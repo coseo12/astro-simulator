@@ -1,0 +1,29 @@
+
+# Harness 로그 (상태 파일은 추적)
+.harness/logs/
+
+# Node.js
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# 빌드 산출물
+dist/
+build/
+
+# 환경 변수
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 에디터
+.vscode/
+.idea/
+*.swp
+

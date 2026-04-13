@@ -1,0 +1,30 @@
+{
+  "env": {
+    "HARNESS_AGENTS_DIR": ".claude/agents",
+    "HARNESS_SKILLS_DIR": ".claude/skills",
+    "HARNESS_STATE_DIR": ".harness"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(gh issue *)",
+      "Bash(gh pr *)",
+      "Bash(gh label *)",
+      "Bash(cat .harness/*)",
+      "Bash(mkdir -p *)",
+      "Bash(ls *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '<critical_rules source=\"CLAUDE.md\">\\n이 세션에서 다음 규칙은 예외 없이 적용됩니다 (CLAUDE.md 최상단 CRITICAL DIRECTIVES 참조):\\n1. main 브랜치 직접 수정/푸시 금지 — PR로만 반영\\n2. 모호한 지시(\"리뉴얼\"/\"셋팅해줘\" 등)는 작업 전 범위 확인\\n3. UI 작업은 빌드 통과 후에도 브라우저 3단계 검증(정적/인터랙션/흐름)\\n4. 한국어 파일 Edit 후 U+FFFD 검증\\n5. rm -rf/force-push 등 파괴적 작업은 사전 경고\\n6. 구현 전 스프린트 계약(검증 가능한 완료 기준) 합의\\n첫 작업 시작 전 위 규칙 중 해당되는 항목이 있는지 자기 점검하세요.\\n</critical_rules>\\n'"
+          }
+        ]
+      }
+    ]
+  }
+}

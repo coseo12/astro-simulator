@@ -1,0 +1,20 @@
+# Harness Framework 핵심 파일 — 변경 시 추가 승인 필요
+
+# 프레임워크 전역 규칙
+/CLAUDE.md @framework-admin
+
+# 에이전트 정의 변경
+/.claude/agents/ @framework-admin
+
+# 스킬 정의 변경
+/.claude/skills/ @framework-admin
+
+# 스크립트 변경
+/scripts/ @framework-admin
+
+# CI/CD 변경
+/.github/workflows/ @framework-admin
+
+# 보안 관련
+/docs/security.md @framework-admin
+/.github/CODEOWNERS @framework-admin

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  detect-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node.js 프로젝트 감지
+      - name: Node.js 테스트
+        if: hashFiles('package.json') != ''
+        run: |
+          node_version=$(jq -r '.engines.node // "20"' package.json | grep -oE '[0-9]+' | head -1)
+          echo "Node.js ${node_version} 사용"
+        # Node 설정은 프로젝트별로 추가
+
+      # Python 프로젝트 감지
+      - name: Python 테스트
+        if: hashFiles('pyproject.toml') != '' || hashFiles('setup.py') != ''
+        run: |
+          echo "Python 프로젝트 감지됨"
+        # Python 설정은 프로젝트별로 추가
+
+      # Go 프로젝트 감지
+      - name: Go 테스트
+        if: hashFiles('go.mod') != ''
+        run: |
+          echo "Go 프로젝트 감지됨"
+        # Go 설정은 프로젝트별로 추가
+
+      # Rust 프로젝트 감지
+      - name: Rust 테스트
+        if: hashFiles('Cargo.toml') != ''
+        run: |
+          echo "Rust 프로젝트 감지됨"
+        # Rust 설정은 프로젝트별로 추가
+
+      # Makefile 기반
+      - name: Make 테스트
+        if: hashFiles('Makefile') != ''
+        run: |
+          if grep -q "^test:" Makefile; then
+            make test
+          fi

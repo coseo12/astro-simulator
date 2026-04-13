@@ -1,0 +1,45 @@
+{
+  "project": "e-commerce",
+  "created_at": "2026-04-13T05:51:46Z",
+  "current_phase": "planning",
+  "agents": {
+    "orchestrator": {
+      "status": "idle",
+      "current_task": null
+    },
+    "planner": {
+      "status": "idle",
+      "current_task": null
+    },
+    "pm": {
+      "status": "idle",
+      "current_task": null
+    },
+    "architect": {
+      "status": "idle",
+      "current_task": null
+    },
+    "frontend-developers": [],
+    "backend-developers": [],
+    "developers": [],
+    "reviewer": {
+      "status": "idle",
+      "current_task": null
+    },
+    "qa": {
+      "status": "idle",
+      "current_task": null
+    },
+    "auditor": {
+      "status": "idle",
+      "current_task": null
+    },
+    "integrator": {
+      "status": "idle",
+      "current_task": null
+    }
+  },
+  "issues": [],
+  "pull_requests": [],
+  "blocked": []
+}
