@@ -34,8 +34,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         sceneApi.enableLogarithmicDepth(instance.scene);
         const camera = sceneApi.setupArcRotateCamera(instance.scene, { radius: 35 });
         const controller = new sceneApi.CameraController(camera, instance.scene);
+        // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
+        const beltParam = new URLSearchParams(window.location.search).get('belt');
+        const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: useSimStore.getState().physicsEngine,
+          asteroidBeltN: beltN,
         });
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));

@@ -14,6 +14,7 @@ import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-sys
 import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
 import { NBodyEngine, buildInitialState } from '../physics/nbody-engine.js';
+import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 
 /**
  * 씬 단위: 1 scene unit = 1 AU.
@@ -53,6 +54,8 @@ export interface SolarSystemSceneOptions {
   showOrbitLines?: boolean;
   /** 물리 엔진 선택. 기본: 'kepler' (해석해). 'newton'은 #86에서 추가. */
   physicsEngine?: PhysicsEngineKind;
+  /** 소행성대 샘플 수. 0 또는 undefined면 생성 안 함. */
+  asteroidBeltN?: number;
 }
 
 /**
@@ -65,7 +68,12 @@ export function createSolarSystemScene(
   scene: Scene,
   options: SolarSystemSceneOptions = {},
 ): SolarSystemSceneHandles {
-  const { initialJulianDate = J2000_JD, showOrbitLines = true, physicsEngine = 'kepler' } = options;
+  const {
+    initialJulianDate = J2000_JD,
+    showOrbitLines = true,
+    physicsEngine = 'kepler',
+    asteroidBeltN = 0,
+  } = options;
   const SECONDS_PER_DAY = 86_400;
 
   const system = getSolarSystem();
@@ -189,6 +197,9 @@ export function createSolarSystemScene(
       sunWorld[1] * SCENE_UNIT_PER_METER,
       sunWorld[2] * SCENE_UNIT_PER_METER,
     );
+
+    // 소행성대 업데이트 — Kepler 경로와 동일한 jd 사용 (Newton 모드에서도 belt는 Kepler).
+    asteroidBelt?.updateAt(jd);
   };
 
   const updateAtKepler = (jd: number) => {
@@ -239,6 +250,16 @@ export function createSolarSystemScene(
   const setOrbitLinesVisible = (visible: boolean) => {
     if (orbitLines) orbitLines.isVisible = visible;
   };
+
+  // 소행성대 (#99) — Kepler 경로 전용. ThinInstances 단일 draw call.
+  let asteroidBelt: AsteroidBeltHandles | null = null;
+  if (asteroidBeltN > 0) {
+    asteroidBelt = createAsteroidBelt(scene, {
+      n: asteroidBeltN,
+      epoch: initialJulianDate,
+    });
+    disposables.push({ dispose: () => asteroidBelt?.dispose() });
+  }
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
     if (kind === activeEngine) return;

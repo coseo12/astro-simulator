@@ -49,7 +49,9 @@ const measureFps = (durationMs) =>
     durationMs,
   );
 
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+// 경로 쿼리는 BENCH_PATH 환경변수로 추가 가능 (예: /ko?belt=200)
+const path = process.env.BENCH_PATH ?? '/ko';
+await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 
 const steps = [
