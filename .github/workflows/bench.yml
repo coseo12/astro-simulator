@@ -30,6 +30,15 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: wasm-pack 설치
+        run: cargo install wasm-pack --version 0.14.0 --locked
+
       - name: 의존성 설치
         run: pnpm install --frozen-lockfile
 
