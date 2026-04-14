@@ -25,16 +25,23 @@
       "import": "./dist/constants/index.js"
     }
   },
-  "files": ["dist", "src", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
     "clean": "rm -rf dist .tsbuildinfo",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src"
   },
   "devDependencies": {
-    "typescript": "^6.0.0"
+    "@vitest/coverage-v8": "^4.1.4",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.4"
   },
   "sideEffects": false
 }

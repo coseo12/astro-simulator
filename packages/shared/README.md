@@ -4,11 +4,11 @@ core와 web 양쪽에서 공유하는 타입/상수/이벤트 정의.
 
 ## 모듈
 
-| 서브패스 | 내용 |
-|---|---|
-| `@astro-simulator/shared/types` | DataTier, CelestialKind, CelestialBody, OrbitalElements, SimMode |
-| `@astro-simulator/shared/constants` | 물리 상수(G, c), 천문 단위(AU, ly, pc), 태양계 기본값 |
-| `@astro-simulator/shared/events` | CoreEvents 타입 맵, CoreCommand 판별식 유니온 |
+| 서브패스                            | 내용                                                             |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `@astro-simulator/shared/types`     | DataTier, CelestialKind, CelestialBody, OrbitalElements, SimMode |
+| `@astro-simulator/shared/constants` | 물리 상수(G, c), 천문 단위(AU, ly, pc), 태양계 기본값            |
+| `@astro-simulator/shared/events`    | CoreEvents 타입 맵, CoreCommand 판별식 유니온                    |
 
 ## 원칙
 

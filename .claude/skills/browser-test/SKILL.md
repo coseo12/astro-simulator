@@ -28,6 +28,7 @@ npx agent-browser open https://example.com
 ```
 
 설치 확인 스크립트:
+
 ```bash
 .claude/skills/browser-test/scripts/check-browser.sh
 ```
@@ -35,6 +36,7 @@ npx agent-browser open https://example.com
 ## 핵심 명령어
 
 ### 페이지 열기 및 탐색
+
 ```bash
 agent-browser open <url>          # URL 열기
 agent-browser back                # 뒤로 가기
@@ -44,6 +46,7 @@ agent-browser get title           # 페이지 제목
 ```
 
 ### 접근성 트리 스냅샷 (AI 최적화)
+
 ```bash
 agent-browser snapshot            # 전체 접근성 트리 (ref 포함)
 agent-browser snapshot -i         # 상호작용 가능한 요소만
@@ -52,6 +55,7 @@ agent-browser snapshot --json     # JSON 형식
 ```
 
 스냅샷 출력 예시:
+
 ```
 - button "Submit" [ref=e2]
 - textbox "Email" [ref=e3]
@@ -59,6 +63,7 @@ agent-browser snapshot --json     # JSON 형식
 ```
 
 ### ref 기반 인터랙션
+
 ```bash
 agent-browser click @e2           # ref로 클릭
 agent-browser fill @e3 "text"     # ref로 입력
@@ -66,6 +71,7 @@ agent-browser hover @e5           # ref로 호버
 ```
 
 ### CSS 선택자 기반 인터랙션
+
 ```bash
 agent-browser click "#submit-btn"
 agent-browser fill "input[name=email]" "test@test.com"
@@ -74,6 +80,7 @@ agent-browser check "#agree"
 ```
 
 ### 의미론적 선택자
+
 ```bash
 agent-browser find role button click --name "Submit"
 agent-browser find text "로그인" click
@@ -81,6 +88,7 @@ agent-browser find label "이메일" fill "test@test.com"
 ```
 
 ### 스크린샷
+
 ```bash
 agent-browser screenshot result.png           # 현재 화면
 agent-browser screenshot --full page.png      # 전체 페이지
@@ -88,6 +96,7 @@ agent-browser screenshot --annotate anno.png  # 요소 번호 표시
 ```
 
 ### 대기
+
 ```bash
 agent-browser wait "#loading"                 # 요소 표시 대기
 agent-browser wait --text "완료"              # 텍스트 출현 대기
@@ -96,6 +105,7 @@ agent-browser wait 2000                       # 2초 대기
 ```
 
 ### 정보 조회
+
 ```bash
 agent-browser get text "#message"             # 텍스트 내용
 agent-browser get value "#input-field"        # 입력값
@@ -196,6 +206,7 @@ agent-browser errors
 ```
 
 **hydration mismatch 발생 원인 (주의 패턴)**:
+
 - `new Date()`, `Date.now()` — 렌더 함수에서 직접 호출 금지, `useEffect` 내에서만 사용
 - `Math.random()` — 서버/클라이언트 결과가 다름
 - `window`, `document`, `localStorage` — 서버에 존재하지 않는 API
@@ -230,25 +241,30 @@ agent-browser session list
 ## 보안 규칙 (필수)
 
 ### 도메인 제한
+
 에이전트가 접속할 수 있는 도메인을 반드시 제한한다:
+
 ```bash
 # 허용 도메인만 접근 (프로젝트별 설정)
 agent-browser --allowed-domains "localhost,*.preview.app.com" open <url>
 ```
 
 ### 금지 사항
+
 - **프로덕션 URL 직접 접근 금지** — 반드시 프리뷰/스테이징 환경만 사용
 - **인증 정보 하드코딩 금지** — `agent-browser auth vault` 사용
 - **결제/삭제 등 파괴적 액션 금지** — `--confirm-actions "submit,delete"` 사용
 - **호스트 네트워크의 내부 서비스 접근 금지** — SSRF 방지
 
 ### 에이전트별 세션 격리
+
 ```bash
 # 각 에이전트는 독립 세션을 사용한다
 agent-browser --session ${AGENT_NAME}-${TASK_NUMBER} open <url>
 ```
 
 ### 인증 관리
+
 ```bash
 # 인증 정보는 암호화 저장
 agent-browser auth save staging --url https://staging.app.com/login
@@ -261,11 +277,11 @@ agent-browser auth login staging
 
 아래 상황에서는 Playwright로 전환한다:
 
-| 상황 | agent-browser 증상 | Playwright 해결 |
-|------|-------------------|----------------|
-| 동적 마운트 컴포넌트 | `click` 후 상태 변화 없음 | auto-waiting으로 마운트 대기 후 클릭 |
-| React controlled input | `fill` 후 state 미갱신 | input/change 이벤트 순차 발생 |
-| form submit | `click` 후 서버에 요청 미도달 | 정상적 form submission 이벤트 체인 |
+| 상황                   | agent-browser 증상            | Playwright 해결                      |
+| ---------------------- | ----------------------------- | ------------------------------------ |
+| 동적 마운트 컴포넌트   | `click` 후 상태 변화 없음     | auto-waiting으로 마운트 대기 후 클릭 |
+| React controlled input | `fill` 후 state 미갱신        | input/change 이벤트 순차 발생        |
+| form submit            | `click` 후 서버에 요청 미도달 | 정상적 form submission 이벤트 체인   |
 
 **폴백 판단 기준**: agent-browser로 액션 수행 후 `snapshot`으로 결과를 확인했을 때 상태 변화가 없으면 Playwright로 재시도한다.
 

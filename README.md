@@ -17,16 +17,16 @@
 
 ## 기술 스택
 
-| 영역 | 선택 |
-|---|---|
-| 렌더 엔진 | Babylon.js (WebGPU-first, WebGL2 폴백) |
-| UI 프레임워크 | Next.js (App Router) |
-| 언어 | TypeScript |
-| 패키지 매니저 | pnpm (workspace 모노레포) |
-| 상태 관리 | Zustand + nuqs + mitt + TanStack Query + zod |
-| 스타일 | Tailwind + Radix Primitives + CVA |
-| 애니메이션 | Framer Motion (LazyMotion) |
-| 테스트 | Vitest + Playwright |
+| 영역          | 선택                                         |
+| ------------- | -------------------------------------------- |
+| 렌더 엔진     | Babylon.js (WebGPU-first, WebGL2 폴백)       |
+| UI 프레임워크 | Next.js (App Router)                         |
+| 언어          | TypeScript                                   |
+| 패키지 매니저 | pnpm (workspace 모노레포)                    |
+| 상태 관리     | Zustand + nuqs + mitt + TanStack Query + zod |
+| 스타일        | Tailwind + Radix Primitives + CVA            |
+| 애니메이션    | Framer Motion (LazyMotion)                   |
+| 테스트        | Vitest + Playwright                          |
 
 ---
 

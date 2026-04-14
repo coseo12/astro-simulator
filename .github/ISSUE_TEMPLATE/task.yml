@@ -1,7 +1,7 @@
 name: 작업 이슈
 description: 에이전트가 처리할 작업 이슈
-title: "[타입] "
-labels: ["status:todo"]
+title: '[타입] '
+labels: ['status:todo']
 body:
   - type: markdown
     attributes:
@@ -63,10 +63,10 @@ body:
     attributes:
       label: 크기
       options:
-        - "size:s (1-2시간)"
-        - "size:m (반나절)"
-        - "size:l (1일)"
-        - "size:xl (2일+)"
+        - 'size:s (1-2시간)'
+        - 'size:m (반나절)'
+        - 'size:l (1일)'
+        - 'size:xl (2일+)'
     validations:
       required: true
 
