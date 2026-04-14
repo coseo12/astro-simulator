@@ -151,6 +151,36 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
     }
   });
 
+  describe('혜성 궤도 요소 공칭값 (JPL SBDB 기반 ±2%)', () => {
+    // 혜성은 태양풍 비중력 효과로 공전 간 약간 변동 — ±2% 여유.
+    const COMET_REF = [
+      { id: 'halley', a_AU: 17.834, e: 0.96714, iDeg: 162.26, periodYears: 75.32 },
+      { id: 'encke', a_AU: 2.2152, e: 0.848, iDeg: 11.78, periodYears: 3.3 },
+      { id: 'swift-tuttle', a_AU: 26.09, e: 0.963, iDeg: 113.45, periodYears: 133.28 },
+    ];
+    for (const ref of COMET_REF) {
+      it(`${ref.id} 장반경 오차 ≤2%`, () => {
+        const body = byId.get(ref.id);
+        const a_AU = (body?.orbit?.semiMajorAxis ?? 0) / AU;
+        expect(Math.abs(a_AU - ref.a_AU) / ref.a_AU).toBeLessThan(0.02);
+      });
+      it(`${ref.id} 이심률/경사 오차 ≤2%`, () => {
+        const body = byId.get(ref.id);
+        const e = body?.orbit?.eccentricity ?? 0;
+        const iDeg = ((body?.orbit?.inclination ?? 0) * 180) / Math.PI;
+        // inclination 부호는 normalize가 [-π, π]로 가져와서 음수일 수 있음 → abs
+        expect(Math.abs(e - ref.e) / ref.e).toBeLessThan(0.02);
+        expect(Math.abs(Math.abs(iDeg) - ref.iDeg) / ref.iDeg).toBeLessThan(0.02);
+      });
+      it(`${ref.id} 공전주기 ≈ ${ref.periodYears}년`, () => {
+        const body = byId.get(ref.id);
+        if (!body?.orbit) throw new Error(ref.id);
+        const periodYears = orbitalPeriod(body.orbit.semiMajorAxis, MU_SUN) / 86_400 / 365.25;
+        expect(Math.abs(periodYears - ref.periodYears) / ref.periodYears).toBeLessThan(0.02);
+      });
+    }
+  });
+
   describe('지구-달 시스템 (부모 중심 좌표)', () => {
     it('달-지구 거리 [356k, 407k] km', () => {
       const moon = byId.get('moon');
