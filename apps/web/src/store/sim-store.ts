@@ -23,6 +23,8 @@ export interface SimStoreState {
   fps: number | null;
   unitSystem: UnitSystem;
   physicsEngine: PhysicsEngineKind;
+  /** 바디 id → 질량 배수 (#107). 1.0 또는 부재는 원래 질량. */
+  massMultipliers: Record<string, number>;
 
   // 개발/디버그용 라운드트립 카운터
   pingCount: number;
@@ -38,6 +40,8 @@ export interface SimStoreState {
   setFps: (fps: number) => void;
   setUnitSystem: (unit: UnitSystem) => void;
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
+  setMassMultiplier: (bodyId: string, multiplier: number) => void;
+  resetMassMultipliers: () => void;
   incrementPing: () => void;
 }
 
@@ -51,6 +55,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   fps: null,
   unitSystem: 'astro',
   physicsEngine: 'kepler',
+  massMultipliers: {},
   pingCount: 0,
   lastPingAt: null,
 
@@ -63,6 +68,14 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setFps: (fps) => set({ fps }),
   setUnitSystem: (unit) => set({ unitSystem: unit }),
   setPhysicsEngine: (kind) => set({ physicsEngine: kind }),
+  setMassMultiplier: (bodyId, multiplier) =>
+    set((state) => {
+      const next = { ...state.massMultipliers };
+      if (multiplier === 1) delete next[bodyId];
+      else next[bodyId] = multiplier;
+      return { massMultipliers: next };
+    }),
+  resetMassMultipliers: () => set({ massMultipliers: {} }),
   incrementPing: () =>
     set((state) => ({
       pingCount: state.pingCount + 1,

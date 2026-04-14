@@ -4,6 +4,7 @@ import { ephemeris as ephemerisApi } from '@astro-simulator/core';
 import { AU } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
 import { TierBadge } from '../ui/tier-badge';
+import { MassSlider } from './mass-slider';
 import { useMemo } from 'react';
 
 const KIND_LABEL: Record<string, string> = {
@@ -84,6 +85,10 @@ export function CelestialInfoPanel() {
           </>
         )}
       </dl>
+
+      <div className="mt-4 pt-3 border-t border-border-subtle">
+        <MassSlider />
+      </div>
     </div>
   );
 }

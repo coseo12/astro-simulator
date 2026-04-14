@@ -40,6 +40,10 @@ export interface SolarSystemSceneHandles {
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   /** 현재 활성 엔진 */
   getPhysicsEngine: () => PhysicsEngineKind;
+  /** 바디 질량 배수 설정. Newton 엔진 재빌드를 유발한다. Kepler 모드에서는 저장만 됨. */
+  setBodyMassMultiplier: (bodyId: string, multiplier: number) => void;
+  /** 모든 배수를 1.0으로 리셋 + Newton 재빌드. */
+  resetMassMultipliers: () => void;
   dispose: () => void;
 }
 
@@ -135,9 +139,15 @@ export function createSolarSystemScene(
   let currentJd = initialJulianDate;
   let newtonIdIndex: Map<string, number> | null = null;
 
+  const massMultipliers = new Map<string, number>();
   const buildNewton = (jd: number) => {
     newtonEngine?.dispose();
     const initial = buildInitialState(system, jd);
+    // 질량 배수 적용 (#107) — 초기 상태 생성 후 Newton 엔진에 주입.
+    for (const [id, mul] of massMultipliers) {
+      const idx = initial.ids.indexOf(id);
+      if (idx >= 0) initial.masses[idx] = (initial.masses[idx] ?? 0) * mul;
+    }
     newtonEngine = new NBodyEngine(initial);
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
     newtonLastJd = jd;
@@ -286,6 +296,17 @@ export function createSolarSystemScene(
   };
   const getPhysicsEngine = () => activeEngine;
 
+  const setBodyMassMultiplier = (bodyId: string, multiplier: number) => {
+    const clamped = Math.max(0.01, Math.min(1000, multiplier));
+    if (clamped === 1) massMultipliers.delete(bodyId);
+    else massMultipliers.set(bodyId, clamped);
+    if (activeEngine === 'newton') buildNewton(currentJd);
+  };
+  const resetMassMultipliers = () => {
+    massMultipliers.clear();
+    if (activeEngine === 'newton') buildNewton(currentJd);
+  };
+
   // 초기 시점 적용
   updateAt(initialJulianDate);
 
@@ -295,6 +316,8 @@ export function createSolarSystemScene(
     setOrbitLinesVisible,
     setPhysicsEngine,
     getPhysicsEngine,
+    setBodyMassMultiplier,
+    resetMassMultipliers,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();

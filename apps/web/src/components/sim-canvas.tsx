@@ -45,9 +45,21 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
+        // + 질량 배수 변경 → setBodyMassMultiplier (#107)
         unsubEngine = useSimStore.subscribe((state, prev) => {
           if (state.physicsEngine !== prev.physicsEngine) {
             solar.setPhysicsEngine(state.physicsEngine);
+          }
+          if (state.massMultipliers !== prev.massMultipliers) {
+            const prevKeys = new Set(Object.keys(prev.massMultipliers));
+            const nextKeys = new Set(Object.keys(state.massMultipliers));
+            // 제거된 키는 1.0으로 복원
+            for (const k of prevKeys) {
+              if (!nextKeys.has(k)) solar.setBodyMassMultiplier(k, 1);
+            }
+            for (const [k, v] of Object.entries(state.massMultipliers)) {
+              if (prev.massMultipliers[k] !== v) solar.setBodyMassMultiplier(k, v);
+            }
           }
         });
         instance.setCameraHandlers(
