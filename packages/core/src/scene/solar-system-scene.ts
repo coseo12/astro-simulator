@@ -203,7 +203,7 @@ function createOrbitLine(body: LoadedCelestialBody, scene: Scene): Mesh | null {
   if (!body.orbit || !body.parentId) return null;
   const orbit = body.orbit;
   // 궤도 한 바퀴 샘플링 (진근점각 기준 등간격)
-  const segments = 180;
+  const segments = 64; // 성능 최적화 (P1 E3)
   const points: Vector3[] = [];
 
   const cosO = Math.cos(orbit.longitudeOfAscendingNode);
