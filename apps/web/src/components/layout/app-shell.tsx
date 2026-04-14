@@ -11,6 +11,7 @@ import { TimeControls } from './time-controls';
 import { DateTimePicker } from './date-time-picker';
 import { UnitToggle } from './unit-toggle';
 import { PhysicsEngineToggle } from './physics-engine-toggle';
+import { BookmarkButton } from './bookmark-button';
 import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 
@@ -35,6 +36,7 @@ export function AppShell() {
               <DateTimePicker />
               <UnitToggle />
               <PhysicsEngineToggle />
+              <BookmarkButton />
             </div>
           }
         />
