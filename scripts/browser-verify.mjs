@@ -78,6 +78,19 @@ if (earthBtn) {
   check('지구 포커스 클릭 시 selected 상태 전환', false, '지구 버튼 못 찾음');
 }
 
+// DateTimePicker / UnitToggle 렌더
+check('DateTimePicker 렌더', (await page.$('[data-testid="datetime-picker"]')) !== null);
+check('UnitToggle 렌더', (await page.$('[data-testid="unit-toggle"]')) !== null);
+
+// UnitToggle 클릭
+const siUnit = await page.$('[data-testid="unit-si"]');
+if (siUnit) {
+  await siUnit.click();
+  await page.waitForTimeout(100);
+  const cls = (await siUnit.getAttribute('class')) ?? '';
+  check('SI 단위 토글 클릭 시 active', cls.includes('bg-primary/25'));
+}
+
 // 모드 전환 — research 클릭
 const researchBtn = await page.$('[data-testid="mode-research"]');
 if (researchBtn) {
@@ -155,6 +168,12 @@ check(
   'en 로케일 전환 — lang 속성',
   (await page.evaluate(() => document.documentElement.lang)) === 'en',
 );
+
+// URL 동기화 검증 — 연구 모드 상태 URL에 반영
+await page.goto(`${baseUrl}/ko?mode=research`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(800);
+const urlMode = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
+check('URL mode=research 복원', urlMode === 'research', `data-mode=${urlMode}`);
 
 // 루트 / → 리다이렉트 확인
 const resp = await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
