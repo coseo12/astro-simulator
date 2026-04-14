@@ -41,6 +41,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             if (mesh) controller.focusOn({ mesh });
           },
           () => controller.reset(35),
+          (radius: number) => {
+            camera.radius = radius;
+          },
         );
       })
       .catch((err: unknown) => {

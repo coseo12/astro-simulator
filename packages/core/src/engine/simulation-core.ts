@@ -25,6 +25,7 @@ export class SimulationCore {
   #lastFrameTime: number | null = null;
   #focusOnHandler: ((bodyId: string) => void) | null = null;
   #resetCameraHandler: (() => void) | null = null;
+  #setRadiusHandler: ((radius: number) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
@@ -52,9 +53,14 @@ export class SimulationCore {
   }
 
   /** 카메라 명령 핸들러 연결 — C6 CameraController와 연결 */
-  setCameraHandlers(focusOn: (bodyId: string) => void, resetCamera: () => void): void {
+  setCameraHandlers(
+    focusOn: (bodyId: string) => void,
+    resetCamera: () => void,
+    setRadius?: (radius: number) => void,
+  ): void {
     this.#focusOnHandler = focusOn;
     this.#resetCameraHandler = resetCamera;
+    this.#setRadiusHandler = setRadius ?? null;
   }
 
   /** 이벤트 구독. */
@@ -98,6 +104,9 @@ export class SimulationCore {
       case 'resetCamera':
         this.#resetCameraHandler?.();
         this.#emitter.emit('bodySelected', { id: null });
+        break;
+      case 'setCameraRadius':
+        this.#setRadiusHandler?.(cmd.radius);
         break;
       case 'setMode':
         this.#emitter.emit('modeChanged', { mode: cmd.mode });
