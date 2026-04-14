@@ -176,6 +176,96 @@
         "longitudeOfPerihelionDeg": 44.96476227,
         "meanLongitudeDeg": -55.12002969
       }
+    },
+    {
+      "id": "ceres",
+      "kind": "dwarf-planet",
+      "nameKo": "세레스",
+      "nameEn": "Ceres",
+      "mass": 9.3835e20,
+      "radius": 4.696e5,
+      "parentId": "sun",
+      "colorHint": { "hex": "#B0A89E" },
+      "orbit": {
+        "semiMajorAxisAU": 2.7653485,
+        "eccentricity": 0.0785,
+        "inclinationDeg": 10.587,
+        "longitudeOfAscendingNodeDeg": 80.3293,
+        "longitudeOfPerihelionDeg": 153.7879,
+        "meanLongitudeDeg": 95.9892
+      }
+    },
+    {
+      "id": "pluto",
+      "kind": "dwarf-planet",
+      "nameKo": "명왕성",
+      "nameEn": "Pluto",
+      "mass": 1.303e22,
+      "radius": 1.1883e6,
+      "parentId": "sun",
+      "colorHint": { "hex": "#C9A27A" },
+      "orbit": {
+        "semiMajorAxisAU": 39.48211675,
+        "eccentricity": 0.2488273,
+        "inclinationDeg": 17.14001206,
+        "longitudeOfAscendingNodeDeg": 110.30393684,
+        "longitudeOfPerihelionDeg": 224.06891629,
+        "meanLongitudeDeg": 238.92903833
+      }
+    },
+    {
+      "id": "haumea",
+      "kind": "dwarf-planet",
+      "nameKo": "하우메아",
+      "nameEn": "Haumea",
+      "mass": 4.006e21,
+      "radius": 7.8e5,
+      "parentId": "sun",
+      "colorHint": { "hex": "#D9D2C5" },
+      "orbit": {
+        "semiMajorAxisAU": 43.13,
+        "eccentricity": 0.19126,
+        "inclinationDeg": 28.2137,
+        "longitudeOfAscendingNodeDeg": 121.9056,
+        "longitudeOfPerihelionDeg": 0.9119,
+        "meanLongitudeDeg": 205.8075
+      }
+    },
+    {
+      "id": "makemake",
+      "kind": "dwarf-planet",
+      "nameKo": "마케마케",
+      "nameEn": "Makemake",
+      "mass": 3.1e21,
+      "radius": 7.15e5,
+      "parentId": "sun",
+      "colorHint": { "hex": "#E4A57E" },
+      "orbit": {
+        "semiMajorAxisAU": 45.791,
+        "eccentricity": 0.1559,
+        "inclinationDeg": 29.004,
+        "longitudeOfAscendingNodeDeg": 79.366,
+        "longitudeOfPerihelionDeg": 296.503,
+        "meanLongitudeDeg": 165.514
+      }
+    },
+    {
+      "id": "eris",
+      "kind": "dwarf-planet",
+      "nameKo": "에리스",
+      "nameEn": "Eris",
+      "mass": 1.66e22,
+      "radius": 1.163e6,
+      "parentId": "sun",
+      "colorHint": { "hex": "#DAD9D4" },
+      "orbit": {
+        "semiMajorAxisAU": 67.864,
+        "eccentricity": 0.43607,
+        "inclinationDeg": 44.0404,
+        "longitudeOfAscendingNodeDeg": 36.0139,
+        "longitudeOfPerihelionDeg": 186.0223,
+        "meanLongitudeDeg": 204.16
+      }
     }
   ]
 }
