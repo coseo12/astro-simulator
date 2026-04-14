@@ -31,3 +31,4 @@ Thumbs.db
 # TypeScript 빌드 캐시
 *.tsbuildinfo
 
+.verify-screenshots/
