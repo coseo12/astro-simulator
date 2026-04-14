@@ -12,7 +12,7 @@ import {
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
-import { add, type Vec3Double } from '../coords/vec3.js';
+import { add } from '../coords/vec3.js';
 
 /**
  * 씬 단위: 1 scene unit = 1 AU.
@@ -94,38 +94,57 @@ export function createSolarSystemScene(
     }
   }
 
-  /** 각 바디의 부모 기준 로컬 좌표 (m) */
-  const localPositions = new Map<string, Vec3Double>();
+  // 재사용 버퍼 — 프레임당 Map/Vec3 재할당을 피한다 (#76).
+  // Vec3Double은 readonly 튜플이라 내부 계산 버퍼는 mutable tuple로 유지.
+  type MutVec3 = [number, number, number];
+  const localPositions = new Map<string, MutVec3>();
+  const worldPositions = new Map<string, MutVec3>();
+  const ZERO: MutVec3 = [0, 0, 0];
+  for (const body of system.bodies) {
+    localPositions.set(body.id, [0, 0, 0]);
+    worldPositions.set(body.id, [0, 0, 0]);
+  }
+  const resolved = new Set<string>();
 
   const updateAt = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
-    localPositions.clear();
     for (const body of system.bodies) {
+      const buf = localPositions.get(body.id)!;
       if (!body.orbit || !body.parentId) {
-        localPositions.set(body.id, [0, 0, 0]);
+        buf[0] = 0;
+        buf[1] = 0;
+        buf[2] = 0;
         continue;
       }
       const parent = bodiesById.get(body.parentId);
       if (!parent) continue;
       const mu = GRAVITATIONAL_CONSTANT * parent.mass;
-      localPositions.set(body.id, positionAt(body.orbit, jd, mu));
+      const p = positionAt(body.orbit, jd, mu);
+      buf[0] = p[0];
+      buf[1] = p[1];
+      buf[2] = p[2];
     }
 
     // 2) 월드 절대 좌표 — 부모 체인 누적 (태양이 원점)
-    const worldPositions = new Map<string, Vec3Double>();
-    const resolveWorld = (id: string): Vec3Double => {
-      const cached = worldPositions.get(id);
-      if (cached) return cached;
+    resolved.clear();
+    const resolveWorld = (id: string): MutVec3 => {
+      if (resolved.has(id)) return worldPositions.get(id) ?? ZERO;
       const body = bodiesById.get(id);
-      if (!body) return [0, 0, 0];
-      const local = localPositions.get(id) ?? [0, 0, 0];
+      if (!body) return ZERO;
+      const local = localPositions.get(id) ?? ZERO;
+      const world = worldPositions.get(id)!;
       if (!body.parentId) {
-        worldPositions.set(id, local);
-        return local;
+        world[0] = local[0];
+        world[1] = local[1];
+        world[2] = local[2];
+      } else {
+        const parentWorld = resolveWorld(body.parentId);
+        const sum = add(parentWorld, local);
+        world[0] = sum[0];
+        world[1] = sum[1];
+        world[2] = sum[2];
       }
-      const parentWorld = resolveWorld(body.parentId);
-      const world = add(parentWorld, local);
-      worldPositions.set(id, world);
+      resolved.add(id);
       return world;
     };
     for (const body of system.bodies) resolveWorld(body.id);
