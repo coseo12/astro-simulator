@@ -2,50 +2,40 @@
 
 import { SimulationCore, scene as sceneApi } from '@astro-simulator/core';
 import { attachCoreToStore } from '@/core/core-adapter';
-import { useSimStore } from '@/store/sim-store';
-import { useEffect, useRef } from 'react';
-
-const FOCUS_BUTTONS = [
-  { id: 'sun', label: '태양' },
-  { id: 'earth', label: '지구' },
-  { id: 'jupiter', label: '목성' },
-  { id: 'neptune', label: '해왕성' },
-];
+import { SimCommandProvider } from '@/core/sim-context';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /**
- * Babylon 캔버스 래퍼.
+ * Babylon 캔버스 + Core 초기화.
+ * 캔버스 위의 UI는 children/overlay에서 렌더 — 이 컴포넌트는 엔진 lifecycle에만 집중.
  */
-export function SimCanvas() {
+export function SimCanvas({ children }: { children?: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreRef = useRef<SimulationCore | null>(null);
-
-  const renderer = useSimStore((s) => s.rendererKind);
-  const engineError = useSimStore((s) => s.engineError);
-  const julianDate = useSimStore((s) => s.julianDate);
-  const selected = useSimStore((s) => s.selectedBodyId);
+  const [core, setCore] = useState<SimulationCore | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (coreRef.current && !coreRef.current.disposed) return;
 
-    const core = new SimulationCore(canvas);
-    coreRef.current = core;
-    const detach = attachCoreToStore(core);
+    const instance = new SimulationCore(canvas);
+    coreRef.current = instance;
+    setCore(instance);
+    const detach = attachCoreToStore(instance);
 
     let cancelled = false;
-    core
+    instance
       .start()
       .then(() => {
-        if (cancelled || !core.scene) return;
-        sceneApi.enableLogarithmicDepth(core.scene);
-        const camera = sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
-        const controller = new sceneApi.CameraController(camera, core.scene);
-        const solar = sceneApi.createSolarSystemScene(core.scene);
+        if (cancelled || !instance.scene) return;
+        sceneApi.enableLogarithmicDepth(instance.scene);
+        const camera = sceneApi.setupArcRotateCamera(instance.scene, { radius: 35 });
+        const controller = new sceneApi.CameraController(camera, instance.scene);
+        const solar = sceneApi.createSolarSystemScene(instance.scene);
 
-        core.on('timeChanged', ({ julianDate: jd }) => solar.updateAt(jd));
-
-        core.setCameraHandlers(
+        instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
+        instance.setCameraHandlers(
           (bodyId: string) => {
             const mesh = solar.meshes.get(bodyId);
             if (mesh) controller.focusOn({ mesh });
@@ -61,70 +51,21 @@ export function SimCanvas() {
     return () => {
       cancelled = true;
       detach();
-      core.dispose();
+      instance.dispose();
       coreRef.current = null;
+      setCore(null);
     };
   }, []);
 
-  const handleFocus = (bodyId: string) => {
-    coreRef.current?.command({ type: 'focusOn', bodyId });
-  };
-
-  const handleReset = () => {
-    coreRef.current?.command({ type: 'resetCamera' });
-  };
-
   return (
-    <div className="relative w-full h-full">
+    <>
       <canvas
         ref={canvasRef}
-        className="block w-full h-full outline-none"
+        data-testid="sim-canvas"
+        className="absolute inset-0 w-full h-full outline-none"
         style={{ touchAction: 'none' }}
       />
-      {/* 우상단 HUD */}
-      <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-        <div className="num text-caption text-fg-secondary bg-bg-surface/80 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
-          {engineError
-            ? `ERR · ${engineError}`
-            : renderer
-              ? `renderer · ${renderer}`
-              : 'initializing…'}
-        </div>
-        {julianDate !== null && (
-          <div className="num text-caption text-fg-secondary bg-bg-surface/80 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
-            JD {julianDate.toFixed(2)}
-          </div>
-        )}
-      </div>
-
-      {/* 좌상단 — 포커스 버튼 (D7 (#26)에서 CelestialTree로 대체) */}
-      <div className="absolute top-2 left-2 flex gap-1">
-        {FOCUS_BUTTONS.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            data-testid={`focus-${b.id}`}
-            onClick={() => handleFocus(b.id)}
-            className={`num text-caption px-2 py-1 rounded-sm border transition-colors ${
-              selected === b.id
-                ? 'bg-primary/20 text-fg-primary border-primary/40'
-                : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'
-            }`}
-            style={{ transitionDuration: 'var(--duration-fast)' }}
-          >
-            {b.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          data-testid="focus-reset"
-          onClick={handleReset}
-          className="num text-caption px-2 py-1 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
-          style={{ transitionDuration: 'var(--duration-fast)' }}
-        >
-          reset
-        </button>
-      </div>
-    </div>
+      <SimCommandProvider core={core}>{children}</SimCommandProvider>
+    </>
   );
 }
