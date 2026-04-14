@@ -21,6 +21,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     if (coreRef.current && !coreRef.current.disposed) return;
 
     const instance = new SimulationCore(canvas);
+    // Babylon이 기본 tabindex=1을 설정 — a11y(WCAG 2.4.3) 권고상 양수 금지.
+    canvas.setAttribute('tabindex', '0');
     coreRef.current = instance;
     setCore(instance);
     const detach = attachCoreToStore(instance);
