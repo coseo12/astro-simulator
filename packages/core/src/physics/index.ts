@@ -14,3 +14,10 @@ export {
   positionAt,
   orbitalPeriod,
 } from './kepler.js';
+export { orbitalStateAt, type StateVector } from './state-vector.js';
+export {
+  NBodyEngine,
+  buildInitialState,
+  type NBodyEngineOptions,
+  type NBodyState,
+} from './nbody-engine.js';

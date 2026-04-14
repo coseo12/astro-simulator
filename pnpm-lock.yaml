@@ -204,6 +204,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@astro-simulator/physics-wasm':
+        specifier: workspace:*
+        version: link:../physics-wasm
       '@astro-simulator/shared':
         specifier: workspace:*
         version: link:../shared

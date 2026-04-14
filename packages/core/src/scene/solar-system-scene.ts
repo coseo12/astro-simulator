@@ -13,6 +13,7 @@ import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
+import { NBodyEngine, buildInitialState } from '../physics/nbody-engine.js';
 
 /**
  * 씬 단위: 1 scene unit = 1 AU.
@@ -39,11 +40,15 @@ export interface SolarSystemSceneHandles {
   dispose: () => void;
 }
 
+export type PhysicsEngineKind = 'kepler' | 'newton';
+
 export interface SolarSystemSceneOptions {
   /** 초기 시각 (Julian Date). 기본: J2000.0 */
   initialJulianDate?: number;
   /** 궤도선 초기 가시성. 기본: true */
   showOrbitLines?: boolean;
+  /** 물리 엔진 선택. 기본: 'kepler' (해석해). 'newton'은 #86에서 추가. */
+  physicsEngine?: PhysicsEngineKind;
 }
 
 /**
@@ -56,7 +61,8 @@ export function createSolarSystemScene(
   scene: Scene,
   options: SolarSystemSceneOptions = {},
 ): SolarSystemSceneHandles {
-  const { initialJulianDate = J2000_JD, showOrbitLines = true } = options;
+  const { initialJulianDate = J2000_JD, showOrbitLines = true, physicsEngine = 'kepler' } = options;
+  const SECONDS_PER_DAY = 86_400;
 
   const system = getSolarSystem();
   const bodiesById = new Map(system.bodies.map((b) => [b.id, b]));
@@ -112,7 +118,62 @@ export function createSolarSystemScene(
   }
   const resolved = new Set<string>();
 
+  // Newton 경로 — 호출 시 초기 상태 빌드 후 updateAt(jd)에서 Δt만큼 적분.
+  let newtonEngine: NBodyEngine | null = null;
+  let newtonLastJd = initialJulianDate;
+  let newtonIdIndex: Map<string, number> | null = null;
+  if (physicsEngine === 'newton') {
+    const initial = buildInitialState(system, initialJulianDate);
+    newtonEngine = new NBodyEngine(initial);
+    newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
+    disposables.push({ dispose: () => newtonEngine?.dispose() });
+  }
+
   const updateAt = (jd: number) => {
+    if (newtonEngine && newtonIdIndex) {
+      const dtSec = (jd - newtonLastJd) * SECONDS_PER_DAY;
+      if (dtSec !== 0) {
+        newtonEngine.advance(dtSec);
+        newtonLastJd = jd;
+      }
+      const flat = newtonEngine.positions();
+      for (const body of system.bodies) {
+        const idx = newtonIdIndex.get(body.id);
+        const world = worldPositions.get(body.id)!;
+        if (idx == null) {
+          world[0] = 0;
+          world[1] = 0;
+          world[2] = 0;
+          continue;
+        }
+        world[0] = flat[3 * idx] ?? 0;
+        world[1] = flat[3 * idx + 1] ?? 0;
+        world[2] = flat[3 * idx + 2] ?? 0;
+      }
+    } else {
+      updateAtKepler(jd);
+    }
+
+    // 메쉬 위치 갱신 (미터 → 씬 단위)
+    for (const [id, world] of worldPositions) {
+      const mesh = meshes.get(id);
+      if (!mesh) continue;
+      mesh.position.set(
+        world[0] * SCENE_UNIT_PER_METER,
+        world[1] * SCENE_UNIT_PER_METER,
+        world[2] * SCENE_UNIT_PER_METER,
+      );
+    }
+
+    const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
+    sunLight.position.set(
+      sunWorld[0] * SCENE_UNIT_PER_METER,
+      sunWorld[1] * SCENE_UNIT_PER_METER,
+      sunWorld[2] * SCENE_UNIT_PER_METER,
+    );
+  };
+
+  const updateAtKepler = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
     for (const body of system.bodies) {
       const buf = localPositions.get(body.id)!;
@@ -154,25 +215,7 @@ export function createSolarSystemScene(
       return world;
     };
     for (const body of system.bodies) resolveWorld(body.id);
-
-    // 3) 메쉬 위치 갱신 (미터 → 씬 단위)
-    for (const [id, world] of worldPositions) {
-      const mesh = meshes.get(id);
-      if (!mesh) continue;
-      mesh.position.set(
-        world[0] * SCENE_UNIT_PER_METER,
-        world[1] * SCENE_UNIT_PER_METER,
-        world[2] * SCENE_UNIT_PER_METER,
-      );
-    }
-
-    // 4) 태양 포인트 라이트를 태양 위치로 이동 (태양 이동은 없지만 안전장치)
-    const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
-    sunLight.position.set(
-      sunWorld[0] * SCENE_UNIT_PER_METER,
-      sunWorld[1] * SCENE_UNIT_PER_METER,
-      sunWorld[2] * SCENE_UNIT_PER_METER,
-    );
+    // 메쉬 위치·광원 업데이트는 호출자(updateAt)가 worldPositions에서 공통 수행.
   };
 
   const setOrbitLinesVisible = (visible: boolean) => {
