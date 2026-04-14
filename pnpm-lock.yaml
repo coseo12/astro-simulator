@@ -36,7 +36,20 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
 
+  packages/core:
+    dependencies:
+      '@babylonjs/core':
+        specifier: ^8.0.0
+        version: 8.56.2
+    devDependencies:
+      typescript:
+        specifier: ^6.0.0
+        version: 6.0.2
+
 packages:
+
+  '@babylonjs/core@8.56.2':
+    resolution: {integrity: sha512-UShs1pt8tSTLYOoITWclXPNrUZUpuHvB2Ur2L1D+uM8c9qaAYOi9gjkurOkQwIlbPGqwQHWImGEyiyix0mQ1dg==}
 
   '@emnapi/runtime@1.9.2':
     resolution: {integrity: sha512-3U4+MIWHImeyu1wnmVygh5WlgfYDtyf0k8AbLhMFxOipihf6nrWC4syIm/SwEeec0mNSafiiNnMJwbza/Is6Lw==}
@@ -606,6 +619,8 @@ packages:
       react: ^17.0.0 || ^18.0.0 || >=19.0.0-rc <19.0.0 || ^19.0.0
 
 snapshots:
+
+  '@babylonjs/core@8.56.2': {}
 
   '@emnapi/runtime@1.9.2':
     dependencies:
