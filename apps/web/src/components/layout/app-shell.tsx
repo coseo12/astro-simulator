@@ -8,6 +8,9 @@ import { ModeSwitcher } from './mode-switcher';
 import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
+import { DateTimePicker } from './date-time-picker';
+import { UnitToggle } from './unit-toggle';
+import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 
 /**
@@ -26,7 +29,14 @@ export function AppShell() {
               <FocusQuickButtons />
             </div>
           }
+          right={
+            <div className="flex items-center gap-2">
+              <DateTimePicker />
+              <UnitToggle />
+            </div>
+          }
         />
+        <UrlSync />
         <HudCorners />
         <SidePanels />
         <ScaleControl />

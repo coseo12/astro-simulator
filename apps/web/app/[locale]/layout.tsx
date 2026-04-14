@@ -1,6 +1,7 @@
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { notFound } from 'next/navigation';
 import { JetBrains_Mono, Space_Grotesk } from 'next/font/google';
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { routing } from '@/i18n/routing';
 import type { ReactNode } from 'react';
 import 'pretendard/dist/web/variable/pretendardvariable.css';
@@ -47,7 +48,9 @@ export default async function LocaleLayout({
       data-mode="observe"
     >
       <body>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NuqsAdapter>
+          <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        </NuqsAdapter>
       </body>
     </html>
   );
