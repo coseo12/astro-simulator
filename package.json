@@ -27,7 +27,8 @@
     "lint:core": "eslint packages/core/src",
     "lint:shared": "eslint packages/shared/src",
     "check-encoding": "bash scripts/check-encoding.sh",
-    "verify:browser": "node scripts/browser-verify.mjs"
+    "verify:browser": "node scripts/browser-verify.mjs",
+    "verify:scale": "node scripts/browser-verify-scale.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
