@@ -5,10 +5,15 @@ import { attachCoreToStore } from '@/core/core-adapter';
 import { useSimStore } from '@/store/sim-store';
 import { useEffect, useRef } from 'react';
 
+const FOCUS_BUTTONS = [
+  { id: 'sun', label: '태양' },
+  { id: 'earth', label: '지구' },
+  { id: 'jupiter', label: '목성' },
+  { id: 'neptune', label: '해왕성' },
+];
+
 /**
  * Babylon 캔버스 래퍼.
- * - SSR 우회는 `SimCanvasDynamic` (sim-canvas.dynamic.tsx) 사용
- * - StrictMode 이중 마운트 대응: 초기화 가드 + dispose
  */
 export function SimCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -16,18 +21,16 @@ export function SimCanvas() {
 
   const renderer = useSimStore((s) => s.rendererKind);
   const engineError = useSimStore((s) => s.engineError);
-  const pingCount = useSimStore((s) => s.pingCount);
-  const incrementPing = useSimStore((s) => s.incrementPing);
+  const julianDate = useSimStore((s) => s.julianDate);
+  const selected = useSimStore((s) => s.selectedBodyId);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     if (coreRef.current && !coreRef.current.disposed) return;
 
     const core = new SimulationCore(canvas);
     coreRef.current = core;
-
     const detach = attachCoreToStore(core);
 
     let cancelled = false;
@@ -36,11 +39,19 @@ export function SimCanvas() {
       .then(() => {
         if (cancelled || !core.scene) return;
         sceneApi.enableLogarithmicDepth(core.scene);
-        sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
-        // 태양계 씬 + 시간 컨트롤러 연결
+        const camera = sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
+        const controller = new sceneApi.CameraController(camera, core.scene);
         const solar = sceneApi.createSolarSystemScene(core.scene);
-        const onTime = ({ julianDate }: { julianDate: number }) => solar.updateAt(julianDate);
-        core.on('timeChanged', onTime);
+
+        core.on('timeChanged', ({ julianDate: jd }) => solar.updateAt(jd));
+
+        core.setCameraHandlers(
+          (bodyId: string) => {
+            const mesh = solar.meshes.get(bodyId);
+            if (mesh) controller.focusOn({ mesh });
+          },
+          () => controller.reset(35),
+        );
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -55,12 +66,12 @@ export function SimCanvas() {
     };
   }, []);
 
-  const handlePing = () => {
-    const core = coreRef.current;
-    if (!core) return;
-    // 라운드트립 테스트 — UI에서 store 업데이트, Core로 명령 발행
-    incrementPing();
-    core.command({ type: 'setMode', mode: 'observe' });
+  const handleFocus = (bodyId: string) => {
+    coreRef.current?.command({ type: 'focusOn', bodyId });
+  };
+
+  const handleReset = () => {
+    coreRef.current?.command({ type: 'resetCamera' });
   };
 
   return (
@@ -70,7 +81,7 @@ export function SimCanvas() {
         className="block w-full h-full outline-none"
         style={{ touchAction: 'none' }}
       />
-      {/* 개발용 HUD — D1 (#20)에서 정식 HUD로 대체 */}
+      {/* 우상단 HUD */}
       <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
         <div className="num text-caption text-fg-secondary bg-bg-surface/80 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
           {engineError
@@ -79,13 +90,39 @@ export function SimCanvas() {
               ? `renderer · ${renderer}`
               : 'initializing…'}
         </div>
+        {julianDate !== null && (
+          <div className="num text-caption text-fg-secondary bg-bg-surface/80 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
+            JD {julianDate.toFixed(2)}
+          </div>
+        )}
+      </div>
+
+      {/* 좌상단 — 포커스 버튼 (D7 (#26)에서 CelestialTree로 대체) */}
+      <div className="absolute top-2 left-2 flex gap-1">
+        {FOCUS_BUTTONS.map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            data-testid={`focus-${b.id}`}
+            onClick={() => handleFocus(b.id)}
+            className={`num text-caption px-2 py-1 rounded-sm border transition-colors ${
+              selected === b.id
+                ? 'bg-primary/20 text-fg-primary border-primary/40'
+                : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'
+            }`}
+            style={{ transitionDuration: 'var(--duration-fast)' }}
+          >
+            {b.label}
+          </button>
+        ))}
         <button
           type="button"
-          onClick={handlePing}
-          className="num text-caption text-fg-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 px-2 py-1 rounded-sm transition-colors"
+          data-testid="focus-reset"
+          onClick={handleReset}
+          className="num text-caption px-2 py-1 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
           style={{ transitionDuration: 'var(--duration-fast)' }}
         >
-          ping: {pingCount}
+          reset
         </button>
       </div>
     </div>

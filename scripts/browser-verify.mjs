@@ -50,7 +50,8 @@ check(
   /renderer\s*·\s*(webgpu|webgl2)/.test(hudText ?? ''),
   (hudText ?? '').match(/renderer\s*·\s*\w+/)?.[0] ?? '없음',
 );
-check('ping 버튼 존재', (await page.$('button:has-text("ping:")')) !== null);
+check('포커스 버튼 존재 (지구)', (await page.$('[data-testid="focus-earth"]')) !== null);
+check('reset 버튼 존재', (await page.$('[data-testid="focus-reset"]')) !== null);
 check('언어 ko 설정', (await page.evaluate(() => document.documentElement.lang)) === 'ko');
 check(
   'data-mode=observe',
@@ -61,17 +62,15 @@ await page.screenshot({ path: join(screenshotDir, '01-static-ko.png'), fullPage:
 
 // ===== Level 2: 인터랙션 =====
 console.log('\n[Level 2] 인터랙션 검증');
-const pingBtn = await page.$('button:has-text("ping:")');
-if (pingBtn) {
-  const before = await pingBtn.textContent();
-  await pingBtn.click();
-  await page.waitForTimeout(200);
-  const after = await pingBtn.textContent();
-  const beforeN = parseInt((before ?? '').match(/\d+/)?.[0] ?? '0', 10);
-  const afterN = parseInt((after ?? '').match(/\d+/)?.[0] ?? '0', 10);
-  check('ping 버튼 클릭 시 카운터 증가', afterN === beforeN + 1, `${beforeN} → ${afterN}`);
+const earthBtn = await page.$('[data-testid="focus-earth"]');
+if (earthBtn) {
+  await earthBtn.click();
+  await page.waitForTimeout(500); // 카메라 애니메이션 대기
+  // 버튼이 선택 상태(primary border)로 전환되는지 확인
+  const cls = (await earthBtn.getAttribute('class')) ?? '';
+  check('지구 포커스 클릭 시 selected 상태 전환', cls.includes('border-primary'));
 } else {
-  check('ping 버튼 클릭 시 카운터 증가', false, 'ping 버튼 못 찾음');
+  check('지구 포커스 클릭 시 selected 상태 전환', false, '지구 버튼 못 찾음');
 }
 
 await page.screenshot({ path: join(screenshotDir, '02-interaction.png') });

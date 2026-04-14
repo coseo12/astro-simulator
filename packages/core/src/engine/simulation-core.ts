@@ -23,6 +23,8 @@ export class SimulationCore {
   #emitter: Emitter<CoreEvents> = mitt<CoreEvents>();
   #time: TimeController;
   #lastFrameTime: number | null = null;
+  #focusOnHandler: ((bodyId: string) => void) | null = null;
+  #resetCameraHandler: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
@@ -47,6 +49,12 @@ export class SimulationCore {
 
   get time(): TimeController {
     return this.#time;
+  }
+
+  /** 카메라 명령 핸들러 연결 — C6 CameraController와 연결 */
+  setCameraHandlers(focusOn: (bodyId: string) => void, resetCamera: () => void): void {
+    this.#focusOnHandler = focusOn;
+    this.#resetCameraHandler = resetCamera;
   }
 
   /** 이벤트 구독. */
@@ -84,10 +92,12 @@ export class SimulationCore {
         this.#emitter.emit('timeChanged', { julianDate: cmd.julianDate });
         break;
       case 'focusOn':
-        // C6 (#18)에서 구현
+        this.#focusOnHandler?.(cmd.bodyId);
+        this.#emitter.emit('bodySelected', { id: cmd.bodyId });
         break;
       case 'resetCamera':
-        // C6 (#18)에서 구현
+        this.#resetCameraHandler?.();
+        this.#emitter.emit('bodySelected', { id: null });
         break;
       case 'setMode':
         this.#emitter.emit('modeChanged', { mode: cmd.mode });
