@@ -7,6 +7,8 @@
 
 export { setupArcRotateCamera } from './camera.js';
 export type { ArcCameraOptions } from './camera.js';
+export { CameraController } from './camera-controller.js';
+export type { FocusTarget } from './camera-controller.js';
 export { createSunEarthDemo } from './sun-earth-demo.js';
 export type { SunEarthDemoHandles } from './sun-earth-demo.js';
 export { enableLogarithmicDepth } from './log-depth.js';
