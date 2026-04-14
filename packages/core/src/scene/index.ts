@@ -15,4 +15,10 @@ export { enableLogarithmicDepth } from './log-depth.js';
 export { createNearFarProbe } from './near-far-probe.js';
 export type { NearFarProbeHandles } from './near-far-probe.js';
 export { createSolarSystemScene } from './solar-system-scene.js';
-export type { SolarSystemSceneHandles, SolarSystemSceneOptions } from './solar-system-scene.js';
+export type {
+  SolarSystemSceneHandles,
+  SolarSystemSceneOptions,
+  PhysicsEngineKind,
+} from './solar-system-scene.js';
+export { createAsteroidBelt } from './asteroid-belt.js';
+export type { AsteroidBeltHandles, AsteroidBeltOptions } from './asteroid-belt.js';
