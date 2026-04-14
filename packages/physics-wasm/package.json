@@ -1,0 +1,28 @@
+{
+  "name": "@astro-simulator/physics-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Newton N-body WASM 코어 (Rust + wasm-pack)",
+  "type": "module",
+  "main": "./pkg/physics_wasm.js",
+  "types": "./pkg/physics_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/physics_wasm.d.ts",
+      "default": "./pkg/physics_wasm.js"
+    }
+  },
+  "scripts": {
+    "build": "wasm-pack build --target nodejs --out-dir pkg",
+    "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
+    "clean": "rm -rf pkg pkg-bundler target",
+    "prebuild-test": "pnpm build",
+    "test": "pnpm prebuild-test && vitest run",
+    "test:watch": "vitest",
+    "lint": "echo 'lint: cargo clippy 참고'",
+    "typecheck": "echo 'typecheck: TS 없음, cargo check 사용'"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  }
+}
