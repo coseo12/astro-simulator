@@ -6,6 +6,7 @@ import { HudCorners } from './hud-corners';
 import { FocusQuickButtons } from './focus-quick-buttons';
 import { ModeSwitcher } from './mode-switcher';
 import { SidePanels } from './side-panels';
+import { TimeControls } from './time-controls';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 
 /**
@@ -27,7 +28,9 @@ export function AppShell() {
         />
         <HudCorners />
         <SidePanels />
-        <TimeBar />
+        <TimeBar>
+          <TimeControls />
+        </TimeBar>
       </SimCanvasDynamic>
     </div>
   );
