@@ -30,7 +30,8 @@
     "verify:browser": "node scripts/browser-verify.mjs",
     "verify:scale": "node scripts/browser-verify-scale.mjs",
     "verify:mobile": "node scripts/browser-verify-mobile.mjs",
-    "verify:all": "pnpm verify:browser && pnpm verify:mobile && pnpm verify:scale"
+    "verify:all": "pnpm verify:browser && pnpm verify:mobile && pnpm verify:scale && pnpm verify:perf",
+    "verify:perf": "node scripts/browser-verify-perf.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
