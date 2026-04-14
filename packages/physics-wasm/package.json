@@ -8,15 +8,20 @@
   "types": "./pkg/physics_wasm.d.ts",
   "exports": {
     ".": {
-      "types": "./pkg/physics_wasm.d.ts",
-      "default": "./pkg/physics_wasm.js"
+      "node": {
+        "types": "./pkg/physics_wasm.d.ts",
+        "default": "./pkg/physics_wasm.js"
+      },
+      "types": "./pkg-bundler/physics_wasm.d.ts",
+      "default": "./pkg-bundler/physics_wasm.js"
     }
   },
   "scripts": {
-    "build": "wasm-pack build --target nodejs --out-dir pkg",
+    "build": "pnpm build:node && pnpm build:bundler",
+    "build:node": "wasm-pack build --target nodejs --out-dir pkg",
     "build:bundler": "wasm-pack build --target bundler --out-dir pkg-bundler",
     "clean": "rm -rf pkg pkg-bundler target",
-    "prebuild-test": "pnpm build",
+    "prebuild-test": "pnpm build:node",
     "test": "pnpm prebuild-test && vitest run",
     "test:watch": "vitest",
     "lint": "echo 'lint: cargo clippy 참고'",
