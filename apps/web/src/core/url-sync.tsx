@@ -7,6 +7,8 @@ import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from './sim-context';
 
 const MODE_VALUES: SimMode[] = ['observe', 'research', 'education', 'sandbox'];
+const ENGINE_VALUES = ['kepler', 'newton'] as const;
+type PhysicsEngineUrl = (typeof ENGINE_VALUES)[number];
 
 /**
  * URL ↔ 시뮬레이션 상태 동기화.
@@ -29,11 +31,17 @@ export function UrlSync() {
     'speed',
     parseAsFloat.withOptions({ history: 'replace' }),
   );
+  const [urlEngine, setUrlEngine] = useQueryState(
+    'engine',
+    parseAsStringEnum<PhysicsEngineUrl>([...ENGINE_VALUES]).withOptions({ history: 'replace' }),
+  );
 
   const mode = useSimStore((s) => s.mode);
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
   const timeScale = useSimStore((s) => s.timeScale);
+  const physicsEngine = useSimStore((s) => s.physicsEngine);
   const setMode = useSimStore((s) => s.setMode);
+  const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
 
   const sendCommand = useSimCommand();
   const initialized = useRef(false);
@@ -56,6 +64,9 @@ export function UrlSync() {
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
       sendCommand({ type: 'setTimeScale', scale: urlSpeed });
     }
+    if (urlEngine) {
+      setPhysicsEngine(urlEngine);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,6 +85,11 @@ export function UrlSync() {
     if (!initialized.current) return;
     setUrlSpeed(timeScale === 86_400 ? null : timeScale);
   }, [timeScale, setUrlSpeed]);
+
+  useEffect(() => {
+    if (!initialized.current) return;
+    setUrlEngine(physicsEngine === 'kepler' ? null : physicsEngine);
+  }, [physicsEngine, setUrlEngine]);
 
   return null;
 }

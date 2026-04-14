@@ -37,6 +37,10 @@ export interface SolarSystemSceneHandles {
   updateAt: (julianDate: number) => void;
   /** 궤도선 가시성 토글 */
   setOrbitLinesVisible: (visible: boolean) => void;
+  /** 런타임 엔진 전환. 현재 jd에서 Newton 초기 상태 재빌드 (심리스). */
+  setPhysicsEngine: (kind: PhysicsEngineKind) => void;
+  /** 현재 활성 엔진 */
+  getPhysicsEngine: () => PhysicsEngineKind;
   dispose: () => void;
 }
 
@@ -119,18 +123,32 @@ export function createSolarSystemScene(
   const resolved = new Set<string>();
 
   // Newton 경로 — 호출 시 초기 상태 빌드 후 updateAt(jd)에서 Δt만큼 적분.
+  let activeEngine: PhysicsEngineKind = physicsEngine;
   let newtonEngine: NBodyEngine | null = null;
   let newtonLastJd = initialJulianDate;
+  let currentJd = initialJulianDate;
   let newtonIdIndex: Map<string, number> | null = null;
-  if (physicsEngine === 'newton') {
-    const initial = buildInitialState(system, initialJulianDate);
+
+  const buildNewton = (jd: number) => {
+    newtonEngine?.dispose();
+    const initial = buildInitialState(system, jd);
     newtonEngine = new NBodyEngine(initial);
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
-    disposables.push({ dispose: () => newtonEngine?.dispose() });
+    newtonLastJd = jd;
+  };
+  const disposeNewton = () => {
+    newtonEngine?.dispose();
+    newtonEngine = null;
+    newtonIdIndex = null;
+  };
+  if (physicsEngine === 'newton') {
+    buildNewton(initialJulianDate);
   }
+  disposables.push({ dispose: disposeNewton });
 
   const updateAt = (jd: number) => {
-    if (newtonEngine && newtonIdIndex) {
+    currentJd = jd;
+    if (activeEngine === 'newton' && newtonEngine && newtonIdIndex) {
       const dtSec = (jd - newtonLastJd) * SECONDS_PER_DAY;
       if (dtSec !== 0) {
         newtonEngine.advance(dtSec);
@@ -222,6 +240,14 @@ export function createSolarSystemScene(
     if (orbitLines) orbitLines.isVisible = visible;
   };
 
+  const setPhysicsEngine = (kind: PhysicsEngineKind) => {
+    if (kind === activeEngine) return;
+    if (kind === 'newton') buildNewton(currentJd);
+    else disposeNewton();
+    activeEngine = kind;
+  };
+  const getPhysicsEngine = () => activeEngine;
+
   // 초기 시점 적용
   updateAt(initialJulianDate);
 
@@ -229,6 +255,8 @@ export function createSolarSystemScene(
     meshes,
     updateAt,
     setOrbitLinesVisible,
+    setPhysicsEngine,
+    getPhysicsEngine,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
