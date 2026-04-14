@@ -27,3 +27,7 @@ Thumbs.db
 .idea/
 *.swp
 
+
+# TypeScript 빌드 캐시
+*.tsbuildinfo
+
