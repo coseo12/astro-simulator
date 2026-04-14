@@ -20,13 +20,19 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "clean": "pnpm -r clean && rm -rf node_modules"
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "prepare": "husky",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint:core": "eslint packages/core/src",
+    "lint:shared": "eslint packages/shared/src",
+    "check-encoding": "bash scripts/check-encoding.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@typescript-eslint/eslint-plugin": "^8.58.2",
     "@typescript-eslint/parser": "^8.58.2",
-    "eslint": "^10.2.0",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.3",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react": "^7.37.5",
@@ -44,6 +50,14 @@
       "@tailwindcss/oxide",
       "esbuild",
       "unrs-resolver"
+    ]
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml,css}": [
+      "prettier --write"
     ]
   }
 }

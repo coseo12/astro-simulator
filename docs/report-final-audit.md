@@ -8,18 +8,18 @@
 
 ## 1. 적용 완료 항목 (10건)
 
-| # | 항목 | 적용 위치 |
-|---|------|----------|
-| 1 | Developer/QA에 3단계 브라우저 검증 | developer.md, qa.md |
-| 2 | Evaluator에 외부 에셋 검증 체크리스트 | evaluator.md |
-| 3 | QA에 비주얼 QA 게이트 | qa.md |
-| 4 | verify-images.sh 오탐 개선 | scripts/verify-images.sh |
-| 5 | 원칙 우선순위 체계 | CLAUDE.md |
-| 6 | "수정 금지" 동적 결정 | CLAUDE.md |
-| 7 | 모호한 지시 대응 원칙 | CLAUDE.md |
-| 8 | 하이브리드 검증 전략 | CLAUDE.md |
-| 9 | Evaluator 디자인 사양 충실도 | evaluator.md |
-| 10 | 메모리 3건 | memory/ |
+| #   | 항목                                  | 적용 위치                |
+| --- | ------------------------------------- | ------------------------ |
+| 1   | Developer/QA에 3단계 브라우저 검증    | developer.md, qa.md      |
+| 2   | Evaluator에 외부 에셋 검증 체크리스트 | evaluator.md             |
+| 3   | QA에 비주얼 QA 게이트                 | qa.md                    |
+| 4   | verify-images.sh 오탐 개선            | scripts/verify-images.sh |
+| 5   | 원칙 우선순위 체계                    | CLAUDE.md                |
+| 6   | "수정 금지" 동적 결정                 | CLAUDE.md                |
+| 7   | 모호한 지시 대응 원칙                 | CLAUDE.md                |
+| 8   | 하이브리드 검증 전략                  | CLAUDE.md                |
+| 9   | Evaluator 디자인 사양 충실도          | evaluator.md             |
+| 10  | 메모리 3건                            | memory/                  |
 
 ---
 
@@ -28,9 +28,11 @@
 ### 우선순위 1: dispatch-agent.sh 잔존 주석
 
 **현상**: 주석에 `auditor, reviewer`가 남아있음
+
 ```bash
 # PR 기반 에이전트(auditor, reviewer, qa)는 gh pr view
 ```
+
 **영향**: 기능 코드는 제거됨, 주석만 잔존. 혼란 가능.
 **조치**: 주석 수정 필요
 
@@ -56,14 +58,14 @@
 
 ## 3. Gemini 건강도 평가
 
-| 영역 | 등급 | 주요 이슈 |
-|------|------|----------|
-| 에이전트 정의 | B | frontend-developer 3단계 검증 누락 |
-| 스킬 정합성 | A- | 양호 |
-| 스크립트 동작성 | C+ | dispatch-agent.sh 주석 잔존 |
-| 문서 일관성 | C | README, model-assumptions 미업데이트 |
-| 예제 프로젝트 품질 | B+ | ChatApp 기능 구현 완료 |
-| 교훈 반영도 | B+ | 대부분 반영, 세부 누락 4건 |
+| 영역               | 등급 | 주요 이슈                            |
+| ------------------ | ---- | ------------------------------------ |
+| 에이전트 정의      | B    | frontend-developer 3단계 검증 누락   |
+| 스킬 정합성        | A-   | 양호                                 |
+| 스크립트 동작성    | C+   | dispatch-agent.sh 주석 잔존          |
+| 문서 일관성        | C    | README, model-assumptions 미업데이트 |
+| 예제 프로젝트 품질 | B+   | ChatApp 기능 구현 완료               |
+| 교훈 반영도        | B+   | 대부분 반영, 세부 누락 4건           |
 
 **종합: B-**
 
@@ -100,9 +102,9 @@
 
 ## 6. 미적용 4건 조치 계획
 
-| # | 항목 | 조치 | 예상 작업 |
-|---|------|------|----------|
-| 1 | dispatch-agent.sh 주석 | 주석 수정 | 1줄 |
-| 2 | README.md | 에이전트 테이블 + 파이프라인 업데이트 | 중간 |
-| 3 | frontend-developer.md | 3단계 검증 상세화 | 소규모 |
-| 4 | model-assumptions.md | "8"→"9" 숫자 수정 | 1줄 |
+| #   | 항목                   | 조치                                  | 예상 작업 |
+| --- | ---------------------- | ------------------------------------- | --------- |
+| 1   | dispatch-agent.sh 주석 | 주석 수정                             | 1줄       |
+| 2   | README.md              | 에이전트 테이블 + 파이프라인 업데이트 | 중간      |
+| 3   | frontend-developer.md  | 3단계 검증 상세화                     | 소규모    |
+| 4   | model-assumptions.md   | "8"→"9" 숫자 수정                     | 1줄       |

@@ -16,15 +16,15 @@ description: |
 
 아래 순서로 프로젝트의 테스트 환경을 감지한다. 첫 번째로 매칭되는 것을 사용한다.
 
-| 감지 파일 | 실행 명령 |
-|-----------|-----------|
-| `package.json` (scripts.test 존재) | `npm test` 또는 `yarn test` |
-| `Makefile` (test 타겟 존재) | `make test` |
-| `pyproject.toml` 또는 `setup.py` | `pytest` 또는 `python -m pytest` |
-| `go.mod` | `go test ./...` |
-| `Cargo.toml` | `cargo test` |
-| `build.gradle` 또는 `build.gradle.kts` | `./gradlew test` |
-| `pom.xml` | `mvn test` |
+| 감지 파일                              | 실행 명령                        |
+| -------------------------------------- | -------------------------------- |
+| `package.json` (scripts.test 존재)     | `npm test` 또는 `yarn test`      |
+| `Makefile` (test 타겟 존재)            | `make test`                      |
+| `pyproject.toml` 또는 `setup.py`       | `pytest` 또는 `python -m pytest` |
+| `go.mod`                               | `go test ./...`                  |
+| `Cargo.toml`                           | `cargo test`                     |
+| `build.gradle` 또는 `build.gradle.kts` | `./gradlew test`                 |
+| `pom.xml`                              | `mvn test`                       |
 
 감지되지 않으면 사용자에게 테스트 실행 방법을 질문한다.
 
@@ -46,11 +46,13 @@ description: |
 - **건너뜀**: N개
 
 ### 실패 상세 (있는 경우)
-| 테스트 | 에러 메시지 | 원인 분석 |
-|--------|-------------|-----------|
+
+| 테스트    | 에러 메시지   | 원인 분석 |
+| --------- | ------------- | --------- |
 | test_name | error message | 분석 내용 |
 
 ### 결론
+
 [통과/실패 — 실패 시 조치 방안 제시]
 ```
 
@@ -73,7 +75,9 @@ git diff --name-only develop | grep -E '\.(test|spec)\.'
 UI가 포함된 프로젝트에서는 단위/통합 테스트 후 **반드시 E2E 테스트를 실행**한다.
 
 ### E2E 감지 조건
+
 아래 중 하나라도 해당하면 E2E를 실행한다:
+
 - `components/`, `app/`, `pages/`, `src/` 디렉토리에 `.tsx`, `.jsx`, `.vue` 파일 존재
 - `package.json`에 `next`, `react`, `vue`, `svelte` 등 UI 프레임워크 의존성 존재
 - PR 변경 파일에 UI 관련 파일이 포함됨
@@ -104,12 +108,14 @@ kill $DEV_PID
 ```
 
 ### E2E 뷰포트 규칙
-| 뷰포트 | 해상도 | 검증 포인트 |
-|--------|--------|------------|
-| 모바일 | 480×900 | 반응형 레이아웃, 사이드바 토글, 터치 영역 |
-| 데스크톱 | 1200×800 | 병렬 레이아웃, 호버, 전체 UI |
+
+| 뷰포트   | 해상도   | 검증 포인트                               |
+| -------- | -------- | ----------------------------------------- |
+| 모바일   | 480×900  | 반응형 레이아웃, 사이드바 토글, 터치 영역 |
+| 데스크톱 | 1200×800 | 병렬 레이아웃, 호버, 전체 UI              |
 
 ### E2E 결과 포함 항목
+
 - 콘솔 에러 수 (0이어야 통과)
 - 스크린샷 (모바일 + 데스크톱)
 - 핵심 사용자 흐름 성공 여부

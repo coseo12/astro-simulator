@@ -11,13 +11,13 @@
 
 ## 모듈 구성
 
-| 모듈 | 역할 | 구현 Phase |
-|---|---|---|
-| `coords` | Floating Origin, RTE 좌표 변환 (CPU float64 ↔ GPU float32) | B4 |
-| `physics` | Kepler 해석해, 심플렉틱 적분기, 상대론 효과 | C2, P2, P4 |
-| `scene` | Babylon 씬/카메라/천체 메쉬 | B1, B3, C3, C6 |
-| `gpu` | WebGPU Compute 래퍼 | P3 |
-| `ephemeris` | JPL Horizons 데이터, 시간 시스템 | C1, C5 |
+| 모듈        | 역할                                                       | 구현 Phase     |
+| ----------- | ---------------------------------------------------------- | -------------- |
+| `coords`    | Floating Origin, RTE 좌표 변환 (CPU float64 ↔ GPU float32) | B4             |
+| `physics`   | Kepler 해석해, 심플렉틱 적분기, 상대론 효과                | C2, P2, P4     |
+| `scene`     | Babylon 씬/카메라/천체 메쉬                                | B1, B3, C3, C6 |
+| `gpu`       | WebGPU Compute 래퍼                                        | P3             |
+| `ephemeris` | JPL Horizons 데이터, 시간 시스템                           | C1, C5         |
 
 ## 원칙
 

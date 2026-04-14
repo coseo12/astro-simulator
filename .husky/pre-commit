@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# U+FFFD 인코딩 검사 (CRITICAL DIRECTIVE #4)
+./scripts/check-encoding.sh
+
+# lint-staged 실행 (변경된 파일만 lint + format)
+pnpm lint-staged
