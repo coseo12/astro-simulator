@@ -9,3 +9,6 @@ export { setupArcRotateCamera } from './camera.js';
 export type { ArcCameraOptions } from './camera.js';
 export { createSunEarthDemo } from './sun-earth-demo.js';
 export type { SunEarthDemoHandles } from './sun-earth-demo.js';
+export { enableLogarithmicDepth } from './log-depth.js';
+export { createNearFarProbe } from './near-far-probe.js';
+export type { NearFarProbeHandles } from './near-far-probe.js';
