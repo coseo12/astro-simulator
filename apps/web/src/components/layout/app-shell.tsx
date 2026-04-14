@@ -4,6 +4,7 @@ import { TopBar } from './top-bar';
 import { TimeBar } from './time-bar';
 import { HudCorners } from './hud-corners';
 import { FocusQuickButtons } from './focus-quick-buttons';
+import { ModeSwitcher } from './mode-switcher';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 
 /**
@@ -15,7 +16,14 @@ export function AppShell() {
   return (
     <div className="fixed inset-0 bg-bg-base text-fg-primary overflow-hidden">
       <SimCanvasDynamic>
-        <TopBar left={<FocusQuickButtons />} />
+        <TopBar
+          left={
+            <div className="flex items-center gap-2">
+              <ModeSwitcher />
+              <FocusQuickButtons />
+            </div>
+          }
+        />
         <HudCorners />
         <TimeBar />
       </SimCanvasDynamic>

@@ -57,6 +57,11 @@ check(
   'data-mode=observe',
   (await page.evaluate(() => document.documentElement.getAttribute('data-mode'))) === 'observe',
 );
+check('ModeSwitcher 렌더', (await page.$('[data-testid="mode-switcher"]')) !== null);
+check(
+  'observe 모드 active 초기 상태',
+  (await page.getAttribute('[data-testid="mode-observe"]', 'data-active')) === 'true',
+);
 
 await page.screenshot({ path: join(screenshotDir, '01-static-ko.png'), fullPage: false });
 
@@ -71,6 +76,26 @@ if (earthBtn) {
   check('지구 포커스 클릭 시 selected 상태 전환', cls.includes('border-primary'));
 } else {
   check('지구 포커스 클릭 시 selected 상태 전환', false, '지구 버튼 못 찾음');
+}
+
+// 모드 전환 — research 클릭
+const researchBtn = await page.$('[data-testid="mode-research"]');
+if (researchBtn) {
+  await researchBtn.click();
+  await page.waitForTimeout(200);
+  const mode = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
+  check('research 모드 클릭 시 data-mode 갱신', mode === 'research', `data-mode=${mode}`);
+} else {
+  check('research 모드 클릭 시 data-mode 갱신', false, 'research 버튼 없음');
+}
+
+// education 비활성 확인
+const educationBtn = await page.$('[data-testid="mode-education"]');
+if (educationBtn) {
+  const disabled = await educationBtn.isDisabled();
+  check('education 모드는 P1에서 비활성', disabled);
+} else {
+  check('education 모드는 P1에서 비활성', false, '버튼 없음');
 }
 
 await page.screenshot({ path: join(screenshotDir, '02-interaction.png') });
