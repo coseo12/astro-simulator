@@ -53,6 +53,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@astro-simulator/shared": "workspace:*"
+    "@astro-simulator/shared": "workspace:*",
+    "mitt": "^3.0.1"
   }
 }
