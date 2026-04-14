@@ -35,6 +35,7 @@
     "verify:a11y": "node scripts/browser-verify-a11y.mjs",
     "verify:test-coverage": "node scripts/verify-test-coverage.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
+    "bench:scene:sweep": "BENCH_N_SWEEP=10,100,200,1000 node scripts/bench-scene.mjs",
     "bench:scene:set-baseline": "node scripts/bench-set-baseline.mjs"
   },
   "devDependencies": {

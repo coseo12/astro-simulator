@@ -11,9 +11,19 @@ pnpm dev
 # 벤치 실행 → docs/benchmarks/{timestamp}.json 생성
 BENCH_PHASE=p1-end pnpm bench:scene
 
+# N-sweep 모드 (소행성대 N=10,100,200,1000 각각 play-1y fps)
+BENCH_PHASE=p2-0-end pnpm bench:scene:sweep
+
 # 첫 실행 시 baseline 설정
 pnpm bench:scene:set-baseline
 ```
+
+### 환경변수
+
+- `BENCH_PATH` — 측정 경로 (기본 `/ko`). 예: `BENCH_PATH=/ko?belt=200`
+- `BENCH_N_SWEEP` — N-sweep 대상 (쉼표구분). 설정 시 각 N마다 `?belt=N` 재방문
+- `BENCH_REGRESSION_FPS` — 회귀 판정 임계값 (기본 `-2`, CI는 `-10`)
+- `BENCH_SUMMARY_OUT` — Markdown 요약 출력 경로 (CI 코멘트용)
 
 ## 파일 규칙
 
@@ -26,6 +36,10 @@ pnpm bench:scene:set-baseline
 bench 실행 시 baseline 대비 각 시나리오의 fps 변화율을 출력한다.
 `Δ < -2 fps` 인 시나리오는 `⚠` 마크. PR에 그 출력을 첨부하거나 값 악화 원인을 분석 후 PR 본문에 기록한다.
 
-## P2-A 이후
+## N-sweep 리포트 스키마
 
-Newton N-body 전환 후 `nBody: [{ n, fps }]` 필드가 추가된다. N=[10, 100, 200, 1000] 샘플.
+`bench:scene:sweep` 실행 시 리포트에 `nBody: [{ n, fps }]` 필드가 추가된다. N=[10, 100, 200, 1000] 샘플을 `/ko?belt=N` 경로에서 play-1y 시나리오로 측정.
+
+## CI 연동
+
+`.github/workflows/bench.yml` — PR 이벤트에서 sweep을 실행해 baseline 대비 diff를 sticky comment로 게시한다 (best-effort). 헤드리스 GitHub Actions runner의 GPU 변동성이 크므로 임계값을 `-10 fps`로 완화하며, 정식 성능 게이트는 로컬 실 GPU 측정(#116, `scripts/bench-scene-real-gpu.mjs`)을 기준으로 한다.
