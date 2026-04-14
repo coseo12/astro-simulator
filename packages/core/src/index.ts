@@ -6,6 +6,8 @@
  * Babylon.js는 peer dependency.
  */
 
+export * from './engine/index.js';
+
 export * as coords from './coords/index.js';
 export * as physics from './physics/index.js';
 export * as scene from './scene/index.js';
