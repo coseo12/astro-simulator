@@ -129,6 +129,28 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
     });
   });
 
+  describe('왜소행성 궤도 요소 공칭값 (±1% / ±5%) — JPL/IAU', () => {
+    // 출처: JPL SBDB / Minor Planet Center / DE440
+    const DWARF_REF = [
+      { id: 'ceres', a_AU: 2.7675, e: 0.079, iDeg: 10.59 },
+      { id: 'pluto', a_AU: 39.482, e: 0.2488, iDeg: 17.14 },
+      { id: 'haumea', a_AU: 43.13, e: 0.1913, iDeg: 28.21 },
+      { id: 'makemake', a_AU: 45.79, e: 0.159, iDeg: 29.0 },
+      { id: 'eris', a_AU: 67.86, e: 0.436, iDeg: 44.04 },
+    ];
+    for (const ref of DWARF_REF) {
+      it(`${ref.id} a 오차 ≤1%, e·i 오차 ≤5%`, () => {
+        const body = byId.get(ref.id);
+        const a_AU = (body?.orbit?.semiMajorAxis ?? 0) / AU;
+        const e = body?.orbit?.eccentricity ?? 0;
+        const iDeg = ((body?.orbit?.inclination ?? 0) * 180) / Math.PI;
+        expect(Math.abs(a_AU - ref.a_AU) / ref.a_AU).toBeLessThan(0.01);
+        expect(Math.abs(e - ref.e) / ref.e).toBeLessThan(0.05);
+        expect(Math.abs(iDeg - ref.iDeg) / ref.iDeg).toBeLessThan(0.05);
+      });
+    }
+  });
+
   describe('지구-달 시스템 (부모 중심 좌표)', () => {
     it('달-지구 거리 [356k, 407k] km', () => {
       const moon = byId.get('moon');
