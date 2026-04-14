@@ -42,4 +42,5 @@ export type CoreCommand =
   | { type: 'jumpToJulianDate'; julianDate: number }
   | { type: 'focusOn'; bodyId: string }
   | { type: 'resetCamera' }
+  | { type: 'setCameraRadius'; radius: number }
   | { type: 'setMode'; mode: SimMode };
