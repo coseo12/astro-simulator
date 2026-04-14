@@ -35,11 +35,12 @@ export function SimCanvas() {
       .start()
       .then(() => {
         if (cancelled || !core.scene) return;
-        // B5: 로그 뎁스 버퍼 활성화 — 극단 near/far 동시 렌더 지원
+        // B5: 로그 뎁스 버퍼 — 극단 near/far 동시 렌더
         sceneApi.enableLogarithmicDepth(core.scene);
-        // C3 (#15)에서 실제 태양계로 교체
+        // C3: 카메라는 태양계 전체를 보도록 35 AU (해왕성 30 AU 포함)
         sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
-        sceneApi.createSunEarthDemo(core.scene);
+        // C3: JPL 궤도 요소 + Kepler 해석해 기반 태양계
+        sceneApi.createSolarSystemScene(core.scene);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
