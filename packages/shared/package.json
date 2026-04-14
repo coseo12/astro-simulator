@@ -23,7 +23,8 @@
     "./constants": {
       "types": "./dist/constants/index.d.ts",
       "import": "./dist/constants/index.js"
-    }
+    },
+    "./data/solar-system.json": "./data/solar-system.json"
   },
   "files": [
     "dist",
