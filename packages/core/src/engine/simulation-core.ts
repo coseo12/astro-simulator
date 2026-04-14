@@ -1,10 +1,13 @@
 import { Color4, Scene } from '@babylonjs/core';
+import { J2000_JD } from '@astro-simulator/shared';
 import type { CoreCommand, CoreEvents } from '@astro-simulator/shared';
 import mitt, { type Emitter, type Handler } from 'mitt';
+import { TimeController } from '../time/time-controller.js';
+import { isoToJulianDate } from '../time/julian-date.js';
 import { createEngine, type CreatedEngine, type EngineKind } from './engine-factory.js';
 
 /**
- * 시뮬레이션 코어 — Babylon 엔진/씬 소유 + 이벤트 버스.
+ * 시뮬레이션 코어 — Babylon 엔진/씬 + 시간 컨트롤러 + 이벤트 버스.
  *
  * - UI 프레임워크 의존성 없음
  * - 캔버스 엘리먼트 하나만 받아 모든 동작을 담당
@@ -18,9 +21,12 @@ export class SimulationCore {
   #resizeObserver: ResizeObserver | null = null;
   #disposed = false;
   #emitter: Emitter<CoreEvents> = mitt<CoreEvents>();
+  #time: TimeController;
+  #lastFrameTime: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
+    this.#time = new TimeController(J2000_JD, 86_400);
   }
 
   get engine(): CreatedEngine['engine'] | null {
@@ -39,6 +45,10 @@ export class SimulationCore {
     return this.#disposed;
   }
 
+  get time(): TimeController {
+    return this.#time;
+  }
+
   /** 이벤트 구독. */
   on<K extends keyof CoreEvents>(type: K, handler: Handler<CoreEvents[K]>): void {
     this.#emitter.on(type, handler);
@@ -49,14 +59,43 @@ export class SimulationCore {
     this.#emitter.off(type, handler);
   }
 
-  /** UI → Core 명령 발행. 미지원 명령은 무시된다 (향후 확장 대비). */
+  /** UI → Core 명령 발행. */
   command(cmd: CoreCommand): void {
     if (this.#disposed) return;
     switch (cmd.type) {
-      // P1에서는 아직 실제 명령 처리가 없다 — B2에서는 라운드트립만 검증.
-      // C5 (#17)에서 시간 명령, C6 (#18)에서 카메라 명령이 추가된다.
-      default:
-        console.warn('[SimulationCore] 미지원 명령:', cmd);
+      case 'play':
+        this.#time.play();
+        break;
+      case 'pause':
+        this.#time.pause();
+        break;
+      case 'setTimeScale':
+        this.#time.setScale(cmd.scale);
+        this.#emitter.emit('timeScaleChanged', { scale: cmd.scale });
+        break;
+      case 'jumpToDate': {
+        const jd = isoToJulianDate(cmd.isoUtc);
+        this.#time.setJulianDate(jd);
+        this.#emitter.emit('timeChanged', { julianDate: jd });
+        break;
+      }
+      case 'jumpToJulianDate':
+        this.#time.setJulianDate(cmd.julianDate);
+        this.#emitter.emit('timeChanged', { julianDate: cmd.julianDate });
+        break;
+      case 'focusOn':
+        // C6 (#18)에서 구현
+        break;
+      case 'resetCamera':
+        // C6 (#18)에서 구현
+        break;
+      case 'setMode':
+        this.#emitter.emit('modeChanged', { mode: cmd.mode });
+        break;
+      default: {
+        const _exhaustive: never = cmd;
+        console.warn('[SimulationCore] 미지원 명령:', _exhaustive);
+      }
     }
   }
 
@@ -84,6 +123,16 @@ export class SimulationCore {
 
     engine.runRenderLoop(() => {
       if (this.#disposed) return;
+      // 프레임 델타 계산 (초)
+      const now = performance.now();
+      const dt = this.#lastFrameTime === null ? 0 : (now - this.#lastFrameTime) / 1000;
+      this.#lastFrameTime = now;
+
+      // 시간 진행 + 변경 시 이벤트
+      if (this.#time.tick(dt)) {
+        this.#emitter.emit('timeChanged', { julianDate: this.#time.julianDate });
+      }
+
       scene.render();
     });
 
@@ -94,6 +143,8 @@ export class SimulationCore {
     this.#resizeObserver.observe(this.#canvas);
 
     this.#emitter.emit('engineReady', { renderer: kind });
+    // 초기 시각도 알림
+    this.#emitter.emit('timeChanged', { julianDate: this.#time.julianDate });
   }
 
   /** 완전 정리 — 캔버스 외부 자원 모두 해제. */
