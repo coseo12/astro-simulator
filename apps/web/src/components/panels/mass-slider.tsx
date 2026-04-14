@@ -36,6 +36,7 @@ export function MassSlider() {
       <input
         type="range"
         data-testid="mass-slider-input"
+        aria-label={`${selected} 질량 배수`}
         min="0.1"
         max="10"
         step="0.1"
