@@ -1,0 +1,25 @@
+{
+  "name": "astro-simulator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "웹 기반 천체물리 시뮬레이터 — Babylon.js WebGPU 기반 멀티스케일 우주 탐험",
+  "license": "MIT",
+  "author": "coseo12",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coseo12/astro-simulator.git"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev": "pnpm --filter @astro-simulator/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  }
+}
