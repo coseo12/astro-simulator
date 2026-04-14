@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-04-14T15:58:27.750Z",
+  "env": "chromium --use-angle=metal + rasterization",
+  "gpu": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+  },
+  "scenarios": [
+    {
+      "path": "/ko",
+      "fps": 120.05
+    },
+    {
+      "path": "/ko?belt=200",
+      "fps": 120.08
+    },
+    {
+      "path": "/ko?belt=1000",
+      "fps": 120.07
+    }
+  ]
+}
