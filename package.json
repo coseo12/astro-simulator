@@ -26,7 +26,8 @@
     "format:check": "prettier --check .",
     "lint:core": "eslint packages/core/src",
     "lint:shared": "eslint packages/shared/src",
-    "check-encoding": "bash scripts/check-encoding.sh"
+    "check-encoding": "bash scripts/check-encoding.sh",
+    "verify:browser": "node scripts/browser-verify.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
@@ -39,6 +40,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "playwright": "^1.59.1",
     "prettier": "^3.8.2",
     "typescript": "^6.0.2"
   },
