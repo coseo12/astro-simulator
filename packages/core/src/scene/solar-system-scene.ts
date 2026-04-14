@@ -61,7 +61,6 @@ export function createSolarSystemScene(
   const system = getSolarSystem();
   const bodiesById = new Map(system.bodies.map((b) => [b.id, b]));
   const meshes = new Map<string, Mesh>();
-  const orbitLines: Mesh[] = [];
   const disposables: { dispose: () => void }[] = [];
 
   // 배경 톤
@@ -83,15 +82,22 @@ export function createSolarSystemScene(
     meshes.set(body.id, mesh);
   }
 
-  // 궤도선 생성 (부모 중심)
+  // 궤도선 — 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
+  // P1은 모든 궤도가 동일 색상이라 색 배열 불필요.
+  const orbitLineBatches: Vector3[][] = [];
   for (const body of system.bodies) {
     if (!body.orbit) continue;
-    const line = createOrbitLine(body, scene);
-    if (line) {
-      line.isVisible = showOrbitLines;
-      orbitLines.push(line);
-      disposables.push({ dispose: () => line.dispose() });
-    }
+    const pts = sampleOrbitPoints(body);
+    if (pts) orbitLineBatches.push(pts);
+  }
+  const orbitLines =
+    orbitLineBatches.length > 0
+      ? MeshBuilder.CreateLineSystem('orbit-lines', { lines: orbitLineBatches }, scene)
+      : null;
+  if (orbitLines) {
+    orbitLines.color = new Color3(0.25, 0.28, 0.4);
+    orbitLines.isVisible = showOrbitLines;
+    disposables.push({ dispose: () => orbitLines.dispose() });
   }
 
   // 재사용 버퍼 — 프레임당 Map/Vec3 재할당을 피한다 (#76).
@@ -170,7 +176,7 @@ export function createSolarSystemScene(
   };
 
   const setOrbitLinesVisible = (visible: boolean) => {
-    for (const line of orbitLines) line.isVisible = visible;
+    if (orbitLines) orbitLines.isVisible = visible;
   };
 
   // 초기 시점 적용
@@ -218,7 +224,7 @@ function createBodyMesh(body: LoadedCelestialBody, scene: Scene): Mesh {
   return mesh;
 }
 
-function createOrbitLine(body: LoadedCelestialBody, scene: Scene): Mesh | null {
+function sampleOrbitPoints(body: LoadedCelestialBody): Vector3[] | null {
   if (!body.orbit || !body.parentId) return null;
   const orbit = body.orbit;
   // 궤도 한 바퀴 샘플링 (진근점각 기준 등간격)
@@ -250,9 +256,7 @@ function createOrbitLine(body: LoadedCelestialBody, scene: Scene): Mesh | null {
     );
   }
 
-  const line = MeshBuilder.CreateLines(`${body.id}-orbit`, { points }, scene);
-  line.color = new Color3(0.25, 0.28, 0.4);
-  return line;
+  return points;
 }
 
 function hexToColor3(hex: string): Color3 {
