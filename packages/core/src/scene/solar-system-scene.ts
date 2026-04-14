@@ -15,6 +15,7 @@ import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
 import { NBodyEngine, buildInitialState } from '../physics/nbody-engine.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
+import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
 
 /**
  * 씬 단위: 1 scene unit = 1 AU.
@@ -23,13 +24,10 @@ import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js
 const SCENE_UNIT_PER_METER = 1 / AU;
 
 /**
- * 행성/달 시각 스케일 — 실제 크기로 표시하면 점으로만 보이므로 배율 적용.
- * 시각 일관성을 위해 종류별로 다른 배율 사용.
- * C3에서 실용 검증, C7에서 스케일 전환 시 동적 조정 가능성 있음.
+ * 시각 스케일 — #100에서 카메라 거리 의존 동적 계산으로 전환.
+ * 메쉬는 실제 크기로 생성하고 프레임마다 `mesh.scaling`을 갱신한다.
+ * 상한은 kind별로 다르며 computeVisualScale/maxScaleForKind에서 관리.
  */
-const PLANET_VISUAL_SCALE = 500;
-const STAR_VISUAL_SCALE = 20;
-const MOON_VISUAL_SCALE = 500;
 
 export interface SolarSystemSceneHandles {
   /** id → 메쉬 */
@@ -191,6 +189,25 @@ export function createSolarSystemScene(
       );
     }
 
+    // 거리 기반 per-body 시각 스케일 (#100)
+    const cam = scene.activeCamera;
+    if (cam) {
+      const cx = cam.globalPosition.x;
+      const cy = cam.globalPosition.y;
+      const cz = cam.globalPosition.z;
+      for (const body of system.bodies) {
+        const mesh = meshes.get(body.id);
+        if (!mesh) continue;
+        const dx = mesh.position.x - cx;
+        const dy = mesh.position.y - cy;
+        const dz = mesh.position.z - cz;
+        const distScene = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const distMeters = distScene * AU;
+        const scale = computeVisualScale(distMeters, body.radius, maxScaleForKind(body.kind));
+        mesh.scaling.setAll(scale);
+      }
+    }
+
     const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
     sunLight.position.set(
       sunWorld[0] * SCENE_UNIT_PER_METER,
@@ -291,15 +308,9 @@ export function createSolarSystemScene(
   };
 }
 
-function visualScaleOf(body: LoadedCelestialBody): number {
-  if (body.kind === 'star') return STAR_VISUAL_SCALE;
-  if (body.kind === 'moon') return MOON_VISUAL_SCALE;
-  return PLANET_VISUAL_SCALE;
-}
-
 function createBodyMesh(body: LoadedCelestialBody, scene: Scene): Mesh {
-  const scale = visualScaleOf(body);
-  const diameter = body.radius * 2 * scale * SCENE_UNIT_PER_METER;
+  // 메쉬는 실제 직경으로 생성. per-frame `mesh.scaling`에서 거리 기반 스케일 적용 (#100).
+  const diameter = body.radius * 2 * SCENE_UNIT_PER_METER;
   const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
 
   const mat = new StandardMaterial(`${body.id}-mat`, scene);
