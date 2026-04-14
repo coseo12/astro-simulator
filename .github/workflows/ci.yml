@@ -20,6 +20,11 @@ jobs:
           echo "Node.js ${node_version} 사용"
         # Node 설정은 프로젝트별로 추가
 
+      # verify:test-coverage — 모든 워크스페이스에 Vitest 설정 존재 강제
+      - name: verify:test-coverage
+        if: hashFiles('scripts/verify-test-coverage.mjs') != ''
+        run: node scripts/verify-test-coverage.mjs
+
       # Python 프로젝트 감지
       - name: Python 테스트
         if: hashFiles('pyproject.toml') != '' || hashFiles('setup.py') != ''

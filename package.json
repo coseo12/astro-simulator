@@ -30,9 +30,10 @@
     "verify:browser": "node scripts/browser-verify.mjs",
     "verify:scale": "node scripts/browser-verify-scale.mjs",
     "verify:mobile": "node scripts/browser-verify-mobile.mjs",
-    "verify:all": "pnpm verify:browser && pnpm verify:mobile && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y",
+    "verify:all": "pnpm verify:test-coverage && pnpm verify:browser && pnpm verify:mobile && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y",
     "verify:perf": "node scripts/browser-verify-perf.mjs",
-    "verify:a11y": "node scripts/browser-verify-a11y.mjs"
+    "verify:a11y": "node scripts/browser-verify-a11y.mjs",
+    "verify:test-coverage": "node scripts/verify-test-coverage.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
