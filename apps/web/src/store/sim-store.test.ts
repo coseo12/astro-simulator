@@ -13,6 +13,7 @@ beforeEach(() => {
     fps: null,
     unitSystem: 'astro',
     physicsEngine: 'kepler',
+    massMultipliers: {},
     pingCount: 0,
     lastPingAt: null,
   });
@@ -76,6 +77,18 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().physicsEngine).toBe('newton');
     useSimStore.getState().setPhysicsEngine('kepler');
     expect(useSimStore.getState().physicsEngine).toBe('kepler');
+  });
+
+  it('setMassMultiplier — 설정·삭제·리셋', () => {
+    const { setMassMultiplier, resetMassMultipliers } = useSimStore.getState();
+    setMassMultiplier('jupiter', 5);
+    expect(useSimStore.getState().massMultipliers).toEqual({ jupiter: 5 });
+    setMassMultiplier('earth', 2);
+    expect(useSimStore.getState().massMultipliers).toEqual({ jupiter: 5, earth: 2 });
+    setMassMultiplier('jupiter', 1); // 1.0은 삭제
+    expect(useSimStore.getState().massMultipliers).toEqual({ earth: 2 });
+    resetMassMultipliers();
+    expect(useSimStore.getState().massMultipliers).toEqual({});
   });
 
   it('engineError — 에러 문자열 설정/클리어', () => {
