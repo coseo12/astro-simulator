@@ -54,7 +54,8 @@ jobs:
 
       - name: Rust 테스트 (physics-wasm)
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        run: cargo test --manifest-path packages/physics-wasm/Cargo.toml
+        # 1000년 심플렉틱 적분(365250 step)은 release 모드에서만 빠름.
+        run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
 
       # Makefile 기반
       - name: Make 테스트
