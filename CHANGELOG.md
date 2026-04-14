@@ -3,6 +3,66 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.2.0-p2] — 2026-04-15
+
+### P2 태양계 확장 + Newton N-body
+
+**P2-0 준비**
+
+- PR 템플릿 브라우저 3단계 검증 필수 섹션 (#74)
+- `verify:test-coverage` 워크스페이스 Vitest 가드 (#75)
+- `updateAt` 프레임당 Map 재할당 제거 (#76)
+- orbit 라인 LineSystem 통합 — draw call 9→1 (#77)
+- `bench:scene` 자동 벤치 + baseline diff (#78)
+
+**P2-A Newton N-body**
+
+- `@astro-simulator/physics-wasm` 신규 크레이트 — Rust 1.94.1 + wasm-pack 0.14 (#84)
+- Velocity-Verlet(Leapfrog) 적분기 — 1000년 에너지 드리프트 2.4e-9 (#85)
+- WASM ↔ TS 바인딩 `NBodyEngine` + 씬 통합 (#86)
+- Kepler 대비 정확도 검증: dt=10min 모든 행성 < 0.1% 오차 (#87)
+- 시간 역행 대칭성 < 1e-9 상대 오차 (#88)
+- Kepler↔Newton UI 토글 + URL `?engine=newton` (#89)
+
+**P2-B 소천체 + 시각 스케일**
+
+- 왜소행성 5개 (Ceres/Pluto/Haumea/Makemake/Eris) (#97)
+- 혜성 3개 (Halley/Encke/Swift-Tuttle) (#98)
+- 소행성대 ThinInstances `?belt=N` N=100~1000 (#99)
+- 거리-의존 per-body 시각 스케일 — P1 Moon 버그 해결 (#100)
+
+**P2-C 파라미터 + 북마크**
+
+- 선택 천체 질량 슬라이더 0.1~10× (Newton 런타임 반영) (#107)
+- 시간 포함 URL 북마크 버튼 (#108)
+- "만약에" 프리셋 3종: jupiter-x10 / no-jupiter / sun-half (#109)
+
+**P2-D 검증·마감**
+
+- 장기 안정성: 9체 100년 드리프트 1.5e-10 (#115)
+- 실 GPU(Apple M1 Pro): N=1000 소행성대에서 120 fps 달성 (#116)
+- a11y 재검증 + MassSlider aria-label / Canvas tabindex 수정 (#117)
+
+**아키텍처/데이터:**
+
+- 바디 10 → **18** (sun + 8행성 + moon + 왜소행성 5 + 혜성 3)
+- `NBodyEngine` 래퍼: `buildInitialState` + `advance(dtSeconds)` + 역행
+- scene 옵션: `physicsEngine`, `asteroidBeltN`, `setBodyMassMultiplier`
+
+**테스트 증분:** P1 139 → **P2 187 PASS** (core 128 + apps/web 54 + shared 4 + physics-wasm 1)
+
+**성능:**
+
+- 헤드리스 fps 감소(콘텐츠 추가 반영분, -16~20%)
+- 실 GPU에서 N=1000까지 120fps vsync cap 도달
+
+**알려진 제약:**
+
+- 소행성대는 Kepler 전용 — Newton 합류 시 O(N²) 폭발. P3 GPU compute에서 재검토
+- macOS Chromium만 실 GPU 측정 — Linux/Windows/모바일은 P3 후속
+- 혜성 비중력 효과(태양풍) 미반영 — ±2% 정확도 한계
+- 질량 변경 후 시간 역행으로 원 상태 복원 불가 — 프리셋 원복으로 암묵 리셋
+
 ## [0.1.0-p1] — 2026-04-14
 
 ### P1 태양계 MVP
