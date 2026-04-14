@@ -25,10 +25,15 @@ export function DateTimePicker() {
 
   return (
     <div className="flex items-center gap-1" data-testid="datetime-picker">
+      <label className="sr-only" htmlFor="datetime-input">
+        특정 UTC 시점 입력
+      </label>
       <input
+        id="datetime-input"
         type="datetime-local"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        aria-label="특정 UTC 시점으로 점프할 날짜/시간"
         className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-primary focus:outline-none focus:border-primary/50"
         data-testid="datetime-input"
       />
