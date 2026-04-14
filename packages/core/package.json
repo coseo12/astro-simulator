@@ -33,7 +33,11 @@
       "import": "./dist/ephemeris/index.js"
     }
   },
-  "files": ["dist", "src", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
@@ -47,5 +51,8 @@
   "devDependencies": {
     "typescript": "^6.0.0"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "dependencies": {
+    "@astro-simulator/shared": "workspace:*"
+  }
 }
