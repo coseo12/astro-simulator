@@ -10,6 +10,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@astro-simulator/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       next:
         specifier: ^16.2.3
         version: 16.2.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -38,9 +41,18 @@ importers:
 
   packages/core:
     dependencies:
+      '@astro-simulator/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@babylonjs/core':
         specifier: ^8.0.0
         version: 8.56.2
+    devDependencies:
+      typescript:
+        specifier: ^6.0.0
+        version: 6.0.2
+
+  packages/shared:
     devDependencies:
       typescript:
         specifier: ^6.0.0
