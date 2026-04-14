@@ -1,0 +1,68 @@
+name: bench:scene
+
+# PR마다 bench:scene:sweep을 실행하여 baseline 대비 fps diff를 코멘트.
+# CI 헤드리스 환경 변동성이 크므로 best-effort(continue-on-error) 운용.
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'scripts/bench-scene.mjs'
+      - 'docs/benchmarks/baseline.json'
+      - '.github/workflows/bench.yml'
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright 브라우저 설치
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 앱 빌드
+        run: pnpm build
+
+      - name: 웹 서버 기동 (백그라운드)
+        run: |
+          pnpm --filter @astro-simulator/web start -p 3001 &
+          echo "WEB_PID=$!" >> $GITHUB_ENV
+          # 서버 준비 대기
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            sleep 2
+          done
+
+      - name: bench:scene:sweep
+        env:
+          BENCH_PHASE: pr-${{ github.event.pull_request.number }}
+          BENCH_SUMMARY_OUT: bench-summary.md
+          BENCH_REGRESSION_FPS: '-10'
+        run: pnpm bench:scene:sweep
+
+      - name: PR 코멘트 게시
+        if: always() && hashFiles('bench-summary.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: bench-scene
+          path: bench-summary.md
+
+      - name: 서버 종료
+        if: always()
+        run: kill $WEB_PID || true
