@@ -266,6 +266,60 @@
         "longitudeOfPerihelionDeg": 186.0223,
         "meanLongitudeDeg": 204.16
       }
+    },
+    {
+      "id": "halley",
+      "kind": "comet",
+      "nameKo": "핼리 혜성",
+      "nameEn": "1P/Halley",
+      "mass": 2.2e14,
+      "radius": 5.5e3,
+      "parentId": "sun",
+      "colorHint": { "hex": "#A8D8E8" },
+      "orbit": {
+        "semiMajorAxisAU": 17.834,
+        "eccentricity": 0.96714,
+        "inclinationDeg": 162.26,
+        "longitudeOfAscendingNodeDeg": 58.42,
+        "longitudeOfPerihelionDeg": 169.75,
+        "meanLongitudeDeg": 236.05
+      }
+    },
+    {
+      "id": "encke",
+      "kind": "comet",
+      "nameKo": "엥케 혜성",
+      "nameEn": "2P/Encke",
+      "mass": 1.0e13,
+      "radius": 2.4e3,
+      "parentId": "sun",
+      "colorHint": { "hex": "#B5E0D1" },
+      "orbit": {
+        "semiMajorAxisAU": 2.2152,
+        "eccentricity": 0.848,
+        "inclinationDeg": 11.78,
+        "longitudeOfAscendingNodeDeg": 334.57,
+        "longitudeOfPerihelionDeg": 161.11,
+        "meanLongitudeDeg": 100.0
+      }
+    },
+    {
+      "id": "swift-tuttle",
+      "kind": "comet",
+      "nameKo": "스위프트-터틀 혜성",
+      "nameEn": "109P/Swift-Tuttle",
+      "mass": 2.5e16,
+      "radius": 1.3e4,
+      "parentId": "sun",
+      "colorHint": { "hex": "#C8D8E8" },
+      "orbit": {
+        "semiMajorAxisAU": 26.09,
+        "eccentricity": 0.963,
+        "inclinationDeg": 113.45,
+        "longitudeOfAscendingNodeDeg": 139.38,
+        "longitudeOfPerihelionDeg": 292.36,
+        "meanLongitudeDeg": 300.0
+      }
     }
   ]
 }

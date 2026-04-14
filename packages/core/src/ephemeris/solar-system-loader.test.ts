@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 15개 바디 (sun + 8행성 + moon + 왜소행성 5)', () => {
+  it('로드 성공 + 18개 바디 (sun + 8행성 + moon + 왜소행성 5 + 혜성 3)', () => {
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(15);
+    expect(data.bodies).toHaveLength(18);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
+    expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
   });
 
   it('태양은 궤도가 없다', () => {
