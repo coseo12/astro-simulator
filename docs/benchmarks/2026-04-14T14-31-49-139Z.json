@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-14T14:27:35.613Z",
+  "timestamp": "2026-04-14T14:31:49.139Z",
   "phase": "p2-b-regression",
   "durationMs": 3000,
   "environment": "playwright-chromium-headless",
@@ -7,23 +7,23 @@
   "scenarios": [
     {
       "name": "idle",
-      "fps": 32.57
+      "fps": 32.51
     },
     {
       "name": "play-1d",
-      "fps": 31.26
+      "fps": 31.4
     },
     {
       "name": "play-1y",
-      "fps": 30.77
+      "fps": 30.89
     },
     {
       "name": "focus-earth",
-      "fps": 101.05
+      "fps": 101.24
     },
     {
       "name": "focus-neptune",
-      "fps": 106.79
+      "fps": 107.81
     }
   ]
 }
