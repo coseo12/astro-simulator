@@ -1,0 +1,242 @@
+@import 'tailwindcss';
+
+/* =========================================================================
+ * 디자인 토큰 — docs/phases/design-tokens.md 기반
+ * 철학: NASA 신뢰감 + 기술 계기판 독창성 + 흑체복사 기반 팔레트
+ * ======================================================================= */
+
+:root {
+  /* ----- Surface (다크 베이스) ----- */
+  --bg-void: #08090d;
+  --bg-base: #0e1018;
+  --bg-surface: #141721;
+  --bg-elevated: #1c2032;
+  --bg-overlay: #252a40;
+
+  --border-subtle: #262b3e;
+  --border-default: #3a4058;
+  --border-strong: #525a78;
+
+  /* ----- Text ----- */
+  --fg-primary: #e8ebf5;
+  --fg-secondary: #9ba3b8;
+  --fg-tertiary: #626978;
+  --fg-disabled: #3e4354;
+
+  /* ----- Stellar Palette (흑체복사 색온도 → UI 의미) ----- */
+  --star-o: #7ba6ff; /* Primary */
+  --star-b: #a8c5ff; /* Info */
+  --star-a: #dce5ff;
+  --star-g: #ffe9a8; /* Warning / 교육 모드 Primary */
+  --star-k: #ffb878; /* Alert */
+  --star-m: #ff8a7a; /* Danger */
+
+  /* ----- Nebula ----- */
+  --nebula-teal: #6fddb4; /* Success / Tier 1 */
+  --nebula-violet: #c899ff; /* Tier 4 (유일한 보라) */
+
+  /* ----- 데이터 신뢰성 Tier ----- */
+  --tier-1-observed: var(--nebula-teal);
+  --tier-2-model: var(--star-o);
+  --tier-3-theory: var(--star-g);
+  --tier-4-artistic: var(--nebula-violet);
+
+  /* ----- Semantic ----- */
+  --primary: var(--star-o);
+  --info: var(--star-b);
+  --success: var(--nebula-teal);
+  --warning: var(--star-g);
+  --alert: var(--star-k);
+  --danger: var(--star-m);
+
+  /* ----- Typography ----- */
+  --font-sans: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: var(--font-space-grotesk), 'Space Grotesk', 'Pretendard Variable', sans-serif;
+  --font-mono: var(--font-jetbrains), 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Type scale (1.25 ratio, 16px base) */
+  --text-display: 3rem;
+  --text-h1: 2.25rem;
+  --text-h2: 1.75rem;
+  --text-h3: 1.375rem;
+  --text-h4: 1.125rem;
+  --text-body: 0.9375rem;
+  --text-body-sm: 0.8125rem;
+  --text-caption: 0.6875rem;
+
+  /* ----- Radius ----- */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  /* ----- Elevation ----- */
+  --shadow-sm: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-default);
+  --glow-accent: 0 0 20px rgba(123, 166, 255, 0.15);
+
+  /* ----- Motion ----- */
+  --duration-instant: 50ms;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 350ms;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ----- Z-index ----- */
+  --z-canvas: 0;
+  --z-hud: 10;
+  --z-panel: 20;
+  --z-dropdown: 30;
+  --z-toast: 40;
+  --z-modal: 50;
+  --z-tooltip: 60;
+
+  /* ----- Mode-dependent (기본값) ----- */
+  --ui-opacity: 1;
+  --grid-visible: 0;
+}
+
+/* ===== 모드별 전환 ===== */
+[data-mode='observe'] {
+  --primary: var(--star-o);
+  --ui-opacity: 0.85;
+}
+
+[data-mode='research'] {
+  --primary: var(--star-o);
+  --ui-opacity: 1;
+}
+
+[data-mode='education'] {
+  --primary: var(--star-g);
+  --ui-opacity: 0.95;
+}
+
+[data-mode='sandbox'] {
+  --primary: var(--star-o);
+  --grid-visible: 1;
+}
+
+/* ===== Tailwind v4 theme 매핑 ===== */
+@theme {
+  --color-bg-void: var(--bg-void);
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-overlay: var(--bg-overlay);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg-primary: var(--fg-primary);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-disabled: var(--fg-disabled);
+
+  --color-star-o: var(--star-o);
+  --color-star-b: var(--star-b);
+  --color-star-a: var(--star-a);
+  --color-star-g: var(--star-g);
+  --color-star-k: var(--star-k);
+  --color-star-m: var(--star-m);
+
+  --color-nebula-teal: var(--nebula-teal);
+  --color-nebula-violet: var(--nebula-violet);
+
+  --color-primary: var(--primary);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-alert: var(--alert);
+  --color-danger: var(--danger);
+
+  --color-tier-1: var(--tier-1-observed);
+  --color-tier-2: var(--tier-2-model);
+  --color-tier-3: var(--tier-3-theory);
+  --color-tier-4: var(--tier-4-artistic);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --text-display: var(--text-display);
+  --text-h1: var(--text-h1);
+  --text-h2: var(--text-h2);
+  --text-h3: var(--text-h3);
+  --text-h4: var(--text-h4);
+  --text-body: var(--text-body);
+  --text-body-sm: var(--text-body-sm);
+  --text-caption: var(--text-caption);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* ===== 리셋 & 베이스 ===== */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 수치 표시 — 항상 모노 + tabular-nums */
+.num,
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 포커스 링 — 다크 배경에서 명확히 보이도록 */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* 접근성: 동작 감소 선호 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

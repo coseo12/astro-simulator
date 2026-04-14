@@ -1,0 +1,181 @@
+{
+  "$comment": "태양계 천체 기본 데이터. 궤도 요소는 J2000.0 기준 표준값 (Standish & Williams 1992, JPL). 단위: a=AU, angles=degrees, mass=kg, radius=m, epoch=JD.",
+  "epoch": 2451545.0,
+  "source": "JPL/Standish ephemeris (DE440 근사치, 장기 평균)",
+  "tier": 1,
+  "bodies": [
+    {
+      "id": "sun",
+      "kind": "star",
+      "nameKo": "태양",
+      "nameEn": "Sun",
+      "mass": 1.98892e30,
+      "radius": 6.957e8,
+      "parentId": null,
+      "colorHint": { "hex": "#FFE9A8", "temperatureK": 5778 }
+    },
+    {
+      "id": "mercury",
+      "kind": "planet",
+      "nameKo": "수성",
+      "nameEn": "Mercury",
+      "mass": 3.3011e23,
+      "radius": 2.4397e6,
+      "parentId": "sun",
+      "colorHint": { "hex": "#8C7853" },
+      "orbit": {
+        "semiMajorAxisAU": 0.38709927,
+        "eccentricity": 0.20563593,
+        "inclinationDeg": 7.00497902,
+        "longitudeOfAscendingNodeDeg": 48.33076593,
+        "longitudeOfPerihelionDeg": 77.45779628,
+        "meanLongitudeDeg": 252.2503235
+      }
+    },
+    {
+      "id": "venus",
+      "kind": "planet",
+      "nameKo": "금성",
+      "nameEn": "Venus",
+      "mass": 4.8675e24,
+      "radius": 6.0518e6,
+      "parentId": "sun",
+      "colorHint": { "hex": "#E8D08A" },
+      "orbit": {
+        "semiMajorAxisAU": 0.72333566,
+        "eccentricity": 0.00677672,
+        "inclinationDeg": 3.39467605,
+        "longitudeOfAscendingNodeDeg": 76.67984255,
+        "longitudeOfPerihelionDeg": 131.60246718,
+        "meanLongitudeDeg": 181.9790995
+      }
+    },
+    {
+      "id": "earth",
+      "kind": "planet",
+      "nameKo": "지구",
+      "nameEn": "Earth",
+      "mass": 5.9722e24,
+      "radius": 6.378137e6,
+      "parentId": "sun",
+      "colorHint": { "hex": "#3B7AB5" },
+      "orbit": {
+        "semiMajorAxisAU": 1.00000261,
+        "eccentricity": 0.01671123,
+        "inclinationDeg": -0.00001531,
+        "longitudeOfAscendingNodeDeg": 0.0,
+        "longitudeOfPerihelionDeg": 102.93768193,
+        "meanLongitudeDeg": 100.46457166
+      }
+    },
+    {
+      "id": "moon",
+      "kind": "moon",
+      "nameKo": "달",
+      "nameEn": "Moon",
+      "mass": 7.342e22,
+      "radius": 1.7374e6,
+      "parentId": "earth",
+      "$comment": "달의 궤도 요소는 지구 중심 기준, 황도면 기준 (J2000). a는 AU가 아닌 km 단위로 별도 해석 필요 — loader에서 처리.",
+      "colorHint": { "hex": "#9C9A96" },
+      "orbit": {
+        "semiMajorAxisAU": 0.00257189,
+        "eccentricity": 0.0549,
+        "inclinationDeg": 5.145,
+        "longitudeOfAscendingNodeDeg": 125.08,
+        "longitudeOfPerihelionDeg": 83.22,
+        "meanLongitudeDeg": 218.32
+      }
+    },
+    {
+      "id": "mars",
+      "kind": "planet",
+      "nameKo": "화성",
+      "nameEn": "Mars",
+      "mass": 6.4171e23,
+      "radius": 3.3895e6,
+      "parentId": "sun",
+      "colorHint": { "hex": "#B2542D" },
+      "orbit": {
+        "semiMajorAxisAU": 1.52371034,
+        "eccentricity": 0.0933941,
+        "inclinationDeg": 1.84969142,
+        "longitudeOfAscendingNodeDeg": 49.55953891,
+        "longitudeOfPerihelionDeg": -23.94362959,
+        "meanLongitudeDeg": -4.55343205
+      }
+    },
+    {
+      "id": "jupiter",
+      "kind": "planet",
+      "nameKo": "목성",
+      "nameEn": "Jupiter",
+      "mass": 1.8982e27,
+      "radius": 6.9911e7,
+      "parentId": "sun",
+      "colorHint": { "hex": "#C9A574" },
+      "orbit": {
+        "semiMajorAxisAU": 5.202887,
+        "eccentricity": 0.04838624,
+        "inclinationDeg": 1.30439695,
+        "longitudeOfAscendingNodeDeg": 100.47390909,
+        "longitudeOfPerihelionDeg": 14.72847983,
+        "meanLongitudeDeg": 34.39644051
+      }
+    },
+    {
+      "id": "saturn",
+      "kind": "planet",
+      "nameKo": "토성",
+      "nameEn": "Saturn",
+      "mass": 5.6834e26,
+      "radius": 5.8232e7,
+      "parentId": "sun",
+      "colorHint": { "hex": "#E0C78E" },
+      "orbit": {
+        "semiMajorAxisAU": 9.53667594,
+        "eccentricity": 0.05386179,
+        "inclinationDeg": 2.48599187,
+        "longitudeOfAscendingNodeDeg": 113.66242448,
+        "longitudeOfPerihelionDeg": 92.59887831,
+        "meanLongitudeDeg": 49.95424423
+      }
+    },
+    {
+      "id": "uranus",
+      "kind": "planet",
+      "nameKo": "천왕성",
+      "nameEn": "Uranus",
+      "mass": 8.681e25,
+      "radius": 2.5362e7,
+      "parentId": "sun",
+      "colorHint": { "hex": "#B5E3EC" },
+      "orbit": {
+        "semiMajorAxisAU": 19.18916464,
+        "eccentricity": 0.04725744,
+        "inclinationDeg": 0.77263783,
+        "longitudeOfAscendingNodeDeg": 74.01692503,
+        "longitudeOfPerihelionDeg": 170.9542763,
+        "meanLongitudeDeg": 313.23810451
+      }
+    },
+    {
+      "id": "neptune",
+      "kind": "planet",
+      "nameKo": "해왕성",
+      "nameEn": "Neptune",
+      "mass": 1.0243e26,
+      "radius": 2.4622e7,
+      "parentId": "sun",
+      "colorHint": { "hex": "#3F6DA8" },
+      "orbit": {
+        "semiMajorAxisAU": 30.06992276,
+        "eccentricity": 0.00859048,
+        "inclinationDeg": 1.77004347,
+        "longitudeOfAscendingNodeDeg": 131.78422574,
+        "longitudeOfPerihelionDeg": 44.96476227,
+        "meanLongitudeDeg": -55.12002969
+      }
+    }
+  ]
+}

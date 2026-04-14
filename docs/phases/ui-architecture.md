@@ -9,22 +9,24 @@
 ## 1. 컴포넌트 구현 원칙
 
 ### 1.1 일반 UI (Radix Primitives 기반)
+
 - **Phase별 필요분만** 구현 (pull-based)
 - 사전에 전체 라이브러리 만들지 않음
 - 각 컴포넌트는 Radix Primitive + 자체 디자인 토큰 + CVA variants 조합
 
 ### 1.2 시뮬레이터 특화 (자체 구현)
+
 - **Phase별 필수 항목 지정** 시 반드시 구현
 - 일반 UI와 같은 디자인 언어 유지 (통합된 느낌)
 
 ### 1.3 Phase별 컴포넌트 배정
 
-| Phase | 일반 UI (필요분) | 시뮬레이터 특화 (필수) |
-|---|---|---|
-| P1 | Button, Input, Select, Slider, Switch, Tabs, Dialog, Tooltip, Toast, Card, ScrollArea, DropdownMenu, Dock/Panel/SplitPane | TimeScrubber, ScaleControl, DateTimePicker, CelestialTree, CelestialInfoPanel, UnitToggle, TierBadge, ModeSwitcher, SpeedControl |
-| P2 | NumberInput, Combobox, ContextMenu, Accordion, Table | CameraBookmark, OrbitalElementsEditor, DataExporter |
-| P3 | Progress, Skeleton | (추가 필요 시 정의) |
-| P4+ | 필요 시 정의 | HRDiagram, SpectrumView, GalaxyMap 등 |
+| Phase | 일반 UI (필요분)                                                                                                          | 시뮬레이터 특화 (필수)                                                                                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| P1    | Button, Input, Select, Slider, Switch, Tabs, Dialog, Tooltip, Toast, Card, ScrollArea, DropdownMenu, Dock/Panel/SplitPane | TimeScrubber, ScaleControl, DateTimePicker, CelestialTree, CelestialInfoPanel, UnitToggle, TierBadge, ModeSwitcher, SpeedControl |
+| P2    | NumberInput, Combobox, ContextMenu, Accordion, Table                                                                      | CameraBookmark, OrbitalElementsEditor, DataExporter                                                                              |
+| P3    | Progress, Skeleton                                                                                                        | (추가 필요 시 정의)                                                                                                              |
+| P4+   | 필요 시 정의                                                                                                              | HRDiagram, SpectrumView, GalaxyMap 등                                                                                            |
 
 ---
 
@@ -40,21 +42,21 @@
 
 ### 2.2 치수 규격
 
-| 영역 | 크기 |
-|---|---|
+| 영역    | 크기                                 |
+| ------- | ------------------------------------ |
 | 좌 패널 | 280px (천체 계층 트리 들여쓰기 여유) |
-| 우 패널 | 340px (모노스페이스 수치 + 레이블) |
-| TopBar | 48px |
-| TimeBar | 64px |
+| 우 패널 | 340px (모노스페이스 수치 + 레이블)   |
+| TopBar  | 48px                                 |
+| TimeBar | 64px                                 |
 
 ### 2.3 반응형 브레이크
 
-| 브레이크 | 동작 |
-|---|---|
-| xl (1280px) 이상 | 기본 레이아웃 |
-| lg (1024px) 이상 | 우 패널 기본 접힘 |
-| md (768px) 이상 | 좌 패널도 기본 접힘 (플로팅 드로어) |
-| sm (640px) 미만 | 라이트 뷰 (관찰 전용, P1~P2 수준) |
+| 브레이크         | 동작                                |
+| ---------------- | ----------------------------------- |
+| xl (1280px) 이상 | 기본 레이아웃                       |
+| lg (1024px) 이상 | 우 패널 기본 접힘                   |
+| md (768px) 이상  | 좌 패널도 기본 접힘 (플로팅 드로어) |
+| sm (640px) 미만  | 라이트 뷰 (관찰 전용, P1~P2 수준)   |
 
 ### 2.4 패널 동작
 
@@ -64,11 +66,11 @@
 
 ### 2.5 몰입 토글 3단계
 
-| Level | 단축키 | 상태 |
-|---|---|---|
-| 0 | (기본) | 모드별 레이아웃 |
-| 1 | Tab | 패널 숨김, TopBar/TimeBar 유지 |
-| 2 | Shift+Tab | 모든 UI 숨김, 순수 캔버스 |
+| Level | 단축키    | 상태                           |
+| ----- | --------- | ------------------------------ |
+| 0     | (기본)    | 모드별 레이아웃                |
+| 1     | Tab       | 패널 숨김, TopBar/TimeBar 유지 |
+| 2     | Shift+Tab | 모든 UI 숨김, 순수 캔버스      |
 
 마우스 이동 시 TopBar 자동 페이드인 (Level 1/2 공통).
 
@@ -141,10 +143,22 @@ HUD 요소는 `backdrop-filter: blur(8px)` + 반투명.
 ### 3.5 모드별 토큰 자동 전환
 
 ```css
-[data-mode="observe"]   { --primary: var(--star-o); --ui-opacity: 0.85; }
-[data-mode="research"]  { --primary: var(--star-o); --ui-opacity: 1.0; }
-[data-mode="education"] { --primary: var(--star-g); --ui-opacity: 0.95; }
-[data-mode="sandbox"]   { --primary: var(--star-o); --grid-visible: 1; }
+[data-mode='observe'] {
+  --primary: var(--star-o);
+  --ui-opacity: 0.85;
+}
+[data-mode='research'] {
+  --primary: var(--star-o);
+  --ui-opacity: 1;
+}
+[data-mode='education'] {
+  --primary: var(--star-g);
+  --ui-opacity: 0.95;
+}
+[data-mode='sandbox'] {
+  --primary: var(--star-o);
+  --grid-visible: 1;
+}
 ```
 
 ---
@@ -181,42 +195,42 @@ Simulation State (Core 소유, GPU/CPU)    UI State (React 소유)
 
 ### 5.2 라이브러리 선택
 
-| 역할 | 선택 | 크기 | 도입 Phase |
-|---|---|---|---|
-| UI 전역 상태 | **Zustand** | ~1KB | P1 |
-| URL 상태 | **nuqs** | ~4KB | P1 |
-| Core↔UI 이벤트 버스 | **mitt** | ~200B | P1 |
-| 외부 데이터 페칭 | **TanStack Query** | ~13KB | P1 |
-| 스키마 검증 | **zod** | ~12KB | P1 |
-| 복잡 폼 | **react-hook-form** | ~9KB | P2 |
+| 역할                | 선택                | 크기  | 도입 Phase |
+| ------------------- | ------------------- | ----- | ---------- |
+| UI 전역 상태        | **Zustand**         | ~1KB  | P1         |
+| URL 상태            | **nuqs**            | ~4KB  | P1         |
+| Core↔UI 이벤트 버스 | **mitt**            | ~200B | P1         |
+| 외부 데이터 페칭    | **TanStack Query**  | ~13KB | P1         |
+| 스키마 검증         | **zod**             | ~12KB | P1         |
+| 복잡 폼             | **react-hook-form** | ~9KB  | P2         |
 
 ### 5.3 Core ↔ UI 통신 패턴
 
 ```ts
 // @space/core — 순수 TS, React 무관
-import mitt from 'mitt'
+import mitt from 'mitt';
 
 type CoreEvents = {
-  timeChanged: { julianDate: number }
-  bodySelected: { id: string }
-  modeChanged: { mode: Mode }
-}
+  timeChanged: { julianDate: number };
+  bodySelected: { id: string };
+  modeChanged: { mode: Mode };
+};
 
 class SimulationCore {
-  private emitter = mitt<CoreEvents>()
-  on = this.emitter.on
-  off = this.emitter.off
+  private emitter = mitt<CoreEvents>();
+  on = this.emitter.on;
+  off = this.emitter.off;
   // ...
 }
 
 // UI 어댑터
-const core = new SimulationCore(canvas)
+const core = new SimulationCore(canvas);
 core.on('timeChanged', ({ julianDate }) => {
-  useSimStore.getState().setTime(julianDate)
-})
+  useSimStore.getState().setTime(julianDate);
+});
 
 // UI → Core 명령
-core.command({ type: 'setTimeScale', value: 86400 })
+core.command({ type: 'setTimeScale', value: 86400 });
 ```
 
 ### 5.4 원칙
@@ -233,20 +247,21 @@ core.command({ type: 'setTimeScale', value: 86400 })
 ### 6.1 라이브러리
 
 **Framer Motion (선별적 사용)**
+
 - `LazyMotion` + `m` 컴포넌트로 초기 번들 ~5KB로 축소
 - `domAnimation` 기본, 필요 시 `domMax` 로드
 
 ### 6.2 사용 기준
 
-| 용도 | 사용 도구 |
-|---|---|
-| 모드 전환 (layout animation) | Framer Motion `layout` prop |
-| 드래그 제스처 (샌드박스, 북마크 재정렬) | Framer Motion `drag` |
-| 수치 카운트업 | Framer Motion `useMotionValue` |
-| 교육 모드 시네마틱 시퀀스 | Framer Motion |
-| 단순 호버/포커스 | CSS transition |
-| 단순 fade | CSS `@keyframes` |
-| 장식 애니메이션 | **금지** |
+| 용도                                    | 사용 도구                      |
+| --------------------------------------- | ------------------------------ |
+| 모드 전환 (layout animation)            | Framer Motion `layout` prop    |
+| 드래그 제스처 (샌드박스, 북마크 재정렬) | Framer Motion `drag`           |
+| 수치 카운트업                           | Framer Motion `useMotionValue` |
+| 교육 모드 시네마틱 시퀀스               | Framer Motion                  |
+| 단순 호버/포커스                        | CSS transition                 |
+| 단순 fade                               | CSS `@keyframes`               |
+| 장식 애니메이션                         | **금지**                       |
 
 ### 6.3 원칙
 

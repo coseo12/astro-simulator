@@ -1,0 +1,63 @@
+{
+  "name": "@astro-simulator/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure TypeScript simulation core for astro-simulator — Babylon.js only, framework-agnostic",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./coords": {
+      "types": "./dist/coords/index.d.ts",
+      "import": "./dist/coords/index.js"
+    },
+    "./physics": {
+      "types": "./dist/physics/index.d.ts",
+      "import": "./dist/physics/index.js"
+    },
+    "./scene": {
+      "types": "./dist/scene/index.d.ts",
+      "import": "./dist/scene/index.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu/index.d.ts",
+      "import": "./dist/gpu/index.js"
+    },
+    "./ephemeris": {
+      "types": "./dist/ephemeris/index.d.ts",
+      "import": "./dist/ephemeris/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "@babylonjs/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.4",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.4"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@astro-simulator/shared": "workspace:*",
+    "mitt": "^3.0.1",
+    "zod": "^4.3.6"
+  }
+}
