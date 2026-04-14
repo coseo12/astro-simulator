@@ -28,8 +28,8 @@ export function setupArcRotateCamera(
     beta = Math.PI / 2.5,
     radius = 30,
     target = Vector3.Zero(),
-    lowerRadiusLimit = 2,
-    upperRadiusLimit = 1_000_000,
+    lowerRadiusLimit = 0.5,
+    upperRadiusLimit = 1e14,
   } = options;
 
   const camera = new ArcRotateCamera('camera', alpha, beta, radius, target, scene);
@@ -38,8 +38,9 @@ export function setupArcRotateCamera(
   camera.wheelPrecision = 3;
   camera.pinchPrecision = 50;
   camera.panningSensibility = 0;
+  // 로그 뎁스 버퍼 전제 — 극단 near/far (행성 표면 ~ 태양계 외곽 이상)
   camera.minZ = 0.01;
-  camera.maxZ = 1e9;
+  camera.maxZ = 1e14;
 
   const canvas = scene.getEngine().getRenderingCanvas();
   if (canvas) {

@@ -35,7 +35,9 @@ export function SimCanvas() {
       .start()
       .then(() => {
         if (cancelled || !core.scene) return;
-        // B3 데모 씬 — C3 (#15)에서 실제 태양계로 교체
+        // B5: 로그 뎁스 버퍼 활성화 — 극단 near/far 동시 렌더 지원
+        sceneApi.enableLogarithmicDepth(core.scene);
+        // C3 (#15)에서 실제 태양계로 교체
         sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
         sceneApi.createSunEarthDemo(core.scene);
       })
