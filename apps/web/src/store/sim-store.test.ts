@@ -12,6 +12,7 @@ beforeEach(() => {
     timeScale: 86_400,
     fps: null,
     unitSystem: 'astro',
+    physicsEngine: 'kepler',
     pingCount: 0,
     lastPingAt: null,
   });
@@ -67,6 +68,14 @@ describe('useSimStore', () => {
     const s = useSimStore.getState();
     expect(s.pingCount).toBe(1);
     expect(s.lastPingAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it('setPhysicsEngine — Kepler ↔ Newton 토글', () => {
+    expect(useSimStore.getState().physicsEngine).toBe('kepler');
+    useSimStore.getState().setPhysicsEngine('newton');
+    expect(useSimStore.getState().physicsEngine).toBe('newton');
+    useSimStore.getState().setPhysicsEngine('kepler');
+    expect(useSimStore.getState().physicsEngine).toBe('kepler');
   });
 
   it('engineError — 에러 문자열 설정/클리어', () => {

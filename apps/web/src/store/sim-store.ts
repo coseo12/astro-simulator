@@ -2,6 +2,7 @@ import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
 
 export type UnitSystem = 'si' | 'astro' | 'natural';
+export type PhysicsEngineKind = 'kepler' | 'newton';
 
 /**
  * 시뮬레이션 UI 상태 store.
@@ -21,6 +22,7 @@ export interface SimStoreState {
   timeScale: number;
   fps: number | null;
   unitSystem: UnitSystem;
+  physicsEngine: PhysicsEngineKind;
 
   // 개발/디버그용 라운드트립 카운터
   pingCount: number;
@@ -35,6 +37,7 @@ export interface SimStoreState {
   setTimeScale: (scale: number) => void;
   setFps: (fps: number) => void;
   setUnitSystem: (unit: UnitSystem) => void;
+  setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   incrementPing: () => void;
 }
 
@@ -47,6 +50,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   timeScale: 86_400,
   fps: null,
   unitSystem: 'astro',
+  physicsEngine: 'kepler',
   pingCount: 0,
   lastPingAt: null,
 
@@ -58,6 +62,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setTimeScale: (scale) => set({ timeScale: scale }),
   setFps: (fps) => set({ fps }),
   setUnitSystem: (unit) => set({ unitSystem: unit }),
+  setPhysicsEngine: (kind) => set({ physicsEngine: kind }),
   incrementPing: () =>
     set((state) => ({
       pingCount: state.pingCount + 1,

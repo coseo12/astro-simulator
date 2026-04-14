@@ -3,6 +3,7 @@
 import { SimulationCore, scene as sceneApi } from '@astro-simulator/core';
 import { attachCoreToStore } from '@/core/core-adapter';
 import { SimCommandProvider } from '@/core/sim-context';
+import { useSimStore } from '@/store/sim-store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /**
@@ -25,6 +26,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     const detach = attachCoreToStore(instance);
 
     let cancelled = false;
+    let unsubEngine: (() => void) | null = null;
     instance
       .start()
       .then(() => {
@@ -32,9 +34,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         sceneApi.enableLogarithmicDepth(instance.scene);
         const camera = sceneApi.setupArcRotateCamera(instance.scene, { radius: 35 });
         const controller = new sceneApi.CameraController(camera, instance.scene);
-        const solar = sceneApi.createSolarSystemScene(instance.scene);
+        const solar = sceneApi.createSolarSystemScene(instance.scene, {
+          physicsEngine: useSimStore.getState().physicsEngine,
+        });
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
+
+        // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
+        unsubEngine = useSimStore.subscribe((state, prev) => {
+          if (state.physicsEngine !== prev.physicsEngine) {
+            solar.setPhysicsEngine(state.physicsEngine);
+          }
+        });
         instance.setCameraHandlers(
           (bodyId: string) => {
             const mesh = solar.meshes.get(bodyId);
@@ -53,6 +64,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
     return () => {
       cancelled = true;
+      unsubEngine?.();
       detach();
       instance.dispose();
       coreRef.current = null;

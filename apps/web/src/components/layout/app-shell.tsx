@@ -10,6 +10,7 @@ import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
 import { DateTimePicker } from './date-time-picker';
 import { UnitToggle } from './unit-toggle';
+import { PhysicsEngineToggle } from './physics-engine-toggle';
 import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 
@@ -33,6 +34,7 @@ export function AppShell() {
             <div className="flex items-center gap-2">
               <DateTimePicker />
               <UnitToggle />
+              <PhysicsEngineToggle />
             </div>
           }
         />
