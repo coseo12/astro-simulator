@@ -108,6 +108,30 @@ if (educationBtn) {
   check('education 모드는 P1에서 비활성', false, '버튼 없음');
 }
 
+// TimeControls 검증
+const pauseBtn = await page.$('[data-testid="time-pause"]');
+if (pauseBtn) {
+  await pauseBtn.click();
+  await page.waitForTimeout(200);
+  check(
+    '일시정지 버튼 클릭 시 play 버튼으로 전환',
+    (await page.$('[data-testid="time-play"]')) !== null,
+  );
+  // 다시 재생
+  await page.click('[data-testid="time-play"]');
+}
+
+// 속도 프리셋 1y 클릭
+const yearPreset = await page.$('[data-testid="time-preset-1y"]');
+if (yearPreset) {
+  await yearPreset.click();
+  await page.waitForTimeout(200);
+  check(
+    '1y 프리셋 클릭 시 active 상태',
+    ((await yearPreset.getAttribute('class')) ?? '').includes('border-primary'),
+  );
+}
+
 await page.screenshot({ path: join(screenshotDir, '02-interaction.png') });
 
 // 마우스 드래그 — 카메라 움직임 (콘솔 에러 없이 수행되는지만 확인)

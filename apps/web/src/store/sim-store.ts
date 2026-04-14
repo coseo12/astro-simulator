@@ -40,7 +40,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   mode: 'observe',
   julianDate: null,
   selectedBodyId: null,
-  timeScale: 1,
+  timeScale: 86_400,
   fps: null,
   pingCount: 0,
   lastPingAt: null,
