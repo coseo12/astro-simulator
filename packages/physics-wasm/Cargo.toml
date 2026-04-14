@@ -1,0 +1,18 @@
+[package]
+name = "physics-wasm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "astro-simulator Newton N-body WASM 코어 (P2-A)"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
