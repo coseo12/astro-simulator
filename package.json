@@ -30,10 +30,12 @@
     "verify:browser": "node scripts/browser-verify.mjs",
     "verify:scale": "node scripts/browser-verify-scale.mjs",
     "verify:mobile": "node scripts/browser-verify-mobile.mjs",
-    "verify:all": "pnpm verify:browser && pnpm verify:mobile && pnpm verify:scale && pnpm verify:perf",
-    "verify:perf": "node scripts/browser-verify-perf.mjs"
+    "verify:all": "pnpm verify:browser && pnpm verify:mobile && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y",
+    "verify:perf": "node scripts/browser-verify-perf.mjs",
+    "verify:a11y": "node scripts/browser-verify-a11y.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.59.1",
     "@typescript-eslint/eslint-plugin": "^8.58.2",
     "@typescript-eslint/parser": "^8.58.2",
