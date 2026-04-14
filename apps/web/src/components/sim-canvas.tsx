@@ -1,6 +1,6 @@
 'use client';
 
-import { SimulationCore } from '@astro-simulator/core';
+import { SimulationCore, scene as sceneApi } from '@astro-simulator/core';
 import { attachCoreToStore } from '@/core/core-adapter';
 import { useSimStore } from '@/store/sim-store';
 import { useEffect, useRef } from 'react';
@@ -31,10 +31,18 @@ export function SimCanvas() {
     const detach = attachCoreToStore(core);
 
     let cancelled = false;
-    core.start().catch((err: unknown) => {
-      if (cancelled) return;
-      console.error('[sim-canvas] 엔진 초기화 실패', err);
-    });
+    core
+      .start()
+      .then(() => {
+        if (cancelled || !core.scene) return;
+        // B3 데모 씬 — C3 (#15)에서 실제 태양계로 교체
+        sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
+        sceneApi.createSunEarthDemo(core.scene);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.error('[sim-canvas] 엔진 초기화 실패', err);
+      });
 
     return () => {
       cancelled = true;
