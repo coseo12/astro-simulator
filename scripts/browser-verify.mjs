@@ -82,9 +82,19 @@ if (earthBtn) {
 const researchBtn = await page.$('[data-testid="mode-research"]');
 if (researchBtn) {
   await researchBtn.click();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(500); // 패널 애니메이션 대기
   const mode = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
   check('research 모드 클릭 시 data-mode 갱신', mode === 'research', `data-mode=${mode}`);
+  // 연구 모드에서 좌/우 패널 표시
+  check('연구 모드 좌 패널 표시', (await page.$('[data-testid="panel-left"]')) !== null);
+  check('연구 모드 우 패널 표시', (await page.$('[data-testid="panel-right"]')) !== null);
+  // 다시 observe로 전환 → 패널 사라짐
+  await page.click('[data-testid="mode-observe"]');
+  await page.waitForTimeout(500);
+  check(
+    '관찰 모드 복귀 시 좌 패널 언마운트',
+    (await page.$('[data-testid="panel-left"]')) === null,
+  );
 } else {
   check('research 모드 클릭 시 data-mode 갱신', false, 'research 버튼 없음');
 }
