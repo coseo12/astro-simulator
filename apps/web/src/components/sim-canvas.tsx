@@ -35,12 +35,12 @@ export function SimCanvas() {
       .start()
       .then(() => {
         if (cancelled || !core.scene) return;
-        // B5: 로그 뎁스 버퍼 — 극단 near/far 동시 렌더
         sceneApi.enableLogarithmicDepth(core.scene);
-        // C3: 카메라는 태양계 전체를 보도록 35 AU (해왕성 30 AU 포함)
         sceneApi.setupArcRotateCamera(core.scene, { radius: 35 });
-        // C3: JPL 궤도 요소 + Kepler 해석해 기반 태양계
-        sceneApi.createSolarSystemScene(core.scene);
+        // 태양계 씬 + 시간 컨트롤러 연결
+        const solar = sceneApi.createSolarSystemScene(core.scene);
+        const onTime = ({ julianDate }: { julianDate: number }) => solar.updateAt(julianDate);
+        core.on('timeChanged', onTime);
       })
       .catch((err: unknown) => {
         if (cancelled) return;

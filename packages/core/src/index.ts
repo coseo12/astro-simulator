@@ -13,5 +13,6 @@ export * as physics from './physics/index.js';
 export * as scene from './scene/index.js';
 export * as gpu from './gpu/index.js';
 export * as ephemeris from './ephemeris/index.js';
+export * as time from './time/index.js';
 
 export const VERSION = '0.0.0';
