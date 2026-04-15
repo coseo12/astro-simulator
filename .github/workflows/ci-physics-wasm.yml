@@ -1,0 +1,40 @@
+name: CI (physics-wasm)
+
+# 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
+# Rust/wasm-pack 툴체인과 workspace 테스트 커버리지 가드를 담당한다.
+# harness가 관리하는 ci.yml 과 분리되어, 템플릿 업데이트 시 충돌을 방지한다.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  verify-and-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 모든 워크스페이스에 Vitest 설정 존재 강제 (조용히 스킵되는 테스트 방지)
+      - name: verify:test-coverage
+        if: hashFiles('scripts/verify-test-coverage.mjs') != ''
+        run: node scripts/verify-test-coverage.mjs
+
+      # Rust + WASM 툴체인 (packages/physics-wasm)
+      - name: Rust 툴체인 설정
+        if: hashFiles('rust-toolchain.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: wasm-pack 설치
+        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        run: cargo install wasm-pack --version 0.14.0 --locked
+
+      # 1000년 심플렉틱 적분(365250 step)은 release 모드에서만 빠름.
+      - name: Rust 테스트 (physics-wasm)
+        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
