@@ -1,55 +1,55 @@
 {
-  "timestamp": "2026-04-15T06:42:40.750Z",
-  "phase": "p3-a-end",
+  "timestamp": "2026-04-15T06:47:12.160Z",
+  "phase": "p3-a-end-bh",
   "durationMs": 3000,
   "environment": "playwright-chromium-headless",
   "viewport": "1280x800",
   "scenarios": [
     {
       "name": "idle",
-      "fps": 32.89
+      "fps": 32.77
     },
     {
       "name": "play-1d",
-      "fps": 30.5
-    },
-    {
-      "name": "play-1y",
       "fps": 30.32
     },
     {
+      "name": "play-1y",
+      "fps": 29.9
+    },
+    {
       "name": "focus-earth",
-      "fps": 90.81
+      "fps": 87.32
     },
     {
       "name": "focus-neptune",
-      "fps": 96.67
+      "fps": 95
     }
   ],
   "nBody": [
     {
       "n": 10,
-      "fps": 28.59
+      "fps": 30.14
     },
     {
       "n": 100,
-      "fps": 23.01
+      "fps": 23.07
     },
     {
       "n": 200,
-      "fps": 18.59
+      "fps": 18.66
     },
     {
       "n": 1000,
-      "fps": 7.48
+      "fps": 7.44
     },
     {
       "n": 5000,
-      "fps": 2.07
+      "fps": 2.06
     },
     {
       "n": 10000,
-      "fps": 1.22
+      "fps": 1.24
     }
   ]
 }
