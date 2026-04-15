@@ -40,20 +40,28 @@ describe('PhysicsEngineToggle', () => {
     expect(screen.getByTestId('engine-newton')).toHaveAttribute('title');
   });
 
-  // P3-0 #126
-  it('barnes-hut/webgpu/auto 버튼은 disabled (미구현)', () => {
+  // P3-A #134 — webgpu만 disabled, barnes-hut/auto는 활성화
+  it('webgpu 버튼만 disabled (P3-B 대기)', () => {
     render(<PhysicsEngineToggle />);
-    for (const id of ['barnes-hut', 'webgpu', 'auto']) {
+    for (const id of ['kepler', 'newton', 'barnes-hut', 'auto']) {
       const btn = screen.getByTestId(`engine-${id}`);
-      expect(btn).toBeDisabled();
-      expect(btn.dataset.runnable).toBe('false');
-      expect(btn).toHaveAttribute('title');
+      expect(btn).not.toBeDisabled();
+      expect(btn.dataset.runnable).toBe('true');
     }
+    const webgpu = screen.getByTestId('engine-webgpu');
+    expect(webgpu).toBeDisabled();
+    expect(webgpu.dataset.runnable).toBe('false');
   });
 
-  it('disabled 엔진 클릭은 store에 반영되지 않음', () => {
+  it('disabled 엔진(webgpu) 클릭은 store에 반영되지 않음', () => {
     render(<PhysicsEngineToggle />);
     fireEvent.click(screen.getByTestId('engine-webgpu'));
     expect(useSimStore.getState().physicsEngine).toBe('kepler');
+  });
+
+  it('barnes-hut 클릭 시 store 반영', () => {
+    render(<PhysicsEngineToggle />);
+    fireEvent.click(screen.getByTestId('engine-barnes-hut'));
+    expect(useSimStore.getState().physicsEngine).toBe('barnes-hut');
   });
 });
