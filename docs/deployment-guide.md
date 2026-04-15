@@ -16,13 +16,6 @@ git clone https://github.com/coseo12/harness-setting.git ./my-project
 cd my-project
 ```
 
-### 방법 C: 플러그인
-
-```bash
-git clone https://github.com/coseo12/harness-setting.git .harness-plugin
-claude --plugin-dir ./.harness-plugin
-```
-
 ## 2. 초기 설정
 
 ### 필수 의존성 확인

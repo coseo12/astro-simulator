@@ -1,0 +1,367 @@
+{
+  "harnessVersion": "2.2.0",
+  "installedAt": "2026-04-15T04:55:02Z",
+  "files": {
+    "CLAUDE.md": {
+      "sha256": "ab2fbd9b2c8b84cf9b29ed21e66fd683db4fa53343defe6937d5f15a07df4d02",
+      "category": "managed-block"
+    },
+    ".claude/agents/developer.md": {
+      "sha256": "be507e39f02b8168556716a7d1be047e4d5a0cc634ce336c45ee59ac86468372",
+      "category": "atomic"
+    },
+    ".claude/commands/harness-update.md": {
+      "sha256": "a94ab2a31f6c0554d0d20b10ea095ba7fa54d61d8731c42b62f2c248d9b9e163",
+      "category": "atomic"
+    },
+    ".claude/commands/volt-review.md": {
+      "sha256": "864d73e6d1ba659ada98c1f6bfb33ebd62cfb7a9055f00097899a926fcb0dea4",
+      "category": "atomic"
+    },
+    ".claude/commands/volt.md": {
+      "sha256": "a4ec26fa0fda11b5f6b2a09410e7a6c37ebd1c7d38e803129cf63df15b77bb76",
+      "category": "atomic"
+    },
+    ".claude/scheduled_tasks.lock": {
+      "sha256": "80e99de23cf0c2bb9a7556a957b1fe5127cee9b64824ebc37e41f60ab7cb103c",
+      "category": "atomic"
+    },
+    ".claude/settings.json": {
+      "sha256": "0a11c1919050a7c5bde79300724cd76129b96ce75f1cc238f4464178fd4ca9a8",
+      "category": "atomic"
+    },
+    ".claude/settings.local.json": {
+      "sha256": "82e8dd570510e2bcca92cf42bc4ee10df5cb70aa37965160801701a36cda4caa",
+      "category": "atomic"
+    },
+    ".claude/skills/browser-test/SKILL.md": {
+      "sha256": "d1d31d89c2f07f651e5cd25a2e79a60e66ca32707b0d28def4f69ddae34587ab",
+      "category": "atomic"
+    },
+    ".claude/skills/browser-test/scripts/check-browser.sh": {
+      "sha256": "8b6700380aa313d19c8f455e234dd2ddf16e2f707672d14e7d163fe1bd89b291",
+      "category": "atomic"
+    },
+    ".claude/skills/capture-volt/SKILL.md": {
+      "sha256": "936743bc451663ffe3287da43e9e88569cb9504d55f3bd11225b6c27216550a2",
+      "category": "atomic"
+    },
+    ".claude/skills/create-issue/SKILL.md": {
+      "sha256": "ff4d5e08aa4c2ae52d3779131dc1c8d4584c762eb6039d0b472a5028f94d220d",
+      "category": "atomic"
+    },
+    ".claude/skills/create-pr/SKILL.md": {
+      "sha256": "c5f58aa57a45a61bafa6a77de7cbfbabaa161920968c8fda86b2555e8a4fe6a2",
+      "category": "atomic"
+    },
+    ".claude/skills/cross-validate/SKILL.md": {
+      "sha256": "2501f6eda62189190903c33660ca7464f86d0daa2527ac58a044711b676b9d8d",
+      "category": "atomic"
+    },
+    ".claude/skills/cross-validate/scripts/cross_validate.sh": {
+      "sha256": "2f89cf54dd89b7902a29cba06eb527a2468353473bcc7545e46eea257ed44ef1",
+      "category": "atomic"
+    },
+    ".claude/skills/record-adr/SKILL.md": {
+      "sha256": "ab9f5688e6e2e6e7591919edfd3a9d217395b513d682434759ecb7a2e6566c4a",
+      "category": "atomic"
+    },
+    ".claude/skills/run-tests/SKILL.md": {
+      "sha256": "a834630de30f6add21548a0f65d0106b46595f46a76ccbe540a008da39df0aa3",
+      "category": "atomic"
+    },
+    ".claude/skills/volt-review/SKILL.md": {
+      "sha256": "0ce5035a2dbf429b987610946d877cfe210dd62e3a965059692e6d17b1249efc",
+      "category": "atomic"
+    },
+    ".github/CODEOWNERS": {
+      "sha256": "9e8ee7a8a9f0936061e617bc73decaae2d754804c17c45ff046fd476333d2390",
+      "category": "atomic"
+    },
+    ".github/ISSUE_TEMPLATE/task.yml": {
+      "sha256": "7007c136122491ebb995dbfdaba3cafc7075a3cf05095906e98a79a5efa414a3",
+      "category": "atomic"
+    },
+    ".github/PULL_REQUEST_TEMPLATE.md": {
+      "sha256": "6f5cc369dee8d47b118b324acd7003c5021e5b4b5d8c9a323d18f09c269fbaba",
+      "category": "atomic"
+    },
+    ".github/workflows/agent-dispatch.yml": {
+      "sha256": "3369562ed9c031652065e468d080f102b068a47f0f56b0545b1fcee16a4bc0f9",
+      "category": "frozen"
+    },
+    ".github/workflows/bench.yml": {
+      "sha256": "90e419f762fce73322943589807a86bf5e790eda1637f801ad4dd7fba870415e",
+      "category": "frozen"
+    },
+    ".github/workflows/ci.yml": {
+      "sha256": "deebad281a574fdc8fa6d60c669069f27c32321795133f4e1e32a7cb71d184c8",
+      "category": "frozen"
+    },
+    ".github/workflows/pr-review.yml": {
+      "sha256": "c58f1b8a529163bf34c851922c4c84f0f5d4eecdad10c8ac863cddeaa44d15cc",
+      "category": "frozen"
+    },
+    "scripts/bench-scene-real-gpu.mjs": {
+      "sha256": "596fa62fdc945486749d185840282bf643aeefcf8d51c8dfdc78d24e7ec1bc80",
+      "category": "frozen"
+    },
+    "scripts/bench-scene.mjs": {
+      "sha256": "35a5e45cd5a95b4f7f74dfbebb85bad04f5f2fe52b687bebd10b0d7abb9dd401",
+      "category": "frozen"
+    },
+    "scripts/bench-set-baseline.mjs": {
+      "sha256": "69dfdf8415e1cb2240f0af36bfee9480515e7ad51b9583dfb830913d5231baca",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-a11y-p2c.mjs": {
+      "sha256": "6c8d7c17a5ad8f003b8855ab01615c2dbbbf837e6802fba8081f132f98027b44",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-a11y.mjs": {
+      "sha256": "0a97a4c4e5c9d350117c7cb40e54b5c226eea5d9364b294a5742755299522740",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-asteroid-belt.mjs": {
+      "sha256": "b6ba6df45f06f609f089c3e26c255e4f3c60df5745d85368e7ea914fa17351d9",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-bookmark.mjs": {
+      "sha256": "42d3393fe42a6cb7da221df83cf0ad24c1ed9e8cada465f2abeb3da795774705",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-comets.mjs": {
+      "sha256": "a62adc20dc5ba2f3c40126cc2b42b0e62509cc92dd73408fb5e3246751c3503d",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-dwarf-planets.mjs": {
+      "sha256": "a4501a9eb8934b3b916e17b370d3f44892600c77ac62fb113afc0de2e6c1560c",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-engine-toggle.mjs": {
+      "sha256": "e17cff7465cc371721c9340aa23a7a72b529c6deea5d39f76ed7c4dfcc9eacab",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-mass-slider.mjs": {
+      "sha256": "ff2cc454ffe47dd11c0e2507c3f39a4e95939bd442a43d505e95ffbcbeb28903",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-mobile.mjs": {
+      "sha256": "1a6e7ebe9457b31f77eb1269dd53da1fa1a8e06936997873eb68c90baf22b86f",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-per-body-scale.mjs": {
+      "sha256": "8ad1873e8a0fe219c6ce5c33563871d4fc0fcbac51d7b788deea496ac408e203",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-perf.mjs": {
+      "sha256": "b59daf67bbb10740c01745746ba9a1f00291bb8919504604c505673b1bd0fb83",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-presets.mjs": {
+      "sha256": "3afbdeb567857717cd16cbb20df7424c1f02c22c8daf1563fce597b264ea98b5",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-scale.mjs": {
+      "sha256": "807c7fa373387c5da616ce65c671cdc0c10b4228a26980c371b45968c26d84cf",
+      "category": "frozen"
+    },
+    "scripts/browser-verify.mjs": {
+      "sha256": "76ed126534b31bde78a73084ce5a3872f516a717ecfc5e7b5ddf0389ba18170b",
+      "category": "frozen"
+    },
+    "scripts/check-encoding.sh": {
+      "sha256": "5baee855690654f55aac3daac70c1254236fa8d3abdf448351ed50478897f61b",
+      "category": "frozen"
+    },
+    "scripts/newton-accuracy-report.mjs": {
+      "sha256": "517ce48411bf0cad2126161258a66d746e2d4d7769cf42da30bc26cac892cd57",
+      "category": "frozen"
+    },
+    "scripts/verify-p2b.mjs": {
+      "sha256": "913330f192dc17e0ba403180ca6e6dbb57ee928eae3092ecfda5e8e290d8f134",
+      "category": "frozen"
+    },
+    "scripts/verify-p2c.mjs": {
+      "sha256": "9d5c352fbc7b72d4d3c7565b7beb81708983f733f278560276170a6937cf1f63",
+      "category": "frozen"
+    },
+    "scripts/verify-test-coverage.mjs": {
+      "sha256": "1c4d3eb44bf67732c9a0f81aabd4aa1a93338cb90e2e94f708ccb8e9e7f51a58",
+      "category": "frozen"
+    },
+    "docs/NEXT-EXAMPLE-PROJECT-REPORT.md": {
+      "sha256": "e66de480d80d5b9fe426e3f6cbdace252608725eedf2e1203957fc6447448d3b",
+      "category": "atomic"
+    },
+    "docs/OPS-REVIEW-REPORT.md": {
+      "sha256": "a8d89195ac9d6e44f85d1de76c5032589c5930eb111ca599bb51cab888e92472",
+      "category": "atomic"
+    },
+    "docs/TDD-DISCUSSION-REPORT.md": {
+      "sha256": "1c6f155d744d61d0159af19ec8912c11231d6b5da9bd6640ce94f3805db7fdaa",
+      "category": "atomic"
+    },
+    "docs/anthropic-harness-design.md": {
+      "sha256": "856253dcef05ba644f1a25e0c5a231ad40a242c265a4605f84d751c9b24d0ae4",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T09-22-19-440Z.json": {
+      "sha256": "c6b826d90cf07e4906d46057fb5833bf916b5812a0b399986401553fd7cf5131",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T13-12-08-070Z.json": {
+      "sha256": "5486b780f815551b95c342dd8d4a8c6057124c59a4561b1cb88549b45fd6dbca",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T13-12-32-305Z.json": {
+      "sha256": "673b42878b4f2829cb3da44500dba1f4869bffc08aeb51c3492464bd34e67920",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T13-13-01-668Z.json": {
+      "sha256": "ab3b22b5a277f8f5374244d9c7f1fa3b0aa75fffc8491c39f450b53902b51311",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T14-27-35-613Z.json": {
+      "sha256": "320ffe6fee27743a394cbc677a8cae447875e31931fbe1bc3c11bc66f31054ab",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T14-31-49-139Z.json": {
+      "sha256": "4c2fb897ba9f83d50804f040e922acf3953f1253cb92ffb36d2cad4edde4d510",
+      "category": "atomic"
+    },
+    "docs/benchmarks/2026-04-14T15-39-33-717Z.json": {
+      "sha256": "5a65643349a0300a52ea0296261d63723a07ab8572731ac8ca3a48f8a6ef5d56",
+      "category": "atomic"
+    },
+    "docs/benchmarks/README.md": {
+      "sha256": "e489254950778cebb4c49e7ecd5a8b7ade4de52571ae5ec66f40f54b492448c5",
+      "category": "atomic"
+    },
+    "docs/benchmarks/asteroid-belt-n-sweep.md": {
+      "sha256": "28c48335852d4324a98ee571255a42955058e1238b6db7b6dbba684147a14c16",
+      "category": "atomic"
+    },
+    "docs/benchmarks/baseline.json": {
+      "sha256": "320ffe6fee27743a394cbc677a8cae447875e31931fbe1bc3c11bc66f31054ab",
+      "category": "atomic"
+    },
+    "docs/benchmarks/newton-1000y.md": {
+      "sha256": "2b7bb5a75778f3c68d569a149ae9872a7fb73e625d6077b28179dc7bd87171e8",
+      "category": "atomic"
+    },
+    "docs/benchmarks/newton-accuracy.md": {
+      "sha256": "9796724a1ee252493f63167501c4b7b2b045aae68ab95f18d269890ac50825da",
+      "category": "atomic"
+    },
+    "docs/benchmarks/p2d-perf.md": {
+      "sha256": "4ffe6fcd59bda2df9b013cc48de6363e0e061a0c32c797c8d2fc4e23604e8fa5",
+      "category": "atomic"
+    },
+    "docs/benchmarks/p2d-real-gpu.json": {
+      "sha256": "f0067070f04cd4a10b86e00b2cbb90d3efd8f9cfb7945885f9918def37dc9efa",
+      "category": "atomic"
+    },
+    "docs/decisions/README.md": {
+      "sha256": "775b0251044cf94ff76f182f7d3f2e2263a085663d1a087ec2cd64d5fb6bd24e",
+      "category": "atomic"
+    },
+    "docs/deployment-guide.md": {
+      "sha256": "d87ee359c7fe11cb435357bd22171948f58f3c7f5adf5602083c89f2a99379fc",
+      "category": "atomic"
+    },
+    "docs/model-assumptions.md": {
+      "sha256": "f4aef34786132d92b9631ab7932a2c5c76983f9805628471beda7c345f21db2c",
+      "category": "atomic"
+    },
+    "docs/phases/P1-solar-system-mvp.md": {
+      "sha256": "bfc5cac22a97a2dee341877c6f142fb37430ec4bcf241c09ef82559f1d2b87a3",
+      "category": "atomic"
+    },
+    "docs/phases/architecture.md": {
+      "sha256": "8ae0740f15b1272a3ab07327f6a38080261988526e033e609fc295bc041c2c66",
+      "category": "atomic"
+    },
+    "docs/phases/design-tokens.md": {
+      "sha256": "ef4ecd25fa6ed492a753b4139d374a17bec31e293656694dc547ef4bd71c2bc9",
+      "category": "atomic"
+    },
+    "docs/phases/product-spec.md": {
+      "sha256": "f6d87bceffef49abbd7ee9f01e3b7404fec6e2d1d2d65f20a6d8409077e80de0",
+      "category": "atomic"
+    },
+    "docs/phases/roadmap.md": {
+      "sha256": "0161194c3490b95f9b948e075595ac69a187665a27e9c4231b907867985cb6fd",
+      "category": "atomic"
+    },
+    "docs/phases/time-reversal.md": {
+      "sha256": "e7c31ad03c46abd716f4f31cf4bf62b82e41bdbce73948863ffd54c42831d3d6",
+      "category": "atomic"
+    },
+    "docs/phases/ui-architecture.md": {
+      "sha256": "e6eb7304a431985993612bd85e3fd2827950caeede944a69f0fd8413a2ac49cb",
+      "category": "atomic"
+    },
+    "docs/plans/.gitkeep": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "category": "atomic"
+    },
+    "docs/report-cross-agent-issue.md": {
+      "sha256": "e7ef105a947d5e22a44ee48b174204984700bb70519da10df6ad29139f9c5f22",
+      "category": "atomic"
+    },
+    "docs/report-final-audit.md": {
+      "sha256": "ba867daf39f5cd6fb5c96d9b918de2483f19ee2efb15fb7b124ce167ec153d2d",
+      "category": "atomic"
+    },
+    "docs/report-harness-design-diagnosis.md": {
+      "sha256": "777ad2445e9fc56eb1f26eac4196590a74abfe3587a0b2f7440107bdecc2736b",
+      "category": "atomic"
+    },
+    "docs/report-lightweight-improvement.md": {
+      "sha256": "1da8c6712ef39cec7c9b8b193e121a59ac807280087b3a5b5db45367e7902a19",
+      "category": "atomic"
+    },
+    "docs/report-npx-vs-plugin.md": {
+      "sha256": "1a44917446a08a45f16f1cd99c498e222ec1f0f57a6b3d446bebf86db82a0f0d",
+      "category": "atomic"
+    },
+    "docs/report-renewal-retrospective.md": {
+      "sha256": "7f33dbe75de2db140b51514fb3314d10b78bf9cda8ed4ad80f8185eacbc6d01a",
+      "category": "atomic"
+    },
+    "docs/report-simpleshop-renewal-retrospective.md": {
+      "sha256": "23f175ea07e064a2177d590f8e2ecad715491de2804a084087187057b4525fb7",
+      "category": "atomic"
+    },
+    "docs/retrospectives/README.md": {
+      "sha256": "69fac0e0cc09d7679f3530173240112d7a7e69eee2ddff23187366950015de87",
+      "category": "atomic"
+    },
+    "docs/screenshots/01-solar-system.png": {
+      "sha256": "7359e984dacae54757c1a6c02545ef68448d7743644c37ae106bc74f7ec59ae2",
+      "category": "atomic"
+    },
+    "docs/screenshots/02-earth-focus.png": {
+      "sha256": "7a780495e800c5b5a9483c852af81aa133199e206252db510e2df037ed3057f5",
+      "category": "atomic"
+    },
+    "docs/screenshots/03-neptune.png": {
+      "sha256": "a10842e635f8661ebe8f39516720503556662d35a4963cb41e26abd0a2684600",
+      "category": "atomic"
+    },
+    "docs/screenshots/04-mobile.png": {
+      "sha256": "a8425b46163a2693b1d7cf1508c571e47c0b945dcff2beeef312ee72e1715440",
+      "category": "atomic"
+    },
+    "docs/security.md": {
+      "sha256": "7e9b2965c9fee2899266b795e1c650329b274fb31be39425137c68b65d0e099e",
+      "category": "atomic"
+    },
+    "docs/skills-guide.md": {
+      "sha256": "94c15fbb8e1d54f8addf786844087449bf0f1a0ab51c83dcd55ae08442f1405c",
+      "category": "atomic"
+    }
+  },
+  "lastUpdatedAt": "2026-04-15T04:55:41Z"
+}

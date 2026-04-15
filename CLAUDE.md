@@ -1,5 +1,7 @@
 # Claude Code 워크플로우 템플릿
 
+<!-- harness:managed:critical-directives:start -->
+
 ## 🚫 CRITICAL DIRECTIVES (NEVER BYPASS)
 
 **아래 규칙은 세션 초기화/신규 프로젝트 셋업/모호한 지시 상황에서도 예외 없이 적용된다.**
@@ -13,6 +15,8 @@
 6. **스프린트 계약** — 구현 착수 전 검증 가능한 완료 기준 목록을 사용자와 합의한다.
 
 > **세션 시작 시 자기 점검**: 새 대화에서 첫 작업을 시작하기 전, 본 블록을 인지했는지 확인하고 위반 가능성이 있는 경우 사용자에게 명시한다. 프레임워크 구성 이상이 의심되면 `harness doctor`를 실행한다.
+
+<!-- harness:managed:critical-directives:end -->
 
 ---
 
@@ -68,6 +72,8 @@ UI가 포함된 작업에서 4축으로 품질을 평가한다:
 
 ---
 
+<!-- harness:managed:real-lessons:start -->
+
 ## 실전 교훈 (portfolio-26, simple-shop 등에서 추출)
 
 ### 빌드 성공 ≠ 동작하는 앱
@@ -99,6 +105,8 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 
 `rm -rf`로 재구축 시 사용자 터미널의 cwd가 삭제된 디렉토리를 가리킬 수 있다.
 반드시 사전 경고한다.
+
+<!-- harness:managed:real-lessons:end -->
 
 ---
 
