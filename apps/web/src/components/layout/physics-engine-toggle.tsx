@@ -28,12 +28,12 @@ const ENGINES: EngineDef[] = [
   {
     id: 'webgpu',
     label: 'WebGPU',
-    tooltip: 'GPU compute shader — N=10000+ 최대 성능 (P3-B에서 활성화).',
+    tooltip: 'GPU compute — N=10000+ 최대 성능. 미지원 시 Barnes-Hut 폴백.',
   },
   {
     id: 'auto',
     label: 'Auto',
-    tooltip: 'belt N≥1000이면 Barnes-Hut, 아니면 Newton. P3-B 후 WebGPU 우선.',
+    tooltip: 'WebGPU+N≥1000 → WebGPU / 미지원이면 Barnes-Hut / N<1000 → Newton.',
   },
 ];
 
