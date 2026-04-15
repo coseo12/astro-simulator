@@ -7,4 +7,4 @@
  * P3 WebGPU N-body Compute에서 본격 활용.
  */
 
-export {};
+export { detectGpuCapability, type GpuCapability } from './capability';

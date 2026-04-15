@@ -10,6 +10,8 @@ import { useSimStore } from '@/store/sim-store';
 export function HudCorners() {
   const renderer = useSimStore((s) => s.rendererKind);
   const engineError = useSimStore((s) => s.engineError);
+  const engineNotice = useSimStore((s) => s.engineNotice);
+  const setEngineNotice = useSimStore((s) => s.setEngineNotice);
   const julianDate = useSimStore((s) => s.julianDate);
   const selected = useSimStore((s) => s.selectedBodyId);
 
@@ -40,6 +42,26 @@ export function HudCorners() {
               : 'initializing…'}
         </div>
       </div>
+
+      {/* 상단 중앙 — 비-fatal 알림 (P3-0 #124, dismissible) */}
+      {engineNotice && (
+        <div
+          data-testid="engine-notice"
+          role="status"
+          className="absolute top-14 left-1/2 -translate-x-1/2 max-w-md text-caption num text-fg-primary bg-bg-surface/90 backdrop-blur px-3 py-1.5 rounded-sm border border-border-subtle flex items-center gap-2"
+        >
+          <span>{engineNotice}</span>
+          <button
+            type="button"
+            data-testid="engine-notice-dismiss"
+            aria-label="알림 닫기"
+            onClick={() => setEngineNotice(null)}
+            className="text-fg-tertiary hover:text-fg-primary px-1"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* 좌하 — 선택 천체 */}
       {selected && (

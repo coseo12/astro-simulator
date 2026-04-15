@@ -1,6 +1,6 @@
 'use client';
 
-import { SimulationCore, scene as sceneApi } from '@astro-simulator/core';
+import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulator/core';
 import { attachCoreToStore } from '@/core/core-adapter';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -19,6 +19,26 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (coreRef.current && !coreRef.current.disposed) return;
+
+    // P3-0 #124 — WebGPU capability 감지 (마운트 시 1회). 사용자가 webgpu/auto
+    // 엔진을 요청했는데 미지원이면 콘솔 경고 + HUD notice + newton 폴백 안내.
+    gpuApi.detectGpuCapability().then((cap) => {
+      const requested = useSimStore.getState().physicsEngine;
+      const wantsGpu = requested === 'webgpu' || requested === 'auto';
+      if (!cap.webgpu) {
+        // 항상 경고: 향후 P3-A/B 활성화 시 진단에 도움.
+        // eslint-disable-next-line no-console
+        console.warn('[gpu] WebGPU 미지원:', cap.reason);
+        if (wantsGpu) {
+          useSimStore
+            .getState()
+            .setEngineNotice(`WebGPU 미지원 — ${cap.reason ?? 'unknown'} · Newton로 폴백.`);
+        }
+      } else if (cap.adapterInfo) {
+        // eslint-disable-next-line no-console
+        console.info('[gpu] adapter:', cap.adapterInfo);
+      }
+    });
 
     const instance = new SimulationCore(canvas);
     // Babylon이 기본 tabindex=1을 설정 — a11y(WCAG 2.4.3) 권고상 양수 금지.

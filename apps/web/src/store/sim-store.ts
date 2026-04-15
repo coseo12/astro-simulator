@@ -25,6 +25,8 @@ export interface SimStoreState {
   // 엔진 상태
   rendererKind: 'webgpu' | 'webgl2' | null;
   engineError: string | null;
+  /** 비-fatal 알림 (예: WebGPU 미지원 폴백). dismiss 가능. */
+  engineNotice: string | null;
 
   // 시뮬레이션 상태
   mode: SimMode;
@@ -44,6 +46,7 @@ export interface SimStoreState {
   // actions (Core → store)
   setRenderer: (kind: 'webgpu' | 'webgl2' | null) => void;
   setEngineError: (message: string | null) => void;
+  setEngineNotice: (message: string | null) => void;
   setMode: (mode: SimMode) => void;
   setTime: (julianDate: number) => void;
   setSelectedBody: (id: string | null) => void;
@@ -59,6 +62,7 @@ export interface SimStoreState {
 export const useSimStore = create<SimStoreState>((set) => ({
   rendererKind: null,
   engineError: null,
+  engineNotice: null,
   mode: 'observe',
   julianDate: null,
   selectedBodyId: null,
@@ -72,6 +76,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
 
   setRenderer: (kind) => set({ rendererKind: kind }),
   setEngineError: (message) => set({ engineError: message }),
+  setEngineNotice: (message) => set({ engineNotice: message }),
   setMode: (mode) => set({ mode }),
   setTime: (julianDate) => set({ julianDate }),
   setSelectedBody: (id) => set({ selectedBodyId: id }),
