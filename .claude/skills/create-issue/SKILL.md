@@ -22,25 +22,20 @@ GitHub 이슈를 프레임워크의 라벨 체계에 맞게 생성한다.
 
 ```markdown
 ## 설명
-
 [작업 내용 요약 — 한 문단 이내]
 
 ## 배경
-
 [왜 이 작업이 필요한지]
 
 ## 완료 조건
-
 - [ ] 조건 1
 - [ ] 조건 2
 
 ## 의존성
-
 - 선행: #이슈번호 (없으면 "없음")
 - 후행: #이슈번호 (없으면 "없음")
 
 ## 기술 참고
-
 [Architect가 참고할 기술적 맥락. 없으면 생략]
 ```
 
@@ -69,14 +64,14 @@ gh issue comment <이슈번호> --body "의존성: #<선행이슈번호> 완료 
 
 ## 라벨 가이드
 
-| 카테고리     | 값                                                                                                                                                                                                                                                | 설명                             |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| **에이전트** | `agent:planner` `agent:pm` `agent:architect` `agent:developer` `agent:frontend-developer` `agent:backend-developer` `agent:reviewer` `agent:qa` `agent:auditor` `agent:integrator` `agent:skill-creator` `agent:cross-validator` `agent:releaser` | 담당 에이전트                    |
-| **범위**     | `scope:frontend` `scope:backend` `scope:fullstack`                                                                                                                                                                                                | FE/BE 구분                       |
-| **우선순위** | `priority:critical` `priority:high` `priority:medium` `priority:low`                                                                                                                                                                              | 처리 긴급도                      |
-| **크기**     | `size:s` `size:m` `size:l` `size:xl`                                                                                                                                                                                                              | s=1-2h, m=반나절, l=1일, xl=2일+ |
-| **타입**     | `type:feature` `type:bug` `type:refactor` `type:infra`                                                                                                                                                                                            | 작업 분류                        |
-| **상태**     | `status:todo` `status:in-progress` `status:review` `status:audit-passed` `status:qa` `status:qa-passed` `status:done` `status:blocked`                                                                                                            | 진행 상태                        |
+| 카테고리 | 값 | 설명 |
+|----------|-----|------|
+| **에이전트** | `agent:planner` `agent:pm` `agent:architect` `agent:developer` `agent:frontend-developer` `agent:backend-developer` `agent:reviewer` `agent:qa` `agent:auditor` `agent:integrator` `agent:skill-creator` `agent:cross-validator` `agent:releaser` | 담당 에이전트 |
+| **범위** | `scope:frontend` `scope:backend` `scope:fullstack` | FE/BE 구분 |
+| **우선순위** | `priority:critical` `priority:high` `priority:medium` `priority:low` | 처리 긴급도 |
+| **크기** | `size:s` `size:m` `size:l` `size:xl` | s=1-2h, m=반나절, l=1일, xl=2일+ |
+| **타입** | `type:feature` `type:bug` `type:refactor` `type:infra` | 작업 분류 |
+| **상태** | `status:todo` `status:in-progress` `status:review` `status:audit-passed` `status:qa` `status:qa-passed` `status:done` `status:blocked` | 진행 상태 |
 
 ## 규칙
 
