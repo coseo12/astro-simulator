@@ -290,9 +290,12 @@ export function createSolarSystemScene(
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
     if (kind === activeEngine) return;
-    if (kind === 'newton') buildNewton(currentJd);
+    // P3-A #132 — barnes-hut/webgpu/auto 모드 수신 시 wasm BarnesHutEngine로의
+    // 직접 라우팅은 #134(JS 어댑터 + UI 활성화)에서 합류한다. 그때까지는 newton로 폴백.
+    const effective: PhysicsEngineKind = kind === 'kepler' ? 'kepler' : 'newton';
+    if (effective === 'newton') buildNewton(currentJd);
     else disposeNewton();
-    activeEngine = kind;
+    activeEngine = effective;
   };
   const getPhysicsEngine = () => activeEngine;
 
