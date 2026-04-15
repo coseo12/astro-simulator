@@ -24,6 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = join(__dirname, '..', 'docs', 'benchmarks');
 mkdirSync(outDir, { recursive: true });
 
+// P3-D #154 — vsync 해제 flag로 절대 throughput 측정 가능. cap fps 우회.
 const browser = await chromium.launch({
   headless: true,
   args: [
@@ -32,6 +33,11 @@ const browser = await chromium.launch({
     '--use-angle=metal',
     '--enable-gpu-rasterization',
     '--ignore-gpu-blocklist',
+    // vsync/frame-rate cap 해제 (절대 throughput 측정용)
+    '--disable-gpu-vsync',
+    '--disable-frame-rate-limit',
+    '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling',
   ],
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
