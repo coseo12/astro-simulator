@@ -24,3 +24,11 @@ export {
   type NbodyForceDispatchOptions,
 } from './nbody-force-shader.js';
 export { computeForcesF32 } from './nbody-force-cpu.js';
+export {
+  NBODY_VV_TILE,
+  NBODY_VV_PHASE_PRE,
+  NBODY_VV_PHASE_POST,
+  NBODY_VV_WGSL,
+  createNbodyVvShader,
+} from './nbody-vv-shader.js';
+export { stepVvF32 } from './nbody-vv-cpu.js';
