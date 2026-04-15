@@ -3,6 +3,57 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.3.0-p3] — 2026-04-15
+
+### P3 Barnes-Hut + WebGPU compute
+
+**P3-0 준비**
+
+- WebGPU 감지 + 자동 폴백 (`detectGpuCapability`, HUD dismissible notice) (#124)
+- `bench:scene:sweep` N=5000/10000 확장 + CI bench 워크플로 timeout 30분 (#125)
+- Engine selector 4-mode 확장 (`kepler|newton|barnes-hut|webgpu|auto`) (#126)
+
+**P3-A Barnes-Hut (Rust/CPU)**
+
+- Octree 데이터 구조 — flat `Vec<Node>`, leaf cap=1, MAX_DEPTH=24 (#130)
+- COM + Salmon-Warren MAC tree-walk force (theta=0.5 max err **4.99e-9**) (#131)
+- WASM `BarnesHutEngine` 노출 + Velocity-Verlet 통합 (#132)
+- 1년 시뮬 정확도 검증 — Newton 직접합 대비 P3 계약 1e-3의 6 자릿수 여유 (#133)
+- UI 활성화 + auto 모드 라우팅 (belt N≥1000 → barnes-hut) (#134)
+
+**P3-B WebGPU compute**
+
+- WebGPU compute 인프라 — `GpuComputeContext`, `GpuFloat32Buffer`, WGSL helpers (#143)
+- N-body force WGSL shader — `workgroup_size=64` tiled algorithm (#144)
+- V-V 적분 ADR + WGSL shader (`docs/decisions/20260415-webgpu-integration-scheme.md`, B 스킴 GPU-resident) (#145)
+- `WebGpuNBodyEngine` JS 어댑터 + scene 라우팅 + UI 활성화 (capability 자동 폴백) (#146)
+- 정확도 가드 + `bench:webgpu` 측정 도구 + p3b-perf.md (#147)
+
+**P3-D 검증·마감**
+
+- vsync 해제 throughput 측정 (`--disable-gpu-vsync` flag) — 가속비 측정 한계 박제 (#154)
+- 종합 회귀 검증 287/287 통과 (Rust 22 + vitest 211 + browser-verify 54) (#155)
+- v0.3.0 릴리스 (#156)
+
+**아키텍처/데이터:**
+
+- 신규 패키지 모듈: `packages/core/src/gpu/` (compute-context / buffer / wgsl-helpers / nbody-force-shader / nbody-vv-shader / capability)
+- 신규 엔진: `BarnesHutNBodyEngine` (CPU/wasm) + `WebGpuNBodyEngine` (GPU)
+- `PhysicsEngineKind`: `kepler|newton|barnes-hut|webgpu|auto` 5-mode
+- harness v2.2.0 → v2.3.0 적용 (신규 페르소나 커맨드 7종 + ADR/회고 디렉토리)
+
+**Known Issues / 인계:**
+
+- WebGPU 가속비 측정 환경 한계: 헤드리스 Chromium ANGLE Metal에서 Babylon이 WebGL2 fallback 사용. webgpu URL은 capability 폴백으로 barnes-hut 라우팅. 실 측정은 데스크톱 Chrome Canary 또는 Babylon `useWebGPU: true` 명시 필요.
+- 소행성대가 Kepler 해석해 + ThinInstances 렌더로 처리됨 — N-body 엔진 입력은 ~10 bodies. 'CPU 대비 webgpu ≥2× 가속'은 소행성대 N-body 통합(P4 후보) 후 재측정.
+- WGSL f32 한정 정밀도 — 행성 SI 좌표(~1e11 m)에서 ~10km 단위 손실. 정밀 시뮬은 CPU 경로(`NBodySystem` f64) 사용.
+
+**문서:**
+
+- `docs/decisions/20260415-webgpu-integration-scheme.md` (ADR)
+- `docs/benchmarks/p3a-barnes-hut-accuracy.md`, `p3a-perf.md`, `p3b-perf.md`, `p3d-comprehensive-verify.md`
+- `docs/retrospectives/harness-update-2.2.0-retrospective.md` (P3 진행 중 회고)
+
 ## [0.2.0-p2] — 2026-04-15
 
 ### P2 태양계 확장 + Newton N-body
