@@ -2,7 +2,18 @@ import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
 
 export type UnitSystem = 'si' | 'astro' | 'natural';
-export type PhysicsEngineKind = 'kepler' | 'newton';
+/**
+ * 물리 엔진 종류 (P3-0 #126).
+ *  - kepler: 2-body 해석해 (P1)
+ *  - newton: N-body Velocity-Verlet 직접합 (P2-A, wasm)
+ *  - barnes-hut: O(N log N) octree (P3-A 도입 예정 — 현재 비활성)
+ *  - webgpu: GPU compute shader (P3-B 도입 예정 — 현재 비활성)
+ *  - auto: 환경 capability 감지로 최적 자동 선택 (현재는 newton로 동작)
+ */
+export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
+
+/** 현재 런타임에서 실제 동작하는 엔진 (auto/미구현은 newton로 폴백). */
+export const RUNNABLE_ENGINES: ReadonlySet<PhysicsEngineKind> = new Set(['kepler', 'newton']);
 
 /**
  * 시뮬레이션 UI 상태 store.

@@ -7,7 +7,9 @@ import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from './sim-context';
 
 const MODE_VALUES: SimMode[] = ['observe', 'research', 'education', 'sandbox'];
-const ENGINE_VALUES = ['kepler', 'newton'] as const;
+// P3-0 #126 — barnes-hut/webgpu/auto는 URL로는 받지만 런타임은 미구현 폴백.
+// 후방호환: 기존 newton/kepler URL은 그대로 동작.
+const ENGINE_VALUES = ['kepler', 'newton', 'barnes-hut', 'webgpu', 'auto'] as const;
 type PhysicsEngineUrl = (typeof ENGINE_VALUES)[number];
 
 /**

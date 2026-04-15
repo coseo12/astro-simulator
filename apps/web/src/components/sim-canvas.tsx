@@ -39,8 +39,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
+        // P3-0 #126 — barnes-hut/webgpu/auto는 아직 런타임 미구현. newton로 폴백.
+        const resolveEngine = (
+          k: ReturnType<typeof useSimStore.getState>['physicsEngine'],
+        ): 'kepler' | 'newton' => (k === 'kepler' ? 'kepler' : 'newton');
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
-          physicsEngine: useSimStore.getState().physicsEngine,
+          physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
         });
 
@@ -50,7 +54,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // + 질량 배수 변경 → setBodyMassMultiplier (#107)
         unsubEngine = useSimStore.subscribe((state, prev) => {
           if (state.physicsEngine !== prev.physicsEngine) {
-            solar.setPhysicsEngine(state.physicsEngine);
+            solar.setPhysicsEngine(resolveEngine(state.physicsEngine));
           }
           if (state.massMultipliers !== prev.massMultipliers) {
             const prevKeys = new Set(Object.keys(prev.massMultipliers));
