@@ -197,7 +197,3 @@ function toFloat32(arr: Float64Array | Float32Array): Float32Array {
   for (let i = 0; i < arr.length; i++) out[i] = arr[i] ?? 0;
   return out;
 }
-
-/** ADR 조건상 NBODY_VV_PHASE_PRE === 0이지만, 명확성을 위해 재 export 안 함 */
-void NBODY_VV_PHASE_PRE;
-void NBODY_VV_PHASE_POST;
