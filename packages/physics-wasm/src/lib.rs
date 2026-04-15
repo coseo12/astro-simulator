@@ -9,6 +9,7 @@
 
 use wasm_bindgen::prelude::*;
 
+pub mod barnes_hut;
 pub mod nbody;
 
 use nbody::NBodySystem;
