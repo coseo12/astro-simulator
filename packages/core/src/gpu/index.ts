@@ -16,3 +16,11 @@ export {
 } from './compute-context.js';
 export { GpuFloat32Buffer } from './buffer.js';
 export { WGSL_GRAVITY_PAIR } from './wgsl-helpers.js';
+export {
+  NBODY_FORCE_TILE,
+  NBODY_FORCE_WGSL,
+  createNbodyForceShader,
+  dispatchNbodyForce,
+  type NbodyForceDispatchOptions,
+} from './nbody-force-shader.js';
+export { computeForcesF32 } from './nbody-force-cpu.js';
