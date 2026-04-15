@@ -1,6 +1,6 @@
 {
   "harnessVersion": "2.4.0",
-  "installedAt": "2026-04-15T09:06:54Z",
+  "installedAt": "2026-04-15T09:10:00Z",
   "files": {
     "CLAUDE.md": {
       "sha256": "ab2fbd9b2c8b84cf9b29ed21e66fd683db4fa53343defe6937d5f15a07df4d02",
@@ -255,7 +255,7 @@
       "category": "atomic"
     },
     "docs/agents-guide.md": {
-      "sha256": "7be18fce2d40cf2e62be7d8cfa553c7808fedf020e6620b65bdba82c23cd0cba",
+      "sha256": "aa55f8f190e1257f6a3a39e3da4a14f68b8dd01f92fd3acd681e5ca0fd768e40",
       "category": "atomic"
     },
     "docs/anthropic-harness-design.md": {
@@ -351,7 +351,7 @@
       "category": "atomic"
     },
     "docs/commands-index.md": {
-      "sha256": "48f4e9b5e847e7f33050f1d40467153319bc2af171f57cbf6a231f4d6bbba095",
+      "sha256": "59791de15132fed6aa330dd8d1d08202f1ed628e124ee2be2f58e39de5b5f5c2",
       "category": "atomic"
     },
     "docs/decisions/README.md": {
@@ -363,7 +363,7 @@
       "category": "atomic"
     },
     "docs/knowledge-compilation.md": {
-      "sha256": "7c516243210669b442d3f8618a6ef54eb99d1333c1c80bf91ad879f1b7074902",
+      "sha256": "5618af8a110f719281e7bb76f2ac7d37db77029ceb89458fc910182d41435773",
       "category": "atomic"
     },
     "docs/model-assumptions.md": {
