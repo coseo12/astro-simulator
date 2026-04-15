@@ -12,6 +12,7 @@ use wasm_bindgen::prelude::*;
 pub mod barnes_hut;
 pub mod nbody;
 
+use barnes_hut::engine::BarnesHutSystem;
 use nbody::NBodySystem;
 
 /// 스모크 테스트용 함수. #84.
@@ -70,6 +71,71 @@ impl NBodyEngine {
 
     pub fn total_energy(&self) -> f64 {
         self.inner.total_energy()
+    }
+}
+
+/// Barnes-Hut O(N log N) 가속 엔진 (P3-A #132).
+/// `NBodyEngine`과 동일 시그니처 — JS는 동일한 어댑터로 두 엔진을 교체 가능.
+#[wasm_bindgen]
+pub struct BarnesHutEngine {
+    inner: BarnesHutSystem,
+}
+
+#[wasm_bindgen]
+impl BarnesHutEngine {
+    /// `theta`: MAC 임계값 (0=직접합, 0.5 권장, 0.7 빠름).
+    /// `softening`: close-encounter 발산 방지용 ε. 권장: 가장 가까운 입자쌍의 1% 수준.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        masses: Vec<f64>,
+        pos: Vec<f64>,
+        vel: Vec<f64>,
+        theta: f64,
+        softening: f64,
+    ) -> BarnesHutEngine {
+        let mut inner = BarnesHutSystem::new(masses, pos, vel, theta);
+        inner.softening_sq = softening * softening;
+        BarnesHutEngine { inner }
+    }
+
+    pub fn n(&self) -> usize {
+        self.inner.n()
+    }
+
+    pub fn step(&mut self, dt: f64) {
+        self.inner.step(dt);
+    }
+
+    pub fn step_chunked(&mut self, total_dt: f64, max_dt: f64) {
+        let abs = total_dt.abs();
+        if abs == 0.0 {
+            return;
+        }
+        let sub_count = (abs / max_dt).ceil() as usize;
+        let sub_dt = total_dt / sub_count as f64;
+        for _ in 0..sub_count {
+            self.inner.step(sub_dt);
+        }
+    }
+
+    pub fn positions(&self) -> Vec<f64> {
+        self.inner.pos.clone()
+    }
+
+    pub fn velocities(&self) -> Vec<f64> {
+        self.inner.vel.clone()
+    }
+
+    pub fn total_energy(&self) -> f64 {
+        self.inner.total_energy()
+    }
+
+    pub fn theta(&self) -> f64 {
+        self.inner.theta
+    }
+
+    pub fn set_theta(&mut self, theta: f64) {
+        self.inner.theta = theta;
     }
 }
 
