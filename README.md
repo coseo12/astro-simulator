@@ -10,12 +10,18 @@
 
 ## 현재 상태
 
-**v0.1.0-p1** — P1 태양계 MVP 완료 (2026-04-14)
+**v0.3.0-p3** — P3 Barnes-Hut + WebGPU compute 완료 (2026-04-15)
 
-- 태양 + 행성 8개 + 달, J2000 기준 Kepler 해석해
-- 시간 제어 (재생/역행/×1~×10y 프리셋)
-- 카메라 포커스 전환 애니메이션
-- 4모드 UI 프레임 (관찰/연구 활성, 교육/샌드박스 P2+)
+- 태양계 18 바디 (행성 8 + 달 + 왜소행성 5 + 혜성 3 + 태양) 실시간 적분
+- 5-mode 물리 엔진 토글: `kepler` / `newton` / `barnes-hut` / `webgpu` / `auto`
+  - Kepler 2-body 해석해 (P1)
+  - Newton N-body Velocity-Verlet, WASM (P2-A)
+  - Barnes-Hut O(N log N) octree, WASM (P3-A) — theta=0.5 max err 4.99e-9
+  - WebGPU compute shader (P3-B) — capability 미지원 시 자동 폴백
+  - Auto: 환경/N에 따라 최적 엔진 자동 선택
+- 소행성대 ThinInstances `?belt=N` 1~10000 (Kepler 해석해)
+- 시간 제어 (재생/역행, ×1d/×1y 프리셋, julian date 정밀 jump)
+- 질량 슬라이더 + "만약에" 시나리오 + URL 북마크 + 4-mode UI
 
 ## 스크린샷
 
@@ -117,28 +123,34 @@ pnpm verify:all           # 위 5개 순차 실행
 
 ## 테스트 현황
 
-- **단위 테스트**: 130개 통과
-  - core: 89 (coords, physics, ephemeris, scene, time)
-  - shared: 4 (astronomy 상수)
-  - web: 37 (store, hooks, UI 컴포넌트)
+v0.3.0 종합 회귀 287/287 통과 — `docs/benchmarks/p3d-comprehensive-verify.md` 참조.
+
+- **단위 테스트**: 211 (vitest)
+  - core: 153 (gpu, physics, scene, coords, ephemeris, time)
+  - web: 57 (store, layout, panels)
+  - physics-wasm: 1 (binding smoke)
+- **Rust**: 22
+  - unit 18 (nbody + barnes_hut + capability)
+  - integration 2 (barnes_hut_accuracy theta sweep + 1-year)
+  - cargo doc-tests 0
 - **E2E (Playwright)**:
   - verify:browser — 25 PASS
-  - verify:mobile — 7 PASS
   - verify:scale — 9 PASS
+  - verify:mobile — 7 PASS
+  - verify:perf — 5 PASS (평균 ≥ 30 fps)
   - verify:a11y — 8 PASS (axe 위반 0건)
-- **성능 (headless)**:
-  - 정지/재생 36~38 FPS
-  - 포커스 상태 90+ FPS
-  - 실제 브라우저 60 FPS 기대
+- **성능 (실 GPU, M1 Pro Metal, #116)**:
+  - N=1000 / N=10000 모두 vsync cap 120 fps
+  - 헤드리스는 software renderer 한계로 N에 비례 감소
 
 ---
 
 ## 로드맵
 
 - **P1 — 태양계 MVP** ✅ (Kepler 해석해, 8행성 + 달)
-- **P2 — N-body 전환** (심플렉틱 적분기, 소행성/혜성)
-- **P3 — WebGPU Compute** (카이퍼대/오르트 구름)
-- **P4 — 근거리 항성 + 상대론** (Gaia DR3, 블랙홀 렌징)
+- **P2 — N-body 전환** ✅ (Velocity-Verlet WASM, 18 바디, 소행성대)
+- **P3 — Barnes-Hut + WebGPU** ✅ (octree O(N log N), WGSL compute, 5-mode 토글)
+- **P4 — 소행성대 N-body 통합 + 일반상대론 + 모바일** (BH/GPU 가속비 실측, 수성 근일점)
 - **P5 — 항성 진화 + 외계행성**
 - **P6 — 은하·은하단**
 - **P7 — 관측가능우주**
@@ -168,6 +180,21 @@ pnpm verify:all           # 위 5개 순차 실행
 - [P1 접근성](./docs/retrospectives/P1-a11y.md)
 - [P1 브라우저 호환성](./docs/retrospectives/P1-browser-compat.md)
 - [P1 회고](./docs/retrospectives/P1-retrospective.md)
+- [P3 회고](./docs/retrospectives/p3-retrospective.md) — Barnes-Hut + WebGPU
+- [harness v2.2.0 업데이트 회고](./docs/retrospectives/harness-update-2.2.0-retrospective.md)
+
+### 벤치마크/측정
+
+- [P2-D 실 GPU 성능](./docs/benchmarks/p2d-perf.md)
+- [P3-A Barnes-Hut 정확도](./docs/benchmarks/p3a-barnes-hut-accuracy.md)
+- [P3-A 성능 비교](./docs/benchmarks/p3a-perf.md)
+- [P3-B WebGPU 측정](./docs/benchmarks/p3b-perf.md)
+- [P3-D 종합 회귀](./docs/benchmarks/p3d-comprehensive-verify.md)
+
+### ADR (아키텍처 결정)
+
+- [WebGPU N-body 적분 스킴 (GPU-resident)](./docs/decisions/20260415-webgpu-integration-scheme.md)
+- [decisions/](./docs/decisions/)
 
 ---
 
