@@ -48,7 +48,8 @@ const measureFps = (d) =>
   );
 
 const rows = [];
-for (const path of ['/ko', '/ko?belt=200', '/ko?belt=1000']) {
+// P3-0(#125) — N=5000/10000 추가. ThinInstances 10k cap은 sim-canvas와 일치.
+for (const path of ['/ko', '/ko?belt=200', '/ko?belt=1000', '/ko?belt=5000', '/ko?belt=10000']) {
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
   await page.click('[data-testid="time-play"]').catch(() => {});

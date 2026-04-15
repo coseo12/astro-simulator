@@ -16,6 +16,8 @@ jobs:
   bench:
     runs-on: ubuntu-latest
     continue-on-error: true
+    # P3-0(#125): sweep N=5000/10000 추가로 측정 시간 증가. 기본 6h → 30m로 명시.
+    timeout-minutes: 30
     permissions:
       pull-requests: write
     steps:
