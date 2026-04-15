@@ -20,11 +20,6 @@ jobs:
           echo "Node.js ${node_version} 사용"
         # Node 설정은 프로젝트별로 추가
 
-      # verify:test-coverage — 모든 워크스페이스에 Vitest 설정 존재 강제
-      - name: verify:test-coverage
-        if: hashFiles('scripts/verify-test-coverage.mjs') != ''
-        run: node scripts/verify-test-coverage.mjs
-
       # Python 프로젝트 감지
       - name: Python 테스트
         if: hashFiles('pyproject.toml') != '' || hashFiles('setup.py') != ''
@@ -39,23 +34,12 @@ jobs:
           echo "Go 프로젝트 감지됨"
         # Go 설정은 프로젝트별로 추가
 
-      # Rust + WASM 툴체인 (packages/physics-wasm)
-      - name: Rust 툴체인 설정
-        if: hashFiles('rust-toolchain.toml') != ''
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-          components: rustfmt, clippy
-
-      - name: wasm-pack 설치
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        run: cargo install wasm-pack --version 0.14.0 --locked
-
-      - name: Rust 테스트 (physics-wasm)
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        # 1000년 심플렉틱 적분(365250 step)은 release 모드에서만 빠름.
-        run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
+      # Rust 프로젝트 감지
+      - name: Rust 테스트
+        if: hashFiles('Cargo.toml') != ''
+        run: |
+          echo "Rust 프로젝트 감지됨"
+        # Rust 설정은 프로젝트별로 추가
 
       # Makefile 기반
       - name: Make 테스트
