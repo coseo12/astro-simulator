@@ -8,3 +8,11 @@
  */
 
 export { detectGpuCapability, type GpuCapability } from './capability';
+export {
+  GpuComputeContext,
+  WebGpuUnavailableError,
+  createGpuComputeContext,
+  isWebGpuEngine,
+} from './compute-context.js';
+export { GpuFloat32Buffer } from './buffer.js';
+export { WGSL_GRAVITY_PAIR } from './wgsl-helpers.js';
