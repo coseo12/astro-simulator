@@ -14,6 +14,7 @@ import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-sys
 import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
 import { NBodyEngine, buildInitialState } from '../physics/nbody-engine.js';
+import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
 
@@ -47,7 +48,7 @@ export interface SolarSystemSceneHandles {
   dispose: () => void;
 }
 
-export type PhysicsEngineKind = 'kepler' | 'newton';
+export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
 
 export interface SolarSystemSceneOptions {
   /** 초기 시각 (Julian Date). 기본: J2000.0 */
@@ -132,23 +133,24 @@ export function createSolarSystemScene(
   }
   const resolved = new Set<string>();
 
-  // Newton 경로 — 호출 시 초기 상태 빌드 후 updateAt(jd)에서 Δt만큼 적분.
+  // Newton/Barnes-Hut 경로 — 두 엔진 모두 동일 advance/positions 인터페이스라 공용 변수로 관리.
   let activeEngine: PhysicsEngineKind = physicsEngine;
-  let newtonEngine: NBodyEngine | null = null;
+  let newtonEngine: NBodyEngine | BarnesHutNBodyEngine | null = null;
   let newtonLastJd = initialJulianDate;
   let currentJd = initialJulianDate;
   let newtonIdIndex: Map<string, number> | null = null;
 
   const massMultipliers = new Map<string, number>();
-  const buildNewton = (jd: number) => {
+  const buildNewton = (jd: number, kind: 'newton' | 'barnes-hut' = 'newton') => {
     newtonEngine?.dispose();
     const initial = buildInitialState(system, jd);
-    // 질량 배수 적용 (#107) — 초기 상태 생성 후 Newton 엔진에 주입.
+    // 질량 배수 적용 (#107) — 초기 상태 생성 후 엔진에 주입.
     for (const [id, mul] of massMultipliers) {
       const idx = initial.ids.indexOf(id);
       if (idx >= 0) initial.masses[idx] = (initial.masses[idx] ?? 0) * mul;
     }
-    newtonEngine = new NBodyEngine(initial);
+    newtonEngine =
+      kind === 'barnes-hut' ? new BarnesHutNBodyEngine(initial) : new NBodyEngine(initial);
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
     newtonLastJd = jd;
   };
@@ -157,14 +159,18 @@ export function createSolarSystemScene(
     newtonEngine = null;
     newtonIdIndex = null;
   };
-  if (physicsEngine === 'newton') {
-    buildNewton(initialJulianDate);
+  if (physicsEngine === 'newton' || physicsEngine === 'barnes-hut') {
+    buildNewton(initialJulianDate, physicsEngine);
   }
   disposables.push({ dispose: disposeNewton });
 
   const updateAt = (jd: number) => {
     currentJd = jd;
-    if (activeEngine === 'newton' && newtonEngine && newtonIdIndex) {
+    if (
+      (activeEngine === 'newton' || activeEngine === 'barnes-hut') &&
+      newtonEngine &&
+      newtonIdIndex
+    ) {
       const dtSec = (jd - newtonLastJd) * SECONDS_PER_DAY;
       if (dtSec !== 0) {
         newtonEngine.advance(dtSec);
@@ -290,11 +296,15 @@ export function createSolarSystemScene(
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
     if (kind === activeEngine) return;
-    // P3-A #132 — barnes-hut/webgpu/auto 모드 수신 시 wasm BarnesHutEngine로의
-    // 직접 라우팅은 #134(JS 어댑터 + UI 활성화)에서 합류한다. 그때까지는 newton로 폴백.
-    const effective: PhysicsEngineKind = kind === 'kepler' ? 'kepler' : 'newton';
-    if (effective === 'newton') buildNewton(currentJd);
-    else disposeNewton();
+    // P3-A #134 — barnes-hut 직접 활성화. webgpu/auto는 P3-B/UI 어댑터에서
+    // capability에 따라 newton 또는 barnes-hut로 매핑되어 들어온다.
+    const effective: PhysicsEngineKind =
+      kind === 'kepler' || kind === 'newton' || kind === 'barnes-hut' ? kind : 'newton';
+    if (effective === 'newton' || effective === 'barnes-hut') {
+      buildNewton(currentJd, effective);
+    } else {
+      disposeNewton();
+    }
     activeEngine = effective;
   };
   const getPhysicsEngine = () => activeEngine;
@@ -303,11 +313,13 @@ export function createSolarSystemScene(
     const clamped = Math.max(0.01, Math.min(1000, multiplier));
     if (clamped === 1) massMultipliers.delete(bodyId);
     else massMultipliers.set(bodyId, clamped);
-    if (activeEngine === 'newton') buildNewton(currentJd);
+    if (activeEngine === 'newton' || activeEngine === 'barnes-hut')
+      buildNewton(currentJd, activeEngine);
   };
   const resetMassMultipliers = () => {
     massMultipliers.clear();
-    if (activeEngine === 'newton') buildNewton(currentJd);
+    if (activeEngine === 'newton' || activeEngine === 'barnes-hut')
+      buildNewton(currentJd, activeEngine);
   };
 
   // 초기 시점 적용

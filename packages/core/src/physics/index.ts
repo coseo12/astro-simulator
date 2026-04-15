@@ -21,3 +21,4 @@ export {
   type NBodyEngineOptions,
   type NBodyState,
 } from './nbody-engine.js';
+export { BarnesHutNBodyEngine, type BarnesHutEngineOptions } from './barnes-hut-engine.js';

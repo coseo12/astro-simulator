@@ -23,7 +23,7 @@ const ENGINES: EngineDef[] = [
   {
     id: 'barnes-hut',
     label: 'Barnes-Hut',
-    tooltip: 'O(N log N) octree — N=5000+ 가속 (P3-A에서 활성화).',
+    tooltip: 'O(N log N) octree — N=5000+ 가속. theta=0.5 정확도 ~1e-9.',
   },
   {
     id: 'webgpu',
@@ -33,7 +33,7 @@ const ENGINES: EngineDef[] = [
   {
     id: 'auto',
     label: 'Auto',
-    tooltip: '환경 감지 후 최적 엔진 자동 선택 (P3-A부터 활성화).',
+    tooltip: 'belt N≥1000이면 Barnes-Hut, 아니면 Newton. P3-B 후 WebGPU 우선.',
   },
 ];
 
