@@ -15,6 +15,8 @@ import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
 import { NBodyEngine, buildInitialState } from '../physics/nbody-engine.js';
 import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
+import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
+import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
 
@@ -133,15 +135,16 @@ export function createSolarSystemScene(
   }
   const resolved = new Set<string>();
 
-  // Newton/Barnes-Hut 경로 — 두 엔진 모두 동일 advance/positions 인터페이스라 공용 변수로 관리.
+  // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
+  // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
   let activeEngine: PhysicsEngineKind = physicsEngine;
-  let newtonEngine: NBodyEngine | BarnesHutNBodyEngine | null = null;
+  let newtonEngine: NBodyEngine | BarnesHutNBodyEngine | WebGpuNBodyEngine | null = null;
   let newtonLastJd = initialJulianDate;
   let currentJd = initialJulianDate;
   let newtonIdIndex: Map<string, number> | null = null;
 
   const massMultipliers = new Map<string, number>();
-  const buildNewton = (jd: number, kind: 'newton' | 'barnes-hut' = 'newton') => {
+  const buildNewton = (jd: number, kind: 'newton' | 'barnes-hut' | 'webgpu' = 'newton') => {
     newtonEngine?.dispose();
     const initial = buildInitialState(system, jd);
     // 질량 배수 적용 (#107) — 초기 상태 생성 후 엔진에 주입.
@@ -149,8 +152,19 @@ export function createSolarSystemScene(
       const idx = initial.ids.indexOf(id);
       if (idx >= 0) initial.masses[idx] = (initial.masses[idx] ?? 0) * mul;
     }
-    newtonEngine =
-      kind === 'barnes-hut' ? new BarnesHutNBodyEngine(initial) : new NBodyEngine(initial);
+    if (kind === 'webgpu') {
+      const engine = scene.getEngine();
+      if (!isWebGpuEngine(engine)) {
+        throw new WebGpuUnavailableError(
+          'scene engine is not WebGPU — auto fallback에서 처리 필요',
+        );
+      }
+      newtonEngine = new WebGpuNBodyEngine(initial, engine);
+    } else if (kind === 'barnes-hut') {
+      newtonEngine = new BarnesHutNBodyEngine(initial);
+    } else {
+      newtonEngine = new NBodyEngine(initial);
+    }
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
     newtonLastJd = jd;
   };
@@ -159,7 +173,7 @@ export function createSolarSystemScene(
     newtonEngine = null;
     newtonIdIndex = null;
   };
-  if (physicsEngine === 'newton' || physicsEngine === 'barnes-hut') {
+  if (physicsEngine === 'newton' || physicsEngine === 'barnes-hut' || physicsEngine === 'webgpu') {
     buildNewton(initialJulianDate, physicsEngine);
   }
   disposables.push({ dispose: disposeNewton });
@@ -167,7 +181,7 @@ export function createSolarSystemScene(
   const updateAt = (jd: number) => {
     currentJd = jd;
     if (
-      (activeEngine === 'newton' || activeEngine === 'barnes-hut') &&
+      (activeEngine === 'newton' || activeEngine === 'barnes-hut' || activeEngine === 'webgpu') &&
       newtonEngine &&
       newtonIdIndex
     ) {
@@ -296,11 +310,13 @@ export function createSolarSystemScene(
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
     if (kind === activeEngine) return;
-    // P3-A #134 — barnes-hut 직접 활성화. webgpu/auto는 P3-B/UI 어댑터에서
-    // capability에 따라 newton 또는 barnes-hut로 매핑되어 들어온다.
+    // P3-B #146 — webgpu 직접 활성화. UI 어댑터(sim-canvas resolveEngine)가
+    // capability/auto 분기를 처리한 후 진입한다. 미지원 환경 진입 시 throw.
     const effective: PhysicsEngineKind =
-      kind === 'kepler' || kind === 'newton' || kind === 'barnes-hut' ? kind : 'newton';
-    if (effective === 'newton' || effective === 'barnes-hut') {
+      kind === 'kepler' || kind === 'newton' || kind === 'barnes-hut' || kind === 'webgpu'
+        ? kind
+        : 'newton';
+    if (effective === 'newton' || effective === 'barnes-hut' || effective === 'webgpu') {
       buildNewton(currentJd, effective);
     } else {
       disposeNewton();

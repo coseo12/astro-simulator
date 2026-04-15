@@ -22,3 +22,4 @@ export {
   type NBodyState,
 } from './nbody-engine.js';
 export { BarnesHutNBodyEngine, type BarnesHutEngineOptions } from './barnes-hut-engine.js';
+export { WebGpuNBodyEngine, type WebGpuEngineOptions } from './webgpu-nbody-engine.js';

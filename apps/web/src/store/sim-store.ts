@@ -12,11 +12,12 @@ export type UnitSystem = 'si' | 'astro' | 'natural';
  */
 export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
 
-/** 현재 런타임에서 실제 동작하는 엔진. webgpu는 P3-B에서, auto는 capability 기반 자동선택. */
+/** 현재 런타임에서 실제 동작하는 엔진. webgpu는 capability 보유 환경에서만 가능 (sim-canvas가 폴백 처리). */
 export const RUNNABLE_ENGINES: ReadonlySet<PhysicsEngineKind> = new Set([
   'kepler',
   'newton',
   'barnes-hut',
+  'webgpu',
   'auto',
 ]);
 

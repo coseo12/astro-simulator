@@ -59,19 +59,26 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
-        // P3-A #134 — barnes-hut는 wasm 활성화. webgpu는 P3-B 대기. auto는 capability
-        // 기반: WebGPU 미지원 시 N≥1000(소행성대 포함)이면 barnes-hut, 아니면 newton.
-        // P3-B에서 webgpu 활성화 시 auto는 webgpu 우선이 된다.
+        // P3-B #146 — webgpu 활성화. 미지원 환경이면 webgpu 요청도 barnes-hut로 폴백.
+        // auto: WebGPU 가능 + N≥1000이면 webgpu, 가능하지만 N<1000이면 newton(오버헤드 회피),
+        //       WebGPU 미지원이면 N≥1000이면 barnes-hut, 아니면 newton.
+        const isWebGpu = (instance.scene?.getEngine() as { isWebGPU?: boolean })?.isWebGPU === true;
         const resolveEngine = (
           k: ReturnType<typeof useSimStore.getState>['physicsEngine'],
-        ): 'kepler' | 'newton' | 'barnes-hut' => {
+        ): 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' => {
           if (k === 'kepler') return 'kepler';
+          if (k === 'newton') return 'newton';
           if (k === 'barnes-hut') return 'barnes-hut';
-          if (k === 'auto') {
-            // belt N으로 자동 분기 (P3-B 후 webgpu가 추가됨)
-            return beltN >= 1000 ? 'barnes-hut' : 'newton';
+          if (k === 'webgpu') {
+            if (!isWebGpu) {
+              useSimStore.getState().setEngineNotice('WebGPU 미지원 — Barnes-Hut로 폴백.');
+              return 'barnes-hut';
+            }
+            return 'webgpu';
           }
-          // newton, webgpu, 그 외 → newton로 폴백
+          // auto
+          if (isWebGpu && beltN >= 1000) return 'webgpu';
+          if (beltN >= 1000) return 'barnes-hut';
           return 'newton';
         };
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
