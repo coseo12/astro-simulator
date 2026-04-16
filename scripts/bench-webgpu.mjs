@@ -38,6 +38,10 @@ const browser = await chromium.launch({
     '--disable-frame-rate-limit',
     '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling',
+    // P4-D #166 — headless Chromium에서 WebGPU timestamp-query resolve 활성화.
+    // 이 flag 없이는 count는 증가하지만 값이 전부 0ns로 기록되어 측정 불가.
+    '--enable-webgpu-developer-features',
+    '--enable-dawn-features=allow_unsafe_apis',
   ],
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -72,18 +76,35 @@ const engineKind = await page.evaluate(() => {
 });
 console.log(`Babylon engine kind: ${engineKind}`);
 
+// P4-D #166 — `?gpuTimer=1`로 Babylon EngineInstrumentation 활성.
+// 미지원 환경(WebGL2 timer query 없음, WebGPU timestamp-query feature 거부)은 null 유지.
+const readGpuMs = () =>
+  page.evaluate(
+    () => /** @type {number | null} */ (/** @type {any} */ (window).__gpuFrameTimeMs ?? null),
+  );
+
 const rows = [];
 for (const engine of ['newton', 'barnes-hut', 'webgpu']) {
   for (const belt of [1000, 5000, 10000]) {
-    const url = `${baseUrl}/ko?engine=${engine}&belt=${belt}`;
+    const url = `${baseUrl}/ko?engine=${engine}&belt=${belt}&gpuTimer=1`;
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
     await page.click('[data-testid="time-play"]').catch(() => {});
     await page.click('[data-testid="time-preset-1y"]').catch(() => {});
     await page.waitForTimeout(500);
     const fps = await measureFps(DURATION_MS);
-    rows.push({ engine, belt, fps: Number(fps.toFixed(2)) });
-    console.log(`${engine.padEnd(11)} N=${String(belt).padEnd(5)}: ${fps.toFixed(2)} fps`);
+    // 측정 직후 읽기 — lastSecAverage는 최근 1초 평균. 측정 윈도우와 정렬.
+    const gpuMs = await readGpuMs();
+    rows.push({
+      engine,
+      belt,
+      fps: Number(fps.toFixed(2)),
+      gpuMs: gpuMs === null ? null : Number(gpuMs.toFixed(3)),
+    });
+    const gpuStr = gpuMs === null ? 'n/a' : `${gpuMs.toFixed(3)}ms`;
+    console.log(
+      `${engine.padEnd(11)} N=${String(belt).padEnd(5)}: ${fps.toFixed(2).padStart(7)} fps · gpu ${gpuStr}`,
+    );
   }
 }
 
@@ -107,17 +128,35 @@ writeFileSync(
 );
 console.log(`\n리포트: ${outPath}`);
 
-// 가속비 표
-console.log('\n=== 가속비 (vs newton baseline) ===');
+// 가속비 표 (fps 기반 — 렌더+시뮬 합산)
+console.log('\n=== fps 가속비 (vs newton baseline) ===');
 const groups = new Map();
 for (const r of rows) {
   if (!groups.has(r.belt)) groups.set(r.belt, {});
-  groups.get(r.belt)[r.engine] = r.fps;
+  groups.get(r.belt)[r.engine] = r;
 }
 console.log('N         newton  bh-x       webgpu-x');
 for (const [n, g] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
-  const base = g.newton ?? 1;
-  const bh = ((g['barnes-hut'] ?? 0) / base).toFixed(2);
-  const wg = ((g.webgpu ?? 0) / base).toFixed(2);
+  const base = g.newton?.fps ?? 1;
+  const bh = ((g['barnes-hut']?.fps ?? 0) / base).toFixed(2);
+  const wg = ((g.webgpu?.fps ?? 0) / base).toFixed(2);
   console.log(`${String(n).padEnd(9)} ${base.toFixed(2).padEnd(7)} ${bh.padEnd(10)} ${wg}`);
+}
+
+// P4-D #166 — GPU ms 기반 비율 (렌더+시뮬의 GPU 시간만 측정. CPU 제외).
+// 이 값이 있으면 "WebGPU compute가 실제 GPU에서 얼마나 시간을 쓰는가"를 직접 비교 가능.
+// null 섞이면 해당 행 skip (WebGL2는 timer query 미지원 환경 흔함).
+console.log('\n=== GPU ms (낮을수록 빠름. null은 timer query 미지원)  ===');
+console.log('N         newton        barnes-hut    webgpu');
+for (const [n, g] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+  const fmt = (r) => (r?.gpuMs == null ? 'n/a'.padEnd(12) : `${r.gpuMs.toFixed(3)}ms`.padEnd(12));
+  console.log(`${String(n).padEnd(9)} ${fmt(g.newton)}  ${fmt(g['barnes-hut'])}  ${fmt(g.webgpu)}`);
+}
+// GPU ms 기반 throughput 비율 (webgpu_ms 기준으로 barnes-hut_ms / webgpu_ms — 2.0× 목표)
+console.log('\n=== GPU ms 기반 가속 (barnes-hut_ms / webgpu_ms, 클수록 WebGPU 우위) ===');
+for (const [n, g] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+  const bhMs = g['barnes-hut']?.gpuMs;
+  const wgMs = g.webgpu?.gpuMs;
+  const ratio = bhMs && wgMs ? (bhMs / wgMs).toFixed(2) + '×' : 'n/a';
+  console.log(`N=${String(n).padEnd(8)} ${ratio}`);
 }

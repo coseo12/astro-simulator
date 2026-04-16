@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-04-16T03:49:22.079Z",
+  "environment": "playwright-chromium-headless",
+  "babylonEngineKind": "webgl2",
+  "navigatorGpuPresent": true,
+  "rows": [
+    {
+      "engine": "newton",
+      "belt": 1000,
+      "fps": 645.91,
+      "gpuMs": 0.026
+    },
+    {
+      "engine": "newton",
+      "belt": 5000,
+      "fps": 328.61,
+      "gpuMs": 0.141
+    },
+    {
+      "engine": "newton",
+      "belt": 10000,
+      "fps": 194.6,
+      "gpuMs": 0.106
+    },
+    {
+      "engine": "barnes-hut",
+      "belt": 1000,
+      "fps": 613.38,
+      "gpuMs": 0.062
+    },
+    {
+      "engine": "barnes-hut",
+      "belt": 5000,
+      "fps": 315.99,
+      "gpuMs": 0.11
+    },
+    {
+      "engine": "barnes-hut",
+      "belt": 10000,
+      "fps": 198.06,
+      "gpuMs": 0.151
+    },
+    {
+      "engine": "webgpu",
+      "belt": 1000,
+      "fps": 557.85,
+      "gpuMs": 0.171
+    },
+    {
+      "engine": "webgpu",
+      "belt": 5000,
+      "fps": 313.21,
+      "gpuMs": 0.201
+    },
+    {
+      "engine": "webgpu",
+      "belt": 10000,
+      "fps": 196.17,
+      "gpuMs": 0.335
+    }
+  ]
+}
