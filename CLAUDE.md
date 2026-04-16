@@ -118,6 +118,25 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 `rm -rf`로 재구축 시 사용자 터미널의 cwd가 삭제된 디렉토리를 가리킬 수 있다.
 반드시 사전 경고한다.
 
+### 인계 항목 실측 재검증 — NO-OP ADR 패턴
+
+이전 마일스톤 회고가 인계한 "수정 필요 항목"이 환경/코드 변화로 **착수 시점엔 이미 해소**되어 있는 경우가 있다. AI는 인계 항목을 "해야 할 일"로 과신하는 편향이 있으므로 구현 직전 실측으로 전제를 재검증한다.
+
+- 작업 착수 전 현재 동작을 실측 (브라우저/bench/테스트)
+- 이미 만족하면 구현 대신 **NO-OP ADR** 작성: `docs/decisions/<YYYYMMDD>-<topic>-no-op.md`
+- NO-OP 결정도 후보 비교 / 실측 결과 / 재검토 조건을 남긴다 — 다음에 재발굴 시 빠르게 기각 근거
+- 대신 **회귀 가드**를 박제: 현재 동작이 퇴행하지 않도록 verify 스크립트 또는 테스트 추가
+- 근거: volt [#14](https://github.com/coseo12/volt/issues/14) — CRITICAL #2 "모호한 지시 사전 확인"과 상호보완 (명확한 지시를 받았어도 실측으로 범위 축소)
+
+### 커밋 성공 ≠ 의도한 변경 커밋됨
+
+`git commit` 종료 코드 0과 "커밋 성공" 메시지만 믿지 말 것. 특히 lint-staged + tracked/ignored 혼재 상황에서 staged 변경 일부가 **조용히 유실**될 수 있다.
+
+- lint-staged 출력에서 `[FAILED]` 키워드를 발견하면 **커밋 후 필수 검증**
+- 커밋 직후 `git diff <base> HEAD -- <예상 파일 목록>` 또는 `git show --stat HEAD` 로 실제 반영된 파일 확인
+- `.gitignore` 규칙을 새로 추가할 때는 `git ls-files <path>` 로 이미 tracked된 파일이 있는지 확인 후 `git rm --cached` 로 정리
+- 근거: volt [#13](https://github.com/coseo12/volt/issues/13) — "빌드 성공 ≠ 동작", "HTTP 200 ≠ 올바른 리소스" 원칙의 연장선
+
 <!-- harness:managed:real-lessons:end -->
 
 ---
@@ -172,7 +191,7 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 
 ### 모노레포 가드
 
-- 신규 워크스페이스(apps/_, packages/_) 추가 시 **테스트 설정(vitest/jest config + scripts.test) 필수**
+- 신규 워크스페이스(`apps/*`, `packages/*`) 추가 시 **테스트 설정(vitest/jest config + scripts.test) 필수**
 - `pnpm -r test` / `npm -ws test` 는 scripts.test 누락 워크스페이스를 **조용히 스킵**한다 — 사고 방지를 위해 루트에 `verify:test-coverage` 스크립트(각 워크스페이스에 테스트 설정 존재 검사) 운용을 권장
 - 신규 패키지 스캐폴딩 시 테스트 베이스를 기본 포함시킨다
 

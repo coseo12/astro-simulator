@@ -1,9 +1,9 @@
 {
   "harnessVersion": "2.6.0",
-  "installedAt": "2026-04-15T09:10:00Z",
+  "installedAt": "2026-04-16T05:40:46Z",
   "files": {
     "CLAUDE.md": {
-      "sha256": "008311bddc44b96557dad0603cae4c2cfb5dc7524135db3fc11eb14a49108539",
+      "sha256": "518208f7c0528d20aff9fe8fc67500ce731e87e6cc8f38a7119aafcbe0b9385c",
       "category": "managed-block"
     },
     ".claude/agents/architect.md": {
@@ -387,11 +387,11 @@
       "category": "atomic"
     },
     "docs/frozen-file-split.md": {
-      "sha256": "c4efa3324c0b1c83b051ec8fe38dcc2ee5d0b501aaa9323f896c63bcafb429ab",
+      "sha256": "ddfdce4b5bfd112c9e25a2c8e293cdf56926c4e4100bbd419247ea6551261fa6",
       "category": "atomic"
     },
     "docs/knowledge-compilation.md": {
-      "sha256": "7c516243210669b442d3f8618a6ef54eb99d1333c1c80bf91ad879f1b7074902",
+      "sha256": "9e8258b96cf43bb7eb7dcadbb4ee698c344442e2a7db482fe02bcd4b1280b375",
       "category": "atomic"
     },
     "docs/model-assumptions.md": {
@@ -490,6 +490,5 @@
       "sha256": "123d7d20e3d758ccc3aa4ff4a660214d7f777fa4a7b8a652cc8313ef114e0d63",
       "category": "atomic"
     }
-  },
-  "lastUpdatedAt": "2026-04-16T05:38:09Z"
+  }
 }
