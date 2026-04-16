@@ -191,7 +191,7 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 
 ### 모노레포 가드
 
-- 신규 워크스페이스(apps/_, packages/_) 추가 시 **테스트 설정(vitest/jest config + scripts.test) 필수**
+- 신규 워크스페이스(`apps/*`, `packages/*`) 추가 시 **테스트 설정(vitest/jest config + scripts.test) 필수**
 - `pnpm -r test` / `npm -ws test` 는 scripts.test 누락 워크스페이스를 **조용히 스킵**한다 — 사고 방지를 위해 루트에 `verify:test-coverage` 스크립트(각 워크스페이스에 테스트 설정 존재 검사) 운용을 권장
 - 신규 패키지 스캐폴딩 시 테스트 베이스를 기본 포함시킨다
 
