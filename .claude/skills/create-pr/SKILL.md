@@ -70,6 +70,40 @@ EOF
 gh issue edit <이슈번호> --remove-label "status:in-progress" --add-label "status:review"
 ```
 
+## Stack PR (base ≠ main/develop) 주의 (volt #17)
+
+PR의 base가 다른 feature 브랜치인 경우(= stack PR), 중간 PR이 머지된 후 상위 PR은 **반드시 rebase + force-push** 필요. `gh pr edit --base` 만으로는 `mergeStateStatus=CONFLICTING`.
+
+절차 (예: base였던 `feature/p4-d` 가 main에 머지된 직후):
+
+```bash
+# 1. head 브랜치 체크아웃
+git checkout feature/p4-a
+
+# 2. 최신 main 기준 rebase
+git fetch origin
+git rebase origin/main
+# → "skipped previously applied commit" 정상 (main에 이미 머지된 커밋)
+# → 실제 conflict 시 수동 해결 + git rebase --continue
+
+# 3. force-push — --force-with-lease (원격이 내가 본 커밋과 일치할 때만)
+git push --force-with-lease origin feature/p4-a
+
+# 4. base 갱신 + 머지
+gh pr edit <PR> --base main
+gh pr merge <PR> --squash
+```
+
+### 충돌 다발 영역
+`package.json` scripts 목록, `CHANGELOG.md`, `MEMORY.md` 같은 **append-heavy 파일**은 stack PR 간 충돌 거의 확실. 같은 섹션을 여러 PR이 수정하면 하위 PR은 rebase 필수.
+
+### 대안 — 독립 브랜치
+stack 대신 각 PR을 main 기반 독립 브랜치로 만들고, 의존성은 **기능 플래그/옵트인 import** 로 해결. rebase 지옥 회피.
+
+### PR 생성 시 체크
+- `--base` 가 `main`/`develop` 이 아니면 경고 + 머지 순서/rebase 필요성 사용자에게 고지
+- `gh pr edit --base main` 후 `gh pr view --json mergeStateStatus` 확인, DIRTY/CONFLICTING이면 로컬 rebase 유도
+
 ## 규칙
 
 - PR 제목은 반드시 `[#이슈번호]`를 포함한다.
@@ -77,3 +111,4 @@ gh issue edit <이슈번호> --remove-label "status:in-progress" --add-label "st
 - 변경 파일 10개 이하를 목표로 한다. 초과 시 PR을 분할한다.
 - 테스트가 통과하는 상태에서만 PR을 생성한다.
 - WIP 상태라면 Draft PR로 생성한다: `gh pr create --draft`
+- `--force-with-lease` 를 `--force` 대신 사용 (CRITICAL #5 파괴적 작업 원칙)
