@@ -3,6 +3,49 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.4.0-p4] — 2026-04-16
+
+### P4 WebGPU 실측 + 모바일 1차 게이트
+
+**P4-B WebGPU 활성 회귀 가드** (#168)
+
+- EngineFactory 전환 **NO-OP** 결정 — `docs/decisions/20260416-engine-factory-no-op.md`
+- `scripts/browser-verify-webgpu.mjs` 신규 — HUD `renderer · webgpu` assert, capability notice 미표시, reload 후 경로 유지 (5/5 통과)
+- `--enable-unsafe-webgpu` 외 flag 명시 — 헤드리스 기본값 의존 제거
+
+**P4-D GPU frame time 직접 측정** (#169)
+
+- `SimulationCore.enableGpuTimer()` / `readGpuFrameTimeMs()` / `debugGpuTimer()` 공개 API
+- `EngineInstrumentation.gpuFrameTimeCounter` 기반 ms 단위 측정 (lastSecAverage → average → current 폴백)
+- `?gpuTimer=1` URL 옵트인 시 `window.__gpuFrameTimeMs` getter 노출
+- `engine-factory.ts` — WebGPUEngine 생성 시 `timestamp-query` feature optional 요청
+- `scripts/bench-webgpu.mjs` — GPU ms 컬럼 + `--enable-webgpu-developer-features` flag 추가
+
+**P4-A 소행성대 N-body 편입** (#170)
+
+- `?beltNbody=1` URL 옵트인 — 소행성대를 N-body 엔진에 편입
+- **실측 WebGPU 226× @ N=5000, 286× @ N=10000** (vs barnes-hut CPU)
+- `AsteroidBeltHandles.getNbodyState()` / `writeWorldPositions()` 추가
+- `scripts/browser-verify-belt-nbody.mjs` — 3단계 회귀 가드 (6/6 통과)
+- bench throughput ≥ 2× assertion 추가 (exit 1 on fail)
+
+**P4-C 모바일 1차 게이트** (#171)
+
+- `scripts/browser-verify-mobile-p4c.mjs` — iPhone 14 emulation 3 시나리오 (5/5 통과)
+- 결과 리포트 자동 생성 (`docs/reports/p4c-mobile-YYYYMMDD.md`)
+- 실기기 iPhone Safari 측정은 인계 (iOS 17.4+ WebGPU)
+
+**회고** (#172)
+
+- `docs/retrospectives/p4-retrospective.md` — 고정 4섹션
+- P4-E(일반상대론) P5로 분리
+
+### 수치 변화
+
+- bench: WebGPU/BH = **0.45×(P3) → 226×(P4)** (소행성대 N-body 편입으로 가속 실제 측정 가능)
+- 테스트: 287 → 290+ (GPU timer + state vector 가드 추가)
+- 회귀 스크립트: +3종 (`verify:webgpu`, `verify:belt-nbody`, `verify:mobile-p4c`)
+
 ## [0.3.0-p3] — 2026-04-15
 
 ### P3 Barnes-Hut + WebGPU compute
