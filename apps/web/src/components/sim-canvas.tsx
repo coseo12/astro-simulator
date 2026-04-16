@@ -76,6 +76,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
+        // P4-A #165 — ?beltNbody=1 옵트인 시 소행성대를 N-body 엔진에 편입.
+        // BH tree / GPU compute 가속 효과를 실측 가능케 한다. 기본 false로 기존 Kepler 경로 유지.
+        const beltNbodyParam = new URLSearchParams(window.location.search).get('beltNbody');
+        const asteroidNbody = beltNbodyParam === '1';
         // P3-B #146 — webgpu 활성화. 미지원 환경이면 webgpu 요청도 barnes-hut로 폴백.
         // auto: WebGPU 가능 + N≥1000이면 webgpu, 가능하지만 N<1000이면 newton(오버헤드 회피),
         //       WebGPU 미지원이면 N≥1000이면 barnes-hut, 아니면 newton.
@@ -101,6 +105,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
+          asteroidNbody,
         });
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));

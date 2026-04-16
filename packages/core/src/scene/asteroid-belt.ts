@@ -17,6 +17,7 @@ import {
 } from '@babylonjs/core';
 import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import { positionAt } from '../physics/kepler.js';
+import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
 
 const SCENE_UNIT_PER_METER = 1 / AU;
@@ -28,6 +29,11 @@ export interface AsteroidBeltOptions {
   seed?: number;
   /** 에폭(JD). 기본 J2000.0 */
   epoch?: number;
+  /**
+   * P4-A #165 — 개별 소행성 질량 (kg). 기본 3e18 kg (주 소행성대 평균 규모).
+   * N-body 경로 사용 시 상호작용 강도에 영향. Kepler 경로에서는 무시된다.
+   */
+  assetMass?: number;
 }
 
 export interface AsteroidBeltHandles {
@@ -35,8 +41,28 @@ export interface AsteroidBeltHandles {
   mesh: Mesh;
   /** 각 소행성의 Kepler 요소 (진단용) */
   elements: ReadonlyArray<LoadedOrbitalElements>;
-  /** 주어진 jd에 위치 갱신 */
+  /** 주어진 jd에 위치 갱신 (Kepler 해석해 경로) */
   updateAt: (jd: number) => void;
+  /**
+   * P4-A #165 — 각 소행성의 현 월드 좌표(SI m, 태양 원점)를 ThinInstance 버퍼에 반영.
+   * 인자는 길이 3N의 flat array. WebGPU 엔진은 Float32Array, Newton/BH는 Float64Array를
+   * 반환하므로 유니온으로 받는다. 빈 배열이면 갱신하지 않음 (방어).
+   */
+  writeWorldPositions: (
+    positions: Float32Array | Float64Array,
+    offset: number,
+    count: number,
+  ) => void;
+  /**
+   * P4-A #165 — N-body 초기 state (positions/velocities/masses). 길이 3N / 3N / N.
+   * 태양 기준 heliocentric coordinates.
+   */
+  getNbodyState: (
+    jd: number,
+    sunMu: number,
+  ) => { masses: Float64Array; positions: Float64Array; velocities: Float64Array };
+  /** 소행성 수 */
+  readonly n: number;
   dispose: () => void;
 }
 
@@ -67,6 +93,7 @@ export function createAsteroidBelt(
   const n = Math.max(0, Math.min(10_000, options.n ?? 200));
   const seed = options.seed ?? 42;
   const epoch = options.epoch ?? 2_451_545.0;
+  const assetMass = options.assetMass ?? 3e18;
 
   const rnd = mulberry32(seed);
   const elements: LoadedOrbitalElements[] = [];
@@ -127,10 +154,52 @@ export function createAsteroidBelt(
   // 초기 위치
   updateAt(epoch);
 
+  // P4-A #165 — N-body 경로에서 사용할 초기 state vector.
+  const getNbodyState = (jd: number, sunMu: number) => {
+    const masses = new Float64Array(n);
+    const positions = new Float64Array(3 * n);
+    const velocities = new Float64Array(3 * n);
+    for (let i = 0; i < n; i += 1) {
+      masses[i] = assetMass;
+      const { position, velocity } = orbitalStateAt(elements[i]!, jd, sunMu);
+      positions[3 * i + 0] = position[0];
+      positions[3 * i + 1] = position[1];
+      positions[3 * i + 2] = position[2];
+      velocities[3 * i + 0] = velocity[0];
+      velocities[3 * i + 1] = velocity[1];
+      velocities[3 * i + 2] = velocity[2];
+    }
+    return { masses, positions, velocities };
+  };
+
+  // N-body 엔진이 적분한 위치를 ThinInstance 버퍼로 반영.
+  // `positions`는 (태양+행성+...+소행성) 전체 배열. `offset`은 소행성 시작 인덱스(body count).
+  const writeWorldPositions = (
+    positions: Float32Array | Float64Array,
+    offset: number,
+    count: number,
+  ) => {
+    const limit = Math.min(count, n);
+    for (let i = 0; i < limit; i += 1) {
+      const o = 3 * (offset + i);
+      writeTranslation(
+        matrixBuffer,
+        i,
+        (positions[o] ?? 0) * SCENE_UNIT_PER_METER,
+        (positions[o + 1] ?? 0) * SCENE_UNIT_PER_METER,
+        (positions[o + 2] ?? 0) * SCENE_UNIT_PER_METER,
+      );
+    }
+    template.thinInstanceBufferUpdated('matrix');
+  };
+
   return {
     mesh: template,
     elements,
     updateAt,
+    writeWorldPositions,
+    getNbodyState,
+    n,
     dispose: () => {
       template.material?.dispose();
       template.dispose();

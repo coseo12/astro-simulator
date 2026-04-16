@@ -61,6 +61,12 @@ export interface SolarSystemSceneOptions {
   physicsEngine?: PhysicsEngineKind;
   /** 소행성대 샘플 수. 0 또는 undefined면 생성 안 함. */
   asteroidBeltN?: number;
+  /**
+   * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
+   * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
+   * BH tree / GPU compute 가속 효과 실측 가능. 기본 false (기존 Kepler 해석해 경로 유지).
+   */
+  asteroidNbody?: boolean;
 }
 
 /**
@@ -78,6 +84,7 @@ export function createSolarSystemScene(
     showOrbitLines = true,
     physicsEngine = 'kepler',
     asteroidBeltN = 0,
+    asteroidNbody = false,
   } = options;
   const SECONDS_PER_DAY = 86_400;
 
@@ -135,6 +142,18 @@ export function createSolarSystemScene(
   }
   const resolved = new Set<string>();
 
+  // 소행성대 (#99) — ThinInstances 단일 draw call.
+  // Kepler 경로: 각 소행성 독립 해석해.
+  // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
+  let asteroidBelt: AsteroidBeltHandles | null = null;
+  if (asteroidBeltN > 0) {
+    asteroidBelt = createAsteroidBelt(scene, {
+      n: asteroidBeltN,
+      epoch: initialJulianDate,
+    });
+    disposables.push({ dispose: () => asteroidBelt?.dispose() });
+  }
+
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
   let activeEngine: PhysicsEngineKind = physicsEngine;
@@ -142,16 +161,44 @@ export function createSolarSystemScene(
   let newtonLastJd = initialJulianDate;
   let currentJd = initialJulianDate;
   let newtonIdIndex: Map<string, number> | null = null;
+  // P4-A #165 — 소행성대가 N-body에 편입된 경우 flat positions 버퍼에서의 시작 인덱스.
+  // (행성 개수). belt 미편입 시 -1.
+  let asteroidStartIndex = -1;
 
   const massMultipliers = new Map<string, number>();
   const buildNewton = (jd: number, kind: 'newton' | 'barnes-hut' | 'webgpu' = 'newton') => {
     newtonEngine?.dispose();
-    const initial = buildInitialState(system, jd);
+    const planetState = buildInitialState(system, jd);
     // 질량 배수 적용 (#107) — 초기 상태 생성 후 엔진에 주입.
     for (const [id, mul] of massMultipliers) {
-      const idx = initial.ids.indexOf(id);
-      if (idx >= 0) initial.masses[idx] = (initial.masses[idx] ?? 0) * mul;
+      const idx = planetState.ids.indexOf(id);
+      if (idx >= 0) planetState.masses[idx] = (planetState.masses[idx] ?? 0) * mul;
     }
+
+    // P4-A #165 — 소행성대 편입. asteroidNbody=true이고 belt가 있을 때만.
+    let initial = planetState;
+    asteroidStartIndex = -1;
+    if (asteroidNbody && asteroidBelt && asteroidBelt.n > 0) {
+      const sun = system.bodies.find((b) => b.id === 'sun');
+      const sunMu = GRAVITATIONAL_CONSTANT * (sun?.mass ?? 1.98892e30);
+      const ast = asteroidBelt.getNbodyState(jd, sunMu);
+      const pN = planetState.ids.length;
+      const aN = ast.masses.length;
+      const totalN = pN + aN;
+      const ids = [...planetState.ids, ...Array.from({ length: aN }, (_, i) => `asteroid-${i}`)];
+      const masses = new Float64Array(totalN);
+      const positions = new Float64Array(3 * totalN);
+      const velocities = new Float64Array(3 * totalN);
+      masses.set(planetState.masses, 0);
+      masses.set(ast.masses, pN);
+      positions.set(planetState.positions, 0);
+      positions.set(ast.positions, 3 * pN);
+      velocities.set(planetState.velocities, 0);
+      velocities.set(ast.velocities, 3 * pN);
+      initial = { ids, masses, positions, velocities };
+      asteroidStartIndex = pN;
+    }
+
     if (kind === 'webgpu') {
       const engine = scene.getEngine();
       if (!isWebGpuEngine(engine)) {
@@ -245,8 +292,21 @@ export function createSolarSystemScene(
       sunWorld[2] * SCENE_UNIT_PER_METER,
     );
 
-    // 소행성대 업데이트 — Kepler 경로와 동일한 jd 사용 (Newton 모드에서도 belt는 Kepler).
-    asteroidBelt?.updateAt(jd);
+    // 소행성대 업데이트.
+    // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
+    // 그 외(Kepler 모드 또는 asteroidNbody=false): 기존 해석해 경로 유지.
+    if (asteroidBelt) {
+      if (
+        asteroidStartIndex >= 0 &&
+        newtonEngine &&
+        (activeEngine === 'newton' || activeEngine === 'barnes-hut' || activeEngine === 'webgpu')
+      ) {
+        const flat = newtonEngine.positions();
+        asteroidBelt.writeWorldPositions(flat, asteroidStartIndex, asteroidBelt.n);
+      } else {
+        asteroidBelt.updateAt(jd);
+      }
+    }
   };
 
   const updateAtKepler = (jd: number) => {
@@ -297,16 +357,6 @@ export function createSolarSystemScene(
   const setOrbitLinesVisible = (visible: boolean) => {
     if (orbitLines) orbitLines.isVisible = visible;
   };
-
-  // 소행성대 (#99) — Kepler 경로 전용. ThinInstances 단일 draw call.
-  let asteroidBelt: AsteroidBeltHandles | null = null;
-  if (asteroidBeltN > 0) {
-    asteroidBelt = createAsteroidBelt(scene, {
-      n: asteroidBeltN,
-      epoch: initialJulianDate,
-    });
-    disposables.push({ dispose: () => asteroidBelt?.dispose() });
-  }
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
     if (kind === activeEngine) return;
