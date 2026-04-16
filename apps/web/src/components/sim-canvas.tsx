@@ -54,6 +54,23 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       .then(() => {
         if (cancelled || !instance.scene) return;
         sceneApi.enableLogarithmicDepth(instance.scene);
+        // P4-D #166 — bench 전용. `?gpuTimer=1` 진입 시 GPU frame time 측정 활성화
+        // + window에 최근 평균 노출 (bench 스크립트가 폴링). 미지원 환경은 null 유지.
+        const gpuTimerParam = new URLSearchParams(window.location.search).get('gpuTimer');
+        if (gpuTimerParam === '1') {
+          const enabled = instance.enableGpuTimer();
+          Object.defineProperty(window, '__gpuFrameTimeMs', {
+            configurable: true,
+            get: () => instance.readGpuFrameTimeMs(),
+          });
+          // 디버그 가시화 — Babylon caps + instrumentation 원시값
+          Object.defineProperty(window, '__gpuTimerDebug', {
+            configurable: true,
+            get: () => instance.debugGpuTimer(),
+          });
+          // eslint-disable-next-line no-console
+          console.info('[gpu-timer] enable=', enabled, 'caps=', instance.debugGpuTimer());
+        }
         const camera = sceneApi.setupArcRotateCamera(instance.scene, { radius: 35 });
         const controller = new sceneApi.CameraController(camera, instance.scene);
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).

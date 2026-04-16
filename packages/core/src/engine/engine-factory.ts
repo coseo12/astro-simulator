@@ -19,10 +19,18 @@ export interface CreatedEngine {
 export async function createEngine(canvas: HTMLCanvasElement): Promise<CreatedEngine> {
   if (await isWebGpuUsable()) {
     try {
+      // P4-D #166 — timestamp-query feature를 optional로 요청.
+      // 어댑터가 지원 시 EngineInstrumentation.captureGPUFrameTime이 동작한다.
+      // 미지원 어댑터는 feature가 비어있는 device로 생성되어 폴백 필요 없음.
+      const supported = await getWebGpuFeatures();
+      const requiredFeatures = (
+        supported.has('timestamp-query') ? ['timestamp-query'] : []
+      ) as GPUFeatureName[];
       const engine = new WebGPUEngine(canvas, {
         antialias: true,
         stencil: true,
         adaptToDeviceRatio: true,
+        deviceDescriptor: { requiredFeatures },
       });
       await engine.initAsync();
       return { engine, kind: 'webgpu' };
@@ -57,5 +65,23 @@ async function isWebGpuUsable(): Promise<boolean> {
     return adapter !== null;
   } catch {
     return false;
+  }
+}
+
+/**
+ * 현재 어댑터가 지원하는 WebGPU feature 집합. P4-D #166 — timestamp-query 사용 가능 여부 판별.
+ * 어댑터 획득 실패 시 빈 Set. 동일 어댑터에 대해 Babylon이 별도 생성하지만, 중복 호출 비용은
+ * microsecond 단위로 무시 가능.
+ */
+async function getWebGpuFeatures(): Promise<ReadonlySet<string>> {
+  if (typeof navigator === 'undefined') return new Set();
+  const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
+  if (!gpu) return new Set();
+  try {
+    const adapter = await gpu.requestAdapter();
+    if (!adapter) return new Set();
+    return new Set(adapter.features);
+  } catch {
+    return new Set();
   }
 }

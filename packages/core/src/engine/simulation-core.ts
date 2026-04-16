@@ -1,4 +1,5 @@
 import { Color4, Scene } from '@babylonjs/core';
+import { EngineInstrumentation } from '@babylonjs/core/Instrumentation/engineInstrumentation.js';
 import { J2000_JD } from '@astro-simulator/shared';
 import type { CoreCommand, CoreEvents } from '@astro-simulator/shared';
 import mitt, { type Emitter, type Handler } from 'mitt';
@@ -26,6 +27,8 @@ export class SimulationCore {
   #focusOnHandler: ((bodyId: string) => void) | null = null;
   #resetCameraHandler: (() => void) | null = null;
   #setRadiusHandler: ((radius: number) => void) | null = null;
+  // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
+  #instrumentation: EngineInstrumentation | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
@@ -50,6 +53,81 @@ export class SimulationCore {
 
   get time(): TimeController {
     return this.#time;
+  }
+
+  /**
+   * P4-D #166 — GPU frame time 측정 활성화.
+   *
+   * WebGPU: `timestamp-query` feature 지원 필요. 미지원 어댑터는 Babylon이 조용히 비활성화하므로
+   *         `readGpuFrameTimeMs()`가 계속 null을 반환한다.
+   * WebGL2: `EXT_disjoint_timer_query_webgl2` 캡 필요. Babylon이 자동 감지.
+   *
+   * 오버헤드: 드라이버에 따라 1~3% — 프로덕션 기본 off, bench/개발 모드에서만 enable.
+   */
+  enableGpuTimer(): boolean {
+    if (this.#disposed) return false;
+    if (this.#instrumentation) return true;
+    if (!this.#created) return false;
+    const hasTimerCap = (this.#created.engine.getCaps() as { timerQuery?: unknown }).timerQuery;
+    if (!hasTimerCap) return false;
+    const instrumentation = new EngineInstrumentation(this.#created.engine);
+    instrumentation.captureGPUFrameTime = true;
+    this.#instrumentation = instrumentation;
+    return true;
+  }
+
+  /**
+   * P4-D #166 — 디버그용 원시 카운터 상태. 테스트/bench에서 측정 실패 원인 진단.
+   */
+  debugGpuTimer(): {
+    instrumentation: boolean;
+    timerQueryCap: unknown;
+    captureGPU: boolean;
+    current: number | null;
+    average: number | null;
+    lastSecAverage: number | null;
+    count: number | null;
+  } {
+    const inst = this.#instrumentation;
+    const caps = (this.#created?.engine.getCaps() ?? {}) as { timerQuery?: unknown };
+    if (!inst) {
+      return {
+        instrumentation: false,
+        timerQueryCap: caps.timerQuery ?? null,
+        captureGPU: false,
+        current: null,
+        average: null,
+        lastSecAverage: null,
+        count: null,
+      };
+    }
+    const c = inst.gpuFrameTimeCounter;
+    return {
+      instrumentation: true,
+      timerQueryCap: caps.timerQuery ?? null,
+      captureGPU: inst.captureGPUFrameTime,
+      current: c.current,
+      average: c.average,
+      lastSecAverage: c.lastSecAverage,
+      count: c.count,
+    };
+  }
+
+  /**
+   * 최근 GPU frame time (ms). enableGpuTimer 미호출 또는 미지원 시 null.
+   * Babylon은 ns 단위로 반환 — ms 변환 후 노출.
+   *
+   * lastSecAverage는 1초 평균이라 초기 진입 직후(<1s)에는 0일 수 있어 `average` 또는
+   * `current`로 폴백한다. 이들 중 첫 번째 양수 값을 사용.
+   */
+  readGpuFrameTimeMs(): number | null {
+    if (!this.#instrumentation) return null;
+    const counter = this.#instrumentation.gpuFrameTimeCounter;
+    const candidates = [counter.lastSecAverage, counter.average, counter.current];
+    for (const ns of candidates) {
+      if (Number.isFinite(ns) && ns > 0) return ns / 1_000_000;
+    }
+    return null;
   }
 
   /** 카메라 명령 핸들러 연결 — C6 CameraController와 연결 */
@@ -170,6 +248,9 @@ export class SimulationCore {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+
+    this.#instrumentation?.dispose();
+    this.#instrumentation = null;
 
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = null;
