@@ -88,6 +88,10 @@ CLAUDE.md/스킬의 규칙이 다음 중 하나면 **volt로만 보존하고 행
 - ❌ 1회 관찰을 즉시 CLAUDE.md 규칙으로 박제 — 사례 부족, 일반화 위험
 - ❌ "왜 이 규칙이 있는가"를 CLAUDE.md에 길게 씀 — Why는 volt 이슈 링크로
 
+## 실무 파생 패턴
+
+- **frozen 파일 분리** — frozen 카테고리 파일에 프로젝트 고유 로직을 얹어야 할 때 `ci-<slug>.yml` 형태로 분리하고 manifest에서 추적 제외. 상세: [docs/frozen-file-split.md](frozen-file-split.md)
+
 ## 참고
 
 - `/volt-review` 스킬: 승격 절차
