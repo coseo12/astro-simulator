@@ -17,12 +17,25 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
 2. **스프린트 계약** — 완료 기준 목록 작성 및 사용자 확인
 3. `develop` 기반으로 feature 브랜치 생성: `feature/<이슈번호>-<설명>`
 4. 테스트 시나리오가 있으면 테스트 코드 먼저 작성
-5. 구현 코드 작성 → 테스트 통과 확인
-6. **브라우저 검증** (UI 포함 시 필수 — 아래 참조)
-7. **스프린트 계약 기준 대조** — 모든 기준 충족 확인
-8. 커밋 (컨벤션 준수)
-9. **커밋 후 검증** — `git show --stat HEAD` 또는 `git diff <base> HEAD -- <예상 파일>` 로 의도한 파일이 실제로 반영됐는지 확인. lint-staged `[FAILED]` 출력 시 필수 (volt #13)
-10. PR 생성
+5. **기존 유사 함수 사전 탐색** — 신규 helper/util/함수 작성 전 `Grep`으로 함수명·핵심 키워드 검색 + 동일 패키지 `index.ts` export 확인. "이미 있을 수 있다"를 기본 가설로 두고 시작한다 (volt #21)
+6. 구현 코드 작성 → 테스트 통과 확인
+7. **브라우저 검증** (UI 포함 시 필수 — 아래 참조)
+8. **스프린트 계약 기준 대조** — 모든 기준 충족 확인
+9. 커밋 (컨벤션 준수)
+10. **커밋 후 검증** — `git show --stat HEAD` 또는 `git diff <base> HEAD -- <예상 파일>` 로 의도한 파일이 실제로 반영됐는지 확인. lint-staged `[FAILED]` 출력 시 필수 (volt #13)
+11. PR 생성
+12. **마무리 체크리스트 JSON 반환** — sub-agent 종료 전 반드시 아래 필드를 포함한 JSON을 반환한다. 누락 field 는 `null` 로 명시 (생략 금지). 메인 오케스트레이터가 GitHub 상태와 대조 검증한다 (volt #24)
+    ```json
+    {
+      "commit_sha": "abc1234",
+      "pr_url": "https://github.com/.../pull/123",
+      "branch": "feature/...",
+      "files_changed": ["path/a", "path/b"],
+      "tests": {"passed": 12, "failed": 0},
+      "browser_verified_levels": [1, 2, 3],
+      "remaining_todos": []
+    }
+    ```
 
 ## 브라우저 검증 (UI 포함 이슈 필수)
 

@@ -5,6 +5,7 @@ description: |
   TRIGGER when: 교차검증이 필요할 때, "검증해줘", "cross-validate", "교차 리뷰",
   "gemini로 확인", "다른 시각", "두 번째 의견", 설계 리뷰, PR의 독립적 검토,
   스킬 품질 검증, 프레임워크 구조 점검이 필요할 때.
+  ALSO TRIGGER (루틴): 정책·규약·ADR·CRITICAL DIRECTIVE 박제 직후 1회 — 단일 모델 편향 노출 효율이 박제 직후에 가장 높다 (volt #23).
   DO NOT TRIGGER when: 일반 코드 리뷰, 테스트 실행,
   Gemini와 무관한 작업일 때.
 ---
