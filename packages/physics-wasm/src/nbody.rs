@@ -8,6 +8,9 @@
 //! 좌표·시간 단위: SI (m, kg, s). G = 6.67430e-11.
 
 pub const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11;
+/// 광속 (m/s). 1PN GR 보정에 사용.
+const SPEED_OF_LIGHT: f64 = 299_792_458.0;
+const C2: f64 = SPEED_OF_LIGHT * SPEED_OF_LIGHT;
 
 /// N-body 시스템 상태. 모든 벡터는 길이 3N flat.
 pub struct NBodySystem {
@@ -15,6 +18,9 @@ pub struct NBodySystem {
     pub pos: Vec<f64>,
     pub vel: Vec<f64>,
     acc: Vec<f64>,
+    /// P5-A #178 — 1PN GR 보정 활성. true면 가장 무거운 body(태양)에 대한
+    /// Schwarzschild 세차 보정항을 가속도에 추가한다.
+    pub enable_gr: bool,
 }
 
 impl NBodySystem {
@@ -27,6 +33,7 @@ impl NBodySystem {
             pos,
             vel,
             acc: vec![0.0; 3 * n],
+            enable_gr: false,
         };
         sys.compute_accelerations();
         sys
@@ -50,7 +57,6 @@ impl NBodySystem {
                 let dz = self.pos[3 * j + 2] - zi;
                 let r2 = dx * dx + dy * dy + dz * dz;
                 let r = r2.sqrt();
-                // Newton's law: F_ij / m_i = G*m_j/r² · r̂. 뉴턴 3법칙으로 j→i는 부호 반전.
                 let inv_r3 = 1.0 / (r2 * r);
                 let s_i = GRAVITATIONAL_CONSTANT * self.masses[j] * inv_r3;
                 let s_j = GRAVITATIONAL_CONSTANT * self.masses[i] * inv_r3;
@@ -61,6 +67,48 @@ impl NBodySystem {
                 self.acc[3 * j + 1] -= s_j * dy;
                 self.acc[3 * j + 2] -= s_j * dz;
             }
+        }
+        // P5-A #178 — 1PN GR 보정 (태양 기준 Schwarzschild 세차항).
+        // 가장 무거운 body를 central mass로 가정하고 나머지 body에 보정 적용.
+        // a_GR_i = (GM/(c²r³)) * [(4GM/r - v²)r + 4(r·v)v]
+        // 여기서 r = pos_i - pos_central, v = vel_i - vel_central.
+        if self.enable_gr {
+            self.apply_gr_correction();
+        }
+    }
+
+    /// 1PN Schwarzschild 세차 보정. central body(index 0, 가장 무거운) 기준.
+    fn apply_gr_correction(&mut self) {
+        let n = self.n();
+        if n < 2 {
+            return;
+        }
+        // central body = index 0 (태양 고정)
+        let gm = GRAVITATIONAL_CONSTANT * self.masses[0];
+        let (cx, cy, cz) = (self.pos[0], self.pos[1], self.pos[2]);
+        let (cvx, cvy, cvz) = (self.vel[0], self.vel[1], self.vel[2]);
+
+        for i in 1..n {
+            let rx = self.pos[3 * i] - cx;
+            let ry = self.pos[3 * i + 1] - cy;
+            let rz = self.pos[3 * i + 2] - cz;
+            let vx = self.vel[3 * i] - cvx;
+            let vy = self.vel[3 * i + 1] - cvy;
+            let vz = self.vel[3 * i + 2] - cvz;
+
+            let r2 = rx * rx + ry * ry + rz * rz;
+            let r = r2.sqrt();
+            let v2 = vx * vx + vy * vy + vz * vz;
+            let rdotv = rx * vx + ry * vy + rz * vz;
+
+            // a_GR = (GM/(c²r³)) * [(4GM/r - v²)r + 4(r·v)v]
+            let coeff = gm / (C2 * r2 * r);
+            let radial = 4.0 * gm / r - v2;
+            let tangential = 4.0 * rdotv;
+
+            self.acc[3 * i] += coeff * (radial * rx + tangential * vx);
+            self.acc[3 * i + 1] += coeff * (radial * ry + tangential * vy);
+            self.acc[3 * i + 2] += coeff * (radial * rz + tangential * vz);
         }
     }
 
@@ -172,6 +220,94 @@ mod tests {
         // 반경은 심플렉틱이 잘 보존, 위상은 dt=1day 수준에서 수 mrad
         assert!(r_err < 1e-3, "반경 오차 {:.3e}", r_err);
         assert!(theta_err < 0.02, "위상 오차 {:.3e} rad", theta_err);
+    }
+
+    // P5-A #178 — 수성 근일점 세차 GR 보정 검증.
+    // 태양+수성 2-body, 100년(1200+ 궤도) 시뮬 후 세차 측정.
+    // 이론: 42.98″/century. 허용: ±5% → 40.8~45.1″.
+    const MERCURY_MASS: f64 = 3.301e23;
+    const MERCURY_A: f64 = 5.791e10; // 장반경 (m)
+    const MERCURY_E: f64 = 0.20563;
+    const MERCURY_PERIOD: f64 = 87.969 * DAY; // 공전주기 (s)
+
+    fn sun_mercury_gr_system() -> NBodySystem {
+        // 근일점(perihelion)에서 시작 — +x 방향, 속도 +y
+        let r_peri = MERCURY_A * (1.0 - MERCURY_E);
+        let mu = GRAVITATIONAL_CONSTANT * SUN_MASS;
+        // vis-viva: v² = μ(2/r - 1/a)
+        let v_peri = (mu * (2.0 / r_peri - 1.0 / MERCURY_A)).sqrt();
+        let mut sys = NBodySystem::new(
+            vec![SUN_MASS, MERCURY_MASS],
+            vec![0.0, 0.0, 0.0, r_peri, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0, v_peri, 0.0],
+        );
+        sys.enable_gr = true;
+        sys
+    }
+
+    /// 근일점 방향 각도를 라디안으로 측정 (x-y 평면).
+    fn measure_perihelion_angle(sys: &mut NBodySystem) -> f64 {
+        let dt = 60.0; // 1분 간격으로 근일점 탐색
+        let steps_per_orbit = (MERCURY_PERIOD / dt) as usize;
+        let mut min_r = f64::MAX;
+        let mut peri_x = 0.0;
+        let mut peri_y = 0.0;
+        for _ in 0..steps_per_orbit {
+            sys.step(dt);
+            let x = sys.pos[3] - sys.pos[0];
+            let y = sys.pos[4] - sys.pos[1];
+            let r = (x * x + y * y).sqrt();
+            if r < min_r {
+                min_r = r;
+                peri_x = x;
+                peri_y = y;
+            }
+        }
+        peri_y.atan2(peri_x)
+    }
+
+    #[test]
+    fn mercury_perihelion_precession_43_arcsec() {
+        let mut sys = sun_mercury_gr_system();
+
+        // 첫 궤도: 초기 근일점 방향 측정
+        let angle_0 = measure_perihelion_angle(&mut sys);
+
+        // 100년 = ~415 궤도. 나머지 414 궤도 전진.
+        let centuries = 1.0;
+        let total_orbits = (centuries * 100.0 * 365.25 / 87.969) as usize;
+        let dt = 60.0;
+        let steps_per_orbit = (MERCURY_PERIOD / dt) as usize;
+
+        // 중간 궤도는 빠르게 전진 (근일점 측정 없이)
+        for _ in 1..(total_orbits - 1) {
+            for _ in 0..steps_per_orbit {
+                sys.step(dt);
+            }
+        }
+
+        // 마지막 궤도: 근일점 방향 측정
+        let angle_final = measure_perihelion_angle(&mut sys);
+
+        let precession_rad = angle_final - angle_0;
+        let precession_arcsec = precession_rad * 206_265.0; // rad → arcseconds
+        let per_century = precession_arcsec / centuries;
+
+        println!(
+            "Mercury perihelion precession: {:.2}″/century (theory: 42.98″)",
+            per_century
+        );
+        println!(
+            "  angle_0={:.6e} rad, angle_final={:.6e} rad, delta={:.6e} rad",
+            angle_0, angle_final, precession_rad
+        );
+
+        // ±5% of 42.98″ → 40.83~45.13″
+        assert!(
+            per_century > 40.0 && per_century < 46.0,
+            "세차 {:.2}″/century가 ±5% 범위(40.8~45.1) 밖",
+            per_century
+        );
     }
 
     #[test]
