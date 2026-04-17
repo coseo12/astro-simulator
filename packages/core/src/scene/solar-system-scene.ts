@@ -47,6 +47,8 @@ export interface SolarSystemSceneHandles {
   setBodyMassMultiplier: (bodyId: string, multiplier: number) => void;
   /** 모든 배수를 1.0으로 리셋 + Newton 재빌드. */
   resetMassMultipliers: () => void;
+  /** P5-C #179 — force/integrator 셰이더별 GPU ms. WebGPU 엔진 + gpuTimer 활성 시만. */
+  readShaderTimings: () => { forceMs: number | null; integratorMs: number | null } | null;
   dispose: () => void;
 }
 
@@ -402,6 +404,12 @@ export function createSolarSystemScene(
     getPhysicsEngine,
     setBodyMassMultiplier,
     resetMassMultipliers,
+    readShaderTimings: () => {
+      if (newtonEngine && 'readShaderTimings' in newtonEngine) {
+        return (newtonEngine as WebGpuNBodyEngine).readShaderTimings();
+      }
+      return null;
+    },
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();

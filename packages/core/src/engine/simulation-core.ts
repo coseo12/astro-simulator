@@ -74,6 +74,12 @@ export class SimulationCore {
     if (!hasTimerCap) return false;
     const instrumentation = new EngineInstrumentation(this.#created.engine);
     instrumentation.captureGPUFrameTime = true;
+    // P5-C #179 — ComputeShader별 gpuTimeInFrame 활성화. 이 플래그가 없으면
+    // ComputeShader 인스턴스에 WebGPUPerfCounter가 생성되지 않는다.
+    const eng = this.#created.engine as { enableGPUTimingMeasurements?: boolean };
+    if ('enableGPUTimingMeasurements' in eng) {
+      eng.enableGPUTimingMeasurements = true;
+    }
     this.#instrumentation = instrumentation;
     return true;
   }

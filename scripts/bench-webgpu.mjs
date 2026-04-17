@@ -83,6 +83,13 @@ const readGpuMs = () =>
     () => /** @type {number | null} */ (/** @type {any} */ (window).__gpuFrameTimeMs ?? null),
   );
 
+// P5-C #179 — shader별 GPU ms 읽기.
+const readShaderTimings = () =>
+  page.evaluate(() => {
+    const t = /** @type {any} */ (window).__gpuShaderTimings;
+    return t ?? null;
+  });
+
 // P4-A #165 — beltNbody=1 모드로 측정. 소행성대가 N-body 엔진에 편입되어
 // engine 선택(newton/barnes-hut/webgpu)이 실제 N=행성+belt 전체에 대해 적용된다.
 //
@@ -105,17 +112,21 @@ for (const engine of ['newton', 'barnes-hut', 'webgpu']) {
     await page.click('[data-testid="time-play"]').catch(() => {});
     await page.waitForTimeout(500);
     const fps = await measureFps(DURATION_MS);
-    // 측정 직후 읽기 — lastSecAverage는 최근 1초 평균. 측정 윈도우와 정렬.
     const gpuMs = await readGpuMs();
+    const shaderT = await readShaderTimings();
     rows.push({
       engine,
       belt,
       fps: Number(fps.toFixed(2)),
       gpuMs: gpuMs === null ? null : Number(gpuMs.toFixed(3)),
+      forceMs: shaderT?.forceMs != null ? Number(shaderT.forceMs.toFixed(3)) : null,
+      integratorMs: shaderT?.integratorMs != null ? Number(shaderT.integratorMs.toFixed(3)) : null,
     });
     const gpuStr = gpuMs === null ? 'n/a' : `${gpuMs.toFixed(3)}ms`;
+    const forceStr = shaderT?.forceMs != null ? `${shaderT.forceMs.toFixed(3)}ms` : 'n/a';
+    const intStr = shaderT?.integratorMs != null ? `${shaderT.integratorMs.toFixed(3)}ms` : 'n/a';
     console.log(
-      `${engine.padEnd(11)} N=${String(belt).padEnd(5)}: ${fps.toFixed(2).padStart(7)} fps · gpu ${gpuStr}`,
+      `${engine.padEnd(11)} N=${String(belt).padEnd(5)}: ${fps.toFixed(2).padStart(7)} fps · gpu ${gpuStr} · force ${forceStr} · integrator ${intStr}`,
     );
   }
 }

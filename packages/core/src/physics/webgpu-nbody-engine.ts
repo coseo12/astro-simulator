@@ -148,8 +148,24 @@ export class WebGpuNBodyEngine {
   }
 
   totalEnergy(): number {
-    // GPU 측 reduce가 필요 — #147 정확도 검증 시점에 추가. 현재는 미지원.
     return Number.NaN;
+  }
+
+  /**
+   * P5-C #179 — force/integrator 셰이더별 GPU ms. enableGPUTimingMeasurements 필요.
+   * 미활성 시 null. ns → ms 변환.
+   */
+  readShaderTimings(): { forceMs: number | null; integratorMs: number | null } {
+    const readMs = (shader: ComputeShader): number | null => {
+      const counter = shader.gpuTimeInFrame?.counter;
+      if (!counter) return null;
+      const ns = counter.lastSecAverage || counter.average || counter.current;
+      return Number.isFinite(ns) && ns > 0 ? ns / 1_000_000 : null;
+    };
+    return {
+      forceMs: readMs(this.forceShader),
+      integratorMs: readMs(this.vvShader),
+    };
   }
 
   dispose(): void {
