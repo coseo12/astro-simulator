@@ -1,17 +1,17 @@
 {
-  "harnessVersion": "2.6.0",
+  "harnessVersion": "2.7.0",
   "installedAt": "2026-04-16T05:40:46Z",
   "files": {
     "CLAUDE.md": {
-      "sha256": "518208f7c0528d20aff9fe8fc67500ce731e87e6cc8f38a7119aafcbe0b9385c",
+      "sha256": "fbfe37880afa63d2e99be5a221a44b0ac70fa32628efda4fef0ab3a82e113319",
       "category": "managed-block"
     },
     ".claude/agents/architect.md": {
-      "sha256": "cd2b0146296a4637094aab059a27d99bd4f68ecae25cc900763821cb94c2d35b",
+      "sha256": "ca28262e8076d08f1439d80431f977cb3e492abc2accf016cf8cc61ddc56b4cb",
       "category": "atomic"
     },
     ".claude/agents/developer.md": {
-      "sha256": "81a22b658dfd077331ea543e67c6bde624c3f9901211913ec8e10562d661fbe1",
+      "sha256": "5a64228d62d2149d571d9077bd4b81445e136cc5b08fa919ee267284d4fe5e42",
       "category": "atomic"
     },
     ".claude/agents/pm.md": {
@@ -19,7 +19,7 @@
       "category": "atomic"
     },
     ".claude/agents/qa.md": {
-      "sha256": "182e1669c1cf4bb85c690a4b956dbdea765395b4e6dc9e39ac3e411e8e521f3c",
+      "sha256": "5d7a006d32e7b181fdff9bf5d5cf86062377ff57fed948c19e6edec25411dc39",
       "category": "atomic"
     },
     ".claude/agents/reviewer.md": {
@@ -67,7 +67,7 @@
       "category": "atomic"
     },
     ".claude/scheduled_tasks.lock": {
-      "sha256": "80e99de23cf0c2bb9a7556a957b1fe5127cee9b64824ebc37e41f60ab7cb103c",
+      "sha256": "76b66b7e2b801c1da57a84f4072a9bc6ee68c447dbcce84fedb19b2524d48937",
       "category": "atomic"
     },
     ".claude/settings.json": {
@@ -99,7 +99,7 @@
       "category": "atomic"
     },
     ".claude/skills/cross-validate/SKILL.md": {
-      "sha256": "2501f6eda62189190903c33660ca7464f86d0daa2527ac58a044711b676b9d8d",
+      "sha256": "1306a963602b5b6a2db948fc4df5888b523bead2ec2e540ad79952f07d181d09",
       "category": "atomic"
     },
     ".claude/skills/cross-validate/scripts/cross_validate.sh": {
@@ -107,7 +107,7 @@
       "category": "atomic"
     },
     ".claude/skills/record-adr/SKILL.md": {
-      "sha256": "f98834fc77430ba658c5d6b2cf6fb8f10067bf9646f537ad65d0743f7c8741e9",
+      "sha256": "1e82733c508dbe34a4cc3acdffdb6da21d21bed6b0bb4a19a18d7e0d85382f50",
       "category": "atomic"
     },
     ".claude/skills/run-tests/SKILL.md": {
@@ -123,11 +123,11 @@
       "category": "atomic"
     },
     ".github/ISSUE_TEMPLATE/task.yml": {
-      "sha256": "7fc26d8969c87670fcdf9b44eab8ebac71de7b3c13b95f8ba3004e34afd81b9b",
+      "sha256": "7007c136122491ebb995dbfdaba3cafc7075a3cf05095906e98a79a5efa414a3",
       "category": "atomic"
     },
     ".github/PULL_REQUEST_TEMPLATE.md": {
-      "sha256": "449bc538894a4eba06c5749d1e010163fa559a8674d37f0134ee0b3aedc1e467",
+      "sha256": "6f5cc369dee8d47b118b324acd7003c5021e5b4b5d8c9a323d18f09c269fbaba",
       "category": "atomic"
     },
     ".github/workflows/agent-dispatch.yml": {
@@ -139,7 +139,7 @@
       "category": "frozen"
     },
     ".github/workflows/ci-physics-wasm.yml": {
-      "sha256": "2d2961f28236cee140cae002786f6d2bc7c472782cfb06e5ba5a4d08cd67036d",
+      "sha256": "f39c65a22bc1800c1f7b43f21e8de8e73f58b87ea700d08160057393e6055183",
       "category": "frozen"
     },
     ".github/workflows/ci.yml": {
@@ -148,6 +148,10 @@
     },
     ".github/workflows/pr-review.yml": {
       "sha256": "c58f1b8a529163bf34c851922c4c84f0f5d4eecdad10c8ac863cddeaa44d15cc",
+      "category": "frozen"
+    },
+    "scripts/bench-p6e.mjs": {
+      "sha256": "227b74fdc9c7e9b02aafc5b40b34b5e545dfb51e01dc6f01061ae3828b753e2f",
       "category": "frozen"
     },
     "scripts/bench-scene-real-gpu.mjs": {
@@ -159,11 +163,11 @@
       "category": "frozen"
     },
     "scripts/bench-set-baseline.mjs": {
-      "sha256": "69dfdf8415e1cb2240f0af36bfee9480515e7ad51b9583dfb830913d5231baca",
+      "sha256": "220bf3c9444ee0187e42d59a7d214716f8a829a9b2ce1983f5dc92624a37e48c",
       "category": "frozen"
     },
     "scripts/bench-webgpu.mjs": {
-      "sha256": "f8c5697e31b0da118407ae7bb75db38886f0e64aadebd00e2b7a415995d02d6d",
+      "sha256": "7ef5fe3f408f8c4fe61aa569b9df022367759dda56776d48ee4b31c3155238cc",
       "category": "frozen"
     },
     "scripts/browser-verify-a11y-p2c.mjs": {
@@ -234,6 +238,14 @@
       "sha256": "76ed126534b31bde78a73084ce5a3872f516a717ecfc5e7b5ddf0389ba18170b",
       "category": "frozen"
     },
+    "scripts/check-duplicate-functions.mjs": {
+      "sha256": "7ecb1ab94e68f89ac9548d30b5ecdc5403482c3ed249152ba541372047d114b4",
+      "category": "frozen"
+    },
+    "scripts/check-duplicate-functions.test.mjs": {
+      "sha256": "6d823ce7ddf726a6b78e6f97ba59f1119285dc772f9e21390ac669815c6fb338",
+      "category": "frozen"
+    },
     "scripts/check-encoding.sh": {
       "sha256": "5baee855690654f55aac3daac70c1254236fa8d3abdf448351ed50478897f61b",
       "category": "frozen"
@@ -259,23 +271,23 @@
       "category": "frozen"
     },
     "docs/NEXT-EXAMPLE-PROJECT-REPORT.md": {
-      "sha256": "c7d4b28c5ca5ae082343e41ab18ee1f108479479a28f4f0af33d69b721e37f37",
+      "sha256": "e66de480d80d5b9fe426e3f6cbdace252608725eedf2e1203957fc6447448d3b",
       "category": "atomic"
     },
     "docs/OPS-REVIEW-REPORT.md": {
-      "sha256": "b1b90e75e74935a63e524e2acee79ef13c3f08340e9d4bbdb2308319b01aab0a",
+      "sha256": "a8d89195ac9d6e44f85d1de76c5032589c5930eb111ca599bb51cab888e92472",
       "category": "atomic"
     },
     "docs/TDD-DISCUSSION-REPORT.md": {
-      "sha256": "19afd72c10cf48c84379290f84f671e0191b8c9a017f69c2417d8db3c6df5b43",
+      "sha256": "1c6f155d744d61d0159af19ec8912c11231d6b5da9bd6640ce94f3805db7fdaa",
       "category": "atomic"
     },
     "docs/agents-guide.md": {
-      "sha256": "7be18fce2d40cf2e62be7d8cfa553c7808fedf020e6620b65bdba82c23cd0cba",
+      "sha256": "aa55f8f190e1257f6a3a39e3da4a14f68b8dd01f92fd3acd681e5ca0fd768e40",
       "category": "atomic"
     },
     "docs/anthropic-harness-design.md": {
-      "sha256": "d94866c063c9cddb3e2164d3661f27a734cb7226bff85ba8aa066e083d65e97d",
+      "sha256": "856253dcef05ba644f1a25e0c5a231ad40a242c265a4605f84d751c9b24d0ae4",
       "category": "atomic"
     },
     "docs/benchmarks/2026-04-14T09-22-19-440Z.json": {
@@ -320,6 +332,10 @@
     },
     "docs/benchmarks/asteroid-belt-n-sweep.md": {
       "sha256": "28c48335852d4324a98ee571255a42955058e1238b6db7b6dbba684147a14c16",
+      "category": "atomic"
+    },
+    "docs/benchmarks/baseline-v0.4.0.json": {
+      "sha256": "bc9ee0b38e9e90dcbf9c25667c6b62dc5d678b0cd96b275634d626da6abfcb51",
       "category": "atomic"
     },
     "docs/benchmarks/baseline.json": {
@@ -374,8 +390,12 @@
       "sha256": "700871d7c946d411e8d896effd43e7d89faa6b3188a5203026dcdbcbdb8f160e",
       "category": "atomic"
     },
+    "docs/benchmarks/p6e-2026-04-17T14-38-49-528Z.json": {
+      "sha256": "d8a26c7cc9a5dd56ceb8b4c91d2b5ba2560bfc95790b4ce430ba9b603e7d6840",
+      "category": "atomic"
+    },
     "docs/commands-index.md": {
-      "sha256": "48f4e9b5e847e7f33050f1d40467153319bc2af171f57cbf6a231f4d6bbba095",
+      "sha256": "59791de15132fed6aa330dd8d1d08202f1ed628e124ee2be2f58e39de5b5f5c2",
       "category": "atomic"
     },
     "docs/decisions/README.md": {
@@ -383,19 +403,19 @@
       "category": "atomic"
     },
     "docs/deployment-guide.md": {
-      "sha256": "4a8c623244cfb82132063f30bf68214e2ffb23e75fd8e4d012e37b83f41b6354",
+      "sha256": "d87ee359c7fe11cb435357bd22171948f58f3c7f5adf5602083c89f2a99379fc",
       "category": "atomic"
     },
     "docs/frozen-file-split.md": {
-      "sha256": "ddfdce4b5bfd112c9e25a2c8e293cdf56926c4e4100bbd419247ea6551261fa6",
+      "sha256": "c4efa3324c0b1c83b051ec8fe38dcc2ee5d0b501aaa9323f896c63bcafb429ab",
       "category": "atomic"
     },
     "docs/knowledge-compilation.md": {
-      "sha256": "9e8258b96cf43bb7eb7dcadbb4ee698c344442e2a7db482fe02bcd4b1280b375",
+      "sha256": "2fb9ad0544b58133d75958f6f382343c9eaa359d42cb3e89fff09f09dbf9e00d",
       "category": "atomic"
     },
     "docs/model-assumptions.md": {
-      "sha256": "fbcbec877c21a0715fe57bc1fa4c37c71d3776e460131e001efddd2c0239606a",
+      "sha256": "f4aef34786132d92b9631ab7932a2c5c76983f9805628471beda7c345f21db2c",
       "category": "atomic"
     },
     "docs/phases/P1-solar-system-mvp.md": {
@@ -431,19 +451,19 @@
       "category": "atomic"
     },
     "docs/report-cross-agent-issue.md": {
-      "sha256": "d5c06bab6fda1e345dbaef6e44a36859e3c1f9fa3d0e3ecef03112a7ee0c9b59",
+      "sha256": "e7ef105a947d5e22a44ee48b174204984700bb70519da10df6ad29139f9c5f22",
       "category": "atomic"
     },
     "docs/report-final-audit.md": {
-      "sha256": "410044f4269fcfe9cca435fad74a6a1c4a58c4da95bf2a38c4ae2cd2d1eeba5b",
+      "sha256": "ba867daf39f5cd6fb5c96d9b918de2483f19ee2efb15fb7b124ce167ec153d2d",
       "category": "atomic"
     },
     "docs/report-harness-design-diagnosis.md": {
-      "sha256": "1af11c7cf9ed26e4a26779702bd73fc627950e299814805beb62460f0613f835",
+      "sha256": "777ad2445e9fc56eb1f26eac4196590a74abfe3587a0b2f7440107bdecc2736b",
       "category": "atomic"
     },
     "docs/report-lightweight-improvement.md": {
-      "sha256": "19fd403418116e0a03af7b3dfb85ccd8856fea27f4b159714a55d9faf8be4d95",
+      "sha256": "1da8c6712ef39cec7c9b8b193e121a59ac807280087b3a5b5db45367e7902a19",
       "category": "atomic"
     },
     "docs/report-npx-vs-plugin.md": {
@@ -451,19 +471,23 @@
       "category": "atomic"
     },
     "docs/report-renewal-retrospective.md": {
-      "sha256": "8c3e20e82266aa58fa45f03338042cbe857fb20ab668c000934340547d7cd1e7",
+      "sha256": "7f33dbe75de2db140b51514fb3314d10b78bf9cda8ed4ad80f8185eacbc6d01a",
       "category": "atomic"
     },
     "docs/report-simpleshop-renewal-retrospective.md": {
-      "sha256": "1582f6a180eeb6d028b1a7245b36b6852b7f448661f87540946ce6da6a0cb5ae",
+      "sha256": "23f175ea07e064a2177d590f8e2ecad715491de2804a084087187057b4525fb7",
       "category": "atomic"
     },
     "docs/reports/p4c-mobile-20260416.md": {
       "sha256": "077cb6cd3b7156e4cc827fabd493d3238a233d9852c3fa7a52ac395dc03de582",
       "category": "atomic"
     },
+    "docs/reports/p4c-mobile-실기기-20260417.md": {
+      "sha256": "a317b12adbd5dda961c8c3ab4fc8c1d90f540c171b4b91d28776e23d9f7a2b5b",
+      "category": "atomic"
+    },
     "docs/retrospectives/README.md": {
-      "sha256": "ae5214b320b6fb5b5efc9282b359799b19c16887bbe90b5a914ef13d8a87a2f4",
+      "sha256": "69fac0e0cc09d7679f3530173240112d7a7e69eee2ddff23187366950015de87",
       "category": "atomic"
     },
     "docs/screenshots/01-solar-system.png": {
@@ -483,12 +507,13 @@
       "category": "atomic"
     },
     "docs/security.md": {
-      "sha256": "e7ab0e5c07dbad4dbf06da2d2280fdb712bef411a6d3c532eabeae84e56cc1b8",
+      "sha256": "7e9b2965c9fee2899266b795e1c650329b274fb31be39425137c68b65d0e099e",
       "category": "atomic"
     },
     "docs/skills-guide.md": {
-      "sha256": "123d7d20e3d758ccc3aa4ff4a660214d7f777fa4a7b8a652cc8313ef114e0d63",
+      "sha256": "94c15fbb8e1d54f8addf786844087449bf0f1a0ab51c83dcd55ae08442f1405c",
       "category": "atomic"
     }
-  }
+  },
+  "lastUpdatedAt": "2026-04-17T18:43:50Z"
 }

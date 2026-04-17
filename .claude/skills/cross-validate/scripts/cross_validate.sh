@@ -62,7 +62,7 @@ run_gemini() {
     }
 
     if echo "${output}" | grep -qE "RESOURCE_EXHAUSTED|429|503|500"; then
-      log "경고: ${GEMINI_MODEL} 용량 부족 (시��� ${attempt}/${MAX_GEMINI_RETRIES})"
+      log "경고: ${GEMINI_MODEL} 용량 부족 (시도 ${attempt}/${MAX_GEMINI_RETRIES})"
       attempt=$((attempt + 1))
       sleep $((attempt * 5))
     else
