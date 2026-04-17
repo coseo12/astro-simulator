@@ -135,7 +135,13 @@ P6-C `measure_perihelion_angle` 패턴(`min_r` 추적으로 근일점 통과 시
 ### 재검토 트리거
 
 1. **D2/D3 미달 (1차 시도, dt=60s)** → dt=30s → dt=15s 순차 축소. 비용 2~4× 증가지만 단위 테스트 단발이라 허용.
-2. **dt=15s에서도 미달** → P6-E에서 적분기 격상 ADR 작성 (Yoshida 4차 심플렉틱 또는 RK8). EIH 식 자체가 아닌 적분기 truncation이 신호를 잠식한 경우.
+2. **적분기 격상 ADR (Yoshida 4차 심플렉틱 또는 RK8) 필요 조건** (갱신 2026-04-17, P6-E reviewer MINOR):
+   원래 "dt=15s에서도 미달 시"로 기재했으나 실측에서 dt=2.5s 5단계 폴백으로 **격상 미발동**.
+   향후 재격상 트리거는 다음 정량 기준으로 재정의:
+   - **지구 rel_err > 4%** (현재 2.48%, 5% 허용치에 1.5% 여유) — 마진이 절반 이하로 축소되면 격상
+   - 또는 **dt < 1s 필요** (현재 2.5s, 추가 4배 이상 축소 요구 시 적분기 선택이 문제)
+   - 또는 **CI 실행 시간 > 15분** (현재 ~223초, 4배 증가 시 심플렉틱 고차 적분기가 비용-이득 우위)
+     EIH 식 자체가 아닌 적분기 truncation이 신호를 잠식한 경우로 한정 — 세 조건 중 하나라도 충족 시 별도 ADR로 격상.
 3. **P5 회귀 발생 (D1 실패)** → 본 ADR 즉시 무효화, P6-C EIH 식 회귀 분석 (헬퍼 추출 시 의도치 않은 변경 의심).
 4. **화성 등 추가 행성 검증 요구** → 헬퍼 시그니처 그대로 호출, 본 ADR 갱신 불필요.
 5. **JPL ephemeris 비교 요구 (행성 섭동 분리 정밀도 검증)** → simplified Keplerian → DE441 마이그레이션 별도 ADR.
@@ -158,3 +164,4 @@ P6-C `measure_perihelion_angle` 패턴(`min_r` 추적으로 근일점 통과 시
 - 마스터 #188 — P6 마일스톤
 - Will C.M., _Theory and Experiment in Gravitational Physics_ (2nd ed.) — 금성/지구 GR 세차 출처
 - Pitjeva E.V., Pitjev N.P. (2014), _Celestial Mechanics and Dynamical Astronomy_ — 행성 근일점 ephemeris
+- Park R.S. et al. (2017), _Astronomical Journal_ 153:121 — 금성 GR 세차 독립 검증치 (테스트 주석 `nbody.rs:690` 박제, P6-E reviewer MINOR로 ADR 참고 섹션에도 명시)

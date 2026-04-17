@@ -40,6 +40,7 @@
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:sweep": "BENCH_N_SWEEP=10,100,200,1000,5000,10000 node scripts/bench-scene.mjs",
     "bench:webgpu": "node scripts/bench-webgpu.mjs",
+    "bench:p6e": "node scripts/bench-p6e.mjs",
     "bench:scene:set-baseline": "node scripts/bench-set-baseline.mjs"
   },
   "devDependencies": {
