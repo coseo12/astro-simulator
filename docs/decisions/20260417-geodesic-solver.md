@@ -130,7 +130,19 @@ P6-A 통과 기준:
 - **3D 적분 필요** (예: 시간 의존 메트릭, Kerr 회전 블랙홀, 다중 블랙홀) → 옵션 (1)-A 또는 (1)-B로 격상
 - **A2 미충족** (1e-4 드리프트 못 맞춤) → (2)-C Adaptive RK45 격상
 - **WGSL 포팅 시 평면 회전 비용 과다** → P6-B에서 (1)-B Cartesian 4-vector 재평가
+  - **(2026-04-17 P6-B 결정)**: WGSL 포팅 자체를 회피하는 LUT 전략 채택.
+    `docs/decisions/20260417-accretion-disk-shadow-pipeline.md` 참고.
+    본 ADR (1) 결정(평면 1차 ODE) 유지.
 - **1.5Rs 미만 photon sphere 정밀 시각화 요구** (예: ergosphere) → metric tensor 일반화 ADR 신규
+
+## P6-B 결정 후속 (2026-04-17)
+
+본 ADR의 "WASM 노출 여부는 P6-B에서 결정" 항목은 P6-B(`20260417-accretion-disk-shadow-pipeline.md`)
+에서 다음으로 확정:
+
+- 노출 함수: `#[wasm_bindgen] pub fn build_lensing_lut(samples: u32) -> Vec<f32>`
+- `integrate_photon_geodesic`은 비공개 유지 (LUT 빌더 내부에서만 호출)
+- TS 측 wrapper: `packages/core/src/physics/lensing-lut.ts` (신규)
 
 ## 비-범위 (P6-A에서 절대 손대지 말 것)
 

@@ -45,6 +45,12 @@ export interface SimStoreState {
   /** 바디 id → 질량 배수 (#107). 1.0 또는 부재는 원래 질량. */
   massMultipliers: Record<string, number>;
 
+  /**
+   * P6-B #190 — accretion disk 파라미터 (?bh=2 옵트인 시에만 의미).
+   * 슬라이더 변경 → store → sim-canvas useEffect → handles.setDisk* 호출.
+   */
+  blackHoleDisk: BlackHoleDiskParams;
+
   // 개발/디버그용 라운드트립 카운터
   pingCount: number;
   lastPingAt: number | null;
@@ -62,8 +68,35 @@ export interface SimStoreState {
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   setMassMultiplier: (bodyId: string, multiplier: number) => void;
   resetMassMultipliers: () => void;
+  setBlackHoleDiskParam: <K extends keyof BlackHoleDiskParams>(
+    key: K,
+    value: BlackHoleDiskParams[K],
+  ) => void;
+  resetBlackHoleDisk: () => void;
   incrementPing: () => void;
 }
+
+/** P6-B #190 — accretion disk 5 파라미터. ADR (4)-i 평면 thin disk. */
+export interface BlackHoleDiskParams {
+  /** disk 안쪽 반경 (Rs 단위). photon sphere 안쪽 비물리 → 1.5 권장 하한. */
+  innerRs: number;
+  /** disk 바깥 반경 (Rs 단위). */
+  outerRs: number;
+  /** 이심률 (0~0.9). */
+  eccentricity: number;
+  /** 두께 (Rs 단위). */
+  thicknessRs: number;
+  /** 기울기 (도). 셰이더에는 rad로 변환되어 전달. */
+  tiltDeg: number;
+}
+
+const DEFAULT_BLACK_HOLE_DISK: BlackHoleDiskParams = {
+  innerRs: 1.5,
+  outerRs: 6.0,
+  eccentricity: 0.0,
+  thicknessRs: 0.15,
+  tiltDeg: 17, // ≈ 0.3 rad
+};
 
 export const useSimStore = create<SimStoreState>((set) => ({
   rendererKind: null,
@@ -77,6 +110,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   unitSystem: 'astro',
   physicsEngine: 'kepler',
   massMultipliers: {},
+  blackHoleDisk: { ...DEFAULT_BLACK_HOLE_DISK },
   pingCount: 0,
   lastPingAt: null,
 
@@ -98,6 +132,9 @@ export const useSimStore = create<SimStoreState>((set) => ({
       return { massMultipliers: next };
     }),
   resetMassMultipliers: () => set({ massMultipliers: {} }),
+  setBlackHoleDiskParam: (key, value) =>
+    set((state) => ({ blackHoleDisk: { ...state.blackHoleDisk, [key]: value } })),
+  resetBlackHoleDisk: () => set({ blackHoleDisk: { ...DEFAULT_BLACK_HOLE_DISK } }),
   incrementPing: () =>
     set((state) => ({
       pingCount: state.pingCount + 1,

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CelestialTree } from '../panels/celestial-tree';
 import { CelestialInfoPanel } from '../panels/celestial-info-panel';
 import { ScenarioPresets } from '../panels/scenario-presets';
+import { BlackHoleDiskPanel } from '../panels/black-hole-disk-panel';
 
 export function SidePanels() {
   const mode = useSimStore((s) => s.mode);
@@ -37,6 +38,9 @@ export function SidePanels() {
             <CelestialInfoPanel />
             <div className="mt-4 pt-3 border-t border-border-subtle">
               <ScenarioPresets />
+            </div>
+            <div className="mt-4 pt-3 border-t border-border-subtle">
+              <BlackHoleDiskPanel />
             </div>
           </motion.aside>
         </>

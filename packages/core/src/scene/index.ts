@@ -24,3 +24,8 @@ export { createAsteroidBelt } from './asteroid-belt.js';
 export type { AsteroidBeltHandles, AsteroidBeltOptions } from './asteroid-belt.js';
 export { createGravitationalLensing } from './gravitational-lensing.js';
 export type { LensingHandles, BlackHoleOptions } from './gravitational-lensing.js';
+export { createBlackHoleRendering, BLACK_HOLE_RS_NATURAL } from './black-hole-rendering.js';
+export type {
+  BlackHoleRenderingHandles,
+  BlackHoleRenderingOptions,
+} from './black-hole-rendering.js';

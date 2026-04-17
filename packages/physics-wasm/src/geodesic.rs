@@ -17,6 +17,8 @@
 //! - Misner, Thorne, Wheeler — *Gravitation*, §25.5
 //! - Hartle — *Gravity*, Ch.9
 
+use wasm_bindgen::prelude::*;
+
 /// 자연단위 Rs (= 2M, M=1).
 pub const RS: f64 = 2.0;
 /// 자연단위 M.
@@ -228,6 +230,61 @@ pub fn integrate_photon_geodesic(
     }
 }
 
+// =============================================================================
+// P6-B #190 — Lensing LUT 빌더 (WASM bindgen 노출)
+// =============================================================================
+//
+// ADR `20260417-accretion-disk-shadow-pipeline.md` (3)-α 결정:
+//   - flat `Vec<f32>` 한 함수만 노출 (`build_lensing_lut`)
+//   - `integrate_photon_geodesic`은 비공개 유지
+//   - b 범위는 자연단위 [LUT_B_MIN, LUT_B_MAX] Rs 모듈 상수 (TS는 samples만 전달)
+//
+// 출력 포맷: `[outcome_flag, deflection]` × samples (총 `2 * samples` floats).
+//   - outcome_flag: 0.0 = Captured, 1.0 = Escaped
+//   - deflection: rad. Captured는 0.0 (사용처에서 outcome_flag로 마스크).
+
+/// LUT b sweep 하한 (Rs 단위).
+pub const LUT_B_MIN: f64 = 0.5;
+/// LUT b sweep 상한 (Rs 단위).
+pub const LUT_B_MAX: f64 = 10.0;
+
+/// 광선 적분의 안전 가드 max_phi — escape 경로가 perihelion 후 다시 무한대로
+/// 충분히 펼쳐질 수 있도록 8π 사용 (geodesic_conservation_1000_steps와 동일).
+const LUT_MAX_PHI: f64 = 8.0 * std::f64::consts::PI;
+/// 광선 적분 initial step (geodesic 솔버 r-기반 step 제어가 강한 장에서 자동 축소).
+const LUT_INITIAL_STEP: f64 = 1e-3;
+
+/// LUT 빌더 — b ∈ [LUT_B_MIN, LUT_B_MAX] Rs를 균등 분포로 sweep.
+///
+/// 반환 포맷: flat `Vec<f32>`, 길이 `2 * samples`.
+///   - index `2*i + 0`: outcome_flag (0.0=Captured, 1.0=Escaped)
+///   - index `2*i + 1`: deflection (rad, Captured는 0.0)
+///
+/// `samples`: LUT 해상도. ADR B2 ±5% 기준 256 이상 권장 (실측 결정).
+#[wasm_bindgen]
+pub fn build_lensing_lut(samples: u32) -> Vec<f32> {
+    assert!(samples >= 2, "samples는 2 이상이어야 함 (선형 sweep)");
+    let n = samples as usize;
+    let mut out = Vec::with_capacity(2 * n);
+    let denom = (n as f64) - 1.0;
+    for i in 0..n {
+        let t = (i as f64) / denom;
+        let b = LUT_B_MIN + (LUT_B_MAX - LUT_B_MIN) * t;
+        let traj = integrate_photon_geodesic(b, LUT_MAX_PHI, LUT_INITIAL_STEP);
+        match traj.outcome {
+            GeodesicOutcome::Escaped { deflection, .. } => {
+                out.push(1.0_f32);
+                out.push(deflection as f32);
+            }
+            GeodesicOutcome::Captured { .. } => {
+                out.push(0.0_f32);
+                out.push(0.0_f32);
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,6 +414,109 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// P6-B B2 회귀 가드 — LUT의 Captured/Escaped 경계 b가 b_crit ±5% 안.
+    ///
+    /// `build_lensing_lut(samples)` 결과를 sweep 순서대로 훑어 outcome_flag가
+    /// 0.0 → 1.0으로 전이하는 인접 두 b의 평균을 boundary로 정의 (LUT 해상도 1bin).
+    /// b_crit = 3√3/2 ≈ 2.598 Rs 기준 ±5% (절대 0.13 Rs).
+    #[test]
+    fn lensing_lut_shadow_b_crit_within_5_percent() {
+        // ADR 비결정 항목: samples 기본값을 256/512/1024 중 ±5% 만족 최소값으로 결정.
+        // bin 폭 = (10.0 - 0.5) / (samples - 1). samples=256 → 0.0373 < 0.13 → 충분.
+        const SAMPLES: u32 = 256;
+        let lut = build_lensing_lut(SAMPLES);
+        assert_eq!(lut.len() as u32, 2 * SAMPLES, "LUT flat 길이 == 2*samples");
+
+        let n = SAMPLES as usize;
+        let denom = (n as f64) - 1.0;
+        let bin_width = (LUT_B_MAX - LUT_B_MIN) / denom;
+
+        // 첫 0→1 전이 인덱스 탐색.
+        let mut boundary_b: Option<f64> = None;
+        for i in 1..n {
+            let prev = lut[2 * (i - 1)];
+            let curr = lut[2 * i];
+            if prev == 0.0 && curr == 1.0 {
+                let b_prev = LUT_B_MIN + (LUT_B_MAX - LUT_B_MIN) * ((i - 1) as f64) / denom;
+                let b_curr = LUT_B_MIN + (LUT_B_MAX - LUT_B_MIN) * (i as f64) / denom;
+                boundary_b = Some(0.5 * (b_prev + b_curr));
+                break;
+            }
+        }
+        let boundary_b = boundary_b.expect("LUT에 Captured→Escaped 전이가 있어야 함");
+
+        let rel_err = ((boundary_b - B_CRIT_OVER_RS) / B_CRIT_OVER_RS).abs();
+        assert!(
+            rel_err < 0.05,
+            "shadow boundary: expected={:.6}, got={:.6}, rel_err={:.4} (bin={:.4})",
+            B_CRIT_OVER_RS,
+            boundary_b,
+            rel_err,
+            bin_width
+        );
+    }
+
+    /// 측정용 보조 — samples 후보별 boundary/rel_err를 출력.
+    /// `cargo test --lib lensing_lut_measure -- --nocapture --ignored`.
+    #[test]
+    #[ignore]
+    fn lensing_lut_measure_boundary_for_samples_candidates() {
+        for &samples in &[64_u32, 128, 256, 512, 1024] {
+            let lut = build_lensing_lut(samples);
+            let n = samples as usize;
+            let denom = (n as f64) - 1.0;
+            let bin = (LUT_B_MAX - LUT_B_MIN) / denom;
+            let mut boundary = None;
+            for i in 1..n {
+                if lut[2 * (i - 1)] == 0.0 && lut[2 * i] == 1.0 {
+                    let b_prev = LUT_B_MIN + (LUT_B_MAX - LUT_B_MIN) * ((i - 1) as f64) / denom;
+                    let b_curr = LUT_B_MIN + (LUT_B_MAX - LUT_B_MIN) * (i as f64) / denom;
+                    boundary = Some(0.5 * (b_prev + b_curr));
+                    break;
+                }
+            }
+            let b = boundary.unwrap();
+            let rel = ((b - B_CRIT_OVER_RS) / B_CRIT_OVER_RS).abs();
+            println!(
+                "samples={:5} bin={:.5} boundary={:.5} rel_err={:.4}%",
+                samples,
+                bin,
+                b,
+                rel * 100.0
+            );
+        }
+    }
+
+    /// LUT 출력 sanity — 길이/경계값/단조 escape 영역.
+    #[test]
+    fn lensing_lut_format_sanity() {
+        const SAMPLES: u32 = 64;
+        let lut = build_lensing_lut(SAMPLES);
+        assert_eq!(lut.len(), 2 * SAMPLES as usize);
+
+        // outcome_flag는 0.0 또는 1.0만.
+        for i in 0..SAMPLES as usize {
+            let f = lut[2 * i];
+            assert!(
+                f == 0.0 || f == 1.0,
+                "outcome_flag must be 0.0/1.0, got {}",
+                f
+            );
+        }
+
+        // 첫 샘플 (b=0.5 Rs)은 Captured, 마지막 (b=10 Rs)은 Escaped여야 함.
+        assert_eq!(lut[0], 0.0, "b=LUT_B_MIN은 Captured");
+        let last = (SAMPLES as usize) - 1;
+        assert_eq!(lut[2 * last], 1.0, "b=LUT_B_MAX은 Escaped");
+
+        // Escape 영역의 deflection은 양수 (광선이 휘는 방향).
+        assert!(
+            lut[2 * last + 1] > 0.0,
+            "b=LUT_B_MAX deflection > 0, got {}",
+            lut[2 * last + 1]
+        );
     }
 
     /// A3 sanity — 경계값 직접 검증 (b_crit 이하/이상 1점씩).
