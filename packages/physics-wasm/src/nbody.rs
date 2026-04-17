@@ -563,48 +563,159 @@ mod tests {
         );
     }
 
-    /// EIH 모드 수성 근일점 세차 가드 (보너스) — Single 1PN과 ±5% 이내.
-    /// EIH 다체 효과는 수성+태양 2체 시나리오에서는 시험입자 한계와 같으므로
-    /// 41~46″/century 범위 (P5-A와 동일 허용)를 만족해야 한다.
-    #[test]
-    fn mercury_perihelion_precession_eih() {
-        let r_peri = MERCURY_A * (1.0 - MERCURY_E);
+    // ─── P6-D #192 ─── EIH 1PN 행성-일반 근일점 세차 헬퍼 ────────────────
+    //
+    // ADR `docs/decisions/20260417-perihelion-verification.md` 결정 1B + 2B + 3A.
+    // P5-A의 `measure_perihelion_angle`(수성 하드코딩) 패턴을 행성-일반화한 측정 헬퍼.
+    // - Single 모드 회귀 가드(`mercury_perihelion_precession_43_arcsec`)는 무수정 보존
+    //   → 기존 `measure_perihelion_angle()` 시그니처도 그대로 유지
+    // - EIH 모드 행성 근일점 세차는 본 헬퍼를 통해 측정 (수성/금성/지구)
+
+    /// 행성 + 태양 2체에서 EIH 1PN 모드로 100년 적분 후 근일점 세차 측정.
+    ///
+    /// - 초기 조건: simplified Keplerian (근일점 시작, +x 방향 / +y 속도, vis-viva)
+    /// - 적분: Velocity-Verlet, dt = 60s (ADR 1차 시도값)
+    /// - 측정: 첫 궤도/마지막 궤도에서 `min_r` 추적으로 근일점 통과 시점 발견 → atan2
+    /// - 통과 조건: `|measured - expected| / expected < tol_pct/100`
+    ///
+    /// 반환값: 측정된 `arcsec/century` (assertion 실패 시에도 println! 로 노출됨).
+    fn measure_perihelion_precession_eih(
+        name: &str,
+        planet_mass: f64,
+        semi_major: f64,
+        eccentricity: f64,
+        period: f64,
+        expected_arcsec_per_century: f64,
+        tol_pct: f64,
+    ) -> f64 {
+        let r_peri = semi_major * (1.0 - eccentricity);
         let mu = GRAVITATIONAL_CONSTANT * SUN_MASS;
-        let v_peri = (mu * (2.0 / r_peri - 1.0 / MERCURY_A)).sqrt();
+        // vis-viva: v² = μ(2/r - 1/a)
+        let v_peri = (mu * (2.0 / r_peri - 1.0 / semi_major)).sqrt();
 
         let mut sys = NBodySystem::new(
-            vec![SUN_MASS, MERCURY_MASS],
+            vec![SUN_MASS, planet_mass],
             vec![0.0, 0.0, 0.0, r_peri, 0.0, 0.0],
             vec![0.0, 0.0, 0.0, 0.0, v_peri, 0.0],
         );
         sys.gr_mode = GrMode::EIH1PN;
 
-        let angle_0 = measure_perihelion_angle(&mut sys);
+        // ADR 폴백 결과 정착값.
+        // 1차 시도 dt=60s 미달(금성 60%, 지구 67%). 30s/15s/7.5s/5s 순차 축소 후 2.5s에서
+        // 수성/금성/지구 모두 ±5% PASS (rel_err 0.90%/0.63%/2.48%).
+        // Velocity-Verlet 적분기 truncation이 신호(8.62″/3.84″)를 잠식하기 때문이며,
+        // 적분기 격상(Yoshida 4차 등)은 P6-E 후속 ADR 트리거.
+        let dt = 2.5;
+        let steps_per_orbit = (period / dt) as usize;
 
+        // 근일점 측정 클로저 — 1궤도 분량을 진행하며 최소 r에서의 각도 기록.
+        let find_perihelion = |sys: &mut NBodySystem| -> f64 {
+            let mut min_r = f64::MAX;
+            let mut peri_x = 0.0;
+            let mut peri_y = 0.0;
+            for _ in 0..steps_per_orbit {
+                sys.step(dt);
+                let x = sys.pos[3] - sys.pos[0];
+                let y = sys.pos[4] - sys.pos[1];
+                let r = (x * x + y * y).sqrt();
+                if r < min_r {
+                    min_r = r;
+                    peri_x = x;
+                    peri_y = y;
+                }
+            }
+            peri_y.atan2(peri_x)
+        };
+
+        // 첫 궤도 — 초기 근일점 방향
+        let angle_0 = find_perihelion(&mut sys);
+
+        // 100년 = centuries × DAY/period 궤도. (orbits-2) 중간 궤도 빠르게 전진.
         let centuries = 1.0;
-        let total_orbits = (centuries * 100.0 * 365.25 / 87.969) as usize;
-        let dt = 60.0;
-        let steps_per_orbit = (MERCURY_PERIOD / dt) as usize;
-
+        let total_orbits = (centuries * 100.0 * 365.25 * DAY / period) as usize;
         for _ in 1..(total_orbits - 1) {
             for _ in 0..steps_per_orbit {
                 sys.step(dt);
             }
         }
 
-        let angle_final = measure_perihelion_angle(&mut sys);
+        // 마지막 궤도 — 최종 근일점 방향
+        let angle_final = find_perihelion(&mut sys);
+
         let precession_rad = angle_final - angle_0;
         let per_century = precession_rad * 206_265.0 / centuries;
+        let rel_err = (per_century - expected_arcsec_per_century).abs() / expected_arcsec_per_century;
 
         println!(
-            "Mercury perihelion precession (EIH mode): {:.2}″/century (theory: 42.98″)",
-            per_century
+            "{} perihelion precession (EIH): {:.4}″/century (theory: {:.2}″, rel_err: {:.2}%, tol: ±{:.1}%)",
+            name,
+            per_century,
+            expected_arcsec_per_century,
+            rel_err * 100.0,
+            tol_pct
         );
 
         assert!(
-            per_century > 40.0 && per_century < 46.0,
-            "EIH 모드 세차 {:.2}″/century가 ±5% 범위(40.8~45.1) 밖",
-            per_century
+            rel_err < tol_pct / 100.0,
+            "{} 세차 {:.4}″/century 가 이론 {:.2}″ 대비 {:.2}% 오차 (허용 ±{:.1}%)",
+            name,
+            per_century,
+            expected_arcsec_per_century,
+            rel_err * 100.0,
+            tol_pct
+        );
+
+        per_century
+    }
+
+    /// EIH 모드 수성 근일점 세차 가드 (보너스) — Single 1PN과 ±5% 이내.
+    /// EIH 다체 효과는 수성+태양 2체 시나리오에서는 시험입자 한계와 같으므로
+    /// 41~46″/century 범위 (P5-A와 동일 허용)를 만족해야 한다.
+    /// P6-D 헬퍼 추출 후 — 본문은 `measure_perihelion_precession_eih` 호출 1줄.
+    #[test]
+    fn mercury_perihelion_precession_eih() {
+        // 이론치 42.98″/century (Einstein 1915), ±5% → 40.83~45.13″.
+        measure_perihelion_precession_eih(
+            "Mercury",
+            MERCURY_MASS,
+            MERCURY_A,
+            MERCURY_E,
+            MERCURY_PERIOD,
+            42.98,
+            5.0,
+        );
+    }
+
+    /// P6-D D2: 금성 EIH 1PN 근일점 세차 ±5%.
+    /// 이론: 8.62″/century (Will, *Theory and Experiment* §7.2 / Park et al. 2017, GR 기여분만).
+    /// 허용: ±5% → 8.19~9.05″/century.
+    /// 행성 파라미터는 `eih_9body_100yr_eccentricity_drift`의 금성 행과 동일.
+    #[test]
+    fn venus_perihelion_eih_within_5_percent() {
+        measure_perihelion_precession_eih(
+            "Venus",
+            4.867e24,         // kg (NIST/IAU)
+            1.0821e11,        // 장반경 (m)
+            0.00677,          // 이심률 (매우 낮음 — 거의 원형)
+            224.701 * DAY,    // 공전주기 (s)
+            8.62,             // GR 세차 ″/century
+            5.0,
+        );
+    }
+
+    /// P6-D D3: 지구 EIH 1PN 근일점 세차 ±5%.
+    /// 이론: 3.84″/century (Pitjeva-Pitjev 2014, *Celest. Mech. Dyn. Astron.*, GR 기여분만).
+    /// 허용: ±5% → 3.65~4.03″/century.
+    #[test]
+    fn earth_perihelion_eih_within_5_percent() {
+        measure_perihelion_precession_eih(
+            "Earth",
+            5.972e24,         // kg
+            1.4960e11,        // 장반경 (m, ≈ 1 AU)
+            0.01671,          // 이심률
+            365.256 * DAY,    // 공전주기 (s, sidereal year)
+            3.84,             // GR 세차 ″/century
+            5.0,
         );
     }
 
