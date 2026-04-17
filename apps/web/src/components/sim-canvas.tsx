@@ -120,6 +120,20 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           });
         }
 
+        // P5-D #180 — ?bh=1 옵트인 시 중력렌즈 PostProcess + 블랙홀 메쉬 추가.
+        const bhParam = new URLSearchParams(window.location.search).get('bh');
+        if (bhParam === '1' && instance.scene) {
+          const lensing = sceneApi.createGravitationalLensing(instance.scene, camera, {
+            position: [3, 0, 0],
+            lensStrength: 3,
+            visualRadius: 0.3,
+          });
+          const bhx = Number(new URLSearchParams(window.location.search).get('bhx')) || 3;
+          const bhy = Number(new URLSearchParams(window.location.search).get('bhy')) || 0;
+          const bhz = Number(new URLSearchParams(window.location.search).get('bhz')) || 0;
+          lensing.setPosition(bhx, bhy, bhz);
+        }
+
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
