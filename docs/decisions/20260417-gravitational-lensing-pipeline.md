@@ -1,8 +1,15 @@
 # ADR: 중력렌즈 시각화 — PostProcess fragment shader 접근
 
 - 일자: 2026-04-17
-- 상태: Draft (shader 패스스루 이슈 미해결)
+- 상태: Superseded by [`20260417-accretion-disk-shadow-pipeline.md`](./20260417-accretion-disk-shadow-pipeline.md) (P6-B #190)
 - 관련: P5-D #180
+
+> **Superseded 메모 (2026-04-17, P6-B 설계)**: 본 ADR의 화면공간 thin-lens 근사는 P6-A
+> (`20260417-geodesic-solver.md`)에서 도입한 정확한 광선 geodesic 솔버 + P6-B의
+> LUT-기반 파이프라인으로 대체된다. P5-D 코드(`createGravitationalLensing`,
+> `?bh=1`)는 회귀 가드용으로 보존되며, 신규 정확 파이프라인은 `?bh=2` 옵트인으로
+> 제공된다. Draft 상태로 남았던 shader 패스스루 이슈는 sim-canvas 통합(`?bh=1`)
+> 검증 + P5 회고에서 사실상 해소되었다.
 
 ## 배경
 
