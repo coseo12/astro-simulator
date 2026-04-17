@@ -67,6 +67,8 @@ export interface SolarSystemSceneOptions {
    * BH tree / GPU compute 가속 효과 실측 가능. 기본 false (기존 Kepler 해석해 경로 유지).
    */
   asteroidNbody?: boolean;
+  /** P5-A #178 — 1PN GR 보정 활성. Newton/Barnes-Hut CPU 엔진에만 적용. 기본 false. */
+  enableGR?: boolean;
 }
 
 /**
@@ -85,6 +87,7 @@ export function createSolarSystemScene(
     physicsEngine = 'kepler',
     asteroidBeltN = 0,
     asteroidNbody = false,
+    enableGR = false,
   } = options;
   const SECONDS_PER_DAY = 86_400;
 
@@ -210,7 +213,7 @@ export function createSolarSystemScene(
     } else if (kind === 'barnes-hut') {
       newtonEngine = new BarnesHutNBodyEngine(initial);
     } else {
-      newtonEngine = new NBodyEngine(initial);
+      newtonEngine = new NBodyEngine(initial, { enableGR });
     }
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
     newtonLastJd = jd;

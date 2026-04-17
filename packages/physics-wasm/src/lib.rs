@@ -41,6 +41,15 @@ impl NBodyEngine {
         self.inner.n()
     }
 
+    /// P5-A #178 — 1PN GR 보정 on/off. 기본 false.
+    pub fn set_gr(&mut self, enable: bool) {
+        self.inner.enable_gr = enable;
+    }
+
+    pub fn gr_enabled(&self) -> bool {
+        self.inner.enable_gr
+    }
+
     /// 1 스텝 전진(Velocity-Verlet). 역행은 dt < 0.
     pub fn step(&mut self, dt: f64) {
         self.inner.step(dt);

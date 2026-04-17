@@ -102,10 +102,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           if (beltN >= 1000) return 'barnes-hut';
           return 'newton';
         };
+        // P5-A #178 — ?gr=1 옵트인 시 1PN GR 보정 활성 (수성 근일점 세차 등).
+        const grParam = new URLSearchParams(window.location.search).get('gr');
+        const enableGR = grParam === '1';
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
+          enableGR,
         });
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));

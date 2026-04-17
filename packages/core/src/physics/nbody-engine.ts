@@ -15,6 +15,8 @@ const DEFAULT_MAX_SUB_DT_SECONDS = 86_400; // 1 일
 export interface NBodyEngineOptions {
   /** 서브스텝 최대 dt(초). 기본 1일. */
   maxSubstepSeconds?: number;
+  /** P5-A #178 — 1PN GR 보정 활성. 수성 근일점 세차 등. 기본 false. */
+  enableGR?: boolean;
 }
 
 export interface NBodyState {
@@ -94,6 +96,9 @@ export class NBodyEngine {
     this.wasm = new WasmEngine(state.masses, state.positions, state.velocities);
     this.maxSubDt = options.maxSubstepSeconds ?? DEFAULT_MAX_SUB_DT_SECONDS;
     this.ids = state.ids;
+    if (options.enableGR) {
+      this.wasm.set_gr(true);
+    }
   }
 
   /** dtSeconds만큼 적분. 음수 값은 역행(심플렉틱 대칭). */
