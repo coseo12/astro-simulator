@@ -38,3 +38,24 @@ jobs:
       - name: Rust 테스트 (physics-wasm)
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
+
+  # P6-E #193 (E4) — 신규 함수 중복 방지 가드 (warn-only).
+  # ADR: docs/decisions/20260417-duplicate-function-guard.md
+  # pre-commit 우회 시 PR diff 로 재검사. exit 0 기본 (머지 차단 X).
+  duplicate-function-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # base 대비 diff 필요
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 가드 회귀 테스트 (픽스처 3종)
+        run: node scripts/check-duplicate-functions.test.mjs
+
+      - name: 중복 함수 가드 (PR diff)
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-duplicate-functions.mjs --base origin/${{ github.base_ref }}

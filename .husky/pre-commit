@@ -3,5 +3,10 @@
 # U+FFFD 인코딩 검사 (CRITICAL DIRECTIVE #4)
 ./scripts/check-encoding.sh
 
+# P6-E #193 (E4) — 신규 함수 중복 방지 가드 (warn-only)
+# ADR: docs/decisions/20260417-duplicate-function-guard.md
+# 실패해도 커밋 차단 안 함 (|| true). WARN 출력만.
+node scripts/check-duplicate-functions.mjs --staged || true
+
 # lint-staged 실행 (변경된 파일만 lint + format)
 pnpm lint-staged
