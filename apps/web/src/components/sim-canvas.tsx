@@ -108,6 +108,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           asteroidNbody,
         });
 
+        // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
+        if (gpuTimerParam === '1') {
+          Object.defineProperty(window, '__gpuShaderTimings', {
+            configurable: true,
+            get: () => solar.readShaderTimings(),
+          });
+        }
+
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
