@@ -27,6 +27,8 @@ export class SimulationCore {
   #focusOnHandler: ((bodyId: string) => void) | null = null;
   #resetCameraHandler: (() => void) | null = null;
   #setRadiusHandler: ((radius: number) => void) | null = null;
+  // P5-B #177 — fps emit 주기 제어. 매 프레임 emit하면 store 갱신 과다 → 0.5초 간격.
+  #lastFpsEmitTime = 0;
   // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
   #instrumentation: EngineInstrumentation | null = null;
 
@@ -231,6 +233,12 @@ export class SimulationCore {
       }
 
       scene.render();
+
+      // P5-B #177 — 0.5초마다 fps emit (Babylon engine.getFps() 사용).
+      if (now - this.#lastFpsEmitTime > 500) {
+        this.#lastFpsEmitTime = now;
+        this.#emitter.emit('performance', { fps: engine.getFps() });
+      }
     });
 
     this.#resizeObserver = new ResizeObserver(() => {
