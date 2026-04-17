@@ -14,6 +14,10 @@ export function HudCorners() {
   const setEngineNotice = useSimStore((s) => s.setEngineNotice);
   const julianDate = useSimStore((s) => s.julianDate);
   const selected = useSimStore((s) => s.selectedBodyId);
+  const fps = useSimStore((s) => s.fps);
+  // P5-B #177 — ?fps=1 URL 옵트인 시 실시간 fps 카운터 표시 (실기기 측정용).
+  const showFps =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('fps') === '1';
 
   return (
     <>
@@ -41,6 +45,14 @@ export function HudCorners() {
               ? `renderer · ${renderer}`
               : 'initializing…'}
         </div>
+        {showFps && fps !== null && (
+          <div
+            data-testid="hud-fps"
+            className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle"
+          >
+            {Math.round(fps)} fps
+          </div>
+        )}
       </div>
 
       {/* 상단 중앙 — 비-fatal 알림 (P3-0 #124, dismissible) */}
