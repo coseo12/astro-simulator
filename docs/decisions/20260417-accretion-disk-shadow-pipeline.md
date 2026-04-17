@@ -116,6 +116,24 @@ P5-D 패턴 (`createGravitationalLensing`) 재사용:
 - LUT samples 기본값 (256/512/1024 중 — B2 ±5% 만족 최소값)
 - UI 패널 위치 (기존 patterns 따름)
 - WGSL uniform 이름·구조
+- **`diskAxisX/Y` uniform 갱신 전략** — 현재 D' MVP에서는 화면 x축 고정(`(1,0)`).
+  카메라가 회전하면 disk가 함께 회전하는 한계가 있다. 트랙 B(3D ray construction
+  복원, 재검토 트리거 참조)에서 카메라 view 행렬 기반으로 disk normal을 화면공간에
+  투영하여 매프레임 갱신할 예정. uniform 자체는 트랙 B hook으로 보존한다.
+
+### 변경 이력
+
+- **2026-04-17 (P6-B reviewer 피드백 #195 dev 회신)**:
+  - M1: WGSL/GLSL 셰이더의 `inDiskThick = step(0.0, rEcc)` 항상 1 상수 버그 수정.
+    thickness 슬라이더가 `minorScale`에 가산되도록 보정(`baseMinor + thickness * 0.5`,
+    clamp 0.05~1.0). thickness 양 끝(0.02 ↔ 1.0)에서 disk ellipse 단축이 본질적으로
+    변하여 ADR (4)-i의 "두께(thickness)" 표현력 약속이 시각적으로 충족됨.
+  - M2: 죽은 코드 `rEll` 제거 (WGSL).
+  - M3: `diskAxisX/Y` uniform 보존 + 트랙 B hook으로 박제 (위 비결정 항목 참조).
+  - M4: 셰이더 내 eccentricity 정의 주석 추가 (장축 stretch factor 1/(1-e),
+    천체역학 표준 e와 다름 명시).
+  - M5: `BLACK_HOLE_RS_NATURAL` export 제거 (호출처 0건). 트랙 B에서 단위 변환 hook
+    필요 시 그때 재노출.
 
 ## 결과·재검토 조건
 

@@ -38,8 +38,14 @@ import {
 import { createLensingLut, type LensingLut } from '../physics/lensing-lut.js';
 
 const SHADER_NAME = 'blackHoleRendering';
-/** 자연단위 Rs (Rust LUT_B_MIN/MAX와 동일 단위계). */
-const RS_NATURAL = 2.0;
+
+/*
+ * thickness → ellipse 단축 가산 가중치 (셰이더에 직접 인라인된 0.5):
+ *   D' 화면공간 모델에 진정한 z-깊이가 없으므로 두께를 단축 확장으로 표현한다.
+ *   thickness ∈ [0.02, 1.0]에서 최대 +0.5 단축 → face-on에 가까워지는 시각 효과.
+ *   K=0.5는 슬라이더 양 끝에서 disk 외형 변화가 본질적으로 보이는 균형점.
+ *   WGSL/GLSL이 상수 블록을 공유하지 못해 코드에 직접 박았다 — 변경 시 양쪽 동시 수정.
+ */
 
 // ============================================================================
 // WGSL fragment shader (WebGPU)
@@ -96,25 +102,25 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
   // tilt = 0 → 화면 면에 수직 (얇은 선처럼 보임). tilt = π/2 → 화면 평면 (원).
   // 화면상의 disk 평면 = 카메라가 보는 disk plane의 화면 투영 = ellipse.
   // major axis 방향: bh를 중심으로 cos(tiltAxis)·dx + sin(tiltAxis)·dy.
-  // disk 단축(thickness 방향) = sin(tilt)·rDisk_world / dist_to_cam.
-  let cosTilt = cos(uniforms.diskTilt);
   let sinTilt = sin(uniforms.diskTilt);
   // disk axis는 별도 회전(z축 회전) 가정 — 단순화로 화면 x축에 정렬.
+  // (diskAxisX/Y uniform은 트랙 B에서 카메라 행렬 기반 회전 추적 hook으로 활용 예정 —
+  //  ADR 20260417-accretion-disk-shadow-pipeline.md 비결정 항목 참조.)
   let xMaj = uniforms.diskAxisX * dx + uniforms.diskAxisY * dy;
   let yMin = -uniforms.diskAxisY * dx + uniforms.diskAxisX * dy;
-  // ellipse 단축 = 장축 · |sin(tilt)| (face-on이면 1, edge-on이면 0).
-  let minorScale = max(abs(sinTilt), 0.05);
-  let rEll = sqrt((xMaj * xMaj) + (yMin * yMin) / (minorScale * minorScale)) / rs;
+  // ellipse 단축 = 장축 · |sin(tilt)| (face-on이면 1, edge-on이면 0)
+  // + thickness 보정 — D' 화면공간 모델에 진정한 z-깊이가 없으므로 두께를 단축 확장으로 표현.
+  let baseMinor = max(abs(sinTilt), 0.05);
+  let minorScale = clamp(baseMinor + uniforms.diskThickness * 0.5, 0.05, 1.0);
   let ecc = clamp(uniforms.diskEccentricity, 0.0, 0.9);
-  // eccentricity는 장축 stretch.
+  // 이심률 정의: 장축 stretch factor 1/(1-e). 천체역학 표준 e (b² = a²(1-e²))와 다름.
+  // 시각 디자인 우선 정의로, 슬라이더 0~0.9에서 disk가 점진적으로 늘어나는 직관 제공.
   let xMajN = xMaj / rs;
   let yMinN = (yMin / rs) / minorScale;
   let rEcc = sqrt((xMajN * xMajN) / max(1.0 - ecc, 1e-3) + yMinN * yMinN);
 
   let inDiskRing = step(uniforms.diskInner, rEcc) * (1.0 - step(uniforms.diskOuter, rEcc));
-  // thickness는 화면공간에서 ellipse "두께" — minorScale·thickness.
-  let inDiskThick = step(0.0, rEcc); // 평면 두께는 단축에 묻힘
-  let diskMask = inDiskRing * inDiskThick * escapeOutcome;
+  let diskMask = inDiskRing * escapeOutcome;
 
   let radialT = clamp(
     (rEcc - uniforms.diskInner) / max(uniforms.diskOuter - uniforms.diskInner, 1e-3),
@@ -196,12 +202,17 @@ void main(void) {
   float capturedFinal = 1.0 - escapeOutcome;
 
   float sinTilt = sin(diskTilt);
+  // diskAxisX/Y uniform은 트랙 B에서 카메라 회전 추적 hook으로 활용 예정 (ADR 비결정 항목).
   float xMaj = diskAxisX * dx + diskAxisY * dy;
   float yMin = -diskAxisY * dx + diskAxisX * dy;
-  float minorScale = max(abs(sinTilt), 0.05);
+  // ellipse 단축 = 장축·|sin(tilt)| + thickness 보정 (D' 화면공간 모델의 z-깊이 부재 보완).
+  float baseMinor = max(abs(sinTilt), 0.05);
+  float minorScale = clamp(baseMinor + diskThickness * 0.5, 0.05, 1.0);
   float xMajN = xMaj / rs;
   float yMinN = (yMin / rs) / minorScale;
   float ecc = clamp(diskEccentricity, 0.0, 0.9);
+  // 이심률 정의: 장축 stretch factor 1/(1-e). 천체역학 표준 e (b² = a²(1-e²))와 다름.
+  // 시각 디자인 우선 정의로, 슬라이더 0~0.9에서 disk가 점진적으로 늘어나는 직관 제공.
   float rEcc = sqrt((xMajN * xMajN) / max(1.0 - ecc, 1e-3) + yMinN * yMinN);
 
   float inDiskRing = step(diskInner, rEcc) * (1.0 - step(diskOuter, rEcc));
@@ -463,6 +474,3 @@ export function createBlackHoleRendering(
     },
   };
 }
-
-// RS_NATURAL은 LUT 단위계 일관성용 — 외부에서 disk 파라미터를 자연단위로 변환할 때 참조.
-export const BLACK_HOLE_RS_NATURAL = RS_NATURAL;
