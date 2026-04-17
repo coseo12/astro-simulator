@@ -149,7 +149,10 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
   result = mix(result, vec4f(diskColor.rgb, 1.0), escapeAndDisk * diskColor.a);
   result = mix(result, shadowColor, capturedFinal);
 
-  fragmentOutputs.color = result;
+  // 출력 alpha=1 강제. WebGPU PostProcess는 backbuffer compositor가 alpha를 곱하므로,
+  // textureSample이 반환한 alpha (Babylon RT는 0일 수 있음)를 그대로 쓰면 화면이 검정으로 보인다.
+  // P5-D 경로는 우연히 mix 마지막 분기로 originalColor 전체(.a 포함)를 통과시켜 회피했음.
+  fragmentOutputs.color = vec4f(result.rgb, 1.0);
   return fragmentOutputs;
 }
 `;
@@ -233,7 +236,8 @@ void main(void) {
   result = mix(result, vec4(diskColor.rgb, 1.0), escapeAndDisk * diskColor.a);
   result = mix(result, shadowColor, capturedFinal);
 
-  gl_FragColor = result;
+  // WGSL 경로와 동일하게 alpha=1 강제 (compositor 검정화 방지).
+  gl_FragColor = vec4(result.rgb, 1.0);
 }
 `;
 
