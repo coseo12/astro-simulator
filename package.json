@@ -1,6 +1,6 @@
 {
   "name": "astro-simulator",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "웹 기반 천체물리 시뮬레이터 — Babylon.js WebGPU 기반 멀티스케일 우주 탐험",
   "license": "MIT",

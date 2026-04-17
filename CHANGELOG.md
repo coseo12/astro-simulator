@@ -3,6 +3,59 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.6.0-p6] — 2026-04-17
+
+### P6 물리 심화 — 중력렌즈 고도화 + EIH 1PN 다체
+
+**P6-A Schwarzschild geodesic RK4 솔버** (#194)
+
+- `packages/physics-wasm/src/geodesic.rs` 신규 — 광선 1차 ODE `d²u/dφ² + u = 3M·u²` + 단순 RK4 + r-기반 step
+- `GeodesicOutcome::{Escaped, Captured}` 분류, invariant 보존 측정
+- 단위 테스트: weak-field b=50 Rs deflection rel_err **3.52%**, strong-field b=3 Rs rel_err **0.05%** (Iyer-Petters 2007 기준)
+- invariant drift **~1e-14** (한계 1e-4, 10¹⁰ 배 여유)
+- ADR: `docs/decisions/20260417-geodesic-solver.md`
+
+**P6-B accretion disk + LUT shadow (D' 변형)** (#195)
+
+- WASM bindgen `build_lensing_lut(samples) -> Vec<f32>` 신규 (flat `[outcome, deflection] × samples`)
+- 신규 PostProcess `packages/core/src/scene/black-hole-rendering.ts` (WGSL/GLSL 듀얼)
+- URL `?bh=2` 옵트인 (P5-D `?bh=1` 보존)
+- 5 UI 파라미터 슬라이더 (Inner/Outer/Eccentricity/Thickness/Tilt)
+- ADR D' 변형 박제 — 원안 3D ray construction → 화면공간 b/Rs + LUT (Babylon invViewProj 이슈로 후퇴, 3D 복원은 #196 후속)
+- 알파 채널 fix (신규 원인 #4 식별): `vec4f(result.rgb, 1.0)` WGSL/GLSL 일관 — P5-D는 우연히 회피했던 패턴
+- ADR 2건: `20260417-accretion-disk-shadow-pipeline.md`, `20260417-gravitational-lensing-pipeline.md` (P5-D Superseded)
+
+**P6-C EIH 1PN 다체** (#197)
+
+- `GrMode` enum (Off / Single1PN / EIH1PN) — 동시 활성 모순 차단
+- WASM `set_gr_mode(u8)` 신규 + `set_gr(bool)` 호환 wrapper 보존
+- `nbody.rs` 인라인 EIH 가속도 (Will eq. 6.80, harmonic gauge)
+- URL: `?gr=eih` 신규 + `?gr=1`/`?gr=1pn` 호환 + `?gr=invalid` → off + warn
+- 단위 테스트: 2체 한계 동치, 9체 100년 drift < 1e-6/orbit
+- ADR: `docs/decisions/20260417-eih-1pn-multibody.md`
+
+**P6-D 행성 근일점 ±5% 검증** (#198)
+
+- `measure_perihelion_precession_eih(name, mass, a, e, period, expected, tol_pct)` 헬퍼 추출 (수성 하드코딩 → 일반화)
+- **수성 42.59″** (rel_err 0.90%), **금성 8.67″** (rel_err 0.63%), **지구 3.74″** (rel_err 2.48%) — 모두 ±5%
+- dt=2.5s 5단계 폴백 (60s → 30s → 15s → 7.5s → 5s → 2.5s) 끝에 통과 — RK4 정밀도 한계
+- 수성 41.46″/century Single 모드 회귀 가드 무수정 보존
+- ADR: `docs/decisions/20260417-perihelion-verification.md` (Park 2017 인용)
+
+**P6-E bench + ADR + 회고 + 중복 방지 가드** (#200)
+
+- `scripts/bench-p6e.mjs` — geodesic_ms sweep {64/256/1024} + eih_1pn_ms (N=9, 1000 step 평균)
+- 실측: geodesic 7.78/30.88/121.32 ms, eih_1pn 0.0042 ms/step
+- `scripts/check-duplicate-functions.mjs` + pre-commit + CI warn-only — P5 회고 `stateVectorAt` 중복 교훈 도구화
+- 정규화 토큰 교집합 ≥ 2 + 도메인 stop list + 회귀 픽스처 13/13
+- ADR: `docs/decisions/20260417-duplicate-function-guard.md`
+- 회고: `docs/retrospectives/p6-retrospective.md`
+
+### 후속 추적
+
+- **#196** — 트랙 B 3D ray construction (invViewProj) + `?bh=2` silent failure 디버깅
+- **#199** — `long-term-drift.test.ts` 5s timeout 선재 (P6-E 회귀 아님, 타임아웃 완화 후보)
+
 ## [0.5.0-p5] — 2026-04-17
 
 ### P5 일반상대론 + 중력렌즈 + 실기기 + 측정 도구
