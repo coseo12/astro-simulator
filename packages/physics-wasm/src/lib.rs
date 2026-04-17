@@ -10,6 +10,7 @@
 use wasm_bindgen::prelude::*;
 
 pub mod barnes_hut;
+pub mod geodesic;
 pub mod nbody;
 
 use barnes_hut::engine::BarnesHutSystem;
