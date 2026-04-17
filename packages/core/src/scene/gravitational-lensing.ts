@@ -16,7 +16,9 @@
  *   - thin-lens 근사 (블랙홀 앞뒤 거리 무시)
  */
 import { Effect } from '@babylonjs/core/Materials/effect.js';
+import { ShaderStore } from '@babylonjs/core/Engines/shaderStore.js';
 import { PostProcess } from '@babylonjs/core/PostProcesses/postProcess.js';
+import { ShaderLanguage } from '@babylonjs/core/Materials/shaderLanguage.js';
 import {
   MeshBuilder,
   StandardMaterial,
@@ -31,46 +33,80 @@ import {
 const LENSING_SHADER_NAME = 'gravitationalLensing';
 
 // GLSL fragment shader — WebGL2 + WebGPU 양쪽에서 Babylon이 자동 변환.
-const LENSING_FRAGMENT = /* glsl */ `
-precision highp float;
+// WGSL PostProcess shader — WebGPU 엔진에서 직접 실행.
+// Babylon의 PostProcess는 `input.vUV`와 `textureSampler`/`textureSamplerSampler`를 자동 제공.
+const LENSING_FRAGMENT_WGSL = /* wgsl */ `
+varying vUV: vec2f;
+var textureSamplerSampler: sampler;
+var textureSampler: texture_2d<f32>;
+uniform bhScreenPos: vec2f;
+uniform bhScreenRs: f32;
+uniform lensStrength: f32;
 
-varying vec2 vUV;
-uniform sampler2D textureSampler;
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+  let dir = input.vUV - uniforms.bhScreenPos;
+  let dist = length(dir);
+  let rs = uniforms.bhScreenRs;
 
-// 블랙홀 스크린 좌표 (0~1 UV space)
+  // UV 왜곡 계산 — 분기 없이 (WGSL textureSample uniform control flow 제약)
+  let alpha = uniforms.lensStrength * 2.0 * rs / max(dist, 0.001);
+  let offset = normalize(dir) * alpha * 0.02;
+  let deflectedUV = clamp(input.vUV + offset, vec2f(0.0), vec2f(1.0));
+
+  // textureSample은 분기 밖에서 1회만 호출 (WGSL 제약)
+  let originalColor = textureSample(textureSampler, textureSamplerSampler, input.vUV);
+  let lensedColor = textureSample(textureSampler, textureSamplerSampler, deflectedUV);
+
+  // 영향 밖 → 패스스루, event horizon → 흑색, 그 외 → 왜곡
+  let outsideInfluence = step(rs * 5.0, dist) + step(0.001, -rs + 0.001);
+  let insideHorizon = step(dist, rs * 0.5) * step(0.001, rs);
+
+  // Einstein ring
+  let ringDist = abs(dist - rs * 1.5);
+  let ring = smoothstep(rs * 0.3, 0.0, ringDist);
+  let ringColor = vec3f(0.3, 0.5, 0.9) * ring * 0.4;
+
+  // mix: outside → original, horizon → black, lensing zone → deflected + ring
+  var result = mix(
+    mix(
+      vec4f(lensedColor.rgb + ringColor, lensedColor.a),
+      vec4f(0.0, 0.0, 0.0, 1.0),
+      clamp(insideHorizon, 0.0, 1.0)
+    ),
+    originalColor,
+    clamp(outsideInfluence, 0.0, 1.0)
+  );
+
+  fragmentOutputs.color = result;
+  return fragmentOutputs;
+}
+`;
+
+// GLSL 폴백 (WebGL2 경로용)
+const LENSING_FRAGMENT_GLSL = /* glsl */ `
 uniform vec2 bhScreenPos;
-// Schwarzschild 반경 (스크린 space 단위)
 uniform float bhScreenRs;
-// 렌즈 강도 배율 (시각적 과장용, 기본 1.0)
 uniform float lensStrength;
 
 void main(void) {
   vec2 dir = vUV - bhScreenPos;
   float dist = length(dir);
-
-  // event horizon 내부 → 순수 흑색
+  if (dist > bhScreenRs * 5.0 || bhScreenRs < 0.001) {
+    gl_FragColor = texture2D(textureSampler, vUV);
+    return;
+  }
   if (dist < bhScreenRs * 0.5) {
     gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     return;
   }
-
-  // weak-field deflection: 이미지를 radially outward로 밀어냄
-  // α = 2 Rs / b → UV offset = α * normalized direction
   float alpha = lensStrength * 2.0 * bhScreenRs / max(dist, 0.001);
-
-  // 안쪽으로 당기는 왜곡 (배경이 블랙홀 뒤에서 감싸듯)
-  vec2 deflectedUV = vUV + dir / dist * alpha * 0.1;
-
-  // 클램프 (화면 밖 참조 방지)
-  deflectedUV = clamp(deflectedUV, vec2(0.0), vec2(1.0));
-
+  vec2 offset = normalize(dir) * alpha * 0.02;
+  vec2 deflectedUV = clamp(vUV + offset, vec2(0.0), vec2(1.0));
   vec4 color = texture2D(textureSampler, deflectedUV);
-
-  // Einstein ring 하이라이트 — Rs 근처에서 밝기 증폭
   float ringDist = abs(dist - bhScreenRs * 1.5);
   float ring = smoothstep(bhScreenRs * 0.3, 0.0, ringDist);
-  color.rgb += vec3(0.3, 0.5, 0.9) * ring * 0.5;
-
+  color.rgb += vec3(0.3, 0.5, 0.9) * ring * 0.4;
   gl_FragColor = color;
 }
 `;
@@ -127,11 +163,20 @@ export function createGravitationalLensing(
   bhMesh.position.set(pos[0], pos[1], pos[2]);
   bhMesh.isPickable = false;
 
-  // fragment shader 등록 (1회)
-  if (!Effect.ShadersStore[LENSING_SHADER_NAME + 'FragmentShader']) {
-    Effect.ShadersStore[LENSING_SHADER_NAME + 'FragmentShader'] = LENSING_FRAGMENT;
+  // 엔진 종류에 따라 WGSL(WebGPU) 또는 GLSL(WebGL2) shader 등록.
+  const isWebGpu = (scene.getEngine() as { isWebGPU?: boolean }).isWebGPU === true;
+
+  if (isWebGpu) {
+    if (!ShaderStore.ShadersStoreWGSL[LENSING_SHADER_NAME + 'FragmentShader']) {
+      ShaderStore.ShadersStoreWGSL[LENSING_SHADER_NAME + 'FragmentShader'] = LENSING_FRAGMENT_WGSL;
+    }
+  } else {
+    if (!Effect.ShadersStore[LENSING_SHADER_NAME + 'FragmentShader']) {
+      Effect.ShadersStore[LENSING_SHADER_NAME + 'FragmentShader'] = LENSING_FRAGMENT_GLSL;
+    }
   }
 
+  const shaderLang = isWebGpu ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
   const pp = new PostProcess(
     'gravitational-lensing',
     LENSING_SHADER_NAME,
@@ -139,6 +184,16 @@ export function createGravitationalLensing(
     null,
     1.0,
     camera,
+    undefined, // samplingMode
+    undefined, // engine
+    undefined, // reusable
+    undefined, // defines
+    undefined, // textureType
+    undefined, // vertexUrl
+    undefined, // indexParameters
+    undefined, // blockCompilation
+    undefined, // textureFormat
+    shaderLang,
   );
 
   pp.onApply = (effect) => {
