@@ -103,14 +103,25 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           if (beltN >= 1000) return 'barnes-hut';
           return 'newton';
         };
-        // P5-A #178 — ?gr=1 옵트인 시 1PN GR 보정 활성 (수성 근일점 세차 등).
+        // P5-A #178 / P6-C #191 — ?gr URL 옵트인 매핑.
+        // - ?gr=1     → 'single-1pn' (P5-A 호환)
+        // - ?gr=1pn   → 'single-1pn' (권장 표기 별칭)
+        // - ?gr=eih   → 'eih' (P6-C 신규: 다체 EIH 1PN)
+        // - ?gr=off / 미지정 → 'off'
+        // - 그 외     → 'off' + console.warn
         const grParam = new URLSearchParams(window.location.search).get('gr');
-        const enableGR = grParam === '1';
+        const grMode: 'off' | 'single-1pn' | 'eih' = (() => {
+          if (grParam === null || grParam === '' || grParam === 'off') return 'off';
+          if (grParam === '1' || grParam === '1pn') return 'single-1pn';
+          if (grParam === 'eih') return 'eih';
+          console.warn(`[sim-canvas] 알 수 없는 ?gr=${grParam} — 'off'로 폴백`);
+          return 'off';
+        })();
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
-          enableGR,
+          grMode,
         });
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.

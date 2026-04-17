@@ -14,7 +14,7 @@ pub mod geodesic;
 pub mod nbody;
 
 use barnes_hut::engine::BarnesHutSystem;
-use nbody::NBodySystem;
+use nbody::{GrMode, NBodySystem};
 
 /// 스모크 테스트용 함수. #84.
 #[wasm_bindgen]
@@ -42,13 +42,27 @@ impl NBodyEngine {
         self.inner.n()
     }
 
-    /// P5-A #178 — 1PN GR 보정 on/off. 기본 false.
+    /// P5-A #178 — 1PN GR 보정 on/off (호환 wrapper).
+    /// P6-C #191에서 GrMode enum으로 교체됨. true → Single1PN, false → Off.
+    /// P5-A 기존 호출자 보호 차원에서 시그니처 보존 — 신규 코드는 `set_gr_mode` 권장.
     pub fn set_gr(&mut self, enable: bool) {
-        self.inner.enable_gr = enable;
+        self.inner.gr_mode = if enable { GrMode::Single1PN } else { GrMode::Off };
     }
 
+    /// 호환 getter — Off=false, 그 외=true.
     pub fn gr_enabled(&self) -> bool {
-        self.inner.enable_gr
+        self.inner.gr_mode != GrMode::Off
+    }
+
+    /// P6-C #191 — GR 모드 설정. 0=Off, 1=Single1PN, 2=EIH1PN.
+    /// 알 수 없는 값은 Off로 폴백 (panic 회피).
+    pub fn set_gr_mode(&mut self, mode: u8) {
+        self.inner.gr_mode = GrMode::from_u8(mode);
+    }
+
+    /// 현재 GR 모드 (0=Off, 1=Single1PN, 2=EIH1PN).
+    pub fn gr_mode(&self) -> u8 {
+        self.inner.gr_mode as u8
     }
 
     /// 1 스텝 전진(Velocity-Verlet). 역행은 dt < 0.
