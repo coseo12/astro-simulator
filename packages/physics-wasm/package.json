@@ -1,6 +1,6 @@
 {
   "name": "@astro-simulator/physics-wasm",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Newton N-body WASM 코어 (Rust + wasm-pack)",
   "type": "module",

@@ -3,6 +3,45 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.5.0-p5] — 2026-04-17
+
+### P5 일반상대론 + 중력렌즈 + 실기기 + 측정 도구
+
+**P5-E bench baseline** (#181)
+
+- v0.4.0 bench 결과 스냅샷 (`baseline-v0.4.0.json`)
+- `bench:scene:set-baseline --compare <tag>` 비교 기능
+
+**P5-B 실기기 iPhone 측정** (#182)
+
+- iPhone 12 mini (A14/iOS 26.3.1) 직접 측정: N=200 **60fps**, N=10000 **40~50fps** 크래시 없음
+- fps HUD 카운터 (`?fps=1` URL 옵트인) — SimulationCore에서 `engine.getFps()` 0.5초 emit
+- WebGPU 미지원 (A14) → WebGL2 폴백 정상
+- `next.config.mjs` allowedDevOrigins 추가
+
+**P5-A 일반상대론** (#183)
+
+- Rust NBodySystem에 1PN Schwarzschild 세차 보정항: `a_GR = (GM/(c²r³))[(4GM/r - v²)r + 4(r·v)v]`
+- 수성 근일점 세차 **41.46″/century** (이론 42.98″, 오차 3.5%, DoD ±5% 충족)
+- WASM `set_gr()/gr_enabled()` + TS `NBodyEngineOptions.enableGR` + URL `?gr=1`
+- ADR: `docs/decisions/20260417-general-relativity-1pn.md`
+
+**P5-C GPU compute shader별 세분화** (#184)
+
+- `ComputeShader.gpuTimeInFrame: WebGPUPerfCounter`로 force/integrator 분리 측정
+- `WebGpuNBodyEngine.readShaderTimings()` → `{forceMs, integratorMs}`
+- `engine.enableGPUTimingMeasurements = true` 활성
+- bench에 force_ms/integrator_ms 컬럼 + `window.__gpuShaderTimings` 노출
+
+**P5-D 중력렌즈 시각화** (#185)
+
+- Schwarzschild 블랙홀 PostProcess WGSL fragment shader
+- 궤도선 왜곡 + Einstein ring (파란 글로우) + event horizon 흑색
+- dual shader path (WGSL for WebGPU, GLSL for WebGL2)
+- URL `?bh=1&bhx=N&bhy=N&bhz=N` 옵트인
+- WGSL `textureSample` uniform control flow 제약 → branchless `step()/mix()` 해결
+- ADR: `docs/decisions/20260417-gravitational-lensing-pipeline.md`
+
 ## [0.4.0-p4] — 2026-04-16
 
 ### P4 WebGPU 실측 + 모바일 1차 게이트
