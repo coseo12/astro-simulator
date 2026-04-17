@@ -12,10 +12,35 @@ import { orbitalStateAt } from './state-vector.js';
 
 const DEFAULT_MAX_SUB_DT_SECONDS = 86_400; // 1 일
 
+/**
+ * P6-C #191 — GR 보정 모드.
+ * - `'off'`: Newton만
+ * - `'single-1pn'`: P5-A 단일체 1PN (태양 기준 시험입자 근사)
+ * - `'eih'`: P6-C 다체 EIH 1PN (모든 쌍 + 간접 가속도)
+ *
+ * WASM 매핑: off=0, single-1pn=1, eih=2 (`set_gr_mode`).
+ */
+export type GrMode = 'off' | 'single-1pn' | 'eih';
+
+const GR_MODE_TO_U8: Record<GrMode, number> = {
+  off: 0,
+  'single-1pn': 1,
+  eih: 2,
+};
+
 export interface NBodyEngineOptions {
   /** 서브스텝 최대 dt(초). 기본 1일. */
   maxSubstepSeconds?: number;
-  /** P5-A #178 — 1PN GR 보정 활성. 수성 근일점 세차 등. 기본 false. */
+  /**
+   * P6-C #191 — GR 모드. 미지정 시 'off'.
+   * `enableGR=true` 와 함께 지정하면 `grMode` 가 우선.
+   */
+  grMode?: GrMode;
+  /**
+   * P5-A #178 — 1PN GR 보정 활성 (호환 boolean).
+   * `true` → `'single-1pn'`, `false` → `'off'` 으로 매핑.
+   * @deprecated P6-C부터 `grMode` 사용 권장. 호환성을 위해 유지.
+   */
   enableGR?: boolean;
 }
 
@@ -96,8 +121,10 @@ export class NBodyEngine {
     this.wasm = new WasmEngine(state.masses, state.positions, state.velocities);
     this.maxSubDt = options.maxSubstepSeconds ?? DEFAULT_MAX_SUB_DT_SECONDS;
     this.ids = state.ids;
-    if (options.enableGR) {
-      this.wasm.set_gr(true);
+    // grMode 우선, 미지정 시 enableGR (호환) 반영.
+    const mode: GrMode = options.grMode ?? (options.enableGR ? 'single-1pn' : 'off');
+    if (mode !== 'off') {
+      this.wasm.set_gr_mode(GR_MODE_TO_U8[mode]);
     }
   }
 

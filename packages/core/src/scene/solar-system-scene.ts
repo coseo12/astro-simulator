@@ -13,7 +13,7 @@ import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
-import { NBodyEngine, buildInitialState } from '../physics/nbody-engine.js';
+import { NBodyEngine, buildInitialState, type GrMode } from '../physics/nbody-engine.js';
 import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
@@ -69,8 +69,18 @@ export interface SolarSystemSceneOptions {
    * BH tree / GPU compute 가속 효과 실측 가능. 기본 false (기존 Kepler 해석해 경로 유지).
    */
   asteroidNbody?: boolean;
-  /** P5-A #178 — 1PN GR 보정 활성. Newton/Barnes-Hut CPU 엔진에만 적용. 기본 false. */
+  /**
+   * P5-A #178 — 1PN GR 보정 활성 (호환 boolean).
+   * `true` → `'single-1pn'`, `false` → `'off'` 으로 매핑. Newton 엔진에만 적용.
+   * @deprecated P6-C부터 `grMode` 사용 권장.
+   */
   enableGR?: boolean;
+  /**
+   * P6-C #191 — GR 모드. 'off' / 'single-1pn' / 'eih'. 기본 'off'.
+   * `enableGR` 와 함께 지정하면 `grMode` 가 우선.
+   * Newton 엔진에만 적용 (Barnes-Hut/WebGPU 미지원).
+   */
+  grMode?: GrMode;
 }
 
 /**
@@ -90,7 +100,10 @@ export function createSolarSystemScene(
     asteroidBeltN = 0,
     asteroidNbody = false,
     enableGR = false,
+    grMode,
   } = options;
+  // grMode 우선 — 미지정 시 enableGR (호환) 반영.
+  const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
   const SECONDS_PER_DAY = 86_400;
 
   const system = getSolarSystem();
@@ -215,7 +228,7 @@ export function createSolarSystemScene(
     } else if (kind === 'barnes-hut') {
       newtonEngine = new BarnesHutNBodyEngine(initial);
     } else {
-      newtonEngine = new NBodyEngine(initial, { enableGR });
+      newtonEngine = new NBodyEngine(initial, { grMode: resolvedGrMode });
     }
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
     newtonLastJd = jd;
