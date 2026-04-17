@@ -3,7 +3,7 @@
   "installedAt": "2026-04-16T05:40:46Z",
   "files": {
     "CLAUDE.md": {
-      "sha256": "fbfe37880afa63d2e99be5a221a44b0ac70fa32628efda4fef0ab3a82e113319",
+      "sha256": "af17b3a1d6c2bb438ad4da7deeaa68e924cb20f2b6971e4620e3e747abd284e3",
       "category": "managed-block"
     },
     ".claude/agents/architect.md": {
@@ -103,7 +103,7 @@
       "category": "atomic"
     },
     ".claude/skills/cross-validate/scripts/cross_validate.sh": {
-      "sha256": "2f89cf54dd89b7902a29cba06eb527a2468353473bcc7545e46eea257ed44ef1",
+      "sha256": "463bff612ac215ded153bb54dcacffe5b97b870b06a6712829caa96abb6ed079",
       "category": "atomic"
     },
     ".claude/skills/record-adr/SKILL.md": {
@@ -515,5 +515,5 @@
       "category": "atomic"
     }
   },
-  "lastUpdatedAt": "2026-04-17T18:43:50Z"
+  "lastUpdatedAt": "2026-04-17T18:50:02Z"
 }

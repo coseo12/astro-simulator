@@ -32,4 +32,7 @@ Thumbs.db
 *.tsbuildinfo
 
 .verify-screenshots/
-.claude/
+
+# .claude/ 는 harness 관리 파일이므로 tracked — 런타임 생성 파일만 선별 ignore
+.claude/scheduled_tasks.lock
+.claude/logs/
