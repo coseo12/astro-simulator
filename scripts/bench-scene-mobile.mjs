@@ -21,6 +21,7 @@ import { chromium, devices } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SAMPLE_MS = Number(process.env.BENCH_SAMPLE_MS ?? 10_000);
@@ -65,7 +66,8 @@ async function sampleIntegrator(kind) {
   // 각 샘플은 페이지 재로드로 진행 (동일 context — CPU/GPU 캐시 특성 유지).
   await page.goto(`${baseUrl}/ko?integrator=${kind}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
-  await page.click('[data-testid="time-play"]').catch(() => {});
+  // P7-E #210 — silent-fail 방지.
+  await pressTimePlay(page, { skipIfAbsent: true });
   await page.click('[data-testid="time-preset-1y"]').catch(() => {});
   await page.waitForTimeout(500);
   return measureFps(SAMPLE_MS);

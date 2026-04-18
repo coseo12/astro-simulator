@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * P6-E #193 — P6-A/C 물리 코어 실측 (geodesic LUT sweep + EIH 1PN N=9).
+ * P6-E #193 / P7-E #210 — 물리 코어 실측 (geodesic LUT sweep + EIH 1PN + Yoshida4).
  *
  * architect ADR E1 결정:
- *   - geodesic_ms: build_lensing_lut(samples) sample sweep {64, 256, 1024}
- *   - eih_1pn_ms:  NBodySystem (GrMode::EIH1PN) N=9 (태양+8행성) 1000 step 평균
+ *   - geodesic_ms:            build_lensing_lut(samples) sample sweep {64, 256, 1024}
+ *   - eih_1pn_ms:             NBodySystem (GrMode::EIH1PN) N=9 (태양+8행성) 1000 step 평균
+ *   - integrator_yoshida4_ms: (P7-E 추가) Kepler 2체 Yoshida4 1000 step 평균 — architect §결정 1.
  *
  * Node 환경에서 pkg-node WASM 직접 호출 (bench-webgpu.mjs는 렌더+엔진 합산 측정인 반면,
  * P6-E는 "물리 코어 자체"의 연산 비용만 격리 측정. Playwright 오버헤드 제거).
  *
- * 결과: docs/benchmarks/p6e-{timestamp}.json + console 표.
+ * 결과: docs/benchmarks/p7-{timestamp}.json + console 표.
  */
 import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -152,10 +153,91 @@ const eihResults = {
 };
 
 // ───────────────────────────────────────────────────────────────────────
+// E1-c (P7-E #210). integrator_yoshida4_ms — Kepler 2체 Yoshida4 1000 step 평균
+// ───────────────────────────────────────────────────────────────────────
+// architect 지정: "Kepler 2체 1000 step 평균". N=2 (태양 + 지구) 대표 케이스로
+// 적분기 자체의 연산 비용을 격리 측정. GrMode=Off (Newton only) — 적분 비용만 추출.
+// VV 대비 Yoshida4는 3-stage 이므로 ~3× 비용 예상 (실측으로 P8+ 회귀 기준 baseline).
+const Y_STEPS = 1000;
+const Y_WARMUP_STEPS = 50;
+const Y_DT = 3600; // dt=1h (EIH와 동일 — 비교 가능)
+
+// 2체: 태양 + 지구 (근일점 시작, vis-viva).
+const yMasses = new Float64Array([BODIES[0][1], BODIES[3][1]]);
+const yPositions = new Float64Array(6);
+const yVelocities = new Float64Array(6);
+{
+  const aEarth = BODIES[3][2];
+  const eEarth = BODIES[3][3];
+  const rPeri = aEarth * (1 - eEarth);
+  const vPeri = Math.sqrt(G * BODIES[0][1] * (2 / rPeri - 1 / aEarth));
+  // Sun at origin
+  yPositions[0] = 0;
+  yPositions[1] = 0;
+  yPositions[2] = 0;
+  yVelocities[0] = 0;
+  yVelocities[1] = 0;
+  yVelocities[2] = 0;
+  // Earth at perihelion
+  yPositions[3] = rPeri;
+  yPositions[4] = 0;
+  yPositions[5] = 0;
+  yVelocities[3] = 0;
+  yVelocities[4] = vPeri;
+  yVelocities[5] = 0;
+}
+
+// VV baseline (비교 reference).
+const yEngineVV = new wasm.NBodyEngine(yMasses, yPositions, yVelocities);
+yEngineVV.set_integrator(0); // 0=VV
+for (let i = 0; i < Y_WARMUP_STEPS; i += 1) yEngineVV.step(Y_DT);
+const yVVStart = performance.now();
+for (let i = 0; i < Y_STEPS; i += 1) yEngineVV.step(Y_DT);
+const yVVTotal = performance.now() - yVVStart;
+const yVVPerStep = yVVTotal / Y_STEPS;
+yEngineVV.free();
+
+// Yoshida4 측정.
+const yEngineY4 = new wasm.NBodyEngine(yMasses, yPositions, yVelocities);
+yEngineY4.set_integrator(1); // 1=Yoshida4
+for (let i = 0; i < Y_WARMUP_STEPS; i += 1) yEngineY4.step(Y_DT);
+const yY4Start = performance.now();
+for (let i = 0; i < Y_STEPS; i += 1) yEngineY4.step(Y_DT);
+const yY4Total = performance.now() - yY4Start;
+const yY4PerStep = yY4Total / Y_STEPS;
+yEngineY4.free();
+
+console.log(
+  `vv_ms        N=2 Kepler: total=${yVVTotal.toFixed(1)}ms · avg/step=${yVVPerStep.toFixed(4)}ms (steps=${Y_STEPS})`,
+);
+console.log(
+  `yoshida4_ms  N=2 Kepler: total=${yY4Total.toFixed(1)}ms · avg/step=${yY4PerStep.toFixed(4)}ms (steps=${Y_STEPS})  [~${(yY4PerStep / yVVPerStep).toFixed(2)}× VV]`,
+);
+
+const integratorResults = {
+  kepler_n2_steps_1000: {
+    velocity_verlet: {
+      total_ms: Number(yVVTotal.toFixed(3)),
+      avg_ms_per_step: Number(yVVPerStep.toFixed(4)),
+    },
+    yoshida4: {
+      total_ms: Number(yY4Total.toFixed(3)),
+      avg_ms_per_step: Number(yY4PerStep.toFixed(4)),
+    },
+    yoshida4_vs_vv_ratio: Number((yY4PerStep / yVVPerStep).toFixed(3)),
+    steps: Y_STEPS,
+    dt_seconds: Y_DT,
+    warmup_steps: Y_WARMUP_STEPS,
+  },
+};
+
+// ───────────────────────────────────────────────────────────────────────
 // 리포트 저장
 // ───────────────────────────────────────────────────────────────────────
 const timestamp = new Date().toISOString();
-const outPath = join(outDir, `p6e-${timestamp.replace(/[:.]/g, '-')}.json`);
+// P7-E #210 — integrator_yoshida4_ms 컬럼이 포함되므로 파일명을 p7-*로 업그레이드.
+// 기존 p6e-*.json 호환을 위해 geodesic_ms / eih_1pn_ms 컬럼 유지 (하위 호환).
+const outPath = join(outDir, `p7-${timestamp.replace(/[:.]/g, '-')}.json`);
 writeFileSync(
   outPath,
   JSON.stringify(
@@ -165,6 +247,7 @@ writeFileSync(
       physicsWasmPath: wasmPath,
       geodesic_ms: geodesicResults,
       eih_1pn_ms: eihResults,
+      integrator_yoshida4_ms: integratorResults,
     },
     null,
     2,

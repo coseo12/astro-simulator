@@ -18,6 +18,7 @@
 import { chromium, devices } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 import { dirname, join } from 'node:path';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
@@ -76,7 +77,8 @@ const measureFps = (ms) =>
 console.log('\n[1/3] N=200 60fps 유지 (iPhone 14 emulation, 5초 평균)');
 await page.goto(`${baseUrl}/ko?belt=200`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지 (pre-assert).
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(500);
 const fps200 = await measureFps(5000);
 check(
@@ -91,7 +93,8 @@ console.log('\n[2/3] N=10000 크래시 없음 (best-effort fps)');
 const errsBeforeBig = pageErrors.length;
 await page.goto(`${baseUrl}/ko?belt=10000`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(3000);
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지 (pre-assert).
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(500);
 const fps10k = await measureFps(3000);
 const bigErrs = pageErrors.slice(errsBeforeBig);

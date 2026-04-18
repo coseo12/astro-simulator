@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,7 +46,8 @@ console.log('\n[3/3] 흐름 — 시간 재생 + Moon focus');
 const before2 = errs.length;
 await page.goto(`${baseUrl}/ko?focus=moon`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지.
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(1500);
 check('Moon focus + 재생 에러 없음', errs.length === before2);
 await page.screenshot({ path: join(shotDir, '3-moon-focus-playing.png') });

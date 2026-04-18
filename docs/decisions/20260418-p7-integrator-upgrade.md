@@ -271,9 +271,21 @@ w0 = -1.7024143839193153
 1. **A3 태양-지구 rel_err ≥ 1.25%** → RK8 (후보 b) 발동. 별도 ADR 필요
 2. **모바일 best-effort 회귀 > 10% FPS** (#209 P7-D 실측) → 데스크톱 전용 플래그 검토 (`?integrator=yoshida4 + !isMobile`)
 3. **WASM 번들 +2 KB 초과** → 계수 하드코딩 제거 + 런타임 계산으로 dedup 시도. 그래도 초과 시 ADR 갱신
-4. **CI verify-and-rust > 7 분** → A5 dt 확대 + orbit 수 축소 검토
+4. **CI verify-and-rust > 11 분** → A5 dt 확대 + orbit 수 축소 검토. _(2026-04-18 P7-E #210 / #215 갱신 — 종전 `> 7분` 임계가 perihelion 5개 테스트의 구조적 하한(Phase C 개정 centuries 확대)과 상충했다. 실측 9m15s + 20% 마진 반영. 15분 CI 타임아웃 이내 유지.)_
 5. **VV 회귀 테스트 실패** → 본 ADR 즉시 무효화, `step` match 분기 회귀 분석 (기본값 경로가 depth-변화로 인해 달라졌는지 확인)
 6. **Yoshida 채택 후 secular drift 발생** → 심플렉틱 구조 파괴 의심. 계수 오차 1e-10 테스트 실패 → ADR 재작성
+
+#### `verify-and-rust` 실측 이력 (#215 추적)
+
+| 날짜       | 시간   | 근거 PR/코멘트                             | 비고                                                           |
+| ---------- | ------ | ------------------------------------------ | -------------------------------------------------------------- |
+| 2026-04-17 | 5m24s  | P6-E 실측 (본 ADR §CI 시간 예산 최초 기록) | Rust 캐시 + wasm-pack prebuilt 안정화 시점                     |
+| 2026-04-18 | ~9m15s | P7-A/B/C/D 머지 후 (PR #218, #212)         | perihelion 5개 (수성/금성/지구×3c/금성×10c/수성×10c) 누적 병목 |
+
+**P8+ 후보**: perihelion 테스트의 3c/10c centuries 는 Phase C 진단으로 정당화된 구조적
+하한. 실시간 단축 경로는 (a) perihelion 병렬잡 분리 (`perihelion-verify` job 신규),
+(b) `#[cfg(feature = "ci-fast")]` 로 centuries 축소 옵트인, (c) Rust 테스트의 릴리스 모드
+병렬도 상향 — 셋 중 하나 이상 P8+ 에서 재검토.
 
 ## Phase C 진단 — "EIH structural bias" 가설 기각 (2026-04-18)
 

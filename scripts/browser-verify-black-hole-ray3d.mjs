@@ -17,6 +17,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay, hasSimErrors } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -256,10 +257,15 @@ consoleErrors.length = 0;
 const comboOk = await safeGoto(`${baseUrl}/ko?gr=eih&bh=2&ray3d=1`);
 if (comboOk) {
   await page.waitForTimeout(1200);
-  await page.click('[data-testid="time-play"]').catch(() => {});
+  // P7-E #210 — silent-fail 방지 + 2차 기준(상세 regex) 병용.
+  await pressTimePlay(page, { skipIfAbsent: true });
   await page.waitForTimeout(5000);
-  const hasNaNOrWasm = consoleErrors.some((e) => /NaN|wasm|NBodyEngine|integrator/i.test(e));
-  check('조합 URL 5초 재생 — WASM/NaN 에러 0건', !hasNaNOrWasm, `errors=${consoleErrors.length}`);
+  const hasSimCritical = hasSimErrors(consoleErrors, { allowExternal: true });
+  check(
+    '조합 URL 5초 재생 — 시뮬레이션 핵심 에러 0건',
+    !hasSimCritical,
+    `errors=${consoleErrors.length}`,
+  );
   await page.screenshot({ path: join(shotDir, '3-combo-gr-eih-bh2-ray3d.png') }).catch(() => {});
 } else {
   check(

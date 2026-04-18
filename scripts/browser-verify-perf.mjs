@@ -16,6 +16,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const MIN_FPS = 30; // 헤드리스 Chromium 하드웨어 가속 제한 — 실 브라우저 60 기대
@@ -62,7 +63,8 @@ await page.waitForTimeout(300);
 scenarios.push({ name: '정지 상태', fps: await measureFps(SCENARIO_DURATION_MS) });
 
 // 2. 재생 ×1일/초 (기본)
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지.
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.click('[data-testid="time-preset-1d"]').catch(() => {});
 await page.waitForTimeout(300);
 scenarios.push({ name: '재생 ×1일/초', fps: await measureFps(SCENARIO_DURATION_MS) });

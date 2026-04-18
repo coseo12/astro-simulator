@@ -22,6 +22,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -97,7 +98,8 @@ await page.screenshot({ path: join(shotDir, '1-webgpu-static.png') });
 
 // ===== 2. 인터랙션: 시간 재생 중 런타임 오류 없음 =====
 console.log('\n[2/3] 인터랙션 — 시간 재생 + GPU compute 경로');
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지.
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(2500);
 
 const hasWebGpuErr = consoleErrors.some((e) =>

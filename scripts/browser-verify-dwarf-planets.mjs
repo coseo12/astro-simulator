@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,7 +41,8 @@ check('콘솔 에러 없음', errs.length === 0);
 await page.screenshot({ path: join(shotDir, '1-static.png') });
 
 console.log('\n[2/3] 인터랙션 — 시간 재생');
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지.
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(1500);
 check('시간 재생 후 추가 콘솔 에러 없음', errs.length === 0);
 await page.screenshot({ path: join(shotDir, '2-playing.png') });

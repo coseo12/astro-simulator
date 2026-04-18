@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -69,7 +70,8 @@ await page.waitForTimeout(1500);
 const initialNewton = await page.getAttribute('[data-testid="engine-newton"]', 'data-active');
 check('?engine=newton 진입 시 Newton active', initialNewton === 'true');
 // 시간 재생 → 위치 업데이트 확인 (씬은 시간 이벤트에서 updateAt 호출)
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지.
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(1500);
 const hasEngineErr = consoleErrors.some((e) => /nbody|wasm|NBodyEngine/i.test(e));
 check('시간 재생 중 WASM 관련 콘솔 에러 없음', !hasEngineErr);
