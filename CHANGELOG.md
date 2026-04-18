@@ -3,6 +3,17 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.6.1] — 2026-04-18
+
+### 테스트 안정화
+
+**long-term-drift 타임아웃 방어** (#203, closes #199)
+
+- `packages/core/src/physics/long-term-drift.test.ts` — 두 `it()`에 `testTimeout: 30_000ms` 명시
+- 재현 조사: main 단일 실행 1.31s / core 전체 163/163 PASS — **선재 회귀 아님**
+- 100년 9체 Newton 적분은 단독 ~1.3s이나 병렬/CI 부하 시 vitest 기본 5s 초과 가능 → 안정성 확보 목적의 방어 조치
+- `LONG_INTEGRATION_TIMEOUT_MS` 상수 추출 + 이유 주석
+
 ## [0.6.0-p6] — 2026-04-17
 
 ### P6 물리 심화 — 중력렌즈 고도화 + EIH 1PN 다체
