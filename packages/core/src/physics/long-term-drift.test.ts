@@ -14,33 +14,45 @@ import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 const DAY = 86_400;
 const YEAR = 365.25 * DAY;
 
-describe('장기 드리프트 — 태양계 9체 Newton', () => {
-  it('100년 에너지 드리프트 < 0.5% (dt=1h 서브스텝)', () => {
-    const system = getSolarSystem();
-    const state = buildInitialState(system, system.epoch);
-    const engine = new NBodyEngine(state, { maxSubstepSeconds: 3600 });
-    const e0 = engine.totalEnergy();
-    engine.advance(100 * YEAR);
-    const e1 = engine.totalEnergy();
-    const drift = Math.abs((e1 - e0) / e0);
-    // 실측치 로그 (CI에서 확인)
-    console.log(`100년 에너지 드리프트: ${drift.toExponential(3)}`);
-    expect(drift).toBeLessThan(5e-3);
-    engine.dispose();
-  });
+// 100년 9체 적분은 단독 실행 시 ~1.3s 이나 병렬 테스트/CI 부하 시 5s 초과 가능 (#199).
+// 안정성 확보를 위해 30s 타임아웃을 지정한다.
+const LONG_INTEGRATION_TIMEOUT_MS = 30_000;
 
-  it('100년 후 위치가 유한값 — 시스템 이탈 없음', () => {
-    const system = getSolarSystem();
-    const state = buildInitialState(system, system.epoch);
-    const engine = new NBodyEngine(state, { maxSubstepSeconds: 3600 });
-    engine.advance(100 * YEAR);
-    const pos = engine.positions();
-    for (let i = 0; i < state.ids.length; i += 1) {
-      const r = Math.hypot(pos[3 * i]!, pos[3 * i + 1]!, pos[3 * i + 2]!);
-      expect(Number.isFinite(r)).toBe(true);
-      // Eris 원일점(~98 AU) 수준을 고려한 상한 — 카오스 이탈 방지 검증
-      expect(r / 1.496e11).toBeLessThan(150);
-    }
-    engine.dispose();
-  });
+describe('장기 드리프트 — 태양계 9체 Newton', () => {
+  it(
+    '100년 에너지 드리프트 < 0.5% (dt=1h 서브스텝)',
+    () => {
+      const system = getSolarSystem();
+      const state = buildInitialState(system, system.epoch);
+      const engine = new NBodyEngine(state, { maxSubstepSeconds: 3600 });
+      const e0 = engine.totalEnergy();
+      engine.advance(100 * YEAR);
+      const e1 = engine.totalEnergy();
+      const drift = Math.abs((e1 - e0) / e0);
+      // 실측치 로그 (CI에서 확인)
+      console.log(`100년 에너지 드리프트: ${drift.toExponential(3)}`);
+      expect(drift).toBeLessThan(5e-3);
+      engine.dispose();
+    },
+    LONG_INTEGRATION_TIMEOUT_MS,
+  );
+
+  it(
+    '100년 후 위치가 유한값 — 시스템 이탈 없음',
+    () => {
+      const system = getSolarSystem();
+      const state = buildInitialState(system, system.epoch);
+      const engine = new NBodyEngine(state, { maxSubstepSeconds: 3600 });
+      engine.advance(100 * YEAR);
+      const pos = engine.positions();
+      for (let i = 0; i < state.ids.length; i += 1) {
+        const r = Math.hypot(pos[3 * i]!, pos[3 * i + 1]!, pos[3 * i + 2]!);
+        expect(Number.isFinite(r)).toBe(true);
+        // Eris 원일점(~98 AU) 수준을 고려한 상한 — 카오스 이탈 방지 검증
+        expect(r / 1.496e11).toBeLessThan(150);
+      }
+      engine.dispose();
+    },
+    LONG_INTEGRATION_TIMEOUT_MS,
+  );
 });
