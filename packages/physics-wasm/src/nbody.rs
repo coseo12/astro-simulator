@@ -885,18 +885,22 @@ mod tests {
         per_century
     }
 
-    /// Yoshida 4차로 Kepler 2체 에너지 보존 — 10,000 궤도 drift < 1e-10.
+    /// Yoshida 4차로 Kepler 2체 에너지 보존 — 5,000 궤도 drift < 1e-10.
     ///
     /// DoD: VV dt=DAY 기준 1000년 drift < 1e-3 (현 회귀 가드) 대비 **7 자릿수** 개선.
     /// 4차 심플렉틱의 차수 이득 증거로, 장기 궤도 적분에서 VV의 한계를 입증한다.
+    ///
+    /// #213 — orbit 10,000 → 5,000 축소 (CI verify-and-rust 시간 단축).
+    /// Yoshida 4차는 bounded drift 이므로 5000 궤도로도 1e-10 기준 3자리 여유 유지.
+    /// 10000 궤도 장기 검증이 필요하면 `--features diagnostics` 로 확장판 돌린다.
     #[test]
     fn yoshida_kepler_energy_conservation() {
-        // Sun-Earth 원궤도, dt = DAY, 10,000 궤도 = 10,000년.
+        // Sun-Earth 원궤도, dt = DAY, 5,000 궤도 = 5,000년.
         let mut sys = sun_earth_system();
         sys.integrator = IntegratorKind::Yoshida4;
         let e0 = sys.total_energy();
         let dt = DAY;
-        let orbits = 10_000usize;
+        let orbits = 5_000usize;
         let steps = ((orbits as f64) * YEAR / dt) as usize;
         for _ in 0..steps {
             sys.step(dt);
