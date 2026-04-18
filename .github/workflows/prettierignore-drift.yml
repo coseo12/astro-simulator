@@ -1,0 +1,25 @@
+name: prettierignore drift guard
+
+# 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
+# 이슈 #229 / ADR: docs/decisions/20260419-prettier-harness-conflict.md
+# `.prettierignore` 의 harness-managed 블록이 매니페스트와 동기화되어 있는지 검증.
+# drift 감지 시 PR 실패 → `pnpm sync:prettierignore` 실행 후 재커밋 유도.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  prettierignore-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: .prettierignore 싱크 검증
+        run: node scripts/sync-prettierignore.mjs --check

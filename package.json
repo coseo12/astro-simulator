@@ -45,7 +45,9 @@
     "bench:p6e": "node scripts/bench-p6e.mjs",
     "bench:p7-lens3d": "node scripts/bench-p7-lens3d.mjs",
     "bench:p7": "pnpm bench:p6e && pnpm bench:p7-lens3d",
-    "bench:scene:set-baseline": "node scripts/bench-set-baseline.mjs"
+    "bench:scene:set-baseline": "node scripts/bench-set-baseline.mjs",
+    "sync:prettierignore": "node scripts/sync-prettierignore.mjs",
+    "sync:prettierignore:check": "node scripts/sync-prettierignore.mjs --check"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
