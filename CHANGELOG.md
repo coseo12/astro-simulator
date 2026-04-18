@@ -3,6 +3,83 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.7.0] — 2026-04-18
+
+### P7 — 트랙 B 3D ray + 적분기 격상 (Yoshida 4차)
+
+**P7-A Yoshida 4차 심플렉틱 적분기 + Phase C 측정법 개선** (#206, PR #212)
+
+- `packages/physics-wasm/src/integrator.rs` 신규 — Yoshida 1990 4차 심플렉틱
+- `IntegratorKind` enum (VelocityVerlet / Yoshida4) + `set_integrator(u8)` bindgen
+- EIH 가속도 본체 **불변** — 적분기만 감쌈
+- **Phase C 측정 방식 개선**: LRL 벡터 + Newton baseline subtraction 도입
+  - P6-D `min_r` 샘플링 노이즈 제거 → 진짜 수렴값 확인
+  - 수성 0.11% / 지구 1.19% (3c) / 금성 1.39% (10c) rel_err 확정
+  - Kepler 2체 5000 orbit drift **1.87e-13** (DoD 1e-10 대비 3자리 여유)
+- WASM gzipped 16.36 → 16.71 KB (+0.35KB, 상한 +2KB 대비 17% 소진)
+- ADR: `docs/decisions/20260418-p7-integrator-upgrade.md`
+
+**P7-B 적분기 선택 API + URL 옵트인** (#207, PR #216)
+
+- `packages/core/src/physics/nbody-engine.ts` — `IntegratorKind` union literal (TS) + `INTEGRATOR_TO_U8` (Rust 1:1)
+- `apps/web/src/core/parse-integrator.ts` — URL 파서 (`verlet`/`velocity-verlet`/`yoshida4`), invalid → VV 폴백
+- 기본값: `velocity-verlet` (Yoshida 옵트인 `?integrator=yoshida4`)
+- E2E: `scripts/browser-verify-integrator.mjs` (정적 / URL 전환 / `?gr=eih&integrator=yoshida4` 5초 재생)
+
+**P7-C 트랙 B 3D ray construction — 5차 D' 보강 채택** (#208, PR #217, PM M1 백업 경로)
+
+- P6-B 3회 실패 후 P7-C 에서 5단계 순차 재시도:
+  - 1차(A) 단일 invViewProj + 알파 fix — WebGL2 GLSL prelude 에러로 실패
+  - 2차(C) 분리 invView/invProj (thinSSRPostProcess 패턴) — 동일 증상
+  - 3차(E) **Frustum Corner Interpolation (Gemini 교차검증 고유 발견)** — 셰이더 컴파일 성공 + lensing 왜곡 성공, 하지만 실 Chrome 검증에서 disk mask 실패 확인
+  - 4차(B) WGSL mat4_invert — 미진입
+  - **5차(D) D' 보강**: `diskAxisX/Y` 를 world disk major axis 의 화면 투영 방향으로 대체 — 카메라 회전 시 disk 타원 장축 화면 내 회전
+- 3차(E) 코드는 `?ray3d=1` 실험적 경로로 보존 (lensing 효과 자산)
+- ADR: `docs/decisions/20260418-p7-track-b-ray3d.md` (Accepted as permanent approximation, Path 5)
+- 선행 ADR `20260417-accretion-disk-shadow-pipeline.md` §재검토 트리거 발동 기록
+
+**P7-D 모바일 best-effort 실측** (#209, PR #218)
+
+- Playwright Chromium iPhone 14 emulation
+- `engineNotice` 구조 전환: `string | null` → `{ key: string; message: string } | null` + `dismissedNoticeKeys` (key-scoped dismiss)
+- `isMobile && !navigator.gpu` 경고 노티 (best-effort 정책)
+- **A/B 교차 bench**: VV 1352.86 fps / Yoshida4 1383.75 fps (**ratio 1.054**, 임계 ≥0.90)
+- 신규: `scripts/browser-verify-mobile-p7d.mjs`, `scripts/bench-scene-mobile.mjs`
+
+**P7-E bench 컬럼 + 회고 + P6 가드 + 후속 흡수** (#210, PR #222, closes #215/#220/#221)
+
+- E1 bench: `integrator_yoshida4_ms` (0.0002 ms/step, 1.59× VV) + `track_b_ray3d_frame_ms` (8.331 ms, M1 Pro WebGPU)
+- E3 회고: `docs/retrospectives/p7-retrospective.md` (4섹션 + v2 로드맵 참조)
+- E4 P6 가드: `apps/web/next-env.d.ts` .gitignore + `git rm --cached`
+- 흡수 #215: ADR §재검토 트리거 §4 갱신 (>7분 → >11분, 실측 기반)
+- 흡수 #220: `apps/web/src/core/is-mobile.ts` (iPadOS 13+ desktop UA `Macintosh + maxTouchPoints > 1` 감지)
+- 흡수 #221: `__simStore` dev-only 전역 노출 (prod 번들 DCE 검증) + 시나리오 4 재작성
+- 흡수 QA 이관 3건:
+  - `scripts/browser-verify-utils.mjs` 신규 공통 유틸 (`pressTimePlay`, `hasSimErrors`)
+  - 22개 browser-verify-\*.mjs 의 `time-play` silent-fail 패턴 + NaN regex 일괄 정비
+  - `apps/web/src/core/parse-gr-mode.ts` (`?gr` 대소문자 정규화)
+
+### 검증
+
+- pnpm test **252/252** PASS (shared 4 + physics-wasm 1 + core 163 + web 84)
+- cargo test --release **37 passed** (lib) + 2 (barnes_hut)
+- 브라우저 3단계 검증 전부 PASS (실 Chrome 수동 + 에뮬레이션)
+- WASM gzipped 16.71 KB (P6 대비 +0.35KB)
+- Rust 본체 P7-B/C/D/E 전부 무수정 — P7-A에서만 integrator 추가
+
+### 후속 이슈 (모두 priority:low)
+
+- #219 iOS Safari 17.4+ 실기기 bench 수동 측정 (P14 배포 후)
+- #223 `bench-p7-lens3d.mjs` `pressTimePlay` 도입 (120Hz vsync 페그 해소)
+- #224 PR #222 본문/회고 '22개/21개' 수치 정정
+- #225 `bench:scene:sweep` focus-earth/neptune baseline 재설정
+- #226 Reviewer 후속 3건 (parseGrMode regex / `__simStore` configurable / ADR §Amendments)
+
+### 이전 릴리스
+
+- v0.6.1 (2026-04-18) — long-term-drift 테스트 타임아웃 방어
+- v0.6.0 (2026-04-17) — P6 물리 심화 (중력렌즈 3D + EIH 1PN 다체)
+
 ## [0.6.1] — 2026-04-18
 
 ### 테스트 안정화
