@@ -202,3 +202,21 @@ export const useSimStore = create<SimStoreState>((set) => ({
       lastPingAt: Date.now(),
     })),
 }));
+
+/**
+ * P7-E #210 / #221 — dev 빌드 한정 전역 노출 (E2E 통합 검증 목적).
+ *
+ * - `process.env.NODE_ENV !== 'production'` 가드로 Next.js webpack dead-code
+ *   elimination 트리거 — prod 번들에는 이 블록 전체가 포함되지 않는다.
+ * - `browser-verify-mobile-p7d.mjs` 시나리오 4 의 "UI 통합 스킵" 분기 제거 목적.
+ * - 민감 데이터 아님 (Zustand store API) — dev 검증 전용.
+ *
+ * 검증: `grep -r "__simStore" apps/web/.next/static` 실행 후 0건이면 성공.
+ */
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  Object.defineProperty(window, '__simStore', {
+    configurable: true,
+    value: useSimStore,
+    writable: false,
+  });
+}

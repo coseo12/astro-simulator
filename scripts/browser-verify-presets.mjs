@@ -9,6 +9,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,7 +46,8 @@ await page.waitForTimeout(1000);
 const newtonActive = await page.getAttribute('[data-testid="engine-newton"]', 'data-active');
 check('Newton 엔진 자동 전환', newtonActive === 'true');
 const before = errs.length;
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — silent-fail 방지.
+await pressTimePlay(page, { skipIfAbsent: true });
 await page.waitForTimeout(2000);
 check('재생 중 콘솔 에러 없음', errs.length === before);
 await page.screenshot({ path: join(shotDir, '2-jupiter-x10.png') });

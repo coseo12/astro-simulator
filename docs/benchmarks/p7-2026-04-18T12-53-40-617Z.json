@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-04-18T12:53:40.617Z",
+  "environment": "node-v24.14.0-darwin-arm64",
+  "physicsWasmPath": "/Users/seo/project/space/packages/physics-wasm/pkg-node/physics_wasm.js",
+  "geodesic_ms": {
+    "samples_64": {
+      "avg_ms": 6.09,
+      "min_ms": 6.002,
+      "max_ms": 6.323,
+      "iterations": 10
+    },
+    "samples_256": {
+      "avg_ms": 24.526,
+      "min_ms": 24.323,
+      "max_ms": 24.792,
+      "iterations": 10
+    },
+    "samples_1024": {
+      "avg_ms": 97.943,
+      "min_ms": 97.374,
+      "max_ms": 98.589,
+      "iterations": 10
+    }
+  },
+  "eih_1pn_ms": {
+    "n_9_steps_1000": {
+      "total_ms": 4.699,
+      "avg_ms_per_step": 0.0047,
+      "steps": 1000,
+      "dt_seconds": 3600,
+      "warmup_steps": 50
+    }
+  },
+  "integrator_yoshida4_ms": {
+    "kepler_n2_steps_1000": {
+      "velocity_verlet": {
+        "total_ms": 0.115,
+        "avg_ms_per_step": 0.0001
+      },
+      "yoshida4": {
+        "total_ms": 0.182,
+        "avg_ms_per_step": 0.0002
+      },
+      "yoshida4_vs_vv_ratio": 1.589,
+      "steps": 1000,
+      "dt_seconds": 3600,
+      "warmup_steps": 50
+    }
+  }
+}

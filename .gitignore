@@ -8,6 +8,9 @@ node_modules/
 # Next.js
 .next/
 out/
+# P7-E #210 / P6 회고 인계 — next-env.d.ts 는 `next dev`/`next build` 마다
+# 자동 재생성되는 타입 shim. tracked 시 diff 노이즈 + 협업자간 재생성 충돌 유발.
+apps/web/next-env.d.ts
 
 # 빌드 산출물
 dist/

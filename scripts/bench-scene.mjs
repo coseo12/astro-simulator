@@ -24,6 +24,7 @@ import { chromium } from 'playwright';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SCENARIO_DURATION_MS = 3_000;
@@ -56,12 +57,14 @@ const path = process.env.BENCH_PATH ?? '/ko';
 await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 
+// P7-E #210 — time-play silent-fail 방지 (유틸 pressTimePlay 선적용).
+// 다른 셀렉터(pause/preset/focus)는 시나리오 의존 — bench 맥락상 관대 허용 유지.
 const steps = [
   { name: 'idle', prep: async () => page.click('[data-testid="time-pause"]').catch(() => {}) },
   {
     name: 'play-1d',
     prep: async () => {
-      await page.click('[data-testid="time-play"]').catch(() => {});
+      await pressTimePlay(page, { skipIfAbsent: true });
       await page.click('[data-testid="time-preset-1d"]').catch(() => {});
     },
   },
@@ -92,7 +95,8 @@ if (sweepEnv) {
   for (const n of ns) {
     await page.goto(`${baseUrl}${path.split('?')[0]}?belt=${n}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(1500);
-    await page.click('[data-testid="time-play"]').catch(() => {});
+    // P7-E #210 — pre-assert 후 click.
+    await pressTimePlay(page, { skipIfAbsent: true });
     await page.click('[data-testid="time-preset-1y"]').catch(() => {});
     await page.waitForTimeout(500);
     const fps = await measureFps(SCENARIO_DURATION_MS);

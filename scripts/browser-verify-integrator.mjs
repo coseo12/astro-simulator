@@ -13,6 +13,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay, hasSimErrors } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -78,11 +79,22 @@ await page.waitForTimeout(1500);
 const badge3 = page.locator('[data-testid="integrator-badge"]');
 const badge3Text = (await badge3.textContent()) ?? '';
 check('조합 URL — 배지 yoshida4', badge3Text.includes('yoshida4'), badge3Text.trim());
-// 시간 재생 시도 (버튼이 없으면 스킵, 기본 시뮬은 시간 진행).
-await page.click('[data-testid="time-play"]').catch(() => {});
+// P7-E #210 — time-play 버튼이 있으면 click (재생 시작), 없으면 이미 재생 중으로 간주.
+// 기본 scale=86400 이므로 마운트 직후엔 time-pause 가 표시되어 pressTimePlay 는 false 반환
+// (이것이 정상). HUD JD 진행 assert 가 실제 시간 진행의 증명이다.
+const playedCombo = await pressTimePlay(page, { skipIfAbsent: true });
+console.log(
+  `  [info] time-play ${playedCombo ? 'click 성공 (일시정지 → 재생)' : '스킵 (이미 재생중)'}`,
+);
 await page.waitForTimeout(5000);
-const hasNaNOrWasm = consoleErrors.some((e) => /NaN|nbody|wasm|NBodyEngine|integrator/i.test(e));
-check('5초 재생 중 WASM/NaN 관련 에러 0건', !hasNaNOrWasm);
+// P7-E #210 — 1차 기준 `consoleErrors.length === 0` + 상세 regex 보조 (allowExternal=true).
+check(
+  '5초 재생 중 콘솔 에러 0건 (1차)',
+  consoleErrors.length === 0,
+  `errors=${consoleErrors.length}`,
+);
+const hasSimCritical = hasSimErrors(consoleErrors, { allowExternal: true });
+check('5초 재생 중 시뮬레이션 핵심 에러 0건 (2차)', !hasSimCritical);
 await page.screenshot({ path: join(shotDir, '3-eih-yoshida4.png') });
 
 await browser.close();

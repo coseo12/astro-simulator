@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const DURATION_MS = 5000;
@@ -52,7 +53,8 @@ const rows = [];
 for (const path of ['/ko', '/ko?belt=200', '/ko?belt=1000', '/ko?belt=5000', '/ko?belt=10000']) {
   await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
-  await page.click('[data-testid="time-play"]').catch(() => {});
+  // P7-E #210 — silent-fail 방지.
+  await pressTimePlay(page, { skipIfAbsent: true });
   await page.waitForTimeout(500);
   const fps = await measureFps(DURATION_MS);
   rows.push({ path, fps: Number(fps.toFixed(2)) });

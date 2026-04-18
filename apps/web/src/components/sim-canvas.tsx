@@ -3,6 +3,8 @@
 import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulator/core';
 import { attachCoreToStore } from '@/core/core-adapter';
 import { parseIntegratorKind } from '@/core/parse-integrator';
+import { parseGrMode } from '@/core/parse-gr-mode';
+import { detectIsMobile } from '@/core/is-mobile';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -46,8 +48,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       // iOS Safari <17.4 등 WebGPU 미탑재 모바일에서 일부 시각 효과(렌즈·disk)가
       // 제한됨을 사용자에게 1회 고지한다. 이미 `webgpu-fallback` 키 알림이 있으면
       // 중복 고지 방지 — 별도 키 사용 (dismiss 독립 관리).
-      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-      const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua);
+      //
+      // P7-E #210 / #220 — iPadOS 13+ 는 데스크톱 UA 로 전송되므로 Macintosh +
+      // maxTouchPoints 조합 감지 (Apple 공식 권고). `detectIsMobile` 유틸로 분리.
+      const isMobile =
+        typeof navigator !== 'undefined'
+          ? detectIsMobile({
+              userAgent: navigator.userAgent,
+              maxTouchPoints: navigator.maxTouchPoints,
+            })
+          : false;
       if (isMobile && !cap.webgpu) {
         useSimStore.getState().setEngineNotice({
           key: 'mobile-webgpu-best-effort',
@@ -128,20 +138,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           if (beltN >= 1000) return 'barnes-hut';
           return 'newton';
         };
-        // P5-A #178 / P6-C #191 — ?gr URL 옵트인 매핑.
-        // - ?gr=1     → 'single-1pn' (P5-A 호환)
-        // - ?gr=1pn   → 'single-1pn' (권장 표기 별칭)
-        // - ?gr=eih   → 'eih' (P6-C 신규: 다체 EIH 1PN)
-        // - ?gr=off / 미지정 → 'off'
-        // - 그 외     → 'off' + console.warn
+        // P5-A #178 / P6-C #191 / P7-E #210 — ?gr URL 옵트인.
+        // `parseGrMode` 로 분리 (parseIntegratorKind 선례) — 대소문자 무시, 별칭 동일.
         const grParam = new URLSearchParams(window.location.search).get('gr');
-        const grMode: 'off' | 'single-1pn' | 'eih' = (() => {
-          if (grParam === null || grParam === '' || grParam === 'off') return 'off';
-          if (grParam === '1' || grParam === '1pn') return 'single-1pn';
-          if (grParam === 'eih') return 'eih';
-          console.warn(`[sim-canvas] 알 수 없는 ?gr=${grParam} — 'off'로 폴백`);
-          return 'off';
-        })();
+        const grMode = parseGrMode(grParam);
         // P7-B #207 — ?integrator=yoshida4 / velocity-verlet(verlet 별칭) 파싱.
         // 실험적 옵트인 — 기본값 VV 유지, 디버그/검증 목적의 URL 파라미터.
         const integratorParam = new URLSearchParams(window.location.search).get('integrator');

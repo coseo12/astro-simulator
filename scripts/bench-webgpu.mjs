@@ -17,6 +17,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3000';
 const DURATION_MS = 3_000;
@@ -109,7 +110,8 @@ for (const engine of ['newton', 'barnes-hut', 'webgpu']) {
     const url = `${baseUrl}/ko?engine=${engine}&belt=${belt}&beltNbody=1&gpuTimer=1`;
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
-    await page.click('[data-testid="time-play"]').catch(() => {});
+    // P7-E #210 — silent-fail 방지.
+    await pressTimePlay(page, { skipIfAbsent: true });
     await page.waitForTimeout(500);
     const fps = await measureFps(DURATION_MS);
     const gpuMs = await readGpuMs();
