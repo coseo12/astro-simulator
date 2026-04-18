@@ -1,73 +1,93 @@
 {
-  "harnessVersion": "2.7.0",
-  "installedAt": "2026-04-16T05:40:46Z",
+  "harnessVersion": "2.11.0",
+  "installedAt": "2026-04-18T14:31:41Z",
   "files": {
     "CLAUDE.md": {
-      "sha256": "af17b3a1d6c2bb438ad4da7deeaa68e924cb20f2b6971e4620e3e747abd284e3",
+      "sha256": "8ebec6e3de0b1ea151c9021cda61109bdd602efadcbaec46aaa3309715987bb3",
       "category": "managed-block"
     },
     ".claude/agents/architect.md": {
       "sha256": "ca28262e8076d08f1439d80431f977cb3e492abc2accf016cf8cc61ddc56b4cb",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "a1a5507de1f91c7b89d7f1e574ef562662daca5c45e1ceee74a8dc9c3e859ba7"
     },
     ".claude/agents/developer.md": {
       "sha256": "5a64228d62d2149d571d9077bd4b81445e136cc5b08fa919ee267284d4fe5e42",
       "category": "atomic"
     },
     ".claude/agents/pm.md": {
-      "sha256": "008e4217cf24378b9af33ef16a6444b101fc65f76fb9445d45fc5eff7f783c72",
+      "sha256": "f6fa5999c19344f418b79db6466998df7d03e43b1999d8d2268e507dc38123db",
       "category": "atomic"
     },
     ".claude/agents/qa.md": {
       "sha256": "5d7a006d32e7b181fdff9bf5d5cf86062377ff57fed948c19e6edec25411dc39",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "05620d57d0faa0d4e9a159f39568c02876654fd6b94a709bf8bb07f4892be9e7"
     },
     ".claude/agents/reviewer.md": {
       "sha256": "a45672c2fe387b40015822fd8ddb204872fa46dccb1e41b769eca888eab8ba61",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "6f57debc08da60cdcfa635da07a18d742b1de70c8968f7effd5437cf0e45db67"
     },
     ".claude/commands/architect.md": {
       "sha256": "6ce7bba239c1b6c546c4c98283c9bed6919b60679b7924d7fab39b3e4297e62f",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "7c45b8a9e402457eb47eee7754add1a69916f2f73f3382db8e89be7be931a93c"
     },
     ".claude/commands/capture-merge.md": {
       "sha256": "914f324074c1fac83170386988eff240f2655e7c1d3758b8b47a7e7addcc800f",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "2b86056c38f85bac777a19f8b2aa2c19c69393e2c5d304f6bb5d11e5404946cc"
     },
     ".claude/commands/harness-update.md": {
       "sha256": "a94ab2a31f6c0554d0d20b10ea095ba7fa54d61d8731c42b62f2c248d9b9e163",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "6805532d79acc4a489c489f1b0529c0f051e32a389df832a3b6c7968884dead2"
     },
     ".claude/commands/next.md": {
       "sha256": "51874c0941707aba65f703ceea6709262a05c9b62892c3cf1fc1dc357cc74908",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "ec510d0d98f19baf3e271a0a4d4d9001af0520691588ed15c33fa507c0ceab3e"
     },
     ".claude/commands/pm.md": {
       "sha256": "68429337d3819559f1795702bffb8379404f6ef8d11fa8ffaf68aa3859b4ad85",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "2a26eb6e2741d9269924065b2ad8c7f9a5a5811f0c3b6225e550a6586d75b250"
     },
     ".claude/commands/qa.md": {
       "sha256": "a07401d75d677a9c43f507281e7f24bc46c708a420ad1c4e6d5584a49ef5bed8",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "555a5ffcb3034b6e9970b5b00e97f966b2ceea3b534281c69bb5dcaed27ac720"
     },
     ".claude/commands/review.md": {
       "sha256": "7b82d610e141421f3de5419ed5e99c119167187434d6c46a2ec4dbb3cb7f6d1e",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "797db9224c2962ea3e5132df87b10aaebf3e670d8c1f18e9e844e29cb07c41f1"
     },
     ".claude/commands/team-status.md": {
       "sha256": "696a9027aa92e142533d7670621a20c6e48d77ba09954a5b1ca33de81e2c38ae",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "a7abd095616352e6e56baff60a4594accb915e45e0c9e1af37dcafd75a631928"
     },
     ".claude/commands/volt-review.md": {
       "sha256": "864d73e6d1ba659ada98c1f6bfb33ebd62cfb7a9055f00097899a926fcb0dea4",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "5f86c6bd620810fa89a32bcc1dc7c7879581ce75fd307d269e707959030ec165"
     },
     ".claude/commands/volt.md": {
-      "sha256": "a4ec26fa0fda11b5f6b2a09410e7a6c37ebd1c7d38e803129cf63df15b77bb76",
+      "sha256": "66d574aac30c0683170fdb2ec5a25fe462cd6ea143e3a4612a99ae5e4a55ccef",
+      "category": "atomic"
+    },
+    ".claude/logs/cross-validate-code-20260418-041614.log": {
+      "sha256": "d41d1cf44b5c0dcacc8e3552b796aea1234fc4a411ddd78609e8b92a9a30248f",
+      "category": "atomic"
+    },
+    ".claude/logs/cross-validate-code-20260418-232208.log": {
+      "sha256": "591e8c3eb9d9f99575faaf0bc6b10a2748d8235667e6343e94378d3e3ffc4605",
       "category": "atomic"
     },
     ".claude/scheduled_tasks.lock": {
-      "sha256": "76b66b7e2b801c1da57a84f4072a9bc6ee68c447dbcce84fedb19b2524d48937",
+      "sha256": "9ae49ab571186fb086c1a06a0c8dfaaa4a6e5d4809b2bb8af44f778065c42dd1",
       "category": "atomic"
     },
     ".claude/settings.json": {
@@ -75,8 +95,9 @@
       "category": "atomic"
     },
     ".claude/settings.local.json": {
-      "sha256": "82e8dd570510e2bcca92cf42bc4ee10df5cb70aa37965160801701a36cda4caa",
-      "category": "atomic"
+      "sha256": "73cfb21d907c1c5ece4c54e782649af616e9c4ca25fdb235009ae048ae685bd2",
+      "category": "atomic",
+      "previousSha256": "ab0a9f8f59a403cd5b705b78b8d5bbbf7bb3935024cf478e3ddb0142c649a913"
     },
     ".claude/skills/browser-test/SKILL.md": {
       "sha256": "d1d31d89c2f07f651e5cd25a2e79a60e66ca32707b0d28def4f69ddae34587ab",
@@ -87,7 +108,7 @@
       "category": "atomic"
     },
     ".claude/skills/capture-volt/SKILL.md": {
-      "sha256": "936743bc451663ffe3287da43e9e88569cb9504d55f3bd11225b6c27216550a2",
+      "sha256": "7c79813fad5165f221afb140afb28e5af042ecac92508bdae7a932cff127f535",
       "category": "atomic"
     },
     ".claude/skills/create-issue/SKILL.md": {
@@ -99,7 +120,7 @@
       "category": "atomic"
     },
     ".claude/skills/cross-validate/SKILL.md": {
-      "sha256": "1306a963602b5b6a2db948fc4df5888b523bead2ec2e540ad79952f07d181d09",
+      "sha256": "2829b7d7e15d9fa4b635697915ffce8bae41d856b22d7572559e76de0438baca",
       "category": "atomic"
     },
     ".claude/skills/cross-validate/scripts/cross_validate.sh": {
@@ -108,7 +129,8 @@
     },
     ".claude/skills/record-adr/SKILL.md": {
       "sha256": "1e82733c508dbe34a4cc3acdffdb6da21d21bed6b0bb4a19a18d7e0d85382f50",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "6f9afabbb41135eade59e3d0c22a59ab269143d98d6759050d360d33b377d2e7"
     },
     ".claude/skills/run-tests/SKILL.md": {
       "sha256": "18efe8dc9abec914cad1399684dd32d98df398690c1121a9e4261d5290c6e4ae",
@@ -116,7 +138,8 @@
     },
     ".claude/skills/volt-review/SKILL.md": {
       "sha256": "523447c52e91d40d9e9dffb4977d1a47bad1cd109ab691a01994aed4dae835ba",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "4d59f2fe48b96329cfca8ae5c4329d237a00bf3f94ab3465a0c6e8adc51c6249"
     },
     ".github/CODEOWNERS": {
       "sha256": "9e8ee7a8a9f0936061e617bc73decaae2d754804c17c45ff046fd476333d2390",
@@ -124,22 +147,24 @@
     },
     ".github/ISSUE_TEMPLATE/task.yml": {
       "sha256": "7007c136122491ebb995dbfdaba3cafc7075a3cf05095906e98a79a5efa414a3",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "7fc26d8969c87670fcdf9b44eab8ebac71de7b3c13b95f8ba3004e34afd81b9b"
     },
     ".github/PULL_REQUEST_TEMPLATE.md": {
       "sha256": "6f5cc369dee8d47b118b324acd7003c5021e5b4b5d8c9a323d18f09c269fbaba",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "449bc538894a4eba06c5749d1e010163fa559a8674d37f0134ee0b3aedc1e467"
     },
     ".github/workflows/agent-dispatch.yml": {
       "sha256": "3369562ed9c031652065e468d080f102b068a47f0f56b0545b1fcee16a4bc0f9",
       "category": "frozen"
     },
     ".github/workflows/bench.yml": {
-      "sha256": "90e419f762fce73322943589807a86bf5e790eda1637f801ad4dd7fba870415e",
+      "sha256": "ef4f9e0842e5fba66b413bb7e6b4f3719b5c47f10260888532c9e9742e710035",
       "category": "frozen"
     },
     ".github/workflows/ci-physics-wasm.yml": {
-      "sha256": "f39c65a22bc1800c1f7b43f21e8de8e73f58b87ea700d08160057393e6055183",
+      "sha256": "ff86c1cb2d2387f73472b056e88fbdc12b5cfff128d86554533c078f538f2f6f",
       "category": "frozen"
     },
     ".github/workflows/ci.yml": {
@@ -151,15 +176,23 @@
       "category": "frozen"
     },
     "scripts/bench-p6e.mjs": {
-      "sha256": "227b74fdc9c7e9b02aafc5b40b34b5e545dfb51e01dc6f01061ae3828b753e2f",
+      "sha256": "2b6c687024fd81ef3d53e06e487bdf4a960a2176b211c3fdf59a654697228962",
+      "category": "frozen"
+    },
+    "scripts/bench-p7-lens3d.mjs": {
+      "sha256": "b4bd628428b75c4ac1aa6533ad882bddf97fab05c105bf19209bfb1e89cc9479",
+      "category": "frozen"
+    },
+    "scripts/bench-scene-mobile.mjs": {
+      "sha256": "fd5251e0686247943fd4ffded928bd82efa1bcb294592754ed4086641b8aefa4",
       "category": "frozen"
     },
     "scripts/bench-scene-real-gpu.mjs": {
-      "sha256": "596fa62fdc945486749d185840282bf643aeefcf8d51c8dfdc78d24e7ec1bc80",
+      "sha256": "db537ec78823e913b1d8a9d7cf63115514a83d33a6d3c5ab80bb666bf72a6dcf",
       "category": "frozen"
     },
     "scripts/bench-scene.mjs": {
-      "sha256": "35a5e45cd5a95b4f7f74dfbebb85bad04f5f2fe52b687bebd10b0d7abb9dd401",
+      "sha256": "9fd547e66660284ea1c962067fa5cceecc0302b94fd23f858756274c759ed638",
       "category": "frozen"
     },
     "scripts/bench-set-baseline.mjs": {
@@ -167,7 +200,7 @@
       "category": "frozen"
     },
     "scripts/bench-webgpu.mjs": {
-      "sha256": "7ef5fe3f408f8c4fe61aa569b9df022367759dda56776d48ee4b31c3155238cc",
+      "sha256": "e9330fab26c657e084d2744a12770835c0138a486a8d15cb3bb81d0e198f61e4",
       "category": "frozen"
     },
     "scripts/browser-verify-a11y-p2c.mjs": {
@@ -179,11 +212,15 @@
       "category": "frozen"
     },
     "scripts/browser-verify-asteroid-belt.mjs": {
-      "sha256": "b6ba6df45f06f609f089c3e26c255e4f3c60df5745d85368e7ea914fa17351d9",
+      "sha256": "f285b559a1f6fb684edb7a165bc617e65137cb1035ee6c6168696ba92d46c0b7",
       "category": "frozen"
     },
     "scripts/browser-verify-belt-nbody.mjs": {
-      "sha256": "1370f261fa89ba15482fab78faa0742fb3e25d08e52095b2c9284c3fadbb2ed8",
+      "sha256": "bd7cd7ed27075b87998c8d467f5e8d55596dff926a923aa2ae64c0a355fba515",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-black-hole-ray3d.mjs": {
+      "sha256": "4fab8a12263860c411ceed7fd123e1c1edc51b06102f6088505303e5216eb06d",
       "category": "frozen"
     },
     "scripts/browser-verify-bookmark.mjs": {
@@ -191,23 +228,31 @@
       "category": "frozen"
     },
     "scripts/browser-verify-comets.mjs": {
-      "sha256": "a62adc20dc5ba2f3c40126cc2b42b0e62509cc92dd73408fb5e3246751c3503d",
+      "sha256": "13cb6c87ad1da34de3ecf8137b8102f7c5b394304630bfca0a71b4b9c20dfbcb",
       "category": "frozen"
     },
     "scripts/browser-verify-dwarf-planets.mjs": {
-      "sha256": "a4501a9eb8934b3b916e17b370d3f44892600c77ac62fb113afc0de2e6c1560c",
+      "sha256": "d69dd575873ae9ce6bf87746f367e87b167838ab6a0b5c593bf39f5ad310b50f",
       "category": "frozen"
     },
     "scripts/browser-verify-engine-toggle.mjs": {
-      "sha256": "e17cff7465cc371721c9340aa23a7a72b529c6deea5d39f76ed7c4dfcc9eacab",
+      "sha256": "fd9a25fd3c155434f2eb64f602143070b1ae219d308faecc36ed026be122901b",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-integrator.mjs": {
+      "sha256": "1bc2b8b1829c5e94012397a93d0f02e6fa025b3749e0d790ad6fcab86d574f5e",
       "category": "frozen"
     },
     "scripts/browser-verify-mass-slider.mjs": {
-      "sha256": "ff2cc454ffe47dd11c0e2507c3f39a4e95939bd442a43d505e95ffbcbeb28903",
+      "sha256": "883af47e7edb9bb71045248a590d0d5721a40befa5ed39970e49110011133a45",
       "category": "frozen"
     },
     "scripts/browser-verify-mobile-p4c.mjs": {
-      "sha256": "e241524c0fcab9d8b988afc2c9313be6fc31bb02e0632fa23958688850bbf0b0",
+      "sha256": "3785e6dfdbb2e72f47f50ce8dc3dc3bd3b0a0ec3465895ceb518be3bd22cb7c3",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-mobile-p7d.mjs": {
+      "sha256": "318fb88f1ae91d7e0f1310b45ecabae9c935aa7be3d7dae0900b4e667c140b67",
       "category": "frozen"
     },
     "scripts/browser-verify-mobile.mjs": {
@@ -215,23 +260,27 @@
       "category": "frozen"
     },
     "scripts/browser-verify-per-body-scale.mjs": {
-      "sha256": "8ad1873e8a0fe219c6ce5c33563871d4fc0fcbac51d7b788deea496ac408e203",
+      "sha256": "56ef240c005a32b8a6a2a1ba2ea63df54904084a8914249585fcf4df3e0b7ad5",
       "category": "frozen"
     },
     "scripts/browser-verify-perf.mjs": {
-      "sha256": "b59daf67bbb10740c01745746ba9a1f00291bb8919504604c505673b1bd0fb83",
+      "sha256": "7938a7cee26c5d9d855d9c176d8bbc0a62c05c079ccc4b8203f6b1495ea9dc00",
       "category": "frozen"
     },
     "scripts/browser-verify-presets.mjs": {
-      "sha256": "3afbdeb567857717cd16cbb20df7424c1f02c22c8daf1563fce597b264ea98b5",
+      "sha256": "d3789b1a41cefd366d77b2db10676afb47d56d48eef3a42206cebaf0638034ef",
       "category": "frozen"
     },
     "scripts/browser-verify-scale.mjs": {
       "sha256": "807c7fa373387c5da616ce65c671cdc0c10b4228a26980c371b45968c26d84cf",
       "category": "frozen"
     },
+    "scripts/browser-verify-utils.mjs": {
+      "sha256": "25fb7c2db96a463cf30763dafcad7cc365922251f9cb4791cab669093e6a2417",
+      "category": "frozen"
+    },
     "scripts/browser-verify-webgpu.mjs": {
-      "sha256": "bd7cf5afa4d6441062812e2848bd1bd4c68456f0f4923c567128183d98ce7a6a",
+      "sha256": "cdc94ec13791169b6cbe07f509d007ad50a4326f992c9547238a22478da09eb1",
       "category": "frozen"
     },
     "scripts/browser-verify.mjs": {
@@ -272,22 +321,31 @@
     },
     "docs/NEXT-EXAMPLE-PROJECT-REPORT.md": {
       "sha256": "e66de480d80d5b9fe426e3f6cbdace252608725eedf2e1203957fc6447448d3b",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "c7d4b28c5ca5ae082343e41ab18ee1f108479479a28f4f0af33d69b721e37f37"
     },
     "docs/OPS-REVIEW-REPORT.md": {
       "sha256": "a8d89195ac9d6e44f85d1de76c5032589c5930eb111ca599bb51cab888e92472",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "b1b90e75e74935a63e524e2acee79ef13c3f08340e9d4bbdb2308319b01aab0a"
     },
     "docs/TDD-DISCUSSION-REPORT.md": {
       "sha256": "1c6f155d744d61d0159af19ec8912c11231d6b5da9bd6640ce94f3805db7fdaa",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "19afd72c10cf48c84379290f84f671e0191b8c9a017f69c2417d8db3c6df5b43"
     },
     "docs/agents-guide.md": {
       "sha256": "aa55f8f190e1257f6a3a39e3da4a14f68b8dd01f92fd3acd681e5ca0fd768e40",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "7be18fce2d40cf2e62be7d8cfa553c7808fedf020e6620b65bdba82c23cd0cba"
     },
     "docs/anthropic-harness-design.md": {
       "sha256": "856253dcef05ba644f1a25e0c5a231ad40a242c265a4605f84d751c9b24d0ae4",
+      "category": "atomic",
+      "previousSha256": "d94866c063c9cddb3e2164d3661f27a734cb7226bff85ba8aa066e083d65e97d"
+    },
+    "docs/architecture/integrator-selection.md": {
+      "sha256": "8397903ff021eea110921d7262fc112061ef2c44a8e854643677c2568caa3ca1",
       "category": "atomic"
     },
     "docs/benchmarks/2026-04-14T09-22-19-440Z.json": {
@@ -394,9 +452,18 @@
       "sha256": "d8a26c7cc9a5dd56ceb8b4c91d2b5ba2560bfc95790b4ce430ba9b603e7d6840",
       "category": "atomic"
     },
+    "docs/benchmarks/p7-2026-04-18T12-53-40-617Z.json": {
+      "sha256": "91828a10cb9c0af624443ea245faa2970f30fa86c378e062ea030e778b65bc97",
+      "category": "atomic"
+    },
+    "docs/benchmarks/p7-lens3d-2026-04-18T13-10-07-883Z.json": {
+      "sha256": "3f1493ca409c98a129cd2a8c74eef75f40694d6f1fb0f51218bad9725bc16632",
+      "category": "atomic"
+    },
     "docs/commands-index.md": {
       "sha256": "59791de15132fed6aa330dd8d1d08202f1ed628e124ee2be2f58e39de5b5f5c2",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "48f4e9b5e847e7f33050f1d40467153319bc2af171f57cbf6a231f4d6bbba095"
     },
     "docs/decisions/README.md": {
       "sha256": "775b0251044cf94ff76f182f7d3f2e2263a085663d1a087ec2cd64d5fb6bd24e",
@@ -404,19 +471,23 @@
     },
     "docs/deployment-guide.md": {
       "sha256": "d87ee359c7fe11cb435357bd22171948f58f3c7f5adf5602083c89f2a99379fc",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "4a8c623244cfb82132063f30bf68214e2ffb23e75fd8e4d012e37b83f41b6354"
     },
     "docs/frozen-file-split.md": {
       "sha256": "c4efa3324c0b1c83b051ec8fe38dcc2ee5d0b501aaa9323f896c63bcafb429ab",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "ddfdce4b5bfd112c9e25a2c8e293cdf56926c4e4100bbd419247ea6551261fa6"
     },
     "docs/knowledge-compilation.md": {
       "sha256": "2fb9ad0544b58133d75958f6f382343c9eaa359d42cb3e89fff09f09dbf9e00d",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "9e8258b96cf43bb7eb7dcadbb4ee698c344442e2a7db482fe02bcd4b1280b375"
     },
     "docs/model-assumptions.md": {
       "sha256": "f4aef34786132d92b9631ab7932a2c5c76983f9805628471beda7c345f21db2c",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "fbcbec877c21a0715fe57bc1fa4c37c71d3776e460131e001efddd2c0239606a"
     },
     "docs/phases/P1-solar-system-mvp.md": {
       "sha256": "bfc5cac22a97a2dee341877c6f142fb37430ec4bcf241c09ef82559f1d2b87a3",
@@ -452,19 +523,23 @@
     },
     "docs/report-cross-agent-issue.md": {
       "sha256": "e7ef105a947d5e22a44ee48b174204984700bb70519da10df6ad29139f9c5f22",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "d5c06bab6fda1e345dbaef6e44a36859e3c1f9fa3d0e3ecef03112a7ee0c9b59"
     },
     "docs/report-final-audit.md": {
       "sha256": "ba867daf39f5cd6fb5c96d9b918de2483f19ee2efb15fb7b124ce167ec153d2d",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "410044f4269fcfe9cca435fad74a6a1c4a58c4da95bf2a38c4ae2cd2d1eeba5b"
     },
     "docs/report-harness-design-diagnosis.md": {
       "sha256": "777ad2445e9fc56eb1f26eac4196590a74abfe3587a0b2f7440107bdecc2736b",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "1af11c7cf9ed26e4a26779702bd73fc627950e299814805beb62460f0613f835"
     },
     "docs/report-lightweight-improvement.md": {
       "sha256": "1da8c6712ef39cec7c9b8b193e121a59ac807280087b3a5b5db45367e7902a19",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "19fd403418116e0a03af7b3dfb85ccd8856fea27f4b159714a55d9faf8be4d95"
     },
     "docs/report-npx-vs-plugin.md": {
       "sha256": "1a44917446a08a45f16f1cd99c498e222ec1f0f57a6b3d446bebf86db82a0f0d",
@@ -472,11 +547,13 @@
     },
     "docs/report-renewal-retrospective.md": {
       "sha256": "7f33dbe75de2db140b51514fb3314d10b78bf9cda8ed4ad80f8185eacbc6d01a",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "8c3e20e82266aa58fa45f03338042cbe857fb20ab668c000934340547d7cd1e7"
     },
     "docs/report-simpleshop-renewal-retrospective.md": {
       "sha256": "23f175ea07e064a2177d590f8e2ecad715491de2804a084087187057b4525fb7",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "1582f6a180eeb6d028b1a7245b36b6852b7f448661f87540946ce6da6a0cb5ae"
     },
     "docs/reports/p4c-mobile-20260416.md": {
       "sha256": "077cb6cd3b7156e4cc827fabd493d3238a233d9852c3fa7a52ac395dc03de582",
@@ -486,9 +563,14 @@
       "sha256": "a317b12adbd5dda961c8c3ab4fc8c1d90f540c171b4b91d28776e23d9f7a2b5b",
       "category": "atomic"
     },
+    "docs/reports/p7d-mobile-20260418.json": {
+      "sha256": "131165ff1c1ace13b700a313d46e9e987e1536300883d36528837633e71648d1",
+      "category": "atomic"
+    },
     "docs/retrospectives/README.md": {
       "sha256": "69fac0e0cc09d7679f3530173240112d7a7e69eee2ddff23187366950015de87",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "ae5214b320b6fb5b5efc9282b359799b19c16887bbe90b5a914ef13d8a87a2f4"
     },
     "docs/screenshots/01-solar-system.png": {
       "sha256": "7359e984dacae54757c1a6c02545ef68448d7743644c37ae106bc74f7ec59ae2",
@@ -508,12 +590,14 @@
     },
     "docs/security.md": {
       "sha256": "7e9b2965c9fee2899266b795e1c650329b274fb31be39425137c68b65d0e099e",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "e7ab0e5c07dbad4dbf06da2d2280fdb712bef411a6d3c532eabeae84e56cc1b8"
     },
     "docs/skills-guide.md": {
       "sha256": "94c15fbb8e1d54f8addf786844087449bf0f1a0ab51c83dcd55ae08442f1405c",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "123d7d20e3d758ccc3aa4ff4a660214d7f777fa4a7b8a652cc8313ef114e0d63"
     }
   },
-  "lastUpdatedAt": "2026-04-17T18:50:02Z"
+  "lastUpdatedAt": "2026-04-18T14:33:08Z"
 }
