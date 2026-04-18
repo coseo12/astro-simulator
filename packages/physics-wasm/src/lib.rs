@@ -11,9 +11,11 @@ use wasm_bindgen::prelude::*;
 
 pub mod barnes_hut;
 pub mod geodesic;
+pub mod integrator;
 pub mod nbody;
 
 use barnes_hut::engine::BarnesHutSystem;
+use integrator::IntegratorKind;
 use nbody::{GrMode, NBodySystem};
 
 /// 스모크 테스트용 함수. #84.
@@ -63,6 +65,17 @@ impl NBodyEngine {
     /// 현재 GR 모드 (0=Off, 1=Single1PN, 2=EIH1PN).
     pub fn gr_mode(&self) -> u8 {
         self.inner.gr_mode as u8
+    }
+
+    /// P7-A #206 — 적분기 설정. 0=Velocity-Verlet (기본), 1=Yoshida 4차 심플렉틱.
+    /// 알 수 없는 값은 Velocity-Verlet로 폴백 (panic 회피).
+    pub fn set_integrator(&mut self, kind: u8) {
+        self.inner.integrator = IntegratorKind::from_u8(kind);
+    }
+
+    /// P7-A #206 — 현재 적분기 (0=Velocity-Verlet, 1=Yoshida4).
+    pub fn integrator(&self) -> u8 {
+        self.inner.integrator as u8
     }
 
     /// 1 스텝 전진(Velocity-Verlet). 역행은 dt < 0.
