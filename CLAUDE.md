@@ -164,6 +164,16 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - v2.9.0 (harness [#92](https://github.com/coseo12/harness-setting/issues/92) Phase 1) 부터 매니페스트에 **`previousSha256`** 필드 자동 기록: `userSha === previousSha256` 인 파일은 `modified-pristine` 으로 재분류되어 `--apply-all-safe` 가 자가 복구한다. v2.8.0 이 못 잡던 타이밍(커밋 시점 lint-staged 롤백) 도 코드 레벨에서 해소.
 - 근거: volt [#27](https://github.com/coseo12/volt/issues/27). harness 코드 레벨 원자성 개선은 [#89](https://github.com/coseo12/harness-setting/issues/89)(v2.8.0) 과 [#92](https://github.com/coseo12/harness-setting/issues/92)(v2.9.0~) 에서 반영
 
+#### prettier 컨벤션 충돌로 인한 drift 재발 — `.prettierignore` 자동 동기화
+
+harness upstream 포맷(double quote / 섹션 헤더 뒤 빈 줄 등)과 프로젝트 `.prettierrc.json`(`singleQuote: true`)이 충돌하면 lint-staged `prettier --write` 가 upstream 적용을 로컬 컨벤션으로 되돌려 **실질 콘텐츠 변경이 없는 drift 가 영구적으로 관찰**된다 (이슈 [#229](https://github.com/coseo12/astro-simulator/issues/229)).
+
+- 대응: `scripts/sync-prettierignore.mjs` 가 매니페스트에서 경로 목록을 추출해 `.prettierignore` 의 `# --- harness-managed ---` 블록을 자동 재생성한다.
+- **필수 체크포인트**: `harness update --apply-*` 실행 후 `pnpm sync:prettierignore` 를 반드시 실행하고 결과를 동일 커밋에 포함한다.
+- CI 가드 `prettierignore-drift` workflow 가 `sync:prettierignore --check` 로 drift 를 감지하면 PR 을 차단한다 — 수동 실행 누락 재발 방지.
+- 예외 경로(매니페스트에 있어도 prettier 제외 안 함): `docs/benchmarks/**`, `docs/phases/**`, `docs/reports/**`, `docs/retrospectives/p*-retrospective.md` — 프로젝트 고유 live 문서.
+- 근거 ADR: `docs/decisions/20260419-prettier-harness-conflict.md`
+
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 
 sub-agent(dev/qa 페르소나 등)는 빌드·테스트·브라우저 검증은 수행하면서도 **커밋/푸시/PR 생성/`gh pr comment` 박제** 같은 외부 가시성 단계에서 이탈하는 패턴이 반복된다(4회 관찰). sub-agent 관점 "작업 완료"와 harness 관점 "외부 가시성 있음"이 어긋나 메인 오케스트레이터가 매번 수동 보완해야 했다.
