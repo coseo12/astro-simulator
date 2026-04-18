@@ -47,6 +47,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     canvas.setAttribute('tabindex', '0');
     coreRef.current = instance;
     setCore(instance);
+    // P7-C #208 — browser-verify 스크립트에서 카메라/씬 조작이 필요할 때 사용.
+    // 테스트 목적 전역 노출 (프로덕션에도 노출되나 민감 데이터 아님).
+    Object.defineProperty(window, '__simCore', {
+      configurable: true,
+      value: instance,
+      writable: false,
+    });
     const detach = attachCoreToStore(instance);
 
     let cancelled = false;
@@ -160,6 +167,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           lensing.setPosition(bhx, bhy, bhz);
         } else if (bhParam === '2' && instance.scene) {
           const initialDisk = useSimStore.getState().blackHoleDisk;
+          // P7-C #208 — ?ray3d=1 옵트인 시 3D ray construction 경로 활성화.
+          // 기본(미지정/0)은 P6-B D' 화면공간 근사 유지 (회귀 격리).
+          const ray3dParam = new URLSearchParams(window.location.search).get('ray3d');
+          const useRay3D = ray3dParam === '1';
           const bh = sceneApi.createBlackHoleRendering(instance.scene, camera, {
             position: [3, 0, 0],
             visualRadius: 0.3,
@@ -168,6 +179,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             diskEccentricity: initialDisk.eccentricity,
             diskThicknessRs: initialDisk.thicknessRs,
             diskTiltRad: (initialDisk.tiltDeg * Math.PI) / 180,
+            useRay3D,
+          });
+          // 검증 스크립트가 현재 활성 경로를 감지할 수 있도록 전역 노출.
+          Object.defineProperty(window, '__bhRay3D', {
+            configurable: true,
+            value: useRay3D,
+            writable: false,
           });
           // store 변경 → handles 호출 (LUT 재생성 0회 — uniform만 갱신).
           const unsubDisk = useSimStore.subscribe((state, prev) => {

@@ -152,6 +152,8 @@ P5-D 패턴 (`createGravitationalLensing`) 재사용:
 ### 재검토 트리거
 
 - **invViewProj 처리 해결** → D' → D 원안 복원 (광선별 3D ray construction). P6-B 트랙 B에서 재시도 예정. 성공 시 본 ADR을 D 원안으로 갱신하고 D' 사유는 변경 이력 섹션에 박제.
+  - **2026-04-18 P7-C #208 발동**: 후속 ADR [`20260418-p7-track-b-ray3d.md`](./20260418-p7-track-b-ray3d.md) 작성됨 (순차 5단계 재시도 + D' 영구 근사 백업).
+  - **2026-04-18 P7-C #208 결과**: **3차 후보 E (Frustum Corner Interpolation) 채택 성공**. GPU mat4 역행렬 0회 경로로 WebGPU 셰이더 컴파일 성공 + 검정 회귀 없음. `?bh=2&ray3d=1` 옵트인 시 트랙 B 활성화, 기본 `?bh=2`는 D' 경로 그대로 유지. 본 ADR은 "Superseded in (1)-D' branch by `20260418-p7-track-b-ray3d.md` (3차 후보 E) — 원안 D 부분 복원 (mat4 기반은 아니지만 3D ray construction 성립)" 으로 이력 박제.
 - **B3 미달** (N=200 60fps 미충족) → (1)-D에서 (1)-B로 후퇴 (disk도 LUT 사전계산)
 - **B2 미달** (LUT 해상도 부족) → samples 증가 + 비선형 b 분포 도입 (photon sphere 근처 dense)
 - **다중 블랙홀 도입** → LUT 차원 ↑ → (1)-A WGSL per-pixel 재평가
