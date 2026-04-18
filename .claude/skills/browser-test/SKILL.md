@@ -216,6 +216,37 @@ agent-browser errors
 agent-browser get html "#result"
 ```
 
+### 7. 3D / WebGPU / shader-bound 렌더 검증 (headless 한계 대응)
+
+headless 환경(특히 `--use-webgpu-adapter=swiftshader` 류 software adapter)은 3D/WebGPU/카메라 조작 경로에서 **부분 freeze** 가 발생한다. 한 pipeline 은 성공하고 다른 pipeline 은 실패하는 **부분 성공** 케이스를 coarse assertion 만으로 "채택" 판정하면 실 Chrome 에서 렌더 실패가 뒤늦게 드러난다. 아래 체크리스트는 시각 효과(3D/WebGPU/camera/shader-bound) 를 포함하는 작업에 **필수**다.
+
+**체크리스트 (`status:review` 전이 전 모두 통과):**
+
+1. **headless 기본 검증** — 비검정 canvas / fps 유지 / WebGPU adapter 초기화 성공 / 콘솔 에러 없음
+2. **도메인 특화 pixel 검증** — 기대되는 시각 요소별 픽셀/색상 존재 assertion
+   ```bash
+   # 예: 오렌지/노랑/빨강 accretion disk 타원의 특정 픽셀 색상 샘플링
+   agent-browser --script verify-disk-pixels.mjs
+   ```
+3. **카메라 회전 응답 diff** — 카메라/뷰 파라미터 변경 후 픽셀 업데이트가 멈추지 않는지 (swiftshader freeze 탐지)
+   ```bash
+   agent-browser screenshot before.png
+   agent-browser --script rotate-camera.mjs
+   agent-browser screenshot after.png
+   # before ≠ after 인지 확인. 동일하면 freeze 의심.
+   ```
+4. **실 Chrome GUI 수동 검증 (필수, 최소 1회)** — 위 자동 검증이 전부 PASS 여도 실 Chrome 에서 육안 확인. headless 단독 신뢰 금지
+   - 확인 항목: 모든 시각 요소가 의도한 대로 렌더되는지, 카메라 회전/줌/팬 모두 즉시 반응하는지
+   - 누락 시 `status:review` 전이 차단. 문서화: PR 코멘트에 "실 Chrome 검증 완료 (스크린샷)" 명시
+5. **부분 성공 보존** — 한 pipeline 만 성공한 경우 `?feature=1` 류 옵트인 경로로 보존하고 ADR 에 "향후 디버깅 자산" 명시. 자동 폐기 금지
+
+**headless "8/8 PASS" false positive 패턴**:
+- 같은 셰이더에서 lensing 왜곡은 성공 / accretion disk mask 는 실패 → 컴파일 + 첫 프레임만으로는 구분 불가
+- 두 번째 `page.goto()` 에서 WebGPU 컨텍스트 재초기화 실패 → 장시간 세션에서만 드러남
+- 카메라 beta/alpha 변경 후 픽셀 freeze → 초기 스크린샷만으로는 탐지 불가
+
+근거: volt [#33](https://github.com/coseo12/volt/issues/33) — astro-simulator P7-C 3차 셰이더 후보가 headless 8/8 PASS + "채택" 판정 후 실 Chrome 에서 disk 렌더 실패 확인, 5차 D' 로 전환.
+
 ## 세션 관리
 
 ```bash
@@ -276,5 +307,6 @@ agent-browser auth login staging
 - 클릭/입력 후 `wait`로 결과를 대기한 뒤 검증한다
 - 스크린샷은 의미 있는 파일명을 사용한다 (예: `login-success.png`)
 - SSR 앱(Next.js, Nuxt 등)은 반드시 hydration 검증을 수행한다
+- **3D/WebGPU/camera/shader-bound 렌더 포함 작업은 실 Chrome GUI 수동 검증을 최소 1회 수행한다** — headless 단독 결과(`--use-webgpu-adapter=swiftshader` 포함)를 "채택" 근거로 사용하지 않는다 (Workflow §7)
 - 보안 규칙을 반드시 준수한다
 - 테스트 결과는 PR 코멘트 또는 이슈에 보고한다

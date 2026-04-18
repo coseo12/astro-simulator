@@ -9,7 +9,6 @@ allowed-tools: [Bash, Read, Grep, Agent]
 qa 페르소나를 sub-agent로 호출. CRITICAL #3 (브라우저 3단계 검증) + 빌드/테스트 + 스프린트 계약 동적 항목 검증.
 
 ## 사용자 입력
-
 `$ARGUMENTS`
 
 ## 절차
@@ -24,6 +23,5 @@ qa 페르소나를 sub-agent로 호출. CRITICAL #3 (브라우저 3단계 검증
    - 차단(`stage:dev` 되돌림): 원인 + 수정점 표시
 
 ## 금지
-
 - 머지 자동화 금지 — qa 통과해도 머지는 사용자
 - 페르소나 메인 컨텍스트 오염 금지

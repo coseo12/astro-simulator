@@ -25,15 +25,15 @@ npx @seo/harness-setting@latest update --check
 
 ### 2. 인자 해석
 
-| 인자                                                    | 동작                                                                                 |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `--check`                                               | 1단계만, 적용 없음                                                                   |
-| `--apply-all-safe`                                      | 충돌 없는 변경 자동 적용 (frozen + pristine + added)                                 |
-| `--apply-frozen` / `--apply-pristine` / `--apply-added` | 카테고리별                                                                           |
-| `--interactive` / `-i`                                  | divergent/removed 파일별 결정 (Bash 직접 실행 필요 — 세션 대신 사용자에게 명령 안내) |
-| `--dry-run`                                             | 시뮬레이션                                                                           |
-| `--bootstrap`                                           | 매니페스트 부재 시 baseline 박제                                                     |
-| 인자 없음                                               | `--check` 와 동일하게 동작 후, 다음 단계 옵션 제시                                   |
+| 인자 | 동작 |
+|---|---|
+| `--check` | 1단계만, 적용 없음 |
+| `--apply-all-safe` | 충돌 없는 변경 자동 적용 (frozen + pristine + added) |
+| `--apply-frozen` / `--apply-pristine` / `--apply-added` | 카테고리별 |
+| `--interactive` / `-i` | divergent/removed 파일별 결정 (Bash 직접 실행 필요 — 세션 대신 사용자에게 명령 안내) |
+| `--dry-run` | 시뮬레이션 |
+| `--bootstrap` | 매니페스트 부재 시 baseline 박제 |
+| 인자 없음 | `--check` 와 동일하게 동작 후, 다음 단계 옵션 제시 |
 
 ### 3. release notes 컨텍스트 (있으면)
 
@@ -60,7 +60,6 @@ gh release view --repo coseo12/harness-setting --json tagName,name,body 2>/dev/n
 ### 5. CRITICAL DIRECTIVES 변경 감시
 
 `CLAUDE.md` 가 divergent/modified-pristine 으로 잡혔다면 **반드시 사용자에게 강조**:
-
 - "CRITICAL DIRECTIVES 블록이 변경됐을 가능성. 적용 전 본인이 영향 검토 필수."
 - 자동 적용을 권하지 않는다.
 

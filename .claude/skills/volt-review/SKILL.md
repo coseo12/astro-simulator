@@ -36,19 +36,18 @@ gh issue list -R coseo12/volt --state all --limit 20 \
 
 각 이슈를 아래 harness 구성요소 중 어디에 반영할지 판정한다:
 
-| harness 위치                    | 반영 조건                                       |
-| ------------------------------- | ----------------------------------------------- |
-| `CLAUDE.md` (프로젝트)          | 워크플로 규칙/금지사항/원칙 추가·수정           |
+| harness 위치 | 반영 조건 |
+|---|---|
+| `CLAUDE.md` (프로젝트) | 워크플로 규칙/금지사항/원칙 추가·수정 |
 | `CLAUDE.md` CRITICAL DIRECTIVES | 재발 위험이 크고 세션 초기에 각인이 필요한 규칙 |
-| `~/.claude/CLAUDE.md` (글로벌)  | 언어·스타일 등 전 프로젝트 공통 취향            |
-| `.claude/agents/*`              | 에이전트의 역할·체크리스트·출력 포맷            |
-| `.claude/skills/*/SKILL.md`     | 스킬 트리거·절차·금지사항                       |
-| `.claude/commands/*.md`         | 슬래시 커맨드                                   |
-| `docs/*`                        | 배경·사례·튜토리얼 (규칙은 CLAUDE.md로)         |
-| 신규 스킬/에이전트              | 기존에 없는 반복 패턴이 관찰된 경우에만         |
+| `~/.claude/CLAUDE.md` (글로벌) | 언어·스타일 등 전 프로젝트 공통 취향 |
+| `.claude/agents/*` | 에이전트의 역할·체크리스트·출력 포맷 |
+| `.claude/skills/*/SKILL.md` | 스킬 트리거·절차·금지사항 |
+| `.claude/commands/*.md` | 슬래시 커맨드 |
+| `docs/*` | 배경·사례·튜토리얼 (규칙은 CLAUDE.md로) |
+| 신규 스킬/에이전트 | 기존에 없는 반복 패턴이 관찰된 경우에만 |
 
 판정 기준:
-
 - **knowledge** 이슈는 주로 `docs/` 또는 스킬 본문 보강에 쓰인다.
 - **report(retrospective/feedback/pattern)** 는 주로 CLAUDE.md 규칙·에이전트 체크리스트로 승격된다.
 - **report(decision/research)** 는 `docs/` 기록 + 필요 시 기본값 변경.
