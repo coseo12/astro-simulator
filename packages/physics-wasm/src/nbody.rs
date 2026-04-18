@@ -49,8 +49,8 @@ pub struct NBodySystem {
     pub pos: Vec<f64>,
     pub vel: Vec<f64>,
     /// P7-A #206 — 적분기(`integrator.rs`)에서 kick 직전 가속도 재계산 후 참조.
-    /// 외부 읽기 허용 (`pub`), 쓰기는 `compute_accelerations_public()` 경유 권장.
-    pub acc: Vec<f64>,
+    /// 같은 crate 내부 전용 (`pub(crate)`) — WASM/JS 외부에서는 직접 읽지 않는다.
+    pub(crate) acc: Vec<f64>,
     /// P6-C #191 — GR 모드 (Off / Single1PN / EIH1PN).
     /// P5-A에서 도입한 `enable_gr: bool`을 enum으로 교체 — 동시 활성 모순 차단.
     pub gr_mode: GrMode,

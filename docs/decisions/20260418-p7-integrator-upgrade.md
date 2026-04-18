@@ -1,6 +1,6 @@
 # ADR: P7 적분기 격상 — Yoshida 4차 심플렉틱 (Velocity-Verlet 병존, 옵트인)
 
-- **상태**: Accepted (개정 2026-04-18 Phase C 진단 반영)
+- **상태**: Accepted (개정 2026-04-18 Phase C 진단 + Reviewer 🟡 반영)
 - **날짜**: 2026-04-18
 - **결정자**: architect (P7-A #206)
 - **관련**: 마스터 #211, P7-A #206, P7-B #207, P6-D ADR `20260417-perihelion-verification.md` (재검토 트리거 원본), P6-C ADR `20260417-eih-1pn-multibody.md` (EIH 식), 선행 `20260417-general-relativity-1pn.md`
@@ -254,6 +254,7 @@ w0 = -1.7024143839193153
 
 - **상한: +2 KB gzipped** (`integrator.rs` + bindgen export 2개)
 - wasm-opt 적용 후 측정, 초과 시 `#[cfg(not(target_arch = "wasm32"))]` 로 native-only 테스트 격리
+- **실측 (2026-04-18, PR #212)**: main 16.36 KB gzipped → P7-A 16.71 KB gzipped, **delta +0.35 KB (상한 대비 17%)**. 여유 확보 충분.
 
 ## 결과 / 재검토 조건
 

@@ -123,14 +123,12 @@ pub fn step_yoshida4(sys: &mut NBodySystem, dt: f64) {
     }
 
     // 최종 drift c4 (속도 갱신 없음)
+    // 말미 acc 재계산은 하지 않는다 — 다음 step 진입 시 첫 kick 전에 재계산되므로 중복.
+    // (`total_energy()`는 acc를 참조하지 않으므로 관측에도 영향 없음.)
     let c4_dt = YOSHIDA_C[3] * dt;
     for k in 0..n3 {
         sys.pos[k] += sys.vel[k] * c4_dt;
     }
-
-    // 다음 step의 관측자(`total_energy` 등)를 위해 acc를 최신 위치 기준으로 갱신.
-    // (Yoshida는 마지막이 drift로 끝나므로 acc가 한 stage 뒤처진 상태로 남는다.)
-    sys.compute_accelerations_public();
 }
 
 #[cfg(test)]
