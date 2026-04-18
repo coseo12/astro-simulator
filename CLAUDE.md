@@ -146,6 +146,24 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - `.gitignore` 규칙을 새로 추가할 때는 `git ls-files <path>` 로 이미 tracked된 파일이 있는지 확인 후 `git rm --cached` 로 정리
 - 근거: volt [#13](https://github.com/coseo12/volt/issues/13) — "빌드 성공 ≠ 동작", "HTTP 200 ≠ 올바른 리소스" 원칙의 연장선
 
+### 매니페스트 최신 ≠ 파일 적용 완료 — 부분 실패 교착 복구
+
+매니페스트 기반 패키지 관리자(`harness update`, Nix, brew, dpkg/apt, npm package-lock 등)는 파일 적용과 매니페스트 해시 기록이 **원자적 트랜잭션이 아닌** 경우가 많다. 파일 적용 중 일부가 롤백되어도 매니페스트는 최신 해시로 기록되어, 다음 재-apply 가 "동일 상태"로 오판하고 스킵하면 **복구 불가능한 교착 상태**에 빠진다.
+
+- 증상: `harness update --apply-all-safe` 재실행이 롤백된 파일을 "사용자 임의 수정"으로 간주해 건너뜀
+- 즉시 복구: 이전 머지 커밋에서 `.harness/manifest.json` 을 복구 후 재-apply
+  ```bash
+  # 이전 머지 커밋 찾기: git log --oneline --merges -n 5
+  git checkout <이전-머지-커밋-해시> -- .harness/manifest.json
+  npx github:coseo12/harness-setting update --apply-all-safe
+  # 롤백된 파일이 다시 pristine 으로 감지되어 재적용됨
+  ```
+- 예방 루틴: 패키지 업데이트 커밋 시 매니페스트와 파일을 **동일 커밋**에 묶고, 부분 실패 감지 시 전체 revert + 재시도를 부분 보수보다 우선한다
+- 선행 원인 lint-staged silent partial commit (volt [#13](https://github.com/coseo12/volt/issues/13)) 과 연쇄될 때 가장 자주 관찰됨
+- v2.8.0 (harness [#89](https://github.com/coseo12/harness-setting/issues/89)) 부터 **post-apply 검증 게이트** 도입: 파일 적용 직후 upstream 패키지 해시와 디스크 실측 해시를 비교하여 불일치 파일의 매니페스트 해시는 이전 값으로 유지(재-apply 시 pristine 재감지). 부분 실패 시 exit code 1 + stderr 경고. `harness doctor` 는 "매니페스트 해시 정합성" 항목으로 해시 위조를 감지한다.
+- v2.9.0 (harness [#92](https://github.com/coseo12/harness-setting/issues/92) Phase 1) 부터 매니페스트에 **`previousSha256`** 필드 자동 기록: `userSha === previousSha256` 인 파일은 `modified-pristine` 으로 재분류되어 `--apply-all-safe` 가 자가 복구한다. v2.8.0 이 못 잡던 타이밍(커밋 시점 lint-staged 롤백) 도 코드 레벨에서 해소.
+- 근거: volt [#27](https://github.com/coseo12/volt/issues/27). harness 코드 레벨 원자성 개선은 [#89](https://github.com/coseo12/harness-setting/issues/89)(v2.8.0) 과 [#92](https://github.com/coseo12/harness-setting/issues/92)(v2.9.0~) 에서 반영
+
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 
 sub-agent(dev/qa 페르소나 등)는 빌드·테스트·브라우저 검증은 수행하면서도 **커밋/푸시/PR 생성/`gh pr comment` 박제** 같은 외부 가시성 단계에서 이탈하는 패턴이 반복된다(4회 관찰). sub-agent 관점 "작업 완료"와 harness 관점 "외부 가시성 있음"이 어긋나 메인 오케스트레이터가 매번 수동 보완해야 했다.
@@ -154,6 +172,15 @@ sub-agent(dev/qa 페르소나 등)는 빌드·테스트·브라우저 검증은 
 - sub-agent 프롬프트 말미에 **마무리 체크리스트 JSON 반환** 을 요구한다 — 커밋 SHA / PR URL / 코멘트 URL / 라벨 전이 결과를 field로 명시해 누락을 구조적으로 감지
 - 누락 감지 시 메인이 직접 보완 박제 (커밋/PR/코멘트). sub-agent를 재호출해 같은 누락을 반복시키지 않는다
 - 근거: volt [#24](https://github.com/coseo12/volt/issues/24) — astro-simulator P6-B~E 에서 dev/qa sub-agent 마무리 단계 누락 4회 연속 관찰
+
+### sub-agent multi-turn 라운드 이탈 — 매트릭스 일관성 검증
+
+sub-agent에 적응적 질답·설계 같은 multi-turn 세션을 위임할 때, SendMessage 로 라운드를 이어가도 전 라운드의 세부 매트릭스(Phase 제목 / DoD 수치 / 의존 관계)가 다음 라운드에서 **이탈**하는 사례가 관찰된다. "권고안 A" 같은 참조 레이블만으로는 세부 컨텍스트 복원이 보장되지 않는다 — sub-agent 는 세션 목적만 유지하고 매트릭스 세부는 잃을 수 있다.
+
+- 메인 오케스트레이터는 라운드 N 출력에서 **핵심 키워드 목록**(매트릭스 행 제목, 수치 DoD, 사용자 답변 Q/A 쌍)을 추출하고, 라운드 N+1 출력과 대조해 이탈을 즉시 감지한다
+- SendMessage 로 라운드를 이어갈 때 **이전 라운드 매트릭스를 본문에 인라인 재첨부**한다 — 참조 레이블("권고 A")만으론 부족. 요약 2~3줄로라도 원문 재첨부
+- 이탈 발견 시 라운드 N+1 결과를 폐기하고 **사용자에게 불일치 보고 + 이전 라운드 재확인**. 이탈 산출물은 손실로 간주하지 말고 후속 확장(예: P17+ 후보) 로 별도 메모리에 박제해 보너스 자산화
+- 근거: volt [#34](https://github.com/coseo12/volt/issues/34) — astro-simulator P8~P16 로드맵 설계 3라운드 중 라운드 3 에서 권고 A(내행성계 위성 / 목성계 / 토성계) 매트릭스가 J2/Yarkovsky/중력파 등 전혀 다른 주제로 이탈. volt [#24](https://github.com/coseo12/volt/issues/24) 의 "sub-agent 신뢰 한계" 계열 확장
 <!-- harness:managed:real-lessons:end -->
 
 ---
