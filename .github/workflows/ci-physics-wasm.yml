@@ -30,9 +30,19 @@ jobs:
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
+      # Rust 빌드 캐시 — cargo registry + target/ 재사용 (cargo test --release 단축)
+      - name: Rust 빌드 캐시
+        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      # wasm-pack: cargo install(≈60~70s) → prebuilt 바이너리로 대체
       - name: wasm-pack 설치
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        run: cargo install wasm-pack --version 0.14.0 --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
 
       # 1000년 심플렉틱 적분(365250 step)은 release 모드에서만 빠름.
       - name: Rust 테스트 (physics-wasm)

@@ -38,8 +38,17 @@ jobs:
           toolchain: '1.94.1'
           targets: wasm32-unknown-unknown
 
+      # Rust 빌드 캐시 — cargo registry + target/ 재사용 (pnpm build 산하 wasm-pack 빌드 단축)
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      # wasm-pack: cargo install(≈60s) → prebuilt 바이너리로 대체
       - name: wasm-pack 설치
-        run: cargo install wasm-pack --version 0.14.0 --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
 
       - name: 의존성 설치
         run: pnpm install --frozen-lockfile
