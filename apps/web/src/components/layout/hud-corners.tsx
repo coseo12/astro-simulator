@@ -11,7 +11,7 @@ export function HudCorners() {
   const renderer = useSimStore((s) => s.rendererKind);
   const engineError = useSimStore((s) => s.engineError);
   const engineNotice = useSimStore((s) => s.engineNotice);
-  const setEngineNotice = useSimStore((s) => s.setEngineNotice);
+  const dismissEngineNotice = useSimStore((s) => s.dismissEngineNotice);
   const julianDate = useSimStore((s) => s.julianDate);
   const selected = useSimStore((s) => s.selectedBodyId);
   const fps = useSimStore((s) => s.fps);
@@ -69,19 +69,21 @@ export function HudCorners() {
         )}
       </div>
 
-      {/* 상단 중앙 — 비-fatal 알림 (P3-0 #124, dismissible) */}
+      {/* 상단 중앙 — 비-fatal 알림 (P3-0 #124, dismissible)
+          P7-D #209: { key, message } 구조 — data-notice-key로 key별 시각 분리 가능. */}
       {engineNotice && (
         <div
           data-testid="engine-notice"
+          data-notice-key={engineNotice.key}
           role="status"
           className="absolute top-14 left-1/2 -translate-x-1/2 max-w-md text-caption num text-fg-primary bg-bg-surface/90 backdrop-blur px-3 py-1.5 rounded-sm border border-border-subtle flex items-center gap-2"
         >
-          <span>{engineNotice}</span>
+          <span>{engineNotice.message}</span>
           <button
             type="button"
             data-testid="engine-notice-dismiss"
             aria-label="알림 닫기"
-            onClick={() => setEngineNotice(null)}
+            onClick={() => dismissEngineNotice()}
             className="text-fg-tertiary hover:text-fg-primary px-1"
           >
             ×

@@ -5,6 +5,18 @@ import { create } from 'zustand';
 type IntegratorKind = physics.IntegratorKind;
 
 export type UnitSystem = 'si' | 'astro' | 'natural';
+
+/**
+ * P7-D #209 — 비-fatal 알림 객체.
+ * 키 분리 dismiss 관리 목적 (예: 사용자가 WebGPU 폴백 알림을 닫은 상태에서
+ * 모바일 best-effort 경고가 후속 표시될 때 서로 간섭하지 않도록 한다).
+ */
+export interface EngineNotice {
+  /** 알림 유형 식별자 (예: 'webgpu-fallback', 'mobile-webgpu-best-effort'). */
+  key: string;
+  /** 사용자에게 표시될 텍스트. */
+  message: string;
+}
 /**
  * 물리 엔진 종류 (P3-0 #126).
  *  - kepler: 2-body 해석해 (P1)
@@ -34,8 +46,17 @@ export interface SimStoreState {
   // 엔진 상태
   rendererKind: 'webgpu' | 'webgl2' | null;
   engineError: string | null;
-  /** 비-fatal 알림 (예: WebGPU 미지원 폴백). dismiss 가능. */
-  engineNotice: string | null;
+  /**
+   * 비-fatal 알림 (예: WebGPU 미지원 폴백). dismiss 가능.
+   * P7-D #209: `{ key, message }` 구조로 확장 — 키 분리 dismiss 관리.
+   */
+  engineNotice: EngineNotice | null;
+  /**
+   * P7-D #209 — 사용자가 dismiss한 알림 key 집합 (세션 한정).
+   * 같은 key의 알림이 재발생해도 자동 표시하지 않는다.
+   * 영속화(localStorage)는 본 마일스톤 범위 밖 — 후속 이슈로 분리.
+   */
+  dismissedNoticeKeys: ReadonlySet<string>;
 
   // 시뮬레이션 상태
   mode: SimMode;
@@ -66,7 +87,17 @@ export interface SimStoreState {
   // actions (Core → store)
   setRenderer: (kind: 'webgpu' | 'webgl2' | null) => void;
   setEngineError: (message: string | null) => void;
-  setEngineNotice: (message: string | null) => void;
+  /**
+   * P7-D #209 — 알림 설정/해제.
+   * - `notice === null`: 현재 알림 해제 (dismiss 기록 없음).
+   * - `notice` 객체: key가 `dismissedNoticeKeys`에 포함되면 재노출하지 않는다 (no-op).
+   */
+  setEngineNotice: (notice: EngineNotice | null) => void;
+  /**
+   * P7-D #209 — 사용자 dismiss. 현재 알림을 해제하고 key를 기억한다.
+   * 같은 key의 후속 `setEngineNotice` 호출은 재노출되지 않는다 (세션 한정).
+   */
+  dismissEngineNotice: () => void;
   setMode: (mode: SimMode) => void;
   setTime: (julianDate: number) => void;
   setSelectedBody: (id: string | null) => void;
@@ -115,6 +146,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   rendererKind: null,
   engineError: null,
   engineNotice: null,
+  dismissedNoticeKeys: new Set<string>(),
   mode: 'observe',
   julianDate: null,
   selectedBodyId: null,
@@ -130,7 +162,21 @@ export const useSimStore = create<SimStoreState>((set) => ({
 
   setRenderer: (kind) => set({ rendererKind: kind }),
   setEngineError: (message) => set({ engineError: message }),
-  setEngineNotice: (message) => set({ engineNotice: message }),
+  setEngineNotice: (notice) =>
+    set((state) => {
+      if (notice === null) return { engineNotice: null };
+      // 이미 dismiss한 key는 재노출하지 않는다 (세션 한정).
+      if (state.dismissedNoticeKeys.has(notice.key)) return state;
+      return { engineNotice: notice };
+    }),
+  dismissEngineNotice: () =>
+    set((state) => {
+      const current = state.engineNotice;
+      if (!current) return { engineNotice: null };
+      const next = new Set(state.dismissedNoticeKeys);
+      next.add(current.key);
+      return { engineNotice: null, dismissedNoticeKeys: next };
+    }),
   setMode: (mode) => set({ mode }),
   setTime: (julianDate) => set({ julianDate }),
   setSelectedBody: (id) => set({ selectedBodyId: id }),

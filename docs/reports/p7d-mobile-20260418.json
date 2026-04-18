@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-04-18T12:14:52.181Z",
+  "phase": "p7-d",
+  "environment": "playwright-chromium-headless + iPhone 14 emulation",
+  "sampleMs": 8000,
+  "threshold": 0.9,
+  "measurements": {
+    "velocityVerlet": 1352.86,
+    "yoshida4": 1383.75,
+    "ratio": 1.0228
+  },
+  "verdict": "PASS"
+}

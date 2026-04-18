@@ -6,6 +6,8 @@ beforeEach(() => {
   useSimStore.setState({
     rendererKind: null,
     engineError: null,
+    engineNotice: null,
+    dismissedNoticeKeys: new Set<string>(),
     mode: 'observe',
     julianDate: null,
     selectedBodyId: null,
@@ -96,5 +98,42 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().engineError).toBe('WebGPU 실패');
     useSimStore.getState().setEngineError(null);
     expect(useSimStore.getState().engineError).toBeNull();
+  });
+
+  // P7-D #209 — engineNotice key 분리 dismiss 동작
+  describe('engineNotice (P7-D #209 key-scoped dismiss)', () => {
+    it('setEngineNotice — 객체 구조로 설정/클리어', () => {
+      useSimStore.getState().setEngineNotice({ key: 'webgpu-fallback', message: 'WebGPU 미지원' });
+      const notice = useSimStore.getState().engineNotice;
+      expect(notice).toEqual({ key: 'webgpu-fallback', message: 'WebGPU 미지원' });
+      useSimStore.getState().setEngineNotice(null);
+      expect(useSimStore.getState().engineNotice).toBeNull();
+    });
+
+    it('dismissEngineNotice — 현재 알림 해제 + dismiss key 기억', () => {
+      useSimStore.getState().setEngineNotice({ key: 'webgpu-fallback', message: 'A' });
+      useSimStore.getState().dismissEngineNotice();
+      expect(useSimStore.getState().engineNotice).toBeNull();
+      expect(useSimStore.getState().dismissedNoticeKeys.has('webgpu-fallback')).toBe(true);
+    });
+
+    it('이미 dismiss한 key의 재표시 요청은 무시 (세션 한정)', () => {
+      useSimStore.getState().setEngineNotice({ key: 'webgpu-fallback', message: 'A' });
+      useSimStore.getState().dismissEngineNotice();
+      // 같은 key로 재요청 → no-op
+      useSimStore.getState().setEngineNotice({ key: 'webgpu-fallback', message: 'A2' });
+      expect(useSimStore.getState().engineNotice).toBeNull();
+    });
+
+    it('서로 다른 key는 독립 관리 — 하나 dismiss 후 다른 key는 정상 표시', () => {
+      useSimStore.getState().setEngineNotice({ key: 'webgpu-fallback', message: 'A' });
+      useSimStore.getState().dismissEngineNotice();
+      // 모바일 경고는 별도 key → 정상 표시 가능해야 한다.
+      useSimStore.getState().setEngineNotice({ key: 'mobile-webgpu-best-effort', message: 'B' });
+      expect(useSimStore.getState().engineNotice).toEqual({
+        key: 'mobile-webgpu-best-effort',
+        message: 'B',
+      });
+    });
   });
 });
