@@ -10,7 +10,6 @@ allowed-tools: [Bash, Read, Agent]
 무거운 state는 두지 않음 — 라벨이 SSoT.
 
 ## 사용자 입력
-
 `$ARGUMENTS`
 
 ## 절차
@@ -25,15 +24,15 @@ allowed-tools: [Bash, Read, Agent]
    ```
 3. **다음 페르소나 결정 표**:
 
-   | 현재 라벨        | 다음 명령                               | 비고                          |
-   | ---------------- | --------------------------------------- | ----------------------------- |
-   | (없음 / new)     | `/pm`                                   | 스프린트 계약 작성            |
-   | `stage:planning` | `/pm` 마무리 → 라벨 전이 → `/architect` | pm이 아직 안 끝났을 가능성    |
-   | `stage:design`   | `/architect`                            | 설계 + ADR                    |
-   | `stage:dev`      | `/dev`                                  | 구현 (developer.md)           |
-   | `stage:review`   | `/review`                               | 정적 리뷰                     |
-   | `stage:qa`       | `/qa`                                   | 동적 검증                     |
-   | `stage:done`     | (사용자 머지)                           | 자동 머지 안 함 (CRITICAL #1) |
+   | 현재 라벨 | 다음 명령 | 비고 |
+   |---|---|---|
+   | (없음 / new) | `/pm` | 스프린트 계약 작성 |
+   | `stage:planning` | `/pm` 마무리 → 라벨 전이 → `/architect` | pm이 아직 안 끝났을 가능성 |
+   | `stage:design` | `/architect` | 설계 + ADR |
+   | `stage:dev` | `/dev` | 구현 (developer.md) |
+   | `stage:review` | `/review` | 정적 리뷰 |
+   | `stage:qa` | `/qa` | 동적 검증 |
+   | `stage:done` | (사용자 머지) | 자동 머지 안 함 (CRITICAL #1) |
 
 4. **정책 적용**: `.harness/policy.json` 의 해당 페르소나 정책.
    - `auto` + `force_review_on` 미발동 → 자동 호출
@@ -47,7 +46,6 @@ allowed-tools: [Bash, Read, Agent]
 6. **결과 보고**: 호출한 명령(또는 안내한 다음 명령) + 라벨 전이 결과.
 
 ## 금지
-
 - 머지 자동화 금지 (`stage:done` 도달해도 머지는 사용자)
 - 라벨을 무시하고 임의 페르소나 호출 금지
 - 페르소나 컨텍스트 오염 — `/next`는 *디스패처*일 뿐, 직접 작업 안 함

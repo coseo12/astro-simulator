@@ -1,7 +1,6 @@
 ---
 description: coseo12/volt 이슈를 읽고 harness 반영 개선안을 제안 → 승인 → feature 브랜치 PR
-argument-hint:
-  [이슈번호 | --label knowledge|report | --since YYYY-MM-DD — 생략 시 최근 10건 자동 선별]
+argument-hint: [이슈번호 | --label knowledge|report | --since YYYY-MM-DD — 생략 시 최근 10건 자동 선별]
 allowed-tools: [Bash, Read, Edit, Grep, Glob, Skill]
 ---
 
@@ -26,7 +25,6 @@ allowed-tools: [Bash, Read, Edit, Grep, Glob, Skill]
    - 비어있으면 최근 10건 조회 후 harness 관련성 높은 이슈만 자동 선별.
 
 3. **이슈 수집**:
-
    ```bash
    gh issue list -R coseo12/volt --state all --limit 20 \
      --json number,title,labels,updatedAt,body
