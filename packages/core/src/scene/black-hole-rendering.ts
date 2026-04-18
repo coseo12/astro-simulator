@@ -552,10 +552,28 @@ export function createBlackHoleRendering(
     // 스크린 aspect — 화면공간 b 거리를 isotropic하게 만들기 위한 보정.
     const aspect = width / Math.max(height, 1);
 
-    // disk axis: D' 경로에서 tilt 회전축을 화면 x축으로 가정.
-    // useRay3D=true일 때는 셰이더가 3D 경로를 선택하므로 이 값은 무시됨.
-    const diskAxisX = 1;
-    const diskAxisY = 0;
+    // P7-C 5차 D' 보강 (#208, ADR 20260418-p7-track-b-ray3d.md §5):
+    // 기존 `(1, 0)` 화면 x축 고정 → world disk major axis (x축)의 화면 투영 방향.
+    // disk plane normal = (0, cosTilt, sinTilt) 이므로 world x축은 이미 disk plane 안에 있음.
+    // bhCenter 와 bhCenter+xAxis 를 screen-project 한 뒤 그 화면 방향을 diskAxisX/Y 에 주입.
+    // 카메라 회전 시 disk 타원 장축이 화면공간에서 따라 회전하여 "화면 x축 고정" 증상 해소.
+    const majorWorld = worldPos.add(new Vector3(visualRadius * diskOuter, 0, 0));
+    const majorScreen = Vector3.Project(majorWorld, viewMatrix, projMatrix, {
+      x: 0,
+      y: 0,
+      width,
+      height,
+    } as Viewport);
+    let daxRaw = majorScreen.x - screenCoord.x;
+    // screenV = 1 - y/height 규약에 맞춰 y 부호 반전.
+    let dayRaw = -(majorScreen.y - screenCoord.y);
+    const daxLen = Math.hypot(daxRaw, dayRaw);
+    let diskAxisX = 1;
+    let diskAxisY = 0;
+    if (daxLen > 1e-5) {
+      diskAxisX = daxRaw / daxLen;
+      diskAxisY = dayRaw / daxLen;
+    }
 
     effect.setFloat2('bhScreenPos', screenU, screenV);
     effect.setFloat('bhScreenRs', screenRs);
