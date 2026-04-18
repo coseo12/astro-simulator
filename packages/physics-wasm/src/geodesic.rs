@@ -459,9 +459,9 @@ mod tests {
     }
 
     /// 측정용 보조 — samples 후보별 boundary/rel_err를 출력.
-    /// `cargo test --lib lensing_lut_measure -- --nocapture --ignored`.
+    /// `cargo test --release --features diagnostics --lib lensing_lut_measure -- --nocapture`.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn lensing_lut_measure_boundary_for_samples_candidates() {
         for &samples in &[64_u32, 128, 256, 512, 1024] {
             let lut = build_lensing_lut(samples);

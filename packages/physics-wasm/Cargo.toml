@@ -9,6 +9,12 @@ license = "MIT"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# P7-A-followup #213 — Phase C 진단 테스트 격리.
+# 평상시 CI 는 미활성(compile 제외로 빌드 단축), 진단 필요 시
+# `cargo test --release --features diagnostics diag_` 로 실행.
+diagnostics = []
+
 [dependencies]
 wasm-bindgen = "0.2"
 
