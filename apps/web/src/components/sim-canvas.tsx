@@ -32,13 +32,27 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // eslint-disable-next-line no-console
         console.warn('[gpu] WebGPU 미지원:', cap.reason);
         if (wantsGpu) {
-          useSimStore
-            .getState()
-            .setEngineNotice(`WebGPU 미지원 — ${cap.reason ?? 'unknown'} · Newton로 폴백.`);
+          useSimStore.getState().setEngineNotice({
+            key: 'webgpu-fallback',
+            message: `WebGPU 미지원 — ${cap.reason ?? 'unknown'} · Newton로 폴백.`,
+          });
         }
       } else if (cap.adapterInfo) {
         // eslint-disable-next-line no-console
         console.info('[gpu] adapter:', cap.adapterInfo);
+      }
+
+      // P7-D #209 — 모바일 UserAgent + WebGPU 미지원 조합에서 best-effort 안내.
+      // iOS Safari <17.4 등 WebGPU 미탑재 모바일에서 일부 시각 효과(렌즈·disk)가
+      // 제한됨을 사용자에게 1회 고지한다. 이미 `webgpu-fallback` 키 알림이 있으면
+      // 중복 고지 방지 — 별도 키 사용 (dismiss 독립 관리).
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua);
+      if (isMobile && !cap.webgpu) {
+        useSimStore.getState().setEngineNotice({
+          key: 'mobile-webgpu-best-effort',
+          message: '모바일 WebGPU best-effort — 일부 시각 효과가 제한될 수 있습니다.',
+        });
       }
     });
 
@@ -101,7 +115,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           if (k === 'barnes-hut') return 'barnes-hut';
           if (k === 'webgpu') {
             if (!isWebGpu) {
-              useSimStore.getState().setEngineNotice('WebGPU 미지원 — Barnes-Hut로 폴백.');
+              useSimStore.getState().setEngineNotice({
+                key: 'webgpu-fallback',
+                message: 'WebGPU 미지원 — Barnes-Hut로 폴백.',
+              });
               return 'barnes-hut';
             }
             return 'webgpu';
