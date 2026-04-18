@@ -28,6 +28,26 @@ const GR_MODE_TO_U8: Record<GrMode, number> = {
   eih: 2,
 };
 
+/**
+ * P7-B #207 — 적분기 종류. WASM `IntegratorKind` (0=VV, 1=Yoshida4)와 1:1 매핑.
+ *
+ * - `'velocity-verlet'`: 2차 심플렉틱, 기본값. 기존 동작 유지.
+ * - `'yoshida4'`: Yoshida 1990 4차 심플렉틱 (3-stage). 장기 궤도 정밀도 우위, 비용 ~3×.
+ *
+ * 런타임 핫스왑은 비지원. 생성자에서만 설정한다 (#207 DoD).
+ */
+export type IntegratorKind = 'velocity-verlet' | 'yoshida4';
+
+/**
+ * TS → WASM u8 매핑. 향후 2=RK8 passive 예약 (Rust 측에서 추가되면 여기도 확장).
+ * 별칭(`verlet`)은 URL 파서(apps/web/src/core/parse-integrator.ts)에서 정규화하므로
+ * 여기에는 포함하지 않는다.
+ */
+const INTEGRATOR_TO_U8: Record<IntegratorKind, number> = {
+  'velocity-verlet': 0,
+  yoshida4: 1,
+};
+
 export interface NBodyEngineOptions {
   /** 서브스텝 최대 dt(초). 기본 1일. */
   maxSubstepSeconds?: number;
@@ -42,6 +62,11 @@ export interface NBodyEngineOptions {
    * @deprecated P6-C부터 `grMode` 사용 권장. 호환성을 위해 유지.
    */
   enableGR?: boolean;
+  /**
+   * P7-B #207 — 적분기 종류. 미지정 시 `'velocity-verlet'` (기존 동작 유지).
+   * 생성자 시점에만 반영되며 런타임 스위치는 비지원.
+   */
+  integrator?: IntegratorKind;
 }
 
 export interface NBodyState {
@@ -125,6 +150,11 @@ export class NBodyEngine {
     const mode: GrMode = options.grMode ?? (options.enableGR ? 'single-1pn' : 'off');
     if (mode !== 'off') {
       this.wasm.set_gr_mode(GR_MODE_TO_U8[mode]);
+    }
+    // P7-B #207 — 적분기 옵션. 기본값(velocity-verlet) 이면 WASM 호출 생략 (GrMode 패턴).
+    const integrator: IntegratorKind = options.integrator ?? 'velocity-verlet';
+    if (integrator !== 'velocity-verlet') {
+      this.wasm.set_integrator(INTEGRATOR_TO_U8[integrator]);
     }
   }
 

@@ -15,9 +15,15 @@ export function HudCorners() {
   const julianDate = useSimStore((s) => s.julianDate);
   const selected = useSimStore((s) => s.selectedBodyId);
   const fps = useSimStore((s) => s.fps);
+  const integrator = useSimStore((s) => s.integrator);
   // P5-B #177 — ?fps=1 URL 옵트인 시 실시간 fps 카운터 표시 (실기기 측정용).
   const showFps =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('fps') === '1';
+  // P7-B #207 — ?integrator 옵트인 감지 (URL 존재 여부). 기본값 VV 이면 배지 숨김.
+  // URL 에 명시적으로 지정된 경우에만 표시 (디버그 가시성 + 사용자 신뢰 확보).
+  const showIntegratorBadge =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('integrator') !== null;
 
   return (
     <>
@@ -51,6 +57,14 @@ export function HudCorners() {
             className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle"
           >
             {Math.round(fps)} fps
+          </div>
+        )}
+        {showIntegratorBadge && (
+          <div
+            data-testid="integrator-badge"
+            className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle"
+          >
+            integrator · {integrator}
           </div>
         )}
       </div>

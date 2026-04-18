@@ -18,6 +18,8 @@ export { orbitalStateAt, type StateVector } from './state-vector.js';
 export {
   NBodyEngine,
   buildInitialState,
+  type GrMode,
+  type IntegratorKind,
   type NBodyEngineOptions,
   type NBodyState,
 } from './nbody-engine.js';

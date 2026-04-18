@@ -13,7 +13,12 @@ import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
-import { NBodyEngine, buildInitialState, type GrMode } from '../physics/nbody-engine.js';
+import {
+  NBodyEngine,
+  buildInitialState,
+  type GrMode,
+  type IntegratorKind,
+} from '../physics/nbody-engine.js';
 import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
@@ -81,6 +86,12 @@ export interface SolarSystemSceneOptions {
    * Newton 엔진에만 적용 (Barnes-Hut/WebGPU 미지원).
    */
   grMode?: GrMode;
+  /**
+   * P7-B #207 — 적분기 종류. `'velocity-verlet'` (기본) 또는 `'yoshida4'`.
+   * Newton 엔진에만 적용 (Barnes-Hut/WebGPU 는 자체 적분기 사용).
+   * 런타임 스위치는 비지원 — 초기화 시점만 결정.
+   */
+  integrator?: IntegratorKind;
 }
 
 /**
@@ -101,6 +112,7 @@ export function createSolarSystemScene(
     asteroidNbody = false,
     enableGR = false,
     grMode,
+    integrator = 'velocity-verlet',
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -228,7 +240,7 @@ export function createSolarSystemScene(
     } else if (kind === 'barnes-hut') {
       newtonEngine = new BarnesHutNBodyEngine(initial);
     } else {
-      newtonEngine = new NBodyEngine(initial, { grMode: resolvedGrMode });
+      newtonEngine = new NBodyEngine(initial, { grMode: resolvedGrMode, integrator });
     }
     newtonIdIndex = new Map(initial.ids.map((id, i) => [id, i]));
     newtonLastJd = jd;

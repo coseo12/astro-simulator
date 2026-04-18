@@ -2,6 +2,7 @@
 
 import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulator/core';
 import { attachCoreToStore } from '@/core/core-adapter';
+import { parseIntegratorKind } from '@/core/parse-integrator';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -117,11 +118,23 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           console.warn(`[sim-canvas] 알 수 없는 ?gr=${grParam} — 'off'로 폴백`);
           return 'off';
         })();
+        // P7-B #207 — ?integrator=yoshida4 / velocity-verlet(verlet 별칭) 파싱.
+        // 실험적 옵트인 — 기본값 VV 유지, 디버그/검증 목적의 URL 파라미터.
+        const integratorParam = new URLSearchParams(window.location.search).get('integrator');
+        const integrator = parseIntegratorKind(integratorParam);
+        // HUD 배지 + browser-verify 스크립트용 전역 노출.
+        Object.defineProperty(window, '__simIntegrator', {
+          configurable: true,
+          value: integrator,
+          writable: false,
+        });
+        useSimStore.getState().setIntegrator(integrator);
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
           grMode,
+          integrator,
         });
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
