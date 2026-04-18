@@ -885,18 +885,22 @@ mod tests {
         per_century
     }
 
-    /// Yoshida 4차로 Kepler 2체 에너지 보존 — 10,000 궤도 drift < 1e-10.
+    /// Yoshida 4차로 Kepler 2체 에너지 보존 — 5,000 궤도 drift < 1e-10.
     ///
     /// DoD: VV dt=DAY 기준 1000년 drift < 1e-3 (현 회귀 가드) 대비 **7 자릿수** 개선.
     /// 4차 심플렉틱의 차수 이득 증거로, 장기 궤도 적분에서 VV의 한계를 입증한다.
+    ///
+    /// #213 — orbit 10,000 → 5,000 축소 (CI verify-and-rust 시간 단축).
+    /// Yoshida 4차는 bounded drift 이므로 5000 궤도로도 1e-10 기준 3자리 여유 유지.
+    /// 10000 궤도 장기 검증이 필요하면 `--features diagnostics` 로 확장판 돌린다.
     #[test]
     fn yoshida_kepler_energy_conservation() {
-        // Sun-Earth 원궤도, dt = DAY, 10,000 궤도 = 10,000년.
+        // Sun-Earth 원궤도, dt = DAY, 5,000 궤도 = 5,000년.
         let mut sys = sun_earth_system();
         sys.integrator = IntegratorKind::Yoshida4;
         let e0 = sys.total_energy();
         let dt = DAY;
-        let orbits = 10_000usize;
+        let orbits = 5_000usize;
         let steps = ((orbits as f64) * YEAR / dt) as usize;
         for _ in 0..steps {
             sys.step(dt);
@@ -998,11 +1002,12 @@ mod tests {
     // Single1PN (Schwarzschild 정확해 구현) 에서도 1c 지구 3.7685″ — EIH/Single이 **동일 deviation**
     // 이므로 EIH 식의 structural bias 가 아니다. 측정법이 1c 에서 저이심률 궤도 잔차를 평균화하지 못함.
     //
-    // 진단 테스트는 `#[ignore]` — 일상 CI 에서 스킵, 필요 시 `cargo test --ignored diag_` 로 실행.
+    // 진단 테스트는 `#[cfg(feature = "diagnostics")]` — 일상 CI 는 compile 제외로 빌드 단축
+    // (#213). 실행 시 `cargo test --release --features diagnostics diag_`.
 
     /// 지구 Single1PN (태양 고정) — Schwarzschild 시험입자 근사. 이론 3.84″.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_earth_single1pn_perihelion() {
         measure_perihelion_precession_gr_with(
             "Earth-Single1PN-diag",
@@ -1019,8 +1024,8 @@ mod tests {
     }
 
     /// 지구 Single1PN, 더 작은 dt — baseline subtraction 수렴성 검증.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_earth_single1pn_perihelion_dt10() {
         measure_perihelion_precession_gr_with(
             "Earth-Single1PN-dt10",
@@ -1111,8 +1116,8 @@ mod tests {
 
     /// 지구 Single1PN, 10 centuries — S/N 10배 향상.
     /// LRL baseline subtraction 이 저이심률에서 남기는 잔차인지, 실제 세차 신호인지 판별.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_earth_single1pn_10centuries() {
         // 10 centuries → 1000 orbits 지구. Newton baseline subtraction 잔차가 선형이면 동일,
         // 신호 대 잡음 이득은 √10 ≈ 3배.
@@ -1175,8 +1180,8 @@ mod tests {
     }
 
     /// 금성 Single1PN — Schwarzschild 시험입자 근사. 이론 8.62″.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_venus_single1pn_perihelion() {
         measure_perihelion_precession_gr_with(
             "Venus-Single1PN-diag",
@@ -1193,8 +1198,8 @@ mod tests {
     }
 
     /// 수성 Single1PN — Schwarzschild 시험입자 근사. 이론 42.98″.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_mercury_single1pn_perihelion() {
         measure_perihelion_precession_gr_with(
             "Mercury-Single1PN-diag",
@@ -1211,8 +1216,8 @@ mod tests {
     }
 
     /// 금성 EIH, 10 centuries — 수렴 검증.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_venus_eih_10centuries() {
         measure_perihelion_precession_gr_centuries(
             "Venus-EIH-10c",
@@ -1229,8 +1234,8 @@ mod tests {
     }
 
     /// 수성 EIH, 10 centuries — 수렴 검증 (선형 scaling 확인).
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_mercury_eih_10centuries() {
         measure_perihelion_precession_gr_centuries(
             "Mercury-EIH-10c",
@@ -1247,8 +1252,8 @@ mod tests {
     }
 
     /// 지구 EIH, 10 centuries — 3.7683″ 수렴값 vs 실제 GR 이론값 접근도 확인.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_earth_eih_10centuries() {
         measure_perihelion_precession_gr_centuries(
             "Earth-EIH-10c",
@@ -1265,8 +1270,8 @@ mod tests {
     }
 
     /// 지구 EIH, 3 centuries — CI 시간 vs 정확도 trade-off 지점 탐색.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_earth_eih_3centuries() {
         measure_perihelion_precession_gr_centuries(
             "Earth-EIH-3c",
@@ -1283,8 +1288,8 @@ mod tests {
     }
 
     /// 지구 EIH, 5 centuries — CI 시간 vs 정확도 trade-off 중간값.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_earth_eih_5centuries() {
         measure_perihelion_precession_gr_centuries(
             "Earth-EIH-5c",
@@ -1301,8 +1306,8 @@ mod tests {
     }
 
     /// 금성 EIH, 3 centuries — 동일 trade-off 탐색.
+    #[cfg(feature = "diagnostics")]
     #[test]
-    #[ignore]
     fn diag_venus_eih_3centuries() {
         measure_perihelion_precession_gr_centuries(
             "Venus-EIH-3c",
