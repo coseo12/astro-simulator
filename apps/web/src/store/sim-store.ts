@@ -1,5 +1,8 @@
+import type { physics } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
+
+type IntegratorKind = physics.IntegratorKind;
 
 export type UnitSystem = 'si' | 'astro' | 'natural';
 /**
@@ -42,6 +45,11 @@ export interface SimStoreState {
   fps: number | null;
   unitSystem: UnitSystem;
   physicsEngine: PhysicsEngineKind;
+  /**
+   * P7-B #207 — 현재 활성 적분기 (URL ?integrator=에서 결정, 초기화 시점 고정).
+   * HUD 배지 표시 + 디버그 가시성 용도. 런타임 스위치는 비지원 (계약상).
+   */
+  integrator: IntegratorKind;
   /** 바디 id → 질량 배수 (#107). 1.0 또는 부재는 원래 질량. */
   massMultipliers: Record<string, number>;
 
@@ -66,6 +74,11 @@ export interface SimStoreState {
   setFps: (fps: number) => void;
   setUnitSystem: (unit: UnitSystem) => void;
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
+  /**
+   * P7-B #207 — 초기화 시점에 URL 파라미터로 결정된 적분기를 스토어에 기록.
+   * 런타임 스위치는 비지원이지만 HUD 배지 렌더링을 위해 setter 는 필요.
+   */
+  setIntegrator: (kind: IntegratorKind) => void;
   setMassMultiplier: (bodyId: string, multiplier: number) => void;
   resetMassMultipliers: () => void;
   setBlackHoleDiskParam: <K extends keyof BlackHoleDiskParams>(
@@ -109,6 +122,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   fps: null,
   unitSystem: 'astro',
   physicsEngine: 'kepler',
+  integrator: 'velocity-verlet',
   massMultipliers: {},
   blackHoleDisk: { ...DEFAULT_BLACK_HOLE_DISK },
   pingCount: 0,
@@ -124,6 +138,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setFps: (fps) => set({ fps }),
   setUnitSystem: (unit) => set({ unitSystem: unit }),
   setPhysicsEngine: (kind) => set({ physicsEngine: kind }),
+  setIntegrator: (kind) => set({ integrator: kind }),
   setMassMultiplier: (bodyId, multiplier) =>
     set((state) => {
       const next = { ...state.massMultipliers };
