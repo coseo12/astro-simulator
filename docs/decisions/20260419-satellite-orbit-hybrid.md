@@ -107,12 +107,21 @@ fn measure_moon_orbital_period(
 
 /// 달 교점역행 주기 측정 — 노드 벡터 `N = L × ẑ` 방위각 시간 선형 회귀.
 /// 반환 단위: 년 (years). 음수면 퇴행(retrograde, 정상 달 거동), 양수면 전진.
+///
+/// **상대 좌표계 (Gemini 교차검증 #247 수용)**: 모든 상태 벡터는 부모 행성 대비 상대치.
+///   r_rel = r_sat - r_parent ;  v_rel = v_sat - v_parent
+///   L = r_rel × v_rel
+///   N = L × ẑ (ecliptic plane 기준 승교점 방향)
+/// 절대 좌표계(태양 기준) 사용 시 지구 공전 자체가 노드 방위각에 주입되어 잔차 발생.
 fn measure_node_regression_period(
     sys: &mut NBodySystem,
     satellite_idx: usize,   // 달 body index
     parent_idx: usize,      // 지구 body index (N = (r - r_earth) × (v - v_earth) 로 상대 각운동량)
     integration_years: f64, // 5.0 기본 / 10.0 확장
-    sample_interval_days: f64, // 30.0 (월 1회 샘플링)
+    sample_interval_days: f64, // 1.0 기본 — 항성월 27.3일/삭망월 29.5일 대비 ≪ 주기로
+                               // Nyquist 여유 확보 (Gemini 교차검증 수용, 종전 30.0 에일리어싱 회피)
+    smoothing_window_days: f64,// 180.0 기본 — 단기 태양 섭동(≈173일 Saros-like) 평활화 이동평균
+                               // 선형 회귀 입력 전 smoothing 필수
     dt: f64,                // 적분 step (기본 3600s = 1h)
 ) -> f64;
 ```
@@ -178,4 +187,30 @@ fn measure_node_regression_period(
 
 ## §Amendments
 
-(빈 자리 — 재검토 조건 발생 시 본 섹션에 추가)
+본 ADR 의 수치·임계·DoD 갱신 이력. 포맷 규약: `docs/decisions/README.md` §Amendments.
+
+| 날짜       | 변경 요약                                                                                               | 근거                 |
+| ---------- | ------------------------------------------------------------------------------------------------------- | -------------------- |
+| 2026-04-19 | D3 `sample_interval_days` 30.0 → 1.0 + `smoothing_window_days` 180.0 신설 (에일리어싱 회피)             | Gemini 교차검증 #244 |
+| 2026-04-19 | D2·D3 측정법 상대 좌표계 (부모 행성 대비 `r_rel` / `v_rel`) 명시 박제                                   | Gemini 교차검증 #244 |
+| 2026-04-19 | 후속 이슈 #247 분리 — "위성 Osculating elements 동적 동기화 파이프라인" (UX 비동기화 우려, P9/P13 후보) | Gemini 교차검증 #244 |
+
+### 2026-04-19 — 상세
+
+**D3 에일리어싱 (심각도: 높음, 즉시 수용)**
+
+Gemini 교차검증에서 `sample_interval_days: 30.0` 이 달 항성월(27.3일)·삭망월(29.5일) 과 근접해 beat 현상 유발 위험을 지적. 5년 적분 × 30일 간격 = 60 샘플로는 단기 태양 섭동(≈173일) 을 제거하지 못함.
+
+대응:
+
+- `sample_interval_days: 1.0` 기본 — Nyquist 조건 충족 (27일 주기 대비 1/27 < 1/2)
+- `smoothing_window_days: 180.0` 신설 — 173일 섭동 한 주기 포함 이동평균으로 단기 잔차 제거
+- 선형 회귀는 smoothing 후 시리즈에 적용
+
+**D2·D3 상대 좌표계 (심각도: 중간, 수용)**
+
+노드 벡터 `N = L × ẑ` 의 L 이 **태양 기준 각운동량** 으로 계산되면 지구 공전 자체가 L 방위에 주입됨. D2 (노드 교차) 도 `z - z_parent = 0` 조건으로 명확화.
+
+**Osculating elements 동적 동기화 (심각도: 높음, 후속 분리)**
+
+"UX 비동기화" (질량 변경 시 위성 무반응) 은 "인터랙티브 시뮬레이터" 정체성과 직결. 그러나 PM 계약 Q2=c 하이브리드(정적 Kepler) 결정과 상충 → **후속 이슈 #247 로 분리** (volt #29 3단 프로토콜). P9/P13 후보, priority:medium.
