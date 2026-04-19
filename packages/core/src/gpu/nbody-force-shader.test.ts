@@ -36,9 +36,10 @@ describe('computeForcesF32 (CPU 참조)', () => {
     const positions = new Float32Array([-1, 0, 0, 1, 0, 0]);
     const masses = new Float32Array([1e10, 1e10]);
     const acc = computeForcesF32(positions, masses, 0, G);
-    expect(acc[0]).toBeCloseTo(-acc[3], 5);
-    expect(Math.sign(acc[0])).toBe(1); // -1에 있는 입자는 +x 방향으로 끌림
-    expect(Math.sign(acc[3])).toBe(-1);
+    // Float32Array 길이 6 보장 (N=2 × 3 컴포넌트). noUncheckedIndexedAccess 가드 해소.
+    expect(acc[0]!).toBeCloseTo(-acc[3]!, 5);
+    expect(Math.sign(acc[0]!)).toBe(1); // -1에 있는 입자는 +x 방향으로 끌림
+    expect(Math.sign(acc[3]!)).toBe(-1);
   });
 
   it('softening_sq가 close-encounter 발산 방지', () => {
