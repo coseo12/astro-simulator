@@ -49,4 +49,18 @@ describe('parseGrMode', () => {
     expect(parseGrMode('newton')).toBe('off');
     expect(spy).toHaveBeenCalledTimes(3);
   });
+
+  // #226-1 — 사용자 실수 케이스 (on/true/gr/숫자/오타) 도 공식 폴백 정책을 따른다.
+  // 이 케이스들이 우연히 eih/1pn 으로 해석되지 않도록 회귀 가드 유지.
+  it('사용자 실수 케이스 (on/true/gr/0/2/오타) 는 모두 off 폴백', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(parseGrMode('on')).toBe('off');
+    expect(parseGrMode('true')).toBe('off');
+    expect(parseGrMode('gr')).toBe('off');
+    expect(parseGrMode('0')).toBe('off');
+    expect(parseGrMode('2')).toBe('off');
+    expect(parseGrMode('eih1pn')).toBe('off');
+    expect(parseGrMode('single1pn')).toBe('off');
+    expect(spy).toHaveBeenCalledTimes(7);
+  });
 });
