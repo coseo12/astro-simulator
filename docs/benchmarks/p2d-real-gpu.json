@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-14T15:58:27.750Z",
+  "timestamp": "2026-04-19T05:33:26.923Z",
   "env": "chromium --use-angle=metal + rasterization",
   "gpu": {
     "vendor": "Google Inc. (Apple)",
@@ -8,15 +8,23 @@
   "scenarios": [
     {
       "path": "/ko",
-      "fps": 120.05
+      "fps": 1141.19
     },
     {
       "path": "/ko?belt=200",
-      "fps": 120.08
+      "fps": 1007.98
     },
     {
       "path": "/ko?belt=1000",
-      "fps": 120.07
+      "fps": 813.13
+    },
+    {
+      "path": "/ko?belt=5000",
+      "fps": 363.58
+    },
+    {
+      "path": "/ko?belt=10000",
+      "fps": 223.79
     }
   ]
 }
