@@ -6,8 +6,20 @@
  *
  * 측정 방법:
  *   - Playwright chromium (WebGPU 플래그)로 ?bh=2&ray3d=1 진입
+ *   - **pressTimePlay() 로 scene 재생 시작** (#223 — `?bh=2&ray3d=1` 기본은
+ *     자동 재생이라 `time-play` 버튼이 부재하므로 `skipIfAbsent:true` no-op.
+ *     paused 상태 회귀 가드 목적)
+ *   - **--disable-frame-rate-limit + --disable-gpu-vsync** 로 RAF 상한 해제
+ *     (#223 — headless chromium 의 120Hz/60Hz vsync 페그가 stdev ≈ 0 을 만드는
+ *     **주 원인**. Metal ANGLE 경로에서도 vsync 우회 필요)
  *   - warmup 2s 후 RAF 카운팅 5s 동안 프레임 수 측정 → frame_ms = 1000/fps
  *   - 10회 샘플 수집 (architect §위험 2 완화 — 표준편차 기록)
+ *
+ * DoD (#223 재조정 2026-04-19, 사용자 합의):
+ *   - 기존: `stdev_ms > 0.5ms` — M1 Pro Metal (~1200fps) 에서 frame_ms 절대값이
+ *     0.8ms 수준이라 원천적으로 도달 불가능한 기준이었음
+ *   - 신규: `stdev_ratio = stdev / avg > 1%` — vsync 페그 탈출 판정 가능한 기준
+ *   - 실측 (2026-04-19, 고정 baseline): **2.61%** — PASS. 이전 페그 상태는 0.012%
  *
  * 주의: 헤드리스 swiftshader 기본 GPU는 데스크톱 실기기와 편차 큼.
  *       bench-scene-real-gpu.mjs의 flag(`--use-angle=metal` 등)를 재사용하여
@@ -20,6 +32,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { pressTimePlay } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SAMPLE_COUNT = 10;
@@ -30,6 +43,7 @@ const outDir = join(__dirname, '..', 'docs', 'benchmarks');
 mkdirSync(outDir, { recursive: true });
 
 // WebGPU + 실 GPU 유도 플래그 — bench-scene-real-gpu.mjs + browser-verify-black-hole-ray3d.mjs 조합.
+// #223: --disable-frame-rate-limit + --disable-gpu-vsync 로 RAF 상한 해제 (vsync 페그 회피).
 const browser = await chromium.launch({
   headless: true,
   args: [
@@ -39,6 +53,8 @@ const browser = await chromium.launch({
     '--use-angle=metal',
     '--enable-gpu-rasterization',
     '--ignore-gpu-blocklist',
+    '--disable-frame-rate-limit',
+    '--disable-gpu-vsync',
   ],
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -73,7 +89,6 @@ const measureFrameMs = (durationMs) =>
 console.log(`track_b_ray3d_frame_ms — ?bh=2&ray3d=1 데스크톱 WebGPU 프레임 시간 측정`);
 console.log(`  sample count=${SAMPLE_COUNT} · duration/sample=${SAMPLE_DURATION_MS}ms`);
 await page.goto(`${baseUrl}/ko?bh=2&ray3d=1`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(WARMUP_MS);
 
 const ray3dFlag = await page.evaluate(() => window.__bhRay3D).catch(() => null);
 if (ray3dFlag !== true) {
@@ -81,6 +96,15 @@ if (ray3dFlag !== true) {
   await browser.close();
   process.exit(1);
 }
+
+// #223 — 재생 시작 확인. `?bh=2&ray3d=1` 기본 상태는 자동 재생(isPaused=false)이라
+// time-play 버튼이 부재 → skipIfAbsent:true 로 no-op. 방어적으로 paused 상태일 때만 토글.
+// 실측 vsync 페그(fps=120.04, stdev=0.001)의 주 원인은 재생 여부가 아니라 프레임 레이트
+// 상한이므로, 연산 부하를 드러내려면 launch args `--disable-frame-rate-limit` +
+// `--disable-gpu-vsync` 가 핵심이다 (이 함수는 회귀 방지 목적).
+const played = await pressTimePlay(page, { skipIfAbsent: true });
+console.log(`  pressTimePlay: ${played ? 'clicked (was paused)' : 'skipped (already playing)'}`);
+await page.waitForTimeout(WARMUP_MS);
 
 // ---- 10회 샘플 ----
 const samples = [];
@@ -141,6 +165,10 @@ const report = {
   track_b_ray3d_frame_ms: {
     avg_ms: Number(avgFrameMs.toFixed(3)),
     stdev_ms: Number(stdevFrameMs.toFixed(3)),
+    // #223 — GPU 속도 독립 분산 지표. vsync 페그 판정(> 1% = OK) 및 fps 격차
+    // 환경에서의 회귀 비교 기준. stdev_ms 절대치는 GPU 속도에 반비례해 부적절.
+    // avg=0 은 현실적으로 불가(샘플 전원 실패)하지만 NaN/Infinity 회피 방어.
+    stdev_ratio: Number((avgFrameMs > 0 ? stdevFrameMs / avgFrameMs : 0).toFixed(4)),
     min_ms: Number(minFrameMs.toFixed(3)),
     max_ms: Number(maxFrameMs.toFixed(3)),
     avg_fps: Number(avgFps.toFixed(2)),

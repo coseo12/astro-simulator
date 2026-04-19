@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-04-19T04:03:10.225Z",
+  "environment": "chromium headless + webgpu (+ --use-angle=metal)",
+  "scenario": "/ko?bh=2&ray3d=1",
+  "gpu": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+  },
+  "track_b_ray3d_frame_ms": {
+    "avg_ms": 0.92,
+    "stdev_ms": 0.024,
+    "stdev_ratio": 0.0261,
+    "min_ms": 0.895,
+    "max_ms": 0.964,
+    "avg_fps": 1088.27,
+    "sample_count": 10,
+    "duration_ms_per_sample": 5000,
+    "warmup_ms": 2000
+  },
+  "samples": [
+    {
+      "fps": 1040.79,
+      "frame_ms": 0.961,
+      "frames": 5205,
+      "elapsed_ms": 5001
+    },
+    {
+      "fps": 1037.11,
+      "frame_ms": 0.964,
+      "frames": 5187,
+      "elapsed_ms": 5001.4
+    },
+    {
+      "fps": 1099.85,
+      "frame_ms": 0.909,
+      "frames": 5501,
+      "elapsed_ms": 5001.6
+    },
+    {
+      "fps": 1117.82,
+      "frame_ms": 0.895,
+      "frames": 5591,
+      "elapsed_ms": 5001.7
+    },
+    {
+      "fps": 1078.56,
+      "frame_ms": 0.927,
+      "frames": 5394,
+      "elapsed_ms": 5001.1
+    },
+    {
+      "fps": 1115.89,
+      "frame_ms": 0.896,
+      "frames": 5581,
+      "elapsed_ms": 5001.4
+    },
+    {
+      "fps": 1094.73,
+      "frame_ms": 0.913,
+      "frames": 5474,
+      "elapsed_ms": 5000.3
+    },
+    {
+      "fps": 1112.98,
+      "frame_ms": 0.898,
+      "frames": 5566,
+      "elapsed_ms": 5001
+    },
+    {
+      "fps": 1080.41,
+      "frame_ms": 0.926,
+      "frames": 5403,
+      "elapsed_ms": 5000.9
+    },
+    {
+      "fps": 1104.53,
+      "frame_ms": 0.905,
+      "frames": 5524,
+      "elapsed_ms": 5001.2
+    }
+  ],
+  "console_error_count": 0
+}
