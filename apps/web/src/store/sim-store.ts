@@ -211,6 +211,15 @@ export const useSimStore = create<SimStoreState>((set) => ({
  * - `browser-verify-mobile-p7d.mjs` 시나리오 4 의 "UI 통합 스킵" 분기 제거 목적.
  * - 민감 데이터 아님 (Zustand store API) — dev 검증 전용.
  *
+ * 속성 구성 근거 (#226-2):
+ * - `configurable: true` — Next.js HMR(Hot Module Replacement) 이 이 모듈을 재평가할 때
+ *   기존 프로퍼티를 재정의(`defineProperty` 재호출) 할 수 있도록 허용. `false` 면 HMR 사이클
+ *   두 번째부터 `TypeError: Cannot redefine property: __simStore` 로 dev 서버가 멈춘다.
+ * - `writable: false` — 직접 할당(`window.__simStore = ...`) 으로 스토어 참조를 바꾸지 못하도록
+ *   방어. 재정의는 HMR 경로(configurable) 로만 가능.
+ * - 일반 할당(`window.__simStore = useSimStore`) 대신 `defineProperty` 를 쓰는 이유는
+ *   `writable: false` 를 명시하기 위함 — 할당 문법으로는 이 보장을 얻을 수 없다.
+ *
  * 검증: `grep -r "__simStore" apps/web/.next/static` 실행 후 0건이면 성공.
  */
 if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
