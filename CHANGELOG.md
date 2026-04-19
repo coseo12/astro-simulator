@@ -3,6 +3,46 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.8.0] — 2026-04-19
+
+### P8 — 내행성계 위성 정밀화 (포보스·데이모스·달 교점역행)
+
+메인 이슈: #244 · ADR: [`docs/decisions/20260419-satellite-orbit-hybrid.md`](docs/decisions/20260419-satellite-orbit-hybrid.md) · 회고: [`docs/retrospectives/p8-retrospective.md`](docs/retrospectives/p8-retrospective.md)
+
+3 PR 분할 릴리스 (CLAUDE.md §Phase 분리 릴리스 리듬 적용):
+
+- **PR #248 (PR-1 인프라 + #242 선행)** — `scripts/bench-scene.mjs` vsync 페그 해소 + `solar-system.json` 포보스/데이모스 2종 엔티티 추가 + `solar-system-loader.test.ts` 가드 + `time-reversal.test.ts` 9체 의도 보존 필터
+- **PR #250 (PR-2 Rust 측정 헬퍼)** — `packages/physics-wasm/src/nbody.rs` `measure_moon_orbital_period` / `measure_node_regression_period` 헬퍼 2종 + 단위테스트 3건 (phobos/deimos/lunar_node). Gemini 교차검증 수용 (상대 좌표계 + Nyquist smoothing)
+- **PR-3 (본 PR) TS 통합 + 회고 + v0.8.0 릴리스 준비** — ADR 예측대로 sim-canvas 코드 변경 0 라인 (기존 `parentId` + `updateAtKepler` 재사용). 회고 + CHANGELOG + 버전 bump.
+
+### Behavior Changes
+
+- **sim-canvas 에 화성 위성 2종 (포보스/데이모스) 자동 렌더** — `?mode=research` 에서 화성 주위 위성이 JSON 기반 Kepler 해석 요소로 표시. 렌더 코드 라인 추가 0 (기존 `parentId=mars` 체인 재사용). CelestialTree 사이드패널에 `tree-phobos` / `tree-deimos` 버튼 자동 노출, 클릭 시 focus 카메라 전환 동작 (실측 L2 PASS)
+- **DoD 물리 검증 CI 가드 3건 추가** — `cargo test` 에 `test_phobos_period_1pct` / `test_deimos_period_1pct` / `test_lunar_node_regression_5pct` 상시 게이트. 측정 실패 시 릴리스 차단. WASM 런타임 번들 delta 0 bytes (`#[cfg(test)]` 격리)
+- **9체 `time-reversal.test.ts` 명시 필터** — 포보스 주기 7.65h × dt=10min 의 per-step 1/45 period 누적 오차가 기존 1e-9 임계를 초과하여 화성 위성 명시 필터. 원 9체 대칭성 의도 보존. 위성 자체의 시간 역행 검증은 PR-2 `measure_moon_orbital_period` 로 대체
+- **bench-scene vsync 페그 해소 (PR-1)** — `--disable-frame-rate-limit` + `--disable-gpu-vsync` 플래그. 머지 직후 baseline 재측정 자동 PR 생성. 기존 baseline 대비 양의 Δ 관찰 예상 (uncapped FPS)
+
+### DoD 실측 (ADR 대비 여유율)
+
+| DoD                   | 계약 | 실측        | 여유율 |
+| --------------------- | ---- | ----------- | ------ |
+| 포보스 공전주기       | ±1%  | **0.087%**  | 11.5×  |
+| 데이모스 공전주기     | ±1%  | **0.032%**  | 31×    |
+| 달 교점역행 주기      | ±5%  | **4.45%**   | 1.12×  |
+| WASM 번들 delta       | +2KB | **0 bytes** | —      |
+| cargo test 시간 delta | +45s | **+18s**    | 2.5×   |
+
+### 후속 OPEN (priority:medium)
+
+- #245 위성 줌 토글 (`?satellites=zoomed` 옵트인) — 위성이 실 스케일에서 서브픽셀, 탐색 UX 보강
+- #246 위성 클릭 정보 패널 — celestial-info-panel 에 궤도 요소 표시
+- #247 Osculating elements 동적 동기화 파이프라인 — 질량 변경 시 위성 무반응 (Gemini 교차검증 고유 발견, 정적 Kepler 한계). P9/P13 후보
+- #251 bench-scene 다회 샘플링 + `stdev_ratio` 필드 (#242 DoD 일부 open 유지)
+
+### 알려진 제한
+
+- `?focus=<moon|phobos|deimos>` URL 직접 진입 시 카메라 focus 는 동작하나 CelestialTree 사이드패널 active 토글은 미연동. 기존 동작과 동일 (#246 클릭 정보 패널 범위). **PR-3 퇴행이 아님**.
+
 ## [0.7.1] — 2026-04-19
 
 ### Behavior Changes: None — 문서/인프라/정적 에러 해소만
