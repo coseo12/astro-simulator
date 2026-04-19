@@ -1,55 +1,67 @@
 {
-  "timestamp": "2026-04-15T06:42:40.750Z",
-  "phase": "p3-a-end",
+  "timestamp": "2026-04-19T05:22:30.710Z",
+  "phase": "remeasure",
   "durationMs": 3000,
-  "environment": "playwright-chromium-headless",
+  "environment": "gh-actions-ubuntu-chromium-headless",
   "viewport": "1280x800",
   "scenarios": [
     {
       "name": "idle",
-      "fps": 32.89
+      "fps": 26.09,
+      "samples": 10
     },
     {
       "name": "play-1d",
-      "fps": 30.5
+      "fps": 22.68,
+      "samples": 10
     },
     {
       "name": "play-1y",
-      "fps": 30.32
+      "fps": 27.64,
+      "samples": 10
     },
     {
       "name": "focus-earth",
-      "fps": 90.81
+      "fps": 60.23,
+      "samples": 10
     },
     {
       "name": "focus-neptune",
-      "fps": 96.67
+      "fps": 60.28,
+      "samples": 10
     }
   ],
   "nBody": [
     {
       "n": 10,
-      "fps": 28.59
+      "fps": 27.15,
+      "samples": 10
     },
     {
       "n": 100,
-      "fps": 23.01
+      "fps": 21.28,
+      "samples": 10
     },
     {
       "n": 200,
-      "fps": 18.59
+      "fps": 17.18,
+      "samples": 10
     },
     {
       "n": 1000,
-      "fps": 7.48
+      "fps": 6.97,
+      "samples": 10
     },
     {
       "n": 5000,
-      "fps": 2.07
+      "fps": 1.96,
+      "samples": 10
     },
     {
       "n": 10000,
-      "fps": 1.22
+      "fps": 1.13,
+      "samples": 10
     }
-  ]
+  ],
+  "source_count": 10
 }
