@@ -19,7 +19,7 @@
  *   - 기존: `stdev_ms > 0.5ms` — M1 Pro Metal (~1200fps) 에서 frame_ms 절대값이
  *     0.8ms 수준이라 원천적으로 도달 불가능한 기준이었음
  *   - 신규: `stdev_ratio = stdev / avg > 1%` — vsync 페그 탈출 판정 가능한 기준
- *   - 실측 (2026-04-19, 첫 baseline): 3.1% — PASS. 이전 페그 상태는 0.012%
+ *   - 실측 (2026-04-19, 고정 baseline): **2.61%** — PASS. 이전 페그 상태는 0.012%
  *
  * 주의: 헤드리스 swiftshader 기본 GPU는 데스크톱 실기기와 편차 큼.
  *       bench-scene-real-gpu.mjs의 flag(`--use-angle=metal` 등)를 재사용하여
@@ -167,7 +167,8 @@ const report = {
     stdev_ms: Number(stdevFrameMs.toFixed(3)),
     // #223 — GPU 속도 독립 분산 지표. vsync 페그 판정(> 1% = OK) 및 fps 격차
     // 환경에서의 회귀 비교 기준. stdev_ms 절대치는 GPU 속도에 반비례해 부적절.
-    stdev_ratio: Number((stdevFrameMs / avgFrameMs).toFixed(4)),
+    // avg=0 은 현실적으로 불가(샘플 전원 실패)하지만 NaN/Infinity 회피 방어.
+    stdev_ratio: Number((avgFrameMs > 0 ? stdevFrameMs / avgFrameMs : 0).toFixed(4)),
     min_ms: Number(minFrameMs.toFixed(3)),
     max_ms: Number(maxFrameMs.toFixed(3)),
     avg_fps: Number(avgFps.toFixed(2)),
