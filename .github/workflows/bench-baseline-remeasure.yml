@@ -43,7 +43,8 @@ jobs:
             echo "::error::sample_count 는 최소 3 이상이어야 한다 (현재: $COUNT)"
             exit 1
           fi
-          ARR=$(python3 -c "import json, sys; print(json.dumps(list(range(1, ${COUNT}+1))))")
+          # node 런타임으로 통일 (Reviewer 권고 3, SHA=62d9323)
+          ARR=$(node -e "console.log(JSON.stringify(Array.from({length: ${COUNT}}, (_,i) => i+1)))")
           echo "matrix=$ARR" >> "$GITHUB_OUTPUT"
           echo "sample_count=$COUNT"
 
@@ -109,8 +110,12 @@ jobs:
       - name: 리포트 JSON 수거
         run: |
           mkdir -p /tmp/bench-run-${{ matrix.run }}
-          # 이 회차에서 갱신된 JSON 만 분리 (git status 기준 새 파일)
-          git ls-files --others --exclude-standard docs/benchmarks/ | xargs -I{} cp {} /tmp/bench-run-${{ matrix.run }}/ || true
+          # 이 회차에서 갱신된 JSON 만 분리 (git status 기준 새 파일).
+          # `.json` 확장자 필터로 향후 BENCH_SUMMARY_OUT 류 부산물 오수거 방어
+          # (Reviewer 권고 1).
+          git ls-files --others --exclude-standard docs/benchmarks/ \
+            | grep -E '\.json$' \
+            | xargs -I{} cp {} /tmp/bench-run-${{ matrix.run }}/ || true
           ls -la /tmp/bench-run-${{ matrix.run }}
 
       - name: 아티팩트 업로드
