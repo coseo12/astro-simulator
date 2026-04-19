@@ -1512,4 +1512,435 @@ mod tests {
             println!("N={:4}: {:.1} µs/step", n, per_step_us);
         }
     }
+
+    // ─── P8 #244 ─── 내행성계 위성 궤도 측정 헬퍼 ─────────────────────────
+    //
+    // ADR `docs/decisions/20260419-satellite-orbit-hybrid.md` §인터페이스 시그니처.
+    // - 포보스/데이모스: 화성 중심 2체 (화성을 index=0) — simplified Keplerian
+    // - 달: 태양+지구+달 3체 (태양=0, 지구=1, 달=2) — simplified Keplerian heliocentric
+    //
+    // 상대 좌표계 (ADR Amendment 2026-04-19) 필수: r_rel = r_sat - r_parent.
+    // 절대 좌표계(태양 기준) 사용 시 부모 행성 공전 자체가 secular 측정치에 주입된다.
+
+    /// 이심률 dispatch 임계값. e > threshold 면 근점 통과(min_r), ≤ 이면 vernal node.
+    const ORBITAL_PERIOD_ECCENTRICITY_THRESHOLD: f64 = 0.005;
+
+    /// 위성 공전주기 측정 — 근점 통과 2회 간격 평균 (e > threshold)
+    /// 또는 vernal node (z 부호 변경) 간격 fallback.
+    ///
+    /// **반환 단위: 초 (seconds).** volt #32 / CLAUDE.md §스프린트 계약 #10 —
+    /// 단위를 시그니처에 명시해 측정법 오진 방지.
+    ///
+    /// **상대 좌표계 (ADR Amendment)**: r_rel = r_sat - r_parent. 부모 행성이
+    /// 이동하더라도 올바르게 작동.
+    ///
+    /// **탐색 윈도우**: `nominal_period_sec × 3` 내부에서 통과 탐색. 측정 실패 시
+    /// f64::NAN 반환 (호출자에서 assert 로 탐지).
+    fn measure_moon_orbital_period(
+        sys: &mut NBodySystem,
+        parent_idx: usize,
+        satellite_idx: usize,
+        nominal_period_sec: f64,
+        dt: f64,
+    ) -> f64 {
+        let total_steps = ((nominal_period_sec * 3.0) / dt) as usize;
+
+        // 상대 좌표 헬퍼 — r_rel, z_rel 반환.
+        let rel_state = |sys: &NBodySystem| -> (f64, f64, f64, f64) {
+            let rx = sys.pos[3 * satellite_idx] - sys.pos[3 * parent_idx];
+            let ry = sys.pos[3 * satellite_idx + 1] - sys.pos[3 * parent_idx + 1];
+            let rz = sys.pos[3 * satellite_idx + 2] - sys.pos[3 * parent_idx + 2];
+            let r = (rx * rx + ry * ry + rz * rz).sqrt();
+            (r, rx, ry, rz)
+        };
+
+        // 이심률 추정 — 현재 (r,v) 로부터 vis-viva 역산. 궤도 평면 정규화 시
+        // 포보스(0.0151) 는 A 경로, 데이모스(0.00033) 는 B 경로로 dispatch.
+        let e_estimate = {
+            let (r, _, _, _) = rel_state(sys);
+            let vrx = sys.vel[3 * satellite_idx] - sys.vel[3 * parent_idx];
+            let vry = sys.vel[3 * satellite_idx + 1] - sys.vel[3 * parent_idx + 1];
+            let vrz = sys.vel[3 * satellite_idx + 2] - sys.vel[3 * parent_idx + 2];
+            let v2 = vrx * vrx + vry * vry + vrz * vrz;
+            let mu = GRAVITATIONAL_CONSTANT * sys.masses[parent_idx];
+            let energy = 0.5 * v2 - mu / r;
+            let (_, rx, ry, rz) = rel_state(sys);
+            let hx = ry * vrz - rz * vry;
+            let hy = rz * vrx - rx * vrz;
+            let hz = rx * vry - ry * vrx;
+            let h2 = hx * hx + hy * hy + hz * hz;
+            // e² = 1 + 2εh²/μ²
+            (1.0 + 2.0 * energy * h2 / (mu * mu)).max(0.0).sqrt()
+        };
+
+        if e_estimate > ORBITAL_PERIOD_ECCENTRICITY_THRESHOLD {
+            // 경로 A — 근점 통과 간격 (P5-A measure_perihelion_angle 패턴).
+            // 1차 통과와 2차 통과 사이의 step 수 × dt 로 주기 계산.
+            // min_r local minimum 은 중앙 차분 검출로 기록.
+            let mut prev_r = f64::MAX;
+            let mut curr_r = {
+                let (r, _, _, _) = rel_state(sys);
+                r
+            };
+            let mut first_peri_step: Option<usize> = None;
+            let mut second_peri_step: Option<usize> = None;
+
+            for step_idx in 0..total_steps {
+                sys.step(dt);
+                let (next_r, _, _, _) = rel_state(sys);
+                // 근점 조건: curr_r < prev_r 이면서 curr_r < next_r (local min).
+                if curr_r < prev_r && curr_r < next_r {
+                    if first_peri_step.is_none() {
+                        first_peri_step = Some(step_idx);
+                    } else if second_peri_step.is_none() {
+                        second_peri_step = Some(step_idx);
+                        break;
+                    }
+                }
+                prev_r = curr_r;
+                curr_r = next_r;
+            }
+
+            match (first_peri_step, second_peri_step) {
+                (Some(s1), Some(s2)) => (s2 - s1) as f64 * dt,
+                _ => f64::NAN,
+            }
+        } else {
+            // 경로 B — vernal node crossing 간격.
+            // z_rel 부호 변경을 상향(ascending node) 2회 사이 간격 측정.
+            let mut prev_z = {
+                let (_, _, _, rz) = rel_state(sys);
+                rz
+            };
+            let mut first_node_step: Option<usize> = None;
+            let mut second_node_step: Option<usize> = None;
+
+            for step_idx in 0..total_steps {
+                sys.step(dt);
+                let (_, _, _, curr_z) = rel_state(sys);
+                // 승교점: prev_z < 0 && curr_z >= 0 (ascending node).
+                if prev_z < 0.0 && curr_z >= 0.0 {
+                    if first_node_step.is_none() {
+                        first_node_step = Some(step_idx);
+                    } else if second_node_step.is_none() {
+                        second_node_step = Some(step_idx);
+                        break;
+                    }
+                }
+                prev_z = curr_z;
+            }
+
+            match (first_node_step, second_node_step) {
+                (Some(s1), Some(s2)) => (s2 - s1) as f64 * dt,
+                _ => f64::NAN,
+            }
+        }
+    }
+
+    /// 달 교점역행 주기 측정 — 노드 벡터 `N = L × ẑ` 방위각 시간 선형 회귀.
+    ///
+    /// **반환 단위: 년 (years).** 음수 = 퇴행(retrograde, 정상 달 거동), 양수 = 전진.
+    ///
+    /// **상대 좌표계 (ADR Amendment)**: 모든 상태 벡터는 부모 행성 대비 상대치.
+    ///   r_rel = r_sat - r_parent ;  v_rel = v_sat - v_parent
+    ///   L = r_rel × v_rel
+    ///   N = L × ẑ (ecliptic plane 기준 승교점 방향)
+    ///
+    /// **Nyquist + smoothing** (ADR Amendment 2026-04-19): sample_interval_days 1.0 기본
+    /// (항성월 27.3 / 삭망월 29.5일 대비 Nyquist 여유), smoothing_window_days 180.0 기본
+    /// (173일 태양 섭동 주기 평활화).
+    #[allow(clippy::too_many_arguments)]
+    fn measure_node_regression_period(
+        sys: &mut NBodySystem,
+        satellite_idx: usize,
+        parent_idx: usize,
+        integration_years: f64,
+        sample_interval_days: f64,
+        smoothing_window_days: f64,
+        dt: f64,
+    ) -> f64 {
+        let total_time = integration_years * YEAR;
+        let sample_interval = sample_interval_days * DAY;
+        let total_steps = (total_time / dt) as usize;
+        let steps_per_sample = (sample_interval / dt).max(1.0) as usize;
+        let expected_samples = total_steps / steps_per_sample;
+
+        // 노드 방위각 계산 — 부모 대비 상대 좌표로 L, N 계산 후 atan2(Ny, Nx).
+        let node_azimuth = |sys: &NBodySystem| -> f64 {
+            let rx = sys.pos[3 * satellite_idx] - sys.pos[3 * parent_idx];
+            let ry = sys.pos[3 * satellite_idx + 1] - sys.pos[3 * parent_idx + 1];
+            let rz = sys.pos[3 * satellite_idx + 2] - sys.pos[3 * parent_idx + 2];
+            let vx = sys.vel[3 * satellite_idx] - sys.vel[3 * parent_idx];
+            let vy = sys.vel[3 * satellite_idx + 1] - sys.vel[3 * parent_idx + 1];
+            let vz = sys.vel[3 * satellite_idx + 2] - sys.vel[3 * parent_idx + 2];
+            // L = r × v
+            let lx = ry * vz - rz * vy;
+            let ly = rz * vx - rx * vz;
+            // N = L × ẑ = (ly, -lx, 0) — ẑ=(0,0,1) 와 외적. ASCII: Nx=ly, Ny=-lx.
+            // 실제 이것이 승교점 방향이 되려면 부호 규약에 주의.
+            // 표준 천체역학: N = ẑ × L = (-ly, lx, 0) (오른손 규칙).
+            let nx = -ly;
+            let ny = lx;
+            ny.atan2(nx)
+        };
+
+        // 샘플링 — (t_days, azimuth_rad) 시계열 수집 + 언래핑 (연속 브랜치).
+        let mut samples: Vec<(f64, f64)> = Vec::with_capacity(expected_samples);
+        let mut prev_azimuth = node_azimuth(sys);
+        samples.push((0.0, prev_azimuth));
+        let mut accumulated_wind = 0.0_f64; // 2π 래핑 보정 누적
+
+        for s in 1..=expected_samples {
+            for _ in 0..steps_per_sample {
+                sys.step(dt);
+            }
+            let raw = node_azimuth(sys);
+            // 연속 언래핑 — |Δ| > π 면 2π 보정.
+            let mut delta = raw - prev_azimuth;
+            while delta > std::f64::consts::PI {
+                delta -= 2.0 * std::f64::consts::PI;
+            }
+            while delta < -std::f64::consts::PI {
+                delta += 2.0 * std::f64::consts::PI;
+            }
+            accumulated_wind += delta;
+            let unwrapped = samples[0].1 + accumulated_wind;
+            let t_days = (s as f64 * steps_per_sample as f64 * dt) / DAY;
+            samples.push((t_days, unwrapped));
+            prev_azimuth = raw;
+        }
+
+        // Moving average smoothing — smoothing_window_days 창 크기.
+        let window_samples = (smoothing_window_days / sample_interval_days).max(1.0) as usize;
+        let smoothed: Vec<(f64, f64)> = if window_samples < 2 {
+            samples.clone()
+        } else {
+            let mut smooth = Vec::with_capacity(samples.len());
+            for i in 0..samples.len() {
+                let lo = i.saturating_sub(window_samples / 2);
+                let hi = (i + window_samples / 2 + 1).min(samples.len());
+                let win = &samples[lo..hi];
+                let avg_az = win.iter().map(|(_, a)| a).sum::<f64>() / win.len() as f64;
+                smooth.push((samples[i].0, avg_az));
+            }
+            smooth
+        };
+
+        // 선형 회귀 → angular_velocity (rad/day).
+        let n = smoothed.len() as f64;
+        let sum_t: f64 = smoothed.iter().map(|(t, _)| t).sum();
+        let sum_a: f64 = smoothed.iter().map(|(_, a)| a).sum();
+        let sum_tt: f64 = smoothed.iter().map(|(t, _)| t * t).sum();
+        let sum_ta: f64 = smoothed.iter().map(|(t, a)| t * a).sum();
+        let slope_rad_per_day = (n * sum_ta - sum_t * sum_a) / (n * sum_tt - sum_t * sum_t);
+
+        // 주기 (years) = 2π / |ω| / DAYS_PER_YEAR. 부호 유지하여 퇴행/전진 판정.
+        let days_per_year = YEAR / DAY; // 365.25
+        let period_days = 2.0 * std::f64::consts::PI / slope_rad_per_day.abs();
+        let period_years = period_days / days_per_year;
+        // 음의 drift (slope < 0) 면 퇴행 — 음수 반환.
+        if slope_rad_per_day < 0.0 {
+            -period_years
+        } else {
+            period_years
+        }
+    }
+
+    // ─── P8 #244 ─── 단위 테스트 3건 (D1 / D2 / D3) ────────────────────────
+
+    /// D1: 포보스 공전주기 ±1% (7h 39m 13.85s = 27540 s).
+    ///
+    /// 셋업: 화성 중심 2체 (화성 index=0, 포보스 index=1). simplified Keplerian
+    /// 근점 시작, vis-viva. 화성 μ = G × M_mars 로 독자 계산 (태양 무관).
+    #[test]
+    fn test_phobos_orbital_period() {
+        const MARS_MASS: f64 = 6.417e23; // kg
+        const PHOBOS_MASS: f64 = 1.0659e16; // kg
+        const PHOBOS_A: f64 = 9.376e6; // 장반경 9376 km = 9.376e6 m
+        const PHOBOS_E: f64 = 0.0151;
+        const PHOBOS_T_TRUE: f64 = 27540.0; // 7h 39m 13.85s in seconds (이슈 #244 DoD)
+
+        let mu = GRAVITATIONAL_CONSTANT * MARS_MASS;
+        let r_peri = PHOBOS_A * (1.0 - PHOBOS_E);
+        let v_peri = (mu * (2.0 / r_peri - 1.0 / PHOBOS_A)).sqrt();
+
+        // 화성은 원점 정지, 포보스는 +x 방향 r_peri, 속도 +y.
+        let mut sys = NBodySystem::new(
+            vec![MARS_MASS, PHOBOS_MASS],
+            vec![0.0, 0.0, 0.0, r_peri, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0, v_peri, 0.0],
+        );
+        sys.integrator = IntegratorKind::Yoshida4;
+
+        // dt=1s (포보스 T=27540s → 1궤도 27540 step. 3 orbits 탐색 윈도우 82620 step).
+        let measured = measure_moon_orbital_period(&mut sys, 0, 1, PHOBOS_T_TRUE, 1.0);
+        let rel_err = (measured - PHOBOS_T_TRUE).abs() / PHOBOS_T_TRUE;
+        println!(
+            "Phobos T: measured={:.2}s, true={:.2}s, rel_err={:.4}%",
+            measured,
+            PHOBOS_T_TRUE,
+            rel_err * 100.0
+        );
+        assert!(
+            measured.is_finite(),
+            "포보스 주기 측정 실패 (NaN) — 탐색 윈도우 내 근점 2회 미발견"
+        );
+        assert!(
+            rel_err < 0.01,
+            "포보스 주기 {:.2}s 가 이론 {:.2}s 대비 {:.2}% 오차 (허용 ±1%)",
+            measured,
+            PHOBOS_T_TRUE,
+            rel_err * 100.0
+        );
+    }
+
+    /// D2: 데이모스 공전주기 ±1% (30h 18m 43.2s = 109080 s).
+    ///
+    /// 저이심률 e=0.00033 → vernal node fallback 경로. ADR L52-54.
+    #[test]
+    fn test_deimos_orbital_period() {
+        const MARS_MASS: f64 = 6.417e23;
+        const DEIMOS_MASS: f64 = 1.4762e15; // kg (JPL Small-Body DB)
+        const DEIMOS_A: f64 = 2.3463e7; // 23463 km = 2.3463e7 m
+        const DEIMOS_E: f64 = 0.00033;
+        const DEIMOS_I_RAD: f64 = 1.791 * std::f64::consts::PI / 180.0; // 궤도 경사 1.791°
+        const DEIMOS_T_TRUE: f64 = 109080.0; // 30h 18m 43.2s in seconds
+
+        let mu = GRAVITATIONAL_CONSTANT * MARS_MASS;
+        let r_peri = DEIMOS_A * (1.0 - DEIMOS_E);
+        let v_peri_mag = (mu * (2.0 / r_peri - 1.0 / DEIMOS_A)).sqrt();
+
+        // 궤도 경사를 y 축 회전으로 구현 — 승교점 검출을 위해 z 성분 필요.
+        // 근점을 +x 축에 두되 궤도 평면이 x-y 에서 i 만큼 기울어짐.
+        // 속도는 (0, v·cos(i), v·sin(i)) — 상승 방향.
+        let mut sys = NBodySystem::new(
+            vec![MARS_MASS, DEIMOS_MASS],
+            vec![0.0, 0.0, 0.0, r_peri, 0.0, 0.0],
+            vec![
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                v_peri_mag * DEIMOS_I_RAD.cos(),
+                v_peri_mag * DEIMOS_I_RAD.sin(),
+            ],
+        );
+        sys.integrator = IntegratorKind::Yoshida4;
+
+        // dt=5s — 데이모스 T=109080s → 21816 step/orbit, 3 orbits 탐색 65448 step.
+        let measured = measure_moon_orbital_period(&mut sys, 0, 1, DEIMOS_T_TRUE, 5.0);
+        let rel_err = (measured - DEIMOS_T_TRUE).abs() / DEIMOS_T_TRUE;
+        println!(
+            "Deimos T: measured={:.2}s, true={:.2}s, rel_err={:.4}%",
+            measured,
+            DEIMOS_T_TRUE,
+            rel_err * 100.0
+        );
+        assert!(
+            measured.is_finite(),
+            "데이모스 주기 측정 실패 (NaN) — 탐색 윈도우 내 승교점 2회 미발견"
+        );
+        assert!(
+            rel_err < 0.01,
+            "데이모스 주기 {:.2}s 가 이론 {:.2}s 대비 {:.2}% 오차 (허용 ±1%)",
+            measured,
+            DEIMOS_T_TRUE,
+            rel_err * 100.0
+        );
+    }
+
+    /// D3: 달 교점역행 18.6년 ±5% (T_true = 18.613년, 음수 = 퇴행).
+    ///
+    /// 셋업: 태양(0) + 지구(1) + 달(2) 3체. simplified Keplerian 초기 조건.
+    /// ADR L77 A 옵션 (근점 시작 vis-viva) — 달도 secular 측정 목적상 위상 무관.
+    /// 3체 Newton 적분으로 태양 토크가 달 궤도면을 퇴행시키는 효과 재현 검증.
+    ///
+    /// 적분 5년 / dt=1h / Yoshida4 (심플렉틱 장기 안정) — ADR §예상 결과 준수.
+    #[test]
+    fn test_lunar_node_regression_period() {
+        const MOON_MASS: f64 = 7.342e22; // kg
+        const EARTH_A: f64 = 1.4960e11; // 지구 장반경 1 AU
+        const EARTH_E: f64 = 0.01671;
+        const MOON_A_GEOCENTRIC: f64 = 3.844e8; // 달 지심 장반경 384400 km
+        const MOON_E: f64 = 0.0549;
+        const MOON_I_RAD: f64 = 5.145 * std::f64::consts::PI / 180.0; // 황도 대비 5.145°
+        const LUNAR_NODE_PERIOD_YR_TRUE: f64 = -18.613; // 음수 = 퇴행 (역행)
+
+        let mu_sun = GRAVITATIONAL_CONSTANT * SUN_MASS;
+        let mu_earth = GRAVITATIONAL_CONSTANT * EARTH_MASS;
+
+        // 지구 근일점 시작 — +x 방향, 속도 +y.
+        let earth_r_peri = EARTH_A * (1.0 - EARTH_E);
+        let earth_v_peri = (mu_sun * (2.0 / earth_r_peri - 1.0 / EARTH_A)).sqrt();
+
+        // 달 지심 근점 — 지구 위치 기준 +x 방향으로 r_peri, 속도는 지구 속도 +
+        // 지심 궤도 속도 (cos i, sin i 로 5.145° 경사).
+        let moon_r_peri_geo = MOON_A_GEOCENTRIC * (1.0 - MOON_E);
+        let moon_v_peri_geo = (mu_earth * (2.0 / moon_r_peri_geo - 1.0 / MOON_A_GEOCENTRIC)).sqrt();
+
+        // 헬리오센트릭 좌표 — 태양 원점 정지.
+        let moon_x = earth_r_peri + moon_r_peri_geo;
+        let moon_y = 0.0;
+        let moon_z = 0.0;
+        let moon_vx = 0.0;
+        let moon_vy = earth_v_peri + moon_v_peri_geo * MOON_I_RAD.cos();
+        let moon_vz = moon_v_peri_geo * MOON_I_RAD.sin();
+
+        let mut sys = NBodySystem::new(
+            vec![SUN_MASS, EARTH_MASS, MOON_MASS],
+            vec![
+                0.0,
+                0.0,
+                0.0,
+                earth_r_peri,
+                0.0,
+                0.0,
+                moon_x,
+                moon_y,
+                moon_z,
+            ],
+            vec![
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                earth_v_peri,
+                0.0,
+                moon_vx,
+                moon_vy,
+                moon_vz,
+            ],
+        );
+        sys.integrator = IntegratorKind::Yoshida4;
+
+        // 5년 적분 / dt=3600s / sample 1day / smoothing 180day.
+        // 인자: (sys, satellite=달, parent=지구, years=5, sample=1day, smooth=180day, dt=3600s).
+        let measured_years =
+            measure_node_regression_period(&mut sys, 2, 1, 5.0, 1.0, 180.0, 3600.0);
+
+        let rel_err =
+            (measured_years - LUNAR_NODE_PERIOD_YR_TRUE).abs() / LUNAR_NODE_PERIOD_YR_TRUE.abs();
+        println!(
+            "Lunar node regression: measured={:.3}yr, true={:.3}yr, rel_err={:.2}%",
+            measured_years,
+            LUNAR_NODE_PERIOD_YR_TRUE,
+            rel_err * 100.0
+        );
+        assert!(
+            measured_years.is_finite(),
+            "달 노드 회귀 주기 측정 실패 (NaN)"
+        );
+        assert!(
+            measured_years < 0.0,
+            "달 노드 회귀 부호가 퇴행(-)이 아님: measured={:.3}yr (태양 토크 방향 오류 의심)",
+            measured_years
+        );
+        assert!(
+            rel_err < 0.05,
+            "달 노드 회귀 주기 {:.3}yr 가 이론 {:.3}yr 대비 {:.2}% 오차 (허용 ±5%)",
+            measured_years,
+            LUNAR_NODE_PERIOD_YR_TRUE,
+            rel_err * 100.0
+        );
+    }
 }
