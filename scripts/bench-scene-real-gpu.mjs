@@ -18,7 +18,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = join(__dirname, '..', 'docs', 'benchmarks');
 mkdirSync(outDir, { recursive: true });
 
-// Chromium GPU 활성 플래그 — 환경별 동작 편차 있음
+// Chromium GPU 활성 플래그 — 환경별 동작 편차 있음.
+// #235: vsync 우회(`--disable-frame-rate-limit` + `--disable-gpu-vsync`) 추가.
+// 실 GPU 성능 측정 목적인 이 스크립트에서 RAF 가 60/120Hz 에 페그되면 실제 GPU
+// 한계가 아니라 vsync 상한을 측정하게 된다. #234 (bench-p7-lens3d) 동일 교훈.
 const browser = await chromium.launch({
   headless: true,
   args: [
@@ -27,6 +30,8 @@ const browser = await chromium.launch({
     '--enable-gpu-rasterization',
     '--ignore-gpu-blocklist',
     '--enable-features=Vulkan',
+    '--disable-frame-rate-limit',
+    '--disable-gpu-vsync',
   ],
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
