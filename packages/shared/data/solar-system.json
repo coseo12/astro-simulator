@@ -106,6 +106,44 @@
       }
     },
     {
+      "id": "phobos",
+      "kind": "moon",
+      "nameKo": "포보스",
+      "nameEn": "Phobos",
+      "mass": 1.0659e16,
+      "radius": 1.1267e4,
+      "parentId": "mars",
+      "$comment": "JPL Small-Body Database, Mars satellite ephemeris (2026-01-01 평균 궤도 요소). a=9376km → AU 변환. 화성 중심 기준, 화성 적도면 기준 궤도 요소.",
+      "colorHint": { "hex": "#8A7560" },
+      "orbit": {
+        "semiMajorAxisAU": 6.26752e-5,
+        "eccentricity": 0.0151,
+        "inclinationDeg": 1.093,
+        "longitudeOfAscendingNodeDeg": 207.79,
+        "longitudeOfPerihelionDeg": 357.83,
+        "meanLongitudeDeg": 92.474
+      }
+    },
+    {
+      "id": "deimos",
+      "kind": "moon",
+      "nameKo": "데이모스",
+      "nameEn": "Deimos",
+      "mass": 1.4762e15,
+      "radius": 6.2e3,
+      "parentId": "mars",
+      "$comment": "JPL Small-Body Database, Mars satellite ephemeris (2026-01-01 평균 궤도 요소). a=23463km → AU 변환. 화성 중심 기준, 화성 적도면 기준 궤도 요소.",
+      "colorHint": { "hex": "#A89078" },
+      "orbit": {
+        "semiMajorAxisAU": 1.5684e-4,
+        "eccentricity": 0.00033,
+        "inclinationDeg": 1.791,
+        "longitudeOfAscendingNodeDeg": 24.525,
+        "longitudeOfPerihelionDeg": 285.16,
+        "meanLongitudeDeg": 220.48
+      }
+    },
+    {
       "id": "jupiter",
       "kind": "planet",
       "nameKo": "목성",

@@ -32,7 +32,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const benchDir = join(__dirname, '..', 'docs', 'benchmarks');
 mkdirSync(benchDir, { recursive: true });
 
-const browser = await chromium.launch();
+// #242 — vsync 페그 해소 (P8 선행 인프라).
+// 기존 baseline(#241, ubuntu median N=10) 은 페그 환경 기준이므로, 플래그 추가 후
+// `bench:baseline-remeasure` workflow_dispatch 재실행하여 baseline 재재측정 필요.
+// 선례: PR #234 (bench-p7-lens3d), PR #243 (bench-scene-real-gpu).
+const browser = await chromium.launch({
+  args: ['--disable-frame-rate-limit', '--disable-gpu-vsync'],
+});
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
 
