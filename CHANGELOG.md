@@ -3,6 +3,51 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.7.1] — 2026-04-19
+
+### Behavior Changes: None — 문서/인프라/정적 에러 해소만
+
+P7-E 후속 follow-up 5건 중 4건 완결 + pre-existing 정적 에러 2건 해소.
+앱 런타임 / 물리 식 / 기본 bench 동작 모두 불변.
+
+**#224 #226 P7-E follow-up 문서·주석·회귀 가드** (PR #233)
+
+- `docs/retrospectives/p7-retrospective.md`: `22개`/`21개` → 실측 15개 (편집 14 + utils 1) 정정
+- `§어려웠던 것 #6 numeric accuracy` 신설 — "회고·PR 에 개수/비율 기재 시 실측 후 기재" 원칙 박제
+- `apps/web/src/core/parse-gr-mode.test.ts` 사용자 실수 케이스 (on/true/gr/0/2/eih1pn/single1pn) 회귀 가드 +7 케이스
+- `apps/web/src/store/sim-store.ts` `__simStore` `configurable:true` HMR 근거 + `defineProperty` 사용 이유 주석 박제
+- `docs/decisions/README.md` §Amendments 표준 포맷 신설 (갱신 이력 테이블 컬럼 고정)
+- `docs/decisions/20260418-p7-integrator-upgrade.md` Phase C 진단 + CI 임계 2건 §Amendments 소급 시범 적용
+
+**#223 bench-p7-lens3d vsync 페그 해소 + DoD 재조정** (PR #234)
+
+- 원인: headless chromium RAF 상한(120Hz vsync) 으로 측정값 stdev ≈ 0 (ray3d 연산 부하 미반영)
+- `scripts/bench-p7-lens3d.mjs` launch args 에 `--disable-frame-rate-limit` + `--disable-gpu-vsync` 추가
+- `pressTimePlay` import (`skipIfAbsent:true` — `?bh=2&ray3d=1` 기본 자동 재생 회귀 가드 목적)
+- 리포트 JSON 에 `stdev_ratio = stdev/avg` 필드 신설 (GPU 속도 독립 지표)
+- **DoD 재조정** (사용자 합의): `stdev_ms > 0.5ms` → `stdev_ratio > 1%` (M1 Pro Metal ~1200fps 에서 절대 stdev 원천 도달 불가)
+- 3위치 박제: 이슈 #223 body / 스크립트 주석 / PR 본문
+- 새 baseline: `docs/benchmarks/p7-lens3d-2026-04-19T04-03-10-225Z.json` (avg 0.920ms · stdev_ratio 2.61% · fps 1088)
+
+**#225 baseline 재측정 workflow + median aggregator (설계 PR)** (PR #238)
+
+- `.github/workflows/bench-baseline-remeasure.yml` 신설 — `workflow_dispatch` 수동 트리거, plan → bench (matrix N 병렬) → aggregate (median + PR 자동 생성) 3 job
+- `scripts/bench-aggregate-median.mjs` (의존성 0, stand-alone) — 여러 회차 JSON 을 median 으로 집계
+- `scripts/bench-aggregate-median.test.mjs` 회귀 가드 **8/8 PASS**
+- `docs/benchmarks/README.md` 재측정 절차 문서화
+- 도구 도입만 — 실제 baseline 갱신은 본 릴리스 후 사용자 수동 트리거 → 자동 PR
+
+**#236 #237 pre-existing typecheck/lint 해소** (PR #239)
+
+- `packages/core/src/gpu/nbody-force-shader.test.ts`: `noUncheckedIndexedAccess` TS2532/TS2345 해소 (non-null assertion, Float32Array 길이 6 정적 보장)
+- `apps/web/src/components/panels/black-hole-disk-panel.tsx`: `useState + useEffect + window.location.search` → `nuqs useQueryState('bh')` (url-sync 패턴 일관, react-hooks/set-state-in-effect 해소)
+- 브라우저 smoke: `?bh=2&mode=research` panel visible=true 회귀 없음 확인
+
+### 후속 OPEN (priority:low)
+
+- #219 iOS Safari 실기기 bench (P14 배포 이후)
+- #235 vsync 우회 플래그 다른 bench 스크립트로 확산
+
 ## [0.7.0] — 2026-04-18
 
 ### P7 — 트랙 B 3D ray + 적분기 격상 (Yoshida 4차)

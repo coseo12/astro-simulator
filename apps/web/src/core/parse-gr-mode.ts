@@ -10,7 +10,9 @@
  *   - `1`   → `single-1pn` (P5-A 호환 유지)
  *   - `1pn` → `single-1pn`
  * - 미지정(null/undefined/'') → `'off'` (기본값)
- * - 알 수 없는 값 → `'off'` 폴백 + `console.warn`
+ * - 알 수 없는 값 → `'off'` 폴백 + `console.warn` (#226-1)
+ *   - 사용자 실수 케이스(`on`, `true`, `gr`, `0`, `2`, `eih1pn`, `single1pn` 등)도 동일 폴백.
+ *   - 신규 별칭 도입 시 반드시 `parse-gr-mode.test.ts` 실수 케이스 목록과 교차 검토 (충돌 방지).
  * - 대소문자 무시 (volt #21 — `?integrator` 와 정책 정렬; EIH / 1PN / Off 등 사용자 입력 허용)
  *
  * 런타임 핫스왑은 비지원. 이 파서는 초기화 시점에 1회만 호출된다.

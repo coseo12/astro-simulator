@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { parseAsString, useQueryState } from 'nuqs';
 import { useSimStore } from '@/store/sim-store';
 
 /**
@@ -10,16 +10,18 @@ import { useSimStore } from '@/store/sim-store';
  * sim-canvas useEffect가 createBlackHoleRendering handles의 setDisk* 메서드를 호출.
  *
  * LUT 재생성 0회 — eccentricity/thickness/tilt/inner/outer 모두 셰이더 uniform만 갱신.
+ *
+ * #237 — `useQueryState` 로 URL 파라미터 구독 (`url-sync.tsx` 일관). 이전의
+ * useState+useEffect+window.location 조합은 SSR-safe 목적이었으나 react-hooks
+ * lint 규칙 위반 + 수동 파싱 부채가 있었다. nuqs 는 SSR 에서 null 반환하므로
+ * 동일 hydration 안전성 유지.
  */
 export function BlackHoleDiskPanel() {
   const params = useSimStore((s) => s.blackHoleDisk);
   const setParam = useSimStore((s) => s.setBlackHoleDiskParam);
   const reset = useSimStore((s) => s.resetBlackHoleDisk);
 
-  const [bhMode, setBhMode] = useState<string | null>(null);
-  useEffect(() => {
-    setBhMode(new URLSearchParams(window.location.search).get('bh'));
-  }, []);
+  const [bhMode] = useQueryState('bh', parseAsString.withOptions({ history: 'replace' }));
 
   // ?bh=2 옵트인일 때만 패널 표시 (P5-D `?bh=1`은 별도 PostProcess).
   if (bhMode !== '2') return null;

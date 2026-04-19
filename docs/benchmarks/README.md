@@ -54,3 +54,23 @@ git add docs/benchmarks/baseline.json && git commit -m "bench: baseline 갱신 (
 ## CI 연동
 
 `.github/workflows/bench.yml` — PR 이벤트에서 sweep을 실행해 baseline 대비 diff를 sticky comment로 게시한다 (best-effort). 헤드리스 GitHub Actions runner의 GPU 변동성이 크므로 임계값을 `-10 fps`로 완화하며, 정식 성능 게이트는 로컬 실 GPU 측정(#116, `scripts/bench-scene-real-gpu.mjs`)을 기준으로 한다.
+
+### baseline 재측정 — `bench:baseline-remeasure` (#225)
+
+헤드리스 ubuntu 환경과 기존 baseline 사이의 구조적 편차로 `bench.yml` 이 특정 scenario(예: focus-earth/neptune) 에서 반복 경고를 띄우면, `.github/workflows/bench-baseline-remeasure.yml` 을 **수동 트리거** 하여 ubuntu 환경 median 으로 재설정한다.
+
+```
+GitHub → Actions → bench:baseline-remeasure → Run workflow
+  inputs:
+    sample_count: "10"     # 3 이상 권장
+    phase_label: "remeasure"
+    target_branch: "develop"
+```
+
+동작:
+
+1. `plan` job 이 `sample_count` 를 검증하고 matrix 배열을 생성
+2. `bench` job 이 matrix 로 **N 회 병렬** `bench:scene:sweep` 실행 → 각 회차 JSON 아티팩트 업로드
+3. `aggregate` job 이 모든 아티팩트 다운로드 → `scripts/bench-aggregate-median.mjs` 로 median 계산 → `baseline.json` 덮어쓰기 → `chore/baseline-remeasure-<run_id>` 브랜치에 PR 자동 생성
+
+새 baseline 에는 `source_count` 와 각 항목의 `samples` 필드가 추가되어 재측정 근거를 추적 가능.
