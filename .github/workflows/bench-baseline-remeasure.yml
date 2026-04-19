@@ -1,0 +1,203 @@
+name: bench:baseline-remeasure
+
+# #225 — GH Actions ubuntu headless 환경에서 bench:scene:sweep 를 N 회 실행하고
+# 각 scenario/nBody 의 중앙값으로 `docs/benchmarks/baseline.json` 을 갱신하는 PR 을
+# 자동 생성한다. `workflow_dispatch` 로 수동 트리거.
+#
+# 근거: PR #222 CI 에서 focus-earth/focus-neptune 이 -33.7%/-37.7% 경고 반복 — 환경
+#       격차(헤드리스 swiftshader vs 원본 baseline 환경) 흡수가 목적. #225 DoD 매핑.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample_count:
+        description: '집계할 회차 수 (기본 10, 최소 3)'
+        default: '10'
+        type: string
+      phase_label:
+        description: 'baseline.phase 필드 값'
+        default: 'remeasure'
+        type: string
+      target_branch:
+        description: 'PR base 브랜치 (기본 develop)'
+        default: 'develop'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+    steps:
+      - name: 회차 배열 생성
+        id: build
+        env:
+          SAMPLE_COUNT: ${{ inputs.sample_count }}
+        run: |
+          COUNT="${SAMPLE_COUNT:-10}"
+          if [ "$COUNT" -lt 3 ]; then
+            echo "::error::sample_count 는 최소 3 이상이어야 한다 (현재: $COUNT)"
+            exit 1
+          fi
+          # node 런타임으로 통일 (Reviewer 권고 3, SHA=62d9323)
+          ARR=$(node -e "console.log(JSON.stringify(Array.from({length: ${COUNT}}, (_,i) => i+1)))")
+          echo "matrix=$ARR" >> "$GITHUB_OUTPUT"
+          echo "sample_count=$COUNT"
+
+  bench:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        run: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright 브라우저 설치
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 앱 빌드
+        run: pnpm build
+
+      - name: 웹 서버 기동 (백그라운드)
+        run: |
+          pnpm --filter @astro-simulator/web start -p 3001 &
+          echo "WEB_PID=$!" >> $GITHUB_ENV
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            sleep 2
+          done
+
+      - name: bench:scene:sweep (run ${{ matrix.run }})
+        env:
+          BENCH_PHASE: remeasure-run-${{ matrix.run }}
+        run: pnpm bench:scene:sweep
+
+      - name: 리포트 JSON 수거
+        run: |
+          mkdir -p /tmp/bench-run-${{ matrix.run }}
+          # 이 회차에서 갱신된 JSON 만 분리 (git status 기준 새 파일).
+          # `.json` 확장자 필터로 향후 BENCH_SUMMARY_OUT 류 부산물 오수거 방어
+          # (Reviewer 권고 1).
+          git ls-files --others --exclude-standard docs/benchmarks/ \
+            | grep -E '\.json$' \
+            | xargs -I{} cp {} /tmp/bench-run-${{ matrix.run }}/ || true
+          ls -la /tmp/bench-run-${{ matrix.run }}
+
+      - name: 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-run-${{ matrix.run }}
+          path: /tmp/bench-run-${{ matrix.run }}/*.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 서버 종료
+        if: always()
+        run: kill $WEB_PID || true
+
+  aggregate:
+    needs: bench
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 전체 아티팩트 다운로드
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/bench-artifacts
+          pattern: bench-run-*
+          merge-multiple: true
+
+      - name: aggregate 실행 → baseline.json 갱신
+        env:
+          PHASE_LABEL: ${{ inputs.phase_label }}
+        run: |
+          ls -la /tmp/bench-artifacts
+          node scripts/bench-aggregate-median.mjs \
+            --input-dir /tmp/bench-artifacts \
+            --phase "${PHASE_LABEL}" \
+            --environment "gh-actions-ubuntu-chromium-headless" \
+            --output docs/benchmarks/baseline.json
+
+      - name: aggregate 단위 테스트 (회귀 가드)
+        run: node scripts/bench-aggregate-median.test.mjs
+
+      - name: baseline 갱신 PR 생성
+        uses: peter-evans/create-pull-request@v7
+        with:
+          base: ${{ inputs.target_branch }}
+          branch: chore/baseline-remeasure-${{ github.run_id }}
+          commit-message: |
+            chore(bench): #225 GH Actions ubuntu baseline 재측정 (median N=${{ inputs.sample_count }})
+
+            source_count=${{ inputs.sample_count }} · phase=${{ inputs.phase_label }}
+            집계 근거: scripts/bench-aggregate-median.mjs
+            트리거: run_id=${{ github.run_id }}
+          title: 'chore(bench): #225 baseline 재측정 (ubuntu median N=${{ inputs.sample_count }})'
+          body: |
+            ## Summary
+
+            `bench-baseline-remeasure` workflow 가 ubuntu-latest × ${{ inputs.sample_count }} 회 `bench:scene:sweep` 실측을 집계해
+            각 scenario / nBody 의 **중앙값** 으로 `docs/benchmarks/baseline.json` 을 갱신.
+
+            - trigger: `workflow_dispatch`
+            - run_id: ${{ github.run_id }}
+            - phase: `${{ inputs.phase_label }}`
+            - sample_count: ${{ inputs.sample_count }}
+            - environment: `gh-actions-ubuntu-chromium-headless`
+
+            ## Test plan
+
+            - [ ] 새 baseline 대비 `bench.yml` (PR 이벤트) 회귀 경고 0건 확인
+            - [ ] diff 검토 — scenario 별 변동률이 환경 격차 범위 내 (±10% 권장)
+            - [ ] Reviewer / QA 통과 후 머지
+
+            Closes #225
+          labels: |
+            type:infra
+            priority:low
+          delete-branch: true
