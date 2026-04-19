@@ -28,7 +28,15 @@ function maxRelativeError(
 }
 
 describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
-  const system = getSolarSystem();
+  // P8 #244: 포보스/데이모스 추가로 체 수가 11 로 증가 시 1년 적분 오차 누적이 1e-9 임계
+  // 초과 (포보스 주기 7.65h × dt=10min sub-step → 1144 주기/년 × 46 sub-step/주기 = 5e4+
+  // step 누적). 본 테스트의 **원 의도는 9체 대칭성 검증** 이므로 화성 위성은 명시적 제외.
+  // 위성 전체 N-body 검증은 P8 PR-2 의 Rust `measure_moon_orbital_period` 에서 수행.
+  const fullSystem = getSolarSystem();
+  const system = {
+    ...fullSystem,
+    bodies: fullSystem.bodies.filter((b) => b.id !== 'phobos' && b.id !== 'deimos'),
+  };
   const initial = buildInitialState(system, system.epoch);
   const AU = 1.495_978_707e11;
 
