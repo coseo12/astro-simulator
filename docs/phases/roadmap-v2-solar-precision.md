@@ -22,17 +22,19 @@ v2 는 **태양계 정밀도·시각 원칙·기술 부채**를 먼저 정리한
 
 ## Phase 개요
 
-| Phase   | 테마                        | 규모  | 상태        | 비고                                                                         |
-| ------- | --------------------------- | ----- | ----------- | ---------------------------------------------------------------------------- |
-| **P10** | Fact Audit + 시각 원칙 정비 | 9~13d | **진행 중** | 상위 원칙 박제 + 데이터 감사 + `educational`/`scientific` 토글 + 정확도 이슈 |
-| **P11** | Visual Foundation           | 6~10d | 계획 중     | Floating Origin + LOD 3단계 + distance scale + **tier preset 1급 설계**      |
-| **P12** | Texture Pipeline            | 5~8d  | 계획 중     | 30+ body PBR + normalMap + cloud layer + ring detail (Cassini 간극 등)       |
-| **P13** | 토성계                      | 5~7d  | 계획 중     | 주요 위성 9 (Titan/Enceladus 등) + 고리 정밀화 + 공명 구조                   |
-| **P14** | 천왕성·해왕성계             | 4~6d  | 계획 중     | 주요 위성 각 5~6 + 자전축 기울기 특성 + 고리 암고리                          |
-| **P15** | 소행성대 + 카이퍼대         | 5~8d  | 계획 중     | JPL SBDB 수십만 샘플 + BH N-body 폴백 + GPU compute 통합                     |
-| **P16** | 배포 + 기술 부채 청산       | 3~5d  | 계획 중     | Vercel/Netlify 공식 배포 + CI 성능 게이트 + `docs/reports/` 자동 갱신        |
+| Phase   | 테마                        | 규모    | 상태        | 비고                                                                         |
+| ------- | --------------------------- | ------- | ----------- | ---------------------------------------------------------------------------- |
+| **P10** | Fact Audit + 시각 원칙 정비 | 9~13d   | **진행 중** | 상위 원칙 박제 + 데이터 감사 + `educational`/`scientific` 토글 + 정확도 이슈 |
+| **P11** | Visual Foundation           | 6~10d\* | 계획 중     | Floating Origin + LOD 3단계 + distance scale + **tier preset 1급 설계**      |
+| **P12** | Texture Pipeline            | 5~8d    | 계획 중     | 30+ body PBR + normalMap + cloud layer + ring detail (Cassini 간극 등)       |
+| **P13** | 토성계                      | 5~7d    | 계획 중     | 주요 위성 9 (Titan/Enceladus 등) + 고리 정밀화 + 공명 구조                   |
+| **P14** | 천왕성·해왕성계             | 4~6d    | 계획 중     | 주요 위성 각 5~6 + 자전축 기울기 특성 + 고리 암고리                          |
+| **P15** | 소행성대 + 카이퍼대         | 5~8d    | 계획 중     | JPL SBDB 수십만 샘플 + BH N-body 폴백 + GPU compute 통합                     |
+| **P16** | 배포 + 기술 부채 청산       | 3~5d    | 계획 중     | Vercel/Netlify 공식 배포 + CI 성능 게이트 + `docs/reports/` 자동 갱신        |
 
 **총: 32~47 영업일**
+
+> \* **P11 일정 경고** (Gemini 2차 교차검증 수용, 2026-04-20): Floating Origin + LOD 3단계 + tier preset 이 **아키텍처 근간 변경 3건** 을 동시 포함. 6~10d 는 기준 추정이며, **PM 착수 시 Floating Origin 복잡도 실측 기반 재조정** 필수. 이는 낙관적 일정 편향 방어를 위한 구조적 경고.
 
 ---
 
@@ -173,4 +175,6 @@ tier 감지는 `navigator.gpu` + `GPUAdapter.requestAdapterInfo()` + `devicePixe
 
 ## §Amendments
 
-(없음 — 초판)
+| 날짜       | 변경 요약                                                                                           | 근거 PR/이슈                  |
+| ---------- | --------------------------------------------------------------------------------------------------- | ----------------------------- |
+| 2026-04-20 | P11 일정에 "\*" 각주 + PM 착수 시 재조정 필수 경고 — Gemini 2차 교차검증 낙관적 일정 편향 징후 수용 | 본 PR (P10-A 보강) / volt #29 |
