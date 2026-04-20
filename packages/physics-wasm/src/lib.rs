@@ -13,6 +13,7 @@ pub mod barnes_hut;
 pub mod geodesic;
 pub mod integrator;
 pub mod nbody;
+pub mod satellites;
 
 use barnes_hut::engine::BarnesHutSystem;
 use integrator::IntegratorKind;
@@ -176,6 +177,37 @@ impl BarnesHutEngine {
     }
 }
 
+// P9 #254 — Osculating 원소 추출 (Galilean 동적 동기화용).
+// Float64Array 7 원소 순서 박제: [a, e, i, Ω, ω, M, singularity].
+// serde-wasm-bindgen 의 struct export 대신 flat Vec<f64> 선택 — 1Hz polling ×
+// 4 Galilean 당 호출 시 직렬화/역직렬화 부담 최소화.
+// ADR `docs/decisions/20260420-p9-galilean-laplace-rings.md` L213~L226.
+#[wasm_bindgen]
+pub fn extract_osculating_elements(
+    pos_x: f64,
+    pos_y: f64,
+    pos_z: f64,
+    vel_x: f64,
+    vel_y: f64,
+    vel_z: f64,
+    mu_parent: f64,
+) -> Vec<f64> {
+    let el = satellites::osculating::extract_osculating_elements(
+        [pos_x, pos_y, pos_z],
+        [vel_x, vel_y, vel_z],
+        mu_parent,
+    );
+    vec![
+        el.semi_major_axis,
+        el.eccentricity,
+        el.inclination,
+        el.longitude_of_ascending_node,
+        el.argument_of_periapsis,
+        el.mean_anomaly,
+        f64::from(el.singularity),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,5 +215,20 @@ mod tests {
     #[test]
     fn add_basic() {
         assert_eq!(add(1.5, 2.25), 3.75);
+    }
+
+    /// WASM bridge flat 배열 길이·필드 순서 박제 (ADR L226).
+    #[test]
+    fn osculating_wasm_export_length_and_order() {
+        let mu_jupiter = 6.67430e-11 * 1.8982e27;
+        // Europa 장반경·원순환 → singularity=1 경로.
+        let r: f64 = 671_100_000.0;
+        let v = (mu_jupiter / r).sqrt();
+        let out = extract_osculating_elements(r, 0.0, 0.0, 0.0, v, 0.0, mu_jupiter);
+        assert_eq!(out.len(), 7, "WASM export 는 길이 7 flat 배열");
+        assert!((out[0] - r).abs() / r < 1e-6, "a 복원 오차");
+        assert!(out[1] < 1e-6, "e<1e-6 기대");
+        // singularity flag
+        assert_eq!(out[6], 1.0, "원순환에서 singularity=1");
     }
 }
