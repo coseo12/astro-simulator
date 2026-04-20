@@ -153,12 +153,20 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           writable: false,
         });
         useSimStore.getState().setIntegrator(integrator);
+        // P9 #254 PR-2.5 — ?ring=shader|fallback|placeholder URL 옵트인.
+        //   shader (기본): `densityProfile[]` uniform + GLSL 선형 보간 (Halo/Main/Gossamer 구분)
+        //   fallback: M1 InstancedMesh 입자 분포 (shader 실패 시 자동 전환 또는 수동 테스트)
+        //   placeholder: PR-1 단색 disk (회귀 검증)
+        const ringParam = new URLSearchParams(window.location.search).get('ring');
+        const ringRenderMode: 'shader' | 'fallback' | 'placeholder' =
+          ringParam === 'fallback' || ringParam === 'placeholder' ? ringParam : 'shader';
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
           grMode,
           integrator,
+          ringRenderMode,
         });
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
