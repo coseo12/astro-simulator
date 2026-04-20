@@ -57,20 +57,20 @@ P9 (#254) 는 P8 (내행성계 위성) 직후 태양계 공전행성 위성 계�
 
 ### 2. 고리 shader 방사밀도 표현 (D6)
 
-| 축 / 후보                          | (a) `densityProfile: [r, d]` 배열 상수 (uniform)     | (b) LUT texture (1D texture, 256px)                      | (c) fragment shader 분기문 `if (r < r1) ... else if ...` |
-| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| **shader 복잡도**                  | ⭐ uniform 배열 + 선형 보간                          | △ texture sampling 필요 (mipmap 고려)                    | ⭐ if-else 3분기                                         |
-| **P10 토성 확장성**                | ⭐ Cassini 간극 등 급변 구조는 배열 길이만 늘리면 됨 | ⭐⭐ Cassini 간극·F 링 등 정밀 구조를 LUT 에 그대로 박제 | ✗ 분기 수 폭증, shader 가독성 붕괴                       |
-| **파라미터 인터페이스**            | JSON `densityProfile[]` 직접 전달, bindgen 부담 없음 | JSON → Float32Array 변환 + GPU 업로드 필요               | JSON `innerRadius`/`outerRadius` × N 구조체              |
-| **런타임 비용**                    | per-fragment 선형 보간 O(log N)                      | per-fragment texture fetch                               | per-fragment 분기 (GPU 분기 페널티)                      |
-| **디버깅 용이성**                  | ⭐ JSON 값 변경 → 즉시 반영                          | △ LUT 재생성 파이프라인 필요                             | ⭐ 분기 식 직접 수정                                     |
-| **M1 백업 (InstancedMesh) 호환성** | ⭐ 동일 배열을 입자 밀도로 변환 가능                 | △ texture → CPU 읽기 왕복                                | ✗ 분기 식은 InstancedMesh 와 매핑 불일치                 |
+| 축 / 후보                     | (a) `densityProfile: [r, d]` 배열 상수 (uniform)     | (b) LUT texture (1D texture, 256px)                      | (c) fragment shader 분기문 `if (r < r1) ... else if ...` |
+| ----------------------------- | ---------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
+| **shader 복잡도**             | ⭐ uniform 배열 + 선형 보간                          | △ texture sampling 필요 (mipmap 고려)                    | ⭐ if-else 3분기                                         |
+| **P10 토성 확장성**           | ⭐ Cassini 간극 등 급변 구조는 배열 길이만 늘리면 됨 | ⭐⭐ Cassini 간극·F 링 등 정밀 구조를 LUT 에 그대로 박제 | ✗ 분기 수 폭증, shader 가독성 붕괴                       |
+| **파라미터 인터페이스**       | JSON `densityProfile[]` 직접 전달, bindgen 부담 없음 | JSON → Float32Array 변환 + GPU 업로드 필요               | JSON `innerRadius`/`outerRadius` × N 구조체              |
+| **런타임 비용**               | per-fragment 선형 보간 O(log N)                      | per-fragment texture fetch                               | per-fragment 분기 (GPU 분기 페널티)                      |
+| **디버깅 용이성**             | ⭐ JSON 값 변경 → 즉시 반영                          | △ LUT 재생성 파이프라인 필요                             | ⭐ 분기 식 직접 수정                                     |
+| **M1 백업 (SPS 입자) 호환성** | ⭐ 동일 배열을 입자 밀도로 변환 가능                 | △ texture → CPU 읽기 왕복                                | ✗ 분기 식은 SPS 입자 밀도 매핑 불일치                    |
 
 **결정**: **(a) `densityProfile: [r_normalized, density]` 배열 상수 (uniform) + fragment shader 선형 보간** 채택.
 
-근거: (1) P10 토성 Cassini 간극·F 링은 배열 길이만 늘려 표현 가능 — Q2=c "P10 재사용 전제" 에 정확히 부합. (2) LUT(b) 는 3층 goss 고리엔 과잉, 텍스처 업로드 파이프라인이 Osculating polling 과 경합할 위험. (3) 분기문(c) 은 확장성 제로. (4) **M1 백업**: shader 실패 시 `densityProfile` 을 그대로 InstancedMesh 입자 `position.random(r ∈ [r_i, r_{i+1}] with prob ∝ d_i)` 로 변환 — 즉시 전환 가능.
+근거: (1) P10 토성 Cassini 간극·F 링은 배열 길이만 늘려 표현 가능 — Q2=c "P10 재사용 전제" 에 정확히 부합. (2) LUT(b) 는 3층 goss 고리엔 과잉, 텍스처 업로드 파이프라인이 Osculating polling 과 경합할 위험. (3) 분기문(c) 은 확장성 제로. (4) **M1 백업**: shader 실패 시 `densityProfile` 을 그대로 Babylon `SolidParticleSystem` 입자 `position.random(r ∈ [r_i, r_{i+1}] with prob ∝ d_i)` 로 변환 — 즉시 전환 가능.
 
-배열 형식: `[[r0, d0], [r1, d1], ..., [rN, dN]]` 단, `r_i` 는 `(r_inner + r_outer) / 2` 에 대해 정규화된 [0, 1] 구간 값. `d_i` 는 0~1 density. Halo/Main/Gossamer 세 층은 **각각 독립 shader instance** (3개의 disk mesh) — 층간 alpha blending 은 three.js 기본 transparent 처리.
+배열 형식: `[[r0, d0], [r1, d1], ..., [rN, dN]]` 단, `r_i` 는 `(r_inner + r_outer) / 2` 에 대해 정규화된 [0, 1] 구간 값. `d_i` 는 0~1 density. Halo/Main/Gossamer 세 층은 **각각 독립 shader instance** (3개의 disk mesh) — 층간 alpha blending 은 Babylon.js `Material.alpha` + `needAlphaBlending` 기본 transparent 파이프라인 처리.
 
 ### 3. Osculating 변환 특이점 처리 (D7)
 
@@ -91,8 +91,8 @@ P9 (#254) 는 P8 (내행성계 위성) 직후 태양계 공전행성 위성 계�
 
 | 축 / 후보                              | (a) 독립 PR-2.5                                                                           | (b) PR-3 통합                                                   |
 | -------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| **리뷰 범위**                          | ⭐ shader 전용 리뷰 — WebGL/Three.js 전문성 독립 판정                                     | ✗ TS 통합 + UI + shader 가 한 PR 에 뒤엉킴 (800 라인 이상 예상) |
-| **M1 백업 전환 비용**                  | ⭐ PR-2.5 에서 shader 실패 시 InstancedMesh 로 전환 후 다음 PR 진행 — 독립 롤백           | ✗ shader 실패가 UI 구현 작업 전체 블록                          |
+| **리뷰 범위**                          | ⭐ shader 전용 리뷰 — WebGL/Babylon.js 전문성 독립 판정                                   | ✗ TS 통합 + UI + shader 가 한 PR 에 뒤엉킴 (800 라인 이상 예상) |
+| **M1 백업 전환 비용**                  | ⭐ PR-2.5 에서 shader 실패 시 Babylon SPS 입자로 전환 후 다음 PR 진행 — 독립 롤백         | ✗ shader 실패가 UI 구현 작업 전체 블록                          |
 | **headless + 실 Chrome 검증 분리**     | ⭐ PR-2.5 단독 시각 검증 1회 (volt #33 준수)                                              | △ PR-3 에 포함되나 UI 검증과 섞임                               |
 | **Phase 분리 릴리스 리듬 (CLAUDE.md)** | ⭐ backward-compat — PR-1/2 만 배포되어도 플레이스홀더 disk 작동. PR-2.5 는 shader 교체만 | △ shader + UI 동시 릴리스                                       |
 | **의존성 그래프**                      | PR-1 JSON → PR-2 Rust → PR-2.5 shader ← → PR-3 TS (PR-2.5/PR-3 병렬 가능)                 | 직렬 체인                                                       |
@@ -228,6 +228,8 @@ pub fn extract_osculating_elements(
 ### TS — `packages/core/src/scene/ring-shader.ts` (신규)
 
 ```ts
+import type { Mesh, Scene, ShaderMaterial, TransformNode } from '@babylonjs/core';
+
 export interface RingShaderParams {
   innerRadius: number; // m
   outerRadius: number; // m
@@ -235,23 +237,23 @@ export interface RingShaderParams {
   densityProfile: Array<[number, number]>;
   /** RGB(a) tint. 기본 #887766 (Jupiter ring dust) */
   color?: [number, number, number];
-  /** three.js Scene 추가용 mesh. ADR 결정 #2: 3 층은 각각 독립 RingMesh */
-  createMesh(parent: THREE.Object3D): THREE.Mesh;
+  /** Babylon.js 부모 노드 (호스트 행성 mesh 또는 TransformNode). ADR 결정 #2: 3 층은 각각 독립 RingMesh */
+  createMesh(parent: TransformNode | Scene): Mesh;
 }
 
 /**
- * 고리 fragment shader 기반 렌더.
+ * 고리 fragment shader 기반 렌더 (Babylon.js `ShaderMaterial`).
  *
  * ADR 결정 #2: uniform `densityProfile` 배열 + fragment 선형 보간.
- *   fragment:
+ *   fragment (GLSL):
  *     float r_norm = (length(vUv.xy - 0.5) * 2.0 - r_inner) / (r_outer - r_inner);
  *     float d = interpLinear(densityProfile, r_norm);
  *     gl_FragColor = vec4(color * d, d);   // alpha = density
  *
  * **M1 백업 경로** (R1 완화): `?ring=fallback` URL 플래그 또는 shader 컴파일 실패 탐지 시
- * `InstancedMesh` 입자로 자동 전환. `densityProfile` 를 그대로 입자 density 로 사용.
+ * Babylon `SolidParticleSystem` (SPS) 입자로 자동 전환. `densityProfile` 를 그대로 입자 density 로 사용.
  */
-export function createRingShaderMaterial(params: RingShaderParams): THREE.ShaderMaterial;
+export function createRingShaderMaterial(params: RingShaderParams): ShaderMaterial;
 ```
 
 ### TS — `apps/web/src/hooks/use-osculating-sync.ts` (신규)
@@ -395,7 +397,7 @@ const CelestialBodyRawSchema = z.object({
 PR-1 (infra + JSON + placeholder)
   ├─ solar-system.json Galilean 4체 + Jupiter.rings 추가
   ├─ zod 스키마 rings 확장
-  └─ 플레이스홀더 단색 disk (Three.js CircleGeometry)
+  └─ 플레이스홀더 단색 disk (Babylon `MeshBuilder.CreateDisc`)
 
   ↓ blocks
 
@@ -426,9 +428,9 @@ PR-2.5 (shader 교체)     PR-3 (TS 통합 + UI + 회고)
 2. headless pixel assertion 실패 후 실 Chrome 검증 1회 불합격
 3. URL 수동 플래그 `?ring=fallback` 존재
 
-**전환 로직**: `createRingShaderMaterial` 내부에서 `try { ... } catch` 로 shader 실패 감지. 실패 시 `createRingInstancedMesh(params)` 대체 호출. `densityProfile` 배열을 그대로 입자 density 로 사용 — rejection sampling 으로 각 반경에 비례 입자 분포. 층당 2000 particles (3층 × 2000 = 6000, 60fps 예산 내).
+**전환 로직**: `createRingShaderMaterial` 내부에서 `try { ... } catch` 로 shader 실패 감지. 실패 시 `createRingParticleSystem(params)` (Babylon `SolidParticleSystem` 기반) 대체 호출. `densityProfile` 배열을 그대로 입자 density 로 사용 — rejection sampling 으로 각 반경에 비례 입자 분포. 층당 2000 particles (3층 × 2000 = 6000, 60fps 예산 내).
 
-**박제 위치**: PR-2.5 `ring-shader.ts` 내 `createRingInstancedMesh` 함수 + `scripts/verify-ring-shader.mjs` 의 실패 시 자동 전환 로그.
+**박제 위치**: PR-2.5 `ring-shader.ts` 내 `createRingParticleSystem` 함수 + `scripts/verify-ring-shader.mjs` 의 실패 시 자동 전환 로그.
 
 ### R2: Osculating polling fps 자동 폴백
 
@@ -477,7 +479,7 @@ PR-2.5 (shader 교체)     PR-3 (TS 통합 + UI + 회고)
 | 2   | Laplace 위상 진폭 peak-to-peak 측정 ±2° 초과                                   | (a) peak 검출 오류 의심 — std 비교로 확인 (std×√2 ≈ peak-to-peak/2 여야 함). 불일치 시 (c) FFT 전환 검토. Rust `rustfft` crate 도입 ADR 신규 필요   |
 | 3   | Osculating 왕복 오차 > 1e-10                                                   | (a) 특이점 가드 조건 완화 (1e-6 → 1e-5), (b) Equinoctial 원소 우회 도입 — 별도 ADR                                                                  |
 | 4   | fps<45 가 10Hz 폴백에서도 지속                                                 | polling subset 전환 — 4 Galilean 중 selected 1체만 동기화. URL `?osc=io-only` 플래그                                                                |
-| 5   | shader 3차 이상 실패 (실 Chrome 수동 검증 포함)                                | M1 InstancedMesh 전환 + 차후 WebGPU 쉐이더 재도전 (P12+ 범위)                                                                                       |
+| 5   | shader 3차 이상 실패 (실 Chrome 수동 검증 포함)                                | M1 Babylon SPS 입자 전환 + 차후 WebGPU 쉐이더 재도전 (P12+ 범위)                                                                                    |
 | 6   | 200 주기 잔차가 100 주기 대비 >50% 증가                                        | Yoshida 4차 secular drift 한계 — P7 ADR §재검토 트리거 #6 경로로 RK8 ADR 착수                                                                       |
 | 7   | `?mass=jupiter×N` 조작 시 Galilean 외 외행성 궤도에도 영향 관측 (비-범위 침범) | `?mass` 스코프를 `jupiter` 로 한정하는 URL 파라미터 재설계 — 별도 이슈                                                                              |
 
@@ -503,6 +505,7 @@ PR-2.5 (shader 교체)     PR-3 (TS 통합 + UI + 회고)
 
 본 ADR 의 수치·임계·DoD 갱신 이력. 포맷 규약: `docs/decisions/README.md` §Amendments.
 
-| 날짜 | 변경 요약                     | 근거                             |
-| ---- | ----------------------------- | -------------------------------- |
-| —    | (본 ADR 초판 박제, 변경 없음) | PR-3 병합 후 실측 기반 수정 예정 |
+| 날짜       | 변경 요약                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | 근거                                                                                                                                                                                                                        |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —          | (본 ADR 초판 박제, 변경 없음)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | PR-3 병합 후 실측 기반 수정 예정                                                                                                                                                                                            |
+| 2026-04-20 | **Babylon.js 스택 정정 (Three.js 가정 폐기)** — §인터페이스 박제의 `ring-shader.ts` 타입 참조 (`THREE.Object3D/Mesh/ShaderMaterial`) 를 `@babylonjs/core` (`TransformNode`/`Scene`/`Mesh`/`ShaderMaterial`) 로 교체. alpha blending 설명·§PR 분할 그래프의 placeholder 스택·§R1 M1 백업 경로의 `InstancedMesh` 가정을 Babylon `SolidParticleSystem` (SPS) 로 정정. 실제 프로젝트 의존성은 `packages/core/package.json @babylonjs/core` 이며, Three.js 는 도입된 적 없음. 본 정정은 **문서 only** — PR-2.5 shader 구현 착수 시 잘못된 가정 근거로 시간 낭비를 차단 | PR #258 리뷰어 피드백 (blocker C1). `packages/core/src/scene/solar-system-scene.ts` 실측 결과 Babylon 스택 확인. Three.js 참조는 4 위치 (L73/L238~239/L254/L398) + 연관 M1 백업 경로 용어 (L67/L71/L95/L431/L433/L482) 정리 |

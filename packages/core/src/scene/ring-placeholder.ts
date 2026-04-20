@@ -94,7 +94,7 @@ export function createRingPlaceholder(
     // 호스트 부모-자식 관계로 위치 자동 추종.
     disc.parent = host;
 
-    // 여러 층을 약간씩 z-offset 해 z-fighting 방지 (idx 당 0.001 AU ≈ 150000 km — 충분히 작음)
+    // 여러 층을 약간씩 z-offset 해 z-fighting 방지 (idx 당 1e-4 AU ≈ 14960 km — 충분히 작음)
     disc.position.y = idx * 1e-4;
 
     meshes.push(disc);
