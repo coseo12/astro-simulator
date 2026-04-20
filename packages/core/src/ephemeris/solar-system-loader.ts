@@ -16,6 +16,23 @@ const OrbitalElementsRawSchema = z.object({
   meanLongitudeDeg: z.number(),
 });
 
+/**
+ * P9 #254 — 목성 고리 3층 (Halo/Main/Gossamer) 데이터 스키마.
+ *
+ * densityProfile 튜플: [r_normalized ∈ [0,1], density ∈ [0,1]]
+ *   - r_normalized: (r - innerRadius) / (outerRadius - innerRadius)
+ *   - density: 방사 밀도 상대값 (shader alpha 에 직접 매핑)
+ *
+ * ADR `docs/decisions/20260420-p9-galilean-laplace-rings.md` §결정 #2 참조.
+ * P10 토성(카시니 간극 등) 재사용 전제 — 층 수·배열 길이는 행성별로 유연.
+ */
+const RingLayerRawSchema = z.object({
+  id: z.string().min(1),
+  innerRadiusKm: z.number().positive(),
+  outerRadiusKm: z.number().positive(),
+  densityProfile: z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2),
+});
+
 const CelestialBodyRawSchema = z.object({
   id: z.string().min(1),
   kind: z.enum([
@@ -43,6 +60,11 @@ const CelestialBodyRawSchema = z.object({
       temperatureK: z.number().optional(),
     })
     .optional(),
+  /**
+   * P9 #254 — 행성 고리 데이터 (선택). 목성/토성/천왕성/해왕성 전용.
+   * 없으면 undefined → 고리 렌더 스킵.
+   */
+  rings: z.array(RingLayerRawSchema).optional(),
 });
 
 const SolarSystemRawSchema = z.object({
@@ -69,6 +91,17 @@ export interface LoadedOrbitalElements {
   epoch: number; // JD
 }
 
+/**
+ * P9 #254 — 고리 1층 로드 결과. 반경은 km → m 로 환산.
+ * densityProfile 은 원본 그대로 (정규화된 r, density 튜플 배열).
+ */
+export interface LoadedRingLayer {
+  id: string;
+  innerRadius: number; // m
+  outerRadius: number; // m
+  densityProfile: ReadonlyArray<readonly [number, number]>;
+}
+
 export interface LoadedCelestialBody {
   id: string;
   kind: string;
@@ -79,6 +112,8 @@ export interface LoadedCelestialBody {
   parentId: string | null;
   orbit?: LoadedOrbitalElements;
   colorHint?: { hex?: string | undefined; temperatureK?: number | undefined };
+  /** P9 #254 — 고리 3층 (목성·토성 등). 없으면 undefined. */
+  rings?: ReadonlyArray<LoadedRingLayer>;
 }
 
 export interface LoadedSolarSystem {
@@ -117,6 +152,17 @@ export function loadSolarSystem(): LoadedSolarSystem {
       radius: b.radius,
       parentId: b.parentId,
       ...(b.colorHint ? { colorHint: b.colorHint } : {}),
+      // P9 #254 — 고리 3층 (km → m 변환). densityProfile 는 정규화된 튜플이라 단위 변환 불필요.
+      ...(b.rings
+        ? {
+            rings: b.rings.map((r) => ({
+              id: r.id,
+              innerRadius: r.innerRadiusKm * 1000,
+              outerRadius: r.outerRadiusKm * 1000,
+              densityProfile: r.densityProfile.map(([rn, d]) => [rn, d] as const),
+            })),
+          }
+        : {}),
     };
 
     if (!b.orbit) return base;
