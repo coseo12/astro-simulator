@@ -52,7 +52,12 @@ page.on('response', (resp) => {
   }
 });
 
-/** 고리 주밍 공통 유틸 — 카메라 회전까지 포함해 3 band 측면 가시성 확보 */
+/**
+ * 고리 주밍 공통 유틸 — 카메라 회전까지 포함해 3 band 측면 가시성 확보.
+ *
+ * rotate=true 기본값은 S1/S2/S3 전부 동일하게 고정 — 3 시나리오를 같은 카메라
+ * 포즈에서 비교 가능하게 만들기 위한 의도 (placeholder 회귀 가드 S3 포함).
+ */
 async function focusAndZoom(page, { rotate = true } = {}) {
   const focusBtn = await page.$('[data-testid="focus-jupiter"]');
   if (focusBtn) {
@@ -101,6 +106,10 @@ const fpsResult = await page.evaluate(async () => {
     samples.push(engine.getFps());
     await new Promise((r) => setTimeout(r, 200));
   }
+  // 엔진 초기화 지연/탭 비활성화 등 edge — 빈 samples 방어
+  if (samples.length === 0) {
+    return { err: 'no fps samples collected (engine stall?)' };
+  }
   const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
   const min = Math.min(...samples);
   const max = Math.max(...samples);
@@ -148,7 +157,8 @@ const totalErrors = Object.values(results).reduce(
 );
 const fpsOk = fpsResult.avg !== undefined && fpsResult.avg >= 55;
 if (totalErrors > 0 || !fpsOk) {
-  console.log(`FAIL — errors=${totalErrors}, fps_ok=${fpsOk}`);
+  const fpsReason = fpsResult.err ? ` (fps_err: ${fpsResult.err})` : '';
+  console.log(`FAIL — errors=${totalErrors}, fps_ok=${fpsOk}${fpsReason}`);
   process.exit(1);
 }
 console.log('PASS — 3 시나리오 + fps 60 유지');
