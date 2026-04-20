@@ -37,7 +37,7 @@
 | **P10-A**   | 원칙 박제 + 로드맵 v2 재작성 + 모바일 보류 ADR + CLAUDE.md 참조 | 1d   | 없음                   |
 | **P10-B**   | 데이터 감사 — IAU 2015 전수 대조 + 필드 확장                    | 3~5d | A 선행                 |
 | **P10-C**   | 디폴트 `educational` 모드 + 토글 + 배지 + 온보딩 + 크레딧 뷰    | 2~3d | B 선행                 |
-| **P10-D**   | 정확도 이슈 소화 (#261 / #263 / #255)                           | 2~3d | **C 직렬 (병렬 금지)** |
+| **P10-D**   | 정확도 이슈 소화 (#261 / #263 / #255)                           | 2~3d | **C 선행 (병렬 금지)** |
 | **P10-D.5** | 물리 수정 후 벤치마크 회귀 측정                                 | 1d   | D 선행                 |
 
 **총: 9~13d**
@@ -54,6 +54,7 @@
 - [ ] `docs/decisions/YYYYMMDD-mobile-support-suspension.md` — 보류 결정 + **재도전 조건** + **Graceful Degradation UX** + **tier preset 전략 초안**
 - [ ] `CLAUDE.md` 프로젝트 섹션 (managed-block 외부) 에 `docs/principles/fact-first.md` 참조 링크 한 줄 추가 (하네스 업스트림 충돌 방지)
 - [ ] ADR 작성 규약 준수 — 배경 / 후보 비교 / 결정 / 결과·재검토 조건 / **재도입 트리거** / **Graceful Degradation UX** 섹션
+- [ ] 기존 `docs/phases/roadmap.md` (v1, "관측가능우주" 체계) 를 `docs/phases/roadmap-v1-cosmic-scale.md` 로 rename + 상단에 v2 안내 블록 + 양방향 링크 박제 (v1/v2 공존 시 현행 재발견 비용 제거)
 
 ### P10-B — 데이터 감사
 
@@ -73,7 +74,7 @@
 - [ ] 모드 토글 UI — 헤더 또는 설정 패널, 키보드 단축키 (권고: `m`)
 - [ ] 첫 진입 온보딩 툴팁 — "현재 시각적 이해를 위해 천체 크기가 N배 과장되어 있습니다. [실제 비율로 보기]"
 - [ ] 데이터 출처/라이선스 크레딧 뷰 — IAU/NASA attribution 고지 (`About` 모달 또는 설정 패널)
-- [ ] `scientific` 모드 작동 검증 — 시각 스케일 1.0 에서 행성이 sub-pixel 이 되어도 "깨진 것 아님" 안내 (빈 화면 이탈 방지)
+- [ ] `scientific` 모드 빈 화면 이탈 방지 안내 — 뷰포트에 `data-testid="scientific-mode-notice"` 노드 존재 + `?mode=scientific` 최초 진입 시 자동 표시 + 사용자 dismiss 가능 (localStorage 키 `astro:scientific-notice-dismissed`)
 - [ ] 3단계 브라우저 검증 (CRITICAL #3) — 정적 / 인터랙션 / 흐름
 
 ### P10-D — 정확도 이슈 소화
@@ -117,6 +118,15 @@ Gemini 교차검증 결과 6건 즉시 반영:
 
 - Low-End GPU Profile → P11 tier preset 설계에 흡수 (모바일 분기 승격)
 
+### 이견 수용 4건 (Claude 설계 → Gemini 지적 수용)
+
+cross-validate 3단 프로토콜 추적성 확보 차원에서 본체 박제 (volt #29 기준):
+
+1. **디폴트 모드 프레이밍** — Claude: "디폴트 `scientific` (사실 모드)" / Gemini: "1.0 스케일 → 행성 sub-pixel → 이탈 리스크". 수용 → 디폴트 `educational` + 1-클릭/1-URL 사실 모드 접근 보장으로 조정 (원칙 문구 대신 운영 해석으로 원칙 유지)
+2. **P10-C / P10-D 병렬화** — Claude: "독립 작업으로 병렬 가능" / Gemini: "과장 모드 변경과 물리 수정 결합 → 회귀 원인 추적 불가". 수용 → C 선행 (병렬 금지) 직렬화
+3. **P10-B 일정 3d** — Claude: 3d 고정 / Gemini: "body 50+ 전수 IAU 대조는 리서치 시간 가중, 낙관적". 수용 → 3~5d 확장
+4. **모바일 폐기 프레이밍** — Claude: "영구 폐기" / Gemini: "기술 성숙도는 시간 함수, 죽은 코드 부채화 방지 필요". 수용 → "무기한 중단 + 재도전 조건 ADR" 로 프레이밍 변경
+
 ## 의존 관계
 
 ```
@@ -148,6 +158,8 @@ P10-D.5 (벤치 회귀)
 | 모바일 ADR          | `docs/decisions/YYYYMMDD-mobile-support-suspension.md` (P10-A) |
 | 로드맵 v2 갱신      | `docs/phases/roadmap-v2-solar-precision.md` (P10-A, 신규)      |
 | CLAUDE.md 참조 링크 | 프로젝트 섹션 (managed-block 외부, P10-A)                      |
+
+> **ADR 파일명 `YYYYMMDD` 치환 규약**: P10-A 착수일(모바일 보류 ADR 작성 시점)의 ISO 날짜로 치환. 예: 2026-04-21 착수 → `docs/decisions/20260421-mobile-support-suspension.md`. CLAUDE.md `## 아키텍처 결정 기록 (ADR)` 규약 준수.
 
 ## 참고
 
