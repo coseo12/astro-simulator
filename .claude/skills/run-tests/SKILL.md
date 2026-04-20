@@ -186,10 +186,108 @@ kill $DEV_PID
 - 스크린샷 (모바일 + 데스크톱)
 - 핵심 사용자 흐름 성공 여부
 
+## 장기 테스트 이원화 (volt #54) — 일상 경로 5분 내 완주
+
+장기 적분 / E2E / 외부 리소스 호출 / stress 테스트가 일상 테스트 경로에 혼재하면 TDD 루프가 교착된다. **장기 테스트는 `#[ignore]` 류 어트리뷰트로 분리 + CI 에 독립 job (`continue-on-error: true`) 구성**. 일상 경로 5분 내 완주를 보장하는 규범.
+
+### 마킹 규약 (언어별)
+
+| 언어/프레임워크 | 마킹 | CI 실행 |
+|---|---|---|
+| Rust | `#[ignore = "<사유>; run with --include-ignored in CI"]` | `cargo test --lib -- --include-ignored` |
+| Jest/Vitest | 파일명 suffix `*.slow.test.ts` + config 프로젝트 분리 / 또는 `describe.skip`·`it.skip` + `RUN_SLOW` env 조건 분기 | `RUN_SLOW=1 vitest` / `vitest --project slow` (config 에 `testMatch` / `include` 분리) |
+| pytest | `@pytest.mark.slow` (conftest 에서 `--run-slow` 훅) | `pytest --run-slow` |
+| Go | `t.Skip(...)` + build tag `//go:build slow` | `go test -tags slow ./...` |
+| JUnit (Java) | `@Tag("slow")` + Maven `-DexcludedGroups=slow` | Maven profile 전환 |
+
+**공통 원칙**:
+- 사유 문자열 필수 — 재현 조건 박제 (예: `"long-integration"` / `"e2e"` / `"requires-network"`)
+- 규약 문구 통일 — `grep` 검색 용이. 프로젝트 상단 주석에 사용 태그 목록 명시
+
+### CI 워크플로 이원화 패턴
+
+```yaml
+jobs:
+  test-fast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: cargo-fast-${{ hashFiles('Cargo.lock') }}   # 빠른 경로 전용 키
+      - run: cargo test --release --lib
+    # 실패 시 PR 차단
+
+  test-long-integration:
+    runs-on: ubuntu-latest
+    continue-on-error: true    # 빠른 경로 실패 시만 머지 차단
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: cargo-long-${{ hashFiles('Cargo.lock') }}   # 장기 경로 전용 키 (접두사 다름)
+      - run: cargo test --release --lib -- --include-ignored
+    # 실패는 nightly 알림 / 대시보드만
+```
+
+**핵심 제약**: 두 job 의 `actions/cache` **`key` 접두사를 다르게** 명시적으로 설정 (예: `cargo-fast-*` / `cargo-long-*`). GitHub Actions `actions/cache` 는 동일 `key` 시 job 간 캐시 공유가 기본이므로, 별도 접두사로 **명시적 분리** 하지 않으면 빠른 경로 재실행이 장기 경로 cache 를 무효화한다. 기본 동작 아님 — 명시적 설정 필수.
+
+### 재발 감지 신호 (정기 감사 항목)
+
+- 로컬 일상 테스트 경로가 이전 대비 **5배+ 소요**
+- CI 빠른 경로 캐시 무효화 빈도 증가
+- 개발자가 전체 테스트 없이 **개별 테스트만 실행하는 습관** 형성 (빠른 경로 신뢰 저하 신호)
+- Rust 의 경우 `target/debug/` 디렉토리 크기 폭증 (동시 test binary 누적 — volt #52 좀비 누적과 연쇄)
+
+### 주의사항
+
+- **`#[ignore]` 남용 경계** — "불편한 테스트" 를 숨기는 용도로 쓰면 장기 경로가 커버리지 블랙홀이 된다. 사유 문자열 + CI 실측 시간 기록 필수
+- **CI 장기 경로 모니터링** — `continue-on-error: true` 는 빠른 경로 **보호** 일 뿐. 장기 실패를 오래 방치하지 않도록 dashboard / nightly 알림 필수
+- **남용 방지 regression 가드**: 전체 테스트 개수 대비 ignore 비율이 일정 임계값 (예: 20%) 을 넘으면 재평가. ignore 목록을 주기적으로 훑어 "이제 빠른 경로로 돌려도 되는가" 재분류
+- **cross-compile 경로**: `#[cfg(not(target_arch = "wasm32"))]` 등과 조합 시 CI matrix 확장 영향 확인
+
+### 실측 사례
+
+volt [#54](https://github.com/coseo12/volt/issues/54) — astro-simulator P9 M4: 6건 `#[ignore]` 적용으로 **30분+ 교착 → 9.27s (200× 단축, 5분 목표의 32× 여유)**. CI `--include-ignored` 경로는 216.9s (3분 36초) 로 독립 실행. 대상: `mercury_perihelion_precession_eih` / `yoshida_mercury_perihelion_regression` / `earth_perihelion_eih_within_5_percent` 등 100+ 년 적분 테스트.
+
+## Flaky 진단 루트 (volt #50) — concurrency=1 누르기 금지
+
+병렬 테스트 flaky 발견 시 `--test-concurrency=1` / `--jobs 1` / CI retry 플래그로 **누르는 것은 증상 마스킹**. 근본 원인은 보통 공유 리소스 / 카테고리 오분류 / I/O race 이고, 임시 조치는 (1) 실행 시간 수배 증가 (2) 근본 원인 은폐 (3) 다른 flaky 감지 능력 저하 세 단점. **실패 시 stderr 에서 영향받은 객체를 특정** 하여 원인 추적으로 바로 연결한다.
+
+### 진단 6단계 (재사용 가능)
+
+1. **병렬 반복 실행 + stderr 수집** — 10~20회 돌려 실패율 + 실패 시 출력 패턴 기록 (1~2회 통과는 증명 부족)
+2. **실패 시 영향받은 객체 특정** — stderr / assert 메시지에서 파일명/키/리소스 이름 추출
+3. **이름 패턴 분석** — 공통 접두사 / 디렉토리 / 카테고리 (예: "실패 파일이 전부 `.claude/logs/` 하위")
+4. **해당 객체의 분기 결과 확인** — categorize 류 함수 / configuration lookup / dispatch table 에 직접 입력해 실제 반환값 확인
+5. **주석 계약 / 문서 규칙 대조** — "주석이 선언한 동작 = 구현" 이 아니면 drift 발견 (관련 교훈: CLAUDE.md "주석 계약 vs 구현 drift")
+6. **수정 + 회귀 가드** — **8회 이상 연속 병렬 통과** 실측 (timing 문제의 불확실성 고려 시 충분한 샘플). 임시 조치 제거한 상태에서 확인
+
+### 수용 기준 (근본 해소 실증)
+
+- **8회 이상 연속 병렬 실행 0 실패**
+- **임시 조치 제거 상태에서 통과** — concurrency=1, retry, skip 등 완화 수단 없이
+- **실행 시간 회복** — 누르기 전 수준 (또는 더 빠르게)
+
+### 안티패턴 (모두 금지)
+
+| 안티패턴 | 이유 |
+|---|---|
+| `--test-concurrency=1` 으로 직행 | 증상 마스킹 + 실행 시간 수배 증가 + 다른 flaky 은폐 |
+| CI `retry` 플래그 추가 | CI 시간 증가 + 진짜 실패 탐지 지연 |
+| `skip` / `xfail` 마킹 | 근본 원인을 영구 은폐 |
+| "우선순위 low" 방치 | 1 라인 수정으로 60~80% 단축될 수 있는 이득 상실 |
+
+### 근거
+
+volt [#50](https://github.com/coseo12/volt/issues/50) — harness v2.24.0 (#153) → v2.25.0 (#157) 에서 병렬 flaky 75% 실패율을 `--test-concurrency=1` 로 눌러 6s → 18s 역행했다가, stderr 의 `.claude/logs/` 파일 경로 단서로 categorize 주석-구현 drift 식별 → 1 라인 수정으로 7.5s 로 회복 + 8회 연속 병렬 통과 확인.
+
 ## 규칙
 
 - 테스트 실행 전 의존성이 설치되어 있는지 확인한다.
 - 전체 테스트 실행이 너무 오래 걸리면 변경 관련 테스트만 먼저 실행한다.
 - 환경 변수가 필요한 테스트는 `.env.example` 등을 참고하여 설정한다.
-- flaky 테스트는 3회 재시도 후에도 실패하면 보고한다.
+- flaky 테스트는 3회 재시도 후에도 실패하면 **위 Flaky 진단 루트로 근본 원인 추적** (concurrency=1 누르기 금지). 우선순위 low 방치도 금지.
 - **UI 프로젝트는 E2E 테스트를 생략하지 않는다.**

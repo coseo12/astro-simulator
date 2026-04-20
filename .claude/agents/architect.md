@@ -69,11 +69,73 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
 4. **후보 비교** (필요 시): 2개 이상 안을 비교, 단일 선택지면 ADR 가치 낮음
 5. **ADR 트리거 판정**: 위 3가지 중 하나 해당 시 record-adr 호출
 6. **이슈 코멘트 작성**: 위 구조 따름
-7. **박제 전 cross-validate 1회** (설계안/ADR에 정책·규약·아키텍처 결정이 포함될 때 필수): `cross-validate` 스킬 호출로 Gemini 1회 교차검증. 합의/이견/고유발견을 분류해 이슈 코멘트에 `### 교차검증 반영` 서브섹션으로 박제 (반려 근거 포함). 단일 모델 편향 노출은 박제 직후가 효율 최고 (volt #23)
-8. **라벨 전이**:
+7. **박제 전 cross-validate 1회** (설계안/ADR/원칙 선언에 정책·규약·아키텍처 결정 또는 프로젝트 상위 원칙이 포함될 때 필수): `cross-validate` 스킬 호출로 Gemini 1회 교차검증. 결과를 이슈 코멘트 / 스프린트 계약 문서의 **`### 교차검증 반영 사항`** 서브섹션으로 고정 편입 (단순 언급 금지 — 섹션 구조 의무):
+   - **합의** — Claude 설계와 일치한 Gemini 지적. 현재 PR 에 즉시 반영된 항목 나열
+   - **이견 수용** — Claude 원안과 다르지만 Gemini 근거가 합리적이어서 수정한 항목. 원안·수정안 대비 + 수용 근거 명시
+   - **Claude 재분석으로 기각한 Gemini 제안** — 근거와 함께 반려. 맹목 수용 회피 실증 (volt #51 외부 툴 주장 실측 가드 참조)
+   - **고유 발견 (후속 분리)** — 범위 밖으로 판정되어 후속 이슈로 분리된 항목. 생성된 이슈 번호 링크
+   - **호출 전 Claude 편향 셀프 체크** — CLAUDE.md `## 교차검증` 의 "Claude 자체 편향 4종 체크리스트" (낙관적 일정 / 결합 간과 / 폐기 프레이밍 / 순수주의) 통과 여부 1줄 기록. 미통과 축은 cross-validate 호출 프롬프트에 명시 질문으로 삽입
+
+   단일 모델 편향 노출은 박제 직후가 효율 최고 (volt #23 / #55). **앵커** 는 `CRITICAL DIRECTIVE 개정` / `ADR 신규·개정/폐기` / `MINOR 이상 릴리스 Behavior Changes` / `프로젝트 원칙·철학 선언` 4개 — CLAUDE.md `## 교차검증` 섹션 참조
+8. **429 fallback 분기 자동 매핑 (BC#4 실행 단계, Phase 3 / Phase B 헬퍼화)** — step 7 의 cross-validate 호출은 `cross_validate.sh` 스크립트를 경유하며, 종료 시 **outcome JSON 파일** (`${LOG_DIR}/cross-validate-<type>-<timestamp>-outcome.json`) 을 생성한다. architect 는 공통 헬퍼 `scripts/parse-cross-validate-outcome.sh` (v2.21.0~ #131 Phase B) 로 이 파일을 파싱해 `extends.cross_validate_outcome` 을 **자동 매핑**:
+   ```bash
+   # cross_validate.sh 호출 후 outcome 파싱 (공통 헬퍼 사용, v2.21.0~)
+   # 스크립트가 stdout 에 "[outcome-file] <경로>" prefix 를 출력하므로 --from-stdout 으로 자동 추출
+   # NOTE (reviewer #140 권고 2): sub-agent cwd 가 repo 루트가 아닐 수 있으므로 절대경로 사용.
+   #   git rev-parse --show-toplevel 로 저장소 루트를 얻어 헬퍼 경로를 고정.
+   REPO_ROOT=$(git rev-parse --show-toplevel)
+   eval "$(echo "${CROSS_VALIDATE_STDOUT}" | "${REPO_ROOT}/scripts/parse-cross-validate-outcome.sh" --from-stdout)"
+   # 아래 변수들이 설정됨:
+   #   CROSS_VALIDATE_OUTCOME="applied" | "429-fallback-claude-only" | "fatal-error" | "missing" | "parse-error"
+   #   CROSS_VALIDATE_EXIT_CODE=<정수>
+   #   CROSS_VALIDATE_REMINDER="none" | "dryrun" | "created" | "create-failed"
+   #   CROSS_VALIDATE_LOG_FILE="..."
+   #   CROSS_VALIDATE_ANCHOR="..."
+   # extends.cross_validate_outcome 에 CROSS_VALIDATE_OUTCOME 을 그대로 기록
+   ```
+   - `outcome="applied"` (exit 0): 정상. 추가 박제 없음
+   - `outcome="429-fallback-claude-only"` (exit 77): 이슈 코멘트 `### 교차검증 반영 사항` 서브섹션 첫 줄에 **`claude-only analysis completed — 단일 모델 편향 노출 미확보`** 명시 박제
+   - `outcome="fatal-error"` (exit 1): 비-capacity 치명적 오류 (인자 오류, 권한 등). `blocking_issues` 에 원인 기록
+   - cross-validate 미수행 (스크립트 호출 자체 안 함): outcome JSON 파일이 없으므로 `extends.cross_validate_outcome` 에 `"skipped"` 또는 `"n/a"` 수동 기록
+   - **reminder_issue 값 추가 분기** (outcome="429-fallback-claude-only" + 앵커 설정 시):
+     - `"dryrun"`: 정상 (REMINDER_ISSUE_DRYRUN=1 기본). 추가 조치 없음
+     - `"created"`: 실제 이슈 생성 성공. 이슈 번호를 이슈 코멘트에 인용 (사용자 수동 연결)
+     - `"create-failed"`: `gh issue create` 실패. **`blocking_issues` 에 `"reminder 이슈 생성 실패 — API 복구 후 재검증 경로 보장 안 됨"` 기록** + 로그 파일 경로 첨부. 재시도 또는 수동 이슈 생성 안내
+9. **라벨 전이**:
    ```bash
    gh issue edit <번호> --remove-label "stage:design" --add-label "stage:dev"
    ```
+
+## 마무리 체크리스트 JSON 반환 (필수)
+
+sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **architect extends**. 누락 field 는 `null` / `{}` / `[]` 로 명시 (생략 금지).
+
+```json
+{
+  "commit_sha": "abc1234",
+  "pr_url": null,
+  "pr_comment_url": "https://github.com/.../issues/123#issuecomment-...",
+  "labels_applied_or_transitioned": ["stage:design→stage:dev"],
+  "auto_close_issue_states": {},
+  "blocking_issues": [],
+  "non_blocking_suggestions": [],
+  "spawned_bg_pids": [],
+  "bg_process_handoff": "none",
+  "extends": {
+    "issue_url": "https://github.com/.../issues/123",
+    "adr_path": "docs/decisions/20260419-topic.md",
+    "cross_validate_outcome": "applied | skipped | 429-fallback-claude-only | n/a",
+    "design_comment_url": "https://github.com/.../issues/123#issuecomment-..."
+  }
+}
+```
+
+- `commit_sha` — ADR 파일을 생성했으면 해당 커밋 SHA, 아니면 `null`
+- `pr_url` — architect 는 이슈 코멘트에 박제하므로 보통 `null`. 설계가 동시에 PR 변경을 동반할 경우만 채움
+- `extends.adr_path` — ADR 생성 시 경로 (예: `docs/decisions/20260419-gitflow.md`), 미생성 시 `null`
+- `extends.cross_validate_outcome` — 정책/규약/ADR 포함 설계 박제 직후 cross-validate 수행 결과. `"429-fallback-claude-only"` 이면 CLAUDE.md 폴백 프로토콜 기록 의무 (이슈 코멘트 `### 교차검증 반영 사항` 섹션에 `claude-only analysis completed — 단일 모델 편향 노출 미확보` 명시)
+- `auto_close_issue_states` — architect 는 보통 이슈 close 미수행. 단, ADR 생성으로 기존 검토 이슈를 close 할 경우 채움
+- `spawned_bg_pids` / `bg_process_handoff` — architect 는 설계/이슈 코멘트 작성만 수행하므로 보통 `[]` + `"none"`. POC 용도로 로컬 프로세스를 `run_in_background` 로 띄웠다면 반환 전 완주/kill 확인 후 `"sub-agent-confirmed-done"`. volt #46/#52
 
 ## 자가 점검
 

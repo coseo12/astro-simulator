@@ -71,23 +71,35 @@ gh pr checkout <PR번호>
 
 ## 마무리 체크리스트 JSON 반환 (필수)
 
-sub-agent 종료 전 반드시 아래 JSON을 반환한다. 메인 컨텍스트 구두 보고만으로 종료 금지 — **PR 본문 박제**가 QA 산출의 SSoT. 누락 시 메인이 직접 박제 후 본 에이전트를 감점 처리 (volt #24).
+sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **qa extends**. 메인 컨텍스트 구두 보고만으로 종료 금지 — **PR 본문 박제**가 QA 산출의 SSoT. 누락 시 메인이 직접 박제 후 본 에이전트를 감점 처리 (volt #24).
 
 ```json
 {
+  "commit_sha": null,
   "pr_url": "https://github.com/.../pull/123",
   "pr_comment_url": "https://github.com/.../pull/123#issuecomment-...",
-  "label_transition": {"from": "stage:qa", "to": "stage:done"},
-  "build_ok": true,
-  "tests": {"passed": 12, "failed": 0},
-  "browser_levels_passed": [1, 2, 3],
-  "contract_unmet": [],
-  "verdict": "pass"
+  "labels_applied_or_transitioned": ["stage:qa→stage:done"],
+  "auto_close_issue_states": {},
+  "blocking_issues": [],
+  "non_blocking_suggestions": [],
+  "spawned_bg_pids": [],
+  "bg_process_handoff": "sub-agent-confirmed-done",
+  "extends": {
+    "build_ok": true,
+    "tests": {"passed": 12, "failed": 0},
+    "browser_levels_passed": [1, 2, 3],
+    "contract_unmet": [],
+    "verdict": "pass"
+  }
 }
 ```
 
 - `pr_comment_url` 이 `null` 이면 **박제 누락** — 종료 금지, `gh pr comment <번호>` 재실행
-- `verdict` 가 `"block"` 이면 `contract_unmet` 에 실패 기준을 나열하고 원인+수정점 명시
+- `extends.verdict` 가 `"block"` 이면 `extends.contract_unmet` 에 실패 기준을 나열하고 원인+수정점 명시. `blocking_issues` 공통 필드에도 축약 전사 (메인이 공통 필드만 봐도 차단 여부 판정 가능)
+- `labels_applied_or_transitioned` — `"stage:qa→stage:done"` (통과) 또는 `"stage:qa→stage:dev"` (차단)
+- `commit_sha` — QA 는 커밋 생성하지 않으므로 보통 `null`. qa 가 추가 fix 커밋을 허용받은 경우에만 채움
+- `auto_close_issue_states` — QA 도 머지 주체가 아니므로 기본 `{}`. 단, PR 본문/커밋 메시지의 `Closes #N` **keyword 문법** 을 정적 점검하여 잘못된 문법(`Closes: #A, #B` 콜론 / `Closes #A, #B` 콤마만 / `Closes #A #B` 공백만) 을 발견하면 `non_blocking_suggestions` 에 "closing keyword 문법 오류 — #B 미인식 위험" 경고 추가 (메인 오케스트레이터는 머지 직후 실제 state 를 직접 확인)
+- `spawned_bg_pids` / `bg_process_handoff` — QA 가 dev 서버 / 테스트 러너를 `run_in_background` 로 띄웠으면 반환 전 **완주/kill 확인 후** `spawned_bg_pids: []` + `bg_process_handoff: "sub-agent-confirmed-done"` 로 기록. 완주 확인 못 하고 반환하면 살아있는 PID 배열 + `"main-cleanup"`. dev 서버를 띄우지 않았으면 `[]` + `"none"`. volt #46/#52 — stale 서버 / cargo 좀비 누적 방지
 
 ## 자가 점검
 

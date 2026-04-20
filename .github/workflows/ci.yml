@@ -12,13 +12,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Node.js 프로젝트 감지
-      - name: Node.js 테스트
+      # Node.js 프로젝트 감지 (감지 메시지만 — 실제 실행은 아래 step 들)
+      - name: Node.js 프로젝트 감지
         if: hashFiles('package.json') != ''
         run: |
           node_version=$(jq -r '.engines.node // "20"' package.json | grep -oE '[0-9]+' | head -1)
           echo "Node.js ${node_version} 사용"
-        # Node 설정은 프로젝트별로 추가
+
+      # Node.js 실 테스트 (#153)
+      # - setup-node 는 package.json 존재 시 실행. node-version-file 이 engines.node 의 semver range 도 해석
+      # - cache 는 package-lock.json 이 있을 때만 활성화 (setup-node v4 가 알아서 skip)
+      # - npm ci 는 package-lock.json 이 있을 때만 (재현 가능한 정확한 설치)
+      # - npm install --no-audit --no-fund 는 lock 이 없는 Node 프로젝트 fallback
+      # - npm test --if-present 는 scripts.test 없으면 조용히 skip (다운스트림 호환성)
+      # setup-node@v4 는 cache: 'npm' 지정 시 package-lock.json 부재면 실제 fail
+       # (실측: "Dependencies lock file is not found" 에러로 step 실패) 하므로 분기 필수
+       # — Gemini non-blocking 권고 (단일화) 실측 오탐 확인, 2 step 유지
+      - name: Node.js setup (lockfile 있음, npm cache 활성)
+        if: hashFiles('package-lock.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: 'npm'
+
+      - name: Node.js setup (lockfile 없음, cache 비활성)
+        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == ''
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      - name: npm ci (lockfile 있을 때)
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci
+
+      - name: npm install (lockfile 없을 때 fallback)
+        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == ''
+        run: npm install --no-audit --no-fund --ignore-scripts
+
+      - name: npm test
+        if: hashFiles('package.json') != ''
+        run: npm test --if-present
 
       # Python 프로젝트 감지
       - name: Python 테스트
@@ -48,3 +81,19 @@ jobs:
           if grep -q "^test:" Makefile; then
             make test
           fi
+
+      # agent SSoT drift 가드 (#145)
+      # CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` 의 공통 JSON 스키마 9개 필드가
+      # 5개 에이전트 파일의 `## 마무리 체크리스트 JSON 반환` 섹션에 모두 존재하고 선언 순서를
+      # 유지하는지 검사. drift 시 exit 1 로 PR 머지 전 차단.
+      - name: agent SSoT drift 가드
+        if: hashFiles('scripts/verify-agent-ssot.sh') != ''
+        run: bash scripts/verify-agent-ssot.sh
+
+      # release version bump 가드 (v2.28.1 복구와 함께 도입)
+      # chore(release) PR 에서 CHANGELOG 를 업데이트했으나 package.json::version bump 를 누락하는 회귀를 차단.
+      # 세션 3연속 릴리스 (v2.26.0~v2.28.0) 에서 실제 발생 → v2.28.1 로 복구 + 본 가드 도입.
+      # CHANGELOG 최신 `## [X.Y.Z]` 엔트리와 package.json::version 일치 검증, 불일치 시 exit 1.
+      - name: release version bump 가드
+        if: hashFiles('scripts/verify-release-version-bump.sh') != ''
+        run: bash scripts/verify-release-version-bump.sh

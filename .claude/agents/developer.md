@@ -24,18 +24,30 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
 9. 커밋 (컨벤션 준수)
 10. **커밋 후 검증** — `git show --stat HEAD` 또는 `git diff <base> HEAD -- <예상 파일>` 로 의도한 파일이 실제로 반영됐는지 확인. lint-staged `[FAILED]` 출력 시 필수 (volt #13)
 11. PR 생성
-12. **마무리 체크리스트 JSON 반환** — sub-agent 종료 전 반드시 아래 필드를 포함한 JSON을 반환한다. 누락 field 는 `null` 로 명시 (생략 금지). 메인 오케스트레이터가 GitHub 상태와 대조 검증한다 (volt #24)
+12. **마무리 체크리스트 JSON 반환** — sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **developer extends**. 누락 field 는 `null` 또는 빈 배열로 명시 (생략 금지). 메인 오케스트레이터가 GitHub 상태와 대조 검증한다 (volt #24)
     ```json
     {
       "commit_sha": "abc1234",
       "pr_url": "https://github.com/.../pull/123",
-      "branch": "feature/...",
-      "files_changed": ["path/a", "path/b"],
-      "tests": {"passed": 12, "failed": 0},
-      "browser_verified_levels": [1, 2, 3],
-      "remaining_todos": []
+      "pr_comment_url": null,
+      "labels_applied_or_transitioned": [],
+      "auto_close_issue_states": {"#123": "OPEN"},
+      "blocking_issues": [],
+      "non_blocking_suggestions": [],
+      "spawned_bg_pids": [],
+      "bg_process_handoff": "sub-agent-confirmed-done",
+      "extends": {
+        "branch": "feature/...",
+        "files_changed": ["path/a", "path/b"],
+        "tests": {"passed": 12, "failed": 0},
+        "browser_verified_levels": [1, 2, 3],
+        "remaining_todos": []
+      }
     }
     ```
+    - `auto_close_issue_states` — PR 본문/커밋 메시지의 `Closes #N` 키워드 대상 이슈의 **현재 state** 를 PR 생성 후 (머지 전) `gh issue view <N> --json state` 로 기록. developer 는 머지 주체가 아니므로 보통 `"OPEN"` 이 정상. 실제 close 성공 검증은 메인 오케스트레이터 책임
+    - `labels_applied_or_transitioned` — developer 는 보통 빈 배열. 라벨 전이는 reviewer / qa 영역
+    - `spawned_bg_pids` / `bg_process_handoff` — 구현 중 dev 서버 / 테스트 러너 / 장시간 빌드를 `run_in_background` 로 띄웠으면 반환 전 **완주/kill 확인 후** `spawned_bg_pids: []` + `bg_process_handoff: "sub-agent-confirmed-done"`. 완주 확인 못 하고 반환하면 살아있는 PID 배열 + `"main-cleanup"` (메인이 `ps`/`lsof` 로 독립 확인). 띄운 적 없으면 `[]` + `"none"`. volt #46/#52 — stale dev 서버 포트 점유 / cargo 좀비 4개 누적 방지
 
 ## 브라우저 검증 (UI 포함 이슈 필수)
 
