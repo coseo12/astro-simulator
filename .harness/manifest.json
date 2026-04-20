@@ -1,5 +1,5 @@
 {
-  "harnessVersion": "2.28.2",
+  "harnessVersion": "2.29.1",
   "installedAt": "2026-04-18T14:35:32Z",
   "files": {
     "CLAUDE.md": {
@@ -111,8 +111,9 @@
       "category": "atomic"
     },
     ".claude/skills/run-tests/SKILL.md": {
-      "sha256": "66f9000ff969e6c8081bc0b98d76462e28df6ef94ae61790f6d493ec5623121c",
-      "category": "atomic"
+      "sha256": "f97622205705095fbab3aaf0c4cfe8288dabdfa962efe9708b462ae18781d364",
+      "category": "atomic",
+      "previousSha256": "66f9000ff969e6c8081bc0b98d76462e28df6ef94ae61790f6d493ec5623121c"
     },
     ".claude/skills/volt-review/SKILL.md": {
       "sha256": "523447c52e91d40d9e9dffb4977d1a47bad1cd109ab691a01994aed4dae835ba",
@@ -147,9 +148,9 @@
       "category": "frozen"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "8df2e12fc2ed328f3df5aa214140b94a3f212395d38933bb9b07e96bf775a540",
+      "sha256": "2e7c831333ded2117f6f5c432ea0ec11b5a2460c7f75b9750b0ccce427b82b97",
       "category": "frozen",
-      "previousSha256": "fddbe647a105092e0520bf1a82d23c5c7820ba1424ef60211f366f3a1f796443"
+      "previousSha256": "8df2e12fc2ed328f3df5aa214140b94a3f212395d38933bb9b07e96bf775a540"
     },
     ".github/workflows/pr-review.yml": {
       "sha256": "d94a4ef84067409cff93af4c15fb4790207af14b69bf3ba4682b710d1e59ebb0",
@@ -624,5 +625,5 @@
       "category": "atomic"
     }
   },
-  "lastUpdatedAt": "2026-04-20T10:38:25Z"
+  "lastUpdatedAt": "2026-04-20T10:58:11Z"
 }

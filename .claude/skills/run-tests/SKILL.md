@@ -14,19 +14,46 @@ description: |
 
 ## 감지 순서
 
-아래 순서로 프로젝트의 테스트 환경을 감지한다. 첫 번째로 매칭되는 것을 사용한다.
+아래 우선순위로 프로젝트의 테스트 환경을 감지한다. 같은 언어 내에서는 **lock 파일 우선순위** 로 도구를 결정 (여러 lock 공존 시 상위 우선).
+
+### Node.js (lock 파일 우선순위)
+
+| 감지 파일 | 도구 | 실행 명령 |
+|---|---|---|
+| `pnpm-lock.yaml` | pnpm | `pnpm install --frozen-lockfile && pnpm test --if-present` |
+| `yarn.lock` + `.yarnrc.yml` | yarn berry (v2+) | `yarn install --immutable && yarn test` |
+| `yarn.lock` (`.yarnrc.yml` 부재) | yarn classic (v1) | `yarn install --frozen-lockfile && yarn test` |
+| `bun.lockb` | Bun | `bun install && bun test` (또는 `bun run test`) ¹ |
+| `deno.lock` / `deno.json` | Deno | `deno test` ¹ |
+| `package-lock.json` | npm | `npm ci && npm test --if-present` |
+| `package.json` (lock 없음) | npm fallback | `npm install --no-audit --no-fund --ignore-scripts && npm test --if-present` |
+
+### Python (lock/manifest 우선순위)
+
+| 감지 파일 | 도구 | 실행 명령 |
+|---|---|---|
+| `uv.lock` | uv | `uv sync --frozen && uv run pytest` |
+| `poetry.lock` | poetry | `poetry install && poetry run pytest` |
+| `Pipfile.lock` | pipenv | `pipenv sync --dev && pipenv run pytest` |
+| `requirements.txt` | pip | `pip install -r requirements.txt && pytest` |
+| `pyproject.toml` (lock 없음) | pip + PEP 621 | `pip install -e .[dev] \|\| pip install -e . && pytest` |
+| `setup.py` (legacy) | pip | `pip install -e . && pytest` |
+
+> ¹ **Bun / Deno — 감지 테이블 정의만, CI 자동 실행 미구현**: 현재 `.github/workflows/ci.yml` 에는 Bun/Deno 경로 step 없음. 다운스트림이 직접 step 추가 필요 (volt #49 주석-구현 drift 경계). 향후 harness 에 추가 검토 — volt 후속 이슈 대상.
+>
+> **pytest exit code 5** (수집된 테스트 0건) 은 CI 에서 경고로 처리 권장: `pytest || [ $? = 5 ]`
+
+### 기타 언어
 
 | 감지 파일 | 실행 명령 |
-|-----------|-----------|
-| `package.json` (scripts.test 존재) | `npm test` 또는 `yarn test` |
-| `Makefile` (test 타겟 존재) | `make test` |
-| `pyproject.toml` 또는 `setup.py` | `pytest` 또는 `python -m pytest` |
+|---|---|
 | `go.mod` | `go test ./...` |
-| `Cargo.toml` | `cargo test` |
-| `build.gradle` 또는 `build.gradle.kts` | `./gradlew test` |
+| `Cargo.toml` | `cargo test --release --lib` (장기 테스트 이원화는 volt #54 참조) |
+| `build.gradle` / `build.gradle.kts` | `./gradlew test` |
 | `pom.xml` | `mvn test` |
+| `Makefile` (`test:` target) | `make test` |
 
-감지되지 않으면 사용자에게 테스트 실행 방법을 질문한다.
+감지되지 않으면 사용자에게 테스트 실행 방법을 질문한다. 하이브리드 상태 (예: `pnpm-lock.yaml` + `package-lock.json` 혼재) 발견 시 우선순위 상위만 실행하되 **경고** 출력 — 통상 lock 하나만 유지해야 재현성 보장.
 
 ## 실행 절차
 
