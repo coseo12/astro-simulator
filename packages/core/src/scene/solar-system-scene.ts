@@ -23,6 +23,7 @@ import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
+import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
 
 /**
@@ -140,6 +141,18 @@ export function createSolarSystemScene(
   for (const body of system.bodies) {
     const mesh = createBodyMesh(body, scene);
     meshes.set(body.id, mesh);
+  }
+
+  // P9 #254 PR-1 — rings 가 있는 행성에 플레이스홀더 disk 3층 생성.
+  // PR-2.5 에서 본 shader (`ring-shader.ts`) 로 교체 예정.
+  const ringHandlesByBody = new Map<string, RingPlaceholderHandles>();
+  for (const body of system.bodies) {
+    if (!body.rings || body.rings.length === 0) continue;
+    const host = meshes.get(body.id);
+    if (!host) continue;
+    const handles = createRingPlaceholder(scene, host, body.rings);
+    ringHandlesByBody.set(body.id, handles);
+    disposables.push({ dispose: () => handles.dispose() });
   }
 
   // 궤도선 — 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).

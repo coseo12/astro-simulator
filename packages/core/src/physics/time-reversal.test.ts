@@ -32,10 +32,22 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
   // 초과 (포보스 주기 7.65h × dt=10min sub-step → 1144 주기/년 × 46 sub-step/주기 = 5e4+
   // step 누적). 본 테스트의 **원 의도는 9체 대칭성 검증** 이므로 화성 위성은 명시적 제외.
   // 위성 전체 N-body 검증은 P8 PR-2 의 Rust `measure_moon_orbital_period` 에서 수행.
+  // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 도 동일 이유로 제외. Io 주기 1.77d
+  // × dt=10min → 253 sub-step/주기 × 206 주기/년 = 5e4 step 누적으로 오차 증폭.
+  // 본 테스트 원 의도(9체 대칭성)는 유지. Galilean N-body 정합성은 P9 PR-2 의 Rust
+  // `measure_galilean_period` + `measure_laplace_resonance` 로 검증.
+  const EXCLUDED_SATELLITES = new Set([
+    'phobos', // P8
+    'deimos', // P8
+    'io', // P9
+    'europa', // P9
+    'ganymede', // P9
+    'callisto', // P9
+  ]);
   const fullSystem = getSolarSystem();
   const system = {
     ...fullSystem,
-    bodies: fullSystem.bodies.filter((b) => b.id !== 'phobos' && b.id !== 'deimos'),
+    bodies: fullSystem.bodies.filter((b) => !EXCLUDED_SATELLITES.has(b.id)),
   };
   const initial = buildInitialState(system, system.epoch);
   const AU = 1.495_978_707e11;
