@@ -153,6 +153,22 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           writable: false,
         });
         useSimStore.getState().setIntegrator(integrator);
+        // P9 #254 PR-3 — ?mass=jupiter×N URL 옵트인 (D7 Osculating 동적 검증용).
+        //   형식: `?mass=jupiter×2` / `?mass=jupiter*1.5` / `?mass=jupiter=0.5` (× * = 모두 허용)
+        //   효과: Jupiter 질량 배수 변경 → Galilean 위성 궤도반경 자연 감소/증가 관찰
+        //   (Osculating 1Hz polling 이 변화 반영 — SatelliteInfoPanel 의 `a` 값 동적 갱신).
+        //   ADR `docs/decisions/20260420-p9-galilean-laplace-rings.md` §R2, §재검토 조건 #7.
+        const massParam = new URLSearchParams(window.location.search).get('mass');
+        if (massParam) {
+          // jupiter×N / jupiter*N / jupiter=N — 세 구분자 모두 허용 (URL 인코딩 편의).
+          const match = massParam.match(/^jupiter[×*=]([\d.]+)$/);
+          if (match) {
+            const multiplier = Number(match[1]);
+            if (Number.isFinite(multiplier) && multiplier > 0) {
+              useSimStore.getState().setMassMultiplier('jupiter', multiplier);
+            }
+          }
+        }
         // P9 #254 PR-2.5 — ?ring=shader|fallback|placeholder URL 옵트인.
         //   shader (기본): `densityProfile[]` uniform + GLSL 선형 보간 (Halo/Main/Gossamer 구분)
         //   fallback: M1 InstancedMesh 입자 분포 (shader 실패 시 자동 전환 또는 수동 테스트)

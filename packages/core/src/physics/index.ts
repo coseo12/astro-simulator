@@ -32,3 +32,4 @@ export {
   LUT_B_MAX,
   type LensingLut,
 } from './lensing-lut.js';
+export { extractOsculatingElements, type OscElements } from './osculating.js';
