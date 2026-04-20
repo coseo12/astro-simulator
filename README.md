@@ -156,7 +156,7 @@ v0.3.0 종합 회귀 287/287 통과 — `docs/benchmarks/p3d-comprehensive-verif
 - **P7 — 관측가능우주**
 - **P8 — 물리 샌드박스 확장**
 
-상세: [`docs/phases/roadmap.md`](./docs/phases/roadmap.md)
+상세: [`docs/phases/roadmap-v2-solar-precision.md`](./docs/phases/roadmap-v2-solar-precision.md) (현행, 진행 중). 초기 구상은 [`roadmap-v1-cosmic-scale.md`](./docs/phases/roadmap-v1-cosmic-scale.md) (archived) 참조.
 
 ---
 
@@ -168,7 +168,9 @@ v0.3.0 종합 회귀 287/287 통과 — `docs/benchmarks/p3d-comprehensive-verif
 - [아키텍처 결정서](./docs/phases/architecture.md)
 - [디자인 토큰](./docs/phases/design-tokens.md)
 - [UI 아키텍처](./docs/phases/ui-architecture.md)
-- [확장 로드맵](./docs/phases/roadmap.md)
+- [확장 로드맵 v2 — 태양계 정밀화 (현행)](./docs/phases/roadmap-v2-solar-precision.md)
+- [확장 로드맵 v1 — 관측가능우주 (archived)](./docs/phases/roadmap-v1-cosmic-scale.md)
+- [Fact-First 원칙](./docs/principles/fact-first.md)
 
 ### Phase별
 
