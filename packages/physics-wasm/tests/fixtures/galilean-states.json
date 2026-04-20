@@ -1,0 +1,92 @@
+{
+  "$schema": "https://astro-simulator/schema/galilean-states/v1.json",
+  "description": "JPL Horizons 2026-01-01 epoch Galilean satellite 궤도 요소 (Jupiter-centric, Laplace plane). packages/shared/data/solar-system.json 과 일치. P9 #254 PR-2 ADR 20260420-p9-galilean-laplace-rings.md §결정 #1 (5체 N-body 그룹) 참조.",
+  "epoch": "2026-01-01T00:00:00Z",
+  "frame": "jupiter-centric-laplace-plane",
+  "units": {
+    "length": "m",
+    "time": "s",
+    "mass": "kg",
+    "angle": "rad"
+  },
+  "central_body": {
+    "id": "jupiter",
+    "mass_kg": 1.8982e27,
+    "mu_m3_s2": 1.266865349218e17,
+    "note": "μ = G·M_jupiter, G = 6.67430e-11"
+  },
+  "satellites": [
+    {
+      "id": "io",
+      "mass_kg": 8.9319e22,
+      "semi_major_axis_m": 421956225.0,
+      "eccentricity": 0.0041,
+      "inclination_rad": 6.283185307179586e-4,
+      "longitude_of_ascending_node_rad": 0.7675028427601472,
+      "argument_of_periapsis_rad": 0.7008972580840166,
+      "mean_anomaly_rad": 1.5165117987810114,
+      "jpl_source": {
+        "longitude_of_perihelion_deg": 84.129,
+        "mean_longitude_deg": 171.016,
+        "note": "ω = ϖ − Ω = 84.129 − 43.977 = 40.152° / M = λ − ϖ = 171.016 − 84.129 = 86.887°"
+      },
+      "reference_period_days": 1.769,
+      "note": "Laplace 1:2:4 최내측. D1 주기 테스트 ±1%."
+    },
+    {
+      "id": "europa",
+      "mass_kg": 4.7998e22,
+      "semi_major_axis_m": 670927909.0,
+      "eccentricity": 0.009,
+      "inclination_rad": 8.133715767131505e-3,
+      "longitude_of_ascending_node_rad": 3.823949175989022,
+      "argument_of_periapsis_rad": -2.2713050180574985,
+      "mean_anomaly_rad": 4.422027415055942,
+      "jpl_source": {
+        "longitude_of_perihelion_deg": 88.97,
+        "mean_longitude_deg": 342.321,
+        "note": "ω = 88.97 − 219.106 = −130.136° / M = 342.321 − 88.97 = 253.351°"
+      },
+      "reference_period_days": 3.551,
+      "note": "Laplace 1:2:4 중간. D2 주기 테스트 ±1%."
+    },
+    {
+      "id": "ganymede",
+      "mass_kg": 1.4819e23,
+      "semi_major_axis_m": 1070413858.0,
+      "eccentricity": 0.0013,
+      "inclination_rad": 3.0892327760299634e-3,
+      "longitude_of_ascending_node_rad": 1.109203716480168,
+      "argument_of_periapsis_rad": 2.2491143324914566,
+      "mean_anomaly_rad": -0.2678814529328859,
+      "jpl_source": {
+        "longitude_of_perihelion_deg": 192.417,
+        "mean_longitude_deg": 177.071,
+        "note": "ω = 192.417 − 63.552 = 128.865° / M = 177.071 − 192.417 = −15.346°"
+      },
+      "reference_period_days": 7.155,
+      "note": "Laplace 1:2:4 최외측. 태양계 최대 위성. D3 주기 테스트 ±1%."
+    },
+    {
+      "id": "callisto",
+      "mass_kg": 1.0759e23,
+      "semi_major_axis_m": 1882758009.0,
+      "eccentricity": 0.0074,
+      "inclination_rad": 3.3510321638291127e-3,
+      "longitude_of_ascending_node_rad": 5.215528517111459,
+      "argument_of_periapsis_rad": -4.297749410020468,
+      "mean_anomaly_rad": 3.614107815596216,
+      "jpl_source": {
+        "longitude_of_perihelion_deg": 52.643,
+        "mean_longitude_deg": 259.697,
+        "note": "ω = 52.643 − 298.848 = −246.205° / M = 259.697 − 52.643 = 207.054°"
+      },
+      "reference_period_days": 16.689,
+      "note": "비공명 baseline — Laplace 공명 미참여. D4 교차검증 기준 ±1%."
+    }
+  ],
+  "usage": {
+    "rust_constant": "JPL_GALILEAN_ELEMENTS in src/satellites/laplace.rs (identical values)",
+    "d5_laplace_notes": "e>0 / i>0 full state vector 기반 초기화가 Laplace 공명 자기-조절에 필수. 원궤도(e=0) 근사는 libration 발산."
+  }
+}
