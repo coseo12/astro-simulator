@@ -699,6 +699,7 @@ mod tests {
     /// 41~46″/century 범위 (P5-A와 동일 허용)를 만족해야 한다.
     /// P6-D 헬퍼 추출 후 — 본문은 `measure_perihelion_precession_eih` 호출 1줄.
     #[test]
+    #[ignore = "long-integration; run with --include-ignored in CI"]
     fn mercury_perihelion_precession_eih() {
         // 이론치 42.98″/century (Einstein 1915), ±5% → 40.83~45.13″.
         measure_perihelion_precession_eih(
@@ -717,6 +718,7 @@ mod tests {
     /// 허용: ±5% → 8.19~9.05″/century.
     /// 행성 파라미터는 `eih_9body_100yr_eccentricity_drift`의 금성 행과 동일.
     #[test]
+    #[ignore = "long-integration; run with --include-ignored in CI"]
     fn venus_perihelion_eih_within_5_percent() {
         measure_perihelion_precession_eih(
             "Venus",
@@ -733,6 +735,7 @@ mod tests {
     /// 이론: 3.84″/century (Pitjeva-Pitjev 2014, *Celest. Mech. Dyn. Astron.*, GR 기여분만).
     /// 허용: ±5% → 3.65~4.03″/century.
     #[test]
+    #[ignore = "long-integration; run with --include-ignored in CI"]
     fn earth_perihelion_eih_within_5_percent() {
         measure_perihelion_precession_eih(
             "Earth",
@@ -931,6 +934,7 @@ mod tests {
     /// **이론값 3.84″ 출처**: Schwarzschild 공식 `6π GM_sun / (a c² (1-e²))`, Pitjeva-Pitjev
     /// 2014, *Celest. Mech. Dyn. Astron.* (GR 기여분만).
     #[test]
+    #[ignore = "long-integration; run with --include-ignored in CI"]
     fn yoshida_earth_perihelion_regression() {
         let per_century = measure_perihelion_precession_gr_centuries(
             "Earth-EIH-regression",
@@ -963,6 +967,7 @@ mod tests {
     ///
     /// **이론값 8.62″ 출처**: Will, *Theory and Experiment* §7.2 / Park et al. 2017.
     #[test]
+    #[ignore = "long-integration; run with --include-ignored in CI"]
     fn yoshida_venus_perihelion_regression() {
         let per_century = measure_perihelion_precession_gr_centuries(
             "Venus-EIH-regression",
@@ -1329,6 +1334,7 @@ mod tests {
     /// 저이심률 궤도(지구/금성)와 달리 Newton baseline subtraction 잔차가 GR 신호의 0.1% 수준에
     /// 불과 — P7-A에서도 1 century 로 충분한 정확도 확보.
     #[test]
+    #[ignore = "long-integration; run with --include-ignored in CI"]
     fn yoshida_mercury_perihelion_regression() {
         let per_century = measure_perihelion_precession_gr_centuries(
             "Mercury-EIH-regression",

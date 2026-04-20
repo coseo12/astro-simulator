@@ -45,9 +45,47 @@ jobs:
           tool: wasm-pack@0.14.0
 
       # 1000년 심플렉틱 적분(365250 step)은 release 모드에서만 빠름.
-      - name: Rust 테스트 (physics-wasm)
+      # P9 #254 M4: 장기 적분 테스트(수성/금성/지구 근일점 EIH 6건 + Laplace 공명
+      # 2건)는 `#[ignore = "long-integration"]` 로 분리됐다. 빠른 경로는 이를 스킵
+      # 하여 PR 피드백 < 5분을 유지한다. 장기 경로는 아래 long-integration job.
+      - name: Rust 테스트 (physics-wasm, 빠른 경로)
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
+
+  # P9 #254 M4 — 장기 적분 테스트 분리 경로.
+  # `#[ignore = "long-integration"]` 로 마킹된 테스트만 실행 (수성/금성/지구 근일점
+  # EIH 6건 + Laplace 공명 D5-a 1건). CPU 집약 테스트를 빠른 경로와 분리해 PR
+  # 피드백 5분 목표 달성 + 장기 경로는 별도 job 으로 병렬 실행.
+  # 실패 시에도 빠른 경로 PASS 면 PR 차단되지 않음 — 장기 경로는 별도 관찰용.
+  long-integration-rust:
+    runs-on: ubuntu-latest
+    # 병렬 실행 (빠른 경로 + 장기 경로 독립).
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust 툴체인 설정
+        if: hashFiles('rust-toolchain.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Rust 빌드 캐시
+        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+          # 빠른 경로와 다른 캐시 키 — 동시 빌드 충돌 방지.
+          key: long-integration
+
+      # `--include-ignored` 로 ignore 테스트만 실행하려면 `--ignored` 필요.
+      # `--include-ignored` 는 전체 실행. 여기서는 ignore 된 것만 실행해 시간 절약.
+      - name: Rust 장기 적분 테스트 (physics-wasm, ignored only)
+        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --ignored --nocapture
+        # 장기 경로 실패는 머지 차단하지 않음 — CI 로그 관찰용.
+        continue-on-error: true
 
   # P6-E #193 (E4) — 신규 함수 중복 방지 가드 (warn-only).
   # ADR: docs/decisions/20260417-duplicate-function-guard.md

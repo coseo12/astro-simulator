@@ -189,11 +189,12 @@ fn measure_node_regression_period(
 
 본 ADR 의 수치·임계·DoD 갱신 이력. 포맷 규약: `docs/decisions/README.md` §Amendments.
 
-| 날짜       | 변경 요약                                                                                               | 근거                 |
-| ---------- | ------------------------------------------------------------------------------------------------------- | -------------------- |
-| 2026-04-19 | D3 `sample_interval_days` 30.0 → 1.0 + `smoothing_window_days` 180.0 신설 (에일리어싱 회피)             | Gemini 교차검증 #244 |
-| 2026-04-19 | D2·D3 측정법 상대 좌표계 (부모 행성 대비 `r_rel` / `v_rel`) 명시 박제                                   | Gemini 교차검증 #244 |
-| 2026-04-19 | 후속 이슈 #247 분리 — "위성 Osculating elements 동적 동기화 파이프라인" (UX 비동기화 우려, P9/P13 후보) | Gemini 교차검증 #244 |
+| 날짜       | 변경 요약                                                                                               | 근거                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 2026-04-19 | D3 `sample_interval_days` 30.0 → 1.0 + `smoothing_window_days` 180.0 신설 (에일리어싱 회피)             | Gemini 교차검증 #244                           |
+| 2026-04-19 | D2·D3 측정법 상대 좌표계 (부모 행성 대비 `r_rel` / `v_rel`) 명시 박제                                   | Gemini 교차검증 #244                           |
+| 2026-04-19 | 후속 이슈 #247 분리 — "위성 Osculating elements 동적 동기화 파이프라인" (UX 비동기화 우려, P9/P13 후보) | Gemini 교차검증 #244                           |
+| 2026-04-20 | #247 Osculating 동적 동기화 P9 (#254) 에 흡수 — Kepler 정적 렌더가 목성계 이상에서 UX 결함 확인         | P9 ADR `20260420-p9-galilean-laplace-rings.md` |
 
 ### 2026-04-19 — 상세
 
@@ -214,3 +215,12 @@ Gemini 교차검증에서 `sample_interval_days: 30.0` 이 달 항성월(27.3일
 **Osculating elements 동적 동기화 (심각도: 높음, 후속 분리)**
 
 "UX 비동기화" (질량 변경 시 위성 무반응) 은 "인터랙티브 시뮬레이터" 정체성과 직결. 그러나 PM 계약 Q2=c 하이브리드(정적 Kepler) 결정과 상충 → **후속 이슈 #247 로 분리** (volt #29 3단 프로토콜). P9/P13 후보, priority:medium.
+
+### 2026-04-20 — #247 Osculating 동적 동기화 P9 흡수
+
+- **배경**: 본 ADR 의 **Kepler 하이브리드 렌더** 는 "질량 변경 시 위성 반응 없음" UX 결함을 가짐 (Gemini 교차검증 2026-04-19 고유 발견, §Amendments 2026-04-19 3번째 엔트리)
+- **결정**: PM 라운드 1 사용자 답변 **Q1=a** — #247 을 P9 (#254) 에 흡수 (+2d 타임박스 확장, 원 3~5d → 7~10d 재조정)
+- **구현 경로**: P9 #254 D7 에서 WASM export `extract_osculating_elements(pos_rel, vel_rel, mu_parent) -> Float64Array(7)` 신규 + TS `useOsculatingSync` 1Hz polling 훅. 정적 Kepler 가 **동적 osculating 으로 확장**
+- **재해석**: 본 ADR 의 원 가설 "Kepler 정적 충분" 은 내행성계 위성(포보스·데이모스·달) 에는 유효했으나, 목성계 이상의 상호 섭동 + Jupiter mass 인터랙션 시점에서는 **동적 동기화 필수**
+- **재검토 조건**: Osculating polling 성능 저하 (fps<55) 지속 시 polling 주기 강등 또는 subset 동기화 재고 (P9 ADR §R2 단계 폴백). fps<45 10Hz 에서도 개선 없으면 selected 1체만 동기화하는 URL 플래그 (`?osc=io-only`) 도입 검토
+- **참조 ADR**: `docs/decisions/20260420-p9-galilean-laplace-rings.md` §결정 #3 (특이점 처리), §R2 (fps 자동 폴백)

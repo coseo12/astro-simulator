@@ -257,6 +257,26 @@ sub-agent에 적응적 질답·설계 같은 multi-turn 세션을 위임할 때,
 - 근거 ADR: `docs/decisions/20260419-prettier-harness-conflict.md`
 - 관련 이슈: [#229](https://github.com/coseo12/astro-simulator/issues/229) (인프라 도입), [#230](https://github.com/coseo12/astro-simulator/issues/230) (v2.15.0 업그레이드 실측)
 
+### sub-agent 이탈의 프로세스 레벨 확장 — cargo/next dev 좀비 누적
+
+상위 "sub-agent 검증 완료 ≠ GitHub 박제 완료" 교훈의 **프로세스 리크 확장**. volt #24 가 코멘트·라벨 등 외부 가시성 박제 누락을 다룬다면, 본 교훈은 **백그라운드 프로세스 정리 누락** 이다.
+
+- **현상**: sub-agent(dev/reviewer/qa) 가 `run_in_background=true` 로 `cargo test --lib` 또는 `pnpm dev` 를 시작한 뒤, PID 종료 확인 없이 보고서 반환. 메인 오케스트레이터가 복귀 후 프로세스 정리 안 하면 다음 sub-agent 가 동일 타겟 디렉토리에 새 cargo 를 시작 → 테스트 바이너리 4개+ 병렬 경쟁 → 어느 것도 완주 못 함
+- **관찰 사례**: P9 PR-1 (#258) 에서 dev(초기)/dev(재작업)/reviewer/qa 가 각자 cargo test 시작 후 누적. `physics_wasm-<hash>` 바이너리 4개 동시 실행, 각 CPU 94~388% 점유, 30~176분 경과. 정상 4~5분 대비 10배+ 지연 후에도 완주 못 함
+- **메인 루틴** (sub-agent 복귀 직후 의무):
+  ```bash
+  # sub-agent 가 띄웠을 수 있는 장기 프로세스 독립 확인
+  ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep
+  # 의도치 않은 좀비 발견 시 kill (시작 시각 비교로 현재 세션 이전 것만 정리)
+  ```
+- **sub-agent 루틴** (반환 직전 의무):
+  - `run_in_background=true` 로 시작한 프로세스가 있으면 PID 기록 + 마무리 체크리스트 JSON 의 `spawned_bg_pids` 필드에 박제
+  - 완주 확인 못 하고 반환 시 명시적 "프로세스 인계" 플래그 (메인이 정리 책임 인지)
+- **cargo test 호출 규범** (PR-2 에서 도입 예정):
+  - 장기 적분 테스트 (`mercury/yoshida_*_perihelion_*`, `earth/venus_perihelion_eih_*`) 에 `#[ignore]` 어트리뷰트 + CI 전용 `--include-ignored` 경로
+  - 일상 개발에서는 `cargo test --lib` 가 5분 내 완주하도록 재설계
+- **근거**: volt [#24](https://github.com/coseo12/volt/issues/24) 의 프로세스 레벨 확장 (2026-04-20 관찰). volt 캡처 예정
+
 ---
 
 ## 교차검증 (cross-validate)

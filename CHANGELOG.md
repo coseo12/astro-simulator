@@ -3,6 +3,61 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.9.0] — 2026-04-20
+
+### P9 — 목성계 (Galilean + Laplace 공명 + 고리 3층 + Osculating 동기화)
+
+메인 이슈: #254 · ADR: [`docs/decisions/20260420-p9-galilean-laplace-rings.md`](docs/decisions/20260420-p9-galilean-laplace-rings.md) · 회고: [`docs/retrospectives/p9-retrospective.md`](docs/retrospectives/p9-retrospective.md)
+
+4 PR 분할 릴리스 (CLAUDE.md §Phase 분리 릴리스 리듬 적용):
+
+- **PR #258 (PR-1 인프라 + Galilean JSON + 고리 placeholder)** — `solar-system.json` 에 Galilean 4체(Io/Europa/Ganymede/Callisto) + Jupiter.rings 3층(Halo/Main/Gossamer) JSON 신설 + zod 스키마 `RingLayerRawSchema` 확장 + `ring-placeholder.ts` 단색 3층 disk
+- **PR #260 (PR-2 Rust satellites + M4 장기 테스트 분리)** — `packages/physics-wasm/src/satellites/{laplace,osculating}.rs` 신규 모듈 + 단위테스트 5건 (D1~D4 주기 + D5-a 잔차 + Osculating 왕복) + `extract_osculating_elements` WASM bindgen export + **M4**: 장기 적분 테스트 6건 `#[ignore]` 분리 + CI workflow 빠른/장기 경로 독립 job
+- **PR #262 (PR-2.5 고리 shader 3층 + M1 백업)** — `ring-shader.ts` fragment shader 방사밀도 3구간 + `createRingShaderMaterial`/`createRingShaderMesh` 신규 + 수동 플래그 `?ring=fallback`/`?ring=placeholder` + 실 Chrome 3 시나리오 수동 검증 통과 + M1 백업 (SPS 자동 전환)
+- **PR-3 (본 PR) TS 통합 + UI + 회고 + v0.9.0** — `use-osculating-sync.ts` 훅 + `satellite-info-panel.tsx` (D8) + `?mass=jupiter×N` URL 핸들러 + ADR §Amendments 3건 + 회고 + 버전 bump
+
+### Behavior Changes
+
+- **sim-canvas 에 목성계 위성 4체 (Io/Europa/Ganymede/Callisto) 자동 렌더** — `?mode=research&focus=jupiter` 에서 목성 주위 Galilean 위성이 JSON 기반 Kepler 해석 요소로 표시. CelestialTree 사이드패널에 `tree-io` / `tree-europa` / `tree-ganymede` / `tree-callisto` 버튼 자동 노출
+- **목성 고리 3층 shader 렌더** — Halo (92k~122.5k km) / Main (122.5k~129k km) / Gossamer (129k~226k km) 각 반경별 fragment shader 방사밀도 표현. `?ring=fallback` 으로 InstancedMesh/SPS 전환, `?ring=placeholder` 로 PR-1 단색 disk 복귀 가능
+- **Galilean 이심률·경사 UI 패널 (D8)** — `SatelliteInfoPanel` 에 4체 `e` / `i` 값 표시 (`solar-system.json` 바인딩, 하드코딩 금지). `singularity===1` 시 "원순환 근사" 배지
+- **Osculating 1Hz polling 훅 인프라** — `use-osculating-sync.ts` 훅 + fps 자동 폴백 (1Hz → 2Hz → 5Hz → 10Hz, 히스테리시스 +5fps). WASM `extract_osculating_elements` wiring 완결. 단 기본 `timeScale=86400` 조건에서 forward-diff velocity noise 로 UI 배지 미렌더 — [#263](https://github.com/coseo12/astro-simulator/issues/263) 이관
+- **`?mass=jupiter×N` URL 파라미터 동적 질량** — Newton 엔진 경로에서 씬 물리에 반영 (Io-Jupiter 거리 감소 실측 확인). Osculating UI 반영은 #263 완료 시점까지 정적 JSON 값 표시
+- **DoD 물리 검증 CI 가드 6건 추가** — `cargo test` 에 `test_io_period_1pct` / `test_europa_period_1pct` / `test_ganymede_period_1pct` / `test_callisto_period_1pct` / `test_laplace_resonance_residual_1pct` / `test_osculating_roundtrip` 상시 게이트. D5-b (위상 진폭 ±2°) 는 `#[ignore]` + follow-up [#261](https://github.com/coseo12/astro-simulator/issues/261) 이관
+- **M4 장기 테스트 분리** — `mercury/yoshida_*_perihelion_*`, `earth/venus_perihelion_eih_*` 6건에 `#[ignore = "long-integration; run with --include-ignored in CI"]` 어트리뷰트. 일상 `cargo test --lib` 경로 완주 시간 **30분+ → 9.27s (≈ 200× 단축)**. CI 장기 경로는 `cargo test --release --lib -- --include-ignored` 독립 job (`continue-on-error: true`)
+- **sub-agent 이탈의 프로세스 레벨 확장 교훈** (CLAUDE.md §프로젝트 고유 보강 교훈 추가, [#259](https://github.com/coseo12/astro-simulator/pull/259)) — sub-agent 가 `run_in_background` 로 띄운 프로세스 정리 누락 시 cargo target 디렉토리 경쟁으로 교착 발생. 메인 오케스트레이터 루틴 (`pgrep -f "cargo|next dev|physics_wasm-"` 독립 확인) + sub-agent 마무리 체크리스트 `spawned_bg_pids` 필드 규범화. [volt #52](https://github.com/coseo12/volt/issues/52) 박제
+
+### DoD 실측 (ADR 대비 여유율)
+
+| DoD                        | 계약          | 실측                             | 여유율     |
+| -------------------------- | ------------- | -------------------------------- | ---------- |
+| D1 Io 공전주기             | ±1%           | PASS                             | —          |
+| D2 Europa 공전주기         | ±1%           | PASS                             | —          |
+| D3 Ganymede 공전주기       | ±1%           | PASS                             | —          |
+| D4 Callisto 공전주기       | ±1%           | PASS                             | —          |
+| D5-a Laplace 잔차          | ±1%           | **0.00024**                      | 41×        |
+| D5-b 위상 진폭             | ±2°           | **이관 (#261 데이터 교정)**      | —          |
+| D6 고리 3층 shader         | 가시          | PASS (실 Chrome 6 스크린샷)      | —          |
+| D7 Osculating 동기화       | 1Hz polling   | **인프라 완결 / UI 이관 (#263)** | —          |
+| D8 이심률·경사 UI          | JSON 바인딩   | PASS                             | —          |
+| M4 cargo fast path         | ≤5분          | **9.27s**                        | **32×**    |
+| cargo include-ignored path | 독립 job 분리 | **216.9s**                       | CI 병렬 OK |
+| fps baseline (실 Chrome)   | ≥55fps        | **평균 59.98 / 최소 59.75**      | 60fps 유지 |
+
+### 알려진 제한 (스프린트 계약 재조정 박제, CLAUDE.md §7 세 위치 완결)
+
+- **D5-b 위상 진폭 ±2°** — `measure_laplace_resonance()` 측정 도구 정상이나 PR-1 에서 박제한 JPL Galilean 초기 조건의 Laplace 인자 φ₀ = 218° (이론 평형점 180° 대비 38° 벗어남) → circulation 상태로 libration 재현 불가. 측정법 검증 우선 원칙 (CLAUDE.md §스프린트 계약 10) 충실 수행 후 데이터 교정 분리. 해결은 `solar-system.json` Galilean 4체 `meanLongitudeDeg` JPL Horizons 재쿼리 → [#261](https://github.com/coseo12/astro-simulator/issues/261) 이관
+- **D7 Osculating UI 동적 표시** — 훅 인프라 완결 / `?mass=jupiter×N` 씬 물리 반영 정상이나 `timeScale=86400` 기본값에서 forward-diff velocity noise 과다로 UI 배지 미렌더. 해결은 Babylon 씬 저장 velocity state vector 직접 추출 (forward-diff 폐기) → [#263](https://github.com/coseo12/astro-simulator/issues/263) 이관. v0.9.0 은 정적 JSON 값 표시
+- **Osculating shader `onError` 비동기 폴백 미구현** — `ring-shader.ts` 는 동기 exception 경로만 M1 자동 전환. 비동기 `onError` 는 기록만 수행. 수동 `?ring=fallback` 은 정상. ADR §재검토 조건 #5 에 위임
+
+### 후속 OPEN
+
+- [#261](https://github.com/coseo12/astro-simulator/issues/261) (P9-followup, priority:medium) — Galilean 초기 조건 φ₀ = 218° → 180° 데이터 교정 + D5-b 재개
+- [#263](https://github.com/coseo12/astro-simulator/issues/263) (P9-followup, priority:medium) — Osculating 속도 추정 timeScale 내성화 (forward-diff → 씬 state vector 직접 추출)
+- [#245](https://github.com/coseo12/astro-simulator/issues/245) / [#246](https://github.com/coseo12/astro-simulator/issues/246) (P8-followup, priority:low) — 위성 줌 토글 / 클릭 정보 패널 인터랙션
+- [#255](https://github.com/coseo12/astro-simulator/issues/255) (P9-followup, priority:medium) — 목성 J2/J4 편평도 세차
+- [#256](https://github.com/coseo12/astro-simulator/issues/256) / [#257](https://github.com/coseo12/astro-simulator/issues/257) (P9-followup, priority:low) — 장기 적분 에너지 보존 DoD / 고리 shader 섀도우 매핑
+
 ## [0.8.0] — 2026-04-19
 
 ### P8 — 내행성계 위성 정밀화 (포보스·데이모스·달 교점역행)

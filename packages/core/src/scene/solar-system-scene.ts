@@ -23,6 +23,8 @@ import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
+import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
+import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
 
 /**
@@ -92,6 +94,14 @@ export interface SolarSystemSceneOptions {
    * 런타임 스위치는 비지원 — 초기화 시점만 결정.
    */
   integrator?: IntegratorKind;
+  /**
+   * P9 #254 PR-2.5 — 행성 고리 렌더 경로.
+   *   - `'shader'` (기본) — `densityProfile[]` uniform + GLSL 선형 보간 (Halo/Main/Gossamer 구분 가능)
+   *   - `'fallback'` — M1 백업 (InstancedMesh 입자 분포). shader 실패 또는 수동 테스트용
+   *   - `'placeholder'` — PR-1 단색 disk (회귀 검증용, 운영 권장하지 않음)
+   * URL `?ring=fallback` 또는 `?ring=placeholder` 로 페이지 측에서 override 가능.
+   */
+  ringRenderMode?: 'shader' | 'fallback' | 'placeholder';
 }
 
 /**
@@ -113,6 +123,7 @@ export function createSolarSystemScene(
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
+    ringRenderMode = 'shader',
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -140,6 +151,28 @@ export function createSolarSystemScene(
   for (const body of system.bodies) {
     const mesh = createBodyMesh(body, scene);
     meshes.set(body.id, mesh);
+  }
+
+  // P9 #254 PR-2.5 — rings 가 있는 행성에 shader 기반 3층 렌더.
+  //   - 'shader' (기본): `densityProfile[]` uniform + GLSL 선형 보간
+  //   - 'fallback': M1 InstancedMesh 입자 분포 (shader 실패 또는 `?ring=fallback`)
+  //   - 'placeholder': PR-1 단색 disk (회귀 검증용)
+  const ringHandlesByBody = new Map<string, RingPlaceholderHandles | RingShaderHandles>();
+  for (const body of system.bodies) {
+    if (!body.rings || body.rings.length === 0) continue;
+    const host = meshes.get(body.id);
+    if (!host) continue;
+
+    let handles: RingPlaceholderHandles | RingShaderHandles;
+    if (ringRenderMode === 'placeholder') {
+      handles = createRingPlaceholder(scene, host, body.rings);
+    } else {
+      handles = createRingShaderMesh(scene, host, body.rings, {
+        forceFallback: ringRenderMode === 'fallback',
+      });
+    }
+    ringHandlesByBody.set(body.id, handles);
+    disposables.push({ dispose: () => handles.dispose() });
   }
 
   // 궤도선 — 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).

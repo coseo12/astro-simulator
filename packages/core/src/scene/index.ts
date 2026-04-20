@@ -22,6 +22,18 @@ export type {
 } from './solar-system-scene.js';
 export { createAsteroidBelt } from './asteroid-belt.js';
 export type { AsteroidBeltHandles, AsteroidBeltOptions } from './asteroid-belt.js';
+export { createRingPlaceholder } from './ring-placeholder.js';
+export type { RingPlaceholderHandles, RingPlaceholderOptions } from './ring-placeholder.js';
+export {
+  createRingShaderMaterial,
+  createRingShaderMesh,
+  createRingInstancedMesh,
+} from './ring-shader.js';
+export type {
+  RingShaderParams,
+  RingShaderHandles,
+  CreateRingShaderOptions,
+} from './ring-shader.js';
 export { createGravitationalLensing } from './gravitational-lensing.js';
 export type { LensingHandles, BlackHoleOptions } from './gravitational-lensing.js';
 export { createBlackHoleRendering } from './black-hole-rendering.js';

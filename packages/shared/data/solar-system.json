@@ -159,6 +159,115 @@
         "longitudeOfAscendingNodeDeg": 100.47390909,
         "longitudeOfPerihelionDeg": 14.72847983,
         "meanLongitudeDeg": 34.39644051
+      },
+      "$ringsComment": "P9 #254 — 목성 고리 3층 (Halo/Main/Gossamer). NASA/JPL 참고값. densityProfile 는 [r_normalized ∈ [0,1], density ∈ [0,1]] 튜플. r_normalized = (r - innerRadius) / (outerRadius - innerRadius). ADR 20260420-p9-galilean-laplace-rings.md §결정 #2.",
+      "rings": [
+        {
+          "id": "halo",
+          "innerRadiusKm": 92000,
+          "outerRadiusKm": 122500,
+          "densityProfile": [
+            [0.0, 0.3],
+            [0.5, 0.5],
+            [1.0, 0.2]
+          ]
+        },
+        {
+          "id": "main",
+          "innerRadiusKm": 122500,
+          "outerRadiusKm": 129000,
+          "densityProfile": [
+            [0.0, 0.8],
+            [0.3, 1.0],
+            [1.0, 0.9]
+          ]
+        },
+        {
+          "id": "gossamer",
+          "innerRadiusKm": 129000,
+          "outerRadiusKm": 226000,
+          "densityProfile": [
+            [0.0, 0.15],
+            [0.4, 0.1],
+            [1.0, 0.02]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "io",
+      "kind": "moon",
+      "nameKo": "이오",
+      "nameEn": "Io",
+      "mass": 8.9319e22,
+      "radius": 1.8216e6,
+      "parentId": "jupiter",
+      "$comment": "P9 #254 — JPL Horizons 2026-01-01 평균 궤도 요소 (Jupiter-centric, Laplace plane 기준). a=421800 km → AU 환산. Laplace 공명 1:2:4 (Io:Europa:Ganymede) 의 최내측.",
+      "colorHint": { "hex": "#F2D35C" },
+      "orbit": {
+        "semiMajorAxisAU": 2.821e-3,
+        "eccentricity": 0.0041,
+        "inclinationDeg": 0.036,
+        "longitudeOfAscendingNodeDeg": 43.977,
+        "longitudeOfPerihelionDeg": 84.129,
+        "meanLongitudeDeg": 171.016
+      }
+    },
+    {
+      "id": "europa",
+      "kind": "moon",
+      "nameKo": "유로파",
+      "nameEn": "Europa",
+      "mass": 4.7998e22,
+      "radius": 1.5608e6,
+      "parentId": "jupiter",
+      "$comment": "P9 #254 — JPL Horizons 2026-01-01. a=671100 km. Laplace 1:2:4 중간. T≈3.551d.",
+      "colorHint": { "hex": "#D4B896" },
+      "orbit": {
+        "semiMajorAxisAU": 4.486e-3,
+        "eccentricity": 0.009,
+        "inclinationDeg": 0.466,
+        "longitudeOfAscendingNodeDeg": 219.106,
+        "longitudeOfPerihelionDeg": 88.97,
+        "meanLongitudeDeg": 342.321
+      }
+    },
+    {
+      "id": "ganymede",
+      "kind": "moon",
+      "nameKo": "가니메데",
+      "nameEn": "Ganymede",
+      "mass": 1.4819e23,
+      "radius": 2.6341e6,
+      "parentId": "jupiter",
+      "$comment": "P9 #254 — JPL Horizons 2026-01-01. a=1070400 km. Laplace 1:2:4 최외측. T≈7.155d. 태양계 최대 위성.",
+      "colorHint": { "hex": "#9C8A74" },
+      "orbit": {
+        "semiMajorAxisAU": 7.1551e-3,
+        "eccentricity": 0.0013,
+        "inclinationDeg": 0.177,
+        "longitudeOfAscendingNodeDeg": 63.552,
+        "longitudeOfPerihelionDeg": 192.417,
+        "meanLongitudeDeg": 177.071
+      }
+    },
+    {
+      "id": "callisto",
+      "kind": "moon",
+      "nameKo": "칼리스토",
+      "nameEn": "Callisto",
+      "mass": 1.0759e23,
+      "radius": 2.4103e6,
+      "parentId": "jupiter",
+      "$comment": "P9 #254 — JPL Horizons 2026-01-01. a=1882700 km. 비공명 baseline. T≈16.689d. D4 Laplace 교차검증 기준.",
+      "colorHint": { "hex": "#6B5D50" },
+      "orbit": {
+        "semiMajorAxisAU": 1.2585e-2,
+        "eccentricity": 0.0074,
+        "inclinationDeg": 0.192,
+        "longitudeOfAscendingNodeDeg": 298.848,
+        "longitudeOfPerihelionDeg": 52.643,
+        "meanLongitudeDeg": 259.697
       }
     },
     {
