@@ -6,10 +6,15 @@ import { CelestialTree } from '../panels/celestial-tree';
 import { CelestialInfoPanel } from '../panels/celestial-info-panel';
 import { ScenarioPresets } from '../panels/scenario-presets';
 import { BlackHoleDiskPanel } from '../panels/black-hole-disk-panel';
+import { SatelliteInfoPanel } from '../panels/satellite-info-panel';
+import { GALILEAN_IDS, useOsculatingSync } from '@/hooks/use-osculating-sync';
 
 export function SidePanels() {
   const mode = useSimStore((s) => s.mode);
   const expanded = mode === 'research' || mode === 'sandbox';
+  // P9 #254 D7/D8 — Galilean Osculating 1Hz polling. 패널이 표시될 때만 enabled.
+  // #246 경계: 본 훅은 데이터만 제공, 선택 상태는 미반영.
+  const osc = useOsculatingSync({ enabled: expanded });
 
   return (
     <AnimatePresence>
@@ -38,6 +43,9 @@ export function SidePanels() {
             <CelestialInfoPanel />
             <div className="mt-4 pt-3 border-t border-border-subtle">
               <ScenarioPresets />
+            </div>
+            <div className="mt-4 pt-3 border-t border-border-subtle">
+              <SatelliteInfoPanel satellites={GALILEAN_IDS} oscElements={osc.elements} />
             </div>
             <div className="mt-4 pt-3 border-t border-border-subtle">
               <BlackHoleDiskPanel />
