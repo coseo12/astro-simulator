@@ -51,6 +51,7 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] 커밋 컨벤션 준수
 - [ ] 불필요한 변경 없음
 - [ ] 보안 취약점 없음
+- [ ] CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` 의 공통 JSON 스키마 (SSoT 코어 필드 7개) 를 수정한 경우: 5개 에이전트 파일 (`.claude/agents/architect.md` / `developer.md` / `pm.md` / `qa.md` / `reviewer.md`) 의 `## 마무리 체크리스트 JSON 반환` 섹션 동기화 + `bash scripts/verify-agent-ssot.sh` 로컬 pass 확인 (CI 에서도 자동 검사 — #145)
 
 ### 관련 이슈
 Closes #

@@ -53,6 +53,35 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    - 차단 항목 0건 → `gh pr edit --remove-label "stage:review" --add-label "stage:qa"`
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
 
+## 마무리 체크리스트 JSON 반환 (필수)
+
+sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **reviewer extends**. 누락 field 는 `null` / `{}` / `[]` 로 명시 (생략 금지). 메인 오케스트레이터가 GitHub 상태와 대조 검증한다 (volt #24).
+
+```json
+{
+  "commit_sha": null,
+  "pr_url": "https://github.com/.../pull/123",
+  "pr_comment_url": "https://github.com/.../pull/123#issuecomment-...",
+  "labels_applied_or_transitioned": ["stage:review→stage:qa"],
+  "auto_close_issue_states": {},
+  "blocking_issues": [],
+  "non_blocking_suggestions": ["..."],
+  "spawned_bg_pids": [],
+  "bg_process_handoff": "none",
+  "extends": {
+    "review_outcome": "approve | request_changes | comment",
+    "minor_classification_verdict": "appropriate | should_be_patch | should_be_major | n/a",
+    "axes_5_findings": {"logic": 0, "security": 0, "consistency": 1, "simplicity": 0, "traceability": 1}
+  }
+}
+```
+
+- `blocking_issues` 가 비어있지 않으면 `labels_applied_or_transitioned` 는 `"stage:review→stage:dev"` (차단). 비어있고 `extends.review_outcome` 이 `"approve"` 또는 `"comment"` 면 `"stage:review→stage:qa"`
+- `pr_comment_url` 이 `null` 이면 **박제 누락** — 종료 금지, `gh pr comment <번호>` 재실행
+- `commit_sha` — reviewer 는 보통 코드를 쓰지 않으므로 `null`
+- `auto_close_issue_states` — reviewer 가 머지 주체가 아니므로 보통 `{}`. 단, PR 본문의 `Closes #N` 이 잘못된 문법(`Closes: #A, #B` 콜론 등)인지 정적으로 점검하고 발견 시 `non_blocking_suggestions` 에 경고 추가
+- `spawned_bg_pids` / `bg_process_handoff` — reviewer 는 정적 리뷰만 수행하므로 보통 `[]` + `"none"`. 로컬 재현 테스트를 `run_in_background` 로 띄웠다면 반환 전 완주/kill 확인 후 `"sub-agent-confirmed-done"`. volt #46/#52
+
 ## 자가 점검
 
 - ❌ "전반적으로 잘 작성됨" 같은 모호한 통과 금지 — 항상 **5축에 매핑**

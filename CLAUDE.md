@@ -148,6 +148,8 @@ UI가 포함된 작업에서 4축으로 품질을 평가한다:
 <!-- harness:managed:real-lessons:start -->
 ## 실전 교훈 (portfolio-26, simple-shop 등에서 추출)
 
+> **블록 내 포인터 포맷 컨벤션**: 각 실전 교훈 블록은 내용 불릿 → `근거:` 불릿 → (선택) `일반화된 설계 지식:` 불릿 순서로 마감한다. `docs/architecture/` 나 `docs/decisions/` 로 승격된 지식이 있을 때만 마지막 포인터를 추가하고, 없으면 생략한다 (빈 placeholder 금지). 형식: `- 일반화된 설계 지식: [docs/architecture/<파일>.md](경로) — 한 줄 요약`. 근거: PR [#113](https://github.com/coseo12/harness-setting/pull/113) reviewer 권고 3, 이슈 [#114](https://github.com/coseo12/harness-setting/issues/114).
+
 ### 빌드 성공 ≠ 동작하는 앱
 빌드 통과 + 단위 테스트 통과여도 실제 브라우저에서 동작하지 않는 경우가 빈번하다.
 커밋 전 반드시 브라우저에서 3단계 검증을 수행한다:
@@ -157,6 +159,46 @@ UI가 포함된 작업에서 4축으로 품질을 평가한다:
 3. **흐름 확인**: 네비게이션 → 페이지 → 데이터 연동, URL ↔ 상태 동기화
 
 > 스크린샷 캡처는 Level 1에 불과하다. "렌더링 됨 = 동작함"이 아니다.
+
+### CI 통과 ≠ 테스트 실행
+"언어 자동 감지" 범용 CI 템플릿이 `echo` 만 수행하고 실제 `npm test` / `pytest` 등을 돌리지 않는 경우가 있다. 초록 체크로 머지되지만 **실제로는 테스트가 돌지 않은 상태**. PR 자동 체크 PASS 만 보지 말고 Actions 로그의 테스트 출력 존재 여부를 정기 감사한다. "빌드 성공 ≠ 동작" 의 CI/파이프라인 버전.
+
+- **진단 신호 3개**:
+  1. **실행 시간**: Node 테스트 포함 CI 가 5초 안에 PASS → 의심 (`npm ci` 만으로도 수십 초 소요). Python/Go/Rust 도 동일 관점
+  2. **Actions 로그**: step log 에 실제 테스트 러너 출력 (`ℹ tests N / ℹ pass N`, `PASSED`, `ok N`) 부재
+  3. **CI 구조**: `detect-and-test` 같은 범용 템플릿 이름 + step 내용이 `echo` 뿐
+- **감사 루틴**: 리포지토리 초기 설정 후 최소 1회, 이후 분기 1회 CI Actions 로그에서 실제 테스트 출력 확인
+- **고의적 실패 PR 실측**: 테스트 1건 일부러 깨뜨린 draft PR 로 CI 가 실제로 red 로 전환되는지 체크 후 revert — "CI 가 회귀 게이트로 동작함" 을 실증
+- **"로컬 통과 = 안전" 가정 금지** — CI 가 실질 회귀 게이트로 동작하지 않으면 로컬 miss 가 곧 main 오염
+- 근거: volt [#48](https://github.com/coseo12/volt/issues/48) — harness [#153](https://github.com/coseo12/harness-setting/issues/153) (v2.24.0). `.github/workflows/ci.yml` 의 `detect-and-test` 잡이 `echo "Node.js ${node_version} 사용"` 만 수행하고 `npm test` 를 돌리지 않은 채 4개 PR (#144/#147/#150/#154) 이 머지됐던 사례. "staging 성공 ≠ 커밋 내용" (volt [#13](https://github.com/coseo12/volt/issues/13)) 의 파이프라인 버전
+
+### workflow_dispatch 2단계 함정 (GitHub Actions)
+`workflow_dispatch` 트리거를 쓰는 workflow 는 default branch (보통 `main`) 반영 후에만 UI/CLI 에서 discover 된다. feature/develop 에만 머지된 상태에서는 `gh workflow run ... --ref develop` 이 `HTTP 404: workflow not found on the default branch` 로 실패한다. 추가로 workflow 가 PR 을 자동 생성하려 하면 저장소 Settings 의 `can_approve_pull_request_reviews` 가 기본 OFF 라서 `##[error]GitHub Actions is not permitted to create or approve pull requests` 로 거부된다.
+
+- **함정 1 — default branch 종속**: GitHub UI 의 "Run workflow" 버튼 + `gh workflow run` 둘 다 default branch 의 파일 목록을 기준으로 workflow 를 찾는다. `--ref <branch>` 로 실행할 브랜치는 고를 수 있으나, **파일 자체는 default branch 에 존재해야** 함. 결과: "설계 PR 머지 → 즉시 실행" 흐름이 기본 gitflow 에서 불가 — release 까지 가야 실행 가능
+- **함정 2 — PR 자동 생성 권한 기본 OFF**: 저장소 기본값 `{"can_approve_pull_request_reviews": false}` 이면 workflow 가 `permissions: pull-requests: write` 를 선언해도 PR 생성 API 가 거부. 조치:
+  ```bash
+  gh api -X PUT /repos/{OWNER}/{REPO}/actions/permissions/workflow \
+    -f default_workflow_permissions=read \
+    -F can_approve_pull_request_reviews=true
+  ```
+  변경 후 즉시 효과 (재시작 불필요)
+- **workflow_dispatch 도입 PR 의 DoD 에 "default branch 반영 후 실행 검증" 명시** — 설계 PR 만 머지하고 DoD 체크박스 "실행 검증" 을 못 채우는 함정 방지
+- **PR 자동 생성 workflow 는 상단 주석에 사전 조건 박제**:
+  ```yaml
+  # 사전 조건: Settings → Actions → "Allow GitHub Actions to create and approve pull requests" ON
+  # 또는: gh api -X PUT /repos/{OWNER}/{REPO}/actions/permissions/workflow -F can_approve_pull_request_reviews=true
+  ```
+- 근거: volt [#45](https://github.com/coseo12/volt/issues/45) — astro-simulator `bench:baseline-remeasure` workflow (PR #238) 도입 후 develop 에서 dispatch 실패 → v0.7.1 release 로 main 반영 → 2차 시도에서 권한 OFF 로 실패 → Settings API 로 플래그 전환 후 성공. 첫 실행 로그: actions/runs/24621714905, 성공 실행: actions/runs/24624988691
+
+### 주석 계약 vs 구현 drift — 버그 생성원
+파일 상단 주석 / JSDoc / 문서 블록이 선언한 **계약** (예: "X 카테고리는 Y 규칙 포함") 이 구현에 반영되지 않은 상태 — 주석-구현 drift — 는 **버그 생성원**. 주석만 있고 구현이 누락되면 드리프트 시 조용히 bug 가 생성되며, default fallback 이 존재하는 분기 함수에서 특히 위험 (누락을 fallback 이 흡수해서 테스트조차 fail 하지 않음).
+
+- **주석에 선언된 규칙 / 계약 / 불변식은 테스트 커버리지 대상** — 주석으로 명시한 동작은 자동 검증되어야 한다. 주석에 나열된 항목을 함수 시그니처/분기와 대조 (누락 발견 시 "주석이 틀렸는가, 구현이 틀렸는가" 판정 후 일치)
+- **카테고리 / enum 류 분기 함수 특히 주의** — `return 'atomic'` 같은 default fallback 은 누락을 조용히 흡수. fallback 에 `console.warn` 또는 테스트에서 **예상 카테고리 assert** 로 드리프트 감지
+- **리팩토링 vs 버그 수정의 경계** — 주석 계약에 구현을 맞추는 것은 엄밀히는 **버그 수정** (주석이 이미 계약). 그러나 downstream 영향(tracked 파일 세트 변화 등)이 있으면 릴리스 분류는 **MINOR** (행동 변화). CLAUDE.md 릴리스 규약의 "행동 변화 vs 문서 변경 판정 질문" 대조
+- **발견 진단 루트**: 테스트 실패 stderr / 영향받은 객체 특정 → 분기 결과 확인 (`console.log(categorize(...))`) → 주석 계약 대조 → 누락 규칙 1 라인 추가 (run-tests 스킬 "Flaky 진단 루트" 6단계 참조)
+- 근거: volt [#49](https://github.com/coseo12/volt/issues/49) — harness v2.25.0 [#157](https://github.com/coseo12/harness-setting/issues/157). `lib/categorize.js` 상단 주석이 "user-only: state, **logs**, 사용자 추가 파일" 을 선언했지만 `.claude/logs/` 규칙이 구현에서 누락되어 `atomic` 으로 fallback. 338개 세션 로그가 copy 대상이 되어 post-apply 검증 해시 race 로 병렬 테스트 75% flaky. 1 라인 추가 (`if (p.startsWith('.claude/logs/')) return 'user-only';`) 로 근본 해소 + 병렬 8회 연속 통과 실측
 
 ### HTTP 200 ≠ 올바른 리소스
 - 이미지 URL이 200을 반환해도 **내용이 의도와 다를 수 있다**
@@ -190,6 +232,16 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - 중복을 발견하면 미련 없이 삭제하고 기존 함수 import로 대체 (sunk cost 편향 경계)
 - 근거: volt [#21](https://github.com/coseo12/volt/issues/21) — 50줄 + 테스트 70줄 작성 후 동일 기능 함수가 동일 패키지에 이미 존재함을 발견한 사례
 
+### 신규 데이터 ≠ 신규 코드 — ADR 예측 재현
+레이어/플러그인/스키마 구조 하에서 기능 확장이 "데이터만 추가, 코드 변경 0" 으로 가능한지 ADR 에 **Concrete Prediction** 으로 박제하면, 구현 시 추상화 건강성을 실증할 수 있다. 위 "신규 함수 ≠ 신규 구현" 의 데이터 버전.
+
+- ADR 작성 시 예측 박제 형식: "{신규 엔티티/라우트/핸들러} 추가로 {핵심 모듈 경로} 의 코드 라인 변화 **0**"
+- 실구현 PR 에서 `git diff --stat <추상화 계층 경로>` 로 재현 확인 — 예측 성공 시 기존 추상화가 올바르게 설계됐다는 **구체 증거**
+- 예측 실패(= 계층 수정 필요) 시 두 갈래: (a) 추상화가 부족하다는 신호 → 먼저 리팩토링 후 ADR 구현 재개 (b) 예외 케이스 인정 → ADR Amendment 박제
+- 적용 시나리오: parentId 체인 / 플러그인 레지스트리 / 라우팅 테이블 / 스키마-주도 UI (form builder, dashboard) / i18n 번역 테이블 — **데이터로 확장하는 계층적 구조** 전반. 새 모듈/레이어를 만드는 결정에는 적용 불가 (확장이 이미 데이터로 흡수 가능한 상태가 전제)
+- 근거: volt [#47](https://github.com/coseo12/volt/issues/47) — astro-simulator P8 ADR `20260419-satellite-orbit-hybrid.md` 에 "포보스/데이모스 JSON 추가 → sim-canvas 코드 변경 0 줄" 예측 박제. PR-3 (#252) 에서 실측 재현 성공 — parentId 3계층 (scene graph / sidebar / camera) 이 모두 데이터로만 참조됨을 실증
+- 스킬 절차: [.claude/skills/record-adr/SKILL.md](.claude/skills/record-adr/SKILL.md) "Concrete Prediction" 섹션 — ADR `## 결과·재검토 조건` 에 박제하는 포맷 템플릿
+
 ### 커밋 성공 ≠ 의도한 변경 커밋됨
 `git commit` 종료 코드 0과 "커밋 성공" 메시지만 믿지 말 것. 특히 lint-staged + tracked/ignored 혼재 상황에서 staged 변경 일부가 **조용히 유실**될 수 있다.
 
@@ -215,14 +267,41 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - v2.8.0 (harness [#89](https://github.com/coseo12/harness-setting/issues/89)) 부터 **post-apply 검증 게이트** 도입: 파일 적용 직후 upstream 패키지 해시와 디스크 실측 해시를 비교하여 불일치 파일의 매니페스트 해시는 이전 값으로 유지(재-apply 시 pristine 재감지). 부분 실패 시 exit code 1 + stderr 경고. `harness doctor` 는 "매니페스트 해시 정합성" 항목으로 해시 위조를 감지한다.
 - v2.9.0 (harness [#92](https://github.com/coseo12/harness-setting/issues/92) Phase 1) 부터 매니페스트에 **`previousSha256`** 필드 자동 기록: `userSha === previousSha256` 인 파일은 `modified-pristine` 으로 재분류되어 `--apply-all-safe` 가 자가 복구한다. v2.8.0 이 못 잡던 타이밍(커밋 시점 lint-staged 롤백) 도 코드 레벨에서 해소.
 - 근거: volt [#27](https://github.com/coseo12/volt/issues/27). harness 코드 레벨 원자성 개선은 [#89](https://github.com/coseo12/harness-setting/issues/89)(v2.8.0) 과 [#92](https://github.com/coseo12/harness-setting/issues/92)(v2.9.0~) 에서 반영
+- 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴 (harness 외 파일 시스템 / DB 마이그레이션 / 빌드 캐시 / git 서브모듈에 재사용)
 
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 sub-agent(dev/qa 페르소나 등)는 빌드·테스트·브라우저 검증은 수행하면서도 **커밋/푸시/PR 생성/`gh pr comment` 박제** 같은 외부 가시성 단계에서 이탈하는 패턴이 반복된다(4회 관찰). sub-agent 관점 "작업 완료"와 harness 관점 "외부 가시성 있음"이 어긋나 메인 오케스트레이터가 매번 수동 보완해야 했다.
 
-- sub-agent 위임은 **"검증"까지는 신뢰하되 "박제"는 신뢰하지 말 것** — 메인 컨텍스트가 sub-agent 보고 수신 직후 `git log --oneline -1` / `gh pr list` / `gh pr view <번호> --json comments` 로 GitHub 상태를 직접 확인한다
-- sub-agent 프롬프트 말미에 **마무리 체크리스트 JSON 반환** 을 요구한다 — 커밋 SHA / PR URL / 코멘트 URL / 라벨 전이 결과를 field로 명시해 누락을 구조적으로 감지
+- sub-agent 위임은 **"검증"까지는 신뢰하되 "박제"는 신뢰하지 말 것** — sub-agent 의 보고는 의도이고 실제 외부 가시성은 별도
+- **메인이 직접 확인할 GitHub 명령 세트** — sub-agent 보고 수신 직후 메인 컨텍스트가 다음을 실행:
+  - `git log --oneline -1` — 커밋이 실제 반영됐는지
+  - `gh pr list` / `gh pr view <번호> --json comments` — PR·코멘트 박제 여부
+  - `gh issue view <auto-close 대상> --json state` — auto-close 실제 성공 여부
+- **auto-close 검증은 PR 규칙 섹션 keyword 문법 가드와 연결** — `Closes: #A, #B` 같은 콜론 문법은 #B 미인식 (PR 규칙 참조). 문법이 틀려도 sub-agent 는 "close 완료" 로 보고하므로 메인이 state 를 직접 확인
+- sub-agent 프롬프트 말미에 **마무리 체크리스트 JSON 반환** 을 요구한다 — 커밋 SHA / PR URL / 코멘트 URL / 라벨 전이 결과 / **auto-close 대상 이슈의 실제 state** 를 field로 명시해 누락을 구조적으로 감지
+- **공통 JSON 스키마 (SSoT)** — 모든 외부 가시성 박제 에이전트(developer / qa / reviewer / architect / pm)가 공통으로 반환하는 **코어 필드**. 에이전트별 특수 필드는 extends 형태로 덧붙인다. **키 순서는 아래 선언 순서대로 고정** (diff 리뷰 가독성 + grep 기반 회귀 검사를 위해):
+  ```json
+  {
+    "commit_sha": "abc1234 | null",
+    "pr_url": "https://github.com/.../pull/123 | null",
+    "pr_comment_url": "https://github.com/.../pull/123#issuecomment-... | null",
+    "labels_applied_or_transitioned": ["stage:qa"] ,
+    "auto_close_issue_states": {"#118": "CLOSED", "#114": "CLOSED"},
+    "blocking_issues": ["..."],
+    "non_blocking_suggestions": ["..."],
+    "spawned_bg_pids": [85117],
+    "bg_process_handoff": "main-cleanup | sub-agent-confirmed-done | none"
+  }
+  ```
+  누락 field 는 `null` 또는 빈 배열/객체로 **명시** (생략 금지). 공통 필드 검증 이후 에이전트별 `extends` 영역을 검증한다. 각 에이전트 파일의 `## 마무리 체크리스트 JSON 반환 (필수)` 섹션은 이 코어를 포함하고 특수 필드만 추가한다.
+  - `spawned_bg_pids` / `bg_process_handoff` (volt #46 #52) — sub-agent 가 `run_in_background=true` 로 띄운 로컬 프로세스(dev 서버 / `cargo test` / 장시간 빌드 등) 의 **정리 책임 인계** 를 명시. sub-agent 세션 종료 후에도 시스템 프로세스가 살아있어 포트 점유 / target 락 경쟁 / CPU 좀비 누적을 일으키는 패턴이 반복됨(astro-simulator P8/P9 에서 관찰). 값 규약:
+    - `spawned_bg_pids`: 반환 전까지 sub-agent 가 시작해 **아직 살아있는** PID 배열. 이미 kill/완주한 프로세스는 제외. 띄운 적 없으면 `[]`
+    - `bg_process_handoff`: `"main-cleanup"` (메인 오케스트레이터가 `ps`/`lsof` 로 확인 후 정리 책임) / `"sub-agent-confirmed-done"` (sub-agent 가 반환 전 완주 확인 완료 — PID 배열이 `[]` 여야 정합) / `"none"` (백그라운드 프로세스 시작 안 함)
+    - **메인 오케스트레이터 책임**: `bg_process_handoff="main-cleanup"` 이고 `spawned_bg_pids` 가 비어있지 않으면 sub-agent 반환 직후 `ps auxww | grep -E '<PID 패턴>'` 또는 `lsof -i :<port>` 로 독립 확인 + 필요 시 kill. 다음 sub-agent 호출 전 포트/경로 경쟁 해소
+    - **중복 브랜치 dev 서버 오진 방지** — feature 브랜치별 worktree 에서 띄운 dev 서버가 이후 브랜치에서 동일 포트를 점유하면 HMR 이 낡은 번들을 서빙한다. 메인이 새 dev 서버 띄우기 전 `lsof -i :<port>` 선행 확인
+- **SSoT 동기화 자동 가드 (#145, v2.23.0~)** — 위 공통 JSON 스키마 9개 필드는 **5개 에이전트 파일** (`.claude/agents/architect.md` / `developer.md` / `pm.md` / `qa.md` / `reviewer.md`) 의 체크리스트 JSON 블록에도 그대로 등장해야 한다 (sub-agent 가 system prompt 만 보고 반환할 수 있도록). 동기화 보장은 수동 체크박스가 아닌 **`scripts/verify-agent-ssot.sh`** 자동 검사로 강제된다 — 9개 필드 존재 + 선언 순서 준수를 검증하며, drift 시 누락 파일/필드와 순서 이탈 지점을 stderr 에 보고하고 exit 1. CI `detect-and-test` 에 통합되어 PR 머지 전 drift 차단. **이 SSoT 블록을 수정하는 PR 은 반드시 5개 에이전트 파일의 `## 마무리 체크리스트 JSON 반환` 섹션을 함께 갱신하고 `bash scripts/verify-agent-ssot.sh` 로 사전 확인한다.**
 - 누락 감지 시 메인이 직접 보완 박제 (커밋/PR/코멘트). sub-agent를 재호출해 같은 누락을 반복시키지 않는다
-- 근거: volt [#24](https://github.com/coseo12/volt/issues/24) — astro-simulator P6-B~E 에서 dev/qa sub-agent 마무리 단계 누락 4회 연속 관찰
+- 근거: volt [#24](https://github.com/coseo12/volt/issues/24) — astro-simulator P6-B~E 에서 dev/qa sub-agent 마무리 단계 누락 4회 연속 관찰. volt [#46](https://github.com/coseo12/volt/issues/46) / volt [#52](https://github.com/coseo12/volt/issues/52) — background 프로세스 인계 누락의 로컬 프로세스 버전 (stale dev 서버 포트 점유 오진 + `cargo test` 좀비 4개 누적 관찰). `spawned_bg_pids` / `bg_process_handoff` 2필드로 인계 책임 구조화
 
 ### sub-agent multi-turn 라운드 이탈 — 매트릭스 일관성 검증
 sub-agent에 적응적 질답·설계 같은 multi-turn 세션을 위임할 때, SendMessage 로 라운드를 이어가도 전 라운드의 세부 매트릭스(Phase 제목 / DoD 수치 / 의존 관계)가 다음 라운드에서 **이탈**하는 사례가 관찰된다. "권고안 A" 같은 참조 레이블만으로는 세부 컨텍스트 복원이 보장되지 않는다 — sub-agent 는 세션 목적만 유지하고 매트릭스 세부는 잃을 수 있다.

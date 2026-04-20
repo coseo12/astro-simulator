@@ -107,7 +107,7 @@ pnpm dev                  # Next.js dev server
 pnpm build                # 전체 빌드 (core, shared, web)
 pnpm typecheck            # 타입 체크
 pnpm lint                 # ESLint
-pnpm test                 # Vitest 전체 (core + shared + web)
+pnpm test:unit            # Vitest 전체 (core + shared + web + physics-wasm)
 pnpm format               # Prettier 포맷
 
 # 브라우저 검증 (CRITICAL #3 준수)
