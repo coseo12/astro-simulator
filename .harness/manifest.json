@@ -1,36 +1,30 @@
 {
-  "harnessVersion": "2.28.1",
+  "harnessVersion": "2.28.2",
   "installedAt": "2026-04-18T14:35:32Z",
   "files": {
     "CLAUDE.md": {
       "sha256": "d5db1344c5e60da983cfba25fbaab75062db13050daf88e815a24d77e95640c9",
-      "category": "managed-block",
-      "previousSha256": "85e6318a8ae0e63cc025a8b57f37a37f05139f3e7fae4b263dcc1ed5781ba105"
+      "category": "managed-block"
     },
     ".claude/agents/architect.md": {
       "sha256": "25a85bc423c3569fd4481212d591761b639c726d354f43e97678ade5e4e99368",
-      "category": "atomic",
-      "previousSha256": "ca28262e8076d08f1439d80431f977cb3e492abc2accf016cf8cc61ddc56b4cb"
+      "category": "atomic"
     },
     ".claude/agents/developer.md": {
       "sha256": "645bf4c8821e2870da4a0d93d447ef9910d55e8c92d613db7cef334558be0e10",
-      "category": "atomic",
-      "previousSha256": "5a64228d62d2149d571d9077bd4b81445e136cc5b08fa919ee267284d4fe5e42"
+      "category": "atomic"
     },
     ".claude/agents/pm.md": {
       "sha256": "17d0d97aa93d7f924dc91fc11c14b0d7fd8a49e762b6305206a17556c75fb95f",
-      "category": "atomic",
-      "previousSha256": "f6fa5999c19344f418b79db6466998df7d03e43b1999d8d2268e507dc38123db"
+      "category": "atomic"
     },
     ".claude/agents/qa.md": {
       "sha256": "1346af41cf87794fb62bdcab946f816002f2b1c9dfc4e01e3d3153249506e3d7",
-      "category": "atomic",
-      "previousSha256": "5d7a006d32e7b181fdff9bf5d5cf86062377ff57fed948c19e6edec25411dc39"
+      "category": "atomic"
     },
     ".claude/agents/reviewer.md": {
       "sha256": "3b587a9f8c266d31581b55a67f810c66eb960d72f1198c913594316d39058d5e",
-      "category": "atomic",
-      "previousSha256": "a45672c2fe387b40015822fd8ddb204872fa46dccb1e41b769eca888eab8ba61"
+      "category": "atomic"
     },
     ".claude/commands/architect.md": {
       "sha256": "6ce7bba239c1b6c546c4c98283c9bed6919b60679b7924d7fab39b3e4297e62f",
@@ -110,18 +104,15 @@
     },
     ".claude/skills/cross-validate/scripts/cross_validate.sh": {
       "sha256": "29147c5fbe457916d4f291b6dfbad3bdf31add8935cfc7064043fcad08cc22f0",
-      "category": "atomic",
-      "previousSha256": "463bff612ac215ded153bb54dcacffe5b97b870b06a6712829caa96abb6ed079"
+      "category": "atomic"
     },
     ".claude/skills/record-adr/SKILL.md": {
       "sha256": "5e6c39f566fc435447174c1a6ccec062a630fa0d6ba6ec902716e577bde84940",
-      "category": "atomic",
-      "previousSha256": "1e82733c508dbe34a4cc3acdffdb6da21d21bed6b0bb4a19a18d7e0d85382f50"
+      "category": "atomic"
     },
     ".claude/skills/run-tests/SKILL.md": {
       "sha256": "66f9000ff969e6c8081bc0b98d76462e28df6ef94ae61790f6d493ec5623121c",
-      "category": "atomic",
-      "previousSha256": "18efe8dc9abec914cad1399684dd32d98df398690c1121a9e4261d5290c6e4ae"
+      "category": "atomic"
     },
     ".claude/skills/volt-review/SKILL.md": {
       "sha256": "523447c52e91d40d9e9dffb4977d1a47bad1cd109ab691a01994aed4dae835ba",
@@ -137,8 +128,7 @@
     },
     ".github/PULL_REQUEST_TEMPLATE.md": {
       "sha256": "b6e8e44a4eb0cd52a43fbc4554577a4a94793888060c8e09789336322b217e00",
-      "category": "atomic",
-      "previousSha256": "ce1e9fc2554a181fe96daeb6957c1add46f073319bae03d93b916cb1534da56d"
+      "category": "atomic"
     },
     ".github/workflows/agent-dispatch.yml": {
       "sha256": "3369562ed9c031652065e468d080f102b068a47f0f56b0545b1fcee16a4bc0f9",
@@ -157,14 +147,13 @@
       "category": "frozen"
     },
     ".github/workflows/ci.yml": {
-      "sha256": "fddbe647a105092e0520bf1a82d23c5c7820ba1424ef60211f366f3a1f796443",
+      "sha256": "8df2e12fc2ed328f3df5aa214140b94a3f212395d38933bb9b07e96bf775a540",
       "category": "frozen",
-      "previousSha256": "deebad281a574fdc8fa6d60c669069f27c32321795133f4e1e32a7cb71d184c8"
+      "previousSha256": "fddbe647a105092e0520bf1a82d23c5c7820ba1424ef60211f366f3a1f796443"
     },
     ".github/workflows/pr-review.yml": {
       "sha256": "d94a4ef84067409cff93af4c15fb4790207af14b69bf3ba4682b710d1e59ebb0",
-      "category": "frozen",
-      "previousSha256": "c58f1b8a529163bf34c851922c4c84f0f5d4eecdad10c8ac863cddeaa44d15cc"
+      "category": "frozen"
     },
     ".github/workflows/prettierignore-drift.yml": {
       "sha256": "1cd5155151579ba7446abd3c84a34cc44b5d82b397c0878fafda6180fe39a5e6",
@@ -500,8 +489,7 @@
     },
     "docs/decisions/README.md": {
       "sha256": "77818c48002cdf52ae7d1e98f13556e80a2d47d28da20006b3d09a06a2e3818b",
-      "category": "atomic",
-      "previousSha256": "23d828450165bb0a2b895e3cd1c54f06c64af41c118affc16d296d74ce6620fc"
+      "category": "atomic"
     },
     "docs/deployment-guide.md": {
       "sha256": "d87ee359c7fe11cb435357bd22171948f58f3c7f5adf5602083c89f2a99379fc",
@@ -636,5 +624,5 @@
       "category": "atomic"
     }
   },
-  "lastUpdatedAt": "2026-04-20T10:23:06Z"
+  "lastUpdatedAt": "2026-04-20T10:38:25Z"
 }

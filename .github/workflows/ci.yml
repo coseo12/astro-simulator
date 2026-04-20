@@ -19,38 +19,62 @@ jobs:
           node_version=$(jq -r '.engines.node // "20"' package.json | grep -oE '[0-9]+' | head -1)
           echo "Node.js ${node_version} 사용"
 
-      # Node.js 실 테스트 (#153)
-      # - setup-node 는 package.json 존재 시 실행. node-version-file 이 engines.node 의 semver range 도 해석
-      # - cache 는 package-lock.json 이 있을 때만 활성화 (setup-node v4 가 알아서 skip)
-      # - npm ci 는 package-lock.json 이 있을 때만 (재현 가능한 정확한 설치)
-      # - npm install --no-audit --no-fund 는 lock 이 없는 Node 프로젝트 fallback
-      # - npm test --if-present 는 scripts.test 없으면 조용히 skip (다운스트림 호환성)
-      # setup-node@v4 는 cache: 'npm' 지정 시 package-lock.json 부재면 실제 fail
-       # (실측: "Dependencies lock file is not found" 에러로 step 실패) 하므로 분기 필수
-       # — Gemini non-blocking 권고 (단일화) 실측 오탐 확인, 2 step 유지
+      # Node.js 실 테스트 (#153 / pnpm 지원 #175)
+      # 패키지 매니저 우선순위: pnpm-lock.yaml > package-lock.json > (lock 없음, npm fallback)
+      # 배타 조건 분기 — pnpm 과 npm step 은 동시에 실행되지 않는다
+      #
+      # - pnpm 경로: pnpm-lock.yaml 감지 → pnpm/action-setup (package.json::packageManager 자동 감지)
+      #   + setup-node cache='pnpm' + pnpm install --frozen-lockfile + pnpm test --if-present
+      # - npm lock 경로: package-lock.json 감지 (pnpm-lock 없음) → setup-node cache='npm' + npm ci + npm test
+      # - lock 없음 fallback: package.json 만 있을 때 → setup-node (cache 비활성) + npm install + npm test
+      #
+      # setup-node@v4 는 cache: 'npm'/'pnpm' 지정 시 해당 lock 부재면 실패하므로 분기 필수
+      # — Gemini non-blocking 권고 (단일화) 실측 오탐 확인, 다중 step 유지
+
+      # --- pnpm 경로 ---
+      - name: pnpm setup
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@v4
+
+      - name: Node.js setup (pnpm)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: 'pnpm'
+
+      - name: pnpm install
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm test
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm test --if-present
+
+      # --- npm 경로 (pnpm-lock 없을 때만) ---
       - name: Node.js setup (lockfile 있음, npm cache 활성)
-        if: hashFiles('package-lock.json') != ''
+        if: hashFiles('package-lock.json') != '' && hashFiles('pnpm-lock.yaml') == ''
         uses: actions/setup-node@v4
         with:
           node-version-file: 'package.json'
           cache: 'npm'
 
       - name: Node.js setup (lockfile 없음, cache 비활성)
-        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == ''
+        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == '' && hashFiles('pnpm-lock.yaml') == ''
         uses: actions/setup-node@v4
         with:
           node-version-file: 'package.json'
 
       - name: npm ci (lockfile 있을 때)
-        if: hashFiles('package-lock.json') != ''
+        if: hashFiles('package-lock.json') != '' && hashFiles('pnpm-lock.yaml') == ''
         run: npm ci
 
       - name: npm install (lockfile 없을 때 fallback)
-        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == ''
+        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == '' && hashFiles('pnpm-lock.yaml') == ''
         run: npm install --no-audit --no-fund --ignore-scripts
 
       - name: npm test
-        if: hashFiles('package.json') != ''
+        if: hashFiles('package.json') != '' && hashFiles('pnpm-lock.yaml') == ''
         run: npm test --if-present
 
       # Python 프로젝트 감지
