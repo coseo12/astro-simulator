@@ -63,8 +63,9 @@
 - [ ] `packages/shared/src/constants/astronomy.ts` 대조 — AU/중력상수/solar mass 등
 - [ ] ±0.01% 초과 발견 시 즉시 JSON 수정 (Q11 결정)
 - [ ] IAU 공식값 없는 body 는 `uncertainty` 필드로 오차 범위 기록 + 대안 출처 (NASA JPL 등) 명시
-- [ ] 색상(`colorHint.hex`) 감사 — 관측 기반 / 아티스트 선택 구분 필드 (`colorSource`)
+- [ ] 색상(`colorHint.hex`) 감사 — `colorSource`: `observed` / `artistic` / `inferred` **3종** (Gemini 2차 교차검증 수용)
 - [ ] 데이터 감사 보고서 — 수정 항목 수 / 추가 필드 수 / IAU 공식값 부재 body 수
+- [ ] **`scripts/verify-iau-data.mjs` 신규** — 감사 결과를 자동 검증하는 스크립트 (IAU 공식값과 JSON 대조 + uncertainty 필드 필수 검사 + epoch 존재 검증). CI `verify-and-rust` 또는 신규 workflow 로 통합하여 PR 머지 전 회귀 차단 (Gemini 2차 교차검증 High 발견 수용)
 
 ### P10-C — 사실 모드 + UI 정비
 
@@ -132,14 +133,14 @@ cross-validate 3단 프로토콜 추적성 확보 차원에서 본체 박제 (vo
 ```
 P10-A (원칙 박제)
    ↓
-P10-B (데이터 감사)
-   ↓
-P10-C (UI 정비)
+P10-B (데이터 감사)  ⇄  P10-C (UI 정비)   ← B/C 간 1회 iterative 조정 허용
    ↓
 P10-D (정확도 이슈)  ← 병렬 금지
    ↓
 P10-D.5 (벤치 회귀)
 ```
+
+> **B ⇄ C iterative 조정 근거 (Gemini 2차 교차검증 수용, 2026-04-20)**: P10-B 에서 `uncertainty` / `colorSource` / `dataSource` 등 **스키마 확장** 이 P10-C 에서 **UI 표시** (배지 / 크레딧 / 오차 막대) 로 직접 연결된다. 직렬 "B → C" 로 엄격히 분리하면 B 완료 후 C 에서 렌더 요구사항 발견 시 B 스키마 재설계 비용이 발생. **B/C 간 1회 iterative 조정 허용** — 단 두 번 이상 왕복 시 설계 결함으로 간주하고 재계약. C → D 는 직렬 유지 (과장 모드 변경 + 물리 수정 동시 금지).
 
 ## 후속 Phase 전망
 
