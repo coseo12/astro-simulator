@@ -7,7 +7,7 @@ import { GALILEAN_IDS, type OscSyncResult } from '@/hooks/use-osculating-sync';
  * P9 #254 PR-3 D8 DOM 스냅샷 테스트.
  *
  * 검증 목표:
- *  1. `solar-system.json` 정적 폴백 시 4체 모두 JSON 값으로 표시 (Io e=0.0041 / i=0.036° 등)
+ *  1. `solar-system.json` 정적 폴백 시 4체 모두 JSON 값으로 표시 (P10-D #261 JPL 재쿼리 후 Io e=0.003988 / i=2.207° 등)
  *  2. `oscElements` 동적 값이 주입되면 WASM 값을 우선 사용
  *  3. `singularity===1` 원소에만 "원순환 근사" 배지 렌더
  *
@@ -18,22 +18,23 @@ describe('SatelliteInfoPanel', () => {
   it('정적 폴백 — 4 Galilean 모두 JSON 값과 일치', () => {
     render(<SatelliteInfoPanel satellites={GALILEAN_IDS} />);
 
-    // Io: e=0.0041 / i=0.036° — solar-system.json 박제값.
+    // P10-D #261: JPL Horizons 2026-01-01 TDB J2000 ecliptic 재쿼리 값.
+    // Io: e=0.003988 / i=2.2065°.
     expect(screen.getByTestId('sat-row-io')).toBeInTheDocument();
-    expect(screen.getByTestId('sat-e-io').textContent).toBe('0.0041');
-    expect(screen.getByTestId('sat-i-io').textContent).toBe('0.036°');
+    expect(screen.getByTestId('sat-e-io').textContent).toBe('0.0040');
+    expect(screen.getByTestId('sat-i-io').textContent).toBe('2.207°');
 
-    // Europa: e=0.0090 / i=0.466°.
-    expect(screen.getByTestId('sat-e-europa').textContent).toBe('0.0090');
-    expect(screen.getByTestId('sat-i-europa').textContent).toBe('0.466°');
+    // Europa: e=0.009286 / i=2.1504°.
+    expect(screen.getByTestId('sat-e-europa').textContent).toBe('0.0093');
+    expect(screen.getByTestId('sat-i-europa').textContent).toBe('2.150°');
 
-    // Ganymede: e=0.0013 / i=0.177°.
-    expect(screen.getByTestId('sat-e-ganymede').textContent).toBe('0.0013');
-    expect(screen.getByTestId('sat-i-ganymede').textContent).toBe('0.177°');
+    // Ganymede: e=0.002186 / i=2.3390°.
+    expect(screen.getByTestId('sat-e-ganymede').textContent).toBe('0.0022');
+    expect(screen.getByTestId('sat-i-ganymede').textContent).toBe('2.339°');
 
-    // Callisto: e=0.0074 / i=0.192°.
-    expect(screen.getByTestId('sat-e-callisto').textContent).toBe('0.0074');
-    expect(screen.getByTestId('sat-i-callisto').textContent).toBe('0.192°');
+    // Callisto: e=0.007347 / i=1.9516°.
+    expect(screen.getByTestId('sat-e-callisto').textContent).toBe('0.0073');
+    expect(screen.getByTestId('sat-i-callisto').textContent).toBe('1.952°');
 
     // 정적 폴백에서는 1Hz 배지 없음.
     expect(screen.queryByTestId('sat-dynamic-io')).not.toBeInTheDocument();

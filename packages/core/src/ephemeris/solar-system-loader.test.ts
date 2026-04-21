@@ -89,14 +89,16 @@ describe('loadSolarSystem', () => {
       expect(m?.orbit).toBeDefined();
     }
 
-    // Io 이심률 = 0.0041 (ADR §결정 #3 특이점 가드 경계 e > 1e-6 충족 확인)
-    expect(io!.orbit!.eccentricity).toBeCloseTo(0.0041, 4);
-    // Europa 이심률 = 0.009
-    expect(europa!.orbit!.eccentricity).toBeCloseTo(0.009, 3);
-    // Ganymede 이심률 = 0.0013
-    expect(ganymede!.orbit!.eccentricity).toBeCloseTo(0.0013, 4);
-    // Callisto 이심률 = 0.0074
-    expect(callisto!.orbit!.eccentricity).toBeCloseTo(0.0074, 4);
+    // P10-D #261 — JPL Horizons 재쿼리 (2026-01-01 TDB, J2000 ecliptic).
+    // ADR §결정 #3 특이점 가드 경계 e > 1e-6 은 여전히 만족 (모두 > 2e-3).
+    // Io 이심률 = 0.003988 (JPL 2026-01-01)
+    expect(io!.orbit!.eccentricity).toBeCloseTo(0.003988, 5);
+    // Europa 이심률 = 0.009286
+    expect(europa!.orbit!.eccentricity).toBeCloseTo(0.009286, 5);
+    // Ganymede 이심률 = 0.002186
+    expect(ganymede!.orbit!.eccentricity).toBeCloseTo(0.002186, 5);
+    // Callisto 이심률 = 0.007347
+    expect(callisto!.orbit!.eccentricity).toBeCloseTo(0.007347, 5);
 
     // 질량 순서: Europa < Io < Callisto < Ganymede (태양계 최대 위성)
     // JPL: Europa 4.8e22 / Io 8.93e22 / Callisto 1.08e23 / Ganymede 1.48e23
