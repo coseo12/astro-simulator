@@ -78,17 +78,17 @@
 - [ ] `scientific` 모드 빈 화면 이탈 방지 안내 — 뷰포트에 `data-testid="scientific-mode-notice"` 노드 존재 + `?view=scientific` 최초 진입 시 자동 표시 + 사용자 dismiss 가능 (localStorage 키 `astro:scientific-notice-dismissed`)
 - [ ] 3단계 브라우저 검증 (CRITICAL #3) — 정적 / 인터랙션 / 흐름
 
-### P10-D — 정확도 이슈 소화
+### P10-D — 정확도 이슈 소화 (2/3 완료, 1건 P13 이관)
 
-- [ ] [#261](https://github.com/coseo12/astro-simulator/issues/261) Galilean φ₀ = 218° → 180° (Laplace 평형점 교정 D5-b 재개)
-- [ ] [#263](https://github.com/coseo12/astro-simulator/issues/263) Osculating 속도 추정 `timeScale` 내성화 — forward-diff → 씬 state vector 직접 추출
-- [ ] [#255](https://github.com/coseo12/astro-simulator/issues/255) 목성 J2/J4 편평도 세차 반영 (Galilean ±0.1% 영향)
-- [ ] 각 이슈별 단위 테스트 + 기존 P9 DoD 유지 확인
+- [x] [#261](https://github.com/coseo12/astro-simulator/issues/261) Galilean φ₀ = 218° → 180° (PR #283 merged, scope-close — JPL 정확값 + φ₀ 평형점 실증, tidal force 는 #282 P11+)
+- [x] [#263](https://github.com/coseo12/astro-simulator/issues/263) Osculating 속도 추정 `timeScale` 내성화 (PR #284 merged, Newton state vector 직접 추출)
+- [ ] ~~[#255](https://github.com/coseo12/astro-simulator/issues/255) 목성 J2/J4 편평도 세차~~ → **P13 (궤도 정밀 보정) 이관**. 이슈 본문 "priority:medium — P13 과 묶어 처리 후보" 및 #282 tidal force 와 통합 구현 목적. 현 공차 ±1% 에서는 J2 미포함 오차 미검출
 
 ### P10-D.5 — 벤치마크 회귀 측정
 
 - [ ] `bench-scene-*.mjs` 재측정 — P9 baseline 대비 회귀율 < 5%
-- [ ] J2/J4 추가로 인한 per-frame 연산 증가 측정 + JSON 보고
+- [ ] ~~J2/J4 추가로 인한 per-frame 연산 증가 측정~~ (P13 이관에 따라 본 항목 제거)
+- [ ] P10-B JSON 데이터 교정 + P10-C viewMode 분기 + P10-D Newton state vector 추출 종합 영향
 - [ ] 회귀율 ≥ 5% 시 원인 프로파일링 + 완화 (필요 시 별도 이슈 분리)
 
 ## 비목표 (명시 박제)
