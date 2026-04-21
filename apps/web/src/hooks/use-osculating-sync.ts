@@ -1,7 +1,7 @@
 'use client';
 
 import { ephemeris as ephemerisApi } from '@astro-simulator/core';
-import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import { useEffect, useRef, useState } from 'react';
 
 // 동적 import 결과 타입 참조용 — top-level import 하면 SSR prerender 시 wasm 로드 시도하므로 type-only.
@@ -13,23 +13,19 @@ type ExtractFn = typeof import('@astro-simulator/core').physics.extractOsculatin
  * ADR `docs/decisions/20260420-p9-galilean-laplace-rings.md` §인터페이스 박제 L257~L290.
  *
  * 동작 요약:
- *  - 주기적으로 Babylon 씬에서 Jupiter-centric (pos, vel) 상태를 샘플링하고
- *    physics-wasm `extract_osculating_elements` 를 호출하여 6 Kepler 요소 + singularity 추출.
+ *  - 주기적으로 `window.__solarScene.getBodyState(id, parentId)` 로 parent-centric
+ *    (pos, vel) state vector 를 읽고 physics-wasm `extract_osculating_elements` 호출.
  *  - fps 자동 폴백 (ADR §R2): 기본 1Hz, fps 저하 시 2Hz/5Hz/10Hz 단계 강등 (히스테리시스 +5fps).
  *  - fps 측정: `requestAnimationFrame` 델타 이동평균 (window=2s).
  *
  * **데이터 소스 우선순위**:
- *  1. 실시간 (씬 mesh 위치 + delta 기반 속도 추정) — `window.__simCore` 로 접근
- *  2. 실패 시 null (정적 JSON 폴백은 `SatelliteInfoPanel` 에서 처리)
+ *  1. Newton 엔진 활성 — `__solarScene.getBodyState()` 로 엔진 내부 state 직접 추출
+ *     (timeScale 무관, forward-diff 없음). P10-D #263 로 도입.
+ *  2. Kepler 모드 또는 state 미가용 — null 반환 → 정적 JSON 폴백 (`SatelliteInfoPanel`).
  *
- * **KNOWN ISSUE — timeScale 내성 부재** (follow-up #263):
- *  - forward-diff `velocity ≈ (pos(t+Δ) - pos(t)) / Δ` 는 씬 `timeScale ≫ 1` 조건에서
- *    Io 공전주기(1.77일) 대비 Δ 스텝이 비선형 구간을 포함하여 noise 과다.
- *  - 기본 `timeScale=86400s/s` 조건에서 UI 패널 "1Hz 배지" 표시 조건 (all-Galilean
- *    extraction 성공) 미충족. 정적 JSON 값만 렌더.
- *  - 해결: Babylon 씬 저장 velocity state vector 직접 추출 (forward-diff 폐기).
- *    상세는 [P9-followup #263](https://github.com/coseo12/astro-simulator/issues/263).
- *  - 인프라 (훅 자체·fps 폴백·WASM wiring) 는 완결. timeScale=1 에서 정상 동작.
+ * **P10-D #263 해결됨** (2026-04-21): forward-diff `(pos(t+Δ) - pos(t)) / Δ` 는 씬
+ * `timeScale ≫ 1` 조건에서 Io 공전주기 대비 비선형 noise 과다로 UI "1Hz 배지" 미렌더.
+ * 씬 state vector 직접 추출로 근본 해결. Newton 모드 한정 (Kepler 는 정적 폴백 유지).
  *
  * #246 경계: 본 훅은 데이터만 제공. 선택 상태 / 클릭 흐름은 #246 범위.
  */
@@ -110,47 +106,37 @@ function resolveStep(currentStep: number, fps: number): number {
 }
 
 /**
- * Babylon 씬에서 Galilean + Jupiter mesh world position 을 읽어 Jupiter-centric
- * (pos [m], vel [m/s]) 상태로 변환하는 내부 헬퍼.
+ * P10-D #263 — Newton 엔진 state vector 직접 추출.
  *
- * 속도 추정: 직전 샘플과의 차분 (forward difference). 첫 샘플은 null.
- * scene 단위: 1 unit = 1 AU → meters 환산은 AU 상수 사용.
- *
- * 실 Babylon 씬 미가용 (SSR/테스트) 시 null.
+ * `__solarScene.getBodyState(id, 'jupiter')` 로 Jupiter-centric (pos [m], vel [m/s])
+ * 상태를 읽는다. Newton/Barnes-Hut/WebGPU 엔진 활성 시 시뮬 state 에서 직접 추출되어
+ * timeScale 무관 정확. Kepler 모드 or 엔진 미가용 시 null (→ 정적 JSON 폴백).
  */
-interface SceneSample {
-  pos: Record<GalileanId, [number, number, number]>; // meters (Jupiter-centric)
-  ts: number; // performance.now() ms
+interface GalileanState {
+  pos: [number, number, number];
+  vel: [number, number, number];
 }
 
-function sampleScene(prev: SceneSample | null): SceneSample | null {
+function sampleSceneStates(): Record<GalileanId, GalileanState> | null {
   if (typeof window === 'undefined') return null;
-  const core = (window as unknown as { __simCore?: { scene?: unknown } }).__simCore;
-  if (!core || !core.scene) return null;
-  const scene = core.scene as {
-    getMeshByName?: (name: string) => { position?: { x: number; y: number; z: number } } | null;
-    meshes?: Array<{ name?: string; position?: { x: number; y: number; z: number } }>;
-  };
-  const getMesh = (id: string) => {
-    if (typeof scene.getMeshByName === 'function') {
-      const m = scene.getMeshByName(id);
-      if (m?.position) return m.position;
+  const solar = (
+    window as unknown as {
+      __solarScene?: {
+        getBodyState?: (
+          id: string,
+          parentId: string,
+        ) => { pos: [number, number, number]; vel: [number, number, number] } | null;
+      };
     }
-    // 폴백: meshes 배열 탐색 (테스트 환경 대응).
-    const found = scene.meshes?.find((m) => m.name === id);
-    return found?.position ?? null;
-  };
-  const jp = getMesh('jupiter');
-  if (!jp) return null;
-  // 씬 좌표(AU) → meters, Jupiter-centric 차분.
-  const pos = {} as Record<GalileanId, [number, number, number]>;
+  ).__solarScene;
+  if (!solar || typeof solar.getBodyState !== 'function') return null;
+  const out = {} as Record<GalileanId, GalileanState>;
   for (const id of GALILEAN_IDS) {
-    const m = getMesh(id);
-    if (!m) return null;
-    pos[id] = [(m.x - jp.x) * AU, (m.y - jp.y) * AU, (m.z - jp.z) * AU];
+    const s = solar.getBodyState(id, 'jupiter');
+    if (!s) return null;
+    out[id] = s;
   }
-  void prev;
-  return { pos, ts: performance.now() };
+  return out;
 }
 
 /**
@@ -190,9 +176,13 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
   const [currentIntervalMs, setCurrentIntervalMs] = useState<number>(baseInterval);
   const [observedFps, setObservedFps] = useState<number>(-1);
 
-  // 직전 샘플 (delta 기반 속도 추정용) + 현재 폴백 단계.
-  const prevSampleRef = useRef<SceneSample | null>(null);
+  // 현재 폴백 단계.
   const stepRef = useRef<number>(0);
+  // P10-D #263 — observedFps 를 ref 로 mirror 하여 polling useEffect 의존성 배열에서
+  // 제거. 이전 구현은 fps raf 가 매 frame setObservedFps 호출 → polling useEffect
+  // 매 frame cleanup/재실행 → setTimeout 취소 → 1Hz 배지 미렌더 (ADR §Amendments
+  // 2026-04-20, volt #46).
+  const observedFpsRef = useRef<number>(-1);
 
   // fps 측정 — raf 델타 이동평균 (window=2s).
   useEffect(() => {
@@ -212,6 +202,7 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
       }
       const avgDt = bufferMs / deltas.length;
       const fps = avgDt > 0 ? 1000 / avgDt : 0;
+      observedFpsRef.current = fps;
       setObservedFps(fps);
       rafId = requestAnimationFrame(tick);
     };
@@ -251,39 +242,32 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
 
     const step = () => {
       if (cancelled) return;
-      const sample = sampleScene(prevSampleRef.current);
-      if (sample && prevSampleRef.current && extractFn) {
-        // 속도 추정 — forward difference (dt > 0 보장).
-        const prev = prevSampleRef.current;
-        const dtSec = (sample.ts - prev.ts) / 1000;
-        if (dtSec > 0) {
-          const mu = computeJupiterMu();
-          if (mu !== null) {
-            const next = {} as Record<GalileanId, OscElements>;
-            let allOk = true;
-            for (const id of GALILEAN_IDS) {
-              const p = sample.pos[id];
-              const p0 = prev.pos[id];
-              const vel: [number, number, number] = [
-                (p[0] - p0[0]) / dtSec,
-                (p[1] - p0[1]) / dtSec,
-                (p[2] - p0[2]) / dtSec,
-              ];
-              const el = callWasmExtract(extractFn, p, vel, mu);
-              if (!el) {
-                allOk = false;
-                break;
-              }
-              next[id] = el;
+      // P10-D #263 — Newton 엔진 state vector 직접 추출 (timeScale 내성).
+      // Newton 모드 미활성 or Kepler 모드 시 null → 정적 JSON 폴백 유지.
+      const states = sampleSceneStates();
+      if (states && extractFn) {
+        const mu = computeJupiterMu();
+        if (mu !== null) {
+          const next = {} as Record<GalileanId, OscElements>;
+          let allOk = true;
+          for (const id of GALILEAN_IDS) {
+            const el = callWasmExtract(extractFn, states[id].pos, states[id].vel, mu);
+            if (!el) {
+              allOk = false;
+              break;
             }
-            if (!cancelled && allOk) setElements(next);
+            next[id] = el;
           }
+          if (!cancelled && allOk) setElements(next);
         }
+      } else if (!cancelled) {
+        // Newton state 미가용 — 이전 상태 그대로 유지 (정적 JSON fallback).
+        setElements(null);
       }
-      prevSampleRef.current = sample;
 
-      // 단계 갱신 + 다음 예약.
-      const nextStep = resolveStep(stepRef.current, observedFps > 0 ? observedFps : 60);
+      // 단계 갱신 + 다음 예약. observedFps 는 ref 로 참조 (의존성 배열 재실행 방지).
+      const fpsNow = observedFpsRef.current;
+      const nextStep = resolveStep(stepRef.current, fpsNow > 0 ? fpsNow : 60);
       stepRef.current = nextStep;
       const interval =
         baseInterval === 1000
@@ -295,8 +279,7 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
       }
     };
 
-    // 첫 샘플은 속도 추정을 위해 baseline 확보만 (데이터 반환 X).
-    prevSampleRef.current = sampleScene(null);
+    // P10-D #263 — forward-diff 폐기로 첫 샘플 baseline 불필요.
     // 동적 import — SSR prerender 에서 wasm top-level load 회피 (Next.js 16 Turbopack 호환).
     import('@astro-simulator/core')
       .then((mod) => {
@@ -314,7 +297,9 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
       cancelled = true;
       if (timerId !== null) clearTimeout(timerId);
     };
-  }, [enabled, baseInterval, observedFps]);
+    // observedFps 는 ref 로 참조 → 의존성 배열 제외 (매 frame 재실행 방지).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, baseInterval]);
 
   return { elements, currentIntervalMs, observedFps };
 }

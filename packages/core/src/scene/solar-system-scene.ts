@@ -52,6 +52,18 @@ export interface SolarSystemSceneHandles {
    * `'scientific'`: 모든 바디 scale=1 로 강제 — IAU 2015 실측 비율 1.0 렌더.
    */
   setViewMode: (mode: 'educational' | 'scientific') => void;
+  /**
+   * P10-D #263 — body 의 위치/속도 state vector (parent-centric, m / m·s⁻¹).
+   * Newton 경로: 엔진 state 에서 직접 추출 (forward-diff noise 없음).
+   * Kepler 경로 및 state 미존재 시 null — 호출자가 polling fallback 처리.
+   *
+   * @param id body id (예: 'io', 'earth')
+   * @param parentId parent body id (예: Galilean 은 'jupiter'). id 와 동일하면 null 반환.
+   */
+  getBodyState: (
+    id: string,
+    parentId: string,
+  ) => { pos: [number, number, number]; vel: [number, number, number] } | null;
   /** 런타임 엔진 전환. 현재 jd에서 Newton 초기 상태 재빌드 (심리스). */
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   /** 현재 활성 엔진 */
@@ -300,6 +312,40 @@ export function createSolarSystemScene(
     viewMode = mode;
   };
 
+  // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
+  // WebGPU 엔진은 velocities() 가 Promise 반환 → 동기 경로 지원 불가 → null 반환.
+  // Kepler 경로·엔진 미활성 시 null 반환 → 호출자 fallback.
+  const getBodyState = (
+    id: string,
+    parentId: string,
+  ): { pos: [number, number, number]; vel: [number, number, number] } | null => {
+    if (id === parentId) return null;
+    // WebGPU 는 async velocities() — 본 동기 API 미지원.
+    if (!(activeEngine === 'newton' || activeEngine === 'barnes-hut')) {
+      return null;
+    }
+    if (!newtonEngine || !newtonIdIndex) return null;
+    const idx = newtonIdIndex.get(id);
+    const parentIdx = newtonIdIndex.get(parentId);
+    if (idx == null || parentIdx == null) return null;
+    const positions = newtonEngine.positions();
+    const velResult = newtonEngine.velocities();
+    // Promise 반환 (WebGPU) 는 진입 직전 가드로 배제되지만 타입 narrowing 보강.
+    if (!(velResult instanceof Float64Array)) return null;
+    const velocities = velResult;
+    const pos: [number, number, number] = [
+      (positions[3 * idx] ?? 0) - (positions[3 * parentIdx] ?? 0),
+      (positions[3 * idx + 1] ?? 0) - (positions[3 * parentIdx + 1] ?? 0),
+      (positions[3 * idx + 2] ?? 0) - (positions[3 * parentIdx + 2] ?? 0),
+    ];
+    const vel: [number, number, number] = [
+      (velocities[3 * idx] ?? 0) - (velocities[3 * parentIdx] ?? 0),
+      (velocities[3 * idx + 1] ?? 0) - (velocities[3 * parentIdx + 1] ?? 0),
+      (velocities[3 * idx + 2] ?? 0) - (velocities[3 * parentIdx + 2] ?? 0),
+    ];
+    return { pos, vel };
+  };
+
   const updateAt = (jd: number) => {
     currentJd = jd;
     if (
@@ -475,6 +521,7 @@ export function createSolarSystemScene(
     updateAt,
     setOrbitLinesVisible,
     setViewMode,
+    getBodyState,
     setPhysicsEngine,
     getPhysicsEngine,
     setBodyMassMultiplier,
