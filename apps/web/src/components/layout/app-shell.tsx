@@ -5,6 +5,11 @@ import { TimeBar } from './time-bar';
 import { HudCorners } from './hud-corners';
 import { FocusQuickButtons } from './focus-quick-buttons';
 import { ModeSwitcher } from './mode-switcher';
+import { ViewModeSwitcher } from './view-mode-switcher';
+import { ScaleBadge } from './scale-badge';
+import { OnboardingTooltip } from './onboarding-tooltip';
+import { ScientificModeNotice } from './scientific-mode-notice';
+import { AboutModal } from './about-modal';
 import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
@@ -28,19 +33,24 @@ export function AppShell() {
           left={
             <div className="flex items-center gap-2">
               <ModeSwitcher />
+              <ViewModeSwitcher />
               <FocusQuickButtons />
             </div>
           }
           right={
             <div className="flex items-center gap-2">
+              <ScaleBadge />
               <DateTimePicker />
               <UnitToggle />
               <PhysicsEngineToggle />
               <BookmarkButton />
+              <AboutModal />
             </div>
           }
         />
         <UrlSync />
+        <OnboardingTooltip />
+        <ScientificModeNotice />
         <HudCorners />
         <SidePanels />
         <ScaleControl />

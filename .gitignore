@@ -36,6 +36,10 @@ Thumbs.db
 
 .verify-screenshots/
 
+# QA/리뷰 스크린샷 — PR 증거는 PR 내에서 선별 커밋, 로컬 산출물은 무시
+# (이미 tracked 된 `screenshots/p9-pr25/` 는 유지됨 — git 표준 동작)
+screenshots/
+
 # .claude/ 는 harness 관리 파일이므로 tracked — 런타임 생성 파일만 선별 ignore
 .claude/scheduled_tasks.lock
 .claude/logs/

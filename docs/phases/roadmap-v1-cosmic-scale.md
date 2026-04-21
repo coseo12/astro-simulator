@@ -1,4 +1,43 @@
-# 확장 로드맵
+# 확장 로드맵 v1 — 관측가능우주 (Cosmic Scale)
+
+> **Status**: Archived (v2 에 의해 P8 이후 범위 보류)
+> **박제일 (v1)**: P1 착수 시점
+> **v2 로 이관일**: 2026-04-20 (P10-A #268)
+> **Successor**: [roadmap-v2-solar-precision.md](roadmap-v2-solar-precision.md)
+
+## v2 안내
+
+본 문서는 프로젝트 **초기 로드맵 (P1~P8)** 을 박제한다. "태양계 (P1) → 근거리 항성 (P4) → 은하 (P6) → 관측가능우주 (P7) → 가상 천체 (P8)" 의 스케일 확장 경로를 원안으로 삼았다.
+
+**P1~P9 구현 과정에서 다음 현실이 누적**되어 후속 방향을 재조정했다 (상세: [roadmap-v2-solar-precision.md](roadmap-v2-solar-precision.md) §재조정 배경):
+
+- 태양계 내부 정밀도 부채 (IAU 2015 대조 미수행)
+- 시각 원칙 부재 (`educational` / `scientific` 토글 없음)
+- 모바일 경로 경직
+- 상위 원칙 박제 선행 필요
+
+**v2 범위** (2026-04-20 박제, 32~47 영업일):
+
+- P10 Fact Audit + 시각 원칙 정비 (진행 중)
+- P11 Visual Foundation (Floating Origin + LOD + tier preset)
+- P12 Texture Pipeline
+- P13 토성계 / P14 천·해계 / P15 소행성대·카이퍼대
+- P16 배포 + 기술 부채 청산
+
+**v1 의 다음 항목은 본 프로젝트 생애주기 내에서 보류** (v3 후보):
+
+- 근거리 100광년 항성 카탈로그 (Gaia DR3)
+- 외계행성 / 성운·성단
+- 은하 / 은하단 / 우주거대구조
+- 가상/이론 천체 (웜홀 등)
+
+보류 결정은 원칙 [Fact-First, Visual-Second](../principles/fact-first.md) 박제와 함께 이뤄졌다. v2 완료 후 사용자 수요 / 기술 성숙도 / 프로젝트 포지셔닝을 재평가하여 v3 진입 여부를 결정한다.
+
+---
+
+> **이하 내용은 v1 원안 (역사 박제)**. 실제 진행 중인 Phase 는 [roadmap-v2-solar-precision.md](roadmap-v2-solar-precision.md) 참조.
+
+---
 
 프로젝트: 웹 기반 천체물리 시뮬레이터
 지향: 교육 + 연구 시각화 + 몰입 탐험 + 물리 샌드박스 (모두)

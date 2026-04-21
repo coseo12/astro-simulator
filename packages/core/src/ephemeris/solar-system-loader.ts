@@ -33,6 +33,18 @@ const RingLayerRawSchema = z.object({
   densityProfile: z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2),
 });
 
+/**
+ * P10-B #274 — 불확실성 스키마 (Fact-First 원칙 §3).
+ * 모든 필드 optional, 상대 오차 (0.15 = ±15%).
+ */
+const UncertaintyRawSchema = z.object({
+  mass: z.number().nonnegative().optional(),
+  radius: z.number().nonnegative().optional(),
+  semiMajorAxis: z.number().nonnegative().optional(),
+  eccentricity: z.number().nonnegative().optional(),
+  inclination: z.number().nonnegative().optional(),
+});
+
 const CelestialBodyRawSchema = z.object({
   id: z.string().min(1),
   kind: z.enum([
@@ -58,6 +70,11 @@ const CelestialBodyRawSchema = z.object({
     .object({
       hex: z.string().optional(),
       temperatureK: z.number().optional(),
+      /**
+       * P10-B #274 — 색상 출처 분류 (Fact-First 원칙 §6, Gemini 2차 교차검증 수용).
+       * `observed` / `artistic` / `inferred` 3종.
+       */
+      colorSource: z.enum(['observed', 'artistic', 'inferred']).optional(),
     })
     .optional(),
   /**
@@ -65,6 +82,27 @@ const CelestialBodyRawSchema = z.object({
    * 없으면 undefined → 고리 렌더 스킵.
    */
   rings: z.array(RingLayerRawSchema).optional(),
+  /**
+   * P10-B #274 — 데이터 출처 (Fact-First 원칙 §5). 문자열 또는 배열.
+   * P10-B 감사 이후 모든 body 필수 예정. 스키마 확장 기간 중에는 optional.
+   */
+  dataSource: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
+  /**
+   * P10-B #274 — 마지막 검증 일자 (ISO YYYY-MM-DD). P10-B 감사 시점부터 업데이트.
+   */
+  lastVerified: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'ISO-8601 date (YYYY-MM-DD)')
+    .optional(),
+  /**
+   * P10-B #274 — 불확실성. IAU 공식값 없는 body 필수.
+   */
+  uncertainty: UncertaintyRawSchema.optional(),
+  /**
+   * P10-B #274 — body 의 epoch. root epoch 과 다를 때만 명시.
+   * 문자열 (`"J2000.0"`, `"2451545.0 TDB"`) 또는 숫자 (JD). 부재 시 root epoch 상속.
+   */
+  epoch: z.union([z.string().min(1), z.number()]).optional(),
 });
 
 const SolarSystemRawSchema = z.object({
@@ -111,9 +149,28 @@ export interface LoadedCelestialBody {
   radius: number;
   parentId: string | null;
   orbit?: LoadedOrbitalElements;
-  colorHint?: { hex?: string | undefined; temperatureK?: number | undefined };
+  colorHint?: {
+    hex?: string | undefined;
+    temperatureK?: number | undefined;
+    /** P10-B #274 — 색상 출처. 부재 시 loader 는 legacy 로 간주. */
+    colorSource?: 'observed' | 'artistic' | 'inferred' | undefined;
+  };
   /** P9 #254 — 고리 3층 (목성·토성 등). 없으면 undefined. */
   rings?: ReadonlyArray<LoadedRingLayer>;
+  /** P10-B #274 — 데이터 출처. */
+  dataSource?: string | ReadonlyArray<string>;
+  /** P10-B #274 — 마지막 검증 일자 (ISO YYYY-MM-DD). */
+  lastVerified?: string;
+  /** P10-B #274 — 불확실성 (상대 오차). exactOptionalPropertyTypes 로 undefined 명시. */
+  uncertainty?: {
+    mass?: number | undefined;
+    radius?: number | undefined;
+    semiMajorAxis?: number | undefined;
+    eccentricity?: number | undefined;
+    inclination?: number | undefined;
+  };
+  /** P10-B #274 — body 의 epoch (root 와 다를 때만). */
+  epoch?: string | number;
 }
 
 export interface LoadedSolarSystem {
@@ -163,6 +220,11 @@ export function loadSolarSystem(): LoadedSolarSystem {
             })),
           }
         : {}),
+      // P10-B #274 — 감사 메타데이터 (optional, 감사 진행 중 일부 body 만 채워질 수 있음).
+      ...(b.dataSource ? { dataSource: b.dataSource } : {}),
+      ...(b.lastVerified ? { lastVerified: b.lastVerified } : {}),
+      ...(b.uncertainty ? { uncertainty: b.uncertainty } : {}),
+      ...(b.epoch !== undefined ? { epoch: b.epoch } : {}),
     };
 
     if (!b.orbit) return base;
