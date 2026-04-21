@@ -5,6 +5,7 @@ import { TimeBar } from './time-bar';
 import { HudCorners } from './hud-corners';
 import { FocusQuickButtons } from './focus-quick-buttons';
 import { ModeSwitcher } from './mode-switcher';
+import { ViewModeSwitcher } from './view-mode-switcher';
 import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
@@ -28,6 +29,7 @@ export function AppShell() {
           left={
             <div className="flex items-center gap-2">
               <ModeSwitcher />
+              <ViewModeSwitcher />
               <FocusQuickButtons />
             </div>
           }
