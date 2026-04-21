@@ -6,6 +6,9 @@ import { HudCorners } from './hud-corners';
 import { FocusQuickButtons } from './focus-quick-buttons';
 import { ModeSwitcher } from './mode-switcher';
 import { ViewModeSwitcher } from './view-mode-switcher';
+import { ScaleBadge } from './scale-badge';
+import { OnboardingTooltip } from './onboarding-tooltip';
+import { ScientificModeNotice } from './scientific-mode-notice';
 import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
@@ -35,6 +38,7 @@ export function AppShell() {
           }
           right={
             <div className="flex items-center gap-2">
+              <ScaleBadge />
               <DateTimePicker />
               <UnitToggle />
               <PhysicsEngineToggle />
@@ -43,6 +47,8 @@ export function AppShell() {
           }
         />
         <UrlSync />
+        <OnboardingTooltip />
+        <ScientificModeNotice />
         <HudCorners />
         <SidePanels />
         <ScaleControl />
