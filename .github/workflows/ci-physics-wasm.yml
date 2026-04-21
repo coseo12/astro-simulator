@@ -21,6 +21,14 @@ jobs:
         if: hashFiles('scripts/verify-test-coverage.mjs') != ''
         run: node scripts/verify-test-coverage.mjs
 
+      # P10-B-3 #274 — IAU 2015 데이터 회귀 차단 게이트.
+      # packages/shared/data/solar-system.json 이 IAU/NASA/JPL 공식값 ±0.01% 공차를
+      # 벗어나거나 감사 필드 (dataSource / lastVerified / colorSource) 가 누락되면 exit 1.
+      # 순수 Node.js (의존성 없음) 이므로 pnpm install 이전 실행 가능.
+      - name: verify:iau-data (Fact-First 원칙 §2 공차 게이트)
+        if: hashFiles('scripts/verify-iau-data.mjs') != ''
+        run: node scripts/verify-iau-data.mjs
+
       # Rust + WASM 툴체인 (packages/physics-wasm)
       - name: Rust 툴체인 설정
         if: hashFiles('rust-toolchain.toml') != ''
