@@ -70,12 +70,12 @@
 ### P10-C — 사실 모드 + UI 정비
 
 - [ ] 뷰 모드 스토어 — `educational` (디폴트) / `scientific` 2종
-- [ ] URL sync — `?mode=educational` / `?mode=scientific`
+- [ ] URL sync — `?view=educational` / `?view=scientific` (P10-C-1 재조정: 기존 `?mode=observe|research` 와 key 충돌 회피. 근거: 이슈 #278 + CRITICAL #6)
 - [ ] 과장 배지 UI — 각 body hover/focus 시 "태양 ×20 과장 중" 등 현재 스케일 표시
 - [ ] 모드 토글 UI — 헤더 또는 설정 패널, 키보드 단축키 (권고: `m`)
 - [ ] 첫 진입 온보딩 툴팁 — "현재 시각적 이해를 위해 천체 크기가 N배 과장되어 있습니다. [실제 비율로 보기]"
 - [ ] 데이터 출처/라이선스 크레딧 뷰 — IAU/NASA attribution 고지 (`About` 모달 또는 설정 패널)
-- [ ] `scientific` 모드 빈 화면 이탈 방지 안내 — 뷰포트에 `data-testid="scientific-mode-notice"` 노드 존재 + `?mode=scientific` 최초 진입 시 자동 표시 + 사용자 dismiss 가능 (localStorage 키 `astro:scientific-notice-dismissed`)
+- [ ] `scientific` 모드 빈 화면 이탈 방지 안내 — 뷰포트에 `data-testid="scientific-mode-notice"` 노드 존재 + `?view=scientific` 최초 진입 시 자동 표시 + 사용자 dismiss 가능 (localStorage 키 `astro:scientific-notice-dismissed`)
 - [ ] 3단계 브라우저 검증 (CRITICAL #3) — 정적 / 인터랙션 / 흐름
 
 ### P10-D — 정확도 이슈 소화

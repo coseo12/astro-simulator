@@ -80,7 +80,7 @@
 3. **첫 진입 온보딩**: 첫 방문 시 툴팁 — "시각적 이해를 위해 크기가 과장되어 있습니다. [실제 비율로 보기]"
 4. **크레딧 뷰**: About 모달 또는 설정 패널에 IAU / NASA JPL / Gaia DR3 등 데이터 출처 attribution + 현재 적용된 과장 요약 ("크기 ×20 / 거리 ×1.0").
 5. **모드 토글**: 헤더 또는 설정 패널에서 `educational` ↔ `scientific` 1-클릭 전환. 키보드 단축키 `m` 권고.
-6. **URL 동기화**: `?mode=scientific` 로 북마크/공유 가능. 링크로 방문 시 해당 모드로 진입.
+6. **URL 동기화**: `?view=scientific` 로 북마크/공유 가능. 링크로 방문 시 해당 모드로 진입.
 
 구현 상세 DoD: [docs/phases/p10-plan.md](../phases/p10-plan.md) P10-C.
 
@@ -90,7 +90,7 @@
 
 `scientific` 모드에서는 대부분의 body 가 sub-pixel 로 표시되어 **빈 화면 이탈 리스크**가 있다 (Gemini 교차검증 지적, 2026-04-20). 이를 방어하기 위해:
 
-- 최초 `?mode=scientific` 진입 시 **안내 배너** 자동 표시 — "실제 비율에서는 대부분 천체가 매우 작게 보입니다. 줌 인/검색으로 특정 천체에 초점 맞추세요."
+- 최초 `?view=scientific` 진입 시 **안내 배너** 자동 표시 — "실제 비율에서는 대부분 천체가 매우 작게 보입니다. 줌 인/검색으로 특정 천체에 초점 맞추세요."
 - 사용자 dismiss 가능 (`localStorage.astro:scientific-notice-dismissed`).
 - 뷰포트에 `data-testid="scientific-mode-notice"` 노드 존재 (E2E 검증).
 

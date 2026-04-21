@@ -46,6 +46,7 @@ export default async function LocaleLayout({
       lang={locale}
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
       data-mode="observe"
+      data-view-mode="educational"
     >
       <body>
         <NuqsAdapter>

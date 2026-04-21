@@ -9,6 +9,7 @@ beforeEach(() => {
     engineNotice: null,
     dismissedNoticeKeys: new Set<string>(),
     mode: 'observe',
+    viewMode: 'educational',
     julianDate: null,
     selectedBodyId: null,
     timeScale: 86_400,
@@ -38,6 +39,27 @@ describe('useSimStore', () => {
   it('setMode', () => {
     useSimStore.getState().setMode('research');
     expect(useSimStore.getState().mode).toBe('research');
+  });
+
+  // P10-C #278 — viewMode (educational/scientific) 직교 축
+  describe('viewMode (P10-C #278)', () => {
+    it('초기 상태 — educational 디폴트', () => {
+      expect(useSimStore.getState().viewMode).toBe('educational');
+    });
+
+    it('setViewMode — educational ↔ scientific 토글', () => {
+      useSimStore.getState().setViewMode('scientific');
+      expect(useSimStore.getState().viewMode).toBe('scientific');
+      useSimStore.getState().setViewMode('educational');
+      expect(useSimStore.getState().viewMode).toBe('educational');
+    });
+
+    it('viewMode 와 mode 직교 — 한쪽 변경이 다른 쪽에 영향 없음', () => {
+      useSimStore.getState().setMode('research');
+      useSimStore.getState().setViewMode('scientific');
+      expect(useSimStore.getState().mode).toBe('research');
+      expect(useSimStore.getState().viewMode).toBe('scientific');
+    });
   });
 
   it('setTime', () => {
