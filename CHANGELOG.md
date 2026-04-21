@@ -3,6 +3,79 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.10.0] — 2026-04-21
+
+### P10 — Fact-First 원칙 + 데이터 감사 + 사실 모드 UI
+
+메인 이슈: #266 (계약) / #268 (P10-A) / #274 (P10-B) / #278 (P10-C) · 회고: [`docs/retrospectives/p10-retrospective.md`](docs/retrospectives/p10-retrospective.md) · 원칙: [`docs/principles/fact-first.md`](docs/principles/fact-first.md) · 플랜: [`docs/phases/p10-plan.md`](docs/phases/p10-plan.md)
+
+10 PR 분할 릴리스 (CLAUDE.md §Phase 분리 릴리스 리듬):
+
+- **PR #269 + #273 (P10-A 원칙 박제 + Gemini 교차검증)** — `docs/principles/fact-first.md` 박제 + 로드맵 v2 (`roadmap-v2-solar-precision.md`) 재작성 + 모바일 보류 ADR + CLAUDE.md 참조. 2차 Gemini 교차검증 6건 즉시 반영 + 4건 이견 수용 + 1건 분리 (#271)
+- **PR #275 + #276 + #277 (P10-B 데이터 감사)** — 타입 확장 (dataSource/lastVerified/colorSource/uncertainty) + IAU 2015 전수 대조 테이블 + 감사 방법론 박제 + `solar-system.json` 9건 수정 + 24 bodies 감사 필드 채움 + CI `verify-and-rust` 에 `verify:iau-data` 회귀 게이트 통합 (0 errors 필수). #274 closed
+- **PR #279 + #280 + #281 (P10-C 사실 모드 UI)** — viewMode store (educational/scientific) + URL `?view=` sync + 키보드 `m` + ViewModeSwitcher + scientific 모드 실제 과장 해제 (scaling 500→1) + ScaleBadge + OnboardingTooltip + ScientificModeNotice + AboutModal (IAU/NASA/JPL 크레딧) + info panel 감사 필드 노출. #278 closed
+- **PR #283 + #284 (P10-D 정확도 이슈)** — Galilean 4체 JPL Horizons API 재쿼리 (J2000 ecliptic, φ₀=179.69°) + Newton state vector 직접 추출 (forward-diff 폐기, timeScale 내성) + observedFps ref 수정. #261·#263 closed. D5-b amp≤2° 는 tidal force 미모델링으로 #282 scope 재조정 (P11+)
+- **PR #285 (P10 회고)** — docs/retrospectives/p10-retrospective.md + 플랜 업데이트 + 벤치 실측 보고
+
+### Behavior Changes
+
+#### 데이터 — IAU 2015 ±0.01% 공차 준수 (P10-B)
+
+- **`packages/shared/data/solar-system.json` 9건 수정** — radius 규약을 IAU equatorial nominal 로 통일 (near-spherical body). jupiter 6.9911e7 → 7.1492e7 (+2.26%), saturn 5.8232e7 → 6.0268e7 (+3.50%), uranus 2.5362e7 → 2.5559e7, neptune 2.4622e7 → 2.4764e7, mars 3.3895e6 → 3.3962e6, phobos 1.1267e4 → 1.108e4, deimos 6.2e3 → 6.27e3, neptune mass 1.0243e26 → 1.02413e26, jupiter mass 1.8982e27 → 1.89813e27. irregular body (Phobos/Deimos/Haumea/3 혜성) 에 `uncertainty` 필수
+- **`packages/shared/data/solar-system.json` 24 bodies 감사 필드 자동 추가** — `dataSource` / `lastVerified: "2026-04-21"` / `colorSource` (observed 17 / artistic 4 / inferred 2) + 8 irregular body 에 `uncertainty.{mass, radius}` 상대 오차 박제
+- **Galilean 4체 궤도 요소 JPL Horizons API 재쿼리** — frame 을 Laplace plane → J2000 ecliptic 으로 통일. Io/Europa/Ganymede/Callisto 의 λ/ϖ/Ω/e/i/a 전체 2026-01-01 00:00 TDB 값으로 교체. Laplace 공명 인자 φ₀ = 179.6929° (평형점 180° ± 0.31°) 달성
+- **`packages/shared/src/constants/solar-system.ts` legacy 상수 2건 IAU 정합화** — SOLAR_MASS 1.98847e30 → 1.98892e30 (IAU B3 §1), JUPITER_RADIUS 6.9911e7 → 7.1492e7 (equatorial)
+
+#### 렌더링 — scientific 모드 실제 과장 해제 (P10-C)
+
+- **scientific 모드에서 `solar-system-scene` per-body scaling 1.0 강제** — IAU 실측 비율 렌더. 기본 educational 모드는 기존 거리-의존 과장 (MAX*VISUAL_SCALE*\*) 유지
+- **헤더 우측 `ViewModeSwitcher` 2-버튼 토글** — `data-testid="view-mode-switcher"`, data-mode + `data-view-mode` DOM 어트리뷰트 동기화, 키보드 `m` 단축키 (input/modifier 가드)
+- **URL `?view=scientific|educational` 양방향 sync** — nuqs parseAsStringEnum, 디폴트 educational 은 URL 생략. 기존 `?mode=observe|research` 와 key 분리 (계약 재조정, CRITICAL #6 §7)
+- **ScaleBadge** 헤더 표시 — focused body kind 별 상한 (`태양 — 시각 크기 최대 ×20 과장 중`) / scientific 모드 (`지구 — 실제 비율 1.0`) / focus 없음 (`시각 과장 모드` / `사실 비율 모드`)
+- **OnboardingTooltip** 첫 진입 CTA — "시각 크기 과장 중. [실제 비율로 보기]". localStorage `astro:onboarding-dismissed` 영속 dismiss. scientific 진입 시 자동 skip
+- **ScientificModeNotice** `?view=scientific` 최초 진입 시 빈 화면 이탈 방지 배너 — localStorage `astro:scientific-notice-dismissed` 영속
+- **AboutModal** 헤더 `?` 버튼 — IAU 2015 / NASA Fact Sheet / NASA JPL / Standish-Williams (1992) 4개 출처 attribution 링크 + 라이선스 + 현재 viewMode 별 정책 안내 + 공차 ±0.01% 명시. Esc / 닫기 / 외부 클릭 닫기
+- **CelestialInfoPanel 감사 필드 섹션** — `dataSource` / `lastVerified` / `colorSource` (관측/아티스트/추론) 표시. mass/radius 옆 `uncertainty` ±% 컬럼 (irregular body 한정)
+
+#### 역학 정확도 (P10-D)
+
+- **Galilean 초기 Laplace 인자 φ₀ 평형점 실증** — `test_laplace_initial_phase_equilibrium` (빠른 경로, Rust) 로 179.69° 검증. 기존 218° circulation 상태 해소. 단, 100 Io 주기 적분 후 libration 은 tidal force 미모델링으로 재현 불가 → #282 로 이관
+- **Osculating 1Hz polling timeScale 내성화** — `SolarSystemSceneHandles.getBodyState(id, parentId)` 신규 API 로 Newton 엔진 state vector 직접 추출. forward-diff 폐기 → timeScale=86400 기본값에서도 `sat-dynamic-{io/europa/ganymede/callisto}` 배지 4/4 렌더 (browser-verify 16/16 실증)
+- **observedFps 의존성 배열 버그 수정** — ADR §Amendments 2026-04-20 박제 버그 완결. `useEffect([..., observedFps])` 가 fps raf 매 frame setState 로 재실행 유발하던 것을 `observedFpsRef` 로 해소
+
+#### CI 회귀 가드 신설
+
+- **`verify:iau-data` CI step** (`ci-physics-wasm.yml::verify-and-rust`) — IAU 2015 ±0.01% 공차 초과 / 감사 필드 (dataSource/lastVerified/colorSource) 부재 시 exit 1 로 PR 머지 차단. 의도적 실패 주입 실증 완료
+
+### DoD 실측
+
+| Sub                | 원 DoD | 달성 | 이관/미달                         |
+| ------------------ | ------ | ---- | --------------------------------- |
+| P10-A 원칙 박제    | 8      | 8/8  | —                                 |
+| P10-B 데이터 감사  | 8      | 8/8  | —                                 |
+| P10-C 사실 모드 UI | 8      | 8/8  | —                                 |
+| P10-D 정확도 이슈  | 3      | 2/3  | #255 → P13 (J2/J4)                |
+| P10-D.5 벤치 회귀  | 3      | 부분 | 환경 mismatch (CI remeasure 필요) |
+
+**30 DoD 중 28 달성 (93%)**.
+
+### 알려진 제한
+
+- **Laplace 공명 libration 재현 불가** — 순수 Newton 다체는 tidal force 미모델링. 실 천체의 조석 에너지 소산 + 공명 barrier 부재로 시뮬은 circulation 으로 발산. 데이터 정확성은 확보 (φ₀ = 179.69° 박제). 후속 #282 (P11+)
+- **목성 J2/J4 편평도 세차 미반영** — 현 공차 ±1% 에서는 오차 미검출. #255 P13 (궤도 정밀 보정) 이관
+- **scale-badge MAX_SCALE_BY_KIND 인라인 미러링** — core scene import 가 SSR prerender 에서 wasm 로드 시도로 실패. ssr-safe 경로 분리는 후속 이슈
+- **로컬 vs CI 벤치 환경 mismatch** — 로컬 macOS headless 측정은 "상대 변화" 관찰용 한정. 공식 회귀 판단은 CI `bench-baseline-remeasure` dispatch 로 ubuntu 재측정 후 확정
+
+### 신규 이슈 (P11+ 후속)
+
+- **#282** tidal force Laplace libration — D5-b amp ≤ 2° 달성 경로
+- **#271** float32 jitter (P11 Floating Origin 블로커)
+- **#272** iOS 플래그십 모바일 재도전 트리거
+
+### 하네스 업데이트
+
+v2.28.1 (현재) 유지. P10 범위에서 하네스 수정 없음.
+
 ## [0.9.0] — 2026-04-20
 
 ### P9 — 목성계 (Galilean + Laplace 공명 + 고리 3층 + Osculating 동기화)
