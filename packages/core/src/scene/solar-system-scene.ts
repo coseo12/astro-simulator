@@ -46,6 +46,12 @@ export interface SolarSystemSceneHandles {
   updateAt: (julianDate: number) => void;
   /** 궤도선 가시성 토글 */
   setOrbitLinesVisible: (visible: boolean) => void;
+  /**
+   * P10-C-2 #278 — 뷰 모드 전환 (Fact-First 원칙).
+   * `'educational'` (기본): 거리-의존 시각 과장 (MAX_VISUAL_SCALE_*) 적용.
+   * `'scientific'`: 모든 바디 scale=1 로 강제 — IAU 2015 실측 비율 1.0 렌더.
+   */
+  setViewMode: (mode: 'educational' | 'scientific') => void;
   /** 런타임 엔진 전환. 현재 jd에서 Newton 초기 상태 재빌드 (심리스). */
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   /** 현재 활성 엔진 */
@@ -288,6 +294,12 @@ export function createSolarSystemScene(
   }
   disposables.push({ dispose: disposeNewton });
 
+  // P10-C-2 #278 — 뷰 모드 (educational/scientific). scientific 모드는 scale=1 강제.
+  let viewMode: 'educational' | 'scientific' = 'educational';
+  const setViewMode = (mode: 'educational' | 'scientific') => {
+    viewMode = mode;
+  };
+
   const updateAt = (jd: number) => {
     currentJd = jd;
     if (
@@ -343,7 +355,11 @@ export function createSolarSystemScene(
         const dz = mesh.position.z - cz;
         const distScene = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const distMeters = distScene * AU;
-        const scale = computeVisualScale(distMeters, body.radius, maxScaleForKind(body.kind));
+        // P10-C-2: scientific 모드는 IAU 실측 비율 1.0 강제. educational 은 거리-의존 과장.
+        const scale =
+          viewMode === 'scientific'
+            ? 1
+            : computeVisualScale(distMeters, body.radius, maxScaleForKind(body.kind));
         mesh.scaling.setAll(scale);
       }
     }
@@ -458,6 +474,7 @@ export function createSolarSystemScene(
     meshes,
     updateAt,
     setOrbitLinesVisible,
+    setViewMode,
     setPhysicsEngine,
     getPhysicsEngine,
     setBodyMassMultiplier,
