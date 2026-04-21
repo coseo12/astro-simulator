@@ -9,6 +9,7 @@ import { ViewModeSwitcher } from './view-mode-switcher';
 import { ScaleBadge } from './scale-badge';
 import { OnboardingTooltip } from './onboarding-tooltip';
 import { ScientificModeNotice } from './scientific-mode-notice';
+import { AboutModal } from './about-modal';
 import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
@@ -43,6 +44,7 @@ export function AppShell() {
               <UnitToggle />
               <PhysicsEngineToggle />
               <BookmarkButton />
+              <AboutModal />
             </div>
           }
         />

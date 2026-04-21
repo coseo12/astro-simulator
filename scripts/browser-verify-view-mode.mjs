@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * P10-C-1/C-2 #278 — ViewMode + UI 요소 브라우저 3단계 검증 (CRITICAL #3 준수).
+ * P10-C-1/C-2/C-3 #278 — ViewMode + UI 요소 + About 모달 + 감사 필드 브라우저 3단계 검증.
  *
  * 사용: node scripts/browser-verify-view-mode.mjs [baseUrl]
  * 기본 URL: http://localhost:3000
  *
- * Level 1 정적:     view-mode-switcher / scale-badge / onboarding-tooltip 존재
- * Level 2 인터랙션: 버튼 클릭 / 키보드 m / scientific 모드 scale=1 실측 / onboarding dismiss
- * Level 3 흐름:     URL ?view=scientific 진입 + scientific-mode-notice 배너 + dismiss 영속
+ * Level 1 정적:     view-mode-switcher / scale-badge / onboarding-tooltip / about-button 존재
+ * Level 2 인터랙션: 버튼 클릭 / 키보드 m / scientific scale=1 실측 / onboarding dismiss / About 모달
+ * Level 3 흐름:     URL ?view=scientific + notice 배너 영속 dismiss + About Esc 닫기
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -86,6 +86,8 @@ check(
   'scientific-mode-notice 초기 educational 에서는 숨김',
   (await page.$('[data-testid="scientific-mode-notice"]')) === null,
 );
+// P10-C-3 추가 — About 버튼 존재
+check('about-button 존재', (await page.$('[data-testid="about-button"]')) !== null);
 
 await page.screenshot({
   path: join(screenshotDir, 'view-mode-01-static.png'),
@@ -200,6 +202,48 @@ check(
   jupiterScaleEdu !== null && jupiterScaleEdu > 1,
   `scaling=${jupiterScaleEdu}`,
 );
+
+// P10-C-3 — About 모달 열기/출처/닫기
+await page.click('[data-testid="about-button"]');
+await page.waitForTimeout(200);
+check('About 모달 오픈', (await page.$('[data-testid="about-modal"]')) !== null);
+const aboutSourcesText = (await page.textContent('[data-testid="about-sources"]')) ?? '';
+check('About 출처 — IAU 2015 포함', aboutSourcesText.includes('IAU 2015'));
+check('About 출처 — NASA Planetary Fact Sheet 포함', aboutSourcesText.includes('NASA'));
+check('About 출처 — JPL Horizons 포함', aboutSourcesText.includes('JPL Horizons'));
+// 닫기 버튼
+await page.click('[data-testid="about-close"]');
+await page.waitForTimeout(200);
+check('About 닫기 버튼 → 모달 제거', (await page.$('[data-testid="about-modal"]')) === null);
+// Escape 키로 닫기
+await page.click('[data-testid="about-button"]');
+await page.waitForTimeout(200);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+check('About Escape 키 → 모달 제거', (await page.$('[data-testid="about-modal"]')) === null);
+
+// P10-C-3 — 지구 focus → info panel 에 P10-B 감사 필드 표시
+const focusEarthBtn = await page.$('[data-testid="focus-earth"]');
+if (focusEarthBtn) {
+  await focusEarthBtn.click();
+  await page.waitForTimeout(300);
+  // research 모드로 전환해야 info panel 표시됨 (관찰 모드는 좌우 패널 없음)
+  await page.click('[data-testid="mode-research"]');
+  await page.waitForTimeout(300);
+  check(
+    'info-panel-audit-fields 노출',
+    (await page.$('[data-testid="info-panel-audit-fields"]')) !== null,
+  );
+  const dataSourceText = (await page.textContent('[data-testid="audit-data-source"]')) ?? '';
+  check('audit-data-source — IAU 2015 포함 (지구)', dataSourceText.includes('IAU 2015'));
+  const lastVerifiedText = (await page.textContent('[data-testid="audit-last-verified"]')) ?? '';
+  check('audit-last-verified — 2026-04-21', lastVerifiedText.includes('2026-04-21'));
+  const colorSourceText = (await page.textContent('[data-testid="audit-color-source"]')) ?? '';
+  check('audit-color-source — 관측 (observed)', colorSourceText.includes('관측'));
+  // observe 모드 복귀
+  await page.click('[data-testid="mode-observe"]');
+  await page.waitForTimeout(200);
+}
 
 // ===== Level 3: 흐름 =====
 console.log('\n[Level 3] 흐름 검증');

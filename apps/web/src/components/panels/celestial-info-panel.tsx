@@ -12,7 +12,20 @@ const KIND_LABEL: Record<string, string> = {
   planet: '행성',
   'dwarf-planet': '왜소행성',
   moon: '위성',
+  comet: '혜성',
 };
+
+// P10-B-2 #274 — colorSource 3종 한국어 라벨.
+const COLOR_SOURCE_LABEL: Record<string, string> = {
+  observed: '관측',
+  artistic: '아티스트',
+  inferred: '추론',
+};
+
+function formatUncertainty(value: number): string {
+  // 상대 오차 (0.05 = ±5%) — percent 표시
+  return `±${(value * 100).toFixed(value < 0.01 ? 2 : 1)}%`;
+}
 
 function formatExp(n: number, digits = 3): string {
   return n.toExponential(digits);
@@ -71,8 +84,16 @@ export function CelestialInfoPanel() {
       </div>
 
       <dl className="flex flex-col gap-2 text-body-sm">
-        <Row label="질량" value={`${formatExp(data.mass)} kg`} />
-        <Row label="반경" value={`${formatExp(data.radius)} m`} />
+        <Row
+          label="질량"
+          value={`${formatExp(data.mass)} kg`}
+          uncertainty={data.uncertainty?.mass}
+        />
+        <Row
+          label="반경"
+          value={`${formatExp(data.radius)} m`}
+          uncertainty={data.uncertainty?.radius}
+        />
         {data.orbit && (
           <>
             <Row label="궤도 장반경" value={`${(data.orbit.semiMajorAxis / AU).toFixed(4)} AU`} />
@@ -86,6 +107,39 @@ export function CelestialInfoPanel() {
         )}
       </dl>
 
+      {/* P10-C-3 #278 — P10-B 감사 메타데이터 (dataSource / lastVerified / colorSource) */}
+      {(data.dataSource || data.lastVerified || data.colorHint?.colorSource) && (
+        <div
+          className="mt-3 pt-3 border-t border-border-subtle"
+          data-testid="info-panel-audit-fields"
+        >
+          <h3 className="text-caption text-fg-tertiary mb-2">데이터 출처</h3>
+          <dl className="flex flex-col gap-1 text-body-sm">
+            {data.dataSource && (
+              <AuditRow
+                label="출처"
+                value={
+                  typeof data.dataSource === 'string'
+                    ? data.dataSource
+                    : data.dataSource.join(' / ')
+                }
+                testId="audit-data-source"
+              />
+            )}
+            {data.lastVerified && (
+              <AuditRow label="최종 검증" value={data.lastVerified} testId="audit-last-verified" />
+            )}
+            {data.colorHint?.colorSource && (
+              <AuditRow
+                label="색상 출처"
+                value={COLOR_SOURCE_LABEL[data.colorHint.colorSource] ?? data.colorHint.colorSource}
+                testId="audit-color-source"
+              />
+            )}
+          </dl>
+        </div>
+      )}
+
       <div className="mt-4 pt-3 border-t border-border-subtle">
         <MassSlider />
       </div>
@@ -93,13 +147,45 @@ export function CelestialInfoPanel() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  uncertainty,
+}: {
+  label: string;
+  value: string;
+  uncertainty?: number;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-border-subtle/50 pb-1">
       <dt className="text-caption text-fg-tertiary">{label}</dt>
       <dd className="flex items-center gap-2">
         <span className="num text-fg-primary">{value}</span>
+        {uncertainty !== undefined && (
+          <span
+            className="num text-caption text-fg-tertiary"
+            data-testid="audit-uncertainty"
+            title="IAU 공식값 부재 — 상대 오차"
+          >
+            {formatUncertainty(uncertainty)}
+          </span>
+        )}
         <TierBadge tier={1} />
+      </dd>
+    </div>
+  );
+}
+
+function AuditRow({ label, value, testId }: { label: string; value: string; testId: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <dt className="text-caption text-fg-tertiary shrink-0">{label}</dt>
+      <dd
+        className="num text-caption text-fg-secondary text-right truncate"
+        data-testid={testId}
+        title={value}
+      >
+        {value}
       </dd>
     </div>
   );
