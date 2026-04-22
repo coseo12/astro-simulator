@@ -282,13 +282,28 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setCameraHandlers(
           (bodyId: string) => {
             const mesh = solar.meshes.get(bodyId);
-            if (mesh) controller.focusOn({ mesh });
+            if (mesh) {
+              // P11-A #288 — Floating Origin primary shift (ADR §1-B).
+              // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
+              // 이후 `updateAt` 이 body 를 scene 원점 근처에서 렌더 → float32 jitter 제거.
+              solar.setFocusOrigin(bodyId);
+              controller.focusOn({ mesh });
+            }
           },
           () => controller.reset(35),
           (radius: number) => {
             camera.radius = radius;
           },
         );
+
+        // P11-A #288 — dev 빌드 한정 `__floatingOrigin` 전역 노출 (검증 스크립트용).
+        // prod 에서도 `__solarScene.floatingOrigin` 경유 접근 가능하지만 편의상 top-level 도 제공.
+        if (process.env.NODE_ENV !== 'production') {
+          Object.defineProperty(window, '__floatingOrigin', {
+            configurable: true,
+            get: () => solar.floatingOrigin,
+          });
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
