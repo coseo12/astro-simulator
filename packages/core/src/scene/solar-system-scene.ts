@@ -13,6 +13,7 @@ import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
 import { add } from '../coords/vec3.js';
+import { FloatingOrigin } from '../coords/floating-origin.js';
 import {
   NBodyEngine,
   buildInitialState,
@@ -32,6 +33,29 @@ import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
  * float32/logarithmic depth 조합으로 지구 표면(수 μ AU) ~ 해왕성 궤도(30 AU) 범위 커버.
  */
 const SCENE_UNIT_PER_METER = 1 / AU;
+
+/**
+ * Floating Origin safety net threshold (P11-A #288, ADR §4).
+ *
+ * 1 AU (1.496e11 m) — focus body origin shift (primary) 가 이미 focus 전환마다 origin 재배치를 처리하므로
+ * safety net 은 free-fly 탐색 중 카메라가 1 AU 이상 이동한 경우만 발동한다.
+ * threshold 를 낮추면 빈번한 shift 로 log-depth 재계산 오버헤드 증가 가능.
+ */
+const FLOATING_ORIGIN_THRESHOLD_METERS = AU;
+
+/**
+ * P11-A #288 — dev-only assert gate.
+ *
+ * core 패키지는 `@types/node` 를 의존으로 두지 않으므로 `process` 가 types 에 없다.
+ * runtime 에 `globalThis.process?.env?.NODE_ENV` 를 안전하게 읽고, Next.js webpack 이
+ * 빌드 시점에 `NODE_ENV` 를 리터럴 치환 → prod bundle 에선 이 함수가 `false` 를 반환해
+ * 하위 assert 블록이 DCE 된다.
+ */
+function floatingOriginAssertEnabled(): boolean {
+  const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
+  const env = g.process?.env?.NODE_ENV;
+  return env !== 'production';
+}
 
 /**
  * 시각 스케일 — #100에서 카메라 거리 의존 동적 계산으로 전환.
@@ -74,6 +98,25 @@ export interface SolarSystemSceneHandles {
   resetMassMultipliers: () => void;
   /** P5-C #179 — force/integrator 셰이더별 GPU ms. WebGPU 엔진 + gpuTimer 활성 시만. */
   readShaderTimings: () => { forceMs: number | null; integratorMs: number | null } | null;
+  /**
+   * P11-A #288 — Floating Origin 인스턴스.
+   *
+   * scientific 모드 float32 jitter 해소를 위해 scene 내부가 매 프레임 `fo.toLocal(world)` 적용.
+   * 외부 노출은 (a) dev 빌드 `__floatingOrigin` 전역 + (b) 미래 Trail 모듈의 `onOriginShift`
+   * 구독을 위함. Zustand store 는 이 값을 저장하지 않는다 (Heliocentric 불변식 — ADR §3).
+   */
+  floatingOrigin: FloatingOrigin;
+  /**
+   * P11-A #288 — focus 전환 hook (primary origin shift).
+   *
+   * `CameraController.focusOn(mesh)` 와 동일 시점에 호출. 해당 body 의 월드 좌표로 origin 즉시 재배치
+   * → focus body 는 scene 원점 근처에서 렌더되어 float32 jitter 제거. `bodyId` 미존재 시 no-op.
+   *
+   * **호출 타이밍**: `setCameraHandlers` focus 콜백에서 `controller.focusOn` 과 같은 프레임에 호출.
+   * 내부적으로 `updateAt` 이 다음 프레임에 origin 반영된 local 좌표로 mesh.position 을 재기록하므로
+   * focus animation (300ms) 중에도 일관된 좌표계 유지.
+   */
+  setFocusOrigin: (bodyId: string) => void;
   dispose: () => void;
 }
 
@@ -312,6 +355,23 @@ export function createSolarSystemScene(
     viewMode = mode;
   };
 
+  // P11-A #288 — Floating Origin 인스턴스 (scene-scoped).
+  //
+  // - Primary trigger: `setFocusOrigin(bodyId)` 가 focus 전환 시 origin 을 body 월드 좌표로 이동.
+  // - Secondary trigger: `updateAt` 말미에서 `fo.update(cameraWorldMeters)` safety net (1 AU).
+  // - mesh.position 할당은 `fo.toLocal(world)` 경유 — ADR §3 주석 계약 아래 박제.
+  //
+  // Zustand store / Rust engine / worldPositions 는 Heliocentric 절대 좌표 유지 — ADR §3 불변식.
+  const floatingOrigin = new FloatingOrigin(FLOATING_ORIGIN_THRESHOLD_METERS);
+  // DoD β dev-only assert 용 — 현재 focus body id 추적. `null` 이면 자유 탐색 (assert 스킵).
+  let focusBodyIdForAssert: string | null = null;
+  const setFocusOrigin = (bodyId: string) => {
+    const world = worldPositions.get(bodyId);
+    if (!world) return;
+    floatingOrigin.setOriginToBody([world[0], world[1], world[2]]);
+    focusBodyIdForAssert = bodyId;
+  };
+
   // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
   // WebGPU 엔진은 velocities() 가 Promise 반환 → 동기 경로 지원 불가 → null 반환.
   // Kepler 경로·엔진 미활성 시 null 반환 → 호출자 fallback.
@@ -376,18 +436,44 @@ export function createSolarSystemScene(
       updateAtKepler(jd);
     }
 
-    // 메쉬 위치 갱신 (미터 → 씬 단위)
+    // Floating Origin primary follow (ADR §1-B 확장).
+    //
+    // focus body 는 태양을 공전하므로 매 프레임 world 좌표가 바뀐다. origin 을 고정하면
+    // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
+    // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
+    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
+    if (focusBodyIdForAssert) {
+      const focusWorld = worldPositions.get(focusBodyIdForAssert);
+      if (focusWorld) {
+        floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
+      }
+    }
+
+    // Floating Origin 계약 (ADR `docs/decisions/20260422-floating-origin.md` §3):
+    //   - `world` (worldPositions): Heliocentric 절대 좌표 (m) — Rust engine / Zustand store 와 동일
+    //   - `local = floatingOrigin.toLocal(world)` : scene 삽입 직전 origin shift 적용 (m)
+    //   - `mesh.position` : scene unit (local × SCENE_UNIT_PER_METER, 1 unit = 1 AU)
+    // 이 3단 변환을 우회하여 `world * SCENE_UNIT_PER_METER` 를 직접 할당하면 scientific 모드
+    // float32 jitter regression 재발 (#271 재현). 아래 루프를 수정할 때 이 주석 계약 유지 필수.
+    const origin = floatingOrigin.originOffset;
+    const ox = origin[0];
+    const oy = origin[1];
+    const oz = origin[2];
     for (const [id, world] of worldPositions) {
       const mesh = meshes.get(id);
       if (!mesh) continue;
+      // float64 뺄셈 (큰 수 - 큰 수 = 작은 수) 을 먼저 수행 후 float32 scene unit 변환.
+      // `toRelativeToEye` 와 동일 원리 — double precision 유지 후 결과만 float32 cast.
       mesh.position.set(
-        world[0] * SCENE_UNIT_PER_METER,
-        world[1] * SCENE_UNIT_PER_METER,
-        world[2] * SCENE_UNIT_PER_METER,
+        (world[0] - ox) * SCENE_UNIT_PER_METER,
+        (world[1] - oy) * SCENE_UNIT_PER_METER,
+        (world[2] - oz) * SCENE_UNIT_PER_METER,
       );
     }
 
     // 거리 기반 per-body 시각 스케일 (#100)
+    // 카메라 거리 계산도 shift 반영된 local 좌표계에서 수행 — mesh.position 이 이미 local 이므로
+    // cam.globalPosition 도 같은 local 좌표계에 있다고 가정할 수 있다 (Floating Origin 은 scene 전체에 균등 적용).
     const cam = scene.activeCamera;
     if (cam) {
       const cx = cam.globalPosition.x;
@@ -410,12 +496,63 @@ export function createSolarSystemScene(
       }
     }
 
+    // Sun light — worldPositions['sun'] 도 Heliocentric 절대 좌표 (m). Floating Origin shift 반영.
     const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
     sunLight.position.set(
-      sunWorld[0] * SCENE_UNIT_PER_METER,
-      sunWorld[1] * SCENE_UNIT_PER_METER,
-      sunWorld[2] * SCENE_UNIT_PER_METER,
+      (sunWorld[0] - ox) * SCENE_UNIT_PER_METER,
+      (sunWorld[1] - oy) * SCENE_UNIT_PER_METER,
+      (sunWorld[2] - oz) * SCENE_UNIT_PER_METER,
     );
+
+    // P11-A #288 — safety net (ADR §1-A). focus 가 없는 free-fly 탐색 중 카메라가 1 AU 이상
+    // 이동하면 origin 을 카메라 위치로 추가 shift. 다음 프레임의 `updateAt` 이 새 origin 으로
+    // 좌표 재기록 — 같은 프레임 내 mesh.position 은 shift 전 좌표라 1 프레임 visible delta 존재 가능.
+    // 1 AU 이동 시점에서 scene scale 이 매우 wide 하므로 sub-pixel (ADR §5).
+    //
+    // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (line 445-450 의
+    // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
+    // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
+    if (cam && !focusBodyIdForAssert) {
+      // cam.globalPosition 은 scene unit (1 AU = 1 unit). fo 는 m 단위 계약 — 환산 후 전달.
+      const cameraLocalMeters = [
+        cam.globalPosition.x * AU,
+        cam.globalPosition.y * AU,
+        cam.globalPosition.z * AU,
+      ] as const;
+      // local → world = local + current origin (shift 전 기준)
+      const cameraWorldMeters: [number, number, number] = [
+        cameraLocalMeters[0] + ox,
+        cameraLocalMeters[1] + oy,
+        cameraLocalMeters[2] + oz,
+      ];
+      floatingOrigin.update(cameraWorldMeters);
+    }
+
+    // P11-A #288 DoD β v2 — dev 빌드 assert: **focus body** local 좌표 절대값 ≤ 1e5 m (100 km).
+    // core 패키지는 `process` 타입이 없으므로 runtime guard 사용. Next.js webpack 이 `process.env.NODE_ENV`
+    // 를 빌드 타임 치환 → prod bundle 에서는 `'development' !== 'production'` 이 false 가 되어 DCE.
+    // SSR / 테스트 환경은 `globalThis.process` 유/무 가드로 안전 접근.
+    //
+    // 카메라 local 불포함 (2026-04-22 재정정): Floating Origin 의 목적은 렌더 대상(mesh) 의 scene
+    // 좌표 jitter 해소. 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 위치가 정상이며, 카메라
+    // local 에 1e5 m 제한을 두면 scientific 모드가 물리적으로 동작 불가. float32 jitter 는 mesh
+    // local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
+    // 위임한다. ADR 20260422-floating-origin.md §6-β / §Amendments 2026-04-22 참조.
+    if (floatingOriginAssertEnabled() && cam) {
+      const focusId = focusBodyIdForAssert;
+      const focusWorld = focusId ? worldPositions.get(focusId) : null;
+      if (focusWorld) {
+        const fx = focusWorld[0] - ox;
+        const fy = focusWorld[1] - oy;
+        const fz = focusWorld[2] - oz;
+        const focusLocalMax = Math.max(Math.abs(fx), Math.abs(fy), Math.abs(fz));
+        if (focusLocalMax >= 1e5) {
+          console.error(
+            `[floating-origin] focus body '${focusId}' local 좌표 초과 (≥1e5m): ${fx},${fy},${fz}`,
+          );
+        }
+      }
+    }
 
     // 소행성대 업데이트.
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
@@ -532,6 +669,8 @@ export function createSolarSystemScene(
       }
       return null;
     },
+    floatingOrigin,
+    setFocusOrigin,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();

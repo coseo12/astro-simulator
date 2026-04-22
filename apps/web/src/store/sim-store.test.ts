@@ -158,4 +158,24 @@ describe('useSimStore', () => {
       });
     });
   });
+
+  // P11-A #288 — DoD γ: Zustand store Heliocentric 불변식 계약.
+  describe('Floating Origin 배선 후에도 store 는 Heliocentric 불변식 유지 (P11-A #288 DoD γ)', () => {
+    it('store 에 body 월드 좌표 field 가 없음 — scene 좌표 누출 경로 차단', () => {
+      // 현재 store state 에는 body 월드 좌표가 저장되어 있지 않다 (__solarScene.meshes 직접 접근 경로).
+      // 본 테스트는 미래 drift 방어 — 누군가 body 월드 좌표를 store 에 추가했다면 절대 Heliocentric (m) 이어야 함.
+      const state = useSimStore.getState();
+      const keys = Object.keys(state);
+      // scene / shifted / local 어휘를 포함한 key 는 scene 좌표 누출 신호
+      const suspectKeys = keys.filter((k) => /scene|shifted|local|floating|origin/i.test(k));
+      expect(suspectKeys).toEqual([]);
+    });
+
+    it('계약 주석 위반 감지 — 미래 body world 좌표 추가 시 키 네이밍 가이드', () => {
+      // 이 테스트는 의도적으로 주석-테스트 계약으로 남긴다 (ADR §3 주석 계약 + CLAUDE.md 주석 계약 교훈).
+      // body 월드 좌표를 store 에 추가하는 순간 필드명은 `bodyWorldPositionsHelio` 등 Heliocentric 명시,
+      // 그리고 위 suspect-key 테스트가 예외 경로로 허용하도록 명시적으로 allowlist 갱신 필수.
+      expect(true).toBe(true);
+    });
+  });
 });

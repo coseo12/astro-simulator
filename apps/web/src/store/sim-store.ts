@@ -52,6 +52,16 @@ export const RUNNABLE_ENGINES: ReadonlySet<PhysicsEngineKind> = new Set([
  *
  * Core에서 방출되는 이벤트를 어댑터가 이 store에 반영한다.
  * 컴포넌트는 이 store를 선택적으로 구독한다 (리렌더 최소화).
+ *
+ * ## 좌표계 불변식 (P11-A #288, ADR `docs/decisions/20260422-floating-origin.md` §3)
+ *
+ * 만약 body 월드 좌표를 이 store 에 추가하게 되면 **반드시 Heliocentric 절대 좌표 (m)** 를 유지한다.
+ * - Rust physics engine state: Heliocentric 절대 좌표 (m)
+ * - 본 store state: Heliocentric 절대 좌표 (m) — 정보 패널 거리 표시, JPL 호환
+ * - Babylon/Three.js scene 좌표: Scene 삽입 **직전** 에만 Floating Origin 행렬 변환 적용 (shift-local)
+ *
+ * Scene 좌표 (shift-local 또는 scene unit) 가 store 로 누출되면 origin shift 에 따라
+ * UI 숫자가 흔들려 사용자 혼란 + JPL 외부 비교 불가 → 즉시 버그로 간주.
  */
 export interface SimStoreState {
   // 엔진 상태
