@@ -508,7 +508,11 @@ export function createSolarSystemScene(
     // 이동하면 origin 을 카메라 위치로 추가 shift. 다음 프레임의 `updateAt` 이 새 origin 으로
     // 좌표 재기록 — 같은 프레임 내 mesh.position 은 shift 전 좌표라 1 프레임 visible delta 존재 가능.
     // 1 AU 이동 시점에서 scene scale 이 매우 wide 하므로 sub-pixel (ADR §5).
-    if (cam) {
+    //
+    // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (line 445-450 의
+    // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
+    // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
+    if (cam && !focusBodyIdForAssert) {
       // cam.globalPosition 은 scene unit (1 AU = 1 unit). fo 는 m 단위 계약 — 환산 후 전달.
       const cameraLocalMeters = [
         cam.globalPosition.x * AU,

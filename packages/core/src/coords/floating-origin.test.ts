@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FloatingOrigin } from './floating-origin.js';
-import { vec3 } from './vec3.js';
+import { vec3, type Vec3Double } from './vec3.js';
 
 describe('FloatingOrigin', () => {
   it('임계 거리 미만에서는 shift 없음', () => {
@@ -192,6 +192,96 @@ describe('FloatingOrigin', () => {
       const delta = fo.update(vec3(AU * 1.5, 0, 0));
       expect(delta).not.toBeNull();
       expect(fo.originOffset[0]).toBeCloseTo(AU * 1.5, 0);
+    });
+  });
+
+  // --- #292 회귀 가드: focus 활성 상태에서 safety net 비활성화 계약 ---
+  // `solar-system-scene.ts` updateAt 은 매 프레임:
+  //   1) focus 있으면 `setOriginToBody(focusWorld)` 로 primary shift (ADR §1-B)
+  //   2) focus 없으면 `update(cameraWorld)` 로 safety net (ADR §1-A)
+  // 2개를 **동시에 호출하면** primary 를 safety net 이 덮어써 originOffset 이 카메라 월드 좌표를
+  // 추적 → ADR §3 "Heliocentric 절대 좌표" 계약 위배. 아래 테스트는 scene 호출 패턴을 pure
+  // 함수로 재현해 회귀 방지.
+  describe('scene updateAt 호출 규약 (#292 회귀 가드)', () => {
+    const AU = 1.495_978_707e11;
+
+    // scene 의 "매 프레임" 로직을 순수 함수로 축약. focusWorld 가 주어지면 primary, 없으면
+    // safety net 만 호출. 이 구조를 유지해야 originOffset 이 focus body 를 추적한다.
+    function scenePerFrame(
+      fo: FloatingOrigin,
+      focusWorld: Vec3Double | null,
+      cameraWorld: Vec3Double,
+    ): void {
+      if (focusWorld) {
+        fo.setOriginToBody(focusWorld);
+      }
+      if (!focusWorld) {
+        fo.update(cameraWorld);
+      }
+    }
+
+    it('focus 상태에서 카메라가 1 AU 이상 이동해도 originOffset 은 focus body 만 추적', () => {
+      const fo = new FloatingOrigin(AU);
+      const earth: Vec3Double = [AU, 0, 0]; // ~1 AU
+      // 카메라가 focus body 와 10 AU 이상 떨어진 상태 — safety net 이 발동하면 originOffset
+      // 이 카메라 월드 좌표 (earth + (10AU, 0, 0) = 11AU) 로 이동해버림
+      const cameraWorld: Vec3Double = [AU + AU * 10, 0, 0];
+
+      scenePerFrame(fo, earth, cameraWorld);
+
+      // 기대: focus primary 가 유지되어 originOffset === earth world (≈ 1 AU)
+      expect(fo.originOffset[0]).toBeCloseTo(AU, 0);
+      // 회귀 가드: 카메라 월드 좌표 (11 AU) 를 추적하면 안 됨
+      expect(fo.originOffset[0]).toBeLessThan(AU * 2);
+    });
+
+    it('focus 해제 상태에서는 safety net 이 정상 작동 (카메라 1 AU 이동 시 shift)', () => {
+      const fo = new FloatingOrigin(AU);
+      const cameraWorld: Vec3Double = [AU * 1.5, 0, 0];
+
+      scenePerFrame(fo, null, cameraWorld);
+
+      // safety net 활성 — 카메라 월드 좌표로 shift
+      expect(fo.originOffset[0]).toBeCloseTo(AU * 1.5, 0);
+    });
+
+    it('focus → 해제 → 다시 focus 전환 시나리오', () => {
+      const fo = new FloatingOrigin(AU);
+      const earth: Vec3Double = [AU, 0, 0];
+      const jupiter: Vec3Double = [AU * 5.2, 0, 0];
+
+      // 1) 지구 focus — origin = earth
+      scenePerFrame(fo, earth, [AU * 5, 0, 0]);
+      expect(fo.originOffset[0]).toBeCloseTo(AU, 0);
+
+      // 2) focus 해제 + 카메라 추가 이동 — safety net 이 origin 을 카메라 월드로 이동
+      // (이 시점 origin 은 지구 AU 이므로 카메라 local 5 AU → world 6 AU)
+      const camLocal: Vec3Double = [AU * 5, 0, 0];
+      const camWorld: Vec3Double = [AU * 5 + AU, 0, 0];
+      scenePerFrame(fo, null, camWorld);
+      expect(fo.originOffset[0]).toBeCloseTo(AU * 6, 0);
+      void camLocal;
+
+      // 3) 다시 목성 focus — origin = jupiter (safety net 결과 무관하게 primary 재적용)
+      scenePerFrame(fo, jupiter, [AU * 10, 0, 0]);
+      expect(fo.originOffset[0]).toBeCloseTo(AU * 5.2, 0);
+    });
+
+    it('DoD β: focus body 의 local 좌표는 focus 활성 프레임에서 ≤ 1e5 m', () => {
+      // 버그 당시 시나리오 재현: originOffset 이 카메라 월드 (예: 1173 AU) 를 추적하면
+      // focus body local 이 수백 AU 단위가 되어 DoD β (≤ 1e5 m) 를 위반.
+      const fo = new FloatingOrigin(AU);
+      const jupiter: Vec3Double = [AU * 5.2, 0, 0];
+      const farCamera: Vec3Double = [AU * 1173, 0, 0];
+
+      scenePerFrame(fo, jupiter, farCamera);
+      const jupiterLocal = fo.toLocal(jupiter);
+      const localMax = Math.max(
+        Math.abs(jupiterLocal[0]),
+        Math.abs(jupiterLocal[1]),
+        Math.abs(jupiterLocal[2]),
+      );
+      expect(localMax).toBeLessThan(1e5);
     });
   });
 });
