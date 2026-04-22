@@ -143,23 +143,21 @@
 - **구현 위치**: `apps/web/scripts/browser-verify-floating-origin.mjs` (신규, 기존 browser-verify 스크립트 패턴)
 - **보조**: 실 Chrome GUI 육안 확인 (volt #33 "headless false positive" 방어 — headless 만으로 accept 금지)
 
-#### 6-β: 좌표 오차 DoD (dev 빌드 assert)
+#### 6-β: 좌표 오차 DoD (dev 빌드 assert) — v2 (2026-04-22 재정정)
 
-- **검증 대상 (cross-validate §1 반영)**: 현재 focus body + 카메라 의 `fo.toLocal(world)` 절대값 ≤ 1e5 m (100 km)
+- **검증 대상**: 현재 **focus body** 의 `fo.toLocal(world)` 절대값 ≤ 1e5 m (100 km)
+- **카메라 local 불포함 (v2 정정)**: Floating Origin 의 목적은 렌더 대상(mesh) 의 scene 좌표 jitter 해소이지 카메라를 원점 근처로 두는 것이 아님. 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 정상 위치에 배치되며, 카메라 local 에 1e5 m 제한을 두면 scientific 모드 자체가 동작 불가능. float32 jitter 는 mesh local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에 위임
 - **비검증 대상**: 원거리 background body (예: 목성 focus 중 태양 좌표 7.7e8 m) — 이들은 LOD low billboard 로 픽셀 오차 은폐 (P11-B 범위). 본 Phase 에선 일반 body 로 렌더되지만 scale=1 scientific 모드에서 sub-pixel 이므로 jitter 가 육안 검출 안 됨
+- **cross-validate §2 정정 (2026-04-22)**: 초기 cross-validate 교정안 ([#288 comment](https://github.com/coseo12/astro-simulator/issues/288#issuecomment-4293503652)) 이 "focus 대상 + 카메라" 병행을 제안했으나 실 dev 서버 검증에서 매 프레임 `[floating-origin] camera local 좌표 초과 (≥1e5m)` 로 실패하며 잘못된 설계임을 확인. 카메라 local 조건 제거로 재정정
 - **구현 위치**: dev 빌드 한정 (`process.env.NODE_ENV !== 'production'` 가드). `solar-system-scene.ts` `updateAt` 말미:
   ```ts
   if (process.env.NODE_ENV !== 'production') {
     const focusLocal = fo.toLocal(focusBodyWorld);
-    const cameraLocal = fo.toLocal(cameraWorldInMeters);
     console.assert(
       Math.max(Math.abs(focusLocal[0]), Math.abs(focusLocal[1]), Math.abs(focusLocal[2])) < 1e5,
       `[floating-origin] focus body local 좌표 초과: ${focusLocal}`,
     );
-    console.assert(
-      Math.max(Math.abs(cameraLocal[0]), Math.abs(cameraLocal[1]), Math.abs(cameraLocal[2])) < 1e5,
-      `[floating-origin] camera local 좌표 초과: ${cameraLocal}`,
-    );
+    // 카메라 local 체크 없음 — scientific 모드에서 카메라는 수 AU 떨어진 정상 배치.
   }
   ```
 - prod 빌드에선 dead-code elimination 으로 제거 (`process.env.NODE_ENV` pattern)
@@ -181,7 +179,7 @@
 5. **Trail/Particle 계약** (결정 §2): subscription API 로 계약만 수립, 실제 구현은 미래 Trail 모듈 도입 시 A 전략 따름
 6. **Smoothing**: 없음 — focus animation 기반 자연 smoothing (결정 §5-A)
 7. **DoD α 검증**: camera matrix projection 기반 결정론적 pixel shift 계산 + 실 Chrome 육안 (§6-α)
-8. **DoD β 검증**: dev 빌드 assert (focus body + 카메라 local ≤ 1e5 m, §6-β)
+8. **DoD β 검증**: dev 빌드 assert (focus body local ≤ 1e5 m, §6-β v2 — 카메라 local 불포함)
 9. **DoD γ 검증**: Zustand Heliocentric 불변식 단위 테스트 + 주석 계약 (§6-γ)
 10. **#271 회귀 방어**: 기존 "scientific 모드 jitter" 재현 시나리오 (목성→지구 zoom) 를 browser-verify 스크립트에 영구 등록
 
@@ -203,7 +201,7 @@
 
 - 목성→지구 zoom in 시 scientific 모드 육안 jitter 제거
 - DoD α (projected pixel shift ≤ 0.5px) 충족
-- DoD β (focus+카메라 local 좌표 ≤ 1e5 m) 충족
+- DoD β (focus body local 좌표 ≤ 1e5 m, 카메라 local 불포함 — v2 정정) 충족
 - #271 회귀 검증 후 close
 - bench 회귀율 < 5% (`fo.toLocal()` 은 subtract 3회 / per-body / per-frame — O(N) 추가, N=태양계 ~100 규모에서 무시 가능)
 
@@ -235,6 +233,12 @@
 - `controller.focusOn(mesh)` 의 `mesh.absolutePosition` 도 scene unit — 마찬가지로 m 환산 후 `setOriginToBody` 호출
 - `FloatingOrigin` 내부는 m 단위 일관 — scene unit 과 혼용 금지 (주석 계약)
 - `process.env.NODE_ENV !== 'production'` 가드 — Next.js webpack DCE 로 prod bundle 에서 제거 (기존 `__simStore` 패턴과 동일)
+
+## Amendments
+
+| 날짜       | 변경                                                                                                                                                                                                                                       | 이력                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| 2026-04-22 | DoD β 정의에서 카메라 local 제한 제거 — scientific 모드에서 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 위치가 정상. cross-validate §2 초기 교정 ("focus 대상 + 카메라" 병행) 이 오류였음을 실 dev 서버 매 프레임 assert 실패로 확인 | PR #291 / #292 연쇄 수정 |
 
 ## 참고
 

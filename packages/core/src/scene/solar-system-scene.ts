@@ -528,10 +528,16 @@ export function createSolarSystemScene(
       floatingOrigin.update(cameraWorldMeters);
     }
 
-    // P11-A #288 DoD β — dev 빌드 assert: focus body + 카메라 의 local 좌표 절대값 ≤ 1e5 m (100 km).
+    // P11-A #288 DoD β v2 — dev 빌드 assert: **focus body** local 좌표 절대값 ≤ 1e5 m (100 km).
     // core 패키지는 `process` 타입이 없으므로 runtime guard 사용. Next.js webpack 이 `process.env.NODE_ENV`
     // 를 빌드 타임 치환 → prod bundle 에서는 `'development' !== 'production'` 이 false 가 되어 DCE.
     // SSR / 테스트 환경은 `globalThis.process` 유/무 가드로 안전 접근.
+    //
+    // 카메라 local 불포함 (2026-04-22 재정정): Floating Origin 의 목적은 렌더 대상(mesh) 의 scene
+    // 좌표 jitter 해소. 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 위치가 정상이며, 카메라
+    // local 에 1e5 m 제한을 두면 scientific 모드가 물리적으로 동작 불가. float32 jitter 는 mesh
+    // local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
+    // 위임한다. ADR 20260422-floating-origin.md §6-β / §Amendments 2026-04-22 참조.
     if (floatingOriginAssertEnabled() && cam) {
       const focusId = focusBodyIdForAssert;
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
@@ -545,14 +551,6 @@ export function createSolarSystemScene(
             `[floating-origin] focus body '${focusId}' local 좌표 초과 (≥1e5m): ${fx},${fy},${fz}`,
           );
         }
-      }
-      // 카메라 local (scene unit × AU → m)
-      const cxm = cam.globalPosition.x * AU;
-      const cym = cam.globalPosition.y * AU;
-      const czm = cam.globalPosition.z * AU;
-      const cameraLocalMax = Math.max(Math.abs(cxm), Math.abs(cym), Math.abs(czm));
-      if (cameraLocalMax >= 1e5) {
-        console.error(`[floating-origin] camera local 좌표 초과 (≥1e5m): ${cxm},${cym},${czm}`);
       }
     }
 

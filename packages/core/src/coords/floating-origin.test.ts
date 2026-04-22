@@ -284,4 +284,105 @@ describe('FloatingOrigin', () => {
       expect(localMax).toBeLessThan(1e5);
     });
   });
+
+  // --- DoD β v2 (2026-04-22): 카메라 local 조건 제거 회귀 가드 ---
+  // ADR §6-β v2 / §Amendments 2026-04-22. cross-validate §2 초기 교정이 "focus + 카메라"
+  // 병행을 제안했으나 scientific 모드에서 카메라는 focus body 관찰을 위해 수 AU 떨어진
+  // 정상 배치. 카메라 local 에 1e5 m 제한을 두면 scene 매 프레임 assert 실패.
+  //
+  // 아래 테스트는 `solar-system-scene.ts` updateAt 말미의 DoD β assert 경로를 pure 함수로
+  // 축약. focus body local 만 검사하고 카메라 local 은 검사하지 않음을 회귀 가드로 박제.
+  describe('DoD β v2 — 카메라 local 조건 제거 회귀 가드 (ADR §6-β v2)', () => {
+    const AU = 1.495_978_707e11;
+
+    // scene 의 DoD β assert 경로를 순수 함수로 축약. focus body local 이 1e5 m 를 넘으면
+    // violation 목록에 추가. 카메라 local 은 의도적으로 검사하지 않음.
+    // 반환: violation 메시지 배열 (빈 배열이면 assert pass)
+    function dodBetaAssert(params: {
+      focusBodyWorld: Vec3Double | null;
+      cameraWorld: Vec3Double;
+      originOffset: Vec3Double;
+    }): string[] {
+      const { focusBodyWorld, originOffset } = params;
+      const violations: string[] = [];
+      if (focusBodyWorld) {
+        const fx = focusBodyWorld[0] - originOffset[0];
+        const fy = focusBodyWorld[1] - originOffset[1];
+        const fz = focusBodyWorld[2] - originOffset[2];
+        const focusLocalMax = Math.max(Math.abs(fx), Math.abs(fy), Math.abs(fz));
+        if (focusLocalMax >= 1e5) {
+          violations.push(`focus body local 초과: ${fx},${fy},${fz}`);
+        }
+      }
+      // 의도적으로 카메라 local 검사 없음 — scientific 모드에서 수 AU 정상 배치.
+      return violations;
+    }
+
+    it('카메라가 focus body 로부터 수 AU 떨어진 정상 상태 — assert 발동 없음', () => {
+      // 실 시나리오: 목성 focus, 카메라는 목성을 관찰하기 위해 5 AU 떨어진 배치.
+      // 버그 버전에서는 이 상태에서 `camera local 좌표 초과` 가 매 프레임 발생했음.
+      const fo = new FloatingOrigin(AU);
+      const jupiter: Vec3Double = [AU * 5.2, 0, 0];
+      fo.setOriginToBody(jupiter);
+      const cameraWorld: Vec3Double = [AU * 5.2 + AU * 5, 0, 0]; // 목성에서 5 AU 떨어진 카메라
+
+      const violations = dodBetaAssert({
+        focusBodyWorld: jupiter,
+        cameraWorld,
+        originOffset: fo.originOffset,
+      });
+
+      expect(violations).toEqual([]);
+    });
+
+    it('버그 재현 시나리오 — 카메라 world = 수백 AU 여도 focus body local 만 검사', () => {
+      // 버그 버전 메시지 예시: `camera local 좌표 초과 (≥1e5m): 551609191979.78, ...`
+      // = 약 3.7 AU. 이 값은 scientific 모드 관찰 배치에서 정상이며 assert 대상 아님.
+      const fo = new FloatingOrigin(AU);
+      const earth: Vec3Double = [AU, 0, 0];
+      fo.setOriginToBody(earth);
+      const farCamera: Vec3Double = [551609191979.78, 267067450948.42, 35002965518.79];
+
+      const violations = dodBetaAssert({
+        focusBodyWorld: earth,
+        cameraWorld: farCamera,
+        originOffset: fo.originOffset,
+      });
+
+      // focus body (earth) local ≈ 0 → pass. 카메라 조건 제거로 전체 pass.
+      expect(violations).toEqual([]);
+    });
+
+    it('focus body local 초과 시에는 여전히 violation 발동 (primary 계약 유지)', () => {
+      // DoD β 의 본질 — focus body local ≤ 1e5 m. 이 조건은 v2 에서도 유지.
+      // origin 이 focus body 와 크게 어긋난 상태를 인위적으로 구성해 violation 유도.
+      const fo = new FloatingOrigin(AU);
+      const earth: Vec3Double = [AU, 0, 0];
+      // origin 을 목성으로 잘못 잡은 상태 (회귀: #292 류 drift)
+      fo.setOriginToBody([AU * 5.2, 0, 0]);
+      const cameraWorld: Vec3Double = [AU * 5, 0, 0];
+
+      const violations = dodBetaAssert({
+        focusBodyWorld: earth,
+        cameraWorld,
+        originOffset: fo.originOffset,
+      });
+
+      expect(violations.length).toBe(1);
+      expect(violations[0]).toMatch(/focus body local 초과/);
+    });
+
+    it('focus 가 null 이면 assert 는 아무것도 검사하지 않음 (free-fly 탐색 중)', () => {
+      const fo = new FloatingOrigin(AU);
+      const farCamera: Vec3Double = [AU * 1000, 0, 0];
+
+      const violations = dodBetaAssert({
+        focusBodyWorld: null,
+        cameraWorld: farCamera,
+        originOffset: fo.originOffset,
+      });
+
+      expect(violations).toEqual([]);
+    });
+  });
 });
