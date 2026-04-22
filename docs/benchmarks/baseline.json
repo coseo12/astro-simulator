@@ -1,65 +1,65 @@
 {
-  "timestamp": "2026-04-19T08:41:07.175Z",
-  "phase": "remeasure-p8",
+  "timestamp": "2026-04-22T08:27:30.311Z",
+  "phase": "remeasure",
   "durationMs": 3000,
   "environment": "gh-actions-ubuntu-chromium-headless",
   "viewport": "1280x800",
   "scenarios": [
     {
       "name": "idle",
-      "fps": 30.09,
+      "fps": 17.77,
       "samples": 10
     },
     {
       "name": "play-1d",
-      "fps": 21.64,
+      "fps": 14.79,
       "samples": 10
     },
     {
       "name": "play-1y",
-      "fps": 24.14,
+      "fps": 14.67,
       "samples": 10
     },
     {
       "name": "focus-earth",
-      "fps": 60.16,
+      "fps": 244.28,
       "samples": 10
     },
     {
       "name": "focus-neptune",
-      "fps": 60.28,
+      "fps": 139.19,
       "samples": 10
     }
   ],
   "nBody": [
     {
       "n": 10,
-      "fps": 27.15,
+      "fps": 15.6,
       "samples": 10
     },
     {
       "n": 100,
-      "fps": 21.18,
+      "fps": 13.56,
       "samples": 10
     },
     {
       "n": 200,
-      "fps": 17.19,
+      "fps": 11.93,
       "samples": 10
     },
     {
       "n": 1000,
-      "fps": 6.92,
+      "fps": 5.7,
       "samples": 10
     },
     {
       "n": 5000,
-      "fps": 1.94,
+      "fps": 1.83,
       "samples": 10
     },
     {
       "n": 10000,
-      "fps": 1.12,
+      "fps": 1.1,
       "samples": 10
     }
   ],
