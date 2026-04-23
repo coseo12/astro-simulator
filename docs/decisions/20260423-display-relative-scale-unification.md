@@ -358,6 +358,35 @@ function currentTier(camera: ArcRotateCamera, focusBodyId: string | null): Tier 
 - **Reviewer m2** (lowerRadiusLimit 원복): 후속 이슈 #305 로 분리 (P11-B billboard marker 통합 시점 재검토)
 - **developer suggestion #1** (FOCUS_RADIUS_MULTIPLIER viewport/fov 동적화): 후속 이슈 #306 으로 분리 (재검토 조건 #3 에 이미 박제)
 
+### 2026-04-23 — Q10 구현 정합성 재평가 (#313 M2)
+
+§Amendments (c) 는 "코드 변경 0, Amendment 만" 으로 박제했으나, #313 M1 재측정 (Run #24837822902, v0.12.0 main, `phase=p11-reshape-m1`) 에서 **non-focus scenario fps 회귀 −38 ~ −44% 가 P12 완결 이후에도 지속** 확인되어 재평가.
+
+**실측 회귀 (ubuntu median N=10, v0.10.0 baseline 대비)**:
+
+| scenario | v0.10.0 | v0.12.0 (M1) | Δ        |
+| -------- | ------- | ------------ | -------- |
+| idle     | 30.09   | 16.89        | **−44%** |
+| play-1d  | 21.64   | 13.41        | **−38%** |
+| play-1y  | 24.14   | 14.77        | **−39%** |
+
+**해석**: §Amendments (c) 의 "T1/T2 에서 `toLocal()` 오버헤드는 0 에 수렴" 전제가 **컴퓨트 비용 전체가 아닌 시각 효과만 다룸**. 실제로는 `updateAt` 매 프레임 내 primary follow (`setOriginToBody`) + free-fly safety net (`update()`) + `Vec3Double` 메모리 할당 + Set iteration (listener 0 건이어도 loop 진입) 등 **tier 무관 overhead** 가 누적되어 non-focus 회귀의 주범.
+
+**재평가 결정 (#313 M2)**:
+
+- §Amendments (c) "코드 변경 0" 을 **부분 수정**: `solar-system-scene.ts` 3지점에 `activeTier === 'body'` 분기 추가
+  - `setTier` — T3 이탈 시 `floatingOrigin.reset()` 1회 호출 (후속 프레임 origin `[0,0,0]` 유지)
+  - primary follow (line 581) — T3 에서만 `setOriginToBody(focusWorld)` 실행
+  - safety net (line 633) — T3 에서만 `floatingOrigin.update(cameraWorldMeters)` 실행
+- **FloatingOrigin 클래스 / `onOriginShift` 계약 / `floating-origin*.test.ts` 전부 유지** — §Amendments (c) 의 "제거 하지 않는 이유" 4항 모두 보존 (P11-A 회귀 가드, 미래 Trail 모듈 계약, toLocal 인터페이스)
+- M3 bench 재측정 게이트: skip 적용 후 회귀율 < 5% 충족 시 P11-A 원 DoD β 만족
+
+**DoD 재조정 (CLAUDE.md 스프린트 계약 6항 ROI 5문 체크)**:
+
+- 원 계약 "T3 기능 회귀 가드 단위 테스트 (지구/달 focus 시 FO primary follow 동작 유지)" 는 Scene 인스턴스 + tier 전환 mock 구축 비용이 수정 라인 수 (3줄) 대비 과다
+- 대체: (a) `floating-origin.test.ts` 의 기존 `reset()` / `setOriginToBody no-op` 테스트가 인접 property 테스트로 간접 보증 (b) 주석 계약 — `setTier` / primary follow / safety net 3지점에 "#313 M2 — P12 ADR §Q10 Amendment" 인라인 박제 (c) M3 bench 재측정 게이트 (non-focus 회귀율 < 5%) 가 회귀 시 자동 감지
+- **재조정 박제 3위치**: 본 Amendment (ADR) / PR 본문 / CHANGELOG Notes — CLAUDE.md 재조정 박제 규칙 준수
+
 ---
 
 ## 참고

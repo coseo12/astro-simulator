@@ -449,6 +449,15 @@ export function createSolarSystemScene(
     }
     rebuildOrbitLines();
 
+    // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. T3 (body) 이탈 시 originOffset 을 [0,0,0] 으로
+    // 리셋하여 T1/T2 에서 mesh.position 이 shift 없는 절대 월드 좌표 × renderScale 로 계산되도록 한다.
+    // T1/T2 는 renderScale 이 작아 origin shift 의 visible 효과가 sub-pixel 이지만, 매 프레임
+    // setOriginToBody / update() overhead 는 실재 (#294 non-focus −38~−44% 회귀). reset 1 회로 이후
+    // 프레임의 primary follow / safety net 이 조건부 skip 가능.
+    if (tier !== 'body') {
+      floatingOrigin.reset();
+    }
+
     // Phase B — camera dolly interp. scene.activeCamera 가 ArcRotateCamera 가 아니면 skip.
     // (e.g. 테스트 셋업 / 비정상 초기화 경로). 통상 경로는 setupArcRotateCamera 에서 항상 ArcRotateCamera.
     //
@@ -578,7 +587,10 @@ export function createSolarSystemScene(
     // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
     // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
     // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
-    if (focusBodyIdForAssert) {
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
+    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
+    if (activeTier === 'body' && focusBodyIdForAssert) {
       const focusWorld = worldPositions.get(focusBodyIdForAssert);
       if (focusWorld) {
         floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
@@ -630,7 +642,11 @@ export function createSolarSystemScene(
     // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (line 445-450 의
     // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
     // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
-    if (cam && !focusBodyIdForAssert) {
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 renderScale 이 작아
+    // 카메라 이동이 AU 단위여도 sub-pixel → safety net skip + origin [0,0,0] 유지. 매 프레임
+    // metersPerSceneUnit 환산 + floatingOrigin.update() + AU 곱셈 3회 overhead 제거 (#294 회귀 주범 후보).
+    if (cam && !focusBodyIdForAssert && activeTier === 'body') {
       // cam.globalPosition 은 scene unit. P12-A 이후 1 unit 크기는 tier 별 상이 — 환산 factor 는
       // 현재 tier 의 renderScale 역수 (1/sceneUnitPerMeter). fo 는 m 단위 계약.
       const metersPerSceneUnit = sceneUnitPerMeter > 0 ? 1 / sceneUnitPerMeter : AU;
