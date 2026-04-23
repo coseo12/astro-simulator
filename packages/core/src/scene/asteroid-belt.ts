@@ -20,7 +20,11 @@ import { positionAt } from '../physics/kepler.js';
 import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
 
-const SCENE_UNIT_PER_METER = 1 / AU;
+// P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. tier 전환 시 본 모듈의
+// ThinInstance 좌표가 body mesh 의 renderScaleForTier(tier) 와 동일 배수로 스케일되도록
+// 호출자가 `updateAt` / `writeWorldPositions` 에 `sceneUnitPerMeter` 를 주입한다.
+// 주석 계약: `sceneUnitPerMeter === renderScaleForTier(activeTier)` 이어야 rings/행성과
+// 상대 비율이 보존됨 (원칙 #1·#4). ADR `20260423-display-relative-scale-unification.md` §결정 §1.
 
 export interface AsteroidBeltOptions {
   /** 생성할 소행성 수. 기본 200. */
@@ -41,17 +45,26 @@ export interface AsteroidBeltHandles {
   mesh: Mesh;
   /** 각 소행성의 Kepler 요소 (진단용) */
   elements: ReadonlyArray<LoadedOrbitalElements>;
-  /** 주어진 jd에 위치 갱신 (Kepler 해석해 경로) */
-  updateAt: (jd: number) => void;
+  /**
+   * 주어진 jd에 위치 갱신 (Kepler 해석해 경로).
+   *
+   * @param jd Julian Date
+   * @param sceneUnitPerMeter 현재 tier 의 `renderScaleForTier(tier)` (m → scene unit 배수).
+   *   tier 전환 시 호출자가 새 값을 주입하면 다음 프레임에 스케일 반영.
+   */
+  updateAt: (jd: number, sceneUnitPerMeter: number) => void;
   /**
    * P4-A #165 — 각 소행성의 현 월드 좌표(SI m, 태양 원점)를 ThinInstance 버퍼에 반영.
    * 인자는 길이 3N의 flat array. WebGPU 엔진은 Float32Array, Newton/BH는 Float64Array를
    * 반환하므로 유니온으로 받는다. 빈 배열이면 갱신하지 않음 (방어).
+   *
+   * @param sceneUnitPerMeter 현재 tier 의 `renderScaleForTier(tier)`.
    */
   writeWorldPositions: (
     positions: Float32Array | Float64Array,
     offset: number,
     count: number,
+    sceneUnitPerMeter: number,
   ) => void;
   /**
    * P4-A #165 — N-body 초기 state (positions/velocities/masses). 길이 3N / 3N / N.
@@ -136,23 +149,24 @@ export function createAsteroidBelt(
 
   const sun = GRAVITATIONAL_CONSTANT * 1.98892e30;
 
-  const updateAt = (jd: number) => {
+  const updateAt = (jd: number, sceneUnitPerMeter: number) => {
     for (let i = 0; i < n; i += 1) {
       const el = elements[i]!;
       const p = positionAt(el, jd, sun);
       writeTranslation(
         matrixBuffer,
         i,
-        p[0] * SCENE_UNIT_PER_METER,
-        p[1] * SCENE_UNIT_PER_METER,
-        p[2] * SCENE_UNIT_PER_METER,
+        p[0] * sceneUnitPerMeter,
+        p[1] * sceneUnitPerMeter,
+        p[2] * sceneUnitPerMeter,
       );
     }
     template.thinInstanceBufferUpdated('matrix');
   };
 
-  // 초기 위치
-  updateAt(epoch);
+  // 초기 위치 — tier 는 씬 생성 시 solar 로 시작하므로 renderScaleForTier('solar')=1/AU 근사값
+  // (기존 상수와 수치상 근접) 을 초기값으로 사용. 첫 프레임 `updateAt` 호출에서 정확한 값으로 덮어써짐.
+  updateAt(epoch, 1 / AU);
 
   // P4-A #165 — N-body 경로에서 사용할 초기 state vector.
   const getNbodyState = (jd: number, sunMu: number) => {
@@ -178,6 +192,7 @@ export function createAsteroidBelt(
     positions: Float32Array | Float64Array,
     offset: number,
     count: number,
+    sceneUnitPerMeter: number,
   ) => {
     const limit = Math.min(count, n);
     for (let i = 0; i < limit; i += 1) {
@@ -185,9 +200,9 @@ export function createAsteroidBelt(
       writeTranslation(
         matrixBuffer,
         i,
-        (positions[o] ?? 0) * SCENE_UNIT_PER_METER,
-        (positions[o + 1] ?? 0) * SCENE_UNIT_PER_METER,
-        (positions[o + 2] ?? 0) * SCENE_UNIT_PER_METER,
+        (positions[o] ?? 0) * sceneUnitPerMeter,
+        (positions[o + 1] ?? 0) * sceneUnitPerMeter,
+        (positions[o + 2] ?? 0) * sceneUnitPerMeter,
       );
     }
     template.thinInstanceBufferUpdated('matrix');

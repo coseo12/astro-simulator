@@ -3,21 +3,19 @@
 import { useSimStore } from '@/store/sim-store';
 
 /**
- * kind 별 시각 과장 상한 (packages/core/src/scene/visual-scale.ts 와 SSoT 동기).
- * core scene 모듈은 babylon + physics-wasm 의존을 끌고 오므로 SSR prerender 에서 ENOENT.
- * 본 컴포넌트는 값만 필요하여 인라인 미러링 (drift 방지는 테스트에서 검증).
+ * P12-A #298 B2 — 과장 배지 내용 재정의.
+ *
+ * 과거 (P10-C-2 #278) 에는 `educational` 모드에서 kind 별 `MAX_SCALE_BY_KIND` (×500 등) 배수를
+ * 표시했으나, P12-A 부터 body 시각 과장이 완전 제거됐다 (tier 엔진 기반 실측 비율). 따라서
+ * "×N 과장 중" 문구는 **거짓 UX** 가 되어 본 Phase 에서 차단한다.
+ *
+ * 본 배지는 Phase C (#298 R2) 에서 완전 제거될 예정이며, Phase A 동안은 혼란 방지를 위해
+ * 내용을 "실측 비율" 기반으로 재정의하여 유지한다 (컴포넌트 자체는 삭제하지 않음).
+ *
+ * - focus 없음: "실측 비율 모드"
+ * - focus 있음: "{bodyName} — 실측 비율 1.0"
+ * - viewMode 분기는 양쪽 동일 (모두 실측) — `data-view-mode` 만 어트리뷰트로 보존 (기존 테스트 호환).
  */
-const MAX_SCALE_BY_KIND: Record<string, number> = {
-  star: 20,
-  planet: 500,
-  moon: 500,
-  'dwarf-planet': 2_000,
-  comet: 20_000,
-};
-
-function maxScaleForKind(kind: string): number {
-  return MAX_SCALE_BY_KIND[kind] ?? 500;
-}
 
 interface BodyMeta {
   id: string;
@@ -55,15 +53,10 @@ const BODY_META: Record<string, BodyMeta> = {
 };
 
 /**
- * P10-C-2 #278 — 과장 스케일 배지 (Fact-First 원칙 §"Hover/Focus 배지").
+ * P10-C-2 #278 → P12-A #298 B2 — 스케일 배지 (실측 비율 표시).
  *
- * selectedBodyId 기반 — 사용자가 body 에 focus 하면 현재 시각 과장 상한 표시.
- *
- * - `educational` 모드: "{bodyName} — 시각 크기 최대 ×N 과장 중" (kind 별 MAX_VISUAL_SCALE_*)
- * - `scientific` 모드: "{bodyName} — 실제 비율 1.0"
- * - focus 없음: 모드 요약만 표시 ("시각 과장 모드" / "사실 비율 모드")
- *
- * hover 기반은 babylon pointer event 통합이 필요하여 C-3 로 분리. 본 MVP 는 focus 경로.
+ * 사용자가 body 에 focus 하면 이름을, 아니면 모드 요약만 표시.
+ * 과거 `MAX_SCALE_BY_KIND` 인라인 미러링은 과장 기능이 제거되어 제거됨.
  */
 export function ScaleBadge() {
   const viewMode = useSimStore((s) => s.viewMode);
@@ -71,28 +64,16 @@ export function ScaleBadge() {
 
   const body = selectedBodyId ? BODY_META[selectedBodyId] : null;
 
-  let label: string;
-  if (viewMode === 'scientific') {
-    label = body ? `${body.nameKo} — 실제 비율 1.0` : '사실 비율 모드';
-  } else {
-    if (body) {
-      const max = maxScaleForKind(body.kind);
-      label = `${body.nameKo} — 시각 크기 최대 ×${max.toLocaleString()} 과장 중`;
-    } else {
-      label = '시각 과장 모드';
-    }
-  }
+  // Phase A 부터는 educational / scientific 모두 실측 비율 (1.0) — tier 엔진이 처리.
+  // 분기 자체를 유지하지 않고 동일 문구 출력. viewMode 값은 어트리뷰트로만 보존.
+  const label = body ? `${body.nameKo} — 실측 비율 1.0` : '실측 비율 모드';
 
   return (
     <div
       className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary"
       data-testid="scale-badge"
       data-view-mode={viewMode}
-      title={
-        viewMode === 'scientific'
-          ? 'IAU 2015 실측 비율. sub-pixel 이탈 주의'
-          : '시각 이해를 위해 천체 크기가 과장되어 있습니다. m 키로 사실 모드 전환.'
-      }
+      title="IAU 2015 실측 비율. 거리·크기 모두 실측 (P12-A 부터). Phase C 에서 배지 자체 제거 예정."
     >
       {label}
     </div>
