@@ -1,6 +1,8 @@
 'use client';
 
 import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulator/core';
+// P12-A #298 — Tier 엔진 유틸 (renderScaleForTier) 는 sceneApi 네임스페이스에 이미 re-export 되어 있다.
+// `sceneApi.renderScaleForTier` 로 접근한다 (별도 import 불필요, 아래 onBeforeRender 에서 사용).
 import { attachCoreToStore } from '@/core/core-adapter';
 import { parseIntegratorKind } from '@/core/parse-integrator';
 import { parseGrMode } from '@/core/parse-gr-mode';
@@ -17,6 +19,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreRef = useRef<SimulationCore | null>(null);
   const unsubDiskRef = useRef<(() => void) | null>(null);
+  // P12-A #298 N1 — onBeforeRender observer 중복 등록 방지용 cleanup 핸들.
+  // HMR / 컴포넌트 remount 시 scene 이 살아있을 수 있어 관찰자 누수 방지.
+  const tierObserverCleanupRef = useRef<(() => void) | null>(null);
   const [core, setCore] = useState<SimulationCore | null>(null);
 
   useEffect(() => {
@@ -282,13 +287,67 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setCameraHandlers(
           (bodyId: string) => {
             const mesh = solar.meshes.get(bodyId);
-            if (mesh) controller.focusOn({ mesh });
+            if (mesh) {
+              // P11-A #288 — Floating Origin primary shift (ADR §1-B).
+              // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
+              // 이후 `updateAt` 이 body 를 scene 원점 근처에서 렌더 → float32 jitter 제거.
+              solar.setFocusOrigin(bodyId);
+              controller.focusOn({ mesh });
+            }
           },
-          () => controller.reset(35),
+          () => {
+            // P12-A #298 — reset 시 focus 해제 → tier 는 free-fly 경로로 판정.
+            solar.clearFocus();
+            controller.reset(35);
+          },
           (radius: number) => {
             camera.radius = radius;
           },
         );
+
+        // P12-A #298 — Tier 하이브리드 트리거 자동 판정 (Q7=7-d2).
+        //
+        // 매 프레임 카메라 위치 → 현재 tier 재판정 (히스테리시스 ±15% 로 왕복 flicker 방지).
+        // focus 존재 시 focus body 거리 기준, 없으면 카메라-원점 거리 기준.
+        //
+        // 비용: 프레임당 Map lookup 1회 + 산술 연산 ~10회. fps 영향 무시 가능 수준 (ADR 재검토 조건 #10
+        // 에 throttle 옵션 예비 박제).
+        const onBeforeRender = () => {
+          if (!instance.scene) return;
+          const activeCam = instance.scene.activeCamera;
+          if (!activeCam) return;
+          const activeTier = solar.getTier();
+          // scene unit → m 환산: 현재 tier 의 renderScale 역수.
+          const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(activeTier);
+          const cx = activeCam.globalPosition.x * metersPerSceneUnit;
+          const cy = activeCam.globalPosition.y * metersPerSceneUnit;
+          const cz = activeCam.globalPosition.z * metersPerSceneUnit;
+          const cameraFromSunMeters = Math.sqrt(cx * cx + cy * cy + cz * cz);
+          // focus body 와의 거리 — ArcRotateCamera 의 `radius` 가 target 과의 거리 (scene unit).
+          // focus 가 없을 때 (free-fly) 도 값은 있지만 solar.updateTierByCamera 가 focus id 부재를
+          // 감지해 카메라-원점 경로로 판정하므로 값 자체는 전달만 하고 효과 없음.
+          const arcCam = activeCam as unknown as { radius?: number };
+          const focusDistSceneUnit = typeof arcCam.radius === 'number' ? arcCam.radius : 0;
+          const cameraFromFocusMeters = focusDistSceneUnit * metersPerSceneUnit;
+          solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+        };
+        const tierObserver = instance.scene.onBeforeRenderObservable.add(onBeforeRender);
+        // N1 권고 — unmount / HMR 시 observer 해제. scene dispose 시 자동 정리되지만 React
+        // remount 타이밍에 scene 은 살아있고 컴포넌트만 다시 마운트되는 경로를 방어.
+        tierObserverCleanupRef.current = () => {
+          if (tierObserver && instance.scene) {
+            instance.scene.onBeforeRenderObservable.remove(tierObserver);
+          }
+        };
+
+        // P11-A #288 — dev 빌드 한정 `__floatingOrigin` 전역 노출 (검증 스크립트용).
+        // prod 에서도 `__solarScene.floatingOrigin` 경유 접근 가능하지만 편의상 top-level 도 제공.
+        if (process.env.NODE_ENV !== 'production') {
+          Object.defineProperty(window, '__floatingOrigin', {
+            configurable: true,
+            get: () => solar.floatingOrigin,
+          });
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -300,6 +359,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       unsubEngine?.();
       unsubDiskRef.current?.();
       unsubDiskRef.current = null;
+      tierObserverCleanupRef.current?.();
+      tierObserverCleanupRef.current = null;
       detach();
       instance.dispose();
       coreRef.current = null;

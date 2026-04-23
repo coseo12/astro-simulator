@@ -20,6 +20,16 @@ export type {
   SolarSystemSceneOptions,
   PhysicsEngineKind,
 } from './solar-system-scene.js';
+// P12-A #298 — Tier 엔진 (Display-Relative Scale Unification).
+export {
+  renderScaleForTier,
+  tierFromFocus,
+  tierFromCameraDistance,
+  resolveCurrentTier,
+  initialTier,
+  TIER_HYSTERESIS,
+} from './tier.js';
+export type { Tier } from './tier.js';
 export { createAsteroidBelt } from './asteroid-belt.js';
 export type { AsteroidBeltHandles, AsteroidBeltOptions } from './asteroid-belt.js';
 export { createRingPlaceholder } from './ring-placeholder.js';

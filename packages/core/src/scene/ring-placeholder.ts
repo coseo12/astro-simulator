@@ -9,7 +9,8 @@
  *   - 반경: innerRadius 는 무시하고 outerRadius 만 사용 (플레이스홀더 특성 — 원판만)
  *   - 기본 색: 목성 dust `#887766`, alpha=0.2 (반투명 겹침)
  *
- * **씬 단위**: 1 scene unit = 1 AU (solar-system-scene 규약 일치).
+ * **씬 단위**: `renderScaleForTier(tier)` 경유 (P12-A #298). solar tier 기준 1 scene unit ≈ 1 AU.
+ *   생성 시점 tier 기반으로 반경을 계산하고, 이후 tier 전환은 host.scaling 으로 흡수된다.
  *
  * ADR `docs/decisions/20260420-p9-galilean-laplace-rings.md`:
  *   - §경로 정정 — Three.js 가정 → Babylon.js 실제 스택
@@ -20,10 +21,12 @@
  */
 
 import { Color3, MeshBuilder, StandardMaterial, type Mesh, type Scene } from '@babylonjs/core';
-import { AU } from '@astro-simulator/shared';
 import type { LoadedRingLayer } from '../ephemeris/solar-system-loader.js';
+import { renderScaleForTier, type Tier } from './tier.js';
 
-const SCENE_UNIT_PER_METER = 1 / AU;
+// P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. 생성 시점의 tier 로 반경을 계산한다.
+// rings 는 host planet mesh 의 자식이므로 host.scaling 이 tier 전환 시 `newScale/prevScale` 로
+// 변화하면 ring 도 같은 배수로 확대되어 body 와 상대 비율 보존 (원칙 #1·#4).
 
 /** 기본 색 — 목성 dust 톤. 행성별 조정은 PR-2.5 shader 의 `color` 파라미터에서 수행. */
 const DEFAULT_RING_COLOR: readonly [number, number, number] = [0x88 / 255, 0x77 / 255, 0x66 / 255];
@@ -47,6 +50,12 @@ export interface RingPlaceholderOptions {
   color?: readonly [number, number, number];
   /** alpha override. 기본 0.2. */
   alpha?: number;
+  /**
+   * P12-A #298 B1 — 생성 시점의 tier. 디스크 반경 계산에 사용된다.
+   * 이후 tier 전환은 host.scaling 으로 흡수되므로 초기 tier 만 정확하면 된다.
+   * 기본값 `'solar'` — 초기 tier 가 solar 로 시작하는 현 디폴트에 맞춤.
+   */
+  tier?: Tier;
 }
 
 /**
@@ -55,7 +64,7 @@ export interface RingPlaceholderOptions {
  * @param scene Babylon 씬
  * @param host 호스트 행성 메쉬 (위치 동기화 기준)
  * @param rings 로드된 고리 층 배열 (1~N 층)
- * @param options 색·alpha override
+ * @param options 색·alpha override 및 초기 tier
  */
 export function createRingPlaceholder(
   scene: Scene,
@@ -65,13 +74,15 @@ export function createRingPlaceholder(
 ): RingPlaceholderHandles {
   const color = options.color ?? DEFAULT_RING_COLOR;
   const alpha = options.alpha ?? DEFAULT_RING_ALPHA;
+  const sceneUnitPerMeter = renderScaleForTier(options.tier ?? 'solar');
 
   const meshes: Mesh[] = [];
 
   rings.forEach((ring, idx) => {
     // Babylon CreateDisc 는 단일 반경 원판 → 플레이스홀더는 outerRadius 만 반영.
     // PR-2.5 shader 에서는 innerRadius/outerRadius 범위에 따라 alpha 를 fragment 단위로 스컬프트.
-    const radiusScene = ring.outerRadius * SCENE_UNIT_PER_METER;
+    // 반경은 생성 시점의 tier 기준 — 이후 host.scaling 이 tier 비율을 자식에 전파한다.
+    const radiusScene = ring.outerRadius * sceneUnitPerMeter;
     const disc = MeshBuilder.CreateDisc(
       `${host.name}-ring-${ring.id}`,
       { radius: radiusScene, tessellation: DISC_TESSELLATION },
