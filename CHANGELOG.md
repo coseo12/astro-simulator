@@ -5,6 +5,34 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-04-23
+
+### P12-B 8D 카메라 dolly 애니메이션 (Display-Relative Scale Unification Phase B)
+
+메인 이슈: #298 · ADR: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) §3 (배선 원리) / §Phase 분리 / §Concrete Prediction
+
+PR #304 (`208f5cb`) — Q8=8D 카메라 dolly 병행 interp + 입력 잠금. Phase A 의 Tier 엔진 기반 (v0.11.0) 위에 integration.
+
+#### Behavior Changes
+
+- **`runTierTransition` 신규 — scene scale 즉시 setAll + `camera.radius` 300ms ExponentialEase interp 병행** (`packages/core/src/scene/tier-transition.ts`) — apparent size 불변 수식 `radius_new = radius_old / ratio` (`ratio = renderScale_new / renderScale_old`) 로 focus body 화면 크기 유지. tier 전환 시 `scene.detachControl()` + `onAnimationEnd` / `setTimeout(lockMs=500)` 이중 해제. Pending tween 취소 (`scene.getAnimatableByTarget(camera).stop()`) + `document.visibilitychange` 핸들러 (idempotent attachControl)
+- **`setTier` 가 `runTierTransition` 호출로 전환** (`packages/core/src/scene/solar-system-scene.ts:436`) — 기존 `scaling.setAll` 즉시 반영은 유지하되 camera dolly 병행 추가. `isArcRotateCamera` 런타임 타입 가드
+- **`focusOn` JSDoc 에 Phase B tier 연계 맥락 박제** (`packages/core/src/scene/camera-controller.ts:44`) — user-trigger focus 경로 (`desiredRadius = meshRadius*5`) 는 유지. tier 전환 시 radius 재계산 경로는 `runTierTransition` 위임
+- **카메라 `minZ` 재조정** — tier 전환 전 `cam.minZ = radius_new * 0.01` 적용. `radius_new < minZ` clamp 충돌 방어 (V5 달성 센서)
+
+#### DoD 실측 (P12-B Phase B)
+
+| DoD                                      | 실측                                                                | 상태 |
+| ---------------------------------------- | ------------------------------------------------------------------- | ---- |
+| V5 T3 Body 지구 세로 40% ±5% (304~336px) | **322px**                                                           | PASS |
+| A1 focus 중심 편차 ≤10px                 | **0.0px**                                                           | PASS |
+| C1 apparent size 변동 ≤5%                | 수식 단위 테스트 (`tier-transition.test.ts` 11건, `1e-12` 상대오차) | PASS |
+| C2 fps<30 프레임 ≤2                      | canvas 비검정 + console.error 0 (Level 1)                           | PASS |
+| C3 전환 ≤500ms                           | QA 독립 재측정 lock 373.5ms / click→reattach 506ms                  | PASS |
+| C4 입력 잠금 + 100ms 내 재활성           | detachControl during=false / attachControl after=true (Level 2)     | PASS |
+
+위험 3건 해소: pending tween 연쇄 (getAnimatableByTarget.stop 구현) / 탭 비활성 영구 잠금 (visibilitychange + fallback timer 이중 방어) / minZ clamp (`radius_new * 0.01` 재조정).
+
 ### P12-C Display-Relative Scale Unification 완결 (Phase C)
 
 메인 이슈: #298 (auto-close) / #288 (auto-close) · ADR Amendment: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) §Amendment / [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) §Amendment · 회고: [`docs/retrospectives/p12-retrospective.md`](docs/retrospectives/p12-retrospective.md)
