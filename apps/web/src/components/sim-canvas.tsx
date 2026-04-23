@@ -259,18 +259,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
 
-        // P10-C-2 #278 — 초기 viewMode 반영 + store 구독으로 토글 시 scale 1 강제.
-        solar.setViewMode(useSimStore.getState().viewMode);
-
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
         // + 질량 배수 변경 → setBodyMassMultiplier (#107)
-        // + P10-C-2 viewMode → solar.setViewMode
+        // (P12-C #298 — viewMode 구독 삭제: 단일 모드 전환)
         unsubEngine = useSimStore.subscribe((state, prev) => {
           if (state.physicsEngine !== prev.physicsEngine) {
             solar.setPhysicsEngine(resolveEngine(state.physicsEngine));
-          }
-          if (state.viewMode !== prev.viewMode) {
-            solar.setViewMode(state.viewMode);
           }
           if (state.massMultipliers !== prev.massMultipliers) {
             const prevKeys = new Set(Object.keys(prev.massMultipliers));

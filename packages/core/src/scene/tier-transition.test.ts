@@ -158,3 +158,110 @@ describe('computeNewMinZ — V5 clamp 충돌 방어 (위험 #3)', () => {
     expect(newMinZ).toBeCloseTo(0.0335, 4);
   });
 });
+
+/**
+ * P12-C #298 — M1 하드닝 단위 테스트.
+ *
+ * `solar-system-scene.ts:setTier` 의 연쇄 전환 race 방지 로직을 **라이프사이클 계약**으로 박제.
+ * 실제 `runTierTransition` 은 Babylon Scene / Animation 에 의존하므로 본 테스트는 `setTier` 내부의
+ * "이전 cleanup 을 먼저 호출 후 새 cleanup 으로 교체" 시퀀스를 mock 으로 검증한다.
+ *
+ * 회귀 가드: 만약 `setTier` 가 `runTierTransition` 반환 cleanup 을 저장하지 않고 버리면
+ * 두 번째 호출에서 첫 번째 cleanup 이 호출되지 않아 fallback timer race 발생 (Phase B PR #304 Reviewer M1).
+ */
+describe('setTier 연쇄 전환 cleanup 저장·호출 계약 (M1 하드닝)', () => {
+  /**
+   * `solar-system-scene.ts:setTier` 내부의 cleanup 클로저 관리 로직을 순수화한 모방.
+   * 실제 구현과 동일한 시퀀스: (1) `pendingTierCleanup?.()` → (2) 새 `runTierTransition` 호출 → (3) 반환값 저장.
+   */
+  function createTierSwitcher(runner: () => () => void) {
+    let pendingTierCleanup: (() => void) | null = null;
+    return {
+      setTier: () => {
+        pendingTierCleanup?.();
+        pendingTierCleanup = runner();
+      },
+      getPending: () => pendingTierCleanup,
+    };
+  }
+
+  it('연쇄 전환 시 이전 cleanup 이 다음 진입 전에 호출된다', () => {
+    const cleanupCalls: number[] = [];
+    let callIndex = 0;
+    const runner = () => {
+      const idx = ++callIndex;
+      return () => {
+        cleanupCalls.push(idx);
+      };
+    };
+    const { setTier } = createTierSwitcher(runner);
+
+    // 첫 번째 전환 — cleanup 호출 이력 없음
+    setTier();
+    expect(cleanupCalls).toEqual([]);
+
+    // 두 번째 전환 — 첫 번째 cleanup 호출됨
+    setTier();
+    expect(cleanupCalls).toEqual([1]);
+
+    // 세 번째 전환 — 두 번째 cleanup 호출됨
+    setTier();
+    expect(cleanupCalls).toEqual([1, 2]);
+  });
+
+  it('idempotent cleanup — 이미 released 된 cleanup 재호출도 안전 (runTierTransition 계약)', () => {
+    let cleanupCallCount = 0;
+    // `runTierTransition` 실 반환값은 idempotent (released 플래그). 본 모방에서도 동일 보장.
+    const runner = () => {
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        cleanupCallCount += 1;
+      };
+    };
+    const { setTier, getPending } = createTierSwitcher(runner);
+
+    setTier();
+    const firstCleanup = getPending();
+    // 외부에서 강제 호출 (예: visibilitychange)
+    firstCleanup?.();
+    firstCleanup?.(); // 재호출도 안전
+    expect(cleanupCallCount).toBe(1);
+
+    // 이제 setTier 호출 — 내부 pendingTierCleanup?.() 는 이미 released 이라 no-op
+    setTier();
+    expect(cleanupCallCount).toBe(1); // 새 cleanup 으로 교체만 됨
+
+    // 새 cleanup 호출 확인
+    const secondCleanup = getPending();
+    secondCleanup?.();
+    expect(cleanupCallCount).toBe(2);
+  });
+
+  it('회귀 가드: 만약 `pendingTierCleanup?.()` 가 누락되면 연쇄 cleanup 이 호출되지 않는다 (버그 재현)', () => {
+    // 버그 재현용 switcher — `setTier` 가 cleanup 반환값을 저장만 하고 이전 것을 호출하지 않는다.
+    const cleanupCalls: number[] = [];
+    let callIndex = 0;
+    let pending: (() => void) | null = null;
+    const runner = () => {
+      const idx = ++callIndex;
+      return () => {
+        cleanupCalls.push(idx);
+      };
+    };
+    const buggySetTier = () => {
+      // ← `pending?.()` 호출 **누락** (버그). 대신 덮어쓰기만.
+      pending = runner();
+    };
+
+    buggySetTier();
+    buggySetTier();
+    buggySetTier();
+    // 버그: 이전 cleanup 호출 이력 0
+    expect(cleanupCalls).toEqual([]);
+    // 올바른 구현은 `cleanupCalls === [1, 2]` 이어야 한다 (위 첫 테스트와 대조).
+    // 마지막 pending 은 여전히 저장됨 — 사용 여부 확인으로 noUnusedLocals 방어.
+    expect(pending).not.toBeNull();
+  });
+});

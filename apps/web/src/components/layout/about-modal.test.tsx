@@ -1,13 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { useSimStore } from '@/store/sim-store';
+import { describe, expect, it } from 'vitest';
 import { AboutModal } from './about-modal';
 
-beforeEach(() => {
-  useSimStore.setState({ viewMode: 'educational' });
-});
-
-describe('AboutModal (P10-C-3 #278)', () => {
+describe('AboutModal (P10-C-3 #278 / P12-C #298 — 단일 모드)', () => {
   it('초기 상태 — 버튼만 표시, 모달 숨김', () => {
     render(<AboutModal />);
     expect(screen.getByTestId('about-button')).toBeInTheDocument();
@@ -29,23 +24,15 @@ describe('AboutModal (P10-C-3 #278)', () => {
     expect(sources).toHaveTextContent('NASA JPL Horizons');
   });
 
-  it('educational 모드 — 과장 요약 표시', () => {
+  it('스케일 정책 — 단일 모드 3단 tier 설명 포함', () => {
     render(<AboutModal />);
     fireEvent.click(screen.getByTestId('about-button'));
     const modal = screen.getByTestId('about-modal');
-    expect(modal).toHaveTextContent('교육');
-    expect(modal).toHaveTextContent('×20');
-    expect(modal).toHaveTextContent('×500');
-    expect(modal).toHaveTextContent('×20,000');
-  });
-
-  it('scientific 모드 — 1.0 비율 안내 표시', () => {
-    useSimStore.setState({ viewMode: 'scientific' });
-    render(<AboutModal />);
-    fireEvent.click(screen.getByTestId('about-button'));
-    const modal = screen.getByTestId('about-modal');
-    expect(modal).toHaveTextContent('사실');
-    expect(modal).toHaveTextContent('1.0');
+    // P12-C #298 — 단일 모드: 과장 요약 섹션 제거, 상대 비율 = IAU 실측 고정 설명
+    expect(modal).toHaveTextContent('IAU 2015 실측');
+    expect(modal).toHaveTextContent('Solar');
+    expect(modal).toHaveTextContent('Inner');
+    expect(modal).toHaveTextContent('Body');
   });
 
   it('닫기 버튼 → 모달 제거', () => {

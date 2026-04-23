@@ -106,6 +106,8 @@
 
 각 예외는 `scientific` 모드에서 해제되거나 명시 배지가 붙는다.
 
+> **2026-04-23 §Amendment 반영**: 이 §예외 3건은 P12-C (#298) 단일 모드 전환 이후 **모든 tier 에 항시 적용**. "scientific 모드에서 해제" 경로는 소멸. 과장 해제는 배지가 아닌 **billboard marker overlay** (P11-B) 로 명시 예정. 본 섹션의 과거 서술 은 역사 맥락 보존 용으로 유지. 자세한 맥락은 §Amendments 표 참조.
+
 ---
 
 ## 참조
@@ -122,3 +124,4 @@
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | 2026-04-20 | §4 에 "저장 epoch vs 시뮬레이션 시작 epoch" 이중 개념 분리 추가 — Gemini 2차 교차검증 Low 발견                | 본 PR (P10-A 보강) / volt #29 |
 | 2026-04-20 | §6 `colorSource: "inferred"` 3번째 카테고리 추가 — Gemini 2차 교차검증 이견 수용 (데이터 부재 body 의 기본값) | 본 PR (P10-A 보강) / volt #29 |
+| 2026-04-23 | **단일 모드 전환** — P12 (#298) 에서 `educational`/`scientific` 이중 모드 폐기. 상대 비율은 **IAU 실측 항시 고정**, 절대 스케일은 3단 tier (Solar / Inner / Body) 함수로 자동 전환 (Q2=B / Q4 단일 모드). §"과장 표시 규약 5~6 모드 토글 / URL 동기화" / §"`scientific` 모드 UX 보호" 는 역사 맥락 보존 용으로 유지하되 구현 경로는 소멸 (backward-ignore — `?view=scientific` 기존 북마크는 파라미터 무시 + 단일 모드 진입). §예외 3건 (궤도선 두께 / 위성 floor / glow halo) 은 모든 tier 에 항시 적용, 과장 해제는 billboard marker overlay (P11-B) 로 이관. 교육 청중 대체 UX 는 필요 시 별도 이슈 개설 | PR #298 Phase C / ADR `20260423-display-relative-scale-unification.md` §Amendment |

@@ -3,12 +3,10 @@
 import type { SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
-import { useSimStore, type ViewMode } from '@/store/sim-store';
+import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from './sim-context';
 
 const MODE_VALUES: SimMode[] = ['observe', 'research', 'education', 'sandbox'];
-// P10-C #278 — 뷰 모드 (Fact-First 원칙). 기존 ?mode= 와 URL key 분리 (?view=)
-const VIEW_MODE_VALUES: ViewMode[] = ['educational', 'scientific'];
 // P3-0 #126 — barnes-hut/webgpu/auto는 URL로는 받지만 런타임은 미구현 폴백.
 // 후방호환: 기존 newton/kepler URL은 그대로 동작.
 const ENGINE_VALUES = ['kepler', 'newton', 'barnes-hut', 'webgpu', 'auto'] as const;
@@ -39,19 +37,12 @@ export function UrlSync() {
     'engine',
     parseAsStringEnum<PhysicsEngineUrl>([...ENGINE_VALUES]).withOptions({ history: 'replace' }),
   );
-  // P10-C #278 — 뷰 모드 URL sync. 디폴트 educational 은 URL 에서 생략.
-  const [urlViewMode, setUrlViewMode] = useQueryState(
-    'view',
-    parseAsStringEnum<ViewMode>(VIEW_MODE_VALUES).withOptions({ history: 'replace' }),
-  );
 
   const mode = useSimStore((s) => s.mode);
-  const viewMode = useSimStore((s) => s.viewMode);
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
   const timeScale = useSimStore((s) => s.timeScale);
   const physicsEngine = useSimStore((s) => s.physicsEngine);
   const setMode = useSimStore((s) => s.setMode);
-  const setViewMode = useSimStore((s) => s.setViewMode);
   const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
 
   const sendCommand = useSimCommand();
@@ -78,9 +69,8 @@ export function UrlSync() {
     if (urlEngine) {
       setPhysicsEngine(urlEngine);
     }
-    if (urlViewMode) {
-      setViewMode(urlViewMode);
-    }
+    // P12-C #298 — `?view=scientific|educational` 은 단일 모드 전환으로 폐기.
+    // 기존 북마크는 파라미터를 조용히 무시하고 단일 모드로 자연 진입 (backward-ignore, ADR §재검토 암묵 전제).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -104,12 +94,6 @@ export function UrlSync() {
     if (!initialized.current) return;
     setUrlEngine(physicsEngine === 'kepler' ? null : physicsEngine);
   }, [physicsEngine, setUrlEngine]);
-
-  // P10-C #278 — viewMode store → URL. 디폴트 educational 은 URL 생략.
-  useEffect(() => {
-    if (!initialized.current) return;
-    setUrlViewMode(viewMode === 'educational' ? null : viewMode);
-  }, [viewMode, setUrlViewMode]);
 
   return null;
 }

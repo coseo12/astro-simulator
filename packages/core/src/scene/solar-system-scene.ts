@@ -88,16 +88,6 @@ export interface SolarSystemSceneHandles {
   /** 궤도선 가시성 토글 */
   setOrbitLinesVisible: (visible: boolean) => void;
   /**
-   * P10-C-2 #278 — 뷰 모드 전환 (Fact-First 원칙).
-   *
-   * **[P12-A Phase A 변경]**: 단일 tier 모드 채택으로 `educational`/`scientific` 구분이 의미를 잃었다.
-   * Phase A 에서는 API 를 유지해 backward-compat 을 보장하지만 내부적으로 동일한 tier 경로를 타므로
-   * 두 값 모두 같은 렌더 결과를 산출한다. Phase C 에서 UI 제거 + API 제거 예정.
-   *
-   * @deprecated Phase C (#298) 에서 제거 예정. tier 전환은 `setTier` 사용 권장.
-   */
-  setViewMode: (mode: 'educational' | 'scientific') => void;
-  /**
    * P12-A #298 — 현재 활성 tier.
    *
    * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
@@ -147,7 +137,8 @@ export interface SolarSystemSceneHandles {
   /**
    * P11-A #288 — Floating Origin 인스턴스.
    *
-   * scientific 모드 float32 jitter 해소를 위해 scene 내부가 매 프레임 `fo.toLocal(world)` 적용.
+   * T3 body tier (P12 단일 모드) 에서 float32 jitter 해소를 위해 scene 내부가 매 프레임
+   * `fo.toLocal(world)` 적용. T1/T2 에서는 originOffset=[0,0,0] 유지 (ADR §4 Q10 판정).
    * 외부 노출은 (a) dev 빌드 `__floatingOrigin` 전역 + (b) 미래 Trail 모듈의 `onOriginShift`
    * 구독을 위함. Zustand store 는 이 값을 저장하지 않는다 (Heliocentric 불변식 — ADR §3).
    */
@@ -421,12 +412,7 @@ export function createSolarSystemScene(
   }
   disposables.push({ dispose: disposeNewton });
 
-  // P10-C-2 #278 / P12-A #298 Phase A — viewMode 는 backward-compat 유지 (Phase C 제거 예정).
-  // 단일 tier 모드 채택으로 'educational'/'scientific' 값은 렌더 결과에 영향 없음.
-  let viewMode: 'educational' | 'scientific' = 'educational';
-  const setViewMode = (mode: 'educational' | 'scientific') => {
-    viewMode = mode;
-  };
+  // P12-C #298 — viewMode 필드 + setViewMode API 제거 (단일 모드 전환, #288 연계 close).
 
   // P12-A #298 — tier 전환. 즉시 모든 body mesh 직경 재계산 + orbit line 재샘플링.
   //
@@ -441,6 +427,12 @@ export function createSolarSystemScene(
   //   원하는 diameter       = base × newScale
   //   ⇒ mesh.scaling        = newScale / initialScale
   // rings 는 host mesh 의 자식이므로 host.scaling 이 바뀌면 ring radius 도 같은 배수로 확대 (B1).
+  //
+  // [P12-C #298 — M1 하드닝] 연쇄 전환 race 방지: 이전 `runTierTransition` 의 cleanup 을
+  // 클로저 변수에 보관해 다음 전환 진입 시 먼저 호출한다. 미해제 fallback timer 가 두 번째
+  // 전환 중 `releaseControl` 을 조기 발동해 입력 잠금이 느슨해지는 edge case 를 제거
+  // (Phase B PR #304 Reviewer M1). `cleanup` 은 idempotent (`released` 플래그).
+  let pendingTierCleanup: (() => void) | null = null;
   const setTier = (tier: Tier) => {
     if (tier === activeTier) return;
     const oldScale = renderScaleForTier(activeTier);
@@ -464,8 +456,10 @@ export function createSolarSystemScene(
     // 목표 radius 계산. 없으면 실거리 보존 수식 fallback (free-fly 전환 경로).
     const cam = scene.activeCamera;
     if (cam && isArcRotateCamera(cam)) {
+      // P12-C M1 — 이전 전환의 fallback timer / visibility listener 를 먼저 정리.
+      pendingTierCleanup?.();
       const focusMesh = focusBodyIdForAssert ? meshes.get(focusBodyIdForAssert) : undefined;
-      runTierTransition({
+      pendingTierCleanup = runTierTransition({
         scene,
         camera: cam,
         oldScale,
@@ -617,10 +611,7 @@ export function createSolarSystemScene(
 
     // P12-A #298 — body mesh.scaling 은 1 로 고정 (kind 차등 / 거리 의존 과장 제거).
     // 실측 반경 × tier renderScale 은 이미 `createBodyMesh` + tier 전환 시 `setTier` 의 scaling.setAll 에서 처리.
-    // `viewMode` 인자는 Phase A 에서 렌더 결과에 영향 없음 (Phase C 에서 제거 예정).
-    //
-    // `viewMode` 참조는 lint unused 방지 + Phase A API 유지 목적 — 내부 분기는 없다.
-    void viewMode;
+    // (P12-C #298 — viewMode 분기 삭제: 단일 모드)
     const cam = scene.activeCamera;
 
     // Sun light — worldPositions['sun'] 도 Heliocentric 절대 좌표 (m). Floating Origin shift + tier scale 반영.
@@ -664,8 +655,8 @@ export function createSolarSystemScene(
     //
     // 카메라 local 불포함 (2026-04-22 재정정): Floating Origin 의 목적은 렌더 대상(mesh) 의 scene
     // 좌표 jitter 해소. 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 위치가 정상이며, 카메라
-    // local 에 1e5 m 제한을 두면 scientific 모드가 물리적으로 동작 불가. float32 jitter 는 mesh
-    // local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
+    // local 에 1e5 m 제한을 두면 T3 body tier (P12 단일 모드) 가 물리적으로 동작 불가. float32 jitter 는
+    // mesh local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
     // 위임한다. ADR 20260422-floating-origin.md §6-β / §Amendments 2026-04-22 참조.
     if (floatingOriginAssertEnabled() && cam) {
       const focusId = focusBodyIdForAssert;
@@ -793,7 +784,6 @@ export function createSolarSystemScene(
     meshes,
     updateAt,
     setOrbitLinesVisible,
-    setViewMode,
     getTier,
     setTier,
     updateTierByCamera,

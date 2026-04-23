@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSimStore } from '@/store/sim-store';
 
 const SOURCES = [
   {
@@ -30,24 +29,19 @@ const SOURCES = [
   },
 ];
 
-const SCALE_SUMMARY = [
-  { kind: '항성 (태양)', max: '×20' },
-  { kind: '행성 / 위성', max: '×500' },
-  { kind: '왜소행성', max: '×2,000' },
-  { kind: '혜성', max: '×20,000' },
-];
-
 /**
- * P10-C-3 #278 — About 모달 (Fact-First 원칙 §"크레딧 뷰").
+ * P10-C-3 #278 / P12-C #298 — About 모달 (Fact-First 원칙 §"크레딧 뷰").
  *
  * - 데이터 출처 attribution (IAU / NASA / JPL)
- * - 현재 과장 요약 (educational 모드의 kind 별 상한)
- * - 모드별 비율 정책 안내
+ * - 정밀도 ±0.01% 및 불확실성 표기 안내
+ *
+ * [P12-C 변경] 단일 모드 전환으로 `educational` / `scientific` 토글이 폐기되어
+ * 모드별 과장 요약 섹션을 제거. 상대 비율은 항시 IAU 실측 고정 (fact-first §Amendment).
+ * 3단 tier (Solar / Inner / Body) 자동 전환은 카메라 거리 / focus body 로 결정.
  *
  * 헤더 우측 버튼 ("?") 으로 열기, Esc 또는 닫기 버튼으로 닫기.
  */
 export function AboutModal() {
-  const viewMode = useSimStore((s) => s.viewMode);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -124,29 +118,12 @@ export function AboutModal() {
             </section>
 
             <section className="mb-5 pt-4 border-t border-border-subtle">
-              <h3 className="text-body-sm text-fg-secondary mb-2">
-                현재 뷰 모드: {viewMode === 'educational' ? '교육 (과장)' : '사실 (1.0 비율)'}
-              </h3>
-              {viewMode === 'educational' ? (
-                <>
-                  <p className="text-caption text-fg-tertiary mb-2">
-                    시각 이해를 위해 천체 크기가 카메라 거리에 비례해 과장됩니다. 상한 요약:
-                  </p>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-body-sm">
-                    {SCALE_SUMMARY.map((s) => (
-                      <div key={s.kind} className="flex items-baseline justify-between">
-                        <dt className="text-caption text-fg-tertiary">{s.kind}</dt>
-                        <dd className="num text-fg-primary">{s.max}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              ) : (
-                <p className="text-caption text-fg-tertiary">
-                  IAU 2015 실측 비율 1.0 — 대부분 천체가 sub-pixel 로 표시됩니다. 줌 인으로 특정
-                  천체에 초점을 맞추세요.
-                </p>
-              )}
+              <h3 className="text-body-sm text-fg-secondary mb-2">스케일 정책</h3>
+              <p className="text-caption text-fg-tertiary">
+                천체 간 상대 비율은 IAU 2015 실측 고정. 절대 표시 크기는 카메라 거리·focus 대상에
+                따라 3단 tier (Solar / Inner / Body) 로 자동 전환되며, 화면 이동은 Q8=8D 병행 interp
+                (300ms) 로 자연스럽게 연결됩니다.
+              </p>
             </section>
 
             <section className="pt-4 border-t border-border-subtle">

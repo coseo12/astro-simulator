@@ -40,6 +40,8 @@ page.on('console', (msg) => {
 page.on('pageerror', (err) => consoleErrors.push(err.message));
 
 // ===== Level 1: 정적 =====
+// [P12-C #298] `?view=scientific` 은 단일 모드 전환으로 폐기됐으나 기존 북마크 backward-ignore
+// 검증을 겸해 동일 URL 로 진입. 에러 없이 단일 모드로 렌더되어야 한다.
 console.log('\n[Level 1] 정적 검증');
 await page.goto(`${baseUrl}/ko?view=scientific`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000); // scene frame 렌더 대기
@@ -70,7 +72,7 @@ check(
   await page.evaluate(() => window.__solarScene?.floatingOrigin === window.__floatingOrigin),
 );
 check(
-  'scientific 모드 초기 로드 시 console.error 없음',
+  '?view=scientific backward-ignore: 단일 모드 초기 로드 시 console.error 없음 (P12-C #298)',
   consoleErrors.length === 0,
   consoleErrors.length ? consoleErrors.join(' | ').slice(0, 200) : '',
 );
