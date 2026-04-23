@@ -7,17 +7,6 @@ type IntegratorKind = physics.IntegratorKind;
 export type UnitSystem = 'si' | 'astro' | 'natural';
 
 /**
- * P10-C #278 — 뷰 모드 (Fact-First 원칙).
- *
- * - `educational` (디폴트): 시각 이해를 위한 크기/거리 과장 + 명시 배지
- * - `scientific`: IAU 2015 실측 비율 1.0 스케일 (sub-pixel 리스크 있으나 안내 배너로 보호)
- *
- * 기존 `SimMode` (관찰/연구) 와 **직교 축**. URL key 충돌 회피를 위해 `?view=` 사용
- * (기존 `?mode=observe|research` 와 분리). 이슈 #278 및 CRITICAL #6 재조정 근거.
- */
-export type ViewMode = 'educational' | 'scientific';
-
-/**
  * P7-D #209 — 비-fatal 알림 객체.
  * 키 분리 dismiss 관리 목적 (예: 사용자가 WebGPU 폴백 알림을 닫은 상태에서
  * 모바일 best-effort 경고가 후속 표시될 때 서로 간섭하지 않도록 한다).
@@ -81,8 +70,6 @@ export interface SimStoreState {
 
   // 시뮬레이션 상태
   mode: SimMode;
-  /** P10-C #278 — 뷰 모드 (과장 on=educational / off=scientific). 디폴트 educational. */
-  viewMode: ViewMode;
   julianDate: number | null;
   selectedBodyId: string | null;
   timeScale: number;
@@ -122,8 +109,6 @@ export interface SimStoreState {
    */
   dismissEngineNotice: () => void;
   setMode: (mode: SimMode) => void;
-  /** P10-C #278 — 뷰 모드 전환 (educational ↔ scientific). */
-  setViewMode: (viewMode: ViewMode) => void;
   setTime: (julianDate: number) => void;
   setSelectedBody: (id: string | null) => void;
   setTimeScale: (scale: number) => void;
@@ -173,7 +158,6 @@ export const useSimStore = create<SimStoreState>((set) => ({
   engineNotice: null,
   dismissedNoticeKeys: new Set<string>(),
   mode: 'observe',
-  viewMode: 'educational',
   julianDate: null,
   selectedBodyId: null,
   timeScale: 86_400,
@@ -204,7 +188,6 @@ export const useSimStore = create<SimStoreState>((set) => ({
       return { engineNotice: null, dismissedNoticeKeys: next };
     }),
   setMode: (mode) => set({ mode }),
-  setViewMode: (viewMode) => set({ viewMode }),
   setTime: (julianDate) => set({ julianDate }),
   setSelectedBody: (id) => set({ selectedBodyId: id }),
   setTimeScale: (scale) => set({ timeScale: scale }),

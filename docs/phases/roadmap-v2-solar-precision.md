@@ -22,17 +22,20 @@ v2 는 **태양계 정밀도·시각 원칙·기술 부채**를 먼저 정리한
 
 ## Phase 개요
 
-| Phase   | 테마                        | 규모    | 상태        | 비고                                                                         |
-| ------- | --------------------------- | ------- | ----------- | ---------------------------------------------------------------------------- |
-| **P10** | Fact Audit + 시각 원칙 정비 | 9~13d   | **진행 중** | 상위 원칙 박제 + 데이터 감사 + `educational`/`scientific` 토글 + 정확도 이슈 |
-| **P11** | Visual Foundation           | 6~10d\* | 계획 중     | Floating Origin + LOD 3단계 + distance scale + **tier preset 1급 설계**      |
-| **P12** | Texture Pipeline            | 5~8d    | 계획 중     | 30+ body PBR + normalMap + cloud layer + ring detail (Cassini 간극 등)       |
-| **P13** | 토성계                      | 5~7d    | 계획 중     | 주요 위성 9 (Titan/Enceladus 등) + 고리 정밀화 + 공명 구조                   |
-| **P14** | 천왕성·해왕성계             | 4~6d    | 계획 중     | 주요 위성 각 5~6 + 자전축 기울기 특성 + 고리 암고리                          |
-| **P15** | 소행성대 + 카이퍼대         | 5~8d    | 계획 중     | JPL SBDB 수십만 샘플 + BH N-body 폴백 + GPU compute 통합                     |
-| **P16** | 배포 + 기술 부채 청산       | 3~5d    | 계획 중     | Vercel/Netlify 공식 배포 + CI 성능 게이트 + `docs/reports/` 자동 갱신        |
+> **P12 재조정 (2026-04-23, ADR `20260423-display-relative-scale-unification.md` §Phase 분리)**: 원 P12 "Texture Pipeline" 은 P13 으로 1-칸 이월. 기존 P12~P16 가 renumber 되며 **P17 로 1-칸 확장**. 본 renumber 의 대상은 **본 로드맵 단일 파일**이며 `p10-plan.md` / `p10-retrospective.md` / 과거 commit message 등 이력 문서는 건드리지 않는다 (당시 판정 맥락 보존).
 
-**총: 32~47 영업일**
+| Phase   | 테마                                      | 규모    | 상태     | 비고                                                                                                                                         |
+| ------- | ----------------------------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P10** | Fact Audit + 시각 원칙 정비               | 9~13d   | 완료     | 상위 원칙 박제 + 데이터 감사 + `educational`/`scientific` 토글 + 정확도 이슈 (P12 단일 모드 전환으로 `educational`/`scientific` 토글은 폐기) |
+| **P11** | Visual Foundation (P11-A Floating Origin) | 6~10d\* | 진행 중  | Floating Origin 배선 완료, billboard marker 통합 (P11-B) 후속 ongoing                                                                        |
+| **P12** | Display-Relative Scale Unification        | 3 Phase | **완료** | 단일 동적 스케일 + 3단 tier (Solar/Inner/Body) + 하이브리드 트리거 + Q8=8D interp. Phase A/B/C 순차 릴리스                                   |
+| **P13** | Texture Pipeline                          | 5~8d    | 계획 중  | 30+ body PBR + normalMap + cloud layer + ring detail (Cassini 간극 등) — **원 P12 에서 renumber**                                            |
+| **P14** | 토성계                                    | 5~7d    | 계획 중  | 주요 위성 9 (Titan/Enceladus 등) + 고리 정밀화 + 공명 구조 — **원 P13 에서 renumber**                                                        |
+| **P15** | 천왕성·해왕성계                           | 4~6d    | 계획 중  | 주요 위성 각 5~6 + 자전축 기울기 특성 + 고리 암고리 — **원 P14 에서 renumber**                                                               |
+| **P16** | 소행성대 + 카이퍼대                       | 5~8d    | 계획 중  | JPL SBDB 수십만 샘플 + BH N-body 폴백 + GPU compute 통합 — **원 P15 에서 renumber**                                                          |
+| **P17** | 배포 + 기술 부채 청산                     | 3~5d    | 계획 중  | Vercel/Netlify 공식 배포 + CI 성능 게이트 + `docs/reports/` 자동 갱신 — **원 P16 에서 renumber**                                             |
+
+**총: 32~47 영업일 (P12 3 Phase 분리로 실질 +1~2d 추가)**
 
 > \* **P11 일정 경고** (Gemini 2차 교차검증 수용, 2026-04-20): Floating Origin + LOD 3단계 + tier preset 이 **아키텍처 근간 변경 3건** 을 동시 포함. 6~10d 는 기준 추정이며, **PM 착수 시 Floating Origin 복잡도 실측 기반 재조정** 필수. 이는 낙관적 일정 편향 방어를 위한 구조적 경고.
 
@@ -43,15 +46,17 @@ v2 는 **태양계 정밀도·시각 원칙·기술 부채**를 먼저 정리한
 ```
 P10 (Fact Audit)
    ↓
-P11 (Visual Foundation)
+P11 (Visual Foundation — P11-A Floating Origin 완료)
    ↓
-P12 (Texture Pipeline)
+P12 (Display-Relative Scale Unification — A/B/C 3 Phase 완료)
    ↓
-P13 (토성계) ─┐
-P14 (천/해계) ─┼── 병렬 가능 (P12 까지 선행 필수)
-P15 (소행성) ─┘
+P13 (Texture Pipeline)
    ↓
-P16 (배포 + 부채 청산)
+P14 (토성계) ─┐
+P15 (천/해계) ─┼── 병렬 가능 (P13 까지 선행 필수)
+P16 (소행성)  ─┘
+   ↓
+P17 (배포 + 부채 청산)
 ```
 
 ---
@@ -97,7 +102,34 @@ tier 감지는 `navigator.gpu` + `GPUAdapter.requestAdapterInfo()` + `devicePixe
 
 ---
 
-## P12 — Texture Pipeline (계획)
+## P12 — Display-Relative Scale Unification (완료)
+
+**ADR**: [../decisions/20260423-display-relative-scale-unification.md](../decisions/20260423-display-relative-scale-unification.md) (#298)
+
+> **이력 맥락 (cross-validate Gemini 수용)**: 본 P12 는 2026-04-23 재조정 결과. 2026-04-20 P10-A 박제 시점의 원 P12 는 "Texture Pipeline" 이었으며, 이력 문서 `p10-plan.md` / `p10-retrospective.md` 의 "P12 = 토성계 또는 P12 = Texture" 서술은 **당시 판정 맥락** 보존을 위해 **retrofit 하지 않는다**. 현재 P12 주제는 아래 ADR 참조. 원 Texture Pipeline 은 P13 으로 이월 (아래 P13 섹션).
+
+**핵심 산출물**:
+
+- **단일 동적 스케일 모드** — `educational`/`scientific` 이중 모드 폐기, `ViewModeSwitcher` / `ScaleBadge` / `OnboardingTooltip` / `ScientificModeNotice` UI 제거
+- **3단 tier 엔진** — Solar / Inner / Body 경계 + `renderScaleForTier(tier)` 함수화 (SCENE_UNIT_PER_METER 상수 폐기)
+- **하이브리드 트리거** (Q7=7-d2) — focus 있을 때 focus 자동, free-fly 시 stateless 카메라 거리 재계산, ±15% 히스테리시스
+- **Q8=8D 애니메이션** — scale + camera radius 병행 300ms ExponentialEase interp + 입력 500ms 잠금 + visibilitychange 이중 방어
+- **Floating Origin 역할 축소** — T3 focus primary 유지, T1/T2 에서 `originOffset=[0,0,0]` no-op (Q10)
+- **#288 close** — scientific 모드 jitter 해소 목표가 단일 모드 전환으로 근본 원인 소멸
+
+**Phase 릴리스 리듬**:
+
+| Phase       | 릴리스                       | 범위 요지                                                                             |
+| ----------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| **Phase A** | v0.11.0 (PR #301, `c4ab4b1`) | Tier 엔진 + 하이브리드 트리거 + body mesh 좌표 변환                                   |
+| **Phase B** | v0.12.0 (PR #304, `208f5cb`) | Q8=8D 애니메이션 + 카메라 입력 잠금 + fallback 안전장치                               |
+| **Phase C** | v0.13.0 (본 PR)              | UI 4종 + sim-store.viewMode + URL sync 제거 + ADR/fact-first/roadmap Amendment + 회고 |
+
+**관련 이슈**: #298 (원 스프린트), #288 (P11-A Floating Origin close), #305 (m2 lowerRadiusLimit 재검토 후속), #306 (FOCUS_RADIUS_MULTIPLIER 동적화 후속), #307 (focus 버튼 확장 + fps HUD 직접 측정 후속).
+
+---
+
+## P13 — Texture Pipeline (계획)
 
 **핵심 산출물**:
 
@@ -111,7 +143,7 @@ tier 감지는 `navigator.gpu` + `GPUAdapter.requestAdapterInfo()` + `devicePixe
 
 ---
 
-## P13 — 토성계 (계획)
+## P14 — 토성계 (계획)
 
 **핵심 산출물**:
 
@@ -122,18 +154,18 @@ tier 감지는 `navigator.gpu` + `GPUAdapter.requestAdapterInfo()` + `devicePixe
 
 ---
 
-## P14 — 천왕성·해왕성계 (계획)
+## P15 — 천왕성·해왕성계 (계획)
 
 **핵심 산출물**:
 
 - **천왕성 위성 5**: Miranda, Ariel, Umbriel, Titania, Oberon. 자전축 97.8° 기울기 특성 반영.
 - **해왕성 위성 2**: Triton (역행 궤도), Nereid (고이심률 0.75).
 - **고리**: 천왕성 13고리 (암고리 중심), 해왕성 5고리 (아크 구조).
-- **해왕성 트로이 소행성**: L4/L5 대표 샘플 10+ (P15 선행 연동).
+- **해왕성 트로이 소행성**: L4/L5 대표 샘플 10+ (P16 선행 연동).
 
 ---
 
-## P15 — 소행성대 + 카이퍼대 (계획)
+## P16 — 소행성대 + 카이퍼대 (계획)
 
 **핵심 산출물**:
 
@@ -146,7 +178,7 @@ tier 감지는 `navigator.gpu` + `GPUAdapter.requestAdapterInfo()` + `devicePixe
 
 ---
 
-## P16 — 배포 + 기술 부채 청산 (계획)
+## P17 — 배포 + 기술 부채 청산 (계획)
 
 **핵심 산출물**:
 
@@ -175,6 +207,7 @@ tier 감지는 `navigator.gpu` + `GPUAdapter.requestAdapterInfo()` + `devicePixe
 
 ## §Amendments
 
-| 날짜       | 변경 요약                                                                                           | 근거 PR/이슈                  |
-| ---------- | --------------------------------------------------------------------------------------------------- | ----------------------------- |
-| 2026-04-20 | P11 일정에 "\*" 각주 + PM 착수 시 재조정 필수 경고 — Gemini 2차 교차검증 낙관적 일정 편향 징후 수용 | 본 PR (P10-A 보강) / volt #29 |
+| 날짜       | 변경 요약                                                                                                                                                                                                                                                     | 근거 PR/이슈                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 2026-04-20 | P11 일정에 "\*" 각주 + PM 착수 시 재조정 필수 경고 — Gemini 2차 교차검증 낙관적 일정 편향 징후 수용                                                                                                                                                           | 본 PR (P10-A 보강) / volt #29                                          |
+| 2026-04-23 | P12 재조정 — 원 P12 "Texture Pipeline" 을 **P13 으로 이월**, 신규 P12 "Display-Relative Scale Unification" 삽입 (이슈 #298 PM 3라운드 수렴 결과). P13~P16 을 P14~P17 로 +1 renumber. 본 renumber 는 **본 로드맵 단일 파일**에만 적용, 이력 문서 retrofit 금지 | PR #298 Phase C / ADR `20260423-display-relative-scale-unification.md` |

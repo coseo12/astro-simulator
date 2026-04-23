@@ -160,7 +160,7 @@ describe('FloatingOrigin', () => {
     });
   });
 
-  describe('scientific 모드 사용 — 1 AU threshold + body-focus (ADR §4 통합 시나리오)', () => {
+  describe('T3 body tier 운용 — 1 AU threshold + body-focus (ADR §4 통합 시나리오, P12-C #298 단일 모드)', () => {
     it('목성 focus 후 지구로 전환 시 두 body 모두 local 좌표 ≤ 1e5 m (DoD β)', () => {
       const AU = 1.495_978_707e11;
       const fo = new FloatingOrigin(AU);
@@ -287,8 +287,8 @@ describe('FloatingOrigin', () => {
 
   // --- DoD β v2 (2026-04-22): 카메라 local 조건 제거 회귀 가드 ---
   // ADR §6-β v2 / §Amendments 2026-04-22. cross-validate §2 초기 교정이 "focus + 카메라"
-  // 병행을 제안했으나 scientific 모드에서 카메라는 focus body 관찰을 위해 수 AU 떨어진
-  // 정상 배치. 카메라 local 에 1e5 m 제한을 두면 scene 매 프레임 assert 실패.
+  // 병행을 제안했으나 (P12-C #298 이전 scientific 모드 맥락) 카메라는 focus body 관찰을
+  // 위해 수 AU 떨어진 정상 배치. 카메라 local 에 1e5 m 제한을 두면 scene 매 프레임 assert 실패.
   //
   // 아래 테스트는 `solar-system-scene.ts` updateAt 말미의 DoD β assert 경로를 pure 함수로
   // 축약. focus body local 만 검사하고 카메라 local 은 검사하지 않음을 회귀 가드로 박제.
@@ -314,7 +314,7 @@ describe('FloatingOrigin', () => {
           violations.push(`focus body local 초과: ${fx},${fy},${fz}`);
         }
       }
-      // 의도적으로 카메라 local 검사 없음 — scientific 모드에서 수 AU 정상 배치.
+      // 의도적으로 카메라 local 검사 없음 — T3 body tier 에서 카메라는 focus body 로부터 수 AU 떨어진 정상 배치.
       return violations;
     }
 
@@ -337,7 +337,7 @@ describe('FloatingOrigin', () => {
 
     it('버그 재현 시나리오 — 카메라 world = 수백 AU 여도 focus body local 만 검사', () => {
       // 버그 버전 메시지 예시: `camera local 좌표 초과 (≥1e5m): 551609191979.78, ...`
-      // = 약 3.7 AU. 이 값은 scientific 모드 관찰 배치에서 정상이며 assert 대상 아님.
+      // = 약 3.7 AU. 이 값은 T3 body tier 관찰 배치에서 정상이며 assert 대상 아님.
       const fo = new FloatingOrigin(AU);
       const earth: Vec3Double = [AU, 0, 0];
       fo.setOriginToBody(earth);

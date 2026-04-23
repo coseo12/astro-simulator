@@ -308,7 +308,55 @@ function currentTier(camera: ArcRotateCamera, focusBodyId: string | null): Tier 
 
 ## Amendments
 
-(본 ADR 박제 시점에는 amendment 없음. 재검토 조건 발동 시 추가)
+### 2026-04-23 — Phase A/B/C 실측 반영 + Concrete Prediction 재현 + Q10 확정
+
+**맥락**: Phase A (PR [#301](https://github.com/coseo12/astro-simulator/pull/301) `c4ab4b1`) + Phase B (PR [#304](https://github.com/coseo12/astro-simulator/pull/304) `208f5cb`) + Phase C (본 PR) 순차 머지 완료. 각 Phase 의 완료 기준 실측 + §Concrete Prediction 재현 확인.
+
+#### (a) Phase 분리 재조정 이력
+
+- **Phase A 재조정 항목**:
+  - **V5 → Phase B 이관** (hard fail 기준 승격) — Phase A 에서는 WARN (V5 달성이 camera dolly 에 의존하므로 Q8=8D 배선 선행 필요). Phase A PR #301 CHANGELOG Notes 에 박제
+  - **V2 / V4 / V6 → P11-B 이관** — §5 body floor overlay 결정으로 billboard marker 합산 측정 대상. 본 3 Phase 단독으로는 측정 불가
+- **Phase B 구현 결과**:
+  - **V5 PASS**: 지구 세로 40% ±5% 목표 320px → 실측 **322px** (boundingR=277.3 unit, `FOCUS_RADIUS_MULTIPLIER=5.9`)
+  - **A1 PASS**: focus 중심 편차 ≤ 10px 목표 → 실측 **0.0px** (화면 중심 640,400 완전 일치)
+  - **C1 PASS**: apparent size 변동 ≤ 5% → 단위 테스트 `tier-transition.test.ts` #14 에서 `1e-12` 상대오차 수식 증명
+  - **C3 PASS (측정 방식 재해석 후)**: 전환 ≤500ms → QA `_alreadyAttached` 폴링 독립 측정으로 lock 실 지속 **373.5ms** / click→reattach **506ms**. ADR §3 Q8=8D "300ms duration + 100ms fallback 마진" 계약에 정합. Phase C 에서 `browser-verify-tier-transition.mjs` 를 폴링 기반으로 교체 (QA suggestion #1)
+- **수식 서술 방향 명확화** (developer suggestion #2): ADR §3 의 `ratio = renderScale_new / renderScale_old, radius_new = radius_old / ratio` 표기는 **ratio 를 역수 해석** 할 때만 `radius_new = radius_old × (newScale / oldScale)` 확대 방향 수식과 동일. 구현은 직관적 "scene unit 비례 확대" 방향 채택. `tier-transition.ts` 코드 주석 § "ADR 서술 정합성" 에 박제
+- **이력 문서 retrofit 금지 원칙** (architect): 본 Amendment 에는 Phase 분리 이력과 현재 상태를 기록하되, `p10-plan.md` / `p10-retrospective.md` / 과거 commit message 등 이력 문서는 건드리지 않는다. 미래 관찰자는 당시 판정 맥락을 잃지 않도록 원문 보존
+
+#### (b) §Concrete Prediction 재현 결과 (D4 DoD)
+
+레이블 규약 (cross-validate Gemini 제안 수용): `PASS` = 현재 관찰·검증 완료 / `PLANNED` = 예측 수립됐으나 검증 활동이 미래 특정 시점으로 예정 / `DEFERRED` = 범위 이월 (다른 Phase/PR 에서 판정).
+
+| #   | 예측                                                                      | 레이블       | 증거·시점                                                                                                                   |
+| --- | ------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Tier 경계 조정 시 mesh 루프 / orbit line 생성 / camera 코드 변경 **0 줄** | **PASS**     | Phase A PR #301 — 변경은 `tier.ts` + `renderScaleForTier` 한 함수 내로 국한                                                 |
+| 2   | 신규 body 추가 시 tier 엔진 관련 코드 변경 **0 줄**                       | **PLANNED**  | P13 Texture Pipeline 시 Titan/Enceladus 등 신규 body 추가 시 `worldPositions` 경로가 그대로 기능하는지 PR diff 로 검증 예정 |
+| 3   | P11-B LOD 통합 시 tier 엔진 자체 변경 **0 줄**                            | **DEFERRED** | P11-B billboard marker 합산 시점에서 판정 (본 스프린트 범위 밖)                                                             |
+| 4   | Floating Origin 제거 결정 시 tier 엔진 변경 **0 줄**                      | **PASS**     | Q10 판정으로 "제거 아님, 간소화 유지" — 코드 변경 0 달성. `originOffset = [0,0,0]` T1/T2 에서 실질 no-op 확인               |
+
+**결론**: 현 시점 관찰 가능한 예측 **2/4 PASS** (#1, #4), **1 PLANNED** (#2, P13 에서 재확인), **1 DEFERRED** (#3, P11-B). "관찰 가능한 2 PASS" 만으로도 기존 추상화 (tier 엔진 / FloatingOrigin / orbit line / mesh.position 경로) 가 계층적으로 직교 설계되어 있음을 **부분 실증**. 미래 P13 / P11-B 진입 시 #2, #3 재평가 + Amendment.
+
+#### (c) Q10 Floating Origin 확정 — **간소화 유지** (제거 아님)
+
+§4 분석에서 도출한 예비 판정 "T3 본질 필요 / T1/T2 no-op" 을 **Phase B 실측 + Phase C architect 판정** 으로 확정:
+
+- **T3 본질 필요**: 지구 focus 시 해왕성 scene 좌표 14 unit jitter (ADR §4 표). `setOriginToBody(focus)` primary 로 해소
+- **T1/T2 no-op**: `originOffset=[0,0,0]` 유지. `updateAt` 말미 safety net trigger 는 free-fly + 1AU 이상 이동 경로에만 의미 있고, 그 경로는 하이브리드 트리거 (Q7=7-d2) 가 이미 T2 로 자동 전환해 사실상 unreachable
+- **제거 하지 않는 이유**: (a) P11-A (#288) 회귀 가드 붕괴 방지, (b) followup #294~#297 의 기준선 변경 회피, (c) 미래 Trail/Particle 모듈의 `onOriginShift` 계약 보존, (d) T1/T2 에서 `toLocal()` 오버헤드는 `subtract([0,0,0])` 수준으로 0 에 수렴
+- **Phase C 처리**: **코드 변경 0, Amendment 만**. `floating-origin.ts` 및 관련 테스트 전부 유지
+- **#288 close 판정**: 본 PR 에서 close. scientific 모드 jitter 해소의 원 목표는 단일 모드 전환으로 근본 원인 소멸. `20260422-floating-origin.md` §Amendment 1줄 박제 — "P12 에서 역할 축소 (T3 primary, T1/T2 no-op)"
+
+#### (d) QA / Reviewer 이관 항목 반영 (Phase C)
+
+- **Reviewer M1** (Major, PR #304): `setTier` 가 `runTierTransition` cleanup 을 클로저에 저장해 연쇄 전환 시 이전 fallback timer / listener 를 먼저 해제. `tier-transition.test.ts` 에 "연쇄 전환 cleanup 호출" 단위 테스트 3건 추가
+- **Reviewer m1** (Minor): `tier-transition.ts:227-236` visibilitychange JSDoc 을 "fallback timer 와 이중 방어 — 둘 중 먼저 도달한 쪽이 release" 로 완화
+- **Reviewer m3** (Minor): `TIER_TRANSITION_EASE` module-level const 로 hoisting — `camera-controller.ts` 의 `#easing` 생성자 패턴과 일관성
+- **QA suggestion #1**: `browser-verify-tier-transition.mjs` C3 측정을 `_alreadyAttached` 폴링 기반으로 교체 (click→reattach 직접 측정). `radius 안정화` 기준은 WARN 레벨 부수 지표로 병기
+- **QA suggestion #2/#3** (focus 버튼 확장 / fps HUD): 후속 이슈 #307 로 분리 (본 PR 비-범위)
+- **Reviewer m2** (lowerRadiusLimit 원복): 후속 이슈 #305 로 분리 (P11-B billboard marker 통합 시점 재검토)
+- **developer suggestion #1** (FOCUS_RADIUS_MULTIPLIER viewport/fov 동적화): 후속 이슈 #306 으로 분리 (재검토 조건 #3 에 이미 박제)
 
 ---
 

@@ -26,7 +26,7 @@ export type CelestialKind = (typeof CelestialKind)[keyof typeof CelestialKind];
  * - `artistic`: 시각적 구분을 위한 의도적 아티스트 선택 (같은 밝기의 위성 2개 구분 등)
  * - `inferred`: 관측 데이터 부재에 따른 기본 추론값 (외곽 소행성 / 혜성 핵 / 탐사 미착지 body)
  *
- * `scientific` 모드에서 `observed` 만 기본, `artistic`/`inferred` 는 배지로 명시.
+ * P12-C #298 (단일 모드 전환) 이후 `observed` 가 기본, `artistic` / `inferred` 는 UI 에서 명시.
  */
 export type ColorSource = 'observed' | 'artistic' | 'inferred';
 
@@ -50,7 +50,7 @@ export type IsoDate = string;
  * P10-B #274 — 불확실성 (상대 오차).
  *
  * 각 필드 값은 **상대 오차** (0.15 = ±15%). IAU 공식값이 없는 body 는 이 필드를 통해
- * "우리가 얼마나 모르는가" 를 명시한다. UI 는 `scientific` 모드에서 error bar 로 시각화 가능.
+ * "우리가 얼마나 모르는가" 를 명시한다. UI 의 천체 정보 패널에서 error bar 로 시각화 가능 (P12-C #298).
  *
  * 예: `{ mass: 0.15, radius: 0.05 }` — 질량 ±15%, 반경 ±5%.
  */
