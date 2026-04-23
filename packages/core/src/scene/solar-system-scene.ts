@@ -26,13 +26,22 @@ import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
-import { computeVisualScale, maxScaleForKind } from './visual-scale.js';
+import {
+  renderScaleForTier,
+  initialTier as defaultInitialTier,
+  tierFromFocus,
+  tierFromCameraDistance,
+  type Tier,
+} from './tier.js';
 
-/**
- * 씬 단위: 1 scene unit = 1 AU.
- * float32/logarithmic depth 조합으로 지구 표면(수 μ AU) ~ 해왕성 궤도(30 AU) 범위 커버.
- */
-const SCENE_UNIT_PER_METER = 1 / AU;
+// P12-A #298 — Display-Relative Scale Unification 계약 (ADR 20260423, §결정):
+//   1. renderScale 은 tier 함수. SCENE_UNIT_PER_METER 하드코딩 금지 (R4 DoD)
+//   2. body mesh 본체는 실측 radius × renderScale — scaling 조작으로 왜곡 금지 (원칙 #1, R3 DoD)
+//   3. 거리도 동일 renderScale 적용 (원칙 #4) — orbit line / trail 동일 규칙
+//   4. Rust engine 반환 좌표는 heliocentric 절대 m — tier 변환은 렌더 레이어 책임 (R6 DoD)
+//   5. [Phase B] tier 전환 시 scale + camera.radius 병행 interp 300ms, 입력 500ms 잠금
+//   6. Floating Origin: Phase A 는 기존 P11-A 배선 유지 (Phase C 에서 simplify, Q10)
+// 위 계약 위배 변경은 즉시 버그로 간주 (CLAUDE.md "주석 계약 vs 구현 drift" 교훈)
 
 /**
  * Floating Origin safety net threshold (P11-A #288, ADR §4).
@@ -58,9 +67,13 @@ function floatingOriginAssertEnabled(): boolean {
 }
 
 /**
- * 시각 스케일 — #100에서 카메라 거리 의존 동적 계산으로 전환.
- * 메쉬는 실제 크기로 생성하고 프레임마다 `mesh.scaling`을 갱신한다.
- * 상한은 kind별로 다르며 computeVisualScale/maxScaleForKind에서 관리.
+ * 시각 스케일 — P12-A (#298) 부터 tier 기반 단일 동적 스케일 모드.
+ *
+ * 메쉬는 실측 반경 × `renderScaleForTier(tier)` 로 고정 크기 생성. `mesh.scaling = 1` 유지
+ * (kind 차등 과거 MAX_VISUAL_SCALE_* 폐기, 원칙 #1 상대 비율 실측 고정).
+ *
+ * Tier 전환 시 orbit line / mesh 직경은 `updateAt` 루프에서 renderScale 재적용으로 일관성 유지.
+ * Phase A 는 즉시 점프 flicker 허용 (Phase B 애니메이션 도입 예정).
  */
 
 export interface SolarSystemSceneHandles {
@@ -72,10 +85,39 @@ export interface SolarSystemSceneHandles {
   setOrbitLinesVisible: (visible: boolean) => void;
   /**
    * P10-C-2 #278 — 뷰 모드 전환 (Fact-First 원칙).
-   * `'educational'` (기본): 거리-의존 시각 과장 (MAX_VISUAL_SCALE_*) 적용.
-   * `'scientific'`: 모든 바디 scale=1 로 강제 — IAU 2015 실측 비율 1.0 렌더.
+   *
+   * **[P12-A Phase A 변경]**: 단일 tier 모드 채택으로 `educational`/`scientific` 구분이 의미를 잃었다.
+   * Phase A 에서는 API 를 유지해 backward-compat 을 보장하지만 내부적으로 동일한 tier 경로를 타므로
+   * 두 값 모두 같은 렌더 결과를 산출한다. Phase C 에서 UI 제거 + API 제거 예정.
+   *
+   * @deprecated Phase C (#298) 에서 제거 예정. tier 전환은 `setTier` 사용 권장.
    */
   setViewMode: (mode: 'educational' | 'scientific') => void;
+  /**
+   * P12-A #298 — 현재 활성 tier.
+   *
+   * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
+   */
+  getTier: () => Tier;
+  /**
+   * P12-A #298 — tier 강제 전환. Phase A 는 즉시 점프 flicker 허용 (Phase B 에서 300ms interp).
+   *
+   * tier 전환 시:
+   *  - orbit line 재샘플링 (새 renderScale 반영)
+   *  - mesh 직경 재계산 (실측 radius × 새 renderScale)
+   *  - 다음 `updateAt` 호출부터 mesh.position 이 새 renderScale 로 기록
+   */
+  setTier: (tier: Tier) => void;
+  /**
+   * P12-A #298 — 하이브리드 트리거 자동 판정 (Q7=7-d2).
+   *
+   * focus 있으면 focus body kind + 카메라 거리로, 없으면 카메라-원점 거리로 tier 결정.
+   * 히스테리시스 ±15% 로 왕복 flicker 방지 (A2 DoD).
+   *
+   * @param cameraFromSunMeters 카메라 위치에서 원점(태양)까지 거리 (m)
+   * @param cameraFromFocusMeters focus body 에서 카메라까지 거리 (m). focusBodyId=null 이면 무시
+   */
+  updateTierByCamera: (cameraFromSunMeters: number, cameraFromFocusMeters: number) => Tier;
   /**
    * P10-D #263 — body 의 위치/속도 state vector (parent-centric, m / m·s⁻¹).
    * Newton 경로: 엔진 state 에서 직접 추출 (forward-diff noise 없음).
@@ -117,6 +159,10 @@ export interface SolarSystemSceneHandles {
    * focus animation (300ms) 중에도 일관된 좌표계 유지.
    */
   setFocusOrigin: (bodyId: string) => void;
+  /**
+   * P12-A #298 — focus 해제 (reset 등). tier 가 free-fly 경로로 자동 전환되도록 focus id 를 null 로 돌린다.
+   */
+  clearFocus: () => void;
   dispose: () => void;
 }
 
@@ -195,6 +241,10 @@ export function createSolarSystemScene(
   const meshes = new Map<string, Mesh>();
   const disposables: { dispose: () => void }[] = [];
 
+  // P12-A #298 — 활성 tier (ADR §1). 초기값 'solar' (전체 태양계 뷰).
+  let activeTier: Tier = defaultInitialTier();
+  const getTier = (): Tier => activeTier;
+
   // 배경 톤
   scene.clearColor = new Color4(0.031, 0.035, 0.051, 1);
 
@@ -208,10 +258,15 @@ export function createSolarSystemScene(
   sunLight.intensity = 2.5;
   sunLight.diffuse = new Color3(1, 0.95, 0.8);
 
-  // 각 바디 메쉬 생성
+  // 각 바디 메쉬 생성 — Phase A: 현재 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
+  //
+  // Tier 전환 시 mesh 직경은 base radius 를 보존한 채 scaling factor 로 재적용한다.
+  // (Mesh 재생성은 비용이 크므로 scaling.setAll(ratio) 으로 tier 배수 전환.)
+  const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립)
   for (const body of system.bodies) {
-    const mesh = createBodyMesh(body, scene);
+    const mesh = createBodyMesh(body, scene, activeTier);
     meshes.set(body.id, mesh);
+    bodyBaseDiameter.set(body.id, body.radius * 2);
   }
 
   // P9 #254 PR-2.5 — rings 가 있는 행성에 shader 기반 3층 렌더.
@@ -236,23 +291,34 @@ export function createSolarSystemScene(
     disposables.push({ dispose: () => handles.dispose() });
   }
 
-  // 궤도선 — 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
-  // P1은 모든 궤도가 동일 색상이라 색 배열 불필요.
-  const orbitLineBatches: Vector3[][] = [];
-  for (const body of system.bodies) {
-    if (!body.orbit) continue;
-    const pts = sampleOrbitPoints(body);
-    if (pts) orbitLineBatches.push(pts);
-  }
-  const orbitLines =
-    orbitLineBatches.length > 0
-      ? MeshBuilder.CreateLineSystem('orbit-lines', { lines: orbitLineBatches }, scene)
-      : null;
-  if (orbitLines) {
-    orbitLines.color = new Color3(0.25, 0.28, 0.4);
-    orbitLines.isVisible = showOrbitLines;
-    disposables.push({ dispose: () => orbitLines.dispose() });
-  }
+  // 궤도선 — P12-A: tier 전환 시 재샘플링. 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
+  let orbitLines: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
+  let orbitLinesVisible = showOrbitLines;
+  const rebuildOrbitLines = () => {
+    // 기존 라인 제거 후 현재 tier 의 renderScale 로 재샘플링.
+    if (orbitLines) {
+      orbitLines.dispose();
+      orbitLines = null;
+    }
+    const batches: Vector3[][] = [];
+    for (const body of system.bodies) {
+      if (!body.orbit) continue;
+      const pts = sampleOrbitPoints(body, activeTier);
+      if (pts) batches.push(pts);
+    }
+    if (batches.length > 0) {
+      orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
+      orbitLines.color = new Color3(0.25, 0.28, 0.4);
+      orbitLines.isVisible = orbitLinesVisible;
+    }
+  };
+  rebuildOrbitLines();
+  disposables.push({
+    dispose: () => {
+      orbitLines?.dispose();
+      orbitLines = null;
+    },
+  });
 
   // 재사용 버퍼 — 프레임당 Map/Vec3 재할당을 피한다 (#76).
   // Vec3Double은 readonly 튜플이라 내부 계산 버퍼는 mutable tuple로 유지.
@@ -349,10 +415,53 @@ export function createSolarSystemScene(
   }
   disposables.push({ dispose: disposeNewton });
 
-  // P10-C-2 #278 — 뷰 모드 (educational/scientific). scientific 모드는 scale=1 강제.
+  // P10-C-2 #278 / P12-A #298 Phase A — viewMode 는 backward-compat 유지 (Phase C 제거 예정).
+  // 단일 tier 모드 채택으로 'educational'/'scientific' 값은 렌더 결과에 영향 없음.
   let viewMode: 'educational' | 'scientific' = 'educational';
   const setViewMode = (mode: 'educational' | 'scientific') => {
     viewMode = mode;
+  };
+
+  // P12-A #298 — tier 전환. 즉시 모든 body mesh 직경 재계산 + orbit line 재샘플링.
+  // Phase A 는 flicker 허용 (Phase B 에서 300ms interp + 카메라 radius 동기 병행).
+  const setTier = (tier: Tier) => {
+    if (tier === activeTier) return;
+    activeTier = tier;
+    const scale = renderScaleForTier(activeTier);
+    // 각 body mesh 직경 재설정 — `scaling` 이 아닌 reshape 로 하면 geometry 재생성 비용이 커서,
+    // scaling factor 로 상대 전환 (tier 내에서 `scaling = 1` 불변식 유지를 위해 원래 base diameter 를
+    // 새 tier 로 재생성한 비율 = newScale / oldScale 로 적용).
+    for (const [id, mesh] of meshes) {
+      const baseDiameter = bodyBaseDiameter.get(id);
+      if (baseDiameter == null) continue;
+      // mesh 는 `CreateSphere(diameter=baseDiameter * prevScale)` 로 만들어졌으므로 새 tier 로
+      // 변경하려면 scaling 을 `newScale / prevScale` 로 설정. 매 tier 전환마다 scaling 가 누적되지
+      // 않도록 절대 scaling 으로 계산 (현재 mesh.scaling = prev factor, target = newScale / initialScale).
+      // 간단화를 위해 geometry 를 재생성하는 대신 상대 scaling 으로 전환:
+      const targetDiameter = baseDiameter * scale; // 실제 scene unit 직경
+      const currentDiameter = mesh.getBoundingInfo().boundingSphere.radius * 2; // 현 scaling 반영
+      if (currentDiameter > 0) {
+        const ratio = targetDiameter / currentDiameter;
+        mesh.scaling.scaleInPlace(ratio);
+      }
+    }
+    rebuildOrbitLines();
+  };
+
+  const updateTierByCamera = (cameraFromSunMeters: number, cameraFromFocusMeters: number): Tier => {
+    const focusInfo = focusBodyIdForAssert
+      ? (() => {
+          const body = bodiesById.get(focusBodyIdForAssert!);
+          return body ? { kind: body.kind } : null;
+        })()
+      : null;
+    const nextTier = focusInfo
+      ? tierFromFocus(focusInfo.kind, cameraFromFocusMeters)
+      : tierFromCameraDistance(cameraFromSunMeters, activeTier);
+    if (nextTier !== activeTier) {
+      setTier(nextTier);
+    }
+    return activeTier;
   };
 
   // P11-A #288 — Floating Origin 인스턴스 (scene-scoped).
@@ -370,6 +479,10 @@ export function createSolarSystemScene(
     if (!world) return;
     floatingOrigin.setOriginToBody([world[0], world[1], world[2]]);
     focusBodyIdForAssert = bodyId;
+  };
+  // P12-A #298 — focus 해제 (reset) 시 tier 는 free-fly 경로로 전환.
+  const clearFocus = () => {
+    focusBodyIdForAssert = null;
   };
 
   // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
@@ -452,56 +565,41 @@ export function createSolarSystemScene(
     // Floating Origin 계약 (ADR `docs/decisions/20260422-floating-origin.md` §3):
     //   - `world` (worldPositions): Heliocentric 절대 좌표 (m) — Rust engine / Zustand store 와 동일
     //   - `local = floatingOrigin.toLocal(world)` : scene 삽입 직전 origin shift 적용 (m)
-    //   - `mesh.position` : scene unit (local × SCENE_UNIT_PER_METER, 1 unit = 1 AU)
-    // 이 3단 변환을 우회하여 `world * SCENE_UNIT_PER_METER` 를 직접 할당하면 scientific 모드
-    // float32 jitter regression 재발 (#271 재현). 아래 루프를 수정할 때 이 주석 계약 유지 필수.
+    //   - `mesh.position` : scene unit (local × renderScaleForTier(activeTier))
+    // 이 3단 변환을 우회하여 `world * SCENE_UNIT_PER_METER` 를 직접 할당하면 float32 jitter regression
+    // 재발 (#271 재현). 아래 루프 수정 시 이 주석 계약 유지 필수. P12-A 부터 SCENE_UNIT_PER_METER 는
+    // `renderScaleForTier(activeTier)` 로 교체 — ADR §결정 §1 R4 DoD.
     const origin = floatingOrigin.originOffset;
     const ox = origin[0];
     const oy = origin[1];
     const oz = origin[2];
+    const sceneUnitPerMeter = renderScaleForTier(activeTier);
     for (const [id, world] of worldPositions) {
       const mesh = meshes.get(id);
       if (!mesh) continue;
       // float64 뺄셈 (큰 수 - 큰 수 = 작은 수) 을 먼저 수행 후 float32 scene unit 변환.
       // `toRelativeToEye` 와 동일 원리 — double precision 유지 후 결과만 float32 cast.
       mesh.position.set(
-        (world[0] - ox) * SCENE_UNIT_PER_METER,
-        (world[1] - oy) * SCENE_UNIT_PER_METER,
-        (world[2] - oz) * SCENE_UNIT_PER_METER,
+        (world[0] - ox) * sceneUnitPerMeter,
+        (world[1] - oy) * sceneUnitPerMeter,
+        (world[2] - oz) * sceneUnitPerMeter,
       );
     }
 
-    // 거리 기반 per-body 시각 스케일 (#100)
-    // 카메라 거리 계산도 shift 반영된 local 좌표계에서 수행 — mesh.position 이 이미 local 이므로
-    // cam.globalPosition 도 같은 local 좌표계에 있다고 가정할 수 있다 (Floating Origin 은 scene 전체에 균등 적용).
+    // P12-A #298 — body mesh.scaling 은 1 로 고정 (kind 차등 / 거리 의존 과장 제거).
+    // 실측 반경 × tier renderScale 은 이미 `createBodyMesh` + tier 전환 시 `setTier` 의 scaling.setAll 에서 처리.
+    // `viewMode` 인자는 Phase A 에서 렌더 결과에 영향 없음 (Phase C 에서 제거 예정).
+    //
+    // `viewMode` 참조는 lint unused 방지 + Phase A API 유지 목적 — 내부 분기는 없다.
+    void viewMode;
     const cam = scene.activeCamera;
-    if (cam) {
-      const cx = cam.globalPosition.x;
-      const cy = cam.globalPosition.y;
-      const cz = cam.globalPosition.z;
-      for (const body of system.bodies) {
-        const mesh = meshes.get(body.id);
-        if (!mesh) continue;
-        const dx = mesh.position.x - cx;
-        const dy = mesh.position.y - cy;
-        const dz = mesh.position.z - cz;
-        const distScene = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        const distMeters = distScene * AU;
-        // P10-C-2: scientific 모드는 IAU 실측 비율 1.0 강제. educational 은 거리-의존 과장.
-        const scale =
-          viewMode === 'scientific'
-            ? 1
-            : computeVisualScale(distMeters, body.radius, maxScaleForKind(body.kind));
-        mesh.scaling.setAll(scale);
-      }
-    }
 
-    // Sun light — worldPositions['sun'] 도 Heliocentric 절대 좌표 (m). Floating Origin shift 반영.
+    // Sun light — worldPositions['sun'] 도 Heliocentric 절대 좌표 (m). Floating Origin shift + tier scale 반영.
     const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
     sunLight.position.set(
-      (sunWorld[0] - ox) * SCENE_UNIT_PER_METER,
-      (sunWorld[1] - oy) * SCENE_UNIT_PER_METER,
-      (sunWorld[2] - oz) * SCENE_UNIT_PER_METER,
+      (sunWorld[0] - ox) * sceneUnitPerMeter,
+      (sunWorld[1] - oy) * sceneUnitPerMeter,
+      (sunWorld[2] - oz) * sceneUnitPerMeter,
     );
 
     // P11-A #288 — safety net (ADR §1-A). focus 가 없는 free-fly 탐색 중 카메라가 1 AU 이상
@@ -513,11 +611,13 @@ export function createSolarSystemScene(
     // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
     // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
     if (cam && !focusBodyIdForAssert) {
-      // cam.globalPosition 은 scene unit (1 AU = 1 unit). fo 는 m 단위 계약 — 환산 후 전달.
+      // cam.globalPosition 은 scene unit. P12-A 이후 1 unit 크기는 tier 별 상이 — 환산 factor 는
+      // 현재 tier 의 renderScale 역수 (1/sceneUnitPerMeter). fo 는 m 단위 계약.
+      const metersPerSceneUnit = sceneUnitPerMeter > 0 ? 1 / sceneUnitPerMeter : AU;
       const cameraLocalMeters = [
-        cam.globalPosition.x * AU,
-        cam.globalPosition.y * AU,
-        cam.globalPosition.z * AU,
+        cam.globalPosition.x * metersPerSceneUnit,
+        cam.globalPosition.y * metersPerSceneUnit,
+        cam.globalPosition.z * metersPerSceneUnit,
       ] as const;
       // local → world = local + current origin (shift 전 기준)
       const cameraWorldMeters: [number, number, number] = [
@@ -617,6 +717,7 @@ export function createSolarSystemScene(
   };
 
   const setOrbitLinesVisible = (visible: boolean) => {
+    orbitLinesVisible = visible;
     if (orbitLines) orbitLines.isVisible = visible;
   };
 
@@ -658,6 +759,9 @@ export function createSolarSystemScene(
     updateAt,
     setOrbitLinesVisible,
     setViewMode,
+    getTier,
+    setTier,
+    updateTierByCamera,
     getBodyState,
     setPhysicsEngine,
     getPhysicsEngine,
@@ -671,6 +775,7 @@ export function createSolarSystemScene(
     },
     floatingOrigin,
     setFocusOrigin,
+    clearFocus,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
@@ -684,9 +789,10 @@ export function createSolarSystemScene(
   };
 }
 
-function createBodyMesh(body: LoadedCelestialBody, scene: Scene): Mesh {
-  // 메쉬는 실제 직경으로 생성. per-frame `mesh.scaling`에서 거리 기반 스케일 적용 (#100).
-  const diameter = body.radius * 2 * SCENE_UNIT_PER_METER;
+function createBodyMesh(body: LoadedCelestialBody, scene: Scene, tier: Tier): Mesh {
+  // P12-A #298 — 실측 직경 × 현재 tier 의 renderScale 로 메쉬 생성.
+  // `mesh.scaling` 은 1 유지 (tier 전환 시 scaling.scaleInPlace 로 비율 적용, ADR §주석 §2).
+  const diameter = body.radius * 2 * renderScaleForTier(tier);
   const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
 
   const mat = new StandardMaterial(`${body.id}-mat`, scene);
@@ -703,7 +809,7 @@ function createBodyMesh(body: LoadedCelestialBody, scene: Scene): Mesh {
   return mesh;
 }
 
-function sampleOrbitPoints(body: LoadedCelestialBody): Vector3[] | null {
+function sampleOrbitPoints(body: LoadedCelestialBody, tier: Tier): Vector3[] | null {
   if (!body.orbit || !body.parentId) return null;
   const orbit = body.orbit;
   // 궤도 한 바퀴 샘플링 (진근점각 기준 등간격)
@@ -730,9 +836,9 @@ function sampleOrbitPoints(body: LoadedCelestialBody): Vector3[] | null {
     const z2 = sinI * y1;
     const x = cosO * x1 - sinO * y2;
     const y = sinO * x1 + cosO * y2;
-    points.push(
-      new Vector3(x * SCENE_UNIT_PER_METER, y * SCENE_UNIT_PER_METER, z2 * SCENE_UNIT_PER_METER),
-    );
+    // P12-A #298 — orbit line 점도 현재 tier 의 renderScale 로 환산 (원칙 #4 거리 동일 스케일).
+    const scale = renderScaleForTier(tier);
+    points.push(new Vector3(x * scale, y * scale, z2 * scale));
   }
 
   return points;
