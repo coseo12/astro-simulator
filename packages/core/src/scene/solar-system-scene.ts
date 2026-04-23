@@ -674,7 +674,12 @@ export function createSolarSystemScene(
     // local 에 1e5 m 제한을 두면 T3 body tier (P12 단일 모드) 가 물리적으로 동작 불가. float32 jitter 는
     // mesh local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
     // 위임한다. ADR 20260422-floating-origin.md §6-β / §Amendments 2026-04-22 참조.
-    if (floatingOriginAssertEnabled() && cam) {
+    //
+    // #313 M2 reviewer 권고 — T3 (body) 에서만 assert 활성. T1/T2 는 `floatingOrigin.reset()` 으로
+    // origin=[0,0,0] 유지 → focus body local = 절대 월드 좌표 (지구 = 1 AU ≈ 1.5e11 m) 로 항상 ≥1e5
+    // 임계 초과 → dev 빌드 console.error spam 발생. assert 자체가 T3 primary follow 불변식 검증 목적
+    // 이므로 T1/T2 에서는 무의미. primary follow / safety net 가드와 동일 조건으로 통일.
+    if (floatingOriginAssertEnabled() && cam && activeTier === 'body') {
       const focusId = focusBodyIdForAssert;
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
       if (focusWorld) {

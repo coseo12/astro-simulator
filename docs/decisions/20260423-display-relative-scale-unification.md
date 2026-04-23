@@ -348,6 +348,8 @@ function currentTier(camera: ArcRotateCamera, focusBodyId: string | null): Tier 
 - **Phase C 처리**: **코드 변경 0, Amendment 만**. `floating-origin.ts` 및 관련 테스트 전부 유지
 - **#288 close 판정**: 본 PR 에서 close. scientific 모드 jitter 해소의 원 목표는 단일 모드 전환으로 근본 원인 소멸. `20260422-floating-origin.md` §Amendment 1줄 박제 — "P12 에서 역할 축소 (T3 primary, T1/T2 no-op)"
 
+> **Forward link (2026-04-23, #313 M2)**: 본 (c) 의 "코드 변경 0" 전제는 시각 효과만 다루고 컴퓨트 비용은 해소하지 않아 non-focus fps −38 ~ −44% 회귀 지속 확인 (#313 M1 재측정 Run #24837822902). 아래 §Amendments "2026-04-23 — Q10 구현 정합성 재평가 (#313 M2)" 에서 **부분 수정** (3지점 `activeTier === 'body'` 분기 추가 / `FloatingOrigin` 클래스·테스트·계약 전부 유지) 으로 재평가.
+
 #### (d) QA / Reviewer 이관 항목 반영 (Phase C)
 
 - **Reviewer M1** (Major, PR #304): `setTier` 가 `runTierTransition` cleanup 을 클로저에 저장해 연쇄 전환 시 이전 fallback timer / listener 를 먼저 해제. `tier-transition.test.ts` 에 "연쇄 전환 cleanup 호출" 단위 테스트 3건 추가
