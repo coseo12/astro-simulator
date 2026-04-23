@@ -14,6 +14,7 @@ import {
   tierFromFocus,
   tierFromCameraDistance,
   TIER_HYSTERESIS,
+  computeFloatingOriginForTier,
 } from './tier.js';
 
 describe('renderScaleForTier — ADR §1 수식 재현', () => {
@@ -152,5 +153,59 @@ describe('R6 DoD — Rust engine 경계 유지 (tier scale 은 렌더 전용)', 
       expect(distScene / s).toBeGreaterThanOrEqual(dist * 0.9999);
       expect(distScene / s).toBeLessThanOrEqual(dist * 1.0001);
     }
+  });
+});
+
+describe('computeFloatingOriginForTier — #313 M2 QA 회귀 가드', () => {
+  // 배경: PR #315 초기 구현에서 `setTier` 가 T1/T2 진입 시 reset 만 호출하고 T3 진입 시
+  // 아무 처리도 하지 않아 runTierTransition 이 이전 origin 기준의 focus mesh 좌표를 읽고
+  // 카메라 target 과 mismatch 를 일으켰다 (A1 119.9px / V5 296px 퇴행). 대칭 처리 함수.
+  const earthWorld = [1.496e11, 0, 0] as const; // 1 AU
+  const moonWorld = [1.496e11 + 3.84e8, 0, 0] as const;
+  const worldMap = new Map<string, readonly [number, number, number]>([
+    ['earth', earthWorld],
+    ['moon', moonWorld],
+  ]);
+  const lookup = (id: string) => worldMap.get(id);
+
+  it('T1 (solar) 진입 → [0,0,0] reset (focus 유무 무관)', () => {
+    expect(computeFloatingOriginForTier('solar', 'earth', lookup)).toEqual([0, 0, 0]);
+    expect(computeFloatingOriginForTier('solar', null, lookup)).toEqual([0, 0, 0]);
+  });
+
+  it('T2 (inner) 진입 → [0,0,0] reset (focus 유무 무관)', () => {
+    expect(computeFloatingOriginForTier('inner', 'earth', lookup)).toEqual([0, 0, 0]);
+    expect(computeFloatingOriginForTier('inner', null, lookup)).toEqual([0, 0, 0]);
+  });
+
+  it('T3 (body) + focus 지구 → 지구 world 좌표 반환 (setOriginToBody 용)', () => {
+    expect(computeFloatingOriginForTier('body', 'earth', lookup)).toEqual([1.496e11, 0, 0]);
+  });
+
+  it('T3 (body) + focus 달 → 달 world 좌표 반환 (지구-달 거리 반영)', () => {
+    const origin = computeFloatingOriginForTier('body', 'moon', lookup);
+    expect(origin).toEqual([1.496e11 + 3.84e8, 0, 0]);
+  });
+
+  it('T3 (body) + focus null (free-fly) → null (기존 origin 유지)', () => {
+    expect(computeFloatingOriginForTier('body', null, lookup)).toBeNull();
+  });
+
+  it('T3 (body) + focus id 가 worldMap 에 없음 → null (stale focus 방어)', () => {
+    expect(computeFloatingOriginForTier('body', 'nonexistent', lookup)).toBeNull();
+  });
+
+  it('반환된 좌표는 lookup 원본과 **값 동일** (reference 공유 여부 불가지, 수치 정합만 확인)', () => {
+    const origin = computeFloatingOriginForTier('body', 'earth', lookup);
+    expect(origin![0]).toBe(earthWorld[0]);
+    expect(origin![1]).toBe(earthWorld[1]);
+    expect(origin![2]).toBe(earthWorld[2]);
+  });
+
+  it('T1/T2 의 [0,0,0] 반환은 호출부에서 reset() 분기 — setOriginToBody([0,0,0]) 은 no-op 계약', () => {
+    // 본 테스트는 floating-origin.ts 계약 (setOriginToBody 가 원점과 동일하면 no-op) 과의
+    // 인접 정합성 박제. 호출부는 [0,0,0] 감지 시 `reset()` 을 선호 (listener emit 0 건 보장).
+    const solarOrigin = computeFloatingOriginForTier('solar', 'earth', lookup);
+    expect(solarOrigin).toEqual([0, 0, 0]);
   });
 });

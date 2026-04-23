@@ -36,6 +36,8 @@
 
 import { AU } from '@astro-simulator/shared';
 
+import type { Vec3Double } from '../coords/vec3.js';
+
 /** P12-A Tier 3단 (Q6=6A). */
 export type Tier = 'solar' | 'inner' | 'body';
 
@@ -193,4 +195,46 @@ export function resolveCurrentTier(
  */
 export function initialTier(): Tier {
   return 'solar';
+}
+
+/**
+ * #313 M2 QA 회귀 수정 — `setTier` 대칭 처리 헬퍼 (순수 함수).
+ *
+ * `runTierTransition` 은 `focusMesh.absolutePosition` 을 읽어 카메라 target 을 재계산한다
+ * (tier-transition.ts line 216-219). 즉 tier 전환 **시점에** mesh.position 이 새 tier 좌표계
+ * (올바른 origin + newScale) 로 이미 재계산되어 있어야 한다.
+ *
+ * 비대칭 처리 (T1/T2 만 reset, T3 진입 시 origin 미갱신) 시:
+ *  1. setTier('body') 호출 시점 origin 은 여전히 [0,0,0] (T1/T2 에서 왔으므로)
+ *  2. `runTierTransition` 이 focusMesh.absolutePosition 을 [world * newScale] 로 읽음 (origin 0 기준)
+ *  3. 카메라 target 이 이 좌표로 설정
+ *  4. 다음 updateAt 의 primary follow 가 origin = focusWorld 로 이동 → mesh.position = [0,0,0] 근처
+ *  5. 카메라 target 과 mesh 가 어긋남 — PR #315 QA 실측 A1 119.9px / V5 296px 퇴행
+ *
+ * 본 함수는 tier 전환 시 적용할 origin target 을 반환한다:
+ *  - T1/T2 진입 → `[0,0,0]` (reset)
+ *  - T3 진입 + focus body 있음 → focus body world 좌표
+ *  - T3 진입 + focus 없음 (free-fly) → `null` (기존 origin 유지 — safety net 이 다음 프레임 재계산)
+ *
+ * 호출부는 반환값이:
+ *  - `[0,0,0]` 이면 `floatingOrigin.reset()`
+ *  - 그 외 배열이면 `floatingOrigin.setOriginToBody(value)`
+ *  - `null` 이면 origin 변경 없음
+ * 을 실행하고, 이어서 origin + newScale 기준으로 mesh.position 재계산 루프를 돌려야 한다.
+ *
+ * @param tier 전환 target tier
+ * @param focusBodyId 현재 focus body id (null 이면 free-fly)
+ * @param lookupFocusWorld focus body 의 절대 월드 좌표 lookup
+ * @returns 적용할 origin 값 또는 null (변경 없음)
+ */
+export function computeFloatingOriginForTier(
+  tier: Tier,
+  focusBodyId: string | null,
+  lookupFocusWorld: (id: string) => Vec3Double | undefined,
+): Vec3Double | null {
+  if (tier !== 'body') return [0, 0, 0];
+  if (focusBodyId === null) return null;
+  const focusWorld = lookupFocusWorld(focusBodyId);
+  if (!focusWorld) return null;
+  return [focusWorld[0], focusWorld[1], focusWorld[2]];
 }

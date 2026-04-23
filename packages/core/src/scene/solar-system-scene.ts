@@ -31,6 +31,7 @@ import {
   initialTier as defaultInitialTier,
   tierFromFocus,
   tierFromCameraDistance,
+  computeFloatingOriginForTier,
   type Tier,
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
@@ -449,6 +450,39 @@ export function createSolarSystemScene(
     }
     rebuildOrbitLines();
 
+    // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. tier 전환 시 origin 을 대칭 처리.
+    //  - T1/T2 진입 → [0,0,0] reset (T1/T2 에서 매 프레임 FO overhead 제거)
+    //  - T3 진입 + focus 있음 → setOriginToBody(focusWorld) 즉시 동기 (QA 회귀 수정: 비대칭 처리 시
+    //    runTierTransition 이 focusMesh.absolutePosition 을 이전 origin 기준으로 읽어 카메라 target
+    //    mismatch 발생 — PR #315 QA A1 119.9px / V5 296px 퇴행 재현)
+    //  - T3 진입 + focus 없음 (free-fly) → null (기존 origin 유지, 다음 updateAt 의 safety net 이 처리)
+    const originTarget = computeFloatingOriginForTier(tier, focusBodyIdForAssert, (id) =>
+      worldPositions.get(id),
+    );
+    if (originTarget !== null) {
+      if (originTarget[0] === 0 && originTarget[1] === 0 && originTarget[2] === 0) {
+        floatingOrigin.reset();
+      } else {
+        floatingOrigin.setOriginToBody(originTarget);
+      }
+    }
+
+    // origin 과 newScale 기준으로 mesh.position 즉시 재계산 — `runTierTransition` 이 읽는
+    // `focusMesh.absolutePosition` (tier-transition.ts:216-219) 이 새 tier 좌표계여야 카메라 target 정합.
+    // updateAt 의 mesh.position 루프 (line 595-610) 와 동일 수식 (의도된 duplication — tier 전환 시점에
+    // 1회 추가 실행으로 transition 이 올바른 좌표를 읽게 함).
+    const tierTransitionOrigin = floatingOrigin.originOffset;
+    for (const [id, world] of worldPositions) {
+      const mesh = meshes.get(id);
+      if (!mesh) continue;
+      mesh.position.set(
+        (world[0] - tierTransitionOrigin[0]) * newScale,
+        (world[1] - tierTransitionOrigin[1]) * newScale,
+        (world[2] - tierTransitionOrigin[2]) * newScale,
+      );
+      mesh.computeWorldMatrix(true);
+    }
+
     // Phase B — camera dolly interp. scene.activeCamera 가 ArcRotateCamera 가 아니면 skip.
     // (e.g. 테스트 셋업 / 비정상 초기화 경로). 통상 경로는 setupArcRotateCamera 에서 항상 ArcRotateCamera.
     //
@@ -578,7 +612,10 @@ export function createSolarSystemScene(
     // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
     // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
     // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
-    if (focusBodyIdForAssert) {
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
+    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
+    if (activeTier === 'body' && focusBodyIdForAssert) {
       const focusWorld = worldPositions.get(focusBodyIdForAssert);
       if (focusWorld) {
         floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
@@ -630,7 +667,11 @@ export function createSolarSystemScene(
     // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (line 445-450 의
     // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
     // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
-    if (cam && !focusBodyIdForAssert) {
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 renderScale 이 작아
+    // 카메라 이동이 AU 단위여도 sub-pixel → safety net skip + origin [0,0,0] 유지. 매 프레임
+    // metersPerSceneUnit 환산 + floatingOrigin.update() + AU 곱셈 3회 overhead 제거 (#294 회귀 주범 후보).
+    if (cam && !focusBodyIdForAssert && activeTier === 'body') {
       // cam.globalPosition 은 scene unit. P12-A 이후 1 unit 크기는 tier 별 상이 — 환산 factor 는
       // 현재 tier 의 renderScale 역수 (1/sceneUnitPerMeter). fo 는 m 단위 계약.
       const metersPerSceneUnit = sceneUnitPerMeter > 0 ? 1 / sceneUnitPerMeter : AU;
@@ -658,7 +699,12 @@ export function createSolarSystemScene(
     // local 에 1e5 m 제한을 두면 T3 body tier (P12 단일 모드) 가 물리적으로 동작 불가. float32 jitter 는
     // mesh local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
     // 위임한다. ADR 20260422-floating-origin.md §6-β / §Amendments 2026-04-22 참조.
-    if (floatingOriginAssertEnabled() && cam) {
+    //
+    // #313 M2 reviewer 권고 — T3 (body) 에서만 assert 활성. T1/T2 는 `floatingOrigin.reset()` 으로
+    // origin=[0,0,0] 유지 → focus body local = 절대 월드 좌표 (지구 = 1 AU ≈ 1.5e11 m) 로 항상 ≥1e5
+    // 임계 초과 → dev 빌드 console.error spam 발생. assert 자체가 T3 primary follow 불변식 검증 목적
+    // 이므로 T1/T2 에서는 무의미. primary follow / safety net 가드와 동일 조건으로 통일.
+    if (floatingOriginAssertEnabled() && cam && activeTier === 'body') {
       const focusId = focusBodyIdForAssert;
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
       if (focusWorld) {
