@@ -63,6 +63,20 @@ import {
 const FOCUS_RADIUS_MULTIPLIER = 5.9;
 
 /**
+ * Tier 전환 전용 ExponentialEase — module-level 에서 1회 생성 후 공유.
+ *
+ * [P12-C #298 — m3 하드닝] 함수형 모듈 특성상 `runTierTransition` 호출마다 `new ExponentialEase()`
+ * 재생성은 오버헤드가 무시할 수준이지만, `camera-controller.ts` 가 생성자에서 1회 생성 후 `#easing`
+ * 필드로 재사용하는 패턴과의 **일관성 nit** 으로 hoisting (Phase B PR #304 Reviewer m3).
+ * easing 함수는 stateless — 공유 안전.
+ */
+const TIER_TRANSITION_EASE = (() => {
+  const ease = new ExponentialEase();
+  ease.setEasingMode(EasingFunction.EASINGMODE_EASEOUT);
+  return ease;
+})();
+
+/**
  * Camera dolly 목표 radius 계산 (Q8=8D apparent size 불변 수식).
  *
  * ## 수식 유도 — world-unit 실거리 보존
@@ -224,8 +238,11 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   // (4) Fallback timer — onAnimationEnd 미호출 (탭 비활성 / 오류) 시 강제 해제.
   const fallbackHandle = setTimeout(releaseControl, lockMs);
 
-  // (5) visibilitychange 핸들러 — 탭 복귀 시 강제 attachControl (idempotent).
-  //     Babylon Animation 이 hidden 상태에서 frame callback 을 미발생하는 케이스 방어.
+  // (5) visibilitychange 핸들러 — fallback timer 와 이중 방어 (defense-in-depth).
+  //     실 런타임에서는 `setTimeout(releaseControl, lockMs=500)` 이 선행 발동해 visibility 이벤트
+  //     도달 시점에 이미 `released=true` 인 경우가 지배적이지만, 둘 중 **먼저 도달한 쪽이 release**
+  //     하고 다른 쪽은 idempotent 로 흡수. 탭 즉시 복귀 시 fallback 을 기다리지 않고 attach 를
+  //     앞당기는 효과도 겸함 (UX jitter 최소화).
   //     document 는 브라우저 환경 only — SSR / jsdom 환경에선 globalThis.document 가 없거나 제한.
   const doc: Document | undefined = typeof document !== 'undefined' ? document : undefined;
   const onVisibilityChange = () => {
@@ -235,10 +252,8 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   };
   doc?.addEventListener('visibilitychange', onVisibilityChange);
 
-  // (6) 애니메이션 시작 — ExponentialEase(EASEOUT) 로 체감 완화 (huge ratio T1→T3 대응).
-  const ease = new ExponentialEase();
-  ease.setEasingMode(EasingFunction.EASINGMODE_EASEOUT);
-
+  // (6) 애니메이션 시작 — module-level `TIER_TRANSITION_EASE` (ExponentialEase EASEOUT) 공유.
+  //     easing 은 stateless 하므로 재사용 안전 (m3 hoisting).
   const FRAMES_PER_SECOND = 60;
   const totalFrames = Math.max(1, Math.round((durationMs / 1000) * FRAMES_PER_SECOND));
 
@@ -257,7 +272,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     radiusOld,
     targetRadius,
     Animation.ANIMATIONLOOPMODE_CONSTANT,
-    ease,
+    TIER_TRANSITION_EASE,
     () => {
       // onAnimationEnd — 정상 종료 경로. fallback timer 취소 + listener 해제 + attachControl.
       cleanup();

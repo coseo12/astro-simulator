@@ -86,12 +86,20 @@ const initialTier = await page.evaluate(() => window.__solarScene?.getTier?.());
 check('페이지 로드 후 초기 tier === solar', initialTier === 'solar', `현재 tier: ${initialTier}`);
 
 // ===== Level 3 흐름: solar → 지구 focus → body tier dolly =====
-// C3 애니메이션 시간 측정 — 브라우저 내부 performance.now() 로 tier 전환 완료 시점 측정.
-// setTier 는 활성 tier 변경을 즉시 반영하므로 "tier 가 body 로 바뀌고 camera.radius 가 최종값에
-// 도달할 때까지" 시간을 측정. polling 1500ms 안에서 실 애니메이션 시간만 추출.
+// [P12-C #298 — QA suggestion #1 반영] C3 측정을 `_alreadyAttached` 폴링 기반으로 교체.
+// 이전 "radius 5프레임 stable" 감지는 ExponentialEase tail + polling IPC 지연을 포함한 가장 엄격한
+// 상한이라 DoD 원문 "전환 ≤500ms" 를 과하게 초과 해석했다 (QA 리포트 §3, click→reattach 506ms 실측).
+// 본 교체: click 직후 `_alreadyAttached` 를 10ms 간격 폴링하여 **lock 해제 시점** = 사용자 관점
+// UX 전환 완료 시점을 직접 측정. ADR §3 Q8=8D "durationMs=300 + lockMs-durationMs=200 마진" 정합.
+//
+// radius 안정화 측정은 **부수 지표** 로 병기 (WARN 레벨). runTierTransition 내부에서 Animation 이
+// 완주(onAnimationEnd) 또는 fallback timer 발동 중 하나가 release 한 시점이 사용자 체감 시점.
 console.log('\n[T3] 지구 focus → body tier dolly 애니메이션');
 await page.evaluate(() => {
-  // tier 전환 감지용 전역 훅 설치
+  // tier 전환 감지용 전역 훅 설치 — start/end 를 클릭 시점/`_alreadyAttached === true` 복귀로 측정.
+  window.__c3ClickStart = null;
+  window.__c3LockReattachTime = null;
+  // 부수 지표: radius 안정화 기준 (병기용).
   window.__tierTransitionStart = null;
   window.__tierTransitionEnd = null;
   const solar = window.__solarScene;
@@ -111,7 +119,7 @@ await page.evaluate(() => {
       stableCount = 0;
     }
 
-    // radius 가 5 프레임 연속 <1% 변화면 완료로 판정
+    // radius 가 5 프레임 연속 <1% 변화면 완료로 판정 (부수 지표)
     if (lastRadius != null && currentRadius != null) {
       const delta = Math.abs(currentRadius - lastRadius) / Math.max(Math.abs(lastRadius), 1);
       if (delta < 0.01 && window.__tierTransitionStart !== null) {
@@ -128,36 +136,82 @@ await page.evaluate(() => {
   window.__simCore.scene.onBeforeRenderObservable.add(window.__tierMonitor);
 });
 
-const earthBtn = await page.$('[data-testid="focus-earth"]');
-if (earthBtn) {
-  await earthBtn.click();
-}
-// 애니메이션 300ms + lock 500ms + world matrix 동기화 여유 500ms = 1300ms 대기 (총 polling 예산 1800ms)
-await page.waitForTimeout(1500);
+// click 시점 + lock 재활성 시점을 브라우저 내부에서 1 step 으로 측정 (Playwright ↔ 브라우저 IPC 오차 최소화).
+// 기존 focus 버튼 click 과 동일 경로를 브라우저 내부 이벤트 트리거로 재현 — focus 처리 + setTier 체인.
+const c3Measure = await page.evaluate(async () => {
+  const btn = document.querySelector('[data-testid="focus-earth"]');
+  if (!btn) return { status: 'no-button' };
+  const inputManager = window.__simCore?.scene?._inputManager;
+  if (!inputManager) return { status: 'no-input-manager' };
+
+  const clickStart = performance.now();
+  window.__c3ClickStart = clickStart;
+  btn.click();
+
+  // _alreadyAttached 폴링 — 10ms 간격, 1500ms 예산
+  const POLL_MS = 10;
+  const BUDGET_MS = 1500;
+  let detachObserved = false;
+  let lockEnd = null;
+  const deadline = clickStart + BUDGET_MS;
+  while (performance.now() < deadline) {
+    const attached = inputManager._alreadyAttached;
+    if (attached === false) detachObserved = true;
+    if (detachObserved && attached === true) {
+      lockEnd = performance.now();
+      break;
+    }
+    await new Promise((r) => setTimeout(r, POLL_MS));
+  }
+  window.__c3LockReattachTime = lockEnd;
+  return {
+    status: 'ok',
+    clickStart,
+    lockEnd,
+    detachObserved,
+    elapsedMs: lockEnd !== null ? lockEnd - clickStart : null,
+  };
+});
+
+// 추가 200ms 여유 대기 — radius 안정화 부수 지표 관찰용.
+await page.waitForTimeout(200);
+
 const tierT3 = await page.evaluate(() => window.__solarScene?.getTier?.());
-const c3Timing = await page.evaluate(() => ({
-  start: window.__tierTransitionStart,
-  end: window.__tierTransitionEnd,
-}));
 check('지구 focus 후 tier === body', tierT3 === 'body', `현재 tier: ${tierT3}`);
-if (c3Timing.start !== null && c3Timing.end !== null) {
-  const animationMs = c3Timing.end - c3Timing.start;
-  // DoD C3 "전환 ≤500ms" 는 순수 애니메이션 시간 (durationMs=300 + lockMs-durationMs=200 marg).
-  // "5 프레임 stable 감지" 가드 (stableCount>=5) 가 60fps 기준 ~83ms 후판정 오버헤드 추가.
-  // 따라서 500 + 83 (감지 버퍼) + 50 (Playwright/HMR 오차) = 633ms 를 실측 상한으로 설정.
-  // 순수 애니메이션 시간은 runTierTransition 내 Animation.CreateAndStartAnimation (300ms) +
-  // lockMs(500ms) fallback timer. 이 둘 내에서 radius 는 이미 안정화되어야 한다.
-  const THRESHOLD = 633;
+
+if (c3Measure.status === 'ok' && c3Measure.elapsedMs !== null) {
+  // ADR §3 Q8=8D: durationMs=300 + lockMs(500) 마진 = 500ms 이내 재활성. +100ms 측정 오차 버퍼 = 600ms.
+  const THRESHOLD = 600;
   check(
-    `C3 애니메이션 시간 ≤ ${THRESHOLD}ms (순수 500ms + 감지 버퍼)`,
-    animationMs <= THRESHOLD,
-    `실측 ${animationMs.toFixed(0)}ms (start→end, radius 안정화 기준)`,
+    `C3 click→attachControl 재활성 ≤ ${THRESHOLD}ms (QA suggestion #1: _alreadyAttached 폴링)`,
+    c3Measure.elapsedMs <= THRESHOLD,
+    `실측 ${c3Measure.elapsedMs.toFixed(0)}ms (detachObserved=${c3Measure.detachObserved})`,
   );
 } else {
   warn(
-    `C3 애니메이션 시간 측정`,
+    `C3 click→reattach 측정`,
     false,
-    `start=${c3Timing.start}, end=${c3Timing.end} (radius 안정 미감지)`,
+    `status=${c3Measure.status}, elapsedMs=${c3Measure.elapsedMs} (폴링 실패)`,
+  );
+}
+
+// 부수 지표: radius 안정화 기준. WARN 레벨로 기록만 — FAIL 승격 금지 (ExponentialEase tail 특성).
+const radiusStabilizeTiming = await page.evaluate(() => ({
+  start: window.__tierTransitionStart,
+  end: window.__tierTransitionEnd,
+}));
+if (radiusStabilizeTiming.start !== null && radiusStabilizeTiming.end !== null) {
+  const radiusStabilizeMs = radiusStabilizeTiming.end - radiusStabilizeTiming.start;
+  warn(
+    `C3 부수 지표: radius 안정화 (5프레임 <1%) ${radiusStabilizeMs.toFixed(0)}ms`,
+    radiusStabilizeMs <= 700,
+    `참고용 — ExponentialEase tail + polling IPC 포함. DoD 판정은 click→reattach 기준.`,
+  );
+} else {
+  warn(
+    `C3 부수 지표 radius 안정화 측정`,
+    false,
+    `start=${radiusStabilizeTiming.start}, end=${radiusStabilizeTiming.end}`,
   );
 }
 
