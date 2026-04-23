@@ -7,7 +7,8 @@ import { type Vec3Double } from './vec3.js';
  *
  * Babylon 의존 없이 **scene 좌표 float32 quantization error** 를 측정한다.
  *
- * GPU 파이프라인은 float32. scientific 모드에서 mesh.position 은 scene unit (1 unit = 1 AU).
+ * GPU 파이프라인은 float32. P12-C #298 이후 단일 모드에서도 T3 body tier 의 mesh.position 은 scene unit
+ * (과거 scientific 모드 1 unit = 1 AU 과 동일 정밀도 영역).
  * 해왕성 30 AU 위치 body 가 baseline (shift 없음) 에선 float32 `fround(30 * SCENE_UNIT_PER_METER)`
  * 근방에 양자화되어 카메라 이동 중 카메라 local 좌표와 body 좌표의 차이가 float32 ε 이하로 떨어지면
  * projection 후 ±1~3 pixel jitter 발생 (#271 관찰 증상).
@@ -113,7 +114,7 @@ describe('P11-A #288 DoD α — scene 좌표 float32 quantization', () => {
     // 달의 ULP 는 2.57e-3 근방이므로 10m 수준 — 프레임 간 변화로 pixel jitter 발생 안 함
     const ulpMoon = float32ULP(moonScene.x);
     const ulpMoonMeters = ulpMoon * AU;
-    expect(ulpMoonMeters).toBeLessThan(100); // 100m 이하 (scientific 모드에서 sub-pixel)
+    expect(ulpMoonMeters).toBeLessThan(100); // 100m 이하 (단일 모드 T3 body tier 기준 sub-pixel)
   });
 
   it('shift 전후 비교 — 해왕성 focus 시 quantization 감소 배율', () => {
