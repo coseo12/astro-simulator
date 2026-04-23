@@ -3,6 +3,84 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.11.0] — 2026-04-23
+
+### P11-A Floating Origin + P12-A Tier 엔진 기반 (Display-Relative Scale Unification Phase A)
+
+메인 이슈: #288 (P11-A Floating Origin) / #298 (P12 Scale Unification 계약) · ADR: [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) / [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) · 원칙: [`docs/principles/fact-first.md`](docs/principles/fact-first.md)
+
+4 PR 누적 (P11-A + bench remeasure + P12 ADR + P12-A Phase A):
+
+- **PR #291 (P11-A Floating Origin)** — scientific 모드 float32 jitter 해소. camera origin 동적 shift (focus body primary + free-fly 1 AU threshold safety net). Zustand / Rust engine / worldPositions 는 heliocentric 절대 m 유지 (ADR §3 주석 계약). `__floatingOrigin` / `__solarScene.floatingOrigin` 전역 dev 노출. 관련 이슈 #271 closed. 후속 #294 (non-focus fps 30~40% 회귀) / #295 / #296 / #297 분리
+- **PR #293 (bench baseline 재측정)** — GH Actions ubuntu × 10 회 median 으로 `docs/benchmarks/baseline.json` 갱신. `bench-baseline-remeasure` workflow dispatch 구조. #225 closed
+- **PR #300 (P12 ADR 박제)** — Display-Relative Scale Unification 결정 매트릭스 + 5축 후보 비교 + Concrete Prediction 4건 + Q10 float32 정밀도 수식 + Phase 분리 판정 + 재검토 조건 10건. PM 3 라운드 Q&A 수렴 (명확도 52 → 5/5) + Gemini 교차검증 적용
+- **PR #301 (P12-A Tier 엔진)** — `tier.ts` 신규 (182 LoC, Solar/Inner/Body 3단) + `SCENE_UNIT_PER_METER` 동적화 + kind 차등 (`visual-scale.ts`) 폐기. rings/asteroid-belt tier 비율 전파 (host.scaling + per-call 주입). ScaleBadge 거짓 UI 제거 (문구 "실측 비율 1.0" 재정의)
+
+### Behavior Changes
+
+#### P11-A Floating Origin (#291)
+
+- **scientific 모드 jitter 해소** — 목성/해왕성 focus 상태 카메라 pan 시 픽셀 양자화 제거. body 중심이 scene 원점 근처에서 렌더되어 float32 유효숫자 손실 없음
+- **Floating Origin primary follow** — focus body 는 매 프레임 scene 원점 근처 (local 좌표 ≤ 1e5 m) 유지. 단, Zustand / Rust engine state 는 Heliocentric 절대값 유지 (정보 패널 거리 표시 변함 없음)
+- **safety net 1 AU threshold** — free-fly 탐색 중 카메라 1 AU 이상 이동 시 origin shift. focus 상태에서는 primary 가 우선
+- **`SolarSystemSceneHandles` API 확장** — `floatingOrigin` + `setFocusOrigin(bodyId)` 2 field 추가
+- **`FloatingOrigin` API 확장** — `setOriginToBody(world)` + `onOriginShift(listener)` 2 메서드 추가 (기존 `update` / `toLocal` / `toWorld` 변경 없음)
+
+#### P12-A Display-Relative Scale Unification 기반 (#301)
+
+- **body 시각 과장 완전 제거** — `educational` 모드의 per-body scale 팽창 (planet ×500, moon ×500, dwarf-planet ×2000, comet ×20000) 폐기. tier 별 실측 `renderScale` 만 적용 — 멀리서 보면 body 가 작아 보일 수 있다 (P11-B billboard marker 도입 전까지 sub-pixel 가능)
+- **3단 tier 도입** — `solar` (해왕성 궤도 수용) / `inner` (화성 궤도 수용) / `body` (focus body 중심). 각 tier 별 `renderScaleForTier(tier)` 로 mesh.position / orbit line / sun light 에 동일 배수 적용. kind 별 차등 없음
+- **하이브리드 tier 트리거** — focus 있으면 focus body kind 기반 자동 tier, free-fly 시 카메라-원점 거리 stateless 재계산. 히스테리시스 ±15% 로 경계 왕복 방지
+- **교차 tier 전환 시 즉시 점프 flicker** — Phase A 는 애니메이션 없음. Phase B (Q8=8D scale + camera.radius 병행 300ms interp) 에서 해소 예정
+- **`scene.solar.clearFocus()` / `setTier` / `updateTierByCamera` / `getTier` 공개 API 신설**
+- **`setViewMode('scientific'|'educational')` backward-compat 유지** — 렌더 결과에 영향 없음. Phase C 에서 API 제거 예정
+- **`ScaleBadge` 문구 재정의** — 기존 "×N 과장 중" → "실측 비율 1.0". Phase A 에서 과장 실제 제거됐으므로 거짓 UI 차단 (dead reference 정리)
+- **`SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거** — 3파일 (`asteroid-belt.ts` / `ring-placeholder.ts` / `ring-shader.ts`) 의 상수 선언 제거, tier 함수 경유로 전환
+- **회귀 가드 신규** — `tier-proportion.test.ts` (5건, 비율 불변식) + `scale-badge.test.tsx` (과장/× 재등장 차단 다층)
+
+#### 벤치 baseline 재측정 (#293)
+
+- `docs/benchmarks/baseline.json` 환경 `gh-actions-ubuntu-chromium-headless` 기준 N=10 median 으로 갱신. 이후 CI bench 게이트의 회귀 기준점
+
+### DoD 실측 (P12-A Phase A)
+
+| DoD      | 상태                                       | 증거                                                                 |
+| -------- | ------------------------------------------ | -------------------------------------------------------------------- |
+| V1/V3    | PASS                                       | browser-verify 해왕성 189/380px, 화성 9/384px                        |
+| V5       | WARN → Phase B 이관 (사용자 승인 재조정)   | 지구 2198px / 목표 320±5% — Phase B dolly 에서 해소                  |
+| V2/V4/V6 | DEFERRED → P11-B billboard marker (Q-C=C3) | —                                                                    |
+| A2/A3    | PASS                                       | tier.test.ts 6건 + tier-lookat.test.ts 4건                           |
+| R3/R4/R6 | PASS                                       | visual-scale.ts 폐기 + SCENE_UNIT_PER_METER 0 + engine boundary test |
+| 테스트   | 343 PASS / 0 FAIL                          | `pnpm -r test`                                                       |
+
+### 알려진 제한
+
+- **교차 tier 전환 flicker** — Phase A 는 즉시 점프 (ADR 에 사전 합의된 degrade). Phase B (v0.12 예정) 에서 scale+radius 병행 interp 로 해소
+- **V5 지구 세로 40% DoD 미충족** — Phase A 는 scale 만 교체 + 카메라 radius 불변 → focus body 과도 확대 (2198px). Phase B 에서 hard fail 승격 예정
+- **V2/V4/V6 최소 pixel floor 미구현** — P11-B billboard marker 합산 측정 이관 (Q-C=C3)
+- **P11-A non-focus fps 30~40% 회귀** (#294) — Floating Origin 배선 overhead 조사 중
+- **scale-badge 존재 유지** — Phase C 에서 완전 제거 예정 (view-mode-switcher / onboarding-tooltip / scientific-mode-notice 포함)
+- **Floating Origin 존속 여부 재검토 필요** — Q10. T1/T2 tier 는 float32 정밀도 충분 예측 (ADR §4 수식) → 재설계 완료 시 T1/T2 simplify 후보. T3 primary 는 유지
+
+### 신규 이슈 (v0.11.0 중 분리 / 후속)
+
+- **#288** P11-A Floating Origin (open, Phase C 완료 후 재검토)
+- **#294** P11-A non-focus fps 30~40% 회귀 — 배선 overhead 조사
+- **#295** browser-verify originOffset assert 범위 완화
+- **#296** #271 canvas readback 대체 지표 — headless swiftshader false negative 방어
+- **#297** `bench:baseline-remeasure` 로컬 smoke 스크립트
+- **#298** P12 Display-Relative Scale Unification (open, Phase B/C 진행 예정)
+- **#299** Tier 전환 시 ARIA Live Region 알림 (P12 후속, priority:low)
+
+### 하네스 업데이트
+
+v2.28.1 유지. v0.11.0 범위에서 하네스 수정 없음.
+
+### 다음 마일스톤 (로드맵 v2)
+
+- **v0.12.0 예정 (P12-B)** — Q8=8D scale + camera.radius 병행 300ms interp + 카메라 입력 500ms 잠금. C1/C2/C3/C4 연속성 DoD + V5 hard fail 승격
+- **v0.13.0 예정 (P12-C)** — UI 컴포넌트 완전 제거 (ViewModeSwitcher / ScaleBadge / OnboardingTooltip / ScientificModeNotice) + `sim-store.viewMode` 필드 제거 + `fact-first.md` §예외 Amendment + `roadmap-v2-solar-precision.md` renumber (P12~P17 +1) + P11-A Floating Origin T1/T2 simplify (Q10 실측 확정 후)
+
 ## [0.10.0] — 2026-04-21
 
 ### P10 — Fact-First 원칙 + 데이터 감사 + 사실 모드 UI
