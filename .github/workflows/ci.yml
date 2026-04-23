@@ -52,6 +52,13 @@ jobs:
         # 알 수 없는 옵션으로 실패 (#181).
         run: pnpm run --if-present test
 
+      # P12-C #298 — 단일 모드 전환 회귀 가드 (R1 DoD).
+      # `scientific` 식별자·리터럴이 활성 코드 경로에 재도입되면 exit 1 로 차단.
+      # 주석(역사 맥락)은 허용. 자세한 규칙은 scripts/verify-no-scientific-grep.mjs 헤더 참조.
+      - name: R1 회귀 가드 (verify:no-scientific-grep)
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-no-scientific-grep.mjs') != ''
+        run: pnpm run --if-present verify:no-scientific-grep
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
