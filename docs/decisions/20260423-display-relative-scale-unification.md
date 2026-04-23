@@ -389,6 +389,31 @@ function currentTier(camera: ArcRotateCamera, focusBodyId: string | null): Tier 
 - 대체: (a) `floating-origin.test.ts` 의 기존 `reset()` / `setOriginToBody no-op` 테스트가 인접 property 테스트로 간접 보증 (b) 주석 계약 — `setTier` / primary follow / safety net 3지점에 "#313 M2 — P12 ADR §Q10 Amendment" 인라인 박제 (c) M3 bench 재측정 게이트 (non-focus 회귀율 < 5%) 가 회귀 시 자동 감지
 - **재조정 박제 3위치**: 본 Amendment (ADR) / PR 본문 / CHANGELOG Notes — CLAUDE.md 재조정 박제 규칙 준수
 
+### 2026-04-23 — QA 회귀 수정: setTier 대칭 처리 (#313 M2 QA)
+
+위 **Q10 구현 정합성 재평가** 1차 구현 (PR #315 commits c3695dc / 766a2ba) 에 대한 QA 동적 검증에서 **시각 회귀 2건** 발견:
+
+- **V5 지구 세로 40% ±5%** — 허용 304~336px, 실측 **296px** (develop baseline 322px → −26px 퇴행). 3회 결정적 재현
+- **A1 지구 focus 중심 편차 ≤ 10px** — 실측 **119.9px** (허용의 12배 초과). develop baseline 0.0px → PR 119.9px
+
+**원인**: `setTier` 내부 **비대칭 처리**.
+
+- T1/T2 진입 시 `floatingOrigin.reset()` 즉시 호출
+- T3 진입 시 **아무 처리 없음** — primary follow (line 583) 는 다음 `updateAt` 프레임에야 origin 갱신
+
+`runTierTransition` (tier-transition.ts:216-219) 이 `focusMesh.absolutePosition` 을 읽어 카메라 target 을 재계산하므로, T3 진입 시점에 origin + mesh.position 이 새 tier 좌표계로 이미 갱신되어 있지 않으면 **카메라 target 과 mesh 가 어긋남** (next frame primary follow 이 origin 을 focus 로 이동시켜 mesh.position 이 [0,0,0] 근처로 재배치되는데 camera.target 은 이전 origin 기준 좌표에 남음).
+
+**수정 (PR #315 추가 커밋)**:
+
+1. `packages/core/src/scene/tier.ts` 에 순수 함수 `computeFloatingOriginForTier(tier, focusId, lookup)` 추가 — tier 별 origin target 을 결정 (T1/T2 → `[0,0,0]`, T3+focus → focus world, T3+free-fly → `null`)
+2. `setTier` 가 위 함수 결과로 `floatingOrigin.reset()` 또는 `setOriginToBody(focusWorld)` 를 **대칭 호출**
+3. origin 갱신 직후 **mesh.position 재계산 루프** 추가 (`(world - origin) * newScale`, `computeWorldMatrix(true)` 포함) — `runTierTransition` 이 올바른 `focusMesh.absolutePosition` 을 읽도록
+4. `packages/core/src/scene/tier.test.ts` 에 `computeFloatingOriginForTier` 단위 테스트 8건 추가 — T1/T2/T3 × focus 유/무/stale 6조합 + reference 동일성 + [0,0,0] 계약 정합
+
+**DoD 재조정 번복**: 위 "DoD 재조정" 섹션의 "T3 기능 회귀 가드 단위 테스트" 생략 판정은 QA 실측 회귀로 **사후 번복**. `computeFloatingOriginForTier` 순수 함수 추출로 Scene 인스턴스 mock 없이 단위 테스트 가능해져 ROI 역전. 이후 유사 tier 분기 로직은 **순수 함수 추출 + 단위 테스트를 우선 검토**.
+
+**시사점 (CLAUDE.md 실전 교훈 후보)**: ROI 5문 체크에서 "주석 계약 + 인접 테스트" 로 대체 판정한 시각 회귀가 실제로 발생한 사례. "회귀 시 조용히 퇴행 vs 빌드 실패" 의 "조용히 퇴행" 이 **QA 브라우저 검증 없이는 감지 불가** 임을 실증. 순수 함수 추출 가능성이 1%라도 있으면 주석 계약 대체보다 추출 + 테스트를 기본 선택. 추후 volt 캡처 후보.
+
 ---
 
 ## 참고

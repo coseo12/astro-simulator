@@ -31,6 +31,7 @@ import {
   initialTier as defaultInitialTier,
   tierFromFocus,
   tierFromCameraDistance,
+  computeFloatingOriginForTier,
   type Tier,
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
@@ -449,13 +450,37 @@ export function createSolarSystemScene(
     }
     rebuildOrbitLines();
 
-    // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. T3 (body) 이탈 시 originOffset 을 [0,0,0] 으로
-    // 리셋하여 T1/T2 에서 mesh.position 이 shift 없는 절대 월드 좌표 × renderScale 로 계산되도록 한다.
-    // T1/T2 는 renderScale 이 작아 origin shift 의 visible 효과가 sub-pixel 이지만, 매 프레임
-    // setOriginToBody / update() overhead 는 실재 (#294 non-focus −38~−44% 회귀). reset 1 회로 이후
-    // 프레임의 primary follow / safety net 이 조건부 skip 가능.
-    if (tier !== 'body') {
-      floatingOrigin.reset();
+    // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. tier 전환 시 origin 을 대칭 처리.
+    //  - T1/T2 진입 → [0,0,0] reset (T1/T2 에서 매 프레임 FO overhead 제거)
+    //  - T3 진입 + focus 있음 → setOriginToBody(focusWorld) 즉시 동기 (QA 회귀 수정: 비대칭 처리 시
+    //    runTierTransition 이 focusMesh.absolutePosition 을 이전 origin 기준으로 읽어 카메라 target
+    //    mismatch 발생 — PR #315 QA A1 119.9px / V5 296px 퇴행 재현)
+    //  - T3 진입 + focus 없음 (free-fly) → null (기존 origin 유지, 다음 updateAt 의 safety net 이 처리)
+    const originTarget = computeFloatingOriginForTier(tier, focusBodyIdForAssert, (id) =>
+      worldPositions.get(id),
+    );
+    if (originTarget !== null) {
+      if (originTarget[0] === 0 && originTarget[1] === 0 && originTarget[2] === 0) {
+        floatingOrigin.reset();
+      } else {
+        floatingOrigin.setOriginToBody(originTarget);
+      }
+    }
+
+    // origin 과 newScale 기준으로 mesh.position 즉시 재계산 — `runTierTransition` 이 읽는
+    // `focusMesh.absolutePosition` (tier-transition.ts:216-219) 이 새 tier 좌표계여야 카메라 target 정합.
+    // updateAt 의 mesh.position 루프 (line 595-610) 와 동일 수식 (의도된 duplication — tier 전환 시점에
+    // 1회 추가 실행으로 transition 이 올바른 좌표를 읽게 함).
+    const tierTransitionOrigin = floatingOrigin.originOffset;
+    for (const [id, world] of worldPositions) {
+      const mesh = meshes.get(id);
+      if (!mesh) continue;
+      mesh.position.set(
+        (world[0] - tierTransitionOrigin[0]) * newScale,
+        (world[1] - tierTransitionOrigin[1]) * newScale,
+        (world[2] - tierTransitionOrigin[2]) * newScale,
+      );
+      mesh.computeWorldMatrix(true);
     }
 
     // Phase B — camera dolly interp. scene.activeCamera 가 ArcRotateCamera 가 아니면 skip.
