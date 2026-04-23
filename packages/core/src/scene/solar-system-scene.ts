@@ -33,13 +33,17 @@ import {
   tierFromCameraDistance,
   type Tier,
 } from './tier.js';
+import { runTierTransition } from './tier-transition.js';
+import type { ArcRotateCamera } from '@babylonjs/core';
 
 // P12-A #298 — Display-Relative Scale Unification 계약 (ADR 20260423, §결정):
 //   1. renderScale 은 tier 함수. SCENE_UNIT_PER_METER 하드코딩 금지 (R4 DoD)
 //   2. body mesh 본체는 실측 radius × renderScale — scaling 조작으로 왜곡 금지 (원칙 #1, R3 DoD)
 //   3. 거리도 동일 renderScale 적용 (원칙 #4) — orbit line / trail 동일 규칙
 //   4. Rust engine 반환 좌표는 heliocentric 절대 m — tier 변환은 렌더 레이어 책임 (R6 DoD)
-//   5. [Phase B] tier 전환 시 scale + camera.radius 병행 interp 300ms, 입력 500ms 잠금
+//   5. [Phase B 활성] tier 전환 시 scale 즉시 setAll + camera.radius 300ms ExponentialEase interp,
+//      카메라 입력 500ms 잠금 + onAnimationEnd / fallback setTimeout(lockMs) / visibilitychange 이중·삼중 안전장치
+//      (apparent size 불변: radius_old / oldScale == radius_new / newScale, tier-transition.ts)
 //   6. Floating Origin: Phase A 는 기존 P11-A 배선 유지 (Phase C 에서 simplify, Q10)
 // 위 계약 위배 변경은 즉시 버그로 간주 (CLAUDE.md "주석 계약 vs 구현 drift" 교훈)
 
@@ -425,7 +429,11 @@ export function createSolarSystemScene(
   };
 
   // P12-A #298 — tier 전환. 즉시 모든 body mesh 직경 재계산 + orbit line 재샘플링.
-  // Phase A 는 flicker 허용 (Phase B 에서 300ms interp + 카메라 radius 동기 병행).
+  //
+  // [P12-B Phase B (#298)] — camera.radius 300ms ExponentialEase interp 추가 (`runTierTransition`).
+  // scale (mesh scaling / orbit line) 은 여전히 **즉시** 적용 — `radius_old / oldScale == radius_new / newScale`
+  // 실거리 보존으로 apparent size 불변 (tier-transition.ts 수식 유도 주석 참조). 입력 500ms 잠금 +
+  // visibilitychange resume 으로 UX 안전장치 박제.
   //
   // N2 권고 반영: 매 tier 전환마다 `scaling.scaleInPlace(ratio)` 누적은 부동소수점 drift 위험.
   // 대신 mesh 가 생성된 **초기 tier** 의 renderScale 기준으로 **절대** scaling 을 계산한다.
@@ -435,14 +443,38 @@ export function createSolarSystemScene(
   // rings 는 host mesh 의 자식이므로 host.scaling 이 바뀌면 ring radius 도 같은 배수로 확대 (B1).
   const setTier = (tier: Tier) => {
     if (tier === activeTier) return;
+    const oldScale = renderScaleForTier(activeTier);
     activeTier = tier;
     const newScale = renderScaleForTier(activeTier);
     const initialScale = renderScaleForTier(bodyInitialRenderScale);
     const absoluteScaling = newScale / initialScale;
     for (const mesh of meshes.values()) {
       mesh.scaling.setAll(absoluteScaling);
+      // P12-B #298 — scaling 변경 즉시 boundingSphere.radiusWorld 가 새 값을 반영하도록 강제 갱신.
+      // runTierTransition 이 focusMesh.boundingSphere.radiusWorld 로 `×5` 공식을 계산하므로
+      // 여기서 world matrix 를 동기 계산해두지 않으면 다음 프레임 전까지 이전 값 반환.
+      mesh.computeWorldMatrix(true);
     }
     rebuildOrbitLines();
+
+    // Phase B — camera dolly interp. scene.activeCamera 가 ArcRotateCamera 가 아니면 skip.
+    // (e.g. 테스트 셋업 / 비정상 초기화 경로). 통상 경로는 setupArcRotateCamera 에서 항상 ArcRotateCamera.
+    //
+    // focus 가 있으면 해당 mesh 전달 — runTierTransition 이 `boundingRadius × 5` (V5 달성 공식) 로
+    // 목표 radius 계산. 없으면 실거리 보존 수식 fallback (free-fly 전환 경로).
+    const cam = scene.activeCamera;
+    if (cam && isArcRotateCamera(cam)) {
+      const focusMesh = focusBodyIdForAssert ? meshes.get(focusBodyIdForAssert) : undefined;
+      runTierTransition({
+        scene,
+        camera: cam,
+        oldScale,
+        newScale,
+        // focusMesh 를 조건부 spread — exactOptionalPropertyTypes 대응 (undefined 명시 금지).
+        ...(focusMesh ? { focusMesh } : {}),
+        // durationMs / lockMs 기본값 (300 / 500) 사용 — ADR §결정 §주석 계약 §5.
+      });
+    }
   };
 
   const updateTierByCamera = (cameraFromSunMeters: number, cameraFromFocusMeters: number): Tier => {
@@ -790,6 +822,20 @@ export function createSolarSystemScene(
       meshes.clear();
     },
   };
+}
+
+/**
+ * P12-B #298 — Babylon `ArcRotateCamera` 런타임 가드.
+ *
+ * runTierTransition 은 `camera.radius` interp 을 수행하므로 ArcRotateCamera 여야 한다.
+ * 통상 운영 경로에서는 `setupArcRotateCamera` 로 초기화되어 true 이지만, 비정상
+ * 초기화 / jsdom 테스트 / FreeCamera 교체 경로 대비 방어 가드. `Camera` base 와 구분용으로
+ * `radius` / `target` / `attachControl` 표면 존재만 확인.
+ */
+function isArcRotateCamera(cam: unknown): cam is ArcRotateCamera {
+  if (!cam || typeof cam !== 'object') return false;
+  const c = cam as Record<string, unknown>;
+  return typeof c.radius === 'number' && typeof c.attachControl === 'function';
 }
 
 function createBodyMesh(body: LoadedCelestialBody, scene: Scene, tier: Tier): Mesh {

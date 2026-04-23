@@ -40,7 +40,15 @@ export class CameraController {
     this.#easing = easing;
   }
 
-  /** 특정 메쉬를 중심으로 카메라를 부드럽게 이동시킨다. */
+  /**
+   * 특정 메쉬를 중심으로 카메라를 부드럽게 이동시킨다.
+   *
+   * **P12-B #298 맥락**: `focusOn` 은 **user focus 트리거 한정** (버튼 클릭 / URL 동기).
+   * `desiredRadius = meshRadius × 5` 기본값 유지. 이후 `updateTierByCamera` 가 tier 전환을
+   * 감지하면 `solar-system-scene.ts:setTier` → `runTierTransition` 이 pending radius tween 을
+   * `scene.getAnimatableByTarget(camera)` 로 취소하고 실거리 보존 수식 (`radius_old × newScale /
+   * oldScale`) 로 재시작한다. 사용자는 두 단계 애니메이션을 하나의 부드러운 전환으로 체감.
+   */
   focusOn(target: FocusTarget): void {
     const { mesh } = target;
     const boundingInfo = mesh.getBoundingInfo();

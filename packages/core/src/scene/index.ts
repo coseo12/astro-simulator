@@ -30,6 +30,9 @@ export {
   TIER_HYSTERESIS,
 } from './tier.js';
 export type { Tier } from './tier.js';
+// P12-B #298 — Tier 전환 애니메이션 (Q8=8D camera dolly + 입력 잠금).
+export { runTierTransition, computeTargetRadius, computeNewMinZ } from './tier-transition.js';
+export type { TierTransitionOptions } from './tier-transition.js';
 export { createAsteroidBelt } from './asteroid-belt.js';
 export type { AsteroidBeltHandles, AsteroidBeltOptions } from './asteroid-belt.js';
 export { createRingPlaceholder } from './ring-placeholder.js';
