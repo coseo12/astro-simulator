@@ -25,7 +25,7 @@ export {
   renderScaleForTier,
   tierFromFocus,
   tierFromCameraDistance,
-  currentTier as resolveCurrentTier,
+  resolveCurrentTier,
   initialTier,
   TIER_HYSTERESIS,
 } from './tier.js';

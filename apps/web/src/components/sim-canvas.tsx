@@ -19,6 +19,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreRef = useRef<SimulationCore | null>(null);
   const unsubDiskRef = useRef<(() => void) | null>(null);
+  // P12-A #298 N1 — onBeforeRender observer 중복 등록 방지용 cleanup 핸들.
+  // HMR / 컴포넌트 remount 시 scene 이 살아있을 수 있어 관찰자 누수 방지.
+  const tierObserverCleanupRef = useRef<(() => void) | null>(null);
   const [core, setCore] = useState<SimulationCore | null>(null);
 
   useEffect(() => {
@@ -328,7 +331,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const cameraFromFocusMeters = focusDistSceneUnit * metersPerSceneUnit;
           solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
         };
-        instance.scene.onBeforeRenderObservable.add(onBeforeRender);
+        const tierObserver = instance.scene.onBeforeRenderObservable.add(onBeforeRender);
+        // N1 권고 — unmount / HMR 시 observer 해제. scene dispose 시 자동 정리되지만 React
+        // remount 타이밍에 scene 은 살아있고 컴포넌트만 다시 마운트되는 경로를 방어.
+        tierObserverCleanupRef.current = () => {
+          if (tierObserver && instance.scene) {
+            instance.scene.onBeforeRenderObservable.remove(tierObserver);
+          }
+        };
 
         // P11-A #288 — dev 빌드 한정 `__floatingOrigin` 전역 노출 (검증 스크립트용).
         // prod 에서도 `__solarScene.floatingOrigin` 경유 접근 가능하지만 편의상 top-level 도 제공.
@@ -349,6 +359,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       unsubEngine?.();
       unsubDiskRef.current?.();
       unsubDiskRef.current = null;
+      tierObserverCleanupRef.current?.();
+      tierObserverCleanupRef.current = null;
       detach();
       instance.dispose();
       coreRef.current = null;

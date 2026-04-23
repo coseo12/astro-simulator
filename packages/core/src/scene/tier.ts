@@ -104,7 +104,18 @@ export function tierFromFocus(focusKind: string, cameraDistanceMeters: number): 
     if (cameraDistanceMeters < 0.1 * AU) return 'body';
     return 'inner';
   }
-  // moon / dwarf-planet / comet / asteroid → 세부 관찰 의도로 해석.
+  // P12-A #298 N4 — 미지 kind silent fallback 방지. 주석-구현 drift (CLAUDE.md 교훈) 회피.
+  // 알려진 세부 관찰 kind 를 명시 분기하고, 그 외는 dev 경고 + body fallback 유지.
+  if (
+    focusKind === 'moon' ||
+    focusKind === 'dwarf-planet' ||
+    focusKind === 'comet' ||
+    focusKind === 'asteroid'
+  ) {
+    return 'body';
+  }
+  // prod 빌드에서는 console.warn 도 DCE 대상일 수 있으나 스킵되더라도 동작 영향 없음 (body fallback).
+  console.warn(`[tier] tierFromFocus: 미지 focusKind '${focusKind}' → 'body' fallback`);
   return 'body';
 }
 
@@ -156,13 +167,16 @@ export function tierFromCameraDistance(cameraFromSunMeters: number, currentTier:
  *  - focusBodyId 존재 → focus 경로 (`tierFromFocus`)
  *  - focusBodyId 없음 → free-fly 경로 (`tierFromCameraDistance`)
  *
- * @param currentTier 현재 tier (히스테리시스 적용 기준). 초기값 `'solar'` 권장.
+ * @param prevTier 이전 프레임의 tier (히스테리시스 적용 기준). 초기값 `'solar'` 권장.
  * @param focusBodyInfo focus body 정보 또는 null (free-fly)
  * @param cameraFromSunMeters 카메라 위치에서 원점(태양)까지 거리 (m)
  * @param cameraFromFocusMeters focus body 에서 카메라까지 거리 (m). focusBodyInfo 있을 때만 사용
+ *
+ * P12-A #298 N3 — 과거 함수명 `currentTier` 는 파라미터 섀도잉이 발생했다. `resolveCurrentTier`
+ * 로 명시적 동사명 채택. `scene/index.ts` 에서 기존 alias 도 계속 re-export 하여 API 호환 유지.
  */
-export function currentTier(
-  currentTier: Tier,
+export function resolveCurrentTier(
+  prevTier: Tier,
   focusBodyInfo: { kind: string } | null,
   cameraFromSunMeters: number,
   cameraFromFocusMeters: number,
@@ -170,7 +184,7 @@ export function currentTier(
   if (focusBodyInfo) {
     return tierFromFocus(focusBodyInfo.kind, cameraFromFocusMeters);
   }
-  return tierFromCameraDistance(cameraFromSunMeters, currentTier);
+  return tierFromCameraDistance(cameraFromSunMeters, prevTier);
 }
 
 /**

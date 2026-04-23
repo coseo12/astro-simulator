@@ -17,8 +17,9 @@
  *   3. densityProfileR/D 배열에서 선형 보간 → density d
  *   4. gl_FragColor = vec4(color * d, d)   (alpha = density)
  *
- * **씬 단위**: 1 scene unit = 1 AU (solar-system-scene 규약). innerRadius/outerRadius 는
- * SI 단위(m) 로 입력받아 내부에서 AU 환산.
+ * **씬 단위**: `renderScaleForTier(tier)` 경유 (P12-A #298). solar tier 기준 1 unit ≈ 1 AU.
+ *   innerRadius/outerRadius 는 SI (m) 로 입력받아 생성 시점 tier 로 scene unit 환산.
+ *   이후 tier 전환은 host.scaling 으로 자식 메쉬 전체가 동일 배수 확대.
  *
  * **M1 백업 경로** (§R1):
  *   - shader 컴파일 실패 감지 시 `createRingInstancedMesh` 로 자동 전환
@@ -35,10 +36,12 @@ import {
   type Mesh,
   type Scene,
 } from '@babylonjs/core';
-import { AU } from '@astro-simulator/shared';
 import type { LoadedRingLayer } from '../ephemeris/solar-system-loader.js';
+import { renderScaleForTier, type Tier } from './tier.js';
 
-const SCENE_UNIT_PER_METER = 1 / AU;
+// P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. 생성 시점의 tier 로 반경을 계산한다.
+// ring mesh 는 host planet mesh 의 자식이라 host.scaling 이 tier 전환 시 새 배수로 설정되면
+// ring 도 동일 배수로 확대되어 body 와 상대 비율 보존 (원칙 #1·#4).
 
 /** 기본 색 — 목성 dust 톤 (`#887766`). */
 const DEFAULT_RING_COLOR: readonly [number, number, number] = [0x88 / 255, 0x77 / 255, 0x66 / 255];
@@ -150,7 +153,7 @@ function registerRingShader(): void {
 export interface RingShaderParams {
   /** 고리 안쪽 반경 (m). 디스크는 outerRadius 로 생성되고, innerRadius/outerRadius 는 shader 의 r_norm 해석에 쓰이지 않는다 — densityProfile 자체가 이미 정규화된 [0,1] 기준. */
   innerRadius: number;
-  /** 고리 바깥 반경 (m). 디스크 반경 = outerRadius × SCENE_UNIT_PER_METER. */
+  /** 고리 바깥 반경 (m). 디스크 반경 = outerRadius × renderScaleForTier(tier). */
   outerRadius: number;
   /** `[[r_normalized ∈ [0,1], density ∈ [0,1]], ...]` 배열. 길이 N (2 ≤ N ≤ 16). */
   densityProfile: ReadonlyArray<readonly [number, number]>;
@@ -182,6 +185,12 @@ export interface CreateRingShaderOptions {
    * shader 컴파일 성공 여부와 무관하게 항상 InstancedMesh 로 렌더.
    */
   forceFallback?: boolean;
+  /**
+   * P12-A #298 B1 — 생성 시점의 tier. 디스크 반경 계산에 사용된다.
+   * 이후 tier 전환은 host.scaling 으로 흡수되므로 초기 tier 만 정확하면 된다.
+   * 기본값 `'solar'` — 초기 tier 가 solar 로 시작하는 현 디폴트에 맞춤.
+   */
+  tier?: Tier;
   /**
    * 테스트 주입용 — shader 컴파일 강제 실패 유도 (잘못된 GLSL 주입).
    * 내부 로직 테스트 전용, 프로덕션 코드에서 호출 금지.
@@ -258,8 +267,9 @@ function createSingleRingShaderMesh(
   name: string,
   params: RingShaderParams,
   zOffset: number,
+  sceneUnitPerMeter: number,
 ): { mesh: Mesh; material: ShaderMaterial } {
-  const radiusScene = params.outerRadius * SCENE_UNIT_PER_METER;
+  const radiusScene = params.outerRadius * sceneUnitPerMeter;
   const disc = MeshBuilder.CreateDisc(
     name,
     { radius: radiusScene, tessellation: DISC_TESSELLATION },
@@ -290,9 +300,10 @@ export function createRingInstancedMesh(
   ring: LoadedRingLayer,
   color: readonly [number, number, number],
   layerIdx: number,
+  sceneUnitPerMeter: number,
 ): Mesh {
-  const innerScene = ring.innerRadius * SCENE_UNIT_PER_METER;
-  const outerScene = ring.outerRadius * SCENE_UNIT_PER_METER;
+  const innerScene = ring.innerRadius * sceneUnitPerMeter;
+  const outerScene = ring.outerRadius * sceneUnitPerMeter;
 
   // 소스 파티클 — 작은 flat disc (카메라에 정면으로 보이도록)
   const particleSize = Math.max((outerScene - innerScene) / 200, 1e-5);
@@ -375,10 +386,11 @@ export function createRingShaderMesh(
   const baseColor = options.color ?? DEFAULT_RING_COLOR;
   const ringAlpha = options.ringAlpha ?? 0.6;
   const layerColors = options.layerColors ?? [];
+  const sceneUnitPerMeter = renderScaleForTier(options.tier ?? 'solar');
 
   // forceFallback — 즉시 InstancedMesh 경로로 분기
   if (options.forceFallback) {
-    return buildFallbackHandles(scene, host, rings, baseColor, layerColors);
+    return buildFallbackHandles(scene, host, rings, baseColor, layerColors, sceneUnitPerMeter);
   }
 
   const meshes: Mesh[] = [];
@@ -400,6 +412,7 @@ export function createRingShaderMesh(
           ringAlpha,
         },
         idx * 1e-4,
+        sceneUnitPerMeter,
       );
       mesh.parent = host;
 
@@ -433,7 +446,7 @@ export function createRingShaderMesh(
       m.dispose();
     }
     meshes.length = 0;
-    return buildFallbackHandles(scene, host, rings, baseColor, layerColors);
+    return buildFallbackHandles(scene, host, rings, baseColor, layerColors, sceneUnitPerMeter);
   }
 
   const syncToHost = (hostMesh: Mesh) => {
@@ -460,11 +473,12 @@ function buildFallbackHandles(
   rings: ReadonlyArray<LoadedRingLayer>,
   baseColor: readonly [number, number, number],
   layerColors: ReadonlyArray<readonly [number, number, number] | undefined>,
+  sceneUnitPerMeter: number,
 ): RingShaderHandles {
   const meshes: Mesh[] = [];
   rings.forEach((ring, idx) => {
     const color = layerColors[idx] ?? baseColor;
-    const mesh = createRingInstancedMesh(scene, host, ring, color, idx);
+    const mesh = createRingInstancedMesh(scene, host, ring, color, idx, sceneUnitPerMeter);
     meshes.push(mesh);
   });
 

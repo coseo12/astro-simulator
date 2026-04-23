@@ -258,11 +258,12 @@ export function createSolarSystemScene(
   sunLight.intensity = 2.5;
   sunLight.diffuse = new Color3(1, 0.95, 0.8);
 
-  // 각 바디 메쉬 생성 — Phase A: 현재 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
+  // 각 바디 메쉬 생성 — Phase A: 생성 시점 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
   //
-  // Tier 전환 시 mesh 직경은 base radius 를 보존한 채 scaling factor 로 재적용한다.
-  // (Mesh 재생성은 비용이 크므로 scaling.setAll(ratio) 으로 tier 배수 전환.)
-  const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립)
+  // Tier 전환 시 mesh.scaling 을 **절대 값** `newScale / initialRenderScale` 로 설정한다.
+  // 과거 `scaleInPlace(ratio)` 반복 호출은 부동소수점 누적 오차를 남겼다 (N2 권고).
+  const bodyInitialRenderScale = activeTier; // 모든 body 가 동일 tier 로 생성됨 → Tier 만 기억하면 충분.
+  const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립, 진단용)
   for (const body of system.bodies) {
     const mesh = createBodyMesh(body, scene, activeTier);
     meshes.set(body.id, mesh);
@@ -281,10 +282,11 @@ export function createSolarSystemScene(
 
     let handles: RingPlaceholderHandles | RingShaderHandles;
     if (ringRenderMode === 'placeholder') {
-      handles = createRingPlaceholder(scene, host, body.rings);
+      handles = createRingPlaceholder(scene, host, body.rings, { tier: activeTier });
     } else {
       handles = createRingShaderMesh(scene, host, body.rings, {
         forceFallback: ringRenderMode === 'fallback',
+        tier: activeTier,
       });
     }
     ringHandlesByBody.set(body.id, handles);
@@ -424,26 +426,21 @@ export function createSolarSystemScene(
 
   // P12-A #298 — tier 전환. 즉시 모든 body mesh 직경 재계산 + orbit line 재샘플링.
   // Phase A 는 flicker 허용 (Phase B 에서 300ms interp + 카메라 radius 동기 병행).
+  //
+  // N2 권고 반영: 매 tier 전환마다 `scaling.scaleInPlace(ratio)` 누적은 부동소수점 drift 위험.
+  // 대신 mesh 가 생성된 **초기 tier** 의 renderScale 기준으로 **절대** scaling 을 계산한다.
+  //   mesh diameter(actual) = base × initialScale × mesh.scaling
+  //   원하는 diameter       = base × newScale
+  //   ⇒ mesh.scaling        = newScale / initialScale
+  // rings 는 host mesh 의 자식이므로 host.scaling 이 바뀌면 ring radius 도 같은 배수로 확대 (B1).
   const setTier = (tier: Tier) => {
     if (tier === activeTier) return;
     activeTier = tier;
-    const scale = renderScaleForTier(activeTier);
-    // 각 body mesh 직경 재설정 — `scaling` 이 아닌 reshape 로 하면 geometry 재생성 비용이 커서,
-    // scaling factor 로 상대 전환 (tier 내에서 `scaling = 1` 불변식 유지를 위해 원래 base diameter 를
-    // 새 tier 로 재생성한 비율 = newScale / oldScale 로 적용).
-    for (const [id, mesh] of meshes) {
-      const baseDiameter = bodyBaseDiameter.get(id);
-      if (baseDiameter == null) continue;
-      // mesh 는 `CreateSphere(diameter=baseDiameter * prevScale)` 로 만들어졌으므로 새 tier 로
-      // 변경하려면 scaling 을 `newScale / prevScale` 로 설정. 매 tier 전환마다 scaling 가 누적되지
-      // 않도록 절대 scaling 으로 계산 (현재 mesh.scaling = prev factor, target = newScale / initialScale).
-      // 간단화를 위해 geometry 를 재생성하는 대신 상대 scaling 으로 전환:
-      const targetDiameter = baseDiameter * scale; // 실제 scene unit 직경
-      const currentDiameter = mesh.getBoundingInfo().boundingSphere.radius * 2; // 현 scaling 반영
-      if (currentDiameter > 0) {
-        const ratio = targetDiameter / currentDiameter;
-        mesh.scaling.scaleInPlace(ratio);
-      }
+    const newScale = renderScaleForTier(activeTier);
+    const initialScale = renderScaleForTier(bodyInitialRenderScale);
+    const absoluteScaling = newScale / initialScale;
+    for (const mesh of meshes.values()) {
+      mesh.scaling.setAll(absoluteScaling);
     }
     rebuildOrbitLines();
   };
@@ -658,15 +655,21 @@ export function createSolarSystemScene(
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
     // 그 외(Kepler 모드 또는 asteroidNbody=false): 기존 해석해 경로 유지.
     if (asteroidBelt) {
+      // P12-A #298 B1 — 현 tier 의 renderScale 을 매 프레임 주입. tier 전환 시 다음 프레임에 자동 반영.
       if (
         asteroidStartIndex >= 0 &&
         newtonEngine &&
         (activeEngine === 'newton' || activeEngine === 'barnes-hut' || activeEngine === 'webgpu')
       ) {
         const flat = newtonEngine.positions();
-        asteroidBelt.writeWorldPositions(flat, asteroidStartIndex, asteroidBelt.n);
+        asteroidBelt.writeWorldPositions(
+          flat,
+          asteroidStartIndex,
+          asteroidBelt.n,
+          sceneUnitPerMeter,
+        );
       } else {
-        asteroidBelt.updateAt(jd);
+        asteroidBelt.updateAt(jd, sceneUnitPerMeter);
       }
     }
   };
