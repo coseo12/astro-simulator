@@ -3,6 +3,72 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [Unreleased]
+
+### P12-C Display-Relative Scale Unification 완결 (Phase C)
+
+메인 이슈: #298 (auto-close) / #288 (auto-close) · ADR Amendment: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) §Amendment / [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) §Amendment · 회고: [`docs/retrospectives/p12-retrospective.md`](docs/retrospectives/p12-retrospective.md)
+
+### Behavior Changes
+
+#### UI 제거 — 단일 모드 전환 완결 (R1/R2/R5)
+
+- **`ViewModeSwitcher` / `ScaleBadge` / `OnboardingTooltip` / `ScientificModeNotice` 4종 UI 컴포넌트 제거** — `apps/web/src/components/layout/` 에서 파일 + 테스트 총 8건 삭제. `app-shell.tsx` 의 import / render 참조 제거. 단일 모드 채택으로 "과장 모드 토글" UX 폐기
+- **`sim-store.viewMode` 필드 + `setViewMode` action + `ViewMode` 타입 제거** — Zustand store 의 뷰 모드 축 완전 소멸. `useSimStore` 소비자 코드 (`sim-canvas.tsx` / `about-modal.tsx` 등) 에서 viewMode 구독 제거
+- **URL `?view=scientific|educational` 파라미터 폐기 (backward-ignore)** — `url-sync.tsx` 에서 `?view=` 경로 제거. 기존 북마크는 파라미터를 조용히 무시하고 단일 모드로 자연 진입 (에러 없음, CRITICAL UX 방어)
+- **`html[data-view-mode]` 어트리뷰트 제거** — `apps/web/app/[locale]/layout.tsx` 에서 `data-view-mode="educational"` 제거. CSS / E2E selector 에서 `data-view-mode` 참조 없음 확인
+- **`SolarSystemSceneHandles.setViewMode` API 제거** — `packages/core/src/scene/solar-system-scene.ts` 에서 backward-compat 유지하던 deprecated API 완전 소멸. 호출 경로 (`sim-canvas.tsx`) 동반 제거
+- **`AboutModal` 단일 모드 컨텍스트 재작성** — 과장 배수 요약 테이블 섹션 제거, "스케일 정책" 섹션 (IAU 실측 고정 + 3단 tier 자동 전환) 추가
+- **R1 회귀 가드 CI 통합** — `scripts/verify-no-scientific-grep.mjs` 신규. `packages/` + `apps/` 범위 활성 코드 라인에서 `scientific` 식별자 / 리터럴 재도입 시 exit 1. 주석(역사 맥락) 은 허용. CI `detect-and-test` 에 `R1 회귀 가드` step 추가
+
+#### Reviewer 이관 하드닝 (M1 / m1 / m3)
+
+- **M1 — `setTier` 가 `runTierTransition` cleanup 클로저 저장** (`solar-system-scene.ts`) — 연쇄 전환 race 방지. `pendingTierCleanup` 변수에 이전 cleanup 보관, 다음 전환 진입 시 `pendingTierCleanup?.()` 선행 호출. `tier-transition.test.ts` 에 "연쇄 전환 cleanup 호출" 단위 테스트 3건 추가 (정상 / idempotent / 버그 재현 대조)
+- **m1 — visibilitychange JSDoc 문구 완화** (`tier-transition.ts:230-240`) — "fallback timer 와 이중 방어 (defense-in-depth). 둘 중 먼저 도달한 쪽이 release" 로 재작성. 구현-주석 drift 지표로서 정확도 ↑
+- **m3 — `TIER_TRANSITION_EASE` module-level const hoisting** (`tier-transition.ts`) — `camera-controller.ts:#easing` 생성자 1회 생성 패턴과 일관성. `ExponentialEase` 는 stateless 하여 공유 안전
+
+#### QA suggestion #1 — C3 측정 방식 교체
+
+- **`scripts/browser-verify-tier-transition.mjs` C3 측정 교체** — 기존 "radius 5프레임 <1% stable" 감지 (ExponentialEase tail + polling IPC 오버헤드 포함) 를 `_alreadyAttached` 폴링 기반 click→reattach 직접 측정 (10ms 폴링, 1500ms 예산) 으로 교체. THRESHOLD 600ms (durationMs=300 + lockMs=500 마진 + 100ms 측정 오차 버퍼). 기존 radius 안정화 기준은 WARN 레벨 부수 지표로 병기
+
+#### 문서 Amendment (D1 / D2 / D3 / D4)
+
+- **D1** — ADR `20260423-display-relative-scale-unification.md` §Amendment 2026-04-23 박제 — Phase A/B/C 실측 결과 + §Concrete Prediction 재현 결과 (3/4 PASS, #3 은 P11-B 시점으로 이월) + Q10 Floating Origin 확정 (간소화 유지, 제거 아님) + QA/Reviewer/developer 이관 항목 처리 결과
+- **D1-b** — ADR `20260422-floating-origin.md` §Amendments 1줄 추가 — "P12 에서 역할 축소. T3 body tier primary, T1/T2 no-op"
+- **D2** — `docs/principles/fact-first.md` §Amendments 2026-04-23 박제 — 단일 모드 전환으로 `educational`/`scientific` 이중 모드 폐기, §예외 3건은 모든 tier 에 항시 적용, 과장 해제는 billboard marker overlay (P11-B) 로 이관. §"`scientific` 모드 UX 보호" 섹션은 역사 맥락 보존 용으로 유지
+- **D3** — `docs/phases/roadmap-v2-solar-precision.md` renumber — P12 Display-Relative Scale Unification (완료) / P13 Texture Pipeline (원 P12) / P14 토성계 (원 P13) / P15 천왕성·해왕성계 (원 P14) / P16 소행성대+카이퍼대 (원 P15) / P17 배포+기술부채 청산 (원 P16). 이력 문서 (`p10-plan.md` / `p10-retrospective.md` / 과거 commit message) 는 retrofit 금지 (당시 판정 맥락 보존)
+- **D4** — ADR §Concrete Prediction 재현 결과 표 박제 (ADR §Amendment (b) 에 포함)
+
+#### 회고 문서
+
+- **`docs/retrospectives/p12-retrospective.md`** 신규 — CLAUDE.md 마일스톤 회고 루틴 4섹션 (달성도 / 잘된 것 / 어려웠던 것 / 다음 인수인계). Phase A/B/C 통합 회고 + 후속 이슈 3건 (#305/#306/#307) 경로 박제
+
+### 후속 이슈 (Phase C 에서 분리)
+
+- **#305** — P11-B followup `lowerRadiusLimit` 원복 누락 재검토 (Reviewer m2)
+- **#306** — P12 followup `FOCUS_RADIUS_MULTIPLIER` viewport/fov 동적화 (developer suggestion #1)
+- **#307** — P12 followup browser-verify focus 버튼 확장 + minZ clamp 작은 body 재검증 + fps HUD 직접 측정 (QA suggestion #2/#3)
+
+### DoD 실측 (P12-C Phase C)
+
+| DoD                             | 상태  | 증거                                                                              |
+| ------------------------------- | ----- | --------------------------------------------------------------------------------- |
+| R1 `scientific` 활성 코드 hit 0 | PASS  | `node scripts/verify-no-scientific-grep.mjs` — 157 파일 스캔 0 건                 |
+| R2 UI 4종 제거                  | PASS  | `rg 'ViewModeSwitcher\|ScaleBadge\|OnboardingTooltip\|ScientificModeNotice'` 0 건 |
+| R5 fact-first §Amendment        | PASS  | `docs/principles/fact-first.md` §Amendments 2026-04-23 entry                      |
+| M1 연쇄 전환 cleanup            | PASS  | `tier-transition.test.ts` 신규 describe 3건 PASS                                  |
+| D1/D2/D3/D4 박제                | PASS  | 각 문서 §Amendment 섹션 박제                                                      |
+| 회고                            | PASS  | `docs/retrospectives/p12-retrospective.md` 4섹션                                  |
+| typecheck                       | PASS  | `pnpm -r typecheck` 0 errors                                                      |
+| 테스트                          | PASS  | `pnpm -r test` 328 tests (core 226 + web 97 + shared 4 + physics 1)               |
+| 빌드                            | PASS  | `pnpm build` Next.js 16.2.3 성공                                                  |
+| 한글 U+FFFD                     | CLEAN | `pnpm check-encoding` 0 건                                                        |
+
+### auto-close 대상
+
+- **#298** P12 Display-Relative Scale Unification (Phase A/B/C 통합 완결)
+- **#288** P11-A Floating Origin (scientific 모드 jitter 해소 목표가 단일 모드 전환으로 근본 원인 소멸)
+
 ## [0.11.0] — 2026-04-23
 
 ### P11-A Floating Origin + P12-A Tier 엔진 기반 (Display-Relative Scale Unification Phase A)
