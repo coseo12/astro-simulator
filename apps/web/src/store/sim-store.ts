@@ -12,7 +12,7 @@ export type UnitSystem = 'si' | 'astro' | 'natural';
  * 모바일 best-effort 경고가 후속 표시될 때 서로 간섭하지 않도록 한다).
  */
 export interface EngineNotice {
-  /** 알림 유형 식별자 (예: 'webgpu-fallback', 'mobile-webgpu-best-effort'). */
+  /** 알림 유형 식별자 (예: 'webgpu-fallback', 'tier-c-graceful-degradation'). */
   key: string;
   /** 사용자에게 표시될 텍스트. */
   message: string;

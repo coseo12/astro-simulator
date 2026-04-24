@@ -7,9 +7,11 @@ import { attachCoreToStore } from '@/core/core-adapter';
 import { parseIntegratorKind } from '@/core/parse-integrator';
 import { parseGrMode } from '@/core/parse-gr-mode';
 import { parseLodLevel } from '@/core/parse-lod-level';
-import { detectIsMobile } from '@/core/is-mobile';
+import { parseGpuTier } from '@/core/parse-gpu-tier';
+import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
+import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /**
@@ -50,25 +52,68 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         console.info('[gpu] adapter:', cap.adapterInfo);
       }
 
-      // P7-D #209 — 모바일 UserAgent + WebGPU 미지원 조합에서 best-effort 안내.
-      // iOS Safari <17.4 등 WebGPU 미탑재 모바일에서 일부 시각 효과(렌즈·disk)가
-      // 제한됨을 사용자에게 1회 고지한다. 이미 `webgpu-fallback` 키 알림이 있으면
-      // 중복 고지 방지 — 별도 키 사용 (dismiss 독립 관리).
+      // P11-C #290 — GPU tier 감지 + 프로파일 적용 + Graceful Degradation 알림.
       //
-      // P7-E #210 / #220 — iPadOS 13+ 는 데스크톱 UA 로 전송되므로 Macintosh +
-      // maxTouchPoints 조합 감지 (Apple 공식 권고). `detectIsMobile` 유틸로 분리.
-      const isMobile =
-        typeof navigator !== 'undefined'
-          ? detectIsMobile({
-              userAgent: navigator.userAgent,
-              maxTouchPoints: navigator.maxTouchPoints,
-            })
-          : false;
-      if (isMobile && !cap.webgpu) {
-        useSimStore.getState().setEngineNotice({
-          key: 'mobile-webgpu-best-effort',
-          message: '모바일 WebGPU best-effort — 일부 시각 효과가 제한될 수 있습니다.',
+      // P7-D/P7-E 의 모바일 best-effort 분기를 tier 프로파일 감지로 승격. 기존 키
+      // `mobile-webgpu-best-effort` 는 `tier-c-graceful-degradation` 으로 치환되며
+      // 저성능 데스크톱(WebGL2-only)도 tier-c 경로에 포함된다 (ADR §위험 2 + 알림 키 SSoT §1).
+      //
+      // 감지 순서 (ADR §결정 §1 축 1):
+      //   1. URL `?gpu=a|b|c` 가 있으면 tier 강제 (invalid 는 'auto' 폴백 + console.warn)
+      //   2. 그 외 → `detectGpuTier(input)` 자동 감지
+      //   3. tier-c 시 LOD 'low' 강제 + 알림 키 'tier-c-graceful-degradation' 표시
+      //
+      // SSR 디폴트는 `GPU_TIER_SSR_DEFAULT='b'` 중립. hydration 후 실측으로 덮어쓴다.
+      if (typeof navigator !== 'undefined') {
+        const gpuUrlParam = new URLSearchParams(window.location.search).get('gpu');
+        const parsedGpu = parseGpuTier(gpuUrlParam);
+        const detectedTier: GpuTier =
+          parsedGpu !== 'auto'
+            ? parsedGpu
+            : detectGpuTier({
+                webgpu: {
+                  supported: cap.webgpu,
+                  adapterInfo: cap.adapterInfo ?? null,
+                },
+                hardwareConcurrency: navigator.hardwareConcurrency ?? 0,
+                navigator: {
+                  userAgent: navigator.userAgent,
+                  maxTouchPoints: navigator.maxTouchPoints,
+                },
+              });
+
+        // browser-verify / dev overlay 에서 감지 tier 확인 가능하도록 전역 노출.
+        Object.defineProperty(window, '__gpuTier', {
+          configurable: true,
+          value: detectedTier,
+          writable: false,
         });
+
+        // tier-c → 자동 최대 억제 조합 (ADR §축 5 후보 A — DoD #5).
+        //   - LOD 'low' 강제 (단, URL `?lod=` 가 있으면 URL 우선)
+        //   - 알림 키 'tier-c-graceful-degradation' 표시
+        //   - 파티클/shadow/post-proc OFF 는 tier profile 소비자가 scene 구성 시 반영
+        if (detectedTier === 'c') {
+          const profile = renderApi.TIER_PROFILES.c;
+          const lodParam = new URLSearchParams(window.location.search).get('lod');
+          const hasLodOverride = lodParam !== null && lodParam !== '';
+          if (!hasLodOverride && profile.lod.forceOverride) {
+            // LOD 'low' 강제 — scene 초기화 완료 후 적용되도록 command stream 경유.
+            // sendCommand 가 아직 handler 를 못 연결했을 수 있어도 setLodOverrideHandler
+            // 등록 시점에 URL 재파싱 경로가 fallback 처리 (기존 P11-B handler 로직 재사용).
+            // 여기서는 window 에 예약 플래그만 박제 — handler 등록 시 참고.
+            Object.defineProperty(window, '__gpuTierForceLod', {
+              configurable: true,
+              value: profile.lod.forceOverride,
+              writable: false,
+            });
+          }
+          useSimStore.getState().setEngineNotice({
+            key: 'tier-c-graceful-degradation',
+            message:
+              '저성능 환경 감지 — 시각 효과가 자동 축소됩니다. (URL ?gpu=b|a 로 수동 상향 가능)',
+          });
+        }
       }
     });
 
@@ -273,7 +318,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         {
           const lodParam = new URLSearchParams(window.location.search).get('lod');
           const parsed = parseLodLevel(lodParam);
-          solar.setLodOverride(parsed);
+          // P11-C #290 — URL `?lod=` 가 없고 GPU tier-c 가 LOD low 강제를 예약했으면 그걸 적용.
+          //   URL 우선 원칙: `?lod=` 가 있으면 사용자 디버그 경로를 차단하지 않는다.
+          const hasLodUrl = lodParam !== null && lodParam !== '';
+          const tierForced = (window as { __gpuTierForceLod?: 'high' | 'mid' | 'low' })
+            .__gpuTierForceLod;
+          if (!hasLodUrl && tierForced) {
+            solar.setLodOverride(tierForced);
+          } else {
+            solar.setLodOverride(parsed);
+          }
         }
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
