@@ -325,9 +325,13 @@ sub-agent에 적응적 질답·설계 같은 multi-turn 세션을 위임할 때,
 
 > 위 `real-lessons` managed-block 은 harness upstream 이 관리하며 업데이트 시 자동 동기화된다. 본 섹션은 프로젝트 고유 해결책/가드를 별도로 박제한다 (block 외부이므로 upstream 업그레이드에 영향받지 않음).
 
-### 프로젝트 원칙 — Fact-First, Visual-Second
+### 프로젝트 접근 — Incremental Body-by-Body Build (v3)
 
-모든 데이터/시각/UI 설계 결정은 [`docs/principles/fact-first.md`](docs/principles/fact-first.md) 를 1차 참조. 사실(fact)이 1차 SSoT, 시각 과장은 2차 overlay. 디폴트 `educational` 모드 + 1-클릭/1-URL (`?mode=scientific`) 사실 모드 접근 보장. IAU 2015 ±0.01% / J2000.0 epoch / `uncertainty` 필드. 현행 로드맵은 [`docs/phases/roadmap-v2-solar-precision.md`](docs/phases/roadmap-v2-solar-precision.md) (P10-A #268 박제, 2026-04-20).
+2026-04-25 기획 전면 재구성. Fact-First 원칙 / 로드맵 v2 / P10~P12 ADR (scale unification 포함) 전부 폐기 (`docs/deprecated/`). **태양부터 하나씩** 사용자가 명시적으로 visible 하게 incremental build. 각 R-Phase DoD 는 "사용자가 실제로 보이는 body" 중심. 현행 로드맵: [`docs/phases/roadmap-v3-incremental.md`](docs/phases/roadmap-v3-incremental.md).
+
+- **폐기 배경**: P12 Display-Relative Scale Unification 후 기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태로 UX 회귀. DoD 수치는 모두 PASS 였음 (volt [#74](https://github.com/coseo12/volt/issues/74) 근거)
+- **유지 대상**: Floating Origin (`20260422-floating-origin.md`), LOD 3단 (`20260424-p11-b-lod-design.md`), Tier 네이밍 정책 (`20260424-tier-naming-policy.md`), Tier Preset 설계 (`20260424-tier-preset-design.md`) — 기술 가치 유지
+- **참고 (폐기)**: `docs/deprecated/principles/fact-first.md`, `docs/deprecated/phases/roadmap-v2-solar-precision.md`, `docs/deprecated/phases/p10-plan.md`, `docs/deprecated/decisions/20260423-display-relative-scale-unification.md`
 
 ### prettier 컨벤션 충돌 — 프로젝트 고유 해결책 (astro-simulator)
 

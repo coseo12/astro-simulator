@@ -1,10 +1,14 @@
-# P10 Plan — Fact Audit + 시각 원칙 정비
+# [DEPRECATED] P10 Plan — Fact Audit + 시각 원칙 정비
 
-> **Status**: 플래닝 (이슈 미생성 — 사용자 승인 후 생성)
+> **Status**: **DEPRECATED (2026-04-25, roadmap reset)**
 > **Contract date**: 2026-04-20
-> **Size**: 9~13 영업일 (sub-phase 5개)
-> **Precedes**: P11 Visual Foundation / P12 Texture Pipeline
-> **Supersedes**: 기존 로드맵 v2 의 "P10 토성계" → P13 로 밀림
+> **폐기일**: 2026-04-25
+> **폐기 사유**: 본 plan 은 Fact-First 원칙 박제를 포함했으며, 해당 원칙은 P12 Scale Unification 이후 UX 회귀로 이어져 전면 폐기됨.
+> **신규 접근**: `docs/phases/roadmap-v3-incremental.md`
+> **폐기 근거**: volt [#74](https://github.com/coseo12/volt/issues/74)
+> **Size**: 9~13 영업일 (sub-phase 5개) ← 참조용 기록
+> **Precedes**: ~~P11 Visual Foundation / P12 Texture Pipeline~~ (폐기)
+> **Supersedes**: ~~기존 로드맵 v2 의 "P10 토성계" → P13 로 밀림~~ (무효)
 
 ---
 

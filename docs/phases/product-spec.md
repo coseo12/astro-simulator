@@ -123,7 +123,7 @@
 
 ## 5. 로드맵
 
-상세: `docs/phases/roadmap-v2-solar-precision.md` 참조 (초기 구상은 `roadmap-v1-cosmic-scale.md` archived).
+상세: `docs/deprecated/phases/roadmap-v2-solar-precision.md` 참조 (초기 구상은 `roadmap-v1-cosmic-scale.md` archived).
 
 | Phase | 범위                 | 완결 제품                   |
 | ----- | -------------------- | --------------------------- |
@@ -286,9 +286,9 @@ type: feat | fix | refactor | test | docs | chore
 ## 부록
 
 - 아키텍처 결정: `docs/phases/architecture.md`
-- 확장 로드맵 (현행 v2): `docs/phases/roadmap-v2-solar-precision.md`
+- 확장 로드맵 (현행 v2): `docs/deprecated/phases/roadmap-v2-solar-precision.md`
 - 확장 로드맵 (원안 v1, archived): `docs/phases/roadmap-v1-cosmic-scale.md`
-- 프로젝트 원칙: `docs/principles/fact-first.md`
+- 프로젝트 원칙: `docs/deprecated/principles/fact-first.md`
 - P1 스프린트 계약: `docs/phases/P1-solar-system-mvp.md`
 - 프로젝트 원칙: `CLAUDE.md`
 

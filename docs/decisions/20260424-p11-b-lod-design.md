@@ -3,7 +3,7 @@
 - **상태**: Accepted
 - **날짜**: 2026-04-24
 - **결정자**: architect (P11-B #289 재계약)
-- **관련**: #289 (본 Phase), #288 (P11-A Floating Origin 선행), #298 (P12 Scale Tier 완결), #310 (네이밍 정책 선행), #247 (Osculating 관찰 대상), #290 (P11-C Tier Preset 후행), ADR `20260424-tier-naming-policy.md` (심볼 SSoT), ADR `20260423-display-relative-scale-unification.md` (Scale Tier Concrete Prediction 3 대응), ADR `20260422-floating-origin.md` (T3 focus body 정합), ADR `20260419-satellite-orbit-hybrid.md` (Concrete Prediction 패턴 원형), 원칙 `docs/principles/fact-first.md`
+- **관련**: #289 (본 Phase), #288 (P11-A Floating Origin 선행), #298 (P12 Scale Tier 완결), #310 (네이밍 정책 선행), #247 (Osculating 관찰 대상), #290 (P11-C Tier Preset 후행), ADR `20260424-tier-naming-policy.md` (심볼 SSoT), ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` (Scale Tier Concrete Prediction 3 대응), ADR `20260422-floating-origin.md` (T3 focus body 정합), ADR `20260419-satellite-orbit-hybrid.md` (Concrete Prediction 패턴 원형), 원칙 `docs/deprecated/principles/fact-first.md`
 - **교훈 적용**: "신규 함수 ≠ 신규 구현" (기존 자산 재사용 조사), "신규 데이터 ≠ 신규 코드 — ADR 예측 재현" (body-kind 보정 상수 데이터화), "주석 계약 vs 구현 drift" (LOD 분기 카테고리 drift 방어), "headless 브라우저 검증 ≠ 실 브라우저" (screenshot diff 3단계 검증), "sub-agent 검증 완료 ≠ GitHub 박제 완료" (draw call 수 dev overlay 박제)
 
 ---
@@ -20,7 +20,7 @@ v0.12.0 (P12-A/B/C 완결) 머지 후 Scale Tier 는 **카메라 거리 기반 3
 
 ### 재계약 배경 (v0.12.0 이후)
 
-이슈 #289 초안에는 원래 **Distance Scale 3 모드 (`log`/`linear`/`uniform`)** 가 포함됐으나, P12 단일 모드 전환 (ADR `20260423-display-relative-scale-unification.md`) 직후 재계약에서 **전면 폐기**되었다 (2026-04-24). `uniform-distance` 는 P12 ADR §5원칙 §1 (상대 비율 = 실측 고정) 위배, `log-distance` 는 Scale Tier 동적 scaling 과 책임 중복이 명확.
+이슈 #289 초안에는 원래 **Distance Scale 3 모드 (`log`/`linear`/`uniform`)** 가 포함됐으나, P12 단일 모드 전환 (ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md`) 직후 재계약에서 **전면 폐기**되었다 (2026-04-24). `uniform-distance` 는 P12 ADR §5원칙 §1 (상대 비율 = 실측 고정) 위배, `log-distance` 는 Scale Tier 동적 scaling 과 책임 중복이 명확.
 
 본 ADR 은 **LOD 3단 + 거리 하이브리드 임계** 에만 집중. Distance Scale 모드는 ADR 상 **폐기 결정으로 박제** 하여 재발굴 차단.
 
@@ -60,7 +60,7 @@ v0.12.0 (P12-A/B/C 완결) 머지 후 Scale Tier 는 **카메라 거리 기반 3
 - `tier.ts` / `tier-transition.ts` 는 **계속 0 라인** 유지 — 자동 수치 재현 검증 (§결과·재검토 조건 참조)
 - Scale Tier 관점에서는 "Prediction 1 부분 성공" = `tier.ts` + `tier-transition.ts` diff = 0 재현 + `solar-system-scene.ts` 수기 리뷰로 금지 조건 위배 0 확인
 
-**선례**: P12 ADR `20260423-display-relative-scale-unification.md` §Amendments (2026-04-23 Q10 재평가 + QA 회귀 수정, line 379) 에서도 동일 파일에 `activeTier === 'body'` 분기 3지점을 추가하며 "코드 변경 0" 을 부분 수정한 전례가 있다.
+**선례**: P12 ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` §Amendments (2026-04-23 Q10 재평가 + QA 회귀 수정, line 379) 에서도 동일 파일에 `activeTier === 'body'` 분기 3지점을 추가하며 "코드 변경 0" 을 부분 수정한 전례가 있다.
 
 ---
 
@@ -644,10 +644,10 @@ Gemini 가 제안했지만 Claude 가 범위/필요성 근거로 반려한 항�
 
 - 이슈 #289 (본 ADR 대상), #289 재계약 코멘트 (2026-04-24)
 - ADR `20260424-tier-naming-policy.md` §1 SSoT — LOD 모듈 경로 선박제
-- ADR `20260423-display-relative-scale-unification.md` §Concrete Prediction 1 — Scale Tier 직교 계약
+- ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` §Concrete Prediction 1 — Scale Tier 직교 계약
 - ADR `20260422-floating-origin.md` §Concrete Prediction 2 — LOD 도입 시 Floating Origin 변화 0 예측 (본 ADR 이 그 예측의 수행자)
 - ADR `20260419-satellite-orbit-hybrid.md` — Concrete Prediction 패턴 원형 + #247 Osculating 맥락
-- `docs/principles/fact-first.md` §2 "절대 스케일 = 디스플레이 함수" — LOD 는 시각 피로 감소 수단, 사실 왜곡 없음
+- `docs/deprecated/principles/fact-first.md` §2 "절대 스케일 = 디스플레이 함수" — LOD 는 시각 피로 감소 수단, 사실 왜곡 없음
 - CLAUDE.md 교훈: "신규 함수 ≠ 신규 구현" / "신규 데이터 ≠ 신규 코드" / "주석 계약 vs 구현 drift" / "headless 브라우저 검증 ≠ 실 브라우저"
 - volt #33 (headless false positive 방어), volt #47 (Concrete Prediction)
 

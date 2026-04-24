@@ -31,7 +31,7 @@
 - 은하 / 은하단 / 우주거대구조
 - 가상/이론 천체 (웜홀 등)
 
-보류 결정은 원칙 [Fact-First, Visual-Second](../principles/fact-first.md) 박제와 함께 이뤄졌다. v2 완료 후 사용자 수요 / 기술 성숙도 / 프로젝트 포지셔닝을 재평가하여 v3 진입 여부를 결정한다.
+보류 결정은 원칙 [Fact-First, Visual-Second](../deprecated/principles/fact-first.md) 박제와 함께 이뤄졌다. v2 완료 후 사용자 수요 / 기술 성숙도 / 프로젝트 포지셔닝을 재평가하여 v3 진입 여부를 결정한다.
 
 ---
 

@@ -1,9 +1,12 @@
-# 로드맵 v2 — 태양계 정밀화 (Solar Precision)
+# [DEPRECATED] 로드맵 v2 — 태양계 정밀화 (Solar Precision)
 
-> **Status**: Active
+> **Status**: **DEPRECATED (2026-04-25, roadmap reset)**
 > **박제일**: 2026-04-20 (P10-A #268)
-> **Supersedes**: `roadmap-v1-cosmic-scale.md` 의 P8 이후 (관측가능우주 확장) 는 **보류**
-> **Precedes**: P10 Fact Audit 완료 후 P11~P16 순차 진행
+> **폐기일**: 2026-04-25
+> **폐기 사유**: P10~P12 Phase 완료 시점에 UX 가시성 회귀 발견. 기본 진입 화면이 궤도 라인만 보이는 빈 상태가 되어 기획 의도에서 이탈. 사용자 결정으로 "태양부터 하나씩 visible 하게 incremental build" 접근으로 전환.
+> **신규 접근**: `docs/phases/roadmap-v3-incremental.md`
+> **폐기 근거**: volt [#74](https://github.com/coseo12/volt/issues/74)
+> **Superseded by**: `roadmap-v3-incremental.md`
 
 ---
 

@@ -3,7 +3,7 @@
 - **상태**: Accepted
 - **날짜**: 2026-04-24
 - **결정자**: architect (issue #310 / P11 재개 선행 블로커)
-- **관련**: #310 (본 이슈), #289 (P11-B LOD 3단계 + Distance Scale), #290 (P11-C Tier Preset + detect-gpu-tier), ADR `20260423-display-relative-scale-unification.md` (P12 Scale Tier 확정), ADR `20260420-mobile-support-suspension.md` (#290 선행), 원칙 `docs/principles/fact-first.md` (Data Tier 근거)
+- **관련**: #310 (본 이슈), #289 (P11-B LOD 3단계 + Distance Scale), #290 (P11-C Tier Preset + detect-gpu-tier), ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` (P12 Scale Tier 확정), ADR `20260420-mobile-support-suspension.md` (#290 선행), 원칙 `docs/deprecated/principles/fact-first.md` (Data Tier 근거)
 - **교훈 적용**: CLAUDE.md "주석 계약 vs 구현 drift" (카테고리 enum drift 방지), "신규 데이터 ≠ 신규 코드 — ADR 예측 재현" (Concrete Prediction 박제), "Phase 분리 릴리스 리듬" (본 ADR 릴리스 분할 판정)
 
 ---
@@ -70,7 +70,7 @@
 | **오인 위험**       | 낮음 — `Tier` / `activeTier` 가 "scene scale" 로 고정 판독됨                                 | 낮음 — 모든 심볼이 자기 문맥 명시                                          | 낮음 — 동일                                                                |
 | **P12 코드 재작업** | 0 라인                                                                                       | scene/ 약 30 라인 수정                                                     | 동일                                                                       |
 
-**선택: 후보 A** — "첫 박제 선점" 원칙. P12 ADR (`20260423-display-relative-scale-unification.md`) 이 이미 `Tier` 를 Scale Tier 전용으로 박제했고, rename 은 볼륨만 늘리고 의미 개선이 미미.
+**선택: 후보 A** — "첫 박제 선점" 원칙. P12 ADR (`../deprecated/decisions/20260423-display-relative-scale-unification.md`) 이 이미 `Tier` 를 Scale Tier 전용으로 박제했고, rename 은 볼륨만 늘리고 의미 개선이 미미.
 
 ### 축 2: URL 파라미터 — `?tier=` 선점 정책
 
@@ -147,7 +147,7 @@
 - **`?tier=`** → Scale Tier 전용. 값: `solar` / `inner` / `body`. 구현 시점: P12 후속 또는 별도 이슈 (현재 미구현)
 - **`?gpu=`** → GPU tier 전용. 값: `a` / `b` / `c`. 구현 시점: #290 P11-C DoD
 - **`?lod=`** → LOD level 전용. 값: `high` / `mid` / `low`. 구현 시점: #289 P11-B DoD (Distance Scale 의 `?distance=` 는 별개 유지)
-- **`?mode=`** → 기존 scientific/educational 이중 모드는 P12 #298 에서 폐기됨 (ADR `20260423-display-relative-scale-unification.md` R1). 재도입 금지
+- **`?mode=`** → 기존 scientific/educational 이중 모드는 P12 #298 에서 폐기됨 (ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` R1). 재도입 금지
 - **`?distance=`** → Distance Scale 모드 (`log` / `linear` / `uniform`). #289 P11-B DoD. 본 ADR 정책과 독립 (Tier 도메인 아님)
 - **충돌 방지 규칙**: 신규 URL 파라미터 도입 시 본 표의 예약어 (`tier`, `gpu`, `lod`, `mode`, `distance`) 재사용 금지. 이름 충돌 시 네임스페이스 prefix 사용 (`?xxx-tier=` 등)
 
@@ -160,9 +160,9 @@
 
 ### §5. Fact-First 원칙 일치 확인
 
-- Data Tier 는 `docs/principles/fact-first.md` "사실(fact)이 1차 SSoT" 에서 직접 유도된 개념. 본 ADR 은 Data Tier 의 **정의·역할** 을 변경하지 않고 **UI 표기** 만 치환 (원칙 무영향)
+- Data Tier 는 `docs/deprecated/principles/fact-first.md` "사실(fact)이 1차 SSoT" 에서 직접 유도된 개념. 본 ADR 은 Data Tier 의 **정의·역할** 을 변경하지 않고 **UI 표기** 만 치환 (원칙 무영향)
 - Scale Tier 는 "절대 스케일 = 디스플레이 함수" 5원칙 #2 의 구현체. 본 ADR 은 Scale Tier 를 건드리지 않음
-- 결론: 원칙 레벨 위반 0, ADR `20260423-display-relative-scale-unification.md` §Amendment 불요
+- 결론: 원칙 레벨 위반 0, ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` §Amendment 불요
 
 ---
 
@@ -214,7 +214,7 @@
 
 본 Prediction 1 박제 직후 #289 P11-B 설계 단계(ADR `20260424-p11-b-lod-design.md`) 에서 `solar-system-scene.ts` **0 라인** 예측이 구조적으로 위배될 수 없음이 reviewer 지적으로 확인됐다. `createBodyMesh` 가 mesh 객체의 유일한 owner 이고 LOD 는 mesh 의 geometry variant 스왑이 필요하므로 외부 주입 없이 LOD 를 도입하려면 scene API 확장이 불가피하다.
 
-P12 ADR `20260423-display-relative-scale-unification.md` §Amendments (2026-04-23 Q10 재평가 + QA 회귀 수정, line 379) 에서도 동일 파일에 `activeTier === 'body'` 분기 3지점을 추가하며 "코드 변경 0" 예측을 부분 수정한 선례가 있다.
+P12 ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` §Amendments (2026-04-23 Q10 재평가 + QA 회귀 수정, line 379) 에서도 동일 파일에 `activeTier === 'body'` 분기 3지점을 추가하며 "코드 변경 0" 예측을 부분 수정한 선례가 있다.
 
 **예외 허용 계약** (본 Amendment):
 
