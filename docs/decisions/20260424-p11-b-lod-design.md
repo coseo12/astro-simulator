@@ -354,7 +354,13 @@ export function lodFromScreenCoverage(
 //      신규 kind 추가 시 LOD_BODY_THRESHOLDS 에 항목 누락하면 default fallback 발생 → 주석-구현 drift
 //   3. high/mid/low 이외의 값 도입 금지 — 추가 단계 필요 시 ADR Amendment 선박제
 //   4. body-kind 분류는 kind 자체 + mass 보조 (planet → giant/terrestrial 2분기)
-//   5. 픽셀 경계: high≥50, 50>mid≥8, low<8 — 변경은 bench tier-a 회귀 < 5% 유지 범위 내
+//   5. 픽셀 경계: GPU tier 프로파일 (`TIER_PROFILES[tier].lod.{high,mid}`) 로 주입.
+//      기본값 high=50 / mid=8 (tier-a/b) — `LOD_PIXEL_THRESHOLDS` 상수가 default fallback.
+//      tier-c 주입 시 high=100 / mid=20 으로 강제 상향 (sub-pixel body 를 low billboard 강제).
+//      @lod-threshold-tier-drift — `lodFromScreenCoverage` 는 `input.pixelThresholds` 인자를
+//      받아 tier 프로파일 값을 덮어쓰며, 인자 부재 시 `LOD_PIXEL_THRESHOLDS` 상수를 쓴다.
+//      하드코딩 상수를 직접 참조하는 호출부는 주석-구현 drift 로 간주 (ADR §Amendments).
+//      변경은 bench tier-a 회귀 < 5% 유지 범위 내.
 //   6. URL `?lod=auto` 는 distance/coverage 자동 판정, `?lod=high|mid|low` 는 전 body 강제
 // 위 계약 위배 변경은 즉시 버그로 간주 (CLAUDE.md "주석 계약 vs 구현 drift" 교훈).
 ```
@@ -644,3 +650,16 @@ Gemini 가 제안했지만 Claude 가 범위/필요성 근거로 반려한 항�
 - `docs/principles/fact-first.md` §2 "절대 스케일 = 디스플레이 함수" — LOD 는 시각 피로 감소 수단, 사실 왜곡 없음
 - CLAUDE.md 교훈: "신규 함수 ≠ 신규 구현" / "신규 데이터 ≠ 신규 코드" / "주석 계약 vs 구현 drift" / "headless 브라우저 검증 ≠ 실 브라우저"
 - volt #33 (headless false positive 방어), volt #47 (Concrete Prediction)
+
+---
+
+## Amendments
+
+### 2026-04-24 — P11-C 구현 시 LOD pixelThresholds 주입 경로 갱신
+
+- **배경**: P11-C (#290) 구현에서 GPU tier 프로파일이 LOD 픽셀 경계를 주입하는 경로를 도입한다. 본 ADR §결정 §3 주석 계약 §5 는 원래 "픽셀 경계: high≥50, 50>mid≥8" 를 하드코딩 상수 기준으로만 박제했으나, tier-c 프로파일 (`TIER_PROFILES['c'].lod = { high: 100, mid: 20 }`) 이 동일 계산 함수에 다른 경계를 주입하도록 확장 필요.
+- **변경**: §결정 §3 주석 계약 §5 문구를 "tier 프로파일로 주입 가능, 기본값 50/8 유지" 로 갱신 + `@lod-threshold-tier-drift` 주석 계약 키 추가. 하드코딩 상수 `LOD_PIXEL_THRESHOLDS` 를 직접 참조하는 호출부는 tier 주입 경로를 우회하는 drift 로 간주.
+- **구현**: `lodFromScreenCoverage(input)` 의 `input.pixelThresholds` optional 인자 추가. 부재 시 `LOD_PIXEL_THRESHOLDS` 상수 fallback. 이로써 기존 호출부 (LOD 단독 테스트) 는 회귀 0, 신규 호출부 (sim-canvas LOD hook) 는 `applyGpuTierPreset` 결과의 `profile.lod` 를 `pixelThresholds` 로 주입.
+- **영향 범위 — Prediction 2 정합 재확인**: 본 Amendment 는 `packages/core/src/render/` 내부 확장이므로 Prediction 2 (Scale Tier 코드 변화 0) 위배 없음. `packages/core/src/scene/` 은 여전히 0 라인.
+- **상위 ADR 연결**: `docs/decisions/20260424-tier-preset-design.md` §결정 §4 "LOD 경계 주입" 경로를 본 Amendment 가 receive. 양 ADR 이 동일 계약 참조.
+- **근거**: CLAUDE.md "주석 계약 vs 구현 drift" 교훈 (volt #49). 하드코딩 상수를 남겨두되 주석 계약에서 "tier 프로파일로 주입 가능" 명시하지 않으면 미래 호출부 변경이 상수 참조를 갱신하지 않을 위험.
