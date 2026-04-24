@@ -14,3 +14,7 @@ export {
 } from './lod.js';
 export type { LodLevel, LodOverride, LodDecisionInput } from './lod.js';
 export type { BodyLodKind, BodyLodThreshold, BodyLodThresholdMode } from './lod-body-thresholds.js';
+
+// P11-C #290 — GPU tier 프로파일 (ADR 20260424-tier-preset-design §결정 §4).
+export { TIER_PROFILES } from './tier-profile.js';
+export type { GpuTier, TierProfile, TierAaMode, TierShadowResolution } from './tier-profile.js';

@@ -288,8 +288,9 @@ describe('VENDOR_RULES — 8 카테고리 완비 assert (카테고리 enum drift
       'arm-mali',
     ];
     for (const key of required) {
-      expect(VENDOR_RULES[key]).toBeDefined();
-      expect(VENDOR_RULES[key].vendorPattern).toBeInstanceOf(RegExp);
+      const rule = VENDOR_RULES[key];
+      expect(rule).toBeDefined();
+      expect(rule?.vendorPattern).toBeInstanceOf(RegExp);
     }
   });
 });

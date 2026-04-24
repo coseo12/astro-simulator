@@ -371,6 +371,30 @@ describe('LOD_PIXEL_THRESHOLDS', () => {
     expect(lodFromScreenCoverage({ ...base, screenCoverage: 8 })).toBe('mid');
     expect(lodFromScreenCoverage({ ...base, screenCoverage: 7.99 })).toBe('low');
   });
+
+  it('pixelThresholds 주입 (P11-C #290 Amendment) — tier-c 100/20 경계로 덮어쓰기', () => {
+    // tier-c 프로파일 주입 시 sub-pixel body 를 low billboard 로 강제.
+    // 50px 은 tier-a/b 에서 high 이지만 tier-c 경계 (high=100) 에서는 mid.
+    const base = {
+      body: { kind: 'moon', mass: 7.342e22, radius: 1.7374e6 },
+      cameraDistanceMeters: 100 * 1.7374e6,
+      pixelThresholds: { high: 100, mid: 20 },
+    };
+    expect(lodFromScreenCoverage({ ...base, screenCoverage: 100 })).toBe('high');
+    expect(lodFromScreenCoverage({ ...base, screenCoverage: 50 })).toBe('mid'); // tier-a/b 면 high
+    expect(lodFromScreenCoverage({ ...base, screenCoverage: 20 })).toBe('mid');
+    expect(lodFromScreenCoverage({ ...base, screenCoverage: 19.99 })).toBe('low');
+  });
+
+  it('pixelThresholds 부재 시 LOD_PIXEL_THRESHOLDS 상수 fallback (회귀 가드)', () => {
+    // Amendment 2026-04-24 — pixelThresholds 옵션 추가 전 호출부 호환.
+    const base = {
+      body: { kind: 'moon', mass: 7.342e22, radius: 1.7374e6 },
+      cameraDistanceMeters: 100 * 1.7374e6,
+    };
+    expect(lodFromScreenCoverage({ ...base, screenCoverage: 50 })).toBe('high');
+    expect(lodFromScreenCoverage({ ...base, screenCoverage: 8 })).toBe('mid');
+  });
 });
 
 // ----------------------------------------------------------------------------
