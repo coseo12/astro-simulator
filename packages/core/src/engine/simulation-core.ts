@@ -27,6 +27,8 @@ export class SimulationCore {
   #focusOnHandler: ((bodyId: string) => void) | null = null;
   #resetCameraHandler: (() => void) | null = null;
   #setRadiusHandler: ((radius: number) => void) | null = null;
+  // P11-B #289 — LOD override 핸들러. URL `?lod=` 초기 1회 sendCommand 에서 scene 에 전달.
+  #setLodOverrideHandler: ((level: 'high' | 'mid' | 'low' | 'auto') => void) | null = null;
   // P5-B #177 — fps emit 주기 제어. 매 프레임 emit하면 store 갱신 과다 → 0.5초 간격.
   #lastFpsEmitTime = 0;
   // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
@@ -149,6 +151,16 @@ export class SimulationCore {
     this.#setRadiusHandler = setRadius ?? null;
   }
 
+  /**
+   * P11-B #289 — LOD override 핸들러 연결. sim-canvas 가 scene 생성 직후 1회 호출.
+   *
+   * 핸들러는 scene 의 `setLodOverride(level)` 를 호출해 override 를 반영한다. URL `?lod=high|mid|low`
+   * 면 전 body 강제, `auto` (또는 미호출) 면 거리 자동 판정.
+   */
+  setLodOverrideHandler(handler: (level: 'high' | 'mid' | 'low' | 'auto') => void): void {
+    this.#setLodOverrideHandler = handler;
+  }
+
   /** 이벤트 구독. */
   on<K extends keyof CoreEvents>(type: K, handler: Handler<CoreEvents[K]>): void {
     this.#emitter.on(type, handler);
@@ -196,6 +208,10 @@ export class SimulationCore {
         break;
       case 'setMode':
         this.#emitter.emit('modeChanged', { mode: cmd.mode });
+        break;
+      case 'setLodOverride':
+        // P11-B #289 — scene 에 위임. 미등록 시 no-op (scene 초기화 전 순서 무관).
+        this.#setLodOverrideHandler?.(cmd.level);
         break;
       default: {
         const _exhaustive: never = cmd;
