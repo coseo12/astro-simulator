@@ -210,6 +210,25 @@
 - **재현 검증**: PR #289 머지 후 `git diff main..<PR-head> -- packages/core/src/scene/tier.ts packages/core/src/scene/solar-system-scene.ts packages/core/src/scene/tier-transition.ts | grep -E '^[+-][^+-]' | wc -l` → `0`
 - **예측 실패 시**: Scale Tier 와 LOD 가 잘못 결합되었다는 신호. (a) LOD 입력이 `activeTier` 를 의존하면 정당할 수 있으나 `setTier` 호출 또는 `Tier` type 확장은 부당. ADR Amendment 박제 후 추상화 재조정
 
+#### Amendment (2026-04-24) — `solar-system-scene.ts` 부분 예외 허용
+
+본 Prediction 1 박제 직후 #289 P11-B 설계 단계(ADR `20260424-p11-b-lod-design.md`) 에서 `solar-system-scene.ts` **0 라인** 예측이 구조적으로 위배될 수 없음이 reviewer 지적으로 확인됐다. `createBodyMesh` 가 mesh 객체의 유일한 owner 이고 LOD 는 mesh 의 geometry variant 스왑이 필요하므로 외부 주입 없이 LOD 를 도입하려면 scene API 확장이 불가피하다.
+
+P12 ADR `20260423-display-relative-scale-unification.md` §Amendments (2026-04-23 Q10 재평가 + QA 회귀 수정, line 379) 에서도 동일 파일에 `activeTier === 'body'` 분기 3지점을 추가하며 "코드 변경 0" 예측을 부분 수정한 선례가 있다.
+
+**예외 허용 계약** (본 Amendment):
+
+- `solar-system-scene.ts` 는 **LOD 분기 hook 추가 용도에 한해 예외 허용**
+- **금지 조건** (예외 범위 밖, 계속 0 라인 유지):
+  - `mesh.position` 좌표 수식 / `renderScaleForTier` 적용 지점
+  - `Tier` 상수 / `activeTier` 의미 변경
+  - `FloatingOrigin` 상호작용 (`fo.toLocal` / `fo.update` / `fo.reset`)
+  - `setTier` 의 origin 갱신 로직
+- **재현 검증 갱신** — Prediction 1 의 `wc -l → 0` 을 다음 2건으로 분할:
+  - `tier.ts` + `tier-transition.ts` 변화 라인: `git diff <base>..<head> -- packages/core/src/scene/tier.ts packages/core/src/scene/tier-transition.ts --numstat | awk '{s+=$1+$2} END {print s+0}'` → **`0`** (유지)
+  - `solar-system-scene.ts` 변화: **LOD hook 추가 용도만 허용**. 수기 diff 리뷰로 "금지 조건 위배 0" 확인 (자동 수치 검증 불가)
+- **근거**: P11-B 설계 PR #320 리뷰 Blocking B-1 해소. 선례 P12 ADR §Amendments (2026-04-23)
+
 ### Prediction 2: GPU tier 도입 → Scale Tier 코드 라인 변화 0
 
 - **예측**: #290 P11-C 에서 `apps/web/src/core/detect-gpu-tier.ts` (승격) + Graceful Degradation 모달 + URL sync 만으로 GPU tier 분기 동작. Scale Tier 파일 **코드 라인 변화 0**
