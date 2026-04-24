@@ -110,7 +110,7 @@ export function HudCorners() {
           className="inline-block w-2 h-2 rounded-full"
           style={{ background: 'var(--tier-1-observed)' }}
         />
-        Tier 1 관측
+        정확도 · T1 관측
       </div>
     </>
   );
