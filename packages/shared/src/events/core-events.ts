@@ -33,6 +33,10 @@ export type CoreEvents = {
 
 /**
  * UI → Core 명령 판별식 유니온.
+ *
+ * P11-B #289 — `setLodOverride` 추가. URL `?lod=` 초기 1회 전달 용도.
+ * `level` 은 `'high' | 'mid' | 'low' | 'auto'`. scene 내부에서 override 로 저장되어
+ * 다음 `updateAt` 호출부터 LOD 분기에 적용된다.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -43,4 +47,5 @@ export type CoreCommand =
   | { type: 'focusOn'; bodyId: string }
   | { type: 'resetCamera' }
   | { type: 'setCameraRadius'; radius: number }
-  | { type: 'setMode'; mode: SimMode };
+  | { type: 'setMode'; mode: SimMode }
+  | { type: 'setLodOverride'; level: 'high' | 'mid' | 'low' | 'auto' };

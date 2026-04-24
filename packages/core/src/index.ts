@@ -14,5 +14,7 @@ export * as scene from './scene/index.js';
 export * as gpu from './gpu/index.js';
 export * as ephemeris from './ephemeris/index.js';
 export * as time from './time/index.js';
+// P11-B #289 — LOD 3단 분기 + 화면 점유 계산 (render 레이어, Scale Tier 와 직교).
+export * as render from './render/index.js';
 
 export const VERSION = '0.0.0';

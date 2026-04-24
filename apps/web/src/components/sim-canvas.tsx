@@ -6,6 +6,7 @@ import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulat
 import { attachCoreToStore } from '@/core/core-adapter';
 import { parseIntegratorKind } from '@/core/parse-integrator';
 import { parseGrMode } from '@/core/parse-gr-mode';
+import { parseLodLevel } from '@/core/parse-lod-level';
 import { detectIsMobile } from '@/core/is-mobile';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -258,6 +259,22 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
+
+        // P11-B #289 — `setLodOverride` command → scene 에 전달. URL `?lod=` 초기 1회 호출 경로.
+        // UrlSync 가 mount 시 `sendCommand({ type: 'setLodOverride', level })` 호출 → 여기로 라우팅.
+        //
+        // [타이밍 주의] UrlSync 의 mount useEffect 는 `setCore(instance)` 직후 실행되지만 scene 초기화
+        // (`instance.start().then(...)`) 는 비동기라 handler 가 아직 null. 이 경우 command 가 no-op 되어
+        // override 유실. 방어 장치로 handler 등록 시점에 **URL 을 직접 재파싱** 하여 즉시 override 적용
+        // (UrlSync 호출이 이미 지나갔어도 최신 URL 상태 복원). 두 경로 동시 적용해도 idempotent.
+        instance.setLodOverrideHandler((level) => {
+          solar.setLodOverride(level);
+        });
+        {
+          const lodParam = new URLSearchParams(window.location.search).get('lod');
+          const parsed = parseLodLevel(lodParam);
+          solar.setLodOverride(parsed);
+        }
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
         // + 질량 배수 변경 → setBodyMassMultiplier (#107)
