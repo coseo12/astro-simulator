@@ -925,10 +925,15 @@ export function createSolarSystemScene(
 
   const getVariantMesh = (body: LoadedCelestialBody, highMesh: Mesh, level: LodLevel): Mesh => {
     if (level === 'high') return highMesh;
+    // ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment 금지 조건 준수 — variant factory 는
+    // `bodyInitialRenderScale` 로 diameter 를 고정하고, tier 전환으로 인한 크기 변화는 parent highMesh
+    // 의 `scaling = newScale / initialScale` 에서 자동 상속된다. `activeTier` 를 전달하면 생성 시점에
+    // 이미 parent scaling 이 반영된 값 위에 `renderScaleForTier(activeTier)` 가 한 번 더 곱해져 이중
+    // scale 이 발생 (리뷰 #321 Blocking 2 지적).
     if (level === 'mid') {
       let m = midVariants.get(body.id);
       if (!m) {
-        m = createBodyMeshMid(body, scene, activeTier, highMesh);
+        m = createBodyMeshMid(body, scene, bodyInitialRenderScale, highMesh);
         midVariants.set(body.id, m);
       }
       return m;
@@ -936,7 +941,7 @@ export function createSolarSystemScene(
     // low
     let m = lowVariants.get(body.id);
     if (!m) {
-      m = createBodyBillboard(body, scene, activeTier, highMesh);
+      m = createBodyBillboard(body, scene, bodyInitialRenderScale, highMesh);
       lowVariants.set(body.id, m);
     }
     return m;
@@ -944,18 +949,24 @@ export function createSolarSystemScene(
 
   const showVariantEntirely = (body: LoadedCelestialBody, highMesh: Mesh, level: LodLevel) => {
     const m = getVariantMesh(body, highMesh, level);
+    // isVisible 로 렌더 여부만 제어 — setEnabled(true/false) 는 parent-child 전파 때문에
+    // high variant 에 쓰면 자식(mid/low) 도 렌더 중단됨 (리뷰 #321 Blocking 1 지적).
     m.setEnabled(true);
+    m.isVisible = true;
     setVariantAlpha(body, highMesh, level, 1, false);
   };
 
   const hideVariantEntirely = (body: LoadedCelestialBody, highMesh: Mesh, level: LodLevel) => {
-    // high variant 는 dispose 하지 않고 setEnabled(false). Tier 전환 시 position/scale owner 역할이라 보존.
+    // parent-child 전파 차단을 위해 `isVisible` 로만 렌더 여부 토글. `setEnabled` 는 자식 variant 로
+    // 전파되어 mid/low 가 정착 상태여도 함께 숨겨지는 버그 유발 (리뷰 #321 Blocking 1).
+    // - high: 반드시 `setEnabled(true)` 유지 (mid/low 의 parent 로 transform 공급)
+    // - mid/low: `isVisible=false` 로 통일. `setEnabled(false)` 사용 금지
     if (level === 'high') {
-      highMesh.setEnabled(false);
+      highMesh.isVisible = false;
       return;
     }
     const m = level === 'mid' ? midVariants.get(body.id) : lowVariants.get(body.id);
-    if (m) m.setEnabled(false);
+    if (m) m.isVisible = false;
   };
 
   const setVariantAlpha = (
@@ -963,16 +974,16 @@ export function createSolarSystemScene(
     highMesh: Mesh,
     level: LodLevel,
     alpha: number,
-    duringFade: boolean,
+    _duringFade: boolean,
   ) => {
     const m = getVariantMesh(body, highMesh, level);
     m.setEnabled(true);
+    m.isVisible = true;
     const mat = m.material;
     if (mat && 'alpha' in mat) {
       (mat as { alpha: number }).alpha = alpha;
     }
-    // fade 중에는 둘 다 보여야 하므로 enabled 유지. 정착 시 hideVariantEntirely 로 반대편 숨김.
-    void duringFade;
+    // fade 중에는 둘 다 보여야 하므로 isVisible 유지. 정착 시 hideVariantEntirely 로 반대편 숨김.
   };
 
   // P11-B #289 — LOD API 외부 노출.

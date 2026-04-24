@@ -188,13 +188,16 @@ interface Vec4 {
 }
 
 /**
- * 4×4 행렬 × 3D 점 (w=1). row-major 16 원소 배열 가정 (Babylon Matrix.m 호환).
+ * 4×4 행렬 × 3D 점 (w=1). Babylon `Matrix.m` 16 원소 Float32Array 호환.
  *
- * Babylon 의 `scene.getTransformationMatrix()` 는 view × projection 결과의 transposed 형식이지만,
- * `.m` 필드는 row-major 16 원소 Float32Array 로 노출되어 본 수식과 정합.
+ * 수식은 Babylon 공식 API `Vector3.TransformCoordinatesFromFloatsToRef` 구현과 동일 —
+ * `rx = x*m[0] + y*m[4] + z*m[8] + m[12]` 식으로 m[col*4+row] 인덱싱. Babylon docs 는 `.m` 을
+ * "row-major" 저장이라고 설명하지만, TransformCoordinates API 의 접근 패턴이 사실상 column-vector
+ * 관례(M × v) 와 호환되므로 본 수식이 올바르다. 리뷰 #321 non-blocking 1 — 이전 주석이 row-major
+ * 표기로 오해를 유발하여 바로잡음. 구현 동작 자체는 변경 없음.
  */
 function mulMat4Point(m: ArrayLike<number>, x: number, y: number, z: number): Vec4 {
-  // Babylon row-major: m[i*4 + j] — row i, column j.
+  // Babylon Vector3.TransformCoordinates 와 동일: m[0], m[4], m[8], m[12] 가 첫 번째 출력 성분에 기여.
   const m0 = m[0] ?? 0;
   const m1 = m[1] ?? 0;
   const m2 = m[2] ?? 0;
