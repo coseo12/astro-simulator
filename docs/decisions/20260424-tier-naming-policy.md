@@ -47,10 +47,10 @@
 ### 기존 자산 재사용 조사 (CLAUDE.md "신규 함수 ≠ 신규 구현")
 
 | 자산                                         | 위치                                            | 본 정책 처리                                                                              |
-| -------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- | --- | -------------------------------------- | ---------------------------------------------------------------------- |
-| `Tier` type (`'solar' \| 'inner' \| 'body'`) | `packages/core/src/scene/tier.ts:40`            | **유지** — Scale Tier 전용 보존. rename 없음                                              |
+| -------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `Tier` type (값: 'solar' / 'inner' / 'body') | `packages/core/src/scene/tier.ts:40`            | **유지** — Scale Tier 전용 보존. rename 없음                                              |
 | `activeTier` / `setTier` / `getTier`         | `packages/core/src/scene/solar-system-scene.ts` | **유지** — Scale Tier 전용 보존                                                           |
-| `DataTier` type (`1                          | 2                                               | 3                                                                                         | 4`) | `packages/shared/src/types/tier.ts:16` | **유지** — 이미 구분 명확. HUD UI 텍스트만 `T1~T4` 라벨 prefix 로 치환 |
+| `DataTier` type (값: 1 / 2 / 3 / 4)          | `packages/shared/src/types/tier.ts:16`          | **유지** — 이미 구분 명확. HUD UI 텍스트만 `T1~T4` 라벨 prefix 로 치환                    |
 | `TierBadge` 컴포넌트                         | `apps/web/src/components/ui/tier-badge.tsx`     | **유지** — "T1~T4" 라벨 표시로 이미 Scale Tier 단어 회피. rename 선택적 (§§§결정 §2 참조) |
 | `CSS 변수 --tier-{1..4}-*`                   | `apps/web/app/[locale]/globals.css:35-36`       | **유지** — 내부 토큰, UI 노출 없음                                                        |
 | `detectIsMobile`                             | `apps/web/src/core/is-mobile.ts`                | **존속** (#290 에서 `detect-gpu-tier.ts` 로 승격. 본 ADR 은 용어만 확정)                  |
