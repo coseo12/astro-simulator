@@ -3,7 +3,7 @@
 - **상태**: Accepted
 - **날짜**: 2026-04-24
 - **결정자**: architect (P11-B #289 재계약)
-- **관련**: #289 (본 Phase), #288 (P11-A Floating Origin 선행), #298 (P12 Scale Tier 완결), #310 (네이밍 정책 선행), #247 (Osculating 관찰 대상), #290 (P11-C Tier Preset 후행), ADR `20260424-tier-naming-policy.md` (심볼 SSoT), ADR `20260423-display-relative-scale-unification.md` (Scale Tier Concrete Prediction 1 대응), ADR `20260422-floating-origin.md` (T3 focus body 정합), ADR `20260419-satellite-orbit-hybrid.md` (Concrete Prediction 패턴 원형), 원칙 `docs/principles/fact-first.md`
+- **관련**: #289 (본 Phase), #288 (P11-A Floating Origin 선행), #298 (P12 Scale Tier 완결), #310 (네이밍 정책 선행), #247 (Osculating 관찰 대상), #290 (P11-C Tier Preset 후행), ADR `20260424-tier-naming-policy.md` (심볼 SSoT), ADR `20260423-display-relative-scale-unification.md` (Scale Tier Concrete Prediction 3 대응), ADR `20260422-floating-origin.md` (T3 focus body 정합), ADR `20260419-satellite-orbit-hybrid.md` (Concrete Prediction 패턴 원형), 원칙 `docs/principles/fact-first.md`
 - **교훈 적용**: "신규 함수 ≠ 신규 구현" (기존 자산 재사용 조사), "신규 데이터 ≠ 신규 코드 — ADR 예측 재현" (body-kind 보정 상수 데이터화), "주석 계약 vs 구현 drift" (LOD 분기 카테고리 drift 방어), "headless 브라우저 검증 ≠ 실 브라우저" (screenshot diff 3단계 검증), "sub-agent 검증 완료 ≠ GitHub 박제 완료" (draw call 수 dev overlay 박제)
 
 ---
