@@ -3,7 +3,7 @@
 - **상태**: Accepted
 - **날짜**: 2026-04-24
 - **결정자**: architect (P11-C #290 재계약 박제)
-- **관련**: #290 (본 Phase), #289 P11-B (LOD 선행 완료), #310 (네이밍 정책 선행 완료), #288 P11-A (Floating Origin 선행), #298 P12 (Scale Tier + 단일 모드 전환), #219 (iOS Yoshida4 실기기 bench — close 하지 않음 유지), ADR `20260420-mobile-support-suspension.md` §3 §4 (Graceful Degradation 전제), ADR `20260424-tier-naming-policy.md` (`?gpu=` SSoT), ADR `20260424-p11-b-lod-design.md` (LOD 임계 상수 → tier 프로파일 승격 경로), ADR `20260423-display-relative-scale-unification.md` (Scale Tier 직교 전제), 원칙 `docs/principles/fact-first.md`
+- **관련**: #290 (본 Phase), #289 P11-B (LOD 선행 완료), #310 (네이밍 정책 선행 완료), #288 P11-A (Floating Origin 선행), #298 P12 (Scale Tier + 단일 모드 전환), #219 (iOS Yoshida4 실기기 bench — close 하지 않음 유지), ADR `20260420-mobile-support-suspension.md` §3 §4 (Graceful Degradation 전제), ADR `20260424-tier-naming-policy.md` (`?gpu=` SSoT), ADR `20260424-p11-b-lod-design.md` (LOD 임계 상수 → tier 프로파일 승격 경로), ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` (Scale Tier 직교 전제), 원칙 `docs/deprecated/principles/fact-first.md`
 - **교훈 적용**: "신규 함수 ≠ 신규 구현" (`detectIsMobile` 재사용 승격), "신규 데이터 ≠ 신규 코드 — ADR 예측 재현" (GPU 감지 규칙 데이터화 → Concrete Prediction 3건), "주석 계약 vs 구현 drift" (GPU tier 카테고리 enum drift 방어), "headless 브라우저 검증 ≠ 실 브라우저" (tier 감지 mock fixture 10 + 실기기 3 이중 레이어), "sub-agent 검증 완료 ≠ GitHub 박제 완료" (bench 차등 실측 증거 박제), "인계 항목 실측 재검증 — NO-OP ADR 패턴" (scientific 모드 폐기로 원 DoD #5 전제 소실 → 자동 억제 대체)
 
 ---

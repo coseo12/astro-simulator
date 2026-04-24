@@ -5,7 +5,7 @@
 > **총 PR**: 3건 (Phase A #301 / Phase B #304 / Phase C — 본 PR)
 > **릴리스**: v0.11.0 (Phase A) → v0.12.0 (Phase B) → v0.13.0 (Phase C 예정)
 > **이슈**: #298 (본 스프린트) + #288 auto-close (P11-A scientific jitter 원인)
-> **ADR**: [docs/decisions/20260423-display-relative-scale-unification.md](../decisions/20260423-display-relative-scale-unification.md)
+> **ADR**: [docs/deprecated/decisions/20260423-display-relative-scale-unification.md](../decisions/20260423-display-relative-scale-unification.md)
 
 ## 달성도 (완료 기준 표)
 
@@ -120,7 +120,7 @@ D1 ADR + D2 fact-first.md §Amendment 박제 직후 cross-validate 스킬 호출
 ## 근거 링크
 
 - **이슈**: [#298](https://github.com/coseo12/astro-simulator/issues/298) — PM 3라운드 수렴 결과
-- **ADR**: [docs/decisions/20260423-display-relative-scale-unification.md](../decisions/20260423-display-relative-scale-unification.md)
+- **ADR**: [docs/deprecated/decisions/20260423-display-relative-scale-unification.md](../decisions/20260423-display-relative-scale-unification.md)
 - **PR**: Phase A [#301](https://github.com/coseo12/astro-simulator/pull/301) / Phase B [#304](https://github.com/coseo12/astro-simulator/pull/304) / Phase C (본 PR)
 - **CHANGELOG**: Phase A (v0.11.0) / Phase B (v0.12.0) / Phase C (v0.13.0 예정)
 - **후속 이슈**: #305 / #306 / #307

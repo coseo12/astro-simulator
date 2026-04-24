@@ -3,7 +3,7 @@
 - **상태**: Accepted
 - **날짜**: 2026-04-20
 - **결정자**: architect / PM (P10-A #268)
-- **관련**: P10 계약 #266, 원칙 `docs/principles/fact-first.md`, 로드맵 v2 `docs/phases/roadmap-v2-solar-precision.md`, 선행 이슈 #219 (iOS Yoshida4 bench — close 하지 않음), 구현 파일 `apps/web/src/core/is-mobile.ts` (P7-E #210/#220)
+- **관련**: P10 계약 #266, 원칙 `docs/deprecated/principles/fact-first.md`, 로드맵 v2 `docs/deprecated/phases/roadmap-v2-solar-precision.md`, 선행 이슈 #219 (iOS Yoshida4 bench — close 하지 않음), 구현 파일 `apps/web/src/core/is-mobile.ts` (P7-E #210/#220)
 
 ## 배경
 
@@ -111,9 +111,9 @@ P11 Visual Foundation 에서 `is-mobile.ts` 를 `detect-gpu-tier.ts` 로 **승�
 
 ## 참조
 
-- P10 계약: [../phases/p10-plan.md](../phases/p10-plan.md) (#266 merged)
-- 원칙: [../principles/fact-first.md](../principles/fact-first.md)
-- 로드맵 v2: [../phases/roadmap-v2-solar-precision.md](../phases/roadmap-v2-solar-precision.md)
+- P10 계약: [../deprecated/phases/p10-plan.md](../deprecated/phases/p10-plan.md) (#266 merged)
+- 원칙: [../deprecated/principles/fact-first.md](../deprecated/principles/fact-first.md)
+- 로드맵 v2: [../deprecated/phases/roadmap-v2-solar-precision.md](../deprecated/phases/roadmap-v2-solar-precision.md)
 - P7-E 모바일 감지 도입: `apps/web/src/core/is-mobile.ts` (#210, #220)
 - 보류 상태 이슈: #219 (iOS Yoshida4 실기기 bench — 유지)
 

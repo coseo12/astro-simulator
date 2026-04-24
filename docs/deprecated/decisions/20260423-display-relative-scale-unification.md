@@ -1,6 +1,10 @@
-# ADR: Display-Relative Scale Unification — 단일 동적 스케일 모드 재설계
+# [DEPRECATED] ADR: Display-Relative Scale Unification — 단일 동적 스케일 모드 재설계
 
-- **상태**: Accepted
+- **상태**: **DEPRECATED (2026-04-25, roadmap reset)**
+- **폐기일**: 2026-04-25
+- **폐기 사유**: 본 ADR 이 `educational` / `scientific` 이중 모드를 폐기하고 단일 사실 모드를 디폴트로 전환한 결과, 기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태가 되어 UX 회귀 발생. Fact-First 원칙의 "1-클릭 사실 모드 접근" 의도가 반대 방향으로 구현됨. 사용자 결정으로 기획 전면 재구성.
+- **폐기 근거**: volt [#74](https://github.com/coseo12/volt/issues/74)
+- **참고**: 구현 코드 (Scale Tier Solar/Inner/Body / 8D 카메라 dolly) 는 기술 가치 유지 판단으로 유지하되 동작 계층 (기본 모드 / shortcut UX) 은 R1+ 에서 재조정
 - **날짜**: 2026-04-23
 - **결정자**: architect (P12 #298)
 - **관련**: #298 (본 Phase), #288 (P11-A Floating Origin), #271 (P10 scientific jitter 원인), #294 (P11-A non-focus 회귀), #278 (P10-C 뷰 모드 도입), #272 (모바일 보류), ADR `20260422-floating-origin.md` (P11-A 선행), ADR `20260420-mobile-support-suspension.md` (모바일 비-범위 근거), 원칙 `docs/principles/fact-first.md` (§Amendment 대상)

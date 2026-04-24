@@ -7,7 +7,7 @@
 
 ## 배경
 
-로드맵 v2 §P11 (`docs/phases/roadmap-v2-solar-precision.md` line 75~96) 의 3-way 분할 중 첫 번째. IAU 2015 실측 거리 (해왕성 궤도 4.5e12 m ≈ 30 AU) 를 `?view=scientific` 모드로 렌더 시 **float32 좌표 정밀도 한계**로 카메라 이동 시 jitter 발생 — P10 known issue #271 + Gemini 교차검증 Medium 고유 발견 근거.
+로드맵 v2 §P11 (`docs/deprecated/phases/roadmap-v2-solar-precision.md` line 75~96) 의 3-way 분할 중 첫 번째. IAU 2015 실측 거리 (해왕성 궤도 4.5e12 m ≈ 30 AU) 를 `?view=scientific` 모드로 렌더 시 **float32 좌표 정밀도 한계**로 카메라 이동 시 jitter 발생 — P10 known issue #271 + Gemini 교차검증 Medium 고유 발견 근거.
 
 **물리적 원인**:
 
@@ -236,15 +236,15 @@
 
 ## Amendments
 
-| 날짜       | 변경                                                                                                                                                                                                                                                                                                                                                                             | 이력                     |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 2026-04-22 | DoD β 정의에서 카메라 local 제한 제거 — scientific 모드에서 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 위치가 정상. cross-validate §2 초기 교정 ("focus 대상 + 카메라" 병행) 이 오류였음을 실 dev 서버 매 프레임 assert 실패로 확인                                                                                                                                       | PR #291 / #292 연쇄 수정 |
-| 2026-04-23 | P12 Display-Relative Scale Unification 에서 **역할 축소** (완전 제거 아님, Q10 판정). T3 body tier 에서 focus primary origin 유지, T1/T2 에서 `originOffset=[0,0,0]` no-op. 선행 "scientific 모드 jitter 해소" 는 단일 모드 전환으로 근본 원인 소멸하여 **#288 close**. 상세 맥락은 ADR `20260423-display-relative-scale-unification.md` §Amendment (c) Q10 Floating Origin 확정 | PR #298 Phase C          |
+| 날짜       | 변경                                                                                                                                                                                                                                                                                                                                                                                                     | 이력                     |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 2026-04-22 | DoD β 정의에서 카메라 local 제한 제거 — scientific 모드에서 카메라는 focus body 를 관찰하기 위해 수 AU 떨어진 위치가 정상. cross-validate §2 초기 교정 ("focus 대상 + 카메라" 병행) 이 오류였음을 실 dev 서버 매 프레임 assert 실패로 확인                                                                                                                                                               | PR #291 / #292 연쇄 수정 |
+| 2026-04-23 | P12 Display-Relative Scale Unification 에서 **역할 축소** (완전 제거 아님, Q10 판정). T3 body tier 에서 focus primary origin 유지, T1/T2 에서 `originOffset=[0,0,0]` no-op. 선행 "scientific 모드 jitter 해소" 는 단일 모드 전환으로 근본 원인 소멸하여 **#288 close**. 상세 맥락은 ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` §Amendment (c) Q10 Floating Origin 확정 | PR #298 Phase C          |
 
 ## 참고
 
-- `docs/phases/roadmap-v2-solar-precision.md` §P11 (line 75~96)
-- `docs/principles/fact-first.md` §"scientific 모드 UX 보호" (line 89~96)
+- `docs/deprecated/phases/roadmap-v2-solar-precision.md` §P11 (line 75~96)
+- `docs/deprecated/principles/fact-first.md` §"scientific 모드 UX 보호" (line 89~96)
 - `docs/decisions/20260420-mobile-support-suspension.md` — 모바일 보류 (M1 백업 경로 비현실성 근거)
 - `docs/retrospectives/p10-retrospective.md` — P10 회고 (#271 known issue 원 기술)
 - CLAUDE.md "신규 함수 ≠ 신규 구현" / "신규 데이터 ≠ 신규 코드" / "주석 계약 vs 구현 drift" 교훈
