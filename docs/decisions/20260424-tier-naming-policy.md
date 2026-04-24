@@ -231,7 +231,7 @@ P12 ADR `20260423-display-relative-scale-unification.md` §Amendments (2026-04-2
 
 ### Prediction 2: GPU tier 도입 → Scale Tier 코드 라인 변화 0
 
-- **예측**: #290 P11-C 에서 `apps/web/src/core/detect-gpu-tier.ts` (승격) + Graceful Degradation 모달 + URL sync 만으로 GPU tier 분기 동작. Scale Tier 파일 **코드 라인 변화 0**
+- **예측**: #290 P11-C 에서 `apps/web/src/core/detect-gpu-tier.ts` (승격) + 자동 억제 조합 + 알림 키 치환 (`tier-c-graceful-degradation`) + URL sync 만으로 GPU tier 분기 동작. Scale Tier 파일 **코드 라인 변화 0**
 - **재현 검증**: PR #290 머지 후 동일 grep 명령 → `0`
 - **예측 실패 시**: GPU tier 프로파일이 Scale Tier 계산에 침투했다는 신호. 예: GPU tier-c 에서 Scale Tier `body` 강제 제외 같은 로직. ADR Amendment 박제
 

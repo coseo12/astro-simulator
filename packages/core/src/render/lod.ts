@@ -42,7 +42,7 @@ export const LOD_PIXEL_THRESHOLDS = {
 } as const;
 
 /**
- * LOD 분기 입력 — focus / override 는 optional.
+ * LOD 분기 입력 — focus / override / pixelThresholds 는 optional.
  */
 export interface LodDecisionInput {
   /** body 분류에 필요한 필드 (kind + mass + radius). */
@@ -60,6 +60,16 @@ export interface LodDecisionInput {
    * URL `?lod=` override. `'auto'` 또는 undefined 면 자동 판정, 그 외는 해당 LOD 강제.
    */
   override?: LodOverride;
+  /**
+   * GPU tier 프로파일 주입 (P11-C #290 Amendment 2026-04-24).
+   *
+   * 부재 시 `LOD_PIXEL_THRESHOLDS` 상수 default (high=50, mid=8) 사용 — tier-a/b 경로.
+   * tier-c 프로파일 주입 시 (high=100, mid=20) sub-pixel body 를 low billboard 로 강제.
+   *
+   * `@lod-threshold-tier-drift` — 하드코딩 상수 직접 참조 금지.
+   * ADR `docs/decisions/20260424-p11-b-lod-design.md` §Amendments (2026-04-24).
+   */
+  pixelThresholds?: { high: number; mid: number };
 }
 
 /**
@@ -74,7 +84,8 @@ export interface LodDecisionInput {
  * 미지 kind 는 `console.warn` + `low` fallback. default 항목 도입 금지 (volt #49 교훈).
  */
 export function lodFromScreenCoverage(input: LodDecisionInput): LodLevel {
-  const { body, cameraDistanceMeters, screenCoverage, isFocused, override } = input;
+  const { body, cameraDistanceMeters, screenCoverage, isFocused, override, pixelThresholds } =
+    input;
 
   // 1. URL override 최우선 (auto 는 자동 판정으로 내려감).
   if (override && override !== 'auto') {
@@ -99,9 +110,11 @@ export function lodFromScreenCoverage(input: LodDecisionInput): LodLevel {
     return 'high';
   }
 
-  // 4. 픽셀 경계.
-  if (screenCoverage >= LOD_PIXEL_THRESHOLDS.high) return 'high';
-  if (screenCoverage >= LOD_PIXEL_THRESHOLDS.mid) return 'mid';
+  // 4. 픽셀 경계 — tier 프로파일 주입 가능 (ADR Amendment 2026-04-24).
+  //    인자 부재 시 LOD_PIXEL_THRESHOLDS 상수 default fallback.
+  const thresholds = pixelThresholds ?? LOD_PIXEL_THRESHOLDS;
+  if (screenCoverage >= thresholds.high) return 'high';
+  if (screenCoverage >= thresholds.mid) return 'mid';
   return 'low';
 }
 
