@@ -26,30 +26,41 @@ v0.12.0 (P12-A/B/C 완결) 머지 후 Scale Tier 는 **카메라 거리 기반 3
 
 ### 기존 자산 재사용 조사 (CLAUDE.md "신규 함수 ≠ 신규 구현")
 
-| 자산                                                                                                    | 위치                                                    | 본 설계 처리                                                                                                         |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `Tier` / `renderScaleForTier` / `resolveCurrentTier`                                                    | `packages/core/src/scene/tier.ts`                       | **읽기 전용 의존** — LOD 는 `activeTier` 를 참조하되 `setTier`/`Tier` 확장 금지 (Scale Tier ADR Prediction 1 계약)   |
-| `FloatingOrigin`                                                                                        | `packages/core/src/coords/floating-origin.ts`           | **읽기 전용 의존** — LOD 계산 이전에 이미 `fo.toLocal` 이 적용된 mesh.position 기반으로 동작, 투명                   |
-| `CelestialBody.kind` (`'star' \| 'planet' \| 'dwarf-planet' \| 'moon' \| 'asteroid' \| 'comet' \| ...`) | `packages/core/src/ephemeris/solar-system-loader.ts:50` | **읽기 전용 의존** — body 타입별 최소 거리 보정의 입력. zod enum 재활용                                              |
-| `createBodyMesh`                                                                                        | `packages/core/src/scene/solar-system-scene.ts`         | **확장** — mesh 생성 시 high/mid/low 3가지 geometry variant 동시 prep 또는 mid/low 를 lazy create. §§§결정 축 4 참조 |
-| `parseIntegratorKind` (URL parser 패턴)                                                                 | `apps/web/src/core/parse-integrator.ts`                 | **패턴 재사용** — `parseLodLevel` 을 동일 구조로 신설 (공식값/fallback/console.warn)                                 |
-| `UrlSync` 컴포넌트                                                                                      | `apps/web/src/core/url-sync.tsx`                        | **확장** — `?lod=` 초기 1회 → sendCommand (Zustand 쓰기 없음, LOD 는 scene 내부 상태 — §§§결정 축 5 참조)            |
-| `updateAt` 루프 (mesh.position 할당 직전)                                                               | `packages/core/src/scene/solar-system-scene.ts:599~605` | **확장** — `renderScaleForTier` 곱하기 **직전** 에 LOD 분기 결과로 mesh visibility/variant 스왑                      |
-| `hud-corners.tsx` 우하단                                                                                | `apps/web/src/components/layout/hud-corners.tsx`        | **참고** — draw call 수 dev overlay 추가 위치 (기존 "정확도 · T1 관측" 영역 아래 또는 좌하단 신설)                   |
+| 자산                                                                                                    | 위치                                                                                                  | 본 설계 처리                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Tier` / `renderScaleForTier` / `resolveCurrentTier`                                                    | `packages/core/src/scene/tier.ts`                                                                     | **읽기 전용 의존** — LOD 는 `activeTier` 를 참조하되 `setTier`/`Tier` 확장 금지 (Scale Tier ADR Prediction 1 계약)                                                         |
+| `FloatingOrigin`                                                                                        | `packages/core/src/coords/floating-origin.ts`                                                         | **읽기 전용 의존** — LOD 계산 이전에 이미 `fo.toLocal` 이 적용된 mesh.position 기반으로 동작, 투명                                                                         |
+| `CelestialBody.kind` (`'star' \| 'planet' \| 'dwarf-planet' \| 'moon' \| 'asteroid' \| 'comet' \| ...`) | `packages/core/src/ephemeris/solar-system-loader.ts:50`                                               | **읽기 전용 의존** — body 타입별 최소 거리 보정의 입력. zod enum 재활용                                                                                                    |
+| `createBodyMesh`                                                                                        | `packages/core/src/scene/solar-system-scene.ts`                                                       | **확장** — mesh 생성 시 high/mid/low 3가지 geometry variant 동시 prep 또는 mid/low 를 lazy create. §§§결정 축 4 참조                                                       |
+| `parseIntegratorKind` (URL parser 패턴)                                                                 | `apps/web/src/core/parse-integrator.ts`                                                               | **패턴 재사용** — `parseLodLevel` 을 동일 구조로 신설 (공식값/fallback/console.warn)                                                                                       |
+| `UrlSync` 컴포넌트                                                                                      | `apps/web/src/core/url-sync.tsx`                                                                      | **확장** — `?lod=` 초기 1회 → sendCommand (Zustand 쓰기 없음, LOD 는 scene 내부 상태 — §§§결정 축 5 참조)                                                                  |
+| `updateAt` 의 mesh.position 할당 루프 (`mesh.position.set`)                                             | `packages/core/src/scene/solar-system-scene.ts` (`updateAt` 내부, 현재 `mesh.position.set` 호출 지점) | **확장** — `renderScaleForTier` 곱하기 **직전** 에 LOD 분기 결과로 mesh visibility/variant 스왑 (라인 번호는 구현 시점 기준으로 이동 가능하므로 함수명/loop 설명으로 참조) |
+| `hud-corners.tsx` 우하단                                                                                | `apps/web/src/components/layout/hud-corners.tsx`                                                      | **참고** — draw call 수 dev overlay 추가 위치 (기존 "정확도 · T1 관측" 영역 아래 또는 좌하단 신설)                                                                         |
 
 **신규 구현**: `packages/core/src/render/lod.ts` (순수 계산 함수 + 타입) — ADR `20260424-tier-naming-policy.md` §1 SSoT 규약으로 이미 경로 박제됨.
 
-### Scale Tier ADR Prediction 1 의 대응 계약
+### 네이밍 정책 ADR Prediction 1 의 대응 계약
 
-ADR `20260423-display-relative-scale-unification.md` §"Concrete Prediction" 1 에서 이미 박제된 예측:
+선행 ADR `20260424-tier-naming-policy.md` §"Concrete Prediction" **Prediction 1** (line 207~211) 에 이미 박제된 예측:
 
 > **Prediction 1**: #289 P11-B 에서 `packages/core/src/render/lod.ts` (신규) + `sim-canvas.tsx` LOD 통합만으로 Distance-based mesh swap 이 동작해야 한다. `packages/core/src/scene/tier.ts` / `solar-system-scene.ts` / `tier-transition.ts` 의 **코드 라인 변화 0**.
 
-본 ADR 은 이 예측의 **상대편 계약**:
+본 ADR 설계 단계에서 `solar-system-scene.ts` 0 라인 예측이 구조적으로 재현 불가능함이 확인됐다 — `createBodyMesh` 가 mesh 객체의 유일한 owner 이고 LOD 는 geometry variant 스왑이 필요하므로 scene API 확장 없이 외부 주입이 불가능하다. 이에 선행 ADR 에 **Amendment (2026-04-24)** 박제로 예외 허용을 정식화했다:
 
-- `solar-system-scene.ts` **확장은 허용** (mesh 할당 루프에 LOD 분기 hook 추가) — 단, `tier.ts` / `tier-transition.ts` 는 변화 0
-- Scale Tier 관점에서는 "Prediction 1 성공" = `tier.ts` + `tier-transition.ts` diff = 0 만 재현 확인
-- LOD 관점에서는 `solar-system-scene.ts` 의 변화를 **LOD hook 추가 용도로만 제한** (mesh.position 계산식/tier 상수/FloatingOrigin 상호작용 수정 금지)
+선행 ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment (2026-04-24) 참조.
+
+**상대편 계약 (본 ADR)**:
+
+- `solar-system-scene.ts` **확장은 허용** — LOD 분기 hook 추가 용도에 한함 (선행 ADR Amendment 계약 준수)
+- **금지 조건** (변경 금지 유지):
+  - `mesh.position` 좌표 수식 / `renderScaleForTier` 적용 지점
+  - `Tier` 상수 / `activeTier` 의미 변경
+  - `FloatingOrigin` 상호작용 (`fo.toLocal` / `fo.update` / `fo.reset`)
+  - `setTier` 의 origin 갱신 로직
+- `tier.ts` / `tier-transition.ts` 는 **계속 0 라인** 유지 — 자동 수치 재현 검증 (§결과·재검토 조건 참조)
+- Scale Tier 관점에서는 "Prediction 1 부분 성공" = `tier.ts` + `tier-transition.ts` diff = 0 재현 + `solar-system-scene.ts` 수기 리뷰로 금지 조건 위배 0 확인
+
+**선례**: P12 ADR `20260423-display-relative-scale-unification.md` §Amendments (2026-04-23 Q10 재평가 + QA 회귀 수정, line 379) 에서도 동일 파일에 `activeTier === 'body'` 분기 3지점을 추가하며 "코드 변경 0" 을 부분 수정한 전례가 있다.
 
 ---
 
@@ -185,6 +196,8 @@ DoD #3 "LOD alpha blend pop-in 최소화 — high↔mid 전환 시 단일 프레
 - B (single-frame) 는 headless 검증에서 pop-in 측정 어려움 (1 프레임 = 16ms, screenshot 타이밍 불안정). 200ms 면 중간 프레임 캡처 가능해 회귀 가드 검증 용이 (volt #33 headless false positive 방어)
 
 ### 축 4. LOD mesh 자산 전략
+
+> **성격**: 축 1 (픽셀 점유 분기) + 축 3 (alpha blend pop-in) 의 **지지 축**. DoD #1 (draw call ≥ 20% 차이) 와 #3 (pop-in diff < 15%) 의 실현 수단. 재계약 DoD 와 직접 1:1 매핑되지는 않으나, 축 1·3 의 수치 목표를 달성하려면 구체 geometry/material 전략이 고정되어야 하므로 별도 축으로 분리.
 
 3 단계 mesh/billboard 구성.
 
@@ -348,13 +361,13 @@ export function lodFromScreenCoverage(
 
 ### 4. 테스트 전략
 
-| 레이어               | 위치                                                     | 검증 대상                                                                                                                                            |
-| -------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 단위 (순수 함수)     | `packages/core/src/render/lod.test.ts`                   | `lodFromScreenCoverage` 의 9개 matrix (태양/지구/달/이오/소행성 × 근/중/원) + 12 카테고리 카테고리 enum 완비 assert ("주석 계약 vs 구현 drift" 방어) |
-| 단위 (URL parser)    | `apps/web/src/core/parse-lod-level.test.ts`              | valid / case-insensitive / invalid fallback + console.warn                                                                                           |
-| 통합 (scene)         | 기존 `solar-system-scene.test.ts` 에 하나 추가           | LOD 전환 시 Scale Tier 코드 변경 0 assert — `git diff` 대체할 **함수 호출 카운트 assert**                                                            |
-| E2E / browser-verify | `apps/web/scripts/browser-verify-lod.mjs` (신규)         | 3 tier × 3 LOD 조합 draw call 수 ≥ 20% 차이, screenshot diff < 15%                                                                                   |
-| bench                | 기존 `pnpm bench` scenario 5종에 `baselineTier='a'` 지정 | idle / play-1d / play-1y / focus-earth / focus-neptune — v0.12.0 + #313 M3 기준 대비 < 5%                                                            |
+| 레이어               | 위치                                                     | 검증 대상                                                                                                                                              |
+| -------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 단위 (순수 함수)     | `packages/core/src/render/lod.test.ts`                   | `lodFromScreenCoverage` 의 9개 matrix (태양/지구/달/이오/소행성 × 근/중/원) + 12 카테고리 카테고리 enum 완비 assert ("주석 계약 vs 구현 drift" 방어)   |
+| 단위 (URL parser)    | `apps/web/src/core/parse-lod-level.test.ts`              | valid / case-insensitive / invalid fallback + console.warn                                                                                             |
+| 통합 (scene)         | 기존 `solar-system-scene.test.ts` 에 하나 추가           | LOD 전환 시 Scale Tier 코드 변경 0 assert — `git diff` 대체할 **함수 호출 카운트 assert**                                                              |
+| E2E / browser-verify | `apps/web/scripts/browser-verify-lod.mjs` (신규)         | 3 tier × 3 LOD 조합 draw call 수 ≥ 20% 차이, screenshot diff < 15%                                                                                     |
+| bench                | 기존 `pnpm bench` scenario 5종에 `baselineTier='a'` 지정 | idle / play-1d / play-1y / focus-earth / focus-neptune — baseline = #313 M3 (PR #316 머지 커밋 `aa2ceb0`, tag `v0.12.0` = `61cbfa7d`) 대비 회귀율 < 5% |
 
 **카테고리 enum 완비 assert** 예시:
 
@@ -435,7 +448,17 @@ DoD #1 "각 단계 draw call 수 차이 ≥ 20%" 의 수단.
 
 ### Scale Tier 관련 파일 (변경 0, Prediction 1 재현)
 
-`packages/core/src/scene/tier.ts` / `tier-transition.ts` — 변경 0 라인 (재현 검증: `git diff main -- packages/core/src/scene/tier.ts packages/core/src/scene/tier-transition.ts | grep '^[+-][^+-]' | wc -l` → `0`).
+`packages/core/src/scene/tier.ts` / `tier-transition.ts` — 변경 0 라인. 선행 ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment (2026-04-24) 재현 검증 명령 준수:
+
+```bash
+git diff <base>..<head> -- \
+  packages/core/src/scene/tier.ts \
+  packages/core/src/scene/tier-transition.ts \
+  --numstat | awk '{s+=$1+$2} END {print s+0}'
+# 기대값: 0 (양쪽 파일 총 추가/삭제 라인 수)
+```
+
+`packages/core/src/scene/solar-system-scene.ts` 는 LOD hook 추가 용도로 예외 허용 (선행 ADR Amendment). 수기 리뷰로 "금지 조건 위배 0" 확인 — `mesh.position` 수식 / `renderScaleForTier` / `Tier` 상수 / `FloatingOrigin` 상호작용 / `setTier` origin 로직 변경 금지.
 
 ---
 
@@ -447,7 +470,14 @@ DoD #1 "각 단계 draw call 수 차이 ≥ 20%" 의 수단.
 
 **근거 메커니즘**: LOD 분기는 body.kind + body.mass + body.radius 만 참조. 신규 body 가 기존 12 카테고리 (star / planet-giant / ... / star-cluster) 중 하나에 속하면 데이터 추가만으로 기존 LOD 분기가 동작.
 
-**재현 검증**: P13 머지 시점에 `git diff <P13 PR base>..<P13 PR head> -- packages/core/src/render/` → `0` 라인.
+**재현 검증**:
+
+```bash
+git diff <P13 PR base>..<P13 PR head> -- \
+  packages/core/src/render/ \
+  --numstat | awk '{s+=$1+$2} END {print s+0}'
+# 기대값: 0
+```
 
 **예측 실패 시**: 신규 body 가 기존 12 카테고리를 벗어난다는 신호. 예: 외계행성 `exoplanet`, 인공위성 `satellite` 세분화. ADR Amendment 박제 + `LOD_BODY_THRESHOLDS` 항목 추가. 카테고리 enum 완비 테스트가 fail 로 drift 즉시 감지 (주석 계약).
 
@@ -457,7 +487,14 @@ DoD #1 "각 단계 draw call 수 차이 ≥ 20%" 의 수단.
 
 **근거**: LOD 는 `activeTier` 를 **읽기만** — `screenCoverageRadius` 는 `renderScale` 인자로 받지만 Scale Tier 내부 상수를 직접 참조 안 함.
 
-**재현 검증**: Scale Tier 튜닝 PR 이 나올 경우 `git diff <PR base>..<PR head> -- packages/core/src/render/` → `0` 라인.
+**재현 검증**:
+
+```bash
+git diff <PR base>..<PR head> -- \
+  packages/core/src/render/ \
+  --numstat | awk '{s+=$1+$2} END {print s+0}'
+# 기대값: 0
+```
 
 **예측 실패 시**: LOD 가 Scale Tier 내부 상수를 몰래 의존했다는 신호. LOD hook 리팩토링 필요.
 
@@ -467,7 +504,14 @@ DoD #1 "각 단계 draw call 수 차이 ≥ 20%" 의 수단.
 
 **근거**: LOD 는 geometry/mesh visibility/alpha 만 조작. material 종류 (Standard → PBR) 는 투명.
 
-**재현 검증**: PBR PR diff.
+**재현 검증**:
+
+```bash
+git diff <PBR PR base>..<PBR PR head> -- \
+  packages/core/src/render/ \
+  --numstat | awk '{s+=$1+$2} END {print s+0}'
+# 기대값: 0
+```
 
 **예측 실패 시**: LOD 가 특정 material property 를 가정했다는 신호 → ADR Amendment.
 
