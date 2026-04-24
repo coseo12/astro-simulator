@@ -5,6 +5,7 @@ import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'n
 import { useEffect, useRef } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from './sim-context';
+import { parseLodLevel } from './parse-lod-level';
 
 const MODE_VALUES: SimMode[] = ['observe', 'research', 'education', 'sandbox'];
 // P3-0 #126 — barnes-hut/webgpu/auto는 URL로는 받지만 런타임은 미구현 폴백.
@@ -37,6 +38,9 @@ export function UrlSync() {
     'engine',
     parseAsStringEnum<PhysicsEngineUrl>([...ENGINE_VALUES]).withOptions({ history: 'replace' }),
   );
+  // P11-B #289 — ?lod=high|mid|low|auto 초기 1회 파싱 → sendCommand.
+  // store 에 저장하지 않음 (LOD 는 scene 내부 상태) — URL → Core → Scene 단방향 파이프.
+  const [urlLod] = useQueryState('lod', parseAsString.withOptions({ history: 'replace' }));
 
   const mode = useSimStore((s) => s.mode);
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
@@ -69,6 +73,9 @@ export function UrlSync() {
     if (urlEngine) {
       setPhysicsEngine(urlEngine);
     }
+    // P11-B #289 — `?lod=` 초기 1회 전달. 미지정 (null) 이면 parseLodLevel 이 'auto' 반환 → override 해제.
+    const parsedLod = parseLodLevel(urlLod);
+    sendCommand({ type: 'setLodOverride', level: parsedLod });
     // P12-C #298 — `?view=scientific|educational` 은 단일 모드 전환으로 폐기.
     // 기존 북마크는 파라미터를 조용히 무시하고 단일 모드로 자연 진입 (backward-ignore, ADR §재검토 암묵 전제).
     // eslint-disable-next-line react-hooks/exhaustive-deps
