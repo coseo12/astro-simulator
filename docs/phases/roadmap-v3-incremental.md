@@ -1,0 +1,134 @@
+# 로드맵 v3 — Incremental Body-by-Body Build
+
+> **Status**: Active (2026-04-25 재구성)
+> **박제일**: 2026-04-25
+> **Supersedes**: `docs/deprecated/phases/roadmap-v2-solar-precision.md` (전면 폐기)
+> **Supersedes**: `docs/deprecated/principles/fact-first.md` (원칙 폐기)
+> **근거**: volt [#74](https://github.com/coseo12/volt/issues/74) — "사실 모드 단일화 부작용 — UX 가시성 회귀"
+
+---
+
+## 재구성 배경
+
+v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사용자 브라우저 실측 결과 **기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태** 로 UX 회귀 확인. DoD 수치 (screenshot diff / bench / fps) 는 전부 PASS 였으나 사용자가 인지하는 제품이 "초기 기획 상태보다 못한 상태". 상세 원인은 volt [#74](https://github.com/coseo12/volt/issues/74) 참조.
+
+사용자 결정 (2026-04-25): **기획 의도 전면 폐기 + 현재 UI 기준 재구성 + 태양부터 하나씩 incremental build**.
+
+---
+
+## 핵심 원칙
+
+1. **현재 UI baseline 기준 유지** — 상단 네비 (관찰/연구 + 4개 shortcut) / HUD / 시간 바 등 구조 보존. `docs/baselines/2026-04-25-current-ui-*.png` 참조
+2. **"사용자가 실제로 보이는 body"** 를 매 R-Phase DoD 에 포함 — 추상적 DoD (screenshot diff, bench 등) 는 2차, 시각 가시성이 1차
+3. **추가만, 제거 없이** — UI 레이아웃 / shortcut / HUD 요소는 필요 시 추가, 기존 제거 최소화
+4. **수동 브라우저 검증 필수** — 각 R-Phase 마다 실 Chrome GUI 에서 사용자 수동 확인. browser-verify 자동화는 보조
+5. **R-Phase 단위로 커밋 + 릴리스 independent** — 앞 R 만 배포돼도 시스템 정상 동작 (backward-compat)
+6. **측정 가능한 UX DoD** — 예: "body X 가 화면에서 ≥20px 크기로 visible", "body X focus 시 화면 중앙 위치"
+
+---
+
+## Phase 개요 (skeleton — 각 R 은 별도 이슈 생성 시점에 상세화)
+
+| R-Phase | 테마                               | 규모 (추정) | 상태                |
+| ------- | ---------------------------------- | ----------- | ------------------- |
+| **R1**  | 태양 하나만                        | 1~2d        | 계획 중 (이슈 예정) |
+| **R2**  | R1 + 수성                          | 1~2d        | 계획 중             |
+| **R3**  | R2 + 금성                          | 1~2d        | 계획 중             |
+| **R4**  | R3 + 지구 + 달                     | 1~2d        | 계획 중             |
+| **R5**  | R4 + 화성 + (포보스/데이모스 선택) | 1~2d        | 계획 중             |
+| **R6**  | R5 + 목성 + 갈릴레이 4             | 2~3d        | 계획 중             |
+| **R7**  | R6 + 토성 + 고리                   | 2~3d        | 계획 중             |
+| **R8**  | R7 + 천왕성                        | 1~2d        | 계획 중             |
+| **R9**  | R8 + 해왕성                        | 1~2d        | 계획 중             |
+| **R10** | 왜소행성 (명왕성 외) + 혜성        | 2~3d        | 선택적              |
+
+**총 예상: 14~22 영업일** (R10 선택 포함)
+
+---
+
+## 각 R-Phase 공통 DoD 템플릿
+
+매 R-Phase 이슈 생성 시 아래 공통 DoD 포함 (구체 수치는 body 크기에 따라 조정):
+
+- [ ] **가시성** — 기본 진입 (`/`) 상태에서 body X 가 화면에서 **≥ 4px** 크기로 명시적 visible (billboard marker 또는 과장 적용)
+- [ ] **Focus 동작** — body X 클릭 / `?focus=X` URL 으로 focus 진입 가능. focus 시 화면 중앙 위치 + 적절한 크기 (≥ 100px 또는 화면의 10% 이상)
+- [ ] **Shortcut** — 상단 shortcut 버튼에 body X 추가 (현재 태양/지구/목성/해왕성 4개에서 순차 확장)
+- [ ] **궤도** — body X 궤도 라인이 기본 진입 상태에서 visible
+- [ ] **Info 패널** — body X focus 시 실측 정보 (mass / radius / semi-major axis / eccentricity 등) 표시
+- [ ] **회귀 가드** — 이전 R-Phase baseline 대비 기존 body 가시성 변화 없음 (육안 확인 + 스크린샷 diff)
+- [ ] **수동 브라우저 검증** — 실 Chrome GUI 에서 사용자 1차 확인 및 승인 (CRITICAL #3)
+
+---
+
+## R1 상세 (첫 스프린트)
+
+### 목적
+
+기본 진입 화면에서 **태양이 명시적으로 보인다**. 현재 화면 (궤도 라인 + 해왕성 1개 + 중앙 흰 점) 에서 **중앙 흰 점을 명확한 태양 mesh / billboard 로 승격**.
+
+### 예상 DoD (이슈 생성 시 PM 라운드에서 확정)
+
+- [ ] 기본 진입 상태에서 태양이 화면 중앙에 **≥ 30px** 크기로 visible (현재는 sub-pixel ~1px)
+- [ ] 과장 배수 `sunScale` 파라미터 단일 상수 박제 + tooltip 에 배율 명시 (투명성)
+- [ ] 태양 shortcut 버튼 클릭 시 focus → 화면 중앙 정렬 + 크기 확대 (Body tier 유지)
+- [ ] `?focus=sun` URL override 동작 (focusBodyId store 필드 추가 전제)
+- [ ] 태양 info 패널: mass / radius / luminosity / spectral class / dataSource (IAU 2015)
+- [ ] 현재 baseline 대비 궤도 라인 / HUD / 상단 네비 시각 변화 없음
+- [ ] 사용자 수동 브라우저 확인 + 승인
+
+### 선결 과제 (R1 내 해결)
+
+- **Store `focusBodyId` 필드 추가** — 현재 부재 상태, URL parser 와 함께 통합
+- **Solar tier 기본 상태에서 태양 visibility** — Fact-First 맥락 없는 새 해석으로 과장 배수 적용 (P12 ADR §5원칙 §1 "상대 비율 = 실측 고정" 은 폐기됨)
+
+### R1 비-범위
+
+- 다른 행성 가시성 (R2+ 에서 순차)
+- 태양 PBR / corona shader / 광도 효과 (R1 은 mesh + billboard 로 충분, 시각 효과는 후속)
+- `educational` / `scientific` 모드 토글 재도입 (P12 폐기 결정 유지)
+
+---
+
+## 기존 코드 / ADR 유지 (Q3=B)
+
+다음은 기술 가치가 있어 유지 (로드맵 reset 와 무관):
+
+- **Floating Origin** (`docs/decisions/20260422-floating-origin.md`) — float32 jitter 해소 기술
+- **LOD 3단** (`docs/decisions/20260424-p11-b-lod-design.md`) — high/mid/low billboard 전환
+- **Tier 네이밍 정책** (`docs/decisions/20260424-tier-naming-policy.md`) — Scale/Data/GPU/LOD 4 네임스페이스 분리
+- **Tier Preset** (`docs/decisions/20260424-tier-preset-design.md`) — GPU tier 감지 + 자동 억제
+- **모바일 보류 ADR** (`docs/decisions/20260420-mobile-support-suspension.md`) — 모바일 지원 정책
+
+단 **동작 계층 일부 재조정** 가능:
+
+- Solar/Inner/Body tier 전환 임계값 — R-Phase 마다 재확인
+- 기본 진입 tier — Solar 디폴트가 UX 빈 화면 원인이었음, R1 에서 재검토
+
+---
+
+## 폐기된 문서 (역사 참조)
+
+- `docs/deprecated/principles/fact-first.md` — Fact-First 원칙
+- `docs/deprecated/phases/roadmap-v2-solar-precision.md` — 로드맵 v2
+- `docs/deprecated/phases/p10-plan.md` — P10 plan
+- `docs/deprecated/decisions/20260423-display-relative-scale-unification.md` — P12 ADR
+
+---
+
+## 재평가 조건
+
+로드맵 v3 의 "매 R-Phase 가시성 1차 DoD" 접근도 미래에 회귀할 수 있음. 다음 조건 중 하나 충족 시 재평가:
+
+1. R1~R5 까지 진행 후에도 사용자가 "기본 화면이 빈 것 같다" 피드백
+2. R-Phase 단위가 너무 느리다고 느껴 병행 (예: R2+R3 묶음) 요청
+3. 각 R-Phase 의 과장 배수가 사용자 간 선호 차이로 논쟁이 될 경우 — 그 시점에 mode 토글 재도입 재검토 가능 (P12 폐기 결정 재번복)
+
+---
+
+## 참조
+
+- `docs/baselines/README.md` — 2026-04-25 재구성 시점 UI baseline 스크린샷
+- volt [#74](https://github.com/coseo12/volt/issues/74) — 재구성 근거 교훈
+- volt [#75](https://github.com/coseo12/volt/issues/75) — SSoT JSON 부호 규약 메타 교훈
+- volt [#76](https://github.com/coseo12/volt/issues/76) — PM multi-turn drift 재현 교훈
+- CLAUDE.md 프로젝트 고유 섹션 — "Incremental Body-by-Body Build (v3)"
