@@ -10,6 +10,7 @@ Semantic Versioning을 따른다.
 ### Fix
 
 - **billboard variant `bodyScale` 분리** ([#333](https://github.com/coseo12/astro-simulator/issues/333), Phase 2) — `createBodyBillboard` 의 `diameter` 식에서 `bodyScale` 곱셈 제거. sphere/mid variant 는 그대로 유지 (시각 과장 책임 단독). billboard 는 sub-pixel draw call 절감 책임 단독 — 책임 직교화. focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 edge case 에서 거대 quad 회귀 차단 (PR [#332](https://github.com/coseo12/astro-simulator/pull/332) 검증 중 발견된 시각 회귀의 근본 해결). ADR `20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조. 신규 단위 테스트 (`packages/core/src/scene/body-scale-variants.test.ts`, 9 케이스) drift 방어
+- **store-scene 동기화 단일 경로 통합** ([#334](https://github.com/coseo12/astro-simulator/issues/334) + [#335](https://github.com/coseo12/astro-simulator/issues/335)) — `SimulationCore.setCameraHandlers(focus, reset, setRadius)` → `setCameraRadiusHandler(setRadius)` 단일 인자로 단순화 + 리네이밍. focus / resetCamera 콜백 폐기 → `useSimStore.subscribe(selectedBodyId)` 분기가 scene focus / 카메라 reset 단일 책임. `syncFocusToScene(bodyId)` helper 추출 (마운트 직후 1회 sync 와 subscribe 분기 식 공유, DRY). `case 'focusOn'` / `case 'resetCamera'` 의 `bodySelected` event emit 은 보존 — store sync 경로 (core-adapter → setSelectedBody) 의존. **이중 호출 해소**: 클릭 시 `controller.focusOn` 1회만 호출 (이전 2회). `setSelectedBody(null)` 시 `controller.reset` 1회 (이전 2회 또는 미래 info-panel close 누락 가능성). PR #332 Phase 1 fix `acfcb74` 의 임시 해결책 (subscribe + setCameraHandlers 이중 경로) 을 정식 통합으로 대체. ADR `20260425-r1-store-scene-sync-unification.md` §결정 1~6. 회귀 가드: `simulation-core-camera-sync.test.ts` 6 케이스 (이벤트 emit / 핸들러 호출 횟수 / `setCameraHandlers` 부활 방지)
 
 ### Chore
 
@@ -54,6 +55,7 @@ PR [#332](https://github.com/coseo12/astro-simulator/pull/332) (`6e7382e`) — �
 - PR [#339](https://github.com/coseo12/astro-simulator/pull/339): PATCH (ADR amendment, 문서 보강만)
 - PR [#340](https://github.com/coseo12/astro-simulator/pull/340): PATCH (CHANGELOG 소급 박제, 문서 보강만)
 - PR [#342](https://github.com/coseo12/astro-simulator/pull/342) (#333 Phase 2): **MINOR** (billboard `bodyScale` 분리 — 시각 행동 변화 + drift 방어 단위 테스트 9 케이스)
+- PR [#346](https://github.com/coseo12/astro-simulator/pull/346) (#334 + #335): **MINOR** (`setCameraHandlers` → `setCameraRadiusHandler` 내부 API 리네이밍 + 시그니처 단순화 + 행동 변화 — 이중 호출 1회로 단일화)
 
 ### Notes
 
