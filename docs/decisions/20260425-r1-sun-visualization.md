@@ -324,15 +324,95 @@ Prediction 실패 시 두 갈래:
 - **카메라 radius=35 가 미래 카메라 reset 변경 시 점유율 변경** — `apps/web/src/components/sim-canvas.tsx:158` 의 `radius: 35` 가 변경되면 본 ADR §결정 1 의 점유율 표가 무효화. 재검토 트리거 #4 에 해당
 - **tier 전환 시 sunScale 동작 비-범위 (Q3=C)** — Solar tier 진입 시는 sunScale 적용, Inner/Body tier 진입 시 동작 미정의. 현재 구현은 모든 tier 에서 동일 식 적용 → 모든 tier 에서 sunScale 영향. R2+ 에서 "Solar tier 만 sunScale 적용" 또는 "tier 별 sunScale 차등" 결정 가능
 
-#### Phase 2 미해결 사항 ([#333](https://github.com/coseo12/astro-simulator/issues/333))
+#### Phase 2 결정 ([#333](https://github.com/coseo12/astro-simulator/issues/333)) — billboard 에서 bodyScale 제거 (후보 A 채택)
 
-billboard variant 의 `bodyScale` 효과 분리 (sphere = ×75, billboard = base 또는 cap) 는 본 ADR 범위 외로 분리됨. PR [#332](https://github.com/coseo12/astro-simulator/pull/332) 검증 중 발견된 거대 quad 회귀의 **근본 원인** 이며, Phase 1 fix (commit `acfcb74` — `selectedBodyId` ↔ scene focus 동기화) 가 일상 케이스를 차단했으나 **edge case (focus 강제 해제 + 1 AU 외부 + 픽셀 경계 부족)** 는 여전히 미해결.
+**날짜**: 2026-04-25 (architect 결정 — #333 단계)
+**관련**: PR #332 (R1 본 구현), #336 (Phase 2 분리 박제), reviewer #332 §D-1, #339 (Phase 2 분리 사유 박제)
 
-- **분리 결정 사유**: R1 좁은 범위 (단일 body, sun) 에서는 회귀 가드 패스 필요충분. R2~R10 진입 전 재검토
-- **자동 회귀 가드**: `apps/web/scripts/p329-qa-focus-lod-guard.mjs` 가 본 회귀 시그니처를 자동 감지 (`channel: 'chrome'` 강제, sphere/billboard 자동 판별). 재발 시 CI 단계에서 차단
-- **처리 시점**: R2 (수성) 시작 전 권고 (medium 우선순위). #333 본문에 4 후보안 (A: billboard 에서 bodyScale 제거 / B: star kind threshold 확장 / C: billboard 자체 폐기 / D: cap)
-- **본 ADR §결정 3 과의 amendment 관계**: §결정 3 은 "3 변형 (high/mid/low) 모두 동일 식 `body.radius × 2 × renderScale × bodyScale(id)`" 으로 박제됨. Phase 2 처리 시 변형별 식 차등 가능성 — billboard 가 채택되면 §결정 3 amendment 필수
-- **관련**: reviewer #332 §D-1 ([코멘트](https://github.com/coseo12/astro-simulator/pull/332#issuecomment-4318463711)), #336 (본 amendment 박제)
+##### 결정 (Amendment to §결정 3)
+
+`createBodyBillboard` 의 `diameter` 계산식에서 `bodyScale` 곱셈을 **제거** 한다.
+
+```typescript
+// 변경 전 (R1 본 구현):
+function createBodyBillboard(...) {
+  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
+  // ...
+}
+
+// 변경 후 (R1.x #333 Phase 2):
+function createBodyBillboard(...) {
+  // billboard 는 sub-pixel body 의 draw call 절감 책임 (P11-B ADR §축 4).
+  // 가시 과장 (bodyScale) 은 sphere variant (high/mid) 만 책임 — 책임 직교화.
+  const diameter = body.radius * 2 * renderScaleForTier(tier);
+  // ...
+}
+```
+
+**§결정 3 의 "3 변형 모두 동일 식" 계약은 본 amendment 로 변경**. 새 계약:
+
+- `createBodyMesh` (high) / `createBodyMeshMid` (mid) — `body.radius × 2 × renderScale × bodyScale(id)` (§결정 3 그대로)
+- `createBodyBillboard` (low) — `body.radius × 2 × renderScale` (bodyScale 제외)
+
+##### 후보 비교 결과 (4 후보안 — #333 본문)
+
+| 후보                                         | 채택 여부 | 핵심 사유                                                                                                                                                |
+| -------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. billboard 에서 bodyScale 제거**         | **선택**  | billboard 의 본래 의도 (P11-B §축 4 sub-pixel draw call 절감) 보존. 가시성은 sphere 가 책임 — 책임 직교화                                                |
+| B. star kind threshold 를 75 AU 로 확장      | 탈락      | LOD 분기 자체 변경 (정적 상수 → 동적 함수). P11-B §주석 계약 §2 위배. tier-c sub-pixel 강제와 정면 충돌                                                  |
+| C. billboard 자체 폐기 (star 한정)           | 탈락      | P11-B §결정 §3 "high/mid/low 외 도입 금지" 위배. star 만 variant 가짓수 분리는 "신규 데이터 ≠ 신규 코드" 위배. sphere segments=32 강제 시 draw call 회귀 |
+| D. bodyScale cap (`LOD_BILLBOARD_MAX_SCALE`) | 탈락      | 매직 넘버 도입. R10 추가 시 cap 값 재산정 부담. A 가 cap 없이 더 단순                                                                                    |
+
+##### 픽셀 경계 자연 정합 분석 (A 채택의 정량 근거)
+
+**핵심 논리**: billboard 진입 = `screenCoverage < 8px` (P11-B §결정 §5 픽셀 경계). billboard 가 등장한다는 건 화면 점유가 이미 sub-pixel 영역. 이 영역에서 bodyScale ×75 곱셈 효과는 user perception 측면에서 **zero gain**.
+
+LOD 분기 입력 `effectiveRadius` (`solar-system-scene.ts:871`) 는 `body.radius × bodyScale(id)` 으로 이미 확대된 값을 `screenCoverageRadius` 에 전달. 따라서 sun ×75 효과는 LOD 분기 _결정_ 에 충분히 반영. `screenCoverage >= 8px` 면 mid/high LOD 로 진입하여 sphere 가 그려지고, `< 8px` 면 billboard 가 등장하지만 그 시점엔 이미 sub-pixel 이라 bodyScale 적용 여부가 사용자 인지에 영향 없음.
+
+**거대 quad 회귀 시나리오 재검증**:
+
+1. focus 강제 해제 (`isFocused=false`)
+2. 카메라가 1 AU 외부 (`star` kind 의 `< 1 AU` 강제 규칙 미적용)
+3. `effectiveRadius = body.radius × 75` 가 `screenCoverageRadius` 입력
+4. coverage 결과가 픽셀 경계 부족 (예: 7.5px) → low billboard 분기
+5. **변경 전**: `diameter = body.radius × 2 × renderScale × 75` → 화면 ~213px quad (회귀)
+6. **변경 후 (A)**: `diameter = body.radius × 2 × renderScale` → 화면 ~2.85px quad (sub-pixel, 정상 의도)
+
+##### Concrete Prediction (R10 호환성 박제)
+
+R10 혜성 / 소행성 / dwarf-planet 이 추가될 때:
+
+- **bodyScale = 1.0 (실측 그대로)** 인 body 는 본 amendment 영향 없음 (sphere = billboard = 동일 식)
+- bodyScale > 1.0 (가시 과장) 인 body 가 미래에 추가되면 — sphere variant 만 과장, billboard variant 는 실측 → **billboard 진입 시점 (sub-pixel) 에서 사용자 인지 zero gain 일관성**
+
+**Prediction**: R2~R10 추가 시 본 amendment 효과는 자동 적용. `apps/web/src/constants/body-scale.ts` 에 `<body>: <N>` 1줄 추가만으로 처리. `createBodyBillboard` 무수정.
+
+검증 절차 (각 R-Phase PR 에서):
+
+```bash
+# R-Phase PR 머지 후 회귀 확인:
+git diff develop...HEAD --stat \
+  packages/core/src/scene/solar-system-scene.ts
+# createBodyBillboard 함수 본체 변경 라인 = 0 이어야 Prediction 성공
+```
+
+##### 결과·재검토 조건
+
+- 본 amendment 의 implementer PR 에서 **R1 회귀 가드 4 영역 mismatch ≤ 0.5% 유지** 검증 (`r1-ui-regression-guard.mjs`)
+- `p329-qa-focus-lod-guard.mjs` PASS — 새 식 적용 후에도 Phase 1 fix 의 sphere 시그니처 유지
+- DoD #333: focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 케이스에서 sun billboard quad 가 화면 점유 ≤ 5% (이론값 ≈ 0.04%, 마진 충분)
+
+##### 재검토 트리거 (Amendment 무효화)
+
+다음 중 하나면 본 amendment 재검토:
+
+1. R10 혜성 dust tail 같이 billboard variant 자체가 가시 효과 핵심인 케이스가 등장 — billboard 가 가시 효과를 책임지는 새 정책 필요
+2. 미래 Phase 에서 sub-pixel body 에 시각 마커 (예: glyph / icon) 가 합성되어 billboard 가 sub-pixel 이상 크기를 의도적으로 가져야 할 경우
+3. P11-B LOD ADR §축 4 의 "sub-pixel draw call 절감" 책임이 다른 메커니즘 (impostor, instancing 등) 으로 대체될 경우
+
+##### Cross-validate (Phase 2 박제 직후)
+
+본 amendment 박제 직후 Gemini 2.5 Pro cross-validate 1회. 합의/이견/고유발견은 본 ADR 의 [§교차검증 반영 사항](#교차검증-반영-사항) 의 **#333 Phase 2 추가** 서브섹션에 기록.
 
 ---
 
@@ -355,6 +435,51 @@ billboard variant 의 `bodyScale` 효과 분리 (sphere = ×75, billboard = base
 **Claude 재분석으로 기각한 Gemini 제안**: 없음 (Gemini 제안 모두 합리적, 본 ADR 은 모두 합의 또는 부분 수용으로 처리)
 
 **고유 발견 (후속 분리)**: 없음 (모두 본 PR 범위 내 처리 가능)
+
+#### #333 Phase 2 추가 — billboard bodyScale 분리
+
+본 amendment 박제 직후 cross-validate 1회 (Gemini 2.5 Pro, 2026-04-25). Claude 자체 편향 4종 셀프 체크: 낙관적 일정 ✓ (스프린트 추가 없음) / 결합 간과 △ (billboard vs sphere 식 분리 인지 부담) / 폐기 프레이밍 ✓ (책임 직교화 명확) / 순수주의 △ ("책임 직교화" 가 회귀 회피 사후 정당화 가능성). △ 2개를 명시 질문으로 삽입. outcome=applied (exit 0).
+
+**합의** — Claude 설계와 일치 + 본 PR 에 반영:
+
+- **Q2 결정 (책임 직교화 vs cap)** — Gemini 가 "후보 A (현재 결정) 가 LOD 의 본질적 목적 (가시성 vs 성능) 에 맞춰 책임을 명확히 분리하는 것이 장기적 부작용 적음. 후보 D (Cap) 는 향후 천체 추가 시마다 'Cap 값이 적절한가' 재검증 부채" 로 강하게 합의. 순수주의 △ 우려 해소
+- **Q3 결정 (미래 재검토 정상성)** — Gemini 가 "현재의 요구사항으로 결정, 미래 책무 변경 시 재검토 트리거 발동 = 애자일 아키텍처의 올바른 작동" 으로 합의. 본 amendment 의 §재검토 트리거 #1 (R10 dust tail) 정당성 확보
+- **Q4 결정 (amendment vs 신규 ADR)** — Gemini 가 "기존 ADR §결정 3 의 엣지 케이스 교정 + 50라인 규모 = amendment 적합. 신규 ADR 분리 시 맥락 파편화" 로 합의. 분리 결정 정당성 확보
+
+**이견 수용** — Claude 원안 보강:
+
+- **Q1 (drift 방어)** — Claude 원안은 "주석 계약" 만 박제했으나 Gemini 가 **1순위로 단위 테스트** 를 강하게 추천 ("LOD 분기 로직에서 동일 body 주입 시 Sphere 빌더는 bodyScale 반영 직경 / Billboard 빌더는 미반영 직경 assert"). **수용** — implementer PR 에서 단위 테스트 추가 의무 박제 (developer 인계 항목). Linter rule 은 Gemini 도 "도메인 특화 단일 수식 차이는 유지보수 비용 과다" 로 비추천 → 채택 안 함
+
+**Claude 재분석으로 기각한 Gemini 제안**: 없음
+
+**고유 발견 (후속 분리)**: 없음 (Gemini 모든 제안이 amendment 범위 내 처리 가능)
+
+##### Developer 인계 (Phase 2 implementer)
+
+본 amendment 의 implementer PR 에서 다음 의무:
+
+1. `createBodyBillboard` 의 `diameter` 계산식에서 `* bodyScale(body.id)` 제거. 식: `body.radius * 2 * renderScaleForTier(tier)`
+2. `createBodyBillboard` 함수 본체 위 또는 `diameter` 계산 라인 위에 **drift 방어 주석 계약 박제**:
+   ```typescript
+   // R1.x #333 Phase 2 — billboard 는 sub-pixel body 의 draw call 절감 책임 (P11-B ADR §축 4).
+   // 가시 과장 (bodyScale) 은 sphere variant (createBodyMesh / createBodyMeshMid) 만 책임.
+   // ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
+   // 향후 본 식을 `createBodyMesh*` 와 동일하게 변경하기 전 ADR 재검토 필수.
+   ```
+3. **단위 테스트 추가 의무** (Gemini Q1 1순위 권고 수용) — `packages/core/src/scene/solar-system-scene.test.ts` 또는 신규 `body-mesh-builder.test.ts` 에:
+   - sphere variant: bodyScale `getBodyScale('sun') === 75` 주입 시 `createBodyMesh` 가 `bodyScale=1` 대비 75배 큰 diameter 생성 assert
+   - billboard variant: 동일 입력에 `createBodyBillboard` 가 `bodyScale=1` 와 동일 diameter 생성 assert (× 75 미적용)
+   - 회귀 시 즉시 fail — 향후 작업자가 두 식을 동기화 변경하면 본 테스트가 차단
+4. R1 회귀 가드 4 영역 mismatch ≤ 0.5% 유지 검증 (`pnpm verify:r1-guard`)
+5. `p329-qa-focus-lod-guard.mjs` PASS — `?focus=sun` 정상 sphere 시그니처 유지
+
+**비-범위** (절대 손대지 말 것):
+
+- `LOD_BODY_THRESHOLDS` (`lod-body-thresholds.ts`) — 0 라인 변경 (후보 B 탈락)
+- `lodFromScreenCoverage` 본체 — 0 라인 변경 (후보 C 탈락)
+- `createBodyMesh` / `createBodyMeshMid` 의 diameter 식 — 0 라인 변경 (sphere 는 §결정 3 그대로)
+- `effectiveRadius` 계산 (`solar-system-scene.ts:871`) — 0 라인 변경 (LOD 분기는 sun ×75 효과 그대로 반영)
+- 다른 body 의 bodyScale (R2~R10 범위)
 
 ---
 
