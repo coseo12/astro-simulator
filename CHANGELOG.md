@@ -5,6 +5,14 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Docs
+
+- **ADR `20260425-r1-sun-visualization.md` Amendment** ([#336](https://github.com/coseo12/astro-simulator/issues/336)) — §결과·재검토 조건 보강: 재검토 트리거 #6 ("[#333](https://github.com/coseo12/astro-simulator/issues/333) Phase 2 처리 시점 도래") + §위험·미해결 sub-섹션 신규 ("Phase 2 미해결 사항 (#333)"). Phase 2 (billboard `bodyScale` 분리) 분리 사유 / 자동 회귀 가드 / §결정 3 amendment 관계 박제
+
+#### Behavior Changes
+
+None — 문서 보강만 (PATCH). reviewer/qa 행동 변화 없음.
+
 ## [0.12.0] — 2026-04-23
 
 ### P12-B 8D 카메라 dolly 애니메이션 (Display-Relative Scale Unification Phase B)
