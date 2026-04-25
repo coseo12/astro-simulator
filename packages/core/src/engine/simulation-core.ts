@@ -148,7 +148,7 @@ export class SimulationCore {
    * UI 가 store `selectedBodyId` 변화를 subscribe 하여 scene focus / 카메라 reset 을 단일 책임으로 처리.
    * 본 핸들러는 `setCameraRadius` programmatic 줌 (예: 향후 줌 슬라이더) 경로 보존용.
    *
-   * 이전 시그니처 `setCameraHandlers(focusOn, resetCamera, setRadius)` 는 본 PR (#346) 에서 제거.
+   * 이전 시그니처 `setCameraHandlers(focusOn, resetCamera, setRadius)` 는 본 PR (#344) 에서 제거.
    */
   setCameraRadiusHandler(setRadius: (radius: number) => void): void {
     this.#setRadiusHandler = setRadius;
