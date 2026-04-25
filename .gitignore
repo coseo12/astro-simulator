@@ -1,6 +1,8 @@
 
 # Harness 로그 (상태 파일은 추적)
 .harness/logs/
+# Harness 마이그레이션 백업 (일시적 — 업데이트 시 자동 생성)
+.harness/backup/
 
 # Node.js
 node_modules/

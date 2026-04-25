@@ -34,6 +34,17 @@ gh pr checkout <PR번호>
 
 각 레벨 스크린샷 경로 기록. verify 스크립트(`scripts/browser-verify-<feature>.mjs`)가 있으면 우선 실행.
 
+#### 2-선행. 브라우저 검증 선행 조건 (monorepo 패키지 수정 시)
+
+monorepo 에서 core/shared 패키지 (`packages/*`) 가 수정된 PR 은 **브라우저 검증 전** 아래 4개 선행 조건을 반드시 통과해야 한다. 생략 시 **dist stale 로 수정 전 아티팩트를 검증해 false-positive 차단** 판정을 내릴 위험. 근거: volt [#70](https://github.com/coseo12/volt/issues/70) — 결정적 재현 실패가 실제로는 core dist 미갱신이었던 사례.
+
+- [ ] **대상 패키지 식별** — 수정 대상 패키지가 dev 서버 앱의 workspace dependency 인지 확인 (`pnpm ls -r <pkg>` / `package.json.dependencies` grep)
+- [ ] **dist 리빌드** — `pnpm --filter <pkg> build` 실행. `--watch` 모드를 별 터미널에서 병행 중이면 생략 가능
+- [ ] **dev 서버 재기동** — 기존 dev 프로세스 `kill` 후 재시작 (포트 재사용 시 stale 프로세스 확인 — `lsof -i :<port>`)
+- [ ] **sanity 로그 확인** — 수정된 함수에 임시 `console.log('qa-sanity-<commit_sha>')` 1줄 삽입 후 브라우저에서 로그 출력 확인. 미출력 시 dist stale 확정 — build/재기동 재시도 (sanity 로그는 검증 후 revert)
+
+위 4개 중 **하나라도 실패** 시 브라우저 3단계 진입 전 차단 (`stage:dev` 되돌림) 하고 차단 사유 코멘트에 "monorepo dist stale 의심 — 선행 조건 미충족" 명시.
+
 ### 3. 스프린트 계약 대조
 이슈 본문의 완료 기준 중 동적 검증 가능한 항목을 직접 확인. 미충족 항목 명시.
 
