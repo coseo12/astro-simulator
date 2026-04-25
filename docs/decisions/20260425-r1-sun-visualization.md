@@ -316,12 +316,23 @@ Prediction 실패 시 두 갈래:
 3. P12 폐기 결정이 재해석되어 "실측 비율 고정" 원칙이 부분 복원될 경우
 4. tier 전환 알고리즘 변경 (R-Phase 후속) 으로 sunScale 적용 시점이 달라져야 할 경우 (Q3=C 합의 무효화)
 5. **카메라 거리 동적 배율 검토** (Gemini 교차검증 개선 제안 3) — 사용자가 태양에 가까이 다가갈수록 sunScale 을 1 (실측) 에 가깝게 줄이는 방식. 극단적 줌인에서 시각 어색함 발생 시 검토
+6. **#333 Phase 2 처리 시점 도래** — billboard variant 의 `bodyScale` 효과 분리 결정 시 본 ADR §결정 3 ("3 변형 모두 동일 식") amendment 필요. R2 진입 전 처리 권고
 
 ### 위험 / 미해결
 
 - **모바일 점유율 19.6%** — 모바일 터치 인터랙션에서 태양이 화면 1/5 차지하면 그 뒤 행성 (수성 등 R2+) focus 가 어려울 수 있음. R2 진입 시 재평가 필요. 본 R1 단독에서는 "태양만 보이면 OK" 단계라 허용
 - **카메라 radius=35 가 미래 카메라 reset 변경 시 점유율 변경** — `apps/web/src/components/sim-canvas.tsx:158` 의 `radius: 35` 가 변경되면 본 ADR §결정 1 의 점유율 표가 무효화. 재검토 트리거 #4 에 해당
 - **tier 전환 시 sunScale 동작 비-범위 (Q3=C)** — Solar tier 진입 시는 sunScale 적용, Inner/Body tier 진입 시 동작 미정의. 현재 구현은 모든 tier 에서 동일 식 적용 → 모든 tier 에서 sunScale 영향. R2+ 에서 "Solar tier 만 sunScale 적용" 또는 "tier 별 sunScale 차등" 결정 가능
+
+#### Phase 2 미해결 사항 ([#333](https://github.com/coseo12/astro-simulator/issues/333))
+
+billboard variant 의 `bodyScale` 효과 분리 (sphere = ×75, billboard = base 또는 cap) 는 본 ADR 범위 외로 분리됨. PR [#332](https://github.com/coseo12/astro-simulator/pull/332) 검증 중 발견된 거대 quad 회귀의 **근본 원인** 이며, Phase 1 fix (commit `acfcb74` — `selectedBodyId` ↔ scene focus 동기화) 가 일상 케이스를 차단했으나 **edge case (focus 강제 해제 + 1 AU 외부 + 픽셀 경계 부족)** 는 여전히 미해결.
+
+- **분리 결정 사유**: R1 좁은 범위 (단일 body, sun) 에서는 회귀 가드 패스 필요충분. R2~R10 진입 전 재검토
+- **자동 회귀 가드**: `apps/web/scripts/p329-qa-focus-lod-guard.mjs` 가 본 회귀 시그니처를 자동 감지 (`channel: 'chrome'` 강제, sphere/billboard 자동 판별). 재발 시 CI 단계에서 차단
+- **처리 시점**: R2 (수성) 시작 전 권고 (medium 우선순위). #333 본문에 4 후보안 (A: billboard 에서 bodyScale 제거 / B: star kind threshold 확장 / C: billboard 자체 폐기 / D: cap)
+- **본 ADR §결정 3 과의 amendment 관계**: §결정 3 은 "3 변형 (high/mid/low) 모두 동일 식 `body.radius × 2 × renderScale × bodyScale(id)`" 으로 박제됨. Phase 2 처리 시 변형별 식 차등 가능성 — billboard 가 채택되면 §결정 3 amendment 필수
+- **관련**: reviewer #332 §D-1 ([코멘트](https://github.com/coseo12/astro-simulator/pull/332#issuecomment-4318463711)), #336 (본 amendment 박제)
 
 ---
 
