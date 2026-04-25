@@ -7,6 +7,10 @@ Semantic Versioning을 따른다.
 
 > **R1 사이클 (2026-04-25)** — Roadmap v3 "Incremental Body-by-Body Build" 첫 스프린트. 태양 가시성 복구 + 회귀 가드 인프라. 5 PR 머지.
 
+### Fix
+
+- **billboard variant `bodyScale` 분리** ([#333](https://github.com/coseo12/astro-simulator/issues/333), Phase 2) — `createBodyBillboard` 의 `diameter` 식에서 `bodyScale` 곱셈 제거. sphere/mid variant 는 그대로 유지 (시각 과장 책임 단독). billboard 는 sub-pixel draw call 절감 책임 단독 — 책임 직교화. focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 edge case 에서 거대 quad 회귀 차단 (PR [#332](https://github.com/coseo12/astro-simulator/pull/332) 검증 중 발견된 시각 회귀의 근본 해결). ADR `20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조. 신규 단위 테스트 (`packages/core/src/scene/body-scale-variants.test.ts`, 9 케이스) drift 방어
+
 ### Chore
 
 - **P11-C QA 진단 스크립트 박제 + 임시 벤치 폐기** ([#290](https://github.com/coseo12/astro-simulator/issues/290), PR [#330](https://github.com/coseo12/astro-simulator/pull/330) `1b4f6d6`) — `apps/web/scripts/p290-{diag-visibility, qa-console-errs, qa-idle-fps, qa-real-chrome}.mjs` 4건 회귀 가드용 정식 추적. phase 라벨 없는 임시 벤치 산출물 (`docs/benchmarks/2026-04-24T08-*.json`) 3건 폐기
@@ -48,11 +52,12 @@ PR [#332](https://github.com/coseo12/astro-simulator/pull/332) (`6e7382e`) — �
 - PR [#332](https://github.com/coseo12/astro-simulator/pull/332): **MINOR** (UI 행동 변화 + 회귀 가드 인프라 신규)
 - PR [#338](https://github.com/coseo12/astro-simulator/pull/338): **MINOR** (메인 오케스트레이터 게이트 룰 + 에이전트/스킬 갱신)
 - PR [#339](https://github.com/coseo12/astro-simulator/pull/339): PATCH (ADR amendment, 문서 보강만)
-- PR [#340 (본 PR)](https://github.com/coseo12/astro-simulator/pulls): PATCH (CHANGELOG 소급 박제, 문서 보강만)
+- PR [#340](https://github.com/coseo12/astro-simulator/pull/340): PATCH (CHANGELOG 소급 박제, 문서 보강만)
+- PR [#333 Phase 2 (본 PR)](https://github.com/coseo12/astro-simulator/pulls): **MINOR** (billboard `bodyScale` 분리 — 시각 행동 변화 + drift 방어 단위 테스트 9 케이스)
 
 ### Notes
 
-- R1 후속 5건 ([#333](https://github.com/coseo12/astro-simulator/issues/333), [#334](https://github.com/coseo12/astro-simulator/issues/334), [#335](https://github.com/coseo12/astro-simulator/issues/335), #336, [#337](https://github.com/coseo12/astro-simulator/issues/337)) — R2 (수성) 진입 전 처리 권고. #336 완료, 4건 잔존
+- R1 후속 5건 ([#333](https://github.com/coseo12/astro-simulator/issues/333), [#334](https://github.com/coseo12/astro-simulator/issues/334), [#335](https://github.com/coseo12/astro-simulator/issues/335), #336, [#337](https://github.com/coseo12/astro-simulator/issues/337)) — R2 (수성) 진입 전 처리 권고. #336 / #333 완료, 3건 잔존
 - 109건 `상위에서 삭제됨` 분류 (harness v3.6.0 자가 점검 결과) — 별도 라운드 처리 권고. `.claude/skills/capture-volt/SKILL.md` / `.claude/commands/volt.md` 보존 우선
 
 #### Behavior Changes (CHANGELOG 소급 박제 자체)
