@@ -316,7 +316,7 @@ Prediction 실패 시 두 갈래:
 3. P12 폐기 결정이 재해석되어 "실측 비율 고정" 원칙이 부분 복원될 경우
 4. tier 전환 알고리즘 변경 (R-Phase 후속) 으로 sunScale 적용 시점이 달라져야 할 경우 (Q3=C 합의 무효화)
 5. **카메라 거리 동적 배율 검토** (Gemini 교차검증 개선 제안 3) — 사용자가 태양에 가까이 다가갈수록 sunScale 을 1 (실측) 에 가깝게 줄이는 방식. 극단적 줌인에서 시각 어색함 발생 시 검토
-6. **#333 Phase 2 처리 시점 도래** — billboard variant 의 `bodyScale` 효과 분리 결정 시 본 ADR §결정 3 ("3 변형 모두 동일 식") amendment 필요. R2 진입 전 처리 권고
+6. ~~**#333 Phase 2 처리 시점 도래**~~ — **처리 완료 (2026-04-25)**. 후보 A 채택, billboard variant 에서 `bodyScale` 곱셈 제거. 상세는 본 문서 §"Phase 2 결정 (#333)" amendment 참조 (구현 PR 본문에 cross-reference 박제됨)
 
 ### 위험 / 미해결
 

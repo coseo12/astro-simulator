@@ -233,8 +233,12 @@ export interface SolarSystemSceneOptions {
    * `packages/core` 가 직접 import 하지 않고 콜백으로 주입받아 데이터 모름.
    *
    * 적용 지점:
-   *   1. `createBodyMesh*` 의 `diameter` 계산식 (LOD 3변형 모두 동일 식)
+   *   1. `createBodyMesh` (high) / `createBodyMeshMid` (mid) 의 `diameter` 계산식
    *   2. `screenCoverageRadius` 입력 — effective radius (`body.radius × bodyScale`) 로 LOD 결정 정합
+   *
+   * **Phase 2 #333 — billboard variant 는 미적용**: `createBodyBillboard` 는 `bodyScale` 미곱.
+   * 책임 분리 — sphere/mid 가 시각 과장 전담, billboard 는 sub-pixel draw call 절감 책임 단독.
+   * ADR `20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
    *
    * ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3 후보 a.
    *
@@ -1244,6 +1248,11 @@ function createBodyMeshMid(
  * 2 triangle. T1 solar 뷰에서 sub-pixel 로 모이는 100+ body 에 대해 draw call 최소화.
  *
  * billboard 는 카메라를 항상 바라보므로 albedo 단색 quad 가 sphere 느낌을 대체.
+ *
+ * Phase 2 #333 — billboard 는 sphere/mid variant 와 달리 `bodyScale` 미적용.
+ * 책임 분리: sphere/mid 가 시각 과장 (sun ×75) 을 전담, billboard 는 sub-pixel draw call 절감만.
+ * focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 케이스에서 거대 quad 회귀 차단.
+ * ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
  */
 function createBodyBillboard(
   body: LoadedCelestialBody,
@@ -1252,8 +1261,12 @@ function createBodyBillboard(
   parent: Mesh,
   bodyScale: (bodyId: string) => number,
 ): Mesh {
-  // R1 #329 — high/mid variant 와 동일 식 (× bodyScale).
-  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
+  // Phase 2 #333 — billboard 는 sphere/mid variant 와 달리 bodyScale 미적용.
+  // 책임 분리: sphere/mid = 가시 과장 책임 (sun ×75), billboard = sub-pixel draw call 절감 책임 단독.
+  // ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333) — billboard 에서 bodyScale 제거 (후보 A 채택)" 참조.
+  // bodyScale 인자 자체는 시그니처 호환성 유지 위해 보존 (호출부 통일 + 미래 변경 가능성).
+  void bodyScale; // Phase 2 #333 — 시그니처 보존, 식에서 미사용 명시.
+  const diameter = body.radius * 2 * renderScaleForTier(tier);
   const mesh = MeshBuilder.CreatePlane(
     `${body.id}-lod-low`,
     { size: diameter, sideOrientation: 2 /* DOUBLESIDE */ },
