@@ -11,6 +11,7 @@ import { parseGpuTier } from '@/core/parse-gpu-tier';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
+import { getBodyScale } from '@/constants/body-scale';
 import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -234,6 +235,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           grMode,
           integrator,
           ringRenderMode,
+          // R1 #329 — body 별 시각 과장 배수 주입 (DI). 현재 `sun = 75` 만 정의됨.
+          // ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3.
+          bodyScale: getBodyScale,
         });
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.

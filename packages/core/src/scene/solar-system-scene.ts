@@ -223,6 +223,25 @@ export interface SolarSystemSceneOptions {
    * URL `?ring=fallback` 또는 `?ring=placeholder` 로 페이지 측에서 override 가능.
    */
   ringRenderMode?: 'shader' | 'fallback' | 'placeholder';
+  /**
+   * R1 #329 — body 별 시각 과장 배수 콜백 (DI).
+   *
+   * `apps/web/src/constants/body-scale.ts` 의 `getBodyScale` 같은 룩업을 주입.
+   * 미주입 시 default `() => 1.0` (실측 그대로, 테스트 회귀 0).
+   *
+   * **레이어 의존 역전 방지**: `BODY_SCALE` 룩업은 `apps/web` 에 박제 (시각 과장 데이터 ≠ physics).
+   * `packages/core` 가 직접 import 하지 않고 콜백으로 주입받아 데이터 모름.
+   *
+   * 적용 지점:
+   *   1. `createBodyMesh*` 의 `diameter` 계산식 (LOD 3변형 모두 동일 식)
+   *   2. `screenCoverageRadius` 입력 — effective radius (`body.radius × bodyScale`) 로 LOD 결정 정합
+   *
+   * ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3 후보 a.
+   *
+   * **R2+ 인계**: tier 차등 필요 시 `(bodyId: string, tier?: Tier) => number` 로 확장 가능.
+   * 현재는 단일 인자 시그니처 (Q3=C 비-범위 가드 — tier 변경 자체에 손대지 않음).
+   */
+  bodyScale?: (bodyId: string) => number;
 }
 
 /**
@@ -245,6 +264,7 @@ export function createSolarSystemScene(
     grMode,
     integrator = 'velocity-verlet',
     ringRenderMode = 'shader',
+    bodyScale = defaultBodyScale,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -279,7 +299,7 @@ export function createSolarSystemScene(
   const bodyInitialRenderScale = activeTier; // 모든 body 가 동일 tier 로 생성됨 → Tier 만 기억하면 충분.
   const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립, 진단용)
   for (const body of system.bodies) {
-    const mesh = createBodyMesh(body, scene, activeTier);
+    const mesh = createBodyMesh(body, scene, activeTier, bodyScale);
     meshes.set(body.id, mesh);
     bodyBaseDiameter.set(body.id, body.radius * 2);
   }
@@ -845,9 +865,13 @@ export function createSolarSystemScene(
       const dz = world[2] - camWorldZ;
       const cameraDistanceMeters = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
+      // R1 #329 — LOD 결정에 사용하는 effective radius 는 `body.radius × bodyScale`.
+      // sun (× 75) 같이 시각 과장된 body 는 화면 점유가 실제로 큰 픽셀이므로 high LOD 가 자연스럽다.
+      // ADR `20260425-r1-sun-visualization.md` §결정 4 (축 4 후보 α).
+      const effectiveRadius = body.radius * bodyScale(body.id);
       const coverage = screenCoverageRadius(
         [localX, localY, localZ],
-        body.radius,
+        effectiveRadius,
         sceneUnitPerMeter,
         vpArr,
         viewportHeight,
@@ -933,7 +957,7 @@ export function createSolarSystemScene(
     if (level === 'mid') {
       let m = midVariants.get(body.id);
       if (!m) {
-        m = createBodyMeshMid(body, scene, bodyInitialRenderScale, highMesh);
+        m = createBodyMeshMid(body, scene, bodyInitialRenderScale, highMesh, bodyScale);
         midVariants.set(body.id, m);
       }
       return m;
@@ -941,7 +965,7 @@ export function createSolarSystemScene(
     // low
     let m = lowVariants.get(body.id);
     if (!m) {
-      m = createBodyBillboard(body, scene, bodyInitialRenderScale, highMesh);
+      m = createBodyBillboard(body, scene, bodyInitialRenderScale, highMesh, bodyScale);
       lowVariants.set(body.id, m);
     }
     return m;
@@ -1137,10 +1161,26 @@ function isArcRotateCamera(cam: unknown): cam is ArcRotateCamera {
   return typeof c.radius === 'number' && typeof c.attachControl === 'function';
 }
 
-function createBodyMesh(body: LoadedCelestialBody, scene: Scene, tier: Tier): Mesh {
+/**
+ * R1 #329 — body 별 시각 과장 배수 default 콜백.
+ *
+ * 옵션 미주입 시 모든 body 가 실측 그대로 (1.0). 본 default 는 `createSolarSystemScene` 호출자가
+ * `apps/web/src/constants/body-scale.ts` 의 `getBodyScale` 을 주입하지 않은 경우 회귀 0 보장.
+ */
+function defaultBodyScale(_bodyId: string): number {
+  return 1.0;
+}
+
+function createBodyMesh(
+  body: LoadedCelestialBody,
+  scene: Scene,
+  tier: Tier,
+  bodyScale: (bodyId: string) => number,
+): Mesh {
   // P12-A #298 — 실측 직경 × 현재 tier 의 renderScale 로 메쉬 생성.
+  // R1 #329 — × bodyScale (시각 과장 배수, ADR `20260425-r1-sun-visualization.md` §결정 3).
   // `mesh.scaling` 은 1 유지 (tier 전환 시 scaling.scaleInPlace 로 비율 적용, ADR §주석 §2).
-  const diameter = body.radius * 2 * renderScaleForTier(tier);
+  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
   const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
 
   const mat = new StandardMaterial(`${body.id}-mat`, scene);
@@ -1171,8 +1211,10 @@ function createBodyMeshMid(
   scene: Scene,
   tier: Tier,
   parent: Mesh,
+  bodyScale: (bodyId: string) => number,
 ): Mesh {
-  const diameter = body.radius * 2 * renderScaleForTier(tier);
+  // R1 #329 — high variant 와 동일 식 (× bodyScale) 로 비율 보존. LOD 전환 시 사용자가 크기 변화 인지 못함.
+  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
   const mesh = MeshBuilder.CreateSphere(`${body.id}-lod-mid`, { diameter, segments: 12 }, scene);
   mesh.parent = parent;
   // parent local 기준 원점 (high mesh 와 동일 위치).
@@ -1208,8 +1250,10 @@ function createBodyBillboard(
   scene: Scene,
   tier: Tier,
   parent: Mesh,
+  bodyScale: (bodyId: string) => number,
 ): Mesh {
-  const diameter = body.radius * 2 * renderScaleForTier(tier);
+  // R1 #329 — high/mid variant 와 동일 식 (× bodyScale).
+  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
   const mesh = MeshBuilder.CreatePlane(
     `${body.id}-lod-low`,
     { size: diameter, sideOrientation: 2 /* DOUBLESIDE */ },

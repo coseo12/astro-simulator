@@ -1,5 +1,6 @@
 'use client';
 
+import { ephemeris as ephemerisApi } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
@@ -48,6 +49,7 @@ export function UrlSync() {
   const physicsEngine = useSimStore((s) => s.physicsEngine);
   const setMode = useSimStore((s) => s.setMode);
   const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
+  const setSelectedBody = useSimStore((s) => s.setSelectedBody);
 
   const sendCommand = useSimCommand();
   const initialized = useRef(false);
@@ -64,8 +66,21 @@ export function UrlSync() {
     if (urlT !== null && urlT !== undefined && Number.isFinite(urlT)) {
       sendCommand({ type: 'jumpToJulianDate', julianDate: urlT });
     }
+    // R1 #329 — `?focus=<bodyId>` 허용 body id 검증.
+    // 미정의 id (예: `?focus=invalid`) 는 무시 + dev 경고 (CRITICAL #2 모호한 입력 방어).
     if (urlFocus) {
-      sendCommand({ type: 'focusOn', bodyId: urlFocus });
+      const validIds = new Set(ephemerisApi.getSolarSystem().bodies.map((b) => b.id));
+      if (validIds.has(urlFocus)) {
+        // 카메라 focus + store selectedBodyId sync (info-panel 표시 트리거).
+        // shortcut 버튼 클릭 경로는 controller.focusOn 후 'bodySelected' event 가 emit 되지만,
+        // URL 직접 진입 시 그 event 가 발생하지 않아 selectedBodyId 가 set 되지 않는 기존 동작 보강.
+        sendCommand({ type: 'focusOn', bodyId: urlFocus });
+        setSelectedBody(urlFocus);
+      } else if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
+        );
+      }
     }
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
       sendCommand({ type: 'setTimeScale', scale: urlSpeed });

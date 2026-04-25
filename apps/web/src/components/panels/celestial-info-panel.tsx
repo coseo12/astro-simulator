@@ -3,6 +3,7 @@
 import { ephemeris as ephemerisApi } from '@astro-simulator/core';
 import { AU } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
+import { getBodyScale } from '@/constants/body-scale';
 import { TierBadge } from '../ui/tier-badge';
 import { MassSlider } from './mass-slider';
 import { useMemo } from 'react';
@@ -68,6 +69,10 @@ export function CelestialInfoPanel() {
 
   void muParent; // 향후 활용
 
+  // R1 #329 — body 별 시각 과장 배수. 1.0 (실측) 이면 과장 안내 미표시.
+  const visualScale = getBodyScale(data.id);
+  const isExaggerated = visualScale !== 1.0;
+
   return (
     <div data-testid="info-panel" className="flex flex-col gap-3">
       <div>
@@ -105,7 +110,28 @@ export function CelestialInfoPanel() {
             {periodSeconds && <Row label="공전주기" value={formatDays(periodSeconds)} />}
           </>
         )}
+        {/* R1 #329 — 항성 한정 추가 정보 (luminosity / spectral class). solar-system.json 스키마 확장은
+            후속 이슈로 분리 (R1 좁은 범위 보호) — 현재는 sun 단일 항성이라 info-panel 한정 박제. */}
+        {data.id === 'sun' && (
+          <>
+            <Row label="광도" value="3.828 × 10²⁶ W (1.0 L☉)" />
+            <Row label="분광형" value="G2V" />
+          </>
+        )}
       </dl>
+
+      {/* R1 #329 — 시각 과장 안내. Gemini 교차검증 개선 제안 2 반영 (사용자 친화 표현 우선).
+          ADR `docs/decisions/20260425-r1-sun-visualization.md` Developer 인계 §7. */}
+      {isExaggerated && (
+        <div
+          data-testid="info-panel-visual-scale"
+          className="mt-2 px-2 py-1.5 bg-bg-elevated/60 backdrop-blur rounded-sm border border-border-subtle text-caption text-fg-secondary"
+        >
+          <span className="text-fg-tertiary">표시 크기 · </span>
+          <span className="num text-fg-primary">실제의 {visualScale}배</span>
+          <span className="text-fg-tertiary"> (가시성 보정)</span>
+        </div>
+      )}
 
       {/* P10-C-3 #278 — P10-B 감사 메타데이터 (dataSource / lastVerified / colorSource) */}
       {(data.dataSource || data.lastVerified || data.colorHint?.colorSource) && (
