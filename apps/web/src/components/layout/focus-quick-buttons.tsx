@@ -19,7 +19,7 @@ export function FocusQuickButtons() {
   const sendCommand = useSimCommand();
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" data-r1-region="shortcut-bar">
       {FOCUS_BUTTONS.map((b) => (
         <button
           key={b.id}

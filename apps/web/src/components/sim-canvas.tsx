@@ -11,6 +11,7 @@ import { parseGpuTier } from '@/core/parse-gpu-tier';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
+import { getBodyScale } from '@/constants/body-scale';
 import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -234,6 +235,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           grMode,
           integrator,
           ringRenderMode,
+          // R1 #329 — body 별 시각 과장 배수 주입 (DI). 현재 `sun = 75` 만 정의됨.
+          // ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3.
+          bodyScale: getBodyScale,
         });
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
@@ -348,6 +352,23 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               if (prev.massMultipliers[k] !== v) solar.setBodyMassMultiplier(k, v);
             }
           }
+          // R1 #329 — selectedBodyId ↔ scene focus 동기화.
+          // url-sync.tsx 의 setSelectedBody(URL `?focus=`) 만으로는 scene 의 setFocusOrigin
+          // 호출이 누락되어 lodFromScreenCoverage 의 isFocused 분기가 false 가 되고,
+          // 1 AU 이상 거리에서 star kind 가 픽셀 경계로 떨어지면서 low billboard 거대 quad
+          // 회귀가 발생했음 (PR #332 검증 중 발견). 클릭 핸들러와 동일 경로로 sync.
+          if (state.selectedBodyId !== prev.selectedBodyId) {
+            if (state.selectedBodyId) {
+              const mesh = solar.meshes.get(state.selectedBodyId);
+              if (mesh) {
+                solar.setFocusOrigin(state.selectedBodyId);
+                controller.focusOn({ mesh });
+              }
+            } else {
+              solar.clearFocus();
+              controller.reset(35);
+            }
+          }
         });
         instance.setCameraHandlers(
           (bodyId: string) => {
@@ -369,6 +390,21 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             camera.radius = radius;
           },
         );
+
+        // R1 #329 — 마운트 직후 selectedBodyId 가 이미 있으면 1회 초기 sync.
+        // URL `?focus=sun` 으로 진입하는 케이스: url-sync.tsx 의 useEffect 가 setSelectedBody
+        // 를 먼저 호출하더라도 위 subscribe 는 sim-canvas 마운트 후의 변화만 잡으므로,
+        // 마운트 시점 store snapshot 을 명시적으로 1회 적용해야 첫 프레임부터 high LOD 진입.
+        {
+          const initialSelected = useSimStore.getState().selectedBodyId;
+          if (initialSelected) {
+            const mesh = solar.meshes.get(initialSelected);
+            if (mesh) {
+              solar.setFocusOrigin(initialSelected);
+              controller.focusOn({ mesh });
+            }
+          }
+        }
 
         // P12-A #298 — Tier 하이브리드 트리거 자동 판정 (Q7=7-d2).
         //
