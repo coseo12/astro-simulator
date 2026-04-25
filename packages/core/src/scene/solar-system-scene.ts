@@ -156,7 +156,8 @@ export interface SolarSystemSceneHandles {
    * `CameraController.focusOn(mesh)` 와 동일 시점에 호출. 해당 body 의 월드 좌표로 origin 즉시 재배치
    * → focus body 는 scene 원점 근처에서 렌더되어 float32 jitter 제거. `bodyId` 미존재 시 no-op.
    *
-   * **호출 타이밍**: `setCameraHandlers` focus 콜백에서 `controller.focusOn` 과 같은 프레임에 호출.
+   * **호출 타이밍**: sim-canvas `syncFocusToScene` helper 에서 `controller.focusOn` 과 같은 프레임에 호출
+   * (R1 #334+#335 — store-scene 동기화 단일 경로 통합. ADR `20260425-r1-store-scene-sync-unification.md`).
    * 내부적으로 `updateAt` 이 다음 프레임에 origin 반영된 local 좌표로 mesh.position 을 재기록하므로
    * focus animation (300ms) 중에도 일관된 좌표계 유지.
    */

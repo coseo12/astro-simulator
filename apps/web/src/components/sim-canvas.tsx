@@ -334,8 +334,35 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           }
         }
 
+        // R1 #334+#335 — store-scene 동기화 단일 경로 helper.
+        //
+        // ADR `20260425-r1-store-scene-sync-unification.md` §결정 4.
+        // 마운트 직후 1회 sync 와 subscribe 분기가 동일 식 사용 → DRY (`syncFocusToScene` 1곳 수정으로
+        // 두 진입점 일관 변경). 신규 진입점 추가 시 (예: 모바일 swipe gesture) 도 본 helper 재사용.
+        //
+        // 의도:
+        //  - id !== null  → solar.setFocusOrigin(id) + controller.focusOn(mesh) (mesh 존재 시)
+        //  - id === null  → solar.clearFocus() + controller.reset(35)
+        //                   ("focus 해제 = 카메라 reset" 박제 — ADR §결정 3).
+        const syncFocusToScene = (bodyId: string | null) => {
+          if (bodyId !== null) {
+            const mesh = solar.meshes.get(bodyId);
+            if (mesh) {
+              // P11-A #288 — Floating Origin primary shift (ADR §1-B).
+              // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
+              solar.setFocusOrigin(bodyId);
+              controller.focusOn({ mesh });
+            }
+          } else {
+            // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
+            solar.clearFocus();
+            controller.reset(35);
+          }
+        };
+
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
         // + 질량 배수 변경 → setBodyMassMultiplier (#107)
+        // + selectedBodyId 변경 → syncFocusToScene (R1 #334+#335 — scene focus / camera 단일 책임)
         // (P12-C #298 — viewMode 구독 삭제: 단일 모드 전환)
         unsubEngine = useSimStore.subscribe((state, prev) => {
           if (state.physicsEngine !== prev.physicsEngine) {
@@ -352,59 +379,33 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               if (prev.massMultipliers[k] !== v) solar.setBodyMassMultiplier(k, v);
             }
           }
-          // R1 #329 — selectedBodyId ↔ scene focus 동기화.
-          // url-sync.tsx 의 setSelectedBody(URL `?focus=`) 만으로는 scene 의 setFocusOrigin
-          // 호출이 누락되어 lodFromScreenCoverage 의 isFocused 분기가 false 가 되고,
-          // 1 AU 이상 거리에서 star kind 가 픽셀 경계로 떨어지면서 low billboard 거대 quad
-          // 회귀가 발생했음 (PR #332 검증 중 발견). 클릭 핸들러와 동일 경로로 sync.
+          // R1 #334+#335 — selectedBodyId ↔ scene focus 동기화 (단일 진실원).
+          //
+          // 클릭 / URL / programmatic 진입 모두 동일 흐름:
+          //   sendCommand({ type: 'focusOn' | 'resetCamera' })
+          //     → simulation-core 가 'bodySelected' event emit
+          //     → core-adapter 가 store.setSelectedBody(id) 호출
+          //     → 본 subscribe 가 변화 감지 → syncFocusToScene(id) 호출 (단일 호출).
+          //
+          // 이전 (Phase 1 fix `acfcb74`): subscribe 분기 + setCameraHandlers focus/reset 콜백 이중 경로.
+          // 이중 호출로 `controller.focusOn` 의 `Animation.CreateAndStartAnimation × 2` 가 2회 폐기 + 재시작.
           if (state.selectedBodyId !== prev.selectedBodyId) {
-            if (state.selectedBodyId) {
-              const mesh = solar.meshes.get(state.selectedBodyId);
-              if (mesh) {
-                solar.setFocusOrigin(state.selectedBodyId);
-                controller.focusOn({ mesh });
-              }
-            } else {
-              solar.clearFocus();
-              controller.reset(35);
-            }
+            syncFocusToScene(state.selectedBodyId);
           }
         });
-        instance.setCameraHandlers(
-          (bodyId: string) => {
-            const mesh = solar.meshes.get(bodyId);
-            if (mesh) {
-              // P11-A #288 — Floating Origin primary shift (ADR §1-B).
-              // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
-              // 이후 `updateAt` 이 body 를 scene 원점 근처에서 렌더 → float32 jitter 제거.
-              solar.setFocusOrigin(bodyId);
-              controller.focusOn({ mesh });
-            }
-          },
-          () => {
-            // P12-A #298 — reset 시 focus 해제 → tier 는 free-fly 경로로 판정.
-            solar.clearFocus();
-            controller.reset(35);
-          },
-          (radius: number) => {
-            camera.radius = radius;
-          },
-        );
+        // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).
+        instance.setCameraRadiusHandler((radius: number) => {
+          camera.radius = radius;
+        });
 
-        // R1 #329 — 마운트 직후 selectedBodyId 가 이미 있으면 1회 초기 sync.
-        // URL `?focus=sun` 으로 진입하는 케이스: url-sync.tsx 의 useEffect 가 setSelectedBody
-        // 를 먼저 호출하더라도 위 subscribe 는 sim-canvas 마운트 후의 변화만 잡으므로,
-        // 마운트 시점 store snapshot 을 명시적으로 1회 적용해야 첫 프레임부터 high LOD 진입.
-        {
-          const initialSelected = useSimStore.getState().selectedBodyId;
-          if (initialSelected) {
-            const mesh = solar.meshes.get(initialSelected);
-            if (mesh) {
-              solar.setFocusOrigin(initialSelected);
-              controller.focusOn({ mesh });
-            }
-          }
-        }
+        // R1 #334+#335 — 마운트 직후 selectedBodyId 가 이미 있으면 helper 로 1회 초기 sync.
+        //
+        // URL `?focus=sun` 진입 케이스: url-sync.tsx 의 useEffect 가 sendCommand({ type:'focusOn' }) +
+        // setSelectedBody(urlFocus) 호출하지만, sim-canvas 마운트 시점에는 두 호출 모두 이미 끝나
+        // store snapshot 에 selectedBodyId 가 박혀있다. 위 subscribe 는 마운트 후의 변화만 감지하므로
+        // 마운트 직후 명시적 1회 sync 로 첫 프레임부터 high LOD 진입.
+        // ADR `20260425-r1-store-scene-sync-unification.md` §축 3 후보 B.
+        syncFocusToScene(useSimStore.getState().selectedBodyId);
 
         // P12-A #298 — Tier 하이브리드 트리거 자동 판정 (Q7=7-d2).
         //
