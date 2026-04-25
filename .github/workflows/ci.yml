@@ -256,20 +256,7 @@ jobs:
           fi
 
       # ============================================================
-      # harness 저장소 전용 가드 (다운스트림은 hashFiles 조건으로 skip)
+      # NOTE: harness 저장소 전용 가드는 `.github/workflows/harness-guards.yml` 로 이동됨
+      # (v3.0.0, harness #196). 다운스트림은 본 ci.yml 을 자유롭게 수정해도 업스트림과 충돌하지 않는다.
+      # 마이그레이션: docs/harness-ci-migration.md
       # ============================================================
-      # agent SSoT drift 가드 (#145)
-      # CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` 의 공통 JSON 스키마 9개 필드가
-      # 5개 에이전트 파일의 `## 마무리 체크리스트 JSON 반환` 섹션에 모두 존재하고 선언 순서를
-      # 유지하는지 검사. drift 시 exit 1 로 PR 머지 전 차단.
-      - name: agent SSoT drift 가드
-        if: hashFiles('scripts/verify-agent-ssot.sh') != ''
-        run: bash scripts/verify-agent-ssot.sh
-
-      # release version bump 가드 (v2.28.1 복구와 함께 도입)
-      # chore(release) PR 에서 CHANGELOG 를 업데이트했으나 package.json::version bump 를 누락하는 회귀를 차단.
-      # 세션 3연속 릴리스 (v2.26.0~v2.28.0) 에서 실제 발생 → v2.28.1 로 복구 + 본 가드 도입.
-      # CHANGELOG 최신 `## [X.Y.Z]` 엔트리와 package.json::version 일치 검증, 불일치 시 exit 1.
-      - name: release version bump 가드
-        if: hashFiles('scripts/verify-release-version-bump.sh') != ''
-        run: bash scripts/verify-release-version-bump.sh
