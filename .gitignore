@@ -45,6 +45,9 @@ screenshots/
 # QA 회귀 가드 아티팩트 (p329-qa-focus-lod-guard.mjs 산출물 등)
 apps/web/scripts/__artifacts__/
 
+# R1 UI 회귀 가드 — 실패 시 생성되는 diff PNG (CI artifact 업로드 후 폐기, ADR Amendment 2026-04-26)
+apps/web/scripts/__diff__/
+
 # .claude/ 는 harness 관리 파일이므로 tracked — 런타임 생성 파일만 선별 ignore
 .claude/scheduled_tasks.lock
 .claude/logs/

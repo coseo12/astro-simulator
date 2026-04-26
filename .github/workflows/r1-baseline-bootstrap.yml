@@ -1,0 +1,144 @@
+name: r1:baseline-bootstrap
+
+# CRITICAL — workflow_dispatch 2단계 함정 (volt #45):
+#
+# (1) default branch 종속:
+#     - 본 workflow 가 main (또는 develop) 에 머지된 후에만 GitHub Actions UI 에 dispatch 버튼이 표시됨
+#     - feature 브랜치에서 push 만으로는 실행 불가
+#     - 절차: PR 머지 → main/develop 반영 확인 → Actions UI → "r1:baseline-bootstrap" → "Run workflow" 클릭
+#
+# (2) PR 자동 생성 권한:
+#     - peter-evans/create-pull-request 는 Settings → Actions → General → "Workflow permissions" →
+#       "Allow GitHub Actions to create and approve pull requests" 가 ON 이어야 작동
+#     - 기본값 OFF — 첫 dispatch 전 1회 enable 필요
+#     - 또는 CLI: gh api -X PUT /repos/coseo12/astro-simulator/actions/permissions/workflow \
+#         -f default_workflow_permissions=write \
+#         -F can_approve_pull_request_reviews=true
+#
+# DoD 매핑: #337 부트스트래핑 1회 dispatch 검증 (volt #45 함정 회피)
+#
+# 본 workflow 는 ubuntu-latest 컨테이너에서 R1 UI 회귀 가드 baseline 12장
+# (4 영역 × 3 viewport) 을 Linux 환경 기준으로 캡처하고 `peter-evans/create-pull-request`
+# 로 develop 대상 갱신 PR 을 자동 생성한다.
+#
+# ADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment 2026-04-26 §결정 2
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'PR base 브랜치 (기본 develop)'
+        default: 'develop'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # physics-wasm 워크스페이스가 wasm-pack 의존 — `pnpm build` 의 root recursive 가
+      # core → physics-wasm 경로로 wasm-pack 호출. bench-baseline-remeasure.yml 검증 패턴 차용.
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright Chrome (Linux) 설치
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 앱 빌드
+        run: pnpm build
+
+      - name: 웹 서버 기동 (백그라운드)
+        run: |
+          pnpm --filter @astro-simulator/web start -p 3001 &
+          echo "WEB_PID=$!" >> $GITHUB_ENV
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            sleep 2
+          done
+
+      - name: R1 baseline 12장 캡처 (Linux)
+        env:
+          BASE_URL: http://localhost:3001
+        run: node apps/web/scripts/r1-ui-regression-guard.mjs --update
+
+      - name: 서버 종료
+        if: always()
+        run: kill $WEB_PID || true
+
+      - name: baseline diff 확인
+        run: |
+          git status --porcelain apps/web/scripts/__baselines__/r1/
+          echo "---"
+          git diff --stat apps/web/scripts/__baselines__/r1/ || true
+
+      - name: baseline 갱신 PR 생성
+        uses: peter-evans/create-pull-request@v7
+        with:
+          base: ${{ inputs.target_branch }}
+          branch: chore/r1-baseline-linux-${{ github.run_id }}
+          commit-message: |
+            chore(r1-guard): #337 baseline 을 Linux CI 캡처본으로 전환
+
+            workflow_dispatch run_id=${{ github.run_id }}
+            ADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment 2026-04-26
+          title: 'chore(r1-guard): [#337] R1 baseline Linux CI 캡처본 전환'
+          body: |
+            ## Summary
+
+            `r1:baseline-bootstrap` workflow 가 ubuntu-latest 환경에서 R1 UI 회귀 가드
+            baseline 12장 (4 영역 × 3 viewport) 을 재캡처. 기존 macOS 캡처본을 Linux
+            CI 캡처본으로 교체하여 PR check (`ci.yml` r1-guard step) 의 false positive
+            (폰트 렌더링 차이) 회피.
+
+            - trigger: `workflow_dispatch`
+            - run_id: ${{ github.run_id }}
+            - environment: `gh-actions-ubuntu-chromium`
+            - ADR: [`20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26](docs/decisions/20260425-r1-ui-pixel-diff-guard.md#amendment-2026-04-26--ci-linux-통합-정책-결정-337)
+
+            ## Behavior Changes
+
+            - R1 회귀 가드 baseline 이 macOS → Linux CI 캡처본으로 전환됨
+            - 로컬 macOS 검증 시 폰트 차이로 false positive 가능 — `SKIP_LOCAL=1` env var 또는 CI 결과 신뢰
+
+            ## Test plan
+
+            - [ ] 머지 후 임의 PR 에서 `ci.yml` 의 r1-guard step PASS 확인
+            - [ ] 고의적 false positive PR (예: shortcut 라벨 1글자 변경) 로 r1-guard 가 실제 fail 하는지 실증 후 revert (메인 ADR §결과·재검토 조건 메타 가드)
+
+            Refs #337
+            (#337 close 는 후속 이슈 #348 (ci.yml r1-guard step 통합) 완료 후 메인 오케스트레이터가 수동 처리)
+          labels: |
+            type:infra
+            priority:medium
+          delete-branch: true
