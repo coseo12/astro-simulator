@@ -5,6 +5,26 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-04-26
+
+> **R1 후속 F-2 (#348) — ci.yml r1-guard step 통합 + Linux baseline 정합 + ADR Amendment v3** — v0.13.1 부트스트래핑 인프라 위에 chicken-and-egg 해소. 모든 PR check 의 `detect-and-test` job 이 R1 UI 회귀 가드를 자동 trigger. PR [#347](https://github.com/coseo12/astro-simulator/pull/347)/[#349](https://github.com/coseo12/astro-simulator/pull/349)/[#350](https://github.com/coseo12/astro-simulator/pull/350)/[#351](https://github.com/coseo12/astro-simulator/pull/351)/[#354](https://github.com/coseo12/astro-simulator/pull/354)/[#355](https://github.com/coseo12/astro-simulator/pull/355) 6 PR 머지 + workflow_dispatch 1회 실증 + 메타 가드 실증 1차 (#356 close, #357 분리).
+
+### Behavior Changes
+
+- **ci.yml `detect-and-test` job 에 R1 UI 회귀 가드 step 5개 통합** ([#348](https://github.com/coseo12/astro-simulator/issues/348), PR [#355](https://github.com/coseo12/astro-simulator/pull/355) `39c896f`) — `verify:no-scientific-grep` 직후에 (1) Rust 툴체인 (`dtolnay/rust-toolchain@stable`, 1.94.1, wasm32-unknown-unknown) (2) Rust 빌드 캐시 (`Swatinem/rust-cache@v2`, packages/physics-wasm) (3) wasm-pack 설치 (`taiki-e/install-action@v2 wasm-pack@0.14.0`) (4) R1 UI 회귀 가드 (Playwright Chromium + `pnpm build` + next start -p 3001 + `r1-ui-regression-guard.mjs`) (5) diff 이미지 업로드 (`actions/upload-artifact@v4`, retention 7 days) — 5개 step 추가. 모든 PR 의 detect-and-test 시간이 약 +100s 증가 (실측 2m10s, ADR §위험 #1 임계 8분의 27%). `if:` 가드: `pnpm-lock.yaml` + `apps/web/scripts/r1-ui-regression-guard.mjs` + `rust-toolchain.toml` + `Cargo.toml` 존재 시에만 trigger. 4 영역 (top-nav / shortcut-bar / hud-top-right / hud-bottom-right) × 3 viewport (1280×720 / 1920×1080 / 375×667) = 12 영역 mismatch ≤ 0.5% 검증. 실패 시 diff PNG artifact 자동 업로드. ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment v3 (PR [#354](https://github.com/coseo12/astro-simulator/pull/354), commit `9481c9d`)
+- **R1 baseline 12 PNG: macOS → Linux CI 캡처본 전환** ([#337](https://github.com/coseo12/astro-simulator/issues/337), PR [#351](https://github.com/coseo12/astro-simulator/pull/351) `d9ae9c0`) — `r1:baseline-bootstrap` workflow_dispatch run 24956759573 (2m1s 완주, ubuntu-latest 환경) 으로 자동 갱신. 로컬 macOS 검증 시 폰트 차이로 false positive 가능 — `SKIP_LOCAL=1` 또는 CI 결과 신뢰
+- **메타 가드 실증 1차 — positive control 미확보 사실 박제** (PR [#356](https://github.com/coseo12/astro-simulator/pull/356) close, run 24957820142) — 1글자 텍스트 변경 ('태양' → '태앙') 의 shortcut-bar mismatch 가 0.114~0.197% 로 임계 0.5% 미만 → r1-guard PASS. r1-guard step 자체 작동은 logs (12 영역 × 3 viewport mismatch 측정 출력) 로 확인. sentinel 정책 + 임계값 재검토는 후속 [#357](https://github.com/coseo12/astro-simulator/issues/357) 로 분리. ADR §결과·재검토 조건 §메타 가드 실증 절차 박제
+
+### Docs
+
+- **ADR `20260425-r1-ui-pixel-diff-guard.md` Amendment v3** (PR [#354](https://github.com/coseo12/astro-simulator/pull/354) `9481c9d`) — 247 라인 신규. 핵심 결정 4건 박제: (1) wasm-pack 후보 A (단일 job 통합) (2) ci.yml r1-guard step 5개 형태 (`if:` 가드 + `pnpm build` 보존 + `exit $GUARD_EXIT`) (3) step 위치 `verify:no-scientific-grep` 직후 (4) 메타 가드 실증 절차 (1글자 변경 → fail → PR close — 본 사이클은 미확보, 분리). Concrete Prediction (ci.yml +35~40 / 다른 파일 0 / detect-and-test ≤ 8분) 박제. Gemini cross-validate "S급 ADR" 평가, BLOCK 0건. 후속 이슈 [#352](https://github.com/coseo12/astro-simulator/issues/352) (메타 가드 자동화 = 카나리아) / [#353](https://github.com/coseo12/astro-simulator/issues/353) (diff 이미지 inline 첨부) — 모두 priority:low 보류
+
+### Notes
+
+- **release PR `--merge` 방식** (gitflow 정책, ADR `20260419-release-merge-strategy.md`) — squash 시 develop 과 diverge 발생 + merge-back 강제. merge commit 으로 main tip 이 develop tip 을 직계 조상으로 포함하므로 fast-forward `git push origin main:develop` 만으로 동기화 완료
+- **closed 이슈**: [#337](https://github.com/coseo12/astro-simulator/issues/337) (R1 후속 F-1 부트스트래핑) / [#348](https://github.com/coseo12/astro-simulator/issues/348) (R1 후속 F-2 통합)
+- **잔여 phase:R1 OPEN 이슈**: #352 / #353 / #357 — 모두 후속 보류, 다음 R-Phase (R2 수성) 진입 가능 시점
+
 ## [0.13.1] — 2026-04-26
 
 > **R1 후속 F-1 (#337) 부트스트래핑 인프라 단독 릴리스** — `r1:baseline-bootstrap` workflow 를 default branch (`main`) 에 도달시켜 `workflow_dispatch` 트리거 가능 상태로 진입 (volt #45 함정 회피). 행동 변화는 `SKIP_LOCAL=1` 1건 + 워크플로 신규. R1 후속 F-2 (#348) 는 본 릴리스 머지 + dispatch + baseline 갱신 PR 머지 후 별도 진입 (chicken-and-egg).
