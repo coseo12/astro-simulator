@@ -604,3 +604,95 @@ git diff develop...HEAD -- apps/web/scripts/r1-ui-regression-guard.mjs apps/web/
   ```
 
 ---
+
+## Amendment v2 2026-04-26 — chicken-and-egg + wasm-pack 실측 발견 박제 (#347, #348)
+
+- **상태**: Accepted (Amendment v2)
+- **날짜**: 2026-04-26 (Amendment 1 박제 직후 약 1시간 내 실측)
+- **결정자**: 메인 오케스트레이터 (PR #347 다운스트림 CI fail 분석)
+- **트리거**: PR [#347](https://github.com/coseo12/astro-simulator/pull/347) commit `eadce1e` 1차 구현 후 `detect-and-test` CI FAIL 실측 — Amendment 1 의 부트스트래핑 절차 (a)~(e) 가 두 가지 잠재 fail 을 명시적으로 짚지 않았음
+- **메인 ADR §결정 본문 보존**: 본 v2 도 §결정 1~5 / Amendment 1 §결정 1~4 어떤 항목도 변경하지 않는다. **부트스트래핑 절차 한계 박제** + **미래 R-Phase 사전 진단 체크리스트** 만 추가
+
+### 발견 사항 — Amendment 1 §결정 2 (workflow 책임 분리) + §Developer 인계의 잠재 fail
+
+#### Fail 1 — wasm-pack 의존 (workspace recursive build)
+
+`r1-baseline-bootstrap.yml` 및 `ci.yml` `detect-and-test` 의 r1-guard step 모두 `pnpm build` (= `pnpm -r build`) 를 호출. monorepo 의존 그래프상:
+
+```
+apps/web (next build) → packages/core → packages/physics-wasm (wasm-pack build)
+```
+
+`physics-wasm` 워크스페이스가 `wasm-pack` 호출. **`r1-baseline-bootstrap.yml` 자체와 `ci.yml` `detect-and-test` job 모두 wasm-pack 미설치** (현재 `verify-and-rust` job 만 보유). 결과:
+
+```
+packages/physics-wasm build: sh: 1: wasm-pack: not found
+ELIFECYCLE Command failed with exit code 1.
+```
+
+Amendment 1 §결정 2 의 "workflow 책임 분리 + 권한 최소화" 가 정합한 설계지만, **wasm-pack 토폴로지 의존을 명시하지 않아** 부트스트래핑 dispatch 즉시 fail 위험 잠재. PR #347 reviewer ([#issuecomment-4321651885](https://github.com/coseo12/astro-simulator/pull/347#issuecomment-4321651885)) BLOCK-1 으로 발견 → commit `d687072` 에서 `dtolnay/rust-toolchain` + `Swatinem/rust-cache` + `taiki-e/install-action wasm-pack@0.14.0` 3 step 추가로 해소.
+
+#### Fail 2 — chicken-and-egg (baseline 미정합 시점의 ci.yml step)
+
+Amendment 1 §결정 2 의 부트스트래핑 절차 (a) PR 머지 → (b) workflow_dispatch → (c) baseline 갱신 PR 머지 가정. (a) 단계의 PR 자체가 `ci.yml` r1-guard step 을 추가하면 **macOS baseline 으로 Linux CI 가 검증** → mismatch ≤ 0.5% 초과 fail 매우 유력. (a) 단계의 ci.yml step 자체가 **chicken 위치**.
+
+PR #347 commit `eadce1e` 가 ci.yml step 추가를 시도했고, wasm-pack fail 로 chicken-and-egg 가 표면화되기 전에 차단됐으나, wasm-pack 해결 후에도 같은 패턴 fail 이 재발할 위험.
+
+### 결정 — 후보 (ii) 채택 + 후속 이슈 분리
+
+PR #347 코멘트 ([#issuecomment-4321641705](https://github.com/coseo12/astro-simulator/pull/347#issuecomment-4321641705)) 에서 후보 (ii) 채택 (commit `70324b8`):
+
+- 본 PR 에서 ci.yml r1-guard step 2개 보류 (workflow + mjs 매개변수화 + .gitignore + CHANGELOG 만 머지)
+- 후속 이슈 [#348](https://github.com/coseo12/astro-simulator/issues/348) ([R1 후속 F-2] ci.yml r1-guard step 통합 — chicken-and-egg + wasm-pack 의존 해소) 신규 — PR #347 머지 + 부트스트래핑 (b)~(c) 완료 후 진행
+
+후보 (iii) `continue-on-error: true` / 후보 (iv) 별도 job 분리 모두 기각 — 후보 (ii) 가 Amendment 1 §결정 2 의 "단계 분리" 와 자연스럽게 정합.
+
+### Amendment 1 부트스트래핑 절차의 한계 박제
+
+Amendment 1 §결정 2 의 부트스트래핑 절차 (a)~(e) 는 **단일 PR 로 workflow + ci.yml step 통합** 을 가정. 본 Amendment v2 가 박제하는 정정 흐름:
+
+1. **PR1 (본 PR #347 후속)** — workflow + mjs 매개변수화 + .gitignore + CHANGELOG (ci.yml step 제외) 머지
+2. **부트스트래핑 (b)** — `r1:baseline-bootstrap` workflow_dispatch 1회 실행 (이때 본 v2 의 wasm-pack 3 step 이 dispatch fail 차단)
+3. **부트스트래핑 (c)** — 자동 생성된 baseline 갱신 PR (12 PNG Linux 캡처본 교체) 머지
+4. **PR2 (후속 이슈 #348)** — ci.yml r1-guard step 통합 + wasm-pack 설치 step (또는 별도 job 분리) — 이 시점 Linux baseline 정합 상태이므로 step 통합이 자연스럽게 PASS
+5. **메타 가드 실증** — 고의적 false positive PR 로 r1-guard fail 검증 후 revert (메인 ADR §결과·재검토 조건)
+
+### 미래 R-Phase 사전 진단 체크리스트 (R2~R10 인프라 재사용 시)
+
+본 Amendment v2 의 핵심 박제 — 동일 패턴 발견 반복 회피:
+
+1. **회귀 가드 인프라 도입 시 baseline + step 통합의 chicken-and-egg 인지 의무**
+   - 단일 PR 로 완결시키려는 관성 vs 부트스트래핑 단계 분리
+   - 체크 질문: "본 PR 의 step 이 동시에 추가하는 baseline 의 OS/환경 정합성 확인 안 된 시점에 동작 가능한가?"
+   - 정합성 미확보 시 → step 추가는 baseline 갱신 PR 머지 후 별도 PR 분리 의무
+
+2. **monorepo recursive build 의 의존성 매핑**
+   - `pnpm build` ≠ `pnpm --filter <pkg> build` — recursive 가 다른 워크스페이스의 binary 의존 (wasm-pack, cargo, rustc, protoc 등) 을 끌어옴
+   - CI job 별 binary 의존 매트릭스 사전 확인:
+     ```bash
+     # 의존 그래프 추적
+     pnpm --filter <target-pkg>... why <suspected-pkg>
+     # 또는 package.json 의 build 스크립트 grep
+     grep -rn '"build":' packages/*/package.json apps/*/package.json
+     ```
+   - 새 workflow/job 도입 전 **빌드 트리 binary 의존 매트릭스 박제** 의무 (예: web → core → physics-wasm → wasm-pack ⊃ rustc)
+
+3. **다운스트림 실측이 최종 가드** (CLAUDE.md `### 다운스트림 실측이 최종 가드 — upstream 3중 방어 blindspot` 의 추가 사례)
+   - architect ADR + developer self-compare + reviewer 정적 분석 3중 방어 통과해도 다운스트림 CI 실측에서만 드러나는 결함 존재
+   - PR #347 사례: developer macOS 로컬 검증 (`pnpm start -p 3001` HTTP 200, `SKIP_LOCAL=1 + macOS` 즉시 PASS, 단위 테스트 441 PASS) 가 wasm-pack/chicken-and-egg 를 잡지 못한 blindspot
+   - 메인 오케스트레이터의 다운스트림 CI 결과 직접 확인 의무 (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료`) 의 핵심 가치 입증
+
+### Volt 캡처 후보 (별도 처리)
+
+본 Amendment v2 의 발견은 다음 volt 교훈으로 캡처 권고:
+
+- **회귀 가드 인프라 도입의 chicken-and-egg 패턴** — baseline 정합성 + step 통합 + 의존성 매핑 3축 사전 진단. 본 ADR Amendment v2 + PR #347 commit history (`eadce1e` → `70324b8` → `d687072`) 가 trace
+- **monorepo recursive build 의존성 누락 (workspace binary 의존)** — `pnpm build` vs `pnpm --filter` 의 의존 그래프 차이. CI job 구조 사전 매핑 의무
+- **upstream 3중 방어 blindspot 의 추가 사례** — volt #195 (CLAUDE.md 박제) 의 구체 사례 1건 추가
+
+### 재검토 트리거 추가 (메인 ADR §결과·재검토 조건 보강)
+
+- R2~R10 의 회귀 가드 인프라 도입 시 본 Amendment v2 §사전 진단 체크리스트 적용 → 동일 패턴 재발 시 체크리스트 미준수 사실 박제
+- 후속 이슈 #348 머지 후 부트스트래핑 절차 (a)~(e) 정합 동작 실증 — Amendment 1 §결정 2 의 절차 검증
+
+---
