@@ -59,6 +59,58 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-no-scientific-grep.mjs') != ''
         run: pnpm run --if-present verify:no-scientific-grep
 
+      # ============================================================
+      # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
+      # ============================================================
+      # ADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment v3 2026-04-26
+      # 의존성:
+      #   - physics-wasm 워크스페이스 → wasm-pack (root recursive `pnpm build` 트리거)
+      #   - apps/web → next start (Playwright BASE_URL 타깃)
+      #   - apps/web/scripts/__baselines__/r1/ Linux 캡처본 12장 (PR #351 머지 후 정합)
+
+      - name: Rust 툴체인 설정 (R1 r1-guard 의존)
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && hashFiles('rust-toolchain.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시 (R1 r1-guard 의존)
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치 (R1 r1-guard 의존)
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
+      - name: R1 UI 회귀 가드 (r1-guard)
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm build
+          pnpm --filter @astro-simulator/web start -p 3001 &
+          WEB_PID=$!
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
+      - name: R1 diff 이미지 업로드 (실패 시)
+        if: failure() && hashFiles('apps/web/scripts/__diff__/r1/**/*.png') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: r1-pixel-diff-${{ github.run_id }}
+          path: apps/web/scripts/__diff__/r1/
+          retention-days: 7
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
