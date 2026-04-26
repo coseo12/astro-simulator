@@ -11,7 +11,11 @@
  *   node apps/web/scripts/r1-ui-regression-guard.mjs --viewport=1280x720
  *   node apps/web/scripts/r1-ui-regression-guard.mjs --measure-sun-coverage  # 점유율만 측정
  *
- * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4.
+ * 환경변수 계약:
+ *   BASE_URL    — 웹 서버 URL (기본 http://localhost:3000, CI 에서 http://localhost:3001 등 오버라이드 가능)
+ *   SKIP_LOCAL  — '1' + macOS darwin 한정 즉시 PASS 종료 (Linux baseline 과 폰트 차이 false positive 회피)
+ *
+ * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4 + §Amendment 2026-04-26.
  */
 
 import { chromium } from 'playwright';
@@ -237,6 +241,8 @@ async function runForViewport(browser, viewport) {
 }
 
 async function main() {
+  // SKIP_LOCAL=1 + darwin — Linux baseline 폰트 차이 false positive 회피 (ADR Amendment 2026-04-26 §결정 1).
+  if (process.env.SKIP_LOCAL === '1' && process.platform === 'darwin') process.exit(0);
   ensureDirSync(BASELINE_DIR);
   ensureDirSync(DIFF_DIR);
 
