@@ -5,9 +5,13 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-04-26
+
+> **R1 후속 F-1 (#337) 부트스트래핑 인프라 단독 릴리스** — `r1:baseline-bootstrap` workflow 를 default branch (`main`) 에 도달시켜 `workflow_dispatch` 트리거 가능 상태로 진입 (volt #45 함정 회피). 행동 변화는 `SKIP_LOCAL=1` 1건 + 워크플로 신규. R1 후속 F-2 (#348) 는 본 릴리스 머지 + dispatch + baseline 갱신 PR 머지 후 별도 진입 (chicken-and-egg).
+
 ### Behavior Changes
 
-- **R1 UI 회귀 가드 baseline CI Linux 전환 인프라 — 부트스트래핑 단계** ([#337](https://github.com/coseo12/astro-simulator/issues/337)) — `.github/workflows/r1-baseline-bootstrap.yml` (`workflow_dispatch`, ubuntu-latest 캡처 + `peter-evans/create-pull-request`) 신규. `apps/web/scripts/r1-ui-regression-guard.mjs` 매개변수화: `BASE_URL` 환경변수 계약 헤더 주석 박제 + `SKIP_LOCAL=1 + macOS darwin` 즉시 PASS 종료 (6 라인 변경). `r1-ui-regions.mjs` 0 라인 변경. baseline 12 PNG 는 본 PR 머지 후 `r1:baseline-bootstrap` workflow_dispatch 1회 실행으로 자동 갱신 PR 생성 (Linux 캡처본 교체). 로컬 macOS 검증 시 폰트 차이 false positive 가능 — `SKIP_LOCAL=1` env var 또는 CI 결과 신뢰. **`ci.yml` 의 r1-guard step 통합은 본 PR 비-범위** — chicken-and-egg 회피 (Linux baseline 갱신 PR 머지 후 별도 후속 PR 에서 통합. `pnpm build` 가 detect-and-test job 에 없는 wasm-pack 의존을 끌어오는 추가 위험도 후속 PR 에서 wasm-pack 설치 step 분리로 해소). ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26
+- **R1 UI 회귀 가드 baseline CI Linux 전환 인프라 — 부트스트래핑 단계** ([#337](https://github.com/coseo12/astro-simulator/issues/337), PR [#347](https://github.com/coseo12/astro-simulator/pull/347)) — `.github/workflows/r1-baseline-bootstrap.yml` (`workflow_dispatch`, ubuntu-latest 캡처 + `peter-evans/create-pull-request`) 신규. `apps/web/scripts/r1-ui-regression-guard.mjs` 매개변수화: `BASE_URL` 환경변수 계약 헤더 주석 박제 + `SKIP_LOCAL=1 + macOS darwin` 즉시 PASS 종료 (6 라인 변경). `r1-ui-regions.mjs` 0 라인 변경. baseline 12 PNG 는 본 릴리스 머지 후 `r1:baseline-bootstrap` workflow_dispatch 1회 실행으로 자동 갱신 PR 생성 (Linux 캡처본 교체). 로컬 macOS 검증 시 폰트 차이 false positive 가능 — `SKIP_LOCAL=1` env var 또는 CI 결과 신뢰. **`ci.yml` 의 r1-guard step 통합은 본 PR 비-범위** — chicken-and-egg 회피 (Linux baseline 갱신 PR 머지 후 별도 후속 PR 에서 통합. `pnpm build` 가 detect-and-test job 에 없는 wasm-pack 의존을 끌어오는 추가 위험도 후속 PR 에서 wasm-pack 설치 step 분리로 해소). ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26
 
 ## [0.13.0] — 2026-04-26
 
