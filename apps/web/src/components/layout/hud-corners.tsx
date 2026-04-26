@@ -42,6 +42,7 @@ export function HudCorners() {
       {/* 우상 — 렌더러/FPS */}
       <div
         data-testid="hud-top-right"
+        data-r1-region="hud-top-right"
         className="absolute top-14 right-2 flex flex-col gap-1 text-caption num text-fg-secondary items-end pointer-events-none"
       >
         <div className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
@@ -104,13 +105,14 @@ export function HudCorners() {
       {/* 우하 — Tier 범례 (D8에서 동적화) */}
       <div
         data-testid="hud-bottom-right"
+        data-r1-region="hud-bottom-right"
         className="absolute bottom-20 right-2 text-caption num text-fg-tertiary bg-bg-surface/60 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle pointer-events-none flex items-center gap-2"
       >
         <span
           className="inline-block w-2 h-2 rounded-full"
           style={{ background: 'var(--tier-1-observed)' }}
         />
-        Tier 1 관측
+        정확도 · T1 관측
       </div>
     </>
   );

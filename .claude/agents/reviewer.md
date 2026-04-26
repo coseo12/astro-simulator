@@ -36,7 +36,12 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    ```
 2. **연결 이슈 확인** — 스프린트 계약 본문을 읽고 검토 범위 확정
 3. **5축 검사** — 변경 hunk 별로 분류
-4. **결과 PR 코멘트 작성**:
+4. **파괴적 리팩토링 체크리스트 (volt [#69](https://github.com/coseo12/volt/issues/69))** — 상수 제거·SSoT 이동·함수 폐기 같은 **파괴적 리팩토링** 이 포함된 PR 이면 추가 점검:
+   - **(Grep) 저장소 전체 검색** — 제거된 상수명을 `grep -rn "<CONST_NAME>" <src dirs>` 로 전 저장소 검색. 위성 모듈 독립 선언 잔존 시 "은닉 상수 drift" (상대 비율 / 단위 / 스케일 drift 를 조용히 생성) 로 차단
+   - **(Dead Reference) 주석 SSoT 참조 확인** — `// SSoT: <파일>` / JSDoc `@see` 등 주석 메타데이터가 **폐기된 파일을 가리키지 않는지** 확인 (dead reference). 참조 대상 파일이 제거됐으면 주석도 함께 갱신 요구
+   - **(Invariant Test) 상대 비율 불변식 테스트** — 다수 모듈에서 쓰이던 상수를 동적 함수로 교체한 PR 은 "모든 모듈이 공통 배수로 확대되는지" 확인하는 불변식 단위 테스트 누락 여부 확인. 누락이면 권고 (차단은 도메인 판단)
+   - **(ADR Prediction) 예측 대비 실측 diff** — ADR 에 "추상화 도입 후 변경 시 X 코드 0줄" Concrete Prediction 이 있으면 `git diff --stat <추상화 경로>` 로 예측 성공 재현. 실패 시 "추상화 건강성" 신호 → 권고
+5. **결과 PR 코멘트 작성**:
    ```markdown
    ## Reviewer 정적 리뷰
 
@@ -49,7 +54,7 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    ### 통과 확인 ✓
    - 스프린트 계약 N개 기준 중 정적으로 검증 가능한 M개 충족
    ```
-5. **라벨 전이**:
+6. **라벨 전이**:
    - 차단 항목 0건 → `gh pr edit --remove-label "stage:review" --add-label "stage:qa"`
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
 

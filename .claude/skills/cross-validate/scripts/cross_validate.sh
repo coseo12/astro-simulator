@@ -354,10 +354,13 @@ PROMPT_END
     fi
 
     # diff 크기 제한 (Gemini 컨텍스트 보호)
-    DIFF_LINES=$(echo "${DIFF}" | wc -l)
+    # `head` 는 2000 라인 읽은 뒤 종료해 producer 에 SIGPIPE 를 전달한다.
+    # `set -euo pipefail` 하에서 파이프 버퍼(64KB) 초과 입력 시 exit 141 로 조기 종료.
+    # awk 는 EOF 까지 소비하여 SIGPIPE 를 회피한다 (이슈 #207).
+    DIFF_LINES=$(printf '%s\n' "${DIFF}" | wc -l)
     if [ "${DIFF_LINES}" -gt 2000 ]; then
       log "경고: diff가 ${DIFF_LINES}줄로 큼. 처음 2000줄만 전달합니다."
-      DIFF=$(echo "${DIFF}" | head -2000)
+      DIFF=$(printf '%s\n' "${DIFF}" | awk 'NR<=2000')
     fi
 
     PR_INFO=$(gh pr view "${TARGET}" --json title,body,labels --template '제목: {{.title}}

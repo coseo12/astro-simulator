@@ -6,9 +6,13 @@ import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulat
 import { attachCoreToStore } from '@/core/core-adapter';
 import { parseIntegratorKind } from '@/core/parse-integrator';
 import { parseGrMode } from '@/core/parse-gr-mode';
-import { detectIsMobile } from '@/core/is-mobile';
+import { parseLodLevel } from '@/core/parse-lod-level';
+import { parseGpuTier } from '@/core/parse-gpu-tier';
+import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
+import { getBodyScale } from '@/constants/body-scale';
+import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /**
@@ -49,25 +53,68 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         console.info('[gpu] adapter:', cap.adapterInfo);
       }
 
-      // P7-D #209 — 모바일 UserAgent + WebGPU 미지원 조합에서 best-effort 안내.
-      // iOS Safari <17.4 등 WebGPU 미탑재 모바일에서 일부 시각 효과(렌즈·disk)가
-      // 제한됨을 사용자에게 1회 고지한다. 이미 `webgpu-fallback` 키 알림이 있으면
-      // 중복 고지 방지 — 별도 키 사용 (dismiss 독립 관리).
+      // P11-C #290 — GPU tier 감지 + 프로파일 적용 + Graceful Degradation 알림.
       //
-      // P7-E #210 / #220 — iPadOS 13+ 는 데스크톱 UA 로 전송되므로 Macintosh +
-      // maxTouchPoints 조합 감지 (Apple 공식 권고). `detectIsMobile` 유틸로 분리.
-      const isMobile =
-        typeof navigator !== 'undefined'
-          ? detectIsMobile({
-              userAgent: navigator.userAgent,
-              maxTouchPoints: navigator.maxTouchPoints,
-            })
-          : false;
-      if (isMobile && !cap.webgpu) {
-        useSimStore.getState().setEngineNotice({
-          key: 'mobile-webgpu-best-effort',
-          message: '모바일 WebGPU best-effort — 일부 시각 효과가 제한될 수 있습니다.',
+      // P7-D/P7-E 의 모바일 best-effort 분기를 tier 프로파일 감지로 승격. 기존 키
+      // `mobile-webgpu-best-effort` 는 `tier-c-graceful-degradation` 으로 치환되며
+      // 저성능 데스크톱(WebGL2-only)도 tier-c 경로에 포함된다 (ADR §위험 2 + 알림 키 SSoT §1).
+      //
+      // 감지 순서 (ADR §결정 §1 축 1):
+      //   1. URL `?gpu=a|b|c` 가 있으면 tier 강제 (invalid 는 'auto' 폴백 + console.warn)
+      //   2. 그 외 → `detectGpuTier(input)` 자동 감지
+      //   3. tier-c 시 LOD 'low' 강제 + 알림 키 'tier-c-graceful-degradation' 표시
+      //
+      // SSR 디폴트는 `GPU_TIER_SSR_DEFAULT='b'` 중립. hydration 후 실측으로 덮어쓴다.
+      if (typeof navigator !== 'undefined') {
+        const gpuUrlParam = new URLSearchParams(window.location.search).get('gpu');
+        const parsedGpu = parseGpuTier(gpuUrlParam);
+        const detectedTier: GpuTier =
+          parsedGpu !== 'auto'
+            ? parsedGpu
+            : detectGpuTier({
+                webgpu: {
+                  supported: cap.webgpu,
+                  adapterInfo: cap.adapterInfo ?? null,
+                },
+                hardwareConcurrency: navigator.hardwareConcurrency ?? 0,
+                navigator: {
+                  userAgent: navigator.userAgent,
+                  maxTouchPoints: navigator.maxTouchPoints,
+                },
+              });
+
+        // browser-verify / dev overlay 에서 감지 tier 확인 가능하도록 전역 노출.
+        Object.defineProperty(window, '__gpuTier', {
+          configurable: true,
+          value: detectedTier,
+          writable: false,
         });
+
+        // tier-c → 자동 최대 억제 조합 (ADR §축 5 후보 A — DoD #5).
+        //   - LOD 'low' 강제 (단, URL `?lod=` 가 있으면 URL 우선)
+        //   - 알림 키 'tier-c-graceful-degradation' 표시
+        //   - 파티클/shadow/post-proc OFF 는 tier profile 소비자가 scene 구성 시 반영
+        if (detectedTier === 'c') {
+          const profile = renderApi.TIER_PROFILES.c;
+          const lodParam = new URLSearchParams(window.location.search).get('lod');
+          const hasLodOverride = lodParam !== null && lodParam !== '';
+          if (!hasLodOverride && profile.lod.forceOverride) {
+            // LOD 'low' 강제 — scene 초기화 완료 후 적용되도록 command stream 경유.
+            // sendCommand 가 아직 handler 를 못 연결했을 수 있어도 setLodOverrideHandler
+            // 등록 시점에 URL 재파싱 경로가 fallback 처리 (기존 P11-B handler 로직 재사용).
+            // 여기서는 window 에 예약 플래그만 박제 — handler 등록 시 참고.
+            Object.defineProperty(window, '__gpuTierForceLod', {
+              configurable: true,
+              value: profile.lod.forceOverride,
+              writable: false,
+            });
+          }
+          useSimStore.getState().setEngineNotice({
+            key: 'tier-c-graceful-degradation',
+            message:
+              '저성능 환경 감지 — 시각 효과가 자동 축소됩니다. (URL ?gpu=b|a 로 수동 상향 가능)',
+          });
+        }
       }
     });
 
@@ -188,6 +235,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           grMode,
           integrator,
           ringRenderMode,
+          // R1 #329 — body 별 시각 과장 배수 주입 (DI). 현재 `sun = 75` 만 정의됨.
+          // ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3.
+          bodyScale: getBodyScale,
         });
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
@@ -259,8 +309,60 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
 
+        // P11-B #289 — `setLodOverride` command → scene 에 전달. URL `?lod=` 초기 1회 호출 경로.
+        // UrlSync 가 mount 시 `sendCommand({ type: 'setLodOverride', level })` 호출 → 여기로 라우팅.
+        //
+        // [타이밍 주의] UrlSync 의 mount useEffect 는 `setCore(instance)` 직후 실행되지만 scene 초기화
+        // (`instance.start().then(...)`) 는 비동기라 handler 가 아직 null. 이 경우 command 가 no-op 되어
+        // override 유실. 방어 장치로 handler 등록 시점에 **URL 을 직접 재파싱** 하여 즉시 override 적용
+        // (UrlSync 호출이 이미 지나갔어도 최신 URL 상태 복원). 두 경로 동시 적용해도 idempotent.
+        instance.setLodOverrideHandler((level) => {
+          solar.setLodOverride(level);
+        });
+        {
+          const lodParam = new URLSearchParams(window.location.search).get('lod');
+          const parsed = parseLodLevel(lodParam);
+          // P11-C #290 — URL `?lod=` 가 없고 GPU tier-c 가 LOD low 강제를 예약했으면 그걸 적용.
+          //   URL 우선 원칙: `?lod=` 가 있으면 사용자 디버그 경로를 차단하지 않는다.
+          const hasLodUrl = lodParam !== null && lodParam !== '';
+          const tierForced = (window as { __gpuTierForceLod?: 'high' | 'mid' | 'low' })
+            .__gpuTierForceLod;
+          if (!hasLodUrl && tierForced) {
+            solar.setLodOverride(tierForced);
+          } else {
+            solar.setLodOverride(parsed);
+          }
+        }
+
+        // R1 #334+#335 — store-scene 동기화 단일 경로 helper.
+        //
+        // ADR `20260425-r1-store-scene-sync-unification.md` §결정 4.
+        // 마운트 직후 1회 sync 와 subscribe 분기가 동일 식 사용 → DRY (`syncFocusToScene` 1곳 수정으로
+        // 두 진입점 일관 변경). 신규 진입점 추가 시 (예: 모바일 swipe gesture) 도 본 helper 재사용.
+        //
+        // 의도:
+        //  - id !== null  → solar.setFocusOrigin(id) + controller.focusOn(mesh) (mesh 존재 시)
+        //  - id === null  → solar.clearFocus() + controller.reset(35)
+        //                   ("focus 해제 = 카메라 reset" 박제 — ADR §결정 3).
+        const syncFocusToScene = (bodyId: string | null) => {
+          if (bodyId !== null) {
+            const mesh = solar.meshes.get(bodyId);
+            if (mesh) {
+              // P11-A #288 — Floating Origin primary shift (ADR §1-B).
+              // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
+              solar.setFocusOrigin(bodyId);
+              controller.focusOn({ mesh });
+            }
+          } else {
+            // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
+            solar.clearFocus();
+            controller.reset(35);
+          }
+        };
+
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
         // + 질량 배수 변경 → setBodyMassMultiplier (#107)
+        // + selectedBodyId 변경 → syncFocusToScene (R1 #334+#335 — scene focus / camera 단일 책임)
         // (P12-C #298 — viewMode 구독 삭제: 단일 모드 전환)
         unsubEngine = useSimStore.subscribe((state, prev) => {
           if (state.physicsEngine !== prev.physicsEngine) {
@@ -277,27 +379,33 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               if (prev.massMultipliers[k] !== v) solar.setBodyMassMultiplier(k, v);
             }
           }
+          // R1 #334+#335 — selectedBodyId ↔ scene focus 동기화 (단일 진실원).
+          //
+          // 클릭 / URL / programmatic 진입 모두 동일 흐름:
+          //   sendCommand({ type: 'focusOn' | 'resetCamera' })
+          //     → simulation-core 가 'bodySelected' event emit
+          //     → core-adapter 가 store.setSelectedBody(id) 호출
+          //     → 본 subscribe 가 변화 감지 → syncFocusToScene(id) 호출 (단일 호출).
+          //
+          // 이전 (Phase 1 fix `acfcb74`): subscribe 분기 + setCameraHandlers focus/reset 콜백 이중 경로.
+          // 이중 호출로 `controller.focusOn` 의 `Animation.CreateAndStartAnimation × 2` 가 2회 폐기 + 재시작.
+          if (state.selectedBodyId !== prev.selectedBodyId) {
+            syncFocusToScene(state.selectedBodyId);
+          }
         });
-        instance.setCameraHandlers(
-          (bodyId: string) => {
-            const mesh = solar.meshes.get(bodyId);
-            if (mesh) {
-              // P11-A #288 — Floating Origin primary shift (ADR §1-B).
-              // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
-              // 이후 `updateAt` 이 body 를 scene 원점 근처에서 렌더 → float32 jitter 제거.
-              solar.setFocusOrigin(bodyId);
-              controller.focusOn({ mesh });
-            }
-          },
-          () => {
-            // P12-A #298 — reset 시 focus 해제 → tier 는 free-fly 경로로 판정.
-            solar.clearFocus();
-            controller.reset(35);
-          },
-          (radius: number) => {
-            camera.radius = radius;
-          },
-        );
+        // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).
+        instance.setCameraRadiusHandler((radius: number) => {
+          camera.radius = radius;
+        });
+
+        // R1 #334+#335 — 마운트 직후 selectedBodyId 가 이미 있으면 helper 로 1회 초기 sync.
+        //
+        // URL `?focus=sun` 진입 케이스: url-sync.tsx 의 useEffect 가 sendCommand({ type:'focusOn' }) +
+        // setSelectedBody(urlFocus) 호출하지만, sim-canvas 마운트 시점에는 두 호출 모두 이미 끝나
+        // store snapshot 에 selectedBodyId 가 박혀있다. 위 subscribe 는 마운트 후의 변화만 감지하므로
+        // 마운트 직후 명시적 1회 sync 로 첫 프레임부터 high LOD 진입.
+        // ADR `20260425-r1-store-scene-sync-unification.md` §축 3 후보 B.
+        syncFocusToScene(useSimStore.getState().selectedBodyId);
 
         // P12-A #298 — Tier 하이브리드 트리거 자동 판정 (Q7=7-d2).
         //

@@ -31,9 +31,16 @@ import {
   initialTier as defaultInitialTier,
   tierFromFocus,
   tierFromCameraDistance,
+  computeFloatingOriginForTier,
   type Tier,
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
+import {
+  lodFromScreenCoverage,
+  screenCoverageRadius,
+  type LodLevel,
+  type LodOverride,
+} from '../render/lod.js';
 import type { ArcRotateCamera } from '@babylonjs/core';
 
 // P12-A #298 — Display-Relative Scale Unification 계약 (ADR 20260423, §결정):
@@ -149,7 +156,8 @@ export interface SolarSystemSceneHandles {
    * `CameraController.focusOn(mesh)` 와 동일 시점에 호출. 해당 body 의 월드 좌표로 origin 즉시 재배치
    * → focus body 는 scene 원점 근처에서 렌더되어 float32 jitter 제거. `bodyId` 미존재 시 no-op.
    *
-   * **호출 타이밍**: `setCameraHandlers` focus 콜백에서 `controller.focusOn` 과 같은 프레임에 호출.
+   * **호출 타이밍**: sim-canvas `syncFocusToScene` helper 에서 `controller.focusOn` 과 같은 프레임에 호출
+   * (R1 #334+#335 — store-scene 동기화 단일 경로 통합. ADR `20260425-r1-store-scene-sync-unification.md`).
    * 내부적으로 `updateAt` 이 다음 프레임에 origin 반영된 local 좌표로 mesh.position 을 재기록하므로
    * focus animation (300ms) 중에도 일관된 좌표계 유지.
    */
@@ -158,6 +166,18 @@ export interface SolarSystemSceneHandles {
    * P12-A #298 — focus 해제 (reset 등). tier 가 free-fly 경로로 자동 전환되도록 focus id 를 null 로 돌린다.
    */
   clearFocus: () => void;
+  /**
+   * P11-B #289 — LOD override 설정. URL `?lod=high|mid|low` 는 전 body 강제, `'auto'` 는 거리 자동 판정 (기본).
+   *
+   * 런타임 1회 변경 전제 — 반복 호출도 허용되지만 매 updateAt 에서 즉시 반영.
+   */
+  setLodOverride: (level: LodOverride) => void;
+  /**
+   * P11-B #289 — 마지막 `updateAt` 에서 집계된 LOD 분포. dev overlay (draw call) 표시용.
+   *
+   * `{ high, mid, low }` 는 각 LOD 단계로 판정된 body 개수. 합은 전체 body 수 (고리/HUD 제외).
+   */
+  getLodStats: () => { high: number; mid: number; low: number; override: LodOverride };
   dispose: () => void;
 }
 
@@ -204,6 +224,29 @@ export interface SolarSystemSceneOptions {
    * URL `?ring=fallback` 또는 `?ring=placeholder` 로 페이지 측에서 override 가능.
    */
   ringRenderMode?: 'shader' | 'fallback' | 'placeholder';
+  /**
+   * R1 #329 — body 별 시각 과장 배수 콜백 (DI).
+   *
+   * `apps/web/src/constants/body-scale.ts` 의 `getBodyScale` 같은 룩업을 주입.
+   * 미주입 시 default `() => 1.0` (실측 그대로, 테스트 회귀 0).
+   *
+   * **레이어 의존 역전 방지**: `BODY_SCALE` 룩업은 `apps/web` 에 박제 (시각 과장 데이터 ≠ physics).
+   * `packages/core` 가 직접 import 하지 않고 콜백으로 주입받아 데이터 모름.
+   *
+   * 적용 지점:
+   *   1. `createBodyMesh` (high) / `createBodyMeshMid` (mid) 의 `diameter` 계산식
+   *   2. `screenCoverageRadius` 입력 — effective radius (`body.radius × bodyScale`) 로 LOD 결정 정합
+   *
+   * **Phase 2 #333 — billboard variant 는 미적용**: `createBodyBillboard` 는 `bodyScale` 미곱.
+   * 책임 분리 — sphere/mid 가 시각 과장 전담, billboard 는 sub-pixel draw call 절감 책임 단독.
+   * ADR `20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
+   *
+   * ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3 후보 a.
+   *
+   * **R2+ 인계**: tier 차등 필요 시 `(bodyId: string, tier?: Tier) => number` 로 확장 가능.
+   * 현재는 단일 인자 시그니처 (Q3=C 비-범위 가드 — tier 변경 자체에 손대지 않음).
+   */
+  bodyScale?: (bodyId: string) => number;
 }
 
 /**
@@ -226,6 +269,7 @@ export function createSolarSystemScene(
     grMode,
     integrator = 'velocity-verlet',
     ringRenderMode = 'shader',
+    bodyScale = defaultBodyScale,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -260,10 +304,32 @@ export function createSolarSystemScene(
   const bodyInitialRenderScale = activeTier; // 모든 body 가 동일 tier 로 생성됨 → Tier 만 기억하면 충분.
   const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립, 진단용)
   for (const body of system.bodies) {
-    const mesh = createBodyMesh(body, scene, activeTier);
+    const mesh = createBodyMesh(body, scene, activeTier, bodyScale);
     meshes.set(body.id, mesh);
     bodyBaseDiameter.set(body.id, body.radius * 2);
   }
+
+  // P11-B #289 — LOD mid/low variant lazy-create 저장소 (ADR 20260424-p11-b §축 4).
+  //
+  // mid (segments=12 low-poly sphere) / low (BILLBOARDMODE_ALL quad) 변형 메쉬는 **첫 전환 시점에**
+  // 생성되어 `setEnabled(false)` 로 숨겨둔다. high variant (`meshes.get(id)`) 가 position/scale 의 유일한
+  // owner — mid/low 는 `parent = highMesh` 로 붙어 좌표 추종. `mesh.scaling` 은 high variant 만 건드린다.
+  const midVariants = new Map<string, Mesh>();
+  const lowVariants = new Map<string, Mesh>();
+  const bodyCurrentLod = new Map<string, LodLevel>();
+  // LOD 집계 — getLodStats 반환 값 재사용 버퍼 (매 프레임 객체 할당 회피).
+  const lodStats = { high: 0, mid: 0, low: 0, override: 'auto' as LodOverride };
+  let lodOverride: LodOverride = 'auto';
+  // LOD cross-fade 상태 (ADR §축 3 — 200ms linear interp).
+  // 각 body 의 전환 진행 상태 보관. `nowMs - startMs >= LOD_FADE_DURATION_MS` 이면 정착.
+  interface LodFadeState {
+    fromLevel: LodLevel;
+    toLevel: LodLevel;
+    startMs: number;
+  }
+  const lodFadeState = new Map<string, LodFadeState>();
+  // ADR §축 3: UX 일관성 + headless 검증 안정화 (middle frame capture) 200ms 고정.
+  const LOD_FADE_DURATION_MS = 200;
 
   // P9 #254 PR-2.5 — rings 가 있는 행성에 shader 기반 3층 렌더.
   //   - 'shader' (기본): `densityProfile[]` uniform + GLSL 선형 보간
@@ -449,6 +515,39 @@ export function createSolarSystemScene(
     }
     rebuildOrbitLines();
 
+    // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. tier 전환 시 origin 을 대칭 처리.
+    //  - T1/T2 진입 → [0,0,0] reset (T1/T2 에서 매 프레임 FO overhead 제거)
+    //  - T3 진입 + focus 있음 → setOriginToBody(focusWorld) 즉시 동기 (QA 회귀 수정: 비대칭 처리 시
+    //    runTierTransition 이 focusMesh.absolutePosition 을 이전 origin 기준으로 읽어 카메라 target
+    //    mismatch 발생 — PR #315 QA A1 119.9px / V5 296px 퇴행 재현)
+    //  - T3 진입 + focus 없음 (free-fly) → null (기존 origin 유지, 다음 updateAt 의 safety net 이 처리)
+    const originTarget = computeFloatingOriginForTier(tier, focusBodyIdForAssert, (id) =>
+      worldPositions.get(id),
+    );
+    if (originTarget !== null) {
+      if (originTarget[0] === 0 && originTarget[1] === 0 && originTarget[2] === 0) {
+        floatingOrigin.reset();
+      } else {
+        floatingOrigin.setOriginToBody(originTarget);
+      }
+    }
+
+    // origin 과 newScale 기준으로 mesh.position 즉시 재계산 — `runTierTransition` 이 읽는
+    // `focusMesh.absolutePosition` (tier-transition.ts:216-219) 이 새 tier 좌표계여야 카메라 target 정합.
+    // updateAt 의 mesh.position 루프 (line 595-610) 와 동일 수식 (의도된 duplication — tier 전환 시점에
+    // 1회 추가 실행으로 transition 이 올바른 좌표를 읽게 함).
+    const tierTransitionOrigin = floatingOrigin.originOffset;
+    for (const [id, world] of worldPositions) {
+      const mesh = meshes.get(id);
+      if (!mesh) continue;
+      mesh.position.set(
+        (world[0] - tierTransitionOrigin[0]) * newScale,
+        (world[1] - tierTransitionOrigin[1]) * newScale,
+        (world[2] - tierTransitionOrigin[2]) * newScale,
+      );
+      mesh.computeWorldMatrix(true);
+    }
+
     // Phase B — camera dolly interp. scene.activeCamera 가 ArcRotateCamera 가 아니면 skip.
     // (e.g. 테스트 셋업 / 비정상 초기화 경로). 통상 경로는 setupArcRotateCamera 에서 항상 ArcRotateCamera.
     //
@@ -578,7 +677,10 @@ export function createSolarSystemScene(
     // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
     // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
     // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
-    if (focusBodyIdForAssert) {
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
+    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
+    if (activeTier === 'body' && focusBodyIdForAssert) {
       const focusWorld = worldPositions.get(focusBodyIdForAssert);
       if (focusWorld) {
         floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
@@ -630,7 +732,11 @@ export function createSolarSystemScene(
     // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (line 445-450 의
     // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
     // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
-    if (cam && !focusBodyIdForAssert) {
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 renderScale 이 작아
+    // 카메라 이동이 AU 단위여도 sub-pixel → safety net skip + origin [0,0,0] 유지. 매 프레임
+    // metersPerSceneUnit 환산 + floatingOrigin.update() + AU 곱셈 3회 overhead 제거 (#294 회귀 주범 후보).
+    if (cam && !focusBodyIdForAssert && activeTier === 'body') {
       // cam.globalPosition 은 scene unit. P12-A 이후 1 unit 크기는 tier 별 상이 — 환산 factor 는
       // 현재 tier 의 renderScale 역수 (1/sceneUnitPerMeter). fo 는 m 단위 계약.
       const metersPerSceneUnit = sceneUnitPerMeter > 0 ? 1 / sceneUnitPerMeter : AU;
@@ -658,7 +764,12 @@ export function createSolarSystemScene(
     // local 에 1e5 m 제한을 두면 T3 body tier (P12 단일 모드) 가 물리적으로 동작 불가. float32 jitter 는
     // mesh local (작은 값) 에서만 발생하므로 카메라 local 은 Three.js/Babylon 내부 부동소수점 관리에
     // 위임한다. ADR 20260422-floating-origin.md §6-β / §Amendments 2026-04-22 참조.
-    if (floatingOriginAssertEnabled() && cam) {
+    //
+    // #313 M2 reviewer 권고 — T3 (body) 에서만 assert 활성. T1/T2 는 `floatingOrigin.reset()` 으로
+    // origin=[0,0,0] 유지 → focus body local = 절대 월드 좌표 (지구 = 1 AU ≈ 1.5e11 m) 로 항상 ≥1e5
+    // 임계 초과 → dev 빌드 console.error spam 발생. assert 자체가 T3 primary follow 불변식 검증 목적
+    // 이므로 T1/T2 에서는 무의미. primary follow / safety net 가드와 동일 조건으로 통일.
+    if (floatingOriginAssertEnabled() && cam && activeTier === 'body') {
       const focusId = focusBodyIdForAssert;
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
       if (focusWorld) {
@@ -672,6 +783,21 @@ export function createSolarSystemScene(
           );
         }
       }
+    }
+
+    // P11-B #289 — LOD 3단 분기 hook (ADR 20260424-p11-b-lod-design §결정).
+    //
+    // 선행 ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment — 본 파일에 LOD 분기 hook 추가는
+    // 예외 허용. 금지 조건 (mesh.position 수식 / renderScaleForTier 적용 지점 / Tier 상수 / activeTier
+    // 의미 / FloatingOrigin 상호작용 / setTier origin 로직) 은 본 hook 에서 건드리지 않음.
+    //
+    // hook 책임:
+    //  1. 각 body 의 `screenCoverageRadius` 계산 → `lodFromScreenCoverage` 로 LOD 결정
+    //  2. LOD 변경된 body 는 `lodFadeState` 에 200ms cross-fade 등록
+    //  3. variant visibility / alpha 갱신
+    //  4. 집계 `lodStats` 갱신 (dev overlay 용)
+    if (cam) {
+      runLodPass(cam);
     }
 
     // 소행성대 업데이트.
@@ -696,6 +822,205 @@ export function createSolarSystemScene(
       }
     }
   };
+
+  // P11-B #289 — LOD 분기 / variant lazy-create / alpha blend.
+  //
+  // 매 updateAt 에서 한 번 호출. body 개수 O(N) 선형이며 태양계 100+ body 기준 프레임당 몇 마이크로초.
+  // 내부 정책:
+  //  - variant (mid / low) 는 lazy-create: 첫 전환 시점에 생성 → 초기 로딩 비용 분산 (ADR 교차검증 반영)
+  //  - 정착 상태는 `bodyCurrentLod` 에서 읽고, 변경 감지 시 `lodFadeState` 로 200ms cross-fade 시작
+  //  - fade 중에는 fromVariant.alpha=1→0, toVariant.alpha=0→1. 종료 프레임에 fromVariant.setEnabled(false)
+  const runLodPass = (camera: { getViewMatrix?: unknown; globalPosition: Vector3 }) => {
+    lodStats.high = 0;
+    lodStats.mid = 0;
+    lodStats.low = 0;
+    lodStats.override = lodOverride;
+
+    // view × projection 결합 행렬. Babylon `scene.getTransformMatrix()` 는 `viewMatrix × projectionMatrix` 의
+    // row-major 16 원소 Float32Array (`.m` 필드). 카메라 타입 관계없이 scene 단위로 호출 가능.
+    const vp = scene.getTransformMatrix();
+    const vpArr = vp.m;
+    const viewportHeight = scene.getEngine().getRenderHeight() || 800;
+
+    const now = performance.now();
+
+    // 카메라 월드 좌표 (m) — mesh 의 world (worldPositions) 와 동일 좌표계에서 거리 계산.
+    // scene 카메라 globalPosition 은 scene unit → sceneUnitPerMeter 로 역환산.
+    const sceneUnitPerMeter = renderScaleForTier(activeTier);
+    const metersPerSceneUnit = sceneUnitPerMeter > 0 ? 1 / sceneUnitPerMeter : 1;
+    const origin = floatingOrigin.originOffset;
+    // camera.globalPosition 은 local (floating origin 적용된 scene unit). 월드 m 환산 = local(m) + origin.
+    const camWorldX = camera.globalPosition.x * metersPerSceneUnit + origin[0];
+    const camWorldY = camera.globalPosition.y * metersPerSceneUnit + origin[1];
+    const camWorldZ = camera.globalPosition.z * metersPerSceneUnit + origin[2];
+
+    for (const body of system.bodies) {
+      const world = worldPositions.get(body.id);
+      const highMesh = meshes.get(body.id);
+      if (!world || !highMesh) continue;
+
+      // body 의 local 좌표 (m, FO 적용된) — screenCoverageRadius 에 전달할 scene 좌표 basis.
+      const localX = world[0] - origin[0];
+      const localY = world[1] - origin[1];
+      const localZ = world[2] - origin[2];
+
+      // 카메라-body 실세계 거리 (m).
+      const dx = world[0] - camWorldX;
+      const dy = world[1] - camWorldY;
+      const dz = world[2] - camWorldZ;
+      const cameraDistanceMeters = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      // R1 #329 — LOD 결정에 사용하는 effective radius 는 `body.radius × bodyScale`.
+      // sun (× 75) 같이 시각 과장된 body 는 화면 점유가 실제로 큰 픽셀이므로 high LOD 가 자연스럽다.
+      // ADR `20260425-r1-sun-visualization.md` §결정 4 (축 4 후보 α).
+      const effectiveRadius = body.radius * bodyScale(body.id);
+      const coverage = screenCoverageRadius(
+        [localX, localY, localZ],
+        effectiveRadius,
+        sceneUnitPerMeter,
+        vpArr,
+        viewportHeight,
+      );
+
+      const isFocused = focusBodyIdForAssert === body.id;
+      const nextLevel = lodFromScreenCoverage({
+        body,
+        cameraDistanceMeters,
+        screenCoverage: coverage,
+        isFocused,
+        override: lodOverride,
+      });
+
+      const prevLevel = bodyCurrentLod.get(body.id);
+      if (prevLevel !== nextLevel) {
+        // 전환 시작 — 200ms cross-fade 등록. mid/low variant 는 lazy-create.
+        if (prevLevel !== undefined) {
+          lodFadeState.set(body.id, {
+            fromLevel: prevLevel,
+            toLevel: nextLevel,
+            startMs: now,
+          });
+        }
+        bodyCurrentLod.set(body.id, nextLevel);
+      }
+
+      // variant visibility / alpha 갱신. fade 중이면 alpha interp, 정착이면 단일 variant.
+      applyLodVariantState(body, highMesh, nextLevel, now);
+
+      // 집계.
+      if (nextLevel === 'high') lodStats.high += 1;
+      else if (nextLevel === 'mid') lodStats.mid += 1;
+      else lodStats.low += 1;
+    }
+  };
+
+  /**
+   * body 의 현재 LOD 상태를 variant mesh 에 반영.
+   *
+   * 전환 중 (lodFadeState 에 등록) 이면 fromVariant.alpha + toVariant.alpha 양방향 interp.
+   * 정착 상태면 해당 variant 만 setEnabled(true) + alpha=1.
+   */
+  const applyLodVariantState = (
+    body: LoadedCelestialBody,
+    highMesh: Mesh,
+    level: LodLevel,
+    nowMs: number,
+  ) => {
+    const fade = lodFadeState.get(body.id);
+    if (fade) {
+      const elapsed = nowMs - fade.startMs;
+      if (elapsed >= LOD_FADE_DURATION_MS) {
+        // fade 종료 — from variant hide, to variant show (alpha=1).
+        lodFadeState.delete(body.id);
+        hideVariantEntirely(body, highMesh, fade.fromLevel);
+        showVariantEntirely(body, highMesh, fade.toLevel);
+        return;
+      }
+      const t = elapsed / LOD_FADE_DURATION_MS;
+      // alpha linear interp. to: 0→1, from: 1→0.
+      const fromAlpha = 1 - t;
+      const toAlpha = t;
+      setVariantAlpha(body, highMesh, fade.fromLevel, fromAlpha, true);
+      setVariantAlpha(body, highMesh, fade.toLevel, toAlpha, true);
+      return;
+    }
+    // 정착 상태 — level 만 보이기.
+    showVariantEntirely(body, highMesh, level);
+    // 나머지 variant 는 숨기기.
+    for (const other of ['high', 'mid', 'low'] as LodLevel[]) {
+      if (other !== level) hideVariantEntirely(body, highMesh, other);
+    }
+  };
+
+  const getVariantMesh = (body: LoadedCelestialBody, highMesh: Mesh, level: LodLevel): Mesh => {
+    if (level === 'high') return highMesh;
+    // ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment 금지 조건 준수 — variant factory 는
+    // `bodyInitialRenderScale` 로 diameter 를 고정하고, tier 전환으로 인한 크기 변화는 parent highMesh
+    // 의 `scaling = newScale / initialScale` 에서 자동 상속된다. `activeTier` 를 전달하면 생성 시점에
+    // 이미 parent scaling 이 반영된 값 위에 `renderScaleForTier(activeTier)` 가 한 번 더 곱해져 이중
+    // scale 이 발생 (리뷰 #321 Blocking 2 지적).
+    if (level === 'mid') {
+      let m = midVariants.get(body.id);
+      if (!m) {
+        m = createBodyMeshMid(body, scene, bodyInitialRenderScale, highMesh, bodyScale);
+        midVariants.set(body.id, m);
+      }
+      return m;
+    }
+    // low
+    let m = lowVariants.get(body.id);
+    if (!m) {
+      m = createBodyBillboard(body, scene, bodyInitialRenderScale, highMesh, bodyScale);
+      lowVariants.set(body.id, m);
+    }
+    return m;
+  };
+
+  const showVariantEntirely = (body: LoadedCelestialBody, highMesh: Mesh, level: LodLevel) => {
+    const m = getVariantMesh(body, highMesh, level);
+    // isVisible 로 렌더 여부만 제어 — setEnabled(true/false) 는 parent-child 전파 때문에
+    // high variant 에 쓰면 자식(mid/low) 도 렌더 중단됨 (리뷰 #321 Blocking 1 지적).
+    m.setEnabled(true);
+    m.isVisible = true;
+    setVariantAlpha(body, highMesh, level, 1, false);
+  };
+
+  const hideVariantEntirely = (body: LoadedCelestialBody, highMesh: Mesh, level: LodLevel) => {
+    // parent-child 전파 차단을 위해 `isVisible` 로만 렌더 여부 토글. `setEnabled` 는 자식 variant 로
+    // 전파되어 mid/low 가 정착 상태여도 함께 숨겨지는 버그 유발 (리뷰 #321 Blocking 1).
+    // - high: 반드시 `setEnabled(true)` 유지 (mid/low 의 parent 로 transform 공급)
+    // - mid/low: `isVisible=false` 로 통일. `setEnabled(false)` 사용 금지
+    if (level === 'high') {
+      highMesh.isVisible = false;
+      return;
+    }
+    const m = level === 'mid' ? midVariants.get(body.id) : lowVariants.get(body.id);
+    if (m) m.isVisible = false;
+  };
+
+  const setVariantAlpha = (
+    body: LoadedCelestialBody,
+    highMesh: Mesh,
+    level: LodLevel,
+    alpha: number,
+    _duringFade: boolean,
+  ) => {
+    const m = getVariantMesh(body, highMesh, level);
+    m.setEnabled(true);
+    m.isVisible = true;
+    const mat = m.material;
+    if (mat && 'alpha' in mat) {
+      (mat as { alpha: number }).alpha = alpha;
+    }
+    // fade 중에는 둘 다 보여야 하므로 isVisible 유지. 정착 시 hideVariantEntirely 로 반대편 숨김.
+  };
+
+  // P11-B #289 — LOD API 외부 노출.
+  const setLodOverride = (level: LodOverride) => {
+    lodOverride = level;
+    lodStats.override = level;
+  };
+  const getLodStats = () => lodStats;
 
   const updateAtKepler = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
@@ -801,6 +1126,8 @@ export function createSolarSystemScene(
     floatingOrigin,
     setFocusOrigin,
     clearFocus,
+    setLodOverride,
+    getLodStats,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
@@ -809,6 +1136,17 @@ export function createSolarSystemScene(
         m.material?.dispose();
         m.dispose();
       }
+      // P11-B #289 — lazy-create 된 LOD variant mesh 정리.
+      for (const m of midVariants.values()) {
+        m.material?.dispose();
+        m.dispose();
+      }
+      for (const m of lowVariants.values()) {
+        m.material?.dispose();
+        m.dispose();
+      }
+      midVariants.clear();
+      lowVariants.clear();
       meshes.clear();
     },
   };
@@ -828,10 +1166,26 @@ function isArcRotateCamera(cam: unknown): cam is ArcRotateCamera {
   return typeof c.radius === 'number' && typeof c.attachControl === 'function';
 }
 
-function createBodyMesh(body: LoadedCelestialBody, scene: Scene, tier: Tier): Mesh {
+/**
+ * R1 #329 — body 별 시각 과장 배수 default 콜백.
+ *
+ * 옵션 미주입 시 모든 body 가 실측 그대로 (1.0). 본 default 는 `createSolarSystemScene` 호출자가
+ * `apps/web/src/constants/body-scale.ts` 의 `getBodyScale` 을 주입하지 않은 경우 회귀 0 보장.
+ */
+function defaultBodyScale(_bodyId: string): number {
+  return 1.0;
+}
+
+function createBodyMesh(
+  body: LoadedCelestialBody,
+  scene: Scene,
+  tier: Tier,
+  bodyScale: (bodyId: string) => number,
+): Mesh {
   // P12-A #298 — 실측 직경 × 현재 tier 의 renderScale 로 메쉬 생성.
+  // R1 #329 — × bodyScale (시각 과장 배수, ADR `20260425-r1-sun-visualization.md` §결정 3).
   // `mesh.scaling` 은 1 유지 (tier 전환 시 scaling.scaleInPlace 로 비율 적용, ADR §주석 §2).
-  const diameter = body.radius * 2 * renderScaleForTier(tier);
+  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
   const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
 
   const mat = new StandardMaterial(`${body.id}-mat`, scene);
@@ -845,6 +1199,97 @@ function createBodyMesh(body: LoadedCelestialBody, scene: Scene, tier: Tier): Me
     mat.specularColor = new Color3(0.05, 0.05, 0.05);
   }
   mesh.material = mat;
+  return mesh;
+}
+
+/**
+ * P11-B #289 — mid LOD variant: 저폴리 sphere (segments=12).
+ *
+ * ADR `docs/decisions/20260424-p11-b-lod-design.md` §축 4.
+ * high (segments=32) 대비 약 85% 버텍스 감소 — draw call 비용 동일하나 GPU fill-rate / transform 절감.
+ *
+ * parent 를 high variant 로 지정 — position / scale 은 high 에서 자동 상속.
+ * `scaling = 1` 유지 → tier 전환 시 high 와 동일 배수로 확대 (parent 상속).
+ */
+function createBodyMeshMid(
+  body: LoadedCelestialBody,
+  scene: Scene,
+  tier: Tier,
+  parent: Mesh,
+  bodyScale: (bodyId: string) => number,
+): Mesh {
+  // R1 #329 — high variant 와 동일 식 (× bodyScale) 로 비율 보존. LOD 전환 시 사용자가 크기 변화 인지 못함.
+  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
+  const mesh = MeshBuilder.CreateSphere(`${body.id}-lod-mid`, { diameter, segments: 12 }, scene);
+  mesh.parent = parent;
+  // parent local 기준 원점 (high mesh 와 동일 위치).
+  mesh.position.set(0, 0, 0);
+
+  const mat = new StandardMaterial(`${body.id}-lod-mid-mat`, scene);
+  const hex = body.colorHint?.hex ?? '#888888';
+  const c = hexToColor3(hex);
+  if (body.kind === 'star') {
+    mat.emissiveColor = c;
+    mat.disableLighting = true;
+  } else {
+    mat.diffuseColor = c;
+    mat.specularColor = new Color3(0.05, 0.05, 0.05);
+  }
+  // alpha blend 허용 — 200ms cross-fade 에서 material.alpha 조작.
+  mat.useAlphaFromDiffuseTexture = false;
+  mesh.material = mat;
+  mesh.setEnabled(false); // 기본 숨김 — 첫 전환 시 enable.
+  return mesh;
+}
+
+/**
+ * P11-B #289 — low LOD variant: billboard quad (BILLBOARDMODE_ALL).
+ *
+ * ADR `docs/decisions/20260424-p11-b-lod-design.md` §축 4.
+ * 2 triangle. T1 solar 뷰에서 sub-pixel 로 모이는 100+ body 에 대해 draw call 최소화.
+ *
+ * billboard 는 카메라를 항상 바라보므로 albedo 단색 quad 가 sphere 느낌을 대체.
+ *
+ * Phase 2 #333 — billboard 는 sphere/mid variant 와 달리 `bodyScale` 미적용.
+ * 책임 분리: sphere/mid 가 시각 과장 (sun ×75) 을 전담, billboard 는 sub-pixel draw call 절감만.
+ * focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 케이스에서 거대 quad 회귀 차단.
+ * ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
+ */
+function createBodyBillboard(
+  body: LoadedCelestialBody,
+  scene: Scene,
+  tier: Tier,
+  parent: Mesh,
+  bodyScale: (bodyId: string) => number,
+): Mesh {
+  // Phase 2 #333 — billboard 는 sphere/mid variant 와 달리 bodyScale 미적용.
+  // 책임 분리: sphere/mid = 가시 과장 책임 (sun ×75), billboard = sub-pixel draw call 절감 책임 단독.
+  // ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333) — billboard 에서 bodyScale 제거 (후보 A 채택)" 참조.
+  // bodyScale 인자 자체는 시그니처 호환성 유지 위해 보존 (호출부 통일 + 미래 변경 가능성).
+  void bodyScale; // Phase 2 #333 — 시그니처 보존, 식에서 미사용 명시.
+  const diameter = body.radius * 2 * renderScaleForTier(tier);
+  const mesh = MeshBuilder.CreatePlane(
+    `${body.id}-lod-low`,
+    { size: diameter, sideOrientation: 2 /* DOUBLESIDE */ },
+    scene,
+  );
+  mesh.parent = parent;
+  mesh.position.set(0, 0, 0);
+  mesh.billboardMode = 7; // BILLBOARDMODE_ALL
+
+  const mat = new StandardMaterial(`${body.id}-lod-low-mat`, scene);
+  const hex = body.colorHint?.hex ?? '#888888';
+  const c = hexToColor3(hex);
+  if (body.kind === 'star') {
+    mat.emissiveColor = c;
+    mat.disableLighting = true;
+  } else {
+    mat.diffuseColor = c;
+    mat.emissiveColor = c.scale(0.3); // billboard 는 구형 음영이 없으므로 약한 emissive 로 가시성 보장
+    mat.specularColor = new Color3(0, 0, 0);
+  }
+  mesh.material = mat;
+  mesh.setEnabled(false); // 기본 숨김.
   return mesh;
 }
 

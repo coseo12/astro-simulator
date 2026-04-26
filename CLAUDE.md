@@ -160,45 +160,33 @@ UI가 포함된 작업에서 4축으로 품질을 평가한다:
 
 > 스크린샷 캡처는 Level 1에 불과하다. "렌더링 됨 = 동작함"이 아니다.
 
-### CI 통과 ≠ 테스트 실행
-"언어 자동 감지" 범용 CI 템플릿이 `echo` 만 수행하고 실제 `npm test` / `pytest` 등을 돌리지 않는 경우가 있다. 초록 체크로 머지되지만 **실제로는 테스트가 돌지 않은 상태**. PR 자동 체크 PASS 만 보지 말고 Actions 로그의 테스트 출력 존재 여부를 정기 감사한다. "빌드 성공 ≠ 동작" 의 CI/파이프라인 버전.
+- **monorepo dist stale 변형 (volt [#70](https://github.com/coseo12/volt/issues/70))**: pnpm workspace 등에서 core 패키지 `src/` 수정 후 앱 dev 서버가 **기존 `dist/` 아티팩트를 참조** 해 수정 미반영. QA 재검증이 **결정적으로 동일 실패** 를 재현해 "수정 효과 없음" 으로 오판하기 쉽다. 증상: (1) dev 재시작 없이 새로고침만 한 경우 (2) 결정적 재현 (flaky 아님) (3) vitest/CI 는 pass (src 직접 import). **방어**: monorepo core 수정 시 `pnpm --filter <pkg> build` 선행 + dev 재기동, 또는 `--watch` 병행, 또는 tsconfig `paths` 로 src 직접 매핑. QA 에이전트는 브라우저 검증 선행 조건 체크리스트 적용 (`.claude/agents/qa.md` §2 전 선행 조건).
+- **엄격 원칙 + 동적 적응 부재 함정 (volt [#68](https://github.com/coseo12/volt/issues/68))**: "사실성 / 정확 / 무결" 같은 단일 축 원칙만 강하게 선언되고 **뷰포트·해상도·카메라 거리 등 동적 문맥 적응이 부재** 하면 자동 검증은 PASS 인데 실 디스플레이에서 UX 가 깨진다 (극단 스케일 렌더링 / AR·VR / GIS 등). 원칙 박제 직후 "이 원칙이 실 뷰포트/디바이스 분포에서 어떻게 작동하는가" 시뮬레이션 필수. 상세·체크리스트: [docs/lessons/strict-principle-dynamic-context.md](docs/lessons/strict-principle-dynamic-context.md).
+- **DoD PASS ≠ 제품 동작 (volt [#72](https://github.com/coseo12/volt/issues/72) / [#74](https://github.com/coseo12/volt/issues/74))**: 성능·정합성 수치 DoD (`screenshot diff < 15%` / `bench 회귀 < 5%` / `idle fps ≥ 30`) 전부 PASS 여도 **기본 진입 화면 (URL 파라미터 없음)** 이 사실상 빈 화면인 UX 회귀 가능. 브라우저 3단계 검증이 focus 상태 위주면 default 진입 상태가 검증 공백. **원칙 폐기 ADR 은 downstream UX 계약 전체 재검증 동반 필수** (폐기할 디폴트 UX 계약의 대체 계약 박제). UX DoD 는 성능 DoD 와 별도 축 — 예: `DoD-UX-1: 기본 진입 후 3초 이내 ≥5개 body 가 ≥4px 로 렌더`. 상세·체크리스트: [docs/lessons/ux-dod-vs-product-behavior.md](docs/lessons/ux-dod-vs-product-behavior.md).
 
-- **진단 신호 3개**:
-  1. **실행 시간**: Node 테스트 포함 CI 가 5초 안에 PASS → 의심 (`npm ci` 만으로도 수십 초 소요). Python/Go/Rust 도 동일 관점
-  2. **Actions 로그**: step log 에 실제 테스트 러너 출력 (`ℹ tests N / ℹ pass N`, `PASSED`, `ok N`) 부재
-  3. **CI 구조**: `detect-and-test` 같은 범용 템플릿 이름 + step 내용이 `echo` 뿐
-- **감사 루틴**: 리포지토리 초기 설정 후 최소 1회, 이후 분기 1회 CI Actions 로그에서 실제 테스트 출력 확인
-- **고의적 실패 PR 실측**: 테스트 1건 일부러 깨뜨린 draft PR 로 CI 가 실제로 red 로 전환되는지 체크 후 revert — "CI 가 회귀 게이트로 동작함" 을 실증
-- **"로컬 통과 = 안전" 가정 금지** — CI 가 실질 회귀 게이트로 동작하지 않으면 로컬 miss 가 곧 main 오염
-- 근거: volt [#48](https://github.com/coseo12/volt/issues/48) — harness [#153](https://github.com/coseo12/harness-setting/issues/153) (v2.24.0). `.github/workflows/ci.yml` 의 `detect-and-test` 잡이 `echo "Node.js ${node_version} 사용"` 만 수행하고 `npm test` 를 돌리지 않은 채 4개 PR (#144/#147/#150/#154) 이 머지됐던 사례. "staging 성공 ≠ 커밋 내용" (volt [#13](https://github.com/coseo12/volt/issues/13)) 의 파이프라인 버전
+### CI 통과 ≠ 테스트 실행
+"언어 자동 감지" 범용 CI 템플릿이 `echo` 만 수행하고 실제 `npm test` 를 돌리지 않는 경우 — 초록 체크 머지 뒤에도 테스트 미실행. 실행 시간/Actions 로그/CI 구조 3개 진단 신호로 감지, 고의적 실패 PR 실측으로 게이트 작동 확인.
+- 상세: [docs/lessons/ci-and-downstream-verification.md](docs/lessons/ci-and-downstream-verification.md)
+
+### 다운스트림 harness update 부합성 사전 체크리스트
+`harness update` 이후 다운스트림 CI 에서 발생하는 반복 push-fail-fix 루프를 **사전 진단**으로 방지. 4단계 체크 (모노레포 재귀 호출 / 빌드 산출물 exports / 특수 빌드 도구 / 기존 전용 워크플로) + 4개 옵션 비교 (A 제거 / B shim / C divergent / D upstream 확장). 판정 애매 시 A 추천.
+
+- 상세: [docs/harness-update-compat-checklist.md](docs/harness-update-compat-checklist.md)
+- 근거: volt [#62](https://github.com/coseo12/volt/issues/62) — astro-simulator PR #270 6단계 push-fail-fix 실측 (2026-04-20)
+- 관련 실행 이슈: [harness#190](https://github.com/coseo12/harness-setting/issues/190) — upstream CI 에 pnpm workspace + WASM 스모크 fixture 추가 (volt #64)
+
+### 다운스트림 실측이 최종 가드 — upstream 3중 방어 blindspot
+upstream 의 단위 테스트 / reviewer / cross-validate 3중 방어가 통과해도 다운스트림 환경 매트릭스에서만 드러나는 결함 존재. release 를 막는 대신 **역방향 피드백 속도 최대화**. "N 적용 시나리오" 근거는 `[실측]` / `[가정]` 라벨 부착 + 박제 문턱 (실측 ≥ 1 + 가정 ≥ 3 + 공통 조건 매트릭스) 충족 필수 (#195).
+- 상세: [docs/lessons/ci-and-downstream-verification.md](docs/lessons/ci-and-downstream-verification.md)
 
 ### workflow_dispatch 2단계 함정 (GitHub Actions)
-`workflow_dispatch` 트리거를 쓰는 workflow 는 default branch (보통 `main`) 반영 후에만 UI/CLI 에서 discover 된다. feature/develop 에만 머지된 상태에서는 `gh workflow run ... --ref develop` 이 `HTTP 404: workflow not found on the default branch` 로 실패한다. 추가로 workflow 가 PR 을 자동 생성하려 하면 저장소 Settings 의 `can_approve_pull_request_reviews` 가 기본 OFF 라서 `##[error]GitHub Actions is not permitted to create or approve pull requests` 로 거부된다.
-
-- **함정 1 — default branch 종속**: GitHub UI 의 "Run workflow" 버튼 + `gh workflow run` 둘 다 default branch 의 파일 목록을 기준으로 workflow 를 찾는다. `--ref <branch>` 로 실행할 브랜치는 고를 수 있으나, **파일 자체는 default branch 에 존재해야** 함. 결과: "설계 PR 머지 → 즉시 실행" 흐름이 기본 gitflow 에서 불가 — release 까지 가야 실행 가능
-- **함정 2 — PR 자동 생성 권한 기본 OFF**: 저장소 기본값 `{"can_approve_pull_request_reviews": false}` 이면 workflow 가 `permissions: pull-requests: write` 를 선언해도 PR 생성 API 가 거부. 조치:
-  ```bash
-  gh api -X PUT /repos/{OWNER}/{REPO}/actions/permissions/workflow \
-    -f default_workflow_permissions=read \
-    -F can_approve_pull_request_reviews=true
-  ```
-  변경 후 즉시 효과 (재시작 불필요)
-- **workflow_dispatch 도입 PR 의 DoD 에 "default branch 반영 후 실행 검증" 명시** — 설계 PR 만 머지하고 DoD 체크박스 "실행 검증" 을 못 채우는 함정 방지
-- **PR 자동 생성 workflow 는 상단 주석에 사전 조건 박제**:
-  ```yaml
-  # 사전 조건: Settings → Actions → "Allow GitHub Actions to create and approve pull requests" ON
-  # 또는: gh api -X PUT /repos/{OWNER}/{REPO}/actions/permissions/workflow -F can_approve_pull_request_reviews=true
-  ```
-- 근거: volt [#45](https://github.com/coseo12/volt/issues/45) — astro-simulator `bench:baseline-remeasure` workflow (PR #238) 도입 후 develop 에서 dispatch 실패 → v0.7.1 release 로 main 반영 → 2차 시도에서 권한 OFF 로 실패 → Settings API 로 플래그 전환 후 성공. 첫 실행 로그: actions/runs/24621714905, 성공 실행: actions/runs/24624988691
+`workflow_dispatch` 트리거는 default branch 반영 후에만 discover 된다 (feature/develop push 로는 실행 불가). 추가로 PR 자동 생성 workflow 는 저장소 Settings `can_approve_pull_request_reviews` 가 기본 OFF 라 거부된다. 도입 PR DoD 에 "default branch 반영 후 실행 검증" 명시.
+- 상세: [docs/lessons/workflow-dispatch-pitfalls.md](docs/lessons/workflow-dispatch-pitfalls.md)
 
 ### 주석 계약 vs 구현 drift — 버그 생성원
-파일 상단 주석 / JSDoc / 문서 블록이 선언한 **계약** (예: "X 카테고리는 Y 규칙 포함") 이 구현에 반영되지 않은 상태 — 주석-구현 drift — 는 **버그 생성원**. 주석만 있고 구현이 누락되면 드리프트 시 조용히 bug 가 생성되며, default fallback 이 존재하는 분기 함수에서 특히 위험 (누락을 fallback 이 흡수해서 테스트조차 fail 하지 않음).
-
-- **주석에 선언된 규칙 / 계약 / 불변식은 테스트 커버리지 대상** — 주석으로 명시한 동작은 자동 검증되어야 한다. 주석에 나열된 항목을 함수 시그니처/분기와 대조 (누락 발견 시 "주석이 틀렸는가, 구현이 틀렸는가" 판정 후 일치)
-- **카테고리 / enum 류 분기 함수 특히 주의** — `return 'atomic'` 같은 default fallback 은 누락을 조용히 흡수. fallback 에 `console.warn` 또는 테스트에서 **예상 카테고리 assert** 로 드리프트 감지
-- **리팩토링 vs 버그 수정의 경계** — 주석 계약에 구현을 맞추는 것은 엄밀히는 **버그 수정** (주석이 이미 계약). 그러나 downstream 영향(tracked 파일 세트 변화 등)이 있으면 릴리스 분류는 **MINOR** (행동 변화). CLAUDE.md 릴리스 규약의 "행동 변화 vs 문서 변경 판정 질문" 대조
-- **발견 진단 루트**: 테스트 실패 stderr / 영향받은 객체 특정 → 분기 결과 확인 (`console.log(categorize(...))`) → 주석 계약 대조 → 누락 규칙 1 라인 추가 (run-tests 스킬 "Flaky 진단 루트" 6단계 참조)
-- 근거: volt [#49](https://github.com/coseo12/volt/issues/49) — harness v2.25.0 [#157](https://github.com/coseo12/harness-setting/issues/157). `lib/categorize.js` 상단 주석이 "user-only: state, **logs**, 사용자 추가 파일" 을 선언했지만 `.claude/logs/` 규칙이 구현에서 누락되어 `atomic` 으로 fallback. 338개 세션 로그가 copy 대상이 되어 post-apply 검증 해시 race 로 병렬 테스트 75% flaky. 1 라인 추가 (`if (p.startsWith('.claude/logs/')) return 'user-only';`) 로 근본 해소 + 병렬 8회 연속 통과 실측
+파일 상단 주석 / JSDoc 이 선언한 계약과 구현의 drift 는 **버그 생성원**. default fallback 이 누락을 조용히 흡수해 테스트도 fail 하지 않는다. 주석에 선언된 규칙은 테스트 커버리지 대상이며, enum 분기 fallback 에 경고·assert 추가로 drift 감지.
+- 상세: [docs/lessons/comment-implementation-drift.md](docs/lessons/comment-implementation-drift.md)
+- **숨은 상수 변형 (volt [#69](https://github.com/coseo12/volt/issues/69))**: 모듈 A 에서 상수 폐기 + 동적 함수 교체해도 위성 모듈 B/C/D 의 독립 선언이 잔존하면 상대 비율/단위/스케일 drift 를 조용히 생성. 주 모듈 grep 만으로는 누락 — reviewer 파괴적 리팩토링 체크리스트 (저장소 전체 `grep -rn "<CONST_NAME>"` + 주석 SSoT 참조 dead reference) 로 차단. 원천: `.claude/agents/reviewer.md` §4.
 
 ### HTTP 200 ≠ 올바른 리소스
 - 이미지 URL이 200을 반환해도 **내용이 의도와 다를 수 있다**
@@ -223,6 +211,7 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - NO-OP 결정도 후보 비교 / 실측 결과 / 재검토 조건을 남긴다 — 다음에 재발굴 시 빠르게 기각 근거
 - 대신 **회귀 가드**를 박제: 현재 동작이 퇴행하지 않도록 verify 스크립트 또는 테스트 추가
 - 근거: volt [#14](https://github.com/coseo12/volt/issues/14) — CRITICAL #2 "모호한 지시 사전 확인"과 상호보완 (명확한 지시를 받았어도 실측으로 범위 축소)
+- **조사 국면 확장 — Explore 미결정 시 debug 스크립트 실측 선행 (volt [#67](https://github.com/coseo12/volt/issues/67))**: 아키텍처 근간 drift 조사에서 정적 분석 (Explore 에이전트, 코드 리뷰) 이 `(C) 미결정` 을 반환하면, 20~30줄 일회성 debug 스크립트 (`scripts/_debug-<topic>-tmp.mjs` — 실행 직후 `rm`) 로 runtime 실측 선행. 정적 분석은 주석·타입 시그니처·표현 일관성까지만 본다 — runtime 조건 분기 omission 버그는 grep 으로 잡히지 않으며 실측이 유일한 확정 경로. "정적 분석 확신 없음 → 수 시간 추가 정적 조사" 대신 "30초 실측" 이 평균 비용 최소. volt #49 (주석 계약 vs 구현 drift) / #60 (다운스트림 실측) 계보의 조사 국면 버전.
 
 ### 신규 함수 ≠ 신규 구현
 새 함수/헬퍼/유틸리티를 쓰기 전 "이미 있을 수 있다"를 기본 가설로 둔다. AI는 "없다"고 가정하고 바로 구현으로 들어가는 편향이 있어, 이전 마일스톤에서 구축된 공용 함수를 재발견하지 못한 채 중복 코드와 테스트를 생성한 사례가 반복된다.
@@ -233,14 +222,8 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - 근거: volt [#21](https://github.com/coseo12/volt/issues/21) — 50줄 + 테스트 70줄 작성 후 동일 기능 함수가 동일 패키지에 이미 존재함을 발견한 사례
 
 ### 신규 데이터 ≠ 신규 코드 — ADR 예측 재현
-레이어/플러그인/스키마 구조 하에서 기능 확장이 "데이터만 추가, 코드 변경 0" 으로 가능한지 ADR 에 **Concrete Prediction** 으로 박제하면, 구현 시 추상화 건강성을 실증할 수 있다. 위 "신규 함수 ≠ 신규 구현" 의 데이터 버전.
-
-- ADR 작성 시 예측 박제 형식: "{신규 엔티티/라우트/핸들러} 추가로 {핵심 모듈 경로} 의 코드 라인 변화 **0**"
-- 실구현 PR 에서 `git diff --stat <추상화 계층 경로>` 로 재현 확인 — 예측 성공 시 기존 추상화가 올바르게 설계됐다는 **구체 증거**
-- 예측 실패(= 계층 수정 필요) 시 두 갈래: (a) 추상화가 부족하다는 신호 → 먼저 리팩토링 후 ADR 구현 재개 (b) 예외 케이스 인정 → ADR Amendment 박제
-- 적용 시나리오: parentId 체인 / 플러그인 레지스트리 / 라우팅 테이블 / 스키마-주도 UI (form builder, dashboard) / i18n 번역 테이블 — **데이터로 확장하는 계층적 구조** 전반. 새 모듈/레이어를 만드는 결정에는 적용 불가 (확장이 이미 데이터로 흡수 가능한 상태가 전제)
-- 근거: volt [#47](https://github.com/coseo12/volt/issues/47) — astro-simulator P8 ADR `20260419-satellite-orbit-hybrid.md` 에 "포보스/데이모스 JSON 추가 → sim-canvas 코드 변경 0 줄" 예측 박제. PR-3 (#252) 에서 실측 재현 성공 — parentId 3계층 (scene graph / sidebar / camera) 이 모두 데이터로만 참조됨을 실증
-- 스킬 절차: [.claude/skills/record-adr/SKILL.md](.claude/skills/record-adr/SKILL.md) "Concrete Prediction" 섹션 — ADR `## 결과·재검토 조건` 에 박제하는 포맷 템플릿
+레이어/플러그인/스키마 구조에서 "데이터만 추가, 코드 변경 0" 예측을 ADR 에 Concrete Prediction 으로 박제하고 `git diff --stat` 로 실측 재현. 예측 성공은 추상화 건강성의 구체 증거, 실패는 리팩토링 필요 신호.
+- 상세: [docs/lessons/data-not-code-extension.md](docs/lessons/data-not-code-extension.md)
 
 ### 커밋 성공 ≠ 의도한 변경 커밋됨
 `git commit` 종료 코드 0과 "커밋 성공" 메시지만 믿지 말 것. 특히 lint-staged + tracked/ignored 혼재 상황에서 staged 변경 일부가 **조용히 유실**될 수 있다.
@@ -301,33 +284,30 @@ sub-agent(dev/qa 페르소나 등)는 빌드·테스트·브라우저 검증은 
     - **중복 브랜치 dev 서버 오진 방지** — feature 브랜치별 worktree 에서 띄운 dev 서버가 이후 브랜치에서 동일 포트를 점유하면 HMR 이 낡은 번들을 서빙한다. 메인이 새 dev 서버 띄우기 전 `lsof -i :<port>` 선행 확인
 - **SSoT 동기화 자동 가드 (#145, v2.23.0~)** — 위 공통 JSON 스키마 9개 필드는 **5개 에이전트 파일** (`.claude/agents/architect.md` / `developer.md` / `pm.md` / `qa.md` / `reviewer.md`) 의 체크리스트 JSON 블록에도 그대로 등장해야 한다 (sub-agent 가 system prompt 만 보고 반환할 수 있도록). 동기화 보장은 수동 체크박스가 아닌 **`scripts/verify-agent-ssot.sh`** 자동 검사로 강제된다 — 9개 필드 존재 + 선언 순서 준수를 검증하며, drift 시 누락 파일/필드와 순서 이탈 지점을 stderr 에 보고하고 exit 1. CI `detect-and-test` 에 통합되어 PR 머지 전 drift 차단. **이 SSoT 블록을 수정하는 PR 은 반드시 5개 에이전트 파일의 `## 마무리 체크리스트 JSON 반환` 섹션을 함께 갱신하고 `bash scripts/verify-agent-ssot.sh` 로 사전 확인한다.**
 - 누락 감지 시 메인이 직접 보완 박제 (커밋/PR/코멘트). sub-agent를 재호출해 같은 누락을 반복시키지 않는다
+- **메인 오케스트레이터 단계 게이트 (volt [#77](https://github.com/coseo12/volt/issues/77))** — `developer → reviewer → qa → 사용자/머지` 순서 강제. developer sub-agent 의 self-compare 자명 PASS 함정을 reviewer/qa 단계가 차단. 예외: docs only / chore. 상세: [docs/lessons/headless-browser-verification.md](docs/lessons/headless-browser-verification.md)
 - 근거: volt [#24](https://github.com/coseo12/volt/issues/24) — astro-simulator P6-B~E 에서 dev/qa sub-agent 마무리 단계 누락 4회 연속 관찰. volt [#46](https://github.com/coseo12/volt/issues/46) / volt [#52](https://github.com/coseo12/volt/issues/52) — background 프로세스 인계 누락의 로컬 프로세스 버전 (stale dev 서버 포트 점유 오진 + `cargo test` 좀비 4개 누적 관찰). `spawned_bg_pids` / `bg_process_handoff` 2필드로 인계 책임 구조화
 
 ### sub-agent multi-turn 라운드 이탈 — 매트릭스 일관성 검증
-sub-agent에 적응적 질답·설계 같은 multi-turn 세션을 위임할 때, SendMessage 로 라운드를 이어가도 전 라운드의 세부 매트릭스(Phase 제목 / DoD 수치 / 의존 관계)가 다음 라운드에서 **이탈**하는 사례가 관찰된다. "권고안 A" 같은 참조 레이블만으로는 세부 컨텍스트 복원이 보장되지 않는다 — sub-agent 는 세션 목적만 유지하고 매트릭스 세부는 잃을 수 있다.
-
-- 메인 오케스트레이터는 라운드 N 출력에서 **핵심 키워드 목록**(매트릭스 행 제목, 수치 DoD, 사용자 답변 Q/A 쌍)을 추출하고, 라운드 N+1 출력과 대조해 이탈을 즉시 감지한다
-- SendMessage 로 라운드를 이어갈 때 **이전 라운드 매트릭스를 본문에 인라인 재첨부**한다 — 참조 레이블("권고 A")만으론 부족. 요약 2~3줄로라도 원문 재첨부
-- 이탈 발견 시 라운드 N+1 결과를 폐기하고 **사용자에게 불일치 보고 + 이전 라운드 재확인**. 이탈 산출물은 손실로 간주하지 말고 후속 확장(예: P17+ 후보) 로 별도 메모리에 박제해 보너스 자산화
-- 근거: volt [#34](https://github.com/coseo12/volt/issues/34) — astro-simulator P8~P16 로드맵 설계 3라운드 중 라운드 3 에서 권고 A(내행성계 위성 / 목성계 / 토성계) 매트릭스가 J2/Yarkovsky/중력파 등 전혀 다른 주제로 이탈. volt [#24](https://github.com/coseo12/volt/issues/24) 의 "sub-agent 신뢰 한계" 계열 확장
+sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운드에서 이탈한다. SendMessage 는 **이전 라운드 매트릭스를 본문에 인라인 재첨부** ("권고 A" 참조 레이블만으론 부족). 메인 오케스트레이터가 핵심 키워드 대조로 이탈 즉시 감지.
+- 상세: [docs/lessons/sub-agent-multiturn-drift.md](docs/lessons/sub-agent-multiturn-drift.md)
+- **PM 이슈 DoD 구조 drift 재현 (volt [#76](https://github.com/coseo12/volt/issues/76))**: astro-simulator P11-B.2 PM 재계약에서 원본 D5 (Osculating 관찰 리포트) 가 라운드 2 에서 D3b (screenshot diff) 의 7 moon 대상으로 **재배치되면서 사라짐**. 라운드 N+1 이 사용자 응답을 받아 **DoD 자체 (ID·산출물·의미) 를 재배치**. 예방: PM 에이전트 프롬프트에 "원본 DoD 재구조화 금지 / 사용자 응답은 각 DoD 의 파라미터 (수치/경계/선택지) 만 조정 / 라운드 N+1 출력에 원본 DoD 변경 전/후 diff 명시" 제약 박제 (`.claude/agents/pm.md`). volt #34 가 **1회성 교훈이 아닌 반복 패턴** 임을 확증.
 
 ### headless 브라우저 검증 ≠ 실 브라우저 동작
-`agent-browser` / Playwright headless(특히 `--use-webgpu-adapter=swiftshader` 같은 software adapter)는 3D/WebGPU/카메라 조작 경로에서 **부분 freeze** 가 발생해 coarse assertion(비검정 canvas / fps 유지 / 컴파일 성공) 만으론 기능 실패를 탐지하지 못한다. 한 pipeline(예: background lensing 왜곡) 은 성공하고 다른 pipeline(예: accretion disk mask) 은 실패하는 **부분 성공** 케이스가 "headless 8/8 PASS" false positive 로 "채택" 판정될 수 있다. CRITICAL #3 "3단계 브라우저 검증"의 확장.
-
-- 시각 효과(3D/WebGPU/camera 조작/shader-bound 렌더)를 포함하는 작업은 **실 Chrome GUI 수동 검증 최소 1회**. `status:review` 전이 전 체크리스트에 명시
-- browser-verify 스크립트에 **도메인 특화 pixel 검증**(특정 색상 존재, scene object visibility, 카메라 회전 응답 diff)을 추가하되, 단독으론 충분하지 않다 — swiftshader freeze 상황에서 여전히 false positive 가능
-- 완전 실패가 아닌 partial 자산은 `?feature=1` 류 옵트인 경로로 보존하고 ADR 에 "향후 디버깅 자산" 명시. 자동 폐기 금지
-- PM 계약에 **"M1 백업 경로"** (실패 시 대체안) 을 사전 박제하면 sub-agent 가 실패 판정 후 재승인 없이 대체안으로 자동 전환 가능
-- 근거: volt [#33](https://github.com/coseo12/volt/issues/33) — astro-simulator P7-C 에서 5차 재시도 중 3차(Frustum Corner Interpolation) 가 headless 8/8 PASS + fps=23 + 비검정 canvas 로 "채택" 판정받았으나 실 Chrome 에서 accretion disk 렌더 실패 확인, 5차 D' 로 전환
+`agent-browser` / Playwright headless (특히 swiftshader adapter) 는 3D/WebGPU 경로에서 부분 freeze 로 false positive 를 낸다. "headless 8/8 PASS" 만 믿지 말 것. 시각 효과 포함 작업은 `status:review` 전 **실 Chrome GUI 수동 검증 최소 1회** 필수. CRITICAL #3 의 확장.
+- 상세: [docs/lessons/headless-browser-verification.md](docs/lessons/headless-browser-verification.md)
 <!-- harness:managed:real-lessons:end -->
 
 ## 프로젝트 고유 보강 교훈
 
 > 위 `real-lessons` managed-block 은 harness upstream 이 관리하며 업데이트 시 자동 동기화된다. 본 섹션은 프로젝트 고유 해결책/가드를 별도로 박제한다 (block 외부이므로 upstream 업그레이드에 영향받지 않음).
 
-### 프로젝트 원칙 — Fact-First, Visual-Second
+### 프로젝트 접근 — Incremental Body-by-Body Build (v3)
 
-모든 데이터/시각/UI 설계 결정은 [`docs/principles/fact-first.md`](docs/principles/fact-first.md) 를 1차 참조. 사실(fact)이 1차 SSoT, 시각 과장은 2차 overlay. 디폴트 `educational` 모드 + 1-클릭/1-URL (`?mode=scientific`) 사실 모드 접근 보장. IAU 2015 ±0.01% / J2000.0 epoch / `uncertainty` 필드. 현행 로드맵은 [`docs/phases/roadmap-v2-solar-precision.md`](docs/phases/roadmap-v2-solar-precision.md) (P10-A #268 박제, 2026-04-20).
+2026-04-25 기획 전면 재구성. Fact-First 원칙 / 로드맵 v2 / P10~P12 ADR (scale unification 포함) 전부 폐기 (`docs/deprecated/`). **태양부터 하나씩** 사용자가 명시적으로 visible 하게 incremental build. 각 R-Phase DoD 는 "사용자가 실제로 보이는 body" 중심. 현행 로드맵: [`docs/phases/roadmap-v3-incremental.md`](docs/phases/roadmap-v3-incremental.md).
+
+- **폐기 배경**: P12 Display-Relative Scale Unification 후 기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태로 UX 회귀. DoD 수치는 모두 PASS 였음 (volt [#74](https://github.com/coseo12/volt/issues/74) 근거)
+- **유지 대상**: Floating Origin (`20260422-floating-origin.md`), LOD 3단 (`20260424-p11-b-lod-design.md`), Tier 네이밍 정책 (`20260424-tier-naming-policy.md`), Tier Preset 설계 (`20260424-tier-preset-design.md`) — 기술 가치 유지
+- **참고 (폐기)**: `docs/deprecated/principles/fact-first.md`, `docs/deprecated/phases/roadmap-v2-solar-precision.md`, `docs/deprecated/phases/p10-plan.md`, `docs/deprecated/decisions/20260423-display-relative-scale-unification.md`
 
 ### prettier 컨벤션 충돌 — 프로젝트 고유 해결책 (astro-simulator)
 

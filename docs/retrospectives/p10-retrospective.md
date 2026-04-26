@@ -26,7 +26,7 @@
 
 ### Fact-First 원칙의 전주기 관통
 
-- P10-A 에서 선언한 원칙 (`docs/principles/fact-first.md`) 이 B (감사) → C (UI) → D (정확도) 전체를 일관되게 관통
+- P10-A 에서 선언한 원칙 (`docs/deprecated/principles/fact-first.md`) 이 B (감사) → C (UI) → D (정확도) 전체를 일관되게 관통
 - `dataSource` / `lastVerified` / `colorSource` / `uncertainty` 스키마가 코드·CI·UI 3계층에 모두 반영
 - About 모달에서 사용자가 각 값의 출처까지 추적 가능 (transparency 극대화)
 
@@ -113,7 +113,7 @@
 
 ## 참조
 
-- 원칙: [docs/principles/fact-first.md](../principles/fact-first.md)
-- 플랜: [docs/phases/p10-plan.md](../phases/p10-plan.md)
+- 원칙: [docs/deprecated/principles/fact-first.md](../deprecated/principles/fact-first.md)
+- 플랜: [docs/deprecated/phases/p10-plan.md](../deprecated/phases/p10-plan.md)
 - P10-B 감사 보고: [docs/reports/p10b-data-audit-2026-04-21.md](../reports/p10b-data-audit-2026-04-21.md)
 - 이슈: #268 (P10-A) / #274 (P10-B) / #278 (P10-C) / #261 / #263 / #255 / #282

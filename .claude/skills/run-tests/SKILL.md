@@ -289,7 +289,7 @@ volt [#54](https://github.com/coseo12/volt/issues/54) — astro-simulator P9 M4:
 2. **실패 시 영향받은 객체 특정** — stderr / assert 메시지에서 파일명/키/리소스 이름 추출
 3. **이름 패턴 분석** — 공통 접두사 / 디렉토리 / 카테고리 (예: "실패 파일이 전부 `.claude/logs/` 하위")
 4. **해당 객체의 분기 결과 확인** — categorize 류 함수 / configuration lookup / dispatch table 에 직접 입력해 실제 반환값 확인
-5. **주석 계약 / 문서 규칙 대조** — "주석이 선언한 동작 = 구현" 이 아니면 drift 발견 (관련 교훈: CLAUDE.md "주석 계약 vs 구현 drift")
+5. **주석 계약 / 문서 규칙 대조** — "주석이 선언한 동작 = 구현" 이 아니면 drift 발견 (관련 교훈: [docs/lessons/comment-implementation-drift.md](../../../docs/lessons/comment-implementation-drift.md))
 6. **수정 + 회귀 가드** — **8회 이상 연속 병렬 통과** 실측 (timing 문제의 불확실성 고려 시 충분한 샘플). 임시 조치 제거한 상태에서 확인
 
 ### 수용 기준 (근본 해소 실증)

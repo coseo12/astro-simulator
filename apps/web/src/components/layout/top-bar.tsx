@@ -17,6 +17,7 @@ export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode })
     <header
       className="absolute top-0 inset-x-0 h-12 flex items-center justify-between px-3 z-[var(--z-hud)] pointer-events-none"
       data-testid="topbar"
+      data-r1-region="top-nav"
       style={{
         opacity: hidden ? 0 : 1,
         transition: 'opacity var(--duration-normal) var(--ease-out)',

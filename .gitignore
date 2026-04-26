@@ -1,6 +1,8 @@
 
 # Harness 로그 (상태 파일은 추적)
 .harness/logs/
+# Harness 마이그레이션 백업 (일시적 — 업데이트 시 자동 생성)
+.harness/backup/
 
 # Node.js
 node_modules/
@@ -39,6 +41,9 @@ Thumbs.db
 # QA/리뷰 스크린샷 — PR 증거는 PR 내에서 선별 커밋, 로컬 산출물은 무시
 # (이미 tracked 된 `screenshots/p9-pr25/` 는 유지됨 — git 표준 동작)
 screenshots/
+
+# QA 회귀 가드 아티팩트 (p329-qa-focus-lod-guard.mjs 산출물 등)
+apps/web/scripts/__artifacts__/
 
 # .claude/ 는 harness 관리 파일이므로 tracked — 런타임 생성 파일만 선별 ignore
 .claude/scheduled_tasks.lock

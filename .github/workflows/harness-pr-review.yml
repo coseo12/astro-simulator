@@ -1,4 +1,4 @@
-name: PR 자동 리뷰 트리거
+name: Harness PR 자동 리뷰 트리거
 
 on:
   pull_request:

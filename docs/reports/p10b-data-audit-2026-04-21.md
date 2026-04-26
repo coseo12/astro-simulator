@@ -175,8 +175,8 @@ radius 3필드 분리 (B안) 는 polar/mean 데이터가 추가 필요한 Phase 
 
 ## 참조
 
-- 원칙: [docs/principles/fact-first.md](../principles/fact-first.md)
-- 계약: [docs/phases/p10-plan.md](../phases/p10-plan.md) §P10-B
+- 원칙: [docs/deprecated/principles/fact-first.md](../deprecated/principles/fact-first.md)
+- 계약: [docs/deprecated/phases/p10-plan.md](../deprecated/phases/p10-plan.md) §P10-B
 - 방법론: [docs/reports/p10b-audit-methodology.md](./p10b-audit-methodology.md)
 - 이슈: [#274](https://github.com/coseo12/astro-simulator/issues/274)
 - 선행 PR: [#275 (P10-B-1)](https://github.com/coseo12/astro-simulator/pull/275)

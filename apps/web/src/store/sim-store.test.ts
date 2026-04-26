@@ -133,9 +133,13 @@ describe('useSimStore', () => {
       useSimStore.getState().setEngineNotice({ key: 'webgpu-fallback', message: 'A' });
       useSimStore.getState().dismissEngineNotice();
       // 모바일 경고는 별도 key → 정상 표시 가능해야 한다.
-      useSimStore.getState().setEngineNotice({ key: 'mobile-webgpu-best-effort', message: 'B' });
+      // P11-C #290 — 기존 'mobile-webgpu-best-effort' 는 'tier-c-graceful-degradation' 으로 치환.
+      useSimStore.getState().setEngineNotice({
+        key: 'tier-c-graceful-degradation',
+        message: 'B',
+      });
       expect(useSimStore.getState().engineNotice).toEqual({
-        key: 'mobile-webgpu-best-effort',
+        key: 'tier-c-graceful-degradation',
         message: 'B',
       });
     });

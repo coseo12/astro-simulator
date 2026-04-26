@@ -13,7 +13,7 @@
 
 ## 목적
 
-Fact-First 원칙 ([docs/principles/fact-first.md](../principles/fact-first.md)) 의 "데이터 무결성 + IAU 2015 ±0.01% 공차" 를 **수동 대조가 아닌 자동 검증** 으로 박제. `verify-iau-data.mjs` 가 회귀 가드 역할.
+Fact-First 원칙 ([docs/deprecated/principles/fact-first.md](../deprecated/principles/fact-first.md)) 의 "데이터 무결성 + IAU 2015 ±0.01% 공차" 를 **수동 대조가 아닌 자동 검증** 으로 박제. `verify-iau-data.mjs` 가 회귀 가드 역할.
 
 ## 감사 대상 (24 bodies 현재 JSON 기준)
 
@@ -150,8 +150,8 @@ node scripts/verify-iau-data.mjs --report  # JSON 리포트
 
 ## 참조
 
-- 원칙: [docs/principles/fact-first.md](../principles/fact-first.md)
-- 계약: [docs/phases/p10-plan.md](../phases/p10-plan.md) §P10-B
+- 원칙: [docs/deprecated/principles/fact-first.md](../deprecated/principles/fact-first.md)
+- 계약: [docs/deprecated/phases/p10-plan.md](../deprecated/phases/p10-plan.md) §P10-B
 - 이슈: [#274](https://github.com/coseo12/astro-simulator/issues/274)
 - 교차검증 수용 근거: PR #273 (Gemini 2차)
 - IAU 2015 Resolution B3: https://www.iau.org/static/resolutions/IAU2015_English.pdf

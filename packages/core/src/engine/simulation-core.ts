@@ -24,9 +24,12 @@ export class SimulationCore {
   #emitter: Emitter<CoreEvents> = mitt<CoreEvents>();
   #time: TimeController;
   #lastFrameTime: number | null = null;
-  #focusOnHandler: ((bodyId: string) => void) | null = null;
-  #resetCameraHandler: (() => void) | null = null;
+  // R1 #334+#335 — store-scene 동기화 단일 경로 통합 (ADR `20260425-r1-store-scene-sync-unification.md`).
+  // focus / resetCamera 콜백은 폐기 — UI 가 store `selectedBodyId` 변화를 subscribe 하여 단일 책임.
+  // `setCameraRadius` 콜백만 유지 (programmatic 카메라 줌 — `setCameraRadius` command 경유).
   #setRadiusHandler: ((radius: number) => void) | null = null;
+  // P11-B #289 — LOD override 핸들러. URL `?lod=` 초기 1회 sendCommand 에서 scene 에 전달.
+  #setLodOverrideHandler: ((level: 'high' | 'mid' | 'low' | 'auto') => void) | null = null;
   // P5-B #177 — fps emit 주기 제어. 매 프레임 emit하면 store 갱신 과다 → 0.5초 간격.
   #lastFpsEmitTime = 0;
   // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
@@ -138,15 +141,27 @@ export class SimulationCore {
     return null;
   }
 
-  /** 카메라 명령 핸들러 연결 — C6 CameraController와 연결 */
-  setCameraHandlers(
-    focusOn: (bodyId: string) => void,
-    resetCamera: () => void,
-    setRadius?: (radius: number) => void,
-  ): void {
-    this.#focusOnHandler = focusOn;
-    this.#resetCameraHandler = resetCamera;
-    this.#setRadiusHandler = setRadius ?? null;
+  /**
+   * R1 #334+#335 — 카메라 반지름 핸들러 연결 (`setCameraRadius` command 경유).
+   *
+   * ADR `20260425-r1-store-scene-sync-unification.md` §결정 1~3 — focus/resetCamera 콜백은 폐기되고
+   * UI 가 store `selectedBodyId` 변화를 subscribe 하여 scene focus / 카메라 reset 을 단일 책임으로 처리.
+   * 본 핸들러는 `setCameraRadius` programmatic 줌 (예: 향후 줌 슬라이더) 경로 보존용.
+   *
+   * 이전 시그니처 `setCameraHandlers(focusOn, resetCamera, setRadius)` 는 본 PR (#344) 에서 제거.
+   */
+  setCameraRadiusHandler(setRadius: (radius: number) => void): void {
+    this.#setRadiusHandler = setRadius;
+  }
+
+  /**
+   * P11-B #289 — LOD override 핸들러 연결. sim-canvas 가 scene 생성 직후 1회 호출.
+   *
+   * 핸들러는 scene 의 `setLodOverride(level)` 를 호출해 override 를 반영한다. URL `?lod=high|mid|low`
+   * 면 전 body 강제, `auto` (또는 미호출) 면 거리 자동 판정.
+   */
+  setLodOverrideHandler(handler: (level: 'high' | 'mid' | 'low' | 'auto') => void): void {
+    this.#setLodOverrideHandler = handler;
   }
 
   /** 이벤트 구독. */
@@ -184,11 +199,13 @@ export class SimulationCore {
         this.#emitter.emit('timeChanged', { julianDate: cmd.julianDate });
         break;
       case 'focusOn':
-        this.#focusOnHandler?.(cmd.bodyId);
+        // R1 #334+#335 — focusOn 콜백 폐기. event emit 만으로 store sync (core-adapter → setSelectedBody)
+        // → sim-canvas subscribe 분기가 scene focus / camera 단일 책임으로 처리.
+        // ADR `20260425-r1-store-scene-sync-unification.md` §결정 1.
         this.#emitter.emit('bodySelected', { id: cmd.bodyId });
         break;
       case 'resetCamera':
-        this.#resetCameraHandler?.();
+        // R1 #334+#335 — resetCamera 콜백 폐기. event emit 으로 selectedBodyId=null sync 트리거.
         this.#emitter.emit('bodySelected', { id: null });
         break;
       case 'setCameraRadius':
@@ -196,6 +213,10 @@ export class SimulationCore {
         break;
       case 'setMode':
         this.#emitter.emit('modeChanged', { mode: cmd.mode });
+        break;
+      case 'setLodOverride':
+        // P11-B #289 — scene 에 위임. 미등록 시 no-op (scene 초기화 전 순서 무관).
+        this.#setLodOverrideHandler?.(cmd.level);
         break;
       default: {
         const _exhaustive: never = cmd;

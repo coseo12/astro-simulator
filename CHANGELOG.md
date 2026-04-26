@@ -5,6 +5,69 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-04-26
+
+> **R1 사이클 (2026-04-25 ~ 2026-04-26)** — Roadmap v3 "Incremental Body-by-Body Build" 첫 스프린트. 태양 가시성 복구 + 회귀 가드 인프라. 8 PR 머지 (#330, #331, #332, #338, #339, #340, #342, #344).
+
+### Fix
+
+- **billboard variant `bodyScale` 분리** ([#333](https://github.com/coseo12/astro-simulator/issues/333), Phase 2) — `createBodyBillboard` 의 `diameter` 식에서 `bodyScale` 곱셈 제거. sphere/mid variant 는 그대로 유지 (시각 과장 책임 단독). billboard 는 sub-pixel draw call 절감 책임 단독 — 책임 직교화. focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 edge case 에서 거대 quad 회귀 차단 (PR [#332](https://github.com/coseo12/astro-simulator/pull/332) 검증 중 발견된 시각 회귀의 근본 해결). ADR `20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조. 신규 단위 테스트 (`packages/core/src/scene/body-scale-variants.test.ts`, 9 케이스) drift 방어
+- **store-scene 동기화 단일 경로 통합** ([#334](https://github.com/coseo12/astro-simulator/issues/334) + [#335](https://github.com/coseo12/astro-simulator/issues/335)) — `SimulationCore.setCameraHandlers(focus, reset, setRadius)` → `setCameraRadiusHandler(setRadius)` 단일 인자로 단순화 + 리네이밍. focus / resetCamera 콜백 폐기 → `useSimStore.subscribe(selectedBodyId)` 분기가 scene focus / 카메라 reset 단일 책임. `syncFocusToScene(bodyId)` helper 추출 (마운트 직후 1회 sync 와 subscribe 분기 식 공유, DRY). `case 'focusOn'` / `case 'resetCamera'` 의 `bodySelected` event emit 은 보존 — store sync 경로 (core-adapter → setSelectedBody) 의존. **이중 호출 해소**: 클릭 시 `controller.focusOn` 1회만 호출 (이전 2회). `setSelectedBody(null)` 시 `controller.reset` 1회 (이전 2회 또는 미래 info-panel close 누락 가능성). PR #332 Phase 1 fix `acfcb74` 의 임시 해결책 (subscribe + setCameraHandlers 이중 경로) 을 정식 통합으로 대체. ADR `20260425-r1-store-scene-sync-unification.md` §결정 1~6. 회귀 가드: `simulation-core-camera-sync.test.ts` 6 케이스 (이벤트 emit / 핸들러 호출 횟수 / `setCameraHandlers` 부활 방지)
+
+### Chore
+
+- **P11-C QA 진단 스크립트 박제 + 임시 벤치 폐기** ([#290](https://github.com/coseo12/astro-simulator/issues/290), PR [#330](https://github.com/coseo12/astro-simulator/pull/330) `1b4f6d6`) — `apps/web/scripts/p290-{diag-visibility, qa-console-errs, qa-idle-fps, qa-real-chrome}.mjs` 4건 회귀 가드용 정식 추적. phase 라벨 없는 임시 벤치 산출물 (`docs/benchmarks/2026-04-24T08-*.json`) 3건 폐기
+- **Harness v2.29.1 → v3.6.0 업데이트** ([volt #77](https://github.com/coseo12/volt/issues/77), PR [#338](https://github.com/coseo12/astro-simulator/pull/338) `9d818e9`) — v3.0.0 책임 분리 6c 수동 마이그레이션 완료. lessons 9개 / 가이드 2개 / frozen verify 4개 신규. ci.yml user-only 격리 (`docs/harness-ci-migration.md`). harness-guards.yml lib 부재 시 skip 임시 패치 (commit `a8f75d4`)
+
+### Docs
+
+- **R1 태양 가시성 ADR 2편 박제** ([#329](https://github.com/coseo12/astro-simulator/issues/329), PR [#331](https://github.com/coseo12/astro-simulator/pull/331) `c001ac1`) — 시각화 ADR (`docs/decisions/20260425-r1-sun-visualization.md`) + 회귀 가드 ADR (`docs/decisions/20260425-r1-ui-pixel-diff-guard.md`). 4 결정 (sunScale 75 / 상수 위치 / 곱셈 순서 / pixel diff 임계값) 박제. Concrete Prediction (R2 추가 시 4 파일 0 라인) 박제
+- **ADR `20260425-r1-sun-visualization.md` Amendment** ([#336](https://github.com/coseo12/astro-simulator/issues/336), PR [#339](https://github.com/coseo12/astro-simulator/pull/339) `f427f88`) — §결과·재검토 조건 보강: 재검토 트리거 #6 ("[#333](https://github.com/coseo12/astro-simulator/issues/333) Phase 2 처리 시점 도래") + §위험·미해결 sub-섹션 신규 ("Phase 2 미해결 사항 (#333)")
+
+### R1 태양 가시성 복구 (Roadmap v3 — 사용자가 명시적으로 visible)
+
+메인 이슈: [#329](https://github.com/coseo12/astro-simulator/issues/329) · ADR: [`20260425-r1-sun-visualization.md`](docs/decisions/20260425-r1-sun-visualization.md) (시각화) + [`20260425-r1-ui-pixel-diff-guard.md`](docs/decisions/20260425-r1-ui-pixel-diff-guard.md) (회귀 가드)
+
+PR [#332](https://github.com/coseo12/astro-simulator/pull/332) (`6e7382e`) — 기본 진입 화면 태양 가시성 복구 + UI 회귀 가드 인프라. P12 폐기 후 incremental body-by-body build 의 첫 body.
+
+#### Behavior Changes
+
+- **`BODY_SCALE.sun = 75` 시각 과장 박제** (`apps/web/src/constants/body-scale.ts`) — 1 AU 거리 카메라 시점에 viewport 점유율 ≥ 3% (1280×720 / 1920×1080 / 375×667 3 viewport 검증). 이전 sub-pixel ~1px → 가시 sphere
+- **`packages/core` ↔ `apps/web` 의존성 역전 방지** — `bodyScale: (id) => number` callback DI 주입. `packages/core` 는 시각 과장 데이터를 모름 (시각/물리 계층 분리)
+- **`sim-canvas.tsx` `selectedBodyId` ↔ scene focus 동기화** (commit `acfcb74` Phase 1 fix) — `useSimStore.subscribe` + 마운트 직후 1회 sync. URL `?focus=` 진입 시 LOD 분기 정상 high 적용. 이전 동기화 누락으로 거대 quad 회귀
+- **R1 회귀 가드 인프라** (`apps/web/scripts/r1-{ui-regression-guard, ui-regions}.mjs` + `__baselines__/r1/` 12 PNG) — pixelmatch threshold=0.1 / mismatch ≤ 0.5% / 4 영역 × 3 viewport
+- **focus LOD 회귀 자동 가드** (`apps/web/scripts/p329-qa-focus-lod-guard.mjs`, commit `9516b68`) — `channel: 'chrome'` 강제 + sphere/billboard 자동 판별. volt #33 (headless swiftshader 함정) 변형 false positive 차단
+- **info-panel sun 5 항목 표시** — mass / radius / luminosity / spectral class / dataSource (IAU 2015). `?mode=research` 모드 한정 (observe 모드 SidePanels 숨김 — R1 비-범위)
+- **`focus=sun` URL override + dev 경고** — 허용 body id 외 무시 + 콘솔 경고
+- **HUD `× 75 과장 중` 명시 표시** — 사용자 친화 표현 (Gemini 교차검증 개선 제안 2 반영)
+- **Q3=C 비-범위 자동 가드** (`apps/web/scripts/verify-r1-tier-untouched.sh`) — `tier.ts` / `tier-transition.ts` / `lod-body-thresholds.ts` 0 라인 변경 검증. PR 머지 전 강제
+
+### Harness 워크플로 (volt #77 반영, v3.6.0)
+
+- **메인 오케스트레이터 단계 게이트 신규** (PR [#338](https://github.com/coseo12/astro-simulator/pull/338)) — `developer → reviewer → qa → 사용자/머지` 순서 강제. developer self-compare 자명 PASS 함정 차단. 예외: docs only / chore. CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` line 287 박제
+- **에이전트 3개 갱신** — `.claude/agents/{pm, qa, reviewer}.md` 행동 정의 v3.6.0 정합
+- **스킬 2개 갱신** — `.claude/skills/{cross-validate, run-tests}/...` 절차 정합
+
+### 분류
+
+- PR [#330](https://github.com/coseo12/astro-simulator/pull/330): PATCH (회귀 가드 스크립트 박제, 행동 변화 없음)
+- PR [#331](https://github.com/coseo12/astro-simulator/pull/331): PATCH (ADR docs only)
+- PR [#332](https://github.com/coseo12/astro-simulator/pull/332): **MINOR** (UI 행동 변화 + 회귀 가드 인프라 신규)
+- PR [#338](https://github.com/coseo12/astro-simulator/pull/338): **MINOR** (메인 오케스트레이터 게이트 룰 + 에이전트/스킬 갱신)
+- PR [#339](https://github.com/coseo12/astro-simulator/pull/339): PATCH (ADR amendment, 문서 보강만)
+- PR [#340](https://github.com/coseo12/astro-simulator/pull/340): PATCH (CHANGELOG 소급 박제, 문서 보강만)
+- PR [#342](https://github.com/coseo12/astro-simulator/pull/342) (#333 Phase 2): **MINOR** (billboard `bodyScale` 분리 — 시각 행동 변화 + drift 방어 단위 테스트 9 케이스)
+- PR [#344](https://github.com/coseo12/astro-simulator/pull/344) (#334 + #335): **MINOR** (`setCameraHandlers` → `setCameraRadiusHandler` 내부 API 리네이밍 + 시그니처 단순화 + 행동 변화 — 이중 호출 1회로 단일화)
+
+### Notes
+
+- R1 후속 5건 ([#333](https://github.com/coseo12/astro-simulator/issues/333), [#334](https://github.com/coseo12/astro-simulator/issues/334), [#335](https://github.com/coseo12/astro-simulator/issues/335), [#336](https://github.com/coseo12/astro-simulator/issues/336), [#337](https://github.com/coseo12/astro-simulator/issues/337)) — R2 (수성) 진입 전 처리 권고. #333 / #334 / #335 / #336 완료, **#337 (CI Linux baseline 부트스트래핑) 만 잔존**
+- 109건 `상위에서 삭제됨` 분류 (harness v3.6.0 자가 점검 결과) — 별도 라운드 처리 권고. `.claude/skills/capture-volt/SKILL.md` / `.claude/commands/volt.md` 보존 우선
+
+#### Behavior Changes (CHANGELOG 소급 박제 자체)
+
+None — 문서 보강만 (PATCH). 본 박제 자체는 코드/에이전트 행동 변화 없음. 미래 release 시점 박제 누락 방지.
+
 ## [0.12.0] — 2026-04-23
 
 ### P12-B 8D 카메라 dolly 애니메이션 (Display-Relative Scale Unification Phase B)

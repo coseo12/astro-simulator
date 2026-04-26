@@ -1,6 +1,10 @@
-# ADR: Display-Relative Scale Unification — 단일 동적 스케일 모드 재설계
+# [DEPRECATED] ADR: Display-Relative Scale Unification — 단일 동적 스케일 모드 재설계
 
-- **상태**: Accepted
+- **상태**: **DEPRECATED (2026-04-25, roadmap reset)**
+- **폐기일**: 2026-04-25
+- **폐기 사유**: 본 ADR 이 `educational` / `scientific` 이중 모드를 폐기하고 단일 사실 모드를 디폴트로 전환한 결과, 기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태가 되어 UX 회귀 발생. Fact-First 원칙의 "1-클릭 사실 모드 접근" 의도가 반대 방향으로 구현됨. 사용자 결정으로 기획 전면 재구성.
+- **폐기 근거**: volt [#74](https://github.com/coseo12/volt/issues/74)
+- **참고**: 구현 코드 (Scale Tier Solar/Inner/Body / 8D 카메라 dolly) 는 기술 가치 유지 판단으로 유지하되 동작 계층 (기본 모드 / shortcut UX) 은 R1+ 에서 재조정
 - **날짜**: 2026-04-23
 - **결정자**: architect (P12 #298)
 - **관련**: #298 (본 Phase), #288 (P11-A Floating Origin), #271 (P10 scientific jitter 원인), #294 (P11-A non-focus 회귀), #278 (P10-C 뷰 모드 도입), #272 (모바일 보류), ADR `20260422-floating-origin.md` (P11-A 선행), ADR `20260420-mobile-support-suspension.md` (모바일 비-범위 근거), 원칙 `docs/principles/fact-first.md` (§Amendment 대상)
@@ -348,6 +352,8 @@ function currentTier(camera: ArcRotateCamera, focusBodyId: string | null): Tier 
 - **Phase C 처리**: **코드 변경 0, Amendment 만**. `floating-origin.ts` 및 관련 테스트 전부 유지
 - **#288 close 판정**: 본 PR 에서 close. scientific 모드 jitter 해소의 원 목표는 단일 모드 전환으로 근본 원인 소멸. `20260422-floating-origin.md` §Amendment 1줄 박제 — "P12 에서 역할 축소 (T3 primary, T1/T2 no-op)"
 
+> **Forward link (2026-04-23, #313 M2)**: 본 (c) 의 "코드 변경 0" 전제는 시각 효과만 다루고 컴퓨트 비용은 해소하지 않아 non-focus fps −38 ~ −44% 회귀 지속 확인 (#313 M1 재측정 Run #24837822902). 아래 §Amendments "2026-04-23 — Q10 구현 정합성 재평가 (#313 M2)" 에서 **부분 수정** (3지점 `activeTier === 'body'` 분기 추가 / `FloatingOrigin` 클래스·테스트·계약 전부 유지) 으로 재평가.
+
 #### (d) QA / Reviewer 이관 항목 반영 (Phase C)
 
 - **Reviewer M1** (Major, PR #304): `setTier` 가 `runTierTransition` cleanup 을 클로저에 저장해 연쇄 전환 시 이전 fallback timer / listener 를 먼저 해제. `tier-transition.test.ts` 에 "연쇄 전환 cleanup 호출" 단위 테스트 3건 추가
@@ -357,6 +363,60 @@ function currentTier(camera: ArcRotateCamera, focusBodyId: string | null): Tier 
 - **QA suggestion #2/#3** (focus 버튼 확장 / fps HUD): 후속 이슈 #307 로 분리 (본 PR 비-범위)
 - **Reviewer m2** (lowerRadiusLimit 원복): 후속 이슈 #305 로 분리 (P11-B billboard marker 통합 시점 재검토)
 - **developer suggestion #1** (FOCUS_RADIUS_MULTIPLIER viewport/fov 동적화): 후속 이슈 #306 으로 분리 (재검토 조건 #3 에 이미 박제)
+
+### 2026-04-23 — Q10 구현 정합성 재평가 (#313 M2)
+
+§Amendments (c) 는 "코드 변경 0, Amendment 만" 으로 박제했으나, #313 M1 재측정 (Run #24837822902, v0.12.0 main, `phase=p11-reshape-m1`) 에서 **non-focus scenario fps 회귀 −38 ~ −44% 가 P12 완결 이후에도 지속** 확인되어 재평가.
+
+**실측 회귀 (ubuntu median N=10, v0.10.0 baseline 대비)**:
+
+| scenario | v0.10.0 | v0.12.0 (M1) | Δ        |
+| -------- | ------- | ------------ | -------- |
+| idle     | 30.09   | 16.89        | **−44%** |
+| play-1d  | 21.64   | 13.41        | **−38%** |
+| play-1y  | 24.14   | 14.77        | **−39%** |
+
+**해석**: §Amendments (c) 의 "T1/T2 에서 `toLocal()` 오버헤드는 0 에 수렴" 전제가 **컴퓨트 비용 전체가 아닌 시각 효과만 다룸**. 실제로는 `updateAt` 매 프레임 내 primary follow (`setOriginToBody`) + free-fly safety net (`update()`) + `Vec3Double` 메모리 할당 + Set iteration (listener 0 건이어도 loop 진입) 등 **tier 무관 overhead** 가 누적되어 non-focus 회귀의 주범.
+
+**재평가 결정 (#313 M2)**:
+
+- §Amendments (c) "코드 변경 0" 을 **부분 수정**: `solar-system-scene.ts` 3지점에 `activeTier === 'body'` 분기 추가
+  - `setTier` — T3 이탈 시 `floatingOrigin.reset()` 1회 호출 (후속 프레임 origin `[0,0,0]` 유지)
+  - primary follow (line 581) — T3 에서만 `setOriginToBody(focusWorld)` 실행
+  - safety net (line 633) — T3 에서만 `floatingOrigin.update(cameraWorldMeters)` 실행
+- **FloatingOrigin 클래스 / `onOriginShift` 계약 / `floating-origin*.test.ts` 전부 유지** — §Amendments (c) 의 "제거 하지 않는 이유" 4항 모두 보존 (P11-A 회귀 가드, 미래 Trail 모듈 계약, toLocal 인터페이스)
+- M3 bench 재측정 게이트: skip 적용 후 회귀율 < 5% 충족 시 P11-A 원 DoD β 만족
+
+**DoD 재조정 (CLAUDE.md 스프린트 계약 6항 ROI 5문 체크)**:
+
+- 원 계약 "T3 기능 회귀 가드 단위 테스트 (지구/달 focus 시 FO primary follow 동작 유지)" 는 Scene 인스턴스 + tier 전환 mock 구축 비용이 수정 라인 수 (3줄) 대비 과다
+- 대체: (a) `floating-origin.test.ts` 의 기존 `reset()` / `setOriginToBody no-op` 테스트가 인접 property 테스트로 간접 보증 (b) 주석 계약 — `setTier` / primary follow / safety net 3지점에 "#313 M2 — P12 ADR §Q10 Amendment" 인라인 박제 (c) M3 bench 재측정 게이트 (non-focus 회귀율 < 5%) 가 회귀 시 자동 감지
+- **재조정 박제 3위치**: 본 Amendment (ADR) / PR 본문 / CHANGELOG Notes — CLAUDE.md 재조정 박제 규칙 준수
+
+### 2026-04-23 — QA 회귀 수정: setTier 대칭 처리 (#313 M2 QA)
+
+위 **Q10 구현 정합성 재평가** 1차 구현 (PR #315 commits c3695dc / 766a2ba) 에 대한 QA 동적 검증에서 **시각 회귀 2건** 발견:
+
+- **V5 지구 세로 40% ±5%** — 허용 304~336px, 실측 **296px** (develop baseline 322px → −26px 퇴행). 3회 결정적 재현
+- **A1 지구 focus 중심 편차 ≤ 10px** — 실측 **119.9px** (허용의 12배 초과). develop baseline 0.0px → PR 119.9px
+
+**원인**: `setTier` 내부 **비대칭 처리**.
+
+- T1/T2 진입 시 `floatingOrigin.reset()` 즉시 호출
+- T3 진입 시 **아무 처리 없음** — primary follow (line 583) 는 다음 `updateAt` 프레임에야 origin 갱신
+
+`runTierTransition` (tier-transition.ts:216-219) 이 `focusMesh.absolutePosition` 을 읽어 카메라 target 을 재계산하므로, T3 진입 시점에 origin + mesh.position 이 새 tier 좌표계로 이미 갱신되어 있지 않으면 **카메라 target 과 mesh 가 어긋남** (next frame primary follow 이 origin 을 focus 로 이동시켜 mesh.position 이 [0,0,0] 근처로 재배치되는데 camera.target 은 이전 origin 기준 좌표에 남음).
+
+**수정 (PR #315 추가 커밋)**:
+
+1. `packages/core/src/scene/tier.ts` 에 순수 함수 `computeFloatingOriginForTier(tier, focusId, lookup)` 추가 — tier 별 origin target 을 결정 (T1/T2 → `[0,0,0]`, T3+focus → focus world, T3+free-fly → `null`)
+2. `setTier` 가 위 함수 결과로 `floatingOrigin.reset()` 또는 `setOriginToBody(focusWorld)` 를 **대칭 호출**
+3. origin 갱신 직후 **mesh.position 재계산 루프** 추가 (`(world - origin) * newScale`, `computeWorldMatrix(true)` 포함) — `runTierTransition` 이 올바른 `focusMesh.absolutePosition` 을 읽도록
+4. `packages/core/src/scene/tier.test.ts` 에 `computeFloatingOriginForTier` 단위 테스트 8건 추가 — T1/T2/T3 × focus 유/무/stale 6조합 + reference 동일성 + [0,0,0] 계약 정합
+
+**DoD 재조정 번복**: 위 "DoD 재조정" 섹션의 "T3 기능 회귀 가드 단위 테스트" 생략 판정은 QA 실측 회귀로 **사후 번복**. `computeFloatingOriginForTier` 순수 함수 추출로 Scene 인스턴스 mock 없이 단위 테스트 가능해져 ROI 역전. 이후 유사 tier 분기 로직은 **순수 함수 추출 + 단위 테스트를 우선 검토**.
+
+**시사점 (CLAUDE.md 실전 교훈 후보)**: ROI 5문 체크에서 "주석 계약 + 인접 테스트" 로 대체 판정한 시각 회귀가 실제로 발생한 사례. "회귀 시 조용히 퇴행 vs 빌드 실패" 의 "조용히 퇴행" 이 **QA 브라우저 검증 없이는 감지 불가** 임을 실증. 순수 함수 추출 가능성이 1%라도 있으면 주석 계약 대체보다 추출 + 테스트를 기본 선택. 추후 volt 캡처 후보.
 
 ---
 

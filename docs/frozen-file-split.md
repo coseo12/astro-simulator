@@ -1,15 +1,26 @@
 # frozen 파일 업데이트 충돌 회피 — 파일 분리 패턴
 
-`.github/workflows/ci.yml` 같은 **frozen 파일**에 프로젝트 고유 로직(Rust 툴체인, wasm-pack, 커스텀 verify 등)을 얹어야 할 때 사용하는 패턴. 업스트림 `harness update` 시 구조적으로 덮어쓰기를 방지한다.
+`.github/workflows/harness-*.yml` 같은 **frozen 파일**에 프로젝트 고유 로직(Rust 툴체인, wasm-pack, 커스텀 verify 등)을 얹어야 할 때 사용하는 패턴. 업스트림 `harness update` 시 구조적으로 덮어쓰기를 방지한다.
 
 근거: volt [#12](https://github.com/coseo12/volt/issues/12).
 
+> **v3.0.0 업데이트** — `.github/workflows/ci.yml` 은 **이제 user-only** 이다 ([ADR 20260421-workflows-responsibility-split](decisions/20260421-workflows-responsibility-split.md)). `harness-` prefix 파일만 frozen 이다. 아래 예시의 `ci-<slug>.yml` 패턴은 여전히 유효하지만, **단순 ci.yml 수정 시엔 파일 분리 없이 직접 수정 가능**.
+>
+> | 파일 | v2.x 까지 | v3.0.0 이후 |
+> |---|---|---|
+> | `.github/workflows/ci.yml` | frozen | **user-only** |
+> | `.github/workflows/harness-*.yml` | — (존재 안 함) | **frozen** |
+> | `.github/workflows/기타 *.yml` | frozen | user-only |
+>
+> 다운스트림 마이그레이션: [harness-ci-migration.md](harness-ci-migration.md)
+
 ## 문제
 
-- `.github/workflows/ci.yml` 은 `lib/categorize.js` 에서 **frozen** 분류
+- `.github/workflows/harness-*.yml` 은 `lib/categorize.js` 에서 **frozen** 분류 (v3.0.0~)
 - frozen = `--apply-all-safe` / `--apply-frozen` 로 **전체 덮어쓰기 안전**이라 가정
-- 그러나 프로젝트 고유 스텝을 같은 파일에 섞으면 업데이트 시 소실 위험
+- 다운스트림이 harness 전용 가드 파일 (예: `harness-guards.yml`) 에 프로젝트 고유 스텝을 섞으면 업데이트 시 소실 위험
 - 매니페스트 해시가 이전 템플릿 기준이라 "modified-pristine"으로 오분류되기도 함
+- **v3.0.0 이전**: 같은 문제가 `ci.yml` 에서 발생 → ci.yml 이 user-only 로 재분류되어 본 문제 완화
 
 ## 해결 — 파일 분리
 

@@ -3,6 +3,7 @@
 import { TopBar } from './top-bar';
 import { TimeBar } from './time-bar';
 import { HudCorners } from './hud-corners';
+import { LodDevOverlay } from './lod-dev-overlay';
 import { FocusQuickButtons } from './focus-quick-buttons';
 import { ModeSwitcher } from './mode-switcher';
 import { AboutModal } from './about-modal';
@@ -44,6 +45,7 @@ export function AppShell() {
         />
         <UrlSync />
         <HudCorners />
+        <LodDevOverlay />
         <SidePanels />
         <ScaleControl />
         <TimeBar>

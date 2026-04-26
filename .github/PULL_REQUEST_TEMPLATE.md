@@ -39,6 +39,7 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] **2단계**: `git push origin main:develop` (fast-forward push — force 아님. main 의 merge commit 이 develop 을 직계 조상으로 포함하므로 안전)
 - [ ] **3단계**: `git tag vX.Y.Z` + `git push origin vX.Y.Z`
 - [ ] **4단계**: `gh release create vX.Y.Z ...`
+- [ ] **5단계 (sub-PR 박제 누락 점검 — #240)**: 포함된 sub-PR 중 정책·규약 박제 PR (CLAUDE.md / 에이전트·스킬 행동 규칙 변경) 의 cross-validate outcome 박제 위치를 확인. 누락 시 release PR 본문 또는 CHANGELOG `### Notes` 에 통합 사후 박제. v3.5.0 누락 사례: PR [#238 코멘트](https://github.com/coseo12/harness-setting/pull/238#issuecomment-4318351320)
 - [ ] 사후 확인: `harness doctor` 의 gitflow 브랜치 정합성이 "동기" 로 pass
 
 ### Hotfix PR 전용 (base=main, head=hotfix/*)
@@ -52,6 +53,7 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] 불필요한 변경 없음
 - [ ] 보안 취약점 없음
 - [ ] CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` 의 공통 JSON 스키마 (SSoT 코어 필드 7개) 를 수정한 경우: 5개 에이전트 파일 (`.claude/agents/architect.md` / `developer.md` / `pm.md` / `qa.md` / `reviewer.md`) 의 `## 마무리 체크리스트 JSON 반환` 섹션 동기화 + `bash scripts/verify-agent-ssot.sh` 로컬 pass 확인 (CI 에서도 자동 검사 — #145)
+- [ ] **정책·규약·ADR·CRITICAL DIRECTIVE 박제 변경 포함 시** (CLAUDE.md / `.claude/agents/*.md` / `.claude/skills/*/SKILL.md` 행동 규칙 신규·수정): cross-validate 박제 직후 1회 루틴 (volt #23) 수행 + outcome 박제 (위치 우선순위 — CHANGELOG Notes > ADR 각주 > 커밋 > PR 코멘트, 중복 금지). API 429 폴백 시 `claude-only analysis completed — 단일 모델 편향 노출 미확보` 명시 (#240 가드)
 
 ### 관련 이슈
 Closes #

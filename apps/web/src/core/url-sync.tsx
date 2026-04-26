@@ -1,10 +1,12 @@
 'use client';
 
+import { ephemeris as ephemerisApi } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from './sim-context';
+import { parseLodLevel } from './parse-lod-level';
 
 const MODE_VALUES: SimMode[] = ['observe', 'research', 'education', 'sandbox'];
 // P3-0 #126 — barnes-hut/webgpu/auto는 URL로는 받지만 런타임은 미구현 폴백.
@@ -37,6 +39,9 @@ export function UrlSync() {
     'engine',
     parseAsStringEnum<PhysicsEngineUrl>([...ENGINE_VALUES]).withOptions({ history: 'replace' }),
   );
+  // P11-B #289 — ?lod=high|mid|low|auto 초기 1회 파싱 → sendCommand.
+  // store 에 저장하지 않음 (LOD 는 scene 내부 상태) — URL → Core → Scene 단방향 파이프.
+  const [urlLod] = useQueryState('lod', parseAsString.withOptions({ history: 'replace' }));
 
   const mode = useSimStore((s) => s.mode);
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
@@ -44,6 +49,7 @@ export function UrlSync() {
   const physicsEngine = useSimStore((s) => s.physicsEngine);
   const setMode = useSimStore((s) => s.setMode);
   const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
+  const setSelectedBody = useSimStore((s) => s.setSelectedBody);
 
   const sendCommand = useSimCommand();
   const initialized = useRef(false);
@@ -60,8 +66,21 @@ export function UrlSync() {
     if (urlT !== null && urlT !== undefined && Number.isFinite(urlT)) {
       sendCommand({ type: 'jumpToJulianDate', julianDate: urlT });
     }
+    // R1 #329 — `?focus=<bodyId>` 허용 body id 검증.
+    // 미정의 id (예: `?focus=invalid`) 는 무시 + dev 경고 (CRITICAL #2 모호한 입력 방어).
     if (urlFocus) {
-      sendCommand({ type: 'focusOn', bodyId: urlFocus });
+      const validIds = new Set(ephemerisApi.getSolarSystem().bodies.map((b) => b.id));
+      if (validIds.has(urlFocus)) {
+        // 카메라 focus + store selectedBodyId sync (info-panel 표시 트리거).
+        // shortcut 버튼 클릭 경로는 controller.focusOn 후 'bodySelected' event 가 emit 되지만,
+        // URL 직접 진입 시 그 event 가 발생하지 않아 selectedBodyId 가 set 되지 않는 기존 동작 보강.
+        sendCommand({ type: 'focusOn', bodyId: urlFocus });
+        setSelectedBody(urlFocus);
+      } else if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
+        );
+      }
     }
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
       sendCommand({ type: 'setTimeScale', scale: urlSpeed });
@@ -69,6 +88,9 @@ export function UrlSync() {
     if (urlEngine) {
       setPhysicsEngine(urlEngine);
     }
+    // P11-B #289 — `?lod=` 초기 1회 전달. 미지정 (null) 이면 parseLodLevel 이 'auto' 반환 → override 해제.
+    const parsedLod = parseLodLevel(urlLod);
+    sendCommand({ type: 'setLodOverride', level: parsedLod });
     // P12-C #298 — `?view=scientific|educational` 은 단일 모드 전환으로 폐기.
     // 기존 북마크는 파라미터를 조용히 무시하고 단일 모드로 자연 진입 (backward-ignore, ADR §재검토 암묵 전제).
     // eslint-disable-next-line react-hooks/exhaustive-deps

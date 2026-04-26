@@ -1,6 +1,6 @@
 {
   "name": "astro-simulator",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "description": "웹 기반 천체물리 시뮬레이터 — Babylon.js WebGPU 기반 멀티스케일 우주 탐험",
   "license": "MIT",
@@ -34,6 +34,9 @@
     "verify:mobile-p7d": "node scripts/browser-verify-mobile-p7d.mjs",
     "verify:webgpu": "node scripts/browser-verify-webgpu.mjs",
     "verify:belt-nbody": "node scripts/browser-verify-belt-nbody.mjs",
+    "verify:lod": "node apps/web/scripts/browser-verify-lod.mjs",
+    "verify:r1-guard": "node apps/web/scripts/r1-ui-regression-guard.mjs",
+    "verify:r1-tier-untouched": "bash apps/web/scripts/verify-r1-tier-untouched.sh",
     "verify:all": "pnpm verify:test-coverage && pnpm verify:browser && pnpm verify:mobile && pnpm verify:mobile-p4c && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y && pnpm verify:webgpu && pnpm verify:belt-nbody",
     "verify:perf": "node scripts/browser-verify-perf.mjs",
     "verify:a11y": "node scripts/browser-verify-a11y.mjs",
@@ -63,7 +66,9 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "pixelmatch": "^7.1.0",
     "playwright": "^1.59.1",
+    "pngjs": "^7.0.0",
     "prettier": "^3.8.2",
     "typescript": "^6.0.2"
   },
