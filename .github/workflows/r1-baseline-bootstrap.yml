@@ -51,6 +51,24 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      # physics-wasm 워크스페이스가 wasm-pack 의존 — `pnpm build` 의 root recursive 가
+      # core → physics-wasm 경로로 wasm-pack 호출. bench-baseline-remeasure.yml 검증 패턴 차용.
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
       - name: 의존성 설치
         run: pnpm install --frozen-lockfile
 
@@ -118,7 +136,8 @@ jobs:
             - [ ] 머지 후 임의 PR 에서 `ci.yml` 의 r1-guard step PASS 확인
             - [ ] 고의적 false positive PR (예: shortcut 라벨 1글자 변경) 로 r1-guard 가 실제 fail 하는지 실증 후 revert (메인 ADR §결과·재검토 조건 메타 가드)
 
-            Closes #337
+            Refs #337
+            (#337 close 는 후속 이슈 #348 (ci.yml r1-guard step 통합) 완료 후 메인 오케스트레이터가 수동 처리)
           labels: |
             type:infra
             priority:medium
