@@ -696,3 +696,250 @@ Amendment 1 §결정 2 의 부트스트래핑 절차 (a)~(e) 는 **단일 PR 로
 - 후속 이슈 #348 머지 후 부트스트래핑 절차 (a)~(e) 정합 동작 실증 — Amendment 1 §결정 2 의 절차 검증
 
 ---
+
+## Amendment v3 2026-04-26 — ci.yml r1-guard step 통합 + wasm-pack 의존 해소 (#348)
+
+- **상태**: Accepted (Amendment v3)
+- **날짜**: 2026-04-26 (PR #347 머지 + workflow_dispatch run 24956759573 + PR #351 baseline Linux 갱신 머지 직후)
+- **결정자**: architect (#348 위임)
+- **트리거**: Amendment v2 §"Amendment 1 부트스트래핑 절차의 한계 박제" (4) 단계 — `chicken-and-egg` 해소 + wasm-pack 의존 충족 후 ci.yml r1-guard step 2개 통합
+- **메인 ADR §결정 본문 보존**: 본 v3 도 §결정 1~5 / Amendment 1 §결정 1~4 / Amendment v2 어떤 항목도 변경하지 않는다. **wasm-pack 설치 전략 + ci.yml step 형태 + 메타 가드 실증 절차 박제** 만 추가
+
+### 사전 조건 충족 확인 (착수 시점, 2026-04-26)
+
+- ✓ PR [#347](https://github.com/coseo12/astro-simulator/pull/347) (workflow + mjs 매개변수화 + .gitignore + CHANGELOG) 머지 완료 (commit `31eac65`)
+- ✓ v0.13.1 release (PR #350, `--merge` 방식) — main tip `20b18a7`
+- ✓ workflow_dispatch run [`24956759573`](https://github.com/coseo12/astro-simulator/actions/runs/24956759573) — 2m1s 완주 (Amendment v2 §발견사항 #1 wasm-pack 3 step 으로 dispatch fail 차단 검증됨)
+- ✓ PR #351 (Linux baseline 12 PNG 갱신, squash 머지) — develop tip `d9ae9c0`. `apps/web/scripts/__baselines__/r1/{1280x720,1920x1080,375x667}/{top-nav,shortcut-bar,hud-top-right,hud-bottom-right}.png` 12장 모두 Linux 환경 캡처본
+- ✓ 인계 항목 실측 재검증 (CLAUDE.md "인계 항목 실측 재검증 — NO-OP ADR 패턴"): Linux baseline 12 PNG 정합성 확인 — chicken-and-egg 해소 완료, NO-OP 미해당
+
+### 후보 비교 — wasm-pack 설치 전략
+
+이슈 #348 본문 명시 후보:
+
+| 후보  | 내용                                                                                                                                                              | detect-and-test job 시간 영향                           | 변경 라인                | 책임 분리   | 평가                                                                     |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------ | ----------- | ------------------------------------------------------------------------ |
+| **A** | `detect-and-test` job 에 `dtolnay/rust-toolchain` + `Swatinem/rust-cache` + `taiki-e/install-action wasm-pack@0.14.0` 3 step 추가 (verify-and-rust job 동일 패턴) | 모든 detect-and-test 실행에 ~30s 증가 (캐시 hit 시 ~5s) | ci.yml +35~40 라인       | △ 통합      | **선택** — 단순 + 패턴 검증 (PR #347 dispatch run 2m1s 실증)             |
+| B     | r1-guard 전용 별도 job (`r1-ui-guard`) — wasm-pack + chromium + web-only build                                                                                    | 신규 job (~3~4분 단독), detect-and-test 영향 없음       | ci.yml +60 라인 + 새 job | ✓ 명확      | 변경량 큼. job 간 setup 중복 (pnpm install / Node setup)                 |
+| ~~C~~ | r1-guard step 의 `pnpm build` 대신 `pnpm --filter @astro-simulator/web build`                                                                                     | (해당 없음 — 효과 0)                                    | (해당 없음)              | (해당 없음) | **폐기** — web → core → physics-wasm 의존 그래프상 wasm-pack 여전히 필요 |
+
+**선택 (A) 근거**:
+
+1. **PR #347 의 r1-baseline-bootstrap.yml 검증 결과 재사용** — workflow_dispatch run `24956759573` 가 동일 3 step 조합 (rust-toolchain + rust-cache + taiki-e/install-action wasm-pack) 으로 2m1s 완주. **재현 가능성 100%** (Concrete Evidence). 후보 B 는 신규 job 설계 + 검증 단계 추가 필요
+2. **Swatinem/rust-cache 캐시 키 정합성** — `verify-and-rust` job (`workspaces: packages/physics-wasm`, 기본 키) + `r1-baseline-bootstrap` (동일 workspaces, 기본 키) + 신규 `detect-and-test` (동일 workspaces, 기본 키) 모두 동일 캐시 공유 가능. `long-integration-rust` 가 `key: long-integration` 으로 분리한 패턴은 release 빌드 격리 의도 — r1-guard 는 release 빌드 사용 안 함 (web build 만 wasm-pack 호출), 기본 캐시 hit 가능
+3. **책임 분리 트레이드오프 ROI** — 후보 B 는 책임 분리 (r1-guard 전용 job) 의 명확함을 주지만, detect-and-test 가 이미 pnpm install + Playwright 설치를 수행 → 동일 setup 중복 비용. 1인 개발 + AI 페어 컨텍스트에서 통합 단순성 > 책임 분리 직교성. 후보 B 채택 트리거: detect-and-test 시간이 N분 (잠정 8분) 초과 시 분리 ADR
+4. **변경량 작음** — 이슈 본문 권고 (변경량 작음) + Amendment v2 §"미래 R-Phase 사전 진단 체크리스트" #2 의 "monorepo recursive build 의존성 매핑" 사례 박제로 충분
+
+**Concrete Prediction**:
+
+> 후보 A 채택 후 `ci.yml` 변경 라인 = **추가 35~40 / 삭제 0**:
+>
+> - wasm-pack 3 step (rust-toolchain + rust-cache + install wasm-pack): +15 라인
+> - r1-guard step (실행): +14 라인 (PR #347 commit `eadce1e` 패턴 재사용 + `pnpm build` 보존)
+> - r1-guard diff 업로드 step: +8 라인
+>
+> `r1-ui-regression-guard.mjs` / `r1-ui-regions.mjs` / baseline 12 PNG / `package.json` / `pnpm-lock.yaml` 변경 = **0 라인**.
+>
+> 검증 절차 (Developer PR 에서 자동 재현):
+>
+> ```bash
+> git diff develop...HEAD -- .github/workflows/ci.yml
+> # 추가 라인 ≈ 35~40 (rust-toolchain 3 step + r1-guard step 2개)
+> git diff develop...HEAD -- apps/web/scripts/ packages/ apps/web/package.json package.json
+> # 변경 라인 = 0 이어야 Prediction 성공
+> ```
+
+### 결정 — ci.yml r1-guard step 2개 + wasm-pack 3 step 통합 형태
+
+**최종 step 매트릭스** (ci.yml `detect-and-test` job 의 기존 `pnpm test` step 직후 또는 `verify:no-scientific-grep` step 직후 — developer 가 가독성 기준 결정):
+
+```yaml
+# ============================================================
+# R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
+# ============================================================
+# ADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment v3 2026-04-26
+# 의존성:
+#   - physics-wasm 워크스페이스 → wasm-pack (root recursive `pnpm build` 트리거)
+#   - apps/web → next start (Playwright BASE_URL 타깃)
+#   - apps/web/scripts/__baselines__/r1/ Linux 캡처본 12장 (PR #351 머지 후 정합)
+
+- name: Rust 툴체인 설정 (R1 r1-guard 의존)
+  if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && hashFiles('rust-toolchain.toml') != ''
+  uses: dtolnay/rust-toolchain@stable
+  with:
+    toolchain: '1.94.1'
+    targets: wasm32-unknown-unknown
+
+- name: Rust 빌드 캐시 (R1 r1-guard 의존)
+  if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('packages/physics-wasm/Cargo.toml') != ''
+  uses: Swatinem/rust-cache@v2
+  with:
+    workspaces: packages/physics-wasm
+
+- name: wasm-pack 설치 (R1 r1-guard 의존)
+  if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('packages/physics-wasm/Cargo.toml') != ''
+  uses: taiki-e/install-action@v2
+  with:
+    tool: wasm-pack@0.14.0
+
+- name: R1 UI 회귀 가드 (r1-guard)
+  if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+  run: |
+    pnpm exec playwright install --with-deps chromium
+    pnpm build
+    pnpm --filter @astro-simulator/web start -p 3001 &
+    WEB_PID=$!
+    for i in {1..30}; do
+      if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+      sleep 2
+    done
+    BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs
+    GUARD_EXIT=$?
+    kill $WEB_PID || true
+    exit $GUARD_EXIT
+
+- name: R1 diff 이미지 업로드 (실패 시)
+  if: failure() && hashFiles('apps/web/scripts/__diff__/r1/**/*.png') != ''
+  uses: actions/upload-artifact@v4
+  with:
+    name: r1-pixel-diff-${{ github.run_id }}
+    path: apps/web/scripts/__diff__/r1/
+    retention-days: 7
+```
+
+**보강 사항** (이슈 본문 yaml 대비):
+
+1. **`if:` 가드에 `hashFiles('rust-toolchain.toml') != ''` / `hashFiles('packages/physics-wasm/Cargo.toml') != ''` 추가** — harness ci.yml 의 일관된 가드 패턴 (rust step 들이 Cargo.toml 부재 시 자동 스킵). harness upstream `ci.yml` 호환성 + 다른 다운스트림 환경 안전성
+2. **`pnpm build` 명시 보존** — 이슈 본문 yaml 그대로. `pnpm --filter @astro-simulator/web build` 로 좁히지 않는 이유: 의존 그래프 (web → core → physics-wasm) 상 어차피 wasm-pack 호출 + 부분 빌드의 stale dist 위험 (CLAUDE.md "monorepo dist stale 변형" volt #70 참조)
+3. **`exit $GUARD_EXIT`** — `kill $WEB_PID` 가 0 종료해도 가드 결과 보존. shell job control 의 silent fail 회피
+4. **`continue-on-error` 미사용** — 후보 (iii) 기각 (Amendment v2 §"Amendment 1 부트스트래핑 절차의 한계 박제"). r1-guard 는 일상 PR check 의 회귀 차단 게이트. fail 시 PR 차단이 본질적 가치
+5. **Step 위치 권고** — `pnpm test` 직후 (line 53 다음) 또는 `verify:no-scientific-grep` 직후 (line 60 다음). 둘 다 가능. **권고**: `verify:no-scientific-grep` 직후 (line 60 다음) — R1 회귀 가드 그룹화 + harness upstream `pnpm test` 와 시간적 격리 (Playwright + wasm-pack 비용을 별도 시각적 그룹으로 인식)
+
+### 메타 가드 실증 절차 박제 (메인 ADR §결과·재검토 조건 +
+
+                                Amendment 1 §Developer 인계 (e) 충족)
+
+**본 PR 머지 후 별도 후속 PR 로 실증** (구현 단계 — 본 ADR 은 절차 박제만):
+
+1. **고의적 false positive 변경** — 다음 중 하나 (가시성 + 결정성 우선):
+   - (a) `apps/web/src/components/layout/<shortcut-bar 컴포넌트>.tsx` 의 shortcut 라벨 1글자 변경 (예: "태양" → "태앙") — 텍스트 변경이 폰트 렌더링 sub-pixel 흡수 임계 (0.5%) 를 명확히 초과
+   - (b) `<top-nav>` 의 메뉴 항목 1개 추가 (예: "샌드박스" → "샌드박스 (P2+)") — DOM 구조 변경 + 텍스트 변경
+   - **권고**: (a) — DOM 구조 보존, 순수 텍스트 회귀 시그널 명확
+2. **PR 생성** — branch `experiment/348-r1-meta-gate-validation`, base `develop`, draft. PR 본문에 "메타 가드 실증 — 머지 의도 없음, r1-guard fail 확인 후 close" 명시
+3. **CI 결과 확인**:
+   - ci.yml `detect-and-test` job 의 `R1 UI 회귀 가드 (r1-guard)` step 이 **fail 종료** (exit 1)
+   - `R1 diff 이미지 업로드 (실패 시)` step 이 trigger 되어 artifact `r1-pixel-diff-<run_id>` 업로드
+   - artifact 다운로드 → `__diff__/r1/<viewport>/<region>.png` 의 빨간색 mismatch 픽셀 시각 확인
+4. **PR close** (revert 아닌 close — 머지 안 함). artifact는 retention-days=7 자동 폐기
+5. **본 ADR §결과·재검토 조건 메타 가드 항목** + **Amendment 1 §Developer 인계 (e)** 체크박스 충족 박제 — issue #348 코멘트 또는 후속 이슈
+
+**비-목표** (메타 가드 실증 PR 직접 생성은 본 ADR 범위 밖):
+
+- 본 ADR 은 **절차만** 박제. 실측은 후속 PR (developer 단계)
+- 메타 가드 실증 결과로 임계값 조정이 필요해지면 별도 amendment
+
+### 위험 / 미해결
+
+1. **detect-and-test job 시간 증가** — wasm-pack 3 step (~30s 캐시 cold, ~5s warm) + Playwright 설치 (~60s) + 빌드 (`pnpm build` ~30s) + 웹 서버 기동 + r1-guard 실행 (~30s) ≈ 추가 **2~3분 cold / 1~2분 warm**. 기존 detect-and-test (`pnpm install` + `pnpm test` ~3~5분) 대비 누적 5~8분 예상. 메인 ADR §재검토 트리거 5 ("CI 실행 시간이 N분 초과") 의 N=8분 잠정 임계 도입 — 초과 시 후보 B (별도 job) 분리 ADR
+2. **port 3001 충돌 가능성** — ubuntu-latest runner 는 신규 컨테이너이므로 충돌 가능성 낮으나, 다른 step 이 향후 3001 port 사용 시 회피. `r1-baseline-bootstrap.yml` 도 3001 사용 중 (workflow 다름이므로 충돌 없음). port 변경 필요 시 `BASE_URL` env var + step env 로 격리
+3. **`pnpm build` 의 silent fail** — `pnpm -r build` 가 일부 워크스페이스에서 비-zero 종료해도 후속 step 진행 시 stale dist 로 r1-guard 가 실패 상태 가리는 위험. `set -e` 또는 명시적 step 분리 (build 별도 step) 검토. **권고**: 본 PR 에서는 `set -e` 명시 (run shell 의 기본 동작이 set -e 이지만 명시적 박제). developer 가 yaml 작성 시 `set -e` 또는 `bash -e` 명시
+4. **wasm-pack 캐시 hit 영향** — Swatinem/rust-cache 가 캐시 hit 시 ~5s 로 단축되지만, branch 별 캐시 격리 (PR 첫 실행 시 cold) 가 이슈. develop merge 후 점진 warm. 본 PR 머지 후 1주 측정 권고 — `r1-baseline-bootstrap.yml` workflow_dispatch run 결과 (2m1s 완주) 와 detect-and-test 측정값 차이로 캐시 효과 확인
+5. **메타 가드 실증의 false negative 위험** — 1글자 텍스트 변경이 0.5% 임계를 초과하지 못하면 r1-guard 가 PASS — 임계값 또는 대상 영역 검토 필요. 메타 가드 실증 PR 에서 발견 시 별도 amendment
+
+### 재검토 트리거 (메인 ADR §결과·재검토 조건 보강)
+
+다음 조건 중 하나면 본 v3 재검토:
+
+1. detect-and-test job 시간이 8분 초과 (위험 #1) — 후보 B (별도 job) 분리 ADR
+2. wasm-pack 캐시 miss 가 PR 의 50% 이상 (위험 #4) — 캐시 키 전략 재검토
+3. r1-guard step 의 false positive 비율이 PR 당 평균 ≥ 1회 (Amendment 1 §결정 1 의 false positive ≥ 2/PR 트리거의 강화) — 후보 C (OS 매트릭스) 또는 SKIP_LOCAL 강제 ADR
+4. 메타 가드 실증 결과 1글자 텍스트 변경이 r1-guard 를 fail 시키지 못함 (위험 #5) — 임계값 또는 영역 정의 amendment
+
+### Developer 인계 (Amendment v3)
+
+**시작 지점**:
+
+1. **사전 조건 검증** (다시 확인):
+   ```bash
+   # baseline 12 PNG 가 Linux 캡처본인지 확인 (PR #351 머지 후)
+   git log --oneline -5 -- apps/web/scripts/__baselines__/r1/
+   # PR #351 squash commit 이 보여야 함
+   ls apps/web/scripts/__baselines__/r1/*/
+   # 12 PNG (4 영역 × 3 viewport) 존재 확인
+   ```
+2. **`.github/workflows/ci.yml` `detect-and-test` job 에 step 5개 추가** — 위 §결정 §"최종 step 매트릭스" yaml 그대로. 위치: `verify:no-scientific-grep` step (line 60) 직후 권고 (R1 회귀 가드 그룹화). 가독성 기준 developer 결정 가능 — `pnpm test` 직후 (line 53) 도 허용
+3. **로컬 검증 (필수)** — branch push 전 ci.yml YAML lint:
+   ```bash
+   # YAML 구문 검증 (로컬에 yamllint 또는 actionlint 설치 시)
+   actionlint .github/workflows/ci.yml
+   # 또는 GitHub Actions UI 에서 syntax error 확인 (PR push 후)
+   ```
+4. **PR 생성** — branch `feature/348-r1-guard-ci-integration`, base `develop`, draft 시작. PR 본문에 본 ADR Amendment v3 링크 + Concrete Prediction 검증 (`git diff` 결과) 박제
+5. **PR check 결과 확인** — detect-and-test job 의 신규 step 5개 PASS 확인:
+   - Rust 툴체인 설정 / Rust 빌드 캐시 / wasm-pack 설치 (3 step) ≈ 30s cold / 5s warm
+   - R1 UI 회귀 가드 (r1-guard) ≈ 60s ~ 90s (Playwright + build + server + guard)
+   - R1 diff 이미지 업로드 — fail 시에만 trigger (정상 PR 에서는 skip)
+6. **메타 가드 실증** — 본 PR 머지 후 별도 PR 로 §"메타 가드 실증 절차 박제" (1)~(5) 수행
+7. **CHANGELOG `[Unreleased]` `### Behavior Changes` 박제** — 예시:
+   ```markdown
+   ### Behavior Changes
+
+   - R1 UI 회귀 가드가 모든 PR `detect-and-test` job 에서 자동 실행됨 — Linux baseline 12 PNG 대비 mismatch ratio ≤ 0.5% 검증, fail 시 diff 이미지 7일 보존 (artifact)
+   - detect-and-test job 시간 ~5~8분 예상 (wasm-pack + Playwright + build + r1-guard 누적)
+   - 로컬 macOS 검증 시 폰트 차이 false positive 회피: `SKIP_LOCAL=1 node apps/web/scripts/r1-ui-regression-guard.mjs`
+   ```
+
+**참조 문서**:
+
+- 본 ADR (메인 + Amendment 1 + v2 + v3)
+- 이슈 #348 본문 (후보 비교 + 사전 조건 + DoD)
+- PR #347 commit `eadce1e` (본 v3 의 step 패턴 출처) → `70324b8` (분리 사유) → `d687072` (workflow 의 wasm-pack 3 step 검증 출처)
+- workflow_dispatch run [`24956759573`](https://github.com/coseo12/astro-simulator/actions/runs/24956759573) (wasm-pack 3 step 재현 가능성 검증)
+- PR #351 (Linux baseline 12 PNG 갱신 — chicken-and-egg 해소)
+
+**비-범위 (절대 손대지 말 것)**:
+
+- 메인 ADR §결정 1~5 / Amendment 1~v2 본문 — Amendment v3 는 §결정 본문 변경 안 함
+- pixel diff 임계값 (0.5%) 변경 — 메타 가드 실증 결과로 필요 시 별도 amendment
+- `r1-ui-regression-guard.mjs` / `r1-ui-regions.mjs` / `package.json` / `pnpm-lock.yaml` / baseline 12 PNG — 0 변경 (Concrete Prediction 검증 대상)
+- 다른 R-Phase (R2~R10) baseline 캡처 — 본 인프라 도입 후 동일 패턴 재사용
+- 후보 B (별도 job 분리) — 위험 #1 재검토 트리거 충족 시 분리 ADR
+- 메타 가드 실증 PR 직접 생성 — 본 ADR 은 절차 박제만, 실측은 후속 PR
+
+### 교차검증 반영 사항
+
+본 Amendment v3 박제 직후 cross-validate 1회 (Gemini 2.5 Pro, 2026-04-26 21:44 KST). outcome=applied (exit 0). 로그: `.claude/logs/cross-validate-architecture-20260426-214432.log`. outcome JSON: `.claude/logs/cross-validate-architecture-20260426-214432-outcome.json`.
+
+**Claude 자체 편향 4종 셀프 체크** (CLAUDE.md `## 교차검증` 호출 전 의무):
+
+- **낙관적 일정**: 통과 — detect-and-test 누적 5~8분은 보수적 추정 (현재 ~3~5분 + wasm-pack ~30s + Playwright ~60s + build ~30s + guard ~30s). cold/warm 양극단 모두 박제
+- **결합 간과**: 통과 — Swatinem/rust-cache 키 정합성 (verify-and-rust + bootstrap + detect-and-test) + port 3001 충돌 검토 + `pnpm build` silent fail 위험 모두 박제. workflow_dispatch run 24956759573 의 2m1s 완주가 결합 검증 증거
+- **폐기 프레이밍**: 통과 — 후보 B/C 단순 폐기 아닌 재검토 트리거 박제 (위험 #1 의 8분 초과 시 후보 B 분리 ADR). 후보 C 만 의존성 추적 결과로 효과 0 으로 폐기 (이슈 본문 동일 결론)
+- **순수주의**: 통과 — `if:` 가드에 `rust-toolchain.toml` / `Cargo.toml` 검사 추가는 harness upstream 호환성 + 다른 다운스트림 안전성 위해 수용 (이슈 본문 yaml 대비 보강 1). 1인 개발 컨텍스트 단순화 vs 일반화 트레이드오프 의식적 선택
+
+**합의** — Claude 설계와 일치 (Gemini 가 "S급 ADR" 평가, 추가 의견 없이 합의):
+
+- **wasm-pack 후보 A 채택 (단일 job 통합)** — Gemini 가 §1 "구조적 완성도" 에서 "정적 설계만으로는 발견하기 어려운 동적 통합 문제를 깊이 있게 다룬다는 증거" 로 합의. workflow_dispatch run 24956759573 의 2m1s 완주가 패턴 검증
+- **CI 환경 우선주의 + Linux baseline (Amendment 1 §결정 1)** — Gemini 가 §2 "기술 결정 타당성" 에서 "업계 표준에 부합하는 매우 중요한 결정" 으로 강하게 합의
+- **권한 최소화** — Gemini 가 §5 "보안" 에서 "최소 권한 원칙을 훌륭하게 준수" 로 합의. `r1-baseline-bootstrap.yml` (write) vs `ci.yml` (read-only) 분리
+- **재검토 트리거 명시** — Gemini 가 §4 "확장성" 에서 "성숙한 엔지니어링 실천법. 노후화 방지 + 지속적 개선 유도 제도적 장치" 로 합의. 위험 #1 의 8분 초과 트리거 박제 호평
+- **Concrete Prediction (35~40 라인 / 다른 파일 0)** — Gemini 가 별도 의견 제시 없음 (= 합의)
+- **메타 가드 실증 false negative 위험 (1글자 텍스트 0.5% 임계 보장 안 됨)** — Gemini 가 별도 지적 없이 절차 박제 자체에 합의. 본 ADR 위험 #5 + 재검토 트리거 #4 로 사전 박제됨
+
+**이견 수용**: 없음 (Gemini 가 본 ADR §결정 본문에 대한 이견 제시 안 함, 모두 합의)
+
+**Claude 재분석으로 기각한 Gemini 제안**: 없음 (Gemini 의 2가지 개선 제안은 모두 합리적이며 본 ADR 비-범위 사유로 후속 분리)
+
+**고유 발견 (후속 분리)** — Gemini 만의 제안 2건, 본 PR 비-범위로 분리 처리:
+
+1. **메타 가드 자동화 (카나리아 테스트)** — Gemini 제안 §"개선 제안 1": 현재 1회성 수동 절차를 매주/매월 스케줄링된 CI 작업이 자동으로 잘못된 변경 브랜치 생성 + r1-guard fail 검증 + 브랜치 삭제 자동화. **범위 밖 사유**: 본 ADR 의 메타 가드 실증은 1회성 절차 박제 (Amendment 1 §Developer 인계 (e) + 메인 ADR §결과·재검토 조건 메타). 자동화는 R-Phase 인프라 누적 후 ROI 평가 대상 (R2 진입 전 무가치). **후속 이슈 분리 권고**:
+   - 제목: `[chore] R1 메타 가드 자동화 — 카나리아 테스트 스케줄 도입 검토`
+   - 본문 핵심: Gemini 설계 스케치 ("매주/매월 자동 false positive PR 생성 + r1-guard fail 검증 + 자동 close") + Builds on: #348 + 우선순위 low (R5 진입 시점 재검토)
+
+2. **PR 코멘트에 diff 이미지 inline 업로드** — Gemini 제안 §"개선 제안 2": 현재 `actions/upload-artifact` (다운로드 + 압축해제 필요) 외에 PR 코멘트에 diff 이미지 직접 업로드하여 리뷰 효율성 향상. **범위 밖 사유**: `actions/upload-artifact` 만으로 본 ADR DoD 충족 (Amendment 1 §Developer 인계 의 Gemini 합의). PR 코멘트 직접 업로드는 (a) `pull-requests: write` 권한 추가 필요 (현재 ci.yml read-only 원칙 침범) (b) 이미지 호스팅 인프라 (GitHub 이슈/PR 첨부 API 또는 외부 CDN) 검토 (c) 본 ADR §결정 4 (CI 통합) 의 범위 밖. **후속 이슈 분리 권고**:
+   - 제목: `[chore] R1 r1-guard 실패 시 diff 이미지 PR 코멘트 inline 첨부 검토`
+   - 본문 핵심: Gemini 설계 스케치 + Builds on: #348 + 우선순위 low + ci.yml read-only 원칙 침범 트레이드오프 박제
+
+후속 이슈 생성은 본 ADR Amendment v3 머지 직후 architect 또는 메인 오케스트레이터 책임 (CLAUDE.md `### 교차검증` §"분리 시 박제 규칙" — 즉시 생성 의무, 맥락 유실 방지).
+
+---
