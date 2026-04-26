@@ -4,7 +4,7 @@ import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
 
 const FOCUS_BUTTONS = [
-  { id: 'sun', label: '태양' },
+  { id: 'sun', label: '태앙' },
   { id: 'earth', label: '지구' },
   { id: 'jupiter', label: '목성' },
   { id: 'neptune', label: '해왕성' },
