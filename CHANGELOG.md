@@ -5,7 +5,9 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-> **R1 사이클 (2026-04-25)** — Roadmap v3 "Incremental Body-by-Body Build" 첫 스프린트. 태양 가시성 복구 + 회귀 가드 인프라. 5 PR 머지.
+## [0.13.0] — 2026-04-26
+
+> **R1 사이클 (2026-04-25 ~ 2026-04-26)** — Roadmap v3 "Incremental Body-by-Body Build" 첫 스프린트. 태양 가시성 복구 + 회귀 가드 인프라. 8 PR 머지 (#330, #331, #332, #338, #339, #340, #342, #344).
 
 ### Fix
 
@@ -59,7 +61,7 @@ PR [#332](https://github.com/coseo12/astro-simulator/pull/332) (`6e7382e`) — �
 
 ### Notes
 
-- R1 후속 5건 ([#333](https://github.com/coseo12/astro-simulator/issues/333), [#334](https://github.com/coseo12/astro-simulator/issues/334), [#335](https://github.com/coseo12/astro-simulator/issues/335), #336, [#337](https://github.com/coseo12/astro-simulator/issues/337)) — R2 (수성) 진입 전 처리 권고. #336 / #333 완료, 3건 잔존
+- R1 후속 5건 ([#333](https://github.com/coseo12/astro-simulator/issues/333), [#334](https://github.com/coseo12/astro-simulator/issues/334), [#335](https://github.com/coseo12/astro-simulator/issues/335), [#336](https://github.com/coseo12/astro-simulator/issues/336), [#337](https://github.com/coseo12/astro-simulator/issues/337)) — R2 (수성) 진입 전 처리 권고. #333 / #334 / #335 / #336 완료, **#337 (CI Linux baseline 부트스트래핑) 만 잔존**
 - 109건 `상위에서 삭제됨` 분류 (harness v3.6.0 자가 점검 결과) — 별도 라운드 처리 권고. `.claude/skills/capture-volt/SKILL.md` / `.claude/commands/volt.md` 보존 우선
 
 #### Behavior Changes (CHANGELOG 소급 박제 자체)
