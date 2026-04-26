@@ -383,3 +383,224 @@ git diff develop...HEAD -- apps/web/scripts/r1-ui-regression-guard.mjs
 - DOM 시맨틱 회귀 검증 — PM Q2 옵션 C 미선택 (R1 비-범위)
 - 시각 회귀의 자동 자가 치유 — `--update` 는 명시적 사용자 의도 표명 (자동 갱신 금지)
 - 신규 라이브러리 추가 — `pixelmatch` / `pngjs` / `sharp` / `playwright` 만 사용
+
+---
+
+## Amendment 2026-04-26 — CI Linux 통합 정책 결정 (#337)
+
+- **상태**: Accepted (Amendment)
+- **날짜**: 2026-04-26
+- **결정자**: architect (#337 위임)
+- **트리거**: PR #332 reviewer F-1 분리 — R1 baseline 12장이 macOS 14 / Apple Silicon / Chrome channel 로 캡처되어 CI Linux 환경 폰트 렌더링 차이로 false positive 위험
+- **메인 ADR §결정 본문 보존**: 본 Amendment 는 §결정 1~5 어떤 항목도 변경하지 않는다. 알고리즘 (pixelmatch 0.1) / 임계값 (0.5%) / 영역 정의 / 디렉토리 구조 / 부트스트래핑 절차 모두 유효. 본 Amendment 는 **OS 매트릭스 축 추가** + **CI workflow 책임 분리**만 다룬다.
+
+### 배경 — 메인 ADR §위험·미해결 4번 항목 구체화
+
+메인 ADR §위험·미해결 4번 ("CI 환경 폰트") 은 baseline 을 "CI 환경에서 1회 캡처" 권고로 종결했다. 그러나 R1 PR #332 머지 시점에 부트스트래핑 절차 단순화 권고 (메인 ADR §Developer 인계 4 대안) 를 채택해 **로컬 macOS 환경에서 baseline 을 박제**했다. 결과:
+
+- 12 PNG (`apps/web/scripts/__baselines__/r1/{1280x720,1920x1080,375x667}/{top-nav,shortcut-bar,hud-top-right,hud-bottom-right}.png`) 모두 macOS 캡처
+- CI Linux 통합 시점에 폰트 렌더링 (macOS San Francisco vs Linux DejaVu/Noto) 차이가 4 영역 모두에 nontrivial 영향 — 특히 텍스트 비율이 높은 `top-nav`, `hud-top-right` 가 위험
+- 본 Amendment 는 이 격차를 어떻게 흡수할지 **3 후보 비교 + 결정**
+
+### 후보 비교 — Baseline OS 매트릭스 정책
+
+| 후보  | 내용                                                                               | macOS 로컬 검증           | CI Linux 검증 | baseline 매트릭스 크기 | r1-ui-regression-guard.mjs 변경 라인 | 평가                                                                 |
+| ----- | ---------------------------------------------------------------------------------- | ------------------------- | ------------- | ---------------------- | ------------------------------------ | -------------------------------------------------------------------- |
+| **A** | macOS baseline 유지 + CI 임계값 완화 (`mismatch ≤ 1.0%~2.0%`)                      | ✓                         | △ (관대)      | 12 (현재 유지)         | 0 (env var 또는 CLI flag 추가만)     | 단순. 진짜 회귀 감지력 약화 — 1글자 텍스트 변경이 임계값 안에 묻힘   |
+| **B** | Linux baseline 으로 전환 + macOS 로컬은 보조 (CI 우선)                             | △ (관대 또는 별도 임계값) | ✓             | 12 (Linux 로 1회 갱신) | 0 (baseline 만 교체)                 | CI 정합성 1순위. 로컬 macOS 검증에서 false positive — 개발 흐름 마찰 |
+| **C** | OS 별 baseline 매트릭스 (`__baselines__/r1/{linux,macos}/{viewport}/{region}.png`) | ✓                         | ✓             | 24 (2 배)              | ≤ 5 (OS detect + 경로 분기)          | 가장 robust. 매트릭스 2배 (디스크 / 갱신 부담)                       |
+
+### 결정 1 — 후보 B (Linux baseline 전환 + macOS 로컬은 보조)
+
+**선택 근거**:
+
+1. **CI 가 진실의 원천 (Source of Truth)** — PR check 가 회귀 감지의 1차 게이트. 메인 ADR §결과·재검토 조건의 "회귀 가드 자체의 회귀 가드 (메타)" 가 요구하는 "고의적 false positive PR 로 가드 fail 실증" 도 CI 환경에서 수행. 로컬은 보조 검증
+2. **회귀 감지력 보존** — 후보 A 의 임계값 완화 (0.5% → 1.0%) 는 1글자 텍스트 변경 / 작은 icon 변경을 흡수해 **회귀 가드의 본질적 가치를 훼손**. 메인 ADR §축 2 의 임계값 0.5% 결정 근거 (1글자 텍스트 변경 검출 보장) 와 충돌
+3. **매트릭스 크기 단순성** — 후보 C 의 24장 매트릭스는 mjs 코드 변경 (OS detect + 경로 분기), CI workflow 복잡도 (matrix strategy), 갱신 시 양쪽 동기화 부담 등 비용이 높다. 1인 개발 + AI 페어 컨텍스트에서 ROI 낮음
+4. **로컬 macOS 검증의 false positive 처리** — macOS 개발자가 로컬에서 `pnpm r1-guard` 실행 시 폰트 차이로 mismatch 가 0.5% 를 초과할 수 있다. 다음 3가지 대응 패턴 박제 (개발자 선택):
+   - (a) **CI 결과만 신뢰** — 로컬 실행은 스킵, PR push 후 CI 결과만 확인 (권고)
+   - (b) **`SKIP_LOCAL=1` env var** — `r1-ui-regression-guard.mjs` 가 `SKIP_LOCAL=1` 시 즉시 PASS 종료 (CLI flag 추가 ≤ 5 라인)
+   - (c) **로컬에서 docker / podman 으로 Linux 컨테이너 실행** — 가장 정합성 높지만 셋업 비용 (선택사항, 비-범위)
+
+**대안 (후보 C) 채택 조건 — 재검토 트리거**:
+
+- macOS 개발자 mismatch false positive 비율이 PR 당 평균 ≥ 2 회 (개발 흐름 심각 마찰)
+- macOS 로컬에서 회귀를 **먼저 발견하는** 사례가 누적 (CI 가 항상 1차 게이트라는 전제 무너짐)
+- 모바일 / 태블릿 등 OS 매트릭스가 viewport 매트릭스와 곱셈으로 폭발 — 그 시점엔 후보 C 보다 viewport 우선 분리 ADR 검토
+
+### 결정 2 — CI Workflow 분리: bootstrap (workflow_dispatch) vs PR check (자동)
+
+**책임 직교화 — 2 workflow 분리**:
+
+| Workflow                                                                               | 트리거                                                | 실행 빈도                        | 책임                                                                                         |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- |
+| **`.github/workflows/r1-baseline-bootstrap.yml`** (신규)                               | `workflow_dispatch` 만                                | 부트스트래핑 / 갱신 시 1회       | Linux 환경에서 12 PNG 캡처 + `peter-evans/create-pull-request` 로 baseline 갱신 PR 자동 생성 |
+| **`.github/workflows/ci.yml`** `detect-and-test` job 의 신규 step (기존 workflow 확장) | `pull_request` (develop/main) + `push` (develop/main) | 모든 PR + 모든 main/develop push | `pnpm r1-guard` 실행. 실패 시 `__diff__/r1/` 을 `actions/upload-artifact` 로 업로드          |
+
+**선택 근거**:
+
+1. **`bench-baseline-remeasure.yml` 패턴 재사용** — 기존 인프라가 동일 모델 (workflow_dispatch + matrix run + create-pull-request) 사용. 패턴 검증 + 컨벤션 일관성
+2. **부트스트래핑은 1회성 / PR check 는 상시** — 2 workflow 의 빈도 / 권한 / 비용이 다름. 단일 workflow 에 condition 분기로 합치면 복잡도 증가, 권한 (PR 자동 생성) 가 PR check 에도 적용되는 위험
+3. **bootstrap workflow 는 별도 job 으로 격리** — `r1-baseline-bootstrap.yml` 은 `permissions: contents:write, pull-requests:write` 필요 (PR 자동 생성). `ci.yml` 의 detect-and-test 는 read-only 권한이면 충분. 권한 최소화 원칙
+4. **PR check 통합 위치** — 기존 `ci.yml` 의 `detect-and-test` job 에 신규 step 추가 (별도 workflow 신설 안 함). 이유: 동일 PR 에 대해 detect-and-test 의 `pnpm test` 가 이미 실행되고 그 직후 `pnpm r1-guard` 만 추가하면 됨. 신규 workflow 신설 시 `pnpm install` / `playwright install` 중복 실행 비용 발생
+
+### 결정 3 — `r1-ui-regression-guard.mjs` 매개변수화 (후보 B 채택 후)
+
+**현재 상태** (`apps/web/scripts/r1-ui-regression-guard.mjs` line 31):
+
+```javascript
+const BASELINE_DIR = path.join(__dirname, '__baselines__', 'r1');
+```
+
+**후보 B 채택 시 변경**: **0 라인** (baseline 디렉토리 그대로 사용, Linux 캡처본으로 PNG 만 교체).
+
+선택 근거:
+
+- 후보 B 는 매트릭스 OS 차원 추가가 아닌 **단일 baseline 의 OS 변경**. 디렉토리 구조 (`__baselines__/r1/{viewport}/{region}.png`) 그대로
+- 후보 C 였다면 OS detect 로직 (`process.platform === 'linux' ? 'linux' : 'macos'`) + 경로 분기 (≤ 5 라인) 필요. 후보 B 에선 불필요
+- 단, **선택사항으로 `SKIP_LOCAL=1` env var 지원** 추가 가능 (≤ 5 라인 — `if (process.env.SKIP_LOCAL === '1' && process.platform === 'darwin') process.exit(0);`). developer 가 PR 시점 판단
+
+**Concrete Prediction**:
+
+> 후보 B 채택 후 `r1-ui-regression-guard.mjs` 의 변경 라인 = **0 ~ 5** (선택적 SKIP_LOCAL 지원 한정). `r1-ui-regions.mjs` 변경 = 0. baseline 12 PNG 가 Linux 캡처본으로 교체되며 git diff 상 binary diff. CI workflow 변경: `r1-baseline-bootstrap.yml` 신규 (≈ 100 라인), `ci.yml` 신규 step 추가 (≈ 15 라인 — `pnpm r1-guard` + diff 업로드).
+
+검증 절차 (Developer PR 에서 자동 재현):
+
+```bash
+git diff develop...HEAD -- apps/web/scripts/r1-ui-regression-guard.mjs apps/web/scripts/r1-ui-regions.mjs
+# 변경 라인 합 ≤ 5 (mjs) + 0 (regions) 이어야 Prediction 성공
+```
+
+### 결정 4 — workflow_dispatch 사전 조건 박제 (volt #45 함정 회피)
+
+**`r1-baseline-bootstrap.yml` 상단 주석에 사전 조건 명시 의무**:
+
+```yaml
+# CRITICAL — workflow_dispatch 2단계 함정 (volt #45):
+#
+# (1) default branch 종속:
+#     - 본 workflow 가 main (또는 develop) 에 머지된 후에만 GitHub Actions UI 에 dispatch 버튼이 표시됨
+#     - feature 브랜치에서 push 만으로는 실행 불가
+#     - 절차: PR 머지 → main 반영 확인 → Actions UI → "r1-baseline-bootstrap" → "Run workflow" 클릭
+#
+# (2) PR 자동 생성 권한:
+#     - peter-evans/create-pull-request 는 Settings → Actions → General → "Workflow permissions" →
+#       "Allow GitHub Actions to create and approve pull requests" 가 ON 이어야 작동
+#     - 기본값 OFF — 첫 dispatch 전 1회 enable 필요
+#     - 또는 CLI: gh api -X PUT /repos/coseo12/astro-simulator/actions/permissions/workflow \
+#         -f default_workflow_permissions=write \
+#         -F can_approve_pull_request_reviews=true
+#
+# DoD 매핑: #337 부트스트래핑 1회 dispatch 검증 (volt #45 함정 회피)
+```
+
+**선택 근거**: volt #45 (workflow_dispatch 2단계 함정) 의 박제 의무 패턴. workflow 도입 PR DoD 에 "default branch 반영 후 dispatch 검증" 명시 → developer 가 R1 PR 머지 후 1회 실행 결과를 PR 본문에 박제.
+
+### Developer 인계 (Amendment 추가분)
+
+**시작 지점**:
+
+1. **사전 조건 검증** (workflow 작성 전):
+   ```bash
+   # PR 자동 생성 권한 현재 상태 확인
+   gh api repos/coseo12/astro-simulator/actions/permissions/workflow
+   # can_approve_pull_request_reviews 가 false 면 enable 필요
+   ```
+2. **`.github/workflows/r1-baseline-bootstrap.yml` 신규 작성** — `bench-baseline-remeasure.yml` 패턴 따라:
+   - `on: workflow_dispatch` 만 (push/PR 트리거 금지 — 비용 + 권한)
+   - `permissions: contents:write, pull-requests:write`
+   - steps: checkout / pnpm setup / Node 20 / Playwright Chrome (Linux) / 앱 빌드 / 웹 서버 기동 / `node apps/web/scripts/r1-ui-regression-guard.mjs --update` / git diff 확인 / `peter-evans/create-pull-request@v7` 로 baseline 갱신 PR 자동 생성
+   - PR base = `develop`, branch = `chore/r1-baseline-linux-${{ github.run_id }}`
+3. **`.github/workflows/ci.yml` `detect-and-test` job 에 step 추가** — pnpm 경로 직후 (line ~60 `verify:no-scientific-grep` step 옆):
+
+   ```yaml
+   - name: R1 UI 회귀 가드 (r1-guard)
+     if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+     run: |
+       pnpm exec playwright install --with-deps chromium
+       pnpm --filter @astro-simulator/web start -p 3001 &
+       WEB_PID=$!
+       for i in {1..30}; do
+         if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+         sleep 2
+       done
+       BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs
+       kill $WEB_PID || true
+
+   - name: R1 diff 이미지 업로드 (실패 시)
+     if: failure() && hashFiles('apps/web/scripts/__diff__/r1/**/*.png') != ''
+     uses: actions/upload-artifact@v4
+     with:
+       name: r1-pixel-diff-${{ github.run_id }}
+       path: apps/web/scripts/__diff__/r1/
+       retention-days: 7
+   ```
+
+   - **NOTE**: `pnpm --filter @astro-simulator/web start` 가 실제 동작하는지 확인 필요 (R1 PR 본문 + `package.json` scripts 검증). 작동 안 하면 `pnpm build && pnpm exec serve` 또는 `next start` 등 대체
+
+4. **부트스트래핑 절차** (volt #45 회피):
+   - (a) PR `feature/337-r1-ci-linux-baseline-design` 머지 (workflow 파일 main 반영)
+   - (b) GitHub Actions UI → "r1-baseline-bootstrap" → "Run workflow" → develop 대상 dispatch
+   - (c) workflow 가 자동 생성한 baseline 갱신 PR 머지 (Linux 캡처 12장이 macOS 12장 교체)
+   - (d) 임의 PR 에서 `ci.yml` 의 r1-guard step 이 PASS 하는지 실증
+   - (e) **고의적 false positive PR** (예: shortcut 라벨 1글자 변경) 로 r1-guard 가 실제 fail 하는지 실증 후 revert (메인 ADR §결과·재검토 조건 메타 가드 충족)
+5. **CHANGELOG 박제** — Behavior Changes 섹션에 "R1 UI 회귀 가드 baseline 이 macOS → Linux CI 캡처본으로 전환. 로컬 macOS 검증 시 폰트 차이로 false positive 가능 — `SKIP_LOCAL=1` env var 또는 CI 결과 신뢰" 명시
+
+**참조 문서**:
+
+- 본 ADR (메인 + Amendment)
+- `bench-baseline-remeasure.yml` (패턴 참조)
+- volt #45 (workflow_dispatch 2단계 함정), volt #48 (CI 통과 ≠ 테스트 실행)
+
+**비-범위 (절대 손대지 말 것)**:
+
+- 메인 ADR §결정 1~5 본문 — Amendment 는 §결정 본문 변경 안 함 (OS 매트릭스 축 추가만)
+- pixel diff 임계값 변경 (0.5% → 1.0%) — 후보 A 미선택. 임계값 변경 필요 시 별도 amendment
+- 다른 R-Phase (R2~R10) baseline 캡처 — 본 인프라 도입 후 동일 패턴 재사용
+- macOS 개발 환경 폐기 — 후보 B 는 "CI 우선" 이지 "macOS 금지" 아님 (보조 검증 + 선택적 SKIP_LOCAL)
+
+### 교차검증 반영 사항
+
+본 Amendment 박제 직후 cross-validate 1회 (Gemini 2.5 Pro, 2026-04-26 08:16Z). outcome=applied. 로그: `.claude/logs/cross-validate-architecture-20260426-171643.log`.
+
+**Claude 자체 편향 4종 셀프 체크** (CLAUDE.md `## 교차검증`):
+
+- **낙관적 일정**: 통과 — mjs 변경 ≤ 5 라인 / workflow 신규 ≈ 100 라인 / ci.yml step 추가 ≈ 15 라인 보수적 추정
+- **결합 간과**: 통과 — `r1-baseline-bootstrap.yml` (workflow_dispatch + PR 자동 생성) ↔ `ci.yml` (PR check) 책임 직교화로 자동 동기화
+- **폐기 프레이밍**: 통과 — 후보 A/C 단순 폐기 아닌 재검토 트리거 박제 (false positive ≥ 2/PR 시 후보 C)
+- **순수주의** (호출 프롬프트 명시 질문): **부분 기각** — Gemini 가 "후보 B 채택은 실용적이고 현명" + "SKIP_LOCAL 까지 마련한 것은 뛰어난 통찰" 로 평가. 1인 개발 + AI 페어 컨텍스트에서 macOS 마찰 < CI 정합성 우선이라는 Claude 판단을 외부 시각이 지지
+
+**합의** — Claude 설계와 일치 + 본 Amendment 에 즉시 반영:
+
+- **Workflow 책임 분리** (§결정 2) — Gemini 가 "각 책임과 권한을 명확히 분리하여 구조적 완성도를 높였습니다" 합의. 생산자(`r1-baseline-bootstrap.yml`)-소비자(`ci.yml`) 패턴 명시
+- **CI 환경을 Source of Truth (§결정 1, 후보 B)** — Gemini 가 "실용적이고 현명한 결정. 로컬 macOS 환경 마찰을 예측하고 SKIP_LOCAL 회피 전략까지 마련한 것은 뛰어난 통찰" 강하게 합의
+- **워크플로우 권한 최소화** (§결정 2) — Gemini 가 "Baseline 생성 워크플로우에만 contents:write/pull-requests:write 부여, ci.yml 은 read-only 유지는 훌륭한 보안 설계" 합의
+- **재검토 트리거 박제** (§결정 1 대안 채택 조건) — Gemini 가 "재검토 조건의 구체성 (false positive 비율, CI 5분 초과 등) 이 노후화 대응 제도적 장치" 합의
+
+**이견 수용 (Gemini 고유 발견 — 본 Amendment 에 즉시 반영)**:
+
+- **`.gitignore` 에 `apps/web/scripts/__diff__/` 추가 (Gemini 개선 제안 1)** — Claude 원안 누락. CI 실패 시 생성되는 diff 이미지가 로컬 개발 환경에 잔존해 의도치 않은 커밋 위험. **수용** — Developer 인계 단계에 `.gitignore` 항목 추가 명시 박제
+- **`BASE_URL` 환경변수 계약 명시 (Gemini 개선 제안 2)** — Claude 원안은 `r1-ui-regression-guard.mjs` 라인 33 의 default 값 (`http://localhost:3000`) 만 박제. CI step 에서 `BASE_URL=http://localhost:3001` 오버라이드 시 환경변수 계약이 명시적이지 않음. **수용** — mjs 헤더 주석에 `BASE_URL` 계약 명시 의무를 Developer 인계에 추가
+
+**Claude 재분석으로 기각한 Gemini 제안**:
+
+- **Animation timing 회귀 감지 (`getAnimations().map(a => a.finished)`)** — 메인 ADR §재검토 트리거 4 에 이미 박제 ("pixel diff 가 missing 한 회귀 (예: animation timing 변경) 가 발생 — DOM 시맨틱 회귀 검증 추가 도입 ADR"). 본 Amendment 범위 밖 + 메인 ADR 의 R1 비-범위 (DOM 시맨틱 회귀 미도입). **기각 근거**: 메인 ADR 본문 검토 누락
+- **Retina/HiDPI `deviceScaleFactor: 1` 고정** — `r1-ui-regression-guard.mjs` 라인 131 에 이미 박제 (`deviceScaleFactor: 1`). **기각 근거**: 코드 미검토. 후보 B 채택으로 CI Linux 가 표준 해상도이므로 추가 보강 불필요
+
+**고유 발견 (후속 분리)**:
+
+- **fork PR 보안 가드 (`if: github.repository == 'owner/repo'`)** — 현재 astro-simulator 는 단일 owner repo + private dev 컨텍스트. fork PR 시나리오 부재. 본 Amendment 범위 밖 (보안 강화). **분리 권고**: future fork-friendly 전환 시점에 검토. 우선순위: low
+- **신규 viewport 추가 가이드라인 (`__baselines__/{width}x{height}/...` 컨벤션 문서화)** — R1 비-범위 (R2~R10 진입 시점에 결정). 메인 ADR §결과·재검토 조건 에 viewport 매트릭스 폭발 시 후보 C 재검토 트리거 박제됨. **분리 권고**: R2 PR 진입 시점에 가이드라인 ADR. 우선순위: low
+
+### 교차검증 반영 → §Developer 인계 보강 (이견 수용)
+
+위 "이견 수용" 2건은 §Developer 인계 의 단계에 다음 항목으로 추가:
+
+- **추가 단계 (mjs 작성/수정 시)**: `apps/web/scripts/r1-ui-regression-guard.mjs` 헤더 주석에 환경변수 계약 명시 — `BASE_URL` (기본 `http://localhost:3000`, CI 에서 `http://localhost:3001` 등 오버라이드 가능), `SKIP_LOCAL=1` (선택사항, macOS darwin 한정 즉시 PASS)
+- **추가 단계 (`.gitignore` 보강)**:
+  ```
+  # R1 UI 회귀 가드 — 실패 시 생성되는 diff PNG (CI artifact 업로드 후 폐기)
+  apps/web/scripts/__diff__/
+  ```
+
+---
