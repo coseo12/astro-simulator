@@ -16,6 +16,8 @@ Semantic Versioning을 따른다.
 
 ### Notes
 
+- **R2 baseline 갱신 + Amendment v4 Concrete Prediction 정정 (R2 후속 사이클, 2026-04-28)** — PR [#363](https://github.com/coseo12/astro-simulator/pull/363) 머지 후 발견된 r1-guard step 5 의도된 FAIL 해소. shortcut-bar 3 viewport (의도 변경 = mercury 5번째 버튼) **+** top-nav 3 viewport (DOM nesting 부수효과 = `<header data-r1-region="top-nav">` 내부에 shortcut-bar 가 child) = **6 PNG 동시 갱신**. hud-top-right / hud-bottom-right 6장은 변경 0 (D-R2 R1 회귀 0 검증). Linux CI `r1:baseline-bootstrap` workflow_dispatch 산출본 사용 (macOS local `--update` 는 폰트 false positive 박제 위험으로 차단)
+- **Amendment v4 Concrete Prediction 정정** — 원안 "shortcut-bar 3장만 변경, 다른 9장 변경 0" 이 DOM nesting 가정 누락. 정정: "shortcut-bar 3장 + top-nav 3장 = 6장 동시 갱신 (R3~R10 SSoT)". §위험·미해결 에 nesting 부수효과 박제 + §재검토 트리거 #5 (DOM nesting 가정 무효화) 추가
 - **shortcut-bar baseline 갱신은 별도 commit 또는 후속 PR 분리** — Amendment v4 §결정 2 5단계 적용. macOS local 환경에서 `r1-ui-regression-guard.mjs --update` 실행 시 의도 외 영역 (top-nav / hud-top-right / hud-bottom-right) 도 폰트 차이로 갱신 → Linux CI 환경에서만 정합. 본 PR 의 머지 전 reviewer 단계에서 CI green 확인 후 baseline 갱신 절차 별도 진행
 - **BODY_SCALE.mercury default 1.0 fallback 테스트 제거** — `body-scale.test.ts` 의 "미정의 body default 1.0" 테스트에서 mercury 사례 삭제 + 다른 body (earth / jupiter / unknown) 로 일반화. R3+ 추가 시 동일 패턴 갱신 의무
 - **r2-focus-race-guard.mjs 의 시나리오 3 (Animation tween spy) 환경 의존 skip** — Babylon 글로벌 (`window.BABYLON`) 미노출 환경 (현재 ESM module 빌드) 에서는 spy 설치 불가, soft skip 처리. 시나리오 1, 2 가 race 회귀 가드 본질 (store sync + camera 변화) 보장
@@ -25,6 +27,7 @@ Semantic Versioning을 따른다.
 
 - **ADR `20260428-r2-mercury-visualization.md` 신규** ([#361](https://github.com/coseo12/astro-simulator/issues/361)) — 632 라인. R2 시각화 결정 5건 통합 (mercuryScale=8500 / shortcut-bar / orbit 라인 / focus race / info 패널). 11 후보 × 3 viewport mercuryScale 산출표. R3 Concrete Prediction (코드 변경 ≤ 2 라인 + 단서 조항: venus 머티리얼 분기 예외). Gemini cross-validate 합의 (Q1/Q4 산출 정합 / Q3 R3 단서 조항 추가) + 후속 이슈 #362 (R1 sun 1920×1080 점유율 정정)
 - **ADR `20260425-r1-ui-pixel-diff-guard.md` Amendment v4** ([#357](https://github.com/coseo12/astro-simulator/issues/357), [#361](https://github.com/coseo12/astro-simulator/issues/361)) — 192 라인. sentinel 정책 amendment + shortcut-bar baseline 갱신 절차 (Q3=B 통합). 후보 (d) 수동 검토 분리 채택 + R2 직접 적용 5단계 + R3~R10 패턴 SSoT
+- **ADR `20260425-r1-ui-pixel-diff-guard.md` Amendment v4 Concrete Prediction 정정** (R2 후속 #361, 2026-04-28) — §결과·재검토 조건 §"Concrete Prediction (R2 PR 자동 재현) — 2026-04-28 정정" + §위험·미해결 nesting 부수효과 bullet + §재검토 트리거 #5 추가. 원안 "shortcut-bar 3장만 변경" → 정정 "shortcut-bar 3장 + top-nav 3장 = 6장 동시 갱신". DOM nesting (top-bar 가 shortcut-bar 의 부모) 자연 부수효과 박제. R3~R10 SSoT
 
 ## [0.14.0] — 2026-04-26
 
