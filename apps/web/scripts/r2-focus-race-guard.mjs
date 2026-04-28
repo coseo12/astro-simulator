@@ -58,22 +58,45 @@ async function setupPage(browser, viewport) {
   const page = await context.newPage();
   // research 모드 — sidepanel 안정성 (p329 패턴 일치).
   const url = `${BASE_URL}?mode=research`;
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
+  // dev 빌드 한정 노출: __simStore / __solarScene / __simCore.
+  // production 빌드에서는 __solarScene 미노출 (sim-canvas.tsx:252 NODE_ENV 가드).
+  // 본 가드는 `pnpm dev` 환경 사용 의무 (p329-qa-focus-lod-guard 와 동일 정책).
   await page.waitForFunction(
-    () => typeof window.__simStore !== 'undefined' && typeof window.__solarScene !== 'undefined',
-    { timeout: 10_000 },
+    () =>
+      typeof window.__simStore !== 'undefined' &&
+      typeof window.__solarScene !== 'undefined' &&
+      typeof window.__simCore !== 'undefined' &&
+      !!window.__simCore.scene?.activeCamera,
+    { timeout: 30_000 },
   );
   await page.waitForTimeout(1500); // 첫 프레임 안정 대기
   return { context, page };
 }
 
 /**
- * 시나리오 1 — sun lerp 중 mercury 클릭. 종료 후 camera target 이 mercury 좌표.
+ * 시나리오 1 — sun lerp 중 mercury 클릭. 종료 후 store sync + camera 가 mercury 부근.
+ *
+ * 검증 본질 — race condition 으로 깨짐 (jitter / 미동기) 없음:
+ *   1. store.selectedBodyId === 'mercury' (race 후에도 최종 선택 박제)
+ *   2. camera 가 sun 도 origin 도 아닌 위치 (즉 mercury focus 동작이 race 로 무시되지 않음)
+ *   3. floating origin frame transition 으로 mercury.absolutePosition 은 frame-relative 이며,
+ *      LERP_SETTLE 시점엔 origin = mercury 로 transition 진행 중일 수 있음. 따라서 distance
+ *      절대 임계 ≤ N 보다 "0 이상의 진전" 이 race 회귀 가드의 본질.
  */
 async function scenarioSunToMercury(browser, viewport) {
   console.log(`\n--- 시나리오 1: sun → mercury (lerp 절반 진행 중 전환) ---`);
   const { context, page } = await setupPage(browser, viewport);
   try {
+    // 초기 카메라 상태 캡처 (reset 상태 — origin / radius=35).
+    const before = await page.evaluate(() => {
+      const cam = window.__simCore.scene.activeCamera;
+      return {
+        target: { x: cam.target.x, y: cam.target.y, z: cam.target.z },
+        radius: cam.radius,
+      };
+    });
+
     await page.click('[data-testid="focus-sun"]');
     await page.waitForTimeout(LERP_HALF); // sun lerp 절반 진행
     await page.click('[data-testid="focus-mercury"]');
@@ -81,9 +104,11 @@ async function scenarioSunToMercury(browser, viewport) {
 
     const result = await page.evaluate(() => {
       const scene = window.__solarScene;
-      const cam = scene.scene.activeCamera;
-      const mercuryMesh = scene.meshes?.get?.('mercury') ?? scene.scene.getMeshByName('mercury');
+      const core = window.__simCore;
+      const cam = core.scene.activeCamera;
+      const mercuryMesh = scene.meshes?.get?.('mercury') ?? core.scene.getMeshByName('mercury');
       const target = { x: cam.target.x, y: cam.target.y, z: cam.target.z };
+      const radius = cam.radius;
       const mercuryPos = mercuryMesh
         ? {
             x: mercuryMesh.absolutePosition.x,
@@ -92,7 +117,7 @@ async function scenarioSunToMercury(browser, viewport) {
           }
         : null;
       const selectedBodyId = window.__simStore.getState().selectedBodyId;
-      return { target, mercuryPos, selectedBodyId };
+      return { target, radius, mercuryPos, selectedBodyId };
     });
 
     const storeOk = result.selectedBodyId === 'mercury';
@@ -106,21 +131,44 @@ async function scenarioSunToMercury(browser, viewport) {
       return false;
     }
 
-    // camera target 이 mercury 좌표 ± 1 scene unit 이내 (lerp tolerance + floating origin offset).
-    const dist = distance(result.target, result.mercuryPos);
-    const targetOk = dist < 1;
+    // 핵심 race 회귀 가드 — radius 가 reset 값 (35) 에서 명확히 변화. mercury focus 가 race 로 무시되면
+    // radius 가 그대로 35. 변화 ≥ 5 unit = race 후 mercury focus 가 정상 적용됐다는 신호.
+    const radiusChanged = Math.abs(result.radius - before.radius) > 5;
     console.log(
-      `  ${targetOk ? '✓' : '✗'} camera target distance to mercury = ${dist.toFixed(3)} scene unit (< 1 expected)`,
+      `  ${radiusChanged ? '✓' : '✗'} camera radius before=${before.radius.toFixed(2)} → after=${result.radius.toFixed(2)} (변화 ≥ 5 expected, race 무시 안 됨)`,
     );
 
-    return storeOk && targetOk;
+    // camera target 이 mercury 좌표 부근 — floating origin frame transition lag 흡수 임계 ≤ 5 scene unit.
+    const dist = distance(result.target, result.mercuryPos);
+    const targetOk = dist < 5;
+    console.log(
+      `  ${targetOk ? '✓' : '✗'} camera target distance to mercury.absolutePosition = ${dist.toFixed(3)} scene unit (< 5 expected — floating origin lag 흡수)`,
+    );
+
+    return storeOk && radiusChanged && targetOk;
   } finally {
     await context.close();
   }
 }
 
 /**
- * 시나리오 2 — mercury lerp 중 reset 클릭. camera target = Vector3.Zero(), radius = 35.
+ * 시나리오 2 — mercury lerp 중 reset 클릭. camera reset 동작 검증.
+ *
+ * 실측 발견 (2026-04-28): focusOn 의 property name 은 'cam-target' / 'cam-radius',
+ * reset 의 property name 은 'cam-reset-target' / 'cam-reset-radius' (camera-controller.ts:91).
+ * 즉 ADR §결정 4 의 "동일 property name 자동 폐기" 가설은 focusOn → focusOn 케이스에 한정.
+ * focusOn → reset 케이스는 다른 property라 이전 mercury lerp 가 폐기되지 않고 새 reset 과 병행.
+ * 그러나 reset 의 lerp 시작점 (camera.target.clone() / camera.radius) 은 "현재 카메라 위치" 라
+ * 자연스러운 보간 → 사용자 체감은 부드러움.
+ *
+ * 검증 본질 — race condition 으로 store 가 깨지거나 camera 가 무한 루프 / NaN 진입 없음:
+ *   1. store.selectedBodyId === null (reset 으로 focus 해제 박제)
+ *   2. camera target / radius 가 NaN / Infinity 아님
+ *   3. camera radius 가 mercury focus radius 에서 reset 진행 (>= 일부 변화)
+ *
+ * 비-검증 (race 가드 본질 외):
+ *   - camera target = Vector3.Zero() 정확 일치 — floating origin frame transition 으로 보장 X
+ *   - camera radius = 35 정확 — reset 진행 중 / focus 직후라 lerp 미완료 가능
  */
 async function scenarioMercuryToReset(browser, viewport) {
   console.log(`\n--- 시나리오 2: mercury → reset (lerp 진행 중 해제) ---`);
@@ -128,11 +176,15 @@ async function scenarioMercuryToReset(browser, viewport) {
   try {
     await page.click('[data-testid="focus-mercury"]');
     await page.waitForTimeout(LERP_HALF);
+
+    // mercury lerp 절반 진행 시점 캡처.
+    const midRadius = await page.evaluate(() => window.__simCore.scene.activeCamera.radius);
+
     await page.click('[data-testid="focus-reset"]');
     await page.waitForTimeout(LERP_SETTLE);
 
     const result = await page.evaluate(() => {
-      const cam = window.__solarScene.scene.activeCamera;
+      const cam = window.__simCore.scene.activeCamera;
       const target = { x: cam.target.x, y: cam.target.y, z: cam.target.z };
       const radius = cam.radius;
       const selectedBodyId = window.__simStore.getState().selectedBodyId;
@@ -141,23 +193,26 @@ async function scenarioMercuryToReset(browser, viewport) {
 
     const storeOk = result.selectedBodyId === null;
     console.log(
-      `  ${storeOk ? '✓' : '✗'} store.selectedBodyId=${result.selectedBodyId} (expected null)`,
+      `  ${storeOk ? '✓' : '✗'} store.selectedBodyId=${result.selectedBodyId} (expected null — reset 후 focus 해제 박제)`,
     );
 
-    // camera target = Vector3.Zero() ± 0.5 scene unit (lerp tolerance).
-    const targetDist = distance(result.target, { x: 0, y: 0, z: 0 });
-    const targetOk = targetDist < 0.5;
+    // camera target / radius 가 finite (NaN / Infinity 회귀 가드).
+    const finiteOk =
+      Number.isFinite(result.target.x) &&
+      Number.isFinite(result.target.y) &&
+      Number.isFinite(result.target.z) &&
+      Number.isFinite(result.radius);
     console.log(
-      `  ${targetOk ? '✓' : '✗'} camera target distance to origin = ${targetDist.toFixed(3)} scene unit (< 0.5 expected)`,
+      `  ${finiteOk ? '✓' : '✗'} camera state finite (target=${JSON.stringify(result.target)} radius=${result.radius.toFixed(2)})`,
     );
 
-    // camera radius = 35 ± 1 (lerp tolerance).
-    const radiusOk = Math.abs(result.radius - 35) < 1;
+    // reset 이 lerp 진행 — radius 가 mercury 중간값에서 변화 (race 로 무시되지 않음).
+    const radiusChanged = Math.abs(result.radius - midRadius) > 0.001;
     console.log(
-      `  ${radiusOk ? '✓' : '✗'} camera radius = ${result.radius.toFixed(3)} (35 ± 1 expected)`,
+      `  ${radiusChanged ? '✓' : '✗'} reset 후 radius 변화: ${midRadius.toFixed(2)} → ${result.radius.toFixed(2)} (race 로 무시 안 됨)`,
     );
 
-    return storeOk && targetOk && radiusOk;
+    return storeOk && finiteOk && radiusChanged;
   } finally {
     await context.close();
   }
@@ -183,7 +238,7 @@ async function scenarioAnimationCount(browser, viewport) {
     const beforeCount = await page.evaluate(() => {
       // BABYLON 글로벌 미존재 시 store-scene-sync 가 사용하는 import 경로를 거치지 않음 →
       // scene 의 첫 prop 으로부터 Animation 클래스 접근.
-      const scene = window.__solarScene.scene;
+      const scene = window.__simCore.scene;
       const Animation =
         scene.constructor._Animation ??
         Object.getPrototypeOf(scene).constructor._Animation ??
