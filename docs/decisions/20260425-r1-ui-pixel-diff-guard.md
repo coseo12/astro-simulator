@@ -881,6 +881,7 @@ Amendment 1 §결정 2 의 부트스트래핑 절차 (a)~(e) 는 **단일 PR 로
    - R1 diff 이미지 업로드 — fail 시에만 trigger (정상 PR 에서는 skip)
 6. **메타 가드 실증** — 본 PR 머지 후 별도 PR 로 §"메타 가드 실증 절차 박제" (1)~(5) 수행
 7. **CHANGELOG `[Unreleased]` `### Behavior Changes` 박제** — 예시:
+
    ```markdown
    ### Behavior Changes
 
@@ -941,5 +942,196 @@ Amendment 1 §결정 2 의 부트스트래핑 절차 (a)~(e) 는 **단일 PR 로
    - 본문 핵심: Gemini 설계 스케치 + Builds on: #348 + 우선순위 low + ci.yml read-only 원칙 침범 트레이드오프 박제
 
 후속 이슈 생성은 본 ADR Amendment v3 머지 직후 architect 또는 메인 오케스트레이터 책임 (CLAUDE.md `### 교차검증` §"분리 시 박제 규칙" — 즉시 생성 의무, 맥락 유실 방지).
+
+---
+
+## Amendment v4 2026-04-28 — sentinel 정책 + shortcut-bar baseline 갱신 절차 (#357 + R2 #361 Q3=B 통합)
+
+- **상태**: Accepted (Amendment v4)
+- **날짜**: 2026-04-28
+- **결정자**: architect (#361 R2 PM 합의 라운드 2 후 위임 — Q3=B 통합)
+- **트리거**: #357 본문 §"다음 진입 트리거" 의 3 조건 중 R2 (수성 가시성) 진입 충족 — "R2 진입 시 baseline 재구성 필요 → sentinel 정책 동시 재검토"
+- **메인 ADR §결정 본문 보존**: 본 v4 도 §결정 1~5 / Amendment 1 / v2 / v3 어떤 항목도 변경하지 않는다. **sentinel 정책 amendment + shortcut-bar baseline 갱신 절차 박제** 만 추가
+- **자매 결정**: [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) — R2 시각화 결정 4건 (mercuryScale / shortcut / orbit / focus race) 동반 박제
+
+### 사전 조건 충족 확인
+
+- ✓ Amendment v3 머지 완료 (PR [#354](https://github.com/coseo12/astro-simulator/pull/354) commit `9481c9d`) — ci.yml r1-guard step 5 통합 + Linux baseline 정합
+- ✓ R1 sentinel 4 영역 baseline 12 PNG (4 영역 × 3 viewport) — Linux 캡처본 박제 (PR #351)
+- ✓ R2 PM 합의 #361 본문 — Q3=B 박제 (sentinel 정책 amendment + baseline 갱신 절차 R2 와 통합)
+- ✓ #357 본문 §"핵심 발견" — positive control 1차 미확보 분석 (해석 A "가드 둔감" vs 해석 B "정상 동작" 판정 보류 → 본 v4 가 판정)
+- ✓ 인계 항목 실측 재검증 (CLAUDE.md NO-OP ADR 패턴): 현재 sentinel 정책 (4 영역 × 0.5% 임계) 이 R2 shortcut-bar 항목 추가 (mercury) 시 baseline mismatch 유발 — 실제 갱신 필요. NO-OP 미해당
+
+### #357 후보 비교 — 4 옵션
+
+이슈 #357 본문 §"후보 안" 의 3 후보 + R2 통합 옵션:
+
+| 후보                                                                       | 내용                                                                           | R2 즉각 해소                                             | R3~R10 일반화                                        | 평가                                                                                                               |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **(a) 정책 변경** — sentinel 4개 → 5개 (수성 추가) 또는 redefine           | 새 sentinel 도입 (예: "R-Phase 활성 body indicator")                           | 부분 — 영역 1개 추가는 가능하나 shortcut-bar 갱신은 별도 | △ — body 마다 sentinel 추가 시 N 비대화              | **탈락** — 영역 추가는 회귀 가드 비용 증가, R10 누적 시 14 sentinel 비대                                           |
+| (b) 임계값 조정 — 0.5% → 0.1% 강화                                         | 1글자 변경도 잡음                                                              | △ — 임계 강화는 baseline 갱신 절차와 직교                | △ — false positive 증가 위험 (i18n 갱신 / 폰트 차이) | **탈락 (보류)** — #357 후보 B. 메타 가드 실증 미완 + false positive 증가 위험. v3 §재검토 트리거 #4 로 이미 박제됨 |
+| **(c) baseline 갱신 자동화** — `--update` 자동 트리거                      | "shortcut-bar 항목 추가 시" 자동 갱신 PR 생성                                  | ✓ — R2 shortcut-bar 갱신 즉시 해소                       | ✓ — R3~R10 동일 패턴 자동                            | △ 위험 — 자동 갱신은 의도 변경 vs 회귀 구분 인간 검증 우회 (false negative 무시 위험 ↑)                            |
+| **(d) 수동 검토 분리** (선택) — baseline 갱신 commit 을 별도 reviewer 단계 | shortcut-bar 항목 추가 시 별도 commit + 별도 reviewer pass + PR 본문 사유 명시 | ✓ — R2 직접 적용                                         | ✓ — R3~R10 동일 절차 재현                            | **선택** — 의도 변경 명시 박제 + 회귀 차단 + ADR §축 6 후보 B (`--update` 플래그 + PR 본문 사유) 확장              |
+
+### 선택: **후보 (d) — 수동 검토 분리 + Amendment v3 §축 6 후보 B 확장**
+
+근거:
+
+1. **메인 ADR §축 6 후보 B 와 정합** — "명시적 `--update` 플래그 + PR 본문 명시" 가 baseline 갱신 정책 박제됨. v4 는 그 위에 **"shortcut-bar 갱신 commit 분리 + reviewer pass 의무"** 만 추가 (절차 강화)
+2. **자동화 (c) 는 false negative 무시 위험** — Gemini 합의 (메인 ADR §교차검증 메타 #1 메타 가드 실증) 의 핵심 우려: 자동 갱신은 메타 가드 (의도된 회귀 검출) 를 약화시킴. 본 amendment 는 회귀 가드 메타-검증을 보존
+3. **R2 즉각 해소** — Q3=B PM 합의가 본 amendment 에 박제되어 R2 PR 의 shortcut-bar baseline 갱신이 명확한 절차로 가능
+4. **R3~R10 패턴 SSoT** — 본 amendment 가 R3~R10 의 shortcut-bar / 다른 sentinel 영역 갱신 절차로 재사용 가능. 매 R-Phase 마다 amendment 재박제 불요
+5. **#357 의 해석 A vs B 판정 보류 → 본 v4 가 자연 판정** — "1글자 텍스트 변경 (예: `태양 → 태앙`) 은 의도 변경 (i18n / 오탈자 수정) 일 수 있고 0.5% 임계는 이런 노이즈를 의도적으로 흡수 = 정상 동작 (해석 B 채택)" 박제. 후보 (b) 임계 강화는 별도 메타 가드 실증 PR 후 재검토 (v3 §재검토 트리거 #4)
+
+### 결정
+
+#### 결정 1 — sentinel 정책 amendment (R2~R10 일관성 박제)
+
+**기존 4 sentinel 정책 유지**:
+
+- `top-nav` / `shortcut-bar` / `hud-top-right` / `hud-bottom-right` 4 영역 (메인 ADR §축 4 박제)
+- 임계값 0.5% (메인 ADR §축 2 박제) — 본 v4 에서 변경 없음 (해석 B 채택)
+
+**R2~R10 sentinel 추가 정책**:
+
+- 신규 sentinel 영역 추가 시 **별도 amendment 필요** (예: R5 진입 시 "satellite-info-panel" 영역 추가가 필요해지면 v5 amendment)
+- R2 shortcut-bar 항목 추가 (5 → 6 버튼) 는 **기존 sentinel 영역 안에서 baseline 갱신**. 영역 정의 (`r1-ui-regions.mjs` 의 `R1_UI_REGIONS`) 변경 0
+- shortcut-bar selector (`[data-r1-region="shortcut-bar"]`) 가 동적 가로폭이므로 selector 우선 + fallback null 정책 (메인 ADR §결정 2) 그대로 유지 — R2 mercury 버튼 추가로 가로폭 증가하지만 selector 가 자동 추적
+
+#### 결정 2 — shortcut-bar baseline 갱신 절차 (R2 직접 적용)
+
+R2 PR 에서 다음 5 단계 의무 수행:
+
+1. **R2 코드 변경 commit 1** — `body-scale.ts` mercury 추가 + `focus-quick-buttons.tsx` FOCUS_BUTTONS 수정 + 기타 회귀 가드 추가 (E2E 테스트 등)
+2. **r1-guard 실측** — `pnpm verify:r1-guard` 실행. shortcut-bar 영역 mismatch 가 0.5% 초과 (의도 변경) 확인 → FAIL 출력 정합. 다른 3 영역 (top-nav / hud-top-right / hud-bottom-right) 은 PASS 유지 의무 (R1 회귀 0)
+3. **별도 commit 으로 baseline 갱신** — `pnpm verify:r1-guard --update --viewport=1280x720` / `--viewport=1920x1080` / `--viewport=375x667` 3회 실행 (또는 `--update` 단일 호출이 3 viewport 동시 갱신 시 1회). 갱신된 PNG 12장 (4 영역 × 3 viewport) 중 **shortcut-bar 3장만 변경, 다른 9장 변경 0** (Concrete Prediction). git status / diff 로 확인
+4. **별도 commit 메시지 박제** — 단일 baseline 갱신 commit 분리:
+
+   ```
+   chore(r1-guard): [#361] R2 shortcut-bar baseline 갱신 — 수성 항목 추가
+
+   R2 PM 합의 (#361 Q3=B) + ADR Amendment v4 절차 적용:
+   - shortcut-bar baseline 3 viewport 갱신 (sun → sun + mercury 5 버튼)
+   - 다른 3 영역 (top-nav / hud-top-right / hud-bottom-right) 변경 0
+   - mismatch 사유: 의도된 UI 변경 (수성 항목 추가, R-Phase R2 진입)
+
+   ADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment v4
+   ```
+
+5. **PR 본문 박제 (CLAUDE.md 스프린트 §7 3 위치 동시)** —
+   - PR 본문 `### Behavior Changes` 에 "shortcut-bar baseline 갱신 (R2 mercury 항목 추가)" bullet
+   - CHANGELOG `### Behavior Changes` 에 동일 bullet
+   - shortcut-bar baseline 갱신 commit 의 commit message 본문 (위 4단계)
+
+#### 결정 3 — reviewer 의무 (수동 검토 분리)
+
+baseline 갱신 commit 은 reviewer 단계에서 다음 검증 의무:
+
+1. **갱신 범위 확인** — `git show <baseline-commit> --stat` 으로 변경된 PNG 가 **shortcut-bar 3장만** 인지 확인. 다른 9장이 변경됐다면 reviewer 가 "의도 외 회귀" 로 차단
+2. **PR 본문 사유 명시 확인** — "수성 항목 추가" 같은 의도된 변경 사유가 PR 본문에 박제됐는지 확인. 사유 박제 없는 baseline 갱신 = 차단
+3. **다른 3 영역 회귀 0 확인** — `pnpm verify:r1-guard` 가 baseline 갱신 후 PASS 인지 확인 (mismatch ≤ 0.5%). FAIL 이면 의도 외 회귀 잔존
+
+reviewer 가 위 3 검증 통과한 후에만 머지 승인. 자동화는 본 amendment 범위 외 (c) 후보 — 메타 가드 무시 위험
+
+#### 결정 4 — R3~R10 패턴 재사용 (SSoT)
+
+R3~R10 진입 시 **본 amendment 의 결정 1~3 절차 재현**:
+
+- shortcut-bar 항목 추가 (R3 venus / R4 earth 이미 있음 / R5 mars / ...) 시 **결정 2** 5 단계 동일 적용
+- 새 sentinel 영역 도입이 필요해지면 **별도 amendment** (v5+) 박제 — 본 v4 는 영역 정의 변경 안 함
+- 임계값 변경 (0.5% → 0.1%) 검토는 **메인 ADR §재검토 트리거 #4** 별도 amendment
+
+### 결과·재검토 조건
+
+#### Concrete Prediction (R2 PR 자동 재현)
+
+```bash
+# R2 PR 의 baseline 갱신 commit 검증:
+git show <baseline-commit> --stat -- apps/web/scripts/__baselines__/r1/
+
+# 예상 출력:
+#  apps/web/scripts/__baselines__/r1/1280x720/shortcut-bar.png   | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/1920x1080/shortcut-bar.png  | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/375x667/shortcut-bar.png    | Bin xxx -> yyy bytes
+#  3 files changed
+# (다른 9장 = 변경 0)
+
+# 다른 sentinel 영역 회귀 0:
+pnpm verify:r1-guard
+# Expected: 4 영역 × 3 viewport = 12 PASS (mismatch ≤ 0.5%)
+```
+
+Prediction 실패 시:
+
+- (a) 다른 영역 PNG 도 변경됨 → R2 가 의도 외 UI 회귀 유발 (예: top-nav 가 함께 변경) → reviewer 차단 + 원인 분석
+- (b) baseline 갱신 후에도 mismatch 잔존 → 갱신 절차 자체 실패 (예: viewport 별 selector 불일치) → 본 amendment 절차 보강
+
+#### 회귀 가드
+
+- **R2 PR 의 r1-guard step 5 (CI)** PASS — Amendment v3 §결정 의 step 통합과 동일 동작
+- **shortcut-bar baseline 갱신 commit 분리** — `git log --oneline -- apps/web/scripts/__baselines__/r1/` 로 R2 PR 의 baseline 갱신 commit 이 단일 commit 으로 분리됐는지 확인
+- **메타 가드 무시 안 됨** — Amendment v3 §교차검증 §"고유 발견 (후속 분리)" #1 의 "메타 가드 자동화 카나리아 테스트" 와 본 amendment 의 (d) 수동 검토 분리는 정합 — 메타 가드 자동화는 false positive 검증을 자동화하지만 baseline 갱신 자체는 수동 절차 (인간 검증) 보존
+
+#### 재검토 트리거
+
+다음 조건 중 하나면 본 v4 amendment 재검토 (v5 또는 신 ADR):
+
+1. **R3~R10 진행 중 sentinel 영역 추가 필요** — 4 → 5 영역 등 영역 정의 변경 트리거. v5 amendment 박제 + `r1-ui-regions.mjs` 갱신
+2. **임계값 0.5% 의 false negative / false positive 사례 누적** — 메인 ADR §재검토 트리거 #4 와 동일. v5 amendment 또는 임계값 강화 별도 ADR
+3. **자동 갱신 (c) 후보 재검토 트리거** — baseline 갱신 빈도가 R-Phase 마다 N 회 누적되어 수동 절차가 ROI 미달이면 (c) 후보 재검토. 단 false negative 무시 위험 차단을 위해 "자동 갱신 PR + 인간 reviewer 의무" 패턴 (자동화 + 수동 검증 결합) 으로 박제 가능
+4. **#357 의 다른 진입 조건 충족** — false negative 사례 1건 또는 false positive 사례 3건+ 누적 시 재검토. 본 v4 는 R2 진입 트리거만 처리, 다른 트리거 별도 amendment
+
+### 위험 / 미해결
+
+- **shortcut-bar 영역 selector 안정성** — `[data-r1-region="shortcut-bar"]` selector 가 R2 mercury 버튼 추가로 가로폭 증가하지만 자동 추적 가능. 단 미래 layout 변경 (예: shortcut-bar 가 sidebar 로 이동) 시 selector 무효화 가능. 그 시점에 v5 amendment 또는 selector 갱신
+- **baseline PNG diff 가독성** — git LFS 미사용 + Binary diff 출력. reviewer 가 "shortcut-bar 갱신이 mercury 추가만인지" 시각 확인하려면 PR 본문에 inline 이미지 또는 GitHub artifact 다운로드 필요. Amendment v3 §교차검증 §"고유 발견 (후속 분리)" #2 (PR 코멘트 inline 이미지) 와 정합 — 후속 이슈
+- **viewport 별 PNG 수동 갱신 부담** — `--viewport=` 옵션 3회 실행 또는 `--update` 단일 (3 viewport 자동) 절차가 R10 누적 시 부담. R5+ 진입 시 ROI 재평가 (위 §재검토 트리거 #3)
+
+### Developer 인계 (Amendment v4 추가분)
+
+본 amendment 의 implementer (R2 #361 PR developer) 의무:
+
+1. **R2 시각화 PR 의 baseline 갱신 commit 분리** — 본 amendment §결정 2 의 5 단계 절차 의무 수행. shortcut-bar 갱신 commit 1개 분리 (단, ROI 가 매우 낮으면 R2 시각화 commit 과 합칠 수 있음 — 단 PR 본문에 명시)
+2. **PR 본문 박제 의무** — `### Behavior Changes` 에 "shortcut-bar baseline 갱신 — R2 수성 항목 추가" bullet
+3. **CHANGELOG 동기 박제** — CLAUDE.md 스프린트 §7 3 위치 동시 박제 의무
+4. **reviewer 검증 의무 안내** — PR 본문에 "reviewer 검증 의무: ① shortcut-bar 3장만 변경 확인 ② PR 본문 사유 명시 확인 ③ 다른 영역 회귀 0 확인" 명시
+5. **r1-guard step 통과** — Amendment v3 의 ci.yml 5 step 정합 (CI green)
+
+**비-범위** (절대 손대지 말 것):
+
+- 메인 ADR §결정 1~5 / Amendment 1 / v2 / v3 본문 — 본 v4 는 §결정 본문 변경 안 함
+- `r1-ui-regions.mjs` 의 `R1_UI_REGIONS` 영역 정의 — 0 변경 (4 영역 유지)
+- 임계값 0.5% — 0 변경 (해석 B 채택, 변경 별도 amendment)
+- 다른 sentinel 영역의 baseline (top-nav / hud-top-right / hud-bottom-right) — R2 PR 에서 0 변경 의무 (Concrete Prediction 검증)
+- 자동 갱신 인프라 — (c) 후보 채택 안 함, 별도 amendment 또는 후속 이슈
+
+### 교차검증 반영 사항
+
+본 v4 박제 직후 cross-validate 1회 호출 예정 (Gemini 2.5 Pro). 자매 결정 [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) 와 통합 호출 (1회) 또는 분리 호출 (2회) — architect 자체 판단으로 통합 호출 (R2 PR 의 단일 결정 단위로 묶음).
+
+**Claude 자체 편향 4종 셀프 체크**:
+
+- **낙관적 일정 ✓** — baseline 갱신 commit 분리는 R2 PR 의 단일 commit 추가. 일정 영향 미미
+- **결합 간과 △** — sentinel 정책 변경 없이 절차 강화만 박제 → 결합 위험 낮음. 단 reviewer 가 시각 검증 못 하면 (binary diff) 메타 가드 실증 약화 가능 — cross-validate 호출 프롬프트에 명시 질문 삽입
+- **폐기 프레이밍 ✓** — (a)/(b)/(c) 후보 비교 명시, 폐기 사유 박제 (false negative 위험 등)
+- **순수주의 △** — "수동 검토 = 절대 안전" 사후 정당화 가능성. 자동화 후보 (c) 의 ROI 재검토 트리거 명시 박제 + (a)/(b) 의 선택 시점 트리거 박제로 균형. cross-validate 호출 프롬프트에 명시 질문 삽입
+
+cross-validate 결과는 본 §"교차검증 반영 사항" 의 합의/이견/고유발견 4 서브섹션으로 박제 (호출 후 추가 commit). outcome 라벨링: `applied` / `429-fallback-claude-only` / `fatal-error` 중 1개.
+
+#### 합의 — Claude 설계와 일치 + 본 amendment 에 반영
+
+(cross-validate 호출 후 박제)
+
+#### 이견 수용 — Claude 원안 보강
+
+(cross-validate 호출 후 박제)
+
+#### Claude 재분석으로 기각한 Gemini 제안
+
+(cross-validate 호출 후 박제)
+
+#### 고유 발견 (후속 분리)
+
+(cross-validate 호출 후 박제)
 
 ---
