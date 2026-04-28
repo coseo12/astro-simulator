@@ -5,6 +5,7 @@ import { useSimCommand } from '@/core/sim-context';
 
 const FOCUS_BUTTONS = [
   { id: 'sun', label: '태양' },
+  { id: 'mercury', label: '수성' }, // R2 #361 — sun 다음 천체 거리 순
   { id: 'earth', label: '지구' },
   { id: 'jupiter', label: '목성' },
   { id: 'neptune', label: '해왕성' },
