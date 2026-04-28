@@ -1043,28 +1043,52 @@ R3~R10 진입 시 **본 amendment 의 결정 1~3 절차 재현**:
 
 ### 결과·재검토 조건
 
-#### Concrete Prediction (R2 PR 자동 재현)
+#### Concrete Prediction (R2 PR 자동 재현) — **2026-04-28 정정 (R2 #363 머지 후 실측)**
+
+> **정정 사유**: 본 amendment 의 원안 prediction 은 "shortcut-bar 3장만 변경, 다른 9장 변경 0" 이었으나 R2 PR [#363](https://github.com/coseo12/astro-simulator/pull/363) Linux CI 실측에서 **`top-nav` 영역이 DOM nesting 부수효과로 함께 변경**됨이 발견됨. DOM 구조: `<header data-r1-region="top-nav">` (apps/web/src/components/layout/top-bar.tsx:11) 의 `{left}` 슬롯에 `<div data-r1-region="shortcut-bar">` 가 child 로 배치 — shortcut-bar 너비 변경 (160→188px / 105→122px) 이 부모 top-nav 영역 픽셀에 자연 반영. 정정 전·후 비교 박제 (CLAUDE.md 스프린트 §7 3 위치 박제 정합).
+
+**원안 (폐기)**:
 
 ```bash
-# R2 PR 의 baseline 갱신 commit 검증:
-git show <baseline-commit> --stat -- apps/web/scripts/__baselines__/r1/
-
-# 예상 출력:
+# 예상 출력 (폐기):
 #  apps/web/scripts/__baselines__/r1/1280x720/shortcut-bar.png   | Bin xxx -> yyy bytes
 #  apps/web/scripts/__baselines__/r1/1920x1080/shortcut-bar.png  | Bin xxx -> yyy bytes
 #  apps/web/scripts/__baselines__/r1/375x667/shortcut-bar.png    | Bin xxx -> yyy bytes
 #  3 files changed
 # (다른 9장 = 변경 0)
+```
+
+**정정 후 (R3~R10 SSoT)**:
+
+```bash
+# R-Phase shortcut-bar 항목 추가 PR 의 baseline 갱신 commit 검증:
+git show <baseline-commit> --stat -- apps/web/scripts/__baselines__/r1/
+
+# 예상 출력 (정정):
+#  apps/web/scripts/__baselines__/r1/1280x720/shortcut-bar.png   | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/1920x1080/shortcut-bar.png  | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/375x667/shortcut-bar.png    | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/1280x720/top-nav.png        | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/1920x1080/top-nav.png       | Bin xxx -> yyy bytes
+#  apps/web/scripts/__baselines__/r1/375x667/top-nav.png         | Bin xxx -> yyy bytes
+#  6 files changed
+# (다른 6장 = hud-top-right / hud-bottom-right × 3 viewport = 변경 0)
 
 # 다른 sentinel 영역 회귀 0:
 pnpm verify:r1-guard
 # Expected: 4 영역 × 3 viewport = 12 PASS (mismatch ≤ 0.5%)
 ```
 
+**6장 갱신 패턴 SSoT (R3~R10 재사용)**:
+
+- shortcut-bar 3 viewport (의도 변경 = 새 body 버튼 추가) **+** top-nav 3 viewport (DOM nesting 부수효과) = **6장 동시 갱신**
+- hud-top-right / hud-bottom-right 6장은 변경 0 의무 — top-bar 와 별도 영역이므로 nesting 부수효과 없음. R-Phase 회귀 0 검증 가드
+
 Prediction 실패 시:
 
-- (a) 다른 영역 PNG 도 변경됨 → R2 가 의도 외 UI 회귀 유발 (예: top-nav 가 함께 변경) → reviewer 차단 + 원인 분석
-- (b) baseline 갱신 후에도 mismatch 잔존 → 갱신 절차 자체 실패 (예: viewport 별 selector 불일치) → 본 amendment 절차 보강
+- (a) hud-top-right / hud-bottom-right 도 변경됨 → R-Phase 가 HUD 영역에도 의도 외 UI 회귀 유발 → reviewer 차단 + 원인 분석
+- (b) top-nav 가 변경되지 않음 → DOM 구조가 변경됨 (예: top-bar 에서 shortcut-bar 가 분리) → 본 amendment 의 nesting 가정 무효 → 재검토 트리거 #5
+- (c) baseline 갱신 후에도 mismatch 잔존 → 갱신 절차 자체 실패 (예: viewport 별 selector 불일치) → 본 amendment 절차 보강
 
 #### 회귀 가드
 
@@ -1080,12 +1104,14 @@ Prediction 실패 시:
 2. **임계값 0.5% 의 false negative / false positive 사례 누적** — 메인 ADR §재검토 트리거 #4 와 동일. v5 amendment 또는 임계값 강화 별도 ADR
 3. **자동 갱신 (c) 후보 재검토 트리거** — baseline 갱신 빈도가 R-Phase 마다 N 회 누적되어 수동 절차가 ROI 미달이면 (c) 후보 재검토. 단 false negative 무시 위험 차단을 위해 "자동 갱신 PR + 인간 reviewer 의무" 패턴 (자동화 + 수동 검증 결합) 으로 박제 가능
 4. **#357 의 다른 진입 조건 충족** — false negative 사례 1건 또는 false positive 사례 3건+ 누적 시 재검토. 본 v4 는 R2 진입 트리거만 처리, 다른 트리거 별도 amendment
+5. **DOM nesting 가정 무효화** — `top-nav` 가 `shortcut-bar` 의 부모가 아니게 되는 layout 재배치 발생 시 (예: shortcut-bar 가 sidebar 또는 별도 floating bar 로 분리) 본 amendment 의 "6장 동시 갱신" SSoT 정정. 그 시점에 v5 amendment 또는 신 ADR — selector / fallback 정의 (`r1-ui-regions.mjs`) 및 6장 → 3장 패턴 복귀 검토
 
 ### 위험 / 미해결
 
 - **shortcut-bar 영역 selector 안정성** — `[data-r1-region="shortcut-bar"]` selector 가 R2 mercury 버튼 추가로 가로폭 증가하지만 자동 추적 가능. 단 미래 layout 변경 (예: shortcut-bar 가 sidebar 로 이동) 시 selector 무효화 가능. 그 시점에 v5 amendment 또는 selector 갱신
 - **baseline PNG diff 가독성** — git LFS 미사용 + Binary diff 출력. reviewer 가 "shortcut-bar 갱신이 mercury 추가만인지" 시각 확인하려면 PR 본문에 inline 이미지 또는 GitHub artifact 다운로드 필요. Amendment v3 §교차검증 §"고유 발견 (후속 분리)" #2 (PR 코멘트 inline 이미지) 와 정합 — 후속 이슈
 - **viewport 별 PNG 수동 갱신 부담** — `--viewport=` 옵션 3회 실행 또는 `--update` 단일 (3 viewport 자동) 절차가 R10 누적 시 부담. R5+ 진입 시 ROI 재평가 (위 §재검토 트리거 #3)
+- **DOM nesting 부수효과 (R2 #363 머지 후 실측, 2026-04-28)** — `top-nav` 가 `shortcut-bar` 의 부모 영역이라 shortcut-bar 변경 시 top-nav 도 함께 mismatch 유발. 본 amendment 원안의 "다른 9장 변경 0" Concrete Prediction 은 §결과·재검토 조건 의 "정정 후 (R3~R10 SSoT)" 블록으로 갱신. **R3~R10 shortcut-bar 항목 추가 시 6장 갱신 패턴 (shortcut-bar 3 + top-nav 3) SSoT**. 만약 미래 DOM 구조 재배치 (top-bar 와 shortcut-bar 분리) 가 일어나면 본 amendment §재검토 트리거 #5 발동. nesting 자체는 자연스러운 layout 결정 — top-bar 영역 내부에 shortcut-bar 가 있는 것이 합리적 UX 이므로 분리 압박은 약함. 자세한 정정 근거 박제: 본 amendment §결과·재검토 조건 §"Concrete Prediction (R2 PR 자동 재현) — 2026-04-28 정정"
 
 ### Developer 인계 (Amendment v4 추가분)
 
