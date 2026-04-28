@@ -5,6 +5,33 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-04-28
+
+> **R2 사이클 (2026-04-28)** — Roadmap v3 "Incremental Body-by-Body Build" 두 번째 스프린트. 태양 단독 visible (R1, v0.14.0) 위에 **수성** 점진 추가. R1 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r1-guard 매트릭스) 100% 재사용. `mercury: 8500` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R1 §결과 Concrete Prediction "R2 코드 변경 ≤ 3 라인" 자연 검증. PR [#363](https://github.com/coseo12/astro-simulator/pull/363) (R2 anchor) + [#365](https://github.com/coseo12/astro-simulator/pull/365) (baseline 갱신 + Amendment v4 정정) + [#366](https://github.com/coseo12/astro-simulator/pull/366) (agent-browser 가드 — volt #79).
+
+### Behavior Changes
+
+- **수성 가시성 진입 — `BODY_SCALE.mercury = 8500` 추가** ([#361](https://github.com/coseo12/astro-simulator/issues/361)) — viewport 점유율 1280×720 / 1920×1080 0.612% (DoD 0.5% + 마진 22%), 모바일 (375×667) 1.94%. sun 시각비 약 40% (sun 의 1/2.5 — "수성 < 태양" 자연스러움). 픽셀 직경 84.76px @ 1280×720. ADR `20260428-r2-mercury-visualization.md` §결정 1
+- **shortcut bar 5 항목 (태양 / 수성 / 지구 / 목성 / 해왕성)** — `FOCUS_BUTTONS` 배열에 sun 다음 위치 (천체 거리 순) 에 `{ id: 'mercury', label: '수성' }` 1줄 추가. R1 패턴 100% 정합 — 키바인딩 무박제, aria 자연 라벨. axe 0 위반 (R1 회귀 0)
+- **수성 focus / info 패널 자동 일반화** — `solar-system.json` mercury 데이터 (이미 박제) + R1 syncFocusToScene helper / CelestialInfoPanel 자동 일반화. 코드 변경 0
+- **R2 focus race condition 회귀 가드 신설** — `apps/web/scripts/r2-focus-race-guard.mjs` 3 시나리오 (sun→mercury / mercury→reset / Animation tween 카운트). 단일 body (sun) 환경이라 R1 단독에서 검증 불가했던 다중 body race scenario 처음 도입. ADR §결정 4 의 "Babylon 자동 폐기 신뢰" 회귀 가드. 실측 보정: focusOn 의 property name 은 `cam-target` / `cam-radius`, reset 의 property name 은 `cam-reset-target` / `cam-reset-radius` (camera-controller.ts:91) — 자동 폐기는 focusOn → focusOn 케이스에 한정. focusOn → reset 은 다른 property라 lerp 병행이지만 시작점이 현재 카메라 위치라 자연스러운 보간
+- **agent-browser Chrome cleanup 가드 도입** (volt [#79](https://github.com/coseo12/volt/issues/79)) — `.claude/agents/qa.md` 마무리 절차 + CLAUDE.md "프로젝트 고유 보강 교훈" §"sub-agent 이탈의 프로세스 레벨 확장" 블록에 agent-browser 좀비 정리 의무 박제. **sub-agent 루틴**: `browser-test` 스킬로 agent-browser 사용 후 반환 직전 `pgrep -f "agent-browser-chrome-" >/dev/null && pkill -TERM/KILL -f "agent-browser-chrome-"` 실행. **메인 루틴**: sub-agent 복귀 직후 `pgrep -af "agent-browser-chrome-"` 검사 + 발견 시 정리. 사용자 본 Chrome 영향 0 (식별자 `agent-browser-chrome-<UUID>` user-data-dir). **본 세션 (2026-04-28) 실측**: 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU. agent-browser 도구 자체 cleanup 이 정상 case 작동하나 sub-agent 비정상 종료 시 lineage 끊긴 좀비 잔존 — `spawned_bg_pids` SSoT 가 직접 spawn PID 만 커버하므로 도구 wrapper child process 별도 가드 (volt #46/#52 의 agent-browser 변형)
+
+### Notes
+
+- **R2 baseline 갱신 + Amendment v4 Concrete Prediction 정정 (R2 후속 사이클, 2026-04-28)** — PR [#363](https://github.com/coseo12/astro-simulator/pull/363) 머지 후 발견된 r1-guard step 5 의도된 FAIL 해소. shortcut-bar 3 viewport (의도 변경 = mercury 5번째 버튼) **+** top-nav 3 viewport (DOM nesting 부수효과 = `<header data-r1-region="top-nav">` 내부에 shortcut-bar 가 child) = **6 PNG 동시 갱신**. hud-top-right / hud-bottom-right 6장은 변경 0 (D-R2 R1 회귀 0 검증). Linux CI `r1:baseline-bootstrap` workflow_dispatch 산출본 사용 (macOS local `--update` 는 폰트 false positive 박제 위험으로 차단)
+- **Amendment v4 Concrete Prediction 정정** — 원안 "shortcut-bar 3장만 변경, 다른 9장 변경 0" 이 DOM nesting 가정 누락. 정정: "shortcut-bar 3장 + top-nav 3장 = 6장 동시 갱신 (R3~R10 SSoT)". §위험·미해결 에 nesting 부수효과 박제 + §재검토 트리거 #5 (DOM nesting 가정 무효화) 추가
+- **shortcut-bar baseline 갱신은 별도 commit 또는 후속 PR 분리** — Amendment v4 §결정 2 5단계 적용. macOS local 환경에서 `r1-ui-regression-guard.mjs --update` 실행 시 의도 외 영역 (top-nav / hud-top-right / hud-bottom-right) 도 폰트 차이로 갱신 → Linux CI 환경에서만 정합. 본 PR 의 머지 전 reviewer 단계에서 CI green 확인 후 baseline 갱신 절차 별도 진행
+- **BODY_SCALE.mercury default 1.0 fallback 테스트 제거** — `body-scale.test.ts` 의 "미정의 body default 1.0" 테스트에서 mercury 사례 삭제 + 다른 body (earth / jupiter / unknown) 로 일반화. R3+ 추가 시 동일 패턴 갱신 의무
+- **r2-focus-race-guard.mjs 의 시나리오 3 (Animation tween spy) 환경 의존 skip** — Babylon 글로벌 (`window.BABYLON`) 미노출 환경 (현재 ESM module 빌드) 에서는 spy 설치 불가, soft skip 처리. 시나리오 1, 2 가 race 회귀 가드 본질 (store sync + camera 변화) 보장
+- **dev 서버 사용 의무** — r2-focus-race-guard 는 `__simCore` / `__solarScene` 글로벌 (sim-canvas.tsx:252 NODE_ENV 가드) 의존 → `pnpm dev` 환경 필요. p329-qa-focus-lod-guard 와 동일 정책
+
+### Docs
+
+- **ADR `20260428-r2-mercury-visualization.md` 신규** ([#361](https://github.com/coseo12/astro-simulator/issues/361)) — 632 라인. R2 시각화 결정 5건 통합 (mercuryScale=8500 / shortcut-bar / orbit 라인 / focus race / info 패널). 11 후보 × 3 viewport mercuryScale 산출표. R3 Concrete Prediction (코드 변경 ≤ 2 라인 + 단서 조항: venus 머티리얼 분기 예외). Gemini cross-validate 합의 (Q1/Q4 산출 정합 / Q3 R3 단서 조항 추가) + 후속 이슈 #362 (R1 sun 1920×1080 점유율 정정)
+- **ADR `20260425-r1-ui-pixel-diff-guard.md` Amendment v4** ([#357](https://github.com/coseo12/astro-simulator/issues/357), [#361](https://github.com/coseo12/astro-simulator/issues/361)) — 192 라인. sentinel 정책 amendment + shortcut-bar baseline 갱신 절차 (Q3=B 통합). 후보 (d) 수동 검토 분리 채택 + R2 직접 적용 5단계 + R3~R10 패턴 SSoT
+- **ADR `20260425-r1-ui-pixel-diff-guard.md` Amendment v4 Concrete Prediction 정정** (R2 후속 #361, 2026-04-28) — §결과·재검토 조건 §"Concrete Prediction (R2 PR 자동 재현) — 2026-04-28 정정" + §위험·미해결 nesting 부수효과 bullet + §재검토 트리거 #5 추가. 원안 "shortcut-bar 3장만 변경" → 정정 "shortcut-bar 3장 + top-nav 3장 = 6장 동시 갱신". DOM nesting (top-bar 가 shortcut-bar 의 부모) 자연 부수효과 박제. R3~R10 SSoT
+
 ## [0.14.0] — 2026-04-26
 
 > **R1 후속 F-2 (#348) — ci.yml r1-guard step 통합 + Linux baseline 정합 + ADR Amendment v3** — v0.13.1 부트스트래핑 인프라 위에 chicken-and-egg 해소. 모든 PR check 의 `detect-and-test` job 이 R1 UI 회귀 가드를 자동 trigger. PR [#347](https://github.com/coseo12/astro-simulator/pull/347)/[#349](https://github.com/coseo12/astro-simulator/pull/349)/[#350](https://github.com/coseo12/astro-simulator/pull/350)/[#351](https://github.com/coseo12/astro-simulator/pull/351)/[#354](https://github.com/coseo12/astro-simulator/pull/354)/[#355](https://github.com/coseo12/astro-simulator/pull/355) 6 PR 머지 + workflow_dispatch 1회 실증 + 메타 가드 실증 1차 (#356 close, #357 분리).
