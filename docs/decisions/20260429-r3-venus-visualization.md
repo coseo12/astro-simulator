@@ -608,3 +608,57 @@ Claude 자체 편향 4종 셀프 체크 (호출 전):
 - 다른 행성 (earth / mars / jupiter / saturn / uranus / neptune) — R4+ 범위
 - venus 표면 텍스처 / 대기 셰이더 / 자전 / 영점 위상 / PBR — 후속 R-Phase
 - venus 역행 자전 (Q3=A 박제) — info 패널 자전 주기 텍스트 표시는 D-I1 자동 포함
+
+---
+
+## Amendment 2026-04-30 — Q2=B 비례 결정 전환 (#373 후속)
+
+### 변경 배경
+
+#373 forensic 결과 + 사용자 옵션 (c) 채택 + Gemini cross-validate (outcome=applied):
+
+- R3 박제 시점 (Q2=A 독립 결정) 의 venusScale=4000 이 sun 대비 px 비 45.2% 로 비현실적 비율 형성
+- D-T2 사용자 검증 2회차에서 venus + mercury 비율 회귀 발견 (사용자 인지: "달이 너무 커서 어색하다" 류)
+- 사용자 인지 단위 = px diameter 비 (현재 area 단위 brightRatio 가드 직교)
+
+### 박제값 갱신 의도
+
+- **venusScale: 4000 → 1500~2200 범위** (구체값 D-T2 검증 후 developer 단계 확정)
+- **시각비 박제 갱신**: sun 대비 px 비 45.2% → ~15~20% 자연화
+
+### 가드 단위 갱신
+
+- **(보존)** brightRatio 점유율 ≥ 0.5% (R1 ADR §결정 1 SSoT 일관)
+- **(신규)** sun 대비 px diameter 비 ≤ 30% (Q2=B 비례 결정 가드 — venus 는 mercury 보다 큰 본체이므로 ≤ 30% 범위)
+- **(신규)** 모바일 (375×667) 누적 disk area ≤ 25%
+
+### 정책 변경
+
+- **폐기**: PM Q2=A "각 body 독립 결정. R3+ 도 각자 독립"
+- **신규**: PM Q2=B "각 body 가 sun 대비 px 비 ≤ N% 로 비례 결정" (R-Phase 공통, R4+ 적용)
+- 본 amendment 시점부터 R3 도 Q2=B 정책 SSoT 따름
+
+### D-X1 Concrete Prediction 영향
+
+본 amendment 는 박제값 갱신 의도만 박제. **D-X1 (R3 코드 +2 라인 + 핵심 6 파일 변경 0) PASS 결과는 보존** — fix PR 의 변경은 R3 핵심 6 파일과 직교 (`apps/web/src/constants/body-scale.ts` 만). R2 ADR §결과·재검토 조건 §Concrete Prediction 핵심 6 파일 SSoT 회귀 0 유지.
+
+### 후속 검증
+
+- D-T2 사용자 검증 (px 비 자연화 확증)
+- r1-guard `--measure-px-ratio` 박제값 PASS
+- 모바일 누적 차단율 ≤ 25%
+
+### 교차검증 반영 사항
+
+본 amendment 는 #373 forensic ADR (커밋 `aade809`) 의 cross-validate (Gemini outcome=applied) 커버리지 안 — 별도 cross-validate skip. forensic ADR §교차검증 반영 사항 §고유 발견 4 (R2/R3 ADR amendment 동반 박제 의무) 가 본 amendment 의 의도까지 포괄.
+
+### 재검토 트리거 #4 발동 박제
+
+R3 ADR §재검토 조건 §재검토 트리거 #4 (body 간 비율 회귀 관찰) 가 본 amendment 로 발동. 향후 R4+ body 추가 시 동일 트리거 재발동 시 Q2=B 정책 SSoT 재검토.
+
+### 참조
+
+- #373 forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) §결정 2
+- R2 ADR amendment [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) §Amendment 2026-04-30 (동반 박제)
+- Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 2026-04-30 (커밋 `20c60c8`)
+- volt [#74](https://github.com/coseo12/volt/issues/74) (UX DoD vs 제품 동작), volt [#29](https://github.com/coseo12/volt/issues/29) (결합 간과 편향)
