@@ -5,7 +5,26 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-## [0.15.0] — 2026-04-28
+> **R3 사이클 진입 (2026-04-29)** — Roadmap v3 "Incremental Body-by-Body Build" 세 번째 스프린트. 태양 + 수성 (R2) 위에 **금성** 점진 추가. R1+R2 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r2-focus-race-guard) 100% 재사용. `venus: 4000` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R2 ADR `20260428-r2-mercury-visualization.md` §결과 Concrete Prediction "R3 추가 시 코드 변경 ≤ 2 라인" **첫 외부 검증 — PASS**. 핵심 6 파일 변경 0 (solar-system-scene.ts / tier.ts / lod.ts / sim-canvas.tsx / celestial-info-panel.tsx / camera-controller.ts). 추가로 R2 머지 시점부터 잠재한 **ambient 라이팅 약점 (#372)** 회귀 fix 동봉 — default 진입 시 행성 그림자측 인지 가능 임계 회복 (옵션 A 정책). PR [#369](https://github.com/coseo12/astro-simulator/pull/369) (R3 anchor + ADR + 시각화 통합 + #372 fix).
+
+### Behavior Changes
+
+- **금성 가시성 진입 — `BODY_SCALE.venus = 4000` 추가** ([#369](https://github.com/coseo12/astro-simulator/issues/369)) — viewport 점유율 1280×720 / 1920×1080 0.692% (DoD 0.5% + 마진 38%), 모바일 (375×667) 2.19%. mercury 시각비 117% (venus 가 mercury 보다 17% 큼 — 과학적 사실 정합), sun 시각비 46% (sun 의 약 1/2). 픽셀 직경 98.91px @ 1280×720. 모바일 누적 차단율 sun + mercury + venus = 16.39% (한계 25% 까지 8.6%p margin). ADR `20260429-r3-venus-visualization.md` §결정 1
+- **shortcut bar 6→7 항목 (태양 / 수성 / 금성 / 지구 / 목성 / 해왕성 + reset)** — `FOCUS_BUTTONS` 배열에 mercury 다음 위치 (천체 거리 순) 에 `{ id: 'venus', label: '금성' }` 1줄 추가. R1+R2 패턴 100% 정합 — 키바인딩 무박제, aria 자연 라벨. shortcut-bar dimension 1280: 170→195 (+25px), 모바일 113→128 (+15px). axe 0 위반 (R1+R2 회귀 0)
+- **금성 focus / info 패널 / 궤도 라인 자동 일반화** — `solar-system.json` venus 데이터 (이미 박제) + R1 syncFocusToScene helper / CelestialInfoPanel / rebuildOrbitLines 자동 일반화. **핵심 6 파일 변경 0** — R2 ADR Concrete Prediction "R3 추가 시 ≤ 2 라인" 첫 외부 검증 성공. body mesh 머티리얼 default StandardMaterial (단색 — Q2=A 박제). 궤도 라인 색상 `Color3(0.25, 0.28, 0.4)` 일관 (R1+R2 박제값 보존)
+- **r2-focus-race-guard body-agnostic 3-body 첫 검증** — 시나리오 1 (sun → mercury) / 2 (mercury → reset) PASS. 3-body 환경 (sun + mercury + venus) 에서 Babylon `Animation.CreateAndStartAnimation` 자동 폐기 동작 유효성 확증 (Q4=A — body id 무관 동일 property name 호출). 시나리오 3 (Animation tween spy) 환경 의존 skip (R2 일관)
+- **회귀 #372 ambient 라이팅 강화 — default 진입 행성 그림자측 가시성 floor 회복** ([#372](https://github.com/coseo12/astro-simulator/issues/372)) — `solar-system-scene.ts` ambient.intensity 0.08 → 0.3 (3.75×) + groundColor (0.01, 0.01, 0.02) → (0.15, 0.15, 0.18) 중립 회색톤. R2 (#363, mercury 추가, v0.15.0) 머지 시점부터 잠재한 라이팅 약점이 R3 venus 추가로 가시화. sun.disableLighting=true 환경이라 sun 자체 영향 무 (1280×720 ?gpu=a 점유율 4.12% → 4.19%, +0.07%p — R1 박제 3.87% ± 0.5% 가드 안전). 행성 mesh sun-반대측 평균 luminance 인지 가능 임계 회복. **volt #77 직접 입증** — headless 는 GPU adapter 부재로 tier-c 자동 진입 → sun 1px 점 → 자동화 가드 8/8 PASS 였던 false positive 사례. AMBIENT_INTENSITY / AMBIENT_GROUND_COLOR_RGB 상수 export + `solar-system-scene.test.ts` 회귀 가드 4건 (intensity ≥ 0.25 floor / groundColor 평균 ≥ 0.05 floor / 박제값 정확 일치 2건) 박제 — 임의 하향 조정 시 단위 테스트 차단
+
+### Notes
+
+- **R3 baseline 갱신은 별도 후속 PR 분리 (R2 #365 패턴)** — 본 PR 머지 후 r1-guard step 5 가 의도된 FAIL (shortcut-bar 6→7 dimension 변동 + top-nav DOM nesting 부수효과). Linux CI `r1:baseline-bootstrap` workflow_dispatch 1회 실행 → auto PR 생성 → 갱신 PR 별도 머지. macOS local `--update` 는 폰트 false positive 박제 위험으로 차단 (Amendment v3 §결정 1)
+- **D-T2 실 Chrome GUI 수동 검증 사용자 단계 분리** — headless 검증만으로 종결 금지 (volt #77 false positive). 본 PR 은 reviewer/qa 통과 후 사용자가 sun ↔ mercury ↔ venus focus 빠른 전환 + 모바일 (375×667) 인지 가능성 + venus info 패널 ("× 4000 과장 중" + 자전 주기 retrograde 표기) 수동 검증
+- **R3 ADR Gemini cross-validate 합의 — viewport-aware scaling 도입 결정 시점 R4 로 박제** — Gemini 권고 1 수용 ("R5 진입 전 검토" → "R4 ADR 박제 시점에 명시적 결정 박제 의무"). 능동적 기술 부채 관리 — 모바일 누적 차단율 한계 25% 가 R5 (mars) 진입 시 도달 위험 → R4 architect 가 도입 / 미도입 / 부분 도입 (모바일 only) 3 후보 비교 의무. R3 ADR §위험·미해결 + §재검토 트리거 #3 박제
+- **#372 후속 — planet 가시성 headless 가드 (`?gpu=a` 매트릭스) 후속 이슈 분리 후보** — 본 PR 은 ambient 상수 SSoT 단위 테스트만 박제 (architect 권고 1 수용). headless 환경에서 `?gpu=a` 강제 + mercury / venus mesh 영역 sun-반대측 평균 luminance 임계 측정 자동화는 별도 이슈 (#373 후보 — 메인 사용자 의사 확인 후 분리). volt #77 매트릭스 자동화 후속 이슈도 동일 분리 후보 (R3 ADR §재검토 트리거 #3 후속)
+
+### Docs
+
+- **ADR `20260429-r3-venus-visualization.md` 신규** ([#369](https://github.com/coseo12/astro-simulator/issues/369)) — 610 라인. R3 시각화 결정 6건 통합 (venusScale=4000 / shortcut-bar venus 항목 / orbit 라인 무수정 / focus race body-agnostic / info 패널 자동 일반화 / 비-범위 보호 가드). 11 후보 × 3 viewport venusScale 산출표. R4 Concrete Prediction (earth 단독 = 1 라인 / earth + moon = 0~2 라인). Gemini cross-validate 합의 (6 영역 우수 + S급 ADR + viewport-aware scaling R4 결정 시점 구체화 권고 수용). 후속 발견 분리 (ADR Status workflow Provisional → Accepted 표준화 — priority:medium-low)
 
 > **R2 사이클 (2026-04-28)** — Roadmap v3 "Incremental Body-by-Body Build" 두 번째 스프린트. 태양 단독 visible (R1, v0.14.0) 위에 **수성** 점진 추가. R1 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r1-guard 매트릭스) 100% 재사용. `mercury: 8500` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R1 §결과 Concrete Prediction "R2 코드 변경 ≤ 3 라인" 자연 검증. PR [#363](https://github.com/coseo12/astro-simulator/pull/363) (R2 anchor) + [#365](https://github.com/coseo12/astro-simulator/pull/365) (baseline 갱신 + Amendment v4 정정) + [#366](https://github.com/coseo12/astro-simulator/pull/366) (agent-browser 가드 — volt #79).
 
