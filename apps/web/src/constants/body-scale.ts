@@ -19,13 +19,23 @@
  *                   sun 시각비 약 40% (sun 의 1/2.5 — "수성 < 태양" 자연스러움)
  *   ADR: docs/decisions/20260428-r2-mercury-visualization.md §결정 1
  *
- * R3~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
+ * R3 baseline (T1 solar / camera radius=35 scene unit / fov=0.8 rad 기준):
+ *   venus = 4000 → pixel diameter ≈ 98.91px (1280×720), 점유율 0.692% (DoD 0.5% margin 38%)
+ *                 pixel diameter ≈ 91.62px (375×667), 점유율 2.19% (모바일 인지 가능)
+ *                 mercury 시각비 117% (venus 가 mercury 보다 17% 큼 — 과학적 사실 정합)
+ *                 sun 시각비 46% (sun 의 약 1/2)
+ *                 모바일 누적 차단율 sun+mercury+venus = 16.39% (한계 25% 까지 8.6%p margin)
+ *   ADR: docs/decisions/20260429-r3-venus-visualization.md §결정 1
+ *
+ * R4~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
  * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
- * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건).
+ * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건 +
+ * `docs/decisions/20260429-r3-venus-visualization.md` §결과·재검토 조건).
  */
 export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   sun: 75,
   mercury: 8500, // R2 #361 — viewport 점유율 1280×720 0.61% / 모바일 1.94% / sun 시각비 40%
+  venus: 4000, // R3 #369 — viewport 점유율 1280×720 0.69% / 모바일 2.19% / mercury 시각비 117% / sun 시각비 46%
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */
