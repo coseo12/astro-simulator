@@ -87,6 +87,22 @@ function floatingOriginAssertEnabled(): boolean {
  * Phase A 는 즉시 점프 flicker 허용 (Phase B 애니메이션 도입 예정).
  */
 
+/**
+ * Ambient 라이팅 가시성 floor — 회귀 #372 fix (R3 venus 동봉, ambient 약점은 R2 머지부터 잠재).
+ *
+ * sun.disableLighting=true 라 sun 자체에는 영향이 없고, 행성 mesh sun-반대측의 평균 luminance
+ * 만 인상하여 그림자측 윤곽이 사라지지 않게 한다. 0.3 / (0.15, 0.15, 0.18) 은 architect 가
+ * debug 패치로 검증한 박제값 (1280×720 ?gpu=a 기준 sun 점유율 +0.07%p, 행성 그림자측 인지 가능).
+ *
+ * 가드 테스트(`solar-system-scene.test.ts`) 가 회귀 임계 (intensity ≥ 0.25, groundColor 비-검정)
+ * 를 검증하므로 본 상수를 임의 하향 조정하면 단위 테스트가 실패한다.
+ *
+ * 근거: docs/decisions/20260429-r3-venus-visualization.md (회귀 #372 amendment),
+ *       volt #77 (headless false positive — tier-c 자동 진입으로 자동화 가드 통과)
+ */
+export const AMBIENT_INTENSITY = 0.3;
+export const AMBIENT_GROUND_COLOR_RGB = { r: 0.15, g: 0.15, b: 0.18 } as const;
+
 export interface SolarSystemSceneHandles {
   /** id → 메쉬 */
   meshes: Map<string, Mesh>;
@@ -287,10 +303,14 @@ export function createSolarSystemScene(
   // 배경 톤
   scene.clearColor = new Color4(0.031, 0.035, 0.051, 1);
 
-  // 약한 전역 조명 (태양 뒤편도 약간 보이게)
+  // 회귀 #372 fix — 행성 그림자측 인지 가능 ambient (AMBIENT_* 상수 SSoT, 단위 테스트 가드).
   const ambient = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
-  ambient.intensity = 0.08;
-  ambient.groundColor = new Color3(0.01, 0.01, 0.02);
+  ambient.intensity = AMBIENT_INTENSITY;
+  ambient.groundColor = new Color3(
+    AMBIENT_GROUND_COLOR_RGB.r,
+    AMBIENT_GROUND_COLOR_RGB.g,
+    AMBIENT_GROUND_COLOR_RGB.b,
+  );
 
   // 태양 중심 포인트 라이트
   const sunLight = new PointLight('sun-light', new Vector3(0, 0, 0), scene);
