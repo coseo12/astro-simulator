@@ -477,14 +477,14 @@ R2 ADR §결과·재검토 조건 §단서 조항 (Gemini cross-validate Q3 권�
 2. **D-X1 Concrete Prediction 실패** — 핵심 6 파일 중 어느 하나가 변경 발생. 본 ADR §결과·재검토 조건 §Concrete Prediction §실측 박제 절차 §결과 분류 적용:
    - (a) 추상화 부족 — 본 ADR amendment + R2 ADR amendment (R3 가 검증 실패 신호)
    - (b) 예외 케이스 — R2 §단서 조항 발동, 본 ADR §단서 조항 박제. PM Q2 합의 위반 의심 시 PM 라운드 재진입
-3. **모바일 2.19% / 누적 16.39% 사용자 피드백 침습성** — D-T2 수동 검증에서 사용자가 "금성이 모바일에서 너무 크다" 또는 "화면이 너무 차단된다" 평가. venusScale 3,000 ~ 3,500 으로 하향 또는 viewport-aware scaling (R1 §축 1 후보 Y 재검토). **Gemini cross-validate 발견 2 (R2 ADR §재검토 트리거 #2 박제)**: 모바일 누적 차단율 R5 (화성) 진입 시 25~30% 도달 위험. 본 R3 가 16.39% 도달 → R4 (지구 추가 시 약 18.94% 예상) → R5 (mars 추가 시 21~22% 예상) → 한계 도달 임박. **R5 진입 전 사전 발동 가능 — 모바일 디바이스 전용 viewport-aware scaling 도입 ADR 검토**
+3. **모바일 2.19% / 누적 16.39% 사용자 피드백 침습성** — D-T2 수동 검증에서 사용자가 "금성이 모바일에서 너무 크다" 또는 "화면이 너무 차단된다" 평가. venusScale 3,000 ~ 3,500 으로 하향 또는 viewport-aware scaling (R1 §축 1 후보 Y 재검토). **Gemini cross-validate 발견 2 (R2 ADR §재검토 트리거 #2 박제)**: 모바일 누적 차단율 R5 (화성) 진입 시 25~30% 도달 위험. 본 R3 가 16.39% 도달 → R4 (지구 추가 시 약 18.94% 예상) → R5 (mars 추가 시 21~22% 예상) → 한계 도달 임박. **R3 cross-validate 권고 1 (Gemini 2026-04-29 강도 상승) 수용**: "R5 진입 전 검토" → **R4 ADR 박제 시점에 viewport-aware scaling 도입 여부를 명시적으로 결정** (능동적 기술 부채 관리 — R5 임박 후 급결정 위험 회피). R4 architect 가 결정을 미루는 경우 본 R3 ADR 의 §재검토 트리거 #3 강제 트리거로 발동 (R4 ADR §결과·재검토 조건 에 viewport-aware scaling 도입 결정 박제 의무)
 4. **focus 전환 race 시각 jitter (3-body 첫 사례)** — D-G2 / D-T2 에서 sun ↔ mercury ↔ venus 빠른 전환 시 jitter 발견. R2 §재검토 트리거 #3 발동 (`getAnimatableByTarget` 명시 취소 도입 amendment 후보 B)
 5. **카메라 거리 / fov / cameraRadius 변경** — `sim-canvas.tsx:158` 의 `radius: 35` 또는 fov 변경 시 본 ADR §축 1 산출표 무효화. R1+R2 §재검토 트리거 동일
 6. **shortcut-bar 7 항목 가로 너비 초과** — 7개 버튼이 TopBar 중앙 영역을 초과하면 layout 변경 또는 dropdown 도입 amendment. R4 (지구 이미 박제) → R5+ (8개+) 진입 시 사전 발동 가능
 
 ### 위험 / 미해결
 
-- **모바일 누적 차단율 한계 접근 가속** — 본 R3 16.39% 도달. R4 (지구) 진입 후 약 18.94% → R5 (mars) 진입 후 21~22% → 한계 25% 도달 임박. **R4 ADR 박제 시점에 viewport-aware scaling 인프라 도입 결정 필요** (R2 §재검토 트리거 #2 사전 발동 시점)
+- **모바일 누적 차단율 한계 접근 가속** — 본 R3 16.39% 도달. R4 (지구) 진입 후 약 18.94% → R5 (mars) 진입 후 21~22% → 한계 25% 도달 임박. **R4 ADR 박제 시점에 viewport-aware scaling 인프라 도입 결정 필수** (R3 cross-validate 권고 1 수용 — Gemini 2026-04-29). R4 architect 단계에서 도입 / 미도입 / 부분 도입 (모바일 only) 3 후보 비교 후 결정 박제 의무. 미결정 또는 미루기 금지 (R5 임박 후 급결정 위험 회피)
 - **earth scale 단조 감소 패턴 부담** — venusScale=4000 채택으로 R4 earthScale 가 venus 의 0.9배 (3,600 권장). earth.radius=6.371e6 m (venus 의 1.053배) → 시각비 보존 시 earthScale ≈ 4000 / 1.053² ≈ 3,602. 자연 단조 감소 (8500 > 4000 > 3602) 만족 + earth 가 venus 보다 시각비 약간 큼 (실측 비례 자연)
 - **Concrete Prediction "≤ 2 라인" 첫 검증 결과 의존** — 본 R3 가 R2 ADR §Concrete Prediction 의 첫 외부 검증. PASS 시 R4~R10 prediction 정밀도 상승 / FAIL 시 (a) 추상화 부족 또는 (b) 예외 케이스 분류 후 amendment. PM Q2=A 단색 박제로 (b) 발동 가능성 낮음
 - **3-body focus race 첫 검증** — R3 가 sun + mercury + venus 3-body 첫 사례. r2-focus-race-guard body-agnostic 동작이 3-body 환경에서도 유효함을 D-G2 + D-T2 로 검증. 시각 jitter 발견 시 R2 §재검토 트리거 #3 발동
@@ -495,14 +495,45 @@ R2 ADR §결과·재검토 조건 §단서 조항 (Gemini cross-validate Q3 권�
 
 ## 교차검증 반영 사항
 
-본 ADR 박제 직후 cross-validate 1회 호출 (Gemini, 정책·ADR 박제 직후 1회 루틴 — CLAUDE.md §교차검증). Claude 자체 편향 4종 셀프 체크:
+본 ADR 박제 직후 cross-validate 1회 호출 (Gemini 2.5 Pro, 2026-04-29 14:47 KST). outcome=applied (exit 0). 로그: `.claude/logs/cross-validate-architecture-20260429-144713.log` / outcome JSON: `.claude/logs/cross-validate-architecture-20260429-144713-outcome.json`.
+
+Claude 자체 편향 4종 셀프 체크 (호출 전):
 
 - **낙관적 일정 ✓** — R3 는 R1+R2 인프라 100% 재사용으로 코드 변경 ≤ 2 라인. 일정 추가 리스크 매우 낮음 (R1: 코드 수십 라인 / R2: 2 라인 / R3: 2 라인 — 단조 감소 패턴 검증)
-- **결합 간과 △** — venusScale=4000 결정과 R4 earthScale 단조 감소 패턴 + 모바일 누적 차단율 한계 접근이 결합. cross-validate 호출 프롬프트에 명시 질문 삽입 의도
+- **결합 간과 △** — venusScale=4000 결정과 R4 earthScale 단조 감소 패턴 + 모바일 누적 차단율 한계 접근이 결합. cross-validate 호출 프롬프트에 명시 질문 삽입
 - **폐기 프레이밍 ✓** — R1+R2 비-범위 보호 가드 명시 (핵심 6 파일 무수정), 폐기 항목 없음
 - **순수주의 △** — "Babylon 자동 폐기 신뢰 = 충분 안전" 사후 정당화 가능성 + venusScale=4000 의 mercury 시각비 117% 가 "과학적 사실 정합" 으로 정당화되지만, 실제로는 모바일 누적 차단율 + DoD margin 38% + 단조 감소 패턴 의 trade-off 결과. cross-validate 호출 프롬프트에 명시 질문 삽입
 
-cross-validate 호출 결과 박제는 본 ADR 머지 직후 amendment (또는 후속 PR) 로 추가. 최소 4 섹션 의무: 합의 / 이견 수용 / 기각 / 고유 발견.
+### 합의 — Claude 설계와 일치 + 본 PR 에 반영
+
+- **6개 검증 영역 모두 우수 평가** — 구조적 완성도 / 기술 결정 타당성 / 인터페이스 명확성 / 확장성 / 보안 / 누락 요소. Gemini 가 "대단히 훌륭한 설계 문서" + "단 2줄의 코드 변경으로 목표 달성 = 시스템 확장성의 증명서" 로 강하게 합의. 결합 간과 △ 우려 해소
+- **venusScale=4000 산출 정합 + 다각도 고려** — Gemini 가 "단순히 DoD 만족 최소값이 아닌 안전 마진 (38%) + 과학적 사실 정합성 (수성보다 커 보임) + 미래 확장성 (지구·화성 scale 영향) + 모바일 제약 (누적 차단율) 종합 고려한 매우 합리적 결정" 으로 합의. 순수주의 △ 우려 해소
+- **인터페이스 명확성 (모듈 간 계약)** — Gemini 가 "수정되는 부분은 설정 값에 한정 + 핵심 로직 인터페이스 전혀 변경 없음 = 매우 낮은 결합도" 로 강하게 합의. R2 §결정 4 후보 A "Babylon 자동 폐기 신뢰" 의 3-body 환경 유효성 별도 이견 없음
+- **위험 요소 식별 (R5 진입 전 viewport-aware scaling)** — Gemini 가 "선제적 대응 통찰력" 으로 합의
+
+### 이견 수용 — Claude 원안 보강
+
+- **권고 1: viewport-aware scaling 도입 결정 시점 구체화** (Gemini 확장성 §개선 제안) — Gemini 권고: "R5 진입 전 검토" 를 **"R4 설계 (ADR) 시점에 도입 여부 결정"** 으로 구체화하여 능동적 기술 부채 관리 + R5 임박 후 급결정 위험 회피. **수용** — 본 ADR §재검토 트리거 #3 + §위험·미해결 §"모바일 누적 차단율 한계 접근 가속" 본문 강화 박제 (cross-validate 직후 amendment):
+  - §재검토 트리거 #3: "R5 진입 전 사전 발동 가능" → "R4 ADR 박제 시점에 viewport-aware scaling 도입 여부 명시적 결정 박제 의무" 로 강도 상승
+  - §위험·미해결: "R4 ADR 박제 시점에 viewport-aware scaling 인프라 도입 결정 필요" → "필수 + 3 후보 비교 의무 + 미결정/미루기 금지" 로 강도 상승
+
+- **권고 2: Developer 인계 §6 CHANGELOG 파일 경로 명시** (Gemini 누락 요소 §개선 제안) — 다른 파일들처럼 전체 경로 (`CHANGELOG.md`) 명시. **수용** — Developer 인계 §6 박제 강화 (cross-validate 직후 amendment)
+
+### Claude 재분석으로 기각 또는 부분 수용
+
+- **권고 3: ADR Status workflow (Provisional → Accepted)** (Gemini 누락 요소 §개선 제안) — Gemini 권고: "ADR 머지 직후 amendment" 대신 "Provisional 상태로 cross-validate 후 Accepted 로 변경" 워크플로우 도입.
+  - **부분 수용 — 본 R3 PR 범위 외**: Gemini 권고 자체는 합리적이나 **현재 R3 ADR 의 §교차검증 반영 사항 섹션은 cross-validate 결과를 박제 직후 amendment 로 박제 (현재 PR 범위 내)** 로 충분 (본 ADR 자체가 그 amendment 박제 사례). ADR Status workflow 일반화는 본 R3 범위 외 — **고유 발견 (후속 분리)** 으로 분류
+  - 기각 사유: 현재 모든 R-ADR (R1/R2/R3) 이 "Accepted" 단일 상태 박제 패턴 + workflow 변경은 별도 메타 ADR 또는 harness 결정. 본 R3 PR 에서 workflow 자체 변경은 CRITICAL #6 (스프린트 비-범위) 침범
+
+### 고유 발견 (후속 분리)
+
+#### 발견 1 — ADR Status workflow 표준 박제 (Provisional → Accepted)
+
+**Gemini 분석**: "ADR 이 최종 승인되기 전에 교차검증 결과가 ADR 본문에 통합되고 검토되는 것이 더 바람직. ADR 을 'Provisional (잠정적)' 상태로 두고 교차검증 완료 후 'Accepted (승인)' 상태로 변경하는 워크플로우 고려"
+
+**범위 체크**: 본 R3 PR 의 §"통합 vs 분리 결정 (메타)" 또는 CLAUDE.md §"아키텍처 결정 기록 (ADR)" 섹션의 status 분류 표준화는 **R3 비-범위** (CRITICAL #6 — PM 합의 §비-범위 §"신규 데이터 모델 변경" 정합 + workflow 변경은 별도 메타 ADR). 현재 모든 R-ADR (R1/R2/R3) 이 "Accepted" 단일 상태 박제 패턴.
+
+**후속 이슈 분리** (즉시 생성 의무 — CLAUDE.md §교차검증 §"분리 시 박제 규칙"): 우선순위 medium-low (수치 박제 동작 영향 없음, 프로세스 개선). 후속 이슈 본문에 Gemini 권고 인용 + 본 R3 PR 링크 + 후보 비교 안 (A. 현재 패턴 유지 / B. Provisional → Accepted workflow 도입 / C. 부분 도입 — cross-validate 미수행 ADR 만 Provisional 박제) 박제.
 
 ---
 
@@ -520,7 +551,7 @@ cross-validate 호출 결과 박제는 본 ADR 머지 직후 amendment (또는 �
 5. **r1-guard shortcut-bar baseline 갱신** (D-T1):
    - 6→7 버튼 영역 변동 → `r1-ui-regression-guard.mjs --update --viewport=<id>` 로 3 viewport shortcut-bar baseline 갱신 + R3 PR 본문 사유 명시
    - 별도 r1-guard ADR amendment 박제 여부는 R3 architect 또는 reviewer 판단 (현재 R2 v3 amendment 가 "shortcut-bar baseline 갱신 절차" 를 일반화 박제했다면 amendment 추가 불요, 새 절차 추가 시 v4 amendment)
-6. **CHANGELOG `### Behavior Changes`** — R3 visible 진입 항목 박제:
+6. **`CHANGELOG.md` `### Behavior Changes`** (Gemini cross-validate 권고 2 — 파일 전체 경로 명시) — R3 visible 진입 항목 박제:
    - "금성 가시성 진입 — `venus: 4000` BODY_SCALE 추가"
    - "shortcut-bar 6→7 항목 (태양 / 수성 / 금성 / 지구 / 목성 / 해왕성)"
    - 분류: **MINOR** (기능 추가 + 행동 변화 — 새 body 가시화)
