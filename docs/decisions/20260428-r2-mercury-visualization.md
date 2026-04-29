@@ -630,3 +630,48 @@ cross-validate 호출 완료 (Gemini 3.1 Pro Preview, 2026-04-28 17:16 KST). out
 - `packages/shared/data/solar-system.json` — 0 라인 변경 (mercury 데이터 이미 박제)
 - 다른 행성 (venus / earth / mars / jupiter / saturn / uranus / neptune) — R3+ 범위
 - 수성 표면 텍스처 / 자전 / 영점 위상 / PBR — 후속 R-Phase
+
+---
+
+## Amendment 2026-04-30 — Q2=B 비례 결정 전환 (#373 후속)
+
+### 변경 배경
+
+#373 forensic 결과 + 사용자 옵션 (c) 채택 + Gemini cross-validate (outcome=applied):
+
+- R2 박제 시점 (Q2=A 독립 결정) 의 mercuryScale=8500 이 sun 대비 px 비 38.2% 로 비현실적 비율 형성
+- 사용자 인지 단위 = px diameter 비 (현재 area 단위 가드 직교)
+- R3 venus 추가로 비율 회귀 가시화 → R3 D-T2 사용자 검증 가드 발견
+
+### 박제값 갱신 의도
+
+- **mercuryScale: 8500 → 2000~3000 범위** (구체값은 D-T2 사용자 검증 후 developer 단계에서 확정)
+- **시각비 박제 갱신**: sun 대비 px 비 38.2% → ~9~12% 자연화
+
+### 가드 단위 갱신
+
+- **(보존)** brightRatio 점유율 ≥ 0.5% (R1 ADR §결정 1 SSoT 일관)
+- **(신규)** sun 대비 px diameter 비 ≤ 25% (Q2=B 비례 결정 가드)
+- **(신규)** 모바일 (375×667) 누적 disk area ≤ 25%
+
+### 정책 변경
+
+- **폐기**: PM Q2=A "각 body 독립 결정. R3+ 도 각자 독립"
+- **신규**: PM Q2=B "각 body 가 sun 대비 px 비 ≤ N% 로 비례 결정" (R-Phase 공통, R4+ 적용)
+- 본 amendment 시점부터 R2 도 Q2=B 정책 SSoT 따름
+
+### 후속 검증
+
+- D-T2 사용자 검증 (px 비 자연화 확증)
+- r1-guard `--measure-px-ratio` 박제값 PASS
+- 모바일 누적 차단율 ≤ 25%
+
+### 교차검증 반영 사항
+
+본 amendment 는 #373 forensic ADR (커밋 `aade809`) 의 cross-validate (Gemini outcome=applied) 커버리지 안 — 별도 cross-validate skip. forensic ADR §교차검증 반영 사항 §고유 발견 4 (R2/R3 ADR amendment 동반 박제 의무) 가 본 amendment 의 의도까지 포괄.
+
+### 참조
+
+- #373 forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) §결정 2
+- Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 2026-04-30 (커밋 `20c60c8`)
+- volt [#74](https://github.com/coseo12/volt/issues/74) (UX DoD vs 제품 동작), volt [#29](https://github.com/coseo12/volt/issues/29) (결합 간과 편향)
