@@ -268,6 +268,13 @@ R3 (#369) PR #371 의 D-T2 사용자 검증 2회차에서 ambient fix (#372) 와
 4. **PM 정책 Q2 amendment** — "Q2=A 독립 결정" → "Q2=B 비례 결정 (sun 대비 px 비 ≤ 25% 등)" 으로 전환. Roadmap v3 §R-Phase 공통 DoD 템플릿 갱신
 5. **r1-guard `--measure-px-ratio` 신설** — sun 대비 mercury/venus 의 px diameter 비 측정 + 박제. 회귀 가드 (예: mercury px 비 ≤ 25%, venus px 비 ≤ 30%)
 
+   **명세 (cross-validate 고유 발견 #1 amendment, 2026-04-30)**:
+   - 측정 기준: sun mesh px diameter 를 100% 로 정규화. mercury / venus / (R4+ 추가 body) 의 px diameter / sun px diameter ratio 산출
+   - 측정 viewport: 1280×720 (default SSoT), 1920×1080 (보조 — viewport 무관 비율 유지 검증), 375×667 (모바일 — UX 침습성 검증)
+   - 허용 오차: 박제값 ± 5% (사용자 D-T2 검증 후 ±10% 허용 여부 재논의 가능)
+   - body 별 임계 (옵션 c 채택 시 초안): mercury ≤ 25%, venus ≤ 30%. fix PR 시 `_debug-373-proportion-tmp.mjs` 재실행 결과로 실측값 박제 (gerald 동반 amendment v5)
+   - 출력 형식: r1-guard JSON 의 `pxRatios: { mercury: <value>, venus: <value>, ... }` 필드 추가
+
 ### 결정 3 (Proposed) — 측정 metric 단위 추가
 
 CRITICAL #6 §10 적용:
@@ -339,19 +346,52 @@ mercuryScale=2000 / venusScale=1500 가정 산출:
 - **R2/R3 ADR amendment 영향** — 두 ADR 의 §결정 1 / §재검토 트리거 / §위험·미해결 박제값이 일제 변경. amendment 박제 누락 시 사후 검증에서 SSoT drift
 - **PM Q2 정책 변경 비용** — Q2=A → Q2=B 전환은 Roadmap v3 §R-Phase 공통 DoD 템플릿 / 향후 R4~R10 PM 라운드 영향. PM 페르소나 재호출로 전환 박제 의무
 - **fix 구현 단계 별도 cross-validate** — 본 forensic ADR 의 옵션 (c) 채택 결정 자체에 대한 cross-validate (Gemini 두 번째 시각) 필요. 본 ADR §교차검증 반영 사항 박제
+- **성능 영향 무시 가능 (cross-validate 고유 발견 #3 amendment, 2026-04-30)** — BODY_SCALE 은 모듈 import 시 1회 평가되는 상수. 옵션 (e) log scaling 도입 시 식 평가도 모듈 로드 시 1회 → 프레임당 부하 0. 성능 회귀 없음.
 
 ---
 
 ## 교차검증 반영 사항
 
-본 forensic ADR 박제 직후 cross-validate 1회 호출 의무 (CLAUDE.md §교차검증 §"정책·설계·ADR 박제 직후 1회 루틴"). Claude 자체 편향 4종 셀프 체크:
+본 forensic ADR 박제 직후 cross-validate 1회 호출 (CLAUDE.md §교차검증 §"정책·설계·ADR 박제 직후 1회 루틴"). Claude 자체 편향 4종 셀프 체크:
 
 - **낙관적 일정 △** — 옵션 (c) 가 "2~4줄 + amendment" 로 단순화 가능성 — cross-validate 명시 질문 삽입
 - **결합 간과 △** — R2/R3 ADR amendment + PM 정책 amendment + r1-guard amendment 동반 — 결합 누락 위험
 - **폐기 프레이밍 ✓** — Q2=A 정책 폐기 명시 (Q2=B 로 전환), 폐기 사유 본 ADR 명시
 - **순수주의 △** — "옵션 (c) 가 정확 해결" 사후 정당화 가능성 — 옵션 (a)/(d)/(e) 균형 명시 질문
 
-cross-validate 호출 결과는 본 §교차검증 반영 사항 의 합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견 4 서브섹션으로 박제 의무.
+### Cross-validate 결과 (Gemini 2.5 Pro, 2026-04-30, outcome=applied)
+
+로그: `.claude/logs/cross-validate-architecture-20260430-014206.log`
+
+**Gemini 총평**: "매우 뛰어난 ADR. 분석 깊이 + 프로세스 성숙도 인상적." 결정 자체 (옵션 c + e 분리 전략) 이견 0건.
+
+#### 합의 (4 항목)
+
+1. **데이터 기반 분석 우수** — `_debug-373-proportion-tmp.mjs` + 다중 metric 비교로 사용자 인지 (px diameter) ↔ 기존 측정치 (brightRatio) 불일치를 사실 기반 증명
+2. **합리적 옵션 비교** — 5개 옵션의 기술/정책 호환성 분석 + 옵션 (b) 근본 미해결 명확 + 옵션 (c) 단기 / (e) 장기 분리 전략 합리적
+3. **점진적 개선 전략** — 옵션 (c) 임시 fix + 옵션 (e) 후속 분리는 시급한 문제 해결 + 기술 부채 방치 안 함
+4. **Developer 인계 명세 명확** — 수정 대상 파일 / 테스트 / ADR / 정책 문서 모두 박제
+
+#### 이견 수용
+
+- 없음 (Gemini 가 본 ADR 결정 자체에 이견 0)
+
+#### Claude 재분석 — 기각 (1 항목)
+
+- **(제안 5) 교차검증 이견 조율 프로세스 명세** — Gemini 가 제안한 "다른 검토자 이견 조율 프로세스" 는 본 §교차검증 반영 사항 §의 4 서브섹션 (합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견) 으로 **이미 충족**. Gemini 가 본 ADR 의 §교차검증 구조를 미숙독한 것으로 판단. 기각.
+
+#### 고유 발견 (4 항목)
+
+1. **(제안 1) r1-guard `--measure-px-ratio` 명세 강화** — 범위 내. 본 §결정 2 §5 amendment:
+   - 측정 기준: sun mesh px diameter 를 100% 로 정규화
+   - 측정 viewport: 1280×720 (default), 1920×1080 (보조), 375×667 (모바일)
+   - 허용 오차: 박제값 ± 5% (사용자 D-T2 검증 후 ±10% 허용 여부 재논의 가능)
+   - body 별 임계: mercury ≤ 25%, venus ≤ 30% (옵션 c 채택 시 초안 — fix PR 시 실측값으로 재박제)
+2. **(제안 2) 옵션 (e) 마이그레이션 전략** — 범위 외. 옵션 (e) 후속 이슈 본문에 박제: "Q2=B 비례 결정 → log scaling 자동 계산 자연 대체. mercuryScale/venusScale 박제값을 식 산출값으로 전환 시 (c→e 마이그레이션) sun=baseline / 다른 body= log(radius/sun_radius) 식 적용. 박제값 변경 0 라인 보장 가능 여부 후속 검증."
+3. **(제안 3) 성능 영향 분석** — 범위 내. 본 §결과·재검토 조건 §위험 amendment: "BODY_SCALE 은 모듈 import 시 1회 평가되는 상수. 옵션 (e) log scaling 도입 시 식 평가가 모듈 로드 시 1회 → 프레임당 부하 0. 성능 영향 무시 가능."
+4. **(제안 4) UX 사용자 소통 계획** — 범위 외. 후속 이슈로 분리 (앱 내 안내 문구 / CHANGELOG 외 사용자 가시성).
+
+cross-validate 결과는 본 ADR 의 진행 정당성 확증. 메인 오케스트레이터가 ADR amendment + 후속 이슈 박제 진행.
 
 ---
 
