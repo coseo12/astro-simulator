@@ -10,12 +10,21 @@
  *   node apps/web/scripts/r1-ui-regression-guard.mjs --update     # baseline 갱신
  *   node apps/web/scripts/r1-ui-regression-guard.mjs --viewport=1280x720
  *   node apps/web/scripts/r1-ui-regression-guard.mjs --measure-sun-coverage  # 점유율만 측정
+ *   node apps/web/scripts/r1-ui-regression-guard.mjs --measure-px-ratio      # body 간 px 비 + 모바일 누적 disk area
  *
  * 환경변수 계약:
  *   BASE_URL    — 웹 서버 URL (기본 http://localhost:3000, CI 에서 http://localhost:3001 등 오버라이드 가능)
  *   SKIP_LOCAL  — '1' + macOS darwin 한정 즉시 PASS 종료 (Linux baseline 과 폰트 차이 false positive 회피)
  *
  * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4 + §Amendment 2026-04-26.
+ *
+ * `--measure-px-ratio` 명세 (#373 ADR `20260430-r3-followup-body-proportion.md` §결정 2 §5):
+ *   - 측정 기준: sun mesh px diameter 를 100% 로 정규화. mercury/venus/(R4+) 의 px 비 산출
+ *   - 측정 viewport: 1280×720 (default) / 1920×1080 (보조) / 375×667 (모바일)
+ *   - 진입 URL: ?gpu=a 강제 (volt #77 false positive 가드)
+ *   - body 별 임계: mercury ≤ 25%, venus ≤ 30% (옵션 c 초안 — D-T2 후 박제 갱신 가능)
+ *   - 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산)
+ *   - 출력: JSON `pxRatios` / `diskAreas` / `guardResult` 필드
  */
 
 import { chromium } from 'playwright';
@@ -40,8 +49,25 @@ const args = process.argv.slice(2);
 const flags = {
   update: args.includes('--update'),
   measureSunCoverage: args.includes('--measure-sun-coverage'),
+  measurePxRatio: args.includes('--measure-px-ratio'),
   viewportFilter: args.find((a) => a.startsWith('--viewport='))?.split('=')[1] ?? null,
 };
+
+/**
+ * #373 ADR §결정 2 §5 — body 별 임계값 SSoT.
+ *
+ * px 비 = body px diameter / sun px diameter × 100. 박제값 ± 5% 허용 (재검토 후 ±10% 가능).
+ * 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산).
+ *
+ * R4+ body 추가 시 본 룩업에 1줄 추가만 — body-scale.ts 와 동일 SSoT 패턴.
+ */
+const PX_RATIO_THRESHOLDS = Object.freeze({
+  mercury: 25,
+  venus: 30,
+});
+
+const MOBILE_VIEWPORT_ID = '375x667';
+const MOBILE_DISK_AREA_LIMIT = 0.25;
 
 /** 영역 클립 좌표 추출 (selector 우선, 없으면 fallback). */
 async function clipForRegion(page, region, viewport) {
@@ -67,6 +93,141 @@ async function clipForRegion(page, region, viewport) {
     `[r1-guard] region "${region.id}" — selector="${region.selector}" 미발견 + viewport=${viewport.id} fallback 부재. ` +
       `해당 컴포넌트에 data-r1-region="${region.id}" attribute 박제 누락 의심.`,
   );
+}
+
+/**
+ * body 별 px diameter + diskArea 측정.
+ *
+ * #373 forensic ADR §결정 2 §5 + cross-validate 고유 발견 #1 amendment 의 SSoT 측정.
+ * `_debug-373-proportion-tmp.mjs` 패턴 (Vector3.Project 직접 산출) 을 r1-guard 에 통합.
+ *
+ * dev 빌드 의존: `window.__solarScene` (apps/web/sim-canvas.tsx:252 NODE_ENV 가드)
+ * + `window.__simCore` 의 scene/camera. production 빌드에서는 `__solarScene` 미노출 → null 반환
+ * (호출자가 dev 서버 사용 의무 안내).
+ *
+ * 반환:
+ *   {
+ *     bodies: { sun: { wsRadius, wsCenter[3], pixelDiameter, diskAreaRatio }, mercury: {...}, ... },
+ *     camera: { type, radius, fov, viewport: [w, h] },
+ *   } | { error: string }
+ */
+async function measureBodyPxRatios(page) {
+  return await page.evaluate(() => {
+    // dev 빌드 한정 globals 검증 (sim-canvas.tsx:252 NODE_ENV 가드).
+    const solar = /** @type {any} */ (window).__solarScene;
+    const core = /** @type {any} */ (window).__simCore;
+    if (!solar || !core || !core.scene) {
+      return {
+        error:
+          'window.__solarScene 또는 __simCore 미노출 — dev 빌드 (NODE_ENV !== production) 사용 필요',
+      };
+    }
+    const scene = core.scene;
+    const camera = scene.activeCamera;
+    if (!camera) return { error: 'scene.activeCamera 부재' };
+
+    // Babylon 글로벌이 ESM module 빌드에서 미노출 → scene 경유로 Vector3.Project 호출.
+    // packages/core/src/scene/black-hole-rendering.ts:534 패턴 참조.
+    const engine = scene.getEngine();
+    const viewMatrix = scene.getViewMatrix();
+    const projMatrix = scene.getProjectionMatrix();
+    const vp = camera.viewport;
+    const widthPx = engine.getRenderWidth() * vp.width;
+    const heightPx = engine.getRenderHeight() * vp.height;
+
+    // mesh 의 wsRadius 산출 — boundingSphere.radiusWorld 가 정확
+    // (mesh.scaling 반영). Babylon API.
+    const meshes = solar.meshes; // Map<string, Mesh>
+    if (!meshes) return { error: 'solar.meshes 부재 (createSolarSystemScene 반환 형식 변경?)' };
+
+    /** @type {Record<string, any>} */
+    const bodies = {};
+    /** @type {string[]} */
+    const targetIds = ['sun', 'mercury', 'venus'];
+
+    /**
+     * mesh world center 를 column-major Matrix.m 로 직접 NDC → 화면 좌표 변환.
+     *
+     * `BABYLON.Vector3.Project` 는 ESM module 빌드에서 글로벌 미노출 → 직접 행렬 곱 필요.
+     * Babylon Matrix.m 는 column-major (m[0..3] = col 0) 라 transform = M.transpose × v.
+     * 즉 `result.x = m[0]*x + m[4]*y + m[8]*z + m[12]`.
+     */
+    function projectWorldToScreen(wpx, wpy, wpz) {
+      const vpMatrix = viewMatrix.multiply(projMatrix);
+      const m = vpMatrix.m;
+      const w = m[3] * wpx + m[7] * wpy + m[11] * wpz + m[15];
+      if (Math.abs(w) < 1e-9) return null;
+      const ndcX = (m[0] * wpx + m[4] * wpy + m[8] * wpz + m[12]) / w;
+      const ndcY = (m[1] * wpx + m[5] * wpy + m[9] * wpz + m[13]) / w;
+      const ndcZ = (m[2] * wpx + m[6] * wpy + m[10] * wpz + m[14]) / w;
+      return {
+        x: ((ndcX + 1) / 2) * widthPx,
+        y: ((1 - ndcY) / 2) * heightPx,
+        z: ndcZ,
+      };
+    }
+
+    for (const id of targetIds) {
+      const mesh = meshes.get(id);
+      if (!mesh) {
+        bodies[id] = { found: false };
+        continue;
+      }
+      // boundingSphere.radiusWorld 는 mesh.scaling 반영. solar-system-scene.ts:531 amendment 박제.
+      mesh.computeWorldMatrix(true);
+      const bs = mesh.getBoundingInfo().boundingSphere;
+      const wsRadius = bs.radiusWorld;
+      const absPos = mesh.getAbsolutePosition();
+      const center = projectWorldToScreen(absPos.x, absPos.y, absPos.z);
+      if (!center) {
+        bodies[id] = { found: false, error: 'projection failed (w ≈ 0)' };
+        continue;
+      }
+      // pixel diameter 산출:
+      //   mesh center 와 + camera-right 방향 × wsRadius 만큼 offset 한 점을 각각 화면 좌표로 변환,
+      //   두 점의 픽셀 거리 = pixelRadius.
+      // camera-right 벡터는 viewMatrix.invert() 의 row 0 (= world space camera right basis).
+      // Babylon Matrix 는 column-major 라 invert() 후 m[0..3] 이 row 0 일 수 있어 안전 접근:
+      // viewMatrix 자체의 row 0 을 추출 (= world axis 가 view space 에서 어떻게 표현되는지 의 transpose).
+      // viewMatrix 는 world-to-view 변환 — invert 가 view-to-world. invert 의 m[0]/m[1]/m[2] 가 right basis.
+      const invView = viewMatrix.clone().invert();
+      const ivm = invView.m;
+      // invView (column-major) 의 col 0 = right axis (world space).
+      const rightX = ivm[0];
+      const rightY = ivm[1];
+      const rightZ = ivm[2];
+      const offsetX = absPos.x + rightX * wsRadius;
+      const offsetY = absPos.y + rightY * wsRadius;
+      const offsetZ = absPos.z + rightZ * wsRadius;
+      const offsetScreen = projectWorldToScreen(offsetX, offsetY, offsetZ);
+      let pixelRadius = 0;
+      if (offsetScreen) {
+        const dx = offsetScreen.x - center.x;
+        const dy = offsetScreen.y - center.y;
+        pixelRadius = Math.sqrt(dx * dx + dy * dy);
+      }
+      const pixelDiameter = pixelRadius * 2;
+      const diskAreaRatio = (Math.PI * pixelRadius * pixelRadius) / (widthPx * heightPx);
+      bodies[id] = {
+        found: true,
+        wsRadius,
+        wsCenter: [absPos.x, absPos.y, absPos.z],
+        screenCenter: { x: center.x, y: center.y, z: center.z },
+        pixelDiameter,
+        diskAreaRatio,
+      };
+    }
+
+    return {
+      bodies,
+      camera: {
+        type: camera.getClassName ? camera.getClassName() : 'unknown',
+        radius: camera.radius ?? null,
+        fov: camera.fov ?? null,
+        viewport: [widthPx, heightPx],
+      },
+    };
+  });
 }
 
 /** Mesh viewport 점유율 측정 — sun 한정 (canvas 중앙 brightness threshold 추출). */
@@ -240,40 +401,188 @@ async function runForViewport(browser, viewport) {
   return { results, pass: overallPass };
 }
 
+/**
+ * #373 ADR §결정 2 §5 — px ratio 측정 모드 전용 흐름.
+ *
+ * 통상 verify/update 흐름과 분리 — baseline 비교 / pixelmatch 미사용. body 별 px diameter +
+ * sun 대비 비 + diskAreaRatio 산출 후 임계 가드 (mercury ≤ 25%, venus ≤ 30%, mobile cumulative ≤ 25%).
+ *
+ * `?gpu=a` 강제 진입 (volt #77 false positive 가드) — headless 의 swiftshader 가 default
+ * tier-c (sun 1px) 로 fallback 하면 측정 자체 무효.
+ */
+async function runPxRatioMeasurement(browser) {
+  const targets = flags.viewportFilter
+    ? R1_VIEWPORTS.filter((v) => v.id === flags.viewportFilter)
+    : R1_VIEWPORTS;
+  if (targets.length === 0) {
+    console.error(`[r1-guard] --viewport=${flags.viewportFilter} 매칭 viewport 없음.`);
+    process.exit(2);
+  }
+
+  /** @type {Record<string, any>} */
+  const allResults = {};
+  let overallPass = true;
+
+  for (const viewport of targets) {
+    console.log(
+      `\n=== px-ratio viewport ${viewport.id} (${viewport.width}×${viewport.height}) ===`,
+    );
+    // ?gpu=a 강제 — volt #77 false positive 가드 (ADR §결정 2 §5)
+    const { context, page } = await setupPage(browser, viewport, '?gpu=a');
+    // sun mesh + mercury/venus 생성까지 추가 대기. setupPage 의 800ms 위에 +2200ms.
+    await page.waitForTimeout(2200);
+
+    const measurement = await measureBodyPxRatios(page);
+    if (measurement.error) {
+      console.log(`  ! 측정 실패: ${measurement.error}`);
+      console.log(
+        `    힌트: dev 서버 (NODE_ENV !== 'production') 사용 필수. \`pnpm dev\` 후 재시도.`,
+      );
+      overallPass = false;
+      allResults[viewport.id] = { error: measurement.error };
+      await context.close();
+      continue;
+    }
+
+    const { bodies, camera } = measurement;
+    const sun = bodies.sun;
+    if (!sun || !sun.found) {
+      console.log(
+        `  ! sun mesh 미발견 — solar.meshes 에 'sun' 키 부재. scene 초기화 미완 또는 R-Phase 정책 변경 의심.`,
+      );
+      overallPass = false;
+      allResults[viewport.id] = { error: 'sun mesh missing' };
+      await context.close();
+      continue;
+    }
+
+    /** @type {Record<string, number>} */
+    const pxRatios = {};
+    /** @type {Record<string, number>} */
+    const diskAreas = { sun: sun.diskAreaRatio };
+    let cumulativeDiskArea = sun.diskAreaRatio;
+    /** @type {Record<string, string>} */
+    const guardResult = {};
+
+    for (const id of Object.keys(bodies)) {
+      if (id === 'sun') continue;
+      const body = bodies[id];
+      if (!body || !body.found) {
+        guardResult[`${id}PxRatio`] = `SKIP (mesh 미발견)`;
+        continue;
+      }
+      const ratio = (body.pixelDiameter / sun.pixelDiameter) * 100;
+      pxRatios[id] = Number(ratio.toFixed(2));
+      diskAreas[id] = body.diskAreaRatio;
+      cumulativeDiskArea += body.diskAreaRatio;
+
+      const threshold = PX_RATIO_THRESHOLDS[id];
+      if (typeof threshold === 'number') {
+        const pass = ratio <= threshold;
+        guardResult[`${id}PxRatio`] =
+          `${pass ? 'PASS' : 'FAIL'} (${ratio.toFixed(2)}% ${pass ? '≤' : '>'} ${threshold}%)`;
+        if (!pass) overallPass = false;
+      }
+    }
+    diskAreas.cumulative = cumulativeDiskArea;
+
+    // 모바일 누적 disk area 가드 — 375×667 viewport 한정.
+    if (viewport.id === MOBILE_VIEWPORT_ID) {
+      const pass = cumulativeDiskArea <= MOBILE_DISK_AREA_LIMIT;
+      const pct = (cumulativeDiskArea * 100).toFixed(2);
+      const limit = (MOBILE_DISK_AREA_LIMIT * 100).toFixed(0);
+      guardResult.mobileCumulativeDiskArea = `${pass ? 'PASS' : 'FAIL'} (${pct}% ${pass ? '≤' : '>'} ${limit}%)`;
+      if (!pass) overallPass = false;
+    }
+
+    const result = {
+      viewport: viewport.id,
+      url: `${BASE_URL}/?gpu=a`,
+      pxRatios,
+      diskAreas: {
+        sun: Number((diskAreas.sun * 100).toFixed(3)),
+        ...Object.fromEntries(
+          Object.keys(diskAreas)
+            .filter((k) => k !== 'sun' && k !== 'cumulative')
+            .map((k) => [k, Number((diskAreas[k] * 100).toFixed(3))]),
+        ),
+        cumulative: Number((cumulativeDiskArea * 100).toFixed(3)),
+      },
+      guardResult,
+      camera,
+      pixelDiameters: Object.fromEntries(
+        Object.entries(bodies)
+          .filter(([, b]) => b && b.found)
+          .map(([id, b]) => [id, Number(b.pixelDiameter.toFixed(2))]),
+      ),
+    };
+    allResults[viewport.id] = result;
+
+    // 출력 — JSON 한 줄 + 사람용 요약.
+    console.log(`  pxRatios: ${JSON.stringify(pxRatios)}`);
+    console.log(
+      `  diskAreas (%): ${JSON.stringify({
+        sun: result.diskAreas.sun,
+        ...Object.fromEntries(Object.keys(pxRatios).map((k) => [k, result.diskAreas[k]])),
+        cumulative: result.diskAreas.cumulative,
+      })}`,
+    );
+    for (const [k, v] of Object.entries(guardResult)) console.log(`  ${k}: ${v}`);
+
+    await context.close();
+  }
+
+  // 최종 JSON dump (CI artifact / PR 본문 박제용).
+  console.log('\n=== JSON 결과 ===');
+  console.log(JSON.stringify(allResults, null, 2));
+  console.log('\n=== 요약 ===');
+  console.log(`mode: measure-px-ratio`);
+  console.log(`overall: ${overallPass ? 'PASS' : 'FAIL'}`);
+  return overallPass;
+}
+
 async function main() {
   // SKIP_LOCAL=1 + darwin — Linux baseline 폰트 차이 false positive 회피 (ADR Amendment 2026-04-26 §결정 1).
-  if (process.env.SKIP_LOCAL === '1' && process.platform === 'darwin') process.exit(0);
+  // 단 --measure-px-ratio 모드는 px ratio 가 viewport 무관 (renderScale 결합 기반) 이므로 SKIP_LOCAL 무관.
+  if (process.env.SKIP_LOCAL === '1' && process.platform === 'darwin' && !flags.measurePxRatio) {
+    process.exit(0);
+  }
   ensureDirSync(BASELINE_DIR);
   ensureDirSync(DIFF_DIR);
 
   const browser = await chromium.launch({ headless: true });
-  const allResults = {};
   let overallPass = true;
 
   try {
-    const targets = flags.viewportFilter
-      ? R1_VIEWPORTS.filter((v) => v.id === flags.viewportFilter)
-      : R1_VIEWPORTS;
-    if (targets.length === 0) {
-      console.error(`[r1-guard] --viewport=${flags.viewportFilter} 매칭 viewport 없음.`);
-      process.exit(2);
-    }
-    for (const viewport of targets) {
-      const { results, pass } = await runForViewport(browser, viewport);
-      allResults[viewport.id] = results;
-      if (!pass) overallPass = false;
+    if (flags.measurePxRatio) {
+      // #373 ADR §결정 2 §5 — px ratio 측정 전용 흐름.
+      overallPass = await runPxRatioMeasurement(browser);
+    } else {
+      const targets = flags.viewportFilter
+        ? R1_VIEWPORTS.filter((v) => v.id === flags.viewportFilter)
+        : R1_VIEWPORTS;
+      if (targets.length === 0) {
+        console.error(`[r1-guard] --viewport=${flags.viewportFilter} 매칭 viewport 없음.`);
+        process.exit(2);
+      }
+      for (const viewport of targets) {
+        const { pass } = await runForViewport(browser, viewport);
+        if (!pass) overallPass = false;
+      }
     }
   } finally {
     await browser.close();
   }
 
-  console.log('\n=== 요약 ===');
-  console.log(
-    `mode: ${flags.update ? 'update' : flags.measureSunCoverage ? 'measure-sun' : 'verify'}`,
-  );
-  console.log(`overall: ${overallPass ? 'PASS' : 'FAIL'}`);
-  if (!overallPass) {
-    console.log(`diff PNG: ${path.relative(process.cwd(), DIFF_DIR)} (실패 영역만)`);
+  if (!flags.measurePxRatio) {
+    console.log('\n=== 요약 ===');
+    console.log(
+      `mode: ${flags.update ? 'update' : flags.measureSunCoverage ? 'measure-sun' : 'verify'}`,
+    );
+    console.log(`overall: ${overallPass ? 'PASS' : 'FAIL'}`);
+    if (!overallPass) {
+      console.log(`diff PNG: ${path.relative(process.cwd(), DIFF_DIR)} (실패 영역만)`);
+    }
   }
 
   process.exit(overallPass ? 0 : 1);

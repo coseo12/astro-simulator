@@ -5,6 +5,21 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+> **#373 body 시각 비율 자연화 (2026-04-30)** — R3 사이클의 후속 fix. R2 (#361, mercury) 시점부터 잠재한 **body 간 px diameter 비 회귀** 가 R3 (#369, venus) 추가로 사용자 trigger. forensic ADR (`20260430-r3-followup-body-proportion.md`) 측정 — 사용자 인지 단위 (px diameter 비) 와 박제 단위 (disk area / brightRatio) 가 제곱 관계로 직교했다. 옵션 (c) 채택: `mercuryScale 8500 → 2500`, `venusScale 4000 → 1850`. PM Q2 정책 amendment (Q2=A 독립 결정 → Q2=B 비례 결정). r1-guard `--measure-px-ratio` 신설 — sun 대비 mercury/venus px diameter 비 + 모바일 누적 disk area 가드. 사용자 D-T2 실 Chrome 검증 후 머지 예정.
+
+### Behavior Changes
+
+- **#373 body 시각 비율 자연화** — `BODY_SCALE.mercury` 8500 → 2500, `BODY_SCALE.venus` 4000 → 1850. sun 대비 px diameter 비 38%/45% → ~11%/17% 자연화 (사용자 인지 단위). 모바일 (375×667) 누적 disk area 49.67% → 추정 ~12% (R5 진입 위험 25% 사전 해소). 사용자 D-T2 검증 후 ±20% 조정 가능 (ADR `20260430-r3-followup-body-proportion.md` §재검토 트리거 #1). 단위 테스트 박제값 정확 일치 강제 (`body-scale.test.ts`)
+- **PM Q2 정책 전환 (Q2=A → Q2=B 비례 결정)** — "각 body 가 viewport 점유율 ≥ N% 만 충족하도록 독립 결정" → "각 body 가 sun 대비 px diameter 비 ≤ N% 로 비례 결정". R4 (지구) 진입 시점부터 SSoT. R-Phase 공통 DoD 템플릿 갱신 (`docs/phases/roadmap-v3-incremental.md` §6 + §R-Phase 공통 DoD)
+- **r1-guard `--measure-px-ratio` 신설** — `apps/web/scripts/r1-ui-regression-guard.mjs --measure-px-ratio` 호출 시 3 viewport (1280×720 / 1920×1080 / 375×667) × `?gpu=a` 강제 (volt #77 false positive 가드) 진입 후 sun/mercury/venus mesh 의 px diameter (`BABYLON.Vector3.Project` 직접 산출) + sun 대비 비 + diskAreaRatio 산출. 임계: mercury ≤ 25%, venus ≤ 30%, 모바일 누적 disk area ≤ 25%. 출력 JSON `pxRatios` / `diskAreas` / `guardResult` 필드. dev 빌드 (`window.__solarScene` 노출 = NODE_ENV !== production) 의존
+- **R2/R3 ADR amendment 박제** — R2 (`20260428-r2-mercury-visualization.md`) §Amendment 2026-04-30 + R3 (`20260429-r3-venus-visualization.md`) §Amendment 2026-04-30 에 박제값 갱신 + Q2=B 전환 SSoT 박제 (architect 단계 2 에서 이미 적용)
+
+### Notes
+
+- **D-T2 사용자 실 Chrome 수동 검증 의무** — 본 PR 머지 전 사용자가 ?gpu=a 강제 진입 (1280×720 / 1920×1080 / 375×667 / 모바일 실기기) + sun ↔ mercury ↔ venus focus 전환 + 시각 자연스러움 평가. headless r1-guard `--measure-px-ratio` 자체 PASS 만으로 결론 금지 (volt #77)
+- **옵션 (e) log scaling 후속 이슈로 분리** — ADR §결정 4 — Q2=B 비례 결정 자동화. 본 #373 범위 외. R4 진입 시점에 우선순위 재평가
+- **사용자 UX 소통 후속 이슈로 분리** — cross-validate 고유 발견 #4 (앱 내 안내 / CHANGELOG 외 사용자 가시성). 본 #373 범위 외
+
 > **R3 사이클 진입 (2026-04-29)** — Roadmap v3 "Incremental Body-by-Body Build" 세 번째 스프린트. 태양 + 수성 (R2) 위에 **금성** 점진 추가. R1+R2 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r2-focus-race-guard) 100% 재사용. `venus: 4000` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R2 ADR `20260428-r2-mercury-visualization.md` §결과 Concrete Prediction "R3 추가 시 코드 변경 ≤ 2 라인" **첫 외부 검증 — PASS**. 핵심 6 파일 변경 0 (solar-system-scene.ts / tier.ts / lod.ts / sim-canvas.tsx / celestial-info-panel.tsx / camera-controller.ts). 추가로 R2 머지 시점부터 잠재한 **ambient 라이팅 약점 (#372)** 회귀 fix 동봉 — default 진입 시 행성 그림자측 인지 가능 임계 회복 (옵션 A 정책). PR [#369](https://github.com/coseo12/astro-simulator/pull/369) (R3 anchor + ADR + 시각화 통합 + #372 fix).
 
 ### Behavior Changes
