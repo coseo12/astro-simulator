@@ -23,7 +23,7 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 3. **추가만, 제거 없이** — UI 레이아웃 / shortcut / HUD 요소는 필요 시 추가, 기존 제거 최소화
 4. **수동 브라우저 검증 필수** — 각 R-Phase 마다 실 Chrome GUI 에서 사용자 수동 확인. browser-verify 자동화는 보조
 5. **R-Phase 단위로 커밋 + 릴리스 independent** — 앞 R 만 배포돼도 시스템 정상 동작 (backward-compat)
-6. **측정 가능한 UX DoD** — 예: "body X 가 화면에서 ≥20px 크기로 visible", "body X focus 시 화면 중앙 위치"
+6. **측정 가능한 UX DoD** — 예: "body X 가 화면에서 ≥20px 크기로 visible", "body X focus 시 화면 중앙 위치". 상세 템플릿 + Q2=B 비례 결정 정책은 [§6 측정 가능 UX DoD (Amendment 2026-04-30)](#6-측정-가능-ux-dod-amendment-2026-04-30--q2b-비례-결정-전환) 참조
 
 ---
 
@@ -57,6 +57,12 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 - [ ] **Info 패널** — body X focus 시 실측 정보 (mass / radius / semi-major axis / eccentricity 등) 표시
 - [ ] **회귀 가드** — 이전 R-Phase baseline 대비 기존 body 가시성 변화 없음 (육안 확인 + 스크린샷 diff)
 - [ ] **수동 브라우저 검증** — 실 Chrome GUI 에서 사용자 1차 확인 및 승인 (CRITICAL #3)
+
+> **R4+ 진입 시점부터 추가 적용** (Amendment 2026-04-30, [§R-Phase 공통 DoD 템플릿 갱신](#r-phase-공통-dod-템플릿-amendment-2026-04-30--q2b-비례-결정-가드-추가) 참조). R2/R3 박제값은 별도 ADR amendment 로 소급 갱신:
+>
+> - [ ] **sun 대비 px diameter 비 가드** — body X (non-sun) 가 sun 대비 px 비 ≤ N% (architect ADR 박제값. 초안: mercury 25% / venus 30% / R4+ 는 R-Phase 진입 시 박제)
+> - [ ] **모바일 누적 차단율 가드** — default 진입 모바일 viewport (375×667) 에서 누적 disk area ≤ 25% (UX 침습성 가드)
+> - [ ] **회귀 가드 강화** — 이전 R-Phase 박제 px 비 도 회귀 0 (기존 가시성 + 박제 px 비 둘 다 보존)
 
 ---
 
@@ -125,6 +131,71 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 
 ---
 
+## §6 측정 가능 UX DoD (Amendment 2026-04-30 — Q2=B 비례 결정 전환)
+
+> **Status**: Active (2026-04-30 박제)
+> **근거 ADR**: [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md)
+> **근거 이슈**: [#373](https://github.com/coseo12/astro-simulator/issues/373) — body 간 시각 비율 회귀 forensic
+> **Cross-validate**: Gemini 2.5 Pro outcome=applied (결정 이견 0)
+> **사용자 결정**: 옵션 (c) 채택 (2026-04-30)
+
+### 변경 배경
+
+#373 forensic 결과 + 사용자 옵션 (c) 채택 + Gemini cross-validate 결과 (outcome=applied):
+
+- **Q2=A 독립 결정 정책의 부작용** — 각 body 가 viewport 점유율 ≥ N% 만 충족하도록 독립 결정한 결과, body 간 px diameter 비가 자연 비율에서 이탈 (sun 25% / mercury,venus 가 sun 대비 40~46% 과장 관찰)
+- **사용자 인지 단위 = px diameter 비** — 현재 면적 단위 가드 (M1 brightRatio / M2 disk area) 와 직교. body 간 비례를 직접 측정하는 가드 부재
+
+### 갱신된 DoD 예시
+
+- (보존) "body X 가 화면에서 ≥ 4px 크기로 visible" — 절대 가시성 (M1 brightRatio 가드, R1 SSoT 유지)
+- (보존) "body X focus 시 화면 중앙 위치"
+- **(신규)** "body X (non-sun) 가 sun 대비 px diameter 비 ≤ N% 로 자연 비율 유지" — N 은 architect ADR 박제 (mercury 25% / venus 30% / R4+ 는 R-Phase 진입 시점에 박제)
+- **(신규)** "default 진입 모바일 (375×667) 에서 누적 disk area ≤ 25%" — UX 침습성 가드
+
+### 측정 단위
+
+- M1 brightRatio (sun ≥ 3% 가드, R1 SSoT — 보존)
+- **(신규) M3 px diameter 비** (body 간 비율 가드. `r1-guard --measure-px-ratio` 신설로 자동 측정)
+- **(신규) M2 disk area** (모바일 누적 가드)
+
+### Q2 정책 전환
+
+- 폐기: Q2=A "각 body 가 독립 결정 (각자 viewport 점유율 ≥ N% 만 충족)"
+- 신규: **Q2=B "각 body 가 sun 대비 px diameter 비 ≤ N% 로 비례 결정"**
+- 적용 범위:
+  - **R4 (지구 + 달) 진입 시점부터 본 정책 SSoT** — R-Phase 진입 PM 라운드에서 Q2=B 정책 명시 의무
+  - **R2 (#361, mercuryScale=2500) / R3 (#369, venusScale=4000)** — ADR amendment 로 소급 갱신 (architect 단계 수행. R2 ADR `20260428-r2-mercury-visualization.md` §결정 1 + R3 ADR `20260429-r3-venus-visualization.md` §결정 1 amendment 의무)
+
+---
+
+## §R-Phase 공통 DoD 템플릿 (Amendment 2026-04-30 — Q2=B 비례 결정 가드 추가)
+
+> **Status**: Active (2026-04-30 박제)
+> **적용 시점**: R4 (지구 + 달) 진입 PM 라운드부터 본 amendment 의 3개 가드를 공통 템플릿에 포함 의무
+> **R2/R3 소급 적용**: ADR amendment 로 박제 (architect 단계)
+
+### 추가되는 공통 DoD 가드
+
+기존 7개 가드 (가시성 / Focus / Shortcut / 궤도 / Info 패널 / 회귀 / 수동 브라우저) 에 **3개 추가**:
+
+8. **sun 대비 px diameter 비 가드** — body X (non-sun) 가 sun 대비 px 비 ≤ N% (architect ADR 박제값)
+   - 측정: `r1-guard --measure-px-ratio` (신설)
+   - 초안 임계: mercury 25% / venus 30% / earth TBD (R4 진입 시 박제) / mars TBD (R5) / R6+ TBD
+9. **모바일 누적 차단율 가드** — default 진입 모바일 viewport (375×667) 에서 누적 disk area ≤ 25%
+   - 측정: M2 disk area (기존 가드 도구 재사용)
+   - 근거: 모바일에서 큰 body 다수 누적 시 viewport 차단율 급증 → UX 침습성 → 25% 임계 (M2 단일 body 가드와 별도)
+10. **회귀 가드 강화** — 이전 R-Phase 박제 px 비 도 회귀 0
+    - 기존 가시성 회귀 가드와 직교 (절대 크기 + 상대 비 둘 다 보존)
+    - R-Phase 진입 시 직전 R-Phase 의 모든 body px 비를 baseline 으로 박제 + 새 R-Phase 종료 시 회귀 측정
+
+### 적용 의무
+
+- 새 R-Phase 이슈 생성 시 PM 라운드에서 위 3개 가드를 architect ADR 박제값으로 인스턴스화 + 이슈 DoD 에 포함
+- R2 (#361) / R3 (#369) 는 ADR amendment 로 소급 박제. 코드 변경 여부는 D-T2 사용자 검증 결과에 따라 결정 (initial 초안: mercuryScale 2500 → 2000~3000, venusScale 4000 → 1500~2200)
+
+---
+
 ## 참조
 
 - `docs/baselines/README.md` — 2026-04-25 재구성 시점 UI baseline 스크린샷
@@ -132,3 +203,5 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 - volt [#75](https://github.com/coseo12/volt/issues/75) — SSoT JSON 부호 규약 메타 교훈
 - volt [#76](https://github.com/coseo12/volt/issues/76) — PM multi-turn drift 재현 교훈
 - CLAUDE.md 프로젝트 고유 섹션 — "Incremental Body-by-Body Build (v3)"
+- [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) — Q2=B 전환 ADR (2026-04-30 박제)
+- [#373](https://github.com/coseo12/astro-simulator/issues/373) — body 간 시각 비율 회귀 forensic 이슈
