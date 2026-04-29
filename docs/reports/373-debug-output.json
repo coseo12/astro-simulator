@@ -1,0 +1,177 @@
+{
+  "timestamp": "2026-04-29T16:21:53.821Z",
+  "baseUrl": "http://localhost:3000",
+  "viewports": {
+    "1280x720": {
+      "pixel": {
+        "sampled": 57600,
+        "brightRatio": 0.04189236111111111,
+        "sunDiskRatio": 0.04220486111111111,
+        "planetDiskRatio": 0.0003125,
+        "visibleRatio": 0.06369791666666667
+      },
+      "mesh": {
+        "sun": {
+          "found": true,
+          "wsRadius": 7.591,
+          "wsCenter": [0, 0, 0],
+          "screenCenter": {
+            "x": 640,
+            "y": 360,
+            "z": 0.9997142246791294
+          },
+          "pixelDiameter": 369.36831248115595,
+          "diskAreaRatio": 0.11626973585629917
+        },
+        "mercury": {
+          "found": true,
+          "wsRadius": 3.017,
+          "wsCenter": [-0.6211, -5.806, -0.4173],
+          "screenCenter": {
+            "x": 625.46920941228,
+            "y": 492.2051833711674,
+            "z": 0.999725196477335
+          },
+          "pixelDiameter": 141.16573540932472,
+          "diskAreaRatio": 0.01698267135056123
+        },
+        "venus": {
+          "found": true,
+          "wsRadius": 3.522,
+          "wsCenter": [-8.941, -1.346, 0.4977],
+          "screenCenter": {
+            "x": 427.86463779480016,
+            "y": 386.71141435454905,
+            "z": 0.9997213047412159
+          },
+          "pixelDiameter": 167.11898384762537,
+          "diskAreaRatio": 0.023801207352711583
+        },
+        "_camera": {
+          "type": "ArcRotateCamera",
+          "radius": 35,
+          "target": [0, 0, 0],
+          "fov": 0.8,
+          "fovDeg": 45.83662361046586,
+          "position": [2.038e-15, 10.82, -33.29],
+          "viewportW": 1280,
+          "viewportH": 720
+        }
+      }
+    },
+    "1920x1080": {
+      "pixel": {
+        "sampled": 129600,
+        "brightRatio": 0.042083333333333334,
+        "sunDiskRatio": 0.042291666666666665,
+        "planetDiskRatio": 0.00015432098765432098,
+        "visibleRatio": 0.05867283950617284
+      },
+      "mesh": {
+        "sun": {
+          "found": true,
+          "wsRadius": 7.591,
+          "wsCenter": [0, 0, 0],
+          "screenCenter": {
+            "x": 960,
+            "y": 540,
+            "z": 0.9997142246791294
+          },
+          "pixelDiameter": 554.0524951985153,
+          "diskAreaRatio": 0.11626974696877904
+        },
+        "mercury": {
+          "found": true,
+          "wsRadius": 3.017,
+          "wsCenter": [-0.6187, -5.807, -0.4176],
+          "screenCenter": {
+            "x": 938.2903816005792,
+            "y": 738.317062275738,
+            "z": 0.9997251951482637
+          },
+          "pixelDiameter": 211.7496373426543,
+          "diskAreaRatio": 0.016982837245478048
+        },
+        "venus": {
+          "found": true,
+          "wsRadius": 3.522,
+          "wsCenter": [-8.941, -1.348, 0.4977],
+          "screenCenter": {
+            "x": 641.8139528389579,
+            "y": 580.1421472764835,
+            "z": 0.9997213097127149
+          },
+          "pixelDiameter": 250.67401602830614,
+          "diskAreaRatio": 0.02380036048042644
+        },
+        "_camera": {
+          "type": "ArcRotateCamera",
+          "radius": 35,
+          "target": [0, 0, 0],
+          "fov": 0.8,
+          "fovDeg": 45.83662361046586,
+          "position": [2.038e-15, 10.82, -33.29],
+          "viewportW": 1920,
+          "viewportH": 1080
+        }
+      }
+    },
+    "375x667": {
+      "pixel": {
+        "sampled": 15698,
+        "brightRatio": 0.13224614600586063,
+        "sunDiskRatio": 0.13122690788635494,
+        "planetDiskRatio": 0.0006370238246910434,
+        "visibleRatio": 0.16543508727226397
+      },
+      "mesh": {
+        "sun": {
+          "found": true,
+          "wsRadius": 7.591,
+          "wsCenter": [0, 0, 0],
+          "screenCenter": {
+            "x": 187.5,
+            "y": 333.5,
+            "z": 0.9997142246791294
+          },
+          "pixelDiameter": 342.1786700683367,
+          "diskAreaRatio": 0.36765345176232317
+        },
+        "mercury": {
+          "found": true,
+          "wsRadius": 3.017,
+          "wsCenter": [-0.6428, -5.805, -0.4152],
+          "screenCenter": {
+            "x": 173.57058247866723,
+            "y": 455.92201851268345,
+            "z": 0.9997252080149416
+          },
+          "pixelDiameter": 130.7688665579476,
+          "diskAreaRatio": 0.05369594608110502
+        },
+        "venus": {
+          "found": true,
+          "wsRadius": 3.522,
+          "wsCenter": [-8.944, -1.326, 0.4981],
+          "screenCenter": {
+            "x": -9.111499671390916,
+            "y": 357.83906222688023,
+            "z": 0.9997212611576142
+          },
+          "pixelDiameter": 154.84136694339557,
+          "diskAreaRatio": 0.07528470846667622
+        },
+        "_camera": {
+          "type": "ArcRotateCamera",
+          "radius": 35,
+          "target": [0, 0, 0],
+          "fov": 0.8,
+          "fovDeg": 45.83662361046586,
+          "position": [2.038e-15, 10.82, -33.29],
+          "viewportW": 375,
+          "viewportH": 667
+        }
+      }
+    }
+  }
+}
