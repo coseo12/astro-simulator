@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { BODY_SCALE, getBodyScale } from './body-scale';
 
-describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업', () => {
-  it('sun = 75 (R1 baseline)', () => {
-    expect(BODY_SCALE.sun).toBe(75);
+describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업 (Amendment 2026-05-01 라운드 2)', () => {
+  it('sun = 50 (R1 Amendment 2026-05-01 — 75 → 50, 옵션 a)', () => {
+    expect(BODY_SCALE.sun).toBe(50);
   });
 
-  it('mercury = 8500 (R2 baseline — ADR 20260428-r2-mercury-visualization.md §결정 1)', () => {
-    expect(BODY_SCALE.mercury).toBe(8500);
+  it('mercury = 900 (R2 Amendment 2026-05-01 라운드 2 — 8500 → 2000 → 900, 옵션 c 적극 재조정)', () => {
+    expect(BODY_SCALE.mercury).toBe(900);
   });
 
-  it('venus = 4000 (R3 baseline — ADR 20260429-r3-venus-visualization.md §결정 1)', () => {
-    expect(BODY_SCALE.venus).toBe(4000);
+  it('venus = 650 (R3 Amendment 2026-05-01 라운드 2 — 4000 → 1500 → 650, 옵션 c 적극 재조정)', () => {
+    expect(BODY_SCALE.venus).toBe(650);
   });
 
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
@@ -21,15 +21,15 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업', () =
       // @ts-expect-error — 의도적 잘못된 할당으로 freeze 동작 확인
       BODY_SCALE.sun = 100;
     }).toThrow();
-    expect(BODY_SCALE.sun).toBe(75);
+    expect(BODY_SCALE.sun).toBe(50);
   });
 });
 
 describe('getBodyScale — 룩업 헬퍼', () => {
   it('정의된 body 는 룩업값 반환', () => {
-    expect(getBodyScale('sun')).toBe(75);
-    expect(getBodyScale('mercury')).toBe(8500);
-    expect(getBodyScale('venus')).toBe(4000);
+    expect(getBodyScale('sun')).toBe(50);
+    expect(getBodyScale('mercury')).toBe(900);
+    expect(getBodyScale('venus')).toBe(650);
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {

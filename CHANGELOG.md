@@ -5,6 +5,29 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+> **R3 D-T2 후속 — body 비율 자연화 (2026-05-01, #373 라운드 2 적극 재조정)** — 어제 (2026-04-30) D-T2 사용자 검증 5건 회귀 발견 중 **#1 (sun ↔ mercury / venus 비율 미해소)** 만 본 PR 범위. #378/#379/#380 (회귀 #2~#4) 은 별도 이슈 분리. 선행 PR [#377](https://github.com/coseo12/astro-simulator/pull/377) (옵션 c 보수값 mercury=2000 / venus=1500) D-T2 미통과 → CLOSED → 라운드 2 적극값 (임계 비례 역산 mercury=900 / venus=650) 채택. forensic ADR [`docs/decisions/20260430-r3-followup-body-proportion.md`](docs/decisions/20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (라운드 2) SSoT.
+
+### Behavior Changes
+
+- **수성/금성/태양 시각 비율 자연화 — 라운드 2 적극 재조정** ([#373](https://github.com/coseo12/astro-simulator/issues/373)) — 박제값 갱신 3건:
+  - `BODY_SCALE.sun` 75 → **50** (R1 amendment, 옵션 a) — sun 자체 자연 크기화. 1280×720 brightRatio 4.19% → ~1.86% (R1 ADR Amendment 2026-05-01 §"sunScale 50 점유율 산출")
+  - `BODY_SCALE.mercury` 8500 → **900** (R2 amendment 라운드 2, 옵션 c 적극 재조정) — sun 대비 px 비 38% → ~6%. 임계 비례 역산 `2000 × 6/13.5 ≈ 889`
+  - `BODY_SCALE.venus` 4000 → **650** (R3 amendment 라운드 2, 옵션 c 적극 재조정) — sun 대비 px 비 45% → ~11%. 임계 비례 역산 `1500 × 11/25.5 ≈ 647`
+- **r1-guard `--measure-px-ratio` flag 신설** — body 별 px diameter + sun 대비 px 비 + diskAreaRatio 자동 측정 + 임계 가드. CLI: `pnpm --filter @astro-simulator/web r1:guard:px-ratio` (또는 `node scripts/r1-ui-regression-guard.mjs --measure-px-ratio`). 임계: mercury sun 대비 ≤ 6% / venus sun 대비 ≤ 11% / 모바일 누적 disk area ≤ 25% (sun + mercury + venus). dev 빌드 (`window.__solarScene` 노출) 의존 + `?gpu=a` 강제 진입 (volt #77 false positive 가드). ADR [`20260430-r3-followup-body-proportion.md`](docs/decisions/20260430-r3-followup-body-proportion.md) §결정 2 §5 + [`20260425-r1-ui-pixel-diff-guard.md`](docs/decisions/20260425-r1-ui-pixel-diff-guard.md) Amendment 2026-05-01 §결정 2
+
+### Notes
+
+- **D-T2 사용자 검증 단계 분리** — 본 PR 은 박제값 갱신 + r1-guard `--measure-px-ratio` 신설 + 단위 테스트/빌드/lint PASS 까지. **실 Chrome GUI 수동 검증** 은 qa 단계 또는 사용자 D-T2 직접 (volt #77 — headless 검증만으로 종결 금지)
+- **R3 baseline 갱신 별도 후속 PR** — sunScale 50 변경은 캔버스 외 4 영역 (top-nav / shortcut-bar / hud-top-right / hud-bottom-right) 에 직접 영향 0 (canvas 영역 비교 제외 박제, R1 UI pixel-diff guard ADR §결정 4) 이지만 sun mesh 가 shortcut-bar 의 하이라이트 색상에 indirect 영향 가능성 있음. PR CI r1-guard step 미스매치 발견 시 `r1:baseline-bootstrap` workflow_dispatch 1회 실행 → auto PR 생성 별도 머지 (R2 #365 / R3 패턴)
+- **회귀 분리 박제 (#378/#379/#380)** — D-T2 5건 회귀 중 비율 미해소 #1 만 본 PR 범위. #2~#4 (Roadmap v3 amendment §"회귀 분리" 박제) 는 별도 이슈로 직교 추적. PR 한 건당 회귀 한 가지만 책임지는 SRP 원칙 (volt #30 Phase 분리 릴리스 리듬 적용)
+- **사후 재조정 경로 박제** — 라운드 2 박제값 (sun 50 / mercury 900 / venus 650) 은 임계 한계 정렬 적극값. forensic ADR §재검토 트리거 #1 라운드 2 보강에 후속 적극값 (mercury 700 / venus 500 — sun 대비 ~5% / ~9% 보수 여유) + 옵션 (e) log scaling 우선순위 high 승격 경로 박제. 측정 노이즈 ± 5% 마진 안에 가까스로 통과 시 사용자 평가 정성 (#1 비율 미해소만 해결, #2~#4 별도) 우선
+
+### Docs
+
+- **forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-01 (라운드 2)** ([#373](https://github.com/coseo12/astro-simulator/issues/373)) — §재검토 트리거 #1 라운드 2 발동 (선행 PR #377 옵션 c 보수값 D-T2 미통과 → 라운드 2 적극값 채택). 박제값 적극 재조정 + r1-guard 임계 보존 + Cross-validate 결과 (Gemini 2.5 Pro outcome=applied). architect 라운드 2 자체-검증 + 사용자 결정 박제
+- **R1/R2/R3 ADR Amendment 2026-05-01 (라운드 2 동반 박제)** — sunScale 50 baseline 갱신 (R1) + mercuryScale 900 (R2 라운드 2) + venusScale 650 (R3 라운드 2). 라운드 1 amendment 본문 보존 (trace = "왜 라운드 1 에서 라운드 2 로 재조정했는가" forensic ADR §"임계 비례 역산" SSoT)
+- **r1-ui-pixel-diff-guard ADR Amendment 2026-05-01 (라운드 2)** — sunScale 50 baseline 동반 갱신 (`--measure-sun-coverage` brightRatio 가드 1280×720 ≥ 3% → ≥ 0.5%, sunScale 50 통과 여유 마진) + `--measure-px-ratio` flag 신설 박제
+
 > **R3 사이클 진입 (2026-04-29)** — Roadmap v3 "Incremental Body-by-Body Build" 세 번째 스프린트. 태양 + 수성 (R2) 위에 **금성** 점진 추가. R1+R2 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r2-focus-race-guard) 100% 재사용. `venus: 4000` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R2 ADR `20260428-r2-mercury-visualization.md` §결과 Concrete Prediction "R3 추가 시 코드 변경 ≤ 2 라인" **첫 외부 검증 — PASS**. 핵심 6 파일 변경 0 (solar-system-scene.ts / tier.ts / lod.ts / sim-canvas.tsx / celestial-info-panel.tsx / camera-controller.ts). 추가로 R2 머지 시점부터 잠재한 **ambient 라이팅 약점 (#372)** 회귀 fix 동봉 — default 진입 시 행성 그림자측 인지 가능 임계 회복 (옵션 A 정책). PR [#369](https://github.com/coseo12/astro-simulator/pull/369) (R3 anchor + ADR + 시각화 통합 + #372 fix).
 
 ### Behavior Changes
@@ -26,7 +49,9 @@ Semantic Versioning을 따른다.
 
 - **ADR `20260429-r3-venus-visualization.md` 신규** ([#369](https://github.com/coseo12/astro-simulator/issues/369)) — 610 라인. R3 시각화 결정 6건 통합 (venusScale=4000 / shortcut-bar venus 항목 / orbit 라인 무수정 / focus race body-agnostic / info 패널 자동 일반화 / 비-범위 보호 가드). 11 후보 × 3 viewport venusScale 산출표. R4 Concrete Prediction (earth 단독 = 1 라인 / earth + moon = 0~2 라인). Gemini cross-validate 합의 (6 영역 우수 + S급 ADR + viewport-aware scaling R4 결정 시점 구체화 권고 수용). 후속 발견 분리 (ADR Status workflow Provisional → Accepted 표준화 — priority:medium-low)
 
-> **R2 사이클 (2026-04-28)** — Roadmap v3 "Incremental Body-by-Body Build" 두 번째 스프린트. 태양 단독 visible (R1, v0.14.0) 위에 **수성** 점진 추가. R1 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r1-guard 매트릭스) 100% 재사용. `mercury: 8500` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R1 §결과 Concrete Prediction "R2 코드 변경 ≤ 3 라인" 자연 검증. PR [#363](https://github.com/coseo12/astro-simulator/pull/363) (R2 anchor) + [#365](https://github.com/coseo12/astro-simulator/pull/365) (baseline 갱신 + Amendment v4 정정) + [#366](https://github.com/coseo12/astro-simulator/pull/366) (agent-browser 가드 — volt #79).
+## [0.15.0] — 2026-04-28
+
+> **R2 사이클 (2026-04-28)** — Roadmap v3 "Incremental Body-by-Body Build" 두 번째 스프린트. 태양 단독 visible (R1, v0.14.0) 위에 **수성** 점진 추가. R1 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r1-guard 매트릭스) 100% 재사용. `mercury: 8500` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R1 §결과 Concrete Prediction "R2 코드 변경 ≤ 3 라인" 자연 검증. PR [#363](https://github.com/coseo12/astro-simulator/pull/363) (R2 anchor) + [#365](https://github.com/coseo12/astro-simulator/pull/365) (baseline 갱신 + Amendment v4 정정) + [#366](https://github.com/coseo12/astro-simulator/pull/366) (agent-browser 가드 — volt #79). 누락된 release entry 박제는 [#373](https://github.com/coseo12/astro-simulator/issues/373) PR 흐름에서 회수 (release version bump 가드 통과 의무).
 
 ### Behavior Changes
 

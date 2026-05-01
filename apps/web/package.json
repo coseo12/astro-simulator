@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "r1:guard": "node scripts/r1-ui-regression-guard.mjs",
+    "r1:guard:px-ratio": "node scripts/r1-ui-regression-guard.mjs --measure-px-ratio"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",
