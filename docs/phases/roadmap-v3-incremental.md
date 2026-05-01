@@ -254,6 +254,53 @@ Amendment 2026-04-30 의 명세 초안 → Amendment 2026-05-01 의 적극값 �
 
 ---
 
+## §6 + §R-Phase 공통 DoD 템플릿 (Amendment 2026-05-01 라운드 2 — 박제값 적극 재조정)
+
+> **Status**: Active (2026-05-01 박제, architect 라운드 2)
+> **근거 ADR**: [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (라운드 2)
+> **사용자 결정**: (A) 임계 비례 역산 적극 재조정 채택 (2026-05-01)
+> **적용 PR**: feature/373-body-proportion-aggressive (라운드 1 박제 보존 + 라운드 2 추가)
+
+### 변경 배경 (라운드 1 의 후속)
+
+라운드 1 박제값 (mercury 2000 / venus 1500) 의 forensic px 비 예측이 DoD 임계를 2.25~2.32배 초과 → 임계 비례 역산 적극 재조정 (mercury 900 / venus 650). sunScale 50 그대로 유지.
+
+### 갱신된 박제값 (라운드 2)
+
+| body    | Amendment 2026-05-01 (라운드 1) | Amendment 2026-05-01 (라운드 2)      |
+| ------- | ------------------------------- | ------------------------------------ |
+| sun     | sunScale = 50                   | **sunScale = 50** (그대로 유지)      |
+| mercury | mercuryScale = 2000 (적극값)    | **mercuryScale = 900 (적극 재조정)** |
+| venus   | venusScale = 1500 (적극값)      | **venusScale = 650 (적극 재조정)**   |
+
+### 임계 비례 역산 근거 (forensic 측정 식 선형성 활용)
+
+`pxDiameter ∝ scale` 1차 비례 → 임계 정렬값 산출:
+
+- mercury: `2000 × (6 / 13.5) ≈ 889` → **900** (보수 라운딩)
+- venus: `1500 × (11 / 25.5) ≈ 647` → **650** (보수 라운딩)
+
+### Q2=B 임계 — 라운드 1 그대로 유지
+
+- mercury sun 대비 px 비: **≤ 6%** (라운드 2 박제값 900 의 통과 목표)
+- venus sun 대비 px 비: **≤ 11%** (라운드 2 박제값 650 의 통과 목표)
+- 라운드 2 박제값은 임계 한계 정렬 (목표 = 임계). 측정 노이즈 ± 5% 마진 안에 통과 필요
+
+### R1 baseline 가드 — 라운드 1 그대로 유지
+
+sunScale 50 박제값 변동 없음 → R1 baseline 가드 임계 모두 라운드 1 amendment 그대로 유지.
+
+### r1-guard `--measure-px-ratio` — 라운드 1 명세 그대로 유지
+
+라운드 2 는 박제값만 재조정, 명세 변경 없음. 라운드 1 amendment 의 명세 (mercury ≤ 6% / venus ≤ 11% / 박제값 ± 2% 마진) 그대로 사용.
+
+### 회귀 분리 — 라운드 1 그대로 유지
+
+- #378 / #379 / #380 분리 박제 보존
+- 라운드 2 박제값 (mercury 900 / venus 650) 은 모바일 누적 disk area 를 라운드 1 의 ~20% 수준으로 더욱 축소 → #380 (모바일 회귀) 우려 추가 완화
+
+---
+
 ## 참조
 
 - `docs/baselines/README.md` — 2026-04-25 재구성 시점 UI baseline 스크린샷
@@ -261,7 +308,7 @@ Amendment 2026-04-30 의 명세 초안 → Amendment 2026-05-01 의 적극값 �
 - volt [#75](https://github.com/coseo12/volt/issues/75) — SSoT JSON 부호 규약 메타 교훈
 - volt [#76](https://github.com/coseo12/volt/issues/76) — PM multi-turn drift 재현 교훈
 - CLAUDE.md 프로젝트 고유 섹션 — "Incremental Body-by-Body Build (v3)"
-- [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) — Q2=B 전환 ADR (2026-04-30 박제) + Amendment 2026-05-01 (적극값 채택 + 옵션 a 동반)
+- [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) — Q2=B 전환 ADR (2026-04-30 박제) + Amendment 2026-05-01 (적극값 채택 + 옵션 a 동반) + Amendment 2026-05-01 라운드 2 (박제값 적극 재조정 mercury 900 / venus 650)
 - [#373](https://github.com/coseo12/astro-simulator/issues/373) — body 간 시각 비율 회귀 forensic 이슈
 - [#378](https://github.com/coseo12/astro-simulator/issues/378) — focus 시 허공 표시 (R3 D-T2 가드 발견 #2, 본 amendment 와 분리 박제)
 - [#379](https://github.com/coseo12/astro-simulator/issues/379) — 모바일 그래픽 사각형 (R3 D-T2 가드 발견 #3, 본 amendment 와 분리 박제)
