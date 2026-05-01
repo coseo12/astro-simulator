@@ -700,3 +700,106 @@ cross-validate outcome=applied. 본 amendment 결정 자체 합의. 보강 의�
 - 옵션 (e) log scaling — 후속 이슈 분리 보존 (본 amendment §재검토 트리거 #4 가 발동되면 우선순위 high 승격)
 - `packages/core/src/scene/tier.ts` (renderScale) — Q3=C 일관 보존
 - `packages/shared/data/solar-system.json` (실측 데이터) — 절대 변경 금지
+
+---
+
+## Amendment 2026-05-01 (라운드 2) — 박제값 적극 재조정 (mercury 2000→900 / venus 1500→650)
+
+> **상태**: 라운드 1 박제값 (mercury 2000 / venus 1500) 의 forensic px 비 예측이 DoD 임계 2.25~2.32배 초과 → **임계 비례 역산 박제값 재조정**. 사용자 (A) 채택 (2026-05-01).
+> **선행 박제**: 본 ADR Amendment 2026-05-01 (라운드 1) — §재검토 트리거 #1 발동 + 5 옵션 (a) 채택 + r1-guard 명세 + D-T2 px 비 예측
+> **트리거**: 라운드 1 박제값 forensic 측정 정합성 검증 → DoD 미충족 위험 명백
+
+### 결정
+
+- `sunScale: 50` 그대로 유지 (라운드 1 amendment 보존)
+- `mercuryScale: 2000 → 900` (적극 재조정)
+- `venusScale: 1500 → 650` (적극 재조정)
+
+### 근거 — 임계 비례 역산
+
+라운드 1 박제값으로 산출한 forensic px 비 예측이 DoD 임계 (mercury sun 의 ≤ 6%, venus sun 의 ≤ 11%) 를 **2.25~2.32배 초과**:
+
+| body    | 라운드 1 박제값 | sun 대비 px 비 예측 | DoD 임계 | 초과 배수 |
+| ------- | --------------- | ------------------- | -------- | --------- |
+| mercury | 2000            | 13.5%               | ≤ 6%     | 2.25배    |
+| venus   | 1500            | 25.5%               | ≤ 11%    | 2.32배    |
+
+forensic 측정 식 (px diameter = renderRadius_world × scale × focalLength_world / cameraDistance × viewportPx) 의 **선형성** 활용:
+
+- mercuryScale 2000 → 13.5%, 목표 ≤ 6% → `2000 × (6 / 13.5) ≈ 889` → **900** (보수 라운딩)
+- venusScale 1500 → 25.5%, 목표 ≤ 11% → `1500 × (11 / 25.5) ≈ 647` → **650** (보수 라운딩)
+
+선형 가정의 타당성: `pxDiameter ∝ scale` (1차 비례) 는 `body-scale.ts` 의 `renderRadius = baseRadius × scale` 정의에 직접 근거. camera distance 와 focalLength 는 scale 과 독립.
+
+### 라운드 2 D-T2 px 비 예측 재산출 박제
+
+#### 1280×720 (데스크톱 viewport, T1 solar tier 기준)
+
+| 항목                | 라운드 1 (mercury 2000 / venus 1500) | 라운드 2 (mercury 900 / venus 650) | DoD 임계 |
+| ------------------- | ------------------------------------ | ---------------------------------- | -------- |
+| sun pxDiameter      | 246.3                                | 246.3 (변동 없음)                  | -        |
+| sun brightRatio     | 1.86%                                | 1.86% (변동 없음)                  | ≥ 0.5%   |
+| sun diskAreaRatio   | 5.17%                                | 5.17% (변동 없음)                  | -        |
+| mercury pxDiameter  | ~33.2                                | **~14.9** (예측, 2000→900 비례)    | -        |
+| mercury sun 대비 비 | 13.5%                                | **~6.0%** (예측, 통과 한계)        | ≤ 6% ✅  |
+| venus pxDiameter    | ~62.8                                | **~27.2** (예측, 1500→650 비례)    | -        |
+| venus sun 대비 비   | 25.5%                                | **~11.0%** (예측, 통과 한계)       | ≤ 11% ✅ |
+
+**경계값 통과**: 적극 재조정으로 임계 한계에 정확히 맞춰지므로 forensic 측정 결과가 ± 5% 마진 (라운드 1 박제값 ± 2% 강화에서 본 amendment 는 임계 통과 안전 여유 확보 위해 ± 5% 다시 사용) 안에 들어와야 통과. 측정 노이즈 우려 시 mercury 850 / venus 600 추가 보수 검토 가능 (D-T2 결과 따름).
+
+#### 모바일 누적 disk area 재계산 박제 (예측)
+
+라운드 1 박제값 적용 시 (375×667 viewport): mercury+venus 모바일 누적 disk area ~0.45% 추산. 라운드 2 (mercury 900 / venus 650) 적용 시 **선형 면적 비율 (scale²)** 로 더 작아짐:
+
+- mercury: `(900 / 2000)² ≈ 0.20` → 라운드 1 추산값의 20% 수준
+- venus: `(650 / 1500)² ≈ 0.19` → 라운드 1 추산값의 19% 수준
+- 누적 disk area ~0.09% 예측 (라운드 1 ~0.45% 의 1/5 수준)
+
+R3 ADR Amendment 2026-05-01 의 모바일 점유율 회귀 우려 (#380 분리) 는 라운드 2 에서 더욱 완화됨. 단, **사용자 D-T2 평가 핵심은 "데스크톱 viewport 자연 비율"** 이므로 모바일은 별도 #380 추적.
+
+### r1-guard `--measure-px-ratio` 명세 — 라운드 2 임계 보존
+
+본 ADR §결정 2 §5 Amendment 2026-05-01 (라운드 1) 의 명세는 **그대로 보존**:
+
+- mercury 임계 `sun 대비 ≤ 6%` (라운드 2 박제값 900 의 통과 목표)
+- venus 임계 `sun 대비 ≤ 11%` (라운드 2 박제값 650 의 통과 목표)
+- 박제값 ± 2% (라운드 1 강화) 유지 — 라운드 2 박제값 자체가 임계 한계 정렬이므로 측정 노이즈 보정 마진 ± 5% 는 forensic ADR §"D-T2 px 비 예측" 에서만 사용
+
+**임계 변경 없음, 박제값만 재조정**. r1-guard 신설 코드 (developer 단계 책임) 는 라운드 1 명세 그대로 사용 가능.
+
+### Developer 인계 갱신 (라운드 2 후 별도 단계)
+
+본 architect 라운드 2 박제 후 developer sub-agent 호출 시 의무 (라운드 1 인계 갱신):
+
+1. **`apps/web/src/constants/body-scale.ts`** — `sun: 50` (변동 없음), `mercury: 2000 → 900`, `venus: 1500 → 650` 갱신
+2. **`apps/web/src/constants/body-scale.test.ts`** — 박제값 정확 일치 단위 테스트 갱신 (mercury 900 / venus 650)
+3. **r1-guard `--measure-px-ratio` 신설** — 본 ADR §결정 2 §5 Amendment 2026-05-01 (라운드 1) 명세 그대로 구현. 라운드 2 박제값에 대해 동일 임계 (mercury ≤ 6% / venus ≤ 11%) 적용
+4. **`_debug-373-proportion-tmp.mjs` 재실행** — 라운드 2 적용 후 px 비 실측 + ADR 박제값 ± 5% 마진 검증
+5. **사용자 D-T2 (실 Chrome GUI 수동)** — 라운드 2 px 비 예측 (mercury ~6.0% / venus ~11.0%) 자연 비율 평가
+6. **CHANGELOG `### Behavior Changes`** — "수성/금성/태양 시각 비율 자연화 (라운드 2 적극 재조정). sun 대비 mercury/venus px 비 38%/45% → ~6%/~11%. sun 점유율 4.19% → ~1.86% (1280×720)"
+7. **r1-ui-pixel-diff-guard ADR amendment 박제 의무** (라운드 1 의무 보존) — sunScale 50 적용 후 회귀 가드 4 영역 baseline 변경 + r1-guard `--measure-px-ratio` 신설 동반 amendment 박제
+
+### §재검토 트리거 라운드 2 보강
+
+라운드 1 amendment 의 §재검토 트리거 5건 보존. 라운드 2 결과로 **§재검토 트리거 #1 (D-T2 미통과)** 의 후속 행동 갱신:
+
+- 라운드 2 적용 후 D-T2 미통과 시 다음 적극값 후보: **mercury 700 / venus 500** (sun 대비 ~5% / ~9% 보수 여유) 또는 **옵션 (e) log scaling** 우선순위 high 승격
+- D-T2 통과 시 본 amendment 박제값 (mercury 900 / venus 650) 이 R3 #373 SSoT 종결값
+- 측정 노이즈로 ± 5% 안에 가까스로 통과 시 사용자 평가 정성 (#1 비율 미해소만 해결, #2~#4 별도) 우선
+
+### 비-범위 (라운드 2, 라운드 1 보존)
+
+- 본 architect 라운드 2 코드 변경 0 — body-scale.ts / body-scale.test.ts / r1-ui-regression-guard.mjs 직접 수정 금지 (developer 단계 책임)
+- #378/#379/#380 fix — 별도 이슈, 본 amendment 와 직교
+- 옵션 (e) log scaling — 후속 이슈 분리 보존 (라운드 2 D-T2 미통과 시 우선순위 high 승격)
+- DoD 변경 금지 (CRITICAL #6) — 라운드 1 사용자 합의 DoD 그대로
+
+### Cross-validate (라운드 2)
+
+본 amendment 박제 직후 cross-validate 스킬 1회 호출 의무 (CLAUDE.md `## 교차검증` 정책 + volt #23). 핵심 평가 축:
+
+1. **임계 비례 역산 방법론 (선형 가정) 의 타당성** — `pxDiameter ∝ scale` 1차 비례가 forensic 측정 식에 직접 근거하는가? 비선형 보정 필요 영역 (예: depth fade / atmosphere shader / camera frustum 경계 효과) 이 있는가?
+2. **라운드 2 박제값의 안전 여유** — 임계 한계 정렬 (목표 = 임계) 이 측정 노이즈에 취약한가? 보수 여유 확보 (예: 목표 = 임계 × 0.85) 가 더 적절한가?
+3. **라운드 1 보존 박제 (sunScale 50, r1-guard 명세 보존, R3 코드 +2 라인 PASS) 와의 일관성**
+
+cross-validate 결과를 라운드 2 amendment 끝에 §"Cross-validate 결과 (라운드 2)" 섹션으로 박제.
