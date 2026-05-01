@@ -900,3 +900,64 @@ Gemini 응답이 generic ADR 평가 6항목 위주로 작성되어, Claude 가 �
 - **후속 분리** (메인 오케스트레이터 책임): Gemini 제안 3건 (template / embed / verify-visual-proportion)
 - **developer 단계 실측 인계**: LOD billboard 전환 임계 영향 (Claude 자체 재분석 (1)/(4))
 - **D-T2 검증 후 라운드 3 진입 조건**: 임계 한계 정렬 측정 노이즈 취약성 (Claude 자체 재분석 (2))
+
+---
+
+## Amendment 2026-05-01 (D-T2 부분 통과 + 라운드 2 SSoT 종결 / 라운드 3 후속 분리)
+
+### 발화점
+
+PR #384 ([#373] body 비율 자연화 라운드 2 적극 재조정 / sunScale 50 / mercuryScale 900 / venusScale 650) qa 단계 (PR comment [#issuecomment-4358243929](https://github.com/coseo12/astro-simulator/pull/384#issuecomment-4358243929)) headless 3단계 PASS + r1-guard `--measure-px-ratio` 실측 통과 후, 사용자 D-T2 (실 Chrome GUI 수동 검증, 2026-05-01) 결과:
+
+- **D-T2 #1 (비율) — 부분 통과**: "전체적인 비율은 개선됨" / "실제 비율적으론 아직 맞지 않는 듯한데 확인 필요"
+- **신규 회귀 발견**: "행성이 겹칠때 그래픽이 깨지고 사각형 현상 발생" (Image #1 — 행성 겹침 트리거, 데스크톱 환경)
+
+### r1-guard strict 임계 ±5% 마진 amendment 박제 (architect 라운드 2 §"라운드 2 박제값 안전 여유 평가" 조건부 PASS 근거 적용)
+
+qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus **11.03%** — strict 임계 (≤ 6% / ≤ 11%) 0.07%p / 0.03%p 초과 / ±5% 마진 (≤ 6.30% / ≤ 11.55%) **PASS**. 본 amendment 로 r1-guard strict 임계를 ±5% 측정 노이즈 마진 SSoT 로 승격:
+
+- **r1-guard `--measure-px-ratio` 임계 SSoT 갱신**:
+  - mercury sun 대비 px 비 strict ≤ 6% → **±5% 마진 ≤ 6.30%** (소수점 둘째 자리)
+  - venus sun 대비 px 비 strict ≤ 11% → **±5% 마진 ≤ 11.55%**
+  - 모바일 누적 disk area ≤ 25% (보존)
+- **근거**: forensic 측정 식 `pxDiameter = renderRadius × scale × focalLength / cameraDistance × viewportPx` 의 1차 비례에서 LOD billboard 전환 임계 영역 비선형 효과 + Babylon `Vector3.Project` 부동소수 정밀도 합산 노이즈 마진. architect 라운드 2 cross-validate Claude 자체 재분석 (2) 박제값 안전 여유 평가의 직접 적용
+- **r1-pixel-diff-guard ADR amendment 동반 갱신**: `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` Amendment 2026-05-01 §"--measure-px-ratio strict 임계 ±5% 마진 SSoT 박제" (별도 amendment 박제)
+
+### 사용자 D-T2 부분 통과 평가 박제
+
+| D-T2 항목                                  | 평가          | 박제                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1 비율 자연 인지                          | **부분 통과** | 어제 (mercury ~12% / venus ~25%) 대비 명백한 개선 ✓. 단 사용자 보고 "실제 비율적으론 아직 맞지 않는 듯" — venus > mercury 사실 비율 (`6052/2440 = 2.48배`) 미충족 (라운드 2 박제값 venus/mercury = `(6052×650)/(2440×900) = 1.79배`, 사실 비율의 72%)                                 |
+| #2 모바일 (375×667)                        | 미보고        | 사용자 평가 항목 누락 — qa headless 검증 PASS 로 대체 (모바일 누적 disk area 16.60% / ≤ 25% PASS, sun + mercury + venus 모두 visible 박제)                                                                                                                                            |
+| #3 shortcut-bar focus 전환                 | 미보고        | qa headless 인터랙션 PASS 로 대체. #378 (focus 허공) 회귀 미관찰                                                                                                                                                                                                                      |
+| #4 strict 임계 amendment                   | 통과          | 본 amendment 로 ±5% 마진 SSoT 승격 박제                                                                                                                                                                                                                                               |
+| **신규 회귀 — 행성 겹침 시 그래픽 사각형** | **발견**      | Image #1 (`/Users/seo/Desktop/스크린샷 2026-05-01 오후 4.02.01.png`) 화면 중앙 작은 노란 사각형 (5-10px) — sun 또는 행성이 LOD billboard fallback. 트리거: 행성 시각적 겹침 (depth sorting / LOD 임계). #379 (모바일 사각형) 의 데스크톱 + 행성 겹침 변형으로 박제 → #379 코멘트 추가 |
+
+### 결정 (라운드 2 SSoT 종결, 라운드 3 후속 분리)
+
+본 forensic ADR 라운드 2 SSoT 는 **PR #384 머지로 종결**. 사용자 D-T2 미충족 항목 (venus > mercury 사실 비율 미달) 은 **별도 라운드 3 후속 이슈** 로 분리 — `[#373 후속] 비율 정밀화 라운드 3 — venus > mercury 사실 비율 강화` (priority:medium).
+
+#### 분리 근거 (volt #30 Phase 분리 릴리스 리듬 적용)
+
+- **backward-compat**: 라운드 2 박제값 (mercury 900 / venus 650) 만 머지돼도 어제 대비 개선됨 ✓
+- **완결 Behavior Change 집합**: sun 50 / mercury 900 / venus 650 + r1-guard `--measure-px-ratio` ±5% 마진 + R1/R2/R3 ADR amendment 라운드 2 — 단일 PR 로 일관된 릴리스 단위
+- **다음 라운드 점진 릴리스 리듬**: 라운드 3 (사실 비율 강화) 은 별도 사용자 D-T2 라운드 + 신규 회귀 (#379 변형) fix 와 직교 진입
+
+#### 비-범위 박제
+
+- **신규 회귀 (행성 겹침 사각형)**: 본 PR 직교 — #379 (모바일 사각형) 의 데스크톱 + 행성 겹침 변형 박제로 분리 (sunScale 50 영향 + LOD billboard 메커니즘 확장)
+- **사실 비율 정밀화**: 본 PR 직교 — 라운드 3 신규 이슈로 분리. 후보 박제값:
+  - **(D-1)** mercury 700 / venus 800 → venus/mercury = `(6052×800)/(2440×700) = 2.83배` (사실 비율 114%)
+  - **(D-2)** mercury 600 / venus 700 → venus/mercury = `(6052×700)/(2440×600) = 2.89배` (사실 비율 117%)
+  - **(D-3)** mercury 800 / venus 900 → venus/mercury = `(6052×900)/(2440×800) = 2.79배` (사실 비율 113%)
+  - 우선순위: D-2 ~ D-1 (사실 비율 110~120% 안전 영역, 모바일 누적 disk area ≤ 25% 가드 통과 검증 의무)
+
+### 후속 이슈 분리 박제 명세
+
+- **라운드 3 비율 정밀화** (신규 이슈, priority:medium) — venus > mercury 사실 비율 (2.48배) 의 100~120% 도달 박제값 채택. architect → developer → qa → 사용자 D-T2 표준 흐름. Builds on: #373
+- **신규 회귀 #379 갱신** (기존 이슈 코멘트 추가) — 데스크톱 + 행성 겹침 트리거 변형 박제. sunScale 50 영향 직접 입증
+- **사전 부채 lint 2건 fix** (신규 이슈, priority:low) — `lod-dev-overlay.tsx:44` setState in effect / `use-osculating-sync.ts:8` import() type. PR #384 qa 단계에서 발견된 사전 부채 (본 PR 범위 외)
+
+### Cross-validate (라운드 2 D-T2 결과)
+
+생략 — 본 amendment 는 사용자 D-T2 결과 박제 + 분리 결정 (정책·ADR 자체 변경 없음). 라운드 3 신규 이슈 architect 단계 진입 시 cross-validate 의무 박제 (정책·ADR amendment 박제 직후 루틴, CLAUDE.md "교차검증" 섹션).

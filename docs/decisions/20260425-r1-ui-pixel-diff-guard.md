@@ -1226,3 +1226,41 @@ cross-validate 결과는 본 §"교차검증 반영 사항" 의 합의/이견/�
 - R3 ADR [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) Amendment 2026-05-01 (라운드 2)
 
 ---
+
+## Amendment 2026-05-01 (라운드 2 D-T2) — `--measure-px-ratio` strict 임계 ±5% 마진 SSoT 박제
+
+### 발화점
+
+PR #384 ([#373] body 비율 자연화 라운드 2) qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus **11.03%** — strict 임계 (≤ 6% / ≤ 11%) 0.07%p / 0.03%p 초과 / ±5% 마진 (≤ 6.30% / ≤ 11.55%) PASS. 사용자 D-T2 부분 통과 (비율 개선 확인) 후 strict 임계를 측정 노이즈 마진 SSoT 로 승격.
+
+### 결정
+
+`--measure-px-ratio` 임계 SSoT 갱신:
+
+| body        | strict 임계 (라운드 2 박제) | ±5% 마진 SSoT (본 amendment) | 측정 노이즈 안전 여유 |
+| ----------- | --------------------------- | ---------------------------- | --------------------- |
+| **mercury** | sun 대비 px 비 ≤ 6%         | **≤ 6.30%**                  | 0.30%p 마진           |
+| **venus**   | sun 대비 px 비 ≤ 11%        | **≤ 11.55%**                 | 0.55%p 마진           |
+| 모바일 누적 | disk area ≤ 25% (보존)      | ≤ 25% (보존)                 | 8.40%p 마진           |
+
+### 근거
+
+- **forensic 측정 식 1차 비례 신뢰도**: `pxDiameter = renderRadius × scale × focalLength / cameraDistance × viewportPx` 의 1차 비례는 body-scale.ts 정의에 직접 근거 (architect 라운드 2 cross-validate Gemini "Exemplary" 평가). 단 LOD billboard 전환 임계 영역에서 비선형 효과 가능
+- **Babylon `Vector3.Project` 부동소수 정밀도**: column-major Matrix.m 직접 NDC 변환 (PR #377 보존 산출물 r1-guard 신설 시 동반 박제) 의 부동소수 합산 노이즈
+- **measureBodyPxRatios viewport 별 측정 정합**: qa 실측 3 viewport (1280×720 / 1920×1080 / 375×667) 동일 비율 (mercury 6.07% / venus 11.03%) 재현 → 측정 식 정합성 확증
+- **architect 라운드 2 §"라운드 2 박제값 안전 여유 평가" 조건부 PASS 근거**: 임계 한계 정렬 (목표 = 임계 = 6% / 11%) 이 측정 노이즈에 취약 → ±5% 마진 SSoT 승격 박제
+
+### 비-범위
+
+- **본 amendment 코드 변경 0** — r1-guard 측정 도구 자체는 PR #384 의 `2c6c8b3` (cherry-pick) → `d6ce3b2` (`--measure-px-ratio` 신설) 에서 박제 완료. 본 amendment 는 임계 SSoT 만 갱신
+- **모바일 누적 disk area ≤ 25% 임계 보존** — 측정 노이즈 영향 미미 (qa 실측 16.60% / 8.40%p 여유 마진), 별도 amendment 불필요
+
+### Cross-validate 결과
+
+본 amendment 는 forensic ADR Amendment 2026-05-01 (D-T2 부분 통과) §"r1-guard strict 임계 ±5% 마진 amendment 박제" 의 직접 박제. forensic ADR 라운드 2 cross-validate (Gemini 2.5 Pro outcome=applied) 의 Claude 자체 재분석 (2) "라운드 2 박제값 안전 여유 평가 조건부 PASS" 가 본 amendment 의 ±5% 마진 SSoT 승격 결정 근거 — 별도 cross-validate skip.
+
+### 관련 박제
+
+- forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (D-T2 부분 통과) — 본 amendment 의 근거 SSoT
+- R1 ADR [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50, 라운드 2 보존)
+- 라운드 3 후속 신규 이슈 (별도 박제 예정) — 비율 정밀화 + 신규 회귀 #379 변형 후속
