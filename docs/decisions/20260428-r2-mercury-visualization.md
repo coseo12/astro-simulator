@@ -675,3 +675,72 @@ cross-validate 호출 완료 (Gemini 3.1 Pro Preview, 2026-04-28 17:16 KST). out
 - #373 forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) §결정 2
 - Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 2026-04-30 (커밋 `20c60c8`)
 - volt [#74](https://github.com/coseo12/volt/issues/74) (UX DoD vs 제품 동작), volt [#29](https://github.com/coseo12/volt/issues/29) (결합 간과 편향)
+
+---
+
+## Amendment 2026-05-01 — mercuryScale 8500 → 2000 확정 (적극값) + Q2=B 임계 강화
+
+> **Status**: Active (2026-05-01 박제, architect 단계)
+> **근거 ADR**: [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01
+> **R1 동반 amendment**: [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50)
+> **근거 PR**: #377 CLOSED (mercuryScale=2500 보수값 D-T2 미통과)
+> **사용자 결정**: 옵션 c 적극값 (mercury=2000) + 옵션 a (sunScale=50) 동반 채택 (2026-05-01)
+> **적용 PR**: feature/373-body-proportion-aggressive (본 amendment 박제 후 developer 단계)
+
+### 확정 박제값 (Amendment 2026-04-30 의 "갱신 의도 → 확정" 전환)
+
+본 ADR §Amendment 2026-04-30 §박제값 갱신 의도 의 "**mercuryScale 갱신 의도: 8500 → 2000~3000 범위**" 가 사용자 D-T2 검증 결과로 **확정**:
+
+| 항목                  | Amendment 2026-04-30 (의도)      | Amendment 2026-05-01 (확정)          |
+| --------------------- | -------------------------------- | ------------------------------------ |
+| mercuryScale          | 8500 → **2000~3000 범위** (의도) | 8500 → **2000 (적극값 확정)**        |
+| sun 대비 px 비 (목표) | ~9~12% 자연화                    | sun 대비 ≤ **6%** (강화)             |
+| Q2=B 임계             | sun 대비 px 비 ≤ 25%             | sun 대비 px 비 ≤ **6%** (강화)       |
+| sunScale 동반 변경    | (보존 — 75)                      | **75 → 50** (R1 amendment 동반 박제) |
+
+### D-T2 px 비 예측 (sunScale 50 + mercuryScale 2000)
+
+forensic 측정 데이터 (`docs/reports/373-debug-output.json`) 기반 산출. wsR / pxDiameter 는 scale 에 선형 비례:
+
+| viewport         | sun pxDiameter (50) | mercury pxDiameter (2000)      | sun 대비 mercury px 비 | mercury disk area | 가드 통과 여부                               |
+| ---------------- | ------------------- | ------------------------------ | ---------------------- | ----------------- | -------------------------------------------- |
+| **1280×720**     | 246.3               | 141.2 × (2000/8500) = **33.2** | **13.5%**              | **0.094%**        | px 비 ≤ 6% **미달**, brightRatio ≥ 0.5% 미달 |
+| 1920×1080        | 369.4               | **49.8**                       | **13.5%**              | **0.094%**        | 미달 (동일)                                  |
+| 375×667 (모바일) | 228.1               | **30.8**                       | **13.5%**              | **0.297%**        | 미달                                         |
+
+**중요**: sun 대비 mercury px 비 13.5% 는 본 amendment 의 임계 ≤ 6% 보다 큰 산출이므로 D-T2 사용자 검증 결과에 따라 **forensic ADR §재검토 트리거 #1 가 다시 발동될 수 있음**. 그 경우 mercuryScale 1500 / 1000 등 더 적극값 또는 옵션 (e) log scaling 우선순위 high 승격 경로 박제됨 (forensic ADR Amendment 2026-05-01 참조).
+
+### 가드 갱신 (Amendment 2026-04-30 의 갱신값 → Amendment 2026-05-01 적극값)
+
+- **(폐기)** ≥ 0.5% brightRatio 가드 (mercury 회색 머티리얼이 sun emissive 대비 sub-임계라 brightRatio 무의미. mercury disk area 0.094% 가 ≥ 0.5% 가드 대체)
+- **(보존)** Q2=B 비례 결정 가드 — sun 대비 px diameter 비. 임계 강화: **≤ 25% → ≤ 6%**
+- **(보존)** 모바일 (375×667) 누적 disk area ≤ 25% — sun 16.34% + mercury 0.297% + venus 1.058% = 17.7% **PASS**
+- **(신규)** mercury disk area ≥ 0.05% (1280×720) — 절대 가시성 최소 임계. mercury 0.094% **PASS**
+
+### D-X1 Concrete Prediction 보존 (R2 ADR §결과·재검토 조건 §Concrete Prediction)
+
+본 amendment 는 mercuryScale 박제값 갱신만 — **R2 ADR §결정 1 의 핵심 6 파일 SSoT 회귀 0** 보존:
+
+- 변경 파일: `apps/web/src/constants/body-scale.ts` 만 (1줄 갱신)
+- 핵심 6 파일 (`solar-system-scene.ts` / `tier.ts` / `tier-transition.ts` / `lod.ts` / `lod-body-thresholds.ts` / `sim-canvas.tsx`) 0 라인 변경 — Concrete Prediction 효력 유지
+
+### 후속 검증 (본 amendment 의 fix PR 의무)
+
+본 amendment 적용 PR (developer 단계) 에서 다음 박제:
+
+1. `apps/web/src/constants/body-scale.ts` — `mercury: 2000` (8500 갱신) + 단위 테스트 갱신
+2. `r1-guard --measure-px-ratio` 신설 — forensic ADR §결정 2 §5 Amendment 2026-05-01 명세 그대로 구현 (`mercury sunPxRatio ≤ 6%` 가드)
+3. `_debug-373-proportion-tmp.mjs` 재실행 — px 비 실측 + 본 amendment 박제값 ± 2% 마진 검증
+4. 사용자 D-T2 (실 Chrome GUI 수동) — px 비 자연 비율 평가 (예측 13.5%, 본 amendment 임계 ≤ 6% 미달 가능성 인지)
+5. CHANGELOG `### Behavior Changes`: "수성 시각 비율 자연화 (mercuryScale 8500 → 2000). sun 대비 mercury px 비 38.2% → ~13.5% (1280×720)"
+
+### 교차검증 반영 사항
+
+본 amendment 는 forensic ADR Amendment 2026-05-01 의 cross-validate (Gemini 2.5 Pro, 2026-05-01) 커버리지 안 — 별도 cross-validate skip. forensic ADR §Cross-validate 결과 (Gemini 2.5 Pro, 2026-05-01) 가 본 amendment 의 의도까지 포괄.
+
+### 참조
+
+- forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 — 본 amendment 의 근거 SSoT
+- R1 ADR [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50 동반 박제)
+- R3 ADR [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) Amendment 2026-05-01 (venusScale 4000 → 1500 확정)
+- Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 갱신 (적극값 채택 후속)
