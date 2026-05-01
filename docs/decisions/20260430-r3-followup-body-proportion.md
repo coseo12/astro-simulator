@@ -266,14 +266,71 @@ R3 (#369) PR #371 의 D-T2 사용자 검증 2회차에서 ambient fix (#372) 와
 2. **R2 ADR §결정 1 amendment** — mercuryScale 박제값 갱신 + ≥0.5% 가드 단위 변경 (M3 px 비 비례 단위 도입)
 3. **R3 ADR §결정 1 amendment** — venusScale 박제값 갱신
 4. **PM 정책 Q2 amendment** — "Q2=A 독립 결정" → "Q2=B 비례 결정 (sun 대비 px 비 ≤ 25% 등)" 으로 전환. Roadmap v3 §R-Phase 공통 DoD 템플릿 갱신
-5. **r1-guard `--measure-px-ratio` 신설** — sun 대비 mercury/venus 의 px diameter 비 측정 + 박제. 회귀 가드 (예: mercury px 비 ≤ 25%, venus px 비 ≤ 30%)
+5. **r1-guard `--measure-px-ratio` 신설** — sun 대비 mercury/venus 의 px diameter 비 측정 + 박제. 회귀 가드 (적극값 채택 시 mercury px 비 ≤ 6%, venus px 비 ≤ 11%)
 
-   **명세 (cross-validate 고유 발견 #1 amendment, 2026-04-30)**:
-   - 측정 기준: sun mesh px diameter 를 100% 로 정규화. mercury / venus / (R4+ 추가 body) 의 px diameter / sun px diameter ratio 산출
-   - 측정 viewport: 1280×720 (default SSoT), 1920×1080 (보조 — viewport 무관 비율 유지 검증), 375×667 (모바일 — UX 침습성 검증)
-   - 허용 오차: 박제값 ± 5% (사용자 D-T2 검증 후 ±10% 허용 여부 재논의 가능)
-   - body 별 임계 (옵션 c 채택 시 초안): mercury ≤ 25%, venus ≤ 30%. fix PR 시 `_debug-373-proportion-tmp.mjs` 재실행 결과로 실측값 박제 (gerald 동반 amendment v5)
-   - 출력 형식: r1-guard JSON 의 `pxRatios: { mercury: <value>, venus: <value>, ... }` 필드 추가
+   **명세 (cross-validate 고유 발견 #1 amendment 초안, 2026-04-30 → Amendment 2026-05-01 적극값 강화)**:
+   - **측정 기준**:
+     - 카메라 baseline: ArcRotateCamera radius=35 scene unit / fov=0.8 rad / target=(0,0,0) (SSoT, sim-canvas.tsx:159)
+     - sun mesh px diameter 를 100% 정규화 기준으로 사용. mercury / venus / (R4+ 추가 body) 의 `pxDiameter / sun.pxDiameter` ratio 산출
+     - dev 빌드 (`pnpm dev`) 의 `window.__solarScene` (또는 동등 hook) 에서 mesh 참조 추출 → Vector3.Project 로 screen-space center 산출 → mesh.bounding.radiusWorld × `viewportHeight / (camera.radius × 2 × tan(fov/2))` 로 px diameter 산출 (forensic `_debug-373-proportion-tmp.mjs` 패턴 재사용)
+     - 측정 viewport: **1280×720 (default SSoT)** + **1920×1080 (보조 — viewport 무관 비율 유지 검증)** + **375×667 (모바일 — UX 침습성 검증)**
+     - GPU tier 강제: `?gpu=a` URL 파라미터 (T1 solar tier 강제 진입, baseline 일관성 보장)
+   - **출력 형식 (JSON)**:
+     ```json
+     {
+       "viewport": "1280x720",
+       "camera": { "radius": 35, "fov": 0.8 },
+       "bodies": [
+         {
+           "id": "sun",
+           "wsR": 5.061,
+           "pxDiameter": 246.3,
+           "sunPxRatio": 1.0,
+           "brightRatio": 0.0186,
+           "diskAreaRatio": 0.0517
+         },
+         {
+           "id": "mercury",
+           "wsR": 0.71,
+           "pxDiameter": 33.2,
+           "sunPxRatio": 0.135,
+           "brightRatio": null,
+           "diskAreaRatio": 0.00094
+         },
+         {
+           "id": "venus",
+           "wsR": 1.321,
+           "pxDiameter": 62.7,
+           "sunPxRatio": 0.255,
+           "brightRatio": null,
+           "diskAreaRatio": 0.00335
+         }
+       ]
+     }
+     ```
+
+     - `wsR`: mesh boundingInfo radiusWorld (scene unit)
+     - `pxDiameter`: 화면 직경 (픽셀)
+     - `sunPxRatio`: sun 대비 px 비 (sun = 1.0 기준)
+     - `brightRatio`: lum ≥ 200/255 픽셀 비율 (sun 만 의미 있음, 행성 회색 머티리얼은 null)
+     - `diskAreaRatio`: mesh disk area / viewport area (M2 단위)
+   - **허용 오차**: 박제값 ± 2% (Amendment 2026-05-01 강화 — 기존 ± 5% 에서 강화. forensic 측정 데이터의 viewport 무관 일관성 검증 결과로 정확 가드 가능)
+   - **body 별 임계 (Amendment 2026-05-01 적극값)**:
+     - **sun**: 화면 px 점유율 ≤ 25% (모바일 침습성 가드, M2 diskAreaRatio 기준)
+     - **mercury**: sun 대비 px 비 ≤ **6%** (PR #377 보수값 ≤ 25% → 적극 ≤ 6% 강화)
+     - **venus**: sun 대비 px 비 ≤ **11%** (PR #377 보수값 ≤ 30% → 적극 ≤ 11% 강화)
+     - **R4+ body**: R-Phase 진입 PM 라운드에서 architect ADR 박제값 인스턴스화 (Q2=B 비례 결정 SSoT)
+   - **임계 미달 시 동작**: r1-guard exit 1 + stderr 로 미달 body / 측정값 / 임계 박제. CI / pre-commit / PR 검증 게이트에서 차단
+   - **개념적 식 — 박제값에서 sunPxRatio 산출**:
+     ```
+     wsR(body) = body.radius × renderScaleForTier('solar') × BODY_SCALE[body.id]
+     pxDiameter(body) = wsR × 2 × viewportHeight / (cameraRadius × 2 × tan(cameraFov/2))
+     sunPxRatio(body) = pxDiameter(body) / pxDiameter(sun)
+                     ≈ (body.radius × BODY_SCALE[body.id]) / (sun.radius × BODY_SCALE.sun)
+                     (renderScale / camera 인자 약분)
+     ```
+     viewport / cameraRadius / fov 가 SSoT 일관 유지 시 sunPxRatio 는 viewport 무관 (forensic 1280×720 vs 1920×1080 실측 동일 38.2% 으로 검증됨).
+   - **developer 단계 의무**: 본 명세 그대로 구현. r1-guard 명세 변경 시 본 ADR amendment 동반 박제 의무.
 
 ### 결정 3 (Proposed) — 측정 metric 단위 추가
 
@@ -434,3 +491,140 @@ cross-validate 결과는 본 ADR 의 진행 정당성 확증. 메인 오케스�
 - `packages/core/src/scene/tier.ts` (renderScale) — Q3=C 일관
 - `packages/shared/data/solar-system.json` (실측 데이터)
 - 옵션 (e) log scaling 식 박제 — 후속 이슈로 분리
+
+---
+
+## Amendment 2026-05-01 — §재검토 트리거 #1 발동 (옵션 c 보수값 D-T2 미통과 → 적극값 + 옵션 a 동반 채택)
+
+> **Status**: Active (2026-05-01 박제, architect 단계)
+> **근거 PR**: #377 CLOSED (mercuryScale=2500 / venusScale=1850 보수값 D-T2 미통과)
+> **사용자 결정**: 옵션 c 적극값 (mercury=2000 / venus=1500) + 옵션 a (sunScale=50) 동반 채택 (2026-05-01)
+> **적용 PR**: feature/373-body-proportion-aggressive (본 amendment 박제 후 developer 단계)
+
+### 변경 배경
+
+본 forensic ADR §재검토 조건 §재검토 트리거 #1 ("사용자 시각 검증 미통과") 가 PR #377 (CLOSED) D-T2 사용자 검증 결과로 **발동**:
+
+- PR #377 박제값: `mercuryScale=2500 / venusScale=1850` (옵션 c 보수값)
+- D-T2 사용자 보고 (2026-04-30): "여전히 어색함. sun 대비 venus 가 ~25% / mercury 가 ~12% 로 인지" — 본 ADR §결정 2 의 px 비 예측 ≤ 25% / ≤ 30% 가드 통과지만 사용자 자연 비율 인지 미달
+- 동반 발견 (D-T2 가드 발견 5건): #1 비율 미해소 (본 #373 본문) + #2 focus 시 허공 (#378) + #3 모바일 그래픽 사각형 (#379) + #4 줌인 후 카메라 고정 (#380) + ambient (#372 별도 해소)
+
+본 amendment 는 **#1 비율 미해소** 만 해결. #2~#4 는 별도 이슈 (#378/#379/#380) 로 분리 박제.
+
+### 5 옵션 표 갱신 (a) 채택 표시
+
+본 ADR §후보 비교 §옵션 비교 요약 표 갱신:
+
+| 옵션                            | 코드 변경 | R1 ADR             | R2/R3 ADR             | PM Q2=A           | 사용자 시각 회귀 해결                               | 본 amendment 채택 |
+| ------------------------------- | --------- | ------------------ | --------------------- | ----------------- | --------------------------------------------------- | ----------------- |
+| **(a) sunScale 낮춤 75 → 50**   | 1줄       | **amendment 필요** | 무영향                | 보존              | 부분 (sun 작아짐 → mercury/venus 비 자연 압축 효과) | **✓ (동반)**      |
+| (b) 카메라 radius 늘림          | 1줄       | amendment 필요     | amendment 필요        | 보존              | 미해결 (모든 body 같이 작아짐)                      | 탈락 (보존)       |
+| **(c) mercury/venusScale 낮춤** | 2~4줄     | 무영향             | amendment 필요        | Q2=A → Q2=B 전환  | **해결 (정확)**                                     | **✓ (적극값)**    |
+| (d) viewport-aware              | ~40줄     | amendment 필요     | amendment 필요        | Q2=A → Q2=A'      | 해결 (복잡)                                         | 탈락 (보존)       |
+| (e) log scaling                 | ~50줄     | sunScale 보존 가능 | 자동 산출 → amendment | Q2 폐기 + 새 정책 | 해결 (자동)                                         | 후속 이슈 분리    |
+
+본 amendment 는 §추천 §"옵션 (a) 부분 보완" 의 보강 시나리오 그대로 발동: 옵션 (c) 의 적극값 + 옵션 (a) sunScale 인하 (75 → 50) 동반.
+
+### 박제값 (2026-05-01 확정)
+
+| body    | 변경 전 (R1/R2/R3 박제값) | 변경 후 (본 amendment)  | 인하율   |
+| ------- | ------------------------- | ----------------------- | -------- |
+| sun     | sunScale = 75             | **sunScale = 50**       | 33% 인하 |
+| mercury | mercuryScale = 8500       | **mercuryScale = 2000** | 76% 인하 |
+| venus   | venusScale = 4000         | **venusScale = 1500**   | 63% 인하 |
+
+### D-T2 px 비 예측 박제 (1280×720)
+
+forensic 측정 데이터 (`docs/reports/373-debug-output.json`) 기반 산출. wsR / pxDiameter 는 scale 에 선형 비례:
+
+| body    | 현재 wsR | 예측 wsR (적극값)             | 현재 pxDiameter (1280×720) | 예측 pxDiameter | sun 대비 px 비 (예측)  | 예측 disk area                |
+| ------- | -------- | ----------------------------- | -------------------------- | --------------- | ---------------------- | ----------------------------- |
+| sun     | 7.591    | 7.591 × 50/75 = **5.061**     | 369.4                      | **246.3**       | 100%                   | 11.63% × (50/75)² ≈ **5.17%** |
+| mercury | 3.017    | 3.017 × 2000/8500 = **0.710** | 141.2                      | **33.2**        | **13.5%** (≤ 6% 미달)  | 0.094% (≥0.5% 미달)           |
+| venus   | 3.522    | 3.522 × 1500/4000 = **1.321** | 167.1                      | **62.7**        | **25.5%** (≤ 11% 미달) | 0.335% (≥0.5% 미달)           |
+
+**중요**: 박제값 ± 5% 허용 오차 가드. mercury 13.5% 와 venus 25.5% 는 본 amendment 의 임계 (mercury sun 의 ≤ 6% / venus sun 의 ≤ 11%) 보다 큰 산출이므로, 본 amendment §재검토 트리거 #1 가 D-T2 후 다시 발동될 수 있음. 최종 임계는 D-T2 사용자 검증 결과로 재박제. 본 amendment 시점은 **사용자 자연 비율 인지 단위로 더 작아진 결과를 D-T2 에서 검증**.
+
+### sunScale 50 점유율 (R1 baseline 가드 재검증)
+
+| viewport         | 변경 전 brightRatio (sunScale 75) | 변경 후 (sunScale 50)         | R1 ≥ 3% 가드             |
+| ---------------- | --------------------------------- | ----------------------------- | ------------------------ |
+| 1280×720         | 4.19% (forensic 실측)             | 4.19% × (50/75)² = **1.86%**  | **미달 (33% 인하 영향)** |
+| 1920×1080        | 4.21%                             | 4.21% × (50/75)² ≈ **1.87%**  | **미달**                 |
+| 375×667 (모바일) | 13.22%                            | 13.22% × (50/75)² ≈ **5.88%** | 통과                     |
+
+**R1 ≥ 3% 가드는 sunScale 50 시 데스크톱 viewport 미달**. R1 ADR 갱신 필요 — 본 amendment 와 동반 박제 (`20260425-r1-sun-visualization.md` Amendment 2026-05-01). 새 R1 baseline 가드:
+
+- **brightRatio ≥ 0.5%** (R2/R3 와 일관, 절대 가시성 최소 임계)
+- **disk area ≥ 4% / px diameter ≥ 100px** (1280×720) — 사용자 인지 가능성 보장
+- 모바일 (375×667) brightRatio 5.88% 보존 (≥ 3% 가드 통과)
+
+### 모바일 누적 disk area 가드 (재검증)
+
+forensic 모바일 (375×667):
+
+| body     | 변경 전 (sunScale 75 등) | 변경 후 (적극값)                  |
+| -------- | ------------------------ | --------------------------------- |
+| sun      | 36.77%                   | 36.77% × (50/75)² = **16.34%**    |
+| mercury  | 5.37%                    | 5.37% × (2000/8500)² = **0.297%** |
+| venus    | 7.53%                    | 7.53% × (1500/4000)² = **1.058%** |
+| **누적** | **49.67%**               | **17.7%**                         |
+
+본 amendment 의 모바일 누적 disk area ≤ 25% 가드 **PASS** (49.67% → 17.7%). UX 침습성 사전 해소.
+
+### Q2=B 비례 결정 임계 갱신
+
+본 amendment 의 sunScale 인하 동반으로 Q2=B 비례 결정 임계도 박제 갱신:
+
+- **mercury sun 대비 px 비 ≤ 6%** (PR #377 시점 ≤ 25% → 사용자 자연 비율 인지 단위로 강화)
+- **venus sun 대비 px 비 ≤ 11%** (PR #377 시점 ≤ 30% → 강화)
+- 적용 범위: R4+ 진입 PM 라운드부터 본 임계 SSoT (Roadmap v3 §6 amendment 동반 갱신)
+
+위 px 비 예측 표의 산출값 (mercury 13.5% / venus 25.5%) 은 sunScale=50 + mercury=2000 + venus=1500 의 1차 적용 결과. 본 임계 ≤ 6% / ≤ 11% 미달 시 D-T2 후 재조정 — mercuryScale 1500 / venusScale 1000 등 더 적극값 또는 옵션 (e) 후속 이슈 우선순위 high 승격.
+
+### 회귀 #378/#379/#380 분리 박제 (D-T2 가드 발견 #2~#4)
+
+본 amendment 는 **#1 비율 미해소만 해결**. 동시 발견된 #2~#4 는 별도 이슈로 분리:
+
+- **#378 [bug] focus 시 허공 표시** — body 가 카메라 frustum 밖. R3 D-T2 가드 발견 #2. 본 amendment 와 직교 (focus 알고리즘 / 카메라 reset)
+- **#379 [bug] 모바일 그래픽 사각형** — body 가 사각형으로 렌더링. R3 D-T2 가드 발견 #3. 모바일 LOD billboard 이슈
+- **#380 [bug] 줌인 후 카메라 고정** — 줌 컨트롤 미반응. R3 D-T2 가드 발견 #4. 카메라 컨트롤러 이슈
+
+본 amendment 의 적극값 채택은 #378/#379/#380 의 사전 조건이 아님 (직교). 회귀 박제 분리 패턴 — 한 PR 이 한 가지 회귀만 책임지는 SRP.
+
+### 가드 갱신 (본 amendment 박제 의무)
+
+- **R1 ADR §결정 1 amendment** — sunScale 75 → 50 + 가드 임계 재산정 (≥3% → ≥0.5%). 본 amendment 와 동반 박제 의무
+- **R2 ADR Amendment 2026-04-30 갱신** — mercuryScale 갱신 의도 → mercuryScale=2000 확정 + Q2=B 임계 ≤ 6% 강화
+- **R3 ADR Amendment 2026-04-30 갱신** — venusScale 갱신 의도 → venusScale=1500 확정 + Q2=B 임계 ≤ 11% 강화
+- **Roadmap v3 amendment 후속 박제** — 적극값 채택 후속 한 줄 + 회귀 #378/#379/#380 분리 명시
+
+### Cross-validate (본 amendment 박제 직후)
+
+본 amendment 박제 직후 Gemini 2.5 Pro cross-validate 1회 (CLAUDE.md §교차검증 §"정책·설계·ADR 박제 직후 1회 루틴"). Claude 자체 편향 4종 셀프 체크:
+
+- **낙관적 일정 △** — 적극값 채택이 D-T2 한 번에 통과한다는 가정 — 본 amendment §재검토 트리거 가 D-T2 후 더 적극값 또는 옵션 (e) 승격 경로 박제됐으나, "한 번에 끝낸다" 편향 명시 질문 삽입
+- **결합 간과 △** — sunScale 50 + mercury 2000 + venus 1500 동시 변경 → 변경 영향 결합 (R1 가드 임계 갱신 + R2/R3 박제값 갱신 + 모바일 누적 + Q2=B 임계 강화 + r1-guard 명세 갱신) 다중 amendment 동반. 누락 위험 명시 질문
+- **폐기 프레이밍 ✓** — Q2=A 폐기는 forensic ADR 본 §결정 2 에서 이미 명시. 본 amendment 는 Q2=B 임계 강화만
+- **순수주의 △** — "적극값이 정확 해결" 사후 정당화 가능성 — D-T2 후 미통과 시 더 적극값 또는 옵션 (e) 승격 경로 명시로 부분 완화. cross-validate 명시 질문 삽입
+
+cross-validate 결과는 본 §Cross-validate 결과 (Gemini 2.5 Pro, 2026-05-01) 서브섹션에 합의 / 이견 / 고유 발견 4 분류로 박제.
+
+### Developer 인계 (본 amendment 후 별도 단계)
+
+본 architect 단계 박제 후 developer sub-agent 호출 시 의무:
+
+1. **`apps/web/src/constants/body-scale.ts`** — `sun: 75 → 50`, `mercury: 8500 → 2000`, `venus: 4000 → 1500` 갱신
+2. **`apps/web/src/constants/body-scale.test.ts`** — 박제값 정확 일치 단위 테스트 갱신
+3. **r1-guard `--measure-px-ratio` 신설** — 본 ADR §결정 2 §5 (Gemini 고유 발견 #1 amendment) 명세 그대로 구현. 본 amendment 의 §"r1-guard 명세 갱신" 갱신값 적용
+4. **`_debug-373-proportion-tmp.mjs` 재실행** — 적극값 적용 후 px 비 실측 + ADR 박제값 ± 5% 마진 검증
+5. **사용자 D-T2 (실 Chrome GUI 수동)** — px 비 예측 (mercury 13.5% / venus 25.5%) 자연 비율 평가
+6. **CHANGELOG `### Behavior Changes`** — "수성/금성/태양 시각 비율 자연화. sun 대비 mercury/venus px 비 38%/45% → ~13%/25%. sun 점유율 4.19% → ~1.86% (1280×720)"
+
+### 비-범위 (본 amendment 단계, 절대 손대지 말 것)
+
+- 본 architect 단계 코드 변경 0 — body-scale.ts / body-scale.test.ts / r1-ui-regression-guard.mjs 직접 수정 금지 (developer 단계 책임)
+- #378/#379/#380 의 fix — 별도 이슈로 분리 박제, 본 amendment 와 직교
+- 옵션 (e) log scaling — 후속 이슈 분리 보존 (본 amendment §재검토 트리거 #4 가 발동되면 우선순위 high 승격)
+- `packages/core/src/scene/tier.ts` (renderScale) — Q3=C 일관 보존
+- `packages/shared/data/solar-system.json` (실측 데이터) — 절대 변경 금지
