@@ -1161,3 +1161,68 @@ cross-validate 결과는 본 §"교차검증 반영 사항" 의 합의/이견/�
 (cross-validate 호출 후 박제)
 
 ---
+
+## Amendment 2026-05-01 (라운드 2) — sunScale 50 baseline 갱신 + `--measure-px-ratio` 신설 박제
+
+> **상태**: Accepted (2026-05-01, #373 D-T2 가드 발견 #1 라운드 2 적극 재조정 동반)
+> **근거 ADR**: [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (라운드 2)
+> **R1 동반 amendment**: [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50)
+> **R2 동반 amendment**: [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) Amendment 2026-05-01 (라운드 2) (mercuryScale 8500 → 900)
+> **R3 동반 amendment**: [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) Amendment 2026-05-01 (라운드 2) (venusScale 4000 → 650)
+
+### 결정 1 — sunScale 50 baseline 동반 갱신
+
+본 ADR §결정 4 (4 영역 × 3 viewport pixel diff) 의 가드 인프라는 `sunScale` 값 변경에 **무영향** (캔버스 영역 비교 제외, ADR §결정 1 §"Crop 영역" 박제). 단 `--measure-sun-coverage` 임계는 sunScale 의 함수.
+
+**갱신 항목**:
+
+1. **`--measure-sun-coverage` brightRatio 가드 임계 갱신**:
+   - 기존: 1280×720 ≥ 3% (sunScale 75 baseline)
+   - **신규 (라운드 2)**: 1280×720 ≥ 0.5% (sunScale 50 baseline 의 brightRatio ≈ 1.86% 통과 여유 마진)
+   - 산출 근거: R1 ADR Amendment 2026-05-01 §"sunScale 50 점유율 산출"
+2. **모바일 (375×667) brightRatio 가드 임계 보존**:
+   - 기존 ≥ 3% (sunScale 75 baseline 19.6% / sunScale 50 baseline 5.88% 둘 다 통과)
+   - 갱신 불필요 — 보존
+3. **baseline 스크린샷 갱신** (`apps/web/scripts/__baselines__/r1/<viewport>/<region>.png`):
+   - sunScale 50 + mercuryScale 900 + venusScale 650 적용 후 **재캡처 의무** (4 영역 × 3 viewport = 12장)
+   - 캡처 절차: `pnpm dev` 후 `pnpm r1:guard --update`
+   - **본 PR (developer 단계) 에서는 baseline 갱신 SKIP** — sunScale 변경은 캔버스 외 4 영역 (top-nav / shortcut-bar / hud-top-right / hud-bottom-right) 에 직접 영향 0 (canvas 영역 비교 제외 박제). 단 sun mesh 가 shortcut-bar 의 하이라이트 색상에 indirect 영향 가능성 있어 PR CI 의 r1-guard step 에서 미스매치 발견 시 별도 commit 으로 baseline 갱신 (CHANGELOG 박제 동반)
+
+### 결정 2 — `--measure-px-ratio` flag 신설 박제
+
+본 ADR 의 명령줄 인터페이스에 `--measure-px-ratio` 추가 — forensic ADR §결정 2 §5 Amendment 2026-05-01 (라운드 1) 의 명세 그대로 구현 + 라운드 2 박제값에 대해 동일 임계 (mercury sun 대비 ≤ 6%, venus sun 대비 ≤ 11%, 모바일 누적 disk area ≤ 25%).
+
+**상세 명세는 forensic ADR SSoT 참조** — 본 ADR 은 "어떤 flag 가 r1-guard 에 존재하는가" 만 박제 (책임 직교 보존):
+
+- **인터페이스**: `node apps/web/scripts/r1-ui-regression-guard.mjs --measure-px-ratio`
+  - npm script: `pnpm --filter @astro-simulator/web r1:guard:px-ratio`
+- **출력**: JSON `{ "<viewport>": { pxRatios, diskAreas, guardResult, camera, pixelDiameters } }` — CI artifact / PR 본문 박제용
+- **dev 빌드 의존**: `window.__solarScene` (sim-canvas.tsx NODE_ENV !== production 가드) — production 빌드 fallback 시 명확한 에러 메시지 (`힌트: dev 서버 사용 필수`)
+- **viewport 무관 가드**: `SKIP_LOCAL=1 + darwin` 도 `--measure-px-ratio` 모드는 SKIP 하지 않음 (px ratio 가 viewport 무관 / renderScale × camera 결합 기반)
+
+### §재검토 트리거 추가 (라운드 2 동반)
+
+본 ADR §결과·재검토 조건 의 트리거 목록에 추가:
+
+- **R4+ 진입 시 sunScale 50 baseline 재측정** — earth/mars/jupiter 추가 시 sun 의 시각 인지가 변할 수 있으므로 (모바일 누적 차단율 25% 가드 위협 가능) baseline 자동 측정 + r1-guard 임계 재박제
+- **`--measure-px-ratio` 측정 노이즈 ± 5% 마진 보호** — D-T2 후 측정값이 임계 ± 5% 안에 가까스로 통과 시 mercury 700 / venus 500 등 추가 보수 검토 (forensic ADR Amendment 2026-05-01 라운드 2 §재검토 트리거 #1 보강)
+- **dev 빌드 globals 스키마 변경 시 측정 도구 갱신 의무** — `window.__solarScene.meshes` Map 인터페이스가 변경되면 `measureBodyPxRatios` 재구현 필요. solar-system-scene.ts 변경 시 본 ADR §결정 2 측정 도구도 동반 갱신
+
+### 비-범위 (라운드 2)
+
+- **본 amendment 코드 변경 0** — r1-guard 측정 도구 추가는 본 #373 PR (developer 단계) 의 책임. 본 ADR 은 결정·인터페이스 박제만
+- **R-Phase 정책 (Q2=B 비례 결정)** — forensic ADR Amendment 2026-05-01 SSoT, 본 ADR 비-범위
+- **#378/#379/#380 (회귀 #2~#4 분리)** — 본 #373 라운드 2 와 직교. 별도 추적
+
+### Cross-validate 결과
+
+본 amendment 는 forensic ADR Amendment 2026-05-01 (라운드 2) §Cross-validate 결과 의 cross-validate (Gemini 2.5 Pro, 2026-05-01) 커버리지 안 — 별도 cross-validate skip. forensic ADR 라운드 2 cross-validate 결과가 본 amendment 의 결정 (sunScale 50 baseline 갱신 + `--measure-px-ratio` 박제) 까지 포괄.
+
+### 관련 박제
+
+- forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (라운드 2) — 본 amendment 의 근거 SSoT
+- R1 ADR [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50)
+- R2 ADR [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) Amendment 2026-05-01 (라운드 2)
+- R3 ADR [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) Amendment 2026-05-01 (라운드 2)
+
+---
