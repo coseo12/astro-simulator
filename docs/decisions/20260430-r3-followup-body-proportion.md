@@ -803,3 +803,100 @@ R3 ADR Amendment 2026-05-01 의 모바일 점유율 회귀 우려 (#380 분리) 
 3. **라운드 1 보존 박제 (sunScale 50, r1-guard 명세 보존, R3 코드 +2 라인 PASS) 와의 일관성**
 
 cross-validate 결과를 라운드 2 amendment 끝에 §"Cross-validate 결과 (라운드 2)" 섹션으로 박제.
+
+### Cross-validate 결과 (라운드 2, Gemini 2.5 Pro, 2026-05-01)
+
+> **outcome**: `applied` (exit 0)
+> **로그**: `.claude/logs/cross-validate-architecture-20260501-145048.log`
+> **outcome JSON**: `.claude/logs/cross-validate-architecture-20260501-145048-outcome.json`
+> **anchor**: 없음 (ADR-revision, 폴백 reminder 무관)
+
+#### Claude 자체 편향 4종 셀프 체크 (호출 전, 박제)
+
+- **낙관적 일정**: 해당 없음 (라운드 2 코드 변경 0, ADR amendment 박제만). PASS
+- **결합 간과**: 임계 비례 역산 선형 가정이 forensic 측정 식의 다른 항 (camera distance / focalLength / DPR / LOD billboard 전환 임계) 과 정말 독립인지 — Gemini 에 명시 질문 박제. **결과**: Gemini 가 LOD billboard 전환 임계에 대한 직접 답변 누락 → developer 단계 실측 의무로 인계 (cross-validate 만으로 해소 못 한 영역)
+- **폐기 프레이밍**: 라운드 1 박제값 (mercury 2000 / venus 1500) 의 임계 초과 사실을 보존 박제 (R2/R3 amendment 본문 + forensic ADR §"라운드 1 D-T2 px 비 예측" 보존). 라운드 2 의 trace 가능 보장. PASS
+- **순수주의**: 임계 한계 정렬 (목표 = 임계 = 6% / 11%) 이 측정 노이즈 ± 5% 마진에 취약한가 — Gemini 에 명시 질문 박제. **결과**: Gemini 가 직접 답변 누락 → D-T2 사용자 검증 결과 + r1-guard 실측 후 라운드 3 재진입 결정 인계 (cross-validate 만으로 사전 결정 못 한 영역)
+
+#### Gemini 응답 요약 (generic ADR 평가 6항목, 모두 매우 긍정적)
+
+| 평가 항목         | Gemini 평가             | 핵심 코멘트                                                                              |
+| ----------------- | ----------------------- | ---------------------------------------------------------------------------------------- |
+| 구조적 완성도     | Exemplary               | 'Amendment' 섹션 + 'Cross-validate' 섹션 + 살아있는 문서 진화 과정 모두 모범적           |
+| 기술 결정 타당성  | Exemplary               | px 비례 역산 수학적 근거 + 단계적 접근 (옵션 c+a 단기 / 옵션 e 장기) 매우 합리적         |
+| 인터페이스 명확성 | Exemplary               | r1-guard `--measure-px-ratio` JSON 출력 포맷 + Developer 인계 + 비-범위 명시             |
+| 확장성            | Excellent               | PM 정책 Q2=B 도입 + r1-guard 회귀 가드로 R4+ 확장 기반 마련                              |
+| 보안              | N/A                     | 렌더링 상수 조정, 보안 무관 영역                                                         |
+| 누락 요소         | 3 사소 제안 (후속 분리) | (1) Forensic ADR 템플릿화 (2) 시각 자료 ADR embed (3) `_debug-*-tmp.mjs` 공식 스크립트화 |
+
+**결정 자체에 이견 0**. 라운드 2 박제값 (mercury 900 / venus 650) 및 임계 비례 역산 방법론을 Gemini 가 합리적이라고 평가.
+
+#### Claude 재분석 (volt #23 / #29 기각·수용 프로토콜)
+
+##### 합의 (6 항목, 본 PR 박제 즉시 반영 — 라운드 2 amendment 본문 자체에 이미 포함)
+
+1. forensic ADR 의 'Amendment' 섹션 + Cross-validate 섹션 구조가 살아있는 문서로 모범적 — 라운드 2 amendment 도 동일 구조로 박제 ✅
+2. 기술 결정 (임계 비례 역산 방법론) 의 타당성 — 라운드 2 amendment §"임계 비례 역산" 에 수학적 근거 박제 ✅
+3. r1-guard `--measure-px-ratio` 명세 라운드 1 보존 (Gemini 도 명세의 명확성 평가) — 라운드 2 amendment 의 §"r1-guard 명세" 보존 ✅
+4. Developer 인계 갱신 (라운드 1 인계 보존 + 라운드 2 박제값 갱신) — 라운드 2 amendment §"Developer 인계 갱신" 박제 ✅
+5. 비-범위 명시 (코드 변경 0, body-scale.ts 직접 수정 금지) — 라운드 1 비-범위 보존 ✅
+6. 단계적 접근 (옵션 e log scaling 후속 이슈 분리 보존) — 라운드 1 §재검토 트리거 #4 보존 ✅
+
+##### 이견 수용
+
+0건. Gemini 가 결정 자체에 이견 제시 안 함 (모든 핵심 결정 Exemplary 평가).
+
+##### Claude 재분석으로 기각한 Gemini 제안
+
+0건. Gemini 의 3 제안 (ADR 템플릿화 / 시각 자료 embed / debug 공식 스크립트화) 모두 합리적이나, 본 PR 비-범위 (R3 #373 라운드 2 박제값 재조정) 와 직교 → **기각이 아닌 후속 분리** (volt #29 프로토콜).
+
+##### 고유 발견 (후속 분리)
+
+Gemini 제안 3건 모두 본 PR 비-범위 → 메인 오케스트레이터에 후속 이슈 분리 책임 인계 (architect 단계 비-범위, 메인이 사용자 합의 후 이슈 생성):
+
+| Gemini 제안 (요약)                                                                     | 우선순위        | 본 PR 직교성                                                                                | 후속 인계 책임                                                                                                    |
+| -------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **1. Forensic ADR 템플릿화** — `docs/templates/forensic-adr-template.md` 신설          | medium          | 본 ADR 의 구조 자체를 자산화. R3 #373 박제값과 무관                                         | 메인 오케스트레이터 — 다른 R-Phase 진입 시 PM 라운드에서 활용 검토                                                |
+| **2. 시각 자료 ADR 내재화** — `373-debug-{resolution}.png` ADR 본문 embed              | low             | 가독성 개선 (현재 외부 파일 참조). 본 박제값 재조정 결정 자체와 직교                        | 메인 오케스트레이터 — 별도 docs 개선 이슈                                                                         |
+| **3. `_debug-373-proportion-tmp.mjs` 공식화** → `scripts/verify-visual-proportion.mjs` | low → 중복 우려 | r1-guard `--measure-px-ratio` (forensic ADR §결정 2 §5) 가 이미 흡수 예정 → **중복 가능성** | developer 단계에서 r1-guard 구현 후 재평가. r1-guard 가 흡수하면 본 제안 자연 폐기, 부분 미커버 시 별도 이슈 분리 |
+
+##### 핵심 평가 축 (1)~(5) 에 대한 Claude 자체 재분석 결론 (Gemini 가 직접 답변 누락한 영역)
+
+Gemini 응답이 generic ADR 평가 6항목 위주로 작성되어, Claude 가 요청한 5개 핵심 평가 축에 대한 직접 답변은 부분 누락. Gemini 의 누락 영역을 Claude 자체 재분석으로 보완:
+
+| 핵심 평가 축                            | Claude 자체 재분석 결론                                                                                                               | 인계 행동                                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| (1) 임계 비례 역산 선형 가정 — LOD 임계 | mercury 14.9px / venus 27.2px 가 LOD billboard 전환 임계 근처인지 정적 분석으로 확정 못 함. **30초 실측 > 추가 정적 조사** (volt #67) | developer 단계 의무 — `_debug-373-proportion-tmp.mjs` 재실행 시 LOD 단계 출력 추가, billboard/mesh 전환 임계 박제 비교 |
+| (2) 안전 여유 — 측정 노이즈 ± 5% 마진   | 임계 한계 정렬은 노이즈 취약. 단 D-T2 사용자 검증 후 라운드 3 재진입 비용 < 처음부터 보수 여유 비용 (사용자 정성 평가 우선)           | r1-guard 실측값이 임계 ± 5% 안에서 통과면 박제. 노이즈로 부분 실패 시 라운드 3 (mercury 765 / venus 552) 진입          |
+| (3) 라운드 1 보존 일관성                | sunScale 50 / r1-guard 명세 / R3 코드 +2 라인 모두 보존 (라운드 2 amendment 추가, 삭제 없음). volt #76 (DoD 재구조화 금지) 준수       | PASS — 추가 행동 불필요                                                                                                |
+| (4) 모바일 sub-pixel 임계               | venus 650 모바일 (375×667, DPR 2) ~12.7px 추산. sub-pixel 영역과 거리 있음. 단 LOD billboard 전환 임계는 (1) 과 동일 우려             | developer 단계 의무 — 모바일 viewport r1-guard 실측 + LOD 단계 출력 비교                                               |
+| (5) DoD 변경 금지 (CRITICAL #6) 준수    | D-T2 px 비 임계 (mercury ≤ 6% / venus ≤ 11%) 그대로. 박제값만 재조정. CRITICAL #6 준수                                                | PASS — 추가 행동 불필요                                                                                                |
+
+#### 임계 비례 역산 방법론 PASS/FAIL 판정
+
+**PASS** — Gemini 평가 (Exemplary, 매우 합리적) + Claude 자체 재분석 결과:
+
+- forensic 측정 식 `pxDiameter = renderRadius × scale × focalLength / cameraDistance × viewportPx` 의 1차 비례 (`pxDiameter ∝ scale`) 가 body-scale.ts 정의에 직접 근거
+- camera distance 와 focalLength 는 scale 과 독립 (R3 R-Phase 진입 default 카메라 / focalLength 고정)
+- 단 LOD billboard 전환 임계 영역에서 비선형 효과 가능 → developer 단계 실측 인계 (cross-validate 만으로 해소 불가)
+
+#### 라운드 2 박제값 안전 여유 평가
+
+**조건부 PASS** — 임계 한계 정렬 (목표 = 임계 = 6% / 11%) 이 측정 노이즈에 취약. 다음 조건 충족 시 PASS:
+
+- r1-guard 실측 mercury sun 대비 px 비 ≤ 6% × 1.05 (마진 ± 5%) ≈ ≤ 6.3%
+- r1-guard 실측 venus sun 대비 px 비 ≤ 11% × 1.05 ≈ ≤ 11.55%
+- 사용자 D-T2 정성 평가 #1 비율 자연 인지 통과
+
+**미충족 시 라운드 3 진입 경로 박제** (forensic ADR §재검토 트리거 #1 보존):
+
+- mercury 765 / venus 552 (임계 × 0.85 보수 여유) — 측정 노이즈 안전 마진
+- 또는 mercury 700 / venus 500 (임계 × 0.78~0.83 더 보수) — 사용자 정성 평가 미통과 시
+- 또는 옵션 (e) log scaling 우선순위 high 승격
+
+#### 발견된 이슈 박제 종합
+
+- **즉시 반영** (본 라운드 2 amendment 박제 자체에 포함): 6 합의 항목 모두
+- **후속 분리** (메인 오케스트레이터 책임): Gemini 제안 3건 (template / embed / verify-visual-proportion)
+- **developer 단계 실측 인계**: LOD billboard 전환 임계 영향 (Claude 자체 재분석 (1)/(4))
+- **D-T2 검증 후 라운드 3 진입 조건**: 임계 한계 정렬 측정 노이즈 취약성 (Claude 자체 재분석 (2))
