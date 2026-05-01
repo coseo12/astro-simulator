@@ -744,3 +744,57 @@ forensic 측정 데이터 (`docs/reports/373-debug-output.json`) 기반 산출. 
 - R1 ADR [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50 동반 박제)
 - R3 ADR [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) Amendment 2026-05-01 (venusScale 4000 → 1500 확정)
 - Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 갱신 (적극값 채택 후속)
+
+---
+
+## Amendment 2026-05-01 (라운드 2) — mercuryScale 2000 → 900 확정 (적극 재조정)
+
+> **상태**: 라운드 1 박제값 mercuryScale 2000 의 forensic px 비 예측 13.5% 가 DoD 임계 ≤ 6% 를 **2.25배 초과** → **임계 비례 역산 재조정**. 사용자 (A) 채택 (2026-05-01).
+> **선행 박제**: 본 ADR Amendment 2026-05-01 (라운드 1) — mercuryScale 8500 → 2000 (적극값) 박제 보존
+> **근거 ADR**: [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (라운드 2) §"임계 비례 역산"
+> **R3 동반 amendment**: [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) Amendment 2026-05-01 (라운드 2) (venusScale 1500 → 650)
+
+### 결정
+
+`mercuryScale: 2000 → 900` 적극 재조정 확정.
+
+### 근거 — 라운드 1 박제값 D-T2 임계 초과
+
+라운드 1 박제값 2000 으로 산출한 forensic px 비 예측 13.5% 가 DoD 임계 ≤ 6% 를 2.25배 초과 (forensic ADR §"라운드 1 D-T2 px 비 예측" 박제 보존). forensic 측정 식은 `pxDiameter ∝ scale` (1차 비례) 이므로 임계 정렬값 산출:
+
+`mercuryScale = 2000 × (6 / 13.5) ≈ 889` → **900** (보수 라운딩 + 임계 한계 정렬)
+
+| 항목                     | Amendment 2026-05-01 (라운드 1) | Amendment 2026-05-01 (라운드 2)        |
+| ------------------------ | ------------------------------- | -------------------------------------- |
+| mercuryScale             | 2000 (적극값)                   | **900 (적극 재조정)**                  |
+| sun 대비 px 비 예측      | 13.5% (1280×720)                | **~6.0% (1280×720)** (예측, 임계 한계) |
+| 라운드 1 → 라운드 2 차이 | -                               | **2.25배 축소** (임계 비례 역산)       |
+
+### 라운드 1 박제값 2000 의 D-T2 임계 초과 박제 보존
+
+본 amendment 는 라운드 1 박제값 `mercuryScale 2000` 의 임계 초과 사실을 **삭제하지 않고 보존**. forensic ADR §"라운드 1 D-T2 px 비 예측" 의 13.5% 산출이 trace 가능하도록 라운드 1 amendment 본문 유지. 라운드 2 결정의 trace = "왜 라운드 1 (2000) 에서 라운드 2 (900) 으로 재조정했는가" → forensic ADR Amendment 2026-05-01 (라운드 2) §"임계 비례 역산" SSoT.
+
+### D-T2 px 비 예측 갱신 (라운드 2)
+
+- mercury sun 대비 ≤ 6% 통과 예측 (목표 = 임계 한계, 임계 비례 역산 정렬)
+- mercury pxDiameter ~14.9 (라운드 1 ~33.2 의 ~45% 수준)
+- 측정 노이즈 ± 5% 마진 안에 들어와야 통과
+
+### 가드 갱신 — 라운드 1 임계 보존
+
+본 ADR Amendment 2026-05-01 (라운드 1) §"가드 갱신" 의 brightRatio + sun 대비 px 비 ≤ 6% 임계는 **그대로 보존**. 박제값만 900 으로 갱신:
+
+1. r1-ui-regression-guard 의 brightRatio 가드 — 라운드 1 명세 그대로 유지 (sunScale 50 baseline 변경 없음)
+2. `r1-guard --measure-px-ratio` 신설 — forensic ADR §결정 2 §5 Amendment 2026-05-01 (라운드 1) 명세 그대로 구현. **mercury 임계 sun 대비 ≤ 6%** (라운드 2 박제값 900 의 통과 목표)
+3. `mercury` 색감/명도 (#A89888) 라운드 1 그대로 유지
+4. `body-scale.test.ts` 박제값 단위 테스트 — `mercury: 900` 정확 일치 검증 (라운드 1 의 2000 단위 테스트 갱신)
+
+### Cross-validate (라운드 2)
+
+본 amendment 는 forensic ADR Amendment 2026-05-01 (라운드 2) §Cross-validate 결과 의 cross-validate (Gemini 2.5 Pro, 2026-05-01) 커버리지 안 — 별도 cross-validate skip. forensic ADR 라운드 2 cross-validate 결과가 본 amendment 의 의도까지 포괄.
+
+### 참조 (라운드 2)
+
+- forensic ADR Amendment 2026-05-01 (라운드 2) — 본 amendment 의 근거 SSoT
+- R1 ADR Amendment 2026-05-01 §"라운드 2 결정" (sunScale 50 그대로 유지)
+- R3 ADR Amendment 2026-05-01 (라운드 2) — venusScale 1500 → 650 동반 박제
