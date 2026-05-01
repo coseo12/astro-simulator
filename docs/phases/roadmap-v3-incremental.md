@@ -196,6 +196,64 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 
 ---
 
+## §6 + §R-Phase 공통 DoD 템플릿 (Amendment 2026-05-01 — 적극값 채택 + sunScale 인하 동반 + 회귀 분리)
+
+> **Status**: Active (2026-05-01 박제, architect 단계)
+> **근거 ADR**: [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) Amendment 2026-05-01
+> **사용자 결정**: 옵션 c 적극값 + 옵션 a (sunScale 75→50) 동반 채택 (2026-05-01)
+> **적용 PR**: feature/373-body-proportion-aggressive
+
+### 변경 배경 (Amendment 2026-04-30 의 후속)
+
+PR #377 (mercuryScale=2500 / venusScale=1850 보수값) 의 D-T2 사용자 검증 미통과. forensic ADR §재검토 트리거 #1 발동 → 옵션 c 적극값 (mercury=2000 / venus=1500) + 옵션 a (sunScale=50) 동반 채택. 사용자 자연 비율 인지 단위로 강화.
+
+### 갱신된 박제값
+
+| body    | Amendment 2026-04-30 (의도)   | Amendment 2026-05-01 (확정)           |
+| ------- | ----------------------------- | ------------------------------------- |
+| sun     | sunScale = 75 (보존)          | **sunScale = 50** (R1 동반 amendment) |
+| mercury | mercuryScale = 2000~3000 범위 | **mercuryScale = 2000 적극값**        |
+| venus   | venusScale = 1500~2200 범위   | **venusScale = 1500 적극값**          |
+
+### Q2=B 임계 강화
+
+- mercury sun 대비 px 비: ≤ 25% → **≤ 6%**
+- venus sun 대비 px 비: ≤ 30% → **≤ 11%**
+- R4+ body 임계: R-Phase 진입 PM 라운드에서 architect ADR 박제값 인스턴스화 (Q2=B 비례 결정 SSoT, 본 amendment 적용)
+
+### R1 baseline 가드 갱신 (sunScale 50 도입 동반)
+
+본 amendment 의 sunScale 인하로 R1 baseline 가드 임계 갱신 (R1 ADR Amendment 2026-05-01 박제):
+
+- (폐기) brightRatio ≥ 3% 데스크톱 가드
+- (신규) brightRatio ≥ 0.5% (R2/R3 와 일관, 절대 가시성 최소 임계)
+- (신규) pxDiameter ≥ 100px (1280×720, 사용자 인지 가능성 보장)
+- (신규) diskAreaRatio ≥ 4% (1280×720, 화면 점유 시각적 인지)
+- (보존) 모바일 (375×667) brightRatio ≥ 3% (sunScale 50 시 5.88% 통과)
+
+### r1-guard `--measure-px-ratio` 명세 강화
+
+Amendment 2026-04-30 의 명세 초안 → Amendment 2026-05-01 의 적극값 강화 (forensic ADR §결정 2 §5 Amendment 2026-05-01 박제):
+
+- 측정 viewport: 1280×720 (default SSoT) + 1920×1080 (보조) + 375×667 (모바일)
+- GPU tier 강제: `?gpu=a` URL 파라미터 (T1 solar tier 강제 진입)
+- 허용 오차: ± 2% (Amendment 2026-04-30 ± 5% → 강화)
+- 출력 형식: JSON `{ viewport, camera, bodies: [{ id, wsR, pxDiameter, sunPxRatio, brightRatio, diskAreaRatio }] }`
+- body 별 임계: sun ≤ 25% (모바일 침습성) / mercury sun 의 ≤ 6% / venus sun 의 ≤ 11%
+- 임계 미달 시: r1-guard exit 1 + stderr 박제. CI / pre-commit / PR 검증 게이트 차단
+
+### 회귀 분리 박제 (D-T2 가드 발견 #2~#4)
+
+본 amendment 는 **#1 비율 미해소만 해결**. 동시 발견된 #2~#4 는 별도 이슈로 분리 박제 (한 PR 이 한 가지 회귀만 책임지는 SRP):
+
+- **#378 [bug] focus 시 허공 표시** — body 가 카메라 frustum 밖. focus 알고리즘 / 카메라 reset 이슈
+- **#379 [bug] 모바일 그래픽 사각형** — body 가 사각형으로 렌더링. 모바일 LOD billboard 이슈
+- **#380 [bug] 줌인 후 카메라 고정** — 줌 컨트롤 미반응. 카메라 컨트롤러 이슈
+
+본 amendment 의 적극값 채택은 #378/#379/#380 의 사전 조건이 아님 (직교).
+
+---
+
 ## 참조
 
 - `docs/baselines/README.md` — 2026-04-25 재구성 시점 UI baseline 스크린샷
@@ -203,5 +261,8 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 - volt [#75](https://github.com/coseo12/volt/issues/75) — SSoT JSON 부호 규약 메타 교훈
 - volt [#76](https://github.com/coseo12/volt/issues/76) — PM multi-turn drift 재현 교훈
 - CLAUDE.md 프로젝트 고유 섹션 — "Incremental Body-by-Body Build (v3)"
-- [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) — Q2=B 전환 ADR (2026-04-30 박제)
+- [docs/decisions/20260430-r3-followup-body-proportion.md](../decisions/20260430-r3-followup-body-proportion.md) — Q2=B 전환 ADR (2026-04-30 박제) + Amendment 2026-05-01 (적극값 채택 + 옵션 a 동반)
 - [#373](https://github.com/coseo12/astro-simulator/issues/373) — body 간 시각 비율 회귀 forensic 이슈
+- [#378](https://github.com/coseo12/astro-simulator/issues/378) — focus 시 허공 표시 (R3 D-T2 가드 발견 #2, 본 amendment 와 분리 박제)
+- [#379](https://github.com/coseo12/astro-simulator/issues/379) — 모바일 그래픽 사각형 (R3 D-T2 가드 발견 #3, 본 amendment 와 분리 박제)
+- [#380](https://github.com/coseo12/astro-simulator/issues/380) — 줌인 후 카메라 고정 (R3 D-T2 가드 발견 #4, 본 amendment 와 분리 박제)
