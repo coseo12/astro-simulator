@@ -276,6 +276,7 @@ R3 (#369) PR #371 의 D-T2 사용자 검증 2회차에서 ambient fix (#372) 와
      - 측정 viewport: **1280×720 (default SSoT)** + **1920×1080 (보조 — viewport 무관 비율 유지 검증)** + **375×667 (모바일 — UX 침습성 검증)**
      - GPU tier 강제: `?gpu=a` URL 파라미터 (T1 solar tier 강제 진입, baseline 일관성 보장)
    - **출력 형식 (JSON)**:
+
      ```json
      {
        "viewport": "1280x720",
@@ -314,6 +315,7 @@ R3 (#369) PR #371 의 D-T2 사용자 검증 2회차에서 ambient fix (#372) 와
      - `sunPxRatio`: sun 대비 px 비 (sun = 1.0 기준)
      - `brightRatio`: lum ≥ 200/255 픽셀 비율 (sun 만 의미 있음, 행성 회색 머티리얼은 null)
      - `diskAreaRatio`: mesh disk area / viewport area (M2 단위)
+
    - **허용 오차**: 박제값 ± 2% (Amendment 2026-05-01 강화 — 기존 ± 5% 에서 강화. forensic 측정 데이터의 viewport 무관 일관성 검증 결과로 정확 가드 가능)
    - **body 별 임계 (Amendment 2026-05-01 적극값)**:
      - **sun**: 화면 px 점유율 ≤ 25% (모바일 침습성 가드, M2 diskAreaRatio 기준)
@@ -511,6 +513,25 @@ cross-validate 결과는 본 ADR 의 진행 정당성 확증. 메인 오케스�
 
 본 amendment 는 **#1 비율 미해소** 만 해결. #2~#4 는 별도 이슈 (#378/#379/#380) 로 분리 박제.
 
+#### sunScale 인하 동반 사유 (정정 박제 — Cross-validate Claude 재분석 #3 순수주의 결과)
+
+본 amendment 의 sunScale 인하 (75 → 50) 동반 사유는 **px 비 산식 분모 축소** 가 아니다. 식 검증 결과:
+
+```
+sunPxRatio(body) ≈ (body.radius × BODY_SCALE[body.id]) / (sun.radius × BODY_SCALE.sun)
+sunScale 인하 (75 → 50) 시 sunPxRatio 분모 축소 → sunPxRatio 오히려 증가 (역효과)
+```
+
+정확 사유:
+
+1. **sun 절대 크기 균형** — sunScale 75 시 sun pxDiameter 369.4px (1280×720) 로 mercury/venus 인하 후에도 sun 단독 침습성 잔존. sunScale 50 적용 시 246.3px 로 데스크톱 자연 크기
+2. **모바일 침습 회피** — sunScale 75 모바일 (375×667) brightRatio 13.22% / diskAreaRatio 36.77% → sunScale 50 시 5.88% / 16.34% 로 가시성 유지하면서 침습 완화
+3. **mercury/venus 의 절대 크기 자연화 동반** — sunScale 인하로 sun pxDiameter 가 자연 크기로 내려오면서 mercury/venus 의 절대 크기 (33px / 63px) 가 sun (246px) 와 함께 자연 비례로 인지
+
+즉 본 amendment 는 **(1) sunScale 인하로 sun 자체 자연 크기화 + (2) mercury/venus 적극값 인하로 sun 대비 px 비 자연화** 두 직교 효과의 조합. sunScale 인하가 sunPxRatio 자체에는 역효과지만 절대 크기 균형 효과로 사용자 자연 비율 인지 종합 개선.
+
+D-T2 px 비 예측 13.5% / 25.5% 는 위 역효과를 반영한 산출. 본 amendment 임계 ≤ 6% / ≤ 11% 미달 가능성은 §재검토 트리거 #1 재발동 경로로 보존됨.
+
 ### 5 옵션 표 갱신 (a) 채택 표시
 
 본 ADR §후보 비교 §옵션 비교 요약 표 갱신:
@@ -608,7 +629,57 @@ forensic 모바일 (375×667):
 - **폐기 프레이밍 ✓** — Q2=A 폐기는 forensic ADR 본 §결정 2 에서 이미 명시. 본 amendment 는 Q2=B 임계 강화만
 - **순수주의 △** — "적극값이 정확 해결" 사후 정당화 가능성 — D-T2 후 미통과 시 더 적극값 또는 옵션 (e) 승격 경로 명시로 부분 완화. cross-validate 명시 질문 삽입
 
-cross-validate 결과는 본 §Cross-validate 결과 (Gemini 2.5 Pro, 2026-05-01) 서브섹션에 합의 / 이견 / 고유 발견 4 분류로 박제.
+### Cross-validate 결과 (Gemini 2.5 Pro, 2026-05-01, outcome=applied)
+
+로그: `.claude/logs/cross-validate-architecture-20260501-143242.log`
+
+**Gemini 총평**: "매우 훌륭하게 작성된 ADR. 문제 분석의 깊이, 데이터 기반의 합리적 의사결정 과정, 피드백을 통해 진화하는 프로세스까지 모든 면에서 뛰어남. Amendment 섹션은 실패로부터 학습하는 과정을 투명하게 보여주어 다른 팀원들에게 좋은 귀감." 결정 자체 (옵션 c 적극값 + 옵션 a 동반) 이견 0건.
+
+#### 합의 (Gemini 일반 평가 6 기준 모두 통과)
+
+1. **구조적 완성도 (Exemplary)** — 코드 레벨 (body-scale.ts / body-scale.test.ts / r1-guard) + 프로세스 레벨 (R1/R2/R3 ADR / 로드맵 / PM 정책) + 피드백 루프 (Amendment 2026-05-01) 모두 완전. 추가할 부분 없음
+2. **기술 결정 타당성 (Exemplary)** — `px diameter 비 ↔ disk area 비` 의 제곱 관계 불일치 정확 분석 + 옵션 (b) 카메라 변경 본질 미해결 명확 기각 + 단기 (c) / 장기 (e) 분리 실용 + sunScale 50 시 brightRatio 미달 선제 예측 + 새 가드 (diskArea ≥ 4% / pxDiameter ≥ 100px) 박제
+3. **인터페이스 명확성 (Excellent)** — `r1-guard --measure-px-ratio` JSON 출력 형식 모호함 0 + Q2=A → Q2=B 정책 인터페이스 (PM ↔ 개발) 개선 명시
+4. **확장성 (Excellent)** — 단기 (c) / 장기 (e) 분리 전략 효과적 + Q2=B 정책으로 R4+ 확장 일관 기준
+5. **보안 (Not Applicable)** — 렌더링 시각 요소 한정, 보안 위험 0
+6. **누락 요소 (Excellent)** — 자체 cross-validate 섹션 + 성능 영향 분석 (BODY_SCALE 1회 평가) + UX 사용자 소통 후속 분리 + D-T2 가드 발견 5건 SRP 분리 (본 amendment 의 #378/#379/#380 분리 정책 합의)
+
+#### 이견 수용
+
+- 없음 (Gemini 가 본 amendment 결정 자체에 이견 0)
+
+#### Claude 재분석 — 명시 질문 5건 자체 답변 (Gemini 직접 응답 없음)
+
+본 amendment cross-validate 호출 시 Claude 자체 편향 4종 박제와 동반 5개 명시 질문 삽입. Gemini 일반 평가는 통과했으나 5 질문에 직접 답변 없음 — Claude 자체 재분석:
+
+1. **낙관적 일정 (질문 #1)** — D-T2 px 비 예측 (mercury 13.5% / venus 25.5%) 이 본 amendment 임계 (≤ 6% / ≤ 11%) 보다 큰 산출. **Claude 답변**: 본 amendment 시점에 더 적극값 (mercury=1000 / venus=800) 으로 바로 진입하지 않은 이유는 (a) 박제값 갱신은 사용자 D-T2 후 ± 5% 마진으로 재조정 경로 박제됨 (b) sunScale 50 인하 동반으로 px 비 산출이 분모 축소 효과 동반 — 실측 sunPxRatio 가 예측보다 낮을 수 있음 (c) volt #14 NO-OP ADR 패턴 적용 — D-T2 실측 후 미통과면 §재검토 트리거 #1 재발동, 통과면 NO-OP. 과잉 인하 리스크 (sun 가시성 약화 / mercury·venus 사라짐) 회피. **결론**: 본 amendment 진입 정당화. D-T2 후 재조정 경로 보존
+2. **결합 간과 (질문 #2)** — 5개 amendment 동시 박제 시 추가 누락. **Claude 답변**: 추가 누락 후보 검토:
+   - **r1-ui-pixel-diff-guard ADR (`20260425-r1-ui-pixel-diff-guard.md`)** — sunScale 50 적용 시 회귀 가드 4 영역 baseline 변경. 본 amendment §"r1-guard --measure-px-ratio 명세 강화" 가 부분 커버하나 **별도 amendment 박제 권고** — developer 단계에서 박제 의무
+   - **CHANGELOG `### Behavior Changes`** — 본 amendment §Developer 인계 §6 에 박제 의무 명시 (developer 단계 책임)
+   - **PM 페르소나 재호출** — Q2=B 정책은 forensic ADR §결정 2 §4 + Roadmap v3 §6 amendment 에서 이미 박제. 본 amendment 는 임계 강화만 — PM 재호출 불요
+   - **결론**: r1-ui-pixel-diff-guard ADR amendment 1건 누락. developer 단계에서 박제 의무 인계 (본 §Developer 인계 §1 보강 의무)
+3. **순수주의 (질문 #3)** — 옵션 (a) + (c) 동반이 사후 정당화인가. **Claude 답변**: forensic ADR §추천 §"옵션 (a) 부분 보완" 시나리오와 정확 일치 — 박제 시점에 이미 옵션 (a) 부분 보완 가능성 명시됨 ("모바일 침습 별도 fix 필요 시 옵션 (a) 의 sunScale 부분 인하 (예: 75 → 50) 동반 검토 가능"). sunScale 인하의 px 비 산식 검증:
+   - sunPxRatio (body) = pxDiameter (body) / pxDiameter (sun) ≈ (body.radius × BODY_SCALE[body.id]) / (sun.radius × BODY_SCALE.sun)
+   - sunScale 75 → 50 (33% 인하) 시 mercury sun 대비: (3.4e9 × 2000) / (6.957e8 × 50) = 195.6 / 100 → 산출 근사 확인
+   - sunScale 75 (보존) 시 mercury 2000 만 단독: (3.4e9 × 2000) / (6.957e8 × 75) = 130.4 / 100 → mercury sunPxRatio 더 작아짐 (9% 영역)
+   - **즉 sunScale 인하는 mercury/venus 의 sunPxRatio 를 오히려 키운다**. 본 amendment 의 sunScale 인하 의도 = "절대 크기 균형 + 모바일 침습 회피" 이고 sunPxRatio 자체에는 역효과. 박제값 13.5% / 25.5% 는 이 역효과 반영 산출. **결론**: sunScale 50 채택 의도가 sunPxRatio 자연화 가 아니라 sun 의 모바일 침습 회피 + 절대 가시성 균형. 본 amendment 의 sunScale 인하 사유는 §변경 배경 §"sun mesh 자체의 절대 크기 인하로 mercury/venus 와의 px 비 산식 분모 축소" 표현이 부정확 — **사후 정당화 위험 존재**. 박제 보강 의무
+4. **D-T2 가드 발견 5건 분리 (질문 #4)** — Gemini 가 §누락 요소 §"한 번에 한 가지 문제만 해결하는 SRP" 합의. **Claude 답변**: SRP 정당성 합의. 단 #379 (모바일 그래픽 사각형) 가 본 amendment 의 sunScale 50 모바일 brightRatio 5.88% 와 결합 검증 필요성 — sunScale 50 모바일 점유율 변화가 모바일 LOD billboard 분기 임계와 영향 가능. **결론**: SRP 분리 유지 + #379 별도 이슈에 본 amendment 의 sunScale 50 모바일 점유율 변화 영향 검증 의무 박제 인계 (#379 본문 갱신)
+5. **r1-guard 명세 강화 (질문 #5)** — 허용 오차 ± 5% → ± 2% 강화. **Claude 답변**: forensic 측정 데이터의 viewport 무관 일관성 (1280×720 vs 1920×1080 동일 38.2% 실측) 으로 정량 정당화. developer 구현 부담은 forensic `_debug-373-proportion-tmp.mjs` 패턴 그대로 재사용 → 추가 부담 0. 회귀 가드 정밀도 증가 효과 명확. **결론**: ± 2% 강화 정당성 합의
+
+#### 고유 발견 (Gemini)
+
+1. **(제안 1) 옵션 (e) 마이그레이션 전략 강화** — 범위 외. forensic ADR Cross-validate 결과 (2026-04-30) §고유 발견 #2 에서 이미 후속 이슈 분리 기록됨. 본 amendment 에서 추가 박제 불요
+2. **(제안 2) ADR 템플릿화 + 팀 공유** — 범위 외. 프로세스 자산 구축 권고. 후속 별도 이슈로 분리 권고 (`[process] forensic ADR + Amendment 패턴 템플릿화 — 다른 복잡 이슈 해결 시 모범 사례 적용`. 우선순위: medium)
+
+#### 보강 의무 (본 amendment 후속 박제, Claude 재분석 결과)
+
+cross-validate Claude 재분석 결과 다음 보강 의무 식별:
+
+1. **r1-ui-pixel-diff-guard ADR amendment** (질문 #2 결합 간과) — `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` 에 sunScale 50 적용 시 회귀 가드 4 영역 baseline 변경 + r1-guard --measure-px-ratio 신설 동반 amendment. **developer 단계 박제 의무 인계** (본 amendment §Developer 인계 §1 에 보강)
+2. **§변경 배경 sunScale 인하 사유 표현 정정** (질문 #3 순수주의) — "sun 분모 축소로 mercury/venus 와의 px 비 산식 분모 축소" 는 부정확 (실제로는 px 비 역효과 — sunScale 인하가 sunPxRatio 를 키움). 정확 사유: "sun 의 절대 크기 균형 + 모바일 침습 회피 + mercury/venus 의 절대 크기 자연화 동반". 본 amendment §변경 배경 박제 의무 정정
+3. **#379 본문 갱신** (질문 #4 SRP 분리) — sunScale 50 모바일 점유율 변화 영향 검증 의무 박제 인계. **메인 오케스트레이터 책임** (본 architect 단계 비-범위)
+
+cross-validate outcome=applied. 본 amendment 결정 자체 합의. 보강 의무 3건은 별도 박제 (1+2 본 amendment 후속 커밋, 3 메인 오케스트레이터 책임).
 
 ### Developer 인계 (본 amendment 후 별도 단계)
 
@@ -620,6 +691,7 @@ cross-validate 결과는 본 §Cross-validate 결과 (Gemini 2.5 Pro, 2026-05-01
 4. **`_debug-373-proportion-tmp.mjs` 재실행** — 적극값 적용 후 px 비 실측 + ADR 박제값 ± 5% 마진 검증
 5. **사용자 D-T2 (실 Chrome GUI 수동)** — px 비 예측 (mercury 13.5% / venus 25.5%) 자연 비율 평가
 6. **CHANGELOG `### Behavior Changes`** — "수성/금성/태양 시각 비율 자연화. sun 대비 mercury/venus px 비 38%/45% → ~13%/25%. sun 점유율 4.19% → ~1.86% (1280×720)"
+7. **r1-ui-pixel-diff-guard ADR amendment 박제 의무** (Cross-validate Claude 재분석 #2 결합 간과 결과) — `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` 에 sunScale 50 적용 후 회귀 가드 4 영역 baseline 변경 + r1-guard `--measure-px-ratio` 신설 동반 amendment 박제. baseline 갱신 의무 (기존 sunScale 75 baseline 폐기 명시)
 
 ### 비-범위 (본 amendment 단계, 절대 손대지 말 것)
 
