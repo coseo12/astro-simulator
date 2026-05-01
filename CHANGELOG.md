@@ -49,7 +49,9 @@ Semantic Versioning을 따른다.
 
 - **ADR `20260429-r3-venus-visualization.md` 신규** ([#369](https://github.com/coseo12/astro-simulator/issues/369)) — 610 라인. R3 시각화 결정 6건 통합 (venusScale=4000 / shortcut-bar venus 항목 / orbit 라인 무수정 / focus race body-agnostic / info 패널 자동 일반화 / 비-범위 보호 가드). 11 후보 × 3 viewport venusScale 산출표. R4 Concrete Prediction (earth 단독 = 1 라인 / earth + moon = 0~2 라인). Gemini cross-validate 합의 (6 영역 우수 + S급 ADR + viewport-aware scaling R4 결정 시점 구체화 권고 수용). 후속 발견 분리 (ADR Status workflow Provisional → Accepted 표준화 — priority:medium-low)
 
-> **R2 사이클 (2026-04-28)** — Roadmap v3 "Incremental Body-by-Body Build" 두 번째 스프린트. 태양 단독 visible (R1, v0.14.0) 위에 **수성** 점진 추가. R1 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r1-guard 매트릭스) 100% 재사용. `mercury: 8500` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R1 §결과 Concrete Prediction "R2 코드 변경 ≤ 3 라인" 자연 검증. PR [#363](https://github.com/coseo12/astro-simulator/pull/363) (R2 anchor) + [#365](https://github.com/coseo12/astro-simulator/pull/365) (baseline 갱신 + Amendment v4 정정) + [#366](https://github.com/coseo12/astro-simulator/pull/366) (agent-browser 가드 — volt #79).
+## [0.15.0] — 2026-04-28
+
+> **R2 사이클 (2026-04-28)** — Roadmap v3 "Incremental Body-by-Body Build" 두 번째 스프린트. 태양 단독 visible (R1, v0.14.0) 위에 **수성** 점진 추가. R1 박제 인프라 (BODY_SCALE 룩업 / FOCUS_BUTTONS / focus sync / rebuildOrbitLines / r1-guard 매트릭스) 100% 재사용. `mercury: 8500` BODY_SCALE 1줄 + `FOCUS_BUTTONS` 1줄 = R1 §결과 Concrete Prediction "R2 코드 변경 ≤ 3 라인" 자연 검증. PR [#363](https://github.com/coseo12/astro-simulator/pull/363) (R2 anchor) + [#365](https://github.com/coseo12/astro-simulator/pull/365) (baseline 갱신 + Amendment v4 정정) + [#366](https://github.com/coseo12/astro-simulator/pull/366) (agent-browser 가드 — volt #79). 누락된 release entry 박제는 [#373](https://github.com/coseo12/astro-simulator/issues/373) PR 흐름에서 회수 (release version bump 가드 통과 의무).
 
 ### Behavior Changes
 
