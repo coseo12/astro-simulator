@@ -624,3 +624,7 @@ R2/R3 (이미 박제, 본 amendment 동반 갱신) + R4+ body 추가 시 본 ame
 - R2 ADR Amendment 2026-04-30 + R3 ADR Amendment 2026-04-30 (mercury=2000 / venus=1500 확정 갱신)
 - Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 갱신 (적극값 채택 후속)
 - volt [#74](https://github.com/coseo12/volt/issues/74) (UX DoD vs 제품 동작), volt [#29](https://github.com/coseo12/volt/issues/29) (결합 간과 편향), CRITICAL #6 §10 (수치 DoD 미달 시 측정 방법 검증 우선)
+
+### 라운드 2 결정 (2026-05-01)
+
+**sunScale 50 그대로 유지**. 라운드 2 amendment 는 mercury (2000 → 900) / venus (1500 → 650) 만 적극 재조정. R1 sunScale 50 박제값은 forensic ADR §재검토 트리거 #1 라운드 1 발동의 근거 박제 (D-T2 미해결 #1 비율 핵심) 그대로 유효. 자세한 재조정 근거: forensic ADR Amendment 2026-05-01 (라운드 2) §"임계 비례 역산".
