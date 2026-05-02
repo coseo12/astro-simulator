@@ -194,7 +194,37 @@ export interface SolarSystemSceneHandles {
    * `{ high, mid, low }` 는 각 LOD 단계로 판정된 body 개수. 합은 전체 body 수 (고리/HUD 제외).
    */
   getLodStats: () => { high: number; mid: number; low: number; override: LodOverride };
+  /**
+   * #388 — 마지막 `runLodPass` 에서 결정된 body 별 LOD 상세. dev overlay 시각화 용도.
+   *
+   * 각 항목:
+   *  - `id`: body 식별자 (예: `'sun'`, `'mercury'`)
+   *  - `level`: 결정된 LOD 단계
+   *  - `screenCoverage`: `screenCoverageRadius` 결과 (pixel) — 화면 점유 반지름
+   *  - `pxDiameter`: 시각 직경 추정 (`screenCoverage × 2`, pixel) — 사용자가 보는 크기 직관용
+   *  - `cameraDistanceMeters`: 카메라-body 실세계 거리 (m) — #387 reviewer 권고 #1 의 actualCameraRadius 변별
+   *
+   * 빈 배열 반환 = `runLodPass` 미실행 (씬 초기화 직후 / dev overlay 가 frame 보다 빠르게 polling).
+   * dev/prod 무관 노출 (overlay 컴포넌트가 prod 빌드에서 DCE 되므로 prod bundle 에 호출 코드 없음).
+   *
+   * **재할당 회피**: 반환 배열은 내부 버퍼 (frozen 아님). 호출자가 mutate 하면 안 됨 (read-only 계약).
+   */
+  getLodInfo: () => readonly LodBodyInfo[];
   dispose: () => void;
+}
+
+/**
+ * #388 — body 별 LOD raw 데이터. dev overlay (`lod-dev-overlay.tsx`) 시각화 + 회귀 진단 용도.
+ *
+ * `runLodPass` 가 매 프레임 갱신. `null` 좌표 (frustum 밖) 가 아닌 raw 결정 입력값을 보존하여
+ * #387 reviewer non-blocking #1 (actualCameraRadius 변별) / #2 (pixelDiameter null 박제) 직접 해소.
+ */
+export interface LodBodyInfo {
+  id: string;
+  level: LodLevel;
+  screenCoverage: number;
+  pxDiameter: number;
+  cameraDistanceMeters: number;
 }
 
 export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
@@ -339,6 +369,9 @@ export function createSolarSystemScene(
   const bodyCurrentLod = new Map<string, LodLevel>();
   // LOD 집계 — getLodStats 반환 값 재사용 버퍼 (매 프레임 객체 할당 회피).
   const lodStats = { high: 0, mid: 0, low: 0, override: 'auto' as LodOverride };
+  // #388 — body 별 LOD raw 데이터 버퍼. runLodPass 가 매 프레임 in-place 갱신.
+  // 배열 자체는 매 frame 동일 참조 — body 추가/제거 시에만 길이 조정. 행 객체도 mutable in-place.
+  const lodInfo: LodBodyInfo[] = [];
   let lodOverride: LodOverride = 'auto';
   // LOD cross-fade 상태 (ADR §축 3 — 200ms linear interp).
   // 각 body 의 전환 진행 상태 보관. `nowMs - startMs >= LOD_FADE_DURATION_MS` 이면 정착.
@@ -855,6 +888,8 @@ export function createSolarSystemScene(
     lodStats.mid = 0;
     lodStats.low = 0;
     lodStats.override = lodOverride;
+    // #388 — body 별 raw 데이터 버퍼 인덱스. system.bodies 길이 변동 없음 (정적 SSoT).
+    let lodInfoIndex = 0;
 
     // view × projection 결합 행렬. Babylon `scene.getTransformMatrix()` 는 `viewMatrix × projectionMatrix` 의
     // row-major 16 원소 Float32Array (`.m` 필드). 카메라 타입 관계없이 scene 단위로 호출 가능.
@@ -931,7 +966,29 @@ export function createSolarSystemScene(
       if (nextLevel === 'high') lodStats.high += 1;
       else if (nextLevel === 'mid') lodStats.mid += 1;
       else lodStats.low += 1;
+
+      // #388 — body 별 raw 데이터 박제. lodInfo 버퍼는 매 프레임 in-place 갱신 (객체 재할당 회피).
+      // 시각 직경 추정 (pxDiameter) = coverage × 2 — screenCoverageRadius 가 반지름이므로 직경은 두 배.
+      const existing = lodInfo[lodInfoIndex];
+      if (existing) {
+        existing.id = body.id;
+        existing.level = nextLevel;
+        existing.screenCoverage = coverage;
+        existing.pxDiameter = coverage * 2;
+        existing.cameraDistanceMeters = cameraDistanceMeters;
+      } else {
+        lodInfo.push({
+          id: body.id,
+          level: nextLevel,
+          screenCoverage: coverage,
+          pxDiameter: coverage * 2,
+          cameraDistanceMeters,
+        });
+      }
+      lodInfoIndex += 1;
     }
+    // body 가 줄었을 가능성 — trailing slot 잘라내기 (현재 시스템에선 정적이지만 미래 안전).
+    if (lodInfo.length > lodInfoIndex) lodInfo.length = lodInfoIndex;
   };
 
   /**
@@ -1041,6 +1098,8 @@ export function createSolarSystemScene(
     lodStats.override = level;
   };
   const getLodStats = () => lodStats;
+  // #388 — body 별 LOD raw 데이터 노출. dev overlay 가 frame 간격으로 polling.
+  const getLodInfo = (): readonly LodBodyInfo[] => lodInfo;
 
   const updateAtKepler = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
@@ -1148,6 +1207,7 @@ export function createSolarSystemScene(
     clearFocus,
     setLodOverride,
     getLodStats,
+    getLodInfo,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
