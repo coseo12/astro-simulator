@@ -1,0 +1,214 @@
+{
+  "issue": 391,
+  "phase": "Phase 2 architect",
+  "createdAt": "2026-05-02T00:00:00Z",
+  "ssot": {
+    "phase1Baseline": "apps/web/scripts/__baselines__/lod-379.json",
+    "phase1ForensicMatrix": "docs/reports/379-forensic/output.json",
+    "billboardCode": "packages/core/src/scene/solar-system-scene.ts:1356-1391 (createBodyBillboard)",
+    "lodPolicy": "packages/core/src/render/lod.ts:189 (screenCoverageRadius, Phase 1 fix)"
+  },
+  "summary": {
+    "phase1FixOutcome": "sun=high 100% 회복 (PR #390 머지 후 baseline 검증). lodStats {high:1, mid:0, low:23} 유지 — 측정 정확도 회복 + sun mid 임계 ≥50px 진입.",
+    "phase2Scope": "mercury/venus 등 small body 가 Phase 1 후에도 low billboard fallback 으로 분류되는 환경에서 사각형 quad 시각 회귀 fix.",
+    "billboardMechanism": "createBodyBillboard 가 MeshBuilder.CreatePlane (단순 quad) + StandardMaterial (단색 albedo, alpha mask 미적용). 카메라가 가까울수록 정사각형 윤곽이 픽셀로 노출 → 사용자 D-T2 보고 사각형 인지의 근원."
+  },
+  "forensicMatrix": {
+    "source": "Phase 1 baseline (apps/web/scripts/__baselines__/lod-379.json)",
+    "viewport": "8 cell 매트릭스 (모바일 4 + 데스크톱 4)",
+    "cells": [
+      {
+        "viewport": "320x568_dpr1",
+        "kind": "mobile-narrow",
+        "sun": { "level": "high", "screenCoverage": 56.08, "pxDiameter": 112.16 },
+        "mercury": { "level": "low", "screenCoverage": 3.40, "pxDiameter": 6.80 },
+        "venus": { "level": "low", "screenCoverage": 6.20, "pxDiameter": 12.39 },
+        "billboardVisible": ["mercury", "venus"],
+        "phase2Target": true,
+        "userDT2Trigger": true
+      },
+      {
+        "viewport": "375x667_dpr1",
+        "kind": "mobile",
+        "sun": { "level": "high", "screenCoverage": 65.85, "pxDiameter": 131.70 },
+        "mercury": { "level": "low", "screenCoverage": 4.00, "pxDiameter": 7.99 },
+        "venus": { "level": "low", "screenCoverage": 7.28, "pxDiameter": 14.55 },
+        "billboardVisible": ["mercury", "venus"],
+        "phase2Target": true,
+        "userDT2Trigger": true
+      },
+      {
+        "viewport": "375x667_dpr2",
+        "kind": "mobile",
+        "sun": { "level": "high", "screenCoverage": 131.70, "pxDiameter": 263.41 },
+        "mercury": { "level": "low", "screenCoverage": 7.99, "pxDiameter": 15.98 },
+        "venus": { "level": "mid", "screenCoverage": 14.55, "pxDiameter": 29.10 },
+        "billboardVisible": ["mercury"],
+        "phase2Target": true,
+        "userDT2Trigger": true
+      },
+      {
+        "viewport": "414x896_dpr2",
+        "kind": "mobile-large",
+        "sun": { "level": "high", "screenCoverage": 176.92, "pxDiameter": 353.85 },
+        "mercury": { "level": "mid", "screenCoverage": 10.73, "pxDiameter": 21.47 },
+        "venus": { "level": "mid", "screenCoverage": 19.55, "pxDiameter": 39.09 },
+        "billboardVisible": [],
+        "phase2Target": false,
+        "userDT2Trigger": false,
+        "note": "Phase 1 효과 — 큰 viewport + dpr2 환경에서는 mercury/venus 가 mid 진입. billboard fallback 미발생."
+      },
+      {
+        "viewport": "1280x720_dpr1",
+        "kind": "desktop",
+        "sun": { "level": "high", "screenCoverage": 71.08, "pxDiameter": 142.17 },
+        "mercury": { "level": "low", "screenCoverage": 4.31, "pxDiameter": 8.63 },
+        "venus": { "level": "low", "screenCoverage": 7.85, "pxDiameter": 15.71 },
+        "billboardVisible": ["mercury", "venus"],
+        "phase2Target": true,
+        "userDT2Trigger": true,
+        "note": "데스크톱 + 행성 겹침 환경 — 사용자 D-T2 trigger 의 핵심 cell."
+      },
+      {
+        "viewport": "1440x900_dpr1",
+        "kind": "desktop",
+        "sun": { "level": "high", "screenCoverage": 88.86, "pxDiameter": 177.71 },
+        "mercury": { "level": "low", "screenCoverage": 5.39, "pxDiameter": 10.78 },
+        "venus": { "level": "mid", "screenCoverage": 9.82, "pxDiameter": 19.63 },
+        "billboardVisible": ["mercury"],
+        "phase2Target": true,
+        "userDT2Trigger": true
+      },
+      {
+        "viewport": "1440x900_dpr2",
+        "kind": "desktop",
+        "sun": { "level": "high", "screenCoverage": 177.71, "pxDiameter": 355.42 },
+        "mercury": { "level": "mid", "screenCoverage": 10.78, "pxDiameter": 21.57 },
+        "venus": { "level": "mid", "screenCoverage": 19.63, "pxDiameter": 39.26 },
+        "billboardVisible": [],
+        "phase2Target": false,
+        "userDT2Trigger": false,
+        "note": "Phase 1 효과 — 고해상도 desktop dpr=2 환경에서 mercury/venus mid 진입."
+      },
+      {
+        "viewport": "1920x1080_dpr1",
+        "kind": "desktop-wide",
+        "sun": { "level": "high", "screenCoverage": 106.63, "pxDiameter": 213.25 },
+        "mercury": { "level": "low", "screenCoverage": 6.47, "pxDiameter": 12.94 },
+        "venus": { "level": "mid", "screenCoverage": 11.78, "pxDiameter": 23.56 },
+        "billboardVisible": ["mercury"],
+        "phase2Target": true,
+        "userDT2Trigger": true
+      }
+    ],
+    "aggregates": {
+      "phase2TargetCells": 6,
+      "phase2NonTargetCells": 2,
+      "mercuryLowCount": 5,
+      "venusLowCount": 3,
+      "mobileLowSensitiveCells": 3,
+      "desktopLowSensitiveCells": 3,
+      "billboardPxDiameterRange": {
+        "mercury": { "min": 6.80, "max": 12.94 },
+        "venus": { "min": 12.39, "max": 15.71 }
+      }
+    }
+  },
+  "billboardVisualAnalysis": {
+    "geometry": "MeshBuilder.CreatePlane({ size: diameter, sideOrientation: 2 (DOUBLESIDE) })",
+    "material": "StandardMaterial — 단색 albedo (body.colorHint.hex 또는 #888888 fallback). emissive=color×0.3 (non-star).",
+    "alphaMask": "미적용 — material.opacityTexture 없음",
+    "billboardMode": "BILLBOARDMODE_ALL (7) — 카메라 정면 회전 자동",
+    "userPerceptionRoot": "정사각형 quad 가 alpha mask 없이 albedo 색상으로 채워짐. body 픽셀 면적 (mercury 7~13px, venus 12~16px) 이 사용자 인지 임계 (≥4px) 진입 시 사각형 윤곽 가시화.",
+    "phase1Effect": "Phase 1 식 정정으로 sun coverage 71px 회복 + 큰 viewport 에서 mercury/venus 가 mid 진입. 그러나 작은 viewport / 낮은 DPR 환경의 mercury/venus 는 여전히 low billboard 잔존."
+  },
+  "candidateImpactSimulation": {
+    "후보_가_alphaMask": {
+      "변경": "createBodyBillboard 의 StandardMaterial 에 procedural alpha mask 추가 (uv 기반 원형 smoothstep)",
+      "파일": "packages/core/src/scene/solar-system-scene.ts",
+      "예상_라인_수": "5~10 라인 (StandardMaterial 또는 ShaderMaterial 분기)",
+      "픽셀_효과": "mercury 7~13px / venus 12~16px quad 가 원형 disc 로 표현. 사각형 인지 회피.",
+      "영향_평가": {
+        "r1_guard_measure_px_ratio": "low — alpha mask 는 quad 자체 size 변경 없음. r1-guard 가 측정하는 BBOX width/height 는 alpha 미반영 raw quad. 단, opaque pixel 비교를 사용한다면 변경 발생 가능 — 사전 검증 의무.",
+        "draw_call": "변경 없음 — 동일 quad 1개 mesh. material 변경만.",
+        "메모리": "변경 없음 — texture 미사용 (procedural shader 분기).",
+        "P11_B_정책": "§미해결 1 정식 fix — 정합. P11-B ADR amendment 박제 가능."
+      },
+      "위험": "ShaderMaterial 도입 시 Babylon shader cache 무효화 가능. StandardMaterial.opacityTexture + DynamicTexture 가 보다 단순.",
+      "385_영향": "박제값 인하 시 mercury/venus pxDiameter 가 더 작아짐 (e.g., mercuryScale 700 → coverage ≈ 6.7→5.2px). alpha mask 적용 시 작은 quad 도 원형으로 보임 — 인하 부담 완화.",
+      "구현_복잡도": "낮음~중간"
+    },
+    "후보_나_segment_강제": {
+      "변경": "createBodyBillboard 의 PlaneBuilder 를 SphereBuilder (segments=8) 로 교체 — billboard 가 아닌 mid-fallback sphere",
+      "파일": "packages/core/src/scene/solar-system-scene.ts",
+      "예상_라인_수": "10~20 라인 + billboardMode 제거 + light 적용 검토",
+      "픽셀_효과": "사각형 → 8세그 sphere (저비용 구형 디테일). 카메라 회전 시 자연스러운 음영.",
+      "영향_평가": {
+        "r1_guard_measure_px_ratio": "low~medium — sphere geometry 의 BBOX 가 quad 와 동일 (radius 기준). 단 라이팅 상태에 따라 BBOX 외곽 픽셀이 dim 으로 보일 수 있음 — 5% 마진 임계 검증 의무.",
+        "draw_call": "변경 없음 — 1개 mesh 유지.",
+        "메모리": "geometry vertex/index buffer 증가 (quad 4 vert → sphere segments=8 = 64 vert). 24 body × 60 vert 추가 ≈ 작음. iOS Safari 17.4+ #219 결합 검토.",
+        "P11_B_정책": "§축 4 'low = billboard quad' 위배 → P11-B ADR Amendment 의무. 'low = low-poly sphere' 로 정책 수정."
+      },
+      "위험": "P11-B ADR §축 4 직접 변경. mid (segments=12) 와 low (segments=8) 가 너무 가까워 LOD 단계 의미 약화 → mid/low 통합 검토 가능 (정책 단순화).",
+      "385_영향": "박제값 인하 시 mercury/venus 가 더 작은 sphere 로 표현. alpha mask 보다 자연스럽지만 작은 sphere 는 segment 가 보일 위험.",
+      "구현_복잡도": "중간 (P11-B ADR amendment 동반)"
+    },
+    "후보_다_adaptive_임계": {
+      "변경": "lodFromScreenCoverage 의 high/mid 임계를 viewport / DPR 에 따라 동적 조정",
+      "파일": "packages/core/src/render/lod.ts (또는 lod-pixel-thresholds 신설)",
+      "예상_라인_수": "20~40 라인 + tier-profile 확장",
+      "픽셀_효과": "임계 인하 (mid 8 → 5) 시 mercury/venus 가 더 자주 mid 진입 → billboard fallback 자체 회피.",
+      "영향_평가": {
+        "r1_guard_measure_px_ratio": "medium — mid sphere 진입 시 라이팅된 sphere 가 BBOX 측정에 영향 가능. 5% 마진 검증 의무.",
+        "draw_call": "증가 — mid sphere segments=12 가 quad 1개 대비 GPU 부담 증가. P11-B DoD #1 'draw call 차이 ≥ 20%' 회귀 가능.",
+        "메모리": "증가 — mid mesh lazy-create 가 더 자주 발생. 장기 세션 LRU dispose 가속 필요.",
+        "P11_B_정책": "§결정 §2 핵심 공식 변경 — P11-B ADR Amendment 의무. tier-c 프로파일 (#290 P11-C) 과의 결합 검토 필요."
+      },
+      "위험": "R4 viewport-aware scaling 결정과 직접 결합 → R4 진입 전 단독 채택 시 충돌 가능. R4 가 viewport 별 박제값을 동적 조정한다면 (다) 의 임계 동적 조정과 책임 중복.",
+      "385_영향": "임계 인하 시 #385 라운드 3 박제값 인하의 효과가 약해짐 (작은 박제값 + 낮은 임계 → mid 진입 유지). 단, R4 결합 시 박제값 자체가 viewport 적응이라 임계 조정 불필요.",
+      "구현_복잡도": "높음 (R4 결합 검토 + tier-profile 확장)"
+    }
+  },
+  "385_combination_simulation": {
+    "현재_385_제안": "mercuryScale 900 → 700~800 / venusScale 650 → 800~900 (사용자 D-T2 자연감 향상 목적)",
+    "385_단독_적용시_phase2_없이": {
+      "mercuryScale_700": "mercury coverage ≈ 3.40 × 700/900 ≈ 2.65px (320×568 dpr1)",
+      "venusScale_900": "venus coverage ≈ 6.20 × 900/650 ≈ 8.59px (320×568 dpr1, mid 경계)",
+      "결론": "mercury 는 모든 cell 에서 low billboard 유지. venus 는 일부 cell mid 진입 가능.  mercury 의 사각형 회귀 잔존 → Phase 2 없이 #385 진입 시 사용자 D-T2 회귀 가능."
+    },
+    "후보_가_alphaMask_385_결합": {
+      "효과": "박제값 인하 시 mercury/venus pxDiameter 가 더 작아져도 alpha mask 가 원형 표현 보장. 사각형 회귀 차단.",
+      "결론": "Phase 2 (가) 가 #385 의 안전 진입을 가능하게 함."
+    },
+    "권고": "Phase 2 가 #385 진입 전 머지 권장. 단, 후보 (가) 채택 시 #385 영향 평가 비용 최소."
+  },
+  "phase2RecommendedDecision": {
+    "primary": "(가) alpha mask",
+    "implementation": {
+      "texture": "DynamicTexture 64x64 1회 + scene 단위 공유 (Babylon Uber-shader cache 활용)",
+      "transparencyMode": "ALPHATEST (1) — CPU 정렬 비용 0, hardware Z-buffer occlusion",
+      "fallbackThreshold": "pxDiameter < 4px → opacityTexture=null + 사각형 quad 유지 (sub-pixel flickering 회피)",
+      "disposeResponsibility": "scene.metadata.alphaMaskTexture 가 scene dispose 시 함께 dispose"
+    },
+    "근거": [
+      "변경 영역 최소 (createBodyBillboard 의 material 만 수정, ~10~20 라인)",
+      "P11-B ADR §미해결 1 정식 fix — 정책 변경 없음 (Amendment 1회)",
+      "R4 viewport-aware scaling 결정과 독립 — R4 진입 전 안전 적용 가능",
+      "#385 박제값 인하 시 안전 마진 제공 — 4px 이상 cell 은 원형 disc, 4px 미만 cell 은 fallback 으로 사각형 quad 유지 (사용자 D-T2 가 3px 이하에서 원/사각형 구분 불가)",
+      "draw call / 메모리 / r1-guard 영향 최소"
+    ],
+    "rejected": {
+      "후보_나": "P11-B ADR §축 4 정책 직접 변경 + mid/low 단계 의미 약화. 메모리 증가.",
+      "후보_다": "R4 viewport-aware 결정과 결합 검토 필요 — Phase 2 단독 채택 시 충돌 가능. 구현 복잡도 높음."
+    },
+    "phaseSplitNotRecommended": "Phase 2 자체가 단일 변경 — 추가 Phase 분리 불필요. (가) 채택 시 1 PR 로 완결.",
+    "p11bAmendmentRequired": true,
+    "crossValidateOutcome": "applied — Gemini 5 합의 / 3 이견 수용 (4px fallback / 공유 텍스처 dispose / 저사양 GPU 관찰) / 1 후속 분리 (디버그 모드) / 0 기각"
+  },
+  "verificationPaths": {
+    "phase1RegressionGuard": "apps/web/scripts/browser-verify-379-lod.mjs (Phase 1 baseline 보존, sun=high 100% 유지)",
+    "phase2VisualGuard": "신규 spot-check 또는 시나리오 A 확장 — billboard alpha mask 적용 확인 (snapshot diff)",
+    "userDT2": "모바일 (320×568 / 375×667 dpr1) + 데스크톱 (1280×720 / 1440×900 dpr1 / 1920×1080 dpr1) 6 cell 에서 mercury/venus 사각형 시각 회귀 0",
+    "r1Guard": "pnpm verify:r1-guard --measure-px-ratio (Phase 1 SSoT) — Phase 2 적용 후 5% 마진 유지 확인 의무"
+  }
+}

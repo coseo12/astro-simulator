@@ -549,6 +549,8 @@ low billboard 는 body 색상만 albedo 단색 평면 — sphere 느낌이 아�
 
 **후속 이슈 후보**: "LOD low billboard 시각 디테일 향상" — 본 Phase 비-범위, 시각 QA 결과 따라 분리.
 
+**Resolved (2026-05-02, #391 Phase 2)**: `docs/decisions/20260502-391-phase2-billboard.md` 가 정식 fix 박제. alpha mask (procedural smoothstep) 채택 — `createBodyBillboard` material 변경 5~15 라인. `MeshBuilder.CreatePlane` quad 자체 유지 (low LOD 정책 변경 없음). #379 Phase 1 (PR #390) 식 정정 후에도 작은 viewport / 낮은 DPR 환경 (모바일 320×568 ~ 데스크톱 1920×1080 dpr1) 6 cell 에서 mercury/venus 가 low billboard 잔존하여 사용자 D-T2 사각형 회귀 trigger — alpha mask 가 quad 의 정사각형 윤곽 → 원형 disc 변환으로 회귀 차단.
+
 ### 미해결 2: 혜성/spacecraft 의 tail / trail
 
 혜성은 `comet` kind 지만 dust tail / ion tail / coma 가 별도 파티클 시스템 (현재 미구현). LOD high/mid/low 전환 시 tail 가시성을 어떻게 처리할지 본 ADR 은 결정 미수. 현재 태양계 JSON 에 comet kind 가 1개도 없어 실 영향 0 — 후속 이슈로 deferred (P14+ 혜성 추가 시).
