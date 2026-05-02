@@ -17,7 +17,7 @@
  *      → DoD: scene.metadata.__lodBillboardAlphaMask 1개 (per-body 생성 금지)
  *      → DoD: low variant material 24개 모두 동일 opacityTexture reference 공유
  *
- * dev 빌드 의존: `window.__solarScene.getLodInfo()` + `window.__simCore.getSceneRef()` (private API).
+ * dev 빌드 의존: `window.__solarScene.getLodInfo()` + `window.__simCore.scene` (private API).
  *
  * 환경변수:
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
