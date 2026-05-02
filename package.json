@@ -35,6 +35,7 @@
     "verify:webgpu": "node scripts/browser-verify-webgpu.mjs",
     "verify:belt-nbody": "node scripts/browser-verify-belt-nbody.mjs",
     "verify:lod": "node apps/web/scripts/browser-verify-lod.mjs",
+    "verify:379-lod": "node apps/web/scripts/browser-verify-379-lod.mjs",
     "verify:r1-guard": "node apps/web/scripts/r1-ui-regression-guard.mjs",
     "verify:r1-tier-untouched": "bash apps/web/scripts/verify-r1-tier-untouched.sh",
     "verify:all": "pnpm verify:test-coverage && pnpm verify:browser && pnpm verify:mobile && pnpm verify:mobile-p4c && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y && pnpm verify:webgpu && pnpm verify:belt-nbody",

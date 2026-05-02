@@ -892,10 +892,27 @@ export function createSolarSystemScene(
     let lodInfoIndex = 0;
 
     // view × projection 결합 행렬. Babylon `scene.getTransformMatrix()` 는 `viewMatrix × projectionMatrix` 의
-    // row-major 16 원소 Float32Array (`.m` 필드). 카메라 타입 관계없이 scene 단위로 호출 가능.
+    // column-major 16 원소 Float32Array (`.m` 필드). 카메라 타입 관계없이 scene 단위로 호출 가능.
     const vp = scene.getTransformMatrix();
     const vpArr = vp.m;
     const viewportHeight = scene.getEngine().getRenderHeight() || 800;
+
+    // #379 fix — screenCoverageRadius 의 edge offset 을 camera-up basis 로 박제.
+    // viewMatrix 는 world-to-view 변환. invert 결과의 col 1 = world space camera-up basis.
+    // edge offset 을 cameraUp 으로 두면 NDC y 변화가 주성분 → viewportHeight 환산이 정확.
+    // (cameraRight 면 NDC x 가 주성분이 되어 perspective anisotropy 로 viewportWidth 환산 필요)
+    // 매 프레임 1회 계산 후 모든 body 에 재사용 (성능 영향 0).
+    //
+    // 첫 frame 에 scene._viewMatrix 가 lazy 초기화 안 된 경우 null 가능 — fallback `[0, 1, 0]`
+    // 으로 두면 world-up 근사. ArcRotateCamera default 자세에서 cameraUp 이 world-up 의
+    // view-forward 성분 제거 후 정규화된 형태라 ±10% 이내. 두 번째 frame 부터 정확한 invView 사용.
+    const viewMatrix = scene.getViewMatrix();
+    let cameraUpWorld: [number, number, number] = [0, 1, 0];
+    if (viewMatrix && typeof viewMatrix.clone === 'function') {
+      const invView = viewMatrix.clone().invert();
+      const ivm = invView.m;
+      cameraUpWorld = [ivm[4] ?? 0, ivm[5] ?? 1, ivm[6] ?? 0];
+    }
 
     const now = performance.now();
 
@@ -935,6 +952,7 @@ export function createSolarSystemScene(
         sceneUnitPerMeter,
         vpArr,
         viewportHeight,
+        cameraUpWorld,
       );
 
       const isFocused = focusBodyIdForAssert === body.id;
