@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **LOD dev overlay 상세 모드 (`?lodOverlay=1`)** ([#388](https://github.com/coseo12/astro-simulator/issues/388)) — body 별 LOD level + screenCoverage(px) + pxDiameter(px) + cameraDistance(km) 4 column 표 박제. 색상 코딩 (high=emerald / mid=amber / low=rose) + `data-lod-level` 속성. 기존 `?debug=draw-calls` 집계 모드는 backwards-compat 으로 유지 (단일 행 H/M/L 분포 박제). **prod bundle DCE 검증**: `LodDevOverlay` 함수 진입 즉시 `if (production) return null` 으로 본체 (`useState`/`useEffect`/JSX) 전체 제거 — `LodDevOverlayImpl` 분리로 hooks 의존 그래프와 prod 분기 격리. `grep -rln "lod-row-\|waiting for first frame" .next/static/` 0 매치 실측. 발화점: PR [#387](https://github.com/coseo12/astro-simulator/pull/387) ([#379] architect 단계) Gemini cross-validate 고유 발견 분리 — `docs/decisions/20260502-379-fix-decision.md` Phase 1 (screenCoverage 식 정정) 디버깅 도구
+- **`SolarSystemSceneHandles.getLodInfo()` API 추가** ([#388](https://github.com/coseo12/astro-simulator/issues/388)) — `runLodPass` 매 프레임 갱신. 반환 시그니처 `readonly LodBodyInfo[]` (`id` / `level` / `screenCoverage` / `pxDiameter` / `cameraDistanceMeters`). 내부 버퍼 in-place mutate (재할당 회피, 매 프레임 24+ body × 5 필드 = 120+ assignment). 호출자는 read-only 계약 — mutate 금지. PR #387 reviewer non-blocking #1 (forensic `actualCameraRadius` 일률 35 cell 별 변별) + #2 (`bodyInfo.pixelDiameter` null) 직접 해소 가능 — overlay 가 raw 박제하면 forensic 측정 시 cell 별 차이가 드러남
+
+### Notes
+
+- **LOD overlay tree-shaking 검증 절차** — prod build 후 `grep -rln "lod-row-\|waiting for first frame\|isDetailedOverlayEnabled" apps/web/.next/static/chunks/` 가 0 매치여야 한다. `LodDevOverlay` 의 prod early-return 패턴은 컴포넌트 본체 분리 (`LodDevOverlayImpl`) 가 필수 — 단일 함수 내 hooks 와 prod 분기 공존 시 minifier 가 보수적 회피하여 hooks 의존 그래프 보존, dead branch JSX 가 잔존 (실측 1차 시도에서 발견)
+- **`getLodInfo` core API 는 prod bundle 에 포함됨** — `LodBodyInfo` 인터페이스 + `runLodPass` 의 buffer in-place mutation (~30 라인) 은 packages/core scene 정상 API 의 일부로 prod 에서도 호출 가능. dev overlay 만 prod 에서 호출하지 않을 뿐. bundle size 영향 약 +1KB minified (버퍼 mutation 코드만, JSX 0)
+- **`__solarScene.getLodInfo` 후방 호환** — 구버전 scene (P11-B v0.13.0~v0.15.0) 에는 `getLodInfo` 부재. dev overlay 가 optional chaining 으로 가드 — `getLodInfo` 미존재 시 `waiting for first frame` 메시지 유지 (#388 vitest 회귀 가드)
+
 > **R3 D-T2 후속 — body 비율 자연화 (2026-05-01, #373 라운드 2 적극 재조정)** — 어제 (2026-04-30) D-T2 사용자 검증 5건 회귀 발견 중 **#1 (sun ↔ mercury / venus 비율 미해소)** 만 본 PR 범위. #378/#379/#380 (회귀 #2~#4) 은 별도 이슈 분리. 선행 PR [#377](https://github.com/coseo12/astro-simulator/pull/377) (옵션 c 보수값 mercury=2000 / venus=1500) D-T2 미통과 → CLOSED → 라운드 2 적극값 (임계 비례 역산 mercury=900 / venus=650) 채택. forensic ADR [`docs/decisions/20260430-r3-followup-body-proportion.md`](docs/decisions/20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (라운드 2) SSoT.
 
 ### Behavior Changes
