@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "r1:guard": "node scripts/r1-ui-regression-guard.mjs",
-    "r1:guard:px-ratio": "node scripts/r1-ui-regression-guard.mjs --measure-px-ratio"
+    "r1:guard:px-ratio": "node scripts/r1-ui-regression-guard.mjs --measure-px-ratio",
+    "verify:379-lod": "node scripts/browser-verify-379-lod.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",

@@ -403,7 +403,7 @@ describe('LOD_PIXEL_THRESHOLDS', () => {
 
 describe('screenCoverageRadius', () => {
   // identity 행렬 (투영 비적용) — perspective divide 시 w=1 → NDC = scene 좌표.
-  // row-major 16 원소.
+  // column-major 16 원소.
   const IDENTITY: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
   it('카메라 뒤 body (w ≤ 0) 는 0 반환', () => {
@@ -413,24 +413,150 @@ describe('screenCoverageRadius', () => {
     expect(result).toBe(0);
   });
 
-  it('identity 행렬 + edge offset = radius × renderScale × viewportHeight/2', () => {
-    // bodyLocalPos = [0, 0, 10] (임의), radius=1e6 m, renderScale=1e-9.
-    // edge 는 y 축으로 radius × renderScale = 1e-3 offset.
+  it('identity 행렬 + cameraUp=+y → edge offset 이 정확한 px radius', () => {
+    // bodyLocalPos = [0, 0, 10], radius=1e6 m, renderScale=1e-9.
+    // edge 는 +y 축으로 radius × renderScale = 1e-3 offset.
     // identity 행렬 w=1 → NDC 차이 = edge.y - center.y = 1e-3.
-    // pixel = 1e-3 × 800 × 0.5 = 0.4.
+    // pixel = sqrt(0 + (1e-3 × 800 × 0.5)^2) = 0.4.
+    const result = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800, [0, 1, 0]);
+    expect(result).toBeCloseTo(0.4, 5);
+  });
+
+  it('cameraUpWorld 부재 시 +y axis fallback (ArcRotateCamera default 근사 회귀 가드)', () => {
+    // 부재 시 [0, 1, 0] 으로 fallback. identity 행렬에서 +y 방향 offset → ndcEdgeY 변화.
     const result = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800);
+    // [0, 1, 0] 명시 전달과 동일 결과 — backward compat.
     expect(result).toBeCloseTo(0.4, 5);
   });
 
   it('renderScale 2배 → pixel 결과 2배', () => {
-    const single = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800);
-    const doubled = screenCoverageRadius([0, 0, 10], 1e6, 2e-9, IDENTITY, 800);
+    const single = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800, [0, 1, 0]);
+    const doubled = screenCoverageRadius([0, 0, 10], 1e6, 2e-9, IDENTITY, 800, [0, 1, 0]);
     expect(doubled).toBeCloseTo(single * 2, 5);
   });
 
   it('viewportHeight 2배 → pixel 결과 2배', () => {
-    const small = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 400);
-    const large = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800);
+    const small = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 400, [0, 1, 0]);
+    const large = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800, [0, 1, 0]);
     expect(large).toBeCloseTo(small * 2, 5);
+  });
+
+  // ----------------------------------------------------------------------------
+  // #379 fix — edge offset axis 회귀 가드 (cross-validate 이견 수용 #1 엣지 케이스)
+  // ----------------------------------------------------------------------------
+
+  it('cameraUp 이 view forward 와 평행하면 edge offset 이 view depth 변화 → pixel 거의 0 (식 sanity)', () => {
+    // identity 행렬 + bodyLocalPos = [0,0,10] (camera at origin, looking +z).
+    // cameraUp = [0, 0, 1] (view forward 와 동일) → edge 는 z 축 offset → NDC xy 변화 미미.
+    // 정상 동작: 결과 ≈ 0 (perspective divide 후 view depth 변화는 NDC 평면 비례 변화 미미).
+    const result = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800, [0, 0, 1]);
+    // identity 에서는 z 변화가 NDC.z 변화로 흡수되어 NDC.x/y 변화 거의 0. result ≈ 0.
+    expect(result).toBeLessThan(0.001);
+  });
+
+  it('cameraUp 단위 벡터 정규화 — radius 단위 일관성 (회귀 가드)', () => {
+    // [0, 1, 0] 과 [0, 0.5, 0] 비교 — 후자는 0.5 만큼 offset 이라 px radius 도 절반.
+    // 호출자가 단위 벡터 보장 — 본 테스트는 비-정규 벡터 입력 시 비례하는 결과를 확인 (sanity).
+    const unit = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800, [0, 1, 0]);
+    const half = screenCoverageRadius([0, 0, 10], 1e6, 1e-9, IDENTITY, 800, [0, 0.5, 0]);
+    expect(half).toBeCloseTo(unit * 0.5, 5);
+  });
+
+  it('극원거리 sub-pixel body (10 AU 거리) → coverage ≪ LOD_PIXEL_THRESHOLDS.mid (low 분기 정합)', () => {
+    // identity 행렬 시뮬레이션 — bodyLocalPos = [0,0,1.5e12] 거리 + cameraUp +y offset:
+    // edge offset = 1.7e6 × 8.4e-11 = 1.4e-4 → pixel = 1.4e-4 × 800 × 0.5 = 5.7e-2 (≪ 8 ⇒ low).
+    const result = screenCoverageRadius([0, 0, 1.5e12], 1.7e6, 8.4e-11, IDENTITY, 800, [0, 1, 0]);
+    expect(result).toBeLessThan(LOD_PIXEL_THRESHOLDS.mid);
+  });
+
+  it('카메라 frustum 경계 (clip w ≤ 0) body — coverage 0 + 호출자 low fallback 정합', () => {
+    // w 성분을 0 으로 강제하는 특수 행렬. lodFromScreenCoverage 가 coverage=0 → low 결정.
+    const W_ZERO: number[] = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0];
+    const moon = { kind: 'moon', mass: 7.342e22, radius: 1.7374e6 };
+    const coverage = screenCoverageRadius([1, 1, 1], 1e6, 1e-9, W_ZERO, 800, [0, 1, 0]);
+    expect(coverage).toBe(0);
+    expect(
+      lodFromScreenCoverage({
+        body: moon,
+        cameraDistanceMeters: 100 * moon.radius,
+        screenCoverage: coverage,
+      }),
+    ).toBe('low');
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 6. #379 forensic SSoT — sun/mercury/venus T1 default 시나리오 회귀 가드
+// ----------------------------------------------------------------------------
+
+describe('#379 forensic — T1 default 진입 시 sun=high / mercury·venus mid 또는 high 보장', () => {
+  // forensic 매트릭스 (`docs/reports/379-forensic/output.json`) 의 T1 default 시나리오 박제.
+  // sun=50, mercury=900, venus=650 라운드 2 박제값 (PR #384, ADR 20260430-r3-followup-body-proportion.md).
+  // T1 default — camera radius=35 sceneUnit, fov=0.8 rad, viewport=1280×720, sceneUnitPerMeter=8.4e-11.
+  //
+  // 이 테스트는 lodFromScreenCoverage 결정 로직만 검증 (screenCoverageRadius 결과는 forensic 에서
+  // 측정된 r1-guard 식 결과를 직접 사용). browser-verify-379-lod.mjs 가 실 scene 에서 통합 검증.
+
+  const SUN = { kind: 'star', mass: 1.989e30, radius: 6.957e8 };
+  const MERCURY = { kind: 'planet', mass: 3.3e23, radius: 2.4397e6 };
+  const VENUS = { kind: 'planet', mass: 4.87e24, radius: 6.0518e6 };
+
+  it('sun T1 default — coverage ≥ 50 (이론 ≈ 123 from r1-guard) → high 결정', () => {
+    // sun=50 baseline + camera radius=35 + viewport 720 → r1-guard 측정 coverage ≈ 123 px.
+    // kind 강제 (1 AU) 실패 (camera-sun ≈ 2.79 AU) → coverage 분기 → ≥ 50 → high.
+    expect(
+      lodFromScreenCoverage({
+        body: SUN,
+        cameraDistanceMeters: 2.79 * 1.495978707e11, // ≈ 4.17e11 m (T1 default)
+        screenCoverage: 123,
+      }),
+    ).toBe('high');
+  });
+
+  it('mercury T1 default — coverage ≥ 8 (이론 ≈ 7~8 from r1-guard, fix 후) → mid 결정', () => {
+    // mercury=900 baseline + camera radius=35 → r1-guard 측정 ≈ 14.94 px (debug-379-tmp 실측).
+    // 5R 임계 ≈ 1.22e7 m (camera-mercury ≈ 4.39e11 m) 실패 → coverage 분기 → ≥ 8 → mid.
+    expect(
+      lodFromScreenCoverage({
+        body: MERCURY,
+        cameraDistanceMeters: 4.39e11,
+        screenCoverage: 14.94,
+      }),
+    ).toBe('mid');
+  });
+
+  it('venus T1 default — coverage ≥ 8 (이론 ≈ 27 from r1-guard, fix 후) → mid 결정', () => {
+    // venus=650 baseline + camera radius=35 → r1-guard 측정 ≈ 27 px (debug-379-tmp 실측).
+    // 5R 임계 ≈ 3.03e7 m (camera-venus ≈ 4.40e11 m) 실패 → coverage 분기 → ≥ 8 → mid.
+    expect(
+      lodFromScreenCoverage({
+        body: VENUS,
+        cameraDistanceMeters: 4.4e11,
+        screenCoverage: 27,
+      }),
+    ).toBe('mid');
+  });
+
+  it('카메라 내부 body (cameraDistance < radius) — kind 규칙 high 강제', () => {
+    // sun 표면 가까이 (0.5 AU < 1 AU 임계) → absolute-distance 강제 high.
+    expect(
+      lodFromScreenCoverage({
+        body: SUN,
+        cameraDistanceMeters: 0.5 * 1.495978707e11,
+        screenCoverage: 0.01, // sub-pixel 이어도 kind 강제
+      }),
+    ).toBe('high');
+  });
+
+  it('asteroid belt sub-pixel body (T1 solar 뷰) — low 유지 (회귀 가드)', () => {
+    // T1 solar 뷰에서 asteroid 100+ body 가 low billboard 유지 — fix 가 이걸 깨면 GPU draw call 폭증.
+    const ASTEROID = { kind: 'asteroid', mass: 9.4e20, radius: 4.73e5 };
+    expect(
+      lodFromScreenCoverage({
+        body: ASTEROID,
+        cameraDistanceMeters: 2 * 1.495978707e11, // 2 AU
+        screenCoverage: 0.05, // sub-pixel
+      }),
+    ).toBe('low');
   });
 });
