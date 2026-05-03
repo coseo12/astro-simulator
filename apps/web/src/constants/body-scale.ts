@@ -15,20 +15,28 @@
  *   - venusScale 4000 → 650 (옵션 c 적극 재조정 라운드 2, R3 ADR Amendment 2026-05-01 라운드 2)
  *   - 근거 SSoT: docs/decisions/20260430-r3-followup-body-proportion.md Amendment 2026-05-01 (라운드 2)
  *
+ * Amendment 2026-05-03 (#385 라운드 3 — venus > mercury 사실 비율 강화 D-1):
+ *   - sunScale 50 (변동 없음, 라운드 1/2/3 보존)
+ *   - mercuryScale 900 → 700 (옵션 c D-1, 사실 비율 강화)
+ *   - venusScale 650 → 800 (옵션 c D-1, 사실 비율 강화)
+ *   - venus/mercury 시각비 1.79배 → 2.83배, 사실 비율 도달률 72% → 114%
+ *   - 4축 평가 (사실 비율 도달률 / 4px fallback 안전 마진 / LOD 일관성 / 모바일 누적 disk area) D-1 채택
+ *   - 근거 SSoT: docs/decisions/20260430-r3-followup-body-proportion.md Amendment 2026-05-03 (라운드 3)
+ *
  * R1 baseline (Amendment 2026-05-01 — sunScale 50, T1 solar / camera radius=35 / fov=0.8 rad):
  *   sun = 50 → pixel diameter ≈ 246px (1280×720), brightRatio ≈ 1.86%, diskAreaRatio ≈ 5.17%
  *             pixel diameter ≈ 246px (1920×1080) viewport 무관 (renderScale × camera 고정)
  *             pixel diameter ≈ 228px (375×667), brightRatio ≈ 5.88% (모바일 인지 가능)
  *
- * R2 baseline (Amendment 2026-05-01 라운드 2 — mercuryScale 900):
- *   mercury = 900 → wsR ≈ 0.32 (sun 의 ~6%), pxDiameter ≈ 14.8px (1280×720)
- *                  sun 대비 px 비 ≈ 6.0% (DoD 임계 ≤ 6% 통과 목표)
- *                  ADR: docs/decisions/20260428-r2-mercury-visualization.md Amendment 2026-05-01 (라운드 2)
+ * R2 baseline (Amendment 2026-05-03 라운드 3 — mercuryScale 700):
+ *   mercury = 700 → sun 대비 px 비 ≈ 4.71% (DoD 임계 ≤ 4.95% 통과 목표, ±5% 마진 정책 보존)
+ *                  저점 pxDiameter ≈ 5.29 px (4px fallback 마진 +1.29 px)
+ *                  ADR: docs/decisions/20260428-r2-mercury-visualization.md Amendment 2026-05-03 (라운드 3)
  *
- * R3 baseline (Amendment 2026-05-01 라운드 2 — venusScale 650):
- *   venus = 650 → wsR ≈ 0.572 (sun 의 ~11%), pxDiameter ≈ 27.1px (1280×720)
- *                sun 대비 px 비 ≈ 11.0% (DoD 임계 ≤ 11% 통과 목표)
- *                ADR: docs/decisions/20260429-r3-venus-visualization.md Amendment 2026-05-01 (라운드 2)
+ * R3 baseline (Amendment 2026-05-03 라운드 3 — venusScale 800):
+ *   venus = 800 → sun 대비 px 비 ≈ 13.58% (DoD 임계 ≤ 14.26% 통과 목표, ±5% 마진 정책 보존)
+ *                고점 pxDiameter ≈ 48.4 px (mid 임계 50 미만 → mid 일관 유지)
+ *                ADR: docs/decisions/20260429-r3-venus-visualization.md Amendment 2026-05-03 (라운드 3)
  *
  * R4~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
  * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
@@ -36,9 +44,9 @@
  * `docs/decisions/20260429-r3-venus-visualization.md` §결과·재검토 조건).
  */
 export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
-  sun: 50, // Amendment 2026-05-01 — 75 → 50 (R3 D-T2 가드 발견 #1, 옵션 a)
-  mercury: 900, // Amendment 2026-05-01 라운드 2 — 8500 → 2000 → 900 (옵션 c 적극 재조정, sun 대비 px 비 ~6%)
-  venus: 650, // Amendment 2026-05-01 라운드 2 — 4000 → 1500 → 650 (옵션 c 적극 재조정, sun 대비 px 비 ~11%)
+  sun: 50, // Amendment 2026-05-01 — 75 → 50 (R3 D-T2 가드 발견 #1, 옵션 a). 라운드 1/2/3 보존
+  mercury: 700, // Amendment 2026-05-03 라운드 3 — 900 → 700 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~4.71%)
+  venus: 800, // Amendment 2026-05-03 라운드 3 — 650 → 800 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~13.58%)
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

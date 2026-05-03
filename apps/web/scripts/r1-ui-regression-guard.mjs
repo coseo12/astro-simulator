@@ -19,14 +19,14 @@
  * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4 + §Amendment 2026-04-26.
  *
  * `--measure-px-ratio` 명세 (#373 ADR `20260430-r3-followup-body-proportion.md` §결정 2 §5
- *  Amendment 2026-05-01 라운드 1 + 라운드 2 박제값 임계 보존):
+ *  Amendment 2026-05-03 라운드 3 D-1 박제값 임계 갱신, ±5% 마진 정책 보존):
  *   - 측정 기준: sun mesh px diameter 를 100% 로 정규화. mercury/venus/(R4+) 의 px 비 산출
  *   - 측정 viewport: 1280×720 (default) / 1920×1080 (보조) / 375×667 (모바일)
  *   - 진입 URL: ?gpu=a 강제 (volt #77 false positive 가드)
- *   - body 별 임계 (라운드 2 박제값 sun=50/mercury=900/venus=650 통과 목표):
- *       mercury sun 대비 px 비 ≤ 6%
- *       venus   sun 대비 px 비 ≤ 11%
- *   - 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산)
+ *   - body 별 임계 (라운드 3 박제값 sun=50/mercury=700/venus=800 통과 목표):
+ *       mercury sun 대비 px 비 ≤ 4.95% (라운드 2 6% → 라운드 3 4.95%)
+ *       venus   sun 대비 px 비 ≤ 14.26% (라운드 2 11% → 라운드 3 14.26%)
+ *   - 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산, 라운드 3 D-1 예측 16.75%)
  *   - 박제값 ± 5% 측정 노이즈 마진 (forensic ADR §"D-T2 px 비 예측" SSoT)
  *   - 출력: JSON `pxRatios` / `diskAreas` / `guardResult` 필드
  */
@@ -58,17 +58,21 @@ const flags = {
 };
 
 /**
- * #373 ADR §결정 2 §5 Amendment 2026-05-01 라운드 2 — body 별 임계값 SSoT.
+ * #373 ADR §결정 2 §5 Amendment 2026-05-03 라운드 3 D-1 — body 별 임계값 SSoT.
  *
  * px 비 = body px diameter / sun px diameter × 100. 박제값 ± 5% 측정 노이즈 마진 (forensic ADR
- * §"D-T2 px 비 예측" SSoT, 라운드 2 박제값 sun=50/mercury=900/venus=650 의 임계 한계 정렬).
- * 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산).
+ * §"D-T2 px 비 예측" SSoT, 라운드 3 박제값 sun=50/mercury=700/venus=800 의 ±5% 마진 정책 보존).
+ * 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산, 라운드 3 D-1 예측 16.75%).
+ *
+ * 임계 산출 (architect ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 라운드 3):
+ *   - mercury: 예측 4.71% × 1.05 ≈ 4.95% (라운드 2 6% → 라운드 3 4.95%)
+ *   - venus:   예측 13.58% × 1.05 ≈ 14.26% (라운드 2 11% → 라운드 3 14.26%)
  *
  * R4+ body 추가 시 본 룩업에 1줄 추가만 — body-scale.ts 와 동일 SSoT 패턴.
  */
 const PX_RATIO_THRESHOLDS = Object.freeze({
-  mercury: 6,
-  venus: 11,
+  mercury: 4.95,
+  venus: 14.26,
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';

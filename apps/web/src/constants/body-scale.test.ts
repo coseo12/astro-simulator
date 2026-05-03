@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { BODY_SCALE, getBodyScale } from './body-scale';
 
-describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업 (Amendment 2026-05-01 라운드 2)', () => {
-  it('sun = 50 (R1 Amendment 2026-05-01 — 75 → 50, 옵션 a)', () => {
+describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업 (Amendment 2026-05-03 라운드 3 D-1)', () => {
+  it('sun = 50 (R1 Amendment 2026-05-01 — 75 → 50, 옵션 a, 라운드 1/2/3 보존)', () => {
     expect(BODY_SCALE.sun).toBe(50);
   });
 
-  it('mercury = 900 (R2 Amendment 2026-05-01 라운드 2 — 8500 → 2000 → 900, 옵션 c 적극 재조정)', () => {
-    expect(BODY_SCALE.mercury).toBe(900);
+  it('mercury = 700 (R2 Amendment 2026-05-03 라운드 3 — 900 → 700, D-1 사실 비율 강화)', () => {
+    expect(BODY_SCALE.mercury).toBe(700);
   });
 
-  it('venus = 650 (R3 Amendment 2026-05-01 라운드 2 — 4000 → 1500 → 650, 옵션 c 적극 재조정)', () => {
-    expect(BODY_SCALE.venus).toBe(650);
+  it('venus = 800 (R3 Amendment 2026-05-03 라운드 3 — 650 → 800, D-1 사실 비율 강화)', () => {
+    expect(BODY_SCALE.venus).toBe(800);
   });
 
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
@@ -28,8 +28,8 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업 (Amend
 describe('getBodyScale — 룩업 헬퍼', () => {
   it('정의된 body 는 룩업값 반환', () => {
     expect(getBodyScale('sun')).toBe(50);
-    expect(getBodyScale('mercury')).toBe(900);
-    expect(getBodyScale('venus')).toBe(650);
+    expect(getBodyScale('mercury')).toBe(700);
+    expect(getBodyScale('venus')).toBe(800);
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
