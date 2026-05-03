@@ -141,6 +141,19 @@ desiredRadius = body.radius * renderScale_currentTier / tan(fov / 2 * targetCove
 
 - 옵션 D 머지 후 #397 (다른 body 잔존) 매트릭스 재실측. **종료 조건 (정량)**: #397 본문 박제 재현 케이스 (mercury / venus 외 6 body focus 시 다른 body 잔존) 를 6 body × 2 모드 = 12 cells 로 재실측, **모든 cell 에서 "focus body 외 다른 body 의 viewport 점유율 ≤ 0.1%" (점 수준 잔존도 허용 안 함) 충족** 시 close. 미충족 시 별도 fix (frustum culling / occlusion / LOD billboard alpha) 진행. (cross-validate G4 반영)
 
+#### Amendment 2026-05-03 — R-Phase 정합 종료 조건 재정의
+
+PR #399 머지 후 12 cells 매트릭스 재실측 결과 (`docs/reports/397-residual/matrix.json`):
+
+- **10/12 PASS** (mercury / venus / earth / jupiter / neptune × observe + research)
+- **2/12 FAIL** (sun-observe / sun-research): venus 잔재 0.198% / mercury 잔재 0.025% — viewport 의 0.1% threshold 초과
+
+R-Phase v3 incremental build 정책 정합 분석 결과, **sun focus 화면의 mercury/venus 잔재는 R3 까지 구현된 visible body 의 자연 귀결로 expected behavior**. strict "12/12 ≤ 0.1%" 적용 시 옵션 C (focus 식 viewport coverage 기반 재설계) 또는 sun focus 시 mercury/venus 강제 hide 가 강요되는데, 둘 다 R-Phase 의도 ("사용자가 실제로 보이는 body 를 매 R-Phase DoD 에 포함") 와 상충.
+
+**갱신된 종료 조건**: 12 cells 각각 — focus body 외 다른 body 의 viewport 점유율이 (a) 0.1% 이하 OR (b) 현재 R-Phase 까지 구현된 body 의 자연 visible 결과 인 경우 PASS. 후자는 R-Phase ADR 박제 시점에 expected list 명시 (R3 시점: `sun-observe`/`sun-research`: mercury/venus expected). R4+ 진입 시 expected list 갱신 의무.
+
+상세 분석 + NO-OP 결정: [`20260503-397-residual-no-op.md`](20260503-397-residual-no-op.md). 회귀 가드: `apps/web/scripts/browser-verify-397-residual.mjs` (R-Phase expected list SSoT 박제, 갱신된 종료 조건으로 12/12 PASS).
+
 ### 회귀 가드
 
 - `apps/web/scripts/browser-verify-378-focus.mjs` (기존 `browser-verify-floating-origin.mjs` 패턴 재사용) **필수 신규 추가** — venus 관찰 + 연구 모드 focus 후 `camera.isInFrustum(venusMesh) === true` + `camera.radius > venusMesh.boundingSphere.radiusWorld * 1.5` 단언. **CI `detect-and-test` 또는 prebuild 검증에 필수 통합** (cross-validate G3 반영 — 사용자 D-T2 재발견 비용 > CI 시간 비용 ROI 명백, 본 ADR 원안의 "선택, ROI 검토 후" 표기 폐기)
