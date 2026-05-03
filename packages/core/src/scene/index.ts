@@ -54,3 +54,7 @@ export type {
   BlackHoleRenderingHandles,
   BlackHoleRenderingOptions,
 } from './black-hole-rendering.js';
+// #402 — R-Phase Body Allowlist SSoT (defense-in-depth UI + scene 가드).
+// ADR: docs/decisions/20260504-r-phase-allowlist-guard.md
+export { R_PHASE_BODY_ALLOWLIST, isRPhaseFocusable } from './r-phase-allowlist.js';
+export type { RPhaseBodyId } from './r-phase-allowlist.js';

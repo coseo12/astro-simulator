@@ -38,10 +38,11 @@ beforeEach(() => {
  * ADR: docs/decisions/20260428-r2-mercury-visualization.md §결정 2
  */
 describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
-  it('5 body 버튼 + reset 렌더 (R1 4 + R2 mercury 1)', () => {
+  it('6 body 버튼 + reset 렌더 (sun / mercury / venus / earth / jupiter / neptune)', () => {
     render(<FocusQuickButtons />);
     expect(screen.getByTestId('focus-sun')).toBeInTheDocument();
     expect(screen.getByTestId('focus-mercury')).toBeInTheDocument();
+    expect(screen.getByTestId('focus-venus')).toBeInTheDocument();
     expect(screen.getByTestId('focus-earth')).toBeInTheDocument();
     expect(screen.getByTestId('focus-jupiter')).toBeInTheDocument();
     expect(screen.getByTestId('focus-neptune')).toBeInTheDocument();
@@ -84,6 +85,7 @@ describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
     const buttons = [
       screen.getByTestId('focus-sun'),
       screen.getByTestId('focus-mercury'),
+      screen.getByTestId('focus-venus'),
       screen.getByTestId('focus-earth'),
       screen.getByTestId('focus-jupiter'),
       screen.getByTestId('focus-neptune'),
@@ -94,8 +96,59 @@ describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
     for (let i = 0; i < buttons.length - 1; i++) {
       const current = buttons[i];
       const next = buttons[i + 1];
-      if (!current || !next) throw new Error('button index OOB — 5 body 보장 위배');
+      if (!current || !next) throw new Error('button index OOB — 6 body 보장 위배');
       expect(current.compareDocumentPosition(next)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     }
+  });
+});
+
+/**
+ * #402 — R-Phase Body Allowlist 가드 (defense-in-depth UI 측면).
+ *
+ * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 2.
+ *
+ * 현재 박제값: R1 sun + R2 mercury + R3 venus 활성. earth/jupiter/neptune 미활성.
+ */
+describe('FocusQuickButtons — R-Phase allowlist 가드 (#402)', () => {
+  it('R-Phase 활성 body (sun/mercury/venus) 는 disabled 아님', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-sun')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-mercury')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-venus')).not.toBeDisabled();
+  });
+
+  it('R-Phase 미활성 body (earth/jupiter/neptune) 는 HTML disabled 속성 + aria-disabled', () => {
+    render(<FocusQuickButtons />);
+    for (const id of ['earth', 'jupiter', 'neptune']) {
+      const btn = screen.getByTestId(`focus-${id}`);
+      expect(btn).toBeDisabled();
+      expect(btn).toHaveAttribute('aria-disabled', 'true');
+      expect(btn).toHaveAttribute('data-r-phase-disabled', 'true');
+    }
+  });
+
+  it('R-Phase 미활성 body 클릭 시 focusOn 명령 발행 0 (UI 가드 1차 방어선)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-earth'));
+    fireEvent.click(screen.getByTestId('focus-jupiter'));
+    fireEvent.click(screen.getByTestId('focus-neptune'));
+    // disabled 버튼은 브라우저 표준상 click event 차단 → sendCommand 호출 0.
+    expect(sentCommands).toHaveLength(0);
+  });
+
+  it('R-Phase 활성 body 는 data-r-phase-disabled 속성 부재', () => {
+    render(<FocusQuickButtons />);
+    for (const id of ['sun', 'mercury', 'venus']) {
+      const btn = screen.getByTestId(`focus-${id}`);
+      expect(btn).not.toHaveAttribute('data-r-phase-disabled');
+    }
+  });
+
+  it('R-Phase 미활성 body 는 opacity 0.5 + cursor:not-allowed 시각 차별화', () => {
+    render(<FocusQuickButtons />);
+    const earthBtn = screen.getByTestId('focus-earth');
+    // tailwind 클래스 박제 — 시각 차별화 회귀 가드 (사용자 D-T2 잔재 방지).
+    expect(earthBtn.className).toContain('opacity-50');
+    expect(earthBtn.className).toContain('cursor-not-allowed');
   });
 });

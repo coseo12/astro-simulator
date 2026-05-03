@@ -6,6 +6,7 @@ import mitt, { type Emitter, type Handler } from 'mitt';
 import { TimeController } from '../time/time-controller.js';
 import { isoToJulianDate } from '../time/julian-date.js';
 import { createEngine, type CreatedEngine, type EngineKind } from './engine-factory.js';
+import { isRPhaseFocusable } from '../scene/r-phase-allowlist.js';
 
 /**
  * 시뮬레이션 코어 — Babylon 엔진/씬 + 시간 컨트롤러 + 이벤트 버스.
@@ -202,6 +203,19 @@ export class SimulationCore {
         // R1 #334+#335 — focusOn 콜백 폐기. event emit 만으로 store sync (core-adapter → setSelectedBody)
         // → sim-canvas subscribe 분기가 scene focus / camera 단일 책임으로 처리.
         // ADR `20260425-r1-store-scene-sync-unification.md` §결정 1.
+        //
+        // #402 — R-Phase allowlist 가드 (defense-in-depth scene 측면).
+        // R-Phase 활성 body 외 입력 (earth/jupiter/neptune 등) 은 emit 차단 →
+        // store/scene/UI 자동 0 변화 (event 단일 진실원 정책 일관). UI 가드 우회한 강제 호출
+        // (URL `?focus=earth` 직접 진입 등) 도 본 가드 통과 필수.
+        // ADR `20260504-r-phase-allowlist-guard.md` §결정 3.
+        if (!isRPhaseFocusable(cmd.bodyId)) {
+          console.warn(
+            `[focusOn] R-Phase allowlist 외 body 무시: "${cmd.bodyId}" — ` +
+              `현재 활성 body 만 focus 가능 (ADR 20260504-r-phase-allowlist-guard.md).`,
+          );
+          break;
+        }
         this.#emitter.emit('bodySelected', { id: cmd.bodyId });
         break;
       case 'resetCamera':

@@ -72,18 +72,86 @@ describe('SimulationCore store-scene sync (R1 #334+#335)', () => {
   });
 
   it('focusOn → resetCamera 연쇄 호출 시 event 2회 (각 1회씩)', () => {
+    // #402 — R-Phase allowlist 가드 도입 후 R-Phase 활성 body (mercury) 사용.
+    // (이전 R1 회귀 테스트는 'earth' 였으나 R-Phase allowlist 외이므로 emit 차단됨)
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
-    core.command({ type: 'focusOn', bodyId: 'earth' });
+    core.command({ type: 'focusOn', bodyId: 'mercury' });
     core.command({ type: 'resetCamera' });
 
     expect(onBodySelected).toHaveBeenCalledTimes(2);
-    expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'earth' });
+    expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'mercury' });
     expect(onBodySelected).toHaveBeenNthCalledWith(2, { id: null });
 
     core.dispose();
+  });
+
+  /**
+   * #402 — R-Phase allowlist 가드 (defense-in-depth scene 측면).
+   *
+   * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 3.
+   *
+   * UI 가드 (focus-quick-buttons.tsx disabled) 우회 강제 호출 (URL `?focus=earth` 등) 시
+   * scene 가드가 마지막 방어선. emit 차단 → store/scene 자동 0 변화.
+   */
+  describe('R-Phase allowlist 가드 (#402)', () => {
+    it('R-Phase 활성 body (sun/mercury/venus) focusOn 은 emit 통과', () => {
+      const core = new SimulationCore(makeCanvas());
+      const onBodySelected = vi.fn();
+      core.on('bodySelected', onBodySelected);
+
+      core.command({ type: 'focusOn', bodyId: 'sun' });
+      core.command({ type: 'focusOn', bodyId: 'mercury' });
+      core.command({ type: 'focusOn', bodyId: 'venus' });
+
+      expect(onBodySelected).toHaveBeenCalledTimes(3);
+      expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'sun' });
+      expect(onBodySelected).toHaveBeenNthCalledWith(2, { id: 'mercury' });
+      expect(onBodySelected).toHaveBeenNthCalledWith(3, { id: 'venus' });
+
+      core.dispose();
+    });
+
+    it('R-Phase 미활성 body (earth/jupiter/neptune) focusOn 은 emit 차단 (selectedBodyId 변화 0)', () => {
+      const core = new SimulationCore(makeCanvas());
+      const onBodySelected = vi.fn();
+      core.on('bodySelected', onBodySelected);
+
+      // console.warn 호출 검증을 위해 spy 등록.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      core.command({ type: 'focusOn', bodyId: 'earth' });
+      core.command({ type: 'focusOn', bodyId: 'jupiter' });
+      core.command({ type: 'focusOn', bodyId: 'neptune' });
+
+      // emit 0회 — store/scene 자동 0 변화 (DoD-3).
+      expect(onBodySelected).toHaveBeenCalledTimes(0);
+      // 각 차단 시 console.warn 1회 — 개발자 진단 가능 (silent 이지만 dev-time 가시성).
+      expect(warnSpy).toHaveBeenCalledTimes(3);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('earth');
+
+      warnSpy.mockRestore();
+      core.dispose();
+    });
+
+    it('focusOn { bodyId: null } 방어 안전망 — isRPhaseFocusable null 처리 통과 (타입 시스템상 unreachable, 강제 캐스트로 검증)', () => {
+      // ADR §초기 박제값 주석: isRPhaseFocusable 의 null 입력 허용은 방어 안전망.
+      // CoreCommand.focusOn 타입은 `bodyId: string` 이라 null/undefined 가 못 들어오지만,
+      // ts-ignore 우회나 외부 명령 직렬화 등에서 안전성 보장 목적.
+      const core = new SimulationCore(makeCanvas());
+      const onBodySelected = vi.fn();
+      core.on('bodySelected', onBodySelected);
+
+      // 강제 캐스트로 가드 통과 검증 — null 은 isRPhaseFocusable 에서 true 반환.
+      core.command({ type: 'focusOn', bodyId: null as unknown as string });
+
+      expect(onBodySelected).toHaveBeenCalledTimes(1);
+      expect(onBodySelected).toHaveBeenCalledWith({ id: null });
+
+      core.dispose();
+    });
   });
 
   it('public API 회귀 가드 — setCameraHandlers 가 부활하지 않는다 (focus/reset 콜백 폐기)', () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { ephemeris as ephemerisApi } from '@astro-simulator/core';
+import { ephemeris as ephemerisApi, scene as sceneApi } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
@@ -68,18 +68,32 @@ export function UrlSync() {
     }
     // R1 #329 — `?focus=<bodyId>` 허용 body id 검증.
     // 미정의 id (예: `?focus=invalid`) 는 무시 + dev 경고 (CRITICAL #2 모호한 입력 방어).
+    //
+    // #402 — R-Phase allowlist 가드 (URL 직접 진입 우회 차단).
+    // ADR `20260504-r-phase-allowlist-guard.md` §결정 3 — "URL `?focus=earth` 진입도 동일 가드 통과 필수".
+    // url-sync 가 `setSelectedBody(urlFocus)` 를 직접 호출 (event 우회 경로) 하므로 본 가드가
+    // simulation-core focusOn 가드와 일관 동작하도록 박제 — 양쪽 모두 차단.
     if (urlFocus) {
       const validIds = new Set(ephemerisApi.getSolarSystem().bodies.map((b) => b.id));
-      if (validIds.has(urlFocus)) {
+      if (!validIds.has(urlFocus)) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
+          );
+        }
+      } else if (!sceneApi.isRPhaseFocusable(urlFocus)) {
+        // R-Phase 미활성 body (earth/jupiter/neptune 등) URL 진입 차단 — store/scene 변화 0.
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[url-sync] ?focus=${urlFocus} 는 R-Phase 미활성 body — 무시 (ADR 20260504-r-phase-allowlist-guard.md).`,
+          );
+        }
+      } else {
         // 카메라 focus + store selectedBodyId sync (info-panel 표시 트리거).
         // shortcut 버튼 클릭 경로는 controller.focusOn 후 'bodySelected' event 가 emit 되지만,
         // URL 직접 진입 시 그 event 가 발생하지 않아 selectedBodyId 가 set 되지 않는 기존 동작 보강.
         sendCommand({ type: 'focusOn', bodyId: urlFocus });
         setSelectedBody(urlFocus);
-      } else if (process.env.NODE_ENV !== 'production') {
-        console.warn(
-          `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
-        );
       }
     }
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
