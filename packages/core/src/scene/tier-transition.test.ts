@@ -265,3 +265,91 @@ describe('setTier 연쇄 전환 cleanup 저장·호출 계약 (M1 하드닝)', (
     expect(pending).not.toBeNull();
   });
 });
+
+/**
+ * #408 F2 — onComplete 콜백 / tierTransitionInProgress lock 라이프사이클 단언.
+ *
+ * `runTierTransition` 자체는 Babylon Animation/Scene 에 의존하므로 본 테스트는 cleanup 시퀀스의
+ * **계약** 만 모방한다 (releaseControl idempotent + onComplete 1회 호출 보장).
+ *
+ * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 2 (i) — onComplete 채택 근거.
+ */
+describe('runTierTransition onComplete 콜백 라이프사이클 (#408 F2)', () => {
+  /**
+   * 실 `runTierTransition` 의 releaseControl 패턴을 순수화한 모방.
+   * 정상 종료 / fallback timer / visibilitychange 어느 경로로 호출되어도 onComplete 는 1회만 발동.
+   */
+  function createCleanupWithCallback(onComplete?: () => void) {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      onComplete?.();
+    };
+  }
+
+  it('cleanup 1회 호출 시 onComplete 도 1회 호출', () => {
+    let count = 0;
+    const cleanup = createCleanupWithCallback(() => {
+      count += 1;
+    });
+    cleanup();
+    expect(count).toBe(1);
+  });
+
+  it('cleanup 다중 호출 (정상 종료 + fallback timer 경합) 에도 onComplete 1회만 호출 — idempotent', () => {
+    let count = 0;
+    const cleanup = createCleanupWithCallback(() => {
+      count += 1;
+    });
+    cleanup();
+    cleanup();
+    cleanup();
+    expect(count).toBe(1);
+  });
+
+  it('onComplete 미주입 시 cleanup 정상 종료 — 옵셔널 콜백 안전성', () => {
+    const cleanup = createCleanupWithCallback();
+    expect(() => cleanup()).not.toThrow();
+  });
+
+  it('실 `runTierTransition` 패턴: tierTransitionInProgress lock false 전이를 onComplete 로 박제', () => {
+    // 실 setTier 로직 모방: lock=true 진입 → cleanup 발동 시 onComplete 가 lock=false.
+    // 정상 종료 (cleanup 1회) / fallback (cleanup 2회) / visibilitychange (cleanup 3회) 어느 경로로도
+    // 최종 lock 값은 false 유지 (idempotent).
+    let lock = false;
+    const enterTransition = () => {
+      lock = true;
+      return createCleanupWithCallback(() => {
+        lock = false;
+      });
+    };
+
+    // 정상 종료 경로
+    let cleanup = enterTransition();
+    expect(lock).toBe(true);
+    cleanup();
+    expect(lock).toBe(false);
+
+    // 다중 cleanup 경합 (fallback + visibilitychange)
+    cleanup = enterTransition();
+    expect(lock).toBe(true);
+    cleanup();
+    cleanup();
+    cleanup();
+    expect(lock).toBe(false);
+  });
+
+  it('회귀 가드: onComplete 누락 시 lock 영구 true (버그 재현)', () => {
+    // onComplete 미주입 (버그) → cleanup 호출되어도 외부 lock 갱신 안됨 → tier oscillate 차단 실패.
+    let lock = false;
+    const enterTransition = () => {
+      lock = true;
+      return createCleanupWithCallback(); // ← onComplete 미주입
+    };
+    const cleanup = enterTransition();
+    cleanup();
+    // 버그: lock 이 여전히 true → 다음 setTier 호출이 stale lock 을 만남
+    expect(lock).toBe(true);
+  });
+});

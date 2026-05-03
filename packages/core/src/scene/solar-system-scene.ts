@@ -181,6 +181,23 @@ export interface SolarSystemSceneHandles {
    */
   setFocusOrigin: (bodyId: string) => void;
   /**
+   * #408 F1 — focus 진입 시 final tier 사전 결정 + setTier 호출 (의존 역전 (c) 채택).
+   *
+   * `controller.focusOn` 의 cam-target tween (300ms) 보간 중간 프레임에서 `cameraFromFocusMeters` 가
+   * 일시적으로 0.1 AU 미만으로 떨어져 `tierFromFocus` 가 잘못된 tier (planet → body) 를 반환하는
+   * race 를 차단하기 위해, focusOn animation 시작 **전에** final tier 를 결정하고 즉시 setTier.
+   *
+   * 호출 시점: `sim-canvas.tsx syncFocusToScene` 헬퍼에서 `setFocusOrigin` 직후 + `controller.focusOn` 직전.
+   * camera-controller 단일 책임 (camera 전용) 보존을 위해 도메인 정책 (tierFromFocus) 은 scene 측에 캡슐화.
+   *
+   * @param bodyId focus 대상 body id (존재해야 함, 미존재 시 현 tier 반환 + no-op)
+   * @param cameraDistMeters focus body 로부터 카메라 목표 거리 (m). 통상 `desiredRadius × metersPerSceneUnit`.
+   * @returns 적용된 (또는 현재) tier
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 1.
+   */
+  applyFocusTier: (bodyId: string, cameraDistMeters: number) => Tier;
+  /**
    * P12-A #298 — focus 해제 (reset 등). tier 가 free-fly 경로로 자동 전환되도록 focus id 를 null 로 돌린다.
    */
   clearFocus: () => void;
@@ -554,6 +571,19 @@ export function createSolarSystemScene(
   // 전환 중 `releaseControl` 을 조기 발동해 입력 잠금이 느슨해지는 edge case 를 제거
   // (Phase B PR #304 Reviewer M1). `cleanup` 은 idempotent (`released` 플래그).
   let pendingTierCleanup: (() => void) | null = null;
+  /**
+   * #408 F2 — runTierTransition 진행 중 tier 재판정 lock.
+   *
+   * `controller.focusOn` 의 cam-target tween 보간과 매 프레임 `updateTierByCamera` 가 race 를 일으켜
+   * inner → body → inner oscillate 발생. transition 진행 중에는 `updateTierByCamera` 가 no-op 하도록
+   * 전환 시작 시 true, cleanup 완료 시 false.
+   *
+   * idempotent 보장: `runTierTransition` 의 cleanup 은 정상 종료 / fallback timer / visibilitychange
+   * 어느 경로로도 정확히 1회만 발동 (`released` 플래그). onComplete 콜백도 동일하게 1회만 호출.
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 2.
+   */
+  let tierTransitionInProgress = false;
   const setTier = (tier: Tier) => {
     if (tier === activeTier) return;
     const oldScale = renderScaleForTier(activeTier);
@@ -611,8 +641,12 @@ export function createSolarSystemScene(
     const cam = scene.activeCamera;
     if (cam && isArcRotateCamera(cam)) {
       // P12-C M1 — 이전 전환의 fallback timer / visibility listener 를 먼저 정리.
+      // 이전 cleanup 이 아직 살아있다면 그 onComplete 가 호출되어 tierTransitionInProgress 가
+      // 일시 false 가 되지만, 바로 아래에서 새 transition 진입과 함께 다시 true 로 set 되므로 안전.
       pendingTierCleanup?.();
       const focusMesh = focusBodyIdForAssert ? meshes.get(focusBodyIdForAssert) : undefined;
+      // #408 F2 — lock 진입. updateTierByCamera 가 transition 중 no-op.
+      tierTransitionInProgress = true;
       pendingTierCleanup = runTierTransition({
         scene,
         camera: cam,
@@ -621,11 +655,21 @@ export function createSolarSystemScene(
         // focusMesh 를 조건부 spread — exactOptionalPropertyTypes 대응 (undefined 명시 금지).
         ...(focusMesh ? { focusMesh } : {}),
         // durationMs / lockMs 기본값 (300 / 500) 사용 — ADR §결정 §주석 계약 §5.
+        // #408 F2 — cleanup 완료 시 lock 해제. runTierTransition 의 released 플래그 기반
+        // idempotent (정상 종료 / fallback timer / visibilitychange 어느 경로로도 1회만 호출).
+        onComplete: () => {
+          tierTransitionInProgress = false;
+        },
       });
     }
   };
 
   const updateTierByCamera = (cameraFromSunMeters: number, cameraFromFocusMeters: number): Tier => {
+    // #408 F2 — transition 진행 중에는 재판정 no-op. cam-target tween 보간 race 차단.
+    // lock 해제 후 다음 frame 에서 정상 재판정 (focus body 가 정착된 시점).
+    if (tierTransitionInProgress) {
+      return activeTier;
+    }
     const focusInfo = focusBodyIdForAssert
       ? (() => {
           const body = bodiesById.get(focusBodyIdForAssert!);
@@ -639,6 +683,36 @@ export function createSolarSystemScene(
       setTier(nextTier);
     }
     return activeTier;
+  };
+
+  /**
+   * #408 F1 — focusOn 진입 시 final tier 사전 결정 + setTier (의존 역전 (c) 채택).
+   *
+   * `tierFromFocus(body.kind, cameraDistMeters)` 으로 final tier 를 결정한 뒤 필요 시 `setTier`.
+   * `setTier` 가 origin shift / mesh.scaling / runTierTransition 까지 처리하므로 본 함수는 wrapper.
+   *
+   * 호출 시점 (sim-canvas `syncFocusToScene`):
+   *   solar.setFocusOrigin(bodyId)
+   *   solar.applyFocusTier(bodyId, cameraDistMeters)   ← 여기
+   *   controller.focusOn({ mesh })
+   *
+   * 이렇게 하면 controller.focusOn 의 cam-target tween 보간 시작 전에 이미 final tier 가 정착되어
+   * 보간 중간 frame 의 tierFromFocus 재판정이 동일 tier 를 반환 → setTier no-op → race 차단.
+   *
+   * @param bodyId focus 대상 body id
+   * @param cameraDistMeters focus body 로부터 카메라 목표 거리 (m)
+   * @returns 적용 (또는 현재) tier
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 1.
+   */
+  const applyFocusTier = (bodyId: string, cameraDistMeters: number): Tier => {
+    const body = bodiesById.get(bodyId);
+    if (!body) return activeTier;
+    const finalTier = tierFromFocus(body.kind, cameraDistMeters);
+    if (finalTier !== activeTier) {
+      setTier(finalTier);
+    }
+    return finalTier;
   };
 
   // P11-A #288 — Floating Origin 인스턴스 (scene-scoped).
@@ -1253,6 +1327,7 @@ export function createSolarSystemScene(
     },
     floatingOrigin,
     setFocusOrigin,
+    applyFocusTier,
     clearFocus,
     setLodOverride,
     getLodStats,

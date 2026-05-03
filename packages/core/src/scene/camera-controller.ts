@@ -11,6 +11,26 @@ import {
 const FRAMES_PER_SECOND = 60;
 const TRANSITION_MS = 300;
 
+/**
+ * focus user-trigger 한정 radius 배수 (#408 — F1 의존 역전 (c) 부산물).
+ *
+ * `focusOn` 의 `desiredRadius = max(meshRadius × 5, meshRadius + 0.01)` 식에서 사용.
+ * tier 전환 시 `runTierTransition` 의 `FOCUS_RADIUS_MULTIPLIER = 5.9` (V5 달성 공식) 와 분리 의도:
+ *  - user-trigger 경로 (버튼 / URL): 본 ×5 → focus body 가 화면 중앙에 적당히 크게
+ *  - tier transition 경로: ×5.9 → V5 DoD (지구 세로 40% ±5%) 달성 정밀값
+ *
+ * `applyFocusTier` 가 `cameraDistMeters = desiredRadius × metersPerSceneUnit` 을 계산할 때
+ * 동일 식이 SSoT 1곳에서 import 되어 sim-canvas 와 camera-controller 의 drift 를 차단한다
+ * (Gemini cross-validate 부분 수용 — ADR §결정 1 §매직 넘버 상수화 권고).
+ */
+export const FOCUS_USER_RADIUS_MULTIPLIER = 5;
+
+/**
+ * meshRadius × 5 가 매우 작을 때 (T1 시점 등) 0 에 가까워져 카메라가 mesh 내부에 박히지
+ * 않도록 보장하는 최소 padding (scene unit). `Math.max(meshRadius × N, meshRadius + PADDING)`.
+ */
+export const FOCUS_USER_RADIUS_MIN_PADDING = 0.01;
+
 export interface FocusTarget {
   /** 대상 메쉬 */
   mesh: Mesh;
@@ -59,7 +79,12 @@ export class CameraController {
     mesh.computeWorldMatrix(true);
     const boundingInfo = mesh.getBoundingInfo();
     const meshRadius = boundingInfo.boundingSphere.radiusWorld;
-    const desiredRadius = target.radius ?? Math.max(meshRadius * 5, meshRadius + 0.01);
+    const desiredRadius =
+      target.radius ??
+      Math.max(
+        meshRadius * FOCUS_USER_RADIUS_MULTIPLIER,
+        meshRadius + FOCUS_USER_RADIUS_MIN_PADDING,
+      );
 
     // #378 옵션 A — focus 트리거 한정 lowerRadiusLimit 동적 완화.
     // T1 시점 desiredRadius (~0.01 unit) 가 ArcRotateCamera default lowerRadiusLimit (0.5) 미만
