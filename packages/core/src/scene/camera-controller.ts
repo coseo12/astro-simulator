@@ -51,9 +51,24 @@ export class CameraController {
    */
   focusOn(target: FocusTarget): void {
     const { mesh } = target;
+    // #378 옵션 B (defense-in-depth) — boundingInfo 명시 갱신.
+    // mesh.scaling 이 setTier 등에서 갱신된 직후 boundingSphere.radiusWorld 가 다음 frame 의
+    // world matrix 갱신 전까지 잔존 값을 반환하는 timing race 방지. focusOn 호출자
+    // (sim-canvas → simulation-core 'focusOn' 명령) 가 setTier 후 같은 프레임에 호출하는
+    // 시나리오에서 안전망. 매 호출 1회 cost 무시 가능 수준.
+    mesh.computeWorldMatrix(true);
     const boundingInfo = mesh.getBoundingInfo();
     const meshRadius = boundingInfo.boundingSphere.radiusWorld;
     const desiredRadius = target.radius ?? Math.max(meshRadius * 5, meshRadius + 0.01);
+
+    // #378 옵션 A — focus 트리거 한정 lowerRadiusLimit 동적 완화.
+    // T1 시점 desiredRadius (~0.01 unit) 가 ArcRotateCamera default lowerRadiusLimit (0.5) 미만
+    // 이면 카메라 radius 가 0.5 로 clamp 되어 mesh 내부에 박힘 → tier 전환 후 mesh 외각이 카메라
+    // frustum 밖으로 빠져 venus 관찰 모드 "허공" 회귀 (D-T2 라운드 3 보고).
+    // tier-transition.ts:189 와 동일 패턴 — focus 트리거 한정 완화 (manual zoom 영향 0).
+    if (this.camera.lowerRadiusLimit != null && desiredRadius < this.camera.lowerRadiusLimit) {
+      this.camera.lowerRadiusLimit = Math.max(this.camera.minZ, desiredRadius * 0.5);
+    }
 
     const targetPos = mesh.absolutePosition.clone();
 
