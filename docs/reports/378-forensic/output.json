@@ -1,0 +1,265 @@
+{
+  "generatedAt": "2026-05-03T00:00:00Z",
+  "mode": "static-analysis",
+  "context": {
+    "issue": "#378",
+    "title": "[bug] focus 시 허공 표시 — body 가 카메라 frustum 밖 (R3 D-T2 가드 발견 #2)",
+    "developBranchTip": "a195465",
+    "bodyScale": { "sun": 50, "mercury": 700, "venus": 800 },
+    "renderScale": {
+      "T1_solar": 8.4e-11,
+      "T2_inner": 1.54e-9,
+      "T3_body": 2.51e-5
+    },
+    "tierBoundaryAU": {
+      "innerUpper_AU": 0.02,
+      "comment": "tier.ts 의 tierFromFocus(planet) 분기는 cameraDistanceMeters < 0.1*AU → T3 body. tierFromCameraDistance 의 BOUNDARY 는 별도."
+    },
+    "cameraDefaults": {
+      "fov": 0.8,
+      "minZ": 0.01,
+      "maxZ": 1e14,
+      "lowerRadiusLimit": 0.5,
+      "upperRadiusLimit": 1e14,
+      "wheelPrecision": 3,
+      "viewport_initial": { "width": 1280, "height": 800 }
+    },
+    "focusOnFormula": "desiredRadius = max(meshRadius * 5, meshRadius + 0.01) where meshRadius = boundingSphere.radiusWorld",
+    "tierTransitionFormula": "if focusMesh: targetRadius = max(meshRadius_newTier * 5, meshRadius_newTier + 0.01); else: radius_old * (newScale / oldScale)"
+  },
+  "bodies": {
+    "sun": {
+      "kind": "star",
+      "radius_m": 6.957e8,
+      "orbitSemiMajor_m": 0,
+      "bodyScale": 50
+    },
+    "mercury": {
+      "kind": "planet",
+      "radius_m": 2.4397e6,
+      "orbitSemiMajor_m": 5.79e10,
+      "orbitSemiMajor_AU": 0.387,
+      "bodyScale": 700
+    },
+    "venus": {
+      "kind": "planet",
+      "radius_m": 6.0518e6,
+      "orbitSemiMajor_m": 1.082e11,
+      "orbitSemiMajor_AU": 0.723,
+      "bodyScale": 800
+    },
+    "earth": {
+      "kind": "planet",
+      "radius_m": 6.371e6,
+      "orbitSemiMajor_m": 1.496e11,
+      "orbitSemiMajor_AU": 1.0,
+      "bodyScale": 1.0
+    },
+    "jupiter": {
+      "kind": "planet",
+      "radius_m": 6.9911e7,
+      "orbitSemiMajor_m": 7.785e11,
+      "orbitSemiMajor_AU": 5.2,
+      "bodyScale": 1.0
+    },
+    "neptune": {
+      "kind": "planet",
+      "radius_m": 2.4622e7,
+      "orbitSemiMajor_m": 4.495e12,
+      "orbitSemiMajor_AU": 30.05,
+      "bodyScale": 1.0
+    }
+  },
+  "matrix_static_analysis": [
+    {
+      "case": "sun-observe",
+      "body": "sun",
+      "mode": "observe",
+      "tier_initial": "solar",
+      "tier_after_focus": "solar",
+      "comment": "tierFromFocus(star) → solar. tier 전환 없음.",
+      "T1_meshDiameter_sceneUnit": 5.844,
+      "T1_meshRadius_sceneUnit": 2.922,
+      "desiredRadius_sceneUnit": 14.61,
+      "afterClamp_sceneUnit": 14.61,
+      "viewportCoverage_pct_estimate": "viewport 적절 — sun 화면 중앙 가시 (R1 baseline)",
+      "predict": "PASS — 정상 표시",
+      "fallback": "n/a"
+    },
+    {
+      "case": "mercury-observe",
+      "body": "mercury",
+      "mode": "observe",
+      "tier_initial": "solar",
+      "T1_meshDiameter_sceneUnit": 2.87e-4,
+      "T1_meshRadius_sceneUnit": 1.435e-4,
+      "desiredRadius_T1_sceneUnit_raw": 0.01072,
+      "desiredRadius_T1_afterLowerClamp": 0.5,
+      "comment_T1": "desiredRadius=0.0107 < lowerRadiusLimit=0.5 → ArcRotateCamera clamp 적용. radius=0.5 로 정착.",
+      "cameraFromFocus_after_focusOn_sceneUnit": 0.5,
+      "cameraFromFocus_after_focusOn_meters_T1": 5.95e9,
+      "tier_resolution_after_1frame": "tierFromFocus(planet, 5.95e9 m = 0.04 AU) < 0.1 AU → 'body' (T3)",
+      "T3_meshDiameter_sceneUnit": 85.7,
+      "T3_meshRadius_sceneUnit": 42.85,
+      "tierTransition_targetRadius": 214.25,
+      "post_transition_camera_target": "venus mesh.absolutePosition ≈ origin (focus = mercury 라면 mercury world 로 origin shift)",
+      "post_transition_visible": true,
+      "predict": "관찰 모드: 라운드 3 박제값 (700) 에서는 PASS 가능 (T3 진입 후 mesh ≈ 86 unit, 카메라 214 unit 떨어진 곳에서 mesh ~25% 화면 점유). 라운드 2 (900) 에서도 동일 이론. 사용자 보고는 'mercury 정상' 으로 추정 (D-T2 라운드 3 보고가 venus 만 명시)",
+      "actual_user_report": "D-T2 라운드 3 (2026-05-03) 에서 mercury focus 명시 회귀 없음 (venus 만 보고)"
+    },
+    {
+      "case": "venus-observe",
+      "body": "venus",
+      "mode": "observe",
+      "tier_initial": "solar",
+      "T1_meshDiameter_sceneUnit": 8.135e-4,
+      "T1_meshRadius_sceneUnit": 4.067e-4,
+      "desiredRadius_T1_sceneUnit_raw": 0.01041,
+      "desiredRadius_T1_afterLowerClamp": 0.5,
+      "comment_T1": "desiredRadius < lowerRadiusLimit=0.5 → clamp. focusOn 의 cam-radius animation 이 0.5 로 정착.",
+      "cameraFromFocus_after_focusOn_sceneUnit": 0.5,
+      "cameraFromFocus_after_focusOn_meters_T1": 5.95e9,
+      "tier_resolution_after_1frame": "tierFromFocus(planet, 5.95e9 m = 0.0398 AU) < 0.1 AU → 'body' (T3) 직행",
+      "T3_meshDiameter_sceneUnit": 243.0,
+      "T3_meshRadius_sceneUnit": 121.5,
+      "tierTransition_targetRadius_sceneUnit": 607.5,
+      "tierTransition_lowerRadiusLimit_relax": "targetRadius=607 > lowerRadiusLimit=0.5 → 완화 안 됨. minZ 도 newMinZ=6.075 로 늘어남 (radius*0.01)",
+      "post_transition_state": {
+        "camera_target_world_local": "venus origin shift 후 mesh.absolutePosition ≈ [0,0,0] (T3 body tier 의 floating origin primary follow)",
+        "camera_position_distance_from_target": 607.5,
+        "venus_mesh_visible_from_camera": "이론상 보여야 함 (mesh 직경 243, 카메라 607 → angular ≈ 0.4 rad ≈ fov 의 50%)"
+      },
+      "anomaly_hypothesis": [
+        "H1: tier 전환 중 (300ms) cam-target animation 이 구 좌표계 → 신 좌표계 jump 시점에 카메라가 mesh 외부 → mesh 외부 → mesh 내부 로 빠르게 이동하면서 일시적 visual confusion. 단, 사용자 보고는 정상 30s 후에도 허공이라 비-주원인",
+        "H2: lowerRadiusLimit clamp (0.5) 가 지속 적용된 채 transition 'tier-transition-radius' animation 이 시작되어, transition 도중 카메라가 lowerRadiusLimit 으로 다시 clamp 되어 mesh 내부에 박힘. tier-transition.ts:189 의 완화 로직은 'targetRadius < lowerRadiusLimit' 일 때만 발동 — venus T3 의 targetRadius=607 > 0.5 라 비-발동",
+        "H3: 라운드 3 박제값 (venus 800) 으로 T3 mesh 가 너무 커서 `camera.minZ` (= newMinZ = 6.075) 와 mesh 외각 사이의 near-plane 클리핑이 mesh 표면 일부를 자르고, 카메라 backdrop 으로 sun 직사광 방향이면 venus 가 sun glow 에 묻힘",
+        "H4: 'cam-target' animation 이 focusOn 시점 venus.absolutePosition (T1 좌표 = ~9.1 unit 거리) 으로 시작하고, 300ms 동안 그 좌표로 향함. 그러나 같은 300ms 안에 tier transition 이 발동해 venus.absolutePosition 이 [0,0,0] 으로 jump. tier-transition (2-b) 에서 `camera.target.copyFrom(focusMesh.absolutePosition)` 으로 즉시 동기화하지만, 'cam-target' animation 이 stop 되지 않으면 (animation 이름 제거 누락) 양쪽이 경합. tier-transition.ts:203-211 에서 'cam-target' / 'cam-reset-target' / 'cam-radius' / 'cam-reset-radius' / 'tier-transition-radius' 5개를 stopAnimation 하므로 정상 — 그러나 tier 전환이 같은 프레임에 이뤄지지 않거나 (focusOn 이 발생한 프레임 != tier 판정 발동 프레임) 1~2 프레임 race 가능",
+        "H5 (R2 박제값 영향 가설): venus 800 (라운드 3) 은 T3 mesh 121.5 unit. 라운드 2 venus 650 시 T3 mesh 직경 6.05e6 × 2 × 2.51e-5 × 650 ≈ 197.5 unit. 라운드 2 보고가 'D-T2 5건 회귀' 중 #2 (어떤 body 는 미명시) 였고, 라운드 3 부터 'venus' 명시 — 박제값 800 으로 mesh 가 더 커지면서 H3 (near-plane 충돌) 또는 H2 (lowerRadiusLimit 가드 우회) 이 더 심해진 것일 수 있음"
+      ],
+      "predict": "FAIL (사용자 보고: 허공)",
+      "primary_hypothesis_rank": "H2 > H1 > H4 (실측 시 tier transition 도중 lowerRadiusLimit clamp 추적 필요)",
+      "actual_user_report": "관찰 모드 venus focus → 허공"
+    },
+    {
+      "case": "venus-research",
+      "body": "venus",
+      "mode": "research",
+      "tier_initial": "solar",
+      "viewport_after_panels_open": { "width_estimate": 660, "height": 800 },
+      "comment_panel_effect": "좌패널 280px + 우패널 340px = 620px → 1280-620=660px. 캔버스 폭 약 51%. ResizeObserver 가 engine.resize() 호출 → ArcRotateCamera aspect ratio 갱신.",
+      "rendered_aspect_change": {
+        "before": 1.6,
+        "after": 0.825,
+        "comment": "세로형으로 변환 — fov 가 vertical 이므로 vertical 시야는 동일. horizontal 시야 좁아짐."
+      },
+      "T1_post_focusOn_state_identical_to_observe": "코드상 mode 분기 없음. focusOn / lowerRadiusLimit / tier 판정 모두 동일.",
+      "anomaly_inversion_hypothesis": [
+        "I1: viewport aspect 변화로 인한 ArcRotateCamera 의 horizontal fov 축소 → 가로 방향에서 venus 가 화면 중앙으로 더 가까이 보일 가능성. 단, vertical fov 가 동일해 mesh 가 화면 가장자리에 있다 해도 동일하게 보여야 함",
+        "I2: 사용자가 '연구 모드 정상' 으로 본 것은 우패널의 CelestialInfoPanel 이 venus 정보를 텍스트로 표시 → 시각적으로 'venus 가 보인다' 고 인지했을 가능성 (하지만 본 보고는 '화면 중앙 가시' 의도일 것)",
+        "I3: panel 표시로 viewport resize 시 engine.resize() → 카메라 minZ/maxZ frustum 재계산이 lowerRadiusLimit 가드를 회피하는 분기 가능성 (실측 필요)",
+        "I4 (가장 그럴듯): 연구 모드는 사이드 패널이 사이즈 큰 영역을 차지해 캔버스 viewport 크기가 작아진 결과, **focusOn 의 boundingSphere.radiusWorld 측정이 viewport 의존 변경** 가능 — 단 코드상 boundingInfo 는 viewport 무관. 따라서 I4 는 기각. **남은 후보는 I3** (resize 직후 frame 에서 lowerRadiusLimit / animation 경합 timing 변동)"
+      ],
+      "predict_actual_user_report": "PASS (사용자 보고: 정상 표시)",
+      "primary_hypothesis_rank": "I3 (resize → frame timing 변화로 H2 회피)"
+    },
+    {
+      "case": "earth-observe",
+      "body": "earth",
+      "mode": "observe",
+      "comment": "earth bodyScale=1.0 (과장 없음). T1 meshDiameter = 6.371e6×2×8.4e-11×1 ≈ 1.07e-6 unit (극히 작음).",
+      "T1_desiredRadius_raw": 0.01,
+      "T1_afterClamp": 0.5,
+      "tier_resolution": "T3 (cameraFromFocus < 0.1 AU)",
+      "T3_meshDiameter_sceneUnit": 0.319,
+      "T3_meshRadius_sceneUnit": 0.16,
+      "tierTransition_targetRadius": 0.8,
+      "tierTransition_lowerRadiusLimit_relax_check": "targetRadius=0.8 > 0.5 → 비-발동. radius=0.8 정착. mesh 직경 0.319, 카메라 0.8 → angular ≈ 0.2 rad ≈ 25% 점유 가능",
+      "predict": "FAIL 가능 (mesh 가 작아 사용자 인지 어려움). 단 사용자 D-T2 보고는 venus 만 명시 — earth focus 재현 미보고"
+    },
+    {
+      "case": "jupiter-observe",
+      "body": "jupiter",
+      "mode": "observe",
+      "comment": "jupiter bodyScale=1.0. radius=6.99e7 m (큰 행성).",
+      "T1_meshDiameter": 1.174e-5,
+      "T1_desiredRadius_raw": 0.01,
+      "T1_afterClamp": 0.5,
+      "tier_resolution": "T3",
+      "T3_meshDiameter": 3.51,
+      "T3_meshRadius": 1.755,
+      "tierTransition_targetRadius": 8.78,
+      "predict": "PASS — mesh 큰 편 + radius 8.78 적절"
+    },
+    {
+      "case": "neptune-observe",
+      "body": "neptune",
+      "mode": "observe",
+      "comment": "neptune bodyScale=1.0. radius=2.46e7 m.",
+      "T1_meshDiameter": 4.13e-6,
+      "T1_desiredRadius_raw": 0.01,
+      "T1_afterClamp": 0.5,
+      "tier_resolution": "T3",
+      "T3_meshDiameter": 1.236,
+      "T3_meshRadius": 0.618,
+      "tierTransition_targetRadius": 3.09,
+      "predict": "PASS — mesh 적절 크기, radius 3 충분"
+    }
+  ],
+  "key_findings": {
+    "1_lowerRadiusLimit_universal_clamp": {
+      "fact": "ArcRotateCamera lowerRadiusLimit=0.5 가 모든 focus body 에 동일 적용. focusOn 의 desiredRadius 가 0.5 미만이면 0.5 로 clamp.",
+      "all_planets_T1_clamp": true,
+      "comment": "T1 시점에서 모든 planet (mercury~neptune) 이 desiredRadius < 0.5 라 clamp 발동. 이후 tier 전환에서 venus 만 안 보이는 회귀가 발생 → tier transition 의 mesh radius * 5 산식 + venus 의 박제값 800 결합이 회귀의 일관 원인 후보로 가장 그럴듯하다."
+    },
+    "2_tierTransition_lowerRadiusLimit_relax_only_when_smaller": {
+      "fact": "tier-transition.ts:189 의 lowerRadiusLimit 완화는 `targetRadius < camera.lowerRadiusLimit` 일 때만 발동. venus T3 targetRadius=607 > 0.5 라 발동 안 함.",
+      "comment": "이는 통제 로직. 그러나 transition 도중 cam-radius animation 이 lowerRadiusLimit 으로 clamp 되는 흐름이 있다면 venus 만 회귀하는 것을 설명 못 함 (다른 planet 도 동일 식)"
+    },
+    "3_focus_target_origin_drift": {
+      "fact": "tier-transition.ts (2-b) 에서 camera.target = focusMesh.absolutePosition 즉시 동기화. T3 body tier 는 floating origin primary follow 발동 (solar-system-scene.ts:683) → mesh.position ≈ [0,0,0] 매 프레임.",
+      "comment": "focusOn 이 시작한 'cam-target' animation 이 T1 좌표 (~9.1 unit) 로 향하고, runTierTransition 이 stopAnimation 으로 그것을 취소하고 origin shift 후 [0,0,0] 으로 jump. 정상 동작 시 사용자는 transition 끝나면 mesh 중앙 봐야 함."
+    },
+    "4_potential_minZ_clamp_after_transition": {
+      "fact": "transition 후 camera.minZ = max(1e-6, targetRadius * 0.01) = 6.075 (venus T3). venus mesh 직경 243, 카메라 거리 607. 카메라 ~ 카메라minZ 사이 (6.075 unit) 에 mesh 표면이 들어오면 near-plane 으로 clip.",
+      "math": "venus mesh 표면까지 거리 = camera.radius - meshRadius = 607.5 - 121.5 = 486 unit. minZ=6.075 << 486 → clip 영향 없음.",
+      "verdict": "near-plane clip 가설은 수치상 비-주원인"
+    },
+    "5_venus_specific_hypothesis_promotion": {
+      "primary_candidate": "라운드 3 박제값 800 + boundingInfo update timing 의 결합",
+      "detail": "createBodyMeshMid / createBodyBillboard 가 tier 전환 시 mesh.scaling 을 갱신하는데, T1 → T3 전환 직후 boundingSphere.radiusWorld 가 새 scaling 으로 즉시 업데이트되지 않는 frame race 가능성. 같은 프레임 내 setTier → mesh.scaling.setAll(newScale/oldScale) → runTierTransition 호출 순. tier-transition.ts:174-176 에서 boundingInfo.boundingSphere.radiusWorld 를 읽을 때 mesh.computeWorldMatrix(true) 미선행 → 이전 transformation matrix 의 boundingSphere 잔존 가능. 검증 필요."
+    },
+    "6_observation_vs_research_mode_divergence": {
+      "fact": "code path 상 mode 분기 0 — focusOn / tier / lowerRadiusLimit 동일.",
+      "only_difference": "side-panels.tsx 의 expanded=true → motion.aside 좌/우 패널 표시 → ResizeObserver fire → engine.resize() → camera.fov / minZ / maxZ 등 재투영 (실제로 수치 변화는 viewport aspect 만)",
+      "candidate_root_cause_for_research_mode_pass": "panel expand animation 이 250ms 진행되는 동안 매 프레임 ResizeObserver 가 fire 되어 engine.resize() 가 다수 호출 → 그 사이 onBeforeRender 가 tier 재판정 + tier-transition 이 중복 발동 → lowerRadiusLimit 완화가 transition 내부에서 발동되거나 카메라가 mesh 외부 으로 점프하는 경로 활성화",
+      "verification_needed": "실제 mode 전환 시 transition / resize fire 횟수 + camera.radius 추이 측정"
+    }
+  },
+  "issue_397_overlap_analysis": {
+    "issue": "#397",
+    "title": "[bug] focus 시 다른 body 잔존",
+    "user_report": "수성, 금성 외 포커스시 행성이 존재하는 경우가 있음 (잔존 표시)",
+    "shared_root_cause_likelihood": "high",
+    "rationale": "focus 후 카메라가 mesh radius * 5 만큼 떨어진 위치에 있고 mesh 가 거대한 T3 scene 에서 다른 body 의 world 좌표가 floating origin shift 적용 후에도 frustum 내라면 함께 보임. 예: jupiter focus → origin=jupiter world. earth world 는 origin shift 후 -7.785e11 m + 1.496e11 m ≈ -6.29e11 m → T3 scene unit -6.29e11 × 2.51e-5 ≈ -1.58e7 unit (거리 1580만 unit, 카메라 maxZ=1e14 라 frustum 내). earth diameter T3 = 0.319 unit → angular 매우 작음 (점). 즉 작은 점으로 잔존 표시. 사용자가 '행성 존재' 로 인지.",
+    "decision": "통합 (#378 fix 가 #397 의 일부 케이스 해결 가능). 단 본 ADR 은 #378 만 다루고 #397 의 추가 forensic 은 fix PR 후 재평가 (NO-OP 가능성 포함)"
+  },
+  "round2_rollback_analysis": {
+    "instruction": "DoD: R2 박제값 (mercury 900 / venus 650) 임시 rollback 후 동일 venus focus 재현 확인",
+    "static_prediction": {
+      "venus_650_T3_meshDiameter": 197.5,
+      "venus_650_T3_meshRadius": 98.75,
+      "venus_650_targetRadius": 493.75,
+      "comparison_to_round3_800": "값 차이 ~23% (607 vs 493). 두 값 모두 mesh 외부에 카메라가 있어 이론상 가시. 따라서 박제값 자체는 회귀의 1차 원인이 아님 — 라운드 2 D-T2 (2026-04-30) 의 5건 회귀 중 venus 가 명시되지 않았던 것은 보고 누락 또는 venus 800 의 작은 차이로 더 잘 노출됐을 가능성.",
+      "verdict": "박제값 rollback 은 fix 가 아닌 회귀 시점 bisect 도구 — 실측 필요. ADR 결과·재검토 조건에 명시"
+    }
+  },
+  "developer_handoff": {
+    "fix_phase_required_measurements": [
+      "M1: 매트릭스 12 cells 실측 (browser-test 스킬 + dev 빌드 __solarScene 핸들). camera.radius / camera.target / mesh.absolutePosition / boundingSphere.radiusWorld / camera.isInFrustum(mesh) 측정. cross-validate G1 반영: 측정 효율화 위해 lod-dev-overlay 패턴으로 focus debug overlay 동반 추가 (camera.radius / boundingSphere.radiusWorld / camera.target 실시간 표시) — 별도 PR 또는 fix PR 동반 결정",
+      "M2: venus focus 시 transition 동안 매 프레임 camera.radius / camera.lowerRadiusLimit 추적 (Babylon scene.onBeforeRenderObservable hook)",
+      "M3: R2 박제값 (venus 650) 임시 rollback (apps/web/src/constants/body-scale.ts 만 수정) 후 venus focus 재현 — 회귀가 박제값 결합인지 단독 카메라 로직인지 분리",
+      "M4: 관찰 모드 → 연구 모드 전환 시 ResizeObserver / engine.resize() / onBeforeRender 호출 순서 timestamp + counter 추적 — mode 분기 회귀의 결정적 메커니즘 식별 + H4 (boundingSphere stale) 가설 확증 (cross-validate G2 반영)"
+    ],
+    "fix_options_to_compare_in_ADR": "ADR 별도 박제 (4 옵션 비교)"
+  }
+}
