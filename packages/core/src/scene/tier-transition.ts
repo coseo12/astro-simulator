@@ -171,6 +171,15 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   // 없으면 실거리 보존 수식 fallback (free-fly tier 전환 등 focus 없는 경로).
   let targetRadius: number;
   if (focusMesh) {
+    // #378 옵션 B — boundingInfo 갱신 강제 (defense-in-depth, ADR 가설 4).
+    // setTier 가 mesh.scaling 을 newScale 로 갱신했더라도 boundingSphere.radiusWorld 가
+    // 다음 frame 의 world matrix recompute 전까지 잔존 값을 반환하는 timing race 가능.
+    // venus 관찰 모드 회귀의 가장 그럴듯한 단일 원인 (ADR §결정 근거 3, 연구 모드 정상의 메커니즘
+    // = panel resize → engine.resize() → 자연 boundingInfo 갱신 → H4 회피).
+    // solar-system-scene.ts:569 에서 이미 모든 mesh 의 computeWorldMatrix(true) 를 호출하지만,
+    // 호출 순서 / 다른 부수효과 race 시 안전망.
+    focusMesh.computeWorldMatrix(true);
+    focusMesh.refreshBoundingInfo();
     const boundingInfo = focusMesh.getBoundingInfo();
     const meshRadius = boundingInfo.boundingSphere.radiusWorld;
     targetRadius = Math.max(meshRadius * FOCUS_RADIUS_MULTIPLIER, meshRadius + 0.01);
