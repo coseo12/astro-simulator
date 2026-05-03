@@ -961,3 +961,260 @@ qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus 
 ### Cross-validate (라운드 2 D-T2 결과)
 
 생략 — 본 amendment 는 사용자 D-T2 결과 박제 + 분리 결정 (정책·ADR 자체 변경 없음). 라운드 3 신규 이슈 architect 단계 진입 시 cross-validate 의무 박제 (정책·ADR amendment 박제 직후 루틴, CLAUDE.md "교차검증" 섹션).
+
+---
+
+## Amendment 2026-05-03 (라운드 3) — 사실 비율 강화 박제값 결정 (mercury 900→700 / venus 650→800)
+
+> **상태**: 라운드 2 박제값 (mercury 900 / venus 650) 의 사실 비율 도달률 72% 미충족. #385 이슈 architect 단계 진입.
+> **선행**: 본 ADR Amendment 2026-05-01 (라운드 2 SSoT 종결 + #385 분리), Amendment 2026-05-01 (라운드 2 박제값) §"비-범위 박제" 후보 D-1/D-2/D-3.
+> **트리거**: 사용자 D-T2 (PR #384, 2026-05-01) "전체적인 비율은 개선됨 / 실제 비율적으론 아직 맞지 않는 듯" 부분 통과 → venus > mercury 사실 비율 (2.48배) 강화 의무.
+
+### 결정
+
+- `sunScale: 50` 그대로 유지 (라운드 1/2 보존)
+- `mercuryScale: 900 → 700` (사실 비율 강화 D-1)
+- `venusScale: 650 → 800` (사실 비율 강화 D-1)
+
+### D-1 / D-2 / D-3 후보 비교 (architect 분석)
+
+#### 비교 표
+
+| 후보  | mercuryScale | venusScale | 사실 비율 도달률 | mercury 저점 pxD (1280×720, dpr=1, far) | mercury 4px 마진 | venus 고점 pxD (1920×1080, dpr=2, close) | LOD 일관성                       | 모바일 누적 disk area |
+| ----- | ------------ | ---------- | ---------------- | --------------------------------------- | ---------------- | ---------------------------------------- | -------------------------------- | --------------------- |
+| **D-1** | 700          | 800        | 114%             | **5.29 px (low)**                       | **+1.29 px**     | 48.4 px (mid 한계)                       | venus mid 일관 유지 (high 미진입) | **16.75%**            |
+| D-2   | 600          | 700        | 117%             | **4.53 px (low)**                       | +0.53 px         | 42.3 px (mid)                            | mid 일관 유지                    | 15.66%                |
+| D-3   | 800          | 900        | 113%             | 6.04 px (low)                           | +2.04 px         | 54.4 px (**high 진입**)                  | venus high/mid 전환 (viewport별) | 17.99%                |
+
+**산출 근거** (선형 비례 — `pxDiameter ∝ scale`, Phase 1 식 정정 PR #390 후 Phase 2 forensic baseline `docs/reports/391-forensic/output.json` SSoT):
+
+- Phase 2 baseline (라운드 2): mercury 6.80~21.5 / venus 12.39~39.3 (16 cell × 측정).
+- D-1: mercury × (700/900) = 0.778 / venus × (800/650) = 1.231
+- D-2: mercury × (600/900) = 0.667 / venus × (700/650) = 1.077
+- D-3: mercury × (800/900) = 0.889 / venus × (900/650) = 1.385
+
+**모바일 누적 disk area** (375×667 baseline, scale² 면적 비례): mercury 1.94% × (newScale/900)² + venus 2.19% × (newScale/650)² + sun 12.26% (변동 없음).
+
+#### 채택 — **D-1 (mercury 700 / venus 800)**
+
+**근거 — 4축 평가**:
+
+1. **사실 비율 도달률** (이슈 본문 우선순위 110~120% 안전 영역): D-1 114% / D-2 117% / D-3 113%. 세 후보 모두 통과. D-2 가 가장 근접하나 안전 마진 (다음 축) 에서 탈락.
+2. **PR #394 Phase 2 4px fallback 안전 마진** (CRITICAL): mercury 저점 (`1280×720, dpr=1, far`) 이 4px 임계와 떨어진 거리.
+   - D-2 0.53px — **측정 노이즈 / floating-point 정밀도 / camera distance 변동** 으로 < 4px 떨어지면 사각형 quad 회귀 (#379 fix 무효화)
+   - D-1 1.29px — D-2 의 **2.43배** 마진. measure-px-ratio ±5% 마진 (라운드 2 SSoT) 과 정합
+   - D-3 2.04px — D-1 의 1.58배 마진, 가장 안전. 그러나 다음 축에서 탈락
+3. **LOD 일관성**: PR #394 Phase 2 alpha mask 정책은 mid sphere (12세그) ↔ low billboard (alpha mask quad) 전환이 시각적 일관. 그러나 high (32세그 sphere) ↔ mid (12세그) 전환은 segment 차이 + lighting 차이로 **viewport 별 시각 변동** 가시화.
+   - D-3 venus 고점 54.4px > high 임계 50 — **viewport 따라 high ↔ mid 전환 발생**. dpr=1 환경에서는 mid, dpr=2 close 에서는 high. 사용자 인지 시각 일관성 저하.
+   - D-1 venus 고점 48.4px — high 임계 미달, **모든 viewport mid 일관**. 색상·세그먼트·lighting 변동 0.
+4. **모바일 누적 disk area** (가드 ≤ 25%): 세 후보 모두 통과. D-1 16.75% (마진 8.25%p), D-2 15.66% (9.34%p), D-3 17.99% (7.01%p). D-1 은 D-3 보다 안전.
+
+**결정 우선순위**: 4px fallback 안전 마진 (안정성) > LOD 일관성 (시각 품질) > 사실 비율 도달률 (사용자 평가). D-1 이 안정성 + 일관성 + 사실 비율 도달 모두 만족하는 유일 후보.
+
+**기각 근거**:
+
+- D-2: 4px 마진 0.53px 이 측정 노이즈 흡수 부족. 노이즈로 < 4px 떨어지면 PR #394 Phase 2 가 사각형 quad 로 fallback (사용자 D-T2 의 #1 회귀 재발). 사실 비율 117% 의 +3%p 이득보다 안정성 손실이 큼.
+- D-3: 사실 비율 113% (D-1 대비 -1%p) 이지만 venus high/mid 전환으로 viewport 별 시각 변동 (dpr=2 close 에서 32세그 sphere, dpr=1 에서 12세그 sphere). 사용자 D-T2 가 "viewport 일관 자연 비율" 을 평가하므로 negative.
+
+### 라운드 3 D-T2 px 비 예측 박제
+
+#### 1280×720 (데스크톱 viewport, 표준 평가 기준)
+
+| 항목                | 라운드 2 (현행) | 라운드 3 D-1 (예측)               | DoD 임계 (라운드 2 SSoT ±5% 마진) |
+| ------------------- | --------------- | --------------------------------- | --------------------------------- |
+| sun pxDiameter      | 246 px          | 246 px (변동 없음)                | -                                 |
+| mercury pxDiameter  | ~14.9 px        | **~11.6 px** (예측, 900→700 비례) | -                                 |
+| mercury sun 대비 비 | ~6.07%          | **~4.71%** (예측)                 | **≤ 4.95% (기존 6.30 → 라운드 3 신규)** |
+| venus pxDiameter    | ~27.2 px        | **~33.5 px** (예측, 650→800 비례) | -                                 |
+| venus sun 대비 비   | ~11.03%         | **~13.58%** (예측)                | **≤ 14.26% (기존 11.55 → 라운드 3 신규)** |
+
+**임계 갱신 근거**: 라운드 3 박제값이 사실 비율 강화 목표로 **mercury 인하 + venus 인상** 의 비대칭 변화를 동반. 라운드 2 SSoT (mercury ≤ 6.30 / venus ≤ 11.55) 는 D-1 이 자연 통과 (4.71 < 6.30) 하지만 venus 13.58 > 11.55 로 strict FAIL. 따라서 r1-guard `--measure-px-ratio` 임계 자체를 라운드 3 박제값에 맞춰 ±5% 마진 SSoT 로 갱신.
+
+- mercury 임계: ~4.71 × 1.05 ≈ **4.95%** (소수점 둘째 자리 보수 라운딩, 박제값 700 의 통과 목표)
+- venus 임계: ~13.58 × 1.05 ≈ **14.26%** (박제값 800 의 통과 목표)
+
+±5% 마진은 라운드 2 amendment SSoT (forensic 측정 식 1차 비례 + Vector3.Project 부동소수 정밀도 합산 노이즈) 그대로 적용.
+
+#### 모바일 누적 disk area 재계산 (예측)
+
+라운드 2 baseline (375×667 viewport): sun 12.26% / mercury 1.94% / venus 2.19% / 누적 16.39%.
+
+라운드 3 D-1 적용 시 (scale² 면적 비례):
+
+- sun: 12.26% (변동 없음)
+- mercury: 1.94% × (700/900)² ≈ **1.17%**
+- venus: 2.19% × (800/650)² ≈ **3.32%**
+- **누적: ~16.75%** (≤ 25% 가드 통과, 마진 8.25%p)
+
+### LOD 영향 분석 (PR #394 Phase 2 forensic baseline 기준)
+
+#### Phase 2 baseline (라운드 2 박제값) 재현
+
+`docs/reports/391-forensic/output.json` 16 cell 매트릭스:
+
+- mercury low: 5/16 (저 viewport / 저 dpr / 원거리 우세)
+- mercury mid: 11/16
+- venus low: 3/16
+- venus mid: 13/16
+- sun high: 16/16 (Phase 1 fix 후 100% 회복)
+
+#### 라운드 3 D-1 예측
+
+- mercury 저점 5.29 px / 고점 16.7 px — **mid 임계 8 미달 영역 확대 예상** (16 cell 중 ~10/16 low 추산, 라운드 2 baseline 대비 +5/16 cell low 증가)
+- venus 저점 15.3 px / 고점 48.4 px — **모든 cell mid 진입 예상** (라운드 2 의 3/16 low 가 0/16 으로 개선)
+- sun: 변동 없음 (16/16 high)
+
+**시각 영향**:
+- mercury low 비율 증가 → PR #394 Phase 2 의 alpha mask 가 더 자주 적용됨 (정상 fallback 경로). 4px ≤ pxD 영역에서 원형 disc 인지 (사용자 D-T1 회귀 #2 fix 영역).
+- venus low → mid 회복 → sphere mesh 인지 강화 (사용자 D-T2 평가 시 "venus 가 더 크고 실제 행성 같음" 인지 강화).
+- 종합: 사용자 D-T2 의 "venus > mercury 사실 비율" 인지가 mercury 인하 + venus 인상 + venus mid 회복의 **3중 경로** 로 강화.
+
+### r1-guard `--measure-px-ratio` 임계 갱신 SSoT
+
+`apps/web/scripts/r1-ui-regression-guard.mjs` `PX_RATIO_THRESHOLDS`:
+
+```js
+// 라운드 2 (현행)
+const PX_RATIO_THRESHOLDS = Object.freeze({
+  mercury: 6,   // 라운드 2 strict (마진 적용 전)
+  venus: 11,
+});
+
+// 라운드 3 D-1 (목표)
+const PX_RATIO_THRESHOLDS = Object.freeze({
+  mercury: 4.95,  // 라운드 3 박제값 700 의 ±5% 마진 (예측 4.71 + 5%)
+  venus: 14.26,   // 라운드 3 박제값 800 의 ±5% 마진 (예측 13.58 + 5%)
+});
+```
+
+**기존 ±5% 마진 정책 SSoT 보존**: 라운드 2 amendment 의 "박제값 ±5% 측정 노이즈 마진" 정책은 그대로. 박제값 변경에 따라 임계만 갱신.
+
+### Concrete Prediction (D-1 채택 시)
+
+1. **r1-guard `--measure-px-ratio` 통과 예측**: mercury 실측 ~4.71% (≤ 4.95% 통과), venus 실측 ~13.58% (≤ 14.26% 통과). 측정 노이즈 ±5% 안에서 통과.
+2. **모바일 누적 disk area**: 실측 ~16.75% (≤ 25% 가드 통과). 라운드 2 (16.39%) 대비 +0.36%p 증가.
+3. **LOD 영향**: mercury low 비율 ~5/16 → ~10/16 증가, venus low ~3/16 → 0/16 감소. PR #394 Phase 2 alpha mask 가 더 자주 적용 (정상 fallback). 4px fallback (사각형 quad) 트리거 0/16 cell (저점 5.29 > 4 마진 1.29).
+4. **사용자 D-T2 #1 비율 인지**: venus 33.5px / mercury 11.6px = **2.89배 시각비** (사실 비율 2.48배의 **117%**). 사용자 인지 임계 (사실 비율 ±20%) 안에서 자연 인지.
+
+### 회귀 가드 (developer 단계 의무)
+
+1. **r1-guard `--measure-px-ratio` 임계 갱신**: 위 SSoT 따라 mercury 4.95 / venus 14.26 박제. ±5% 마진 보존. 예측 vs 실측 일치 검증.
+2. **`apps/web/src/constants/body-scale.ts` 갱신**: mercury 900→700, venus 650→800. 주석 SSoT 갱신 (라운드 3 박제값 + ADR amendment 링크).
+3. **`apps/web/src/constants/body-scale.test.ts` 갱신**: 단위 테스트 박제값 정확 일치 (mercury 700 / venus 800).
+4. **PR #394 Phase 2 4px fallback 회귀 가드** (NEW): qa headless 매트릭스에서 mercury 저점이 4px 미만으로 떨어지지 않는지 확인. `docs/reports/391-forensic/output.json` 의 1280×720 dpr=1 far cell 에서 mercury pxDiameter ≥ 4 + 2σ 마진 (예측 5.29) 검증.
+5. **CHANGELOG `### Behavior Changes`**: "수성/금성 시각 비율 사실 비율 강화 (라운드 3, D-1 채택). venus/mercury 시각비 1.79배 → ~2.89배 (사실 비율 72% → 117%). r1-guard `--measure-px-ratio` 임계 갱신 (mercury 6 → 4.95, venus 11 → 14.26)."
+
+### §재검토 트리거 라운드 3
+
+라운드 1/2 amendment 의 §재검토 트리거 5건 보존. 라운드 3 결과로 **§재검토 트리거 #1 (D-T2 미통과)** 의 후속 행동 갱신:
+
+- 라운드 3 D-1 적용 후 D-T2 미통과 시 다음 적극값 후보:
+  - **(a)** D-2 (mercury 600 / venus 700) — 사실 비율 117% 이지만 mercury 4px 마진 0.53px 위험. PR #394 Phase 2 alpha mask 4px fallback 측정 노이즈 보강 선행 의무 (Phase 3 ADR 분리)
+  - **(b)** 옵션 (e) log scaling — #375 우선순위 high 승격
+  - **(c)** D-3 (mercury 800 / venus 900) + venus high/mid 전환 fix — high LOD threshold 동적 조정 ADR 분리
+- D-T2 통과 시 본 amendment 박제값 (mercury 700 / venus 800) 이 R3 #373 라운드 3 SSoT 종결값
+- venus 고점 48.4px 가 high 임계 50 직전이므로 **PR #394 Phase 2 와 PR #390 Phase 1 측정 결과의 ±5% 변동** 으로 high 진입 시 LOD 일관성 영향 검증 의무
+
+### R4 (지구 + 달) 진입 전제 정합성
+
+R4 viewport-aware scaling ADR (Gemini R3 권고 1, `docs/decisions/20260429-r3-venus-visualization.md` cross-validate 고유 발견 1) 와 라운드 3 박제값 정합성:
+
+- R4 진입 시 earth + moon 박제값 신규 결정 — 본 amendment 의 `mercury 700 / venus 800` 은 **R4 박제값과 직교** (Concrete Prediction 1 의 "1줄 추가 패턴" 보존)
+- 사실 비율 (`earth/venus = 6371/6052 ≈ 1.053배`, `moon/earth = 1737/6371 ≈ 0.273배`) 산출 시 venus 800 baseline 기준 — earth 박제값은 venus × 1.053 ≈ 800 ~ 850 범위 추정 가능 (R4 ADR 단계 정밀화)
+- viewport-aware scaling (Gemini 권고) 은 R4+ 에서만 도입 검토 — 본 라운드 3 은 정적 박제값 보존 (viewport-aware 도입 시 라운드 1~3 박제값 모두 SSoT 변경). 본 amendment 는 viewport-aware 도입 전제 변경 없음
+
+### 비-범위 (라운드 3, 라운드 1/2 보존)
+
+- 본 architect 라운드 3 코드 변경 0 — body-scale.ts / body-scale.test.ts / r1-ui-regression-guard.mjs 직접 수정 금지 (developer 단계 책임)
+- sunScale 50 그대로 유지 (라운드 1/2 보존)
+- 옵션 (e) log scaling — 후속 이슈 분리 보존 (라운드 3 D-T2 미통과 시 우선순위 high 승격)
+- viewport-aware scaling — R4 ADR 단계로 분리 보존 (본 amendment 는 정적 박제값만)
+- DoD 변경 금지 (CRITICAL #6) — 이슈 본문 D-T2 5종 그대로
+- PR #394 Phase 2 alpha mask 정책 변경 금지 — 4px fallback 임계 / opacityTexture 토글 그대로 (라운드 3 박제값이 4px 마진 1.29px 안전 영역 진입 검증)
+
+### Cross-validate (라운드 3)
+
+본 amendment 박제 직후 cross-validate 1회 의무 (CLAUDE.md "교차검증 박제 직후 루틴", anchor=`ADR 신규·개정/폐기`). Claude 자체 편향 4종 셀프 체크 (호출 전):
+
+- **낙관적 일정**: D-1 채택 후 developer 단계 단순 (3개 파일 박제값 갱신) — 통과
+- **결합 간과**: PR #394 Phase 2 alpha mask 4px fallback 의 측정 노이즈 결합을 mercury 4px 마진 1.29px 로 박제 — 통과
+- **폐기 프레이밍**: D-2 / D-3 기각 근거 명시 (4px 마진 부족 / LOD 일관성) — 통과
+- **순수주의**: 사실 비율 100% (정확한 venus/mercury = 2.48배) 가 아닌 117% (D-1) 채택은 LOD 임계 + 4px fallback + 측정 노이즈의 **3중 trade-off 결과** — 사용자 인지 임계 (±20%) 안에서 정합. 통과
+
+호출 프롬프트에 명시 질문: "D-1 (mercury 700 / venus 800) 이 D-2 / D-3 보다 우월하다는 4px fallback 안전 마진 + LOD 일관성 분석 근거가 타당한가? 라운드 2 SSoT (±5% 마진) 의 라운드 3 박제값에 대한 자동 갱신 (mercury 6 → 4.95 / venus 11 → 14.26) 이 정합한가?"
+
+cross-validate 결과 박제 위치: 본 amendment §"### Cross-validate 결과 (라운드 3)" 서브섹션 (architect.md §교차검증 반영 사항 SSoT 4종 분류).
+
+### Cross-validate 결과 (라운드 3, Gemini 2.5 Pro, 2026-05-03, outcome=applied)
+
+- **호출**: `.claude/skills/cross-validate/scripts/cross_validate.sh architecture docs/decisions/20260430-r3-followup-body-proportion.md`
+- **로그**: `.claude/logs/cross-validate-architecture-20260503-144335.log`
+- **outcome JSON**: `.claude/logs/cross-validate-architecture-20260503-144335-outcome.json` (`outcome=applied`, `exit_code=0`, `reminder_issue=none`)
+
+#### Gemini 응답 요약 (총평 6 항목)
+
+| 검증 기준        | Gemini 평가                | 핵심 의견                                                                  |
+| ---------------- | -------------------------- | -------------------------------------------------------------------------- |
+| 1. 구조적 완성도 | **Exemplary**              | 문제 정의 → 해결 → 검증 → 인계 모든 단계 누락 없이 구조화. 모범적 사례     |
+| 2. 기술 결정 타당성 | **Exemplary**              | 데이터 기반 분석 + 합리적 옵션 비교 + 점진 개선 전략 모두 훌륭            |
+| 3. 인터페이스 명확성 | **Excellent**              | 개발자 인계 + 자동화 검증(Guard) 명세 명확. 협업 오류 최소화              |
+| 4. 확장성        | **Excellent**              | 단기/장기 분리 + R-Phase 정책 개선 (Q2=B 비례 결정)                       |
+| 5. 보안          | **Not Applicable**         | 시각적 표현 결정. 보안 관련 사항 없음                                     |
+| 6. 누락 요소     | **Excellent**              | 자체 cross-validate + 사용자 D-T2 피드백 루프로 누락 요소 자체 발견       |
+
+라운드 3 D-1 채택에 대한 Gemini 직접 평가 (인용): *"4px fallback 안전 마진과 LOD 일관성을 기준으로 D-1을 채택한 것은 안정성을 우선하는 훌륭한 엔지니어링 트레이드오프 결정"*.
+
+#### Claude 재분석 (volt #23 / #29 기각·수용 프로토콜)
+
+##### 합의 (3 항목, 본 PR 박제 즉시 반영 — 라운드 3 amendment 본문 자체에 이미 포함)
+
+1. **D-1 채택 4축 평가의 안정성 우선 trade-off** — Gemini "안정성을 우선하는 훌륭한 엔지니어링 trade-off 결정" 직접 동의. 4px fallback 마진 + LOD 일관성 + 사실 비율 도달률 + 모바일 disk area 4축이 적정 trade-off
+2. **r1-guard `--measure-px-ratio` 임계 갱신 SSoT 자동화** — Gemini "자동화된 회귀 테스트(계약)로 전환한 훌륭한 사례" 동의. ±5% 마진 정책 보존 + 박제값별 임계 자동 갱신 (mercury 6 → 4.95 / venus 11 → 14.26) 정합
+3. **Phase 분리 릴리스 리듬 (라운드 1/2/3) 의 점진 품질 개선 + 릴리스 리듬 유지** — Gemini "성숙한 모습" 직접 동의. 사실 비율 강화 라운드 3 분리가 backward-compat + 완결 Behavior Change + 점진 릴리스 3조건 충족
+
+##### 이견 수용
+
+없음. Gemini 응답에 D-1 채택 / r1-guard 임계 갱신 / 라운드 3 분리에 대한 이견 없음.
+
+##### Claude 재분석으로 기각한 Gemini 제안
+
+1. **경영진/비개발자 Executive Summary 추가** — Gemini 개선 제안 1.
+   - Claude 재분석: 본 프로젝트 (astro-simulator) 는 1인 개발자 - AI 페어 프로그래밍 컨텍스트. 이해관계자는 사용자 단일이며 D-T2 사용자 평가가 곧 사용자 인지 임계 박제. ADR 의 1차 독자는 architect / developer / qa sub-agent (즉 AI 자신) 이고 Executive Summary 의 가치는 낮음
+   - 기각 근거: 본 ADR 의 §"배경" 첫 1~2 문단 자체가 이미 "왜 이 ADR 이 존재하는가" 의 압축 요약 역할 수행. 별도 Executive Summary 추가 시 SSoT 중복 + 동기화 부담 증가 (라운드 4 amendment 시 본문 + Executive Summary 두 곳 갱신 의무)
+   - volt #51 (외부 툴 주장 실측 가드) 적용: Gemini 가 generic ADR 모범 사례를 추천하나 본 프로젝트 컨텍스트에서 부적합
+
+##### 고유 발견 (1 항목, 후속 분리)
+
+1. **forensic-adr-template.md 자산화** — Gemini 개선 제안 2. 본 ADR 의 forensic + Amendment 라운드 + cross-validate 박제 + 발화점 추적 구조를 템플릿화하여 다른 복잡한 문제 해결에 재사용
+   - Claude 평가: 가치 있는 제안. **본 amendment 범위 밖** (이슈 #385 의 비-범위 = 사실 비율 정밀화. ADR 템플릿 자산화는 직교 인프라 작업)
+   - 후속 이슈 분리 권장: priority:low — `[infra] forensic ADR 템플릿 자산화 — 살아있는 ADR 구조 재사용 가능화` (Builds on: #385)
+   - 분리 박제 규칙 (volt #29 3단 프로토콜): 본 ADR 의 §배경 + §Amendment 다중 라운드 + §"Cross-validate 결과" + §"§재검토 트리거" 4섹션 구조를 템플릿 SSoT 로 추출
+
+##### 핵심 평가 축 (1)~(6) 에 대한 Claude 자체 재분석 결론
+
+- (1) 구조적 완성도: Gemini Exemplary 동의. forensic 측정 결과 박제 + 라운드 1/2/3 진화 + cross-validate 박제 + 사용자 D-T2 피드백 루프 모두 SSoT 추적 가능
+- (2) 기술 결정 타당성: Gemini Exemplary 동의. 데이터 기반 (Phase 2 forensic baseline 16 cell × 4px fallback 마진 산출) + 4축 trade-off 명시
+- (3) 인터페이스 명확성: Gemini Excellent 동의. developer 인계 §회귀 가드 5 항목 + r1-guard 임계 SSoT 갱신 명세
+- (4) 확장성: Gemini Excellent 동의. R4 (지구 + 달) 진입 전제 정합성 §"R4 진입 전제 정합성" 박제. 라운드 1~3 SSoT 가 R4+ 박제값과 직교 (Concrete Prediction 1 의 1줄 추가 패턴 보존)
+- (5) 보안: Gemini Not Applicable 동의
+- (6) 누락 요소: Gemini Excellent 동의. cross-validate 자체가 누락 발견 메커니즘으로 작동 (forensic-adr-template 자산화 고유 발견)
+
+#### 임계 비례 역산 + 4px fallback 안전 마진 PASS/FAIL 판정
+
+라운드 3 D-1 채택 근거 (architect 자체 분석) 가 cross-validate 결과로 검증됨:
+
+- **임계 비례 역산** (라운드 2 SSoT 보존): mercury 4.95% / venus 14.26% 임계는 박제값 × ±5% 마진 자동 산출. 정합 PASS
+- **4px fallback 안전 마진**: D-1 mercury 저점 5.29 px (마진 1.29 px) 이 D-2 (0.53 px) 의 2.43배 안전. 측정 노이즈 흡수 가능. PASS
+- **LOD 일관성**: D-1 venus 고점 48.4 px 가 high 임계 50 직전 (마진 1.6 px). 모든 viewport mid 일관 유지. PASS
+
+#### 라운드 3 박제값 안전 여유 평가
+
+- **mercury 4px fallback 마진 1.29 px** — Phase 2 forensic baseline 의 측정 노이즈 ±5% (~0.34 px) 안에서 안전
+- **venus high 임계 미진입 마진 1.6 px** — Phase 2 forensic baseline 의 dpr=2 close 환경 ±5% (~2.4 px) 마진 일부 잠식 가능. 단, mid (12세그) ↔ high (32세그) 전환 자체가 4px fallback (사각형 quad) 만큼의 회귀는 아니므로 acceptable
+- **모바일 누적 disk area 16.75% (마진 8.25%p)** — 충분 안전
+
+#### 발견된 이슈 박제 종합
+
+- **본 PR 즉시 반영**: 합의 3 항목 (D-1 채택 4축, r1-guard 임계 갱신 SSoT, 라운드 3 분리 릴리스)
+- **본 PR 기각**: Executive Summary 추가 (1인 개발자 컨텍스트 부적합)
+- **후속 이슈 분리**: forensic-adr-template 자산화 (priority:low, infra 작업)

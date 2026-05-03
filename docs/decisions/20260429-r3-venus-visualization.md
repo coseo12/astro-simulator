@@ -797,3 +797,83 @@ forensic 측정 데이터 (`docs/reports/373-debug-output.json`) 기반 산출. 
 - forensic ADR Amendment 2026-05-01 (라운드 2) — 본 amendment 의 근거 SSoT
 - R1 ADR Amendment 2026-05-01 §"라운드 2 결정" (sunScale 50 그대로 유지)
 - R2 ADR Amendment 2026-05-01 (라운드 2) — mercuryScale 2000 → 900 동반 박제
+
+---
+
+## Amendment 2026-05-03 (라운드 3) — venusScale 650 → 800 (사실 비율 강화 D-1)
+
+> **상태**: 라운드 2 박제값 (venus 650) 의 사실 비율 도달률 72% 미충족. forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라운드 3) §"D-1 / D-2 / D-3 후보 비교" 채택 D-1 결과.
+> **선행**: 본 ADR Amendment 2026-05-01 (라운드 2) — venusScale 1500 → 650.
+> **트리거**: 사용자 D-T2 (PR #384, 2026-05-01) "전체적인 비율은 개선됨 / 실제 비율적으론 아직 맞지 않는 듯" 부분 통과 → venus > mercury 사실 비율 (`6052/2440 = 2.48배`) 강화 라운드 3 진입.
+
+### 결정
+
+- `venusScale: 650 → 800` (사실 비율 강화 D-1, 라운드 3)
+- mercury 동반 박제: `900 → 700` (R2 ADR Amendment 2026-05-03 라운드 3 SSoT)
+- sun 보존: `50` (R1 ADR Amendment 2026-05-01 라운드 1)
+
+### 근거 (forensic ADR D-1 채택 4축)
+
+forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라운드 3) §"D-1 / D-2 / D-3 후보 비교" 의 4축 평가에서 D-1 (mercury 700 / venus 800) 채택. **venus/mercury 시각비 = `(6052×800)/(2440×700) = 2.83배`** (사실 비율 2.48배의 **114%**).
+
+본 amendment 는 venus 측 박제값 갱신 — 라운드 2 와 동일하게 `body-scale.ts` 의 venus 상수값만 변경 (+0 라인). R3 코드 변동 영역 (PR #371 의 shortcut-bar venus 항목 1라인 + body-scale.ts venus 1라인 = +2 라인) 은 라운드 3 에서도 누적 +2 라인 유지.
+
+### 라운드 3 venus 영향 박제
+
+| 항목                                          | 라운드 2 (venus 650) | 라운드 3 D-1 (venus 800) | 변동           |
+| --------------------------------------------- | -------------------- | ------------------------ | -------------- |
+| pxDiameter (1280×720, dpr=1, T1 default)      | ~27.2 px             | **~33.5 px** (예측)      | +6.3 px (+23%) |
+| pxDiameter 저점 (1280×720, dpr=1, far)        | 12.39 px (low/mid경계) | **15.27 px (mid)** (예측) | +2.88 px       |
+| pxDiameter 고점 (1920×1080, dpr=2, close)     | 39.26 px (mid)       | **48.4 px (mid 한계)** (예측) | +9.14 px       |
+| sun 대비 px 비 (1280×720)                     | ~11.03%              | **~13.58%** (예측)       | +2.55%p        |
+| 모바일 disk area (375×667, baseline)          | ~2.19%               | **~3.32%** (예측)        | +1.13%p        |
+| LOD 분포 (16 cell)                            | low 3 / mid 13       | **low 0 / mid 16** (예측) | low -3 (전부 mid) |
+| sphere mesh 인지 강화                         | viewport별 변동      | **모든 viewport mid 일관** | 시각 일관성 향상 |
+
+**LOD 일관성**: D-1 venus 고점 48.4px 가 high 임계 50 직전 (마진 1.6px). **모든 viewport 에서 mid 일관 유지** (high 미진입). 사용자 D-T2 평가 시 "venus 가 viewport 무관하게 일관되게 더 큰 행성으로 보임" 인지.
+
+**D-3 (venus 900) 기각 근거**: 고점 54.4 px > high 임계 50 → viewport 별 high (32세그) ↔ mid (12세그) 전환 발생. dpr=1 환경에서 mid, dpr=2 close 에서 high 로 LOD 변동 시 segment / lighting 차이로 viewport 별 시각 불일치.
+
+### r1-guard `--measure-px-ratio` venus 임계 갱신
+
+라운드 2 amendment §"가드 갱신" 의 venus 임계 (sun 대비 ≤ 11%) 는 strict 박제. 라운드 3 박제값 (venus 800) 의 ±5% 마진 (라운드 2 SSoT 정책 보존) 적용:
+
+- 라운드 2 strict: venus sun 대비 ≤ 11%
+- 라운드 3 D-1 ±5% 마진: venus sun 대비 ≤ **14.26%** (예측 13.58% × 1.05, 소수점 둘째 자리 보수 라운딩)
+
+`apps/web/scripts/r1-ui-regression-guard.mjs` `PX_RATIO_THRESHOLDS.venus` 갱신 의무 (developer 단계). ±5% 마진 정책 SSoT 보존.
+
+### 가드 갱신 — 라운드 2 패턴 보존
+
+본 amendment 는 라운드 2 amendment §"가드 갱신" 의 4종 가드 (brightRatio / px 비 / 색감 / 단위 테스트) 패턴 그대로 유지:
+
+1. `r1-guard --measure-px-ratio` venus 임계 — `14.26%` 갱신 (위 SSoT)
+2. venus 색감/명도 (R3 라운드 1 채택값) 그대로 유지 — 색상은 `body-scale` 과 직교
+3. `body-scale.test.ts` 박제값 단위 테스트 — `venus: 800` 정확 일치 검증 (라운드 2 의 650 단위 테스트 갱신)
+4. 모바일 누적 disk area 가드 (≤ 25%) — D-1 누적 16.75% 통과 검증 (라운드 2 16.39% 대비 +0.36%p 증가)
+
+### D-X1 (R3 코드 +2 라인) PASS 결과 보존
+
+본 ADR Amendment 2026-05-01 (라운드 1) 의 R3 코드 +2 라인 PASS 결과 (R3 #369 PR #371 박제) 는 **그대로 보존**. 라운드 3 박제값 갱신은 `body-scale.ts` 의 venus 상수값만 변경 (+0 라인). R3 코드 변동 영역 (`body-scale.ts` venus 항목 1라인 + R3 PR #371 의 shortcut-bar venus 항목 1라인 = +2 라인) 은 라운드 3 에서도 누적 +2 라인 유지.
+
+### 모바일 누적 disk area 라운드 3 갱신
+
+라운드 2 박제값 650 → 라운드 3 D-1 800 적용 시 (375×667 viewport):
+
+- venus disk area 비율: `(800 / 650)² ≈ 1.515` → 라운드 2 추산값의 152% 수준 (mercury 인하분 -0.77%p 동반)
+- 모바일 누적: 16.39% (라운드 2) → **~16.75%** (라운드 3 D-1, 마진 +8.25%p)
+- ≤ 25% 가드 통과 안전 영역 보존
+
+#380 분리 회귀 우려 (모바일 점유율) 는 라운드 3 에서도 가드 안에 머물지만 라운드 2 대비 **+0.36%p 증가 trend** 박제 — venus 사실 비율 강화 trade-off 의 일부.
+
+### Cross-validate (라운드 3)
+
+본 amendment 는 forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라운드 3) §"Cross-validate 결과 (라운드 3)" 의 cross-validate 커버리지 안 — 별도 cross-validate skip. forensic ADR 라운드 3 cross-validate 결과가 본 amendment 의 의도까지 포괄.
+
+### 참조 (라운드 3)
+
+- forensic ADR Amendment 2026-05-03 (라운드 3) — 본 amendment 의 근거 SSoT (D-1 채택 4축)
+- R1 ADR (sunScale 50 그대로 유지, 라운드 1/2/3 보존)
+- R2 ADR Amendment 2026-05-03 (라운드 3) — mercuryScale 900 → 700 동반 박제 (D-1 채택)
+- 이슈 #385 — 라운드 3 architect → developer → qa → 사용자 D-T2 표준 흐름
+- PR #394 Phase 2 (#391) — 4px fallback alpha mask 정책. 라운드 3 venus 저점 15.27 px 가 4px 마진 11.27 px 안전 영역
