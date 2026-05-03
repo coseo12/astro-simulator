@@ -154,6 +154,16 @@ export interface TierTransitionOptions {
   durationMs?: number;
   /** 입력 잠금 최대 시간 (ms). 기본 500 — durationMs + fallback 마진 */
   lockMs?: number;
+  /**
+   * #408 F2 — transition 종료 (cleanup) 시점에 1회 호출되는 idempotent 콜백.
+   *
+   * `solar-system-scene.ts:setTier` 가 `tierTransitionInProgress` 플래그를 해제하기 위해 주입.
+   * 정상 종료 (onAnimationEnd) / fallback timer / visibilitychange 어느 경로로 cleanup 이 발동해도
+   * 본 콜백은 정확히 1회만 호출된다 (`released` 플래그 기반 idempotent).
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 2 (i) 채택.
+   */
+  onComplete?: () => void;
 }
 
 /**
@@ -163,7 +173,16 @@ export interface TierTransitionOptions {
  * @returns cleanup 함수 — 테스트 / 강제 해제 목적. 내부 타이머 + visibility listener 해제.
  */
 export function runTierTransition(opts: TierTransitionOptions): () => void {
-  const { scene, camera, oldScale, newScale, focusMesh, durationMs = 300, lockMs = 500 } = opts;
+  const {
+    scene,
+    camera,
+    oldScale,
+    newScale,
+    focusMesh,
+    durationMs = 300,
+    lockMs = 500,
+    onComplete,
+  } = opts;
 
   const radiusOld = camera.radius;
   // focusMesh 가 있으면 V5 달성 공식 (boundingRadius × 5) 사용. setTier 시점에 scaling 이 이미 newScale
@@ -241,6 +260,17 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
       scene.attachControl();
     } catch {
       // scene dispose 후 호출 — 안전하게 무시.
+    }
+    // #408 F2 — onComplete 콜백 호출 (released 플래그 안에 있어 정확히 1회 호출).
+    // 정상 종료 / fallback timer / visibilitychange 어느 경로로 cleanup 이 발동해도 idempotent.
+    // 콜백 자체가 throw 해도 attachControl 은 이미 완료되어 release 상태가 보존되도록
+    // try/catch 로 격리.
+    if (onComplete) {
+      try {
+        onComplete();
+      } catch {
+        // 호출자 onComplete 가 throw 해도 transition lifecycle 은 안전하게 종료.
+      }
     }
   };
 

@@ -134,6 +134,28 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # ============================================================
+      # #408 focus transition 회귀 가드 — tier oscillate 차단 (사용자 D-T2 2026-05-04)
+      # ============================================================
+      # ADR: docs/decisions/20260504-focus-tier-oscillate-fix.md §결정 5 (회귀 가드 신설)
+      # 9 cells (3 from × 3 to) 매트릭스 — venus → mercury 등 다른 행성 전환 시 oscillate 차단 확인
+      # tier 전환 횟수 ≤ 1 / target origin reset 0 / camR jump > 1000 unit 0 단언
+      # __solarScene + __simCore.sendCommand 핸들이 dev 빌드 한정 노출이므로 next dev 재사용.
+
+      - name: '#408 focus transition 회귀 가드 (verify:focus-transition)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-focus-transition.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3003 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3003/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3003 node apps/web/scripts/browser-verify-focus-transition.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)

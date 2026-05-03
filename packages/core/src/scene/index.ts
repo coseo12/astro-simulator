@@ -7,7 +7,11 @@
 
 export { setupArcRotateCamera } from './camera.js';
 export type { ArcCameraOptions } from './camera.js';
-export { CameraController } from './camera-controller.js';
+export {
+  CameraController,
+  FOCUS_USER_RADIUS_MULTIPLIER,
+  FOCUS_USER_RADIUS_MIN_PADDING,
+} from './camera-controller.js';
 export type { FocusTarget } from './camera-controller.js';
 export { createSunEarthDemo } from './sun-earth-demo.js';
 export type { SunEarthDemoHandles } from './sun-earth-demo.js';

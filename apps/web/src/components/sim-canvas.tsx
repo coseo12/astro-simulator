@@ -351,6 +351,36 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // P11-A #288 — Floating Origin primary shift (ADR §1-B).
               // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
               solar.setFocusOrigin(bodyId);
+
+              // #408 F1 — focusOn 진입 시 final tier 사전 결정 + setTier (의존 역전 (c) 채택).
+              //
+              // 목적: controller.focusOn 의 cam-target tween (300ms) 보간 중간 frame 에서
+              // `cameraFromFocusMeters` 가 일시적으로 0.1 AU 미만으로 떨어져 `tierFromFocus` 가
+              // 잘못된 tier 를 반환하는 race 차단. tier 가 보간 시작 **전에** 정착되므로 보간 중
+              // updateTierByCamera 가 동일 tier 반환 → no-op.
+              //
+              // cameraDistMeters 산식 — camera-controller.ts focusOn() 의 desiredRadius 와 정합:
+              //   desiredRadius = max(meshRadius × FOCUS_USER_RADIUS_MULTIPLIER,
+              //                       meshRadius + FOCUS_USER_RADIUS_MIN_PADDING)
+              //   metersPerSceneUnit = 1 / renderScaleForTier(currentTier)
+              //   cameraDistMeters = desiredRadius × metersPerSceneUnit
+              //
+              // 주의: meshRadius (boundingSphere.radiusWorld) 는 **현 tier** 의 scaling 이 적용된
+              // 상태값이므로 metersPerSceneUnit 도 **현 tier** 기준이어야 일관 (`tierFromFocus`
+              // 가 결정한 newTier 적용 전이라 같은 tier 의 식). 결정된 finalTier 가 다르면 setTier
+              // 가 즉시 mesh.scaling 과 origin 을 갱신하므로 다음 controller.focusOn 호출 시
+              // mesh.absolutePosition 은 새 tier 좌표계에서 정확.
+              mesh.computeWorldMatrix(true);
+              const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+              const desiredRadius = Math.max(
+                meshRadius * sceneApi.FOCUS_USER_RADIUS_MULTIPLIER,
+                meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+              );
+              const currentTier = solar.getTier();
+              const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(currentTier);
+              const cameraDistMeters = desiredRadius * metersPerSceneUnit;
+              solar.applyFocusTier(bodyId, cameraDistMeters);
+
               controller.focusOn({ mesh });
             }
           } else {
