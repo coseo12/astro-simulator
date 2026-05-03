@@ -1,0 +1,292 @@
+{
+  "timestamp": "2026-05-03T11:47:14.213Z",
+  "baseUrl": "http://localhost:3003",
+  "viewport": {
+    "width": 1280,
+    "height": 800,
+    "dpr": 1
+  },
+  "threshold": 0.1,
+  "cells": [
+    {
+      "cellId": "sun-observe",
+      "body": "sun",
+      "mode": "observe",
+      "tier": "solar",
+      "pass": false,
+      "max": 0.19820400144264497,
+      "total": 0.22362377921023735,
+      "residualCount": 2,
+      "worstId": "venus",
+      "camera": {
+        "radius": 25.304742683339025,
+        "fov": 0.8,
+        "posX": 1.4736322150255479e-15,
+        "posY": 7.819595527436868,
+        "posZ": -24.066240422161687
+      },
+      "residualBodies": [
+        {
+          "id": "mercury",
+          "coverageRatio": 0.025419777767592387,
+          "projectedDiameterPx": 18.205009602471574,
+          "dist": 27.296908434867646,
+          "inViewport": true,
+          "isEnabled": true
+        },
+        {
+          "id": "venus",
+          "coverageRatio": 0.19820400144264497,
+          "projectedDiameterPx": 50.83481491094438,
+          "dist": 27.712979241682472,
+          "inViewport": true,
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "cellId": "mercury-observe",
+      "body": "mercury",
+      "mode": "observe",
+      "tier": "inner",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 26.876198568148503,
+        "fov": 0.8,
+        "posX": -29.96990966796875,
+        "posY": -94.74232902617617,
+        "posZ": -31.227877535294805
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "venus-observe",
+      "body": "venus",
+      "mode": "observe",
+      "tier": "inner",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 76.19174652373938,
+        "fov": 0.8,
+        "posX": -165.48623657226562,
+        "posY": 16.009560395157905,
+        "posZ": -63.01344780605412
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "earth-observe",
+      "body": "earth",
+      "mode": "observe",
+      "tier": "body",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 1635.9883804594795,
+        "fov": 0.8,
+        "posX": 9.527246378363269e-14,
+        "posY": 505.54821216192636,
+        "posZ": -1555.9174098191427
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "jupiter-observe",
+      "body": "jupiter",
+      "mode": "observe",
+      "tier": "body",
+      "pass": true,
+      "max": 0.004510120066533104,
+      "total": 0.004510120066533104,
+      "residualCount": 1,
+      "worstId": "io",
+      "camera": {
+        "radius": 18337.65585402275,
+        "fov": 0.8,
+        "posX": 1.0679010157385247e-12,
+        "posY": 5666.6472958922695,
+        "posZ": -17440.147093546304
+      },
+      "residualBodies": [
+        {
+          "id": "io",
+          "coverageRatio": 0.004510120066533104,
+          "projectedDiameterPx": 7.66829990121582,
+          "dist": 20654.67108587578,
+          "inViewport": true,
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "cellId": "neptune-observe",
+      "body": "neptune",
+      "mode": "observe",
+      "tier": "body",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 6351.9514011220745,
+        "fov": 0.8,
+        "posX": 3.699085317762663e-13,
+        "posY": 1962.8609303904796,
+        "posZ": -6041.064771227279
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "sun-research",
+      "body": "sun",
+      "mode": "research",
+      "tier": "solar",
+      "pass": false,
+      "max": 0.19820505407550168,
+      "total": 0.22362478854196263,
+      "residualCount": 2,
+      "worstId": "venus",
+      "camera": {
+        "radius": 25.304742683339025,
+        "fov": 0.8,
+        "posX": 1.4736322150255479e-15,
+        "posY": 7.819595527436868,
+        "posZ": -24.066240422161687
+      },
+      "residualBodies": [
+        {
+          "id": "mercury",
+          "coverageRatio": 0.025419734466460963,
+          "projectedDiameterPx": 18.204994096870852,
+          "dist": 27.2969316842552,
+          "inViewport": true,
+          "isEnabled": true
+        },
+        {
+          "id": "venus",
+          "coverageRatio": 0.19820505407550168,
+          "projectedDiameterPx": 50.834949898949176,
+          "dist": 27.712905652158298,
+          "inViewport": true,
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "cellId": "mercury-research",
+      "body": "mercury",
+      "mode": "research",
+      "tier": "inner",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 26.876198568148503,
+        "fov": 0.8,
+        "posX": -29.96990966796875,
+        "posY": -94.74232902617617,
+        "posZ": -31.227877535294805
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "venus-research",
+      "body": "venus",
+      "mode": "research",
+      "tier": "inner",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 76.19174652373938,
+        "fov": 0.8,
+        "posX": -165.48623657226562,
+        "posY": 16.009560395157905,
+        "posZ": -63.01344780605412
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "earth-research",
+      "body": "earth",
+      "mode": "research",
+      "tier": "body",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 1635.9883804594795,
+        "fov": 0.8,
+        "posX": 9.527246378363269e-14,
+        "posY": 505.54821216192636,
+        "posZ": -1555.9174098191427
+      },
+      "residualBodies": []
+    },
+    {
+      "cellId": "jupiter-research",
+      "body": "jupiter",
+      "mode": "research",
+      "tier": "body",
+      "pass": true,
+      "max": 0.004710729322693518,
+      "total": 0.004710729322693518,
+      "residualCount": 1,
+      "worstId": "io",
+      "camera": {
+        "radius": 18337.65585402275,
+        "fov": 0.8,
+        "posX": 1.0679010157385247e-12,
+        "posY": 5666.6472958922695,
+        "posZ": -17440.147093546304
+      },
+      "residualBodies": [
+        {
+          "id": "io",
+          "coverageRatio": 0.004710729322693518,
+          "projectedDiameterPx": 7.83698675690702,
+          "dist": 20210.090582056302,
+          "inViewport": true,
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "cellId": "neptune-research",
+      "body": "neptune",
+      "mode": "research",
+      "tier": "body",
+      "pass": true,
+      "max": 0,
+      "total": 0,
+      "residualCount": 0,
+      "worstId": null,
+      "camera": {
+        "radius": 6351.9514011220745,
+        "fov": 0.8,
+        "posX": 3.699085317762663e-13,
+        "posY": 1962.8609303904796,
+        "posZ": -6041.064771227279
+      },
+      "residualBodies": []
+    }
+  ]
+}
