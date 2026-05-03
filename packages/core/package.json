@@ -24,6 +24,10 @@
       "types": "./dist/scene/index.d.ts",
       "import": "./dist/scene/index.js"
     },
+    "./scene/r-phase-allowlist": {
+      "types": "./dist/scene/r-phase-allowlist.d.ts",
+      "import": "./dist/scene/r-phase-allowlist.js"
+    },
     "./gpu": {
       "types": "./dist/gpu/index.d.ts",
       "import": "./dist/gpu/index.js"

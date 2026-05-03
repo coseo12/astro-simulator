@@ -5,32 +5,39 @@
  * NO-OP ADR `docs/decisions/20260503-397-residual-no-op.md` §결과·재검토 조건 §회귀 가드
  *
  * R-Phase v3 incremental build 정책 정합 — sun focus 화면의 mercury/venus 잔재는
- * R3 까지 구현된 visible body 의 자연 귀결로 expected. 그 외 10 cells 는 strict ≤ 0.1%.
+ * R3 까지 구현된 visible body 의 자연 귀결로 expected. 그 외 cells 는 strict ≤ 0.1%.
  *
  * 사용법:
- *   node apps/web/scripts/browser-verify-397-residual.mjs              # 12 cells 매트릭스 검증
+ *   node apps/web/scripts/browser-verify-397-residual.mjs              # N cells 매트릭스 검증
  *   node apps/web/scripts/browser-verify-397-residual.mjs --json       # JSON 결과만 (CI artifact)
  *
- * 검증 매트릭스: 6 body × 2 모드 = 12 cells
- *  - bodies: sun / mercury / venus / earth / jupiter / neptune
+ * 검증 매트릭스: **R-Phase allowlist body × 2 모드** (R3 시점 = 3 body × 2 모드 = 6 cells)
+ *  - bodies: `R_PHASE_BODY_ALLOWLIST` (현재 sun / mercury / venus)
  *  - modes:  observe / research
+ *
+ * **R-Phase 진입 시 본 매트릭스 자동 확장**:
+ *   `R_PHASE_BODY_ALLOWLIST` SSoT (`@astro-simulator/core/scene`) 를 import 하여 cells 도출.
+ *   R4 진입 시 'earth' 가 allowlist 에 추가되면 본 검증 매트릭스도 자동 8 cells 확장.
+ *   ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 4 "4곳 동시 박제" 절차의 단일 SSoT.
  *
  * R-Phase expected residual list (R3 시점 — R4+ 진입 시 갱신):
  *  - sun-observe  : { mercury, venus } expected (R2/R3 구현물)
  *  - sun-research : { mercury, venus } expected
- *  - 그 외 10 cells: expected = ∅, 모든 residual body coverageRatio ≤ 0.1%
+ *  - 그 외 cells: expected = ∅, 모든 residual body coverageRatio ≤ 0.1%
  *
  * 추가 허용 노이즈:
  *  - jupiter focus 시 io 자식 mesh 의 자연 visibility (R6 예정 갈릴레이 moon) — coverageRatio < 0.01%
+ *  - R6 진입 시 jupiter cell 의 expected residual list 갱신 의무
  *
  * 환경변수:
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
  */
 
 import { chromium } from 'playwright';
+import { R_PHASE_BODY_ALLOWLIST } from '@astro-simulator/core/scene/r-phase-allowlist';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
-const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'jupiter', 'neptune'];
+const FOCUS_BODIES = [...R_PHASE_BODY_ALLOWLIST];
 const MODES = ['observe', 'research'];
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };
 const POST_FOCUS_WAIT_MS = 3000;
@@ -215,7 +222,9 @@ async function main() {
   const cells = [];
   let allPass = true;
 
-  console.log('\n=== #397 12 cells residual matrix (R-Phase 정합) ===');
+  const totalCells = FOCUS_BODIES.length * MODES.length;
+  console.log(`\n=== #397 ${totalCells} cells residual matrix (R-Phase allowlist 정합) ===`);
+  console.log(`  R-Phase allowlist: [${FOCUS_BODIES.join(', ')}]`);
   console.log(
     `viewport: ${VIEWPORT.width}x${VIEWPORT.height}, baseUrl: ${BASE_URL}, threshold: ≤${RESIDUAL_THRESHOLD_PCT}% (noise floor: ${NOISE_THRESHOLD_PCT}%)`,
   );

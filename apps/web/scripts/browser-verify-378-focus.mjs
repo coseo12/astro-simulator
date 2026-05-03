@@ -6,13 +6,19 @@
  * cross-validate G3 수용 — "사용자 D-T2 재발견 비용 > CI 시간 비용" ROI 명백.
  *
  * 사용법:
- *   node apps/web/scripts/browser-verify-378-focus.mjs              # 12 cells 매트릭스 검증
+ *   node apps/web/scripts/browser-verify-378-focus.mjs              # N cells 매트릭스 검증
  *   node apps/web/scripts/browser-verify-378-focus.mjs --json       # JSON 결과만 (CI artifact)
  *   node apps/web/scripts/browser-verify-378-focus.mjs --update     # baseline 업데이트
  *
- * 검증 매트릭스: **6 body × 2 모드 = 12 cells**
- *  - bodies: sun / mercury / venus / earth / jupiter / neptune
+ * 검증 매트릭스: **R-Phase allowlist body × 2 모드** (R3 시점 = 3 body × 2 모드 = 6 cells)
+ *  - bodies: `R_PHASE_BODY_ALLOWLIST` (현재 sun / mercury / venus)
  *  - modes:  observe / research
+ *
+ * **R-Phase 진입 시 본 매트릭스 자동 확장**:
+ *   `R_PHASE_BODY_ALLOWLIST` SSoT (`@astro-simulator/core/scene`) 를 import 하여 cells 도출.
+ *   R4 진입 시 'earth' 가 allowlist 에 추가되면 본 검증 매트릭스도 자동 8 cells 확장.
+ *   R6 진입 시 'jupiter' 추가 → 10 cells, R10 'neptune' → 12 cells.
+ *   ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 4 "4곳 동시 박제" 절차의 단일 SSoT.
  *
  * 각 cell DoD:
  *  1) `camera.isInFrustum(focusMesh) === true` — focus 대상이 카메라 frustum 내부
@@ -34,6 +40,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { R_PHASE_BODY_ALLOWLIST } from '@astro-simulator/core/scene/r-phase-allowlist';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
@@ -45,8 +52,13 @@ const flags = {
   update: args.includes('--update'),
 };
 
-/** 12 cells 매트릭스 정의 — body × mode. */
-const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'jupiter', 'neptune'];
+/**
+ * 매트릭스 정의 — R-Phase allowlist body × mode.
+ *
+ * R-Phase 진입 시 갱신: `R_PHASE_BODY_ALLOWLIST` SSoT (packages/core/src/scene/r-phase-allowlist.ts) 만 변경하면
+ * 본 매트릭스 자동 확장 (ADR `20260504-r-phase-allowlist-guard.md` §결정 4 "4곳 동시 박제" 의 단일 SSoT).
+ */
+const FOCUS_BODIES = [...R_PHASE_BODY_ALLOWLIST];
 const MODES = ['observe', 'research'];
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };
@@ -217,7 +229,11 @@ async function setupPageWithFocus(browser, body, mode) {
 }
 
 async function run12CellMatrix(browser) {
-  console.log('\n=== #378 12 cells matrix (6 bodies × 2 modes) ===\n');
+  const totalCells = FOCUS_BODIES.length * MODES.length;
+  console.log(
+    `\n=== #378 ${totalCells} cells matrix (${FOCUS_BODIES.length} bodies × ${MODES.length} modes) — R-Phase allowlist 정합 ===\n`,
+  );
+  console.log(`  R-Phase allowlist: [${FOCUS_BODIES.join(', ')}]\n`);
   const cellResults = [];
   let allPass = true;
 

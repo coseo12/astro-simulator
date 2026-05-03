@@ -25,12 +25,12 @@ v3 reset (2026-04-25) 후 R-Phase incremental build (R1 sun + R2 mercury + R3 ve
 
 ### PM 합의 (라운드 1, 2026-05-03)
 
-| Q | 결정 | 의미 |
-| --- | --- | --- |
+| Q      | 결정                               | 의미                                                                                                              |
+| ------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **Q1** | (ii) R-Phase 진행에 따라 점진 활성 | sun/mercury/venus 활성, earth/jupiter/neptune disabled. R4 진입 시 earth 자동 활성, R6 시 jupiter, R10 시 neptune |
-| **Q5** | (C) defense-in-depth | UI + scene 둘 다 가드 (#378 옵션 D 패턴 일관) |
-| **Q6** | (b) Top 1 우선 | Top 2/3 (#403/#404) 후속 분리 |
-| **Q4** | (ii) 폐기 코드 별도 | #405 후속 |
+| **Q5** | (C) defense-in-depth               | UI + scene 둘 다 가드 (#378 옵션 D 패턴 일관)                                                                     |
+| **Q6** | (b) Top 1 우선                     | Top 2/3 (#403/#404) 후속 분리                                                                                     |
+| **Q4** | (ii) 폐기 코드 별도                | #405 후속                                                                                                         |
 
 본 ADR 은 **R-Phase allowlist SSoT + UI/scene 가드 패턴 + 진입 갱신 절차** 를 영구 정책으로 박제. 단발성 #402 fix 가 아닌 **R4~R10 진행 동안 적용될 정책**.
 
@@ -40,35 +40,35 @@ v3 reset (2026-04-25) 후 R-Phase incremental build (R1 sun + R2 mercury + R3 ve
 
 ### 축 1 — `R_PHASE_BODY_ALLOWLIST` SSoT 위치
 
-| 후보 | 장점 | 단점 | 비고 |
-|---|---|---|---|
-| **A. `packages/core/src/scene/r-phase-allowlist.ts`** | scene-level focusOn 가드가 직접 import 가능. defense-in-depth 의 scene 측면 단일 SSoT 보장. R-Phase 진입 시 단일 파일 수정 | web app UI 가드 (focus-quick-buttons.tsx) 도 동일 SSoT 참조 필요 — `@astro-simulator/core` 의 scene namespace 경유 가능 (이미 export됨) | **채택** |
-| B. `packages/shared/src/r-phase-allowlist.ts` | 단순 readonly 상수 + helper 만 — shared 가 적합. core / web 양쪽 import 부담 0 | shared 는 데이터/타입/이벤트 layer 인데 R-Phase 정책은 도메인 정책이라 layer 의미 약함 | 차선 |
-| C. `apps/web/src/constants/r-phase-allowlist.ts` | UI 가드 측면만 보면 가장 가까운 위치 | core 가 web 을 import 못 하므로 scene 가드는 별도 박제 필요 → defense-in-depth 위반 (Q5=(C) 실패) | 즉시 기각 |
+| 후보                                                  | 장점                                                                                                                       | 단점                                                                                                                                    | 비고      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **A. `packages/core/src/scene/r-phase-allowlist.ts`** | scene-level focusOn 가드가 직접 import 가능. defense-in-depth 의 scene 측면 단일 SSoT 보장. R-Phase 진입 시 단일 파일 수정 | web app UI 가드 (focus-quick-buttons.tsx) 도 동일 SSoT 참조 필요 — `@astro-simulator/core` 의 scene namespace 경유 가능 (이미 export됨) | **채택**  |
+| B. `packages/shared/src/r-phase-allowlist.ts`         | 단순 readonly 상수 + helper 만 — shared 가 적합. core / web 양쪽 import 부담 0                                             | shared 는 데이터/타입/이벤트 layer 인데 R-Phase 정책은 도메인 정책이라 layer 의미 약함                                                  | 차선      |
+| C. `apps/web/src/constants/r-phase-allowlist.ts`      | UI 가드 측면만 보면 가장 가까운 위치                                                                                       | core 가 web 을 import 못 하므로 scene 가드는 별도 박제 필요 → defense-in-depth 위반 (Q5=(C) 실패)                                       | 즉시 기각 |
 
 ### 축 2 — UI 가드 패턴 (FocusQuickButtons)
 
-| 후보 | 장점 | 단점 | 비고 |
-|---|---|---|---|
-| **A. HTML `disabled` + tooltip wrapper + opacity/cursor** | 표준 a11y. screen reader 가 disabled 인지. SSoT 단순 (단일 속성으로 비활성 박제) | tooltip 은 disabled 버튼에선 hover 안 잡힘 (브라우저 표준) — wrapper span (`<span title="...">` / radix-ui Tooltip) 필요 | **채택** |
-| B. `aria-disabled="true"` + onClick 무시 + tooltip | focus 가능 (a11y) + tooltip 정상 동작 (button 자체는 활성) | onClick 가드를 명시적으로 추가해야 함 (실수 시 동작). SSoT 가 두 곳 (aria-disabled + onClick guard) | 차선 |
-| C. 버튼 hide (display:none) | 단순 | Q1=(ii) "추가만 제거 없이" 정책 + v3 reset 메모리 박제 ("HUD + 4개 shortcut 구조 보존") 위배 | 즉시 기각 |
+| 후보                                                      | 장점                                                                             | 단점                                                                                                                     | 비고      |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------- |
+| **A. HTML `disabled` + tooltip wrapper + opacity/cursor** | 표준 a11y. screen reader 가 disabled 인지. SSoT 단순 (단일 속성으로 비활성 박제) | tooltip 은 disabled 버튼에선 hover 안 잡힘 (브라우저 표준) — wrapper span (`<span title="...">` / radix-ui Tooltip) 필요 | **채택**  |
+| B. `aria-disabled="true"` + onClick 무시 + tooltip        | focus 가능 (a11y) + tooltip 정상 동작 (button 자체는 활성)                       | onClick 가드를 명시적으로 추가해야 함 (실수 시 동작). SSoT 가 두 곳 (aria-disabled + onClick guard)                      | 차선      |
+| C. 버튼 hide (display:none)                               | 단순                                                                             | Q1=(ii) "추가만 제거 없이" 정책 + v3 reset 메모리 박제 ("HUD + 4개 shortcut 구조 보존") 위배                             | 즉시 기각 |
 
 ### 축 3 — Scene 가드 패턴 (focusOn handler)
 
-| 후보 | 장점 | 단점 | 비고 |
-|---|---|---|---|
-| **A. `simulation-core.ts` `case 'focusOn'` emit 차단** | store/scene/UI 동기화 단일 진실원이 event — emit 차단 시 store/scene/UI 자동 0 변화. core-adapter / sim-canvas subscribe / url-sync 모두 영향 없음 (다 event 소비자). URL `?focus=earth` 도 동일 가드 통과 | silent ignore — UI 강제 클릭 시 사용자 피드백 0. but DoD-2 의 UI 가드가 1차 선언적 피드백 담당 — scene 은 마지막 방어선 | **채택** |
-| B. `sim-canvas.tsx` subscribe 분기에서 검증 | scene 측면만 영향. core 변경 없음 | store 의 selectedBodyId 는 이미 변경됨 → store 와 scene 가 desync. ADR `20260425-r1-store-scene-sync-unification.md` §결정 1 의 "event 단일 진실원" 위배 | 즉시 기각 |
-| C. emit 차단 + subscribe 이중 가드 | 강한 방어 | 단일 SSoT 원칙 위배. 후보 A 의 emit 차단만으로 store/scene/UI 자동 0 변화 → 이중 가드 불필요 | 기각 |
+| 후보                                                   | 장점                                                                                                                                                                                                       | 단점                                                                                                                                                     | 비고      |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **A. `simulation-core.ts` `case 'focusOn'` emit 차단** | store/scene/UI 동기화 단일 진실원이 event — emit 차단 시 store/scene/UI 자동 0 변화. core-adapter / sim-canvas subscribe / url-sync 모두 영향 없음 (다 event 소비자). URL `?focus=earth` 도 동일 가드 통과 | silent ignore — UI 강제 클릭 시 사용자 피드백 0. but DoD-2 의 UI 가드가 1차 선언적 피드백 담당 — scene 은 마지막 방어선                                  | **채택**  |
+| B. `sim-canvas.tsx` subscribe 분기에서 검증            | scene 측면만 영향. core 변경 없음                                                                                                                                                                          | store 의 selectedBodyId 는 이미 변경됨 → store 와 scene 가 desync. ADR `20260425-r1-store-scene-sync-unification.md` §결정 1 의 "event 단일 진실원" 위배 | 즉시 기각 |
+| C. emit 차단 + subscribe 이중 가드                     | 강한 방어                                                                                                                                                                                                  | 단일 SSoT 원칙 위배. 후보 A 의 emit 차단만으로 store/scene/UI 자동 0 변화 → 이중 가드 불필요                                                             | 기각      |
 
 ### 축 4 — R-Phase 진입 갱신 절차 (Q1=(ii) 핵심)
 
-| 후보 | 장점 | 단점 | 비고 |
-|---|---|---|---|
-| A. ADR 신규 (R4/R6/R10 ADR) 만 | 단순 | ADR 갱신 누락 시 `R_PHASE_BODY_ALLOWLIST` 와 BODY_SCALE / scene 박제 drift 가능 (volt #69 패턴) | 단일 박제 부족 |
-| **B. ADR + allowlist + 회귀 가드 expected list + CHANGELOG (4곳 동시)** | drift 방지. R-Phase 진입 PR 의 reviewer 체크리스트로 강제 | 4곳 박제 부담 — but BODY_SCALE 도 동일 패턴 (R1 ADR §Concrete Prediction "R2 추가 시 1줄") 검증 정착됨 | **채택** |
-| C. 자동화 (ADR hook 으로 allowlist 자동 추출) | drift 0 | 본 sprint scope 밖. 자동화 인프라 비용 > drift 방지 ROI (4곳 박제는 R4/R6/R10 3회) | 후속 인프라 이슈로 분리 |
+| 후보                                                                    | 장점                                                      | 단점                                                                                                   | 비고                    |
+| ----------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------- |
+| A. ADR 신규 (R4/R6/R10 ADR) 만                                          | 단순                                                      | ADR 갱신 누락 시 `R_PHASE_BODY_ALLOWLIST` 와 BODY_SCALE / scene 박제 drift 가능 (volt #69 패턴)        | 단일 박제 부족          |
+| **B. ADR + allowlist + 회귀 가드 expected list + CHANGELOG (4곳 동시)** | drift 방지. R-Phase 진입 PR 의 reviewer 체크리스트로 강제 | 4곳 박제 부담 — but BODY_SCALE 도 동일 패턴 (R1 ADR §Concrete Prediction "R2 추가 시 1줄") 검증 정착됨 | **채택**                |
+| C. 자동화 (ADR hook 으로 allowlist 자동 추출)                           | drift 0                                                   | 본 sprint scope 밖. 자동화 인프라 비용 > drift 방지 ROI (4곳 박제는 R4/R6/R10 3회)                     | 후속 인프라 이슈로 분리 |
 
 ---
 
@@ -86,10 +86,24 @@ v3 reset (2026-04-25) 후 R-Phase incremental build (R1 sun + R2 mercury + R3 ve
    - 근거: ADR `20260425-r1-store-scene-sync-unification.md` §결정 1 의 "event 단일 진실원" 정책 일관. emit 차단 시 store/scene/UI 자동 0 변화 (DoD-3 의 "selectedBodyId 변화 0 / camera radius 변화 0" 자동 충족). URL `?focus=earth` 진입도 url-sync.tsx 의 `sendCommand({type:'focusOn'})` 가 simulation-core 통과 → 동일 가드 (URL 직접 진입도 차단 = 추가 회귀 보호).
 
 4. **R-Phase 진입 갱신 절차** (영구 정책, 4곳 동시 박제 — 축 4 후보 B):
-   - **R4 진입 (지구)** → `R_PHASE_BODY_ALLOWLIST` 에 `'earth'` 추가 + R4 ADR §결정 N 에 본 ADR §결정 4 cross-link + `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` expected list 갱신 + CHANGELOG `### Behavior Changes`
+   - **R4 진입 (지구)** → `R_PHASE_BODY_ALLOWLIST` 에 `'earth'` 추가 + R4 ADR §결정 N 에 본 ADR §결정 4 cross-link + 회귀 가드 expected list 갱신 (아래 매트릭스) + CHANGELOG `### Behavior Changes`
    - **R6 진입 (목성)** → `'jupiter'` 동일 절차
    - **R10 진입 (해왕성)** → `'neptune'` 동일 절차
    - **R5/R7/R8/R9/R11+** (mars/saturn/uranus/pluto/moon 등) → 각 R-Phase ADR 에 동일 절차 명시 + 본 ADR §결정 4 가 SSoT 참조
+
+   **회귀 가드 갱신 매트릭스** (R-Phase 진입 시 자동 / 수동 갱신 대상):
+
+   | 가드 파일                                                  | 갱신 방식                                                                                                                 | 영향                                                                               |
+   | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+   | `apps/web/scripts/browser-verify-r-phase-allowlist.mjs`    | 수동 (`EXPECTED_ENABLED` / `EXPECTED_DISABLED` 갱신)                                                                      | UI/Scene 가드 정합성 — 신규 활성 body 가 enabled 인지 검증                         |
+   | `apps/web/scripts/browser-verify-378-focus.mjs`            | **자동** (`R_PHASE_BODY_ALLOWLIST` import)                                                                                | focus 회귀 가드 매트릭스 자동 확장 (3 body × 2 모드 → 4 → 5 → 6 cells)             |
+   | `apps/web/scripts/browser-verify-379-lod.mjs` 시나리오 B   | **자동** (`R_PHASE_BODY_ALLOWLIST` import, sun 제외)                                                                      | T3 focus high LOD 보장 매트릭스 자동 확장                                          |
+   | `apps/web/scripts/browser-verify-397-residual.mjs`         | **자동** (`R_PHASE_BODY_ALLOWLIST` import) + 수동 (`R_PHASE_EXPECTED` 갱신 — sun/jupiter focus 의 expected residual list) | residual 매트릭스 자동 확장 + R6 jupiter 진입 시 io 등 갈릴레이 moon expected 박제 |
+   | 코드 SSoT (`packages/core/src/scene/r-phase-allowlist.ts`) | **수동**                                                                                                                  | body id 추가 (1줄)                                                                 |
+   | ADR (해당 R-Phase ADR §결정 N)                             | 수동                                                                                                                      | 본 ADR cross-link                                                                  |
+   | CHANGELOG `### Behavior Changes`                           | 수동                                                                                                                      | "R4 진입 — 'earth' R-Phase allowlist 추가" 박제                                    |
+
+   **단일 SSoT 의 가치**: R4~R10 진입 시 `R_PHASE_BODY_ALLOWLIST` 1줄 변경만으로 378/379B/397 가드 매트릭스가 **자동 확장**. `verify:r-phase-allowlist` 의 `EXPECTED_ENABLED`/`EXPECTED_DISABLED` + `verify:397-residual` 의 `R_PHASE_EXPECTED` 만 수동 갱신 (정책 의미 영역이라 자동화 부적). cross-validate 권고 + qa #407 라운드 1 BLOCK 후 보강 (2026-05-03).
 
 ### 초기 박제값
 
@@ -160,17 +174,21 @@ cross-validate 1회 (2026-05-04, anchor=ADR 신규, outcome=applied — `.claude
 **Claude 편향 4종 셀프 체크 통과**: 낙관적 일정 N/A / 결합 간과 통과 (defense-in-depth UI+scene 결합 명시) / 폐기 프레이밍 통과 (Accepted, 외부 조건부 경계 없음) / 순수주의 통과 (shared 도 차선으로 인정).
 
 #### 합의 (Claude 설계와 일치 — Gemini 양호 평가)
+
 - 구조적 완성도, 기술 결정 타당성, 인터페이스 명확성, 확장성, 강건성(심층 방어) 측면 모두 "매우 우수~우수"
 - SSoT 위치 (core/scene), UI HTML disabled, scene emit 차단, 4곳 동시 박제 절차 전부 양호
 - `BODY_SCALE` venus 누락 발견 (Concrete Prediction B) — 설계 깊이의 증거로 평가
 
 #### 이견 수용
+
 - 없음. Gemini 가 결정 4축 모두 합의
 
 #### Claude 재분석으로 기각한 Gemini 제안
+
 - 없음. Gemini 가 결정에 대한 반대 의견 없이 보완 제안만 제시
 
 #### 고유 발견 (현재 ADR 에 즉시 반영)
+
 1. **PR 템플릿 R-Phase 진입 체크리스트 추가** (Gemini 제안):
    - "reviewer 체크리스트로 강제" 를 넘어 GitHub PR 템플릿에 4곳 박제 항목 명문화
    - 범위 체크: 본 ADR §결과·재검토 조건 1 (자동화 ROI 임계) 의 **경량화 버전** — 본 ADR 본문 권고로 즉시 박제 가능 (PR 템플릿 실제 도입은 R4 진입 PR 또는 별도 인프라 이슈로 분리)
@@ -180,6 +198,7 @@ cross-validate 1회 (2026-05-04, anchor=ADR 신규, outcome=applied — `.claude
    - 범위 체크: 본 ADR §관련 ADR / §참고 에서 #403/#404 cross-link 이미 명시됨. 후속 이슈 생성 시 본문 박제 의무 — 본 ADR §비-범위 보강
 
 #### 고유 발견 (후속 분리)
+
 - 없음. Gemini 제안 모두 본 ADR 범위 내 박제로 충분
 
 ### 결정 4 보강 (cross-validate 반영)
@@ -188,13 +207,36 @@ cross-validate 1회 (2026-05-04, anchor=ADR 신규, outcome=applied — `.claude
 
 ```markdown
 ### R-Phase 진입 체크리스트 (해당 PR 만)
-- [ ] `packages/core/src/scene/r-phase-allowlist.ts` body id 추가
-- [ ] `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` expected list 갱신
+
+- [ ] `packages/core/src/scene/r-phase-allowlist.ts` body id 추가 (단일 SSoT)
+- [ ] `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` `EXPECTED_ENABLED` / `EXPECTED_DISABLED` 갱신
+- [ ] `apps/web/scripts/browser-verify-397-residual.mjs` `R_PHASE_EXPECTED` 갱신 (sun/jupiter focus 등 expected residual)
+- [ ] `verify:378-focus` / `verify:379-lod` / `verify:397-residual` 매트릭스 모두 PASS 자동 확장 확인
 - [ ] `CHANGELOG.md` `### Behavior Changes` 박제
 - [ ] 본 R-Phase ADR 에 `20260504-r-phase-allowlist-guard.md` cross-link
 ```
 
 근거: Gemini cross-validate 권고. 실수 방지 강화 — 본 ADR §결과·재검토 조건 1 (자동화 ROI) 의 경량 선행 단계.
+
+### Amendment 2026-05-03 (qa #407 라운드 1 BLOCK 후 보강)
+
+qa 동적 검증 (PR #407 코멘트) 4건 BLOCK 발견:
+
+- B1: `verify:378-focus` 6/12 FAIL (earth/jupiter/neptune focus cell 의 DoD-3 FAIL)
+- B2: `verify:379-lod` 시나리오 B FAIL (focusTargets=`['earth','mars']` 둘 다 R-Phase 가드 차단)
+- B3: `verify:397-residual` 6/12 FAIL (earth/jupiter/neptune focus cell + sun/mercury/venus 의 unexpected residual)
+- B4 (메타): 본 ADR §결정 4 "4곳 동시 박제" 가 자기 자신만 박제, 기존 378/379/397 가드 갱신 의무 누락
+
+**근본 원인**: 본 PR 박제 시점에 `simulation-core.ts focusOn` 가드가 earth/jupiter/neptune/mars 차단을 추가했으나, 기존 회귀 가드 3개 (`verify:378-focus`, `verify:379-lod` 시나리오 B, `verify:397-residual`) 의 매트릭스 가정 (6 body 모두 focus 가능) 과 충돌.
+
+**해소 (PR #407 보강 커밋, 2026-05-03)**:
+
+1. **단일 SSoT import 적용** (옵션 A.5) — 3 verify 스크립트가 `R_PHASE_BODY_ALLOWLIST` 를 `@astro-simulator/core/scene` 에서 import. R4 진입 시 allowlist 1줄 변경만으로 378/379B/397 매트릭스 자동 확장 (수동 갱신 0 건).
+2. §결정 4 본문에 **회귀 가드 갱신 매트릭스** 추가 — 7개 박제 위치 + 자동/수동 구분 + 영향 명시.
+3. 헤더 주석 — 3 verify 파일 모두 "R-Phase 진입 시 본 SSoT 자동 확장" 명시.
+4. CHANGELOG `### Behavior Changes` — R-Phase 정합 갱신 사실 박제.
+
+**volt 교훈 활용**: volt #69 ("숨은 상수 변형") — 본 보강은 "박제 시점에 하나의 SSoT 만 변경하면 위성 모듈 N 개가 자동 따라옴" 패턴의 강화. 단일 SSoT 가 grep 만으로 drift 검출 가능.
 
 ## 비-범위
 

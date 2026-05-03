@@ -13,7 +13,9 @@
  * 검증 매트릭스:
  *  - 시나리오 A: T1 default (모바일 3 viewport × DPR 1/2 + 데스크톱 2 viewport × DPR 1/2 = 10 cell)
  *      → DoD: sun=high 100%, billboard fallback 비율 ≤ 95% (sub-pixel asteroid 제외)
- *  - 시나리오 B: T3 body focus (지구 / 화성 focus 진입) → focus body=high 보장
+ *  - 시나리오 B: T3 body focus (R-Phase allowlist body 중 비-sun) → focus body=high 보장
+ *      → R-Phase 진입 시 본 시나리오 대상이 자동 확장 (R3 시점 mercury/venus, R4 진입 시 + earth)
+ *      → ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 4 "4곳 동시 박제" 단일 SSoT
  *  - 시나리오 C: asteroid belt sub-pixel scenario (T1 solar 뷰에서 asteroid low billboard 유지)
  *
  * dev 빌드 의존: `window.__solarScene.getLodInfo()` (#388 dev overlay API).
@@ -27,6 +29,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { R_PHASE_BODY_ALLOWLIST } from '@astro-simulator/core/scene/r-phase-allowlist';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
@@ -181,8 +184,12 @@ async function runScenarioA(browser) {
 
 /** 시나리오 B — T3 body focus 진입 시 focus body 가 high LOD 인지 검증. */
 async function runScenarioB(browser) {
-  console.log('\n=== 시나리오 B — T3 body focus high 보장 ===');
-  const focusTargets = ['earth', 'mars'];
+  console.log('\n=== 시나리오 B — T3 body focus high 보장 (R-Phase allowlist 정합) ===');
+  // R-Phase allowlist 중 sun 제외 (sun 은 T1 유지 — focus 시 T3 진입 안 함).
+  // R3 시점 = ['mercury', 'venus']. R4 진입 시 'earth' 자동 추가 (allowlist SSoT 변경만).
+  // ADR `20260504-r-phase-allowlist-guard.md` §결정 4 "4곳 동시 박제" 단일 SSoT.
+  const focusTargets = R_PHASE_BODY_ALLOWLIST.filter((id) => id !== 'sun');
+  console.log(`  focus targets: [${focusTargets.join(', ')}]`);
   const cellResults = [];
   let allPass = true;
 
