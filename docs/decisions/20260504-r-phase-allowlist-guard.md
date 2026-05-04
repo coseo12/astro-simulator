@@ -517,6 +517,52 @@ cross-validate 1회 (2026-05-04, anchor=ADR Amendment, outcome=applied — `.cla
 | 라운드 2 초안 (Amendment 첫 push)   | 변경 0                           | `export *` 추가          | 없음                       | namespace 경유 (`sceneApi.X`)                                  | ❌ 500    | namespace chain 평가 trigger (PR #414 실측 발견) |
 | **라운드 2 정정 (PR #414 채택)**    | **변경 0**                       | **회피 주석**            | **named export 박제**      | **named import (`import { X } from '@astro-simulator/core'`)** | **✓ 200** | chain 평가 0                                     |
 
+#### 라운드 2 정정 cross-validate (2026-05-04, anchor=ADR Amendment 라운드 2 정정, outcome=applied)
+
+cross-validate 1회 (`/Users/seo/project/space/.claude/logs/cross-validate-architecture-20260504-164109.log`).
+
+**Claude 편향 4종 셀프 체크 통과**: (a) 낙관적 일정 N/A — 정정은 PR #414 실측 발견 후속 / (b) 결합 간과 통과 — D1 + D2 + D4 결합 명시 + SSR 평가 컨텍스트 매트릭스 박제 / (c) 폐기 프레이밍 통과 — 라운드 2 초안 (namespace re-export) 명시 폐기 박제 / (d) 순수주의 통과 — Gemini Q3 응답 반영해 화이트리스트 스코프 좁힘 (WASM 도메인 한정 vs 모든 sub-path 금지) 보존.
+
+##### 합의 (Gemini 평가, Claude 설계와 일치)
+
+- **총평 "매우 뛰어난 수준의 ADR"** — 실패로부터의 학습 / 구체적 예측 / 방어적 설계 / 자동화 회귀 방지 / 프로세스화 5축 모두 양호
+- **항목별**: 구조적 완성도 매우 우수 / 기술 결정 타당성 매우 우수 / 인터페이스 명확성 우수 / 확장성 우수 / 보안 양호 / 누락 요소 매우 우수
+- "SSR 평가 컨텍스트 매트릭스" Gemini 가 "이 문제에 대한 완벽한 이해" 로 평가 — 라운드 2 정정의 핵심 산출물 정합성 확인
+- WASM 의존 도메인 한정 화이트리스트 (스코프 좁힘) 가 "확장성을 고려한 좋은 선택" — D2 보강 정합성 확인
+- `Object.freeze` 불변성 / Defense-in-depth UI+scene / 자동화 hook 모두 양호 평가
+
+##### 이견 수용
+
+- 없음. Gemini 가 라운드 2 정정 결정에 대한 반대 의견 없이 보완 제안만 제시
+
+##### Claude 재분석으로 기각한 Gemini 제안
+
+- 없음. Gemini 모든 제안이 합리적
+
+##### 고유 발견 (즉시 반영)
+
+- **본 cross-validate 결과 박제 자체** — 본 §라운드 2 정정 cross-validate 섹션이 즉시 반영 항목
+
+##### 고유 발견 (후속 분리)
+
+1. **린트 규칙 커스터마이징** (Gemini 항목 3 인터페이스 명확성 개선 제안):
+   - `apps/web` 에서 `import { scene as sceneApi } from '@astro-simulator/core'` 후 `sceneApi.isRPhaseFocusable` 접근 시 린트 에러
+   - 현재 `verify-core-exports-immutable.sh` + `grep` 기반 검증으로 **차선책 충분** (Gemini 명시)
+   - 범위 체크: 본 ADR §결정 D1/D2 의 휴먼 가드 강화는 D2 자동화 hook + reviewer 체크리스트 + Concrete Prediction D 로 이미 3중 방어. 린트 규칙은 4중 방어로 ROI medium
+   - **후속 인프라 이슈 분리** — 우선순위 medium (현재 SSR 200 회복 + 12/12 회귀 가드 + verify 스크립트 정착 후 검토)
+2. **`BODY_SCALE` venus 누락 (#412) cross-link 의무 강조** (Gemini 항목 6 누락 요소 개선 제안 1):
+   - Concrete Prediction B 가 발견한 `BODY_SCALE` drift 의 후속 이슈 #412 가 본 ADR 머지 시 명시적으로 생성·링크되도록 박제 강조
+   - 범위 체크: 이미 §참고 / 비-범위 섹션에 #412 분리 명시. 추가 박제 불필요
+   - **현재 ADR 박제 충분** (Gemini 권고 보존을 위해 §참고에 #412 명시 박제 확인)
+3. **`--target bundler` 마이그레이션 추적용 이슈** (Gemini 항목 6 누락 요소 개선 제안 2):
+   - 재검토 조건 5 트리거 발현 전이라도 별도 추적용 이슈 미리 생성
+   - 범위 체크: 본 ADR §재검토 조건 5 + Edge Runtime 제약 박제로 미래 readers 가 트리거 즉시 인지 가능. 현재 미발현 단계에서 추적용 이슈 생성은 ROI low
+   - **본 ADR 박제로 충분** (트리거 발현 시 즉시 분리)
+4. **지식 전파 — 기술 블로그/내부 위키** (Gemini 항목 6 누락 요소 개선 제안 3):
+   - Turbopack + WASM + SSR 조합 ADR 의 요약본
+   - 범위 체크: harness 외 전파 — 별도 인프라 / 운영 이슈
+   - **후속 분리** — 우선순위 low
+
 ---
 
 ### 라운드 2 Developer 인수인계 (라운드 2 정정 반영 — PR #414 채택 패턴)
