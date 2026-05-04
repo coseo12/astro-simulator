@@ -96,10 +96,14 @@ if [ "${#violations[@]}" -gt 0 ]; then
   echo "근거: ADR docs/decisions/20260504-r-phase-allowlist-guard.md §Amendment 결정 D1" >&2
   echo "      turbopack \\\${__dirname} SSR 500 회귀 (라운드 1 PR #407 closed)" >&2
   echo "" >&2
-  echo "해결책:" >&2
+  echo "해결책 (ADR §Amendment 2026-05-04 §결정 D1 라운드 2 정정):" >&2
   echo "  1. sub-path entry 제거" >&2
-  echo "  2. SSoT 는 \\\`packages/core/src/\\\${domain}/index.ts\\\` 의 \\\`export *\\\` re-export 통해 노출" >&2
-  echo "  3. apps/web 에서 namespace 경유 import (예: \\\`import { scene as sceneApi } from '@astro-simulator/core'\\\`)" >&2
+  echo "  2. SSoT 는 \\\`packages/core/src/<도메인>/<파일>.ts\\\` 에 박제 + \\\`packages/core/src/index.ts\\\` 에 named export 직접 박제" >&2
+  echo "     (예: \\\`export { isRPhaseFocusable, R_PHASE_BODY_ALLOWLIST } from './scene/r-phase-allowlist.js'\\\`)" >&2
+  echo "  3. \\\`packages/core/src/<도메인>/index.ts\\\` 에서는 의도적으로 re-export 회피 (turbopack chain evaluation 차단)" >&2
+  echo "  4. apps/web 에서 named import 직접 사용 (namespace 경유 금지)" >&2
+  echo "     (예: \\\`import { isRPhaseFocusable } from '@astro-simulator/core'\\\`)" >&2
+  echo "  사유: namespace 경유 (\\\`import { scene as sceneApi } from ...\\\`) 도 turbopack 이 \\\`scene/index.ts\\\` re-export chain 을 평가 → solar-system-scene → nbody-engine → physics_wasm.js \\\${__dirname} ENOENT 로 SSR 500 재발현 (PR #414 실측)" >&2
   exit 1
 fi
 
