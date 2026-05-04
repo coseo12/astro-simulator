@@ -6,13 +6,16 @@
  * cross-validate G3 수용 — "사용자 D-T2 재발견 비용 > CI 시간 비용" ROI 명백.
  *
  * 사용법:
- *   node apps/web/scripts/browser-verify-378-focus.mjs              # 12 cells 매트릭스 검증
+ *   node apps/web/scripts/browser-verify-378-focus.mjs              # R-Phase 매트릭스 검증
  *   node apps/web/scripts/browser-verify-378-focus.mjs --json       # JSON 결과만 (CI artifact)
  *   node apps/web/scripts/browser-verify-378-focus.mjs --update     # baseline 업데이트
  *
- * 검증 매트릭스: **6 body × 2 모드 = 12 cells**
- *  - bodies: sun / mercury / venus / earth / jupiter / neptune
+ * 검증 매트릭스: **R-Phase allowlist body × 2 모드 = 6 cells (R3 시점)**
+ *  - bodies: sun / mercury / venus (R-Phase R3 진입 완료, ADR `20260504-r-phase-allowlist-guard.md`)
  *  - modes:  observe / research
+ *
+ * R-Phase 진입 시 갱신 의무 — `R_PHASE_BODY_ALLOWLIST` 와 본 매트릭스를 동시 갱신.
+ * R4 (earth) / R6 (jupiter) / R10 (neptune) 진입 시 동기화 (#424 forensic 박제).
  *
  * 각 cell DoD:
  *  1) `camera.isInFrustum(focusMesh) === true` — focus 대상이 카메라 frustum 내부
@@ -45,8 +48,19 @@ const flags = {
   update: args.includes('--update'),
 };
 
-/** 12 cells 매트릭스 정의 — body × mode. */
-const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'jupiter', 'neptune'];
+/**
+ * R-Phase 매트릭스 정의 — body × mode.
+ *
+ * **SSoT 동기화 의무**: `packages/core/src/scene/r-phase-allowlist.ts` 의
+ * `R_PHASE_BODY_ALLOWLIST` 와 일치해야 한다. R4 (earth) / R6 (jupiter) /
+ * R10 (neptune) 진입 시 두 위치를 동시에 갱신한다.
+ *
+ * 회귀 이력 (#424 forensic): PR #414 (#402 라운드 2) 머지로 simulation-core
+ * focusOn 가드가 R-Phase 외 body 의 카메라 동기화를 차단 → 본 매트릭스의
+ * earth/jupiter/neptune cells 가 의도하지 않게 FAIL. ci.yml verify:378-focus
+ * step 4 commit 잠복 (#414 → #417 → #421 → #422 → #423 빈 commit push 로 재발견).
+ */
+const FOCUS_BODIES = ['sun', 'mercury', 'venus'];
 const MODES = ['observe', 'research'];
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };
@@ -217,7 +231,9 @@ async function setupPageWithFocus(browser, body, mode) {
 }
 
 async function run12CellMatrix(browser) {
-  console.log('\n=== #378 12 cells matrix (6 bodies × 2 modes) ===\n');
+  console.log(
+    `\n=== #378 ${FOCUS_BODIES.length * MODES.length} cells matrix (${FOCUS_BODIES.length} R-Phase bodies × ${MODES.length} modes) ===\n`,
+  );
   const cellResults = [];
   let allPass = true;
 
