@@ -142,9 +142,9 @@ gh workflow run r1-baseline-bootstrap.yml --ref develop
 ```bash
 pnpm build && pnpm --filter @astro-simulator/web start -p 3001 &
 BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs --update
-git status # shortcut-bar 3 PNG 만 modified 확인
-git add apps/web/scripts/__baselines__/r1/{1280x720,1920x1080,375x667}/shortcut-bar.png
-git commit -m "..."  # 부모 ADR Amendment v4 §결정 2 §4 의 commit 메시지 템플릿 적용
+git status # 6장 (shortcut-bar 3 + top-nav 3) modified + hud × 6 변경 0 확인
+git add apps/web/scripts/__baselines__/r1/{1280x720,1920x1080,375x667}/{shortcut-bar,top-nav}.png
+git commit -m "..."  # 부모 ADR Amendment v4 §결정 2 §4 의 commit 메시지 템플릿 적용 (6장 갱신 패턴 SSoT)
 ```
 
 **옵션 C (탈락)** — macOS 로컬에서 `SKIP_LOCAL=` 환경변수 비활성 후 `--update` 실행. **금지** — Linux baseline 정책 (Amendment 1 §결정 1) 위반. macOS 폰트로 캡처하면 다음 CI Linux PR check 에서 **즉시 회귀 재발생**.

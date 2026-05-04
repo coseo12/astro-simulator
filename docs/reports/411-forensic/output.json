@@ -119,7 +119,7 @@
   "fix_decision": {
     "chosen_option": "(d) baseline 재캡처 (ADR Amendment v4 §결정 2 절차 재현)",
     "rationale": "회귀가 의도된 UI 변경 (venus 신규 + disabled 시각화 모두 #369 R3 / #402 라운드 2 에서 박제된 의도된 변경) 이며 코드 변경 0 이 정합. baseline 재캡처가 정확한 fix 방향. ADR §축 6 후보 B + Amendment v4 결정 1~3 정책 그대로 적용",
-    "scope": "shortcut-bar baseline 3 viewport 갱신 (1280x720 / 1920x1080 / 375x667). 다른 9 PNG (top-nav / hud-top-right / hud-bottom-right × 3 viewport) 변경 0 의무 (Concrete Prediction)",
+    "scope": "6장 동시 갱신 (shortcut-bar 3 + top-nav 3) — 부모 ADR Amendment v4 §결과·재검토 조건 §'정정 후 (R3~R10 SSoT)' 6장 갱신 패턴 SSoT 일관. shortcut-bar 3 viewport (의도된 변경 — venus 신규 + R-Phase disabled 시각화) + top-nav 3 viewport (DOM nesting 부수효과). 다른 6 PNG (hud-top-right / hud-bottom-right × 3 viewport) 변경 0 의무 (Concrete Prediction). cross-validate Gemini critical flaw 정정 반영 — 원안 'shortcut-bar 3장만' 은 forensic 매트릭스 자체의 top-nav 81 픽셀 mismatch (0.132%/0.088%/0.433% 임계 흡수 PASS, 그러나 --update 는 임계 무관 절대 스냅샷) 와 자기모순",
     "execution_path": "workflow_dispatch — .github/workflows/r1-baseline-bootstrap.yml 트리거 후 자동 PR 생성 또는 developer 가 Linux 환경에서 --update 실행 후 commit 분리. 본 architect 결정에서는 후자 권고 (wd 트리거 인프라 부담 회피, R3 시점 PR #361 패턴 재사용)"
   },
   "non_scope": [
@@ -131,16 +131,16 @@
     "macOS SKIP_LOCAL 가드 동작 — 별도 이슈 (qa worktree 측정값이 SSoT 아니라는 점만 박제, 가드 자체는 동작 정상 추정)"
   ],
   "developer_handoff": {
-    "primary_action": "shortcut-bar baseline 3장 재캡처 (CI Linux 환경 또는 동등 환경)",
+    "primary_action": "6장 baseline 재캡처 (shortcut-bar 3 + top-nav 3, CI Linux 환경 또는 동등 환경)",
     "execution_options": [
       "옵션 A — workflow_dispatch: gh workflow run r1-baseline-bootstrap.yml. 자동 생성 PR 머지",
       "옵션 B — developer Linux 로컬: BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs --update + commit 분리"
     ],
     "verification_required": [
-      "git show <baseline-commit> --stat — shortcut-bar 3 PNG 만 변경됐는지 확인",
-      "다른 9 PNG (top-nav / hud-top-right / hud-bottom-right × 3 viewport) 변경 0 확인",
+      "git show <baseline-commit> --stat — 6 PNG (shortcut-bar 3 + top-nav 3) 변경됐는지 확인 (부모 ADR Amendment v4 6장 갱신 패턴 SSoT 일관)",
+      "다른 6 PNG (hud-top-right / hud-bottom-right × 3 viewport) 변경 0 확인 — top-bar 와 별도 영역이라 nesting 부수효과 없음",
       "baseline 갱신 후 `pnpm verify:r1-guard` PASS 확인 (CI Linux 또는 BASE_URL 매개변수)"
     ],
-    "commit_message_template": "chore(r1-guard): [#411] shortcut-bar baseline 갱신 — venus 신규 + R-Phase disabled 시각화\n\nADR Amendment v4 §결정 2 절차 재적용:\n- shortcut-bar baseline 3 viewport 갱신 (5 buttons 활성 → 6 buttons + earth/jupiter/neptune disabled 시각화)\n- 다른 3 영역 (top-nav / hud-top-right / hud-bottom-right) 변경 0\n- mismatch 사유: 의도된 UI 변경 (R3 #369 venus 진입 + #402 라운드 2 disabled UI)\n\nADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment v4\nForensic: docs/decisions/20260504-411-r1-guard-shortcut-bar-forensic.md\nRefs: #411 (회귀), #369 (R3 venus), #402 (R-Phase allowlist 라운드 2 — PR #414)"
+    "commit_message_template": "chore(r1-guard): [#411] 6장 baseline 갱신 (shortcut-bar 3 + top-nav 3) — venus 신규 + R-Phase disabled 시각화\n\nADR Amendment v4 §결정 2 5단계 절차 + §결과·재검토 조건 6장 갱신 패턴 SSoT (R3~R10) 재적용:\n- shortcut-bar 3 viewport (의도된 UI 변경 — 5 buttons 활성 → 6 buttons + earth/jupiter/neptune disabled 시각화)\n- top-nav 3 viewport (DOM nesting 부수효과 — <header data-r1-region=\"top-nav\"> 의 child <div data-r1-region=\"shortcut-bar\">)\n- 다른 6 PNG (hud-top-right / hud-bottom-right × 3 viewport) 변경 0 의무\n- mismatch 사유: 의도된 UI 변경 (R3 #369 venus 진입 + #402 라운드 2 disabled UI)\n\nADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment v4\nForensic: docs/decisions/20260504-411-r1-guard-shortcut-bar-forensic.md\n자매 6장 갱신 패턴 사례: PR #361 (bebd741)\nRefs: #411 (회귀), #369 (R3 venus), #402 (R-Phase allowlist 라운드 2 — PR #414)"
   }
 }
