@@ -3,7 +3,7 @@
 - **상태**: Accepted
 - **날짜**: 2026-05-04
 - **결정자**: architect (#402 PM 합의 라운드 1, 2026-05-03 후 위임)
-- **관련**: #402 (본 이슈 — Top 1 FocusQuickButtons), #403 (Top 2 CelestialTree+InfoPanel 후속), #404 (Top 3 ScenarioPresets 후속), #405 (폐기 코드 정리 후속), `20260425-r1-store-scene-sync-unification.md` (event 단일 진실원 — 본 ADR §결정 3 근거), `20260425-r1-sun-visualization.md` (R-Phase incremental build SSoT), `20260428-r2-mercury-visualization.md` (R-Phase ADR 패턴 SSoT), `20260503-378-focus-frustum-fix.md` (defense-in-depth 옵션 D 패턴 인용), `20260503-397-residual-no-op.md` (R-Phase 정합 종료 조건 → 본 이슈에서 expected list 자동화)
+- **관련**: #402 (본 이슈 — Top 1 FocusQuickButtons), #403 (Top 2 CelestialTree+InfoPanel 후속), #404 (Top 3 ScenarioPresets 후속), #405 (폐기 코드 정리 후속), #415 (store mutation 측면 3번째 방어선 — `20260504-415-url-sync-guard.md`), `20260425-r1-store-scene-sync-unification.md` (event 단일 진실원 — 본 ADR §결정 3 근거), `20260425-r1-sun-visualization.md` (R-Phase incremental build SSoT), `20260428-r2-mercury-visualization.md` (R-Phase ADR 패턴 SSoT), `20260503-378-focus-frustum-fix.md` (defense-in-depth 옵션 D 패턴 인용), `20260503-397-residual-no-op.md` (R-Phase 정합 종료 조건 → 본 이슈에서 expected list 자동화)
 - **교훈 적용**: "신규 함수 ≠ 신규 구현" (volt [#21](https://github.com/coseo12/volt/issues/21) — `R_PHASE_BODY_ALLOWLIST` 박제 전 grep 결과 0 확인), "숨은 상수 변형" (volt [#69](https://github.com/coseo12/volt/issues/69) — 4곳 동시 박제 의무로 drift 방지), "DoD PASS ≠ 제품 동작" (volt [#74](https://github.com/coseo12/volt/issues/74) — 본 이슈 자체가 정량 매트릭스 PASS 아래 UX 회귀 잔존의 후속), "PM DoD 구조 drift" (volt [#76](https://github.com/coseo12/volt/issues/76) — 본 ADR 의 4곳 박제 절차는 PM DoD 의 영구 정책 버전), "Explore 미결정 시 debug 실측" (volt [#67](https://github.com/coseo12/volt/issues/67) — 본 ADR 은 정적 분석으로 결정 충분), "단계 게이트" (volt [#77](https://github.com/coseo12/volt/issues/77) — architect 후 reviewer/qa 게이트 의무), "헤드리스 ≠ 실 브라우저" (volt [#78](https://github.com/coseo12/volt/issues/78) — DoD-5 사용자 D-T2 실 Chrome 권고)
 
 ---
@@ -90,6 +90,7 @@ v3 reset (2026-04-25) 후 R-Phase incremental build (R1 sun + R2 mercury + R3 ve
    - **R6 진입 (목성)** → `'jupiter'` 동일 절차
    - **R10 진입 (해왕성)** → `'neptune'` 동일 절차
    - **R5/R7/R8/R9/R11+** (mars/saturn/uranus/pluto/moon 등) → 각 R-Phase ADR 에 동일 절차 명시 + 본 ADR §결정 4 가 SSoT 참조
+   - **외부 진입점 가드 의무** (#415 add-on, `20260504-415-url-sync-guard.md` §결정 1·5): URL 파라미터 / deep link / programmatic command 등 store action 직접 호출 진입점 신설 시 `isRPhaseFocusable` 가드 통합 의무 + 회귀 가드 mjs 시나리오 4 매트릭스 갱신
 
 ### 초기 박제값
 

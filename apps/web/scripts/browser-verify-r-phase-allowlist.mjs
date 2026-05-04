@@ -3,11 +3,16 @@
  * #402 R-Phase Body Focus Allowlist 회귀 가드.
  *
  * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 4 (DoD-4 회귀 가드 + CI 통합).
+ * #415 Amendment — `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (시나리오 4 매트릭스).
  *
  * 검증 매트릭스:
  *   1. allowlist 박제 body (sun / mercury / venus): shortcut 버튼 활성 (disabled 아님)
  *   2. allowlist 외 body (earth / jupiter / neptune): shortcut 버튼 disabled / aria-disabled / data-r-phase-disabled
  *   3. 강제 click 시뮬레이션 — disabled 버튼 click 후 selectedBodyId 변화 0 / camera radius 변화 0
+ *   4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선):
+ *      - 4-A 차단: ?focus=earth / jupiter / neptune → selectedBodyId === null + camera radius 변화 0
+ *      - 4-B 정상: ?focus=sun / mercury / venus → selectedBodyId === <body> (R1 #329 / R2 #361 / R3 #369 회귀 보호)
+ *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
  *   - R4 (earth) 진입 시 RPHASE_EXPECTED_ENABLED 에 'earth' 이동
@@ -192,6 +197,71 @@ async function verifyEnabledClickWorks(page) {
   return results;
 }
 
+/**
+ * #415 — URL 직접 진입 매트릭스 (store mutation 측면 가드, 3번째 방어선).
+ *
+ * ADR `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (DoD-2).
+ *
+ * 각 body 마다 새 페이지로 `?focus=<body>` 진입 후:
+ *   - allowlist 외 (earth / jupiter / neptune): selectedBodyId === null (url-sync 가드 작동)
+ *   - allowlist 박제 (sun / mercury / venus): selectedBodyId === <body> (정상 회귀 보호)
+ *   - invalid: selectedBodyId === null (기존 R1 가드 회귀 보호)
+ *
+ * 매 case 마다 새 page 생성 — initialized.current useRef 를 우회하기 위해.
+ */
+async function verifyUrlDirectEntry(browser) {
+  const cases = [
+    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동.
+    { focus: 'earth', expected: null, label: '4-A 차단' },
+    { focus: 'jupiter', expected: null, label: '4-A 차단' },
+    { focus: 'neptune', expected: null, label: '4-A 차단' },
+    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호).
+    { focus: 'sun', expected: 'sun', label: '4-B 정상' },
+    { focus: 'mercury', expected: 'mercury', label: '4-B 정상' },
+    { focus: 'venus', expected: 'venus', label: '4-B 정상' },
+    // 4-C 무효 — 기존 R1 가드 회귀 보호.
+    { focus: 'invalid-body-id', expected: null, label: '4-C 무효' },
+  ];
+
+  const results = [];
+
+  for (const c of cases) {
+    const context = await browser.newContext({
+      viewport: VIEWPORT,
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+
+    const url = `${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}focus=${encodeURIComponent(c.focus)}`;
+
+    try {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
+      await page.waitForFunction(
+        () =>
+          typeof window.__simStore !== 'undefined' &&
+          typeof window.__solarScene !== 'undefined' &&
+          typeof window.__simCore !== 'undefined',
+        { timeout: 30_000 },
+      );
+      // url-sync useEffect 발화 + 가드 통과 시 store mutation propagation 대기.
+      await page.waitForTimeout(POST_INIT_WAIT_MS);
+
+      const selectedBodyId = await page.evaluate(
+        () => window.__simStore?.getState?.()?.selectedBodyId ?? null,
+      );
+
+      const pass = selectedBodyId === c.expected;
+      results.push({ ...c, selectedBodyId, pass });
+    } catch (err) {
+      results.push({ ...c, selectedBodyId: 'ERROR', pass: false, error: String(err) });
+    } finally {
+      await context.close();
+    }
+  }
+
+  return results;
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true });
   let allPass = true;
@@ -233,6 +303,18 @@ async function main() {
     }
 
     await context.close();
+
+    // 4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선)
+    console.log('\n4) URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선)\n');
+    const urlEntryResults = await verifyUrlDirectEntry(browser);
+    for (const r of urlEntryResults) {
+      const status = r.pass ? 'PASS' : 'FAIL';
+      const expectedStr = r.expected === null ? 'null' : r.expected;
+      console.log(
+        `   ${r.label}  ?focus=${r.focus.padEnd(18)} → selectedBodyId=${String(r.selectedBodyId).padEnd(10)} (expected=${expectedStr})  ${status}`,
+      );
+      if (!r.pass) allPass = false;
+    }
   } finally {
     await browser.close();
   }

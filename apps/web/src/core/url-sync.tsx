@@ -1,6 +1,10 @@
 'use client';
 
-import { ephemeris as ephemerisApi } from '@astro-simulator/core';
+import {
+  ephemeris as ephemerisApi,
+  isRPhaseFocusable,
+  R_PHASE_BODY_ALLOWLIST,
+} from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
@@ -68,18 +72,36 @@ export function UrlSync() {
     }
     // R1 #329 — `?focus=<bodyId>` 허용 body id 검증.
     // 미정의 id (예: `?focus=invalid`) 는 무시 + dev 경고 (CRITICAL #2 모호한 입력 방어).
+    //
+    // #415 — R-Phase allowlist 가드 (defense-in-depth store mutation 측면, 3번째 방어선).
+    // ADR: docs/decisions/20260504-415-url-sync-guard.md §결정 1 (옵션 B).
+    // #402 부모 ADR §결정 2 (UI) + §결정 3 (scene) 와 직교 — url-sync 의 store 직접 mutation 우회 차단.
     if (urlFocus) {
       const validIds = new Set(ephemerisApi.getSolarSystem().bodies.map((b) => b.id));
-      if (validIds.has(urlFocus)) {
+      if (!validIds.has(urlFocus)) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
+          );
+        }
+      } else if (!isRPhaseFocusable(urlFocus)) {
+        // R-Phase 미진입 body — store mutation 우회 차단.
+        // sendCommand({type:'focusOn'}) 와 setSelectedBody 둘 다 skip
+        // (PR #414 simulation-core focusOn 가드는 그대로 작동하지만 1차 방어선으로 url-sync 에서 차단).
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[url-sync] ?focus=${urlFocus} 는 R-Phase 미진입 body — 무시. ` +
+              `R_PHASE_BODY_ALLOWLIST: ${R_PHASE_BODY_ALLOWLIST.join(', ')}.`,
+          );
+        }
+      } else {
         // 카메라 focus + store selectedBodyId sync (info-panel 표시 트리거).
-        // shortcut 버튼 클릭 경로는 controller.focusOn 후 'bodySelected' event 가 emit 되지만,
-        // URL 직접 진입 시 그 event 가 발생하지 않아 selectedBodyId 가 set 되지 않는 기존 동작 보강.
+        // line 77 (sendCommand) + line 78 (setSelectedBody) 둘 다 보존:
+        //   - sendCommand({type:'focusOn'}) → simulation-core focusOn → emit 'bodySelected' → core-adapter → setSelectedBody 자동
+        //   - setSelectedBody(urlFocus) 는 race condition fallback (sim-canvas mount 전 useSimCommand no-op 시 보호)
+        // race condition 자체 해결은 후속 이슈 #419 (재검토 조건 1).
         sendCommand({ type: 'focusOn', bodyId: urlFocus });
         setSelectedBody(urlFocus);
-      } else if (process.env.NODE_ENV !== 'production') {
-        console.warn(
-          `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
-        );
       }
     }
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
