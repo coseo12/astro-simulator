@@ -76,11 +76,15 @@ describe('SimulationCore store-scene sync (R1 #334+#335)', () => {
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
-    core.command({ type: 'focusOn', bodyId: 'earth' });
+    // #402 라운드 2 — 'earth' 는 R-Phase allowlist 외 (ADR `20260504-r-phase-allowlist-guard.md`)
+    // 이므로 focusOn 시 emit 차단. 본 테스트는 store-sync 경로 검증이 목적이므로
+    // allowlist 박제 body ('mercury') 로 교체. allowlist 가드 자체는
+    // simulation-core-r-phase-allowlist-guard.test.ts 가 별도 검증.
+    core.command({ type: 'focusOn', bodyId: 'mercury' });
     core.command({ type: 'resetCamera' });
 
     expect(onBodySelected).toHaveBeenCalledTimes(2);
-    expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'earth' });
+    expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'mercury' });
     expect(onBodySelected).toHaveBeenNthCalledWith(2, { id: null });
 
     core.dispose();
