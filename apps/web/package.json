@@ -15,7 +15,8 @@
     "verify:379-lod": "node scripts/browser-verify-379-lod.mjs",
     "verify:378-focus": "node scripts/browser-verify-378-focus.mjs",
     "verify:397-residual": "node scripts/browser-verify-397-residual.mjs",
-    "verify:focus-transition": "node scripts/browser-verify-focus-transition.mjs"
+    "verify:focus-transition": "node scripts/browser-verify-focus-transition.mjs",
+    "verify:r-phase-allowlist": "node scripts/browser-verify-r-phase-allowlist.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",

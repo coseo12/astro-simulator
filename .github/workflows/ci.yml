@@ -156,6 +156,38 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # ============================================================
+      # #402 R-Phase Allowlist 자동화 hook — exports field WASM 도메인 sub-path 금지
+      # ============================================================
+      # ADR: docs/decisions/20260504-r-phase-allowlist-guard.md §Amendment 결정 D2
+      # 라운드 1 회귀 (PR #407, turbopack ${__dirname} SSR 500) 직접 가드.
+      # jq 로 packages/core/package.json exports field 검사. WASM 의존 도메인 sub-path 추가 시 차단.
+
+      - name: '#402 core exports immutable 가드 (verify-core-exports-immutable.sh)'
+        if: hashFiles('scripts/verify-core-exports-immutable.sh') != '' && hashFiles('packages/core/package.json') != ''
+        run: bash scripts/verify-core-exports-immutable.sh
+
+      # ============================================================
+      # #402 R-Phase Allowlist 회귀 가드 — UI disabled + scene-level 강제 click 차단
+      # ============================================================
+      # ADR: docs/decisions/20260504-r-phase-allowlist-guard.md §결정 4 (DoD-4)
+      # 매트릭스: 박제 body (sun/mercury/venus) 활성 + 미박제 body (earth/jupiter/neptune) disabled
+      # + 강제 click 시 store/camera 변화 0 (defense-in-depth scene 측면)
+
+      - name: '#402 R-Phase allowlist 회귀 가드 (verify:r-phase-allowlist)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3004 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3004/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3004/ko node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
