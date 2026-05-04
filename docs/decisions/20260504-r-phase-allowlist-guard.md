@@ -221,20 +221,29 @@ cross-validate 1회 (2026-05-04, anchor=ADR 신규, outcome=applied — `.claude
 - Builds on: #378 (focus fix, MERGED), #397 (NO-OP 재평가)
 - 이슈: [#402](https://github.com/coseo12/astro-simulator/issues/402)
 - 후속 이슈 (예정): #403 (Top 2), #404 (Top 3), #405 (폐기 코드)
+- 라운드별 PR 추적 (라운드 2 정정 시 보강):
+  - 라운드 1 ADR 박제: PR #406 (merged `3c90844`)
+  - 라운드 1 sprint 폐기: PR #407 (closed `3eed4e0` — turbopack `__dirname` SSR 500 회귀)
+  - **라운드 2 ADR Amendment**: [PR #413](https://github.com/coseo12/astro-simulator/pull/413) (head `fix/402-r-phase-allowlist-guard-round2`, 본 ADR Amendment + 라운드 2 정정 본 박제)
+  - **라운드 2 developer 코드 구현**: [PR #414](https://github.com/coseo12/astro-simulator/pull/414) (head `fix/402-r-phase-allowlist-guard-round2-impl`, commit `d6eb2c5`, 514/515 단위 + 12/12 회귀 가드 + SSR 200 PASS — 라운드 2 정정 발견)
 - 코드 SSoT:
   - `apps/web/src/components/layout/focus-quick-buttons.tsx` (UI 가드 박제 대상)
   - `packages/core/src/scene/r-phase-allowlist.ts` (SSoT 신규)
+  - `packages/core/src/scene/index.ts` (re-export 의도적 회피 — 라운드 2 정정)
+  - `packages/core/src/index.ts` (named export 직접 박제 — 라운드 2 정정)
   - `packages/core/src/engine/simulation-core.ts:201` (focusOn handler 가드 박제 대상)
   - `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` (회귀 가드 신규)
-- volt 교훈: [#21](https://github.com/coseo12/volt/issues/21), [#67](https://github.com/coseo12/volt/issues/67), [#69](https://github.com/coseo12/volt/issues/69), [#74](https://github.com/coseo12/volt/issues/74), [#76](https://github.com/coseo12/volt/issues/76), [#77](https://github.com/coseo12/volt/issues/77), [#78](https://github.com/coseo12/volt/issues/78)
+  - `scripts/verify-core-exports-immutable.sh` (D2 자동화 — WASM-safe 화이트리스트 SSoT)
+- volt 교훈: [#21](https://github.com/coseo12/volt/issues/21), [#67](https://github.com/coseo12/volt/issues/67), [#69](https://github.com/coseo12/volt/issues/69), [#70](https://github.com/coseo12/volt/issues/70) (monorepo dist stale), [#74](https://github.com/coseo12/volt/issues/74), [#76](https://github.com/coseo12/volt/issues/76), [#77](https://github.com/coseo12/volt/issues/77) (헤드리스 ≠ 실 Chrome / 단계 게이트), [#78](https://github.com/coseo12/volt/issues/78), [#79](https://github.com/coseo12/volt/issues/79)
 
 ---
 
 ## Amendment 2026-05-04 — Turbopack `__dirname` SSR 500 회귀 + wasm-safe 패턴 박제 (라운드 2)
 
-> **상태**: 라운드 1 §결정 1/4 갱신 — sub-path export 폐기, namespace re-export 강제. §결정 2/3 보존.
+> **상태**: 라운드 1 §결정 1/4 갱신 — sub-path export 폐기, **named export 직접 박제** (core/src/index.ts) + scene/index.ts re-export 의도적 회피. §결정 2/3 보존. 라운드 2 정정 (2026-05-04, PR #414 실측 발견 반영).
 > **트리거**: PR #407 (라운드 1 sprint, closed `3eed4e0`) 머지 직전 사용자 D-T2 (2026-05-04) 보고.
 > **사용자 D-T2 인용**: "다시 포커스 시 이상현상이 재발했어" / "금성 클릭시 허공에 포커스됨 또한 한번에 포커스가 자연스럽게 되지 않고 반복되듯 줌하는 현상"
+> **라운드 2 정정 사유 (2026-05-04, PR #414)**: 본 Amendment 초안의 "namespace re-export 강제" 패턴 (`sceneApi.isRPhaseFocusable`) 도 SSR 500 동일 발현 확인. 원인은 turbopack 이 namespace 경유 시 `packages/core/src/scene/index.ts` re-export chain → `solar-system-scene.ts` → `nbody-engine.ts` → `physics_wasm.js:367` (`${__dirname}`) evaluation 까지 trigger 하기 때문. **D1 정정**: namespace re-export 폐기 → `core/src/index.ts` named export 직접 박제 + `scene/index.ts` 의도적 회피로 교체. SSR 200 회복 확인 (PR #414 실측).
 
 ### 회귀 메커니즘 박제 (forensic)
 
@@ -274,6 +283,43 @@ physics engine 미초기화 → mesh.position 미갱신 →
 
 **핵심 발견**: turbopack 의 module dep graph 가 새 sub-path entry point 를 추가하면서 chunking boundary 를 새로 긋고, 이 과정에서 가상 파일 시스템(VFS) 의 `__dirname` 해석이 꼬인다. 기존 `./scene` entry 안에 편승하면 graph 영향 0.
 
+#### 라운드 2 정정 발견 — namespace re-export 도 SSR 평가 trigger (PR #414 실측)
+
+본 Amendment 초안 (PR #413 첫 push) 은 "sub-path export 폐기 + `scene/index.ts` re-export + namespace 경유 (`sceneApi.isRPhaseFocusable`)" 패턴을 제시했으나, **PR #414 실측 결과 동일 SSR 500 발현**.
+
+**메커니즘 (실측)**:
+
+```
+apps/web/src/components/layout/focus-quick-buttons.tsx (app-shell 직접 import — SSR 평가 대상)
+        ↓ import { scene as sceneApi } from '@astro-simulator/core'
+turbopack module resolver
+        ↓ namespace 경유 시 scene namespace 의 모든 re-export 평가 강제
+packages/core/src/scene/index.ts (re-export chain)
+        ↓ export * from './r-phase-allowlist.js'
+        ↓ export * from './solar-system-scene.js'   ← 함께 평가
+solar-system-scene.ts
+        ↓ import { ... } from '../engine/nbody-engine.js'
+nbody-engine.ts
+        ↓ import physics_wasm
+physics_wasm.js:367
+        ↓ const wasmPath = `${__dirname}/physics_wasm_bg.wasm`
+SSR runtime ENOENT → HTTP 500
+```
+
+**대조 관찰** (왜 sim-canvas 는 동일 import 를 해도 안 깨지나):
+
+- `apps/web/src/components/sim-canvas.dynamic.tsx` 는 `next/dynamic({ ssr: false })` 로 sim-canvas 본체 평가를 클라이언트로 미룸 → SSR 시 `solar-system-scene.ts` 평가 0
+- `focus-quick-buttons.tsx` 는 app-shell 에서 직접 import → SSR 평가 대상 → namespace 경유 시 chain 폭발
+- 즉, namespace 경유는 **SSR 평가 컨텍스트** 에 따라 trigger 여부가 달라진다. dev 서버에서만 발현하는 것이 아니라, "SSR 평가 대상 컴포넌트" 가 namespace 경유 시 즉시 발현
+
+**미래 회피 패턴 (PR #414 채택)**:
+
+1. `packages/core/src/scene/index.ts` 에서 `r-phase-allowlist.ts` re-export **의도적 회피** — chain 평가 trigger 차단 (회귀 메커니즘 주석 박제 의무)
+2. `packages/core/src/index.ts` 에 **named export 직접 박제** (`R_PHASE_BODY_ALLOWLIST` / `isRPhaseFocusable` / `RPhaseBodyId`) — module graph 영향 최소
+3. `apps/web` 호출 측: `import { isRPhaseFocusable } from '@astro-simulator/core'` named import (namespace 금지)
+
+이 패턴은 라운드 2 정정 (D1 갱신) 으로 박제. 라운드 2 초안의 "namespace re-export" 는 **폐기**.
+
 #### 시도하고 실패한 fix
 
 | 시도                                                                                                   | 결과     | 메커니즘                                                                                      |
@@ -303,13 +349,20 @@ physics engine 미초기화 → mesh.position 미갱신 →
 
 ### 결정 (라운드 2)
 
-#### 결정 D1 — 라운드 1 §결정 1 갱신 (SSoT 위치 보존 + sub-path export 폐기)
+#### 결정 D1 — 라운드 1 §결정 1 갱신 (SSoT 위치 보존 + sub-path export 폐기 + named export 직접 박제)
+
+> **라운드 2 정정 (2026-05-04, PR #414)**: 본 D1 초안의 "namespace re-export" 패턴이 SSR 500 동일 발현으로 **폐기**. 아래는 PR #414 실측 PASS 패턴.
 
 - SSoT 위치: `packages/core/src/scene/r-phase-allowlist.ts` (라운드 1 와 동일)
-- **`packages/core/package.json` exports field 에 `./scene/r-phase-allowlist` sub-path 추가 금지**
-- **`packages/core/src/scene/index.ts`** 에 `export * from './r-phase-allowlist.js'` 만 추가 → `apps/web` 은 기존 `scene as sceneApi` namespace 경유 import (`sceneApi.isRPhaseFocusable`)
-- `packages/core/src/engine/simulation-core.ts` 는 같은 패키지 내부이므로 직접 relative import (`'../scene/r-phase-allowlist.js'`)
-- **근거**: turbopack chunking boundary 가 `./scene` entry 안에서만 결정 → `__dirname` resolve 영향 0
+- **`packages/core/package.json` exports field 에 `./scene/r-phase-allowlist` sub-path 추가 금지** (라운드 2 보존)
+- **`packages/core/src/scene/index.ts` 에서 `r-phase-allowlist.ts` re-export 의도적 회피** ⚠️ — `solar-system-scene.ts` 등 동일 namespace 의 다른 re-export chain 이 namespace 경유 시 함께 평가되어 `physics_wasm.js:367` `${__dirname}` evaluation 을 trigger 함. 회귀 메커니즘 주석 박제 의무 (`scene/index.ts` 에 "왜 re-export 하지 않는가" 명시)
+- **`packages/core/src/index.ts` 에 named export 직접 박제** — `R_PHASE_BODY_ALLOWLIST` / `isRPhaseFocusable` / `RPhaseBodyId` 3종을 main entry 에 직접 박제. 별도 namespace 평가 trigger 없음
+- `apps/web` 호출 측: **named import 만 허용** (`import { isRPhaseFocusable } from '@astro-simulator/core'`). namespace 경유 (`import { scene as sceneApi } from '@astro-simulator/core'` → `sceneApi.isRPhaseFocusable`) **금지** — namespace 도 chain 평가 trigger
+- `packages/core/src/engine/simulation-core.ts` 는 같은 패키지 내부이므로 직접 relative import (`'../scene/r-phase-allowlist.js'`) — 라운드 1 와 동일
+- **근거**:
+  - turbopack chunking boundary 가 `./scene` entry 안에서만 결정 → sub-path 미추가 → `__dirname` resolve 영향 0 (라운드 2 보존)
+  - **추가 발견 (라운드 2 정정)**: namespace 경유 (`scene` namespace) 도 turbopack 이 chain 평가 → `solar-system-scene.ts` 평가 → `nbody-engine.ts` import 평가 → `physics_wasm.js:367` evaluation trigger. **회피책**: main entry (`core/src/index.ts`) 에서 named export 직접 박제 시 chain 평가 0 (단일 symbol 만 export, scene namespace 평가 없음)
+  - sim-canvas 는 `sim-canvas.dynamic.tsx` 의 `next/dynamic({ssr:false})` 로 SSR 평가 회피하지만 **focus-quick-buttons 는 app-shell 직접 import → SSR 평가 대상**. SSR 평가 대상 컴포넌트가 namespace 경유 시 즉시 chain 폭발 → named import 만 안전
 
 #### 결정 D2 — 라운드 1 §결정 4 보강 (5번째 동시 박제 항목 + 자동화 hook)
 
@@ -317,13 +370,20 @@ physics engine 미초기화 → mesh.position 미갱신 →
 
 5. **wasm-safe 패턴 검증 항목**:
    - `packages/core/package.json` exports field 에 **WASM 의존 도메인 (scene / physics / render / gpu) 의 새 sub-path entry 추가 금지** (turbopack `__dirname` SSR 회귀)
-   - 신규 SSoT 는 기존 namespace 의 `index.ts` 에 `export * from` 으로 추가 후 web 에서 namespace 경유
+   - **WASM-safe 화이트리스트** (PR #414 의 `verify-core-exports-immutable.sh` SSoT): `. / ./coords / ./physics / ./scene / ./gpu / ./ephemeris` — 이 목록 외 entry 추가 시 자동 차단
+   - **순수 데이터 도메인은 자유** (Gemini cross-validate Q3 권고 — 스코프 좁힘): coords / ephemeris / time / utils 등 WASM 미사용 도메인은 sub-path export 자유 (단, 화이트리스트 갱신 동반 PR 필요)
+   - **신규 SSoT 의 web 측 import 경로 규칙** (라운드 2 정정 반영):
+     - **명시적 named export 우선** — `core/src/index.ts` 에 직접 박제, web 에서 named import (`import { X } from '@astro-simulator/core'`)
+     - namespace 경유 (`import { scene as sceneApi }` → `sceneApi.X`) **금지** — SSR 평가 대상 컴포넌트에서 chain 평가 trigger
+     - `scene/index.ts` 등 namespace barrel 에 신규 SSoT re-export 추가 시 회귀 메커니즘 주석 의무 (왜 회피하는지 SSoT)
    - 새 namespace 도입 시 (예: `coords` 처럼 WASM 미사용 도메인이 아닌 신규 카테고리) `next.config.mjs` 의 webpack/turbopack 양쪽 호환성 사전 검증 필수 (`curl http://localhost:3000/ko` HTTP 200 + 콘솔 에러 0)
 
-**자동화 hook (Gemini cross-validate 권고 — Q5 응답)**:
+**자동화 hook (Gemini cross-validate 권고 — Q5 응답, PR #414 실측 박제)**:
 
-- `apps/web/scripts/verify-core-exports-immutable.sh` (또는 `scripts/`) 신설 — `jq` 로 `packages/core/package.json` exports field 의 entry 개수 / WASM 도메인 entry 추가 여부 검사
-- CI `detect-and-test` 또는 `verify:exports-immutable` script 통합
+- `scripts/verify-core-exports-immutable.sh` 신설 — `jq` 로 `packages/core/package.json` exports field 의 entry 검사
+- 화이트리스트 SSoT: `. / ./coords / ./physics / ./scene / ./gpu / ./ephemeris` (스크립트 본문에 박제, 변경 시 동반 PR + ADR amendment 의무)
+- WASM 도메인 (scene/physics/render/gpu) sub-path 추가 시 exit 1
+- CI `detect-and-test` step 통합 (PR #414 의 `.github/workflows/ci.yml` 참조)
 - 휴먼 누락 (reviewer 체크리스트만으로는 불충분 — Gemini 명시 권고) 가드
 - ROI: 30분 작성 비용 vs 무한 회귀 방지
 
@@ -338,17 +398,40 @@ physics engine 미초기화 → mesh.position 미갱신 →
 
 #### 결정 D4 — turbopack 회귀 메커니즘 ADR 박제 (미래 회피용)
 
-본 §회귀 메커니즘 박제 섹션 자체가 D4 — 미래 동일 패턴 회피용 SSoT. 다음 패턴 발견 시 본 ADR Amendment cross-link:
+본 §회귀 메커니즘 박제 섹션 + §라운드 2 정정 발견 섹션 자체가 D4 — 미래 동일 패턴 회피용 SSoT. 다음 3자 결합 패턴 발견 시 본 ADR Amendment cross-link 의무:
+
+**3자 결합 trigger 패턴**:
 
 - wasm-pack `--target nodejs` 출력 + Next.js SSR 환경
 - `${__dirname}` 또는 `require('fs').readFileSync` 패턴이 monorepo workspace package 안에 있음
-- turbopack module dep graph 변경 (sub-path export / barrel file refactor / new namespace)
+- turbopack module dep graph 변경 — 다음 중 하나:
+  - sub-path export 추가 (라운드 1 발견)
+  - **namespace re-export 경유 (`scene as sceneApi.X` 또는 `scene/index.ts` 의 새 re-export)** — 라운드 2 정정 발견. SSR 평가 대상 컴포넌트가 namespace 경유 시 chain 평가 폭발
+  - barrel file refactor (`index.ts` 의 `export *` 추가)
+  - 새 namespace 도입
 
-### Concrete Prediction (라운드 2)
+**미래 회피 패턴 (PR #414 채택)**:
 
-- **A. import 경로 변경량**: `apps/web/src/components/layout/focus-quick-buttons.tsx` 1곳 + `packages/core/src/engine/simulation-core.ts` 1곳 + `packages/core/src/scene/index.ts` re-export 1줄. 합 3곳 / ~5줄. 미달 시 SSoT drift 의심
-- **B. SSR 200 검증 통과**: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ko` → `200`. 500 시 회귀 직접 발현 (라운드 1 mechanism 재현)
-- **C. exports field 변경량**: `packages/core/package.json` 변경 0줄. 1줄이라도 추가되면 자동화 hook 가 차단 (D2 자동화)
+- WASM-safe 도메인 SSoT 는 `core/src/index.ts` 에 named export 직접 박제
+- namespace barrel (`scene/index.ts` 등) 에 SSoT 추가 회피 (회피 사유 주석 박제 의무)
+- web 호출 측은 named import 만 허용, namespace 경유 금지
+- `verify-core-exports-immutable.sh` 자동 가드로 휴먼 누락 차단
+
+**SSR 평가 컨텍스트 매트릭스** (라운드 2 정정 발견):
+
+| import 패턴                                                    | 호출 컴포넌트 SSR 평가 대상                    | 결과                                                     |
+| -------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------- |
+| sub-path (`@astro-simulator/core/scene/r-phase-allowlist`)     | 임의                                           | SSR 500 (라운드 1 발현)                                  |
+| namespace 경유 (`scene as sceneApi.X`)                         | SSR 평가 대상 (예: app-shell 직접 import)      | SSR 500 (라운드 2 정정 발현)                             |
+| namespace 경유                                                 | `next/dynamic({ssr:false})` 로 클라이언트 미룸 | SSR 200 (예: sim-canvas — 단, R-Phase guard 박제 부적합) |
+| **named import (`import { X } from '@astro-simulator/core'`)** | 임의                                           | **SSR 200** (PR #414 채택 패턴)                          |
+
+### Concrete Prediction (라운드 2 — 정정 후)
+
+- **A. import 경로 변경량 (라운드 2 정정 반영)**: `apps/web/src/components/layout/focus-quick-buttons.tsx` 1곳 (named import) + `packages/core/src/engine/simulation-core.ts` 1곳 (relative import) + `packages/core/src/index.ts` named export 박제 3 symbol + `packages/core/src/scene/index.ts` re-export 회피 주석 박제. 합 4곳 / ~10줄. 미달 시 SSoT drift 의심. **`scene/index.ts` 에 r-phase-allowlist re-export 추가 시 즉시 회귀 의심**
+- **B. SSR 200 검증 통과**: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ko` → `200`. 500 시 회귀 직접 발현 (라운드 1 / 라운드 2 mechanism 재현)
+- **C. exports field 변경량**: `packages/core/package.json` 변경 0줄. 1줄이라도 추가되면 자동화 hook (`verify-core-exports-immutable.sh`) 가 차단 (D2 자동화)
+- **D. named import 만 사용 (라운드 2 정정 신규)**: `apps/web` 내에서 `R_PHASE_BODY_ALLOWLIST` / `isRPhaseFocusable` 호출 시 `import { X } from '@astro-simulator/core'` 형태만 허용. `import { scene as sceneApi }` 후 `sceneApi.X` 패턴 0건 (`grep -rn 'sceneApi\\.isRPhaseFocusable\\|scene\\..*RPhaseFocusable' apps/web/src` 0 결과)
 
 ### 재검토 조건 (라운드 2 추가)
 
@@ -407,36 +490,80 @@ cross-validate 1회 (2026-05-04, anchor=ADR Amendment, outcome=applied — `.cla
 2. **Symlink resolve 함정** — 현재 미발현 위험. 재검토 조건 6 모니터링 박제로 충분 (별도 이슈 불필요)
 3. **CI 경로 길이 함정** — 동일 (재검토 조건 7)
 
+### 라운드 2 정정 박제 (2026-05-04, PR #414 실측 발견 반영)
+
+> 본 ADR Amendment 의 D1 patch — namespace re-export 폐기 + named export 직접 박제로 교체. PR #414 (developer 라운드 2 코드 구현, head=`fix/402-r-phase-allowlist-guard-round2-impl`, commit `d6eb2c5`) 가 발견·실측·박제.
+
+#### 정정 사유
+
+- 본 Amendment 초안 D1 의 "namespace re-export 강제" (`import { scene as sceneApi } from '@astro-simulator/core'` 후 `sceneApi.isRPhaseFocusable`) 패턴이 PR #414 실측 결과 SSR 500 동일 발현
+- 메커니즘: turbopack 이 namespace 경유 시 `packages/core/src/scene/index.ts` re-export chain (`solar-system-scene.ts` 포함) 평가 → `nbody-engine.ts` → `physics_wasm.js:367` `${__dirname}` evaluation trigger
+- sim-canvas 는 `next/dynamic({ssr:false})` 로 회피하지만 focus-quick-buttons 는 app-shell 직접 import → SSR 평가 대상 → namespace 경유 시 chain 폭발
+
+#### 정정 적용 (PR #414 실측 PASS 패턴)
+
+- D1 갱신: namespace re-export → `core/src/index.ts` named export 직접 박제 + `scene/index.ts` re-export 의도적 회피
+- D2 보강: WASM-safe 화이트리스트 명시 (`. / ./coords / ./physics / ./scene / ./gpu / ./ephemeris`) + 순수 데이터 도메인 자유 명시
+- D4 보강: namespace re-export trigger 메커니즘 + SSR 평가 컨텍스트 매트릭스 추가
+- §회귀 메커니즘: 라운드 2 정정 발견 섹션 추가 (메커니즘 / 대조 관찰 / 미래 회피 패턴)
+- §Concrete Prediction: D 항목 추가 (named import 만 사용 단언)
+- §Developer 인수인계: PR #414 실제 채택 패턴 박제 (시작 지점 7단계 + 빌드/검증 순서 9단계)
+
+#### 라운드 1 → 라운드 2 → 라운드 2 정정 패턴 매트릭스
+
+| 패턴                                | exports field                    | scene/index.ts re-export | core/index.ts named export | web 호출 패턴                                                  | SSR       | 비고                                             |
+| ----------------------------------- | -------------------------------- | ------------------------ | -------------------------- | -------------------------------------------------------------- | --------- | ------------------------------------------------ |
+| 라운드 1 (PR #407 closed `3eed4e0`) | `./scene/r-phase-allowlist` 추가 | 없음                     | 없음                       | sub-path import                                                | ❌ 500    | turbopack chunking boundary 폭발                 |
+| 라운드 2 초안 (Amendment 첫 push)   | 변경 0                           | `export *` 추가          | 없음                       | namespace 경유 (`sceneApi.X`)                                  | ❌ 500    | namespace chain 평가 trigger (PR #414 실측 발견) |
+| **라운드 2 정정 (PR #414 채택)**    | **변경 0**                       | **회피 주석**            | **named export 박제**      | **named import (`import { X } from '@astro-simulator/core'`)** | **✓ 200** | chain 평가 0                                     |
+
 ---
 
-### 라운드 2 Developer 인수인계 (라운드 1 대비 차이)
+### 라운드 2 Developer 인수인계 (라운드 2 정정 반영 — PR #414 채택 패턴)
 
-#### 시작 지점 (라운드 1 와 차이)
+> **이 섹션은 PR #414 (developer 라운드 2 코드 구현) 의 실제 채택 패턴을 박제**. 라운드 2 초안의 namespace re-export 패턴은 **폐기**.
 
-1. **`packages/core/src/scene/r-phase-allowlist.ts`** 신규 (라운드 1 와 동일 — 박제값 코드 재사용)
-2. **`packages/core/src/scene/index.ts`** 에 `export * from './r-phase-allowlist.js'` 추가 (라운드 1 와 동일)
-3. **`packages/core/package.json`** **변경 0** (라운드 1 의 sub-path export 추가 작업 폐기) ⚠️
-4. **`packages/core/src/engine/simulation-core.ts`** focusOn 가드 — import 경로 `'../scene/r-phase-allowlist.js'` (라운드 1 와 동일, 단 sub-path export 미사용 명확화)
-5. **`apps/web/src/components/layout/focus-quick-buttons.tsx`** UI 가드 — namespace 경유 (`import { scene as sceneApi } from '@astro-simulator/core'` 후 `sceneApi.isRPhaseFocusable`)
-6. **회귀 가드 스크립트 + 자동화 hook 신규**:
-   - `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` (라운드 1 와 동일)
-   - **`scripts/verify-core-exports-immutable.sh`** 신규 (D2 보강 — `jq` 로 exports entry 검사)
+#### 시작 지점 (PR #414 실제 채택)
 
-#### 빌드 / 검증 순서 (volt #70 + 라운드 2 추가)
+1. **`packages/core/src/scene/r-phase-allowlist.ts`** 신규 — `R_PHASE_BODY_ALLOWLIST = Object.freeze(['sun', 'mercury', 'venus'] as const)` + `isRPhaseFocusable(bodyId)` helper + `RPhaseBodyId` 타입 (라운드 1 박제값 코드 재사용)
+2. **`packages/core/src/scene/index.ts`** 에 `r-phase-allowlist.ts` re-export **의도적 회피** ⚠️ — `solar-system-scene.ts` 등 동일 namespace 의 chain 평가 trigger 차단. 회귀 메커니즘 주석 박제 의무 (왜 회피하는지 명시)
+3. **`packages/core/src/index.ts`** 에 named export 직접 박제 ⚠️:
+   ```ts
+   export {
+     R_PHASE_BODY_ALLOWLIST,
+     isRPhaseFocusable,
+     type RPhaseBodyId,
+   } from './scene/r-phase-allowlist.js';
+   ```
+4. **`packages/core/package.json`** **변경 0** (sub-path export 추가 금지 — D1 보존)
+5. **`packages/core/src/engine/simulation-core.ts`** focusOn 가드 — import 경로 `'../scene/r-phase-allowlist.js'` (같은 패키지 내부 relative import)
+6. **`apps/web/src/components/layout/focus-quick-buttons.tsx`** UI 가드 — **named import 만**: `import { isRPhaseFocusable } from '@astro-simulator/core'` (namespace 경유 금지)
+7. **회귀 가드 스크립트 + 자동화 hook 신규**:
+   - `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` (3종 매트릭스 12 case)
+   - **`scripts/verify-core-exports-immutable.sh`** 신규 (D2 보강 — `jq` 로 exports entry 화이트리스트 검사: `. / ./coords / ./physics / ./scene / ./gpu / ./ephemeris`)
+   - `.github/workflows/ci.yml` 에 `verify-core-exports-immutable` + `verify:r-phase-allowlist` step 통합
 
-1. `r-phase-allowlist.ts` + `scene/index.ts` re-export 작성 후 `pnpm --filter @astro-simulator/core build` 선행
-2. `pnpm --filter @astro-simulator/core test` (단위 테스트)
-3. `apps/web` dev 서버 **재기동** (HMR 신뢰 금지)
-4. **CRITICAL DoD-9 (라운드 2 신규)**: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ko` → `200` 확인 (500 시 즉시 차단 — sub-path export 추가 흔적 의심)
-5. `pnpm --filter @astro-simulator/web verify:r-phase-allowlist` (회귀 가드)
-6. `bash scripts/verify-core-exports-immutable.sh` (D2 자동화)
-7. **사용자 D-T2 실 Chrome 의무** (DoD-5 + 라운드 2 보강) — venus focus 정상 동작 확인 (3-tier 1회 / oscillate 0 / animation 부드러움)
+#### 빌드 / 검증 순서 (volt #70 + 라운드 2 정정 + volt #77 SSR 200 단계 게이트)
 
-#### 명시적 비-범위 (라운드 2 추가)
+1. `r-phase-allowlist.ts` 작성 + `scene/index.ts` 회피 주석 박제 + `core/src/index.ts` named export 박제 후 `pnpm --filter @astro-simulator/core build` 선행 (volt #70 monorepo dist stale 가드)
+2. `pnpm --filter @astro-simulator/core test` (단위 테스트 — r-phase-allowlist 6 case + simulation-core focusOn 가드 9 case)
+3. `pnpm --filter @astro-simulator/web test` (UI 가드 11 case)
+4. `apps/web` dev 서버 **재기동** (HMR 신뢰 금지)
+5. **CRITICAL DoD-9 (SSR 200 회복 직접 가드 — volt #77 단계 게이트)**: `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ko` → `200` 확인 (500 시 즉시 차단 — sub-path export 추가 또는 namespace re-export trigger 흔적 의심. `grep -rn 'sceneApi\\.isRPhaseFocusable\\|scene\\..*RPhaseFocusable' apps/web/src` 으로 namespace 경유 잔재 확인)
+6. `pnpm --filter @astro-simulator/web verify:r-phase-allowlist` (회귀 가드 12/12)
+7. `bash scripts/verify-core-exports-immutable.sh` (D2 자동화)
+8. `grep -rn` 으로 U+FFFD (replacement character) 검사 — `<수정 파일>` 대상 0건 (CRITICAL #4)
+9. **사용자 D-T2 실 Chrome 의무** (DoD-5 + DoD-9 — volt #77 헤드리스 ≠ 실 Chrome) — venus focus 정상 동작 확인 (3-tier 1회 / oscillate 0 / animation 부드러움) + earth/jupiter/neptune 잔재 0
 
-- `packages/core/package.json` exports field 변경 — sub-path 추가 금지 (D1)
+#### 명시적 비-범위 (라운드 2 정정 반영)
+
+- `packages/core/package.json` exports field 변경 — sub-path 추가 금지 (D1 보존)
+- `packages/core/src/scene/index.ts` 에 `r-phase-allowlist.ts` re-export 추가 — **금지** (D1 라운드 2 정정)
+- `apps/web` 에서 namespace 경유 (`import { scene as sceneApi }` → `sceneApi.X`) — **금지** (D1 라운드 2 정정)
 - `--target bundler` 마이그레이션 — 재검토 조건 5 후속 이슈 (D2 후속 분리)
 - Edge Runtime / Middleware / Edge API Routes 사용 — 제약 박제로 차단
+- BODY_SCALE 변경 — #412 분리
+- 기타 R-Phase allowlist 무관 컴포넌트 변경 — celestial-tree-panel / celestial-info-panel / scenario-presets / black-hole-disk-panel / about-modal 0 (#403 / #404 / #405 후속)
 
 #### 머지 권한
 
