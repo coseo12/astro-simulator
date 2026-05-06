@@ -4,6 +4,7 @@
  *
  * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 4 (DoD-4 회귀 가드 + CI 통합).
  * #415 Amendment — `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (시나리오 4 매트릭스).
+ * #403 Amendment — `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장 (시나리오 5 매트릭스).
  *
  * 검증 매트릭스:
  *   1. allowlist 박제 body (sun / mercury / venus): shortcut 버튼 활성 (disabled 아님)
@@ -13,6 +14,12 @@
  *      - 4-A 차단: ?focus=earth / jupiter / neptune → selectedBodyId === null + camera radius 변화 0
  *      - 4-B 정상: ?focus=sun / mercury / venus → selectedBodyId === <body> (R1 #329 / R2 #361 / R3 #369 회귀 보호)
  *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
+ *   5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth):
+ *      - 5-A 정상 (CelestialTree): tree-sun click → selectedBodyId === 'sun' + info-panel 정상 분기 렌더
+ *      - 5-B 차단 (CelestialTree): tree-earth/jupiter/neptune disabled / aria-disabled / data-r-phase-disabled,
+ *        force click 시 store / camera 변화 0
+ *      - 5-C 차단 (InfoPanel): URL `?focus=earth` → url-sync 가드 작동 (#415) → selectedBody 변화 0,
+ *        하지만 외부 경로로 set 시 info-panel-r-phase-blocked 분기 노출 검증 (programmatic mutation)
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
  *   - R4 (earth) 진입 시 RPHASE_EXPECTED_ENABLED 에 'earth' 이동
@@ -262,6 +269,165 @@ async function verifyUrlDirectEntry(browser) {
   return results;
 }
 
+/**
+ * #403 — CelestialTree + InfoPanel UI 가드 (defense-in-depth UI 측면 2번째 축).
+ *
+ * ADR `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장.
+ *
+ * 5-A 정상 (CelestialTree): allowlist 박제 body click → selectedBodyId 정상 set + info-panel 정상 분기
+ * 5-B 차단 (CelestialTree): allowlist 외 body 항목 disabled / aria-disabled / data-r-phase-disabled,
+ *                          force click 시 selectedBodyId / camera radius 변화 0
+ * 5-C 차단 (InfoPanel): allowlist 외 body 가 selectedBody 로 set 된 경우 info-panel-r-phase-blocked 분기 렌더.
+ *                       store 직접 mutation (`window.__simStore.setState`) 으로 외부 경로 시뮬레이션 —
+ *                       url-sync 가드 (#415) / scene 가드 (#402) 통과 후 panel 잔존 가드 검증.
+ */
+async function verifyTreePanelGuards(browser) {
+  const results = [];
+  const { context, page } = await setupPage(browser);
+
+  try {
+    // CelestialTree / CelestialInfoPanel 은 `mode === 'research' || 'sandbox'` 에서만 렌더 (side-panels.tsx 14).
+    // 기본 모드 'observe' 에서는 panel 미노출 → 'research' 모드로 전환 후 검증.
+    await page.evaluate(() => {
+      window.__simStore?.setState?.({ mode: 'research' });
+    });
+    await page.waitForTimeout(POST_INIT_WAIT_MS);
+    // panel 마운트 + framer-motion 애니메이션 (250ms) 완료 대기.
+    await page.waitForSelector('[data-testid="celestial-tree"]', { timeout: 10_000 });
+
+    // 5-A 정상 (CelestialTree): allowlist 박제 body click → 정상 panel 노출.
+    for (const body of RPHASE_EXPECTED_ENABLED) {
+      const selector = `[data-testid="tree-${body}"]`;
+      const btn = await page.locator(selector).first();
+      const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
+      await btn.click();
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      const selectedBodyId = await page.evaluate(
+        () => window.__simStore?.getState?.()?.selectedBodyId ?? null,
+      );
+      const panelEmpty = await page.locator('[data-testid="info-panel-empty"]').count();
+      const panelBlocked = await page.locator('[data-testid="info-panel-r-phase-blocked"]').count();
+      const panelNormal = await page.locator('[data-testid="info-panel"]').count();
+
+      const pass =
+        !isDisabled &&
+        selectedBodyId === body &&
+        panelNormal === 1 &&
+        panelEmpty === 0 &&
+        panelBlocked === 0;
+      results.push({
+        scenario: '5-A 정상 (CelestialTree)',
+        body,
+        isDisabled,
+        selectedBodyId,
+        panelNormal,
+        panelBlocked,
+        pass,
+      });
+
+      // reset 으로 초기화 후 다음 body.
+      await page.locator('[data-testid="focus-reset"]').click();
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+    }
+
+    // 5-B 차단 (CelestialTree): allowlist 외 body 항목 disabled + force click 무시.
+    for (const body of RPHASE_EXPECTED_DISABLED) {
+      const selector = `[data-testid="tree-${body}"]`;
+      const btn = await page.locator(selector).first();
+      const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
+      const ariaDisabled = await btn.getAttribute('aria-disabled');
+      const dataDisabled = await btn.getAttribute('data-r-phase-disabled');
+      const title = await btn.getAttribute('title');
+
+      // 강제 click — disabled 우회 (Playwright `force: true`).
+      const before = await page.evaluate(() => {
+        const store = window.__simStore?.getState?.();
+        const scene = window.__solarScene?.meshes?.get?.('sun')?.getScene?.();
+        const camera = scene?.activeCamera;
+        return {
+          selectedBodyId: store?.selectedBodyId ?? null,
+          camRadius: camera?.radius ?? null,
+        };
+      });
+      await page.locator(selector).click({ force: true });
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+      const after = await page.evaluate(() => {
+        const store = window.__simStore?.getState?.();
+        const scene = window.__solarScene?.meshes?.get?.('sun')?.getScene?.();
+        const camera = scene?.activeCamera;
+        return {
+          selectedBodyId: store?.selectedBodyId ?? null,
+          camRadius: camera?.radius ?? null,
+        };
+      });
+      const selectedChanged = before.selectedBodyId !== after.selectedBodyId;
+      const radiusDiff =
+        before.camRadius !== null && after.camRadius !== null
+          ? Math.abs(before.camRadius - after.camRadius)
+          : 0;
+      const radiusChanged = radiusDiff > 1e-3;
+
+      const pass =
+        isDisabled &&
+        ariaDisabled === 'true' &&
+        dataDisabled === 'true' &&
+        title !== null &&
+        title.includes('R-Phase') &&
+        !selectedChanged &&
+        !radiusChanged;
+      results.push({
+        scenario: '5-B 차단 (CelestialTree)',
+        body,
+        isDisabled,
+        ariaDisabled,
+        dataDisabled,
+        titleHasRPhase: title !== null && title.includes('R-Phase'),
+        selectedChanged,
+        radiusDiff,
+        pass,
+      });
+    }
+
+    // 5-C 차단 (InfoPanel): store 직접 mutation 으로 외부 경로 시뮬레이션 — info-panel-r-phase-blocked 분기 렌더.
+    for (const body of RPHASE_EXPECTED_DISABLED) {
+      // 외부 경로 시뮬레이션 — store mutation 직접 (url-sync 가드 / scene 가드 모두 우회).
+      // info-panel 잔존 가드만 격리 검증 (defense-in-depth UI 측면 2번째 축).
+      await page.evaluate((b) => {
+        window.__simStore?.setState?.({ selectedBodyId: b });
+      }, body);
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      const panelBlocked = await page.locator('[data-testid="info-panel-r-phase-blocked"]').count();
+      const panelNormal = await page.locator('[data-testid="info-panel"]').count();
+      const blockedText = panelBlocked
+        ? await page.locator('[data-testid="info-panel-r-phase-blocked"]').textContent()
+        : '';
+
+      const pass =
+        panelBlocked === 1 && panelNormal === 0 && (blockedText ?? '').includes('R-Phase');
+      results.push({
+        scenario: '5-C 차단 (InfoPanel)',
+        body,
+        panelBlocked,
+        panelNormal,
+        blockedTextHasRPhase: (blockedText ?? '').includes('R-Phase'),
+        pass,
+      });
+
+      // reset.
+      await page.evaluate(() => {
+        window.__simStore?.setState?.({ selectedBodyId: null });
+      });
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+    }
+  } finally {
+    await context.close();
+  }
+
+  return results;
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true });
   let allPass = true;
@@ -314,6 +480,19 @@ async function main() {
         `   ${r.label}  ?focus=${r.focus.padEnd(18)} → selectedBodyId=${String(r.selectedBodyId).padEnd(10)} (expected=${expectedStr})  ${status}`,
       );
       if (!r.pass) allPass = false;
+    }
+
+    // 5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth)
+    console.log('\n5) CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축)\n');
+    const treePanelResults = await verifyTreePanelGuards(browser);
+    for (const r of treePanelResults) {
+      const status = r.pass ? 'PASS' : 'FAIL';
+      console.log(`   ${r.scenario.padEnd(28)} body=${r.body.padEnd(10)} ${status}`);
+      if (!r.pass) {
+        // 디버그용 raw 출력.
+        console.log(`      raw: ${JSON.stringify(r)}`);
+        allPass = false;
+      }
     }
   } finally {
     await browser.close();
