@@ -149,7 +149,7 @@ NO-OP 거부 근거: #397 NO-OP 재평가 패턴 (volt [#14](https://github.com/
 4. **`apps/web/scripts/browser-verify-378-focus.mjs` `FOCUS_BODIES` 갱신** — qa 검증 매트릭스 동시 박제 (메모리 line 67 #424 학습)
 5. **CHANGELOG `### Behavior Changes`** — 사용자 관찰 가능 변화 (예: "R4: earth body 가 점 수준 → 시각 활성") 박제
 
-본 5곳 박제는 #402 ADR `20260504-r-phase-allowlist-guard.md` §결정 4 (4곳 박제 의무) 의 BODY_SCALE 측면 확장. allowlist 측 4곳 + BODY_SCALE 측 1곳 = R-Phase 진입 시 총 박제 위치 합집합.
+본 5곳 박제는 #402 ADR `20260504-r-phase-allowlist-guard.md` §결정 4 + §Amendment D2 (라운드 2 wasm-safe, **5곳 박제 의무**) 와 합집합 관계. R-Phase 진입 시 본 ADR 5곳 (R-Phase ADR / BODY_SCALE / allowlist / FOCUS_BODIES / CHANGELOG) + #402 D2 5곳 (allowlist / R-Phase ADR / browser-verify-r-phase-allowlist.mjs RPHASE_EXPECTED_ENABLED / scripts/verify-core-exports-immutable.sh / CHANGELOG) **합집합 (중복 제거 후 7곳) 동시 박제 의무**. 본 ADR 은 #402 D2 대비 BODY_SCALE 측면 (체크리스트 #2) + FOCUS_BODIES 측면 (#4) 추가, #402 D2 는 본 ADR 대비 verify-r-phase-allowlist.mjs + verify-core-exports-immutable.sh 추가.
 
 **reviewer 체크 패턴**: 진입 PR 의 git diff 가 본 5곳을 모두 포함하는지 확인. 누락 발견 시 `Changes requested` (CRITICAL #1 박제 의무 위반).
 
@@ -250,7 +250,7 @@ CHANGELOG.md                                              | + (Behavior Changes 
 
 ### 정책 효과 검증 (R4 진입 시)
 
-- **검증 1 (체크리스트 작동)**: R4 진입 PR 의 git diff 가 §체크리스트 5곳 모두 포함하는지 확인. 누락 발견 시 본 ADR §결정 3 인용 + Changes requested
+- **검증 1 (체크리스트 작동)**: R4 진입 PR 의 git diff 가 본 ADR §체크리스트 5곳 + #402 ADR `20260504-r-phase-allowlist-guard.md` §Amendment D2 5곳 (`browser-verify-r-phase-allowlist.mjs RPHASE_EXPECTED_ENABLED` + `scripts/verify-core-exports-immutable.sh` 포함) **합집합 (중복 제거 후 7곳) 모두 포함**하는지 확인. 누락 발견 시 본 ADR §결정 3 + #402 ADR §Amendment D2 인용 + Changes requested
 - **검증 2 (Concrete Prediction)**: R4 진입 PR 의 코드 변경 ≤ 5~6 라인. 초과 시 본 ADR §재검토 조건 트리거
 - **검증 3 (drift 0)**: R4 진입 후 분면 II/III (시각 ∧ ¬focus, ¬시각 ∧ focus) 0 body 유지. 1 body 라도 발생 시 drift 알림 → 본 ADR §재검토
 
