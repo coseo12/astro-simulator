@@ -130,7 +130,7 @@ R1 ADR §결정 1 산출식 적용. mercury.radius = 2.4397e6 m, sun=75 baseline
 
 근거:
 
-1. **DoD 0.5% 마진 22%** — 산출식이 카메라 fov / radius / renderScale 에 의존하므로 ±5% 노이즈 흡수 필요 (sun 사례에서 R1 ADR §결정 1 표 1920×1080 6.18% 박제값과 본 산출 3.88% 차이 가능성 — 둘 중 하나가 검증 오류). margin 1.5× 가 안전
+1. **DoD 0.5% 마진 22%** — 산출식이 카메라 fov / radius / renderScale 에 의존하므로 ±5% 노이즈 흡수 필요 (sun 사례에서 R1 ADR §결정 1 표 1920×1080 6.18% 박제값과 본 산출 3.88% 차이 가능성 — 둘 중 하나가 검증 오류[^r1-amend-v2]). margin 1.5× 가 안전
 2. **시각비 40%** — sun 의 절반 미만, 사용자가 "수성이 태양보다 작다" 직관 만족 (R3 금성 → R4 지구 → ... 진행 시 비율 단조 증가 부담 분담)
 3. **모바일 1.94%** — DoD 0.5% 의 약 4배. 모바일 viewport 면적 250,125px² 에서 4,852px² (수성 disk 면적) → 사용자 인지 가능 + 화면 차단 없음 (sun 12.26% 와 합쳐도 약 14%, < 25% 자연스러움 임계)
 4. **단순 정수** — 8,500 은 직관적 (75 × 113.3 ≈ 8,500, 사용자가 dev 콘솔에서 읽기 쉬움)
@@ -520,7 +520,7 @@ Prediction 실패 시 두 갈래:
 
 ### 위험 / 미해결
 
-- **viewport 점유율 산출과 실측 오차** — R1 ADR §결정 1 의 1920×1080 점유율 표기 (6.18%) 와 본 ADR §축 1 의 산출값 (3.88%) 차이. 본 산출은 16:9 종횡비 + 동일 fov + 동일 cameraRadius 라 1280×720 / 1920×1080 점유율 동일이 정합. R1 표는 viewport-relative 좌표 변환 오류 가능성. R2 PR 에서 실측 (`--measure-mercury-coverage`) 으로 정정 필요
+- **viewport 점유율 산출과 실측 오차** — R1 ADR §결정 1 의 1920×1080 점유율 표기 (6.18%) 와 본 ADR §축 1 의 산출값 (3.88%) 차이. 본 산출은 16:9 종횡비 + 동일 fov + 동일 cameraRadius 라 1280×720 / 1920×1080 점유율 동일이 정합. R1 표는 viewport-relative 좌표 변환 오류 가능성. R2 PR 에서 실측 (`--measure-mercury-coverage`) 으로 정정 필요[^r1-amend-v2]
 - **모바일 점유율 1.94% 침습성** — sun 12.26% + mercury 1.94% = 14.2% (모바일 화면의 1/7). 향후 venus/earth/... 누적 시 모바일 화면 차단 위험 (R3+ 에서 viewport-aware scaling 재검토 트리거)
 - **Animation 자동 폐기 의존** — Babylon 라이브러리 업데이트 시 `Animation.CreateAndStartAnimation` 동일 property 자동 폐기 동작 변경 가능성. R1 store-scene-sync ADR §재검토 트리거 #4 와 동일 위험. R2 의 multi-body race scenario 가 Babylon 변경 시 첫 노출 케이스
 - **R10 누적 시 BODY_SCALE 룩업 비대화** — 10 body × 평균 100자 주석 = 룩업 파일 ~1000 라인. 별도 데이터 파일 (json) 분리 검토 가능 (R5+ 에서). 단 `bodyScale` 콜백 시그니처는 변경 안 해도 됨
@@ -566,6 +566,8 @@ cross-validate 호출 완료 (Gemini 3.1 Pro Preview, 2026-04-28 17:16 KST). out
 **범위 체크**: 본 R2 PR 에서 R1 ADR §결정 1 표 정정은 **R2 비-범위** (CRITICAL #6 — PM 합의 §비-범위 침범 가능). R1 ADR 본문 변경은 R1 시각화 ADR 의 별도 amendment 로 분리 필요.
 
 **후속 이슈 분리** (즉시 생성 완료): [#362](https://github.com/coseo12/astro-simulator/issues/362) — `[chore] R1 sun 점유율 1920×1080 박제값 정정 — ADR Amendment 후보`. 본문에 Gemini 산출 (3.88%) vs R1 ADR 박제 (6.18%) 차이 + 본 R2 ADR 산출 일치 + 후보 A (Amendment 박제) / B (실측 확정) / C (NO-OP) 박제. 우선순위 low (수치 박제 오류, 동작 영향 없음).
+
+**Amendment 박제 완료 (2026-05-06)**: 후보 A 채택. R1 ADR `20260425-r1-sun-visualization.md` §"Amendment v2 (2026-05-06)" 박제 완료 — 본문 정정 3 위치 (line 89 / 98 / 307) + cross-validate Gemini 합의 + R2 ADR cross-link 5곳 (line 133 / 523 / 562 / 564 / 568) footnote 동기화[^r1-amend-v2].
 
 #### 발견 2 — 모바일 누적 점유율 한계 도달 경고 (주의)
 
@@ -858,3 +860,7 @@ forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라
 - R1 ADR (sunScale 50 그대로 유지, 라운드 1/2/3 보존)
 - R3 ADR Amendment 2026-05-03 (라운드 3) — venusScale 650 → 800 동반 박제 (D-1 채택)
 - 이슈 #385 — 라운드 3 architect → developer → qa → 사용자 D-T2 표준 흐름
+
+---
+
+[^r1-amend-v2]: 2026-05-06 R1 ADR `20260425-r1-sun-visualization.md` §"Amendment v2 (2026-05-06)" 박제 완료. 본 R2 ADR §발견 1 발견값 (3.88%) 이 R1 ADR 본문 박제값으로 정정 확정. 본 §"고유 발견" §"위험 / 미해결" §"DoD 마진 분석" 의 R1 ADR 6.18% 인용은 *발견 시점 (2026-04-28) 컨텍스트* 보존 — 역사적 인용. 이슈 [#362](https://github.com/coseo12/astro-simulator/issues/362).
