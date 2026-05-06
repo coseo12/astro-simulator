@@ -10,7 +10,7 @@
   - **사용자 D-T2 보고 계열**: #412 (BODY_SCALE R-Phase 정책, 시각 활성 vs focus 활성 분리), `20260506-body-scale-r-phase-policy.md`
   - **scene event 단일 진실원**: `20260425-r1-store-scene-sync-unification.md`
 - **교훈 적용**:
-  - "DoD PASS ≠ 제품 동작" (volt [#74](https://github.com/coseo12/issues/74)) — 본 ADR 도 #402 의 정량 매트릭스 PASS 후 사용자 D-T2 잔재 인지의 후속
+  - "DoD PASS ≠ 제품 동작" (volt [#74](https://github.com/coseo12/volt/issues/74)) — 본 ADR 도 #402 의 정량 매트릭스 PASS 후 사용자 D-T2 잔재 인지의 후속
   - "숨은 상수 변형" (volt [#69](https://github.com/coseo12/volt/issues/69)) — UI 측 Tree/InfoPanel 두 곳에 동일 정책 박제 시 drift 방지
   - "단계 게이트" (volt [#77](https://github.com/coseo12/volt/issues/77)) — 본 PR 은 코드 변경 동반이라 docs-only 예외 적용 불가, developer + reviewer + qa 풀 단계 의무
   - "헤드리스 ≠ 실 브라우저" (volt [#78](https://github.com/coseo12/volt/issues/78)) — UI 가드 검증은 사용자 D-T2 의무 (CRITICAL #3)
@@ -350,7 +350,7 @@ node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
 - `packages/core/src/scene/r-phase-allowlist.ts` — SSoT 재사용만, 변경 금지
 - `packages/core/src/sim/simulation-core.ts` `case 'focusOn'` — #402 가드 그대로
 - `apps/web/src/core/url-sync.tsx` — #415 가드 그대로
-- `apps/web/src/components/hud/focus-quick-buttons.tsx` — #402 가드 그대로
+- `apps/web/src/components/layout/focus-quick-buttons.tsx` — #402 가드 그대로
 - `celestial-info-panel.tsx` line 11~17, 20~23 (P10 KIND_LABEL / COLOR_SOURCE_LABEL) — #405 통합 후보지, 본 PR 비-범위
 - BlackHoleDiskPanel / AboutModal — #405
 - **i18n 키 분기 신설 금지** (cross-validate Gemini 개선 제안 1 반영) — 본 PR UI 메시지는 한국어 하드코딩 (`/ko` 라우팅 기본). 다국어 키 추출 (`t('rPhase.disabledWarning')` 패턴) 은 향후 i18n 라이브러리 도입 후속 이슈 분리. 본 PR 은 `/en` 라우팅 미지원 상태로 박제
