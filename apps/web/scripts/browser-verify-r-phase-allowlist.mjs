@@ -5,6 +5,7 @@
  * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 4 (DoD-4 회귀 가드 + CI 통합).
  * #415 Amendment — `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (시나리오 4 매트릭스).
  * #403 Amendment — `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장 (시나리오 5 매트릭스).
+ * #404 Amendment — `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제 (시나리오 6 매트릭스).
  *
  * 검증 매트릭스:
  *   1. allowlist 박제 body (sun / mercury / venus): shortcut 버튼 활성 (disabled 아님)
@@ -20,6 +21,12 @@
  *        force click 시 store / camera 변화 0
  *      - 5-C 차단 (InfoPanel): URL `?focus=earth` → url-sync 가드 작동 (#415) → selectedBody 변화 0,
  *        하지만 외부 경로로 set 시 info-panel-r-phase-blocked 분기 노출 검증 (programmatic mutation)
+ *   6. ScenarioPresets UI 가드 (#404 — UI 측면 3번째 축, defense-in-depth):
+ *      - 6-A 정상 (sun-half): preset-sun-half disabled 부재 / aria-disabled='false' / data-r-phase-disabled='false',
+ *        click 시 physicsEngine='newton' + massMultipliers={sun:0.5} 정상 동작
+ *      - 6-B 차단 (jupiter-x10): preset-jupiter-x10 disabled / aria-disabled='true' / data-r-phase-disabled='true' /
+ *        title='R-Phase 진행 시 활성', force click 시 store mutation 호출 0 (physicsEngine/massMultipliers 변화 0)
+ *      - 6-C 차단 (no-jupiter): 동일 (jupiter R6 미구현)
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
  *   - R4 (earth) 진입 시 RPHASE_EXPECTED_ENABLED 에 'earth' 이동
@@ -428,6 +435,150 @@ async function verifyTreePanelGuards(browser) {
   return results;
 }
 
+/**
+ * #404 — ScenarioPresets UI 가드 (defense-in-depth UI 측면 3번째 축).
+ *
+ * ADR `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제.
+ *
+ * 6-A 정상 (sun-half): R1 박제 sun → preset 활성, click 시 physicsEngine='newton' + massMultipliers={sun:0.5} 정상 동작
+ * 6-B 차단 (jupiter-x10): R6 미구현 jupiter → preset disabled + a11y 4축 박제, force click 시 store mutation 호출 0
+ * 6-C 차단 (no-jupiter): 동일 (jupiter R6 미구현)
+ *
+ * mode-gated 컴포넌트 mount precondition (#403 학습): ScenarioPresets 는
+ * `mode === 'research' || 'sandbox'` 에서만 렌더 (side-panels.tsx 14) →
+ * 검증 시 mode='research' 전환 + framer-motion 애니메이션 (250ms) 완료 대기.
+ */
+async function verifyScenarioPresetsGuards(browser) {
+  const results = [];
+  const { context, page } = await setupPage(browser);
+
+  try {
+    // ScenarioPresets 는 `mode === 'research' || 'sandbox'` 에서만 렌더 → 'research' 모드로 전환.
+    await page.evaluate(() => {
+      window.__simStore?.setState?.({ mode: 'research' });
+    });
+    await page.waitForTimeout(POST_INIT_WAIT_MS);
+    await page.waitForSelector('[data-testid="scenario-presets"]', { timeout: 10_000 });
+
+    // 6-A 정상 (sun-half): R1 박제 sun → preset 활성, click 시 정상 동작.
+    {
+      const selector = '[data-testid="preset-sun-half"]';
+      const btn = page.locator(selector).first();
+      const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
+      const ariaDisabled = await btn.getAttribute('aria-disabled');
+      const dataDisabled = await btn.getAttribute('data-r-phase-disabled');
+      const title = await btn.getAttribute('title');
+
+      // store 초기 상태 측정 + reset (이전 시나리오 잔재 제거).
+      await page.evaluate(() => {
+        window.__simStore?.setState?.({
+          physicsEngine: 'kepler',
+          massMultipliers: {},
+        });
+      });
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      await btn.click();
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      const after = await page.evaluate(() => {
+        const s = window.__simStore?.getState?.();
+        return {
+          physicsEngine: s?.physicsEngine ?? null,
+          massMultipliers: s?.massMultipliers ?? null,
+        };
+      });
+
+      const pass =
+        !isDisabled &&
+        ariaDisabled === 'false' &&
+        dataDisabled === 'false' &&
+        title === null &&
+        after.physicsEngine === 'newton' &&
+        after.massMultipliers?.sun === 0.5;
+      results.push({
+        scenario: '6-A 정상 (sun-half)',
+        preset: 'sun-half',
+        isDisabled,
+        ariaDisabled,
+        dataDisabled,
+        title,
+        physicsEngineAfter: after.physicsEngine,
+        massSunAfter: after.massMultipliers?.sun ?? null,
+        pass,
+      });
+    }
+
+    // 6-B / 6-C 차단 (jupiter-x10 / no-jupiter): R6 미구현 jupiter → disabled + force click 무시.
+    for (const presetId of ['jupiter-x10', 'no-jupiter']) {
+      const selector = `[data-testid="preset-${presetId}"]`;
+      const btn = page.locator(selector).first();
+      const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
+      const ariaDisabled = await btn.getAttribute('aria-disabled');
+      const dataDisabled = await btn.getAttribute('data-r-phase-disabled');
+      const title = await btn.getAttribute('title');
+
+      // store 초기 상태 reset (sun-half 잔재 제거).
+      await page.evaluate(() => {
+        window.__simStore?.setState?.({
+          physicsEngine: 'kepler',
+          massMultipliers: {},
+        });
+      });
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      const before = await page.evaluate(() => {
+        const s = window.__simStore?.getState?.();
+        return {
+          physicsEngine: s?.physicsEngine ?? null,
+          massMultipliers: { ...(s?.massMultipliers ?? {}) },
+        };
+      });
+
+      // 강제 click — disabled 우회 (Playwright `force: true`).
+      await btn.click({ force: true });
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      const after = await page.evaluate(() => {
+        const s = window.__simStore?.getState?.();
+        return {
+          physicsEngine: s?.physicsEngine ?? null,
+          massMultipliers: { ...(s?.massMultipliers ?? {}) },
+        };
+      });
+
+      const engineUnchanged = before.physicsEngine === after.physicsEngine;
+      const massUnchanged =
+        JSON.stringify(before.massMultipliers) === JSON.stringify(after.massMultipliers);
+
+      const scenario =
+        presetId === 'jupiter-x10' ? '6-B 차단 (jupiter-x10)' : '6-C 차단 (no-jupiter)';
+      const pass =
+        isDisabled &&
+        ariaDisabled === 'true' &&
+        dataDisabled === 'true' &&
+        title === 'R-Phase 진행 시 활성' &&
+        engineUnchanged &&
+        massUnchanged;
+      results.push({
+        scenario,
+        preset: presetId,
+        isDisabled,
+        ariaDisabled,
+        dataDisabled,
+        title,
+        engineUnchanged,
+        massUnchanged,
+        pass,
+      });
+    }
+  } finally {
+    await context.close();
+  }
+
+  return results;
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true });
   let allPass = true;
@@ -488,6 +639,19 @@ async function main() {
     for (const r of treePanelResults) {
       const status = r.pass ? 'PASS' : 'FAIL';
       console.log(`   ${r.scenario.padEnd(28)} body=${r.body.padEnd(10)} ${status}`);
+      if (!r.pass) {
+        // 디버그용 raw 출력.
+        console.log(`      raw: ${JSON.stringify(r)}`);
+        allPass = false;
+      }
+    }
+
+    // 6. ScenarioPresets UI 가드 (#404 — UI 측면 3번째 축, defense-in-depth)
+    console.log('\n6) ScenarioPresets UI 가드 (#404 — UI 측면 3번째 축)\n');
+    const presetResults = await verifyScenarioPresetsGuards(browser);
+    for (const r of presetResults) {
+      const status = r.pass ? 'PASS' : 'FAIL';
+      console.log(`   ${r.scenario.padEnd(28)} preset=${r.preset.padEnd(14)} ${status}`);
       if (!r.pass) {
         // 디버그용 raw 출력.
         console.log(`      raw: ${JSON.stringify(r)}`);

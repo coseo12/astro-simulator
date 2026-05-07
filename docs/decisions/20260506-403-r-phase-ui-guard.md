@@ -24,22 +24,22 @@
 
 ### #402 와의 직교 책임
 
-| 축                | #402 (Top 1)                            | 본 PR (Top 2 = #403)                          |
-| ----------------- | --------------------------------------- | --------------------------------------------- |
-| UI 진입점         | shortcut bar 6 버튼 (focus-quick)       | CelestialTree 트리 항목 + InfoPanel selectedBody |
-| Scene 측 가드     | simulation-core focusOn (이미 박제)     | (재사용 — 본 PR 코드 변경 0)                   |
-| URL 측 가드       | url-sync `?focus=` (#415, 이미 박제)    | (재사용 — 본 PR 코드 변경 0)                   |
-| SSoT              | `R_PHASE_BODY_ALLOWLIST` (이미 박제)    | (재사용 — 본 PR 코드 변경 0)                   |
+| 축            | #402 (Top 1)                         | 본 PR (Top 2 = #403)                             |
+| ------------- | ------------------------------------ | ------------------------------------------------ |
+| UI 진입점     | shortcut bar 6 버튼 (focus-quick)    | CelestialTree 트리 항목 + InfoPanel selectedBody |
+| Scene 측 가드 | simulation-core focusOn (이미 박제)  | (재사용 — 본 PR 코드 변경 0)                     |
+| URL 측 가드   | url-sync `?focus=` (#415, 이미 박제) | (재사용 — 본 PR 코드 변경 0)                     |
+| SSoT          | `R_PHASE_BODY_ALLOWLIST` (이미 박제) | (재사용 — 본 PR 코드 변경 0)                     |
 
 본 ADR 은 **UI 측 2번째 축** (CelestialTree + InfoPanel) 박제. SSoT / scene / URL 가드는 이미 박제되어 본 PR 은 UI 가드만 추가.
 
 ### PM 합의 박제 (라운드 1, 2026-05-03 / 라운드 2, 2026-05-06)
 
-| Q      | 결정                              | 의미                                              |
-| ------ | --------------------------------- | ------------------------------------------------- |
-| **Q2** | (iii) 표시 유지 + 클릭 disabled + tooltip | 트리 항목 자체는 보이되 R4+ 는 클릭 차단          |
-| **Q5** | (C) defense-in-depth (UI + scene) | 본 PR 은 UI 측 추가 (scene 측 #402 와 직교)       |
-| **Q6** | (b) Top 1 우선 → Top 2 후속 분리 | 본 PR 이 Top 2                                    |
+| Q      | 결정                                      | 의미                                        |
+| ------ | ----------------------------------------- | ------------------------------------------- |
+| **Q2** | (iii) 표시 유지 + 클릭 disabled + tooltip | 트리 항목 자체는 보이되 R4+ 는 클릭 차단    |
+| **Q5** | (C) defense-in-depth (UI + scene)         | 본 PR 은 UI 측 추가 (scene 측 #402 와 직교) |
+| **Q6** | (b) Top 1 우선 → Top 2 후속 분리          | 본 PR 이 Top 2                              |
 
 ### Explore: 현재 코드 상태
 
@@ -67,21 +67,22 @@ PM 라운드 2 인계 핵심 결정 (a). 본 PR 책임 단일화를 위해 P10 �
 
 ### 축 1 — DoD-3 P10 KIND_LABEL / COLOR_SOURCE UI 정리 분리/통합
 
-| 후보                                    | 장점                                                                          | 단점                                                                                                                                | 비고                |
-| --------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| (i) 본 PR 동시 처리                     | 단일 PR 으로 P10 잔재 일괄 정리                                               | PR 크기 ↑, 회귀 위험 ↑, 본 PR 의 사용자 D-T2 검증 root cause 분리 어려움                                                            | 기각                |
-| (ii) #405 chore 통합                    | 폐기 코드 일괄 정리 일관성 ↑ (이미 BlackHoleDiskPanel / AboutModal trail)     | #405 가 별도 PR 이라 본 PR 종결 후 별 PR 진행                                                                                       | 차선                |
-| **(iii) 본 PR 비-범위 분리**            | 직교 책임 / 단일 PR 작은 단위 / 회귀 격리 / 후속 chore 이슈 박제              | P10 잔재가 한 PR 더 살아있음 (관찰 비용)                                                                                            | **채택 (PM 권고)**  |
+| 후보                         | 장점                                                                      | 단점                                                                     | 비고               |
+| ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------ |
+| (i) 본 PR 동시 처리          | 단일 PR 으로 P10 잔재 일괄 정리                                           | PR 크기 ↑, 회귀 위험 ↑, 본 PR 의 사용자 D-T2 검증 root cause 분리 어려움 | 기각               |
+| (ii) #405 chore 통합         | 폐기 코드 일괄 정리 일관성 ↑ (이미 BlackHoleDiskPanel / AboutModal trail) | #405 가 별도 PR 이라 본 PR 종결 후 별 PR 진행                            | 차선               |
+| **(iii) 본 PR 비-범위 분리** | 직교 책임 / 단일 PR 작은 단위 / 회귀 격리 / 후속 chore 이슈 박제          | P10 잔재가 한 PR 더 살아있음 (관찰 비용)                                 | **채택 (PM 권고)** |
 
 ### 축 2 — InfoPanel 가드 패턴
 
-| 후보                                              | 장점                                                                                              | 단점                                                                                                              | 비고                                |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| (i) panel 자체 미렌더 (`info-panel-empty` 분기)   | 코드 변경 최소 — `selected && data && isRPhaseFocusable(selected)` 로 1줄                          | 사용자 인지 약함 (왜 빈 panel 인지 모름). 회귀 가드 검증성 낮음 (`info-panel-empty` 와 정상 빈 패널 구별 어려움)   | 차선                                |
-| **(ii) "R-Phase 미구현" 메시지**                  | 사용자 인지 ↑ (body name + "R<N> 진입 시 표시 예정"), 회귀 가드 검증성 ↑ (testid 명확), a11y 우수 | 코드 추가량 약간 ↑ (~15 lines 신규 분기 + i18n 텍스트)                                                            | **채택 (PM 추정 권고)**             |
-| (iii) selectedBody 자체 차단 (useEffect 가드)     | defense-in-depth UI 측 추가 분기 (외부 set 보호)                                                  | url-sync 가 이미 #415 가드로 차단하므로 외부 진입 경로 거의 없음. 추가 복잡도 대비 ROI 낮음                       | 보강용 (DoD-2 채택안에 보조 박제)   |
+| 후보                                            | 장점                                                                                              | 단점                                                                                                             | 비고                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| (i) panel 자체 미렌더 (`info-panel-empty` 분기) | 코드 변경 최소 — `selected && data && isRPhaseFocusable(selected)` 로 1줄                         | 사용자 인지 약함 (왜 빈 panel 인지 모름). 회귀 가드 검증성 낮음 (`info-panel-empty` 와 정상 빈 패널 구별 어려움) | 차선                              |
+| **(ii) "R-Phase 미구현" 메시지**                | 사용자 인지 ↑ (body name + "R<N> 진입 시 표시 예정"), 회귀 가드 검증성 ↑ (testid 명확), a11y 우수 | 코드 추가량 약간 ↑ (~15 lines 신규 분기 + i18n 텍스트)                                                           | **채택 (PM 추정 권고)**           |
+| (iii) selectedBody 자체 차단 (useEffect 가드)   | defense-in-depth UI 측 추가 분기 (외부 set 보호)                                                  | url-sync 가 이미 #415 가드로 차단하므로 외부 진입 경로 거의 없음. 추가 복잡도 대비 ROI 낮음                      | 보강용 (DoD-2 채택안에 보조 박제) |
 
 **채택 근거**:
+
 - 사용자 D-T2 학습: 사용자가 "이전 잔재" 라고 보고한 사례에서 명시적 안내가 인지 도움
 - 회귀 가드 ROI: `data-testid="info-panel-r-phase-blocked"` 명확 단언이 단위 테스트 + browser-verify 매트릭스 모두에서 검증 가능
 - (iii) 보강: 본 채택안 (ii) 의 분기 자체가 selectedBody 직접 차단 분기를 포함하므로 (iii) 는 (ii) 안에 자연 흡수
@@ -90,29 +91,30 @@ PM 라운드 2 인계 핵심 결정 (a). 본 PR 책임 단일화를 위해 P10 �
 
 본 PR 머지 후 R-Phase 외 body focus 시도의 차단 매트릭스:
 
-| 분기 | 진입 경로                                            | UI 가드 (본 PR Top 2)              | UI 가드 (#402 Top 1)              | scene 가드 (#402)                 | URL 가드 (#415)                  | 1차 차단 위치    |
-| ---- | ---------------------------------------------------- | ----------------------------------- | --------------------------------- | --------------------------------- | --------------------------------- | ---------------- |
-| 1    | focus-quick-buttons 클릭 (R4+ body)                  | (도달 안 함)                        | **disabled (이벤트 차단)**        | (도달 안 함)                      | (도달 안 함)                      | UI #402         |
-| 2    | CelestialTree 클릭 (R4+ body)                        | **disabled (이벤트 차단)** ★ 본 PR | (도달 안 함)                      | (도달 안 함)                      | (도달 안 함)                      | UI 본 PR        |
-| 3    | InfoPanel selectedBody set (외부 경로, R4+ body)     | **R-Phase 미구현 메시지** ★ 본 PR  | (도달 안 함)                      | (도달 안 함)                      | (도달 안 함)                      | UI 본 PR        |
-| 4    | 외부 URL `?focus=earth` 직접 진입                    | (도달 안 함, 페이지 외부)           | (도달 안 함, store 경유)          | **isRPhaseFocusable=false 차단**  | **store mutation 차단 (1차)**    | URL #415        |
-| 5    | scene focusOn API 직접 호출 (시나리오/preset 등)     | (도달 안 함)                        | (도달 안 함)                      | **simulation-core focusOn emit 차단** | (도달 안 함)                  | scene #402      |
-| 6    | (정상) sun/mercury/venus 모든 진입 경로              | enabled                             | enabled                           | isRPhaseFocusable=true            | store mutation 정상              | (정상 통과)      |
+| 분기 | 진입 경로                                        | UI 가드 (본 PR Top 2)              | UI 가드 (#402 Top 1)       | scene 가드 (#402)                     | URL 가드 (#415)               | 1차 차단 위치 |
+| ---- | ------------------------------------------------ | ---------------------------------- | -------------------------- | ------------------------------------- | ----------------------------- | ------------- |
+| 1    | focus-quick-buttons 클릭 (R4+ body)              | (도달 안 함)                       | **disabled (이벤트 차단)** | (도달 안 함)                          | (도달 안 함)                  | UI #402       |
+| 2    | CelestialTree 클릭 (R4+ body)                    | **disabled (이벤트 차단)** ★ 본 PR | (도달 안 함)               | (도달 안 함)                          | (도달 안 함)                  | UI 본 PR      |
+| 3    | InfoPanel selectedBody set (외부 경로, R4+ body) | **R-Phase 미구현 메시지** ★ 본 PR  | (도달 안 함)               | (도달 안 함)                          | (도달 안 함)                  | UI 본 PR      |
+| 4    | 외부 URL `?focus=earth` 직접 진입                | (도달 안 함, 페이지 외부)          | (도달 안 함, store 경유)   | **isRPhaseFocusable=false 차단**      | **store mutation 차단 (1차)** | URL #415      |
+| 5    | scene focusOn API 직접 호출 (시나리오/preset 등) | (도달 안 함)                       | (도달 안 함)               | **simulation-core focusOn emit 차단** | (도달 안 함)                  | scene #402    |
+| 6    | (정상) sun/mercury/venus 모든 진입 경로          | enabled                            | enabled                    | isRPhaseFocusable=true                | store mutation 정상           | (정상 통과)   |
 
 **directionality**:
+
 - 본 PR 분기 2/3 차단은 1차 방어선 (사용자 즉시 피드백 — disabled / 메시지)
 - #402 / #415 는 다른 진입 경로 1차 방어선 + 본 PR 분기 1차 방어 통과 시 2차 방어 (scene 가드는 모든 분기의 마지막 방어선)
 - 진입 경로 N=5 → 가드 N=3 직교 매트릭스. 새 진입점 추가 시 매트릭스 1행 추가 + 가드 박제 의무
 
 ### 축 4 — NO-OP 분기 평가 (UI 가드 추가의 비용 vs 가치)
 
-| 평가 항목       | 비용                                                                                                                                                    | 가치                                                                                                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 코드 변경       | celestial-tree.tsx (~30 lines) + celestial-info-panel.tsx (~15 lines)                                                                                   | UI 측 분기 2/3 차단 (위 매트릭스)                                                                                                                                    |
-| 테스트          | celestial-tree.test.tsx (신규 ~80 lines) + celestial-info-panel.test.tsx (신규 또는 갱신 ~60 lines) + browser-verify 시나리오 확장 (~50 lines)          | 사용자 D-T2 잔재 인지 차단 — #412 BODY_SCALE 정책의 진짜 보완 (R4+ body 시각 활성 차단 + focus 진입 차단 동시)                                                       |
-| ADR / cross-val | 본 ADR (~600 lines) + cross-validate 1회                                                                                                                | defense-in-depth UI 측 2번째 축 박제 — R4 진입 시 자동 작동 (R_PHASE_BODY_ALLOWLIST 1줄 추가만으로 새 R-Phase body 가 자동 enabled)                                  |
-| 사용자 합의     | (PM 라운드 1 Q2=(iii) Q5=(C) 박제 — 추가 합의 비용 0)                                                                                                   | 사용자 D-T2 직접 보고 cluster 종결 (#412 ADR §결과 §재검토 트리거 1)                                                                                                 |
-| **종합**        | 추가 PR 1 (small~medium)                                                                                                                                | **NO-OP 거부, UI 가드 추가 채택** — 사용자 합의 강함 + 회귀 가드 ROI 높음                                                                                            |
+| 평가 항목       | 비용                                                                                                                                           | 가치                                                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 코드 변경       | celestial-tree.tsx (~30 lines) + celestial-info-panel.tsx (~15 lines)                                                                          | UI 측 분기 2/3 차단 (위 매트릭스)                                                                                                   |
+| 테스트          | celestial-tree.test.tsx (신규 ~80 lines) + celestial-info-panel.test.tsx (신규 또는 갱신 ~60 lines) + browser-verify 시나리오 확장 (~50 lines) | 사용자 D-T2 잔재 인지 차단 — #412 BODY_SCALE 정책의 진짜 보완 (R4+ body 시각 활성 차단 + focus 진입 차단 동시)                      |
+| ADR / cross-val | 본 ADR (~600 lines) + cross-validate 1회                                                                                                       | defense-in-depth UI 측 2번째 축 박제 — R4 진입 시 자동 작동 (R_PHASE_BODY_ALLOWLIST 1줄 추가만으로 새 R-Phase body 가 자동 enabled) |
+| 사용자 합의     | (PM 라운드 1 Q2=(iii) Q5=(C) 박제 — 추가 합의 비용 0)                                                                                          | 사용자 D-T2 직접 보고 cluster 종결 (#412 ADR §결과 §재검토 트리거 1)                                                                |
+| **종합**        | 추가 PR 1 (small~medium)                                                                                                                       | **NO-OP 거부, UI 가드 추가 채택** — 사용자 합의 강함 + 회귀 가드 ROI 높음                                                           |
 
 ---
 
@@ -172,6 +174,7 @@ const renderBody = (id: string, depth = 0) => {
 ```
 
 **검증 단언** (`celestial-tree.test.tsx`):
+
 - `tree-sun` / `tree-mercury` / `tree-venus`: `disabled` 없음, `aria-disabled="false"`, `data-r-phase-disabled="false"`
 - `tree-earth` / `tree-jupiter` / `tree-neptune`: `disabled` 있음, `aria-disabled="true"`, `data-r-phase-disabled="true"`, `title` 속성 박제
 - 강제 click 시 `sendCommand` 호출 0회 (jest mock)
@@ -183,11 +186,7 @@ const renderBody = (id: string, depth = 0) => {
 import { isRPhaseFocusable } from '@astro-simulator/core';
 
 if (!selected || !data) {
-  return (
-    <div data-testid="info-panel-empty">
-      {/* 기존 빈 패널 */}
-    </div>
-  );
+  return <div data-testid="info-panel-empty">{/* 기존 빈 패널 */}</div>;
 }
 
 if (!isRPhaseFocusable(selected)) {
@@ -205,6 +204,7 @@ if (!isRPhaseFocusable(selected)) {
 ```
 
 **검증 단언** (`celestial-info-panel.test.tsx`):
+
 - `selectedBodyId === null`: `info-panel-empty` 렌더
 - `selectedBodyId === 'sun'`: `info-panel` 렌더 (정상)
 - `selectedBodyId === 'earth'`: `info-panel-r-phase-blocked` 렌더 + body name 포함 + R-Phase 메시지 박제
@@ -375,3 +375,56 @@ node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
 - volt [#78](https://github.com/coseo12/volt/issues/78) (헤드리스 ≠ 실 브라우저)
 - volt [#82](https://github.com/coseo12/volt/issues/82) (worktree base drift)
 - volt [#83](https://github.com/coseo12/volt/issues/83) (sub-agent cross-validate 응답 박제)
+
+---
+
+## Amendment 2026-05-08 — ScenarioPresets 분기 7 추가 (#404)
+
+- **상태**: Accepted
+- **날짜**: 2026-05-08
+- **트리거**: 본 ADR §재검토 트리거 2번 ("defense-in-depth 분기 매트릭스 추가 — 새 UI 진입점 신설 시 매트릭스 1행 추가 + 본 ADR 갱신") 직접 만족
+- **관련 ADR**: [`20260508-404-scenario-presets-r-phase-guard.md`](20260508-404-scenario-presets-r-phase-guard.md) (Top 3 신규 ADR)
+- **관련 PR**: #404 developer PR (이슈 #404)
+
+### 배경
+
+#404 (Top 3 ScenarioPresets) 가 defense-in-depth UI 측 _세 번째 축_ 박제 — focus-quick-buttons (#402) → CelestialTree + InfoPanel (#403) → **ScenarioPresets (#404)** 시리즈. 본 #403 ADR §결정 3 의 **분기 매트릭스가 시리즈 SSoT** 이므로 분기 7 박제 책임은 본 ADR Amendment 가 담당 (단일 SSoT 유지, drift 방지). #404 ADR §결정 2 (축 2 후보 c, 둘 다 채택) 가 본 Amendment 박제를 명시 인계.
+
+### Amendment 결정
+
+**분기 매트릭스 갱신** (위 §결정 3 매트릭스 → 본 Amendment 가 N=5 → N=7 갱신):
+
+| 분기              | 진입 경로                                             | UI 가드 (Top 1 #402) | UI 가드 (Top 2 #403) | UI 가드 (Top 3 #404)         | scene 가드 (#402)                     | URL 가드 (#415)               | 1차 차단 위치 |
+| ----------------- | ----------------------------------------------------- | -------------------- | -------------------- | ---------------------------- | ------------------------------------- | ----------------------------- | ------------- |
+| 1                 | focus-quick-buttons 클릭 (R4+ body)                   | **disabled**         | (도달 안 함)         | (도달 안 함)                 | (도달 안 함)                          | (도달 안 함)                  | UI #402       |
+| 2                 | CelestialTree 클릭 (R4+ body)                         | (도달 안 함)         | **disabled**         | (도달 안 함)                 | (도달 안 함)                          | (도달 안 함)                  | UI #403       |
+| 3                 | InfoPanel selectedBody set (R4+ body)                 | (도달 안 함)         | **R-Phase 메시지**   | (도달 안 함)                 | (도달 안 함)                          | (도달 안 함)                  | UI #403       |
+| 4                 | 외부 URL `?focus=earth` 직접 진입                     | (도달 안 함)         | (도달 안 함)         | (도달 안 함)                 | **isRPhaseFocusable=false 차단**      | **store mutation 차단 (1차)** | URL #415      |
+| 5                 | scene focusOn API 직접 호출                           | (도달 안 함)         | (도달 안 함)         | (도달 안 함)                 | **simulation-core focusOn emit 차단** | (도달 안 함)                  | scene #402    |
+| 6                 | (정상) sun/mercury/venus 모든 진입 경로               | enabled              | enabled              | enabled                      | isRPhaseFocusable=true                | store mutation 정상           | (정상 통과)   |
+| **7** ★ #404 신규 | **ScenarioPresets preset 클릭 (R6 미구현 body 영향)** | (도달 안 함)         | (도달 안 함)         | **disabled (이벤트 차단)** ★ | (도달 안 함, mass mutation only)      | (도달 안 함, URL 무관)        | UI #404       |
+
+**핵심 변화**:
+
+- 분기 N=5 → **N=7** (분기 6 정상 통과 + 분기 7 #404 신규 추가). 분기 N=5 는 **차단 분기 수** 의미가 아니라 **표 전체 행 수**. #404 신규 분기 7 추가로 **차단 분기 5 + 정상 분기 1 + #404 신규 차단 분기 1 = N=7**
+- 분기 7 1차 차단 위치는 **UI #404** (ScenarioPresets disabled). focus 가 아닌 **mass mutation** 만 발생 → scene/URL 가드 도달 안 함 (분기 1/2/3 와 동일 단일 방어선 패턴)
+- a11y 4축 (`disabled` + `aria-disabled` + `title` + `data-r-phase-disabled`) 시리즈 패턴 일관
+
+### Amendment 후 cross-link 박제
+
+- 본 Amendment → #404 ADR 인용 (`20260508-404-scenario-presets-r-phase-guard.md`)
+- #404 ADR §결정 2 → 본 Amendment 인용 (단방향 의존 패턴 — Gemini cross-validate "정보 파편화·드리프트 방지 최선의 방법" 평가)
+
+### 5곳/4곳/7곳 표기 명확화 (reviewer 권고 1, 2 cross-link 해소)
+
+ADR PR #431 reviewer 비차단 권고 1, 2 (5곳/4곳/7곳 표기 drift) 해소:
+
+- **5곳** — #402 ADR §결정 4 의 **R-Phase 진입 시 동시 박제 의무 5곳** (allowlist body id / R-Phase ADR cross-link / browser-verify expected list / CHANGELOG / wasm-safe sub-path 검증). 본 매트릭스 분기 수와 무관
+- **4곳** — #412 ADR (BODY_SCALE R-Phase 정책) §"R-Phase 진입 의무 체크리스트" 4곳 (BODY_SCALE / R_PHASE_BODY_ALLOWLIST / FOCUS_BODIES / R-Phase ADR + CHANGELOG = 5곳 중 4곳 박제 ↔ 5곳 SSoT 와의 부분집합 의미)
+- **7곳** — 본 매트릭스 분기 N=7 (defense-in-depth 진입 경로 매트릭스 행 수). #412 §체크리스트 합집합과는 무관
+- **결론**: 5/4/7 모두 **다른 축의 카운트** — 동일 SSoT drift 아님. 각 SSoT 의 의미 명확 박제로 reviewer 권고 1, 2 해소
+
+### 회귀 가드
+
+- `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` 시나리오 6 (#404 ADR §결정 §browser-verify 시나리오 6 박제) 가 분기 7 작동 자동 회귀 가드. CI `detect-and-test` job 통합 (기존 verify:r-phase-allowlist 패턴 일관)
+- R6 (jupiter) 진입 시 본 매트릭스 분기 7 의 차단/정상 분기 자동 전환 검증 (`R_PHASE_BODY_ALLOWLIST` 1줄 추가만으로 zero-touch — #404 ADR §Concrete Prediction 인용)
