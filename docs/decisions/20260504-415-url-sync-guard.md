@@ -270,7 +270,7 @@ DoD-2 충족:
 
 ### 재검토 조건
 
-1. **sim-context useSimCommand race condition 자체 해결 시** → line 78 fallback 의 존재 이유 소멸. 본 ADR §결정 1 의 가드 분기는 유지하되 line 77 + 78 의 line 78 단독 제거 가능. 별도 후속 ADR / 이슈 박제 필요
+1. **sim-context useSimCommand race condition 자체 해결 시** → line 78 fallback 의 존재 이유 소멸. 본 ADR §결정 1 의 가드 분기는 유지하되 line 77 + 78 의 line 78 단독 제거 가능. 별도 후속 ADR / 이슈 박제 필요 — **충족 완료 (#419 ADR Accepted, 2026-05-10) — §Amendment (2026-05-10) 참조**
 2. **다른 외부 진입점 (deep link / programmatic API / IPC) 신설 시** → 본 ADR §결정 5 의 6번째 박제 항목 (외부 진입점 가드 의무) 적용. 새 진입점도 `isRPhaseFocusable` 가드 통합
 3. **R_PHASE_BODY_ALLOWLIST 가 5개 이상 도달 시** → 부모 ADR §재검토 조건 2 (자동화 ROI 재평가) 와 함께 평가. 본 ADR §결정 1~4 자동화 가능성 검토
 4. **store mutation 측면 다른 직접 호출 발견 시** (예: programmatic IPC / external store action 호출 등) → 본 ADR amendment 로 4번째 가드 축 박제 또는 별도 ADR
@@ -378,3 +378,24 @@ expect(warnSpy.mock.calls[0][0]).toMatch(/R-Phase 미진입/);
 - **C. 성능 영향 (실측 가능)**: `isRPhaseFocusable` 은 useEffect 초기 1회 + Set.has lookup 1회 = O(1) 상수 시간 (< 0.1ms). 클라이언트 성능 측정 불필요. dev 환경 console.warn 도 production 빌드에서 dead-code elimination (NODE_ENV 가드)
   - 검증: production 번들에 `R-Phase 미진입` 문자열 부재 확인 (`grep -r "R-Phase 미진입" apps/web/.next/static` 0건) — production 빌드 후 회귀 가드 옵션
   - 실패 시 대응: NODE_ENV 가드 누락 의심 — Edit 후 build 재검증
+
+---
+
+## Amendment (2026-05-10) — §재검토 조건 1 충족 (#419)
+
+ADR `docs/decisions/20260510-419-sim-canvas-mount-race.md` (Accepted) 가 본 ADR §재검토 조건 1 의 `useSimCommand` race condition 본질 해결을 박제. volt #91 ADR Amendment 위치 결정 트리 (b) 패턴 — 신규 이슈 (#419) 가 부모 ADR §재검토 조건을 충족 → 신규 ADR + 부모 ADR Amendment 동시 박제.
+
+### 변경 사항
+
+- **§결정 1 (옵션 B = D2) 의 url-sync.tsx line 104 `setSelectedBody(urlFocus)` race fallback 제거** — #419 §결정 2 에서 처리. 본 ADR §결정 1 의 가드 분기는 그대로 유지 (sendCommand 단독으로 R-Phase allowlist 외 body 차단 + R-Phase 진입 body 의 emit chain 자동 sync)
+- **§배경 line 50-58 의 race condition 분석** 은 historical 기록으로 보존 — drift 분석의 정확성을 미래 관찰자가 재구성 가능하게 함
+
+### 연쇄 효과
+
+- 본 ADR §결정 4 (단위 테스트 매트릭스) 의 케이스 1 단언이 race fallback 부재 환경 가정으로 재해석 — sendCommand 호출만 확인. selectedBodyId 단언은 browser-verify (e2e) 이관 (#419 §결정 3-2)
+- 본 ADR §재검토 조건 1 → "충족 완료 (#419 ADR Accepted, 2026-05-10)" 로 박제
+- 본 ADR §재검토 조건 2 (외부 진입점 신설 시 가드) 는 race 부재 환경이므로 외부 진입점 race 인식 의무 소멸 — 가드 의무만 박제
+
+### Cross-link
+
+`docs/decisions/20260510-419-sim-canvas-mount-race.md` — 본 Amendment 의 근거 ADR (mount 순서 정합화, A1-E early return 채택)
