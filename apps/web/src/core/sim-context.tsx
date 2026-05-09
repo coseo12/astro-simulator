@@ -21,8 +21,15 @@ export function SimCommandProvider({
   core: SimulationCore | null;
   children: ReactNode;
 }) {
+  // #419 — core null 시 children 렌더 보류 (mount 순서 정합화).
+  // ADR: docs/decisions/20260510-419-sim-canvas-mount-race.md §결정 1 (A1-E early return).
+  // sim-canvas.tsx 의 비동기 core 생성 (useEffect → setCore) 이 완료된 후에만 children 의 useEffect 가
+  // 발화 → sendCommand 가 항상 non-null core 호출 보장 → useSimCommand race condition 구조적 차단.
+  // 부모 ADR 20260504-415-url-sync-guard.md §재검토 조건 1 충족 (line 104 race fallback 의 존재 이유 소멸).
+  if (core === null) return null;
+
   const api: SimCommandApi = {
-    command: (cmd) => core?.command(cmd),
+    command: (cmd) => core.command(cmd),
   };
   return <SimCommandContext.Provider value={api}>{children}</SimCommandContext.Provider>;
 }

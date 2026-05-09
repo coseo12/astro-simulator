@@ -53,7 +53,7 @@ export function UrlSync() {
   const physicsEngine = useSimStore((s) => s.physicsEngine);
   const setMode = useSimStore((s) => s.setMode);
   const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
-  const setSelectedBody = useSimStore((s) => s.setSelectedBody);
+  // #419 §결정 2 — `setSelectedBody` 직접 호출 제거 (race fallback 폐기, event 단일 진실원 회복).
 
   const sendCommand = useSimCommand();
   const initialized = useRef(false);
@@ -96,12 +96,12 @@ export function UrlSync() {
         }
       } else {
         // 카메라 focus + store selectedBodyId sync (info-panel 표시 트리거).
-        // line 77 (sendCommand) + line 78 (setSelectedBody) 둘 다 보존:
-        //   - sendCommand({type:'focusOn'}) → simulation-core focusOn → emit 'bodySelected' → core-adapter → setSelectedBody 자동
-        //   - setSelectedBody(urlFocus) 는 race condition fallback (sim-canvas mount 전 useSimCommand no-op 시 보호)
-        // race condition 자체 해결은 후속 이슈 #419 (재검토 조건 1).
+        // #419 ADR `docs/decisions/20260510-419-sim-canvas-mount-race.md` §결정 2 (mount 순서 정합화 후 race fallback 제거).
+        //   sendCommand({type:'focusOn'}) → simulation-core focusOn → emit 'bodySelected' → core-adapter → setSelectedBody 자동
+        //   race condition 부재로 setSelectedBody fallback 제거 — event 단일 진실원
+        //   (R1 #334+#335 ADR `20260425-r1-store-scene-sync-unification.md` §결정 3 정신 회복).
+        // 부모 ADR `20260504-415-url-sync-guard.md` §재검토 조건 1 충족.
         sendCommand({ type: 'focusOn', bodyId: urlFocus });
-        setSelectedBody(urlFocus);
       }
     }
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
