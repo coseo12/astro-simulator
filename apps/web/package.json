@@ -14,6 +14,7 @@
     "r1:guard:px-ratio": "node scripts/r1-ui-regression-guard.mjs --measure-px-ratio",
     "verify:379-lod": "node scripts/browser-verify-379-lod.mjs",
     "verify:378-focus": "node scripts/browser-verify-378-focus.mjs",
+    "verify:380-zoom": "node scripts/browser-verify-380-zoom.mjs",
     "verify:397-residual": "node scripts/browser-verify-397-residual.mjs",
     "verify:focus-transition": "node scripts/browser-verify-focus-transition.mjs",
     "verify:r-phase-allowlist": "node scripts/browser-verify-r-phase-allowlist.mjs"

@@ -586,6 +586,18 @@ export function createSolarSystemScene(
   let tierTransitionInProgress = false;
   const setTier = (tier: Tier) => {
     if (tier === activeTier) return;
+    // 가드 G8a (#380 G8 fix) — tier 전환 결정 직후 즉시 입력 잠금.
+    // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §Amendment 2026-05-11 §G8a.
+    //
+    // setTier 진입 후 mesh.scaling / boundingInfo / origin shift / mesh.position 루프 등
+    // 수 ms 작업 동안 wheel/pinch 입력이 ArcRotateCamera native handler 에 도달해 `radius` 를
+    // 직접 변경하면, 곧이어 시작될 tween 의 시작값과 충돌해 jitter (사용자 D-T2 양상 B) 발생.
+    // 본 가드는 **준비 작업 시작 전** 입력을 차단하여 race 윈도우를 0 ms 로 축소.
+    //
+    // 가드 B (`tierTransitionInProgress = true`, 아래 line 663) 와 직교 — 본 가드는 입력 자체를
+    // scene 차원에서 차단, 가드 B 는 매 프레임 tier 재판정에서 setTier 재진입 차단.
+    // runTierTransition 내부의 detachControl 은 idempotent 흡수.
+    scene.detachControl();
     const oldScale = renderScaleForTier(activeTier);
     activeTier = tier;
     const newScale = renderScaleForTier(activeTier);
@@ -800,22 +812,25 @@ export function createSolarSystemScene(
       updateAtKepler(jd);
     }
 
-    // Floating Origin primary follow (ADR §1-B 확장).
+    // 가드 C (#380 G3 fix) — Floating Origin primary follow sub-frame 이동.
+    // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §결정 §가드 C.
     //
-    // focus body 는 태양을 공전하므로 매 프레임 world 좌표가 바뀐다. origin 을 고정하면
-    // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
-    // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
-    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
+    // ## 변경 전 race 분기 (G3)
     //
-    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
-    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
-    if (activeTier === 'body' && focusBodyIdForAssert) {
-      const focusWorld = worldPositions.get(focusBodyIdForAssert);
-      if (focusWorld) {
-        floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
-      }
-    }
-
+    // 이전 순서: (a) setOriginToBody → (b) mesh.position 갱신 → (c) Babylon render → (d)
+    // cam.globalPosition 산출 → (e) updateTierByCamera 가 (d) 로 tier 재판정.
+    // T3 body + focus 활성 시 (a) 가 origin 을 매 프레임 W_N 으로 점프시키지만, (d) 의
+    // cam.globalPosition 은 ArcRotateCamera 가 alpha/beta/radius/target 으로 산출 — target
+    // 이 mesh.absolutePosition 추적이 1 frame 지연되면 (e) 가 shift 전 좌표로 tier 판정 →
+    // 매 프레임 tier oscillate → setTier 매 프레임 발동 → detachControl race window 누적 →
+    // 최종 freeze.
+    //
+    // ## fix 사양 (mesh.position 갱신 후 setOriginToBody)
+    //
+    // 새 순서: (a') mesh.position 갱신 (이전 origin 기준) → (b') setOriginToBody → (c') 다음
+    // frame 의 mesh.position 은 새 origin 기준. 한 frame 내에서 mesh.position 과 origin 이
+    // 같은 reference frame 으로 정합 → cam.globalPosition 도 일관 → tier 재판정 race 차단.
+    //
     // Floating Origin 계약 (ADR `docs/decisions/20260422-floating-origin.md` §3):
     //   - `world` (worldPositions): Heliocentric 절대 좌표 (m) — Rust engine / Zustand store 와 동일
     //   - `local = floatingOrigin.toLocal(world)` : scene 삽입 직전 origin shift 적용 (m)
@@ -838,6 +853,25 @@ export function createSolarSystemScene(
         (world[1] - oy) * sceneUnitPerMeter,
         (world[2] - oz) * sceneUnitPerMeter,
       );
+    }
+
+    // Floating Origin primary follow (ADR §1-B 확장) — **mesh.position 갱신 후 발동**.
+    //
+    // focus body 는 태양을 공전하므로 매 프레임 world 좌표가 바뀐다. origin 을 고정하면
+    // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
+    // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
+    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
+    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
+    //
+    // #380 가드 C — 본 호출이 mesh.position 루프 **이후** 에 위치하는 것이 핵심 race 차단.
+    // 이 순서를 역전하면 G3 분기 재발 — 위 주석 계약 SSoT 참조.
+    if (activeTier === 'body' && focusBodyIdForAssert) {
+      const focusWorld = worldPositions.get(focusBodyIdForAssert);
+      if (focusWorld) {
+        floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
+      }
     }
 
     // P12-A #298 — body mesh.scaling 은 1 로 고정 (kind 차등 / 거리 의존 과장 제거).
