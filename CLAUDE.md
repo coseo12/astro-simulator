@@ -340,6 +340,16 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
   - 일상 개발에서는 `cargo test --lib` 가 5분 내 완주하도록 재설계
 - **근거**: volt [#24](https://github.com/coseo12/volt/issues/24) 의 프로세스 레벨 확장 (2026-04-20 관찰). volt 캡처 예정
 - **agent-browser Chrome 좀비 변형** (volt [#79](https://github.com/coseo12/volt/issues/79)): qa / browser-test sub-agent 가 `agent-browser` 도구로 real Chrome 사용 후 세션 종료 시 정리 누락. 식별자 `agent-browser-chrome-<UUID>` user-data-dir (사용자 본 Chrome 영향 0). 본 세션 (2026-04-28) 실측 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU 관찰. **메인 루틴** (sub-agent 복귀 직후 의무): `pgrep -af "agent-browser-chrome-"` 검사 + 발견 시 `pkill -TERM -f "agent-browser-chrome-"` → 2초 대기 후 잔존 시 `pkill -KILL`. **sub-agent 루틴** (반환 직전 의무): `browser-test` 스킬 사용 후 동일 정리 명령 실행. agent-browser 도구 자체 cleanup 이 정상 case 에선 작동하나 sub-agent 비정상 종료 (timeout / SIGKILL / panic) 시 lineage 끊긴 좀비 잔존. cargo/next dev 의 `spawned_bg_pids` SSoT 가 직접 spawn 한 PID 만 커버하므로 도구 wrapper 가 spawn 한 child process 는 별도 검증 의무
+- **메인 dev/장기 프로세스 spawn 시점 lsof 선행 의무 (2026-05-10 incident — 이슈 [#440](https://github.com/coseo12/astro-simulator/issues/440))**: 메인 오케스트레이터가 `pnpm dev` / `pnpm start` / `cargo test --release` 등 장기 프로세스를 `run_in_background=true` 로 시작하기 **직전**, 사용 포트(3000 / 4000 / 기타)에 대해 `lsof -i :<port>` 선행 확인 의무. 점유 중이면 좀비 인지 + 사용자 보고 + 정리 후 재시작. **본 가드 위반 시 발생 시퀀스** (실측 2026-05-10): 좀비 (이전 세션 PID 97333, ETIME 3h 17m) 가 포트 3000 점유 → 메인이 새 dev spawn 시도 → EADDRINUSE 로 즉사 → 좀비가 HTTP 응답 → 메인이 "dev ready" 오인 → 사용자 D-T2 안내 → 사용자 자기 터미널 `pnpm dev` 시도 → EADDRINUSE → `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` → 사용자 보고 → forensic. 상세: [`docs/reports/20260510-419-dev-server-zombie-recurrence.md`](docs/reports/20260510-419-dev-server-zombie-recurrence.md). 위 "메인 루틴" (sub-agent 복귀 직후) 가드와 **직교** — 본 가드는 **메인이 직접 spawn 하는 시점** + **이전 세션 좀비 (sub-agent 추적 단위 외)** 검증.
+  ```bash
+  # 메인 dev/장기 프로세스 spawn 직전 의무 가드
+  PORT=3000
+  if lsof -i :$PORT > /dev/null 2>&1; then
+    echo "WARN: 포트 $PORT 점유 중 — 좀비 가능"
+    ps -p $(lsof -t -i :$PORT) -o pid,etime,command
+    # 사용자 확인 후 kill -TERM <PID> 진행
+  fi
+  ```
 
 ---
 
