@@ -1,7 +1,7 @@
 # ADR: #380 줌인 후 카메라 고정 — forensic 정적 조사 + Provisional fix 옵션 비교
 
-- **상태**: **Provisional** (실 D-T2 측정 후 Accepted 전이 — §재검토 조건)
-- **날짜**: 2026-05-09
+- **상태**: **Accepted** (2026-05-11 Amendment — §Amendment 2026-05-11 사용자 D-T2 양상 기반 G8 신규 + Option D+G8a 확정)
+- **날짜**: 2026-05-09 (initial Provisional) / 2026-05-11 (Amendment Accepted)
 - **결정자**: architect
 - **이슈**: [#380](https://github.com/coseo12/astro-simulator/issues/380) (R3 D-T2 가드 발견 #4)
 - **선행**:
@@ -226,3 +226,131 @@ PR #377 (R3 fix) 머지 시점 (2026-04-30) 직전 카메라/tier 관련 핵심 
   - 결합 간과: ✓ G1~G7 모두 결합 분기로 박제 (Option D 권장 명시)
   - 폐기 프레이밍: ✓ P12 ADR DEPRECATED 명시 + 코드 잔존 영향 박제
   - 순수주의: △ Option A 단독을 "최소 변경 우선" 으로 미는 편향 가능 — Option D 권장은 R-Phase defense-in-depth 시리즈 18회 누적 근거로 정당화. 다만 fix 단계 cross-validate 에서 Gemini 의 "단일 원인 확정 후 단독 fix" 반론 진지 검토 필요
+
+---
+
+## Amendment 2026-05-11 — 사용자 D-T2 양상 기반 G8 신규 + Option D+G8a 확정
+
+### 사용자 D-T2 응답 인용 (2026-05-11)
+
+원 ADR §재검토 조건 의 M1~M7 매트릭스 (정확한 radius / tier 번호 / DevTools 값) 는 미측정. 그러나 사용자 양상 보고는 명확:
+
+- **A. 어떤 인터랙션 시 발생?** → 줌인/줌아웃 **둘 다**
+- **B. 양태?** → "tier 전환 시 카메라가 줌인아웃을 하면서 **흔들려**" (jitter)
+- **C. 시점?** → **tier 전환 시점**
+
+### 통합 가설 — G2 + G8 동일 근본 원인의 두 인지
+
+원 이슈 ("줌인 후 카메라 고정") + 본 D-T2 발견 ("tier 전환 시 jitter") 을 동일 원인의 두 단계로 통합 추정:
+
+1. **tier transition tween 시작** — `runTierTransition` 이 카메라 `radius` 를 새 tier 의 target 으로 Babylon `Animation.CreateAndStartAnimation` tween 시작 (`tier-transition.ts:251` 의 `scene.detachControl()` 직전 / 직후 짧은 윈도우 존재)
+2. **사용자 줌 입력 동시 발생 (G8 race)** — 사용자가 transition 시작 트리거 직전·직후에 휠/핀치/터치 입력 → ArcRotateCamera 의 내장 input handler 가 `radius` 를 직접 변경 → tween 의 시작값 / 진행값과 즉시 충돌 → **jitter (흔들림)** ← G8 신규 가설
+3. **transition 완료 시점** — `tier-transition.ts:189-191` lowerRadiusLimit 한 방향 완화 (G2) → 누적 drift 매 transition 마다 적층
+4. **최종 freeze (원 이슈)** — 누적된 lowerRadiusLimit drift + race 잔존으로 radius 가 lowerRadiusLimit 에 도달 + 추가 입력이 tween animatable 잔존과 충돌 → 무반응
+
+→ **G2 (high) + G8 (신규 high)** 결합. 단일 fix (Option D + G8 가드) 로 두 인지 (jitter + freeze) 동시 해결 가능.
+
+### G8 신규 가설 박제
+
+**G8: Tier transition tween + 사용자 입력 race**
+
+- **분기**: tier transition 진행 중 `scene.detachControl()` 가 호출되지만, transition 시작 트리거 (`updateTierByCamera` 가 매 프레임 cam.globalPosition 으로 tier 재판정) 와 detachControl 호출 사이에 **수 ms 윈도우** 존재. 이 윈도우 내 휠/핀치 이벤트가 ArcRotateCamera 의 native handler 에 도달하면 `radius` 를 직접 변경 + tween 도 같은 `radius` 를 변경 → 동일 frame 내 두 변경원 충돌
+- **사용자 인지 매핑**: A (줌인/줌아웃 둘 다) — race 는 입력 방향과 무관 / B (jitter) — 두 변경원이 매 frame 다른 값 산출 / C (tier 전환 시점) — race 는 transition 시작 윈도우에서만 발생
+- **진단 비용**: △ tier transition 시작 시 wheel event 도달 횟수 카운터
+- **fix 비용**: ⭐~△ 가드 옵션에 따라 (G8a 가장 단순)
+- **회귀 위험**: △ transition 중 사용자 입력이 즉시 반응하지 않는 UX 변화 (의도된 trade-off)
+- **R-Phase 의존**: 비의존 (모든 R-Phase 에서 동일 분기)
+- **우선순위**: **High** (사용자 D-T2 양상과 직접 일치)
+
+### G8 가드 옵션 비교
+
+| 옵션 | 메커니즘 | 장점 | 단점 |
+|---|---|---|---|
+| **G8a** — transition 중 input lock (`scene.detachControl()` 즉시 발동) | tier 전환 결정 직후 (tween 시작 *전*) detachControl 즉시 호출. 트랜지션 종료 후 attachControl | 가장 단순 + UX 명확 (transition 동안 입력 무시). 기존 detachControl/attachControl 인프라 재사용. 구현 1~2 라인 | transition 진행 중 사용자 입력 응답 안 함 (200~500ms 정도). 빠른 연속 줌 시 체감 |
+| **G8b** — input 큐잉 + transition 완료 후 적용 | transition 동안 wheel/pinch 이벤트 수집 → 완료 직후 누적값 적용 | 입력 손실 없음 | 구현 복잡 (queue + replay). attachControl 직후 점프 효과 (큐 누적값이 한꺼번에 적용) → 새로운 jitter 생성 위험 |
+| **G8c** — transition 자체 취소 가능 (사용자 입력 우선) | 사용자 입력 발생 시 진행 중 transition tween 중단 + animatable 정리 + 새 tier 재판정 | 사용자 의도 우선 | tier oscillate 분기와 충돌 (#408 fix 가 oscillate 차단을 transition 비취소 전제로 박제). animatable 누수 위험 (G7 가설) |
+
+**권장: G8a** — 가장 단순 + 기존 인프라 재사용 + 회귀 위험 최소. detachControl 호출을 **transition 결정 직후 + tween 시작 전** 으로 이동만 하면 race 윈도우 0 으로 축소.
+
+### Option D + G8a 확정 (defense-in-depth 4 가드)
+
+원 ADR Option D (A+B+C) + G8a 추가 = **A+B+C+G8a** 4 가드 직교 적용. R-Phase 시리즈 (#402/#403/#404) defense-in-depth Top 1/2/3 패턴의 4 가드 변형 (#380 = Top 4).
+
+- **A. lowerRadiusLimit tier 별 동적** — `computeLowerRadiusLimit(tier)` 헬퍼, 양방향 변경 (G1)
+- **B. tier 판정 in-flight 잠금** — `updateTierByCamera` 에 transition in-flight 플래그 (G2)
+- **C. T3 body primary follow sub-frame 이동** — `setOriginToBody` 를 `onAfterRender` 로 (G3)
+- **G8a. Transition tween + 사용자 입력 race 차단** — `scene.detachControl()` 호출을 transition 결정 직후로 이동, tween 시작 전 race 윈도우 0 화
+
+### Concrete Predictions 갱신 (5 → 7 건)
+
+원 ADR §Concrete Predictions 의 5 건 + G8 fix 검증 prediction 2 건 추가:
+
+6. **G8 jitter 차단 Prediction**: G8a 가드 적용 후 사용자 D-T2 재현 (tier 전환 시점 휠 회전 5회 / 1초 간격) 시 카메라 `radius` 변화율이 transition 진행 중 단조 (휠 입력으로 인한 spike 없음). jitter 0회.
+7. **회귀 가드 Prediction**: 단위 테스트 `tier-transition.test.ts` 에 mock scene `detachControl` spy 추가, transition 시작 시점에 detachControl 이 tween 시작 *전* 호출되는지 assertion. browser-verify 시나리오에 "tier 전환 + 빠른 휠 회전" 케이스 박제.
+
+### Status 전이 — Provisional → Accepted
+
+- 원 사유 (Provisional 보류): "사용자 D-T2 매트릭스 미수령 → 단일 원인 확정 불가"
+- 전이 사유 (Accepted): 사용자 D-T2 양상 보고로 G2 + G8 통합 가설 명확화 + Option D+G8a 4 가드 직교 fix 사양 확정. 정확한 radius / tier 번호 측정값은 미수령이나 양상 (jitter at tier transition) 이 가설을 단일 원인 군집으로 좁히기 충분
+- developer 단계 진입 가능 — `stage:planning → stage:dev`
+
+### 후속 이슈 분리 가능 항목 (범위 외 잠재 발견)
+
+- **G6 WebGL context lost** — 여전히 미관찰 (사용자 D-T2 에서 freeze 양태가 "흔들림" 으로 한정). 별도 분리 보류 (재발 시 #380 후속으로 분리)
+- **모바일 핀치 경로 G8 변형** — #427 에서 별도 검증
+- **G8b/G8c 차후 검토** — G8a 의 사용자 입력 손실 UX 가 실측에서 거슬리면 G8b 큐잉으로 격상. 격상 trigger 데이터 수집은 [#444](https://github.com/coseo12/astro-simulator/issues/444) 에서 운영
+- **cross-validate 고유 발견 후속 6 건** — [#444](https://github.com/coseo12/astro-simulator/issues/444) (F1 입력 계측) / [#445](https://github.com/coseo12/astro-simulator/issues/445) (F2 CameraLockManager) / [#446](https://github.com/coseo12/astro-simulator/issues/446) (F3 updateTierByCamera 순수 분리) / [#447](https://github.com/coseo12/astro-simulator/issues/447) (F4 시각 큐) / [#448](https://github.com/coseo12/astro-simulator/issues/448) (F5 저사양 프로파일링) / [#449](https://github.com/coseo12/astro-simulator/issues/449) (F6 용어사전) — Gemini 2026-05-11 고유 발견 7 건 중 F7 (주석 보강) 만 현 PR 범위 내
+
+## 교차검증 반영 사항 (Amendment 2026-05-11)
+
+본 Amendment 박제 직후 cross-validate 1회 호출 — Gemini 두 번째 시각으로 G2+G8 통합 가설 / Option D+G8a 부수 영향 / G8a/G8b/G8c 트레이드오프 / Claude 편향 셀프 체크.
+
+### 호출 전 Claude 편향 셀프 체크
+
+- **낙관적 일정**: ✓ Amendment + cross-validate + developer 단계 진입 순차 명시 (단일 PR 일정 미박제는 의도)
+- **결합 간과**: ✓ G2 + G8 통합 가설 명시 + Option D 의 A/B/C 와 G8a 직교성 박제
+- **폐기 프레이밍**: ✓ Provisional → Accepted 전이 근거 명시 (양상 보고로 가설 군집 좁힘)
+- **순수주의**: △ G8a 단독을 "가장 단순" 으로 미는 편향 가능 — G8b/G8c 비교표로 trade-off 명시했으나 Gemini 가 G8b 큐잉을 적극 권장하면 진지 재검토. cross-validate 호출 프롬프트에 "G8a 단순성 편향 가능 — G8b 의 입력 손실 0 가치를 어떻게 평가하는가?" 명시 질문 삽입
+
+### 합의 / 이견 수용 / 기각 / 고유 발견
+
+cross-validate 호출 (2026-05-11, gemini-2.5-pro, outcome=applied, exit 0) — 로그 `.claude/logs/cross-validate-architecture-20260511-030357.log`.
+
+#### 합의 (Claude 설계 + Gemini 일치 — 즉시 강화 박제)
+
+1. **defense-in-depth 4 가드 (Option D + G8a) 합리성** — Gemini: "복잡한 race condition 에서 단일 수정보다 다중 잠재 원인 차단이 장기 안정". R-Phase 시리즈 18회 누적 정당화 + Gemini 독립 동의
+2. **G8a 단순성 + 즉시 잠금 채택** — Gemini: "트레이드오프 명확히 인지한 좋은 결정". G8b/G8c 비교표가 결정 투명성 확보
+3. **G1 양방향 동기화 (lowerRadiusLimit + minZ)** — Gemini: "단방향 완화 → 양방향 확장성 개선" (확장성 축 평가)
+4. **Provisional → Accepted 전이 + Amendment 추적성** — Gemini: "의사결정 투명성 우수". 양상 보고만으로도 가설 군집 좁힘 충분
+5. **Claude 편향 셀프 체크 메타인지** — Gemini: "엔지니어링 성숙도 매우 높음" (구조 평가에서 명시)
+
+#### 이견 수용 (Claude 원안 < Gemini 근거 → 수정)
+
+- 없음 — Gemini 가 Option D + G8a 4 가드 사양 자체에 대한 반박 제시하지 않음. Gemini 의 모든 추가 제안은 "현 PR 강화" 또는 "범위 외 후속 분리" 로 분류됨
+
+#### Claude 재분석으로 기각한 Gemini 제안
+
+- 없음 — Gemini 의 모든 지적이 합리적이며 합의 또는 범위 외 후속 분리로 자연 분류됨. 맹목 수용 회피보다 **자연 분류** 케이스
+
+#### 고유 발견 (후속 분리 — 박제 직후 이슈 생성)
+
+Gemini 만의 제안. CLAUDE.md `## 교차검증 고유 발견 수용 vs 후속 분리 3단 프로토콜` 적용 — 현 PR Behavior Changes (Option D + G8a 4 가드 freeze + jitter 차단) 와 **직교** 한 항목은 후속 이슈 분리.
+
+| Gemini 제안 | 범위 판정 | 후속 이슈 / 처리 | 우선순위 |
+|---|---|---|---|
+| **F1. 전환 중 사용자 입력 시도 횟수 로깅** (G8b 격상 의사결정 데이터) | 범위 외 (계측 코드, fix 동작과 직교) | [#444](https://github.com/coseo12/astro-simulator/issues/444) — G8a 운영 후 G8b 큐잉 격상 여부 데이터 수집 | medium |
+| **F2. CameraLockManager 추상화** — 카메라 제어권 요청/해제 일관 인터페이스 | 범위 외 (큰 리팩토링, fix 와 무관) | [#445](https://github.com/coseo12/astro-simulator/issues/445) — 카메라 제어 모듈 통합 (cutscene / 특수 UI 확장 시 유용) | low |
+| **F3. `updateTierByCamera` 순수 함수 분리 리팩토링** | 범위 외 (테스트 용이성 향상, fix 와 무관) | [#446](https://github.com/coseo12/astro-simulator/issues/446) — tier 판정 로직 순수성 분리 + 테스트 단순화 | low |
+| **F4. G8a 무응답 시각 큐 (vignette / fade)** — 사용자 인지 보강 | 범위 외 (신규 시각 효과 도입, fix DoD 외) | [#447](https://github.com/coseo12/astro-simulator/issues/447) — UX 보강. G8a 운영 후 사용자 체감 거슬림 보고 시 격상 | low |
+| **F5. 저사양 기기 성능 프로파일링** | 부분 범위 내 (Option D 가드 부수 비용 측정) | [#448](https://github.com/coseo12/astro-simulator/issues/448) — fix PR DoD 후보로 검토 권장 (agent-browser 또는 단위 bench 1회) | medium |
+| **F6. 용어사전 (Glossary) 섹션** — D-T2 / R-Phase / Tier 정의 | 범위 외 (별도 docs) | [#449](https://github.com/coseo12/astro-simulator/issues/449) — 신규 참여자 onboarding 비용 절감 | low |
+| **F7. `tier-transition` 카메라 제어권 명시 주석** — `detachControl` 호출 의도 + 보장 행동 | **범위 내** (코드 변경 0, 주석 추가) | **현 PR 반영** — developer 단계에서 `tier-transition.ts:251` 주변 주석 보강 의무 | high |
+
+후속 이슈 6 건 (F1~F6) 는 본 ADR Amendment 박제 직후 이슈 생성 (capture 비용 < 분리 후 발굴 비용). F7 은 developer 단계 의무 항목으로 박제 (Behavior Change 0, 주석만).
+
+#### 호출 후 Claude 편향 셀프 체크 결과
+
+- **낙관적 일정**: ✓ Gemini 일정 관련 별도 지적 없음
+- **결합 간과**: ✓ Gemini 가 race condition 결합 분석 (3 모듈 공유 자원 경쟁) 독립 도달 + 동의
+- **폐기 프레이밍**: ✓ Gemini 가 P12 ADR DEPRECATED 영향 박제 동의
+- **순수주의 (G8a 단순성 편향)**: △ Gemini 가 "G8b 격상 데이터 측정" 제안 — F1 후속 이슈 분리로 수용. G8a 즉시 채택 자체는 합의 정당화. 운영 후 데이터로 G8b 격상 재검토 trigger 명시
