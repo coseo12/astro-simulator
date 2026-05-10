@@ -59,6 +59,13 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-no-scientific-grep.mjs') != ''
         run: pnpm run --if-present verify:no-scientific-grep
 
+      # #440 dev 서버 좀비 incident SSoT 박제 회귀 가드.
+      # CLAUDE.md 가드 A/B sub-section / qa.md 좀비 카나리아 / hook 파일 / forensic 보고서 5건 정합 검증.
+      # 박제가 의도치 않게 제거되면 exit 1 로 차단. 근거: docs/reports/20260510-419-dev-server-zombie-recurrence.md
+      - name: '#440 dev 서버 좀비 SSoT 회귀 가드 (verify:zombie-check)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-zombie-check.mjs') != ''
+        run: pnpm run --if-present verify:zombie-check
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================

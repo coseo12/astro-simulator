@@ -45,6 +45,7 @@
     "verify:test-coverage": "node scripts/verify-test-coverage.mjs",
     "verify:iau-data": "node scripts/verify-iau-data.mjs",
     "verify:no-scientific-grep": "node scripts/verify-no-scientific-grep.mjs",
+    "verify:zombie-check": "node scripts/verify-zombie-check.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
     "bench:scene:sweep": "BENCH_N_SWEEP=10,100,200,1000,5000,10000 node scripts/bench-scene.mjs",

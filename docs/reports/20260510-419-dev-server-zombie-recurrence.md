@@ -111,7 +111,7 @@ CLAUDE.md "중복 브랜치 dev 서버 오진 방지" 가드는 **메인 자신�
 **구현**: bash 스니펫
 
 ```bash
-# 메인 dev 서버 spawn 직전 의무 가드
+# 메인 dev/장기 프로세스 spawn 직전 의무 가드
 PORT=3000
 if lsof -i :$PORT > /dev/null 2>&1; then
   echo "WARN: 포트 $PORT 점유 중 — 좀비 가능"
