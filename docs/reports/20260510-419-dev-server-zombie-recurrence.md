@@ -114,9 +114,9 @@ CLAUDE.md "중복 브랜치 dev 서버 오진 방지" 가드는 **메인 자신�
 # 메인 dev 서버 spawn 직전 의무 가드
 PORT=3000
 if lsof -i :$PORT > /dev/null 2>&1; then
-  echo "WARN: 포트 $PORT 점유 중 — 좀비 가능성"
+  echo "WARN: 포트 $PORT 점유 중 — 좀비 가능"
   ps -p $(lsof -t -i :$PORT) -o pid,etime,command
-  # 사용자 확인 후 kill
+  # 사용자 확인 후 kill -TERM <PID> 진행
 fi
 ```
 
