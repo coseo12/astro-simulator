@@ -936,9 +936,15 @@ export function createSolarSystemScene(
       const focusId = focusBodyIdForAssert;
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
       if (focusWorld) {
-        const fx = focusWorld[0] - ox;
-        const fy = focusWorld[1] - oy;
-        const fz = focusWorld[2] - oz;
+        // #380 가드 C 후속 fix — 가드 C 가 setOriginToBody 호출을 mesh.position 루프 후로
+        // 옮겼기 때문에 line 826 의 ox/oy/oz 는 *변경 전 origin* 이다. assert 는 *변경 후*
+        // origin 기준으로 focus body local 좌표를 검증해야 mercury 같이 멀리 있는 body 의
+        // 첫 frame stale origin 박제로 인한 console.error spam (CI verify:378-focus FAIL 원인)
+        // 을 회피. originOffset 은 setOriginToBody 호출 시 mutate 되므로 다시 읽음.
+        const currentOrigin = floatingOrigin.originOffset;
+        const fx = focusWorld[0] - currentOrigin[0];
+        const fy = focusWorld[1] - currentOrigin[1];
+        const fz = focusWorld[2] - currentOrigin[2];
         const focusLocalMax = Math.max(Math.abs(fx), Math.abs(fy), Math.abs(fz));
         if (focusLocalMax >= 1e5) {
           console.error(
