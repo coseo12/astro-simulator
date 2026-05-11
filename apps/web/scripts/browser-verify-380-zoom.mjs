@@ -219,19 +219,29 @@ async function scenarioS2TransitionJitter(browser) {
     await page.waitForTimeout(TIER_TRANSITION_MS);
     const final = await measureCameraState(page);
 
-    // DoD: jitter spike 없음 — 휠 입력 사이 radius 변화율의 표준편차가 평균 변화율 대비 작아야 함.
-    // race window 가 있으면 wheel handler 가 transition tween 과 충돌해 spike 발생.
-    // 보수적 단언: max-min 차이가 평균값의 5배 미만 (jitter 0회 = 단조)
+    // DoD (ADR §Amendment 2026-05-11 라운드 2 정정): deltas 부호 일관성 (monotonic).
+    // G8a 가드의 본질 = wheel 입력이 transition tween 과 충돌해 부호 섞임 (spike) 을 만들지 않음.
+    // 변화량 절대값은 transition tween 자연 변화로 다양 — 단조성만 검증.
+    //
+    // 회귀 시: race window 에서 wheel handler 가 radius 를 transition tween 반대 방향으로 변경 → 부호 섞임.
+    // 정상 시: tier 전환 중 detachControl 발동 → wheel 무시 → tween 만 작동 → radius 단조 변화.
+    //
+    // jitterRatio = (max-min)/avg 는 변화 절대값 측정 — transition tween 자연 변화도 큰 jitterRatio 유발해 오판.
+    // 진단 정보로 함께 로그 (회귀 분석용).
     let pass = false;
     let jitterRatio = null;
+    let monotonic = null;
+    let deltaSigns = null;
     if (radii.length >= 2) {
       const min = Math.min(...radii);
       const max = Math.max(...radii);
       const avg = radii.reduce((a, b) => a + b, 0) / radii.length;
       jitterRatio = avg > 0 ? (max - min) / avg : 0;
-      // 정상 동작: tier 전환 중 detachControl 발동 → wheel 입력 무시 → radius 변동 0~소
-      // 회귀 시: race window 에서 wheel handler 가 radius 직접 변경 → spike
-      pass = jitterRatio < 1.0; // 평균값의 100% 미만 변동 — 매우 관대한 임계 (real Chrome 차이 마진)
+      const deltas = radii.slice(1).map((r, i) => r - radii[i]);
+      const signs = new Set(deltas.map((d) => Math.sign(d)).filter((s) => s !== 0));
+      monotonic = signs.size <= 1; // 모든 변화율 같은 부호 (또는 0 만) — wheel spike 0
+      deltaSigns = Array.from(signs);
+      pass = monotonic;
     }
 
     const result = {
@@ -240,10 +250,12 @@ async function scenarioS2TransitionJitter(browser) {
       finalTier: final.tier,
       radii,
       jitterRatio,
+      monotonic,
+      deltaSigns,
       pass,
     };
     console.log(
-      `  tier ${initial.tier} → ${final.tier} radii=[${radii.map((r) => r?.toFixed?.(2) ?? 'n/a').join(', ')}] jitterRatio=${jitterRatio?.toFixed?.(3) ?? 'n/a'}`,
+      `  tier ${initial.tier} → ${final.tier} radii=[${radii.map((r) => r?.toFixed?.(2) ?? 'n/a').join(', ')}] monotonic=${monotonic} signs=[${deltaSigns?.join(',') ?? 'n/a'}] jitterRatio=${jitterRatio?.toFixed?.(3) ?? 'n/a'}`,
     );
     return result;
   } finally {
