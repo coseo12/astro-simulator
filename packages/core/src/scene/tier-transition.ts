@@ -133,6 +133,43 @@ export function computeNewMinZ(targetRadius: number): number {
 }
 
 /**
+ * Tier 별 lowerRadiusLimit 권장값 — 가드 A (#380 G1 fix).
+ *
+ * ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §결정 §가드 A SSoT.
+ *
+ * ## 배경 (G1 분기)
+ *
+ * `setupArcRotateCamera` 의 default `lowerRadiusLimit = 0.5` (scene unit) 는 tier 별로 실거리
+ * 의미가 100,000 배 차이 (renderScale 비대칭):
+ *  - T1 solar: 0.5 unit ≈ 0.04 AU (수성 궤도 안쪽)
+ *  - T2 inner: 0.5 unit ≈ 0.0022 AU (지구-달 거리 ~ 0.5)
+ *  - **T3 body: 0.5 unit ≈ 20 km** ← 지구 표면 근접 시 카메라가 mesh 에 박히는 wall 형성
+ *
+ * T3 진입 후 mesh boundingSphere (지구 ~160 unit) 표면까지 줌인하려 하면 0.5 unit 에서 clamp,
+ * "줌인 후 freeze" 의 직접 원인 분기 (G1).
+ *
+ * ## 사양 (양방향 동기화)
+ *
+ *  - T1/T2: 사용자 줌인 한계는 mesh 직경 수준이면 충분 → `targetRadius * 0.01` 수준
+ *  - T3 body: 표면까지 자유 접근 → `max(newMinZ, targetRadius * 0.01)` ≈ mesh 표면 도달 가능
+ *
+ * `tier-transition.ts:189-191` 의 한 방향 완화 (`lowerRadiusLimit > targetRadius` 시만 낮춤) 는
+ * 누적 drift 의 부수효과 + 줌 freeze 와는 직교. 본 헬퍼는 **양방향** 동기 — 진입 tier 에 맞춰
+ * lowerRadiusLimit 도 적정값으로 즉시 갱신 (확대 / 축소 모두).
+ *
+ * @param targetRadius 전환 후 카메라 목표 radius (scene unit)
+ * @param newMinZ 전환 후 minZ (computeNewMinZ 반환값)
+ * @returns 전환 후 lowerRadiusLimit (scene unit)
+ */
+export function computeLowerRadiusLimit(targetRadius: number, newMinZ: number): number {
+  // targetRadius * 0.01 — mesh 표면 (T3) 까지 또는 정상 줌인 한계 (T1/T2).
+  // newMinZ 와 동일한 0.01 비율 — 두 값이 동기 변동하여 V5 clamp 정합성 보존.
+  // floor: newMinZ — lowerRadiusLimit 이 minZ 보다 작으면 카메라가 near-plane 안쪽으로 박혀
+  // 정합 깨짐 (Babylon 내부 clamp 가 보장하지 않음).
+  return Math.max(newMinZ, targetRadius * 0.01);
+}
+
+/**
  * `runTierTransition` 옵션.
  */
 export interface TierTransitionOptions {
@@ -184,6 +221,21 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     onComplete,
   } = opts;
 
+  // 가드 G8a (#380 G8 fix) — transition 결정 직후 detachControl 즉시 발동 (defense-in-depth).
+  // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §Amendment 2026-05-11 §G8a.
+  //
+  // 카메라 제어권 명시 주석 (cross-validate F7 권고 반영):
+  //  - `runTierTransition` 진입 시점부터 cleanup 발동까지 카메라 입력은 **scene 차원 차단**
+  //  - `releaseControl` 의 `attachControl` 은 정상 종료 / fallback timer / visibilitychange 어느
+  //    경로로도 정확히 1회 발동 (released 플래그)
+  //  - 호출자 (`setTier`) 가 진입 *전에* detachControl 을 선행 호출해도 본 호출은 idempotent —
+  //    Babylon `Scene.detachControl()` 은 이미 detached 상태에서도 안전
+  //
+  // 이전 코드는 (3) 단계 (line 252) 에서 호출했으나, mesh.boundingInfo 계산 / camera.target
+  // copyFrom / pending tween 취소 등 수 ms 작업 사이 wheel/pinch race 윈도우 존재. 본 가드는
+  // 이 윈도우를 **0 ms 로 축소** — runTierTransition 진입 즉시 입력 차단.
+  scene.detachControl();
+
   const radiusOld = camera.radius;
   // focusMesh 가 있으면 V5 달성 공식 (boundingRadius × 5) 사용. setTier 시점에 scaling 이 이미 newScale
   // 반영된 상태이므로 boundingSphere.radiusWorld 도 새 tier 기준.
@@ -212,10 +264,15 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   if (newMinZ < camera.minZ) {
     camera.minZ = newMinZ;
   }
-  // lowerRadiusLimit 과도 충돌 가능 — targetRadius 가 lowerRadiusLimit 이하로 내려가면 clamp.
-  // 전환 중 한시적으로 lowerRadiusLimit 도 완화 (전환 직후 원복은 생략 — 사용자 수동 reset 허용).
-  if (camera.lowerRadiusLimit != null && targetRadius < camera.lowerRadiusLimit) {
-    camera.lowerRadiusLimit = Math.max(newMinZ, targetRadius * 0.5);
+  // 가드 A (#380 G1 fix) — lowerRadiusLimit 양방향 동기화.
+  // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §결정 §가드 A.
+  //
+  // 이전 코드는 `targetRadius < lowerRadiusLimit` 일 때만 한 방향 완화 → 누적 drift + T3 body
+  // 진입 시 default `lowerRadiusLimit = 0.5` (≈ 20 km) 가 mesh 표면 (수 km) 줌인 wall 형성.
+  // 본 가드는 tier 진입 시점마다 `computeLowerRadiusLimit(targetRadius, newMinZ)` 로 양방향
+  // 동기 → tier 별 적정 줌인 한계 (`targetRadius * 0.01`) 를 항상 보장.
+  if (camera.lowerRadiusLimit != null) {
+    camera.lowerRadiusLimit = computeLowerRadiusLimit(targetRadius, newMinZ);
   }
 
   // (2) Pending tween 취소 — user focusOn 직후 tier 경계를 넘을 때 애니메이션 충돌 방지.
@@ -248,8 +305,9 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     camera.target.copyFrom(worldPos);
   }
 
-  // (3) 입력 잠금. detachControl 호출 — pointer / keyboard 이벤트 모두 차단 (Babylon 표준).
-  scene.detachControl();
+  // (3) 입력 잠금은 **함수 진입 시 가드 G8a 에서 이미 발동** (line 187 부근).
+  //     본 단계는 release 단계와의 대칭성 표시만 — Babylon detachControl 은 idempotent 이므로
+  //     본 단계가 호출되지 않아도 race 윈도우는 0 ms 로 보장됨.
 
   let released = false;
   const releaseControl = () => {

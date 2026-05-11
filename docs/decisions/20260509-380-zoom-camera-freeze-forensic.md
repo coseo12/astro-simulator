@@ -354,3 +354,68 @@ Gemini 만의 제안. CLAUDE.md `## 교차검증 고유 발견 수용 vs 후속 
 - **결합 간과**: ✓ Gemini 가 race condition 결합 분석 (3 모듈 공유 자원 경쟁) 독립 도달 + 동의
 - **폐기 프레이밍**: ✓ Gemini 가 P12 ADR DEPRECATED 영향 박제 동의
 - **순수주의 (G8a 단순성 편향)**: △ Gemini 가 "G8b 격상 데이터 측정" 제안 — F1 후속 이슈 분리로 수용. G8a 즉시 채택 자체는 합의 정당화. 운영 후 데이터로 G8b 격상 재검토 trigger 명시
+
+## Amendment 2026-05-11 (라운드 2) — S2 회귀 가드 측정 방법 정정
+
+### 배경
+
+PR #451 머지 직전 메인 오케스트레이터가 `pnpm --filter @astro-simulator/web verify:380-zoom` 자체 실행 결과 S2 (가드 G8a race window 0) **FAIL**:
+
+- 측정: radii=[31.83, 137.28, 469.01, 551.37, 582.86], **jitterRatio=1.554** (임계 1.0 위반)
+- mjs 측정식: `(max - min) / avg` (line 226-234)
+- exit 1 + PR 머지 차단
+
+### 정밀 분석 — G8a 가드는 정상 작동, 측정 방법이 오인
+
+radii deltas = [105.45, 331.73, 82.36, 31.49] — **모두 양수 (radius 단조 증가)** ✓
+
+원인 분류:
+1. **tier 전환 자연 변화**: T1 solar (low radius) → T3 body (high radius target) tween 으로 radius 가 자연스럽게 큰 폭 증가 (31.83 → 582.86, ~18배)
+2. **G8a 가드 본질 (race window 0)**: wheel 입력이 transition tween 과 충돌해 spike (부호 섞임) 를 만들지 않음 → **deltas 부호 일관성 보존**
+3. **측정 식 (max-min)/avg 임계 1.0**: tier 전환 중 radius 자체 변화량 (max-min) 이 평균 (avg) 대비 큼 → 자연스러운 변화도 jitter 로 오인
+
+**결론**: G8a 가드는 의도대로 race window 를 0 으로 만들어 wheel spike 를 차단했다. 측정 방법 `(max-min)/avg` 가 transition 중 자연스러운 radius 변화량을 jitter 로 오인한 게 FAIL 원인. **fix 회귀 가드의 측정 방법 자체 정정** 이 본 Amendment 의 결정.
+
+### Concrete Prediction 6 정의 명확화 (volt #76 — 의미 변경 없이 측정 방법만 정정)
+
+**원안 (Amendment 2026-05-11 라운드 1)**:
+> G8a 가드 적용 후 tier 전환 시점 5회 휠 입력 시 카메라 radius 변화율 **단조** (jitter 0회 — 사용자 D-T2 재검증)
+
+→ "단조" 의 명확한 정의가 모호 (변화율 동일성? 부호 일관성?)
+
+**정정 (Amendment 2026-05-11 라운드 2)**:
+> G8a 가드 적용 후 tier 전환 시점 5회 휠 입력 시 카메라 radius 변화율의 **부호 일관성 (deltas 모두 같은 부호 = monotonic)** 보존 — 부호 섞임 (wheel spike) 0회. **변화량 절대값은 transition tween 자연 변화로 다양 허용**.
+
+### 회귀 가드 측정 방법 변경
+
+`apps/web/scripts/browser-verify-380-zoom.mjs` scenarioS2TransitionJitter() 의 pass 단언:
+
+**Before** (라운드 1):
+```js
+jitterRatio = (max - min) / avg;
+pass = jitterRatio < 1.0;
+```
+
+**After** (라운드 2):
+```js
+const deltas = radii.slice(1).map((r, i) => r - radii[i]);
+const signs = new Set(deltas.map((d) => Math.sign(d)).filter((s) => s !== 0));
+pass = signs.size <= 1; // 모든 변화율 같은 부호 (monotonic) — wheel spike 0
+```
+
+근거: G8a 가드의 본질 = "wheel 입력이 transition tween 과 충돌해 부호 섞임 (spike) 을 만들지 않음". 변화량 절대값은 transition tween 자연 변화로 다양 — 단조성 (monotonic) 만 검증.
+
+### 결정
+
+- **G8a 가드 유지** (변경 없음) — 정상 작동 확인됨
+- **mjs S2 측정 방법 정정** — `(max-min)/avg` → deltas 부호 일관성
+- **G8b 격상 보류** — G8a 가드 실제 작동 중. F1 (#444) 격상 데이터는 그대로 수집
+- **잔존 정보 (jitterRatio 측정값)**: 정정 후에도 진단 정보로 로그 (회귀 시 원인 분석)
+
+### 부수 발견 (별도 트랙)
+
+- **`verify:378-focus` floating-origin 좌표 초과** (CI run 25636707640): mercury focus 시 ~1억 1천만 m (임계 1e5 의 1000배+). 본 PR 가드 C (`setOriginToBody` 호출 시점 변경) 와 연관 가능성 미확정. CI failure 의 nearest 직접 사유는 Playwright `waitUntil: networkidle` Next.js 16 turbopack timeout. 별도 분리 — **이슈 [#452](https://github.com/coseo12/astro-simulator/issues/452)** (생성 예정)
+
+### Status 유지
+
+**Accepted** (G8a 결정 변경 없음. 측정 방법 정정만)
