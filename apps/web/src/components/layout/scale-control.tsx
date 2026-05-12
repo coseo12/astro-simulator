@@ -17,7 +17,7 @@ import {
  * ## 결정 A — tier-aware AU 환산
  *  - 슬라이더가 표시하는 값은 `camera.radius` (scene unit) 가 아니라 **현재 tier 의
  *    `renderScaleForTier(tier)` 역수로 환산한 m → AU** 값. tier 별 환산:
- *      T1 solar (renderScale 8.4e-11): 1 unit ≈ 79.5 AU
+ *      T1 solar (renderScale 8.4e-11): 1 unit ≈ 0.0795 AU (≈ 1.19e10 m)
  *      T2 inner (1.54e-9): 1 unit ≈ 0.0043 AU
  *      T3 body (2.51e-5): 1 unit ≈ 39.8 km
  *  - 단위 자동 분기 (ADR 결정 A expected behavior #5, Gemini Q3 고유 발견):

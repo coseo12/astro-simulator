@@ -14,6 +14,7 @@
  *  - `≥ 1000 AU` → `{value} kAU` (T1 solar 극단 줌아웃)
  */
 
+import { AU } from '@astro-simulator/shared';
 import { renderScaleForTier, type Tier } from '@astro-simulator/core/scene';
 
 /**
@@ -72,8 +73,8 @@ export function formatScaleLabel(radiusAU: number): string {
   if (!Number.isFinite(radiusAU) || radiusAU < 0) return '-- AU';
 
   if (radiusAU < UNIT_BOUNDARY.km) {
-    // < 1e-3 AU = < 149,597 km. AU → m → km.
-    const km = (radiusAU * 149_597_870.7).toFixed(0); // AU × (149597870700 / 1000) = AU × 149_597_870.7
+    // < 1e-3 AU = < 149,597 km. AU → m → km. AU 상수 SSoT 사용 (`@astro-simulator/shared`).
+    const km = ((radiusAU * AU) / 1000).toFixed(0);
     return `${km} km`;
   }
   if (radiusAU < UNIT_BOUNDARY.mAU) {
