@@ -203,6 +203,16 @@ cross-validate 1회 (2026-05-04, anchor=ADR 신규, outcome=applied — `.claude
 
 근거: Gemini cross-validate 권고. 실수 방지 강화 — 본 ADR §결과·재검토 조건 1 (자동화 ROI) 의 경량 선행 단계.
 
+#### R-Phase 진입 시 Amendment 검토 의무 (누적)
+
+R-Phase 진입 시점에 신규 결정이 기존 ADR 의 전제와 상충할 수 있는 경우, 진입 PR 에 해당 ADR Amendment / 폐기 검토를 동반한다. 본 표는 누적되며, R5+ 진입 시 1행씩 추가한다. 폐기 항목은 행 제거 대신 ~~취소선~~ + 폐기 PR cross-link 로 history 를 보존한다.
+
+| trigger R-Phase | 검토 대상 ADR | 검토 의도 | 박제 PR | 박제 시점 |
+| --- | --- | --- | --- | --- |
+| R4 (earth) | [docs/decisions/20260512-au-slider-semantics.md](20260512-au-slider-semantics.md) | viewport-aware scaling 도입 결정 박제 시 동일 PR 에 본 ADR Amendment (AU 슬라이더 의미 확장) | #460 | 2026-05-14 |
+
+**근거**: ADR 20260512 §결정 C "구조적 가드" (Gemini cross-validate 2026-05-12 Q5 이견 수용) + 이슈 [#454](https://github.com/coseo12/astro-simulator/issues/454).
+
 ## 비-범위
 
 - **Top 2** (CelestialTree + InfoPanel R-Phase allowlist) — #403 후속 이슈 (Q6=(b)). **본 ADR SSoT (`R_PHASE_BODY_ALLOWLIST`) 인용 의무** — 후속 이슈 본문에 본 ADR cross-link 박제
