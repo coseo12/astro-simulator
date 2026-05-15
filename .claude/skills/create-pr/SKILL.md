@@ -89,6 +89,41 @@ EOF
 
 > **PR 본문 7 체크박스 base 보존 의무** — 위 예시의 `## 체크리스트` 7 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / ADR 호환성 + 상위 Test plan) 은 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 섹션 SSoT 와 일치한다. `gh pr create --body` 로 본문을 수동 작성할 때 GitHub 의 템플릿 자동 prefill 이 우회되므로, 7 체크박스 base 를 변경 없이 포함하고 충족 여부에 따라 `[x]` / `[ ]` 만 갱신한다. N/A 항목도 체크박스를 삭제하지 않고 `[x] N/A — <사유>` 로 유지 (PR [#468](https://github.com/coseo12/astro-simulator/pull/468) reviewer/qa 발견 → 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469)).
 
+## Strict Assertion 동적 읽기 (drift 0 가드)
+
+**원칙**: PR 본문 생성 시 PR 템플릿 (`.github/PULL_REQUEST_TEMPLATE.md`) 의 `### 체크리스트` 섹션을 **반드시 직접 읽어** 본문에 포함한다. 위 예시 코드 블록의 7 체크박스 base 는 **참고용 snapshot** 일 뿐이며, 실제 PR 본문 생성 시점에는 템플릿 파일을 SSoT 로 동적 읽기한다. 하드코딩 fallback 금지 — drift 자기모순 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) 폐기 패턴 재현).
+
+**1차 — 파일 존재 검증 (Strict Assertion)**:
+
+```bash
+test -f .github/PULL_REQUEST_TEMPLATE.md || (echo "FAIL: PR 템플릿 파일 부재 (.github/PULL_REQUEST_TEMPLATE.md). 작업 차단." && exit 1)
+```
+
+**2차 — 섹션 추출 (A1 단순 grep)**:
+
+```bash
+# `### 체크리스트` 섹션을 sed 로 위치 기반 추출 (다음 ### 헤더 직전까지)
+sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | sed '$d'
+```
+
+추출 결과가 비어 있으면: `echo "FAIL: ### 체크리스트 섹션 부재 또는 깨짐. PR 템플릿 SSoT 점검 필요." && exit 1`
+
+**3차 — checkbox 라인 검증**:
+
+```bash
+sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | grep -c "^- \[ \]"
+```
+
+0 hit 시: `echo "FAIL: ### 체크리스트 섹션에 - [ ] 항목 0건. PR 템플릿 SSoT 깨짐." && exit 1`
+
+**4차 — PR 본문 생성**: 위 2차에서 추출한 결과를 PR 본문 `### 체크리스트` 섹션에 그대로 박제한다. 충족 여부에 따라 `[ ]` → `[x]` 갱신만 허용 (라인 자체 변경·삭제 금지). 다른 6개 base 섹션 (변경 사항 / 브랜치 Base 확인 / 스프린트 계약 / 테스트 / 브라우저 3단계 / 마일스톤 회고) 도 동일 절차로 처리 (해당 섹션이 N/A 인 경우 `### <섹션명>` 헤더 + `- [x] N/A — <사유>` 1줄 유지, 섹션 자체 삭제 금지).
+
+**Fallback 금지 (CRITICAL)**: 위 1~3차 중 어느 단계 FAIL 시 작업 차단. 하드코딩 또는 default 본문 사용 금지 — drift 자기모순 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) 폐기 패턴 재현). 템플릿이 깨졌으면 먼저 `.github/PULL_REQUEST_TEMPLATE.md` 를 수리한 뒤 PR 본문 생성을 재개한다.
+
+근거: 이슈 [#471](https://github.com/coseo12/astro-simulator/issues/471) + architect cross-validate Gemini 2.5-pro applied. ADR [`20260515-harness-managed-divergent-pattern.md`](../../../docs/decisions/20260515-harness-managed-divergent-pattern.md) Z 패턴 4회 재사용 (Phase 1 = 본 PR 선반영 / Phase 2 = upstream 기여 별도, [#476](https://github.com/coseo12/astro-simulator/issues/476) 추적). 관례적 방어선 (5 페르소나 .md 의무 박제) 은 [#477](https://github.com/coseo12/astro-simulator/issues/477) 추적.
+
+<!-- 참고: developer.md §메타 규칙 (#470) + reviewer.md §절차 6번 (#470) + qa.md §검증 backstop (#470) + #476 (Z 패턴 §재검토 조건 추가) + #477 (5 페르소나 의무 박제) -->
+
 ## 측정 방법 C (혼합) — PR 본문 가시성 자기 검증
 
 PR 본문 작성 후 거버넌스 체크 항목 (예: "ADR 호환성 체크") 의 가시성을 다음 두 grep 의 **AND** 로 판정한다 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) architect cross-validate 합의):
