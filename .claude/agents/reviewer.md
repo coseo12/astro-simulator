@@ -41,7 +41,14 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    - **(Dead Reference) 주석 SSoT 참조 확인** — `// SSoT: <파일>` / JSDoc `@see` 등 주석 메타데이터가 **폐기된 파일을 가리키지 않는지** 확인 (dead reference). 참조 대상 파일이 제거됐으면 주석도 함께 갱신 요구
    - **(Invariant Test) 상대 비율 불변식 테스트** — 다수 모듈에서 쓰이던 상수를 동적 함수로 교체한 PR 은 "모든 모듈이 공통 배수로 확대되는지" 확인하는 불변식 단위 테스트 누락 여부 확인. 누락이면 권고 (차단은 도메인 판단)
    - **(ADR Prediction) 예측 대비 실측 diff** — ADR 에 "추상화 도입 후 변경 시 X 코드 0줄" Concrete Prediction 이 있으면 `git diff --stat <추상화 경로>` 로 예측 성공 재현. 실패 시 "추상화 건강성" 신호 → 권고
-5. **결과 PR 코멘트 작성**:
+5. **ADR 호환성 의미론적 검증** (이슈 [#463](https://github.com/coseo12/astro-simulator/issues/463), ADR `20260515-harness-managed-divergent-pattern.md`) — PR 이 기존 ADR 의 §재검토 조건 / §결정 조항을 의미적으로 침범하는지 점검. PR 본문 체크박스만으로는 self-attestation 함정에 빠지므로 reviewer 가 독립 검증한다:
+   1. **PR 변경 파일 진단** — `gh pr view <번호> --json files` 로 `docs/decisions/*.md` 수정 포함 여부 확인. **수정 포함 여부와 무관하게 본 항목은 reviewer 코멘트에 1줄 박제 의무** (검증 누락 vs 비대상 구분)
+   2. **수정 미포함 PR** — reviewer 코멘트에 `ADR 호환성: 적용 비대상 (docs/decisions 변경 없음)` 1줄 박제. 의미적 침범 의심 시에도 `non_blocking_suggestions` 에 추가만 하고 차단하지 않음 (도메인 판단)
+   3. **수정 포함 시 혼합 검증** (grep 1차 결정론 + LLM 2차 의미론):
+      - **grep 1차 (결정론)** — PR 본문 또는 변경된 ADR 파일에서 키워드 검색: `Amendment` / `폐기` / `Supersedes` / `§재검토 조건`. 1개 이상 매칭 시 "거버넌스 박제 감지" 로 분류 + reviewer 코멘트에 매칭 키워드 + 파일 위치 인용
+      - **LLM 2차 (의미론)** — 변경된 ADR 의 §재검토 조건 / §결정 조항을 PR diff 가 직접 변경했는지 판단. 키워드 누락 + 의미적 ADR 충돌 의심 (예: 기존 결정과 상반된 새 기본값 도입) 시 reviewer 권고 (차단 아님 — 도메인 판단). 오판 가능성은 후속 이슈 [#467](https://github.com/coseo12/astro-simulator/issues/467) 추적
+   4. **PR 본문 체크박스 검증** — PR 템플릿 6번째 항목 `ADR 호환성 체크` 의 체크 여부 확인 (`gh pr view <번호> --json body`). 미체크 + ADR 수정 포함 시 `non_blocking_suggestions` 에 권고 추가. 미체크 + ADR 수정 미포함 시 무시 (자명 PASS)
+6. **결과 PR 코멘트 작성**:
    ```markdown
    ## Reviewer 정적 리뷰
 
@@ -53,8 +60,11 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
 
    ### 통과 확인 ✓
    - 스프린트 계약 N개 기준 중 정적으로 검증 가능한 M개 충족
+
+   ### ADR 호환성
+   - <적용 비대상 (docs/decisions 변경 없음) | 거버넌스 박제 감지: <키워드> @ <파일:줄> | 권고: <ADR 충돌 의심 근거>>
    ```
-6. **라벨 전이**:
+7. **라벨 전이**:
    - 차단 항목 0건 → `gh pr edit --remove-label "stage:review" --add-label "stage:qa"`
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
 
