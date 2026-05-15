@@ -109,6 +109,8 @@ gh pr view <PR> --json body --jq .body | grep -c -i "ADR 호환성"
 
 > 참고: 동일 측정 방법이 `.claude/agents/developer.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — 동시 수정 의무. harness-managed 파일 운영은 ADR [`20260515-harness-managed-divergent-pattern.md`](../../../docs/decisions/20260515-harness-managed-divergent-pattern.md) Z 패턴 (Phase 1 = 본 프로젝트 선반영 / Phase 2 = upstream 기여 / Phase 3 = 동기화) 적용.
 
+> 참고: PR 템플릿 신규 항목 양가성 가드 (체크박스 prefill 0 hit + phrase 0 hit 시 발화) 는 `.claude/agents/developer.md` §메타 규칙 (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)) 에 박제됨. reviewer §절차 6번 + qa §검증 단계 backstop 양쪽이 방어의 깊이 (architect cross-validate 합의 D3 F1).
+
 ## 라벨 업데이트
 
 ```bash

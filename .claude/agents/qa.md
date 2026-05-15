@@ -48,6 +48,9 @@ monorepo 에서 core/shared 패키지 (`packages/*`) 가 수정된 PR 은 **브�
 ### 3. 스프린트 계약 대조
 이슈 본문의 완료 기준 중 동적 검증 가능한 항목을 직접 확인. 미충족 항목 명시.
 
+### 4. PR 본문 7 체크박스 base 보존 backstop (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470))
+- PR 본문 7 체크박스 base 보존 backstop — `gh pr view <번호> --json body --jq .body | grep -c "ADR 호환성"` ≥ 1 (반환 0 시 reviewer 단계로 되돌림 권고). reviewer §절차 6번이 1차 가드, 본 backstop 은 메타 가드의 깊이 (방어의 깊이). 근거: developer.md 메타 규칙 (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)).
+
 ## 결과 코멘트 포맷
 
 ```markdown

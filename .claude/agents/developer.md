@@ -87,6 +87,18 @@ gh pr view <PR> --json body --jq .body | grep -c -i "ADR 호환성"
 
 > 참고: 동일 측정 방법이 `.claude/skills/create-pr/SKILL.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — 동시 수정 의무. harness-managed 파일 운영은 ADR [`20260515-harness-managed-divergent-pattern.md`](../../docs/decisions/20260515-harness-managed-divergent-pattern.md) Z 패턴 (Phase 1 = 본 프로젝트 선반영 / Phase 2 = upstream 기여 / Phase 3 = 동기화) 적용.
 
+### 메타 규칙 — PR 템플릿 신규 항목 양가성 가드
+
+PR 템플릿 (`.github/PULL_REQUEST_TEMPLATE.md`) 의 `### 체크리스트` 항목이 PR 본문에 노출되지 않는 양가성 (체크박스 prefill 0 hit + phrase 0 hit) 발견 시:
+
+1. 즉시 본 메타 규칙 발화 — 측정 방법 C (1차 구조 grep + 2차 phrase grep) 양쪽 0 hit 시 reviewer/qa 가 권고 박제
+2. 노출된 항목별 grep 키워드 박제 (developer.md 본문에 추가)
+3. 후속 이슈 분리 박제 (volt #29) — 본 메타 규칙 발화의 1차 사례 인덱싱
+
+> 1차 사례: 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) "ADR 호환성 체크" 항목의 측정 방법 C 박제 (PR [#472](https://github.com/coseo12/astro-simulator/pull/472)). 다른 6 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / Test plan) 은 미래 노출 시 본 메타 규칙으로 자동 가드.
+
+> 참고: 동일 메타 규칙이 `.claude/agents/reviewer.md` §절차 6번 + `.claude/agents/qa.md` §검증 단계 backstop 에서 발화. 근거: ADR `docs/decisions/20260515-harness-managed-divergent-pattern.md` Z 패턴 / 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) (1 항목 사례) / 이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470) (메타 규칙 박제).
+
 ## 브라우저 검증 (UI 포함 이슈 필수)
 
 **빌드 성공 + 단위 테스트 통과 ≠ 동작하는 앱**
