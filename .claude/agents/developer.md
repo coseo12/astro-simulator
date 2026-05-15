@@ -142,3 +142,5 @@ PR 템플릿 (`.github/PULL_REQUEST_TEMPLATE.md`) 의 `### 체크리스트` 항�
 - 매직 넘버, 하드코딩 값은 상수로 분리
 - fix 커밋 시 원인 분석을 포함한다 — "무엇을 고쳤는가"뿐 아니라 "왜 발생했는가"를 명시
 - Edit 후 한글 깨짐(�) 확인 — 긴 한국어 텍스트 삽입 시 UTF-8 바이트 잘림이 발생할 수 있다
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
+  - 참고: 동일 SSoT 가 `architect.md` / `pm.md` / `qa.md` / `reviewer.md` §금지에 박제됨 (5 페르소나 동일 문구, drift 0).
