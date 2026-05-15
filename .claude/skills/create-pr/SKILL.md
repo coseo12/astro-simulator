@@ -61,20 +61,53 @@ gh pr create \
 ## 설계 참조
 - docs/architecture/관련문서.md
 
+## 브랜치 / Base 확인 (gitflow)
+- [x] **일반 feature/fix**: `base=develop`, `head=feature/*` 또는 `fix/*`
+
+## 스프린트 계약
+- [ ] 구현 전 완료 기준 합의 완료
+- [ ] 모든 완료 기준 충족
+
 ## 테스트
 - [ ] 단위 테스트 추가/수정
 - [ ] 기존 테스트 통과 확인
+- [ ] 모노레포: 신규/변경 워크스페이스에 `scripts.test` 존재 확인
 
 ## 체크리스트
-- [ ] 설계 문서의 인터페이스 준수
 - [ ] 커밋 컨벤션 준수
 - [ ] 불필요한 변경 없음
+- [ ] 보안 취약점 없음
+- [ ] CLAUDE.md SSoT 코어 필드 9개 동기화 (스키마 변경 시) + verify-agent-ssot.sh (#145)
+- [ ] 정책·규약·ADR·CRITICAL DIRECTIVE 박제 변경 시 cross-validate (volt #23) outcome 박제
+- [ ] **ADR 호환성 체크**: 본 PR 의 변경이 기존 ADR (docs/decisions/*.md) 의 결정과 충돌하지 않음
 
 Closes #이슈번호
 EOF
 )" \
   --label "status:review"
 ```
+
+> **PR 본문 7 체크박스 base 보존 의무** — 위 예시의 `## 체크리스트` 7 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / ADR 호환성 + 상위 Test plan) 은 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 섹션 SSoT 와 일치한다. `gh pr create --body` 로 본문을 수동 작성할 때 GitHub 의 템플릿 자동 prefill 이 우회되므로, 7 체크박스 base 를 변경 없이 포함하고 충족 여부에 따라 `[x]` / `[ ]` 만 갱신한다. N/A 항목도 체크박스를 삭제하지 않고 `[x] N/A — <사유>` 로 유지 (PR [#468](https://github.com/coseo12/astro-simulator/pull/468) reviewer/qa 발견 → 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469)).
+
+## 측정 방법 C (혼합) — PR 본문 가시성 자기 검증
+
+PR 본문 작성 후 거버넌스 체크 항목 (예: "ADR 호환성 체크") 의 가시성을 다음 두 grep 의 **AND** 로 판정한다 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) architect cross-validate 합의):
+
+```bash
+# 1차 구조 grep — 체크박스 prefill 보존 확인
+gh pr view <PR> --json body --jq .body | grep -c "ADR 호환성 체크"
+# 기대: ≥ 1 hit (체크박스 항목명 그대로)
+
+# 2차 phrase grep — 별도 위치 박제까지 포괄 확인 (대소문자 무시)
+gh pr view <PR> --json body --jq .body | grep -c -i "ADR 호환성"
+# 기대: ≥ 1 hit (체크박스 + prose 중 어디든)
+```
+
+- **양쪽 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
+- **체크박스 0 + phrase ≥ 1** → non-blocking 권고 (체크박스 prefill 누락. 동일 권고 시 위 7 체크박스 base 코드 블록 동봉 권장)
+- **양쪽 동시 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단)
+
+> 참고: 동일 측정 방법이 `.claude/agents/developer.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — 동시 수정 의무. harness-managed 파일 운영은 ADR [`20260515-harness-managed-divergent-pattern.md`](../../../docs/decisions/20260515-harness-managed-divergent-pattern.md) Z 패턴 (Phase 1 = 본 프로젝트 선반영 / Phase 2 = upstream 기여 / Phase 3 = 동기화) 적용.
 
 ## 라벨 업데이트
 
