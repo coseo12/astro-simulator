@@ -48,7 +48,14 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
       - **grep 1차 (결정론)** — PR 본문 또는 변경된 ADR 파일에서 키워드 검색: `Amendment` / `폐기` / `Supersedes` / `§재검토 조건`. 1개 이상 매칭 시 "거버넌스 박제 감지" 로 분류 + reviewer 코멘트에 매칭 키워드 + 파일 위치 인용
       - **LLM 2차 (의미론)** — 변경된 ADR 의 §재검토 조건 / §결정 조항을 PR diff 가 직접 변경했는지 판단. 키워드 누락 + 의미적 ADR 충돌 의심 (예: 기존 결정과 상반된 새 기본값 도입) 시 reviewer 권고 (차단 아님 — 도메인 판단). 오판 가능성은 후속 이슈 [#467](https://github.com/coseo12/astro-simulator/issues/467) 추적
    4. **PR 본문 체크박스 검증** — PR 템플릿 6번째 항목 `ADR 호환성 체크` 의 체크 여부 확인 (`gh pr view <번호> --json body`). 미체크 + ADR 수정 포함 시 `non_blocking_suggestions` 에 권고 추가. 미체크 + ADR 수정 미포함 시 무시 (자명 PASS)
-6. **결과 PR 코멘트 작성**:
+6. **PR 본문 7 체크박스 메타 가드** (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)) — PR 본문에 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 7 항목 base 가 보존되었는지 점검:
+
+   1. **1차 구조 grep**: `gh pr view <번호> --json body --jq .body | grep -c "ADR 호환성 체크"` (현재 가드 대상 1 항목 — 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) 박제)
+   2. **2차 phrase grep**: `gh pr view <번호> --json body --jq .body | grep -c -i "ADR 호환성"`
+   3. **양쪽 0 hit 시**: PR 본문에 prefill 무시 권고 박제 (`non_blocking_suggestions`) + 미래 6 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / Test plan) 의 양가성 노출 발견 시 즉시 본 메타 규칙 발화 (developer.md 본문에 grep 키워드 박제 후속 요청)
+
+   근거: ADR `docs/decisions/20260515-harness-managed-divergent-pattern.md` / `.claude/agents/developer.md` 메타 규칙 (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)).
+7. **결과 PR 코멘트 작성**:
    ```markdown
    ## Reviewer 정적 리뷰
 
@@ -64,7 +71,7 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    ### ADR 호환성
    - <적용 비대상 (docs/decisions 변경 없음) | 거버넌스 박제 감지: <키워드> @ <파일:줄> | 권고: <ADR 충돌 의심 근거>>
    ```
-7. **라벨 전이**:
+8. **라벨 전이**:
    - 차단 항목 0건 → `gh pr edit --remove-label "stage:review" --add-label "stage:qa"`
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
 
