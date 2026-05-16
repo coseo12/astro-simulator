@@ -72,12 +72,60 @@ json_escape() {
 # 초기값 "none" — 호출 자체가 없었음
 REMINDER_ISSUE_RESULT="none"
 
+# plan-mode 우회 감지 결과 추적 (#479) — snapshot_pre / snapshot_post_and_rollback 이 저장
+# write_outcome_json 이 소비. 초기값은 호출 전 false / 빈 배열 / false (정상 상태).
+#   PLAN_BYPASS:     Gemini 호출 전후 워킹트리 변경 감지 여부
+#   BYPASS_FILES:    감지된 파일 경로 배열 (bash 배열)
+#   ROLLBACK_FAILED: 자동 롤백 시도 중 실패한 파일이 있는지 (CRITICAL — 수동 개입 필요)
+# Gemini Q1 수용: tracked 변경 + untracked 신규 파일 모두 추적
+# Gemini Q2 수용: 롤백 자체 실패 케이스 별도 필드로 분리
+PLAN_BYPASS=false
+BYPASS_FILES=()
+ROLLBACK_FAILED=false
+# snapshot 임시 파일 경로 — snapshot_pre 가 설정, snapshot_post_and_rollback 이 소비
+PRE_TRACKED_HASHES=""
+PRE_UNTRACKED=""
+
+# JSON 배열 문자열 생성 헬퍼 (#479) — bash 배열 → JSON string array.
+# bypass_files 가 비어있으면 "[]" 반환. 각 요소는 json_escape 적용.
+# NOTE: `set -u` 환경에서 빈 배열 expansion 은 unbound 오류 발생 — 호출 측은
+# `${ARR[@]+"${ARR[@]}"}` 또는 본 함수 내부에서 빈 배열 케이스 분기로 회피.
+json_array_from_bash_array() {
+  # $# 으로 인자 수 직접 확인 — `local -a arr=("$@")` 는 빈 인자에서 정상 작동하지만
+  # 호출 측 `"${ARR[@]}"` 가 unbound 인 경우 호출 자체가 실패하므로 본 함수 진입 전에 차단됨
+  if [ "$#" -eq 0 ]; then
+    printf '[]'
+    return
+  fi
+  local out="["
+  local first=1
+  local item
+  for item in "$@"; do
+    if [ "${first}" = "1" ]; then
+      first=0
+    else
+      out+=","
+    fi
+    out+="\"$(json_escape "${item}")\""
+  done
+  out+="]"
+  printf '%s' "${out}"
+}
+
 # outcome JSON 파일 출력
 # architect.md step 8 규약: 이 파일을 읽어 extends.cross_validate_outcome 에 매핑
 # outcome 값 규약:
 #   "applied"                  — Gemini 정상 응답 수신 (exit 0)
 #   "429-fallback-claude-only" — 429 최종 실패 폴백 (exit 77)
 #   "fatal-error"              — 비-capacity 치명적 오류 (exit 1)
+#
+# Phase 4 (#479) 확장 — plan-mode 우회 가드 3 필드:
+#   plan_bypass:     boolean — Gemini 호출 전후 워킹트리 변경 감지 여부
+#   bypass_files:    string[] — 감지된 파일 경로 배열
+#   rollback_failed: boolean — 자동 롤백 시도 중 실패가 있었는지 (true 면 수동 개입)
+# backward compat: 기존 8 필드 (outcome / exit_code / anchor / pr_ref / context /
+#   log_file / reminder_issue / timestamp) 미변경. parse-cross-validate-outcome.sh
+#   헬퍼가 신규 필드 옵션 처리.
 write_outcome_json() {
   local outcome="$1"
   local exit_code="$2"
@@ -92,6 +140,12 @@ write_outcome_json() {
   # reviewer 차단 반영: 이전에는 REMINDER_ISSUE_DRYRUN 환경변수만 보고 "created" 를 가정했음 — 실측으로 교정
   reminder_esc=$(json_escape "${REMINDER_ISSUE_RESULT}")
 
+  # Phase 4 (#479): bypass_files 배열은 JSON array 로 직접 생성
+  # `set -u` 안전 expansion — 빈 배열일 때 `${ARR[@]}` 가 unbound 발생하므로
+  # `${ARR[@]+"${ARR[@]}"}` 패턴으로 빈 배열을 인자 0개로 전달
+  local bypass_files_json
+  bypass_files_json=$(json_array_from_bash_array ${BYPASS_FILES[@]+"${BYPASS_FILES[@]}"})
+
   cat > "${OUTCOME_FILE}" <<EOF
 {
   "outcome": "${outcome}",
@@ -101,9 +155,132 @@ write_outcome_json() {
   "context": "${context_esc}",
   "log_file": "${log_file_esc}",
   "reminder_issue": "${reminder_esc}",
+  "plan_bypass": ${PLAN_BYPASS},
+  "bypass_files": ${bypass_files_json},
+  "rollback_failed": ${ROLLBACK_FAILED},
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
+}
+
+# plan-mode 우회 가드 — 호출 전 워킹트리 snapshot (#479)
+# 결정점 1: D 방식 (porcelain + hash-object 혼합)
+#   - tracked 파일은 hash-object 로 정확 검증 (성능 부담 < 100ms)
+#   - untracked 는 porcelain ?? 프리픽스로 별도 식별 (Gemini Q1 수용)
+# git 저장소가 아닌 경로에서 호출되면 silent skip (가드 비활성).
+# 비-범위: .gitignore 이용 무시 파일 동시 수정 완전 방어는 후속 분리.
+snapshot_pre() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    log "plan-bypass 가드: git 저장소가 아닌 경로 — 가드 비활성"
+    return 0
+  fi
+  PRE_TRACKED_HASHES="${LOG_DIR}/cv-pre-tracked-${TIMESTAMP}.txt"
+  PRE_UNTRACKED="${LOG_DIR}/cv-pre-untracked-${TIMESTAMP}.txt"
+  # tracked 파일 해시 (정확). git ls-files 가 staged + tracked 모두 포함.
+  # hash-object 는 동일 내용이면 동일 해시 → 라인 변경이든 추가든 모두 검출.
+  git ls-files 2>/dev/null | while read -r f; do
+    if [ -f "${f}" ]; then
+      printf '%s\t%s\n' "$(git hash-object "${f}" 2>/dev/null)" "${f}"
+    fi
+  done > "${PRE_TRACKED_HASHES}"
+  # untracked 파일 (?? 프리픽스만) — porcelain 으로 식별.
+  # 'git status --porcelain' 의 untracked 라인은 "?? path" 형식.
+  git status --porcelain 2>/dev/null | grep "^?? " | sed 's/^?? //' > "${PRE_UNTRACKED}" || true
+  log "plan-bypass 가드: 사전 snapshot 완료 (tracked=$(wc -l < "${PRE_TRACKED_HASHES}" | tr -d ' ') / untracked=$(wc -l < "${PRE_UNTRACKED}" | tr -d ' '))"
+}
+
+# plan-mode 우회 가드 — 호출 후 diff 검증 + 자동 롤백 (#479)
+# 결정점 2: R4 (자동 롤백 + 사용자 사후 알림)
+# 결정점 1: tracked 는 hash-object 비교, untracked 는 신규 라인 비교
+# Gemini Q2 수용: 롤백 실패 케이스를 ROLLBACK_FAILED 로 분리
+# .gitignore 변경 시 CRITICAL 격상 (Gemini Q1 부분 수용)
+snapshot_post_and_rollback() {
+  # snapshot_pre 가 skip 된 경우 (git 저장소 아님) 본 함수도 skip
+  if [ -z "${PRE_TRACKED_HASHES}" ] || [ ! -f "${PRE_TRACKED_HASHES}" ]; then
+    return 0
+  fi
+  local post_tracked="${LOG_DIR}/cv-post-tracked-${TIMESTAMP}.txt"
+  local post_untracked="${LOG_DIR}/cv-post-untracked-${TIMESTAMP}.txt"
+  # 사후 snapshot — 사전과 동일 방식
+  git ls-files 2>/dev/null | while read -r f; do
+    if [ -f "${f}" ]; then
+      printf '%s\t%s\n' "$(git hash-object "${f}" 2>/dev/null)" "${f}"
+    fi
+  done > "${post_tracked}"
+  git status --porcelain 2>/dev/null | grep "^?? " | sed 's/^?? //' > "${post_untracked}" || true
+
+  # tracked diff — 해시가 달라진 파일 식별
+  # `diff` 출력 중 '>' (post 에만 있음) 또는 '<' (pre 에만 있음) 라인의 두 번째 필드 = 파일 경로
+  # 동일 경로의 해시가 변경되면 양쪽에 나옴 → uniq 로 중복 제거
+  local tracked_changed
+  tracked_changed=$(diff "${PRE_TRACKED_HASHES}" "${post_tracked}" 2>/dev/null \
+    | grep -E "^[<>] " \
+    | awk -F'\t' '{print $2}' \
+    | sort -u || true)
+
+  # untracked 신규 파일 — post 에만 있는 라인
+  local untracked_new
+  untracked_new=$(comm -13 \
+    <(sort "${PRE_UNTRACKED}") \
+    <(sort "${post_untracked}") 2>/dev/null || true)
+
+  # 변경이 없으면 정상 — PLAN_BYPASS 기본값 (false) 유지하고 종료
+  if [ -z "${tracked_changed}" ] && [ -z "${untracked_new}" ]; then
+    log "plan-bypass 가드: 사후 snapshot diff empty — 정상"
+    return 0
+  fi
+
+  # plan-mode 우회 감지 — CRITICAL
+  PLAN_BYPASS=true
+  local gitignore_modified=false
+
+  # tracked 파일 자동 롤백 (git checkout --)
+  if [ -n "${tracked_changed}" ]; then
+    while IFS= read -r f; do
+      [ -z "${f}" ] && continue
+      BYPASS_FILES+=("${f}")
+      if [ "${f}" = ".gitignore" ]; then
+        gitignore_modified=true
+      fi
+      if ! git checkout -- "${f}" 2>/dev/null; then
+        ROLLBACK_FAILED=true
+        log "plan-bypass 가드: 자동 롤백 실패 — ${f}"
+      fi
+    done <<< "${tracked_changed}"
+  fi
+
+  # untracked 신규 파일 자동 삭제 (Gemini Q1 수용)
+  # git checkout -- 는 untracked 를 건드리지 않으므로 rm 이 필요
+  if [ -n "${untracked_new}" ]; then
+    while IFS= read -r f; do
+      [ -z "${f}" ] && continue
+      BYPASS_FILES+=("${f}")
+      if ! rm -f "${f}" 2>/dev/null; then
+        ROLLBACK_FAILED=true
+        log "plan-bypass 가드: untracked 신규 파일 삭제 실패 — ${f}"
+      fi
+    done <<< "${untracked_new}"
+  fi
+
+  # stderr 경고 (CRITICAL 위반 즉시 차단 시각화)
+  echo "WARN: Gemini plan-mode bypass detected — ${#BYPASS_FILES[@]} files modified, auto-rollback applied" >&2
+  # `${ROLLBACK_FAILED:+...}` 는 변수가 비어있지 않으면 (값이 'true' 또는 'false' 어느 쪽이든)
+  # 텍스트를 출력하므로 실제 실패 여부와 무관. 명시적 비교로 교체.
+  local rollback_status="성공"
+  [ "${ROLLBACK_FAILED}" = "true" ] && rollback_status="일부 실패"
+  log "plan-bypass 가드: ${#BYPASS_FILES[@]}개 파일 감지 — 자동 롤백 (${rollback_status})"
+
+  # .gitignore 변경은 CRITICAL — 별도 경고 (Gemini Q1 부분 수용)
+  # 무시 대상 파일 동시 수정 false negative 위험. 사용자 수동 검증 권고.
+  if [ "${gitignore_modified}" = "true" ]; then
+    echo "CRITICAL: .gitignore modified by Gemini — 무시 파일 동시 수정 false negative 위험. 수동 검증 필요." >&2
+    log "plan-bypass 가드 CRITICAL: .gitignore 변경 감지 — 사용자 수동 검증 의무"
+  fi
+
+  # 롤백 실패 시 추가 경고 (Gemini Q2 수용)
+  if [ "${ROLLBACK_FAILED}" = "true" ]; then
+    echo "CRITICAL: 자동 롤백 실패 — 수동 개입 필요. outcome.rollback_failed=true" >&2
+  fi
 }
 
 # Gemini 모델 설정 — 경량 모델 폴백 없음 (교차검증 품질 보존)
@@ -313,6 +490,11 @@ is_sensitive() {
   return 1
 }
 
+# plan-mode 우회 가드 — 호출 전 워킹트리 snapshot (#479)
+# Gemini 호출 (run_gemini) 직전에 실행해 사전 상태를 박제.
+# 사후 비교는 case 분기 후 snapshot_post_and_rollback 으로 수행.
+snapshot_pre
+
 case "${TYPE}" in
   structure)
     log "=== 구조 교차검증 시작 ==="
@@ -494,6 +676,11 @@ esac
 log ""
 log "=== 교차검증 완료 ==="
 log "로그: ${LOG_FILE}"
+
+# plan-mode 우회 가드 — 호출 후 diff 검증 + 자동 롤백 (#479)
+# Gemini 호출 직후 워킹트리 변경이 있는지 검증. 변경 발견 시 자동 롤백 + PLAN_BYPASS=true.
+# 결과는 write_outcome_json 이 outcome JSON 의 plan_bypass / bypass_files / rollback_failed 필드에 박제.
+snapshot_post_and_rollback
 
 # outcome JSON 출력 (Phase 3, #131) — 호출 측이 extends.cross_validate_outcome 자동 매핑
 FINAL_RC="${RC:-0}"

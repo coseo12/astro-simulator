@@ -74,6 +74,7 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
 8. **라벨 전이**:
    - 차단 항목 0건 → `gh pr edit --remove-label "stage:review" --add-label "stage:qa"`
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
+9. **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
 
 ## 마무리 체크리스트 JSON 반환 (필수)
 
