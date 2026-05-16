@@ -9,7 +9,8 @@ name: ADR 20260515 Z Pattern Health Metric
 #   - workflow_dispatch 는 default branch (develop) 반영 후에만 discover 됨
 #   - 본 PR 머지 후 D2/D3 검증은 develop 반영 후 1회 수동 실행으로 수행
 
-on:
+# YAML 1.1 'on:' → boolean True 함정 — quote 로 string key 강제 (volt 캡처 후보)
+"on":
   schedule:
     - cron: '0 0 * * 1' # 매주 월요일 UTC 00:00 = KST 09:00
   workflow_dispatch:
