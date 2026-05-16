@@ -51,6 +51,9 @@ monorepo 에서 core/shared 패키지 (`packages/*`) 가 수정된 PR 은 **브�
 ### 4. PR 본문 7 체크박스 base 보존 backstop (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470))
 - PR 본문 7 체크박스 base 보존 backstop — `gh pr view <번호> --json body --jq .body | grep -c "ADR 호환성"` ≥ 1 (반환 0 시 reviewer 단계로 되돌림 권고). reviewer §절차 6번이 1차 가드, 본 backstop 은 메타 가드의 깊이 (방어의 깊이). 근거: developer.md 메타 규칙 (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)).
 
+### 5. cross-validate outcome 검증
+- **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
+
 ## 결과 코멘트 포맷
 
 ```markdown
