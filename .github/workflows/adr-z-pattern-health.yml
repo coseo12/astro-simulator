@@ -58,20 +58,20 @@ jobs:
             --title "[ADR Trigger] Z 패턴 §재검토 조건 #5 발화 (자동 탐지 ${DATE})" \
             --label "documentation,priority:high" \
             --body "## 배경
-자동 탐지 workflow \`.github/workflows/adr-z-pattern-health.yml\` 발화. 임계값 충족.
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health.yml\` 발화. 임계값 충족.
 
-## 임계값 발화 결과
-\`\`\`
-${HEALTH_OUTPUT}
-\`\`\`
+          ## 임계값 발화 결과
+          \`\`\`
+          ${HEALTH_OUTPUT}
+          \`\`\`
 
-## 의무 (Amendment 1 §재검토 조건 #5 정합)
-3 영업일 내 결정 분기 (A Phase 2 일괄 / B 폐기 / C 임계값 재조정).
+          ## 의무 (Amendment 1 §재검토 조건 #5 정합)
+          3 영업일 내 결정 분기 (A Phase 2 일괄 / B 폐기 / C 임계값 재조정).
 
-## Cross-link
-- ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\`
-- workflow: \`.github/workflows/adr-z-pattern-health.yml\`
-- 직전 [ADR Trigger]: #487 (옵션 C 채택)"
+          ## Cross-link
+          - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\`
+          - workflow: \`.github/workflows/adr-z-pattern-health.yml\`
+          - 직전 [ADR Trigger]: #487 (옵션 C 채택)"
 
       - name: Fail on script execution error
         if: steps.verify.outputs.exit_code == '2'
