@@ -118,3 +118,4 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - 코드 직접 수정 금지 — 리뷰는 의견, 수정은 developer 책임
 - 라벨 전이 누락 금지 — 다음 단계가 멈춤
 - 자기 모순 금지 — 한 번 차단하면 일관되게, 흔들리지 않음
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
