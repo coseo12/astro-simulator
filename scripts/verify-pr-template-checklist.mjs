@@ -20,7 +20,7 @@
  * 관련 이슈: #473 (D4 CI backstop, #470 분리) / #471 (스킬 측 사전 차단)
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 
 // 7 키워드 base — `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 6 항목 + 상위 Test plan 1 항목
 // 측정 방법 C: 각 항목 1차 구조 (`- [x]` / `- [ ]`) + 2차 phrase (키워드) AND 매칭
@@ -87,10 +87,14 @@ function postComment(prNumber, missing) {
     `근거: [#473](https://github.com/coseo12/astro-simulator/issues/473) (D4 CI backstop, #470 분리) / [#471](https://github.com/coseo12/astro-simulator/issues/471) (스킬 사전 차단)`,
   ].join('\n');
 
-  try {
-    execSync(`gh pr comment ${prNumber} --body ${JSON.stringify(body)}`, { stdio: 'inherit' });
-  } catch (err) {
-    console.error(`코멘트 발송 실패: ${err.message}`);
+  // shell 우회 (백틱 / 특수 문자 보호) — spawnSync + stdin 전달
+  const result = spawnSync('gh', ['pr', 'comment', prNumber, '--body-file', '-'], {
+    input: body,
+    stdio: ['pipe', 'inherit', 'inherit'],
+    encoding: 'utf-8',
+  });
+  if (result.status !== 0) {
+    console.error(`코멘트 발송 실패: exit ${result.status}`);
   }
 }
 
