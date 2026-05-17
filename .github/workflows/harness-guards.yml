@@ -35,6 +35,14 @@ jobs:
         if: hashFiles('scripts/verify-agent-ssot.sh') != ''
         run: bash scripts/verify-agent-ssot.sh
 
+      # create-pr SSoT drift 가드 (#480, #477 후속)
+      # 5 페르소나 .md (architect/developer/pm/qa/reviewer) 에 박제된
+      # "**PR 생성 시 반드시 `create-pr` 스킬 사용**" SSoT 문구의 존재 + 동일성 검증.
+      # 한쪽만 갱신 시 drift 발생 → exit 1 로 차단.
+      - name: create-pr SSoT drift 가드
+        if: hashFiles('scripts/verify-create-pr-ssot.sh') != ''
+        run: bash scripts/verify-create-pr-ssot.sh
+
       # release version bump 가드 (v2.28.1 복구와 함께 도입)
       # chore(release) PR 에서 CHANGELOG 를 업데이트했으나 package.json::version bump 를 누락하는 회귀를 차단.
       # 세션 3연속 릴리스 (v2.26.0~v2.28.0) 에서 실제 발생 → v2.28.1 로 복구 + 본 가드 도입.
