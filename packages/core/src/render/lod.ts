@@ -146,16 +146,44 @@ function isHighByKindRule(
  *  2. clip-space 에서 body 반지름만큼 떨어진 surface point 도 투영 (perspective 발산 흡수)
  *  3. clip → NDC → pixel (w 로 나누기 — perspective divide)
  *
+ * #379 fix (2026-05-02) — edge offset axis + NDC→pixel 환산 정정:
+ *   기존 구현은 edge point 를 world-up (+y) 으로 고정했고 "구형 대칭으로 어느 방향이든 정확도
+ *   충분" 이라는 암묵 전제가 있었다. 그러나 카메라가 비스듬히 (target up vector 와 view forward 가
+ *   non-orthogonal) 자세를 잡으면 world-up 의 view-forward 성분이 NDC y 변화를 흡수해 pixel
+ *   offset 이 작아진다. 추가로 NDC x 와 y 는 perspective projection 의 anisotropy 로 인해
+ *   서로 다른 단위 (m[0] = 1/(aspect·tan(fov/2)), m[5] = 1/tan(fov/2)) 를 가지며, NDC x 변화를
+ *   `× viewportHeight` 로 환산하면 aspect 만큼 작게 측정된다.
+ *
+ *   forensic 매트릭스 (#379, `docs/reports/379-forensic/`) 에서 sun=low 100% / mercury=low 100% /
+ *   venus=low 100% 의 단일 원인. 실측 (debug-379-tmp 박제) 은 sun pxDiameter 가 식 결과의
+ *   √3 배 (≈173%) 로 나타나는데, 이는 r1-guard `radiusWorld` (BBOX 대각선/2 = √3 × 실 반지름)
+ *   의 산출 한계와 결합된 결과 — 본 식은 sphere 의 실제 화면 반지름을 정확히 반환한다.
+ *
+ *   #379 fix 는 두 가지를 동시 정정:
+ *   1. edge offset axis 를 cameraUp (world space) 로 변경 — invView col 1. NDC 변화가 y 축
+ *      주성분이 되도록 강제 (cameraRight 면 NDC x 가 주성분이 되어 anisotropic 환산 필요)
+ *   2. NDC y 를 viewportHeight 로 환산 (이 부분은 기존 동작 유지 — y 축 환산은 정확)
+ *
+ *   호출자는 매 frame `cameraUpWorld` (= invView col 1, world space camera-up basis) 를 전달.
+ *   부재 시 fallback 은 world-up [0, 1, 0] — ArcRotateCamera default 자세에서 cameraUp 이
+ *   world-up 의 view-forward 성분 제거 후 정규화된 형태이므로 ±10% 이내. 견고성을 위해 호출자가
+ *   매 프레임 invView 로부터 추출 권장.
+ *
  * 암묵 전제:
- *  - body 는 구형 — edge point 방향이 up / right / 임의 표면 방향 중 무엇이든 radius 길이만
- *    벗어나면 대칭성으로 정확도 충분 (Gemini 교차검증 반영)
+ *  - body 는 구형 — cameraUp 방향으로 offset 한 edge 는 view 의 vertical axis 평행 →
+ *    NDC y 변화 = 정확한 sphere 반지름의 화면 투영 (radius)
  *  - body 가 카메라 뒤 (clip w ≤ 0) 면 0 반환 — 호출자가 culling 처리
  *
  * @param bodyLocalPos body 중심 scene 좌표 (fo.toLocal 적용된 m 단위 — scene unit 기준이 아님)
- * @param bodyRadiusMeters 실측 반경 (m)
+ * @param bodyRadiusMeters 실측 반경 (m). 호출자가 `body.radius × bodyScale(id)` 로 효과 반경
+ *   적용한 값을 전달 (#379 호출 사이트 SSoT, runLodPass 의 effectiveRadius)
  * @param renderScale `renderScaleForTier(activeTier)` — scene unit per m
- * @param viewProjMatrix view × projection 결합 4×4 행렬 (row-major 16 원소)
+ * @param viewProjMatrix view × projection 결합 4×4 행렬. Babylon `scene.getTransformMatrix().m`.
+ *   메모리 레이아웃은 column-major 16 원소 — TransformCoordinatesFromFloatsToRef 가 사용하는
+ *   `m[0], m[4], m[8], m[12]` 인덱싱 (`mulMat4Point` 와 동일) 이 표준
  * @param viewportHeight 뷰포트 높이 (pixel)
+ * @param cameraUpWorld world space camera-up basis (= invView col 1). 부재 시 world-up
+ *   `[0, 1, 0]` fallback (ArcRotateCamera default 자세에서 ±10% 이내, 비스듬 카메라에서 부정확)
  * @returns 화면 공간 반지름 (pixel). 카메라 뒤 body 는 0.
  */
 export function screenCoverageRadius(
@@ -164,33 +192,46 @@ export function screenCoverageRadius(
   renderScale: number,
   viewProjMatrix: ArrayLike<number>,
   viewportHeight: number,
+  cameraUpWorld?: Vec3Double,
 ): number {
   // scene 좌표 = 실세계 거리 m × renderScale.
   const sx = bodyLocalPos[0] * renderScale;
   const sy = bodyLocalPos[1] * renderScale;
   const sz = bodyLocalPos[2] * renderScale;
 
-  // body 반경을 scene unit 으로 환산 — edge point 는 카메라-업 방향 근사 (구형 대칭 전제).
-  // 실 구현은 camera.upVector 전달 받을 수 있으나 본 순수 함수는 "y 축 up" 근사로 충분.
-  // 방향이 틀어지더라도 body 가 구형이라 radius 길이만 벗어나면 대칭성으로 정확도 충분 (ADR §축 1).
+  // edge point 의 scene-unit 좌표 — body 반경을 sceneUnit 으로 환산 후 cameraUp 방향으로 offset.
+  // cameraUpWorld 는 unit vector 가정 (invView col 1 은 정규직교 회전이라 자연스럽게 unit).
+  // 부재 시 world-up [0, 1, 0] fallback — ArcRotateCamera default 자세에서 cameraUp 이
+  // world-up 의 view-forward 성분 제거 후 정규화된 형태라 근사 가능.
   const edgeScale = bodyRadiusMeters * renderScale;
-  const ex = sx;
-  const ey = sy + edgeScale;
-  const ez = sz;
+  const ux = cameraUpWorld?.[0] ?? 0;
+  const uy = cameraUpWorld?.[1] ?? 1; // fallback: world-up
+  const uz = cameraUpWorld?.[2] ?? 0;
+  const ex = sx + ux * edgeScale;
+  const ey = sy + uy * edgeScale;
+  const ez = sz + uz * edgeScale;
 
-  // clip-space 투영 (row-major 4×4 × column vector, w=1 가정).
+  // clip-space 투영 (column-major 4×4 × column vector, w=1 가정).
   const clipCenter = mulMat4Point(viewProjMatrix, sx, sy, sz);
   const clipEdge = mulMat4Point(viewProjMatrix, ex, ey, ez);
 
   // 카메라 뒤 (w ≤ 0) — culling. 호출자가 LOD 'low' fallback 처리.
   if (clipCenter.w <= 0 || clipEdge.w <= 0) return 0;
 
-  // NDC (-1 ~ 1) 환산.
+  // NDC (-1 ~ 1) 환산. cameraUp basis 로 offset 했으므로 NDC y 변화가 주성분.
+  // x 변화도 함께 측정해 거리 합산 (perspective tilt 시 약간의 x 성분 발생).
+  const ndcCenterX = clipCenter.x / clipCenter.w;
   const ndcCenterY = clipCenter.y / clipCenter.w;
+  const ndcEdgeX = clipEdge.x / clipEdge.w;
   const ndcEdgeY = clipEdge.y / clipEdge.w;
 
-  // NDC → pixel. viewportHeight × 0.5 로 환산 (NDC 범위 -1~1 → 0~height).
-  return Math.abs((ndcEdgeY - ndcCenterY) * viewportHeight * 0.5);
+  // NDC → pixel. NDC y 는 viewportHeight 환산이 정확. x 는 viewportWidth 가 더 정확하나
+  // cameraUp 방향 offset 이라 x 성분이 매우 작아 실용적 영향 미미 — viewportHeight 로 통일하면
+  // 식이 단순. LOD 픽셀 임계 (50/8) 의 ±5% 오차 이내 (forensic 매트릭스 검증 + 단위 테스트
+  // `screenCoverageRadius — identity 행렬` 케이스).
+  const dx = (ndcEdgeX - ndcCenterX) * viewportHeight * 0.5;
+  const dy = (ndcEdgeY - ndcCenterY) * viewportHeight * 0.5;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 interface Vec4 {

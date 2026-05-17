@@ -1,6 +1,6 @@
 'use client';
 
-import { ephemeris as ephemerisApi } from '@astro-simulator/core';
+import { ephemeris as ephemerisApi, isRPhaseFocusable } from '@astro-simulator/core';
 import { AU } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale } from '@/constants/body-scale';
@@ -56,6 +56,23 @@ export function CelestialInfoPanel() {
         <h3 className="text-body-sm text-fg-secondary mb-2">천체 정보</h3>
         <p className="text-caption text-fg-tertiary">
           좌측 트리에서 천체를 선택하면 상세 정보가 표시됩니다.
+        </p>
+      </div>
+    );
+  }
+
+  // #403 R-Phase Allowlist 가드 (defense-in-depth UI 측면 2번째 축).
+  // ADR `20260506-403-r-phase-ui-guard.md` §결정 2 + §InfoPanel UI 가드 박제 패턴.
+  // 분기 위치: 정상 분기 *이전* — selected/data 존재 후 R-Phase 미진입 시 안내 메시지로 차단.
+  // 외부 경로 (programmatic command 등) 로 selectedBody 가 R-Phase 외 body 로 set 된 경우의
+  // 잔존 정보 panel 노출 차단 (1차 방어선은 #402 UI / #415 url-sync, 본 분기는 잔존 가드).
+  // i18n 키 분기 신설 금지 (ADR §명시적 비-범위 line 356) — 한국어 하드코딩.
+  if (!isRPhaseFocusable(selected)) {
+    return (
+      <div data-testid="info-panel-r-phase-blocked">
+        <h3 className="text-body-sm text-fg-secondary mb-2">천체 정보</h3>
+        <p className="text-caption text-fg-tertiary">
+          {data.nameKo} 은(는) R-Phase 미진입 — 후속 R-Phase 에서 활성화 예정입니다.
         </p>
       </div>
     );

@@ -1,10 +1,12 @@
 import {
   Color3,
   Color4,
+  DynamicTexture,
   HemisphericLight,
   MeshBuilder,
   PointLight,
   StandardMaterial,
+  Texture,
   Vector3,
   type Mesh,
   type Scene,
@@ -87,6 +89,22 @@ function floatingOriginAssertEnabled(): boolean {
  * Phase A 는 즉시 점프 flicker 허용 (Phase B 애니메이션 도입 예정).
  */
 
+/**
+ * Ambient 라이팅 가시성 floor — 회귀 #372 fix (R3 venus 동봉, ambient 약점은 R2 머지부터 잠재).
+ *
+ * sun.disableLighting=true 라 sun 자체에는 영향이 없고, 행성 mesh sun-반대측의 평균 luminance
+ * 만 인상하여 그림자측 윤곽이 사라지지 않게 한다. 0.3 / (0.15, 0.15, 0.18) 은 architect 가
+ * debug 패치로 검증한 박제값 (1280×720 ?gpu=a 기준 sun 점유율 +0.07%p, 행성 그림자측 인지 가능).
+ *
+ * 가드 테스트(`solar-system-scene.test.ts`) 가 회귀 임계 (intensity ≥ 0.25, groundColor 비-검정)
+ * 를 검증하므로 본 상수를 임의 하향 조정하면 단위 테스트가 실패한다.
+ *
+ * 근거: docs/decisions/20260429-r3-venus-visualization.md (회귀 #372 amendment),
+ *       volt #77 (headless false positive — tier-c 자동 진입으로 자동화 가드 통과)
+ */
+export const AMBIENT_INTENSITY = 0.3;
+export const AMBIENT_GROUND_COLOR_RGB = { r: 0.15, g: 0.15, b: 0.18 } as const;
+
 export interface SolarSystemSceneHandles {
   /** id → 메쉬 */
   meshes: Map<string, Mesh>;
@@ -163,6 +181,23 @@ export interface SolarSystemSceneHandles {
    */
   setFocusOrigin: (bodyId: string) => void;
   /**
+   * #408 F1 — focus 진입 시 final tier 사전 결정 + setTier 호출 (의존 역전 (c) 채택).
+   *
+   * `controller.focusOn` 의 cam-target tween (300ms) 보간 중간 프레임에서 `cameraFromFocusMeters` 가
+   * 일시적으로 0.1 AU 미만으로 떨어져 `tierFromFocus` 가 잘못된 tier (planet → body) 를 반환하는
+   * race 를 차단하기 위해, focusOn animation 시작 **전에** final tier 를 결정하고 즉시 setTier.
+   *
+   * 호출 시점: `sim-canvas.tsx syncFocusToScene` 헬퍼에서 `setFocusOrigin` 직후 + `controller.focusOn` 직전.
+   * camera-controller 단일 책임 (camera 전용) 보존을 위해 도메인 정책 (tierFromFocus) 은 scene 측에 캡슐화.
+   *
+   * @param bodyId focus 대상 body id (존재해야 함, 미존재 시 현 tier 반환 + no-op)
+   * @param cameraDistMeters focus body 로부터 카메라 목표 거리 (m). 통상 `desiredRadius × metersPerSceneUnit`.
+   * @returns 적용된 (또는 현재) tier
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 1.
+   */
+  applyFocusTier: (bodyId: string, cameraDistMeters: number) => Tier;
+  /**
    * P12-A #298 — focus 해제 (reset 등). tier 가 free-fly 경로로 자동 전환되도록 focus id 를 null 로 돌린다.
    */
   clearFocus: () => void;
@@ -178,7 +213,37 @@ export interface SolarSystemSceneHandles {
    * `{ high, mid, low }` 는 각 LOD 단계로 판정된 body 개수. 합은 전체 body 수 (고리/HUD 제외).
    */
   getLodStats: () => { high: number; mid: number; low: number; override: LodOverride };
+  /**
+   * #388 — 마지막 `runLodPass` 에서 결정된 body 별 LOD 상세. dev overlay 시각화 용도.
+   *
+   * 각 항목:
+   *  - `id`: body 식별자 (예: `'sun'`, `'mercury'`)
+   *  - `level`: 결정된 LOD 단계
+   *  - `screenCoverage`: `screenCoverageRadius` 결과 (pixel) — 화면 점유 반지름
+   *  - `pxDiameter`: 시각 직경 추정 (`screenCoverage × 2`, pixel) — 사용자가 보는 크기 직관용
+   *  - `cameraDistanceMeters`: 카메라-body 실세계 거리 (m) — #387 reviewer 권고 #1 의 actualCameraRadius 변별
+   *
+   * 빈 배열 반환 = `runLodPass` 미실행 (씬 초기화 직후 / dev overlay 가 frame 보다 빠르게 polling).
+   * dev/prod 무관 노출 (overlay 컴포넌트가 prod 빌드에서 DCE 되므로 prod bundle 에 호출 코드 없음).
+   *
+   * **재할당 회피**: 반환 배열은 내부 버퍼 (frozen 아님). 호출자가 mutate 하면 안 됨 (read-only 계약).
+   */
+  getLodInfo: () => readonly LodBodyInfo[];
   dispose: () => void;
+}
+
+/**
+ * #388 — body 별 LOD raw 데이터. dev overlay (`lod-dev-overlay.tsx`) 시각화 + 회귀 진단 용도.
+ *
+ * `runLodPass` 가 매 프레임 갱신. `null` 좌표 (frustum 밖) 가 아닌 raw 결정 입력값을 보존하여
+ * #387 reviewer non-blocking #1 (actualCameraRadius 변별) / #2 (pixelDiameter null 박제) 직접 해소.
+ */
+export interface LodBodyInfo {
+  id: string;
+  level: LodLevel;
+  screenCoverage: number;
+  pxDiameter: number;
+  cameraDistanceMeters: number;
 }
 
 export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
@@ -287,10 +352,14 @@ export function createSolarSystemScene(
   // 배경 톤
   scene.clearColor = new Color4(0.031, 0.035, 0.051, 1);
 
-  // 약한 전역 조명 (태양 뒤편도 약간 보이게)
+  // 회귀 #372 fix — 행성 그림자측 인지 가능 ambient (AMBIENT_* 상수 SSoT, 단위 테스트 가드).
   const ambient = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
-  ambient.intensity = 0.08;
-  ambient.groundColor = new Color3(0.01, 0.01, 0.02);
+  ambient.intensity = AMBIENT_INTENSITY;
+  ambient.groundColor = new Color3(
+    AMBIENT_GROUND_COLOR_RGB.r,
+    AMBIENT_GROUND_COLOR_RGB.g,
+    AMBIENT_GROUND_COLOR_RGB.b,
+  );
 
   // 태양 중심 포인트 라이트
   const sunLight = new PointLight('sun-light', new Vector3(0, 0, 0), scene);
@@ -319,6 +388,9 @@ export function createSolarSystemScene(
   const bodyCurrentLod = new Map<string, LodLevel>();
   // LOD 집계 — getLodStats 반환 값 재사용 버퍼 (매 프레임 객체 할당 회피).
   const lodStats = { high: 0, mid: 0, low: 0, override: 'auto' as LodOverride };
+  // #388 — body 별 LOD raw 데이터 버퍼. runLodPass 가 매 프레임 in-place 갱신.
+  // 배열 자체는 매 frame 동일 참조 — body 추가/제거 시에만 길이 조정. 행 객체도 mutable in-place.
+  const lodInfo: LodBodyInfo[] = [];
   let lodOverride: LodOverride = 'auto';
   // LOD cross-fade 상태 (ADR §축 3 — 200ms linear interp).
   // 각 body 의 전환 진행 상태 보관. `nowMs - startMs >= LOD_FADE_DURATION_MS` 이면 정착.
@@ -499,8 +571,33 @@ export function createSolarSystemScene(
   // 전환 중 `releaseControl` 을 조기 발동해 입력 잠금이 느슨해지는 edge case 를 제거
   // (Phase B PR #304 Reviewer M1). `cleanup` 은 idempotent (`released` 플래그).
   let pendingTierCleanup: (() => void) | null = null;
+  /**
+   * #408 F2 — runTierTransition 진행 중 tier 재판정 lock.
+   *
+   * `controller.focusOn` 의 cam-target tween 보간과 매 프레임 `updateTierByCamera` 가 race 를 일으켜
+   * inner → body → inner oscillate 발생. transition 진행 중에는 `updateTierByCamera` 가 no-op 하도록
+   * 전환 시작 시 true, cleanup 완료 시 false.
+   *
+   * idempotent 보장: `runTierTransition` 의 cleanup 은 정상 종료 / fallback timer / visibilitychange
+   * 어느 경로로도 정확히 1회만 발동 (`released` 플래그). onComplete 콜백도 동일하게 1회만 호출.
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 2.
+   */
+  let tierTransitionInProgress = false;
   const setTier = (tier: Tier) => {
     if (tier === activeTier) return;
+    // 가드 G8a (#380 G8 fix) — tier 전환 결정 직후 즉시 입력 잠금.
+    // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §Amendment 2026-05-11 §G8a.
+    //
+    // setTier 진입 후 mesh.scaling / boundingInfo / origin shift / mesh.position 루프 등
+    // 수 ms 작업 동안 wheel/pinch 입력이 ArcRotateCamera native handler 에 도달해 `radius` 를
+    // 직접 변경하면, 곧이어 시작될 tween 의 시작값과 충돌해 jitter (사용자 D-T2 양상 B) 발생.
+    // 본 가드는 **준비 작업 시작 전** 입력을 차단하여 race 윈도우를 0 ms 로 축소.
+    //
+    // 가드 B (`tierTransitionInProgress = true`, 아래 line 663) 와 직교 — 본 가드는 입력 자체를
+    // scene 차원에서 차단, 가드 B 는 매 프레임 tier 재판정에서 setTier 재진입 차단.
+    // runTierTransition 내부의 detachControl 은 idempotent 흡수.
+    scene.detachControl();
     const oldScale = renderScaleForTier(activeTier);
     activeTier = tier;
     const newScale = renderScaleForTier(activeTier);
@@ -556,8 +653,12 @@ export function createSolarSystemScene(
     const cam = scene.activeCamera;
     if (cam && isArcRotateCamera(cam)) {
       // P12-C M1 — 이전 전환의 fallback timer / visibility listener 를 먼저 정리.
+      // 이전 cleanup 이 아직 살아있다면 그 onComplete 가 호출되어 tierTransitionInProgress 가
+      // 일시 false 가 되지만, 바로 아래에서 새 transition 진입과 함께 다시 true 로 set 되므로 안전.
       pendingTierCleanup?.();
       const focusMesh = focusBodyIdForAssert ? meshes.get(focusBodyIdForAssert) : undefined;
+      // #408 F2 — lock 진입. updateTierByCamera 가 transition 중 no-op.
+      tierTransitionInProgress = true;
       pendingTierCleanup = runTierTransition({
         scene,
         camera: cam,
@@ -566,11 +667,21 @@ export function createSolarSystemScene(
         // focusMesh 를 조건부 spread — exactOptionalPropertyTypes 대응 (undefined 명시 금지).
         ...(focusMesh ? { focusMesh } : {}),
         // durationMs / lockMs 기본값 (300 / 500) 사용 — ADR §결정 §주석 계약 §5.
+        // #408 F2 — cleanup 완료 시 lock 해제. runTierTransition 의 released 플래그 기반
+        // idempotent (정상 종료 / fallback timer / visibilitychange 어느 경로로도 1회만 호출).
+        onComplete: () => {
+          tierTransitionInProgress = false;
+        },
       });
     }
   };
 
   const updateTierByCamera = (cameraFromSunMeters: number, cameraFromFocusMeters: number): Tier => {
+    // #408 F2 — transition 진행 중에는 재판정 no-op. cam-target tween 보간 race 차단.
+    // lock 해제 후 다음 frame 에서 정상 재판정 (focus body 가 정착된 시점).
+    if (tierTransitionInProgress) {
+      return activeTier;
+    }
     const focusInfo = focusBodyIdForAssert
       ? (() => {
           const body = bodiesById.get(focusBodyIdForAssert!);
@@ -584,6 +695,36 @@ export function createSolarSystemScene(
       setTier(nextTier);
     }
     return activeTier;
+  };
+
+  /**
+   * #408 F1 — focusOn 진입 시 final tier 사전 결정 + setTier (의존 역전 (c) 채택).
+   *
+   * `tierFromFocus(body.kind, cameraDistMeters)` 으로 final tier 를 결정한 뒤 필요 시 `setTier`.
+   * `setTier` 가 origin shift / mesh.scaling / runTierTransition 까지 처리하므로 본 함수는 wrapper.
+   *
+   * 호출 시점 (sim-canvas `syncFocusToScene`):
+   *   solar.setFocusOrigin(bodyId)
+   *   solar.applyFocusTier(bodyId, cameraDistMeters)   ← 여기
+   *   controller.focusOn({ mesh })
+   *
+   * 이렇게 하면 controller.focusOn 의 cam-target tween 보간 시작 전에 이미 final tier 가 정착되어
+   * 보간 중간 frame 의 tierFromFocus 재판정이 동일 tier 를 반환 → setTier no-op → race 차단.
+   *
+   * @param bodyId focus 대상 body id
+   * @param cameraDistMeters focus body 로부터 카메라 목표 거리 (m)
+   * @returns 적용 (또는 현재) tier
+   *
+   * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 1.
+   */
+  const applyFocusTier = (bodyId: string, cameraDistMeters: number): Tier => {
+    const body = bodiesById.get(bodyId);
+    if (!body) return activeTier;
+    const finalTier = tierFromFocus(body.kind, cameraDistMeters);
+    if (finalTier !== activeTier) {
+      setTier(finalTier);
+    }
+    return finalTier;
   };
 
   // P11-A #288 — Floating Origin 인스턴스 (scene-scoped).
@@ -671,22 +812,25 @@ export function createSolarSystemScene(
       updateAtKepler(jd);
     }
 
-    // Floating Origin primary follow (ADR §1-B 확장).
+    // 가드 C (#380 G3 fix) — Floating Origin primary follow sub-frame 이동.
+    // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §결정 §가드 C.
     //
-    // focus body 는 태양을 공전하므로 매 프레임 world 좌표가 바뀐다. origin 을 고정하면
-    // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
-    // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
-    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
+    // ## 변경 전 race 분기 (G3)
     //
-    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
-    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
-    if (activeTier === 'body' && focusBodyIdForAssert) {
-      const focusWorld = worldPositions.get(focusBodyIdForAssert);
-      if (focusWorld) {
-        floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
-      }
-    }
-
+    // 이전 순서: (a) setOriginToBody → (b) mesh.position 갱신 → (c) Babylon render → (d)
+    // cam.globalPosition 산출 → (e) updateTierByCamera 가 (d) 로 tier 재판정.
+    // T3 body + focus 활성 시 (a) 가 origin 을 매 프레임 W_N 으로 점프시키지만, (d) 의
+    // cam.globalPosition 은 ArcRotateCamera 가 alpha/beta/radius/target 으로 산출 — target
+    // 이 mesh.absolutePosition 추적이 1 frame 지연되면 (e) 가 shift 전 좌표로 tier 판정 →
+    // 매 프레임 tier oscillate → setTier 매 프레임 발동 → detachControl race window 누적 →
+    // 최종 freeze.
+    //
+    // ## fix 사양 (mesh.position 갱신 후 setOriginToBody)
+    //
+    // 새 순서: (a') mesh.position 갱신 (이전 origin 기준) → (b') setOriginToBody → (c') 다음
+    // frame 의 mesh.position 은 새 origin 기준. 한 frame 내에서 mesh.position 과 origin 이
+    // 같은 reference frame 으로 정합 → cam.globalPosition 도 일관 → tier 재판정 race 차단.
+    //
     // Floating Origin 계약 (ADR `docs/decisions/20260422-floating-origin.md` §3):
     //   - `world` (worldPositions): Heliocentric 절대 좌표 (m) — Rust engine / Zustand store 와 동일
     //   - `local = floatingOrigin.toLocal(world)` : scene 삽입 직전 origin shift 적용 (m)
@@ -709,6 +853,25 @@ export function createSolarSystemScene(
         (world[1] - oy) * sceneUnitPerMeter,
         (world[2] - oz) * sceneUnitPerMeter,
       );
+    }
+
+    // Floating Origin primary follow (ADR §1-B 확장) — **mesh.position 갱신 후 발동**.
+    //
+    // focus body 는 태양을 공전하므로 매 프레임 world 좌표가 바뀐다. origin 을 고정하면
+    // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
+    // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
+    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
+    //
+    // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
+    // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
+    //
+    // #380 가드 C — 본 호출이 mesh.position 루프 **이후** 에 위치하는 것이 핵심 race 차단.
+    // 이 순서를 역전하면 G3 분기 재발 — 위 주석 계약 SSoT 참조.
+    if (activeTier === 'body' && focusBodyIdForAssert) {
+      const focusWorld = worldPositions.get(focusBodyIdForAssert);
+      if (focusWorld) {
+        floatingOrigin.setOriginToBody([focusWorld[0], focusWorld[1], focusWorld[2]]);
+      }
     }
 
     // P12-A #298 — body mesh.scaling 은 1 로 고정 (kind 차등 / 거리 의존 과장 제거).
@@ -773,9 +936,15 @@ export function createSolarSystemScene(
       const focusId = focusBodyIdForAssert;
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
       if (focusWorld) {
-        const fx = focusWorld[0] - ox;
-        const fy = focusWorld[1] - oy;
-        const fz = focusWorld[2] - oz;
+        // #380 가드 C 후속 fix — 가드 C 가 setOriginToBody 호출을 mesh.position 루프 후로
+        // 옮겼기 때문에 line 826 의 ox/oy/oz 는 *변경 전 origin* 이다. assert 는 *변경 후*
+        // origin 기준으로 focus body local 좌표를 검증해야 mercury 같이 멀리 있는 body 의
+        // 첫 frame stale origin 박제로 인한 console.error spam (CI verify:378-focus FAIL 원인)
+        // 을 회피. originOffset 은 setOriginToBody 호출 시 mutate 되므로 다시 읽음.
+        const currentOrigin = floatingOrigin.originOffset;
+        const fx = focusWorld[0] - currentOrigin[0];
+        const fy = focusWorld[1] - currentOrigin[1];
+        const fz = focusWorld[2] - currentOrigin[2];
         const focusLocalMax = Math.max(Math.abs(fx), Math.abs(fy), Math.abs(fz));
         if (focusLocalMax >= 1e5) {
           console.error(
@@ -835,12 +1004,31 @@ export function createSolarSystemScene(
     lodStats.mid = 0;
     lodStats.low = 0;
     lodStats.override = lodOverride;
+    // #388 — body 별 raw 데이터 버퍼 인덱스. system.bodies 길이 변동 없음 (정적 SSoT).
+    let lodInfoIndex = 0;
 
     // view × projection 결합 행렬. Babylon `scene.getTransformMatrix()` 는 `viewMatrix × projectionMatrix` 의
-    // row-major 16 원소 Float32Array (`.m` 필드). 카메라 타입 관계없이 scene 단위로 호출 가능.
+    // column-major 16 원소 Float32Array (`.m` 필드). 카메라 타입 관계없이 scene 단위로 호출 가능.
     const vp = scene.getTransformMatrix();
     const vpArr = vp.m;
     const viewportHeight = scene.getEngine().getRenderHeight() || 800;
+
+    // #379 fix — screenCoverageRadius 의 edge offset 을 camera-up basis 로 박제.
+    // viewMatrix 는 world-to-view 변환. invert 결과의 col 1 = world space camera-up basis.
+    // edge offset 을 cameraUp 으로 두면 NDC y 변화가 주성분 → viewportHeight 환산이 정확.
+    // (cameraRight 면 NDC x 가 주성분이 되어 perspective anisotropy 로 viewportWidth 환산 필요)
+    // 매 프레임 1회 계산 후 모든 body 에 재사용 (성능 영향 0).
+    //
+    // 첫 frame 에 scene._viewMatrix 가 lazy 초기화 안 된 경우 null 가능 — fallback `[0, 1, 0]`
+    // 으로 두면 world-up 근사. ArcRotateCamera default 자세에서 cameraUp 이 world-up 의
+    // view-forward 성분 제거 후 정규화된 형태라 ±10% 이내. 두 번째 frame 부터 정확한 invView 사용.
+    const viewMatrix = scene.getViewMatrix();
+    let cameraUpWorld: [number, number, number] = [0, 1, 0];
+    if (viewMatrix && typeof viewMatrix.clone === 'function') {
+      const invView = viewMatrix.clone().invert();
+      const ivm = invView.m;
+      cameraUpWorld = [ivm[4] ?? 0, ivm[5] ?? 1, ivm[6] ?? 0];
+    }
 
     const now = performance.now();
 
@@ -880,6 +1068,7 @@ export function createSolarSystemScene(
         sceneUnitPerMeter,
         vpArr,
         viewportHeight,
+        cameraUpWorld,
       );
 
       const isFocused = focusBodyIdForAssert === body.id;
@@ -911,7 +1100,58 @@ export function createSolarSystemScene(
       if (nextLevel === 'high') lodStats.high += 1;
       else if (nextLevel === 'mid') lodStats.mid += 1;
       else lodStats.low += 1;
+
+      // #391 Phase 2 — billboard alpha mask 4px fallback 토글 (cross-validate 이견 수용 #1).
+      // ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"4px fallback 분기".
+      //  - pxDiameter ≥ 4px: alpha mask 적용 (원형 disc 인지)
+      //  - pxDiameter < 4px: alpha mask 바이패스 (사각형 quad 유지) — sub-pixel flickering 회피
+      //
+      // low variant 가 lazy-create 된 후에만 의미 있음. 미생성 시 토글 skip.
+      // billboard fade 중에도 정확한 mask 상태 유지 — fade 는 material.alpha (0~1) 를 건드리지만
+      // opacityTexture 자체는 별개 채널. fade 종료 후에도 fallback 상태가 보존됨.
+      const pxDiameter = coverage * 2;
+      const lowVariantMesh = lowVariants.get(body.id);
+      if (lowVariantMesh) {
+        const lowMat = lowVariantMesh.material as StandardMaterial | null;
+        if (lowMat) {
+          const wantsMask = shouldApplyBillboardAlphaMask(pxDiameter);
+          // 매 프레임 호출되므로 토글 변경이 있을 때만 material 갱신 (Babylon shader cache 보존).
+          // opacityTexture 의 boolean 비교는 reference equality — null 또는 동일 인스턴스 비교.
+          const hasMask = lowMat.opacityTexture !== null && lowMat.opacityTexture !== undefined;
+          if (wantsMask !== hasMask) {
+            if (wantsMask) {
+              lowMat.opacityTexture = getOrCreateBillboardAlphaMask(scene);
+              lowMat.transparencyMode = 1; // ALPHATEST
+            } else {
+              lowMat.opacityTexture = null;
+              lowMat.transparencyMode = 0; // OPAQUE
+            }
+          }
+        }
+      }
+
+      // #388 — body 별 raw 데이터 박제. lodInfo 버퍼는 매 프레임 in-place 갱신 (객체 재할당 회피).
+      // 시각 직경 추정 (pxDiameter) = coverage × 2 — screenCoverageRadius 가 반지름이므로 직경은 두 배.
+      const existing = lodInfo[lodInfoIndex];
+      if (existing) {
+        existing.id = body.id;
+        existing.level = nextLevel;
+        existing.screenCoverage = coverage;
+        existing.pxDiameter = pxDiameter;
+        existing.cameraDistanceMeters = cameraDistanceMeters;
+      } else {
+        lodInfo.push({
+          id: body.id,
+          level: nextLevel,
+          screenCoverage: coverage,
+          pxDiameter,
+          cameraDistanceMeters,
+        });
+      }
+      lodInfoIndex += 1;
     }
+    // body 가 줄었을 가능성 — trailing slot 잘라내기 (현재 시스템에선 정적이지만 미래 안전).
+    if (lodInfo.length > lodInfoIndex) lodInfo.length = lodInfoIndex;
   };
 
   /**
@@ -1021,6 +1261,8 @@ export function createSolarSystemScene(
     lodStats.override = level;
   };
   const getLodStats = () => lodStats;
+  // #388 — body 별 LOD raw 데이터 노출. dev overlay 가 frame 간격으로 polling.
+  const getLodInfo = (): readonly LodBodyInfo[] => lodInfo;
 
   const updateAtKepler = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
@@ -1125,9 +1367,11 @@ export function createSolarSystemScene(
     },
     floatingOrigin,
     setFocusOrigin,
+    applyFocusTier,
     clearFocus,
     setLodOverride,
     getLodStats,
+    getLodInfo,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
@@ -1148,6 +1392,10 @@ export function createSolarSystemScene(
       midVariants.clear();
       lowVariants.clear();
       meshes.clear();
+      // #391 Phase 2 — scene 공유 alpha mask 텍스처 정리 (cross-validate 이견 수용 #2).
+      // ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"공유 텍스처 dispose 책임".
+      // billboard material 들이 모두 dispose 된 후 호출 (참조 정리 후 텍스처 해제 순서 보장).
+      disposeBillboardAlphaMask(scene);
     },
   };
 }
@@ -1243,6 +1491,135 @@ function createBodyMeshMid(
 }
 
 /**
+ * #391 Phase 2 — billboard quad 의 alpha mask fallback 임계 (pxDiameter, 픽셀).
+ *
+ * ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 + cross-validate 이견 수용 #1.
+ *
+ * **계약 (drift 방어)**:
+ *  - pxDiameter ≥ 4px → alpha mask 적용 (원형 disc 인지)
+ *  - pxDiameter < 4px → alpha mask 바이패스, 사각형 quad 그대로 유지
+ *  - 근거: smoothstep(0.4, 0.5) 의 0.53px 전이 구간이 1 hardware pixel 미만 → GPU sampler aliasing
+ *    + sub-pixel flickering 발생. 사용자 D-T2 가 3px 이하 객체에서 원/사각형 구분 불가 →
+ *    사각형 quad 가 시각 안정성 우위.
+ *
+ * 본 임계값을 변경하려면 ADR Amendment 박제 의무 (volt #49 — 주석 계약 vs 구현 drift).
+ */
+export const LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER = 4;
+
+/**
+ * #391 Phase 2 — billboard alpha mask 적용 여부 결정 헬퍼.
+ *
+ * ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"4px fallback 분기".
+ * runLodPass 가 매 프레임 호출 + lod.test.ts 단위 테스트에서 경계 검증 (3.9 / 4.1px).
+ *
+ * @param pxDiameter — 현재 측정된 billboard 직경 (pixel). `screenCoverage * 2` SSoT.
+ * @returns true = alpha mask 적용 / false = 사각형 quad 유지 (fallback)
+ */
+export function shouldApplyBillboardAlphaMask(pxDiameter: number): boolean {
+  // NaN / 음수 / undefined → fallback (alpha mask 미적용 안전 측).
+  if (!Number.isFinite(pxDiameter) || pxDiameter <= 0) return false;
+  return pxDiameter >= LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER;
+}
+
+/**
+ * #391 Phase 2 — alpha mask 텍스처 캐시 키 (scene.metadata 단일 SSoT).
+ *
+ * scene 단위 1회 생성 + 모든 billboard material 공유. per-body 생성 금지 (메모리 24배).
+ * scene dispose 시 함께 dispose 의무 (cross-validate 이견 수용 #2).
+ */
+const ALPHA_MASK_METADATA_KEY = '__lodBillboardAlphaMask';
+
+/**
+ * #391 Phase 2 — billboard 용 procedural 원형 alpha mask 텍스처 (scene 공유 인스턴스).
+ *
+ * ADR `docs/decisions/20260502-391-phase2-billboard.md` §"developer 단계 작업 명세" §1
+ * (옵션 A 채택 — DynamicTexture 64×64 + scene 공유).
+ *
+ * 동작:
+ *  - 첫 호출 시 64×64 DynamicTexture 생성 (≈ 16KB VRAM, Babylon Uber-shader 캐시 호환)
+ *  - radial gradient: alpha = 1 - smoothstep(0.4 * size, 0.5 * size, length(uv - 0.5))
+ *    → 64.6% 면적이 opaque 원형 disc, 가장자리 ~3.2px 안티앨리어싱 전이
+ *  - 두 번째+ 호출은 캐시된 동일 인스턴스 반환 (메모리 1× 보장)
+ *  - 캐시는 `scene.metadata.__lodBillboardAlphaMask` 에 저장 — scene dispose 시 함께 정리
+ *
+ * 텍스처 자체는 모든 billboard material 의 `opacityTexture` 로 공유 참조. material 인스턴스는
+ * body 별 emissiveColor / diffuseColor 를 분리 유지하되 mask 만 공유.
+ */
+function getOrCreateBillboardAlphaMask(scene: Scene): DynamicTexture {
+  const meta = (scene.metadata ?? (scene.metadata = {})) as Record<string, unknown>;
+  const cached = meta[ALPHA_MASK_METADATA_KEY];
+  if (cached instanceof DynamicTexture) return cached;
+
+  const SIZE = 64;
+  const texture = new DynamicTexture(
+    'lod-billboard-alpha-mask',
+    { width: SIZE, height: SIZE },
+    scene,
+    /* generateMipMaps */ false,
+    Texture.TRILINEAR_SAMPLINGMODE,
+  );
+  texture.hasAlpha = true;
+  // Babylon DynamicTexture 가 wrap clamp 미설정 시 sub-pixel 가장자리에서 1px 라인 누설 가능.
+  texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+  texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+
+  const ctx = texture.getContext() as CanvasRenderingContext2D;
+  // 투명 초기화 (clearRect 사용 — fillStyle 'transparent' 보다 명시적).
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  // smoothstep(0.4, 0.5) 의 직접 캔버스 구현 — radial gradient 로 근사.
+  // 0.0 ~ 0.4 = alpha 1.0 (완전 opaque)
+  // 0.4 ~ 0.5 = smoothstep 전이 구간
+  // 0.5 ~ 1.0 = alpha 0 (완전 transparent)
+  // 캔버스 픽셀 직접 조작이 가장 정확 (gradient API 의 cubic interp 와 smoothstep 미일치).
+  const imageData = ctx.createImageData(SIZE, SIZE);
+  const data = imageData.data;
+  const cx = (SIZE - 1) / 2;
+  const cy = (SIZE - 1) / 2;
+  const halfSize = SIZE / 2;
+  for (let y = 0; y < SIZE; y += 1) {
+    for (let x = 0; x < SIZE; x += 1) {
+      const dx = (x - cx) / halfSize; // -1 ~ 1
+      const dy = (y - cy) / halfSize;
+      const dist = Math.sqrt(dx * dx + dy * dy); // 0 ~ √2 (코너 = 1.414)
+      // smoothstep(edge0, edge1, x) = clamp((x - edge0) / (edge1 - edge0), 0, 1) ^ 2 * (3 - 2 * t)
+      // ADR SSoT — 0.4/0.5 경계 (반지름 기준).
+      // dist 는 캔버스 가장자리에서 1.0 (반지름 = halfSize) 이므로 0.4/0.5 = 캔버스 반경의 80%/100%.
+      // 단, ADR 박제 0.4/0.5 는 quad UV 0~1 좌표계 (0.5 = 중심, 0~0.5 = 반지름) 기준이라 dist 직접 사용.
+      const t = Math.max(0, Math.min(1, (dist - 0.8) / (1.0 - 0.8))); // 0.4*2/0.5*2 = 0.8/1.0
+      const smoothstep = t * t * (3 - 2 * t);
+      const alpha = 1 - smoothstep;
+      const idx = (y * SIZE + x) * 4;
+      data[idx + 0] = 255; // R — opacity 텍스처라 RGB 무시되나 white 박제
+      data[idx + 1] = 255; // G
+      data[idx + 2] = 255; // B
+      data[idx + 3] = Math.round(alpha * 255); // A
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  texture.update(false /* invertY 무관 */);
+
+  meta[ALPHA_MASK_METADATA_KEY] = texture;
+  return texture;
+}
+
+/**
+ * #391 Phase 2 — scene dispose 시 alpha mask 텍스처 정리 (cross-validate 이견 수용 #2).
+ *
+ * scene 단위 1회 생성된 DynamicTexture 가 누수되지 않도록 명시 dispose. scene 의 dispose 콜백에서
+ * 호출. metadata 키도 함께 정리하여 dispose 후 stale 참조 회피.
+ */
+function disposeBillboardAlphaMask(scene: Scene): void {
+  const meta = scene.metadata as Record<string, unknown> | null;
+  if (!meta) return;
+  const cached = meta[ALPHA_MASK_METADATA_KEY];
+  if (cached instanceof DynamicTexture) {
+    cached.dispose();
+    delete meta[ALPHA_MASK_METADATA_KEY];
+  }
+}
+
+/**
  * P11-B #289 — low LOD variant: billboard quad (BILLBOARDMODE_ALL).
  *
  * ADR `docs/decisions/20260424-p11-b-lod-design.md` §축 4.
@@ -1254,6 +1631,16 @@ function createBodyMeshMid(
  * 책임 분리: sphere/mid 가 시각 과장 (sun ×75) 을 전담, billboard 는 sub-pixel draw call 절감만.
  * focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 케이스에서 거대 quad 회귀 차단.
  * ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
+ *
+ * #391 Phase 2 — alpha mask 적용 의무 (drift 방어).
+ *  - quad 의 정사각형 윤곽이 픽셀 그리드에 그대로 노출 → 사용자 D-T2 회귀 (mercury/venus 사각형)
+ *  - 본 함수는 항상 alpha mask 적용된 material 로 생성 (기본 상태). LOD pass 가 매 프레임 측정한
+ *    pxDiameter < 4px 진입 시 runLodPass 가 opacityTexture = null + transparencyMode = 0 (OPAQUE)
+ *    로 fallback 토글. ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"4px fallback".
+ *  - 공유 텍스처는 `getOrCreateBillboardAlphaMask(scene)` 가 scene 단위 1회 생성, 24 body 가 동일
+ *    인스턴스를 `opacityTexture` 로 참조 → 메모리 ≈ 16KB VRAM (per-body 생성 금지).
+ *  - alpha mask threshold (smoothstep 0.4/0.5) 변경 시 ADR Amendment 의무.
+ *  - transparencyMode = 1 (ALPHATEST) — ALPHABLEND (2) 는 24 body back-to-front CPU 정렬 부하.
  */
 function createBodyBillboard(
   body: LoadedCelestialBody,
@@ -1288,6 +1675,23 @@ function createBodyBillboard(
     mat.emissiveColor = c.scale(0.3); // billboard 는 구형 음영이 없으므로 약한 emissive 로 가시성 보장
     mat.specularColor = new Color3(0, 0, 0);
   }
+
+  // #391 Phase 2 — alpha mask 적용 (기본 상태).
+  // ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"developer 단계 작업 명세" §1.
+  // - opacityTexture 로 procedural 원형 alpha mask 적용 (scene 공유 1회 생성)
+  // - transparencyMode = ALPHATEST (1) — ALPHABLEND (2) 는 24 body back-to-front 정렬 매 프레임 부하
+  //   ALPHATEST 는 fragment shader discard + Z-buffer write → CPU 정렬 비용 0 + 하드웨어 occlusion
+  // - useAlphaFromDiffuseTexture = false — opacityTexture 채널 단독 사용 (diffuse 와 분리)
+  // 4px fallback 진입 시 runLodPass 가 opacityTexture = null + transparencyMode = OPAQUE (0) 토글.
+  mat.opacityTexture = getOrCreateBillboardAlphaMask(scene);
+  // Babylon `Material.MATERIAL_ALPHATEST = 1`. 정적 상수 직접 import 시 일부 빌드 환경에서
+  // tree-shake 충돌 가능 — 숫자 리터럴 + 주석 SSoT 로 박제 (ADR `20260502-391-phase2-billboard.md`).
+  mat.transparencyMode = 1; // ALPHATEST
+  mat.useAlphaFromDiffuseTexture = false;
+  // ALPHATEST 의 cutoff. opacityTexture alpha < alphaCutOff 면 fragment discard.
+  // smoothstep 0.4~0.5 전이 구간의 중간값 (alpha ≈ 0.5) 을 cutoff 로 두면 원형 외곽 ≈ 1px 안티앨리어싱.
+  mat.alphaCutOff = 0.5;
+
   mesh.material = mat;
   mesh.setEnabled(false); // 기본 숨김.
   return mesh;

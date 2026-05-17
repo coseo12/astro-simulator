@@ -59,6 +59,13 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-no-scientific-grep.mjs') != ''
         run: pnpm run --if-present verify:no-scientific-grep
 
+      # #440 dev 서버 좀비 incident SSoT 박제 회귀 가드.
+      # CLAUDE.md 가드 A/B sub-section / qa.md 좀비 카나리아 / hook 파일 / forensic 보고서 5건 정합 검증.
+      # 박제가 의도치 않게 제거되면 exit 1 로 차단. 근거: docs/reports/20260510-419-dev-server-zombie-recurrence.md
+      - name: '#440 dev 서버 좀비 SSoT 회귀 가드 (verify:zombie-check)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-zombie-check.mjs') != ''
+        run: pnpm run --if-present verify:zombie-check
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================
@@ -110,6 +117,83 @@ jobs:
           name: r1-pixel-diff-${{ github.run_id }}
           path: apps/web/scripts/__diff__/r1/
           retention-days: 7
+
+      # ============================================================
+      # #378 focus 회귀 가드 — focus 시 허공 표시 차단
+      # ============================================================
+      # ADR: docs/decisions/20260503-378-focus-frustum-fix.md §결과·재검토 조건 §회귀 가드
+      # cross-validate G3 수용 — "사용자 D-T2 재발견 비용 > CI 시간 비용" ROI 명백
+      # 12 cells (6 body × 2 모드) 매트릭스 — venus 관찰 모드 PASS 확인
+      # next start 는 R1 가드 step 에서 이미 build/start 완료되므로 dev 빌드 별도 기동 필요.
+      # __solarScene 핸들이 dev 빌드 한정 노출 (sim-canvas.tsx:253) 이므로 next dev 사용.
+
+      - name: '#378 focus 회귀 가드 (verify:378-focus)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-378-focus.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3002 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3002/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
+      # ============================================================
+      # #408 focus transition 회귀 가드 — tier oscillate 차단 (사용자 D-T2 2026-05-04)
+      # ============================================================
+      # ADR: docs/decisions/20260504-focus-tier-oscillate-fix.md §결정 5 (회귀 가드 신설)
+      # 9 cells (3 from × 3 to) 매트릭스 — venus → mercury 등 다른 행성 전환 시 oscillate 차단 확인
+      # tier 전환 횟수 ≤ 1 / target origin reset 0 / camR jump > 1000 unit 0 단언
+      # __solarScene + __simCore.sendCommand 핸들이 dev 빌드 한정 노출이므로 next dev 재사용.
+
+      - name: '#408 focus transition 회귀 가드 (verify:focus-transition)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-focus-transition.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3003 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3003/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3003 node apps/web/scripts/browser-verify-focus-transition.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
+      # ============================================================
+      # #402 R-Phase Allowlist 자동화 hook — exports field WASM 도메인 sub-path 금지
+      # ============================================================
+      # ADR: docs/decisions/20260504-r-phase-allowlist-guard.md §Amendment 결정 D2
+      # 라운드 1 회귀 (PR #407, turbopack ${__dirname} SSR 500) 직접 가드.
+      # jq 로 packages/core/package.json exports field 검사. WASM 의존 도메인 sub-path 추가 시 차단.
+
+      - name: '#402 core exports immutable 가드 (verify-core-exports-immutable.sh)'
+        if: hashFiles('scripts/verify-core-exports-immutable.sh') != '' && hashFiles('packages/core/package.json') != ''
+        run: bash scripts/verify-core-exports-immutable.sh
+
+      # ============================================================
+      # #402 R-Phase Allowlist 회귀 가드 — UI disabled + scene-level 강제 click 차단
+      # ============================================================
+      # ADR: docs/decisions/20260504-r-phase-allowlist-guard.md §결정 4 (DoD-4)
+      # 매트릭스: 박제 body (sun/mercury/venus) 활성 + 미박제 body (earth/jupiter/neptune) disabled
+      # + 강제 click 시 store/camera 변화 0 (defense-in-depth scene 측면)
+
+      - name: '#402 R-Phase allowlist 회귀 가드 (verify:r-phase-allowlist)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3004 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3004/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3004/ko node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
 
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:

@@ -1,0 +1,465 @@
+{
+  "timestamp": "2026-05-03T09:00:13.213Z",
+  "baseUrl": "http://localhost:3000/ko",
+  "matrix": {
+    "pass": true,
+    "cellResults": [
+      {
+        "cellId": "sun-observe",
+        "body": "sun",
+        "mode": "observe",
+        "measurement": {
+          "focus": "sun",
+          "tier": "solar",
+          "meshRadiusWorld": 5.060948536667805,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 25.304742683339025,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 1.4736322150255479e-15,
+            "y": 7.819595527436868,
+            "z": -24.066240422161687
+          },
+          "camLowerRadiusLimit": 0.5,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "mercury-observe",
+        "body": "mercury",
+        "mode": "observe",
+        "measurement": {
+          "focus": "mercury",
+          "tier": "inner",
+          "meshRadiusWorld": 4.5552878929065255,
+          "meshAbsPos": {
+            "x": -13.971102714538574,
+            "y": -106.23253631591797,
+            "z": -7.3957319259643555
+          },
+          "camRadius": 26.876198568148503,
+          "camTarget": {
+            "x": -29.96990966796875,
+            "y": -103.04753112792969,
+            "z": -5.667093753814697
+          },
+          "camPosition": {
+            "x": -29.96990966796875,
+            "y": -94.74232902617617,
+            "z": -31.227877535294805
+          },
+          "camLowerRadiusLimit": 0.5,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 16.404093145030934,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "venus-observe",
+        "body": "venus",
+        "mode": "observe",
+        "measurement": {
+          "focus": "venus",
+          "tier": "inner",
+          "meshRadiusWorld": 12.913855343006675,
+          "meshAbsPos": {
+            "x": -164.28292846679688,
+            "y": -22.016921997070312,
+            "z": 9.181836128234863
+          },
+          "camRadius": 76.19174652373938,
+          "camTarget": {
+            "x": -165.48623657226562,
+            "y": -7.534984111785889,
+            "z": 9.449209213256836
+          },
+          "camPosition": {
+            "x": -165.48623657226562,
+            "y": 16.009560395157905,
+            "z": -63.01344780605412
+          },
+          "camLowerRadiusLimit": 0.5,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.8999999999999995,
+          "targetDistance": 14.534302999336337,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "earth-observe",
+        "body": "earth",
+        "mode": "observe",
+        "measurement": {
+          "focus": "earth",
+          "tier": "body",
+          "meshRadiusWorld": 277.2861661795728,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 1635.9883804594795,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 9.527246378363269e-14,
+            "y": 505.54821216192636,
+            "z": -1555.9174098191427
+          },
+          "camLowerRadiusLimit": 0.01,
+          "camMinZ": 0.001003753836870195,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "jupiter-observe",
+        "body": "jupiter",
+        "mode": "observe",
+        "measurement": {
+          "focus": "jupiter",
+          "tier": "body",
+          "meshRadiusWorld": 3108.077263393686,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 18337.65585402275,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 1.0679010157385247e-12,
+            "y": 5666.6472958922695,
+            "z": -17440.147093546304
+          },
+          "camLowerRadiusLimit": 0.026003833030289976,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "neptune-observe",
+        "body": "neptune",
+        "mode": "observe",
+        "measurement": {
+          "focus": "neptune",
+          "tier": "body",
+          "meshRadiusWorld": 1076.6019323935718,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 6351.9514011220745,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 3.699085317762663e-13,
+            "y": 1962.8609303904796,
+            "z": -6041.064771227279
+          },
+          "camLowerRadiusLimit": 0.01,
+          "camMinZ": 0.003897213248359749,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "sun-research",
+        "body": "sun",
+        "mode": "research",
+        "measurement": {
+          "focus": "sun",
+          "tier": "solar",
+          "meshRadiusWorld": 5.060948536667805,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 25.304742683339025,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 1.4736322150255479e-15,
+            "y": 7.819595527436868,
+            "z": -24.066240422161687
+          },
+          "camLowerRadiusLimit": 0.5,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "mercury-research",
+        "body": "mercury",
+        "mode": "research",
+        "measurement": {
+          "focus": "mercury",
+          "tier": "inner",
+          "meshRadiusWorld": 4.5552878929065255,
+          "meshAbsPos": {
+            "x": -13.747020721435547,
+            "y": -106.2547378540039,
+            "z": -7.418112754821777
+          },
+          "camRadius": 26.876198568148503,
+          "camTarget": {
+            "x": -29.96990966796875,
+            "y": -103.04753112792969,
+            "z": -5.667093753814697
+          },
+          "camPosition": {
+            "x": -29.96990966796875,
+            "y": -94.74232902617617,
+            "z": -31.227877535294805
+          },
+          "camLowerRadiusLimit": 0.5,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 16.629322544746454,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "venus-research",
+        "body": "venus",
+        "mode": "research",
+        "measurement": {
+          "focus": "venus",
+          "tier": "inner",
+          "meshRadiusWorld": 12.913855343006675,
+          "meshAbsPos": {
+            "x": -164.2498016357422,
+            "y": -22.275793075561523,
+            "z": 9.176386833190918
+          },
+          "camRadius": 76.19174652373938,
+          "camTarget": {
+            "x": -165.48623657226562,
+            "y": -7.534984111785889,
+            "z": 9.449209213256836
+          },
+          "camPosition": {
+            "x": -165.48623657226562,
+            "y": 16.009560395157905,
+            "z": -63.01344780605412
+          },
+          "camLowerRadiusLimit": 0.5,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.8999999999999995,
+          "targetDistance": 14.795088790198207,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "earth-research",
+        "body": "earth",
+        "mode": "research",
+        "measurement": {
+          "focus": "earth",
+          "tier": "body",
+          "meshRadiusWorld": 277.2861661795728,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 1635.9883804594795,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 9.527246378363269e-14,
+            "y": 505.54821216192636,
+            "z": -1555.9174098191427
+          },
+          "camLowerRadiusLimit": 0.01,
+          "camMinZ": 0.001003753836870195,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "jupiter-research",
+        "body": "jupiter",
+        "mode": "research",
+        "measurement": {
+          "focus": "jupiter",
+          "tier": "body",
+          "meshRadiusWorld": 3108.077263393686,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 18337.65585402275,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 1.0679010157385247e-12,
+            "y": 5666.6472958922695,
+            "z": -17440.147093546304
+          },
+          "camLowerRadiusLimit": 0.026003833030289976,
+          "camMinZ": 0.01,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      },
+      {
+        "cellId": "neptune-research",
+        "body": "neptune",
+        "mode": "research",
+        "measurement": {
+          "focus": "neptune",
+          "tier": "body",
+          "meshRadiusWorld": 1076.6019323935718,
+          "meshAbsPos": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camRadius": 6351.9514011220745,
+          "camTarget": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "camPosition": {
+            "x": 3.699085317762663e-13,
+            "y": 1962.8609303904796,
+            "z": -6041.064771227279
+          },
+          "camLowerRadiusLimit": 0.01,
+          "camMinZ": 0.003897213248359749,
+          "isInFrustum": true
+        },
+        "verdict": {
+          "pass": true,
+          "dod1": true,
+          "dod2": true,
+          "dod3": true,
+          "radiusRatio": 5.9,
+          "targetDistance": 0,
+          "reasons": []
+        }
+      }
+    ]
+  }
+}

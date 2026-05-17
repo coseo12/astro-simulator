@@ -2,6 +2,13 @@
 
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
+// #404 — R-Phase allowlist SSoT (named import — scene namespace 경유 금지).
+// ADR `20260508-404-scenario-presets-r-phase-guard.md` §결정 3.
+//
+// ⚠️ #402 §Amendment 결정 D1 — `scene as sceneApi` namespace 경유 시 turbopack module dep graph 가
+//    solar-system-scene → nbody-engine → physics_wasm `__dirname` 평가를 trigger 하여 SSR 500.
+//    본 컴포넌트는 side-panels.tsx 직접 import → SSR 평가 대상이므로 named import 로 모듈 그래프 영향 0 보장.
+import { isRPhaseFocusable } from '@astro-simulator/core';
 
 interface Preset {
   id: string;
@@ -17,6 +24,11 @@ interface Preset {
  *  1. Newton 엔진으로 전환 (Kepler 2-body는 섭동 관찰 불가)
  *  2. 시간을 J2000으로 리셋 — 비교 관찰을 동일 시점에서 시작
  *  3. 질량 배수 교체
+ *
+ * #404 R-Phase Allowlist 가드 (defense-in-depth UI 측면 3번째 축, #402/#403 와 직교) —
+ * ADR `20260508-404-scenario-presets-r-phase-guard.md` §결정 3.
+ * preset 의 모든 mass multiplier target body 가 `R_PHASE_BODY_ALLOWLIST` 에 박제되어야 enabled.
+ * R_PHASE_BODY_ALLOWLIST 1줄 추가만으로 자동 활성 (Concrete Prediction §zero-touch).
  */
 const PRESETS: Preset[] = [
   {
@@ -40,6 +52,24 @@ const PRESETS: Preset[] = [
 ];
 
 const J2000 = 2_451_545.0;
+
+// #404 — R-Phase 미진입 preset 호버 / 클릭 시 사용자 안내 문구.
+// ADR `20260508-404-scenario-presets-r-phase-guard.md` §결정 3.
+// i18n 키 분기 신설 금지 (ADR §명시적 비-범위) — 한국어 하드코딩, `/en` 라우팅 미지원.
+const DISABLED_TOOLTIP = 'R-Phase 진행 시 활성';
+
+/**
+ * preset 활성 여부 판정 — 모든 mass multiplier target body 가
+ * `R_PHASE_BODY_ALLOWLIST` 에 박제되어야 enabled.
+ *
+ * R-Phase 진입 시 자동 적응 (zero-touch): allowlist 1줄 추가만으로
+ * 해당 body 영향 preset 자동 enabled.
+ *
+ * ADR `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 3 참조.
+ */
+function isPresetEnabled(preset: Preset): boolean {
+  return Object.keys(preset.massMultipliers).every((bodyId) => isRPhaseFocusable(bodyId));
+}
 
 export function ScenarioPresets() {
   const resetMasses = useSimStore((s) => s.resetMassMultipliers);
@@ -76,18 +106,30 @@ export function ScenarioPresets() {
           원복
         </button>
       </div>
-      {PRESETS.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          data-testid={`preset-${p.id}`}
-          onClick={() => apply(p)}
-          className="text-left bg-bg-elevated/50 hover:bg-primary/15 rounded-sm px-2 py-1.5 border border-border-subtle"
-        >
-          <div className="text-body-sm text-fg-primary">{p.label}</div>
-          <div className="text-caption text-fg-tertiary leading-snug">{p.description}</div>
-        </button>
-      ))}
+      {PRESETS.map((p) => {
+        const enabled = isPresetEnabled(p);
+        return (
+          <button
+            key={p.id}
+            type="button"
+            data-testid={`preset-${p.id}`}
+            // data-r-phase-disabled — E2E (browser-verify) 회귀 가드 + 선택자 노출용
+            // (#403 ADR cross-validate Gemini 개선 제안 2 패턴 일관, disabled / aria-disabled 와
+            // 의미 중복이지만 selector 일관성 위해 #402/#403 박제 패턴 그대로 재사용).
+            data-r-phase-disabled={!enabled}
+            disabled={!enabled}
+            aria-disabled={!enabled}
+            title={enabled ? undefined : DISABLED_TOOLTIP}
+            onClick={() => apply(p)}
+            className={`text-left bg-bg-elevated/50 rounded-sm px-2 py-1.5 border border-border-subtle ${
+              enabled ? 'hover:bg-primary/15' : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="text-body-sm text-fg-primary">{p.label}</div>
+            <div className="text-caption text-fg-tertiary leading-snug">{p.description}</div>
+          </button>
+        );
+      })}
     </div>
   );
 }

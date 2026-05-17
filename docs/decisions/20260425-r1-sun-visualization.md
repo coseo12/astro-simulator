@@ -86,7 +86,7 @@ pixel diameter ≈ diameter × viewportHeight / (radius × 2 × tan(fov / 2))
 | sunScale | 1280×720 (px d) | 1280×720 (점유율) | 1920×1080 (px d) | 1920×1080 (점유율) | 375×667 (px d) | 375×667 (점유율) | 평가                                 |
 | -------- | --------------- | ----------------- | ---------------- | ------------------ | -------------- | ---------------- | ------------------------------------ |
 | × 50     | 142             | 1.72%             | 213              | 2.74%              | 132            | 8.69%            | 1280×720 / 1920×1080 미달 — **탈락** |
-| × 75     | 213             | 3.87%             | 320              | 6.18%              | 197            | 19.6%            | 모바일 19.6% 침습 가능               |
+| × 75     | 213             | 3.87%             | 320              | ~~6.18%~~ 3.88%[^c1]    | 197            | 19.6%            | 모바일 19.6% 침습 가능               |
 | × 100    | 285             | 6.91%             | 427              | 11.0%              | 263            | 34.7%            | **모바일 34.7% 과도 — 탈락**         |
 | × 150    | 427             | 15.5%             | 640              | 24.7%              | 395            | 78.3%            | **모바일 화면 거의 차단 — 탈락**     |
 | × 200    | 570             | 27.6%             | 854              | 44.0%              | 526            | 가시 영역 초과   | **탈락**                             |
@@ -95,7 +95,7 @@ pixel diameter ≈ diameter × viewportHeight / (radius × 2 × tan(fov / 2))
 
 **해결책 — 후보 X (viewport-aware fixed): × 75 + 모바일 점유율 cap 19.6% 인정**:
 
-- 데스크톱 1280×720 (3.87%) / 1920×1080 (6.18%) 은 3% 임계 통과 + 자연스러움 (< 7%)
+- 데스크톱 1280×720 (3.87%) / 1920×1080 (~~6.18%~~ 3.88%[^c1]) 은 3% 임계 통과 + 자연스러움 (< 7%)
 - 모바일 19.6% 는 3% 임계 통과 + 인지 가능 + 화면 차단 안 함 (< 25%)
 - **단순 정수 75 = 1.5 × 50 직관적**, R2 추가 시 BODY_SCALE 데이터 구조에 단순 박제 가능
 
@@ -304,7 +304,7 @@ Prediction 실패 시 두 갈래:
 
 ### 회귀 가드
 
-- 본 ADR 의 R1 구현 PR 에서 **3개 viewport 점유율 실측값 박제** (1280×720 / 1920×1080 / 375×667) — 본 ADR §결정 1 표의 예측값 (3.87% / 6.18% / 19.6%) ± 0.5% 이내
+- 본 ADR 의 R1 구현 PR 에서 **3개 viewport 점유율 실측값 박제** (1280×720 / 1920×1080 / 375×667) — 본 ADR §결정 1 표의 예측값 (3.87% / ~~6.18%~~ 3.88%[^c1] / 19.6%) ± 0.5% 이내
 - 측정 도구는 별도 ADR `20260425-r1-ui-pixel-diff-guard.md` 의 회귀 가드 인프라와 통합 (sun viewport 점유율 측정도 같은 playwright 스크립트에서 수행)
 
 ### 재검토 트리거
@@ -511,3 +511,202 @@ git diff develop...HEAD --stat \
 - `packages/core/src/render/lod-body-thresholds.ts` — 0 라인 변경
 - 다른 body (mercury / venus / ... ) — R2+ 범위
 - `body.radius` 실측 데이터 (`solar-system.json`) — 절대 변경 금지
+
+---
+
+## Amendment 2026-05-01 — sunScale 75 → 50 (R3 D-T2 가드 발견 #1 / 옵션 a 채택)
+
+> **Status**: Active (2026-05-01 박제, architect 단계)
+> **근거 ADR**: [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01
+> **근거 PR**: #377 CLOSED (mercuryScale=2500 / venusScale=1850 보수값 D-T2 미통과)
+> **사용자 결정**: 옵션 c 적극값 + 옵션 a (sunScale 75 → 50) 동반 채택 (2026-05-01)
+> **적용 PR**: feature/373-body-proportion-aggressive (본 amendment 박제 후 developer 단계)
+
+### 변경 배경
+
+R3 (#369) D-T2 가드 발견 #1 (body 비율 미해소) 의 forensic ADR (`20260430-r3-followup-body-proportion.md`) 옵션 a 채택의 R1 amendment.
+
+PR #377 (mercuryScale=2500 / venusScale=1850 보수값) 의 D-T2 사용자 검증 미통과로 forensic ADR §재검토 트리거 #1 발동. 사용자 자연 비율 인지 단위로 적극값 (mercury=2000 / venus=1500) + sunScale 인하 (75 → 50) 동반 채택.
+
+본 R1 amendment 의 적용 의도: sun mesh 자체의 절대 크기 인하로 mercury/venus 와의 px 비 산식 분모 축소 → 적극값 채택 후에도 mercury/venus 가 자연 비례 (sun 의 ≤ 6% / ≤ 11%) 로 인지되도록 균형 조정.
+
+### 결정 1 갱신 — `BODY_SCALE.sun = 50`
+
+본 ADR §결정 1 (`BODY_SCALE.sun = 75` 박제) 의 **갱신**:
+
+```typescript
+/**
+ * R1 #329 — body 별 시각 과장 배수.
+ *
+ * Amendment 2026-05-01 — sunScale 75 → 50 (R3 #373 D-T2 가드 발견 #1 / 옵션 a 채택).
+ * 사유: PR #377 보수값 (mercury=2500 / venus=1850) D-T2 미통과 → 적극값 (mercury=2000 / venus=1500)
+ * + sunScale 인하 (75 → 50) 동반 채택. 사용자 자연 비율 인지 단위 (px diameter 비) 강화.
+ *
+ * 적용 지점: `createBodyMesh*` 에서 `diameter = body.radius × 2 × renderScale × scale`.
+ * 실측 데이터 (body.radius, solar-system.json) 자체는 변경 없음.
+ *
+ * 1.0 = 실측 그대로. > 1 = 시각 과장. < 1 은 R1 비-범위.
+ *
+ * R1 baseline (Amendment 2026-05-01): T1 solar / camera radius=35 scene unit / fov=0.8 rad 기준
+ * sun = 50 → pixel diameter ≈ 246px (1280×720), brightRatio ≈ 1.86%, diskAreaRatio ≈ 5.17%
+ *           pixel diameter ≈ 228px (375×667), brightRatio ≈ 5.88%, diskAreaRatio ≈ 16.34%
+ */
+export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
+  sun: 50, // Amendment 2026-05-01 — 75 → 50 (R3 D-T2 가드 발견 #1)
+  // mercury / venus 박제값은 R2/R3 ADR amendment 참조
+} as const);
+```
+
+### sunScale 50 점유율 산출 (3 viewport 재산정)
+
+본 ADR §축 1 §점유율 산출식 그대로 적용. `sunScale 50` 시:
+
+```
+diameter (scene unit) = 6.957e8 × 2 × 8.4e-11 × 50 = 5.84
+pixel diameter (1280×720) ≈ 5.84 × 720 / (35 × 2 × 0.4228) ≈ 142px
+점유율 ≈ π × (142/2)² / (1280 × 720) ≈ 1.72%
+```
+
+forensic 측정 데이터 검증 (sunScale 75 → wsR 7.591 → pxDiameter 369.4 → brightRatio 4.19% / diskAreaRatio 11.63% (1280×720)) 기반 선형 비례 산출:
+
+| viewport         | pxDiameter (sunScale 50) | brightRatio (산출) | diskAreaRatio (산출) | R1 가드 통과 여부                                 |
+| ---------------- | ------------------------ | ------------------ | -------------------- | ------------------------------------------------- |
+| 1280×720         | 246.3                    | **1.86%**          | 5.17%                | brightRatio ≥ 3% **미달**. R1 가드 임계 갱신 필요 |
+| 1920×1080        | 369.4                    | **1.87%**          | 5.17%                | 미달 (동일)                                       |
+| 375×667 (모바일) | 228.1                    | **5.88%**          | 16.34%               | 통과 (≥ 3%)                                       |
+
+**R1 baseline 가드 갱신 의도** (본 amendment 박제):
+
+본 ADR §결정 1 의 viewport 점유율 ≥ 3% 가드는 sunScale 75 박제값 기준. sunScale 50 도입으로 데스크톱 viewport (1280×720 / 1920×1080) 가 ≥ 3% 미달. 새 baseline 가드 박제:
+
+- **신규 R1 baseline (Amendment 2026-05-01)**:
+  - **brightRatio ≥ 0.5%** (R2/R3 와 일관 — 절대 가시성 최소 임계, 1280×720 1.86% / 1920×1080 1.87% / 모바일 5.88% 모두 통과)
+  - **pxDiameter ≥ 100px** (1280×720) — 사용자 인지 가능성 보장 (실측 246px 통과)
+  - **diskAreaRatio ≥ 4%** (1280×720) — 화면 점유 시각적 인지 (실측 5.17% 통과)
+  - **모바일 (375×667) brightRatio ≥ 3%** (보존 — sunScale 50 시 5.88% 통과)
+- **기존 R1 가드 (sunScale 75 시점) 폐기**: brightRatio ≥ 3% 데스크톱 가드. 본 amendment 가 폐기 사유 = sunScale 인하 동반으로 mercury/venus 와의 비율 자연화
+
+### Concrete Prediction (sunScale 50 도입 후)
+
+R2/R3 (이미 박제, 본 amendment 동반 갱신) + R4+ body 추가 시 본 amendment 의 sunScale 50 baseline 이 SSoT:
+
+> **Prediction**: R4 (지구) 추가 시 `apps/web/src/constants/body-scale.ts` 에 `earth: <N>` 1줄 추가. earth scale 산정 시 Q2=B 비례 결정 가드 (earth sun 대비 px 비 ≤ N% — R4 PM 라운드 박제값) 충족 + sunScale 50 baseline 보존. R-Phase 정책 prediction 효력 유지.
+
+### 회귀 가드 (본 amendment 의 fix PR 의무)
+
+- 본 amendment 적용 PR (developer 단계) 에서 다음 박제:
+  - `apps/web/src/constants/body-scale.ts` — `sun: 50` 박제 + 단위 테스트 갱신
+  - `r1-ui-regression-guard.mjs` — sunScale 50 baseline 새 임계 적용 (≥ 0.5% brightRatio + ≥ 100px pxDiameter + ≥ 4% diskAreaRatio)
+  - `r1-guard --measure-px-ratio` 신설 — forensic ADR §결정 2 §5 명세 그대로 구현
+  - CHANGELOG `### Behavior Changes`: "태양 시각 점유율 인하 (sunScale 75 → 50). 데스크톱 brightRatio 4.19% → 1.86% (1280×720)"
+
+### 재검토 트리거 (본 amendment 갱신)
+
+기존 §재검토 트리거 (#1~#6) 보존. 추가:
+
+7. **sunScale 50 도 사용자 시각 인지 미달** — D-T2 사용자 검증 결과 sun 이 "여전히 너무 큼" 또는 "너무 작음" 평가. sunScale 30~70 범위 재조정 또는 viewport-aware (후보 Y) 재검토
+8. **R4 (지구) 진입 시 baseline 가드 prediction 실패** — earth scale 산정 시 sunScale 50 baseline 이 비례 결정 산식과 호환 안 됨. log scaling (forensic ADR 옵션 e) 후속 이슈 우선순위 high 승격
+9. **모바일 brightRatio 5.88% 보존 안 됨** — 향후 mobile viewport 매트릭스 변경 (예: 414×896 등) 시 본 amendment 의 모바일 점유율 보장 가드 재산정 필요
+
+### 위험 / 미해결 (본 amendment 갱신)
+
+- **데스크톱 1280×720 brightRatio 1.86% 가시성 약화 우려** — 사용자가 "태양이 작아 보임" 인지 가능. 본 amendment 의 기대 효과 = mercury/venus 와의 비율 자연화. D-T2 후 사용자 평가 받음
+- **R4+ body 추가 시 sun 의 절대 크기 더 인하 압박** — 본 amendment 가 sun 인하 시작점 박제. 향후 R5 mars / R6 jupiter 등 추가 시 sun 의 상대 크기가 더 작아 보일 수 있음 → 옵션 (e) log scaling 우선순위 high 승격 가능
+- **R2/R3 ADR amendment 동반 박제 누락 시 SSoT drift** — 본 amendment 단독 박제 시 mercury/venus 박제값과 sunScale baseline 의 결합 의도가 SSoT 단절. R2 ADR Amendment 2026-04-30 + R3 ADR Amendment 2026-04-30 갱신 동반 의무
+
+### Cross-validate (본 amendment 박제 직후)
+
+본 amendment 는 forensic ADR Amendment 2026-05-01 의 cross-validate (Gemini 2.5 Pro, 2026-05-01) 커버리지 안 — 별도 cross-validate skip. forensic ADR §Cross-validate 결과 (Gemini 2.5 Pro, 2026-05-01) 가 본 amendment 의 의도까지 포괄.
+
+### 참조
+
+- forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 — 본 amendment 의 근거 SSoT
+- R2 ADR Amendment 2026-04-30 + R3 ADR Amendment 2026-04-30 (mercury=2000 / venus=1500 확정 갱신)
+- Roadmap v3 §6 + §R-Phase 공통 DoD 템플릿 amendment 갱신 (적극값 채택 후속)
+- volt [#74](https://github.com/coseo12/volt/issues/74) (UX DoD vs 제품 동작), volt [#29](https://github.com/coseo12/volt/issues/29) (결합 간과 편향), CRITICAL #6 §10 (수치 DoD 미달 시 측정 방법 검증 우선)
+
+### 라운드 2 결정 (2026-05-01)
+
+**sunScale 50 그대로 유지**. 라운드 2 amendment 는 mercury (2000 → 900) / venus (1500 → 650) 만 적극 재조정. R1 sunScale 50 박제값은 forensic ADR §재검토 트리거 #1 라운드 1 발동의 근거 박제 (D-T2 미해결 #1 비율 핵심) 그대로 유효. 자세한 재조정 근거: forensic ADR Amendment 2026-05-01 (라운드 2) §"임계 비례 역산".
+
+---
+
+## Amendment v2 (2026-05-06) — §결정 1 표 1920×1080 점유율 박제값 6.18% → 3.88% 정정 ([#362](https://github.com/coseo12/astro-simulator/issues/362))
+
+**범주**: 박제값 산출 오류 정정 (역사적 분석 시점 박제값) — 동작/구현 영향 0.
+
+### 발견 경위
+
+R2 (#361) Architect 단계 cross-validate (Gemini 3.1 Pro Preview, 2026-04-28, R2 ADR `20260428-r2-mercury-visualization.md` §고유 발견 §발견 1 박제) 에서 본 R1 ADR §결정 1 표의 sunScale × 75 행 1920×1080 점유율 박제값 **6.18%** 가 산출 오류임을 발견. 후속 분리 이슈 [#362](https://github.com/coseo12/astro-simulator/issues/362) 에서 본 Amendment 박제로 정정 확정.
+
+### 정정 매트릭스
+
+| 위치 (line) | 원본 박제값 | 정정값 | 정정 사유 |
+| ----------- | ----------- | ------ | --------- |
+| §결정 1 §축 1 §점유율 산출 표 (line 89) — `× 75` 행 1920×1080 점유율 | 6.18% | **3.88%** | 16:9 동일 종횡비 + 동일 fov (0.8 rad) + 동일 카메라 거리 (35 scene unit) → coverage 동일이 정합 (산출식 검증) |
+| §결정 1 §해결책 §후보 X 산출 결과 (line 98) | 6.18% | **3.88%** | 동일 (위와 같은 산출식 의존) |
+| §결과·재검토 조건 §회귀 가드 (line 307) §3 viewport 예측값 | 6.18% | **3.88%** | 본 §결정 1 표 박제값 인용 — 동기화 |
+
+**보존 정책**: 본문 직접 정정 + strikethrough (`~~6.18%~~ 3.88%`) + footnote 참조 (`[^c1]`) 박제로 *역사적 박제값* + *정정값* 동시 추적. 원본 박제값 git history 보존.
+
+### 산출식 재검증
+
+본 ADR §결정 1 §점유율 산출식 그대로 적용 (sunScale × 75):
+
+```
+diameter (scene unit) = body.radius × 2 × renderScaleForTier × scale
+                      = 6.957e8 × 2 × 8.4e-11 × 75
+                      = 8.766 scene unit
+pixel diameter (1280×720)  = 8.766 × 720 / (35 × 2 × tan(0.4)) = 213.3 px
+pixel diameter (1920×1080) = 8.766 × 1080 / (35 × 2 × tan(0.4)) = 319.9 px
+점유율 (1280×720)   = π × (213.3/2)² / (1280 × 720)   = 3.87%
+점유율 (1920×1080)  = π × (319.9/2)² / (1920 × 1080)  = 3.88%
+```
+
+**핵심**: 16:9 동일 종횡비 + 동일 fov + 동일 카메라 거리 + 동일 mesh diameter (scene unit) → coverage **동일** 이 정합 (viewport 면적이 W×H 비례하지만 px diameter 도 viewport H 비례 → 면적비 상쇄).
+
+### Gemini 분석 인용 (R2 ADR §발견 1, 2026-04-28)
+
+> "동일 fov, 16:9 종횡비, 동일 카메라 거리(35) 적용 시 1920×1080 환경에서도 sun 점유율은 3.88% 가 나오는 것이 수학적으로 정확. R1 ADR 박제 6.18% 는 R1 작성 시 viewport 상대 좌표계 계산 실수이거나 종횡비 / 카메라 거리가 다르게 적용된 수치"
+
+### 운영 영향
+
+- **현재 운영 sunScale = 50** (Amendment 2026-05-01 시점 갱신). 본 §결정 1 표는 **R1 본 구현 시점 (sunScale 75) 의 분석 컨텍스트** — 현재 운영 baseline 은 본 ADR §"sunScale 50 점유율 산출 (3 viewport 재산정)" (line 560~) 이 SSoT
+- **회귀 가드** (line 307) — sunScale 75 시점 baseline. 현재 운영 baseline 은 §"신규 R1 baseline (Amendment 2026-05-01)" 박제값 (brightRatio ≥ 0.5% / pxDiameter ≥ 100px / diskAreaRatio ≥ 4% / 모바일 brightRatio ≥ 3%) 이 SSoT. 본 Amendment v2 는 *역사적 박제값* 정정만 — 현재 R1 회귀 가드 인프라 변경 0
+- **코드 영향 0** — `apps/web/src/constants/body-scale.ts` / `apps/web/scripts/r1-ui-regression-guard.mjs` / 단위 테스트 / browser-verify 스크립트 변경 0 (`git diff develop -- 'apps/' 'packages/' '.github/'` 출력 0 검증 의무)
+
+### Cross-validate (본 Amendment v2 박제 직후, 2026-05-06)
+
+CLAUDE.md §"교차검증" §"정책·설계·ADR 박제 직후 1회 루틴" 적용. Gemini 0.38.2 호출 결과:
+
+- **outcome**: applied (4축 모두 PASS, 이견 0)
+- **합의 4축**:
+  - 축 1: 정정값 1920×1080 = 3.88% (산출식 재검증 합의) — Gemini 분석: "16:9 종횡비에서 분모 뷰포트 면적 ∝ H² + 분자 객체 픽셀 면적 ∝ H² → 동일 비율 증가로 상쇄. 산출 논리 빈틈 없음"
+  - 축 2: Amendment 박제 위치 (별도 표 + footnote + strikethrough) — 원본 박제값 보존 + 정정 추적 명확. Gemini 평가: "ADR 정정 시 컨텍스트 충족 + 부수 효과 우려 차단"
+  - 축 3: R2 ADR cross-link 매트릭스 (line 133/523/562/564/568) — 역사적 인용 보존 + Amendment cross-link footnote 추가. Gemini 평가: "ADR 의 작성 시점 스냅샷 성격 보존 + footnote 만 삽입하여 추적성 (Traceability) 완벽 제공"
+  - 축 4: NO-OP 분기 평가 거부 — Amendment 비용 < 가치 (R-Phase 누적 시 후속 ADR 인용 신뢰도)
+- **Gemini 고유 발견 2건** (현재 PR 범위 내, 즉시 반영):
+  - **회귀 가드 추적 정합성** (축 2) — line 307 §회귀 가드 §3 viewport 예측값까지 정정 추적한 점이 문서 내 정합성 핵심. 본 Amendment v2 정정 매트릭스 표가 이미 line 89 / 98 / 307 3 위치 박제 완료
+  - **인지적 부채 차단** (축 4) — Sun baseline 오류 방치 시 R-Phase 후속 (R2~R10) 추가 시마다 이전 문서 신뢰성 의심. 후속 합류자 / Agent 할루시네이션 위험 (잘못된 비율 계산 유발) 선제 차단
+
+### 회귀 가드 (본 Amendment v2 의무)
+
+- 본 Amendment v2 적용 PR (architect 단계 ADR-only docs PR) 에서 다음 박제:
+  - R1 ADR 본문 정정 3 위치 (line 89 / 98 / 307) + Amendment v2 섹션 추가
+  - R2 ADR `20260428-r2-mercury-visualization.md` cross-link footnote 5곳 (line 133 / 523 / 562 / 564 / 568) — 역사적 인용 보존 + Amendment v2 박제 사실 cross-link
+  - U+FFFD 0개 (CRITICAL #4)
+  - 코드 영향 0 검증 (`git diff develop -- 'apps/' 'packages/' '.github/'` 출력 0)
+
+### 재검토 트리거 (본 Amendment v2 갱신)
+
+기존 §재검토 트리거 (#1~#6) 보존. 추가 트리거 없음 — 본 Amendment 는 *박제값 정정* 으로 결정·구현·인프라 변경 0, 후속 재검토 조건 별도 박제 불필요.
+
+### 참조
+
+- R2 ADR [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) §고유 발견 §발견 1 — 본 Amendment 발견 SSoT (Gemini 분석 + 산출 정합성 입증)
+- 이슈 [#362](https://github.com/coseo12/astro-simulator/issues/362) — 본 Amendment 박제 sprint 계약
+- volt [#23](https://github.com/coseo12/volt/issues/23) — 정책·ADR 박제 직후 cross-validate 1회 루틴
+
+---
+
+[^c1]: 2026-05-06 Amendment v2 박제로 6.18% → 3.88% 정정 확정. 본 ADR §"Amendment v2 (2026-05-06)" 참조. 원본 박제값 6.18% 는 R1 본 구현 시점 (sunScale 75) 산출 오류로, R2 ADR §고유 발견 §발견 1 (Gemini 3.1 Pro Preview, 2026-04-28) 에서 발견됨. strikethrough 보존으로 원본 인용 추적 가능.

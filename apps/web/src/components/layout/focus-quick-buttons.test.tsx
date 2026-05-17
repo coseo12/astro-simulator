@@ -99,3 +99,88 @@ describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
     }
   });
 });
+
+/**
+ * #402 R-Phase Allowlist 가드 — UI 측면 단위 테스트 (defense-in-depth).
+ *
+ * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 2.
+ *
+ * 검증:
+ *  - allowlist 외 body 버튼 (earth / jupiter / neptune) 은 disabled + aria-disabled + data-r-phase-disabled
+ *  - allowlist 박제 body 버튼 (sun / mercury / venus) 은 활성
+ *  - disabled 버튼 강제 클릭 시 focusOn 명령 발행 0 (HTML disabled 자체 차단)
+ *  - tooltip (title 속성) 박제
+ */
+describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402)', () => {
+  it('R-Phase 박제 body (sun / mercury / venus) 는 활성', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-sun')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-mercury')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-venus')).not.toBeDisabled();
+  });
+
+  it('R-Phase 미박제 body (earth / jupiter / neptune) 는 disabled', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-earth')).toBeDisabled();
+    expect(screen.getByTestId('focus-jupiter')).toBeDisabled();
+    expect(screen.getByTestId('focus-neptune')).toBeDisabled();
+  });
+
+  it('disabled 버튼은 aria-disabled="true" 설정 (스크린 리더 인지)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-earth')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('focus-jupiter')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('focus-neptune')).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('활성 버튼은 aria-disabled="false"', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-sun')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('focus-venus')).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('disabled 버튼은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-earth')).toHaveAttribute('data-r-phase-disabled', 'true');
+    expect(screen.getByTestId('focus-sun')).toHaveAttribute('data-r-phase-disabled', 'false');
+  });
+
+  it('disabled 버튼은 tooltip (title 속성) 박제 — 사용자 안내', () => {
+    render(<FocusQuickButtons />);
+    const earthBtn = screen.getByTestId('focus-earth');
+    expect(earthBtn).toHaveAttribute('title');
+    expect(earthBtn.getAttribute('title')).toMatch(/구현|R-Phase/);
+  });
+
+  it('활성 버튼은 title 속성 없음 (불필요 노이즈 차단)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-sun')).not.toHaveAttribute('title');
+  });
+
+  it('disabled 버튼 강제 click → focusOn 명령 발행 0 (HTML disabled 자체 차단)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-earth'));
+    fireEvent.click(screen.getByTestId('focus-jupiter'));
+    fireEvent.click(screen.getByTestId('focus-neptune'));
+    // HTML button[disabled] 는 click 이벤트 자체를 dispatch 하지 않음.
+    expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
+  });
+
+  it('disabled 버튼 시각 차별화 — opacity-50 cursor-not-allowed 클래스 박제', () => {
+    render(<FocusQuickButtons />);
+    const earthBtn = screen.getByTestId('focus-earth');
+    expect(earthBtn.className).toContain('opacity-50');
+    expect(earthBtn.className).toContain('cursor-not-allowed');
+  });
+
+  it('venus 버튼 텍스트 = "금성" (R3 박제 + 한국어 라벨)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-venus')).toHaveTextContent('금성');
+  });
+
+  it('venus 클릭 시 focusOn 명령 발행 (R3 정상 활성)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-venus'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'venus' });
+  });
+});

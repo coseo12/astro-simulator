@@ -1,0 +1,3718 @@
+{
+  "timestamp": "2026-05-02T08:51:16.461Z",
+  "baseUrl": "http://localhost:3000",
+  "bakedScales": {
+    "sun": 50,
+    "mercury": 900,
+    "venus": 650
+  },
+  "matrixSize": 40,
+  "matrixCompleted": 40,
+  "triggerAnalysis": {
+    "sunBillboardCount": 40,
+    "mercuryBillboardCount": 40,
+    "venusBillboardCount": 40,
+    "mobileBillboardKeys": [
+      "320x568_dpr1_close",
+      "320x568_dpr1_mid",
+      "320x568_dpr1_far",
+      "320x568_dpr1_overview",
+      "320x568_dpr2_close",
+      "320x568_dpr2_mid",
+      "320x568_dpr2_far",
+      "320x568_dpr2_overview",
+      "375x667_dpr1_close",
+      "375x667_dpr1_mid",
+      "375x667_dpr1_far",
+      "375x667_dpr1_overview",
+      "375x667_dpr2_close",
+      "375x667_dpr2_mid",
+      "375x667_dpr2_far",
+      "375x667_dpr2_overview",
+      "414x896_dpr1_close",
+      "414x896_dpr1_mid",
+      "414x896_dpr1_far",
+      "414x896_dpr1_overview",
+      "414x896_dpr2_close",
+      "414x896_dpr2_mid",
+      "414x896_dpr2_far",
+      "414x896_dpr2_overview"
+    ],
+    "desktopBillboardKeys": [
+      "1440x900_dpr1_close",
+      "1440x900_dpr1_mid",
+      "1440x900_dpr1_far",
+      "1440x900_dpr1_overview",
+      "1440x900_dpr2_close",
+      "1440x900_dpr2_mid",
+      "1440x900_dpr2_far",
+      "1440x900_dpr2_overview",
+      "1920x1080_dpr1_close",
+      "1920x1080_dpr1_mid",
+      "1920x1080_dpr1_far",
+      "1920x1080_dpr1_overview",
+      "1920x1080_dpr2_close",
+      "1920x1080_dpr2_mid",
+      "1920x1080_dpr2_far",
+      "1920x1080_dpr2_overview"
+    ]
+  },
+  "matrix": [
+    {
+      "key": "320x568_dpr1_close",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 1,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 320,
+          "height": 568
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8129999998211861,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x11c001c8a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x11c001c8a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x11c001c8a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+        },
+        {
+          "type": "warning",
+          "text": "[.WebGL-0x11c001c8a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr1_close.png"
+    },
+    {
+      "key": "320x568_dpr1_mid",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 1,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 320,
+          "height": 568
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8609999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr1_mid.png"
+    },
+    {
+      "key": "320x568_dpr1_far",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 1,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 320,
+          "height": 568
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8575,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr1_far.png"
+    },
+    {
+      "key": "320x568_dpr1_overview",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 1,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 320,
+          "height": 568
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8684999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr1_overview.png"
+    },
+    {
+      "key": "320x568_dpr2_close",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 2,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 640,
+          "height": 1136
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8369999998807907,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8369999998807907,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr2_close.png"
+    },
+    {
+      "key": "320x568_dpr2_mid",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 2,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 640,
+          "height": 1136
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8419999998807908,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8419999998807908,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr2_mid.png"
+    },
+    {
+      "key": "320x568_dpr2_far",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 2,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 640,
+          "height": 1136
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8409999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8409999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr2_far.png"
+    },
+    {
+      "key": "320x568_dpr2_overview",
+      "viewport": "320x568",
+      "viewportKind": "mobile-narrow",
+      "dpr": 2,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 640,
+          "height": 1136
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8434999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8434999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/320x568_dpr2_overview.png"
+    },
+    {
+      "key": "375x667_dpr1_close",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 1,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 375,
+          "height": 667
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8595000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr1_close.png"
+    },
+    {
+      "key": "375x667_dpr1_mid",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 1,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 375,
+          "height": 667
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8645000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr1_mid.png"
+    },
+    {
+      "key": "375x667_dpr1_far",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 1,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 375,
+          "height": 667
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8554999998211861,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr1_far.png"
+    },
+    {
+      "key": "375x667_dpr1_overview",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 1,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 0,
+          "low": 23,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 375,
+          "height": 667
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.862999999821186,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr1_overview.png"
+    },
+    {
+      "key": "375x667_dpr2_close",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 2,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 2,
+          "low": 21,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 750,
+          "height": 1334
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8305000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8305000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr2_close.png"
+    },
+    {
+      "key": "375x667_dpr2_mid",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 2,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 2,
+          "low": 21,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 750,
+          "height": 1334
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8325,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8325,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr2_mid.png"
+    },
+    {
+      "key": "375x667_dpr2_far",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 2,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 2,
+          "low": 21,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 750,
+          "height": 1334
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8289999997615815,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8289999997615815,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr2_far.png"
+    },
+    {
+      "key": "375x667_dpr2_overview",
+      "viewport": "375x667",
+      "viewportKind": "mobile",
+      "dpr": 2,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 2,
+          "low": 21,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 750,
+          "height": 1334
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8345000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8345000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/375x667_dpr2_overview.png"
+    },
+    {
+      "key": "414x896_dpr1_close",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 1,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 414,
+          "height": 896
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8539999997615815,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8539999997615815,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr1_close.png"
+    },
+    {
+      "key": "414x896_dpr1_mid",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 1,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 414,
+          "height": 896
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8539999997615815,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8539999997615815,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr1_mid.png"
+    },
+    {
+      "key": "414x896_dpr1_far",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 1,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 414,
+          "height": 896
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8555000001192092,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8555000001192092,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr1_far.png"
+    },
+    {
+      "key": "414x896_dpr1_overview",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 1,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 414,
+          "height": 896
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8505000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8505000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr1_overview.png"
+    },
+    {
+      "key": "414x896_dpr2_close",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 2,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 828,
+          "height": 1792
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8259999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8259999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8259999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr2_close.png"
+    },
+    {
+      "key": "414x896_dpr2_mid",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 2,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 828,
+          "height": 1792
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8240000000596046,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8240000000596046,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8240000000596046,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr2_mid.png"
+    },
+    {
+      "key": "414x896_dpr2_far",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 2,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 828,
+          "height": 1792
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8134999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8134999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8134999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr2_far.png"
+    },
+    {
+      "key": "414x896_dpr2_overview",
+      "viewport": "414x896",
+      "viewportKind": "mobile-wide",
+      "dpr": 2,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 828,
+          "height": 1792
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.825,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.825,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.825,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/414x896_dpr2_overview.png"
+    },
+    {
+      "key": "1440x900_dpr1_close",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 1,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1440,
+          "height": 900
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8319999998807908,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8319999998807908,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr1_close.png"
+    },
+    {
+      "key": "1440x900_dpr1_mid",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 1,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1440,
+          "height": 900
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.824500000178814,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.824500000178814,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr1_mid.png"
+    },
+    {
+      "key": "1440x900_dpr1_far",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 1,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1440,
+          "height": 900
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8309999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8309999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr1_far.png"
+    },
+    {
+      "key": "1440x900_dpr1_overview",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 1,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1440,
+          "height": 900
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8229999998211861,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8229999998211861,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr1_overview.png"
+    },
+    {
+      "key": "1440x900_dpr2_close",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 2,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 2880,
+          "height": 1800
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7109999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7109999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7109999999403953,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr2_close.png"
+    },
+    {
+      "key": "1440x900_dpr2_mid",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 2,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 2880,
+          "height": 1800
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7155000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7155000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7155000001192093,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr2_mid.png"
+    },
+    {
+      "key": "1440x900_dpr2_far",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 2,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 2880,
+          "height": 1800
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7170000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7170000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7170000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr2_far.png"
+    },
+    {
+      "key": "1440x900_dpr2_overview",
+      "viewport": "1440x900",
+      "viewportKind": "desktop",
+      "dpr": 2,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 2880,
+          "height": 1800
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7184999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7184999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.7184999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1440x900_dpr2_overview.png"
+    },
+    {
+      "key": "1920x1080_dpr1_close",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 1,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1920,
+          "height": 1080
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8075,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8075,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr1_close.png"
+    },
+    {
+      "key": "1920x1080_dpr1_mid",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 1,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1920,
+          "height": 1080
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8049999999999999,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8049999999999999,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr1_mid.png"
+    },
+    {
+      "key": "1920x1080_dpr1_far",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 1,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1920,
+          "height": 1080
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.809500000178814,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.809500000178814,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr1_far.png"
+    },
+    {
+      "key": "1920x1080_dpr1_overview",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 1,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 1,
+          "low": 22,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 1920,
+          "height": 1080
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8059999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 1,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.8059999999403954,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr1_overview.png"
+    },
+    {
+      "key": "1920x1080_dpr2_close",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 2,
+      "distanceId": "close",
+      "distanceRadius": 15,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 3840,
+          "height": 2160
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6345000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6345000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6345000001788139,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr2_close.png"
+    },
+    {
+      "key": "1920x1080_dpr2_mid",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 2,
+      "distanceId": "mid",
+      "distanceRadius": 35,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 3840,
+          "height": 2160
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6365000000596046,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6365000000596046,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6365000000596046,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr2_mid.png"
+    },
+    {
+      "key": "1920x1080_dpr2_far",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 2,
+      "distanceId": "far",
+      "distanceRadius": 70,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 3840,
+          "height": 2160
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6394999998807906,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6394999998807906,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6394999998807906,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr2_far.png"
+    },
+    {
+      "key": "1920x1080_dpr2_overview",
+      "viewport": "1920x1080",
+      "viewportKind": "desktop-wide",
+      "dpr": 2,
+      "distanceId": "overview",
+      "distanceRadius": 150,
+      "data": {
+        "lodStats": {
+          "high": 1,
+          "mid": 3,
+          "low": 20,
+          "override": "auto"
+        },
+        "cameraRadius": 35,
+        "cameraTarget": [0, 0, 0],
+        "cameraFov": 0.8,
+        "viewportPx": {
+          "width": 3840,
+          "height": 2160
+        },
+        "bodyInfo": {
+          "sun": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": false,
+            "midEnabled": false,
+            "midAlpha": null,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6240000000596047,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "mercury": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6240000000596047,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          },
+          "venus": {
+            "highEnabled": true,
+            "highAlpha": 1,
+            "midExists": true,
+            "midEnabled": true,
+            "midAlpha": 1,
+            "lowExists": true,
+            "lowEnabled": true,
+            "lowAlpha": 0.6240000000596047,
+            "visibleVariant": "low",
+            "pixelDiameter": null,
+            "screenCenter": null
+          }
+        }
+      },
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "[gpu] WebGPU 미지원: GPU 어댑터를 가져오지 못했습니다."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        }
+      ],
+      "screenshot": "docs/reports/379-forensic/1920x1080_dpr2_overview.png"
+    }
+  ]
+}

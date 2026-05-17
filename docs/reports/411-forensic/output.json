@@ -1,0 +1,146 @@
+{
+  "issue": 411,
+  "phase": "architect-forensic",
+  "timestamp": "2026-05-04",
+  "develop_tip": "e70c98e",
+  "ssot_measurement_environment": "CI Linux (ci.yml r1-guard step)",
+  "rationale_ssot_choice": "baseline 자체가 Linux CI 캡처본 (ADR Amendment 1 §결정 1). macOS 로컬은 SKIP_LOCAL=1 가드로 즉시 PASS 가 정책 — qa worktree 의 macOS 측정값은 폰트 차이 false positive 가능성 있음. Linux CI 가 SSoT.",
+  "ci_linux_actual_matrix": {
+    "1280x720": {
+      "top-nav": { "mismatched": 81, "total": 61440, "ratio_pct": 0.132, "verdict": "PASS" },
+      "shortcut-bar": { "mismatched": 81, "total": 4104, "ratio_pct": 1.974, "verdict": "FAIL" },
+      "hud-top-right": { "mismatched": 0, "total": 2299, "ratio_pct": 0.0, "verdict": "PASS" },
+      "hud-bottom-right": { "mismatched": 0, "total": 2185, "ratio_pct": 0.0, "verdict": "PASS" }
+    },
+    "1920x1080": {
+      "top-nav": { "mismatched": 81, "total": 92160, "ratio_pct": 0.088, "verdict": "PASS" },
+      "shortcut-bar": { "mismatched": 81, "total": 4104, "ratio_pct": 1.974, "verdict": "FAIL" },
+      "hud-top-right": { "mismatched": 0, "total": 2299, "ratio_pct": 0.0, "verdict": "PASS" },
+      "hud-bottom-right": { "mismatched": 0, "total": 2185, "ratio_pct": 0.0, "verdict": "PASS" }
+    },
+    "375x667": {
+      "top-nav": { "mismatched": 78, "total": 18000, "ratio_pct": 0.433, "verdict": "PASS" },
+      "shortcut-bar": { "mismatched": 78, "total": 6950, "ratio_pct": 1.122, "verdict": "FAIL" },
+      "hud-top-right": { "mismatched": 0, "total": 2299, "ratio_pct": 0.0, "verdict": "PASS" },
+      "hud-bottom-right": { "mismatched": 0, "total": 2185, "ratio_pct": 0.0, "verdict": "PASS" }
+    },
+    "overall": "FAIL"
+  },
+  "issue_label_correction": {
+    "issue_title_says": "top-nav 영역 6.012% / 4.000% / 10.906%",
+    "actual_failing_region": "shortcut-bar 1.974% / 1.974% / 1.122%",
+    "explanation": "이슈에 박제된 6.012%/4.000%/10.906% 는 PR #410 qa 단계의 macOS 로컬 측정값. CI Linux SSoT 에서는 top-nav 가 PASS (0.132%/0.088%/0.433%) 이고 shortcut-bar 가 FAIL. macOS 측 top-nav 큰 mismatch 는 폰트 렌더링 차이 (San Francisco vs DejaVu/Noto) false positive 추정 — SKIP_LOCAL=1 가 정상적으로 적용되면 macOS 는 즉시 PASS 했어야 함."
+  },
+  "bisect": {
+    "method": "gh run list --workflow=ci.yml --branch=develop --limit 30",
+    "commits_inspected": [
+      {
+        "sha": "658d9d7",
+        "pr": 410,
+        "subject": "[#408] focus oscillate fix",
+        "ci_conclusion": "success"
+      },
+      {
+        "sha": "4975846",
+        "pr": 413,
+        "subject": "[#402] ADR Amendment",
+        "ci_conclusion": "success"
+      },
+      {
+        "sha": "d2f6adf",
+        "pr": 414,
+        "subject": "[#402] R-Phase Body Allowlist 라운드 2 (focus-quick-buttons disabled UI)",
+        "ci_conclusion": "FAILURE",
+        "is_first_failure": true
+      },
+      { "sha": "2519f0e", "pr": 417, "subject": "favicon 추가", "ci_conclusion": "failure" },
+      {
+        "sha": "e70c98e",
+        "pr": 421,
+        "subject": "[#415] url-sync R-Phase allowlist 가드",
+        "ci_conclusion": "failure"
+      }
+    ],
+    "first_failing_commit": "d2f6adf",
+    "first_failing_pr": 414,
+    "regression_onset": "PR #414 머지 직후 (2026-05-04 11:12:41Z)"
+  },
+  "diff_analysis": {
+    "file_changed": "apps/web/src/components/layout/focus-quick-buttons.tsx",
+    "lines_changed": "+57 -19",
+    "ui_changes": [
+      "FOCUS_BUTTONS 배열에 venus 신규 추가 (5 buttons → 6 buttons 시각 — focus-reset 제외)",
+      "earth/jupiter/neptune 에 disabled 시각화 적용 (opacity-50 + bg-bg-surface/40 + text-fg-muted + border-border-subtle + cursor-not-allowed)",
+      "title (tooltip) 속성 추가 (disabled body)",
+      "data-r-phase-disabled / aria-disabled 속성 추가"
+    ],
+    "data_r1_region_owner": "[data-r1-region=\"shortcut-bar\"]",
+    "comment_in_component": "TopBar 중앙 영역 — 임시 포커스 단축 버튼"
+  },
+  "earlier_baseline_history": [
+    {
+      "sha": "bebd741",
+      "subject": "PR #361 R2 후속 baseline 갱신 — shortcut-bar 5→6 버튼 + top-nav nesting 부수효과 (6장 동시)",
+      "policy_followed": true
+    },
+    {
+      "sha": "d9ae9c0",
+      "subject": "PR #351 #337 baseline 을 Linux CI 캡처본으로 전환",
+      "policy_followed": true
+    },
+    {
+      "sha": "6a7f4c2",
+      "subject": "#337 baseline 을 Linux CI 캡처본으로 전환 (revert 또는 변형)",
+      "policy_followed": true
+    }
+  ],
+  "baseline_update_skipped_history": [
+    {
+      "sha": "1f0c369",
+      "pr": "?",
+      "subject": "[#373] body 비율 자연화 라운드 2",
+      "shortcut_bar_visual_change": "venus 가 이미 add 됐었는지 확인 필요 — 본 commit 에서 추가 시 R3 시점 baseline 갱신 누락 가능성 (다만 이후 r1-guard SUCCESS 확인됨)",
+      "ci_conclusion_after_merge": "success"
+    },
+    {
+      "sha": "d50848f",
+      "pr": 369,
+      "subject": "R3 금성 가시성 진입 — venusScale=4000 + shortcut-bar venus 항목",
+      "shortcut_bar_visual_change": "venus 신규 버튼 추가 (의도된 UI 변경)",
+      "ci_conclusion_after_merge": "success",
+      "speculation": "이 PR 머지 시점에 baseline 갱신이 정상 진행됐거나, 또는 mismatch 가 0.5% 임계 이하로 흡수돼 silent pass. 실측 확인 권고 (후속)"
+    }
+  ],
+  "root_cause_classification": {
+    "primary": "(1) baseline 갱신 누락 — 의도된 UI 변경 (venus 신규 + disabled 시각화) 후 ADR Amendment v4 §결정 2 의 5단계 baseline 갱신 절차 미수행",
+    "secondary_dispatched": "(3) macOS qa 측정값의 false positive (SKIP_LOCAL 가드 우회 또는 미적용) — 본 issue 의 라벨된 수치 6.012%/4.000%/10.906% 는 SSoT (CI Linux) 가 아님",
+    "process_failure_root": "PR #414 의 architect 단계는 __dirname SSR 회귀 / wasm-safe export 가 핵심 의제였고, focus-quick-buttons 의 disabled 시각화 (R-Phase allowlist UI 측면) 가 부수효과로 묻혀 sentinel 영향 인지 못함. ADR `20260425-r1-ui-pixel-diff-guard.md` Amendment v4 §결정 2 가 박제한 5단계 절차 (코드 commit → r1-guard 실측 → baseline 갱신 commit 분리 → commit 메시지 박제 → PR/CHANGELOG 3 위치 박제) 미실행"
+  },
+  "fix_decision": {
+    "chosen_option": "(d) baseline 재캡처 (ADR Amendment v4 §결정 2 절차 재현)",
+    "rationale": "회귀가 의도된 UI 변경 (venus 신규 + disabled 시각화 모두 #369 R3 / #402 라운드 2 에서 박제된 의도된 변경) 이며 코드 변경 0 이 정합. baseline 재캡처가 정확한 fix 방향. ADR §축 6 후보 B + Amendment v4 결정 1~3 정책 그대로 적용",
+    "scope": "6장 동시 갱신 (shortcut-bar 3 + top-nav 3) — 부모 ADR Amendment v4 §결과·재검토 조건 §'정정 후 (R3~R10 SSoT)' 6장 갱신 패턴 SSoT 일관. shortcut-bar 3 viewport (의도된 변경 — venus 신규 + R-Phase disabled 시각화) + top-nav 3 viewport (DOM nesting 부수효과). 다른 6 PNG (hud-top-right / hud-bottom-right × 3 viewport) 변경 0 의무 (Concrete Prediction). cross-validate Gemini critical flaw 정정 반영 — 원안 'shortcut-bar 3장만' 은 forensic 매트릭스 자체의 top-nav 81 픽셀 mismatch (0.132%/0.088%/0.433% 임계 흡수 PASS, 그러나 --update 는 임계 무관 절대 스냅샷) 와 자기모순",
+    "execution_path": "workflow_dispatch — .github/workflows/r1-baseline-bootstrap.yml 트리거 후 자동 PR 생성 또는 developer 가 Linux 환경에서 --update 실행 후 commit 분리. 본 architect 결정에서는 후자 권고 (wd 트리거 인프라 부담 회피, R3 시점 PR #361 패턴 재사용)"
+  },
+  "non_scope": [
+    "focus oscillate (#408 / 머지 완료) — 본 forensic 영역 아님",
+    "R-Phase allowlist 코드 (#402 라운드 2 / 머지 완료) — disabled UI 의 동작 자체 무관",
+    "BODY_SCALE 미박제 (#412) — 별도 이슈",
+    "r1-guard 정책 자체 변경 — 부모 ADR 권한 영역, 본 forensic 은 절차 미준수 fix 만",
+    "임계값 0.5% → 0.1% 강화 (메인 ADR §재검토 트리거 #4) — 별도 PR/메타 가드 실증 의무",
+    "macOS SKIP_LOCAL 가드 동작 — 별도 이슈 (qa worktree 측정값이 SSoT 아니라는 점만 박제, 가드 자체는 동작 정상 추정)"
+  ],
+  "developer_handoff": {
+    "primary_action": "6장 baseline 재캡처 (shortcut-bar 3 + top-nav 3, CI Linux 환경 또는 동등 환경)",
+    "execution_options": [
+      "옵션 A — workflow_dispatch: gh workflow run r1-baseline-bootstrap.yml. 자동 생성 PR 머지",
+      "옵션 B — developer Linux 로컬: BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs --update + commit 분리"
+    ],
+    "verification_required": [
+      "git show <baseline-commit> --stat — 6 PNG (shortcut-bar 3 + top-nav 3) 변경됐는지 확인 (부모 ADR Amendment v4 6장 갱신 패턴 SSoT 일관)",
+      "다른 6 PNG (hud-top-right / hud-bottom-right × 3 viewport) 변경 0 확인 — top-bar 와 별도 영역이라 nesting 부수효과 없음",
+      "baseline 갱신 후 `pnpm verify:r1-guard` PASS 확인 (CI Linux 또는 BASE_URL 매개변수)"
+    ],
+    "commit_message_template": "chore(r1-guard): [#411] 6장 baseline 갱신 (shortcut-bar 3 + top-nav 3) — venus 신규 + R-Phase disabled 시각화\n\nADR Amendment v4 §결정 2 5단계 절차 + §결과·재검토 조건 6장 갱신 패턴 SSoT (R3~R10) 재적용:\n- shortcut-bar 3 viewport (의도된 UI 변경 — 5 buttons 활성 → 6 buttons + earth/jupiter/neptune disabled 시각화)\n- top-nav 3 viewport (DOM nesting 부수효과 — <header data-r1-region=\"top-nav\"> 의 child <div data-r1-region=\"shortcut-bar\">)\n- 다른 6 PNG (hud-top-right / hud-bottom-right × 3 viewport) 변경 0 의무\n- mismatch 사유: 의도된 UI 변경 (R3 #369 venus 진입 + #402 라운드 2 disabled UI)\n\nADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment v4\nForensic: docs/decisions/20260504-411-r1-guard-shortcut-bar-forensic.md\n자매 6장 갱신 패턴 사례: PR #361 (bebd741)\nRefs: #411 (회귀), #369 (R3 venus), #402 (R-Phase allowlist 라운드 2 — PR #414)"
+  }
+}

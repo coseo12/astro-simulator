@@ -1,0 +1,269 @@
+{
+  "timestamp": "2026-05-02T12:35:30.463Z",
+  "baseUrl": "http://localhost:3000",
+  "scenarios": {
+    "A": {
+      "pass": true,
+      "sunHighRatio": 1,
+      "maxLowRatio": 0.9583333333333334,
+      "cellResults": [
+        {
+          "viewport": "320x568_dpr1",
+          "kind": "mobile-narrow",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 56.07813556520191,
+            "pxDiameter": 112.15627113040382,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "low",
+            "screenCoverage": 3.402410688740633,
+            "pxDiameter": 6.804821377481266,
+            "cameraDistanceMeters": 438749462794.73315
+          },
+          "venus": {
+            "level": "low",
+            "screenCoverage": 6.195630708899019,
+            "pxDiameter": 12.391261417798038,
+            "cameraDistanceMeters": 439785193999.50024
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 0,
+            "low": 23,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "375x667_dpr1",
+          "kind": "mobile",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 65.85231764434802,
+            "pxDiameter": 131.70463528869604,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "low",
+            "screenCoverage": 3.995403914797979,
+            "pxDiameter": 7.990807829595958,
+            "cameraDistanceMeters": 438753002996.4135
+          },
+          "venus": {
+            "level": "low",
+            "screenCoverage": 7.275774128804878,
+            "pxDiameter": 14.551548257609756,
+            "cameraDistanceMeters": 439770058988.3549
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 0,
+            "low": 23,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "375x667_dpr2",
+          "kind": "mobile",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 131.70463528869604,
+            "pxDiameter": 263.4092705773921,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "low",
+            "screenCoverage": 7.990896335574389,
+            "pxDiameter": 15.981792671148778,
+            "cameraDistanceMeters": 438748194155.3622
+          },
+          "venus": {
+            "level": "mid",
+            "screenCoverage": 14.550812266590414,
+            "pxDiameter": 29.10162453318083,
+            "cameraDistanceMeters": 439790598647.6366
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 1,
+            "low": 22,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "414x896_dpr2",
+          "kind": "mobile-large",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 176.9225685437356,
+            "pxDiameter": 353.8451370874712,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "mid",
+            "screenCoverage": 10.734500115359587,
+            "pxDiameter": 21.469000230719175,
+            "cameraDistanceMeters": 438744040776.03375
+          },
+          "venus": {
+            "level": "mid",
+            "screenCoverage": 19.54567009848668,
+            "pxDiameter": 39.09134019697336,
+            "cameraDistanceMeters": 439808223522.1975
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 2,
+            "low": 21,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "1280x720_dpr1",
+          "kind": "desktop",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 71.08496057560805,
+            "pxDiameter": 142.1699211512161,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "low",
+            "screenCoverage": 4.312945426500299,
+            "pxDiameter": 8.625890853000598,
+            "cameraDistanceMeters": 438746394690.4601
+          },
+          "venus": {
+            "level": "low",
+            "screenCoverage": 7.853363942110908,
+            "pxDiameter": 15.706727884221817,
+            "cameraDistanceMeters": 439798247663.91327
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 0,
+            "low": 23,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "1440x900_dpr1",
+          "kind": "desktop",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 88.85620071951007,
+            "pxDiameter": 177.71240143902014,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "low",
+            "screenCoverage": 5.391160659395458,
+            "pxDiameter": 10.782321318790917,
+            "cameraDistanceMeters": 438748096473.7615
+          },
+          "venus": {
+            "level": "mid",
+            "screenCoverage": 9.816879785085327,
+            "pxDiameter": 19.633759570170653,
+            "cameraDistanceMeters": 439791014376.89844
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 1,
+            "low": 22,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "1440x900_dpr2",
+          "kind": "desktop",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 177.71240143902014,
+            "pxDiameter": 355.4248028780403,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "mid",
+            "screenCoverage": 10.783084366506628,
+            "pxDiameter": 21.566168733013257,
+            "cameraDistanceMeters": 438717315293.72815
+          },
+          "venus": {
+            "level": "mid",
+            "screenCoverage": 19.627563034753866,
+            "pxDiameter": 39.25512606950773,
+            "cameraDistanceMeters": 439919201565.4056
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 2,
+            "low": 21,
+            "override": "auto"
+          }
+        },
+        {
+          "viewport": "1920x1080_dpr1",
+          "kind": "desktop-wide",
+          "sun": {
+            "level": "high",
+            "screenCoverage": 106.62744086341208,
+            "pxDiameter": 213.25488172682415,
+            "cameraDistanceMeters": 416666641169.7097
+          },
+          "mercury": {
+            "level": "low",
+            "screenCoverage": 6.46953098217795,
+            "pxDiameter": 12.9390619643559,
+            "cameraDistanceMeters": 438738815343.6578
+          },
+          "venus": {
+            "level": "mid",
+            "screenCoverage": 11.779117643980959,
+            "pxDiameter": 23.558235287961917,
+            "cameraDistanceMeters": 439830249013.4489
+          },
+          "lodStats": {
+            "high": 1,
+            "mid": 1,
+            "low": 22,
+            "override": "auto"
+          }
+        }
+      ]
+    },
+    "B": {
+      "pass": true,
+      "cellResults": [
+        {
+          "focus": "earth",
+          "id": "earth",
+          "level": "high",
+          "screenCoverage": 83.32240976264605,
+          "pxDiameter": 166.6448195252921,
+          "cameraDistanceMeters": 65178818.059343465,
+          "pass": true
+        },
+        {
+          "focus": "mars",
+          "id": "mars",
+          "level": "high",
+          "screenCoverage": 83.32241158273354,
+          "pxDiameter": 166.64482316546707,
+          "cameraDistanceMeters": 34706107.33436857,
+          "pass": true
+        }
+      ]
+    },
+    "C": {
+      "pass": true,
+      "lodStats": {
+        "high": 1,
+        "mid": 0,
+        "low": 23,
+        "override": "auto"
+      }
+    }
+  }
+}

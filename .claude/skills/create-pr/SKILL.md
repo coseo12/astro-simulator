@@ -61,20 +61,90 @@ gh pr create \
 ## 설계 참조
 - docs/architecture/관련문서.md
 
+## 브랜치 / Base 확인 (gitflow)
+- [x] **일반 feature/fix**: `base=develop`, `head=feature/*` 또는 `fix/*`
+
+## 스프린트 계약
+- [ ] 구현 전 완료 기준 합의 완료
+- [ ] 모든 완료 기준 충족
+
 ## 테스트
 - [ ] 단위 테스트 추가/수정
 - [ ] 기존 테스트 통과 확인
+- [ ] 모노레포: 신규/변경 워크스페이스에 `scripts.test` 존재 확인
 
 ## 체크리스트
-- [ ] 설계 문서의 인터페이스 준수
 - [ ] 커밋 컨벤션 준수
 - [ ] 불필요한 변경 없음
+- [ ] 보안 취약점 없음
+- [ ] CLAUDE.md SSoT 코어 필드 9개 동기화 (스키마 변경 시) + verify-agent-ssot.sh (#145)
+- [ ] 정책·규약·ADR·CRITICAL DIRECTIVE 박제 변경 시 cross-validate (volt #23) outcome 박제
+- [ ] **ADR 호환성 체크**: 본 PR 의 변경이 기존 ADR (docs/decisions/*.md) 의 결정과 충돌하지 않음
 
 Closes #이슈번호
 EOF
 )" \
   --label "status:review"
 ```
+
+> **PR 본문 7 체크박스 base 보존 의무** — 위 예시의 `## 체크리스트` 7 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / ADR 호환성 + 상위 Test plan) 은 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 섹션 SSoT 와 일치한다. `gh pr create --body` 로 본문을 수동 작성할 때 GitHub 의 템플릿 자동 prefill 이 우회되므로, 7 체크박스 base 를 변경 없이 포함하고 충족 여부에 따라 `[x]` / `[ ]` 만 갱신한다. N/A 항목도 체크박스를 삭제하지 않고 `[x] N/A — <사유>` 로 유지 (PR [#468](https://github.com/coseo12/astro-simulator/pull/468) reviewer/qa 발견 → 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469)).
+
+## Strict Assertion 동적 읽기 (drift 0 가드)
+
+**원칙**: PR 본문 생성 시 PR 템플릿 (`.github/PULL_REQUEST_TEMPLATE.md`) 의 `### 체크리스트` 섹션을 **반드시 직접 읽어** 본문에 포함한다. 위 예시 코드 블록의 7 체크박스 base 는 **참고용 snapshot** 일 뿐이며, 실제 PR 본문 생성 시점에는 템플릿 파일을 SSoT 로 동적 읽기한다. 하드코딩 fallback 금지 — drift 자기모순 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) 폐기 패턴 재현).
+
+**1차 — 파일 존재 검증 (Strict Assertion)**:
+
+```bash
+test -f .github/PULL_REQUEST_TEMPLATE.md || (echo "FAIL: PR 템플릿 파일 부재 (.github/PULL_REQUEST_TEMPLATE.md). 작업 차단." && exit 1)
+```
+
+**2차 — 섹션 추출 (A1 단순 grep)**:
+
+```bash
+# `### 체크리스트` 섹션을 sed 로 위치 기반 추출 (다음 ### 헤더 직전까지)
+sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | sed '$d'
+```
+
+추출 결과가 비어 있으면: `echo "FAIL: ### 체크리스트 섹션 부재 또는 깨짐. PR 템플릿 SSoT 점검 필요." && exit 1`
+
+**3차 — checkbox 라인 검증**:
+
+```bash
+sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | grep -c "^- \[ \]"
+```
+
+0 hit 시: `echo "FAIL: ### 체크리스트 섹션에 - [ ] 항목 0건. PR 템플릿 SSoT 깨짐." && exit 1`
+
+**4차 — PR 본문 생성**: 위 2차에서 추출한 결과를 PR 본문 `### 체크리스트` 섹션에 그대로 박제한다. 충족 여부에 따라 `[ ]` → `[x]` 갱신만 허용 (라인 자체 변경·삭제 금지). 다른 6개 base 섹션 (변경 사항 / 브랜치 Base 확인 / 스프린트 계약 / 테스트 / 브라우저 3단계 / 마일스톤 회고) 도 동일 절차로 처리 (해당 섹션이 N/A 인 경우 `### <섹션명>` 헤더 + `- [x] N/A — <사유>` 1줄 유지, 섹션 자체 삭제 금지).
+
+**Fallback 금지 (CRITICAL)**: 위 1~3차 중 어느 단계 FAIL 시 작업 차단. 하드코딩 또는 default 본문 사용 금지 — drift 자기모순 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) 폐기 패턴 재현). 템플릿이 깨졌으면 먼저 `.github/PULL_REQUEST_TEMPLATE.md` 를 수리한 뒤 PR 본문 생성을 재개한다.
+
+근거: 이슈 [#471](https://github.com/coseo12/astro-simulator/issues/471) + architect cross-validate Gemini 2.5-pro applied. ADR [`20260515-harness-managed-divergent-pattern.md`](../../../docs/decisions/20260515-harness-managed-divergent-pattern.md) Z 패턴 4회 재사용 (Phase 1 = 본 PR 선반영 / Phase 2 = upstream 기여 별도, [#476](https://github.com/coseo12/astro-simulator/issues/476) 추적). 관례적 방어선 (5 페르소나 .md 의무 박제) 은 [#477](https://github.com/coseo12/astro-simulator/issues/477) 추적.
+
+<!-- 참고: developer.md §메타 규칙 (#470) + reviewer.md §절차 6번 (#470) + qa.md §검증 backstop (#470) + #476 (Z 패턴 §재검토 조건 추가) + #477 (5 페르소나 의무 박제) -->
+
+## 측정 방법 C (혼합) — PR 본문 가시성 자기 검증
+
+PR 본문 작성 후 거버넌스 체크 항목 (예: "ADR 호환성 체크") 의 가시성을 다음 두 grep 의 **AND** 로 판정한다 (이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) architect cross-validate 합의):
+
+```bash
+# 1차 구조 grep — 체크박스 prefill 보존 확인
+gh pr view <PR> --json body --jq .body | grep -c "ADR 호환성 체크"
+# 기대: ≥ 1 hit (체크박스 항목명 그대로)
+
+# 2차 phrase grep — 별도 위치 박제까지 포괄 확인 (대소문자 무시)
+gh pr view <PR> --json body --jq .body | grep -c -i "ADR 호환성"
+# 기대: ≥ 1 hit (체크박스 + prose 중 어디든)
+```
+
+- **양쪽 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
+- **체크박스 0 + phrase ≥ 1** → non-blocking 권고 (체크박스 prefill 누락. 동일 권고 시 위 7 체크박스 base 코드 블록 동봉 권장)
+- **양쪽 동시 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단)
+
+> 참고: 동일 측정 방법이 `.claude/agents/developer.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — 동시 수정 의무. harness-managed 파일 운영은 ADR [`20260515-harness-managed-divergent-pattern.md`](../../../docs/decisions/20260515-harness-managed-divergent-pattern.md) Z 패턴 (Phase 1 = 본 프로젝트 선반영 / Phase 2 = upstream 기여 / Phase 3 = 동기화) 적용.
+
+> 참고: PR 템플릿 신규 항목 양가성 가드 (체크박스 prefill 0 hit + phrase 0 hit 시 발화) 는 `.claude/agents/developer.md` §메타 규칙 (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)) 에 박제됨. reviewer §절차 6번 + qa §검증 단계 backstop 양쪽이 방어의 깊이 (architect cross-validate 합의 D3 F1).
 
 ## 라벨 업데이트
 

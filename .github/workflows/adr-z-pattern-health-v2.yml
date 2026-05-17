@@ -1,0 +1,81 @@
+name: ADR 20260515 Z Pattern Health Metric
+
+# ADR 20260515 Z 패턴 §재검토 조건 #5 자동 발화 가드.
+#
+# 매주 월요일 09:00 KST (UTC 00:00) 에 verify-z-pattern-health.mjs 를 실행.
+# 3중 OR 임계값 (Amendment 1+2 정합) 발화 시 [ADR Trigger] 이슈 자동 생성.
+#
+# workflow_dispatch 2단계 함정 (volt #69):
+#   - workflow_dispatch 는 default branch (develop) 반영 후에만 discover 됨
+#   - 본 PR 머지 후 D2/D3 검증은 develop 반영 후 1회 수동 실행으로 수행
+
+# YAML 1.1 'on:' → boolean True 함정 — quote 로 string key 강제 (volt 캡처 후보)
+"on":
+  schedule:
+    - cron: '0 0 * * 1' # 매주 월요일 UTC 00:00 = KST 09:00
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Z Pattern Health
+        id: verify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          node scripts/verify-z-pattern-health.mjs | tee /tmp/health-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          # workflow 자체는 항상 PASS (이슈 생성으로 알림)
+          exit 0
+
+      - name: Create [ADR Trigger] issue
+        if: steps.verify.outputs.exit_code == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 중복 방지 — 동일 제목 OPEN 이슈 검색
+          EXISTING=$(gh issue list \
+            --search '"[ADR Trigger] Z 패턴 §재검토 조건 #5 발화" in:title' \
+            --state open --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "이미 [ADR Trigger] OPEN 이슈 존재 — 중복 생성 스킵"
+            exit 0
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          HEALTH_OUTPUT=$(node scripts/verify-z-pattern-health.mjs 2>&1 || true)
+
+          gh issue create \
+            --title "[ADR Trigger] Z 패턴 §재검토 조건 #5 발화 (자동 탐지 ${DATE})" \
+            --label "documentation,priority:high" \
+            --body "## 배경
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health.yml\` 발화. 임계값 충족.
+
+          ## 임계값 발화 결과
+          \`\`\`
+          ${HEALTH_OUTPUT}
+          \`\`\`
+
+          ## 의무 (Amendment 1 §재검토 조건 #5 정합)
+          3 영업일 내 결정 분기 (A Phase 2 일괄 / B 폐기 / C 임계값 재조정).
+
+          ## Cross-link
+          - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\`
+          - workflow: \`.github/workflows/adr-z-pattern-health.yml\`
+          - 직전 [ADR Trigger]: #487 (옵션 C 채택)"
+
+      - name: Fail on script execution error
+        if: steps.verify.outputs.exit_code == '2'
+        run: |
+          echo "ERROR: verify-z-pattern-health.mjs 실행 실패 (exit code 2)"
+          exit 1

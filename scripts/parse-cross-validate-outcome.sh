@@ -19,6 +19,9 @@
 #   CROSS_VALIDATE_REMINDER="none|dryrun|created|create-failed"
 #   CROSS_VALIDATE_LOG_FILE="..."
 #   CROSS_VALIDATE_ANCHOR="..."
+#   CROSS_VALIDATE_PLAN_BYPASS="true|false"            # (#479 신규)
+#   CROSS_VALIDATE_BYPASS_FILES="path1 path2 ..."       # (#479 신규) 공백 구분
+#   CROSS_VALIDATE_ROLLBACK_FAILED="true|false"        # (#479 신규)
 #
 # 예외 분기:
 #   - 파일 없음 → OUTCOME="missing", EXIT_CODE=1, stderr 경고
@@ -58,6 +61,11 @@ print_defaults() {
   printf 'CROSS_VALIDATE_REMINDER="none"\n'
   printf 'CROSS_VALIDATE_LOG_FILE=""\n'
   printf 'CROSS_VALIDATE_ANCHOR=""\n'
+  # Phase 4 (#479) — plan-mode 우회 가드 필드 기본값
+  # 파일 없음 / parse-error 케이스에서는 false / 빈 배열 / false 로 안전 fallback
+  printf 'CROSS_VALIDATE_PLAN_BYPASS="false"\n'
+  printf 'CROSS_VALIDATE_BYPASS_FILES=""\n'
+  printf 'CROSS_VALIDATE_ROLLBACK_FAILED="false"\n'
 }
 
 if [ "${MODE}" = "--from-stdout" ]; then
@@ -95,11 +103,41 @@ extract_number() {
   grep -o "\"${key}\": *-\?[0-9]\+" "${OUTCOME_FILE}" 2>/dev/null | head -1 | sed 's/.*: *//' || true
 }
 
+# boolean 필드 추출 (#479) — JSON 의 `"key": true` 또는 `"key": false` 패턴
+# 기본값은 "false" (필드 부재 시 안전 fallback — backward compat)
+extract_boolean() {
+  local key="$1"
+  local value
+  value=$(grep -o "\"${key}\": *\(true\|false\)" "${OUTCOME_FILE}" 2>/dev/null | head -1 | sed 's/.*: *//' || true)
+  echo "${value:-false}"
+}
+
+# 문자열 배열 필드 추출 (#479) — JSON 의 `"key": ["a", "b"]` 패턴
+# 단일 라인 가정 (cross_validate.sh write_outcome_json 이 단일 라인 생성).
+# 출력: 공백 구분 문자열 (각 요소는 따옴표 제거). 빈 배열은 빈 문자열.
+extract_string_array() {
+  local key="$1"
+  # `"bypass_files": ["a","b"]` 또는 `"bypass_files": []`
+  local raw
+  raw=$(grep -o "\"${key}\": *\[[^]]*\]" "${OUTCOME_FILE}" 2>/dev/null | head -1 | sed "s/.*: *\[//" | sed 's/\]$//' || true)
+  if [ -z "${raw}" ]; then
+    echo ""
+    return
+  fi
+  # 요소 추출: "..." 패턴만 (이스케이프된 따옴표는 본 헬퍼 범위 외 — write 측에서 이미 처리)
+  # 결과를 공백 구분으로 변환 (배열 요소에 공백이 있으면 호출 측이 따옴표 분리 필요)
+  echo "${raw}" | grep -o "\"[^\"]*\"" | sed 's/^"//; s/"$//' | tr '\n' ' ' | sed 's/ $//'
+}
+
 OUTCOME=$(extract_string "outcome")
 REMINDER=$(extract_string "reminder_issue")
 LOG_FILE=$(extract_string "log_file")
 ANCHOR=$(extract_string "anchor")
 EXIT_CODE=$(extract_number "exit_code")
+# Phase 4 (#479) — plan-mode 우회 가드 신규 필드. 부재 시 false / 빈 배열로 fallback (backward compat)
+PLAN_BYPASS=$(extract_boolean "plan_bypass")
+BYPASS_FILES=$(extract_string_array "bypass_files")
+ROLLBACK_FAILED=$(extract_boolean "rollback_failed")
 
 # 최소 필수 필드(outcome / exit_code) 부재 시 parse-error 로 표기
 if [ -z "${OUTCOME}" ] || [ -z "${EXIT_CODE}" ]; then
@@ -118,3 +156,7 @@ printf 'CROSS_VALIDATE_EXIT_CODE=%s\n' "${EXIT_CODE}"
 printf 'CROSS_VALIDATE_REMINDER="%s"\n' "${REMINDER}"
 printf 'CROSS_VALIDATE_LOG_FILE="%s"\n' "${LOG_FILE}"
 printf 'CROSS_VALIDATE_ANCHOR="%s"\n' "${ANCHOR}"
+# Phase 4 (#479) — plan-mode 우회 가드 필드
+printf 'CROSS_VALIDATE_PLAN_BYPASS="%s"\n' "${PLAN_BYPASS}"
+printf 'CROSS_VALIDATE_BYPASS_FILES="%s"\n' "${BYPASS_FILES}"
+printf 'CROSS_VALIDATE_ROLLBACK_FAILED="%s"\n' "${ROLLBACK_FAILED}"

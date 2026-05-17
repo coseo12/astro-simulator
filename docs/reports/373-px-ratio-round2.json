@@ -1,0 +1,75 @@
+{
+  "_meta": {
+    "captured_at": "2026-05-01T15:11+09:00",
+    "issue": "#373",
+    "phase": "developer 라운드 2 박제값 적용 후 r1-guard --measure-px-ratio 실측",
+    "branch": "feature/373-body-proportion-aggressive",
+    "body_scale": { "sun": 50, "mercury": 900, "venus": 650 },
+    "adr": "docs/decisions/20260430-r3-followup-body-proportion.md Amendment 2026-05-01 (라운드 2)",
+    "thresholds": {
+      "mercury_sun_px_ratio": "≤ 6%",
+      "venus_sun_px_ratio": "≤ 11%",
+      "mobile_cumulative_disk_area": "≤ 25%",
+      "noise_margin": "± 5% (forensic ADR §D-T2 px 비 예측 SSoT)"
+    },
+    "interpretation": "mercury 6.07% / venus 11.03% — 임계 0.07%p / 0.03%p 초과. forensic ADR §결정 2 §5 라운드 2 의 박제값 ± 5% 측정 노이즈 마진 안 (mercury 5.7~6.3% / venus 10.45~11.55% 범위). r1-guard strict 임계는 FAIL 이지만 측정 노이즈 마진 안에 들어와 사용자 D-T2 평가로 인계."
+  },
+  "1280x720": {
+    "viewport": "1280x720",
+    "url": "http://localhost:3000/?gpu=a",
+    "pxRatios": { "mercury": 6.07, "venus": 11.03 },
+    "diskAreas": {
+      "sun": 5.168,
+      "mercury": 0.019,
+      "venus": 0.063,
+      "cumulative": 5.249
+    },
+    "guardResult": {
+      "mercuryPxRatio": "FAIL (6.07% > 6%) — ± 5% 마진 안 (5.70~6.30%)",
+      "venusPxRatio": "FAIL (11.03% > 11%) — ± 5% 마진 안 (10.45~11.55%)"
+    },
+    "camera": { "type": "ArcRotateCamera", "radius": 35, "fov": 0.8, "viewport": [1280, 720] },
+    "pixelDiameters": { "sun": 246.25, "mercury": 14.95, "venus": 27.16 }
+  },
+  "1920x1080": {
+    "viewport": "1920x1080",
+    "url": "http://localhost:3000/?gpu=a",
+    "pxRatios": { "mercury": 6.07, "venus": 11.03 },
+    "diskAreas": {
+      "sun": 5.168,
+      "mercury": 0.019,
+      "venus": 0.063,
+      "cumulative": 5.249
+    },
+    "guardResult": {
+      "mercuryPxRatio": "FAIL (6.07% > 6%) — ± 5% 마진 안",
+      "venusPxRatio": "FAIL (11.03% > 11%) — ± 5% 마진 안"
+    },
+    "camera": { "type": "ArcRotateCamera", "radius": 35, "fov": 0.8, "viewport": [1920, 1080] },
+    "pixelDiameters": { "sun": 369.37, "mercury": 22.42, "venus": 40.74 },
+    "_note": "viewport 무관 px 비 일관성 검증 PASS (1280×720 동일 6.07% / 11.03%) — forensic ADR §결정 2 §5 의 viewport 무관 가드 prediction 재현"
+  },
+  "375x667": {
+    "viewport": "375x667",
+    "url": "http://localhost:3000/?gpu=a",
+    "pxRatios": { "mercury": 6.07, "venus": 11.03 },
+    "diskAreas": {
+      "sun": 16.34,
+      "mercury": 0.06,
+      "venus": 0.199,
+      "cumulative": 16.599
+    },
+    "guardResult": {
+      "mercuryPxRatio": "FAIL (6.07% > 6%) — ± 5% 마진 안",
+      "venusPxRatio": "FAIL (11.03% > 11%) — ± 5% 마진 안",
+      "mobileCumulativeDiskArea": "PASS (16.60% ≤ 25%) — R3 Amendment 2026-05-01 라운드 2 모바일 누적 점유율 회귀 우려 해소"
+    },
+    "camera": { "type": "ArcRotateCamera", "radius": 35, "fov": 0.8, "viewport": [375, 667] },
+    "pixelDiameters": { "sun": 228.12, "mercury": 13.85, "venus": 25.16 }
+  },
+  "_summary": {
+    "overall_pass": false,
+    "overall_pass_with_noise_margin": true,
+    "next_action": "사용자 D-T2 실 Chrome GUI 수동 검증 → 자연 비율 인지 평가. 평가 결과: (1) 통과 인지 → r1-guard 임계 ± 5% 마진 박제 amendment / (2) 미통과 → forensic ADR §재검토 트리거 #1 라운드 3 발동 (mercury 700 / venus 500 후보 또는 옵션 e log scaling 우선순위 high 승격)"
+  }
+}

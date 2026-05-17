@@ -159,3 +159,5 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - 코드 수정 / PR 생성 — pm은 *정의*만, 구현은 developer
 - 머지 권한 (CRITICAL #1)
 - 라벨 누락
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
+- **cross-validate 스킬은 architect / reviewer / qa 페르소나에서만 호출** (#479 박제) — pm 에서 직접 호출 금지. 단, 다른 sub-agent 의 cross-validate 결과 (`outcome.plan_bypass`) 를 코멘트 또는 본문에서 참조 시 정합성 검증 의무 — `plan_bypass=true` 발견 시 즉시 메인 오케스트레이터에게 보고.

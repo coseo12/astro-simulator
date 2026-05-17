@@ -1,6 +1,8 @@
 'use client';
 
 import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulator/core';
+import type { Tier } from '@astro-simulator/core/scene';
+import type { CameraSyncSurface } from '@/core/sim-context';
 // P12-A #298 — Tier 엔진 유틸 (renderScaleForTier) 는 sceneApi 네임스페이스에 이미 re-export 되어 있다.
 // `sceneApi.renderScaleForTier` 로 접근한다 (별도 import 불필요, 아래 onBeforeRender 에서 사용).
 import { attachCoreToStore } from '@/core/core-adapter';
@@ -27,6 +29,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
   // HMR / 컴포넌트 remount 시 scene 이 살아있을 수 있어 관찰자 누수 방지.
   const tierObserverCleanupRef = useRef<(() => void) | null>(null);
   const [core, setCore] = useState<SimulationCore | null>(null);
+  // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter.
+  // sim-canvas 의 `instance.start().then(...)` 내부에서 setupArcRotateCamera + createSolarSystemScene
+  // 이 완료되면 setCameraTierApi 로 끌어올린다. SimCommandProvider 가 children 에 전달.
+  // - camera: `onViewMatrixChangedObservable` 구독 + `radius` 읽기 (mutate 금지)
+  // - getActiveTier: `solar.getTier` 직접 전달 — 호출 시점 active tier snapshot 반환
+  const [cameraTierApi, setCameraTierApi] = useState<{
+    camera: CameraSyncSurface;
+    getActiveTier: () => Tier;
+  } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -240,6 +251,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           bodyScale: getBodyScale,
         });
 
+        // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
+        // SimCommandProvider 에 전달 → ScaleControl 이 `useSimCameraTier` 로 구독.
+        // camera 는 setupArcRotateCamera 의 instance, getActiveTier 는 solar.getTier 직접 전달.
+        if (!cancelled) {
+          setCameraTierApi({ camera, getActiveTier: solar.getTier });
+        }
+
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
         if (gpuTimerParam === '1') {
           Object.defineProperty(window, '__gpuShaderTimings', {
@@ -351,6 +369,36 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // P11-A #288 — Floating Origin primary shift (ADR §1-B).
               // focus 전환과 **동일 프레임** 에 origin 을 해당 body 월드 좌표로 이동.
               solar.setFocusOrigin(bodyId);
+
+              // #408 F1 — focusOn 진입 시 final tier 사전 결정 + setTier (의존 역전 (c) 채택).
+              //
+              // 목적: controller.focusOn 의 cam-target tween (300ms) 보간 중간 frame 에서
+              // `cameraFromFocusMeters` 가 일시적으로 0.1 AU 미만으로 떨어져 `tierFromFocus` 가
+              // 잘못된 tier 를 반환하는 race 차단. tier 가 보간 시작 **전에** 정착되므로 보간 중
+              // updateTierByCamera 가 동일 tier 반환 → no-op.
+              //
+              // cameraDistMeters 산식 — camera-controller.ts focusOn() 의 desiredRadius 와 정합:
+              //   desiredRadius = max(meshRadius × FOCUS_USER_RADIUS_MULTIPLIER,
+              //                       meshRadius + FOCUS_USER_RADIUS_MIN_PADDING)
+              //   metersPerSceneUnit = 1 / renderScaleForTier(currentTier)
+              //   cameraDistMeters = desiredRadius × metersPerSceneUnit
+              //
+              // 주의: meshRadius (boundingSphere.radiusWorld) 는 **현 tier** 의 scaling 이 적용된
+              // 상태값이므로 metersPerSceneUnit 도 **현 tier** 기준이어야 일관 (`tierFromFocus`
+              // 가 결정한 newTier 적용 전이라 같은 tier 의 식). 결정된 finalTier 가 다르면 setTier
+              // 가 즉시 mesh.scaling 과 origin 을 갱신하므로 다음 controller.focusOn 호출 시
+              // mesh.absolutePosition 은 새 tier 좌표계에서 정확.
+              mesh.computeWorldMatrix(true);
+              const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+              const desiredRadius = Math.max(
+                meshRadius * sceneApi.FOCUS_USER_RADIUS_MULTIPLIER,
+                meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+              );
+              const currentTier = solar.getTier();
+              const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(currentTier);
+              const cameraDistMeters = desiredRadius * metersPerSceneUnit;
+              solar.applyFocusTier(bodyId, cameraDistMeters);
+
               controller.focusOn({ mesh });
             }
           } else {
@@ -467,6 +515,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       instance.dispose();
       coreRef.current = null;
       setCore(null);
+      // #400 — camera 도 dispose 됨. ScaleControl 이 다음 mount 까지 subscribe 보류.
+      setCameraTierApi(null);
     };
   }, []);
 
@@ -478,7 +528,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         className="absolute inset-0 w-full h-full outline-none"
         style={{ touchAction: 'none' }}
       />
-      <SimCommandProvider core={core}>{children}</SimCommandProvider>
+      <SimCommandProvider
+        core={core}
+        camera={cameraTierApi?.camera ?? null}
+        getActiveTier={cameraTierApi?.getActiveTier ?? null}
+      >
+        {children}
+      </SimCommandProvider>
     </>
   );
 }

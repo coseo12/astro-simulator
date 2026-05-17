@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-05-02T19:15:23.311Z",
+  "phase": "unlabeled",
+  "durationMs": 3000,
+  "environment": "playwright-chromium-headless",
+  "viewport": "1280x800",
+  "scenarios": [
+    {
+      "name": "idle",
+      "fps": 102.43
+    },
+    {
+      "name": "play-1d",
+      "fps": 89.49
+    },
+    {
+      "name": "play-1y",
+      "fps": 89.88
+    },
+    {
+      "name": "focus-earth",
+      "fps": 88.3
+    },
+    {
+      "name": "focus-neptune",
+      "fps": 91.59
+    }
+  ]
+}

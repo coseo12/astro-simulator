@@ -41,7 +41,21 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    - **(Dead Reference) 주석 SSoT 참조 확인** — `// SSoT: <파일>` / JSDoc `@see` 등 주석 메타데이터가 **폐기된 파일을 가리키지 않는지** 확인 (dead reference). 참조 대상 파일이 제거됐으면 주석도 함께 갱신 요구
    - **(Invariant Test) 상대 비율 불변식 테스트** — 다수 모듈에서 쓰이던 상수를 동적 함수로 교체한 PR 은 "모든 모듈이 공통 배수로 확대되는지" 확인하는 불변식 단위 테스트 누락 여부 확인. 누락이면 권고 (차단은 도메인 판단)
    - **(ADR Prediction) 예측 대비 실측 diff** — ADR 에 "추상화 도입 후 변경 시 X 코드 0줄" Concrete Prediction 이 있으면 `git diff --stat <추상화 경로>` 로 예측 성공 재현. 실패 시 "추상화 건강성" 신호 → 권고
-5. **결과 PR 코멘트 작성**:
+5. **ADR 호환성 의미론적 검증** (이슈 [#463](https://github.com/coseo12/astro-simulator/issues/463), ADR `20260515-harness-managed-divergent-pattern.md`) — PR 이 기존 ADR 의 §재검토 조건 / §결정 조항을 의미적으로 침범하는지 점검. PR 본문 체크박스만으로는 self-attestation 함정에 빠지므로 reviewer 가 독립 검증한다:
+   1. **PR 변경 파일 진단** — `gh pr view <번호> --json files` 로 `docs/decisions/*.md` 수정 포함 여부 확인. **수정 포함 여부와 무관하게 본 항목은 reviewer 코멘트에 1줄 박제 의무** (검증 누락 vs 비대상 구분)
+   2. **수정 미포함 PR** — reviewer 코멘트에 `ADR 호환성: 적용 비대상 (docs/decisions 변경 없음)` 1줄 박제. 의미적 침범 의심 시에도 `non_blocking_suggestions` 에 추가만 하고 차단하지 않음 (도메인 판단)
+   3. **수정 포함 시 혼합 검증** (grep 1차 결정론 + LLM 2차 의미론):
+      - **grep 1차 (결정론)** — PR 본문 또는 변경된 ADR 파일에서 키워드 검색: `Amendment` / `폐기` / `Supersedes` / `§재검토 조건`. 1개 이상 매칭 시 "거버넌스 박제 감지" 로 분류 + reviewer 코멘트에 매칭 키워드 + 파일 위치 인용
+      - **LLM 2차 (의미론)** — 변경된 ADR 의 §재검토 조건 / §결정 조항을 PR diff 가 직접 변경했는지 판단. 키워드 누락 + 의미적 ADR 충돌 의심 (예: 기존 결정과 상반된 새 기본값 도입) 시 reviewer 권고 (차단 아님 — 도메인 판단). 오판 가능성은 후속 이슈 [#467](https://github.com/coseo12/astro-simulator/issues/467) 추적
+   4. **PR 본문 체크박스 검증** — PR 템플릿 6번째 항목 `ADR 호환성 체크` 의 체크 여부 확인 (`gh pr view <번호> --json body`). 미체크 + ADR 수정 포함 시 `non_blocking_suggestions` 에 권고 추가. 미체크 + ADR 수정 미포함 시 무시 (자명 PASS)
+6. **PR 본문 7 체크박스 메타 가드** (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)) — PR 본문에 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 7 항목 base 가 보존되었는지 점검:
+
+   1. **1차 구조 grep**: `gh pr view <번호> --json body --jq .body | grep -c "ADR 호환성 체크"` (현재 가드 대상 1 항목 — 이슈 [#469](https://github.com/coseo12/astro-simulator/issues/469) 박제)
+   2. **2차 phrase grep**: `gh pr view <번호> --json body --jq .body | grep -c -i "ADR 호환성"`
+   3. **양쪽 0 hit 시**: PR 본문에 prefill 무시 권고 박제 (`non_blocking_suggestions`) + 미래 6 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / Test plan) 의 양가성 노출 발견 시 즉시 본 메타 규칙 발화 (developer.md 본문에 grep 키워드 박제 후속 요청)
+
+   근거: ADR `docs/decisions/20260515-harness-managed-divergent-pattern.md` / `.claude/agents/developer.md` 메타 규칙 (이슈 [#470](https://github.com/coseo12/astro-simulator/issues/470)).
+7. **결과 PR 코멘트 작성**:
    ```markdown
    ## Reviewer 정적 리뷰
 
@@ -53,10 +67,14 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
 
    ### 통과 확인 ✓
    - 스프린트 계약 N개 기준 중 정적으로 검증 가능한 M개 충족
+
+   ### ADR 호환성
+   - <적용 비대상 (docs/decisions 변경 없음) | 거버넌스 박제 감지: <키워드> @ <파일:줄> | 권고: <ADR 충돌 의심 근거>>
    ```
-6. **라벨 전이**:
+8. **라벨 전이**:
    - 차단 항목 0건 → `gh pr edit --remove-label "stage:review" --add-label "stage:qa"`
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
+9. **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
 
 ## 마무리 체크리스트 JSON 반환 (필수)
 
@@ -101,3 +119,4 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - 코드 직접 수정 금지 — 리뷰는 의견, 수정은 developer 책임
 - 라벨 전이 누락 금지 — 다음 단계가 멈춤
 - 자기 모순 금지 — 한 번 차단하면 일관되게, 흔들리지 않음
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.

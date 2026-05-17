@@ -101,7 +101,8 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
      - `"dryrun"`: 정상 (REMINDER_ISSUE_DRYRUN=1 기본). 추가 조치 없음
      - `"created"`: 실제 이슈 생성 성공. 이슈 번호를 이슈 코멘트에 인용 (사용자 수동 연결)
      - `"create-failed"`: `gh issue create` 실패. **`blocking_issues` 에 `"reminder 이슈 생성 실패 — API 복구 후 재검증 경로 보장 안 됨"` 기록** + 로그 파일 경로 첨부. 재시도 또는 수동 이슈 생성 안내
-9. **라벨 전이**:
+9. **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
+10. **라벨 전이**:
    ```bash
    gh issue edit <번호> --remove-label "stage:design" --add-label "stage:dev"
    ```
@@ -155,3 +156,4 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - 라벨 전이 누락 — 다음 단계가 멈춤
 - ADR을 사후 정당화 도구로 사용 — 결정 *전*에 후보를 비교
 - 머지 권한 행사 (CRITICAL #1)
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
