@@ -1,0 +1,38 @@
+name: PR Template Checklist Guard
+
+# PR 본문이 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 7 키워드 base 를
+# 보존하는지 CI 측에서 사후 검증한다 (#473, #470 분리).
+#
+# #471 (create-pr 스킬 사전 차단) 의 backstop:
+# - #471: 스킬 측 작성 시점 가드 (PR 본문 생성 시 PR 템플릿 동적 읽기)
+# - #473 (본 워크플로): CI 측 사후 검증 (PR 생성/수정 후 본문 매칭)
+#
+# 둘은 타이밍이 달라 직교. 본 워크플로는 사용자가 수동 `gh pr create --body "..."`
+# 로 prefill 우회 시 최종 차단.
+#
+# 측정 방법 C — 1차 구조 (체크박스 prefix `- [ ]`) + 2차 phrase (키워드 문구) AND.
+# 둘 중 하나라도 hit 하면 PASS, 둘 다 0 → FAIL + actionable 코멘트.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+    branches: [develop, main]
+
+permissions:
+  pull-requests: write  # actionable 코멘트 발송용
+  contents: read
+
+jobs:
+  pr-template-checklist:
+    runs-on: ubuntu-latest
+    # bot 이 만든 PR 은 무시 (무한 루프 방지)
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PR 템플릿 7 체크박스 base 가드
+        if: hashFiles('scripts/verify-pr-template-checklist.mjs') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          POST_COMMENT: 'true'
+        run: node scripts/verify-pr-template-checklist.mjs ${{ github.event.pull_request.number }}
