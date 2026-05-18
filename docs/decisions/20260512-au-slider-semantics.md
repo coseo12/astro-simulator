@@ -202,6 +202,7 @@ ADR §재검토 조건 #1 + 결정 C 텍스트만으로는 인적 오류 (R4 arc
 - **#412 R-Phase 진입 체크리스트 amendment 후속 이슈 분리 박제 의무** — "R4 진입 시 ADR `20260512-au-slider-semantics.md` Amendment / 폐기 검토" 항목을 R-Phase 진입 체크리스트 SSoT 에 추가. 본 ADR 박제와 **동일 PR** 에 후속 이슈 즉시 생성 (volt #29 분리 박제 규칙). **후속 이슈 [#454](https://github.com/coseo12/astro-simulator/issues/454) 박제 완료** (priority:high, 2026-05-12)
 - **본 ADR 박제 시 #454 우선순위 high 박제** — R4 진입 (~1주 이내 예상) 전 amendment 박제 완료 필요. cross-validate Q5 + #412 R-Phase 진입 체크리스트 SSoT 직교성 확보
 - **PR 템플릿 ADR 호환성 체크 강제 (Gemini Q5 추가 권고)** — 모든 PR 에 적용되는 일반 가드. **후속 이슈 [#455](https://github.com/coseo12/astro-simulator/issues/455) 박제 완료** (priority:medium, 2026-05-12). 결정 C 구조적 가드 #454 와 직교
+- **ADR 20260504 §결정 4 양방향 cross-link 박제** — 본 ADR 의 R4 진입 Amendment 검토 의무는 ADR [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) §결정 4 "R-Phase 진입 시 Amendment 검토 의무 (누적)" 표 R4 첫 행에 박제됨 ([PR #460](https://github.com/coseo12/astro-simulator/pull/460) 머지, 2026-05-14, 이슈 [#454](https://github.com/coseo12/astro-simulator/issues/454)). 양방향 cross-link 정합성: ADR 20260504 → 본 ADR (forward, §결정 4 표) + 본 ADR → ADR 20260504 (backward, 본 항목). 후속 이슈 [#461](https://github.com/coseo12/astro-simulator/issues/461) 박제 (단방향 → 양방향 정합화)
 
 ---
 
