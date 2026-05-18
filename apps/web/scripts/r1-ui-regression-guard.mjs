@@ -335,6 +335,30 @@ async function runForViewport(browser, viewport) {
     results.push({ regionId: '__sun_coverage__', ratio: sunCoverage.ratio, pass: true });
   }
 
+  // capture 시점 frame timing 진단 로깅 — bootstrap (--update) vs detect-and-test (verify) 환경
+  // 차이로 인한 mobile noise floor 0.5% 임계 살짝 초과 회귀 (PR #506 후속, ADR Amendment 후보) 디버그용.
+  // 두 워크플로의 같은 commit/viewport 캡처 시점 state 차이를 비교한다.
+  const frameState = await page.evaluate(() => {
+    const core = window.__simCore;
+    if (!core) return null;
+    const scene = core.scene;
+    const cam = scene?.activeCamera;
+    return {
+      perfNow: Math.round(performance.now()),
+      sceneFrameId: scene?.getFrameId?.() ?? null,
+      sceneDeltaTime: scene?.getEngine?.()?.getDeltaTime?.() ?? null,
+      cameraRadius: cam?.radius ?? null,
+      cameraTarget: cam?.target ? [
+        Math.round(cam.target.x),
+        Math.round(cam.target.y),
+        Math.round(cam.target.z),
+      ] : null,
+    };
+  });
+  if (frameState) {
+    console.log(`  frame state: perfNow=${frameState.perfNow}ms sceneFrameId=${frameState.sceneFrameId} sceneDeltaMs=${frameState.sceneDeltaTime?.toFixed?.(2) ?? frameState.sceneDeltaTime} camR=${frameState.cameraRadius?.toExponential?.(3) ?? frameState.cameraRadius} camTarget=${frameState.cameraTarget?.join(',') ?? 'null'}`);
+  }
+
   if (flags.measureSunCoverage) {
     await context.close();
     return { results, pass: true };
