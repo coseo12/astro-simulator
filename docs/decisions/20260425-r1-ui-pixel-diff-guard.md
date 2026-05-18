@@ -1264,3 +1264,109 @@ PR #384 ([#373] body 비율 자연화 라운드 2) qa 단계 r1-guard `--measure
 - forensic ADR [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01 (D-T2 부분 통과) — 본 amendment 의 근거 SSoT
 - R1 ADR [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50, 라운드 2 보존)
 - 라운드 3 후속 신규 이슈 (별도 박제 예정) — 비율 정밀화 + 신규 회귀 #379 변형 후속
+
+---
+
+## Amendment 2 2026-05-19 — viewport 별 mismatch 임계 분리 (mobile 1.5% / desktop 0.5%)
+
+- **상태**: Accepted (Amendment)
+- **결정자**: 사용자 (PR [#508](https://github.com/coseo12/astro-simulator/pull/508), 2026-05-19)
+- **변경 분류**: 측정 지표 갱신 (CLAUDE.md ADR Amendment B 형식 4종 중 §3 — `docs/decisions/_amendment-template.md` 박제 기준)
+- **메인 ADR §결정 본문 immutable 보존**: §축 2 의 기본 임계 0.5% 표현은 그대로. 본 Amendment 는 **viewport 별 분기 helper 도입** 으로 mobile 만 1.5% 적용 (desktop 변경 0).
+
+### 배경 — PR #506 → #508 사고 인계
+
+PR [#506](https://github.com/coseo12/astro-simulator/pull/506) (#439 orbit-lines R-Phase 가드 defense-in-depth #5) admin override 머지 직후 develop tip (`578ee6e`) 의 `detect-and-test` r1-guard step 이 **mobile 375×667 viewport** 에서 결정적 fail:
+- top-nav: 99/18000 = **0.550%** mismatch (임계 0.5%)
+- shortcut-bar: 77/6950 = **1.108%** mismatch
+- desktop (1280×720 / 1920×1080) 은 PASS
+
+그러나 `r1:baseline-bootstrap` workflow_dispatch (run 26042983998, ubuntu-latest 동일 환경) 의 `--update` mode 는 **0 git diff** (capture 가 develop baseline 과 byte-identical) → PR 생성 안 됨. 즉 두 워크플로의 같은 코드 / 같은 OS / 다른 capture 결과.
+
+PR [#508](https://github.com/coseo12/astro-simulator/pull/508) deep dive 2단계로 가설 검증:
+
+### Deep dive 결과 — 2 가설 기각
+
+**가설 1 (Babylon frame timing nondeterminism)** — 기각.
+`apps/web/scripts/r1-ui-regression-guard.mjs` 에 capture 시점 frame state (perfNow / sceneFrameId / sceneDeltaMs / cameraRadius / cameraTarget) 로깅 추가 후 같은 commit 2회 실행 비교:
+
+| viewport | 회차 | sceneFrameId | sceneDeltaMs | mismatch (top-nav / shortcut-bar) |
+|---|---|---|---|---|
+| 1280×720 | 1차 / 2차 | 58 / 58 | 27.40 / 20.80 | 0.363% / 0.000% (정확 동일) ✓ |
+| 1920×1080 | 1차 / 2차 | 62 / 61 | 32.20 / 31.40 | 0.109% / 0.171% (정확 동일) ✓ |
+| **375×667** | 1차 / 2차 | **61 / 61** | **16.70 / 16.70** | **0.550% / 1.108% (정확 동일)** ✗ |
+
+mismatch ratio 100% 결정적 → frame timing nondeterminism / random chromium anti-alias 둘 다 기각.
+
+**가설 2 (워크플로 step 구조 차이)** — 기각.
+ci.yml r1-guard step 을 bootstrap.yml 동일 구조 (Playwright install / 빌드 / 서버 기동 / capture / 종료 5 step 분리) 로 리팩토링 후 재실행:
+
+| viewport | step 통일 전 | step 통일 후 | mismatch 변화 |
+|---|---|---|---|
+| 375×667 | sceneFrameId=61 sceneDeltaMs=16.70 | sceneFrameId=59 sceneDeltaMs=18.20 | **0.550% / 1.108% (완전 동일)** |
+
+frame state 변동 (sceneFrameId / sceneDeltaMs) 에도 mismatch ratio 정확 동일 → step warm-up 가설 기각. ci.yml step 통일 fix 롤백.
+
+### 잔여 가설 — 추가 deep dive ROI 낮음
+
+bootstrap (`--update`) capture 는 0 git diff (baseline 일치) ↔ detect-and-test capture 는 결정적 0.55%/1.11% mismatch → 두 환경의 capture 결과 실제로 systemic 다름. 잔여 후보:
+1. **chromium 빌드/버전 미세 차이** (playwright install 시점 micro-version 차이)
+2. **rendering pipeline (GPU/canvas) systemic difference**
+3. **GH Actions runner 의 컨테이너 이미지 미세 변화**
+
+명확한 원인 식별은 추가 PR 사이클 요구. ROI 평가:
+- **추가 deep dive 비용**: capture PNG 자체 artifact 업로드 + byte 비교 + chromium 버전 추적 (medium-large 사이클)
+- **효과 한계**: 원인 식별해도 systemic 환경 차이는 fix 가 추가 PR + ADR
+- **현실 가치**: mobile noise floor 가 결정적 0.55%/1.11% 위 → 임계 1.5% 완화로 즉시 효과 ≥ 1
+
+### 결정
+
+- **mobile (375×667)**: 임계 0.5% → **1.5%** 완화
+- **desktop (1280×720 / 1920×1080)**: 임계 0.5% 유지
+- 구현: `apps/web/scripts/r1-ui-regions.mjs` 에 `MISMATCH_RATIO_LIMIT_DESKTOP` (0.005) + `MISMATCH_RATIO_LIMIT_MOBILE` (0.015) + `getMismatchRatioLimit(viewportId)` 분기 helper 도입. 후방 호환용 `MISMATCH_RATIO_LIMIT` (= desktop 값) export 보존
+- 본 ADR §축 2 기본값 (0.5%) 은 desktop 기본 임계로 의미 유지 (메인 §결정 본문 immutable)
+
+### 비대상
+
+- pixelmatch 알고리즘 (per-pixel `PIXELMATCH_THRESHOLD = 0.1`) 변경 — 유지
+- desktop 임계 (0.5%) 변경 — 유지
+- R1_UI_REGIONS 영역 정의 변경 — 유지
+- 부트스트래핑 절차 (r1-baseline-bootstrap.yml) 변경 — 유지
+- chromium / rendering pipeline systemic 차이의 정확한 원인 식별 — 별도 후속 이슈 (낮은 우선순위)
+
+### 측정 지표 (Amendment 2 PASS 기준)
+
+- desktop (1280×720 / 1920×1080) 모든 영역 mismatch ≤ **0.5%**
+- mobile (375×667) 모든 영역 mismatch ≤ **1.5%**
+- 임계 초과 시 diff PNG `__diff__/r1/<viewport>/<region>.png` 저장 + CI artifact 업로드
+
+### 회귀 가드
+
+- `getMismatchRatioLimit('375x667') === 0.015` / `getMismatchRatioLimit('1280x720') === 0.005` 단위 검증 (단순 매핑)
+- `apps/web/scripts/r1-ui-regression-guard.mjs:416` 의 `mismatchLimit` 값이 viewport 별 분기로 적용되는지 통합 검증 (CI r1-guard step PASS)
+
+### 재검토 조건
+
+1. **mobile mismatch ≥ 1.5% 발화 시** → 본 Amendment 완화도 부족 신호. 잔여 systemic 원인 (chromium / rendering pipeline) deep dive 후속 이슈로 재진입 + 임계 추가 완화 또는 본질 fix 결정
+2. **desktop mismatch 가 systemic 0.5% 초과 회귀 시** → 본 Amendment 의 viewport 별 분리 정책 desktop 까지 확장 검토
+3. **chromium 메이저 업그레이드 시** (예: playwright `1.x → 2.x`) → 본 Amendment 의 mobile 1.5% 임계 재검증 의무
+4. **r1-baseline-bootstrap (`--update`) workflow_dispatch 가 git diff != empty 결과 발생 시** → 두 워크플로 환경 통일 신호 또는 baseline 자체 갱신 필요
+
+### 회피 시나리오 박제 (안티패턴)
+
+- **추가 deep dive 강제 진행** — capture PNG byte 비교 / chromium 버전 매트릭스 추적 등 medium-large 사이클 비용 vs 효과 ROI 낮음. 본 Amendment 가 ROI 우선 선택. 잔여 원인 식별은 별도 high 회귀 발생 시 재진입.
+- **mobile viewport 자체 폐기** — 모바일 정합성 검증 무력화. R-Phase 진입 시 모바일 회귀 발견의 1차 가드 손실.
+- **임계 일괄 완화 (desktop 도 1.5%)** — desktop 의 0.5% 가 충분히 작동 중 (현재 0.000~0.363%). 일괄 완화 시 desktop 회귀 검출 감도 손실.
+
+### Cross-validate 결과
+
+본 Amendment 박제 직후 cross-validate 1회 (Gemini 2.5 Pro). outcome 박제 위치: PR #508 코멘트.
+
+### 관련 박제
+
+- 발화점: PR [#506](https://github.com/coseo12/astro-simulator/pull/506) (#439 orbit-lines R-Phase 가드 admin merge)
+- Deep dive: PR [#508](https://github.com/coseo12/astro-simulator/pull/508) (frame timing 로깅 + step 통일 가설 + ci.yml rollback)
+- bootstrap workflow run: [26042983998](https://github.com/coseo12/astro-simulator/actions/runs/26042983998) (0 git diff)
+- detect-and-test fail (가설 1 검증): [26048178289](https://github.com/coseo12/astro-simulator/actions/runs/26048178289) (1차+2차, 결정적 동일)
+- detect-and-test fail (가설 2 검증): [26049292683](https://github.com/coseo12/astro-simulator/actions/runs/26049292683) (step 분리 후, mismatch 정확 동일)
+- CLAUDE.md Amendment B 형식 컨벤션: `docs/decisions/README.md` + `docs/decisions/_amendment-template.md` (PR #504 박제)

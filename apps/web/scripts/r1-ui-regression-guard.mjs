@@ -38,8 +38,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  MISMATCH_RATIO_LIMIT,
   PIXELMATCH_THRESHOLD,
+  getMismatchRatioLimit,
   R1_UI_REGIONS,
   R1_VIEWPORTS,
 } from './r1-ui-regions.mjs';
@@ -413,7 +413,9 @@ async function runForViewport(browser, viewport) {
     });
     const totalPixels = width * height;
     const ratio = mismatched / totalPixels;
-    const pass = ratio <= MISMATCH_RATIO_LIMIT;
+    // ADR §Amendment 2 (PR #508): viewport 별 임계값 분리 — mobile 1.5% / desktop 0.5%.
+    const mismatchLimit = getMismatchRatioLimit(viewport.id);
+    const pass = ratio <= mismatchLimit;
 
     if (!pass) {
       // diff 이미지 저장 (CI artifact 업로드 대상).
@@ -423,7 +425,7 @@ async function runForViewport(browser, viewport) {
     }
 
     const ratioPct = (ratio * 100).toFixed(3);
-    const limitPct = (MISMATCH_RATIO_LIMIT * 100).toFixed(1);
+    const limitPct = (mismatchLimit * 100).toFixed(1);
     console.log(
       `  ${pass ? '✓' : '✗'} ${region.id} — mismatch ${mismatched}/${totalPixels} (${ratioPct}% ${pass ? '≤' : '>'} ${limitPct}%)`,
     );
