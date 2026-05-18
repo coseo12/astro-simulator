@@ -37,6 +37,7 @@ import {
   type Tier,
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
+import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import {
   lodFromScreenCoverage,
   screenCoverageRadius,
@@ -438,6 +439,9 @@ export function createSolarSystemScene(
     const batches: Vector3[][] = [];
     for (const body of system.bodies) {
       if (!body.orbit) continue;
+      // defense-in-depth #5 (이슈 #439): R-Phase 미진입 body 는 본체가 점 수준이라
+      // 궤도선만 그리면 시각 혼란. R_PHASE_BODY_ALLOWLIST SSoT 직접 참조 (BODY_SCALE 의존 역전 회피).
+      if (!(R_PHASE_BODY_ALLOWLIST as readonly string[]).includes(body.id)) continue;
       const pts = sampleOrbitPoints(body, activeTier);
       if (pts) batches.push(pts);
     }
