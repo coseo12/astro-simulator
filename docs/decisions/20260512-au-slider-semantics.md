@@ -307,3 +307,23 @@ R4 architect 단계 진입 시 본 ADR 의 §재검토 조건 #1 이 자동 발�
 - **Gemini Q3 추가 검증 — focus target 소실 fallback**: focus 중인 body 가 R-Phase 진입/이탈로 R_PHASE_BODY_ALLOWLIST 에서 제거되거나 selectedBodyId 가 null 로 바뀌는 경우. **본 ADR 결정 B expected behavior #7 으로 즉시 반영** (범위 내 — `isRPhaseFocusable` 가드와 정합). 후속 분리 불요
 - **Gemini Q5 — #412 R-Phase 진입 체크리스트 amendment**: ADR 텍스트만으론 R4 진입 시 본 ADR Amendment 누락 차단 불가. **후속 이슈 [#454](https://github.com/coseo12/astro-simulator/issues/454) 박제 완료** (범위 밖 — 본 ADR 결정 대상은 슬라이더 의미, #412 는 R-Phase 가드 SSoT). 본 ADR PR 박제와 동시 생성 (volt #29 분리 박제 규칙 — 즉시 생성 + Builds on 링크 + 우선순위 high)
 - **PR 템플릿 ADR 호환성 체크 강제 (Gemini Q5 추가 권고)**: PR 템플릿 또는 ISSUE_TEMPLATE 에 "이전 ADR 호환성 체크" 항목 강제. **본 ADR 박제 PR 의 비-범위** (PR 템플릿 변경은 별도 영역). **후속 이슈 [#455](https://github.com/coseo12/astro-simulator/issues/455) 박제 완료** (priority:medium)
+
+## Amendment 1 — 2026-05-18 — sun focus desiredRadius drift 박제
+
+- **발의**: [#459](https://github.com/coseo12/astro-simulator/issues/459) (PR [#457](https://github.com/coseo12/astro-simulator/pull/457) reviewer 정적 리뷰 + developer 헤드리스 실측 발견)
+- **트리거**: 결정 B expected behavior #6 의 가정 ("sun focus 시 sun 위치 = 원점이므로 카메라-sun = 카메라-원점, 수학적으로 동일, 값 변화 0") 과 실 R3 동작의 28% drift 실측 발견.
+- **헤드리스 실측 (developer 보고)**:
+  - T1 solar 기본 진입: `2.79 AU`
+  - focus sun 진입: `2.01 AU (focus: sun)`
+  - 차이: 28%
+- **원인 분석 (reviewer)**: `packages/core/src/scene/camera-controller.ts:82-87` `controller.focusOn` 의 `desiredRadius` 식 — `desiredRadius = max(meshRadius × 5, meshRadius + 0.01)`. sun mesh `boundingSphere.radiusWorld` ≈ 5.06 scene unit (SUN_RADIUS 6.957e8 m × T1 renderScale 8.4e-11 × SUN_BODY_SCALE ~86배). `desiredRadius = max(5.06 × 5, 5.06 + 0.01) ≈ 25.3 scene unit ≈ 2.01 AU`. sun focus 진입 시 카메라가 원점이 아닌 sun 표면에서 25.3 unit 떨어진 위치로 강제 이동되므로 ADR 가정 무효.
+- **결정 (Gemini cross-validate Q5 합의 — 옵션 A 채택)**: 결정 B expected behavior #6 의 "값 변화 0 / 텍스트 분기만" 가정 **폐기**. 정정안 — **"sun focus 진입 시 desiredRadius 강제 재설정으로 값 변화 발생 (T1 기준 ~28%). 라벨 텍스트 `(focus: sun)` 분기 + 값 변화 모두 사용자가 인지하도록 시각 큐 박제."** 옵션 B (sun bypass 코드 수정) 는 sun mesh 거대 → 카메라 박힘 위험 + 일관성 깨짐으로 기각.
+- **결정 B expected behavior #6 정정 (Amendment 적용 후 실효 SSoT)**:
+  > **엣지 케이스 — sun focus**: focus body 가 sun 일 때도 `controller.focusOn` 의 `desiredRadius` 강제 재설정이 발생 (sun mesh `boundingSphere.radiusWorld` 5.06 scene unit × 5 ≈ 25.3 unit ≈ 2.01 AU at T1 solar). free-fly "카메라-원점 거리" 대비 ~28% drift. 라벨 텍스트 `(focus: sun)` 분기 **+ 값 변화 발생** 모두 시각 큐로 사용자에게 인지. DoD 검증: sun focus 진입/해제 시 라벨 **텍스트 분기 + desiredRadius 환산 값 일치** (라벨 값이 `2.79 AU` → `2.01 AU` 자연 전환 — 사용자 위화감 평가는 §재검토 조건 #2 강화 항목).
+- **§재검토 조건 #2 강화 (Amendment 적용 후 실효 SSoT)**: 기존 "focus 모드 슬라이더 의미 재정의의 사용자 인지 미달" 평가에 **sun focus 진입 시 28% 값 변화에 대한 사용자 위화감 평가 추가**. D-T2 검증에서 "sun focus 진입 시 라벨 값이 갑자기 변한다 (튀는 느낌)" 평가 시:
+  - 옵션 1 — 시각 큐 강화 (tooltip / animation 으로 값 변화 자연스럽게)
+  - 옵션 2 — `desiredRadius` 식 별도 분기 (sun = `meshRadius + ε` 처럼 표면 근접 거리 박제, 단 mesh 박힘 위험 검증 후)
+  - 옵션 3 — sun focus 자체 비허용 (R_PHASE_BODY_ALLOWLIST 에서 sun 제거) — 사용자 UX 손실로 최후 옵션
+- **영향**: PR [#457](https://github.com/coseo12/astro-simulator/pull/457) 코드 + 단위 테스트 **수정 불요** (정확 동작). ADR 본문 정정 + Amendment 박제만.
+- **cross-link**: 본 Amendment, [#459](https://github.com/coseo12/astro-simulator/issues/459), 발견 PR [#457](https://github.com/coseo12/astro-simulator/pull/457), 직전 Amendment 없음 (본 ADR 의 첫 Amendment)
+- **참조 SSoT**: `packages/core/src/scene/camera-controller.ts:82-87` (`focusOn` desiredRadius 식), `packages/core/src/scene/sun-body.ts` (`SUN_RADIUS` / `SUN_BODY_SCALE`)
