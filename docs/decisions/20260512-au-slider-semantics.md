@@ -25,16 +25,16 @@ const displayAU = Math.pow(10, value);  // 라벨에 "AU" 단위로 표시
 
 | Tier | renderScale | 1 scene unit ≈ m | 1 scene unit ≈ AU |
 | ---- | ----------- | ---------------- | ----------------- |
-| T1 solar | 8.4e-11 | 1.19e10 m | **79.5 AU** |
+| T1 solar | 8.4e-11 | 1.19e10 m | **0.0795 AU** |
 | T2 inner | 1.54e-9 | 6.50e8 m | **4.35e-3 AU** (≈ 0.0043 AU) |
 | T3 body | 2.51e-5 | 3.98e4 m | **2.66e-7 AU** (≈ 39.8 km) |
 
 즉 슬라이더 라벨 "1 AU" 가 실제로는:
-- T1 solar 진입 상태 → 약 **79.5 AU** (해왕성 궤도 ~2.6배)
+- T1 solar 진입 상태 → 약 **0.0795 AU** (≈ 1.19e10 m, 해왕성 평균 궤도 30.1 AU 의 ~1/378)
 - T2 inner 진입 상태 → 약 **0.0043 AU** (≈ 643,000 km, 달 거리의 ~1.7배)
 - T3 body 진입 상태 → 약 **2.66e-7 AU** (≈ 39.8 km)
 
-**최대 ~3억배의 의미 drift**. 본 ADR 박제 이전의 라벨은 사실상 가짜 (volt #74 "DoD PASS ≠ 제품 동작" 패턴 — 슬라이더는 측정적으론 "AU 단위 표시" 인데 실 의미는 가짜).
+**최대 ~30만배의 의미 drift** (T1 0.0795 AU ÷ T3 2.66e-7 AU ≈ 298,872). 본 ADR 박제 이전의 라벨은 사실상 가짜 (volt #74 "DoD PASS ≠ 제품 동작" 패턴 — 슬라이더는 측정적으론 "AU 단위 표시" 인데 실 의미는 가짜).
 
 추가로 focus 모드 (sun / mercury / venus R-Phase Allowlist `[sun, mercury, venus]`) 진입 시 `controller.focusOn({ mesh })` 가 `camera.target` 을 focus body 로 이동시키므로 ArcRotateCamera 의 `radius` 의미는 "**카메라-focus body** 거리 (scene unit)" 로 바뀐다. free-fly 일 때만 "카메라-원점 (태양)" 거리. 슬라이더 라벨이 이 변화를 반영하지 않으면 focus 진입 즉시 라벨 사실성 추가 붕괴.
 
