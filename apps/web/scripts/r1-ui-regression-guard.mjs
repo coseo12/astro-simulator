@@ -38,8 +38,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  MISMATCH_RATIO_LIMIT,
   PIXELMATCH_THRESHOLD,
+  getMismatchRatioLimit,
   R1_UI_REGIONS,
   R1_VIEWPORTS,
 } from './r1-ui-regions.mjs';
@@ -335,6 +335,30 @@ async function runForViewport(browser, viewport) {
     results.push({ regionId: '__sun_coverage__', ratio: sunCoverage.ratio, pass: true });
   }
 
+  // capture 시점 frame timing 진단 로깅 — bootstrap (--update) vs detect-and-test (verify) 환경
+  // 차이로 인한 mobile noise floor 0.5% 임계 살짝 초과 회귀 (PR #506 후속, ADR Amendment 후보) 디버그용.
+  // 두 워크플로의 같은 commit/viewport 캡처 시점 state 차이를 비교한다.
+  const frameState = await page.evaluate(() => {
+    const core = window.__simCore;
+    if (!core) return null;
+    const scene = core.scene;
+    const cam = scene?.activeCamera;
+    return {
+      perfNow: Math.round(performance.now()),
+      sceneFrameId: scene?.getFrameId?.() ?? null,
+      sceneDeltaTime: scene?.getEngine?.()?.getDeltaTime?.() ?? null,
+      cameraRadius: cam?.radius ?? null,
+      cameraTarget: cam?.target ? [
+        Math.round(cam.target.x),
+        Math.round(cam.target.y),
+        Math.round(cam.target.z),
+      ] : null,
+    };
+  });
+  if (frameState) {
+    console.log(`  frame state: perfNow=${frameState.perfNow}ms sceneFrameId=${frameState.sceneFrameId} sceneDeltaMs=${frameState.sceneDeltaTime?.toFixed?.(2) ?? frameState.sceneDeltaTime} camR=${frameState.cameraRadius?.toExponential?.(3) ?? frameState.cameraRadius} camTarget=${frameState.cameraTarget?.join(',') ?? 'null'}`);
+  }
+
   if (flags.measureSunCoverage) {
     await context.close();
     return { results, pass: true };
@@ -389,7 +413,9 @@ async function runForViewport(browser, viewport) {
     });
     const totalPixels = width * height;
     const ratio = mismatched / totalPixels;
-    const pass = ratio <= MISMATCH_RATIO_LIMIT;
+    // ADR §Amendment 2 (PR #508): viewport 별 임계값 분리 — mobile 1.5% / desktop 0.5%.
+    const mismatchLimit = getMismatchRatioLimit(viewport.id);
+    const pass = ratio <= mismatchLimit;
 
     if (!pass) {
       // diff 이미지 저장 (CI artifact 업로드 대상).
@@ -399,7 +425,7 @@ async function runForViewport(browser, viewport) {
     }
 
     const ratioPct = (ratio * 100).toFixed(3);
-    const limitPct = (MISMATCH_RATIO_LIMIT * 100).toFixed(1);
+    const limitPct = (mismatchLimit * 100).toFixed(1);
     console.log(
       `  ${pass ? '✓' : '✗'} ${region.id} — mismatch ${mismatched}/${totalPixels} (${ratioPct}% ${pass ? '≤' : '>'} ${limitPct}%)`,
     );
