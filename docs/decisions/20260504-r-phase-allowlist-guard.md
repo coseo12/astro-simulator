@@ -151,7 +151,13 @@ export function isRPhaseFocusable(bodyId: string | null | undefined): boolean {
 2. **`R_PHASE_BODY_ALLOWLIST` 가 5개 이상 도달 시** (예: R6 진입 시 sun/mercury/venus/earth/mars/jupiter) → 자동화 ROI 재평가 (수동 4곳 박제 vs 자동화 인프라 비용)
 3. **scene 가드 emit 차단이 다른 명령에도 필요 시** (`resetCamera` / `setLodOverride` / `setCameraRadius` 등) → 별도 ADR 박제. 본 ADR 은 `focusOn` 만 다룸
 4. **shortcut 버튼 자체 hide / 제거 정책 변경 시** → "추가만 제거 없이" 정책 (Q1=(ii)) 폐기 ADR 선행 필수. 본 ADR 보다 상위 정책
-5. **§결정 4 표 누적 행 수 N ≥ 5 도달 시** → 별도 ADR 분리 검토 발화. 분리 절차: (a) `docs/decisions/<YYYYMMDD>-r-phase-amendment-checklist.md` 신규 ADR 박제 + 표 이전, (b) 본 ADR §결정 4 표 위치에는 신규 ADR 로의 cross-link 만 잔존 (history 보존, ~~취소선~~ 항목 포함), (c) 폐기 ADR 박제 시 본 §결정 4 의 R-Phase 진입 절차 본문은 SSoT 유지. 임계값 근거: R-Phase R10 까지 총 ~6 행 예상의 절반 도달 시 §결정 4 본질 정책 (R-Phase allowlist guard) 가독성 보전. 후속 이슈 [#462](https://github.com/coseo12/astro-simulator/issues/462) 박제 (PR #460 reviewer non-blocking #2)
+5. **§결정 4 표 누적 행 수 N ≥ 5 도달 시** → 별도 ADR 분리 검토 발화.
+   - **분리 절차**:
+     - (a) `docs/decisions/<YYYYMMDD>-r-phase-amendment-checklist.md` 신규 ADR 박제 후 표 이전
+     - (b) 본 ADR §결정 4 표 위치에는 신규 ADR 로의 cross-link 만 잔존 (history 보존, ~~취소선~~ 항목 포함)
+     - (c) 폐기 ADR 박제 시 본 §결정 4 의 R-Phase 진입 절차 본문은 SSoT 유지
+   - **임계값 근거**: R-Phase R10 까지 총 ~6 행 예상의 절반 도달 시 §결정 4 본질 정책 (R-Phase allowlist guard) 가독성 보전
+   - 후속 이슈 [#462](https://github.com/coseo12/astro-simulator/issues/462) 박제 (PR #460 reviewer non-blocking #2)
 
 ---
 
