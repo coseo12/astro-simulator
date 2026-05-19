@@ -25,6 +25,12 @@ R3 (#369) PR #371 의 D-T2 사용자 검증 2회차에서 ambient fix (#372) 와
 
 `scripts/_debug-373-proportion-tmp.mjs` (volt #67 패턴 일회성 debug) 로 실측. 데이터: [`docs/reports/373-debug-output.json`](../reports/373-debug-output.json), 스크린샷: [`docs/reports/373-debug-{1280x720,1920x1080,375x667}.png`](../reports/).
 
+#### 측정 시각 자료 (#382 embed 표준)
+
+![373 forensic 측정 1280×720](../reports/373-debug-1280x720.png)
+![373 forensic 측정 1920×1080](../reports/373-debug-1920x1080.png)
+![373 forensic 측정 375×667 (모바일)](../reports/373-debug-375x667.png)
+
 #### 측정 1 — 다중 metric 비교 (1280×720 default 진입 `?gpu=a`)
 
 | metric                       | 정의                                                                                  | 값         | 비고                                                                          |

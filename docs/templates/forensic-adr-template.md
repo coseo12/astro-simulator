@@ -41,6 +41,20 @@
 
 > ⚠️ `_debug-*-tmp.mjs` 는 실측 직후 `rm` (영구 박제 금지). 결과 JSON/PNG 만 `docs/reports/` 에 박제. 영속화 가치가 있는 측정 스크립트는 `scripts/verify-<topic>.mjs` 로 승격.
 
+#### 측정 시각 자료 (PNG embed 표준 — #382)
+
+ADR 단독 가독성 보장 — GitHub 렌더링에서 본문에 측정 시각 자료가 보이도록 markdown image embed:
+
+```markdown
+![<이슈번호> forensic 측정 1280×720](../reports/<이슈번호>-debug-1280x720.png)
+![<이슈번호> forensic 측정 1920×1080](../reports/<이슈번호>-debug-1920x1080.png)
+![<이슈번호> forensic 측정 375×667](../reports/<이슈번호>-debug-375x667.png)
+```
+
+- 위치: 측정 데이터 표 직전 또는 직후 (가독성 우선 선택)
+- alt text: `<이슈번호> <측정 이름> <viewport 또는 시나리오>` (예: `373 forensic 측정 1280×720`)
+- 모범 사례: [`20260430-r3-followup-body-proportion.md`](../decisions/20260430-r3-followup-body-proportion.md) §Forensic 측정 결과
+
 #### 측정 1 — <측정 이름> (<viewport / 시나리오>)
 
 | metric | 정의 | 값 | 비고 |
