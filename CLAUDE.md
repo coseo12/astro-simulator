@@ -455,6 +455,22 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 - 코어 기술 스택 선택(언어/런타임/프레임워크/주요 라이브러리)을 도입·교체할 때는 `docs/decisions/<YYYYMMDD>-<topic>.md` 로 ADR을 남긴다
 - 섹션: **배경 / 후보 비교(축별) / 결정 / 결과·재검토 조건**
 - 프로젝트별 고유 패턴(상태 관리, 씬 동기화 등)도 추후 에이전트가 참조 가능하도록 `docs/architecture/` 또는 해당 프로젝트 CLAUDE.md에 명시 기록한다
+- 프로젝트 고유 용어 (D-T2 / R-Phase / Tier / Floating Origin / EIH 등) 는 [`docs/glossary.md`](docs/glossary.md) 에 일괄 정의 (#449) — ADR 본문 첫 등장 시 glossary 링크 권장
+
+#### ADR Status 워크플로 (Provisional → Accepted, 부분 도입 — #370 옵션 C)
+
+- 기본: 단순 결정 ADR (NO-OP / Phase 진입 / 라이브러리 채택 등) 은 **Accepted 직접 박제**
+- 예외 (Provisional 의무): **cross-validate 발동 ADR** (`## 교차검증` 의 박제 직후 1회 루틴 대상 — CRITICAL DIRECTIVE 개정 / ADR 신규·개정/폐기 / MINOR 이상 릴리스 Behavior Changes / 프로젝트 원칙·철학 선언) 은 cross-validate 결과 본문 통합 전까지 **Provisional** 박제. 통합 후 Accepted 전이
+- 전이 절차: ADR 메타데이터 `상태: Provisional` → `상태: Accepted (cross-validate <YYYY-MM-DD>)` 명시. §교차검증 반영 사항 4축 분류 (합의 / 이견 / 고유 발견 / Claude 편향 셀프 체크) 박제 후 전이
+- 근거: #370 (R3 cross-validate Gemini 고유 발견 — ADR 머지 시점 cross-validate 결과 미통합 잠재 위험)
+
+#### ADR 본문 시각 자료 embed 표준 (#382)
+
+forensic ADR 의 측정 데이터 (스크린샷 / 차트 / diagram) 는 별도 파일 박제 + ADR 본문 markdown image embed (`![desc](../reports/<이슈>-debug-<resolution>.png)`) 형식. ADR 단독 가독성 보장 — GitHub 렌더링에서 측정 시각 자료가 본문에 보임.
+
+- 적용 대상: 모든 forensic ADR (§Forensic 측정 결과 섹션) + 시각 자료가 있는 일반 ADR
+- 위치: 측정 데이터 표 직전 또는 직후
+- 표준 alt text: `<이슈번호> <측정 이름> <viewport 또는 시나리오>` (예: `373 forensic 측정 1280×720`)
 
 #### Forensic ADR 변형 (복잡 회귀 전용)
 
