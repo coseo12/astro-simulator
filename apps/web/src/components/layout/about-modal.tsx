@@ -30,14 +30,14 @@ const SOURCES = [
 ];
 
 /**
- * P10-C-3 #278 / P12-C #298 — About 모달 (Fact-First 원칙 §"크레딧 뷰").
+ * About 모달 — 데이터 출처 attribution + 정밀도 안내.
  *
- * - 데이터 출처 attribution (IAU / NASA / JPL)
+ * - 데이터 출처 (IAU / NASA / JPL)
  * - 정밀도 ±0.01% 및 불확실성 표기 안내
+ * - 3단 tier (Solar / Inner / Body) 자동 전환은 카메라 거리 / focus body 로 결정
  *
- * [P12-C 변경] 단일 모드 전환으로 `educational` / `scientific` 토글이 폐기되어
- * 모드별 과장 요약 섹션을 제거. 상대 비율은 항시 IAU 실측 고정 (fact-first §Amendment).
- * 3단 tier (Solar / Inner / Body) 자동 전환은 카메라 거리 / focus body 로 결정.
+ * #405 — v3 incremental build 정책으로 전환. 폐기된 P12-C fact-first 원칙 / educational·scientific
+ * 토글 / 절대 비율 IAU 고정 표현 정리 (Roadmap v3 §`docs/phases/roadmap-v3-incremental.md`).
  *
  * 헤더 우측 버튼 ("?") 으로 열기, Esc 또는 닫기 버튼으로 닫기.
  */
@@ -120,9 +120,10 @@ export function AboutModal() {
             <section className="mb-5 pt-4 border-t border-border-subtle">
               <h3 className="text-body-sm text-fg-secondary mb-2">스케일 정책</h3>
               <p className="text-caption text-fg-tertiary">
-                천체 간 상대 비율은 IAU 2015 실측 고정. 절대 표시 크기는 카메라 거리·focus 대상에
-                따라 3단 tier (Solar / Inner / Body) 로 자동 전환되며, 화면 이동은 Q8=8D 병행 interp
-                (300ms) 로 자연스럽게 연결됩니다.
+                Roadmap v3 incremental build — 각 R-Phase (R1 태양, R2 수성, R3 금성, R4+ 예정) 가
+                활성된 천체만 표시 + 시각 과장 배수 박제. 카메라 거리·focus 대상에 따라 3단 tier
+                (Solar / Inner / Body) 로 자동 전환되며, 화면 이동은 ExponentialEase 300ms interp 로
+                자연스럽게 연결됩니다.
               </p>
             </section>
 
