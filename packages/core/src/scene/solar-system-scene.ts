@@ -748,8 +748,19 @@ export function createSolarSystemScene(
     focusBodyIdForAssert = bodyId;
   };
   // P12-A #298 — focus 해제 (reset) 시 tier 는 free-fly 경로로 전환.
+  //
+  // R-Phase #510 H6 fix — focus 해제는 **tier 까지 default 복원**해야 한다.
+  // 이전: focusBodyIdForAssert = null 만 → tier (focus 시 sub-tier) + origin (focus body 위치) 잔존.
+  // 잔존 상태에서 sim-canvas 가 controller.reset(35) Animation 시작하면 매 프레임
+  // updateTierByCamera 가 잘못된 tier 판정 → setTier 트리거 → tier-transition.ts:288-296 의
+  // stopAnimation 이 cam-reset-radius/target 까지 stop + computeTargetRadius(35, oldScale, newScale)
+  // 로 radius 폭증 (forensic 실측: 35 → 688,901 ≈ ×19,683).
+  //
+  // setTier(defaultInitialTier()) 호출은 내부에서 floatingOrigin.reset() (T1/T2 경로) 도 자동
+  // 동반하므로 origin 도 함께 복원. focus 진입 시 applyFocusTier + setFocusOrigin 의 대칭.
   const clearFocus = () => {
     focusBodyIdForAssert = null;
+    setTier(defaultInitialTier());
   };
 
   // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
