@@ -24,7 +24,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export function SimCanvas({ children }: { children?: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreRef = useRef<SimulationCore | null>(null);
-  const unsubDiskRef = useRef<(() => void) | null>(null);
   // P12-A #298 N1 — onBeforeRender observer 중복 등록 방지용 cleanup 핸들.
   // HMR / 컴포넌트 remount 시 scene 이 살아있을 수 있어 관찰자 누수 방지.
   const tierObserverCleanupRef = useRef<(() => void) | null>(null);
@@ -281,7 +280,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
 
         // P5-D #180 — ?bh=1 옵트인 시 중력렌즈 PostProcess + 블랙홀 메쉬 추가.
-        // P6-B #190 — ?bh=2 옵트인 시 정확 shadow + accretion disk PostProcess (별도 모듈).
+        // (#405 — `?bh=2` accretion disk 경로는 v3 reset 후 적용 대상 없어 폐기.
+        //  BlackHoleDiskPanel + store.blackHoleDisk + createBlackHoleRendering 호출 함께 제거.)
         const bhParam = new URLSearchParams(window.location.search).get('bh');
         if (bhParam === '1' && instance.scene) {
           const lensing = sceneApi.createGravitationalLensing(instance.scene, camera, {
@@ -293,41 +293,6 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const bhy = Number(new URLSearchParams(window.location.search).get('bhy')) || 0;
           const bhz = Number(new URLSearchParams(window.location.search).get('bhz')) || 0;
           lensing.setPosition(bhx, bhy, bhz);
-        } else if (bhParam === '2' && instance.scene) {
-          const initialDisk = useSimStore.getState().blackHoleDisk;
-          // P7-C #208 — ?ray3d=1 옵트인 시 3D ray construction 경로 활성화.
-          // 기본(미지정/0)은 P6-B D' 화면공간 근사 유지 (회귀 격리).
-          const ray3dParam = new URLSearchParams(window.location.search).get('ray3d');
-          const useRay3D = ray3dParam === '1';
-          const bh = sceneApi.createBlackHoleRendering(instance.scene, camera, {
-            position: [3, 0, 0],
-            visualRadius: 0.3,
-            diskInnerRs: initialDisk.innerRs,
-            diskOuterRs: initialDisk.outerRs,
-            diskEccentricity: initialDisk.eccentricity,
-            diskThicknessRs: initialDisk.thicknessRs,
-            diskTiltRad: (initialDisk.tiltDeg * Math.PI) / 180,
-            useRay3D,
-          });
-          // 검증 스크립트가 현재 활성 경로를 감지할 수 있도록 전역 노출.
-          Object.defineProperty(window, '__bhRay3D', {
-            configurable: true,
-            value: useRay3D,
-            writable: false,
-          });
-          // store 변경 → handles 호출 (LUT 재생성 0회 — uniform만 갱신).
-          const unsubDisk = useSimStore.subscribe((state, prev) => {
-            const next = state.blackHoleDisk;
-            const old = prev.blackHoleDisk;
-            if (next === old) return;
-            if (next.innerRs !== old.innerRs) bh.setDiskInner(next.innerRs);
-            if (next.outerRs !== old.outerRs) bh.setDiskOuter(next.outerRs);
-            if (next.eccentricity !== old.eccentricity) bh.setDiskEccentricity(next.eccentricity);
-            if (next.thicknessRs !== old.thicknessRs) bh.setDiskThickness(next.thicknessRs);
-            if (next.tiltDeg !== old.tiltDeg) bh.setDiskTilt((next.tiltDeg * Math.PI) / 180);
-          });
-          // dispose 시 구독 해제 (useEffect cleanup chain에 묶기 위해 ref 보존).
-          unsubDiskRef.current = unsubDisk;
         }
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
@@ -527,8 +492,6 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     return () => {
       cancelled = true;
       unsubEngine?.();
-      unsubDiskRef.current?.();
-      unsubDiskRef.current = null;
       tierObserverCleanupRef.current?.();
       tierObserverCleanupRef.current = null;
       detach();
