@@ -223,6 +223,13 @@ export class SimulationCore {
         // R1 #334+#335 — resetCamera 콜백 폐기. event emit 으로 selectedBodyId=null sync 트리거.
         this.#emitter.emit('bodySelected', { id: null });
         break;
+      case 'enterFreeFly':
+        // #509 — 자유시점 진입. bodySelected:null (resetCamera) 과 구분 — focus tracking 만
+        // 해제 + 카메라 시점 (alpha/beta/radius/target/tier) 보존.
+        // 어댑터가 freeFlyEntered + bodySelected:null 동시 처리 → store freeFlyMode=true.
+        this.#emitter.emit('freeFlyEntered', {});
+        this.#emitter.emit('bodySelected', { id: null });
+        break;
       case 'setCameraRadius':
         this.#setRadiusHandler?.(cmd.radius);
         break;

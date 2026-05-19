@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
 // #402 — R-Phase allowlist SSoT (named import — scene namespace 경유 금지).
@@ -36,6 +37,24 @@ export function FocusQuickButtons() {
   const selected = useSimStore((s) => s.selectedBodyId);
   const sendCommand = useSimCommand();
 
+  // #509 — focus 중 Esc 키로 자유시점 진입. focus 없을 때는 no-op (reset 과 구분).
+  // input/textarea/contenteditable 포커스 중에는 발화 차단 (사용자 입력 보호).
+  useEffect(() => {
+    if (selected === null) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const el = document.activeElement;
+      const isEditable =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable);
+      if (isEditable) return;
+      sendCommand({ type: 'enterFreeFly' });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selected, sendCommand]);
+
   return (
     <div className="flex items-center gap-1" data-r1-region="shortcut-bar">
       {FOCUS_BUTTONS.map((b) => {
@@ -71,6 +90,23 @@ export function FocusQuickButtons() {
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
         reset
+      </button>
+      {/* #509 — 자유시점 진입. focus 있을 때만 활성 (focus 없으면 의미 없음). */}
+      <button
+        type="button"
+        data-testid="focus-free-fly"
+        disabled={selected === null}
+        aria-disabled={selected === null}
+        title={selected === null ? '포커스 상태에서만 사용 가능' : '자유시점 (Esc)'}
+        onClick={() => sendCommand({ type: 'enterFreeFly' })}
+        className={`num text-caption px-2 py-1 rounded-sm border transition-colors ${
+          selected === null
+            ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
+            : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'
+        }`}
+        style={{ transitionDuration: 'var(--duration-fast)' }}
+      >
+        탐색
       </button>
     </div>
   );

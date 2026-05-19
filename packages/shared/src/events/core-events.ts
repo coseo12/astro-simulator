@@ -12,6 +12,17 @@ export type CoreEvents = {
   /** 천체가 선택됨 */
   bodySelected: { id: string | null };
 
+  /**
+   * #509 — 자유시점 (free-fly) 진입.
+   *
+   * `bodySelected: null` (resetCamera 경로) 과 구분된 별도 event.
+   * focus tracking 만 해제 + 카메라 alpha/beta/radius/target/tier 모두 보존 의도.
+   *
+   * UI 진입: shortcut bar "탐색" 버튼 or Esc 단축키 → sendCommand({type:'enterFreeFly'}).
+   * 어댑터 측에서 store.setFreeFlyMode(true) + selectedBodyId=null 동반 처리.
+   */
+  freeFlyEntered: Record<string, never>;
+
   /** 시뮬레이터 모드가 변경됨 */
   modeChanged: { mode: SimMode };
 
@@ -46,6 +57,7 @@ export type CoreCommand =
   | { type: 'jumpToJulianDate'; julianDate: number }
   | { type: 'focusOn'; bodyId: string }
   | { type: 'resetCamera' }
+  | { type: 'enterFreeFly' }
   | { type: 'setCameraRadius'; radius: number }
   | { type: 'setMode'; mode: SimMode }
   | { type: 'setLodOverride'; level: 'high' | 'mid' | 'low' | 'auto' };

@@ -408,6 +408,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           }
         };
 
+        // #509 — 자유시점 (free-fly) 진입 분기. clearFocus + reset 과 달리 tier/origin/camera 보존.
+        // syncFocusToScene 과 별도 helper — selectedBodyId 변화 (null 전이) 와 freeFlyMode 변화를
+        // 분리 처리하기 위함 (resetCamera vs enterFreeFly 경로 구분).
+        const detachToFreeFly = () => {
+          solar.detachFocus();
+          controller.clearFollow();
+        };
+
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
         // + 질량 배수 변경 → setBodyMassMultiplier (#107)
         // + selectedBodyId 변경 → syncFocusToScene (R1 #334+#335 — scene focus / camera 단일 책임)
@@ -438,7 +446,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // 이전 (Phase 1 fix `acfcb74`): subscribe 분기 + setCameraHandlers focus/reset 콜백 이중 경로.
           // 이중 호출로 `controller.focusOn` 의 `Animation.CreateAndStartAnimation × 2` 가 2회 폐기 + 재시작.
           if (state.selectedBodyId !== prev.selectedBodyId) {
-            syncFocusToScene(state.selectedBodyId);
+            // #509 — selectedBodyId=null 전이 시 freeFlyMode 확인. true 면 detachToFreeFly (시점 유지),
+            // false 면 syncFocusToScene (sun 중심 reset). enterFreeFly action 이 selectedBodyId=null +
+            // freeFlyMode=true 를 같은 set 으로 commit 하므로 두 상태가 동시 관찰됨.
+            if (state.selectedBodyId === null && state.freeFlyMode) {
+              detachToFreeFly();
+            } else {
+              syncFocusToScene(state.selectedBodyId);
+            }
           }
         });
         // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).
