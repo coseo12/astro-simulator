@@ -456,6 +456,21 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 - 섹션: **배경 / 후보 비교(축별) / 결정 / 결과·재검토 조건**
 - 프로젝트별 고유 패턴(상태 관리, 씬 동기화 등)도 추후 에이전트가 참조 가능하도록 `docs/architecture/` 또는 해당 프로젝트 CLAUDE.md에 명시 기록한다
 
+#### Forensic ADR 변형 (복잡 회귀 전용)
+
+단순 기술 선택과 달리 **다중 가설 + runtime 측정 + 사용자 인지 단위 ↔ 박제 단위 mismatch** 가 있는 회귀는 일반 ADR 4섹션으로 부족. 아래 5조건 중 **3개 이상** 충족하면 forensic 변형 사용 — [`docs/templates/forensic-adr-template.md`](docs/templates/forensic-adr-template.md) 의 8 섹션 구조 채택.
+
+1. **가설 N≥2** — 단일 원인 확정 안 되고 후보 가설 비교 필요
+2. **Runtime 측정 데이터 필수** — 정적 분석 + 코드 리뷰만으로 결정 불가, `scripts/_debug-<이슈>-tmp.mjs` (volt #67 패턴) 실측 선행
+3. **DoD PASS 인데 사용자/제품 회귀** — 자동 검증 통과 + 실 사용 회귀 (volt #74, #76)
+4. **5±2 옵션 비교** — 단순 채택/기각이 아닌 (a)~(e) 옵션의 축별 trade-off 비교
+5. **Amendment 라운드 N 예상** — cross-validate / 사용자 D-T2 후속 응답으로 결정이 갱신될 가능성
+
+조건 미달 시 일반 ADR 사용 (forensic 변형 의 8섹션이 잡음). 판정 애매하면 **일반 ADR 로 시작 후 Amendment 1회 필요해지면 forensic 으로 승격** — 양방향 cross-link 박제.
+
+- 모범 사례: [`20260430-r3-followup-body-proportion.md`](docs/decisions/20260430-r3-followup-body-proportion.md) (#373), [`20260509-380-zoom-camera-freeze-forensic.md`](docs/decisions/20260509-380-zoom-camera-freeze-forensic.md) (#380), [`20260504-411-r1-guard-shortcut-bar-forensic.md`](docs/decisions/20260504-411-r1-guard-shortcut-bar-forensic.md) (#411)
+- 근거: #381 — #373 cross-validate Gemini 고유 발견 (의사결정 trace 가능성 + 재현 가능성 동시 확보 → 다른 복잡 회귀에도 모범)
+
 ### 한글 인코딩 검증
 - 한국어가 포함된 파일을 Edit한 후, 깨진 문자(U+FFFD, �)가 없는지 확인한다
 - 커밋 전 `grep -rn '�' <수정한 파일>` 실행을 권장한다

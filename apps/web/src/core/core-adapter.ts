@@ -27,6 +27,13 @@ export function attachCoreToStore(core: SimulationCore): () => void {
     store.setSelectedBody(id);
   };
 
+  // #509 — 자유시점 진입. 'bodySelected:null' 이 emit 직전에 발화하므로 freeFlyMode=true 가
+  // setSelectedBody(null) 의 freeFlyMode=false 에 덮여쓰지 않도록 enterFreeFly() 호출이 후행.
+  // simulation-core 가 emit 순서를 freeFlyEntered → bodySelected:null 로 보장.
+  const onFreeFlyEntered = () => {
+    store.enterFreeFly();
+  };
+
   const onTimeScaleChanged = ({ scale }: { scale: number }) => {
     store.setTimeScale(scale);
   };
@@ -39,6 +46,7 @@ export function attachCoreToStore(core: SimulationCore): () => void {
   core.on('error', onError);
   core.on('timeChanged', onTimeChanged);
   core.on('bodySelected', onBodySelected);
+  core.on('freeFlyEntered', onFreeFlyEntered);
   core.on('timeScaleChanged', onTimeScaleChanged);
   core.on('performance', onFps);
 
@@ -47,6 +55,7 @@ export function attachCoreToStore(core: SimulationCore): () => void {
     core.off('error', onError);
     core.off('timeChanged', onTimeChanged);
     core.off('bodySelected', onBodySelected);
+    core.off('freeFlyEntered', onFreeFlyEntered);
     core.off('timeScaleChanged', onTimeScaleChanged);
     core.off('performance', onFps);
   };

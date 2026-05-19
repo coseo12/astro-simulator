@@ -61,6 +61,30 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
 
 이 PR이 ADR 변경을 포함하면 정책 `force_review_on: ["architect-decision"]` 트리거 — `/review` 호출 시 강제 사용자 확인.
 
+### Forensic ADR 변형 (복잡 회귀 전용)
+
+일반 ADR 4섹션 (배경/후보비교/결정/재검토) 으로 부족한 **복잡 회귀** 는 forensic 변형 사용 — [`docs/templates/forensic-adr-template.md`](../../docs/templates/forensic-adr-template.md) 8섹션 구조 채택.
+
+**발동 조건** (5개 중 3개 이상 충족 — CLAUDE.md `#### Forensic ADR 변형` 참조):
+
+1. 가설 N≥2 (단일 원인 미확정)
+2. Runtime 측정 데이터 필수 (정적 분석 부족 → `scripts/_debug-<이슈>-tmp.mjs` 실측 선행, volt #67 패턴)
+3. DoD PASS 인데 사용자/제품 회귀 (volt #74, #76)
+4. 5±2 옵션 (a~e) 비교
+5. Amendment 라운드 N 예상 (cross-validate / D-T2 후속 응답으로 결정 갱신)
+
+**호출 절차**:
+
+1. forensic 진입 전 일반 ADR 시도 → 4섹션 부족 인식 시 승격
+2. `docs/templates/forensic-adr-template.md` 복사 → `docs/decisions/<YYYYMMDD>-<topic>-forensic.md` (파일명 `-forensic` 또는 `-followup-` suffix)
+3. 8 섹션 placeholder 채움 — **§Forensic 측정 결과 + §가설 검증 결론 + §Concrete Prediction** 이 필수 차별점 (일반 ADR 에 없음)
+4. `_debug-*-tmp.mjs` 는 실측 직후 `rm` (영구 박제 금지). 결과 JSON/PNG 만 `docs/reports/` 박제
+5. 측정 스크립트 영속화 가치 시 → 후속 이슈로 `scripts/verify-<topic>.mjs` 승격 분리
+
+**판정 애매 시**: 일반 ADR 로 시작 → Amendment 1회 필요 시점에 forensic 으로 승격 + 양방향 cross-link.
+
+**모범 사례**: [`20260430-r3-followup-body-proportion.md`](../../docs/decisions/20260430-r3-followup-body-proportion.md) (#373), [`20260509-380-zoom-camera-freeze-forensic.md`](../../docs/decisions/20260509-380-zoom-camera-freeze-forensic.md) (#380), [`20260504-411-r1-guard-shortcut-bar-forensic.md`](../../docs/decisions/20260504-411-r1-guard-shortcut-bar-forensic.md) (#411). 근거: #381 (#373 cross-validate Gemini 고유 발견).
+
 ## 절차
 
 1. **이슈 정독**: 스프린트 계약 본문 + 첨부 자료

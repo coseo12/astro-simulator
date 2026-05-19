@@ -37,6 +37,7 @@ import {
   type Tier,
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
+import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import {
   lodFromScreenCoverage,
   screenCoverageRadius,
@@ -202,6 +203,17 @@ export interface SolarSystemSceneHandles {
    */
   clearFocus: () => void;
   /**
+   * #509 — 자유시점 (free-fly) 진입. `clearFocus` 와 달리 **tier/origin 을 유지**한다.
+   *
+   * 동작:
+   *  - focusBodyIdForAssert = null (focus tracking 해제)
+   *  - **setTier 미호출** — activeTier / floatingOrigin / mesh.scaling 등 모두 보존
+   *  - 카메라 alpha/beta/radius/target 도 호출자가 별도 변경하지 않으면 그대로 유지
+   *
+   * 사용: sim-canvas 의 freeFlyMode 진입 분기에서 호출 + camera-controller.clearFollow() 동반.
+   */
+  detachFocus: () => void;
+  /**
    * P11-B #289 — LOD override 설정. URL `?lod=high|mid|low` 는 전 body 강제, `'auto'` 는 거리 자동 판정 (기본).
    *
    * 런타임 1회 변경 전제 — 반복 호출도 허용되지만 매 updateAt 에서 즉시 반영.
@@ -312,6 +324,15 @@ export interface SolarSystemSceneOptions {
    * 현재는 단일 인자 시그니처 (Q3=C 비-범위 가드 — tier 변경 자체에 손대지 않음).
    */
   bodyScale?: (bodyId: string) => number;
+
+  /**
+   * #444 — tier transition 윈도우 (`runTierTransition` detachControl ~ cleanup) 에서 도달한
+   * 사용자 입력 (wheel/touchstart) 카운트 콜백. transition 종료 시점에 1회 호출 (count > 0 일 때만).
+   *
+   * 호출자 (sim-canvas / SimulationCore) 가 metrics 객체로 누적 → DevTools 노출
+   * (`window.__simCore.metrics.tierTransitionInputDrops`). G8b (input 큐잉) 격상 결정 데이터.
+   */
+  onTierTransitionInputAttempts?: (count: number) => void;
 }
 
 /**
@@ -335,6 +356,7 @@ export function createSolarSystemScene(
     integrator = 'velocity-verlet',
     ringRenderMode = 'shader',
     bodyScale = defaultBodyScale,
+    onTierTransitionInputAttempts,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -438,6 +460,9 @@ export function createSolarSystemScene(
     const batches: Vector3[][] = [];
     for (const body of system.bodies) {
       if (!body.orbit) continue;
+      // defense-in-depth #5 (이슈 #439): R-Phase 미진입 body 는 본체가 점 수준이라
+      // 궤도선만 그리면 시각 혼란. R_PHASE_BODY_ALLOWLIST SSoT 직접 참조 (BODY_SCALE 의존 역전 회피).
+      if (!(R_PHASE_BODY_ALLOWLIST as readonly string[]).includes(body.id)) continue;
       const pts = sampleOrbitPoints(body, activeTier);
       if (pts) batches.push(pts);
     }
@@ -672,6 +697,10 @@ export function createSolarSystemScene(
         onComplete: () => {
           tierTransitionInProgress = false;
         },
+        // #444 — tier transition 윈도우에서 도달한 사용자 입력 시도 횟수. G8b 격상 결정 데이터.
+        // 콜백은 transition 종료 시점에 1회 호출 (count > 0 일 때만). 호출자 (SimulationCore) 의
+        // metrics 객체로 누적 전달.
+        ...(onTierTransitionInputAttempts ? { onInputAttempts: onTierTransitionInputAttempts } : {}),
       });
     }
   };
@@ -744,7 +773,25 @@ export function createSolarSystemScene(
     focusBodyIdForAssert = bodyId;
   };
   // P12-A #298 — focus 해제 (reset) 시 tier 는 free-fly 경로로 전환.
+  //
+  // R-Phase #510 H6 fix — focus 해제는 **tier 까지 default 복원**해야 한다.
+  // 이전: focusBodyIdForAssert = null 만 → tier (focus 시 sub-tier) + origin (focus body 위치) 잔존.
+  // 잔존 상태에서 sim-canvas 가 controller.reset(35) Animation 시작하면 매 프레임
+  // updateTierByCamera 가 잘못된 tier 판정 → setTier 트리거 → tier-transition.ts:288-296 의
+  // stopAnimation 이 cam-reset-radius/target 까지 stop + computeTargetRadius(35, oldScale, newScale)
+  // 로 radius 폭증 (forensic 실측: 35 → 688,901 ≈ ×19,683).
+  //
+  // setTier(defaultInitialTier()) 호출은 내부에서 floatingOrigin.reset() (T1/T2 경로) 도 자동
+  // 동반하므로 origin 도 함께 복원. focus 진입 시 applyFocusTier + setFocusOrigin 의 대칭.
   const clearFocus = () => {
+    focusBodyIdForAssert = null;
+    setTier(defaultInitialTier());
+  };
+
+  // #509 — 자유시점 진입. focus tracking 만 해제 (tier/origin 보존).
+  // clearFocus 와 분리된 이유는 free-fly UX 가 "현재 시점 그대로 자유 탐색" 의도이므로
+  // tier/origin 까지 default 복원하면 사용자 시점이 깨짐 (예: venus 가까이 → 갑자기 solar 뷰).
+  const detachFocus = () => {
     focusBodyIdForAssert = null;
   };
 
@@ -1369,6 +1416,7 @@ export function createSolarSystemScene(
     setFocusOrigin,
     applyFocusTier,
     clearFocus,
+    detachFocus,
     setLodOverride,
     getLodStats,
     getLodInfo,

@@ -5,6 +5,7 @@ import {
   Vector3,
   type ArcRotateCamera,
   type Mesh,
+  type Observer,
   type Scene,
 } from '@babylonjs/core';
 
@@ -52,12 +53,57 @@ export class CameraController {
   #scene: Scene;
   #easing: EasingFunction;
 
+  /**
+   * R-Phase #507 — focus body 추적 observer.
+   *
+   * 회귀: mercury focus 는 정상 추적 (activeTier='body' → primary follow 활성),
+   * venus focus 는 mesh 가 공전해도 카메라 target 고정 (activeTier='inner' → primary follow skip).
+   *
+   * 본 observer 는 scene 측 tier 정책 (T1/T2 origin reset) 과 직교하게 카메라 책임으로 추적:
+   * focus 진입 시 매 프레임 `camera.target.copyFrom(mesh.absolutePosition)`. tier 무관.
+   *
+   * 라이프사이클:
+   *  - focusOn() Animation 종료 (onAnimationEnd) 후 attach — Animation 도중 target 덮어쓰기 race 회피
+   *  - 새 focusOn() / reset() / dispose() 호출 시 detach
+   *  - 변화 없는 frame 은 copyFrom 자체가 cheap (3 float 복사) — perf 영향 무시 가능
+   */
+  #followObserver: Observer<Scene> | null = null;
+
   constructor(camera: ArcRotateCamera, scene: Scene) {
     this.camera = camera;
     this.#scene = scene;
     const easing = new ExponentialEase();
     easing.setEasingMode(EasingFunction.EASINGMODE_EASEOUT);
     this.#easing = easing;
+  }
+
+  #detachFollow(): void {
+    if (this.#followObserver) {
+      this.#scene.onBeforeRenderObservable.remove(this.#followObserver);
+      this.#followObserver = null;
+    }
+  }
+
+  /**
+   * #509 — follow observer 외부 해제 (free-fly 진입 경로 전용).
+   *
+   * `reset()` 은 follow detach + Animation 동반이지만 free-fly 는 시점 유지 필수 →
+   * Animation 없이 follow 만 해제하는 public 진입점. 호출자 책임으로 한 번만 호출.
+   */
+  clearFollow(): void {
+    this.#detachFollow();
+  }
+
+  #attachFollow(mesh: Mesh): void {
+    this.#detachFollow();
+    this.#followObserver = this.#scene.onBeforeRenderObservable.add(() => {
+      // mesh 가 dispose 됐거나 scene 에서 제거됐으면 detach (스크럽 안전)
+      if (mesh.isDisposed()) {
+        this.#detachFollow();
+        return;
+      }
+      this.camera.target.copyFrom(mesh.absolutePosition);
+    });
   }
 
   /**
@@ -97,6 +143,10 @@ export class CameraController {
 
     const targetPos = mesh.absolutePosition.clone();
 
+    // R-Phase #507 — 새 focus 진입 시 기존 follow observer detach. Animation 도중 race 방지 +
+    // 이전 mesh 가 dispose 되지 않은 채 attach 잔존하는 경로 차단.
+    this.#detachFollow();
+
     // 현재 target → 새 target으로 애니메이션 (camera.target)
     Animation.CreateAndStartAnimation(
       'cam-target',
@@ -108,6 +158,12 @@ export class CameraController {
       targetPos,
       Animation.ANIMATIONLOOPMODE_CONSTANT,
       this.#easing,
+      () => {
+        // R-Phase #507 — onAnimationEnd: Animation 종료 후 follow observer attach.
+        // Animation 도중 attach 하면 매 프레임 target.copyFrom 이 Animation 보간값을 덮어써
+        // 부드러운 진입 효과 손실. 종료 후 attach 로 race 0.
+        this.#attachFollow(mesh);
+      },
     );
 
     // 반지름 애니메이션
@@ -122,13 +178,14 @@ export class CameraController {
       Animation.ANIMATIONLOOPMODE_CONSTANT,
       this.#easing,
     );
-
-    // 대상이 움직이는 천체라면 매 프레임 target 추적 — 단순화: 한 번만 애니메이션
-    // C6 다음 단계(D6/D7 UI)에서 실시간 추적 필요 시 observer 등록 예정.
   }
 
   /** 카메라 reset — 기본 위치로 복귀 */
   reset(targetRadius = 35, target: Vector3 = Vector3.Zero()): void {
+    // R-Phase #507 — focus 해제 시 follow observer detach. observer 잔존 시 Animation 의
+    // target=(0,0,0) 을 매 프레임 mesh 위치로 덮어써 reset 자체가 무효화됨.
+    this.#detachFollow();
+
     Animation.CreateAndStartAnimation(
       'cam-reset-target',
       this.camera,
@@ -154,6 +211,7 @@ export class CameraController {
   }
 
   dispose(): void {
+    this.#detachFollow();
     this.#scene.stopAllAnimations();
   }
 }
