@@ -28,20 +28,24 @@ beforeEach(() => {
 });
 
 /**
- * R2 #361 — FocusQuickButtons 단위 테스트.
+ * R2 #361 / R3 #369 — FocusQuickButtons 단위 테스트.
  *
- * D-S1 (shortcut bar 수성 항목 추가) 검증:
- *   1. 5 body 버튼 (sun / mercury / earth / jupiter / neptune) + reset 버튼 렌더
- *   2. mercury 클릭 시 focusOn 명령 발행 (R1 패턴 재사용)
- *   3. 천체 거리 순서 (sun → mercury → earth → ...) 보존
+ * D-S1 (shortcut bar 수성/금성 항목 추가) 검증:
+ *   1. 6 body 버튼 (sun / mercury / venus / earth / jupiter / neptune) + reset 버튼 렌더
+ *   2. mercury / venus 클릭 시 focusOn 명령 발행 (R1 패턴 재사용)
+ *   3. 천체 거리 순서 (sun → mercury → venus → earth → ...) 보존
  *
- * ADR: docs/decisions/20260428-r2-mercury-visualization.md §결정 2
+ * ADR: docs/decisions/20260428-r2-mercury-visualization.md §결정 2 +
+ *       docs/decisions/20260429-r3-venus-visualization.md §결정
+ *
+ * #416 — R2/R3 활성 케이스 describe 제목 + venus 명시 단언 1개 보강 (PR #414 reviewer 권고 4).
  */
-describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
-  it('5 body 버튼 + reset 렌더 (R1 4 + R2 mercury 1)', () => {
+describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus', () => {
+  it('6 body 버튼 + reset 렌더 (R1 sun + R2 mercury + R3 venus + R4~R10 placeholder)', () => {
     render(<FocusQuickButtons />);
     expect(screen.getByTestId('focus-sun')).toBeInTheDocument();
     expect(screen.getByTestId('focus-mercury')).toBeInTheDocument();
+    expect(screen.getByTestId('focus-venus')).toBeInTheDocument();
     expect(screen.getByTestId('focus-earth')).toBeInTheDocument();
     expect(screen.getByTestId('focus-jupiter')).toBeInTheDocument();
     expect(screen.getByTestId('focus-neptune')).toBeInTheDocument();
@@ -57,6 +61,18 @@ describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
     render(<FocusQuickButtons />);
     fireEvent.click(screen.getByTestId('focus-mercury'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'mercury' });
+  });
+
+  // #416 — R3 venus 명시 단언 (PR #414 reviewer 권고 4 — R2/R3 활성 케이스 의미 정합성).
+  it('venus 클릭 시 focusOn 명령 발행 (R3 #369 진입 검증)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-venus'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'venus' });
+  });
+
+  it('venus 버튼 텍스트 = "금성" (한국어 라벨, axe 자연 라벨)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-venus')).toHaveTextContent('금성');
   });
 
   it('sun 클릭 시 focusOn 명령 발행 (R1 회귀 0)', () => {
@@ -79,11 +95,12 @@ describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
     expect(btn.className).toContain('bg-primary/20');
   });
 
-  it('sun 다음 위치에 mercury (천체 거리 순서 보존)', () => {
+  it('sun → mercury → venus → earth → jupiter → neptune 거리 순서 보존 (R3 venus 포함)', () => {
     render(<FocusQuickButtons />);
     const buttons = [
       screen.getByTestId('focus-sun'),
       screen.getByTestId('focus-mercury'),
+      screen.getByTestId('focus-venus'),
       screen.getByTestId('focus-earth'),
       screen.getByTestId('focus-jupiter'),
       screen.getByTestId('focus-neptune'),
@@ -94,7 +111,7 @@ describe('FocusQuickButtons — R1 sun + R2 mercury', () => {
     for (let i = 0; i < buttons.length - 1; i++) {
       const current = buttons[i];
       const next = buttons[i + 1];
-      if (!current || !next) throw new Error('button index OOB — 5 body 보장 위배');
+      if (!current || !next) throw new Error('button index OOB — 6 body 보장 위배');
       expect(current.compareDocumentPosition(next)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     }
   });
