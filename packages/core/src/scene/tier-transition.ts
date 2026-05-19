@@ -201,6 +201,14 @@ export interface TierTransitionOptions {
    * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 2 (i) 채택.
    */
   onComplete?: () => void;
+  /**
+   * #444 — tier transition 윈도우 (detachControl ~ cleanup) 에서 도달한 사용자 입력 (wheel/touchstart)
+   * 개수. G8a (input lock) 의 UX 비용 정량화 — 일정 운영 후 분포 관찰 → G8b (큐잉) 격상 결정 데이터.
+   *
+   * 본 콜백은 transition 종료 시점에 1회 호출되며, `count` 는 해당 transition 윈도우 내 발생한 시도 횟수.
+   * 카운트 0 이면 호출 안 함 (호출자 누적 부담 최소화).
+   */
+  onInputAttempts?: (count: number) => void;
 }
 
 /**
@@ -219,6 +227,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     durationMs = 300,
     lockMs = 500,
     onComplete,
+    onInputAttempts,
   } = opts;
 
   // 가드 G8a (#380 G8 fix) — transition 결정 직후 detachControl 즉시 발동 (defense-in-depth).
@@ -235,6 +244,16 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   // copyFrom / pending tween 취소 등 수 ms 작업 사이 wheel/pinch race 윈도우 존재. 본 가드는
   // 이 윈도우를 **0 ms 로 축소** — runTierTransition 진입 즉시 입력 차단.
   scene.detachControl();
+
+  // #444 — 입력 시도 카운트. transition 윈도우 (detachControl ~ cleanup) 에서 도달한 wheel/touchstart
+  // 이벤트 개수. capture phase + passive (스크롤 차단 안 함). cleanup 시 removeEventListener.
+  let inputAttempts = 0;
+  const onInputAttempt = () => {
+    inputAttempts += 1;
+  };
+  const doc: Document | undefined = typeof document !== 'undefined' ? document : undefined;
+  doc?.addEventListener('wheel', onInputAttempt, { capture: true, passive: true });
+  doc?.addEventListener('touchstart', onInputAttempt, { capture: true, passive: true });
 
   const radiusOld = camera.radius;
   // focusMesh 가 있으면 V5 달성 공식 (boundingRadius × 5) 사용. setTier 시점에 scaling 이 이미 newScale
@@ -313,6 +332,16 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   const releaseControl = () => {
     if (released) return;
     released = true;
+    // #444 — 입력 시도 listener 해제 + 콜백. released 플래그 안에 있어 정확히 1회.
+    doc?.removeEventListener('wheel', onInputAttempt, { capture: true });
+    doc?.removeEventListener('touchstart', onInputAttempt, { capture: true });
+    if (inputAttempts > 0 && onInputAttempts) {
+      try {
+        onInputAttempts(inputAttempts);
+      } catch {
+        // 호출자 콜백 throw 해도 transition lifecycle 보존.
+      }
+    }
     // attachControl 은 idempotent 하지만 scene 이 dispose 된 edge case 대비 try 감싸기.
     try {
       scene.attachControl();
@@ -341,7 +370,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   //     하고 다른 쪽은 idempotent 로 흡수. 탭 즉시 복귀 시 fallback 을 기다리지 않고 attach 를
   //     앞당기는 효과도 겸함 (UX jitter 최소화).
   //     document 는 브라우저 환경 only — SSR / jsdom 환경에선 globalThis.document 가 없거나 제한.
-  const doc: Document | undefined = typeof document !== 'undefined' ? document : undefined;
+  // #444 — `doc` 는 위 입력 시도 listener 등록 단계에서 이미 선언됨 (재선언 금지).
   const onVisibilityChange = () => {
     if (doc && !doc.hidden) {
       releaseControl();

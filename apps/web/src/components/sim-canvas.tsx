@@ -249,6 +249,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // R1 #329 — body 별 시각 과장 배수 주입 (DI). 현재 `sun = 75` 만 정의됨.
           // ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3.
           bodyScale: getBodyScale,
+          // #444 — tier transition 윈도우 사용자 입력 시도 카운트. SimulationCore.metrics 누적.
+          // DevTools: `__simCore.metrics.tierTransitionInputDrops`. G8b 격상 결정 데이터.
+          onTierTransitionInputAttempts: (count) => {
+            instance.metrics.tierTransitionInputDrops += count;
+          },
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.

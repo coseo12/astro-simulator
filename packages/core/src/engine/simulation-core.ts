@@ -38,6 +38,18 @@ export class SimulationCore {
   // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
   #instrumentation: EngineInstrumentation | null = null;
 
+  /**
+   * #444 — 운영 계측 메트릭. tier transition 윈도우에서 사용자 입력 시도 카운트 등.
+   *
+   * G8b (input 큐잉) 격상 결정 데이터 — 일정 운영 후 분포 관찰 → 평균 drop/분/사용자가
+   * 임계 이상이면 G8b 도입 정당화. 본 카운터는 누적 (페이지 reload 시 0 으로 리셋).
+   *
+   * 접근: `window.__simCore.metrics.tierTransitionInputDrops`.
+   */
+  readonly metrics = {
+    tierTransitionInputDrops: 0,
+  };
+
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
     this.#time = new TimeController(J2000_JD, 86_400);
