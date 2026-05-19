@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CelestialTree } from '../panels/celestial-tree';
 import { CelestialInfoPanel } from '../panels/celestial-info-panel';
 import { ScenarioPresets } from '../panels/scenario-presets';
-import { BlackHoleDiskPanel } from '../panels/black-hole-disk-panel';
 import { SatelliteInfoPanel } from '../panels/satellite-info-panel';
 import { GALILEAN_IDS, useOsculatingSync } from '@/hooks/use-osculating-sync';
 
@@ -46,9 +45,6 @@ export function SidePanels() {
             </div>
             <div className="mt-4 pt-3 border-t border-border-subtle">
               <SatelliteInfoPanel satellites={GALILEAN_IDS} oscElements={osc.elements} />
-            </div>
-            <div className="mt-4 pt-3 border-t border-border-subtle">
-              <BlackHoleDiskPanel />
             </div>
           </motion.aside>
         </>

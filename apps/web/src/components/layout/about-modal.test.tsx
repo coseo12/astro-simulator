@@ -24,12 +24,13 @@ describe('AboutModal (P10-C-3 #278 / P12-C #298 — 단일 모드)', () => {
     expect(sources).toHaveTextContent('NASA JPL Horizons');
   });
 
-  it('스케일 정책 — 단일 모드 3단 tier 설명 포함', () => {
+  it('스케일 정책 — v3 incremental build + 3단 tier 설명 포함', () => {
     render(<AboutModal />);
     fireEvent.click(screen.getByTestId('about-button'));
     const modal = screen.getByTestId('about-modal');
-    // P12-C #298 — 단일 모드: 과장 요약 섹션 제거, 상대 비율 = IAU 실측 고정 설명
-    expect(modal).toHaveTextContent('IAU 2015 실측');
+    // #405 — P12-C fact-first 폐기 후 Roadmap v3 incremental build 정책 박제
+    expect(modal).toHaveTextContent('Roadmap v3');
+    expect(modal).toHaveTextContent('R-Phase');
     expect(modal).toHaveTextContent('Solar');
     expect(modal).toHaveTextContent('Inner');
     expect(modal).toHaveTextContent('Body');
