@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-05-19T13:58:19.204Z",
+  "environment": "playwright-chromium-headless",
+  "cpuSlowdown": 4,
+  "sampleMs": 5000,
+  "thresholds": {
+    "fpsMin": 24,
+    "p95FrameMsMax": 60
+  },
+  "scenarios": [
+    {
+      "name": "idle-throttled",
+      "fps": 66.11,
+      "frames": 331,
+      "p50FrameMs": 15,
+      "p95FrameMs": 16.7,
+      "maxFrameMs": 17.8
+    },
+    {
+      "name": "focus-mercury-throttled",
+      "fps": 55.86,
+      "frames": 280,
+      "p50FrameMs": 17.8,
+      "p95FrameMs": 19.5,
+      "maxFrameMs": 24.2
+    },
+    {
+      "name": "post-zoom-cycles-throttled",
+      "fps": 55.57,
+      "frames": 278,
+      "p50FrameMs": 18,
+      "p95FrameMs": 19.4,
+      "maxFrameMs": 21
+    },
+    {
+      "name": "post-reset-throttled",
+      "fps": 55.95,
+      "frames": 280,
+      "p50FrameMs": 17.9,
+      "p95FrameMs": 19.2,
+      "maxFrameMs": 26.3
+    }
+  ],
+  "passed": true,
+  "failures": []
+}
