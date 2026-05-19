@@ -1,11 +1,13 @@
 'use client';
 
 import { ephemeris as ephemerisApi } from '@astro-simulator/core';
+// #386 — TypeScript 5 권고 `import type` 분리 (consistent-type-imports). type-only import 는
+// SSR prerender 시 runtime wasm 로드 시도를 차단 (기존 `typeof import(...)` 패턴과 동일 의도).
+import type { physics as physicsApi } from '@astro-simulator/core';
 import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import { useEffect, useRef, useState } from 'react';
 
-// 동적 import 결과 타입 참조용 — top-level import 하면 SSR prerender 시 wasm 로드 시도하므로 type-only.
-type ExtractFn = typeof import('@astro-simulator/core').physics.extractOsculatingElements;
+type ExtractFn = typeof physicsApi.extractOsculatingElements;
 
 /**
  * P9 #254 D7 — Galilean 위성 Osculating 원소 1Hz polling 훅.
@@ -298,7 +300,7 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
       if (timerId !== null) clearTimeout(timerId);
     };
     // observedFps 는 ref 로 참조 → 의존성 배열 제외 (매 frame 재실행 방지).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [enabled, baseInterval]);
 
   return { elements, currentIntervalMs, observedFps };
