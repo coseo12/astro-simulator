@@ -72,6 +72,16 @@ export interface SimStoreState {
   mode: SimMode;
   julianDate: number | null;
   selectedBodyId: string | null;
+  /**
+   * #509 — 자유시점 (free-fly) 모드. focus 해제 시 'reset' (sun 중심 복귀) vs 'free-fly' (시점 유지) 구분.
+   *
+   * 전이:
+   *  - focus 진입 (selectedBodyId !== null) → 자동 false
+   *  - resetCamera 경로 → false (sun 중심)
+   *  - enterFreeFly 경로 → true (시점 유지)
+   * subscribe 측은 `selectedBodyId === null && freeFlyMode === true` 분기에서 detachFocus + clearFollow.
+   */
+  freeFlyMode: boolean;
   timeScale: number;
   fps: number | null;
   unitSystem: UnitSystem;
@@ -111,6 +121,8 @@ export interface SimStoreState {
   setMode: (mode: SimMode) => void;
   setTime: (julianDate: number) => void;
   setSelectedBody: (id: string | null) => void;
+  /** #509 — 자유시점 진입 시 호출. selectedBodyId=null + freeFlyMode=true 동시 set. */
+  enterFreeFly: () => void;
   setTimeScale: (scale: number) => void;
   setFps: (fps: number) => void;
   setUnitSystem: (unit: UnitSystem) => void;
@@ -160,6 +172,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   mode: 'observe',
   julianDate: null,
   selectedBodyId: null,
+  freeFlyMode: false,
   timeScale: 86_400,
   fps: null,
   unitSystem: 'astro',
@@ -189,7 +202,11 @@ export const useSimStore = create<SimStoreState>((set) => ({
     }),
   setMode: (mode) => set({ mode }),
   setTime: (julianDate) => set({ julianDate }),
-  setSelectedBody: (id) => set({ selectedBodyId: id }),
+  setSelectedBody: (id) =>
+    // #509 — focus 진입 시 freeFlyMode 자동 해제. resetCamera 경로 (id=null) 도 freeFlyMode=false.
+    // enterFreeFly 경로는 별도 action 으로 freeFlyMode=true 명시.
+    set({ selectedBodyId: id, freeFlyMode: false }),
+  enterFreeFly: () => set({ selectedBodyId: null, freeFlyMode: true }),
   setTimeScale: (scale) => set({ timeScale: scale }),
   setFps: (fps) => set({ fps }),
   setUnitSystem: (unit) => set({ unitSystem: unit }),

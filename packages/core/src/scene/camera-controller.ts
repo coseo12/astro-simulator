@@ -84,6 +84,16 @@ export class CameraController {
     }
   }
 
+  /**
+   * #509 — follow observer 외부 해제 (free-fly 진입 경로 전용).
+   *
+   * `reset()` 은 follow detach + Animation 동반이지만 free-fly 는 시점 유지 필수 →
+   * Animation 없이 follow 만 해제하는 public 진입점. 호출자 책임으로 한 번만 호출.
+   */
+  clearFollow(): void {
+    this.#detachFollow();
+  }
+
   #attachFollow(mesh: Mesh): void {
     this.#detachFollow();
     this.#followObserver = this.#scene.onBeforeRenderObservable.add(() => {

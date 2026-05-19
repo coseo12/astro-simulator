@@ -203,6 +203,17 @@ export interface SolarSystemSceneHandles {
    */
   clearFocus: () => void;
   /**
+   * #509 — 자유시점 (free-fly) 진입. `clearFocus` 와 달리 **tier/origin 을 유지**한다.
+   *
+   * 동작:
+   *  - focusBodyIdForAssert = null (focus tracking 해제)
+   *  - **setTier 미호출** — activeTier / floatingOrigin / mesh.scaling 등 모두 보존
+   *  - 카메라 alpha/beta/radius/target 도 호출자가 별도 변경하지 않으면 그대로 유지
+   *
+   * 사용: sim-canvas 의 freeFlyMode 진입 분기에서 호출 + camera-controller.clearFollow() 동반.
+   */
+  detachFocus: () => void;
+  /**
    * P11-B #289 — LOD override 설정. URL `?lod=high|mid|low` 는 전 body 강제, `'auto'` 는 거리 자동 판정 (기본).
    *
    * 런타임 1회 변경 전제 — 반복 호출도 허용되지만 매 updateAt 에서 즉시 반영.
@@ -761,6 +772,13 @@ export function createSolarSystemScene(
   const clearFocus = () => {
     focusBodyIdForAssert = null;
     setTier(defaultInitialTier());
+  };
+
+  // #509 — 자유시점 진입. focus tracking 만 해제 (tier/origin 보존).
+  // clearFocus 와 분리된 이유는 free-fly UX 가 "현재 시점 그대로 자유 탐색" 의도이므로
+  // tier/origin 까지 default 복원하면 사용자 시점이 깨짐 (예: venus 가까이 → 갑자기 solar 뷰).
+  const detachFocus = () => {
+    focusBodyIdForAssert = null;
   };
 
   // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
@@ -1384,6 +1402,7 @@ export function createSolarSystemScene(
     setFocusOrigin,
     applyFocusTier,
     clearFocus,
+    detachFocus,
     setLodOverride,
     getLodStats,
     getLodInfo,
