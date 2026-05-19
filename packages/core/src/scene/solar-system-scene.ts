@@ -324,6 +324,15 @@ export interface SolarSystemSceneOptions {
    * 현재는 단일 인자 시그니처 (Q3=C 비-범위 가드 — tier 변경 자체에 손대지 않음).
    */
   bodyScale?: (bodyId: string) => number;
+
+  /**
+   * #444 — tier transition 윈도우 (`runTierTransition` detachControl ~ cleanup) 에서 도달한
+   * 사용자 입력 (wheel/touchstart) 카운트 콜백. transition 종료 시점에 1회 호출 (count > 0 일 때만).
+   *
+   * 호출자 (sim-canvas / SimulationCore) 가 metrics 객체로 누적 → DevTools 노출
+   * (`window.__simCore.metrics.tierTransitionInputDrops`). G8b (input 큐잉) 격상 결정 데이터.
+   */
+  onTierTransitionInputAttempts?: (count: number) => void;
 }
 
 /**
@@ -347,6 +356,7 @@ export function createSolarSystemScene(
     integrator = 'velocity-verlet',
     ringRenderMode = 'shader',
     bodyScale = defaultBodyScale,
+    onTierTransitionInputAttempts,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -687,6 +697,10 @@ export function createSolarSystemScene(
         onComplete: () => {
           tierTransitionInProgress = false;
         },
+        // #444 — tier transition 윈도우에서 도달한 사용자 입력 시도 횟수. G8b 격상 결정 데이터.
+        // 콜백은 transition 종료 시점에 1회 호출 (count > 0 일 때만). 호출자 (SimulationCore) 의
+        // metrics 객체로 누적 전달.
+        ...(onTierTransitionInputAttempts ? { onInputAttempts: onTierTransitionInputAttempts } : {}),
       });
     }
   };
