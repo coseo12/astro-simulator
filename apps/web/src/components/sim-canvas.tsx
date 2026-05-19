@@ -51,7 +51,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       const wantsGpu = requested === 'webgpu' || requested === 'auto';
       if (!cap.webgpu) {
         // 항상 경고: 향후 P3-A/B 활성화 시 진단에 도움.
-        // eslint-disable-next-line no-console
+         
         console.warn('[gpu] WebGPU 미지원:', cap.reason);
         if (wantsGpu) {
           useSimStore.getState().setEngineNotice({
