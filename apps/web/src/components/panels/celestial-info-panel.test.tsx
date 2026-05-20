@@ -22,15 +22,16 @@ beforeEach(() => {
  * #403 — CelestialInfoPanel R-Phase Allowlist 가드 단위 테스트 (defense-in-depth UI 측면 2번째 축).
  *
  * ADR `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §InfoPanel UI 가드 박제 패턴.
+ * R4 #532 — earth + moon 진입 (Allowlist 5개 활성).
  *
  * 검증:
  *  - selectedBodyId === null: info-panel-empty 렌더 (기존 분기 회귀 0)
- *  - R-Phase 박제 body (sun / mercury / venus): info-panel 정상 분기 렌더
- *  - R-Phase 미박제 body (earth / jupiter / neptune): info-panel-r-phase-blocked 분기 렌더
+ *  - R-Phase 박제 body (sun / mercury / venus / earth / moon): info-panel 정상 분기 렌더
+ *  - R-Phase 미박제 body (jupiter / neptune): info-panel-r-phase-blocked 분기 렌더
  *  - R-Phase 차단 분기는 body 이름 포함 + R-Phase 메시지 박제
  *  - 분기 위치 — 정상 분기 *이전* (selected/data 존재 후 R-Phase 검사)
  */
-describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403)', () => {
+describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () => {
   it('selectedBodyId === null: info-panel-empty 렌더 (기존 분기 회귀 가드)', () => {
     render(<CelestialInfoPanel />);
     expect(screen.getByTestId('info-panel-empty')).toBeInTheDocument();
@@ -59,11 +60,18 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403)', () => {
     expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
   });
 
-  it('selectedBodyId === "earth": info-panel-r-phase-blocked 분기 렌더', () => {
+  it('selectedBodyId === "earth": info-panel 정상 분기 렌더 (R4 #532 진입)', () => {
     useSimStore.setState({ selectedBodyId: 'earth' });
     render(<CelestialInfoPanel />);
-    expect(screen.getByTestId('info-panel-r-phase-blocked')).toBeInTheDocument();
-    expect(screen.queryByTestId('info-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
+  });
+
+  it('selectedBodyId === "moon": info-panel 정상 분기 렌더 (R4 #532 satellite 첫 본 사례)', () => {
+    useSimStore.setState({ selectedBodyId: 'moon' });
+    render(<CelestialInfoPanel />);
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
   });
 
   it('selectedBodyId === "jupiter": info-panel-r-phase-blocked 분기 렌더', () => {
@@ -80,26 +88,26 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403)', () => {
     expect(screen.queryByTestId('info-panel')).not.toBeInTheDocument();
   });
 
-  it('차단 분기는 body 이름 (지구) 포함 — 사용자 인지 우수', () => {
-    useSimStore.setState({ selectedBodyId: 'earth' });
+  it('차단 분기는 body 이름 (목성) 포함 — 사용자 인지 우수', () => {
+    useSimStore.setState({ selectedBodyId: 'jupiter' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
-    expect(blocked.textContent ?? '').toMatch(/지구/);
+    expect(blocked.textContent ?? '').toMatch(/목성/);
   });
 
   it('차단 분기는 R-Phase 메시지 박제', () => {
-    useSimStore.setState({ selectedBodyId: 'earth' });
+    useSimStore.setState({ selectedBodyId: 'jupiter' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
     expect(blocked.textContent ?? '').toMatch(/R-Phase/);
   });
 
-  it('차단 분기는 body 별 이름이 정확히 박제 (mercury 외 venus 회귀 0)', () => {
-    useSimStore.setState({ selectedBodyId: 'jupiter' });
+  it('차단 분기는 body 별 이름이 정확히 박제 (jupiter / neptune 회귀 0)', () => {
+    useSimStore.setState({ selectedBodyId: 'neptune' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
-    expect(blocked.textContent ?? '').toMatch(/목성/);
-    expect(blocked.textContent ?? '').not.toMatch(/지구/);
+    expect(blocked.textContent ?? '').toMatch(/해왕성/);
+    expect(blocked.textContent ?? '').not.toMatch(/목성/);
   });
 
   it('알 수 없는 body id (data 없음): info-panel-empty 폴백 (R-Phase 분기 미진입)', () => {

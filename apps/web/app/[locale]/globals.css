@@ -63,6 +63,7 @@
   --text-body: 0.9375rem;
   --text-body-sm: 0.8125rem;
   --text-caption: 0.6875rem;
+  --text-mini: 0.625rem; /* R4 #532 — shortcut bar 모바일 너비 수용 (ADR §결정 5) */
 
   /* ----- Radius ----- */
   --radius-xs: 2px;
@@ -173,6 +174,7 @@
   --text-body: var(--text-body);
   --text-body-sm: var(--text-body-sm);
   --text-caption: var(--text-caption);
+  --text-mini: var(--text-mini);
 
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);

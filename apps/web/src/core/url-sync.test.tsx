@@ -10,12 +10,14 @@ import { useSimStore } from '@/store/sim-store';
  * ADR: docs/decisions/20260504-415-url-sync-guard.md §결정 1 (옵션 B) + §결정 4 (단위 테스트 매트릭스).
  *      docs/decisions/20260510-419-sim-canvas-mount-race.md §결정 3-2 (라운드 2 합의 DoD-4 보강).
  *
- * 검증 매트릭스:
+ * 검증 매트릭스 (R4 #532 — earth + moon 진입 후):
  *   1. ?focus=sun       → sendCommand({type:'focusOn',bodyId:'sun'}) 1회 (R1 정상 회귀 보호)
- *   2. ?focus=earth     → sendCommand(focusOn) 0회 + console.warn 1회 (R-Phase 미진입)
+ *   2. ?focus=jupiter   → sendCommand(focusOn) 0회 + console.warn 1회 (R-Phase 미진입)
  *   3. ?focus=invalid   → sendCommand(focusOn) 0회 + console.warn 1회 (알 수 없는 body id) — 기존 가드 회귀 보호
  *   4. ?focus=null      → sendCommand(focusOn) 0회 + console.warn 0회
  *   5. ?focus=sun → setSelectedBody 직접 호출 0회 (#419 race fallback 부재 검증)
+ *   6. ?focus=earth     → sendCommand({type:'focusOn',bodyId:'earth'}) 1회 (R4 #532 정상 진입)
+ *   7. ?focus=moon      → sendCommand({type:'focusOn',bodyId:'moon'}) 1회 (R4 #532 satellite 첫 본 사례)
  *
  * #419 §결정 3-2 변경점:
  *   - 케이스 1~3 (sun/mercury/venus) 의 selectedBodyId 단언 → sendCommand 호출 단언으로 격상
@@ -25,7 +27,7 @@ import { useSimStore } from '@/store/sim-store';
  *
  * cross-validate 보강 (§결정 4 보강):
  *   - vi.spyOn(console, 'warn') 단언 의무 — 진단 기능 dev 환경 작동 보장
- *   - 메시지 매칭: /R-Phase 미진입/ (earth) / /알 수 없는 body id/ (invalid)
+ *   - 메시지 매칭: /R-Phase 미진입/ (jupiter / neptune) / /알 수 없는 body id/ (invalid)
  *
  * mock 전략:
  *   - nuqs `useQueryState` 를 vi.mock 으로 가로채 [urlFocus, setter] 반환
@@ -131,20 +133,27 @@ describe('UrlSync — ?focus= R-Phase Allowlist 가드 (#415)', () => {
     expect(setSelectedBodySpy).not.toHaveBeenCalled();
   });
 
-  it('?focus=earth → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (가드 핵심)', () => {
+  it('?focus=earth → sendCommand({type:"focusOn",bodyId:"earth"}) 1회 (R4 #532 정상 진입)', () => {
     mockUrlFocus = 'earth';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     render(<UrlSync />);
 
-    expect(useSimStore.getState().selectedBodyId).toBeNull();
-    expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/R-Phase 미진입/);
-    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/sun, mercury, venus/);
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'earth' });
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('?focus=jupiter → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입)', () => {
+  it('?focus=moon → sendCommand({type:"focusOn",bodyId:"moon"}) 1회 (R4 #532 satellite 첫 본 사례)', () => {
+    mockUrlFocus = 'moon';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<UrlSync />);
+
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'moon' });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('?focus=jupiter → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (가드 핵심)', () => {
     mockUrlFocus = 'jupiter';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -154,6 +163,8 @@ describe('UrlSync — ?focus= R-Phase Allowlist 가드 (#415)', () => {
     expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0]?.[0]).toMatch(/R-Phase 미진입/);
+    // R4 #532 — allowlist 메시지가 sun/mercury/venus/earth/moon 포함
+    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/sun, mercury, venus, earth, moon/);
   });
 
   it('?focus=neptune → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입)', () => {

@@ -20,13 +20,15 @@
  *
  * `--measure-px-ratio` 명세 (#373 ADR `20260430-r3-followup-body-proportion.md` §결정 2 §5
  *  Amendment 2026-05-03 라운드 3 D-1 박제값 임계 갱신, ±5% 마진 정책 보존):
- *   - 측정 기준: sun mesh px diameter 를 100% 로 정규화. mercury/venus/(R4+) 의 px 비 산출
+ *   - 측정 기준: sun mesh px diameter 를 100% 로 정규화. mercury/venus/earth/moon/(R5+) 의 px 비 산출
  *   - 측정 viewport: 1280×720 (default) / 1920×1080 (보조) / 375×667 (모바일)
  *   - 진입 URL: ?gpu=a 강제 (volt #77 false positive 가드)
- *   - body 별 임계 (라운드 3 박제값 sun=50/mercury=700/venus=800 통과 목표):
+ *   - body 별 임계 (라운드 3 박제값 sun=50/mercury=700/venus=800 + R4 #532 박제값 earth=800/moon=800 통과 목표):
  *       mercury sun 대비 px 비 ≤ 4.95% (라운드 2 6% → 라운드 3 4.95%)
  *       venus   sun 대비 px 비 ≤ 14.26% (라운드 2 11% → 라운드 3 14.26%)
- *   - 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산, 라운드 3 D-1 예측 16.75%)
+ *       earth   sun 대비 px 비 ≤ 15% (R4 #532 — Q2=B SSoT 첫 본 인스턴스화)
+ *       moon    sun 대비 px 비 ≤ 4.5% (R4 #532 — satellite 첫 본 사례)
+ *   - 모바일 누적 disk area ≤ 25% (sun + mercury + venus + earth + moon 합산, R4 예측 ≈ 8.72%)
  *   - 박제값 ± 5% 측정 노이즈 마진 (forensic ADR §"D-T2 px 비 예측" SSoT)
  *   - 출력: JSON `pxRatios` / `diskAreas` / `guardResult` 필드
  */
@@ -58,21 +60,28 @@ const flags = {
 };
 
 /**
- * #373 ADR §결정 2 §5 Amendment 2026-05-03 라운드 3 D-1 — body 별 임계값 SSoT.
+ * #373 ADR §결정 2 §5 Amendment 2026-05-03 라운드 3 D-1 + R4 #532 — body 별 임계값 SSoT.
  *
  * px 비 = body px diameter / sun px diameter × 100. 박제값 ± 5% 측정 노이즈 마진 (forensic ADR
- * §"D-T2 px 비 예측" SSoT, 라운드 3 박제값 sun=50/mercury=700/venus=800 의 ±5% 마진 정책 보존).
- * 모바일 누적 disk area ≤ 25% (sun + mercury + venus 합산, 라운드 3 D-1 예측 16.75%).
+ * §"D-T2 px 비 예측" SSoT). R4 earth/moon 은 Q2=B SSoT 첫 본 인스턴스화 — ADR §결정 3 박제값
+ * (earth ≤ 15% / moon ≤ 4.5%) 그대로 적용. 모바일 누적 disk area ≤ 25%
+ * (sun + mercury + venus + earth + moon 합산, R4 예측 ≈ 8.72%).
  *
- * 임계 산출 (architect ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 라운드 3):
+ * 임계 산출:
  *   - mercury: 예측 4.71% × 1.05 ≈ 4.95% (라운드 2 6% → 라운드 3 4.95%)
  *   - venus:   예측 13.58% × 1.05 ≈ 14.26% (라운드 2 11% → 라운드 3 14.26%)
+ *   - earth:   ADR §결정 3 박제 ≤ 15% (Q2=B 첫 본 인스턴스화, 예측 14.67% margin 0.33%)
+ *   - moon:    ADR §결정 3 박제 ≤ 4.5% (예측 3.99% margin 0.51%)
  *
- * R4+ body 추가 시 본 룩업에 1줄 추가만 — body-scale.ts 와 동일 SSoT 패턴.
+ * R5+ body 추가 시 본 룩업에 1줄 추가만 — body-scale.ts 와 동일 SSoT 패턴.
+ *
+ * ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 3
  */
 const PX_RATIO_THRESHOLDS = Object.freeze({
   mercury: 4.95,
   venus: 14.26,
+  earth: 15, // R4 #532 — Q2=B 첫 본 인스턴스화
+  moon: 4.5, // R4 #532 — satellite 첫 본 사례
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
@@ -152,7 +161,7 @@ async function measureBodyPxRatios(page) {
     /** @type {Record<string, any>} */
     const bodies = {};
     /** @type {string[]} */
-    const targetIds = ['sun', 'mercury', 'venus'];
+    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon'];
 
     /**
      * mesh world center 를 column-major Matrix.m 로 직접 NDC → 화면 좌표 변환.
@@ -440,7 +449,7 @@ async function runForViewport(browser, viewport) {
  * #373 ADR §결정 2 §5 Amendment 2026-05-01 라운드 2 — px ratio 측정 모드 전용 흐름.
  *
  * 통상 verify/update 흐름과 분리 — baseline 비교 / pixelmatch 미사용. body 별 px diameter +
- * sun 대비 비 + diskAreaRatio 산출 후 임계 가드 (mercury ≤ 6%, venus ≤ 11%, mobile cumulative ≤ 25%).
+ * sun 대비 비 + diskAreaRatio 산출 후 임계 가드 (PX_RATIO_THRESHOLDS 룩업, mobile cumulative ≤ 25%).
  *
  * `?gpu=a` 강제 진입 (volt #77 false positive 가드) — headless 의 swiftshader 가 default
  * tier-c (sun 1px) 로 fallback 하면 측정 자체 무효.
