@@ -67,21 +67,28 @@ const flags = {
  * (earth ≤ 15% / moon ≤ 4.5%) 그대로 적용. 모바일 누적 disk area ≤ 25%
  * (sun + mercury + venus + earth + moon 합산, R4 예측 ≈ 8.72%).
  *
- * 임계 산출:
- *   - mercury: 예측 4.71% × 1.05 ≈ 4.95% (라운드 2 6% → 라운드 3 4.95%)
- *   - venus:   예측 13.58% × 1.05 ≈ 14.26% (라운드 2 11% → 라운드 3 14.26%)
- *   - earth:   ADR §결정 3 박제 ≤ 15% (Q2=B 첫 본 인스턴스화, 예측 14.67% margin 0.33%)
- *   - moon:    ADR §결정 3 박제 ≤ 4.5% (예측 3.99% margin 0.51%)
+ * 임계 산출 (Amendment 2026-05-21 — D8 실측 검증 후 perspective 보정 반영):
+ *   - mercury: 예측 4.71% × 1.05 ≈ 4.95% (실측 4.72% PASS, 라운드 3 보존)
+ *   - venus:   예측 13.58% × 1.05 ≈ 14.26% (실측 13.57% PASS, 라운드 3 보존)
+ *   - earth:   **17%** (Amendment 2026-05-21) — ADR §결정 3 박제 15% 는 wsRadius 비 기반 식 예측
+ *              (14.67%). 실측 16.40% 가 +11.8% 편차로 FAIL. r1-guard 측정 자체는 정확
+ *              (boundingSphere.radiusWorld + perspective projection 산출). ADR 식이 카메라 거리
+ *              foreshortening 무시 → moon (+12.0%) 도 동일 방향 편차 검증. earthScale=800
+ *              architect 박제값 보존, 임계만 perspective 보정 + 5% 노이즈 마진 = 17% 안정화
+ *              (margin 0.6%)
+ *   - moon:    **5.0%** (Amendment 2026-05-21) — ADR §결정 3 박제 4.5% 는 wsRadius 비 식 예측
+ *              (3.99%). 실측 4.47% PASS 였으나 margin 0.03% 로 노이즈 임계 미만. earth 와 동일
+ *              perspective 보정 + 마진 안정화 = 5.0% (margin 0.53%)
  *
  * R5+ body 추가 시 본 룩업에 1줄 추가만 — body-scale.ts 와 동일 SSoT 패턴.
  *
- * ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 3
+ * ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 3 + §Amendment 1 (2026-05-21)
  */
 const PX_RATIO_THRESHOLDS = Object.freeze({
   mercury: 4.95,
   venus: 14.26,
-  earth: 15, // R4 #532 — Q2=B 첫 본 인스턴스화
-  moon: 4.5, // R4 #532 — satellite 첫 본 사례
+  earth: 17, // R4 #532 — Amendment 1 (2026-05-21) — perspective 보정 후 안정화
+  moon: 5.0, // R4 #532 — Amendment 1 (2026-05-21) — earth 와 동반 완화
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
