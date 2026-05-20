@@ -84,6 +84,8 @@ export function UrlSync() {
             `[url-sync] ?focus=${urlFocus} 는 알 수 없는 body id — 무시. 허용 id 예: sun / earth / jupiter / neptune.`,
           );
         }
+        // #418 — 무효 URL 파라미터 자동 제거 (replaceState). URL 일관성 보장 + 사용자 혼란 차단.
+        setUrlFocus(null);
       } else if (!isRPhaseFocusable(urlFocus)) {
         // R-Phase 미진입 body — store mutation 우회 차단.
         // sendCommand({type:'focusOn'}) 와 setSelectedBody 둘 다 skip
@@ -94,6 +96,11 @@ export function UrlSync() {
               `R_PHASE_BODY_ALLOWLIST: ${R_PHASE_BODY_ALLOWLIST.join(', ')}.`,
           );
         }
+        // #418 — R-Phase 미진입 body URL 진입 시 URL 자동 제거 (옵션 A).
+        // ADR `20260504-415-url-sync-guard.md` cross-validate Gemini 고유 발견 #1 후속.
+        // 시각적 변화 0 + URL 잔존으로 인한 "왜 동작 안 하지?" 혼란 차단.
+        // backward-compat 손실 없음 — 가드 거부된 URL 은 의미 없음.
+        setUrlFocus(null);
       } else {
         // 카메라 focus + store selectedBodyId sync (info-panel 표시 트리거).
         // #419 ADR `docs/decisions/20260510-419-sim-canvas-mount-race.md` §결정 2 (mount 순서 정합화 후 race fallback 제거).
