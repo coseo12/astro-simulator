@@ -256,6 +256,17 @@ export interface LodBodyInfo {
   screenCoverage: number;
   pxDiameter: number;
   cameraDistanceMeters: number;
+  /**
+   * #393 — low variant (billboard) 의 alpha mask 적용 여부.
+   *
+   * - `true`: pxDiameter ≥ 4 — alpha mask 적용 (원형 disc 인지)
+   * - `false`: pxDiameter < 4 — 4px fallback (사각형 quad, sub-pixel flickering 회피)
+   * - `null`: low variant 아직 lazy-create 안 됨 또는 level ≠ 'low'
+   *
+   * ADR [`20260502-391-phase2-billboard.md`](../../docs/decisions/20260502-391-phase2-billboard.md) §결정 §"4px fallback 분기".
+   * dev overlay 시각화 + 회귀 진단 용도.
+   */
+  billboardAlphaMask: boolean | null;
 }
 
 export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
@@ -1179,6 +1190,14 @@ export function createSolarSystemScene(
 
       // #388 — body 별 raw 데이터 박제. lodInfo 버퍼는 매 프레임 in-place 갱신 (객체 재할당 회피).
       // 시각 직경 추정 (pxDiameter) = coverage × 2 — screenCoverageRadius 가 반지름이므로 직경은 두 배.
+      //
+      // #393 — billboard alpha mask 상태 박제 (low variant 만 의미 있음, null 외 경우 dev overlay 표시).
+      // pxDiameter 와 shouldApplyBillboardAlphaMask 임계 (4px) 비교 결과를 즉시 노출 — 4px fallback
+      // 트리거 / mask 적용 / sphere 분기 모두 시각화 가능.
+      const billboardAlphaMask: boolean | null =
+        nextLevel === 'low' && lowVariants.has(body.id)
+          ? shouldApplyBillboardAlphaMask(pxDiameter)
+          : null;
       const existing = lodInfo[lodInfoIndex];
       if (existing) {
         existing.id = body.id;
@@ -1186,6 +1205,7 @@ export function createSolarSystemScene(
         existing.screenCoverage = coverage;
         existing.pxDiameter = pxDiameter;
         existing.cameraDistanceMeters = cameraDistanceMeters;
+        existing.billboardAlphaMask = billboardAlphaMask;
       } else {
         lodInfo.push({
           id: body.id,
@@ -1193,6 +1213,7 @@ export function createSolarSystemScene(
           screenCoverage: coverage,
           pxDiameter,
           cameraDistanceMeters,
+          billboardAlphaMask,
         });
       }
       lodInfoIndex += 1;
