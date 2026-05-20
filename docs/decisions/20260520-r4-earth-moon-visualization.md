@@ -1,6 +1,6 @@
 # ADR: R4 지구 + 달 시각화 — Q2=B 비례 결정 정책 SSoT 첫 본 인스턴스화
 
-- **상태**: Provisional (cross-validate 미통합 — `## 교차검증` 박제 직후 1회 루틴 대상, Accepted 전이는 본 PR 머지 후 cross-validate 결과 본문 통합 후)
+- **상태**: Accepted (cross-validate 2026-05-20 — Gemini "ADR 내용대로 진행 적극 권장" 합의, 고유 발견 3건 §교차검증 반영 사항 4 서브섹션 통합)
 - **날짜**: 2026-05-20
 - **결정자**: architect (#532 R4 PM 합의 라운드 1+2 후 위임)
 - **관련**: #532 (본 R4 스프린트), `20260425-r1-sun-visualization.md` (R1 SSoT — sunScale=50 + bodyScale 인프라), `20260428-r2-mercury-visualization.md` (R2 SSoT — mercuryScale=700, R-Phase ADR 패턴), `20260429-r3-venus-visualization.md` (R3 SSoT — venusScale=800, Concrete Prediction "≤ 2 라인" 첫 검증), `20260430-r3-followup-body-proportion.md` (**Q2=B 비례 결정 정책 SSoT** + Amendment 2026-05-01 라운드 1/2 + Amendment 2026-05-03 라운드 3), `20260504-r-phase-allowlist-guard.md` (R-Phase 진입 4곳 동시 박제 절차), `20260424-p11-b-lod-design.md` (LOD × scale 합성 순서), `20260422-floating-origin.md`, `docs/templates/forensic-adr-template.md` (forensic 변형 발동 시 참조)
@@ -451,9 +451,9 @@ moon orbit semiMajorAxis = 3.844e8 m (earth 중심 기준). renderScale=8.4e-11 
 
 ---
 
-## 결정 (Provisional)
+## 결정 (Accepted, cross-validate 2026-05-20)
 
-본 ADR 의 6가지 결정은 본 PR 머지 후 cross-validate 1회 결과 본문 통합 후 Accepted 전이 예정 (CLAUDE.md §ADR Status 워크플로 #370).
+본 ADR 의 6가지 결정은 cross-validate 1회 (Gemini 2.5 pro, 2026-05-20) 결과 본문 통합 후 Accepted 전이 완료 (CLAUDE.md §ADR Status 워크플로 #370). 상세 cross-validate 결과는 §교차검증 반영 사항 참조.
 
 ### 결정 1 — earthScale = 800 (축 1 후보 A)
 
@@ -652,22 +652,66 @@ const EXPECTED_DISABLED = ['jupiter', 'neptune'];
 - **폐기 프레이밍 ✓** — 기존 R1/R2/R3 박제값 (sunScale=50 / mercuryScale=700 / venusScale=800) 보존 명시. 폐기 없음
 - **순수주의 △** — earthScale=800 / moonScale=800 동일값이 "단순 정수" 사후 정당화 가능성. radius 비 (1.054, 0.272) 차이가 단순 정수 정합과 일치하는지 cross-validate 명시 질문
 
-### Cross-validate 호출 예정 (본 PR 머지 직후)
+### Cross-validate 호출 결과 (2026-05-20, Gemini 2.5 pro)
 
-본 architect 단계는 ADR 박제까지만. cross-validate 호출은 본 PR 머지 후 1회. 결과는 본 ADR `### 교차검증 반영 사항` 4 서브섹션 (합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견) 으로 본문 통합 후 **상태: Provisional → Accepted** 전이.
+호출 명령: `.claude/skills/cross-validate/scripts/cross_validate.sh architecture docs/decisions/20260520-r4-earth-moon-visualization.md`
+로그: `.claude/logs/cross-validate-architecture-20260520-202501.log`
+outcome: `applied` (exit 0)
+plan-bypass 가드: 사후 snapshot diff empty — 정상
 
-#### 예정 호출 명령
+#### 합의 (높은 신뢰도)
 
-```bash
-# 본 PR 머지 후 1회 호출 (CLAUDE.md §교차검증 박제 직후 1회 루틴)
-scripts/cross_validate.sh --type architecture --anchor "R4 ADR + Q2=B 첫 본 인스턴스화" --doc docs/decisions/20260520-r4-earth-moon-visualization.md
-```
+Gemini 5개 기준 (구조 완성도 / 결정 타당성 / 인터페이스 / 확장성 / 보안) 전부 양호 평가. 6가지 결정 모두 합리적 평가. 총평 인용:
 
-#### outcome 분기 (메인 오케스트레이터 책임)
+> **이 ADR 내용대로 진행하는 것을 적극 권장합니다.**
 
-- `outcome="applied"`: 4 서브섹션 본문 통합 + Accepted 전이
-- `outcome="429-fallback-claude-only"`: `claude-only analysis completed — 단일 모델 편향 노출 미확보` 명시 박제. 후속 cross-validate 재시도 예약 (API 복구 후)
-- `outcome="fatal-error"`: blocking 박제 + 사용자 보고
+세부 합의 항목:
+- 모든 시각적 결정을 산출식 + 예상 px 결과치로 객관성 확보 (Claude 의도 = Gemini 평가 일치)
+- 위험 사전 식별 + Fallback Plan 박제 (Claude 의도 = Gemini 평가 일치)
+- R5/R6 확장성 미리 고려 (Claude 의도 = Gemini 평가 일치)
+- moon (위성 첫 본 사례) parent-satellite 패턴 정립이 화성 위성 등에 재사용 가능 (Gemini 보강)
+- 시각화 렌더링 로직 중심 → 보안 위험 없음 (Claude 자체 평가 = Gemini 확정)
+
+#### 이견 수용 (양쪽 근거 비교)
+
+**없음** — Gemini 가 근본 반박 0. "설계의 근본적인 방향에는 이견이 없습니다" 명시.
+
+#### Claude 재분석 기각
+
+**없음** — Gemini 가 잘못 지적한 항목 0. 모든 평가가 ADR 의도와 정합.
+
+#### 고유 발견 3건 — 수용/분리 3단 프로토콜 적용 (volt #29)
+
+각 발견에 스프린트 계약 비-범위 대조 (§비-범위 7항목 + #532 PM DoD 9개) 수행.
+
+##### 발견 1 — earth focus 시 일회성 tooltip (UX 학습 지원)
+
+- **Gemini 제안**: zoom-in mental model 학습이 신규 사용자에게 비직관적 → "확대하여 달의 궤도와 모습을 확인하세요" 일회성 tooltip 추가
+- **범위 체크**: 본 R4 §결정 4 (달 궤도 thickness 강조) + §결정 6 (earth focus zoom-in 분리) 가 이미 시각적 안내 책임 분담. tooltip 은 신규 UI 컴포넌트 추가 = 본 R4 PM DoD 9개에 없음
+- **판정**: **후속 분리** — UX 학습 가이드는 본 R4 의 "earth + moon 시각화 진입" Behavior Change 와 직교. tooltip 컴포넌트 + 일회성 표시 상태 관리 (localStorage 등) 가 별도 인프라
+- **후속 이슈**: #534 (`enhance(ux): earth focus 시 zoom-in 안내 tooltip — R4 cross-validate Gemini 고유 발견 1`, priority:medium)
+
+##### 발견 2 — WCAG 폰트 / 명도 대비 a11y 가드
+
+- **Gemini 제안**: §결정 5 모바일 폰트 축소 (`text-mini`) 가 WCAG 최소 폰트 미충족 가능 + §결정 4 달 궤도 색상 (배경 대비 명도) 검증 필요
+- **범위 체크**: 본 R4 PM DoD 9개에 a11y 항목 없음. 신규 DoD 추가 = scope creep
+- **판정**: **부분 수용** — 본 PR 의 D7 (수동 검증) 가이드에 "WCAG 명도 대비 / 폰트 크기 점검" 한 줄 추가 권고를 이슈 #532 코멘트로 박제 (D7 가이드 보강이지 신규 DoD 가 아님). 정식 a11y 가드 (WCAG AA 기준 자동 측정) 는 후속 이슈로 분리
+- **후속 이슈**: #535 (`feat(a11y): WCAG AA 자동 측정 가드 — R4 cross-validate Gemini 고유 발견 2`, priority:medium)
+
+##### 발견 3 — 저사양 기기 달 궤도 상시 표시 FPS 영향
+
+- **Gemini 제안**: §결정 4 (달 궤도 상시 표시) 가 sub-pixel 얇은 선이라도 draw call 발생 → 저사양 모바일 frame drop 가능성. D-T2 검증 시 함께 확인 권고
+- **범위 체크**: 본 R4 의 D9 (모바일 누적 차단율 ≤ 25%) 는 시각 차단 측정. FPS 는 별도 차원. P11 LOD 시스템 (#393) 이 별도 트랙 frame budget 관리 중
+- **판정**: **부분 수용** — D7 가이드에 "저사양 기기 프레임 드랍 점검" 한 줄 추가 권고를 이슈 #532 코멘트로 박제. 정식 FPS 가드 (저사양 baseline 측정 + 회귀 임계) 는 후속 이슈로 분리
+- **후속 이슈**: #536 (`perf(lod): 저사양 모바일 FPS 회귀 가드 — R4 cross-validate Gemini 고유 발견 3`, priority:medium)
+
+#### 종합 판정
+
+- **반려 사유 없음** — Gemini 가 ADR 진행 적극 권장 + 근본 반박 0
+- **고유 발견 3건은 비목표 / 직교** — 본 R4 의 "earth + moon 진입" 핵심 가치와 충돌 0. 후속 이슈로 분리하여 각 단계 독립 관리
+- **D7 가이드 보강 2건은 ADR 본문 변경 없이 이슈 코멘트로 박제** — 본 PR 의 Behavior Change 와 직교
+- **CRITICAL #6 (스프린트 계약 비목표 보호) 준수** — Gemini 제안이 타당해도 비목표면 후속 분리 (volt #29 프로토콜)
+- **Provisional → Accepted 전이** — 본 §교차검증 반영 사항 4 서브섹션 박제 완료 + 머리말 상태 라인 갱신 완료
 
 ---
 
