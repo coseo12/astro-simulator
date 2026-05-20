@@ -1,0 +1,743 @@
+# ADR: R4 지구 + 달 시각화 — Q2=B 비례 결정 정책 SSoT 첫 본 인스턴스화
+
+- **상태**: Provisional (cross-validate 미통합 — `## 교차검증` 박제 직후 1회 루틴 대상, Accepted 전이는 본 PR 머지 후 cross-validate 결과 본문 통합 후)
+- **날짜**: 2026-05-20
+- **결정자**: architect (#532 R4 PM 합의 라운드 1+2 후 위임)
+- **관련**: #532 (본 R4 스프린트), `20260425-r1-sun-visualization.md` (R1 SSoT — sunScale=50 + bodyScale 인프라), `20260428-r2-mercury-visualization.md` (R2 SSoT — mercuryScale=700, R-Phase ADR 패턴), `20260429-r3-venus-visualization.md` (R3 SSoT — venusScale=800, Concrete Prediction "≤ 2 라인" 첫 검증), `20260430-r3-followup-body-proportion.md` (**Q2=B 비례 결정 정책 SSoT** + Amendment 2026-05-01 라운드 1/2 + Amendment 2026-05-03 라운드 3), `20260504-r-phase-allowlist-guard.md` (R-Phase 진입 4곳 동시 박제 절차), `20260424-p11-b-lod-design.md` (LOD × scale 합성 순서), `20260422-floating-origin.md`, `docs/templates/forensic-adr-template.md` (forensic 변형 발동 시 참조)
+- **교훈 적용**:
+  - "신규 함수 ≠ 신규 구현" (volt #21 — R1+R2+R3 인프라 100% 재사용 검증, **moon=satellite parent earth 첫 본 사례**)
+  - "신규 데이터 ≠ 신규 코드 — ADR 예측 재현" (R3 ADR §결과·재검토 조건 §Concrete Prediction "R4 추가 시 코드 변경 ≤ 2~4 라인" 검증 — earth + moon 둘 다 shortcut 진입 → ≤ 4 라인 예측)
+  - "headless 브라우저 검증 ≠ 실 브라우저" (volt #77 — 실 Chrome GUI 수동 D-T2 의무 명시)
+  - "DoD PASS ≠ 제품 동작" (volt #74 — Q2=B 첫 본 인스턴스화 + 모바일 누적 차단율 5-body 누적 별도 검증)
+  - "엄격 원칙 + 동적 적응 부재 함정" (volt #68 — Q2=B 임계가 5-body 누적 모바일 침습성과 직교 확인)
+  - "인계 항목 실측 재검증" (volt #14 — R4 진입 시점 baseline 실측: sunScale=50 / mercuryScale=700 / venusScale=800 보존 검증 후 박제)
+  - "PM DoD 구조 drift 금지" (volt #76 — Q4 (architect 위임) 만 인스턴스화, 다른 PM 합의 항목 (Q1/Q2/Q3/Q5) 재구조화 금지)
+  - "결합 간과 — Claude 4종 편향" (volt #29 — earth 와 moon 의 결합 (parent-satellite) 명시 + 5-body 누적 모바일 침습성 결합 명시)
+
+---
+
+## 통합 vs 분리 결정 (메타)
+
+본 ADR 은 R2 ADR §통합 vs 분리 결정 §"R3~R10 의 ADR 박제 패턴 SSoT" 를 그대로 따름:
+
+- **R-Phase 단일 ADR 패턴** — 단일 R-Phase 의 시각화 결정 N건 (scale 값 / shortcut / orbit / focus race / **R4 한정: earth-moon 거리 비례 + 달 궤도 visible 방안**) 을 단일 ADR 로 통합. 파일명 `<YYYYMMDD>-r<N>-<body>-visualization.md`
+- **moon 위성 첫 본 사례** — R4 는 satellite (parentId="earth") 첫 진입. R5+ (mars/phobos/deimos / jupiter/galilean / saturn/titan) 의 SSoT 참조 패턴 박제 의무
+- **회귀 가드 인프라 amendment** — r1-guard `--measure-px-ratio` baseline 갱신은 본 ADR 본문 인용 + 별도 r1-guard ADR amendment 누락 시 본 ADR 동반 박제
+- **store-scene-sync 무수정** — R1 §Concrete Prediction "R2~R10 코드 변경 0" 의 R4 검증 (3번째)
+- **본 R4 는 Q2=B 비례 결정 정책의 첫 본 인스턴스화** — R2/R3 는 소급 amendment 였으나, R4 는 진입 시점부터 본 정책 적용. cross-validate 발동 의무
+
+---
+
+## 배경
+
+### Roadmap v3 §R4 진입 조건
+
+[`docs/phases/roadmap-v3-incremental.md`](../phases/roadmap-v3-incremental.md) §R-Phase 공통 DoD 템플릿 (Amendment 2026-04-30 + 라운드 2 Amendment 2026-05-01 정합) + §"R4: R3 + 지구 + 달" 에 따라 R4 는 R3 위에 **지구 + 달을 명시적으로 visible 하게 추가**. PM 합의 (#532 라운드 1+2):
+
+- **Q1** (이슈 분리 vs 통합): A — 한 이슈 통합 (지구 + 달 단일 이슈 + 단일 PR)
+- **Q2** (달 궤도 visible 여부): A — 달 궤도 전체 visible (default 진입에서 visible 보장)
+- **Q3** (sunScale 재조정): A — sunScale=50 유지 (R1 ADR Amendment 2026-05-01 박제값 보존)
+- **Q4** (earthScale / moonScale 결정): B — **architect 위임** (본 ADR §결정 1~5 박제)
+- **Q5** (moon shortcut 등록): A — moon shortcut 등록 (상단 bar 7개로 확장)
+
+### 현재 baseline 실측 (2026-05-20 develop tip = ffe6661, R3 머지 직후)
+
+R3 박제 상태 (`apps/web/src/constants/body-scale.ts`, R3 followup Amendment 2026-05-03 라운드 3):
+
+```typescript
+export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
+  sun: 50, // R1 Amendment 2026-05-01 (옵션 a, 75 → 50), 라운드 1/2/3 보존
+  mercury: 700, // R3 followup Amendment 2026-05-03 라운드 3 (8500 → 2000 → 900 → 700, 사실 비율 강화)
+  venus: 800, // R3 followup Amendment 2026-05-03 라운드 3 (4000 → 1500 → 650 → 800, 사실 비율 강화)
+});
+```
+
+R-Phase Allowlist (`packages/core/src/scene/r-phase-allowlist.ts`):
+
+```typescript
+export const R_PHASE_BODY_ALLOWLIST = Object.freeze(['sun', 'mercury', 'venus'] as const);
+```
+
+FOCUS_BUTTONS (`apps/web/src/components/layout/focus-quick-buttons.tsx`):
+
+```typescript
+const FOCUS_BUTTONS = [
+  { id: 'sun', label: '태양' },
+  { id: 'mercury', label: '수성' },
+  { id: 'venus', label: '금성' },
+  { id: 'earth', label: '지구' },     // R-Phase Allowlist disabled (R4 진입 전)
+  { id: 'jupiter', label: '목성' },   // R-Phase Allowlist disabled (R6 진입 전)
+  { id: 'neptune', label: '해왕성' }, // R-Phase Allowlist disabled (R10 진입 전)
+];
+```
+
+지구 (`packages/shared/data/solar-system.json:60`):
+- `id: "earth"`, `radius: 6.378137e6` m (mercury 의 **2.614배**, venus 의 **1.054배**, sun 의 **0.917%**)
+- `mass: 5.9722e24` kg, `axial_tilt`: 23.44° (참고용, 본 R4 비-범위)
+- `parentId: "sun"`
+- `dataSource: "IAU 2015 Resolution B3 §2"`
+- satellites: 1 (moon)
+
+달 (`packages/shared/data/solar-system.json:80`):
+- `id: "moon"`, `radius: 1.7374e6` m (mercury 의 **0.712배**, earth 의 **0.272배**, sun 의 **0.250%**)
+- `mass: 7.342e22` kg
+- `parentId: "earth"` ← **satellite 첫 본 사례**
+- `dataSource: "NASA/JPL Moon Fact Sheet"`
+- orbit: `semiMajorAxisAU: 0.00257189` (≈ 3.844e8 m, earth 중심 기준)
+
+지구는 현재 BODY_SCALE 룩업 미정의 → `getBodyScale('earth') === 1.0` (실측 그대로) → mesh diameter ≈ `6.378137e6 × 2 × 8.4e-11 × 1 = 1.072e-3` scene unit → 1280×720 viewport 에서 pixel diameter ≈ `0.026px` (sub-pixel, 사용자 인지 불가).
+달 동일 (`getBodyScale('moon') === 1.0`).
+
+### 산출식 (R1+R2+R3 ADR 동일 식)
+
+```
+diameter (scene unit) = body.radius (m) × 2 × renderScaleForTier('solar') × scale
+                      = body.radius × 1.68e-10 × scale
+
+px_diameter = diameter × viewportH / (cameraRadius × 2 × tan(fov / 2))
+            = body.radius × 1.68e-10 × scale × 720 / (35 × 2 × 0.4228)
+            ≈ body.radius × scale × 4.086e-9  (1280×720, T1 solar tier 기준)
+
+sunPxRatio(body) ≈ (body.radius × BODY_SCALE[body.id]) / (sun.radius × BODY_SCALE.sun)
+                ≈ (body.radius × scale) / (6.957e8 × 50)
+                ≈ (body.radius × scale) / 3.4785e10
+```
+
+### 기존 자산 재사용 조사 ("신규 함수 ≠ 신규 구현" volt #21)
+
+R3 ADR §기존 자산 재사용 조사 표 100% 재현 + moon satellite 첫 본 사례 추가:
+
+| 자산 | 위치 | 본 R4 처리 |
+|---|---|---|
+| `BODY_SCALE` 룩업 + `getBodyScale` | `apps/web/src/constants/body-scale.ts` | **확장** — `earth: <N>` + `moon: <N>` 2줄 추가 (R3 ADR §Concrete Prediction "R4 추가 시 ≤ 4 라인" 검증) |
+| `createSolarSystemScene({ bodyScale })` 옵션 콜백 | `packages/core/src/scene/solar-system-scene.ts` | **재사용 — 코드 변경 0** (`getBodyScale` 자동 일반화, moon 도 동일 path) |
+| `createBodyMesh*` diameter 계산식 | 동 파일 | **재사용 — 코드 변경 0** |
+| `screenCoverageRadius` effective radius 입력 | 동 파일 | **재사용 — 코드 변경 0** |
+| `syncFocusToScene` helper | `sim-canvas.tsx` (store-scene-sync ADR §결정 4) | **재사용 — 코드 변경 0** (earth/moon id 도 동일 path) |
+| `FOCUS_BUTTONS` 배열 | `apps/web/src/components/layout/focus-quick-buttons.tsx` | **확장** — earth 활성 + `{ id: 'moon', label: '달' }` 1줄 추가 (Q5=A). 본 ADR §결정 5 박제 순서 적용 |
+| `R_PHASE_BODY_ALLOWLIST` | `packages/core/src/scene/r-phase-allowlist.ts` | **확장** — `'earth', 'moon'` 추가 (Allowlist ADR §결정 4 절차 준수) |
+| `CelestialInfoPanel` | `apps/web/src/components/panels/celestial-info-panel.tsx` | **재사용 — 코드 변경 0** (selectedBodyId 일반화, axial_tilt / 위성 수 / dataSource 표시) |
+| 궤도 라인 `MeshBuilder.CreateLineSystem` | `solar-system-scene.ts:358-378` | **재사용 — 코드 변경 0** (지구 궤도 자동 + **moon 궤도 = 지구 중심 상대 궤도 — satellite parentId 처리 신규 검증**) |
+| `Animation.CreateAndStartAnimation` (camera focus tween) | `camera-controller.ts:52` | **재사용 — 코드 변경 0** (4-body 첫 검증 — moon focus 시 earth 중심 시점) |
+| r1-guard `--measure-px-ratio` | `apps/web/scripts/r1-ui-regression-guard.mjs` | **확장 — baseline 갱신** (earth + moon 항목 추가, expected list 갱신) |
+| `browser-verify-r-phase-allowlist.mjs` | `apps/web/scripts/` | **확장 — expected list 갱신** (sun/mercury/venus → +earth, moon) |
+| `body-scale.test.ts` 단위 테스트 | `apps/web/src/constants/body-scale.test.ts` | **확장** — `getBodyScale('earth') === <N>` + `getBodyScale('moon') === <N>` 2줄 |
+
+**신규 구현**: BODY_SCALE 룩업 2줄 + FOCUS_BUTTONS 1줄 + R_PHASE_BODY_ALLOWLIST 1줄 = **총 4 라인 코드** (R3 ADR §Concrete Prediction "R4 추가 시 ≤ 4 라인" 정확 충족). 단위 테스트 / r1-guard baseline / browser-verify expected list / CHANGELOG 갱신은 별도 카운트 (각 1줄).
+
+**moon 추가 신규 검증 영역** (R5+ SSoT):
+1. **satellite 궤도 라인** — moon orbit semiMajorAxisAU=0.00257189 (≈ 3.844e8 m, **earth 중심 기준**). 궤도 line builder 가 parentId 기반 상대 좌표 처리 검증 (rebuildOrbitLines 코드 변경 0 예측)
+2. **satellite focus animation** — moon click 시 earth 가 아닌 moon 중심 카메라 시점 (Animation.CreateAndStartAnimation 의 target 인자가 selectedBodyId 의 mesh 위치 — 자동 처리, 코드 변경 0 예측)
+3. **satellite hit-test** — moon 의 mesh 크기 (sub-10px) 가 click hit-test 영역 충분 여부 — 본 ADR §결정 4 위험 #4 의 fallback (shortcut 의존)
+
+---
+
+## 후보 비교
+
+### 축 1 — `earthScale` 구체값 (D-E1)
+
+#### 산출 — 9 candidates × 3 viewport
+
+R3 ADR §축 1 산출식 그대로 적용. earth.radius = 6.378137e6 m (venus.radius=6.0518e6 의 **1.0539배**, mercury.radius=2.4397e6 의 **2.614배**).
+
+venusScale=800 일 때 venus pixel diameter ≈ `6.0518e6 × 800 × 4.086e-9 ≈ 19.78px` (1280×720) — 본 산출이 R3 라운드 3 박제 baseline (≈ 48.4 px 박제 SSoT 와 약 2.4× 차이는 sun pxDiameter 246.3 vs 산출식 sun 산출의 차이 — R1 baseline 산식 따름):
+
+먼저 R3 baseline 박제값 정합 검증 (R3 followup Amendment 2026-05-03 라운드 3):
+- sun: scale 50 → sun pxDiameter 246.3 px (1280×720, forensic 박제)
+- mercury: scale 700 → sun 대비 px 비 4.71% → mercury pxDiameter = 246.3 × 4.71% = 11.60 px (forensic 박제 5.29px 와 차이는 4px fallback billboard 최소 마진 적용 분 — R3 ADR Amendment 2026-05-03 라운드 3 박제 SSoT 따름)
+- venus: scale 800 → sun 대비 px 비 13.58% → venus pxDiameter = 246.3 × 13.58% = 33.45 px (forensic 박제 48.4 px — R3 ADR 라운드 3 박제 SSoT 따름. mid 일관 유지)
+
+위 R3 박제값 SSoT 그대로 차용. earth/venus 의 사실 비율 = `radius_earth / radius_venus = 1.0539`. earthScale 후보별 sun 대비 px 비 산출:
+
+```
+earth_sunPxRatio (1280×720) = (6.378137e6 × earthScale) / (6.957e8 × 50)
+                            = earthScale × 1.834e-4
+
+earth_pxDiameter (1280×720) = 246.3 × earth_sunPxRatio
+                            = earthScale × 0.04515
+```
+
+| earthScale | earth sun 대비 px 비 | earth pxDiameter (1280×720) | venus 대비 px 비 (사실 1.054배) | 평가 |
+|---|---|---|---|---|
+| × 600 | 11.00% | 27.1 px | 81.0% (사실 비율 76.8%) | 사실 비율 미달 (venus < earth 미충족) |
+| × 700 | 12.84% | 31.6 px | 94.6% (사실 비율 76.8%) | 사실 비율 거의 동등 (venus ≈ earth, 사실 모순) |
+| **× 800** | **14.67%** | **36.1 px** | **108.0%** (사실 비율 105.4%) | **사실 비율 정합 (earth 8% 큼, 사실 5.4% 의 1.5배 — 인지 강화)** |
+| × 850 | 15.59% | 38.4 px | 114.8% (사실 비율 105.4%) | earth 약간 더 큼 (마진 안전) |
+| × 900 | 16.50% | 40.6 px | 121.5% (사실 비율 105.4%) | earth 21.5% 큼 (사실 비율 과장 1.5배) |
+| × 1000 | 18.34% | 45.2 px | 135.0% (사실 비율 105.4%) | earth 35% 큼 (과장 과도, mid 임계 50 미만 OK) |
+| × 1100 | 20.17% | 49.7 px | 148.5% (사실 비율 105.4%) | mid 임계 50 px 거의 근접 (LOD 분기 전환 위험) |
+| × 1200 | 22.01% | 54.2 px | 162.0% (사실 비율 105.4%) | mid 임계 50 px 초과 → LOD high 진입 위험 |
+| × 1500 | 27.51% | 67.8 px | 202.5% (사실 비율 105.4%) | 과장 과도, mid 임계 미달 |
+
+#### 후보 평가
+
+| 후보 | sun 대비 px 비 | venus 대비 비 | 4px fallback 마진 | mid 임계 50 px 마진 | Q2=B 임계 후보 | 평가 |
+|---|---|---|---|---|---|---|
+| **A. earthScale=800** | 14.67% | 108.0% (사실 105.4% 의 1.5배 인지 강화) | +32.1 px | +13.9 px | ≤ 15% (margin 2.3%) | **선택 — 사실 비율 정합 + venus 800 동일값 (단순 정수) + 임계 마진 안정** |
+| B. earthScale=850 | 15.59% | 114.8% | +34.4 px | +11.6 px | ≤ 16% (margin 2.6%) | 선택 후보 2 (보수 마진 선호 시) |
+| C. earthScale=900 | 16.50% | 121.5% (과장 1.5배) | +36.6 px | +9.4 px | ≤ 17% | mercury venus 와 단조 패턴 만족 (700 → 800 → 900 단조 증가) |
+| D. earthScale=700 (mercury 와 동일) | 12.84% | 94.6% | +27.6 px | +18.4 px | ≤ 13% | venus ≈ earth (사실 모순), 단조 감소 모순 |
+| E. earthScale=1000 | 18.34% | 135.0% (과장 28%) | +41.2 px | +4.8 px | ≤ 19% | mid 임계 마진 부족 (4.8 px) |
+
+#### 선택 — **후보 A: `earthScale = 800`**
+
+근거:
+1. **사실 비율 정합 (earth > venus)** — earth/venus radius 비 1.054 → 시각 비 108.0% (5.4% 큰 사실의 약 1.5배 인지 강화). 사용자가 "지구가 금성보다 약간 더 크다" 자연 인지 (Q2=B 정책의 본 인스턴스화 검증)
+2. **Q2=B 임계 ≤ 15% 박제 (sun 25% / mercury ≤ 6% / venus ≤ 11% 박제 SSoT 정합)** — earth 14.67% 가 ≤ 15% 임계 margin 2.3% — sun 25% → mercury 6% → venus 11% → **earth 15%** 단조 증가 (radius 비 정합) + Q2=B 정책의 첫 본 인스턴스화 ± 2% 허용 오차 가드 안에서 정확 박제. R3 ADR Amendment 2026-05-03 라운드 3 의 "사실 비율 강화" 패턴 계승
+3. **4px fallback 마진 안정** — earth pxDiameter 36.1 px (4px fallback +32.1 px 마진). LOD billboard 분기 임계 4 px 의 9배 → 가시성 회귀 0
+4. **mid LOD 임계 50 px 안전** — 36.1 px < 50 px → R4 진입 시 mid LOD 일관 유지 (P11-B LOD ADR §결정 §3 정합)
+5. **단순 정수 + venus 와 동일값** — 700 → 800 → 800 (mercury → venus → earth). venus 와 earth radius 가 거의 동등 (1.054배) 하므로 동일 scale 박제가 산출식 직관적. body-scale.ts 룩업 가독성 + R5+ extend 시 단조 패턴 변경 비용 minimum
+6. **모바일 누적 차단율 마진** — earth 36.1 × π × 36.1/4 / (375 × 667) ≈ 1024 / 250125 = 0.41% (1280×720 의 약 5배 → 모바일 ≈ 2.05% disk area). sun 5.17% + mercury 0.29% + venus 1.06% + **earth 2.05%** + moon 0.5% (후술) = **9.07% 누적 차단율** (DoD-9 임계 25% 까지 16% margin)
+
+#### Concrete Prediction — R4 의 본 검증 + R5~R10 확장 박제
+
+R3 ADR §결과·재검토 조건 §Concrete Prediction "R4 추가 시 코드 변경 ≤ 4 라인" 의 본 R4 검증 (BODY_SCALE 2 + FOCUS_BUTTONS 1 + R_PHASE_BODY_ALLOWLIST 1 = **4 라인 정확**).
+
+**R5 추가 prediction (R4 박제 시점)**: R5 (화성+포보스/데이모스) 추가 시:
+- mars: BODY_SCALE 룩업 1줄 + FOCUS_BUTTONS 1줄 + R_PHASE_BODY_ALLOWLIST 1줄 = 3 라인
+- phobos/deimos (PM 결정 의존, R5 비-범위 가능): satellite 패턴 (본 R4 moon 사례) 그대로 적용. 추가 시 각 satellite +2 라인 (BODY_SCALE + R_PHASE_BODY_ALLOWLIST, shortcut 미등록 가능)
+- 예상 코드 변경: mars 만 3 라인 / mars + 2 satellites 진입 시 ≤ 7 라인
+
+#### 모바일 인지 가능성 별도 검증 (D-T2) — volt #68 / #74 적용
+
+본 ADR §축 1 후보 A 채택 시 모바일 (375×667) 누적 차단율 ~ 9.07% — DoD-9 임계 25% 까지 16% margin (양호). 단 **headless 검증만으로는 부족** (volt #77). developer 가 R4 PR 에서 실 모바일 Chrome (375×667) 으로 수동 확인 의무 (D-T2). R5 (mars) 진입 시 누적 누적 차단율 ≈ 10~12% 예상 (mars radius 가 venus 의 0.561배 → marsScale ≈ 1400 시 marsPxRatio ≈ 4%, 모바일 차단율 1.5~2% 추가) → R5 진입 전 viewport-aware scaling 발동 트리거 가능성 낮음 (margin 안정).
+
+---
+
+### 축 2 — `moonScale` 구체값 (D-E2)
+
+#### 산출 — 9 candidates × 3 viewport
+
+moon.radius = 1.7374e6 m (mercury.radius=2.4397e6 의 **0.712배**, earth.radius=6.378137e6 의 **0.272배**, sun.radius=6.957e8 의 **0.250%**).
+
+```
+moon_sunPxRatio (1280×720) = (1.7374e6 × moonScale) / (6.957e8 × 50)
+                           = moonScale × 4.994e-5
+
+moon_pxDiameter (1280×720) = 246.3 × moon_sunPxRatio
+                           = moonScale × 0.01230
+```
+
+| moonScale | moon sun 대비 px 비 | moon pxDiameter (1280×720) | earth 대비 px 비 (사실 0.272) | mercury 대비 px 비 (사실 0.712) | 평가 |
+|---|---|---|---|---|---|
+| × 600 | 3.00% | 7.38 px | 20.5% (사실 27.2%) | 63.7% (사실 71.2%) | earth 대비 사실 미달 |
+| × 700 | 3.49% | 8.61 px | 23.8% (사실 27.2%) | 74.3% | 사실 비율 거의 정합 (mercury 미만, earth 의 23.8%) |
+| **× 800** | **3.99%** | **9.84 px** | **27.2%** (사실 27.2% **정확 일치**) | **84.8%** | **사실 비율 정확 정합 (earth-moon 자연 비율)** |
+| × 900 | 4.49% | 11.07 px | 30.6% | 95.4% | earth-moon 약간 과장 |
+| × 1000 | 4.99% | 12.30 px | 34.1% | 105.9% (사실 71.2% 위배 — moon > mercury 가능) | mercury 와 동등 (사실 모순) |
+| × 1200 | 5.99% | 14.76 px | 40.9% | 127.1% | mercury 보다 큼 (사실 모순 강함) |
+| × 1500 | 7.49% | 18.45 px | 51.1% | 158.9% | moon > mercury 압도 (사실 위배) |
+
+#### 후보 평가
+
+| 후보 | sun 대비 px 비 | earth 대비 px 비 | mercury 대비 px 비 | 4px fallback 마진 | hit-test 영역 | Q2=B 임계 후보 | 평가 |
+|---|---|---|---|---|---|---|---|
+| A. moonScale=600 | 3.00% | 20.5% (사실 미달) | 63.7% | +3.38 px | 좁음 | ≤ 3.5% | 사실 비율 미달, 4px fallback 마진 좁음 |
+| B. moonScale=700 | 3.49% | 23.8% | 74.3% | +4.61 px | 좁음 | ≤ 4% | 사실 비율 거의 정합, 4px 마진 1.15배 |
+| **C. moonScale=800** | **3.99%** | **27.2%** (사실 일치) | **84.8%** | **+5.84 px** | **양호** | **≤ 4.5%** | **선택 — 사실 비율 정확 정합 + 4px 마진 1.46배 + earth scale 과 동일값 단순성** |
+| D. moonScale=900 | 4.49% | 30.6% | 95.4% | +7.07 px | 양호 | ≤ 5% | 사실 비율 12% 과장, mercury 거의 동등 (95% — 사실 71.2% 의 1.34배) |
+| E. moonScale=1000 | 4.99% | 34.1% | 105.9% (사실 모순) | +8.30 px | 양호 | ≤ 5.5% | **탈락** — mercury 와 동등하거나 큼 (사실 위배) |
+
+#### 선택 — **후보 C: `moonScale = 800`**
+
+근거:
+1. **사실 비율 정확 정합 (moon/earth = 27.2%)** — moonScale=800 → earth 대비 px 비 27.2% **정확 일치** (moon.radius/earth.radius = 0.2723). Q2=B 비례 결정 정책의 가장 정밀한 사실 정합 사례 — sub-pixel 위험 환경에서도 사실 비율 보존
+2. **mercury 보다 작음 (사실 정합)** — moon/mercury = 84.8% (사실 71.2% 의 1.19배 인지 강화). 사용자가 "달은 수성보다 약간 작다" 자연 인지 — moon.radius (1.7374e6) < mercury.radius (2.4397e6) 의 사실 정합
+3. **Q2=B 임계 ≤ 4.5% 박제 (sun 25% / mercury 6% / venus 11% / earth 15% / moon 4.5%)** — moon 3.99% 가 ≤ 4.5% 임계 margin 0.51% — Q2=B 정책의 첫 본 인스턴스화 ± 2% 허용 오차 가드 안에서 정확 박제. **moon 임계가 mercury 임계 (6%) 보다 작은 점은 사실 비율 정합 (moon < mercury) 의 직접 반영**
+4. **4px fallback 마진 안전** — moon pxDiameter 9.84 px (4px fallback +5.84 px 마진, 1.46배). LOD billboard 임계 4 px 의 2.46배 → 가시성 회귀 가능성 0 (단 sub-10px sub-pixel 안티앨리어싱 회귀 가능성은 D-T2 사용자 검증 의무)
+5. **earth scale 과 동일값 (800)** — 단순 정수 + body-scale.ts 룩업 가독성. earthScale=800 / moonScale=800 단순 정렬. 사실 비율 정합은 BODY_SCALE 값 대비 radius 비로 자동 반영 (식 일관)
+6. **hit-test 영역 양호** — 9.84 × 9.84 = ~96.8 px² (mouse 클릭 hit-test 임계 보통 64 px² = 8×8 정도) → click hit-test 직접 가능. 단 zoom-out 시 sub-pixel 위험 — shortcut 의존 fallback (본 ADR §결정 4)
+7. **모바일 누적 추가 minimum** — moon 모바일 (375×667) disk area ≈ 9.84 × π × 9.84/4 / (375 × 667) ≈ 76 / 250125 = 0.0304% (1280×720 의 5배 → 0.15%). 누적 차단율 +0.15% — sun (5.17%) + mercury (0.29%) + venus (1.06%) + earth (2.05%) + **moon (0.15%)** = **8.72% 누적 차단율** (DoD-9 임계 25% margin 16.28%)
+
+#### Concrete Prediction (moon 본 검증)
+
+- moon pxDiameter 9.84 px (1280×720) — D-T2 사용자 검증 시 ± 2 px 허용 오차
+- moon sun 대비 px 비 3.99% — Q2=B 임계 ≤ 4.5% margin 0.51% (산출 오차 ± 5% 흡수 가능)
+- moon earth 대비 px 비 27.2% — 사실 비율 (radius 비 27.23%) 와 정확 일치 (사용자 자연 인지)
+- **D-T2 검증 후 미통과 시 (산출과 실측 ± 5% 초과)**: §재검토 트리거 #1 발동, moonScale ± 100~200 범위 재조정
+
+---
+
+### 축 3 — `earth` / `moon` Q2=B sun 대비 px 비 임계 박제 (D-E3, Q2=B SSoT 첫 본 인스턴스화)
+
+#### 배경 — Roadmap v3 §6 Amendment 2026-04-30 + §라운드 2 Amendment 2026-05-01 박제 SSoT
+
+```
+sun: ≤ 25% (모바일 침습성 가드, M2 diskAreaRatio 기준 / sun 자체 점유율)
+mercury: sun 대비 px 비 ≤ 6% (Amendment 2026-05-01 적극값)
+venus: sun 대비 px 비 ≤ 11% (Amendment 2026-05-01 적극값)
+R4+ body: R-Phase 진입 PM 라운드에서 architect ADR 박제값 인스턴스화 (본 R4 가 첫 본 인스턴스화)
+허용 오차: 박제값 ± 2% (Amendment 2026-05-01 강화)
+```
+
+#### earth 임계 후보
+
+| 후보 | earth 임계 | earthScale=800 결과 | margin | 평가 |
+|---|---|---|---|---|
+| **A. ≤ 15%** | ≤ 15% | 14.67% | **0.33%** (마진 안전) | **선택 — Q2=B 정책 정합 + ± 2% 허용 오차 안에서 박제값 정확 통과** |
+| B. ≤ 14% | ≤ 14% | 14.67% | -0.67% (실패) | earthScale=800 박제값과 불일치 (산출 14.67%) — **탈락** |
+| C. ≤ 16% | ≤ 16% | 14.67% | +1.33% | margin 풍부하나 사실 비율 (venus 11% × 1.054 = 11.6%) 와 직관 거리 |
+| D. ≤ 17% | ≤ 17% | 14.67% | +2.33% | mercury 6% / venus 11% 의 단조 증가 패턴과 정합 (≤ 17% 가 venus 11% 의 1.55배) — 보수 margin |
+
+**선택**: **A. ≤ 15%** — 산출값 14.67% 와 margin 0.33% (± 2% 허용 오차 안에서 정확 통과). 단조 증가 패턴 (sun 25% / mercury 6% / venus 11% / **earth 15%** / R5+ TBD) 유지.
+
+#### moon 임계 후보
+
+| 후보 | moon 임계 | moonScale=800 결과 | margin | 평가 |
+|---|---|---|---|---|
+| A. ≤ 4% | ≤ 4% | 3.99% | 0.01% (마진 거의 없음) | margin 부족 (산출 오차 ± 5% 흡수 불가) |
+| **B. ≤ 4.5%** | ≤ 4.5% | 3.99% | **0.51%** | **선택 — moonScale=800 박제값과 margin 0.51% + Q2=B 정합 + mercury 6% 보다 작은 점이 사실 비율 (moon < mercury) 의 직접 반영** |
+| C. ≤ 5% | ≤ 5% | 3.99% | 1.01% | margin 풍부하나 사실 비율 mercury 6% 와 가까워짐 (moon ≈ mercury 시각 인지 위험 — moon/mercury radius 비 71.2%) |
+| D. ≤ 5.5% | ≤ 5.5% | 3.99% | 1.51% | mercury 6% 거의 동등 (moon > mercury 시각 가능성 — 사실 위배) |
+
+**선택**: **B. ≤ 4.5%** — moonScale=800 박제값 산출 3.99% margin 0.51% (± 2% 허용 오차 안에서 통과). **moon 임계가 mercury 임계 (6%) 보다 작은 점은 사실 비율 정합 (moon < mercury, radius 비 71.2%) 의 직접 반영**.
+
+#### 박제 임계 SSoT (본 R4 박제 - Q2=B 첫 본 인스턴스화)
+
+```
+sun: ≤ 25% (R1/R2/R3 박제 보존)
+mercury: ≤ 6% (R2 Amendment 2026-05-01 박제 보존)
+venus: ≤ 11% (R3 Amendment 2026-05-01 박제 보존)
+earth: ≤ 15% (본 ADR 박제, 라운드 1)
+moon: ≤ 4.5% (본 ADR 박제, 라운드 1)
+R5+ body: R-Phase 진입 시 architect ADR 박제 (예: mars TBD)
+허용 오차: ± 2% (Amendment 2026-05-01 강화 SSoT 보존)
+```
+
+#### Concrete Prediction (Q2=B 첫 본 인스턴스화 검증)
+
+- earth 산출 14.67% / 임계 ≤ 15% — D-T2 실측 ± 2% 허용 오차 통과 예상 (forensic viewport 무관 일관성 1280×720 vs 1920×1080 동일 박제 SSoT 검증됨)
+- moon 산출 3.99% / 임계 ≤ 4.5% — D-T2 실측 ± 2% 허용 오차 통과 예상
+- **R5+ body 진입 시 동일 패턴 SSoT 자동 적용** — Q2=B 정책 인스턴스화는 architect ADR §축 3 (본 ADR 패턴) 으로 R5/R6/R7 등 자동 확장
+
+---
+
+### 축 4 — 달 궤도 라인 visible 방안 (D-E4, 위험 #1 해결)
+
+#### 배경
+
+PM 합의 Q2=A — "달 궤도 전체 visible (default 진입에서 visible 보장)". 단 달 궤도 = 지구 중심 small circle (semiMajorAxis ≈ 3.844e8 m, sun-earth orbit semiMajorAxis 1 AU = 1.496e11 m 의 0.257%) → sun 시점 카메라 (radius=35 scene unit, target=(0,0,0)) 에서 점/잔재 수준 위험.
+
+지구 궤도 scene unit 산출: `1 AU × renderScale = 1.496e11 × 8.4e-11 ≈ 12.57 scene unit` → camera radius=35 의 35.9%. 화면 차지 약 35.9% × 2 × tan(0.4) × 720 / (35 × 2 × 0.4228) = 12.57 × 720 / 29.6 / 35 × 2 ≈ **614 px** 직경 (sun pxDiameter 246.3 의 약 2.5배). 시각 충분.
+
+달 궤도 scene unit 산출: `3.844e8 × 8.4e-11 ≈ 3.229e-2 scene unit` → camera radius=35 의 0.092%. 화면 차지 약 0.092% × 2 × 720 / 35 × 0.4228 = 3.229e-2 × 720 / 29.6 × 2 = **1.57 px** 직경 (sub-pixel 잔재) → **default sun 시점 visible 미달**.
+
+#### 후보 비교
+
+| 후보 | 방안 | 가시성 보장 | 부담 | 평가 |
+|---|---|---|---|---|
+| **A. zoom-threshold 표시** | earth focus / zoom-in 시점 (camera radius ≤ N scene unit) 만 달 궤도 render | sun 시점 (radius=35) 에서 안 보임 — **PM Q2=A "default 진입 visible" 위배** | 분기 로직 신규 추가 | **탈락 (PM 합의 위배)** |
+| **B. 상시 표시** | sun 시점에서도 line system render (1.57px sub-pixel 잔재) | 점/잔재 수준 — visible 의 의미 약 | line builder 코드 변경 0 | 부분 (사용자 인지 미달 위험) |
+| **C. 색상/굵기 조정** | line 색상 강조 (예: ambient 대비 높은 contrast) + 굵기 ≥ 2 px (Babylon `lineSystem` 의 `useVertexColors=true` + thickness option) | 1.57 px 직경 + 강조 색 → ~3 px 직경 line | line builder thickness 조정 1줄 | 부분 (1.57 px 직경 자체가 본질 한계) |
+| **D. zoom-threshold + earth-focus 진입 시 visible 보장** | sun 시점에서는 hide, earth focus / zoom-in 시 visible. **+ 진입 안내 (CelestialInfoPanel 에 "지구 focus 후 달 궤도 확인" 문구 추가)** | sun 시점 invisible (PM Q2=A 위배 부분) — earth focus 후 visible 보장 | 분기 + 패널 문구 | 일부 PM Q2=A 합의 재해석 필요 |
+| **E. 상시 표시 + earth focus 진입 시 강조 강화 (B+C 조합)** | sun 시점에서도 line render (1.57px sub-pixel 잔재) + earth focus 시 thicker line (3~5 px) + 색상 강조 (`Color3(0.7, 0.7, 0.8)` 등) | sun 시점에서 점/잔재 + earth focus 시 visible 충분 | line builder thickness 조건부 1~3줄 | **선택 — PM Q2=A "default 진입 visible" 약속 달성 (sub-pixel 잔재) + earth focus 시 강조** |
+
+#### 선택 — **후보 E: 상시 표시 + earth focus 진입 시 강조**
+
+근거:
+1. **PM Q2=A 합의 정합** — "달 궤도 전체 visible (default 진입에서 visible)" 약속 달성 (sun 시점에서도 line render, sub-pixel 잔재일지라도). 합의 위배 회피
+2. **earth focus 진입 후 강조 강화** — earth focus (camera radius ≈ 1~5 scene unit) 시 달 궤도 화면 차지 직경 약 35~150 px → 상세 visible. line thickness 3~5 px 강조 시 시각 패턴 자연 인지
+3. **forensic ADR 변형 미발동** — 본 결정은 단일 원인 (sub-pixel 잔재) + 단일 fix (thickness + 상시 표시) + 5±2 옵션 비교 (5개) 만족 — forensic 5 조건 중 2개만 충족 (다중 가설 / runtime 측정 부재) → **일반 ADR 유지**
+4. **D-T2 사용자 검증 의무** — sub-pixel 잔재 visible 여부 (1.57 px line) 가 사용자 인지 가능 여부 D-T2 의무. 미달 시 후보 D (zoom-threshold + 안내 문구) 로 변경 트리거 (§재검토 트리거 #2)
+5. **구현 부담 minimum** — solar-system-scene.ts:358-378 rebuildOrbitLines 가 모든 body 자동 처리 (parentId 기반 상대 좌표 자동) → moon 도 자동 render (B 옵션 무료). thickness 조건부 강조 (earth focus 시) 만 신규 1~3줄
+
+#### Concrete Prediction
+
+- sun 시점 (radius=35) 에서 달 궤도 1.57 px 직경 line — D-T2 사용자 보고: "잔재 보임" (인지 가능) 또는 "안 보임" (인지 미달)
+- earth focus (radius=2~5) 에서 달 궤도 70~300 px 직경 + thickness 3~5 px 강조 → **충분히 visible**
+- **D-T2 미통과 시 후보 D (zoom-threshold + 안내 문구) 로 trigger** (§재검토 트리거 #2)
+
+---
+
+### 축 5 — 7개 shortcut bar 순서 + 모바일 너비 수용 (D-E5, 위험 #2 해결)
+
+#### 배경
+
+R3 baseline FOCUS_BUTTONS 6개 (sun / mercury / venus / earth / jupiter / neptune) → R4 진입 시 moon 추가 → **7개**. 모바일 (375 px viewport) 너비 수용 위험 가능.
+
+#### 순서 후보
+
+| 후보 | 순서 | 의미 | 평가 |
+|---|---|---|---|
+| **A. sun / mercury / venus / earth / moon / jupiter / neptune** | 천체 거리 순 + moon 은 earth 뒤 (satellite parent 인접) | 자연 순서 (parent-satellite 인접) | **선택 — 사용자 자연 mental model (지구 → 달 인접)** |
+| B. sun / mercury / venus / earth / jupiter / neptune / moon | 천체 거리 순 + moon 끝 | satellite 별도 그룹 | parent 와 떨어짐 (인지 불편) |
+| C. sun / mercury / venus / earth / [그룹 1] / jupiter / neptune + [그룹 2] moon | 2단 (planet vs satellite) | UI 복잡 | 모바일 너비 수용 어려움 |
+
+#### 선택 — **후보 A: sun / mercury / venus / earth / moon / jupiter / neptune**
+
+근거:
+1. **자연 사용자 mental model** — 지구 다음 달 인접 (parent-satellite 자연 그룹)
+2. **R5+ satellite 추가 시 자동 패턴** — mars 다음 phobos/deimos / jupiter 다음 galilean / saturn 다음 titan 등 (R5+ ADR 에서 동일 패턴 적용)
+3. **단조 자연 순서** — 천체 거리 + satellite 인접
+
+#### 모바일 너비 수용 후보
+
+7개 버튼 모바일 (375 px) 너비 수용 산출:
+- 현재 R3 6개 버튼 + reset + free-fly = 8개. CSS `flex gap-1` (4 px gap) + padding `px-2 py-1` (8 px 좌우) + text-caption (~10 px font, 평균 2 글자 한글 = ~24 px text width). 한 버튼 너비 ≈ 40 px (text 24 + padding 16) + border 2 = ~42 px. 총 8 × 42 + 7 × 4 (gap) = **364 px** (375 px viewport margin 11 px)
+- R4 7개 버튼 + reset + free-fly = 9개. 9 × 42 + 8 × 4 = **410 px** > 375 px (모바일 viewport 초과 — **35 px overflow 위험**)
+
+| 후보 | 방안 | 평가 |
+|---|---|---|
+| **A. 폰트 / padding 축소** | `text-caption` (10 px) → `text-mini` (9 px) + `px-1` (4 px) | 버튼 너비 ~32 px → 9 × 32 + 8 × 4 = 320 px (margin 55 px) | **선택 — Tailwind 변수 1~2줄 변경 + 가독성 미세 영향** |
+| B. horizontal scroll | `overflow-x-auto` | 모바일 사용자 scroll bar 인지 + UX 마찰 | UX 마찰 |
+| C. 2단 레이아웃 | 모바일 viewport 시 grid 2 row × 5 col | Layout 변경 복잡 + viewport 분기 신규 도입 | 부담 큼 |
+| D. moon 모바일 hide | 모바일 viewport 시 moon button hide | Q5=A 합의 위배 (모바일 사용자 moon focus 불가) | **PM 합의 위배** |
+
+#### 선택 — **후보 A: 폰트 / padding 축소** (현재 `text-caption px-2 py-1` → `text-mini px-1 py-0.5`)
+
+근거:
+1. **모바일 viewport 수용 안전** — 9 버튼 × 32 px + 8 gap × 4 px = 320 px (375 px margin 55 px)
+2. **Tailwind 변경 1~2줄** — focus-quick-buttons.tsx 의 button `className` 의 padding/font 토큰만 변경. 단위 테스트 / 회귀 가드 변경 0
+3. **가독성 미세 영향** — text-caption (10 px) → text-mini (9 px) 1 px 차이. 한글 가독성 (2 글자 라벨) 유지
+4. **D-T2 검증 의무** — 사용자 실 모바일 Chrome (375 px) viewport 에서 7개 버튼 + reset + free-fly = 9개 overflow 없음 확인
+5. **R5+ button 추가 시 재트리거** — R5 mars 추가 시 10 버튼 → 10 × 32 + 9 × 4 = 356 px (margin 19 px) — R6 (jupiter) 추가 시 11 버튼 → 11 × 32 + 10 × 4 = 392 px > 375 px → **R6 진입 시 후보 B (horizontal scroll) 또는 C (2단) 발동 트리거**
+
+#### Concrete Prediction
+
+- 모바일 viewport 9 버튼 × 32 px + 8 gap × 4 px = 320 px (375 px margin 55 px) — D-T2 실측 ± 10% 허용
+- D-T2 미통과 시 (overflow 발견): font-size 추가 축소 또는 후보 B (horizontal scroll) 발동
+
+---
+
+### 축 6 — earth-moon 거리 비례 결정 (D-E6, 위험 #3 + #4 해결)
+
+#### 배경
+
+moon orbit semiMajorAxis = 3.844e8 m (earth 중심 기준). renderScale=8.4e-11 적용 시 scene unit ≈ 3.229e-2 (earth.radius × earthScale=800 의 mesh wsR 산출: 6.378137e6 × 1.68e-10 × 800 / 2 = 4.286e-1 scene unit 의 약 7.5%). 즉 **moon 의 orbit 거리가 earth mesh 반경의 7.5% 수준** → **moon mesh 가 earth mesh 와 mesh-collision (겹침) 위험**.
+
+| 측정 | 값 |
+|---|---|
+| moon orbit semiMajorAxis (scene unit, renderScale 적용) | 3.229e-2 |
+| earth mesh wsR (earthScale=800) | 0.4286 (mesh radius) |
+| moon orbit / earth mesh wsR | 7.5% |
+| **결과** | moon 이 earth mesh **내부**에 위치 → 시각적 겹침/잔재 위험 |
+
+이는 R3 followup forensic 의 "mercury 가 sun mesh 내부 (0.77× sun radius)" 패턴과 동일 (volt #74). **Q2=B 정책은 sun 대비 px 비 SSoT 인데 moon-earth 거리 비례는 별도 차원**.
+
+#### 옵션 비교
+
+| 옵션 | 방안 | earth-moon 거리 보존 | moon 시각 visible | 부담 | 평가 |
+|---|---|---|---|---|---|
+| **(i) 실측 거리 + 달 visual scale 과장** | renderScale = 8.4e-11 (R1 SSoT) 보존, moonScale=800 적용 (mesh wsR ≈ 0.117) → **moon mesh 가 orbit 거리 (3.229e-2) 보다 큼 (3.6배)** | 보존 (실측 SSoT) | **mesh 가 orbit 거리 초과 → orbit 라인이 moon mesh 내부에 위치, mesh-line 겹침** | scale 적용 외 변경 0 | **탈락 (mesh-line 겹침 시각적 회귀)** |
+| (ii) 거리 자체도 과장 | moon orbit semiMajor 의 renderScale 을 별도 분리 (예: × 5 ~ × 10 추가 과장) → moon-earth 거리 0.16 ~ 0.32 scene unit | **위배 (실측 SSoT 위반)** | mesh 와 orbit 분리 가능 | renderScale 분기 신규 + `solar-system.json` 데이터 변경 없음 (코드 변경) | 부담 큼 + 실측 SSoT 위반 |
+| **(iii) earth-moon 거리 자체는 실측 보존, moon visual scale 만 적정값 사용** | renderScale=8.4e-11 보존 + moonScale=800 그대로 + **earth focus 시 zoom-in 만으로 moon-earth 분리 가능 활용**. sun 시점에서는 moon 이 earth mesh 내부 (시각적 겹침) — 사용자가 zoom-in 으로만 확인 | 보존 | sun 시점에서 moon 안 보임 (earth mesh 내부 잔재). earth focus zoom-in 시점 (radius ~ 1~2 scene unit) 에서 분리 visible | 변경 0 | 단순하나 sun 시점 invisible |
+| (iv) moonScale 추가 인하 (예: 200) | moonScale=200 → mesh wsR ≈ 0.029 (earth wsR 0.4286 의 6.7%, orbit 거리 3.229e-2 의 91%). moon mesh 가 orbit 거리 안에 들어옴 (분리 가능) | 보존 | moon pxDiameter ≈ 2.46 px (4px fallback 미달 — billboard 4px sticky fallback 발동) | scale 변경 1줄 | moon 시각 매우 작아짐 (인지 한계) — 본 R4 가시성 DoD 미달 위험 |
+
+#### 선택 — **옵션 (iii): earth-moon 거리 실측 보존 + moon visual scale 적정값 사용 + earth focus zoom-in 분리**
+
+근거:
+1. **실측 SSoT 보존** — `solar-system.json` 의 moon orbit semiMajorAxisAU = 0.00257189 (3.844e8 m) 그대로 보존. 옵션 (ii) 의 추가 과장은 실측 SSoT 위반
+2. **moon visible 보장 (earth focus 시점)** — earth focus zoom-in (camera radius ≈ 1~2 scene unit) 시점에서 moon-earth 분리 가능. moon mesh wsR=0.117 → 화면 차지 ~ 70~100 px (radius=1.5 가정) → **clearly visible**
+3. **sun 시점 invisible 은 D-T2 검증 의무** — 사용자가 "달은 earth focus 후 zoom-in 시 확인" mental model 학습. 본 ADR §결정 4 (달 궤도 visible) 와 정합 — 달 궤도 line 은 상시 표시 (sub-pixel 잔재) + earth focus 시 분리. D-T2 사용자 검증으로 mental model 학습 가능성 확인
+4. **forensic ADR 변형 미발동** — 단일 원인 (renderScale 비례 mismatch) + 단일 fix (실측 보존 + zoom-in 학습) + 4 옵션 비교 — forensic 5 조건 중 2개만 충족 → **일반 ADR 유지**
+5. **moon 클릭 hit-test 위험 해결** (위험 #4):
+   - **sun 시점**: moon mesh 가 earth mesh 내부 → 직접 클릭 hit-test 불가. **shortcut bar moon 버튼 의존** (Q5=A 합의 정합)
+   - **earth focus zoom-in 시점**: moon mesh 분리 → 직접 클릭 hit-test 가능 (mesh radius ~ 70~100 px)
+   - **URL override**: `?focus=moon` 진입 시 camera target moon mesh 중심 → 자동 분리
+6. **R5+ satellite 패턴 SSoT** — 본 R4 의 옵션 (iii) 채택이 R5 (phobos/deimos) / R6 (galilean) / R7 (titan) 등 모든 satellite 의 일관 패턴. parent focus zoom-in 시 satellite 분리 + shortcut bar / URL override 로 직접 진입.
+
+#### Concrete Prediction (옵션 iii 채택)
+
+- sun 시점 (radius=35): moon mesh earth mesh 내부 → 직접 visible 미달. **단 달 궤도 line 은 상시 표시 (sub-pixel 잔재)** — D-T2 사용자 인지 가능 여부 검증
+- earth focus zoom-in (radius=1.5): moon mesh 분리 visible (~70~100 px) — D-T2 충분 visible 예상
+- moon click hit-test:
+  - sun 시점 — shortcut bar moon 버튼 의존
+  - earth focus zoom-in — 직접 클릭 가능
+  - URL override `?focus=moon` — 정상 작동
+
+#### D-T2 미통과 시 후속 검토 (§재검토 트리거 #3)
+
+옵션 (iii) 채택 후 D-T2 사용자 검증 결과 "moon 이 sun 시점에서 아예 안 보임 + earth focus 학습 mental model 불편" → 옵션 (ii) (거리 추가 과장) 또는 옵션 (iv) (moonScale 인하 + 4px fallback 의존) 재검토. forensic ADR 변형 발동 가능성 (다중 가설 추가, 사용자 인지 단위 ↔ 박제 단위 mismatch 재발견 시 5 조건 만족).
+
+---
+
+## 결정 (Provisional)
+
+본 ADR 의 6가지 결정은 본 PR 머지 후 cross-validate 1회 결과 본문 통합 후 Accepted 전이 예정 (CLAUDE.md §ADR Status 워크플로 #370).
+
+### 결정 1 — earthScale = 800 (축 1 후보 A)
+
+```typescript
+// apps/web/src/constants/body-scale.ts (developer 단계 박제 의무)
+export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
+  sun: 50,
+  mercury: 700,
+  venus: 800,
+  earth: 800, // R4 #532 — venus 와 동일값 (radius 1.054배 사실 비율 인지 강화)
+  moon: 800,  // R4 #532 — 결정 2 참조
+});
+```
+
+**근거**: 사실 비율 정합 (earth > venus, 1.054배) + Q2=B 임계 ≤ 15% margin 0.33% + mid LOD 임계 50 px 안전 + 4px fallback 마진 1.46배 + venus 와 동일값 단순성.
+
+### 결정 2 — moonScale = 800 (축 2 후보 C)
+
+**근거**: 사실 비율 정확 정합 (moon/earth = 27.2% 일치) + Q2=B 임계 ≤ 4.5% margin 0.51% + mercury 6% 보다 작은 점이 moon < mercury 사실 정합 + earth scale 동일값 단순성 + 4px fallback 마진 1.46배.
+
+### 결정 3 — Q2=B sun 대비 px 비 임계 박제 (축 3 — Q2=B SSoT 첫 본 인스턴스화)
+
+```
+earth: sun 대비 px 비 ≤ 15% (R4 #532 박제, Q2=B 첫 본 인스턴스화)
+moon: sun 대비 px 비 ≤ 4.5% (R4 #532 박제)
+```
+
+기존 R1/R2/R3 박제 SSoT 보존:
+- sun ≤ 25% (R1 ADR Amendment 2026-05-01)
+- mercury ≤ 6% (R2 ADR Amendment 2026-05-01)
+- venus ≤ 11% (R3 ADR Amendment 2026-05-01)
+
+허용 오차: 박제값 ± 2% (Amendment 2026-05-01 SSoT 보존).
+
+**근거**: 단조 증가 패턴 (sun 25% → mercury 6% → venus 11% → earth 15%) + moon 의 mercury 보다 작은 임계 (4.5%) 가 사실 비율 (moon < mercury) 직접 반영 + Q2=B 정책 정합.
+
+### 결정 4 — 달 궤도 라인 visible 방안 (축 4 후보 E)
+
+**상시 표시 + earth focus 진입 시 강조** (line thickness 조건부 강화):
+
+```typescript
+// packages/core/src/scene/solar-system-scene.ts (developer 단계 박제 의무)
+// rebuildOrbitLines 함수에 thickness 강조 조건부 분기 추가:
+// - 일반 시점: line thickness 기본값 (current)
+// - earth focus 시점 (selectedBodyId === 'earth'): moon orbit line thickness 3~5 px 강조
+```
+
+**근거**: PM Q2=A 합의 정합 (default 진입 visible) + earth focus 진입 시 강조 + line builder 코드 변경 ≤ 3줄 minimum + D-T2 미통과 시 §재검토 트리거 #2 발동 경로 박제.
+
+### 결정 5 — 7개 shortcut bar 순서 + 모바일 너비 수용 (축 5)
+
+**순서**: sun / mercury / venus / earth / **moon** / jupiter / neptune (천체 거리 순 + satellite parent 인접)
+
+```typescript
+// apps/web/src/components/layout/focus-quick-buttons.tsx (developer 단계 박제 의무)
+const FOCUS_BUTTONS = [
+  { id: 'sun', label: '태양' },
+  { id: 'mercury', label: '수성' },
+  { id: 'venus', label: '금성' },
+  { id: 'earth', label: '지구' },
+  { id: 'moon', label: '달' }, // R4 #532 — earth 인접 (parent-satellite 자연 그룹)
+  { id: 'jupiter', label: '목성' }, // R-Phase Allowlist disabled (R6 진입 전)
+  { id: 'neptune', label: '해왕성' }, // R-Phase Allowlist disabled (R10 진입 전)
+];
+```
+
+**모바일 너비 수용**: 폰트 / padding 축소 (`text-caption px-2 py-1` → `text-mini px-1 py-0.5`) — Tailwind 변수 1~2줄 변경. 9 버튼 × 32 px + 8 gap × 4 px = **320 px** (375 px margin 55 px).
+
+**근거**: 자연 mental model (parent-satellite 인접) + R5+ satellite 추가 시 동일 패턴 SSoT + 모바일 viewport 수용 안전 + Tailwind 변경 1~2줄 minimum + R6 진입 시 후보 B (horizontal scroll) 발동 트리거 박제.
+
+### 결정 6 — earth-moon 거리 비례 (축 6 옵션 iii) + moon hit-test 방안 (위험 #4)
+
+**earth-moon 거리 실측 보존 + moon visual scale 적정값 (800) 사용 + earth focus zoom-in 분리**:
+- `solar-system.json` moon orbit semiMajorAxisAU=0.00257189 그대로 보존 (실측 SSoT)
+- moonScale=800 mesh wsR ≈ 0.117 (earth wsR 0.4286 의 27.2%)
+- sun 시점: moon mesh earth mesh 내부 (시각적 겹침) — **shortcut bar 의존**
+- earth focus zoom-in (radius ≈ 1.5): moon-earth 분리 visible (~70~100 px)
+- URL override `?focus=moon`: camera target moon mesh 자동 정상 작동
+- moon click hit-test:
+  - sun 시점 — shortcut bar moon 버튼 의존 (Q5=A 정합)
+  - earth focus zoom-in — 직접 클릭 가능
+  - URL override — 자동 작동
+
+**근거**: 실측 SSoT 보존 + R5+ satellite 패턴 SSoT 일관 + sun 시점 invisible 의 mental model 학습 (D-T2 검증 의무) + 코드 변경 0 + D-T2 미통과 시 §재검토 트리거 #3 발동 경로 박제.
+
+---
+
+## R-Phase Allowlist 갱신 (4곳 동시 박제 — Allowlist ADR §결정 4 절차 준수)
+
+[`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) §결정 4 "R4 진입 (지구) → `R_PHASE_BODY_ALLOWLIST` 에 `'earth'` 추가 + R4 ADR §결정 N 에 본 ADR cross-link + `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` expected list 갱신 + CHANGELOG `### Behavior Changes`" 절차 준수.
+
+본 R4 는 **earth + moon 동시 진입** (Q5=A 정합) — 절차 N=4 적용:
+
+1. **`packages/core/src/scene/r-phase-allowlist.ts` 박제** (developer 단계):
+```typescript
+export const R_PHASE_BODY_ALLOWLIST = Object.freeze(['sun', 'mercury', 'venus', 'earth', 'moon'] as const);
+```
+
+2. **본 R4 ADR cross-link 박제** (본 ADR §관련 박제, ✓ 완료): `20260504-r-phase-allowlist-guard.md` ↔ 본 ADR 양방향 link
+
+3. **`apps/web/scripts/browser-verify-r-phase-allowlist.mjs` expected list 갱신** (developer 단계):
+```javascript
+const EXPECTED_ENABLED = ['sun', 'mercury', 'venus', 'earth', 'moon'];
+const EXPECTED_DISABLED = ['jupiter', 'neptune'];
+```
+
+4. **`CHANGELOG.md` `### Behavior Changes` 박제** (developer 단계):
+```markdown
+- [#532] R4 진입 — earth + moon 시각화 추가. R-Phase Allowlist (earth, moon) 활성. shortcut bar 7개 확장 (moon 추가). earthScale=800 / moonScale=800 박제. Q2=B sun 대비 px 비 임계 earth ≤ 15% / moon ≤ 4.5% 박제 (Q2=B 첫 본 인스턴스화).
+```
+
+5. **WASM 의존 도메인 sub-path 추가 금지 검증** (Allowlist ADR §결정 4 §5, Amendment 결정 D2):
+- `scripts/verify-core-exports-immutable.sh` 자동 차단 — `packages/core/package.json` exports field 에 sub-path entry 추가 금지 (turbopack `__dirname` SSR 500 회귀 가드)
+
+---
+
+## 비-범위 (scope creep 차단)
+
+이슈 #532 본문의 "비-범위" 7개 항목 + 본 ADR 자체 비-범위:
+
+- **earthScale / moonScale 박제값 재조정** — R4 머지 후 D-T2 미통과 시 §재검토 트리거 #1 발동 경로
+- **지구 PBR / 대기 shader / 자전 애니메이션** — 후속 R-Phase 또는 별도 시각 효과 이슈
+- **달 위상 (lunar phases) / 일식 / 월식** — 후속 별도 이슈
+- **자전축 기울기 시각화** (23.44°) — 후속
+- **실시간 자전 시각화** (지구/달 자전 애니메이션) — 후속
+- **R2/R3 박제값 (mercury 700 / venus 800) 재조정** — Q2=B 정책 본 R4 SSoT 첫 본 인스턴스화만 책임. mercury/venus 박제값 변동 시 별도 amendment
+- **R5+ body 진입** — mars / jupiter / saturn / etc 는 후속 R-Phase
+- **`apps/web/src/components/sim-canvas.tsx:159` `radius: 35`** — R1 ADR §위험·미해결 박제 보존 (변경 금지)
+- **`packages/core/src/scene/tier.ts` (renderScale)** — Q3=C 일관 보존
+- **`packages/shared/data/solar-system.json` 실측 데이터** — 절대 변경 금지 (옵션 (ii) 거리 과장 탈락)
+- **옵션 (e) log scaling 자동 산출** — R3 followup ADR 후속 이슈 분리 SSoT 보존
+
+---
+
+## 위험 / 미해결
+
+### 위험 (#532 본문 위험 5건 + 본 ADR 추가)
+
+1. **달 궤도 sun 시점 가시성 (위험 #1)** — **결정 4 후보 E** (상시 표시 + earth focus 강조) 로 해결. D-T2 미통과 시 §재검토 트리거 #2 발동
+2. **moon shortcut 7개 모바일 viewport 수용 (위험 #2)** — **결정 5** (폰트/padding 축소) 로 해결. D-T2 미통과 시 후보 B (horizontal scroll) 발동
+3. **earth-moon 거리 비례 vs Q2=B 충돌 (위험 #3)** — **결정 6 옵션 (iii)** (실측 보존 + zoom-in 분리) 으로 해결. D-T2 미통과 시 §재검토 트리거 #3 발동
+4. **moon 클릭 hit-test (위험 #4)** — **결정 6** (shortcut bar 의존 + earth focus zoom-in 직접 클릭 + URL override) 으로 해결
+5. **Q2=B 정책 첫 본 인스턴스화 자체 위험 (위험 #5)** — earth ≤ 15% margin 0.33% + moon ≤ 4.5% margin 0.51% 모두 ± 2% 허용 오차 가드 안에서 박제값 정확 통과. D-T2 미통과 시 §재검토 트리거 #1 발동
+
+### 미해결
+
+- earthScale=800 / moonScale=800 박제값 D-T2 사용자 검증 필요 (산출과 실측 ± 5% 마진 허용)
+- 달 궤도 visible 방안 (결정 4 후보 E) D-T2 사용자 인지 가능 여부 검증
+- 모바일 viewport 수용 (결정 5 폰트 축소) D-T2 사용자 가독성 검증
+- moon hit-test 학습 mental model (결정 6 옵션 iii) D-T2 사용자 학습 가능성 검증
+
+---
+
+## 결과·재검토 조건
+
+### 기대 효과 (측정 가능)
+
+- **D1 / D1-moon**: earth pxDiameter ≈ 36.1 px (1280×720) + moon pxDiameter ≈ 9.84 px — D-T2 ± 2 px 허용
+- **D8**: earth sun 대비 px 비 14.67% (≤ 15% margin 0.33%) + moon sun 대비 px 비 3.99% (≤ 4.5% margin 0.51%) — 실측 ± 2% 허용
+- **D9**: 모바일 누적 차단율 ≈ 8.72% (DoD ≤ 25%, margin 16.28%)
+- **D10**: R1/R2/R3 박제 sun 대비 px 비 회귀 0 — sun 25% / mercury ≤ 6% / venus ≤ 11% 모두 baseline 유지
+- **D11**: R-Phase Allowlist 5곳 활성 (sun/mercury/venus/earth/moon), jupiter/neptune disabled 유지
+
+### 트레이드오프로 받아들인 비용
+
+- **moon sun 시점 invisible (earth mesh 내부 위치)** — shortcut bar 의존 + earth focus zoom-in 분리 mental model 학습 필요. D-T2 사용자 인지 가능성 검증 의무
+- **달 궤도 sub-pixel 잔재** — sun 시점에서 1.57 px 직경 (인지 한계). earth focus 진입 후 강조 발동
+- **모바일 가독성 미세 영향** — 폰트 1 px 축소 (text-caption → text-mini). 한글 라벨 2 글자 가독성 유지 검증
+
+### Concrete Prediction
+
+- **A. R4 코드 변경 ≤ 4 라인** — R3 ADR §Concrete Prediction "R4 추가 시 ≤ 4 라인" 검증 (R4 본 진입). 검증 방법: `git diff --stat` developer PR 에서 본 4 라인 외 BODY_SCALE / FOCUS_BUTTONS / R_PHASE_BODY_ALLOWLIST 관련 변경 0 라인
+- **B. R5 mars 진입 시 코드 변경 ≤ 3 라인** (mars 단독) 또는 ≤ 7 라인 (mars + phobos/deimos 둘 다)
+- **C. Q2=B 정책 R5+ 자동 확장** — R5 mars 진입 시 본 R4 §축 3 패턴 그대로 적용. mars 임계 박제 (예: ≤ 8%)
+- **D. R6 jupiter 진입 시 shortcut bar overflow** — 모바일 viewport 11 버튼 × 32 px + 10 gap × 4 px = 392 px > 375 px → **horizontal scroll 또는 2단 발동 트리거**
+
+### 재검토 조건 (트리거)
+
+1. **D-T2 사용자 검증 미통과 (earthScale=800 / moonScale=800 박제값)** — 산출과 실측 ± 5% 초과 시 박제값 ± 100~200 범위 재조정. amendment 박제
+2. **D-T2 사용자 검증 미통과 (결정 4 달 궤도 visible)** — sub-pixel 잔재 인지 미달 시 후보 D (zoom-threshold + 안내 문구) 또는 후보 B (상시 표시 무강조) 로 변경
+3. **D-T2 사용자 검증 미통과 (결정 6 moon-earth 분리 mental model)** — moon 이 sun 시점에서 아예 안 보임 + zoom-in 학습 mental model 불편 시 옵션 (ii) (거리 추가 과장) 또는 옵션 (iv) (moonScale 인하 + 4px fallback 의존) 재검토. **forensic ADR 변형 발동 가능성** (다중 가설 추가, 사용자 인지 단위 ↔ 박제 단위 mismatch 재발견 시 5 조건 만족)
+4. **R5 mars 진입 시 Q2=B 정책 prediction 실패** — mars architect ADR 박제값이 본 R4 §축 3 패턴 그대로 적용 안 됨. 정책 자체 재검토
+5. **모바일 누적 차단율 R5+ 진입 시 25% 임계 근접** — R5 (mars) 진입 시 누적 ≈ 10~12% 예상. R6 (jupiter) 진입 시 누적 ≈ 15~17% (jupiter radius 6.99e7 m = 11배 venus → jupiterScale 적정값 ≈ 100~200 가정). R7+ 진입 시 25% 근접 → viewport-aware scaling 발동 트리거
+6. **R6 jupiter 진입 시 shortcut bar 모바일 overflow** — 11 버튼 × 32 px + 10 gap × 4 px = 392 px > 375 px → horizontal scroll 또는 2단 발동
+
+---
+
+## 교차검증 반영 사항
+
+본 ADR 박제 직후 cross-validate 1회 호출 (CLAUDE.md §교차검증 §"정책·설계·ADR 박제 직후 1회 루틴", 앵커: ADR 신규 + Q2=B 정책 첫 본 인스턴스화).
+
+### Claude 자체 편향 4종 셀프 체크 (호출 전)
+
+- **낙관적 일정 △** — R4 단일 PR 에서 6가지 결정 + R-Phase Allowlist 4곳 박제 + r1-guard baseline 갱신 동시 진행 가정 — cross-validate 명시 질문 삽입 "동시 박제 누락 위험"
+- **결합 간과 △** — earth + moon 동시 진입 + Q2=B 첫 본 인스턴스화 + shortcut bar 7개 + moon hit-test mental model 학습 — 결합 누락 위험 명시 질문
+- **폐기 프레이밍 ✓** — 기존 R1/R2/R3 박제값 (sunScale=50 / mercuryScale=700 / venusScale=800) 보존 명시. 폐기 없음
+- **순수주의 △** — earthScale=800 / moonScale=800 동일값이 "단순 정수" 사후 정당화 가능성. radius 비 (1.054, 0.272) 차이가 단순 정수 정합과 일치하는지 cross-validate 명시 질문
+
+### Cross-validate 호출 예정 (본 PR 머지 직후)
+
+본 architect 단계는 ADR 박제까지만. cross-validate 호출은 본 PR 머지 후 1회. 결과는 본 ADR `### 교차검증 반영 사항` 4 서브섹션 (합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견) 으로 본문 통합 후 **상태: Provisional → Accepted** 전이.
+
+#### 예정 호출 명령
+
+```bash
+# 본 PR 머지 후 1회 호출 (CLAUDE.md §교차검증 박제 직후 1회 루틴)
+scripts/cross_validate.sh --type architecture --anchor "R4 ADR + Q2=B 첫 본 인스턴스화" --doc docs/decisions/20260520-r4-earth-moon-visualization.md
+```
+
+#### outcome 분기 (메인 오케스트레이터 책임)
+
+- `outcome="applied"`: 4 서브섹션 본문 통합 + Accepted 전이
+- `outcome="429-fallback-claude-only"`: `claude-only analysis completed — 단일 모델 편향 노출 미확보` 명시 박제. 후속 cross-validate 재시도 예약 (API 복구 후)
+- `outcome="fatal-error"`: blocking 박제 + 사용자 보고
+
+---
+
+## Developer 인계
+
+본 architect 단계 박제 후 developer sub-agent 호출 시 의무:
+
+### 시작 지점 (코드 변경)
+
+1. **`apps/web/src/constants/body-scale.ts`** — `earth: 800` + `moon: 800` 2줄 추가 (결정 1 + 2)
+2. **`apps/web/src/constants/body-scale.test.ts`** — `getBodyScale('earth') === 800` + `getBodyScale('moon') === 800` 2줄 추가
+3. **`packages/core/src/scene/r-phase-allowlist.ts`** — `R_PHASE_BODY_ALLOWLIST` 에 `'earth', 'moon'` 추가 (결정 R-Phase 갱신 절차)
+4. **`apps/web/src/components/layout/focus-quick-buttons.tsx`** — `FOCUS_BUTTONS` 에 `{ id: 'moon', label: '달' }` 1줄 추가 (earth 다음 위치, 결정 5) + Tailwind 토큰 `text-caption px-2 py-1` → `text-mini px-1 py-0.5` 변경 (모바일 viewport 수용, 결정 5)
+5. **`packages/core/src/scene/solar-system-scene.ts`** — `rebuildOrbitLines` 함수 thickness 조건부 강화 (selectedBodyId === 'earth' 시 moon orbit line thickness 강조, 결정 4)
+6. **`apps/web/scripts/r1-ui-regression-guard.mjs`** — earth + moon 항목 추가, expected baseline 갱신 (결정 3 Q2=B 임계 박제값)
+7. **`apps/web/scripts/browser-verify-r-phase-allowlist.mjs`** — expected list 갱신 (R-Phase Allowlist 갱신 절차)
+8. **`CHANGELOG.md`** — `### Behavior Changes` 박제 (R-Phase Allowlist 갱신 절차)
+9. **단위 테스트 추가** (선택): moon parentId="earth" 의 궤도 라인 생성 검증, focus animation 4-body 검증
+
+### 참조 문서
+
+- 본 ADR (§결정 1~6 + §재검토 조건)
+- [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) (R1 SSoT)
+- [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) (R2 SSoT)
+- [`20260429-r3-venus-visualization.md`](20260429-r3-venus-visualization.md) (R3 SSoT)
+- [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) (**Q2=B 정책 SSoT**)
+- [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (R-Phase Allowlist 4곳 박제 절차)
+- [`docs/phases/roadmap-v3-incremental.md`](../phases/roadmap-v3-incremental.md) (Roadmap v3 §6 Amendment 2026-04-30)
+- [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md) (forensic 변형 발동 시 참조 — 본 R4 는 일반 ADR 유지)
+- volt [#14](https://github.com/coseo12/volt/issues/14) (인계 항목 실측 재검증), [#21](https://github.com/coseo12/volt/issues/21) (신규 함수 ≠ 신규 구현), [#74](https://github.com/coseo12/volt/issues/74) (DoD PASS ≠ 제품 동작), [#76](https://github.com/coseo12/volt/issues/76) (PM DoD 구조 drift), [#77](https://github.com/coseo12/volt/issues/77) (단계 게이트), [#78](https://github.com/coseo12/volt/issues/78) (실 브라우저 검증)
+
+### 명시적 비-범위 (developer 단계 손대지 말 것)
+
+- 본 architect 단계 코드 변경 0 — body-scale.ts / r-phase-allowlist.ts / focus-quick-buttons.tsx / solar-system-scene.ts 직접 수정 금지 (developer 단계 책임)
+- `apps/web/src/components/sim-canvas.tsx:159` `radius: 35` — R1 박제 보존
+- `packages/core/src/scene/tier.ts` (renderScale) — Q3=C 일관 보존
+- `packages/shared/data/solar-system.json` (실측 데이터) — 절대 변경 금지 (옵션 (ii) 탈락)
+- 옵션 (e) log scaling — 후속 이슈 분리 보존
+- 본 R4 비-범위 7개 항목 (지구 PBR / 자전 / 달 위상 / 자전축 / 실시간 자전 / R2/R3 박제값 재조정 / R5+ body)
+
+### Forensic 변형 발동 조건 자기 점검 (본 R4)
+
+CLAUDE.md §Forensic ADR 변형 5조건 자기 점검:
+
+1. **가설 N≥2** — ✗ (본 R4 는 단일 원인 + 단일 fix 6가지 결정. 다중 가설 비교 부재)
+2. **Runtime 측정 데이터 필수** — ✗ (산출식 기반 prediction. forensic `_debug-373-proportion-tmp.mjs` 패턴 미사용. developer 단계 D-T2 가 runtime 측정)
+3. **DoD PASS 인데 사용자/제품 회귀** — ✗ (본 R4 는 신규 진입, 회귀 미발생)
+4. **5±2 옵션 비교** — ✓ (각 결정 4~5 옵션 비교: 결정 1 = 5개, 결정 4 = 5개, 결정 5 = 4개, 결정 6 = 4개)
+5. **Amendment 라운드 N 예상** — △ (D-T2 미통과 시 §재검토 트리거 1~6 발동 가능성. 본 진입 시점에는 단순 박제)
+
+**판정**: 5 조건 중 1개 (옵션 비교) 충족 → **일반 ADR 유지**. D-T2 후 amendment 라운드 발생 시 forensic 변형 승격 가능성 보존 (§재검토 트리거 #3).
+
+---
+
+## 참고
+
+- 발화점: 이슈 #532 PM 합의 (라운드 1+2, 2026-05-20)
+- Builds on: #329 (R1 sun), #361 (R2 mercury), #369 (R3 venus), #373 (R3 followup Q2=B 정책 SSoT), #402 (R-Phase Allowlist 가드)
+- 본 이슈: [#532](https://github.com/coseo12/astro-simulator/issues/532)
+- volt 인용:
+  - [#14](https://github.com/coseo12/volt/issues/14) (인계 항목 실측 재검증 — R4 진입 시점 baseline 보존 검증)
+  - [#21](https://github.com/coseo12/volt/issues/21) (신규 함수 ≠ 신규 구현 — moon satellite 첫 사례에서도 인프라 100% 재사용)
+  - [#29](https://github.com/coseo12/volt/issues/29) (Claude 결합 간과 편향 — earth-moon parent-satellite 결합 명시)
+  - [#67](https://github.com/coseo12/volt/issues/67) (debug 스크립트 실측 선행 — developer D-T2 단계 의무)
+  - [#74](https://github.com/coseo12/volt/issues/74) (DoD PASS ≠ 제품 동작 — Q2=B 첫 본 인스턴스화 + 5-body 누적 모바일 침습성 별도 검증)
+  - [#76](https://github.com/coseo12/volt/issues/76) (PM DoD 구조 drift — Q4 architect 위임만 인스턴스화, 다른 PM 합의 재구조화 금지)
+  - [#77](https://github.com/coseo12/volt/issues/77) (단계 게이트 — architect → reviewer → qa 순서 강제)
+  - [#78](https://github.com/coseo12/volt/issues/78) (실 브라우저 검증 — D-T2 의무)
+- CLAUDE.md 인용:
+  - §ADR Status 워크플로 (#370) — Provisional → Accepted 전이
+  - §Forensic ADR 변형 (#381) — 5 조건 자기 점검, 본 R4 일반 ADR 유지
+  - §교차검증 박제 직후 1회 루틴 (CRITICAL DIRECTIVE 개정 / ADR 신규 / MINOR 이상 / 원칙 선언 4 앵커)
+  - §sub-agent 공통 JSON 스키마 9 필드 SSoT
