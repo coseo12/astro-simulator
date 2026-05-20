@@ -264,8 +264,17 @@ async function verifyUrlDirectEntry(browser) {
         () => window.__simStore?.getState?.()?.selectedBodyId ?? null,
       );
 
-      const pass = selectedBodyId === c.expected;
-      results.push({ ...c, selectedBodyId, pass });
+      // #418 — 가드 거부 (4-A / 4-C) 시 URL 자동 제거 (replaceState) 단언.
+      // 가드 통과 (4-B) 는 URL focus 보존 (사용자 의도 정합).
+      const urlFocusAfter = await page.evaluate(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('focus');
+      });
+      const expectsUrlCleared = c.expected === null;
+      const urlPass = expectsUrlCleared ? urlFocusAfter === null : urlFocusAfter === c.focus;
+
+      const pass = selectedBodyId === c.expected && urlPass;
+      results.push({ ...c, selectedBodyId, urlFocusAfter, urlPass, pass });
     } catch (err) {
       results.push({ ...c, selectedBodyId: 'ERROR', pass: false, error: String(err) });
     } finally {
@@ -622,13 +631,19 @@ async function main() {
     await context.close();
 
     // 4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선)
-    console.log('\n4) URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선)\n');
+    console.log(
+      '\n4) URL 직접 진입 매트릭스 (#415 — store mutation 가드, 3번째 방어선 + #418 URL 자동 제거)\n',
+    );
     const urlEntryResults = await verifyUrlDirectEntry(browser);
     for (const r of urlEntryResults) {
       const status = r.pass ? 'PASS' : 'FAIL';
       const expectedStr = r.expected === null ? 'null' : r.expected;
+      // #418 — URL 자동 제거 단언 추가 (가드 거부 시 ?focus= 파라미터 제거).
+      const urlStr = r.urlFocusAfter === null ? 'null' : r.urlFocusAfter;
+      const urlExp = r.expected === null ? 'null' : r.focus;
       console.log(
-        `   ${r.label}  ?focus=${r.focus.padEnd(18)} → selectedBodyId=${String(r.selectedBodyId).padEnd(10)} (expected=${expectedStr})  ${status}`,
+        `   ${r.label}  ?focus=${r.focus.padEnd(18)} → selectedBodyId=${String(r.selectedBodyId).padEnd(10)} (expected=${expectedStr}) ` +
+          `urlFocusAfter=${String(urlStr).padEnd(10)} (expected=${urlExp})  ${status}`,
       );
       if (!r.pass) allPass = false;
     }
