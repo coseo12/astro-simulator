@@ -7,13 +7,13 @@
  * #403 Amendment — `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장 (시나리오 5 매트릭스).
  * #404 Amendment — `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제 (시나리오 6 매트릭스).
  *
- * 검증 매트릭스:
- *   1. allowlist 박제 body (sun / mercury / venus): shortcut 버튼 활성 (disabled 아님)
- *   2. allowlist 외 body (earth / jupiter / neptune): shortcut 버튼 disabled / aria-disabled / data-r-phase-disabled
+ * 검증 매트릭스 (R4 #532 — earth + moon 진입 후):
+ *   1. allowlist 박제 body (sun / mercury / venus / earth / moon): shortcut 버튼 활성 (disabled 아님)
+ *   2. allowlist 외 body (jupiter / neptune): shortcut 버튼 disabled / aria-disabled / data-r-phase-disabled
  *   3. 강제 click 시뮬레이션 — disabled 버튼 click 후 selectedBodyId 변화 0 / camera radius 변화 0
  *   4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선):
- *      - 4-A 차단: ?focus=earth / jupiter / neptune → selectedBodyId === null + camera radius 변화 0
- *      - 4-B 정상: ?focus=sun / mercury / venus → selectedBodyId === <body> (R1 #329 / R2 #361 / R3 #369 회귀 보호)
+ *      - 4-A 차단: ?focus=jupiter / neptune → selectedBodyId === null + camera radius 변화 0
+ *      - 4-B 정상: ?focus=sun / mercury / venus / earth / moon → selectedBodyId === <body> (R1~R4 회귀 보호)
  *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
  *   5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth):
  *      - 5-A 정상 (CelestialTree): tree-sun click → selectedBodyId === 'sun' + info-panel 정상 분기 렌더
@@ -45,13 +45,16 @@ import { chromium } from 'playwright';
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
 
 /**
- * 현재 R-Phase 박제값 (R1 sun + R2 mercury + R3 venus).
+ * 현재 R-Phase 박제값 (R1 sun + R2 mercury + R3 venus + R4 earth + moon).
  * R-Phase 진입 시 이 리스트 갱신 의무 박제 (ADR §결정 4 항목 3).
  *
  * SSoT: packages/core/src/scene/r-phase-allowlist.ts `R_PHASE_BODY_ALLOWLIST`.
+ *
+ * R4 #532 — earth + moon 동시 진입 (Q5=A 정합).
+ * ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 R-Phase 갱신 절차.
  */
-const RPHASE_EXPECTED_ENABLED = ['sun', 'mercury', 'venus'];
-const RPHASE_EXPECTED_DISABLED = ['earth', 'jupiter', 'neptune'];
+const RPHASE_EXPECTED_ENABLED = ['sun', 'mercury', 'venus', 'earth', 'moon'];
+const RPHASE_EXPECTED_DISABLED = ['jupiter', 'neptune'];
 
 const VIEWPORT = { width: 1280, height: 800 };
 const POST_INIT_WAIT_MS = 1500;
@@ -183,7 +186,7 @@ async function verifyDisabledClickIgnored(page) {
 }
 
 /**
- * 활성 버튼 정상 동작 smoke (sun / mercury / venus).
+ * 활성 버튼 정상 동작 smoke (sun / mercury / venus / earth / moon — R4 #532 진입).
  *
  * 단언: focus click → selectedBodyId === body. 정상 동작 회귀 가드.
  */
@@ -217,22 +220,23 @@ async function verifyEnabledClickWorks(page) {
  * ADR `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (DoD-2).
  *
  * 각 body 마다 새 페이지로 `?focus=<body>` 진입 후:
- *   - allowlist 외 (earth / jupiter / neptune): selectedBodyId === null (url-sync 가드 작동)
- *   - allowlist 박제 (sun / mercury / venus): selectedBodyId === <body> (정상 회귀 보호)
+ *   - allowlist 외 (jupiter / neptune): selectedBodyId === null (url-sync 가드 작동)
+ *   - allowlist 박제 (sun / mercury / venus / earth / moon): selectedBodyId === <body> (정상 회귀 보호)
  *   - invalid: selectedBodyId === null (기존 R1 가드 회귀 보호)
  *
  * 매 case 마다 새 page 생성 — initialized.current useRef 를 우회하기 위해.
  */
 async function verifyUrlDirectEntry(browser) {
   const cases = [
-    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동.
-    { focus: 'earth', expected: null, label: '4-A 차단' },
+    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R4 #532: jupiter / neptune 만).
     { focus: 'jupiter', expected: null, label: '4-A 차단' },
     { focus: 'neptune', expected: null, label: '4-A 차단' },
-    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호).
+    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon 진입 검증).
     { focus: 'sun', expected: 'sun', label: '4-B 정상' },
     { focus: 'mercury', expected: 'mercury', label: '4-B 정상' },
     { focus: 'venus', expected: 'venus', label: '4-B 정상' },
+    { focus: 'earth', expected: 'earth', label: '4-B 정상 (R4 #532)' },
+    { focus: 'moon', expected: 'moon', label: '4-B 정상 (R4 #532)' },
     // 4-C 무효 — 기존 R1 가드 회귀 보호.
     { focus: 'invalid-body-id', expected: null, label: '4-C 무효' },
   ];
@@ -609,7 +613,9 @@ async function main() {
     }
 
     // 2. 활성 버튼 정상 동작 smoke
-    console.log('\n2) 활성 버튼 (sun / mercury / venus) focusOn 정상 동작 smoke\n');
+    console.log(
+      '\n2) 활성 버튼 (sun / mercury / venus / earth / moon — R4) focusOn 정상 동작 smoke\n',
+    );
     const enabledResults = await verifyEnabledClickWorks(page);
     for (const r of enabledResults) {
       const status = r.pass ? 'PASS' : 'FAIL';

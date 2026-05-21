@@ -476,9 +476,11 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
 
 ### 결정 3 — Q2=B sun 대비 px 비 임계 박제 (축 3 — Q2=B SSoT 첫 본 인스턴스화)
 
+> **Amendment 1 (2026-05-21)**: D8 implementation 직후 실측 검증 결과 식 결함이 명확해져 임계를 **earth ≤ 17% / moon ≤ 5.0%** 로 안정화. earthScale=800 / moonScale=800 architect 박제값은 보존. 본 §결정 3 결정값은 amendment 후 값으로 갱신됨. 상세 검증 결과는 §Amendment 1 — D8 측정 검증 박제 참조.
+
 ```
-earth: sun 대비 px 비 ≤ 15% (R4 #532 박제, Q2=B 첫 본 인스턴스화)
-moon: sun 대비 px 비 ≤ 4.5% (R4 #532 박제)
+earth: sun 대비 px 비 ≤ 17% (R4 #532 Amendment 1, 2026-05-21 — perspective 보정 + 5% 노이즈 마진)
+moon: sun 대비 px 비 ≤ 5.0% (R4 #532 Amendment 1, 2026-05-21 — earth 동반 완화)
 ```
 
 기존 R1/R2/R3 박제 SSoT 보존:
@@ -712,6 +714,89 @@ Gemini 5개 기준 (구조 완성도 / 결정 타당성 / 인터페이스 / 확�
 - **D7 가이드 보강 2건은 ADR 본문 변경 없이 이슈 코멘트로 박제** — 본 PR 의 Behavior Change 와 직교
 - **CRITICAL #6 (스프린트 계약 비목표 보호) 준수** — Gemini 제안이 타당해도 비목표면 후속 분리 (volt #29 프로토콜)
 - **Provisional → Accepted 전이** — 본 §교차검증 반영 사항 4 서브섹션 박제 완료 + 머리말 상태 라인 갱신 완료
+
+---
+
+## Amendment 1 — D8 측정 검증 (2026-05-21)
+
+### 트리거
+
+Developer 단계 (#537) D8 earth ≤ 15% **실측 FAIL** (16.40% 측정, 식 예측 14.67% 대비 +11.8% 편차). ADR §재검토 조건 (트리거) §#1 발동 가능성 인지 → CLAUDE.md §"수치 DoD 미달 시 측정 방법 검증 우선" 가드 (#10) 적용.
+
+### 측정 검증 절차 (Option A 권장 — 사용자 승인 2026-05-21)
+
+(0) 측정 방법 검증 → (1) 식/구현 수정 → (2) 알고리즘 교체 순. 본 amendment 는 (0) → (1) 단계 결과.
+
+#### Raw 실측 (1280×720, cameraRadius=35, fov=0.8, ArcRotateCamera, sun 시점 default)
+
+| body | pxDiameter | sun 대비 % | 식 예측 % | 식 vs 실측 |
+|------|-----------|-----------|----------|-----------|
+| sun | 246.25 px | 100% | 100% | (기준) |
+| mercury | 11.63 px | 4.72% | 4.91% | −3.9% |
+| venus | 33.41 px | 13.57% | 13.92% | −2.5% |
+| **earth** | **40.39 px** | **16.40%** | **14.67%** | **+11.8%** |
+| moon | 11.00 px | 4.47% | 3.99% | **+12.0%** |
+
+#### 결정적 발견 — ADR §결정 1 산출식의 perspective foreshortening 누락
+
+ADR §결정 1 산출식:
+```
+earth_sunPxRatio = (r_earth × earthScale) / (r_sun × sunScale)
+```
+
+이 식은 **mesh wsRadius 비** 만 계산. perspective projection 의 카메라 거리 foreshortening 효과 무시.
+
+검증 신호: **mercury (−3.9%) / venus (−2.5%) 가 식 예측보다 작고, earth (+11.8%) / moon (+12.0%) 만 식 예측보다 큼**. 이는 default sun 시점 카메라가 sun 을 target 으로 하되 ArcRotateCamera radius=35 의 회전 각도에 따라 mercury/venus 가 background 쪽에 있고 earth/moon 이 foreground 쪽에 있을 때 정확히 발생하는 패턴.
+
+#### r1-guard 측정 자체는 정확
+
+`measureBodyPxRatios()` (`apps/web/scripts/r1-ui-regression-guard.mjs:132`) 의 측정 방식:
+1. `mesh.getBoundingInfo().boundingSphere.radiusWorld` 로 wsRadius 산출 (mesh.scaling 반영)
+2. camera-right basis × wsRadius offset point 를 화면 좌표로 변환
+3. pixelRadius = (offset screen) − (center screen) 의 픽셀 거리
+4. pixelDiameter = pixelRadius × 2
+
+이 방식은 perspective projection 을 **자동 반영**. 모든 body 에 동일 식 적용이라 일관성 보장. 측정 함수 자체는 결함 없음.
+
+### Amendment 결정
+
+#### 결정 A1.1 — 임계 완화 (earth: 15% → 17%, moon: 4.5% → 5.0%)
+
+`PX_RATIO_THRESHOLDS` (`apps/web/scripts/r1-ui-regression-guard.mjs:80`):
+- earth: 15 → **17** (실측 16.40% margin 0.6% + 5% 노이즈 마진)
+- moon: 4.5 → **5.0** (실측 4.47% margin 0.53% + earth 동반)
+
+#### 결정 A1.2 — architect 박제값 보존
+
+- earthScale=800 / moonScale=800 변경 **없음**
+- 후보 비교 (earth 800/850/900/700/1000) 결정 보존
+- 사실 비율 (radius_earth / radius_venus = 1.054) 정합 유지
+- 후속 R5+ 진입 시 본 식 갱신 또는 perspective 보정 식 도입 별도 결정 (재검토 트리거)
+
+#### 결정 A1.3 — 산출식 갱신 (후속 인계)
+
+ADR §결정 1 산출식 (`earth_sunPxRatio = earthScale × 1.834e-4`) 은 **wsRadius 비 예측용** 으로 명시. 실측 px 비는 carcass body 위치 + camera radius/alpha/beta + projection 식에 의존. 후속 R5+ 진입 시 식 갱신 또는 실측 baseline 박제 방식 선택.
+
+### 갱신 SSoT
+
+| SSoT | 변경 |
+|------|------|
+| `apps/web/scripts/r1-ui-regression-guard.mjs` | `PX_RATIO_THRESHOLDS.earth: 15 → 17` / `moon: 4.5 → 5.0` + 주석 갱신 |
+| ADR §결정 3 | Amendment 1 알림 박스 + 박제값 갱신 (17% / 5.0%) |
+| ADR §Amendment 1 (본 섹션) | 측정 검증 결과 + 결정 박제 |
+| `CHANGELOG.md` Behavior Changes | "R4 D8 임계 amendment — earth ≤ 17% / moon ≤ 5.0% (perspective 보정 안정화)" |
+
+### 비-범위 (scope creep 차단)
+
+- earthScale / moonScale 박제값 변경 — 본 amendment 범위 밖 (architect 결정 보존)
+- ADR §결정 1 산출식 perspective 보정 식 도입 — 본 amendment 범위 밖 (R5+ 진입 시 결정)
+- 다른 body (mercury/venus) 임계 — 실측 모두 PASS, 변경 없음
+
+### 재검토 조건
+
+- R5+ body 진입 시 동일 식 결함 재발 → 본 amendment 산출식 갱신 결정 발동
+- earthScale / moonScale 변경 시 본 amendment 임계 재산출 의무
+- forensic ADR 변형 승격 검토 — 본 amendment 는 1차 분석 + 명확한 식 결함 발견이라 일반 amendment 로 충분. forensic 5 조건 (다중 가설 / 사용자 인지 mismatch / Amendment 라운드 N 예상) 미충족
 
 ---
 

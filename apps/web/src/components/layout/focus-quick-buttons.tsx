@@ -16,9 +16,10 @@ const FOCUS_BUTTONS = [
   { id: 'sun', label: '태양' },
   { id: 'mercury', label: '수성' }, // R2 #361 — sun 다음 천체 거리 순
   { id: 'venus', label: '금성' }, // R3 #369 — mercury 다음 천체 거리 순
-  { id: 'earth', label: '지구' },
-  { id: 'jupiter', label: '목성' },
-  { id: 'neptune', label: '해왕성' },
+  { id: 'earth', label: '지구' }, // R4 #532 — venus 다음 천체 거리 순
+  { id: 'moon', label: '달' }, // R4 #532 — earth 인접 (parent-satellite 자연 그룹)
+  { id: 'jupiter', label: '목성' }, // R-Phase Allowlist disabled (R6 진입 전)
+  { id: 'neptune', label: '해왕성' }, // R-Phase Allowlist disabled (R10 진입 전)
 ];
 
 // R-Phase 미진입 body 호버 / focus 시 사용자 안내 문구.
@@ -69,7 +70,7 @@ export function FocusQuickButtons() {
             aria-disabled={!enabled}
             title={enabled ? undefined : DISABLED_TOOLTIP}
             onClick={() => sendCommand({ type: 'focusOn', bodyId: b.id })}
-            className={`num text-caption px-2 py-1 rounded-sm border transition-colors ${
+            className={`num text-mini px-1 py-0.5 rounded-sm border transition-colors ${
               !enabled
                 ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
                 : selected === b.id
@@ -86,7 +87,7 @@ export function FocusQuickButtons() {
         type="button"
         data-testid="focus-reset"
         onClick={() => sendCommand({ type: 'resetCamera' })}
-        className="num text-caption px-2 py-1 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
+        className="num text-mini px-1 py-0.5 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
         reset
@@ -99,7 +100,7 @@ export function FocusQuickButtons() {
         aria-disabled={selected === null}
         title={selected === null ? '포커스 상태에서만 사용 가능' : '자유시점 (Esc)'}
         onClick={() => sendCommand({ type: 'enterFreeFly' })}
-        className={`num text-caption px-2 py-1 rounded-sm border transition-colors ${
+        className={`num text-mini px-1 py-0.5 rounded-sm border transition-colors ${
           selected === null
             ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
             : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'

@@ -460,34 +460,87 @@ export function createSolarSystemScene(
   }
 
   // 궤도선 — P12-A: tier 전환 시 재샘플링. 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
+  //
+  // R4 #532 — ADR `20260520-r4-earth-moon-visualization.md` §결정 4:
+  //   달 궤도 라인은 별도 LineSystem (`moon-orbit-line`) 으로 분리하여 earth focus 진입 시 색상 강조.
+  //   - 일반 시점 (focusBodyIdForAssert !== 'earth'): 기본 궤도선 색상 (Color3(0.25, 0.28, 0.4))
+  //   - earth focus 시점 (focusBodyIdForAssert === 'earth'): 강조 색상 (Color3(0.65, 0.7, 0.85)) — 명도 ~2.6배
+  //   WebGL 한계로 LineSystem thickness 직접 조절 불가 → 색상 명도 강조로 ADR 의도 (시각 강조) 실현.
   let orbitLines: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
+  let moonOrbitLine: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
   let orbitLinesVisible = showOrbitLines;
+
+  // R4 #532 — moon orbit line 색상 SSoT (결정 4).
+  const MOON_ORBIT_COLOR_DEFAULT = new Color3(0.25, 0.28, 0.4); // 일반 시점 (기본 orbitLines 와 동일)
+  const MOON_ORBIT_COLOR_EARTH_FOCUS = new Color3(0.65, 0.7, 0.85); // earth focus 강조 (~2.6배 명도)
+
   const rebuildOrbitLines = () => {
     // 기존 라인 제거 후 현재 tier 의 renderScale 로 재샘플링.
     if (orbitLines) {
       orbitLines.dispose();
       orbitLines = null;
     }
+    if (moonOrbitLine) {
+      moonOrbitLine.dispose();
+      moonOrbitLine = null;
+    }
     const batches: Vector3[][] = [];
+    let moonOrbitPts: Vector3[] | null = null;
     for (const body of system.bodies) {
       if (!body.orbit) continue;
       // defense-in-depth #5 (이슈 #439): R-Phase 미진입 body 는 본체가 점 수준이라
       // 궤도선만 그리면 시각 혼란. R_PHASE_BODY_ALLOWLIST SSoT 직접 참조 (BODY_SCALE 의존 역전 회피).
       if (!(R_PHASE_BODY_ALLOWLIST as readonly string[]).includes(body.id)) continue;
       const pts = sampleOrbitPoints(body, activeTier);
-      if (pts) batches.push(pts);
+      if (!pts) continue;
+      // R4 #532 — moon orbit 은 별도 LineSystem 으로 분리 (결정 4: earth focus 시 색상 강조).
+      if (body.id === 'moon') {
+        moonOrbitPts = pts;
+      } else {
+        batches.push(pts);
+      }
     }
     if (batches.length > 0) {
       orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
       orbitLines.color = new Color3(0.25, 0.28, 0.4);
       orbitLines.isVisible = orbitLinesVisible;
     }
+    if (moonOrbitPts) {
+      moonOrbitLine = MeshBuilder.CreateLineSystem(
+        'moon-orbit-line',
+        { lines: [moonOrbitPts] },
+        scene,
+      );
+      // 초기 색상은 default — focus 상태에 따라 setMoonOrbitHighlight 가 갱신.
+      // (focusBodyIdForAssert 는 779 line 에서 선언되므로 TDZ 회피 위해 default 로 시작.
+      //  tier 전환 후 setFocusOrigin 이 setMoonOrbitHighlight('earth') 재호출해 강조 복원.)
+      moonOrbitLine.color = MOON_ORBIT_COLOR_DEFAULT;
+      moonOrbitLine.isVisible = orbitLinesVisible;
+      // R4 #532 — moon orbit 은 earth 중심 상대 좌표 (sampleOrbitPoints 가 parent 0 원점 기준 ellipse).
+      // earth 가 매 프레임 움직이므로 LineSystem.position 을 updateAt 루프에서 earth scene-unit 좌표로 동기화.
+      // (ADR §결정 4: "지구 중심 small circle" 정합 + ADR §결정 6: "earth-moon 거리 실측 보존")
+      // 초기 position 은 default (0,0,0) — 첫 updateAt 호출 시점에 갱신됨.
+    }
+  };
+
+  /**
+   * R4 #532 — moon orbit line 색상 강조 토글 (ADR §결정 4).
+   *
+   * earth focus 진입 / 해제 시 호출되어 moon orbit line 색상을 default ↔ earth-focus 강조 사이 전환.
+   * rebuildOrbitLines 가 tier 전환 시 호출되어 초기값으로 재설정되므로, focus 변경 시점에 별도 호출 필요.
+   */
+  const setMoonOrbitHighlight = (focusedBodyId: string | null) => {
+    if (!moonOrbitLine) return;
+    moonOrbitLine.color =
+      focusedBodyId === 'earth' ? MOON_ORBIT_COLOR_EARTH_FOCUS : MOON_ORBIT_COLOR_DEFAULT;
   };
   rebuildOrbitLines();
   disposables.push({
     dispose: () => {
       orbitLines?.dispose();
       orbitLines = null;
+      moonOrbitLine?.dispose();
+      moonOrbitLine = null;
     },
   });
 
@@ -647,6 +700,9 @@ export function createSolarSystemScene(
       mesh.computeWorldMatrix(true);
     }
     rebuildOrbitLines();
+    // R4 #532 — tier 전환으로 moon orbit line 이 재생성되어 default 색상 초기화됨.
+    // focus 가 earth 라면 강조 복원 (ADR §결정 4).
+    setMoonOrbitHighlight(focusBodyIdForAssert);
 
     // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. tier 전환 시 origin 을 대칭 처리.
     //  - T1/T2 진입 → [0,0,0] reset (T1/T2 에서 매 프레임 FO overhead 제거)
@@ -782,6 +838,8 @@ export function createSolarSystemScene(
     if (!world) return;
     floatingOrigin.setOriginToBody([world[0], world[1], world[2]]);
     focusBodyIdForAssert = bodyId;
+    // R4 #532 — earth focus 진입 시 moon orbit line 강조 (ADR §결정 4).
+    setMoonOrbitHighlight(bodyId);
   };
   // P12-A #298 — focus 해제 (reset) 시 tier 는 free-fly 경로로 전환.
   //
@@ -797,6 +855,8 @@ export function createSolarSystemScene(
   const clearFocus = () => {
     focusBodyIdForAssert = null;
     setTier(defaultInitialTier());
+    // R4 #532 — focus 해제 시 moon orbit line 강조 해제 (ADR §결정 4).
+    setMoonOrbitHighlight(null);
   };
 
   // #509 — 자유시점 진입. focus tracking 만 해제 (tier/origin 보존).
@@ -804,6 +864,8 @@ export function createSolarSystemScene(
   // tier/origin 까지 default 복원하면 사용자 시점이 깨짐 (예: venus 가까이 → 갑자기 solar 뷰).
   const detachFocus = () => {
     focusBodyIdForAssert = null;
+    // R4 #532 — 자유시점 진입 시도 moon orbit line 강조 해제 (focus 상태 아님).
+    setMoonOrbitHighlight(null);
   };
 
   // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
@@ -911,6 +973,21 @@ export function createSolarSystemScene(
         (world[1] - oy) * sceneUnitPerMeter,
         (world[2] - oz) * sceneUnitPerMeter,
       );
+    }
+
+    // R4 #532 — moon orbit line position 동기화 (ADR §결정 4).
+    // moon orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
+    // earth 가 sun 주위를 매 프레임 공전하므로 LineSystem 의 position 을 earth scene-unit 좌표로 동기.
+    // moon mesh 위치는 worldPositions 가 sun 중심 좌표라 별도 처리 불필요 (위 루프에서 처리됨).
+    if (moonOrbitLine) {
+      const earthWorld = worldPositions.get('earth');
+      if (earthWorld) {
+        moonOrbitLine.position.set(
+          (earthWorld[0] - ox) * sceneUnitPerMeter,
+          (earthWorld[1] - oy) * sceneUnitPerMeter,
+          (earthWorld[2] - oz) * sceneUnitPerMeter,
+        );
+      }
     }
 
     // Floating Origin primary follow (ADR §1-B 확장) — **mesh.position 갱신 후 발동**.
@@ -1380,6 +1457,8 @@ export function createSolarSystemScene(
   const setOrbitLinesVisible = (visible: boolean) => {
     orbitLinesVisible = visible;
     if (orbitLines) orbitLines.isVisible = visible;
+    // R4 #532 — moon orbit line 도 동일하게 가시성 토글 (ADR §결정 4 default visible 정합).
+    if (moonOrbitLine) moonOrbitLine.isVisible = visible;
   };
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {

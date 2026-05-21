@@ -14,14 +14,20 @@
  *   5. WASM 의존 도메인 (scene / physics / render / gpu) 한정 sub-path 추가 금지 검증
  *      — `scripts/verify-core-exports-immutable.sh` 자동 차단 (라운드 1 turbopack `__dirname` SSR 500 회귀 가드)
  *
- * 현재 박제: R1 sun (#329) + R2 mercury (#361) + R3 venus (#369)
+ * 현재 박제: R1 sun (#329) + R2 mercury (#361) + R3 venus (#369) + R4 earth + moon (#532)
  *
  * ⚠️ wasm-safe 패턴: 본 모듈은 `packages/core/src/scene/index.ts` 의 `export *` re-export 만 통해 노출된다.
  *    `packages/core/package.json` exports field 에 sub-path entry (`./scene/r-phase-allowlist`) 를 추가하면
  *    turbopack module dep graph 변경으로 wasm-pack `--target nodejs` 의 `__dirname` resolve 가
  *    `/ROOT/...` 가상 path 로 ENOENT 발생 → SSR 500. ADR §Amendment §결정 D1 참조.
  */
-export const R_PHASE_BODY_ALLOWLIST = Object.freeze(['sun', 'mercury', 'venus'] as const);
+export const R_PHASE_BODY_ALLOWLIST = Object.freeze([
+  'sun',
+  'mercury',
+  'venus',
+  'earth', // R4 #532 — Q2=B 첫 본 인스턴스화
+  'moon', // R4 #532 — satellite 첫 본 사례 (parent-satellite SSoT 패턴)
+] as const);
 
 export type RPhaseBodyId = (typeof R_PHASE_BODY_ALLOWLIST)[number];
 
