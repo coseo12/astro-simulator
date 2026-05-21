@@ -1,8 +1,8 @@
 # ADR: R4 지구 + 달 시각화 — Q2=B 비례 결정 정책 SSoT 첫 본 인스턴스화
 
-- **상태**: Accepted (cross-validate 2026-05-20, Amendment 1 2026-05-21 — D8 측정 검증 임계 완화, **Amendment 2 2026-05-21 — forensic ADR 변형 승격 + moon visual fusion 해결 (#539)**)
-- **날짜**: 2026-05-20 (Amendment 2 forensic 승격: 2026-05-21)
-- **결정자**: architect (#532 R4 PM 합의 라운드 1+2 후 위임 / #539 forensic Amendment 2 라운드)
+- **상태**: Accepted (cross-validate 2026-05-21 Gemini 2.5 pro 합의 후 Amendment 3 Provisional → Accepted 전이 완료). Accepted 시점들: cross-validate 2026-05-20 / Amendment 1 2026-05-21 D8 측정 검증 임계 완화 / Amendment 2 2026-05-21 forensic ADR 변형 승격 + moon visual fusion 해결 (#539) / **Amendment 3 2026-05-21 — LOD × visual scale 결합 결함 해결 + measurement-only DoD 함정 회피 (#539 QA 차단 후속, Gemini cross-validate 합의 후 Accepted)**
+- **날짜**: 2026-05-20 (Amendment 2 forensic 승격: 2026-05-21, Amendment 3 라운드: 2026-05-21)
+- **결정자**: architect (#532 R4 PM 합의 라운드 1+2 후 위임 / #539 forensic Amendment 2 라운드 / #539 Amendment 3 라운드 — PR #542 QA 차단 후속)
 - **관련**: #532 (본 R4 스프린트), #539 (forensic Amendment 2 라운드 — moon visual fusion), #537 (PR R4 머지본 commit 9b4ba37), `20260425-r1-sun-visualization.md` (R1 SSoT — sunScale=50 + bodyScale 인프라), `20260428-r2-mercury-visualization.md` (R2 SSoT — mercuryScale=700, R-Phase ADR 패턴), `20260429-r3-venus-visualization.md` (R3 SSoT — venusScale=800, Concrete Prediction "≤ 2 라인" 첫 검증), `20260430-r3-followup-body-proportion.md` (**Q2=B 비례 결정 정책 SSoT** + Amendment 2026-05-01 라운드 1/2 + Amendment 2026-05-03 라운드 3 + forensic 모범), `20260504-r-phase-allowlist-guard.md` (R-Phase 진입 4곳 동시 박제 절차), `20260424-p11-b-lod-design.md` (LOD × scale 합성 순서), `20260422-floating-origin.md`, [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md) (**Amendment 2 발동 — 본 ADR forensic 변형 승격**)
 - **교훈 적용**:
   - "신규 함수 ≠ 신규 구현" (volt #21 — R1+R2+R3 인프라 100% 재사용 검증, **moon=satellite parent earth 첫 본 사례**)
@@ -13,6 +13,50 @@
   - "인계 항목 실측 재검증" (volt #14 — R4 진입 시점 baseline 실측: sunScale=50 / mercuryScale=700 / venusScale=800 보존 검증 후 박제)
   - "PM DoD 구조 drift 금지" (volt #76 — Q4 (architect 위임) 만 인스턴스화, 다른 PM 합의 항목 (Q1/Q2/Q3/Q5) 재구조화 금지)
   - "결합 간과 — Claude 4종 편향" (volt #29 — earth 와 moon 의 결합 (parent-satellite) 명시 + 5-body 누적 모바일 침습성 결합 명시)
+
+---
+
+## 현재 유효 결정 요약 (Living ADR Executive Summary, Amendment 3 cross-validate 발견 1 통합)
+
+> 본 ADR 은 Amendment 1/2/3 거치며 길어졌다. 신규 팀원 / 후속 R-Phase architect 가 빠르게 최종 결정 파악할 수 있도록 **현재 유효한 박제값과 결정만** 본 섹션에 요약. 상세 후보 비교 / forensic 측정 / 회고는 §결정 N / §Amendment N 본문 참조.
+
+### 핵심 박제값
+
+| 항목 | 박제값 | 위치 | 박제 시점 |
+|---|---|---|---|
+| `BODY_SCALE.earth` | **800** | `apps/web/src/constants/body-scale.ts` | R4 본 진입 §결정 1 |
+| `BODY_SCALE.moon` | **800** | `apps/web/src/constants/body-scale.ts` | R4 본 진입 §결정 2 |
+| `EARTH_MOON_ORBIT_VISUAL_SCALE` | **30** | `packages/core/src/scene/orbit-visual-scale.ts` | Amendment 2 (#539 forensic) |
+| `FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE` (또는 동등 식) | **20** (식 후보 2 선택 시) | developer 단계 박제 위치 결정 | Amendment 3 (#539 fix) |
+| `PX_RATIO_THRESHOLDS.earth` | **17%** | `apps/web/scripts/r1-ui-regression-guard.mjs` | Amendment 1 |
+| `PX_RATIO_THRESHOLDS.moon` | **5.0%** | `apps/web/scripts/r1-ui-regression-guard.mjs` | Amendment 1 |
+| `R_PHASE_BODY_ALLOWLIST` | `['sun', 'mercury', 'venus', 'earth', 'moon']` | `packages/core/src/scene/r-phase-allowlist.ts` | R4 본 진입 §결정 R-Phase |
+
+### 핵심 결정 요약
+
+1. **earth/moon 박제값** (R4 §결정 1+2): earthScale=800, moonScale=800 — 사실 비율 (radius_earth / radius_venus = 1.054) 정합
+2. **moon 궤도 visible 정책** (R4 §결정 4): default 진입에서 visible 보장 (PM Q2=A 합의)
+3. **moon shortcut 등록** (R4 §결정 5): 상단 bar "달" 버튼 + URL `?focus=moon` 진입 지원
+4. **R-Phase Allowlist 5 body** (R4 §결정 R-Phase): sun/mercury/venus/earth/moon 진입 + 그 외 자동 reset
+5. **moon visual fusion 해결** (Amendment 2 §결정 6 → iii-amended): rendering 시점 earth-moon orbit visual scale=30 도입. 실측 데이터 SSoT (`solar-system.json`) + 박제값 (earthScale/moonScale=800) 보존
+6. **moon focus 시 mesh 외각 카메라 보장** (Amendment 3): focus 진입 식 `meshRadius × FOCUS_USER_RADIUS_MULTIPLIER` 의 satellite 분기 도입 (식 후보 1~3 developer 단계 선택). LOD/visual scale 무수정
+7. **measurement-only DoD 함정 회피 가드** (Amendment 3 메타 결정): LOD-aware measurement 패턴 SSoT — `mesh.isVisible` 검증 후 wsRadius × projection 측정. R5+ R-Phase ADR 의무 박제
+
+### 비-범위 (전 Amendment 공통 보존)
+
+- 실측 데이터 변경 ❌ (`solar-system.json`)
+- earthScale/moonScale 박제값 변경 ❌ (R4 §결정 1+2 보존)
+- LOD 시스템 변경 ❌ (Amendment 3 §결정 — `lod.ts` 무수정)
+- mercury/venus/sun 박제값 변경 ❌
+- `apps/web/src/components/sim-canvas.tsx:159 radius=35` ❌ (R1 박제)
+- floating origin 시스템 변경 ❌
+- R5+ body 진입 ❌
+- #534 (UX tooltip) / #535 (a11y) / #536 (FPS 가드) / #541 (Visual Fidelity 원칙) ❌ (후속 분리 보존)
+
+### 후속 R-Phase 인계 의무
+
+- R5 (mars/phobos/deimos) / R6 (jupiter/galilean) / R7 (saturn/titan) 진입 시 **satellite 가 있는 모든 case 에 LOD × visual scale 결합 점검 + LOD-aware measurement DoD 의무**
+- Amendment 3 §"R-Phase 일반 framework 보강" 참조
 
 ---
 
@@ -1263,8 +1307,414 @@ CLAUDE.md §Forensic ADR 변형 5조건 자기 점검:
 
 ---
 
+## Amendment 3 — LOD × visual scale 결합 결함 해결 + measurement-only DoD 함정 회피 (2026-05-21)
+
+### 트리거
+
+Amendment 2 fix PR ([#542](https://github.com/coseo12/astro-simulator/pull/542), commit `6c03c92`) QA 단계 차단. QA sub-agent 가 PR #542 동적 검증에서 **D2.4 시각 회귀** 발견:
+
+1. moon focus 진입 6회 측정 (t=2~12s) — `cameraRadius=302130.22` 고정, `moon` (high variant) `isVisible=false`, `moon-lod-low` (1 px billboard) 만 가시
+2. wheel zoom-in 30회로도 `cameraRadius=302130 → 301830` (1% 변동) — LOD high 전환 미발동
+3. 스크린샷 (`.verify-screenshots/qa-pr542/d24-moon-focus.png` / `d24-moon-focus-zoomin.png`) — 화면 중앙 mesh 시각적으로 보이지 않음. 우측에 보이는 dot 은 사이드 UI indicator (`3984 km (focus: moon)` 라벨 옆)
+4. Developer 보고 D2.4 196.65 px 측정값은 **`isVisible=false` 인 high variant 의 wsRadius 기반 projection** — measurement-only 함정 정확 재현
+
+QA 코멘트 SSoT: [PR #542 QA 코멘트](https://github.com/coseo12/astro-simulator/pull/542#issuecomment-4504915805).
+
+### Forensic 변형 5조건 점검 (5/5 유지, Amendment 2 라운드와 동등)
+
+1. ✅ **다중 가설 N≥2** — (a) cameraRadius 자동 조정 / (b) LOD high 강제 전환 / (c) LOD 임계 재조정 / (d) visual scale 만 변경 / (e) 조합 5 가설 비교
+2. ✅ **Runtime 측정 데이터 필수** — QA Playwright 측정 + 스크린샷 5종 (`.verify-screenshots/qa-pr542/`). 정적 분석으로는 `cameraRadius/moonScaling ≈ 1.011` mesh-내부-카메라 모순 발견 어려움
+3. ✅ **DoD PASS 인데 사용자/제품 회귀** — D2.1~D2.6 measurement 6개 PASS (PR #542 본문 박제) → QA visual 검증 FAIL (volt #74 정확 사례 2회 연속)
+4. ✅ **5±2 옵션 비교** — 옵션 (a)~(e) 5개 후보 §옵션 비교 표
+5. ✅ **Amendment 라운드 N≥3 예상** — Amendment 1 → 2 → 3 직계 후속 + Amendment 4 가능성 (LOD 전환 잔재 / visual scale fallback 발동 시) 박제
+
+### Forensic 측정 결과 (2026-05-21, PR #542 QA 동적 검증 박제)
+
+QA 코멘트 본문 + 스크린샷 5종 박제. 본문 인용 (ADR 단독 가독성):
+
+#### 측정 1 — moon focus 진입 6회 측정 (PR #542 QA 코멘트 §"D2.4 차단 사유" §"진단" §1)
+
+| 측정 항목 | 값 | 진단 |
+|---|---|---|
+| `cameraRadius` (camera-controller 결과) | **302130.22** (고정, 12s 정착) | meshRadius × FOCUS_USER_RADIUS_MULTIPLIER (=5) 식 결과 |
+| `moon` (high variant) `isVisible` | **false** | LOD pass 결과 `level=low` → `applyLodVariantState` 가 high `isVisible=false` 토글 |
+| `moon` (high variant) `scaling` | **298809.52** | moonScale=800 × visual scale 적용된 좌표계 |
+| `moon-lod-low` (billboard) `isVisible` | **true** | 1 px billboard 만 가시 |
+| `moon-lod-low` (billboard) `scaling` | **1.0** | billboard 는 bodyScale 미적용 (sphere/mid 만 적용, ADR `20260502-391-phase2-billboard.md` §결정 참조) |
+
+→ **카메라가 moon mesh 표면 안쪽 0.01 단위에 박힘** (`cameraRadius/moonScaling = 302130/298809 ≈ 1.011`). 화면 정중앙은 mesh 내부 → mesh 가 화면 밖 frustum (`screenCoverage ≈ 0`) → LOD `low` 판정 → high `isVisible=false` 토글.
+
+#### 측정 2 — wheel zoom-in 30회 후 (PR #542 QA 코멘트 §"D2.4 차단 사유" §"진단" §2)
+
+| 측정 항목 | 값 | 진단 |
+|---|---|---|
+| `cameraRadius` (zoom-in 30회 후) | **301830** (1% 변동) | wheel zoom step 작아서 1% 만 줄어듦 |
+| `moon` (high variant) `isVisible` | **여전히 false** | LOD high 전환 미발동 — `screenCoverage` 가 임계 high 50px 도달 못 함 |
+
+→ **wheel zoom 으로는 mesh 안쪽 박힘 해소 불가능** — `lowerRadiusLimit` 가 desiredRadius × 0.5 로 완화돼 있어 더 가까이 갈 수도 있지만 LOD 임계 (high=50, mid=8) 가 mesh 안쪽 카메라에서 trigger 안 됨 (screenCoverage=0).
+
+#### 측정 3 — focus 진입 코드 경로 (architect 정적 분석, sim-canvas.tsx:335-378)
+
+```typescript
+const syncFocusToScene = (bodyId: string | null) => {
+  if (bodyId !== null) {
+    const mesh = solar.meshes.get(bodyId);  // ← high variant 만 반환
+    if (mesh) {
+      solar.setFocusOrigin(bodyId);  // ← focusBodyIdForAssert='moon'
+      mesh.computeWorldMatrix(true);
+      const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+      // ↑ moon high variant wsRadius — visual scale 적용된 좌표계 + moonScale=800 → 매우 큰 값
+      const desiredRadius = Math.max(
+        meshRadius * sceneApi.FOCUS_USER_RADIUS_MULTIPLIER,  // ← × 5
+        meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+      );
+      // ↑ moon mesh 표면 + (mesh 반지름의 4배) — 즉 mesh 안쪽 cameraRadius
+      const currentTier = solar.getTier();
+      const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(currentTier);
+      const cameraDistMeters = desiredRadius * metersPerSceneUnit;
+      solar.applyFocusTier(bodyId, cameraDistMeters);
+      controller.focusOn({ mesh });  // ← camera.radius Animation 시작
+    }
+  }
+};
+```
+
+→ `meshRadius * 5` 식은 R3 까지 정상 (mesh radius 가 작아서 camera 가 mesh 외각에 위치). 그러나 Amendment 2 의 visual scale=30 적용 + moonScale=800 결합으로 moon mesh wsRadius 가 sun mesh wsRadius 와 비슷한 규모 → `× 5` 가 mesh **내부** 좌표를 desiredRadius 로 반환.
+
+### 가설 검증 결론
+
+| 가설 | 결론 | 근거 |
+|---|---|---|
+| **가설 1: focus 진입 시 cameraRadius 계산 식 (`meshRadius × 5`) 자체 결함** | **확정 (근본 원인)** | visual scale 적용 + moonScale=800 결합으로 moon high variant wsRadius 가 매우 커 cameraRadius 가 mesh 내부에 위치. `cameraRadius/moonScaling ≈ 1.011` 실측 |
+| **가설 2: LOD 시스템 결함 — `isFocused` 분기 미발동** | **기각** | `lod.ts:96` 가 `isFocused=true` 면 항상 high 강제. 그러나 `runLodPass` 의 `screenCoverageRadius` 가 카메라 안쪽 mesh 좌표를 frustum 밖으로 반환 → coverage=0 → low. 즉 LOD 분기 자체는 정상이지만 입력 (mesh 안쪽 카메라) 자체가 비정상 |
+| **가설 3: visual scale=30 부족** | **기각** | sun 시점 분리 (D2.1/D2.2) PASS — visual scale 자체는 작동. moon focus 진입 시 카메라 위치 결함이지 visual scale 결함 아님 |
+| **가설 4: moon mesh wsRadius 가 R-Phase 5 body 중 가장 큰 mesh 가 됨** | **확정 (가설 1 부산물)** | earth wsRadius (mesh) 5.103e9 m vs moon visual scale=30 시 mesh radius scaling 직접 비교 필요 — 본 Amendment 3 §해결 옵션 §(a) 에서 산출 |
+| **가설 5: focus 진입 시 LOD high 강제 전환 누락** | **부분 확정** | `applyLodVariantState` 가 `level=low` 정착 시 high `isVisible=false` 토글. focus 진입 시점 LOD high lock 부재 → low billboard fallback 발동 |
+
+### 옵션 비교 (5축, Amendment 3 라운드)
+
+#### 옵션 (a) — cameraRadius 자동 조정 (focus 진입 시 mesh 외각 보장)
+
+- **변경**: `camera-controller.ts` 의 `focusOn` 또는 `sim-canvas.tsx syncFocusToScene` 에서 `desiredRadius` 계산 시 **moon mesh wsRadius 무관 자연 거리** 산출
+  - 식 후보: `desiredRadius = max(meshRadius × 5, fixedSafeDistance(body.kind))` 또는 `desiredRadius = meshRadius × FOCUS_USER_RADIUS_MULTIPLIER_BY_KIND[body.kind]` (moon kind 한정 ×20 또는 ×50)
+- **장점**: 결합 결함의 직접 원인 (cameraRadius 식) 수정. LOD 시스템 무수정 — `screenCoverage` 가 정상 계산 → LOD high 자동 발동
+- **단점**: `meshRadius × 5` 식이 R1~R3 body 에 대해선 정상 작동 → moon (또는 satellite kind) 한정 분기 필요. 일반화 부담
+- **회귀 예측**: D3.1 (moon focus 시 mesh 외각 카메라) PASS / D3.2 (LOD high 자동 발동) PASS / D2.5 회귀 0 / R-Phase Allowlist 회귀 0
+- **R5+ 일반화 비용**: satellite kind 박제값 추가 (예: phobos/deimos/io/europa 각각 ×N) — 매 R-Phase 박제. 또는 satellite 일괄 정책 (모든 satellite ×20)
+
+#### 옵션 (b) — LOD high 강제 전환 (focus 상태에서 LOD 시스템 우회)
+
+- **변경**: `runLodPass` 가 `focusBodyIdForAssert === body.id` 면 `screenCoverage` 무관 high 강제 + `applyLodVariantState` 에서 high `isVisible=true` 강제
+- **장점**: LOD 시스템 수정 1곳 (`lod.ts:96` 가 이미 `isFocused=true` 시 high 반환하지만 추가 가드 — `screenCoverage=0` 인 mesh-안쪽 카메라 케이스에서도 high isVisible=true 보장)
+- **단점**: **사용자 화면에 mesh 가 보이지 않는 본질 미해결** — high variant 가 `isVisible=true` 여도 카메라가 mesh 내부에 있어 mesh 가 화면 밖 frustum. LOD 시스템만 우회해도 시각 회귀 해소 안 됨
+- **회귀 예측**: D3.2 (LOD high `isVisible=true`) PASS / D3.1 (mesh 화면 중앙 ≥ 200 px 직경) **FAIL** (카메라 안쪽 박힘 미해결) → 본 옵션 단독 무효
+- **R5+ 일반화 비용**: 0 (LOD pass 코드 수정 1곳)
+
+#### 옵션 (c) — LOD 임계 재조정 (visual scale 적용 좌표에서 LOD 임계 자동 보정)
+
+- **변경**: `lod.ts` 의 `LOD_PIXEL_THRESHOLDS` 또는 `LOD_BODY_THRESHOLDS` 를 visual scale 적용 mesh 에 대해 동적 임계 보정
+- **장점**: LOD 시스템 일반화 — 모든 visual scale body 자동 처리
+- **단점**: **카메라 안쪽 mesh 문제 직접 해결 안 됨** — screenCoverage=0 인 카메라 안쪽 mesh 는 어떤 임계도 high 반환 못 함. 임계 보정만으론 cameraRadius 결함 미해결
+- **회귀 예측**: 옵션 (b) 와 동일 — D3.1 FAIL. LOD 시스템 복잡도만 증가
+- **R5+ 일반화 비용**: 높음 (visual scale 적용 body 마다 임계 보정 식 박제)
+
+#### 옵션 (d) — visual scale 만 변경 (30 → 50 / 75 fallback)
+
+- **변경**: `EARTH_MOON_ORBIT_VISUAL_SCALE = 30 → 50 또는 75` 박제값 상향
+- **장점**: 박제값 1줄 변경
+- **단점**: **visual scale 상향은 moon position 만 멀어지게 함** — moon mesh wsRadius 자체는 `moonScale=800 × R_moon × renderScale` 식이라 visual scale 무관. 즉 `cameraRadius/moonScaling` 비율은 visual scale 변경에도 1.011 그대로 유지. mesh 안쪽 카메라 박힘 해소 불가. QA 가 "해결 불가 명시" 한 이유 — Amendment 2 §재검토 트리거 #7 의 30 → 50 → 75 fallback 은 D2.1/D2.2 sun 시점 fusion 회귀 시점 가드였지, D2.4 mesh-안쪽-카메라 가드 아님
+- **회귀 예측**: D3.1 FAIL (visual scale 100 이여도 mesh 안쪽 카메라 동일)
+- **R5+ 일반화 비용**: 0 (박제값만)
+
+#### 옵션 (e) — 조합 (옵션 a + b)
+
+- **변경**: 옵션 (a) cameraRadius 자동 조정 + 옵션 (b) LOD high 강제 전환 (defense-in-depth)
+- **장점**: 두 layer 직교 가드 — cameraRadius 식이 향후 회귀해도 LOD high 강제로 최소 1 px billboard 가 아닌 high variant 가시 보존
+- **단점**: 옵션 (a) 단독으로 충분 — 옵션 (b) 는 본질 미해결이라 추가 가치 낮음. 복잡도 증가
+- **회귀 예측**: 옵션 (a) 와 동일 + 옵션 (b) 가드 잔재
+- **R5+ 일반화 비용**: 옵션 (a) 수준
+
+#### 축별 비교 매트릭스
+
+| 축 | (a) cameraRadius 자동 조정 | (b) LOD high 강제 | (c) LOD 임계 재조정 | (d) visual scale↑ | (e) a+b 조합 |
+|---|---|---|---|---|---|
+| D3.1 mesh 화면 중앙 ≥ 200 px | **✓** | ✗ | ✗ | ✗ | **✓** |
+| D3.2 high variant `isVisible=true` | **✓** (LOD 자동) | ✓ (강제) | ✓ (강제) | ✗ | **✓** |
+| 박제값 변경 최소 | △ (식 변경 + 박제값 1) | △ (LOD 가드 1줄) | ✗ (임계 보정 식) | ✓ (1줄) | ✗ (a+b 합) |
+| LOD 시스템 무수정 | **✓** | ✗ | ✗ | **✓** | ✗ |
+| Amendment 2 박제 보존 | **✓** | ✓ | ✓ | ✗ (30→상향) | ✓ |
+| R5+ satellite 일반화 | △ (kind 분기 또는 일괄) | ✓ (수정 1곳) | △ (임계 식) | ✓ (박제값만) | △ |
+| 결합 결함 본질 해결 | **✓** (cameraRadius 식) | ✗ (LOD 우회) | ✗ (LOD 임계) | ✗ (visual scale) | **✓** |
+| ADR Amendment 필요 | 본 ADR (Amendment 3) | 본 ADR + LOD ADR | 본 ADR + LOD ADR | 본 ADR (박제값만) | 본 ADR + LOD ADR |
+
+### 선택 — 옵션 (a) "cameraRadius 자동 조정"
+
+근거 (CLAUDE.md §교차검증 §결합 간과 편향 + §순수주의 가드 + §결정은 단일·명시적):
+
+1. **결합 결함 본질 해결** — 회귀의 직접 원인 (cameraRadius 식 결함) 수정. LOD 시스템은 정상 작동 — 입력 (mesh 안쪽 카메라) 만 정상이면 자동 회복
+2. **LOD 시스템 무수정** — `lod.ts:96` 의 `isFocused` 분기 보존. ADR `20260424-p11-b-lod-design.md` 와 직교
+3. **Amendment 2 박제 보존** — `EARTH_MOON_ORBIT_VISUAL_SCALE = 30` 박제값 무수정, `solar-system.json` 데이터 보존, earthScale=800/moonScale=800 보존
+4. **R5+ satellite 일반화 가능** — focus 진입 식을 (i) body.kind === 'moon' 한정 분기 또는 (ii) satellite (parentId !== null && parentId !== 'sun') 일괄 정책 으로 일반화. (ii) 가 R5+ phobos/deimos/io/europa/titan 자동 수용 → developer 단계 결정
+5. **D3.1/D3.2 동시 PASS** — mesh 외각 카메라 보장 → screenCoverage 정상 → LOD high 자동 → isVisible=true 자동
+6. **옵션 (b) 단독 무효 + 옵션 (c)/(d) 본질 미해결** — 시각 자료 (스크린샷) 와 측정값 (cameraRadius/moonScaling=1.011) 으로 명확 기각
+
+### 구현 방안 (developer 단계 결정 위임, 옵션 비교 박제)
+
+옵션 (a) 의 구체 식 — developer 단계에서 옵션 비교 후 선택:
+
+#### 식 후보 1 — body.kind 'moon' 한정 분기 (R4 한정)
+
+```typescript
+// camera-controller.ts 또는 sim-canvas.tsx syncFocusToScene
+const focusMultiplier = body.kind === 'moon'
+  ? FOCUS_USER_RADIUS_MULTIPLIER_MOON  // 신규 박제값 (예: 20)
+  : FOCUS_USER_RADIUS_MULTIPLIER;       // 기존 5
+const desiredRadius = Math.max(
+  meshRadius * focusMultiplier,
+  meshRadius + FOCUS_USER_RADIUS_MIN_PADDING,
+);
+```
+
+- 장점: R4 한정 분기. R5+ 진입 시 추가 박제
+- 단점: kind 박제값 매 R-Phase 추가 부담
+
+#### 식 후보 2 — satellite (parentId !== null && parentId !== 'sun') 일괄 정책
+
+```typescript
+const isSatellite = body.parentId != null && body.parentId !== 'sun';
+const focusMultiplier = isSatellite
+  ? FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE  // 신규 (예: 20)
+  : FOCUS_USER_RADIUS_MULTIPLIER;            // 기존 5
+```
+
+- 장점: R5+ phobos/deimos/io/europa/titan 자동 수용 — 신규 박제값 0
+- 단점: satellite 별 mesh radius 차이 무시 — 향후 큰 satellite (titan, ganymede) 진입 시 재조정 필요 가능성
+
+#### 식 후보 3 — visual scale 인지 식 (mesh radius 자체에서 visual scale 효과 제거)
+
+```typescript
+// meshRadius 가 visual scale 적용된 좌표계 라면, 식에서 visual scale 역수 적용
+const effectiveMeshRadius = isSatellite
+  ? meshRadius / getOrbitVisualScale(body.parentId)
+  : meshRadius;
+const desiredRadius = Math.max(
+  effectiveMeshRadius * FOCUS_USER_RADIUS_MULTIPLIER,
+  effectiveMeshRadius + FOCUS_USER_RADIUS_MIN_PADDING,
+);
+```
+
+- 장점: 박제값 추가 없음 — visual scale SSoT 직접 활용
+- 단점: meshRadius 가 사실 visual scale 적용 안 됨 (mesh scaling 은 bodyScale × renderScale, visual scale 은 position 에만 적용) → 식 검증 실패 위험 — **developer 단계 실측 검증 의무**
+
+**developer 단계 선택 의무**: 위 3 식 후보 중 실측 측정 후 D3.1/D3.2/D3.3 통과하는 식 선택. 우선순위 후보 2 (R5+ 일반화) → 후보 3 (박제값 0) → 후보 1 (R4 한정).
+
+### Concrete Prediction (Amendment 3 결정 후 D-T2 검증 의무)
+
+#### 예측 1 — 코드 변경 라인 수
+
+- focus 진입 식 변경: ~5 라인 (camera-controller.ts 또는 sim-canvas.tsx)
+- 신규 상수 `FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE = 20` (식 후보 2 선택 시): 1 라인
+- LOD 시스템 변경: 0 라인 (옵션 b 기각)
+- visual scale 변경: 0 라인 (옵션 d 기각)
+- **합계: 5~7 라인 변경 + 신규 상수 0~1줄** (Amendment 2 본 fix 의 약 1배 — 식 보정만)
+- 위반 임계: 실측 라인 수가 10 라인 초과 시 → 옵션 (e) 조합 필요성 재검토
+
+#### 예측 2 — 수치 DoD (D-T2 사용자 검증 의무, **LOD-aware measurement** 강제)
+
+본 라운드 신규 DoD — **measurement-only 함정 회피 가드** 박제:
+
+- **D3.1 (moon focus 후 mesh 화면 중앙 ≥ 200 px 직경)** — visual measurement (스크린샷 확인). 단순 `solar.meshes.get('moon').getBoundingInfo().boundingSphere.radiusWorld × projection` 측정 **금지** — 반드시 `isVisible=true` 검증 후 측정
+- **D3.2 (moon focus 시 `moon` high variant `isVisible=true`)** — measurement 자체. `solar.meshes.get('moon').isVisible === true` + `moon-lod-low.isVisible === false`
+- **D3.3 (moon focus 시 cameraRadius / moonScaling > 1.5)** — 카메라 mesh 외각 보장. QA 측정 1.011 → fix 후 ≥ 1.5 (FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE=20 시 ≈ 4.0)
+- **D3.4 (Amendment 2 D2.1/D2.2/D2.3 보존)** — sun 시점 moon 분리 + earth focus moon 분리 무회귀 (visual scale=30 무수정, focus 식만 변경)
+- **D3.5 (Amendment 1 임계 보존)** — earth ≤ 17% / moon ≤ 5.0% r1-guard PASS
+- **D3.6 (R-Phase Allowlist 보존)** — sun / mercury / venus / earth / moon 5 body 진입 유지
+- 위반 임계: D3.1~D3.3 중 1개라도 fail → fix 회귀, 식 후보 재선택 또는 Amendment 4 필요
+
+#### 예측 3 — 인접 영역 무영향
+
+- LOD 시스템 변경 0 (옵션 b 기각)
+- visual scale 변경 0 (옵션 d 기각)
+- mercury / venus / sun / earth focus 동작 무변동 (식 후보 2 선택 시 satellite 분기만 발동, 비-satellite 는 기존 식)
+- 위반 임계: r1-guard / browser-verify-r-phase-allowlist 회귀 시 → 부수효과 확정, Amendment 4 필요
+
+#### 예측 4 — D-T2 미통과 시 fallback
+
+D-T2 실측 시 D3.1~D3.3 미통과 발견 시:
+- 식 후보 2 박제값 `FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE=20 → 30` 상향 (1단계 fallback)
+- 여전히 미통과 → `40` 상향 (2단계)
+- 40 도 미통과 시 → 옵션 (e) 조합 (옵션 a + b defense-in-depth) Amendment 4 발동
+
+### measurement-only DoD 함정 회피 가드 박제 (본 라운드 핵심 메타 결정)
+
+본 Amendment 3 라운드는 **함정 #4 재발 (volt #74 변형)** 의 직계 사례. Amendment 2 fix PR #542 의 D2.4 박제값 196.65 px 는 `solar.meshes.get('moon').getBoundingInfo().boundingSphere.radiusWorld × projection` 식으로 산출된 **measurement-only 값** — high variant `isVisible=false` 검증 누락.
+
+#### 회피 가드 정의 — "LOD-aware measurement"
+
+본 라운드부터 모든 px 측정 DoD 에 다음 검증 의무 박제:
+
+```typescript
+// LOD-aware measurement 의무 패턴 (DoD measurement 검증 SSoT)
+function measureLodAwarePxDiameter(bodyId: string): number | null {
+  const highMesh = solar.meshes.get(bodyId);
+  if (!highMesh) return null;
+  // 1. high variant 가시성 검증 — 미가시 시 측정 무효 (LOD low billboard fallback 상태)
+  if (!highMesh.isVisible) return null;
+  // 2. 가시 상태에서만 wsRadius × projection 측정
+  highMesh.computeWorldMatrix(true);
+  const wsRadius = highMesh.getBoundingInfo().boundingSphere.radiusWorld;
+  // 3. screenCoverageRadius 또는 직접 projection 식 적용
+  return projectToPxDiameter(wsRadius, /* camera/projection 인자 */);
+}
+```
+
+#### 함정 #4 회피 가드 — DoD 검증 코드 의무 박제 (영향 범위)
+
+- **R4 본 진입 fix (#532)** — `apps/web/scripts/r1-ui-regression-guard.mjs` 가 D8 px 비 측정 시 LOD-aware 누락 — Amendment 1 에서 perspective foreshortening 보정만 박제. 본 Amendment 3 에서 추가 가드 의무
+- **Amendment 2 fix (#539)** — PR #542 본문 박제 D2.1~D2.4 가 LOD-aware 누락. QA 가 차단으로 발견
+- **Amendment 3 fix (본 라운드)** — D3.1 visual measurement + D3.2 isVisible 명시 측정 분리. fix PR developer 단계 박제 의무
+- **후속 R-Phase (R5 mars/phobos / R6 jupiter/galilean / ...)** — **모든 satellite 가 있는 R-Phase 진입 시 LOD × visual scale 결합 점검 + LOD-aware measurement DoD 의무**. R-Phase architect template (`docs/templates/r-phase-architect-template.md` 가 있으면) 또는 R-Phase ADR 표준 §"LOD-aware measurement 가드" 박제
+
+#### 본 라운드 회고 박제 — 함정 #4 / 함정 #6 재발
+
+- **함정 #4 (DoD "renderable" 만 정의, "visually distinguishable" 미정의)** — Amendment 2 의 D2.1~D2.6 정의 자체가 measurement-only 였음. QA 가 별도 visual 검증 책임 부여받아 차단 발견. 본 Amendment 3 에서 LOD-aware measurement 표준 박제 후 R5+ 재발 차단
+- **함정 #6 (Cross-validate Gemini 도 LOD × visual scale 결합 미발견)** — Amendment 2 cross-validate (2026-05-21, Gemini 2.5 pro) 가 "ADR 적극 권장" 합의. Gemini 가 LOD 시스템 결합 가능성 자체 검증 안 함. 단일 외부 시각도 결합 결함 자동 발견 못 함 — cross-validate 가치는 **있다** (없으면 더 못 발견) 지만 충분조건 아님. QA 단계 동적 검증이 최종 가드. 본 라운드 cross-validate 호출 시 명시 질문 "LOD / camera / floating origin 시스템 결합 위험" 삽입 의무
+
+### 갱신 SSoT (Amendment 3)
+
+| SSoT | 변경 |
+|------|------|
+| 본 ADR 머리말 (상태 / 결정자 / 관련) | Amendment 3 박제 명시 (line 3~5). Provisional 전환 (cross-validate 통합 후 Accepted) |
+| 본 ADR §결정 1~6 (R4 본 진입) | Amendment 3 보존 명시 (변경 없음) |
+| 본 ADR §Amendment 2 §결정 6 (orbit visual scale=30) | Amendment 3 보존 명시 (visual scale 무수정) |
+| 본 ADR §Amendment 3 (본 섹션) | 신규 박제 — forensic 5/5 형식 |
+| `packages/core/src/scene/camera-controller.ts` 또는 `apps/web/src/components/sim-canvas.tsx` | **developer 단계** 박제 — focus 진입 식 변경 (~5 라인) + 신규 상수 (식 후보 2 선택 시 1줄) |
+| `apps/web/scripts/r1-ui-regression-guard.mjs` 또는 DoD 측정 helper | **developer 단계** 박제 — LOD-aware measurement 패턴 적용 (D3.x px 측정 시 isVisible 검증) |
+| `CHANGELOG.md` Behavior Changes | "[#539] R4 Amendment 3 — moon focus 진입 시 LOD × visual scale 결합 결함 해결: cameraRadius 자동 조정 (mesh 외각 보장)" |
+
+### 비-범위 (Amendment 3 scope creep 차단)
+
+- earthScale=800 변경 ❌ (R4 §결정 1 보존)
+- moonScale=800 변경 ❌ (R4 §결정 2 보존)
+- `EARTH_MOON_ORBIT_VISUAL_SCALE = 30` 변경 ❌ (Amendment 2 박제 보존, 옵션 (d) 기각)
+- LOD 시스템 변경 ❌ (옵션 (b)/(c) 기각, `lod.ts` 무수정)
+- mercury / venus / sun 박제값 ❌
+- `solar-system.json` 실측 거리 데이터 변경 ❌
+- R-Phase Allowlist 5 body 유지 (변경 없음)
+- `apps/web/src/components/sim-canvas.tsx:159` `radius: 35` ❌ (R1 박제)
+- floating origin 시스템 변경 ❌
+- #534 (UX tooltip) / #535 (a11y) / #536 (FPS 가드) / #541 (Visual Fidelity 원칙 명문화) ❌
+- R5+ body 진입 ❌
+
+### 위험 / 재검토 트리거 (Amendment 3 추가)
+
+| 위험 | 회귀 시점 | 임계 / 발동 조건 | 완화 방안 |
+|---|---|---|---|
+| FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE=20 부족 (D3.3 mesh 외각 미보장) | fix PR D-T2 단계 | `cameraRadius/moonScaling < 1.5` 또는 mesh-안쪽 카메라 잔존 | 20 → 30 → 40 단계 fallback. 40 미통과 시 옵션 (e) defense-in-depth Amendment 4 |
+| satellite 일괄 정책 (식 후보 2) R5+ 부적합 | R5 (mars/phobos/deimos) 진입 시 | phobos/deimos 의 mesh radius 가 moon 과 비교 → ×20 식 부적합 | R5 architect ADR 에서 satellite kind 별 분기 (식 후보 1) 박제 |
+| LOD-aware measurement 가드 누락 재발 | R5+ R-Phase 진입 시 px 측정 DoD 추가 시 | px 측정 식이 `mesh.isVisible` 검증 없이 작성 | R-Phase architect template 에 LOD-aware measurement 의무 박제. QA 단계 측정 식 표준 적용 |
+| Visual Fidelity 원칙 미박제 | 본 fix 머지 후 사용자 인지 | visual scale=30 의도가 "사실 비율 위배" 로 오해 | #541 (Visual Fidelity 원칙 명문화) 후속 이슈 우선순위 상향 |
+
+### 재검토 트리거 (Amendment 3 추가)
+
+- **#10** — fix PR D-T2 사용자 검증 D3.1/D3.2/D3.3 미통과 → 식 후보 재선택 또는 식 후보 2 박제값 20→30→40 fallback. 40 미통과 시 옵션 (e) 조합 Amendment 4 (defense-in-depth)
+- **#11** — R5 mars/phobos 진입 시 본 Amendment 3 의 satellite focus 식 적용 실패 → 식 후보 1 (kind 분기) 로 식 변경 + R5 architect ADR cross-link
+- **#12** — LOD-aware measurement 가드 R5+ R-Phase 적용 누락 D-T2 보고 → R-Phase architect template SSoT 강화 (template 자체에 LOD-aware measurement 의무 명시)
+
+### Amendment 3 cross-validate (Amendment 3 박제 직후 1회 의무)
+
+본 Amendment 3 박제 직후 cross-validate 호출 의무 (CLAUDE.md §교차검증 §"정책·설계·ADR 박제 직후 1회 루틴", 앵커: **ADR 개정 — Amendment 3 forensic 라운드 + measurement-only DoD 함정 회피 표준 박제**).
+
+#### Claude 자체 편향 4종 셀프 체크 (호출 전)
+
+- **낙관적 일정 ✓** — 옵션 (a) 식 변경 5~7 라인 + 박제값 1 줄 합리적 예측. 식 후보 3가지 박제로 fallback 경로 보장
+- **결합 간과 ⚠️** — Amendment 2 cross-validate 가 LOD × visual scale 결합 자체를 발견 못 함 (함정 #6 재발). 본 라운드 cross-validate 명시 질문 "focus 식 변경이 LOD / camera / floating origin / orbit visual scale 4 시스템 결합 영향 검증" 의무 삽입
+- **폐기 프레이밍 ✓** — 옵션 (b)/(c)/(d) 명시적 기각 + 회귀 예측 표시. 본질 미해결 함정 명시
+- **순수주의 △** — 식 후보 3가지가 "단일 정답 없는" 결합 결정 — developer 단계 실측 후 선택 위임 명시. 본 ADR 라운드는 결정 식 자체보다 **"결합 결함 분리 + DoD 함정 회피 가드 박제"** 가 핵심
+
+#### cross-validate 호출 결과 (2026-05-21, Gemini 2.5 pro)
+
+호출 명령: `.claude/skills/cross-validate/scripts/cross_validate.sh architecture docs/decisions/20260520-r4-earth-moon-visualization.md`
+로그: `.claude/logs/cross-validate-architecture-20260521-143057.log`
+outcome: `applied` (exit 0) — plan-bypass 가드 사후 snapshot diff empty 정상.
+
+##### 합의 (높은 신뢰도)
+
+Gemini 6 기준 평가:
+- 구조적 완성도 **매우 뛰어남** (vertical slice 전체 + 데이터/설정/렌더링/UI/테스트 5계층 추적)
+- 기술 결정 타당성 **매우 뛰어남** (정량 데이터 + 산출식 기반, "실패로부터 학습하고 진화하는 조직" 평가)
+- 인터페이스 명확성 **매우 명확함** (Configuration-Driven Design + Developer 인계 + D-T2 가이드)
+- 확장성 **매우 뛰어남** (R5+ satellite 패턴 SSoT, shortcut bar R6 사전 대응, Concrete Prediction R5 ≤ 7 라인)
+- 보안 **위험 요소 없음**
+- 누락 요소 **거의 없음** (#534/#535/#536/#541 자체 발견 + 후속 분리)
+
+총평 인용: > **이 ADR의 내용대로 진행하는 것을 적극 권장합니다.**
+
+특히 Gemini 가 인정한 진단 정확성:
+- Amendment 2 — "earth mesh 가 earth-moon distance 초과" 근본 원인 정확 진단 + visual scale 우아한 해법
+- Amendment 3 — "cameraRadius 계산식 결함" 직접 원인 정확 진단 + LOD/visual scale 우회 안 함
+
+##### 이견 수용 (양쪽 근거 비교)
+
+**없음** — Gemini 가 근본 반박 0. 옵션 (a)~(e) 선택 + 식 후보 1~3 위임 모두 합의.
+
+##### Claude 재분석 기각
+
+**없음** — Gemini 가 잘못 지적한 항목 0. 함정 #4/#6 회고 + LOD-aware measurement 가드 박제 모두 합의.
+
+##### 고유 발견 4건 — 수용/분리 3단 프로토콜 적용 (volt #29)
+
+| # | Gemini 제안 | 범위 체크 | 판정 |
+|---|------|------|------|
+| 1 | **Living ADR Executive Summary** — ADR 상단에 현재 유효한 최종 결정 + 핵심 상수값 요약 섹션 추가 (3회 amendment 로 가독성 저하) | 본 ADR 가독성 향상 = 본 PR 범위 내 (구조 보강) | **즉시 수용** — 본 PR 에 ADR 상단 §"현재 유효 결정 요약 (Living ADR Executive Summary)" 추가 박제 |
+| 2 | **Visual Regression Testing 자동화** — measurement-only 함정 자동 검출 (isVisible + 렌더링 결과 동시 검증) | QA 파이프라인 인프라 변경 = scope creep (본 R4 ADR 와 직교, 별도 ADR 가치) | **후속 분리** — 신규 이슈 생성 권고 (priority:high, type:infra) |
+| 3 | **`visual-policy.ts` 정책 상수 분리** — visual scale=30 / focus multiplier=20 등 정책적 결정 상수를 `body-scale.ts` 와 분리해 중앙 관리 | satellite 일반화 + R5+ 패턴 의존 = 본 Amendment 3 의 식 후보 2 (satellite 일괄 정책) 선택 시 자연스럽게 발생 → developer 단계 위임 가능 (옵션 (a) 식 후보 결정 시 박제 위치 동시 결정) | **부분 수용** — developer 단계 인계에 "신규 상수 박제 위치는 `visual-policy.ts` 또는 `orbit-visual-scale.ts` 확장" 명시 |
+| 4 | **프로세스 회고 공식화** — Amendment 2/3 같은 결함이 초기 설계 / Code Review / Cross-validate 단계에서 걸러지지 못한 이유를 공식 회고로 기록 (LOD-aware measurement 가드를 넘어 개발-검증 파이프라인 강화) | 프로세스 메타 회고 = harness-setting 또는 volt 레벨 = 본 ADR 와 직교 (R-Phase ADR 가 프로세스 ADR 가 아님) | **후속 분리** — volt 캡처 권고 (메인 오케스트레이터 의무, volt #74 변형 + 함정 #4 재발 사례) |
+
+##### 종합 판정
+
+- **반려 사유 없음** — Gemini ADR 적극 권장 + 근본 반박 0
+- **발견 1 본 PR 즉시 수용** — Living ADR Executive Summary 추가 박제 (§"현재 유효 결정 요약")
+- **발견 2 후속 분리** — Visual Regression Testing 자동화 신규 이슈 (메인 오케스트레이터가 후속 PR 작업 시 issue 생성)
+- **발견 3 부분 수용** — developer 단계 인계에 박제 위치 옵션 명시
+- **발견 4 후속 분리** — 프로세스 회고 volt 캡처 (메인 오케스트레이터 의무)
+- **Amendment 3 결정 변경 0건** — Gemini 가 옵션 (a) 선택 + 식 후보 위임 + 본 라운드 결정 전부 합의
+- **Provisional → Accepted 전이 조건 충족** — cross-validate 결과 본문 통합 완료, 본 라운드 박제 직후 Accepted 전이
+
+##### Claude 자체 편향 4종 셀프 체크 (호출 후 재평가)
+
+- **낙관적 일정 ✓** — Gemini 권고 4건 중 1건 즉시 수용 + 1건 부분 수용 + 2건 후속 분리. 본 PR 안에서 처리 가능 범위 정확 판정
+- **결합 간과 ✓** — cross-validate 호출 전 명시 질문 "LOD / camera / floating origin / orbit visual scale 4 시스템 결합" 삽입 → Gemini 가 LOD-aware measurement 자동화 (발견 2) 와 visual-policy.ts 분리 (발견 3) 로 응답. 결합 분석 깊이 노출 성공 (함정 #6 회피)
+- **폐기 프레이밍 ✓** — 옵션 (b)/(c)/(d) 기각 + 함정 #4 회고 박제 모두 Gemini 합의
+- **순수주의 ✓** — Gemini 가 식 후보 1~3 위임 정책에 합의. "결정 식 자체보다 결합 결함 분리 + DoD 함정 회피 가드 박제" 가 핵심이라는 본 라운드 자가 평가 정합
+
+
+
+### Amendment 3 의 메타 의의 — R-Phase 일반 framework 보강
+
+본 Amendment 3 라운드는 단일 R4 fix 가 아닌 **R-Phase 일반 framework 보강**:
+
+1. **LOD × visual scale 결합 점검 의무** — R5+ (mars/phobos/deimos) / R6 (jupiter/galilean) / R7 (saturn/titan) 진입 시 satellite 가 있는 모든 case 에 본 Amendment 3 의 결합 점검 의무. focus 진입 식 검증 + LOD-aware measurement 적용
+2. **measurement-only DoD 함정 회피 가드 SSoT** — Amendment 2 PR #542 의 D2.4 196.65 px 박제값이 measurement-only 였던 사례를 박제. R5+ R-Phase ADR 의 Concrete Prediction §수치 DoD 작성 시 LOD-aware measurement 의무 인용
+3. **Amendment N≥3 라운드 가능성 인지** — forensic ADR 변형 (Amendment 2 5/5) 직계 후속. R-Phase 1차 박제값 + 1차 fix 가 결합 결함을 잠재 가능성 박제. R5+ ADR 작성 시 "forensic 변형 발동 조건 사전 자기 점검" 의무 강화
+
+### Forensic 변형 발동 조건 자기 점검 (Amendment 3 시점)
+
+CLAUDE.md §Forensic ADR 변형 5조건 자기 점검 (Amendment 2 라운드 5/5 충족 후 Amendment 3 라운드 동등 유지):
+
+1. **가설 N≥2** — ✓ (옵션 a~e 5 가설 + 식 후보 1~3)
+2. **Runtime 측정 데이터 필수** — ✓ (PR #542 QA 측정 + 스크린샷 5종, cameraRadius/moonScaling=1.011 정적 분석 추가 측정)
+3. **DoD PASS 인데 사용자/제품 회귀** — ✓ (PR #542 본문 박제 D2.1~D2.6 measurement PASS → QA visual FAIL, volt #74 2회 연속)
+4. **5±2 옵션 비교** — ✓ (옵션 (a)~(e) 5개 후보)
+5. **Amendment 라운드 N≥3 예상** — ✓ (Amendment 1 → 2 → 3 직계 후속 + Amendment 4 가능성 §재검토 #10~#12 박제)
+
+**판정**: 5/5 조건 유지 → **forensic 변형 박제 보존** (R4 ADR 본문 forensic 변형 유효).
+
+---
+
 ## 변경 이력
 
 - **2026-05-20**: R4 본 진입 ADR 박제 (architect, #532). cross-validate 2026-05-20 Gemini 합의 후 Accepted 전이. 고유 발견 3건 후속 분리 (#534/#535/#536)
 - **2026-05-21**: Amendment 1 박제 — D8 측정 검증 (perspective foreshortening 누락 발견) → 임계 완화 (earth ≤ 17% / moon ≤ 5.0%). 박제값 보존
 - **2026-05-21**: **Amendment 2 박제 — forensic ADR 변형 승격 (5/5 충족). moon visual fusion 회귀 (#539) 해결. 옵션 (iii-amended) earth-moon orbit visual scale=30 도입 (rendering 시점, 실측 데이터 SSoT 보존). earthScale=800 / moonScale=800 / 실측 데이터 / R4 §비-범위 7항목 전부 보존**
+- **2026-05-21**: **Amendment 3 박제 — LOD × visual scale 결합 결함 해결 + measurement-only DoD 함정 회피 표준 박제 (PR #542 QA 차단 후속, #539). 옵션 (a) cameraRadius 자동 조정 선택 — focus 식 변경 ~5 라인 + 신규 상수 1줄. Amendment 2 박제 보존 (visual scale=30 무수정, LOD 시스템 무수정). R-Phase 일반 framework 보강 (LOD-aware measurement 가드 R5+ 의무 박제). Provisional — cross-validate 통합 후 Accepted 전이**
