@@ -541,6 +541,23 @@ const FOCUS_BUTTONS = [
 - earthScale=800 / moonScale=800 박제값 보존 (결정 1 + 결정 2 무수정)
 - 새 상수는 `apps/web/src/constants/body-scale.ts` 또는 `packages/core/src/scene/orbit-visual-scale.ts` (신규) 박제 — developer 단계 SSoT 위치 결정
 
+#### Visual scale 후보 비교 (Gemini cross-validate 2026-05-21 권고 1 통합)
+
+분리 마진 = `(earth-moon distance × visual_scale) / sum_mesh_radius`. sum_mesh_radius = 6.493e9 m (earth + moon mesh radius). 안전 마진 임계: ≥ 1.5x (분리 시각 확실, 사용자 인지 부담 최소).
+
+| visual_scale | visual 거리 (m) | 분리 마진 | 평가 |
+|---|---|---|---|
+| ×10 | 3.847e9 | 0.59x | **fail** — mesh fusion 잔존 |
+| ×15 | 5.770e9 | 0.89x | **fail** — mesh fusion 잔존 |
+| ×20 | 7.694e9 | 1.18x | 통과 한계 (margin < 1.5x 안전 임계) |
+| ×25 | 9.617e9 | 1.48x | 경계 (margin 0.02 부족) |
+| **×30** | **1.154e10** | **1.78x** | **선택 — 안전 마진 (≥ 1.5x) 통과 + 최소 distortion** |
+| ×40 | 1.539e10 | 2.37x | 보수 (사실 비례 왜곡 +33% 추가) |
+| ×50 | 1.924e10 | 2.96x | **fallback 1** (D-T2 미통과 시) |
+| ×75 | 2.885e10 | 4.45x | **fallback 2** (D-T2 미통과 시) |
+
+**근거**: ×30 = 분리 마진 1.78x (≥ 1.5x 안전 임계 +0.28) + 거리 distortion 최소화 (×40~75 대비 사실 비례 보존도 우수). ×20/25 통과 한계는 perspective 노이즈 ±15% 안에서 mesh fusion 재발 위험. ×50/75 는 fallback 단계 (Amendment 3 발동 트리거 §재검토 #7).
+
 #### Amendment 2 후 거리·시각 산출 (orbitScale=30, earthScale=800, moonScale=800)
 
 | 측정 | 값 | 비고 |
@@ -1042,11 +1059,50 @@ D-T2 실측 시 분리 부족 (pxDistance < 30 px) 또는 fusion 잔재 발견 �
 - **폐기 프레이밍 ✓** — 원안 옵션 (iii) "실측 거리 + zoom-in 분리" 폐기 명시. 실측 데이터 / 박제값 / 비-범위 전부 보존
 - **순수주의 △** — orbit visual scale=30 단일 정수가 "단순값" 사후 정당화 가능성. 30 = 분리 마진 1.78배 / 50 / 75 fallback 비교 박제 (위 §옵션 비교 §Amendment 2 후 거리·시각 산출) 로 마진 산출 보강
 
-#### cross-validate 호출 결과 (Amendment 2 머지 직후 박제 예정 — developer/reviewer 단계 의무)
+#### cross-validate 호출 결과 (2026-05-21, Gemini 2.5 pro)
 
-본 architect 단계에서는 ADR 박제만 수행. cross-validate 호출 자체는 PR 생성 직후 별도 실행 → 결과 본문 통합은 reviewer/qa 단계 또는 후속 amendment 라운드에서 박제.
+호출 명령: `.claude/skills/cross-validate/scripts/cross_validate.sh architecture docs/decisions/20260520-r4-earth-moon-visualization.md`
+로그: `.claude/logs/cross-validate-architecture-20260521-130701.log`
+outcome: `applied` (exit 0) — plan-bypass 가드 사후 snapshot diff empty 정상.
 
-(cross-validate 결과 본문은 reviewer / qa 단계 박제 의무 — 본 architect 단계 PR 본문에는 "Amendment 2 박제 직후 cross-validate 호출 예정" 명시)
+##### 합의 (높은 신뢰도)
+
+Gemini 6 기준 평가:
+- 구조적 완성도 **매우 높음** (수직 계층 vertical slice 전체 + R-Phase Allowlist 운영 측면 + Developer 인계 명확)
+- 기술 결정 타당성 **매우 높음** (정량 데이터 기반 결정, Amendment 1 의 원근감 누락 식 수정 + Amendment 2 의 orbit visual scale 우아한 해결)
+- 인터페이스 명확성 **명확** (configuration-driven design + R5 ≤ 3 라인 변경 예측)
+- 확장성 **뛰어남** (R5+ satellite 패턴 SSoT, shortcut bar R6 너비 사전 대응)
+- 보안 **위험 요소 없음** (client-side rendering, 서버 없음)
+- 누락 요소 **거의 없음** (#534/#535/#536 자체 발견 + 후속 분리)
+
+총평 인용: > **이 ADR 내용대로 진행하는 것을 적극 권장합니다.**
+
+##### 이견 수용 (양쪽 근거 비교)
+
+**없음** — Gemini 가 근본 반박 0. "설계의 근본적인 방향에는 이견이 없습니다" 명시.
+
+##### Claude 재분석 기각
+
+**없음** — Gemini 가 잘못 지적한 항목 0. Amendment 1 의 원근감 누락 진단 + Amendment 2 의 13.26배 fusion 진단 둘 다 Claude 분석과 정합.
+
+##### 고유 발견 2건 — 수용/분리 3단 프로토콜 적용 (volt #29)
+
+**발견 1 — visual scale 결정 과정 구체화 권고**:
+- Gemini 제안: "20배수는 분리 마진 부족, 30배수에서 처음으로 안정적 분리 확보" 같은 다른 후보 값과의 비교 표 추가
+- 범위 체크: 본 ADR 본문 보강 (architect ADR §결정 6 가 30 / 50 / 75 fallback 단계만 명시, 명시적 후보 비교 표 없음). 신규 DoD 추가 아님 = 본 PR 범위 내
+- **판정**: **즉시 수용** — 본 PR 에 §"Visual scale 후보 비교 (Gemini cross-validate 2026-05-21 권고 1 통합)" 표 추가 박제 (10/15/20/25/30/40/50/75 후보 8개 분리 마진 비교 + 30 선택 근거 강화)
+
+**발견 2 — "Visual Fidelity (시각적 진실성)" 원칙 명문화 권고**:
+- Gemini 제안: "데이터의 과학적 정확성은 유지하되, 사용자의 인지를 돕기 위해 시각적 표현은 의도적으로 왜곡할 수 있다" 원칙을 `docs/architecture/principles.md` 별도 문서로 박제
+- 범위 체크: 신규 원칙 문서 = 본 R4 ADR 와 직교 + 다른 ADR (Q2=B 정책 SSoT 등) 영향 가능성 = scope creep
+- **판정**: **후속 분리** — 신규 이슈 #541 생성 (priority:medium, type:docs)
+
+##### 종합 판정
+
+- **반려 사유 없음** — Gemini ADR 적극 권장 + 근본 반박 0
+- **발견 1 본 PR 즉시 수용** — visual scale 후보 비교 표 추가 박제 (본 §결정 6 §"Visual scale 후보 비교" 표 박제 완료)
+- **발견 2 후속 분리** — Visual Fidelity 원칙 명문화 = #541 후속 이슈 (CRITICAL #6 비목표 보호)
+- **PM DoD 11개 (R4 원안 D1~D11) 재구조화 0건** (volt #76 drift 방지)
 
 ---
 
