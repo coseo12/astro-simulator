@@ -6,7 +6,7 @@ allowed-tools: [Bash, Read, Skill]
 
 # /capture-merge — PR 머지 → volt 캡처 초안
 
-Gemini의 "마찰 없는 자동화" 통찰을 1단계 적용. 사용자가 PR 머지 직후 한 번 호출하면 capture-volt 스킬을 자동 초안과 함께 호출. 사용자는 검토 후 승인만.
+Gemini의 "마찰 없는 자동화" 통찰을 1단계 적용 (역사적 인용 — 통찰 자체는 도구 무관, Phase 1A #269 부터 외부 검증 모델은 Antigravity `agy` 로 교체). 사용자가 PR 머지 직후 한 번 호출하면 capture-volt 스킬을 자동 초안과 함께 호출. 사용자는 검토 후 승인만.
 
 ## 사용자 입력
 `$ARGUMENTS`

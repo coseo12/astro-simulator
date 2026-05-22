@@ -3,7 +3,7 @@
 ## 권한 원칙
 
 - **최소 권한**: 에이전트는 역할에 필요한 최소한의 도구만 사용한다.
-- **읽기 전용 기본**: 외부 도구(Gemini 등)는 항상 읽기 전용 모드로 실행한다.
+- **읽기 전용 기본**: 외부 검증 모델 (현재 Antigravity `agy`, Phase 1A #269 부터 — 이전 gemini-cli) 은 cross-validate 스킬의 L1 prompt strict prefix + L3 워킹트리 snapshot 가드 (#479) 이중 보호로 읽기 전용을 강제한다.
 - **파괴적 명령 차단**: `git push --force`, `git reset --hard`, `rm -rf` 등은 명시적으로 차단한다.
 
 ## 시크릿 관리

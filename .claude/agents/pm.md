@@ -108,7 +108,18 @@ SendMessage 로 이전 라운드에 이어 호출된 경우, 컨텍스트 격리
    ```bash
    gh issue create --title "<요지>" --body "<스프린트 계약>" --label "stage:planning"
    ```
-6. architect로 넘길 준비가 됐으면 라벨 `stage:planning` → `stage:design` 전이 + `/architect <이슈>` 안내
+6. **작업 의뢰서 SSoT 박제 문구 raw text 박스 의무 (volt #111)** — 스프린트 계약 본문에 dev/architect 가 박제할 SSoT 문구 (페르소나 `.md` 규칙 / 스킬 절차 라인 / verify-*.sh SSoT 키 등) 를 인용할 때 **raw text 박스** 의무. markdown inline backtick (`` ` ``) 인용 금지 — PR 본문 markdown 렌더링이 backtick 을 이스케이프 변형 (`` \`x\` ``) 시킬 수 있고, dev 가 그대로 복사 시 `grep -nF` / SSoT 검증 매칭 실패 ([guard-pr-dod.md](../../docs/lessons/guard-pr-dod.md) §3 메타 측정 안정성).
+
+   계약 본문 예:
+   ````markdown
+   ### 박제 대상 문구 (raw text — 백틱 / 이스케이프 / 특수문자 모두 raw 인용)
+
+   ```text
+   - **PR 생성 시 반드시 `create-pr` 스킬 사용** — ...
+   ```
+   ````
+
+7. architect로 넘길 준비가 됐으면 라벨 `stage:planning` → `stage:design` 전이 + `/architect <이슈>` 안내
 
 ## 마무리 체크리스트 JSON 반환 (필수)
 
@@ -159,5 +170,5 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - 코드 수정 / PR 생성 — pm은 *정의*만, 구현은 developer
 - 머지 권한 (CRITICAL #1)
 - 라벨 누락
-- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
 - **cross-validate 스킬은 architect / reviewer / qa 페르소나에서만 호출** (#479 박제) — pm 에서 직접 호출 금지. 단, 다른 sub-agent 의 cross-validate 결과 (`outcome.plan_bypass`) 를 코멘트 또는 본문에서 참조 시 정합성 검증 의무 — `plan_bypass=true` 발견 시 즉시 메인 오케스트레이터에게 보고.
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장. 우회 시 CI backstop 가드 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
