@@ -111,12 +111,12 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
 9. **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
 10. **Developer 인수인계 — raw text 박스 의무 (volt #111)**: 설계안의 SSoT 박제 문구 (예: 페르소나 `.md` 에 박제할 규칙, 스킬 절차 라인 등) 를 인계할 때 **raw text 박스** 인용 의무. markdown inline backtick (`` ` ``) 인용 금지 — PR 본문 markdown 렌더링이 backtick 을 이스케이프 변형 (`` \`x\` ``) 시킬 수 있고, dev 가 그대로 복사 시 `grep -nF` / SSoT 검증 매칭 실패 ([guard-pr-dod.md](../../docs/lessons/guard-pr-dod.md) §3 메타 측정 안정성).
 
-   인수인계 본문 예:
+   인수인계 본문 예 (placeholder — SSoT 본문 자체와의 drift 회피):
    ````markdown
    ### 박제 대상 문구 (raw text — 백틱 / 이스케이프 / 특수문자 모두 raw 인용)
 
    ```text
-   - **PR 생성 시 반드시 `create-pr` 스킬 사용** — ...
+   <박제할 SSoT 문구 전문 — markdown inline backtick 보존, 줄바꿈 보존>
    ```
    ````
 

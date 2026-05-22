@@ -110,12 +110,12 @@ SendMessage 로 이전 라운드에 이어 호출된 경우, 컨텍스트 격리
    ```
 6. **작업 의뢰서 SSoT 박제 문구 raw text 박스 의무 (volt #111)** — 스프린트 계약 본문에 dev/architect 가 박제할 SSoT 문구 (페르소나 `.md` 규칙 / 스킬 절차 라인 / verify-*.sh SSoT 키 등) 를 인용할 때 **raw text 박스** 의무. markdown inline backtick (`` ` ``) 인용 금지 — PR 본문 markdown 렌더링이 backtick 을 이스케이프 변형 (`` \`x\` ``) 시킬 수 있고, dev 가 그대로 복사 시 `grep -nF` / SSoT 검증 매칭 실패 ([guard-pr-dod.md](../../docs/lessons/guard-pr-dod.md) §3 메타 측정 안정성).
 
-   계약 본문 예:
+   계약 본문 예 (placeholder — SSoT 본문 자체와의 drift 회피):
    ````markdown
    ### 박제 대상 문구 (raw text — 백틱 / 이스케이프 / 특수문자 모두 raw 인용)
 
    ```text
-   - **PR 생성 시 반드시 `create-pr` 스킬 사용** — ...
+   <박제할 SSoT 문구 전문 — markdown inline backtick 보존, 줄바꿈 보존>
    ```
    ````
 
