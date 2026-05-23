@@ -57,7 +57,7 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   mercury: 700, // Amendment 2026-05-03 라운드 3 — 900 → 700 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~4.71%)
   venus: 800, // Amendment 2026-05-03 라운드 3 — 650 → 800 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~13.58%)
   earth: 800, // R4 #532 — venus 동일값 (radius 1.054배 사실 비율 정합, sun 대비 px 비 ~14.67%)
-  moon: 800, // R4 #532 — earth 동일값 (moon/earth=27.2% 사실 비율 정확 정합, sun 대비 px 비 ~3.99%)
+  moon: 200, // R4 #539 Amendment 4 (2026-05-23) — 사실 비율 (×800) D-T2 시각 인지 mismatch ("비정상적으로 큼"). earth 의 6.8% (mesh radius 3.475e8 m) 로 축소 — 사실 비율 깨지지만 사용자 천문 직관 정합. moon sun 대비 px 비 ~1.12% (Amendment 1 임계 5% 안)
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

@@ -1718,3 +1718,96 @@ CLAUDE.md §Forensic ADR 변형 5조건 자기 점검 (Amendment 2 라운드 5/5
 - **2026-05-21**: Amendment 1 박제 — D8 측정 검증 (perspective foreshortening 누락 발견) → 임계 완화 (earth ≤ 17% / moon ≤ 5.0%). 박제값 보존
 - **2026-05-21**: **Amendment 2 박제 — forensic ADR 변형 승격 (5/5 충족). moon visual fusion 회귀 (#539) 해결. 옵션 (iii-amended) earth-moon orbit visual scale=30 도입 (rendering 시점, 실측 데이터 SSoT 보존). earthScale=800 / moonScale=800 / 실측 데이터 / R4 §비-범위 7항목 전부 보존**
 - **2026-05-21**: **Amendment 3 박제 — LOD × visual scale 결합 결함 해결 + measurement-only DoD 함정 회피 표준 박제 (PR #542 QA 차단 후속, #539). 옵션 (a) cameraRadius 자동 조정 선택 — focus 식 변경 ~5 라인 + 신규 상수 1줄. Amendment 2 박제 보존 (visual scale=30 무수정, LOD 시스템 무수정). R-Phase 일반 framework 보강 (LOD-aware measurement 가드 R5+ 의무 박제). Provisional — cross-validate 통합 후 Accepted 전이**
+
+
+---
+
+## Amendment 4 — moonScale 800 → 200, 사실 비율 vs 시각 인지 mismatch 해결 (2026-05-23)
+
+### 트리거
+
+Amendment 3 fix (PR #545, commit 5c0e420) QA PASS + 사용자 D-T2 시각 확인에서 회귀 2건 추가 발견:
+1. **moon 크기 비정상적으로 큼** — default sun 시점에서 moon mesh 가 earth 옆 너무 큰 dot 으로 인지
+2. **특정 카메라 각도에서 사라짐** — beta 극단 또는 alpha 회전 시 moon 가시성 불안정
+
+### debug 진단 (메인 오케스트레이터, volt #67)
+
+6 각도 sweep + raw screen radius 측정:
+
+| 각도 | moon screenRadius (px) | earth screenRadius (px) | moon isVisible | earth-moon screen distance (px) |
+|------|------------------------|--------------------------|----------------|---------------------------------|
+| default | 5.5 | 20.4 | **false** | 28 |
+| alpha+90 | 6.1 | 22.9 | false | 31 |
+| alpha+180 | 5.5 | 20.4 | false | 28 |
+| alpha-90 | 5.1 | 18.4 | false | 25 |
+| beta-top | 7.1 | 26.8 | false | 36 |
+| beta-bottom | 3.7 | 13.5 | false | 19 |
+
+#### 결정적 발견
+
+1. **moon high variant 6 각도 모두 `isVisible: false`** — Amendment 3 fix 는 moon focus 진입 시 LOD high 보장 (식 후보 2) 만 적용. **default sun 시점은 LOD 가드 없음** — billboard 또는 mid variant 가 실제 화면에 그려짐
+2. **사실 비율 (moon = earth 27.2%) 정합이 사용자 시각 인지 mismatch** — Amendment 2 §결정 2 의 moonScale=800 박제 근거 ("사실 비율 정합 + venus 800 동일값") 가 사용자 천문 직관 (moon = sub-pixel) 과 충돌. 5 단계 (PM / architect / cross-validate Gemini / developer / QA) 모두 합의했으나 D-T2 사용자만 mismatch 발견
+3. **회고 함정 #4 재발 + 신규 함정 #7** — DoD "renderable + visually distinguishable" 외에 **사용자 인지 단위 (천문 직관)** 도 검증 의무. 사실 비율 정합이 항상 사용자 시각 인지에 부적절할 수 있음
+
+### Amendment 결정
+
+#### 결정 A4.1 — moonScale 800 → 200 (사용자 인지 우선)
+
+- `apps/web/src/constants/body-scale.ts` `moon: 800 → 200`
+- moon mesh radius 1.39e9 m → **3.475e8 m** (earth 의 27.2% → **6.8%**)
+- moon sun 대비 px 비 4.47% → **1.12%** (Amendment 1 임계 5% 안전 보존)
+- earth-moon visual distance (1.154e10 m) / moon mesh radius = 8.3배 → **33배** (사용자 인지 자연화)
+- 사실 비율 (radius 비) 깨짐 — 사용자 천문 직관 우선 (R3 ADR Amendment 2026-05-03 라운드 3 의 "사실 비율 강화" 원칙과 직교)
+
+#### 결정 A4.2 — moon focus marginal 인정
+
+PR #545 의 D3.1 marginal (focus pxDiameter 85 px vs 임계 200 px). moonScale 200 적용 시 더 작아짐 (~21 px). 사용자 시각 인지 통과 = marginal 허용. focus 시점 측정-only 임계 D3.1 은 후속 R5+ 진입 시 LOD-aware 패턴으로 재정의 가능
+
+#### 결정 A4.3 — orbit visual scale=30 / earthScale=800 / 임계 17%·5% 보존
+
+- Amendment 2 의 orbit visual scale=30 보존 — moon-earth orbit visible 가치 보존
+- Amendment 1 의 임계 (earth ≤ 17% / moon ≤ 5%) 보존 — 1.12% 가 5% 안에 충분 안전
+- earthScale=800 보존 — earth 자체 시각 회귀 없음
+
+#### 결정 A4.4 — 특정 각도 사라짐 회귀 후속 분리
+
+- moon "사라짐" 회귀는 LOD billboard sub-pixel 처리 + beta 극단 culling 추정. moonScale 축소로 더 심해질 가능성 인지
+- 본 Amendment 4 범위 밖 — R5+ 진입 또는 별도 후속 (LOD billboard 시각 강화 / min-pixel-radius gate / focus-only highlight 등) 으로 분리
+- 후속 이슈 박제 (메인 오케스트레이터 의무, capture-volt 동반)
+
+### 갱신 SSoT
+
+| SSoT | 변경 |
+|------|------|
+| `apps/web/src/constants/body-scale.ts` | `moon: 800 → 200` + 주석 갱신 (Amendment 4 근거) |
+| `apps/web/src/constants/body-scale.test.ts` | `moon` 단언 800 → 200 (2 testcase) |
+| ADR §Amendment 4 (본 섹션) | 측정 검증 + 결정 A4.1~A4.4 박제 |
+| `CHANGELOG.md` Behavior Changes | "R4 #539 Amendment 4 — moonScale 200 사용자 인지 정합" |
+
+### 비-범위 (scope creep 차단)
+
+- earthScale=800 변경 ❌ (보존)
+- orbit visual scale=30 변경 ❌ (Amendment 2 보존)
+- Amendment 1 임계 (earth ≤ 17 / moon ≤ 5) 변경 ❌ (1.12% 안전)
+- LOD 시스템 / camera focusOn 식 (Amendment 3) 변경 ❌
+- mercury / venus / sun 박제값 ❌
+- 사라짐 회귀 fix ❌ (후속 분리)
+- #534/#535/#536/#541 후속 이슈 ❌
+
+### 재검토 조건
+
+- 사용자 D-T2 재확인 시 moonScale=200 도 부적절 시 → 50/100/300 fallback 비교
+- 사라짐 회귀가 사용자 사용 흐름에 큰 문제로 보고 시 → LOD billboard 시각 강화 별도 PR
+- R5+ (mars/phobos/deimos) 진입 시 satellite scale 패턴 재평가 — moonScale=200 이 R-Phase framework SSoT 의 일관 패턴인지 (다른 satellite 도 parent 의 6.8% 등)
+
+### Forensic 변형 5조건 점검
+
+| 조건 | 충족 | 근거 |
+|------|------|------|
+| 가설 N≥2 | △ | 단일 가설 (사실 비율 mismatch) — moon visibility 회귀는 후속 분리 |
+| Runtime 측정 데이터 필수 | ✓ | debug 스크립트 6 각도 sweep + screen radius 측정 |
+| DoD PASS 인데 사용자/제품 회귀 | ✓ | QA D3.1~D3.6 PASS + D-T2 회귀 |
+| 5±2 옵션 비교 | ✗ | 사용자가 직접 옵션 A (moonScale 감소) 선택 |
+| Amendment 라운드 N 예상 | △ | R5+ 진입 시 satellite scale 패턴 재평가 가능 |
+
+**점검 결과: 2/5 (forensic 변형 발동 조건 미충족)** — 일반 amendment 유지. R-Phase framework 의 단순 박제값 갱신.
