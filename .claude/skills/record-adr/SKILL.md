@@ -119,6 +119,117 @@ ADR 본문 `## 결과·재검토 조건` 섹션에 다음 형태로 추가:
 
 NO-OP ADR은 "아무것도 안 했다"는 기록이 아니라 "왜 아무것도 안 해도 되는지"의 근거. 다음에 재발굴 시 빠르게 기각하는 박물관 전시물이 된다.
 
+## Amendment B 형식 표준 (volt #104)
+
+원안과 같은 결정 라인을 수정해야 할 때 (정정 / 임계값 조정 / 범위 변경 등), 본문을 직접 mutation 하지 않고 **현존 문서 보존 + §Amendment N 섹션 신설** 형식을 표준 채택. 변형 박제 D' 패턴 (아래) 의 일반화 — D' 는 "기술 장벽으로 원안 조정" 특수 케이스, B 형식은 모든 mutation 시나리오 공통.
+
+### 두 형식 비교 (B 형식 채택)
+
+**A 형식 — 본문 직접 mutation** (미채택):
+
+```markdown
+## 결정
+
+~~원안~~ → **Amendment 1 (2026-05-16): 변경된 결정**
+```
+
+단점: diff 가 mutation 으로 표현되어 변경 이력 불명확 / strikethrough 누적 시 가독성 급락 / 마크다운 렌더링 일관성 부재.
+
+**B 형식 — 신설 §Amendment 섹션** (표준):
+
+```markdown
+## 배경
+(원본 보존)
+
+## 결정
+(원본 보존)
+
+...
+
+## Amendment 1 (2026-05-16)
+
+### 배경
+(왜 수정 — 이슈 #N, 트리거 조건 등)
+
+### 변경 사항
+- §재검토 조건 #5 → "Phase 2 N=3 OR 30일 트리거" 추가
+- §측정 지표 → health metric 박제
+
+### 영향 범위
+(downstream 영향)
+```
+
+장점:
+
+- 원본 + 변경 history append-only 로 차곡차곡 누적
+- diff 가 깔끔 (신설 섹션만 +)
+- "원본 의도 vs 현재 결정" 비교 용이
+- 후속 Amendment N+1, N+2 가 자연 append
+
+### B 형식 vs Superseded vs D' 변형 — 운영 컨벤션
+
+| 상황 | 선택 | 이유 |
+|---|---|---|
+| 같은 이슈가 결정을 수정 (정정/임계값 조정/범위 변경) | **Amendment B 형식** | 단일 ADR 의 결정 이력 누적 |
+| 다른 이슈가 결정을 수정 (대체) | Superseded by 새 ADR + cross-link | 이력 단절 없이 대체 기록 |
+| 기술 장벽으로 원안 조정 (현실 적응) | **D' 변형** (아래 §변형 박제) | 원안 의도 보존 + 복원 트리거 |
+| 결정 자체가 무의미해짐 | Deprecated 표기 | 폐기도 이력은 남긴다 |
+
+### 적용 조건
+
+- ADR 결정 자체 수정 시 (배경 정정은 본문 직접 수정 가능)
+- 후속 이슈가 추가 결정 조항을 도출했을 때
+- §재검토 조건 발화 후 사용자 결정 박제 시 (§ADR Trigger 와 연계)
+
+## ADR Trigger 패턴 — §재검토 조건 발화 (volt #105)
+
+ADR §재검토 조건이 발화하면 (자동 탐지 workflow 또는 수동 인지) **`[ADR Trigger]` 이슈를 즉시 박제** + **결정 deadline** + **A/B/C 결정 분기 명시**. 사용자 결정 분기 위임의 표준화 + ADR mutation 책임 명시화.
+
+### Trigger 이슈 표준 구조
+
+이슈 제목 prefix: `[ADR Trigger]`. 라벨: `type:adr-trigger` 또는 `documentation` + `priority:high`.
+
+본문 4섹션:
+
+```markdown
+## 배경
+- 발화 workflow path (자동) 또는 인지 컨텍스트 (수동)
+- 발화 시각 + 임계값 충족 조건
+
+## 임계값 발화 결과
+- 측정 수치 + 임계값 + 충족 여부
+
+## 의무 (A/B/C 결정 분기)
+- 결정 deadline 박제 (예: "3 영업일 내")
+
+## Cross-link
+- ADR path + workflow path + 직전 [ADR Trigger]
+```
+
+### A/B/C 결정 분기 표준
+
+| 옵션 | 의미 | 후속 |
+|------|------|------|
+| **A** | 현 정책 유지 + Amendment 박제 | 수치만 갱신 (예: N=3 → N=10) |
+| **B** | ADR 폐기 + 신규 ADR + `Supersedes:` | 큰 변화 시 |
+| **C** | 임계값 재조정 + Amendment 박제 | 정책 부분 완화/강화 |
+
+### 결정 deadline 의무
+
+- ADR mutation 책임의 **시간 박제** — 결정 지연 자체가 의사결정
+- 영업일 (workday) — 주말 제외 (월~금 카운트)
+- deadline 경과 시 자동 후속: 옵션 A (현 정책 유지 + Amendment 박제) 또는 사용자 명시 결정 후속
+
+### 자동 탐지 workflow 와의 연계 (선택)
+
+§재검토 조건이 측정 가능한 임계값일 때 (예: "Phase 2 진행률 < 33%") 자동 탐지 workflow + cron + `gh issue create` 자동 발화 가능. workflow 도입 시 [workflow-dispatch-pitfalls.md](../../../docs/lessons/workflow-dispatch-pitfalls.md) 4 함정 점검.
+
+### 적용 조건
+
+- ADR §재검토 조건이 측정 가능한 임계값 (수치 / 비율 / 경과일수 등) 일 때
+- ADR mutation 빈도가 1회 이상 예상 (단발성 결정에는 과잉)
+- 1인 운영 또는 소규모 팀에서 결정 강제 트리거가 필요할 때 (운영 피로 vs silent drift 트레이드오프 — [guard-design-principles.md](../../../docs/lessons/guard-design-principles.md) §2)
+
 ## 변형 박제 — D' (prime) 패턴 (volt #26)
 
 ADR 원안을 구현하는 도중 **기술 장벽**(프레임워크 버그, 플랫폼 제약 등)으로 결정을 현실에 맞게 조정해야 할 때, 원안을 **편집하거나 폐기하지 않고** 변형 서브섹션을 추가 박제한다. reviewer·QA·후속 작업자가 차이를 인지하고 판단할 수 있도록 의사결정 이력을 보존하는 패턴.

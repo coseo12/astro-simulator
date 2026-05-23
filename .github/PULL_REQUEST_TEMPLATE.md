@@ -19,6 +19,13 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] 기존 테스트 통과 확인
 - [ ] 모노레포: 신규/변경 워크스페이스에 `scripts.test` 존재 확인
 
+### ADR 호환성 체크 (docs/decisions/ 변경 시 필수, reviewer.md §절차 5 정합)
+적용 비대상이면 자명 PASS. 적용 대상이면 grep 1차 (`Amendment` / `폐기` / `Supersedes` / `§재검토 조건`) + LLM 2차 의미론적 검증.
+- [ ] **적용 비대상**: 본 PR 은 `docs/decisions/` 미변경
+- [ ] **적용 대상**: `docs/decisions/` 변경 포함. 변경 ADR + 검증 결과 박제:
+  - 변경 ADR:
+  - 검증 결과: 호환 / 비호환 (이유):
+
 ### 브라우저 3단계 검증 (UI 변경 포함 시 필수)
 빌드 통과 ≠ 동작 통과. 아래 증거를 첨부한다 (최소 1가지).
 - [ ] **[1/3] 정적**: 렌더링 OK, 콘솔 에러 0 — 스크린샷 경로:
@@ -54,7 +61,6 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] 보안 취약점 없음
 - [ ] CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` 의 공통 JSON 스키마 (SSoT 코어 필드 7개) 를 수정한 경우: 5개 에이전트 파일 (`.claude/agents/architect.md` / `developer.md` / `pm.md` / `qa.md` / `reviewer.md`) 의 `## 마무리 체크리스트 JSON 반환` 섹션 동기화 + `bash scripts/verify-agent-ssot.sh` 로컬 pass 확인 (CI 에서도 자동 검사 — #145)
 - [ ] **정책·규약·ADR·CRITICAL DIRECTIVE 박제 변경 포함 시** (CLAUDE.md / `.claude/agents/*.md` / `.claude/skills/*/SKILL.md` 행동 규칙 신규·수정): cross-validate 박제 직후 1회 루틴 (volt #23) 수행 + outcome 박제 (위치 우선순위 — CHANGELOG Notes > ADR 각주 > 커밋 > PR 코멘트, 중복 금지). API 429 폴백 시 `claude-only analysis completed — 단일 모델 편향 노출 미확보` 명시 (#240 가드)
-- [ ] **ADR 호환성 체크**: 본 PR 의 변경이 기존 ADR (docs/decisions/*.md) 의 결정과 충돌하지 않음. 충돌 시 ADR Amendment 또는 폐기 결정을 동일 PR 에 동반 박제
 
 ### 관련 이슈
 Closes #

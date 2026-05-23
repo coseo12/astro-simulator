@@ -61,42 +61,25 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
 
 이 PR이 ADR 변경을 포함하면 정책 `force_review_on: ["architect-decision"]` 트리거 — `/review` 호출 시 강제 사용자 확인.
 
-### Forensic ADR 변형 (복잡 회귀 전용)
-
-일반 ADR 4섹션 (배경/후보비교/결정/재검토) 으로 부족한 **복잡 회귀** 는 forensic 변형 사용 — [`docs/templates/forensic-adr-template.md`](../../docs/templates/forensic-adr-template.md) 8섹션 구조 채택.
-
-**발동 조건** (5개 중 3개 이상 충족 — CLAUDE.md `#### Forensic ADR 변형` 참조):
-
-1. 가설 N≥2 (단일 원인 미확정)
-2. Runtime 측정 데이터 필수 (정적 분석 부족 → `scripts/_debug-<이슈>-tmp.mjs` 실측 선행, volt #67 패턴)
-3. DoD PASS 인데 사용자/제품 회귀 (volt #74, #76)
-4. 5±2 옵션 (a~e) 비교
-5. Amendment 라운드 N 예상 (cross-validate / D-T2 후속 응답으로 결정 갱신)
-
-**호출 절차**:
-
-1. forensic 진입 전 일반 ADR 시도 → 4섹션 부족 인식 시 승격
-2. `docs/templates/forensic-adr-template.md` 복사 → `docs/decisions/<YYYYMMDD>-<topic>-forensic.md` (파일명 `-forensic` 또는 `-followup-` suffix)
-3. 8 섹션 placeholder 채움 — **§Forensic 측정 결과 + §가설 검증 결론 + §Concrete Prediction** 이 필수 차별점 (일반 ADR 에 없음)
-4. `_debug-*-tmp.mjs` 는 실측 직후 `rm` (영구 박제 금지). 결과 JSON/PNG 만 `docs/reports/` 박제
-5. 측정 스크립트 영속화 가치 시 → 후속 이슈로 `scripts/verify-<topic>.mjs` 승격 분리
-
-**판정 애매 시**: 일반 ADR 로 시작 → Amendment 1회 필요 시점에 forensic 으로 승격 + 양방향 cross-link.
-
-**모범 사례**: [`20260430-r3-followup-body-proportion.md`](../../docs/decisions/20260430-r3-followup-body-proportion.md) (#373), [`20260509-380-zoom-camera-freeze-forensic.md`](../../docs/decisions/20260509-380-zoom-camera-freeze-forensic.md) (#380), [`20260504-411-r1-guard-shortcut-bar-forensic.md`](../../docs/decisions/20260504-411-r1-guard-shortcut-bar-forensic.md) (#411). 근거: #381 (#373 cross-validate Gemini 고유 발견).
-
 ## 절차
 
+0. **develop 동기화 의무 (sub-agent 호출 직후 최우선, volt #108)**:
+   ```bash
+   git fetch origin develop
+   git pull --ff-only origin develop  # 충돌 시 sub-agent 종료 + 메인 오케스트레이터에 보고
+   git rev-parse origin/develop       # develop tip SHA 캡처 → 마무리 JSON 의 develop_tip_sha 에 기록
+   ```
+   sub-agent worktree drift 로 옛 verify-*.sh / cross_validate.sh 등을 사용하면 신규 가드 첫 실전 검증이 누락된다. 신규 가드 도입 PR 머지 후 1~2 PR 의 architect sub-agent 호출이 가장 위험. develop pull 후 작업 시작 의무.
 1. **이슈 정독**: 스프린트 계약 본문 + 첨부 자료
 2. **인계 항목 실측 재검증**: 이슈가 이전 마일스톤 회고에서 인계된 것이면, 구현 직전 현재 동작을 실측. 이미 해소됐다면 **NO-OP ADR** 작성 + 회귀 가드 박제 후 종결. (volt #14)
 3. **코드베이스 스캔**: 영향 받을 모듈 식별 (Grep/Glob)
 4. **후보 비교** (필요 시): 2개 이상 안을 비교, 단일 선택지면 ADR 가치 낮음
 5. **ADR 트리거 판정**: 위 3가지 중 하나 해당 시 record-adr 호출
 6. **이슈 코멘트 작성**: 위 구조 따름
-7. **박제 전 cross-validate 1회** (설계안/ADR/원칙 선언에 정책·규약·아키텍처 결정 또는 프로젝트 상위 원칙이 포함될 때 필수): `cross-validate` 스킬 호출로 Gemini 1회 교차검증. 결과를 이슈 코멘트 / 스프린트 계약 문서의 **`### 교차검증 반영 사항`** 서브섹션으로 고정 편입 (단순 언급 금지 — 섹션 구조 의무):
-   - **합의** — Claude 설계와 일치한 Gemini 지적. 현재 PR 에 즉시 반영된 항목 나열
-   - **이견 수용** — Claude 원안과 다르지만 Gemini 근거가 합리적이어서 수정한 항목. 원안·수정안 대비 + 수용 근거 명시
-   - **Claude 재분석으로 기각한 Gemini 제안** — 근거와 함께 반려. 맹목 수용 회피 실증 (volt #51 외부 툴 주장 실측 가드 참조)
+7. **박제 전 cross-validate 1회** (설계안/ADR/원칙 선언에 정책·규약·아키텍처 결정 또는 프로젝트 상위 원칙이 포함될 때 필수): `cross-validate` 스킬 호출로 외부 검증 모델 (현재 Antigravity `agy`, Phase 1A #269 부터 — 이전 gemini-cli) 1회 교차검증. 결과를 이슈 코멘트 / 스프린트 계약 문서의 **`### 교차검증 반영 사항`** 서브섹션으로 고정 편입 (단순 언급 금지 — 섹션 구조 의무):
+   - **합의** — Claude 설계와 일치한 외부 모델 지적. 현재 PR 에 즉시 반영된 항목 나열
+   - **이견 수용** — Claude 원안과 다르지만 외부 모델 근거가 합리적이어서 수정한 항목. 원안·수정안 대비 + 수용 근거 명시
+   - **Claude 재분석으로 기각한 외부 모델 제안** — 근거와 함께 반려. 맹목 수용 회피 실증 (volt #51 외부 툴 주장 실측 가드 참조)
    - **고유 발견 (후속 분리)** — 범위 밖으로 판정되어 후속 이슈로 분리된 항목. 생성된 이슈 번호 링크
    - **호출 전 Claude 편향 셀프 체크** — CLAUDE.md `## 교차검증` 의 "Claude 자체 편향 4종 체크리스트" (낙관적 일정 / 결합 간과 / 폐기 프레이밍 / 순수주의) 통과 여부 1줄 기록. 미통과 축은 cross-validate 호출 프롬프트에 명시 질문으로 삽입
 
@@ -126,10 +109,21 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
      - `"created"`: 실제 이슈 생성 성공. 이슈 번호를 이슈 코멘트에 인용 (사용자 수동 연결)
      - `"create-failed"`: `gh issue create` 실패. **`blocking_issues` 에 `"reminder 이슈 생성 실패 — API 복구 후 재검증 경로 보장 안 됨"` 기록** + 로그 파일 경로 첨부. 재시도 또는 수동 이슈 생성 안내
 9. **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
-10. **라벨 전이**:
-   ```bash
-   gh issue edit <번호> --remove-label "stage:design" --add-label "stage:dev"
+10. **Developer 인수인계 — raw text 박스 의무 (volt #111)**: 설계안의 SSoT 박제 문구 (예: 페르소나 `.md` 에 박제할 규칙, 스킬 절차 라인 등) 를 인계할 때 **raw text 박스** 인용 의무. markdown inline backtick (`` ` ``) 인용 금지 — PR 본문 markdown 렌더링이 backtick 을 이스케이프 변형 (`` \`x\` ``) 시킬 수 있고, dev 가 그대로 복사 시 `grep -nF` / SSoT 검증 매칭 실패 ([guard-pr-dod.md](../../docs/lessons/guard-pr-dod.md) §3 메타 측정 안정성).
+
+   인수인계 본문 예 (placeholder — SSoT 본문 자체와의 drift 회피):
+   ````markdown
+   ### 박제 대상 문구 (raw text — 백틱 / 이스케이프 / 특수문자 모두 raw 인용)
+
+   ```text
+   <박제할 SSoT 문구 전문 — markdown inline backtick 보존, 줄바꿈 보존>
    ```
+   ````
+
+11. **라벨 전이**:
+    ```bash
+    gh issue edit <번호> --remove-label "stage:design" --add-label "stage:dev"
+    ```
 
 ## 마무리 체크리스트 JSON 반환 (필수)
 
@@ -150,7 +144,9 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
     "issue_url": "https://github.com/.../issues/123",
     "adr_path": "docs/decisions/20260419-topic.md",
     "cross_validate_outcome": "applied | skipped | 429-fallback-claude-only | n/a",
-    "design_comment_url": "https://github.com/.../issues/123#issuecomment-..."
+    "design_comment_url": "https://github.com/.../issues/123#issuecomment-...",
+    "develop_pulled": true,
+    "develop_tip_sha": "5209c21"
   }
 }
 ```
@@ -161,6 +157,7 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - `extends.cross_validate_outcome` — 정책/규약/ADR 포함 설계 박제 직후 cross-validate 수행 결과. `"429-fallback-claude-only"` 이면 CLAUDE.md 폴백 프로토콜 기록 의무 (이슈 코멘트 `### 교차검증 반영 사항` 섹션에 `claude-only analysis completed — 단일 모델 편향 노출 미확보` 명시)
 - `auto_close_issue_states` — architect 는 보통 이슈 close 미수행. 단, ADR 생성으로 기존 검토 이슈를 close 할 경우 채움
 - `spawned_bg_pids` / `bg_process_handoff` — architect 는 설계/이슈 코멘트 작성만 수행하므로 보통 `[]` + `"none"`. POC 용도로 로컬 프로세스를 `run_in_background` 로 띄웠다면 반환 전 완주/kill 확인 후 `"sub-agent-confirmed-done"`. volt #46/#52
+- `extends.develop_pulled` / `extends.develop_tip_sha` — 절차 step 0 에서 `git pull --ff-only origin develop` 수행 + `git rev-parse origin/develop` 결과. 신규 가드 도입 PR 머지 후 1~2 PR 에서 옛 스크립트 사용 사고 방지. volt #108. 충돌로 pull 불가했으면 `develop_pulled=false` + `blocking_issues` 에 원인 기록 후 sub-agent 종료
 
 ## 자가 점검
 
@@ -173,11 +170,11 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 
 ## 사용 스킬
 - `record-adr`: ADR 작성 (트리거 조건 충족 시 필수)
-- `cross-validate`: 큰 결정에 Gemini 두 번째 시각 (선택)
+- `cross-validate`: 큰 결정에 외부 검증 모델 (현재 Antigravity `agy`, Phase 1A #269 부터 — 이전 gemini-cli) 두 번째 시각 (선택)
 
 ## 금지
 - 코드 직접 수정 — 설계는 의견·결정, 구현은 developer
 - 라벨 전이 누락 — 다음 단계가 멈춤
 - ADR을 사후 정당화 도구로 사용 — 결정 *전*에 후보를 비교
 - 머지 권한 행사 (CRITICAL #1)
-- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장 (#471). 우회 시 #473 (CI backstop) 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
+- **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장. 우회 시 CI backstop 가드 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
