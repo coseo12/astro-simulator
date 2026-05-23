@@ -358,18 +358,42 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // 가 결정한 newTier 적용 전이라 같은 tier 의 식). 결정된 finalTier 가 다르면 setTier
               // 가 즉시 mesh.scaling 과 origin 을 갱신하므로 다음 controller.focusOn 호출 시
               // mesh.absolutePosition 은 새 tier 좌표계에서 정확.
+              // R4 #539 Amendment 3 — satellite focus multiplier 분기 (식 후보 2).
+              // moon focus 시 visual scale=30 + moonScale=800 결합으로 wsRadius 가 매우 커
+              // 기존 ×5 식이 mesh 내부 (`cameraRadius/moonScaling ≈ 1.011`) 에 카메라 박힘.
+              // satellite (parentId ≠ null && parentId ≠ 'sun') 는 ×20 적용해 mesh 외각 보장
+              // (D3.3 cameraRadius/moonScaling > 1.5 통과). R5+ phobos/io/europa/titan 자동 수용.
+              // ADR `20260520-r4-earth-moon-visualization.md` §Amendment 3 §식 후보 2.
+              const parentId = solar.getBodyParentId(bodyId);
+              const focusMultiplier = sceneApi.resolveFocusMultiplier(parentId);
+
+              // 1차 측정 — 현 tier 기준 cameraDistMeters 산출 (applyFocusTier 입력용).
               mesh.computeWorldMatrix(true);
-              const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
-              const desiredRadius = Math.max(
-                meshRadius * sceneApi.FOCUS_USER_RADIUS_MULTIPLIER,
-                meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+              const meshRadiusPre = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+              const desiredRadiusPre = Math.max(
+                meshRadiusPre * focusMultiplier,
+                meshRadiusPre + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
               );
               const currentTier = solar.getTier();
               const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(currentTier);
-              const cameraDistMeters = desiredRadius * metersPerSceneUnit;
+              const cameraDistMeters = desiredRadiusPre * metersPerSceneUnit;
               solar.applyFocusTier(bodyId, cameraDistMeters);
 
-              controller.focusOn({ mesh });
+              // R4 #539 Amendment 3 — applyFocusTier 가 setTier 트리거 시 mesh.scaling 이 즉시
+              // 갱신되므로 wsRadius 재측정 필수. tier T1→T3 전환 시 wsRadius 가 0.2 → 60426 으로
+              // 점프 (≈ ×300000), 1차 desiredRadius=4.04 로 controller.focusOn 호출하면 새 tier
+              // mesh 내부 매우 깊숙이 카메라 박힘 → D3.2 isVisible=false 회귀.
+              // 2차 측정으로 tier 전환 후 mesh radius 기준 desiredRadius 재계산.
+              mesh.computeWorldMatrix(true);
+              const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+              const desiredRadius = Math.max(
+                meshRadius * focusMultiplier,
+                meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+              );
+
+              // controller.focusOn 도 동일 식 적용 (sim-canvas SSoT 단일). 명시적 radius 전달로
+              // camera-controller 내부 default 식 (×5) 우회 — Amendment 3 satellite 분기 정합.
+              controller.focusOn({ mesh, radius: desiredRadius });
             }
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
