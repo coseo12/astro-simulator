@@ -18,8 +18,8 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 시각 과장 룩
     expect(BODY_SCALE.earth).toBe(800);
   });
 
-  it('moon = 800 (R4 #532 — earth 동일값, moon/earth=27.2% 사실 비율 정확 정합)', () => {
-    expect(BODY_SCALE.moon).toBe(800);
+  it('moon = 200 (R4 #539 Amendment 4 — 사실 비율 D-T2 인지 mismatch 후 축소, earth 6.8%)', () => {
+    expect(BODY_SCALE.moon).toBe(200);
   });
 
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
@@ -39,7 +39,7 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('mercury')).toBe(700);
     expect(getBodyScale('venus')).toBe(800);
     expect(getBodyScale('earth')).toBe(800);
-    expect(getBodyScale('moon')).toBe(800);
+    expect(getBodyScale('moon')).toBe(200);
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {

@@ -13,6 +13,11 @@ export {
   FOCUS_USER_RADIUS_MIN_PADDING,
 } from './camera-controller.js';
 export type { FocusTarget } from './camera-controller.js';
+// R4 #539 Amendment 3 — satellite focus multiplier 분기 SSoT.
+export {
+  FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE,
+  resolveFocusMultiplier,
+} from './focus-multiplier.js';
 export { createSunEarthDemo } from './sun-earth-demo.js';
 export type { SunEarthDemoHandles } from './sun-earth-demo.js';
 export { enableLogarithmicDepth } from './log-depth.js';

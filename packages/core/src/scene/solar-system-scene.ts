@@ -14,7 +14,6 @@ import {
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
-import { add } from '../coords/vec3.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
 import {
   NBodyEngine,
@@ -38,6 +37,7 @@ import {
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
+import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import {
   lodFromScreenCoverage,
   screenCoverageRadius,
@@ -150,6 +150,13 @@ export interface SolarSystemSceneHandles {
     id: string,
     parentId: string,
   ) => { pos: [number, number, number]; vel: [number, number, number] } | null;
+  /**
+   * R4 #539 Amendment 3 — body id 로 parentId 조회 (focus multiplier 분기 결정 입력).
+   *
+   * `sim-canvas.tsx syncFocusToScene` 가 `resolveFocusMultiplier(parentId)` 식 후보 2 적용 시
+   * 사용. id 미존재 시 `undefined` 반환 (호출자 fallback). ADR §Amendment 3 §식 후보 2 정합.
+   */
+  getBodyParentId: (id: string) => string | null | undefined;
   /** 런타임 엔진 전환. 현재 jd에서 Newton 초기 상태 재빌드 (심리스). */
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   /** 현재 활성 엔진 */
@@ -516,9 +523,15 @@ export function createSolarSystemScene(
       //  tier 전환 후 setFocusOrigin 이 setMoonOrbitHighlight('earth') 재호출해 강조 복원.)
       moonOrbitLine.color = MOON_ORBIT_COLOR_DEFAULT;
       moonOrbitLine.isVisible = orbitLinesVisible;
+      // R4 #539 Amendment 2 — orbit line 도 mesh 와 동일 visual scale 적용 (시각 정합).
+      // sampleOrbitPoints 가 parent 0 원점 기준 ellipse 점을 반환하므로, LineSystem.scaling 으로
+      // 일괄 ×N 확장. moon mesh position 은 resolveWorld 에서 동일 scale 곱해진 좌표라 정합.
+      // 미적용 시 orbit line 은 실측 좌표, mesh 는 visual 좌표 → 시각 mismatch.
+      const moonOrbitScale = getOrbitVisualScale('earth');
+      moonOrbitLine.scaling.set(moonOrbitScale, moonOrbitScale, moonOrbitScale);
       // R4 #532 — moon orbit 은 earth 중심 상대 좌표 (sampleOrbitPoints 가 parent 0 원점 기준 ellipse).
       // earth 가 매 프레임 움직이므로 LineSystem.position 을 updateAt 루프에서 earth scene-unit 좌표로 동기화.
-      // (ADR §결정 4: "지구 중심 small circle" 정합 + ADR §결정 6: "earth-moon 거리 실측 보존")
+      // (ADR §결정 4: "지구 중심 small circle" 정합 + ADR §Amendment 2: "earth-moon visual scale=30 적용")
       // 초기 position 은 default (0,0,0) — 첫 updateAt 호출 시점에 갱신됨.
     }
   };
@@ -1441,11 +1454,15 @@ export function createSolarSystemScene(
         world[1] = local[1];
         world[2] = local[2];
       } else {
+        // R4 #539 Amendment 2 — parent-satellite orbit visual scale 적용 (rendering 시점만).
+        // 실측 데이터 SSoT (`solar-system.json` semiMajorAxis 등) 보존 + mesh radius
+        // 박제값 (BODY_SCALE) 보존 양립을 위한 시각 분리. earth-moon 기본값 30.
+        // ADR `20260520-r4-earth-moon-visualization.md` §Amendment 2 §결정.
+        const visualScale = getOrbitVisualScale(body.parentId);
         const parentWorld = resolveWorld(body.parentId);
-        const sum = add(parentWorld, local);
-        world[0] = sum[0];
-        world[1] = sum[1];
-        world[2] = sum[2];
+        world[0] = parentWorld[0] + local[0] * visualScale;
+        world[1] = parentWorld[1] + local[1] * visualScale;
+        world[2] = parentWorld[2] + local[2] * visualScale;
       }
       resolved.add(id);
       return world;
@@ -1494,6 +1511,12 @@ export function createSolarSystemScene(
   // 초기 시점 적용
   updateAt(initialJulianDate);
 
+  // R4 #539 Amendment 3 — body id → parentId lookup (focus multiplier 분기 입력).
+  // sim-canvas syncFocusToScene 의 식 후보 2 적용 SSoT. id 미존재 시 undefined 반환.
+  const getBodyParentId = (id: string): string | null | undefined => {
+    return bodiesById.get(id)?.parentId;
+  };
+
   return {
     meshes,
     updateAt,
@@ -1502,6 +1525,7 @@ export function createSolarSystemScene(
     setTier,
     updateTierByCamera,
     getBodyState,
+    getBodyParentId,
     setPhysicsEngine,
     getPhysicsEngine,
     setBodyMassMultiplier,
