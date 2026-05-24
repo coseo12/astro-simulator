@@ -263,6 +263,7 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 - **폐기 배경**: P12 Display-Relative Scale Unification 후 기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태로 UX 회귀. DoD 수치는 모두 PASS 였음 (volt [#74](https://github.com/coseo12/volt/issues/74) 근거)
 - **유지 대상**: Floating Origin (`20260422-floating-origin.md`), LOD 3단 (`20260424-p11-b-lod-design.md`), Tier 네이밍 정책 (`20260424-tier-naming-policy.md`), Tier Preset 설계 (`20260424-tier-preset-design.md`) — 기술 가치 유지
 - **참고 (폐기)**: `docs/deprecated/principles/fact-first.md`, `docs/deprecated/phases/roadmap-v2-solar-precision.md`, `docs/deprecated/phases/p10-plan.md`, `docs/deprecated/decisions/20260423-display-relative-scale-unification.md`
+- **횡단 원칙**: [`docs/architecture/principles.md`](docs/architecture/principles.md) §1 **Visual Fidelity** — 데이터 SSoT 보존 + rendering 시점 왜곡 허용. R-Phase ADR 박제 시 §의무 체크리스트 4항목 적용 (#541, R4 cross-validate 후속)
 
 ### prettier 컨벤션 충돌 — 프로젝트 고유 해결책 (astro-simulator)
 
