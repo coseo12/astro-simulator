@@ -1,0 +1,65 @@
+name: a11y-baseline-guard
+
+# 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
+# 이슈 #535 / R4 cross-validate Gemini 고유 발견 2 후속.
+# `docs/benchmarks/a11y-baseline.json` 대비 회귀 (axe 위반 신규 / 폰트 축소 / contrast 저하)
+# 감지 시 PR 차단. baseline 갱신은 의도적 — PR 본문에 갱신 사유 박제 필수.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  a11y-baseline-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: 'pnpm'
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright chromium 설치
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: web 앱 빌드
+        run: pnpm --filter @astro-simulator/web build
+
+      - name: dev server 기동 (background)
+        run: |
+          PORT=3001 pnpm --filter @astro-simulator/web exec next start -p 3001 &
+          echo $! > /tmp/next-pid
+        env:
+          NODE_ENV: production
+
+      - name: dev server ready 대기
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/ko > /dev/null; then
+              echo "ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "timeout"; exit 1
+
+      - name: a11y baseline 회귀 검증
+        run: BASE_URL=http://localhost:3001 node scripts/verify-a11y-baseline.mjs
+
+      - name: 회귀 보고서 업로드 (실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-baseline-report
+          path: |
+            .verify-screenshots/a11y-baseline/
+            docs/benchmarks/a11y-baseline.json
+          retention-days: 7
