@@ -16,6 +16,7 @@ import { PhysicsEngineToggle } from './physics-engine-toggle';
 import { BookmarkButton } from './bookmark-button';
 import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
+import { SatelliteZoomTooltip } from '../ui/satellite-zoom-tooltip';
 
 /**
  * 전역 레이아웃 컨테이너.
@@ -51,6 +52,7 @@ export function AppShell() {
         <TimeBar>
           <TimeControls />
         </TimeBar>
+        <SatelliteZoomTooltip />
       </SimCanvasDynamic>
     </div>
   );
