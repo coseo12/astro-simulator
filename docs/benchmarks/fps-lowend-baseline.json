@@ -1,23 +1,25 @@
 {
-  "version": 1,
+  "version": 2,
   "measuredAt": "2026-05-24",
   "issue": "#536",
   "environment": {
+    "measuredOn": "CI ubuntu-latest (GitHub Actions runner)",
     "cpuThrottling": "4x",
     "measureDurationMs": 5000,
     "minFpsAbsolute": 30,
-    "regressionMargin": 0.3
+    "regressionMargin": 0.3,
+    "note": "rAF FPS 는 display refresh rate 에 종속 (macOS 120Hz / Linux headless ~60Hz). baseline 은 CI 환경 (Linux 60Hz) 기준이며 로컬 macOS 측정 시 더 높게 나올 수 있음 — 그 경우 회귀 비교는 자연 통과."
   },
   "viewports": {
     "desktop": {
-      "default": 76,
-      "earth-focus": 77,
-      "moon-focus": 78.7
+      "default": 49.9,
+      "earth-focus": 60.2,
+      "moon-focus": 60.1
     },
     "mobile": {
-      "default": 120,
-      "earth-focus": 120.1,
-      "moon-focus": 119.5
+      "default": 60.4,
+      "earth-focus": 60.1,
+      "moon-focus": 59.1
     }
   }
 }

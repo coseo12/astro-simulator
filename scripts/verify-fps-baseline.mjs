@@ -160,11 +160,21 @@ for (const vp of VIEWPORTS) {
 
 await browser.close();
 
+// baseline 의 environment 메타데이터 보존 (measuredOn / note 등 사람이 박제한 정보)
+let preservedEnvironment = {};
+if (existsSync(baselinePath)) {
+  try {
+    const existing = JSON.parse(readFileSync(baselinePath, 'utf8'));
+    preservedEnvironment = existing.environment ?? {};
+  } catch {}
+}
+
 const current = {
-  version: 1,
+  version: 2,
   measuredAt: new Date().toISOString().slice(0, 10),
   issue: '#536',
   environment: {
+    ...preservedEnvironment,
     cpuThrottling: `${CPU_THROTTLING_RATE}x`,
     measureDurationMs: MEASURE_DURATION_MS,
     minFpsAbsolute: MIN_FPS_ABSOLUTE,
