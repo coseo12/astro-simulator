@@ -1,0 +1,573 @@
+{
+  "measuredAt": "2026-05-24T08:12:23.936Z",
+  "baseUrl": "http://localhost:3000",
+  "viewports": [
+    {
+      "viewport": "1280x720",
+      "scenarios": [
+        {
+          "label": "default-sun-view",
+          "tier": "solar",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 0.7848826912414397,
+            "pxDiameter": 1.5697653824828794
+          },
+          "earthLod": {
+            "level": "mid",
+            "screenCoverage": 11.662270914222198,
+            "pxDiameter": 23.324541828444396
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.05055565322757881,
+            "scalingX": 1
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-initial",
+          "tier": "inner",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 6.084397771029764,
+            "pxDiameter": 12.168795542059527
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 98.30981832727586,
+            "pxDiameter": 196.61963665455173
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-1",
+          "tier": "inner",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 6.0873284416071805,
+            "pxDiameter": 12.174656883214361
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 98.31016041042044,
+            "pxDiameter": 196.62032082084087
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-2",
+          "tier": "inner",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 6.094601879975614,
+            "pxDiameter": 12.189203759951228
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 98.30991078750193,
+            "pxDiameter": 196.61982157500387
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-3",
+          "tier": "inner",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 6.106129835952503,
+            "pxDiameter": 12.212259671905006
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 98.30965882082481,
+            "pxDiameter": 196.61931764164962
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-4",
+          "tier": "inner",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 6.122168428077903,
+            "pxDiameter": 12.244336856155806
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 98.30969307388496,
+            "pxDiameter": 196.61938614776992
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-out",
+          "tier": "inner",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 6.142291105399016,
+            "pxDiameter": 12.284582210798032
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 98.30935597519867,
+            "pxDiameter": 196.61871195039734
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "moon-focus-direct",
+          "tier": "body",
+          "moonLod": {
+            "level": "high",
+            "screenCoverage": 24.585662637803377,
+            "pxDiameter": 49.171325275606755
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 571.6870586641686,
+            "pxDiameter": 1143.3741173283372
+          },
+          "moonMesh": {
+            "isVisible": true,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 15106.511042970373,
+            "scalingX": 298809.52380952385
+          },
+          "camera": null,
+          "selectedBodyId": null
+        }
+      ]
+    },
+    {
+      "viewport": "1920x1080",
+      "scenarios": [
+        {
+          "label": "default-sun-view",
+          "tier": "solar",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 1.177366959414452,
+            "pxDiameter": 2.354733918828904
+          },
+          "earthLod": {
+            "level": "mid",
+            "screenCoverage": 17.494348894141137,
+            "pxDiameter": 34.98869778828227
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.05055565322757881,
+            "scalingX": 1
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-initial",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 9.126023104752765,
+            "pxDiameter": 18.25204620950553
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 147.4516279742911,
+            "pxDiameter": 294.9032559485822
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-1",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 9.131813712560898,
+            "pxDiameter": 18.263627425121797
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 147.45542562239854,
+            "pxDiameter": 294.9108512447971
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-2",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 9.143899931564935,
+            "pxDiameter": 18.28779986312987
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 147.45392592281434,
+            "pxDiameter": 294.90785184562867
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-3",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 9.162464012462744,
+            "pxDiameter": 18.324928024925487
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 147.4521141344236,
+            "pxDiameter": 294.9042282688472
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-4",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 9.188932824963453,
+            "pxDiameter": 18.377865649926907
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 147.4517115029222,
+            "pxDiameter": 294.9034230058444
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-out",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 9.221143704575116,
+            "pxDiameter": 18.442287409150232
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 147.44050000938546,
+            "pxDiameter": 294.8810000187709
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "moon-focus-direct",
+          "tier": "body",
+          "moonLod": {
+            "level": "high",
+            "screenCoverage": 36.884320819347295,
+            "pxDiameter": 73.76864163869459
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 857.7441980821505,
+            "pxDiameter": 1715.488396164301
+          },
+          "moonMesh": {
+            "isVisible": true,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 15106.511042970373,
+            "scalingX": 298809.52380952385
+          },
+          "camera": null,
+          "selectedBodyId": null
+        }
+      ]
+    },
+    {
+      "viewport": "375x667",
+      "scenarios": [
+        {
+          "label": "default-sun-view",
+          "tier": "solar",
+          "moonLod": {
+            "level": "low",
+            "screenCoverage": 1.4542858208844764,
+            "pxDiameter": 2.908571641768953
+          },
+          "earthLod": {
+            "level": "mid",
+            "screenCoverage": 21.609151220084087,
+            "pxDiameter": 43.21830244016817
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.05055565322757881,
+            "scalingX": 1
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-initial",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 11.272899083704159,
+            "pxDiameter": 22.545798167408318
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 182.1438204728618,
+            "pxDiameter": 364.2876409457236
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-1",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 11.27818397924709,
+            "pxDiameter": 22.55636795849418
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 182.14532394347626,
+            "pxDiameter": 364.2906478869525
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-2",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 11.291448931438133,
+            "pxDiameter": 22.582897862876266
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 182.14492312528267,
+            "pxDiameter": 364.28984625056535
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-3",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 11.31243849411821,
+            "pxDiameter": 22.62487698823642
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 182.14316462134485,
+            "pxDiameter": 364.2863292426897
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-4",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 11.34210568666882,
+            "pxDiameter": 22.68421137333764
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 182.14393433203108,
+            "pxDiameter": 364.28786866406216
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "earth-focus-zoom-out",
+          "tier": "inner",
+          "moonLod": {
+            "level": "mid",
+            "screenCoverage": 11.379405422494912,
+            "pxDiameter": 22.758810844989824
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 182.14277030057488,
+            "pxDiameter": 364.28554060114976
+          },
+          "moonMesh": {
+            "isVisible": false,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 0.9268536746480301,
+            "scalingX": 18.333333333333336
+          },
+          "camera": null,
+          "selectedBodyId": null
+        },
+        {
+          "label": "moon-focus-direct",
+          "tier": "body",
+          "moonLod": {
+            "level": "high",
+            "screenCoverage": 45.55111905979784,
+            "pxDiameter": 91.10223811959568
+          },
+          "earthLod": {
+            "level": "high",
+            "screenCoverage": 1059.1483142418276,
+            "pxDiameter": 2118.2966284836552
+          },
+          "moonMesh": {
+            "isVisible": true,
+            "midIsVisible": null,
+            "lowIsVisible": null,
+            "wsRadius": 15106.511042970373,
+            "scalingX": 298809.52380952385
+          },
+          "camera": null,
+          "selectedBodyId": null
+        }
+      ]
+    }
+  ]
+}
