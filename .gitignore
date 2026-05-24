@@ -4,6 +4,12 @@
 # Harness 마이그레이션 백업 (일시적 — 업데이트 시 자동 생성)
 .harness/backup/
 
+# agy (Antigravity CLI v4.2.5+) session config symlink 디렉토리.
+# `agy -p` 호출 시 워크스페이스에 자동 생성 — Gemini config 디렉토리 symlink.
+# 코드/문서 무관 부산물. cross_validate.sh L3 plan-bypass 가드가 매번 untracked 감지하지 않도록 제외.
+# 근거: #546 forensic ADR cross-validate (agy 첫 사용 검증) 시 outcome.plan_bypass=true 발견.
+.antigravitycli/
+
 # Node.js
 node_modules/
 
