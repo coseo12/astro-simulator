@@ -38,6 +38,7 @@ import {
 import { runTierTransition } from './tier-transition.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
+import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
   lodFromScreenCoverage,
   screenCoverageRadius,
@@ -1220,12 +1221,29 @@ export function createSolarSystemScene(
       );
 
       const isFocused = focusBodyIdForAssert === body.id;
-      const nextLevel = lodFromScreenCoverage({
+      const baselineLevel = lodFromScreenCoverage({
         body,
         cameraDistanceMeters,
         screenCoverage: coverage,
         isFocused,
         override: lodOverride,
+      });
+
+      // #546 — parent-focus aware satellite LOD floor + 4 px guard (외부 가드 후처리, SRP 단방향).
+      // ADR `docs/decisions/20260524-546-satellite-billboard-visibility-forensic.md` §5 §결정.
+      //
+      // - earth focus + moon (parentId='earth') → low → mid 승격 (사용자 형태 인지 충족)
+      // - earth focus + mercury (parentId='sun') → 가드 비활성 (행성 분기 — Q3=(c))
+      // - default sun 시점 → 가드 비활성 (Q2=(a) — moonScale 200 의도 보존)
+      // - pxDiameter < 4 → low 유지 (alpha mask Amendment 1 보호, cross-validate 이견 수용 #1)
+      //
+      // 호출 시퀀스: lod.ts 가 baseline 반환 → 본 가드 후처리 → effective level 출력
+      // (Split-brain SRP 회피 — lod.ts 입력 무영향, 출력만 후처리). agy 이견 수용 #2.
+      const nextLevel = applySatelliteVisibilityGuard({
+        parentId: body.parentId,
+        focusedBodyId: focusBodyIdForAssert,
+        baselineLodLevel: baselineLevel,
+        pxDiameter: coverage * 2,
       });
 
       const prevLevel = bodyCurrentLod.get(body.id);
