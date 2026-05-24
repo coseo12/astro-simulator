@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "measuredAt": "2026-05-24",
+  "issue": "#535",
+  "wcagVersion": "2.2 AA",
+  "viewports": {
+    "desktop": {
+      "axe": {
+        "violations": 1,
+        "byImpact": {
+          "critical": 0,
+          "serious": 1,
+          "moderate": 0,
+          "minor": 0
+        },
+        "ids": [
+          "serious:target-size"
+        ]
+      },
+      "shortcutBar": {
+        "fontSizePx": 10,
+        "wcagAaMinPx": 12,
+        "marginPx": -2
+      }
+    },
+    "mobile": {
+      "axe": {
+        "violations": 1,
+        "byImpact": {
+          "critical": 0,
+          "serious": 1,
+          "moderate": 0,
+          "minor": 0
+        },
+        "ids": [
+          "serious:target-size"
+        ]
+      },
+      "shortcutBar": {
+        "fontSizePx": 10,
+        "wcagAaMinPx": 12,
+        "marginPx": -2
+      }
+    }
+  },
+  "moonOrbitContrast": {
+    "backgroundColorRgb": "#000000",
+    "default": {
+      "colorRgb": "rgb(64, 71, 102)",
+      "contrastRatio": 2.32,
+      "meetsAA": false
+    },
+    "earthFocus": {
+      "colorRgb": "rgb(166, 178, 217)",
+      "contrastRatio": 10.02,
+      "meetsAA": true
+    },
+    "wcagAaNonTextMin": 3
+  }
+}
