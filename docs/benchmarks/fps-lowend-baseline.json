@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "measuredAt": "2026-05-24",
+  "issue": "#536",
+  "environment": {
+    "cpuThrottling": "4x",
+    "measureDurationMs": 5000,
+    "minFpsAbsolute": 30,
+    "regressionMargin": 0.3
+  },
+  "viewports": {
+    "desktop": {
+      "default": 76,
+      "earth-focus": 77,
+      "moon-focus": 78.7
+    },
+    "mobile": {
+      "default": 120,
+      "earth-focus": 120.1,
+      "moon-focus": 119.5
+    }
+  }
+}

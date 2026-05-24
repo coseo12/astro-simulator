@@ -43,6 +43,7 @@
     "verify:perf": "node scripts/browser-verify-perf.mjs",
     "verify:a11y": "node scripts/browser-verify-a11y.mjs",
     "verify:a11y-baseline": "node scripts/verify-a11y-baseline.mjs",
+    "verify:fps-baseline": "node scripts/verify-fps-baseline.mjs",
     "verify:test-coverage": "node scripts/verify-test-coverage.mjs",
     "verify:iau-data": "node scripts/verify-iau-data.mjs",
     "verify:no-scientific-grep": "node scripts/verify-no-scientific-grep.mjs",
