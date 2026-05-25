@@ -87,7 +87,7 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 2. **drift 노출 기간 평균 ≥ 30일** — upstream 머지 + 릴리스 사이클이 지속적으로 30일을 넘으면 `harness doctor` 노이즈 영구화 → Phase 1 manifest 수동 갱신 (`harness update --bootstrap`) 검토
 3. **다운스트림 프로젝트 ≤ 1** — 본 프로젝트가 유일한 harness 사용자가 되면 (다른 프로젝트 전부 fork 또는 폐기) X 경로 가치 0 → Y 단독으로 회귀
 4. **`harness update --apply-all-safe` 자가 복구 정책 변경** — v2.9.0+ 의 `previousSha256` 자가 복구가 비활성화되면 Phase 3 자동 동기화 보장 약화 → 재평가
-5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조)
+5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조)
 
 ### 측정 지표
 
@@ -213,3 +213,102 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 - **함정 통계 강화**: base=develop PR closingIssuesReferences=[] 100% 미발화 패턴 — 본 PR [#260](https://github.com/coseo12/harness-setting/pull/260) 18회차 재현 (volt [#115](https://github.com/coseo12/volt/issues/115) 10/10 + 다운스트림 누적). 메인 의무: base=develop PR 머지 후 무조건 수동 close.
 - **cross-link**: 본 Amendment, [#500](https://github.com/coseo12/astro-simulator/issues/500) [ADR Trigger] discussion, [#260](https://github.com/coseo12/harness-setting/pull/260) upstream PR, 직전 [#495](https://github.com/coseo12/astro-simulator/issues/495) Amendment 4, [#488](https://github.com/coseo12/astro-simulator/issues/488) Amendment 5
 - **Z 패턴 12회차 적용 실측 (2026-05-18)**: 본 PR Amendment 6. Phase 2 = 4/11 = 36.4% ✅ — Amendment 1 임계값 (33%) 충족. 다음 자동 탐지 시 발화 없음 (Phase 2 충족 조건 통과). Amendment 4/6 의 점진 진행 전략 성공 완료.
+
+## Amendment 7 — 2026-05-25
+
+- **발의**: [#554](https://github.com/coseo12/astro-simulator/issues/554) ([ADR Trigger] 자동 박제 2026-05-25, deadline 2026-05-28 KST)
+- **트리거 발화 사유**: Amendment 1+2 정합 3중 OR 중 **단일 발화** — Phase 1 회차 12 ≥ N=10 임계. 단, Phase 2 진행률은 33.3% ≥ 33% 충족 (Amendment 1 미발화), 시간 경과 10일 (Amendment 2 미발화).
+- **사용자 결정 (2026-05-25)**: **옵션 D — 측정 방법 정정** (메타 옵션). CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법 검증 우선" 원칙 직접 적용. silent 가드 추가 약화 (옵션 C) 또는 Phase 2 강제 진행 (옵션 A) 대신 **측정 식의 자기참조 인플레이션 결함** 정정 우선.
+
+### 측정 결함 forensic
+
+기존 측정 식 (`scripts/verify-z-pattern-health.mjs:53`):
+
+```javascript
+const phase1Count = Math.max(amendmentCount, adrCitations);
+```
+
+여기서 `adrCitations` 는 본 ADR 의 파일명 (`20260515-harness-managed-divergent-pattern`) 을 인용한 모든 머지된 PR 카운트. 그러나 ADR 본문 자체를 변경하는 메타 PR (Amendment 박제 / 자동화 hotfix / 릴리스) 도 동일 파일명을 인용하므로 카운트 인플레이션 발생.
+
+**Phase 1 = 12 PR 분류 실측** (2026-05-25):
+
+| 분류 | PR 수 | PR 번호 | Z 패턴 적용? |
+|---|---|---|---|
+| **실제 Z 패턴 적용** | **6** | #468 #472 #475 #478 #481 #482 | ✓ Phase 1 |
+| ADR Amendment 박제 | 4 | #486 #489 #490 #501 | ✗ ADR 자체 진화 |
+| 자동화 hotfix | 1 | #491 | ✗ ADR 자체 진화 |
+| 릴리스 PR (v0.16.0) | 1 | #494 | ✗ ADR 자체 진화 |
+
+→ 실제 Z 적용 회차 = **6** (< N=10, 임계 미달)
+
+### 변경 사항
+
+#### 자동화 스크립트 정정 — `scripts/verify-z-pattern-health.mjs` (2단 정정)
+
+1. **`isAdrEvolutionPr(title)` 신규 함수** — PR title 에서 `Amendment N` / `hotfix` / `release vX.Y.Z` 패턴 식별. `adrCitations` 계산 시 `isAdrEvolutionPr` 통과 PR 만 카운트 → PR citations 자기참조 회피
+2. **`phase1Count = adrCitations`** (기존 `Math.max(amendmentCount, adrCitations)` 폐기) — Amendment 7 박제 직후 D1 검증에서 발견: `amendmentCount` 도 Amendment N 박제 자체로 +1 증가 (Amendment 7 박제 → amendmentCount 6→7) → Math.max 가 인플레된 amendmentCount 채택 → 자기참조 인플레이션 재발생 (66.7% → 57.1% 하락 관찰). 정정: amendmentCount 는 console.log 정보 출력에만 활용, 임계 비교 SSoT 는 adrCitations 단일
+
+> **D1 검증 시점의 메타 학습** — 측정 식 정정의 1차 효과 (isAdrEvolutionPr 필터) 만 박제 후 산출값 검증에서 2차 자기참조 (amendmentCount 인플레) 발견. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법 검증 우선" 원칙의 반복 적용 사례 — 측정 식 변경 후 즉시 재검증 의무.
+
+#### ADR §재검토 조건 #5 본문 갱신
+
+- "ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 은 Z 적용 회차로 카운트하지 않음" 명시
+- §측정 지표에 정정 식 산출 결과 박제 (Phase 1 = 6, Phase 2 = 4, 진행률 66.7%)
+
+### 정정 후 실측 (2026-05-25, 본 PR 머지 직후)
+
+- **Phase 1 카운트** (정정): 12 → **6** (자기참조 6 제외)
+- **Phase 2 카운트**: 4 (변경 없음, upstream PR 4건 모두 머지)
+- **Phase 2 진행률** (정정): 33.3% → **66.7%** (Amendment 1 임계 33% 대비 2배 초과)
+- **임계 발화**: 3중 OR 모두 미발화 → exit 0 ✅
+- **다음 트리거 회피**: Phase 1 회차가 N=10 도달까지 추가 4 Z 적용 PR 여유
+
+### silent 가드 무력화 위험 점검 (메타 검증)
+
+옵션 D 가 silent 가드 무력화 (옵션 C 변형) 인지 자기점검:
+
+- ❌ **옵션 C와 무관**: N 임계값 (10) 변경 없음. silent 가드 본래 의도 보존
+- ❌ **회피 트릭 아님**: 측정 식이 자기참조로 인플레된 false-positive 제거 — 실제 회차 (6) 가 임계 (10) 미만이라는 사실은 정확한 측정의 결과
+- ✓ **CLAUDE.md §스프린트 계약 #10 정합**: "수치 DoD 미달 시 측정 방법 검증 우선" — DoD 가 미달이 아니라 임계 *초과* 였으나 동일 원칙 (측정 식 검증 우선) 적용
+- ✓ **다운스트림 부담 제거**: workflow 가 매주 false-positive 발화하면 alert fatigue → 진짜 트리거 발화 시 사용자 무시 위험. 정확한 측정이 silent 가드의 효과 자체를 보호
+
+### 측정 식 정정 회귀 가드
+
+- **자기점검 단위 검증**: 정정 후 스크립트 실행 → 6/4/66.7% 산출 + exit 0 확인 (본 PR 머지 전 D1/D2 통과)
+- **회귀 가드**: workflow_dispatch 수동 트리거 1회 (default branch 반영 후, volt #69 함정 회피) → CI 환경에서도 exit 0 확인 의무
+- **미래 Amendment 박제 시 카운트 동작**: 새 Amendment (예: Amendment 8) 박제 PR 은 자동으로 `isAdrEvolutionPr` 필터 통과 → 자기참조 회피 (정정 식 영구 보존)
+
+### 트레이드오프
+
+- **장점**: false-positive 제거 + 다음 트리거 시점 정확화 + silent 가드 본래 효과 강화 + Phase 2 강제 부담 제거
+- **단점 (잠재)**: PR title 컨벤션 의존 — 향후 Amendment PR title 에 `Amendment N` 명시 누락 시 카운트 인플레 재현 가능. 회피: 본 ADR §운영 절차에 "Amendment 박제 PR title 컨벤션 의무" 박제 (후속 분리 검토)
+
+### cross-link
+
+- 본 Amendment, [#554](https://github.com/coseo12/astro-simulator/issues/554) [ADR Trigger] discussion
+- 자동화 스크립트: `scripts/verify-z-pattern-health.mjs`
+- 직전 Amendment: [#500](https://github.com/coseo12/astro-simulator/issues/500) Amendment 6
+- 측정 방법 원칙: CLAUDE.md §스프린트 계약 #10 (volt [#32](https://github.com/coseo12/volt/issues/32) — 측정 방법 검증 우선)
+
+### 교차검증 반영 사항 (agy Antigravity, 2026-05-25)
+
+- **outcome**: `applied` (exit 0) — log `.claude/logs/cross-validate-architecture-20260525-134600.log`
+- **합의** (Claude 설계와 일치): Amendment 7 의 자기참조 회피 정정 = 모범 사례 평가 ("측정 식 자체에 대한 포렌식 및 결함 분석 적용은 이 시스템이 자생적으로 동작하고 있음을 입증")
+- **이견**: 0건 (4 검증 포인트 모두에 대해 agy 반박 없음)
+- **본 PR 반영 (즉시)**: 0건 (agy 발견 모두 본 PR 비-범위 영역)
+- **고유 발견 (후속 분리, volt #29 3단 프로토콜)**: 4건 — 모두 본 Amendment 7 비-범위 (측정 식 정정 단일 목표) 와 직교
+  1. **Phase 1 드리프트 가시화** (medium 후보) — Phase 1 임시 수정 파일에 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 변경 정적 비교 가드 (Amendment 5 보완)
+  2. **경고 피로감 (Alert Fatigue) 가드** (medium 후보) — 동시 드리프트 최대 N개 상한 박제
+  3. **CI exit code 계약 명시** (low 후보) — `.github/workflows/adr-z-pattern-health-v2.yml` 의 block vs warn 동작 박제
+  4. **신규 진입 인지 부하 완화** (low 후보) — CLAUDE.md TL;DR 3단계 요약 카드 + markdownlint 등 다른 린터 정합성 통합 박제
+- **Claude 편향 셀프 체크 4종**:
+  - (a) 낙관적 일정 → ✓ 측정 식 정정 1단 박제 후 D1 재검증으로 2차 자기참조 (amendmentCount 인플레) 발견 + 즉시 정정. CLAUDE.md §스프린트 계약 #10 반복 적용 사례
+  - (b) 결합 간과 → ✓ `Math.max(amendmentCount, adrCitations)` 의 2축 자기참조 결합 발견. 1단 (isAdrEvolutionPr) 만으론 2축 중 1축 (adrCitations) 만 해소 — Math.max 폐기로 2축 (amendmentCount) 자기참조도 SSoT 에서 제거
+  - (c) 폐기 프레이밍 → ✓ 옵션 D 가 옵션 B (Z 패턴 폐기) 또는 옵션 C (silent 약화) 변형 아님 — §결정 본문 / N 임계 / Phase 2 의무 모두 보존 (자기점검 통과)
+  - (d) 순수주의 → ✓ "정직한 측정" 도그마 아님 — Phase 2 진행률 33.3% vs 66.7% 차이 실측이 사용자 의사결정 정확화에 직접 기여
+
+### Z 패턴 적용 카운트 (정정 후, 2026-05-25)
+
+- 회차 정정 후 = **6** (#468/#472/#475/#478/#481/#482)
+- Phase 2 진행률 정정 후 = 4/6 = **66.7%** ✅ Amendment 1 임계 (33%) 2배 초과
+- Amendment 7 박제 자체는 ADR 자체 진화 PR 이므로 정정 식상 Phase 1 카운트 +0 — 의도된 자기참조 회피 동작
