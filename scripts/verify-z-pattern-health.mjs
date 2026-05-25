@@ -30,6 +30,18 @@ const N_THRESHOLD = 10; // Amendment 2
 const TIME_THRESHOLD_DAYS = 90; // Amendment 2
 const PHASE2_THRESHOLD = 0.33; // Amendment 1 health metric
 
+// Amendment 7 (#554): ADR 자체 진화 PR 식별 — Phase 1 카운트에서 제외
+// 패턴: "Amendment N" (박제) / "hotfix" (자동화 hotfix) / "release vX.Y.Z" (릴리스 PR)
+// 제외 사유: ADR 본문 변경 PR 은 Z 패턴 "적용" 이 아니라 ADR 자체의 진화 — 카운트 자기참조 회피
+function isAdrEvolutionPr(title) {
+  if (!title) return false;
+  const lower = title.toLowerCase();
+  if (/amendment\s+\d+/i.test(title)) return true;
+  if (/\bhotfix\b/i.test(title)) return true;
+  if (lower.startsWith('release:') || /\brelease\s+v\d+\.\d+/i.test(title)) return true;
+  return false;
+}
+
 try {
   // 1. ADR 파일 존재 검증
   if (!existsSync(ADR_PATH)) {
@@ -45,12 +57,24 @@ try {
   const amendmentCount = amendmentNumbers.length;
 
   // PR commit grep 보조 — ADR 인용 PR 카운트 (본 프로젝트)
+  //
+  // Amendment 7 (#554, 2026-05-25): 측정 식 자기참조 인플레이션 회피.
+  // 기존 식은 ADR 본문 자체 변경 PR (Amendment 박제 / hotfix / release) 도 Z 적용으로
+  // 카운트 → 12회차 인플레로 N=10 임계 false-positive 트리거. 정정 식은 PR title 에서
+  // ADR 자체 진화 표식 (Amendment N / hotfix / release) 을 제외하여 Phase 1 (Z 패턴
+  // 실제 적용) 만 카운트. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법
+  // 검증 우선" 원칙 정합 박제.
   const adrCitationsRaw = execSync(
-    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number --jq 'length'`,
+    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title`,
     { encoding: 'utf-8' },
   ).trim();
-  const adrCitations = parseInt(adrCitationsRaw, 10) || 0;
-  const phase1Count = Math.max(amendmentCount, adrCitations);
+  const adrCitationPrs = JSON.parse(adrCitationsRaw || '[]');
+  const adrCitations = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title)).length;
+  // Amendment 7 (#554): 임계 비교 SSoT 는 adrCitations (Z 적용 PR 카운트).
+  // amendmentCount 도 자기참조 (Amendment N 박제 자체로 +1 증가) 라 임계 SSoT 부적합 —
+  // console.log 정보 출력에만 활용. amendmentCount > adrCitations 가능 시점: ADR
+  // 진화 활발 + 적용 정체기 (별도 정보로 가시화).
+  const phase1Count = adrCitations;
 
   // 3. Phase 2 카운트 — upstream harness-setting PR 검색
   //
