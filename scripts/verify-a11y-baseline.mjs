@@ -60,8 +60,9 @@ function contrastRatio(l1, l2) {
 }
 
 // Babylon Color3 (0~1 range) 와 동일 색상 베이스 (SSoT: solar-system-scene.ts L482~)
+// #552 — MOON_ORBIT_COLOR_DEFAULT WCAG 1.4.11 ≥ 3:1 (3.06:1) 갱신. SSoT mirror 동기화 (drift 차단, volt #69 패턴).
 const MOON_ORBIT_COLORS = {
-  default: { r: 0.25, g: 0.28, b: 0.4 }, // MOON_ORBIT_COLOR_DEFAULT — sun 시점
+  default: { r: 0.3, g: 0.35, b: 0.5 }, // MOON_ORBIT_COLOR_DEFAULT — sun 시점 (#552: 0.25/0.28/0.40 → 0.30/0.35/0.50)
   earthFocus: { r: 0.65, g: 0.7, b: 0.85 }, // MOON_ORBIT_COLOR_EARTH_FOCUS — earth focus 강조
 };
 // 우주 배경 (Babylon scene default clearColor — 일반적으로 black)
@@ -122,7 +123,7 @@ function computeMoonOrbitContrast() {
   return {
     backgroundColorRgb: '#000000',
     default: {
-      colorRgb: 'rgb(64, 71, 102)',
+      colorRgb: 'rgb(77, 89, 128)', // #552 — 0.30/0.35/0.50 × 255 = 76.5/89.25/127.5 (반올림)
       contrastRatio: +contrastRatio(defaultL, bgL).toFixed(2),
       meetsAA: contrastRatio(defaultL, bgL) >= WCAG_AA_NONTEXT_MIN_CONTRAST,
     },

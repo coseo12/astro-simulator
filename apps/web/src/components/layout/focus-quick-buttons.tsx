@@ -57,7 +57,10 @@ export function FocusQuickButtons() {
   }, [selected, sendCommand]);
 
   return (
-    <div className="flex items-center gap-1" data-r1-region="shortcut-bar">
+    <div
+      className="flex items-center gap-1 overflow-x-auto whitespace-nowrap max-w-full"
+      data-r1-region="shortcut-bar"
+    >
       {FOCUS_BUTTONS.map((b) => {
         const enabled = isRPhaseFocusable(b.id);
         return (
@@ -70,7 +73,7 @@ export function FocusQuickButtons() {
             aria-disabled={!enabled}
             title={enabled ? undefined : DISABLED_TOOLTIP}
             onClick={() => sendCommand({ type: 'focusOn', bodyId: b.id })}
-            className={`num text-mini px-1 py-0.5 rounded-sm border transition-colors ${
+            className={`num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border transition-colors ${
               !enabled
                 ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
                 : selected === b.id
@@ -87,7 +90,7 @@ export function FocusQuickButtons() {
         type="button"
         data-testid="focus-reset"
         onClick={() => sendCommand({ type: 'resetCamera' })}
-        className="num text-mini px-1 py-0.5 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
+        className="num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
         reset
@@ -100,7 +103,7 @@ export function FocusQuickButtons() {
         aria-disabled={selected === null}
         title={selected === null ? '포커스 상태에서만 사용 가능' : '자유시점 (Esc)'}
         onClick={() => sendCommand({ type: 'enterFreeFly' })}
-        className={`num text-mini px-1 py-0.5 rounded-sm border transition-colors ${
+        className={`num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border transition-colors ${
           selected === null
             ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
             : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'
