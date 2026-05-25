@@ -1,23 +1,21 @@
 {
   "version": 1,
   "measuredAt": "2026-05-25",
-  "issue": "#552",
-  "previousMeasuredAt": "2026-05-24",
-  "updateReason": "#552 통합 fix — (1) shortcut bar 9 버튼 target-size 24×24 px PASS (실측 확인), (2) fontSize 10 → 12 px, (3) moon orbit contrast 2.32:1 → 3.06:1. axe violations 잔존 1건은 shortcut bar 외 영역 (mode-observe/research, unit-si/astro/natural, time-reverse/pause/forward) — 본 PR scope 외. 후속 이슈 분리 박제 의무.",
+  "issue": "#564",
+  "previousMeasuredAt": "2026-05-25",
+  "updateReason": "#564 통합 fix — shortcut-bar 외 영역 (mode-switcher / unit-toggle / time-controls) 9 버튼 target-size 24×24 px PASS. PR #561 shortcut-bar fix 와 동일 패턴 (`min-w-6 min-h-6 shrink-0` + 부모 overflow 안전망) 답습. axe `serious:target-size` 위반 0건 확정 — WCAG 2.2 2.5.8 전 영역 정합 완료.",
   "wcagVersion": "2.2 AA",
   "viewports": {
     "desktop": {
       "axe": {
-        "violations": 1,
+        "violations": 0,
         "byImpact": {
           "critical": 0,
-          "serious": 1,
+          "serious": 0,
           "moderate": 0,
           "minor": 0
         },
-        "ids": [
-          "serious:target-size"
-        ],
+        "ids": [],
         "shortcutBarTargetSizePass": true
       },
       "shortcutBar": {
@@ -28,16 +26,14 @@
     },
     "mobile": {
       "axe": {
-        "violations": 1,
+        "violations": 0,
         "byImpact": {
           "critical": 0,
-          "serious": 1,
+          "serious": 0,
           "moderate": 0,
           "minor": 0
         },
-        "ids": [
-          "serious:target-size"
-        ],
+        "ids": [],
         "shortcutBarTargetSizePass": true
       },
       "shortcutBar": {

@@ -17,7 +17,7 @@ export function UnitToggle() {
 
   return (
     <div
-      className="flex items-center gap-0.5 bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm p-0.5"
+      className="flex items-center gap-0.5 bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm p-0.5 overflow-x-auto whitespace-nowrap max-w-full"
       data-testid="unit-toggle"
     >
       {UNITS.map((u) => {
@@ -29,7 +29,7 @@ export function UnitToggle() {
             onClick={() => setUnit(u.id)}
             title={u.desc}
             data-testid={`unit-${u.id}`}
-            className={`num text-caption px-2 py-0.5 rounded-xs transition-colors ${
+            className={`num text-caption px-2 py-0.5 rounded-xs transition-colors min-w-6 min-h-6 shrink-0 ${
               active ? 'bg-primary/25 text-fg-primary' : 'text-fg-secondary hover:bg-bg-elevated'
             }`}
             style={{ transitionDuration: 'var(--duration-fast)' }}
