@@ -479,7 +479,7 @@ export function createSolarSystemScene(
   let orbitLinesVisible = showOrbitLines;
 
   // R4 #532 — moon orbit line 색상 SSoT (결정 4).
-  const MOON_ORBIT_COLOR_DEFAULT = new Color3(0.25, 0.28, 0.4); // 일반 시점 (기본 orbitLines 와 동일)
+  const MOON_ORBIT_COLOR_DEFAULT = new Color3(0.3, 0.35, 0.5); // #552 — WCAG 1.4.11 ≥ 3:1 (3.06:1) 충족. 톤 보존으로 EARTH_FOCUS 자연 그라데이션 유지
   const MOON_ORBIT_COLOR_EARTH_FOCUS = new Color3(0.65, 0.7, 0.85); // earth focus 강조 (~2.6배 명도)
 
   const rebuildOrbitLines = () => {

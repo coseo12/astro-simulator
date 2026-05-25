@@ -63,7 +63,7 @@
   --text-body: 0.9375rem;
   --text-body-sm: 0.8125rem;
   --text-caption: 0.6875rem;
-  --text-mini: 0.625rem; /* R4 #532 — shortcut bar 모바일 너비 수용 (ADR §결정 5) */
+  --text-mini: 0.75rem; /* #552 — WCAG 2.2 AA 권고 (≥ 12 px). R4 §결정 5 의 모바일 너비 수용은 min-w-6 min-h-6 + px-1 보존으로 유지 */
 
   /* ----- Radius ----- */
   --radius-xs: 2px;
