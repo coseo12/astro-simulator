@@ -43,6 +43,7 @@
 | **R3** (venus) | `20260429-r3-venus-visualization.md` | venus mesh radius | `venusScale = 800` (Amendment 2026-05-03 라운드 3) | 사실 비례 역전 (venus > mercury 강화) | ✓ `venus.radius = 6.0518e6 m` 보존 |
 | **R4** (earth + moon) | `20260520-r4-earth-moon-visualization.md` §결정 1 | earth/moon mesh radius | `earthScale = 800`, `moonScale = 800` | Q2=B 비례 결정 정책 (사실 비례 보존) | ✓ `earth.radius = 6.371e6 m` 보존 |
 | **R4** (earth + moon) | `20260520-r4-earth-moon-visualization.md` §결정 6 (Amendment 2 forensic) | earth-moon orbit 거리 | `EARTH_MOON_ORBIT_VISUAL_SCALE = 30` | mesh-mesh fusion (sum mesh > 실측 거리 16.9배) | ✓ `semiMajorAxisAU = 0.00257189` 보존 |
+| **R4 후속** (a11y) | `20260525-552-a11y-baseline-fix.md` §결정 3 | moon orbit color (RGB) | `MOON_ORBIT_COLOR_DEFAULT = Color3(0.30, 0.35, 0.50)` (2026-05-25) | WCAG 1.4.11 non-text 2.32:1 → 3.06:1 (a11y baseline 격차) | ✓ rendering-only 상수, `solar-system.json` 변경 0 — §의무 체크리스트 4항목 첫 본 인스턴스화 |
 
 > R5+ (mars/phobos/deimos, jupiter/galilean, saturn/titan) 진입 시 satellite 가 있는 모든 case 에 동일한 평가를 의무화한다 — R4 §결정 6 Amendment 2 의 R5+ 확장 박제 참조.
 
