@@ -5,18 +5,21 @@
  *
  * ADR 20260515 Amendment 8 (#556) Phase 1 드리프트 가시화 가드.
  * ADR 20260515 Amendment 9 (#557) 경고 피로감 가드 (활성 drift ≥ N=10 soft-warn).
+ * ADR 20260515 Amendment 11 (#572) Phase 3 sidecar 라이프사이클 자동화 (opt-in).
  *
  * `.harness/manifest.json` 의 sha256 와 실제 파일 sha256 를 비교해 drift 감지.
  * drift 파일에 HARNESS-DRIFT 데코레이터 (Z-PATTERN [upstream-link-or-TODO]) 박제
  * 검증. 누락 시 exit 1 (fail-fast — Amendment 8 §결정점 4 silent 가드 강화 방향).
  *
- * Amendment 9 (#557) — 두 모드 분기:
- *   --mode=verify (기본) — Amendment 8 데코레이터 가드 (fail-fast)
- *   --mode=count-warn — Amendment 9 경고 피로감 가드 (soft-warn, exit 0 + stdout 마커)
+ * Amendment 9 (#557) / Amendment 11 (#572) — 세 모드 분기:
+ *   --mode=verify (기본)         — Amendment 8 데코레이터 가드 (fail-fast)
+ *   --mode=count-warn            — Amendment 9 경고 피로감 가드 (soft-warn, exit 0 + stdout 마커)
+ *   --mode=sidecar-cleanup       — Amendment 11 orphan sidecar 정리 자동화 (opt-in)
  *
- * 비대칭 의도적 (ADR §Amendment 9 §결정점 4):
+ * 비대칭 의도적 (ADR §Amendment 11 §결정점 4 SSoT — Amendment 8/9/10/11 통합):
  *   - 데코레이터 누락 = fail-fast (예방 비용 < 1줄, 컨벤션 강제)
  *   - drift 카운트 초과 = soft-warn (사용자 결정 분기 의무 — Phase 2 가속 / 일부 revert / N 재조정)
+ *   - sidecar 라이프사이클 = fail-fast (verify 모드 silent leak 차단) + opt-in 자동화 (sidecar-cleanup 모드 사용자 시점 정리)
  *
  * 본문 형식 SSoT (ADR §Amendment 8):
  *   HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]
@@ -39,7 +42,7 @@
  *   - orphan sidecar (본 파일 없음 OR drift 해소된 상태) 발견 시 exit 1
  *
  * 호출:
- *   node scripts/verify-harness-drift-decorator.mjs [--mode=verify|count-warn]
+ *   node scripts/verify-harness-drift-decorator.mjs [--mode=verify|count-warn|sidecar-cleanup] [--apply]
  *
  *   --mode=verify (기본, Amendment 8):
  *     → drift 0 또는 모든 drift 파일에 데코레이터 정합 박제 → exit 0
@@ -52,13 +55,24 @@
  *     → drift ≥ N → exit 0 + stdout 에 "[Alert Fatigue Trigger]" 마커 + drift 파일 목록 박제
  *       (soft-warn — CI workflow 가 stdout 파싱하여 자동 이슈 생성)
  *
+ *   --mode=sidecar-cleanup (Amendment 11, opt-in):
+ *     → detectOrphanSidecars() 재사용 — orphan 목록 stdout 출력
+ *     → orphan 0 → "no orphan sidecars" + exit 0
+ *     → orphan N (--apply 미명시, dry-run 기본) → "[Sidecar Cleanup — Dry Run]" 마커 + 목록 + exit 0
+ *     → orphan N (--apply 명시) → file unlink + "[Sidecar Cleanup — Apply]" 마커 + exit 0
+ *     → manifest 부재 / 실행 에러 → exit 2
+ *
+ *     안전 장치: --apply 는 detectOrphanSidecars() 가 식별한 orphan 만 삭제 (정상 sidecar 보존).
+ *     orphan 휴리스틱 (검사 1: base file missing / 검사 2: drift 해소된 상태) 이 SSoT.
+ *
  * Self-test:
  *   node scripts/verify-harness-drift-decorator.mjs --self-test
  *     → 인라인 positive/negative/recovery 3중 시뮬레이션 + sidecar/regex 단위 검증
  *     → Amendment 9 boundary 시뮬레이션 (N-1 / N / N+1) 3 cases
+ *     → Amendment 11 boundary 시뮬레이션 (orphan 0 / dry-run / apply / drift 안전 거부) 4 cases
  *
  * 관련:
- *   - ADR docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8 / §Amendment 9
+ *   - ADR docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8 / §Amendment 9 / §Amendment 11
  */
 import { createHash } from 'node:crypto';
 import {
@@ -69,6 +83,7 @@ import {
   rmSync,
   mkdtempSync,
   mkdirSync,
+  unlinkSync,
 } from 'node:fs';
 import { join, dirname, basename, extname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -83,6 +98,11 @@ const ALERT_FATIGUE_THRESHOLD_N = 10;
 
 // stdout 마커 — CI workflow 가 grep 으로 파싱하여 자동 이슈 생성 트리거.
 const ALERT_FATIGUE_MARKER = '[Alert Fatigue Trigger]';
+
+// Amendment 11 (#572) — sidecar-cleanup 모드 stdout 마커 SSoT.
+// dry-run 기본 (--apply 미명시) / --apply 명시 시 실제 삭제. 마커는 CI / 사용자 grep 식별용.
+const SIDECAR_CLEANUP_DRY_RUN_MARKER = '[Sidecar Cleanup — Dry Run]';
+const SIDECAR_CLEANUP_APPLY_MARKER = '[Sidecar Cleanup — Apply]';
 
 // Amendment 8 SSoT regex — 위치 A (파일 첫 줄 + shebang/DOCTYPE/YAML frontmatter 1블록 허용).
 // 형식별 분기: `<!--` (md) / `//` (ts/js/mjs) / `#` (yml/sh)
@@ -447,6 +467,104 @@ function runSelfTest() {
     } finally {
       rmSync(cwTmp, { recursive: true, force: true });
     }
+
+    // --- Amendment 11 (#572) sidecar-cleanup boundary 시뮬레이션 (4 cases) ---
+    // ADR §Amendment 11 §회귀 가드 4축 §(2) 3중 시뮬레이션 (positive → negative → recovery)
+    // + 추가 boundary (drift 상태 sidecar 는 cleanup 대상 아님 — 안전 거부)
+    //
+    // Cases:
+    //   case 1: orphan 0 (정상) → orphans.length === 0
+    //   case 2: orphan 2 (base missing + drift 해소) — dry-run (apply=false) → 파일 잔존
+    //   case 3: 동일 baseline — apply 실행 → 파일 삭제 + 후속 orphan 0 (recovery)
+    //   case 4: drift 상태 sidecar (정상 sidecar) — orphans 에 미포함 (안전 거부)
+    const scTmp = mkdtempSync(join(tmpdir(), 'harness-drift-sc-'));
+    try {
+      const scHarnessDir = join(scTmp, '.harness');
+      mkdirSync(scHarnessDir, { recursive: true });
+
+      // baseline 환경: alive.json 은 drift 상태 (정상 sidecar 있음) + 2 orphan sidecar 인공 생성
+      writeFileSync(join(scTmp, 'alive.json'), '{"k":1}\n');
+      writeFileSync(
+        join(scTmp, 'alive.json.HARNESS-DRIFT.md'),
+        '# HARNESS-DRIFT: Z-PATTERN [TODO]\n원 파일: alive.json\n사유: self-test\n',
+      );
+      // orphan 1: base 파일 부재 (base file missing)
+      writeFileSync(
+        join(scTmp, 'ghost.json.HARNESS-DRIFT.md'),
+        '# HARNESS-DRIFT: Z-PATTERN [TODO]\n원 파일: ghost.json (부재)\n',
+      );
+      // orphan 2: base 파일 존재하나 drift 해소 (manifest sha 일치)
+      writeFileSync(join(scTmp, 'resolved.json'), '{"r":1}\n');
+      const resolvedSha = createHash('sha256')
+        .update(readFileSync(join(scTmp, 'resolved.json')))
+        .digest('hex');
+      writeFileSync(
+        join(scTmp, 'resolved.json.HARNESS-DRIFT.md'),
+        '# HARNESS-DRIFT: Z-PATTERN [TODO]\n원 파일: resolved.json (drift 해소됨)\n',
+      );
+
+      // alive.json 만 drift, resolved.json 은 sha 일치 (drift 해소)
+      const scManifest = {
+        files: {
+          'alive.json': { sha256: 'c'.repeat(64) }, // drift
+          'resolved.json': { sha256: resolvedSha }, // drift 해소
+        },
+      };
+      writeFileSync(join(scHarnessDir, 'manifest.json'), JSON.stringify(scManifest));
+
+      // case 4 (먼저 검증): drift 상태 sidecar 안전 거부 — alive.json.HARNESS-DRIFT.md 는 orphan 아님
+      const scDrifts = detectDriftFiles(scTmp);
+      const scDriftSet = new Set(scDrifts.map((d) => join(scTmp, d.file)));
+      const scOrphans = detectOrphanSidecars(scTmp, scDriftSet);
+      const orphanPaths = scOrphans.map((o) => o.sidecar);
+      expect(
+        'sidecar-cleanup case 4: drift 상태 sidecar 안전 거부 (alive.json.HARNESS-DRIFT.md 제외)',
+        !orphanPaths.some((p) => p.endsWith('alive.json.HARNESS-DRIFT.md')),
+        JSON.stringify(orphanPaths),
+      );
+
+      // case 2 (dry-run): orphan 2 검출 + 파일 잔존 검증
+      expect(
+        'sidecar-cleanup case 2 (dry-run): orphans=2 (base missing + drift 해소)',
+        scOrphans.length === 2,
+        JSON.stringify(scOrphans),
+      );
+      expect(
+        'sidecar-cleanup case 2: ghost.json.HARNESS-DRIFT.md 파일 잔존 (dry-run 비파괴)',
+        existsSync(join(scTmp, 'ghost.json.HARNESS-DRIFT.md')),
+      );
+      expect(
+        'sidecar-cleanup case 2: resolved.json.HARNESS-DRIFT.md 파일 잔존 (dry-run 비파괴)',
+        existsSync(join(scTmp, 'resolved.json.HARNESS-DRIFT.md')),
+      );
+
+      // case 3 (apply): orphan 직접 unlink + 후속 orphan 0 검증 (recovery)
+      for (const o of scOrphans) {
+        unlinkSync(o.sidecar);
+      }
+      // 후속 verify — orphan 0 + alive.json.HARNESS-DRIFT.md 보존
+      const scPostDrifts = detectDriftFiles(scTmp);
+      const scPostDriftSet = new Set(scPostDrifts.map((d) => join(scTmp, d.file)));
+      const scPostOrphans = detectOrphanSidecars(scTmp, scPostDriftSet);
+      expect(
+        'sidecar-cleanup case 3 (apply→recovery): orphans=0 후속 확인',
+        scPostOrphans.length === 0,
+        JSON.stringify(scPostOrphans),
+      );
+      expect(
+        'sidecar-cleanup case 3: alive.json.HARNESS-DRIFT.md 보존 (정상 sidecar 안전)',
+        existsSync(join(scTmp, 'alive.json.HARNESS-DRIFT.md')),
+      );
+
+      // case 1 (positive baseline): orphan 0 — 정상 sidecar 만 잔존
+      // recovery 단계 후 동일 환경 → 이미 orphan 0 검증 완료. 추가로 alive.json 만 sidecar 가짐.
+      expect(
+        'sidecar-cleanup case 1 (positive baseline): orphan 0 (정상 sidecar 만 잔존)',
+        scPostOrphans.length === 0,
+      );
+    } finally {
+      rmSync(scTmp, { recursive: true, force: true });
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -461,15 +579,17 @@ function runSelfTest() {
 // =============================================================================
 
 /**
- * Amendment 9 (#557) — CLI 인자 파싱 헬퍼 (`--mode=verify|count-warn`).
- * 기본값 'verify' (Amendment 8 기존 동작 회귀 0 보장).
+ * Amendment 9 (#557) / Amendment 11 (#572) — CLI 인자 파싱 헬퍼.
+ * 지원: `--mode=verify|count-warn|sidecar-cleanup` (기본 'verify' — Amendment 8 회귀 0 보장).
  */
 function parseMode(args) {
   const flag = args.find((a) => a.startsWith('--mode='));
   if (!flag) return 'verify';
   const value = flag.slice('--mode='.length);
-  if (value !== 'verify' && value !== 'count-warn') {
-    console.error(`ERROR: invalid --mode value: ${value} (expected: verify | count-warn)`);
+  if (value !== 'verify' && value !== 'count-warn' && value !== 'sidecar-cleanup') {
+    console.error(
+      `ERROR: invalid --mode value: ${value} (expected: verify | count-warn | sidecar-cleanup)`,
+    );
     process.exit(2);
   }
   return value;
@@ -511,6 +631,56 @@ function mainCountWarn() {
   }
 }
 
+/**
+ * Amendment 11 (#572) — sidecar-cleanup 모드 실행.
+ *
+ * orphan sidecar 자동 정리 (opt-in). 기본은 dry-run (목록 출력만), `--apply` 명시 시 실제 삭제.
+ *
+ * 안전 장치:
+ *   - detectOrphanSidecars() 가 식별한 orphan 만 삭제 (정상 sidecar 는 대상 아님)
+ *   - 휴리스틱 SSoT 단일화 — verify 모드와 동일 헬퍼 호출 (코드 중복 0)
+ *   - manifest 부재 / 실행 에러 시 exit 2 (자동 삭제 차단)
+ *
+ * @param {boolean} apply — true 면 실제 file unlink, false 면 dry-run (목록만)
+ */
+function mainSidecarCleanup({ apply }) {
+  try {
+    // detectOrphanSidecars() 가 manifest 의 driftSet 을 인자로 받으므로 runVerify 와 동일 패턴 답습.
+    const drifts = detectDriftFiles('.');
+    const driftSet = new Set(drifts.map((d) => join('.', d.file)));
+    const orphans = detectOrphanSidecars('.', driftSet);
+
+    if (orphans.length === 0) {
+      console.log('no orphan sidecars (sidecar lifecycle 정합)');
+      process.exit(0);
+    }
+
+    if (!apply) {
+      // dry-run 기본 — ADR §Amendment 11 §결정점 3 출력 형식 SSoT
+      console.log(`${SIDECAR_CLEANUP_DRY_RUN_MARKER} orphan sidecars detected: ${orphans.length}`);
+      for (const o of orphans) {
+        console.log(`  - ${o.sidecar} — ${o.reason}`);
+      }
+      console.log('');
+      console.log('조치 (ADR 20260515 §Amendment 11 §결정점 3):');
+      console.log('  --apply 명시 시 실제 삭제. 미명시 시 본 출력만 (exit 0).');
+      console.log('  수동 정리: rm <sidecar path>');
+      process.exit(0);
+    }
+
+    // --apply 명시 — 실제 삭제 (orphan 만, 안전 장치 보호)
+    console.log(`${SIDECAR_CLEANUP_APPLY_MARKER} orphan sidecars deleted: ${orphans.length}`);
+    for (const o of orphans) {
+      unlinkSync(o.sidecar);
+      console.log(`  - ${o.sidecar} (${o.reason})`);
+    }
+    process.exit(0);
+  } catch (err) {
+    console.error(`ERROR: ${err.message}`);
+    process.exit(2);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.includes('--self-test')) {
@@ -520,6 +690,11 @@ function main() {
   const mode = parseMode(args);
   if (mode === 'count-warn') {
     mainCountWarn();
+    return;
+  }
+  if (mode === 'sidecar-cleanup') {
+    const apply = args.includes('--apply');
+    mainSidecarCleanup({ apply });
     return;
   }
 
@@ -573,4 +748,6 @@ export {
   runCountWarn,
   ALERT_FATIGUE_THRESHOLD_N,
   ALERT_FATIGUE_MARKER,
+  SIDECAR_CLEANUP_DRY_RUN_MARKER,
+  SIDECAR_CLEANUP_APPLY_MARKER,
 };
