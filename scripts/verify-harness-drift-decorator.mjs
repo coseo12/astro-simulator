@@ -87,6 +87,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 const MANIFEST_PATH = '.harness/manifest.json';
 
@@ -103,6 +104,21 @@ const ALERT_FATIGUE_MARKER = '[Alert Fatigue Trigger]';
 // dry-run 기본 (--apply 미명시) / --apply 명시 시 실제 삭제. 마커는 CI / 사용자 grep 식별용.
 const SIDECAR_CLEANUP_DRY_RUN_MARKER = '[Sidecar Cleanup — Dry Run]';
 const SIDECAR_CLEANUP_APPLY_MARKER = '[Sidecar Cleanup — Apply]';
+
+// Amendment 12 (#577) — TODO Aging Guard 임계값 SSoT.
+// baseline (2026-05-26 develop tip ff24995) 위반 0 + buffer 21일 (verify-z-pattern-health.mjs 9일 경과 → 30일까지 21일 여유).
+// Amendment 2 ~1 sprint (3 PR / 30일) 정합. 30일 ≪ 90일 (Amendment 2 SSoT) — 시간 차원 우선순위 명확화.
+// 변경 금지 (ADR §Amendment 12 §결정점 2 박제값, measurement-first 정합).
+const TODO_AGING_THRESHOLD_DAYS = 30;
+
+// Amendment 12 stdout 마커 — CI workflow 가 grep 으로 파싱하여 자동 이슈 생성 트리거.
+const TODO_AGING_MARKER = '[TODO Aging Trigger]';
+
+// Amendment 12 §결정점 3 — harness-managed 카테고리 식별 휴리스틱 SSoT.
+// TODO 박제 commit message prefix 가 `chore(harness):` 매칭 → upstream 영역 (다운스트림 해소 불가).
+// 예: "chore(harness): v2.29.1 → v3.6.0 업데이트 (#338)" — harness update 자동화 commit.
+// architect 원안 `.harness/manifest.json` `apply.*` 키 매트릭스 매칭 가정 오류 정정 (#577 developer 단계 실측).
+const HARNESS_MANAGED_COMMIT_PREFIX = 'chore(harness):';
 
 // Amendment 8 SSoT regex — 위치 A (파일 첫 줄 + shebang/DOCTYPE/YAML frontmatter 1블록 허용).
 // 형식별 분기: `<!--` (md) / `//` (ts/js/mjs) / `#` (yml/sh)
@@ -282,6 +298,147 @@ function runCountWarn(rootDir = '.') {
     threshold: ALERT_FATIGUE_THRESHOLD_N,
     exceeded,
     files: drifts.map((d) => d.file),
+  };
+}
+
+// =============================================================================
+// Amendment 12 (#577) — TODO Aging Guard (시간 누적 차원, Phase 1 다운스트림 분기 한정)
+// =============================================================================
+
+/**
+ * 파일 안에서 `[TODO]` 박제 라인의 line 번호 목록 추출.
+ * `verifyDecorator()` 가 통과한 (= 데코레이터 박제된) 파일만 대상으로 호출.
+ *
+ * @param {string} absPath — 검사 대상 파일 절대경로 또는 sidecar 경로
+ * @returns {number[]} — 1-based line 번호 (없으면 [])
+ */
+function findTodoLines(absPath) {
+  if (!existsSync(absPath)) return [];
+  const content = readFileSync(absPath, 'utf-8');
+  const lines = content.split('\n');
+  const todoLines = [];
+  // SSoT regex 의 [TODO] 변형만 매칭 (URL 박제는 Phase 2 진행 중이므로 본 가드 대상 아님)
+  const todoPattern = /HARNESS-DRIFT: Z-PATTERN \[TODO\]/;
+  for (let i = 0; i < lines.length; i++) {
+    if (todoPattern.test(lines[i])) {
+      todoLines.push(i + 1);
+    }
+  }
+  return todoLines;
+}
+
+/**
+ * `git blame` 으로 특정 파일의 특정 라인이 처음 박제된 commit 의 author 시점과 message 추출.
+ *
+ * porcelain 출력 형식 사용 — author-time + summary 2 줄 파싱.
+ *
+ * @param {string} filePath — repo-relative path
+ * @param {number} lineNum — 1-based line number
+ * @param {string} rootDir — repo root (`git -C <rootDir> blame ...` 호출용)
+ * @returns {{authorTimeMs: number, summary: string} | null} — 실패 시 null
+ */
+function getBlameForLine(filePath, lineNum, rootDir = '.') {
+  try {
+    const out = execFileSync(
+      'git',
+      ['-C', rootDir, 'blame', '--porcelain', `-L${lineNum},${lineNum}`, '--', filePath],
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    let authorTimeSec = null;
+    let summary = '';
+    for (const line of out.split('\n')) {
+      if (line.startsWith('author-time ')) {
+        authorTimeSec = parseInt(line.slice('author-time '.length), 10);
+      } else if (line.startsWith('summary ')) {
+        summary = line.slice('summary '.length);
+      }
+    }
+    if (authorTimeSec === null) return null;
+    return { authorTimeMs: authorTimeSec * 1000, summary };
+  } catch {
+    return null; // git blame 실패 (untracked 파일 등) → 본 가드 대상 외
+  }
+}
+
+/**
+ * Amendment 12 §결정점 3 — harness-managed 카테고리 식별.
+ *
+ * commit summary 가 `chore(harness):` 로 시작하면 harness update 자동화 commit → upstream 영역.
+ * 그 외 prefix (feat / fix / docs / refactor / 그 외 chore) → Phase 1 다운스트림 분기 (본 가드 대상).
+ *
+ * @param {string} commitSummary
+ * @returns {boolean}
+ */
+function isHarnessManagedCommit(commitSummary) {
+  return typeof commitSummary === 'string' && commitSummary.startsWith(HARNESS_MANAGED_COMMIT_PREFIX);
+}
+
+/**
+ * Amendment 12 메인 검증 로직.
+ *
+ * 흐름:
+ *   1. detectDriftFiles() 로 drift 파일 목록 추출
+ *   2. 각 파일의 [TODO] 박제 라인 발견 (sidecar 형식 = json 은 sidecar 파일 검사)
+ *   3. git blame 으로 박제 시점 + commit summary 추출
+ *   4. harness-managed 카테고리 (commit prefix `chore(harness):`) 제외
+ *   5. 시점 - 현재 시간 ≥ 30일 → violations 누적
+ *
+ * @param {string} rootDir
+ * @param {number} [nowMs] — 테스트 주입용 (default: Date.now())
+ * @param {(filePath: string, lineNum: number, rootDir: string) => {authorTimeMs: number, summary: string} | null} [blameFn]
+ *   — 테스트 주입용 (default: getBlameForLine). 외부 의존성 (git) 격리 차원.
+ * @returns {{
+ *   threshold: number,
+ *   nowMs: number,
+ *   violations: Array<{file: string, line: number, agingDays: number, summary: string}>,
+ *   skippedHarnessManaged: Array<{file: string, line: number, agingDays: number, summary: string}>,
+ *   skippedNonTodo: Array<{file: string, reason: string}>,
+ * }}
+ */
+function runTodoAging(rootDir = '.', nowMs = Date.now(), blameFn = getBlameForLine) {
+  const drifts = detectDriftFiles(rootDir);
+  const violations = [];
+  const skippedHarnessManaged = [];
+  const skippedNonTodo = [];
+
+  for (const { file } of drifts) {
+    const abs = join(rootDir, file);
+    const format = decoratorFormatFor(abs);
+    // [TODO] 라인 추출 대상: 본 파일 (md/line-slash/line-hash) 또는 sidecar (json-sidecar)
+    const targetPath = format === 'json-sidecar' ? abs + '.HARNESS-DRIFT.md' : abs;
+    const targetRel = format === 'json-sidecar' ? file + '.HARNESS-DRIFT.md' : file;
+    const todoLines = findTodoLines(targetPath);
+    if (todoLines.length === 0) {
+      // [TODO] 박제 없음 → upstream PR URL 박제 상태 (Phase 2 진행 중) → 본 가드 대상 외
+      skippedNonTodo.push({ file, reason: 'no [TODO] line (URL 박제 = Phase 2 진행 중)' });
+      continue;
+    }
+    // 동일 파일에 여러 [TODO] 라인 있을 수 있으나, 첫 라인 박제 시점만 검사 (가장 오래된 박제)
+    const firstTodoLine = todoLines[0];
+    const blame = blameFn(targetRel, firstTodoLine, rootDir);
+    if (!blame) {
+      skippedNonTodo.push({ file, reason: 'git blame 실패 (untracked / 새 파일)' });
+      continue;
+    }
+    const agingMs = nowMs - blame.authorTimeMs;
+    const agingDays = Math.floor(agingMs / (1000 * 60 * 60 * 24));
+
+    if (isHarnessManagedCommit(blame.summary)) {
+      // harness-managed 영역 — 본 가드 검사 대상 외, 단 가시화 차원에서 별도 분류 추적
+      skippedHarnessManaged.push({ file: targetRel, line: firstTodoLine, agingDays, summary: blame.summary });
+      continue;
+    }
+    if (agingDays >= TODO_AGING_THRESHOLD_DAYS) {
+      violations.push({ file: targetRel, line: firstTodoLine, agingDays, summary: blame.summary });
+    }
+  }
+
+  return {
+    threshold: TODO_AGING_THRESHOLD_DAYS,
+    nowMs,
+    violations,
+    skippedHarnessManaged,
+    skippedNonTodo,
   };
 }
 
@@ -565,6 +722,112 @@ function runSelfTest() {
     } finally {
       rmSync(scTmp, { recursive: true, force: true });
     }
+
+    // --- Amendment 12 (#577) todo-aging boundary 시뮬레이션 (4 cases) ---
+    // ADR §Amendment 12 §회귀 가드 (2) 3중 시뮬레이션 (positive → negative → recovery)
+    // + 추가 boundary (harness-managed 제외 휴리스틱)
+    //
+    // Cases:
+    //   case 1: positive  — TODO 박제 29일 경과, prefix `feat:` → violations=0
+    //   case 2: negative  — TODO 박제 31일 경과, prefix `feat:` → violations=1
+    //   case 3: boundary  — TODO 박제 30일 정확, prefix `feat:` → violations=1 (≥ 30 정합)
+    //   case 4: harness-managed 제외 — TODO 박제 90일 경과, prefix `chore(harness):` → skippedHarnessManaged=1, violations=0
+    //
+    // mock blameFn 으로 git 의존성 격리 (CLAUDE.md §가드 도입 PR DoD §(2) 3중 시뮬레이션).
+    const taTmp = mkdtempSync(join(tmpdir(), 'harness-drift-ta-'));
+    try {
+      const taHarnessDir = join(taTmp, '.harness');
+      mkdirSync(taHarnessDir, { recursive: true });
+
+      // mock drift 파일 1개 — [TODO] 데코레이터 박제 + manifest sha 불일치 (drift 진입)
+      writeFileSync(join(taTmp, 'aging.md'), '<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->\nbody\n');
+      const taManifest = {
+        files: { 'aging.md': { sha256: 'a'.repeat(64) } },
+      };
+      writeFileSync(join(taHarnessDir, 'manifest.json'), JSON.stringify(taManifest));
+
+      const NOW = 1_800_000_000_000; // 고정 mock 현재 시간 (2027년 정도, 임의)
+      const DAY_MS = 24 * 60 * 60 * 1000;
+
+      // case 1: 29일 경과, prefix `feat:` → violations=0
+      const mock29 = (path, line, root) => ({
+        authorTimeMs: NOW - 29 * DAY_MS,
+        summary: 'feat(z-pattern): test commit',
+      });
+      const r29 = runTodoAging(taTmp, NOW, mock29);
+      expect(
+        'todo-aging case 1 (positive, 29일): violations=0',
+        r29.violations.length === 0 &&
+          r29.skippedHarnessManaged.length === 0 &&
+          r29.skippedNonTodo.length === 0,
+        JSON.stringify({
+          violations: r29.violations.length,
+          skipped: r29.skippedHarnessManaged.length,
+          non: r29.skippedNonTodo.length,
+        }),
+      );
+
+      // case 2: 31일 경과, prefix `feat:` → violations=1
+      const mock31 = (path, line, root) => ({
+        authorTimeMs: NOW - 31 * DAY_MS,
+        summary: 'feat(z-pattern): test commit',
+      });
+      const r31 = runTodoAging(taTmp, NOW, mock31);
+      expect(
+        'todo-aging case 2 (negative, 31일): violations=1 + agingDays=31',
+        r31.violations.length === 1 && r31.violations[0].agingDays === 31,
+        JSON.stringify(r31.violations),
+      );
+
+      // case 3: 30일 정확 → violations=1 (≥ 30 정합)
+      const mock30 = (path, line, root) => ({
+        authorTimeMs: NOW - 30 * DAY_MS,
+        summary: 'feat(z-pattern): test commit',
+      });
+      const r30 = runTodoAging(taTmp, NOW, mock30);
+      expect(
+        'todo-aging case 3 (boundary, 30일 정확): violations=1 (≥ 30 정합)',
+        r30.violations.length === 1 && r30.violations[0].agingDays === 30,
+        JSON.stringify(r30.violations),
+      );
+
+      // case 4: 90일 경과 + harness-managed → skippedHarnessManaged=1, violations=0
+      const mockHarness = (path, line, root) => ({
+        authorTimeMs: NOW - 90 * DAY_MS,
+        summary: 'chore(harness): v3.6.0 → v3.7.0 업데이트',
+      });
+      const rHarness = runTodoAging(taTmp, NOW, mockHarness);
+      expect(
+        'todo-aging case 4 (harness-managed 제외, 90일): violations=0 + skippedHarnessManaged=1',
+        rHarness.violations.length === 0 &&
+          rHarness.skippedHarnessManaged.length === 1 &&
+          rHarness.skippedHarnessManaged[0].agingDays === 90,
+        JSON.stringify({
+          violations: rHarness.violations.length,
+          skipped: rHarness.skippedHarnessManaged,
+        }),
+      );
+
+      // case 5 (추가 boundary): isHarnessManagedCommit 단위 검증
+      expect(
+        'todo-aging case 5: isHarnessManagedCommit positive',
+        isHarnessManagedCommit('chore(harness): v3.6.0 업데이트') === true,
+      );
+      expect(
+        'todo-aging case 5: isHarnessManagedCommit negative (feat)',
+        isHarnessManagedCommit('feat(z-pattern): TODO 박제') === false,
+      );
+      expect(
+        'todo-aging case 5: isHarnessManagedCommit negative (chore non-harness)',
+        isHarnessManagedCommit('chore(docs): typo') === false,
+      );
+      expect(
+        'todo-aging case 5: isHarnessManagedCommit null guard',
+        isHarnessManagedCommit(null) === false,
+      );
+    } finally {
+      rmSync(taTmp, { recursive: true, force: true });
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -586,9 +849,14 @@ function parseMode(args) {
   const flag = args.find((a) => a.startsWith('--mode='));
   if (!flag) return 'verify';
   const value = flag.slice('--mode='.length);
-  if (value !== 'verify' && value !== 'count-warn' && value !== 'sidecar-cleanup') {
+  if (
+    value !== 'verify' &&
+    value !== 'count-warn' &&
+    value !== 'sidecar-cleanup' &&
+    value !== 'todo-aging'
+  ) {
     console.error(
-      `ERROR: invalid --mode value: ${value} (expected: verify | count-warn | sidecar-cleanup)`,
+      `ERROR: invalid --mode value: ${value} (expected: verify | count-warn | sidecar-cleanup | todo-aging)`,
     );
     process.exit(2);
   }
@@ -681,6 +949,53 @@ function mainSidecarCleanup({ apply }) {
   }
 }
 
+/**
+ * Amendment 12 (#577) — todo-aging 모드 실행.
+ * soft-warn 동작 (Amendment 9/10 답습): exit 0 + stdout 마커 박제.
+ */
+function mainTodoAging() {
+  try {
+    const { threshold, violations, skippedHarnessManaged, skippedNonTodo } = runTodoAging('.');
+    console.log(`TODO aging threshold (days): ${threshold}`);
+    console.log(`violations (Phase 1 다운스트림 분기, ≥ ${threshold}일 경과): ${violations.length}`);
+    console.log(`harness-managed 제외 (upstream 영역): ${skippedHarnessManaged.length}`);
+    console.log(`skipped (no [TODO] / git blame 실패): ${skippedNonTodo.length}`);
+
+    if (skippedHarnessManaged.length > 0) {
+      console.log('\nharness-managed [TODO] (참고 — upstream 영역, 본 가드 대상 외):');
+      for (const s of skippedHarnessManaged) {
+        console.log(`  - ${s.file}:${s.line} (${s.agingDays}일 경과, "${s.summary}")`);
+      }
+    }
+
+    if (violations.length === 0) {
+      console.log('\n[OK] TODO aging 정합 — Phase 1 다운스트림 분기 영역 위반 0');
+      process.exit(0);
+    }
+
+    // soft-warn 발화 — CI workflow 가 grep "[TODO Aging Trigger]" 로 감지
+    console.log('');
+    console.log(`${TODO_AGING_MARKER} violations: ${violations.length}`);
+    console.log('violation files:');
+    for (const v of violations) {
+      console.log(`  - ${v.file}:${v.line} (${v.agingDays}일 경과, "${v.summary}")`);
+    }
+    console.log('');
+    console.log('조치 (ADR 20260515 §Amendment 12 §결정점 4 옵션 B):');
+    console.log('  3 영업일 내 [TODO Aging Trigger] discussion 이슈 결정 분기 의무.');
+    console.log('  옵션: (1) Phase 2 가속 — upstream PR 제출');
+    console.log('       (2) Phase 1 revert — 임시 변경 폐기');
+    console.log('       (3) 임계값 재조정 — Amendment 2/7 silent 약화 사이클 답습 (신중)');
+    console.log('');
+    console.log('우선순위 (§재검토 조건 #5 > #6 > #7): Phase 2 진행률 > drift 카운트 > TODO Aging');
+    // soft-warn — exit 0 유지 (CI hard-block 아님, Amendment 8 §결정점 3b 옵션 A 정합)
+    process.exit(0);
+  } catch (err) {
+    console.error(`ERROR: ${err.message}`);
+    process.exit(2);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.includes('--self-test')) {
@@ -695,6 +1010,10 @@ function main() {
   if (mode === 'sidecar-cleanup') {
     const apply = args.includes('--apply');
     mainSidecarCleanup({ apply });
+    return;
+  }
+  if (mode === 'todo-aging') {
+    mainTodoAging();
     return;
   }
 
@@ -746,8 +1065,15 @@ export {
   detectOrphanSidecars,
   runVerify,
   runCountWarn,
+  runTodoAging,
+  findTodoLines,
+  getBlameForLine,
+  isHarnessManagedCommit,
   ALERT_FATIGUE_THRESHOLD_N,
   ALERT_FATIGUE_MARKER,
   SIDECAR_CLEANUP_DRY_RUN_MARKER,
   SIDECAR_CLEANUP_APPLY_MARKER,
+  TODO_AGING_THRESHOLD_DAYS,
+  TODO_AGING_MARKER,
+  HARNESS_MANAGED_COMMIT_PREFIX,
 };

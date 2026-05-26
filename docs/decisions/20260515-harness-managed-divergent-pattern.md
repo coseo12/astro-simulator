@@ -901,16 +901,20 @@ orphan sidecars: 0
 
 ### baseline 실측 (architect 박제 시점, develop tip ff24995)
 
-현재 develop tip 의 `[TODO]` 잔존 파일 + 박제 시점 (git log `--diff-filter=A` 최초 박제 commit 기준):
+> **developer 단계 정정 (2026-05-27, PR Amendment 12 구현)**: architect 단계 실측은 "파일 첫 박제 commit 시점" 을 사용 → 본 §결정점 6 §정의 ("`[TODO]` 토큰 라인의 git blame 최초 commit 시점") 와 불일치. developer 단계 `node scripts/verify-harness-drift-decorator.mjs --mode=todo-aging` 실측 결과 모든 6 drift 파일 [TODO] 라인이 #556 (Amendment 8 PR #571, 2026-05-26 commit `c6ea749`) 에서 박제됨 = **공통 1일 경과** (오늘 2026-05-27 기준). **결정점 2 §결정 (30일) 영향 없음** — agy 원안 7일 채택 시도도 baseline 위반 0 (모든 파일 1일). 정정 사유: ADR architect 단계 "파일 첫 박제" vs "[TODO] 라인 첫 박제" 측정 식 차이 (CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법 검증 우선" 답습).
 
-| 파일 | [TODO] 박제 시점 | 경과 일수 (오늘 2026-05-26 기준) | 분류 |
+| 파일 | [TODO] 박제 시점 (실측 git blame) | 경과 일수 (오늘 2026-05-27 기준) | 분류 |
 |---|---|---|---|
-| `.github/workflows/harness-guards.yml` | 2026-04-25 (#338 harness update) | **31일** | **harness-managed** (다운스트림 해소 불가, 별도 카테고리) |
-| `scripts/verify-z-pattern-health.mjs` | 2026-05-17 (#490 Amendment 3) | **9일** | Phase 1 (다운스트림 분기 영역) |
-| `scripts/verify-harness-drift-decorator.mjs` | 2026-05-26 (#571 Amendment 8) | **0일** | Phase 1 (오늘) |
-| `scripts/resolve-harness-drift-todo.mjs` | 2026-05-26 (#580 Amendment 10) | **0일** | Phase 1 (오늘) |
+| `CLAUDE.md` | 2026-05-26 (#571 Amendment 8, `c6ea749`) | **1일** | Phase 1 (다운스트림 분기 영역) |
+| `.claude/agents/architect.md` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
+| `.claude/agents/pm.md` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
+| `.github/workflows/harness-guards.yml` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (architect 단계 분류 "harness-managed" 는 파일 자체 출처가 #338 harness update 였음에 근거했으나, **[TODO] 라인** 자체는 #556 다운스트림 분기 commit `feat(z-pattern):` 박제 — 본 §결정점 3 §식별 휴리스틱 `chore(harness):` prefix 매칭에서 **제외 안 됨**) |
+| `scripts/verify-z-pattern-health.mjs` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
+| `docs/phases/roadmap-v3-incremental.md` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
 
-추가 잔존 (텍스트 박제용 — 본 가드 휴리스틱 대상): `CLAUDE.md`, `.claude/agents/pm.md`, `.claude/agents/architect.md`, `docs/phases/roadmap-v3-incremental.md` — Amendment 10 §baseline 실측에서 박제. 단 Amendment 10 자동 해소 (`resolve-harness-drift-todo.mjs`) 가 첫 cron 시 매칭 후 갱신 예정 (`CLAUDE.md`/`.claude/agents/pm.md`/`.claude/agents/architect.md` 3건 upstream PR #254/#260 매칭). 따라서 본 baseline 시점에서 **Amendment 10 해소 후 잔존 가능 파일**은 `scripts/verify-z-pattern-health.mjs` (9일 경과) + `scripts/verify-harness-drift-decorator.mjs` + `scripts/resolve-harness-drift-todo.mjs` (당일) + `harness-guards.yml` (harness-managed 카테고리).
+**식별 휴리스틱 정합성 (developer 단계 추가 발견)**: `.github/workflows/harness-guards.yml` 의 [TODO] 라인이 commit prefix `feat(z-pattern):` (Amendment 8 도입 PR) 박제 — `chore(harness):` 매칭 안 됨. 즉 본 가드 §결정점 3 §식별 휴리스틱에서 **Phase 1 다운스트림 분기로 분류**. architect 단계 §baseline 실측 표의 "harness-managed (다운스트림 해소 불가)" 분류는 **파일 출처 (manifest 등록 = harness update 박제)** 기준이었으며, **[TODO] 라인 출처 (commit prefix)** 기준 정합과 차원이 다름. 본 가드는 후자 (commit prefix) 만 사용 — 발화 시 사용자가 `.github/workflows/harness-guards.yml` 에 대한 후속 조치 (Phase 2 PR 제출 vs upstream 영역 위임) 분기 결정 의무 (architect 분류 의도 유지 측면).
+
+추가 잔존 (텍스트 박제용 — 본 가드 휴리스틱 대상): Amendment 10 자동 해소 (`resolve-harness-drift-todo.mjs`) 가 첫 cron 시 매칭 후 갱신 예정 (`CLAUDE.md`/`.claude/agents/pm.md`/`.claude/agents/architect.md` 3건 upstream PR #254/#260 매칭). 따라서 본 baseline 시점에서 **Amendment 10 해소 후 잔존 가능 파일**은 `scripts/verify-z-pattern-health.mjs` + `.github/workflows/harness-guards.yml` + `docs/phases/roadmap-v3-incremental.md` (4 파일).
 
 **임계 후보별 즉시 발화 검증** (measurement-first 원칙, agy 제안 임계 7일 baseline 검증):
 
@@ -977,7 +981,7 @@ orphan sidecars: 0
 - 본 가드는 **Phase 1 다운스트림 분기 영역** silent leak 차단 본질 — harness-managed (upstream 영역) 은 #573 (Y-회귀 doctor mute) 영역
 - `.github/workflows/harness-guards.yml` (31일 경과) 은 harness update v3.6.0 → v3.7.x 등 upstream 릴리스 대기 영역 — 다운스트림 해소 불가
 - Amendment 5 (upstream 리뷰 피드백 동기화 의무) 와 직교 — harness-managed 파일의 [TODO] 갱신은 upstream PR 영역
-- 매트릭스 매칭: `.harness/manifest.json` 의 키 (예: `apply.workflows`, `apply.agents`) 가 harness-managed 영역 SSoT — 기존 데이터 재사용 (운영 부담 0)
+- **식별 휴리스틱 (developer 단계 정정)**: TODO 박제 line 의 `git blame` commit message prefix 가 `chore(harness):` 매칭 시 harness-managed 영역으로 분류 (예: `chore(harness): v2.29.1 → v3.6.0 업데이트 (#338)`). 그 외 prefix (`feat`/`fix`/`docs`/`refactor`/`chore` 그 외) 는 Phase 1 다운스트림 분기. **architect 단계 원안 (`.harness/manifest.json` 의 `apply.*` 키 매트릭스 매칭) 은 실제 manifest 구조 (`harnessVersion`/`installedAt`/`files` 만 존재, `apply.*` 키 부재) 와 불일치 — developer 단계 실측 후 정정**. 정합 정정 근거: harness update 자동화 commit 만이 upstream 영역 박제 시그널이며, manifest 키 의존 회피 (manifest 스키마 변경 시 SSoT drift 위험)
 
 ##### 결정점 4 — 발화 형태
 

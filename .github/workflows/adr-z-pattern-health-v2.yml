@@ -262,3 +262,71 @@ jobs:
           - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
           - 가드 스크립트: \`scripts/verify-harness-drift-decorator.mjs\` (\`--mode=count-warn\`)
           - 직전 [ADR Trigger]: #495/#500/#554 (§재검토 조건 #5 패턴)"
+
+      # Amendment 12 (#577) — TODO Aging Guard (시간 누적 차원, Phase 1 다운스트림 분기 한정, soft-warn).
+      # ADR §Amendment 12 §결정점 4 — verify-harness-drift-decorator.mjs `--mode=todo-aging`
+      # 으로 [TODO] 박제 + 30일 경과 + harness-managed 제외 매칭 후 stdout `[TODO Aging Trigger]` 마커
+      # 감지하여 자동 이슈 생성 (CI hard-block 아님).
+      - name: Verify TODO Aging Threshold (soft-warn)
+        id: todo-aging
+        run: |
+          set +e
+          node scripts/verify-harness-drift-decorator.mjs --mode=todo-aging | tee /tmp/todo-aging-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          # stdout 에서 [TODO Aging Trigger] 마커 감지
+          if grep -q "\[TODO Aging Trigger\]" /tmp/todo-aging-output.txt 2>/dev/null; then
+            echo "triggered=true" >> $GITHUB_OUTPUT
+            echo "=== TODO Aging Trigger block ==="
+            cat /tmp/todo-aging-output.txt
+          else
+            echo "triggered=false" >> $GITHUB_OUTPUT
+          fi
+          # soft-warn — workflow 자체는 항상 PASS (이슈 생성으로 알림)
+          exit 0
+
+      - name: Create [TODO Aging Trigger] issue
+        if: steps.todo-aging.outputs.triggered == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 중복 방지 — 동일 제목 OPEN 이슈 검색
+          EXISTING=$(gh issue list \
+            --search '"[TODO Aging Trigger] ADR 20260515 Amendment 12" in:title' \
+            --state open --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "이미 [TODO Aging Trigger] OPEN 이슈 존재 — 중복 생성 스킵"
+            exit 0
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          AGING_BLOCK=$(cat /tmp/todo-aging-output.txt)
+
+          gh issue create \
+            --title "[TODO Aging Trigger] ADR 20260515 Amendment 12 발화 (자동 탐지 ${DATE})" \
+            --label "documentation,priority:medium" \
+            --body "## 배경
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health-v2.yml\` 의
+          Amendment 12 (#577) TODO Aging Guard 발화. Phase 1 다운스트림 분기 영역의 \`[TODO]\` 데코레이터
+          박제 시점이 임계 30일 이상 경과 — upstream PR 영구 망각 위험 영역 진입 (silent Y 회귀 차단).
+
+          ## 발화 결과
+          \`\`\`
+          ${AGING_BLOCK}
+          \`\`\`
+
+          ## 의무 (ADR §Amendment 12 §결정점 4 옵션 B — soft-warn)
+          3 영업일 내 결정 분기:
+          - **옵션 1 — Phase 2 가속**: upstream PR 제출 (coseo12/harness-setting 영역)
+          - **옵션 2 — Phase 1 revert**: 임시 변경 폐기 (가장 오래된 [TODO] 부터)
+          - **옵션 3 — 임계값 재조정**: Amendment 2/7 silent 약화 사이클 답습 (신중)
+
+          ## §재검토 조건 #5 / #6 동시 발화 시 우선순위
+          §재검토 조건 #5 (Phase 2 진행률 시간/누적 차원) > #6 (drift 파일 수 차원) > **#7 (본 TODO Aging)**.
+          본 가드는 가장 후순위 — 다른 가드가 발화된 경우 그 가드 우선 조치.
+
+          ## Cross-link
+          - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\` §Amendment 12
+          - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
+          - 가드 스크립트: \`scripts/verify-harness-drift-decorator.mjs\` (\`--mode=todo-aging\`)
+          - 직전 Amendment: #572 (Amendment 11, sidecar 라이프사이클) / #569 (Amendment 10, [TODO] 자동 해소) / #557 (Amendment 9, [Alert Fatigue Trigger])"
