@@ -1,3 +1,4 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
 # 로드맵 v3 — Incremental Body-by-Body Build
 
 > **Status**: Active (2026-04-25 재구성)

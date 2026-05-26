@@ -341,10 +341,11 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
   - `.yml` / `.yaml`: `# HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]` (line comment)
   - `.json` (예: `.claude/settings.json`): JSON 표준 주석 미지원 → **sidecar 파일** `<filename>.HARNESS-DRIFT.md` 동일 디렉토리 박제. 본문은 `# HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]\n원 파일: <filename>\n변경 사유: <한 줄 요약>` 형식. 적용 빈도 낮음 (실측 0건) 으로 운영 부담 최소
   - **sidecar 라이프사이클 계약** (cross-validate agy 이견 수용 — orphan 방지): `<filename>.HARNESS-DRIFT.md` 존재 시 동일 디렉토리에 매칭되는 `<filename>` 반드시 존재 + `harness doctor` 상 drift 감지 상태 의무. orphan sidecar (본 파일 삭제/이름 변경 후 sidecar 잔존) 발견 시 verify 스크립트가 CI fail (exit 1). Phase 3 자동 동기화 후 drift 해소 시 sidecar 도 함께 삭제 의무 (developer 단계 verify 스크립트 구현 시 박제)
-- **위치 SSoT (결정점 2)**: **파일 첫 줄 의무** + shebang (`#!/usr/bin/env node` 등) / DOCTYPE (`<!DOCTYPE html>` 등) 직후 1줄 허용. regex SSoT (verify 스크립트 의무 패턴):
+- **위치 SSoT (결정점 2)**: **파일 첫 줄 의무** + shebang (`#!/usr/bin/env node` 등) / DOCTYPE (`<!DOCTYPE html>` 등) / YAML frontmatter (`---\n...\n---\n`) 1블록 직후 1줄 허용. regex SSoT (verify 스크립트 의무 패턴):
   ```regex
-  ^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n)?(?:<!--|//|#) HARNESS-DRIFT: Z-PATTERN \[(?:https?://[^\]]+|TODO)\](?: -->)?
+  ^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n|---\n(?:[\s\S]*?\n)?---\n)?(?:<!--|//|#) HARNESS-DRIFT: Z-PATTERN \[(?:https?://[^\]]+|TODO)\](?: -->)?
   ```
+  - **developer 단계 보완 (2026-05-26, PR #556)**: architect 박제값 regex 는 shebang/DOCTYPE 만 허용했으나 적용 대상 `.claude/agents/*.md` 의 컨벤션 (YAML frontmatter) 미커버. YAML frontmatter 1블록 prefix 허용 추가 — 의미는 동일 (파일 메타 헤더 직후 첫 컨텐츠 라인).
 - **자동 가드 (결정점 3 — verify 스크립트 분리)**: `scripts/verify-harness-drift-decorator.mjs` 신규 (Node ESM). `harness doctor` 가 drift 감지한 파일 (= `.harness/manifest.json` 의 sha256 과 실제 파일 sha256 불일치 + Phase 1 PR 컨벤션 의도된 drift) 에 대해 데코레이터 존재 검증 — 누락 시 exit 1 (CI hard-fail). 로컬 사전 검증 비용 < 1초 (gh API 호출 없음, 파일 grep 만)
 - **CI 통합**: `.github/workflows/harness-guards.yml` 또는 `.github/workflows/pr-template-checklist-guard.yml` 에 step 추가 (developer 단계 결정)
 - **선택 근거 (대안 비교)**:
