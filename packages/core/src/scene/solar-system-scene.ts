@@ -471,8 +471,8 @@ export function createSolarSystemScene(
   //
   // R4 #532 — ADR `20260520-r4-earth-moon-visualization.md` §결정 4:
   //   달 궤도 라인은 별도 LineSystem (`moon-orbit-line`) 으로 분리하여 earth focus 진입 시 색상 강조.
-  //   - 일반 시점 (focusBodyIdForAssert !== 'earth'): 기본 궤도선 색상 (Color3(0.25, 0.28, 0.4))
-  //   - earth focus 시점 (focusBodyIdForAssert === 'earth'): 강조 색상 (Color3(0.65, 0.7, 0.85)) — 명도 ~2.6배
+  //   - 일반 시점 (focusBodyIdForAssert !== 'earth'): MOON_ORBIT_COLOR_DEFAULT (Color3(0.30, 0.35, 0.50), #552 a11y 갱신 — WCAG 1.4.11 3.06:1 PASS)
+  //   - earth focus 시점 (focusBodyIdForAssert === 'earth'): MOON_ORBIT_COLOR_EARTH_FOCUS (Color3(0.65, 0.7, 0.85)) — 명도 ~2.6배
   //   WebGL 한계로 LineSystem thickness 직접 조절 불가 → 색상 명도 강조로 ADR 의도 (시각 강조) 실현.
   let orbitLines: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
   let moonOrbitLine: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
@@ -510,6 +510,8 @@ export function createSolarSystemScene(
     }
     if (batches.length > 0) {
       orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
+      // 일반 궤도선 (moon 외 모든 body). moon orbit 은 별도 SSoT (`MOON_ORBIT_COLOR_DEFAULT`, #552).
+      // 본 색상은 #552 a11y fix 비대상 (moon orbit 만 WCAG 1.4.11 격차였음).
       orbitLines.color = new Color3(0.25, 0.28, 0.4);
       orbitLines.isVisible = orbitLinesVisible;
     }
