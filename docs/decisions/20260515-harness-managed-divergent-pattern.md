@@ -45,15 +45,18 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 #### Phase 1 — 본 프로젝트 선반영 (Y 경로)
 
 1. `feature/<이슈번호>-<설명>` 브랜치에서 harness-managed 파일을 직접 수정
-2. `.harness/manifest.json` 은 **수정하지 않음** — `harness doctor` 가 일시적으로 warn (drift) 상태로 표시
-3. PR 본문에 "**harness upstream 기여 동시 진행 중**: [upstream PR 링크 또는 TODO]" 명시
-4. 머지 후 본 프로젝트 D2 검증 가시화 (후속 첫 일상 PR 에서 reviewer/qa/dev sub-agent 출력 확인)
+2. **수정 파일 첫 줄 (shebang/DOCTYPE 직후 1줄 허용) 에 HARNESS-DRIFT 데코레이터 주석 박제** — Amendment 8 (cross-validate trustless 영속화 권고). 형식: 파일 형식별 분기 (`.md` = HTML 주석 / `.json` = sidecar `.HARNESS-DRIFT.md` / `.ts|mjs|js|yml` = line comment). 본문 형식: `HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]`. upstream PR 미생성 시 `[TODO]` 허용 (Phase 2 머지 직후 실제 링크로 교체 의무). 자동 가드: `scripts/verify-harness-drift-decorator.mjs` (PR check + 로컬 사전 검증). 자세한 SSoT regex: §Amendment 8
+3. `.harness/manifest.json` 은 **수정하지 않음** — `harness doctor` 가 일시적으로 warn (drift) 상태로 표시
+4. PR 본문에 "**harness upstream 기여 동시 진행 중**: [upstream PR 링크 또는 TODO]" 명시
+5. 머지 후 본 프로젝트 D2 검증 가시화 (후속 첫 일상 PR 에서 reviewer/qa/dev sub-agent 출력 확인)
 
 #### Phase 2 — upstream 기여 (X 경로)
 
 1. coseo12/harness-setting 레포에 동일 변경 PR 제출
-2. 본 프로젝트 PR 본문에 upstream PR 번호 박제 (cross-link)
-3. upstream 머지 + 신규 릴리스 (MINOR — 행동 규칙 추가) 대기
+2. 본 프로젝트 PR 본문에 upstream PR 번호 박제 (cross-link) + Phase 1 데코레이터 주석의 `[upstream-link]` 필드를 실제 URL 로 교체 (Phase 1 단계 2 의 `[TODO]` 해소)
+3. **upstream 리뷰 피드백 반영 시 즉시 로컬 프로젝트 파일 동기화 의무** (Amendment 5)
+4. **자동 정적 비교 가드** — Amendment 8 (cross-validate Phase 2 중도 변경 추적 권고). `scripts/verify-z-pattern-health.mjs` 의 `verifyPhase2Sync()` 함수가 월 cron 시점에 upstream open PR head SHA 와 로컬 drift 파일 SHA 를 비교. 차이 발견 시 [Phase 2 Sync Required] 라벨 부착 + 자동 코멘트 (soft-warn, hard-block 아님 — Amendment 2/6 1인 운영 트레이드오프 정합)
+5. upstream 머지 + 신규 릴리스 (MINOR — 행동 규칙 추가) 대기
 
 #### Phase 3 — 본 프로젝트 동기화 (Z 완성)
 
@@ -87,7 +90,7 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 2. **drift 노출 기간 평균 ≥ 30일** — upstream 머지 + 릴리스 사이클이 지속적으로 30일을 넘으면 `harness doctor` 노이즈 영구화 → Phase 1 manifest 수동 갱신 (`harness update --bootstrap`) 검토
 3. **다운스트림 프로젝트 ≤ 1** — 본 프로젝트가 유일한 harness 사용자가 되면 (다른 프로젝트 전부 fork 또는 폐기) X 경로 가치 0 → Y 단독으로 회귀
 4. **`harness update --apply-all-safe` 자가 복구 정책 변경** — v2.9.0+ 의 `previousSha256` 자가 복구가 비활성화되면 Phase 3 자동 동기화 보장 약화 → 재평가
-5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조)
+5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조). **2026-05-26 Amendment 8 로 Phase 1 드리프트 가시화 + Phase 2 중도 변경 정적 비교 가드 박제** — HARNESS-DRIFT 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 drift 자동 비교 (Amendment 5 보완, soft-warn 라벨 부착) — silent 가드 강화 방향. 측정 식 / N 임계 / 90일 임계 변경 없음 (§Amendment 8 참조).
 
 ### 측정 지표
 
@@ -312,3 +315,126 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 - 회차 정정 후 = **6** (#468/#472/#475/#478/#481/#482)
 - Phase 2 진행률 정정 후 = 4/6 = **66.7%** ✅ Amendment 1 임계 (33%) 2배 초과
 - Amendment 7 박제 자체는 ADR 자체 진화 PR 이므로 정정 식상 Phase 1 카운트 +0 — 의도된 자기참조 회피 동작
+
+## Amendment 8 — 2026-05-26
+
+상태: Accepted (cross-validate 2026-05-26 통합 완료)
+
+- **발의**: [#556](https://github.com/coseo12/astro-simulator/issues/556) (Amendment 7 PR [#555](https://github.com/coseo12/astro-simulator/pull/555) cross-validate agy Antigravity 고유 발견 #1, 2026-05-25)
+- **근거** (cross-validate 원문 — log `.claude/logs/cross-validate-architecture-20260525-134600.log`):
+  1. **Phase 2 중도 변경 추적의 공백** — Amendment 5 (upstream 리뷰 피드백 즉시 로컬 동기화 의무) 는 개발자 수동 기억력 의존. 정적 비교 장치 보완 필요
+  2. **Trustless 영속화 (보안/무결성)** — Phase 1 임시 수정 파일에 식별 가능한 데코레이터 주석 의무화로 정적 분석 도구 / 보안 검수자가 "승인받은 임시 드리프트" 즉시 식별 가능
+
+### 변경 사항
+
+#### 1. HARNESS-DRIFT 데코레이터 주석 의무 (Phase 1 운영 절차 단계 2 신설)
+
+- **적용 대상**: Phase 1 단계에서 직접 수정하는 모든 harness-managed 파일 (`.claude/agents/*.md` / `.claude/skills/*/SKILL.md` / `.claude/commands/*.md` / `.claude/settings.json` / 기타 `.harness/manifest.json` 의 `files` 키 포함)
+- **본문 형식 SSoT**:
+  ```text
+  HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]
+  ```
+  - `upstream-link`: Phase 2 PR URL (예: `https://github.com/coseo12/harness-setting/pull/N`). Phase 1 단독 머지 시 `TODO` 허용 (Phase 2 머지 직후 실제 URL 로 교체 의무)
+- **파일 형식별 분기 (결정점 1)**:
+  - `.md`: `<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO] -->` (HTML 주석, GitHub 렌더 시 비표시)
+  - `.ts` / `.tsx` / `.js` / `.mjs` / `.cjs`: `// HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]` (line comment)
+  - `.yml` / `.yaml`: `# HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]` (line comment)
+  - `.json` (예: `.claude/settings.json`): JSON 표준 주석 미지원 → **sidecar 파일** `<filename>.HARNESS-DRIFT.md` 동일 디렉토리 박제. 본문은 `# HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]\n원 파일: <filename>\n변경 사유: <한 줄 요약>` 형식. 적용 빈도 낮음 (실측 0건) 으로 운영 부담 최소
+  - **sidecar 라이프사이클 계약** (cross-validate agy 이견 수용 — orphan 방지): `<filename>.HARNESS-DRIFT.md` 존재 시 동일 디렉토리에 매칭되는 `<filename>` 반드시 존재 + `harness doctor` 상 drift 감지 상태 의무. orphan sidecar (본 파일 삭제/이름 변경 후 sidecar 잔존) 발견 시 verify 스크립트가 CI fail (exit 1). Phase 3 자동 동기화 후 drift 해소 시 sidecar 도 함께 삭제 의무 (developer 단계 verify 스크립트 구현 시 박제)
+- **위치 SSoT (결정점 2)**: **파일 첫 줄 의무** + shebang (`#!/usr/bin/env node` 등) / DOCTYPE (`<!DOCTYPE html>` 등) 직후 1줄 허용. regex SSoT (verify 스크립트 의무 패턴):
+  ```regex
+  ^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n)?(?:<!--|//|#) HARNESS-DRIFT: Z-PATTERN \[(?:https?://[^\]]+|TODO)\](?: -->)?
+  ```
+- **자동 가드 (결정점 3 — verify 스크립트 분리)**: `scripts/verify-harness-drift-decorator.mjs` 신규 (Node ESM). `harness doctor` 가 drift 감지한 파일 (= `.harness/manifest.json` 의 sha256 과 실제 파일 sha256 불일치 + Phase 1 PR 컨벤션 의도된 drift) 에 대해 데코레이터 존재 검증 — 누락 시 exit 1 (CI hard-fail). 로컬 사전 검증 비용 < 1초 (gh API 호출 없음, 파일 grep 만)
+- **CI 통합**: `.github/workflows/harness-guards.yml` 또는 `.github/workflows/pr-template-checklist-guard.yml` 에 step 추가 (developer 단계 결정)
+- **선택 근거 (대안 비교)**:
+  - 형식 A (HTML 주석 단일) 거부: `.json` 적용 불가능 (JSON 주석 표준 미지원)
+  - 형식 C (별도 SSoT 위치, 예: manifest 메타 필드) 거부: cross-validate 원문의 "trustless 영속화" 의도와 충돌 — 보안 검수자가 파일 내부에서 즉시 식별 불가능
+  - 위치 B (regex 매치만, 파일 어디든) 거부: 정적 분석 비용 증가 + "어디부터 봐야 하는지" 불확정. 위치 A (첫 줄) 가 O(1)
+
+#### 2. Phase 2 중도 변경 정적 비교 가드 (Amendment 5 보완)
+
+- **통합 위치 (결정점 3 후보 B)**: 기존 `scripts/verify-z-pattern-health.mjs` 에 `verifyPhase2Sync()` 함수 추가 (별도 스크립트/workflow 분리 거부 — 운영 부담 2배 회피)
+- **측정 방식**:
+  - `gh pr list --repo coseo12/harness-setting --state open --search "ADR 20260515" --json number,headRefOid,files` 로 진행 중 upstream PR 식별
+  - 각 upstream PR 의 변경 파일 (`files[].path`) 과 로컬 drift 파일 (`harness doctor` 가 warn 한 파일) 매칭
+  - 매칭된 파일 쌍의 sha256 비교 (upstream blob SHA via gh API + 로컬 파일 SHA)
+  - 차이 발견 시 drift 파일명 / upstream PR 번호 / diff URL 박제
+- **트리거 주기**: 월 cron (UTC 00:00 = KST 09:00 월요일) — 기존 `adr-z-pattern-health-v2.yml` workflow 와 동일 trigger 사용
+- **후속 행동 (결정점 3 옵션 A 채택)**: **soft-warn** — [Phase 2 Sync Required] 라벨 (priority:medium) 자동 부착 + 자동 코멘트 (drift 파일 목록 + upstream PR head SHA + diff URL). CI hard-block 아님
+- **선택 근거 (대안 비교)**:
+  - 옵션 B (hard-block CI fail) 거부: Amendment 2/6 의 silent 가드 약화 트레이드오프 (1인 운영 현실) 와 충돌. Phase 2 drift 는 upstream 리뷰 라운드에서 자연 정합되는 시점이 많음 — 즉시 차단은 false-positive 비용 과대
+  - 옵션 C (Hybrid 임계 초과 시 block) 거부: 임계 정의 복잡도 증가 + 의식적 silent 약화 사이클 재발 위험
+- **measurement-first 원칙 정합** (CLAUDE.md §"가드 설계 원칙"): broad 권고 (drift 즉시 block) 가 아닌 precision 정정 (라벨 부착 + 사용자 인지 강화) 채택
+
+#### 3. ADR §운영 절차 갱신 (Phase 1 4→5단계 / Phase 2 3→5단계)
+
+- Phase 1: 데코레이터 박제 단계 (단계 2 신설) — 본 §Amendment 8 본문 변경 사항 1 박제 형식 답습
+- Phase 2: 데코레이터 link 교체 단계 (단계 2 보강) + 자동 정적 비교 가드 단계 (단계 4 신설) — 본 §Amendment 8 본문 변경 사항 2 박제 형식 답습
+- Amendment 5 (upstream 리뷰 즉시 동기화 의무) Phase 2 단계 3 유지 + 본 가드 단계 4 가 보완
+
+### silent 가드 강화 vs 약화 자기점검 (결정점 4)
+
+본 Amendment 8 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — Amendment 2 (N 임계 완화 = 약화) 의 정반대. 가시성 추가 + 새로운 행동 규칙 추가
+- ✓ **§결정 본문 / N 임계 / 90일 임계 변경 0** — 기존 silent 가드 본래 의도 보존
+- ✓ **데코레이터 누락 = CI hard-fail (fail-fast 원칙)** vs **drift 비교 = soft-warn (1인 운영 트레이드오프)** — 비대칭 의도적. 데코레이터 누락은 *컨벤션 강제* (예방 비용 < 1줄), drift 비교는 *예방 권고* (upstream 리뷰로 자연 해소 가능)
+- ✓ **measurement-first 원칙 정합** — broad 권고 (drift 즉시 block) 가 아닌 precision 정정 (라벨 부착)
+- ⚠ **발화 빈도 ≥ 1/주 예상 잠재 위험** — 월 cron + PR check 누적 시 alert fatigue 가능. 회피 전략: cross-validate 후속 발견 #2 (경고 피로감 가드, 동시 drift N개 상한) 가 별도 이슈 #557 로 분리 박제됨
+
+### 트레이드오프
+
+- **장점**: trustless 영속화 (보안 검수자 즉시 식별) + Phase 2 중도 drift 가시화 (Amendment 5 수동 의존 제거) + silent 가드 강화 일관성
+- **단점 (잠재)**:
+  - 데코레이터 누락 PR → 즉시 CI fail. developer 페르소나에 데코레이터 박제 의무 추가 (행동 변화 = MINOR 릴리스) — 본 Amendment 머지 후 첫 Phase 1 PR 부터 적용
+  - 데코레이터 link 의 `TODO → URL` 교체 누락 시 검증 통과 (regex 가 `TODO` 허용). 회피: Phase 2 PR 머지 직후 후속 커밋 1회 의무. 검증 강화는 Amendment 9 후보로 보류 (현재 적용 빈도 낮음)
+  - `.json` sidecar 파일 (`.HARNESS-DRIFT.md`) 분리로 GitHub 파일 트리 noise 1건 증가. 적용 빈도 < 5건 예상 (`.claude/settings.json` 등)
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규 파일: `scripts/verify-harness-drift-decorator.mjs` (~80-120 라인 예상)
+- 기존 파일 수정: `scripts/verify-z-pattern-health.mjs` 에 `verifyPhase2Sync()` 함수 추가 (~60-100 라인 예상)
+- CI workflow: `.github/workflows/harness-guards.yml` 또는 `pr-template-checklist-guard.yml` 에 step 추가 (1 step ~10 라인) — developer 단계 결정
+- 기존 harness-managed 파일 데코레이터 추가: 현재 drift 0건 가정 시 0 파일 (`harness doctor` 실행 결과로 발견 시 N 파일). developer 단계 `harness doctor` 실행 후 확정
+- 본 ADR Amendment 8 자체: ~110-130 라인 박제 (본 §섹션)
+- 단위 테스트: regex 패턴 정합성 unit test (`scripts/__tests__/verify-harness-drift-decorator.test.mjs` 또는 인라인 self-test) ~40-60 라인 예상
+- **총 예상 라인 수**: 250-450 라인 (신규 + 기존 + 테스트)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "Phase 1 PR 머지 전 HARNESS-DRIFT 데코레이터 주석 의무화" (MINOR 릴리스 후보) — 단, 본 PR 은 ADR Amendment 만 박제 (CHANGELOG 미터치, developer 단계에서 추가)
+
+### 회귀 가드
+
+- **자기점검 단위 검증**: regex SSoT 패턴 + 형식별 분기 표 self-test (`.md` / `.ts` / `.yml` / `.json` 각 1건 positive + 1건 negative)
+- **3중 시뮬레이션** (positive → negative → recovery): 데코레이터 박제 → 누락 → 추가 → CI fail/pass 시퀀스 검증
+- **회귀 가드 (CLAUDE.md §"가드 도입 PR DoD")**: 본 가드 도입 PR 자체에 4축 검증 의무 — (1) 격리 동적 테스트 (2) 3중 시뮬레이션 (3) 5 페르소나 self-consistency (4) 메타 측정 도구 자기 적용 안정성
+
+### cross-link
+
+- 본 Amendment, [#556](https://github.com/coseo12/astro-simulator/issues/556) 이슈 본문
+- cross-validate 원본: `.claude/logs/cross-validate-architecture-20260525-134600.log` (Amendment 7 PR #555)
+- 직전 Amendment: [#554](https://github.com/coseo12/astro-simulator/issues/554) Amendment 7 (측정 식 정정), [#488](https://github.com/coseo12/astro-simulator/issues/488) Amendment 5 (upstream 리뷰 즉시 동기화 의무)
+- 후속 분리: [#557](https://github.com/coseo12/astro-simulator/issues/557) (경고 피로감 가드, 동시 drift N개 상한 — Amendment 8 의 발화 빈도 잠재 위험 회피 전략)
+- 자동화 스크립트: `scripts/verify-harness-drift-decorator.mjs` (신규), `scripts/verify-z-pattern-health.mjs` (기존, `verifyPhase2Sync()` 추가)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" (volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107))
+
+### 교차검증 반영 사항 (agy Antigravity, 2026-05-26)
+
+- **outcome**: `applied` (exit 0) — log `.claude/logs/cross-validate-architecture-20260526-150418.log`, outcome JSON `.claude/logs/cross-validate-architecture-20260526-150418-outcome.json` (plan_bypass=false, rollback_failed=false, reminder_issue="none")
+- **합의** (Claude 설계와 일치 — 5건):
+  1. Z-Pattern 의 즉시성 vs SSoT 트레이드오프 합리성
+  2. Amendment 2/7 의 1인 운영 현실 반영 + forensic 정정 모범 사례
+  3. Phase 1→2→3 + upstream 반려 폴백 경로 구조적 완성도
+  4. Amendment 8 의 trustless 영속화 (CI hard-fail) + 데코레이터 mechanical contract
+  5. regex 단일 일반화로 신규 확장자 (`.toml` / `.py` 등) 대응 용이
+- **이견 수용 (본 PR 즉시 반영 — 1건)**:
+  - **agy 제안 1 — Sidecar 라이프사이클 계약 강화**: Claude 원안은 sidecar 박제만 명시 + 라이프사이클 미명시. agy 근거 합리적 — orphan sidecar (본 파일 삭제/이름 변경 후 잔존) 가 정적 검사 false-positive / false-negative 발생. **반영**: §변경 사항 1 의 `.json` 분기에 sidecar 라이프사이클 계약 추가 — orphan 발견 시 verify 스크립트 CI fail (exit 1) + Phase 3 동기화 후 sidecar 동시 삭제 의무. developer 단계 verify 스크립트 구현 시 박제.
+- **Claude 재분석으로 기각한 외부 모델 제안**: 0건 (3 제안 모두 합리적, 단 본 PR 범위 분류만 차이)
+- **고유 발견 (후속 분리, volt #29 3단 프로토콜)**:
+  1. **agy 제안 2 — Phase 2 PR URL `TODO` 해소 자동화** (medium 후보, 후속 분리 [#569](https://github.com/coseo12/astro-simulator/issues/569)): 자동 치환 CLI 도우미 스크립트 제안. 본 PR §단점 "TODO → URL 교체 누락" 자리에 Amendment 9 후보로 보류 명시됨 — agy 가 자동화 도구 구체 제안. 본 PR 비-범위 (단순 컨벤션 + 사후 커밋 1회 충분, 자동화는 운영 부담 증가). 후속 이슈 #569 박제 완료
+  2. **agy 제안 3 — 동시 drift Hard Limit 구체값 (N=3)** (medium 후보, 기존 분리 #557 본문 갱신 영역): 본 PR §단점 "발화 빈도 ≥ 1/주 잠재 위험" 자리에 #557 cross-link 박제됨. agy 가 N=3 구체값 + Hard Limit exit 1 제안. 본 PR 비-범위 (#557 영역). #557 architect 단계 SSoT 갱신 시 인용 박제 의무
+  3. **agy 누락 검증 1 — Phase 3 harness doctor 3-way merge** (low 후보, harness-setting 레포 후보): `harness update --apply-all-safe` 가 데코레이터 주석 보존 vs 덮어쓰기 시 유실 검증 누락. 본 PR 비-범위 (Phase 3 동작 = ADR §결정 본문 영역). 후속 분리 — harness-setting 레포 issue 후보 (다운스트림 verify 가능 영역 아님)
+- **호출 전 Claude 편향 셀프 체크 4종 (모두 통과)**:
+  - (a) 낙관적 일정 → ✓ developer 단계 라인 수 예측 250-450 라인 박제 + 회귀 가드 4축 검증 의무 박제 (단순 추가 작업 가정 회피)
+  - (b) 결합 간과 → ✓ Phase 1 데코레이터 가드 (별도 verify 스크립트) + Phase 2 중도 비교 가드 (기존 verify-z-pattern-health.mjs 통합) 분리 — 의존성 결합 회피
+  - (c) 폐기 프레이밍 → ✓ Amendment 5 (수동 동기화 의무) 폐기 아님. 보완 (자동 정적 비교 추가) — 양립
+  - (d) 순수주의 → ✓ ".json sidecar 가 보기 싫다" 도그마 회피 — 적용 빈도 < 5건 실측 기반 수용. fail-fast (데코레이터) vs soft-warn (drift 비교) 비대칭 의도적 유지
