@@ -51,9 +51,12 @@ function isAdrEvolutionPr(title) {
 // CI hard-block 아님 (Amendment 2/6 1인 운영 silent 약화 트레이드오프 정합).
 //
 // 반환:
-//   { mismatches: Array<{file, upstreamPr, localSha, upstreamSha}>, error?: string }
+//   { mismatches: Array<{file, upstreamPr, localSha, upstreamSha}>, error?: string,
+//     todoResolutions?: Array<{file, line, upstreamPrNumber, upstreamPrUrl, downstreamIssue}> }
 //   - mismatches.length > 0 → 호출자가 [Phase 2 Sync Required] 라벨/코멘트 박제
 //   - error 존재 → 네트워크/권한 실패 (보수적으로 mismatches=0 처리, exit code 영향 없음)
+//   - todoResolutions (Amendment 10): includeTodoResolution=true 시 박제. merged upstream PR
+//     중 title 의 본 프로젝트 이슈 번호 AND 파일 경로 둘 다 매칭되는 후보
 //
 // 측정 방식:
 //   1. gh pr list (open, "ADR 20260515" 검색) → upstream PR 목록
@@ -64,7 +67,21 @@ function isAdrEvolutionPr(title) {
 // 비교 한계 박제 (precision 정정):
 //   git blob SHA (SHA-1) ≠ sha256 → 직접 비교 불가. 본 함수는 "매칭된 파일 쌍 = 잠재 drift"
 //   까지만 가시화하고 hard 비교는 향후 Amendment 9 (#569 TODO 해소 후속) 영역.
-function verifyPhase2Sync(rootDir = '.') {
+//
+// Amendment 10 (#569) — includeTodoResolution 옵션 추가:
+//   - merged upstream PR (state=merged) 도 함께 조회
+//   - 다운스트림 [TODO] 잔존 파일 + upstream PR 의 (title issue ref AND 파일 경로) AND 매칭
+//   - 매칭 시 todoResolutions 배열로 박제 (호출자 wrapper CLI 가 dry-run / apply 분기)
+//
+// 매칭 휴리스틱 (ADR §Amendment 10 §결정점 2 후보 다 — AND 결합):
+//   - (a) PR title 에 본 프로젝트 이슈 번호 ref 포함:
+//        - 패턴 1: `#N` (단순 hash + 숫자, GitHub 자동 자기 repo 링크 컨벤션)
+//        - 패턴 2: `astro-simulator#N` (cross-repo 명시)
+//        - 패턴 3: `coseo12/astro-simulator#N` (full path)
+//   - (b) PR 변경 파일 경로가 다운스트림 [TODO] 잔존 파일과 일치
+//   - (a) AND (b) 둘 다 충족 시에만 매칭 (precision ↑, false-positive 회피)
+function verifyPhase2Sync(rootDir = '.', options = {}) {
+  const { includeTodoResolution = false } = options;
   try {
     if (!existsSync(`${rootDir}/${HARNESS_MANIFEST_PATH}`)) {
       return { mismatches: [], error: 'manifest not found' };
@@ -86,7 +103,8 @@ function verifyPhase2Sync(rootDir = '.') {
     }
 
     if (localDrifts.size === 0) {
-      return { mismatches: [] };
+      // Amendment 10: drift 없으면 TODO 해소 후보도 없음 (단축 경로)
+      return { mismatches: [], ...(includeTodoResolution ? { todoResolutions: [] } : {}) };
     }
 
     // upstream open PR 검색 (ADR 20260515 컨벤션 식별자)
@@ -117,10 +135,141 @@ function verifyPhase2Sync(rootDir = '.') {
       }
     }
 
-    return { mismatches };
+    // Amendment 10 (#569) — TODO 해소 후보 매칭 (옵션)
+    let todoResolutions;
+    if (includeTodoResolution) {
+      todoResolutions = computeTodoResolutions(rootDir);
+    }
+
+    return {
+      mismatches,
+      ...(includeTodoResolution ? { todoResolutions: todoResolutions || [] } : {}),
+    };
   } catch (err) {
     return { mismatches: [], error: err.message };
   }
+}
+
+// =============================================================================
+// Amendment 10 (#569) — [TODO] → upstream PR URL 자동 해소 매칭 로직
+// =============================================================================
+
+// 다운스트림 [TODO] 데코레이터 라인 매칭 (verify-harness-drift-decorator.mjs SSoT 정합).
+// 형식별 분기 — `.md` HTML 주석 / `.ts|js|mjs|cjs` line-slash / `.yml|sh` line-hash.
+// sidecar `.json` 은 별도 sidecar 파일 (`<filename>.HARNESS-DRIFT.md`) 매칭.
+//
+// 위치 SSoT: 파일 첫 줄 (shebang/DOCTYPE/YAML frontmatter 1블록 직후 1줄 허용) —
+// verify-harness-drift-decorator.mjs DECORATOR_REGEX 와 동일 의도.
+//
+// 본 함수는 [TODO] 잔존 파일만 식별 (URL 교체된 파일은 제외).
+const TODO_LINE_REGEX = /^((?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN \[)(TODO)(\](?: -->)?)/;
+
+// PR title 에서 본 프로젝트 이슈 번호 추출.
+// 매칭 패턴 (3종): `astro-simulator#N` (cross-repo) / `coseo12/astro-simulator#N` (full path) / `#N` (단순).
+// 단순 `#N` 패턴은 upstream repo (coseo12/harness-setting) 의 자기 이슈 자동 링크 컨벤션과
+// 충돌할 수 있으므로 (예: harness-setting `#190` 은 자기 repo 이슈), upstream 자기 ref 가 아닌
+// **다운스트림 이슈 ref 의도** 인 경우만 사용. 본 함수는 단순 `#N` 도 후보로 추출하되,
+// 호출자 (computeTodoResolutions) 가 다운스트림 OPEN 이슈 존재 여부 별도 검증 — false-positive 회피.
+function extractIssueRefsFromTitle(title) {
+  if (!title) return [];
+  const refs = new Set();
+  // 패턴 1: coseo12/astro-simulator#N (full path)
+  for (const m of title.matchAll(/\bcoseo12\/astro-simulator#(\d+)\b/g)) {
+    refs.add(parseInt(m[1], 10));
+  }
+  // 패턴 2: astro-simulator#N (cross-repo 명시)
+  for (const m of title.matchAll(/\bastro-simulator#(\d+)\b/g)) {
+    refs.add(parseInt(m[1], 10));
+  }
+  // 패턴 3: 단순 `#N` (자기 repo 링크 가능성 — caller 검증 의무)
+  for (const m of title.matchAll(/(?:^|[^\w/])#(\d+)\b/g)) {
+    refs.add(parseInt(m[1], 10));
+  }
+  return [...refs];
+}
+
+// 다운스트림 [TODO] 잔존 파일 + 데코레이터 라인 번호 스캔.
+// 반환: Array<{file: string, line: number}>
+function scanTodoFiles(rootDir) {
+  // architect ADR Amendment 10 baseline 6 파일 SSoT (현재 develop tip).
+  // 광범위 fs 스캔 회피를 위해 manifest 등록된 drift 파일들 + 본 가드 스크립트들로 한정.
+  const manifestAbs = `${rootDir}/${HARNESS_MANIFEST_PATH}`;
+  const candidates = new Set();
+  if (existsSync(manifestAbs)) {
+    const manifest = JSON.parse(readFileSync(manifestAbs, 'utf-8'));
+    for (const rel of Object.keys(manifest.files || {})) {
+      candidates.add(rel);
+    }
+  }
+  // 본 가드 스크립트들도 [TODO] 박제 대상 (drift 0 이라도 데코레이터 박제 의무 — Phase 1 도입 PR)
+  candidates.add('scripts/verify-z-pattern-health.mjs');
+  candidates.add('scripts/verify-harness-drift-decorator.mjs');
+  candidates.add('scripts/resolve-harness-drift-todo.mjs'); // Amendment 10 (#569) 신규 wrapper
+  candidates.add('.github/workflows/harness-guards.yml');
+
+  const results = [];
+  for (const rel of candidates) {
+    const abs = `${rootDir}/${rel}`;
+    if (!existsSync(abs)) continue;
+    const content = readFileSync(abs, 'utf-8');
+    const lines = content.split('\n');
+    // 첫 5줄까지만 스캔 (위치 SSoT: 첫 줄 + shebang/DOCTYPE/YAML frontmatter 1블록 직후 1줄)
+    const scanLimit = Math.min(lines.length, 30);
+    for (let i = 0; i < scanLimit; i++) {
+      if (TODO_LINE_REGEX.test(lines[i])) {
+        results.push({ file: rel, line: i + 1 });
+        break; // 파일당 첫 매칭만
+      }
+    }
+  }
+  return results;
+}
+
+// upstream merged PR 조회 (ADR 20260515) + 다운스트림 [TODO] 잔존 파일 매칭.
+// 반환: Array<{file, line, upstreamPrNumber, upstreamPrUrl, upstreamPrTitle, downstreamIssue}>
+function computeTodoResolutions(rootDir = '.') {
+  const todoFiles = scanTodoFiles(rootDir);
+  if (todoFiles.length === 0) return [];
+
+  // upstream merged PR 조회 (open 은 verifyPhase2Sync mismatches 영역)
+  let mergedPrs = [];
+  try {
+    const result = execSync(
+      `gh pr list --repo coseo12/harness-setting --state merged --search "ADR 20260515" --json number,title,files`,
+      { encoding: 'utf-8' },
+    ).trim();
+    mergedPrs = JSON.parse(result || '[]');
+  } catch (e) {
+    // 네트워크/권한 실패 — 보수적으로 빈 결과 반환 (caller 가 dry-run 시 안내)
+    return [];
+  }
+
+  // 다운스트림 [TODO] 잔존 파일 Set (O(1) 매칭)
+  const todoFileSet = new Map(todoFiles.map((t) => [t.file, t]));
+  const resolutions = [];
+  const seen = new Set(); // 동일 파일 다중 매칭 회피 (첫 매칭만 박제)
+
+  for (const pr of mergedPrs) {
+    const issueRefs = extractIssueRefsFromTitle(pr.title);
+    if (issueRefs.length === 0) continue; // (a) title 매칭 실패 — skip
+    const upstreamFiles = (pr.files || []).map((f) => f.path);
+    for (const path of upstreamFiles) {
+      if (!todoFileSet.has(path)) continue; // (b) 파일 경로 매칭 실패 — skip
+      if (seen.has(path)) continue; // 동일 파일 첫 매칭만
+      // (a) AND (b) 둘 다 충족 — 매칭 후보
+      const todo = todoFileSet.get(path);
+      resolutions.push({
+        file: path,
+        line: todo.line,
+        upstreamPrNumber: pr.number,
+        upstreamPrUrl: `https://github.com/coseo12/harness-setting/pull/${pr.number}`,
+        upstreamPrTitle: pr.title,
+        downstreamIssue: issueRefs[0], // 첫 ref 박제 (다중 시 첫 번째)
+      });
+      seen.add(path);
+    }
+  }
+  return resolutions;
 }
 
 // Amendment 8 (#556) — main flow 를 함수로 wrap. 직접 실행 시에만 호출하여
@@ -251,4 +400,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Amendment 8 (#556) — 함수 export (단위 테스트용)
-export { isAdrEvolutionPr, verifyPhase2Sync };
+// Amendment 10 (#569) — TODO 해소 매칭 헬퍼 추가 export
+export {
+  isAdrEvolutionPr,
+  verifyPhase2Sync,
+  extractIssueRefsFromTitle,
+  scanTodoFiles,
+  computeTodoResolutions,
+  TODO_LINE_REGEX,
+};
