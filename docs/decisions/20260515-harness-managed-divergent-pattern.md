@@ -674,6 +674,8 @@ orphan sidecars: 0
   - **결정 근거**: false-positive 회피 — title 만 매칭하면 동일 이슈번호의 다른 영역 PR 오탐. 파일 경로만 매칭하면 동일 파일 변경의 다른 이슈 PR 오탐. 두 조건 AND 결합으로 precision ↑
   - 후보 가 (title 만) 거부: upstream `.claude/agents/reviewer.md` 변경이 본 이슈와 무관한 PR 일 가능성
   - 후보 나 (파일 경로 만) 거부: 동일 파일 변경 PR 이 N 개 존재 시 자동 매칭 불가능
+  - **#581 정정 (2026-05-27, developer 단계 후속) — title 매칭 패턴 3 정정 (`[#N]` brackets 필수)**: PR #580 reviewer 단계 false-positive 발견 (PR #254 `volt #114` → astro-simulator #114 단순 `#N` 오탐). 정정: `extractIssueRefsFromTitle()` 의 패턴 3 단순 `#N` → `\[#(\d+)\]` brackets 필수. 본 프로젝트 PR title 컨벤션 (`feat(scope): [#N] description`) 표준 답습으로 cross-repo `volt #N` / 단순 `#N` 인용 회피.
+  - **#581 한계 (옵션 B/C 후속 분리 가치 박제)**: 본 정정 (옵션 A)으로 `volt #N` 같은 명백한 cross-repo 단순 인용 차단. 단 `[#252]` 같은 brackets 형식 cross-repo issue number 우연 충돌 (upstream harness-setting #252 ↔ astro-simulator #252) 잔존 — 옵션 B (PR body `volt #N` / `<owner>/<repo>#N` 형식 명시 감지 skip) 또는 옵션 C (다운스트림 OPEN 이슈 state 조회) 후속 분리 가치 보존. 현재 자동 갱신 안전망 (`--dry-run` 기본 + `--apply` 분리) 으로 file write 위험 0 → 후속 분리 우선순위 low.
 - **발화 형태 (결정점 3 채택)**: **soft-warn (Amendment 8/9 비대칭 정합 답습)** — 자동 갱신 PR 생성 (옵션 A) 또는 stdout 안내 (옵션 B). hard-fail 거부 (Phase 2 머지 직후 1~3 사이클 내 자연 해소 가능 + 1인 운영 부담 가속)
   - **CLI 모드 분기**:
     - `--mode=resolve-todo` (신규): `[TODO]` 잔존 파일 + upstream 매칭 PR 식별 → stdout 안내 + (CI 모드 시) PR 자동 생성

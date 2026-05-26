@@ -165,11 +165,15 @@ function verifyPhase2Sync(rootDir = '.', options = {}) {
 const TODO_LINE_REGEX = /^((?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN \[)(TODO)(\](?: -->)?)/;
 
 // PR title 에서 본 프로젝트 이슈 번호 추출.
-// 매칭 패턴 (3종): `astro-simulator#N` (cross-repo) / `coseo12/astro-simulator#N` (full path) / `#N` (단순).
-// 단순 `#N` 패턴은 upstream repo (coseo12/harness-setting) 의 자기 이슈 자동 링크 컨벤션과
-// 충돌할 수 있으므로 (예: harness-setting `#190` 은 자기 repo 이슈), upstream 자기 ref 가 아닌
-// **다운스트림 이슈 ref 의도** 인 경우만 사용. 본 함수는 단순 `#N` 도 후보로 추출하되,
-// 호출자 (computeTodoResolutions) 가 다운스트림 OPEN 이슈 존재 여부 별도 검증 — false-positive 회피.
+// 매칭 패턴 (3종): `astro-simulator#N` (cross-repo) / `coseo12/astro-simulator#N` (full path) / `[#N]` (brackets 필수).
+//
+// **Amendment 10 §결정점 2 정정 (#581, 2026-05-27)**: 패턴 3 의 단순 `#N` 매칭을
+// **`[#N]` brackets 필수** 로 정정. PR #580 reviewer 단계 실측 false-positive 발견:
+//   - PR #254 (`volt #114` 인용) → astro-simulator #114 cross-repo 오탐 (단순 `#N` 패턴 매칭)
+//   - 본 프로젝트 PR title 컨벤션 (`feat(scope): [#N] description`) 표준 `[#N]` 답습 시
+//     brackets 강제로 cross-repo `volt #N` / 단순 `#N` 인용 회피 (false-positive 0)
+// 본 함수는 다운스트림 이슈 ref **의도된 박제** (`[#N]` brackets) 만 후보로 추출.
+// 호출자 (computeTodoResolutions) 가 다운스트림 OPEN 이슈 존재 여부 별도 검증 — 2중 안전.
 function extractIssueRefsFromTitle(title) {
   if (!title) return [];
   const refs = new Set();
@@ -181,8 +185,10 @@ function extractIssueRefsFromTitle(title) {
   for (const m of title.matchAll(/\bastro-simulator#(\d+)\b/g)) {
     refs.add(parseInt(m[1], 10));
   }
-  // 패턴 3: 단순 `#N` (자기 repo 링크 가능성 — caller 검증 의무)
-  for (const m of title.matchAll(/(?:^|[^\w/])#(\d+)\b/g)) {
+  // 패턴 3: [#N] brackets 필수 (Amendment 10 §결정점 2 정정, #581)
+  //   본 프로젝트 PR title 컨벤션 표준 — brackets 가 의도된 박제 시그널.
+  //   `volt #114` / 단순 `#114` 같은 cross-repo / 자기 ref 인용 회피.
+  for (const m of title.matchAll(/\[#(\d+)\]/g)) {
     refs.add(parseInt(m[1], 10));
   }
   return [...refs];

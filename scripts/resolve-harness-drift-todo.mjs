@@ -224,10 +224,10 @@ function runSelfTest() {
     JSON.stringify(extractIssueRefsFromTitle('chore: [#789] auto fix').sort()) ===
       JSON.stringify([789]),
   );
-  // 다중 ref — Set 으로 정렬
+  // 다중 ref — Set 으로 정렬 ([#N] brackets + cross-repo 패턴 매칭)
   expect(
-    'extractIssueRefs: multi',
-    JSON.stringify(extractIssueRefsFromTitle('fix: #100 closes #200 astro-simulator#300').sort((a, b) => a - b)) ===
+    'extractIssueRefs: multi (Amendment 10 §결정점 2 정정 후 — brackets 필수)',
+    JSON.stringify(extractIssueRefsFromTitle('fix: [#100] closes [#200] astro-simulator#300').sort((a, b) => a - b)) ===
       JSON.stringify([100, 200, 300]),
   );
   // 빈 title
@@ -239,6 +239,35 @@ function runSelfTest() {
   expect(
     'extractIssueRefs: no refs',
     extractIssueRefsFromTitle('chore: regular work without issue ref').length === 0,
+  );
+
+  // --- Amendment 10 §결정점 2 정정 (#581) cross-repo false-positive boundary cases ---
+  // brackets 강제로 false-positive 회피 검증
+  expect(
+    'extractIssueRefs: cross-repo volt false-positive 회피 (#581 정정)',
+    extractIssueRefsFromTitle('docs(harness): real-lessons 박제 2건 — volt #114 (spawnSync stdin) + volt #115').length === 0,
+    JSON.stringify(extractIssueRefsFromTitle('docs(harness): real-lessons 박제 2건 — volt #114')),
+  );
+  expect(
+    'extractIssueRefs: 단순 #N (brackets 없음) skip (#581 정정)',
+    extractIssueRefsFromTitle('fix: #100 description without brackets').length === 0,
+    JSON.stringify(extractIssueRefsFromTitle('fix: #100 description')),
+  );
+  expect(
+    'extractIssueRefs: PR squash merge suffix (#583) skip (brackets 없음)',
+    JSON.stringify(extractIssueRefsFromTitle('feat: [#572] Amendment 11 (#583)').sort()) ===
+      JSON.stringify([572]),
+  );
+  // upstream repo 자기 ref 패턴 회피 (harness-setting #190 등)
+  expect(
+    'extractIssueRefs: upstream 자기 ref (harness-setting #190) skip',
+    extractIssueRefsFromTitle('chore: harness-setting #190 자기 ref').length === 0,
+  );
+  // brackets 정합 ref 매칭 정상
+  expect(
+    'extractIssueRefs: [#N] brackets 매칭 정상 (본 프로젝트 PR title 컨벤션)',
+    JSON.stringify(extractIssueRefsFromTitle('feat(z-pattern): [#577] ADR Amendment 12').sort()) ===
+      JSON.stringify([577]),
   );
 
   // --- (2) applyTodoReplacement 단위 검증 (positive / negative / boundary) ---
