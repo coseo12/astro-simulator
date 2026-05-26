@@ -888,3 +888,219 @@ orphan sidecars: 0
   - (c) 폐기 프레이밍 → ✓ Amendment 8 §sidecar 라이프사이클 계약 (fail-fast verify 모드) 폐기 아님. 보완 (opt-in 자동화 사용자 시점 정리 추가) — 양립
   - (d) 순수주의 → ✓ "자동 즉시 삭제 (옵션 A) / soft-warn 라벨 + 자동 코멘트 (옵션 B) 둘 다 도입" agy 광범위 권고 도그마 회피 — baseline sidecar 0 / orphan 0 실측 + `--dry-run` 기본 + `--apply` 분리 (precision 정정) 채택. agy §종합 결론 직접 인정 가치 박제
 - **cross-validate 후속 분리 박제 의무 (volt #29 §3)**: 본 §고유 발견 1 (#581 박제 예정) 은 본 PR 머지 직후 즉시 후속 이슈 생성 의무. PM 단계로 전달 (architect → PM 인계 보고에 명시 박제)
+
+## Amendment 12 — 2026-05-26
+
+상태: Provisional (cross-validate 결과 본문 통합 전)
+
+- **발의**: [#577](https://github.com/coseo12/astro-simulator/issues/577) (Amendment 10 PR [#580](https://github.com/coseo12/astro-simulator/pull/580) cross-validate agy Antigravity 고유 발견 #2 후속 분리, 2026-05-26)
+- **근거** (cross-validate 원문 인용 — log `.claude/logs/cross-validate-architecture-20260526-180552.log`, agy 제안 B):
+  > Phase 1에서 임시 변경을 가하며 `[TODO]` 상태로 PR을 머지한 뒤, 개발자가 업스트림 PR 생성을 영구히 잊어버려 로컬 드리프트가 고착화될 위험이 있습니다.
+  >
+  > 대책: `verify-harness-drift-decorator.mjs` 에서 `TODO` 토큰을 발견하고 해당 변경이 주 브랜치(`develop`/`main`)에 포함되어 있으며, 최초 발견 시점으로부터 일정 기간(예: 7일 이상) 경과했다면 빌드를 경고 혹은 실패 처리하는 단순 시간 누적 가드(Aging Guard) 도입을 검토할 가치가 있습니다.
+
+### baseline 실측 (architect 박제 시점, develop tip ff24995)
+
+현재 develop tip 의 `[TODO]` 잔존 파일 + 박제 시점 (git log `--diff-filter=A` 최초 박제 commit 기준):
+
+| 파일 | [TODO] 박제 시점 | 경과 일수 (오늘 2026-05-26 기준) | 분류 |
+|---|---|---|---|
+| `.github/workflows/harness-guards.yml` | 2026-04-25 (#338 harness update) | **31일** | **harness-managed** (다운스트림 해소 불가, 별도 카테고리) |
+| `scripts/verify-z-pattern-health.mjs` | 2026-05-17 (#490 Amendment 3) | **9일** | Phase 1 (다운스트림 분기 영역) |
+| `scripts/verify-harness-drift-decorator.mjs` | 2026-05-26 (#571 Amendment 8) | **0일** | Phase 1 (오늘) |
+| `scripts/resolve-harness-drift-todo.mjs` | 2026-05-26 (#580 Amendment 10) | **0일** | Phase 1 (오늘) |
+
+추가 잔존 (텍스트 박제용 — 본 가드 휴리스틱 대상): `CLAUDE.md`, `.claude/agents/pm.md`, `.claude/agents/architect.md`, `docs/phases/roadmap-v3-incremental.md` — Amendment 10 §baseline 실측에서 박제. 단 Amendment 10 자동 해소 (`resolve-harness-drift-todo.mjs`) 가 첫 cron 시 매칭 후 갱신 예정 (`CLAUDE.md`/`.claude/agents/pm.md`/`.claude/agents/architect.md` 3건 upstream PR #254/#260 매칭). 따라서 본 baseline 시점에서 **Amendment 10 해소 후 잔존 가능 파일**은 `scripts/verify-z-pattern-health.mjs` (9일 경과) + `scripts/verify-harness-drift-decorator.mjs` + `scripts/resolve-harness-drift-todo.mjs` (당일) + `harness-guards.yml` (harness-managed 카테고리).
+
+**임계 후보별 즉시 발화 검증** (measurement-first 원칙, agy 제안 임계 7일 baseline 검증):
+
+| 임계 후보 | 위반 파일 수 (Phase 1 영역) | 위반율 | 평가 |
+|---|---|---|---|
+| **7일 (agy 원안)** | 1건 (verify-z-pattern-health 9일) | **25%** (1/4) | **즉시 발화 위험** — baseline 1건 위반 = 가드 도입 PR 자체가 즉시 위반 상태 진입 (Amendment 9 §결정점 1 self-test 자기 모순 회피 패턴 위반) |
+| 14일 | 0건 | 0% | buffer 5일 (verify-z-pattern-health 9일 → 14일까지 5일 여유) |
+| **30일** | 0건 | 0% | **buffer 21일** (verify-z-pattern-health 9일 → 30일까지 21일 여유) — Amendment 2 N=10 / 90일 / Amendment 1 ~1 sprint 정합 |
+| 60일 | 0건 | 0% | buffer 51일 — 가시화 효과 약함 |
+| 90일 | 0건 | 0% | Amendment 2 SSoT 동일 임계 — 차원 식별 약화 (시간 차원 중복) |
+
+**harness-managed 파일 카테고리 분리 의무** (결정점 3): `.github/workflows/harness-guards.yml` 은 harness update 가 frozen 파일로 박제 — 다운스트림 자체로 [TODO] 해소 불가 (upstream PR coseo12/harness-setting 영역). 본 가드는 **Phase 1 다운스트림 분기 영역** 에 한정, harness-managed 카테고리 제외 휴리스틱 필수.
+
+### 변경 사항
+
+#### 1. §재검토 조건 #7 신설 — TODO Aging (시간 누적 차원, Phase 1 다운스트림 분기 한정)
+
+- **위치**: §재검토 조건 #5 (Phase 2 진행률 시간/누적 차원) + #6 (drift 파일 수 차원, Amendment 9) 와 직교한 **TODO 시간 누적 차원** 추가
+- **임계값 SSoT (결정점 2)**: `TODO_AGING_THRESHOLD_DAYS = 30` — baseline 위반 0 + buffer 21일 + Amendment 2 ~1 sprint (3 PR / 30일 분량) 정합
+- **시점 추적 방식 SSoT (결정점 1)**: **git blame** 채택 (메타파일 거부) — 후보 비교는 §결정점 1 참조
+- **harness-managed 카테고리 분리 SSoT (결정점 3)**: 본 가드는 **Phase 1 다운스트림 분기 파일** 에 한정 — `.github/workflows/harness-guards.yml` 등 harness update 가 박제하는 frozen 파일은 제외 (휴리스틱: `.harness/manifest.json` 의 `harness-managed` 경로 매트릭스 매칭)
+- **발화 형태 (결정점 4)**: **soft-warn (라벨 + 자동 이슈)** — Amendment 9/10 답습 (sidecar 라이프사이클 fail-fast 비대칭 의도적). 트리거 발화 시 후속 행동: 3 영업일 내 `[TODO Aging Trigger]` 라벨 discussion 이슈 생성 의무 — Phase 2 가속 (upstream PR 제출 강제) / 해당 [TODO] 박제 revert (Phase 1 임시 변경 폐기) / 임계값 재조정 (Amendment 2/7 silent 약화 사이클 답습 — 신중)
+
+#### 2. 4축 결정 박제값
+
+##### 결정점 1 — 시점 추적 방식
+
+| 방식 | 장점 | 단점 | 정합성 |
+|---|---|---|---|
+| **git blame** (TODO 토큰 라인 최초 commit 시점) | 신규 메타파일 0 + 운영 부담 0 + git history 신뢰 가능 | rebase / squash 시 시점 변형 위험 | **Amendment 8/9/10/11 단일 스크립트 통합 패턴 답습 (운영 부담 2배 회피)** |
+| 별도 메타파일 (`.harness/todo-discovery.json`) | rebase 영향 0 + 추적 명시적 | 신규 파일 추가 + 동기화 의무 + Amendment 9 §결정점 3 단일 스크립트 통합 위반 | 운영 부담 2배 |
+
+**결정: git blame** 채택. 근거:
+- rebase / squash 시점 변형 위험은 **본 프로젝트 운영 현실** 에서 marginal — 1인 운영 develop merge 정책 (gitflow squash 금지, merge commit 답습) + 본 가드는 develop tip 만 검사 (rebase 빈도 0)
+- 신규 메타파일 추가 = `.harness/manifest.json` SSoT 와 분리된 트러스트 상태 — Amendment 8 §sidecar 라이프사이클 (단일 SSoT) 정합 위반
+- Amendment 9/10/11 의 "단일 스크립트 통합 + 단일 SSoT" 패턴 답습
+- 운영 부담 2배 회피 (메타파일 동기화 의무 + 동기화 누락 시 self-leak 위험)
+
+##### 결정점 2 — 임계 기간
+
+| 임계 후보 | 즉시 발화? | 운영 영향 | 정합성 |
+|---|---|---|---|
+| 7일 (agy 원안) | ✓ (1/4 즉시 발화) | self-leak — 가드 PR 자체가 위반 상태 진입 | Amendment 9 §결정점 1 self-test 자기 모순 회피 위반 |
+| 14일 | ✗ (buffer 5일) | 1 PR 머지 시 위반 가능 (편차 흡수 부족) | 중간 |
+| **30일** | ✗ (buffer 21일) | 3 PR 누적 + 1 sprint buffer | **Amendment 2 ~1 sprint 정합 + 30일 ≪ 90일 ≪ 시간 차원 우선순위 명확화** |
+| 60일 | ✗ (buffer 51일) | 가시화 효과 약함 | Amendment 2 90일 비대칭 약함 |
+| 90일 | ✗ (buffer 81일) | Amendment 2 SSoT 중복 (시간 차원 식별 약화) | Amendment 2 SSoT 정합 — 단 차원 식별 약화 |
+
+**결정: 30일** 채택. 근거:
+- baseline 위반 0 + buffer 21일 — Amendment 9 §결정점 1 self-test 자기 모순 회피 정합 (가드 도입 PR 자체가 즉시 위반 상태로 진입하는 자가-fail 패턴 차단)
+- Amendment 2 ~1 sprint (3 PR 누적 / 30일) 정합 — `N=10 회차` (Phase 1 회차) ↔ `30일 경과` (TODO Aging) 두 시간 차원 비대칭 (회차 누적 더 빠른 임계, 시간 누적 더 느린 임계)
+- agy 원안 7일 거부 근거 박제: agy 가 "예: 7일 이상" 제시했으나 본 프로젝트 baseline 실측 (verify-z-pattern-health.mjs 9일 경과) 검증 후 거부. **measurement-first 원칙** (CLAUDE.md §"가드 설계 원칙" + §스프린트 계약 #10) 정합 — 외부 모델 broad 권고 → 다운스트림 실측 precision 정정 답습 (volt #51 외부 툴 주장 실측 가드 + Amendment 7/9/10 답습)
+- 90일 거부 근거: Amendment 2 §재검토 조건 #5 의 90일 SSoT 와 중복 — 시간 차원 식별 약화 (사용자가 본 가드 발화 시 #5 vs #7 차원 혼동 위험)
+
+##### 결정점 3 — harness-managed 카테고리 분리
+
+| 옵션 | 동작 | 정합성 |
+|---|---|---|
+| **A: harness-managed 제외 휴리스틱** | `.harness/manifest.json` 의 managed 경로 매트릭스 매칭 → 본 가드 검사 대상 제외 | **다운스트림 분기 영역 한정 (본 가드 본질 정합) + Y-회귀 영역 (#573) 직교** |
+| B: 모든 [TODO] 검사 (구분 없음) | harness-managed 파일도 30일 경과 시 발화 | false-positive 폭증 — `.github/workflows/harness-guards.yml` 31일 경과 즉시 발화, 다운스트림 해소 불가 (upstream 영역) — 본 가드 발화 무용 |
+| C: 별도 임계 (harness-managed = 90일 / Phase 1 = 30일) | 카테고리별 임계 분리 | 임계값 정의 복잡도 증가 + Y-회귀 (#573) 영역 침범 |
+
+**결정: 옵션 A (harness-managed 제외 휴리스틱)** 채택. 근거:
+- 본 가드는 **Phase 1 다운스트림 분기 영역** silent leak 차단 본질 — harness-managed (upstream 영역) 은 #573 (Y-회귀 doctor mute) 영역
+- `.github/workflows/harness-guards.yml` (31일 경과) 은 harness update v3.6.0 → v3.7.x 등 upstream 릴리스 대기 영역 — 다운스트림 해소 불가
+- Amendment 5 (upstream 리뷰 피드백 동기화 의무) 와 직교 — harness-managed 파일의 [TODO] 갱신은 upstream PR 영역
+- 매트릭스 매칭: `.harness/manifest.json` 의 키 (예: `apply.workflows`, `apply.agents`) 가 harness-managed 영역 SSoT — 기존 데이터 재사용 (운영 부담 0)
+
+##### 결정점 4 — 발화 형태
+
+| 옵션 | 동작 | 정합성 |
+|---|---|---|
+| A: hard-fail (Amendment 8 답습) | 30일 경과 시 CI fail | 1인 운영 부담 폭증 (Phase 2 강제 머지 압력) — Amendment 9 §결정점 4 silent 가드 강화 vs 약화 비대칭 정합 위반 |
+| **B: soft-warn (Amendment 9/10 답습)** | 30일 경과 시 `[TODO Aging Trigger]` 자동 이슈 + 라벨 부착 (CI exit 0) | **Amendment 9/10 답습 — sidecar 라이프사이클 fail-fast 비대칭 의도적** |
+| C: Hybrid | 30일 → soft-warn / 60일 → hard-fail (에스컬레이션) | Amendment 11 §교차검증 §기각한 외부 모델 제안 (agy 60일 hard-block 에스컬레이션) 답습 거부 |
+
+**결정: 옵션 B (soft-warn)** 채택. 근거:
+- Amendment 9 (drift 카운트) / Amendment 10 (TODO 해소) silent 가드 약화 vs 강화 비대칭 트레이드오프 답습 — **TODO 시간 누적 = 사후 행동 (Phase 2 PR 제출 또는 Phase 1 revert) → hard-block 불가 (시점 차이)**
+- Amendment 11 §교차검증 §기각 (agy 60일 hard-block 에스컬레이션 거부 — silent 가드 약화↔강화 차원에 시간 차원 신규 도입 = Amendment 2 (N=10/90일) + Amendment 9 (N=10 drift 카운트) 직교 박제 본질 훼손) 답습
+- 1인 운영 현실 (Amendment 2 옵션 C SSoT) — hard-fail 시 Phase 2 PR 머지 압력 폭증
+
+##### 결정점 5 — 통합 위치
+
+| 후보 | 비용 | 정합성 |
+|---|---|---|
+| 신규 스크립트 (`verify-todo-aging.mjs`) | 별도 파일 + CI step 추가 | Amendment 9 §결정점 3 / Amendment 10 §결정점 1 / Amendment 11 §결정점 1 단일 스크립트 통합 패턴 답습 위반 |
+| `verify-z-pattern-health.mjs` 확장 | Phase 2 진행률 + TODO Aging 차원 혼재 | 책임 결합 — Phase 2 진행률 (회차 누적) vs TODO Aging (시간 누적) 다른 차원 |
+| **`verify-harness-drift-decorator.mjs` 통합** | 이미 [TODO] 토큰 탐지 보유 (`detectDriftFiles()`) + git blame 추가 = ~40-60 라인 | **drift 검증 + drift 카운트 (Amendment 9) + sidecar-cleanup (Amendment 11) + TODO Aging (본 Amendment 12) 단일 입력 단일 스크립트** |
+
+**결정: `verify-harness-drift-decorator.mjs` 통합** 채택. 근거:
+- 본 스크립트의 `detectDriftFiles()` 가 이미 drift 파일 + [TODO] 토큰 검색 — git blame 호출 추가 = ~40-60 라인. self-test 인라인 3중 시뮬레이션 패턴 답습 가능
+- **CLI 모드 분기 SSoT 확장**: 기존 `--mode=verify` (Amendment 8) / `--mode=count-warn` (Amendment 9) / `--mode=sidecar-cleanup` (Amendment 11) + 신규 **`--mode=todo-aging`** (Amendment 12)
+- Amendment 9/10/11 의 "단일 스크립트 통합 + 단일 SSoT" 패턴 답습
+
+##### 결정점 6 (추가) — git blame 시점 정의
+
+**TODO 박제 시점 = `[TODO]` 토큰 라인의 git blame 최초 commit 시점** (해당 라인이 처음 추가된 commit) — 라인 수정 시 git blame 이 새 commit 으로 갱신되는 표준 동작 답습.
+
+- **rebase / squash 시점 변형 회피**: 본 프로젝트 운영 정책 (develop merge commit, squash 금지) 답습 — rebase 빈도 0 가정
+- **`[TODO]` → upstream PR URL 교체 (Amendment 10)** 발생 시 라인 수정 = git blame 시점 갱신 → 자연 해소 (TODO 해소된 라인은 본 가드 검사 대상 아님)
+- **신규 [TODO] 박제 = 새 line 추가** → git blame 시점 = 박제 commit 시점
+
+### silent 가드 강화 vs 약화 자기점검
+
+본 Amendment 12 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — Amendment 10 §단점 "사후 커밋 1회 의무 leak" + 영구 망각 위험 차단 = 새 차원 (TODO 시간 누적) silent 회귀 신호 가시화
+- ✓ **§결정 본문 / Amendment 2 N=10 / 90일 임계 / Amendment 9 N=10 drift 카운트 변경 0** — 기존 silent 가드 본래 의도 보존
+- ✓ **fail-fast (Amendment 8 데코레이터 / Amendment 11 verify) vs soft-warn (Amendment 9 drift 카운트 / Amendment 10 TODO 해소 / 본 Amendment 12 TODO Aging) 비대칭 의도적** — Amendment 8/9/10/11 답습. TODO Aging 은 사후 행동이므로 hard-block 불가 (시점 차이 — 30일 경과 시점엔 upstream PR 미제출 또는 망각 상태)
+- ✓ **measurement-first 원칙 정합** — agy broad 권고 (7일 hard-block) 가 아닌 baseline 실측 (verify-z-pattern-health 9일 경과 1건) 기반 precision 정정 (30일 soft-warn) 채택. agy 권고 거부 근거 박제 (volt #51 외부 툴 주장 실측 가드)
+- ✓ **§재검토 조건 #5 / #6 와 직교** — 시간/누적 차원 (#5 Phase 2 진행률) vs drift 파일 수 차원 (#6 활성 drift) vs **TODO 시간 누적 차원 (#7 본 Amendment 12)**. 셋 다 발화 시 우선순위 명시 (#5 > #6 > #7 — Phase 2 강제 우위, drift 카운트 차원 다음, TODO Aging 가장 후순위 — discussion 이슈 본문에 박제 의무)
+
+### 트레이드오프
+
+- **장점**:
+  - agy cross-validate 고유 발견 #2 (TODO Aging) 영구 박제 — Amendment 10 §단점 "사후 커밋 1회 의무 leak" + 영구 망각 위험 차단
+  - Amendment 8/9/10/11 비대칭 패턴 통합 — fail-fast vs soft-warn vs opt-in 자동화 3축 + **시간 누적 차원 신규** (Amendment 9 drift 카운트 / Amendment 10 매칭 자동화 / 본 Amendment 12 시간 누적) 직교 박제
+  - harness-managed 카테고리 분리로 false-positive 회피 — #573 (Y-회귀 doctor mute) 영역 직교 보존
+  - 단일 스크립트 통합 (Amendment 9/10/11 정합) — 운영 부담 2배 회피
+- **단점 (잠재)**:
+  - git blame 의존 — CI 환경에서 `git log --follow` 또는 `git blame` 호출 비용 (다운스트림 [TODO] 잔존 파일 ~7 파일 기준 < 1초 예상, 무시 가능)
+  - rebase / squash 시점 변형 위험 (운영 정책상 현재 marginal, 미래 운영 변경 시 재검토)
+  - 30일 임계 buffer 21일 — verify-z-pattern-health 9일 경과 파일이 21일 후 위반 → 본 가드 도입 PR 머지 + 21일 시점 첫 발화 가능. **이는 본 가드 본질 (Amendment 10 자동 해소 21일 cron 안 매칭 시 발화)** — 정상 동작
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규 코드:
+  - `scripts/verify-harness-drift-decorator.mjs` 확장: CLI 플래그 (`--mode=todo-aging`) 분기 + git blame 호출 + 30일 임계 비교 + harness-managed 카테고리 제외 휴리스틱 + soft-warn stdout 출력 — **~40-60 라인**
+  - self-test 확장: `--mode=todo-aging` positive (29일 경과 — exit 0) / negative (31일 경과 — exit 0 + warn) / boundary (30일 정확 — exit 0) / harness-managed 제외 (90일 경과해도 제외) — **~50-80 라인**
+- CI workflow 변경: `.github/workflows/adr-z-pattern-health-v2.yml` 에 step 추가 (`Verify TODO Aging Threshold` + `Create [TODO Aging Trigger] issue`) — **~30-50 라인** (Amendment 9 `[Alert Fatigue Trigger]` / Amendment 10 `[TODO Resolution Suggested]` step 답습)
+- ADR Amendment 12 자체: 본 §섹션 ~180-220 라인 박제 완료
+- harness-managed 파일 변경: 0 (정책 + 가드만, 기존 파일 무영향)
+- **총 예상 라인 수**: 250-360 라인 (스크립트 + workflow + ADR + 테스트)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "월 cron 시점 다운스트림 `[TODO]` 박제 시점 + 30일 경과 + Phase 1 다운스트림 분기 영역 매칭 → `[TODO Aging Trigger]` 자동 이슈 생성" (MINOR 릴리스 후보) — 단, 본 PR 은 ADR Amendment 만 박제 (CHANGELOG 미터치, developer 단계에서 추가)
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/verify-harness-drift-decorator.mjs --self-test` PASS 의무. todo-aging 모드 self-test 케이스 추가 의무.
+- **(2) 3중 시뮬레이션** (positive → negative → recovery):
+  - positive: TODO 박제 29일 경과 → `--mode=todo-aging` 호출 → "OK" 출력 + exit 0
+  - negative: TODO 박제 31일 경과 → `--mode=todo-aging` 호출 → `[TODO Aging Trigger]` 마커 + 파일 목록 + exit 0 (soft-warn)
+  - recovery: 31일 경과 파일의 [TODO] → upstream PR URL 교체 (Amendment 10 자동 해소) → 다음 cron `--mode=todo-aging` 호출 → "OK" + exit 0
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (architect 단계 의무) + 후속 developer/reviewer/qa 단계 페르소나가 동일 결론 (git blame / 30일 / harness-managed 제외 / soft-warn / verify-harness-drift-decorator 통합) 도출 검증
+- **(4) 메타 측정 도구 자기 적용 안정성**: 본 가드 도입 PR 자체는 ADR Amendment 만 박제 (코드 변경 0) — developer 단계 자기 검증 의무 (현재 baseline verify-z-pattern-health.mjs 9일 < 30일 → 본 가드 PR 자체가 즉시 위반 상태로 진입하는 자기 모순 회피, 결정점 2 SSoT 정합)
+
+### cross-link
+
+- 본 Amendment, [#577](https://github.com/coseo12/astro-simulator/issues/577) 이슈 본문
+- cross-validate 원본 (Amendment 10 발의): `.claude/logs/cross-validate-architecture-20260526-180552.log` (PR #580 cross-validate agy 고유 발견 #2)
+- 직전 Amendment: [#572](https://github.com/coseo12/astro-simulator/issues/572) Amendment 11 (Phase 3 sidecar 라이프사이클 자동화)
+- 인접 박제 의무 인용: Amendment 10 §교차검증 §고유 발견 2 (TODO Aging Guard, agy 제안 B) — 본 Amendment 12 가 해소 자리
+- 자동화 스크립트: `scripts/verify-harness-drift-decorator.mjs` (`--mode=todo-aging` 신규 — developer 단계)
+- CI workflow: `.github/workflows/adr-z-pattern-health-v2.yml` (확장, `[TODO Aging Trigger]` step 추가 — developer 단계)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" (volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107))
+- 외부 모델 실측 가드: volt [#51](https://github.com/coseo12/volt/issues/51) (외부 툴 주장 실측 가드 — agy 7일 임계 권고 → baseline 실측 후 30일 정정 패턴 답습)
+- 비대칭 가드 패턴 SSoT (Amendment 8/9/10/11/12 통합): 본 §silent 가드 강화 vs 약화 자기점검 + Amendment 11 §결정점 4 표 갱신 (developer 단계 의무)
+- 후속 분리 영역 (본 PR 비-범위): [#573](https://github.com/coseo12/astro-simulator/issues/573) (Y-회귀 시 doctor mute — upstream 영역, harness-managed 카테고리 직교), [#578](https://github.com/coseo12/astro-simulator/issues/578) (Prettier 정합성 교차 검증), [#581](https://github.com/coseo12/astro-simulator/issues/581) (Upstream PR 데코레이터 오염 방지 — Amendment 11 §고유 발견 1)
+
+### 교차검증 반영 사항 (agy Antigravity, 2026-05-26)
+
+> **본 §섹션은 Provisional 상태 — cross-validate 결과 본문 통합 완료. 사용자 승인 후 Accepted 전이** (CLAUDE.md §"ADR Status 워크플로 (Provisional → Accepted, 부분 도입 — #370 옵션 C)" §전이 절차, #566 PR #584 머지 사례 답습).
+
+- **outcome**: `applied` (exit 0) — log `.claude/logs/cross-validate-architecture-20260526-234223.log`, outcome JSON `.claude/logs/cross-validate-architecture-20260526-234223-outcome.json` (plan_bypass=false, rollback_failed=false, reminder_issue="none")
+- **합의** (Claude 설계와 일치 — 5건, ADR 전반 평가 + 본 Amendment 12 영역 정당성 간접 확인):
+  1. **구조적 완성도 우수** — Phase 1/2/3 closed-loop + 폴백 (Z → Y 회귀) 라이프사이클 정교
+  2. **1인 개발 임계 조정 (Amendment 2) 매우 현실적** — 지나치게 엄격한 규제는 프로세스 우회 + 피로감 유발
+  3. **자기참조 인플레이션 제거 (Amendment 7) 매우 정확** — 포렌식 분석 + `isAdrEvolutionPr` 필터 정합성 높음
+  4. **데코레이터 + 사이드카 (Amendment 8) 추적성 탁월** — JSON 사이드카 합리적 차선책
+  5. **인터페이스 명확성 — 하드블록 vs 소프트워닝 분리 = 엔지니어링 모범 사례** (Amendment 8/9/10/11/12 silent 가드 비대칭 SSoT 답습 정합)
+- **Amendment 12 직접 검증 간접 확인 (핵심)**:
+  - agy §6 §누락 요소 §CRITICAL VULNERABILITY 가 본 Amendment 12 영역을 정확히 식별: *"개발자가 `[TODO]` 상태로 머지한 후 업스트림 PR 생성을 잊어버리면, CI 가드는 데코레이터가 존재하므로 통과시키고 결과적으로 시스템은 영구 포크(Y) 상태로 조용히 전락"*
+  - agy 가 본 ADR 의 Amendment 12 자체 본문을 직접 평가하지 않고 (ADR 본문 통째 입력의 토큰 제한 영향 추정) 누락 요소로 동일 영역 지적 — **본 Amendment 12 의 영역 정당성 간접 확인** (agy ≈ Claude 합의)
+- **이견 수용 (본 PR 즉시 반영)**: 0건 — agy CRITICAL 권고 (hard-fail) 와 Claude 정정 (30일 soft-warn) 의 차원이 다르며 (즉시 차원 vs 시간 누적 차원), Claude 정정이 Amendment 10 §결정점 3 SSoT 정합. 본 §교차검증 §기각 항목 참조
+- **Claude 재분석으로 기각한 외부 모델 제안 (2건)**:
+  1. **agy CRITICAL §6 — `develop`/`main` 머지 PR 검증 단계 `[TODO]` 포함 시 CI Hard-fail**:
+     - agy 권고: PR 검증 스크립트 (`verify-harness-drift-decorator.mjs`) 에 브랜치 컨텍스트 검증 추가. feature/* 에서는 [TODO] 허용, develop/main 대상 머지 PR 에서는 [TODO] = CI Hard-fail (실제 PR URL 만 허용)
+     - **기각 근거 1 (차원 정합)**: agy 권고는 **머지 시점 차원** (브랜치 컨텍스트 즉시 차단), 본 Amendment 12 는 **시간 누적 차원** (30일 경과 시 soft-warn). 둘은 차원이 다르며 **본 Amendment 12 시간 누적 차원이 Amendment 10 SSoT 정합** — 머지 시점 즉시 차단 = Phase 1 작업 자체 차단 (Amendment 10 자동 해소 의도 무효화)
+     - **기각 근거 2 (Amendment 10 §결정점 3 §발화 형태 SSoT 정합 위반)**: Amendment 10 §결정점 3 가 "hard-fail 거부 — Phase 2 머지 직후 1~3 사이클 내 자연 해소 가능 + 1인 운영 부담 가속" 명시. agy hard-fail 권고는 Amendment 10 SSoT 직접 위반. 본 Amendment 12 의 soft-warn 채택이 정합
+     - **기각 근거 3 (1인 운영 트레이드오프, Amendment 2 SSoT 정합)**: 머지 시점 hard-fail = upstream PR 제출 강제 압력 폭증 → Amendment 2 §"silent 가드 약화 트레이드오프 (CRITICAL)" §"1인 운영 현실 대응 완화" SSoT 위반
+     - **기각 근거 4 (Amendment 11 §교차검증 §기각 답습)**: Amendment 11 가 이미 agy 의 "60일 hard-block 에스컬레이션" 권고를 *"silent 가드 약화↔강화 차원에 시간 차원 신규 도입 → Amendment 2 (N=10/90일) + Amendment 9 (N=10 drift 카운트) 직교 박제 본질 훼손"* 근거로 기각. 본 Amendment 12 의 agy hard-fail 권고 기각이 답습 (시간 차원 신규 도입 자체는 본 Amendment 12 본질 — 단 hard-fail 형태가 아닌 soft-warn 형태)
+     - **양립 가치 박제**: agy hard-fail 권고는 본 PR 비-범위로 거부했으나 **머지 시점 차원** 자체는 별도 후속 분리 가치 있음 (low 우선순위 — Amendment 12 30일 buffer 가 1인 운영에서 충분한지 운영 사이클 1~3 회 측정 후 정정 가능). 후속 분리 영역 박제
+  2. **agy §6 §누락 요소 §2 — Prettier 무시 설정 강제화**:
+     - agy 권고: ADR 배경에 `.prettierignore` 블록 보호 명시했으나 Phase 1 운영 절차에 ".prettierignore 임시 등록" 의무화 부재. lint-staged / prettier 가 데코레이터 박제 파일을 변조하여 해시 불일치 충돌 가속 위험
+     - **기각 근거 (이미 분리됨)**: 본 PR 비-범위 — Amendment 10 §교차검증 §고유 발견 3 (agy 제안 C) 에서 이미 [#578](https://github.com/coseo12/astro-simulator/issues/578) 로 분리 박제. agy 가 본 ADR 의 후속 분리 영역 미인지 (Amendment 10 §교차검증 본문 입력 토큰 제한 추정)
+- **고유 발견 (후속 분리, volt #29 3단 프로토콜 — 2건)**:
+  1. **agy §1 §구조적 공백 §1 — Phase 3 사이드카 정리 스크립트 부재** (이미 박제됨, **#572 → PR #582/#583 Amendment 11**): agy 권고 "스크립트나 가이드 명령 (예: `npm run harness:drift-clean`)" — **Amendment 11 §1 (`--mode=sidecar-cleanup` CLI) 가 정확히 해소 완료**. agy 가 본 ADR 의 Amendment 11 영역 미인지 — 본 Amendment 12 §교차검증 §고유 발견 1 박제값이 미래 reviewer 단계 답습 가능 (인접 박제)
+  2. **agy §1 §구조적 공백 §2 — 로컬 도구 지원 (개발자 CLI 헬퍼)** (low 후보, **신규 후속 분리 박제 예정 — 본 PR 비-범위**): 개발자가 직접 수동으로 각 언어 규칙에 맞춰 데코레이터 주석 / 사이드카 파일을 생성하는 과정 인지 부하 크다. CLI 헬퍼 (예: `pnpm harness:drift add <file>` — 파일 형식 자동 감지 + 데코레이터 자동 박제 + sidecar 자동 생성) 가치. 본 PR 비-범위 (#577 = TODO Aging Guard 단일 목표 + 시간 누적 차원). 후속 분리 시 사용자 결정 (Phase 2 가속 / 별도 이슈 분리 / 우선순위 low — 현재 박제 빈도 < 5건 marginal, agy §1 §우수한 점 §"인지 부하" 자체는 시인 가능). 후속 분리 사용자 승인 시 PM 단계 위임.
+- **호출 전 Claude 편향 셀프 체크 4종 (모두 통과)**:
+  - (a) 낙관적 일정 → ✓ developer 단계 라인 수 예측 250-360 라인 박제 + 회귀 가드 4축 검증 의무 박제 (단순 추가 작업 가정 회피). agy §1 §구조적 공백 (사이드카 / 도구 지원) 박제 완료 (§고유 발견 후속 분리)
+  - (b) 결합 간과 → ✓ §재검토 조건 #5 (Phase 2 진행률) ↔ #6 (drift 파일 수) ↔ #7 (TODO 시간 누적) 직교 박제. 동시 발화 시 우선순위 명시 (#5 > #6 > #7). harness-managed 카테고리 (#573 영역) 분리 박제로 Y-회귀 영역 결합 차단. agy CRITICAL (머지 시점 차원) vs 본 Amendment 12 (시간 누적 차원) 결합 분리 박제 (§기각 §1)
+  - (c) 폐기 프레이밍 → ✓ Amendment 10 (TODO 해소 자동화) 폐기 아님. 보완 (시간 누적 차원 — 매칭 실패 + 시간 경과 시 발화) — 양립. agy hard-fail 권고도 Amendment 10 폐기 프레이밍 위반으로 기각 (§기각 §1 §기각 근거 2)
+  - (d) 순수주의 → ✓ "agy 제안 7일 hard-block" broad 권고 도그마 회피 — baseline 실측 (verify-z-pattern-health 9일 경과) + 30일 soft-warn + harness-managed 제외 (precision 정정) 채택. agy CRITICAL hard-fail 권고도 동일 도그마 회피 패턴으로 기각 (§기각 §1)
+- **cross-validate 후속 분리 박제 의무 (volt #29 §3)**: 본 §고유 발견 2 (CLI 헬퍼) 는 본 PR 머지 직후 즉시 후속 이슈 생성 의무 여부 사용자 결정 — PM 단계 위임 가능 (architect → PM 인계 보고에 명시 박제). 우선순위 low — 1인 운영 박제 빈도 < 5건 marginal.
