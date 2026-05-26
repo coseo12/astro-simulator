@@ -131,3 +131,72 @@ jobs:
           - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\`
           - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
           - 가드 스크립트: \`scripts/verify-z-pattern-health.mjs\` (\`verifyPhase2Sync()\`)"
+
+      # Amendment 9 (#557) — 경고 피로감 가드 (활성 drift ≥ N=10 soft-warn).
+      # ADR §Amendment 9 §결정점 3 — verify-harness-drift-decorator.mjs `--mode=count-warn`
+      # CLI 플래그 분기로 통합. soft-warn (exit 0 + stdout 마커) → CI workflow grep 으로
+      # 감지하여 [Alert Fatigue Trigger] 자동 이슈 생성 (CI hard-block 아님).
+      - name: Verify Alert Fatigue Threshold (soft-warn)
+        id: alert-fatigue
+        run: |
+          set +e
+          node scripts/verify-harness-drift-decorator.mjs --mode=count-warn | tee /tmp/alert-fatigue-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          # stdout 에서 [Alert Fatigue Trigger] 마커 감지
+          if grep -q "\[Alert Fatigue Trigger\]" /tmp/alert-fatigue-output.txt 2>/dev/null; then
+            echo "triggered=true" >> $GITHUB_OUTPUT
+            echo "=== Alert Fatigue Trigger block ==="
+            cat /tmp/alert-fatigue-output.txt
+          else
+            echo "triggered=false" >> $GITHUB_OUTPUT
+          fi
+          # soft-warn — workflow 자체는 항상 PASS (이슈 생성으로 알림)
+          exit 0
+
+      - name: Create [Alert Fatigue Trigger] issue
+        if: steps.alert-fatigue.outputs.triggered == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 중복 방지 — 동일 제목 OPEN 이슈 검색
+          EXISTING=$(gh issue list \
+            --search '"[Alert Fatigue Trigger] ADR 20260515 Amendment 9" in:title' \
+            --state open --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "이미 [Alert Fatigue Trigger] OPEN 이슈 존재 — 중복 생성 스킵"
+            exit 0
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          ALERT_BLOCK=$(cat /tmp/alert-fatigue-output.txt)
+
+          gh issue create \
+            --title "[Alert Fatigue Trigger] ADR 20260515 Amendment 9 발화 (자동 탐지 ${DATE})" \
+            --label "documentation,priority:high" \
+            --body "## 배경
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health-v2.yml\` 의
+          Amendment 9 (#557) 경고 피로감 가드 발화. 활성 drift 파일 수가 임계 N=10 도달/초과 —
+          alert fatigue (개발자가 다른 치명적 drift/오염도 무시하게 되는 심리적 부작용) 위험 영역 진입.
+
+          ## 임계 발화 결과
+          \`\`\`
+          ${ALERT_BLOCK}
+          \`\`\`
+
+          ## 의무 (ADR §Amendment 9 §결정점 2 옵션 A)
+          3 영업일 내 결정 분기:
+          - **옵션 1 — Phase 2 가속**: 점진 drift 해소 (upstream 기여 진행으로 자연 정리)
+          - **옵션 2 — 일부 Phase 1 revert**: 긴급 정리 (가장 오래된 drift 부터 제거)
+          - **옵션 3 — N 임계값 재조정**: Amendment 2/7 silent 약화 사이클 답습 (신중)
+
+          ## §재검토 조건 #5 동시 발화 시 우선순위
+          §재검토 조건 #5 (Phase 2 진행률 시간/누적 차원) 와 본 #6 (drift 파일 수 차원) 동시 발화 시
+          **#5 우선** — Phase 2 강제 우위 (ADR §Amendment 9 §silent 가드 강화 vs 약화 자기점검).
+
+          ## Cross-link
+          - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\` §Amendment 9
+          - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
+          - 가드 스크립트: \`scripts/verify-harness-drift-decorator.mjs\` (\`--mode=count-warn\`)
+          - 직전 [ADR Trigger]: #495/#500/#554 (§재검토 조건 #5 패턴)"
