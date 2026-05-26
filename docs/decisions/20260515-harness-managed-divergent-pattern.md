@@ -91,6 +91,7 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 3. **다운스트림 프로젝트 ≤ 1** — 본 프로젝트가 유일한 harness 사용자가 되면 (다른 프로젝트 전부 fork 또는 폐기) X 경로 가치 0 → Y 단독으로 회귀
 4. **`harness update --apply-all-safe` 자가 복구 정책 변경** — v2.9.0+ 의 `previousSha256` 자가 복구가 비활성화되면 Phase 3 자동 동기화 보장 약화 → 재평가
 5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조). **2026-05-26 Amendment 8 로 Phase 1 드리프트 가시화 + Phase 2 중도 변경 정적 비교 가드 박제** — HARNESS-DRIFT 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 drift 자동 비교 (Amendment 5 보완, soft-warn 라벨 부착) — silent 가드 강화 방향. 측정 식 / N 임계 / 90일 임계 변경 없음 (§Amendment 8 참조).
+6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 `.harness/manifest.json` 의 sha256 과 불일치하는 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조).
 
 ### 측정 지표
 
@@ -439,3 +440,163 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
   - (b) 결합 간과 → ✓ Phase 1 데코레이터 가드 (별도 verify 스크립트) + Phase 2 중도 비교 가드 (기존 verify-z-pattern-health.mjs 통합) 분리 — 의존성 결합 회피
   - (c) 폐기 프레이밍 → ✓ Amendment 5 (수동 동기화 의무) 폐기 아님. 보완 (자동 정적 비교 추가) — 양립
   - (d) 순수주의 → ✓ ".json sidecar 가 보기 싫다" 도그마 회피 — 적용 빈도 < 5건 실측 기반 수용. fail-fast (데코레이터) vs soft-warn (drift 비교) 비대칭 의도적 유지
+
+## Amendment 9 — 2026-05-26
+
+상태: Accepted (cross-validate 2026-05-26 통합 완료)
+
+- **발의**: [#557](https://github.com/coseo12/astro-simulator/issues/557) (Amendment 7 PR [#555](https://github.com/coseo12/astro-simulator/pull/555) cross-validate agy Antigravity 고유 발견 #2, 2026-05-25)
+- **근거** (cross-validate 원문 — log `.claude/logs/cross-validate-architecture-20260525-134600.log`):
+  - **경고 피로감 (Alert Fatigue)**: Z 패턴 적용 빈도가 높을수록 프로젝트는 상시 `harness doctor` 경고 (Drift) 상태에 놓이게 됨. 이는 개발자가 '진짜 치명적인 다른 드리프트나 파일 오염' 마저 무시하게 만드는 심리적 부작용을 낳을 수 있음. 경고 상태의 임계 수치나 활성화된 드리프트 파일 개수의 상한선 (예: 동시 드리프트 최대 3개 이하) 을 기술 결정 제약에 추가할 것을 권장.
+- **PR [#556](https://github.com/coseo12/astro-simulator/pull/556) Amendment 8 cross-validate 후속 인용** (2026-05-26): agy 가 동일 권고를 N=3 구체값 + Hard Limit (exit 1) 제안으로 재발화. 본 Amendment 9 가 그 후속 분리 영역 (#557) — agy 제안 3 인용 의무 박제.
+
+### 변경 사항
+
+#### 1. §재검토 조건 #6 신설 — 동시 활성 drift 파일 수 ≥ N=10
+
+- **위치**: §재검토 조건 #5 (Phase 2 진행률 시간/누적 차원) 와 직교한 **drift 파일 수 차원** 추가
+- **임계값 SSoT**: `N=10` (활성 drift 파일 수 = `.harness/manifest.json` sha256 과 실제 파일 sha256 불일치 + manifest 등록된 파일만 카운트, orphan sidecar 제외)
+- **트리거 발화 시 후속 행동**: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 — Phase 2 가속 (점진 drift 해소) / 일부 Phase 1 revert (긴급 정리) / N 임계값 재조정 (Amendment 2/7 silent 약화 사이클 답습 — 신중)
+
+#### 2. 측정 결함 baseline 박제 — 2026-05-26 실측
+
+본 Amendment 9 박제 직전 `node scripts/verify-harness-drift-decorator.mjs` 실측 (develop tip c6ea749):
+
+```text
+harness drift files: 6
+decorator PASS: 6
+decorator FAIL: 0
+orphan sidecars: 0
+```
+
+- 활성 drift 파일 수 = **6** (N=10 임계 buffer 4)
+- 모든 drift 파일에 Amendment 8 데코레이터 정합 박제 (FAIL 0)
+- 본 baseline 이 N 임계 결정의 결정적 근거 — N=3/5 채택 시 본 가드 도입이 즉시 발화하는 자기 모순 회피
+
+#### 3. 4축 결정 박제값
+
+##### 결정점 1 — N 임계값
+
+| N | 즉시 발화? | 운영 영향 | 정합성 |
+|---|---|---|---|
+| 3 | ✓ (6 > 3 즉시 발화) | 6→3 revert 강제 → 운영 부담 폭증 | Amendment 1 N=3 정합 |
+| 5 | ✓ (6 > 5 즉시 발화) | buffer 0 → 1 PR 머지 시 발화 | 중간 |
+| **10** | ✗ (6 < 10) | buffer 4 → 4 PR 적용 buffer | **Amendment 2 N=10 정합** |
+
+**결정: N=10**. 근거:
+- baseline 6 이 N=10 임계 buffer 내. 본 가드 도입이 즉시 위반 상태로 PR 들어가는 자기 모순 회피
+- Amendment 1 (N=3) / Amendment 2 (N=10) 사이클 정합 — Amendment 2 의 silent 가드 약화 트레이드오프 (1인 운영) 수용 결정과 **동일 N=10** 차원만 다름 (Phase 1 회차 ↔ 활성 drift 파일 수)
+- Amendment 1/2 SSoT N=10 인용으로 임계 정의 복잡도 증가 회피
+- agy 제안 N=3 거부 근거 박제: agy 가 N=3 구체값 제시했으나 본 프로젝트 실측 baseline=6 검증 후 거부. **measurement-first 원칙** (CLAUDE.md §"가드 설계 원칙" + §스프린트 계약 #10) 정합 — 외부 모델 broad 권고 → 다운스트림 실측 precision 정정 답습 (volt #51 외부 툴 주장 실측 가드 + Amendment 7 의 측정 식 forensic 답습)
+
+##### 결정점 2 — 후속 행동
+
+| 옵션 | 동작 | 정합성 |
+|---|---|---|
+| **A: 사용자 결정 분기 자동 이슈** | drift 초과 시 [Alert Fatigue Trigger] 라벨 자동 이슈 (Phase 2 가속 / 일부 Phase 1 revert / N 재조정) | Amendment 3 의 [ADR Trigger] 자동 이슈 패턴 답습 + Amendment 8 §결정점 3b 옵션 A soft-warn 정합 |
+| B: CI fail (hard-block) | drift 초과 시 모든 PR CI fail | Amendment 7 의 silent 가드 약화 사이클 차단 정합 — 단 1인 운영 부담 폭증 |
+| C: Hybrid | 임계 N 초과 시 block + 자동 이슈 생성 | 임계 정의 복잡도 증가 + Amendment 8 결정점 3b 옵션 A "soft-warn" 정합 위반 |
+
+**결정: 옵션 A (사용자 결정 분기 자동 이슈)** + soft-warn 라벨 부착.
+- 근거: Amendment 8 §결정점 3b 옵션 A (Phase 2 sync drift → soft-warn 라벨 부착) 정합. silent 가드 강화 (Amendment 8 방향) vs 약화 (Amendment 2/7) 트레이드오프 통합 — **데코레이터 누락 = fail-fast / drift 카운트 초과 = soft-warn** 비대칭 의도적 (Amendment 8 §결정점 4 답습)
+- Amendment 3 의 `.github/workflows/adr-z-pattern-health-v2.yml` `[ADR Trigger]` 자동 이슈 패턴 답습 — 중복 방지 (gh issue list `--search`) + 3 영업일 결정 분기 의무 박제
+
+##### 결정점 3 — 통합 위치
+
+| 후보 | 비용 | 정합성 |
+|---|---|---|
+| 신규 스크립트 (`verify-drift-count.mjs`) | 별도 파일 + CI step 추가 | 운영 부담 2배 — Amendment 8 §단점 회피 정합 위반 |
+| `verify-z-pattern-health.mjs` 확장 | 기존 cron + main flow 통합 | Phase 2 진행률 + drift 카운트 차원 혼재 — 책임 결합 |
+| **`verify-harness-drift-decorator.mjs` 통합** | 이미 `detectDriftFiles()` 보유 + drift 카운트 산출 | **drift 검증 + 카운트 동일 입력 단일 스크립트** |
+
+**결정: `verify-harness-drift-decorator.mjs` 통합**.
+- 근거: 본 스크립트의 `detectDriftFiles()` 가 이미 drift 카운트 산출 — N=10 비교 추가 = ~30 라인. self-test 인라인 3중 시뮬레이션 패턴 답습 가능
+- **트리거 시점 분기 (developer 단계 구현 의무)**: PR check 시점 (decorator FAIL = exit 1 hard-fail) vs 월 cron 시점 (drift 카운트 > N = soft-warn). 단일 스크립트 내 CLI 플래그 (`--mode=count-warn` 또는 `--check-count-only`) 로 분기
+- CI workflow: `.github/workflows/adr-z-pattern-health-v2.yml` 의 cron step 추가 (verify-z-pattern-health 직후 `verify-harness-drift-decorator.mjs --mode=count-warn` 호출 + `[Alert Fatigue Trigger]` 자동 이슈)
+
+##### 결정점 4 — silent 가드 방향
+
+**결정: soft-warn (라벨 + 자동 이슈)** — Amendment 8 §결정점 3b 옵션 A 답습.
+- 데코레이터 누락 (Phase 1 PR check) = **fail-fast (hard-block)** — 컨벤션 강제, 예방 비용 < 1줄
+- drift 카운트 초과 (월 cron) = **soft-warn (라벨 부착 + 자동 이슈)** — 사용자 결정 분기 (Phase 2 가속 / Phase 1 revert / N 재조정), 자동 차단 false-positive 비용 과대
+- 비대칭 의도적 — Amendment 8 §결정점 4 silent 가드 강화 vs 약화 트레이드오프 통합 답습
+
+##### 결정점 5 (추가) — 임계 비교 대상
+
+**활성 drift 파일 수 (`detectDriftFiles().length`) 만** vs **drift + orphan sidecar 수**:
+- **결정: 활성 drift 파일 수만** (orphan 제외)
+- 근거: orphan sidecar 는 Amendment 8 hard-fail 가드가 이미 처리 (exit 1). 본 가드는 "Z 패턴 활성 적용 누적" 측정이 본질 — drift 파일 수가 정합. orphan 포함 시 측정 의미 혼재 (Phase 3 정리 누락 ≠ Z 패턴 누적)
+
+### silent 가드 강화 vs 약화 자기점검
+
+본 Amendment 9 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — Amendment 2 (N 임계 완화 = 약화) 의 정반대. 새로운 차원 (drift 파일 수) silent 회귀 신호 가시화
+- ✓ **§결정 본문 / Amendment 2 N=10 / 90일 임계 변경 0** — 기존 silent 가드 본래 의도 보존
+- ✓ **fail-fast (Amendment 8 데코레이터) vs soft-warn (본 가드) 비대칭 의도적** — Amendment 8 §결정점 4 답습. 데코레이터 누락 = 컨벤션 강제 (예방 < 1줄), drift 카운트 초과 = 예방 권고 (1인 운영 트레이드오프)
+- ✓ **measurement-first 원칙 정합** — agy broad 권고 (N=3 hard-limit) 가 아닌 baseline 실측 (drift=6) 기반 precision 정정 (N=10 soft-warn) 채택
+- ✓ **§재검토 조건 #5 와 직교** — 시간/누적 차원 (Phase 2 진행률 33% / N=10 회차 / 90일) vs drift 파일 수 차원 (활성 drift ≥ N=10). 둘 다 발화 시 우선순위는 #5 (Phase 2 강제 우위) — discussion 이슈 본문에 명시
+
+### 트레이드오프
+
+- **장점**: agy cross-validate 고유 발견 #2 영구 박제 (Alert Fatigue 위험 인식 명문화) + drift 차원 silent 회귀 신호 가시화 + Amendment 8 의 발화 빈도 ≥ 1/주 잠재 위험 회피 전략 제도화
+- **단점 (잠재)**:
+  - N=10 의 baseline=6 buffer 4 가 향후 Phase 1 4 PR 누적 시 즉시 발화 가능. 회피: Amendment 8 데코레이터 가드와 동시에 발화 시 사용자 인지 부하 증가 — discussion 이슈 본문에 동시 발화 처리 우선순위 박제 의무
+  - soft-warn 라벨 + 자동 이슈가 alert fatigue 자체를 추가 발생시킬 잠재 — 중복 방지 (gh issue list `--search`) + 월 cron 빈도 제한 (Amendment 3 패턴 답습) 으로 완화
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규 코드:
+  - `scripts/verify-harness-drift-decorator.mjs` 확장: CLI 플래그 (`--mode=count-warn`) 분기 + drift 카운트 N=10 비교 + soft-warn stdout 출력 — **~40-60 라인** (기존 함수 재사용 가능)
+  - self-test 확장: `--mode=count-warn` positive (drift=5, N=10 → exit 0) / negative (drift=11, N=10 → exit 0 + warn) / boundary (drift=10, N=10 → exit 0) 3건 — **~30-50 라인**
+- CI workflow 변경: `.github/workflows/adr-z-pattern-health-v2.yml` 에 step 추가 (verify-harness-drift-decorator `--mode=count-warn` 호출 + `[Alert Fatigue Trigger]` 자동 이슈) — **~30-50 라인** (Amendment 3 `[ADR Trigger]` step 답습)
+- ADR Amendment 9 자체: ~140-180 라인 박제 (본 §섹션)
+- harness-managed 파일 변경: 0 (정책 + 가드만, 기존 파일 무영향)
+- **총 예상 라인 수**: 240-340 라인 (스크립트 + workflow + ADR + 테스트)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "월 cron 시점 활성 drift 파일 ≥ N=10 발화 시 [Alert Fatigue Trigger] 자동 이슈 생성" (MINOR 릴리스 후보) — 단, 본 PR 은 ADR Amendment 만 박제 (CHANGELOG 미터치, developer 단계에서 추가)
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/verify-harness-drift-decorator.mjs --self-test` + `--mode=count-warn` 인라인 시뮬레이션 PASS 의무
+- **(2) 3중 시뮬레이션** (positive → negative → recovery): drift=5 (정상) → drift=11 (warn) → drift=8 (recovery) 시퀀스 self-test
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (architect 단계 의무) + 후속 developer/reviewer/qa 단계 페르소나가 동일 결론 (N=10 / 옵션 A / verify-harness-drift-decorator 통합 / soft-warn) 도출 검증
+- **(4) 메타 측정 도구 자기 적용 안정성**: 본 가드 도입 PR 자체가 자기 가드를 통과 (drift=6 < N=10 → exit 0 / soft-warn 미발화) — developer 단계 자기 검증 의무
+
+### cross-link
+
+- 본 Amendment, [#557](https://github.com/coseo12/astro-simulator/issues/557) 이슈 본문
+- cross-validate 원본: `.claude/logs/cross-validate-architecture-20260525-134600.log` (Amendment 7 PR #555)
+- Amendment 8 cross-validate 후속 (agy 제안 3 N=3 hard-limit 인용): `.claude/logs/cross-validate-architecture-20260526-150418.log` (PR #570)
+- 직전 Amendment: [#556](https://github.com/coseo12/astro-simulator/issues/556) Amendment 8 (Phase 1 드리프트 가시화 + Phase 2 중도 비교)
+- 자동화 스크립트: `scripts/verify-harness-drift-decorator.mjs` (확장, `--mode=count-warn` 플래그 추가 — developer 단계)
+- CI workflow: `.github/workflows/adr-z-pattern-health-v2.yml` (확장, `[Alert Fatigue Trigger]` step 추가 — developer 단계)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" (volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107))
+- 측정 방법 검증 원칙: CLAUDE.md §스프린트 계약 #10 (volt [#32](https://github.com/coseo12/volt/issues/32) — 수치 DoD 미달 시 측정 방법 검증 우선)
+- 외부 모델 실측 가드: volt [#51](https://github.com/coseo12/volt/issues/51) (외부 툴 주장 실측 가드 — agy N=3 제안 baseline=6 실측 후 N=10 정정 패턴)
+
+### 교차검증 반영 사항 (agy Antigravity, 2026-05-26)
+
+- **outcome**: `applied` (exit 0) — log `.claude/logs/cross-validate-architecture-20260526-161511.log`, outcome JSON `.claude/logs/cross-validate-architecture-20260526-161511-outcome.json` (plan_bypass=false, rollback_failed=false, reminder_issue="none")
+- **합의** (Claude 설계와 일치 — 5건):
+  1. Fallback 경로 (Z→Y 회귀) 선제 설계 = "프로세스 고착 상태 예방"
+  2. 1인 운영 임계 완화 (Amendment 2 N=10/90일) + 자동 이슈 보완 (Amendment 3) 트레이드오프 분석 = "모범 사례"
+  3. SSoT decorator regex 정교함 + YAML frontmatter prefix 확장 (Amendment 8) = "오차 없는 정적 분석 가능"
+  4. verifyPhase2Sync upstream-downstream 정합성 강제 = "단순 체크박스 확인을 넘어 기술적 실질 정합"
+  5. **Amendment 9 N=10 alert fatigue 가드 = "훌륭한 아키텍처 확장성 통제 장치, 시스템 복잡도 임계 제어"** (본 §Amendment 9 핵심 평가)
+- **이견 수용 (본 PR 즉시 반영)**: 0건 (agy 4 발견 모두 본 PR 비-범위 영역 또는 거부 영역)
+- **Claude 재분석으로 기각한 외부 모델 제안 (1건)**:
+  - **agy 잠재 위험 — Soft-warn 60일 초과 시 Hard-block 에스컬레이션**: agy 가 "Soft-warn 방치 시 보안 불감증" 우려로 60일 임계 도입 제안. **기각 근거**:
+    - 본 §Amendment 9 §결정점 4 (silent 가드 방향) 가 의도적으로 "fail-fast vs soft-warn 비대칭" 박제 — Amendment 8 (데코레이터 hard-fail) ↔ Amendment 9 (drift 카운트 soft-warn) 차원 분리가 핵심 설계
+    - 60일 임계 추가 = silent 가드 약화↔강화 차원에 **시간 차원** 신규 도입 → Amendment 2 (N=10/90일) + Amendment 9 (N=10 drift 카운트) 직교 박제 본질 훼손
+    - drift 카운트 누적 차단은 본 가드 자체 (N=10) 가 이미 수행 — 시간 차원 보조 가드는 누적 차단 본질 무관
+    - measurement-first 원칙: 60일 임계의 baseline 실측 (현재 0건 Soft-warn 발화) 부재 — 추측 기반 보조 가드 도입은 silent 가드 사이클 (Amendment 2/7 약화 패턴) 재발 위험
+- **고유 발견 (후속 분리, volt #29 3단 프로토콜 — 3건, 모두 박제 완료)**:
+  1. **agy 발견 1 — Phase 3 sidecar 자동 삭제 메커니즘** (medium 후보, 후속 분리 [#572](https://github.com/coseo12/astro-simulator/issues/572)): Amendment 8 §변경 사항 1 sidecar 라이프사이클 계약은 박제 있으나 Phase 3 (`harness update --apply-all-safe`) 진입 시 drift 해소 → sidecar 자동 삭제 메커니즘 미명시. agy 권고: `verify-harness-drift-decorator.mjs` 내부에 자동 삭제 또는 CI 에러 강제 로직 확장. 본 PR 비-범위 (Amendment 9 #557 = drift 카운트 차원 단일 목표, Amendment 8 sidecar 라이프사이클 보강은 별개 영역).
+  2. **agy 발견 2 — Y-회귀 시 harness doctor mute (Ignore List 프로토콜)** (medium 후보, 후속 분리 [#573](https://github.com/coseo12/astro-simulator/issues/573) — upstream harness-setting 영역): upstream 반려 시 영구 Y-fork 전환 시나리오에서 `harness doctor` 가 지속 drift 경고 → CI 로그 오염 + alert fatigue 가속. agy 권고: `.harness/ignored-drifts: [...]` 명시적 허용 목록 인터페이스 정의 + doctor 가 이를 파싱하여 정상 상태 (Exit 0) 인지하는 "영구 예외 등록 절차" 수립. 본 PR 비-범위 (ADR §결정 본문 / harness 도구 자체 영역).
+  3. **agy 발견 3 — PR 타이틀 린팅 (Commitlint) 통합** (low 후보, 후속 분리 [#574](https://github.com/coseo12/astro-simulator/issues/574)): Amendment 7 `isAdrEvolutionPr(title)` 필터의 PR 제목 명명 규칙 묵시적 의존 (`Amendment N` / `hotfix` / `release vX`). 개발자 실수로 다른 형태 제목 작성 시 자기참조 인플레이션 재발. agy 권고: Semantic PRs Linter 등 CI 수준 강제. 본 PR 비-범위 (Amendment 7 영역).
+- **호출 전 Claude 편향 셀프 체크 4종 (모두 통과)**:
+  - (a) 낙관적 일정 → ✓ developer 단계 라인 수 예측 240-340 라인 박제 + 회귀 가드 4축 검증 의무 박제 (단순 추가 작업 가정 회피)
+  - (b) 결합 간과 → ✓ Phase 2 진행률 차원 (#5) ↔ drift 파일 수 차원 (#6) 직교 박제. 동시 발화 시 우선순위 명시 (Phase 2 강제 우위)
+  - (c) 폐기 프레이밍 → ✓ Amendment 8 (데코레이터 fail-fast) 폐기 아님. 보완 (drift 카운트 soft-warn 추가 차원) — 양립
+  - (d) 순수주의 → ✓ "alert fatigue 가드가 alert fatigue 만든다" 도그마 회피 — N=10 baseline buffer 4 실측 + 중복 방지 + 월 cron 빈도 제한으로 완화 박제
+
