@@ -40,13 +40,16 @@ export function TimeControls() {
   const isReverse = scale < 0;
 
   return (
-    <div className="flex items-center gap-2" data-testid="time-controls">
+    <div
+      className="flex items-center gap-2 overflow-x-auto whitespace-nowrap max-w-full"
+      data-testid="time-controls"
+    >
       <div className="flex items-center gap-1">
         <button
           type="button"
           data-testid="time-reverse"
           onClick={() => setScale(-Math.abs(scale || timeApi.TimeScalePreset.DAY_PER_SEC))}
-          className={`p-1 rounded-sm border transition-colors ${
+          className={`p-1 rounded-sm border transition-colors min-w-6 min-h-6 shrink-0 ${
             isReverse
               ? 'bg-primary/20 border-primary/40 text-fg-primary'
               : 'bg-bg-surface/80 border-border-subtle text-fg-secondary hover:bg-bg-elevated'
@@ -59,7 +62,7 @@ export function TimeControls() {
           type="button"
           data-testid={isPaused ? 'time-play' : 'time-pause'}
           onClick={isPaused ? play : pause}
-          className="p-1 rounded-sm border bg-bg-surface/80 border-border-subtle text-fg-primary hover:bg-bg-elevated transition-colors"
+          className="p-1 rounded-sm border bg-bg-surface/80 border-border-subtle text-fg-primary hover:bg-bg-elevated transition-colors min-w-6 min-h-6 shrink-0"
           aria-label={isPaused ? '재생' : '일시정지'}
         >
           {isPaused ? <Play size={14} /> : <Pause size={14} />}
@@ -68,7 +71,7 @@ export function TimeControls() {
           type="button"
           data-testid="time-forward"
           onClick={() => setScale(Math.abs(scale || timeApi.TimeScalePreset.DAY_PER_SEC))}
-          className={`p-1 rounded-sm border transition-colors ${
+          className={`p-1 rounded-sm border transition-colors min-w-6 min-h-6 shrink-0 ${
             !isReverse && !isPaused
               ? 'bg-primary/20 border-primary/40 text-fg-primary'
               : 'bg-bg-surface/80 border-border-subtle text-fg-secondary hover:bg-bg-elevated'
@@ -88,7 +91,7 @@ export function TimeControls() {
               type="button"
               data-testid={`time-preset-${p.label}`}
               onClick={() => setScale((isReverse ? -1 : 1) * p.value)}
-              className={`num text-caption px-2 py-0.5 rounded-xs border transition-colors ${
+              className={`num text-caption px-2 py-0.5 rounded-xs border transition-colors min-w-6 min-h-6 shrink-0 ${
                 active
                   ? 'bg-primary/20 border-primary/40 text-fg-primary'
                   : 'bg-transparent border-border-subtle text-fg-secondary hover:bg-bg-elevated'
