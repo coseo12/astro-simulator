@@ -1,13 +1,22 @@
 name: ADR 20260515 Z Pattern Health Metric
 
-# ADR 20260515 Z 패턴 §재검토 조건 #5 자동 발화 가드.
+# ADR 20260515 Z 패턴 §재검토 조건 #5/#6/#7 자동 발화 가드.
 #
-# 매주 월요일 09:00 KST (UTC 00:00) 에 verify-z-pattern-health.mjs 를 실행.
+# 매주 월요일 09:00 KST (UTC 00:00) 에 verify-z-pattern-health.mjs 외 4 가드 실행.
 # 3중 OR 임계값 (Amendment 1+2 정합) 발화 시 [ADR Trigger] 이슈 자동 생성.
 #
 # workflow_dispatch 2단계 함정 (volt #69):
 #   - workflow_dispatch 는 default branch (develop) 반영 후에만 discover 됨
 #   - 본 PR 머지 후 D2/D3 검증은 develop 반영 후 1회 수동 실행으로 수행
+#
+# CI exit code 계약 SSoT (ADR §CI exit code 계약, #558 박제):
+#   - 가드 스크립트 exit 0 → workflow PASS (warn 없음, 이슈 생성 없음)
+#   - 가드 스크립트 exit 1 → 자동 이슈 생성 + workflow `exit 0` (CI PASS, soft-warn 옵션 A 채택)
+#   - 가드 스크립트 exit 2 → workflow `exit 1` (CI FAIL, hard-block — 환경 진단 의무)
+#
+# Soft-warn 옵션 A 채택 근거: 1인 운영 silent 가드 약화 트레이드오프 (Amendment 2 SSoT 답습)
+# + Amendment 8/9/10/11/12 silent 가드 비대칭 정합 (데코레이터 누락만 fail-fast, 그 외 soft-warn).
+# Hard-block 예외 (exit 2) 는 가드 자체 작동 보장 차원.
 
 # YAML 1.1 'on:' → boolean True 함정 — quote 로 string key 강제 (volt 캡처 후보)
 "on":
