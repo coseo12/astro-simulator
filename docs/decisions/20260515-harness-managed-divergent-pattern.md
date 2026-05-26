@@ -101,6 +101,32 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 - **Phase 2 진행률 health metric** — `Phase 2 PR 제출 횟수 / Phase 1 적용 횟수 ≥ 33%` (≥ 1/3, Amendment 1 박제). 미달 시 §재검토 조건 #5 트리거 후보
 - **실측 (2026-05-16)**: Phase 1 = 6회 누적 (#463/#469/#470/#471/#477/#479), Phase 2 = 0회 → 0/6 = 0% → §재검토 조건 #5 트리거 충족
 
+### CI exit code 계약 (workflow 동작 SSoT, [#558](https://github.com/coseo12/astro-simulator/issues/558))
+
+자동 탐지 workflow `.github/workflows/adr-z-pattern-health-v2.yml` 가 발화하는 가드 스크립트 (`verify-z-pattern-health.mjs`, `verify-harness-drift-decorator.mjs --mode={count-warn|sidecar-cleanup|todo-aging}`, `resolve-harness-drift-todo.mjs`) 의 exit code → CI 동작 매핑 SSoT:
+
+| 가드 스크립트 exit | 의미 | workflow 동작 | CI 결과 |
+|---|---|---|---|
+| **0** | 정상 (모든 임계값 미발화) | warn 없음, 자동 이슈 생성 없음 | **PASS** |
+| **1** | 트리거 발화 (임계값 도달/초과 — soft-warn) | `[<Trigger>] issue` 자동 생성 (중복 방지 `gh issue list --search`) + workflow `exit 0` | **PASS** (soft-warn 옵션 A 채택) |
+| **2** | 실행 에러 (gh CLI 실패 / 파일 부재 / 환경 문제) | `exit 1` | **FAIL** (hard-block — 환경 진단 의무) |
+
+**결정: 옵션 A (Soft-warn)** 채택. 근거:
+- **현재 운영 사실 답습** — 2026-05-25 Amendment 7 (PR #555) 시점부터 옵션 A 사실상 운영 중 (workflow 가 자동 이슈 생성 후 CI `exit 0` 박제). 본 §섹션은 **운영 사실의 SSoT 명시 박제** (행동 변화 0)
+- **Amendment 2 silent 가드 약화 SSoT 정합** — 1인 운영 현실 (silent 가드 약화 트레이드오프 수용) 답습. Hard-block (옵션 B) 시 Phase 2 머지 압력 폭증 → Amendment 2/9/10/11/12 §결정점 4 silent 가드 약화 vs 강화 비대칭 정합 위반
+- **Amendment 1 점진적 진화 SSoT 정합** — Phase 2 (upstream 기여) 누적 단계적 진화 답습. Hybrid (옵션 C, 90일 hard-block 에스컬레이션) 는 Amendment 11 §교차검증 §기각한 외부 모델 제안 (agy 60일 hard-block) 답습 거부 패턴 정합
+- **Silent 가드 비대칭 의도적** (Amendment 8/9/10/11/12 SSoT 답습) — 데코레이터 누락 (Amendment 8) = fail-fast, 그 외 (drift 카운트 / TODO 해소 / sidecar-cleanup / TODO Aging) = soft-warn
+
+**예외 (Hard-block 유지)**: exit 2 (실행 에러) 는 환경 진단 의무 차원으로 hard-block 유지 — 가드 자체 작동 보장 차원 (Amendment 8 §결정점 3a 정합).
+
+**Amendment 9/10/11/12 발화 마커 일관성** (자동 이슈 생성 트리거 stdout 마커 SSoT):
+- `[ADR Trigger]` — Amendment 7 §재검토 조건 #5 발화 (Phase 2 진행률)
+- `[Alert Fatigue Trigger]` — Amendment 9 §재검토 조건 #6 발화 (drift 카운트)
+- `[Phase 2 Sync Required]` — Amendment 8 §결정점 3b 발화 (Phase 2 중도 변경)
+- `[TODO Resolution Suggested]` — Amendment 10 §결정점 3 발화 (TODO 해소 매칭)
+- `[Sidecar Cleanup — Dry Run]` / `[Sidecar Cleanup — Apply]` — Amendment 11 §결정점 3 발화 (sidecar 라이프사이클)
+- `[TODO Aging Trigger]` — Amendment 12 §결정점 4 발화 (TODO 시간 누적)
+
 ## 참고
 
 - 선행 ADR: `20260419-prettier-harness-conflict.md` — formatter 컨벤션 충돌 (drift 의 1차 변형, prettier 재포맷)
