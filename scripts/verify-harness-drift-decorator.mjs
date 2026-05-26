@@ -4,10 +4,19 @@
  * verify-harness-drift-decorator.mjs
  *
  * ADR 20260515 Amendment 8 (#556) Phase 1 드리프트 가시화 가드.
+ * ADR 20260515 Amendment 9 (#557) 경고 피로감 가드 (활성 drift ≥ N=10 soft-warn).
  *
  * `.harness/manifest.json` 의 sha256 와 실제 파일 sha256 를 비교해 drift 감지.
  * drift 파일에 HARNESS-DRIFT 데코레이터 (Z-PATTERN [upstream-link-or-TODO]) 박제
  * 검증. 누락 시 exit 1 (fail-fast — Amendment 8 §결정점 4 silent 가드 강화 방향).
+ *
+ * Amendment 9 (#557) — 두 모드 분기:
+ *   --mode=verify (기본) — Amendment 8 데코레이터 가드 (fail-fast)
+ *   --mode=count-warn — Amendment 9 경고 피로감 가드 (soft-warn, exit 0 + stdout 마커)
+ *
+ * 비대칭 의도적 (ADR §Amendment 9 §결정점 4):
+ *   - 데코레이터 누락 = fail-fast (예방 비용 < 1줄, 컨벤션 강제)
+ *   - drift 카운트 초과 = soft-warn (사용자 결정 분기 의무 — Phase 2 가속 / 일부 revert / N 재조정)
  *
  * 본문 형식 SSoT (ADR §Amendment 8):
  *   HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]
@@ -30,16 +39,26 @@
  *   - orphan sidecar (본 파일 없음 OR drift 해소된 상태) 발견 시 exit 1
  *
  * 호출:
- *   node scripts/verify-harness-drift-decorator.mjs
+ *   node scripts/verify-harness-drift-decorator.mjs [--mode=verify|count-warn]
+ *
+ *   --mode=verify (기본, Amendment 8):
  *     → drift 0 또는 모든 drift 파일에 데코레이터 정합 박제 → exit 0
  *     → drift N + 데코레이터 누락 K (K > 0) → exit 1 (CI hard-fail)
  *     → manifest 파일 부재 / 실행 에러 → exit 2
  *
+ *   --mode=count-warn (Amendment 9):
+ *     → 활성 drift 파일 수 산출 + N=10 임계 비교 (orphan 제외)
+ *     → drift < N → exit 0 (정상, stdout: "alert fatigue: OK")
+ *     → drift ≥ N → exit 0 + stdout 에 "[Alert Fatigue Trigger]" 마커 + drift 파일 목록 박제
+ *       (soft-warn — CI workflow 가 stdout 파싱하여 자동 이슈 생성)
+ *
  * Self-test:
  *   node scripts/verify-harness-drift-decorator.mjs --self-test
  *     → 인라인 positive/negative/recovery 3중 시뮬레이션 + sidecar/regex 단위 검증
+ *     → Amendment 9 boundary 시뮬레이션 (N-1 / N / N+1) 3 cases
  *
- * 관련: ADR docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8
+ * 관련:
+ *   - ADR docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8 / §Amendment 9
  */
 import { createHash } from 'node:crypto';
 import {
@@ -55,6 +74,15 @@ import { join, dirname, basename, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const MANIFEST_PATH = '.harness/manifest.json';
+
+// Amendment 9 (#557) — 경고 피로감 가드 임계값 SSoT.
+// baseline 6 (2026-05-26 develop tip) + buffer 4 = N=10.
+// Amendment 2 N=10 (Phase 1 회차) 와 동일 N — 차원만 다름 (drift 파일 수 ↔ Phase 1 회차).
+// 변경 금지 (ADR §Amendment 9 §결정점 1 박제값).
+const ALERT_FATIGUE_THRESHOLD_N = 10;
+
+// stdout 마커 — CI workflow 가 grep 으로 파싱하여 자동 이슈 생성 트리거.
+const ALERT_FATIGUE_MARKER = '[Alert Fatigue Trigger]';
 
 // Amendment 8 SSoT regex — 위치 A (파일 첫 줄 + shebang/DOCTYPE/YAML frontmatter 1블록 허용).
 // 형식별 분기: `<!--` (md) / `//` (ts/js/mjs) / `#` (yml/sh)
@@ -215,6 +243,28 @@ function runVerify(rootDir = '.') {
   return { drifts: drifts.length, passed, failed, orphans };
 }
 
+/**
+ * Amendment 9 (#557) — 활성 drift 파일 수 카운트 + N=10 임계 비교 (soft-warn).
+ *
+ * ADR §Amendment 9 §결정점 5: orphan sidecar 제외, 활성 drift 파일 수만 카운트.
+ * 근거: orphan 은 Amendment 8 fail-fast 가드가 이미 처리. 본 가드는 "Z 패턴 활성 적용 누적"
+ * 측정이 본질 — drift 파일 수가 정합.
+ *
+ * @param {string} rootDir
+ * @returns {{count: number, threshold: number, exceeded: boolean, files: string[]}}
+ */
+function runCountWarn(rootDir = '.') {
+  const drifts = detectDriftFiles(rootDir);
+  const count = drifts.length;
+  const exceeded = count >= ALERT_FATIGUE_THRESHOLD_N;
+  return {
+    count,
+    threshold: ALERT_FATIGUE_THRESHOLD_N,
+    exceeded,
+    files: drifts.map((d) => d.file),
+  };
+}
+
 // =============================================================================
 // Self-test (인라인 단위 검증 — D1 3중 시뮬레이션)
 // =============================================================================
@@ -333,6 +383,70 @@ function runSelfTest() {
       orphanScan.orphans.length >= 1,
       JSON.stringify(orphanScan.orphans),
     );
+
+    // --- Amendment 9 (#557) boundary 시뮬레이션 (N-1 / N / N+1) ---
+    // ADR §Amendment 9 §회귀 가드 (2) 3중 시뮬레이션 (positive → negative → recovery)
+    //
+    // 임계 ALERT_FATIGUE_THRESHOLD_N=10 기준 boundary cases:
+    //   - N-1 (drift=9) → exceeded=false (정상)
+    //   - N   (drift=10) → exceeded=true (경계 발화)
+    //   - N+1 (drift=11) → exceeded=true (초과 발화)
+    // 가상 manifest 에 K 개 파일 등록 + sha 불일치로 K drift 인위 발생.
+    const cwTmp = mkdtempSync(join(tmpdir(), 'harness-drift-cw-'));
+    try {
+      const cwHarnessDir = join(cwTmp, '.harness');
+      mkdirSync(cwHarnessDir, { recursive: true });
+
+      function setupDriftFiles(k) {
+        const files = {};
+        for (let i = 0; i < k; i++) {
+          const name = `cw-mock-${i}.md`;
+          writeFileSync(join(cwTmp, name), `content ${i}\n`);
+          // 의도적으로 sha 불일치 (실제 sha 와 다른 값 박제) → drift 발생
+          files[name] = { sha256: String(i).padStart(64, '0') };
+        }
+        writeFileSync(join(cwHarnessDir, 'manifest.json'), JSON.stringify({ files }));
+      }
+
+      // case 1: N-1 (drift=9, threshold=10) → exceeded=false
+      setupDriftFiles(9);
+      const cwBelow = runCountWarn(cwTmp);
+      expect(
+        'count-warn N-1 (drift=9): exceeded=false',
+        cwBelow.count === 9 && cwBelow.threshold === 10 && cwBelow.exceeded === false,
+        JSON.stringify(cwBelow),
+      );
+
+      // case 2: N (drift=10, threshold=10) → exceeded=true (경계 발화)
+      // 정리 후 다시 set up
+      for (let i = 0; i < 9; i++) rmSync(join(cwTmp, `cw-mock-${i}.md`));
+      setupDriftFiles(10);
+      const cwBoundary = runCountWarn(cwTmp);
+      expect(
+        'count-warn N (drift=10): exceeded=true',
+        cwBoundary.count === 10 && cwBoundary.threshold === 10 && cwBoundary.exceeded === true,
+        JSON.stringify(cwBoundary),
+      );
+
+      // case 3: N+1 (drift=11, threshold=10) → exceeded=true (초과 발화)
+      for (let i = 0; i < 10; i++) rmSync(join(cwTmp, `cw-mock-${i}.md`));
+      setupDriftFiles(11);
+      const cwAbove = runCountWarn(cwTmp);
+      expect(
+        'count-warn N+1 (drift=11): exceeded=true',
+        cwAbove.count === 11 && cwAbove.threshold === 10 && cwAbove.exceeded === true,
+        JSON.stringify(cwAbove),
+      );
+
+      // files 목록이 박제되는지 검증 (CI workflow 가 stdout 파싱하여 자동 이슈 본문 박제)
+      expect(
+        'count-warn files list: 11 entries',
+        Array.isArray(cwAbove.files) && cwAbove.files.length === 11,
+        `files.length=${cwAbove.files?.length}`,
+      );
+    } finally {
+      rmSync(cwTmp, { recursive: true, force: true });
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -346,12 +460,70 @@ function runSelfTest() {
 // CLI entrypoint
 // =============================================================================
 
+/**
+ * Amendment 9 (#557) — CLI 인자 파싱 헬퍼 (`--mode=verify|count-warn`).
+ * 기본값 'verify' (Amendment 8 기존 동작 회귀 0 보장).
+ */
+function parseMode(args) {
+  const flag = args.find((a) => a.startsWith('--mode='));
+  if (!flag) return 'verify';
+  const value = flag.slice('--mode='.length);
+  if (value !== 'verify' && value !== 'count-warn') {
+    console.error(`ERROR: invalid --mode value: ${value} (expected: verify | count-warn)`);
+    process.exit(2);
+  }
+  return value;
+}
+
+/**
+ * Amendment 9 (#557) — count-warn 모드 실행.
+ * soft-warn 동작: exit 0 + stdout 마커 박제 (CI workflow grep 파싱용).
+ */
+function mainCountWarn() {
+  try {
+    const { count, threshold, exceeded, files } = runCountWarn('.');
+    console.log(`harness drift files: ${count}`);
+    console.log(`alert fatigue threshold (N): ${threshold}`);
+
+    if (!exceeded) {
+      console.log(`alert fatigue: OK (drift ${count} < N=${threshold})`);
+      process.exit(0);
+    }
+
+    // soft-warn 발화 — CI workflow 가 grep "[Alert Fatigue Trigger]" 로 감지
+    console.log('');
+    console.log(`${ALERT_FATIGUE_MARKER} drift ${count} >= N=${threshold}`);
+    console.log('drift files:');
+    for (const f of files) {
+      console.log(`  - ${f}`);
+    }
+    console.log('');
+    console.log('조치 (ADR 20260515 §Amendment 9 §결정점 2 옵션 A):');
+    console.log('  3 영업일 내 [Alert Fatigue Trigger] discussion 이슈 결정 분기 의무.');
+    console.log('  옵션: (1) Phase 2 가속 — 점진 drift 해소');
+    console.log('       (2) 일부 Phase 1 revert — 긴급 정리');
+    console.log('       (3) N 임계값 재조정 — Amendment 2/7 silent 약화 사이클 답습 (신중)');
+    // soft-warn — exit 0 유지 (CI hard-block 아님, Amendment 8 §결정점 3b 옵션 A 정합)
+    process.exit(0);
+  } catch (err) {
+    console.error(`ERROR: ${err.message}`);
+    process.exit(2);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.includes('--self-test')) {
     process.exit(runSelfTest());
   }
 
+  const mode = parseMode(args);
+  if (mode === 'count-warn') {
+    mainCountWarn();
+    return;
+  }
+
+  // mode === 'verify' (기본) — Amendment 8 데코레이터 가드 (fail-fast)
   try {
     const { drifts, passed, failed, orphans } = runVerify('.');
     console.log(`harness drift files: ${drifts}`);
@@ -398,4 +570,7 @@ export {
   verifyDecorator,
   detectOrphanSidecars,
   runVerify,
+  runCountWarn,
+  ALERT_FATIGUE_THRESHOLD_N,
+  ALERT_FATIGUE_MARKER,
 };
