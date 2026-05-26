@@ -229,6 +229,18 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - 상세 (증상 / 즉시 복구 절차 / formatter 재포맷 drift / 버전 이력): [docs/lessons/manifest-partial-failure-recovery.md](docs/lessons/manifest-partial-failure-recovery.md)
 - 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴
 
+### Z 패턴 TL;DR (3단계 카드)
+
+harness-managed 파일에 프로젝트 고유 행동 규칙을 추가/수정할 때 3단계 워크플로 (ADR `20260515-harness-managed-divergent-pattern.md` 정합):
+
+1. **Phase 1 — 본 프로젝트 선반영 (Y 경로)**: feature 브랜치에서 파일 직접 수정 + PR `Closes #N` 박제 (`.harness/manifest.json` 미수정). 데코레이터 의무 (Amendment 8): `HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]` 박제. `.json` 은 sidecar `<filename>.HARNESS-DRIFT.md`
+2. **Phase 2 — upstream 기여 (X 경로)**: coseo12/harness-setting 에 동일 변경 PR 동시 제출 (cross-link 박제 — 본 프로젝트 PR title 에 본 프로젝트 이슈 `#N` ref 포함 의무, Amendment 10 자동 해소 정합)
+3. **Phase 3 — 본 프로젝트 동기화 (Z 완성)**: upstream 머지 후 `harness update --apply-all-safe` 자동 동기화 → drift 해소 + `[TODO]` → upstream PR URL 자동 교체 (Amendment 10). sidecar 잔존 시 `verify-harness-drift-decorator.mjs --mode=sidecar-cleanup --apply` 로 정리 (Amendment 11)
+
+silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (drift 카운트 soft-warn) + Amendment 10 (TODO 해소 자동화) + Amendment 11 (sidecar 라이프사이클) + Amendment 12 (TODO Aging soft-warn).
+
+- 상세: [docs/decisions/20260515-harness-managed-divergent-pattern.md](docs/decisions/20260515-harness-managed-divergent-pattern.md) §결정 + §Amendment 1~12
+
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 sub-agent(dev/qa 페르소나 등) 는 **검증** 까지는 신뢰하되 **박제** (커밋/푸시/PR 생성/`gh pr comment`/auto-close) 는 신뢰하지 말 것. sub-agent 보고는 *의도* 이고 실제 외부 가시성은 별도. 메인이 `git log --oneline -1` / `gh pr view` / `gh issue view --json state` 로 직접 확인.
 
