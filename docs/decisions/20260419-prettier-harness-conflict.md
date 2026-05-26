@@ -80,3 +80,21 @@ PR #228 에서 `--bootstrap` 으로 매니페스트 baseline 을 로컬-포맷 �
 
 - **후보 A**: 버전업마다 수동 경로 업데이트 — volt #27 이 경고한 "조용한 drift" 패턴의 정확한 재연. 자동화 우선 원칙과 맞지 않음.
 - **후보 B**: upstream 과의 포맷 합의는 조직 경계 외(harness-setting 저장소 이슈). 프로젝트 단독 해결 범위 초과 + 대규모 PR 리스크.
+
+### markdownlint 등 정적 검사 도구 충돌 가능성 ([#559](https://github.com/coseo12/astro-simulator/issues/559) — 사전 박제)
+
+PR #555 (ADR 20260515 Amendment 7) cross-validate agy Antigravity 고유 발견 #4 후속 분리. 본 ADR 의 prettier 경계 drift 답습 패턴 적용 — 미래 markdownlint / stylelint / eslint markdown 플러그인 등 다른 정적 검사 도구 도입 시 동일 경계 위험.
+
+**경계 위험 가설 (markdownlint 도입 시 가정 — 본 프로젝트 현재 미도입)**:
+- harness-managed `.md` (`CLAUDE.md`, `.claude/agents/*.md`, `.claude/skills/*/SKILL.md` 등) 가 markdownlint 규칙 위반 시 local fix → harness sha256 drift (prettier 경계 drift 답습)
+- IDE 자동 fix on save 가 동일 함정 (volt #35 prettier 재포맷 경계 drift 답습)
+
+**예방 가드 (도입 시점 박제 의무)**:
+1. **`.markdownlintignore` 매니페스트 동기화**: `scripts/sync-prettierignore.mjs` 패턴 답습 — manifest 의 harness-managed 경로를 `.markdownlintignore` 의 `# --- harness-managed ---` 블록으로 자동 동기화 (`sync-prettierignore.mjs` 일반화 또는 신규 `sync-markdownlintignore.mjs`)
+2. **CI drift 가드**: `.github/workflows/markdownlintignore-drift.yml` 신설 — `--check` 모드로 drift 차단 (`prettierignore-drift.yml` 답습)
+3. **운영 의무**: `harness update --apply-*` 직후 `pnpm sync:markdownlintignore` 실행 후 동일 커밋에 포함 (prettier 정합 의무 답습)
+4. **데코레이터 의무**: ADR `20260515` Amendment 8 의 HARNESS-DRIFT 데코레이터가 markdownlint 규칙 (`MD041: first-line-h1` / `MD013: line-length` 등) 위반 시 → `.markdownlint.json` 의 `default: false` 또는 inline disable (`<!-- markdownlint-disable -->`) 박제 가이드 필요
+
+**현재 박제 상태 (2026-05-27)**: 본 프로젝트 markdownlint 미도입. 본 §섹션은 미래 도입 시점 SSoT 박제 (사전 가드, 도입 PR 시 본 §섹션 참조 의무).
+
+**관련 후속 분리**: [#578](https://github.com/coseo12/astro-simulator/issues/578) (Prettier 정합성 자동 교차 검증) — Amendment 12 영역 / 본 §섹션 (markdownlint) 영역 직교. 둘 다 미래 도입 시점 박제.
