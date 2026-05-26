@@ -720,3 +720,171 @@ orphan sidecars: 0
   - (c) 폐기 프레이밍 → ✓ Amendment 8 의 `[TODO]` 허용 (Phase 1 단독 머지) 폐기 아님. 보완 (사후 해소 자동화 추가) — 양립
   - (d) 순수주의 → ✓ "자동 봇 + CLI 도우미 둘 다 도입" agy 광범위 권고 도그마 회피 — baseline 6 파일 systemic leak 실측 + 단일 wrapper CLI + verifyPhase2Sync 확장 (precision 정정) 채택
 
+## Amendment 11 — 2026-05-26
+
+상태: Accepted (cross-validate 2026-05-26 통합 완료)
+
+- **발의**: [#572](https://github.com/coseo12/astro-simulator/issues/572) (Amendment 9 PR [#575](https://github.com/coseo12/astro-simulator/pull/575) cross-validate agy Antigravity 고유 발견 #1 후속 분리, 2026-05-26)
+- **근거** (cross-validate 원문 인용):
+  > Amendment 8에서 orphan sidecar를 방지하기 위한 계약을 명시했으나, Phase 3에서 `harness update --apply-all-safe`가 실행되어 drift가 해소될 때, sidecar 파일(`<filename>.HARNESS-DRIFT.md`)이 자동으로 삭제되는 메커니즘이 구체적으로 정의되어 있지 않습니다. 수동 삭제에 의존할 경우 orphan sidecar가 남을 확률이 높습니다.
+- **추가 근거** (Amendment 10 §교차검증 반영 사항 §고유 발견 1 인용 의무 박제값 — 본 Amendment 자리에서 해소):
+  > **agy 제안 A — Stale Sidecar Clean-up Guard**: `verify-harness-drift-decorator.mjs` 에 역방향 검증 추가 — `*.HARNESS-DRIFT.md` 존재하지만 원본 파일 sha256 가 manifest 일치 (drift 해소) 또는 원본 부재 시 exit 1. ... #572 (Phase 3 sidecar 자동 삭제) architect 단계 SSoT 갱신 시 본 제안 인용 박제 의무
+
+### baseline 실측 (architect 박제 시점, develop tip db0ceca)
+
+`node scripts/verify-harness-drift-decorator.mjs` 실측:
+
+```
+harness drift files: 6
+decorator PASS: 6
+decorator FAIL: 0
+orphan sidecars: 0
+
+[OK] 모든 drift 파일에 데코레이터 정합 박제
+```
+
+`find . -name "*.HARNESS-DRIFT.md" -not -path "./node_modules/*"` 실측: **0건** (sidecar 파일 자체 부재 — Amendment 8 §변경 사항 1 의 "적용 빈도 < 5건 예상" 박제값 정합).
+
+- **현재 가드 상태**: `detectOrphanSidecars()` (라인 175~217) 가 이미 박제 — orphan 발견 시 exit 1 (verify 모드 fail-fast). 본 Amendment 11 는 **사용자 시점 자동화 (opt-in dry-run + --apply)** 영역 추가 (수동 정리 강제 vs 자동 정리 사이의 사용자 선택권 박제).
+
+### 변경 사항
+
+#### 1. `--mode=sidecar-cleanup` 신규 CLI 모드 (verify 스크립트 확장)
+
+- **위치 SSoT (결정점 1)**: `scripts/verify-harness-drift-decorator.mjs` 의 `parseMode()` 헬퍼에 `sidecar-cleanup` 옵션 추가 (Amendment 9 §결정점 3 단일 스크립트 통합 패턴 답습).
+  - 후보 A (`harness update --apply-all-safe` 후속 hook 통합) 거부: upstream harness-setting 영역 (#573) 의존 + 다운스트림 단독 해결 불가
+  - 후보 C (별도 신규 스크립트 `cleanup-orphan-sidecars.mjs`) 거부: 운영 부담 2배 — Amendment 8 §단점 / Amendment 9 §결정점 3 / Amendment 10 §결정점 1 답습 위반
+  - 후보 D (NO-OP — manual cleanup 권고) 거부: agy 발견 #1 의 "Phase 3 동기화 누적 시 자연 leak" 위험 박제값 무효화 + Amendment 10 §"systemic 누락 관찰" baseline 6 파일 leak 패턴 답습 위험 (1인 운영 매뉴얼 정리 누락 systemic)
+- **CLI 시그니처 SSoT**:
+  ```text
+  node scripts/verify-harness-drift-decorator.mjs --mode=sidecar-cleanup [--apply]
+  ```
+- **모드 동작 분기**:
+  - `--mode=verify` (기본, 무변경): orphan 발견 시 exit 1 (CI hard-fail) — Amendment 8 컨벤션 강제 정합 보존
+  - `--mode=count-warn` (Amendment 9, 무변경): drift 카운트 N=10 임계 soft-warn
+  - `--mode=sidecar-cleanup` **신규**: orphan 목록 stdout 출력 + `--apply` 미명시 시 exit 0 (dry-run) / `--apply` 명시 시 실제 삭제 + exit 0
+
+#### 2. 감지 휴리스틱 SSoT (결정점 2 — 기존 `detectOrphanSidecars()` 재사용)
+
+- **휴리스틱 무변경 보존**: 기존 `detectOrphanSidecars()` (라인 175~217) 가 검사 1+2 결합 박제 완료:
+  - 검사 1: `<filename>.HARNESS-DRIFT.md` 가 존재하나 원본 파일 부재 (`base file missing`)
+  - 검사 2: 원본 파일 존재하나 `harness doctor` drift 미감지 (`base file not in drift state (Phase 3 cleanup needed)`)
+- **단일화 박제**: `verify` 모드 / `sidecar-cleanup` 모드 양쪽이 동일 헬퍼 호출 — 휴리스틱 SSoT 단일화 (Amendment 8 §결정점 1 형식별 분기 SSoT 답습 패턴).
+- **신규 휴리스틱 추가 거부 근거**: cross-validate 권고는 sidecar 라이프사이클 자동화 영역으로 한정. 새 휴리스틱 (예: sidecar 본문 내 [TODO] 검사 등) 은 별 영역 (Amendment 10 / #577 TODO Aging Guard) 와 직교 — 본 PR 범위 밖.
+
+#### 3. 발화 형태 (결정점 3 — 옵션 C: --dry-run 기본 + --apply 분리)
+
+- **결정**: 옵션 C 채택. **Amendment 10 §결정점 3 패턴 답습** (사용자 인지 우선 + 부수효과 회피).
+- **dry-run 출력 형식 SSoT** (`--mode=sidecar-cleanup` 단독, `--apply` 미명시):
+  ```text
+  [Sidecar Cleanup — Dry Run] orphan sidecars detected: N
+    - <path/to/sidecar1.HARNESS-DRIFT.md> — base file missing
+    - <path/to/sidecar2.HARNESS-DRIFT.md> — base file not in drift state (Phase 3 cleanup needed)
+
+  조치 (ADR 20260515 §Amendment 11 §결정점 3):
+    --apply 명시 시 실제 삭제. 미명시 시 본 출력만 (exit 0).
+    수동 정리: rm <sidecar path>
+  ```
+- **--apply 실제 삭제 형식 SSoT** (`--mode=sidecar-cleanup --apply`):
+  ```text
+  [Sidecar Cleanup — Apply] orphan sidecars deleted: N
+    - <path/to/sidecar1.HARNESS-DRIFT.md> (base file missing)
+    - <path/to/sidecar2.HARNESS-DRIFT.md> (base file not in drift state)
+  ```
+- **옵션 A (자동 즉시 삭제, hard-action) 거부**: `--apply` 분리 없으면 사용자가 의도치 않은 sidecar 삭제 회수 불가. Amendment 10 §결정점 3 dry-run 기본 패턴 위반.
+- **옵션 B (soft-warn 라벨 + 자동 코멘트, [Phase 2 Sync Required] 패턴) 거부**: sidecar 라이프사이클은 PR 자동 코멘트보다 **로컬 사전 정리 (Phase 3 동기화 직후 사용자 1회 호출)** 가 효율적. CI workflow 추가 운영 부담 회피.
+- **verify 모드 fail-fast 보존 근거**: orphan 발견 = Amendment 8 §sidecar 라이프사이클 계약 위반 = silent leak 차단 시점 사용자 인지 강제. fail-fast 유지가 컨벤션 강제 정합.
+
+#### 4. silent 가드 방향 (결정점 4 — fail-fast + opt-in 자동화 이중 박제)
+
+- **결정**: 비대칭 이중 박제. **verify 모드 = fail-fast / sidecar-cleanup 모드 = opt-in 자동화**.
+- **Amendment 8/9/10/11 비대칭 패턴 명문화 (SSoT)**:
+
+  | Amendment | 차원 | 가드 방향 | 동기 |
+  |---|---|---|---|
+  | 8 (#556) | 데코레이터 누락 | **fail-fast** (verify 모드) | 컨벤션 강제 (예방 비용 < 1줄) |
+  | 9 (#557) | drift 카운트 ≥ N=10 | **soft-warn** (count-warn 모드) | 1인 운영 alert fatigue 회피 |
+  | 10 (#569) | TODO 해소 | **soft-warn + opt-in 자동화** (resolve-todo wrapper) | 사후 행동 + Phase 2 머지 대기 |
+  | **11 (#572)** | **sidecar 라이프사이클** | **fail-fast (verify) + opt-in 자동화 (sidecar-cleanup)** | **silent leak 차단 (fail-fast) + 사용자 시점 정리 자동화 (opt-in)** |
+
+- **비대칭 의도적 — "silent leak 차단은 fail-fast, 사용자 시점 자동화는 opt-in dry-run 기본"**: Amendment 11 가 본 SSoT 박제 (이전 Amendment 들의 비대칭 박제값 통합).
+
+### silent 가드 강화 vs 약화 자기점검
+
+본 Amendment 11 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — verify 모드 fail-fast 동작 보존 + opt-in 자동화 신규 추가 (가시성 + 행동 규칙 강화)
+- ✓ **§결정 본문 / N 임계 / 90일 임계 변경 0** — 기존 silent 가드 본래 의도 보존. 측정 식 (Amendment 7) 변경 없음
+- ✓ **fail-fast (데코레이터 / verify 모드) vs soft-warn (drift 카운트 / TODO 해소) vs opt-in 자동화 (sidecar-cleanup) 3축 비대칭 의도적** — Amendment 8/9/10 답습. sidecar 라이프사이클은 본질적으로 "silent leak 차단 (즉시) + 사용자 시점 정리 (지연)" 이원 차원이므로 이중 박제 정합
+- ✓ **measurement-first 원칙 정합** — broad 권고 (자동 즉시 삭제 / hard-action) 가 아닌 precision 정정 (dry-run 기본 + --apply 명시) 채택. cross-validate 시점 baseline 실측 (sidecar 0 / orphan 0) 박제값 정합
+- ⚠ **발화 빈도 잠재 위험 최소** — 현재 sidecar 0 / Phase 3 동기화 빈도 < 월 1회 예상. opt-in 호출이므로 자동 발화 0 (사용자 명시 호출만)
+
+### 트레이드오프
+
+- **장점**:
+  - agy cross-validate 고유 발견 #1 의 "Phase 3 동기화 누적 시 자연 leak" 위험 영구 박제 해소
+  - Amendment 10 §교차검증 §고유 발견 1 의 "Stale Sidecar Clean-up Guard" 인용 의무 박제값 해소
+  - verify 모드 fail-fast 보존으로 silent leak 차단 정합 유지
+  - `--dry-run` 기본 + `--apply` 분리로 사용자 회수 가능성 확보 (Amendment 10 패턴 답습)
+  - 단일 스크립트 통합 (Amendment 9/10 정합) — 운영 부담 2배 회피
+- **단점 (잠재)**:
+  - 사용자 명시 호출 의존 — Phase 3 동기화 직후 호출 누락 시 orphan 누적 가능. 회피: verify 모드 fail-fast 가 다음 CI 시점 차단 (silent leak 차단 정합 보존). 자동화 강화는 미래 Amendment 후보로 보류 (현재 baseline 0 — 자동화 가치 미확보)
+  - `--apply` 실수 사용 시 의도치 않은 sidecar 삭제. 회피: orphan 휴리스틱이 매우 정확 (검사 1+2 결합), 정상 sidecar 는 삭제 대상 아님
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규 코드:
+  - `parseMode()` 헬퍼 확장 (`sidecar-cleanup` value 추가) — ~3-5 라인
+  - `mainSidecarCleanup()` 신규 함수 (`runVerify()` 호출 + orphans 분기 + `--apply` 분기 + stdout 박제) — ~30-50 라인
+  - `main()` 분기 추가 (`mode === 'sidecar-cleanup'`) — ~3-5 라인
+  - self-test 확장 (3중 시뮬레이션 — orphan 0 / orphan N dry-run / orphan N apply) — ~50-80 라인
+- CI workflow 변경: **0건** (sidecar-cleanup 는 opt-in CLI 모드 — CI 자동 실행 안 함). verify 모드 fail-fast 동작은 기존 workflow 정합 유지.
+- 데이터: 현재 develop sidecar 0건 / orphan 0건 (실측) → 본 Amendment 11 도입 시점 즉시 적용 가능한 cleanup 대상 0건. 미래 sidecar 추가 시점부터 가드 작동.
+- ADR Amendment 11 자체: 본 §섹션 ~140-180 라인 박제 완료
+- **총 예상 라인 수**: 220-320 라인 (스크립트 확장 + self-test + ADR)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "verify 스크립트 `--mode=sidecar-cleanup` 신규 — orphan sidecar 자동 정리 (dry-run 기본 / --apply 명시 시 실제 삭제)" (MINOR 릴리스 후보) — 단, 본 PR 은 ADR Amendment 만 박제 (CHANGELOG 미터치, developer 단계에서 추가)
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/verify-harness-drift-decorator.mjs --self-test` PASS 의무. sidecar-cleanup 모드 self-test 케이스 추가 의무.
+- **(2) 3중 시뮬레이션** (positive → negative → recovery):
+  - positive: orphan 0 → `--mode=sidecar-cleanup` 호출 → "no orphans" 출력 + exit 0
+  - negative: orphan 2 (base file missing / drift 해소) → `--mode=sidecar-cleanup` 호출 (dry-run) → 목록 출력 + 파일 잔존 + exit 0
+  - recovery: 동일 baseline → `--mode=sidecar-cleanup --apply` 호출 → 파일 삭제 확인 + exit 0 + 후속 verify 모드 호출 → orphan 0 + exit 0
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (architect 단계 의무) + 후속 developer/reviewer/qa 단계 페르소나가 동일 결론 (verify 스크립트 확장 / 휴리스틱 무변경 / opt-in dry-run / fail-fast + opt-in 이중 박제) 도출 검증
+- **(4) 메타 측정 도구 자기 적용 안정성**: 본 가드 도입 PR 자체는 ADR Amendment 만 박제 (코드 변경 0) — developer 단계 자기 검증 의무 (현재 sidecar 0 → CLI 호출 시 "no orphans" 자기 적용 안정 검증). 인공 sidecar 생성 후 dry-run / apply 안정성 self-test 박제 의무
+
+### cross-link
+
+- 본 Amendment, [#572](https://github.com/coseo12/astro-simulator/issues/572) 이슈 본문
+- cross-validate 원본 (Amendment 9 발의): `.claude/logs/cross-validate-architecture-20260526-161511.log` (PR #575 cross-validate agy 고유 발견 #1)
+- 직전 Amendment: [#569](https://github.com/coseo12/astro-simulator/issues/569) Amendment 10 (TODO 해소 자동화)
+- 인접 박제 의무 인용: Amendment 10 §교차검증 §고유 발견 1 (Stale Sidecar Clean-up Guard, agy 제안 A) — 본 Amendment 11 가 해소 자리
+- 자동화 스크립트: `scripts/verify-harness-drift-decorator.mjs` (`--mode=sidecar-cleanup` 신규 — developer 단계)
+- 휴리스틱 SSoT: 기존 `detectOrphanSidecars()` (라인 175~217 무변경)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" (volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107))
+- 비대칭 가드 패턴 SSoT (Amendment 8/9/10/11 통합): 본 §결정점 4 표
+- 후속 분리 영역 (본 PR 비-범위): [#573](https://github.com/coseo12/astro-simulator/issues/573) (Y-회귀 시 doctor mute — upstream 영역), [#577](https://github.com/coseo12/astro-simulator/issues/577) (TODO Aging Guard — 시간 누적 차원), [#578](https://github.com/coseo12/astro-simulator/issues/578) (Prettier 정합성 교차 검증)
+
+### 교차검증 반영 사항 (agy Antigravity, 2026-05-26)
+
+- **outcome**: `applied` (exit 0) — log `.claude/logs/cross-validate-architecture-20260526-184439.log`, outcome JSON `.claude/logs/cross-validate-architecture-20260526-184439-outcome.json` (plan_bypass=false, rollback_failed=false, reminder_issue="none")
+- **합의** (Claude 설계와 일치 — 6건, ADR 전반 + 본 Amendment 11 정당성 확인):
+  1. 구조적 완성도 "매우 우수" — Phase 1/2/3 closed-loop + 폴백 경로 (Y 회귀)
+  2. 기술 결정 타당성 "매우 합리적" — Z 패턴 + 1인 운영 임계 완화 + 측정 식 정정 + CI 가드 이원화 (fail-fast vs soft-warn)
+  3. 인터페이스 명확성 "우수" — 형식별 정적 계약 + regex SSoT
+  4. 확장성 "매우 유연" — regex 헤더 prefix (shebang / DOCTYPE / YAML frontmatter) 신규 stack 무수정 적용
+  5. 보안 "매우 안전" — trustless 영속화 (HARNESS-DRIFT 식별자 박제로 SAST/검수자 즉시 식별)
+  6. **§1 §보완 누락 구조 "사후 청소(Post-Cleanup) 자동화"** — agy 직접 인용: *"Phase 3가 완료되어 로컬 파일이 업스트림 버전으로 안전하게 덮어써지면 기존 로컬 파일에 삽입했던 `HARNESS-DRIFT` 데코레이터 주석이나 sidecar 파일(`.HARNESS-DRIFT.md`)은 무용지물이 됩니다. ... 사후 라이프사이클 단계가 모호합니다."* — **본 Amendment 11 정확히 해소 영역**. agy 가 §종합 결론에서 "제안한 세부 개선 사항(사후 청소 및 주석 유출 방지)만 보완된다면 프로덕션 환경에서 즉시 신뢰하고 적용할 수 있는 매우 강력한 아키텍처" 라고 본 Amendment 11 의 영구 박제 가치 직접 인정
+- **이견 수용 (본 PR 즉시 반영)**: 0건 — agy §3 §개선 (sidecar 라이프사이클 경계 명확화 — Phase 3 직후 찰나 CI 검증 타이밍) 가 본 §결정점 3 + §회귀 가드 4축 §(2) 3중 시뮬레이션 recovery 단계에 이미 박제됨 (sidecar-cleanup --apply 후 verify 모드 호출 → orphan 0 + exit 0). 추가 박제 불필요 (이미 영속화)
+- **Claude 재분석으로 기각한 외부 모델 제안**: 0건 — agy §6 누락 요소 1/2/3 모두 합리적이나 본 PR (Amendment 11 = sidecar 라이프사이클 자동화 단일 목표) 범위 밖 → 후속 분리 또는 이미 분리됨
+- **고유 발견 (후속 분리, volt #29 3단 프로토콜 — 3건)**:
+  1. **agy §6 누락 요소 1 — Upstream PR 데코레이터 오염 방지** (medium 후보, **신규 후속 분리 [#581](https://github.com/coseo12/astro-simulator/issues/581) 박제 예정 — 본 PR 비-범위**): Phase 2 (Upstream PR 제출) 시 다운스트림 로컬 데코레이터 (`HARNESS-DRIFT: Z-PATTERN [TODO]`) 가 upstream 레포에 오염 전파 위험. agy 권고: 자동 pre-commit filter 또는 PR 가이드라인 박제. 본 PR 비-범위 (#572 = sidecar 라이프사이클 단일 목표 + upstream 영역 인접 #573). **현재 영향도 측정 필요** (Phase 2 PR #248/#254/#257/#260 의 데코레이터 누출 여부 — developer 단계 또는 후속 분리 시 실측 박제 의무).
+  2. **agy §6 누락 요소 2 — Merge Conflict Runbook** (low 후보, **Amendment 5 영역**): Phase 3 `harness update --apply-all-safe` 실행 시 upstream 리뷰 피드백 반영으로 인한 자동 머지 충돌 대응 Runbook 부재. agy 권고: `harness doctor` + Git 3-way merge 결합 절차 박제. 본 PR 비-범위 (Amendment 5 upstream 리뷰 동기화 영역, sidecar 라이프사이클 직교). 후속 분리 검토 (현재 실측 빈도 0 — 우선순위 low).
+  3. **agy §6 누락 요소 3 — Linter (ESLint/markdownlint) 정합성 충돌** (low 후보, **기존 분리 [#578](https://github.com/coseo12/astro-simulator/issues/578) 영역 인접**): 데코레이터 주석 (`HARNESS-DRIFT: Z-PATTERN [TODO]`) 의 첫 줄 위치가 ESLint / markdownlint 의 autofix 규칙과 충돌 위험. agy 권고: CLAUDE.md Linter 정합성 통합 예외 처리 컨벤션 박제. 본 PR 비-범위 (#578 Prettier 정합성 영역 인접 — Amendment 10 §교차검증 §고유 발견 3 에서 이미 분리). 후속 #578 SSoT 갱신 시 본 제안 인용 박제 가능.
+- **호출 전 Claude 편향 셀프 체크 4종 (모두 통과)**:
+  - (a) 낙관적 일정 → ✓ developer 단계 라인 수 예측 220-320 라인 박제 + 회귀 가드 4축 검증 의무 박제 (단순 추가 작업 가정 회피). agy §3 §개선 (Phase 3 직후 찰나 CI 검증 타이밍) 박제 완료 (§회귀 가드 §(2) 3중 시뮬레이션 recovery 단계)
+  - (b) 결합 간과 → ✓ `verify` 모드 fail-fast (silent leak 차단) + `sidecar-cleanup` 모드 opt-in 자동화 (사용자 시점 정리) 책임 분리 박제. Amendment 8/9/10/11 비대칭 패턴 SSoT 통합표 박제로 미래 Amendment 와의 결합 위험 차단
+  - (c) 폐기 프레이밍 → ✓ Amendment 8 §sidecar 라이프사이클 계약 (fail-fast verify 모드) 폐기 아님. 보완 (opt-in 자동화 사용자 시점 정리 추가) — 양립
+  - (d) 순수주의 → ✓ "자동 즉시 삭제 (옵션 A) / soft-warn 라벨 + 자동 코멘트 (옵션 B) 둘 다 도입" agy 광범위 권고 도그마 회피 — baseline sidecar 0 / orphan 0 실측 + `--dry-run` 기본 + `--apply` 분리 (precision 정정) 채택. agy §종합 결론 직접 인정 가치 박제
+- **cross-validate 후속 분리 박제 의무 (volt #29 §3)**: 본 §고유 발견 1 (#581 박제 예정) 은 본 PR 머지 직후 즉시 후속 이슈 생성 의무. PM 단계로 전달 (architect → PM 인계 보고에 명시 박제)
