@@ -600,3 +600,123 @@ orphan sidecars: 0
   - (c) 폐기 프레이밍 → ✓ Amendment 8 (데코레이터 fail-fast) 폐기 아님. 보완 (drift 카운트 soft-warn 추가 차원) — 양립
   - (d) 순수주의 → ✓ "alert fatigue 가드가 alert fatigue 만든다" 도그마 회피 — N=10 baseline buffer 4 실측 + 중복 방지 + 월 cron 빈도 제한으로 완화 박제
 
+## Amendment 10 — 2026-05-26
+
+상태: Accepted (cross-validate 2026-05-26 통합 완료)
+
+- **발의**: [#569](https://github.com/coseo12/astro-simulator/issues/569) (Amendment 8 PR [#570](https://github.com/coseo12/astro-simulator/pull/570) cross-validate agy Antigravity 고유 발견 #1 후속 분리, 2026-05-26)
+- **근거** (cross-validate 원문 — log `.claude/logs/cross-validate-architecture-20260526-150418.log`):
+  - Phase 1에서 파일을 수정해 머지할 때 `TODO` 주석을 허용하지만, Phase 2 PR을 열어야만 생성되는 URL을 Phase 1 브랜치에 사후 업데이트하는 과정에서 **추가 커밋/PR 로 인한 CI 낭비 및 관리 오버헤드**가 생긴다.
+  - agy 구체 권고: 로컬 PR 머지 시 자동 코멘트를 달아주는 봇이나 혹은 `verifyPhase2Sync()` 과정에서 upstream PR 제목에 기재된 `[astro-simulator#이슈번호]` 정보를 감지하여, 로컬 파일의 `TODO` 를 자동으로 치환하는 가벼운 CLI 도우미 스크립트 제공.
+- **baseline 실측 (develop tip 7051dda, 2026-05-26)**:
+
+  ```text
+  HARNESS-DRIFT: Z-PATTERN [TODO] 잔존 파일: 6
+    - CLAUDE.md
+    - .claude/agents/pm.md
+    - .claude/agents/architect.md
+    - docs/phases/roadmap-v3-incremental.md
+    - .github/workflows/harness-guards.yml
+    - scripts/verify-z-pattern-health.mjs
+    (+ scripts/verify-harness-drift-decorator.mjs — 본 파일도 잠재 갱신 대상)
+  ```
+
+  - **systemic 누락 관찰**: Phase 2 PR (`coseo12/harness-setting` #248/#254/#257/#260) 가 이미 머지되었으나 다운스트림 `[TODO]` 갱신은 0건. Amendment 8 §단점 "사후 커밋 1회 의무" 가 1인 운영에서 자연 leak — 자동화 가치 검증된 사례
+
+### 변경 사항
+
+#### 1. `[TODO]` → upstream PR URL 자동 해소 메커니즘 (Phase 2 운영 절차 단계 2 보강)
+
+- **자동화 방식 (결정점 1 후보 A 채택)**: 기존 `scripts/verify-z-pattern-health.mjs` 의 `verifyPhase2Sync()` 확장. upstream open + merged PR 식별 + 다운스트림 `[TODO]` 잔존 파일 매칭 + PR URL 자동 갱신 (또는 stdout 안내) 통합
+  - **결정 근거**: Amendment 8 §단점 회피 정합 (운영 부담 2배 회피) + Amendment 9 §결정점 3 패턴 답습 (단일 스크립트 통합 = drift 검증 + 카운트 동일 입력)
+  - 후보 B (별도 신규 `scripts/resolve-harness-drift-todo.mjs`) 거부: 운영 부담 2배 + 스크립트 책임 분산
+  - 후보 C (CI 단계 자동 이슈 생성) 거부: Amendment 9 의 [Alert Fatigue Trigger] 자동 이슈가 이미 존재 — 동일 패턴 중복 발화 (alert fatigue 가속)
+- **매칭 휴리스틱 (결정점 2 후보 다 채택)**: upstream PR title prefix (`[#N]` 또는 `astro-simulator#N`) **AND** PR 변경 파일 경로 (`.claude/agents/reviewer.md` 등) 둘 다 매칭 시에만 자동 갱신
+  - **결정 근거**: false-positive 회피 — title 만 매칭하면 동일 이슈번호의 다른 영역 PR 오탐. 파일 경로만 매칭하면 동일 파일 변경의 다른 이슈 PR 오탐. 두 조건 AND 결합으로 precision ↑
+  - 후보 가 (title 만) 거부: upstream `.claude/agents/reviewer.md` 변경이 본 이슈와 무관한 PR 일 가능성
+  - 후보 나 (파일 경로 만) 거부: 동일 파일 변경 PR 이 N 개 존재 시 자동 매칭 불가능
+- **발화 형태 (결정점 3 채택)**: **soft-warn (Amendment 8/9 비대칭 정합 답습)** — 자동 갱신 PR 생성 (옵션 A) 또는 stdout 안내 (옵션 B). hard-fail 거부 (Phase 2 머지 직후 1~3 사이클 내 자연 해소 가능 + 1인 운영 부담 가속)
+  - **CLI 모드 분기**:
+    - `--mode=resolve-todo` (신규): `[TODO]` 잔존 파일 + upstream 매칭 PR 식별 → stdout 안내 + (CI 모드 시) PR 자동 생성
+    - `--mode=resolve-todo --dry-run` (기본 안전): stdout 만 (사용자 수동 확인 후 갱신)
+- **통합 위치 (결정점 4 채택)**: **기존 `verify-z-pattern-health.mjs` 의 `verifyPhase2Sync()` 확장 + 신규 wrapper CLI 도우미** (혼합 채택)
+  - `verifyPhase2Sync()` 에 `--include-todo-resolution` 옵션 추가 → upstream PR title/files 매칭 + `[TODO]` 매핑 결과 반환
+  - 신규 `scripts/resolve-harness-drift-todo.mjs` (60-100 라인) — 위 함수 호출 + 자동 갱신 또는 stdout 안내 (사용자 친화 인터페이스)
+  - **결정 근거**: `verifyPhase2Sync()` 코어 로직 재사용 (DRY) + wrapper CLI 가 사용자 직접 호출 인터페이스 제공 (개발자가 `pnpm verify:z-pattern` 으로 진단 가능)
+
+#### 2. ADR §운영 절차 갱신 (Phase 2 단계 2 보강)
+
+- Phase 2 단계 2 (데코레이터 link 교체) 에 자동 해소 도구 안내 박제 — `node scripts/resolve-harness-drift-todo.mjs --dry-run` 우선 실행 + 매칭 결과 확인 후 적용 명시
+- Amendment 8 §변경 사항 1 의 `[TODO]` 허용 사유 박제값 유지 — 본 가드는 사후 해소 자동화만, 사전 허용은 보존
+
+### silent 가드 강화 vs 약화 자기점검 (결정점 5 — 추가)
+
+본 Amendment 10 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — Amendment 8 §단점 "사후 커밋 1회 의무 leak" 가 systemic 으로 관찰됨 (baseline 6 파일 잔존). 자동화로 leak 차단 = 가시화 강화
+- ✓ **§결정 본문 / N 임계 / 90일 임계 변경 0** — 기존 silent 가드 본래 의도 보존. Amendment 8 의 `[TODO]` 허용 (Phase 1 단독 머지 시) 도 보존
+- ✓ **fail-fast (데코레이터) vs soft-warn (drift 카운트) vs soft-warn (TODO 해소) 3축 비대칭 의도적** — Amendment 8/9 답습. TODO 해소는 사후 행동이므로 hard-block 불가 (시점 차이 — Phase 1 PR 시점엔 upstream PR 미생성)
+- ✓ **measurement-first 원칙 정합** — agy broad 권고 (자동 봇 + CLI 도우미 둘 다) 가 아닌 baseline 실측 (6 파일 systemic leak) 기반 precision 정정 (단일 wrapper CLI + verifyPhase2Sync 확장)
+- ⚠ **발화 빈도 잠재** — `[TODO]` 매칭 알림이 월 cron 시점 매번 발화 시 alert fatigue 가속. 회피: 중복 방지 (이전 cron 의 stdout 마커 비교) + soft-warn 단발성 (PR 자동 생성 시 중복 방지)
+
+### 트레이드오프
+
+- **장점**:
+  - Amendment 8 §단점 "TODO → URL 교체 누락" systemic leak 차단 (baseline 6 파일 자동 해소 후보)
+  - upstream PR 식별 휴리스틱 (title AND 파일 경로) 정합성 강제 → false-positive 회피
+  - 기존 `verifyPhase2Sync()` 재사용 (DRY) + CLI wrapper 사용자 인터페이스 추가 — 운영 부담 최소화
+- **단점 (잠재)**:
+  - upstream PR 식별이 PR title 컨벤션 (`[#N]` / `astro-simulator#N`) 의존 — 컨벤션 위반 PR 자동 매칭 불가 (수동 fallback). 회피: #574 (PR title commitlint) 후속 분리 영역과 직교
+  - 자동 PR 생성 모드 (`--mode=resolve-todo` non-dry-run) 가 false-positive 갱신 시 revert 필요. 회피: 기본값 `--dry-run` + 사용자 수동 확인 후 적용
+  - `verifyPhase2Sync()` 의 git blob SHA (SHA-1) ≠ sha256 한계 (기존 박제) 상속 — 본 가드는 매칭만 수행, 실제 비교는 사용자에게 diff URL 안내
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규 코드:
+  - `scripts/resolve-harness-drift-todo.mjs` (신규 wrapper CLI, ~60-100 라인) — `verifyPhase2Sync()` 호출 + 매칭 결과 stdout 안내 / 자동 PR 생성 (dry-run 기본)
+  - `verifyPhase2Sync()` 확장 (`scripts/verify-z-pattern-health.mjs` 내): `--include-todo-resolution` 옵션 + upstream PR title/files 매칭 로직 추가 — ~30-50 라인
+  - self-test 확장: positive (title+파일 매칭) / negative (title 만 매칭 거부) / boundary (다중 PR 매칭) 3 cases — ~30-50 라인
+- CI workflow 변경: `.github/workflows/adr-z-pattern-health-v2.yml` 의 cron step 추가 (`resolve-harness-drift-todo.mjs --mode=resolve-todo` 호출 + 매칭 결과 자동 이슈/코멘트) — ~20-30 라인. **단** Amendment 9 의 [Alert Fatigue Trigger] 와 중복 방지 — 본 가드는 별도 마커 (`[TODO Resolution]`) + 중복 방지 (gh issue list `--search`) 박제 의무
+- ADR Amendment 10 자체: 본 §섹션 ~150-180 라인 박제 완료
+- 기존 6 파일 `[TODO]` 갱신: 본 가드 도입 후 첫 실행으로 자연 해소 예상 (baseline → 0 buffer 회복)
+- **총 예상 라인 수**: 290-410 라인 (스크립트 + workflow + ADR + 테스트)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "월 cron 시점 다운스트림 `[TODO]` 잔존 파일 + upstream 머지 PR 매칭 → 자동 해소 PR 생성 또는 stdout 안내 박제" (MINOR 릴리스 후보) — 단, 본 PR 은 ADR Amendment 만 박제 (CHANGELOG 미터치, developer 단계에서 추가)
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/resolve-harness-drift-todo.mjs --dry-run --self-test` PASS 의무
+- **(2) 3중 시뮬레이션** (positive → negative → recovery): TODO=6 (baseline) → upstream 매칭 4건 갱신 → TODO=2 잔존 (recovery) → 다음 cron 시 잔존 2건 재발화 시퀀스 self-test
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (architect 단계 의무) + 후속 developer/reviewer/qa 단계 페르소나가 동일 결론 (후보 A / 휴리스틱 다 / soft-warn / verifyPhase2Sync 확장) 도출 검증
+- **(4) 메타 측정 도구 자기 적용 안정성**: 본 가드 도입 PR 자체는 ADR Amendment 만 박제 (코드 변경 0) — developer 단계 자기 검증 의무 (실제 baseline 6 파일 → wrapper CLI 호출 후 매칭 결과 자기 적용 안정)
+
+### cross-link
+
+- 본 Amendment, [#569](https://github.com/coseo12/astro-simulator/issues/569) 이슈 본문
+- cross-validate 원본 (Amendment 8 발의): `.claude/logs/cross-validate-architecture-20260526-150418.log` (PR #570 — 본 #569 발의 cross-validate)
+- 직전 Amendment: [#557](https://github.com/coseo12/astro-simulator/issues/557) Amendment 9 (경고 피로감 가드, 활성 drift ≥ N=10 soft-warn)
+- 자동화 스크립트: `scripts/resolve-harness-drift-todo.mjs` (신규 wrapper — developer 단계), `scripts/verify-z-pattern-health.mjs` (확장 `verifyPhase2Sync()` — developer 단계)
+- CI workflow: `.github/workflows/adr-z-pattern-health-v2.yml` (확장, `[TODO Resolution]` step 추가 — developer 단계)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" (volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107))
+- 외부 모델 실측 가드: volt [#51](https://github.com/coseo12/volt/issues/51) (외부 툴 주장 실측 가드 — agy 자동 봇 + CLI 도우미 둘 다 권고 → baseline 실측 후 단일 wrapper CLI + verifyPhase2Sync 확장 정정 패턴 답습)
+- 후속 분리 영역 (본 PR 비-범위): [#572](https://github.com/coseo12/astro-simulator/issues/572) (Phase 3 sidecar 자동 삭제), [#573](https://github.com/coseo12/astro-simulator/issues/573) (Y-회귀 시 doctor mute — upstream 영역), [#574](https://github.com/coseo12/astro-simulator/issues/574) (PR title commitlint — Amendment 7 영역), [#577](https://github.com/coseo12/astro-simulator/issues/577) (TODO Aging Guard — agy cross-validate 제안 B, 시간 누적 차원), [#578](https://github.com/coseo12/astro-simulator/issues/578) (Prettier 정합성 교차 검증 — agy cross-validate 제안 C)
+
+### 교차검증 반영 사항 (agy Antigravity, 2026-05-26)
+
+- **outcome**: `applied` (exit 0) — log `.claude/logs/cross-validate-architecture-20260526-180552.log`, outcome JSON `.claude/logs/cross-validate-architecture-20260526-180552-outcome.json` (plan_bypass=false, rollback_failed=false, reminder_issue="none")
+- **합의** (Claude 설계와 일치 — 4건, ADR 전반 평가):
+  1. 구조적 완성도 "우수" — Phase 1/2/3 + 폴백 경로 (Y 회귀) closed-loop 설계
+  2. 기술 결정 타당성 "매우 타당함" — Z 패턴 채택 / 1인 운영 임계 완화 (Amendment 2/7) / JSON sidecar 도입 / 비대칭 가드 정책 (fail-fast vs soft-warn)
+  3. 확장성 "매우 우수" — regex 형식별 무관 + Amendment 단위 진화적 아키텍처
+  4. 보안 "우수" — HARNESS-DRIFT 식별자 박제로 정적 분석 도구 / 보안 검수자 즉시 식별 가능 (trustless 영속화 정합)
+- **이견 수용 (본 PR 즉시 반영)**: 0건 — agy 3 제안 모두 본 PR 비-범위 영역 (인접 가드 보완책)
+- **Claude 재분석으로 기각한 외부 모델 제안**: 0건 — agy 제안 A/B/C 모두 합리적이나 본 PR (#569 Amendment 10 = TODO 해소 자동화 단일 목표) 범위 밖 → 후속 분리
+- **고유 발견 (후속 분리, volt #29 3단 프로토콜 — 3건)**:
+  1. **agy 제안 A — Stale Sidecar Clean-up Guard** (medium 후보, **기존 분리 [#572](https://github.com/coseo12/astro-simulator/issues/572) 영역 인접**): `verify-harness-drift-decorator.mjs` 에 역방향 검증 추가 — `*.HARNESS-DRIFT.md` 존재하지만 원본 파일 sha256 가 manifest 일치 (drift 해소) 또는 원본 부재 시 exit 1. 본 PR 비-범위 (#569 = TODO 해소 자동화 단일 목표). #572 (Phase 3 sidecar 자동 삭제) architect 단계 SSoT 갱신 시 본 제안 인용 박제 의무
+  2. **agy 제안 B — TODO Aging Guard (시간 누적 가드)** (medium 후보, **신규 후속 분리 [#577](https://github.com/coseo12/astro-simulator/issues/577)**): `[TODO]` 토큰 발견 + develop/main 포함 + 최초 발견 7일 이상 경과 시 빌드 경고/실패. **본 PR Amendment 10 (매칭 자동화 차원) 과 차원 직교** — 시간 누적 차원 추가. 본 PR 비-범위 (단일 목표 + Amendment 9 silent 약화 사이클 답습 위험 회피).
+  3. **agy 제안 C — Prettier 포맷터 정합성 교차 검증** (low 후보, **신규 후속 분리 [#578](https://github.com/coseo12/astro-simulator/issues/578)**): `verify-harness-drift-decorator.mjs` 가 drift 판별 파일이 `.prettierignore` 패턴 내 포함되는지 교차 검증. 본 PR 비-범위 (`20260419-prettier-harness-conflict.md` ADR 별도 영역).
+- **호출 전 Claude 편향 셀프 체크 4종 (모두 통과)**:
+  - (a) 낙관적 일정 → ✓ developer 단계 라인 수 예측 290-410 라인 박제 + 회귀 가드 4축 검증 의무 박제 (단순 추가 작업 가정 회피)
+  - (b) 결합 간과 → ✓ `verifyPhase2Sync()` 확장 (코어) + wrapper CLI (인터페이스) 책임 분리 박제. Amendment 9 [Alert Fatigue Trigger] 와 별도 마커 [TODO Resolution] 분리 — 동시 발화 시 중복 차단 박제
+  - (c) 폐기 프레이밍 → ✓ Amendment 8 의 `[TODO]` 허용 (Phase 1 단독 머지) 폐기 아님. 보완 (사후 해소 자동화 추가) — 양립
+  - (d) 순수주의 → ✓ "자동 봇 + CLI 도우미 둘 다 도입" agy 광범위 권고 도그마 회피 — baseline 6 파일 systemic leak 실측 + 단일 wrapper CLI + verifyPhase2Sync 확장 (precision 정정) 채택
+
