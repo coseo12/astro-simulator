@@ -155,6 +155,68 @@ jobs:
           # soft-warn — workflow 자체는 항상 PASS (이슈 생성으로 알림)
           exit 0
 
+      # Amendment 10 (#569) — [TODO] → upstream PR URL 자동 해소 (soft-warn).
+      # resolve-harness-drift-todo.mjs --dry-run 으로 매칭 검색 후 stdout 마커 감지 시
+      # [TODO Resolution Suggested] 자동 코멘트 박제 (CI fail 아님, ADR §Amendment 10 §결정점 3 정합).
+      - name: Detect [TODO] resolution candidates (soft-warn)
+        id: todo-resolve
+        run: |
+          set +e
+          node scripts/resolve-harness-drift-todo.mjs --dry-run | tee /tmp/todo-resolve-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          # stdout 에서 [TODO Resolution Suggested] 마커 감지
+          if grep -q "\[TODO Resolution Suggested\]" /tmp/todo-resolve-output.txt 2>/dev/null; then
+            echo "triggered=true" >> $GITHUB_OUTPUT
+            echo "=== TODO Resolution block ==="
+            cat /tmp/todo-resolve-output.txt
+          else
+            echo "triggered=false" >> $GITHUB_OUTPUT
+          fi
+          # soft-warn — workflow 자체는 항상 PASS (이슈 생성으로 알림)
+          exit 0
+
+      - name: Create [TODO Resolution Suggested] issue
+        if: steps.todo-resolve.outputs.triggered == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 중복 방지 — 동일 제목 OPEN 이슈 검색
+          EXISTING=$(gh issue list \
+            --search '"[TODO Resolution Suggested] ADR 20260515 Amendment 10" in:title' \
+            --state open --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "이미 [TODO Resolution Suggested] OPEN 이슈 존재 — 중복 생성 스킵"
+            exit 0
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          TODO_BLOCK=$(cat /tmp/todo-resolve-output.txt)
+
+          gh issue create \
+            --title "[TODO Resolution Suggested] ADR 20260515 Amendment 10 (자동 탐지 ${DATE})" \
+            --label "documentation,priority:medium" \
+            --body "## 배경
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health-v2.yml\` 의
+          Amendment 10 (#569) [TODO] → upstream PR URL 자동 해소 가드 발화. upstream merged PR 의
+          (title 이슈 ref AND 파일 경로) 매칭 후보 발견 — Phase 2 머지 직후 사후 해소 의무.
+
+          ## 매칭 결과
+          \`\`\`
+          ${TODO_BLOCK}
+          \`\`\`
+
+          ## 의무 (ADR §Amendment 10 §결정점 3 — soft-warn)
+          매칭 결과 검토 후:
+          - **자동 갱신**: \`node scripts/resolve-harness-drift-todo.mjs --apply\` (file write 수행)
+          - **수동 fallback**: 매칭 결과 잘못된 경우 \`--file=<path>\` 로 단일 파일 갱신 또는 수동 편집
+
+          ## Cross-link
+          - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\` §Amendment 10
+          - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
+          - 가드 스크립트: \`scripts/resolve-harness-drift-todo.mjs\` + \`scripts/verify-z-pattern-health.mjs\` (\`computeTodoResolutions()\`)
+          - 직전 Amendment: #557 (Amendment 9, [Alert Fatigue Trigger])"
+
       - name: Create [Alert Fatigue Trigger] issue
         if: steps.alert-fatigue.outputs.triggered == 'true'
         env:
