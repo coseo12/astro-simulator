@@ -311,7 +311,20 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 ### 트레이드오프
 
 - **장점**: false-positive 제거 + 다음 트리거 시점 정확화 + silent 가드 본래 효과 강화 + Phase 2 강제 부담 제거
-- **단점 (잠재)**: PR title 컨벤션 의존 — 향후 Amendment PR title 에 `Amendment N` 명시 누락 시 카운트 인플레 재현 가능. 회피: 본 ADR §운영 절차에 "Amendment 박제 PR title 컨벤션 의무" 박제 (후속 분리 검토)
+- **단점 (잠재 — [#574](https://github.com/coseo12/astro-simulator/issues/574) 후속 분리 박제)**: PR title 컨벤션 의존 — 향후 Amendment PR title 에 `Amendment N` 명시 누락 시 카운트 인플레 재현 가능. **운영 컨벤션 박제 의무 (옵션 C, 본 트레이드오프 영역)**: Amendment 박제 PR title 은 다음 regex 중 1건 정합 의무 (`isAdrEvolutionPr()` SSoT 정합 — `scripts/verify-z-pattern-health.mjs`):
+  - `Amendment N` (Amendment 박제 PR — N 정수)
+  - `hotfix` (Amendment 박제 후 hotfix PR)
+  - `release vX.Y.Z` (release PR)
+
+  **옵션 비교 결과 (#574 architect, 2026-05-27)**:
+
+  | 옵션 | 동작 | 운영 비용 | 정합성 |
+  |---|---|---|---|
+  | A: Semantic PRs Linter CI 통합 (`amannn/action-semantic-pull-request`) | 외부 GitHub Action 의존 + PR title 강제 | 외부 service 의존 추가 | 본 프로젝트 외부 의존 회피 패턴 위반 |
+  | B: `verify-pr-title-convention.mjs` 신규 가드 | 본 프로젝트 가드 답습 (`verify-pr-template-checklist.mjs` 정합) | CI step 추가 + 운영 부담 +1 | 위반 빈도 < 1건 (Amendment 7 정정 후 baseline 정상) — ROI marginal |
+  | **C: 컨벤션 박제만 (가드 신규 X)** | 본 ADR §단점 영역에 컨벤션 의무 명시 박제 | **운영 비용 0** + 미래 위반 시 옵션 B 승격 가능 | **measurement-first 정합 (volt #51) + Amendment 2 silent 약화 답습** |
+
+  **결정: 옵션 C** 채택 (#574, 2026-05-27). 근거: 현재 위반 빈도 0 (Amendment 7 정정 후 baseline) + 1인 운영 부담 회피 (Amendment 2 SSoT 답습) + 위반 발생 시점에 옵션 B 승격 경로 보존. 우선순위 low — 자기참조 인플레이션 재발 0건 (Amendment 7 정정 후 baseline 정상 유지). 미래 1+ 위반 발생 시 옵션 B 승격 후속 이슈 분리 의무.
 
 ### cross-link
 
