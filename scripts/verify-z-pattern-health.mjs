@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// HARNESS-DRIFT: Z-PATTERN [TODO]
 /**
  * ADR 20260515 Z 패턴 health metric 자동 탐지 스크립트
  *
@@ -22,6 +23,7 @@
  *   - volt #69 (workflow_dispatch 2단계 함정 — D2/D3 머지 후 검증)
  */
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 
 const ADR_PATH = 'docs/decisions/20260515-harness-managed-divergent-pattern.md';
@@ -29,6 +31,7 @@ const ADR_FIRST_APPLY_DATE = '2026-05-15'; // ADR 첫 박제일 (#463)
 const N_THRESHOLD = 10; // Amendment 2
 const TIME_THRESHOLD_DAYS = 90; // Amendment 2
 const PHASE2_THRESHOLD = 0.33; // Amendment 1 health metric
+const HARNESS_MANIFEST_PATH = '.harness/manifest.json'; // Amendment 8 verifyPhase2Sync()
 
 // Amendment 7 (#554): ADR 자체 진화 PR 식별 — Phase 1 카운트에서 제외
 // 패턴: "Amendment N" (박제) / "hotfix" (자동화 hotfix) / "release vX.Y.Z" (릴리스 PR)
@@ -42,6 +45,87 @@ function isAdrEvolutionPr(title) {
   return false;
 }
 
+// Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 가드 (cross-validate agy 고유 발견 #1).
+// upstream PR (coseo12/harness-setting) 의 head SHA + 변경 파일 경로를 로컬 drift 파일과
+// 매칭해 sha256 차이 검출. 차이 발견 시 soft-warn (라벨 부착 + 자동 코멘트 trigger) —
+// CI hard-block 아님 (Amendment 2/6 1인 운영 silent 약화 트레이드오프 정합).
+//
+// 반환:
+//   { mismatches: Array<{file, upstreamPr, localSha, upstreamSha}>, error?: string }
+//   - mismatches.length > 0 → 호출자가 [Phase 2 Sync Required] 라벨/코멘트 박제
+//   - error 존재 → 네트워크/권한 실패 (보수적으로 mismatches=0 처리, exit code 영향 없음)
+//
+// 측정 방식:
+//   1. gh pr list (open, "ADR 20260515" 검색) → upstream PR 목록
+//   2. 각 PR 의 files[].path 추출 → 로컬 drift 파일과 경로 매칭
+//   3. 매칭된 쌍의 sha256 비교 (로컬: 파일 직접 / upstream: gh API blob SHA git→sha256 변환 불가
+//      → 본 함수는 파일명 매칭만 박제, 실제 비교는 사용자에게 diff URL 안내)
+//
+// 비교 한계 박제 (precision 정정):
+//   git blob SHA (SHA-1) ≠ sha256 → 직접 비교 불가. 본 함수는 "매칭된 파일 쌍 = 잠재 drift"
+//   까지만 가시화하고 hard 비교는 향후 Amendment 9 (#569 TODO 해소 후속) 영역.
+function verifyPhase2Sync(rootDir = '.') {
+  try {
+    if (!existsSync(`${rootDir}/${HARNESS_MANIFEST_PATH}`)) {
+      return { mismatches: [], error: 'manifest not found' };
+    }
+    const manifest = JSON.parse(readFileSync(`${rootDir}/${HARNESS_MANIFEST_PATH}`, 'utf-8'));
+    const managedFiles = manifest.files || {};
+
+    // 로컬 drift 파일 목록 (sha256 불일치)
+    const localDrifts = new Set();
+    for (const [rel, entry] of Object.entries(managedFiles)) {
+      const abs = `${rootDir}/${rel}`;
+      if (!existsSync(abs)) continue;
+      const content = readFileSync(abs);
+      const sha = createHash('sha256').update(content).digest('hex');
+      const expected = entry.sha256 || entry;
+      if (typeof expected === 'string' && sha !== expected) {
+        localDrifts.add(rel);
+      }
+    }
+
+    if (localDrifts.size === 0) {
+      return { mismatches: [] };
+    }
+
+    // upstream open PR 검색 (ADR 20260515 컨벤션 식별자)
+    let upstreamPrs = [];
+    try {
+      const result = execSync(
+        `gh pr list --repo coseo12/harness-setting --state open --search "ADR 20260515" --json number,headRefOid,files,title`,
+        { encoding: 'utf-8' },
+      ).trim();
+      upstreamPrs = JSON.parse(result || '[]');
+    } catch (e) {
+      return { mismatches: [], error: `upstream PR list failed: ${e.message}` };
+    }
+
+    // 매칭: upstream PR 의 files[].path ∩ 로컬 drift 파일
+    const mismatches = [];
+    for (const pr of upstreamPrs) {
+      const upstreamFiles = (pr.files || []).map((f) => f.path);
+      for (const path of upstreamFiles) {
+        if (localDrifts.has(path)) {
+          mismatches.push({
+            file: path,
+            upstreamPr: pr.number,
+            upstreamHead: (pr.headRefOid || '').slice(0, 8),
+            diffUrl: `https://github.com/coseo12/harness-setting/pull/${pr.number}/files`,
+          });
+        }
+      }
+    }
+
+    return { mismatches };
+  } catch (err) {
+    return { mismatches: [], error: err.message };
+  }
+}
+
+// Amendment 8 (#556) — main flow 를 함수로 wrap. 직접 실행 시에만 호출하여
+// import 시 부작용 (gh CLI 호출 / process.exit) 방지. 외부 인터페이스 (stdout/exit) 동일.
+function main() {
 try {
   // 1. ADR 파일 존재 검증
   if (!existsSync(ADR_PATH)) {
@@ -98,6 +182,26 @@ try {
     phase2Count = 0;
   }
 
+  // 3-b. Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 (soft-warn)
+  //
+  // upstream open PR + 로컬 drift 파일 매칭 결과를 stdout 에 박제.
+  // CI workflow (adr-z-pattern-health-v2.yml) 가 본 stdout 을 파싱해
+  // [Phase 2 Sync Required] 라벨 부착 / 자동 코멘트 박제 트리거.
+  // exit code 변경 없음 (hard-block 아님 — Amendment 8 §결정점 3b 옵션 A).
+  const phase2Sync = verifyPhase2Sync('.');
+  if (phase2Sync.error) {
+    console.log(`\n[Phase 2 Sync] check skipped: ${phase2Sync.error}`);
+  } else if (phase2Sync.mismatches.length > 0) {
+    console.log(`\n[Phase 2 Sync Drift] ${phase2Sync.mismatches.length} 파일 매칭 (soft-warn):`);
+    for (const m of phase2Sync.mismatches) {
+      console.log(
+        `  - ${m.file} ↔ upstream PR #${m.upstreamPr} (head ${m.upstreamHead}) ${m.diffUrl}`,
+      );
+    }
+  } else {
+    console.log(`\n[Phase 2 Sync] OK — drift 파일 ↔ upstream open PR 매칭 0건`);
+  }
+
   // 4. 시간 경과 검증
   const firstApplyDate = new Date(ADR_FIRST_APPLY_DATE);
   const today = new Date();
@@ -139,3 +243,12 @@ try {
   console.error(`ERROR: ${err.message}`);
   process.exit(2);
 }
+} // main() 종료 (Amendment 8 #556)
+
+// 직접 실행 시에만 main() 호출 (import 시 부작용 회피)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
+
+// Amendment 8 (#556) — 함수 export (단위 테스트용)
+export { isAdrEvolutionPr, verifyPhase2Sync };

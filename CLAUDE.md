@@ -1,3 +1,4 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
 # Claude Code 워크플로우 템플릿
 
 <!-- harness:managed:critical-directives:start -->

@@ -79,3 +79,55 @@ jobs:
         run: |
           echo "ERROR: verify-z-pattern-health.mjs 실행 실패 (exit code 2)"
           exit 1
+
+      # Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 soft-warn 처리.
+      # verify-z-pattern-health.mjs 의 stdout 에서 [Phase 2 Sync Drift] 라인 감지 시
+      # [Phase 2 Sync Required] 라벨 부착 + 자동 코멘트 박제 (CI fail 아님).
+      - name: Detect Phase 2 sync drift (soft-warn)
+        id: phase2-sync
+        run: |
+          if grep -q "\[Phase 2 Sync Drift\]" /tmp/health-output.txt 2>/dev/null; then
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+            echo "=== Phase 2 sync drift block ==="
+            grep -A 20 "\[Phase 2 Sync Drift\]" /tmp/health-output.txt || true
+          else
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Apply [Phase 2 Sync Required] label + comment
+        if: steps.phase2-sync.outputs.drift_detected == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 중복 방지 — 이미 [Phase 2 Sync Required] OPEN 이슈 존재 시 스킵
+          EXISTING=$(gh issue list \
+            --search '"[Phase 2 Sync Required]" in:title' \
+            --state open --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "이미 [Phase 2 Sync Required] OPEN 이슈 존재 — 중복 생성 스킵"
+            exit 0
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          DRIFT_BLOCK=$(grep -A 50 "\[Phase 2 Sync Drift\]" /tmp/health-output.txt | head -60 || true)
+
+          gh issue create \
+            --title "[Phase 2 Sync Required] ADR 20260515 Amendment 8 (자동 탐지 ${DATE})" \
+            --label "documentation,priority:medium" \
+            --body "## 배경
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health-v2.yml\` 의
+          Amendment 8 Phase 2 중도 변경 정적 비교 가드 발화. upstream open PR 의
+          변경 파일이 로컬 drift 파일과 매칭 — Amendment 5 (upstream 리뷰 즉시 동기화 의무) 적용 필요.
+
+          ## drift 매칭 결과
+          \`\`\`
+          ${DRIFT_BLOCK}
+          \`\`\`
+
+          ## 의무 (ADR §운영 절차 Phase 2 단계 3 + Amendment 8 단계 4)
+          upstream PR 의 리뷰 피드백을 본 프로젝트 동일 파일에 즉시 동기화. 후속 커밋 또는 PR.
+
+          ## Cross-link
+          - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\`
+          - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
+          - 가드 스크립트: \`scripts/verify-z-pattern-health.mjs\` (\`verifyPhase2Sync()\`)"

@@ -2,6 +2,7 @@
 name: pm
 description: "적응적 질답 → 스프린트 계약 — 모호한 요구를 명확도 점수에 따라 질답 또는 단방향 정리하여 이슈로 박제"
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
 
 # PM 에이전트
 

@@ -2,6 +2,7 @@
 name: architect
 description: "설계/기술 결정 — 이슈 + 코드베이스를 기반으로 설계안을 작성하고 필요 시 ADR을 남긴다. 라벨 전이"
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
 
 # Architect 에이전트
 
