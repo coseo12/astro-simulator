@@ -5,6 +5,24 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-05-27
+
+### 요약
+
+R4 (지구+달) visualization 완주 + a11y baseline 도입 + Z 패턴 ADR Amendment 7~12 누적 + R1~R3 후속 NO-OP 일괄 정리. 46 커밋 누적 — 마지막 릴리스 v0.17.0 (2026-05-20) 이후 7일. 상세 entry 22건은 아래 sub-section 참조.
+
+**카테고리별 머지 매핑**:
+
+- **R4 (지구+달) 사이클**: `#532` / `#534` / `#539` / `#546` — R4 ADR forensic 변형 승격 + Amendment 4 까지 누적, Q2=B SSoT 첫 본 인스턴스화 (PR #533/#537/#540/#543/#545/#547/#548/#549)
+- **a11y baseline + WCAG 2.2 AA**: `#535` / `#551` / `#552` / `#564` — 자동 측정 가드 + 격차 3건 통합 fix + target-size 전 영역 정합 (PR #551/#560/#561/#567)
+- **저사양 모바일 FPS 가드**: `#536` (PR #553)
+- **Visual Fidelity 원칙 명문화**: `#541` — `docs/architecture/principles.md` §1 (PR #550)
+- **Z 패턴 ADR Amendment 7~12**: `#554` / `#556` / `#557` / `#569` / `#572` / `#574` / `#577` / `#578` / `#581` — 측정 식 자기참조 인플레이션 정정 + Phase 1 드리프트 가시화 + 경고 피로감 가드 (N=10 soft-warn) + [TODO] → upstream PR URL 자동 해소 + Phase 3 sidecar 라이프사이클 자동화 + PR title 컨벤션 의무 + TODO Aging Guard (시간 누적 차원) + .prettierignore 교차 검증 가드 거부 박제 + cross-repo false-positive 차단 (PR #555/#570/#571/#575/#576/#579/#580/#582/#583/#585/#586/#587/#588/#589/#590/#591)
+- **R4 후속 docs 정리**: `#563` / `#565` / `#566` — principles.md cross-link + dead reference 정정 + ADR 전이 (PR #584)
+- **NO-OP 결정 박제**: `#446` / `#445` / `#447` / `#438` / `#376` / `#353` / `#352` / `#383` — Camera 리팩토링 2건 + UX polishing 3건 + R1 메타 가드 자동화 2건 + verify-visual-proportion (PR #524/#527/#529/#530)
+- **인프라**: harness v3.6.0 → v4.2.5 Antigravity 마이그레이션 (PR #544), Glossary + ADR Status workflow + 시각 자료 embed 표준 (`#449`/`#370`/`#382` PR #520)
+- **기타**: iOS Safari 17.4+ Yoshida4 bench 가이드 (`#219` PR #531), lint 부채 정리 (`#386`/`#434`/`#435` PR #521), URL R-Phase 가드 자동 제거 옵션 A (`#418` PR #525), LodBodyInfo dev overlay 컬럼 (`#393` PR #528), R3 venus 명시 단언 보강 (`#416` PR #522), R1 ADR Amendment v3 모바일 점유율 박제값 정정 (`#427` PR #526), 폐기 코드 정리 (`#405` PR #523), r1-guard baseline Linux CI 전환 (`#337` PR #562/#568), CLAUDE.md Z 패턴 TL;DR 3단계 카드 (`#559` PR #588), adr-z-pattern-health-v2 CI exit code 계약 SSoT (`#558` PR #587)
+
 ### Behavior Changes (Amendment 10 cross-repo false-positive 차단)
 
 - **[#581] Amendment 10 §결정점 2 정정 — `extractIssueRefsFromTitle()` 단순 `#N` → `[#N]` brackets 필수 (cross-repo false-positive 차단)** ([#581](https://github.com/coseo12/astro-simulator/issues/581)) — PR #580 (Amendment 10) reviewer 단계 cross-repo false-positive 실측 발견 후속. **PR #254 (`volt #114` 인용) → astro-simulator #114 단순 `#N` 오탐 1건 확인** → 옵션 A 채택 (`[#N]` brackets 필수, #574 옵션 C / #578 옵션 B 패턴 답습). **수정**: `scripts/verify-z-pattern-health.mjs` `extractIssueRefsFromTitle()` 패턴 3 정정 — `(?:^|[^\\w/])#(\\d+)\\b` → `\\[#(\\d+)\\]` brackets 필수. 본 프로젝트 PR title 컨벤션 (`feat(scope): [#N] description`) 표준 답습으로 false-positive 회피. **self-test 확장**: 기존 6 cases (extractIssueRefs) + 5 cases 추가 (cross-repo volt #114 skip / 단순 #N skip / PR squash merge suffix `(#583)` skip / upstream 자기 ref skip / brackets 정합 매칭 정상) → 총 **22 PASS, 0 failed**. 1 case 갱신 (`multi` — brackets 강제 정합). **baseline 재실측**: 다운스트림 [TODO] 잔존 8 파일 → upstream merged PR 매칭 3건 (`.claude/agents/architect.md` / `.claude/agents/pm.md` / `CLAUDE.md` → upstream PR #260). 정정 전 매칭 (PR #254 `volt #114` 오탐) 제거 정합. **회귀 0 확인**: `verify-z-pattern-health.mjs` [ADR OK] 모든 임계값 미발화 / Phase 1=8 / Phase 2=4 / 진행률 50% / `verifyPhase2Sync` 동일 출력. **ADR §Amendment 10 §결정점 2 정정 박제**: 단순 `#N` → `[#N]` brackets 필수 + 옵션 A 한계 명시 (cross-repo issue number 우연 충돌 잔존, 옵션 B/C 후속 분리 가치 박제 — low). **한계 박제**: `[#252]` 형식 cross-repo issue number 우연 충돌 (upstream harness-setting #252 ↔ astro-simulator #252) 잔존 — `--dry-run` 기본 + `--apply` 분리 안전망으로 file write 위험 0, 후속 분리 우선순위 low. **agy cross-validate 비대상** — reviewer 실측 발견 가드 정정만 (기존 SSoT 보존, 신규 결정 박제 아님). 비-범위: 옵션 B (PR body 분석) ❌ / 옵션 C (다운스트림 OPEN 이슈 state 조회) ❌ — 본 PR 비-범위, 후속 분리 가치 보존.
