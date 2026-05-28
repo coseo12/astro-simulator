@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "measuredAt": "2026-05-25",
+  "issue": "#564",
+  "previousMeasuredAt": "2026-05-25",
+  "updateReason": "#564 통합 fix — shortcut-bar 외 영역 (mode-switcher / unit-toggle / time-controls) 9 버튼 target-size 24×24 px PASS. PR #561 shortcut-bar fix 와 동일 패턴 (`min-w-6 min-h-6 shrink-0` + 부모 overflow 안전망) 답습. axe `serious:target-size` 위반 0건 확정 — WCAG 2.2 2.5.8 전 영역 정합 완료.",
+  "wcagVersion": "2.2 AA",
+  "viewports": {
+    "desktop": {
+      "axe": {
+        "violations": 0,
+        "byImpact": {
+          "critical": 0,
+          "serious": 0,
+          "moderate": 0,
+          "minor": 0
+        },
+        "ids": [],
+        "shortcutBarTargetSizePass": true
+      },
+      "shortcutBar": {
+        "fontSizePx": 12,
+        "wcagAaMinPx": 12,
+        "marginPx": 0
+      }
+    },
+    "mobile": {
+      "axe": {
+        "violations": 0,
+        "byImpact": {
+          "critical": 0,
+          "serious": 0,
+          "moderate": 0,
+          "minor": 0
+        },
+        "ids": [],
+        "shortcutBarTargetSizePass": true
+      },
+      "shortcutBar": {
+        "fontSizePx": 12,
+        "wcagAaMinPx": 12,
+        "marginPx": 0
+      }
+    }
+  },
+  "moonOrbitContrast": {
+    "backgroundColorRgb": "#000000",
+    "default": {
+      "colorRgb": "rgb(77, 89, 128)",
+      "contrastRatio": 3.06,
+      "meetsAA": true
+    },
+    "earthFocus": {
+      "colorRgb": "rgb(166, 178, 217)",
+      "contrastRatio": 10.02,
+      "meetsAA": true
+    },
+    "wcagAaNonTextMin": 3
+  }
+}

@@ -2,7 +2,7 @@
 
 > **요지**: CLAUDE.md 실전 교훈의 sub-agent multi-turn 매트릭스 이탈 블록 상세. 본문 요약은 CLAUDE.md `## 실전 교훈` 의 포인터 참조.
 >
-> **근거**: harness [#199](https://github.com/coseo12/harness-setting/issues/199) Phase 3-A 에서 추출.
+> **근거**: harness [#199](https://github.com/coseo12/harness-setting/issues/199) Phase 3-A 에서 추출. harness [#256](https://github.com/coseo12/harness-setting/issues/256) 가지치기 PR 에서 PM DoD 구조 drift (volt [#76](https://github.com/coseo12/volt/issues/76)) 사례 보강.
 
 ---
 
@@ -16,6 +16,19 @@ sub-agent 에 적응적 질답·설계 같은 multi-turn 세션을 위임할 때
 - SendMessage 로 라운드를 이어갈 때 **이전 라운드 매트릭스를 본문에 인라인 재첨부**한다 — 참조 레이블("권고 A")만으론 부족. 요약 2~3줄로라도 원문 재첨부
 - 이탈 발견 시 라운드 N+1 결과를 폐기하고 **사용자에게 불일치 보고 + 이전 라운드 재확인**. 이탈 산출물은 손실로 간주하지 말고 후속 확장(예: P17+ 후보) 로 별도 메모리에 박제해 보너스 자산화
 
+## PM 이슈 DoD 구조 drift 재현 (volt [#76](https://github.com/coseo12/volt/issues/76))
+
+astro-simulator P11-B.2 PM 재계약에서 원본 D5 (Osculating 관찰 리포트) 가 라운드 2 에서 D3b (screenshot diff) 의 7 moon 대상으로 **재배치되면서 사라짐**. 라운드 N+1 이 사용자 응답을 받아 **DoD 자체 (ID·산출물·의미) 를 재배치**.
+
+**예방**: PM 에이전트 프롬프트에 다음 제약 박제 (`.claude/agents/pm.md`):
+- 원본 DoD 재구조화 금지
+- 사용자 응답은 각 DoD 의 **파라미터** (수치/경계/선택지) 만 조정
+- 라운드 N+1 출력에 원본 DoD 변경 전/후 diff 명시
+
+volt [#34](https://github.com/coseo12/volt/issues/34) 가 **1회성 교훈이 아닌 반복 패턴** 임을 확증.
+
 ## 근거
 
-- volt [#34](https://github.com/coseo12/volt/issues/34) — astro-simulator P8~P16 로드맵 설계 3라운드 중 라운드 3 에서 권고 A(내행성계 위성 / 목성계 / 토성계) 매트릭스가 J2/Yarkovsky/중력파 등 전혀 다른 주제로 이탈. volt [#24](https://github.com/coseo12/volt/issues/24) 의 "sub-agent 신뢰 한계" 계열 확장
+- volt [#34](https://github.com/coseo12/volt/issues/34) — astro-simulator P8~P16 로드맵 설계 3라운드 중 라운드 3 에서 권고 A(내행성계 위성 / 목성계 / 토성계) 매트릭스가 J2/Yarkovsky/중력파 등 전혀 다른 주제로 이탈
+- volt [#76](https://github.com/coseo12/volt/issues/76) — astro-simulator P11-B.2 PM 재계약에서 원본 D5 DoD 재배치 (구조 drift). #34 의 **DoD 자체** 변형
+- volt [#24](https://github.com/coseo12/volt/issues/24) 의 "sub-agent 신뢰 한계" 계열 확장

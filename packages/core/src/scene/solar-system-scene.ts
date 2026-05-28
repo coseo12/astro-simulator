@@ -14,7 +14,6 @@ import {
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
-import { add } from '../coords/vec3.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
 import {
   NBodyEngine,
@@ -38,6 +37,8 @@ import {
 } from './tier.js';
 import { runTierTransition } from './tier-transition.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
+import { getOrbitVisualScale } from './orbit-visual-scale.js';
+import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
   lodFromScreenCoverage,
   screenCoverageRadius,
@@ -150,6 +151,13 @@ export interface SolarSystemSceneHandles {
     id: string,
     parentId: string,
   ) => { pos: [number, number, number]; vel: [number, number, number] } | null;
+  /**
+   * R4 #539 Amendment 3 — body id 로 parentId 조회 (focus multiplier 분기 결정 입력).
+   *
+   * `sim-canvas.tsx syncFocusToScene` 가 `resolveFocusMultiplier(parentId)` 식 후보 2 적용 시
+   * 사용. id 미존재 시 `undefined` 반환 (호출자 fallback). ADR §Amendment 3 §식 후보 2 정합.
+   */
+  getBodyParentId: (id: string) => string | null | undefined;
   /** 런타임 엔진 전환. 현재 jd에서 Newton 초기 상태 재빌드 (심리스). */
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   /** 현재 활성 엔진 */
@@ -256,6 +264,17 @@ export interface LodBodyInfo {
   screenCoverage: number;
   pxDiameter: number;
   cameraDistanceMeters: number;
+  /**
+   * #393 — low variant (billboard) 의 alpha mask 적용 여부.
+   *
+   * - `true`: pxDiameter ≥ 4 — alpha mask 적용 (원형 disc 인지)
+   * - `false`: pxDiameter < 4 — 4px fallback (사각형 quad, sub-pixel flickering 회피)
+   * - `null`: low variant 아직 lazy-create 안 됨 또는 level ≠ 'low'
+   *
+   * ADR [`20260502-391-phase2-billboard.md`](../../docs/decisions/20260502-391-phase2-billboard.md) §결정 §"4px fallback 분기".
+   * dev overlay 시각화 + 회귀 진단 용도.
+   */
+  billboardAlphaMask: boolean | null;
 }
 
 export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
@@ -449,34 +468,95 @@ export function createSolarSystemScene(
   }
 
   // 궤도선 — P12-A: tier 전환 시 재샘플링. 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
+  //
+  // R4 #532 — ADR `20260520-r4-earth-moon-visualization.md` §결정 4:
+  //   달 궤도 라인은 별도 LineSystem (`moon-orbit-line`) 으로 분리하여 earth focus 진입 시 색상 강조.
+  //   - 일반 시점 (focusBodyIdForAssert !== 'earth'): MOON_ORBIT_COLOR_DEFAULT (Color3(0.30, 0.35, 0.50), #552 a11y 갱신 — WCAG 1.4.11 3.06:1 PASS)
+  //   - earth focus 시점 (focusBodyIdForAssert === 'earth'): MOON_ORBIT_COLOR_EARTH_FOCUS (Color3(0.65, 0.7, 0.85)) — 명도 ~2.6배
+  //   WebGL 한계로 LineSystem thickness 직접 조절 불가 → 색상 명도 강조로 ADR 의도 (시각 강조) 실현.
   let orbitLines: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
+  let moonOrbitLine: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
   let orbitLinesVisible = showOrbitLines;
+
+  // R4 #532 — moon orbit line 색상 SSoT (결정 4).
+  const MOON_ORBIT_COLOR_DEFAULT = new Color3(0.3, 0.35, 0.5); // #552 — WCAG 1.4.11 ≥ 3:1 (3.06:1) 충족. 톤 보존으로 EARTH_FOCUS 자연 그라데이션 유지
+  const MOON_ORBIT_COLOR_EARTH_FOCUS = new Color3(0.65, 0.7, 0.85); // earth focus 강조 (~2.6배 명도)
+
   const rebuildOrbitLines = () => {
     // 기존 라인 제거 후 현재 tier 의 renderScale 로 재샘플링.
     if (orbitLines) {
       orbitLines.dispose();
       orbitLines = null;
     }
+    if (moonOrbitLine) {
+      moonOrbitLine.dispose();
+      moonOrbitLine = null;
+    }
     const batches: Vector3[][] = [];
+    let moonOrbitPts: Vector3[] | null = null;
     for (const body of system.bodies) {
       if (!body.orbit) continue;
       // defense-in-depth #5 (이슈 #439): R-Phase 미진입 body 는 본체가 점 수준이라
       // 궤도선만 그리면 시각 혼란. R_PHASE_BODY_ALLOWLIST SSoT 직접 참조 (BODY_SCALE 의존 역전 회피).
       if (!(R_PHASE_BODY_ALLOWLIST as readonly string[]).includes(body.id)) continue;
       const pts = sampleOrbitPoints(body, activeTier);
-      if (pts) batches.push(pts);
+      if (!pts) continue;
+      // R4 #532 — moon orbit 은 별도 LineSystem 으로 분리 (결정 4: earth focus 시 색상 강조).
+      if (body.id === 'moon') {
+        moonOrbitPts = pts;
+      } else {
+        batches.push(pts);
+      }
     }
     if (batches.length > 0) {
       orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
+      // 일반 궤도선 (moon 외 모든 body). moon orbit 은 별도 SSoT (`MOON_ORBIT_COLOR_DEFAULT`, #552).
+      // 본 색상은 #552 a11y fix 비대상 (moon orbit 만 WCAG 1.4.11 격차였음).
       orbitLines.color = new Color3(0.25, 0.28, 0.4);
       orbitLines.isVisible = orbitLinesVisible;
     }
+    if (moonOrbitPts) {
+      moonOrbitLine = MeshBuilder.CreateLineSystem(
+        'moon-orbit-line',
+        { lines: [moonOrbitPts] },
+        scene,
+      );
+      // 초기 색상은 default — focus 상태에 따라 setMoonOrbitHighlight 가 갱신.
+      // (focusBodyIdForAssert 는 779 line 에서 선언되므로 TDZ 회피 위해 default 로 시작.
+      //  tier 전환 후 setFocusOrigin 이 setMoonOrbitHighlight('earth') 재호출해 강조 복원.)
+      moonOrbitLine.color = MOON_ORBIT_COLOR_DEFAULT;
+      moonOrbitLine.isVisible = orbitLinesVisible;
+      // R4 #539 Amendment 2 — orbit line 도 mesh 와 동일 visual scale 적용 (시각 정합).
+      // sampleOrbitPoints 가 parent 0 원점 기준 ellipse 점을 반환하므로, LineSystem.scaling 으로
+      // 일괄 ×N 확장. moon mesh position 은 resolveWorld 에서 동일 scale 곱해진 좌표라 정합.
+      // 미적용 시 orbit line 은 실측 좌표, mesh 는 visual 좌표 → 시각 mismatch.
+      const moonOrbitScale = getOrbitVisualScale('earth');
+      moonOrbitLine.scaling.set(moonOrbitScale, moonOrbitScale, moonOrbitScale);
+      // R4 #532 — moon orbit 은 earth 중심 상대 좌표 (sampleOrbitPoints 가 parent 0 원점 기준 ellipse).
+      // earth 가 매 프레임 움직이므로 LineSystem.position 을 updateAt 루프에서 earth scene-unit 좌표로 동기화.
+      // (ADR §결정 4: "지구 중심 small circle" 정합 + ADR §Amendment 2: "earth-moon visual scale=30 적용")
+      // 초기 position 은 default (0,0,0) — 첫 updateAt 호출 시점에 갱신됨.
+    }
+  };
+
+  /**
+   * R4 #532 — moon orbit line 색상 강조 토글 (ADR §결정 4).
+   *
+   * earth focus 진입 / 해제 시 호출되어 moon orbit line 색상을 default ↔ earth-focus 강조 사이 전환.
+   * rebuildOrbitLines 가 tier 전환 시 호출되어 초기값으로 재설정되므로, focus 변경 시점에 별도 호출 필요.
+   */
+  const setMoonOrbitHighlight = (focusedBodyId: string | null) => {
+    if (!moonOrbitLine) return;
+    moonOrbitLine.color =
+      focusedBodyId === 'earth' ? MOON_ORBIT_COLOR_EARTH_FOCUS : MOON_ORBIT_COLOR_DEFAULT;
   };
   rebuildOrbitLines();
   disposables.push({
     dispose: () => {
       orbitLines?.dispose();
       orbitLines = null;
+      moonOrbitLine?.dispose();
+      moonOrbitLine = null;
     },
   });
 
@@ -636,6 +716,9 @@ export function createSolarSystemScene(
       mesh.computeWorldMatrix(true);
     }
     rebuildOrbitLines();
+    // R4 #532 — tier 전환으로 moon orbit line 이 재생성되어 default 색상 초기화됨.
+    // focus 가 earth 라면 강조 복원 (ADR §결정 4).
+    setMoonOrbitHighlight(focusBodyIdForAssert);
 
     // #313 M2 — P12 ADR §Q10 Amendment 구현 정합성. tier 전환 시 origin 을 대칭 처리.
     //  - T1/T2 진입 → [0,0,0] reset (T1/T2 에서 매 프레임 FO overhead 제거)
@@ -771,6 +854,8 @@ export function createSolarSystemScene(
     if (!world) return;
     floatingOrigin.setOriginToBody([world[0], world[1], world[2]]);
     focusBodyIdForAssert = bodyId;
+    // R4 #532 — earth focus 진입 시 moon orbit line 강조 (ADR §결정 4).
+    setMoonOrbitHighlight(bodyId);
   };
   // P12-A #298 — focus 해제 (reset) 시 tier 는 free-fly 경로로 전환.
   //
@@ -786,6 +871,8 @@ export function createSolarSystemScene(
   const clearFocus = () => {
     focusBodyIdForAssert = null;
     setTier(defaultInitialTier());
+    // R4 #532 — focus 해제 시 moon orbit line 강조 해제 (ADR §결정 4).
+    setMoonOrbitHighlight(null);
   };
 
   // #509 — 자유시점 진입. focus tracking 만 해제 (tier/origin 보존).
@@ -793,6 +880,8 @@ export function createSolarSystemScene(
   // tier/origin 까지 default 복원하면 사용자 시점이 깨짐 (예: venus 가까이 → 갑자기 solar 뷰).
   const detachFocus = () => {
     focusBodyIdForAssert = null;
+    // R4 #532 — 자유시점 진입 시도 moon orbit line 강조 해제 (focus 상태 아님).
+    setMoonOrbitHighlight(null);
   };
 
   // P10-D #263 — Newton 엔진 state 에서 body pos/vel 직접 추출 (timeScale 내성).
@@ -900,6 +989,21 @@ export function createSolarSystemScene(
         (world[1] - oy) * sceneUnitPerMeter,
         (world[2] - oz) * sceneUnitPerMeter,
       );
+    }
+
+    // R4 #532 — moon orbit line position 동기화 (ADR §결정 4).
+    // moon orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
+    // earth 가 sun 주위를 매 프레임 공전하므로 LineSystem 의 position 을 earth scene-unit 좌표로 동기.
+    // moon mesh 위치는 worldPositions 가 sun 중심 좌표라 별도 처리 불필요 (위 루프에서 처리됨).
+    if (moonOrbitLine) {
+      const earthWorld = worldPositions.get('earth');
+      if (earthWorld) {
+        moonOrbitLine.position.set(
+          (earthWorld[0] - ox) * sceneUnitPerMeter,
+          (earthWorld[1] - oy) * sceneUnitPerMeter,
+          (earthWorld[2] - oz) * sceneUnitPerMeter,
+        );
+      }
     }
 
     // Floating Origin primary follow (ADR §1-B 확장) — **mesh.position 갱신 후 발동**.
@@ -1119,12 +1223,29 @@ export function createSolarSystemScene(
       );
 
       const isFocused = focusBodyIdForAssert === body.id;
-      const nextLevel = lodFromScreenCoverage({
+      const baselineLevel = lodFromScreenCoverage({
         body,
         cameraDistanceMeters,
         screenCoverage: coverage,
         isFocused,
         override: lodOverride,
+      });
+
+      // #546 — parent-focus aware satellite LOD floor + 4 px guard (외부 가드 후처리, SRP 단방향).
+      // ADR `docs/decisions/20260524-546-satellite-billboard-visibility-forensic.md` §5 §결정.
+      //
+      // - earth focus + moon (parentId='earth') → low → mid 승격 (사용자 형태 인지 충족)
+      // - earth focus + mercury (parentId='sun') → 가드 비활성 (행성 분기 — Q3=(c))
+      // - default sun 시점 → 가드 비활성 (Q2=(a) — moonScale 200 의도 보존)
+      // - pxDiameter < 4 → low 유지 (alpha mask Amendment 1 보호, cross-validate 이견 수용 #1)
+      //
+      // 호출 시퀀스: lod.ts 가 baseline 반환 → 본 가드 후처리 → effective level 출력
+      // (Split-brain SRP 회피 — lod.ts 입력 무영향, 출력만 후처리). agy 이견 수용 #2.
+      const nextLevel = applySatelliteVisibilityGuard({
+        parentId: body.parentId,
+        focusedBodyId: focusBodyIdForAssert,
+        baselineLodLevel: baselineLevel,
+        pxDiameter: coverage * 2,
       });
 
       const prevLevel = bodyCurrentLod.get(body.id);
@@ -1179,6 +1300,14 @@ export function createSolarSystemScene(
 
       // #388 — body 별 raw 데이터 박제. lodInfo 버퍼는 매 프레임 in-place 갱신 (객체 재할당 회피).
       // 시각 직경 추정 (pxDiameter) = coverage × 2 — screenCoverageRadius 가 반지름이므로 직경은 두 배.
+      //
+      // #393 — billboard alpha mask 상태 박제 (low variant 만 의미 있음, null 외 경우 dev overlay 표시).
+      // pxDiameter 와 shouldApplyBillboardAlphaMask 임계 (4px) 비교 결과를 즉시 노출 — 4px fallback
+      // 트리거 / mask 적용 / sphere 분기 모두 시각화 가능.
+      const billboardAlphaMask: boolean | null =
+        nextLevel === 'low' && lowVariants.has(body.id)
+          ? shouldApplyBillboardAlphaMask(pxDiameter)
+          : null;
       const existing = lodInfo[lodInfoIndex];
       if (existing) {
         existing.id = body.id;
@@ -1186,6 +1315,7 @@ export function createSolarSystemScene(
         existing.screenCoverage = coverage;
         existing.pxDiameter = pxDiameter;
         existing.cameraDistanceMeters = cameraDistanceMeters;
+        existing.billboardAlphaMask = billboardAlphaMask;
       } else {
         lodInfo.push({
           id: body.id,
@@ -1193,6 +1323,7 @@ export function createSolarSystemScene(
           screenCoverage: coverage,
           pxDiameter,
           cameraDistanceMeters,
+          billboardAlphaMask,
         });
       }
       lodInfoIndex += 1;
@@ -1343,11 +1474,15 @@ export function createSolarSystemScene(
         world[1] = local[1];
         world[2] = local[2];
       } else {
+        // R4 #539 Amendment 2 — parent-satellite orbit visual scale 적용 (rendering 시점만).
+        // 실측 데이터 SSoT (`solar-system.json` semiMajorAxis 등) 보존 + mesh radius
+        // 박제값 (BODY_SCALE) 보존 양립을 위한 시각 분리. earth-moon 기본값 30.
+        // ADR `20260520-r4-earth-moon-visualization.md` §Amendment 2 §결정.
+        const visualScale = getOrbitVisualScale(body.parentId);
         const parentWorld = resolveWorld(body.parentId);
-        const sum = add(parentWorld, local);
-        world[0] = sum[0];
-        world[1] = sum[1];
-        world[2] = sum[2];
+        world[0] = parentWorld[0] + local[0] * visualScale;
+        world[1] = parentWorld[1] + local[1] * visualScale;
+        world[2] = parentWorld[2] + local[2] * visualScale;
       }
       resolved.add(id);
       return world;
@@ -1359,6 +1494,8 @@ export function createSolarSystemScene(
   const setOrbitLinesVisible = (visible: boolean) => {
     orbitLinesVisible = visible;
     if (orbitLines) orbitLines.isVisible = visible;
+    // R4 #532 — moon orbit line 도 동일하게 가시성 토글 (ADR §결정 4 default visible 정합).
+    if (moonOrbitLine) moonOrbitLine.isVisible = visible;
   };
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
@@ -1394,6 +1531,12 @@ export function createSolarSystemScene(
   // 초기 시점 적용
   updateAt(initialJulianDate);
 
+  // R4 #539 Amendment 3 — body id → parentId lookup (focus multiplier 분기 입력).
+  // sim-canvas syncFocusToScene 의 식 후보 2 적용 SSoT. id 미존재 시 undefined 반환.
+  const getBodyParentId = (id: string): string | null | undefined => {
+    return bodiesById.get(id)?.parentId;
+  };
+
   return {
     meshes,
     updateAt,
@@ -1402,6 +1545,7 @@ export function createSolarSystemScene(
     setTier,
     updateTierByCamera,
     getBodyState,
+    getBodyParentId,
     setPhysicsEngine,
     getPhysicsEngine,
     setBodyMassMultiplier,

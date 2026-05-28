@@ -31,59 +31,64 @@ beforeEach(() => {
  * #403 — CelestialTree R-Phase Allowlist 가드 단위 테스트 (defense-in-depth UI 측면 2번째 축).
  *
  * ADR `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §CelestialTree UI 가드 박제 패턴.
+ * R4 #532 — earth + moon 진입 (Allowlist 5개 활성: sun/mercury/venus/earth/moon).
  *
  * 검증:
- *  - allowlist 박제 body (sun / mercury / venus) 항목은 활성 (focusOn 정상 발행)
- *  - allowlist 외 body (earth / jupiter / neptune 등) 항목은 disabled + aria-disabled + data-r-phase-disabled
+ *  - allowlist 박제 body (sun / mercury / venus / earth / moon) 항목은 활성 (focusOn 정상 발행)
+ *  - allowlist 외 body (jupiter / neptune 등) 항목은 disabled + aria-disabled + data-r-phase-disabled
  *  - disabled 항목 강제 click 시 focusOn 명령 발행 0 (HTML disabled 자체 차단)
  *  - tooltip (title 속성) 박제 — 사용자 안내
  *  - 시각 차별화 (opacity-50 / cursor-not-allowed) 박제
  */
-describe('CelestialTree — R-Phase Allowlist 가드 UI (#403)', () => {
+describe('CelestialTree — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () => {
   it('R-Phase 박제 body (sun) 항목은 활성', () => {
     render(<CelestialTree />);
     expect(screen.getByTestId('tree-sun')).not.toBeDisabled();
   });
 
-  it('R-Phase 박제 body (mercury / venus) 항목은 활성', () => {
+  it('R-Phase 박제 body (mercury / venus / earth / moon) 항목은 활성', () => {
     render(<CelestialTree />);
     expect(screen.getByTestId('tree-mercury')).not.toBeDisabled();
     expect(screen.getByTestId('tree-venus')).not.toBeDisabled();
+    expect(screen.getByTestId('tree-earth')).not.toBeDisabled();
+    expect(screen.getByTestId('tree-moon')).not.toBeDisabled();
   });
 
-  it('R-Phase 미박제 body (earth / jupiter / neptune) 는 disabled', () => {
+  it('R-Phase 미박제 body (jupiter / neptune) 는 disabled', () => {
     render(<CelestialTree />);
-    expect(screen.getByTestId('tree-earth')).toBeDisabled();
     expect(screen.getByTestId('tree-jupiter')).toBeDisabled();
     expect(screen.getByTestId('tree-neptune')).toBeDisabled();
   });
 
   it('disabled 항목은 aria-disabled="true" 설정 (스크린 리더 인지)', () => {
     render(<CelestialTree />);
-    expect(screen.getByTestId('tree-earth')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('tree-jupiter')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('tree-neptune')).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('활성 항목은 aria-disabled="false"', () => {
+  it('활성 항목은 aria-disabled="false" (R4 earth / moon 포함)', () => {
     render(<CelestialTree />);
     expect(screen.getByTestId('tree-sun')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('tree-mercury')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('tree-venus')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('tree-earth')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('tree-moon')).toHaveAttribute('aria-disabled', 'false');
   });
 
   it('disabled 항목은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
     render(<CelestialTree />);
-    expect(screen.getByTestId('tree-earth')).toHaveAttribute('data-r-phase-disabled', 'true');
+    expect(screen.getByTestId('tree-jupiter')).toHaveAttribute('data-r-phase-disabled', 'true');
     expect(screen.getByTestId('tree-sun')).toHaveAttribute('data-r-phase-disabled', 'false');
+    expect(screen.getByTestId('tree-earth')).toHaveAttribute('data-r-phase-disabled', 'false');
+    expect(screen.getByTestId('tree-moon')).toHaveAttribute('data-r-phase-disabled', 'false');
   });
 
   it('disabled 항목은 tooltip (title 속성) 박제 — 사용자 안내 + body 이름 포함', () => {
     render(<CelestialTree />);
-    const earthBtn = screen.getByTestId('tree-earth');
-    expect(earthBtn).toHaveAttribute('title');
-    const title = earthBtn.getAttribute('title') ?? '';
-    expect(title).toMatch(/지구/);
+    const jupiterBtn = screen.getByTestId('tree-jupiter');
+    expect(jupiterBtn).toHaveAttribute('title');
+    const title = jupiterBtn.getAttribute('title') ?? '';
+    expect(title).toMatch(/목성/);
     expect(title).toMatch(/R-Phase/);
   });
 
@@ -91,18 +96,19 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403)', () => {
     render(<CelestialTree />);
     expect(screen.getByTestId('tree-sun')).not.toHaveAttribute('title');
     expect(screen.getByTestId('tree-mercury')).not.toHaveAttribute('title');
+    expect(screen.getByTestId('tree-earth')).not.toHaveAttribute('title');
+    expect(screen.getByTestId('tree-moon')).not.toHaveAttribute('title');
   });
 
   it('disabled 항목 강제 click → focusOn 명령 발행 0 (HTML disabled 자체 차단)', () => {
     render(<CelestialTree />);
-    fireEvent.click(screen.getByTestId('tree-earth'));
     fireEvent.click(screen.getByTestId('tree-jupiter'));
     fireEvent.click(screen.getByTestId('tree-neptune'));
     // HTML button[disabled] 는 click 이벤트 자체를 dispatch 하지 않음.
     expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
   });
 
-  it('활성 항목 click 시 focusOn 명령 발행 (정상 동작 회귀 가드)', () => {
+  it('활성 항목 click 시 focusOn 명령 발행 (정상 동작 회귀 가드, R4 earth/moon 포함)', () => {
     render(<CelestialTree />);
     fireEvent.click(screen.getByTestId('tree-sun'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'sun' });
@@ -110,13 +116,17 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403)', () => {
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'mercury' });
     fireEvent.click(screen.getByTestId('tree-venus'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'venus' });
+    fireEvent.click(screen.getByTestId('tree-earth'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'earth' });
+    fireEvent.click(screen.getByTestId('tree-moon'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'moon' });
   });
 
   it('disabled 항목 시각 차별화 — opacity-50 cursor-not-allowed 클래스 박제', () => {
     render(<CelestialTree />);
-    const earthBtn = screen.getByTestId('tree-earth');
-    expect(earthBtn.className).toContain('opacity-50');
-    expect(earthBtn.className).toContain('cursor-not-allowed');
+    const jupiterBtn = screen.getByTestId('tree-jupiter');
+    expect(jupiterBtn.className).toContain('opacity-50');
+    expect(jupiterBtn.className).toContain('cursor-not-allowed');
   });
 
   it('selected body active 스타일 — 활성 + selected 일 때 bg-primary/20', () => {

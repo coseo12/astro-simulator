@@ -1,3 +1,4 @@
+# HARNESS-DRIFT: Z-PATTERN [TODO]
 name: Harness Guards
 
 # harness 저장소 전용 가드 workflow (v3.0.0~).
@@ -73,3 +74,12 @@ jobs:
       - name: docs/lessons README 동기화 가드
         if: hashFiles('scripts/verify-lessons-readme.sh') != ''
         run: bash scripts/verify-lessons-readme.sh
+
+      # HARNESS-DRIFT 데코레이터 가드 (#556 ADR 20260515 Amendment 8)
+      # Phase 1 임시 수정 파일 (manifest sha256 불일치) 에 HARNESS-DRIFT 데코레이터
+      # 박제 의무 — 누락 시 exit 1 (fail-fast). 정적 분석 도구 / 보안 검수자가
+      # "승인받은 임시 drift" 즉시 식별 가능 (trustless 영속화, cross-validate agy 권고).
+      # SSoT: docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8
+      - name: HARNESS-DRIFT 데코레이터 가드
+        if: hashFiles('scripts/verify-harness-drift-decorator.mjs') != ''
+        run: node scripts/verify-harness-drift-decorator.mjs

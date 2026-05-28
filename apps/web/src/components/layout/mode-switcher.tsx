@@ -44,7 +44,7 @@ export function ModeSwitcher() {
 
   return (
     <div
-      className="flex items-center gap-0.5 bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm p-0.5"
+      className="flex items-center gap-0.5 bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm p-0.5 overflow-x-auto whitespace-nowrap max-w-full"
       data-testid="mode-switcher"
     >
       {MODES.map((m) => {
@@ -58,7 +58,7 @@ export function ModeSwitcher() {
             disabled={!m.enabled}
             title={m.tooltip}
             onClick={() => handleClick(m.id, m.enabled)}
-            className={`num text-caption px-2 py-1 rounded-xs transition-colors ${
+            className={`num text-caption px-2 py-1 rounded-xs transition-colors min-w-6 min-h-6 shrink-0 ${
               active
                 ? 'bg-primary/25 text-fg-primary'
                 : m.enabled

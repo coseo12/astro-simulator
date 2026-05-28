@@ -80,3 +80,46 @@ PR #228 에서 `--bootstrap` 으로 매니페스트 baseline 을 로컬-포맷 �
 
 - **후보 A**: 버전업마다 수동 경로 업데이트 — volt #27 이 경고한 "조용한 drift" 패턴의 정확한 재연. 자동화 우선 원칙과 맞지 않음.
 - **후보 B**: upstream 과의 포맷 합의는 조직 경계 외(harness-setting 저장소 이슈). 프로젝트 단독 해결 범위 초과 + 대규모 PR 리스크.
+
+### drift 파일 ↔ .prettierignore 교차 검증 가드 ([#578](https://github.com/coseo12/astro-simulator/issues/578) — 거부 근거 박제)
+
+PR #569 (Amendment 10) 박제 직후 agy Antigravity cross-validate (2026-05-26) 고유 발견 #3 후속 분리. agy 제안: `verify-harness-drift-decorator.mjs` 가 drift 상태로 판별한 모든 파일 경로가 로컬 `.prettierignore` 패턴에 정상 포함되어 있는지 파일 파싱을 통해 교차 검증 (별도 가드 step 추가).
+
+**baseline 실측 (2026-05-27, develop tip)**: 6 drift 파일 ↔ `.prettierignore` 교차 검증 결과 — **1건 누락** (`docs/phases/roadmap-v3-incremental.md`). 다른 5 파일 (CLAUDE.md / `.claude/agents/architect.md` / `.claude/agents/pm.md` / `.github/workflows/harness-guards.yml` / `scripts/verify-z-pattern-health.mjs`) 은 정합 포함.
+
+**누락 원인 분석**: `docs/phases/roadmap-v3-incremental.md` 는 manifest 에 등록된 harness-managed 파일이나 **CLAUDE.md 예외 경로 SSoT** (CLAUDE.md "프로젝트 고유 보강 교훈" §"prettier 컨벤션 충돌" — `docs/benchmarks/**`, `docs/phases/**`, `docs/reports/**`, `docs/retrospectives/p*-retrospective.md`) 정합 의도적 제외. `scripts/sync-prettierignore.mjs` 가 이 예외 경로 화이트리스트를 적용해 `.prettierignore` 에서 의도적 제외.
+
+**결정: agy 제안 가드 거부** (옵션 B — ADR 거부 근거 박제만, #574 옵션 C 패턴 답습). 근거:
+
+- **본 프로젝트 SSoT (예외 경로) 위반**: agy 가드 도입 시 `docs/phases/roadmap-v3-incremental.md` 1건 즉시 false-positive 발화 — CLAUDE.md 예외 경로 SSoT 와 직접 충돌
+- **운영 비용 부담**: 가드 도입 시 화이트리스트 매니페스트 추가 + 운영 부담 +1 — 현재 false-positive 빈도 ↑ 가드 효과 ↓
+- **기존 가드로 충분**: `sync-prettierignore.mjs --check` + `.github/workflows/prettierignore-drift.yml` 이 이미 매니페스트 ↔ `.prettierignore` 동기화 검증 + PR 차단 수행 (도입 PR #229/#230 답습). agy 가드는 동일 영역 중복
+
+**미래 재검토 트리거 (옵션 A 승격 경로)**:
+
+- **예외 경로 외 drift 파일 leak 발생** — CLAUDE.md 예외 경로 SSoT 가 아닌 파일이 `.prettierignore` 누락 시 본 가드 도입 가치 발생 (false-positive 0, true-positive 1+)
+- **CLAUDE.md 예외 경로 SSoT 폐기** — `docs/phases/**` 등 예외 정책 변경 시 본 §섹션 재검토 의무
+- **agy 가드 + 화이트리스트 통합 신규 설계** — 예외 경로 SSoT 를 가드에 통합하면 false-positive 0 가능. 단 운영 부담 +1 trade-off 재검증
+
+**관련 직교 영역**:
+- [#578 agy 권고 영역 자체 거부] — 본 §섹션
+- [markdownlint 정합성 사전 박제] (#559) — 직교 도구 영역, 본 ADR 다른 §섹션
+- [Amendment 10 [TODO] 자동 해소] (#569) — 직교 (drift 해소 차원)
+
+### markdownlint 등 정적 검사 도구 충돌 가능성 ([#559](https://github.com/coseo12/astro-simulator/issues/559) — 사전 박제)
+
+PR #555 (ADR 20260515 Amendment 7) cross-validate agy Antigravity 고유 발견 #4 후속 분리. 본 ADR 의 prettier 경계 drift 답습 패턴 적용 — 미래 markdownlint / stylelint / eslint markdown 플러그인 등 다른 정적 검사 도구 도입 시 동일 경계 위험.
+
+**경계 위험 가설 (markdownlint 도입 시 가정 — 본 프로젝트 현재 미도입)**:
+- harness-managed `.md` (`CLAUDE.md`, `.claude/agents/*.md`, `.claude/skills/*/SKILL.md` 등) 가 markdownlint 규칙 위반 시 local fix → harness sha256 drift (prettier 경계 drift 답습)
+- IDE 자동 fix on save 가 동일 함정 (volt #35 prettier 재포맷 경계 drift 답습)
+
+**예방 가드 (도입 시점 박제 의무)**:
+1. **`.markdownlintignore` 매니페스트 동기화**: `scripts/sync-prettierignore.mjs` 패턴 답습 — manifest 의 harness-managed 경로를 `.markdownlintignore` 의 `# --- harness-managed ---` 블록으로 자동 동기화 (`sync-prettierignore.mjs` 일반화 또는 신규 `sync-markdownlintignore.mjs`)
+2. **CI drift 가드**: `.github/workflows/markdownlintignore-drift.yml` 신설 — `--check` 모드로 drift 차단 (`prettierignore-drift.yml` 답습)
+3. **운영 의무**: `harness update --apply-*` 직후 `pnpm sync:markdownlintignore` 실행 후 동일 커밋에 포함 (prettier 정합 의무 답습)
+4. **데코레이터 의무**: ADR `20260515` Amendment 8 의 HARNESS-DRIFT 데코레이터가 markdownlint 규칙 (`MD041: first-line-h1` / `MD013: line-length` 등) 위반 시 → `.markdownlint.json` 의 `default: false` 또는 inline disable (`<!-- markdownlint-disable -->`) 박제 가이드 필요
+
+**현재 박제 상태 (2026-05-27)**: 본 프로젝트 markdownlint 미도입. 본 §섹션은 미래 도입 시점 SSoT 박제 (사전 가드, 도입 PR 시 본 §섹션 참조 의무).
+
+**관련 후속 분리**: [#578](https://github.com/coseo12/astro-simulator/issues/578) (Prettier 정합성 자동 교차 검증) — Amendment 12 영역 / 본 §섹션 (markdownlint) 영역 직교. 둘 다 미래 도입 시점 박제.

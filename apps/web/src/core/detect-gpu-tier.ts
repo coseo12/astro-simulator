@@ -100,7 +100,7 @@ export function classifyAdapterIsDiscrete(
 ): boolean {
   if (adapter === null || adapter.vendor === '') {
     // Privacy fingerprinting 완화로 빈 adapter info — 보수적 integrated 취급 (ADR §위험 1)
-    // eslint-disable-next-line no-console
+     
     console.warn('[detect-gpu-tier] adapter info unavailable (privacy) — integrated 폴백');
     return false;
   }
@@ -118,7 +118,7 @@ export function classifyAdapterIsDiscrete(
   }
 
   // 미지 vendor — 보수적 integrated 취급 + drift 탐지 경고 (ADR §축 1 암묵 전제)
-  // eslint-disable-next-line no-console
+   
   console.warn(
     `[detect-gpu-tier] 미지 vendor='${adapter.vendor}' architecture='${adapter.architecture}' — integrated 폴백`,
   );

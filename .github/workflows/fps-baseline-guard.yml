@@ -1,0 +1,83 @@
+name: fps-baseline-guard
+
+# 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
+# 이슈 #536 / R4 cross-validate Gemini 고유 발견 3 후속.
+# `docs/benchmarks/fps-lowend-baseline.json` 대비 회귀 (>30% 저하 또는 <30 FPS) 감지 시 PR 차단.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  fps-baseline-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: 'pnpm'
+
+      # ci.yml R1 가드 패턴 따름 — wasm 빌드 후 next dev 사용 (__solarScene 핸들 의존).
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright chromium 설치
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: wasm + workspace 빌드
+        run: pnpm build
+
+      - name: next dev server 기동
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
+          echo $! > /tmp/next-pid
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/ko > /dev/null; then
+              echo "ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "timeout"; exit 1
+
+      - name: FPS baseline 회귀 검증
+        run: BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs
+
+      - name: dev server 정리
+        if: always()
+        run: |
+          if [[ -f /tmp/next-pid ]]; then
+            kill $(cat /tmp/next-pid) || true
+          fi
+
+      - name: 회귀 보고서 업로드 (실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-baseline-report
+          path: |
+            .verify-screenshots/fps-baseline/
+            docs/benchmarks/fps-lowend-baseline.json
+          retention-days: 7

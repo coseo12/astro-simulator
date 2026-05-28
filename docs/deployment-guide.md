@@ -30,8 +30,8 @@ gh auth status
 
 ### 선택 의존성
 ```bash
-# Gemini CLI (교차검증용)
-command -v gemini || echo "설치 필요: https://github.com/google-gemini/gemini-cli"
+# Antigravity CLI (교차검증용 — Phase 1A #269 부터, 이전 gemini-cli 가 2026-06-18 지원 종료)
+command -v agy || echo "설치 필요: https://antigravity.google/docs/cli-overview"
 
 # agent-browser (브라우저 테스트용)
 command -v agent-browser || echo "설치 필요: npm install -g agent-browser"
@@ -43,7 +43,7 @@ command -v agent-browser || echo "설치 필요: npm install -g agent-browser"
 |------|------|
 | `CLAUDE.md` | 워크플로우 규칙 + 실전 교훈 |
 | `.claude/agents/developer.md` | 풀스택 구현 에이전트 |
-| `.claude/skills/cross-validate/` | Gemini 교차검증 |
+| `.claude/skills/cross-validate/` | 외부 검증 모델 교차검증 (agy, Phase 1A #269 부터) |
 | `.claude/skills/browser-test/` | 브라우저 E2E 검증 |
 | `.claude/skills/create-issue/` | 이슈 생성 |
 | `.claude/skills/create-pr/` | PR 생성 |
@@ -54,7 +54,7 @@ command -v agent-browser || echo "설치 필요: npm install -g agent-browser"
 ```
 사용자 → Developer → 검증(CI + browser-test) → PR → Merge
                        ↑
-              cross-validate (선택, Gemini 교차검증)
+              cross-validate (선택, 외부 검증 모델 교차검증 — agy)
 ```
 
 ## 5. 커스터마이징

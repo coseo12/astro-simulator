@@ -38,15 +38,26 @@
  *                고점 pxDiameter ≈ 48.4 px (mid 임계 50 미만 → mid 일관 유지)
  *                ADR: docs/decisions/20260429-r3-venus-visualization.md Amendment 2026-05-03 (라운드 3)
  *
- * R4~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
+ * R4 baseline (#532 — earthScale 800 / moonScale 800, Q2=B SSoT 첫 본 인스턴스화):
+ *   earth = 800 → sun 대비 px 비 ≈ 14.67% (DoD 임계 ≤ 15% margin 0.33%, ±2% 마진 정책 보존)
+ *                예상 pxDiameter ≈ 36.1 px (1280×720)
+ *                ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 1
+ *   moon  = 800 → sun 대비 px 비 ≈ 3.99% (DoD 임계 ≤ 4.5% margin 0.51%, ±2% 마진 정책 보존)
+ *                예상 pxDiameter ≈ 9.84 px (1280×720), moon/earth 비 27.2% 사실 정합
+ *                ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 2
+ *
+ * R5~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
  * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
  * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건 +
- * `docs/decisions/20260429-r3-venus-visualization.md` §결과·재검토 조건).
+ * `docs/decisions/20260429-r3-venus-visualization.md` §결과·재검토 조건 +
+ * `docs/decisions/20260520-r4-earth-moon-visualization.md` §Concrete Prediction).
  */
 export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   sun: 50, // Amendment 2026-05-01 — 75 → 50 (R3 D-T2 가드 발견 #1, 옵션 a). 라운드 1/2/3 보존
   mercury: 700, // Amendment 2026-05-03 라운드 3 — 900 → 700 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~4.71%)
   venus: 800, // Amendment 2026-05-03 라운드 3 — 650 → 800 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~13.58%)
+  earth: 800, // R4 #532 — venus 동일값 (radius 1.054배 사실 비율 정합, sun 대비 px 비 ~14.67%)
+  moon: 200, // R4 #539 Amendment 4 (2026-05-23) — 사실 비율 (×800) D-T2 시각 인지 mismatch ("비정상적으로 큼"). earth 의 6.8% (mesh radius 3.475e8 m) 로 축소 — 사실 비율 깨지지만 사용자 천문 직관 정합. moon sun 대비 px 비 ~1.12% (Amendment 1 임계 5% 안)
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

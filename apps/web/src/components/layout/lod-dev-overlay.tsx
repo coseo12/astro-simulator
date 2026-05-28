@@ -43,6 +43,9 @@ interface LodBodyInfo {
   screenCoverage: number;
   pxDiameter: number;
   cameraDistanceMeters: number;
+  // #393 — billboard alpha mask 적용 여부 (low 만, sphere = null).
+  // true=mask 적용 (pxDiameter ≥ 4) / false=4px fallback (사각형 quad) / null=low 아님 or 미생성.
+  billboardAlphaMask: boolean | null;
 }
 
 interface SceneHandlesPartial {
@@ -183,19 +186,44 @@ function LodDevOverlayImpl() {
               <th className="text-left pr-2">lod</th>
               <th className="text-right pr-2">cov(px)</th>
               <th className="text-right pr-2">dia(px)</th>
-              <th className="text-right">camR(km)</th>
+              <th className="text-right pr-2">camR(km)</th>
+              <th className="text-left">bbAlpha</th>
             </tr>
           </thead>
           <tbody>
-            {bodies.map((b) => (
-              <tr key={b.id} data-testid={`lod-row-${b.id}`} data-lod-level={b.level}>
-                <td className="pr-2">{b.id}</td>
-                <td className={`pr-2 font-semibold ${LEVEL_COLOR_CLASS[b.level]}`}>{b.level}</td>
-                <td className="text-right pr-2">{b.screenCoverage.toFixed(2)}</td>
-                <td className="text-right pr-2">{b.pxDiameter.toFixed(2)}</td>
-                <td className="text-right">{(b.cameraDistanceMeters / 1000).toFixed(0)}</td>
-              </tr>
-            ))}
+            {bodies.map((b) => {
+              // #393 — billboard alpha mask 시각화:
+              //   - 'mask' (cyan) — alpha mask 적용 (pxDiameter ≥ 4, 원형 disc 인지)
+              //   - 'fb4px' (rose) — 4px fallback (사각형 quad, sub-pixel flickering 회피)
+              //   - '-' — sphere variant (high/mid) or low 미생성
+              const bbLabel =
+                b.billboardAlphaMask === true
+                  ? 'mask'
+                  : b.billboardAlphaMask === false
+                    ? 'fb4px'
+                    : '-';
+              const bbClass =
+                b.billboardAlphaMask === true
+                  ? 'text-cyan-400'
+                  : b.billboardAlphaMask === false
+                    ? 'text-rose-400'
+                    : 'text-fg-tertiary';
+              return (
+                <tr
+                  key={b.id}
+                  data-testid={`lod-row-${b.id}`}
+                  data-lod-level={b.level}
+                  data-bb-alpha={bbLabel}
+                >
+                  <td className="pr-2">{b.id}</td>
+                  <td className={`pr-2 font-semibold ${LEVEL_COLOR_CLASS[b.level]}`}>{b.level}</td>
+                  <td className="text-right pr-2">{b.screenCoverage.toFixed(2)}</td>
+                  <td className="text-right pr-2">{b.pxDiameter.toFixed(2)}</td>
+                  <td className="text-right pr-2">{(b.cameraDistanceMeters / 1000).toFixed(0)}</td>
+                  <td className={`font-semibold ${bbClass}`}>{bbLabel}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

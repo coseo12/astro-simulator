@@ -1,13 +1,14 @@
 /**
- * #402 R-Phase Allowlist 가드 — simulation-core focusOn 단위 테스트.
+ * #402 + R4 #532 R-Phase Allowlist 가드 — simulation-core focusOn 단위 테스트.
  *
  * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 3 (defense-in-depth scene 측면).
+ * R4 #532 — earth + moon 진입 (Allowlist 5개: sun/mercury/venus/earth/moon).
  *
  * 검증 대상:
- *  - focusOn 명령 + allowlist 외 body → bodySelected event emit 차단 + console.warn
- *  - focusOn + allowlist 박제 body → bodySelected event 정상 emit
+ *  - focusOn 명령 + allowlist 외 body (jupiter / neptune) → bodySelected event emit 차단 + console.warn
+ *  - focusOn + allowlist 박제 body (sun / mercury / venus / earth / moon) → bodySelected event 정상 emit
  *  - resetCamera → null id 정상 emit (가드 영향 없음 — null 은 isRPhaseFocusable true)
- *  - URL `?focus=earth` 직접 진입 시뮬레이션 — focusOn earth 호출도 차단
+ *  - URL `?focus=jupiter` 직접 진입 시뮬레이션 — focusOn jupiter 호출도 차단
  *
  * 본 테스트는 SimulationCore.command 분기만 다루므로 Babylon 초기화 불필요.
  */
@@ -16,7 +17,7 @@ import { SimulationCore } from './simulation-core.js';
 
 const makeCanvas = () => ({}) as unknown as HTMLCanvasElement;
 
-describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402)', () => {
+describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402 + R4 #532)', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -67,22 +68,35 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402)', () => {
     core.dispose();
   });
 
-  it('allowlist 외 body (earth) focusOn → bodySelected emit 0 + console.warn', () => {
+  it('allowlist 박제 body (earth) 는 focusOn 시 bodySelected emit (R4 #532)', () => {
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
     core.command({ type: 'focusOn', bodyId: 'earth' });
 
-    expect(onBodySelected).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('R_PHASE_BODY_ALLOWLIST');
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('earth');
+    expect(onBodySelected).toHaveBeenCalledTimes(1);
+    expect(onBodySelected).toHaveBeenCalledWith({ id: 'earth' });
+    expect(warnSpy).not.toHaveBeenCalled();
 
     core.dispose();
   });
 
-  it('allowlist 외 body (jupiter) focusOn → bodySelected emit 0', () => {
+  it('allowlist 박제 body (moon) 는 focusOn 시 bodySelected emit (R4 #532 satellite 첫 본 사례)', () => {
+    const core = new SimulationCore(makeCanvas());
+    const onBodySelected = vi.fn();
+    core.on('bodySelected', onBodySelected);
+
+    core.command({ type: 'focusOn', bodyId: 'moon' });
+
+    expect(onBodySelected).toHaveBeenCalledTimes(1);
+    expect(onBodySelected).toHaveBeenCalledWith({ id: 'moon' });
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    core.dispose();
+  });
+
+  it('allowlist 외 body (jupiter) focusOn → bodySelected emit 0 + console.warn', () => {
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
@@ -91,6 +105,8 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402)', () => {
 
     expect(onBodySelected).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('R_PHASE_BODY_ALLOWLIST');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('jupiter');
 
     core.dispose();
   });
@@ -122,32 +138,32 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402)', () => {
     core.dispose();
   });
 
-  it('연쇄 호출 — sun(허용) → earth(차단) → venus(허용) 시 emit 2회만', () => {
+  it('연쇄 호출 — sun(허용) → jupiter(차단) → venus(허용) 시 emit 2회만', () => {
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
     core.command({ type: 'focusOn', bodyId: 'sun' });
-    core.command({ type: 'focusOn', bodyId: 'earth' });
+    core.command({ type: 'focusOn', bodyId: 'jupiter' });
     core.command({ type: 'focusOn', bodyId: 'venus' });
 
     expect(onBodySelected).toHaveBeenCalledTimes(2);
     expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'sun' });
     expect(onBodySelected).toHaveBeenNthCalledWith(2, { id: 'venus' });
-    // earth 차단 시 1회 warn
+    // jupiter 차단 시 1회 warn
     expect(warnSpy).toHaveBeenCalledTimes(1);
 
     core.dispose();
   });
 
-  it('URL ?focus=earth 직접 진입 시나리오 — focusOn earth 도 차단', () => {
-    // URL 진입은 url-sync.tsx 가 sendCommand({type:'focusOn', bodyId: 'earth'}) 발행 →
+  it('URL ?focus=jupiter 직접 진입 시나리오 — focusOn jupiter 도 차단', () => {
+    // URL 진입은 url-sync.tsx 가 sendCommand({type:'focusOn', bodyId: 'jupiter'}) 발행 →
     // SimulationCore.command 가 본 가드로 차단. UI 우회 진입 회귀 가드.
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
-    core.command({ type: 'focusOn', bodyId: 'earth' });
+    core.command({ type: 'focusOn', bodyId: 'jupiter' });
 
     expect(onBodySelected).not.toHaveBeenCalled();
 

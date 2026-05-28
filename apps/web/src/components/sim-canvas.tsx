@@ -24,7 +24,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export function SimCanvas({ children }: { children?: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreRef = useRef<SimulationCore | null>(null);
-  const unsubDiskRef = useRef<(() => void) | null>(null);
   // P12-A #298 N1 — onBeforeRender observer 중복 등록 방지용 cleanup 핸들.
   // HMR / 컴포넌트 remount 시 scene 이 살아있을 수 있어 관찰자 누수 방지.
   const tierObserverCleanupRef = useRef<(() => void) | null>(null);
@@ -51,7 +50,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       const wantsGpu = requested === 'webgpu' || requested === 'auto';
       if (!cap.webgpu) {
         // 항상 경고: 향후 P3-A/B 활성화 시 진단에 도움.
-        // eslint-disable-next-line no-console
+         
         console.warn('[gpu] WebGPU 미지원:', cap.reason);
         if (wantsGpu) {
           useSimStore.getState().setEngineNotice({
@@ -281,7 +280,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
 
         // P5-D #180 — ?bh=1 옵트인 시 중력렌즈 PostProcess + 블랙홀 메쉬 추가.
-        // P6-B #190 — ?bh=2 옵트인 시 정확 shadow + accretion disk PostProcess (별도 모듈).
+        // (#405 — `?bh=2` accretion disk 경로는 v3 reset 후 적용 대상 없어 폐기.
+        //  BlackHoleDiskPanel + store.blackHoleDisk + createBlackHoleRendering 호출 함께 제거.)
         const bhParam = new URLSearchParams(window.location.search).get('bh');
         if (bhParam === '1' && instance.scene) {
           const lensing = sceneApi.createGravitationalLensing(instance.scene, camera, {
@@ -293,41 +293,6 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const bhy = Number(new URLSearchParams(window.location.search).get('bhy')) || 0;
           const bhz = Number(new URLSearchParams(window.location.search).get('bhz')) || 0;
           lensing.setPosition(bhx, bhy, bhz);
-        } else if (bhParam === '2' && instance.scene) {
-          const initialDisk = useSimStore.getState().blackHoleDisk;
-          // P7-C #208 — ?ray3d=1 옵트인 시 3D ray construction 경로 활성화.
-          // 기본(미지정/0)은 P6-B D' 화면공간 근사 유지 (회귀 격리).
-          const ray3dParam = new URLSearchParams(window.location.search).get('ray3d');
-          const useRay3D = ray3dParam === '1';
-          const bh = sceneApi.createBlackHoleRendering(instance.scene, camera, {
-            position: [3, 0, 0],
-            visualRadius: 0.3,
-            diskInnerRs: initialDisk.innerRs,
-            diskOuterRs: initialDisk.outerRs,
-            diskEccentricity: initialDisk.eccentricity,
-            diskThicknessRs: initialDisk.thicknessRs,
-            diskTiltRad: (initialDisk.tiltDeg * Math.PI) / 180,
-            useRay3D,
-          });
-          // 검증 스크립트가 현재 활성 경로를 감지할 수 있도록 전역 노출.
-          Object.defineProperty(window, '__bhRay3D', {
-            configurable: true,
-            value: useRay3D,
-            writable: false,
-          });
-          // store 변경 → handles 호출 (LUT 재생성 0회 — uniform만 갱신).
-          const unsubDisk = useSimStore.subscribe((state, prev) => {
-            const next = state.blackHoleDisk;
-            const old = prev.blackHoleDisk;
-            if (next === old) return;
-            if (next.innerRs !== old.innerRs) bh.setDiskInner(next.innerRs);
-            if (next.outerRs !== old.outerRs) bh.setDiskOuter(next.outerRs);
-            if (next.eccentricity !== old.eccentricity) bh.setDiskEccentricity(next.eccentricity);
-            if (next.thicknessRs !== old.thicknessRs) bh.setDiskThickness(next.thicknessRs);
-            if (next.tiltDeg !== old.tiltDeg) bh.setDiskTilt((next.tiltDeg * Math.PI) / 180);
-          });
-          // dispose 시 구독 해제 (useEffect cleanup chain에 묶기 위해 ref 보존).
-          unsubDiskRef.current = unsubDisk;
         }
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
@@ -393,18 +358,42 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // 가 결정한 newTier 적용 전이라 같은 tier 의 식). 결정된 finalTier 가 다르면 setTier
               // 가 즉시 mesh.scaling 과 origin 을 갱신하므로 다음 controller.focusOn 호출 시
               // mesh.absolutePosition 은 새 tier 좌표계에서 정확.
+              // R4 #539 Amendment 3 — satellite focus multiplier 분기 (식 후보 2).
+              // moon focus 시 visual scale=30 + moonScale=800 결합으로 wsRadius 가 매우 커
+              // 기존 ×5 식이 mesh 내부 (`cameraRadius/moonScaling ≈ 1.011`) 에 카메라 박힘.
+              // satellite (parentId ≠ null && parentId ≠ 'sun') 는 ×20 적용해 mesh 외각 보장
+              // (D3.3 cameraRadius/moonScaling > 1.5 통과). R5+ phobos/io/europa/titan 자동 수용.
+              // ADR `20260520-r4-earth-moon-visualization.md` §Amendment 3 §식 후보 2.
+              const parentId = solar.getBodyParentId(bodyId);
+              const focusMultiplier = sceneApi.resolveFocusMultiplier(parentId);
+
+              // 1차 측정 — 현 tier 기준 cameraDistMeters 산출 (applyFocusTier 입력용).
               mesh.computeWorldMatrix(true);
-              const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
-              const desiredRadius = Math.max(
-                meshRadius * sceneApi.FOCUS_USER_RADIUS_MULTIPLIER,
-                meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+              const meshRadiusPre = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+              const desiredRadiusPre = Math.max(
+                meshRadiusPre * focusMultiplier,
+                meshRadiusPre + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
               );
               const currentTier = solar.getTier();
               const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(currentTier);
-              const cameraDistMeters = desiredRadius * metersPerSceneUnit;
+              const cameraDistMeters = desiredRadiusPre * metersPerSceneUnit;
               solar.applyFocusTier(bodyId, cameraDistMeters);
 
-              controller.focusOn({ mesh });
+              // R4 #539 Amendment 3 — applyFocusTier 가 setTier 트리거 시 mesh.scaling 이 즉시
+              // 갱신되므로 wsRadius 재측정 필수. tier T1→T3 전환 시 wsRadius 가 0.2 → 60426 으로
+              // 점프 (≈ ×300000), 1차 desiredRadius=4.04 로 controller.focusOn 호출하면 새 tier
+              // mesh 내부 매우 깊숙이 카메라 박힘 → D3.2 isVisible=false 회귀.
+              // 2차 측정으로 tier 전환 후 mesh radius 기준 desiredRadius 재계산.
+              mesh.computeWorldMatrix(true);
+              const meshRadius = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+              const desiredRadius = Math.max(
+                meshRadius * focusMultiplier,
+                meshRadius + sceneApi.FOCUS_USER_RADIUS_MIN_PADDING,
+              );
+
+              // controller.focusOn 도 동일 식 적용 (sim-canvas SSoT 단일). 명시적 radius 전달로
+              // camera-controller 내부 default 식 (×5) 우회 — Amendment 3 satellite 분기 정합.
+              controller.focusOn({ mesh, radius: desiredRadius });
             }
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
@@ -527,8 +516,6 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     return () => {
       cancelled = true;
       unsubEngine?.();
-      unsubDiskRef.current?.();
-      unsubDiskRef.current = null;
       tierObserverCleanupRef.current?.();
       tierObserverCleanupRef.current = null;
       detach();

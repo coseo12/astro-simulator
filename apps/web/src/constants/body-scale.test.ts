@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BODY_SCALE, getBodyScale } from './body-scale';
 
-describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업 (Amendment 2026-05-03 라운드 3 D-1)', () => {
+describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 시각 과장 룩업 (Q2=B SSoT 첫 본 인스턴스화)', () => {
   it('sun = 50 (R1 Amendment 2026-05-01 — 75 → 50, 옵션 a, 라운드 1/2/3 보존)', () => {
     expect(BODY_SCALE.sun).toBe(50);
   });
@@ -12,6 +12,14 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 시각 과장 룩업 (Amend
 
   it('venus = 800 (R3 Amendment 2026-05-03 라운드 3 — 650 → 800, D-1 사실 비율 강화)', () => {
     expect(BODY_SCALE.venus).toBe(800);
+  });
+
+  it('earth = 800 (R4 #532 — venus 동일값, radius 1.054배 사실 비율 정합)', () => {
+    expect(BODY_SCALE.earth).toBe(800);
+  });
+
+  it('moon = 200 (R4 #539 Amendment 4 — 사실 비율 D-T2 인지 mismatch 후 축소, earth 6.8%)', () => {
+    expect(BODY_SCALE.moon).toBe(200);
   });
 
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
@@ -30,11 +38,13 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('sun')).toBe(50);
     expect(getBodyScale('mercury')).toBe(700);
     expect(getBodyScale('venus')).toBe(800);
+    expect(getBodyScale('earth')).toBe(800);
+    expect(getBodyScale('moon')).toBe(200);
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('earth')).toBe(1.0);
     expect(getBodyScale('jupiter')).toBe(1.0);
+    expect(getBodyScale('mars')).toBe(1.0);
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 
