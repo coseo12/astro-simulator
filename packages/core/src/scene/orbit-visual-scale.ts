@@ -31,11 +31,38 @@
  * R5 (mars/phobos/deimos) / R6 (jupiter/galilean) / R7 (saturn/titan) 진입 시 동일 패턴.
  * 각 parent-satellite 쌍별로 박제값 추가 (forensic 측정 후 확정).
  *
+ * ## R5 박제 (#594, 2026-05-28) — satellite 2개 첫 본 사례
+ *
+ * mars-phobos (binding constraint):
+ *   - mars-phobos 실측 거리 = 9.376e6 m (JPL SSD, semiMajorAxisAU 6.26752e-5)
+ *   - mars mesh radius (marsScale=800) = 2.717e9 m
+ *   - phobos mesh radius (phobosScale=5000) = 5.54e7 m
+ *   - sum mesh radius = 2.772e9 m → 실측 거리의 **295.6배** (R4 moon 16.9배 의 17.5배 더 극단)
+ *   - visual_scale=500 적용 시 visual 거리 = 4.688e9 m → sum mesh / visual 거리 = **1.69배** 분리 마진
+ *     (분리 임계 ≥ 1.5x 통과 +0.19, R4 1.78배 와 거의 동등 안정)
+ *
+ * mars-deimos (자동 안전):
+ *   - mars-deimos 실측 거리 = 23.463e6 m (JPL SSD, semiMajorAxisAU 1.5684e-4)
+ *   - sum mesh radius = 2.748e9 m (mars 2.717e9 + deimos 3.135e7) → 실측 거리의 117.1배
+ *   - visual_scale=500 적용 시 visual 거리 = 1.173e10 m → sum mesh / visual 거리 = **4.27배** 분리 마진
+ *     (phobos 가 binding constraint 이고 deimos 는 자동 안전 — 단일 룩업으로 둘 다 처리)
+ *
+ * 후보 비교 (8개, R5 ADR §결정 4 §축 4 후보 비교):
+ *   ×100 (0.34x fail) / ×200 (0.68x fail) / ×300 (1.02x ε통과 — 마진 부족) / ×400 (1.35x 미통과)
+ *   / **×500 (1.69x 선택)** / ×600 (2.03x 보수) / ×750 (2.54x fallback) / ×1000 (3.38x 과도)
+ *
+ * 명명 결정 (cross-validate 이견 수용 #1, 2026-05-28): `MARS_SATELLITES_ORBIT_VISUAL_SCALE`
+ * — deimos 도 포함하므로 `MARS_PHOBOS_*` 보다 정확. R6+ 다중 satellite (galilean 4 / titan +
+ * saturn moons 다수) 일관성 우선. R4 `EARTH_MOON_*` 답습 무시 (R4 가 단일 satellite 특수 사례).
+ *
  * ## 참고 ADR
  *
- *   - `docs/decisions/20260520-r4-earth-moon-visualization.md` §Amendment 2 — forensic 박제
+ *   - `docs/decisions/20260520-r4-earth-moon-visualization.md` §Amendment 2 — forensic 박제 (earth-moon)
  *   - §결정 6 §Visual scale 후보 비교 — 8개 후보 분리 마진 비교
  *   - §Concrete Prediction §예측 1~4 — D2.1~D2.6 검증 의무
+ *   - `docs/decisions/20260528-r5-mars-visualization.md` §결정 4 — mars-satellites 박제
+ *   - §축 4 후보 비교 — 8개 후보 분리 마진 비교 (mars-phobos binding constraint)
+ *   - §위험 #6 + §재검토 트리거 #4 — `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` 신규 룩업 Amendment 가능성
  */
 
 /**
@@ -49,12 +76,31 @@
 export const EARTH_MOON_ORBIT_VISUAL_SCALE = 30;
 
 /**
+ * Mars-Satellites 궤도 visual scale 배수 (phobos + deimos 둘 다 적용).
+ *
+ * `phobos world position = mars world position + (phobos local orbit × 500)` 로 산출.
+ * `deimos world position = mars world position + (deimos local orbit × 500)` 동일.
+ * 실측 거리 (phobos 9.376e6 m / deimos 23.463e6 m) 는 보존되며 rendering 단계에서만 ×500 적용.
+ *
+ * 분리 마진: phobos 1.69x (binding constraint) / deimos 4.27x (자동 안전).
+ *
+ * D-T2 미통과 시 fallback: 500 → 600 → 750. 750 미통과 시 Amendment 1 (deimos 별도 룩업 도입).
+ * `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` 신규 룩업 가능성 (R5 ADR §위험 #6).
+ *
+ * R6+ SSoT: galilean (io/europa/ganymede/callisto) / titan 등 satellite 진입 시
+ * 동일 단일 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT.jupiter` 등) 우선. 사실 비율 편차 큰 satellite
+ * (예: io vs callisto) 는 Amendment 1 가능.
+ */
+export const MARS_SATELLITES_ORBIT_VISUAL_SCALE = 500;
+
+/**
  * parent body id 별 satellite orbit visual scale 룩업.
  *
  * R5+ 진입 시 parent-satellite 쌍별로 박제값 추가. 미정의 parent 는 1.0 (실측 그대로).
  */
 export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Object.freeze({
   earth: EARTH_MOON_ORBIT_VISUAL_SCALE, // R4 #539 Amendment 2 — moon visual fusion 해결
+  mars: MARS_SATELLITES_ORBIT_VISUAL_SCALE, // R5 #594 — phobos + deimos 단일 룩업 (binding constraint=phobos)
 });
 
 /** 기본값 (parent 가 룩업에 없거나 visual scale 미적용 — 실측 그대로). */

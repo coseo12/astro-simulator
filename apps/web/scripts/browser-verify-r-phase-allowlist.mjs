@@ -45,15 +45,21 @@ import { chromium } from 'playwright';
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
 
 /**
- * 현재 R-Phase 박제값 (R1 sun + R2 mercury + R3 venus + R4 earth + moon).
+ * 현재 R-Phase 박제값 (R1 sun + R2 mercury + R3 venus + R4 earth + moon + R5 mars + phobos + deimos).
  * R-Phase 진입 시 이 리스트 갱신 의무 박제 (ADR §결정 4 항목 3).
  *
  * SSoT: packages/core/src/scene/r-phase-allowlist.ts `R_PHASE_BODY_ALLOWLIST`.
  *
  * R4 #532 — earth + moon 동시 진입 (Q5=A 정합).
+ * R5 #594 — mars + phobos + deimos 동시 진입 (Q1=B 정합, Q4a=A — phobos/deimos shortcut 미등록).
  * ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 R-Phase 갱신 절차.
+ * ADR: docs/decisions/20260528-r5-mars-visualization.md §결정 7 + §결정 8.
+ *
+ * ⚠️ 검증 매트릭스 — focus-quick-buttons UI 만 검증 (shortcut bar 등록 대상). R5 Q4a=A 정합:
+ *    phobos / deimos 는 shortcut bar 미등록 → 본 매트릭스 비대상.
+ *    phobos/deimos R-Phase Allowlist 진입 검증은 4) URL 직접 진입 매트릭스 (4-B 정상) 에서 별도 박제.
  */
-const RPHASE_EXPECTED_ENABLED = ['sun', 'mercury', 'venus', 'earth', 'moon'];
+const RPHASE_EXPECTED_ENABLED = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars'];
 const RPHASE_EXPECTED_DISABLED = ['jupiter', 'neptune'];
 
 const VIEWPORT = { width: 1280, height: 800 };
@@ -228,15 +234,18 @@ async function verifyEnabledClickWorks(page) {
  */
 async function verifyUrlDirectEntry(browser) {
   const cases = [
-    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R4 #532: jupiter / neptune 만).
+    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R5 #594 후: jupiter / neptune 만).
     { focus: 'jupiter', expected: null, label: '4-A 차단' },
     { focus: 'neptune', expected: null, label: '4-A 차단' },
-    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon 진입 검증).
+    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon + R5 mars/phobos/deimos 진입 검증).
     { focus: 'sun', expected: 'sun', label: '4-B 정상' },
     { focus: 'mercury', expected: 'mercury', label: '4-B 정상' },
     { focus: 'venus', expected: 'venus', label: '4-B 정상' },
     { focus: 'earth', expected: 'earth', label: '4-B 정상 (R4 #532)' },
     { focus: 'moon', expected: 'moon', label: '4-B 정상 (R4 #532)' },
+    { focus: 'mars', expected: 'mars', label: '4-B 정상 (R5 #594)' },
+    { focus: 'phobos', expected: 'phobos', label: '4-B 정상 (R5 #594 satellite 2개 첫 본 사례)' },
+    { focus: 'deimos', expected: 'deimos', label: '4-B 정상 (R5 #594 satellite 2개 첫 본 사례)' },
     // 4-C 무효 — 기존 R1 가드 회귀 보호.
     { focus: 'invalid-body-id', expected: null, label: '4-C 무효' },
   ];

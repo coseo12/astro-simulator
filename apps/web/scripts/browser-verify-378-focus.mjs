@@ -59,8 +59,12 @@ const flags = {
  * focusOn 가드가 R-Phase 외 body 의 카메라 동기화를 차단 → 본 매트릭스의
  * earth/jupiter/neptune cells 가 의도하지 않게 FAIL. ci.yml verify:378-focus
  * step 4 commit 잠복 (#414 → #417 → #421 → #422 → #423 빈 commit push 로 재발견).
+ *
+ * R5 #594 — R4 baseline 잔존 drift (earth/moon 누락) + R5 추가 (mars/phobos/deimos) 동시 처리.
+ * ADR `docs/decisions/20260528-r5-mars-visualization.md` §위험 #4 박제 + D17 의무.
+ * R4 머지 시 미동기화 발견 (R5 진입에서 R4 + R5 누적 동시 처리).
  */
-const FOCUS_BODIES = ['sun', 'mercury', 'venus'];
+const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos'];
 const MODES = ['observe', 'research'];
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };

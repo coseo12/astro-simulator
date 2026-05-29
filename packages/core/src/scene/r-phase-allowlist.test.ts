@@ -8,8 +8,17 @@ import { R_PHASE_BODY_ALLOWLIST, isRPhaseFocusable } from './r-phase-allowlist.j
  */
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1 sun + R2 mercury + R3 venus + R4 earth + moon 순서로 정확히 5개', () => {
-    expect(R_PHASE_BODY_ALLOWLIST).toEqual(['sun', 'mercury', 'venus', 'earth', 'moon']);
+  it('현재 박제: R1 sun + R2 mercury + R3 venus + R4 earth + moon + R5 mars + phobos + deimos 순서로 정확히 8개', () => {
+    expect(R_PHASE_BODY_ALLOWLIST).toEqual([
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'moon',
+      'mars',
+      'phobos',
+      'deimos',
+    ]);
   });
 
   it('Object.freeze 로 런타임 변경 불가능', () => {
@@ -18,25 +27,27 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 
   it('readonly tuple 타입 박제 — RPhaseBodyId 추출 가능', () => {
     // 타입 레벨 검증은 컴파일러가 담당. 런타임은 구조만 확인.
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(5);
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(8);
   });
 });
 
 describe('isRPhaseFocusable — focusOn 가드 helper', () => {
-  it('allowlist 박제 body 는 true (sun / mercury / venus / earth / moon)', () => {
+  it('allowlist 박제 body 는 true (sun / mercury / venus / earth / moon / mars / phobos / deimos)', () => {
     expect(isRPhaseFocusable('sun')).toBe(true);
     expect(isRPhaseFocusable('mercury')).toBe(true);
     expect(isRPhaseFocusable('venus')).toBe(true);
     expect(isRPhaseFocusable('earth')).toBe(true);
     expect(isRPhaseFocusable('moon')).toBe(true);
+    expect(isRPhaseFocusable('mars')).toBe(true); // R5 #594
+    expect(isRPhaseFocusable('phobos')).toBe(true); // R5 #594
+    expect(isRPhaseFocusable('deimos')).toBe(true); // R5 #594
   });
 
-  it('allowlist 외 body 는 false (jupiter / neptune / mars / saturn / phobos)', () => {
+  it('allowlist 외 body 는 false (jupiter / neptune / saturn / io)', () => {
     expect(isRPhaseFocusable('jupiter')).toBe(false);
     expect(isRPhaseFocusable('neptune')).toBe(false);
-    expect(isRPhaseFocusable('mars')).toBe(false);
     expect(isRPhaseFocusable('saturn')).toBe(false);
-    expect(isRPhaseFocusable('phobos')).toBe(false);
+    expect(isRPhaseFocusable('io')).toBe(false); // R6 galilean 진입 전
   });
 
   it('null 은 true — resetCamera / free-fly 경로 차단 금지 (ADR §결정 3)', () => {

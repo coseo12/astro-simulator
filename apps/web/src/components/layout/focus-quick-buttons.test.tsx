@@ -132,14 +132,15 @@ describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus + R4 earth + moon
  *  - disabled 버튼 강제 클릭 시 focusOn 명령 발행 0 (HTML disabled 자체 차단)
  *  - tooltip (title 속성) 박제
  */
-describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532)', () => {
-  it('R-Phase 박제 body (sun / mercury / venus / earth / moon) 는 활성', () => {
+describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5 #594)', () => {
+  it('R-Phase 박제 body (sun / mercury / venus / earth / moon / mars) 는 활성', () => {
     render(<FocusQuickButtons />);
     expect(screen.getByTestId('focus-sun')).not.toBeDisabled();
     expect(screen.getByTestId('focus-mercury')).not.toBeDisabled();
     expect(screen.getByTestId('focus-venus')).not.toBeDisabled();
     expect(screen.getByTestId('focus-earth')).not.toBeDisabled();
     expect(screen.getByTestId('focus-moon')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-mars')).not.toBeDisabled(); // R5 #594
   });
 
   it('R-Phase 미박제 body (jupiter / neptune) 는 disabled', () => {
@@ -154,12 +155,13 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532)', (
     expect(screen.getByTestId('focus-neptune')).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('활성 버튼은 aria-disabled="false" (R4 earth / moon 포함)', () => {
+  it('활성 버튼은 aria-disabled="false" (R4 earth / moon + R5 mars 포함)', () => {
     render(<FocusQuickButtons />);
     expect(screen.getByTestId('focus-sun')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-venus')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-earth')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-moon')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('focus-mars')).toHaveAttribute('aria-disabled', 'false'); // R5 #594
   });
 
   it('disabled 버튼은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
@@ -168,6 +170,7 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532)', (
     expect(screen.getByTestId('focus-sun')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('focus-earth')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('focus-moon')).toHaveAttribute('data-r-phase-disabled', 'false');
+    expect(screen.getByTestId('focus-mars')).toHaveAttribute('data-r-phase-disabled', 'false'); // R5 #594
   });
 
   it('disabled 버튼은 tooltip (title 속성) 박제 — 사용자 안내', () => {
@@ -182,6 +185,7 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532)', (
     expect(screen.getByTestId('focus-sun')).not.toHaveAttribute('title');
     expect(screen.getByTestId('focus-earth')).not.toHaveAttribute('title');
     expect(screen.getByTestId('focus-moon')).not.toHaveAttribute('title');
+    expect(screen.getByTestId('focus-mars')).not.toHaveAttribute('title'); // R5 #594
   });
 
   it('disabled 버튼 강제 click → focusOn 명령 발행 0 (HTML disabled 자체 차단)', () => {
@@ -231,5 +235,26 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532)', (
     render(<FocusQuickButtons />);
     fireEvent.click(screen.getByTestId('focus-moon'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'moon' });
+  });
+
+  // R5 #594 — mars 활성 케이스 단언 (Q4a=A: mars 만 추가, phobos/deimos 미등록 검증)
+  it('mars 버튼 텍스트 = "화성" (R5 박제 + 한국어 라벨)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-mars')).toHaveTextContent('화성');
+  });
+
+  it('mars 클릭 시 focusOn 명령 발행 (R5 #594 Q2=B 2번째 본 인스턴스화)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-mars'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'mars' });
+  });
+
+  it('phobos / deimos 는 shortcut bar 미등록 (Q4a=A — 모바일 너비 안전)', () => {
+    render(<FocusQuickButtons />);
+    // R5 ADR §결정 8: phobos/deimos 는 URL override 또는 mars focus zoom-in 후 mesh 클릭 진입.
+    // shortcut bar 미등록으로 10 버튼 (sun/mercury/venus/earth/moon/mars/jupiter/neptune + reset + free-fly)
+    // = 356 px < 375 px 모바일 viewport (margin 19 px).
+    expect(screen.queryByTestId('focus-phobos')).toBeNull();
+    expect(screen.queryByTestId('focus-deimos')).toBeNull();
   });
 });
