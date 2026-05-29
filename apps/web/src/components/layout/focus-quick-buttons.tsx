@@ -18,6 +18,7 @@ const FOCUS_BUTTONS = [
   { id: 'venus', label: '금성' }, // R3 #369 — mercury 다음 천체 거리 순
   { id: 'earth', label: '지구' }, // R4 #532 — venus 다음 천체 거리 순
   { id: 'moon', label: '달' }, // R4 #532 — earth 인접 (parent-satellite 자연 그룹)
+  { id: 'mars', label: '화성' }, // R5 #594 — Q4a=A (mars 만 추가, phobos/deimos 미등록 — 모바일 너비 안전 356 px < 375 px)
   { id: 'jupiter', label: '목성' }, // R-Phase Allowlist disabled (R6 진입 전)
   { id: 'neptune', label: '해왕성' }, // R-Phase Allowlist disabled (R10 진입 전)
 ];

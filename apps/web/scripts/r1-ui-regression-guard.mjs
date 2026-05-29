@@ -89,6 +89,10 @@ const PX_RATIO_THRESHOLDS = Object.freeze({
   venus: 14.26,
   earth: 17, // R4 #532 — Amendment 1 (2026-05-21) — perspective 보정 후 안정화
   moon: 5.0, // R4 #532 — Amendment 1 (2026-05-21) — earth 와 동반 완화
+  mars: 8, // R5 #594 — Q2=B 2번째 본 인스턴스화 (산출 7.81%, margin 0.19%, ± 2% 노이즈 허용)
+  // phobos / deimos: N/A — 사실 비율 명시 위배 박제값 + 4px fallback billboard 흡수.
+  //                       R5 ADR §결정 6: r1-guard `--measure-px-ratio` 미박제. 회귀 가드는
+  //                       R-Phase Allowlist + browser-verify-r-phase-allowlist 의 expected list 우회.
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
@@ -168,7 +172,10 @@ async function measureBodyPxRatios(page) {
     /** @type {Record<string, any>} */
     const bodies = {};
     /** @type {string[]} */
-    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon'];
+    // R5 #594 — mars 추가 (Q2=B 임계 ≤ 8% 박제). phobos/deimos 는 §결정 6 (미박제) 정합 — 측정만
+    // 하고 임계 가드는 없음 (4px fallback billboard 흡수). 단 사용자 D-T2 단계에서 mesh visible
+    // 회귀 확인 의무.
+    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos'];
 
     /**
      * mesh world center 를 column-major Matrix.m 로 직접 NDC → 화면 좌표 변환.
