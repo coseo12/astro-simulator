@@ -1,6 +1,6 @@
 # ADR: [#606] r1-guard Playwright Chromium freeze forensic — CI detect-and-test ~6시간 stuck (PR #596 R5 머지 직후 회귀)
 
-- **상태**: Provisional (cross-validate 대기 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이)
+- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료)
 - **날짜**: 2026-05-31
 - **결정자**: architect (#606 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #606 (본 forensic), #604/#605 (직전 발현 PR), #594/#596 (R5 머지 trigger), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md), [`apps/web/scripts/r1-ui-regression-guard.mjs`](../../apps/web/scripts/r1-ui-regression-guard.mjs), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
@@ -88,8 +88,8 @@ PR #596 의 r1-guard 변경 정확 영역:
 #### 가설 5 의 sub-가설 (root cause 후속 분리)
 
 - **가설 5a**: phobos/deimos 의 `boundingSphere.radiusWorld` 가 `mesh.computeWorldMatrix(true)` 후에도 Tier transition 시점 (mars_R 16292배 점프 — Tier 1 ↔ Tier 3) 에 비동기 갱신되어 r1-guard 의 sync access 가 무한 wait
-- **가설 5b**: `projectWorldToScreen` 의 NDC 변환에서 satellite 좌표가 numerical precision 한계 (phobos visual orbit 4.688e9 m × Floating Origin scale) 에서 NaN/Infinity 발생 → Chromium GPU shader 가 freeze
-- **가설 5c**: 8 body 측정의 `page.evaluate` payload 직렬화가 satellite mesh reference 순환 참조로 무한 직렬화 시도 → Playwright IPC 채널 deadlock
+- **가설 5b**: `projectWorldToScreen` 의 NDC 변환에서 satellite 좌표가 numerical precision 한계 (phobos visual orbit 4.688e9 m × Floating Origin scale) 에서 NaN/Infinity 발생 → Chromium GPU shader 가 freeze. **agy cross-validate 보강 (제안 1 수용)**: `projectWorldToScreen` 은 pure JS 함수 (CPU side V8/Node 연산) — WebGL pipeline shader 가 아니므로 GPU shader freeze 메커니즘은 부정확. 실제 위험은 **(i) CPU thread 무한 loop 조건** — `while`/`for` 탈출 조건이 NaN 비교로 영구 false 화 (예: `while (current > target)` 에서 current=NaN 시 항상 false 인데 increment 가 NaN 으로 누적 안 됨) / **(ii) division by zero** — `w ≈ 0` 가드 (line 191 `Math.abs(w) < 1e-9`) 가 satellite 좌표 극단값에서 false negative (예: w=NaN 시 `Math.abs(NaN) < 1e-9` 는 false → 비정상 path 진행). pure JS NaN 전파가 page.evaluate sync evaluation 을 freeze 시키는 메커니즘. WebGL shader freeze 가설은 별도 차원 (Babylon 의 frame loop 자체 freeze) 가능성으로 분리
+- **가설 5c**: 8 body 측정의 `page.evaluate` payload 직렬화가 satellite mesh reference 순환 참조로 무한 직렬화 시도 → Playwright IPC 채널 deadlock. **agy cross-validate 보강 (제안 1 수용)**: Playwright `page.evaluate()` 는 인자 전달 + 반환값 수신 시 내부 `JSON.stringify` 계열 직렬화 통과 의무. Babylon `Mesh` / `Scene` / `Camera` 인스턴스는 순환 참조 (parent ↔ children + scene back-reference + material/texture back-reference 등) 가 깊어 직렬화 실패 시 `TypeError: Converting circular structure to JSON` 예외 또는 IPC 채널 응답 없음 도달. 본 r1-guard `measureBodyPxRatios` 의 반환값 `bodies[id]` 는 원시 타입 (`wsRadius` number / `wsCenter` number[] / `screenCenter` object / `pixelDiameter` number / `diskAreaRatio` number) 만 — 명시적 순환 참조 0. 단 **(i) Babylon Vector3 객체 직접 반환 시** 내부 `_x/_y/_z` private + getter 직렬화 분기 / **(ii) `meshes` Map 자체가 evaluate scope 외부 leak 시** Mesh 인스턴스 IPC 직렬화 시도 가능성. 본 r1-guard 는 원시 타입만 반환 — 가설 5c 발현 영역은 코드 변경 시 도입될 위험 (현재 한정 안전, 미래 instrumentation 시 주의). **운영 규칙 (가설 5c 예방)**: `page.evaluate()` 반환 payload 는 원시 데이터 타입 (`number` / `string` / `boolean` / `Plain Object` / `Array of primitives`) 만 — Babylon 인스턴스 (`Mesh` / `Scene` / `Vector3` / `Matrix`) 직접 반환 금지. Vector3 → `[x, y, z]` 변환 / Matrix → `[...m]` array 변환 의무
 
 ### 잠재 시점 분석
 
@@ -196,9 +196,11 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ### 예측 3 — 옵션 (a) 채택 시 CI 정상화 검증
 
-- **D-X1**: 5 body 임시 revert 후 detect-and-test 실행 시간 < 10분 (정상 baseline ~5분 + Linux runner overhead +5분 안전 마진)
+- **D-X1a**: 5 body 임시 revert 후 detect-and-test 워크플로 전체 실행 시간 < 10분 (정상 baseline ~5분 + Linux runner overhead +5분 안전 마진)
+- **D-X1b** (agy cross-validate 제안 3 수용 — step 단위 정량화): r1-guard 단일 step 실행 시간 < 2분 (정상 baseline ~30초~1분 + 측정 변동 안전 마진). 워크플로 전체 시간 < 10분은 다른 step (pnpm install / build / wasm-pack 등) 의 변동 흡수 포함이라 r1-guard step 자체의 freeze 여부 판정에는 step 단위 metric 필수
 - **D-X2**: cancelled 0건 (전 브랜치 다음 N=3 push 검증)
-- 위반 임계: D-X1 ≥ 10분 또는 D-X2 ≥ 1건 cancelled → **가설 5 기각** + 다른 가설 재탐색 (가설 5 의 sub-가설 5a/5b/5c 중 어느 것도 아님)
+- 위반 임계: D-X1a 또는 D-X1b 위반 또는 D-X2 ≥ 1건 cancelled → **가설 5 기각** + 다른 가설 재탐색 (가설 5 의 sub-가설 5a/5b/5c 중 어느 것도 아님)
+- **측정 도구**: `gh run view <run-id> --json jobs --jq '.jobs[0].steps[] | select(.name | contains("r1-guard")) | "\(.startedAt) -> \(.completedAt)"'` 로 r1-guard step 시작/종료 시각 추출. 단일 step 시간 = completedAt - startedAt
 
 ### 예측 4 — 본 ADR Provisional → Accepted 전이 시점
 
@@ -232,10 +234,10 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ### Fix 후 박제 의무 (별도 후속 PR)
 
-- 옵션 (a) 후속 PR — 5 body 임시 revert + D-X1/D-X2 측정 + 가설 5 확정/기각 박제
-- 옵션 (b) 후속 PR — ci.yml timeout-minutes:10 추가 + admin override 의존 측정 (다음 N=3 push)
+- **옵션 (b) 후속 PR — 우선순위 high (agy cross-validate 제안 2 가치 보존, §7 박제)**: ci.yml r1-guard step `timeout-minutes: 10` 추가 + admin override 의존 측정 (다음 N=3 push) + CI 자원 절약 즉시 효과
+- 옵션 (a) 후속 PR — 5 body 임시 revert + D-X1a/D-X1b/D-X2 측정 + 가설 5 확정/기각 박제
 - 옵션 (c) 또는 (d) 후속 PR — 가설 5 확정 후 root cause fix
-- 본 ADR §5 §구현 절차 갱신 (Accepted 전이) + R5 ADR §결정 5 Amendment 동반 (mars 임계 가드 보존 또는 폐기)
+- 본 ADR §5 §구현 절차 갱신 (Accepted 전이 완료) + R5 ADR §결정 5 Amendment 동반 (mars 임계 가드 보존 또는 폐기, fix 후 박제값 영향 시)
 
 ---
 
@@ -259,7 +261,49 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ---
 
-## §7 Amendment 라운드 N (예상)
+## §7 교차검증 반영 사항 (cross-validate 2026-05-31 agy Antigravity outcome=applied)
+
+본 ADR 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 직후 1회 루틴" 의무) 결과 4축 분류 박제:
+
+### 합의 (agy + Claude 일치, 5건)
+
+1. forensic 변형 ADR 8섹션 구조 정합 (`docs/templates/forensic-adr-template.md` 답습)
+2. 회귀 시점 정확도 강력 (PR #596 머지 후 2초, 5초 단위 인과관계 확정)
+3. 가설 5 (R5 추가 satellite body 측정 freeze) 의 정황 증거 타당성
+4. 보안 / 엣지 케이스 양호 (마크다운 문서 박제만)
+5. 인코딩 정합 (U+FFFD 0건 verified)
+
+### 이견 (없음)
+
+본 ADR 의 핵심 결정 (옵션 e — Provisional 박제만 + 후속 분리) 자체에 대한 이견 0.
+
+### Claude 재분석 기각 (agy 제안 거부, 1건)
+
+1. **agy 제안 2 거부 — 옵션 (b) `timeout-minutes: 10` 본 PR 통합 머지 권고 거부**:
+   - **거부 근거**: 사용자 합의 옵션 D ("ADR 박제 + 후속 분리") 답습 의무 + 본 PR 결정 (옵션 e) 자체 모순 회피 (단기 fix 분리 원칙 위배)
+   - **CLAUDE.md §교차검증 §"수용 vs 후속 분리 3단 프로토콜" 정합**: agy 제안이 즉시 운영 개선 가치 있으나 본 PR 스프린트 계약 §비목표 ("단기/장기 fix 구현은 별도 후속 PR 분리") 침범 → 후속 이슈 분리
+   - **후속 PR 우선순위 high 박제 의무 (agy 가치 보존)**: 본 PR 머지 직후 옵션 (b) PR 분리 → ci.yml r1-guard step `timeout-minutes: 10` 추가 → admin override 의존 즉시 감소 + CI 자원 절약 + 개발 피드백 루프 정상화
+
+### 고유 발견 (수용 → 본 PR 즉시 반영, 2건)
+
+1. **agy 제안 1 수용 — 가설 5b/5c 작동 메커니즘 구체화** (ADR §1 §가설 5 §sub-가설 본문 보강):
+   - **가설 5b**: `projectWorldToScreen` 은 pure JS 함수 (CPU side V8/Node 연산) 임을 명시 — WebGL pipeline shader 가설 부정확 분리. 실제 위험 (i) CPU thread 무한 loop 조건 (NaN 비교 영구 false 화) (ii) division by zero gate 의 false negative
+   - **가설 5c**: Playwright `page.evaluate()` 직렬화 분기 명시 + 운영 규칙 신설 (payload 는 원시 데이터 타입만, Babylon 인스턴스 직접 반환 금지)
+
+2. **agy 제안 3 수용 — Concrete Prediction §예측 3 정량화 분리** (ADR §4 §예측 3 보강):
+   - **D-X1a 분리**: 워크플로 전체 < 10분 (다른 step 변동 흡수 포함)
+   - **D-X1b 신설**: r1-guard 단일 step < 2분 (정상 baseline ~30초~1분 + 안전 마진)
+   - **측정 도구 박제**: `gh run view <run-id> --json jobs --jq` 명령 SSoT
+
+### Claude 셀프 체크 (편향 회피)
+
+- **단일 모델 합의 편향** — agy 가 옵션 (e) 결정 자체 부분 반박 (제안 2 통합 머지 권고). 본 PR 결정 (옵션 e) 의 논리 (사용자 합의 옵션 D 정합 + CRITICAL #2 root cause 미확정 상태 즉시 fix 결정 금지) 박제로 합의 편향 완화 + 후속 PR (옵션 b) 분리로 agy 가치 보존
+- **"엄격한 DoD = 안전" 편향** (volt #66) — agy 가 즉시 운영 가속 권고했으나 본 PR 범위 제한 우선 + 후속 PR 분리로 즉시 운영 가치 보존 (스프린트 계약 강도 유지)
+- **measurement-first 원칙** (volt #51) — 가설 5b/5c sub-가설 메커니즘은 정황 증거만 (코드 직접 실행 검증 없음). 옵션 (a) 후속 PR 의 D-X1a/D-X1b/D-X2 측정으로 사후 검증 의무 박제
+
+---
+
+## §8 Amendment 라운드 N (예상)
 
 본 forensic ADR 은 후속 PR (옵션 a/b/c/d) 의 실측 결과로 Amendment 라운드 N≥1 예상:
 
@@ -271,7 +315,7 @@ forensic 5 조건 충족 (가설 N=5 / runtime 측정 = CI history 정적 분석
 
 ---
 
-## §8 참고
+## §9 참고
 
 - 트리거 이슈: [#606](https://github.com/coseo12/astro-simulator/issues/606)
 - 트리거 PR: [#605](https://github.com/coseo12/astro-simulator/pull/605) (close 후 본 forensic 박제)
