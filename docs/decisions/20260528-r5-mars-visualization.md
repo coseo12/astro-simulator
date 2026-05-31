@@ -1,6 +1,6 @@
 # ADR: R5 화성 + 포보스 + 데이모스 시각화 — Q2=B 정책 2번째 본 인스턴스화 + satellite 2개 첫 본 사례
 
-- **상태**: Accepted (cross-validate 2026-05-28 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이) **+ Amendment 1 Provisional (#604, 2026-05-31 cross-validate 대기)**
+- **상태**: Accepted (cross-validate 2026-05-28 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이) **+ Amendment 1 Accepted (#604, cross-validate 2026-05-31 agy outcome=applied 후 본문 통합 완료)**
 - **날짜**: 2026-05-28
 - **결정자**: architect (#594 R5 PM 합의 라운드 1, 2026-05-28 후 위임)
 - **관련**: #594 (본 R5 스프린트), [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) (R4 SSoT — earthScale=800 / moonScale=200 Amendment 4 / EARTH_MOON_ORBIT_VISUAL_SCALE=30 / satellite 첫 본 사례 패턴 + R-Phase 단일 ADR + forensic 변형 패턴), [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) (Q2=B 비례 결정 정책 SSoT — 본 R5 가 R4 이후 2번째 본 인스턴스화), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (R-Phase 진입 5곳 동시 박제 절차 SSoT), [`20260424-p11-b-lod-design.md`](20260424-p11-b-lod-design.md) (LOD × scale 합성 순서), [`20260422-floating-origin.md`](20260422-floating-origin.md), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541, 의무 체크리스트 4항목), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md) (Amendment 라운드 N 예상 시 승격 SSoT)
@@ -844,7 +844,7 @@ forensic 5 조건 중 3개 이상 충족 시 forensic 변형 승격 ([`docs/temp
 
 ## Amendment 1 (#604, 2026-05-31) — §결정 4 산식 vs 실측 분리 명시
 
-- **상태**: Provisional (cross-validate 대기 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이)
+- **상태**: Accepted (cross-validate 2026-05-31 agy Antigravity outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이)
 - **트리거**: PR #603 ([#597 NO-OP ADR](20260530-597-satellite-z-fighting-no-op.md)) §Forensic 측정 데이터 §핵심 발견 #1 — "R5 ADR §결정 4 박제값 1.69x 실측 0.99 mismatch" 부산물 박제
 - **결정**: §결정 4 산식 (1.69x) **유지** + 실측 데이터 (0.99 / 2.49) 분리 박제 + Tier scale 가설 박제 (검증 없음)
 - **행동 변화**: 없음 (코드 / 박제값 / 회귀 가드 무수정). ADR 정합성 회복 목적
@@ -884,9 +884,9 @@ deimos 동일 단위 산출 시 4.27x. **본 산식 보존** — phobos binding 
 
 ### Mismatch 분석 (산식 vs 실측)
 
-- phobos: 산식 1.69x / 실측 0.99 → **실측이 산식의 약 1.74배 작음** (1.69 / 0.99 = 1.708)
+- phobos: 산식 1.69x / 실측 0.99 → **실측이 산식의 약 1.71배 작음** (1.69 / 0.99 = 1.708) — cross-validate agy 정정 (제안 2 수용)
 - deimos: 산식 4.27x / 실측 2.49 → **실측이 산식의 약 1.71배 작음** (4.27 / 2.49 = 1.715)
-- 두 satellite 동일 ratio (~1.71~1.74배) 일관 — 단일 원인 (단위 변환 또는 measurement metric 정의 차이) 강력 시사
+- 두 satellite 동일 ratio (~1.71배) 일관 — 단일 원인 (단위 변환 또는 measurement metric 정의 차이) 강력 시사
 
 ### 가설 (架설, 검증 없음 — R6 architect 단계 의무)
 
@@ -916,7 +916,7 @@ deimos 동일 단위 산출 시 4.27x. **본 산식 보존** — phobos binding 
 
 §결과 / 재검토 조건 (line 759~) 의 기존 트리거에 추가:
 
-- **R6 (jupiter + galilean 4) 진입 시 architect 단계 의무**: 본 Amendment 1 §가설 3종 검증 → 산식 정정 (옵션 A 승격) 또는 산식 vs 실측 분리 메트릭 정의 명시. R6 ADR 박제 시점에 본 Amendment 1 cross-link 박제 의무
+- **R6 (jupiter + galilean 4) 진입 시 architect 단계 의무**: 본 Amendment 1 §가설 3종 검증 → 산식 정정 (옵션 A 승격) 또는 산식 vs 실측 분리 메트릭 정의 명시. R6 ADR 박제 시점에 본 Amendment 1 cross-link 박제 의무. **Tier 변환 시점 (Floating Origin Tier 1 ↔ Tier 3 전이 구간) edge validation 테스트 의무 추가** — cross-validate agy 고유 발견 #3 수용, mars_R 16292배 점프 (PR #603 §핵심 발견 #2) 구간에서 satellite 분리 마진 실측 (`phobos.position.length() / mars.boundingSphere.radiusWorld`) 가 산식과 일치하는 임계값 확인 의무
 - **단독 정정 트리거**: 사용자 D-T2 회귀 보고 (mars/phobos/deimos 줌인 시각 회귀) / Floating Origin Tier scale 변환 정정 작업 (별도 ADR) / measurement metric SSoT 정합 가드 도입
 
 ### Visual Fidelity §의무 체크리스트 4항목 (#541) 정합
@@ -926,11 +926,40 @@ deimos 동일 단위 산출 시 4.27x. **본 산식 보존** — phobos binding 
 - **UI overlay 실측값 표기** ✓ — CelestialInfoPanel mars/phobos/deimos 실측 radius 표기 유지
 - **baseline 박제** ✓ — 본 Amendment §실측 표 박제 (산식 vs 실측 mismatch 1.71배 일관 ratio)
 
+### 교차검증 반영 사항 (cross-validate 2026-05-31 agy Antigravity outcome=applied)
+
+PR #605 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 직후 1회 루틴" 의무) 결과 4축 분류 박제:
+
+#### 합의 (agy + Claude 일치)
+
+1. **PATCH 분류 적정** — 런타임 코드 변경 0 (마크다운 문서 편집만) / 보안 취약점 경로 없음 / 성능 영향 0
+2. **ADR 정합·cross-link 무결성** — CLAUDE.md §ADR Status 워크플로 정합 + PR #603 양방향 cross-link 추적성 확보
+3. **옵션 B 선택 자체 반박 없음** — 산식 보존 + 실측 분리 박제 결정 자체에 이견 0
+
+#### 이견 (없음)
+
+본 Amendment 의 핵심 결정 (옵션 B / 가설 3종 박제 / R6 트리거 갱신) 에 대한 이견 0.
+
+#### Claude 재분석 기각 (agy 제안 거부)
+
+1. **agy 제안 1: CHANGELOG 1500자 한 줄 → 개행 분할 제안 거부** — 본 프로젝트 CHANGELOG.md 컨벤션 (R5 entry 8000+ 자 한 줄 + 굵은 글씨 + 백틱 SSoT 박제 패턴) 답습. agy 가 프로젝트 전체 컨벤션 미인지 → 일관성 손상 회피. 후속 분리 가치도 보존하지 않음 (CHANGELOG 포맷 일괄 개선은 별도 영역, 본 PR 범위 외)
+
+#### 고유 발견 (수용 → 본 PR 즉시 반영)
+
+1. **agy 제안 2 수용 — Mismatch 분석 phobos 수식 오타 정정** (사실 오류 영역): `1.69 / 0.99 = 1.708 ≈ 1.71배` 인데 본문 초안에 "약 1.74배" 로 잘못 표기. 본 Amendment 의 핵심 논지 (1.71배 일관 ratio → 단일 원인 시사) 자체 약화하는 오타. **즉시 정정** (deimos 1.71과 일관성 강화)
+2. **agy 제안 3 수용 — R6 architect 단계 Tier 변환 edge validation 테스트 명시 추가**: 가설 1 (Floating Origin Tier scale 변환 누락) + 가설 2 (Babylon `boundingSphere.radiusWorld` 갱신 시점) 의 동적 Tier 전이 구간 edge validation 테스트 의무 추가. mars_R 16292배 점프 (PR #603 §핵심 발견 #2) 구간 임계값 확인 의무 §재검토 트리거에 박제
+
+#### Claude 셀프 체크 (편향 회피)
+
+- **"엄격한 DoD = 안전" 편향** (volt #66) — 본 Amendment 는 산식 정정이 아닌 분리 명시 (옵션 B) 로 priority:low 정합 + 작업량 최소화. agy 가 R6 가드 강화 (제안 3) 만 제안하고 산식 정정 (옵션 A) 자체는 요구하지 않음 → 사용자 합의 옵션 B 결정 정당화 정합
+- **단일 모델 합의 편향** — agy 가 옵션 B 결정 자체 반박 0. 본 Amendment §옵션 비교 표가 옵션 A/B/C 명시 박제 + 거부 근거 박제로 합의 편향 완화 정합
+
 ### 참고
 
 - 부모 ADR: 본 ADR §결정 4 (line 376~410) — 산식 SSoT 보존
 - 부모 ADR: [`20260422-floating-origin.md`](20260422-floating-origin.md) — Tier transition SSoT (가설 1 의 단위 변환 영역)
 - 트리거 ADR: [`20260530-597-satellite-z-fighting-no-op.md`](20260530-597-satellite-z-fighting-no-op.md) §Forensic 측정 데이터 §핵심 발견 #1 — 본 Amendment 의 실측 박제 출처
 - 학습 사례: volt [#74](https://github.com/coseo12/volt/issues/74) (DoD PASS ≠ 제품 동작), volt [#77](https://github.com/coseo12/volt/issues/77) (headless ≠ 실 Chrome 일관 패턴 확인 → 본 mismatch 는 환경 무관 동일 패턴이므로 가설 1/2/3 모두 환경 독립)
+- cross-validate 로그: `.claude/logs/cross-validate-code-20260531-152956.log` + outcome JSON `cross-validate-code-20260531-152956-outcome.json`
 - 트리거 이슈: [#604](https://github.com/coseo12/astro-simulator/issues/604)
 - Builds on: #597 (PR #603)
