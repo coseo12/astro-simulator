@@ -1,6 +1,6 @@
 # ADR: [#606] r1-guard Playwright Chromium freeze forensic — CI detect-and-test ~6시간 stuck (PR #596 R5 머지 직후 회귀)
 
-- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료)
+- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Provisional (2026-06-01 cross-validate 대기)**
 - **날짜**: 2026-05-31
 - **결정자**: architect (#606 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #606 (본 forensic), #604/#605 (직전 발현 PR), #594/#596 (R5 머지 trigger), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md), [`apps/web/scripts/r1-ui-regression-guard.mjs`](../../apps/web/scripts/r1-ui-regression-guard.mjs), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
@@ -303,15 +303,72 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ---
 
-## §8 Amendment 라운드 N (예상)
+## §8 Amendment 라운드 N
 
-본 forensic ADR 은 후속 PR (옵션 a/b/c/d) 의 실측 결과로 Amendment 라운드 N≥1 예상:
+### Amendment 1 (2026-06-01) — 옵션 (b) 자가 입증 결과 + 가설 5 재확인
 
-- Amendment 1: 옵션 (a) 후속 PR — 가설 5 확정 또는 기각 (D-X1/D-X2 측정)
-- Amendment 2: 옵션 (c) 또는 (d) 후속 PR — root cause fix 박제
-- Amendment 3: R6 진입 시 satellite 측정 일반화 가드 (galilean 4 + 본 R5 phobos/deimos 의 8 body 측정 freeze 패턴 → R6 의 12 body 측정)
+- **상태**: Provisional (cross-validate 대기)
+- **트리거**: PR #608 (`e1d3ebf`) 머지 후 자가 입증 — `.github/workflows/ci.yml` line 99 r1-guard step `timeout-minutes: 10` 추가 후 본 PR #608 의 CI run 26716302495 자체에서 옵션 (b) 효과 실측
+- **PATCH 분류** — 본 Amendment 는 자가 입증 결과 박제 + 가설 5 재확인. 코드 / 박제값 / 회귀 가드 / 단위 테스트 / 워크플로 동작 변화 0 (옵션 b 자체는 별도 PR #608 에서 박제)
 
-forensic 5 조건 충족 (가설 N=5 / runtime 측정 = CI history 정적 분석 / DoD PASS 인데 사용자/제품 회귀 = admin override 누적 / 5 옵션 비교 / Amendment N≥1 예상) → forensic 변형 ADR 정합.
+#### Concrete Prediction §예측 2 검증 결과 (PASS)
+
+본 ADR §4 §예측 2 ("옵션 (b) 채택 시 코드 변경 라인 수 = 1 라인, 위반 임계 ±50%") 사후 검증:
+
+| metric | 예측 | 실측 (PR #608) | 결과 |
+|---|---|---|---|
+| 코드 변경 라인 수 | 1 라인 | 1 라인 (`.github/workflows/ci.yml` line 99 `timeout-minutes: 10`) | ✅ PASS (예측 정확 일치) |
+| 추가 주석 박제 | 1 라인 (선택) | 1 라인 (`# #606 옵션 (b) — Playwright Chromium freeze 시 ~6시간 stuck 방지`) | ✅ PASS |
+| ADR §5 §Fix 후 박제 의무 갱신 | 1 라인 | 1 라인 (옵션 (b) ✅ 완료 표시) | ✅ PASS |
+| CHANGELOG 박제 | (자유) | 4 라인 (Behavior Changes 박제) | (메타) |
+| **합계** | ~1-3 라인 | **3 파일 7 라인** | ✅ PASS (±50% 임계 0배 / 정확) |
+
+#### 자가 입증 측정 결과 (PR #608 run 26716302495)
+
+| 항목 | 값 | SSoT 관계 |
+|---|---|---|
+| r1-guard step 시작 | 2026-05-31T15:12:39Z | — |
+| r1-guard step 종료 | 2026-05-31T15:22:52Z | — |
+| **r1-guard step 실행 시간** | **10분 13초** | **timeout-minutes:10 정확 발현** |
+| r1-guard step conclusion | **failure (timeout cancelled)** | freeze 발생 → timeout 가드 작동 |
+| workflow 전체 시간 | 11분 (15:11:59 → 15:22:52) | fail-fast 효과 (후속 step skipped) |
+| 이전 baseline | ~6시간 stuck → 360분 cancelled | GitHub Actions 기본 timeout |
+| **단축 비율** | **36배** (360분 → 10분) | 즉시 운영 효과 입증 |
+
+#### 가설 5 재확인 (root cause 잔존)
+
+옵션 (b) 의 timeout 가드는 freeze **증상 차단** 만 — root cause 미해소:
+- r1-guard step 이 10분 후 자동 cancelled = freeze 발생 사실 (timeout 0초 success 였다면 freeze 해소)
+- **가설 5 (R5 추가 satellite body 측정 freeze) 재확인** — opportunity 가설로 격상
+- sub-가설 5a/5b/5c 중 어느 것이 root cause 인지 후속 옵션 (a) PR 의 D-X1a/D-X1b/D-X2 측정으로 확정 필요
+- **R6 진입 전 옵션 (a) 또는 (c) 선행 의무** — §6 §위험 #2 박제 정합
+
+#### 부수 효과 실측
+
+- **fail-fast 효과** — r1-guard failure 후 후속 step (#378/#408/#402/Node yarn/python/go 감지 등) **자동 skipped** → workflow 전체 fail 도달 시간 ~6시간 → ~11분 (36배 단축의 본질)
+- **admin override 의존 즉시 감소** — 본 PR #608 자체가 admin override 머지 (메모리 SSoT 답습 13회차) 였으나, 이후 PR 들은 자연 cancelled 후 fail-only admin override 가능 (대기 시간 단축)
+- **R6 인계 위험 완화** — galilean 4 추가 (8 body → 12 body) 시 stuck 발생해도 10분 후 cancelled → admin override 의존도 동일하게 36배 단축
+
+#### §재검토 트리거 갱신 (본 Amendment 추가)
+
+§6 §재검토 트리거 기존 4항목에 추가:
+
+5. **timeout-minutes:10 임계 부족 시** — pnpm install (~3분) + build (~2분) 누적 합이 8분 초과 시 r1-guard 측정 시간 부족으로 정상 시에도 cancelled 위험. 다음 N=3 push 검증 시 r1-guard step 실측 < 2분 (D-X1b) 확인 의무 — 위반 시 timeout-minutes 임계 상향 검토
+6. **fail-fast 효과 변화** — GitHub Actions workflow 정의 변경 (composite action / matrix expansion) 시 fail-fast 자동 적용 보장 재검증 의무
+
+#### 학습 정수
+
+- **measurement-first 원칙** (volt #51) 답습 — Concrete Prediction §예측 2 박제로 사후 검증 가능. 본 Amendment 는 옵션 (b) 의 효과 실측 데이터 박제로 본 ADR 전체 신뢰성 증명
+- **agy cross-validate 제안 2 거부 결정 정합 검증** — PR #607 §7 §Claude 기각 1건 (옵션 b 본 PR 통합 머지 권고 거부 + 후속 PR 분리로 가치 보존) 의 후속 분리 결정이 실제로 옵션 (b) 자가 입증 + 메모리 SSoT 갱신 동시 박제로 가치 보존 입증
+- **forensic ADR 변형의 사후 검증 가치** — 본 Amendment 가 §4 §Concrete Prediction 의 사후 검증 가능 박제 패턴 답습. 일반 ADR (Concrete Prediction 없음) 대비 forensic 변형의 우월성 입증
+
+### Amendment 라운드 N≥2 예상
+
+- Amendment 2: 옵션 (a) 후속 PR — 가설 5 확정 또는 기각 (D-X1a/D-X1b/D-X2 측정)
+- Amendment 3: 옵션 (c) 또는 (d) 후속 PR — root cause fix 박제 (가설 5b/5a 직접 타격)
+- Amendment 4: R6 진입 시 satellite 측정 일반화 가드 (galilean 4 + 본 R5 phobos/deimos 의 8 body 측정 freeze 패턴 → R6 의 12 body 측정)
+
+forensic 5 조건 충족 (가설 N=5 / runtime 측정 = CI history 정적 분석 + 본 Amendment 1 자가 입증 측정 / DoD PASS 인데 사용자/제품 회귀 = admin override 누적 / 5 옵션 비교 / Amendment N=1 박제 + N≥2 예상) → forensic 변형 ADR 정합.
 
 ---
 
