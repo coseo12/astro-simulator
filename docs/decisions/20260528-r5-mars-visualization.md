@@ -1,6 +1,6 @@
 # ADR: R5 화성 + 포보스 + 데이모스 시각화 — Q2=B 정책 2번째 본 인스턴스화 + satellite 2개 첫 본 사례
 
-- **상태**: Accepted (cross-validate 2026-05-28 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이)
+- **상태**: Accepted (cross-validate 2026-05-28 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이) **+ Amendment 1 Provisional (#604, 2026-05-31 cross-validate 대기)**
 - **날짜**: 2026-05-28
 - **결정자**: architect (#594 R5 PM 합의 라운드 1, 2026-05-28 후 위임)
 - **관련**: #594 (본 R5 스프린트), [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) (R4 SSoT — earthScale=800 / moonScale=200 Amendment 4 / EARTH_MOON_ORBIT_VISUAL_SCALE=30 / satellite 첫 본 사례 패턴 + R-Phase 단일 ADR + forensic 변형 패턴), [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) (Q2=B 비례 결정 정책 SSoT — 본 R5 가 R4 이후 2번째 본 인스턴스화), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (R-Phase 진입 5곳 동시 박제 절차 SSoT), [`20260424-p11-b-lod-design.md`](20260424-p11-b-lod-design.md) (LOD × scale 합성 순서), [`20260422-floating-origin.md`](20260422-floating-origin.md), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541, 의무 체크리스트 4항목), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md) (Amendment 라운드 N 예상 시 승격 SSoT)
@@ -28,7 +28,7 @@
 | `BODY_SCALE.mars` | **800** | `apps/web/src/constants/body-scale.ts` | R5 본 진입 §결정 1 |
 | `BODY_SCALE.phobos` | **5000** | `apps/web/src/constants/body-scale.ts` | R5 본 진입 §결정 2 (moon Amendment 4 학습 — 사실 비율 깨고 사용자 천문 직관) |
 | `BODY_SCALE.deimos` | **5000** | `apps/web/src/constants/body-scale.ts` | R5 본 진입 §결정 3 (moon Amendment 4 학습) |
-| `MARS_SATELLITES_ORBIT_VISUAL_SCALE` + `ORBIT_VISUAL_SCALE_BY_PARENT.mars` | **500** (상수명 cross-validate 이견 수용 #1 박제) | `packages/core/src/scene/orbit-visual-scale.ts` | R5 본 진입 §결정 4 (phobos 분리 마진 1.69x) |
+| `MARS_SATELLITES_ORBIT_VISUAL_SCALE` + `ORBIT_VISUAL_SCALE_BY_PARENT.mars` | **500** (상수명 cross-validate 이견 수용 #1 박제) | `packages/core/src/scene/orbit-visual-scale.ts` | R5 본 진입 §결정 4 (phobos 분리 마진 산식 1.69x / 실측 0.99 — Amendment 1 분리 명시 #604) |
 | `PX_RATIO_THRESHOLDS.mars` | **8%** | `apps/web/scripts/r1-ui-regression-guard.mjs` | R5 본 진입 §결정 5 |
 | `PX_RATIO_THRESHOLDS.phobos` | **N/A** (4px fallback billboard 의존 — Q2=B 임계 미적용) | r1-guard expected 미박제 | R5 본 진입 §결정 6 |
 | `PX_RATIO_THRESHOLDS.deimos` | **N/A** (4px fallback billboard 의존) | r1-guard expected 미박제 | R5 본 진입 §결정 6 |
@@ -41,7 +41,7 @@
 1. **marsScale=800** (§결정 1): venus/earth 와 동일값. 사실 비율 정합 (mars/venus radius 56.1% → 시각 비 57.5% 인지 강화) + Q2=B 단조 패턴 (mercury 700 → venus 800 → earth 800 → mars 800)
 2. **phobosScale=5000** (§결정 2): **moon Amendment 4 학습 적용** — 사실 비율 (radius_phobos/radius_mars = 0.33%) 명시 위배. 시각 visible 보장 (4px fallback billboard 의존)
 3. **deimosScale=5000** (§결정 3): phobos 와 동일값. 사실 비율 명시 위배 + 4px fallback 의존
-4. **MARS_SATELLITES_ORBIT_VISUAL_SCALE=500** (§결정 4, cross-validate 이견 수용 #1 명명 박제): mars-phobos sum mesh / 실측 거리 = 295.6배 → visual_scale=500 적용 시 분리 마진 1.69x (≥ 1.5 임계 통과). deimos 도 동일 parent 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT.mars`) 으로 처리 (Amendment 1 가능성)
+4. **MARS_SATELLITES_ORBIT_VISUAL_SCALE=500** (§결정 4, cross-validate 이견 수용 #1 명명 박제): mars-phobos sum mesh / 실측 거리 = 295.6배 → visual_scale=500 적용 시 분리 마진 **산식 1.69x** (≥ 1.5 임계 통과). deimos 도 동일 parent 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT.mars`) 으로 처리. **Amendment 1 (#604, 2026-05-31)**: 실측 `phobos.position.length() / mars.boundingSphere.radiusWorld` = 0.99 (phobos) / 2.49 (deimos) — 산식 vs 실측 1.71배 일관 ratio mismatch 발견. 시각 회귀 0 + alpha mask billboard 자연 흡수 + D-T2 정상 통과로 NO-OP 결정. R6 진입 시 architect 단계 산식 정정 의무 (§Amendment 1 참조)
 5. **Q2=B 임계 박제 — mars=8%** (§결정 5): mars sun 대비 px 비 산출 7.81% margin 0.19% (± 2% 허용 오차 안)
 6. **Q2=B 임계 미적용 — phobos/deimos** (§결정 6): 사실 비율 명시 위배로 박제값 자체가 Q2=B 정합 무관. 4px fallback billboard 의존 → r1-guard `--measure-px-ratio` 미박제. 회귀 가드는 R-Phase Allowlist + browser-verify-r-phase-allowlist 로 우회
 7. **R-Phase Allowlist 8 body** (§결정 7): sun/mercury/venus/earth/moon/mars/phobos/deimos 진입
@@ -839,3 +839,98 @@ R6+: R-Phase 진입 시 architect ADR 박제 (jupiter ≥ 100% 예상 — Q2=B �
 - Amendment 4: 사실 비율 vs 시각 인지 mismatch (R5 phobos/deimos 사실 위배 박제값 D-T2 검증 필수)
 
 forensic 5 조건 중 3개 이상 충족 시 forensic 변형 승격 ([`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md)). 본 R5 의 satellite 2개 첫 본 사례 + mars-phobos 극단 fusion (R4 의 17.5배) 으로 Amendment 2 forensic 승격 가능성 R4 보다 높음 — 양방향 cross-link 박제 의무.
+
+---
+
+## Amendment 1 (#604, 2026-05-31) — §결정 4 산식 vs 실측 분리 명시
+
+- **상태**: Provisional (cross-validate 대기 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이)
+- **트리거**: PR #603 ([#597 NO-OP ADR](20260530-597-satellite-z-fighting-no-op.md)) §Forensic 측정 데이터 §핵심 발견 #1 — "R5 ADR §결정 4 박제값 1.69x 실측 0.99 mismatch" 부산물 박제
+- **결정**: §결정 4 산식 (1.69x) **유지** + 실측 데이터 (0.99 / 2.49) 분리 박제 + Tier scale 가설 박제 (검증 없음)
+- **행동 변화**: 없음 (코드 / 박제값 / 회귀 가드 무수정). ADR 정합성 회복 목적
+- **PATCH 분류** — CLAUDE.md §릴리스 §"행동 변화 vs 문서 변경 판정 질문" 기준 (에이전트 동작 변화 없음)
+
+### 배경
+
+#597 (PR #603) NO-OP forensic 측정의 **부산물 발견**. 시각 회귀 0 + alpha mask billboard 자연 흡수 + D-T2 정상 통과 정합 (NO-OP 결정 영향 없음) 이나, **본 ADR §결정 4 박제값 1.69x 와 runtime 실측 0.99 의 mismatch** 가 정합성 회귀로 잠재. R6 (jupiter + galilean) 진입 시 satellite 분리 마진 산식 정합성 의무 (§위험 #6 + §재검토 트리거 #4) 에 영향 가능성 차단 목적.
+
+### 산식 (보존) — §결정 4 SSoT
+
+본 §결정 4 (line 376~410) 의 산출식은 **SI 단위 (m)** 기준 단위 일관:
+
+```
+mars mesh radius (marsScale=800) = 3.3962e6 × 800 = 2.717e9 m
+phobos mesh radius (phobosScale=5000) = 1.108e4 × 5000 = 5.54e7 m
+mars + phobos sum mesh = 2.772e9 m
+phobos 실측 orbit = 9.376e6 m
+phobos sum mesh / orbit = 295.6배
+visual_scale = 500 적용 시 phobos visual orbit = 9.376e6 × 500 = 4.688e9 m
+phobos 분리 마진 = (visual orbit) / (sum mesh) = 4.688e9 / 2.772e9 = 1.69x
+```
+
+deimos 동일 단위 산출 시 4.27x. **본 산식 보존** — phobos binding constraint 의 ≥ 1.5x 임계 통과 + R4 §결정 6 패턴 답습 일관성 + visual_scale=500 박제값 정정 0.
+
+### 실측 (PR #603 §Forensic 측정 데이터, 신규 박제)
+
+- **measurement metric**: `phobos.position.length() / mars.boundingSphere.radiusWorld` (mars mesh 중심 → phobos mesh 중심 거리 / mars wsR)
+- **measurement tool**: `scripts/_debug-597-tmp.mjs` (volt #67 패턴, 즉시 rm)
+- **measurement env**: develop tip `50c9c57` (R5 + 후속 #598/#599 머지 후) / viewport 1280×720 / `?focus=mars`
+
+| 측정 환경 | phobos_marsRadiusRatio | deimos_marsRadiusRatio | mars_R (boundingSphere) |
+|---|---|---|---|
+| headless Playwright (7 cell) | 0.9848 ~ 1.0110 (평균 ≈ 0.998) | 2.4931 ~ 2.4937 (평균 ≈ 2.493) | 118118 → 7.247 (ultra) |
+| 실 Chrome agent-browser (8 cell) | 0.9866 ~ 0.9906 (대부분 0.9906) | 2.4927 ~ 2.4936 | 7.247 → 118118 (r=20+ Tier transition) |
+| **R5 ADR §결정 4 박제값** | **1.69x** | **4.27x** | **2.717e9 (SI 단위 m)** |
+
+### Mismatch 분석 (산식 vs 실측)
+
+- phobos: 산식 1.69x / 실측 0.99 → **실측이 산식의 약 1.74배 작음** (1.69 / 0.99 = 1.708)
+- deimos: 산식 4.27x / 실측 2.49 → **실측이 산식의 약 1.71배 작음** (4.27 / 2.49 = 1.715)
+- 두 satellite 동일 ratio (~1.71~1.74배) 일관 — 단일 원인 (단위 변환 또는 measurement metric 정의 차이) 강력 시사
+
+### 가설 (架설, 검증 없음 — R6 architect 단계 의무)
+
+본 Amendment 는 산식 정정이 아닌 분리 명시만 박제. 원인 가설 3종:
+
+1. **Floating Origin Tier scale 변환 누락** — mars mesh radius 의 Tier scaled (rendering 시점) vs unscaled (산식) 차이. `mars_R` 가 7.247 (Tier 1) ↔ 118118 (Tier 3) 의 16292배 점프 (PR #603 §핵심 발견 #2) 가 단위 변환 신호 의심
+2. **`mesh.scaling` 적용 후 `boundingSphere.radiusWorld` 갱신 시점** — Babylon boundingInfo 가 scaling 후 즉시 갱신되지 않는 경우 measurement metric (`boundingSphere.radiusWorld`) 와 산식 (`radius × scale`) 의 차이
+3. **measurement metric vs 산식 metric 정의 차이** — 산식: `(visual orbit) / (mars mesh radius + phobos mesh radius)` (sum mesh 분리 마진) / 실측: `(phobos.position.length()) / (mars.boundingSphere.radiusWorld)` (단순 중심 거리 / mars wsR). 두 metric 정의 자체가 다를 가능성. 1.71배 일관 ratio 가 단순 산식 분모 차이 (sum mesh vs mars only) 일 수 있음 — `2.772e9 / 2.717e9 = 1.02` 로 1.71 미달이므로 본 가설 단독 설명 부족, 가설 1/2 와 결합 가능성
+
+**검증 보류 근거** (옵션 B 선택): priority:low + 시각 회귀 0 + alpha mask billboard 자연 흡수 + D-T2 정상 통과 + R6 진입 시 architect 단계 산식 정합성 의무 (§재검토 트리거 #4) 로 자연 트리거 보존. 단독 산식 정정 작업 ROI marginal (옵션 A 거부 근거).
+
+### 옵션 비교 (Provisional 결정)
+
+| 옵션 | 방안 | 작업량 | 리스크 | 선택 |
+|---|---|---|---|---|
+| **A. 산식 정정 + Tier scale 변환 추가** | runtime debug 스크립트로 가설 1/2/3 검증 → 산식에 Tier scale 변환 추가 → 실측 0.99 박제 | 큼 (R5 + Floating Origin ADR 동시 영향) | priority:low 대비 작업량 과잉. Floating Origin SSoT 침범 위험 | ❌ |
+| **B. 산식 vs 실측 분리 명시 Amendment** (선택) | §결정 4 산식 보존 + 실측 분리 박제 + 가설 박제 + R6 정정 트리거 | 작음 (ADR 1개 + Amendment 헤더) | ADR 정합 회복 + R6 자연 트리거 보존 | ✓ |
+| C. R6 진입 시 동시 정정 | 현재 mismatch 박제 보류, R6 architect 단계에 산식 정정 위임 | 0 | mismatch 박제 누락 → R6 architect 가 발견 못 할 위험 (volt #21 신규 함수 ≠ 신규 구현 변형) | ❌ |
+
+옵션 B 선택 근거:
+1. **priority:low 정합** — 시각 회귀 0 + D-T2 정상 통과 + 4px alpha mask 자연 흡수 (PR #603 §결정 5축 정합)
+2. **ADR 정합 회복** — 미래 reviewer / R6 architect 의 "산식이 틀린데 왜 안 고치냐" 혼란 차단 (분리 명시로 해소)
+3. **R6 자연 트리거 보존** — §재검토 트리거 #4 (R6 jupiter + galilean architect 단계 산식 정합성 의무) 에 본 Amendment cross-link 박제 → 자동 트리거
+4. **PR #603 §재검토 트리거 #4 cross-link** — "R5 ADR §결정 4 산식 재검증 의무 — Tier transition (Floating Origin) 영향 단위 변환 정정 필요 시 본 ADR 도 amendment 박제" 정합
+
+### §재검토 트리거 갱신 (본 Amendment 추가)
+
+§결과 / 재검토 조건 (line 759~) 의 기존 트리거에 추가:
+
+- **R6 (jupiter + galilean 4) 진입 시 architect 단계 의무**: 본 Amendment 1 §가설 3종 검증 → 산식 정정 (옵션 A 승격) 또는 산식 vs 실측 분리 메트릭 정의 명시. R6 ADR 박제 시점에 본 Amendment 1 cross-link 박제 의무
+- **단독 정정 트리거**: 사용자 D-T2 회귀 보고 (mars/phobos/deimos 줌인 시각 회귀) / Floating Origin Tier scale 변환 정정 작업 (별도 ADR) / measurement metric SSoT 정합 가드 도입
+
+### Visual Fidelity §의무 체크리스트 4항목 (#541) 정합
+
+- **데이터 SSoT 보존** ✓ — `solar-system.json` mars/phobos/deimos radius / semiMajorAxis 무수정
+- **rendering 시점 분리** ✓ — physics 엔진 무의존 (산식·실측 모두 rendering-only 영역)
+- **UI overlay 실측값 표기** ✓ — CelestialInfoPanel mars/phobos/deimos 실측 radius 표기 유지
+- **baseline 박제** ✓ — 본 Amendment §실측 표 박제 (산식 vs 실측 mismatch 1.71배 일관 ratio)
+
+### 참고
+
+- 부모 ADR: 본 ADR §결정 4 (line 376~410) — 산식 SSoT 보존
+- 부모 ADR: [`20260422-floating-origin.md`](20260422-floating-origin.md) — Tier transition SSoT (가설 1 의 단위 변환 영역)
+- 트리거 ADR: [`20260530-597-satellite-z-fighting-no-op.md`](20260530-597-satellite-z-fighting-no-op.md) §Forensic 측정 데이터 §핵심 발견 #1 — 본 Amendment 의 실측 박제 출처
+- 학습 사례: volt [#74](https://github.com/coseo12/volt/issues/74) (DoD PASS ≠ 제품 동작), volt [#77](https://github.com/coseo12/volt/issues/77) (headless ≠ 실 Chrome 일관 패턴 확인 → 본 mismatch 는 환경 무관 동일 패턴이므로 가설 1/2/3 모두 환경 독립)
+- 트리거 이슈: [#604](https://github.com/coseo12/astro-simulator/issues/604)
+- Builds on: #597 (PR #603)
