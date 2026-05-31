@@ -234,7 +234,7 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ### Fix 후 박제 의무 (별도 후속 PR)
 
-- **옵션 (b) 후속 PR — 우선순위 high (agy cross-validate 제안 2 가치 보존, §7 박제)**: ci.yml r1-guard step `timeout-minutes: 10` 추가 + admin override 의존 측정 (다음 N=3 push) + CI 자원 절약 즉시 효과
+- ~~**옵션 (b) 후속 PR — 우선순위 high (agy cross-validate 제안 2 가치 보존, §7 박제)**: ci.yml r1-guard step `timeout-minutes: 10` 추가 + admin override 의존 측정 (다음 N=3 push) + CI 자원 절약 즉시 효과~~ → **✅ 완료** (2026-06-01, `.github/workflows/ci.yml` line 99 에 `timeout-minutes: 10` 추가). 다음 N=3 push 검증 → admin override 의존 감소 실측 (본 ADR §Amendment 1 박제 예정)
 - 옵션 (a) 후속 PR — 5 body 임시 revert + D-X1a/D-X1b/D-X2 측정 + 가설 5 확정/기각 박제
 - 옵션 (c) 또는 (d) 후속 PR — 가설 5 확정 후 root cause fix
 - 본 ADR §5 §구현 절차 갱신 (Accepted 전이 완료) + R5 ADR §결정 5 Amendment 동반 (mars 임계 가드 보존 또는 폐기, fix 후 박제값 영향 시)

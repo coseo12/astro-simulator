@@ -96,6 +96,8 @@ jobs:
 
       - name: R1 UI 회귀 가드 (r1-guard)
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # #606 옵션 (b) — Playwright Chromium freeze 시 ~6시간 stuck 방지 (ADR `20260531-606-r1-guard-playwright-freeze-forensic.md` §5 §Fix 후 박제 의무 §"옵션 (b) — high")
+        timeout-minutes: 10
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm build
