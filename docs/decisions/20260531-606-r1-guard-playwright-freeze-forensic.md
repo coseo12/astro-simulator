@@ -1,6 +1,6 @@
 # ADR: [#606] r1-guard Playwright Chromium freeze forensic — CI detect-and-test ~6시간 stuck (PR #596 R5 머지 직후 회귀)
 
-- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Provisional (2026-06-01 cross-validate 대기)**
+- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)**
 - **날짜**: 2026-05-31
 - **결정자**: architect (#606 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #606 (본 forensic), #604/#605 (직전 발현 PR), #594/#596 (R5 머지 trigger), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md), [`apps/web/scripts/r1-ui-regression-guard.mjs`](../../apps/web/scripts/r1-ui-regression-guard.mjs), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
@@ -234,7 +234,8 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ### Fix 후 박제 의무 (별도 후속 PR)
 
-- ~~**옵션 (b) 후속 PR — 우선순위 high (agy cross-validate 제안 2 가치 보존, §7 박제)**: ci.yml r1-guard step `timeout-minutes: 10` 추가 + admin override 의존 측정 (다음 N=3 push) + CI 자원 절약 즉시 효과~~ → **✅ 완료** (2026-06-01, `.github/workflows/ci.yml` line 99 에 `timeout-minutes: 10` 추가). 다음 N=3 push 검증 → admin override 의존 감소 실측 (본 ADR §Amendment 1 박제 예정)
+- ~~**옵션 (b) 후속 PR — 우선순위 high (agy cross-validate 제안 2 가치 보존, §7 박제)**: ci.yml r1-guard step `timeout-minutes: 10` 추가 + admin override 의존 측정 (다음 N=3 push) + CI 자원 절약 즉시 효과~~ → **✅ 완료** (2026-06-01, `.github/workflows/ci.yml` line 99 에 `timeout-minutes: 10` 추가, PR #608 `e1d3ebf` 머지). **자가 입증 결과**: r1-guard step 10분 13초 timeout cancelled → 36배 단축 (360분 → 10분). 본 ADR §8 §Amendment 1 박제 완료
+- **옵션 (f) 후속 PR — 우선순위 low (agy cross-validate Amendment 1 제안 1 분리, §8 §Amendment 1 §교차검증 박제)**: workflow step 분리 + 캐싱 — `playwright install` + `pnpm build` 별도 step + 캐싱 적용 + 순수 r1-guard 실행 step 에 `timeout-minutes: 3~5` 적용으로 가변성 흡수 분리. **발화 조건**: 본 ADR §6 §재검토 트리거 #5 정량화 임계 도달 시 (최근 5회 평균 8분 초과 또는 단일 정상 빌드 9분 초과 2회 이상 연속) — false-positive 빈도 측정 후 ROI 검증 의무
 - 옵션 (a) 후속 PR — 5 body 임시 revert + D-X1a/D-X1b/D-X2 측정 + 가설 5 확정/기각 박제
 - 옵션 (c) 또는 (d) 후속 PR — 가설 5 확정 후 root cause fix
 - 본 ADR §5 §구현 절차 갱신 (Accepted 전이 완료) + R5 ADR §결정 5 Amendment 동반 (mars 임계 가드 보존 또는 폐기, fix 후 박제값 영향 시)
@@ -353,7 +354,7 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 §6 §재검토 트리거 기존 4항목에 추가:
 
-5. **timeout-minutes:10 임계 부족 시** — pnpm install (~3분) + build (~2분) 누적 합이 8분 초과 시 r1-guard 측정 시간 부족으로 정상 시에도 cancelled 위험. 다음 N=3 push 검증 시 r1-guard step 실측 < 2분 (D-X1b) 확인 의무 — 위반 시 timeout-minutes 임계 상향 검토
+5. **timeout-minutes:10 임계 부족 시** — pnpm install (~3분) + build (~2분) 누적 합이 8분 초과 시 r1-guard 측정 시간 부족으로 정상 시에도 cancelled 위험. 다음 N=3 push 검증 시 r1-guard step 실측 < 2분 (D-X1b) 확인 의무 — 위반 시 timeout-minutes 임계 상향 검토. **정량화 임계** (agy cross-validate 제안 2 수용): 최근 5회 평균 정상 빌드 시간이 8분 초과하거나 단일 정상 빌드 시간이 9분 초과 사례가 2회 이상 연속 발생 시 timeout-minutes 임계값 상향 조정 의무. **후속 워크플로 최적화 옵션** (agy cross-validate 제안 1 분리, 본 ADR §5 §Fix 후 박제 의무 후속 PR 옵션 (f)): `playwright install` + `pnpm build` 를 별도 step 으로 격리 + 캐싱 적용 + 순수 r1-guard 실행 step 에만 `timeout-minutes: 3` 또는 5 적용으로 가변성 흡수 분리. 워크플로 구조 개편 영역이므로 본 ADR §재검토 트리거 #5 발화 시 검토 의무 (false-positive 빈도 측정 후 ROI 검증 의무)
 6. **fail-fast 효과 변화** — GitHub Actions workflow 정의 변경 (composite action / matrix expansion) 시 fail-fast 자동 적용 보장 재검증 의무
 
 #### 학습 정수
@@ -361,6 +362,34 @@ PR #596 의 r1-guard 변경 정확 영역:
 - **measurement-first 원칙** (volt #51) 답습 — Concrete Prediction §예측 2 박제로 사후 검증 가능. 본 Amendment 는 옵션 (b) 의 효과 실측 데이터 박제로 본 ADR 전체 신뢰성 증명
 - **agy cross-validate 제안 2 거부 결정 정합 검증** — PR #607 §7 §Claude 기각 1건 (옵션 b 본 PR 통합 머지 권고 거부 + 후속 PR 분리로 가치 보존) 의 후속 분리 결정이 실제로 옵션 (b) 자가 입증 + 메모리 SSoT 갱신 동시 박제로 가치 보존 입증
 - **forensic ADR 변형의 사후 검증 가치** — 본 Amendment 가 §4 §Concrete Prediction 의 사후 검증 가능 박제 패턴 답습. 일반 ADR (Concrete Prediction 없음) 대비 forensic 변형의 우월성 입증
+
+#### 교차검증 반영 사항 (cross-validate 2026-06-01 agy Antigravity outcome=applied)
+
+본 Amendment 1 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 직후 1회 루틴" 의무) 결과 4축 분류 박제:
+
+**합의 (agy + Claude 일치, 4건)**:
+1. 로직 정확성 양호 — 자가 입증 측정 데이터 정합 + Concrete Prediction §예측 2 정확 일치 (1라인 예측 vs 1라인 실측)
+2. 보안 양호 — 마크다운 박제만 (인젝션 / XSS / 시크릿 / 경로 순회 경로 0)
+3. 성능 양호 — 36배 단축 실측 + fail-fast 자원 절약 효과 입증
+4. 설계 준수 — ADR Status 워크플로 정합 + `Accepted + Amendment 1 Provisional` 메타데이터 표기 정확
+
+**이견 (0건)**: 본 Amendment 1 핵심 결정 (자가 입증 결과 박제 + 가설 5 재확인) 자체 반박 없음.
+
+**Claude 기각 (0건)**: agy §4 §엣지 케이스 "주의" 평가는 본 ADR §재검토 트리거 #5 박제 영역 내 정합 — 별도 기각 아님.
+
+**고유 발견 (수용 1 + 분리 1)**:
+
+1. **agy 제안 2 수용 — §재검토 트리거 #5 정량화 보강** (즉시 반영):
+   - 기존 "누적 합 8분 초과 시" 모호한 임계 → 정량화: "최근 5회 평균 정상 빌드 시간이 8분 초과하거나 단일 정상 빌드 시간이 9분 초과 사례가 2회 이상 연속 발생 시"
+   - 본 ADR §6 §재검토 트리거 #5 본문 직접 보강
+2. **agy 제안 1 분리 — workflow step 분리 후속 PR** (옵션 f 신설, 본 ADR §5 §Fix 후 박제 의무 추가):
+   - `playwright install` + `pnpm build` 별도 step 격리 + 캐싱 + 순수 r1-guard step 에 `timeout-minutes: 3~5` 적용
+   - 본 PR 범위 외 (workflow 구조 개편 영역)
+   - 본 ADR §재검토 트리거 #5 발화 시 검토 의무 박제 (false-positive 빈도 측정 후 ROI 검증)
+
+**Claude 셀프 체크 (편향 회피)**:
+- **단일 모델 합의 편향** — agy 가 본 Amendment 1 핵심 결정 부분 반박 0. 본 Amendment 의 자가 입증 데이터 정확성 + 가설 5 재확인 합의 → 합의 편향 가능성 있으나 자가 입증 데이터 자체가 정량적 측정 (10분 13초 / 36배) 으로 편향 차단 가능
+- **measurement-first 원칙** (volt #51) — agy §4 §엣지 케이스 평가 (가변성 흡수 분리 필요) 가 본 ADR §재검토 트리거 #5 박제 영역 내 정합. 정량화 강화 + 후속 PR 분리로 측정 의무 박제 답습
 
 ### Amendment 라운드 N≥2 예상
 
