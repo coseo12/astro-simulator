@@ -116,11 +116,24 @@ jobs:
         env:
           DEBUG: 'pw:install'
         run: |
+          echo "=== #606 진단 3차 — extract hang 원인 좁히기 (disk/mem/node) ===" >&2
+          echo "[node] $(node --version)" >&2
+          echo "[disk] (extract 전)" >&2; df -h / /tmp >&2
+          echo "[mem]" >&2; free -h >&2
+          echo "[cpu] nproc=$(nproc)" >&2
           echo "::group::install-deps (apt — 1차 진단에서 통과 확인됨)" >&2
           pnpm exec playwright install-deps chromium
           echo "::endgroup::" >&2
-          echo "=== install chromium 본체 시작 (DEBUG=pw:install) ===" >&2
-          pnpm exec playwright install chromium
+          echo "=== install chromium 본체 시작 (DEBUG=pw:install, 백그라운드 + 디스크 폴링) ===" >&2
+          pnpm exec playwright install chromium &
+          PWPID=$!
+          # extract hang 중 디스크 추이 폴링 — full 로 차오르다 멈추면 디스크 원인,
+          # 여유 있는데 hang 이면 Node/playwright extract 로직 원인.
+          while kill -0 "$PWPID" 2>/dev/null; do
+            echo "[disk-poll $(date -u +%H:%M:%S)] $(df -h / | tail -1)" >&2
+            sleep 15
+          done
+          wait "$PWPID"
           echo "=== install chromium 완료 ===" >&2
 
       - name: 'r1-guard: production build (#606 진단 2/4)'
