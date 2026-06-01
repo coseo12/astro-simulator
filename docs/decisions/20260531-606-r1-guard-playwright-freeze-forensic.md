@@ -1,6 +1,6 @@
 # ADR: [#606] r1-guard Playwright Chromium freeze forensic — CI detect-and-test ~6시간 stuck (PR #596 R5 머지 직후 회귀)
 
-- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)** **+ Amendment 2 Provisional (2026-06-01 — 가설 1~5 전부 오진 정정 + root cause 확정 = Node 24.16 + playwright 1.59.1 extract 비호환. PR #610 measurement-first 4단계 진단. cross-validate 대기)**
+- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)** **+ Amendment 2 Accepted (2026-06-01 — 가설 1~5 전부 오진 정정 + root cause 확정 = Node 24.16 + playwright 1.59.1 extract 비호환. PR #610 measurement-first 4단계 진단. cross-validate agy outcome=applied 후 본문 통합 완료, §Amendment 2 §교차검증 반영 사항 4축 분류 박제 — 합의 5 / 이견 0 / Claude 기각 1(readiness 오탐) / 고유 발견 3(로컬 정합성·SSoT·dead code 후속 박제))**
 - **날짜**: 2026-05-31
 - **결정자**: architect (#606 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #606 (본 forensic), #604/#605 (직전 발현 PR), #594/#596 (R5 머지 trigger), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md), [`apps/web/scripts/r1-ui-regression-guard.mjs`](../../apps/web/scripts/r1-ui-regression-guard.mjs), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
@@ -445,9 +445,39 @@ freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 foc
 - **forensic ADR 의 가설 검증 한계** — 본 ADR §1 의 가설 5 는 "정황 증거 강력" 으로 확정했으나 CI 실행 경로 (verify vs measure-px-ratio) 를 검증하지 않은 채 코드 변경 영역 (+9 라인) 만으로 추론 → 오진. **forensic ADR 도 "코드가 실제 실행되는 경로" 를 실측해야** (DoD PASS ≠ 실행 경로 일치)
 - **step 분리의 진단 가치** — 단일 step 의 buffering 유실을 step 경계 + 개별 timeout 으로 격리. ADR 옵션 (f) (워크플로 step 분리) 가 "우선순위 low" 였으나 실제로는 **진단 핵심 도구**였음
 
+#### 교차검증 반영 사항 (cross-validate 2026-06-01 agy Antigravity outcome=applied)
+
+본 Amendment 2 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 직후 1회 루틴" 의무 — ADR 개정) 결과 4축 분류 박제:
+
+**합의 (agy + Claude 일치, 5건)**:
+
+1. measurement-first dead code 발견 + shotgun fix 방지 타당 (가설 5 verify 미경로 입증)
+2. Node 22 LTS 핀 결정 타당 — Node 24.16 + playwright extract 결함은 upstream 영역, 내부 코드 인위 변경보다 검증된 LTS 고정이 실무적
+3. step 4분리 + `R1_GUARD_DIAG=1` 상시 진단 로깅의 관측 가능성(observability) 설계 완성도
+4. 재검토 조건(playwright 업그레이드 시 핀 해제) 명문화로 기술 부채 영구화 방지
+5. 보안 영향 없음 (빌드 파이프라인 내부 엔진 버전 조정, 공격 표면 무관)
+
+**이견 (0건)**: 본 Amendment 2 핵심 결정(가설 1~5 오진 정정 + Node 22 핀) 반박 0.
+
+**Claude 기각 (agy 오탐 1건)**:
+
+1. **agy 제안 "next start readiness 메커니즘 명시 결여" 거부** — agy 가 도구 미사용으로 `ci.yml` 실제 내용을 못 본 채 지적. 실제 ci.yml start step(3/4)에 `curl -sf` readiness loop (30회 × 2초) + 실패 시 `::error::` + `exit 1` 이미 존재. 오탐 기각
+
+**고유 발견 (수용 → 박제 3건)**:
+
+1. **로컬 정합성 gap (후속 검토 박제)** — CI 는 Node 22 핀했으나 `.nvmrc` = 24.14.0 (Node 24) 잔존. 로컬 개발자가 fresh `playwright install` 후 r1-guard 수동 검증 시 동일 extract deadlock 가능성. 단 기존 설치 브라우저는 재install 안 하므로 빈도 낮음 (본 세션 로컬 verify 8초 정상 = 브라우저 기설치 상태). **본 PR #610 은 CI freeze fix 범위라 로컬 정합성은 직교 — 후속 검토 분리** (옵션: `engines.node` 핀 vs 로컬 개발 가이드 vs `.nvmrc` 다운그레이드, 단 로컬 강제 다운그레이드는 verify 외 작업 영향이라 신중). Node 24.14(로컬) vs 24.16(CI) extract hang 동일 여부도 미검증 (CI 실측만 확정)
+2. **SSoT 트레이드오프 (의도적 결정 박제)** — agy 가 `ci.yml` Node 22 하드코딩 vs `package.json` engines / `.nvmrc` 분산을 SSoT 위반으로 지적. 그러나 detect-and-test job 만 playwright extract 를 타므로 **의도적 국소 핀** (다른 job line 264/295/302 은 node-version-file 유지 = engines SSoT). 전체 Node 22 통일은 본 PR 범위 확장 — Node 24 가 verify 외 작업엔 정상이므로 국소 핀이 최소 변경. 일관성 비용 < 범위 확장 비용
+3. **measureBodyPxRatios dead code 최종 처리 (R6 전 의사결정 후속)** — agy 가 verify dead code 의 생명주기 미결정 지적. 정정: `measureBodyPxRatios` 는 `--measure-px-ratio` 모드 전용 (수동 측정 도구) 이라 **완전 dead code 아님** — verify 모드에서만 미경로. R6 진입 전 measure-px-ratio 모드의 CI 통합 여부 + satellite 측정 정리 의사결정 후속 (R6 architect 단계)
+
+**Claude 셀프 체크 (편향 회피)**:
+
+- **단일 모델 합의 편향** — agy 가 핵심 결정(가설 오진 정정 + Node 22 핀) 반박 0, 전면 합의. 합의 편향 가능성 있으나 **root cause 확정은 CI 4단계 실측 SSoT (run 4건)** 이라 정성 합의가 아닌 정량 측정이 가드. 단 agy 고유 발견(로컬 정합성)은 Claude 가 놓친 실제 gap — 후속 박제로 편향 보완
+- **measurement-first 원칙** (volt #51 / volt #32) — Node 22 핀은 CI install 28초 통과로 확정. 로컬 정합성은 미검증 → 후속 검토 (실측 전 핀 확장 금지, volt #32 역방향 손실 회피)
+
 ### Amendment 라운드 N≥3 예상
 
 - Amendment 3 (해소됨 — 본 Amendment 2 가 root cause fix 까지 박제): ~~옵션 (c)/(d) root cause fix~~ → 실제 root cause 는 옵션 a~e 어디에도 없던 Node/playwright extract 비호환이었고 Node 22 핀으로 해소
+- Amendment 3 (잠재 — cross-validate 고유 발견 #1): 로컬 정합성 (`.nvmrc` Node 24 잔존) 후속 검토 — fresh playwright install deadlock 로컬 재현 측정 후 engines 핀 vs 가이드 결정
 - Amendment 3 (잠재): playwright 업그레이드로 Node 24 extract 호환 확인 시 Node 22 핀 해제
 - Amendment 4: R6 진입 시 satellite 측정 일반화 가드 (단 본 Amendment 2 로 freeze 자체는 R6 무관 확정 — R6 galilean 추가는 verify/measure 경로이고 freeze 는 install 단계였으므로 §6 §위험 #2 "R6 stuck 가속" 위험도 **해소**)
 
