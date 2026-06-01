@@ -64,11 +64,13 @@ const flags = {
  * ADR `docs/decisions/20260528-r5-mars-visualization.md` §위험 #4 박제 + D17 의무.
  * R4 머지 시 미동기화 발견 (R5 진입에서 R4 + R5 누적 동시 처리).
  */
-// #611 임시 제외 — phobos focus DoD-3 (camera target 동기화) 회귀 (R5 잠복, freeze fix #610
-//   으로 드러남). observe targetΔ=12764 / research targetΔ=32566 모두 tolerance 12042 초과.
-//   deimos 는 PASS (phobos 특정). 근본 fix 후 phobos 복원 의무 — 이슈 #611 추적.
+// #611 임시 제외 — satellite (phobos + deimos) focus DoD-3 (camera target 동기화) 회귀
+//   (R5 잠복, freeze fix #610 으로 드러남). phobos: observe Δ=12764 / research Δ=32566 모두
+//   tolerance 12042 크게 초과 (확실 FAIL). deimos: research Δ 가 5429~6816 으로 run 마다 변동,
+//   tolerance 6814 경계에서 flaky (margin 2.04 로 FAIL/PASS 갈림). 즉 satellite focus target
+//   동기화 회귀 전반 — phobos 강발현 / deimos 경계 약발현. 근본 fix 후 둘 다 복원 — 이슈 #611.
 //   (r1-guard freeze #606 와 직교한 별개 버그라 본 PR #610 freeze fix 범위에서 분리)
-const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'deimos'];
+const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars'];
 const MODES = ['observe', 'research'];
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };

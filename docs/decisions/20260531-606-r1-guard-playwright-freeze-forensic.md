@@ -437,7 +437,7 @@ verify 모드(runForViewport) → measureSunCoverage + pixel diff 만 실행
 
 #### 부수 발견 — #611 phobos focus DoD-3 회귀 (분리)
 
-freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 focus 회귀 가드` 가 비로소 실행 → **phobos focus DoD-3 (camera target 동기화) 회귀** 노출 (observe targetΔ=12764 / research targetΔ=32566, 둘 다 tolerance 12042 초과. deimos 는 PASS). R5 (#596) 잠복 회귀. r1-guard freeze (#606) 와 직교 → **이슈 #611 분리** (CLAUDE.md §교차검증 §수용 vs 후속 분리 3단 프로토콜). PR #610 에서는 `browser-verify-378-focus.mjs` FOCUS_BODIES 에서 phobos 임시 제외 (주석 계약 + #611 링크) 로 freeze fix 를 green CI 로 머지
+freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 focus 회귀 가드` 가 비로소 실행 → **satellite (phobos + deimos) focus DoD-3 (camera target 동기화) 회귀** 노출. phobos: observe targetΔ=12764 / research targetΔ=32566 모두 tolerance 12042 크게 초과 (강발현). deimos: research targetΔ 가 run 마다 5429~6816 변동, tolerance 6814 경계에서 flaky (run 26756788369 PASS 5429 / run 26761107821 FAIL 6816, margin 2.04 — 약발현). 즉 satellite focus 시 camera target 이 mesh 궤도 운동을 못 따라가는 lag 공통 회귀. R5 (#596) 잠복. r1-guard freeze (#606) 와 직교 → **이슈 #611 분리** (CLAUDE.md §교차검증 §수용 vs 후속 분리 3단 프로토콜). PR #610 에서는 `browser-verify-378-focus.mjs` FOCUS_BODIES 에서 phobos + deimos 임시 제외 (주석 계약 + #611 링크) 로 freeze fix 를 green CI 로 머지
 
 #### 학습 정수
 
