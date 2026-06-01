@@ -51,6 +51,14 @@ const BASELINE_DIR = path.join(__dirname, '__baselines__', 'r1');
 const DIFF_DIR = path.join(__dirname, '__diff__', 'r1');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
+// #606 진단 — verify 경로 단계별 stderr 로깅 (R1_GUARD_DIAG=1 시 활성화).
+// stderr 는 unbuffered(동기) 라 freeze/timeout cancel 시에도 stuck 직전 단계가 보존된다.
+// stdout(console.log) 은 CI pipe 에서 block-buffered → step cancel 시 유실 (실측 #606).
+const DIAG = process.env.R1_GUARD_DIAG === '1';
+function diag(msg) {
+  if (DIAG) process.stderr.write(`[r1-diag ${new Date().toISOString()}] ${msg}\n`);
+}
+
 const args = process.argv.slice(2);
 const flags = {
   update: args.includes('--update'),
@@ -322,25 +330,31 @@ function diffPath(viewportId, regionId) {
 }
 
 async function setupPage(browser, viewport, queryString = '') {
+  diag(`setupPage[${viewport.id}] newContext + newPage`);
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
   const url = `${BASE_URL}${queryString}`;
+  diag(`setupPage[${viewport.id}] goto ${url} (networkidle, 30s)`);
   await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
   // hydration + scene 초기화 대기.
+  diag(`setupPage[${viewport.id}] goto done → waitForFunction(__gpuTier,__simCore, 10s)`);
   await page.waitForFunction(
     () => typeof window.__gpuTier !== 'undefined' && typeof window.__simCore !== 'undefined',
     { timeout: 10_000 },
   );
   // 추가 안정 대기 — sun mesh 생성 + 첫 프레임 렌더 완료.
+  diag(`setupPage[${viewport.id}] waitForFunction done → waitForTimeout(800)`);
   await page.waitForTimeout(800);
+  diag(`setupPage[${viewport.id}] ready`);
   return { context, page };
 }
 
 async function runForViewport(browser, viewport) {
   console.log(`\n=== viewport ${viewport.id} (${viewport.width}×${viewport.height}) ===`);
+  diag(`runForViewport[${viewport.id}] start`);
 
   const { context, page } = await setupPage(browser, viewport);
 
@@ -351,7 +365,9 @@ async function runForViewport(browser, viewport) {
   let overallPass = true;
 
   // sun viewport 점유율 측정 (시각화 ADR §결과·재검토 조건 박제용).
+  diag(`runForViewport[${viewport.id}] measureSunCoverage (page.evaluate, no-timeout)`);
   const sunCoverage = await measureSunCoverage(page, viewport);
+  diag(`runForViewport[${viewport.id}] measureSunCoverage done`);
   if (sunCoverage) {
     const pct = (sunCoverage.ratio * 100).toFixed(2);
     console.log(`  sun viewport 점유율 (밝기 ≥ 200/255 픽셀 비율, stride=8 샘플) = ${pct}%`);
@@ -361,6 +377,7 @@ async function runForViewport(browser, viewport) {
   // capture 시점 frame timing 진단 로깅 — bootstrap (--update) vs detect-and-test (verify) 환경
   // 차이로 인한 mobile noise floor 0.5% 임계 살짝 초과 회귀 (PR #506 후속, ADR Amendment 후보) 디버그용.
   // 두 워크플로의 같은 commit/viewport 캡처 시점 state 차이를 비교한다.
+  diag(`runForViewport[${viewport.id}] frameState evaluate`);
   const frameState = await page.evaluate(() => {
     const core = window.__simCore;
     if (!core) return null;
@@ -371,15 +388,15 @@ async function runForViewport(browser, viewport) {
       sceneFrameId: scene?.getFrameId?.() ?? null,
       sceneDeltaTime: scene?.getEngine?.()?.getDeltaTime?.() ?? null,
       cameraRadius: cam?.radius ?? null,
-      cameraTarget: cam?.target ? [
-        Math.round(cam.target.x),
-        Math.round(cam.target.y),
-        Math.round(cam.target.z),
-      ] : null,
+      cameraTarget: cam?.target
+        ? [Math.round(cam.target.x), Math.round(cam.target.y), Math.round(cam.target.z)]
+        : null,
     };
   });
   if (frameState) {
-    console.log(`  frame state: perfNow=${frameState.perfNow}ms sceneFrameId=${frameState.sceneFrameId} sceneDeltaMs=${frameState.sceneDeltaTime?.toFixed?.(2) ?? frameState.sceneDeltaTime} camR=${frameState.cameraRadius?.toExponential?.(3) ?? frameState.cameraRadius} camTarget=${frameState.cameraTarget?.join(',') ?? 'null'}`);
+    console.log(
+      `  frame state: perfNow=${frameState.perfNow}ms sceneFrameId=${frameState.sceneFrameId} sceneDeltaMs=${frameState.sceneDeltaTime?.toFixed?.(2) ?? frameState.sceneDeltaTime} camR=${frameState.cameraRadius?.toExponential?.(3) ?? frameState.cameraRadius} camTarget=${frameState.cameraTarget?.join(',') ?? 'null'}`,
+    );
   }
 
   if (flags.measureSunCoverage) {
@@ -388,6 +405,7 @@ async function runForViewport(browser, viewport) {
   }
 
   for (const region of R1_UI_REGIONS) {
+    diag(`runForViewport[${viewport.id}] region ${region.id} clip+capture`);
     let clip;
     try {
       clip = await clipForRegion(page, region, viewport);
@@ -608,7 +626,9 @@ async function main() {
   ensureDirSync(BASELINE_DIR);
   ensureDirSync(DIFF_DIR);
 
+  diag('main: chromium.launch({ headless: true })');
   const browser = await chromium.launch({ headless: true });
+  diag('main: chromium launched');
   let overallPass = true;
 
   try {
@@ -629,6 +649,7 @@ async function main() {
       }
     }
   } finally {
+    diag('main: browser.close()');
     await browser.close();
   }
 

@@ -94,22 +94,53 @@ jobs:
         with:
           tool: wasm-pack@0.14.0
 
-      - name: R1 UI 회귀 가드 (r1-guard)
+      # ============================================================
+      # #606 진단 — r1-guard step 4분리 (install / build / start / verify)
+      # ============================================================
+      # 배경: ADR 20260531-606 가설 5 (8 body 측정 freeze) 는 verify 모드가
+      #   measureBodyPxRatios 를 호출하지 않으므로 dead code 오진. 진짜 freeze 지점
+      #   (build / start / verify-런타임) 을 step 단위로 격리하기 위해 분리.
+      # 기존 단일 step + timeout-minutes:10 (옵션 b) 은 build/start/verify 중 어디서
+      #   stuck 인지 격리 불가 (buffering 으로 stdout 도 유실). step 분리 시 GitHub Actions
+      #   UI 가 step 별 소요시간 + timeout 위치를 명확히 표시 → freeze 지점 확정.
+      # 머지 후 CI run 1회로 측정 → ADR Amendment 2 박제 + root cause fix 후속 PR.
+
+      - name: 'r1-guard: Playwright Chromium 설치 (#606 진단 1/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        # #606 옵션 (b) — Playwright Chromium freeze 시 ~6시간 stuck 방지 (ADR `20260531-606-r1-guard-playwright-freeze-forensic.md` §5 §Fix 후 박제 의무 §"옵션 (b) — high")
-        timeout-minutes: 10
+        timeout-minutes: 5
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 'r1-guard: production build (#606 진단 2/4)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # build 단독 timeout — stuck 시 scene 코드 (R5 mars/phobos/deimos) prerender 무한 루프 확정
+        timeout-minutes: 8
+        run: pnpm build
+
+      - name: 'r1-guard: next start 기동 + readiness (#606 진단 3/4)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # start + readiness 단독 timeout — stuck 시 production 런타임 초기화 freeze 확정.
+        # setsid 로 띄워 step 종료 시 SIGHUP 으로 죽지 않도록 (다음 verify step 에서 사용).
+        timeout-minutes: 3
         run: |
-          pnpm exec playwright install --with-deps chromium
-          pnpm build
-          pnpm --filter @astro-simulator/web start -p 3001 &
-          WEB_PID=$!
+          setsid pnpm --filter @astro-simulator/web start -p 3001 > /tmp/r1-web.log 2>&1 &
+          echo $! > /tmp/r1-web.pid
           for i in {1..30}; do
-            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            if curl -sf http://localhost:3001/ko > /dev/null; then echo "READY after ${i}x2s"; break; fi
             sleep 2
           done
+          curl -sf http://localhost:3001/ko > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
+
+      - name: 'r1-guard: verify 실행 (#606 진단 4/4)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # verify 단독 timeout — stuck 시 Playwright/런타임 verify 경로 freeze 확정.
+        # R1_GUARD_DIAG=1 — verify 경로 단계별 stderr 진단 로깅 활성화 (stuck 직전 단계 보존).
+        timeout-minutes: 5
+        env:
+          R1_GUARD_DIAG: '1'
+        run: |
           BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs
           GUARD_EXIT=$?
-          kill $WEB_PID || true
+          kill "$(cat /tmp/r1-web.pid)" 2>/dev/null || true
           exit $GUARD_EXIT
 
       - name: R1 diff 이미지 업로드 (실패 시)
