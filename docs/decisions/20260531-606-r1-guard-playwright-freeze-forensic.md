@@ -1,6 +1,6 @@
 # ADR: [#606] r1-guard Playwright Chromium freeze forensic — CI detect-and-test ~6시간 stuck (PR #596 R5 머지 직후 회귀)
 
-- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)**
+- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)** **+ Amendment 2 Accepted (2026-06-01 — 가설 1~5 전부 오진 정정 + root cause 확정 = Node 24.16 + playwright 1.59.1 extract 비호환. PR #610 measurement-first 4단계 진단. cross-validate agy outcome=applied 후 본문 통합 완료, §Amendment 2 §교차검증 반영 사항 4축 분류 박제 — 합의 5 / 이견 0 / Claude 기각 1(readiness 오탐) / 고유 발견 3(로컬 정합성·SSoT·dead code 후속 박제))**
 - **날짜**: 2026-05-31
 - **결정자**: architect (#606 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #606 (본 forensic), #604/#605 (직전 발현 PR), #594/#596 (R5 머지 trigger), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md), [`apps/web/scripts/r1-ui-regression-guard.mjs`](../../apps/web/scripts/r1-ui-regression-guard.mjs), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
@@ -27,25 +27,26 @@
 
 #### 측정 1 — CI history 회귀 시점 SSoT (전 브랜치)
 
-| run ID | 브랜치 | 결과 | created | 정상 시간 vs 실측 | 비고 |
-|---|---|---|---|---|---|
-| 26555081614 | develop | ✅ success | 2026-05-28T04:40:55Z | **4m 52s** | **마지막 정상 — R5 머지 전** |
-| 26460896087 | develop | ✅ success | 2026-05-26T16:22:23Z | 4m 56s | 정상 baseline |
-| 26460576009 | develop | ✅ success | 2026-05-26T16:16:22Z | 4m 46s | 정상 baseline |
-| 26460369623 | develop | ✅ success | 2026-05-26T16:12:32Z | 4m 37s | 정상 baseline |
-| 26460187933 | develop | ✅ success | 2026-05-26T16:09:08Z | 4m 36s | 정상 baseline |
-| **#596 머지** | develop | — | **2026-05-29T05:41:22Z** (`28be1cd`) | — | **회귀 trigger 시점** |
-| 26620332744 | develop | ❌ cancelled | **2026-05-29T05:41:24Z** | **~6h** | **#596 머지 직후 2초** |
-| 26672174267 | chore/r1 | ❌ cancelled | 2026-05-30T02:36:35Z | ~6h | |
-| 26672194105 | fix/598 | ❌ cancelled | 2026-05-30T02:37:34Z | ~6h | |
-| 26679422883 | develop | ❌ cancelled | 2026-05-30T08:37:52Z | ~6h | |
-| 26679434785 | develop | ❌ cancelled | 2026-05-30T08:38:31Z | ~6h | |
-| 26684583267 | fix/597 | ❌ cancelled | 2026-05-30T13:06:32Z | ~6h | |
-| 26688134286 | develop | ❌ cancelled | 2026-05-30T15:50:25Z | ~6h | |
-| 26704106386 | feature/604 | ❌ cancelled | 2026-05-31T05:18:42Z | ~6h | PR #605 1차 |
-| 26705479971 | feature/604 | ❌ cancelled | 2026-05-31T06:33:52Z | ~5h+ (수동 cancel) | PR #605 2차 (본 forensic trigger) |
+| run ID        | 브랜치      | 결과         | created                              | 정상 시간 vs 실측  | 비고                              |
+| ------------- | ----------- | ------------ | ------------------------------------ | ------------------ | --------------------------------- |
+| 26555081614   | develop     | ✅ success   | 2026-05-28T04:40:55Z                 | **4m 52s**         | **마지막 정상 — R5 머지 전**      |
+| 26460896087   | develop     | ✅ success   | 2026-05-26T16:22:23Z                 | 4m 56s             | 정상 baseline                     |
+| 26460576009   | develop     | ✅ success   | 2026-05-26T16:16:22Z                 | 4m 46s             | 정상 baseline                     |
+| 26460369623   | develop     | ✅ success   | 2026-05-26T16:12:32Z                 | 4m 37s             | 정상 baseline                     |
+| 26460187933   | develop     | ✅ success   | 2026-05-26T16:09:08Z                 | 4m 36s             | 정상 baseline                     |
+| **#596 머지** | develop     | —            | **2026-05-29T05:41:22Z** (`28be1cd`) | —                  | **회귀 trigger 시점**             |
+| 26620332744   | develop     | ❌ cancelled | **2026-05-29T05:41:24Z**             | **~6h**            | **#596 머지 직후 2초**            |
+| 26672174267   | chore/r1    | ❌ cancelled | 2026-05-30T02:36:35Z                 | ~6h                |                                   |
+| 26672194105   | fix/598     | ❌ cancelled | 2026-05-30T02:37:34Z                 | ~6h                |                                   |
+| 26679422883   | develop     | ❌ cancelled | 2026-05-30T08:37:52Z                 | ~6h                |                                   |
+| 26679434785   | develop     | ❌ cancelled | 2026-05-30T08:38:31Z                 | ~6h                |                                   |
+| 26684583267   | fix/597     | ❌ cancelled | 2026-05-30T13:06:32Z                 | ~6h                |                                   |
+| 26688134286   | develop     | ❌ cancelled | 2026-05-30T15:50:25Z                 | ~6h                |                                   |
+| 26704106386   | feature/604 | ❌ cancelled | 2026-05-31T05:18:42Z                 | ~6h                | PR #605 1차                       |
+| 26705479971   | feature/604 | ❌ cancelled | 2026-05-31T06:33:52Z                 | ~5h+ (수동 cancel) | PR #605 2차 (본 forensic trigger) |
 
 **일관 패턴**:
+
 - 정상 baseline: ~5분 / 회귀 후: ~6시간 (GitHub Actions 기본 timeout 360분 정확 도달 후 cancelled)
 - 회귀 시점 정확도: **PR #596 머지 후 2초** (인과관계 5초 단위로 확정)
 - 브랜치 무관 (develop / feature / fix / chore 전부 동일)
@@ -53,10 +54,10 @@
 
 #### 측정 2 — r1-guard 관련 파일 변경 history (2026-05-25 이후)
 
-| commit | 날짜 | PR | 변경 영역 | 관련 영향 |
-|---|---|---|---|---|
-| 94e5a30 | 2026-05-27 18:25 | #592 (v0.18.0 release) | CHANGELOG / package.json 만 | r1-guard 무관 |
-| **28be1cd** | **2026-05-29 14:41** | **#596 (R5 머지)** | **r1-ui-regression-guard.mjs +9 라인** | **회귀 trigger 확정 영역** |
+| commit      | 날짜                 | PR                     | 변경 영역                              | 관련 영향                  |
+| ----------- | -------------------- | ---------------------- | -------------------------------------- | -------------------------- |
+| 94e5a30     | 2026-05-27 18:25     | #592 (v0.18.0 release) | CHANGELOG / package.json 만            | r1-guard 무관              |
+| **28be1cd** | **2026-05-29 14:41** | **#596 (R5 머지)**     | **r1-ui-regression-guard.mjs +9 라인** | **회귀 trigger 확정 영역** |
 
 PR #596 의 r1-guard 변경 정확 영역:
 
@@ -77,12 +78,12 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ### 가설 검증 결론
 
-| 가설 | 결론 | 근거 |
-|---|---|---|
-| **가설 1: Playwright Chromium swiftshader adapter freeze** | **약화 (부분 기각)** | R5 머지 직후 2초 일관 발현 — transient 환경 아님. R5 머지 전 동일 환경에서 ~5분 정상 통과 (id=26555081614). swiftshader 자체 결함이면 PR #596 머지 전부터 발현됐어야 함 |
-| **가설 2: GitHub Actions runner transient 인프라 회귀** | **기각** | 10회차+ 일관 발현 (모든 브랜치). transient 면 일부 통과 사례 있어야 함 |
-| **가설 3: `pnpm build` 산출물 corruption** | **기각** | `pnpm build` step success 통과 + stuck step 은 그 다음 `r1-guard` step. build 산출물 자체는 정상 |
-| **가설 4: Next.js `start` mode + Playwright headless 결합 회귀** | **기각** | start mode 자체 변경 없음. R5 머지 (28be1cd) 가 ci.yml / next.config / start script 변경 없음 |
+| 가설                                                                                                                                 | 결론                                                                      | 근거                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **가설 1: Playwright Chromium swiftshader adapter freeze**                                                                           | **약화 (부분 기각)**                                                      | R5 머지 직후 2초 일관 발현 — transient 환경 아님. R5 머지 전 동일 환경에서 ~5분 정상 통과 (id=26555081614). swiftshader 자체 결함이면 PR #596 머지 전부터 발현됐어야 함                                                                                                                                                                                                                                                                                                                                       |
+| **가설 2: GitHub Actions runner transient 인프라 회귀**                                                                              | **기각**                                                                  | 10회차+ 일관 발현 (모든 브랜치). transient 면 일부 통과 사례 있어야 함                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **가설 3: `pnpm build` 산출물 corruption**                                                                                           | **기각**                                                                  | `pnpm build` step success 통과 + stuck step 은 그 다음 `r1-guard` step. build 산출물 자체는 정상                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **가설 4: Next.js `start` mode + Playwright headless 결합 회귀**                                                                     | **기각**                                                                  | start mode 자체 변경 없음. R5 머지 (28be1cd) 가 ci.yml / next.config / start script 변경 없음                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **가설 5 (신규): R5 추가 satellite body (phobos/deimos) 측정 시 Babylon `boundingSphere.radiusWorld` 또는 NDC projection 무한 wait** | **확정 (주된 원인) — 정황 증거 강력 / 완전 증명은 옵션 (e) 후속 PR 필요** | (a) 회귀 시점 정확도 2초 — R5 머지 외 다른 원인 후보 0 / (b) r1-guard 변경은 +9 라인만 (targetIds 3 body 추가 + 임계 1건 추가) / (c) satellite (phobos/deimos) 은 R-Phase 최초 추가 — 다른 body 와 다른 좌표계 (mars-relative orbit + Floating Origin Tier transition, ADR `20260528-r5-mars-visualization.md` §Amendment 1 박제 측정 metric mismatch 1.71배 일관 ratio 도 동일 영역) / (d) 동일 page.evaluate scope 에서 5 body → 8 body 확장이 Playwright Chromium GPU compositor 와 결합해 deadlock 가능성 |
 
 #### 가설 5 의 sub-가설 (root cause 후속 분리)
@@ -161,16 +162,16 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ### 축별 비교 매트릭스
 
-| 축 | (a) revert | (b) timeout | (c) NDC guard | (d) launch opts | (e) ADR only |
-|---|---|---|---|---|---|
-| 가설 5 확정 검증 가능 | ✅ 직접 | ❌ | ⚠ 부분 (5b만) | ❌ | ❌ |
-| 즉각 CI 정상화 | ✅ | ⚠ (cancelled 후 fail) | ⚠ (가설 5b 확정 시만) | ⚠ | ❌ |
-| admin override 의존 감소 | ✅ | ✅ (10분 단축) | ⚠ | ⚠ | ❌ |
-| root cause 해소 | ❌ (가설 검증만) | ❌ (가리기) | ⚠ (5b 한정) | ⚠ (1 잔존 영역) | ❌ |
-| 박제값 회귀 위험 | mars 임계 가드 무효 | 0 | 0 | 픽셀 baseline | 0 |
-| 구현 비용 | 1 라인 | 1 라인 | ~10 라인 | ~5 라인 + baseline 재캡처 | ADR 1 파일 |
-| ADR Amendment 필요 | R5 §결정 5 (Provisional) | 0 | 0 | 0 | 본 ADR Provisional |
-| R6+ 일반화 가치 | 0 (mars 만 revert) | ✅ (모든 R-Phase) | ✅ (모든 satellite) | ✅ (모든 Playwright) | 0 (정보만) |
+| 축                       | (a) revert               | (b) timeout           | (c) NDC guard         | (d) launch opts           | (e) ADR only       |
+| ------------------------ | ------------------------ | --------------------- | --------------------- | ------------------------- | ------------------ |
+| 가설 5 확정 검증 가능    | ✅ 직접                  | ❌                    | ⚠ 부분 (5b만)         | ❌                        | ❌                 |
+| 즉각 CI 정상화           | ✅                       | ⚠ (cancelled 후 fail) | ⚠ (가설 5b 확정 시만) | ⚠                         | ❌                 |
+| admin override 의존 감소 | ✅                       | ✅ (10분 단축)        | ⚠                     | ⚠                         | ❌                 |
+| root cause 해소          | ❌ (가설 검증만)         | ❌ (가리기)           | ⚠ (5b 한정)           | ⚠ (1 잔존 영역)           | ❌                 |
+| 박제값 회귀 위험         | mars 임계 가드 무효      | 0                     | 0                     | 픽셀 baseline             | 0                  |
+| 구현 비용                | 1 라인                   | 1 라인                | ~10 라인              | ~5 라인 + baseline 재캡처 | ADR 1 파일         |
+| ADR Amendment 필요       | R5 §결정 5 (Provisional) | 0                     | 0                     | 0                         | 본 ADR Provisional |
+| R6+ 일반화 가치          | 0 (mars 만 revert)       | ✅ (모든 R-Phase)     | ✅ (모든 satellite)   | ✅ (모든 Playwright)      | 0 (정보만)         |
 
 ### 권장 안 (architect 사전 선호)
 
@@ -244,13 +245,13 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 ## §6 위험 / 재검토 트리거
 
-| 위험 | 회귀 시점 | 임계 / 발동 조건 | 완화 방안 |
-|---|---|---|---|
-| 누적 admin override 의존 패턴 영구화 | 다음 PR 부터 | 본 ADR 머지 후 N=3 PR 모두 admin override 시 | 옵션 (b) 후속 PR 우선 — timeout-minutes:10 으로 cancelled 자동화 |
-| R6 진입 시 galilean 4 satellite 추가로 stuck 가속 | R6 PR 머지 직후 | satellite 측정 7개+ (R5 의 phobos/deimos 2개 + galilean 4개) 동시 진입 | 옵션 (a) 또는 (c) 후속 PR 선행 의무 — R6 진입 전 root cause fix |
-| 가설 5 기각 시 root cause 미상 장기화 | 옵션 (a) 후속 PR 의 D-X1 위반 시 | 5 body revert 후에도 stuck | Playwright trace upload 활성화 + GitHub Actions debug logging 활성화 |
-| Provisional 영구화 위험 | 옵션 (a/b) 후속 PR 미진행 시 | 30일 후에도 Provisional 유지 | 30일 후 자동 후속 PR 트리거 박제 (volt #24 패턴 답습) |
-| 본 ADR 자체 머지 시 동일 stuck 답습 | 본 PR CI | detect-and-test r1-guard step stuck | admin override 머지 (메모리 박제 패턴 11회차+) |
+| 위험                                              | 회귀 시점                        | 임계 / 발동 조건                                                       | 완화 방안                                                            |
+| ------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 누적 admin override 의존 패턴 영구화              | 다음 PR 부터                     | 본 ADR 머지 후 N=3 PR 모두 admin override 시                           | 옵션 (b) 후속 PR 우선 — timeout-minutes:10 으로 cancelled 자동화     |
+| R6 진입 시 galilean 4 satellite 추가로 stuck 가속 | R6 PR 머지 직후                  | satellite 측정 7개+ (R5 의 phobos/deimos 2개 + galilean 4개) 동시 진입 | 옵션 (a) 또는 (c) 후속 PR 선행 의무 — R6 진입 전 root cause fix      |
+| 가설 5 기각 시 root cause 미상 장기화             | 옵션 (a) 후속 PR 의 D-X1 위반 시 | 5 body revert 후에도 stuck                                             | Playwright trace upload 활성화 + GitHub Actions debug logging 활성화 |
+| Provisional 영구화 위험                           | 옵션 (a/b) 후속 PR 미진행 시     | 30일 후에도 Provisional 유지                                           | 30일 후 자동 후속 PR 트리거 박제 (volt #24 패턴 답습)                |
+| 본 ADR 자체 머지 시 동일 stuck 답습               | 본 PR CI                         | detect-and-test r1-guard step stuck                                    | admin override 머지 (메모리 박제 패턴 11회차+)                       |
 
 ### 재검토 트리거
 
@@ -316,29 +317,30 @@ PR #596 의 r1-guard 변경 정확 영역:
 
 본 ADR §4 §예측 2 ("옵션 (b) 채택 시 코드 변경 라인 수 = 1 라인, 위반 임계 ±50%") 사후 검증:
 
-| metric | 예측 | 실측 (PR #608) | 결과 |
-|---|---|---|---|
-| 코드 변경 라인 수 | 1 라인 | 1 라인 (`.github/workflows/ci.yml` line 99 `timeout-minutes: 10`) | ✅ PASS (예측 정확 일치) |
-| 추가 주석 박제 | 1 라인 (선택) | 1 라인 (`# #606 옵션 (b) — Playwright Chromium freeze 시 ~6시간 stuck 방지`) | ✅ PASS |
-| ADR §5 §Fix 후 박제 의무 갱신 | 1 라인 | 1 라인 (옵션 (b) ✅ 완료 표시) | ✅ PASS |
-| CHANGELOG 박제 | (자유) | 4 라인 (Behavior Changes 박제) | (메타) |
-| **합계** | ~1-3 라인 | **3 파일 7 라인** | ✅ PASS (±50% 임계 0배 / 정확) |
+| metric                        | 예측          | 실측 (PR #608)                                                               | 결과                           |
+| ----------------------------- | ------------- | ---------------------------------------------------------------------------- | ------------------------------ |
+| 코드 변경 라인 수             | 1 라인        | 1 라인 (`.github/workflows/ci.yml` line 99 `timeout-minutes: 10`)            | ✅ PASS (예측 정확 일치)       |
+| 추가 주석 박제                | 1 라인 (선택) | 1 라인 (`# #606 옵션 (b) — Playwright Chromium freeze 시 ~6시간 stuck 방지`) | ✅ PASS                        |
+| ADR §5 §Fix 후 박제 의무 갱신 | 1 라인        | 1 라인 (옵션 (b) ✅ 완료 표시)                                               | ✅ PASS                        |
+| CHANGELOG 박제                | (자유)        | 4 라인 (Behavior Changes 박제)                                               | (메타)                         |
+| **합계**                      | ~1-3 라인     | **3 파일 7 라인**                                                            | ✅ PASS (±50% 임계 0배 / 정확) |
 
 #### 자가 입증 측정 결과 (PR #608 run 26716302495)
 
-| 항목 | 값 | SSoT 관계 |
-|---|---|---|
-| r1-guard step 시작 | 2026-05-31T15:12:39Z | — |
-| r1-guard step 종료 | 2026-05-31T15:22:52Z | — |
-| **r1-guard step 실행 시간** | **10분 13초** | **timeout-minutes:10 정확 발현** |
-| r1-guard step conclusion | **failure (timeout cancelled)** | freeze 발생 → timeout 가드 작동 |
-| workflow 전체 시간 | 11분 (15:11:59 → 15:22:52) | fail-fast 효과 (후속 step skipped) |
-| 이전 baseline | ~6시간 stuck → 360분 cancelled | GitHub Actions 기본 timeout |
-| **단축 비율** | **36배** (360분 → 10분) | 즉시 운영 효과 입증 |
+| 항목                        | 값                              | SSoT 관계                          |
+| --------------------------- | ------------------------------- | ---------------------------------- |
+| r1-guard step 시작          | 2026-05-31T15:12:39Z            | —                                  |
+| r1-guard step 종료          | 2026-05-31T15:22:52Z            | —                                  |
+| **r1-guard step 실행 시간** | **10분 13초**                   | **timeout-minutes:10 정확 발현**   |
+| r1-guard step conclusion    | **failure (timeout cancelled)** | freeze 발생 → timeout 가드 작동    |
+| workflow 전체 시간          | 11분 (15:11:59 → 15:22:52)      | fail-fast 효과 (후속 step skipped) |
+| 이전 baseline               | ~6시간 stuck → 360분 cancelled  | GitHub Actions 기본 timeout        |
+| **단축 비율**               | **36배** (360분 → 10분)         | 즉시 운영 효과 입증                |
 
 #### 가설 5 재확인 (root cause 잔존)
 
 옵션 (b) 의 timeout 가드는 freeze **증상 차단** 만 — root cause 미해소:
+
 - r1-guard step 이 10분 후 자동 cancelled = freeze 발생 사실 (timeout 0초 success 였다면 freeze 해소)
 - **가설 5 (R5 추가 satellite body 측정 freeze) 재확인** — opportunity 가설로 격상
 - sub-가설 5a/5b/5c 중 어느 것이 root cause 인지 후속 옵션 (a) PR 의 D-X1a/D-X1b/D-X2 측정으로 확정 필요
@@ -368,6 +370,7 @@ PR #596 의 r1-guard 변경 정확 영역:
 본 Amendment 1 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 직후 1회 루틴" 의무) 결과 4축 분류 박제:
 
 **합의 (agy + Claude 일치, 4건)**:
+
 1. 로직 정확성 양호 — 자가 입증 측정 데이터 정합 + Concrete Prediction §예측 2 정확 일치 (1라인 예측 vs 1라인 실측)
 2. 보안 양호 — 마크다운 박제만 (인젝션 / XSS / 시크릿 / 경로 순회 경로 0)
 3. 성능 양호 — 36배 단축 실측 + fail-fast 자원 절약 효과 입증
@@ -388,14 +391,95 @@ PR #596 의 r1-guard 변경 정확 영역:
    - 본 ADR §재검토 트리거 #5 발화 시 검토 의무 박제 (false-positive 빈도 측정 후 ROI 검증)
 
 **Claude 셀프 체크 (편향 회피)**:
+
 - **단일 모델 합의 편향** — agy 가 본 Amendment 1 핵심 결정 부분 반박 0. 본 Amendment 의 자가 입증 데이터 정확성 + 가설 5 재확인 합의 → 합의 편향 가능성 있으나 자가 입증 데이터 자체가 정량적 측정 (10분 13초 / 36배) 으로 편향 차단 가능
 - **measurement-first 원칙** (volt #51) — agy §4 §엣지 케이스 평가 (가변성 흡수 분리 필요) 가 본 ADR §재검토 트리거 #5 박제 영역 내 정합. 정량화 강화 + 후속 PR 분리로 측정 의무 박제 답습
 
-### Amendment 라운드 N≥2 예상
+### Amendment 2 (2026-06-01) — 가설 1~5 전부 오진 정정 + root cause 확정 (Node 24.16 + playwright 1.59.1 extract 비호환)
 
-- Amendment 2: 옵션 (a) 후속 PR — 가설 5 확정 또는 기각 (D-X1a/D-X1b/D-X2 측정)
-- Amendment 3: 옵션 (c) 또는 (d) 후속 PR — root cause fix 박제 (가설 5b/5a 직접 타격)
-- Amendment 4: R6 진입 시 satellite 측정 일반화 가드 (galilean 4 + 본 R5 phobos/deimos 의 8 body 측정 freeze 패턴 → R6 의 12 body 측정)
+- **상태**: Provisional (cross-validate 대기)
+- **트리거**: PR #610 (`fix/606-r1-guard-freeze-isolate`) — 옵션 (a)/(c) 적용 전 measurement-first 실측으로 ADR 전제 검증 → **가설 5 (및 가설 1~4) 전부 오진 발견** → step 분리 + DEBUG 진단으로 root cause 확정
+- **MINOR 분류** — CI workflow gate 구조 변경 (r1-guard step 4분리 + Node 22 핀 + verify 진단 로깅 상시화)
+
+#### 가설 5 오진 발견 (옵션 a/c 가 CI 효과 0 인 이유)
+
+ADR §1 §가설 5 가 지목한 `measureBodyPxRatios` (8 body `targetIds` 측정) 는 r1-guard 의 `--measure-px-ratio` 모드 **전용**:
+
+```
+CI ci.yml:110 → node r1-ui-regression-guard.mjs   (플래그 없음 = verify 모드)
+verify 모드(runForViewport) → measureSunCoverage + pixel diff 만 실행
+가설 5 지목 measureBodyPxRatios(8 body) → --measure-px-ratio 모드에서만 호출 (CI 미실행 = dead code)
+```
+
+- **옵션 (a)** (targetIds 5 body revert) / **옵션 (c)** (`projectWorldToScreen` NDC guard) 는 verify 경로 **밖** → CI 효과 0 확정. 만약 옵션 (a)/(c) 를 적용했다면 회귀 미해소 (measurement-first 가 헛수고 차단)
+- ADR §1 의 "`pnpm build` success 후 다음 r1-guard step stuck" 도 부정확 — ci.yml:103 에서 `pnpm build` 가 r1-guard step **내부** (단일 step) 라 build/start/verify 어디서 stuck 인지 격리 불가였음
+
+#### measurement-first 4단계 진단 (CI 실측 SSoT)
+
+| 단계 | 변경                                                                       | CI run      | 측정 결과                                                                                                                                       |
+| ---- | -------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | r1-guard step 4분리 (install/build/start/verify, 개별 timeout)             | 26753107929 | **install (1/4) 5분 13초 timeout**, build/start/verify 전부 **skipped (미도달)**                                                                |
+| 2    | `DEBUG=pw:install` + install-deps/install 분리                             | 26753862359 | `pw:install download complete` (success) → `pw:install extracting archive` 직후 **5분 hang** (2차 다운로드 아님 = extract 단계 확정)            |
+| 3    | install 직전 disk/mem/node + extract 중 15초 간격 df 폴링                  | 26756305719 | Node **v24.16.0** / 디스크 88G avail (extract 5분 내내 **변동 0 = I/O 0바이트**) / 메모리 14Gi available → **자원 전부 정상**, extract deadlock |
+| 4    | detect-and-test job Node **22** 핀 (node-version-file → node-version:'22') | 26756788369 | **install 28초 통과** (이전 5분 hang → 28초) + build 35s / start 3s / verify 8s 전부 **success**                                                |
+
+#### Root cause 확정
+
+- **Node 24.16 + playwright 1.59.1 의 `extracting archive` 단계 deadlock** — 디스크/메모리/네트워크 무관, extract I/O 가 0바이트 진행하며 무한 hang. Node 22 LTS 에서 즉시 해소 (28초)
+- **회귀 시점 재해석**: ADR §측정 1 의 "PR #596 머지 후 2초" 는 **R5 코드와 무인과** — setup-node 가 `engines.node ">=20.0.0"` 범위를 최신 Node 24.16 으로 해석해 설치하기 시작한 **runner 인프라 시점**과 R5 머지가 우연히 겹친 것. ADR §가설 2 (인프라 시점 회귀) 가 "10회차+ 일관이라 transient 아님" 으로 기각됐으나, 실제는 _지속적_ 인프라 회귀 (transient 아님이 맞고, 인프라 회귀가 맞음 — 양립). **가설 2 부분 부활 + 정정**
+- **가설 1 (swiftshader) / 가설 3 (build corruption) / 가설 4 (start mode) / 가설 5 (satellite 측정)** 전부 기각 — freeze 가 verify/scene/build 도달 이전 (playwright install) 에 발생
+
+#### fix (PR #610)
+
+- **핵심**: `.github/workflows/ci.yml:39` detect-and-test job `node-version-file: 'package.json'` → `node-version: '22'` 핀 (Node 24.16 회피). playwright 버전 / r1-guard baseline / lock 무영향
+- **유지**: r1-guard step 4분리 (freeze 재발 시 즉시 step 단위 격리, ADR 옵션 f 정합) + verify 경로 `R1_GUARD_DIAG=1` 진단 로깅 상시화 (재발 시 단계 즉시 보존)
+- **재검토 조건**: playwright 업그레이드 (예: 1.60+) 로 Node 24 extract 호환 확인되면 Node 22 핀 해제 가능. §6 §재검토 트리거 #4 (Playwright version 변경) 정합
+
+#### 부수 발견 — #611 phobos focus DoD-3 회귀 (분리)
+
+freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 focus 회귀 가드` 가 비로소 실행 → **satellite (phobos + deimos) focus DoD-3 (camera target 동기화) 회귀** 노출. phobos: observe targetΔ=12764 / research targetΔ=32566 모두 tolerance 12042 크게 초과 (강발현). deimos: research targetΔ 가 run 마다 5429~6816 변동, tolerance 6814 경계에서 flaky (run 26756788369 PASS 5429 / run 26761107821 FAIL 6816, margin 2.04 — 약발현). 즉 satellite focus 시 camera target 이 mesh 궤도 운동을 못 따라가는 lag 공통 회귀. R5 (#596) 잠복. r1-guard freeze (#606) 와 직교 → **이슈 #611 분리** (CLAUDE.md §교차검증 §수용 vs 후속 분리 3단 프로토콜). PR #610 에서는 `browser-verify-378-focus.mjs` FOCUS_BODIES 에서 phobos + deimos 임시 제외 (주석 계약 + #611 링크) 로 freeze fix 를 green CI 로 머지
+
+#### 학습 정수
+
+- **measurement-first 원칙** (volt #51 / volt #32 측정법 검증 우선) 의 교과서적 적용 — ADR 의 정성적 가설 (satellite 측정 freeze) 을 채택 옵션 적용 _전에_ 실측 검증 → dead code 오진 발견 → 4단계 변수 분리 진단으로 root cause 확정. 가설 5 를 믿고 옵션 (a)/(c) 를 적용했다면 회귀 미해소 + 잘못된 "고침" 박제 (volt #32 역방향 손실 패턴)
+- **forensic ADR 의 가설 검증 한계** — 본 ADR §1 의 가설 5 는 "정황 증거 강력" 으로 확정했으나 CI 실행 경로 (verify vs measure-px-ratio) 를 검증하지 않은 채 코드 변경 영역 (+9 라인) 만으로 추론 → 오진. **forensic ADR 도 "코드가 실제 실행되는 경로" 를 실측해야** (DoD PASS ≠ 실행 경로 일치)
+- **step 분리의 진단 가치** — 단일 step 의 buffering 유실을 step 경계 + 개별 timeout 으로 격리. ADR 옵션 (f) (워크플로 step 분리) 가 "우선순위 low" 였으나 실제로는 **진단 핵심 도구**였음
+
+#### 교차검증 반영 사항 (cross-validate 2026-06-01 agy Antigravity outcome=applied)
+
+본 Amendment 2 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 직후 1회 루틴" 의무 — ADR 개정) 결과 4축 분류 박제:
+
+**합의 (agy + Claude 일치, 5건)**:
+
+1. measurement-first dead code 발견 + shotgun fix 방지 타당 (가설 5 verify 미경로 입증)
+2. Node 22 LTS 핀 결정 타당 — Node 24.16 + playwright extract 결함은 upstream 영역, 내부 코드 인위 변경보다 검증된 LTS 고정이 실무적
+3. step 4분리 + `R1_GUARD_DIAG=1` 상시 진단 로깅의 관측 가능성(observability) 설계 완성도
+4. 재검토 조건(playwright 업그레이드 시 핀 해제) 명문화로 기술 부채 영구화 방지
+5. 보안 영향 없음 (빌드 파이프라인 내부 엔진 버전 조정, 공격 표면 무관)
+
+**이견 (0건)**: 본 Amendment 2 핵심 결정(가설 1~5 오진 정정 + Node 22 핀) 반박 0.
+
+**Claude 기각 (agy 오탐 1건)**:
+
+1. **agy 제안 "next start readiness 메커니즘 명시 결여" 거부** — agy 가 도구 미사용으로 `ci.yml` 실제 내용을 못 본 채 지적. 실제 ci.yml start step(3/4)에 `curl -sf` readiness loop (30회 × 2초) + 실패 시 `::error::` + `exit 1` 이미 존재. 오탐 기각
+
+**고유 발견 (수용 → 박제 3건)**:
+
+1. **로컬 정합성 gap (후속 검토 박제)** — CI 는 Node 22 핀했으나 `.nvmrc` = 24.14.0 (Node 24) 잔존. 로컬 개발자가 fresh `playwright install` 후 r1-guard 수동 검증 시 동일 extract deadlock 가능성. 단 기존 설치 브라우저는 재install 안 하므로 빈도 낮음 (본 세션 로컬 verify 8초 정상 = 브라우저 기설치 상태). **본 PR #610 은 CI freeze fix 범위라 로컬 정합성은 직교 — 후속 검토 분리** (옵션: `engines.node` 핀 vs 로컬 개발 가이드 vs `.nvmrc` 다운그레이드, 단 로컬 강제 다운그레이드는 verify 외 작업 영향이라 신중). Node 24.14(로컬) vs 24.16(CI) extract hang 동일 여부도 미검증 (CI 실측만 확정)
+2. **SSoT 트레이드오프 (의도적 결정 박제)** — agy 가 `ci.yml` Node 22 하드코딩 vs `package.json` engines / `.nvmrc` 분산을 SSoT 위반으로 지적. 그러나 detect-and-test job 만 playwright extract 를 타므로 **의도적 국소 핀** (다른 job line 264/295/302 은 node-version-file 유지 = engines SSoT). 전체 Node 22 통일은 본 PR 범위 확장 — Node 24 가 verify 외 작업엔 정상이므로 국소 핀이 최소 변경. 일관성 비용 < 범위 확장 비용
+3. **measureBodyPxRatios dead code 최종 처리 (R6 전 의사결정 후속)** — agy 가 verify dead code 의 생명주기 미결정 지적. 정정: `measureBodyPxRatios` 는 `--measure-px-ratio` 모드 전용 (수동 측정 도구) 이라 **완전 dead code 아님** — verify 모드에서만 미경로. R6 진입 전 measure-px-ratio 모드의 CI 통합 여부 + satellite 측정 정리 의사결정 후속 (R6 architect 단계)
+
+**Claude 셀프 체크 (편향 회피)**:
+
+- **단일 모델 합의 편향** — agy 가 핵심 결정(가설 오진 정정 + Node 22 핀) 반박 0, 전면 합의. 합의 편향 가능성 있으나 **root cause 확정은 CI 4단계 실측 SSoT (run 4건)** 이라 정성 합의가 아닌 정량 측정이 가드. 단 agy 고유 발견(로컬 정합성)은 Claude 가 놓친 실제 gap — 후속 박제로 편향 보완
+- **measurement-first 원칙** (volt #51 / volt #32) — Node 22 핀은 CI install 28초 통과로 확정. 로컬 정합성은 미검증 → 후속 검토 (실측 전 핀 확장 금지, volt #32 역방향 손실 회피)
+
+### Amendment 라운드 N≥3 예상
+
+- Amendment 3 (해소됨 — 본 Amendment 2 가 root cause fix 까지 박제): ~~옵션 (c)/(d) root cause fix~~ → 실제 root cause 는 옵션 a~e 어디에도 없던 Node/playwright extract 비호환이었고 Node 22 핀으로 해소
+- Amendment 3 (잠재 — cross-validate 고유 발견 #1): 로컬 정합성 (`.nvmrc` Node 24 잔존) 후속 검토 — fresh playwright install deadlock 로컬 재현 측정 후 engines 핀 vs 가이드 결정
+- Amendment 3 (잠재): playwright 업그레이드로 Node 24 extract 호환 확인 시 Node 22 핀 해제
+- Amendment 4: R6 진입 시 satellite 측정 일반화 가드 (단 본 Amendment 2 로 freeze 자체는 R6 무관 확정 — R6 galilean 추가는 verify/measure 경로이고 freeze 는 install 단계였으므로 §6 §위험 #2 "R6 stuck 가속" 위험도 **해소**)
 
 forensic 5 조건 충족 (가설 N=5 / runtime 측정 = CI history 정적 분석 + 본 Amendment 1 자가 입증 측정 / DoD PASS 인데 사용자/제품 회귀 = admin override 누적 / 5 옵션 비교 / Amendment N=1 박제 + N≥2 예상) → forensic 변형 ADR 정합.
 

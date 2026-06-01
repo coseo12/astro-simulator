@@ -36,7 +36,13 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != ''
         uses: actions/setup-node@v4
         with:
-          node-version-file: 'package.json'
+          # #606 fix (ADR 20260531-606 §Amendment 2) — playwright 1.59.1 extract 가
+          #   Node 24.16 환경에서 deadlock ("extracting archive" 후 I/O 0바이트 5분 hang).
+          #   node-version-file: 'package.json' (engines.node ">=20.0.0") 은 setup-node 가
+          #   최신 24.16 을 설치 → freeze. Node 22 LTS 핀으로 회피 (run 26756788369 에서
+          #   install 28초 통과 검증, playwright 버전/r1-guard baseline 무영향).
+          #   재검토: playwright 업그레이드로 Node 24 extract 호환 확인되면 핀 해제 가능.
+          node-version: '22'
           cache: 'pnpm'
 
       - name: pnpm install
@@ -94,22 +100,57 @@ jobs:
         with:
           tool: wasm-pack@0.14.0
 
-      - name: R1 UI 회귀 가드 (r1-guard)
+      # ============================================================
+      # #606 r1-guard step 4분리 (install / build / start / verify)
+      # ============================================================
+      # ADR 20260531-606 §Amendment 2: 가설 1~5 (scene/satellite/verify/build) 전부 오진.
+      #   measurement-first 4단계 진단으로 root cause 확정:
+      #   1) step 분리 → install(1/4) 이 freeze 지점 (build/verify 미도달, run 26753107929)
+      #   2) DEBUG=pw:install → "extracting archive" 직후 hang, download 는 success (run 26753862359)
+      #   3) disk/mem/node 폴링 → 자원 전부 정상 (88G avail / 14Gi mem / Node 24.16),
+      #      extract I/O 0바이트 deadlock (run 26756305719)
+      #   4) Node 22 핀 → install 28초 통과 → Node 24.16 + playwright 1.59.1 extract
+      #      비호환 확정 (run 26756788369). fix: Node 22 LTS 핀 (line 39).
+      # step 분리는 fix 후에도 유지 — freeze 재발 시 즉시 step 단위 격리 (ADR 옵션 f 정합).
+
+      - name: 'r1-guard: Playwright Chromium 설치 (1/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        # #606 옵션 (b) — Playwright Chromium freeze 시 ~6시간 stuck 방지 (ADR `20260531-606-r1-guard-playwright-freeze-forensic.md` §5 §Fix 후 박제 의무 §"옵션 (b) — high")
-        timeout-minutes: 10
+        # Node 22 핀 (line 39) 으로 extract deadlock 해소. timeout-minutes:5 는 회귀 재발 가드 유지.
+        timeout-minutes: 5
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 'r1-guard: production build (2/4)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # build 단독 timeout — stuck 시 scene 코드 (R5 mars/phobos/deimos) prerender 무한 루프 격리
+        timeout-minutes: 8
+        run: pnpm build
+
+      - name: 'r1-guard: next start 기동 + readiness (3/4)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # start + readiness 단독 timeout — stuck 시 production 런타임 초기화 freeze 확정.
+        # setsid 로 띄워 step 종료 시 SIGHUP 으로 죽지 않도록 (다음 verify step 에서 사용).
+        timeout-minutes: 3
         run: |
-          pnpm exec playwright install --with-deps chromium
-          pnpm build
-          pnpm --filter @astro-simulator/web start -p 3001 &
-          WEB_PID=$!
+          setsid pnpm --filter @astro-simulator/web start -p 3001 > /tmp/r1-web.log 2>&1 &
+          echo $! > /tmp/r1-web.pid
           for i in {1..30}; do
-            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            if curl -sf http://localhost:3001/ko > /dev/null; then echo "READY after ${i}x2s"; break; fi
             sleep 2
           done
+          curl -sf http://localhost:3001/ko > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
+
+      - name: 'r1-guard: verify 실행 (4/4)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # verify 단독 timeout — stuck 시 Playwright/런타임 verify 경로 freeze 격리.
+        # R1_GUARD_DIAG=1 — verify 경로 단계별 stderr 진단 로깅 상시 활성화 (freeze 재발 시
+        #   stuck 직전 단계 즉시 보존, 성공 시 stderr 노이즈 무시. ADR §Amendment 2 정합).
+        timeout-minutes: 5
+        env:
+          R1_GUARD_DIAG: '1'
+        run: |
           BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs
           GUARD_EXIT=$?
-          kill $WEB_PID || true
+          kill "$(cat /tmp/r1-web.pid)" 2>/dev/null || true
           exit $GUARD_EXIT
 
       - name: R1 diff 이미지 업로드 (실패 시)
