@@ -36,7 +36,12 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != ''
         uses: actions/setup-node@v4
         with:
-          node-version-file: 'package.json'
+          # #606 진단 4차 — Node 변수 분리. node-version-file: 'package.json' 은
+          #   engines.node ">=20.0.0" 범위라 setup-node 가 최신(24.16)을 설치 → playwright
+          #   1.59.1 extract 가 Node 24.16 환경에서 deadlock (3차 진단: disk/mem/node 자원
+          #   전부 정상인데 extracting archive I/O 0바이트 hang). Node 22 LTS 로 핀하여
+          #   extract 통과 시 Node 24.16 원인 확정 + 즉시 fix (playwright/baseline 무영향).
+          node-version: '22'
           cache: 'pnpm'
 
       - name: pnpm install
