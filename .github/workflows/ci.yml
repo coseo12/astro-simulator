@@ -107,8 +107,21 @@ jobs:
 
       - name: 'r1-guard: Playwright Chromium 설치 (#606 진단 1/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # #606 진단 2차 — freeze 가 chromium zip 다운로드 100% 직후 extract 인지
+        #   2차 다운로드(chromium-headless-shell) 인지 격리. DEBUG=pw:install 로 playwright
+        #   내부 단계(download/extract 시작·완료)를 stderr 실시간 로깅 + install-deps(apt) 와
+        #   install(브라우저 본체) 분리로 stuck 단계 step 내 구분.
+        #   1차 진단(run 26753107929): 다운로드 100% 후 5분 침묵 → extract/post-download stuck 확정.
         timeout-minutes: 5
-        run: pnpm exec playwright install --with-deps chromium
+        env:
+          DEBUG: 'pw:install'
+        run: |
+          echo "::group::install-deps (apt — 1차 진단에서 통과 확인됨)" >&2
+          pnpm exec playwright install-deps chromium
+          echo "::endgroup::" >&2
+          echo "=== install chromium 본체 시작 (DEBUG=pw:install) ===" >&2
+          pnpm exec playwright install chromium
+          echo "=== install chromium 완료 ===" >&2
 
       - name: 'r1-guard: production build (#606 진단 2/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
