@@ -36,11 +36,12 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != ''
         uses: actions/setup-node@v4
         with:
-          # #606 진단 4차 — Node 변수 분리. node-version-file: 'package.json' 은
-          #   engines.node ">=20.0.0" 범위라 setup-node 가 최신(24.16)을 설치 → playwright
-          #   1.59.1 extract 가 Node 24.16 환경에서 deadlock (3차 진단: disk/mem/node 자원
-          #   전부 정상인데 extracting archive I/O 0바이트 hang). Node 22 LTS 로 핀하여
-          #   extract 통과 시 Node 24.16 원인 확정 + 즉시 fix (playwright/baseline 무영향).
+          # #606 fix (ADR 20260531-606 §Amendment 2) — playwright 1.59.1 extract 가
+          #   Node 24.16 환경에서 deadlock ("extracting archive" 후 I/O 0바이트 5분 hang).
+          #   node-version-file: 'package.json' (engines.node ">=20.0.0") 은 setup-node 가
+          #   최신 24.16 을 설치 → freeze. Node 22 LTS 핀으로 회피 (run 26756788369 에서
+          #   install 28초 통과 검증, playwright 버전/r1-guard baseline 무영향).
+          #   재검토: playwright 업그레이드로 Node 24 extract 호환 확인되면 핀 해제 가능.
           node-version: '22'
           cache: 'pnpm'
 
@@ -100,54 +101,31 @@ jobs:
           tool: wasm-pack@0.14.0
 
       # ============================================================
-      # #606 진단 — r1-guard step 4분리 (install / build / start / verify)
+      # #606 r1-guard step 4분리 (install / build / start / verify)
       # ============================================================
-      # 배경: ADR 20260531-606 가설 5 (8 body 측정 freeze) 는 verify 모드가
-      #   measureBodyPxRatios 를 호출하지 않으므로 dead code 오진. 진짜 freeze 지점
-      #   (build / start / verify-런타임) 을 step 단위로 격리하기 위해 분리.
-      # 기존 단일 step + timeout-minutes:10 (옵션 b) 은 build/start/verify 중 어디서
-      #   stuck 인지 격리 불가 (buffering 으로 stdout 도 유실). step 분리 시 GitHub Actions
-      #   UI 가 step 별 소요시간 + timeout 위치를 명확히 표시 → freeze 지점 확정.
-      # 머지 후 CI run 1회로 측정 → ADR Amendment 2 박제 + root cause fix 후속 PR.
+      # ADR 20260531-606 §Amendment 2: 가설 1~5 (scene/satellite/verify/build) 전부 오진.
+      #   measurement-first 4단계 진단으로 root cause 확정:
+      #   1) step 분리 → install(1/4) 이 freeze 지점 (build/verify 미도달, run 26753107929)
+      #   2) DEBUG=pw:install → "extracting archive" 직후 hang, download 는 success (run 26753862359)
+      #   3) disk/mem/node 폴링 → 자원 전부 정상 (88G avail / 14Gi mem / Node 24.16),
+      #      extract I/O 0바이트 deadlock (run 26756305719)
+      #   4) Node 22 핀 → install 28초 통과 → Node 24.16 + playwright 1.59.1 extract
+      #      비호환 확정 (run 26756788369). fix: Node 22 LTS 핀 (line 39).
+      # step 분리는 fix 후에도 유지 — freeze 재발 시 즉시 step 단위 격리 (ADR 옵션 f 정합).
 
-      - name: 'r1-guard: Playwright Chromium 설치 (#606 진단 1/4)'
+      - name: 'r1-guard: Playwright Chromium 설치 (1/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        # #606 진단 2차 — freeze 가 chromium zip 다운로드 100% 직후 extract 인지
-        #   2차 다운로드(chromium-headless-shell) 인지 격리. DEBUG=pw:install 로 playwright
-        #   내부 단계(download/extract 시작·완료)를 stderr 실시간 로깅 + install-deps(apt) 와
-        #   install(브라우저 본체) 분리로 stuck 단계 step 내 구분.
-        #   1차 진단(run 26753107929): 다운로드 100% 후 5분 침묵 → extract/post-download stuck 확정.
+        # Node 22 핀 (line 39) 으로 extract deadlock 해소. timeout-minutes:5 는 회귀 재발 가드 유지.
         timeout-minutes: 5
-        env:
-          DEBUG: 'pw:install'
-        run: |
-          echo "=== #606 진단 3차 — extract hang 원인 좁히기 (disk/mem/node) ===" >&2
-          echo "[node] $(node --version)" >&2
-          echo "[disk] (extract 전)" >&2; df -h / /tmp >&2
-          echo "[mem]" >&2; free -h >&2
-          echo "[cpu] nproc=$(nproc)" >&2
-          echo "::group::install-deps (apt — 1차 진단에서 통과 확인됨)" >&2
-          pnpm exec playwright install-deps chromium
-          echo "::endgroup::" >&2
-          echo "=== install chromium 본체 시작 (DEBUG=pw:install, 백그라운드 + 디스크 폴링) ===" >&2
-          pnpm exec playwright install chromium &
-          PWPID=$!
-          # extract hang 중 디스크 추이 폴링 — full 로 차오르다 멈추면 디스크 원인,
-          # 여유 있는데 hang 이면 Node/playwright extract 로직 원인.
-          while kill -0 "$PWPID" 2>/dev/null; do
-            echo "[disk-poll $(date -u +%H:%M:%S)] $(df -h / | tail -1)" >&2
-            sleep 15
-          done
-          wait "$PWPID"
-          echo "=== install chromium 완료 ===" >&2
+        run: pnpm exec playwright install --with-deps chromium
 
-      - name: 'r1-guard: production build (#606 진단 2/4)'
+      - name: 'r1-guard: production build (2/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        # build 단독 timeout — stuck 시 scene 코드 (R5 mars/phobos/deimos) prerender 무한 루프 확정
+        # build 단독 timeout — stuck 시 scene 코드 (R5 mars/phobos/deimos) prerender 무한 루프 격리
         timeout-minutes: 8
         run: pnpm build
 
-      - name: 'r1-guard: next start 기동 + readiness (#606 진단 3/4)'
+      - name: 'r1-guard: next start 기동 + readiness (3/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
         # start + readiness 단독 timeout — stuck 시 production 런타임 초기화 freeze 확정.
         # setsid 로 띄워 step 종료 시 SIGHUP 으로 죽지 않도록 (다음 verify step 에서 사용).
@@ -161,10 +139,11 @@ jobs:
           done
           curl -sf http://localhost:3001/ko > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
 
-      - name: 'r1-guard: verify 실행 (#606 진단 4/4)'
+      - name: 'r1-guard: verify 실행 (4/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        # verify 단독 timeout — stuck 시 Playwright/런타임 verify 경로 freeze 확정.
-        # R1_GUARD_DIAG=1 — verify 경로 단계별 stderr 진단 로깅 활성화 (stuck 직전 단계 보존).
+        # verify 단독 timeout — stuck 시 Playwright/런타임 verify 경로 freeze 격리.
+        # R1_GUARD_DIAG=1 — verify 경로 단계별 stderr 진단 로깅 상시 활성화 (freeze 재발 시
+        #   stuck 직전 단계 즉시 보존, 성공 시 stderr 노이즈 무시. ADR §Amendment 2 정합).
         timeout-minutes: 5
         env:
           R1_GUARD_DIAG: '1'
