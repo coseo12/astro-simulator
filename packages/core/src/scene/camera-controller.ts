@@ -102,6 +102,15 @@ export class CameraController {
         this.#detachFollow();
         return;
       }
+      // #611 — onBeforeRender 시점에 mesh.position 은 이번 프레임 값으로 갱신됐으나
+      // (render loop: time.tick → updateAt → mesh.position 설정이 scene.render 보다 먼저),
+      // worldMatrix 는 아직 이번 프레임 계산 전이라 `absolutePosition` 이 **직전 프레임** 값을
+      // 반환한다. 갱신 없이 읽으면 target 이 한 프레임 lag → 궤도 각속도가 큰 위성
+      // (phobos 주기 7.66h / deimos 30.3h) 에서 프레임당 이동량이 tolerance 를 초과해
+      // DoD-3 (target 동기화) 회귀. 행성은 각속도가 작아 lag 가 tolerance 내라 잠복했다.
+      // 측정 스크립트 (browser-verify-378-focus.mjs:101) 와 동일하게 강제 갱신 후 읽어
+      // lag 0. focus mesh 1개만 매 프레임 갱신이라 비용 무시 가능.
+      mesh.computeWorldMatrix(true);
       this.camera.target.copyFrom(mesh.absolutePosition);
     });
   }
