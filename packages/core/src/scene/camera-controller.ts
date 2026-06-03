@@ -60,12 +60,13 @@ export class CameraController {
    * venus focus 는 mesh 가 공전해도 카메라 target 고정 (activeTier='inner' → primary follow skip).
    *
    * 본 observer 는 scene 측 tier 정책 (T1/T2 origin reset) 과 직교하게 카메라 책임으로 추적:
-   * focus 진입 시 매 프레임 `camera.target.copyFrom(mesh.absolutePosition)`. tier 무관.
+   * focus 진입 시 매 프레임 `mesh.computeWorldMatrix(true)` 후 `camera.target.copyFrom(mesh.absolutePosition)`.
+   * tier 무관. (#611 — worldMatrix 갱신 없이 읽으면 absolutePosition 이 직전 프레임 값이라 한 프레임 lag.)
    *
    * 라이프사이클:
    *  - focusOn() Animation 종료 (onAnimationEnd) 후 attach — Animation 도중 target 덮어쓰기 race 회피
    *  - 새 focusOn() / reset() / dispose() 호출 시 detach
-   *  - 변화 없는 frame 은 copyFrom 자체가 cheap (3 float 복사) — perf 영향 무시 가능
+   *  - 매 frame 비용: focus mesh 1개 computeWorldMatrix + copyFrom (3 float) — perf 영향 무시 가능
    */
   #followObserver: Observer<Scene> | null = null;
 
@@ -102,6 +103,15 @@ export class CameraController {
         this.#detachFollow();
         return;
       }
+      // #611 — onBeforeRender 시점에 mesh.position 은 이번 프레임 값으로 갱신됐으나
+      // (render loop: time.tick → updateAt → mesh.position 설정이 scene.render 보다 먼저),
+      // worldMatrix 는 아직 이번 프레임 계산 전이라 `absolutePosition` 이 **직전 프레임** 값을
+      // 반환한다. 갱신 없이 읽으면 target 이 한 프레임 lag → 궤도 각속도가 큰 위성
+      // (phobos 주기 7.66h / deimos 30.3h) 에서 프레임당 이동량이 tolerance 를 초과해
+      // DoD-3 (target 동기화) 회귀. 행성은 각속도가 작아 lag 가 tolerance 내라 잠복했다.
+      // 측정 스크립트 (browser-verify-378-focus.mjs:101) 와 동일하게 강제 갱신 후 읽어
+      // lag 0. focus mesh 1개만 매 프레임 갱신이라 비용 무시 가능.
+      mesh.computeWorldMatrix(true);
       this.camera.target.copyFrom(mesh.absolutePosition);
     });
   }
