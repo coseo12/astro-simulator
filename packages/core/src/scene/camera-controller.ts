@@ -60,12 +60,13 @@ export class CameraController {
    * venus focus 는 mesh 가 공전해도 카메라 target 고정 (activeTier='inner' → primary follow skip).
    *
    * 본 observer 는 scene 측 tier 정책 (T1/T2 origin reset) 과 직교하게 카메라 책임으로 추적:
-   * focus 진입 시 매 프레임 `camera.target.copyFrom(mesh.absolutePosition)`. tier 무관.
+   * focus 진입 시 매 프레임 `mesh.computeWorldMatrix(true)` 후 `camera.target.copyFrom(mesh.absolutePosition)`.
+   * tier 무관. (#611 — worldMatrix 갱신 없이 읽으면 absolutePosition 이 직전 프레임 값이라 한 프레임 lag.)
    *
    * 라이프사이클:
    *  - focusOn() Animation 종료 (onAnimationEnd) 후 attach — Animation 도중 target 덮어쓰기 race 회피
    *  - 새 focusOn() / reset() / dispose() 호출 시 detach
-   *  - 변화 없는 frame 은 copyFrom 자체가 cheap (3 float 복사) — perf 영향 무시 가능
+   *  - 매 frame 비용: focus mesh 1개 computeWorldMatrix + copyFrom (3 float) — perf 영향 무시 가능
    */
   #followObserver: Observer<Scene> | null = null;
 
