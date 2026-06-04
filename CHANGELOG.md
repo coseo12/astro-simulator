@@ -5,6 +5,20 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-06-04
+
+### 요약
+
+R5 (화성 + 포보스 + 데이모스) visualization 완주 + satellite 2개 첫 본 사례 + R5 후속 회귀/CI 안정화 일괄 정리. 19 커밋 누적 — 마지막 릴리스 v0.18.0 (2026-05-28) 이후 7일.
+
+**카테고리별 매핑**:
+- **R5 본 시각화** (MINOR): #594 화성 + 포보스 + 데이모스 (Q2=B 2번째 본 인스턴스화, satellite 2개 첫 본 사례)
+- **satellite focus 회귀 fix** (MINOR): #611 follow observer 한 프레임 lag — onBeforeRender worldMatrix 미갱신으로 위성 focus 시 camera target 추적 lag (#610 freeze fix 로 드러난 R5 잠복 회귀)
+- **CI 안정화** (MINOR): #606 r1-guard freeze root cause = Node 24.16 + playwright extract 비호환 → Node 22 핀 + step 4분리 + timeout-minutes:10 가드 (PR #608/#610)
+- **NO-OP / ADR Amendment / 가드 폐기** (PATCH): #604 R5 ADR §결정 4 Amendment 1 (산식 1.69x vs 실측 0.99 분리) / #606 forensic ADR / #602 browser-verify-397-residual.mjs 회귀 가드 폐기 (CI 미통합 + R-Phase 갱신 부담)
+
+상세 entry 는 아래 sub-section 참조. cross-validate (agy) 반영: #604/#605/#606/#607/#602 outcome=applied.
+
 ### Notes (행동 변경 없음 — 회귀 가드 폐기)
 
 - **[#602] browser-verify-397-residual.mjs 회귀 가드 폐기 — CI 미통합 + R-Phase 갱신 부담 > 가치 (PATCH, ADR §Amendment 1 Accepted cross-validate 2026-06-04 agy outcome=applied)** ([#602](https://github.com/coseo12/astro-simulator/issues/602)) — PR #602. #397 NO-OP ADR 의 R-Phase residual(focus 외 body viewport 점유율) 회귀 가드 스크립트 + `apps/web/package.json` `verify:397-residual` 스크립트 폐기. **폐기 사유 (ROI 역전)**: (1) "CI `detect-and-test` 통합 검토" 가 끝내 미실행 (수동 전용) → 자동 회귀 검출 0 (2) `R_PHASE_EXPECTED` 매트릭스가 R-Phase 진입마다 dev 서버 실측 갱신 의무인데 **R4(#532)/R5(#594) 둘 다 누락** (FOCUS_BODIES 가 R3 baseline `[sun,mercury,venus,earth,jupiter,neptune]` 잔존 — jupiter/neptune 미구현이라 focus 불가). #598(PR #601) 단위 테스트 구현 중 drift 발견 → #602 박제 (3) focus 동작은 `browser-verify-378-focus.mjs`(CI 실행, #611 satellite follow lag 직접 차단 입증)가 커버, residual 측면은 priority:low + #397 NO-OP 종결. **보존**: "R-Phase 정합 종료 조건" 원칙은 397 ADR §재검토 조건 + R-Phase 공통 DoD 에 박제 유지 (스크립트 없이도 R-Phase ADR expected 명시 의무 살아있음), `docs/reports/397-residual/` 측정 증거 유지. **ADR 정합 갱신**: 397 ADR §회귀 가드 §Amendment 1 박제 (R3 원본은 `<details>` 역사 기록 보존) + 378 ADR §#397 재평가 회귀 가드 참조 폐기 명시. **PATCH 분류** — 검증 스크립트 폐기, product/agent 동작 변화 0 (frozen `.claude/` 미해당). **cross-validate 반영 (4축 분류)**: 합의 2건 (Amendment 폐기+역사 보존 추적성 우월 / 옵션 B NO-OP 타당) + 핵심 사각 우려 1건 (스크립트 폐기 → 잔존도 검증 수동 의존 — 폐기 사유 (1)(3) 에서 이미 다룸, "새 사각 생성" 아닌 "작동 안 하던 가드 명시 제거") + 고유 발견 수용 후속 분리 1건 ([#613](https://github.com/coseo12/astro-simulator/issues/613) — `introducedInRPhase` body 메타데이터 SSoT 자동화, #598/#602 drift 근본 해결책, priority:low) + Claude 기각 1건 (transient state / scale-control UI / 렌더 fade-out — #397/#400 영역 이미 종결, 비목표). 비-범위: residual 검증 자동화 재구현 (#613 후속) / docs/reports/397-residual 측정 증거 / R-Phase 공통 DoD 템플릿 변경.
