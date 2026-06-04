@@ -15,6 +15,7 @@
  *      — `scripts/verify-core-exports-immutable.sh` 자동 차단 (라운드 1 turbopack `__dirname` SSR 500 회귀 가드)
  *
  * 현재 박제: R1 sun (#329) + R2 mercury (#361) + R3 venus (#369) + R4 earth + moon (#532)
+ *           + R5 mars + phobos + deimos (#594) — satellite 2개 첫 본 사례, Q2=B 2번째 본 인스턴스화
  *
  * ⚠️ wasm-safe 패턴: 본 모듈은 `packages/core/src/scene/index.ts` 의 `export *` re-export 만 통해 노출된다.
  *    `packages/core/package.json` exports field 에 sub-path entry (`./scene/r-phase-allowlist`) 를 추가하면
@@ -27,6 +28,9 @@ export const R_PHASE_BODY_ALLOWLIST = Object.freeze([
   'venus',
   'earth', // R4 #532 — Q2=B 첫 본 인스턴스화
   'moon', // R4 #532 — satellite 첫 본 사례 (parent-satellite SSoT 패턴)
+  'mars', // R5 #594 — Q2=B 2번째 본 인스턴스화 (mercury → venus → earth → mars 단조 패턴)
+  'phobos', // R5 #594 — satellite 2개 첫 본 사례 (parent=mars, moon Amendment 4 학습 적용)
+  'deimos', // R5 #594 — satellite 2개 첫 본 사례 (parent=mars, moon Amendment 4 학습 적용)
 ] as const);
 
 export type RPhaseBodyId = (typeof R_PHASE_BODY_ALLOWLIST)[number];
