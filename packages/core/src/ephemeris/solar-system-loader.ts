@@ -68,6 +68,10 @@ const CelestialBodyRawSchema = z.object({
   // #613 — body 최초 등장 R-Phase (메타데이터 SSoT). R_PHASE_BODY_ALLOWLIST 자동 생성 소스.
   // 로드맵 v3 (R1=sun … R10=왜소행성/혜성) 정합. ADR `20260604-613-r-phase-metadata-ssot.md` §결정 A.
   introducedInRPhase: z.number().int().positive(),
+  // #617 — shortcut bar 노출 대상 메타 SSoT. "focus 가능"(introducedInRPhase)과 직교 축 —
+  // satellite(phobos/deimos 등)는 focus 가능하나 shortcut bar 미등록 (R5 Q4a=A 모바일 너비 정책).
+  // RPHASE_EXPECTED_ENABLED / FOCUS_BUTTONS 정적 매칭 가드 소스 (r-phase-allowlist.test.ts).
+  showInShortcutBar: z.boolean(),
   orbit: OrbitalElementsRawSchema.optional(),
   colorHint: z
     .object({
@@ -153,6 +157,8 @@ export interface LoadedCelestialBody {
   parentId: string | null;
   /** #613 — body 최초 등장 R-Phase. R_PHASE_BODY_ALLOWLIST 자동 생성 SSoT. */
   introducedInRPhase: number;
+  /** #617 — shortcut bar 노출 대상 메타. focus 가능과 직교 (satellite 는 focus 가능하나 미등록). */
+  showInShortcutBar: boolean;
   orbit?: LoadedOrbitalElements;
   colorHint?: {
     hex?: string | undefined;
@@ -214,6 +220,7 @@ export function loadSolarSystem(): LoadedSolarSystem {
       radius: b.radius,
       parentId: b.parentId,
       introducedInRPhase: b.introducedInRPhase,
+      showInShortcutBar: b.showInShortcutBar,
       ...(b.colorHint ? { colorHint: b.colorHint } : {}),
       // P9 #254 — 고리 3층 (km → m 변환). densityProfile 는 정규화된 튜플이라 단위 변환 불필요.
       ...(b.rings
