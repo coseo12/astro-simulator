@@ -6,34 +6,56 @@
  * 본 SSoT 외 body 는 simulation-core focusOn handler 가 emit 차단 (defense-in-depth scene 측면).
  * UI (focus-quick-buttons.tsx) 도 본 SSoT 참조 후 disabled 처리 (defense-in-depth UI 측면).
  *
- * R-Phase 진입 시 5곳 동시 박제 의무 (ADR `20260504-r-phase-allowlist-guard.md` §결정 4 + §Amendment 결정 D2):
- *   1. 본 파일에 body id 추가
- *   2. 해당 R-Phase ADR §결정 N 에 본 ADR cross-link
- *   3. apps/web/scripts/browser-verify-r-phase-allowlist.mjs expected list 갱신
- *   4. CHANGELOG `### Behavior Changes` 박제
- *   5. WASM 의존 도메인 (scene / physics / render / gpu) 한정 sub-path 추가 금지 검증
- *      — `scripts/verify-core-exports-immutable.sh` 자동 차단 (라운드 1 turbopack `__dirname` SSR 500 회귀 가드)
+ * #613 — allowlist 자동 생성 (ADR `20260604-613-r-phase-metadata-ssot.md`):
+ *   `R_PHASE_BODY_ALLOWLIST` 는 더 이상 하드코딩하지 않는다. `solar-system.json` 의 body
+ *   메타데이터 `introducedInRPhase` 를 `CURRENT_R_PHASE` 로 필터해 자동 생성한다 (데이터 SSoT).
+ *   기존 5곳 동시 박제 의무 → **3곳으로 감소**:
+ *     1. (소멸) ~~본 파일 body id 추가~~ → `CURRENT_R_PHASE` 1줄 증가 (R6+ body 는 데이터에 사전 부여됨)
+ *     2. 해당 R-Phase ADR §결정 N 에 본 ADR cross-link
+ *     3. apps/web/scripts/browser-verify-r-phase-allowlist.mjs + browser-verify-378-focus.mjs 의
+ *        `FOCUS_BODIES` 하드코딩 갱신 (정적 매칭 가드 #598 가 자동 생성값 ↔ FOCUS_BODIES 정합 차단)
+ *     4. CHANGELOG `### Behavior Changes` 박제
+ *     5. WASM 의존 도메인 sub-path 추가 금지 검증 (`scripts/verify-core-exports-immutable.sh`)
  *
- * 현재 박제: R1 sun (#329) + R2 mercury (#361) + R3 venus (#369) + R4 earth + moon (#532)
- *           + R5 mars + phobos + deimos (#594) — satellite 2개 첫 본 사례, Q2=B 2번째 본 인스턴스화
+ * 현재 박제: CURRENT_R_PHASE=5 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
+ *           / mars·phobos·deimos(R5). R6+ (jupiter·galilean 등) 는 데이터에 introducedInRPhase
+ *           부여돼 있으나 필터로 제외 — R6 진입 시 CURRENT_R_PHASE=6 1줄로 자동 포함.
  *
- * ⚠️ wasm-safe 패턴: 본 모듈은 `packages/core/src/scene/index.ts` 의 `export *` re-export 만 통해 노출된다.
- *    `packages/core/package.json` exports field 에 sub-path entry (`./scene/r-phase-allowlist`) 를 추가하면
- *    turbopack module dep graph 변경으로 wasm-pack `--target nodejs` 의 `__dirname` resolve 가
- *    `/ROOT/...` 가상 path 로 ENOENT 발생 → SSR 500. ADR §Amendment §결정 D1 참조.
+ * ⚠️ wasm-safe 패턴: 본 모듈은 `solar-system-loader.ts` 를 import 한다 (자동 생성 소스). loader 는
+ *    이미 scene 모듈들이 의존하는 core 내부 모듈이라 신규 외부 sub-path 노출은 없다. 단
+ *    `packages/core/package.json` exports field 에 sub-path entry (`./scene/r-phase-allowlist`) 를
+ *    추가하면 turbopack `__dirname` SSR 500 회귀 (ADR §Amendment §결정 D1) — sub-path 추가 금지 유지.
  */
-export const R_PHASE_BODY_ALLOWLIST = Object.freeze([
-  'sun',
-  'mercury',
-  'venus',
-  'earth', // R4 #532 — Q2=B 첫 본 인스턴스화
-  'moon', // R4 #532 — satellite 첫 본 사례 (parent-satellite SSoT 패턴)
-  'mars', // R5 #594 — Q2=B 2번째 본 인스턴스화 (mercury → venus → earth → mars 단조 패턴)
-  'phobos', // R5 #594 — satellite 2개 첫 본 사례 (parent=mars, moon Amendment 4 학습 적용)
-  'deimos', // R5 #594 — satellite 2개 첫 본 사례 (parent=mars, moon Amendment 4 학습 적용)
-] as const);
+import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
-export type RPhaseBodyId = (typeof R_PHASE_BODY_ALLOWLIST)[number];
+/** 현재 도달한 R-Phase. R-Phase 진입 시 이 상수 1줄만 증가하면 allowlist 가 자동 확장된다. */
+export const CURRENT_R_PHASE = 5;
+
+/**
+ * 주어진 phase 까지 등장한 body id 목록을 데이터 순서대로 반환하는 순수 함수.
+ *
+ * `R_PHASE_BODY_ALLOWLIST` 자동 생성 + R6 시뮬레이션 단위 테스트가 동일 함수를 재사용한다
+ * (ADR §결정 F #3 — 필터 로직 인라인 금지).
+ */
+export function filterBodiesByPhase(
+  bodies: readonly LoadedCelestialBody[],
+  phase: number,
+): string[] {
+  return bodies.filter((b) => b.introducedInRPhase <= phase).map((b) => b.id);
+}
+
+export const R_PHASE_BODY_ALLOWLIST: readonly string[] = Object.freeze(
+  filterBodiesByPhase(getSolarSystem().bodies, CURRENT_R_PHASE),
+);
+
+/**
+ * #613 — body id 타입. 자동 생성으로 JSON import 가 wide `string` 추론이라 8개 union literal 은
+ * 소실된다. 실측상 소비처 13곳 중 `RPhaseBodyId` 를 타입 파라미터로 쓰는 곳이 없어 (전부
+ * `R_PHASE_BODY_ALLOWLIST` 값 + `isRPhaseFocusable` 런타임 helper 사용) 약화 비용이 낮다.
+ * 별도 24-body union 추출은 데이터와 중복 하드코딩을 만들어 #613 취지(drift 제거)에 역행하므로
+ * `string` 후퇴 + 런타임 가드(`isRPhaseFocusable`)로 방어한다. ADR §결정 B 재량 (b).
+ */
+export type RPhaseBodyId = string;
 
 /**
  * R-Phase allowlist 검증 helper.

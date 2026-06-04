@@ -65,6 +65,9 @@ const CelestialBodyRawSchema = z.object({
   mass: z.number().positive(),
   radius: z.number().positive(),
   parentId: z.string().nullable(),
+  // #613 — body 최초 등장 R-Phase (메타데이터 SSoT). R_PHASE_BODY_ALLOWLIST 자동 생성 소스.
+  // 로드맵 v3 (R1=sun … R10=왜소행성/혜성) 정합. ADR `20260604-613-r-phase-metadata-ssot.md` §결정 A.
+  introducedInRPhase: z.number().int().positive(),
   orbit: OrbitalElementsRawSchema.optional(),
   colorHint: z
     .object({
@@ -148,6 +151,8 @@ export interface LoadedCelestialBody {
   mass: number;
   radius: number;
   parentId: string | null;
+  /** #613 — body 최초 등장 R-Phase. R_PHASE_BODY_ALLOWLIST 자동 생성 SSoT. */
+  introducedInRPhase: number;
   orbit?: LoadedOrbitalElements;
   colorHint?: {
     hex?: string | undefined;
@@ -208,6 +213,7 @@ export function loadSolarSystem(): LoadedSolarSystem {
       mass: b.mass,
       radius: b.radius,
       parentId: b.parentId,
+      introducedInRPhase: b.introducedInRPhase,
       ...(b.colorHint ? { colorHint: b.colorHint } : {}),
       // P9 #254 — 고리 3층 (km → m 변환). densityProfile 는 정규화된 튜플이라 단위 변환 불필요.
       ...(b.rings

@@ -86,6 +86,9 @@ v3 reset (2026-04-25) 후 R-Phase incremental build (R1 sun + R2 mercury + R3 ve
    - 근거: ADR `20260425-r1-store-scene-sync-unification.md` §결정 1 의 "event 단일 진실원" 정책 일관. emit 차단 시 store/scene/UI 자동 0 변화 (DoD-3 의 "selectedBodyId 변화 0 / camera radius 변화 0" 자동 충족). URL `?focus=earth` 진입도 url-sync.tsx 의 `sendCommand({type:'focusOn'})` 가 simulation-core 통과 → 동일 가드 (URL 직접 진입도 차단 = 추가 회귀 보호).
 
 4. **R-Phase 진입 갱신 절차** (영구 정책, 4곳 동시 박제 — 축 4 후보 B):
+
+   > **Amendment (#613, 2026-06-04) — `R_PHASE_BODY_ALLOWLIST` 자동 생성으로 절차 간소화 (ADR `20260604-613-r-phase-metadata-ssot.md`)**: 본 §결정 4 의 "①`R_PHASE_BODY_ALLOWLIST` 에 body id 직접 추가" 절차는 **소멸**한다. body 데이터(`solar-system.json`)의 `introducedInRPhase` 메타데이터를 `CURRENT_R_PHASE` 로 필터해 allowlist 를 자동 생성하므로, R-Phase 진입 시 **`CURRENT_R_PHASE` 1줄 증가** 로 대체된다 (R6+ body 는 데이터에 사전 부여됨). 나머지 박제(②ADR cross-link / ③browser-verify `FOCUS_BODIES` 갱신 / ④CHANGELOG)는 존속 — #598 정적 가드가 자동 생성값 ↔ `FOCUS_BODIES` 정합을 계속 차단. 즉 동시 박제 **4곳 → 3곳** (allowlist 직접 박제만 자동화). 아래 R4/R6/R10 예시의 "allowlist 추가"는 "`CURRENT_R_PHASE` 증가"로 읽는다.
+
    - **R4 진입 (지구)** → `R_PHASE_BODY_ALLOWLIST` 에 `'earth'` 추가 + R4 ADR §결정 N 에 본 ADR §결정 4 cross-link + `apps/web/scripts/browser-verify-r-phase-allowlist.mjs` expected list 갱신 + CHANGELOG `### Behavior Changes`
    - **R6 진입 (목성)** → `'jupiter'` 동일 절차
    - **R10 진입 (해왕성)** → `'neptune'` 동일 절차
