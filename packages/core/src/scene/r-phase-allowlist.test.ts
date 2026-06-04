@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { R_PHASE_BODY_ALLOWLIST, isRPhaseFocusable } from './r-phase-allowlist.js';
+import {
+  R_PHASE_BODY_ALLOWLIST,
+  isRPhaseFocusable,
+  CURRENT_R_PHASE,
+  filterBodiesByPhase,
+} from './r-phase-allowlist.js';
+import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 
 /**
  * #402 R-Phase Body Focus Allowlist SSoT 단위 테스트.
@@ -34,9 +40,65 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('readonly tuple 타입 박제 — RPhaseBodyId 추출 가능', () => {
-    // 타입 레벨 검증은 컴파일러가 담당. 런타임은 구조만 확인.
+  it('자동 생성 결과 8개 (CURRENT_R_PHASE=5 필터)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. 회귀 0 (위 toEqual 8개).
     expect(R_PHASE_BODY_ALLOWLIST.length).toBe(8);
+  });
+});
+
+/**
+ * #613 — `introducedInRPhase` 메타데이터 SSoT 자동 생성 검증.
+ *
+ * ADR `20260604-613-r-phase-metadata-ssot.md` §결정 C/E/F. `R_PHASE_BODY_ALLOWLIST` 는
+ * `solar-system.json` body 의 `introducedInRPhase <= CURRENT_R_PHASE` 필터로 자동 생성.
+ * `filterBodiesByPhase` 순수 함수로 R6+ 진입을 시뮬레이션해 마이그레이션 안전성을 박제한다.
+ */
+describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
+  const bodies = getSolarSystem().bodies;
+
+  it('CURRENT_R_PHASE 는 5 (R5 mars + phobos + deimos 까지)', () => {
+    expect(CURRENT_R_PHASE).toBe(5);
+  });
+
+  it('filterBodiesByPhase(5) == 현재 자동 생성 allowlist (회귀 0)', () => {
+    expect(filterBodiesByPhase(bodies, CURRENT_R_PHASE)).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+  });
+
+  it('R1 시뮬레이션 — phase 1 은 sun 1개', () => {
+    expect(filterBodiesByPhase(bodies, 1)).toEqual(['sun']);
+  });
+
+  it('R4 시뮬레이션 — phase 4 는 sun~moon 5개', () => {
+    expect(filterBodiesByPhase(bodies, 4)).toEqual(['sun', 'mercury', 'venus', 'earth', 'moon']);
+  });
+
+  it('R6 시뮬레이션 — phase 6 진입 시 jupiter + galilean 4 자동 포함 (코드 변경 0)', () => {
+    expect(filterBodiesByPhase(bodies, 6)).toEqual([
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'moon',
+      'mars',
+      'phobos',
+      'deimos',
+      'jupiter',
+      'io',
+      'europa',
+      'ganymede',
+      'callisto',
+    ]);
+  });
+
+  it('R10 시뮬레이션 — phase 10 은 전체 24 body (데이터 전부 부여 확인)', () => {
+    expect(filterBodiesByPhase(bodies, 10).length).toBe(24);
+  });
+
+  it('모든 body 에 introducedInRPhase 부여 (1~10 범위)', () => {
+    for (const b of bodies) {
+      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 누락`).toBeGreaterThanOrEqual(1);
+      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(10);
+    }
   });
 });
 
@@ -82,10 +144,7 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
  * 누적 동시 처리 (8 body) 로 해소했으나, 본 가드는 재발 방지 (정적 매칭, CI fail-fast).
  */
 describe('#598 — browser-verify-378-focus.mjs FOCUS_BODIES SSoT 정합', () => {
-  const verifyScriptPath = path.join(
-    REPO_ROOT,
-    'apps/web/scripts/browser-verify-378-focus.mjs',
-  );
+  const verifyScriptPath = path.join(REPO_ROOT, 'apps/web/scripts/browser-verify-378-focus.mjs');
 
   it('verify 스크립트 파일이 존재한다', () => {
     expect(fs.existsSync(verifyScriptPath)).toBe(true);
