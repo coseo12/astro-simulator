@@ -161,3 +161,90 @@ describe('#598 — browser-verify-378-focus.mjs FOCUS_BODIES SSoT 정합', () =>
     expect(focusBodies).toEqual([...R_PHASE_BODY_ALLOWLIST]);
   });
 });
+
+/**
+ * #619 — `r1-ui-regression-guard.mjs` `targetIds` 정적 매칭 가드.
+ *
+ * px-ratio 측정 대상 `targetIds` 는 R-Phase 진입 body 집합(= R_PHASE_BODY_ALLOWLIST)과 정합해야
+ * 하나 #598 가드 비대상이라 R6 진입 시 조용히 정체할 수 있다 (volt #69 은닉 상수 4번째 사본).
+ * 본 정적 가드로 자동 생성 allowlist ↔ targetIds 하드코딩 정합을 CI fail-fast 차단.
+ */
+describe('#619 — r1-ui-regression-guard.mjs targetIds SSoT 정합', () => {
+  const guardPath = path.join(REPO_ROOT, 'apps/web/scripts/r1-ui-regression-guard.mjs');
+
+  function extractArray(source: string, name: string): string[] {
+    const match = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^\\]]+)\\]`));
+    expect(match, `${name} 선언 패턴을 찾지 못함`).toBeTruthy();
+    return match![1]
+      .split(',')
+      .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+      .filter((s) => s.length > 0);
+  }
+
+  it('targetIds 가 R_PHASE_BODY_ALLOWLIST 와 정확히 일치한다 (drift 0)', () => {
+    const source = fs.readFileSync(guardPath, 'utf-8');
+    expect(extractArray(source, 'targetIds')).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+  });
+});
+
+/**
+ * #617 — shortcut bar 노출 목록 (`showInShortcutBar` 메타) 정적 매칭 가드.
+ *
+ * "focus 가능"(introducedInRPhase)과 직교 축 — satellite(phobos/deimos)는 focus 가능하나
+ * shortcut bar 미등록 (R5 Q4a=A). `showInShortcutBar` 데이터 메타를 SSoT 로,
+ * `FOCUS_BUTTONS`(렌더) / `RPHASE_EXPECTED_ENABLED|DISABLED`(verify) 하드코딩과 정합 차단.
+ * (렌더 자동 생성은 비목표 — UI 무변경 + verify 격리성 유지, ADR #613 §결정 D 패턴 정합.)
+ */
+describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
+  const bodies = getSolarSystem().bodies;
+  const shortcutBodies = bodies.filter((b) => b.showInShortcutBar).map((b) => b.id);
+  const shortcutEnabled = bodies
+    .filter((b) => b.showInShortcutBar && b.introducedInRPhase <= CURRENT_R_PHASE)
+    .map((b) => b.id);
+  const shortcutDisabled = bodies
+    .filter((b) => b.showInShortcutBar && b.introducedInRPhase > CURRENT_R_PHASE)
+    .map((b) => b.id);
+
+  it('현재 shortcut 노출 = sun~mars(활성) + jupiter/neptune(비활성 대표)', () => {
+    expect(shortcutBodies).toEqual([
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'moon',
+      'mars',
+      'jupiter',
+      'neptune',
+    ]);
+    expect(shortcutEnabled).toEqual(['sun', 'mercury', 'venus', 'earth', 'moon', 'mars']);
+    expect(shortcutDisabled).toEqual(['jupiter', 'neptune']);
+  });
+
+  it('FOCUS_BUTTONS(focus-quick-buttons.tsx) 의 id 가 showInShortcutBar 파생과 일치', () => {
+    const source = fs.readFileSync(
+      path.join(REPO_ROOT, 'apps/web/src/components/layout/focus-quick-buttons.tsx'),
+      'utf-8',
+    );
+    const block = source.match(/const\s+FOCUS_BUTTONS\s*=\s*\[([\s\S]+?)\];/);
+    expect(block, 'FOCUS_BUTTONS 선언을 찾지 못함').toBeTruthy();
+    const ids = [...block![1].matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
+    expect(ids).toEqual(shortcutBodies);
+  });
+
+  it('RPHASE_EXPECTED_ENABLED / DISABLED(browser-verify) 가 showInShortcutBar 파생과 일치', () => {
+    const source = fs.readFileSync(
+      path.join(REPO_ROOT, 'apps/web/scripts/browser-verify-r-phase-allowlist.mjs'),
+      'utf-8',
+    );
+    const extract = (name: string) => {
+      const m = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^\\]]+)\\]`));
+      expect(m, `${name} 선언을 찾지 못함`).toBeTruthy();
+      return m![1]
+        .split(',')
+        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+        .filter((s) => s.length > 0);
+    };
+    expect(extract('RPHASE_EXPECTED_ENABLED')).toEqual(shortcutEnabled);
+    expect(extract('RPHASE_EXPECTED_DISABLED')).toEqual(shortcutDisabled);
+  });
+});
