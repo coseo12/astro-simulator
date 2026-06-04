@@ -1,6 +1,6 @@
 # ADR 20260604 — R-Phase body 메타데이터 SSoT (`introducedInRPhase`)
 
-- **상태**: Provisional (cross-validate 발동 ADR — CLAUDE.md §ADR Status #370. 본문 §교차검증 반영 사항 통합 후 Accepted 전이)
+- **상태**: Accepted (cross-validate agy 2026-06-04 — §교차검증 반영 사항 통합 완료)
 - **날짜**: 2026-06-04
 - **결정자**: architect (#613 설계 위임, 2026-06-04)
 - **관련**: #613 (본 이슈), #598 (PR #601 — `R_PHASE_BODY_ALLOWLIST` ↔ `FOCUS_BODIES` 정적 매칭 가드), #602 (browser-verify-397-residual.mjs 폐기 — cross-validate agy 고유 발견 발화), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (R-Phase 진입 5곳 동시 박제 절차 SSoT — 본 ADR 이 그 절차의 일부를 자동화), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md) (R5 본 진입 §결정 7 R-Phase Allowlist), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (데이터 SSoT 보존 원칙), [`docs/glossary.md`](../glossary.md) (R-Phase / R_PHASE_BODY_ALLOWLIST / 5곳 동시 박제)
@@ -96,6 +96,8 @@ export const R_PHASE_BODY_ALLOWLIST = Object.freeze(
 
 > **wasm-safe 주의 (Developer 필독)**: `r-phase-allowlist.ts` 가 `solar-system-loader.ts` 를 import 하면 module dep graph 가 변경된다. 기존 ADR §Amendment D1 (turbopack `__dirname` SSR 500 회귀) 은 **`package.json` exports sub-path entry 추가** 가 트리거였으므로 import 추가 자체는 별개일 가능성이 높으나, **반드시 dev 빌드 SSR 200 + `verify-core-exports-immutable.sh` 통과를 구현 단계에서 실증** 한다. loader 는 이미 scene 모듈들이 의존하는 core 내부 모듈이므로 신규 외부 sub-path 노출은 없다.
 
+> **top-level 평가 타이밍 (cross-validate 이견 수용 #1, agy 발견 1)**: 위 예시처럼 `R_PHASE_BODY_ALLOWLIST` 를 module top-level const 로 두면 **모듈 로드 시점에 `getSolarSystem()` 이 강제 평가** 된다. **실측 결과 `loadSolarSystem` 은 완전 동기** (`grep` 으로 async/await/Promise/wasm 호출 0 확인 — static JSON import + zod parse 만) 이므로 agy 가 우려한 "비동기/wasm 초기화 전 호출 크래시" 는 **해당 없음**. `solar-system-scene.ts` 도 이미 `getSolarSystem()` 을 함수 내부(384줄)에서 호출 중. 그럼에도 top-level 즉시 평가는 import-order 견고성(번들러 tree-shaking / circular import) 에 민감하므로, **Developer 는 (a) top-level const 즉시 평가가 dev/prod 빌드 + 단위 테스트 전부 통과하면 그대로 유지, (b) import-order 이슈가 실측되면 lazy getter (`getRPhaseAllowlist()` 메모이즈) 로 전환** 중 택일한다. (a) 우선 — `getSolarSystem` 싱글톤 캐시가 이미 lazy 라 추가 지연이 불필요할 가능성이 높음. 전환 시 13 소비처가 값(배열) 을 직접 import 하므로 getter 전환은 소비처 변경 동반 — 비용 실측 후 결정.
+
 ### 결정 D — `#598` 정적 매칭 가드 재설계
 
 자동 생성 후 `R_PHASE_BODY_ALLOWLIST` 가 데이터에서 파생되므로, `FOCUS_BODIES` (browser-verify-378-focus.mjs) 와의 관계를 재정의한다.
@@ -150,7 +152,22 @@ export const R_PHASE_BODY_ALLOWLIST = Object.freeze(
 
 1. **순서 보존**: `R_PHASE_BODY_ALLOWLIST` 는 현재 `['sun','mercury','venus','earth','moon','mars','phobos','deimos']` 순서. 자동 생성은 `solar-system.json` 의 `bodies` 배열 순서를 따르므로, **JSON body 정의 순서가 R-Phase 등장 순서와 일치** 함을 검증해야 한다. 실측: JSON 순서 == 로드맵 등장 순서(sun→mercury→...→deimos→jupiter→...) 이미 일치(위 §확정 사실 body 목록). 단위 테스트로 `toEqual` (순서 포함) 박제.
 2. **#598 정적 가드 존속**: `r-phase-allowlist.test.ts` 의 `toEqual([...R_PHASE_BODY_ALLOWLIST])` 가 자동 생성값 == `FOCUS_BODIES` 를 계속 단언 → 회귀 차단.
-3. **R6 시뮬레이션 테스트**: `CURRENT_R_PHASE` 를 6 으로 가정한 순수 함수(필터 로직 분리) 단위 테스트로 jupiter+galilean4 가 추가됨을 검증 → R6 진입 동작 사전 실증.
+3. **R6 시뮬레이션 테스트 — 순수 함수 분리 의무 (cross-validate 이견 수용 #2, agy 발견 2)**: 필터 로직을 `R_PHASE_BODY_ALLOWLIST` 생성에 인라인하지 말고 **export 된 순수 함수로 분리** 한다:
+   ```typescript
+   // r-phase-allowlist.ts — 순수 함수 분리 (테스트 격리)
+   export function filterBodiesByPhase(
+     bodies: ReadonlyArray<LoadedCelestialBody>,
+     phase: number,
+   ): string[] {
+     return bodies
+       .filter((b) => b.introducedInRPhase !== undefined && b.introducedInRPhase <= phase)
+       .map((b) => b.id);
+   }
+   export const R_PHASE_BODY_ALLOWLIST = Object.freeze(
+     filterBodiesByPhase(getSolarSystem().bodies, CURRENT_R_PHASE),
+   );
+   ```
+   이로써 `CURRENT_R_PHASE` 모킹 hack 없이 `filterBodiesByPhase(bodies, 6)` 로 R6 진입을 단위 테스트한다. agy 가 제안한 시그니처를 채택 — Claude 원안(결정 F-3 "순수 함수")의 구체화이며 직교 항목 추가 아님.
 
 ---
 
@@ -200,6 +217,27 @@ export const R_PHASE_BODY_ALLOWLIST = Object.freeze(
 
 ## 교차검증 반영 사항
 
-> cross-validate (agy) 호출 후 본 섹션을 4축(합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견 후속 분리)으로 채우고 상태를 Accepted 로 전이한다. (CLAUDE.md §교차검증 / §ADR Status #370)
+cross-validate: agy (Antigravity), 2026-06-04. outcome=applied (exit 0, plan_bypass=false, rollback_failed=false). 로그: `.claude/logs/cross-validate-architecture-20260604-151733.log`.
 
-- **호출 전 Claude 편향 셀프 체크** (CLAUDE.md §교차검증 4종): 낙관적 일정 — 해당 없음(설계만) / **결합 간과 — 부분 미통과**: `r-phase-allowlist.ts` → `solar-system-loader.ts` import 추가가 turbopack module dep graph 를 바꿔 `__dirname` SSR 500(ADR §Amendment D1) 을 재발시킬 결합 위험. cross-validate 명시 질문으로 삽입 / 폐기 프레이밍 — 통과(#598 가드 존속, 결정 D) / 순수주의 — 통과(결정 B union 약화 수용 + Developer `string` 후퇴 재량).
+- **호출 전 Claude 편향 셀프 체크** (CLAUDE.md §교차검증 4종): 낙관적 일정 — 해당 없음(설계만) / **결합 간과 — 부분 미통과**: `r-phase-allowlist.ts` → `solar-system-loader.ts` import 추가가 turbopack module dep graph 를 바꿔 `__dirname` SSR 500(ADR §Amendment D1) 을 재발시킬 결합 위험. cross-validate 명시 질문으로 삽입 → agy 가 `verify-core-exports-immutable.sh` 빌드타임 차단을 "훌륭한 방어"로 인정 / 폐기 프레이밍 — 통과(#598 가드 존속, 결정 D) / 순수주의 — 통과(결정 B union 약화 수용 + Developer `string` 후퇴 재량).
+
+### 합의 (Claude 설계와 일치 — 즉시 반영됨)
+
+- 결정 A~F 6개 전부 타당 판정. 4개 명시 질문 모두 Claude 선택 지지:
+  - (1) wasm-safe — import 추가 자체는 sub-path entry 트리거와 별개 가능성 + `verify-core-exports-immutable.sh` 빌드타임 차단을 "훌륭한 방어적 설계"로 인정 (Claude 가정 지지)
+  - (2) 결정 B (24 union 약화) — "13 소비처 literal 강결합 없음 실측 → 합리적 트레이드오프"
+  - (3) 결정 E (전체 24 body 사전 부여) — "변경 유연성 극대화, Concrete Prediction 실증 가능"
+  - (4) 결정 D (#598 가드 존속) — "테스트 더블이 SUT 빌드타임 의존 회피, 적절한 격리"
+
+### 이견 수용 (외부 모델 근거 합리 — 수정 반영)
+
+1. **top-level 평가 타이밍 (agy 발견 1)** — agy: `R_PHASE_BODY_ALLOWLIST = Object.freeze(getSolarSystem().filter(...))` top-level const 즉시 평가가 비동기/wasm 초기화 전 호출 시 크래시 위험. **Claude 재분석**: `loadSolarSystem` 은 **완전 동기** 실측(`grep` async/await/Promise/wasm 호출 0 — static JSON import + zod parse 만) → "비동기 크래시"는 해당 없음. 단 top-level 즉시 평가의 import-order 견고성 우려는 합리 → §결정 C 에 (a) top-level const 유지(우선) / (b) lazy getter 전환(import-order 이슈 실측 시) 택일 박제. **원안**: top-level const 단일 / **수정안**: Developer 택일 + 실측 조건 명시
+2. **순수 함수 분리 (agy 발견 2)** — agy: `filterBodiesByPhase(bodies, phase)` 순수 함수로 분리해 R6 시뮬레이션 테스트 격리. **Claude 재분석**: 원안 §결정 F-3 이 "순수 함수(필터 로직 분리)" 이미 언급했으나 시그니처 미명시 → agy 제안 시그니처 채택해 §결정 F-3 구체화. 직교 항목 추가 아닌 구체화이므로 수용.
+
+### Claude 재분석으로 기각한 외부 모델 제안
+
+- 없음. agy 발견 1·2 는 실측 보완(1) / 구체화(2) 로 수용, 발견 3 은 범위 밖 후속 분리. 맹목 수용 회피는 발견 1 의 "비동기 크래시" 시나리오를 **실측(`loadSolarSystem` 동기성)으로 반증** 후 "import-order 견고성" 부분만 선별 수용한 데서 실증.
+
+### 고유 발견 (범위 밖 — 후속 분리)
+
+- **발견 3: `showInShortcutBar` 메타로 `RPHASE_EXPECTED_ENABLED` 자동화** — agy: shortcut bar 노출 여부도 JSON 메타 속성화해 `browser-verify-r-phase-allowlist.mjs` 의 `RPHASE_EXPECTED_ENABLED` 수동 잔재 제거. **Claude 판정**: #613 스프린트 계약은 `R_PHASE_BODY_ALLOWLIST` (focus 활성) 자동화가 목표. shortcut bar 정책(R5 Q4a=A satellite 제외)은 "focus 가능 ≠ shortcut bar 노출"의 직교 축 → 범위 밖. **후속 이슈 [#617](https://github.com/coseo12/astro-simulator/issues/617) 분리** (priority:low — `RPHASE_EXPECTED_ENABLED` stale 은 browser-verify 매트릭스 직접 FAIL 로 조용한 퇴행 아님).
