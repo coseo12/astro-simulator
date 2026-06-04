@@ -152,7 +152,7 @@ R-Phase v3 incremental build 정책 정합 분석 결과, **sun focus 화면의 
 
 **갱신된 종료 조건**: 12 cells 각각 — focus body 외 다른 body 의 viewport 점유율이 (a) 0.1% 이하 OR (b) 현재 R-Phase 까지 구현된 body 의 자연 visible 결과 인 경우 PASS. 후자는 R-Phase ADR 박제 시점에 expected list 명시 (R3 시점: `sun-observe`/`sun-research`: mercury/venus expected). R4+ 진입 시 expected list 갱신 의무.
 
-상세 분석 + NO-OP 결정: [`20260503-397-residual-no-op.md`](20260503-397-residual-no-op.md). 회귀 가드: `apps/web/scripts/browser-verify-397-residual.mjs` (R-Phase expected list SSoT 박제, 갱신된 종료 조건으로 12/12 PASS).
+상세 분석 + NO-OP 결정: [`20260503-397-residual-no-op.md`](20260503-397-residual-no-op.md). 회귀 가드 `apps/web/scripts/browser-verify-397-residual.mjs` 는 **#602 (2026-06-04) 로 폐기** — CI 미통합(수동 전용) + R-Phase 갱신 부담 > 가치 + focus 동작은 `browser-verify-378-focus.mjs`(CI) 가 커버. 상세: 397 ADR §회귀 가드 §Amendment 1. "R-Phase 정합 종료 조건" 원칙(위 갱신된 종료 조건)은 R-Phase 공통 DoD 로 유지.
 
 ### 회귀 가드
 

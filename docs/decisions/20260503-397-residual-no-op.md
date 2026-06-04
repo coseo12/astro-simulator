@@ -137,12 +137,30 @@ ADR §#397 재평가 정량 종료 조건은 strict "12/12 PASS" 인데, R-Phase
 
 ### 회귀 가드
 
+> **Amendment 1 (#602, 2026-06-04) — 회귀 가드 스크립트 폐기 (상태: Accepted, cross-validate 2026-06-04 agy outcome=applied)**
+>
+> `apps/web/scripts/browser-verify-397-residual.mjs` + `apps/web/package.json` 의 `verify:397-residual` 스크립트를 **폐기** (PR #602). 아래 R3 시점 박제는 **역사적 기록** 으로 보존하되 실 파일은 제거.
+>
+> **폐기 사유 (ROI 역전)**:
+> 1. **CI 미통합** — "CI `detect-and-test` 통합 검토" 가 끝내 미실행 (수동 전용) → **자동 회귀 검출 0**. 회귀 가드의 핵심 가치(자동 차단)가 부재
+> 2. **R-Phase 갱신 부담 > 가치** — `R_PHASE_EXPECTED` 매트릭스는 R-Phase 진입마다 dev 서버 실측 갱신 의무인데 **R4(#532)/R5(#594) 진입 시 둘 다 누락** (FOCUS_BODIES 가 R3 baseline `[sun,mercury,venus,earth,jupiter,neptune]` 잔존 — jupiter/neptune 은 미구현이라 focus 자체 불가). #598 (PR #601) 단위 테스트 구현 중 drift 발견 → #602 박제. 유지비용이 반복적으로 누락을 유발
+> 3. **focus 동작은 이미 CI 가드가 커버** — `browser-verify-378-focus.mjs` (CI `detect-and-test` 실행, #611 에서 satellite follow lag 직접 차단 입증) 가 focus 동작 회귀를 자동 검증. residual(viewport 점유율) 측면은 priority:low 이며 #397 은 이미 NO-OP 로 종결된 1회성 검증
+>
+> **보존되는 원칙**: "R-Phase 정합 종료 조건" (각 R-Phase 진입 시 해당 phase 까지 구현된 body 의 sun/외부 focus 자연 visible 을 expected 로 명시) 은 **본 §R4 이후 재검토 조건 + R-Phase 공통 DoD** 에 박제로 유지 — 스크립트 없이도 R-Phase ADR 에 expected 명시 의무는 살아있다. `docs/reports/397-residual/` 측정 증거(매트릭스 + 스크린샷)도 유지.
+>
+> **cross-validate 반영 (agy 2026-06-04, 4축 분류)**: 합의 2건 (Amendment 폐기+역사 보존 방식 추적성 우월 / 옵션 B NO-OP 타당) + 핵심 사각 우려 1건 ("스크립트 폐기 → 잔존도 검증 100% 수동 의존" — **폐기 사유 (1)(3) 에서 이미 다룸**: residual 자동 검출은 CI 미통합으로 애초에 부재, focus 동작은 `browser-verify-378-focus.mjs`(CI) 가 커버, residual 은 priority:low + NO-OP 종결. "새 사각 생성" 아닌 "작동 안 하던 가드 명시 제거") + 고유 발견 수용 1건 후속 분리 (**[#613](https://github.com/coseo12/astro-simulator/issues/613)** — `introducedInRPhase` body 메타데이터 SSoT 로 R-Phase 5곳 동시 박제 자동화, #598/#602 drift 근본 해결책, 본 폐기 범위 밖 → priority:low 분리) + Claude 기각 1건 (transient state 정량화 / scale-control UI 오인 / 렌더 파이프라인 fade-out — #397/#400 영역 이미 NO-OP 종결, 본 폐기 결정 비목표).
+
+<details>
+<summary>R3 시점 원본 박제 (폐기됨 — Amendment 1 참조)</summary>
+
 - **신규**: `apps/web/scripts/browser-verify-397-residual.mjs` — 12 cells × focus body 외 다른 body viewport 점유율 측정. R-Phase 정합 expected list 와 대조 후 PASS/FAIL 판정
 - expected list (R3 시점):
   - `sun-observe`, `sun-research`: mercury / venus 잔재 expected (R3 구현물)
   - 그 외 10 cells: residual ≤ 0.1% 엄격 적용
 - R4 진입 시 expected list 갱신 (예: earth-observe 에 R4 구현 moon 추가)
 - CI `detect-and-test` 통합 검토 — `verify:378-focus` 와 함께 dev 서버 기동 step 재사용
+
+</details>
 
 ### R4 이후 재검토 조건
 
