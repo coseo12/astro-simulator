@@ -3,7 +3,7 @@
 - **상태**: **Accepted (cross-validate 2026-06-05 agy outcome=applied)** (cross-validate 발동 ADR — CLAUDE.md §ADR Status 워크플로 #370. cross-validate 결과 §교차검증 반영 사항 본문 통합 완료 → Provisional → Accepted 전이)
 - **날짜**: 2026-06-05 (PM 합의 + cross-validate 통합: 2026-06-05)
 - **결정자**: architect (R6 PM 합의 라운드 완료 — Q1=A / Q2=B 임계 완화 (jupiter 거성 예외) / Q3=후속 분리. 메인 오케스트레이터가 사용자와 합의)
-- **관련**: #TBD (R6 PM 합의 라운드 예정), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md) (R5 SSoT — marsScale=800 / phobos·deimosScale=5000 / MARS_SATELLITES_ORBIT_VISUAL_SCALE=500 / satellite 2개 첫 본 사례 + **§결정 4 Amendment 1 산식 정정 인계 의무**), [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) (R4 SSoT — satellite 첫 본 사례 + EARTH_MOON_ORBIT_VISUAL_SCALE=30 + moon Amendment 4), [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) (Q2=B 비례 결정 정책 SSoT), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (**R-Phase 메타데이터 SSoT — allowlist 자동 생성 / showInShortcutBar / CURRENT_R_PHASE — R6 Concrete Prediction 대폭 단축 근거**), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (R-Phase 진입 박제 절차 SSoT), [`20260424-p11-b-lod-design.md`](20260424-p11-b-lod-design.md) (LOD × scale 합성), [`20260422-floating-origin.md`](20260422-floating-origin.md) (Tier transition — §결정 4 Amendment 1 가설 1 영역), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541, 의무 체크리스트 4항목)
+- **관련**: [#621](https://github.com/coseo12/astro-simulator/issues/621) (R6 본 스프린트, PM 합의 2026-06-05), 후속 분리 [#622](https://github.com/coseo12/astro-simulator/issues/622) (잔여 gap forensic) / [#623](https://github.com/coseo12/astro-simulator/issues/623) (DPR) / [#624](https://github.com/coseo12/astro-simulator/issues/624) (occlusion), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md) (R5 SSoT — marsScale=800 / phobos·deimosScale=5000 / MARS_SATELLITES_ORBIT_VISUAL_SCALE=500 / satellite 2개 첫 본 사례 + **§결정 4 Amendment 1 산식 정정 인계 의무**), [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) (R4 SSoT — satellite 첫 본 사례 + EARTH_MOON_ORBIT_VISUAL_SCALE=30 + moon Amendment 4), [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) (Q2=B 비례 결정 정책 SSoT), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (**R-Phase 메타데이터 SSoT — allowlist 자동 생성 / showInShortcutBar / CURRENT_R_PHASE — R6 Concrete Prediction 대폭 단축 근거**), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (R-Phase 진입 박제 절차 SSoT), [`20260424-p11-b-lod-design.md`](20260424-p11-b-lod-design.md) (LOD × scale 합성), [`20260422-floating-origin.md`](20260422-floating-origin.md) (Tier transition — §결정 4 Amendment 1 가설 1 영역), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541, 의무 체크리스트 4항목)
 - **교훈 적용**:
   - "신규 함수 ≠ 신규 구현" (volt [#21](https://github.com/coseo12/volt/issues/21) — R1~R5 인프라 100% 재사용 + **#613 메타데이터 SSoT 도입으로 allowlist 1줄 + shortcut bar 0줄 자동화 재발견**. R5 ADR §Concrete Prediction "R6 ≤ 12 라인" 예측을 #613 도입 사실로 **하향 갱신**)
   - "신규 데이터 ≠ 신규 코드 — ADR 예측 재현" (#613 `introducedInRPhase` / `showInShortcutBar` 메타데이터가 R6 body 에 이미 부여됨 → R6 진입은 `CURRENT_R_PHASE=5→6` 1줄로 allowlist + shortcut 활성화 자동 전파. "데이터만 추가, 코드 변경 최소" 예측 재현)
@@ -57,9 +57,9 @@
 - shortcut bar 모바일 너비 재조정 ❌ (#617 데이터로 R6 overflow 없음 — R5 인계 가정 무효화)
 - 실측 데이터 변경 ❌ (`solar-system.json`)
 - LOD 시스템 변경 ❌ (R4 Amendment 3 보존)
-- §결정 4 산식 ↔ 실측 1.74배 gap 의 **runtime 원인 확정** ❌ (가설 박제만 — 본 ADR §축 4 Amendment 인계. **후속 이슈 분리 예정** — Q3-1, priority:low, §재검토 트리거 #4)
-- **DPR(Retina) 4px fallback physical/logical pixel 명시** ❌ (**후속 이슈 분리 예정** — Q3-2, priority:low. agy cross-validate 고유 발견)
-- **galilean occlusion/raycast hit-test 엣지** ❌ (4개 일직선 겹침 / jupiter 뒤 엄폐 시 선택 불가 — **후속 이슈 분리 예정** — Q3-3, priority:medium. agy cross-validate 고유 발견)
+- §결정 4 산식 ↔ 실측 1.74배 gap 의 **runtime 원인 확정** ❌ (가설 박제만 — 본 ADR §축 4 Amendment 인계. **후속 이슈 분리 완료** — [#622](https://github.com/coseo12/astro-simulator/issues/622), priority:low, §재검토 트리거 #4)
+- **DPR(Retina) 4px fallback physical/logical pixel 명시** ❌ (**후속 이슈 분리 완료** — [#623](https://github.com/coseo12/astro-simulator/issues/623), priority:low. agy cross-validate 고유 발견)
+- **galilean occlusion/raycast hit-test 엣지** ❌ (4개 일직선 겹침 / jupiter 뒤 엄폐 시 선택 불가 — **후속 이슈 분리 완료** — [#624](https://github.com/coseo12/astro-simulator/issues/624), priority:medium. agy cross-validate 고유 발견)
 
 ### 후속 R-Phase 인계 의무
 
@@ -378,7 +378,7 @@ earth: ≤ 15%
 moon: ≤ 4.5%
 mars: ≤ 8% (R5)
 phobos / deimos: N/A (R5 §결정 6)
-jupiter: TBD (본 ADR — PM Q2=B 임계 완화 / 거성 예외)
+jupiter: ≤ 10% (R6 거성 예외, 본 ADR §결정 5 — jupScale=48 산출 9.87%)
 허용 오차: ± 2%
 ```
 
@@ -691,10 +691,10 @@ R7+: R-Phase 진입 시 architect ADR 박제 (saturn sun 의 8.37% — 거성 �
 
 ### 고유 발견 (범위 밖 — 후속 이슈 분리)
 
-agy 고유 발견 3건을 R6 본 스프린트 비목표로 판정, 메인 오케스트레이터가 후속 이슈 생성 (Q3):
+agy 고유 발견 3건을 R6 본 스프린트 비목표로 판정, 메인 오케스트레이터가 후속 이슈 생성 완료 (Q3, 2026-06-05):
 
-1. **Q3-1: 잔여 1.74배 gap forensic** (priority:low) — §축 4 산식 A/B 분리 후 잔여 gap 의 runtime 원인 (Tier scale vs boundingSphere 갱신). **agy 가 boundingSphere `computeWorldMatrix(true)` 갱신 타이밍으로 가설화 — #611 satellite follow lag 을 정확히 같은 `computeWorldMatrix(true)` 방식으로 고친 전례가 강한 출발점** (§축 4 가설 2 박제). §재검토 트리거 #4.
-2. **Q3-2: DPR(Retina) 4px fallback physical/logical pixel 명시** (priority:low) — 4px fallback 임계가 physical pixel 인지 logical(CSS) pixel 인지 명시 부재. Retina (DPR 2~3) 에서 fallback 진입 경계가 달라질 수 있음.
-3. **Q3-3: galilean occlusion/raycast hit-test 엣지** (priority:medium) — galilean 4개 일직선 겹침 / jupiter 뒤 엄폐 시 raycast 선택 불가. satellite 4개 첫 본 사례라 hit-test 엣지 미검증.
+1. **Q3-1: 잔여 1.74배 gap forensic** ([#622](https://github.com/coseo12/astro-simulator/issues/622), priority:low) — §축 4 산식 A/B 분리 후 잔여 gap 의 runtime 원인 (Tier scale vs boundingSphere 갱신). **agy 가 boundingSphere `computeWorldMatrix(true)` 갱신 타이밍으로 가설화 — #611 satellite follow lag 을 정확히 같은 `computeWorldMatrix(true)` 방식으로 고친 전례가 강한 출발점** (§축 4 가설 2 박제). §재검토 트리거 #4.
+2. **Q3-2: DPR(Retina) 4px fallback physical/logical pixel 명시** ([#623](https://github.com/coseo12/astro-simulator/issues/623), priority:low) — 4px fallback 임계가 physical pixel 인지 logical(CSS) pixel 인지 명시 부재. Retina (DPR 2~3) 에서 fallback 진입 경계가 달라질 수 있음.
+3. **Q3-3: galilean occlusion/raycast hit-test 엣지** ([#624](https://github.com/coseo12/astro-simulator/issues/624), priority:medium) — galilean 4개 일직선 겹침 / jupiter 뒤 엄폐 시 raycast 선택 불가. satellite 4개 첫 본 사례라 hit-test 엣지 미검증.
 
 **⑤ (browser-verify-378-focus.mjs bypass)**: 위 §기각 2 참조 — **기존 #598 정적 매칭 가드로 해소** (후속 분리 불필요).
