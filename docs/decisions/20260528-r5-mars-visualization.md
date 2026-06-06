@@ -849,6 +849,7 @@ forensic 5 조건 중 3개 이상 충족 시 forensic 변형 승격 ([`docs/temp
 - **결정**: §결정 4 산식 (1.69x) **유지** + 실측 데이터 (0.99 / 2.49) 분리 박제 + Tier scale 가설 박제 (검증 없음)
 - **행동 변화**: 없음 (코드 / 박제값 / 회귀 가드 무수정). ADR 정합성 회복 목적
 - **PATCH 분류** — CLAUDE.md §릴리스 §"행동 변화 vs 문서 변경 판정 질문" 기준 (에이전트 동작 변화 없음)
+- **R6 후속 정정 (2026-06-05, forward-link)** — R6 ADR ([`20260605-r6-jupiter-galilean-visualization.md`](20260605-r6-jupiter-galilean-visualization.md) §축 4, #621) 에서 본 1.71배 mismatch 의 **architect 단계 산식 정정 의무를 충족** — "산식 버그가 아니라 metric 정의 2종 분리 미명시" (산식 A = `visual_orbit / (parent_mesh + satellite_mesh)` 설계 임계 / 산식 B = `satellite.position.length() / parent.boundingSphere.radiusWorld` 검증 metric) 로 정정. 잔여 1.74배 gap 의 runtime 원인 (boundingSphere `computeWorldMatrix(true)` 갱신 타이밍 가설, #611 전례) 은 후속 forensic [#622](https://github.com/coseo12/astro-simulator/issues/622) 분리.
 
 ### 배경
 
