@@ -303,7 +303,7 @@ agy 가 옵션 A+D 조합을 지지 (구조적 완성도 / 기술 타당성 / �
 | jupiter (galilean 4) | 16 | **0.019 unit** ✅ ≤ 0.2 | 62.41 |
 
   - planet `orbit-lines` 원점 1 unit 이내 vertex: **0.0% (0/325)** ← 결함기 54% (390/715). agy 보강 ③ 통계 테스트 PASS.
-- **옵션 D 발동 (보고 1)**: 옵션 A 적용 후 galilean 재측정 — ganymede/jupiter **0.230** (여전히 moon/earth 0.068 의 3.4배 과대) → galilean `BODY_SCALE` 300 → 200 적용. 재측정: ganymede 0.230 → **0.1535** (D-627-3 ≤ 0.16 충족, binding constraint). io 0.106 / europa 0.091 / callisto 0.140. R6 ADR §Amendment 2 박제.
+- **옵션 D 발동 (보고 1, 2단계 iteration)**: 옵션 A 적용 후 galilean 재측정 — ganymede/jupiter **0.230** (여전히 moon/earth 0.068 의 3.4배 과대) → **1차 `BODY_SCALE` 300 → 200** (ganymede 0.1535, D-627-3 ≤ 0.16 충족). **사용자 D-T2 (2026-06-06) "목성 대비 아직 큼" 재보고 → 2차 200 → 100** (dev iteration 합의): ganymede **0.077** (moon/earth 0.068 의 1.13배 정합) / io 0.053 / europa 0.046 / callisto 0.070. 사용자 "목성 대비 적당" 합의. galilean 4개 sub-4px → 4px fallback billboard 전면 의존 (LOD #391 흡수). R6 ADR §Amendment 2 박제 (300→200→100).
 - **회귀 가드**: `apps/web/scripts/browser-verify-627-satellite-orbit.mjs` (verify:627-satellite-orbit) — 2축 (A worldCenter ±0.2 / B 원점 밀집 0) + CI `detect-and-test` 통합 (port 3005). 단위 테스트 `packages/core/src/scene/satellite-orbit-structure.test.ts` (isSatelliteOrbit 분류 11 케이스 + getOrbitVisualScale fallback).
 - **D-T2 실 Chrome 육안**: 사용자 위임 (headless ≠ 실 브라우저, volt #77). PR #627 본문 명시.
 - **코드 변경 라인 수 (§4 예측 1 대조)**: 예측 ~40~60 라인 (옵션 A) + 4 라인 (옵션 D). 실측 옵션 A 핵심 변경 ~70 라인 (분류 helper + dispose helper + Map 일반화 — 예측 상한 근방, 100 미만 임계 통과) + 옵션 D 4 라인. 예측 정합.

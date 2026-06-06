@@ -38,20 +38,20 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE.jupiter).toBe(48);
   });
 
-  it('io = 200 (R6 #627 옵션 D — 300→200 moon 정합, galilean/jupiter 0.106)', () => {
-    expect(BODY_SCALE.io).toBe(200);
+  it('io = 100 (R6 #627 옵션 D — 사용자 D-T2 합의 300→200→100, galilean/jupiter 0.053 moon 정합)', () => {
+    expect(BODY_SCALE.io).toBe(100);
   });
 
-  it('europa = 200 (R6 #627 옵션 D — io 동일값 moon=galilean=200 mental model)', () => {
-    expect(BODY_SCALE.europa).toBe(200);
+  it('europa = 100 (R6 #627 옵션 D — io 동일값, 비율 0.046)', () => {
+    expect(BODY_SCALE.europa).toBe(100);
   });
 
-  it('ganymede = 200 (R6 #627 옵션 D — 비율 0.1535 ≤ 0.16 binding, 태양계 최대 위성)', () => {
-    expect(BODY_SCALE.ganymede).toBe(200);
+  it('ganymede = 100 (R6 #627 옵션 D — 비율 0.077 (moon 0.068 의 1.13배), 태양계 최대 위성)', () => {
+    expect(BODY_SCALE.ganymede).toBe(100);
   });
 
-  it('callisto = 200 (R6 #627 옵션 D — 비율 0.140)', () => {
-    expect(BODY_SCALE.callisto).toBe(200);
+  it('callisto = 100 (R6 #627 옵션 D — 비율 0.070)', () => {
+    expect(BODY_SCALE.callisto).toBe(100);
   });
 
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
@@ -76,10 +76,10 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('phobos')).toBe(5000); // R5 #594
     expect(getBodyScale('deimos')).toBe(5000); // R5 #594
     expect(getBodyScale('jupiter')).toBe(48); // R6 #621
-    expect(getBodyScale('io')).toBe(200); // R6 #627 옵션 D (300→200)
-    expect(getBodyScale('europa')).toBe(200); // R6 #627 옵션 D
-    expect(getBodyScale('ganymede')).toBe(200); // R6 #627 옵션 D
-    expect(getBodyScale('callisto')).toBe(200); // R6 #627 옵션 D
+    expect(getBodyScale('io')).toBe(100); // R6 #627 옵션 D (300→200→100, D-T2 합의)
+    expect(getBodyScale('europa')).toBe(100); // R6 #627 옵션 D
+    expect(getBodyScale('ganymede')).toBe(100); // R6 #627 옵션 D
+    expect(getBodyScale('callisto')).toBe(100); // R6 #627 옵션 D
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
