@@ -28,7 +28,7 @@
 | `BODY_SCALE.ganymede` | **300** | `apps/web/src/constants/body-scale.ts` | §축 2 — mesh 5.60 px (mesh visible). jupiter 대비 0.23배 (역전 없음) |
 | `BODY_SCALE.callisto` | **300** | `apps/web/src/constants/body-scale.ts` | §축 2 — mesh 5.12 px (mesh visible). jupiter 대비 0.21배 |
 | `JUPITER_SATELLITES_ORBIT_VISUAL_SCALE` + `ORBIT_VISUAL_SCALE_BY_PARENT.jupiter` | **16** | `packages/core/src/scene/orbit-visual-scale.ts` | §축 4 — **jupiter mesh 4.8배 확대 (scale 48) 로 io binding 재산출**: io 분리 마진 1.69x (R5 phobos 1.69x 정합). **6→16 상향 (jupiter scale 상향의 결합 효과)**. R5 §결정 4 정정 산식 적용 |
-| `PX_RATIO_THRESHOLDS.jupiter` | **`10`** (퍼센트 단위 정수 — guard SSoT `mars: 8` / `venus: 14.26` 동일 단위. ⚠️ `0.10` 박제 시 `9.87 <= 0.10` 영구 FAIL) | `apps/web/scripts/r1-ui-regression-guard.mjs` | §축 5 — 산출 9.87%, margin 0.13% (± 2% 안). **Q2=B 거성 예외 — inner planet 단조 정책과 직교** |
+| `PX_RATIO_THRESHOLDS.jupiter` | **정책 9.87% (식) / guard `16.3` (실측 보정 — §Amendment 1)** | `apps/web/scripts/r1-ui-regression-guard.mjs` | §축 5 + **§Amendment 1 (2026-06-06)** — 식 9.87% 는 wsRadius 비 예측, 실측 **15.52%** perspective foreshortening (earth 2026-05-21 선례). guard 임계 = 실측 × 1.05 = 16.3 (earth 17 / venus 14.26 패턴). ⚠️ 퍼센트 단위 정수. **Q2=B 거성 예외 — inner planet 단조와 직교** |
 | `PX_RATIO_THRESHOLDS.{io,europa,ganymede,callisto}` | **N/A** (4px fallback 의존 — Q2=B 임계 미적용) | r1-guard 미박제 | §축 6 — R5 phobos/deimos §결정 6 답습 |
 | `CURRENT_R_PHASE` | **5 → 6** (1줄) | `packages/core/src/scene/r-phase-allowlist.ts` | §축 7 — #613 자동 생성. allowlist + shortcut 자동 전파 |
 | `R_PHASE_BODY_ALLOWLIST` | (자동) `[...R5, jupiter, io, europa, ganymede, callisto]` | (자동 생성) | §축 7 — `introducedInRPhase=6` 데이터 필터 |
@@ -511,7 +511,7 @@ jupiterScale=48 + galileanScale=300 시 galilean 4개 모두 jupiter mesh 의 0.
 
 ### 결정 5 — Q2=B 임계 jupiter = 10% (축 5, 거성 예외)
 
-`PX_RATIO_THRESHOLDS.jupiter = 10` (⚠️ 퍼센트 단위 정수 — guard 는 `mars: 8` / `venus: 14.26` 처럼 퍼센트 값 직접 비교. `0.10` 직박제 시 `9.87 <= 0.10` 영구 FAIL) — 산출 9.87% margin 0.13%. **거성 예외 — inner planet 거리순 단조 (mercury 6 < venus 11 < earth 15) 와 직교**: jupiter (10%) 는 venus(11%) 와 mars(8%) 사이에 위치, 사실 비율 정합 우선. **Q3 정정: Q2=B sun 천장 (25%) 인스턴스화는 sun 자신만 — jupiter 포함 어떤 body 도 sun 의 10.3% 미만이라 천장 도달 불가. 거성 예외 = 사실 비율 정합 임계 상향 ≠ 천장 도달.**
+`PX_RATIO_THRESHOLDS.jupiter` — **정책 식 9.87% / guard 실측 16.3% (§Amendment 1 2026-06-06)**. ADR 산출식 9.87% 는 wsRadius 비 예측 (margin 0.13%) 이나 qa D-T2 실측 **15.52%** (perspective foreshortening, earth 선례). guard 임계 = 실측 × 1.05 = **16.3** (earth 17 / venus 14.26 / mercury 4.95 동일 — 정책 식값 ≠ guard 실측 튜닝 이원화). ⚠️ 퍼센트 단위 정수 (`0.10` 직박제 시 영구 FAIL). **거성 예외 — inner planet 거리순 단조 (mercury 6 < venus 11 < earth 15) 와 직교**: jupiter (정책 9.87%) 는 venus 와 mars 사이, 사실 비율 정합 우선. **Q3 정정: Q2=B sun 천장 (25%) 인스턴스화는 sun 자신만 — jupiter 포함 어떤 body 도 sun 의 10.3% 미만이라 천장 도달 불가.**
 
 ### 결정 6 — Q2=B 임계 미적용 (galilean 4개, 축 6)
 
@@ -698,3 +698,16 @@ agy 고유 발견 3건을 R6 본 스프린트 비목표로 판정, 메인 오케
 3. **Q3-3: galilean occlusion/raycast hit-test 엣지** ([#624](https://github.com/coseo12/astro-simulator/issues/624), priority:medium) — galilean 4개 일직선 겹침 / jupiter 뒤 엄폐 시 raycast 선택 불가. satellite 4개 첫 본 사례라 hit-test 엣지 미검증.
 
 **⑤ (browser-verify-378-focus.mjs bypass)**: 위 §기각 2 참조 — **기존 #598 정적 매칭 가드로 해소** (후속 분리 불필요).
+
+---
+
+## Amendment 1 (2026-06-06) — §결정 5 r1-guard 임계 perspective 보정 (식 예측 → 실측)
+
+- **상태**: Accepted (cross-validate 2026-06-06 agy outcome=applied)
+- **트리거**: PR #627 ([#621](https://github.com/coseo12/astro-simulator/issues/621)) qa D-T2 — `--measure-px-ratio` 실측 jupiter **15.52% / 38.21px** (§결정 5 박제 식 예측 9.87% / 24.3px 의 **1.573배**). `jupiterPxRatio FAIL (15.52% > 10%)` 3 viewport 결정적 재현 + galilean 4 동일 **1.556~1.582배 일관** (측정 노이즈 아님 — 결정적 수렴).
+- **원인**: §축 5 sun 대비 px 비 산출식 (`sunPxRatio ≈ body.radius × scale / 3.4785e10`) 은 **wsRadius 비 기반 — perspective foreshortening 무시**. **earth 2026-05-21 선례** (R4 ADR [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) §Amendment 1: 식 14.67% → 실측 16.40%, +11.8%) 와 **동일 방향**. jupiter 는 sun 5.2 AU 거리라 카메라 foreshortening 편차 **최대 (+57%)**. galilean 4 가 jupiter 와 동일 거리라 같은 1.56~1.58배 → perspective 거리 의존 일관 검증. **§축 4 산식 A/B 분리 ([#622](https://github.com/coseo12/astro-simulator/issues/622) forensic) 와 같은 뿌리** (정적 식 ≠ runtime 실측). r1-guard 측정 자체는 정확 (boundingSphere.radiusWorld + perspective projection).
+- **결정**: **jupiterScale=48 / Q2=B 거성 예외 정책 (사실 비율 식 9.87%) 보존** + **r1-guard `PX_RATIO_THRESHOLDS.jupiter` 임계만 실측 perspective 보정**: 실측 15.52% × 1.05 = **16.3** (earth 17 / venus 14.26 / mercury 4.95 동일 패턴 — 정책 식값 ≠ guard 실측 튜닝값 이원화). 시각 품질 영향 0: jupiter **38px > earth 36px** 거성 직관 오히려 강화, galilean 8.82px ≪ jupiter 38px **역전 없음** (qa headless 확인). scale 축소 (qa 권고 A, ≈30) 는 거성 직관 역행이라 기각 — earth 선례 (scale 보존, 임계 보정) 채택.
+- **DoD 재조정** (CLAUDE.md 스프린트 계약 §재조정 — 사용자 합의 2026-06-06, 세 위치 박제): 이슈 #621 DoD "jupiter sun 대비 px 비 ~9.87% (±2%)" → "**정책 식 9.87% / guard 실측 16.3% 이원화** (earth 선례)". 박제 3위치 = 코드 주석 (`r1-ui-regression-guard.mjs:104`) + PR #627 본문 + CHANGELOG `### Notes`.
+- **행동 변화**: r1-guard jupiter 임계 10 → 16.3 (회귀 가드 정확도 회복). 박제값 / 시각 / 산식 무변경.
+- **후속**: qa non-blocking — CI r1-guard 가 pixel-diff (verify) 모드라 `--measure-px-ratio` 임계 미검사 (게이트 사각). CI 에 px-ratio step 추가 검토 → 별도 인프라 이슈 ([#626](https://github.com/coseo12/astro-simulator/issues/626) 계열).
+- **PATCH 분류** — 측정 임계 보정 (시각 / 박제값 / 에이전트 행동 무변경, 가드 정확도 회복).
