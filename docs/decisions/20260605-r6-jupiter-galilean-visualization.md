@@ -28,7 +28,7 @@
 | `BODY_SCALE.ganymede` | **300** | `apps/web/src/constants/body-scale.ts` | §축 2 — mesh 5.60 px (mesh visible). jupiter 대비 0.23배 (역전 없음) |
 | `BODY_SCALE.callisto` | **300** | `apps/web/src/constants/body-scale.ts` | §축 2 — mesh 5.12 px (mesh visible). jupiter 대비 0.21배 |
 | `JUPITER_SATELLITES_ORBIT_VISUAL_SCALE` + `ORBIT_VISUAL_SCALE_BY_PARENT.jupiter` | **16** | `packages/core/src/scene/orbit-visual-scale.ts` | §축 4 — **jupiter mesh 4.8배 확대 (scale 48) 로 io binding 재산출**: io 분리 마진 1.69x (R5 phobos 1.69x 정합). **6→16 상향 (jupiter scale 상향의 결합 효과)**. R5 §결정 4 정정 산식 적용 |
-| `PX_RATIO_THRESHOLDS.jupiter` | **10%** (`0.10`) | `apps/web/scripts/r1-ui-regression-guard.mjs` | §축 5 — 산출 9.87%, margin 0.13% (± 2% 안). **Q2=B 거성 예외 — inner planet 단조 정책과 직교** |
+| `PX_RATIO_THRESHOLDS.jupiter` | **`10`** (퍼센트 단위 정수 — guard SSoT `mars: 8` / `venus: 14.26` 동일 단위. ⚠️ `0.10` 박제 시 `9.87 <= 0.10` 영구 FAIL) | `apps/web/scripts/r1-ui-regression-guard.mjs` | §축 5 — 산출 9.87%, margin 0.13% (± 2% 안). **Q2=B 거성 예외 — inner planet 단조 정책과 직교** |
 | `PX_RATIO_THRESHOLDS.{io,europa,ganymede,callisto}` | **N/A** (4px fallback 의존 — Q2=B 임계 미적용) | r1-guard 미박제 | §축 6 — R5 phobos/deimos §결정 6 답습 |
 | `CURRENT_R_PHASE` | **5 → 6** (1줄) | `packages/core/src/scene/r-phase-allowlist.ts` | §축 7 — #613 자동 생성. allowlist + shortcut 자동 전파 |
 | `R_PHASE_BODY_ALLOWLIST` | (자동) `[...R5, jupiter, io, europa, ganymede, callisto]` | (자동 생성) | §축 7 — `introducedInRPhase=6` 데이터 필터 |
@@ -511,7 +511,7 @@ jupiterScale=48 + galileanScale=300 시 galilean 4개 모두 jupiter mesh 의 0.
 
 ### 결정 5 — Q2=B 임계 jupiter = 10% (축 5, 거성 예외)
 
-`PX_RATIO_THRESHOLDS.jupiter = 0.10` — 산출 9.87% margin 0.13%. **거성 예외 — inner planet 거리순 단조 (mercury 6 < venus 11 < earth 15) 와 직교**: jupiter (10%) 는 venus(11%) 와 mars(8%) 사이에 위치, 사실 비율 정합 우선. **Q3 정정: Q2=B sun 천장 (25%) 인스턴스화는 sun 자신만 — jupiter 포함 어떤 body 도 sun 의 10.3% 미만이라 천장 도달 불가. 거성 예외 = 사실 비율 정합 임계 상향 ≠ 천장 도달.**
+`PX_RATIO_THRESHOLDS.jupiter = 10` (⚠️ 퍼센트 단위 정수 — guard 는 `mars: 8` / `venus: 14.26` 처럼 퍼센트 값 직접 비교. `0.10` 직박제 시 `9.87 <= 0.10` 영구 FAIL) — 산출 9.87% margin 0.13%. **거성 예외 — inner planet 거리순 단조 (mercury 6 < venus 11 < earth 15) 와 직교**: jupiter (10%) 는 venus(11%) 와 mars(8%) 사이에 위치, 사실 비율 정합 우선. **Q3 정정: Q2=B sun 천장 (25%) 인스턴스화는 sun 자신만 — jupiter 포함 어떤 body 도 sun 의 10.3% 미만이라 천장 도달 불가. 거성 예외 = 사실 비율 정합 임계 상향 ≠ 천장 도달.**
 
 ### 결정 6 — Q2=B 임계 미적용 (galilean 4개, 축 6)
 
