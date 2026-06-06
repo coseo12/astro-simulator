@@ -1,6 +1,6 @@
 # ADR: satellite 궤도 라인 구조 결함 — phobos/deimos/galilean 궤도선이 parent 미추적 + visual scale 미적용으로 태양 원점에 잘못 렌더 (R6 D-T2 표면화)
 
-- **상태**: **Provisional** (사용자 옵션 선택 + cross-validate 메인 위임 대기. forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
+- **상태**: **Accepted** (사용자 옵션 선택 2026-06-06 옵션 A+D + cross-validate 2026-06-06 agy outcome=applied 통합 — §교차검증 반영 사항 본문 통합 완료. fix 구현은 developer 단계)
 - **날짜**: 2026-06-06
 - **결정자**: architect (#627 R6 PR D-T2 forensic 단계)
 - **관련**: [#627](https://github.com/coseo12/astro-simulator/pull/627) (R6 PR — galilean 4개로 표면화), [`20260605-r6-jupiter-galilean-visualization.md`](20260605-r6-jupiter-galilean-visualization.md) (R6 SSoT — JUPITER_SATELLITES_ORBIT_VISUAL_SCALE=16), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md) (**R5 SSoT — MARS_SATELLITES_ORBIT_VISUAL_SCALE=500 박제했으나 구현은 moon 만 → 본 결함 최초 도입 시점**), [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) (R4 SSoT — §결정 4 moon orbit 별도 LineSystem + position 동기화 + scaling 패턴, **본 fix 의 일반화 출발점**), [`20260509-380-zoom-camera-freeze-forensic.md`](20260509-380-zoom-camera-freeze-forensic.md) (camera-controller lowerRadiusLimit 동적 완화 SSoT — §1 camera R6 무관 분석 참조), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity
@@ -230,10 +230,10 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 ## §5 결정 (사용자/cross-validate 선택 후 박제)
 
-> **Provisional** — 사용자 옵션 선택 + cross-validate (메인 위임) 통합 전까지 비워둠. Accepted 전이 시 채택 옵션 + 근거 박제.
+> **Accepted** (사용자 옵션 선택 2026-06-06 + cross-validate 2026-06-06 agy outcome=applied 통합).
 
-- **채택 옵션**: (보고 2) ___ / (보고 1) ___ — *선택 대기*
-- **사전 권장 (architect)**: 보고 2 = (A) parent별 일반화, 보고 1 = (A) 적용 후 재측정 → 필요 시 (D). 근거 §3 권장 안.
+- **채택 옵션**: (보고 2 satellite 궤도) = **(A) parent별 moon 패턴 일반화** / (보고 1 galilean 비율) = **(A) 궤도 fix 적용 후 재측정 → 필요 시 (D) BODY_SCALE 300→200**. 사용자 합의 2026-06-06 + cross-validate agy 지지.
+- **근거**: 옵션 A 는 R4 검증된 moon 패턴 정확 일반화 (저위험 + R7+ titan/saturn moons 자동 확장). 옵션 B(parenting) 는 parent BODY_SCALE scaling 누적 전파 + Floating Origin 결합 위험으로 기각. 옵션 C(비표시) 는 R6 교육 가치 후퇴 + R4 moon 강조 충돌로 기각.
 
 ### 구현 절차 (옵션 A 채택 가정 — 사용자 확정 후 developer 단계)
 
@@ -245,12 +245,23 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 ### Fix 후 박제 의무
 
-- 본 ADR §결정 갱신 (Accepted 전이) + §교차검증 반영 사항 추가.
+- 본 ADR §결정 갱신 (Accepted 전이 완료) + §교차검증 반영 사항 (아래).
 - **R5 ADR §결정 4 Amendment** — "MARS_SATELLITES_ORBIT_VISUAL_SCALE 박제했으나 satellite orbit-line 구현은 moon 만 → #627 fix 에서 일반화" 정정.
 - **R6 ADR §축 2 Amendment** (보고 1 D 채택 시) — galilean BODY_SCALE 재산출.
 - `orbit-visual-scale.ts` §적용 위치 주석 갱신 ("모든 satellite orbit LineSystem").
-- **회귀 가드 승격** — `apps/web/scripts/browser-verify-627-satellite-orbit.mjs`: 각 satellite 궤도선 worldCenter 가 parent scene 좌표의 ±0.2 unit 이내 정적 가드 (DoD PASS ≠ 제품 동작 재발 차단, volt #74).
+- **회귀 가드 승격** — `apps/web/scripts/browser-verify-627-satellite-orbit.mjs`: 각 satellite 궤도선 worldCenter 가 parent scene 좌표의 ±0.2 unit 이내 정적 가드 + **원점(0,0,0) 1 unit 이내 비정상 밀집 통계 테스트** (cross-validate agy 고유 발견 #3 — 실측 vertex 54% 원점 밀집 현상 직접 감지). (DoD PASS ≠ 제품 동작 재발 차단, volt #74).
 - `docs/reports/627-fix-output.json` + before/after 스크린샷.
+
+---
+
+## §교차검증 반영 사항 (cross-validate 2026-06-06 agy outcome=applied)
+
+agy 가 옵션 A+D 조합을 지지 (구조적 완성도 / 기술 타당성 / 확장성 우수 평가). 4축 분류:
+
+- **합의 (3)**: ① 옵션 A(moon 패턴 일반화) — B(parenting) 의 scaling 누적 전파 + Floating Origin 결합 위험 회피, R4 검증 패턴 안전 ② 옵션 D(BODY_SCALE 하향) — E(jupiter 상향) 의 시스템 연쇄 + PM 임계 위반 위험 회피, 영향 국소 ③ 결합 해결 순서 (A 적용 → 재측정 → 필요시 D) 의 visual 착시 제거 선행이 우수.
+- **고유 발견 수용 (3, 구현 단계 반영 의무)**: ① **다중 LineSystem dispose 라이프사이클** — 기존 `moonOrbitLine` 단일 dispose 를 `Map<string, LineSystem>` 전체 순회 안전 dispose 로 확장 (메모리 누수 차단). §구현 절차 1단계 + disposables 에 명시. ② **`getOrbitVisualScale(parentId)` fallback 계약** — parentId null / 미매핑 시 기본 1.0 fallback (예외 안정성). ③ **회귀 가드 원점 밀집 통계 테스트** — worldCenter ±0.2 외에 "원점 1 unit 이내 비정상 밀집" 감지 (위 회귀 가드 승격에 반영).
+- **이견 (0)**: 없음 (구조 결정 합의).
+- **고유 발견 후속 분리 (1)**: 수십 위성 시나리오 시 `updateAt` 프레임별 순회 / draw call 임계 가이드라인 — R7+ titan/saturn moons 다수 진입 시 성능 검토 (현재 13 body 무관, 별도 검토). Claude 편향 셀프 체크: 옵션 A 의 updateAt 순회 비용은 현재 satellite 6개(moon/phobos/deimos/galilean 4 — 잠깐, galilean 4 + phobos/deimos + moon = 7) 수준이라 무시 가능, R7+ 에서 재평가.
 
 ---
 
@@ -280,7 +291,7 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 ## §8 후속 / 분리 이슈
 
-- **카메라 free-fly 고정 (R6 무관)** — `focusOn` 의 `lowerRadiusLimit` 동적 완화 (camera-controller.ts:150-152) 가 free-fly 진입 (`detachToFreeFly` clearFollow only, sim-canvas.tsx:408-411) 시 원복 안 되어 satellite focus 후 자유 이동 제약 인지. **develop (R5) 재현 확정** (git diff 0) → R6 차단 사유 아님. **별도 이슈 분리 권고** (메인이 #N 생성). 출발점: `clearFollow` 에 lowerRadiusLimit 원복 또는 free-fly 진입 시 tier-transition 의 `computeLowerRadiusLimit` 재적용.
+- **카메라 free-fly 고정 (R6 무관)** — `focusOn` 의 `lowerRadiusLimit` 동적 완화 (camera-controller.ts:150-152) 가 free-fly 진입 (`detachToFreeFly` clearFollow only, sim-canvas.tsx:408-411) 시 원복 안 되어 satellite focus 후 자유 이동 제약 인지. **develop (R5) 재현 확정** (git diff 0) → R6 차단 사유 아님. **별도 이슈 분리 완료** ([#629](https://github.com/coseo12/astro-simulator/issues/629), priority:medium, 2026-06-06). 출발점: `clearFollow` 에 lowerRadiusLimit 원복 또는 free-fly 진입 시 tier-transition 의 `computeLowerRadiusLimit` 재적용.
 - **satellite orbit visual scale 잔여 gap** — 기존 [#622](https://github.com/coseo12/astro-simulator/issues/622) (satellite orbit visual scale 잔여 1.74배 gap forensic) 와 본 결함 연관. #622 는 visual scale **값** gap, 본 ADR 은 visual scale **적용 자체 누락** — 본 fix (옵션 A) 가 #622 의 전제 (satellite 궤도선이 실제로 visual scale 적용됨) 를 충족시킨 후 #622 재측정 권고. Builds on: #627.
 
 ---
