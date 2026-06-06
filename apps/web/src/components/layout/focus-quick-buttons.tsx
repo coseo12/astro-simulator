@@ -19,7 +19,7 @@ const FOCUS_BUTTONS = [
   { id: 'earth', label: '지구' }, // R4 #532 — venus 다음 천체 거리 순
   { id: 'moon', label: '달' }, // R4 #532 — earth 인접 (parent-satellite 자연 그룹)
   { id: 'mars', label: '화성' }, // R5 #594 — Q4a=A (mars 만 추가, phobos/deimos 미등록 — 모바일 너비 안전 356 px < 375 px)
-  { id: 'jupiter', label: '목성' }, // R-Phase Allowlist disabled (R6 진입 전)
+  { id: 'jupiter', label: '목성' }, // R6 #621 — CURRENT_R_PHASE=6 진입으로 isRPhaseFocusable 자동 enabled (배열 변경 0). galilean 4 는 showInShortcutBar=false 라 bar 미등록
   { id: 'neptune', label: '해왕성' }, // R-Phase Allowlist disabled (R10 진입 전)
 ];
 

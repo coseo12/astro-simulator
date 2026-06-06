@@ -29,7 +29,7 @@
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 /** 현재 도달한 R-Phase. R-Phase 진입 시 이 상수 1줄만 증가하면 allowlist 가 자동 확장된다. */
-export const CURRENT_R_PHASE = 5;
+export const CURRENT_R_PHASE = 6;
 
 /**
  * 주어진 phase 까지 등장한 body id 목록을 데이터 순서대로 반환하는 순수 함수.

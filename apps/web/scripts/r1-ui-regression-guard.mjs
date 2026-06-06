@@ -101,6 +101,9 @@ const PX_RATIO_THRESHOLDS = Object.freeze({
   // phobos / deimos: N/A — 사실 비율 명시 위배 박제값 + 4px fallback billboard 흡수.
   //                       R5 ADR §결정 6: r1-guard `--measure-px-ratio` 미박제. 회귀 가드는
   //                       R-Phase Allowlist + browser-verify-r-phase-allowlist 의 expected list 우회.
+  jupiter: 10, // R6 #621 — Q2=B 거성 예외 (산출 9.87%, margin 0.13%, ± 2% 노이즈 허용). ⚠️ 퍼센트 단위 정수 — guard 는 sunPxRatio 퍼센트 값 직접 비교 (mercury 4.95 / mars 8 동일 단위). 0.10 박제 시 9.87 <= 0.10 영구 FAIL
+  // io / europa / ganymede / callisto: N/A — galilean 4px fallback 부분 의존 (R5 phobos/deimos
+  //                       §결정 6 답습). 회귀 가드는 R-Phase Allowlist (#613) + FOCUS_BODIES 매칭 (#598).
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
@@ -183,7 +186,9 @@ async function measureBodyPxRatios(page) {
     // R5 #594 — mars 추가 (Q2=B 임계 ≤ 8% 박제). phobos/deimos 는 §결정 6 (미박제) 정합 — 측정만
     // 하고 임계 가드는 없음 (4px fallback billboard 흡수). 단 사용자 D-T2 단계에서 mesh visible
     // 회귀 확인 의무.
-    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos'];
+    // R6 #621 — jupiter (Q2=B 거성 예외 임계 ≤ 10% 박제) + galilean 4 (io/europa/ganymede/callisto,
+    // §결정 6 미박제 — 측정만). #619 정적 매칭 가드가 targetIds === R_PHASE_BODY_ALLOWLIST 차단.
+    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos', 'jupiter', 'io', 'europa', 'ganymede', 'callisto'];
 
     /**
      * mesh world center 를 column-major Matrix.m 로 직접 NDC → 화면 좌표 변환.

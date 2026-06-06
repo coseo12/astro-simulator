@@ -34,6 +34,26 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE.deimos).toBe(5000);
   });
 
+  it('jupiter = 48 (R6 #621 — PM Q2=B 임계 완화 거성 예외, sun 대비 px 비 ~9.87%)', () => {
+    expect(BODY_SCALE.jupiter).toBe(48);
+  });
+
+  it('io = 300 (R6 #621 — galilean moon-class, mesh 3.87px 4px fallback)', () => {
+    expect(BODY_SCALE.io).toBe(300);
+  });
+
+  it('europa = 300 (R6 #621 — io 동일값 단일값 mental model)', () => {
+    expect(BODY_SCALE.europa).toBe(300);
+  });
+
+  it('ganymede = 300 (R6 #621 — mesh 5.60px visible, 태양계 최대 위성)', () => {
+    expect(BODY_SCALE.ganymede).toBe(300);
+  });
+
+  it('callisto = 300 (R6 #621 — mesh 5.12px visible)', () => {
+    expect(BODY_SCALE.callisto).toBe(300);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -55,11 +75,16 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('mars')).toBe(800); // R5 #594
     expect(getBodyScale('phobos')).toBe(5000); // R5 #594
     expect(getBodyScale('deimos')).toBe(5000); // R5 #594
+    expect(getBodyScale('jupiter')).toBe(48); // R6 #621
+    expect(getBodyScale('io')).toBe(300); // R6 #621
+    expect(getBodyScale('europa')).toBe(300); // R6 #621
+    expect(getBodyScale('ganymede')).toBe(300); // R6 #621
+    expect(getBodyScale('callisto')).toBe(300); // R6 #621
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('jupiter')).toBe(1.0); // R6 진입 전
-    expect(getBodyScale('io')).toBe(1.0); // R6 galilean 진입 전
+    expect(getBodyScale('saturn')).toBe(1.0); // R7 진입 전
+    expect(getBodyScale('titan')).toBe(1.0); // R7 satellite 진입 전
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 

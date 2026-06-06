@@ -59,8 +59,11 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
  *    phobos / deimos 는 shortcut bar 미등록 → 본 매트릭스 비대상.
  *    phobos/deimos R-Phase Allowlist 진입 검증은 4) URL 직접 진입 매트릭스 (4-B 정상) 에서 별도 박제.
  */
-const RPHASE_EXPECTED_ENABLED = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars'];
-const RPHASE_EXPECTED_DISABLED = ['jupiter', 'neptune'];
+// R6 #621 — jupiter 진입 (CURRENT_R_PHASE=6) 시 disabled → enabled 전환. galilean 4 는
+// showInShortcutBar=false 라 bar 미등록 (R5 phobos/deimos Q4a=A 답습) → 본 매트릭스 비대상.
+// #617 정적 매칭 가드 (r-phase-allowlist.test.ts) 가 showInShortcutBar 파생과 정합 차단.
+const RPHASE_EXPECTED_ENABLED = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter'];
+const RPHASE_EXPECTED_DISABLED = ['neptune'];
 
 const VIEWPORT = { width: 1280, height: 800 };
 const POST_INIT_WAIT_MS = 1500;
