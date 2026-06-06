@@ -1,0 +1,167 @@
+[
+  {
+    "label": "A. free-fly 직접 (baseline)",
+    "focusId": null,
+    "beforeFreeFly": {
+      "tier": "solar",
+      "radius": 35,
+      "lowerRadiusLimit": 0.5,
+      "upperRadiusLimit": 100000000000000,
+      "minZ": 0.01,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "panningSensibility": 0,
+      "wheelPrecision": 3,
+      "target": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "targetDistToOrigin": 0
+    },
+    "afterFreeFly": {
+      "tier": "solar",
+      "radius": 35,
+      "lowerRadiusLimit": 0.5,
+      "upperRadiusLimit": 100000000000000,
+      "minZ": 0.01,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "panningSensibility": 0,
+      "wheelPrecision": 3,
+      "target": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "targetDistToOrigin": 0
+    },
+    "response": {
+      "rotate": {
+        "dAlpha": 1.1311937778027712,
+        "dBeta": 0.5655968889013859,
+        "rotates": true
+      },
+      "zoomIn": {
+        "dRadius": 516.8657728026312,
+        "rel": 14.767593508646607,
+        "perceptible": true
+      },
+      "zoomOut": {
+        "dRadius": 38.85349461359078,
+        "rel": 0.07040388538008918,
+        "perceptible": true
+      }
+    }
+  },
+  {
+    "label": "B. jupiter focus → free-fly",
+    "focusId": "jupiter",
+    "beforeFreeFly": {
+      "tier": "inner",
+      "radius": 45.76674772045837,
+      "lowerRadiusLimit": 0.5400476231014087,
+      "upperRadiusLimit": 100000000000000,
+      "minZ": 0.01,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "panningSensibility": 0,
+      "wheelPrecision": 3,
+      "target": {
+        "x": 915.0281982421875,
+        "y": 687.1533813476562,
+        "z": -23.332324981689453
+      },
+      "targetDistToOrigin": 1144.55265080507
+    },
+    "afterFreeFly": {
+      "tier": "solar",
+      "radius": 2.4963680574795473,
+      "lowerRadiusLimit": 0.024963680574795474,
+      "upperRadiusLimit": 100000000000000,
+      "minZ": 0.01,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "panningSensibility": 0,
+      "wheelPrecision": 3,
+      "target": {
+        "x": 915.0137329101562,
+        "y": 687.1734008789062,
+        "z": -23.332082748413086
+      },
+      "targetDistToOrigin": 1144.5531007231773
+    },
+    "response": {
+      "rotate": {
+        "dAlpha": 1.1703811775001194,
+        "dBeta": 0.5851905887500597,
+        "rotates": true
+      },
+      "zoomIn": {
+        "dRadius": -2.471404376904752,
+        "rel": -0.9900000000000001,
+        "perceptible": true
+      },
+      "zoomOut": {
+        "dRadius": 47.46573163237215,
+        "rel": 1901.3915632415126,
+        "perceptible": true
+      }
+    }
+  },
+  {
+    "label": "C. io(galilean) focus → free-fly",
+    "focusId": "io",
+    "beforeFreeFly": {
+      "tier": "body",
+      "radius": 158386.2122474665,
+      "lowerRadiusLimit": 467.23932613002626,
+      "upperRadiusLimit": 100000000000000,
+      "minZ": 0.01,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "panningSensibility": 0,
+      "wheelPrecision": 3,
+      "target": {
+        "x": -8337.4580078125,
+        "y": 518.4668579101562,
+        "z": -103.63997650146484
+      },
+      "targetDistToOrigin": 8354.20583655426
+    },
+    "afterFreeFly": {
+      "tier": "body",
+      "radius": 158386.2122474665,
+      "lowerRadiusLimit": 467.23932613002626,
+      "upperRadiusLimit": 100000000000000,
+      "minZ": 0.01,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "panningSensibility": 0,
+      "wheelPrecision": 3,
+      "target": {
+        "x": -9572.3984375,
+        "y": 115.39495849609375,
+        "z": -136.19100952148438
+      },
+      "targetDistToOrigin": 9574.06266084431
+    },
+    "response": {
+      "rotate": {
+        "dAlpha": 1.1056156074112087,
+        "dBeta": 0.5528078037056048,
+        "rotates": true
+      },
+      "zoomIn": {
+        "dRadius": -43.424927023181226,
+        "rel": -0.0002741711314829163,
+        "perceptible": false
+      },
+      "zoomOut": {
+        "dRadius": 37.526322974707,
+        "rel": 0.0002369951889556531,
+        "perceptible": false
+      }
+    }
+  }
+]
