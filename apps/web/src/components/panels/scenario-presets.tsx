@@ -49,6 +49,17 @@ const PRESETS: Preset[] = [
     description: '모든 행성의 공전주기가 √2배 길어진다(Kepler 3법칙). 1일/초 재생에서 체감.',
     massMultipliers: { sun: 0.5 },
   },
+  {
+    // #621 R6 — saturn(introducedInRPhase=7) target preset. jupiter 가 R6 진입으로
+    // allowlist 에 포함되면서 jupiter-x10 / no-jupiter 가 모두 enabled 가 되어 disabled-path
+    // 검증 negative 케이스가 소멸한다. 미진입 body(saturn) target preset 을 추가해
+    // R-Phase 가드 disabled 분기 (#404) 가 "항상 PASS" 로 무력화되지 않도록 negative 케이스 보존
+    // (CLAUDE.md §가드 설계 원칙 — fail-fast / negative 케이스 유지). R7 진입 시 자동 enabled.
+    id: 'saturn-x10',
+    label: '토성 10배 질량',
+    description: '외행성 섭동과 목성-토성 대공명(2:5)을 관찰. 토성 진입(R7) 시 활성.',
+    massMultipliers: { saturn: 10 },
+  },
 ];
 
 const J2000 = 2_451_545.0;

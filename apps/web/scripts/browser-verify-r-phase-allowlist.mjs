@@ -7,13 +7,15 @@
  * #403 Amendment — `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장 (시나리오 5 매트릭스).
  * #404 Amendment — `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제 (시나리오 6 매트릭스).
  *
- * 검증 매트릭스 (R4 #532 — earth + moon 진입 후):
- *   1. allowlist 박제 body (sun / mercury / venus / earth / moon): shortcut 버튼 활성 (disabled 아님)
- *   2. allowlist 외 body (jupiter / neptune): shortcut 버튼 disabled / aria-disabled / data-r-phase-disabled
+ * 검증 매트릭스 (R6 #621 — jupiter + galilean 4 진입 후):
+ *   1. allowlist 박제 body (sun / mercury / venus / earth / moon / mars / jupiter): shortcut 버튼 활성 (disabled 아님)
+ *      — galilean (io/europa/ganymede/callisto) 은 showInShortcutBar=false 라 bar 미등록 → 본 매트릭스 비대상 (4-B URL 진입 검증).
+ *   2. allowlist 외 body (neptune — R9): shortcut 버튼 disabled / aria-disabled / data-r-phase-disabled (negative 케이스 보존)
  *   3. 강제 click 시뮬레이션 — disabled 버튼 click 후 selectedBodyId 변화 0 / camera radius 변화 0
  *   4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선):
- *      - 4-A 차단: ?focus=jupiter / neptune → selectedBodyId === null + camera radius 변화 0
- *      - 4-B 정상: ?focus=sun / mercury / venus / earth / moon → selectedBodyId === <body> (R1~R4 회귀 보호)
+ *      - 4-A 차단: ?focus=neptune (R9) → selectedBodyId === null + camera radius 변화 0 (negative 케이스 보존)
+ *      - 4-B 정상: ?focus=sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / io / europa /
+ *        ganymede / callisto → selectedBodyId === <body> (R1~R6 회귀 보호)
  *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
  *   5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth):
  *      - 5-A 정상 (CelestialTree): tree-sun click → selectedBodyId === 'sun' + info-panel 정상 분기 렌더
@@ -24,9 +26,12 @@
  *   6. ScenarioPresets UI 가드 (#404 — UI 측면 3번째 축, defense-in-depth):
  *      - 6-A 정상 (sun-half): preset-sun-half disabled 부재 / aria-disabled='false' / data-r-phase-disabled='false',
  *        click 시 physicsEngine='newton' + massMultipliers={sun:0.5} 정상 동작
- *      - 6-B 차단 (jupiter-x10): preset-jupiter-x10 disabled / aria-disabled='true' / data-r-phase-disabled='true' /
- *        title='R-Phase 진행 시 활성', force click 시 store mutation 호출 0 (physicsEngine/massMultipliers 변화 0)
- *      - 6-C 차단 (no-jupiter): 동일 (jupiter R6 미구현)
+ *      - 6-B 정상 (jupiter-x10): R6 #621 진입으로 jupiter allowlist 포함 → zero-touch 자동 enabled.
+ *        disabled 부재 / aria-disabled='false' / data-r-phase-disabled='false', click 시 massMultipliers={jupiter:10} 정상 동작
+ *      - 6-C 정상 (no-jupiter): 동일 (jupiter R6 #621 진입 → enabled, massMultipliers={jupiter:0.01})
+ *      - 6-D 차단 (saturn-x10): R7 미진입 saturn → preset disabled (negative 케이스 보존).
+ *        jupiter 진입으로 6-B/6-C 가 enabled 되어 disabled-path 가드가 무력화되지 않도록 saturn target preset 으로 negative 보존.
+ *        disabled / aria-disabled='true' / data-r-phase-disabled='true' / title='R-Phase 진행 시 활성', force click 시 store mutation 0
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
  *   - R4 (earth) 진입 시 RPHASE_EXPECTED_ENABLED 에 'earth' 이동
@@ -195,7 +200,7 @@ async function verifyDisabledClickIgnored(page) {
 }
 
 /**
- * 활성 버튼 정상 동작 smoke (sun / mercury / venus / earth / moon — R4 #532 진입).
+ * 활성 버튼 정상 동작 smoke (sun / mercury / venus / earth / moon / mars / jupiter — R6 #621 진입).
  *
  * 단언: focus click → selectedBodyId === body. 정상 동작 회귀 가드.
  */
@@ -229,18 +234,18 @@ async function verifyEnabledClickWorks(page) {
  * ADR `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (DoD-2).
  *
  * 각 body 마다 새 페이지로 `?focus=<body>` 진입 후:
- *   - allowlist 외 (jupiter / neptune): selectedBodyId === null (url-sync 가드 작동)
- *   - allowlist 박제 (sun / mercury / venus / earth / moon): selectedBodyId === <body> (정상 회귀 보호)
+ *   - allowlist 외 (neptune — R9): selectedBodyId === null (url-sync 가드 작동, negative 케이스 보존)
+ *   - allowlist 박제 (sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / galilean 4):
+ *     selectedBodyId === <body> (정상 회귀 보호)
  *   - invalid: selectedBodyId === null (기존 R1 가드 회귀 보호)
  *
  * 매 case 마다 새 page 생성 — initialized.current useRef 를 우회하기 위해.
  */
 async function verifyUrlDirectEntry(browser) {
   const cases = [
-    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R5 #594 후: jupiter / neptune 만).
-    { focus: 'jupiter', expected: null, label: '4-A 차단' },
+    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R6 #621 후: neptune(R9) 만 — negative 케이스 보존).
     { focus: 'neptune', expected: null, label: '4-A 차단' },
-    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon + R5 mars/phobos/deimos 진입 검증).
+    // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon + R5 mars/phobos/deimos + R6 jupiter/galilean 진입 검증).
     { focus: 'sun', expected: 'sun', label: '4-B 정상' },
     { focus: 'mercury', expected: 'mercury', label: '4-B 정상' },
     { focus: 'venus', expected: 'venus', label: '4-B 정상' },
@@ -249,6 +254,11 @@ async function verifyUrlDirectEntry(browser) {
     { focus: 'mars', expected: 'mars', label: '4-B 정상 (R5 #594)' },
     { focus: 'phobos', expected: 'phobos', label: '4-B 정상 (R5 #594 satellite 2개 첫 본 사례)' },
     { focus: 'deimos', expected: 'deimos', label: '4-B 정상 (R5 #594 satellite 2개 첫 본 사례)' },
+    { focus: 'jupiter', expected: 'jupiter', label: '4-B 정상 (R6 #621)' },
+    { focus: 'io', expected: 'io', label: '4-B 정상 (R6 #621 galilean 4개 첫 본 사례)' },
+    { focus: 'europa', expected: 'europa', label: '4-B 정상 (R6 #621 galilean 4개 첫 본 사례)' },
+    { focus: 'ganymede', expected: 'ganymede', label: '4-B 정상 (R6 #621 galilean 4개 첫 본 사례)' },
+    { focus: 'callisto', expected: 'callisto', label: '4-B 정상 (R6 #621 galilean 4개 첫 본 사례)' },
     // 4-C 무효 — 기존 R1 가드 회귀 보호.
     { focus: 'invalid-body-id', expected: null, label: '4-C 무효' },
   ];
@@ -466,8 +476,10 @@ async function verifyTreePanelGuards(browser) {
  * ADR `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제.
  *
  * 6-A 정상 (sun-half): R1 박제 sun → preset 활성, click 시 physicsEngine='newton' + massMultipliers={sun:0.5} 정상 동작
- * 6-B 차단 (jupiter-x10): R6 미구현 jupiter → preset disabled + a11y 4축 박제, force click 시 store mutation 호출 0
- * 6-C 차단 (no-jupiter): 동일 (jupiter R6 미구현)
+ * 6-B 정상 (jupiter-x10): R6 #621 진입 jupiter → zero-touch 자동 enabled, click 시 massMultipliers={jupiter:10} 정상 동작
+ * 6-C 정상 (no-jupiter): 동일 (jupiter R6 #621 진입 → enabled, massMultipliers={jupiter:0.01})
+ * 6-D 차단 (saturn-x10): R7 미진입 saturn → preset disabled + a11y 4축 박제, force click 시 store mutation 호출 0
+ *                       (jupiter 진입으로 6-B/6-C enabled → disabled-path negative 케이스 보존용 saturn target preset)
  *
  * mode-gated 컴포넌트 mount precondition (#403 학습): ScenarioPresets 는
  * `mode === 'research' || 'sandbox'` 에서만 렌더 (side-panels.tsx 14) →
@@ -534,8 +546,13 @@ async function verifyScenarioPresetsGuards(browser) {
       });
     }
 
-    // 6-B / 6-C 차단 (jupiter-x10 / no-jupiter): R6 미구현 jupiter → disabled + force click 무시.
-    for (const presetId of ['jupiter-x10', 'no-jupiter']) {
+    // 6-B / 6-C 정상 (jupiter-x10 / no-jupiter): R6 #621 진입 jupiter → zero-touch 자동 enabled, click 시 정상 동작.
+    // jupiter-x10 → massMultipliers={jupiter:10}, no-jupiter → massMultipliers={jupiter:0.01}.
+    const enabledPresetCases = [
+      { presetId: 'jupiter-x10', expectedMul: 10, scenario: '6-B 정상 (jupiter-x10)' },
+      { presetId: 'no-jupiter', expectedMul: 0.01, scenario: '6-C 정상 (no-jupiter)' },
+    ];
+    for (const { presetId, expectedMul, scenario } of enabledPresetCases) {
       const selector = `[data-testid="preset-${presetId}"]`;
       const btn = page.locator(selector).first();
       const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
@@ -543,7 +560,57 @@ async function verifyScenarioPresetsGuards(browser) {
       const dataDisabled = await btn.getAttribute('data-r-phase-disabled');
       const title = await btn.getAttribute('title');
 
-      // store 초기 상태 reset (sun-half 잔재 제거).
+      // store 초기 상태 reset (이전 시나리오 잔재 제거).
+      await page.evaluate(() => {
+        window.__simStore?.setState?.({
+          physicsEngine: 'kepler',
+          massMultipliers: {},
+        });
+      });
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      await btn.click();
+      await page.waitForTimeout(POST_CLICK_WAIT_MS);
+
+      const after = await page.evaluate(() => {
+        const s = window.__simStore?.getState?.();
+        return {
+          physicsEngine: s?.physicsEngine ?? null,
+          massMultipliers: { ...(s?.massMultipliers ?? {}) },
+        };
+      });
+
+      const pass =
+        !isDisabled &&
+        ariaDisabled === 'false' &&
+        dataDisabled === 'false' &&
+        title === null &&
+        after.physicsEngine === 'newton' &&
+        after.massMultipliers?.jupiter === expectedMul;
+      results.push({
+        scenario,
+        preset: presetId,
+        isDisabled,
+        ariaDisabled,
+        dataDisabled,
+        title,
+        physicsEngineAfter: after.physicsEngine,
+        massJupiterAfter: after.massMultipliers?.jupiter ?? null,
+        pass,
+      });
+    }
+
+    // 6-D 차단 (saturn-x10): R7 미진입 saturn → disabled + force click 무시.
+    // jupiter 진입으로 6-B/6-C 가 enabled 되어 disabled-path 가드가 무력화되지 않도록 saturn target preset 으로 negative 보존.
+    {
+      const selector = '[data-testid="preset-saturn-x10"]';
+      const btn = page.locator(selector).first();
+      const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
+      const ariaDisabled = await btn.getAttribute('aria-disabled');
+      const dataDisabled = await btn.getAttribute('data-r-phase-disabled');
+      const title = await btn.getAttribute('title');
+
+      // store 초기 상태 reset (이전 시나리오 잔재 제거).
       await page.evaluate(() => {
         window.__simStore?.setState?.({
           physicsEngine: 'kepler',
@@ -576,8 +643,6 @@ async function verifyScenarioPresetsGuards(browser) {
       const massUnchanged =
         JSON.stringify(before.massMultipliers) === JSON.stringify(after.massMultipliers);
 
-      const scenario =
-        presetId === 'jupiter-x10' ? '6-B 차단 (jupiter-x10)' : '6-C 차단 (no-jupiter)';
       const pass =
         isDisabled &&
         ariaDisabled === 'true' &&
@@ -586,8 +651,8 @@ async function verifyScenarioPresetsGuards(browser) {
         engineUnchanged &&
         massUnchanged;
       results.push({
-        scenario,
-        preset: presetId,
+        scenario: '6-D 차단 (saturn-x10)',
+        preset: 'saturn-x10',
         isDisabled,
         ariaDisabled,
         dataDisabled,
@@ -626,7 +691,7 @@ async function main() {
 
     // 2. 활성 버튼 정상 동작 smoke
     console.log(
-      '\n2) 활성 버튼 (sun / mercury / venus / earth / moon — R4) focusOn 정상 동작 smoke\n',
+      '\n2) 활성 버튼 (sun / mercury / venus / earth / moon / mars / jupiter — R6) focusOn 정상 동작 smoke\n',
     );
     const enabledResults = await verifyEnabledClickWorks(page);
     for (const r of enabledResults) {
