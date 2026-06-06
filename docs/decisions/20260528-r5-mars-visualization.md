@@ -655,6 +655,8 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
 
 > **명명 결정**: `MARS_SATELLITES_ORBIT_VISUAL_SCALE` (deimos 도 포함하므로 `MARS_PHOBOS_*` 보다 정확). R4 `EARTH_MOON_ORBIT_VISUAL_SCALE` 답습 일관성 무시 — R6+ 다중 satellite (galilean 4) 진입 시 본 명명 패턴이 일관성 우선 (developer 단계 final 결정).
 
+> ⚠️ **구현 누락 발견 (#627 R6 forensic, 2026-06-06)**: 본 §결정 4 가 `MARS_SATELLITES_ORBIT_VISUAL_SCALE=500` 을 박제하고 "satellite orbit visual scale 적용" 을 명시했으나, **실제 구현은 satellite mesh 경로 (`resolveWorld`) 에만 적용** 되고 satellite **궤도선** (orbit-line) 은 moon 만 별도 LineSystem 으로 처리됨 (`solar-system-scene.ts:rebuildOrbitLines`). phobos/deimos 궤도선은 일반 `batches` 로 들어가 position (0,0,0) 태양 원점 고정 + visual scale 미적용 → 궤도선이 mars 가 아닌 sun 옆에 렌더. R5 D-T2 에서 phobos/deimos 궤도선 위치 미검증으로 잠복, R6 galilean 4개로 표면화. 근본 fix 는 satellite 궤도선의 moon 패턴 일반화. 상세: [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md). fix 머지 시 본 §결정 4 Amendment 동반 의무.
+
 ### 결정 5 — Q2=B 임계 박제 (축 5)
 
 ```javascript
