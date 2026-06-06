@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1 sun + R2 mercury + R3 venus + R4 earth + moon + R5 mars + phobos + deimos 순서로 정확히 8개', () => {
+  it('현재 박제: R1~R5 (sun~deimos) + R6 jupiter + galilean 4 순서로 정확히 13개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -33,6 +33,11 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'mars',
       'phobos',
       'deimos',
+      'jupiter',
+      'io',
+      'europa',
+      'ganymede',
+      'callisto',
     ]);
   });
 
@@ -40,9 +45,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 8개 (CURRENT_R_PHASE=5 필터)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. 회귀 0 (위 toEqual 8개).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(8);
+  it('자동 생성 결과 13개 (CURRENT_R_PHASE=6 필터)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R6 #621 진입 13개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(13);
   });
 });
 
@@ -56,8 +61,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 5 (R5 mars + phobos + deimos 까지)', () => {
-    expect(CURRENT_R_PHASE).toBe(5);
+  it('CURRENT_R_PHASE 는 6 (R6 jupiter + galilean 4 까지)', () => {
+    expect(CURRENT_R_PHASE).toBe(6);
   });
 
   it('filterBodiesByPhase(5) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -103,7 +108,7 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
 });
 
 describe('isRPhaseFocusable — focusOn 가드 helper', () => {
-  it('allowlist 박제 body 는 true (sun / mercury / venus / earth / moon / mars / phobos / deimos)', () => {
+  it('allowlist 박제 body 는 true (sun~deimos + R6 jupiter + galilean 4)', () => {
     expect(isRPhaseFocusable('sun')).toBe(true);
     expect(isRPhaseFocusable('mercury')).toBe(true);
     expect(isRPhaseFocusable('venus')).toBe(true);
@@ -112,13 +117,17 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('mars')).toBe(true); // R5 #594
     expect(isRPhaseFocusable('phobos')).toBe(true); // R5 #594
     expect(isRPhaseFocusable('deimos')).toBe(true); // R5 #594
+    expect(isRPhaseFocusable('jupiter')).toBe(true); // R6 #621
+    expect(isRPhaseFocusable('io')).toBe(true); // R6 #621
+    expect(isRPhaseFocusable('europa')).toBe(true); // R6 #621
+    expect(isRPhaseFocusable('ganymede')).toBe(true); // R6 #621
+    expect(isRPhaseFocusable('callisto')).toBe(true); // R6 #621
   });
 
-  it('allowlist 외 body 는 false (jupiter / neptune / saturn / io)', () => {
-    expect(isRPhaseFocusable('jupiter')).toBe(false);
+  it('allowlist 외 body 는 false (neptune / saturn / titan)', () => {
     expect(isRPhaseFocusable('neptune')).toBe(false);
-    expect(isRPhaseFocusable('saturn')).toBe(false);
-    expect(isRPhaseFocusable('io')).toBe(false); // R6 galilean 진입 전
+    expect(isRPhaseFocusable('saturn')).toBe(false); // R7 진입 전
+    expect(isRPhaseFocusable('titan')).toBe(false); // R7 satellite 진입 전
   });
 
   it('null 은 true — resetCamera / free-fly 경로 차단 금지 (ADR §결정 3)', () => {
@@ -216,8 +225,8 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'jupiter',
       'neptune',
     ]);
-    expect(shortcutEnabled).toEqual(['sun', 'mercury', 'venus', 'earth', 'moon', 'mars']);
-    expect(shortcutDisabled).toEqual(['jupiter', 'neptune']);
+    expect(shortcutEnabled).toEqual(['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter']);
+    expect(shortcutDisabled).toEqual(['neptune']);
   });
 
   it('FOCUS_BUTTONS(focus-quick-buttons.tsx) 의 id 가 showInShortcutBar 파생과 일치', () => {

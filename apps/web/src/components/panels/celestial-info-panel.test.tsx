@@ -74,29 +74,29 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', 
     expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
   });
 
-  it('selectedBodyId === "jupiter": info-panel-r-phase-blocked 분기 렌더', () => {
+  it('selectedBodyId === "jupiter": info-panel 정상 분기 렌더 (R6 #621 진입 — 차단 아님)', () => {
     useSimStore.setState({ selectedBodyId: 'jupiter' });
     render(<CelestialInfoPanel />);
-    expect(screen.getByTestId('info-panel-r-phase-blocked')).toBeInTheDocument();
-    expect(screen.queryByTestId('info-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
   });
 
-  it('selectedBodyId === "neptune": info-panel-r-phase-blocked 분기 렌더', () => {
+  it('selectedBodyId === "neptune": info-panel-r-phase-blocked 분기 렌더 (R9 미진입 negative 보존)', () => {
     useSimStore.setState({ selectedBodyId: 'neptune' });
     render(<CelestialInfoPanel />);
     expect(screen.getByTestId('info-panel-r-phase-blocked')).toBeInTheDocument();
     expect(screen.queryByTestId('info-panel')).not.toBeInTheDocument();
   });
 
-  it('차단 분기는 body 이름 (목성) 포함 — 사용자 인지 우수', () => {
-    useSimStore.setState({ selectedBodyId: 'jupiter' });
+  it('차단 분기는 body 이름 (해왕성) 포함 — 사용자 인지 우수', () => {
+    useSimStore.setState({ selectedBodyId: 'neptune' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
-    expect(blocked.textContent ?? '').toMatch(/목성/);
+    expect(blocked.textContent ?? '').toMatch(/해왕성/);
   });
 
   it('차단 분기는 R-Phase 메시지 박제', () => {
-    useSimStore.setState({ selectedBodyId: 'jupiter' });
+    useSimStore.setState({ selectedBodyId: 'neptune' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
     expect(blocked.textContent ?? '').toMatch(/R-Phase/);

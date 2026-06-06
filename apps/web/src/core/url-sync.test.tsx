@@ -153,21 +153,18 @@ describe('UrlSync — ?focus= R-Phase Allowlist 가드 (#415)', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('?focus=jupiter → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (가드 핵심)', () => {
+  it('?focus=jupiter → R6 #621 진입 body 정상 진입 — sendCommand(focusOn) 1회 + console.warn 0회 (회귀 보호)', () => {
+    // R6 #621 — jupiter 가 allowlist 에 진입하여 URL 직접 진입이 정상 동작 (이전 R5 까지는 차단 negative 케이스).
     mockUrlFocus = 'jupiter';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     render(<UrlSync />);
 
-    expect(useSimStore.getState().selectedBodyId).toBeNull();
-    expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/R-Phase 미진입/);
-    // R4 #532 — allowlist 메시지가 sun/mercury/venus/earth/moon 포함
-    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/sun, mercury, venus, earth, moon/);
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'jupiter' });
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('?focus=neptune → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입)', () => {
+  it('?focus=neptune → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (R9 미진입 negative 케이스 보존)', () => {
     mockUrlFocus = 'neptune';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
