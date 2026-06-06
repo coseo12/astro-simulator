@@ -711,3 +711,33 @@ agy 고유 발견 3건을 R6 본 스프린트 비목표로 판정, 메인 오케
 - **행동 변화**: r1-guard jupiter 임계 10 → 16.3 (회귀 가드 정확도 회복). 박제값 / 시각 / 산식 무변경.
 - **후속**: qa non-blocking — CI r1-guard 가 pixel-diff (verify) 모드라 `--measure-px-ratio` 임계 미검사 (게이트 사각). CI 에 px-ratio step 추가 검토 → 별도 인프라 이슈 ([#626](https://github.com/coseo12/astro-simulator/issues/626) 계열).
 - **PATCH 분류** — 측정 임계 보정 (시각 / 박제값 / 에이전트 행동 무변경, 가드 정확도 회복).
+
+---
+
+## Amendment 2 (#627, 2026-06-06) — §결정 2 / §축 2 galilean BODY_SCALE 300 → 200 (옵션 D)
+
+- **상태**: Accepted (#627 forensic ADR §5 옵션 A+D 채택 — 사용자 합의 + cross-validate agy outcome=applied)
+- **트리거**: #627 satellite 궤도선 구조 fix (옵션 A — moon 패턴 일반화) **적용 후 dev 재측정** — galilean 이 jupiter 대비 여전히 과대 (ganymede/jupiter **0.230** = moon/earth 0.068 의 **3.4배**). #627 forensic §결정 의 "옵션 A 적용 → 재측정 → 필요 시 옵션 D" 순서에서 D 발동.
+- **배경 — §결정 2 "300 유지" 가 뒤집힌 이유**: R6 본 §결정 2 / §축 2 는 "jupiterScale 48 (24.3px) ≫ galilean (3.3~5.6px) 로 시각 역전 자동 해소 → galilean 무리한 하향 불필요 (300 유지)" 로 박제했다. 이는 **시각 역전 (위성 > 행성)** 만 본 판단이었고, 사용자 D-T2 가 보고한 "**목성 대비 비율 과대**" (역전은 아니나 moon/earth baseline 대비 과대) 는 별개 결함이었다 (#627 forensic 보고 1 = §가설 3 확정, 보고 2 궤도선과 독립). #627 D-T2 (실 Chrome) 에서 galilean 이 zoom-in focus 시 과대 인지 → 옵션 D 발동.
+- **결정**: `BODY_SCALE.{io,europa,ganymede,callisto}` **300 → 200** (moon 정합, 단일 mental model moon=galilean=200). moon Amendment 4 정책 (사실 비율 깨도 천문 직관 우선) 답습. **jupiterScale 48 무변경** (Q2=B 임계 불변), **JUPITER_SATELLITES_ORBIT_VISUAL_SCALE=16 무변경** (orbit fix 와 직교).
+- **fix 후 실측 (2026-06-06, 1280×720, dev — orbit fix + scale 200 적용)**:
+
+| body | ratioToJupiter (scale 300, 결함기) | ratioToJupiter (scale 200, fix) | moon/earth baseline |
+|---|---|---|---|
+| io | 0.159 | **0.106** | 0.068 |
+| europa | 0.136 | **0.091** | 0.068 |
+| ganymede (binding) | 0.230 | **0.1535** | 0.068 |
+| callisto | 0.211 | **0.140** | 0.068 |
+
+  - D-627-3 (#627 forensic §4 예측): galilean/jupiter ≤ **0.16** → ganymede 0.1535 (binding constraint) 충족.
+  - moon/earth (0.068) 대비 galilean 1.3~2.3배 — moon-class radius (io/moon 1.048x) 의 자연 결과 (사실 ganymede 가 가장 큼). 결함기 2.0~3.4배에서 정상화.
+- **trade-off**: galilean mesh px 하향 (io 3.87 → ~2.58px, europa 3.32 → ~2.21px, ganymede 5.60 → ~3.73px, callisto 5.12 → ~3.41px). **4px fallback billboard 의존 심화** (4개 모두 4px 미만 진입 가능) — LOD Phase 2 (#391) billboard alpha mask 4px fallback 가 흡수. §재검토 트리거 #2 (4개 간 미세 순서 묻힘) 는 fallback 진입으로 강화되나, jupiter 38px ≫ galilean 으로 역전 0 유지 + 천문 직관 (galilean 이 jupiter 대비 작은 점) 정합 우선.
+- **§결정 2 / §축 2 / §결정 5 px 비 산출 supersede**: 본 Amendment 가 galilean=300 박제를 200 으로 갱신. §축 2 후보 비교의 "B. galilean=300 선택" 은 #627 D-T2 재측정으로 "D. galilean=200" 으로 정정. sun 대비 px 비 (§축 5): io 1.57% → ~1.05% / ganymede 2.27% → ~1.51% (모바일 누적 차단율 영향 < 0.1%p, DoD 25% margin 무관).
+- **행동 변화**: galilean 4개 mesh 직경 1/1.5 축소 (시각 변화 — MINOR). 박제값 300 → 200. 회귀 가드 무변경 (궤도선 가드는 scale 무관).
+- **MINOR 분류** — galilean mesh 시각 크기 변화 (사용자 같은 입력에 다른 렌더). CHANGELOG `### Behavior Changes` 박제 의무.
+
+### 참고
+
+- fix ADR: [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) §3 옵션 D + §5 §결정 (A→재측정→D 순서)
+- 학습: moon Amendment 4 (R4 ADR [`20260520-r4-earth-moon-visualization.md`](20260520-r4-earth-moon-visualization.md) §결정 — 사실 비율 깨도 천문 직관 우선)
+- 트리거 PR: [#627](https://github.com/coseo12/astro-simulator/pull/627)

@@ -75,10 +75,10 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   phobos: 5000, // R5 #594 — 사실 비율 (radius 0.326%) 명시 위배. moon Amendment 4 학습 — 사용자 천문 직관 우선. 4px fallback billboard 의존 (mesh 0.226 px sub-pixel, LOD Phase 2 #391)
   deimos: 5000, // R5 #594 — 사실 비율 (radius 0.185%) 명시 위배. phobos 동일값 (mental model "phobos ≈ deimos"). 4px fallback 의존 (mesh 0.128 px)
   jupiter: 48, // R6 #621 — PM Q2=B 임계 완화 (거성 예외). sun 대비 px 비 ~9.87% (≤ 10% margin 0.13%), mesh visible 24.3px. 사실 비율 jupiter/sun=10.276% 정합 우선
-  io: 300, // R6 #621 — galilean moon-class. mesh 3.87px (4px fallback). jupiter 24.3px ≫ io 로 시각 역전 자동 해소
-  europa: 300, // R6 #621 — io 동일값 (단일값 mental model). mesh 3.32px (4px fallback)
-  ganymede: 300, // R6 #621 — mesh 5.60px (mesh visible). 태양계 최대 위성, 사실 크기 순서 mesh px 보존
-  callisto: 300, // R6 #621 — mesh 5.12px (mesh visible). jupiter 대비 0.21배 (역전 없음)
+  io: 200, // R6 #627 옵션 D — 300 → 200 (moon 정합, BODY_SCALE 단일 mental model moon=galilean=200). galilean/jupiter 비율 0.159 → ~0.106 (moon/earth 0.068 의 1.6배, D-627-3 ≤ 0.16 충족). 사용자 D-T2 "목성 대비 과대" 해소
+  europa: 200, // R6 #627 옵션 D — 300 → 200 (io 동일값). 비율 0.136 → ~0.091
+  ganymede: 200, // R6 #627 옵션 D — 300 → 200. 태양계 최대 위성, 사실 크기 순서 mesh px 보존. 비율 0.230 → ~0.153 (D-627-3 ≤ 0.16 충족 binding)
+  callisto: 200, // R6 #627 옵션 D — 300 → 200. 비율 0.211 → ~0.140. fallback 의존은 LOD Phase 2 (#391) 가 흡수
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

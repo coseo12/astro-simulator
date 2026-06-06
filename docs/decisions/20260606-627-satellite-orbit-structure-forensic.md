@@ -285,7 +285,28 @@ agy 가 옵션 A+D 조합을 지지 (구조적 완성도 / 기술 타당성 / �
 
 ## §7 Amendment 라운드 N (라운드별 추가)
 
-> 본 ADR 은 Provisional. cross-validate (메인 위임) + 사용자 옵션 선택 후 §결정 박제 + Amendment 라운드 1 추가 예정.
+### Amendment 1 (2026-06-06) — 옵션 A+D fix 구현 완료 + 재측정 실측 박제
+
+- **상태**: Accepted (developer fix 구현 + dev 재측정 + 회귀 가드 신설 완료)
+- **구현 (옵션 A — moon 패턴 일반화)**:
+  - `rebuildOrbitLines` (`solar-system-scene.ts`): satellite (parentId !== 'sun') 를 parent 별 `Map<string, LineSystem>` (`satelliteOrbitLines`) 로 분리. `isSatelliteOrbit(parentId)` 분류 SSoT (단위 테스트 가드). 분류 정책 = parentId 가 null/'sun' 이 아니면 satellite.
+  - `getOrbitVisualScale(parentId)` scaling 적용 (earth=30 / mars=500 / jupiter=16). `updateAt` 루프가 각 LineSystem position 을 parent scene 좌표로 매 프레임 동기화 (moon 전용 → satellite Map 순회 일반화).
+  - moon 특수 케이스 제거 — moon 은 `satelliteOrbitLines.get('earth')`. 색상 강조 (#552 `setMoonOrbitHighlight`) 만 earth 별도 룩업 유지.
+  - **agy 보강 ① (dispose 라이프사이클)**: `disposeSatelliteOrbitLines` (Map 전체 순회 안전 dispose) 를 rebuildOrbitLines 재호출 + scene dispose 둘 다에서 호출 (LineSystem 누수 차단).
+  - **agy 보강 ② (fallback 계약)**: `DEFAULT_ORBIT_VISUAL_SCALE=1.0` export + `getOrbitVisualScale` null/undefined/미매핑 시 1.0 보장 (단위 테스트 가드).
+- **재측정 실측 (2026-06-06, 1280×720, dev — D-627 검증)**:
+
+| satellite parent | scaling | worldCenter ↔ parent (D-627-1) | distToOrigin |
+|---|---|---|---|
+| earth (moon) | 30 | **0.053 unit** ✅ ≤ 0.2 | 12.31 |
+| mars (phobos/deimos) | 500 | **0.0003 unit** ✅ ≤ 0.2 | 17.50 |
+| jupiter (galilean 4) | 16 | **0.019 unit** ✅ ≤ 0.2 | 62.41 |
+
+  - planet `orbit-lines` 원점 1 unit 이내 vertex: **0.0% (0/325)** ← 결함기 54% (390/715). agy 보강 ③ 통계 테스트 PASS.
+- **옵션 D 발동 (보고 1)**: 옵션 A 적용 후 galilean 재측정 — ganymede/jupiter **0.230** (여전히 moon/earth 0.068 의 3.4배 과대) → galilean `BODY_SCALE` 300 → 200 적용. 재측정: ganymede 0.230 → **0.1535** (D-627-3 ≤ 0.16 충족, binding constraint). io 0.106 / europa 0.091 / callisto 0.140. R6 ADR §Amendment 2 박제.
+- **회귀 가드**: `apps/web/scripts/browser-verify-627-satellite-orbit.mjs` (verify:627-satellite-orbit) — 2축 (A worldCenter ±0.2 / B 원점 밀집 0) + CI `detect-and-test` 통합 (port 3005). 단위 테스트 `packages/core/src/scene/satellite-orbit-structure.test.ts` (isSatelliteOrbit 분류 11 케이스 + getOrbitVisualScale fallback).
+- **D-T2 실 Chrome 육안**: 사용자 위임 (headless ≠ 실 브라우저, volt #77). PR #627 본문 명시.
+- **코드 변경 라인 수 (§4 예측 1 대조)**: 예측 ~40~60 라인 (옵션 A) + 4 라인 (옵션 D). 실측 옵션 A 핵심 변경 ~70 라인 (분류 helper + dispose helper + Map 일반화 — 예측 상한 근방, 100 미만 임계 통과) + 옵션 D 4 라인. 예측 정합.
 
 ---
 

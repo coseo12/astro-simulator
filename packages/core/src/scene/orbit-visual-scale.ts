@@ -9,8 +9,11 @@
  *
  * ## 적용 위치
  *
- *   - `solar-system-scene.ts` 의 `resolveWorld` — parent + (local × visual_scale) 산출
- *   - `solar-system-scene.ts` 의 `rebuildOrbitLines` — moon orbit LineSystem.scaling 적용
+ *   - `solar-system-scene.ts` 의 `resolveWorld` — parent + (local × visual_scale) 산출 (mesh 경로)
+ *   - `solar-system-scene.ts` 의 `rebuildOrbitLines` — #627 부터 **모든 satellite orbit LineSystem**
+ *     (parent 별 `Map<string, LineSystem>`) 의 `.scaling` 적용. R5 까지 moon LineSystem 만 적용되어
+ *     phobos/deimos/galilean 궤도선이 visual scale 미적용 + parent 미추적으로 태양 원점에 잘못
+ *     렌더됐던 결함을 옵션 A (moon 패턴 일반화) 로 해소 (ADR `20260606-627-satellite-orbit-structure-forensic.md`).
  *
  * ## 박제값 산출 근거 (R4 #539 Amendment 2 forensic, 2026-05-21)
  *
@@ -122,8 +125,15 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
   jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io, 마진 1.69x)
 });
 
-/** 기본값 (parent 가 룩업에 없거나 visual scale 미적용 — 실측 그대로). */
-const DEFAULT_ORBIT_VISUAL_SCALE = 1.0;
+/**
+ * 기본값 (parent 가 룩업에 없거나 visual scale 미적용 — 실측 그대로).
+ *
+ * #627 (agy 보강 ②) — `getOrbitVisualScale` 의 fallback 계약. parentId null / undefined /
+ * 미매핑 시 1.0 반환 보장으로 satellite 궤도 LineSystem.scaling 이 항상 안전한 값을 받는다
+ * (rebuildOrbitLines 의 미매핑 parent 예외 안정성). 단위 테스트 `satellite-orbit-structure.test.ts`
+ * 가 본 계약을 가드.
+ */
+export const DEFAULT_ORBIT_VISUAL_SCALE = 1.0;
 
 /**
  * parent body id 에 해당하는 satellite orbit visual scale 조회.

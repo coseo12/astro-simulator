@@ -16,7 +16,8 @@
     "verify:378-focus": "node scripts/browser-verify-378-focus.mjs",
     "verify:380-zoom": "node scripts/browser-verify-380-zoom.mjs",
     "verify:focus-transition": "node scripts/browser-verify-focus-transition.mjs",
-    "verify:r-phase-allowlist": "node scripts/browser-verify-r-phase-allowlist.mjs"
+    "verify:r-phase-allowlist": "node scripts/browser-verify-r-phase-allowlist.mjs",
+    "verify:627-satellite-orbit": "node scripts/browser-verify-627-satellite-orbit.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",

@@ -238,6 +238,29 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # ============================================================
+      # #627 satellite 궤도선 구조 회귀 가드 — parent 추적 + 원점 밀집 통계
+      # ============================================================
+      # ADR: docs/decisions/20260606-627-satellite-orbit-structure-forensic.md §5 §결정
+      #      + §교차검증 반영 사항 (agy 고유 발견 #3 — 원점 밀집 통계 테스트)
+      # 검증 2축: (A) 각 satellite 궤도 LineSystem worldCenter ↔ parent ±0.2 unit
+      #          (B) planet orbit-lines 원점 1 unit 이내 vertex 0 (forensic 54% 밀집 결함 재발 차단)
+      # DoD PASS ≠ 제품 동작 (volt #74) — R5 satellite 궤도선 미검증 잠복 → R6 galilean 표면화 재발 방지.
+
+      - name: '#627 satellite 궤도 회귀 가드 (verify:627-satellite-orbit)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-627-satellite-orbit.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3005 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3005/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3005 node apps/web/scripts/browser-verify-627-satellite-orbit.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
