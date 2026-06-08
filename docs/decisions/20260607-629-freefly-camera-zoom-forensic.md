@@ -181,8 +181,9 @@ agy 가 F1(반지름 비례 줌) 결정을 "거대 척도 시뮬레이션에 매
 
 ## §8 후속 / 분리 이슈
 
-- **free-fly 패닝/탐색 UX (F3)** — 본 fix 는 줌 정지(주 원인)를 해소하나, target 이 동결점에 고정되어 "공전만 가능"한 부 원인은 남는다. "진짜 자유 이동(WASD/패닝)" 은 별도 가치 → 사용자 수요 확인 후 분리 검토 (floating origin 결합 설계 필요).
-- **#627 ADR §8** — 본 forensic 이 §8 정적 가설을 정정. #627 ADR 에 cross-link 박제.
+- **free-fly deep-tier 줌아웃 → 허공 (부 원인 표면화)** — **[#631](https://github.com/coseo12/astro-simulator/issues/631) 분리 완료** (2026-06-07 D-T2). 본 fix 로 줌 응답은 복구됐으나, D-T2 실 Chrome 에서 "줌아웃 시 갑자기 멀어져 허공" 보고. forensic 실측: body tier 의 floating origin 이 focus body(io)로 이동 → `sim-canvas.tsx:481-484` 의 `cameraFromSunMeters` 가 실제로는 io(이동 원점)로부터 거리를 측정 → `tierFromCameraDistance` 가 줌아웃해도 body tier 유지(escalate 안 됨) + target 동결점 → body-scale 허공 비행 (12틱 내내 tier=body / targetDist 8124 / 보이는 mesh 1개). floating-origin tier 좌표계 정밀 작업이라 독립 PR 권장.
+- **free-fly 패닝 (F3)** — "진짜 자유 이동(WASD/패닝)" 은 별도 가치 → #631 과 함께 또는 후속 검토.
+- **#627 ADR §8** — 본 forensic 이 §8 정적 가설을 정정. #627 ADR 에 cross-link 박제 완료.
 
 ---
 
