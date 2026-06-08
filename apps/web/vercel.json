@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "rustup target add wasm32-unknown-unknown && cargo install wasm-pack --version 0.14.0 --locked && pnpm i --frozen-lockfile",
+  "buildCommand": "pnpm -r build"
+}
