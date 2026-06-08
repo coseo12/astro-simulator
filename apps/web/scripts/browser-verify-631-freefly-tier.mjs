@@ -100,8 +100,9 @@ async function scenarioPlanetPreserve(browser) {
     await freeFly(page);
     const ff = await measure(page);
     // #509: tier 불변 + target 보존 (개요로 리셋되지 않음). earth focus 가 body 가 아닌 한해서만 의미.
+    // (measure() 는 `tier` 필드 반환 — focusTier 아님. reviewer #632 권고 정정.)
     const pass =
-      f.focusTier !== 'body' &&
+      f.tier !== 'body' &&
       ff.tier === f.tier &&
       ff.targetDist >= PRESERVE_TARGET_MIN &&
       Math.abs(ff.targetDist - f.targetDist) < Math.max(5, f.targetDist * 0.1);
