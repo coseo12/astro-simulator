@@ -50,7 +50,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       const wantsGpu = requested === 'webgpu' || requested === 'auto';
       if (!cap.webgpu) {
         // 항상 경고: 향후 P3-A/B 활성화 시 진단에 도움.
-         
+
         console.warn('[gpu] WebGPU 미지원:', cap.reason);
         if (wantsGpu) {
           useSimStore.getState().setEngineNotice({
@@ -406,6 +406,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // syncFocusToScene 과 별도 helper — selectedBodyId 변화 (null 전이) 와 freeFlyMode 변화를
         // 분리 처리하기 위함 (resetCamera vs enterFreeFly 경로 구분).
         const detachToFreeFly = () => {
+          // #631 — deep tier(body, 위성/근접 focus)에서 탐색 진입 시: 시점 보존(#509)을 그대로 두면
+          // target 이 focus body 의 먼 위치(예: io ~5.2 AU)에 동결되어 줌아웃해도 태양계가 frame 밖
+          // → "허공" (D-T2). 따라서 body tier 진입은 태양계 개요로 pull-back 한다 (target→sun 원점 +
+          // solar radius). controller.reset 은 alpha/beta(시점 방향)는 유지하므로 "현재 각도로 태양계
+          // 전체를 보는" 자연스러운 탐색이 된다. inner/solar tier(행성)는 기존 #509 시점 보존 유지.
+          if (solar.getTier() === 'body') {
+            solar.clearFocus();
+            // controller.reset() 기본값 = (radius 35, target 원점) = 태양계 개요. 매직 넘버 없이
+            // 문서화된 default 사용 (cross-validate agy 권고 #1).
+            controller.reset();
+            return;
+          }
           solar.detachFocus();
           controller.clearFollow();
         };
@@ -478,9 +490,17 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const activeTier = solar.getTier();
           // scene unit → m 환산: 현재 tier 의 renderScale 역수.
           const metersPerSceneUnit = 1 / sceneApi.renderScaleForTier(activeTier);
-          const cx = activeCam.globalPosition.x * metersPerSceneUnit;
-          const cy = activeCam.globalPosition.y * metersPerSceneUnit;
-          const cz = activeCam.globalPosition.z * metersPerSceneUnit;
+          // #631 — cameraFromSunMeters 는 sun(절대 월드 원점) 기준 거리여야 한다.
+          // body tier 에서 floatingOrigin 이 focus body 로 이동(originOffset ≠ 0)하므로
+          // globalPosition(shifted-origin local) × metersPerSceneUnit 만으로는 focus body 로부터의
+          // 거리가 되어 sun 거리를 과소 측정한다. originOffset(m) 을 가산해 참 거리를 구한다.
+          // 누락 시 free-fly 줌아웃에서 tier 가 escalate 안 됨(body 고정 → 허공). 씬 updateAt
+          // (solar-system-scene.ts:1093-1098)의 cameraWorldMeters 계산과 동일 패턴.
+          // T1/T2 는 originOffset=[0,0,0] 이라 무영향, body tier 만 교정.
+          const origin = solar.floatingOrigin.originOffset;
+          const cx = activeCam.globalPosition.x * metersPerSceneUnit + origin[0];
+          const cy = activeCam.globalPosition.y * metersPerSceneUnit + origin[1];
+          const cz = activeCam.globalPosition.z * metersPerSceneUnit + origin[2];
           const cameraFromSunMeters = Math.sqrt(cx * cx + cy * cy + cz * cz);
           // focus body 와의 거리 — ArcRotateCamera 의 `radius` 가 target 과의 거리 (scene unit).
           // focus 가 없을 때 (free-fly) 도 값은 있지만 solar.updateTierByCamera 가 focus id 부재를
