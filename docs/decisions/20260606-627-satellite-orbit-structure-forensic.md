@@ -37,52 +37,52 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 #### 측정 1 — LineSystem position/scaling (탐색 시점, tier=solar, 1280×720)
 
-| LineSystem | position | scaling | worldCenter | 비고 |
-|---|---|---|---|---|
-| `orbit-lines` (batch) | **(0, 0, 0)** | **(1, 1, 1)** | (-3.03, -0.81, 0.07) | **position 고정 + scale 1 — parent 미추적 + visual scale 미적용** |
-| `moon-orbit-line` (별도) | (-3.01, **11.98**, ~0) | **(30, 30, 30)** | (-3.02, 11.93, ~0) | position = earth scene 좌표 (parent 추적) + scaling 30 = `getOrbitVisualScale('earth')` |
+| LineSystem               | position               | scaling          | worldCenter          | 비고                                                                                    |
+| ------------------------ | ---------------------- | ---------------- | -------------------- | --------------------------------------------------------------------------------------- |
+| `orbit-lines` (batch)    | **(0, 0, 0)**          | **(1, 1, 1)**    | (-3.03, -0.81, 0.07) | **position 고정 + scale 1 — parent 미추적 + visual scale 미적용**                       |
+| `moon-orbit-line` (별도) | (-3.01, **11.98**, ~0) | **(30, 30, 30)** | (-3.02, 11.93, ~0)   | position = earth scene 좌표 (parent 추적) + scaling 30 = `getOrbitVisualScale('earth')` |
 
 - **관찰 1**: `moon-orbit-line` 은 position 이 earth scene 좌표 (11.98) 로 매 프레임 동기화 + scaling 30 적용 → moon mesh (distToOrigin 11.39) 와 정합.
 - **관찰 2**: `orbit-lines` 는 모든 비-moon 궤도를 하나의 LineSystem 에 담아 position (0,0,0) 고정. planet 궤도는 sun 중심이라 정상이지만, **satellite 궤도 점은 parent-relative ellipse (parent 0 원점 기준)** 라 parent offset 없이 sun 근처에 잘못 렌더.
 
 #### 측정 1b — `orbit-lines` vertex 원점 거리 분포 (715 점)
 
-| 거리 bucket (scene unit) | 점 개수 | 해석 |
-|---|---|---|
-| < 1 | **390 (54%)** | satellite 궤도 (phobos/deimos/galilean) — parent-relative 작은 ellipse 가 **태양 원점에 밀집** |
-| 1–5 | 40 | 내행성 궤도 일부 |
-| 5–20 | 199 | 내행성 ~ 중간 궤도 (정상) |
-| 20–40 | 21 | 외행성 궤도 |
-| 40–70 | 65 | jupiter 궤도 (~52 AU scene unit, 정상) |
+| 거리 bucket (scene unit) | 점 개수       | 해석                                                                                           |
+| ------------------------ | ------------- | ---------------------------------------------------------------------------------------------- |
+| < 1                      | **390 (54%)** | satellite 궤도 (phobos/deimos/galilean) — parent-relative 작은 ellipse 가 **태양 원점에 밀집** |
+| 1–5                      | 40            | 내행성 궤도 일부                                                                               |
+| 5–20                     | 199           | 내행성 ~ 중간 궤도 (정상)                                                                      |
+| 20–40                    | 21            | 외행성 궤도                                                                                    |
+| 40–70                    | 65            | jupiter 궤도 (~52 AU scene unit, 정상)                                                         |
 
 - min 거리 = **7.76e-4** (io 가장 안쪽 궤도점), median = 0.158.
 - **결론**: 715 점 중 390 점 (54%) 이 원점 1 unit 이내에 satellite 궤도 ellipse 로 밀집 — 이것이 사용자가 본 "탐색 모드 궤도라인 잔상" (태양 주변 작은 링 다발) + "focus 시 불필요한 궤도라인" (jupiter focus 시 galilean 궤도가 jupiter 가 아닌 sun 에 있음).
 
 #### 측정 1c — satellite mesh vs parent 거리 (mesh 경로는 정상)
 
-| satellite | parent | distToParent | distToOrigin | mesh가 parent추적 |
-|---|---|---|---|---|
-| moon | earth | 1.023 | 11.39 | ✅ |
-| phobos | mars | 0.396 | 17.35 | ✅ |
-| deimos | mars | 0.986 | 16.52 | ✅ |
-| io | jupiter | 0.566 | 62.87 | ✅ |
-| europa | jupiter | 0.906 | 62.12 | ✅ |
-| ganymede | jupiter | 1.442 | 61.56 | ✅ |
-| callisto | jupiter | 2.547 | 60.79 | ✅ |
+| satellite | parent  | distToParent | distToOrigin | mesh가 parent추적 |
+| --------- | ------- | ------------ | ------------ | ----------------- |
+| moon      | earth   | 1.023        | 11.39        | ✅                |
+| phobos    | mars    | 0.396        | 17.35        | ✅                |
+| deimos    | mars    | 0.986        | 16.52        | ✅                |
+| io        | jupiter | 0.566        | 62.87        | ✅                |
+| europa    | jupiter | 0.906        | 62.12        | ✅                |
+| ganymede  | jupiter | 1.442        | 61.56        | ✅                |
+| callisto  | jupiter | 2.547        | 60.79        | ✅                |
 
 - **모든 satellite mesh 는 parent 를 정상 추적** (distToParent ≪ distToOrigin). `resolveWorld` (solar-system-scene.ts:1481-1485) 가 `parentWorld + local × getOrbitVisualScale(parentId)` 적용.
 - **핵심 비대칭**: mesh 경로 (✅ 정상) vs orbit-line 경로 (❌ 결함). 사용자 인지: galilean mesh 는 jupiter 옆에 있는데 galilean 궤도선은 sun 옆에 있어 **mesh ↔ 궤도선 분리** = "불필요한 궤도라인".
 
 #### 측정 2 — galilean world radius / jupiter 비율 (사용자 보고 1 분석)
 
-| body | worldRadius | ratioToJupiter | 비고 |
-|---|---|---|---|
-| jupiter | 0.4993 | 1.000 | BODY_SCALE 48 (R6 PM Q2=B 거성 예외) |
-| io | 0.0795 | **0.159** | BODY_SCALE 300 |
-| europa | 0.0681 | **0.136** | BODY_SCALE 300 |
-| ganymede | 0.1150 | **0.230** | BODY_SCALE 300, 태양계 최대 위성 |
-| callisto | 0.1052 | **0.211** | BODY_SCALE 300 |
-| (baseline) moon | 0.0506 | **0.068** (vs earth) | BODY_SCALE 200 |
+| body            | worldRadius | ratioToJupiter       | 비고                                 |
+| --------------- | ----------- | -------------------- | ------------------------------------ |
+| jupiter         | 0.4993      | 1.000                | BODY_SCALE 48 (R6 PM Q2=B 거성 예외) |
+| io              | 0.0795      | **0.159**            | BODY_SCALE 300                       |
+| europa          | 0.0681      | **0.136**            | BODY_SCALE 300                       |
+| ganymede        | 0.1150      | **0.230**            | BODY_SCALE 300, 태양계 최대 위성     |
+| callisto        | 0.1052      | **0.211**            | BODY_SCALE 300                       |
+| (baseline) moon | 0.0506      | **0.068** (vs earth) | BODY_SCALE 200                       |
 
 - **사용자 인지 단위** = jupiter focus zoom-in 시 galilean 의 시각적 크기 (jupiter 대비).
 - **ADR 박제 단위** = `BODY_SCALE.{io,europa,ganymede,callisto} = 300`.
@@ -92,12 +92,12 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 ### 가설 검증 결론
 
-| 가설 | 결론 | 근거 |
-|---|---|---|
-| **가설 1: satellite 궤도선이 parent 를 안 따라가 태양 원점에 렌더** | **확정 (보고 2 주된 원인)** | 측정 1 (`orbit-lines` position (0,0,0)) + 측정 1b (390/715 점 원점 밀집) + 측정 1c (mesh 는 정상 추적 — orbit-line 만 결함) |
+| 가설                                                                           | 결론                        | 근거                                                                                                                                                                 |
+| ------------------------------------------------------------------------------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **가설 1: satellite 궤도선이 parent 를 안 따라가 태양 원점에 렌더**            | **확정 (보고 2 주된 원인)** | 측정 1 (`orbit-lines` position (0,0,0)) + 측정 1b (390/715 점 원점 밀집) + 측정 1c (mesh 는 정상 추적 — orbit-line 만 결함)                                          |
 | **가설 2: satellite 궤도선에 visual scale 미적용으로 mesh 와 궤도선 mismatch** | **확정 (보고 2 부수 원인)** | 측정 1 (`orbit-lines` scaling (1,1,1) vs `moon-orbit-line` scaling 30). visual scale 적용해도 parent offset 없으면 여전히 sun 에 있음 → 가설 1 이 1차, 가설 2 가 2차 |
-| **가설 3: galilean BODY_SCALE 300 자체가 jupiter 대비 과대** | **확정 (보고 1 주된 원인)** | 측정 2 (galilean/jupiter 0.136~0.230 vs moon/earth 0.068). perspective 아닌 scale 자체 — focus zoom 무관하게 비율 일정 |
-| **가설 4: galilean 과대는 perspective (focus zoom 거리) 효과** | **기각** | world radius 비율은 카메라 거리 불변. 측정 2 의 ratioToJupiter 는 zoom 과 무관한 mesh 절대 비율 |
+| **가설 3: galilean BODY_SCALE 300 자체가 jupiter 대비 과대**                   | **확정 (보고 1 주된 원인)** | 측정 2 (galilean/jupiter 0.136~0.230 vs moon/earth 0.068). perspective 아닌 scale 자체 — focus zoom 무관하게 비율 일정                                               |
+| **가설 4: galilean 과대는 perspective (focus zoom 거리) 효과**                 | **기각**                    | world radius 비율은 카메라 거리 불변. 측정 2 의 ratioToJupiter 는 zoom 과 무관한 mesh 절대 비율                                                                      |
 
 > 가설 1+2 가 보고 2 (궤도선) 의 결합 원인 — parent offset 누락 (1차) + visual scale 누락 (2차). 둘 다 해소해야 moon 패턴과 정합. 가설 3 이 보고 1 (비율) 의 독립 원인.
 
@@ -162,14 +162,14 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 #### 축별 비교 매트릭스 (보고 2)
 
-| 축 | (A) parent별 일반화 | (B) parenting | (C) 비표시 |
-|---|---|---|---|
-| 사용자 인지 회귀 해소 | ✅ 완전 (mesh 정합) | ✅ (scaling 처리 시) | △ (정보 손실로 회피) |
-| moon 패턴 일관성 | ✅ 동일 메커니즘 | ❌ 다른 메커니즘 | ❌ moon 만 잔존 |
-| R7+ 확장성 | ✅ 데이터만 추가 | △ (parent scaling 보정 매번) | ❌ 위성 궤도 영구 손실 |
-| 부수 회귀 위험 | low (moon 검증됨) | **high** (scaling 전파/floating origin) | low |
-| 구현 비용 | 중 (moon 루프 일반화) | 중~고 (scaling 보정) | 1줄 (skip) |
-| ADR Amendment 필요 | R5 §결정 4 정정 1건 | R5 §결정 4 정정 1건 | R5/R6 satellite 가시화 결정 폐기 |
+| 축                    | (A) parent별 일반화   | (B) parenting                           | (C) 비표시                       |
+| --------------------- | --------------------- | --------------------------------------- | -------------------------------- |
+| 사용자 인지 회귀 해소 | ✅ 완전 (mesh 정합)   | ✅ (scaling 처리 시)                    | △ (정보 손실로 회피)             |
+| moon 패턴 일관성      | ✅ 동일 메커니즘      | ❌ 다른 메커니즘                        | ❌ moon 만 잔존                  |
+| R7+ 확장성            | ✅ 데이터만 추가      | △ (parent scaling 보정 매번)            | ❌ 위성 궤도 영구 손실           |
+| 부수 회귀 위험        | low (moon 검증됨)     | **high** (scaling 전파/floating origin) | low                              |
+| 구현 비용             | 중 (moon 루프 일반화) | 중~고 (scaling 보정)                    | 1줄 (skip)                       |
+| ADR Amendment 필요    | R5 §결정 4 정정 1건   | R5 §결정 4 정정 1건                     | R5/R6 satellite 가시화 결정 폐기 |
 
 ### 보고 1 (galilean 비율 과대) — 옵션 D/E
 
@@ -189,13 +189,13 @@ R6 PR #627 의 실 Chrome D-T2 검증에서 사용자가 두 회귀를 보고 (h
 
 #### 축별 비교 매트릭스 (보고 1)
 
-| 축 | (D) galilean 하향 | (E) jupiter 상향 |
-|---|---|---|
-| 사용자 "과대" 해소 | ✅ 직접 | ✅ 상대 |
-| galilean mesh 가시성 | △ fallback 의존 심화 | ✅ 유지 |
-| PM Q2=B 임계 충돌 | ❌ 없음 | ⚠️ 위반 (재합의) |
-| 결합 영향 | 낮음 (galilean 독립) | **높음** (orbit scale 동반) |
-| ADR Amendment | R6 §축 2 | R6 §축 1+2+4 + PM 재합의 |
+| 축                   | (D) galilean 하향    | (E) jupiter 상향            |
+| -------------------- | -------------------- | --------------------------- |
+| 사용자 "과대" 해소   | ✅ 직접              | ✅ 상대                     |
+| galilean mesh 가시성 | △ fallback 의존 심화 | ✅ 유지                     |
+| PM Q2=B 임계 충돌    | ❌ 없음              | ⚠️ 위반 (재합의)            |
+| 결합 영향            | 낮음 (galilean 독립) | **높음** (orbit scale 동반) |
+| ADR Amendment        | R6 §축 2             | R6 §축 1+2+4 + PM 재합의    |
 
 ### 권장 안 (사전 선호 — 사용자/cross-validate 결정 전 안내)
 
@@ -267,12 +267,12 @@ agy 가 옵션 A+D 조합을 지지 (구조적 완성도 / 기술 타당성 / �
 
 ## §6 위험 / 재검토 트리거
 
-| 위험 | 회귀 시점 | 임계 / 발동 조건 | 완화 방안 |
-|---|---|---|---|
-| satellite 궤도선 회귀 재잠복 (다음 R-Phase) | R7 (titan/saturn) 진입 | 신규 satellite 궤도선 worldCenter ≠ parent | `browser-verify-627-satellite-orbit.mjs` 회귀 가드 (모든 satellite 자동 검사) |
-| 옵션 A draw call 증가 | fix 머지 직후 | LineSystem 개수 × satellite parent 수 | parent 3개 (earth/mars/jupiter) 수준 — #77 최적화 대비 미미. fps DoD 재측정 |
-| galilean fallback 의존 심화 (옵션 D) | D 채택 시 | io mesh px < 4 | LOD Phase 2 (#391) billboard fallback 가 흡수 |
-| 궤도선 visual scale ↔ mesh visual scale drift | Amendment 시 | 두 경로 scale 불일치 | 단일 SSoT `getOrbitVisualScale` 양쪽 호출 (mesh: resolveWorld / line: rebuildOrbitLines) |
+| 위험                                          | 회귀 시점              | 임계 / 발동 조건                           | 완화 방안                                                                                |
+| --------------------------------------------- | ---------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| satellite 궤도선 회귀 재잠복 (다음 R-Phase)   | R7 (titan/saturn) 진입 | 신규 satellite 궤도선 worldCenter ≠ parent | `browser-verify-627-satellite-orbit.mjs` 회귀 가드 (모든 satellite 자동 검사)            |
+| 옵션 A draw call 증가                         | fix 머지 직후          | LineSystem 개수 × satellite parent 수      | parent 3개 (earth/mars/jupiter) 수준 — #77 최적화 대비 미미. fps DoD 재측정              |
+| galilean fallback 의존 심화 (옵션 D)          | D 채택 시              | io mesh px < 4                             | LOD Phase 2 (#391) billboard fallback 가 흡수                                            |
+| 궤도선 visual scale ↔ mesh visual scale drift | Amendment 시           | 두 경로 scale 불일치                       | 단일 SSoT `getOrbitVisualScale` 양쪽 호출 (mesh: resolveWorld / line: rebuildOrbitLines) |
 
 ### 재검토 트리거
 
@@ -296,13 +296,13 @@ agy 가 옵션 A+D 조합을 지지 (구조적 완성도 / 기술 타당성 / �
   - **agy 보강 ② (fallback 계약)**: `DEFAULT_ORBIT_VISUAL_SCALE=1.0` export + `getOrbitVisualScale` null/undefined/미매핑 시 1.0 보장 (단위 테스트 가드).
 - **재측정 실측 (2026-06-06, 1280×720, dev — D-627 검증)**:
 
-| satellite parent | scaling | worldCenter ↔ parent (D-627-1) | distToOrigin |
-|---|---|---|---|
-| earth (moon) | 30 | **0.053 unit** ✅ ≤ 0.2 | 12.31 |
-| mars (phobos/deimos) | 500 | **0.0003 unit** ✅ ≤ 0.2 | 17.50 |
-| jupiter (galilean 4) | 16 | **0.019 unit** ✅ ≤ 0.2 | 62.41 |
+| satellite parent     | scaling | worldCenter ↔ parent (D-627-1) | distToOrigin |
+| -------------------- | ------- | ------------------------------ | ------------ |
+| earth (moon)         | 30      | **0.053 unit** ✅ ≤ 0.2        | 12.31        |
+| mars (phobos/deimos) | 500     | **0.0003 unit** ✅ ≤ 0.2       | 17.50        |
+| jupiter (galilean 4) | 16      | **0.019 unit** ✅ ≤ 0.2        | 62.41        |
 
-  - planet `orbit-lines` 원점 1 unit 이내 vertex: **0.0% (0/325)** ← 결함기 54% (390/715). agy 보강 ③ 통계 테스트 PASS.
+- planet `orbit-lines` 원점 1 unit 이내 vertex: **0.0% (0/325)** ← 결함기 54% (390/715). agy 보강 ③ 통계 테스트 PASS.
 - **옵션 D 발동 (보고 1, 2단계 iteration)**: 옵션 A 적용 후 galilean 재측정 — ganymede/jupiter **0.230** (여전히 moon/earth 0.068 의 3.4배 과대) → **1차 `BODY_SCALE` 300 → 200** (ganymede 0.1535, D-627-3 ≤ 0.16 충족). **사용자 D-T2 (2026-06-06) "목성 대비 아직 큼" 재보고 → 2차 200 → 100** (dev iteration 합의): ganymede **0.077** (moon/earth 0.068 의 1.13배 정합) / io 0.053 / europa 0.046 / callisto 0.070. 사용자 "목성 대비 적당" 합의. galilean 4개 sub-4px → 4px fallback billboard 전면 의존 (LOD #391 흡수). R6 ADR §Amendment 2 박제 (300→200→100).
 - **회귀 가드**: `apps/web/scripts/browser-verify-627-satellite-orbit.mjs` (verify:627-satellite-orbit) — 2축 (A worldCenter ±0.2 / B 원점 밀집 0) + CI `detect-and-test` 통합 (port 3005). 단위 테스트 `packages/core/src/scene/satellite-orbit-structure.test.ts` (isSatelliteOrbit 분류 11 케이스 + getOrbitVisualScale fallback).
 - **D-T2 실 Chrome 육안**: 사용자 위임 (headless ≠ 실 브라우저, volt #77). PR #627 본문 명시.
@@ -312,7 +312,8 @@ agy 가 옵션 A+D 조합을 지지 (구조적 완성도 / 기술 타당성 / �
 
 ## §8 후속 / 분리 이슈
 
-- **카메라 free-fly 고정 (R6 무관)** — `focusOn` 의 `lowerRadiusLimit` 동적 완화 (camera-controller.ts:150-152) 가 free-fly 진입 (`detachToFreeFly` clearFollow only, sim-canvas.tsx:408-411) 시 원복 안 되어 satellite focus 후 자유 이동 제약 인지. **develop (R5) 재현 확정** (git diff 0) → R6 차단 사유 아님. **별도 이슈 분리 완료** ([#629](https://github.com/coseo12/astro-simulator/issues/629), priority:medium, 2026-06-06). 출발점: `clearFollow` 에 lowerRadiusLimit 원복 또는 free-fly 진입 시 tier-transition 의 `computeLowerRadiusLimit` 재적용.
+- **카메라 free-fly 고정 (R6 무관)** — `focusOn` 의 `lowerRadiusLimit` 동적 완화 (camera-controller.ts:150-152) 가 free-fly 진입 (`detachToFreeFly` clearFollow only, sim-canvas.tsx:408-411) 시 원복 안 되어 satellite focus 후 자유 이동 제약 인지. **develop (R5) 재현 확정** (git diff 0) → R6 차단 사유 아님. **별도 이슈 분리 완료** ([#629](https://github.com/coseo12/astro-simulator/issues/629), priority:medium, 2026-06-06).
+  - **⚠️ 정정 (2026-06-07, #629 forensic)**: 위 정적 분석의 "lowerRadiusLimit 미원복" 가설은 **#629 forensic 실측에서 기각**됨 (free-fly 후 lowerRadiusLimit = 467 로 극소 아님). 실제 원인은 **절대 `wheelPrecision` 이 tier=body 거대 radius(≈158386)에서 줌 변화율 0.03% 로 정지**. fix = `wheelDeltaPercentage`(radius 비례). 상세: [`20260607-629-freefly-camera-zoom-forensic.md`](20260607-629-freefly-camera-zoom-forensic.md). measurement-first 가 정적 가설을 정정한 사례 (volt #32).
 - **satellite orbit visual scale 잔여 gap** — 기존 [#622](https://github.com/coseo12/astro-simulator/issues/622) (satellite orbit visual scale 잔여 1.74배 gap forensic) 와 본 결함 연관. #622 는 visual scale **값** gap, 본 ADR 은 visual scale **적용 자체 누락** — 본 fix (옵션 A) 가 #622 의 전제 (satellite 궤도선이 실제로 visual scale 적용됨) 를 충족시킨 후 #622 재측정 권고. Builds on: #627.
 
 ---

@@ -261,6 +261,29 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # ============================================================
+      # #629 free-fly 줌 고정 회귀 가드 — wheelDeltaPercentage (scale-invariant zoom)
+      # ============================================================
+      # ADR: docs/decisions/20260607-629-freefly-camera-zoom-forensic.md §결정 §회귀 가드
+      # 검증 2축: (S1) free-fly 직접 baseline 줌 체감 (#509 시점 보존 + 줌 작동)
+      #          (S2) io(galilean) focus → free-fly 줌 5틱 누적 rel ≥ 1% + 회전 작동
+      # forensic 회귀값: S2 절대 wheelPrecision 시 rel 0.03% (tier=body radius≈158386).
+      # DoD PASS ≠ 제품 동작 (volt #74) — 위성 free-fly 줌 정지 잠복 재발 차단.
+
+      - name: '#629 free-fly 줌 회귀 가드 (verify:629-freefly-zoom)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-629-freefly-zoom.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3006 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3006/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3006 node apps/web/scripts/browser-verify-629-freefly-zoom.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
