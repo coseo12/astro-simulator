@@ -36,8 +36,8 @@ const flags = { json: args.includes('--json') };
 
 const VIEWPORT = { width: 1280, height: 720 };
 const SETTLE_MS = 2500;
-// 줌 체감 임계 — 5틱 누적 상대변화율. fix(wheelDeltaPercentage=0.01) 후 ~5%, 회귀(절대) 시 ~0.15%.
-// 1% 임계는 두 상태를 안전 마진으로 분리.
+// 줌 체감 임계 — 5틱 누적 상대변화율. 실측: fix(wheelDeltaPercentage=0.01) 후 위성 free-fly
+// ~38.95%/54.66%, 회귀(절대 wheelPrecision) 시 ~0.03%. 1% 임계가 두 상태를 안전 마진으로 분리.
 const ZOOM_PERCEPTIBLE_THRESHOLD = 0.01;
 const WHEEL_TICKS = 5;
 // 위성 focus 가 push 하는 deep tier. fix 전 radius≈158386 에서 줌 정지가 발현된 케이스.
