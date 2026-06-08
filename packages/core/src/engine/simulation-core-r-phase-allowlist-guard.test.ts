@@ -96,17 +96,18 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402 + R4 #532)',
     core.dispose();
   });
 
-  it('allowlist 외 body (jupiter) focusOn → bodySelected emit 0 + console.warn', () => {
+  it('allowlist 외 body (saturn) focusOn → bodySelected emit 0 + console.warn', () => {
+    // R6 #621 — jupiter 가 R6 진입으로 allowlist 포함 → 차단 예시 body 를 saturn(R7) 로 교체.
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
-    core.command({ type: 'focusOn', bodyId: 'jupiter' });
+    core.command({ type: 'focusOn', bodyId: 'saturn' });
 
     expect(onBodySelected).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0]?.[0]).toContain('R_PHASE_BODY_ALLOWLIST');
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('jupiter');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('saturn');
 
     core.dispose();
   });
@@ -138,32 +139,34 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402 + R4 #532)',
     core.dispose();
   });
 
-  it('연쇄 호출 — sun(허용) → jupiter(차단) → venus(허용) 시 emit 2회만', () => {
+  it('연쇄 호출 — sun(허용) → saturn(차단) → venus(허용) 시 emit 2회만', () => {
+    // R6 #621 — 차단 예시 body 를 saturn(R7) 로 교체 (jupiter R6 진입으로 허용 전환).
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
     core.command({ type: 'focusOn', bodyId: 'sun' });
-    core.command({ type: 'focusOn', bodyId: 'jupiter' });
+    core.command({ type: 'focusOn', bodyId: 'saturn' });
     core.command({ type: 'focusOn', bodyId: 'venus' });
 
     expect(onBodySelected).toHaveBeenCalledTimes(2);
     expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'sun' });
     expect(onBodySelected).toHaveBeenNthCalledWith(2, { id: 'venus' });
-    // jupiter 차단 시 1회 warn
+    // saturn 차단 시 1회 warn
     expect(warnSpy).toHaveBeenCalledTimes(1);
 
     core.dispose();
   });
 
-  it('URL ?focus=jupiter 직접 진입 시나리오 — focusOn jupiter 도 차단', () => {
-    // URL 진입은 url-sync.tsx 가 sendCommand({type:'focusOn', bodyId: 'jupiter'}) 발행 →
+  it('URL ?focus=saturn 직접 진입 시나리오 — focusOn saturn 도 차단', () => {
+    // URL 진입은 url-sync.tsx 가 sendCommand({type:'focusOn', bodyId: 'saturn'}) 발행 →
     // SimulationCore.command 가 본 가드로 차단. UI 우회 진입 회귀 가드.
+    // R6 #621 — jupiter 가 R6 진입으로 허용 전환 → 차단 예시 body 를 saturn(R7) 로 교체.
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
-    core.command({ type: 'focusOn', bodyId: 'jupiter' });
+    core.command({ type: 'focusOn', bodyId: 'saturn' });
 
     expect(onBodySelected).not.toHaveBeenCalled();
 

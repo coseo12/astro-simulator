@@ -74,6 +74,11 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   mars: 800, // R5 #594 — earth 와 동일값 (radius 53.3% 사실 비율 정합 시각 53.2% 정확 일치, sun 대비 px 비 ~7.81%, Q2=B 임계 ≤ 8% margin 0.19%)
   phobos: 5000, // R5 #594 — 사실 비율 (radius 0.326%) 명시 위배. moon Amendment 4 학습 — 사용자 천문 직관 우선. 4px fallback billboard 의존 (mesh 0.226 px sub-pixel, LOD Phase 2 #391)
   deimos: 5000, // R5 #594 — 사실 비율 (radius 0.185%) 명시 위배. phobos 동일값 (mental model "phobos ≈ deimos"). 4px fallback 의존 (mesh 0.128 px)
+  jupiter: 48, // R6 #621 — PM Q2=B 임계 완화 (거성 예외). sun 대비 px 비 ~9.87% (≤ 10% margin 0.13%), mesh visible 24.3px. 사실 비율 jupiter/sun=10.276% 정합 우선
+  io: 100, // R6 #627 옵션 D (사용자 D-T2 합의 2026-06-06: 300→200→100). galilean/jupiter 비율 0.053 (moon/earth 0.068 정합). 4px fallback billboard 의존 (mesh sub-pixel, LOD Phase 2 #391 흡수)
+  europa: 100, // R6 #627 옵션 D — 비율 0.046 (io 동일값, mental model "galilean 균일")
+  ganymede: 100, // R6 #627 옵션 D — 비율 0.077 (태양계 최대 위성, moon 0.068 의 1.13배). 사실 크기 순서 보존
+  callisto: 100, // R6 #627 옵션 D — 비율 0.070. galilean 4개 moon 비율 근접 — 사용자 "목성 대비 적당" 합의
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

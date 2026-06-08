@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "issue": "#627 (R6 PR)",
+    "topic": "satellite 궤도 라인 구조 결함 forensic 실측",
+    "date": "2026-06-06",
+    "developTip": "d243ec33c5f6f874b1bb8de0b326ee5741261a81",
+    "viewport": "1280x720",
+    "tier": "solar",
+    "scenario": "탐색 시점 (focus 없음, 첫 로드 후 3s)",
+    "tool": "scripts/_debug-satellite-orbit-tmp.mjs (volt #67 패턴, 측정 후 rm)",
+    "devServer": "http://localhost:3000 (메인 소유)"
+  },
+  "measurement1_lineSystems": {
+    "lineSystemNames": ["orbit-lines", "moon-orbit-line"],
+    "orbit-lines": {
+      "comment": "batch — moon 외 모든 궤도 (planet + phobos/deimos/galilean)",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scaling": { "x": 1, "y": 1, "z": 1 },
+      "worldCenter": { "x": -3.026, "y": -0.806, "z": 0.072 },
+      "worldExtendSize": { "x": 65.31, "y": 65.30, "z": 1.49 },
+      "note": "position (0,0,0) 고정 + scaling 1 — parent 미추적 + visual scale 미적용"
+    },
+    "moon-orbit-line": {
+      "comment": "별도 LineSystem (R4 #532 결정 4)",
+      "position": { "x": -3.010, "y": 11.984, "z": -0.0000032 },
+      "scaling": { "x": 30, "y": 30, "z": 30 },
+      "worldCenter": { "x": -3.016, "y": 11.931, "z": 0.0032 },
+      "worldExtendSize": { "x": 0.965, "y": 0.968, "z": 0.087 },
+      "note": "position = earth scene 좌표 (parent 추적) + scaling 30 = getOrbitVisualScale('earth')"
+    }
+  },
+  "measurement1b_orbitLinesVertexDistribution": {
+    "totalPoints": 715,
+    "minDist": 0.0007757,
+    "maxDist": 68.544,
+    "median": 0.1581,
+    "histogram_distToOrigin_sceneUnit": {
+      "<1": 390,
+      "1-5": 40,
+      "5-20": 199,
+      "20-40": 21,
+      "40-70": 65,
+      ">70": 0
+    },
+    "note": "390/715 (54%) 점이 원점 < 1 unit — satellite 궤도(phobos/deimos/galilean)가 parent-relative 작은 ellipse 로 태양 원점에 밀집. min 7.76e-4 = galilean 가장 안쪽 io 궤도. 5-20/40-70 = planet 궤도(정상)."
+  },
+  "measurement1c_satelliteMeshVsParent": {
+    "comment": "mesh 는 resolveWorld 에서 parent offset + visualScale 적용 → 정상 추적. orbit line 만 결함.",
+    "moon": { "parent": "earth", "distToParent": 1.023, "distToOrigin": 11.39, "satWorldRadius": 0.0506, "parentWorldRadius": 0.7424, "meshFollowsParent": true },
+    "phobos": { "parent": "mars", "distToParent": 0.396, "distToOrigin": 17.35, "satWorldRadius": 0.00806, "parentWorldRadius": 0.3953, "meshFollowsParent": true },
+    "deimos": { "parent": "mars", "distToParent": 0.986, "distToOrigin": 16.52, "satWorldRadius": 0.00456, "parentWorldRadius": 0.3953, "meshFollowsParent": true },
+    "io": { "parent": "jupiter", "distToParent": 0.566, "distToOrigin": 62.87, "satWorldRadius": 0.0795, "parentWorldRadius": 0.4993, "meshFollowsParent": true },
+    "europa": { "parent": "jupiter", "distToParent": 0.906, "distToOrigin": 62.12, "satWorldRadius": 0.0681, "parentWorldRadius": 0.4993, "meshFollowsParent": true },
+    "ganymede": { "parent": "jupiter", "distToParent": 1.442, "distToOrigin": 61.56, "satWorldRadius": 0.1150, "parentWorldRadius": 0.4993, "meshFollowsParent": true },
+    "callisto": { "parent": "jupiter", "distToParent": 2.547, "distToOrigin": 60.79, "satWorldRadius": 0.1052, "parentWorldRadius": 0.4993, "meshFollowsParent": true }
+  },
+  "measurement2_galileanRatioToJupiter": {
+    "jupiterWorldRadius": 0.49927,
+    "io": { "worldRadius": 0.07951, "ratioToJupiter": 0.1592 },
+    "europa": { "worldRadius": 0.06813, "ratioToJupiter": 0.1364 },
+    "ganymede": { "worldRadius": 0.11497, "ratioToJupiter": 0.2303 },
+    "callisto": { "worldRadius": 0.10520, "ratioToJupiter": 0.2107 },
+    "earthWorldRadius": 0.74238,
+    "moonWorldRadius": 0.05056,
+    "moonRatioToEarth": 0.0681,
+    "note": "galilean/jupiter 비율 (0.136~0.230) 이 moon/earth (0.068) 의 2.0~3.4배. mesh 크기 순서 ganymede > callisto > io > europa = 사실 순서 보존. 절대 px 는 R6 ADR §축 2 (io 3.87px ... ganymede 5.60px headless)."
+  },
+  "consoleErrors": []
+}

@@ -34,6 +34,26 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE.deimos).toBe(5000);
   });
 
+  it('jupiter = 48 (R6 #621 — PM Q2=B 임계 완화 거성 예외, sun 대비 px 비 ~9.87%)', () => {
+    expect(BODY_SCALE.jupiter).toBe(48);
+  });
+
+  it('io = 100 (R6 #627 옵션 D — 사용자 D-T2 합의 300→200→100, galilean/jupiter 0.053 moon 정합)', () => {
+    expect(BODY_SCALE.io).toBe(100);
+  });
+
+  it('europa = 100 (R6 #627 옵션 D — io 동일값, 비율 0.046)', () => {
+    expect(BODY_SCALE.europa).toBe(100);
+  });
+
+  it('ganymede = 100 (R6 #627 옵션 D — 비율 0.077 (moon 0.068 의 1.13배), 태양계 최대 위성)', () => {
+    expect(BODY_SCALE.ganymede).toBe(100);
+  });
+
+  it('callisto = 100 (R6 #627 옵션 D — 비율 0.070)', () => {
+    expect(BODY_SCALE.callisto).toBe(100);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -55,11 +75,16 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('mars')).toBe(800); // R5 #594
     expect(getBodyScale('phobos')).toBe(5000); // R5 #594
     expect(getBodyScale('deimos')).toBe(5000); // R5 #594
+    expect(getBodyScale('jupiter')).toBe(48); // R6 #621
+    expect(getBodyScale('io')).toBe(100); // R6 #627 옵션 D (300→200→100, D-T2 합의)
+    expect(getBodyScale('europa')).toBe(100); // R6 #627 옵션 D
+    expect(getBodyScale('ganymede')).toBe(100); // R6 #627 옵션 D
+    expect(getBodyScale('callisto')).toBe(100); // R6 #627 옵션 D
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('jupiter')).toBe(1.0); // R6 진입 전
-    expect(getBodyScale('io')).toBe(1.0); // R6 galilean 진입 전
+    expect(getBodyScale('saturn')).toBe(1.0); // R7 진입 전
+    expect(getBodyScale('titan')).toBe(1.0); // R7 satellite 진입 전
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 

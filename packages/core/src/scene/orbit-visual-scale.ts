@@ -9,8 +9,11 @@
  *
  * ## 적용 위치
  *
- *   - `solar-system-scene.ts` 의 `resolveWorld` — parent + (local × visual_scale) 산출
- *   - `solar-system-scene.ts` 의 `rebuildOrbitLines` — moon orbit LineSystem.scaling 적용
+ *   - `solar-system-scene.ts` 의 `resolveWorld` — parent + (local × visual_scale) 산출 (mesh 경로)
+ *   - `solar-system-scene.ts` 의 `rebuildOrbitLines` — #627 부터 **모든 satellite orbit LineSystem**
+ *     (parent 별 `Map<string, LineSystem>`) 의 `.scaling` 적용. R5 까지 moon LineSystem 만 적용되어
+ *     phobos/deimos/galilean 궤도선이 visual scale 미적용 + parent 미추적으로 태양 원점에 잘못
+ *     렌더됐던 결함을 옵션 A (moon 패턴 일반화) 로 해소 (ADR `20260606-627-satellite-orbit-structure-forensic.md`).
  *
  * ## 박제값 산출 근거 (R4 #539 Amendment 2 forensic, 2026-05-21)
  *
@@ -94,6 +97,24 @@ export const EARTH_MOON_ORBIT_VISUAL_SCALE = 30;
 export const MARS_SATELLITES_ORBIT_VISUAL_SCALE = 500;
 
 /**
+ * Jupiter-Galilean 궤도 visual scale 배수 (io/europa/ganymede/callisto 4개 적용).
+ *
+ * `io world position = jupiter world position + (io local orbit × 16)` (나머지 3개 동일).
+ * 실측 거리 (io 4.2023e8 m ~ callisto 1.8826e9 m) 는 보존되며 rendering 단계에서만 ×16 적용.
+ *
+ * 분리 마진 (산식 A, 설계 임계): io 1.69x (binding constraint) / callisto 7.25x (자동 안전).
+ * jupiterScale=48 (mesh 4.8배 확대) 의 결합 효과로 R5 ×6 → ×16 동반 상향 (기존 ×6 은 io 0.63x
+ * 묻힘). io 마진 1.69x 는 R5 phobos 1.69x 와 정확 정합 (검증된 binding 마진 답습).
+ *
+ * D-T2 미통과 시 fallback: callisto 분리 과도 (4.29배 편차) → `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY`
+ * 신규 룩업 (R6 ADR §위험 #3 + §재검토 트리거 #3).
+ *
+ * R6 ADR `20260605-r6-jupiter-galilean-visualization.md` §결정 4 — 산식 A(설계 임계) / B(검증 metric)
+ * 정의 분리 박제 (R5 §결정 4 Amendment 1 정정 적용).
+ */
+export const JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 16;
+
+/**
  * parent body id 별 satellite orbit visual scale 룩업.
  *
  * R5+ 진입 시 parent-satellite 쌍별로 박제값 추가. 미정의 parent 는 1.0 (실측 그대로).
@@ -101,10 +122,18 @@ export const MARS_SATELLITES_ORBIT_VISUAL_SCALE = 500;
 export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Object.freeze({
   earth: EARTH_MOON_ORBIT_VISUAL_SCALE, // R4 #539 Amendment 2 — moon visual fusion 해결
   mars: MARS_SATELLITES_ORBIT_VISUAL_SCALE, // R5 #594 — phobos + deimos 단일 룩업 (binding constraint=phobos)
+  jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io, 마진 1.69x)
 });
 
-/** 기본값 (parent 가 룩업에 없거나 visual scale 미적용 — 실측 그대로). */
-const DEFAULT_ORBIT_VISUAL_SCALE = 1.0;
+/**
+ * 기본값 (parent 가 룩업에 없거나 visual scale 미적용 — 실측 그대로).
+ *
+ * #627 (agy 보강 ②) — `getOrbitVisualScale` 의 fallback 계약. parentId null / undefined /
+ * 미매핑 시 1.0 반환 보장으로 satellite 궤도 LineSystem.scaling 이 항상 안전한 값을 받는다
+ * (rebuildOrbitLines 의 미매핑 parent 예외 안정성). 단위 테스트 `satellite-orbit-structure.test.ts`
+ * 가 본 계약을 가드.
+ */
+export const DEFAULT_ORBIT_VISUAL_SCALE = 1.0;
 
 /**
  * parent body id 에 해당하는 satellite orbit visual scale 조회.

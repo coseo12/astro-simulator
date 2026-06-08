@@ -71,7 +71,10 @@ const flags = {
 //   deimos 30.3h) 에서 프레임당 이동량이 tolerance 초과 (행성은 각속도 작아 잠복). follow
 //   observer 에 mesh.computeWorldMatrix(true) 추가로 측정과 동일 시점 → lag 0 해소.
 //   본 가드가 satellite focus DoD-3 회귀를 CI r1-guard 에서 직접 차단한다 (이슈 #611).
-const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos'];
+// R6 #621 — jupiter + galilean 4 (io/europa/ganymede/callisto) 동기화. R_PHASE_BODY_ALLOWLIST
+// 자동 생성값 (CURRENT_R_PHASE=6) 과 정합 — #598 정적 매칭 가드 (r-phase-allowlist.test.ts) 가
+// FOCUS_BODIES === R_PHASE_BODY_ALLOWLIST 를 CI fail-fast 로 차단한다.
+const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos', 'jupiter', 'io', 'europa', 'ganymede', 'callisto'];
 const MODES = ['observe', 'research'];
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };

@@ -101,6 +101,9 @@ const PX_RATIO_THRESHOLDS = Object.freeze({
   // phobos / deimos: N/A — 사실 비율 명시 위배 박제값 + 4px fallback billboard 흡수.
   //                       R5 ADR §결정 6: r1-guard `--measure-px-ratio` 미박제. 회귀 가드는
   //                       R-Phase Allowlist + browser-verify-r-phase-allowlist 의 expected list 우회.
+  jupiter: 16.3, // R6 #621 — Amendment 2026-06-06 (perspective 보정). ADR §결정 5 박제 9.87% 는 wsRadius 비 식 예측 — 실측 15.52% (qa D-T2 3 viewport 결정적). earth 2026-05-21 선례 (식 14.67% → 실측 16.40%) 와 동일 방향: ADR 식이 perspective foreshortening 무시. jupiter 는 sun 5.2 AU 거리라 foreshortening 편차 최대 (+57%), galilean 4 동일 1.56~1.58배 일관 → 측정 정확. jupiterScale=48 architect 박제값 보존, 임계만 실측 × 1.05 = 16.3 보정 (earth 17 / venus 14.26 패턴). ⚠️ 퍼센트 단위 정수 — guard 는 sunPxRatio 퍼센트 값 직접 비교. 0.10 박제 시 영구 FAIL
+  // io / europa / ganymede / callisto: N/A — galilean 4px fallback 부분 의존 (R5 phobos/deimos
+  //                       §결정 6 답습). 회귀 가드는 R-Phase Allowlist (#613) + FOCUS_BODIES 매칭 (#598).
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
@@ -183,7 +186,9 @@ async function measureBodyPxRatios(page) {
     // R5 #594 — mars 추가 (Q2=B 임계 ≤ 8% 박제). phobos/deimos 는 §결정 6 (미박제) 정합 — 측정만
     // 하고 임계 가드는 없음 (4px fallback billboard 흡수). 단 사용자 D-T2 단계에서 mesh visible
     // 회귀 확인 의무.
-    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos'];
+    // R6 #621 — jupiter (Q2=B 거성 예외 임계 ≤ 10% 박제) + galilean 4 (io/europa/ganymede/callisto,
+    // §결정 6 미박제 — 측정만). #619 정적 매칭 가드가 targetIds === R_PHASE_BODY_ALLOWLIST 차단.
+    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos', 'jupiter', 'io', 'europa', 'ganymede', 'callisto'];
 
     /**
      * mesh world center 를 column-major Matrix.m 로 직접 NDC → 화면 좌표 변환.

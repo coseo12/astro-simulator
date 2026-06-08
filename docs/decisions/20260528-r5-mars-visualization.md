@@ -655,6 +655,8 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
 
 > **명명 결정**: `MARS_SATELLITES_ORBIT_VISUAL_SCALE` (deimos 도 포함하므로 `MARS_PHOBOS_*` 보다 정확). R4 `EARTH_MOON_ORBIT_VISUAL_SCALE` 답습 일관성 무시 — R6+ 다중 satellite (galilean 4) 진입 시 본 명명 패턴이 일관성 우선 (developer 단계 final 결정).
 
+> ⚠️ **구현 누락 발견 (#627 R6 forensic, 2026-06-06) → Amendment 2 에서 해소**: 본 §결정 4 가 `MARS_SATELLITES_ORBIT_VISUAL_SCALE=500` 을 박제하고 "satellite orbit visual scale 적용" 을 명시했으나, **실제 구현은 satellite mesh 경로 (`resolveWorld`) 에만 적용** 되고 satellite **궤도선** (orbit-line) 은 moon 만 별도 LineSystem 으로 처리됨 (`solar-system-scene.ts:rebuildOrbitLines`). phobos/deimos 궤도선은 일반 `batches` 로 들어가 position (0,0,0) 태양 원점 고정 + visual scale 미적용 → 궤도선이 mars 가 아닌 sun 옆에 렌더. R5 D-T2 에서 phobos/deimos 궤도선 위치 미검증으로 잠복, R6 galilean 4개로 표면화. **#627 fix (옵션 A, 2026-06-06) 에서 satellite 궤도선의 moon 패턴 일반화로 해소** — `MARS_SATELLITES_ORBIT_VISUAL_SCALE=500` 이 이제 mars 궤도선 (`satellite-orbit-line-mars`) 에도 적용됨 (실측 distToParent 0.0003 unit, scaling 500). 상세: [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) + 본 ADR §Amendment 2.
+
 ### 결정 5 — Q2=B 임계 박제 (축 5)
 
 ```javascript
@@ -849,6 +851,7 @@ forensic 5 조건 중 3개 이상 충족 시 forensic 변형 승격 ([`docs/temp
 - **결정**: §결정 4 산식 (1.69x) **유지** + 실측 데이터 (0.99 / 2.49) 분리 박제 + Tier scale 가설 박제 (검증 없음)
 - **행동 변화**: 없음 (코드 / 박제값 / 회귀 가드 무수정). ADR 정합성 회복 목적
 - **PATCH 분류** — CLAUDE.md §릴리스 §"행동 변화 vs 문서 변경 판정 질문" 기준 (에이전트 동작 변화 없음)
+- **R6 후속 정정 (2026-06-05, forward-link)** — R6 ADR ([`20260605-r6-jupiter-galilean-visualization.md`](20260605-r6-jupiter-galilean-visualization.md) §축 4, #621) 에서 본 1.71배 mismatch 의 **architect 단계 산식 정정 의무를 충족** — "산식 버그가 아니라 metric 정의 2종 분리 미명시" (산식 A = `visual_orbit / (parent_mesh + satellite_mesh)` 설계 임계 / 산식 B = `satellite.position.length() / parent.boundingSphere.radiusWorld` 검증 metric) 로 정정. 잔여 1.74배 gap 의 runtime 원인 (boundingSphere `computeWorldMatrix(true)` 갱신 타이밍 가설, #611 전례) 은 후속 forensic [#622](https://github.com/coseo12/astro-simulator/issues/622) 분리.
 
 ### 배경
 
@@ -963,3 +966,41 @@ PR #605 박제 직후 1회 cross-validate (CLAUDE.md §교차검증 §"박제 �
 - cross-validate 로그: `.claude/logs/cross-validate-code-20260531-152956.log` + outcome JSON `cross-validate-code-20260531-152956-outcome.json`
 - 트리거 이슈: [#604](https://github.com/coseo12/astro-simulator/issues/604)
 - Builds on: #597 (PR #603)
+
+---
+
+## Amendment 2 (#627, 2026-06-06) — §결정 4 구현 누락 정정 (satellite 궤도선 visual scale 적용)
+
+- **상태**: Accepted (#627 forensic ADR §5 옵션 A fix 머지 동반)
+- **트리거**: #627 R6 D-T2 forensic — `MARS_SATELLITES_ORBIT_VISUAL_SCALE=500` 이 satellite **mesh** 경로 (`resolveWorld`) 에만 적용되고 satellite **궤도선** (orbit-line) 에는 moon 만 적용되던 구현 누락 발견 (§결정 4 inline ⚠️ 박제).
+
+### 정정 내용
+
+본 §결정 4 가 박제한 `MARS_SATELLITES_ORBIT_VISUAL_SCALE=500` 의 "satellite orbit visual scale 적용" 의도는 **mesh + 궤도선 양쪽** 이었으나, R5 구현은 mesh 경로만 적용했다. phobos/deimos 궤도선은 sun 중심 `orbit-lines` batch 로 처리되어:
+
+- position (0,0,0) 태양 원점 고정 (parent 미추적)
+- LineSystem.scaling 1 (visual scale 500 미적용)
+
+→ 궤도선이 mars 가 아닌 sun 옆에 렌더 (forensic 측정 1: `orbit-lines` vertex 54% 가 원점 1 unit 이내 밀집).
+
+**#627 fix (옵션 A — moon 패턴 일반화)**: `rebuildOrbitLines` 가 satellite (parentId !== 'sun') 를 parent 별 `Map<string, LineSystem>` 으로 분리. `satellite-orbit-line-mars` LineSystem 이 (a) updateAt 에서 mars scene 좌표로 position 동기화 + (b) `getOrbitVisualScale('mars')=500` scaling 적용.
+
+### fix 후 실측 (2026-06-06, 1280×720, dev)
+
+| 지표 | R5 구현 (결함) | #627 fix |
+|---|---|---|
+| `satellite-orbit-line-mars` worldCenter ↔ mars 거리 | (orbit-lines 원점 고정) | **0.0003 unit** (parent 추적 정합) |
+| `satellite-orbit-line-mars` scaling | 1 (미적용) | **500** (visual scale 적용) |
+| planet `orbit-lines` 원점 1 unit 이내 vertex | 54% (390/715) | **0.0%** (0/325) |
+
+`MARS_SATELLITES_ORBIT_VISUAL_SCALE=500` 박제값 자체는 **무변경** (1.69x 산식 마진 + Amendment 1 산식/실측 분리 모두 보존). 변경은 적용 **경로** (mesh-only → mesh + 궤도선).
+
+### 회귀 가드
+
+- `apps/web/scripts/browser-verify-627-satellite-orbit.mjs` — mars 포함 모든 satellite parent 의 궤도선 worldCenter ↔ parent ±0.2 unit + planet orbit-lines 원점 밀집 0 (CI `detect-and-test` 통합).
+
+### 참고
+
+- fix ADR: [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) §5 §결정
+- 학습: volt [#74](https://github.com/coseo12/volt/issues/74) (DoD PASS ≠ 제품 동작 — R5 궤도선 위치 미검증 잠복)
+- 트리거 PR: [#627](https://github.com/coseo12/astro-simulator/pull/627)

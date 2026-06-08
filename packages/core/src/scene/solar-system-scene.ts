@@ -470,17 +470,35 @@ export function createSolarSystemScene(
   // 궤도선 — P12-A: tier 전환 시 재샘플링. 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
   //
   // R4 #532 — ADR `20260520-r4-earth-moon-visualization.md` §결정 4:
-  //   달 궤도 라인은 별도 LineSystem (`moon-orbit-line`) 으로 분리하여 earth focus 진입 시 색상 강조.
+  //   달 궤도 라인은 별도 LineSystem 으로 분리하여 earth focus 진입 시 색상 강조.
   //   - 일반 시점 (focusBodyIdForAssert !== 'earth'): MOON_ORBIT_COLOR_DEFAULT (Color3(0.30, 0.35, 0.50), #552 a11y 갱신 — WCAG 1.4.11 3.06:1 PASS)
   //   - earth focus 시점 (focusBodyIdForAssert === 'earth'): MOON_ORBIT_COLOR_EARTH_FOCUS (Color3(0.65, 0.7, 0.85)) — 명도 ~2.6배
   //   WebGL 한계로 LineSystem thickness 직접 조절 불가 → 색상 명도 강조로 ADR 의도 (시각 강조) 실현.
+  //
+  // #627 — satellite 궤도선 구조 결함 fix (ADR `20260606-627-satellite-orbit-structure-forensic.md` §5 옵션 A).
+  //   R5 까지 moon 만 별도 LineSystem (parent 추적 + visual scale) 이었고 phobos/deimos/galilean 은
+  //   sun 중심 `orbitLines` batch 로 처리 → parent 미추적 (position 0,0,0) + visual scale 미적용 →
+  //   궤도선이 태양 원점에 잘못 렌더 (forensic 실측 vertex 54% 원점 밀집). moon 패턴을 parent 별
+  //   `Map<string, LineSystem>` 으로 일반화 — earth/mars/jupiter 각 parent 의 모든 satellite 궤도를
+  //   하나의 LineSystem 에 담고 (a) updateAt 에서 parent scene 좌표로 position 동기화 + (b)
+  //   `getOrbitVisualScale(parentId)` scaling 적용. R7+ (titan/saturn moons) 자동 확장.
   let orbitLines: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
-  let moonOrbitLine: ReturnType<typeof MeshBuilder.CreateLineSystem> | null = null;
+  // #627 — parentId → satellite 궤도 LineSystem (moon 의 'earth' 포함). moon 특수 케이스 제거.
+  const satelliteOrbitLines = new Map<string, ReturnType<typeof MeshBuilder.CreateLineSystem>>();
   let orbitLinesVisible = showOrbitLines;
 
-  // R4 #532 — moon orbit line 색상 SSoT (결정 4).
+  // R4 #532 — moon orbit line 색상 SSoT (결정 4). #627 — moon 은 satelliteOrbitLines.get('earth').
   const MOON_ORBIT_COLOR_DEFAULT = new Color3(0.3, 0.35, 0.5); // #552 — WCAG 1.4.11 ≥ 3:1 (3.06:1) 충족. 톤 보존으로 EARTH_FOCUS 자연 그라데이션 유지
   const MOON_ORBIT_COLOR_EARTH_FOCUS = new Color3(0.65, 0.7, 0.85); // earth focus 강조 (~2.6배 명도)
+  // #627 — 일반 satellite 궤도선 색상 (moon 외 phobos/deimos/galilean). orbitLines (planet) 와 동일 톤.
+  const SATELLITE_ORBIT_COLOR_DEFAULT = new Color3(0.25, 0.28, 0.4);
+
+  // #627 — parent 별 satellite 궤도 LineSystem 전체 안전 dispose (agy 보강 ① 다중 LineSystem
+  // 라이프사이클). rebuildOrbitLines 재호출 + scene dispose 둘 다에서 호출되어 메모리 누수 차단.
+  const disposeSatelliteOrbitLines = () => {
+    for (const ls of satelliteOrbitLines.values()) ls.dispose();
+    satelliteOrbitLines.clear();
+  };
 
   const rebuildOrbitLines = () => {
     // 기존 라인 제거 후 현재 tier 의 renderScale 로 재샘플링.
@@ -488,12 +506,14 @@ export function createSolarSystemScene(
       orbitLines.dispose();
       orbitLines = null;
     }
-    if (moonOrbitLine) {
-      moonOrbitLine.dispose();
-      moonOrbitLine = null;
-    }
+    // #627 — satellite 궤도 LineSystem 전체 안전 dispose (agy 보강 ①). tier 전환마다 재호출되므로
+    // Map 전체 순회 dispose 없이는 매 전환마다 LineSystem 누수.
+    disposeSatelliteOrbitLines();
+
+    // planet 궤도 (sun 중심) batch + parent 별 satellite 궤도 batch 분리 수집.
     const batches: Vector3[][] = [];
-    let moonOrbitPts: Vector3[] | null = null;
+    // #627 — parentId → 해당 parent 의 satellite 궤도점 배열 묶음 (한 LineSystem 에 다수 satellite).
+    const satellitePtsByParent = new Map<string, Vector3[][]>();
     for (const body of system.bodies) {
       if (!body.orbit) continue;
       // defense-in-depth #5 (이슈 #439): R-Phase 미진입 body 는 본체가 점 수준이라
@@ -501,41 +521,47 @@ export function createSolarSystemScene(
       if (!(R_PHASE_BODY_ALLOWLIST as readonly string[]).includes(body.id)) continue;
       const pts = sampleOrbitPoints(body, activeTier);
       if (!pts) continue;
-      // R4 #532 — moon orbit 은 별도 LineSystem 으로 분리 (결정 4: earth focus 시 색상 강조).
-      if (body.id === 'moon') {
-        moonOrbitPts = pts;
+      // #627 — satellite (parentId !== 'sun') 는 parent 별 별도 LineSystem (parent 추적 + visual scale).
+      //   sampleOrbitPoints 는 parent 0 원점 기준 ellipse 점을 반환하므로 sun 중심 batch 에 넣으면
+      //   태양 원점에 잘못 렌더된다 (forensic 결함). 분류 정책은 isSatelliteOrbit 단일 SSoT (단위 테스트 가드).
+      if (isSatelliteOrbit(body.parentId)) {
+        const arr = satellitePtsByParent.get(body.parentId!) ?? [];
+        arr.push(pts);
+        satellitePtsByParent.set(body.parentId!, arr);
       } else {
         batches.push(pts);
       }
     }
     if (batches.length > 0) {
       orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
-      // 일반 궤도선 (moon 외 모든 body). moon orbit 은 별도 SSoT (`MOON_ORBIT_COLOR_DEFAULT`, #552).
+      // 일반 (planet) 궤도선. satellite orbit 은 satelliteOrbitLines 별도 SSoT.
       // 본 색상은 #552 a11y fix 비대상 (moon orbit 만 WCAG 1.4.11 격차였음).
       orbitLines.color = new Color3(0.25, 0.28, 0.4);
       orbitLines.isVisible = orbitLinesVisible;
     }
-    if (moonOrbitPts) {
-      moonOrbitLine = MeshBuilder.CreateLineSystem(
-        'moon-orbit-line',
-        { lines: [moonOrbitPts] },
+
+    // #627 — parent 별 satellite 궤도 LineSystem 생성 (moon 패턴 일반화).
+    for (const [parentId, ptsBatches] of satellitePtsByParent) {
+      const ls = MeshBuilder.CreateLineSystem(
+        `satellite-orbit-line-${parentId}`,
+        { lines: ptsBatches },
         scene,
       );
-      // 초기 색상은 default — focus 상태에 따라 setMoonOrbitHighlight 가 갱신.
-      // (focusBodyIdForAssert 는 779 line 에서 선언되므로 TDZ 회피 위해 default 로 시작.
-      //  tier 전환 후 setFocusOrigin 이 setMoonOrbitHighlight('earth') 재호출해 강조 복원.)
-      moonOrbitLine.color = MOON_ORBIT_COLOR_DEFAULT;
-      moonOrbitLine.isVisible = orbitLinesVisible;
-      // R4 #539 Amendment 2 — orbit line 도 mesh 와 동일 visual scale 적용 (시각 정합).
-      // sampleOrbitPoints 가 parent 0 원점 기준 ellipse 점을 반환하므로, LineSystem.scaling 으로
-      // 일괄 ×N 확장. moon mesh position 은 resolveWorld 에서 동일 scale 곱해진 좌표라 정합.
-      // 미적용 시 orbit line 은 실측 좌표, mesh 는 visual 좌표 → 시각 mismatch.
-      const moonOrbitScale = getOrbitVisualScale('earth');
-      moonOrbitLine.scaling.set(moonOrbitScale, moonOrbitScale, moonOrbitScale);
-      // R4 #532 — moon orbit 은 earth 중심 상대 좌표 (sampleOrbitPoints 가 parent 0 원점 기준 ellipse).
-      // earth 가 매 프레임 움직이므로 LineSystem.position 을 updateAt 루프에서 earth scene-unit 좌표로 동기화.
-      // (ADR §결정 4: "지구 중심 small circle" 정합 + ADR §Amendment 2: "earth-moon visual scale=30 적용")
+      // 색상 — earth (moon) 는 a11y 강조 색상 (#552), 나머지 satellite 는 planet 톤.
+      // earth 초기 색상은 default — focus 상태에 따라 setMoonOrbitHighlight 가 갱신.
+      // (focusBodyIdForAssert TDZ 회피 위해 default 로 시작. tier 전환 후 setFocusOrigin 이
+      //  setMoonOrbitHighlight('earth') 재호출해 강조 복원.)
+      ls.color = parentId === 'earth' ? MOON_ORBIT_COLOR_DEFAULT : SATELLITE_ORBIT_COLOR_DEFAULT;
+      ls.isVisible = orbitLinesVisible;
+      // #627 — orbit line 도 mesh 와 동일 visual scale 적용 (R4 #539 Amendment 2 일반화).
+      //   sampleOrbitPoints 가 parent 0 원점 기준 ellipse 점을 반환하므로 LineSystem.scaling 으로
+      //   일괄 ×N 확장. satellite mesh position 은 resolveWorld 에서 동일 scale 곱해진 좌표라 정합.
+      //   getOrbitVisualScale 은 미매핑 parentId 에 1.0 fallback (agy 보강 ②, orbit-visual-scale.ts 계약).
+      const visualScale = getOrbitVisualScale(parentId);
+      ls.scaling.set(visualScale, visualScale, visualScale);
+      // position 은 parent 가 매 프레임 공전하므로 updateAt 루프에서 parent scene-unit 좌표로 동기화.
       // 초기 position 은 default (0,0,0) — 첫 updateAt 호출 시점에 갱신됨.
+      satelliteOrbitLines.set(parentId, ls);
     }
   };
 
@@ -546,8 +572,10 @@ export function createSolarSystemScene(
    * rebuildOrbitLines 가 tier 전환 시 호출되어 초기값으로 재설정되므로, focus 변경 시점에 별도 호출 필요.
    */
   const setMoonOrbitHighlight = (focusedBodyId: string | null) => {
-    if (!moonOrbitLine) return;
-    moonOrbitLine.color =
+    // #627 — moon 궤도는 satelliteOrbitLines.get('earth') (parent='earth' LineSystem).
+    const earthOrbitLine = satelliteOrbitLines.get('earth');
+    if (!earthOrbitLine) return;
+    earthOrbitLine.color =
       focusedBodyId === 'earth' ? MOON_ORBIT_COLOR_EARTH_FOCUS : MOON_ORBIT_COLOR_DEFAULT;
   };
   rebuildOrbitLines();
@@ -555,8 +583,8 @@ export function createSolarSystemScene(
     dispose: () => {
       orbitLines?.dispose();
       orbitLines = null;
-      moonOrbitLine?.dispose();
-      moonOrbitLine = null;
+      // #627 — satellite 궤도 LineSystem 전체 dispose (agy 보강 ① — Map 순회 안전 dispose).
+      disposeSatelliteOrbitLines();
     },
   });
 
@@ -783,7 +811,9 @@ export function createSolarSystemScene(
         // #444 — tier transition 윈도우에서 도달한 사용자 입력 시도 횟수. G8b 격상 결정 데이터.
         // 콜백은 transition 종료 시점에 1회 호출 (count > 0 일 때만). 호출자 (SimulationCore) 의
         // metrics 객체로 누적 전달.
-        ...(onTierTransitionInputAttempts ? { onInputAttempts: onTierTransitionInputAttempts } : {}),
+        ...(onTierTransitionInputAttempts
+          ? { onInputAttempts: onTierTransitionInputAttempts }
+          : {}),
       });
     }
   };
@@ -991,17 +1021,18 @@ export function createSolarSystemScene(
       );
     }
 
-    // R4 #532 — moon orbit line position 동기화 (ADR §결정 4).
-    // moon orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
-    // earth 가 sun 주위를 매 프레임 공전하므로 LineSystem 의 position 을 earth scene-unit 좌표로 동기.
-    // moon mesh 위치는 worldPositions 가 sun 중심 좌표라 별도 처리 불필요 (위 루프에서 처리됨).
-    if (moonOrbitLine) {
-      const earthWorld = worldPositions.get('earth');
-      if (earthWorld) {
-        moonOrbitLine.position.set(
-          (earthWorld[0] - ox) * sceneUnitPerMeter,
-          (earthWorld[1] - oy) * sceneUnitPerMeter,
-          (earthWorld[2] - oz) * sceneUnitPerMeter,
+    // #627 — satellite orbit line position 동기화 (moon 패턴 일반화, ADR §5 옵션 A 구현 절차 3).
+    // satellite orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
+    // parent (earth/mars/jupiter) 가 sun 주위를 매 프레임 공전하므로 각 satellite 궤도 LineSystem 의
+    // position 을 parent scene-unit 좌표로 동기 (parent 추적). satellite mesh 위치는 worldPositions 가
+    // sun 중심 좌표라 위 루프에서 처리됨 (별도 처리 불필요).
+    for (const [parentId, ls] of satelliteOrbitLines) {
+      const parentWorld = worldPositions.get(parentId);
+      if (parentWorld) {
+        ls.position.set(
+          (parentWorld[0] - ox) * sceneUnitPerMeter,
+          (parentWorld[1] - oy) * sceneUnitPerMeter,
+          (parentWorld[2] - oz) * sceneUnitPerMeter,
         );
       }
     }
@@ -1494,8 +1525,8 @@ export function createSolarSystemScene(
   const setOrbitLinesVisible = (visible: boolean) => {
     orbitLinesVisible = visible;
     if (orbitLines) orbitLines.isVisible = visible;
-    // R4 #532 — moon orbit line 도 동일하게 가시성 토글 (ADR §결정 4 default visible 정합).
-    if (moonOrbitLine) moonOrbitLine.isVisible = visible;
+    // #627 — 모든 satellite orbit line 도 동일하게 가시성 토글 (moon 패턴 일반화).
+    for (const ls of satelliteOrbitLines.values()) ls.isVisible = visible;
   };
 
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
@@ -1887,6 +1918,27 @@ function createBodyBillboard(
   mesh.material = mat;
   mesh.setEnabled(false); // 기본 숨김.
   return mesh;
+}
+
+/**
+ * #627 — 궤도선이 satellite 궤도 (parent 추적 + visual scale 필요) 인지 판정 SSoT.
+ *
+ * ADR `docs/decisions/20260606-627-satellite-orbit-structure-forensic.md` §5 옵션 A.
+ *
+ * satellite (moon/phobos/deimos/galilean 등) 의 `sampleOrbitPoints` 는 parent 0 원점 기준
+ * ellipse 점을 반환하므로, sun 중심 `orbit-lines` batch 에 넣으면 태양 원점에 잘못 렌더된다
+ * (forensic 실측 vertex 54% 원점 밀집). 따라서 parent 가 sun 이 아닌 (= 행성을 도는) body 는
+ * parent 별 별도 LineSystem 으로 분리해 (a) position 을 parent scene 좌표로 동기화 +
+ * (b) `getOrbitVisualScale(parentId)` scaling 을 적용한다.
+ *
+ * - parentId === null (sun) → planet batch (false)
+ * - parentId === 'sun' (행성) → planet batch (false)
+ * - parentId === 'earth'/'mars'/'jupiter' 등 (satellite) → satellite 분리 (true)
+ *
+ * @param parentId body 의 parentId (LoadedCelestialBody.parentId)
+ */
+export function isSatelliteOrbit(parentId: string | null | undefined): parentId is string {
+  return parentId !== null && parentId !== undefined && parentId !== 'sun';
 }
 
 function sampleOrbitPoints(body: LoadedCelestialBody, tier: Tier): Vector3[] | null {

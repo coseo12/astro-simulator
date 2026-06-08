@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   EARTH_MOON_ORBIT_VISUAL_SCALE,
   MARS_SATELLITES_ORBIT_VISUAL_SCALE,
+  JUPITER_SATELLITES_ORBIT_VISUAL_SCALE,
   ORBIT_VISUAL_SCALE_BY_PARENT,
   getOrbitVisualScale,
 } from './orbit-visual-scale.js';
@@ -33,8 +34,7 @@ describe('orbit-visual-scale SSoT (R4 #539 Amendment 2)', () => {
     expect(getOrbitVisualScale(undefined)).toBe(1.0);
   });
 
-  it('R6+ 미진입 parent (jupiter/saturn) → 1.0 (R5 비-범위)', () => {
-    expect(getOrbitVisualScale('jupiter')).toBe(1.0);
+  it('R7+ 미진입 parent (saturn) → 1.0 (R6 비-범위)', () => {
     expect(getOrbitVisualScale('saturn')).toBe(1.0);
   });
 
@@ -102,5 +102,51 @@ describe('orbit-visual-scale SSoT (R5 #594 mars-satellites — satellite 2개 �
     // ADR §결정 4 §축 4 §×500 = 4.27배 분리 마진 (phobos 1.69배 의 2.53배 더 안전)
     expect(separationMargin).toBeGreaterThanOrEqual(1.5);
     expect(separationMargin).toBeCloseTo(4.27, 1);
+  });
+});
+
+describe('orbit-visual-scale SSoT (R6 #621 — jupiter-galilean)', () => {
+  it('JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 16 (R6 #621 박제값)', () => {
+    expect(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE).toBe(16);
+  });
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT.jupiter == JUPITER_SATELLITES_ORBIT_VISUAL_SCALE (룩업 정합)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT.jupiter).toBe(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE);
+  });
+
+  it('getOrbitVisualScale(jupiter) == 16', () => {
+    expect(getOrbitVisualScale('jupiter')).toBe(16);
+  });
+
+  it('io 분리 마진 산출 (산식 A, binding constraint) — visual_scale=16 → 1.69x (R5 phobos 정합)', () => {
+    // R6 ADR §결정 4 §축 4 박제값 (실측 거리 + jupiterScale=48 + ioScale=300)
+    const JUPITER_IO_DISTANCE_M = 4.2023e8; // semiMajorAxisAU 0.00280906
+    const JUPITER_MESH_RADIUS_M = 3.4316e9; // 7.1492e7 × 48
+    const IO_MESH_RADIUS_M = 5.465e8; // 1.8216e6 × 300
+    const SUM_MESH_M = JUPITER_MESH_RADIUS_M + IO_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('jupiter');
+    const visualDistance = JUPITER_IO_DISTANCE_M * visualScale;
+    const separationMargin = visualDistance / SUM_MESH_M;
+
+    // ADR §결정 4 — io binding 분리 마진 1.69x (≥ 1.5 임계 +0.19, R5 phobos 1.69x 정확 정합)
+    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
+    expect(separationMargin).toBeCloseTo(1.69, 1);
+  });
+
+  it('callisto 분리 마진 산출 (자동 안전) — visual_scale=16 → 7.25x (io binding 자동 통과)', () => {
+    // R6 ADR §결정 4 §축 4 박제값 (실측 거리 + jupiterScale=48 + callistoScale=300)
+    const JUPITER_CALLISTO_DISTANCE_M = 1.8826e9; // semiMajorAxisAU 0.0125847
+    const JUPITER_MESH_RADIUS_M = 3.4316e9; // 7.1492e7 × 48
+    const CALLISTO_MESH_RADIUS_M = 7.231e8; // 2.4103e6 × 300
+    const SUM_MESH_M = JUPITER_MESH_RADIUS_M + CALLISTO_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('jupiter');
+    const visualDistance = JUPITER_CALLISTO_DISTANCE_M * visualScale;
+    const separationMargin = visualDistance / SUM_MESH_M;
+
+    // ADR §결정 4 — callisto 자동 안전 7.25x (io 가 binding constraint, 나머지 3개 자동 통과)
+    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
+    expect(separationMargin).toBeCloseTo(7.25, 0);
   });
 });
