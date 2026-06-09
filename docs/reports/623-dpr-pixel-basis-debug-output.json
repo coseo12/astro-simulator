@@ -1,0 +1,36 @@
+{
+  "issue": 623,
+  "measured": "2026-06-09, headless, css 1280x720",
+  "note": "adaptToDeviceRatio:true → getRenderHeight = physical px. pxDiameter, screenCoverage 모두 물리 px. DPR2 에서 정확히 ×2 → coverage·threshold 동일 공간 정합 (NO-OP).",
+  "dpr1": {
+    "devicePixelRatio": 1,
+    "hardwareScalingLevel": 1,
+    "renderWidth": 1280,
+    "renderHeight": 720,
+    "bodies": [
+      { "id": "jupiter", "level": "mid", "pxDiameter": 22.06 },
+      { "id": "earth", "level": "mid", "pxDiameter": 23.32 },
+      { "id": "io", "level": "low", "pxDiameter": 1.18 },
+      { "id": "moon", "level": "low", "pxDiameter": 1.57 }
+    ]
+  },
+  "dpr2": {
+    "devicePixelRatio": 2,
+    "hardwareScalingLevel": 0.5,
+    "renderWidth": 2560,
+    "renderHeight": 1440,
+    "bodies": [
+      { "id": "jupiter", "level": "mid", "pxDiameter": 44.12 },
+      { "id": "earth", "level": "mid", "pxDiameter": 46.64 },
+      { "id": "io", "level": "low", "pxDiameter": 2.36 },
+      { "id": "moon", "level": "low", "pxDiameter": 3.14 }
+    ]
+  },
+  "ratio_dpr2_over_dpr1": {
+    "renderHeight": 2.0,
+    "jupiter_px": 2.0,
+    "earth_px": 2.0,
+    "io_px": 2.0,
+    "moon_px": 2.0
+  }
+}
