@@ -1,0 +1,47 @@
+{
+  "issue": 622,
+  "measured": "2026-06-09, headless 1280x720, develop",
+  "metric": "산식 B = distSatToParent(scene) / parent.boundingSphere.radiusWorld(scene)",
+  "hypothesis2_boundingSphere_timing": "REJECTED — stale/fresh = 1.0 (computeWorldMatrix 가 radiusWorld 불변, #611 패턴 아님)",
+  "hypothesis1_tier_ordering": "REJECTED — parScaling=1, ratio_stale==ratio_fresh (타이밍/순서 효과 0)",
+  "conclusion": "1.7배 gap = 측정-정의 artifact (산식 A 실미터 설계비 vs 산식 B scene-unit 런타임). 런타임 버그 아님. 시각 회귀 0.",
+  "data": [
+    {
+      "sat": "phobos",
+      "parent": "mars",
+      "bsStale": 0.3953,
+      "bsFresh": 0.3953,
+      "staleVsFresh": 1.0,
+      "dist": 0.3935,
+      "ratio": 0.9954,
+      "designFormulaA": 1.691
+    },
+    {
+      "sat": "deimos",
+      "parent": "mars",
+      "bsStale": 0.3953,
+      "bsFresh": 0.3953,
+      "staleVsFresh": 1.0,
+      "dist": 0.9851,
+      "ratio": 2.4921
+    },
+    {
+      "sat": "io",
+      "parent": "jupiter",
+      "bsStale": 0.4993,
+      "bsFresh": 0.4993,
+      "staleVsFresh": 1.0,
+      "dist": 0.567,
+      "ratio": 1.1356
+    },
+    {
+      "sat": "moon",
+      "parent": "earth",
+      "bsStale": 0.7424,
+      "bsFresh": 0.7424,
+      "staleVsFresh": 1.0,
+      "dist": 1.0224,
+      "ratio": 1.3772
+    }
+  ]
+}

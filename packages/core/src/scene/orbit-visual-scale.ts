@@ -43,6 +43,10 @@
  *   - sum mesh radius = 2.772e9 m → 실측 거리의 **295.6배** (R4 moon 16.9배 의 17.5배 더 극단)
  *   - visual_scale=500 적용 시 visual 거리 = 4.688e9 m → sum mesh / visual 거리 = **1.69배** 분리 마진
  *     (분리 임계 ≥ 1.5x 통과 +0.19, R4 1.78배 와 거의 동등 안정)
+ *   - ⚠️ **위 산식 A(설계 real-meter 비)와 런타임 산식 B(scene-unit `satellite.dist / parent.bsRadius`,
+ *     실측 phobos≈0.99)의 ~1.7배 gap 은 측정-정의 차이이지 버그가 아니다** (#622 NO-OP ADR
+ *     `docs/decisions/20260609-622-orbit-scale-gap-no-op.md`). boundingSphere 타이밍(#611 패턴) 아님이
+ *     실측 확정 (stale/fresh=1.0) — scale(BODY/ORBIT_VISUAL/render) 합성 정의 차이. 재오인 분석 금지.
  *
  * mars-deimos (자동 안전):
  *   - mars-deimos 실측 거리 = 23.463e6 m (JPL SSD, semiMajorAxisAU 1.5684e-4)
