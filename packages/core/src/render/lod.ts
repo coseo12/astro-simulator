@@ -35,6 +35,15 @@ export type LodOverride = LodLevel | 'auto';
  *  - high: ≥ 50px 또는 body-kind 강제 조건 충족
  *  - mid: 8 ≤ px < 50
  *  - low: < 8px
+ *
+ * **단위: physical pixel** (#623). `screenCoverageRadius` 가 `engine.getRenderHeight()`
+ * (drawing buffer 높이 = engine-factory `adaptToDeviceRatio: true` 로 DPR 이 곱해진 물리 px)
+ * 기준이므로, 본 임계와 4px fallback 임계(`pxDiameter ≥ 4`, lod-dev-overlay) 모두 동일한 물리
+ * px 공간에서 비교된다 → coverage 와 threshold 가 같은 공간이라 DPR 변동에 정합 (logical px
+ * 혼선 없음). 실측: DPR 1 vs 2 에서 `getRenderHeight` 720→1440 + 모든 body `pxDiameter` 정확히
+ * ×2 (NO-OP ADR `docs/decisions/20260609-623-dpr-pixel-basis-no-op.md`). Retina(DPR≥2)는 같은
+ * 물리 px 임계라 logical 로 더 작은 body 도 mask/high 에 먼저 진입 — "물리 픽셀이 많을수록 정밀
+ * 렌더 가치" 로 의도된 동작 (버그 아님).
  */
 export const LOD_PIXEL_THRESHOLDS = {
   high: 50,
