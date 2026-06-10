@@ -474,14 +474,19 @@ export function createSolarSystemScene(
       return [c.r, c.g, c.b] as const;
     });
 
+    // R8 #647 §축 2a — axial tilt (ring-only, 후보 A). 미지정 body 폴백 0 (jupiter 무회귀).
+    // uranus 97.77° (세로 고리 — R8 핵심 showcase) / saturn 26.73° (R7 비-범위 동반 해소).
+    const axialTiltRad = ((body.axialTiltDeg ?? 0) * Math.PI) / 180;
+
     let handles: RingPlaceholderHandles | RingShaderHandles;
     if (ringRenderMode === 'placeholder') {
-      handles = createRingPlaceholder(scene, host, scaledRings, { tier: activeTier });
+      handles = createRingPlaceholder(scene, host, scaledRings, { tier: activeTier, axialTiltRad });
     } else {
       handles = createRingShaderMesh(scene, host, scaledRings, {
         forceFallback: ringRenderMode === 'fallback',
         tier: activeTier,
         layerColors,
+        axialTiltRad,
         // R7 #641 §축 2c — ringAlphaHint (saturn 0.9 prominent / jupiter 0.15 faint).
         // 미지정 시 필드 생략 → shader 기본 0.6 (하위 호환).
         ...(body.ringAlphaHint !== undefined ? { ringAlpha: body.ringAlphaHint } : {}),

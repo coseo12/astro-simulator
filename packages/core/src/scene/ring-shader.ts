@@ -218,6 +218,15 @@ export interface CreateRingShaderOptions {
    */
   tier?: Tier;
   /**
+   * R8 #647 §축 2a — ring 자전축 기울기 (rad). disc `rotation.x = π/2 + axialTiltRad`
+   * (shader/fallback 양 경로 동일 — placeholder 는 `ring-placeholder.ts` 동명 옵션).
+   * 회전축 방위각은 world X 고정 근사 (pole RA/Dec 미사용 — ADR §위험 #6 주석 계약).
+   * 층간 z-offset (`position.y = idx × 1e-4`) 의 tilt 후 ring 법선 방향 cos 편차는
+   * 1e-4 scene unit 스케일이라 무시 (주석 계약, 테스트 불요 — ROI 5문).
+   * 기본 0 — 기존 동작 (XZ 공전면) 하위 호환 (jupiter 무회귀).
+   */
+  axialTiltRad?: number;
+  /**
    * 테스트 주입용 — shader 컴파일 강제 실패 유도 (잘못된 GLSL 주입).
    * 내부 로직 테스트 전용, 프로덕션 코드에서 호출 금지.
    */
@@ -308,6 +317,7 @@ function createSingleRingShaderMesh(
   params: RingShaderParams,
   zOffset: number,
   sceneUnitPerMeter: number,
+  axialTiltRad: number,
 ): { mesh: Mesh; material: ShaderMaterial } {
   const radiusScene = params.outerRadius * sceneUnitPerMeter;
   const disc = MeshBuilder.CreateDisc(
@@ -315,7 +325,8 @@ function createSingleRingShaderMesh(
     { radius: radiusScene, tessellation: DISC_TESSELLATION },
     scene,
   );
-  disc.rotation.x = Math.PI / 2; // XZ 평면 (공전면 근사)
+  // R8 #647 §축 2a — XZ 공전면 (π/2) + 자전축 기울기 (uranus 97.77° 세로 고리 / saturn 26.73°).
+  disc.rotation.x = Math.PI / 2 + axialTiltRad;
   disc.position.y = zOffset; // z-fighting 방지 (층간 미세 offset)
 
   const material = createRingShaderMaterial(scene, params);
@@ -341,6 +352,7 @@ export function createRingInstancedMesh(
   color: readonly [number, number, number],
   layerIdx: number,
   sceneUnitPerMeter: number,
+  axialTiltRad = 0,
 ): Mesh {
   const innerScene = ring.innerRadius * sceneUnitPerMeter;
   const outerScene = ring.outerRadius * sceneUnitPerMeter;
@@ -359,7 +371,8 @@ export function createRingInstancedMesh(
   mat.alpha = 0.6;
   mat.backFaceCulling = false;
   source.material = mat;
-  source.rotation.x = Math.PI / 2;
+  // R8 #647 §축 2a — shader 경로와 동일 tilt (3경로 일관 — 회귀 검증 모드 정합).
+  source.rotation.x = Math.PI / 2 + axialTiltRad;
   source.position.y = layerIdx * 1e-4;
   source.parent = host;
 
@@ -427,10 +440,20 @@ export function createRingShaderMesh(
   const ringAlpha = options.ringAlpha ?? 0.6;
   const layerColors = options.layerColors ?? [];
   const sceneUnitPerMeter = renderScaleForTier(options.tier ?? 'solar');
+  // R8 #647 §축 2a — 미지정 시 0 (XZ 공전면 하위 호환, jupiter 무회귀).
+  const axialTiltRad = options.axialTiltRad ?? 0;
 
   // forceFallback — 즉시 InstancedMesh 경로로 분기
   if (options.forceFallback) {
-    return buildFallbackHandles(scene, host, rings, baseColor, layerColors, sceneUnitPerMeter);
+    return buildFallbackHandles(
+      scene,
+      host,
+      rings,
+      baseColor,
+      layerColors,
+      sceneUnitPerMeter,
+      axialTiltRad,
+    );
   }
 
   const meshes: Mesh[] = [];
@@ -453,6 +476,7 @@ export function createRingShaderMesh(
         },
         idx * 1e-4,
         sceneUnitPerMeter,
+        axialTiltRad,
       );
       mesh.parent = host;
 
@@ -486,7 +510,15 @@ export function createRingShaderMesh(
       m.dispose();
     }
     meshes.length = 0;
-    return buildFallbackHandles(scene, host, rings, baseColor, layerColors, sceneUnitPerMeter);
+    return buildFallbackHandles(
+      scene,
+      host,
+      rings,
+      baseColor,
+      layerColors,
+      sceneUnitPerMeter,
+      axialTiltRad,
+    );
   }
 
   const syncToHost = (hostMesh: Mesh) => {
@@ -514,11 +546,20 @@ function buildFallbackHandles(
   baseColor: readonly [number, number, number],
   layerColors: ReadonlyArray<readonly [number, number, number] | undefined>,
   sceneUnitPerMeter: number,
+  axialTiltRad = 0,
 ): RingShaderHandles {
   const meshes: Mesh[] = [];
   rings.forEach((ring, idx) => {
     const color = layerColors[idx] ?? baseColor;
-    const mesh = createRingInstancedMesh(scene, host, ring, color, idx, sceneUnitPerMeter);
+    const mesh = createRingInstancedMesh(
+      scene,
+      host,
+      ring,
+      color,
+      idx,
+      sceneUnitPerMeter,
+      axialTiltRad,
+    );
     meshes.push(mesh);
   });
 

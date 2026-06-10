@@ -17,10 +17,11 @@
  *     4. CHANGELOG `### Behavior Changes` 박제
  *     5. WASM 의존 도메인 sub-path 추가 금지 검증 (`scripts/verify-core-exports-immutable.sh`)
  *
- * 현재 박제: CURRENT_R_PHASE=7 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
- *           / mars·phobos·deimos(R5) / jupiter·galilean 4(R6) / saturn·titan(R7).
- *           R8+ (uranus 등) 는 데이터에 introducedInRPhase 부여돼 있으나 필터로 제외 —
- *           R8 진입 시 CURRENT_R_PHASE=8 1줄로 자동 포함.
+ * 현재 박제: CURRENT_R_PHASE=8 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
+ *           / mars·phobos·deimos(R5) / jupiter·galilean 4(R6) / saturn·titan(R7)
+ *           / uranus·titania(R8).
+ *           R9+ (neptune 등) 는 데이터에 introducedInRPhase 부여돼 있으나 필터로 제외 —
+ *           R9 진입 시 CURRENT_R_PHASE=9 1줄로 자동 포함.
  *
  * ⚠️ wasm-safe 패턴: 본 모듈은 `solar-system-loader.ts` 를 import 한다 (자동 생성 소스). loader 는
  *    이미 scene 모듈들이 의존하는 core 내부 모듈이라 신규 외부 sub-path 노출은 없다. 단
@@ -30,7 +31,7 @@
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 /** 현재 도달한 R-Phase. R-Phase 진입 시 이 상수 1줄만 증가하면 allowlist 가 자동 확장된다. */
-export const CURRENT_R_PHASE = 7; // R7 #641 — saturn + titan 자동 포함 (#613 자동 생성 3번째 실전)
+export const CURRENT_R_PHASE = 8; // R8 #647 — uranus + titania 자동 포함 (#613 자동 생성 4번째 실전)
 
 /**
  * 주어진 phase 까지 등장한 body id 목록을 데이터 순서대로 반환하는 순수 함수.

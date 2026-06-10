@@ -38,9 +38,9 @@ const flags = { json: args.includes('--json') };
 const VIEWPORT = { width: 1280, height: 720 };
 const POST_LOAD_WAIT_MS = 2500; // tier transition + LOD 안정화 마진
 
-// R7 시점 satellite parent (earth=moon / mars=phobos·deimos / jupiter=galilean 4 / saturn=titan).
-// R8+ 진입 시 갱신 (R_PHASE_BODY_ALLOWLIST 의 satellite parent 집합과 동기).
-const EXPECTED_SATELLITE_PARENTS = ['earth', 'mars', 'jupiter', 'saturn'];
+// R8 시점 satellite parent (earth=moon / mars=phobos·deimos / jupiter=galilean 4 / saturn=titan
+// / uranus=titania #647). R9+ 진입 시 갱신 (R_PHASE_BODY_ALLOWLIST 의 satellite parent 집합과 동기).
+const EXPECTED_SATELLITE_PARENTS = ['earth', 'mars', 'jupiter', 'saturn', 'uranus'];
 
 // DoD 임계.
 const PARENT_TRACK_TOLERANCE = 0.2; // worldCenter ↔ parent scene 좌표 (D-627-1)

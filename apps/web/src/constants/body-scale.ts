@@ -58,6 +58,19 @@
  *                  "phobos ≈ deimos"). mesh pxDiameter ≈ 0.128 px (4px fallback 의존).
  *                  ADR: docs/decisions/20260528-r5-mars-visualization.md §결정 3
  *
+ * R8 baseline (#647 — uranusScale 250 / titaniaScale 500, ice giant 정책 신설 — 3번째 scale 그룹):
+ *   uranus  = 250 → 사실 비율 (sun 의 3.67%) 명시 위배 + earth 대비 직관 우선 (PM 제약
+ *                  "천왕성 > 지구" — 실반경 4.007배). 거성 예외 48 답습 시 px 8.69 (earth 의
+ *                  0.24배) 로 제약 위반. 예상 pxDiameter ≈ 45.24 px (1280×720, mid LOD 50px
+ *                  미만 margin 4.76px) / sunPxRatio 식 18.37% / uranus/earth px 비 1.25.
+ *                  ⚠️ uranus > jupiter(24.3px)/saturn(20.5px) 시각 역전은 PM 제약의 수학적
+ *                  필연 (ADR §위험 #1 — 회귀 보고 시 PM 재합의 라운드 필수, 단독 조정 금지).
+ *                  ADR: docs/decisions/20260610-r8-uranus-titania-rings-visualization.md §축 1
+ *   titania = 500 → titania/uranus mesh 비 0.0617 (moon/earth 0.068 / titan/saturn 0.089
+ *                  수렴대 0.05~0.09 정중앙). titan=100 답습 시 0.0123 과소 — uranus(250) 가
+ *                  gas giant(48) 의 5.2배라 satellite scale 동반 상향. mesh 2.79 px →
+ *                  4px fallback billboard 의존 (LOD Phase 2 #391 흡수). ADR §축 3
+ *
  * R6~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
  * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
  * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건 +
@@ -81,6 +94,8 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   callisto: 100, // R6 #627 옵션 D — 비율 0.070. galilean 4개 moon 비율 근접 — 사용자 "목성 대비 적당" 합의
   saturn: 48, // R7 #641 — jupiter 동일값 (거성 예외 2번째 인스턴스, "가스 거성 = scale 48" 단일 mental model). saturn/jupiter mesh 비 0.843 = 사실 radius 비 정확 보존 (R5 mars=earth=800 선례 동형). sun 대비 px 비 ~8.32% (식, Q2=B 거성 임계 ≤ 8.5% margin 0.18%), mesh visible 20.5px. ADR 20260610-r7 §축 1
   titan: 100, // R7 #641 — galilean 최종값 (R6 Amendment 2) 답습 (300→200→100 iteration 건너뛰고 수렴값 시작). titan/saturn 비 0.089 (moon/earth 0.068 근접, ganymede-class 0.978배). 4px fallback billboard 의존 (mesh 1.82px). ADR 20260610-r7 §축 3
+  uranus: 250, // R8 #647 — ice giant 정책 신설 (3번째 scale 그룹). 사실 비율 (sun 3.67%) 명시 위배 + earth 대비 직관 우선 (PM 제약 "천왕성 > 지구", 실반경 4.007배). px 45.24 / uranus/earth 비 1.25 / mid LOD 50px 미만 (margin 4.76px). jupiter/saturn 시각 역전은 의식적 수용 (ADR 20260610-r8 §축 1 + §위험 #1)
+  titania: 500, // R8 #647 — titania/uranus mesh 비 0.0617 (moon/earth 0.068 수렴대). titan=100 답습 시 0.0123 과소 (uranus 250 이 gas giant 48 의 5.2배). 4px fallback billboard 의존 (mesh 2.79px). ADR 20260610-r8 §축 3
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

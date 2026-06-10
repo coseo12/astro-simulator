@@ -62,13 +62,21 @@ const PRESETS: Preset[] = [
     massMultipliers: { saturn: 10 },
   },
   {
-    // R7 #641 — uranus(introducedInRPhase=8) target preset. saturn 진입으로 saturn-x10 이
-    // enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입 body(uranus) 로
-    // 교체 보존 (R6 #621 의 saturn-x10 추가와 동일 선례 답습). R8 진입 시 자동 enabled.
+    // R7 #641 — uranus(introducedInRPhase=8) target preset (negative 케이스 교체 보존).
+    // R8 #647 — uranus 진입으로 zero-touch 자동 enabled (Concrete Prediction 재현 3번째).
     id: 'uranus-x10',
     label: '천왕성 10배 질량',
     description: '외행성 외곽 섭동을 관찰. 천왕성 진입(R8) 시 활성.',
     massMultipliers: { uranus: 10 },
+  },
+  {
+    // R8 #647 — neptune(introducedInRPhase=9) target preset. uranus 진입으로 uranus-x10 이
+    // enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입 body(neptune) 로
+    // 교체 보존 (R6 saturn-x10 / R7 uranus-x10 선례 답습). R9 진입 시 자동 enabled.
+    id: 'neptune-x10',
+    label: '해왕성 10배 질량',
+    description: '최외곽 행성 섭동을 관찰. 해왕성 진입(R9) 시 활성.',
+    massMultipliers: { neptune: 10 },
   },
 ];
 

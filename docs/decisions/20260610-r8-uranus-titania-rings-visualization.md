@@ -409,6 +409,39 @@ R7 §Concrete Prediction 의 R8 예측: "uranus = BODY_SCALE 1 + CURRENT_R_PHASE
 
 ---
 
+## Amendment 1 (2026-06-10, dev 구현 실측 — #647 구현 PR)
+
+구현 단계 실측 3건 박제 (§축 1 결정 트리 / §축 6 baseline 재실측 의무 / §Concrete Prediction 검증 의무 이행):
+
+### ① `PX_RATIO_THRESHOLDS.uranus = 7.9` (결정 트리 분기 1 — 실측 × 1.05)
+
+- `--measure-px-ratio` 3 viewport 실측: uranus **7.52% / 7.52% / 7.52%** (1280×720 / 1920×1080 / 375×667 — **완전 결정적**, 분기 2 N/A 불요)
+- ⚠️ 정책 식값 18.37% 대비 **×0.41 축소** — §위험 #4 의 "극단 부풀림 또는 projection 실패" 예상과 달리 **반대 방향**. saturn (×6.8 부풀림, w=5.13 측면 근접) 과 같은 뿌리 (perspective division) 의 다른 발현: uranus (19.19 AU) 는 default view 에서 view-space depth 가 충분히 커서 투영 직경이 축소된다. wsRadius 비는 정확 (uranus/earth 1.252 — 단위 테스트 정량 가드) → **uranusScale=250 박제값 정상**, 임계는 BODY_SCALE 회귀 감지용 synthetic metric (saturn 59.7 패턴 동일)
+- titania 0.46% — N/A 박제 유지 (§축 1 확정대로)
+
+### ② 모바일 diskArea off-screen 제외 후 신규 baseline = **16.82%** (§재검토 트리거 #8 발동 + 측정 방법 검증 수행)
+
+- 실측 cumulative (375×667): **16.82% ≤ 25% PASS** (margin 8.18%p). 단 ADR 예상 9.96% 대비 **+6.86%p 괴리** (± 3%p 초과) → 트리거 #8 절차 (측정 방법 검증 우선, volt #32) 수행:
+  - off-screen 분류 실측 (375×667): venus / mars / phobos / deimos / jupiter+galilean 4 / saturn+titan / uranus+titania 13 body 제외 — 분류 자체는 전부 타당 (좁은 viewport 에서 화면 밖)
+  - **괴리 원인은 측정이 아닌 사전 추정**: §축 6 의 "saturn artifact ~13.0%p" 추정이 과대 — saturn 의 실측 모바일 diskArea 는 **5.29%p**. R7 의 22.96% 분해: sun 16.34 + saturn 5.29 + jupiter 0.39 + venus 0.30 + 기타 ≈ 22.96 → off-screen 제외 합계 ~6.1%p → 16.82%. 모바일 cumulative 의 지배 항은 sun (16.34%) 이며 sun 은 on-screen 정상 합산
+  - 결론: **측정 방법 정상, 사전 산식의 추정 오차**. 신규 baseline 16.82% 를 R9 산출 기준으로 박제 (R9 인계 #7 의 "R8 재실측값" = 16.82%)
+- 1280×720 / 1920×1080 cumulative: 5.45% (off-screen 9 body 제외)
+
+### ③ Concrete Prediction 실측 — ring 축 0 적중 / 코어 합계 23 라인 (예측 ≤ 18 대비 +5 정직 박제)
+
+- **ring 렌더 경로 (tilt diff 제외) 변경 0 적중** — uranus.rings 데이터 추가로 인한 결합/colorHint/ringAlphaHint 경로 코드 변경 없음 (R7 예측 재현 성공. generic 결합 + 스키마 추상화 건강성 입증)
+- 코어 논리 라인 실측 (주석 제외): tilt 인프라 **17** (스키마 1 + loader 타입/매핑 2 + scene 산출/전달 3 + ring 3경로 옵션/적용/시그니처 threading 11) + BODY_SCALE 2 + CURRENT_R_PHASE 1 + ORBIT 2 + FOCUS_BUTTONS 1 = **23** (예측 ≤ 18 대비 +5)
+- 초과 원인: §Concrete Prediction 의 "ring-shader 옵션/적용 5~7" 이 **함수 시그니처 threading 비용** (createSingleRingShaderMesh / createRingInstancedMesh / buildFallbackHandles 3개 함수의 파라미터 추가 + 호출부 전달) 을 과소 추정. 기능 라인 (rotation 적용 3경로 + 폴백 산출) 자체는 예측 범위 내
+- R9 예측 보정: tilt 축 코드 0 (데이터 2값만) 예측은 유지 — threading 은 이미 완료된 1회 비용
+
+### ④ 기타 구현 실측
+
+- titania 를 `time-reversal.test.ts` 9체 대칭성 테스트 제외 목록에 추가 (주기 8.71d — titan 동일 오차 증폭 메커니즘. 미제외 시 1년 vel relErr 1.146e-9 로 1e-9 임계 초과 실측)
+- ring tilt runtime 정량 검증: jupiter 90° (폴백 0 — 무회귀) / saturn 116.73° (90+26.73) / uranus 187.77° (90+97.77) — shader 경로 disc.rotation.x 실측
+- scenario preset negative 교체: uranus-x10 zero-touch enabled (3번째 재현) + neptune-x10 신규 (R6/R7 선례 답습)
+
+---
+
 ## 교차검증 반영 사항 (cross-validate 2026-06-10 agy outcome=applied)
 
 agy 가 본 설계를 "R6/R7 교훈·제약을 정확히 반영한 완성도 높은 문서 — 보완 3건 전제 Accepted 권장" 으로 지지. 4축 분류:
