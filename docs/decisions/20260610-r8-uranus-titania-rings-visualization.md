@@ -1,6 +1,6 @@
 # ADR: R8 천왕성 + 고리 + 티타니아 시각화 — ice giant 정책 신설 (uranus=250, 사실 비율 명시 위배 + earth 직관 우선) + axial tilt 인프라 (97.77° 세로 고리, saturn 26.73° 동반) + 모바일 diskArea off-screen 제외
 
-- **상태**: **Provisional** — cross-validate (메인 오케스트레이터 수행) 결과 본문 통합 후 Accepted 전이 (#370 옵션 C — 본 ADR 은 cross-validate 발동 대상: ADR 신규 + 프로젝트 시각 정책 신설)
+- **상태**: **Accepted (cross-validate 2026-06-10 agy outcome=applied)** — §교차검증 반영 사항 통합 완료 (densityProfile zod max(16) + titania frame 의무 + tilt 방위 D-T2 확인 수용)
 - **날짜**: 2026-06-10
 - **결정자**: architect (R8 PM 합의 라운드 완료 — Q1=A / Q2=ice giant 별도 판단 (제약: 천왕성 > 지구 시각 직관) / Q3=ring tilt 인프라 R8 범위 포함 + saturn 동반 / Q4=uranus shortcut bar 진입. 메인 오케스트레이터가 사용자와 합의 2026-06-10. **PM 합의 그대로 박제 — 재구조화 금지**)
 - **관련**: [#647](https://github.com/coseo12/astro-simulator/issues/647) (R8 본 스프린트), [`20260610-r7-saturn-titan-rings-visualization.md`](20260610-r7-saturn-titan-rings-visualization.md) (R7 SSoT — §R8 인계 5건 + Amendment 1 ③ 본 ADR 이 전부 이행), [`20260605-r6-jupiter-galilean-visualization.md`](20260605-r6-jupiter-galilean-visualization.md) (거성 예외 첫 인스턴스 + guard 이원화), [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) (satellite 궤도선 일반화 — titania 자동 확장), [`20260609-622-orbit-scale-gap-no-op.md`](20260609-622-orbit-scale-gap-no-op.md) (산식 A/B 측정-정의 분리), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (CURRENT_R_PHASE 1줄 자동 전파), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541 의무 체크리스트 4항목)
@@ -409,9 +409,15 @@ R7 §Concrete Prediction 의 R8 예측: "uranus = BODY_SCALE 1 + CURRENT_R_PHASE
 
 ---
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (cross-validate 2026-06-10 agy outcome=applied)
 
-> **Provisional** — cross-validate 는 메인 오케스트레이터가 본 ADR 박제 직후 수행 (CLAUDE.md §교차검증 앵커: ADR 신규). 결과 4축 분류 (합의 / 이견 수용 / 기각 / 고유 발견 후속 분리) + Claude 편향 셀프 체크 통합 후 **Accepted (cross-validate YYYY-MM-DD)** 전이.
+agy 가 본 설계를 "R6/R7 교훈·제약을 정확히 반영한 완성도 높은 문서 — 보완 3건 전제 Accepted 권장" 으로 지지. 4축 분류:
+
+- **합의 (4)**: ① ice giant 정책 신설 (사실 비율 의식적 미적용 + PM 직관 제약 — moon Amendment 4 계보) ② composite ring layer (개별 ring sub-pixel 구조적 비가시 → 데이터 SSoT 보존하며 rendering 근사 — Visual Fidelity 정합) ③ axialTiltDeg optional 스키마 하위 호환 (zod 0~180 범위 가드로 NaN 전파 차단) ④ ring-only tilt 의 한계 박제 ("본체 자전/텍스처 도입 시 host 통합 승격 재검토" — 마이그레이션 부담 시점 명확).
+- **합의 — 기박제 확인 (1)**: saturn tilt → r1-guard baseline 갱신 의무 (§위험 #2 사전 박제와 agy WARNING 일치. 구현 dev 에게 "--update 갱신은 회귀 아님" 지침 전달).
+- **고유 발견 수용 (2, 구현 단계 반영 의무)**: ① **densityProfile zod `.max(16)` 스키마 가드** — composite 15점이 shader `MAX_DENSITY_POINTS=16` 상한에 1점 여유뿐 → 파싱 레벨에서 초과 차단 (uniform overflow/컴파일 실패 방지). ② **titania 궤도 frame "Uranus-centric J2000 Ecliptic" 의무** — uranus 계는 적도면(Laplace plane) 좌표 혼입 시 고리(97.77°)와 궤도선이 비정렬 교차하는 버그. R7 titan frame 선례 답습 + dataSource 주석 박제 (§축 3 강조 격상).
+- **고유 발견 — D-T2 확인 항목 (1)**: **tilt 의 rotation.x 단축 근사** — pole RA/Dec 방위각 미정의라 기울임 방향이 임의 → 시각 정합 (공전 궤도와의 논리 정합) 을 구현 D-T2 에서 육안 확인 (§DoD 추가).
+- **이견 (0)** / architect 권고 질문 4건 (composite 경계 / 시각 역전 / tilt 잠복 결합 / off-screen 경계) 에 대한 agy 별도 이의 없음 — 설계 박제 유지.
 
 ### Claude 편향 셀프 체크 (architect 사전 기록 — cross-validate 호출 전)
 
