@@ -104,6 +104,8 @@ const PX_RATIO_THRESHOLDS = Object.freeze({
   jupiter: 16.3, // R6 #621 — Amendment 2026-06-06 (perspective 보정). ADR §결정 5 박제 9.87% 는 wsRadius 비 식 예측 — 실측 15.52% (qa D-T2 3 viewport 결정적). earth 2026-05-21 선례 (식 14.67% → 실측 16.40%) 와 동일 방향: ADR 식이 perspective foreshortening 무시. jupiter 는 sun 5.2 AU 거리라 foreshortening 편차 최대 (+57%), galilean 4 동일 1.56~1.58배 일관 → 측정 정확. jupiterScale=48 architect 박제값 보존, 임계만 실측 × 1.05 = 16.3 보정 (earth 17 / venus 14.26 패턴). ⚠️ 퍼센트 단위 정수 — guard 는 sunPxRatio 퍼센트 값 직접 비교. 0.10 박제 시 영구 FAIL
   // io / europa / ganymede / callisto: N/A — galilean 4px fallback 부분 의존 (R5 phobos/deimos
   //                       §결정 6 답습). 회귀 가드는 R-Phase Allowlist (#613) + FOCUS_BODIES 매칭 (#598).
+  saturn: 59.7, // R7 #641 — 실측 56.89% (3 viewport 결정적) × 1.05. ⚠️ ADR 예상 ~13.1% 과 괴리 — §재검토 트리거 #4 절차 (측정 방법 검증 우선, volt #32) 수행 결과: default solar view 에서 saturn (9.54 AU) 의 view-space depth w=5.13 (유클리드 거리 111.4 unit) — 카메라 측면 평면 근접으로 perspective division 이 투영 직경을 ×21 부풀리는 측정-정의 artifact (화면 밖 x≈14k, 실제 렌더 크기 아님). jupiter +57% (w=22.3) 와 같은 뿌리의 극단값. wsRadius 비 0.843 (사실 radius 비) 정확 → saturnScale=48 박제값 정상, 본 임계는 "BODY_SCALE 회귀 감지" 목적의 결정적 synthetic metric 으로만 유효 (시각 크기 검증은 focus 스크린샷 + D-T2). #622 NO-OP (산식 A/B 측정-정의 분리) 동일 패턴
+  // titan: N/A — 4px fallback billboard 의존 (R5 phobos/deimos §결정 6 / R6 galilean 답습 — R7 ADR §축 3).
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
@@ -188,7 +190,24 @@ async function measureBodyPxRatios(page) {
     // 회귀 확인 의무.
     // R6 #621 — jupiter (Q2=B 거성 예외 임계 ≤ 10% 박제) + galilean 4 (io/europa/ganymede/callisto,
     // §결정 6 미박제 — 측정만). #619 정적 매칭 가드가 targetIds === R_PHASE_BODY_ALLOWLIST 차단.
-    const targetIds = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos', 'jupiter', 'io', 'europa', 'ganymede', 'callisto'];
+    // R7 #641 — saturn (거성 예외 2번째, 실측 × 1.05 임계 박제) + titan (§결정 6 답습 미박제 — 측정만).
+    const targetIds = [
+      'sun',
+      'mercury',
+      'venus',
+      'earth',
+      'moon',
+      'mars',
+      'phobos',
+      'deimos',
+      'jupiter',
+      'io',
+      'europa',
+      'ganymede',
+      'callisto',
+      'saturn',
+      'titan',
+    ];
 
     /**
      * mesh world center 를 column-major Matrix.m 로 직접 NDC → 화면 좌표 변환.

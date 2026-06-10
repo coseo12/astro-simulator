@@ -54,6 +54,14 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE.callisto).toBe(100);
   });
 
+  it('saturn = 48 (R7 #641 — jupiter 동일값 거성 예외 2번째, saturn/jupiter mesh 비 0.843 사실 보존)', () => {
+    expect(BODY_SCALE.saturn).toBe(48);
+  });
+
+  it('titan = 100 (R7 #641 — galilean 최종값 답습, titan/saturn 비 0.089 moon/earth 0.068 근접)', () => {
+    expect(BODY_SCALE.titan).toBe(100);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -80,11 +88,12 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('europa')).toBe(100); // R6 #627 옵션 D
     expect(getBodyScale('ganymede')).toBe(100); // R6 #627 옵션 D
     expect(getBodyScale('callisto')).toBe(100); // R6 #627 옵션 D
+    expect(getBodyScale('saturn')).toBe(48); // R7 #641 — jupiter 동일값 (거성 예외 2번째)
+    expect(getBodyScale('titan')).toBe(100); // R7 #641 — galilean 답습
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('saturn')).toBe(1.0); // R7 진입 전
-    expect(getBodyScale('titan')).toBe(1.0); // R7 satellite 진입 전
+    expect(getBodyScale('uranus')).toBe(1.0); // R8 진입 전
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 
