@@ -35,7 +35,7 @@ beforeEach(() => {
  *
  * 검증:
  *  - allowlist 박제 body (sun / mercury / venus / earth / moon) 항목은 활성 (focusOn 정상 발행)
- *  - allowlist 외 body (jupiter / neptune 등) 항목은 disabled + aria-disabled + data-r-phase-disabled
+ *  - allowlist 외 body (pluto 등 R10) 항목은 disabled + aria-disabled + data-r-phase-disabled (R9 #653 — neptune 진입으로 pluto 교체)
  *  - disabled 항목 강제 click 시 focusOn 명령 발행 0 (HTML disabled 자체 차단)
  *  - tooltip (title 속성) 박제 — 사용자 안내
  *  - 시각 차별화 (opacity-50 / cursor-not-allowed) 박제
@@ -54,14 +54,19 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () =>
     expect(screen.getByTestId('tree-moon')).not.toBeDisabled();
   });
 
-  it('R-Phase 미박제 body (neptune — R9 미진입) 는 disabled (negative 케이스 보존)', () => {
+  it('neptune (R9 #653 진입) 은 활성 — zero-touch 자동 enabled', () => {
     render(<CelestialTree />);
-    expect(screen.getByTestId('tree-neptune')).toBeDisabled();
+    expect(screen.getByTestId('tree-neptune')).not.toBeDisabled();
+  });
+
+  it('R-Phase 미박제 body (pluto — R10 미진입) 는 disabled (negative 케이스 교체 보존 — R9 neptune 선례)', () => {
+    render(<CelestialTree />);
+    expect(screen.getByTestId('tree-pluto')).toBeDisabled();
   });
 
   it('disabled 항목은 aria-disabled="true" 설정 (스크린 리더 인지)', () => {
     render(<CelestialTree />);
-    expect(screen.getByTestId('tree-neptune')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('tree-pluto')).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('활성 항목은 aria-disabled="false" (R4 earth / moon + R6 jupiter 포함)', () => {
@@ -76,7 +81,8 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () =>
 
   it('disabled 항목은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
     render(<CelestialTree />);
-    expect(screen.getByTestId('tree-neptune')).toHaveAttribute('data-r-phase-disabled', 'true');
+    expect(screen.getByTestId('tree-pluto')).toHaveAttribute('data-r-phase-disabled', 'true');
+    expect(screen.getByTestId('tree-neptune')).toHaveAttribute('data-r-phase-disabled', 'false'); // R9 #653 진입
     expect(screen.getByTestId('tree-sun')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('tree-earth')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('tree-moon')).toHaveAttribute('data-r-phase-disabled', 'false');
@@ -85,10 +91,10 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () =>
 
   it('disabled 항목은 tooltip (title 속성) 박제 — 사용자 안내 + body 이름 포함', () => {
     render(<CelestialTree />);
-    const neptuneBtn = screen.getByTestId('tree-neptune');
-    expect(neptuneBtn).toHaveAttribute('title');
-    const title = neptuneBtn.getAttribute('title') ?? '';
-    expect(title).toMatch(/해왕성/);
+    const plutoBtn = screen.getByTestId('tree-pluto');
+    expect(plutoBtn).toHaveAttribute('title');
+    const title = plutoBtn.getAttribute('title') ?? '';
+    expect(title).toMatch(/명왕성/);
     expect(title).toMatch(/R-Phase/);
   });
 
@@ -103,7 +109,7 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () =>
 
   it('disabled 항목 강제 click → focusOn 명령 발행 0 (HTML disabled 자체 차단)', () => {
     render(<CelestialTree />);
-    fireEvent.click(screen.getByTestId('tree-neptune'));
+    fireEvent.click(screen.getByTestId('tree-pluto'));
     // HTML button[disabled] 는 click 이벤트 자체를 dispatch 하지 않음.
     expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
   });
@@ -124,9 +130,9 @@ describe('CelestialTree — R-Phase Allowlist 가드 UI (#403 + R4 #532)', () =>
 
   it('disabled 항목 시각 차별화 — opacity-50 cursor-not-allowed 클래스 박제', () => {
     render(<CelestialTree />);
-    const neptuneBtn = screen.getByTestId('tree-neptune');
-    expect(neptuneBtn.className).toContain('opacity-50');
-    expect(neptuneBtn.className).toContain('cursor-not-allowed');
+    const plutoBtn = screen.getByTestId('tree-pluto');
+    expect(plutoBtn.className).toContain('opacity-50');
+    expect(plutoBtn.className).toContain('cursor-not-allowed');
   });
 
   it('selected body active 스타일 — 활성 + selected 일 때 bg-primary/20', () => {

@@ -27,7 +27,7 @@ import { useSimStore } from '@/store/sim-store';
  *
  * cross-validate 보강 (§결정 4 보강):
  *   - vi.spyOn(console, 'warn') 단언 의무 — 진단 기능 dev 환경 작동 보장
- *   - 메시지 매칭: /R-Phase 미진입/ (jupiter / neptune) / /알 수 없는 body id/ (invalid)
+ *   - 메시지 매칭: /R-Phase 미진입/ (pluto — R9 #653 후 neptune 에서 교체) / /알 수 없는 body id/ (invalid)
  *
  * mock 전략:
  *   - nuqs `useQueryState` 를 vi.mock 으로 가로채 [urlFocus, setter] 반환
@@ -164,8 +164,28 @@ describe('UrlSync — ?focus= R-Phase Allowlist 가드 (#415)', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('?focus=neptune → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (R9 미진입 negative 케이스 보존)', () => {
+  it('?focus=neptune → focusOn 발행 (R9 #653 진입 — 차단 → 허용 전환)', () => {
     mockUrlFocus = 'neptune';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<UrlSync />);
+
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'neptune' });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('?focus=triton → focusOn 발행 (R9 #653 — 역행 위성 첫 사례, URL-only 진입 경로)', () => {
+    mockUrlFocus = 'triton';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<UrlSync />);
+
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'triton' });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('?focus=pluto → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (R10 미진입 negative 케이스 교체 보존)', () => {
+    mockUrlFocus = 'pluto';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     render(<UrlSync />);

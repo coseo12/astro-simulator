@@ -165,6 +165,33 @@ export const SATURN_SATELLITES_ORBIT_VISUAL_SCALE = 10;
 export const URANUS_SATELLITES_ORBIT_VISUAL_SCALE = 50;
 
 /**
+ * Neptune-Satellites 궤도 visual scale 배수 (R9 triton 단일 — R10+ nereid/proteus 등 확장 전제 복수형).
+ *
+ * `triton world position = neptune world position + (triton local orbit × 75)` 로 산출.
+ * 실측 거리 (triton 3.54759e8 m = 2.37142e-3 AU) 는 보존되며 rendering 단계에서만 ×75 적용.
+ *
+ * **binding constraint = ring outer mesh (R7 신규 유형의 3번째 인스턴스)** — ring × bodyScale
+ * 결합으로 Adams ring outer mesh (6.293e7 × 250 = 1.57325e10 m) 가 neptune mesh (6.191e9 m) 의
+ * 2.541배까지 확장되므로 parent mesh 가 아닌 **ring outer 가 분모**.
+ * ⚠️ ring 미고려 시 ×50 (uranus 답습) 이 2.69x 로 통과처럼 보이는 함정값 (실제 1.10x fail —
+ * 고리 안에 묻힘). Adams ring 의 상대 확장 (2.541) 이 uranus ε (2.001) 보다 커서 ice giant
+ * 동일 scale 답습이 미달 — visual scale 동반 상향 필요.
+ *
+ * 산식 A (설계 임계, real-meter — #622 NO-OP SSoT: 산식 B 와 직접 비교 금지):
+ *   triton 분리 마진 = (3.54759e8 × 75) / (1.57325e10 + 4.0602e8) = 1.65x (≥ 1.5 통과 +0.15,
+ *   R8 titania 1.65x 정확 동률 + R5 phobos/R6 io 1.69x 근접 정합). 후보: ×50 1.10x fail (함정값)
+ *   / ×70 1.54x 경계 +0.04 / **×75 1.65x 선택** / ×80 1.76x / ×100 2.20x 과분리.
+ *
+ * D-T2 미통과 시 fallback: 궤도선-고리 시각 간섭 보고 시 ×75 → ×80 (마진 1.76x —
+ * R9 ADR §재검토 트리거 #4). triton 궤도는 ecliptic inclination 129.14° **역행** (태양계 유일
+ * 대형 역행 위성) — 공전 애니메이션 방향이 다른 모든 body 와 반대인 것이 사실 정합,
+ * 버그 오인 금지 (ADR §축 3 사전 등록, PM Q1).
+ *
+ * R9 ADR `20260610-r9-neptune-triton-rings-visualization.md` §축 4.
+ */
+export const NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE = 75;
+
+/**
  * parent body id 별 satellite orbit visual scale 룩업.
  *
  * R5+ 진입 시 parent-satellite 쌍별로 박제값 추가. 미정의 parent 는 1.0 (실측 그대로).
@@ -175,6 +202,7 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
   jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io, 마진 1.69x)
   saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형, 마진 1.75x)
   uranus: URANUS_SATELLITES_ORBIT_VISUAL_SCALE, // R8 #647 — titania 단일 룩업 (binding constraint=ring outer 2번째 인스턴스, 마진 1.65x — ×30 은 ring 미고려 함정값)
+  neptune: NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE, // R9 #653 — triton 단일 룩업 (binding constraint=ring outer 3번째 인스턴스, 마진 1.65x — ×50 uranus 답습은 1.10x 함정값)
 });
 
 /**

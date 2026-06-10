@@ -10,6 +10,7 @@ import {
   JUPITER_SATELLITES_ORBIT_VISUAL_SCALE,
   SATURN_SATELLITES_ORBIT_VISUAL_SCALE,
   URANUS_SATELLITES_ORBIT_VISUAL_SCALE,
+  NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE,
   ORBIT_VISUAL_SCALE_BY_PARENT,
   getOrbitVisualScale,
 } from './orbit-visual-scale.js';
@@ -36,8 +37,8 @@ describe('orbit-visual-scale SSoT (R4 #539 Amendment 2)', () => {
     expect(getOrbitVisualScale(undefined)).toBe(1.0);
   });
 
-  it('R9+ 미진입 parent (neptune) → 1.0 (R8 비-범위)', () => {
-    expect(getOrbitVisualScale('neptune')).toBe(1.0);
+  it('R10+ 미진입 parent (pluto) → 1.0 (R9 비-범위)', () => {
+    expect(getOrbitVisualScale('pluto')).toBe(1.0);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT 는 frozen (런타임 변경 차단)', () => {
@@ -242,5 +243,55 @@ describe('orbit-visual-scale SSoT (R8 #647 — uranus-titania, binding=ring oute
     expect(marginVsMeshOnly).toBeCloseTo(2.05, 1); // 통과처럼 보이는 함정
     expect(marginVsRingOuter).toBeLessThan(1.5); // 실제 fail (0.99x)
     expect(marginVsRingOuter).toBeCloseTo(0.99, 1);
+  });
+});
+
+describe('orbit-visual-scale SSoT (R9 #653 — neptune-triton, binding=ring outer 3번째 인스턴스)', () => {
+  it('NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE = 75 (R9 #653 박제값)', () => {
+    expect(NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE).toBe(75);
+  });
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT.neptune == NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE (룩업 정합)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT.neptune).toBe(NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE);
+  });
+
+  it('getOrbitVisualScale(neptune) == 75', () => {
+    expect(getOrbitVisualScale('neptune')).toBe(75);
+  });
+
+  it('triton 분리 마진 산출 (산식 A, binding=ring outer mesh) — visual_scale=75 → 1.65x', () => {
+    // R9 ADR §축 4 박제값. binding constraint = Adams ring outer mesh — ring × bodyScale 결합으로
+    // Adams ring outer (6.293e7 m) × neptuneScale 250 = 1.57325e10 m (neptune mesh 의 2.541배).
+    const NEPTUNE_TRITON_DISTANCE_M = 3.54759e8; // semiMajorAxisAU 2.37142e-3
+    const ADAMS_RING_OUTER_MESH_M = 6.293e7 * 250; // 1.57325e10
+    const TRITON_MESH_RADIUS_M = 1.3534e6 * 300; // 4.0602e8
+    const SUM_MESH_M = ADAMS_RING_OUTER_MESH_M + TRITON_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('neptune');
+    const visualDistance = NEPTUNE_TRITON_DISTANCE_M * visualScale;
+    const separationMargin = visualDistance / SUM_MESH_M;
+
+    // ADR §축 4 — triton 분리 마진 1.65x (≥ 1.5 통과 +0.15, R8 titania 1.65x 정확 동률)
+    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
+    expect(separationMargin).toBeCloseTo(1.65, 1);
+  });
+
+  it('ice giant 답습 함정값 검증 — ×50 (uranus 답습) 은 neptune mesh 분모로 2.69x 통과 오판 (실제 1.10x fail)', () => {
+    // R9 ADR §축 4 — ×50 함정값: Adams ring 상대 확장 (2.541) 이 uranus ε (2.001) 보다 커서
+    // ice giant 동일 scale 답습이 미달. binding = ring outer 정의 회귀 가드 (3번째 인스턴스).
+    const NEPTUNE_TRITON_DISTANCE_M = 3.54759e8;
+    const NEPTUNE_MESH_RADIUS_M = 2.4764e7 * 250; // 6.191e9
+    const ADAMS_RING_OUTER_MESH_M = 6.293e7 * 250; // 1.57325e10
+    const TRITON_MESH_RADIUS_M = 1.3534e6 * 300;
+
+    const trapScale = 50;
+    // ADR §축 4 "vs neptune mesh 만 (참고)" 열 — ring 미고려 분모 (neptune mesh + triton mesh)
+    const marginVsMeshOnly =
+      (NEPTUNE_TRITON_DISTANCE_M * trapScale) / (NEPTUNE_MESH_RADIUS_M + TRITON_MESH_RADIUS_M);
+    const marginVsRingOuter =
+      (NEPTUNE_TRITON_DISTANCE_M * trapScale) / (ADAMS_RING_OUTER_MESH_M + TRITON_MESH_RADIUS_M);
+    expect(marginVsMeshOnly).toBeCloseTo(2.69, 1); // 통과처럼 보이는 함정 (ring 미고려)
+    expect(marginVsRingOuter).toBeLessThan(1.5); // 실제 fail (1.10x — 고리 안에 묻힘)
+    expect(marginVsRingOuter).toBeCloseTo(1.1, 1);
   });
 });

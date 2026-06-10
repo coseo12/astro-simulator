@@ -27,7 +27,7 @@ beforeEach(() => {
  * 검증:
  *  - selectedBodyId === null: info-panel-empty 렌더 (기존 분기 회귀 0)
  *  - R-Phase 박제 body (sun / mercury / venus / earth / moon): info-panel 정상 분기 렌더
- *  - R-Phase 미박제 body (jupiter / neptune): info-panel-r-phase-blocked 분기 렌더
+ *  - R-Phase 미박제 body (pluto — R10): info-panel-r-phase-blocked 분기 렌더 (R9 #653 — neptune 진입으로 pluto 교체)
  *  - R-Phase 차단 분기는 body 이름 포함 + R-Phase 메시지 박제
  *  - 분기 위치 — 정상 분기 *이전* (selected/data 존재 후 R-Phase 검사)
  */
@@ -81,32 +81,46 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', 
     expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
   });
 
-  it('selectedBodyId === "neptune": info-panel-r-phase-blocked 분기 렌더 (R9 미진입 negative 보존)', () => {
+  it('selectedBodyId === "neptune": info-panel 정상 분기 렌더 (R9 #653 진입 — 차단 아님)', () => {
     useSimStore.setState({ selectedBodyId: 'neptune' });
+    render(<CelestialInfoPanel />);
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
+  });
+
+  it('selectedBodyId === "triton": info-panel 정상 분기 렌더 (R9 #653 — 역행 위성 첫 사례)', () => {
+    useSimStore.setState({ selectedBodyId: 'triton' });
+    render(<CelestialInfoPanel />);
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
+  });
+
+  it('selectedBodyId === "pluto": info-panel-r-phase-blocked 분기 렌더 (R10 미진입 negative 교체 보존)', () => {
+    useSimStore.setState({ selectedBodyId: 'pluto' });
     render(<CelestialInfoPanel />);
     expect(screen.getByTestId('info-panel-r-phase-blocked')).toBeInTheDocument();
     expect(screen.queryByTestId('info-panel')).not.toBeInTheDocument();
   });
 
-  it('차단 분기는 body 이름 (해왕성) 포함 — 사용자 인지 우수', () => {
-    useSimStore.setState({ selectedBodyId: 'neptune' });
+  it('차단 분기는 body 이름 (명왕성) 포함 — 사용자 인지 우수', () => {
+    useSimStore.setState({ selectedBodyId: 'pluto' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
-    expect(blocked.textContent ?? '').toMatch(/해왕성/);
+    expect(blocked.textContent ?? '').toMatch(/명왕성/);
   });
 
   it('차단 분기는 R-Phase 메시지 박제', () => {
-    useSimStore.setState({ selectedBodyId: 'neptune' });
+    useSimStore.setState({ selectedBodyId: 'pluto' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
     expect(blocked.textContent ?? '').toMatch(/R-Phase/);
   });
 
-  it('차단 분기는 body 별 이름이 정확히 박제 (jupiter / neptune 회귀 0)', () => {
-    useSimStore.setState({ selectedBodyId: 'neptune' });
+  it('차단 분기는 body 별 이름이 정확히 박제 (jupiter / pluto 회귀 0)', () => {
+    useSimStore.setState({ selectedBodyId: 'pluto' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
-    expect(blocked.textContent ?? '').toMatch(/해왕성/);
+    expect(blocked.textContent ?? '').toMatch(/명왕성/);
     expect(blocked.textContent ?? '').not.toMatch(/목성/);
   });
 
