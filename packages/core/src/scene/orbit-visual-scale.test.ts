@@ -8,6 +8,7 @@ import {
   EARTH_MOON_ORBIT_VISUAL_SCALE,
   MARS_SATELLITES_ORBIT_VISUAL_SCALE,
   JUPITER_SATELLITES_ORBIT_VISUAL_SCALE,
+  SATURN_SATELLITES_ORBIT_VISUAL_SCALE,
   ORBIT_VISUAL_SCALE_BY_PARENT,
   getOrbitVisualScale,
 } from './orbit-visual-scale.js';
@@ -34,8 +35,8 @@ describe('orbit-visual-scale SSoT (R4 #539 Amendment 2)', () => {
     expect(getOrbitVisualScale(undefined)).toBe(1.0);
   });
 
-  it('R7+ 미진입 parent (saturn) → 1.0 (R6 비-범위)', () => {
-    expect(getOrbitVisualScale('saturn')).toBe(1.0);
+  it('R8+ 미진입 parent (uranus) → 1.0 (R7 비-범위)', () => {
+    expect(getOrbitVisualScale('uranus')).toBe(1.0);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT 는 frozen (런타임 변경 차단)', () => {
@@ -148,5 +149,48 @@ describe('orbit-visual-scale SSoT (R6 #621 — jupiter-galilean)', () => {
     // ADR §결정 4 — callisto 자동 안전 7.25x (io 가 binding constraint, 나머지 3개 자동 통과)
     expect(separationMargin).toBeGreaterThanOrEqual(1.5);
     expect(separationMargin).toBeCloseTo(7.25, 0);
+  });
+});
+
+describe('orbit-visual-scale SSoT (R7 #641 — saturn-titan, binding=ring outer 신규 유형)', () => {
+  it('SATURN_SATELLITES_ORBIT_VISUAL_SCALE = 10 (R7 #641 박제값)', () => {
+    expect(SATURN_SATELLITES_ORBIT_VISUAL_SCALE).toBe(10);
+  });
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT.saturn == SATURN_SATELLITES_ORBIT_VISUAL_SCALE (룩업 정합)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT.saturn).toBe(SATURN_SATELLITES_ORBIT_VISUAL_SCALE);
+  });
+
+  it('getOrbitVisualScale(saturn) == 10', () => {
+    expect(getOrbitVisualScale('saturn')).toBe(10);
+  });
+
+  it('titan 분리 마진 산출 (산식 A, binding=ring outer mesh) — visual_scale=10 → 1.75x', () => {
+    // R7 ADR §축 4 박제값. binding constraint 가 parent mesh 가 아닌 ring outer mesh —
+    // ring × bodyScale 결합 (§축 2a) 으로 F ring outer 가 saturn mesh 의 2.326배까지 확장.
+    const SATURN_TITAN_DISTANCE_M = 1.22187e9; // semiMajorAxisAU 8.1677e-3
+    const F_RING_OUTER_MESH_M = 1.4018e8 * 48; // F ring outer 실반경 × saturnScale=48 = 6.7286e9
+    const TITAN_MESH_RADIUS_M = 2.575e6 * 100; // titanScale=100 = 2.575e8
+    const SUM_MESH_M = F_RING_OUTER_MESH_M + TITAN_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('saturn');
+    const visualDistance = SATURN_TITAN_DISTANCE_M * visualScale;
+    const separationMargin = visualDistance / SUM_MESH_M;
+
+    // ADR §축 4 — titan 분리 마진 1.75x (≥ 1.5 통과 +0.25, R4 moon 1.78x 근접 정합)
+    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
+    expect(separationMargin).toBeCloseTo(1.75, 1);
+  });
+
+  it('ring 미고려 함정값 검증 — saturn mesh 만 분모로 쓰면 ×10 마진 3.88x 로 과대평가', () => {
+    // R7 ADR §축 4 — ring 미고려 시 ×4 가 1.55x 로 통과 오판하는 함정. binding 정의가
+    // ring outer 임을 회귀 가드 (R8+ uranus ring 보유 진입 시 동일 유형 답습).
+    const SATURN_TITAN_DISTANCE_M = 1.22187e9;
+    const SATURN_MESH_RADIUS_M = 6.0268e7 * 48; // 2.8929e9
+    const TITAN_MESH_RADIUS_M = 2.575e6 * 100;
+    const marginVsMeshOnly =
+      (SATURN_TITAN_DISTANCE_M * getOrbitVisualScale('saturn')) /
+      (SATURN_MESH_RADIUS_M + TITAN_MESH_RADIUS_M);
+    expect(marginVsMeshOnly).toBeCloseTo(3.88, 1);
   });
 });

@@ -62,7 +62,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     }
   });
 
-  it('moon/phobos/deimos/galilean 은 satellite (parent 별 분리)', () => {
+  it('moon/phobos/deimos/galilean/titan 은 satellite (parent 별 분리)', () => {
     const satellites: Record<string, string> = {
       moon: 'earth',
       phobos: 'mars',
@@ -71,6 +71,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       europa: 'jupiter',
       ganymede: 'jupiter',
       callisto: 'jupiter',
+      titan: 'saturn', // R7 #641
     };
     for (const [satId, expectedParent] of Object.entries(satellites)) {
       const body = byId.get(satId);
@@ -80,7 +81,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     }
   });
 
-  it('R-Phase allowlist 의 satellite 들은 정확히 earth/mars/jupiter 3 parent 로 그룹화', () => {
+  it('R-Phase allowlist 의 satellite 들은 정확히 earth/mars/jupiter/saturn 4 parent 로 그룹화', () => {
     // 본 fix 의 핵심 불변식 — satellite 궤도선이 parent 수만큼의 LineSystem 으로 생성됨.
     const parents = new Set<string>();
     for (const id of R_PHASE_BODY_ALLOWLIST) {
@@ -88,8 +89,8 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       if (!body || !body.orbit) continue;
       if (isSatelliteOrbit(body.parentId)) parents.add(body.parentId);
     }
-    // R6 시점: earth (moon) / mars (phobos, deimos) / jupiter (galilean 4).
-    expect([...parents].sort()).toEqual(['earth', 'jupiter', 'mars']);
+    // R7 시점: earth (moon) / mars (phobos, deimos) / jupiter (galilean 4) / saturn (titan #641).
+    expect([...parents].sort()).toEqual(['earth', 'jupiter', 'mars', 'saturn']);
   });
 });
 
@@ -101,7 +102,7 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
   });
 
   it('미매핑 parentId → 1.0 fallback (visual scale 미적용, 실측 그대로)', () => {
-    expect(getOrbitVisualScale('saturn')).toBe(DEFAULT_ORBIT_VISUAL_SCALE);
+    expect(getOrbitVisualScale('uranus')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R8 진입 전
     expect(getOrbitVisualScale('unknown-parent')).toBe(DEFAULT_ORBIT_VISUAL_SCALE);
   });
 

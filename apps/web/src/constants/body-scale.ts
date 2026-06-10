@@ -79,6 +79,8 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   europa: 100, // R6 #627 옵션 D — 비율 0.046 (io 동일값, mental model "galilean 균일")
   ganymede: 100, // R6 #627 옵션 D — 비율 0.077 (태양계 최대 위성, moon 0.068 의 1.13배). 사실 크기 순서 보존
   callisto: 100, // R6 #627 옵션 D — 비율 0.070. galilean 4개 moon 비율 근접 — 사용자 "목성 대비 적당" 합의
+  saturn: 48, // R7 #641 — jupiter 동일값 (거성 예외 2번째 인스턴스, "가스 거성 = scale 48" 단일 mental model). saturn/jupiter mesh 비 0.843 = 사실 radius 비 정확 보존 (R5 mars=earth=800 선례 동형). sun 대비 px 비 ~8.32% (식, Q2=B 거성 임계 ≤ 8.5% margin 0.18%), mesh visible 20.5px. ADR 20260610-r7 §축 1
+  titan: 100, // R7 #641 — galilean 최종값 (R6 Amendment 2) 답습 (300→200→100 iteration 건너뛰고 수렴값 시작). titan/saturn 비 0.089 (moon/earth 0.068 근접, ganymede-class 0.978배). 4px fallback billboard 의존 (mesh 1.82px). ADR 20260610-r7 §축 3
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

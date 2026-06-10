@@ -28,12 +28,13 @@ beforeEach(() => {
 });
 
 describe('ScenarioPresets', () => {
-  it('4개 프리셋 + 원복 버튼 렌더', () => {
+  it('5개 프리셋 + 원복 버튼 렌더', () => {
     render(<ScenarioPresets />);
     expect(screen.getByTestId('preset-jupiter-x10')).toBeInTheDocument();
     expect(screen.getByTestId('preset-no-jupiter')).toBeInTheDocument();
     expect(screen.getByTestId('preset-sun-half')).toBeInTheDocument();
     expect(screen.getByTestId('preset-saturn-x10')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-uranus-x10')).toBeInTheDocument(); // R7 #641 — negative 케이스 교체 보존
     expect(screen.getByTestId('scenario-reset')).toBeInTheDocument();
   });
 
@@ -78,14 +79,19 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
     expect(screen.getByTestId('preset-no-jupiter')).not.toBeDisabled();
   });
 
-  it('saturn-x10 (R7 미진입 saturn) preset 은 disabled (negative 케이스 보존)', () => {
+  it('saturn-x10 (R7 #641 진입 saturn) preset 은 활성 (zero-touch 자동 enabled 재현 2번째)', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-saturn-x10')).toBeDisabled();
+    expect(screen.getByTestId('preset-saturn-x10')).not.toBeDisabled();
+  });
+
+  it('uranus-x10 (R8 미진입 uranus) preset 은 disabled (negative 케이스 교체 보존)', () => {
+    render(<ScenarioPresets />);
+    expect(screen.getByTestId('preset-uranus-x10')).toBeDisabled();
   });
 
   it('disabled preset 은 aria-disabled="true" 설정 (스크린 리더 인지)', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-saturn-x10')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('preset-uranus-x10')).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('활성 preset 은 aria-disabled="false"', () => {
@@ -96,11 +102,15 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
 
   it('disabled preset 은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-saturn-x10')).toHaveAttribute(
+    expect(screen.getByTestId('preset-uranus-x10')).toHaveAttribute(
       'data-r-phase-disabled',
       'true',
     );
     expect(screen.getByTestId('preset-sun-half')).toHaveAttribute('data-r-phase-disabled', 'false');
+    expect(screen.getByTestId('preset-saturn-x10')).toHaveAttribute(
+      'data-r-phase-disabled',
+      'false',
+    ); // R7 #641 진입
     expect(screen.getByTestId('preset-jupiter-x10')).toHaveAttribute(
       'data-r-phase-disabled',
       'false',
@@ -109,7 +119,7 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
 
   it('disabled preset 은 tooltip "R-Phase 진행 시 활성" 박제', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-saturn-x10')).toHaveAttribute(
+    expect(screen.getByTestId('preset-uranus-x10')).toHaveAttribute(
       'title',
       'R-Phase 진행 시 활성',
     );
@@ -123,14 +133,14 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
 
   it('disabled preset 시각 차별화 — opacity-50 cursor-not-allowed 클래스 박제', () => {
     render(<ScenarioPresets />);
-    const saturnBtn = screen.getByTestId('preset-saturn-x10');
-    expect(saturnBtn.className).toContain('opacity-50');
-    expect(saturnBtn.className).toContain('cursor-not-allowed');
+    const uranusBtn = screen.getByTestId('preset-uranus-x10');
+    expect(uranusBtn.className).toContain('opacity-50');
+    expect(uranusBtn.className).toContain('cursor-not-allowed');
   });
 
   it('disabled preset 강제 click → apply 부작용 0 (HTML disabled 자체 차단)', () => {
     render(<ScenarioPresets />);
-    fireEvent.click(screen.getByTestId('preset-saturn-x10'));
+    fireEvent.click(screen.getByTestId('preset-uranus-x10'));
     // HTML button[disabled] 는 click 이벤트 자체를 dispatch 하지 않음.
     const s = useSimStore.getState();
     expect(s.physicsEngine).toBe('kepler'); // 초기값 유지 (setEngine 호출 0)

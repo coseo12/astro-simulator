@@ -74,7 +74,24 @@ const flags = {
 // R6 #621 — jupiter + galilean 4 (io/europa/ganymede/callisto) 동기화. R_PHASE_BODY_ALLOWLIST
 // 자동 생성값 (CURRENT_R_PHASE=6) 과 정합 — #598 정적 매칭 가드 (r-phase-allowlist.test.ts) 가
 // FOCUS_BODIES === R_PHASE_BODY_ALLOWLIST 를 CI fail-fast 로 차단한다.
-const FOCUS_BODIES = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'phobos', 'deimos', 'jupiter', 'io', 'europa', 'ganymede', 'callisto'];
+// R7 #641 — saturn + titan 동기화 (CURRENT_R_PHASE=7).
+const FOCUS_BODIES = [
+  'sun',
+  'mercury',
+  'venus',
+  'earth',
+  'moon',
+  'mars',
+  'phobos',
+  'deimos',
+  'jupiter',
+  'io',
+  'europa',
+  'ganymede',
+  'callisto',
+  'saturn',
+  'titan',
+];
 const MODES = ['observe', 'research'];
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };
