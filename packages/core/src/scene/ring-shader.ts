@@ -71,10 +71,16 @@ attribute vec2 uv;
 uniform mat4 worldViewProjection;
 
 varying vec2 vUV;
+// #641 D-T2 fix 2 — 로그 depth: scene 이 enableLogarithmicDepth 로 StandardMaterial(본체)을
+// 로그 depth 공간에 기록하는데, 커스텀 ShaderMaterial 은 표준 z 를 쓰면 depth 비교 공간이
+// 불일치 → 본체↔고리 가림이 엉터리 (행성이 항상 고리 위). Babylon logDepth 공식과 동일하게
+// fragment 에서 gl_FragDepth 를 로그 공간으로 기록한다.
+varying float vFragmentDepth;
 
 void main(void) {
   gl_Position = worldViewProjection * vec4(position, 1.0);
   vUV = uv;
+  vFragmentDepth = 1.0 + gl_Position.w;
 }
 `;
 
@@ -101,6 +107,14 @@ uniform float densityProfileR[${MAX_DENSITY_POINTS}];
 uniform float densityProfileD[${MAX_DENSITY_POINTS}];
 uniform int profileLength;
 uniform float ringAlpha;
+// #641 D-T2 fix — layer innerRadius/outerRadius 비 (0~1). r < innerRatio 는 discard (annulus).
+// 기존엔 inner cutoff 가 없어 interpDensity 의 r<=profileR[0] clamp 가 disc 중심까지
+// profileD[0] 로 칠함 → 5층 누적으로 본체가 불투명 원반에 묻힘 (P9 jupiter 에선 ring 이
+// bodyScale 미결합으로 mesh 안에 묻혀 잠복 — R7 ring×bodyScale 결합으로 표면화).
+uniform float innerRatio;
+// #641 D-T2 fix 2 — Babylon logDepth 정합 상수 = 2 / log2(camera.maxZ + 1).
+uniform float logDepthConstant;
+varying float vFragmentDepth;
 
 /**
  * densityProfile 배열 선형 보간.
@@ -128,12 +142,19 @@ void main(void) {
   // 디스크 중심(0.5, 0.5) 기준 반경을 [0, 1] 로. (거리 × 2 = 0~1)
   float r = length(vUV - vec2(0.5)) * 2.0;
 
-  // 디스크 바깥(원 밖) 은 그리지 않음 — 정사각형 quad 의 코너 영역
-  if (r > 1.0) discard;
+  // 디스크 바깥(원 밖) + layer 안쪽 (innerRadius 미만 annulus 밖) 은 그리지 않음 (#641 fix).
+  if (r > 1.0 || r < innerRatio) discard;
 
-  float d = interpDensity(r);
+  // densityProfile 의 r 는 layer 내부 [inner, outer] 구간 정규화 (데이터 의도 — 예: saturn A ring
+  // Encke gap dip 0.782 = (133,480-122,170)/(136,780-122,170)). disc 전역 r 을 layer 구간으로 재정규화.
+  float r_norm = (r - innerRatio) / max(1.0 - innerRatio, 1e-6);
+
+  float d = interpDensity(r_norm);
   float alpha = clamp(d * ringAlpha, 0.0, 1.0);
   gl_FragColor = vec4(color * d, alpha);
+
+  // #641 D-T2 fix 2 — 본체(StandardMaterial useLogarithmicDepth)와 동일한 로그 depth 공간 기록.
+  gl_FragDepth = log2(max(vFragmentDepth, 1e-6)) * logDepthConstant * 0.5;
 }
 `;
 
@@ -151,7 +172,12 @@ function registerRingShader(): void {
 }
 
 export interface RingShaderParams {
-  /** 고리 안쪽 반경 (m). 디스크는 outerRadius 로 생성되고, innerRadius/outerRadius 는 shader 의 r_norm 해석에 쓰이지 않는다 — densityProfile 자체가 이미 정규화된 [0,1] 기준. */
+  /**
+   * 고리 안쪽 반경 (m). 디스크는 outerRadius 로 생성되고, shader 가 `innerRatio =
+   * innerRadius/outerRadius` 로 annulus cutoff (#641 D-T2 fix — r < innerRatio discard +
+   * densityProfile 의 r 를 [inner, outer] layer 구간 재정규화). 이전 계약("r_norm 해석에 쓰이지
+   * 않는다")은 P9 잠복 결함 — fallback InstancedMesh 경로는 처음부터 innerScene 을 올바르게 사용.
+   */
   innerRadius: number;
   /** 고리 바깥 반경 (m). 디스크 반경 = outerRadius × renderScaleForTier(tier). */
   outerRadius: number;
@@ -224,6 +250,8 @@ export function createRingShaderMaterial(scene: Scene, params: RingShaderParams)
         'densityProfileD',
         'profileLength',
         'ringAlpha',
+        'innerRatio',
+        'logDepthConstant',
       ],
       needAlphaBlending: true,
     },
@@ -247,6 +275,18 @@ export function createRingShaderMaterial(scene: Scene, params: RingShaderParams)
   material.setFloats('densityProfileD', Array.from(dArr));
   material.setInt('profileLength', len);
   material.setFloat('ringAlpha', params.ringAlpha ?? 0.6);
+  // #641 D-T2 fix — layer annulus cutoff. inner ≥ outer 등 비정상 데이터는 0 (full disc) 로 방어.
+  const innerRatio =
+    params.outerRadius > 0
+      ? Math.min(Math.max(params.innerRadius / params.outerRadius, 0), 0.999)
+      : 0;
+  material.setFloat('innerRatio', innerRatio);
+
+  // #641 D-T2 fix 2 — 로그 depth 상수 (Babylon logDepth 공식: 2 / log2(maxZ + 1)).
+  // maxZ 는 setupArcRotateCamera 가 1e14 로 고정 (tier 전환은 minZ 만 변경 — tier-transition.ts).
+  // activeCamera 부재 (테스트 등) 시 1e14 fallback.
+  const maxZ = scene.activeCamera?.maxZ ?? 1e14;
+  material.setFloat('logDepthConstant', 2.0 / (Math.log(maxZ + 1.0) / Math.LN2));
 
   // 투명 파이프라인 — 뒷면도 렌더 (고리는 위·아래 모두 관측)
   material.backFaceCulling = false;

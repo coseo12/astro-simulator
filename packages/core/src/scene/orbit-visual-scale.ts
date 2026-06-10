@@ -43,6 +43,10 @@
  *   - sum mesh radius = 2.772e9 m → 실측 거리의 **295.6배** (R4 moon 16.9배 의 17.5배 더 극단)
  *   - visual_scale=500 적용 시 visual 거리 = 4.688e9 m → sum mesh / visual 거리 = **1.69배** 분리 마진
  *     (분리 임계 ≥ 1.5x 통과 +0.19, R4 1.78배 와 거의 동등 안정)
+ *   - ⚠️ **위 산식 A(설계 real-meter 비)와 런타임 산식 B(scene-unit `satellite.dist / parent.bsRadius`,
+ *     실측 phobos≈0.99)의 ~1.7배 gap 은 측정-정의 차이이지 버그가 아니다** (#622 NO-OP ADR
+ *     `docs/decisions/20260609-622-orbit-scale-gap-no-op.md`). boundingSphere 타이밍(#611 패턴) 아님이
+ *     실측 확정 (stale/fresh=1.0) — scale(BODY/ORBIT_VISUAL/render) 합성 정의 차이. 재오인 분석 금지.
  *
  * mars-deimos (자동 안전):
  *   - mars-deimos 실측 거리 = 23.463e6 m (JPL SSD, semiMajorAxisAU 1.5684e-4)
@@ -115,6 +119,28 @@ export const MARS_SATELLITES_ORBIT_VISUAL_SCALE = 500;
 export const JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 16;
 
 /**
+ * Saturn-Satellites 궤도 visual scale 배수 (R7 titan 단일 — R8+ enceladus 등 확장 전제 복수형).
+ *
+ * `titan world position = saturn world position + (titan local orbit × 10)` 로 산출.
+ * 실측 거리 (titan 1.22187e9 m = 8.1677e-3 AU) 는 보존되며 rendering 단계에서만 ×10 적용.
+ *
+ * **binding constraint = ring outer mesh (R4/R5/R6 과 다른 신규 유형)** — R7 ring × bodyScale
+ * 결합 (ADR §축 2a) 으로 F ring outer mesh (1.4018e8 × 48 = 6.7286e9 m) 가 saturn mesh
+ * (2.8929e9 m) 의 2.326배까지 확장되므로 parent mesh 가 아닌 **ring outer 가 분모**.
+ * ring 미고려 시 ×4 가 1.55x 로 통과하는 것처럼 보이는 함정값 (실제 0.70x fail — 고리 안에 묻힘).
+ *
+ * 산식 A (설계 임계, real-meter — #622 NO-OP SSoT: 산식 B 와 직접 비교 금지):
+ *   titan 분리 마진 = (1.22187e9 × 10) / (6.7286e9 + 2.575e8) = 1.75x (≥ 1.5 통과 +0.25,
+ *   R4 moon 1.78x 근접 정합). 후보: ×4 0.70x fail / ×9 1.57x 박빙 / **×10 1.75x 선택** / ×12 2.10x 과분리.
+ *
+ * D-T2 미통과 시 fallback: 궤도선-고리 시각 간섭 보고 시 ×10 → ×12 (R7 ADR §위험 #3).
+ * R8+ uranus (ring 보유) 진입 시 본 "binding = ring outer" 유형 답습 (R7 ADR §R8 인계 #2).
+ *
+ * R7 ADR `20260610-r7-saturn-titan-rings-visualization.md` §축 4.
+ */
+export const SATURN_SATELLITES_ORBIT_VISUAL_SCALE = 10;
+
+/**
  * parent body id 별 satellite orbit visual scale 룩업.
  *
  * R5+ 진입 시 parent-satellite 쌍별로 박제값 추가. 미정의 parent 는 1.0 (실측 그대로).
@@ -123,6 +149,7 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
   earth: EARTH_MOON_ORBIT_VISUAL_SCALE, // R4 #539 Amendment 2 — moon visual fusion 해결
   mars: MARS_SATELLITES_ORBIT_VISUAL_SCALE, // R5 #594 — phobos + deimos 단일 룩업 (binding constraint=phobos)
   jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io, 마진 1.69x)
+  saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형, 마진 1.75x)
 });
 
 /**

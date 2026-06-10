@@ -454,13 +454,37 @@ export function createSolarSystemScene(
     const host = meshes.get(body.id);
     if (!host) continue;
 
+    // R7 #641 — ring × bodyScale 결합 (ADR 20260610-r7 §축 2a, R7 유일 코어 인프라 확장).
+    // body mesh 는 생성 시점 `× bodyScale` bake (createBodyMesh) 인데 ring disc 는 실반경 ×
+    // renderScale 만이라, 미결합 시 saturn F ring outer (1.4018e8 m) 가 mesh 반경 (×48 =
+    // 2.8929e9 m) 의 4.8% — 고리가 mesh 안에 완전히 묻힌다. host bodyScale 을 ring 반경에
+    // rendering 시점 곱해 ring/body 비율 = 사실 비율 (saturn 2.326배) 자동 보존. 데이터 SSoT
+    // (실측 km) 무수정. generic 결합이므로 jupiter ring 도 가시화 (R6 비-범위 해제 —
+    // Behavior Change, ringAlphaHint 0.15 faint 처리로 PM "jupiter faint 대조" 충족).
+    const hostBodyScale = bodyScale(body.id);
+    const scaledRings = body.rings.map((r) => ({
+      ...r,
+      innerRadius: r.innerRadius * hostBodyScale,
+      outerRadius: r.outerRadius * hostBodyScale,
+    }));
+    // R7 #641 §축 2b — 층별 colorHint → RGB tuple. 미지정 층은 undefined → DEFAULT `#887766` 폴백.
+    const layerColors = body.rings.map((r) => {
+      if (!r.colorHint?.hex) return undefined;
+      const c = hexToColor3(r.colorHint.hex);
+      return [c.r, c.g, c.b] as const;
+    });
+
     let handles: RingPlaceholderHandles | RingShaderHandles;
     if (ringRenderMode === 'placeholder') {
-      handles = createRingPlaceholder(scene, host, body.rings, { tier: activeTier });
+      handles = createRingPlaceholder(scene, host, scaledRings, { tier: activeTier });
     } else {
-      handles = createRingShaderMesh(scene, host, body.rings, {
+      handles = createRingShaderMesh(scene, host, scaledRings, {
         forceFallback: ringRenderMode === 'fallback',
         tier: activeTier,
+        layerColors,
+        // R7 #641 §축 2c — ringAlphaHint (saturn 0.9 prominent / jupiter 0.15 faint).
+        // 미지정 시 필드 생략 → shader 기본 0.6 (하위 호환).
+        ...(body.ringAlphaHint !== undefined ? { ringAlpha: body.ringAlphaHint } : {}),
       });
     }
     ringHandlesByBody.set(body.id, handles);

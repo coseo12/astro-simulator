@@ -54,11 +54,21 @@ const PRESETS: Preset[] = [
     // allowlist 에 포함되면서 jupiter-x10 / no-jupiter 가 모두 enabled 가 되어 disabled-path
     // 검증 negative 케이스가 소멸한다. 미진입 body(saturn) target preset 을 추가해
     // R-Phase 가드 disabled 분기 (#404) 가 "항상 PASS" 로 무력화되지 않도록 negative 케이스 보존
-    // (CLAUDE.md §가드 설계 원칙 — fail-fast / negative 케이스 유지). R7 진입 시 자동 enabled.
+    // (CLAUDE.md §가드 설계 원칙 — fail-fast / negative 케이스 유지).
+    // R7 #641 — saturn 진입으로 zero-touch 자동 enabled (Concrete Prediction 재현 2번째).
     id: 'saturn-x10',
     label: '토성 10배 질량',
     description: '외행성 섭동과 목성-토성 대공명(2:5)을 관찰. 토성 진입(R7) 시 활성.',
     massMultipliers: { saturn: 10 },
+  },
+  {
+    // R7 #641 — uranus(introducedInRPhase=8) target preset. saturn 진입으로 saturn-x10 이
+    // enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입 body(uranus) 로
+    // 교체 보존 (R6 #621 의 saturn-x10 추가와 동일 선례 답습). R8 진입 시 자동 enabled.
+    id: 'uranus-x10',
+    label: '천왕성 10배 질량',
+    description: '외행성 외곽 섭동을 관찰. 천왕성 진입(R8) 시 활성.',
+    massMultipliers: { uranus: 10 },
   },
 ];
 

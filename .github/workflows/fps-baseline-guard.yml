@@ -7,8 +7,19 @@ name: fps-baseline-guard
 on:
   pull_request:
     branches: [develop, main]
+    # #626 — docs/ADR/워크플로만 바뀐 PR 은 fps 측정이 무의미(런타임 무관)한데 25분 실 브라우저
+    # 측정 후 timeout cancelled (PR #625 ADR-only 실측). 런타임 영향 없는 경로는 skip (fail-safe —
+    # 코드/데이터/config 가 하나라도 있으면 실행). paths filter 효과는 base 브랜치 반영 후 후속 PR 부터.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/**'
   push:
     branches: [develop, main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/**'
 
 jobs:
   fps-baseline-guard:

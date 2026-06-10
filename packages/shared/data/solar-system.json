@@ -203,6 +203,8 @@
         "longitudeOfPerihelionDeg": 14.72847983,
         "meanLongitudeDeg": 34.39644051
       },
+      "$ringAlphaHintComment": "R7 #641 §축 2c — ring × bodyScale generic 결합 (ADR 20260610-r7)으로 jupiter ring 이 가시화됨 (R6 비-범위 해제, Behavior Change). PM Q3 'saturn prominent vs jupiter faint 대조' — faint 0.15 (P9 densityProfile 데이터는 보존, rendering hint 만).",
+      "ringAlphaHint": 0.15,
       "$ringsComment": "P9 #254 — 목성 고리 3층 (Halo/Main/Gossamer). NASA/JPL 참고값. densityProfile 는 [r_normalized ∈ [0,1], density ∈ [0,1]] 튜플. r_normalized = (r - innerRadius) / (outerRadius - innerRadius). ADR 20260420-p9-galilean-laplace-rings.md §결정 #2.",
       "rings": [
         {
@@ -339,7 +341,8 @@
       "$radiusComment": "P10-B-2: 5.8232e7 (mean) → 6.0268e7 (NASA equatorial).",
       "parentId": "sun",
       "introducedInRPhase": 7,
-      "showInShortcutBar": false,
+      "$showInShortcutBarComment": "R7 #641 §축 5 — false → true (jupiter 정합, 거성 본체는 bar 노출). titan 은 false (galilean 패턴).",
+      "showInShortcutBar": true,
       "colorHint": { "hex": "#E0C78E", "colorSource": "observed" },
       "dataSource": "NASA Planetary Fact Sheet (2024)",
       "lastVerified": "2026-04-21",
@@ -350,6 +353,89 @@
         "longitudeOfAscendingNodeDeg": 113.66242448,
         "longitudeOfPerihelionDeg": 92.59887831,
         "meanLongitudeDeg": 49.95424423
+      },
+      "$ringAlphaHintComment": "R7 #641 §축 2c — prominent 강조 (PM Q3, jupiter faint 0.15 대조). rendering hint — densityProfile 실측 데이터와 직교.",
+      "ringAlphaHint": 0.9,
+      "$ringsComment": "R7 #641 — 토성 고리 5층 (D/C/B/A/F). NASA Saturn Fact Sheet / JPL Ring-Moon Systems Node 실측 반경. Cassini Division 은 B(117,580 km)–A(122,170 km) 층간 gap 으로 자연 표현 (별도 층 불필요 — 스키마가 비연속 층 허용). Encke gap 은 A ring densityProfile dip @0.782 = (133589−122170)/14610. F ring outer 140,180 km = saturn 반경 2.326배 (PM '~2.3배' 정합 상한). 층별 colorHint 는 R7 optional 스키마 확장 (ADR 20260610-r7 §축 2b).",
+      "rings": [
+        {
+          "id": "d",
+          "innerRadiusKm": 66900,
+          "outerRadiusKm": 74510,
+          "densityProfile": [
+            [0.0, 0.02],
+            [1.0, 0.06]
+          ],
+          "colorHint": { "hex": "#5C5147", "colorSource": "observed" }
+        },
+        {
+          "id": "c",
+          "innerRadiusKm": 74658,
+          "outerRadiusKm": 92000,
+          "densityProfile": [
+            [0.0, 0.1],
+            [1.0, 0.25]
+          ],
+          "colorHint": { "hex": "#8A7A66", "colorSource": "observed" }
+        },
+        {
+          "id": "b",
+          "innerRadiusKm": 92000,
+          "outerRadiusKm": 117580,
+          "densityProfile": [
+            [0.0, 0.85],
+            [0.5, 1.0],
+            [1.0, 0.9]
+          ],
+          "colorHint": { "hex": "#D8C9A8", "colorSource": "observed" }
+        },
+        {
+          "id": "a",
+          "innerRadiusKm": 122170,
+          "outerRadiusKm": 136780,
+          "densityProfile": [
+            [0.0, 0.7],
+            [0.75, 0.65],
+            [0.782, 0.15],
+            [0.81, 0.65],
+            [1.0, 0.55]
+          ],
+          "colorHint": { "hex": "#C9B894", "colorSource": "observed" }
+        },
+        {
+          "id": "f",
+          "innerRadiusKm": 140180,
+          "outerRadiusKm": 140680,
+          "densityProfile": [
+            [0.0, 0.3],
+            [0.5, 0.7],
+            [1.0, 0.3]
+          ],
+          "colorHint": { "hex": "#B0A48E", "colorSource": "observed" }
+        }
+      ]
+    },
+    {
+      "id": "titan",
+      "kind": "moon",
+      "nameKo": "타이탄",
+      "nameEn": "Titan",
+      "mass": 1.345e23,
+      "radius": 2.575e6,
+      "parentId": "saturn",
+      "introducedInRPhase": 7,
+      "showInShortcutBar": false,
+      "$comment": "R7 #641 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-10 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Saturn-centric J2000 Ecliptic (osculating). Laplace plane 값 혼입 금지 — P10-D #261 galilean frame 통일 선례 (ADR 20260610-r7 §위험 #6). Horizons 원시값: IN=27.7090 / OM=169.0774 / W=177.9434 / MA=352.3105 → ϖ=OM+W=347.0208, L=ϖ+MA mod 360=339.3313. a/e 는 NASA Titan Fact Sheet 박제값 (PM Q4, ADR §축 3).",
+      "colorHint": { "hex": "#E8A33D", "colorSource": "observed" },
+      "dataSource": "NASA Titan Fact Sheet + JPL Horizons API (2026-06-10 쿼리, 2026-01-01 TDB epoch, Saturn-centric J2000 Ecliptic)",
+      "lastVerified": "2026-06-10",
+      "orbit": {
+        "semiMajorAxisAU": 8.1677e-3,
+        "eccentricity": 0.0288,
+        "inclinationDeg": 27.709,
+        "longitudeOfAscendingNodeDeg": 169.0774,
+        "longitudeOfPerihelionDeg": 347.0208,
+        "meanLongitudeDeg": 339.3313
       }
     },
     {

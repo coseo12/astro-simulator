@@ -36,6 +36,8 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
   // × dt=10min → 253 sub-step/주기 × 206 주기/년 = 5e4 step 누적으로 오차 증폭.
   // 본 테스트 원 의도(9체 대칭성)는 유지. Galilean N-body 정합성은 P9 PR-2 의 Rust
   // `measure_galilean_period` + `measure_laplace_resonance` 로 검증.
+  // R7 #641: titan 도 동일 이유로 제외 (주기 15.95d × dt=10min → ~1.4e3 sub-step/주기 ×
+  // 23 주기/년 누적 — galilean 과 동일 오차 증폭 메커니즘). 본 테스트 원 의도(9체 대칭성) 유지.
   const EXCLUDED_SATELLITES = new Set([
     'phobos', // P8
     'deimos', // P8
@@ -43,6 +45,7 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
     'europa', // P9
     'ganymede', // P9
     'callisto', // P9
+    'titan', // R7 #641
   ]);
   const fullSystem = getSolarSystem();
   const system = {
