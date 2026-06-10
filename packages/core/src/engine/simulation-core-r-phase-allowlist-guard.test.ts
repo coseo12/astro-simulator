@@ -110,24 +110,24 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402 + R4 #532)',
     core.dispose();
   });
 
-  it('allowlist 외 body (uranus) focusOn → bodySelected emit 0 + console.warn', () => {
-    // R7 #641 — saturn 이 R7 진입으로 allowlist 포함 → 차단 예시 body 를 uranus(R8) 로 교체
-    // (R6 #621 의 jupiter → saturn 교체 선례 답습).
+  it('allowlist 진입 body (uranus) focusOn → bodySelected emit 정상 (R8 #647 허용 전환)', () => {
+    // R8 #647 — uranus 가 R8 진입으로 allowlist 포함 (R7 까지의 차단 예시 → 허용 전환.
+    // 차단 예시 body 는 neptune(R9) 으로 교체 — R6 jupiter → R7 saturn → R8 uranus 선례 답습).
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
     core.command({ type: 'focusOn', bodyId: 'uranus' });
 
-    expect(onBodySelected).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('R_PHASE_BODY_ALLOWLIST');
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('uranus');
+    expect(onBodySelected).toHaveBeenCalledTimes(1);
+    expect(onBodySelected).toHaveBeenCalledWith({ id: 'uranus' });
+    expect(warnSpy).not.toHaveBeenCalled();
 
     core.dispose();
   });
 
-  it('allowlist 외 body (neptune) focusOn → bodySelected emit 0', () => {
+  it('allowlist 외 body (neptune) focusOn → bodySelected emit 0 + console.warn', () => {
+    // R8 #647 — 차단 예시 body 를 neptune(R9) 으로 교체 (uranus R8 진입으로 허용 전환).
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
@@ -136,6 +136,8 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402 + R4 #532)',
 
     expect(onBodySelected).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('R_PHASE_BODY_ALLOWLIST');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('neptune');
 
     core.dispose();
   });
@@ -154,34 +156,34 @@ describe('SimulationCore focusOn — R-Phase Allowlist 가드 (#402 + R4 #532)',
     core.dispose();
   });
 
-  it('연쇄 호출 — sun(허용) → uranus(차단) → venus(허용) 시 emit 2회만', () => {
-    // R7 #641 — 차단 예시 body 를 uranus(R8) 로 교체 (saturn R7 진입으로 허용 전환).
+  it('연쇄 호출 — sun(허용) → neptune(차단) → venus(허용) 시 emit 2회만', () => {
+    // R8 #647 — 차단 예시 body 를 neptune(R9) 으로 교체 (uranus R8 진입으로 허용 전환).
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
     core.command({ type: 'focusOn', bodyId: 'sun' });
-    core.command({ type: 'focusOn', bodyId: 'uranus' });
+    core.command({ type: 'focusOn', bodyId: 'neptune' });
     core.command({ type: 'focusOn', bodyId: 'venus' });
 
     expect(onBodySelected).toHaveBeenCalledTimes(2);
     expect(onBodySelected).toHaveBeenNthCalledWith(1, { id: 'sun' });
     expect(onBodySelected).toHaveBeenNthCalledWith(2, { id: 'venus' });
-    // uranus 차단 시 1회 warn
+    // neptune 차단 시 1회 warn
     expect(warnSpy).toHaveBeenCalledTimes(1);
 
     core.dispose();
   });
 
-  it('URL ?focus=uranus 직접 진입 시나리오 — focusOn uranus 도 차단', () => {
-    // URL 진입은 url-sync.tsx 가 sendCommand({type:'focusOn', bodyId: 'uranus'}) 발행 →
+  it('URL ?focus=neptune 직접 진입 시나리오 — focusOn neptune 도 차단', () => {
+    // URL 진입은 url-sync.tsx 가 sendCommand({type:'focusOn', bodyId: 'neptune'}) 발행 →
     // SimulationCore.command 가 본 가드로 차단. UI 우회 진입 회귀 가드.
-    // R7 #641 — saturn 이 R7 진입으로 허용 전환 → 차단 예시 body 를 uranus(R8) 로 교체.
+    // R8 #647 — uranus 가 R8 진입으로 허용 전환 → 차단 예시 body 를 neptune(R9) 으로 교체.
     const core = new SimulationCore(makeCanvas());
     const onBodySelected = vi.fn();
     core.on('bodySelected', onBodySelected);
 
-    core.command({ type: 'focusOn', bodyId: 'uranus' });
+    core.command({ type: 'focusOn', bodyId: 'neptune' });
 
     expect(onBodySelected).not.toHaveBeenCalled();
 

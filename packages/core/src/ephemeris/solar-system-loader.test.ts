@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 25개 바디 (sun + 8행성 + moon 8 + 왜소행성 5 + 혜성 3)', () => {
+  it('로드 성공 + 26개 바디 (sun + 8행성 + moon 9 + 왜소행성 5 + 혜성 3)', () => {
     // P8 #244: 포보스/데이모스 추가 → moon 엔티티 3개 (moon + phobos + deimos).
     // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 추가 → moon 엔티티 7개.
     // R7 #641: titan 추가 → moon 엔티티 8개, 총 25 바디.
+    // R8 #647: titania 추가 → moon 엔티티 9개, 총 26 바디.
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(25);
-    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(8);
+    expect(data.bodies).toHaveLength(26);
+    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(9);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
     expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
   });
@@ -200,5 +201,69 @@ describe('loadSolarSystem', () => {
     // ringAlphaHint 미지정 body (earth) 는 undefined — scene 이 전달 생략 → shader 기본 0.6
     const earth = loadSolarSystem().bodies.find((b) => b.id === 'earth');
     expect(earth?.ringAlphaHint).toBeUndefined();
+  });
+
+  it('R8 #647 — titania 로드 (parentId=uranus, Uranus-centric J2000 Ecliptic 각도 요소)', () => {
+    const titania = loadSolarSystem().bodies.find((b) => b.id === 'titania');
+    expect(titania).toBeDefined();
+    expect(titania?.kind).toBe('moon');
+    expect(titania?.parentId).toBe('uranus');
+    expect(titania?.introducedInRPhase).toBe(8);
+    expect(titania?.showInShortcutBar).toBe(false); // galilean/titan 패턴 (URL ?focus=titania 진입)
+    // ADR §축 3 박제값 — a=2.91388e-3 AU (NASA Fact Sheet 435,910 km), e=0.0011
+    expect(titania!.orbit!.semiMajorAxis).toBeCloseTo(2.91388e-3 * 1.495978707e11, -5);
+    expect(titania!.orbit!.eccentricity).toBeCloseTo(0.0011, 4);
+    // Horizons 쿼리 (Uranus-centric J2000 Ecliptic) — inclination 97.7633° (ecliptic 기준).
+    // ~98° 세로 궤도가 사실 정합 (uranus 계 전체 누움 — tilt 97.77° 고리 평면과 정렬, §축 3 사전 등록)
+    expect(titania!.orbit!.inclination).toBeCloseTo((97.7633 * Math.PI) / 180, 3);
+  });
+
+  it('R8 #647 — uranus.rings 1 composite layer (densityProfile 15점 ≤ MAX 16) + ringAlphaHint 0.8', () => {
+    const bodies = loadSolarSystem().bodies;
+    const uranus = bodies.find((b) => b.id === 'uranus');
+    expect(uranus).toBeDefined();
+    expect(uranus?.showInShortcutBar).toBe(true); // R8 §축 5 — false → true 전환
+    expect(uranus?.rings).toHaveLength(1);
+
+    const [main] = uranus!.rings!;
+    expect(main!.id).toBe('main');
+    // km → m 변환 — ring 6 inner (41,837 km) ~ ε outer (51,149 km) 실측 경계
+    expect(main!.innerRadius).toBeCloseTo(41837 * 1000, -3);
+    expect(main!.outerRadius).toBeCloseTo(51149 * 1000, -3);
+    // ε ring outer = uranus 반경의 2.001배 (orbit binding 분모 — §축 4)
+    expect(main!.outerRadius / uranus!.radius).toBeCloseTo(2.001, 2);
+
+    // composite densityProfile 15점 (zod .max(16) 상한 1점 여유 — agy 고유 발견 ① 정합)
+    expect(main!.densityProfile).toHaveLength(15);
+    // ε ring @1.0 최대 밀도 1.0 (우라누스계 지배 ring)
+    const last = main!.densityProfile[main!.densityProfile.length - 1]!;
+    expect(last[0]).toBe(1.0);
+    expect(last[1]).toBe(1.0);
+
+    // colorHint #5A5E66 (observed dark gray) + ringAlphaHint 0.8 (saturn 0.9 / jupiter 0.15 사이)
+    expect(main!.colorHint?.hex).toBe('#5A5E66');
+    expect(uranus?.ringAlphaHint).toBe(0.8);
+  });
+
+  it('R8 #647 — axialTiltDeg 로드 (uranus 97.77 / saturn 26.73) + 미지정 body 폴백 (하위 호환)', () => {
+    const bodies = loadSolarSystem().bodies;
+    expect(bodies.find((b) => b.id === 'uranus')?.axialTiltDeg).toBe(97.77);
+    expect(bodies.find((b) => b.id === 'saturn')?.axialTiltDeg).toBe(26.73);
+    // 미지정 body (jupiter — 3.13° 는 R8 비-범위) 는 undefined → scene 폴백 0 (tilt 없음, 무회귀)
+    expect(bodies.find((b) => b.id === 'jupiter')?.axialTiltDeg).toBeUndefined();
+    expect(bodies.find((b) => b.id === 'earth')?.axialTiltDeg).toBeUndefined();
+  });
+
+  it('R8 #647 — densityProfile zod .max(16) 가드: 모든 ring layer 가 shader MAX_DENSITY_POINTS 이내', () => {
+    // ring-shader MAX_DENSITY_POINTS=16 정합 — 초과 데이터는 loadSolarSystem 파싱 단계에서
+    // ZodError 로 차단된다 (agy 고유 발견 ① — uniform overflow/컴파일 실패 방지).
+    // 본 단언은 현재 데이터 전체가 가드 이내임을 회귀 박제 (스키마 자체는 내부 비공개).
+    for (const body of loadSolarSystem().bodies) {
+      if (!body.rings) continue;
+      for (const ring of body.rings) {
+        expect(ring.densityProfile.length).toBeGreaterThanOrEqual(2);
+        expect(ring.densityProfile.length).toBeLessThanOrEqual(16);
+      }
+    }
   });
 });

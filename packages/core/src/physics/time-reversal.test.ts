@@ -38,6 +38,8 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
   // `measure_galilean_period` + `measure_laplace_resonance` 로 검증.
   // R7 #641: titan 도 동일 이유로 제외 (주기 15.95d × dt=10min → ~1.4e3 sub-step/주기 ×
   // 23 주기/년 누적 — galilean 과 동일 오차 증폭 메커니즘). 본 테스트 원 의도(9체 대칭성) 유지.
+  // R8 #647: titania 도 동일 이유로 제외 (주기 8.71d — titan 보다 짧아 누적 step 더 많음.
+  // 미제외 시 1년 vel relErr 1.146e-9 로 1e-9 임계 초과 실측). 본 테스트 원 의도(9체 대칭성) 유지.
   const EXCLUDED_SATELLITES = new Set([
     'phobos', // P8
     'deimos', // P8
@@ -46,6 +48,7 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
     'ganymede', // P9
     'callisto', // P9
     'titan', // R7 #641
+    'titania', // R8 #647
   ]);
   const fullSystem = getSolarSystem();
   const system = {
