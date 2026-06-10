@@ -354,6 +354,8 @@
         "longitudeOfPerihelionDeg": 92.59887831,
         "meanLongitudeDeg": 49.95424423
       },
+      "$axialTiltDegComment": "R8 #647 §축 2a — NASA obliquity to orbit 26.73° (R7 비-범위 → R8 동반 적용, PM Q3). ring disc rotation.x = π/2 + tiltRad (ring-only — 본체 자전/텍스처 미구현이라 host 통합 tilt 불필요). r1-guard pixel baseline 변경은 의도된 Behavior Change (ADR 20260610-r8 §위험 #2).",
+      "axialTiltDeg": 26.73,
       "$ringAlphaHintComment": "R7 #641 §축 2c — prominent 강조 (PM Q3, jupiter faint 0.15 대조). rendering hint — densityProfile 실측 데이터와 직교.",
       "ringAlphaHint": 0.9,
       "$ringsComment": "R7 #641 — 토성 고리 5층 (D/C/B/A/F). NASA Saturn Fact Sheet / JPL Ring-Moon Systems Node 실측 반경. Cassini Division 은 B(117,580 km)–A(122,170 km) 층간 gap 으로 자연 표현 (별도 층 불필요 — 스키마가 비연속 층 허용). Encke gap 은 A ring densityProfile dip @0.782 = (133589−122170)/14610. F ring outer 140,180 km = saturn 반경 2.326배 (PM '~2.3배' 정합 상한). 층별 colorHint 는 R7 optional 스키마 확장 (ADR 20260610-r7 §축 2b).",
@@ -448,10 +450,13 @@
       "$radiusComment": "P10-B-2: 2.5362e7 (mean) → 2.5559e7 (NASA equatorial).",
       "parentId": "sun",
       "introducedInRPhase": 8,
-      "showInShortcutBar": false,
+      "$showInShortcutBarComment": "R8 #647 §축 5 — false → true (jupiter/saturn/neptune 거성 본체 bar 노출 정합). titania 는 false (galilean/titan 패턴 — URL ?focus=titania 진입).",
+      "showInShortcutBar": true,
       "colorHint": { "hex": "#B5E3EC", "colorSource": "observed" },
       "dataSource": "NASA Planetary Fact Sheet (2024)",
       "lastVerified": "2026-04-21",
+      "$axialTiltDegComment": "R8 #647 §축 2a — NASA obliquity to orbit 97.77° (옆으로 누움 — 고리가 공전면에 거의 수직인 세로 고리, R8 핵심 showcase). 회전축 방위각은 world X 고정 근사 (pole RA/Dec 77.3°/15.2° 미사용 — ADR 20260610-r8 §위험 #6 주석 계약).",
+      "axialTiltDeg": 97.77,
       "orbit": {
         "semiMajorAxisAU": 19.18916464,
         "eccentricity": 0.04725744,
@@ -459,6 +464,57 @@
         "longitudeOfAscendingNodeDeg": 74.01692503,
         "longitudeOfPerihelionDeg": 170.9542763,
         "meanLongitudeDeg": 313.23810451
+      },
+      "$ringAlphaHintComment": "R8 #647 §축 2c — 어두운 고리 (albedo ~0.05, 토성의 1/10) 지만 R8 showcase (세로 고리) 가시성 우선 0.8 (saturn 0.9 / jupiter 0.15 사이). 어두움은 colorHint #5A5E66 dark gray 로 분리 표현. D-T2 과밝음 보고 시 0.8 → 0.5 (ADR 20260610-r8 §재검토 트리거 #3).",
+      "ringAlphaHint": 0.8,
+      "$ringsComment": "R8 #647 §축 2b — 천왕성 main rings 9개 (6/5/4/α/β/η/γ/δ/λ/ε) 를 1 composite layer (41,837~51,149 km — ring 6 inner ~ ε outer 실측 경계, JPL Ring-Moon Systems Node) 로 표현. 개별 narrow ring 폭 (20~100 km) 이 화면에서 sub-pixel (ε ≈ 0.09 px) 이라 층 분리 시 전부 비가시 — densityProfile 15점 피크가 각 ring 의 실측 반경 정규화 위치 (span 9,312 km): 6/5/4 그룹 @0.000/0.043/0.079 → 피크 0.00~0.08 / α/β @0.309/0.411 → 0.31~0.41 / η/γ/δ @0.573/0.622/0.694 → 0.57~0.69 / λ @0.879 → 0.88 / ε @1.000 → 최대 밀도 1.0 (광학 깊이 0.5~2.3 — 우라누스계 지배 ring). 피크 간 baseline 0.05 는 실제론 거의 빈 공간이나 선형 보간 + 가시성 위해 극미 채움 (rendering 근사 — 주석 계약). ν/μ 외곽 dust ring + ζ 내측 dust sheet 비-범위 (ADR 20260610-r8 §축 2b 후보 (iii) 선택 / §비-범위).",
+      "rings": [
+        {
+          "id": "main",
+          "innerRadiusKm": 41837,
+          "outerRadiusKm": 51149,
+          "densityProfile": [
+            [0.0, 0.35],
+            [0.04, 0.4],
+            [0.08, 0.38],
+            [0.13, 0.05],
+            [0.28, 0.05],
+            [0.31, 0.35],
+            [0.41, 0.4],
+            [0.46, 0.05],
+            [0.55, 0.05],
+            [0.57, 0.3],
+            [0.69, 0.35],
+            [0.74, 0.05],
+            [0.88, 0.15],
+            [0.93, 0.08],
+            [1.0, 1.0]
+          ],
+          "colorHint": { "hex": "#5A5E66", "colorSource": "observed" }
+        }
+      ]
+    },
+    {
+      "id": "titania",
+      "kind": "moon",
+      "nameKo": "티타니아",
+      "nameEn": "Titania",
+      "mass": 3.42e21,
+      "radius": 7.884e5,
+      "parentId": "uranus",
+      "introducedInRPhase": 8,
+      "showInShortcutBar": false,
+      "$comment": "R8 #647 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-10 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Uranus-centric J2000 Ecliptic (osculating). Laplace plane 값 혼입 금지 — R7 titan frame 선례 답습 (ADR 20260610-r8 §축 3, agy 고유 발견 수용 ②). Horizons 원시값: IN=97.7633 / OM=167.6422 / W=261.8914 / MA=308.3043 → ϖ=OM+W mod 360=69.5337, L=ϖ+MA mod 360=17.8379. a/e 는 NASA Fact Sheet 박제값 (a=435,910 km / e=0.0011). ecliptic inclination ~97.76° — 세로 궤도 렌더가 사실 정합 (uranus 계 전체 누움, tilt 97.77° 고리 평면과 정렬 — §축 3 사전 등록, D-T2 버그 오인 금지).",
+      "colorHint": { "hex": "#8E8275", "colorSource": "observed" },
+      "dataSource": "NASA Uranus Fact Sheet + JPL Horizons API (2026-06-10 쿼리, 2026-01-01 TDB epoch, Uranus-centric J2000 Ecliptic)",
+      "lastVerified": "2026-06-10",
+      "orbit": {
+        "semiMajorAxisAU": 2.91388e-3,
+        "eccentricity": 0.0011,
+        "inclinationDeg": 97.7633,
+        "longitudeOfAscendingNodeDeg": 167.6422,
+        "longitudeOfPerihelionDeg": 69.5337,
+        "meanLongitudeDeg": 17.8379
       }
     },
     {

@@ -62,6 +62,21 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE.titan).toBe(100);
   });
 
+  it('uranus = 250 (R8 #647 — ice giant 정책 신설 3번째 scale 그룹, PM 제약 uranus > earth 직관)', () => {
+    expect(BODY_SCALE.uranus).toBe(250);
+  });
+
+  it('titania = 500 (R8 #647 — titania/uranus 비 0.0617 moon/earth 0.068 수렴대 정중앙)', () => {
+    expect(BODY_SCALE.titania).toBe(500);
+  });
+
+  it('R8 ice giant 정책 — uranus mesh > earth mesh (PM 제약 "천왕성 > 지구" 정량 가드)', () => {
+    // ADR 20260610-r8 §축 1 — uranus(2.5559e7 × 250) / earth(6.378137e6 × 800) = 1.252 (1.25 ± 0.05)
+    const ratio = (2.5559e7 * BODY_SCALE.uranus!) / (6.378137e6 * BODY_SCALE.earth!);
+    expect(ratio).toBeGreaterThan(1.2);
+    expect(ratio).toBeLessThan(1.3);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -90,10 +105,12 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('callisto')).toBe(100); // R6 #627 옵션 D
     expect(getBodyScale('saturn')).toBe(48); // R7 #641 — jupiter 동일값 (거성 예외 2번째)
     expect(getBodyScale('titan')).toBe(100); // R7 #641 — galilean 답습
+    expect(getBodyScale('uranus')).toBe(250); // R8 #647 — ice giant 정책 신설
+    expect(getBodyScale('titania')).toBe(500); // R8 #647 — moon/earth 수렴대
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('uranus')).toBe(1.0); // R8 진입 전
+    expect(getBodyScale('neptune')).toBe(1.0); // R9 진입 전
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 

@@ -30,7 +30,8 @@
  *        disabled 부재 / aria-disabled='false' / data-r-phase-disabled='false', click 시 massMultipliers={jupiter:10} 정상 동작
  *      - 6-C 정상 (no-jupiter): 동일 (jupiter R6 #621 진입 → enabled, massMultipliers={jupiter:0.01})
  *      - 6-D 정상 (saturn-x10): R7 #641 진입 saturn → zero-touch 자동 enabled (massMultipliers={saturn:10})
- *      - 6-E 차단 (uranus-x10): R8 미진입 uranus → preset disabled (negative 케이스 교체 보존 — R6 saturn-x10 선례).
+ *      - 6-E 정상 (uranus-x10): R8 #647 진입 uranus → zero-touch 자동 enabled (massMultipliers={uranus:10})
+ *      - 6-F 차단 (neptune-x10): R9 미진입 neptune → preset disabled (negative 케이스 교체 보존 — R6 saturn-x10 / R7 uranus-x10 선례).
  *        disabled / aria-disabled='true' / data-r-phase-disabled='true' / title='R-Phase 진행 시 활성', force click 시 store mutation 0
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
@@ -68,6 +69,7 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
 // showInShortcutBar=false 라 bar 미등록 (R5 phobos/deimos Q4a=A 답습) → 본 매트릭스 비대상.
 // #617 정적 매칭 가드 (r-phase-allowlist.test.ts) 가 showInShortcutBar 파생과 정합 차단.
 // R7 #641 — saturn 진입 (showInShortcutBar true 전환). titan 은 false (galilean 패턴) → 비대상.
+// R8 #647 — uranus 진입 (showInShortcutBar true 전환). titania 는 false (galilean/titan 패턴) → 비대상.
 const RPHASE_EXPECTED_ENABLED = [
   'sun',
   'mercury',
@@ -77,6 +79,7 @@ const RPHASE_EXPECTED_ENABLED = [
   'mars',
   'jupiter',
   'saturn',
+  'uranus',
 ];
 const RPHASE_EXPECTED_DISABLED = ['neptune'];
 
@@ -565,9 +568,9 @@ async function verifyScenarioPresetsGuards(browser) {
       });
     }
 
-    // 6-B / 6-C / 6-D 정상 (jupiter-x10 / no-jupiter / saturn-x10): R6 #621 jupiter + R7 #641 saturn
-    // 진입 → zero-touch 자동 enabled, click 시 정상 동작.
-    // jupiter-x10 → {jupiter:10}, no-jupiter → {jupiter:0.01}, saturn-x10 → {saturn:10}.
+    // 6-B / 6-C / 6-D / 6-E 정상 (jupiter-x10 / no-jupiter / saturn-x10 / uranus-x10):
+    // R6 #621 jupiter + R7 #641 saturn + R8 #647 uranus 진입 → zero-touch 자동 enabled, click 시 정상 동작.
+    // jupiter-x10 → {jupiter:10}, no-jupiter → {jupiter:0.01}, saturn-x10 → {saturn:10}, uranus-x10 → {uranus:10}.
     const enabledPresetCases = [
       {
         presetId: 'jupiter-x10',
@@ -586,6 +589,12 @@ async function verifyScenarioPresetsGuards(browser) {
         massKey: 'saturn',
         expectedMul: 10,
         scenario: '6-D 정상 (saturn-x10)',
+      },
+      {
+        presetId: 'uranus-x10',
+        massKey: 'uranus',
+        expectedMul: 10,
+        scenario: '6-E 정상 (uranus-x10)',
       },
     ];
     for (const { presetId, massKey, expectedMul, scenario } of enabledPresetCases) {
@@ -636,11 +645,11 @@ async function verifyScenarioPresetsGuards(browser) {
       });
     }
 
-    // 6-E 차단 (uranus-x10): R8 미진입 uranus → disabled + force click 무시.
-    // saturn 진입 (R7 #641) 으로 6-D 가 enabled 되어 disabled-path 가드가 무력화되지 않도록
-    // uranus target preset 으로 negative 교체 보존 (R6 saturn-x10 선례 답습).
+    // 6-F 차단 (neptune-x10): R9 미진입 neptune → disabled + force click 무시.
+    // uranus 진입 (R8 #647) 으로 6-E 가 enabled 되어 disabled-path 가드가 무력화되지 않도록
+    // neptune target preset 으로 negative 교체 보존 (R6 saturn-x10 / R7 uranus-x10 선례 답습).
     {
-      const selector = '[data-testid="preset-uranus-x10"]';
+      const selector = '[data-testid="preset-neptune-x10"]';
       const btn = page.locator(selector).first();
       const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
       const ariaDisabled = await btn.getAttribute('aria-disabled');
@@ -688,8 +697,8 @@ async function verifyScenarioPresetsGuards(browser) {
         engineUnchanged &&
         massUnchanged;
       results.push({
-        scenario: '6-E 차단 (uranus-x10)',
-        preset: 'uranus-x10',
+        scenario: '6-F 차단 (neptune-x10)',
+        preset: 'neptune-x10',
         isDisabled,
         ariaDisabled,
         dataDisabled,

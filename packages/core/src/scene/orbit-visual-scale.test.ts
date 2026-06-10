@@ -9,6 +9,7 @@ import {
   MARS_SATELLITES_ORBIT_VISUAL_SCALE,
   JUPITER_SATELLITES_ORBIT_VISUAL_SCALE,
   SATURN_SATELLITES_ORBIT_VISUAL_SCALE,
+  URANUS_SATELLITES_ORBIT_VISUAL_SCALE,
   ORBIT_VISUAL_SCALE_BY_PARENT,
   getOrbitVisualScale,
 } from './orbit-visual-scale.js';
@@ -35,8 +36,8 @@ describe('orbit-visual-scale SSoT (R4 #539 Amendment 2)', () => {
     expect(getOrbitVisualScale(undefined)).toBe(1.0);
   });
 
-  it('R8+ 미진입 parent (uranus) → 1.0 (R7 비-범위)', () => {
-    expect(getOrbitVisualScale('uranus')).toBe(1.0);
+  it('R9+ 미진입 parent (neptune) → 1.0 (R8 비-범위)', () => {
+    expect(getOrbitVisualScale('neptune')).toBe(1.0);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT 는 frozen (런타임 변경 차단)', () => {
@@ -192,5 +193,54 @@ describe('orbit-visual-scale SSoT (R7 #641 — saturn-titan, binding=ring outer 
       (SATURN_TITAN_DISTANCE_M * getOrbitVisualScale('saturn')) /
       (SATURN_MESH_RADIUS_M + TITAN_MESH_RADIUS_M);
     expect(marginVsMeshOnly).toBeCloseTo(3.88, 1);
+  });
+});
+
+describe('orbit-visual-scale SSoT (R8 #647 — uranus-titania, binding=ring outer 2번째 인스턴스)', () => {
+  it('URANUS_SATELLITES_ORBIT_VISUAL_SCALE = 50 (R8 #647 박제값)', () => {
+    expect(URANUS_SATELLITES_ORBIT_VISUAL_SCALE).toBe(50);
+  });
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT.uranus == URANUS_SATELLITES_ORBIT_VISUAL_SCALE (룩업 정합)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT.uranus).toBe(URANUS_SATELLITES_ORBIT_VISUAL_SCALE);
+  });
+
+  it('getOrbitVisualScale(uranus) == 50', () => {
+    expect(getOrbitVisualScale('uranus')).toBe(50);
+  });
+
+  it('titania 분리 마진 산출 (산식 A, binding=ring outer mesh) — visual_scale=50 → 1.65x', () => {
+    // R8 ADR §축 4 박제값. binding constraint = ε ring outer mesh — ring × bodyScale 결합으로
+    // ε ring outer (5.1149e7 m) × uranusScale 250 = 1.2787e10 m (uranus mesh 의 2.001배).
+    const URANUS_TITANIA_DISTANCE_M = 4.3591e8; // semiMajorAxisAU 2.91388e-3
+    const EPSILON_RING_OUTER_MESH_M = 5.1149e7 * 250; // 1.2787e10
+    const TITANIA_MESH_RADIUS_M = 7.884e5 * 500; // 3.942e8
+    const SUM_MESH_M = EPSILON_RING_OUTER_MESH_M + TITANIA_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('uranus');
+    const visualDistance = URANUS_TITANIA_DISTANCE_M * visualScale;
+    const separationMargin = visualDistance / SUM_MESH_M;
+
+    // ADR §축 4 — titania 분리 마진 1.65x (≥ 1.5 통과 +0.15, R5 phobos/R6 io 1.69x 근접 정합)
+    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
+    expect(separationMargin).toBeCloseTo(1.65, 1);
+  });
+
+  it('ring 미고려 함정값 검증 — uranus mesh 만 분모로 쓰면 ×30 이 2.05x 통과 오판 (실제 0.99x fail)', () => {
+    // R8 ADR §축 4 — ×30 함정값: uranus mesh 만 보면 2.05x 통과처럼 보이나 ring outer 분모로는
+    // 0.99x fail (titania 가 고리 안에 묻힘). binding = ring outer 정의 회귀 가드.
+    const URANUS_TITANIA_DISTANCE_M = 4.3591e8;
+    const URANUS_MESH_RADIUS_M = 2.5559e7 * 250; // 6.3898e9
+    const EPSILON_RING_OUTER_MESH_M = 5.1149e7 * 250; // 1.2787e10
+    const TITANIA_MESH_RADIUS_M = 7.884e5 * 500;
+
+    const trapScale = 30;
+    // ADR §축 4 "vs uranus mesh 만 (참고)" 열 — parent mesh 단독 분모 (satellite mesh 미포함)
+    const marginVsMeshOnly = (URANUS_TITANIA_DISTANCE_M * trapScale) / URANUS_MESH_RADIUS_M;
+    const marginVsRingOuter =
+      (URANUS_TITANIA_DISTANCE_M * trapScale) / (EPSILON_RING_OUTER_MESH_M + TITANIA_MESH_RADIUS_M);
+    expect(marginVsMeshOnly).toBeCloseTo(2.05, 1); // 통과처럼 보이는 함정
+    expect(marginVsRingOuter).toBeLessThan(1.5); // 실제 fail (0.99x)
+    expect(marginVsRingOuter).toBeCloseTo(0.99, 1);
   });
 });

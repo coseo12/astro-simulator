@@ -75,6 +75,7 @@ const flags = {
 // 자동 생성값 (CURRENT_R_PHASE=6) 과 정합 — #598 정적 매칭 가드 (r-phase-allowlist.test.ts) 가
 // FOCUS_BODIES === R_PHASE_BODY_ALLOWLIST 를 CI fail-fast 로 차단한다.
 // R7 #641 — saturn + titan 동기화 (CURRENT_R_PHASE=7).
+// R8 #647 — uranus + titania 동기화 (CURRENT_R_PHASE=8).
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -91,6 +92,8 @@ const FOCUS_BODIES = [
   'callisto',
   'saturn',
   'titan',
+  'uranus',
+  'titania',
 ];
 const MODES = ['observe', 'research'];
 

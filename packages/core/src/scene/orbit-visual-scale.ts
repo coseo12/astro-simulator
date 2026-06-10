@@ -141,6 +141,30 @@ export const JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 16;
 export const SATURN_SATELLITES_ORBIT_VISUAL_SCALE = 10;
 
 /**
+ * Uranus-Satellites 궤도 visual scale 배수 (R8 titania 단일 — R9+ oberon/miranda 등 확장 전제 복수형).
+ *
+ * `titania world position = uranus world position + (titania local orbit × 50)` 로 산출.
+ * 실측 거리 (titania 4.3591e8 m = 2.91388e-3 AU) 는 보존되며 rendering 단계에서만 ×50 적용.
+ *
+ * **binding constraint = ring outer mesh (R7 신규 유형의 2번째 인스턴스)** — ring × bodyScale
+ * 결합으로 ε ring outer mesh (5.1149e7 × 250 = 1.2787e10 m) 가 uranus mesh (6.3898e9 m) 의
+ * 2.001배까지 확장되므로 parent mesh 가 아닌 **ring outer 가 분모**.
+ * ⚠️ ring 미고려 시 ×30 이 2.05x 로 통과처럼 보이는 함정값 (실제 0.99x fail — 고리 안에 묻힘).
+ *
+ * 산식 A (설계 임계, real-meter — #622 NO-OP SSoT: 산식 B 와 직접 비교 금지):
+ *   titania 분리 마진 = (4.3591e8 × 50) / (1.2787e10 + 3.942e8) = 1.65x (≥ 1.5 통과 +0.15,
+ *   R5 phobos / R6 io 1.69x 근접 정합). 후보: ×30 0.99x fail (함정값) / ×45 1.49x 경계 미달
+ *   / **×50 1.65x 선택 (정수 단순)** / ×55 1.82x / ×60 1.98x 과분리.
+ *
+ * D-T2 미통과 시 fallback: 궤도선-고리 시각 간섭 보고 시 ×50 → ×55 (마진 1.82x —
+ * R8 ADR §재검토 트리거 #4). titania 궤도는 ecliptic inclination ~98° 세로 궤도로 렌더 —
+ * 사실 정합 (uranus 계 전체 누움), 버그 오인 금지 (ADR §축 3 사전 등록).
+ *
+ * R8 ADR `20260610-r8-uranus-titania-rings-visualization.md` §축 4.
+ */
+export const URANUS_SATELLITES_ORBIT_VISUAL_SCALE = 50;
+
+/**
  * parent body id 별 satellite orbit visual scale 룩업.
  *
  * R5+ 진입 시 parent-satellite 쌍별로 박제값 추가. 미정의 parent 는 1.0 (실측 그대로).
@@ -150,6 +174,7 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
   mars: MARS_SATELLITES_ORBIT_VISUAL_SCALE, // R5 #594 — phobos + deimos 단일 룩업 (binding constraint=phobos)
   jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io, 마진 1.69x)
   saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형, 마진 1.75x)
+  uranus: URANUS_SATELLITES_ORBIT_VISUAL_SCALE, // R8 #647 — titania 단일 룩업 (binding constraint=ring outer 2번째 인스턴스, 마진 1.65x — ×30 은 ring 미고려 함정값)
 });
 
 /**
