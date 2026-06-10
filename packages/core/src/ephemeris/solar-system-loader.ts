@@ -31,6 +31,17 @@ const RingLayerRawSchema = z.object({
   innerRadiusKm: z.number().positive(),
   outerRadiusKm: z.number().positive(),
   densityProfile: z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2),
+  /**
+   * R7 #641 — 층별 색 (body colorHint 동형, optional). saturn 5층 (D/C/B/A/F) 층별 톤 분리.
+   * 미지정 시 scene 이 undefined 전달 → ring-shader DEFAULT `#887766` 폴백 (jupiter.rings 무회귀).
+   * ADR `20260610-r7-saturn-titan-rings-visualization.md` §축 2b.
+   */
+  colorHint: z
+    .object({
+      hex: z.string().optional(),
+      colorSource: z.enum(['observed', 'artistic', 'inferred']).optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -90,6 +101,13 @@ const CelestialBodyRawSchema = z.object({
    */
   rings: z.array(RingLayerRawSchema).optional(),
   /**
+   * R7 #641 — ring 전역 alpha rendering hint (0~1, optional). prominent (saturn 0.9) vs
+   * faint (jupiter 0.15) 대조 (PM Q3). 미지정 시 scene 이 전달 생략 → shader 기본 0.6 (하위 호환).
+   * densityProfile (실측 상대 밀도 분포) 와 직교하는 rendering hint — 데이터 SSoT 보존.
+   * ADR `20260610-r7-saturn-titan-rings-visualization.md` §축 2c.
+   */
+  ringAlphaHint: z.number().min(0).max(1).optional(),
+  /**
    * P10-B #274 — 데이터 출처 (Fact-First 원칙 §5). 문자열 또는 배열.
    * P10-B 감사 이후 모든 body 필수 예정. 스키마 확장 기간 중에는 optional.
    */
@@ -145,6 +163,11 @@ export interface LoadedRingLayer {
   innerRadius: number; // m
   outerRadius: number; // m
   densityProfile: ReadonlyArray<readonly [number, number]>;
+  /** R7 #641 — 층별 색 (optional). 미지정 시 ring-shader DEFAULT `#887766` 폴백. */
+  colorHint?: {
+    hex?: string | undefined;
+    colorSource?: 'observed' | 'artistic' | 'inferred' | undefined;
+  };
 }
 
 export interface LoadedCelestialBody {
@@ -166,8 +189,10 @@ export interface LoadedCelestialBody {
     /** P10-B #274 — 색상 출처. 부재 시 loader 는 legacy 로 간주. */
     colorSource?: 'observed' | 'artistic' | 'inferred' | undefined;
   };
-  /** P9 #254 — 고리 3층 (목성·토성 등). 없으면 undefined. */
+  /** P9 #254 — 고리 층 배열 (목성 3층·토성 5층 등). 없으면 undefined. */
   rings?: ReadonlyArray<LoadedRingLayer>;
+  /** R7 #641 — ring 전역 alpha rendering hint (saturn 0.9 / jupiter 0.15). 미지정 시 기본 0.6. */
+  ringAlphaHint?: number;
   /** P10-B #274 — 데이터 출처. */
   dataSource?: string | ReadonlyArray<string>;
   /** P10-B #274 — 마지막 검증 일자 (ISO YYYY-MM-DD). */
@@ -222,7 +247,7 @@ export function loadSolarSystem(): LoadedSolarSystem {
       introducedInRPhase: b.introducedInRPhase,
       showInShortcutBar: b.showInShortcutBar,
       ...(b.colorHint ? { colorHint: b.colorHint } : {}),
-      // P9 #254 — 고리 3층 (km → m 변환). densityProfile 는 정규화된 튜플이라 단위 변환 불필요.
+      // P9 #254 — 고리 층 (km → m 변환). densityProfile 는 정규화된 튜플이라 단위 변환 불필요.
       ...(b.rings
         ? {
             rings: b.rings.map((r) => ({
@@ -230,9 +255,13 @@ export function loadSolarSystem(): LoadedSolarSystem {
               innerRadius: r.innerRadiusKm * 1000,
               outerRadius: r.outerRadiusKm * 1000,
               densityProfile: r.densityProfile.map(([rn, d]) => [rn, d] as const),
+              // R7 #641 — 층별 colorHint (optional, 미지정 시 필드 자체 생략 — exactOptionalPropertyTypes).
+              ...(r.colorHint ? { colorHint: r.colorHint } : {}),
             })),
           }
         : {}),
+      // R7 #641 — ring 전역 alpha rendering hint (optional).
+      ...(b.ringAlphaHint !== undefined ? { ringAlphaHint: b.ringAlphaHint } : {}),
       // P10-B #274 — 감사 메타데이터 (optional, 감사 진행 중 일부 body 만 채워질 수 있음).
       ...(b.dataSource ? { dataSource: b.dataSource } : {}),
       ...(b.lastVerified ? { lastVerified: b.lastVerified } : {}),
