@@ -30,7 +30,13 @@ const RingLayerRawSchema = z.object({
   id: z.string().min(1),
   innerRadiusKm: z.number().positive(),
   outerRadiusKm: z.number().positive(),
-  densityProfile: z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2),
+  // R8 #647 (agy 고유 발견 수용 ①) — `.max(16)`: ring-shader `MAX_DENSITY_POINTS = 16` 정합.
+  // uranus composite 15점이 상한 1점 여유뿐 — 초과 데이터를 파싱 레벨에서 차단해 shader
+  // uniform overflow / 컴파일 실패를 방지. ADR `20260610-r8-uranus-titania-rings-visualization.md` §교차검증.
+  densityProfile: z
+    .array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]))
+    .min(2)
+    .max(16),
   /**
    * R7 #641 — 층별 색 (body colorHint 동형, optional). saturn 5층 (D/C/B/A/F) 층별 톤 분리.
    * 미지정 시 scene 이 undefined 전달 → ring-shader DEFAULT `#887766` 폴백 (jupiter.rings 무회귀).
@@ -107,6 +113,15 @@ const CelestialBodyRawSchema = z.object({
    * ADR `20260610-r7-saturn-titan-rings-visualization.md` §축 2c.
    */
   ringAlphaHint: z.number().min(0).max(1).optional(),
+  /**
+   * R8 #647 §축 2a — 자전축 기울기 (NASA "obliquity to orbit", 도 단위, optional).
+   * ring disc 생성 3경로 (shader/fallback/placeholder) 의 `rotation.x = π/2 + tiltRad` 에 사용
+   * (ring-only tilt — 본체 자전/텍스처 미구현이라 host 통합 불필요, 후보 A).
+   * 0~180 범위 가드 (97.77° 같은 역행 자전 포함, NaN 전파 차단 — agy 합의 ③).
+   * 미지정 시 scene 이 0 폴백 → 기존 동작 (XZ 공전면) 하위 호환 (jupiter 무회귀).
+   * ADR `20260610-r8-uranus-titania-rings-visualization.md` §축 2a.
+   */
+  axialTiltDeg: z.number().min(0).max(180).optional(),
   /**
    * P10-B #274 — 데이터 출처 (Fact-First 원칙 §5). 문자열 또는 배열.
    * P10-B 감사 이후 모든 body 필수 예정. 스키마 확장 기간 중에는 optional.
@@ -193,6 +208,8 @@ export interface LoadedCelestialBody {
   rings?: ReadonlyArray<LoadedRingLayer>;
   /** R7 #641 — ring 전역 alpha rendering hint (saturn 0.9 / jupiter 0.15). 미지정 시 기본 0.6. */
   ringAlphaHint?: number;
+  /** R8 #647 — 자전축 기울기 (도). ring tilt 전용 (uranus 97.77 / saturn 26.73). 미지정 시 tilt 0. */
+  axialTiltDeg?: number;
   /** P10-B #274 — 데이터 출처. */
   dataSource?: string | ReadonlyArray<string>;
   /** P10-B #274 — 마지막 검증 일자 (ISO YYYY-MM-DD). */
@@ -262,6 +279,8 @@ export function loadSolarSystem(): LoadedSolarSystem {
         : {}),
       // R7 #641 — ring 전역 alpha rendering hint (optional).
       ...(b.ringAlphaHint !== undefined ? { ringAlphaHint: b.ringAlphaHint } : {}),
+      // R8 #647 — 자전축 기울기 (optional, ring tilt 전용).
+      ...(b.axialTiltDeg !== undefined ? { axialTiltDeg: b.axialTiltDeg } : {}),
       // P10-B #274 — 감사 메타데이터 (optional, 감사 진행 중 일부 body 만 채워질 수 있음).
       ...(b.dataSource ? { dataSource: b.dataSource } : {}),
       ...(b.lastVerified ? { lastVerified: b.lastVerified } : {}),

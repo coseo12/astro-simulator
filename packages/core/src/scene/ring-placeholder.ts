@@ -56,6 +56,11 @@ export interface RingPlaceholderOptions {
    * 기본값 `'solar'` — 초기 tier 가 solar 로 시작하는 현 디폴트에 맞춤.
    */
   tier?: Tier;
+  /**
+   * R8 #647 §축 2a — ring 자전축 기울기 (rad). `rotation.x = π/2 + axialTiltRad`
+   * (shader/fallback 경로 동일 — 3경로 일관, 회귀 검증 모드 정합). 기본 0 (하위 호환).
+   */
+  axialTiltRad?: number;
 }
 
 /**
@@ -100,7 +105,8 @@ export function createRingPlaceholder(
     // Disc 는 기본적으로 XY 평면에 생성됨. 목성 공전면(황도면) 에 맞추려면
     // 적도면 경사가 있어야 하지만, 본 ADR §결정 #2 각주대로 Laplace plane 기준은
     // PR-2.5 본 shader 에서 처리. PR-1 은 평면 disk 로 족함.
-    disc.rotation.x = Math.PI / 2; // XZ 평면으로 눕힘 (목성 공전면 근사)
+    // R8 #647 §축 2a — XZ 공전면 (π/2) + 자전축 기울기 (미지정 0 — 기존 동작 하위 호환).
+    disc.rotation.x = Math.PI / 2 + (options.axialTiltRad ?? 0);
 
     // 호스트 부모-자식 관계로 위치 자동 추종.
     disc.parent = host;
