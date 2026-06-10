@@ -109,6 +109,9 @@ const PX_RATIO_THRESHOLDS = Object.freeze({
   uranus: 7.9, // R8 #647 — 실측 7.52% (3 viewport 결정적 — 1280/1920/375 전부 7.52) × 1.05. R8 ADR §축 1 결정 트리 분기 1. ⚠️ 정책 식값 18.37% (wsRadius 비) 과 반대 방향 편차 (×0.41) — saturn (×6.8 부풀림) 과 같은 뿌리의 perspective division artifact 이나 방향이 다름: uranus (19.19 AU) 는 default view 에서 view-space depth 가 커서 (saturn w=5.13 측면 근접과 달리) 투영 직경이 축소됨. wsRadius 비는 정확 → uranusScale=250 박제값 정상. 본 임계는 "BODY_SCALE 회귀 감지" 결정적 synthetic metric (시각 크기 검증은 focus 스크린샷 + D-T2 — saturn 59.7 패턴 동일). ⚠️ 퍼센트 단위 — guard 는 sunPxRatio 퍼센트 직접 비교
   // titania: N/A — 4px fallback billboard 의존 (titan/galilean 답습 — R8 ADR §축 3). 회귀 가드는
   //                R-Phase Allowlist (#613) + FOCUS_BODIES 매칭 (#598) 우회.
+  neptune: 4.9, // R9 #653 — 실측 4.66% (3 viewport 완전 결정적 — 1280/1920/375 전부 4.66) × 1.05. R9 ADR §축 1 결정 트리 분기 1. 정책 식값 17.80% (wsRadius 비) 대비 ×0.26 축소 — uranus (×0.41) 와 같은 방향의 perspective division artifact 이며 depth 가 더 깊어 (30.07 AU vs 19.19 AU) 축소 폭 확대 (ADR §축 1 예상 "7.5% 미만 추가 축소" 적중). wsRadius 비는 정확 → neptuneScale=250 박제값 정상. 본 임계는 "BODY_SCALE 회귀 감지" 결정적 synthetic metric (시각 크기 검증은 focus 스크린샷 + D-T2 — saturn 59.7 / uranus 7.9 패턴 동일). ⚠️ 퍼센트 단위 — guard 는 sunPxRatio 퍼센트 직접 비교
+  // triton: N/A — 4px fallback billboard 의존 (titania/titan/galilean 답습 — R9 ADR §축 3, 실측 0.31% sub-pixel). 회귀 가드는
+  //               R-Phase Allowlist (#613) + FOCUS_BODIES 매칭 (#598) 우회.
 });
 
 const MOBILE_VIEWPORT_ID = '375x667';
@@ -195,6 +198,7 @@ async function measureBodyPxRatios(page) {
     // §결정 6 미박제 — 측정만). #619 정적 매칭 가드가 targetIds === R_PHASE_BODY_ALLOWLIST 차단.
     // R7 #641 — saturn (거성 예외 2번째, 실측 × 1.05 임계 박제) + titan (§결정 6 답습 미박제 — 측정만).
     // R8 #647 — uranus (ice giant 정책, §축 1 결정 트리 임계) + titania (titan 답습 미박제 — 측정만).
+    // R9 #653 — neptune (ice giant 2번째, §축 1 결정 트리 임계) + triton (titania 답습 미박제 — 측정만).
     const targetIds = [
       'sun',
       'mercury',
@@ -213,6 +217,8 @@ async function measureBodyPxRatios(page) {
       'titan',
       'uranus',
       'titania',
+      'neptune',
+      'triton',
     ];
 
     /**

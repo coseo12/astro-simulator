@@ -76,6 +76,8 @@ const flags = {
 // FOCUS_BODIES === R_PHASE_BODY_ALLOWLIST 를 CI fail-fast 로 차단한다.
 // R7 #641 — saturn + titan 동기화 (CURRENT_R_PHASE=7).
 // R8 #647 — uranus + titania 동기화 (CURRENT_R_PHASE=8).
+// R9 #653 — neptune + triton 동기화 (CURRENT_R_PHASE=9). triton 은 역행 궤도 (ecliptic
+// inclination 129.14° > 90° — 태양계 유일 대형 역행 위성) 이나 focus 진입/추적엔 무관 (사실 정합).
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -94,6 +96,8 @@ const FOCUS_BODIES = [
   'titan',
   'uranus',
   'titania',
+  'neptune',
+  'triton',
 ];
 const MODES = ['observe', 'research'];
 
