@@ -1,6 +1,6 @@
 # ADR: R9 해왕성 + 고리 + 트리톤 시각화 — ice giant 정책 2번째 인스턴스 (neptune=250 답습) + ring·tilt 이중 코드 0 검증 (R8 인프라) + 역행 위성 첫 사례 (triton, 태양계 유일 대형 역행 위성)
 
-- **상태**: **Provisional** — cross-validate (메인 오케스트레이터 수행) 결과 본문 통합 후 Accepted 전이 (#370 옵션 C 워크플로)
+- **상태**: **Accepted (cross-validate 2026-06-10 agy outcome=applied)** — §교차검증 반영 사항 통합 완료 (Horizons Epoch 의무 수용 + PX_RATIO 대체 가드 부분 반려 + arcs 안내 후속 분리)
 - **날짜**: 2026-06-10
 - **결정자**: architect (R9 PM 합의 라운드 완료 — Q1=A: neptune + rings + triton 1개 동시, **triton 역행 궤도는 사실 그대로 — D-T2 버그 오인 선제 등록** / Q2=Adams ring arcs 각도 비균질의 **균질 근사 수용** — 후속 인프라 비-범위. 메인 오케스트레이터가 사용자와 합의 2026-06-10. **PM 합의 그대로 박제 — 재구조화 금지**)
 - **관련**: [#653](https://github.com/coseo12/astro-simulator/issues/653) (R9 본 스프린트), [`20260610-r8-uranus-titania-rings-visualization.md`](20260610-r8-uranus-titania-rings-visualization.md) (R8 SSoT — §R9 인계 7건 + Amendment 1 을 본 ADR 이 전부 이행), [`20260610-r7-saturn-titan-rings-visualization.md`](20260610-r7-saturn-titan-rings-visualization.md) (composite 이전 단계 — ring outer binding 유형 신설), [`20260605-r6-jupiter-galilean-visualization.md`](20260605-r6-jupiter-galilean-visualization.md) (거성 예외 + guard 이원화), [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) (satellite 궤도선 일반화 — triton 자동 확장), [`20260609-622-orbit-scale-gap-no-op.md`](20260609-622-orbit-scale-gap-no-op.md) (산식 A/B 측정-정의 분리), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (CURRENT_R_PHASE 1줄 자동 전파), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541 의무 체크리스트 4항목)
@@ -378,9 +378,14 @@ R8 §Concrete Prediction 의 R9 예측: "neptune (rings 보유 + tilt 28.32°) =
 
 ---
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (cross-validate 2026-06-10 agy outcome=applied)
 
-> **Provisional** — cross-validate 는 메인 오케스트레이터가 본 ADR 박제 직후 수행 (CLAUDE.md `## 교차검증` 앵커: ADR 신규). agy outcome 통합 후 본 섹션을 4축 분류 (합의 / 이견 수용 / 기각 / 고유 발견 후속 분리) 로 갱신 + 상태 Accepted 전이.
+agy 가 본 설계를 지지 (orbit scale ×50 함정 회피 / triton 역행 D-T2 선제 등록 / 주석 계약 박제를 우수 평가). 4축 분류:
+
+- **합의 (4)**: ① orbit scale ×75 (×50 답습 시 triton 이 Adams ring 내부에 묻히는 함정 정확 회피) ② ice giant 250 답습 + 사실 서열 자동 보존 ③ zod 스키마 규격 안착 (tilt/max(16)) ④ triton 역행 "정상 동작" 사전 등록 리스크 관리.
+- **고유 발견 수용 (1, 구현 의무)**: **JPL Horizons 쿼리 Epoch 명시** — osculating elements 는 시각 가변이므로 frame 외에 기준 시점 박제 의무. R8 titania 선례 (2026-01-01 TDB) 동일 epoch 사용 + dataSource 주석에 명기 (§축 3 격상).
+- **부분 반려 (1)**: **PX_RATIO N/A 시 대체 가드** — N/A 가 되어도 r1-guard 의 **pixel-diff baseline 이 전체 화면을 커버**하므로 행성 누락/렌더 실패는 이미 포착 (px-ratio 는 비율 미세 회귀 전용 보조축). 결정 트리 1순위는 실측 박제 (R8 uranus 7.9 선례 — neptune 도 3 viewport 결정적이면 실측×1.05). 추가 어서션 불필요.
+- **고유 발견 후속 분리 (1)**: **Adams arcs 균질 근사의 사용자 안내** (info panel 툴팁) — UI 텍스트/i18n 범위라 R9 비-범위 유지. `$ringsComment` 주석 계약 + 본 ADR 박제로 개발자 오해는 차단. 사용자-facing 안내는 ring 표현 정밀화 인프라 (arcs 등) 와 함께 후속 검토.
 
 ### Claude 편향 셀프 체크 (architect 사전 기록 — cross-validate 호출 전)
 
