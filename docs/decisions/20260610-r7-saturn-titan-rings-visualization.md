@@ -1,6 +1,6 @@
 # ADR: R7 토성 + 고리 + 타이탄 시각화 — 거성 예외 2번째 인스턴스 (saturn=jupiter 동일 scale 48) + ring × bodyScale 결합 (코어 인프라 1회 확장) + titan 단일 satellite
 
-- **상태**: **Provisional** (cross-validate 발동 ADR — CLAUDE.md §ADR Status 워크플로 #370. cross-validate 는 메인 오케스트레이터가 수행 후 §교차검증 반영 사항 통합 → Accepted 전이)
+- **상태**: **Accepted (cross-validate 2026-06-10 agy outcome=applied)** — §교차검증 반영 사항 통합 완료 (tilt 위험 실측 해소 + z-fighting 구현 DoD 추가 + titan frame 명시 의무)
 - **날짜**: 2026-06-10
 - **결정자**: architect (R7 PM 합의 라운드 완료 — Q1=A / Q2=거성 예외 답습 / Q3=고리 실비율+prominent / Q4=titan 신규. 메인 오케스트레이터가 사용자와 합의 2026-06-10)
 - **관련**: [#641](https://github.com/coseo12/astro-simulator/issues/641) (R7 본 스프린트), [`20260605-r6-jupiter-galilean-visualization.md`](20260605-r6-jupiter-galilean-visualization.md) (R6 SSoT — 거성 예외 첫 인스턴스 + §후속 R-Phase 인계 의무 + Amendment 1 guard 이원화 + Amendment 2 galilean=100), [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) (satellite 궤도선 moon 패턴 일반화 — R7 자동 확장), [`20260609-622-orbit-scale-gap-no-op.md`](20260609-622-orbit-scale-gap-no-op.md) (산식 A/B 측정-정의 분리 — 설계는 산식 A), [`20260420-p9-galilean-laplace-rings.md`](20260420-p9-galilean-laplace-rings.md) (ring 3층 densityProfile 인프라 — P10 토성 재사용 전제 명시), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (CURRENT_R_PHASE 1줄 자동 전파), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541 의무 체크리스트 4항목)
@@ -370,9 +370,16 @@ R6 ADR §Concrete Prediction 은 "R7 (saturn/titan): BODY_SCALE 2 + CURRENT_R_PH
 
 ---
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (cross-validate 2026-06-10 agy outcome=applied)
 
-> **(Provisional — 메인 오케스트레이터가 cross-validate 수행 후 본 섹션에 4축 분류 통합 → Accepted 전이 예정)**
+agy 가 본 설계를 "R6 실패 패턴(임계 이원화/scale 수렴값)을 피드백한 완성도 높은 문서" 로 지지. 4축 분류:
+
+- **합의 (4)**: ① ring×bodyScale generic 결합 — R8 uranus "ring 축 코드 0" 예측 타당성 입증 ② optional 스키마(colorHint/ringAlphaHint) 하위 호환 폴백 설계 ③ px-ratio 임계 이원화(정책 식 ≠ guard 실측 ×1.05) ④ ORBIT_VISUAL_SCALE_BY_PARENT.saturn 맵 등록으로 R8+ 위성 자동 상속.
+- **고유 발견 — 실측 해소 (1)**: **자전축 tilt ↔ ring 불일치 위험** — 코드 전수 grep (axialTilt/obliquity/rotationQuaternion/mesh.rotate 0건) 으로 **행성 자전축 기울기/자전 자체가 미구현** 확정 → agy 제시 시나리오 (b) "둘 다 기울기 0 이므로 비-범위 합의가 시각 위화감 없이 성립". §비-범위 ring tilt 후속 분리 유지.
+- **고유 발견 — 구현 단계 검증 항목 수용 (2)**: ① **ring z-fighting (depthWrite/renderingGroupId)** — ring-shader.ts 실측: `backFaceCulling=false` 만 명시, depthWrite 미설정. saturn prominent(alpha 0.9) 는 jupiter faint 보다 z-fighting 가시 위험 큼 → **구현 DoD 에 "ring↔본체 limb z-fighting 무발생 (D-T2 육안 + 얕은 각도 시나리오)" 추가, 발생 시 `material.disableDepthWrite=true` 또는 alphaIndex 보정** (§위험 #5 신규). ② **titan 궤도 frame 명시** — `solar-system.json` titan orbit 에 dataSource 주석으로 "Query Frame: Saturn-centric J2000 Ecliptic" 명시 의무 (Laplace plane 좌표 혼입 방지). §축 3 JPL Horizons 쿼리 의무에 frame 파라미터 추가.
+- **이견 (0)**: 없음.
+
+### 사전 셀프 체크 (architect 기록 보존)
 
 ### Claude 편향 셀프 체크 (cross-validate 호출 전 사전 기록 — CLAUDE.md §교차검증)
 
