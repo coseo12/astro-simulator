@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 26개 바디 (sun + 8행성 + moon 9 + 왜소행성 5 + 혜성 3)', () => {
+  it('로드 성공 + 27개 바디 (sun + 8행성 + moon 10 + 왜소행성 5 + 혜성 3)', () => {
     // P8 #244: 포보스/데이모스 추가 → moon 엔티티 3개 (moon + phobos + deimos).
     // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 추가 → moon 엔티티 7개.
     // R7 #641: titan 추가 → moon 엔티티 8개, 총 25 바디.
     // R8 #647: titania 추가 → moon 엔티티 9개, 총 26 바디.
+    // R9 #653: triton 추가 → moon 엔티티 10개, 총 27 바디.
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(26);
-    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(9);
+    expect(data.bodies).toHaveLength(27);
+    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(10);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
     expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
   });
@@ -252,6 +253,59 @@ describe('loadSolarSystem', () => {
     // 미지정 body (jupiter — 3.13° 는 R8 비-범위) 는 undefined → scene 폴백 0 (tilt 없음, 무회귀)
     expect(bodies.find((b) => b.id === 'jupiter')?.axialTiltDeg).toBeUndefined();
     expect(bodies.find((b) => b.id === 'earth')?.axialTiltDeg).toBeUndefined();
+  });
+
+  it('R9 #653 — triton 로드 (parentId=neptune, Neptune-centric J2000 Ecliptic — 역행 inclination > 90°)', () => {
+    const triton = loadSolarSystem().bodies.find((b) => b.id === 'triton');
+    expect(triton).toBeDefined();
+    expect(triton?.kind).toBe('moon');
+    expect(triton?.parentId).toBe('neptune');
+    expect(triton?.introducedInRPhase).toBe(9);
+    expect(triton?.showInShortcutBar).toBe(false); // galilean/titan/titania 패턴 (URL ?focus=triton 진입)
+    // ADR §축 3 박제값 — a=2.37142e-3 AU (NASA Fact Sheet 354,759 km), e=0.000016 (대형 위성 중 최소)
+    expect(triton!.orbit!.semiMajorAxis).toBeCloseTo(2.37142e-3 * 1.495978707e11, -5);
+    expect(triton!.orbit!.eccentricity).toBeCloseTo(0.000016, 5);
+    // Horizons 쿼리 (Neptune-centric J2000 Ecliptic, 2026-01-01 TDB) — IN=129.1418° (ecliptic 기준).
+    // ⚠️ 역행 핵심 단언: inclination > 90° 는 frame 무관 불변량 (NASA 적도면 통념 157° 와 다른 값이
+    // 정상 — ADR §위험 #2). 역행 = 사실 정합 (태양계 유일 대형 역행 위성, 포획 기원) — 공전
+    // 애니메이션 방향 반전은 버그 아님 (D-T2 사전 등록, PM Q1). "보정" 시도 자체가 회귀.
+    expect(triton!.orbit!.inclination).toBeGreaterThan(Math.PI / 2); // > 90° (역행)
+    expect(triton!.orbit!.inclination).toBeCloseTo((129.1418 * Math.PI) / 180, 3);
+  });
+
+  it('R9 #653 — neptune.rings 1 composite layer (densityProfile 12점 ≤ MAX 16) + ringAlphaHint 0.7', () => {
+    const bodies = loadSolarSystem().bodies;
+    const neptune = bodies.find((b) => b.id === 'neptune');
+    expect(neptune).toBeDefined();
+    expect(neptune?.showInShortcutBar).toBe(true); // R9 §축 5 — 이미 true (변경 0, #613 Concrete Prediction)
+    expect(neptune?.rings).toHaveLength(1);
+
+    const [main] = neptune!.rings!;
+    expect(main!.id).toBe('main');
+    // km → m 변환 — Galle inner (41,000 km) ~ Adams outer (62,930 km) 실측 경계
+    expect(main!.innerRadius).toBeCloseTo(41000 * 1000, -3);
+    expect(main!.outerRadius).toBeCloseTo(62930 * 1000, -3);
+    // Adams ring outer = neptune 반경의 2.541배 (orbit binding 분모 — §축 4, uranus ε 2.001 초과)
+    expect(main!.outerRadius / neptune!.radius).toBeCloseTo(2.541, 2);
+
+    // composite densityProfile 12점 (zod .max(16) 상한 4점 여유 — R8 15점 대비 margin)
+    expect(main!.densityProfile).toHaveLength(12);
+    // Adams ring @1.0 최대 밀도 1.0 (해왕성계 지배 ring — arcs 균질 근사는 PM Q2 의도된 근사)
+    const last = main!.densityProfile[main!.densityProfile.length - 1]!;
+    expect(last[0]).toBe(1.0);
+    expect(last[1]).toBe(1.0);
+
+    // colorHint #6F635A (observed dark reddish gray) + ringAlphaHint 0.7 (jupiter 0.15 / uranus 0.8 사이)
+    expect(main!.colorHint?.hex).toBe('#6F635A');
+    expect(neptune?.ringAlphaHint).toBe(0.7);
+  });
+
+  it('R9 #653 — neptune axialTiltDeg 28.32 로드 (R8 tilt 인프라 재사용 — 코드 0, 데이터 1값)', () => {
+    const bodies = loadSolarSystem().bodies;
+    expect(bodies.find((b) => b.id === 'neptune')?.axialTiltDeg).toBe(28.32);
+    // R8 기존값 무회귀 (saturn/uranus tilt 데이터 불변)
+    expect(bodies.find((b) => b.id === 'uranus')?.axialTiltDeg).toBe(97.77);
+    expect(bodies.find((b) => b.id === 'saturn')?.axialTiltDeg).toBe(26.73);
   });
 
   it('R8 #647 — densityProfile zod .max(16) 가드: 모든 ring layer 가 shader MAX_DENSITY_POINTS 이내', () => {

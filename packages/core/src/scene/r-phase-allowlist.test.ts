@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1~R7 (sun~titan) + R8 uranus + titania 순서로 정확히 17개', () => {
+  it('현재 박제: R1~R8 (sun~titania) + R9 neptune + triton 순서로 정확히 19개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -42,6 +42,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'titan',
       'uranus',
       'titania',
+      'neptune',
+      'triton',
     ]);
   });
 
@@ -49,9 +51,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 17개 (CURRENT_R_PHASE=8 필터)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R8 #647 진입 17개 (위 toEqual).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(17);
+  it('자동 생성 결과 19개 (CURRENT_R_PHASE=9 필터)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R9 #653 진입 19개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(19);
   });
 });
 
@@ -65,8 +67,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 8 (R8 uranus + titania 까지)', () => {
-    expect(CURRENT_R_PHASE).toBe(8);
+  it('CURRENT_R_PHASE 는 9 (R9 neptune + triton 까지 — 로드맵 마지막 행성)', () => {
+    expect(CURRENT_R_PHASE).toBe(9);
   });
 
   it('filterBodiesByPhase(CURRENT_R_PHASE) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -108,14 +110,23 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     expect(r7).not.toContain('titania');
   });
 
-  it('R8 시뮬레이션 — phase 8 진입 시 uranus + titania 자동 포함 (CURRENT_R_PHASE 1줄, 코드 변경 0)', () => {
-    expect(filterBodiesByPhase(bodies, 8)).toEqual([...R_PHASE_BODY_ALLOWLIST]);
-    expect(filterBodiesByPhase(bodies, 8)).toContain('uranus');
-    expect(filterBodiesByPhase(bodies, 8)).toContain('titania');
+  it('R8 시뮬레이션 — phase 8 은 uranus + titania 까지 17개 (neptune/triton 제외)', () => {
+    const r8 = filterBodiesByPhase(bodies, 8);
+    expect(r8.length).toBe(17);
+    expect(r8).toContain('uranus');
+    expect(r8).toContain('titania');
+    expect(r8).not.toContain('neptune');
+    expect(r8).not.toContain('triton');
   });
 
-  it('R10 시뮬레이션 — phase 10 은 전체 26 body (R8 titania 추가 후 데이터 전부 부여 확인)', () => {
-    expect(filterBodiesByPhase(bodies, 10).length).toBe(26);
+  it('R9 시뮬레이션 — phase 9 진입 시 neptune + triton 자동 포함 (CURRENT_R_PHASE 1줄, 코드 변경 0)', () => {
+    expect(filterBodiesByPhase(bodies, 9)).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+    expect(filterBodiesByPhase(bodies, 9)).toContain('neptune');
+    expect(filterBodiesByPhase(bodies, 9)).toContain('triton');
+  });
+
+  it('R10 시뮬레이션 — phase 10 은 전체 27 body (R9 triton 추가 후 데이터 전부 부여 확인)', () => {
+    expect(filterBodiesByPhase(bodies, 10).length).toBe(27);
   });
 
   it('모든 body 에 introducedInRPhase 부여 (1~10 범위)', () => {
@@ -145,11 +156,13 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('titan')).toBe(true); // R7 #641
     expect(isRPhaseFocusable('uranus')).toBe(true); // R8 #647
     expect(isRPhaseFocusable('titania')).toBe(true); // R8 #647
+    expect(isRPhaseFocusable('neptune')).toBe(true); // R9 #653
+    expect(isRPhaseFocusable('triton')).toBe(true); // R9 #653 — 역행 위성 첫 사례 (focus 가능 여부는 궤도 방향 무관)
   });
 
-  it('allowlist 외 body 는 false (neptune / pluto)', () => {
-    expect(isRPhaseFocusable('neptune')).toBe(false); // R9 진입 전
+  it('allowlist 외 body 는 false (pluto / ceres — R10 진입 전)', () => {
     expect(isRPhaseFocusable('pluto')).toBe(false); // R10 진입 전
+    expect(isRPhaseFocusable('ceres')).toBe(false); // R10 진입 전
   });
 
   it('null 은 true — resetCamera / free-fly 경로 차단 금지 (ADR §결정 3)', () => {
@@ -236,7 +249,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     .filter((b) => b.showInShortcutBar && b.introducedInRPhase > CURRENT_R_PHASE)
     .map((b) => b.id);
 
-  it('현재 shortcut 노출 = sun~uranus(활성) + neptune(비활성 대표)', () => {
+  it('현재 shortcut 노출 = sun~neptune 전부 활성 (R9 — 로드맵 마지막 행성 진입, 비활성 0)', () => {
     expect(shortcutBodies).toEqual([
       'sun',
       'mercury',
@@ -247,7 +260,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'jupiter',
       'saturn', // R7 #641 — showInShortcutBar false → true 전환 (§축 5)
       'uranus', // R8 #647 — showInShortcutBar false → true 전환 (§축 5)
-      'neptune',
+      'neptune', // R9 #653 — 이미 true (배열 변경 0, #613 Concrete Prediction — CURRENT_R_PHASE=9 1줄 자동 enabled)
     ]);
     expect(shortcutEnabled).toEqual([
       'sun',
@@ -259,8 +272,11 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'jupiter',
       'saturn',
       'uranus',
+      'neptune',
     ]);
-    expect(shortcutDisabled).toEqual(['neptune']);
+    // R9 — R10 8 body (왜소행성·혜성) 전부 showInShortcutBar=false → bar 비활성 대표 구조 소멸.
+    // negative 케이스는 browser-verify CelestialTree 5-B/5-C (pluto) + preset 6-G (pluto-x10) 보존.
+    expect(shortcutDisabled).toEqual([]);
   });
 
   it('FOCUS_BUTTONS(focus-quick-buttons.tsx) 의 id 가 showInShortcutBar 파생과 일치', () => {
@@ -274,13 +290,15 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     expect(ids).toEqual(shortcutBodies);
   });
 
-  it('RPHASE_EXPECTED_ENABLED / DISABLED(browser-verify) 가 showInShortcutBar 파생과 일치', () => {
+  it('RPHASE_EXPECTED_ENABLED / SHORTCUT_DISABLED(browser-verify) 가 showInShortcutBar 파생과 일치', () => {
     const source = fs.readFileSync(
       path.join(REPO_ROOT, 'apps/web/scripts/browser-verify-r-phase-allowlist.mjs'),
       'utf-8',
     );
+    // R9 #653 — 빈 배열 (`[]`) 허용 위해 quantifier `[^\]]*` 사용 (R10 body 전부 bar 미등록이라
+    // shortcut disabled 가 구조 소멸 — tree/preset negative 는 별도 보존).
     const extract = (name: string) => {
-      const m = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^\\]]+)\\]`));
+      const m = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^\\]]*)\\]`));
       expect(m, `${name} 선언을 찾지 못함`).toBeTruthy();
       return m![1]
         .split(',')
@@ -288,6 +306,6 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
         .filter((s) => s.length > 0);
     };
     expect(extract('RPHASE_EXPECTED_ENABLED')).toEqual(shortcutEnabled);
-    expect(extract('RPHASE_EXPECTED_DISABLED')).toEqual(shortcutDisabled);
+    expect(extract('RPHASE_SHORTCUT_EXPECTED_DISABLED')).toEqual(shortcutDisabled);
   });
 });
