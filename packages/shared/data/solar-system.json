@@ -532,6 +532,8 @@
       "colorHint": { "hex": "#3F6DA8", "colorSource": "observed" },
       "dataSource": "NASA Planetary Fact Sheet (2024)",
       "lastVerified": "2026-04-21",
+      "$axialTiltDegComment": "R9 #653 §축 2a — NASA obliquity to orbit 28.32° (saturn 26.73° 와 유사한 평범한 타원 ring — R8 세로 고리 showcase 아님). 회전축 방위각은 world X 고정 근사 (R8 ADR 20260610-r8 §위험 #6 주석 계약 답습). R8 tilt 인프라 재사용 — 코드 0, 데이터 1값.",
+      "axialTiltDeg": 28.32,
       "orbit": {
         "semiMajorAxisAU": 30.06992276,
         "eccentricity": 0.00859048,
@@ -539,6 +541,54 @@
         "longitudeOfAscendingNodeDeg": 131.78422574,
         "longitudeOfPerihelionDeg": 44.96476227,
         "meanLongitudeDeg": -55.12002969
+      },
+      "$ringAlphaHintComment": "R9 #653 §축 2c — dusty 어두운 고리 (광학 깊이 Adams ~0.01 대 — saturn 의 1/100). jupiter 0.15 / uranus 0.8 사이 — DoD '고리 visible' 가시 우선이되 R8 showcase (세로 고리) 보다 한 단계 낮춤. 어두움은 colorHint #6F635A 로 분리 표현 (R8 동일 논리). D-T2 과밝음/안 보임 보고 시 0.7 → 0.5 / 0.9 (ADR 20260610-r9 §재검토 트리거 #3).",
+      "ringAlphaHint": 0.7,
+      "$ringsComment": "R9 #653 §축 2b — 해왕성 rings 5개 (Galle/Le Verrier/Lassell/Arago/Adams) 를 1 composite layer (41,000~62,930 km — Galle inner ~ Adams outer 실측 경계, NASA Neptune Fact Sheet / JPL Ring-Moon Systems Node) 로 표현. narrow 3개 (Le Verrier ~113 / Arago <100 / Adams ~35 km) 는 화면에서 sub-pixel (0.04~0.13 px) 이라 층 분리 시 비가시 — densityProfile 12점 피크가 각 ring 의 실측 반경 정규화 위치 (span 21,930 km): Galle (41,000~43,000) @0.000~0.091 → broad faint band 0.20~0.25 / Le Verrier @0.556 → 피크 0.45 / Lassell (53,200~57,200) @0.556~0.739 → faint plateau 0.15 / Arago @0.739 → 피크 0.30 / Adams @1.000 → 최대 밀도 1.0 (해왕성계 지배 ring). 피크 간 baseline 0.04 는 거의 빈 공간이나 선형 보간 + 가시성 위해 극미 채움 (rendering 근사 — 주석 계약). ⚠️ Adams arcs 균질 근사 (PM Q2 합의): 실제 Adams ring 은 5 arcs (Fraternité/Égalité 1·2/Liberté/Courage — 둘레의 ~10%) 만 밝고 나머지는 극미광이나, 방사 densityProfile 은 각도 방향 표현 불가 → 균질 환형 렌더가 의도된 근사 (버그 아님 — D-T2 사전 등록). 각도 density 인프라는 후속 분리 (ADR 20260610-r9 §위험 #3).",
+      "rings": [
+        {
+          "id": "main",
+          "innerRadiusKm": 41000,
+          "outerRadiusKm": 62930,
+          "densityProfile": [
+            [0.0, 0.2],
+            [0.05, 0.25],
+            [0.09, 0.2],
+            [0.14, 0.04],
+            [0.51, 0.04],
+            [0.56, 0.45],
+            [0.6, 0.15],
+            [0.7, 0.15],
+            [0.74, 0.3],
+            [0.79, 0.04],
+            [0.95, 0.04],
+            [1.0, 1.0]
+          ],
+          "colorHint": { "hex": "#6F635A", "colorSource": "observed" }
+        }
+      ]
+    },
+    {
+      "id": "triton",
+      "kind": "moon",
+      "nameKo": "트리톤",
+      "nameEn": "Triton",
+      "mass": 2.139e22,
+      "radius": 1.3534e6,
+      "parentId": "neptune",
+      "introducedInRPhase": 9,
+      "showInShortcutBar": false,
+      "$comment": "R9 #653 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-10 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Neptune-centric J2000 Ecliptic (osculating). Laplace plane 값 혼입 금지 — R7 titan / R8 titania frame 선례 답습 (ADR 20260610-r9 §축 3, agy Epoch 명시 수용). Horizons 원시값: IN=129.1418 / OM=222.6557 / W=8.8796 / MA=40.7904 → ϖ=OM+W mod 360=231.5353, L=ϖ+MA mod 360=272.3256. a/e 는 NASA Fact Sheet 박제값 (a=354,759 km / e=0.000016 — 태양계 대형 위성 중 최소, 사실상 완전 원). ⚠️ inclination 129.14° > 90° = 역행 (태양계 유일 대형 역행 위성 — 포획 기원 가설). NASA 통념 '157°' 는 Neptune 적도면 기준이고 본 값은 ecliptic osculating — frame 무관 불변량은 '> 90° (역행)' (ADR §위험 #2). 공전 애니메이션이 다른 모든 body 와 반대 방향 (시계방향) 으로 도는 것이 사실 정합 — 버그 아님 (D-T2 사전 등록, PM Q1). 코드에서 보정 시도 금지.",
+      "colorHint": { "hex": "#D2C2B0", "colorSource": "observed" },
+      "dataSource": "NASA Neptune Fact Sheet + JPL Horizons API (2026-06-10 쿼리, 2026-01-01 TDB epoch, Neptune-centric J2000 Ecliptic)",
+      "lastVerified": "2026-06-10",
+      "orbit": {
+        "semiMajorAxisAU": 0.00237142,
+        "eccentricity": 0.000016,
+        "inclinationDeg": 129.1418,
+        "longitudeOfAscendingNodeDeg": 222.6557,
+        "longitudeOfPerihelionDeg": 231.5353,
+        "meanLongitudeDeg": 272.3256
       }
     },
     {

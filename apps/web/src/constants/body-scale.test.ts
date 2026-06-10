@@ -77,6 +77,29 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(ratio).toBeLessThan(1.3);
   });
 
+  it('neptune = 250 (R9 #653 — ice giant 정책 답습 2번째 인스턴스, uranus 동일값)', () => {
+    expect(BODY_SCALE.neptune).toBe(250);
+  });
+
+  it('triton = 300 (R9 #653 — triton/neptune 비 0.0656 moon/earth 0.068 최근접, titania=500 답습 기각)', () => {
+    expect(BODY_SCALE.triton).toBe(300);
+  });
+
+  it('R9 ice giant 답습 — neptune/uranus px 비 0.969 ± 0.02 (사실 radius 비 자동 보존 — DoD 1 정량 가드)', () => {
+    // ADR 20260610-r9 §축 1 — 동일 scale 그룹 내 동일값 답습 시 상대 비율 = 사실 radius 비.
+    // neptune(2.4764e7 × 250) / uranus(2.5559e7 × 250) = 0.9689 (R5 mars=earth / R7 saturn=jupiter 동형 3번째).
+    const ratio = (2.4764e7 * BODY_SCALE.neptune!) / (2.5559e7 * BODY_SCALE.uranus!);
+    expect(ratio).toBeGreaterThan(0.949);
+    expect(ratio).toBeLessThan(0.989);
+  });
+
+  it('R9 — neptune mesh > earth mesh (neptune/earth 1.21 > 1 직관 유지)', () => {
+    // ADR 20260610-r9 §축 1 — neptune(2.4764e7 × 250) / earth(6.378137e6 × 800) = 1.213.
+    const ratio = (2.4764e7 * BODY_SCALE.neptune!) / (6.378137e6 * BODY_SCALE.earth!);
+    expect(ratio).toBeGreaterThan(1.15);
+    expect(ratio).toBeLessThan(1.27);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -107,10 +130,12 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('titan')).toBe(100); // R7 #641 — galilean 답습
     expect(getBodyScale('uranus')).toBe(250); // R8 #647 — ice giant 정책 신설
     expect(getBodyScale('titania')).toBe(500); // R8 #647 — moon/earth 수렴대
+    expect(getBodyScale('neptune')).toBe(250); // R9 #653 — ice giant 답습 2번째
+    expect(getBodyScale('triton')).toBe(300); // R9 #653 — moon/earth 수렴대 (역행 위성 첫 사례 — scale 은 궤도 방향 무관)
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('neptune')).toBe(1.0); // R9 진입 전
+    expect(getBodyScale('pluto')).toBe(1.0); // R10 진입 전
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 

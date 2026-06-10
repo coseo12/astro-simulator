@@ -96,6 +96,8 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   titan: 100, // R7 #641 — galilean 최종값 (R6 Amendment 2) 답습 (300→200→100 iteration 건너뛰고 수렴값 시작). titan/saturn 비 0.089 (moon/earth 0.068 근접, ganymede-class 0.978배). 4px fallback billboard 의존 (mesh 1.82px). ADR 20260610-r7 §축 3
   uranus: 250, // R8 #647 — ice giant 정책 신설 (3번째 scale 그룹). 사실 비율 (sun 3.67%) 명시 위배 + earth 대비 직관 우선 (PM 제약 "천왕성 > 지구", 실반경 4.007배). px 45.24 / uranus/earth 비 1.25 / mid LOD 50px 미만 (margin 4.76px). jupiter/saturn 시각 역전은 의식적 수용 (ADR 20260610-r8 §축 1 + §위험 #1)
   titania: 500, // R8 #647 — titania/uranus mesh 비 0.0617 (moon/earth 0.068 수렴대). titan=100 답습 시 0.0123 과소 (uranus 250 이 gas giant 48 의 5.2배). 4px fallback billboard 의존 (mesh 2.79px). ADR 20260610-r8 §축 3
+  neptune: 250, // R9 #653 — ice giant 정책 답습 (2번째 인스턴스, uranus 동일값). neptune/uranus px 비 0.969 = 사실 radius 비 자동 보존 (R5 mars=earth / R7 saturn=jupiter 동형 3번째). px 43.84 / neptune/earth 비 1.21 / mid LOD 50px 미만 (margin 6.16px). "ice giant = 250" 단일 mental model 완성. ADR 20260610-r9 §축 1
+  triton: 300, // R9 #653 — triton/neptune mesh 비 0.0656 (moon/earth 0.068 최근접 — 수렴대 0.05~0.09 중앙). titania=500 답습 시 비 0.109 상한 초과 기각 (triton radius 가 titania 의 1.72배 — 비율 산출 방법론이 SSoT, scale 값 답습 아님). 4px fallback billboard 의존 (mesh 2.87px). ADR 20260610-r9 §축 3
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

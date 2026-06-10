@@ -73,10 +73,21 @@ const PRESETS: Preset[] = [
     // R8 #647 — neptune(introducedInRPhase=9) target preset. uranus 진입으로 uranus-x10 이
     // enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입 body(neptune) 로
     // 교체 보존 (R6 saturn-x10 / R7 uranus-x10 선례 답습). R9 진입 시 자동 enabled.
+    // R9 #653 — neptune 진입으로 zero-touch 자동 enabled (Concrete Prediction 재현 4번째).
     id: 'neptune-x10',
     label: '해왕성 10배 질량',
     description: '최외곽 행성 섭동을 관찰. 해왕성 진입(R9) 시 활성.',
     massMultipliers: { neptune: 10 },
+  },
+  {
+    // R9 #653 — pluto(introducedInRPhase=10) target preset. neptune 진입으로 neptune-x10 이
+    // enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입 body(pluto) 로
+    // 교체 보존 (R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 선례 답습 — 로드맵 행성 완주로
+    // R10 은 왜소행성·혜성 라운드). R10 진입 시 자동 enabled.
+    id: 'pluto-x10',
+    label: '명왕성 10배 질량',
+    description: '카이퍼벨트 왜소행성 섭동을 관찰. 명왕성 진입(R10) 시 활성.',
+    massMultipliers: { pluto: 10 },
   },
 ];
 

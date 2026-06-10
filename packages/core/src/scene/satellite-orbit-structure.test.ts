@@ -73,6 +73,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       callisto: 'jupiter',
       titan: 'saturn', // R7 #641
       titania: 'uranus', // R8 #647
+      triton: 'neptune', // R9 #653 — 역행 위성 첫 사례 (parent 추적/분리는 궤도 방향 무관)
     };
     for (const [satId, expectedParent] of Object.entries(satellites)) {
       const body = byId.get(satId);
@@ -82,7 +83,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     }
   });
 
-  it('R-Phase allowlist 의 satellite 들은 정확히 earth/mars/jupiter/saturn/uranus 5 parent 로 그룹화', () => {
+  it('R-Phase allowlist 의 satellite 들은 정확히 earth/mars/jupiter/saturn/uranus/neptune 6 parent 로 그룹화', () => {
     // 본 fix 의 핵심 불변식 — satellite 궤도선이 parent 수만큼의 LineSystem 으로 생성됨.
     const parents = new Set<string>();
     for (const id of R_PHASE_BODY_ALLOWLIST) {
@@ -90,9 +91,16 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       if (!body || !body.orbit) continue;
       if (isSatelliteOrbit(body.parentId)) parents.add(body.parentId);
     }
-    // R8 시점: earth (moon) / mars (phobos, deimos) / jupiter (galilean 4) / saturn (titan #641)
-    // / uranus (titania #647).
-    expect([...parents].sort()).toEqual(['earth', 'jupiter', 'mars', 'saturn', 'uranus']);
+    // R9 시점: earth (moon) / mars (phobos, deimos) / jupiter (galilean 4) / saturn (titan #641)
+    // / uranus (titania #647) / neptune (triton #653).
+    expect([...parents].sort()).toEqual([
+      'earth',
+      'jupiter',
+      'mars',
+      'neptune',
+      'saturn',
+      'uranus',
+    ]);
   });
 });
 
@@ -104,7 +112,7 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
   });
 
   it('미매핑 parentId → 1.0 fallback (visual scale 미적용, 실측 그대로)', () => {
-    expect(getOrbitVisualScale('neptune')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R9 진입 전
+    expect(getOrbitVisualScale('pluto')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R10 진입 전
     expect(getOrbitVisualScale('unknown-parent')).toBe(DEFAULT_ORBIT_VISUAL_SCALE);
   });
 
