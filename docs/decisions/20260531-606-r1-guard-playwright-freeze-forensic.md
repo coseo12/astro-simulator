@@ -484,11 +484,18 @@ freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 foc
 - **ci.yml 잔존 `node-version-file` 3곳 (line 319/350/357) NO-OP 분류**: yarn / npm / no-lockfile 폴백 분기 — `if: hashFiles('pnpm-lock.yaml') == ''` 조건이 본 repo (pnpm-lock 존재) 에서 항상 false 인 dead path. playwright 실행 이전 단계이며 본 repo 에선 미실행 — 핀 불요 (범용 템플릿 경로 보존)
 - **검증**: fix PR 은 `.github/**` paths-ignore (#626) 로 a11y/fps 를 트리거하지 못하므로, runtime 파일 (reviewer 권고 stale 주석 2건 정정) 동반으로 트리거 확보 — fix PR 자체에서 green 실측 (자가 입증)
 
+#### Amendment 3 교차검증 반영 (cross-validate 2026-06-11 agy outcome=applied)
+
+- **고유 발견 수용 → 후속 분리**: 다수 workflow 하드코딩 핀의 관리 포인트 중복 — 중앙 집중식 정확 버전 파일 (`.node-version` 등) 을 setup-node 가 읽는 방식. **정책 정밀화**: 본 Amendment 의 금지 대상은 "범위 해석" (`package.json` engines `">=20.0.0"`) — 정확 버전 중앙 파일은 root cause 와 무관한 유효 대안. 단 6 workflow 일괄 전환은 #663 DoD 범위 밖 → 후속 이슈 분리 (우선순위 low)
+- **수용 (본문 통합)**: upstream (playwright/Node) 버그 리포트 추적 항목 — Amendment 4 잠재에 추가 (핀 해제 조건의 관찰 대상)
+- **기존재 (중복 — 추가 조치 없음)**: 로컬-CI 정합성 (`engines-strict`/`.nvmrc`) = Amendment 2 고유 발견 #1 기박제 / measureBodyPxRatios dead code 격리 = Amendment 2 고유 발견 #3 기박제
+- **기각**: `DEBUG=pw:install` secrets 필터링 — 해당 로깅은 #606 진단 당시 일회성 (현행 workflow 미잔존), 상시 가이드 박제는 과잉
+
 ### Amendment 라운드 N≥4 예상
 
 - ~~Amendment 3 (해소됨 — 본 Amendment 2 가 root cause fix 까지 박제): 옵션 (c)/(d) root cause fix~~ → 실제 root cause 는 옵션 a~e 어디에도 없던 Node/playwright extract 비호환이었고 Node 22 핀으로 해소
 - Amendment 4 (잠재 — cross-validate 고유 발견 #1): 로컬 정합성 (`.nvmrc` Node 24 잔존) 후속 검토 — fresh playwright install deadlock 로컬 재현 측정 후 engines 핀 vs 가이드 결정
-- Amendment 4 (잠재): playwright 업그레이드로 Node 24 extract 호환 확인 시 Node 22 핀 해제 — 해제 시 본 Amendment 3 정책 (전수 명시 핀) 도 동시 재검토 (3 workflow 일괄)
+- Amendment 4 (잠재): playwright 업그레이드로 Node 24 extract 호환 확인 시 Node 22 핀 해제 — 해제 시 본 Amendment 3 정책 (전수 명시 핀) 도 동시 재검토 (3 workflow 일괄). 호환 확인 경로: playwright/Node upstream 이슈 추적 (Amendment 3 cross-validate 수용 — 리포트 링크 발견 시 본 항목에 박제)
 - Amendment 4: R6 진입 시 satellite 측정 일반화 가드 (단 본 Amendment 2 로 freeze 자체는 R6 무관 확정 — R6 galilean 추가는 verify/measure 경로이고 freeze 는 install 단계였으므로 §6 §위험 #2 "R6 stuck 가속" 위험도 **해소**)
 
 forensic 5 조건 충족 (가설 N=5 / runtime 측정 = CI history 정적 분석 + 본 Amendment 1 자가 입증 측정 / DoD PASS 인데 사용자/제품 회귀 = admin override 누적 / 5 옵션 비교 / Amendment N=1 박제 + N≥2 예상) → forensic 변형 ADR 정합.
