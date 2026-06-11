@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 
 describe('ScenarioPresets', () => {
-  it('7개 프리셋 + 원복 버튼 렌더', () => {
+  it('8개 프리셋 + 원복 버튼 렌더', () => {
     render(<ScenarioPresets />);
     expect(screen.getByTestId('preset-jupiter-x10')).toBeInTheDocument();
     expect(screen.getByTestId('preset-no-jupiter')).toBeInTheDocument();
@@ -36,7 +36,8 @@ describe('ScenarioPresets', () => {
     expect(screen.getByTestId('preset-saturn-x10')).toBeInTheDocument();
     expect(screen.getByTestId('preset-uranus-x10')).toBeInTheDocument(); // R8 #647 — zero-touch 자동 enabled
     expect(screen.getByTestId('preset-neptune-x10')).toBeInTheDocument(); // R9 #653 — zero-touch 자동 enabled (재현 4번째)
-    expect(screen.getByTestId('preset-pluto-x10')).toBeInTheDocument(); // R9 #653 — negative 케이스 교체 보존 (R10)
+    expect(screen.getByTestId('preset-pluto-x10')).toBeInTheDocument(); // R10a #659 — zero-touch 자동 enabled (재현 5번째)
+    expect(screen.getByTestId('preset-halley-x10')).toBeInTheDocument(); // R10a #659 — negative 케이스 교체 보존 (R10b 혜성)
     expect(screen.getByTestId('scenario-reset')).toBeInTheDocument();
   });
 
@@ -55,11 +56,11 @@ describe('ScenarioPresets', () => {
  *
  * ADR `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 1, 3.
  *
- * 검증 (R9 #653 진입 — neptune allowlist 포함 후):
+ * 검증 (R10a #659 진입 — 왜소행성 5 allowlist 포함 후):
  *  - sun-half (R1 박제 sun) preset 활성 — apply 호출 시 setEngine/setMass/sendCommand 정상 발행
- *  - jupiter-x10 / no-jupiter (R6) / saturn-x10 (R7) / uranus-x10 (R8) / neptune-x10 (R9) preset 활성 — zero-touch 자동 enabled
- *  - pluto-x10 (R10 미진입 pluto) preset disabled — disabled-path negative 케이스 보존
- *    (neptune 진입으로 neptune-x10 이 enabled 되어 가드 무력화 위험 → pluto 로 대체 박제 — R6/R7/R8 선례)
+ *  - jupiter-x10 / no-jupiter (R6) / saturn-x10 (R7) / uranus-x10 (R8) / neptune-x10 (R9) / pluto-x10 (R10a) preset 활성 — zero-touch 자동 enabled
+ *  - halley-x10 (R10b 미진입 halley — phase 11 혜성) preset disabled — disabled-path negative 케이스 보존
+ *    (pluto 진입으로 pluto-x10 이 enabled 되어 가드 무력화 위험 → halley 로 대체 박제 — R6/R7/R8/R9 선례)
  *  - a11y 4축 (disabled / aria-disabled / title / data-r-phase-disabled) 정합성
  *  - sun-half tooltip 부재 (불필요 노이즈 차단), disabled preset tooltip 'R-Phase 진행 시 활성' 박제
  *  - 시각 차별화 (opacity-50 / cursor-not-allowed) 박제
@@ -96,14 +97,19 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
     expect(screen.getByTestId('preset-neptune-x10')).not.toBeDisabled();
   });
 
-  it('pluto-x10 (R10 미진입 pluto) preset 은 disabled (negative 케이스 교체 보존)', () => {
+  it('pluto-x10 (R10a #659 진입 pluto) preset 은 활성 (zero-touch 자동 enabled 재현 5번째)', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-pluto-x10')).toBeDisabled();
+    expect(screen.getByTestId('preset-pluto-x10')).not.toBeDisabled();
+  });
+
+  it('halley-x10 (R10b 미진입 halley — phase 11 혜성) preset 은 disabled (negative 케이스 교체 보존)', () => {
+    render(<ScenarioPresets />);
+    expect(screen.getByTestId('preset-halley-x10')).toBeDisabled();
   });
 
   it('disabled preset 은 aria-disabled="true" 설정 (스크린 리더 인지)', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-pluto-x10')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('활성 preset 은 aria-disabled="false"', () => {
@@ -114,7 +120,14 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
 
   it('disabled preset 은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-pluto-x10')).toHaveAttribute('data-r-phase-disabled', 'true');
+    expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute(
+      'data-r-phase-disabled',
+      'true',
+    );
+    expect(screen.getByTestId('preset-pluto-x10')).toHaveAttribute(
+      'data-r-phase-disabled',
+      'false',
+    ); // R10a #659 진입
     expect(screen.getByTestId('preset-sun-half')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('preset-saturn-x10')).toHaveAttribute(
       'data-r-phase-disabled',
@@ -136,7 +149,10 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
 
   it('disabled preset 은 tooltip "R-Phase 진행 시 활성" 박제', () => {
     render(<ScenarioPresets />);
-    expect(screen.getByTestId('preset-pluto-x10')).toHaveAttribute('title', 'R-Phase 진행 시 활성');
+    expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute(
+      'title',
+      'R-Phase 진행 시 활성',
+    );
   });
 
   it('활성 preset 은 title 속성 없음 (불필요 노이즈 차단)', () => {
@@ -147,14 +163,14 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
 
   it('disabled preset 시각 차별화 — opacity-50 cursor-not-allowed 클래스 박제', () => {
     render(<ScenarioPresets />);
-    const plutoBtn = screen.getByTestId('preset-pluto-x10');
-    expect(plutoBtn.className).toContain('opacity-50');
-    expect(plutoBtn.className).toContain('cursor-not-allowed');
+    const halleyBtn = screen.getByTestId('preset-halley-x10');
+    expect(halleyBtn.className).toContain('opacity-50');
+    expect(halleyBtn.className).toContain('cursor-not-allowed');
   });
 
   it('disabled preset 강제 click → apply 부작용 0 (HTML disabled 자체 차단)', () => {
     render(<ScenarioPresets />);
-    fireEvent.click(screen.getByTestId('preset-pluto-x10'));
+    fireEvent.click(screen.getByTestId('preset-halley-x10'));
     // HTML button[disabled] 는 click 이벤트 자체를 dispatch 하지 않음.
     const s = useSimStore.getState();
     expect(s.physicsEngine).toBe('kepler'); // 초기값 유지 (setEngine 호출 0)
