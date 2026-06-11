@@ -87,7 +87,7 @@ const PRESETS: Preset[] = [
     // R10a #659 — pluto 진입으로 zero-touch 자동 enabled (Concrete Prediction 재현 5번째).
     id: 'pluto-x10',
     label: '명왕성 10배 질량',
-    description: '카이퍼벨트 왜소행성 섭동을 관찰. 명왕성 진입(R10) 시 활성.',
+    description: '카이퍼벨트 왜소행성 섭동을 관찰 (R10a 진입 완료 — 활성).',
     massMultipliers: { pluto: 10 },
   },
   {
