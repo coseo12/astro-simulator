@@ -127,7 +127,7 @@ describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus + R4 earth + moon
  * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 2.
  *
  * 검증:
- *  - R9 #653: bar 전체 enabled (R10 body 는 bar 미등록 — disabled-path negative 는 tree/panel/preset 의 pluto 가 보존)
+ *  - R10a #659: bar 전체 enabled (pluto 14버튼째 승격 — disabled-path negative 는 tree/panel/preset 의 halley 가 보존)
  *  - allowlist 박제 body 버튼 (sun / mercury / venus) 은 활성
  *  - disabled 버튼 강제 클릭 시 focusOn 명령 발행 0 (HTML disabled 자체 차단)
  *  - tooltip (title 속성) 박제
@@ -146,10 +146,46 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
 
   it('neptune (R9 #653 진입) 은 활성 — CURRENT_R_PHASE=9 1줄 자동 enabled (#613 Concrete Prediction)', () => {
     // R9 — 로드맵 마지막 행성 진입으로 FOCUS_BUTTONS 의 disabled 대상이 구조 소멸
-    // (R10 8 body 전부 showInShortcutBar=false → bar 미등록). disabled-path negative 는
-    // celestial-tree / celestial-info-panel / scenario-presets 단위 테스트 (pluto) 가 보존.
+    // (R10a 미등록 4 + R10b 혜성 3 전부 showInShortcutBar=false → bar 미등록). disabled-path
+    // negative 는 celestial-tree / celestial-info-panel / scenario-presets 단위 테스트 (halley —
+    // R10a #659 에서 pluto 교체) 가 보존.
     render(<FocusQuickButtons />);
     expect(screen.getByTestId('focus-neptune')).not.toBeDisabled();
+  });
+
+  // R10a #659 — pluto 승격 케이스 단언 (PM Q3=A: pluto 만 추가, 나머지 4 미등록 검증).
+  it('pluto (R10a #659 진입 + bar 승격) 은 활성 — 14버튼째 (거리순 마지막)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-pluto')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-pluto')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('focus-pluto')).toHaveAttribute('data-r-phase-disabled', 'false');
+    expect(screen.getByTestId('focus-pluto')).not.toHaveAttribute('title');
+  });
+
+  it('pluto 버튼 텍스트 = "명왕성" (R10a 박제 + 한국어 라벨)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-pluto')).toHaveTextContent('명왕성');
+  });
+
+  it('pluto 클릭 시 focusOn 명령 발행 (R10a #659 진입 검증)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-pluto'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'pluto' });
+  });
+
+  it('neptune → pluto DOM 거리 순서 보존 (pluto 가 bar 마지막 body — 39.48 AU)', () => {
+    render(<FocusQuickButtons />);
+    const neptune = screen.getByTestId('focus-neptune');
+    const pluto = screen.getByTestId('focus-pluto');
+    expect(neptune.compareDocumentPosition(pluto)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('ceres / haumea / makemake / eris 는 shortcut bar 미등록 (PM Q3=A — URL ?focus= 진입, #617 직교 축)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.queryByTestId('focus-ceres')).toBeNull();
+    expect(screen.queryByTestId('focus-haumea')).toBeNull();
+    expect(screen.queryByTestId('focus-makemake')).toBeNull();
+    expect(screen.queryByTestId('focus-eris')).toBeNull();
   });
 
   it('neptune 은 aria-disabled="false" + data-r-phase-disabled="false" (R9 enabled 전환)', () => {

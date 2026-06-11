@@ -37,8 +37,11 @@ describe('orbit-visual-scale SSoT (R4 #539 Amendment 2)', () => {
     expect(getOrbitVisualScale(undefined)).toBe(1.0);
   });
 
-  it('R10+ 미진입 parent (pluto) → 1.0 (R9 비-범위)', () => {
+  it('미매핑 parent (pluto — R10a 진입했으나 위성 0) / 미진입 parent (halley — R10b) → 1.0', () => {
+    // R10a #659 — pluto 는 allowlist 진입했으나 charon 등 위성 데이터 부재 (R9 인계 #6 이월)
+    // → ORBIT_VISUAL_SCALE_BY_PARENT 미매핑이 정합. halley 는 R10b (phase 11) 미진입 negative.
     expect(getOrbitVisualScale('pluto')).toBe(1.0);
+    expect(getOrbitVisualScale('halley')).toBe(1.0);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT 는 frozen (런타임 변경 차단)', () => {

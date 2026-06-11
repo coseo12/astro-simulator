@@ -100,6 +100,14 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(ratio).toBeLessThan(1.27);
   });
 
+  it('R10a dwarf 그룹 — 5 body 전부 800 (4번째 scale 그룹, inner 계보 답습 — PM Q2=A)', () => {
+    expect(BODY_SCALE.ceres).toBe(800);
+    expect(BODY_SCALE.pluto).toBe(800);
+    expect(BODY_SCALE.haumea).toBe(800);
+    expect(BODY_SCALE.makemake).toBe(800);
+    expect(BODY_SCALE.eris).toBe(800);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -108,6 +116,50 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
       BODY_SCALE.sun = 100;
     }).toThrow();
     expect(BODY_SCALE.sun).toBe(50);
+  });
+});
+
+/**
+ * R10a #659 — dwarf 그룹 서열 정량 가드 (ADR 20260611-r10a §축 1).
+ *
+ * radius × scale 곱 (결정적 — runtime 측정 불요) 기준 3축:
+ *   1. 그룹 내 사실 서열: pluto > eris > haumea > makemake > ceres (strict 부등호 4개)
+ *   2. cross-group: pluto×800 < mercury×700 (pluto visual < mercury visual — PM Q2 명시 제약)
+ *   3. 그룹 동일값: 5 body 전부 === 800 — 단일값 구조 자체를 가드 (개별 조정 후보 D 회귀 차단.
+ *      단일값이 깨지면 그룹 내 서열이 radius 단독에서 radius×scale 산식으로 복잡화)
+ */
+describe('R10a #659 — dwarf 그룹 서열 정량 가드 (ADR §축 1)', () => {
+  // 사실 radius (m) — solar-system.json 기박제 실측값 (변경 없음).
+  const RADIUS = {
+    mercury: 2.4397e6,
+    ceres: 4.696e5,
+    pluto: 1.1883e6,
+    haumea: 7.8e5,
+    makemake: 7.15e5,
+    eris: 1.163e6,
+  } as const;
+  const visual = (id: keyof typeof RADIUS) => RADIUS[id] * BODY_SCALE[id]!;
+
+  it('그룹 내 사실 서열 — pluto > eris > haumea > makemake > ceres (strict 부등호 4개)', () => {
+    expect(visual('pluto')).toBeGreaterThan(visual('eris'));
+    expect(visual('eris')).toBeGreaterThan(visual('haumea'));
+    expect(visual('haumea')).toBeGreaterThan(visual('makemake'));
+    expect(visual('makemake')).toBeGreaterThan(visual('ceres'));
+  });
+
+  it('cross-group — pluto×800 < mercury×700 (pluto visual < mercury visual, 비 0.557)', () => {
+    expect(visual('pluto')).toBeLessThan(visual('mercury'));
+    // 비 0.557 ± 0.01 — 서열 방향뿐 아니라 크기 비도 가드 (scale 상향 Amendment 시 수학 상한 1437 인지).
+    const ratio = visual('pluto') / visual('mercury');
+    expect(ratio).toBeGreaterThan(0.547);
+    expect(ratio).toBeLessThan(0.567);
+  });
+
+  it('그룹 동일값 — dwarf 5 body 전부 === 800 (단일값 구조 가드, 개별 조정 후보 D 회귀 차단)', () => {
+    const dwarfIds = ['ceres', 'pluto', 'haumea', 'makemake', 'eris'] as const;
+    for (const id of dwarfIds) {
+      expect(BODY_SCALE[id], `${id} 는 dwarf 그룹 단일값 800 이어야 함`).toBe(800);
+    }
   });
 });
 
@@ -132,10 +184,15 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('titania')).toBe(500); // R8 #647 — moon/earth 수렴대
     expect(getBodyScale('neptune')).toBe(250); // R9 #653 — ice giant 답습 2번째
     expect(getBodyScale('triton')).toBe(300); // R9 #653 — moon/earth 수렴대 (역행 위성 첫 사례 — scale 은 궤도 방향 무관)
+    expect(getBodyScale('ceres')).toBe(800); // R10a #659 — dwarf 그룹
+    expect(getBodyScale('pluto')).toBe(800); // R10a #659 — dwarf 그룹 (R9 negative → positive 전환)
+    expect(getBodyScale('haumea')).toBe(800); // R10a #659 — dwarf 그룹
+    expect(getBodyScale('makemake')).toBe(800); // R10a #659 — dwarf 그룹
+    expect(getBodyScale('eris')).toBe(800); // R10a #659 — dwarf 그룹
   });
 
   it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('pluto')).toBe(1.0); // R10 진입 전
+    expect(getBodyScale('halley')).toBe(1.0); // R10b 진입 전 (R10a #659 — pluto positive 전환으로 halley 교체, ADR §축 4)
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 

@@ -199,6 +199,9 @@ async function measureBodyPxRatios(page) {
     // R7 #641 — saturn (거성 예외 2번째, 실측 × 1.05 임계 박제) + titan (§결정 6 답습 미박제 — 측정만).
     // R8 #647 — uranus (ice giant 정책, §축 1 결정 트리 임계) + titania (titan 답습 미박제 — 측정만).
     // R9 #653 — neptune (ice giant 2번째, §축 1 결정 트리 임계) + triton (titania 답습 미박제 — 측정만).
+    // R10a #659 — 왜소행성 5 (ceres/pluto/haumea/makemake/eris) 전부 §축 5 결정 트리 N/A (미박제 — 측정만).
+    // 5 body 전부 billboard 4px fallback 의존 (식 px 2.66~6.73, depth 2.77~67.86 AU 투영 축소) —
+    // phobos/deimos §결정 6 답습 7번째 그룹. 회귀 가드는 allowlist(#613)/FOCUS_BODIES(#598)/본 targetIds(#619) 우회.
     const targetIds = [
       'sun',
       'mercury',
@@ -219,6 +222,11 @@ async function measureBodyPxRatios(page) {
       'titania',
       'neptune',
       'triton',
+      'ceres',
+      'pluto',
+      'haumea',
+      'makemake',
+      'eris',
     ];
 
     /**

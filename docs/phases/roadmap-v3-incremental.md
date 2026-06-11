@@ -1,4 +1,5 @@
 <!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+
 # 로드맵 v3 — Incremental Body-by-Body Build
 
 > **Status**: Active (2026-04-25 재구성)
@@ -41,7 +42,9 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 | **R7**  | R6 + 토성 + 고리                   | 2~3d        | 계획 중             |
 | **R8**  | R7 + 천왕성                        | 1~2d        | 계획 중             |
 | **R9**  | R8 + 해왕성                        | 1~2d        | 계획 중             |
-| **R10** | 왜소행성 (명왕성 외) + 혜성        | 2~3d        | 선택적              |
+| **R10** | 왜소행성 (명왕성 외) + 혜성        | 2~3d        | 선택적 — 분할 진행  |
+
+> **R10 분할 매핑 (PM 2026-06-11, [#659](https://github.com/coseo12/astro-simulator/issues/659))**: 로드맵 라벨 ↔ `introducedInRPhase` 정수 매핑 — **R10a = phase 10 (왜소행성 5: ceres/pluto/haumea/makemake/eris) / R10b = phase 11 (혜성 3: halley/encke/swift-tuttle)**. 각각 독립 릴리스 (v0.24.0 / v0.25.0 리듬). 분리 메커니즘 (혜성 phase 11 재박제 — 데이터만, 코드 0) 은 [ADR 20260611-r10a](../decisions/20260611-r10a-dwarf-planets-visualization.md) §축 2. 동일 매핑 박제 3곳: 본 행 / `solar-system.json` 혜성 `$introducedInRPhaseComment` / `r-phase-allowlist.ts` CURRENT_R_PHASE 주석.
 
 **총 예상: 14~22 영업일** (R10 선택 포함)
 

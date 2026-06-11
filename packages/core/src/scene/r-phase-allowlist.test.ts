@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1~R8 (sun~titania) + R9 neptune + triton 순서로 정확히 19개', () => {
+  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 순서로 정확히 24개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -44,6 +44,11 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'titania',
       'neptune',
       'triton',
+      'ceres', // R10a #659 — 왜소행성 5 (데이터 등장 순)
+      'pluto',
+      'haumea',
+      'makemake',
+      'eris',
     ]);
   });
 
@@ -51,9 +56,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 19개 (CURRENT_R_PHASE=9 필터)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R9 #653 진입 19개 (위 toEqual).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(19);
+  it('자동 생성 결과 24개 (CURRENT_R_PHASE=10 필터 — 혜성 3 은 phase 11 로 자동 제외)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R10a #659 진입 24개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(24);
   });
 });
 
@@ -67,8 +72,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 9 (R9 neptune + triton 까지 — 로드맵 마지막 행성)', () => {
-    expect(CURRENT_R_PHASE).toBe(9);
+  it('CURRENT_R_PHASE 는 10 (R10a 왜소행성 5 까지 — 첫 비-행성 라운드. phase 11 = R10b 혜성)', () => {
+    expect(CURRENT_R_PHASE).toBe(10);
   });
 
   it('filterBodiesByPhase(CURRENT_R_PHASE) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -119,20 +124,49 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     expect(r8).not.toContain('triton');
   });
 
-  it('R9 시뮬레이션 — phase 9 진입 시 neptune + triton 자동 포함 (CURRENT_R_PHASE 1줄, 코드 변경 0)', () => {
-    expect(filterBodiesByPhase(bodies, 9)).toEqual([...R_PHASE_BODY_ALLOWLIST]);
-    expect(filterBodiesByPhase(bodies, 9)).toContain('neptune');
-    expect(filterBodiesByPhase(bodies, 9)).toContain('triton');
+  it('R9 시뮬레이션 — phase 9 는 19개 (neptune + triton 까지, 왜소행성/혜성 제외)', () => {
+    const r9 = filterBodiesByPhase(bodies, 9);
+    expect(r9.length).toBe(19);
+    expect(r9).toContain('neptune');
+    expect(r9).toContain('triton');
+    expect(r9).not.toContain('ceres');
+    expect(r9).not.toContain('pluto');
   });
 
-  it('R10 시뮬레이션 — phase 10 은 전체 27 body (R9 triton 추가 후 데이터 전부 부여 확인)', () => {
-    expect(filterBodiesByPhase(bodies, 10).length).toBe(27);
+  it('R10a 시뮬레이션 — phase 10 진입 시 왜소행성 5 자동 포함 24개 (CURRENT_R_PHASE 1줄, 코드 변경 0 — 혜성 3 제외)', () => {
+    expect(filterBodiesByPhase(bodies, 10)).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+    expect(filterBodiesByPhase(bodies, 10).length).toBe(24);
+    for (const id of ['ceres', 'pluto', 'haumea', 'makemake', 'eris']) {
+      expect(filterBodiesByPhase(bodies, 10)).toContain(id);
+    }
+    for (const id of ['halley', 'encke', 'swift-tuttle']) {
+      expect(filterBodiesByPhase(bodies, 10), `${id} 는 phase 11 (R10b) — R10a 제외`).not.toContain(
+        id,
+      );
+    }
   });
 
-  it('모든 body 에 introducedInRPhase 부여 (1~10 범위)', () => {
+  it('R10b 시뮬레이션 — phase 11 은 전체 27 body (혜성 3 자동 포함 — CURRENT_R_PHASE=11 1줄 예고)', () => {
+    const r11 = filterBodiesByPhase(bodies, 11);
+    expect(r11.length).toBe(27);
+    expect(r11).toContain('halley');
+    expect(r11).toContain('encke');
+    expect(r11).toContain('swift-tuttle');
+  });
+
+  it('혜성 3 body 는 introducedInRPhase === 11 (R10a/R10b 분리 메커니즘 — ADR 20260611-r10a §축 2 재박제 회귀 가드)', () => {
+    // 로드맵 라벨 ↔ phase 정수 매핑: phase 10 = R10a 왜소행성 / phase 11 = R10b 혜성 (PM 2026-06-11, #659).
+    const comets = bodies.filter((b) => ['halley', 'encke', 'swift-tuttle'].includes(b.id));
+    expect(comets.length).toBe(3);
+    for (const c of comets) {
+      expect(c.introducedInRPhase, `${c.id} 는 R10b (phase 11) 박제여야 함`).toBe(11);
+    }
+  });
+
+  it('모든 body 에 introducedInRPhase 부여 (1~11 범위 — phase 11 = R10b 혜성)', () => {
     for (const b of bodies) {
       expect(b.introducedInRPhase, `${b.id} introducedInRPhase 누락`).toBeGreaterThanOrEqual(1);
-      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(10);
+      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(11);
     }
   });
 });
@@ -158,11 +192,17 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('titania')).toBe(true); // R8 #647
     expect(isRPhaseFocusable('neptune')).toBe(true); // R9 #653
     expect(isRPhaseFocusable('triton')).toBe(true); // R9 #653 — 역행 위성 첫 사례 (focus 가능 여부는 궤도 방향 무관)
+    expect(isRPhaseFocusable('ceres')).toBe(true); // R10a #659 — 왜소행성 5 (negative → positive 전환)
+    expect(isRPhaseFocusable('pluto')).toBe(true); // R10a #659
+    expect(isRPhaseFocusable('haumea')).toBe(true); // R10a #659
+    expect(isRPhaseFocusable('makemake')).toBe(true); // R10a #659
+    expect(isRPhaseFocusable('eris')).toBe(true); // R10a #659
   });
 
-  it('allowlist 외 body 는 false (pluto / ceres — R10 진입 전)', () => {
-    expect(isRPhaseFocusable('pluto')).toBe(false); // R10 진입 전
-    expect(isRPhaseFocusable('ceres')).toBe(false); // R10 진입 전
+  it('allowlist 외 body 는 false (halley / encke / swift-tuttle — R10b phase 11 진입 전)', () => {
+    expect(isRPhaseFocusable('halley')).toBe(false); // R10b 진입 전 (R10a #659 — pluto positive 전환으로 혜성 교체)
+    expect(isRPhaseFocusable('encke')).toBe(false); // R10b 진입 전
+    expect(isRPhaseFocusable('swift-tuttle')).toBe(false); // R10b 진입 전
   });
 
   it('null 은 true — resetCamera / free-fly 경로 차단 금지 (ADR §결정 3)', () => {
@@ -249,7 +289,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     .filter((b) => b.showInShortcutBar && b.introducedInRPhase > CURRENT_R_PHASE)
     .map((b) => b.id);
 
-  it('현재 shortcut 노출 = sun~neptune 전부 활성 (R9 — 로드맵 마지막 행성 진입, 비활성 0)', () => {
+  it('현재 shortcut 노출 = sun~pluto 전부 활성 (R10a #659 — pluto 승격 14버튼, 비활성 0)', () => {
     expect(shortcutBodies).toEqual([
       'sun',
       'mercury',
@@ -261,6 +301,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'saturn', // R7 #641 — showInShortcutBar false → true 전환 (§축 5)
       'uranus', // R8 #647 — showInShortcutBar false → true 전환 (§축 5)
       'neptune', // R9 #653 — 이미 true (배열 변경 0, #613 Concrete Prediction — CURRENT_R_PHASE=9 1줄 자동 enabled)
+      'pluto', // R10a #659 — showInShortcutBar false → true 승격 (PM Q3=A — pluto 만, §축 4)
     ]);
     expect(shortcutEnabled).toEqual([
       'sun',
@@ -273,10 +314,21 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'saturn',
       'uranus',
       'neptune',
+      'pluto', // R10a #659
     ]);
-    // R9 — R10 8 body (왜소행성·혜성) 전부 showInShortcutBar=false → bar 비활성 대표 구조 소멸.
-    // negative 케이스는 browser-verify CelestialTree 5-B/5-C (pluto) + preset 6-G (pluto-x10) 보존.
+    // R10a — ceres/haumea/makemake/eris = "focus 가능 + bar 미등록" (#617 직교 축 — parent=sun
+    // 첫 bar-미등록 사례. phobos/deimos/galilean/titan/titania/triton 와 동일 분류). 혜성 3 도
+    // showInShortcutBar=false 라 shortcutDisabled 는 여전히 빈 배열 — bar 비활성 대표 구조 소멸 유지.
+    // negative 케이스는 browser-verify CelestialTree 5-B/5-C (halley) + preset 6-H (halley-x10) 보존.
     expect(shortcutDisabled).toEqual([]);
+  });
+
+  it('R10a #659 — ceres/haumea/makemake/eris 는 focus 가능 + bar 미등록 (#617 직교 축 negative)', () => {
+    for (const id of ['ceres', 'haumea', 'makemake', 'eris']) {
+      const body = bodies.find((b) => b.id === id);
+      expect(body?.introducedInRPhase, `${id} 는 R10a (phase 10) 진입`).toBe(10);
+      expect(body?.showInShortcutBar, `${id} 는 bar 미등록 (URL ?focus= 진입만)`).toBe(false);
+    }
   });
 
   it('FOCUS_BUTTONS(focus-quick-buttons.tsx) 의 id 가 showInShortcutBar 파생과 일치', () => {
