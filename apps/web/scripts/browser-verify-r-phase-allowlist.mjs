@@ -7,22 +7,22 @@
  * #403 Amendment — `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장 (시나리오 5 매트릭스).
  * #404 Amendment — `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제 (시나리오 6 매트릭스).
  *
- * 검증 매트릭스 (R9 #653 — neptune + triton 진입 후, 로드맵 마지막 행성):
- *   1. allowlist 박제 body (sun ~ neptune 10개): shortcut 버튼 활성 (disabled 아님)
- *      — satellite (galilean/titan/titania/triton) 는 showInShortcutBar=false 라 bar 미등록 → 본 매트릭스 비대상 (4-B URL 진입 검증).
- *   2. allowlist 외 body shortcut negative: R9 진입으로 FOCUS_BUTTONS 의 disabled 대상 구조 소멸 (R10 8 body 전부 bar 미등록)
- *      — negative 는 URL 4-A (pluto) + CelestialTree 5-B/5-C (pluto) + preset 6-G (pluto-x10) 가 보존
+ * 검증 매트릭스 (R10a #659 — 왜소행성 5 진입 후, 첫 비-행성 라운드):
+ *   1. allowlist 박제 body (sun ~ pluto 11개): shortcut 버튼 활성 (disabled 아님)
+ *      — satellite (galilean/titan/titania/triton) + ceres/haumea/makemake/eris 는 showInShortcutBar=false 라 bar 미등록 → 본 매트릭스 비대상 (4-B URL 진입 검증).
+ *   2. allowlist 외 body shortcut negative: R9 진입으로 FOCUS_BUTTONS 의 disabled 대상 구조 소멸 (R10a 미등록 4 + R10b 혜성 3 전부 bar 미등록)
+ *      — negative 는 URL 4-A (halley) + CelestialTree 5-B/5-C (halley) + preset 6-H (halley-x10) 가 보존
  *   3. 강제 click 시뮬레이션 — disabled 버튼 click 후 selectedBodyId 변화 0 / camera radius 변화 0 (시나리오 2 와 동일 사유로 R9 에선 skip)
  *   4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선):
- *      - 4-A 차단: ?focus=pluto (R10) → selectedBodyId === null + camera radius 변화 0 (negative 케이스 교체 보존 — R8 까지의 neptune 에서 교체)
+ *      - 4-A 차단: ?focus=halley (R10b — phase 11) → selectedBodyId === null + camera radius 변화 0 (R10a #659 — pluto positive 전환으로 halley 교체, ADR §축 4)
  *      - 4-B 정상: ?focus=sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / io / europa /
  *        ganymede / callisto → selectedBodyId === <body> (R1~R6 회귀 보호. R7+ body 전수 focus 진입은
- *        browser-verify-378-focus.mjs FOCUS_BODIES 19 body 가 커버 — R7/R8 선례 답습)
+ *        browser-verify-378-focus.mjs FOCUS_BODIES 24 body 가 커버 — R7~R10a 선례 답습)
  *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
  *   5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth):
  *      - 5-A 정상 (CelestialTree): tree-sun click → selectedBodyId === 'sun' + info-panel 정상 분기 렌더
- *      - 5-B 차단 (CelestialTree): tree-pluto disabled / aria-disabled / data-r-phase-disabled,
- *        force click 시 store / camera 변화 0 (tree 는 전체 body 렌더 — R10 body 가 negative)
+ *      - 5-B 차단 (CelestialTree): tree-halley disabled / aria-disabled / data-r-phase-disabled,
+ *        force click 시 store / camera 변화 0 (tree 는 전체 body 렌더 — R10b 혜성이 negative, R10a #659 교체)
  *      - 5-C 차단 (InfoPanel): 외부 경로로 set 시 info-panel-r-phase-blocked 분기 노출 검증 (programmatic mutation)
  *   6. ScenarioPresets UI 가드 (#404 — UI 측면 3번째 축, defense-in-depth):
  *      - 6-A 정상 (sun-half): preset-sun-half disabled 부재 / aria-disabled='false' / data-r-phase-disabled='false',
@@ -33,7 +33,8 @@
  *      - 6-D 정상 (saturn-x10): R7 #641 진입 saturn → zero-touch 자동 enabled (massMultipliers={saturn:10})
  *      - 6-E 정상 (uranus-x10): R8 #647 진입 uranus → zero-touch 자동 enabled (massMultipliers={uranus:10})
  *      - 6-F 정상 (neptune-x10): R9 #653 진입 neptune → zero-touch 자동 enabled (massMultipliers={neptune:10}, Concrete Prediction 재현 4번째)
- *      - 6-G 차단 (pluto-x10): R10 미진입 pluto → preset disabled (negative 케이스 교체 보존 — R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 선례).
+ *      - 6-G 정상 (pluto-x10): R10a #659 진입 pluto → zero-touch 자동 enabled (massMultipliers={pluto:10}, Concrete Prediction 재현 5번째)
+ *      - 6-H 차단 (halley-x10): R10b 미진입 halley (phase 11) → preset disabled (negative 케이스 교체 보존 — R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 / R9 pluto-x10 선례).
  *        disabled / aria-disabled='true' / data-r-phase-disabled='true' / title='R-Phase 진행 시 활성', force click 시 store mutation 0
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
@@ -74,6 +75,8 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
 // R8 #647 — uranus 진입 (showInShortcutBar true 전환). titania 는 false (galilean/titan 패턴) → 비대상.
 // R9 #653 — neptune 진입 (CURRENT_R_PHASE=9, showInShortcutBar 이미 true — 배열 변경 0,
 // #613 Concrete Prediction). triton 은 false (galilean/titan/titania 패턴) → 비대상.
+// R10a #659 — pluto 진입 + showInShortcutBar true 승격 (PM Q3=A — pluto 만, 14버튼째).
+// ceres/haumea/makemake/eris 는 false (focus 가능 + bar 미등록 — #617 직교 축 negative) → 비대상.
 const RPHASE_EXPECTED_ENABLED = [
   'sun',
   'mercury',
@@ -85,14 +88,17 @@ const RPHASE_EXPECTED_ENABLED = [
   'saturn',
   'uranus',
   'neptune',
+  'pluto',
 ];
 // R9 #653 — 로드맵 마지막 행성 (neptune) 진입으로 FOCUS_BUTTONS 의 disabled 대상이 구조 소멸
-// (R10 왜소행성·혜성 8 body 는 전부 showInShortcutBar=false 라 bar 미등록 — #624 tradeoff).
-// shortcut bar negative 는 빈 배열 (시나리오 1/3 skip) — negative 케이스는 URL 4-A (pluto) +
-// CelestialTree 5-B/5-C (pluto, 전체 body 렌더라 tree-pluto 존재) + preset 6-G (pluto-x10) 가 보존.
+// (R10a 미등록 4 + R10b 혜성 3 전부 showInShortcutBar=false 라 bar 미등록 — #624 tradeoff).
+// shortcut bar negative 는 빈 배열 (시나리오 1/3 skip) — negative 케이스는 URL 4-A (halley) +
+// CelestialTree 5-B/5-C (halley, 전체 body 렌더라 tree-halley 존재) + preset 6-H (halley-x10) 가 보존.
+// R10a #659 — ceres/haumea/makemake/eris = "focus 가능 + bar 미등록" (#617 직교 축, parent=sun 첫 사례).
 const RPHASE_SHORTCUT_EXPECTED_DISABLED = [];
-// CelestialTree 는 getSolarSystem() 전체 body 를 렌더 → R10 미진입 body (pluto) 가 tree negative.
-const RPHASE_TREE_EXPECTED_DISABLED = ['pluto'];
+// CelestialTree 는 getSolarSystem() 전체 body 를 렌더 → R10b 미진입 body (halley — phase 11) 가 tree negative.
+// R10a #659 — pluto positive 전환으로 halley 교체 (encke/swift-tuttle 추가는 R10b architect 재량 — 대표 1 body).
+const RPHASE_TREE_EXPECTED_DISABLED = ['halley'];
 
 const VIEWPORT = { width: 1280, height: 800 };
 const POST_INIT_WAIT_MS = 1500;
@@ -258,7 +264,7 @@ async function verifyEnabledClickWorks(page) {
  * ADR `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (DoD-2).
  *
  * 각 body 마다 새 페이지로 `?focus=<body>` 진입 후:
- *   - allowlist 외 (pluto — R10): selectedBodyId === null (url-sync 가드 작동, negative 케이스 보존)
+ *   - allowlist 외 (halley — R10b phase 11): selectedBodyId === null (url-sync 가드 작동, negative 케이스 보존)
  *   - allowlist 박제 (sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / galilean 4):
  *     selectedBodyId === <body> (정상 회귀 보호)
  *   - invalid: selectedBodyId === null (기존 R1 가드 회귀 보호)
@@ -267,8 +273,8 @@ async function verifyEnabledClickWorks(page) {
  */
 async function verifyUrlDirectEntry(browser) {
   const cases = [
-    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R9 #653 후: pluto(R10) 로 교체 — negative 케이스 보존).
-    { focus: 'pluto', expected: null, label: '4-A 차단' },
+    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R10a #659: pluto positive 전환 → halley(R10b phase 11) 로 교체 — negative 케이스 보존).
+    { focus: 'halley', expected: null, label: '4-A 차단' },
     // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon + R5 mars/phobos/deimos + R6 jupiter/galilean 진입 검증).
     { focus: 'sun', expected: 'sun', label: '4-B 정상' },
     { focus: 'mercury', expected: 'mercury', label: '4-B 정상' },
@@ -614,6 +620,13 @@ async function verifyScenarioPresetsGuards(browser) {
         expectedMul: 10,
         scenario: '6-F 정상 (neptune-x10)',
       },
+      {
+        // R10a #659 — pluto 진입 → zero-touch 자동 enabled (Concrete Prediction 재현 5번째).
+        presetId: 'pluto-x10',
+        massKey: 'pluto',
+        expectedMul: 10,
+        scenario: '6-G 정상 (pluto-x10)',
+      },
     ];
     for (const { presetId, massKey, expectedMul, scenario } of enabledPresetCases) {
       const selector = `[data-testid="preset-${presetId}"]`;
@@ -663,11 +676,11 @@ async function verifyScenarioPresetsGuards(browser) {
       });
     }
 
-    // 6-G 차단 (pluto-x10): R10 미진입 pluto → disabled + force click 무시.
-    // neptune 진입 (R9 #653) 으로 6-F 가 enabled 되어 disabled-path 가드가 무력화되지 않도록
-    // pluto target preset 으로 negative 교체 보존 (R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 선례 답습).
+    // 6-H 차단 (halley-x10): R10b 미진입 halley (phase 11) → disabled + force click 무시.
+    // pluto 진입 (R10a #659) 으로 6-G 가 enabled 되어 disabled-path 가드가 무력화되지 않도록
+    // halley target preset 으로 negative 교체 보존 (R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 / R9 pluto-x10 선례 답습).
     {
-      const selector = '[data-testid="preset-pluto-x10"]';
+      const selector = '[data-testid="preset-halley-x10"]';
       const btn = page.locator(selector).first();
       const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
       const ariaDisabled = await btn.getAttribute('aria-disabled');
@@ -715,8 +728,8 @@ async function verifyScenarioPresetsGuards(browser) {
         engineUnchanged &&
         massUnchanged;
       results.push({
-        scenario: '6-G 차단 (pluto-x10)',
-        preset: 'pluto-x10',
+        scenario: '6-H 차단 (halley-x10)',
+        preset: 'halley-x10',
         isDisabled,
         ariaDisabled,
         dataDisabled,

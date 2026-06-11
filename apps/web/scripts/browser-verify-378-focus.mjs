@@ -78,6 +78,8 @@ const flags = {
 // R8 #647 — uranus + titania 동기화 (CURRENT_R_PHASE=8).
 // R9 #653 — neptune + triton 동기화 (CURRENT_R_PHASE=9). triton 은 역행 궤도 (ecliptic
 // inclination 129.14° > 90° — 태양계 유일 대형 역행 위성) 이나 focus 진입/추적엔 무관 (사실 정합).
+// R10a #659 — 왜소행성 5 (ceres/pluto/haumea/makemake/eris) 동기화 (CURRENT_R_PHASE=10).
+// 혜성 3 (halley/encke/swift-tuttle) 은 phase 11 재박제로 R10b 까지 비대상 (ADR 20260611-r10a §축 2).
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -98,6 +100,11 @@ const FOCUS_BODIES = [
   'titania',
   'neptune',
   'triton',
+  'ceres',
+  'pluto',
+  'haumea',
+  'makemake',
+  'eris',
 ];
 const MODES = ['observe', 'research'];
 

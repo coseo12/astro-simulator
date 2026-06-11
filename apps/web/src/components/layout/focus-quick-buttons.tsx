@@ -23,6 +23,7 @@ const FOCUS_BUTTONS = [
   { id: 'saturn', label: '토성' }, // R7 #641 — jupiter 다음 천체 거리순 (showInShortcutBar true 전환 동반, #617 가드 정합). titan 은 showInShortcutBar=false (galilean 패턴 — URL ?focus=titan 진입)
   { id: 'uranus', label: '천왕성' }, // R8 #647 — saturn 다음 천체 거리순 (showInShortcutBar true 전환 동반, #617 가드 정합). titania 는 showInShortcutBar=false (galilean/titan 패턴 — URL ?focus=titania 진입). 12버튼 — 모바일은 overflow-x-auto 흡수 (R7 11버튼 선례)
   { id: 'neptune', label: '해왕성' }, // R9 #653 enabled — CURRENT_R_PHASE=9 1줄 자동 enabled (#613 Concrete Prediction negative→positive 전환 5번째, 배열 변경 0). triton 은 showInShortcutBar=false (galilean/titan/titania 패턴 — URL ?focus=triton 진입). ADR 20260610-r9 §축 5
+  { id: 'pluto', label: '명왕성' }, // R10a #659 — PM Q3=A pluto 만 승격 (showInShortcutBar true 전환 동반, #617 가드 정합). 거리순 마지막 (39.48 AU). 14버튼 — 모바일 overflow-x-auto 흡수. ceres/haumea/makemake/eris 는 showInShortcutBar=false (URL ?focus= 진입 — #624 tradeoff). ADR 20260611-r10a §축 4
 ];
 
 // R-Phase 미진입 body 호버 / focus 시 사용자 안내 문구.

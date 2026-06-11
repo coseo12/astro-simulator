@@ -83,11 +83,23 @@ const PRESETS: Preset[] = [
     // R9 #653 — pluto(introducedInRPhase=10) target preset. neptune 진입으로 neptune-x10 이
     // enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입 body(pluto) 로
     // 교체 보존 (R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 선례 답습 — 로드맵 행성 완주로
-    // R10 은 왜소행성·혜성 라운드). R10 진입 시 자동 enabled.
+    // R10 은 왜소행성·혜성 라운드).
+    // R10a #659 — pluto 진입으로 zero-touch 자동 enabled (Concrete Prediction 재현 5번째).
     id: 'pluto-x10',
     label: '명왕성 10배 질량',
-    description: '카이퍼벨트 왜소행성 섭동을 관찰. 명왕성 진입(R10) 시 활성.',
+    description: '카이퍼벨트 왜소행성 섭동을 관찰 (R10a 진입 완료 — 활성).',
     massMultipliers: { pluto: 10 },
+  },
+  {
+    // R10a #659 — halley(introducedInRPhase=11, R10b 혜성) target preset. pluto 진입으로
+    // pluto-x10 이 enabled 가 되어 disabled-path negative 케이스가 다시 소멸 → 미진입
+    // body(halley) 로 교체 보존 (R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 / R9 pluto-x10
+    // 선례 답습 — phase 11 재박제가 halley 를 최소 미진입 body 로 선출, ADR 20260611-r10a §축 2/§축 4).
+    // R10b 진입 시 자동 enabled.
+    id: 'halley-x10',
+    label: '핼리 혜성 10배 질량',
+    description: '고이심률 혜성 궤도 섭동을 관찰. 혜성 진입(R10b) 시 활성.',
+    massMultipliers: { halley: 10 },
   },
 ];
 

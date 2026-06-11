@@ -71,6 +71,16 @@
  *                  gas giant(48) 의 5.2배라 satellite scale 동반 상향. mesh 2.79 px →
  *                  4px fallback billboard 의존 (LOD Phase 2 #391 흡수). ADR §축 3
  *
+ * R10a baseline (#659 — dwarf 그룹 5 body 전부 800, 4번째 scale 그룹 — PM Q2=A):
+ *   dwarf = 800 → inner (venus/earth/mars 800) 계보 답습. 그룹 단일값으로 그룹 내 사실 서열
+ *                (pluto > eris > haumea > makemake > ceres) 자동 보존 + cross-group 서열
+ *                (pluto×800 = 9.5064e8 < mercury×700 = 1.70779e9, 비 0.557) 보존.
+ *                식 px: pluto 6.73 / eris 6.59 / haumea 4.42 / makemake 4.05 / ceres 2.66 —
+ *                solar view 실효는 depth 투영 축소 (39~68 AU) 로 5 body 전부 billboard 4px
+ *                fallback 의존 예상 (LOD Phase 2 #391 흡수). focus view 는 mesh 직접 관찰.
+ *                scale 4그룹 체계 완성: inner 700~800 / gas giant 48 / ice giant 250 / dwarf 800.
+ *                ADR: docs/decisions/20260611-r10a-dwarf-planets-visualization.md §축 1
+ *
  * R6~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
  * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
  * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건 +
@@ -98,6 +108,14 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   titania: 500, // R8 #647 — titania/uranus mesh 비 0.0617 (moon/earth 0.068 수렴대). titan=100 답습 시 0.0123 과소 (uranus 250 이 gas giant 48 의 5.2배). 4px fallback billboard 의존 (mesh 2.79px). ADR 20260610-r8 §축 3
   neptune: 250, // R9 #653 — ice giant 정책 답습 (2번째 인스턴스, uranus 동일값). neptune/uranus px 비 0.969 = 사실 radius 비 자동 보존 (R5 mars=earth / R7 saturn=jupiter 동형 3번째). px 43.84 / neptune/earth 비 1.21 / mid LOD 50px 미만 (margin 6.16px). "ice giant = 250" 단일 mental model 완성. ADR 20260610-r9 §축 1
   triton: 300, // R9 #653 — triton/neptune mesh 비 0.0656 (moon/earth 0.068 최근접 — 수렴대 0.05~0.09 중앙). titania=500 답습 시 비 0.109 상한 초과 기각 (triton radius 가 titania 의 1.72배 — 비율 산출 방법론이 SSoT, scale 값 답습 아님). 4px fallback billboard 의존 (mesh 2.87px). ADR 20260610-r9 §축 3
+  // R10a #659 — dwarf 그룹 (4번째 scale 그룹, 전부 800 = inner 계보 답습 — PM Q2=A).
+  // 그룹 단일값으로 그룹 내 사실 서열 자동 보존 + cross-group (pluto < mercury) 보존.
+  // ADR 20260611-r10a §축 1. 개별 조정 (후보 D) 금지 — 단일값 구조가 서열 가드의 전제.
+  ceres: 800, // R10a #659 — 식 px 2.66 sub-4px (PM 명시 허용 — billboard 전면 의존, phobos/deimos §결정 6 동형). 소행성대 유일 < 5 AU
+  pluto: 800, // R10a #659 — 그룹 최대 radius (1.1883e6). 식 px 6.73 / pluto×800 < mercury×700 (비 0.557 — cross-group 사실 서열 보존)
+  haumea: 800, // R10a #659 — 식 px 4.42 (4px 경계 — billboard 의존 분류로 진동 무위험). volumetric mean 구체 근사 ($radiusComment)
+  makemake: 800, // R10a #659 — 식 px 4.05 (4px 경계 — billboard 의존 분류)
+  eris: 800, // R10a #659 — pluto/eris 사실 radius 비 1.0218 보존 (식 px 차 0.14 — 시각 동일 크기는 사실 정합, ADR §위험 #1). a 67.86 AU 그룹 최대
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */
