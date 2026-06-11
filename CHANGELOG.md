@@ -3,7 +3,11 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
-## [Unreleased]
+## [0.24.0] — 2026-06-11
+
+### Behavior Changes (인프라 — #663 a11y/fps baseline guard 복구)
+
+- **[#663] a11y/fps-baseline-guard Node 22 핀 — playwright Node 24.16 deadlock 잔여 2 workflow fix (#606 ADR Amendment 3)** ([#663](https://github.com/coseo12/astro-simulator/issues/663)) — `a11y-baseline-guard.yml` / `fps-baseline-guard.yml` 의 `node-version-file: 'package.json'` (engines `">=20.0.0"` → setup-node 최신 24.16 해석) 이 playwright 1.59.1 extract deadlock (#606 root cause 동형) 을 유발, **R9 (2026-06-10) 시점부터 모든 브랜치에서 "Playwright chromium 설치" 단계 timeout cancelled 상시** (required check 아님 — 머지 비차단이나 a11y/fps 회귀 감지 silent 무력화). fix: `node-version: '22'` 명시 핀 (ci.yml #610 동형) + `workflow_dispatch` 수동 재실측 경로 (volt #45 2단계 함정 — main 반영 후 사용 가능). **fix PR #665 자가 입증**: 본 PR CI 에서 양 가드 green (R9 이후 첫 측정 완주 — `.github/**` paths-ignore 우회는 runtime 파일 동반으로 확보). **#606 ADR Amendment 3 정책 박제**: playwright 사용 workflow 전수 `node-version` 명시 핀 의무 (engines 범위 해석 금지 — 전수 감사: bench/bench-remeasure/r1-bootstrap 기핀 20/22 확인, 미핀은 본 2개가 전부) + ci.yml 잔존 `node-version-file` 3곳 NO-OP 분류 (yarn/npm/no-lockfile 폴백 — pnpm-lock 존재로 dead path). cross-validate (agy outcome=applied): 중앙 `.node-version` 일원화 고유 발견 → #666 분리 (low). reviewer 권고 stale 주석 2건 동반 정정 (browser-verify-r-phase-allowlist "19→24 body" / pluto-x10 description). **Behavior Changes: CI 만** (앱 런타임 무관).
 
 ### Behavior Changes (R10a 왜소행성 5 body 시각화)
 
