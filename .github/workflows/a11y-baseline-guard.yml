@@ -21,6 +21,9 @@ on:
       - '**/*.md'
       - 'docs/**'
       - '.github/**'
+  # #663 — 수동 재실측 경로. workflow_dispatch 2단계 함정 (volt #45): dispatch 버튼은
+  # 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 (v0.24.0 릴리스 이후 사용 가능).
+  workflow_dispatch:
 
 jobs:
   a11y-baseline-guard:
@@ -33,7 +36,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: 'package.json'
+          # #663 fix (#606 ADR §Amendment 3) — playwright 1.59.1 extract 가 Node 24.16 에서
+          #   deadlock. node-version-file (engines ">=20.0.0") 은 setup-node 가 최신 24.16 을
+          #   설치 → "Playwright chromium 설치" 단계 timeout cancelled (R9 시점부터 상시).
+          #   ci.yml line 45 와 동일한 Node 22 LTS 핀 (#610 의 잔여 workflow 2개 중 1).
+          node-version: '22'
           cache: 'pnpm'
 
       # ci.yml R1 가드 패턴 따름 — wasm-pack 으로 physics-wasm 빌드 후 next dev 기동.

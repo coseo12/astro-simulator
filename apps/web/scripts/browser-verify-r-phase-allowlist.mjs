@@ -17,7 +17,7 @@
  *      - 4-A 차단: ?focus=halley (R10b — phase 11) → selectedBodyId === null + camera radius 변화 0 (R10a #659 — pluto positive 전환으로 halley 교체, ADR §축 4)
  *      - 4-B 정상: ?focus=sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / io / europa /
  *        ganymede / callisto → selectedBodyId === <body> (R1~R6 회귀 보호. R7+ body 전수 focus 진입은
- *        browser-verify-378-focus.mjs FOCUS_BODIES 19 body 가 커버 — R7/R8 선례 답습)
+ *        browser-verify-378-focus.mjs FOCUS_BODIES 24 body 가 커버 — R7~R10a 선례 답습)
  *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
  *   5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth):
  *      - 5-A 정상 (CelestialTree): tree-sun click → selectedBodyId === 'sun' + info-panel 정상 분기 렌더
