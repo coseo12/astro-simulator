@@ -1,6 +1,6 @@
 # ADR: R10a 왜소행성 5 body 시각화 — 첫 비-행성 라운드 + dwarf scale 4번째 그룹 (dwarf=800 inner 답습) + R10a/R10b allowlist 분리 메커니즘 (혜성 phase 11 재박제)
 
-- **상태**: **Provisional** — cross-validate 발동 대상 (ADR 신규 박제 — CLAUDE.md `## 교차검증` 앵커). agy 교차검증 결과 §교차검증 반영 사항 통합 후 Accepted 전이 (#370 옵션 C 워크플로)
+- **상태**: **Accepted (cross-validate 2026-06-11)** — agy 교차검증 완료 (outcome=applied, 조건부 Accept). §교차검증 반영 사항 4축 분류 통합 후 전이 (#370 옵션 C 워크플로)
 - **날짜**: 2026-06-11
 - **결정자**: architect (R10 PM 합의 라운드 완료 2026-06-11 — Q1=A: **R10a 왜소행성 5 / R10b 혜성 3 분할, 각각 독립 릴리스** / Q2=A: **dwarf=800 (inner 답습)** — cross-group 사실 서열 보존 (pluto visual < mercury visual) + 그룹 내 서열 자동 보존, ceres 등 소형은 billboard 4px fallback 의존 허용 / Q3=A: **shortcut bar pluto 만 true 승격**, 나머지 4 false / Q4 비목표: 혜성 꼬리·코마 ❌ / charon 등 위성 ❌ / 궤도 세차 ❌ / 기존 body 실측 데이터 변경 ❌. **PM 합의 그대로 박제 — 재구조화 금지**)
 - **관련**: [#659](https://github.com/coseo12/astro-simulator/issues/659) (R10a 본 스프린트), [`20260610-r9-neptune-triton-rings-visualization.md`](20260610-r9-neptune-triton-rings-visualization.md) (R9 SSoT — §R10 인계 8항목을 본 ADR 이 전부 소화), [`20260610-r8-uranus-titania-rings-visualization.md`](20260610-r8-uranus-titania-rings-visualization.md) (ice giant 정책 / px-ratio 결정 트리 원본), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (introducedInRPhase 데이터 SSoT — 본 라운드 분리 메커니즘의 보존 대상), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md) (Q2=B 인스턴스 + N/A 임계 선례), [`20260606-627-satellite-orbit-structure-forensic.md`](20260606-627-satellite-orbit-structure-forensic.md) (궤도선 구조 — 본 라운드는 satellite 0 이라 planet batch 만), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541 의무 체크리스트 4항목)
@@ -330,6 +330,7 @@ R9 §Concrete Prediction 의 R10 예측: "왜소행성+혜성 8 body = CURRENT_R
 
 - segments=64 고정 — eris aphelion 1224.7 unit 에서 인접 vertex chord 간격 ≈ 2π×853/64 ≈ 84 unit (jupiter 궤도 반경 65 unit 초과!) — 줌아웃 프레임에서 다각형 꺾임 시각 노출 가능. 단 e=0.436 의 true-anomaly 등간격은 근일점 측 밀집이 자연 발생해 곡률 큰 구간은 오히려 촘촘 — 꺾임은 원일점 측 (곡률 최소 구간) 이라 시각 영향 제한 예상
 - 완화: D-T2 실측 — 꺾임 식별 시 segments 동적 산정 (a 비례) 후속 분리 (R10b 혜성 e=0.967 에서 동일 축 재검증 필수 — §R10b 인계 #1 과 통합 검토)
+- **cross-validate 보강 (agy 권장 조치 1)**: eris 원일점 측 줌아웃 프레임 **D-T2 캡처를 구현 PR 본문에 박제 의무** — 시각 허용 여부 판단 근거를 R10b (halley e=0.967 동일 축) 의 기준선으로 재사용
 
 ### 위험 #4 — pluto-neptune 궤도 교차 표현 — "충돌 위험?" D-T2 오인
 
@@ -340,6 +341,7 @@ R9 §Concrete Prediction 의 R10 예측: "왜소행성+혜성 8 body = CURRENT_R
 
 - 식 레벨 4px 경계 — 실효는 depth 축소로 sub-4px (billboard 안정) 예상이나, focus 직전·중간 줌에서 mesh↔billboard LOD 전환 진동 가능
 - 완화: LOD cross-fade 200ms (기존 인프라) 흡수. 진동 보고 시 측정 방법 검증 우선 (volt #32)
+- **cross-validate 보강 (agy 위험 #2 — 대상 확대)**: pluto/eris (식 6.73/6.59px) 도 4~8px 대역으로 동일 진동 후보. 기존 완화 인프라 실측 확인 (2026-06-11): tier 전이 히스테리시스 ±15% (`tier.ts` `TIER_HYSTERESIS`) + billboard alpha mask smoothstep 전이 (`lod-billboard-alpha-mask.test.ts`) 기존재 — **qa 단계에서 5 body 줌 조작 popping/flickering 실측 항목 추가** (관측 시 hysteresis margin 후속 분리, R10a 비-범위)
 
 ### 위험 #6 — 혜성 phase 11 재박제의 의미 drift (R10b 미진행 시)
 
@@ -364,7 +366,7 @@ R9 §Concrete Prediction 의 R10 예측: "왜소행성+혜성 8 body = CURRENT_R
 
 1. **고이심률 궤도선 실측 검증 의무 (코드 0 보장 불가 축)** — e=0.967 (halley) / 0.963 (swift-tuttle) / 0.848 (encke). 실측 완료분: sampling 은 true-anomaly 등간격 64 seg (mean-anomaly 아님 — 근일점 vertex 밀집 가설 기각). 잔여 검증: ① 64 seg chord 오차 — e=0.967 타원 (a 17.8 AU, q 0.59 AU) 의 원일점 측 꺾임 + 근일점 측 곡률 (true-anomaly 등간격이 근일점 부근을 자동 밀집하나 q 0.34 AU (encke) 는 inner 권역 — sun mesh (1.46 unit 반경) 와의 시각 간섭) ② Kepler 전파 (physics) 의 고이심률 수치 안정성 — 이미 적분 중 (time-reversal green) 이라 신규 위험 낮음
 2. **혜성 scale 5번째 그룹 필요** — radius 2.4~13 km: dwarf 800 적용 시 px 0.000014~0.00007 (4px fallback 전면 의존조차 billboard 진입 거리 검증 필요). phobos/deimos 5000 으로도 sub-px — billboard 의존 명시 그룹 or 별도 정책 (PM 라운드)
-3. **allowlist negative 구조 소멸** — phase 11 진입 시 미진입 body 0. 대안: 가상 id negative / phase 12+ 데이터 선박제 / negative 축 자체 종료 결정 (R10b architect)
+3. **allowlist negative 구조 소멸** — phase 11 진입 시 미진입 body 0. 대안: 가상 id negative / phase 12+ 데이터 선박제 / negative 축 자체 종료 결정 (R10b architect). **cross-validate (agy 권장 조치 2)**: 가상 ID (예: `nonexistent-body`) 전환을 1순위 후보로 권고 — 테스트 슈트가 실데이터 phase 진행에 종속되지 않는 구조적 해소 (R10b architect 가 최종 결정하되 본 권고를 기본값으로)
 4. **위성 0 — satellite N≥5 단일 룩업 한계 재이월** (charon/nereid 등 데이터 박제 라운드로)
 5. **모바일 diskArea baseline** — R10a 재실측값 기준 (16.82% 또는 갱신값 — 구버전 금지)
 6. **scenario preset negative** — halley-x10 zero-touch enabled 재현 (R10a 신설분)
@@ -372,9 +374,28 @@ R9 §Concrete Prediction 의 R10 예측: "왜소행성+혜성 8 body = CURRENT_R
 
 ---
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (cross-validate 2026-06-11 agy outcome=applied — 조건부 Accept)
 
-> **Provisional** — cross-validate (agy) 후속 수행 예정. outcome 통합 시 본 섹션에 합의 / 이견 수용 / 기각 / 고유 발견 (후속 분리) 4축 분류 박제 후 **상태: Accepted (cross-validate YYYY-MM-DD)** 전이.
+> 로그: `.claude/logs/cross-validate-architecture-20260611-163209.log`. agy 종합 판정 "조건부 Accept (Provisional → Accepted)" + 권장 조치 2건. architect 명시 질문 3건 (① phase 정수 의미 drift ② eris DoD 완화 과잉 ③ 64-seg chord) 전부 응답 확보.
+
+### 합의 (3건 — 전부 ADR 기존 박제와 수렴, 보강 통합)
+
+1. **eris 원일점 chord 꺾임** (agy 위험 #1 = §위험 #3 동일 축) — agy 보강: D-T2 캡처 PR 박제 의무 + R10b 기준선 재사용 → §위험 #3 에 통합. 명시 질문 ③ 응답: 64 seg 한계 내 실측 검증 의무로 수렴 (segments 동적 산정은 관측 시 후속 — Claude 기존 입장 유지)
+2. **LOD 경계 진동** (agy 위험 #2 = §위험 #5 동일 축) — agy 보강: 대상을 makemake/haumea 에서 pluto/eris (4~8px 대역) 로 확대 + hysteresis 존재 검토 요구. **Claude 실측 응답 (수용 전 sanity check)**: tier 히스테리시스 ±15% + billboard smoothstep alpha mask 기존재 확인 — 신규 구현 불요, qa 줌 조작 실측 항목만 추가 → §위험 #5 에 통합
+3. **R10b negative 구조 소멸** (agy 위험 #3 = §R10b 인계 #3 동일 축) — agy 보강: 가상 ID 전환을 의무 권고. Claude 취사: R10b architect 결정권 보존하되 가상 ID 를 1순위 기본값으로 격상 → §R10b 인계 #3 에 통합
+
+### 이견 / 기각 (0건)
+
+- 명시 질문 ① (phase 정수 의미 drift): agy "옵션 (a) 완승" — §위험 #6 의 3곳 박제 완화로 충분 합의, 추가 조치 없음
+- 명시 질문 ② (eris DoD 해석 완화 과잉): agy "렌더링 성능과 UI 경험 간 적절한 타협" — §축 3 해석 기준 유지 합의
+
+### 고유 발견 (0건 — 후속 분리 없음)
+
+- agy 3건 전부 ADR 기존 위험/인계 축과 수렴 — 스프린트 비목표와 상충하는 신규 제안 없음 (수용 vs 분리 3단 프로토콜 발동 불요)
+
+### Claude 편향 셀프 체크 결과 대조
+
+- 사전 기록 4항목 (하단) 전부 agy 평가와 모순 없음 — 특히 "결합 간과" 항목의 (b) negative 연쇄 소멸이 agy 위험 #3 과 독립 수렴 (이중 시각 합의 = 높은 신뢰도)
 
 ### Claude 편향 셀프 체크 (architect 사전 기록 — cross-validate 호출 전)
 
