@@ -1,6 +1,6 @@
 # ADR: R10b 혜성 3 body 시각화 — 고이심률 궤도선 첫 사례 (e=0.967) + comet scale 5번째 그룹 (comet=5000) + negative 가상 ID 3분류 전환 + 로드맵 v3 최종 라운드
 
-- **상태**: **Provisional** — cross-validate (agy) 결과 본문 통합 후 Accepted 전이 (#370 옵션 C 워크플로)
+- **상태**: **Accepted (cross-validate 2026-06-12)** — agy outcome=applied (Accepted 승격 권장, 이견 0). §교차검증 반영 사항 4축 분류 통합 후 전이 (#370 옵션 C 워크플로)
 - **날짜**: 2026-06-12
 - **결정자**: architect (R10b PM 합의 라운드 완료 2026-06-12 — Q1=A: **comet = 5000** (phobos/deimos 극소형 계보 — 5번째 scale 그룹, solar view sub-pixel billboard 의존 명시) / Q2=A: **halley 만 showInShortcutBar true 승격** (pluto 선례 동형 — encke/swift-tuttle 은 URL 진입) / Q3=A: **궤도선 64 seg 유지 + measurement-first** — chord 오차 사전 산출 박제 → 실측 → 꺾임 식별 시에만 동적 segments 구현 (코드 변경 가능성 사전 수용 — 조건부 축) / Q4: negative **가상 ID 전환 수용** (agy 1순위) + 비목표 꼬리·코마 ❌ / 비중력 효과 ❌ / 세차 ❌ + **v0.25.0 독립 릴리스**. **PM 합의 그대로 박제 — 재구조화 금지**)
 - **관련**: [#664](https://github.com/coseo12/astro-simulator/issues/664) (R10b 본 스프린트), [`20260611-r10a-dwarf-planets-visualization.md`](20260611-r10a-dwarf-planets-visualization.md) (직전 라운드 SSoT — **§R10b 인계 7항목을 본 ADR 이 전부 소화**, §소화 매핑 참조), [`20260604-613-r-phase-metadata-ssot.md`](20260604-613-r-phase-metadata-ssot.md) (introducedInRPhase 데이터 SSoT), [`20260610-r9-neptune-triton-rings-visualization.md`](20260610-r9-neptune-triton-rings-visualization.md) (triton 역행 선례 — 본 라운드 역행 혜성 2 body 답습), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md) (phobos/deimos=5000 — comet scale 계보 원본 + §결정 6 px-ratio N/A 선례), [`docs/architecture/principles.md`](../architecture/principles.md) §1 Visual Fidelity (#541 의무 체크리스트 4항목), [`docs/phases/roadmap-v3-incremental.md`](../phases/roadmap-v3-incremental.md) (R10b = 로드맵 v3 최종 라운드 — §축 9)
@@ -372,9 +372,27 @@ radius × scale 곱 (결정적 — runtime 측정 불요) 기준:
 - **폐기 프레이밍** — E2E disabled 축 종료 (§축 5 ③) 는 "영구 폐기" 아님: production 도달 불가의 **조건** (미진입 실데이터 0) 명시 + phase 12+ 데이터 재등장 시 실데이터 negative 재구성 가능성을 §축 9 에 박제. agy 권고 (가상 ID) 도 맹목 수용 아닌 분기 semantics 실측으로 적용 한계 정밀화. 통과
 - **순수주의** — halley 비구형 (15×8×8 km) / 꼬리·코마 / 비중력 효과의 사실 정밀성 대신 PM Q4 근사 수용 (Visual Fidelity §1 정합). 데이터 실측값 무수정. equal-E 의 수학적 우아함 (0.43px e-invariant) 보다 기존 baseline 보존 + 근일점 품질의 실용 우선 (후보 C 선택). 통과
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (cross-validate 2026-06-12 agy outcome=applied — Accepted 승격 권장, 이견 0)
 
-> (Provisional — cross-validate 1회 호출 후 본 섹션에 4축 분류 통합 + Accepted 전이 예정. #370 옵션 C 워크플로)
+> 로그: `.claude/logs/cross-validate-architecture-20260612-143711.log`. agy 결론: "구조적으로 매우 단단 — measurement-first chord 사전 예측 + 조건부 세그먼트 사전 설계는 아키텍처적으로 매우 우수한 사례. Accepted 승격 권장."
+
+### 합의 (2건 — 기존 박제와 수렴, 보강 통합)
+
+1. **encke 근일점 줌인 시 광원 효과 (bloom/corona) 겹침** — 수치상 ×2.9 안전하나 렌더 레벨 겹침은 별개 (agy 누락 권고 #1). 기존 D-T2 확인 항목을 **"encke 근일점 극대 줌인 상태 렌더 겹침 확인"** 으로 구체화 — qa/D-T2 체크리스트 보강
+2. **pixel-diff churn 형상 이력 관리** — baseline 변화 예측 (§축 8) 과 수렴. agy 보강: 단순 갱신이 아닌 `--update` 절차 + 갱신 사유 PR 박제 (R10a baseline PR #662 선례 답습 — bootstrap dispatch 경로)
+
+### 이견 / 기각 (0건)
+
+- 조건부 segments `e >= 0.6 ? 256 : 64` / 가상 ID 3분류 / bar 후미 배치 전부 agy 동의 — 추가 조치 없음
+
+### 고유 발견 (2건 — 전부 범위 밖 기록만, 후속 이슈 비생성)
+
+1. **모바일 15버튼 한계 → v4+ 드롭다운/탭 그룹화** — 로드맵 v3 종결 라운드라 본 차수 수용 가능 (agy 자체 판정 동일). v4 진입 시 PM 라운드 입력으로 §축 9 인계에 기록 (이슈 분리는 v4 계획 부재로 시기상조)
+2. **동적 segments 외부 입력 DoS** — 현행 static 데이터 (solar-system.json) 경로라 비위협 합의. 사용자 커스텀 천체 API 등장 시 이심률 상한 필터 의무 — 동일하게 §축 9 조건부 기록
+
+### Claude 편향 셀프 체크 결과 대조
+
+- 사전 기록 4항목 (상단) 전부 agy 평가와 모순 없음 — 특히 "낙관적 일정" 의 조건부 축 발동 확률 높음 판정을 agy 가 "사전 설계 우수 사례" 로 독립 평가 (이중 시각 합의)
 
 ## 참고
 
