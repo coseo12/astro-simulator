@@ -1,6 +1,6 @@
 {
   "name": "@astro-simulator/web",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -19,7 +19,8 @@
     "verify:r-phase-allowlist": "node scripts/browser-verify-r-phase-allowlist.mjs",
     "verify:627-satellite-orbit": "node scripts/browser-verify-627-satellite-orbit.mjs",
     "verify:629-freefly-zoom": "node scripts/browser-verify-629-freefly-zoom.mjs",
-    "verify:631-freefly-tier": "node scripts/browser-verify-631-freefly-tier.mjs"
+    "verify:631-freefly-tier": "node scripts/browser-verify-631-freefly-tier.mjs",
+    "verify:675-glow-marker": "node scripts/browser-verify-glow-marker.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",
