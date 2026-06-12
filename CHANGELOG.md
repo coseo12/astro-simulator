@@ -3,7 +3,11 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
-## [Unreleased]
+## [0.26.0] — 2026-06-13
+
+### Behavior Changes (#677 forensic — tier-c LOD override race fix)
+
+- **[#675-forensic] tier-c 강제 LOD override race fix — headless/저속 환경에서 강제 low LOD 영구 유실 (잠복 버그, glow 무관 입증)** ([PR #677](https://github.com/coseo12/astro-simulator/pull/677) 커밋 cd9603f, ADR `20260613-675-glow-pixel-marker.md` Amendment 2) — CI fps-baseline-guard mobile 3 시나리오 −36~43% FAIL 의 forensic 결과: glow marker 비용 ≈ 0 (order 통제 A/B 실측) 이고 **glow 부재 develop run 27412497611 이 동일 시그니처 선행 FAIL** — 원인은 `sim-canvas.tsx` 의 tier-c 판정 (`detectGpuCapability().then` 플래그 박제) 와 handler 등록 (`instance.start().then` 1회 읽기) 의 별개 async chain race. race-lost 시 강제 low 영구 유실 → auto LOD (sun high 131.7px sphere) 렌더가 swiftshader CI 에서 증폭. **fix**: tier-c 분기에서 `setLodOverride` command 직접 발행 동승 (적용 경로 2중화, 양 경로 idempotent, `?lod=` URL 우선 보존). **회귀 가드**: `browser-verify-glow-marker.mjs` 축 6 신설 (requestAdapter 를 scene 준비까지 게이트 — race-lost 방향 결정론 재현, pre-fix FAIL / post-fix PASS 3중 시뮬레이션). #663 으로 복구된 fps 가드가 첫 실전에서 잠복 race 를 노출시킨 연쇄 — 증분 reviewer + cross-validate (agy) 검증 완료.
 
 ### Behavior Changes (#675 glow pixel marker 정식화 — 기본 ON)
 
