@@ -202,6 +202,8 @@ async function measureBodyPxRatios(page) {
     // R10a #659 — 왜소행성 5 (ceres/pluto/haumea/makemake/eris) 전부 §축 5 결정 트리 N/A (미박제 — 측정만).
     // 5 body 전부 billboard 4px fallback 의존 (식 px 2.66~6.73, depth 2.77~67.86 AU 투영 축소) —
     // phobos/deimos §결정 6 답습 7번째 그룹. 회귀 가드는 allowlist(#613)/FOCUS_BODIES(#598)/본 targetIds(#619) 우회.
+    // R10b #664 — 혜성 3 (halley/encke/swift-tuttle) 전부 §축 7 N/A (미박제 — 측정만). 식 px
+    // 0.085~0.460 sub-px, billboard 전면 의존 — 8번째 그룹 (ADR 20260612-r10b §축 7).
     const targetIds = [
       'sun',
       'mercury',
@@ -227,6 +229,9 @@ async function measureBodyPxRatios(page) {
       'haumea',
       'makemake',
       'eris',
+      'halley',
+      'encke',
+      'swift-tuttle',
     ];
 
     /**

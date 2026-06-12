@@ -7,23 +7,29 @@
  * #403 Amendment — `docs/decisions/20260506-403-r-phase-ui-guard.md` §결정 §browser-verify 시나리오 확장 (시나리오 5 매트릭스).
  * #404 Amendment — `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 §browser-verify 시나리오 6 박제 (시나리오 6 매트릭스).
  *
- * 검증 매트릭스 (R10a #659 — 왜소행성 5 진입 후, 첫 비-행성 라운드):
- *   1. allowlist 박제 body (sun ~ pluto 11개): shortcut 버튼 활성 (disabled 아님)
- *      — satellite (galilean/titan/titania/triton) + ceres/haumea/makemake/eris 는 showInShortcutBar=false 라 bar 미등록 → 본 매트릭스 비대상 (4-B URL 진입 검증).
- *   2. allowlist 외 body shortcut negative: R9 진입으로 FOCUS_BUTTONS 의 disabled 대상 구조 소멸 (R10a 미등록 4 + R10b 혜성 3 전부 bar 미등록)
- *      — negative 는 URL 4-A (halley) + CelestialTree 5-B/5-C (halley) + preset 6-H (halley-x10) 가 보존
- *   3. 강제 click 시뮬레이션 — disabled 버튼 click 후 selectedBodyId 변화 0 / camera radius 변화 0 (시나리오 2 와 동일 사유로 R9 에선 skip)
+ * 검증 매트릭스 (R10b #664 — 혜성 3 진입 후, 전 데이터 소진 — 로드맵 v3 최종 라운드):
+ *   1. allowlist 박제 body (sun ~ pluto + halley 12개): shortcut 버튼 활성 (disabled 아님)
+ *      — satellite (galilean/titan/titania/triton) + ceres/haumea/makemake/eris + encke/swift-tuttle 는
+ *        showInShortcutBar=false 라 bar 미등록 → 본 매트릭스 비대상 (FOCUS_BODIES URL 진입 검증).
+ *   2. allowlist 외 body shortcut negative: 전 데이터 소진으로 disabled 대상 구조 소멸 (영구)
+ *      — membership 가드 negative 는 URL 4-A (가상 ID nonexistent-body) 가 승계, UI disabled 계약은
+ *        단위 vi.mock 부분 mock 이 승계 (ADR 20260612-r10b §축 5 — E2E disabled 축 종료)
+ *   3. 강제 click 시뮬레이션 — disabled 버튼 click 후 selectedBodyId 변화 0 / camera radius 변화 0 (시나리오 2 와 동일 사유로 skip)
  *   4. URL 직접 진입 매트릭스 (#415 — store mutation 측면 가드, 3번째 방어선):
- *      - 4-A 차단: ?focus=halley (R10b — phase 11) → selectedBodyId === null + camera radius 변화 0 (R10a #659 — pluto positive 전환으로 halley 교체, ADR §축 4)
+ *      - 4-A 차단: ?focus=nonexistent-body (가상 ID — R10b #664 전환) → selectedBodyId === null.
+ *        ⚠️ 도달 분기 변경: 기존 halley 는 "R-Phase 미진입" 분기였으나 가상 ID 는 데이터 존재 검사
+ *        선행으로 "알 수 없는 body id" 가드 분기 — 차단 결과 단언 (selectedBodyId===null + URL 제거) 은 동일.
+ *        phase 11 진입으로 미진입 실데이터 0 → 가상 ID 가 영구 승계 (phase 12+ 에서 'nonexistent-body'
+ *        류 실데이터 등록 금지 — ADR §재검토 #7)
  *      - 4-B 정상: ?focus=sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / io / europa /
  *        ganymede / callisto → selectedBodyId === <body> (R1~R6 회귀 보호. R7+ body 전수 focus 진입은
- *        browser-verify-378-focus.mjs FOCUS_BODIES 24 body 가 커버 — R7~R10a 선례 답습)
+ *        browser-verify-378-focus.mjs FOCUS_BODIES 27 body 가 커버 — R7~R10b 선례 답습)
  *      - 4-C 무효: ?focus=invalid → selectedBodyId === null (기존 R1 가드 회귀 보호)
  *   5. CelestialTree + InfoPanel UI 가드 (#403 — UI 측면 2번째 축, defense-in-depth):
  *      - 5-A 정상 (CelestialTree): tree-sun click → selectedBodyId === 'sun' + info-panel 정상 분기 렌더
- *      - 5-B 차단 (CelestialTree): tree-halley disabled / aria-disabled / data-r-phase-disabled,
- *        force click 시 store / camera 변화 0 (tree 는 전체 body 렌더 — R10b 혜성이 negative, R10a #659 교체)
- *      - 5-C 차단 (InfoPanel): 외부 경로로 set 시 info-panel-r-phase-blocked 분기 노출 검증 (programmatic mutation)
+ *        (halley 포함 — R10b positive 전환으로 tree-halley enabled 자동 검증)
+ *      - 5-B/5-C 차단: RPHASE_TREE_EXPECTED_DISABLED = [] (전 데이터 소진 — E2E disabled 축 종료,
+ *        production 도달 가능 disabled 시나리오 0. UI disabled 계약은 단위 vi.mock 이 승계 — §축 5 ③)
  *   6. ScenarioPresets UI 가드 (#404 — UI 측면 3번째 축, defense-in-depth):
  *      - 6-A 정상 (sun-half): preset-sun-half disabled 부재 / aria-disabled='false' / data-r-phase-disabled='false',
  *        click 시 physicsEngine='newton' + massMultipliers={sun:0.5} 정상 동작
@@ -34,8 +40,9 @@
  *      - 6-E 정상 (uranus-x10): R8 #647 진입 uranus → zero-touch 자동 enabled (massMultipliers={uranus:10})
  *      - 6-F 정상 (neptune-x10): R9 #653 진입 neptune → zero-touch 자동 enabled (massMultipliers={neptune:10}, Concrete Prediction 재현 4번째)
  *      - 6-G 정상 (pluto-x10): R10a #659 진입 pluto → zero-touch 자동 enabled (massMultipliers={pluto:10}, Concrete Prediction 재현 5번째)
- *      - 6-H 차단 (halley-x10): R10b 미진입 halley (phase 11) → preset disabled (negative 케이스 교체 보존 — R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 / R9 pluto-x10 선례).
- *        disabled / aria-disabled='true' / data-r-phase-disabled='true' / title='R-Phase 진행 시 활성', force click 시 store mutation 0
+ *      - 6-H 정상 (halley-x10): R10b #664 진입 halley → zero-touch 자동 enabled (massMultipliers={halley:10}, Concrete Prediction 재현 6번째 —
+ *        preset 코드/데이터 변경 0. 차단 → 정상 positive 전환 — 전 데이터 소진으로 disabled-path E2E 축 종료,
+ *        후계 negative preset 신설은 production UI 가짜 entry 노출 (UX 오염) 로 기각 — ADR 20260612-r10b §축 5 ③)
  *
  * R-Phase 진입 시 expected list 갱신 의무 (ADR §결정 4):
  *   - R4 (earth) 진입 시 RPHASE_EXPECTED_ENABLED 에 'earth' 이동
@@ -77,6 +84,8 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
 // #613 Concrete Prediction). triton 은 false (galilean/titan/titania 패턴) → 비대상.
 // R10a #659 — pluto 진입 + showInShortcutBar true 승격 (PM Q3=A — pluto 만, 14버튼째).
 // ceres/haumea/makemake/eris 는 false (focus 가능 + bar 미등록 — #617 직교 축 negative) → 비대상.
+// R10b #664 — halley 진입 + showInShortcutBar true 승격 (PM Q2=A — halley 만, 15버튼째 비-행성
+// 후미 컨벤션). encke/swift-tuttle 는 false (focus 가능 + bar 미등록 — #617 직교 축 합류) → 비대상.
 const RPHASE_EXPECTED_ENABLED = [
   'sun',
   'mercury',
@@ -89,16 +98,19 @@ const RPHASE_EXPECTED_ENABLED = [
   'uranus',
   'neptune',
   'pluto',
+  'halley',
 ];
-// R9 #653 — 로드맵 마지막 행성 (neptune) 진입으로 FOCUS_BUTTONS 의 disabled 대상이 구조 소멸
-// (R10a 미등록 4 + R10b 혜성 3 전부 showInShortcutBar=false 라 bar 미등록 — #624 tradeoff).
-// shortcut bar negative 는 빈 배열 (시나리오 1/3 skip) — negative 케이스는 URL 4-A (halley) +
-// CelestialTree 5-B/5-C (halley, 전체 body 렌더라 tree-halley 존재) + preset 6-H (halley-x10) 가 보존.
-// R10a #659 — ceres/haumea/makemake/eris = "focus 가능 + bar 미등록" (#617 직교 축, parent=sun 첫 사례).
+// R9 #653 — 로드맵 마지막 행성 (neptune) 진입으로 FOCUS_BUTTONS 의 disabled 대상이 구조 소멸.
+// R10b #664 — 전 데이터 소진으로 영구 빈 배열 확정 (시나리오 2/3 skip). membership 가드 negative 는
+// URL 4-A (가상 ID nonexistent-body) 가 승계, UI disabled 계약은 단위 vi.mock 부분 mock 이 승계
+// (ADR 20260612-r10b §축 5). bar 미등록 직교 축 (#617) = ceres 등 4 + encke/swift-tuttle.
 const RPHASE_SHORTCUT_EXPECTED_DISABLED = [];
-// CelestialTree 는 getSolarSystem() 전체 body 를 렌더 → R10b 미진입 body (halley — phase 11) 가 tree negative.
-// R10a #659 — pluto positive 전환으로 halley 교체 (encke/swift-tuttle 추가는 R10b architect 재량 — 대표 1 body).
-const RPHASE_TREE_EXPECTED_DISABLED = ['halley'];
+// R10b #664 — 빈 배열 (E2E disabled 축 종료): phase 11 진입으로 전 데이터 소진 — production 에서
+// 도달 가능한 tree disabled 시나리오 자체가 소멸 (트리거 가능 미진입 실데이터 0). tree 의 disabled
+// 분기 코드는 미래 phase 12+ 데이터 대비 잔존하며, UI disabled 계약 검증은 단위 vi.mock 부분 mock
+// (celestial-tree.test.tsx 등 4 파일) 이 승계 (ADR 20260612-r10b §축 5 ③ — shortcut bar negative
+// 빈 배열 선례 동형). membership 가드 negative 는 4-A 가상 ID (nonexistent-body) 가 보존.
+const RPHASE_TREE_EXPECTED_DISABLED = [];
 
 const VIEWPORT = { width: 1280, height: 800 };
 const POST_INIT_WAIT_MS = 1500;
@@ -273,8 +285,12 @@ async function verifyEnabledClickWorks(page) {
  */
 async function verifyUrlDirectEntry(browser) {
   const cases = [
-    // 4-A 차단 — R-Phase 외 body URL 직접 진입 시 가드 작동 (R10a #659: pluto positive 전환 → halley(R10b phase 11) 로 교체 — negative 케이스 보존).
-    { focus: 'halley', expected: null, label: '4-A 차단' },
+    // 4-A 차단 — 가상 ID URL 직접 진입 시 가드 작동 (R10b #664: halley positive 전환 + 전 데이터
+    // 소진 → 가상 ID nonexistent-body 로 영구 전환 — ADR §축 5 ①).
+    // ⚠️ 도달 분기: 가상 ID 는 url-sync 데이터 존재 검사 선행으로 "알 수 없는 body id" 분기
+    // (기존 halley 의 "R-Phase 미진입" 분기와 다름) — 차단 결과 단언 (selectedBodyId===null +
+    // #418 URL 자동 제거) 은 동일. "R-Phase 미진입" 분기 자체는 단위 vi.mock (url-sync.test.tsx) 승계.
+    { focus: 'nonexistent-body', expected: null, label: '4-A 차단' },
     // 4-B 정상 — R-Phase 박제 body 는 정상 진입 (회귀 보호 + R4 earth/moon + R5 mars/phobos/deimos + R6 jupiter/galilean 진입 검증).
     { focus: 'sun', expected: 'sun', label: '4-B 정상' },
     { focus: 'mercury', expected: 'mercury', label: '4-B 정상' },
@@ -627,6 +643,16 @@ async function verifyScenarioPresetsGuards(browser) {
         expectedMul: 10,
         scenario: '6-G 정상 (pluto-x10)',
       },
+      {
+        // R10b #664 — halley 진입 → zero-touch 자동 enabled (Concrete Prediction 재현 6번째 —
+        // preset 코드/데이터 변경 0). 차단 6-H → 정상 6-H positive 전환: 전 데이터 소진으로
+        // disabled-path E2E 축 종료 (후계 negative preset 신설은 production UI 가짜 entry 노출
+        // = UX 오염으로 기각 — ADR 20260612-r10b §축 5 ③. 단위 vi.mock 부분 mock 이 승계).
+        presetId: 'halley-x10',
+        massKey: 'halley',
+        expectedMul: 10,
+        scenario: '6-H 정상 (halley-x10)',
+      },
     ];
     for (const { presetId, massKey, expectedMul, scenario } of enabledPresetCases) {
       const selector = `[data-testid="preset-${presetId}"]`;
@@ -676,69 +702,10 @@ async function verifyScenarioPresetsGuards(browser) {
       });
     }
 
-    // 6-H 차단 (halley-x10): R10b 미진입 halley (phase 11) → disabled + force click 무시.
-    // pluto 진입 (R10a #659) 으로 6-G 가 enabled 되어 disabled-path 가드가 무력화되지 않도록
-    // halley target preset 으로 negative 교체 보존 (R6 saturn-x10 / R7 uranus-x10 / R8 neptune-x10 / R9 pluto-x10 선례 답습).
-    {
-      const selector = '[data-testid="preset-halley-x10"]';
-      const btn = page.locator(selector).first();
-      const isDisabled = await btn.evaluate((el) => el.hasAttribute('disabled'));
-      const ariaDisabled = await btn.getAttribute('aria-disabled');
-      const dataDisabled = await btn.getAttribute('data-r-phase-disabled');
-      const title = await btn.getAttribute('title');
-
-      // store 초기 상태 reset (이전 시나리오 잔재 제거).
-      await page.evaluate(() => {
-        window.__simStore?.setState?.({
-          physicsEngine: 'kepler',
-          massMultipliers: {},
-        });
-      });
-      await page.waitForTimeout(POST_CLICK_WAIT_MS);
-
-      const before = await page.evaluate(() => {
-        const s = window.__simStore?.getState?.();
-        return {
-          physicsEngine: s?.physicsEngine ?? null,
-          massMultipliers: { ...(s?.massMultipliers ?? {}) },
-        };
-      });
-
-      // 강제 click — disabled 우회 (Playwright `force: true`).
-      await btn.click({ force: true });
-      await page.waitForTimeout(POST_CLICK_WAIT_MS);
-
-      const after = await page.evaluate(() => {
-        const s = window.__simStore?.getState?.();
-        return {
-          physicsEngine: s?.physicsEngine ?? null,
-          massMultipliers: { ...(s?.massMultipliers ?? {}) },
-        };
-      });
-
-      const engineUnchanged = before.physicsEngine === after.physicsEngine;
-      const massUnchanged =
-        JSON.stringify(before.massMultipliers) === JSON.stringify(after.massMultipliers);
-
-      const pass =
-        isDisabled &&
-        ariaDisabled === 'true' &&
-        dataDisabled === 'true' &&
-        title === 'R-Phase 진행 시 활성' &&
-        engineUnchanged &&
-        massUnchanged;
-      results.push({
-        scenario: '6-H 차단 (halley-x10)',
-        preset: 'halley-x10',
-        isDisabled,
-        ariaDisabled,
-        dataDisabled,
-        title,
-        engineUnchanged,
-        massUnchanged,
-        pass,
-      });
-    }
+    // (R10b #664) 기존 "6-H 차단 (halley-x10)" 블록 제거 — halley 진입으로 positive 전환되어
+    // enabledPresetCases 의 '6-H 정상 (halley-x10)' 이 승계 (zero-touch 재현 6번째). 전 데이터
+    // 소진으로 disabled-path E2E 축 종료 — UI disabled 계약은 단위 vi.mock 부분 mock 이 검증
+    // (ADR 20260612-r10b §축 5 ③).
   } finally {
     await context.close();
   }

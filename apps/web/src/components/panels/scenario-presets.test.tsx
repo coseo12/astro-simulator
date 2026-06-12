@@ -9,8 +9,27 @@ vi.mock('@/core/sim-context', () => ({
   useSimCommand: () => (cmd: CoreCommand) => sent.push(cmd),
 }));
 
+// R10b #664 — preset disabled negative 를 vi.mock 부분 mock 으로 승계 (ADR 20260612-r10b §축 5 ②).
+// phase 11 진입으로 미진입 실데이터 body 0 → halley-x10 이 zero-touch enabled 전환 (6번째 재현)
+// 되어 disabled-path negative 가 구조 소멸. 가상 preset 신설은 production UI 노출 (UX 오염) 로
+// 기각 (ADR §축 5 ③) → isRPhaseFocusable 만 지정 body 에 false 반환 (importOriginal partial
+// mock) 으로 "isPresetEnabled=false 일 때 disabled 렌더" UI 계약을 영구 검증. mock drift 위험은
+// membership 가드 가상 ID 실모듈 테스트가 직교 커버 (ADR §위험 #5).
+const rPhaseMock = vi.hoisted(() => ({ disabledIds: [] as string[] }));
+vi.mock('@astro-simulator/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@astro-simulator/core')>();
+  return {
+    ...actual,
+    isRPhaseFocusable: (bodyId: string | null | undefined) =>
+      typeof bodyId === 'string' && rPhaseMock.disabledIds.includes(bodyId)
+        ? false
+        : actual.isRPhaseFocusable(bodyId),
+  };
+});
+
 beforeEach(() => {
   sent = [];
+  rPhaseMock.disabledIds = []; // 기본 passthrough (실모듈) — disabled 계약 테스트만 개별 지정
   useSimStore.setState({
     rendererKind: null,
     engineError: null,
@@ -37,7 +56,7 @@ describe('ScenarioPresets', () => {
     expect(screen.getByTestId('preset-uranus-x10')).toBeInTheDocument(); // R8 #647 — zero-touch 자동 enabled
     expect(screen.getByTestId('preset-neptune-x10')).toBeInTheDocument(); // R9 #653 — zero-touch 자동 enabled (재현 4번째)
     expect(screen.getByTestId('preset-pluto-x10')).toBeInTheDocument(); // R10a #659 — zero-touch 자동 enabled (재현 5번째)
-    expect(screen.getByTestId('preset-halley-x10')).toBeInTheDocument(); // R10a #659 — negative 케이스 교체 보존 (R10b 혜성)
+    expect(screen.getByTestId('preset-halley-x10')).toBeInTheDocument(); // R10b #664 — zero-touch 자동 enabled (재현 6번째)
     expect(screen.getByTestId('scenario-reset')).toBeInTheDocument();
   });
 
@@ -56,11 +75,12 @@ describe('ScenarioPresets', () => {
  *
  * ADR `docs/decisions/20260508-404-scenario-presets-r-phase-guard.md` §결정 1, 3.
  *
- * 검증 (R10a #659 진입 — 왜소행성 5 allowlist 포함 후):
+ * 검증 (R10b #664 진입 — 혜성 3 allowlist 포함, 전 데이터 소진):
  *  - sun-half (R1 박제 sun) preset 활성 — apply 호출 시 setEngine/setMass/sendCommand 정상 발행
- *  - jupiter-x10 / no-jupiter (R6) / saturn-x10 (R7) / uranus-x10 (R8) / neptune-x10 (R9) / pluto-x10 (R10a) preset 활성 — zero-touch 자동 enabled
- *  - halley-x10 (R10b 미진입 halley — phase 11 혜성) preset disabled — disabled-path negative 케이스 보존
- *    (pluto 진입으로 pluto-x10 이 enabled 되어 가드 무력화 위험 → halley 로 대체 박제 — R6/R7/R8/R9 선례)
+ *  - jupiter-x10 / no-jupiter (R6) / saturn-x10 (R7) / uranus-x10 (R8) / neptune-x10 (R9) /
+ *    pluto-x10 (R10a) / halley-x10 (R10b — 재현 6번째) preset 활성 — zero-touch 자동 enabled
+ *  - disabled UI 계약 (R10b #664 — vi.mock 부분 mock 승계, ADR 20260612-r10b §축 5 ②):
+ *    isRPhaseFocusable=false 인 target body preset 은 disabled (phase 진행 영구 비종속)
  *  - a11y 4축 (disabled / aria-disabled / title / data-r-phase-disabled) 정합성
  *  - sun-half tooltip 부재 (불필요 노이즈 차단), disabled preset tooltip 'R-Phase 진행 시 활성' 박제
  *  - 시각 차별화 (opacity-50 / cursor-not-allowed) 박제
@@ -102,12 +122,33 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
     expect(screen.getByTestId('preset-pluto-x10')).not.toBeDisabled();
   });
 
-  it('halley-x10 (R10b 미진입 halley — phase 11 혜성) preset 은 disabled (negative 케이스 교체 보존)', () => {
+  it('halley-x10 (R10b #664 진입 halley) preset 은 활성 (zero-touch 자동 enabled 재현 6번째 — preset 코드/데이터 변경 0)', () => {
+    render(<ScenarioPresets />);
+    expect(screen.getByTestId('preset-halley-x10')).not.toBeDisabled();
+    expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute(
+      'data-r-phase-disabled',
+      'false',
+    );
+  });
+
+  it('halley-x10 (활성) click → setEngine(newton) + setMass(halley, 10) 정상 동작 (R10b 진입 회귀 가드)', () => {
+    render(<ScenarioPresets />);
+    fireEvent.click(screen.getByTestId('preset-halley-x10'));
+    const s = useSimStore.getState();
+    expect(s.physicsEngine).toBe('newton');
+    expect(s.massMultipliers).toEqual({ halley: 10 });
+    expect(sent).toContainEqual({ type: 'jumpToJulianDate', julianDate: 2_451_545.0 });
+  });
+
+  it('disabled UI 계약 — isRPhaseFocusable=false 인 target preset 은 disabled (vi.mock 부분 mock 승계, ADR §축 5 ②)', () => {
+    rPhaseMock.disabledIds = ['halley'];
     render(<ScenarioPresets />);
     expect(screen.getByTestId('preset-halley-x10')).toBeDisabled();
   });
 
   it('disabled preset 은 aria-disabled="true" 설정 (스크린 리더 인지)', () => {
+    rPhaseMock.disabledIds = ['halley'];
     render(<ScenarioPresets />);
     expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute('aria-disabled', 'true');
   });
@@ -119,6 +160,7 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
   });
 
   it('disabled preset 은 data-r-phase-disabled="true" 회귀 가드 selector 박제', () => {
+    rPhaseMock.disabledIds = ['halley'];
     render(<ScenarioPresets />);
     expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute(
       'data-r-phase-disabled',
@@ -148,6 +190,7 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
   });
 
   it('disabled preset 은 tooltip "R-Phase 진행 시 활성" 박제', () => {
+    rPhaseMock.disabledIds = ['halley'];
     render(<ScenarioPresets />);
     expect(screen.getByTestId('preset-halley-x10')).toHaveAttribute(
       'title',
@@ -162,6 +205,7 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
   });
 
   it('disabled preset 시각 차별화 — opacity-50 cursor-not-allowed 클래스 박제', () => {
+    rPhaseMock.disabledIds = ['halley'];
     render(<ScenarioPresets />);
     const halleyBtn = screen.getByTestId('preset-halley-x10');
     expect(halleyBtn.className).toContain('opacity-50');
@@ -169,6 +213,7 @@ describe('ScenarioPresets — R-Phase Allowlist 가드 UI (#404)', () => {
   });
 
   it('disabled preset 강제 click → apply 부작용 0 (HTML disabled 자체 차단)', () => {
+    rPhaseMock.disabledIds = ['halley'];
     render(<ScenarioPresets />);
     fireEvent.click(screen.getByTestId('preset-halley-x10'));
     // HTML button[disabled] 는 click 이벤트 자체를 dispatch 하지 않음.

@@ -108,6 +108,12 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE.eris).toBe(800);
   });
 
+  it('R10b comet 그룹 — 3 body 전부 5000 (5번째 scale 그룹, phobos/deimos 극소형 계보 답습 — PM Q1=A)', () => {
+    expect(BODY_SCALE.halley).toBe(5000);
+    expect(BODY_SCALE.encke).toBe(5000);
+    expect(BODY_SCALE['swift-tuttle']).toBe(5000);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -163,6 +169,58 @@ describe('R10a #659 — dwarf 그룹 서열 정량 가드 (ADR §축 1)', () => 
   });
 });
 
+/**
+ * R10b #664 — comet 그룹 서열 정량 가드 (ADR 20260612-r10b §축 1).
+ *
+ * radius × scale 곱 (결정적 — runtime 측정 불요) 기준 4축:
+ *   1. 그룹 내 사실 서열: swift-tuttle > halley > encke (strict 부등호 2개)
+ *   2. 그룹 동일값: 3 body 전부 === 5000 — 단일값 구조 자체를 가드 (개별 조정 회귀 차단)
+ *   3. cross-group: swift-tuttle×5000 < ceres×800 (max comet < min dwarf, 비 0.173)
+ *   4. 5000 통합 그룹 사실 서열: swift-tuttle > phobos > deimos > halley > encke
+ *      (comet + phobos/deimos 동일 scale 이므로 visual 서열 = 사실 radius 서열 — scale drift 감지.
+ *       swift-tuttle visual > phobos visual 은 사실 정합, 버그 아님 — D-T2 사전 등록)
+ */
+describe('R10b #664 — comet 그룹 서열 정량 가드 (ADR §축 1)', () => {
+  // 사실 radius (m) — solar-system.json 기박제 실측값 (변경 없음).
+  const RADIUS = {
+    ceres: 4.696e5,
+    phobos: 1.108e4,
+    deimos: 6.27e3,
+    halley: 5.5e3,
+    encke: 2.4e3,
+    'swift-tuttle': 1.3e4,
+  } as const;
+  const visual = (id: keyof typeof RADIUS) => RADIUS[id] * BODY_SCALE[id]!;
+
+  it('그룹 내 사실 서열 — swift-tuttle > halley > encke (strict 부등호 2개)', () => {
+    expect(visual('swift-tuttle')).toBeGreaterThan(visual('halley'));
+    expect(visual('halley')).toBeGreaterThan(visual('encke'));
+  });
+
+  it('그룹 동일값 — comet 3 body 전부 === 5000 (단일값 구조 가드, 개별 조정 회귀 차단)', () => {
+    const cometIds = ['halley', 'encke', 'swift-tuttle'] as const;
+    for (const id of cometIds) {
+      expect(BODY_SCALE[id], `${id} 는 comet 그룹 단일값 5000 이어야 함`).toBe(5000);
+    }
+  });
+
+  it('cross-group — swift-tuttle×5000 < ceres×800 (max comet < min dwarf, 비 0.173)', () => {
+    expect(visual('swift-tuttle')).toBeLessThan(visual('ceres'));
+    // 비 0.173 ± 0.01 — 서열 방향뿐 아니라 크기 비도 가드 (scale 상향 Amendment 시
+    // 수학 상한 28,898 인지 — ADR §재검토 #4).
+    const ratio = visual('swift-tuttle') / visual('ceres');
+    expect(ratio).toBeGreaterThan(0.163);
+    expect(ratio).toBeLessThan(0.183);
+  });
+
+  it('5000 통합 그룹 사실 서열 — swift-tuttle > phobos > deimos > halley > encke (scale drift 감지)', () => {
+    expect(visual('swift-tuttle')).toBeGreaterThan(visual('phobos'));
+    expect(visual('phobos')).toBeGreaterThan(visual('deimos'));
+    expect(visual('deimos')).toBeGreaterThan(visual('halley'));
+    expect(visual('halley')).toBeGreaterThan(visual('encke'));
+  });
+});
+
 describe('getBodyScale — 룩업 헬퍼', () => {
   it('정의된 body 는 룩업값 반환', () => {
     expect(getBodyScale('sun')).toBe(50);
@@ -189,10 +247,16 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('haumea')).toBe(800); // R10a #659 — dwarf 그룹
     expect(getBodyScale('makemake')).toBe(800); // R10a #659 — dwarf 그룹
     expect(getBodyScale('eris')).toBe(800); // R10a #659 — dwarf 그룹
+    expect(getBodyScale('halley')).toBe(5000); // R10b #664 — comet 그룹 (negative → positive 전환)
+    expect(getBodyScale('encke')).toBe(5000); // R10b #664 — comet 그룹
+    expect(getBodyScale('swift-tuttle')).toBe(5000); // R10b #664 — comet 그룹
   });
 
-  it('미정의 body 는 default 1.0 반환 (실측 그대로)', () => {
-    expect(getBodyScale('halley')).toBe(1.0); // R10b 진입 전 (R10a #659 — pluto positive 전환으로 halley 교체, ADR §축 4)
+  it('미정의 body 는 default 1.0 반환 (실측 그대로 — 가상 ID 가드)', () => {
+    // R10b #664 — halley positive 전환으로 negative 를 가상 ID 로 전환 (ADR §축 5 ①).
+    // semantics: "미진입" → "미정의 default fallback" — drift 가드 가치 유지, phase 진행 영구 비종속.
+    // ⚠️ 'nonexistent-body' 류 가상 ID 는 미래 phase 12+ 에서 실데이터 등록 금지 (ADR §재검토 #7).
+    expect(getBodyScale('nonexistent-body')).toBe(1.0);
     expect(getBodyScale('unknown')).toBe(1.0);
   });
 

@@ -27,7 +27,8 @@ import { useSimStore } from '@/store/sim-store';
  *
  * cross-validate 보강 (§결정 4 보강):
  *   - vi.spyOn(console, 'warn') 단언 의무 — 진단 기능 dev 환경 작동 보장
- *   - 메시지 매칭: /R-Phase 미진입/ (halley — R10a #659 후 pluto 에서 교체, phase 11 혜성) / /알 수 없는 body id/ (invalid)
+ *   - 메시지 매칭: /R-Phase 미진입/ (R10b #664 — halley positive 전환 후 vi.mock 부분 mock 승계,
+ *     ADR 20260612-r10b §축 5 ②) / /알 수 없는 body id/ (invalid — 가상 ID 도 본 분기로 빠짐)
  *
  * mock 전략:
  *   - nuqs `useQueryState` 를 vi.mock 으로 가로채 [urlFocus, setter] 반환
@@ -61,12 +62,32 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
+// R10b #664 — R-Phase 미진입 분기 negative 를 vi.mock 부분 mock 으로 승계 (ADR 20260612-r10b §축 5 ②).
+// phase 11 진입으로 미진입 실데이터 body 0 → url-sync 의 "R-Phase 미진입" 분기는 실데이터 +
+// allowlist 외 동시 요구 (데이터 존재 검사 선행 — url-sync.tsx, 가상 ID 는 "알 수 없는 body id"
+// 분기로 빠져 도달 불가). isRPhaseFocusable 만 지정 body 에 false 반환 (importOriginal partial
+// mock — 시그니처 drift 시 타입 에러 fail-fast), 나머지 실모듈 passthrough.
+// mock drift 위험은 membership 가드 가상 ID 실모듈 테스트 (r-phase-allowlist.test.ts /
+// simulation-core 가드) + filterBodiesByPhase 순수 함수 경계 테스트가 직교 커버 (ADR §위험 #5).
+const rPhaseMock = vi.hoisted(() => ({ disabledIds: [] as string[] }));
+vi.mock('@astro-simulator/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@astro-simulator/core')>();
+  return {
+    ...actual,
+    isRPhaseFocusable: (bodyId: string | null | undefined) =>
+      typeof bodyId === 'string' && rPhaseMock.disabledIds.includes(bodyId)
+        ? false
+        : actual.isRPhaseFocusable(bodyId),
+  };
+});
+
 // 동적 import — vi.mock 등록 후 평가되도록.
 const { UrlSync } = await import('./url-sync');
 
 beforeEach(() => {
   sentCommands = [];
   mockUrlFocus = null;
+  rPhaseMock.disabledIds = []; // 기본 passthrough (실모듈) — disabled 계약 테스트만 개별 지정
   useSimStore.setState({
     rendererKind: null,
     engineError: null,
@@ -194,7 +215,21 @@ describe('UrlSync — ?focus= R-Phase Allowlist 가드 (#415)', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('?focus=halley → setSelectedBody 0회 + sendCommand(focusOn) 0회 + console.warn(R-Phase 미진입) (R10b 미진입 negative 케이스 교체 보존 — phase 11 혜성)', () => {
+  it('?focus=halley → focusOn 발행 (R10b #664 진입 — 차단 → 허용 전환, 역행 혜성 첫 사례)', () => {
+    mockUrlFocus = 'halley';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<UrlSync />);
+
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'halley' });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('?focus=halley + isRPhaseFocusable mock false → sendCommand 0회 + console.warn(R-Phase 미진입) — UI 계약 mock 승계 (ADR §축 5 ②)', () => {
+    // R10b #664 — phase 11 진입으로 미진입 실데이터 0. "R-Phase 미진입" 분기는 실데이터 +
+    // allowlist 외 동시 요구 (가상 ID 는 데이터 존재 검사 선행으로 도달 불가) → vi.mock 부분
+    // mock 으로 "isRPhaseFocusable=false 일 때 차단 + warn" 이라는 UI 계약 자체를 영구 검증.
+    rPhaseMock.disabledIds = ['halley'];
     mockUrlFocus = 'halley';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 

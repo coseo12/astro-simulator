@@ -1,9 +1,28 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSimStore } from '@/store/sim-store';
 import { CelestialInfoPanel } from './celestial-info-panel';
 
+// R10b #664 — info-panel 차단 분기 negative 를 vi.mock 부분 mock 으로 승계 (ADR 20260612-r10b §축 5 ②).
+// phase 11 진입으로 미진입 실데이터 body 0 → 차단 분기는 data.nameKo 렌더를 요구해 실데이터 body
+// 필수 (가상 ID 는 data === null 로 info-panel-empty 폴백 — 가상 ID 전환 불가). isRPhaseFocusable
+// 만 지정 body 에 false 반환 (importOriginal partial mock) 으로 "isRPhaseFocusable=false 일 때
+// blocked 분기 렌더" UI 계약을 phase 진행과 영구 비종속으로 검증. mock drift 위험은 membership
+// 가드 가상 ID 실모듈 테스트가 직교 커버 (ADR §위험 #5).
+const rPhaseMock = vi.hoisted(() => ({ disabledIds: [] as string[] }));
+vi.mock('@astro-simulator/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@astro-simulator/core')>();
+  return {
+    ...actual,
+    isRPhaseFocusable: (bodyId: string | null | undefined) =>
+      typeof bodyId === 'string' && rPhaseMock.disabledIds.includes(bodyId)
+        ? false
+        : actual.isRPhaseFocusable(bodyId),
+  };
+});
+
 beforeEach(() => {
+  rPhaseMock.disabledIds = []; // 기본 passthrough (실모듈) — blocked 계약 테스트만 개별 지정
   useSimStore.setState({
     rendererKind: null,
     engineError: null,
@@ -27,7 +46,8 @@ beforeEach(() => {
  * 검증:
  *  - selectedBodyId === null: info-panel-empty 렌더 (기존 분기 회귀 0)
  *  - R-Phase 박제 body (sun / mercury / venus / earth / moon): info-panel 정상 분기 렌더
- *  - R-Phase 미박제 body (halley — R10b phase 11): info-panel-r-phase-blocked 분기 렌더 (R10a #659 — pluto 진입으로 halley 교체)
+ *  - blocked UI 계약 (R10b #664 — vi.mock 부분 mock 승계, ADR 20260612-r10b §축 5 ②):
+ *    isRPhaseFocusable=false 인 body 는 info-panel-r-phase-blocked 분기 렌더
  *  - R-Phase 차단 분기는 body 이름 포함 + R-Phase 메시지 박제
  *  - 분기 위치 — 정상 분기 *이전* (selected/data 존재 후 R-Phase 검사)
  */
@@ -102,7 +122,25 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', 
     expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
   });
 
-  it('selectedBodyId === "halley": info-panel-r-phase-blocked 분기 렌더 (R10b 미진입 negative 교체 보존 — phase 11 혜성)', () => {
+  it('selectedBodyId === "halley": info-panel 정상 분기 렌더 (R10b #664 진입 — negative → positive 전환)', () => {
+    useSimStore.setState({ selectedBodyId: 'halley' });
+    render(<CelestialInfoPanel />);
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('info-panel-r-phase-blocked')).not.toBeInTheDocument();
+  });
+
+  it('selectedBodyId === "encke" / "swift-tuttle": info-panel 정상 분기 렌더 (R10b #664 — URL-only 진입 경로)', () => {
+    useSimStore.setState({ selectedBodyId: 'encke' });
+    const { unmount } = render(<CelestialInfoPanel />);
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+    unmount();
+    useSimStore.setState({ selectedBodyId: 'swift-tuttle' });
+    render(<CelestialInfoPanel />);
+    expect(screen.getByTestId('info-panel')).toBeInTheDocument();
+  });
+
+  it('blocked UI 계약 — isRPhaseFocusable=false 인 body 는 blocked 분기 렌더 (vi.mock 부분 mock 승계, ADR §축 5 ②)', () => {
+    rPhaseMock.disabledIds = ['halley'];
     useSimStore.setState({ selectedBodyId: 'halley' });
     render(<CelestialInfoPanel />);
     expect(screen.getByTestId('info-panel-r-phase-blocked')).toBeInTheDocument();
@@ -110,6 +148,7 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', 
   });
 
   it('차단 분기는 body 이름 (핼리 혜성) 포함 — 사용자 인지 우수', () => {
+    rPhaseMock.disabledIds = ['halley'];
     useSimStore.setState({ selectedBodyId: 'halley' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
@@ -117,6 +156,7 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', 
   });
 
   it('차단 분기는 R-Phase 메시지 박제', () => {
+    rPhaseMock.disabledIds = ['halley'];
     useSimStore.setState({ selectedBodyId: 'halley' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
@@ -124,6 +164,7 @@ describe('CelestialInfoPanel — R-Phase Allowlist 가드 UI (#403 + R4 #532)', 
   });
 
   it('차단 분기는 body 별 이름이 정확히 박제 (jupiter / halley 회귀 0)', () => {
+    rPhaseMock.disabledIds = ['halley'];
     useSimStore.setState({ selectedBodyId: 'halley' });
     render(<CelestialInfoPanel />);
     const blocked = screen.getByTestId('info-panel-r-phase-blocked');
