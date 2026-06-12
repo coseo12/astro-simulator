@@ -3,7 +3,11 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
-## [Unreleased]
+## [0.25.0] — 2026-06-12
+
+### Docs (R10 통합 회고 — 로드맵 v3 종결 기록)
+
+- **[#664] R10 통합 회고 + off-by-one 표기 정정 + halley-x10 description polish** ([PR #672](https://github.com/coseo12/astro-simulator/pull/672)) — `docs/retrospectives/r10-retrospective.md` 신규 (달성도/잘 된 것/어려웠던 것/인수인계 4섹션 — 로드맵 v3 27 body 전수 완주 종결 기록 겸함). bar 버튼 카운트 off-by-one drift 정정 (qa 실측 14 = focus 12 + reset + free-fly — R9 부터 +1 누적, focus-quick-buttons.tsx 주석 2곳 + R10b ADR §축 6). scenario-presets halley-x10 description "(R10b 진입 완료 — 활성)" (reviewer 권고 2). **Behavior Changes: None — 문서/문구만** (preset description 문자열 1건은 표기 정정).
 
 ### Behavior Changes (R10b 혜성 3 body 시각화 — 로드맵 v3 최종 라운드)
 
