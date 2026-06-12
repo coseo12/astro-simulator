@@ -10,6 +10,7 @@ import { parseIntegratorKind } from '@/core/parse-integrator';
 import { parseGrMode } from '@/core/parse-gr-mode';
 import { parseLodLevel } from '@/core/parse-lod-level';
 import { parseGpuTier } from '@/core/parse-gpu-tier';
+import { parseGlowMarkerRatio, parseMarkerMode } from '@/core/parse-marker-mode';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -109,15 +110,23 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const lodParam = new URLSearchParams(window.location.search).get('lod');
           const hasLodOverride = lodParam !== null && lodParam !== '';
           if (!hasLodOverride && profile.lod.forceOverride) {
-            // LOD 'low' 강제 — scene 초기화 완료 후 적용되도록 command stream 경유.
-            // sendCommand 가 아직 handler 를 못 연결했을 수 있어도 setLodOverrideHandler
-            // 등록 시점에 URL 재파싱 경로가 fallback 처리 (기존 P11-B handler 로직 재사용).
-            // 여기서는 window 에 예약 플래그만 박제 — handler 등록 시 참고.
+            // LOD 'low' 강제 — 적용 경로 2중화 (#677 forensic fix).
+            //
+            // 본 then (capability 감지) 과 instance.start().then (handler 등록 + 플래그 읽기) 은
+            // 별개 async chain 이라 완료 순서가 비결정적이다:
+            //  (1) 감지가 먼저 → window 플래그 박제 → handler 등록 시점 읽기가 적용 (기존 P11-B 경로)
+            //  (2) scene 초기화가 먼저 → 플래그 읽기 시점이 이미 지나가 강제 low 영구 유실 →
+            //      auto LOD (sun high + mid sphere) 렌더 → CI fps-baseline-guard flaky FAIL
+            //      (#677 — glow 무관. develop push run 27412497611 desktop 28.1 FPS 선행 사례.
+            //      headless/저속 환경에서 requestAdapter 가 느릴 때 발현)
+            // 방향 (2) 를 command 직접 발행으로 커버 — handler 미등록이면 no-op (방향 (1) 이 처리),
+            // 양 경로 동시 적용은 idempotent. 회귀 가드: browser-verify-glow-marker.mjs 축 6.
             Object.defineProperty(window, '__gpuTierForceLod', {
               configurable: true,
               value: profile.lod.forceOverride,
               writable: false,
             });
+            coreRef.current?.command({ type: 'setLodOverride', level: profile.lod.forceOverride });
           }
           useSimStore.getState().setEngineNotice({
             key: 'tier-c-graceful-degradation',
@@ -238,6 +247,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const ringParam = new URLSearchParams(window.location.search).get('ring');
         const ringRenderMode: 'shader' | 'fallback' | 'placeholder' =
           ringParam === 'fallback' || ringParam === 'placeholder' ? ringParam : 'shader';
+        // #675 — glow pixel marker 기본 ON + `?marker=off` 옵트아웃 (ADR 20260613-675 §축 1).
+        const markerParam = new URLSearchParams(window.location.search).get('marker');
+        const markerMode = parseMarkerMode(markerParam);
+        // #675 — ?ratio= glow marker 모행성:위성 비율 (PM 확정 기본 2:1, 디버그용 — ADR §축 7).
+        const ratioParam = new URLSearchParams(window.location.search).get('ratio');
+        const glowMarkerRatio = parseGlowMarkerRatio(ratioParam);
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
@@ -253,6 +268,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           onTierTransitionInputAttempts: (count) => {
             instance.metrics.tierTransitionInputDrops += count;
           },
+          // #675 — glow pixel marker. 기본 ON 은 parseMarkerMode 기본값 ('glow') 이 결정 —
+          // core 옵션 기본값은 false 유지 (ADR 20260613-675 §축 1 레이어 분리).
+          glowMarker: markerMode === 'glow',
+          // #675 — 모행성:위성 marker 비율 (glowMarker=false 면 scene 이 무시).
+          glowMarkerSatelliteRatio: glowMarkerRatio,
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.

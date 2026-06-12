@@ -307,6 +307,27 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # #675 — glow pixel marker 회귀 가드 (기본 ON Behavior Change 의 CI 상시 감시).
+      # ADR: docs/decisions/20260613-675-glow-pixel-marker.md §축 6 (헤드리스/CI 가드)
+      # 검증 5축: (1) 식별 천체 증가분 40 AU +10 / 100 AU +11 (프리뷰 실측 기준)
+      #          (2) ?marker=off 격리 — low variant 전수 scaling=1 (기존 동작 100%)
+      #          (3) off-frustum 가드 — pxDiameter ≤ 0 body marker 부재
+      #          (4) 100 AU 화면 안 low body 전수 발동 (sun 포함 27 body)
+      #          (5) ?marker=glow 명시 = default 동일 (하위 호환)
+      - name: '#675 glow pixel marker 회귀 가드 (verify:675-glow-marker)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-glow-marker.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3008 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3008/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3008 node apps/web/scripts/browser-verify-glow-marker.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)

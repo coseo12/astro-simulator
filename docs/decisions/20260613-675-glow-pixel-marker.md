@@ -270,3 +270,29 @@ scene (`runLodPass`) 은 본 함수 호출 + mesh/material 적용만 담당 — 
 ### Claude 편향 셀프 체크 결과 대조
 
 - 사전 기록 4항목 전부 agy 평가와 모순 없음 — popping 기각 논거 (도달 불가 경계 dead-code 가드) 를 agy 가 성능 제어 우수 사례로 독립 평가
+
+---
+
+## Amendment 1 (2026-06-13) — Concrete Prediction ② 메트릭 단위 정제 (구현 PR #677 실측)
+
+- **실측 분기**: 행동 semantics 변경 = **4 statement ≤ 15 적중** / 라인-문자 해석 (prettier 멀티라인 + 함수 추출 경계 포함) = **23 > 15 실패** — 동일 diff 의 해석 차이 (PR #677 정직 박제 → reviewer 판정 "원인은 추상화 결함이 아닌 메트릭 단위 모호")
+- **정제**: Concrete Prediction 의 코어 예산 메트릭은 이후 라운드부터 **"행동 semantics 변경 statement 수"** 기준 (prettier 줄바꿈/함수 추출 경계의 기계적 라인 증가는 제외 — 단 추출 자체가 신규 분기/조건을 추가하면 포함). 본 ADR ② 의 "(기본값 flip + 함수 추출 경계)" 괄호가 라인 해석을 유도한 모호 표기였음을 인정
+- **동승 박제 (reviewer 권고 3)**: §축 6 "scene 통합 테스트 1건" 은 구현에서 **headless 5축 가드 (`browser-verify-glow-marker.mjs`) 의 축 ②** 로 대체 — Babylon scene 의존 단위 테스트 대신 실 렌더 경로 검증이 상위 보증 (동등 이상 대체, 결손 아님)
+
+## Amendment 2 (2026-06-13) — CI fps-baseline-guard mobile FAIL 원귀인 정정: glow 무관 (tier-c LOD override race — #677 forensic)
+
+구현 PR #677 의 CI fps-baseline-guard mobile 3 시나리오 FAIL (60.4→38.8 / 60.1→34.1 / 59.1→34.5, run 27425095939) 은 **glow marker 비용이 아님** — Concrete Prediction ③ "fps baseline 갱신 0" 은 **유지** (실측 입증).
+
+- **forensic 핵심 증거 (3축)**:
+  1. **order 통제 A/B**: mobile 375×667 / CPU 12x throttle 에서 OFF-1st 19.5 / ON-2nd 23.2 / OFF-3rd 21.0 / ON-4th 21.4 FPS — glow ON/OFF 차이 소멸, "첫 로드" 만 느림. `?lod=auto` 고정 (race-lost 상태 등가) A/B 에서도 ON 20.6 / OFF 20.5 / ON 20.5 — **glow per-frame 비용 ≈ 0** (swiftshader 강제 4x 에서도 ON 114.8 / OFF 114.5)
+  2. **CI 이력 비상관**: glow 기본 ON 본체 커밋 0f297de 의 run 27424529423 은 **PASS**. FAIL 2건 (29fda0f r1-guard baseline / fc58d50 docs+pin) 은 fps 무관 diff. 결정적으로 **glow 부재 develop push run 27412497611 (2026-06-12 11:21) 이 동일 시그니처로 선행 FAIL** ([desktop/default] 28.1 FPS, −43.7%)
+  3. **상태 재현**: race-lost 시 `lodStats.override='auto'` 잔존 → tier-c 강제 low 유실 → sun **high** (131.7px sphere) + mid 4 렌더 — swiftshader CI 에서 비용 증폭. 로컬 cold first-load 에서 재현 (override auto), warm load 는 low
+- **근본 원인**: `sim-canvas.tsx` 의 tier-c 강제 LOD 적용이 (a) `detectGpuCapability().then` 의 `__gpuTierForceLod` 플래그 박제와 (b) `instance.start().then` 의 handler 등록 시점 1회 읽기로 분리된 **양방향 race** — (b) 가 먼저 끝나면 (headless/저속 환경에서 `requestAdapter` 지연) 강제 low **영구 유실**. 한 page load 의 race 결과가 해당 viewport 의 3 시나리오 측정 전체를 오염 (verify-fps-baseline 은 viewport 당 1회 navigation)
+- **fix (glow 코드 0 변경 — PM 확정값 전부 보존)**: (a) 경로에서 `coreRef.current?.command({ type: 'setLodOverride', level })` 직접 발행 동승 — handler 미등록이면 no-op ((b) 가 처리), 양 경로 idempotent. **회귀 가드**: `browser-verify-glow-marker.mjs` **축 6 신설** — requestAdapter 를 scene 준비 완료까지 게이트해 race-lost 방향을 결정론 재현 (pre-fix FAIL / post-fix PASS 3중 시뮬레이션 실측)
+- **popping (c) / §축 1~7 결정 전부 무영향** — 본 Amendment 는 원귀인 정정 + web 레이어 race fix 기록
+
+### Amendment 2 교차검증 반영 (cross-validate 2026-06-13 agy outcome=applied — "전이 및 구현 강력 권장")
+
+- **합의**: race 원귀인 분석 + 축 6 결정론 가드 "훌륭" / 증분 reviewer 도 증거 2축 (run 27412497611 선행 FAIL / 27424529423 PASS) gh 독립 재검증 일치
+- **권고 기충족 (조치 0)**: `?ratio=` 범위 밖 클램핑 — `parseGlowMarkerRatio` 가 1~10 외/비수치 → 2 폴백 + warn 기구현
+- **고유 발견 (2건 — 범위 밖 기록)**: ① 저전력 모바일 실기기 1회 프레임 프로파일링 (27 body 역보정 scaling — swiftshader 외 실기기 검증. #219 iOS won't-do 선례와 동일 제약, 발화 조건: 실기기 성능 보고 접수 시) ② glow 시인성의 배경 대비 최소 명도 보정 (colorHint 무관 contrast 하한 — 어두운 colorHint body 의 시인성. 발화 조건: D-T2 "특정 body 마커 안 보임" 보고 시 PM 라운드)
