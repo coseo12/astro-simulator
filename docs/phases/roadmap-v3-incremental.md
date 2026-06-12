@@ -2,8 +2,8 @@
 
 # 로드맵 v3 — Incremental Body-by-Body Build
 
-> **Status**: Active (2026-04-25 재구성)
-> **박제일**: 2026-04-25
+> **Status**: **완주 (2026-06, R10b [#664](https://github.com/coseo12/astro-simulator/issues/664))** — R1 태양 → R10b 혜성 3 까지 전 27 body 시각화 완료 (phase 11 = 전 데이터 소진). 후속 라운드 후보 (위성 데이터 확장 / ring arcs / 클릭 raycast / 궤도선 toggle / 패닝 F3) 는 [ADR 20260612-r10b](../decisions/20260612-r10b-comets-visualization.md) §축 9 인계 참조.
+> **박제일**: 2026-04-25 (재구성) / 2026-06-12 (완주)
 > **Supersedes**: `docs/deprecated/phases/roadmap-v2-solar-precision.md` (전면 폐기)
 > **Supersedes**: `docs/deprecated/principles/fact-first.md` (원칙 폐기)
 > **근거**: volt [#74](https://github.com/coseo12/volt/issues/74) — "사실 모드 단일화 부작용 — UX 가시성 회귀"
@@ -31,20 +31,20 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 
 ## Phase 개요 (skeleton — 각 R 은 별도 이슈 생성 시점에 상세화)
 
-| R-Phase | 테마                               | 규모 (추정) | 상태                |
-| ------- | ---------------------------------- | ----------- | ------------------- |
-| **R1**  | 태양 하나만                        | 1~2d        | 계획 중 (이슈 예정) |
-| **R2**  | R1 + 수성                          | 1~2d        | 계획 중             |
-| **R3**  | R2 + 금성                          | 1~2d        | 계획 중             |
-| **R4**  | R3 + 지구 + 달                     | 1~2d        | 계획 중             |
-| **R5**  | R4 + 화성 + (포보스/데이모스 선택) | 1~2d        | 계획 중             |
-| **R6**  | R5 + 목성 + 갈릴레이 4             | 2~3d        | 계획 중             |
-| **R7**  | R6 + 토성 + 고리                   | 2~3d        | 계획 중             |
-| **R8**  | R7 + 천왕성                        | 1~2d        | 계획 중             |
-| **R9**  | R8 + 해왕성                        | 1~2d        | 계획 중             |
-| **R10** | 왜소행성 (명왕성 외) + 혜성        | 2~3d        | 선택적 — 분할 진행  |
+| R-Phase | 테마                               | 규모 (추정) | 상태                                                                                                                                                                                                          |
+| ------- | ---------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R1**  | 태양 하나만                        | 1~2d        | 계획 중 (이슈 예정)                                                                                                                                                                                           |
+| **R2**  | R1 + 수성                          | 1~2d        | 계획 중                                                                                                                                                                                                       |
+| **R3**  | R2 + 금성                          | 1~2d        | 계획 중                                                                                                                                                                                                       |
+| **R4**  | R3 + 지구 + 달                     | 1~2d        | 계획 중                                                                                                                                                                                                       |
+| **R5**  | R4 + 화성 + (포보스/데이모스 선택) | 1~2d        | 계획 중                                                                                                                                                                                                       |
+| **R6**  | R5 + 목성 + 갈릴레이 4             | 2~3d        | 계획 중                                                                                                                                                                                                       |
+| **R7**  | R6 + 토성 + 고리                   | 2~3d        | 계획 중                                                                                                                                                                                                       |
+| **R8**  | R7 + 천왕성                        | 1~2d        | 계획 중                                                                                                                                                                                                       |
+| **R9**  | R8 + 해왕성                        | 1~2d        | 계획 중                                                                                                                                                                                                       |
+| **R10** | 왜소행성 (명왕성 외) + 혜성        | 2~3d        | **완료** — R10a [#659](https://github.com/coseo12/astro-simulator/issues/659) (왜소행성 5, v0.24.0) + R10b [#664](https://github.com/coseo12/astro-simulator/issues/664) (혜성 3 — **로드맵 v3 최종 라운드**) |
 
-> **R10 분할 매핑 (PM 2026-06-11, [#659](https://github.com/coseo12/astro-simulator/issues/659))**: 로드맵 라벨 ↔ `introducedInRPhase` 정수 매핑 — **R10a = phase 10 (왜소행성 5: ceres/pluto/haumea/makemake/eris) / R10b = phase 11 (혜성 3: halley/encke/swift-tuttle)**. 각각 독립 릴리스 (v0.24.0 / v0.25.0 리듬). 분리 메커니즘 (혜성 phase 11 재박제 — 데이터만, 코드 0) 은 [ADR 20260611-r10a](../decisions/20260611-r10a-dwarf-planets-visualization.md) §축 2. 동일 매핑 박제 3곳: 본 행 / `solar-system.json` 혜성 `$introducedInRPhaseComment` / `r-phase-allowlist.ts` CURRENT_R_PHASE 주석.
+> **R10 분할 매핑 (PM 2026-06-11, [#659](https://github.com/coseo12/astro-simulator/issues/659))**: 로드맵 라벨 ↔ `introducedInRPhase` 정수 매핑 — **R10a = phase 10 (왜소행성 5: ceres/pluto/haumea/makemake/eris) / R10b = phase 11 (혜성 3: halley/encke/swift-tuttle)**. 각각 독립 릴리스 (v0.24.0 / v0.25.0 리듬). 분리 메커니즘 (혜성 phase 11 재박제 — 데이터만, 코드 0) 은 [ADR 20260611-r10a](../decisions/20260611-r10a-dwarf-planets-visualization.md) §축 2. R10b 진입 (CURRENT_R_PHASE=11, [#664](https://github.com/coseo12/astro-simulator/issues/664)) 으로 **전 데이터 소진 — 진입 완료** ([ADR 20260612-r10b](../decisions/20260612-r10b-comets-visualization.md) §축 2/§축 9). 동일 매핑 박제 3곳: 본 행 / `solar-system.json` 혜성 `$introducedInRPhaseComment` / `r-phase-allowlist.ts` CURRENT_R_PHASE 주석.
 
 **총 예상: 14~22 영업일** (R10 선택 포함)
 

@@ -23,7 +23,8 @@ const FOCUS_BUTTONS = [
   { id: 'saturn', label: '토성' }, // R7 #641 — jupiter 다음 천체 거리순 (showInShortcutBar true 전환 동반, #617 가드 정합). titan 은 showInShortcutBar=false (galilean 패턴 — URL ?focus=titan 진입)
   { id: 'uranus', label: '천왕성' }, // R8 #647 — saturn 다음 천체 거리순 (showInShortcutBar true 전환 동반, #617 가드 정합). titania 는 showInShortcutBar=false (galilean/titan 패턴 — URL ?focus=titania 진입). 12버튼 — 모바일은 overflow-x-auto 흡수 (R7 11버튼 선례)
   { id: 'neptune', label: '해왕성' }, // R9 #653 enabled — CURRENT_R_PHASE=9 1줄 자동 enabled (#613 Concrete Prediction negative→positive 전환 5번째, 배열 변경 0). triton 은 showInShortcutBar=false (galilean/titan/titania 패턴 — URL ?focus=triton 진입). ADR 20260610-r9 §축 5
-  { id: 'pluto', label: '명왕성' }, // R10a #659 — PM Q3=A pluto 만 승격 (showInShortcutBar true 전환 동반, #617 가드 정합). 거리순 마지막 (39.48 AU). 14버튼 — 모바일 overflow-x-auto 흡수. ceres/haumea/makemake/eris 는 showInShortcutBar=false (URL ?focus= 진입 — #624 tradeoff). ADR 20260611-r10a §축 4
+  { id: 'pluto', label: '명왕성' }, // R10a #659 — PM Q3=A pluto 만 승격 (showInShortcutBar true 전환 동반, #617 가드 정합). 거리순 마지막 (39.48 AU). bar 전체 13버튼 (focus 11 + reset + free-fly — 2026-06-12 qa 실측 기준 역산) — 모바일 overflow-x-auto 흡수. ceres/haumea/makemake/eris 는 showInShortcutBar=false (URL ?focus= 진입 — #624 tradeoff). ADR 20260611-r10a §축 4
+  { id: 'halley', label: '핼리 혜성' }, // R10b #664 — PM Q2=A halley 만 승격 (showInShortcutBar true 전환 동반, #617 가드 정합). ⚠️ 배치 컨벤션: "행성 8 거리순 블록 + 비-행성 카테고리 후미 (pluto → halley)" — halley a=17.834 AU 를 saturn/uranus 사이 엄격 삽입하면 행성 거리순 블록이 깨져 기각 (ADR 20260612-r10b §축 6 — 후속 비-행성 추가 시 본 컨벤션 답습). bar 전체 14버튼 = focus 12 (halley 12번째) + reset + free-fly (2026-06-12 qa 실측 — 종전 "15버튼" 표기는 +1 drift 정정) — 모바일 overflow-x-auto 흡수. encke/swift-tuttle 은 showInShortcutBar=false (URL ?focus= 진입 — #624 tradeoff)
 ];
 
 // R-Phase 미진입 body 호버 / focus 시 사용자 안내 문구.

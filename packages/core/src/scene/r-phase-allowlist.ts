@@ -17,17 +17,19 @@
  *     4. CHANGELOG `### Behavior Changes` 박제
  *     5. WASM 의존 도메인 sub-path 추가 금지 검증 (`scripts/verify-core-exports-immutable.sh`)
  *
- * 현재 박제: CURRENT_R_PHASE=10 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
+ * 현재 박제: CURRENT_R_PHASE=11 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
  *           / mars·phobos·deimos(R5) / jupiter·galilean 4(R6) / saturn·titan(R7)
  *           / uranus·titania(R8) / neptune·triton(R9)
- *           / ceres·pluto·haumea·makemake·eris(R10a — 왜소행성 5, #659) = 24 body.
+ *           / ceres·pluto·haumea·makemake·eris(R10a — 왜소행성 5, #659)
+ *           / halley·encke·swift-tuttle(R10b — 혜성 3, #664) = 27 body (전 데이터 소진 —
+ *           로드맵 v3 최종 라운드).
  *
  * ⚠️ 로드맵 라벨 ↔ phase 정수 매핑 (R10 분할 — PM 2026-06-11, #659):
  *           **phase 10 = R10a 왜소행성 5 / phase 11 = R10b 혜성 3 (halley/encke/swift-tuttle)**.
  *           혜성 3 body 는 introducedInRPhase=11 재박제로 R10a 에서 자동 제외 (옵션 a —
- *           데이터만 변경, 코드 0. ADR 20260611-r10a §축 2). R10b 진입 시 CURRENT_R_PHASE=11
- *           1줄로 자동 포함. 매핑 3곳 동시 박제: solar-system.json `$comment` / 본 주석 /
- *           docs/phases/roadmap-v3-incremental.md R10 행.
+ *           데이터만 변경, 코드 0. ADR 20260611-r10a §축 2). R10b (#664) 에서 CURRENT_R_PHASE=11
+ *           1줄로 자동 포함 — **진입 완료** (ADR 20260612-r10b §축 2). 매핑 3곳 동시 박제:
+ *           solar-system.json `$comment` / 본 주석 / docs/phases/roadmap-v3-incremental.md R10 행.
  *
  * ⚠️ wasm-safe 패턴: 본 모듈은 `solar-system-loader.ts` 를 import 한다 (자동 생성 소스). loader 는
  *    이미 scene 모듈들이 의존하는 core 내부 모듈이라 신규 외부 sub-path 노출은 없다. 단
@@ -37,7 +39,7 @@
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 /** 현재 도달한 R-Phase. R-Phase 진입 시 이 상수 1줄만 증가하면 allowlist 가 자동 확장된다. */
-export const CURRENT_R_PHASE = 10; // R10a #659 — 왜소행성 5 자동 포함 (#613 자동 생성 6번째 실전. phase 11 = R10b 혜성 — 위 매핑 주석 참조)
+export const CURRENT_R_PHASE = 11; // R10b #664 — 혜성 3 자동 포함 (#613 자동 생성 7번째 실전. 전 데이터 소진 — 로드맵 v3 최종 라운드. 위 매핑 주석 참조)
 
 /**
  * 주어진 phase 까지 등장한 body id 목록을 데이터 순서대로 반환하는 순수 함수.

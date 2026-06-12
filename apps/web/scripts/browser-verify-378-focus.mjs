@@ -79,7 +79,9 @@ const flags = {
 // R9 #653 — neptune + triton 동기화 (CURRENT_R_PHASE=9). triton 은 역행 궤도 (ecliptic
 // inclination 129.14° > 90° — 태양계 유일 대형 역행 위성) 이나 focus 진입/추적엔 무관 (사실 정합).
 // R10a #659 — 왜소행성 5 (ceres/pluto/haumea/makemake/eris) 동기화 (CURRENT_R_PHASE=10).
-// 혜성 3 (halley/encke/swift-tuttle) 은 phase 11 재박제로 R10b 까지 비대상 (ADR 20260611-r10a §축 2).
+// R10b #664 — 혜성 3 (halley/encke/swift-tuttle) 동기화 (CURRENT_R_PHASE=11 — 전 데이터 소진,
+// 로드맵 v3 최종 라운드). halley/swift-tuttle 은 역행 궤도 (i 162.26°/113.45° > 90°) 이나 focus
+// 진입/추적엔 무관 (R9 triton 선례 — 사실 정합). 고이심률 (e 0.848~0.967) 도 focus 비저촉.
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -105,6 +107,9 @@ const FOCUS_BODIES = [
   'haumea',
   'makemake',
   'eris',
+  'halley',
+  'encke',
+  'swift-tuttle',
 ];
 const MODES = ['observe', 'research'];
 

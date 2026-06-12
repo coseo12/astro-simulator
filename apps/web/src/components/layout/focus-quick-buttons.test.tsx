@@ -127,7 +127,7 @@ describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus + R4 earth + moon
  * ADR `docs/decisions/20260504-r-phase-allowlist-guard.md` §결정 2.
  *
  * 검증:
- *  - R10a #659: bar 전체 enabled (pluto 14버튼째 승격 — disabled-path negative 는 tree/panel/preset 의 halley 가 보존)
+ *  - R10b #664: bar 전체 enabled (halley 15버튼째 승격 — disabled-path negative 는 tree/panel/preset 의 vi.mock 부분 mock 이 승계, ADR 20260612-r10b §축 5 ②)
  *  - allowlist 박제 body 버튼 (sun / mercury / venus) 은 활성
  *  - disabled 버튼 강제 클릭 시 focusOn 명령 발행 0 (HTML disabled 자체 차단)
  *  - tooltip (title 속성) 박제
@@ -147,7 +147,8 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   it('neptune (R9 #653 진입) 은 활성 — CURRENT_R_PHASE=9 1줄 자동 enabled (#613 Concrete Prediction)', () => {
     // R9 — 로드맵 마지막 행성 진입으로 FOCUS_BUTTONS 의 disabled 대상이 구조 소멸
     // (R10a 미등록 4 + R10b 혜성 3 전부 showInShortcutBar=false → bar 미등록). disabled-path
-    // negative 는 celestial-tree / celestial-info-panel / scenario-presets 단위 테스트 (halley —
+    // negative 는 celestial-tree / celestial-info-panel / scenario-presets 단위 테스트 (R10b #664
+    // 부터 vi.mock 부분 mock 승계 — ADR 20260612-r10b §축 5 ②. 이전: halley —
     // R10a #659 에서 pluto 교체) 가 보존.
     render(<FocusQuickButtons />);
     expect(screen.getByTestId('focus-neptune')).not.toBeDisabled();
@@ -173,11 +174,38 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'pluto' });
   });
 
-  it('neptune → pluto DOM 거리 순서 보존 (pluto 가 bar 마지막 body — 39.48 AU)', () => {
+  it('neptune → pluto DOM 거리 순서 보존 (행성 거리순 블록 + 비-행성 후미 — pluto 가 14번째)', () => {
     render(<FocusQuickButtons />);
     const neptune = screen.getByTestId('focus-neptune');
     const pluto = screen.getByTestId('focus-pluto');
     expect(neptune.compareDocumentPosition(pluto)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  // R10b #664 — halley 승격 케이스 단언 (PM Q2=A: halley 만 추가, encke/swift-tuttle 미등록 검증).
+  it('halley (R10b #664 진입 + bar 승격) 은 활성 — 15버튼째 (비-행성 카테고리 후미 컨벤션)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-halley')).not.toBeDisabled();
+    expect(screen.getByTestId('focus-halley')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByTestId('focus-halley')).toHaveAttribute('data-r-phase-disabled', 'false');
+    expect(screen.getByTestId('focus-halley')).not.toHaveAttribute('title');
+  });
+
+  it('halley 버튼 텍스트 = "핼리 혜성" (R10b 박제 + 한국어 라벨)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.getByTestId('focus-halley')).toHaveTextContent('핼리 혜성');
+  });
+
+  it('halley 클릭 시 focusOn 명령 발행 (R10b #664 진입 검증)', () => {
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('focus-halley'));
+    expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'halley' });
+  });
+
+  it('pluto → halley DOM 순서 보존 (비-행성 카테고리 후미 — halley 가 bar 마지막. ⚠️ a 17.834 AU 거리순 엄격 삽입 기각, ADR 20260612-r10b §축 6 컨벤션)', () => {
+    render(<FocusQuickButtons />);
+    const pluto = screen.getByTestId('focus-pluto');
+    const halley = screen.getByTestId('focus-halley');
+    expect(pluto.compareDocumentPosition(halley)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('ceres / haumea / makemake / eris 는 shortcut bar 미등록 (PM Q3=A — URL ?focus= 진입, #617 직교 축)', () => {
@@ -186,6 +214,12 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
     expect(screen.queryByTestId('focus-haumea')).toBeNull();
     expect(screen.queryByTestId('focus-makemake')).toBeNull();
     expect(screen.queryByTestId('focus-eris')).toBeNull();
+  });
+
+  it('encke / swift-tuttle 는 shortcut bar 미등록 (R10b PM Q2=A — URL ?focus= 진입, #617 직교 축)', () => {
+    render(<FocusQuickButtons />);
+    expect(screen.queryByTestId('focus-encke')).toBeNull();
+    expect(screen.queryByTestId('focus-swift-tuttle')).toBeNull();
   });
 
   it('neptune 은 aria-disabled="false" + data-r-phase-disabled="false" (R9 enabled 전환)', () => {
