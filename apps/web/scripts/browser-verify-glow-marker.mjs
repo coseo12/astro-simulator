@@ -14,6 +14,10 @@
  *      scaling=1 유지 (marker 부재 — ADR §축 4 fail-safe).
  *   4. 전수 발동: 100 AU 에서 lodInfo.pxDiameter > 0 + level='low' body 전수 scaling > 1.
  *   5. 하위 호환: `?marker=glow` 명시 = default (미지정) 와 식별 천체 카운트 동일.
+ *   6. #677 — tier-c LOD override race 가드: GPU capability 감지 (requestAdapter) 를 의도 지연해
+ *      race-lost 방향 (scene 초기화가 감지보다 먼저 완료) 을 결정론 재현해도 tier-c 강제 LOD 'low'
+ *      가 정착하는지 검증. 회귀 시 override 'auto' 영구 잔존 → sun high + mid sphere 렌더 →
+ *      CI fps-baseline-guard flaky FAIL (develop push 27412497611 desktop 28.1 FPS 선행 사례).
  *
  * 사용법:
  *   node apps/web/scripts/browser-verify-glow-marker.mjs
@@ -297,6 +301,70 @@ async function main() {
         delta >= minDelta,
         `기준 ≥ +${minDelta}`,
       );
+    }
+
+    // 6) #677 — tier-c LOD override race 가드 (worst-case 결정론 재현).
+    //
+    // sim-canvas 는 (a) detectGpuCapability().then(...) 에서 tier-c 판정 + 강제 low 예약과
+    // (b) instance.start().then(...) 의 handler 등록 시점 플래그 읽기가 별개 async chain 이라,
+    // (b) 가 (a) 보다 먼저 끝나면 (저속/headless 환경에서 requestAdapter 가 느린 경우) 강제 low 가
+    // 영구 유실된다 (#677 forensic — fix 는 (a) 에서 command 직접 발행으로 양방향 커버).
+    // 여기서는 requestAdapter 가 **scene 초기화 완료 (`__solarScene` 노출 = handler 등록 동일
+    // sync 블록) 이후에만** adapter null (→ detectGpuTier 분기 2 = tier 'c') 을 반환하도록 폴링
+    // 게이트를 걸어 race-lost 방향을 시간 무관하게 구조적으로 강제한다 (고정 지연은 cold context
+    // 의 scene 초기화가 더 느리면 race 를 이겨버려 negative 재현 실패 — 2026-06-13 실측).
+    // gpu/lod URL 파라미터 없이 자동 감지 경로 사용 (modes 의 ?gpu=a 함정 회피와 정반대 — 의도).
+    console.log("\n6) #677 tier-c LOD override race — 지연 감지에서도 override='low' 정착\n");
+    {
+      const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+      await context.addInitScript(() => {
+        // 호출 1번째 = sim-canvas useEffect 의 detectGpuCapability (동기적으로 가장 먼저 호출됨)
+        // → __solarScene 노출 (= handler 등록 동일 sync 블록 완료) 까지 게이트.
+        // 호출 2번째+ = Babylon 엔진 init 의 WebGPU 탐지 → 즉시 null (게이트 걸면 scene 초기화
+        // 자체가 게이트를 기다리는 순환 대기 deadlock — 2026-06-13 실측).
+        let adapterCalls = 0;
+        Object.defineProperty(navigator, 'gpu', {
+          configurable: true,
+          value: {
+            requestAdapter: () => {
+              adapterCalls += 1;
+              if (adapterCalls > 1) return Promise.resolve(null);
+              return new Promise((resolve) => {
+                const poll = () => {
+                  // +300ms 는 task 경계 여유.
+                  if (window.__solarScene) setTimeout(() => resolve(null), 300);
+                  else setTimeout(poll, 100);
+                };
+                poll();
+              });
+            },
+          },
+        });
+      });
+      const page = await context.newPage();
+      await page.goto(buildUrl(''), { waitUntil: 'networkidle', timeout: 60_000 });
+      let settled = false;
+      try {
+        await page.waitForFunction(
+          () => window.__gpuTier === 'c' && window.__solarScene?.getLodStats?.().override === 'low',
+          { timeout: 15_000 },
+        );
+        settled = true;
+      } catch {
+        // timeout → settled=false 로 FAIL 처리 (아래 check)
+      }
+      const state = await page.evaluate(() => ({
+        tier: window.__gpuTier ?? null,
+        override: window.__solarScene?.getLodStats?.().override ?? null,
+      }));
+      check(
+        `지연 tier-c 감지 후 override='${state.override}' (tier='${state.tier}')`,
+        settled,
+        settled
+          ? undefined
+          : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)",
+      );
+      await context.close();
     }
   } finally {
     await browser.close();
