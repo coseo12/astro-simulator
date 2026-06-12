@@ -1,6 +1,6 @@
 # ADR: glow pixel marker 정식화 — 줌아웃 sub-pixel body 의 화면 고정 크기 글로우 표기 (기본 ON + `?marker=off` 옵트아웃)
 
-- **상태**: **Provisional** — cross-validate (agy) 결과 본문 통합 후 Accepted 전이 (#370 옵션 C 워크플로. 본 ADR 은 "ADR 신규" 앵커로 cross-validate 발동 대상)
+- **상태**: **Accepted (cross-validate 2026-06-12)** — agy outcome=applied ("Accepted 전이 적극 권장", 명시 질문 2건 합의, 고유 발견 1 발화 조건부 박제). §교차검증 반영 사항 4축 통합 후 전이 (#370 옵션 C 워크플로)
 - **날짜**: 2026-06-13
 - **결정자**: architect (PM 합의 라운드 완료 2026-06-13 — 프리뷰 3-iteration 실 Chrome D-T2 사용자 만족 승인. **PM 확정값 그대로 박제 — 재구조화 금지**: 채택 / 모행성:위성 **2:1** (parent 4.5px / satellite 2.25px) / **sun 포함** (parent 동급 4.5px) / 발동 기준 **실 billboard 렌더 px < 4** / emissive boost **parent 1.6 / satellite 2.0**)
 - **관련**: [#675](https://github.com/coseo12/astro-simulator/issues/675) (본 스프린트), `preview/glow-marker` 로컬 브랜치 (`83b8aae`/`a69a5a5`/`73225a1` — 설계의 실측 기반, dev 구현 시 참조), [`20260424-p11-b-lod-design.md`](20260424-p11-b-lod-design.md) (LOD 3단 — R4 Amendment 3 보존 대상, 본 ADR 은 LOD 결정 로직 무변경), [`20260425-r1-ui-pixel-diff-guard.md`](20260425-r1-ui-pixel-diff-guard.md) (r1-guard — §축 1 baseline 영향 평가), [`20260609-623-dpr-pixel-basis-no-op.md`](20260609-623-dpr-pixel-basis-no-op.md) (px = physical px 확정 — targetPx 4.5 의 픽셀 기저), [`20260612-r10b-comets-visualization.md`](20260612-r10b-comets-visualization.md) (직전 라운드 — comet sub-px billboard 전면 의존이 본 기능의 직접 동기), #333 (billboard 실반경 렌더 정책 — 발동 임계 환산식의 전제)
@@ -250,6 +250,23 @@ scene (`runLodPass`) 은 본 함수 호출 + mesh/material 적용만 담당 — 
 | 폐기 프레이밍 | 통과 — 주석 계약을 "폐기" 가 아닌 "예외 1건 개정" (본질 보존), star 제외 설계 폐기는 PM/D-T2 실측 근거                                                                                                                                                                                |
 | 순수주의      | 주의 — `glow-marker.ts` 모듈 분리가 프리뷰 inline 대비 유일한 구조 재작업. 최소 범위 (판정 식만, frame loop 불변) 로 제한했으나 분리 자체의 적정성을 cross-validate 프롬프트에 명시 질문                                                                                              |
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (cross-validate 2026-06-12 agy outcome=applied — "Accepted 전이 적극 권장")
 
-> (Provisional — cross-validate (agy) 1회 호출 후 본 섹션에 4축 분류 (합의 / 이견 수용 / 기각 / 고유 발견 후속 분리) 통합 + Accepted 전이 예정. 호출 프롬프트 명시 질문 2건: ① sun viewport 밝기 점유율 readback 영향 보수 상한 추정의 타당성 ② glow-marker.ts 모듈 분리 범위의 적정성)
+> 로그: `.claude/logs/cross-validate-architecture-20260612-232604.log`. 명시 질문 2건 전부 응답 확보.
+
+### 합의 (명시 질문 2건 — 추가 조치 없음)
+
+1. **① sun viewport readback 보수 상한 (+0.035%p)** — agy "타당함 (안전함)": 1280×720 에서 marker 1개 ≈ 16px² ≈ 0.0017%, 20여 개 전체 켜져도 +0.035%p — 25% 임계 대비 극미. dev 실측 1회 DoD 는 "훌륭한 안전장치" 평가 — §결정 1 유지
+2. **② glow-marker.ts 순수 함수 분리** — agy "매우 적절함 (권장)": solar-system-scene.ts 2100+ 라인 비대 모듈에서 판정 수식 분리 = Babylon 로딩 없는 고속 단위 테스트 가능 — §결정 4 유지
+
+### 이견 / 기각 (0건)
+
+- 기본 ON (web 레이어 flip) / popping 명시 수용 (LOD 경계 일치 논거) / 주석 계약 개정 / off-frustum 가드 전부 agy 동의
+
+### 고유 발견 (1건 — 발화 조건부 후속 박제)
+
+1. **pixel-diff flaky 가능성** — gradient 경계부의 GPU 래스터화 디바이스/드라이버별 미세 차이로 baseline 경계 flaky 위험. agy 제안: 마진 여유 또는 marker 주변부 masking 옵션. **Claude 취사**: baseline 은 Linux CI 단일 환경 캡처 (r1-baseline-bootstrap — 환경 고정이라 디바이스 간 차이 비발화) 이므로 선제 masking 은 과잉 — **발화 조건부 후속**: 갱신 후 동일 환경 re-run 에서 mismatch > 0 관찰 시 (= 동일 GPU 내 비결정성 실증) masking 옵션 이슈 분리
+
+### Claude 편향 셀프 체크 결과 대조
+
+- 사전 기록 4항목 전부 agy 평가와 모순 없음 — popping 기각 논거 (도달 불가 경계 dead-code 가드) 를 agy 가 성능 제어 우수 사례로 독립 평가
