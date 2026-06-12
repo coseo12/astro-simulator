@@ -276,7 +276,7 @@ async function verifyEnabledClickWorks(page) {
  * ADR `docs/decisions/20260504-415-url-sync-guard.md` §결정 3 (DoD-2).
  *
  * 각 body 마다 새 페이지로 `?focus=<body>` 진입 후:
- *   - allowlist 외 (halley — R10b phase 11): selectedBodyId === null (url-sync 가드 작동, negative 케이스 보존)
+ *   - allowlist 외 (nonexistent-body — 가상 ID, R10b #664 에서 halley positive 전환으로 교체): selectedBodyId === null (url-sync 가드 작동, negative 케이스 보존)
  *   - allowlist 박제 (sun / mercury / venus / earth / moon / mars / phobos / deimos / jupiter / galilean 4):
  *     selectedBodyId === <body> (정상 회귀 보호)
  *   - invalid: selectedBodyId === null (기존 R1 가드 회귀 보호)
