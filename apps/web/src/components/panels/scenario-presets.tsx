@@ -98,7 +98,7 @@ const PRESETS: Preset[] = [
     // R10b 진입 시 자동 enabled.
     id: 'halley-x10',
     label: '핼리 혜성 10배 질량',
-    description: '고이심률 혜성 궤도 섭동을 관찰. 혜성 진입(R10b) 시 활성.',
+    description: '고이심률 혜성 궤도 섭동을 관찰 (R10b 진입 완료 — 활성).',
     massMultipliers: { halley: 10 },
   },
 ];
