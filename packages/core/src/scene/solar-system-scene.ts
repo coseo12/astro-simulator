@@ -352,6 +352,19 @@ export interface SolarSystemSceneOptions {
    * (`window.__simCore.metrics.tierTransitionInputDrops`). G8b (input 큐잉) 격상 결정 데이터.
    */
   onTierTransitionInputAttempts?: (count: number) => void;
+
+  /**
+   * [preview] glow pixel marker — 줌아웃 시 sub-pixel body 를 화면 고정 크기 글로우 픽셀로 표기.
+   *
+   * `?marker=glow` URL 파라미터로만 활성화되는 프리뷰 실험 기능 (정식 라운드 전 시각 확인용).
+   * false (기본) 면 runLodPass 의 glow 분기 자체가 실행되지 않아 기존 동작과 100% 동일 (연산 0).
+   *
+   * 동작 (glow=true 일 때만):
+   *  - billboard (low LOD) 상태 + pxDiameter < 4px 인 non-star body 의 low variant quad 를
+   *    `scaling = targetPx / 측정px` 역보정으로 화면 고정 크기 (~3.5px) 유지 + emissive boost
+   *  - pxDiameter ≥ 4px 복귀 시 scaling=1 + emissive 원복 (히스테리시스 없음 — popping 허용)
+   */
+  glowMarker?: boolean;
 }
 
 /**
@@ -376,6 +389,7 @@ export function createSolarSystemScene(
     ringRenderMode = 'shader',
     bodyScale = defaultBodyScale,
     onTierTransitionInputAttempts,
+    glowMarker = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -443,6 +457,11 @@ export function createSolarSystemScene(
   const lodFadeState = new Map<string, LodFadeState>();
   // ADR §축 3: UX 일관성 + headless 검증 안정화 (middle frame capture) 200ms 고정.
   const LOD_FADE_DURATION_MS = 200;
+
+  // [preview] glow pixel marker — 현재 glow 상태인 body id 집합.
+  // material (emissive) 토글은 상태 전이 시점 1회만 수행하기 위한 추적 (매 프레임 material 쓰기 회피).
+  // glowMarker=false 면 본 Set 은 영구 비어있음 (연산 0 보장).
+  const glowActiveBodies = new Set<string>();
 
   // P9 #254 PR-2.5 — rings 가 있는 행성에 shader 기반 3층 렌더.
   //   - 'shader' (기본): `densityProfile[]` uniform + GLSL 선형 보간
@@ -1339,10 +1358,24 @@ export function createSolarSystemScene(
       // opacityTexture 자체는 별개 채널. fade 종료 후에도 fallback 상태가 보존됨.
       const pxDiameter = coverage * 2;
       const lowVariantMesh = lowVariants.get(body.id);
+
+      // [preview] glow pixel marker 활성 판정 (?marker=glow 전용 — glowMarker=false 면 항상 false).
+      //  - billboard (low) 상태 + 측정 직경 < 4px (alpha mask 임계와 동일 SSoT) + non-star (sun 제외)
+      //  - pxDiameter 가 비유한/0 이하 (behind-camera 등) 이면 비활성 — scaling 폭주 방지
+      const glowActive =
+        glowMarker &&
+        body.kind !== 'star' &&
+        nextLevel === 'low' &&
+        Number.isFinite(pxDiameter) &&
+        pxDiameter > 0 &&
+        pxDiameter < GLOW_MARKER_ACTIVATION_PX_DIAMETER;
+
       if (lowVariantMesh) {
         const lowMat = lowVariantMesh.material as StandardMaterial | null;
         if (lowMat) {
-          const wantsMask = shouldApplyBillboardAlphaMask(pxDiameter);
+          // [preview] glow 중에는 radial gradient alpha mask 를 강제 적용해 "둥근 글로우 점" 형상 유지.
+          // (4px fallback 의 사각 quad 는 glow 마커로 부적합 — 기존 동작은 glowActive=false 면 불변)
+          const wantsMask = glowActive || shouldApplyBillboardAlphaMask(pxDiameter);
           // 매 프레임 호출되므로 토글 변경이 있을 때만 material 갱신 (Babylon shader cache 보존).
           // opacityTexture 의 boolean 비교는 reference equality — null 또는 동일 인스턴스 비교.
           const hasMask = lowMat.opacityTexture !== null && lowMat.opacityTexture !== undefined;
@@ -1353,6 +1386,46 @@ export function createSolarSystemScene(
             } else {
               lowMat.opacityTexture = null;
               lowMat.transparencyMode = 0; // OPAQUE
+            }
+          }
+        }
+      }
+
+      // [preview] glow pixel marker — 화면 고정 크기 역보정 + emissive boost.
+      //
+      // 주의 (주석 계약 의도적 이탈, 프리뷰 한정): 본 파일 변수 선언부의 "mesh.scaling 은 high variant 만
+      // 건드린다" 계약을 low variant 에 한해 깬다. 정식 라운드 진입 시 ADR 로 계약 개정 의무.
+      //
+      // 측정 pxDiameter 는 effective radius (body.radius × bodyScale) 기준이지만 billboard quad 는
+      // bodyScale 미적용 (#333 책임 분리) — billboard 실제 화면 px ≈ pxDiameter / bodyScale.
+      // 따라서 scaling = targetPx / billboardPx = targetPx × bodyScale / pxDiameter.
+      // 매 프레임 갱신 (줌 변화 추종). 상한 클램프로 극단 줌아웃 scaling 폭주 방지.
+      if (glowMarker && body.kind !== 'star') {
+        const wasGlow = glowActiveBodies.has(body.id);
+        if (glowActive && lowVariantMesh) {
+          const bodyScaleVal = Math.max(bodyScale(body.id), 1e-9);
+          const billboardPx = Math.max(pxDiameter / bodyScaleVal, GLOW_MARKER_MIN_MEASURED_PX);
+          const rawScale = GLOW_MARKER_TARGET_PX_DIAMETER / billboardPx;
+          const clamped = Math.min(Math.max(rawScale, 1), GLOW_MARKER_MAX_SCALE);
+          lowVariantMesh.scaling.setAll(clamped);
+          if (!wasGlow) {
+            glowActiveBodies.add(body.id);
+            const mat = lowVariantMesh.material as StandardMaterial | null;
+            if (mat) {
+              // createBodyBillboard 의 non-star emissive (c.scale(0.3)) 대비 boost — "빛나는" 인상.
+              const c = hexToColor3(body.colorHint?.hex ?? '#888888');
+              mat.emissiveColor = c.scale(GLOW_MARKER_EMISSIVE_SCALE);
+            }
+          }
+        } else if (wasGlow) {
+          // pxDiameter ≥ 4px 복귀 또는 low 이탈 — 원복 (cross-fade 없음, popping 은 프리뷰 관찰 포인트).
+          glowActiveBodies.delete(body.id);
+          if (lowVariantMesh) {
+            lowVariantMesh.scaling.setAll(1);
+            const mat = lowVariantMesh.material as StandardMaterial | null;
+            if (mat) {
+              const c = hexToColor3(body.colorHint?.hex ?? '#888888');
+              mat.emissiveColor = c.scale(0.3); // createBodyBillboard 기본값 원복
             }
           }
         }
@@ -1757,6 +1830,23 @@ function createBodyMeshMid(
  * 본 임계값을 변경하려면 ADR Amendment 박제 의무 (volt #49 — 주석 계약 vs 구현 drift).
  */
 export const LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER = 4;
+
+/**
+ * [preview] glow pixel marker 상수 (?marker=glow 전용 — 정식 라운드에서 PM 합의로 재결정 대상).
+ *
+ *  - ACTIVATION_PX_DIAMETER: glow 발동 임계 (측정 pxDiameter 기준). alpha mask 임계 (4px) 와 동일값 —
+ *    "mask 바이패스 구간 = 식별 곤란 구간" 가설. 후보: 2~6px
+ *  - TARGET_PX_DIAMETER: glow 마커의 화면 고정 목표 직경 (px). 후보: 3~4px
+ *  - MAX_SCALE: scaling 역보정 상한 클램프 — 극단 줌아웃 (pxDiameter→0) 에서 quad 월드 크기 폭주 방지.
+ *    halley (bodyScale 5000, 측정 0.001px 급) 도 ≈1.75e7 로 상한 내. 후보: 1e6~1e9
+ *  - MIN_MEASURED_PX: 역보정 분모 하한 (0 나눗셈 방어)
+ *  - EMISSIVE_SCALE: glow 중 emissive 배율 (기본 0.3 대비). 후보: 1.2~2.0
+ */
+const GLOW_MARKER_ACTIVATION_PX_DIAMETER = LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER;
+const GLOW_MARKER_TARGET_PX_DIAMETER = 3.5;
+const GLOW_MARKER_MAX_SCALE = 1e8;
+const GLOW_MARKER_MIN_MEASURED_PX = 1e-6;
+const GLOW_MARKER_EMISSIVE_SCALE = 1.6;
 
 /**
  * #391 Phase 2 — billboard alpha mask 적용 여부 결정 헬퍼.

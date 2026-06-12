@@ -10,6 +10,7 @@ import { parseIntegratorKind } from '@/core/parse-integrator';
 import { parseGrMode } from '@/core/parse-gr-mode';
 import { parseLodLevel } from '@/core/parse-lod-level';
 import { parseGpuTier } from '@/core/parse-gpu-tier';
+import { parseMarkerMode } from '@/core/parse-marker-mode';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -238,6 +239,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const ringParam = new URLSearchParams(window.location.search).get('ring');
         const ringRenderMode: 'shader' | 'fallback' | 'placeholder' =
           ringParam === 'fallback' || ringParam === 'placeholder' ? ringParam : 'shader';
+        // [preview] ?marker=glow — sub-pixel body 글로우 픽셀 마커 옵트인 (미지정 시 기존 동작 100% 동일).
+        const markerParam = new URLSearchParams(window.location.search).get('marker');
+        const markerMode = parseMarkerMode(markerParam);
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
@@ -253,6 +257,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           onTierTransitionInputAttempts: (count) => {
             instance.metrics.tierTransitionInputDrops += count;
           },
+          // [preview] glow pixel marker — ?marker=glow 일 때만 true.
+          glowMarker: markerMode === 'glow',
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
