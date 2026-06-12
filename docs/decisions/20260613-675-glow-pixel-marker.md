@@ -290,3 +290,9 @@ scene (`runLodPass`) 은 본 함수 호출 + mesh/material 적용만 담당 — 
 - **근본 원인**: `sim-canvas.tsx` 의 tier-c 강제 LOD 적용이 (a) `detectGpuCapability().then` 의 `__gpuTierForceLod` 플래그 박제와 (b) `instance.start().then` 의 handler 등록 시점 1회 읽기로 분리된 **양방향 race** — (b) 가 먼저 끝나면 (headless/저속 환경에서 `requestAdapter` 지연) 강제 low **영구 유실**. 한 page load 의 race 결과가 해당 viewport 의 3 시나리오 측정 전체를 오염 (verify-fps-baseline 은 viewport 당 1회 navigation)
 - **fix (glow 코드 0 변경 — PM 확정값 전부 보존)**: (a) 경로에서 `coreRef.current?.command({ type: 'setLodOverride', level })` 직접 발행 동승 — handler 미등록이면 no-op ((b) 가 처리), 양 경로 idempotent. **회귀 가드**: `browser-verify-glow-marker.mjs` **축 6 신설** — requestAdapter 를 scene 준비 완료까지 게이트해 race-lost 방향을 결정론 재현 (pre-fix FAIL / post-fix PASS 3중 시뮬레이션 실측)
 - **popping (c) / §축 1~7 결정 전부 무영향** — 본 Amendment 는 원귀인 정정 + web 레이어 race fix 기록
+
+### Amendment 2 교차검증 반영 (cross-validate 2026-06-13 agy outcome=applied — "전이 및 구현 강력 권장")
+
+- **합의**: race 원귀인 분석 + 축 6 결정론 가드 "훌륭" / 증분 reviewer 도 증거 2축 (run 27412497611 선행 FAIL / 27424529423 PASS) gh 독립 재검증 일치
+- **권고 기충족 (조치 0)**: `?ratio=` 범위 밖 클램핑 — `parseGlowMarkerRatio` 가 1~10 외/비수치 → 2 폴백 + warn 기구현
+- **고유 발견 (2건 — 범위 밖 기록)**: ① 저전력 모바일 실기기 1회 프레임 프로파일링 (27 body 역보정 scaling — swiftshader 외 실기기 검증. #219 iOS won't-do 선례와 동일 제약, 발화 조건: 실기기 성능 보고 접수 시) ② glow 시인성의 배경 대비 최소 명도 보정 (colorHint 무관 contrast 하한 — 어두운 colorHint body 의 시인성. 발화 조건: D-T2 "특정 body 마커 안 보임" 보고 시 PM 라운드)
