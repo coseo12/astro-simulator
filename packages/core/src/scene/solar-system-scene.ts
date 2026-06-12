@@ -40,6 +40,11 @@ import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
+  GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
+  resolveGlowMarker,
+  resolveGlowMarkerRestoreEmissiveScale,
+} from './glow-marker.js';
+import {
   lodFromScreenCoverage,
   screenCoverageRadius,
   type LodLevel,
@@ -354,30 +359,26 @@ export interface SolarSystemSceneOptions {
   onTierTransitionInputAttempts?: (count: number) => void;
 
   /**
-   * [preview] glow pixel marker — 줌아웃 시 sub-pixel body 를 화면 고정 크기 글로우 픽셀로 표기.
+   * #675 — glow pixel marker. 줌아웃 시 sub-pixel (시각 비식별) body 를 화면 고정 크기의
+   * 둥근 글로우 픽셀로 표기 (ADR `20260613-675-glow-pixel-marker.md`).
    *
-   * `?marker=glow` URL 파라미터로만 활성화되는 프리뷰 실험 기능 (정식 라운드 전 시각 확인용).
-   * false (기본) 면 runLodPass 의 glow 분기 자체가 실행되지 않아 기존 동작과 100% 동일 (연산 0).
+   * 기본값 **false** (core 라이브러리 보수 기본 — 기존 NullEngine 단위 테스트 무회귀).
+   * **기본 ON 은 web 레이어 결정** — `parseMarkerMode` (apps/web) 기본값이 'glow' 이며
+   * `?marker=off` 가 옵트아웃 (ADR §축 1). false 면 runLodPass 의 glow 분기가 무조건
+   * inactive — 기존 동작과 100% 동일 (연산 0 수준).
    *
-   * 동작 (glow=true 일 때만):
-   *  - billboard (low LOD) 상태 + **실 billboard 렌더 px** (측정 pxDiameter ÷ bodyScale) < 4px 인
-   *    non-star body 의 low variant quad 를 `scaling = targetPx / 실측px` 역보정으로
-   *    화면 고정 크기 유지 + emissive boost
-   *  - [iteration 2] 발동 임계를 측정 pxDiameter (effective, ×bodyScale) → 실 billboard 렌더 px 로
-   *    교체. iteration 1 은 effective px ∈ [4, 16) 데드존에서 행성이 비식별인데 미발동
-   *    (실측 2026-06-12: 5 AU 에서 venus 12.06px / earth 13.71px / saturn 13.96px 등 8 행성 전부)
-   *  - [iteration 2] targetPx 계층: parentId === 'sun' (행성/왜소행성/혜성) 4.5px,
-   *    위성은 4.5 / glowMarkerSatelliteRatio (기본 2:1)
-   *  - 임계 이상 복귀 시 scaling=1 + emissive 원복 (히스테리시스 없음 — popping 허용)
+   * 동작 (true 일 때): low LOD (billboard) + 실 billboard 렌더 px (측정 pxDiameter ÷
+   * bodyScale) < 4px 인 body (sun 포함 27 전수) 의 low variant quad 를 화면 고정 크기로
+   * 역보정 + emissive boost. 판정 식·상수는 `glow-marker.ts` SSoT (PM 확정값 2026-06-13).
    */
   glowMarker?: boolean;
 
   /**
-   * [preview] glow marker 의 모행성:위성 크기 비율 (iteration 2 — 사용자 피드백 "2:1 or 3:1").
+   * #675 — glow marker 의 모행성:위성 크기 비율 (PM 확정 기본 2:1).
    *
    * 위성 (parentId !== 'sun') 의 targetPx = GLOW_MARKER_TARGET_PX_PARENT / ratio.
    *  - 2 (기본): parent 4.5px / satellite 2.25px
-   *  - 3: parent 4.5px / satellite 1.5px (`?marker=glow&ratio=3`)
+   *  - `?ratio=` URL 파라미터로 디버그/후속 PM 튜닝 가능 (ADR §축 7 — 1~10 유한 수)
    *
    * glowMarker=false 면 미사용.
    */
@@ -454,8 +455,12 @@ export function createSolarSystemScene(
   // P11-B #289 — LOD mid/low variant lazy-create 저장소 (ADR 20260424-p11-b §축 4).
   //
   // mid (segments=12 low-poly sphere) / low (BILLBOARDMODE_ALL quad) 변형 메쉬는 **첫 전환 시점에**
-  // 생성되어 `setEnabled(false)` 로 숨겨둔다. high variant (`meshes.get(id)`) 가 position/scale 의 유일한
-  // owner — mid/low 는 `parent = highMesh` 로 붙어 좌표 추종. `mesh.scaling` 은 high variant 만 건드린다.
+  // 생성되어 `setEnabled(false)` 로 숨겨둔다. high variant (`meshes.get(id)`) 가 position/transform 의
+  // 유일한 owner — mid/low 는 `parent = highMesh` 로 붙어 좌표 추종. `mesh.scaling` 은 high variant 만
+  // 건드린다. **예외 1건 (ADR 20260613-675-glow-pixel-marker §축 2)**: low variant quad 는 glow marker
+  // 의 화면 고정 크기 역보정 (`scaling = targetPx × bodyScale / pxDiameter`) 에 한해 자체 scaling 을
+  // 사용한다. low quad 는 BILLBOARDMODE_ALL + parent 좌표 추종이므로 scaling 은 local 크기에만 작용 —
+  // position owner 단일성 (계약의 본질) 은 불변. mid variant 는 여전히 금지.
   const midVariants = new Map<string, Mesh>();
   const lowVariants = new Map<string, Mesh>();
   const bodyCurrentLod = new Map<string, LodLevel>();
@@ -476,9 +481,9 @@ export function createSolarSystemScene(
   // ADR §축 3: UX 일관성 + headless 검증 안정화 (middle frame capture) 200ms 고정.
   const LOD_FADE_DURATION_MS = 200;
 
-  // [preview] glow pixel marker — 현재 glow 상태인 body id 집합.
-  // material (emissive) 토글은 상태 전이 시점 1회만 수행하기 위한 추적 (매 프레임 material 쓰기 회피).
-  // glowMarker=false 면 본 Set 은 영구 비어있음 (연산 0 보장).
+  // #675 — glow pixel marker: 현재 glow 상태인 body id 집합 (ADR 20260613-675 §축 1-3).
+  // material (emissive) 토글은 상태 전이 시점 1회만 수행하기 위한 추적 (매 프레임 material 쓰기 회피
+  // — Babylon shader cache 보존). glowMarker=false 면 본 Set 은 영구 비어있음 (연산 0 보장).
   const glowActiveBodies = new Set<string>();
 
   // P9 #254 PR-2.5 — rings 가 있는 행성에 shader 기반 3층 렌더.
@@ -1309,8 +1314,8 @@ export function createSolarSystemScene(
       // R1 #329 — LOD 결정에 사용하는 effective radius 는 `body.radius × bodyScale`.
       // sun (× 75) 같이 시각 과장된 body 는 화면 점유가 실제로 큰 픽셀이므로 high LOD 가 자연스럽다.
       // ADR `20260425-r1-sun-visualization.md` §결정 4 (축 4 후보 α).
-      // [preview iteration 2] bodyScale 값을 변수로 hoisting — glow 발동 판정 (실 billboard px 환산)
-      // 에서 재사용. glowMarker=false 경로의 호출 횟수/결과는 기존과 동일 (semantic 불변).
+      // #675 — bodyScale 값을 변수로 hoisting: glow marker 발동 판정 (실 billboard px 환산) 에서
+      // 재사용. glowMarker=false 경로의 호출 횟수/결과는 기존과 동일 (semantic 불변).
       const bodyScaleVal = bodyScale(body.id);
       const effectiveRadius = body.radius * bodyScaleVal;
       const coverage = screenCoverageRadius(
@@ -1380,34 +1385,26 @@ export function createSolarSystemScene(
       const pxDiameter = coverage * 2;
       const lowVariantMesh = lowVariants.get(body.id);
 
-      // [preview] glow pixel marker 활성 판정 (?marker=glow 전용 — glowMarker=false 면 항상 false).
-      //
-      // [iteration 2 fix — 가설 (b) 실측 확정 2026-06-12] 발동 임계를 측정 pxDiameter (effective,
-      // ×bodyScale) → **실 billboard 렌더 px** (pxDiameter ÷ bodyScale) 로 교체.
-      //  - iteration 1 은 effective px ∈ [4, 16) 데드존에서 미발동: billboard 는 bodyScale 미적용
-      //    실반경 렌더 (#333) 라 실제 화면 px ≈ 측정값/700~800 ≈ 0.005~0.02px 비식별인데,
-      //    측정값이 4px 이상이라 분기 미진입 (5 AU 실측: venus 12.06 / earth 13.71 / saturn 13.96px
-      //    등 8 행성 전부 scaling=1 미발동 — 사용자 "일부 모행성 적용 안 됨" 의 원인)
-      //  - low 대역 (effective < 16px) 에서 실 billboard px 는 항상 < 16/48 ≈ 0.33px (최소 bodyScale
-      //    48 기준) → 사실상 low 진입 = 발동. 임계 비교는 bodyScale 미정의 (=1.0) body 방어용 유지
-      //  - pxDiameter 가 비유한/0 이하 (off-frustum/behind-camera) 이면 비활성 — scaling 폭주 방지
-      //    (실측: 5 AU 에서 halley/swift-tuttle px=0 — 화면 밖이므로 마커 불필요, 가드가 정답)
-      const glowBillboardPx = pxDiameter / Math.max(bodyScaleVal, 1e-9);
-      // [iteration 3] sun(star) 포함 — 사용자 피드백 "태양만 적용이 안 된 듯". 100 AU 에서
-      // sun billboard 실반경 ≈ 0.09px 비식별이라 동일하게 glow 대상 (star 제외 설계 폐기).
-      const glowActive =
-        glowMarker &&
-        nextLevel === 'low' &&
-        Number.isFinite(pxDiameter) &&
-        pxDiameter > 0 &&
-        glowBillboardPx < GLOW_MARKER_ACTIVATION_PX_DIAMETER;
+      // #675 — glow pixel marker 발동 판정 (순수 함수 — ADR 20260613-675-glow-pixel-marker §축 6).
+      // 판정 식 (발동 임계 실 billboard px 환산 / off-frustum 가드 / 2:1 크기 계층 / emissive 계층)
+      // 전부 glow-marker.ts 에 박제 — scene 은 mesh/material 적용만 담당.
+      // glowMarker=false (`?marker=off`) 면 무조건 inactive — 기존 동작 100% 보존 (연산 0 수준).
+      const glow = resolveGlowMarker({
+        glowMarker,
+        nextLevel,
+        pxDiameter,
+        bodyScaleVal,
+        parentId: body.parentId,
+        kind: body.kind,
+        satelliteRatio: glowMarkerSatelliteRatio,
+      });
 
       if (lowVariantMesh) {
         const lowMat = lowVariantMesh.material as StandardMaterial | null;
         if (lowMat) {
-          // [preview] glow 중에는 radial gradient alpha mask 를 강제 적용해 "둥근 글로우 점" 형상 유지.
-          // (4px fallback 의 사각 quad 는 glow 마커로 부적합 — 기존 동작은 glowActive=false 면 불변)
-          const wantsMask = glowActive || shouldApplyBillboardAlphaMask(pxDiameter);
+          // #675 — glow 중에는 radial gradient alpha mask 를 강제 적용해 "둥근 글로우 점" 형상 유지.
+          // (4px fallback 의 사각 quad 는 glow 마커로 부적합 — 기존 동작은 glow.active=false 면 불변)
+          const wantsMask = glow.active || shouldApplyBillboardAlphaMask(pxDiameter);
           // 매 프레임 호출되므로 토글 변경이 있을 때만 material 갱신 (Babylon shader cache 보존).
           // opacityTexture 의 boolean 비교는 reference equality — null 또는 동일 인스턴스 비교.
           const hasMask = lowMat.opacityTexture !== null && lowMat.opacityTexture !== undefined;
@@ -1423,55 +1420,40 @@ export function createSolarSystemScene(
         }
       }
 
-      // [preview] glow pixel marker — 화면 고정 크기 역보정 + emissive boost.
+      // #675 — glow pixel marker 적용 (화면 고정 크기 역보정 + emissive boost).
       //
-      // 주의 (주석 계약 의도적 이탈, 프리뷰 한정): 본 파일 변수 선언부의 "mesh.scaling 은 high variant 만
-      // 건드린다" 계약을 low variant 에 한해 깬다. 정식 라운드 진입 시 ADR 로 계약 개정 의무.
+      // 주석 계약 예외 1건 (ADR 20260613-675-glow-pixel-marker §축 2): low variant quad 에 한해
+      // glow marker 의 화면 고정 크기 역보정 scaling 사용 — 본 파일 변수 선언부 주석 계약의 개정문 참조.
       //
-      // 측정 pxDiameter 는 effective radius (body.radius × bodyScale) 기준이지만 billboard quad 는
-      // bodyScale 미적용 (#333 책임 분리) — billboard 실제 화면 px ≈ pxDiameter / bodyScale.
-      // 따라서 scaling = targetPx / billboardPx = targetPx × bodyScale / pxDiameter.
-      // 매 프레임 갱신 (줌 변화 추종). 상한 클램프로 극단 줌아웃 scaling 폭주 방지.
+      // scaling = glow.scale = targetPx × bodyScale / pxDiameter (산식·클램프는 glow-marker.ts SSoT).
+      // scaling 은 매 프레임 갱신 (줌 변화 연속 추종), material (emissive) 쓰기는 상태 전이 시 1회만
+      // (glowActiveBodies Set 추적 — Babylon shader cache 보존, ADR §축 1-3 fps 영향 0 근거).
       if (glowMarker) {
         const wasGlow = glowActiveBodies.has(body.id);
-        if (glowActive && lowVariantMesh) {
-          const billboardPx = Math.max(glowBillboardPx, GLOW_MARKER_MIN_MEASURED_PX);
-          // [iteration 2] 모행성:위성 크기 계층 — parentId === 'sun' (행성/왜소행성/혜성) 은
-          // 4.5px, 위성은 4.5/ratio (기본 2:1 → 2.25px, ?ratio=3 → 1.5px). 사용자 피드백
-          // "모행성과 하위 행성의 비율도 살짝 2:1 or 3:1 정도 픽셀로 조절" 반영.
-          // [iteration 3] sun(star) 은 parent 동급 크기 (root 천체 — 위성 축소 비대상).
-          const targetPx =
-            body.parentId === 'sun' || body.kind === 'star'
-              ? GLOW_MARKER_TARGET_PX_PARENT
-              : GLOW_MARKER_TARGET_PX_PARENT / glowMarkerSatelliteRatio;
-          const rawScale = targetPx / billboardPx;
-          const clamped = Math.min(Math.max(rawScale, 1), GLOW_MARKER_MAX_SCALE);
-          lowVariantMesh.scaling.setAll(clamped);
+        if (glow.active && lowVariantMesh) {
+          lowVariantMesh.scaling.setAll(glow.scale);
           if (!wasGlow) {
             glowActiveBodies.add(body.id);
             const mat = lowVariantMesh.material as StandardMaterial | null;
             if (mat) {
-              // createBodyBillboard 의 non-star emissive (c.scale(0.3)) 대비 boost — "빛나는" 인상.
-              // [iteration 2] 위성은 2.0 상향 — 1.5~2.25px marker 의 gradient falloff 휘도 보상
-              // (10 AU 실측: 위성 피크 173~214 vs parent 199~252).
+              // createBodyBillboard 의 non-star emissive (c×0.3) 대비 boost — "빛나는" 인상.
+              // 계층값 (parent 1.6 / satellite 2.0) 은 glow-marker.ts PM 확정값 SSoT.
               const c = hexToColor3(body.colorHint?.hex ?? '#888888');
-              const emissiveScale =
-                body.parentId === 'sun' || body.kind === 'star'
-                  ? GLOW_MARKER_EMISSIVE_SCALE
-                  : GLOW_MARKER_EMISSIVE_SCALE_SATELLITE;
-              mat.emissiveColor = c.scale(emissiveScale);
+              mat.emissiveColor = c.scale(glow.emissiveScale);
             }
           }
         } else if (wasGlow) {
-          // pxDiameter ≥ 4px 복귀 또는 low 이탈 — 원복 (cross-fade 없음, popping 은 프리뷰 관찰 포인트).
+          // low 이탈 (LOD 경계) — 원복. popping 은 명시 수용 (ADR §축 3 — 발동/해제 경계가 LOD low
+          // 경계와 일치해 기존 200ms LOD cross-fade 가 마스킹. 히스테리시스는 dead-code 가드로 기각).
           glowActiveBodies.delete(body.id);
           if (lowVariantMesh) {
             lowVariantMesh.scaling.setAll(1);
             const mat = lowVariantMesh.material as StandardMaterial | null;
             if (mat) {
               const c = hexToColor3(body.colorHint?.hex ?? '#888888');
-              // createBodyBillboard 기본값 원복 — star 는 full emissive(c), 그 외 c×0.3 (iteration 3)
-              mat.emissiveColor = body.kind === 'star' ? c : c.scale(0.3);
+              // createBodyBillboard 기본값 원복 — star full emissive / non-star ×0.3 (SSoT 대조는
+              // glow-marker.test.ts 가 박제).
+              mat.emissiveColor = c.scale(resolveGlowMarkerRestoreEmissiveScale(body.kind));
             }
           }
         }
@@ -1876,31 +1858,6 @@ function createBodyMeshMid(
  * 본 임계값을 변경하려면 ADR Amendment 박제 의무 (volt #49 — 주석 계약 vs 구현 drift).
  */
 export const LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER = 4;
-
-/**
- * [preview] glow pixel marker 상수 (?marker=glow 전용 — 정식 라운드에서 PM 합의로 재결정 대상).
- *
- *  - ACTIVATION_PX_DIAMETER: glow 발동 임계. [iteration 2] 비교 대상이 측정 pxDiameter (effective,
- *    ×bodyScale) → **실 billboard 렌더 px** (÷bodyScale) 로 교체 — effective px ∈ [4, 16) 데드존
- *    (행성 비식별인데 미발동, 2026-06-12 실측) 해소. 값 자체는 alpha mask 임계 (4px) SSoT 유지
- *  - TARGET_PX_PARENT: parentId === 'sun' body (행성/왜소행성/혜성) 의 marker 목표 직경 (px).
- *    위성은 TARGET_PX_PARENT / satelliteRatio (옵션, 기본 2 → 2.25px / ratio=3 → 1.5px)
- *  - DEFAULT_SATELLITE_RATIO: 모행성:위성 비율 기본값 (사용자 피드백 "2:1 or 3:1" 의 2)
- *  - MAX_SCALE: scaling 역보정 상한 클램프 — 극단 줌아웃 (pxDiameter→0) 에서 quad 월드 크기 폭주 방지.
- *    halley (bodyScale 5000, 측정 0.004px 급 @100 AU) 도 ≈4.5e6 으로 상한 내. 후보: 1e6~1e9
- *  - MIN_MEASURED_PX: 역보정 분모 하한 (0 나눗셈 방어)
- *  - EMISSIVE_SCALE: glow 중 emissive 배율 (기본 0.3 대비). 후보: 1.2~2.0
- *  - EMISSIVE_SCALE_SATELLITE: [iteration 2] 위성 전용 상향 보정 — ratio=3 (1.5px) 에서 marker 가
- *    1~2px bright 픽셀로 축소되며 피크 휘도 173~214 로 어두워짐 (parent 199~252, 10 AU 실측).
- *    gradient falloff 보상으로 위성만 2.0 (사용자 피드백 예고 사항)
- */
-const GLOW_MARKER_ACTIVATION_PX_DIAMETER = LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER;
-const GLOW_MARKER_TARGET_PX_PARENT = 4.5;
-const GLOW_MARKER_DEFAULT_SATELLITE_RATIO = 2;
-const GLOW_MARKER_MAX_SCALE = 1e8;
-const GLOW_MARKER_MIN_MEASURED_PX = 1e-6;
-const GLOW_MARKER_EMISSIVE_SCALE = 1.6;
-const GLOW_MARKER_EMISSIVE_SCALE_SATELLITE = 2.0;
 
 /**
  * #391 Phase 2 — billboard alpha mask 적용 여부 결정 헬퍼.

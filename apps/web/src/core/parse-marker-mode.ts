@@ -1,22 +1,26 @@
 /**
- * [preview] `?marker=` URL 파라미터 → marker 모드 파싱 순수 함수.
+ * #675 — `?marker=` URL 파라미터 → marker 모드 파싱 순수 함수.
  *
  * 선례: `parse-gpu-tier.ts` / `parse-lod-level.ts` 동일 구조.
+ * ADR `docs/decisions/20260613-675-glow-pixel-marker.md` §축 1/§축 7.
  *
- * 정책 (프리뷰 — 정식 라운드에서 ADR 박제 대상):
- *  - `glow`: sub-pixel body 글로우 픽셀 마커 활성 (화면 고정 크기 billboard 역보정)
- *  - 미지정 / `off`: 기존 동작과 100% 동일 (glow 분기 연산 0)
+ * 정책 (PM 확정 2026-06-13 — 기본 ON):
+ *  - 미지정 / `glow`: glow pixel marker 활성 (**기본 ON** — web 레이어 결정. core
+ *    `glowMarker` 옵션 기본값은 false 유지, ADR §축 1 레이어 분리)
+ *  - `off`: 옵트아웃 — 기존 동작과 100% 동일 (glow 분기 연산 0)
  *  - 대소문자 무시 (URL 사용자 편의)
- *  - 알 수 없는 값 → `'off'` 폴백 + `console.warn`
+ *  - 알 수 없는 값 → 기본값 `'glow'` 폴백 + `console.warn` (parse-gpu-tier 등
+ *    "unknown → 기본 동작" 패턴 정합)
+ *  - `?marker=glow` 명시 지정은 기본값과 동일 — 하위 호환 (프리뷰 공유 URL 보존)
  *
  * 런타임 핫스왑은 비지원 — 초기 hydration 시점 1회만 호출된다.
  */
 export type MarkerMode = 'off' | 'glow';
 
 export function parseMarkerMode(urlParam: string | null | undefined): MarkerMode {
-  // 미지정 → 'off' (기존 동작).
+  // 미지정 → 'glow' (기본 ON — ADR §축 1: default 진입 화면의 sub-pixel body 비식별 gap 해소).
   if (urlParam === null || urlParam === undefined || urlParam === '') {
-    return 'off';
+    return 'glow';
   }
   const normalized = urlParam.toLowerCase();
   if (normalized === 'off') {
@@ -25,22 +29,23 @@ export function parseMarkerMode(urlParam: string | null | undefined): MarkerMode
   if (normalized === 'glow') {
     return 'glow';
   }
-  // 알 수 없는 값 — 기존 parse-* 패턴과 동일한 폴백 + warn.
+  // 알 수 없는 값 — 기본값 'glow' 폴백 + warn (기존 parse-* "unknown → 기본 동작" 패턴).
 
-  console.warn(`[parse-marker-mode] 알 수 없는 ?marker=${urlParam} — 'off' 로 폴백`);
-  return 'off';
+  console.warn(`[parse-marker-mode] 알 수 없는 ?marker=${urlParam} — 'glow' (기본) 로 폴백`);
+  return 'glow';
 }
 
 /**
- * [preview iteration 2] `?ratio=` → glow marker 모행성:위성 비율 파싱.
+ * #675 — `?ratio=` → glow marker 모행성:위성 비율 파싱.
  *
- * 사용자 피드백 "2:1 or 3:1" 두 비율을 URL 비교 프리뷰 가능하게:
- *  - 미지정 → 2 (기본 2:1 — parent 4.5px / satellite 2.25px)
- *  - `?marker=glow&ratio=3` → 3 (3:1 — parent 4.5px / satellite 1.5px)
- *  - 프리뷰 유연성: 1~10 범위의 유한 수 허용 (예: 2.5)
+ * PM 확정 기본 2:1 (parent 4.5px / satellite 2.25px). 파라미터는 디버그/후속 PM 튜닝용
+ * 유지 (ADR §축 7 — 기본 2 가 확정값이므로 default 경로 무영향):
+ *  - 미지정 → 2 (기본 2:1)
+ *  - `?ratio=3` → 3 (3:1 — parent 4.5px / satellite 1.5px, 프리뷰에서 비채택된 비교값)
+ *  - 1~10 범위의 유한 수 허용 (예: 2.5)
  *  - 범위 밖 / 비수치 → 2 폴백 + `console.warn`
  *
- * marker=glow 가 아닐 때는 호출 결과가 미사용 (scene 옵션이 무시).
+ * marker=off 일 때는 호출 결과가 미사용 (scene 옵션이 무시).
  */
 export const GLOW_MARKER_RATIO_DEFAULT = 2;
 

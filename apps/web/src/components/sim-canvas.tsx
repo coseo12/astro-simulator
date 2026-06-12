@@ -239,10 +239,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const ringParam = new URLSearchParams(window.location.search).get('ring');
         const ringRenderMode: 'shader' | 'fallback' | 'placeholder' =
           ringParam === 'fallback' || ringParam === 'placeholder' ? ringParam : 'shader';
-        // [preview] ?marker=glow — sub-pixel body 글로우 픽셀 마커 옵트인 (미지정 시 기존 동작 100% 동일).
+        // #675 — glow pixel marker 기본 ON + `?marker=off` 옵트아웃 (ADR 20260613-675 §축 1).
         const markerParam = new URLSearchParams(window.location.search).get('marker');
         const markerMode = parseMarkerMode(markerParam);
-        // [preview iteration 2] ?ratio= — glow marker 모행성:위성 비율 (기본 2:1, &ratio=3 → 3:1).
+        // #675 — ?ratio= glow marker 모행성:위성 비율 (PM 확정 기본 2:1, 디버그용 — ADR §축 7).
         const ratioParam = new URLSearchParams(window.location.search).get('ratio');
         const glowMarkerRatio = parseGlowMarkerRatio(ratioParam);
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
@@ -260,9 +260,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           onTierTransitionInputAttempts: (count) => {
             instance.metrics.tierTransitionInputDrops += count;
           },
-          // [preview] glow pixel marker — ?marker=glow 일 때만 true.
+          // #675 — glow pixel marker. 기본 ON 은 parseMarkerMode 기본값 ('glow') 이 결정 —
+          // core 옵션 기본값은 false 유지 (ADR 20260613-675 §축 1 레이어 분리).
           glowMarker: markerMode === 'glow',
-          // [preview iteration 2] 모행성:위성 marker 비율 (glowMarker=false 면 scene 이 무시).
+          // #675 — 모행성:위성 marker 비율 (glowMarker=false 면 scene 이 무시).
           glowMarkerSatelliteRatio: glowMarkerRatio,
         });
 
