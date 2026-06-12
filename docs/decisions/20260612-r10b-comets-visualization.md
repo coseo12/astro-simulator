@@ -215,7 +215,7 @@ radius × scale 곱 (결정적 — runtime 측정 불요) 기준:
 
 - `solar-system.json` halley `showInShortcutBar: false → true` (데이터 1값) — #617 가드 3종 동시 갱신 의무: ① 데이터 ② `FOCUS_BUTTONS` `{ id: 'halley', label: '핼리 혜성' }` ③ browser-verify `RPHASE_EXPECTED_ENABLED` +halley. `RPHASE_SHORTCUT_EXPECTED_DISABLED` 는 `[]` 유지 (encke/swift-tuttle 은 false → bar 미등록 — #617 직교 축의 "focus 가능 + bar 미등록" 분류에 ceres 등과 함께 합류)
 - **배치 결정 — 후미 (pluto 다음 15번째)**: FOCUS_BUTTONS 기존 컨벤션은 "천체 거리순" 이나 halley a=17.834 AU 를 엄격 적용하면 saturn (9.58)/uranus (19.19) **사이 삽입** — 행성 8 거리순 블록이 깨지고 사용자 mental model (행성 나열) 훼손. **"행성 거리순 블록 + 비-행성 카테고리 후미 (왜소행성 pluto → 혜성 halley)" 컨벤션 신규 박제** (배치 주석에 명시 — 후속 비-행성 추가 시 답습 기준)
-- 15버튼 — R8 12 / R9 13 / R10a 14 선례의 overflow-x-auto 흡수. 모바일 (375px) D-T2 스크롤 확인 답습
+- ~~15버튼 — R8 12 / R9 13 / R10a 14 선례~~ **(2026-06-12 qa 실측 정정 — off-by-one drift)**: bar 전체 **14버튼** = focus 12 (halley 12번째) + reset + free-fly. R9 시점부터 표기 +1 누적 drift 였음 (qa PR #670 비차단 관찰 #1). overflow-x-auto 흡수. 모바일 (375px) D-T2 스크롤 확인 답습
 - encke/swift-tuttle 은 URL `?focus=` / CelestialTree 진입 (discoverability gap — #624 사용자 accepted tradeoff 답습)
 
 ---
