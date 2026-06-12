@@ -360,11 +360,28 @@ export interface SolarSystemSceneOptions {
    * false (기본) 면 runLodPass 의 glow 분기 자체가 실행되지 않아 기존 동작과 100% 동일 (연산 0).
    *
    * 동작 (glow=true 일 때만):
-   *  - billboard (low LOD) 상태 + pxDiameter < 4px 인 non-star body 의 low variant quad 를
-   *    `scaling = targetPx / 측정px` 역보정으로 화면 고정 크기 (~3.5px) 유지 + emissive boost
-   *  - pxDiameter ≥ 4px 복귀 시 scaling=1 + emissive 원복 (히스테리시스 없음 — popping 허용)
+   *  - billboard (low LOD) 상태 + **실 billboard 렌더 px** (측정 pxDiameter ÷ bodyScale) < 4px 인
+   *    non-star body 의 low variant quad 를 `scaling = targetPx / 실측px` 역보정으로
+   *    화면 고정 크기 유지 + emissive boost
+   *  - [iteration 2] 발동 임계를 측정 pxDiameter (effective, ×bodyScale) → 실 billboard 렌더 px 로
+   *    교체. iteration 1 은 effective px ∈ [4, 16) 데드존에서 행성이 비식별인데 미발동
+   *    (실측 2026-06-12: 5 AU 에서 venus 12.06px / earth 13.71px / saturn 13.96px 등 8 행성 전부)
+   *  - [iteration 2] targetPx 계층: parentId === 'sun' (행성/왜소행성/혜성) 4.5px,
+   *    위성은 4.5 / glowMarkerSatelliteRatio (기본 2:1)
+   *  - 임계 이상 복귀 시 scaling=1 + emissive 원복 (히스테리시스 없음 — popping 허용)
    */
   glowMarker?: boolean;
+
+  /**
+   * [preview] glow marker 의 모행성:위성 크기 비율 (iteration 2 — 사용자 피드백 "2:1 or 3:1").
+   *
+   * 위성 (parentId !== 'sun') 의 targetPx = GLOW_MARKER_TARGET_PX_PARENT / ratio.
+   *  - 2 (기본): parent 4.5px / satellite 2.25px
+   *  - 3: parent 4.5px / satellite 1.5px (`?marker=glow&ratio=3`)
+   *
+   * glowMarker=false 면 미사용.
+   */
+  glowMarkerSatelliteRatio?: number;
 }
 
 /**
@@ -390,6 +407,7 @@ export function createSolarSystemScene(
     bodyScale = defaultBodyScale,
     onTierTransitionInputAttempts,
     glowMarker = false,
+    glowMarkerSatelliteRatio = GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -1291,7 +1309,10 @@ export function createSolarSystemScene(
       // R1 #329 — LOD 결정에 사용하는 effective radius 는 `body.radius × bodyScale`.
       // sun (× 75) 같이 시각 과장된 body 는 화면 점유가 실제로 큰 픽셀이므로 high LOD 가 자연스럽다.
       // ADR `20260425-r1-sun-visualization.md` §결정 4 (축 4 후보 α).
-      const effectiveRadius = body.radius * bodyScale(body.id);
+      // [preview iteration 2] bodyScale 값을 변수로 hoisting — glow 발동 판정 (실 billboard px 환산)
+      // 에서 재사용. glowMarker=false 경로의 호출 횟수/결과는 기존과 동일 (semantic 불변).
+      const bodyScaleVal = bodyScale(body.id);
+      const effectiveRadius = body.radius * bodyScaleVal;
       const coverage = screenCoverageRadius(
         [localX, localY, localZ],
         effectiveRadius,
@@ -1360,15 +1381,25 @@ export function createSolarSystemScene(
       const lowVariantMesh = lowVariants.get(body.id);
 
       // [preview] glow pixel marker 활성 판정 (?marker=glow 전용 — glowMarker=false 면 항상 false).
-      //  - billboard (low) 상태 + 측정 직경 < 4px (alpha mask 임계와 동일 SSoT) + non-star (sun 제외)
-      //  - pxDiameter 가 비유한/0 이하 (behind-camera 등) 이면 비활성 — scaling 폭주 방지
+      //
+      // [iteration 2 fix — 가설 (b) 실측 확정 2026-06-12] 발동 임계를 측정 pxDiameter (effective,
+      // ×bodyScale) → **실 billboard 렌더 px** (pxDiameter ÷ bodyScale) 로 교체.
+      //  - iteration 1 은 effective px ∈ [4, 16) 데드존에서 미발동: billboard 는 bodyScale 미적용
+      //    실반경 렌더 (#333) 라 실제 화면 px ≈ 측정값/700~800 ≈ 0.005~0.02px 비식별인데,
+      //    측정값이 4px 이상이라 분기 미진입 (5 AU 실측: venus 12.06 / earth 13.71 / saturn 13.96px
+      //    등 8 행성 전부 scaling=1 미발동 — 사용자 "일부 모행성 적용 안 됨" 의 원인)
+      //  - low 대역 (effective < 16px) 에서 실 billboard px 는 항상 < 16/48 ≈ 0.33px (최소 bodyScale
+      //    48 기준) → 사실상 low 진입 = 발동. 임계 비교는 bodyScale 미정의 (=1.0) body 방어용 유지
+      //  - pxDiameter 가 비유한/0 이하 (off-frustum/behind-camera) 이면 비활성 — scaling 폭주 방지
+      //    (실측: 5 AU 에서 halley/swift-tuttle px=0 — 화면 밖이므로 마커 불필요, 가드가 정답)
+      const glowBillboardPx = pxDiameter / Math.max(bodyScaleVal, 1e-9);
       const glowActive =
         glowMarker &&
         body.kind !== 'star' &&
         nextLevel === 'low' &&
         Number.isFinite(pxDiameter) &&
         pxDiameter > 0 &&
-        pxDiameter < GLOW_MARKER_ACTIVATION_PX_DIAMETER;
+        glowBillboardPx < GLOW_MARKER_ACTIVATION_PX_DIAMETER;
 
       if (lowVariantMesh) {
         const lowMat = lowVariantMesh.material as StandardMaterial | null;
@@ -1403,9 +1434,15 @@ export function createSolarSystemScene(
       if (glowMarker && body.kind !== 'star') {
         const wasGlow = glowActiveBodies.has(body.id);
         if (glowActive && lowVariantMesh) {
-          const bodyScaleVal = Math.max(bodyScale(body.id), 1e-9);
-          const billboardPx = Math.max(pxDiameter / bodyScaleVal, GLOW_MARKER_MIN_MEASURED_PX);
-          const rawScale = GLOW_MARKER_TARGET_PX_DIAMETER / billboardPx;
+          const billboardPx = Math.max(glowBillboardPx, GLOW_MARKER_MIN_MEASURED_PX);
+          // [iteration 2] 모행성:위성 크기 계층 — parentId === 'sun' (행성/왜소행성/혜성) 은
+          // 4.5px, 위성은 4.5/ratio (기본 2:1 → 2.25px, ?ratio=3 → 1.5px). 사용자 피드백
+          // "모행성과 하위 행성의 비율도 살짝 2:1 or 3:1 정도 픽셀로 조절" 반영.
+          const targetPx =
+            body.parentId === 'sun'
+              ? GLOW_MARKER_TARGET_PX_PARENT
+              : GLOW_MARKER_TARGET_PX_PARENT / glowMarkerSatelliteRatio;
+          const rawScale = targetPx / billboardPx;
           const clamped = Math.min(Math.max(rawScale, 1), GLOW_MARKER_MAX_SCALE);
           lowVariantMesh.scaling.setAll(clamped);
           if (!wasGlow) {
@@ -1413,8 +1450,14 @@ export function createSolarSystemScene(
             const mat = lowVariantMesh.material as StandardMaterial | null;
             if (mat) {
               // createBodyBillboard 의 non-star emissive (c.scale(0.3)) 대비 boost — "빛나는" 인상.
+              // [iteration 2] 위성은 2.0 상향 — 1.5~2.25px marker 의 gradient falloff 휘도 보상
+              // (10 AU 실측: 위성 피크 173~214 vs parent 199~252).
               const c = hexToColor3(body.colorHint?.hex ?? '#888888');
-              mat.emissiveColor = c.scale(GLOW_MARKER_EMISSIVE_SCALE);
+              const emissiveScale =
+                body.parentId === 'sun'
+                  ? GLOW_MARKER_EMISSIVE_SCALE
+                  : GLOW_MARKER_EMISSIVE_SCALE_SATELLITE;
+              mat.emissiveColor = c.scale(emissiveScale);
             }
           }
         } else if (wasGlow) {
@@ -1834,19 +1877,27 @@ export const LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER = 4;
 /**
  * [preview] glow pixel marker 상수 (?marker=glow 전용 — 정식 라운드에서 PM 합의로 재결정 대상).
  *
- *  - ACTIVATION_PX_DIAMETER: glow 발동 임계 (측정 pxDiameter 기준). alpha mask 임계 (4px) 와 동일값 —
- *    "mask 바이패스 구간 = 식별 곤란 구간" 가설. 후보: 2~6px
- *  - TARGET_PX_DIAMETER: glow 마커의 화면 고정 목표 직경 (px). 후보: 3~4px
+ *  - ACTIVATION_PX_DIAMETER: glow 발동 임계. [iteration 2] 비교 대상이 측정 pxDiameter (effective,
+ *    ×bodyScale) → **실 billboard 렌더 px** (÷bodyScale) 로 교체 — effective px ∈ [4, 16) 데드존
+ *    (행성 비식별인데 미발동, 2026-06-12 실측) 해소. 값 자체는 alpha mask 임계 (4px) SSoT 유지
+ *  - TARGET_PX_PARENT: parentId === 'sun' body (행성/왜소행성/혜성) 의 marker 목표 직경 (px).
+ *    위성은 TARGET_PX_PARENT / satelliteRatio (옵션, 기본 2 → 2.25px / ratio=3 → 1.5px)
+ *  - DEFAULT_SATELLITE_RATIO: 모행성:위성 비율 기본값 (사용자 피드백 "2:1 or 3:1" 의 2)
  *  - MAX_SCALE: scaling 역보정 상한 클램프 — 극단 줌아웃 (pxDiameter→0) 에서 quad 월드 크기 폭주 방지.
- *    halley (bodyScale 5000, 측정 0.001px 급) 도 ≈1.75e7 로 상한 내. 후보: 1e6~1e9
+ *    halley (bodyScale 5000, 측정 0.004px 급 @100 AU) 도 ≈4.5e6 으로 상한 내. 후보: 1e6~1e9
  *  - MIN_MEASURED_PX: 역보정 분모 하한 (0 나눗셈 방어)
  *  - EMISSIVE_SCALE: glow 중 emissive 배율 (기본 0.3 대비). 후보: 1.2~2.0
+ *  - EMISSIVE_SCALE_SATELLITE: [iteration 2] 위성 전용 상향 보정 — ratio=3 (1.5px) 에서 marker 가
+ *    1~2px bright 픽셀로 축소되며 피크 휘도 173~214 로 어두워짐 (parent 199~252, 10 AU 실측).
+ *    gradient falloff 보상으로 위성만 2.0 (사용자 피드백 예고 사항)
  */
 const GLOW_MARKER_ACTIVATION_PX_DIAMETER = LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER;
-const GLOW_MARKER_TARGET_PX_DIAMETER = 3.5;
+const GLOW_MARKER_TARGET_PX_PARENT = 4.5;
+const GLOW_MARKER_DEFAULT_SATELLITE_RATIO = 2;
 const GLOW_MARKER_MAX_SCALE = 1e8;
 const GLOW_MARKER_MIN_MEASURED_PX = 1e-6;
 const GLOW_MARKER_EMISSIVE_SCALE = 1.6;
+const GLOW_MARKER_EMISSIVE_SCALE_SATELLITE = 2.0;
 
 /**
  * #391 Phase 2 — billboard alpha mask 적용 여부 결정 헬퍼.

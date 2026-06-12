@@ -30,3 +30,31 @@ export function parseMarkerMode(urlParam: string | null | undefined): MarkerMode
   console.warn(`[parse-marker-mode] 알 수 없는 ?marker=${urlParam} — 'off' 로 폴백`);
   return 'off';
 }
+
+/**
+ * [preview iteration 2] `?ratio=` → glow marker 모행성:위성 비율 파싱.
+ *
+ * 사용자 피드백 "2:1 or 3:1" 두 비율을 URL 비교 프리뷰 가능하게:
+ *  - 미지정 → 2 (기본 2:1 — parent 4.5px / satellite 2.25px)
+ *  - `?marker=glow&ratio=3` → 3 (3:1 — parent 4.5px / satellite 1.5px)
+ *  - 프리뷰 유연성: 1~10 범위의 유한 수 허용 (예: 2.5)
+ *  - 범위 밖 / 비수치 → 2 폴백 + `console.warn`
+ *
+ * marker=glow 가 아닐 때는 호출 결과가 미사용 (scene 옵션이 무시).
+ */
+export const GLOW_MARKER_RATIO_DEFAULT = 2;
+
+export function parseGlowMarkerRatio(urlParam: string | null | undefined): number {
+  if (urlParam === null || urlParam === undefined || urlParam === '') {
+    return GLOW_MARKER_RATIO_DEFAULT;
+  }
+  const parsed = Number(urlParam);
+  if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 10) {
+    return parsed;
+  }
+
+  console.warn(
+    `[parse-marker-mode] 유효하지 않은 ?ratio=${urlParam} — ${GLOW_MARKER_RATIO_DEFAULT} 로 폴백`,
+  );
+  return GLOW_MARKER_RATIO_DEFAULT;
+}
