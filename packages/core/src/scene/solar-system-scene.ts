@@ -1393,9 +1393,10 @@ export function createSolarSystemScene(
       //  - pxDiameter 가 비유한/0 이하 (off-frustum/behind-camera) 이면 비활성 — scaling 폭주 방지
       //    (실측: 5 AU 에서 halley/swift-tuttle px=0 — 화면 밖이므로 마커 불필요, 가드가 정답)
       const glowBillboardPx = pxDiameter / Math.max(bodyScaleVal, 1e-9);
+      // [iteration 3] sun(star) 포함 — 사용자 피드백 "태양만 적용이 안 된 듯". 100 AU 에서
+      // sun billboard 실반경 ≈ 0.09px 비식별이라 동일하게 glow 대상 (star 제외 설계 폐기).
       const glowActive =
         glowMarker &&
-        body.kind !== 'star' &&
         nextLevel === 'low' &&
         Number.isFinite(pxDiameter) &&
         pxDiameter > 0 &&
@@ -1431,15 +1432,16 @@ export function createSolarSystemScene(
       // bodyScale 미적용 (#333 책임 분리) — billboard 실제 화면 px ≈ pxDiameter / bodyScale.
       // 따라서 scaling = targetPx / billboardPx = targetPx × bodyScale / pxDiameter.
       // 매 프레임 갱신 (줌 변화 추종). 상한 클램프로 극단 줌아웃 scaling 폭주 방지.
-      if (glowMarker && body.kind !== 'star') {
+      if (glowMarker) {
         const wasGlow = glowActiveBodies.has(body.id);
         if (glowActive && lowVariantMesh) {
           const billboardPx = Math.max(glowBillboardPx, GLOW_MARKER_MIN_MEASURED_PX);
           // [iteration 2] 모행성:위성 크기 계층 — parentId === 'sun' (행성/왜소행성/혜성) 은
           // 4.5px, 위성은 4.5/ratio (기본 2:1 → 2.25px, ?ratio=3 → 1.5px). 사용자 피드백
           // "모행성과 하위 행성의 비율도 살짝 2:1 or 3:1 정도 픽셀로 조절" 반영.
+          // [iteration 3] sun(star) 은 parent 동급 크기 (root 천체 — 위성 축소 비대상).
           const targetPx =
-            body.parentId === 'sun'
+            body.parentId === 'sun' || body.kind === 'star'
               ? GLOW_MARKER_TARGET_PX_PARENT
               : GLOW_MARKER_TARGET_PX_PARENT / glowMarkerSatelliteRatio;
           const rawScale = targetPx / billboardPx;
@@ -1454,7 +1456,7 @@ export function createSolarSystemScene(
               // (10 AU 실측: 위성 피크 173~214 vs parent 199~252).
               const c = hexToColor3(body.colorHint?.hex ?? '#888888');
               const emissiveScale =
-                body.parentId === 'sun'
+                body.parentId === 'sun' || body.kind === 'star'
                   ? GLOW_MARKER_EMISSIVE_SCALE
                   : GLOW_MARKER_EMISSIVE_SCALE_SATELLITE;
               mat.emissiveColor = c.scale(emissiveScale);
@@ -1468,7 +1470,8 @@ export function createSolarSystemScene(
             const mat = lowVariantMesh.material as StandardMaterial | null;
             if (mat) {
               const c = hexToColor3(body.colorHint?.hex ?? '#888888');
-              mat.emissiveColor = c.scale(0.3); // createBodyBillboard 기본값 원복
+              // createBodyBillboard 기본값 원복 — star 는 full emissive(c), 그 외 c×0.3 (iteration 3)
+              mat.emissiveColor = body.kind === 'star' ? c : c.scale(0.3);
             }
           }
         }
