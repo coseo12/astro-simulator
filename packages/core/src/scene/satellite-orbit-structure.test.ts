@@ -113,7 +113,7 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
 
   it('미매핑 parentId → 1.0 fallback (visual scale 미적용, 실측 그대로)', () => {
     expect(getOrbitVisualScale('pluto')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R10a #659 진입 — 단 위성 0 (charon 데이터 부재) 이라 미매핑 정합
-    expect(getOrbitVisualScale('halley')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R10b (phase 11) 진입 전
+    expect(getOrbitVisualScale('halley')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R10b #664 진입 — 단 위성 0 이라 미매핑 정합 (semantics "미진입" → "미매핑", ADR 20260612-r10b §축 5 변경 0 행)
     expect(getOrbitVisualScale('unknown-parent')).toBe(DEFAULT_ORBIT_VISUAL_SCALE);
   });
 

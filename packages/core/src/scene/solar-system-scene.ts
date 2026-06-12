@@ -1974,7 +1974,13 @@ function sampleOrbitPoints(body: LoadedCelestialBody, tier: Tier): Vector3[] | n
   if (!body.orbit || !body.parentId) return null;
   const orbit = body.orbit;
   // 궤도 한 바퀴 샘플링 (진근점각 기준 등간격)
-  const segments = 64; // 성능 최적화 (P1 E3)
+  // R10b #664 — 고이심률 (e ≥ 0.6) body 는 256 seg: 진근점각 등간격은 근일점 자동 밀집 +
+  // 원일점 희소가 구조라, halley (e 0.967) 원일점측 chord sagitta 가 프레임핏 13.97px 로
+  // 다각형 꺾임이 육안 식별됨 (D-T2 실측 발동 — ADR 20260612-r10b §축 3 fix 1순위.
+  // 256 seg → 1.52px, eris 식별-불가 기준선 1.10px 근접). 임계 0.6 근거: 실측 검증된 최대
+  // OK (eris 0.436 — 꺾임 식별 불가) 와 최소 혜성 (encke 0.848) 사이 — e < 0.6 인 기존
+  // 24 body 는 seg 64 불변 (vertex 동일, pixel-diff 기존 궤도선 무영향).
+  const segments = orbit.eccentricity >= 0.6 ? 256 : 64; // 성능 최적화 (P1 E3) + 고이심률 예외
   const points: Vector3[] = [];
 
   const cosO = Math.cos(orbit.longitudeOfAscendingNode);

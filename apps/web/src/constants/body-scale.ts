@@ -81,6 +81,21 @@
  *                scale 4그룹 체계 완성: inner 700~800 / gas giant 48 / ice giant 250 / dwarf 800.
  *                ADR: docs/decisions/20260611-r10a-dwarf-planets-visualization.md §축 1
  *
+ * R10b baseline (#664 — comet 그룹 3 body 전부 5000, 5번째 scale 그룹 — PM Q1=A):
+ *   comet = 5000 → phobos/deimos 극소형 (km 급) 계보 답습 — "극소형 천체 = 5000" 단일 mental
+ *                 model. 그룹 단일값으로 그룹 내 사실 서열 (swift-tuttle 1.3e4 > halley 5.5e3 >
+ *                 encke 2.4e3) 자동 보존 + cross-group (swift-tuttle×5000 = 6.50e7 <
+ *                 ceres×800 = 3.7568e8, 비 0.173 — max comet < min dwarf) 보존.
+ *                 식 px: swift-tuttle 0.460 / halley 0.195 / encke 0.085 — 3 body 전부 sub-px,
+ *                 solar view 는 billboard 4px fallback 전면 의존 (PM 명시 — LOD Phase 2 #391
+ *                 흡수). focus view 는 mesh 직접 관찰 (R5 위성 선례 검증 경로).
+ *                 5000 통합 그룹 사실 서열: swift-tuttle > phobos > deimos > halley > encke
+ *                 (동일 scale 이므로 visual 서열 = 사실 radius 서열 — swift-tuttle visual >
+ *                 phobos visual 은 사실 정합, 버그 아님. ADR §축 1 D-T2 사전 등록).
+ *                 scale 5그룹 체계: inner 700~800 / gas giant 48 / ice giant 250 / dwarf 800 /
+ *                 comet·극소형 위성 5000.
+ *                 ADR: docs/decisions/20260612-r10b-comets-visualization.md §축 1
+ *
  * R6~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
  * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
  * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건 +
@@ -116,6 +131,12 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   haumea: 800, // R10a #659 — 식 px 4.42 (4px 경계 — billboard 의존 분류로 진동 무위험). volumetric mean 구체 근사 ($radiusComment)
   makemake: 800, // R10a #659 — 식 px 4.05 (4px 경계 — billboard 의존 분류)
   eris: 800, // R10a #659 — pluto/eris 사실 radius 비 1.0218 보존 (식 px 차 0.14 — 시각 동일 크기는 사실 정합, ADR §위험 #1). a 67.86 AU 그룹 최대
+  // R10b #664 — comet 그룹 (5번째 scale 그룹, 전부 5000 = phobos/deimos 극소형 계보 답습 — PM Q1=A).
+  // 그룹 단일값으로 그룹 내 사실 서열 자동 보존 + cross-group (max comet < min dwarf, 비 0.173) 보존.
+  // ADR 20260612-r10b §축 1. 개별 조정 금지 — 단일값 구조가 서열 가드의 전제 (R10a dwarf 동형).
+  halley: 5000, // R10b #664 — 식 px 0.195 sub-px (billboard 전면 의존). e=0.96714 그룹 최대 이심률 + 역행 (i 162.26°). volumetric mean 구체 근사 ($radiusComment)
+  encke: 5000, // R10b #664 — 식 px 0.085 그룹 최소 (radius 2.4 km). 근일점 0.337 AU = 4.23 unit > sun mesh 1.46 unit (×2.9 여유 — ADR §축 3)
+  'swift-tuttle': 5000, // R10b #664 — 그룹 최대 radius (1.3e4). swift-tuttle×5000 < ceres×800 (비 0.173 — cross-group 사실 서열 보존) + 역행 (i 113.45°)
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

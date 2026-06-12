@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 순서로 정확히 24개', () => {
+  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 순서로 정확히 27개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -49,6 +49,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'haumea',
       'makemake',
       'eris',
+      'halley', // R10b #664 — 혜성 3 (데이터 등장 순, 전 데이터 소진 — 로드맵 v3 최종 라운드)
+      'encke',
+      'swift-tuttle',
     ]);
   });
 
@@ -56,9 +59,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 24개 (CURRENT_R_PHASE=10 필터 — 혜성 3 은 phase 11 로 자동 제외)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R10a #659 진입 24개 (위 toEqual).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(24);
+  it('자동 생성 결과 27개 (CURRENT_R_PHASE=11 필터 — 전 데이터 소진, 미진입 body 0)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R10b #664 진입 27개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(27);
   });
 });
 
@@ -72,8 +75,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 10 (R10a 왜소행성 5 까지 — 첫 비-행성 라운드. phase 11 = R10b 혜성)', () => {
-    expect(CURRENT_R_PHASE).toBe(10);
+  it('CURRENT_R_PHASE 는 11 (R10b 혜성 3 까지 — 전 데이터 소진, 로드맵 v3 최종 라운드)', () => {
+    expect(CURRENT_R_PHASE).toBe(11);
   });
 
   it('filterBodiesByPhase(CURRENT_R_PHASE) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -133,21 +136,22 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     expect(r9).not.toContain('pluto');
   });
 
-  it('R10a 시뮬레이션 — phase 10 진입 시 왜소행성 5 자동 포함 24개 (CURRENT_R_PHASE 1줄, 코드 변경 0 — 혜성 3 제외)', () => {
-    expect(filterBodiesByPhase(bodies, 10)).toEqual([...R_PHASE_BODY_ALLOWLIST]);
-    expect(filterBodiesByPhase(bodies, 10).length).toBe(24);
+  it('R10a 시뮬레이션 — phase 10 고정은 24개 (혜성 3 제외 — R10a/R10b 경계 가드 유지)', () => {
+    // R10b #664 진입 후에도 phase 10 고정 시뮬레이션은 24 body — 분리 메커니즘 경계 가드.
+    const r10 = filterBodiesByPhase(bodies, 10);
+    expect(r10.length).toBe(24);
     for (const id of ['ceres', 'pluto', 'haumea', 'makemake', 'eris']) {
-      expect(filterBodiesByPhase(bodies, 10)).toContain(id);
+      expect(r10).toContain(id);
     }
     for (const id of ['halley', 'encke', 'swift-tuttle']) {
-      expect(filterBodiesByPhase(bodies, 10), `${id} 는 phase 11 (R10b) — R10a 제외`).not.toContain(
-        id,
-      );
+      expect(r10, `${id} 는 phase 11 (R10b) — phase 10 제외`).not.toContain(id);
     }
   });
 
-  it('R10b 시뮬레이션 — phase 11 은 전체 27 body (혜성 3 자동 포함 — CURRENT_R_PHASE=11 1줄 예고)', () => {
+  it('R10b — phase 11 = 현재 자동 생성 allowlist 와 동치 27 body (혜성 3 자동 포함 — CURRENT_R_PHASE=11 1줄 적중)', () => {
+    // R10a 의 "phase 11 시뮬레이션 예고" 테스트를 R_PHASE_BODY_ALLOWLIST 동치 단언으로 승격 (ADR §축 2).
     const r11 = filterBodiesByPhase(bodies, 11);
+    expect(r11).toEqual([...R_PHASE_BODY_ALLOWLIST]);
     expect(r11.length).toBe(27);
     expect(r11).toContain('halley');
     expect(r11).toContain('encke');
@@ -197,12 +201,16 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('haumea')).toBe(true); // R10a #659
     expect(isRPhaseFocusable('makemake')).toBe(true); // R10a #659
     expect(isRPhaseFocusable('eris')).toBe(true); // R10a #659
+    expect(isRPhaseFocusable('halley')).toBe(true); // R10b #664 — 혜성 3 (negative → positive 전환, 역행 i 162.26°)
+    expect(isRPhaseFocusable('encke')).toBe(true); // R10b #664
+    expect(isRPhaseFocusable('swift-tuttle')).toBe(true); // R10b #664 — 전 데이터 소진 (미진입 body 0)
   });
 
-  it('allowlist 외 body 는 false (halley / encke / swift-tuttle — R10b phase 11 진입 전)', () => {
-    expect(isRPhaseFocusable('halley')).toBe(false); // R10b 진입 전 (R10a #659 — pluto positive 전환으로 혜성 교체)
-    expect(isRPhaseFocusable('encke')).toBe(false); // R10b 진입 전
-    expect(isRPhaseFocusable('swift-tuttle')).toBe(false); // R10b 진입 전
+  it('allowlist 외 가상 ID 는 false (R10b #664 — 미진입 실데이터 0, 가상 ID 로 membership 가드 영구 보존)', () => {
+    // ADR 20260612-r10b §축 5 ① — phase 11 진입으로 미진입 실데이터 body 가 소멸 →
+    // membership 가드 negative 를 가상 ID 로 전환 (phase 진행 영구 비종속, agy 1순위 권고).
+    // ⚠️ 'nonexistent-body' 류 가상 ID 는 미래 phase 12+ 에서 실데이터 등록 금지 (ADR §재검토 #7).
+    expect(isRPhaseFocusable('nonexistent-body')).toBe(false);
   });
 
   it('null 은 true — resetCamera / free-fly 경로 차단 금지 (ADR §결정 3)', () => {
@@ -289,7 +297,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     .filter((b) => b.showInShortcutBar && b.introducedInRPhase > CURRENT_R_PHASE)
     .map((b) => b.id);
 
-  it('현재 shortcut 노출 = sun~pluto 전부 활성 (R10a #659 — pluto 승격 14버튼, 비활성 0)', () => {
+  it('현재 shortcut 노출 = sun~pluto + halley 전부 활성 (R10b #664 — halley 승격 15버튼, 비활성 0)', () => {
     expect(shortcutBodies).toEqual([
       'sun',
       'mercury',
@@ -302,6 +310,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'uranus', // R8 #647 — showInShortcutBar false → true 전환 (§축 5)
       'neptune', // R9 #653 — 이미 true (배열 변경 0, #613 Concrete Prediction — CURRENT_R_PHASE=9 1줄 자동 enabled)
       'pluto', // R10a #659 — showInShortcutBar false → true 승격 (PM Q3=A — pluto 만, §축 4)
+      'halley', // R10b #664 — showInShortcutBar false → true 승격 (PM Q2=A — halley 만, 비-행성 후미 컨벤션 §축 6)
     ]);
     expect(shortcutEnabled).toEqual([
       'sun',
@@ -315,11 +324,11 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       'uranus',
       'neptune',
       'pluto', // R10a #659
+      'halley', // R10b #664
     ]);
-    // R10a — ceres/haumea/makemake/eris = "focus 가능 + bar 미등록" (#617 직교 축 — parent=sun
-    // 첫 bar-미등록 사례. phobos/deimos/galilean/titan/titania/triton 와 동일 분류). 혜성 3 도
-    // showInShortcutBar=false 라 shortcutDisabled 는 여전히 빈 배열 — bar 비활성 대표 구조 소멸 유지.
-    // negative 케이스는 browser-verify CelestialTree 5-B/5-C (halley) + preset 6-H (halley-x10) 보존.
+    // R10b — encke/swift-tuttle 는 "focus 가능 + bar 미등록" (#617 직교 축 — ceres 등 4 body 와
+    // 동일 분류 합류). shortcutDisabled 는 여전히 빈 배열 — phase 11 진입으로 미진입 실데이터 0
+    // (전 데이터 소진). negative 는 가상 ID (membership 가드) + vi.mock (UI 계약) 이 승계 — §축 5.
     expect(shortcutDisabled).toEqual([]);
   });
 
@@ -328,6 +337,16 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
       const body = bodies.find((b) => b.id === id);
       expect(body?.introducedInRPhase, `${id} 는 R10a (phase 10) 진입`).toBe(10);
       expect(body?.showInShortcutBar, `${id} 는 bar 미등록 (URL ?focus= 진입만)`).toBe(false);
+    }
+  });
+
+  it('R10b #664 — encke/swift-tuttle 는 focus 가능 + bar 미등록 (#617 직교 축 negative 합류)', () => {
+    for (const id of ['encke', 'swift-tuttle']) {
+      const body = bodies.find((b) => b.id === id);
+      expect(body?.introducedInRPhase, `${id} 는 R10b (phase 11) 진입`).toBe(11);
+      expect(body?.showInShortcutBar, `${id} 는 bar 미등록 (URL ?focus= 진입만 — PM Q2=A)`).toBe(
+        false,
+      );
     }
   });
 
