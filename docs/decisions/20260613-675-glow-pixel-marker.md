@@ -270,3 +270,11 @@ scene (`runLodPass`) 은 본 함수 호출 + mesh/material 적용만 담당 — 
 ### Claude 편향 셀프 체크 결과 대조
 
 - 사전 기록 4항목 전부 agy 평가와 모순 없음 — popping 기각 논거 (도달 불가 경계 dead-code 가드) 를 agy 가 성능 제어 우수 사례로 독립 평가
+
+---
+
+## Amendment 1 (2026-06-13) — Concrete Prediction ② 메트릭 단위 정제 (구현 PR #677 실측)
+
+- **실측 분기**: 행동 semantics 변경 = **4 statement ≤ 15 적중** / 라인-문자 해석 (prettier 멀티라인 + 함수 추출 경계 포함) = **23 > 15 실패** — 동일 diff 의 해석 차이 (PR #677 정직 박제 → reviewer 판정 "원인은 추상화 결함이 아닌 메트릭 단위 모호")
+- **정제**: Concrete Prediction 의 코어 예산 메트릭은 이후 라운드부터 **"행동 semantics 변경 statement 수"** 기준 (prettier 줄바꿈/함수 추출 경계의 기계적 라인 증가는 제외 — 단 추출 자체가 신규 분기/조건을 추가하면 포함). 본 ADR ② 의 "(기본값 flip + 함수 추출 경계)" 괄호가 라인 해석을 유도한 모호 표기였음을 인정
+- **동승 박제 (reviewer 권고 3)**: §축 6 "scene 통합 테스트 1건" 은 구현에서 **headless 5축 가드 (`browser-verify-glow-marker.mjs`) 의 축 ②** 로 대체 — Babylon scene 의존 단위 테스트 대신 실 렌더 경로 검증이 상위 보증 (동등 이상 대체, 결손 아님)

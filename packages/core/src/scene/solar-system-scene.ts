@@ -41,6 +41,7 @@ import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
   GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
+  GLOW_MARKER_RESTORE_EMISSIVE_SCALE_NON_STAR,
   resolveGlowMarker,
   resolveGlowMarkerRestoreEmissiveScale,
 } from './glow-marker.js';
@@ -2025,7 +2026,9 @@ function createBodyBillboard(
     mat.disableLighting = true;
   } else {
     mat.diffuseColor = c;
-    mat.emissiveColor = c.scale(0.3); // billboard 는 구형 음영이 없으므로 약한 emissive 로 가시성 보장
+    // billboard 는 구형 음영이 없으므로 약한 emissive 로 가시성 보장 — 값은 glow-marker.ts
+    // RESTORE 상수와 양방향 SSoT (#675 reviewer 권고 2: 인라인 리터럴은 cross-assert 불가한 단방향 pin)
+    mat.emissiveColor = c.scale(GLOW_MARKER_RESTORE_EMISSIVE_SCALE_NON_STAR);
     mat.specularColor = new Color3(0, 0, 0);
   }
 
