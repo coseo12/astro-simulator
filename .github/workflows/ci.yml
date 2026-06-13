@@ -38,11 +38,11 @@ jobs:
         with:
           # #606 fix (ADR 20260531-606 §Amendment 2) — playwright 1.59.1 extract 가
           #   Node 24.16 환경에서 deadlock ("extracting archive" 후 I/O 0바이트 5분 hang).
-          #   node-version-file: 'package.json' (engines.node ">=20.0.0") 은 setup-node 가
-          #   최신 24.16 을 설치 → freeze. Node 22 LTS 핀으로 회피 (run 26756788369 에서
-          #   install 28초 통과 검증, playwright 버전/r1-guard baseline 무영향).
-          #   재검토: playwright 업그레이드로 Node 24 extract 호환 확인되면 핀 해제 가능.
-          node-version: '22'
+          #   engines.node ">=20.0.0" 범위 해석은 setup-node 가 최신 24.16 을 설치 → freeze.
+          #   #666 (Amendment 4): 정확 버전 중앙 파일 `.node-version` (22.16.0) 로 일원화.
+          #   정확 버전이라 범위 해석 함정 회피 (Amendment 3 "전수 명시 핀" 정책 양립).
+          #   재검토: playwright 업그레이드로 Node 24 extract 호환 확인되면 .node-version 갱신.
+          node-version-file: '.node-version'
           cache: 'pnpm'
 
       - name: pnpm install
@@ -113,11 +113,29 @@ jobs:
       #      비호환 확정 (run 26756788369). fix: Node 22 LTS 핀 (line 39).
       # step 분리는 fix 후에도 유지 — freeze 재발 시 즉시 step 단위 격리 (ADR 옵션 f 정합).
 
-      - name: 'r1-guard: Playwright Chromium 설치 (1/4)'
+      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 line 39 가 1차).
+      # 캐시 히트 시 ~/.cache/ms-playwright 복원 → 아래 1/4 install 의 extract 단계 자체 미발생.
+      - name: 'r1-guard: Playwright 브라우저 캐시'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
+          # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
+          # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: 'r1-guard: Playwright Chromium 설치 (1/4, 캐시 미스 — 다운로드+extract)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && steps.playwright-cache.outputs.cache-hit != 'true'
         # Node 22 핀 (line 39) 으로 extract deadlock 해소. timeout-minutes:5 는 회귀 재발 가드 유지.
         timeout-minutes: 5
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: 'r1-guard: Playwright 시스템 deps (1/4, 캐시 히트 — extract 생략 = deadlock 2차 방어)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 5
+        run: pnpm exec playwright install-deps chromium
 
       - name: 'r1-guard: production build (2/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''

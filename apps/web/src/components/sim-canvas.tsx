@@ -324,22 +324,36 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // (`instance.start().then(...)`) 는 비동기라 handler 가 아직 null. 이 경우 command 가 no-op 되어
         // override 유실. 방어 장치로 handler 등록 시점에 **URL 을 직접 재파싱** 하여 즉시 override 적용
         // (UrlSync 호출이 이미 지나갔어도 최신 URL 상태 복원). 두 경로 동시 적용해도 idempotent.
-        instance.setLodOverrideHandler((level) => {
-          solar.setLodOverride(level);
-        });
-        {
+        //
+        // #680 — tier-c 강제 LOD 보존 (race 제3 윈도우 fix). UrlSync 는 `?lod=` 미지정 시
+        // `setLodOverride('auto')` 를 **무조건** 발행한다 (url-sync.tsx:120-122). 이 'auto' command 가
+        // handler 등록 **후** 도착하면 (저속/headless 의 비결정적 mount 타이밍) tier-c 강제 'low' 를
+        // 'auto' 로 덮어써 sun high + mid sphere 렌더 → fps-baseline-guard FAIL.
+        //   #677 Amendment 2 는 detectGpuCapability().then 의 command 직접 발행만 보강했으나,
+        //   그 후 도착하는 UrlSync 'auto' 를 막지 못했다 (run 27456421530 mobile override='auto'
+        //   잔존 — 진단 trace: setLodOverride('low')@1059ms → setLodOverride('auto')@1272ms).
+        // 처치: handler 가 매 진입마다 **현 URL + tier-c 강제 플래그를 재참조**해 미지정 기본
+        // ('auto') 를 강제값으로 치환한다 (재판정마다 결정론 정착). 사용자 명시 `?lod=` 는
+        // 그대로 통과 (디버그 경로 보존 — URL 우선 원칙). 강제 플래그가 늦게 박제돼도 (Chain A
+        // 지연) 후속 어떤 setLodOverride 진입에서든 강제값 복원 → 순서 무관 idempotent.
+        const resolveLodWithTierForce = (level: 'high' | 'mid' | 'low' | 'auto') => {
           const lodParam = new URLSearchParams(window.location.search).get('lod');
-          const parsed = parseLodLevel(lodParam);
-          // P11-C #290 — URL `?lod=` 가 없고 GPU tier-c 가 LOD low 강제를 예약했으면 그걸 적용.
-          //   URL 우선 원칙: `?lod=` 가 있으면 사용자 디버그 경로를 차단하지 않는다.
           const hasLodUrl = lodParam !== null && lodParam !== '';
           const tierForced = (window as { __gpuTierForceLod?: 'high' | 'mid' | 'low' })
             .__gpuTierForceLod;
-          if (!hasLodUrl && tierForced) {
-            solar.setLodOverride(tierForced);
-          } else {
-            solar.setLodOverride(parsed);
-          }
+          // 사용자 명시 URL 우선. 미지정('auto' 기본) + tier-c 강제면 강제값으로 치환.
+          if (!hasLodUrl && level === 'auto' && tierForced) return tierForced;
+          return level;
+        };
+        instance.setLodOverrideHandler((level) => {
+          solar.setLodOverride(resolveLodWithTierForce(level));
+        });
+        {
+          // P11-C #290 — URL `?lod=` 가 없고 GPU tier-c 가 LOD low 강제를 예약했으면 그걸 적용.
+          //   URL 우선 원칙: `?lod=` 가 있으면 사용자 디버그 경로를 차단하지 않는다.
+          // #680 — handler 와 동일 식 (resolveLodWithTierForce) 사용 → 강제 보존 로직 SSoT 단일.
+          const parsed = parseLodLevel(new URLSearchParams(window.location.search).get('lod'));
+          solar.setLodOverride(resolveLodWithTierForce(parsed));
         }
 
         // R1 #334+#335 — store-scene 동기화 단일 경로 helper.
