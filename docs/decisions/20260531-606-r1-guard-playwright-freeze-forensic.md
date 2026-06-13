@@ -516,6 +516,20 @@ freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 foc
   3. **upstream (playwright/Node) 이슈 추적** — Amendment 3 cross-validate 수용 + §Amendment 라운드 N≥4 "핀 해제 조건 = upstream 이슈 추적" 항목에 **기존 박제와 수렴** (리포트 링크 발견 시 박제 조건부). 추가 조치 없음
 - **Claude 셀프 체크**: 일원화 vs NO-OP 의 "적극 처치 편향" 경계 — NO-OP 근거 (전환 비용 > 이득) 를 실측으로 부정 (`.nvmrc` footgun = 유지보수성 아닌 재현 위험 / bench 영향 0) 후 진행. 통과
 
+#### Amendment 5 — Playwright 바이너리 캐싱 = extract deadlock 2차 방어 (#684, defense-in-depth)
+
+Amendment 4 cross-validate 고유 발견 #1 (#684 로 분리) 의 구현 박제. **Node 22 핀 (Amendment 2, #610/#663) 이 "어떤 Node 로 extract 하느냐" 의 1차 방어라면, 본 캐싱은 "extract 를 아예 안 하기" 의 직교 2차 방어** (defense-in-depth).
+
+- **메커니즘**: playwright 사용 6 workflow (`ci` / `a11y-baseline-guard` / `fps-baseline-guard` / `bench` / `bench-baseline-remeasure` / `r1-baseline-bootstrap`) 의 `pnpm exec playwright install --with-deps chromium` **직전** `actions/cache@v4` step 추가. `~/.cache/ms-playwright` 를 `key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}` 로 캐싱.
+- **분기**:
+  - 캐시 미스 (`cache-hit != 'true'`): 기존 `playwright install --with-deps chromium` (다운로드 + **extract** + 시스템 deps) — 이 경로에서만 deadlock 위험 노출 (Node 22 핀이 막음)
+  - 캐시 히트 (`cache-hit == 'true'`): `playwright install-deps chromium` (apt 시스템 패키지만 — 바이너리는 캐시 복원, **extract 단계 자체 미발생** = deadlock 발생 불가)
+- **key 설계 결정**: `hashFiles('pnpm-lock.yaml')` 채택. `@playwright/test` 버전이 lockfile 에 포함되므로 playwright 버전 변경 시 자동 무효화 (**stale 바이너리 서빙 0 — 안전 방향**). trade-off: 무관 의존성 변경에도 over-eager miss (전체 재설치) 가능하나 fallback = 기존 동작 (느려질 뿐). 버전만 추출하는 정밀 키는 추출 로직 fragility 위험으로 기각.
+- **`--with-deps` 의 deps 는 캐시 대상 아님**: apt 시스템 패키지는 `~/.cache/ms-playwright` 밖이라 히트 시에도 `install-deps` 로 별도 설치 필요 (runner 이미지에 이미 있으면 빠름).
+- **#680 (fps flake) 와 직교**: 캐싱은 install 시간만 줄임 — fps 측정 안정성 (#680) 과 무관.
+- 트리거 이슈: [#684](https://github.com/coseo12/astro-simulator/issues/684) / 영향 파일: 6 workflow + 본 ADR
+- 일반화된 학습: defense-in-depth — 동일 장애 클래스에 대해 "원인 제거 (Node 핀)" 와 "원인 우회 (extract 생략)" 직교 방어를 병치. 1차가 회귀해도 2차가 잔존.
+
 ### Amendment 라운드 N≥4 예상
 
 - ~~Amendment 3 (해소됨 — 본 Amendment 2 가 root cause fix 까지 박제): 옵션 (c)/(d) root cause fix~~ → 실제 root cause 는 옵션 a~e 어디에도 없던 Node/playwright extract 비호환이었고 Node 22 핀으로 해소
