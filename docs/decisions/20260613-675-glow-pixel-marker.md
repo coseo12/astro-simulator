@@ -311,4 +311,12 @@ Amendment 2 의 fix (detectGpuCapability().then 의 command 직접 발행) 후�
 - **회귀 가드**: 축 6 (`browser-verify-glow-marker.mjs`) 무회귀 PASS (지연 tier-c 감지 후 override='low' 정착). 단위 853 (web 357 + core 492 + shared 4) 무회귀. 축 6 가드는 (2)-(1) race 만 게이트하므로 (3) UrlSync race 는 직접 커버 안 하나, 본 fix 의 handler 재참조가 모든 출처를 idempotent 하게 흡수해 축 6 도 통과.
 - **popping (c) / §축 1~7 결정 전부 무영향** — 본 Amendment 는 race 제3 윈도우 확정 + web 레이어 fix 기록. Concrete Prediction ③ "fps baseline 갱신 0" 유지 (glow 무관 재확정).
 
-> cross-validate 통합 대기: 본 Amendment 는 reviewer/architect 의 후속 cross-validate 1회 루틴 대상 (#370 옵션 C — race fix 설계 결정). developer 는 cross-validate 직접 호출 범위 밖 (#479).
+- **DoD #3 연속 5 run green 실측 (2026-06-13)**: fix 후 fps-baseline-guard 연속 **5/5 run success** (run 27457138358 attempt 1~5) — mobile override 5 run 전부 'low' 정착 (이전 4 run 중 1 fail = race-lost 와 대비, race 결정론화 입증). #680 DoD #3 충족.
+
+#### Amendment 3 교차검증 (2026-06-13 — agy 응답 불가, Claude 단독 분석)
+
+> cross-validate 시도 (로그 `.claude/logs/cross-validate-architecture-20260613-140230.log`) 에서 **agy (Antigravity CLI) 응답 없음 (비-capacity 오류, 2시도 실패)** — CLAUDE.md §교차검증 "외부 모델 실패 시 스킵 + 'Claude 단독 분석' 명시, 경량 폴백 금지" 정책에 따라 **Claude 단독 분석으로 Accepted 전이**. 이중 시각은 미확보이나 **reviewer 의 독립 정밀 검증** (PR #683 증분 리뷰 — idempotent 3경우 정합 / 무한루프 부재 (`setLodOverride` 순수 상태변이) / `?lod=` URL 우선 보존 / #677 Amendment 2 와 정합) 이 단일 모델 편향을 부분 상쇄.
+>
+> **Claude 셀프 체크**: ① 원귀인 = 코드 trace (UrlSync command @1272ms 가 강제 low @1059ms 덮어씀) + delay sweep 100% 결정론 재현 — 가정 아닌 실측 ② fix 가 측정 하네스 아닌 앱 코드 (실 tier-c 기기 동일 race) — 근본 처치 ③ DoD #3 연속 5/5 run green 실측 ④ glow PM 확정값 0 변경. 후속 cross-validate 재시도 가치 낮음 (race 메커니즘 코드 확정 + reviewer 검증 + 5 run 실측 3중).
+
+**상태: Amendment 3 Accepted (Claude 단독 2026-06-13, agy 응답 불가).**
