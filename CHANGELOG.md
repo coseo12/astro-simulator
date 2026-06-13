@@ -3,6 +3,17 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.27.0] — 2026-06-13
+
+### Behavior Changes (#680 — tier-c LOD override race 근본 fix + fps 가드 진단 인프라)
+
+- **[#680] tier-c LOD override race 제3 윈도우 근본 fix + fps-baseline-guard 진단 인프라 (MINOR — 앱 코드: 저사양 GPU LOD 결정론화)** ([#680](https://github.com/coseo12/astro-simulator/issues/680)) — #677 Amendment 2 의 race fix (출처 2개 보강) 후에도 fps-baseline-guard mobile 잔존 flake (동일 코드 fail −44~54% → rerun 만점). **진단 인프라** (`captureLodDiag` — 측정 시점 tier/override/lod 박제 + fail 시 가설 자동 분류) 가 CI 에서 **가설 1 (race 제3 윈도우) 즉시 확정**: desktop `override=low` 정착 vs mobile `override=auto` 잔존 (강제 low 유실 → sun high sphere 풀렌더). **근본 원인 (앱 코드)**: `url-sync.tsx` mount 의 무조건 `setLodOverride('auto')` 발행 (**제3 출처 — #677 Amendment 2 누락**) 이 tier-c 강제 low 를 덮어씀. delay sweep 100% 결정론 재현 (delay=0 → 'auto', ≥50ms → 'low'). **fix** (`sim-canvas.tsx`, glow 코드 0 변경): handler 가 매 진입마다 URL `?lod=` + `__gpuTierForceLod` 강제 플래그 재참조 (`resolveLodWithTierForce`) → 미지정 'auto' 를 강제값으로 idempotent 치환 (#677 2중화 → 3중 + 순서 보장, `?lod=` URL 우선 보존). **진단 처치** (`verify-fps-baseline.mjs`): override='low' 정착 8s bounded 대기 (영구 race-lost 는 FAIL 표면화 — 은폐 0) + 재측정 1회 best (transient 흡수, 진짜 회귀는 두 번 다 fail). **DoD 연속 5/5 run green 실측** (mobile override 전부 'low' 정착). #677 ADR Amendment 3 Accepted (agy 응답 불가 → Claude 단독 + reviewer 독립 검증). **실 tier-c 기기도 동일 race 겪으므로 앱 fix = 제품 동작 변화 (MINOR)** — 저사양 GPU 에서 강제 low LOD 안정 적용.
+
+### Behavior Changes (CI 인프라 — #666 Node 중앙화 + #684 Playwright 캐싱, 앱 런타임 무관)
+
+- **[#666] Node 버전 중앙 집중 관리 — `.node-version` 정확 버전 일원화** ([#666](https://github.com/coseo12/astro-simulator/issues/666)) — playwright 6 workflow 의 하드코딩 Node 핀 (ci/a11y/fps '22' / bench 계열 20) 중복을 `.node-version` (정확 버전 `22.16.0`) 중앙 파일로 일원화 (8 workflow `node-version-file` 전환) + `.nvmrc` 24.14.0→22.16.0 정리 (#606 deadlock 로컬 footgun 해소). **bench 20→22 영향 0 실측** (Node 비종속 — WASM+Chromium 렌더링, baseline 재측정 불요). 정확 버전이라 #606 root cause (engines 범위 해석) 와 무관 — Amendment 3 "전수 명시 핀" 의도를 중앙 SSoT 로 보존. #606 ADR Amendment 4 Accepted (cross-validate agy 이견 0). **Behavior Changes: CI 만**.
+- **[#684] Playwright Chromium 바이너리 캐싱 (`actions/cache`) — extract deadlock 직교 2차 방어** ([#684](https://github.com/coseo12/astro-simulator/issues/684)) — 6 workflow 에 `actions/cache@v4` (`~/.cache/ms-playwright`, key `playwright-{os}-hashFiles(pnpm-lock)`) + 히트/미스 분기 (미스=`install --with-deps` extract O / 히트=`install-deps` **extract 생략**). **양 경로 CI 실측**: 미스 ci 29s·bench 26s → 히트 13s·14s. **Node 22 핀 (1차) ↔ extract 생략 (2차)** defense-in-depth — 캐시 히트 시 extract 단계 자체 미발생 = #606 deadlock 발생 불가. #606 ADR Amendment 5 Accepted (agy 제안 범위 내 → cross-validate 재발동 비대상). **Behavior Changes: CI 만**.
+
 ## [0.26.0] — 2026-06-13
 
 ### Behavior Changes (#677 forensic — tier-c LOD override race fix)
