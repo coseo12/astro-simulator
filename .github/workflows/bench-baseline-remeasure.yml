@@ -90,8 +90,25 @@ jobs:
       - name: 의존성 설치
         run: pnpm install --frozen-lockfile
 
-      - name: Playwright 브라우저 설치
+      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 #663 이 1차).
+      # 캐시 히트 시 ~/.cache/ms-playwright 복원 → extract 단계 자체 미발생.
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
+          # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
+          # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Playwright 브라우저 설치 (캐시 미스 — 다운로드+extract)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
 
       - name: 앱 빌드
         run: pnpm build
