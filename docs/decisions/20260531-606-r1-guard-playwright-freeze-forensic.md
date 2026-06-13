@@ -1,6 +1,6 @@
 # ADR: [#606] r1-guard Playwright Chromium freeze forensic — CI detect-and-test ~6시간 stuck (PR #596 R5 머지 직후 회귀)
 
-- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)** **+ Amendment 2 Accepted (2026-06-01 — 가설 1~5 전부 오진 정정 + root cause 확정 = Node 24.16 + playwright 1.59.1 extract 비호환. PR #610 measurement-first 4단계 진단. cross-validate agy outcome=applied 후 본문 통합 완료, §Amendment 2 §교차검증 반영 사항 4축 분류 박제 — 합의 5 / 이견 0 / Claude 기각 1(readiness 오탐) / 고유 발견 3(로컬 정합성·SSoT·dead code 후속 박제))** **+ Amendment 3 Accepted (2026-06-11 — #663: a11y/fps-baseline-guard 핀 누락 2 workflow 발견 + "playwright 사용 workflow 전수 명시 핀" 정책 박제. 기확정 root cause 의 적용 범위 확장이라 cross-validate 재발동 비대상 — Amendment 2 agy 합의 범위 내)**
+- **상태**: Accepted (cross-validate 2026-05-31 Antigravity `agy` outcome=applied 후 본문 통합 완료 — CLAUDE.md §ADR Status 워크플로 #370 의 cross-validate 발동 ADR 전이. §7 §교차검증 반영 사항 4축 분류 박제 완료) **+ Amendment 1 Accepted (2026-06-01 cross-validate agy outcome=applied 후 본문 통합 완료, §8 §Amendment 1 §교차검증 반영 사항 4축 분류 박제 완료)** **+ Amendment 2 Accepted (2026-06-01 — 가설 1~5 전부 오진 정정 + root cause 확정 = Node 24.16 + playwright 1.59.1 extract 비호환. PR #610 measurement-first 4단계 진단. cross-validate agy outcome=applied 후 본문 통합 완료, §Amendment 2 §교차검증 반영 사항 4축 분류 박제 — 합의 5 / 이견 0 / Claude 기각 1(readiness 오탐) / 고유 발견 3(로컬 정합성·SSoT·dead code 후속 박제))** **+ Amendment 3 Accepted (2026-06-11 — #663: a11y/fps-baseline-guard 핀 누락 2 workflow 발견 + "playwright 사용 workflow 전수 명시 핀" 정책 박제. 기확정 root cause 의 적용 범위 확장이라 cross-validate 재발동 비대상 — Amendment 2 agy 합의 범위 내)** **+ Amendment 4 Accepted (cross-validate 2026-06-13 agy outcome=applied — #666: Node 버전 중앙 집중 관리 일원화 `.node-version` 정확 버전 22.16.0 + 8 workflow 전환 + `.nvmrc` Node 24 잔존 해소. bench 20→22 영향 0 실측. agy 이견 0, 고유 발견 3 분류 — 캐싱 #684 분리 / 로컬 강제화 부분 해소 / upstream 수렴)**
 - **날짜**: 2026-05-31
 - **결정자**: architect (#606 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #606 (본 forensic), #604/#605 (직전 발현 PR), #594/#596 (R5 머지 trigger), [`20260528-r5-mars-visualization.md`](20260528-r5-mars-visualization.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md), [`apps/web/scripts/r1-ui-regression-guard.mjs`](../../apps/web/scripts/r1-ui-regression-guard.mjs), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
@@ -491,10 +491,35 @@ freeze fix 로 그동안 r1-guard freeze 에 가려 항상 skip 되던 `#378 foc
 - **기존재 (중복 — 추가 조치 없음)**: 로컬-CI 정합성 (`engines-strict`/`.nvmrc`) = Amendment 2 고유 발견 #1 기박제 / measureBodyPxRatios dead code 격리 = Amendment 2 고유 발견 #3 기박제
 - **기각**: `DEBUG=pw:install` secrets 필터링 — 해당 로깅은 #606 진단 당시 일회성 (현행 workflow 미잔존), 상시 가이드 박제는 과잉
 
+### Amendment 4 (2026-06-13) — Node 버전 중앙 집중 관리 일원화 (`.node-version` 정확 버전) + `.nvmrc` Node 24 잔존 해소 (#666)
+
+**배경**: Amendment 3 의 "playwright 사용 workflow 전수 명시 핀" 정책 + cross-validate 고유 발견 (#666 분리) — 다수 workflow 가 Node 버전을 각각 하드코딩 핀 (ci.yml '22' / a11y '22' / fps '22' / bench 20 / bench-remeasure 20 / r1-bootstrap 20) 하여 관리 포인트가 중복. 추가로 Amendment 2 고유 발견 #1 (`.nvmrc` = 24.14.0 Node 24 잔존) 이 로컬 fresh playwright install 시 동일 extract deadlock 를 유발할 잠재 footgun 으로 미해소.
+
+- **결정: 일원화 진행** (NO-OP 기각). `.node-version` (정확 버전 `22.16.0`) 신설 + 8 workflow `node-version-file: '.node-version'` 전환 + `.nvmrc` 24.14.0 → 22.16.0 동반 정리.
+- **Amendment 3 정책과의 정합 (핵심)**: Amendment 3 의 금지 대상은 **"범위 해석"** (`package.json` engines `">=20.0.0"` → setup-node 가 항상 최신 24.16+ 해석 = #606 root cause). `.node-version` 은 **정확 버전 단일 값** 이므로 setup-node 가 범위 해석을 하지 않는다 — root cause 와 무관한 유효 대안. Amendment 3 "전수 명시 핀" 의도 (silent 재발 차단) 를 **중앙 SSoT 단일 파일** 로 동일 보장하면서 관리 포인트 중복 제거.
+- **bench 20→22 통일 영향 실측 (NO-OP 근거 부정)**: bench 측정 루프는 WASM (Rust 컴파일) + Chromium headless 렌더링으로 **Node 버전 비종속**. baseline JSON 의 `environment` 필드 = `"gh-actions-ubuntu-chromium-headless"` 로 Node 버전 미기록 (`docs/benchmarks/baseline.json:5` 실측). Node 는 테스트 harness/스크립트 실행만 담당 — 측정 수치 (FPS / wasm step time) 에 미개입. → bench baseline 재측정 불요. bench 계열 별도 핀 유지 사유 없음.
+- **전환 범위 (8 workflow, dead-path 3곳 보존)**:
+  - playwright 사용 6 (이슈 명시): `ci.yml` (pnpm path) / `a11y-baseline-guard.yml` / `fps-baseline-guard.yml` / `bench.yml` / `bench-baseline-remeasure.yml` (2 step) / `r1-baseline-bootstrap.yml`
+  - playwright 미사용 2 (SSoT 완성 위해 동반 — deadlock 무관): `prettierignore-drift.yml` / `ci-physics-wasm.yml`
+  - **보존 (NO-OP 분류)**: `ci.yml` 의 yarn/npm/no-lockfile 폴백 3곳 (`node-version-file: 'package.json'`) — `if: hashFiles('pnpm-lock.yaml') == ''` dead path (Amendment 3 §"ci.yml 잔존 3곳 NO-OP" 와 동일 근거). 범용 템플릿 경로이므로 engines-range 형태 보존.
+- **`.nvmrc` 정리 근거**: 24.14.0 은 P4-A (#170, 2026-04-16) 부터 잔존 — #606 deadlock 발견 (2026-05-31) 이전에 박제된 stale Node 24 footgun. 로컬-CI 정합 (`.node-version` ↔ `.nvmrc` 동일 값) 으로 fresh playwright install 재현 위험 제거. `.node-version` 과 `.nvmrc` 이중 파일은 도구별 인식 차이 대응 (nvm = `.nvmrc`, fnm/nodenv/Volta 등 = `.node-version`) — 둘 다 동일 값 유지로 drift 차단.
+- **핀 해제 시 절차 갱신**: 향후 playwright 가 Node 24 extract 호환 확인되면 **`.node-version` 단일 파일 갱신** (이전엔 workflow N개 + ci.yml 주석 동시 수정 필요) — 중앙화의 직접 이득.
+
+#### Amendment 4 교차검증 반영 (cross-validate 2026-06-13 agy outcome=applied — 박제 직후 1회 루틴)
+
+> 로그: `.claude/logs/cross-validate-architecture-20260613-132247.log`. agy 종합 의견: "Measurement-first 원칙으로 가설 5 shotgun fix 직전 단계 격리·진단해 진범 (인프라 패키지 extract deadlock) 규명 — 엔지니어링 모범 사례." Amendment 4 일원화 결정 이견 0.
+
+- **합의**: `.node-version` 정확 버전 = 범위 해석 회피 (Amendment 3 정책 양립) / bench Node 비종속 실측 / 중앙 SSoT 단일 파일 핀 해제 절차 간소화 전부 동의 — 추가 조치 없음
+- **고유 발견 (3건 — 분류)**:
+  1. **Playwright 바이너리 캐싱** (`actions/cache` `~/.cache/ms-playwright`) — extract 단계 자체 생략으로 deadlock 위험 회피 + 2~3분 단축. **본 #666 범위 밖** (목표 = 버전 핀 중복 제거, 캐싱 도입은 별도 인프라 개선) → **후속 이슈 분리** ([#684](https://github.com/coseo12/astro-simulator/issues/684), medium — deadlock 근본 회피 2차 방어). #680 install 경로와 직교
+  2. **로컬 Node 강제화** — `.node-version` + `.nvmrc` 동일 값으로 **부분 해소** (fnm/nodenv/Volta/nvm 도구별 인식 커버). agy 제안 중 `engines` 정확 버전 고정은 **기각** (#606 root cause 가 engines 범위 해석이므로 engines 를 SSoT 로 삼는 방향은 정책 긴장 — `.node-version` 이 SSoT). `preinstall` 버전 검증 스크립트는 후속 low (footgun 은 이미 `.nvmrc` 정리로 차단, 강제화는 추가 안전망)
+  3. **upstream (playwright/Node) 이슈 추적** — Amendment 3 cross-validate 수용 + §Amendment 라운드 N≥4 "핀 해제 조건 = upstream 이슈 추적" 항목에 **기존 박제와 수렴** (리포트 링크 발견 시 박제 조건부). 추가 조치 없음
+- **Claude 셀프 체크**: 일원화 vs NO-OP 의 "적극 처치 편향" 경계 — NO-OP 근거 (전환 비용 > 이득) 를 실측으로 부정 (`.nvmrc` footgun = 유지보수성 아닌 재현 위험 / bench 영향 0) 후 진행. 통과
+
 ### Amendment 라운드 N≥4 예상
 
 - ~~Amendment 3 (해소됨 — 본 Amendment 2 가 root cause fix 까지 박제): 옵션 (c)/(d) root cause fix~~ → 실제 root cause 는 옵션 a~e 어디에도 없던 Node/playwright extract 비호환이었고 Node 22 핀으로 해소
-- Amendment 4 (잠재 — cross-validate 고유 발견 #1): 로컬 정합성 (`.nvmrc` Node 24 잔존) 후속 검토 — fresh playwright install deadlock 로컬 재현 측정 후 engines 핀 vs 가이드 결정
+- ~~Amendment 4 (잠재 — cross-validate 고유 발견 #1): 로컬 정합성 (`.nvmrc` Node 24 잔존) 후속 검토~~ → **✅ 해소** (Amendment 4, #666): `.nvmrc` 24.14.0 → 22.16.0 + `.node-version` 정확 버전 신설로 로컬-CI 정합 확보. fresh playwright install 재현 위험 제거
 - Amendment 4 (잠재): playwright 업그레이드로 Node 24 extract 호환 확인 시 Node 22 핀 해제 — 해제 시 본 Amendment 3 정책 (전수 명시 핀) 도 동시 재검토 (3 workflow 일괄). 호환 확인 경로: playwright/Node upstream 이슈 추적 (Amendment 3 cross-validate 수용 — 리포트 링크 발견 시 본 항목에 박제)
 - Amendment 4: R6 진입 시 satellite 측정 일반화 가드 (단 본 Amendment 2 로 freeze 자체는 R6 무관 확정 — R6 galilean 추가는 verify/measure 경로이고 freeze 는 install 단계였으므로 §6 §위험 #2 "R6 stuck 가속" 위험도 **해소**)
 

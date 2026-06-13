@@ -107,7 +107,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # #666 (Amendment 4) — 정확 버전 중앙 파일 일원화 (기존 node-version: 20).
+          #   playwright 미사용 (deadlock 무관) 이나 SSoT 완성을 위해 동반 전환.
+          node-version-file: '.node-version'
 
       - name: 가드 회귀 테스트 (픽스처 3종)
         run: node scripts/check-duplicate-functions.test.mjs

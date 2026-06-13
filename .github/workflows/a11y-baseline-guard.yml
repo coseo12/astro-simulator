@@ -37,10 +37,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           # #663 fix (#606 ADR §Amendment 3) — playwright 1.59.1 extract 가 Node 24.16 에서
-          #   deadlock. node-version-file (engines ">=20.0.0") 은 setup-node 가 최신 24.16 을
-          #   설치 → "Playwright chromium 설치" 단계 timeout cancelled (R9 시점부터 상시).
-          #   ci.yml line 45 와 동일한 Node 22 LTS 핀 (#610 의 잔여 workflow 2개 중 1).
-          node-version: '22'
+          #   deadlock. engines ">=20.0.0" 범위 해석은 setup-node 가 최신 24.16 을 설치
+          #   → "Playwright chromium 설치" 단계 timeout cancelled (R9 시점부터 상시).
+          #   #666 (Amendment 4): 정확 버전 중앙 파일 `.node-version` (22.16.0) 로 일원화.
+          node-version-file: '.node-version'
           cache: 'pnpm'
 
       # ci.yml R1 가드 패턴 따름 — wasm-pack 으로 physics-wasm 빌드 후 next dev 기동.

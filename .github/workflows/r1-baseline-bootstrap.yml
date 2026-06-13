@@ -48,7 +48,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # #666 (Amendment 4) — playwright 사용 workflow 의 정확 버전 중앙 파일 일원화.
+          #   기존 node-version: 20 → .node-version (22.16.0). #606 deadlock 회피 정합.
+          node-version-file: '.node-version'
           cache: pnpm
 
       # physics-wasm 워크스페이스가 wasm-pack 의존 — `pnpm build` 의 root recursive 가
