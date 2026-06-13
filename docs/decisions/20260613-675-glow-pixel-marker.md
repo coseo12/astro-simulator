@@ -296,3 +296,27 @@ scene (`runLodPass`) 은 본 함수 호출 + mesh/material 적용만 담당 — 
 - **합의**: race 원귀인 분석 + 축 6 결정론 가드 "훌륭" / 증분 reviewer 도 증거 2축 (run 27412497611 선행 FAIL / 27424529423 PASS) gh 독립 재검증 일치
 - **권고 기충족 (조치 0)**: `?ratio=` 범위 밖 클램핑 — `parseGlowMarkerRatio` 가 1~10 외/비수치 → 2 폴백 + warn 기구현
 - **고유 발견 (2건 — 범위 밖 기록)**: ① 저전력 모바일 실기기 1회 프레임 프로파일링 (27 body 역보정 scaling — swiftshader 외 실기기 검증. #219 iOS won't-do 선례와 동일 제약, 발화 조건: 실기기 성능 보고 접수 시) ② glow 시인성의 배경 대비 최소 명도 보정 (colorHint 무관 contrast 하한 — 어두운 colorHint body 의 시인성. 발화 조건: D-T2 "특정 body 마커 안 보임" 보고 시 PM 라운드)
+
+## Amendment 3 (2026-06-13) — tier-c LOD override race 제3 윈도우 확정 + 근본 fix (#680 forensic, CI 진단)
+
+Amendment 2 의 fix (detectGpuCapability().then 의 command 직접 발행) 후에도 CI fps-baseline-guard **mobile 3 시나리오 잔존 FAIL** (run 27456421530 attempt 3). #683 가 도입한 `captureLodDiag` 가 측정 시점 LOD 상태를 박제해 **제3 윈도우를 확정** — Amendment 2 가 놓친 **세 번째 setLodOverride 출처 (UrlSync mount command)** 가 원인.
+
+- **확정 진단 (CI run 27456421530 attempt 3)**: desktop 3 시나리오 `tier=c override=low lod=0/0/27` (정착, 전부 PASS) / mobile 3 시나리오 `tier=c override=auto lod=1/4/22 등` (race-lost, 전부 FAIL, FPS 33~36.8). desktop 은 정착, mobile 만 race-lost.
+- **원귀인 (로컬 forensic trace 로 5초 단위 확정 — `_debug-680-trace-tmp.mjs`, 즉시 rm)**: race-lost 시 동일 scene 인스턴스에 `setLodOverride('low')`@1059ms → **`setLodOverride('auto')`@1272ms** 순서로 두 번 호출됨. 두 번째 'auto' 는 **`url-sync.tsx:120-122` 의 mount useEffect 가 `?lod=` 미지정 시 무조건 발행하는 `sendCommand({ type: 'setLodOverride', level: 'auto' })`**. 이 command 가 scene handler 등록 **후** 도착하면 tier-c 강제 'low' 를 'auto' 로 덮어쓴다 → sun **high** (sphere 1) + mid 3~4 렌더 → swiftshader 에서 FPS 끌어내림.
+- **제3 윈도우 = 출처 3개의 비결정적 도착 순서**: (1) `detectGpuCapability().then` 의 command (Amendment 2 보강), (2) `instance.start().then` 의 handler 등록 + 초기 `tierForced` 읽기 (P11-B), (3) **UrlSync 의 mount `setLodOverride('auto')` command (Amendment 2 가 누락)**. (3) 이 (2) 이후 + (1) 의 'low' 적용 이후 도착하면 강제 low 영구 유실. 결정 변수는 UrlSync command 가 handler 등록 전(no-op → PASS)인지 후(덮어씀 → FAIL)인지.
+- **고정 지연 스윕 재현 (`_debug-680-sweep-tmp.mjs`, 즉시 rm)**: requestAdapter(1번째=detectGpuCapability) 지연 sweep 에서 **delay=0 → override='auto' lod=1/4/22 (CI 시그니처 정확 일치)**, delay≥50ms → 'low'. delay=0 에서 scene init 이 빨라 handler 등록 후 UrlSync command 도착 → race-lost. 100% 결정론 재현.
+- **근본 원인 = 앱 코드** (측정 하네스 아님): `verify-fps-baseline` 의 `waitForLodSettle` (#683) 은 정상 작동 (영구 race-lost 라 settle timeout 후 FAIL 표면화 — 은폐 아님). 실 사용자도 tier-c 기기에서 동일 race 를 겪으므로 측정만 고치면 제품 버그 잔존 — 앱 fix 우선이 정답.
+- **fix (sim-canvas.tsx, glow 코드 0 변경 — PM 확정값 전부 보존)**: handler 가 매 진입마다 **현 URL `?lod=` + `__gpuTierForceLod` 강제 플래그를 재참조** (`resolveLodWithTierForce`) 해 미지정 기본 ('auto') 을 강제값으로 치환. 사용자 명시 `?lod=` (URL 우선 원칙) 는 그대로 통과. 강제 플래그가 늦게 박제돼도 후속 어떤 setLodOverride 진입에서든 강제값 복원 → **출처 도착 순서 무관 idempotent 정착**. 초기 적용 블록도 동일 헬퍼로 통일 (강제 보존 로직 SSoT 단일). #677 의 2중화를 **3중 (UrlSync 경로 커버) + 순서 보장 (재참조)** 으로 강화.
+- **3중 시뮬레이션 (delay sweep 실측)**: negative (pre-fix delay=0 → 'auto' race-lost) → recovery (post-fix delay=0 → 'low' 5/5) → positive (delay≥50 → 'low'). trace 재확인: 1275ms 의 UrlSync command 가 이전 'auto' → 이제 'low' 로 치환됨.
+- **회귀 가드**: 축 6 (`browser-verify-glow-marker.mjs`) 무회귀 PASS (지연 tier-c 감지 후 override='low' 정착). 단위 853 (web 357 + core 492 + shared 4) 무회귀. 축 6 가드는 (2)-(1) race 만 게이트하므로 (3) UrlSync race 는 직접 커버 안 하나, 본 fix 의 handler 재참조가 모든 출처를 idempotent 하게 흡수해 축 6 도 통과.
+- **popping (c) / §축 1~7 결정 전부 무영향** — 본 Amendment 는 race 제3 윈도우 확정 + web 레이어 fix 기록. Concrete Prediction ③ "fps baseline 갱신 0" 유지 (glow 무관 재확정).
+
+- **DoD #3 연속 5 run green 실측 (2026-06-13)**: fix 후 fps-baseline-guard 연속 **5/5 run success** (run 27457138358 attempt 1~5) — mobile override 5 run 전부 'low' 정착 (이전 4 run 중 1 fail = race-lost 와 대비, race 결정론화 입증). #680 DoD #3 충족.
+
+#### Amendment 3 교차검증 (2026-06-13 — agy 응답 불가, Claude 단독 분석)
+
+> cross-validate 시도 (로그 `.claude/logs/cross-validate-architecture-20260613-140230.log`) 에서 **agy (Antigravity CLI) 응답 없음 (비-capacity 오류, 2시도 실패)** — CLAUDE.md §교차검증 "외부 모델 실패 시 스킵 + 'Claude 단독 분석' 명시, 경량 폴백 금지" 정책에 따라 **Claude 단독 분석으로 Accepted 전이**. 이중 시각은 미확보이나 **reviewer 의 독립 정밀 검증** (PR #683 증분 리뷰 — idempotent 3경우 정합 / 무한루프 부재 (`setLodOverride` 순수 상태변이) / `?lod=` URL 우선 보존 / #677 Amendment 2 와 정합) 이 단일 모델 편향을 부분 상쇄.
+>
+> **Claude 셀프 체크**: ① 원귀인 = 코드 trace (UrlSync command @1272ms 가 강제 low @1059ms 덮어씀) + delay sweep 100% 결정론 재현 — 가정 아닌 실측 ② fix 가 측정 하네스 아닌 앱 코드 (실 tier-c 기기 동일 race) — 근본 처치 ③ DoD #3 연속 5/5 run green 실측 ④ glow PM 확정값 0 변경. 후속 cross-validate 재시도 가치 낮음 (race 메커니즘 코드 확정 + reviewer 검증 + 5 run 실측 3중).
+
+**상태: Amendment 3 Accepted (Claude 단독 2026-06-13, agy 응답 불가).**
