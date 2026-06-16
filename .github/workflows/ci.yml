@@ -346,6 +346,27 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # #693 — free-fly 패닝(F3) 회귀 가드 (우클릭 드래그 target 평면 이동 + floating origin 정합).
+      # ADR: docs/decisions/20260616-693-freefly-panning.md §결정 §회귀 가드
+      # 검증 4축: (S1) free-fly 진입 → panningSensibility>0 + 우클릭 드래그 target 평면 이동 + globalPos 추적
+      #          (S2) earth focus 중 panningSensibility=0 (#509 follow 유지)
+      #          (S3) io→free-fly(pull-back) 패닝 후 originOffset=[0,0,0] + tier 일관 (#631)
+      #          (S4) free-fly 줌(radius 변동) 후 sensibility×radius 곱 불변 (진입 시점 잔존 아님)
+      # forensic 회귀: panningSensibility=0 잔존 → target 불변 / focus 중 활성 → jitter / 줌 후 감도 어긋남.
+      - name: '#693 free-fly 패닝 회귀 가드 (verify:693-freefly-panning)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-693-freefly-panning.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3009 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3009/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3009 node apps/web/scripts/browser-verify-693-freefly-panning.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
