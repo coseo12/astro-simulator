@@ -123,7 +123,12 @@ export function setupArcRotateCamera(
     // #693 — 우클릭 드래그 패닝 시 브라우저 contextmenu 팝업 차단 (ADR §결정 5).
     // `attachControl(canvas, true)` 는 noPreventDefault=true 라 native 우클릭 메뉴가 뜬다 →
     // 우클릭 패닝과 충돌. canvas 한정 contextmenu 차단으로 패닝 UX 보존 (좌클릭 회전/휠 줌 무영향).
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // named handler + camera dispose 시 제거 — HMR/StrictMode 재마운트 리스너 누수 방지 (reviewer 권고).
+    const preventContextMenu = (e: Event) => e.preventDefault();
+    canvas.addEventListener('contextmenu', preventContextMenu);
+    camera.onDisposeObservable.add(() => {
+      canvas.removeEventListener('contextmenu', preventContextMenu);
+    });
   }
 
   return camera;
