@@ -366,7 +366,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             new URLSearchParams(window.location.search).get('orbits'),
           );
           solar.setOrbitLinesVisible(orbitsVisible);
-          // 버튼 표시 SSoT 동기화 (토글 버튼이 store 를 구독). 기본 true 와 다를 때만 의미 있음.
+          // 버튼 표시 SSoT 동기화 (토글 버튼이 store 를 구독). 무조건 발행 — store 기본 true 와
+          // 같으면 idempotent no-op, `?orbits=off` 면 false 반영 (reviewer 권고: 주석-구현 정합).
           useSimStore.getState().setOrbitLinesVisible(orbitsVisible);
         }
 
