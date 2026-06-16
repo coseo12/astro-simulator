@@ -3,6 +3,12 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [0.28.0] — 2026-06-16
+
+### Behavior Changes (#688 — 궤도선 toggle UI)
+
+- **[#688] 궤도선 toggle UI — `?orbits=off` + 토글 버튼 (glow marker 시너지: 별자리 뷰) (MINOR — UI 기능)** ([#688](https://github.com/coseo12/astro-simulator/issues/688)) — 27 body 궤도선(행성+위성)을 런타임 on/off 하는 토글. 후속 후보 분석 1순위 (LOW 난이도 + 기존 인프라 재사용 HIGH + glow 시너지). **scene 인프라 `setOrbitLinesVisible` (satellite 일괄 #627) 0 변경 재사용** — web/core wiring 만 추가 (glow `?marker=` + LOD `setLodOverride` command 패턴 답습). **확정 동작 (PM 합의 2026-06-16)**: 기본 ON + `?orbits=off` 옵트아웃 (미지정·`?orbits=on`·이상값 → ON, 폴백+warn) / shortcut bar 마지막 토글 버튼 (reset/free-fly 동급, aria-pressed 가역 + active 스타일) / 전체 on/off (행성+위성 일괄 — `setOrbitLinesVisible` satellite Map 포함) / UI 버튼(런타임) + URL 초기값 둘 다. **glow 시너지**: 궤도선 OFF + glow ON(기본) = body 위치가 glow 픽셀로만 표시되는 "별자리 뷰" (qa 실측). **wiring**: `CoreCommand.setOrbitLinesVisible` + `simulation-core.ts` `setOrbitLinesVisibleHandler` (미등록 no-op) + `parse-orbits-mode.ts` URL 파서 + `sim-store.ts` state + `focus-quick-buttons.tsx` 토글 버튼. **검증**: core 497 / web 371 (873 tests, 신규 18 케이스) + 3단계 브라우저 (가역 토글 / `?orbits=off` OFF 시작 / focus·reset 무회귀) + 별자리 뷰 캡처 + D-T2 실 Chrome 사용자 승인 (2026-06-16). reviewer approve (command/URL/state/무회귀/glow 직교 정합). r1-guard baseline 갱신 (shortcut-bar region 토글 버튼 신규). ADR 생략 (단순 UX — cross-validate 비대상, 구현 PR 설계 인라인). **MINOR 분류** — UI 기능 추가. 비-범위: 궤도선 색상/스타일 커스터마이징 / 개별 body 궤도선 선택 토글 / fade 애니메이션.
+
 ## [0.27.0] — 2026-06-13
 
 ### Behavior Changes (#680 — tier-c LOD override race 근본 fix + fps 가드 진단 인프라)
