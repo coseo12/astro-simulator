@@ -1,0 +1,164 @@
+[
+  {
+    "label": "A. free-fly 직접 (solar)",
+    "focusId": null,
+    "beforePan": {
+      "tier": "solar",
+      "radius": 35,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "target": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "targetDist": 0,
+      "globalPos": {
+        "x": 2.0382395214170197e-15,
+        "y": 10.815594673156738,
+        "z": -33.2869758605957
+      },
+      "globalDist": 34.99999785825561,
+      "originOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "originDist": 0
+    },
+    "afterPan": {
+      "tier": "solar",
+      "radius": 35,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "target": {
+        "x": 10.5,
+        "y": 0,
+        "z": 0
+      },
+      "targetDist": 10.5,
+      "globalPos": {
+        "x": 10.5,
+        "y": 10.815594673156738,
+        "z": -33.2869758605957
+      },
+      "globalDist": 36.54107072976786,
+      "originOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "originDist": 0
+    },
+    "panStep": 10.5,
+    "globalFollowedTarget": true
+  },
+  {
+    "label": "B. earth focus → free-fly (inner)",
+    "focusId": "earth",
+    "beforePan": {
+      "tier": "inner",
+      "radius": 68.05110758441998,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "target": {
+        "x": -62.98172378540039,
+        "y": 217.60606384277344,
+        "z": -0.000058146495575783774
+      },
+      "targetDist": 226.53718580429364,
+      "globalPos": {
+        "x": -62.98172378540039,
+        "y": 238.635009765625,
+        "z": -64.72050476074219
+      },
+      "globalDist": 255.15114962175983,
+      "originOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "originDist": 0
+    },
+    "afterPan": {
+      "tier": "inner",
+      "radius": 68.05110758441998,
+      "alpha": -1.5707963267948966,
+      "beta": 1.2566370614359172,
+      "target": {
+        "x": -42.566391510074396,
+        "y": 217.60606384277344,
+        "z": -0.000058146495575783774
+      },
+      "targetDist": 221.73023408488413,
+      "globalPos": {
+        "x": -42.56639099121094,
+        "y": 238.635009765625,
+        "z": -64.72050476074219
+      },
+      "globalDist": 250.8930235465742,
+      "originOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "originDist": 0
+    },
+    "panStep": 20.415332275325994,
+    "globalFollowedTarget": true
+  },
+  {
+    "label": "C. io focus → free-fly (body→pullback)",
+    "focusId": "io",
+    "beforePan": {
+      "tier": "solar",
+      "radius": 35,
+      "alpha": -1.5988042025507383,
+      "beta": 1.2371752929290205,
+      "target": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "targetDist": 0,
+      "globalPos": {
+        "x": -0.9261048436164856,
+        "y": 11.461329460144043,
+        "z": -33.057228088378906
+      },
+      "globalDist": 35.00000102946346,
+      "originOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "originDist": 0
+    },
+    "afterPan": {
+      "tier": "solar",
+      "radius": 35,
+      "alpha": -1.5988042025507383,
+      "beta": 1.2371752929290205,
+      "target": {
+        "x": 10.5,
+        "y": 0,
+        "z": 0
+      },
+      "targetDist": 10.5,
+      "globalPos": {
+        "x": 9.573895454406738,
+        "y": 11.461329460144043,
+        "z": -33.05722427368164
+      },
+      "globalDist": 36.2739799835414,
+      "originOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "originDist": 0
+    },
+    "panStep": 10.5,
+    "globalFollowedTarget": true
+  }
+]
