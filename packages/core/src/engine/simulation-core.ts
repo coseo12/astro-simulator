@@ -33,6 +33,8 @@ export class SimulationCore {
   #setRadiusHandler: ((radius: number) => void) | null = null;
   // P11-B #289 — LOD override 핸들러. URL `?lod=` 초기 1회 sendCommand 에서 scene 에 전달.
   #setLodOverrideHandler: ((level: 'high' | 'mid' | 'low' | 'auto') => void) | null = null;
+  // #688 — 궤도선 가시성 핸들러. UI 토글 버튼 + URL `?orbits=off` 초기값에서 scene 에 전달.
+  #setOrbitLinesVisibleHandler: ((visible: boolean) => void) | null = null;
   // P5-B #177 — fps emit 주기 제어. 매 프레임 emit하면 store 갱신 과다 → 0.5초 간격.
   #lastFpsEmitTime = 0;
   // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
@@ -179,6 +181,17 @@ export class SimulationCore {
     this.#setLodOverrideHandler = handler;
   }
 
+  /**
+   * #688 — 궤도선 가시성 핸들러 연결. sim-canvas 가 scene 생성 직후 1회 호출.
+   *
+   * 핸들러는 scene 의 `setOrbitLinesVisible(visible)` 를 호출해 행성+위성 궤도선 (satellite
+   * 일반화 #627) 을 일괄 토글한다. `setLodOverrideHandler` 패턴 답습 — UI 버튼 토글과
+   * URL `?orbits=off` 초기값 모두 `setOrbitLinesVisible` command 를 경유해 여기로 라우팅된다.
+   */
+  setOrbitLinesVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setOrbitLinesVisibleHandler = handler;
+  }
+
   /** 이벤트 구독. */
   on<K extends keyof CoreEvents>(type: K, handler: Handler<CoreEvents[K]>): void {
     this.#emitter.on(type, handler);
@@ -251,6 +264,10 @@ export class SimulationCore {
       case 'setLodOverride':
         // P11-B #289 — scene 에 위임. 미등록 시 no-op (scene 초기화 전 순서 무관).
         this.#setLodOverrideHandler?.(cmd.level);
+        break;
+      case 'setOrbitLinesVisible':
+        // #688 — scene 에 위임. 미등록 시 no-op (scene 초기화 전 순서 무관 — setLodOverride 동일).
+        this.#setOrbitLinesVisibleHandler?.(cmd.visible);
         break;
       default: {
         const _exhaustive: never = cmd;

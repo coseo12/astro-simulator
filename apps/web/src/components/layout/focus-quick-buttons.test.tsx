@@ -19,6 +19,7 @@ beforeEach(() => {
     mode: 'observe',
     julianDate: null,
     selectedBodyId: null,
+    orbitLinesVisible: true, // #688 — 기본 ON 결정적 리셋
     timeScale: 86_400,
     fps: null,
     unitSystem: 'astro',
@@ -328,5 +329,58 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   it('triton 은 shortcut bar 미등록 (galilean/titan/titania 패턴 — URL ?focus=triton 진입)', () => {
     render(<FocusQuickButtons />);
     expect(screen.queryByTestId('focus-triton')).toBeNull();
+  });
+});
+
+/**
+ * #688 — 궤도선 on/off 토글 버튼 단위 테스트.
+ *
+ * 검증:
+ *  - 버튼 렌더 + bar 마지막 (free-fly 다음 = 컨트롤 그룹 후미)
+ *  - 기본 ON (store orbitLinesVisible=true) 일 때 aria-pressed=true + active 스타일
+ *  - 클릭 → setOrbitLinesVisible command 발행 (toggle: true→false→true) + store 동기화
+ *  - OFF 상태 (store false) 진입 시 aria-pressed=false (URL `?orbits=off` 초기값 시나리오)
+ */
+describe('FocusQuickButtons — 궤도선 토글 (#688)', () => {
+  it('궤도선 토글 버튼 렌더 + bar 마지막 (free-fly 다음)', () => {
+    render(<FocusQuickButtons />);
+    const toggle = screen.getByTestId('toggle-orbits');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveTextContent('궤도선');
+    // 컨트롤 그룹 후미 — free-fly 버튼 다음 (DOM 순서).
+    const freeFly = screen.getByTestId('focus-free-fly');
+    expect(freeFly.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('기본 ON (store orbitLinesVisible=true) — aria-pressed=true + active 스타일', () => {
+    useSimStore.setState({ orbitLinesVisible: true });
+    render(<FocusQuickButtons />);
+    const toggle = screen.getByTestId('toggle-orbits');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle.className).toContain('bg-primary/20'); // 켜짐 시각 구분
+  });
+
+  it('OFF (store orbitLinesVisible=false) — aria-pressed=false (URL ?orbits=off 시나리오)', () => {
+    useSimStore.setState({ orbitLinesVisible: false });
+    render(<FocusQuickButtons />);
+    const toggle = screen.getByTestId('toggle-orbits');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle.className).not.toContain('bg-primary/20'); // 꺼짐 시각 구분
+  });
+
+  it('ON 상태 클릭 → setOrbitLinesVisible(false) command 발행 + store false', () => {
+    useSimStore.setState({ orbitLinesVisible: true });
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('toggle-orbits'));
+    expect(sentCommands).toContainEqual({ type: 'setOrbitLinesVisible', visible: false });
+    expect(useSimStore.getState().orbitLinesVisible).toBe(false);
+  });
+
+  it('OFF 상태 클릭 → setOrbitLinesVisible(true) command 발행 + store true (양방향 토글)', () => {
+    useSimStore.setState({ orbitLinesVisible: false });
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('toggle-orbits'));
+    expect(sentCommands).toContainEqual({ type: 'setOrbitLinesVisible', visible: true });
+    expect(useSimStore.getState().orbitLinesVisible).toBe(true);
   });
 });

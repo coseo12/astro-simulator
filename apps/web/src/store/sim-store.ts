@@ -82,6 +82,13 @@ export interface SimStoreState {
    * subscribe 측은 `selectedBodyId === null && freeFlyMode === true` 분기에서 detachFocus + clearFollow.
    */
   freeFlyMode: boolean;
+  /**
+   * #688 — 궤도선 (행성+위성 일괄) 가시성. 토글 버튼 표시 + 런타임 on/off 의 SSoT.
+   *
+   * 초기값은 URL `?orbits=` (parseOrbitsVisible) 가 sim-canvas mount 시 결정 (기본 true).
+   * 버튼 클릭 → setOrbitLinesVisible 액션 (store) + setOrbitLinesVisible command (scene) 동시.
+   */
+  orbitLinesVisible: boolean;
   timeScale: number;
   fps: number | null;
   unitSystem: UnitSystem;
@@ -117,6 +124,8 @@ export interface SimStoreState {
   setSelectedBody: (id: string | null) => void;
   /** #509 — 자유시점 진입 시 호출. selectedBodyId=null + freeFlyMode=true 동시 set. */
   enterFreeFly: () => void;
+  /** #688 — 궤도선 가시성 설정. 토글 버튼 + URL 초기값에서 호출 (버튼 표시 SSoT). */
+  setOrbitLinesVisible: (visible: boolean) => void;
   setTimeScale: (scale: number) => void;
   setFps: (fps: number) => void;
   setUnitSystem: (unit: UnitSystem) => void;
@@ -142,6 +151,8 @@ export const useSimStore = create<SimStoreState>((set) => ({
   julianDate: null,
   selectedBodyId: null,
   freeFlyMode: false,
+  // #688 — 기본 ON. URL `?orbits=off` 진입 시 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  orbitLinesVisible: true,
   timeScale: 86_400,
   fps: null,
   unitSystem: 'astro',
@@ -175,6 +186,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
     // enterFreeFly 경로는 별도 action 으로 freeFlyMode=true 명시.
     set({ selectedBodyId: id, freeFlyMode: false }),
   enterFreeFly: () => set({ selectedBodyId: null, freeFlyMode: true }),
+  setOrbitLinesVisible: (visible) => set({ orbitLinesVisible: visible }),
   setTimeScale: (scale) => set({ timeScale: scale }),
   setFps: (fps) => set({ fps }),
   setUnitSystem: (unit) => set({ unitSystem: unit }),

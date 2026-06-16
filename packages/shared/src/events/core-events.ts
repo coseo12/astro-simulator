@@ -48,6 +48,9 @@ export type CoreEvents = {
  * P11-B #289 — `setLodOverride` 추가. URL `?lod=` 초기 1회 전달 용도.
  * `level` 은 `'high' | 'mid' | 'low' | 'auto'`. scene 내부에서 override 로 저장되어
  * 다음 `updateAt` 호출부터 LOD 분기에 적용된다.
+ *
+ * #688 — `setOrbitLinesVisible` 추가. 궤도선 런타임 토글 (UI 버튼 + URL `?orbits=off` 초기값).
+ * `visible` true/false. scene `setOrbitLinesVisible` (satellite 일반화 #627) 로 위임.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -60,4 +63,5 @@ export type CoreCommand =
   | { type: 'enterFreeFly' }
   | { type: 'setCameraRadius'; radius: number }
   | { type: 'setMode'; mode: SimMode }
-  | { type: 'setLodOverride'; level: 'high' | 'mid' | 'low' | 'auto' };
+  | { type: 'setLodOverride'; level: 'high' | 'mid' | 'low' | 'auto' }
+  | { type: 'setOrbitLinesVisible'; visible: boolean };
