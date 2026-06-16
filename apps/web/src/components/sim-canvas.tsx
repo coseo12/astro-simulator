@@ -11,6 +11,7 @@ import { parseGrMode } from '@/core/parse-gr-mode';
 import { parseLodLevel } from '@/core/parse-lod-level';
 import { parseGpuTier } from '@/core/parse-gpu-tier';
 import { parseGlowMarkerRatio, parseMarkerMode } from '@/core/parse-marker-mode';
+import { parseOrbitsVisible } from '@/core/parse-orbits-mode';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -354,6 +355,19 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #680 — handler 와 동일 식 (resolveLodWithTierForce) 사용 → 강제 보존 로직 SSoT 단일.
           const parsed = parseLodLevel(new URLSearchParams(window.location.search).get('lod'));
           solar.setLodOverride(resolveLodWithTierForce(parsed));
+        }
+
+        // #688 — 궤도선 가시성 핸들러 + URL `?orbits=off` 초기값. setLodOverride wiring 패턴 답습.
+        //   handler: UI 토글 버튼 / URL 초기 command → scene.setOrbitLinesVisible (satellite 일반화 #627).
+        instance.setOrbitLinesVisibleHandler((visible) => solar.setOrbitLinesVisible(visible));
+        {
+          // 초기값: `?orbits=off` → 숨김 / 미지정·`?orbits=on` → 표시 (기본 ON, 현행 보존).
+          const orbitsVisible = parseOrbitsVisible(
+            new URLSearchParams(window.location.search).get('orbits'),
+          );
+          solar.setOrbitLinesVisible(orbitsVisible);
+          // 버튼 표시 SSoT 동기화 (토글 버튼이 store 를 구독). 기본 true 와 다를 때만 의미 있음.
+          useSimStore.getState().setOrbitLinesVisible(orbitsVisible);
         }
 
         // R1 #334+#335 — store-scene 동기화 단일 경로 helper.
