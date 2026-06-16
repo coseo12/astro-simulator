@@ -534,6 +534,20 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // null→null + freeFlyMode false→true 만 commit). 패닝 활성화를 위해 freeFlyMode
             // 전이(false→true)도 detachToFreeFly 로 라우팅한다. ADR §1 측정 시나리오 A "free-fly 직접".
             detachToFreeFly();
+          } else if (
+            state.freeFlyMode !== prev.freeFlyMode &&
+            !state.freeFlyMode &&
+            state.selectedBodyId === null
+          ) {
+            // #693 (qa 차단 fix) — free-fly 패닝 후 reset 경로.
+            // reset 버튼 → resetCamera command → setSelectedBody(null) = {selectedBodyId:null,
+            // freeFlyMode:false}. free-fly 진입 상태는 이미 selectedBodyId=null 이므로 1차 분기
+            // (selectedBodyId 변화)가 미발화하고, 2차 분기는 `&& state.freeFlyMode`(=false)라 미발화.
+            // → syncFocusToScene(null) 미호출 → 패닝으로 옮긴 target 이 원점 복원 안 됨 (DoD "reset 원복" 위반).
+            // freeFlyMode true→false 전이(selectedBodyId 불변 null)를 sun 중심 reset 으로 라우팅하여
+            // controller.reset(35) 로 target 원점 복원 + 패닝 비활성. focus→reset(selectedBodyId 변화)
+            // 경로는 1차 분기가 이미 처리하므로 본 분기는 free-fly→reset 에만 한정 발화.
+            syncFocusToScene(null);
           }
         });
         // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).

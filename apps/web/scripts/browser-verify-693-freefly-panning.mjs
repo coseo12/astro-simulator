@@ -15,7 +15,7 @@
  * 불변식 + globalPos 의 target 추적 → 기존 cameraFromSunMeters(#631) 가산식이 그대로 정합
  * (좌표 보정 코드 0). 감도 = radius 비례 panningSensibility (줌 일관성 위해 매 프레임 재산출).
  *
- * ## 검증 시나리오 (4 직교)
+ * ## 검증 시나리오 (5 직교)
  *
  * | S | DoD (PASS 조건) | 회귀 시 |
  * |---|---|---|
@@ -23,6 +23,7 @@
  * | S2 focus 중 패닝 비활성 | body focus 중 panningSensibility=0 (follow 유지) | focus 중 활성 → jitter (FAIL) |
  * | S3 deep-tier 패닝 floating origin 정합 | io→free-fly(pull-back) 패닝 후 originOffset=[0,0,0] + tier 일관 | originOffset≠0 / tier 오판 (FAIL) |
  * | S4 줌 중 패닝 감도 일관성 | free-fly 줌(radius 변동) 후 sensibility×radius 곱 불변 (진입 시점 잔존 아님) | 진입 1회 감도 잔존 → 곱 어긋남 (FAIL) |
+ * | S5 free-fly 패닝 후 reset 원복 | free-fly 패닝(target 이동) → reset → target 원점 복원(targetDist≈0) + 패닝 비활성 | subscribe free-fly→reset 분기 누락 시 target 잔존 (FAIL) — qa 차단 사유 #695 |
  *
  * dev 빌드 의존: window.__solarScene(getTier/floatingOrigin) / window.__simStore(setSelectedBody/enterFreeFly)
  * 환경변수: BASE_URL (기본 http://localhost:3000)
@@ -40,6 +41,9 @@ const PAN_MIN_TARGET_DELTA = 0.01;
 const TRACK_TOLERANCE = 1.0;
 // S4 — sensibility × radius 곱이 줌 전후 일정한지 (radius 비례 → 곱 상수). 상대 편차 임계.
 const PRODUCT_REL_TOLERANCE = 0.1;
+// S5 — reset 후 카메라 target 이 원점(sun 중심)으로 복원됐는지 (controller.reset → target 0).
+// scene unit 기준. 패닝으로 옮긴 targetDist(≥PAN_MIN_TARGET_DELTA)가 reset 후 임계 이내로 줄어야 PASS.
+const RESET_TARGET_TOLERANCE = 0.1;
 
 async function measure(page) {
   return await page.evaluate(() => {
@@ -82,6 +86,13 @@ async function focus(page, id) {
 async function freeFly(page) {
   await page.evaluate(() => window.__simStore.getState().enterFreeFly());
   await page.waitForTimeout(1200);
+}
+// reset 버튼 = resetCamera command → store setSelectedBody(null) (selectedBodyId=null, freeFlyMode=false).
+// 실 reset 버튼이 sendCommand({type:'resetCamera'}) → core 'bodySelected:{id:null}' → setSelectedBody(null)
+// 으로 귀결되므로 store action 직접 호출로 동일 상태 전이를 재현한다.
+async function resetCamera(page) {
+  await page.evaluate(() => window.__simStore.getState().setSelectedBody(null));
+  await page.waitForTimeout(SETTLE_MS);
 }
 // 우클릭(button: 'right') 드래그 = ArcRotateCamera 기본 패닝 입력.
 async function dragPan(page) {
@@ -212,6 +223,37 @@ async function scenarioZoomConsistency(browser) {
   }
 }
 
+async function scenarioPanResetRestore(browser) {
+  console.log('\n[S5] free-fly 패닝 후 reset 원복 — target 원점 복원 + 패닝 비활성 (qa 차단 사유 #695)');
+  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  try {
+    await boot(page);
+    await freeFly(page);
+    await dragPan(page);
+    const panned = await measure(page);
+    await resetCamera(page);
+    const after = await measure(page);
+    // 1) 패닝이 실제로 target 을 옮겼는지(전제) 2) reset 후 target 이 원점 복원됐는지 3) 패닝 비활성.
+    const pannedAway = panned.targetDist >= PAN_MIN_TARGET_DELTA;
+    const restored = after.targetDist <= RESET_TARGET_TOLERANCE;
+    const panningOff = after.panningSensibility === 0;
+    const pass = pannedAway && restored && panningOff;
+    console.log(
+      `  패닝후 targetDist=${panned.targetDist.toFixed(3)} (≥${PAN_MIN_TARGET_DELTA}) → reset후 targetDist=${after.targetDist.toFixed(3)} (≤${RESET_TARGET_TOLERANCE}) | sensibility=${after.panningSensibility} (=0) → ${pass ? 'PASS' : 'FAIL'}`,
+    );
+    return {
+      scenario: 'S5',
+      pannedTargetDist: panned.targetDist,
+      resetTargetDist: after.targetDist,
+      panningSensibility: after.panningSensibility,
+      pass,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function main() {
   console.log('\n=== #693 free-fly 패닝(F3) 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -227,6 +269,8 @@ async function main() {
     if (!result.scenarios.s3.pass) allPass = false;
     result.scenarios.s4 = await scenarioZoomConsistency(browser);
     if (!result.scenarios.s4.pass) allPass = false;
+    result.scenarios.s5 = await scenarioPanResetRestore(browser);
+    if (!result.scenarios.s5.pass) allPass = false;
   } finally {
     await browser.close();
   }
