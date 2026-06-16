@@ -5,7 +5,13 @@
  * 본격 Scene Graph는 C3/C6 (#15, #18)에서 구현.
  */
 
-export { setupArcRotateCamera } from './camera.js';
+export {
+  setupArcRotateCamera,
+  ZOOM_DELTA_PERCENTAGE,
+  PANNING_DELTA_PERCENTAGE,
+  computePanningSensibility,
+  setPanningEnabled,
+} from './camera.js';
 export type { ArcCameraOptions } from './camera.js';
 export {
   CameraController,

@@ -178,6 +178,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
         const camera = sceneApi.setupArcRotateCamera(instance.scene, { radius: 35 });
         const controller = new sceneApi.CameraController(camera, instance.scene);
+        // #693 — free-fly 패닝 활성 상태. free-fly 진입(detachToFreeFly) 시 true, focus/reset
+        // (syncFocusToScene) 시 false. onBeforeRender 가 이 플래그를 읽어 free-fly 중에만 radius
+        // 비례 panningSensibility 를 매 프레임 재산출(줌 일관성, ADR §결정 2). 토글 SSoT 는
+        // sceneApi.setPanningEnabled 1곳.
+        let freeFlyActive = false;
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
@@ -443,11 +448,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // controller.focusOn 도 동일 식 적용 (sim-canvas SSoT 단일). 명시적 radius 전달로
               // camera-controller 내부 default 식 (×5) 우회 — Amendment 3 satellite 분기 정합.
               controller.focusOn({ mesh, radius: desiredRadius });
+              // #693 — focus 진입 시 패닝 비활성 (ADR §결정 3 옵션 A). focus 중 followObserver 가
+              // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.
+              freeFlyActive = false;
+              sceneApi.setPanningEnabled(camera, false);
             }
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
             solar.clearFocus();
             controller.reset(35);
+            // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
+            freeFlyActive = false;
+            sceneApi.setPanningEnabled(camera, false);
           }
         };
 
@@ -465,10 +477,17 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // controller.reset() 기본값 = (radius 35, target 원점) = 태양계 개요. 매직 넘버 없이
             // 문서화된 default 사용 (cross-validate agy 권고 #1).
             controller.reset();
+            // #693 — body tier pull-back 도 free-fly 진입이므로 패닝 활성 (ADR §결정 4).
+            freeFlyActive = true;
+            sceneApi.setPanningEnabled(camera, true);
             return;
           }
           solar.detachFocus();
           controller.clearFollow();
+          // #693 — free-fly 진입 → radius 비례 패닝 활성. onBeforeRender 가 줌 중 radius 변동을
+          // 따라 매 프레임 재산출 (ADR §결정 2).
+          freeFlyActive = true;
+          sceneApi.setPanningEnabled(camera, true);
         };
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
@@ -509,6 +528,26 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             } else {
               syncFocusToScene(state.selectedBodyId);
             }
+          } else if (state.freeFlyMode !== prev.freeFlyMode && state.freeFlyMode) {
+            // #693 — solar 개요(selectedBodyId 이미 null)에서 free-fly 직접 진입 경로.
+            // 이 경우 selectedBodyId 가 변하지 않아 위 분기가 발화하지 않는다(enterFreeFly 가
+            // null→null + freeFlyMode false→true 만 commit). 패닝 활성화를 위해 freeFlyMode
+            // 전이(false→true)도 detachToFreeFly 로 라우팅한다. ADR §1 측정 시나리오 A "free-fly 직접".
+            detachToFreeFly();
+          } else if (
+            state.freeFlyMode !== prev.freeFlyMode &&
+            !state.freeFlyMode &&
+            state.selectedBodyId === null
+          ) {
+            // #693 (qa 차단 fix) — free-fly 패닝 후 reset 경로.
+            // reset 버튼 → resetCamera command → setSelectedBody(null) = {selectedBodyId:null,
+            // freeFlyMode:false}. free-fly 진입 상태는 이미 selectedBodyId=null 이므로 1차 분기
+            // (selectedBodyId 변화)가 미발화하고, 2차 분기는 `&& state.freeFlyMode`(=false)라 미발화.
+            // → syncFocusToScene(null) 미호출 → 패닝으로 옮긴 target 이 원점 복원 안 됨 (DoD "reset 원복" 위반).
+            // freeFlyMode true→false 전이(selectedBodyId 불변 null)를 sun 중심 reset 으로 라우팅하여
+            // controller.reset(35) 로 target 원점 복원 + 패닝 비활성. focus→reset(selectedBodyId 변화)
+            // 경로는 1차 분기가 이미 처리하므로 본 분기는 free-fly→reset 에만 한정 발화.
+            syncFocusToScene(null);
           }
         });
         // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).
@@ -558,6 +597,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const focusDistSceneUnit = typeof arcCam.radius === 'number' ? arcCam.radius : 0;
           const cameraFromFocusMeters = focusDistSceneUnit * metersPerSceneUnit;
           solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+
+          // #693 — free-fly 패닝 감도 줌 일관성 (ADR §결정 2, agy 고유 발견 ②).
+          // panningSensibility 는 radius 비례 정적 스칼라라 줌(radius 변동) 시 진입 시점 값이
+          // 잔존하면 화면 px↔world 비율이 어긋난다("튀는" UX). free-fly 활성 중에는 매 프레임
+          // radius 기반 재산출 (산술 1식, 비용 무시 가능). focus 중에는 sensibility=0 유지(토글이
+          // 비활성화했으므로 재산출 안 함).
+          if (freeFlyActive) {
+            sceneApi.setPanningEnabled(camera, true);
+          }
         };
         const tierObserver = instance.scene.onBeforeRenderObservable.add(onBeforeRender);
         // N1 권고 — unmount / HMR 시 observer 해제. scene dispose 시 자동 정리되지만 React
