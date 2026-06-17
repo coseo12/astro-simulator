@@ -3,6 +3,13 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [Unreleased]
+
+### Behavior Changes (#699 — free-fly 카메라 통합 재설계)
+
+- **[#699] free-fly 카메라 통합 재설계 — 진입/줌/이동/시점 일관 모델 (MINOR)** ([#699](https://github.com/coseo12/astro-simulator/issues/699)) — free-fly 진입(시점 보존 단일 규칙) + 줌 % + WASD 이동(deltaTime 정규화) + 패닝 일관 모델. ADR `20260617-699-freefly-camera-unified-redesign.md` SSoT.
+  - **D-T2 Amendment 1 (2026-06-18) — 탐색 버튼(command 경로) free-fly 진입 정상화**: 사용자 보고 "탐색 버튼 클릭 시 리셋만 되고 조작이 안 됨" critical 회귀 fix. simulation-core `enterFreeFly` 가 `freeFlyEntered → bodySelected:null` 2-emit 하여 후행 `bodySelected:null` 이 어댑터 `setSelectedBody(null)` 로 store `freeFlyMode` 를 false 로 덮어써(§509) free-fly 가 reset 으로 되돌아가던 문제 — 후행 `bodySelected:null` emit 제거(2-emit→1-emit). `store.enterFreeFly()` 가 `{selectedBodyId:null, freeFlyMode:true}` 를 단일 set 으로 commit. `resetCamera` 경로는 자체 `bodySelected:null` emit 유지 (reset 버튼 무회귀). emit 순서 #509 부터 존재한 develop 잠복 버그를 #699 가 표면화 → #699 PR 에 fix 포함. 가드 사각 해소: verify:699 신규 S5 (실 버튼 = `__simCore.command` 경로 SSoT) + 단위 가드 + 3중 시뮬레이션.
+
 ## [0.28.0] — 2026-06-16
 
 ### Behavior Changes (#688 — 궤도선 toggle UI)

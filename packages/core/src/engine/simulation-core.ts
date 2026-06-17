@@ -251,9 +251,15 @@ export class SimulationCore {
       case 'enterFreeFly':
         // #509 — 자유시점 진입. bodySelected:null (resetCamera) 과 구분 — focus tracking 만
         // 해제 + 카메라 시점 (alpha/beta/radius/target/tier) 보존.
-        // 어댑터가 freeFlyEntered + bodySelected:null 동시 처리 → store freeFlyMode=true.
+        //
+        // #699 D-T2 회귀 fix — freeFlyEntered 만 emit. 후행 bodySelected:null 제거.
+        // 근거: 어댑터의 store.enterFreeFly() action 이 {selectedBodyId:null, freeFlyMode:true}
+        // 를 단일 set 으로 commit 하므로 selectedBodyId sync 는 bodySelected:null 없이 충족된다.
+        // focus tracking 해제는 sim-canvas subscribe 의 detachToFreeFly(solar.detachFocus) 담당.
+        // 후행 bodySelected:null 은 어댑터 setSelectedBody(null) 가 freeFlyMode 를 false 로 강제
+        // (sim-store §509) → 방금 set 한 freeFlyMode:true 를 덮어쓰는 잉여이자 회귀원이었다
+        // (탐색 버튼 command 경로에서 free-fly 가 reset 으로 되돌아감). 제거로 1-emit 단일화.
         this.#emitter.emit('freeFlyEntered', {});
-        this.#emitter.emit('bodySelected', { id: null });
         break;
       case 'setCameraRadius':
         this.#setRadiusHandler?.(cmd.radius);

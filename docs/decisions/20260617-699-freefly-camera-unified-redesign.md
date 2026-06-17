@@ -259,7 +259,23 @@ free-fly 카메라가 #509(진입)→#629(줌)→#631(허공 fix)→#693(패닝)
 
 ## §7 Amendment 라운드 N
 
-(사용자 D-T2 / cross-validate 후속으로 결정 갱신 시 추가. 본 ADR 은 진입 방향/속도가 1차 제안이라 Amendment 다회 예상.)
+### Amendment 1 (2026-06-18) — 탐색 버튼(command 경로) free-fly 진입 회귀 fix + 가드 사각 해소
+
+사용자 D-T2 보고: **"탐색 버튼 클릭 시 리셋만 되고 조작이 안 됨"**. 정량 재현 (dev localhost:3000):
+
+| 시나리오                                                  | before (회귀)                                          | after (fix)                                      |
+| --------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| A. earth focus → enterFreeFly **command**(탐색버튼)       | `{freeFlyMode:false, panning:0, radius:35}` = reset ❌ | `{freeFlyMode:true, panning:1469, radius:68}` ✅ |
+| B. earth focus → enterFreeFly **store action**(가드 헬퍼) | `{freeFlyMode:true, panning:1469, radius:68}` ✅       | 동일 ✅                                          |
+| C. default → enterFreeFly **command**(탐색버튼)           | reset ❌                                               | `{freeFlyMode:true, panning:2857, radius:35}` ✅ |
+
+**근본 원인**: simulation-core `enterFreeFly` case 가 `freeFlyEntered → bodySelected:null` **2-emit**. 어댑터가 ① freeFlyEntered → `store.enterFreeFly()` (`freeFlyMode:true`) ② bodySelected:null → `store.setSelectedBody(null)` (§509 가 `freeFlyMode:false` 강제) 순으로 동기 처리 → 후행 emit 이 free-fly 를 **reset 으로 덮어씀**. emit 순서 #509(b498a3b)부터 존재한 develop 잠복 버그지만, #699 가 default 진입 허용 + 탐색 버튼을 통합 진입점화 하여 표면화.
+
+**Fix (옵션 B — 근본)**: `enterFreeFly` case 에서 후행 `bodySelected:null` emit **제거**. `store.enterFreeFly()` action 이 `{selectedBodyId:null, freeFlyMode:true}` 를 단일 set 으로 commit 하므로 selectedBodyId sync 충족 + focus tracking 해제는 sim-canvas subscribe `detachToFreeFly` 담당. `resetCamera` case 는 자체 `bodySelected:null` emit 유지 (무회귀 — reset 버튼 정상).
+
+**가드 사각 해소**: 기존 verify:699(S1~S4)/verify:693 freeFly 헬퍼는 전부 `__simStore.getState().enterFreeFly()` (store action 직접 = 단일 set) 로만 진입 → command 경로 2-emit 회귀 미검출. **신규 S5** 는 실제 버튼 경로 `__simCore.command({type:'enterFreeFly'})` 를 SSoT 로 검증 (focusOn/resetCamera command → enterFreeFly command → freeFlyMode=true + panning>0). 3중 시뮬레이션: positive(fix) PASS → negative(bodySelected:null 복원) FAIL (S5: freeFlyMode=false/panning=0/radius=35 = reset 재현, unit FAIL) → recovery PASS. 단위 가드: `simulation-core-camera-sync.test.ts` "enterFreeFly 명령은 freeFlyEntered 1회만 emit (bodySelected 미emit)".
+
+(이하 사용자 D-T2 / cross-validate 후속으로 결정 갱신 시 추가.)
 
 ---
 
@@ -274,3 +290,4 @@ free-fly 카메라가 #509(진입)→#629(줌)→#631(허공 fix)→#693(패닝)
 
 - 2026-06-17: 최초 작성 (Provisional). measurement-first 진단 (P1 4거동 / P2 io 85→1.3px / P3 42.57px 일정 → 계수 과대 재정의). 진입 (가)+(A)+(I)+(나) 1차 제안.
 - 2026-06-17: cross-validate (agy outcome=applied) → **Accepted** 전이. 4축 통합: 합의(P3 재정의·코어 라인 낙관) / 이견 수용(sun anomaly 1회 억제→구조적 차단 / deltaTime 산식 명시 / default 진입 target 계승) / 기각(origin shift hysteresis — floating-origin no-op 근거) / 고유 발견 후속 분리(계수 동적 설정·exit 보간·캔버스 키보드 포커스). 진입 방향/속도 계수는 D-T2 튜닝 대상 유지.
+- 2026-06-18: **Amendment 1** (§7) — 사용자 D-T2 "탐색 버튼 클릭 시 리셋만 됨" critical 회귀 fix. simulation-core enterFreeFly 의 잉여 `bodySelected:null` 후행 emit 제거(2-emit→1-emit) + command 경로 가드 사각 해소(verify:699 S5 신설) + 3중 시뮬레이션.

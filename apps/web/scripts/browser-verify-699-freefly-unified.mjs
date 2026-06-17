@@ -25,9 +25,20 @@
  * | S3  | 이동 화면체감 — WASD 1 step screen px ≤ 16, tier 편차 < 10%      | 계수 0.05 과대 회귀      |
  * | S3b | frame-rate 독립 — 동일 hold 시간 동일 이동량(deltaTime 정규화)   | deltaTime 누락 회귀      |
  * | S4  | 무회귀 — #629 줌 % / #693 패닝 originOffset=0 / tier escalate     | 좌표계 깨짐              |
+ * | S5  | 탐색버튼 경로 — focusOn/resetCamera command → enterFreeFly command| 2-emit 회귀(reset로 복귀)|
+ *
+ * ## S5 가드 사각 배경 (#699 D-T2 회귀)
+ *
+ * S1~S4 의 freeFly 진입 헬퍼는 `window.__simStore.getState().enterFreeFly()` (store action 직접
+ * = 단일 set) 로만 진입했다. 그러나 **실제 탐색 버튼은 command 경로**
+ * (`window.__simCore.command({type:'enterFreeFly'})`) 를 탄다. command 경로는 simulation-core 가
+ * freeFlyEntered → bodySelected:null **2-emit** 하던 회귀가 있어 후행 bodySelected:null 이
+ * 어댑터 setSelectedBody(null) 로 freeFlyMode 를 false 로 덮어써 free-fly 가 reset 으로 되돌아갔다.
+ * store action 직접 호출 헬퍼는 단일 set 이라 이 회귀를 검출하지 못한 **가드 사각**이었다.
+ * S5 는 실제 버튼 경로(command)를 SSoT 로 검증한다.
  *
  * dev 빌드 의존: window.__solarScene(getTier/floatingOrigin/meshes) / window.__simStore
- *               (setSelectedBody/enterFreeFly)
+ *               (setSelectedBody/enterFreeFly) / window.__simCore(command — S5 탐색버튼 경로)
  * 환경변수: BASE_URL (기본 http://localhost:3000)
  */
 
@@ -115,6 +126,20 @@ async function focus(page, id) {
 }
 async function enterFreeFly(page) {
   await page.evaluate(() => window.__simStore.getState().enterFreeFly());
+  await page.waitForTimeout(1500);
+}
+// S5 — 실제 탐색 버튼 경로 (command). store action 직접 호출과 달리 simulation-core 의
+// command dispatch 를 거치므로 emit 순서/개수 회귀를 검출한다 (#699 D-T2 가드 사각 해소).
+async function focusViaCommand(page, id) {
+  await page.evaluate((id) => window.__simCore.command({ type: 'focusOn', bodyId: id }), id);
+  await page.waitForTimeout(SETTLE_MS);
+}
+async function resetViaCommand(page) {
+  await page.evaluate(() => window.__simCore.command({ type: 'resetCamera' }));
+  await page.waitForTimeout(1500);
+}
+async function enterFreeFlyViaCommand(page) {
+  await page.evaluate(() => window.__simCore.command({ type: 'enterFreeFly' }));
   await page.waitForTimeout(1500);
 }
 async function focusCanvas(page) {
@@ -397,6 +422,71 @@ async function scenarioNoRegression(browser) {
   }
 }
 
+// S5 — 탐색버튼(command) 경로: focusOn/resetCamera command → enterFreeFly command 후
+// store freeFlyMode=true + panningSensibility>0 (패닝 활성) + radius 시점 보존(reset 35 아님).
+//
+// [회귀 검출 원리] simulation-core enterFreeFly 가 freeFlyEntered→bodySelected:null 2-emit 하면
+// 어댑터 setSelectedBody(null) 가 freeFlyMode=false 로 덮어써 sim-canvas subscribe 3rd 분기
+// (free-fly→reset)가 syncFocusToScene(null) reset 으로 라우팅 → freeFlyMode=false, panning=0,
+// radius≈35(reset). fix(1-emit)면 freeFlyMode=true, panning>0, radius=focus 시점 보존.
+async function scenarioCommandPathEntry(browser) {
+  console.log(
+    '\n[S5] 탐색버튼 경로(command) — focusOn/resetCamera→enterFreeFly command 후 freeFlyMode=true + panning>0',
+  );
+  const readStore = (page) =>
+    page.evaluate(() => {
+      const s = window.__simStore.getState();
+      const solar = window.__solarScene;
+      const cam = solar?.meshes?.values().next().value?.getScene()?.activeCamera;
+      return {
+        freeFlyMode: s.freeFlyMode,
+        selectedBodyId: s.selectedBodyId,
+        panningSensibility: cam?.panningSensibility ?? 0,
+        radius: cam?.radius ?? 0,
+      };
+    });
+  // 진입 직후 시점 보존 — focus 본체 radius ≠ reset 기본(35). default 경로는 panning>0 만 핵심.
+  const RESET_RADIUS = 35;
+  const cases = [
+    { label: 'inner/earth focus → freefly(command)', id: 'earth', useFocus: true },
+    { label: 'default → freefly(command)', id: null, useFocus: false },
+  ];
+  const rows = [];
+  let pass = true;
+  for (const c of cases) {
+    const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    const page = await ctx.newPage();
+    try {
+      await boot(page);
+      if (c.useFocus) {
+        await focusViaCommand(page, c.id);
+      } else {
+        await resetViaCommand(page);
+      }
+      const before = await readStore(page);
+      await enterFreeFlyViaCommand(page);
+      const after = await readStore(page);
+      // 핵심 회귀 가드 — freeFlyMode 유지 + 패닝 활성. (회귀 시 둘 다 false/0.)
+      const modeOk = after.freeFlyMode === true;
+      const panningOk = after.panningSensibility > 0;
+      // 시점 보존 — focus 경로는 focus radius(≈35 reset 아님) 보존. default 는 진입 전후 radius 동일.
+      const radiusOk = c.useFocus
+        ? Math.abs(after.radius - RESET_RADIUS) > 1e-6
+        : Math.abs(after.radius - before.radius) / Math.max(before.radius, 1e-9) <
+          RADIUS_PRESERVE_REL;
+      const ok = modeOk && panningOk && radiusOk;
+      if (!ok) pass = false;
+      rows.push({ label: c.label, ...after, modeOk, panningOk, radiusOk, ok });
+      console.log(
+        `  ${c.label}: freeFlyMode=${after.freeFlyMode} panning=${after.panningSensibility.toFixed(0)} radius=${after.radius.toFixed(1)} → ${ok ? 'PASS' : 'FAIL'}`,
+      );
+    } finally {
+      await ctx.close();
+    }
+  }
+  return { scenario: 'S5', rows, pass };
+}
+
 async function main() {
   console.log('\n=== #699 free-fly 통합 재설계 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -414,6 +504,8 @@ async function main() {
     if (!result.scenarios.s3b.pass) allPass = false;
     result.scenarios.s4 = await scenarioNoRegression(browser);
     if (!result.scenarios.s4.pass) allPass = false;
+    result.scenarios.s5 = await scenarioCommandPathEntry(browser);
+    if (!result.scenarios.s5.pass) allPass = false;
   } finally {
     await browser.close();
   }
