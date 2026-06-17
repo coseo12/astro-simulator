@@ -87,6 +87,13 @@ async function freeFly(page) {
   await page.evaluate(() => window.__simStore.getState().enterFreeFly());
   await page.waitForTimeout(1200);
 }
+// #696 D-T2 — 실제 "탐색" 버튼/Esc 와 동일한 command 경로 (sendCommand → core.command → emit).
+// store action 직접 호출(freeFly)은 simulation-core 의 enterFreeFly command 2단 emit 을 우회해
+// "진입이 reset 으로 귀결되는 회귀"(panning=0)를 가렸다. command 경로로 진입 직후 panning 활성을 검증.
+async function freeFlyViaCommand(page) {
+  await page.evaluate(() => window.__simCore.command({ type: 'enterFreeFly' }));
+  await page.waitForTimeout(1200);
+}
 // reset 버튼 = resetCamera command → store setSelectedBody(null) (selectedBodyId=null, freeFlyMode=false).
 // 실 reset 버튼이 sendCommand({type:'resetCamera'}) → core 'bodySelected:{id:null}' → setSelectedBody(null)
 // 으로 귀결되므로 store action 직접 호출로 동일 상태 전이를 재현한다.
@@ -136,7 +143,13 @@ async function scenarioPanWorks(browser) {
     console.log(
       `  sensibility=${before.panningSensibility.toFixed(2)} (>0) | targetΔ=${targetDelta.toExponential(3)} (≥${PAN_MIN_TARGET_DELTA}) | offsetDrift=${offsetDrift.toExponential(3)} (track) → ${pass ? 'PASS' : 'FAIL'}`,
     );
-    return { scenario: 'S1', sensibility: before.panningSensibility, targetDelta, offsetDrift, pass };
+    return {
+      scenario: 'S1',
+      sensibility: before.panningSensibility,
+      targetDelta,
+      offsetDrift,
+      pass,
+    };
   } finally {
     await ctx.close();
   }
@@ -224,7 +237,9 @@ async function scenarioZoomConsistency(browser) {
 }
 
 async function scenarioPanResetRestore(browser) {
-  console.log('\n[S5] free-fly 패닝 후 reset 원복 — target 원점 복원 + 패닝 비활성 (qa 차단 사유 #695)');
+  console.log(
+    '\n[S5] free-fly 패닝 후 reset 원복 — target 원점 복원 + 패닝 비활성 (qa 차단 사유 #695)',
+  );
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   try {
@@ -254,6 +269,52 @@ async function scenarioPanResetRestore(browser) {
   }
 }
 
+async function scenarioFocusToFreeFlyCommand(browser) {
+  console.log(
+    '\n[S6] focus→탐색(command 경로) 패닝 활성 — earth focus → enterFreeFly command → panning>0 + 시점 보존 (#696 D-T2)',
+  );
+  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  try {
+    await boot(page);
+    await focus(page, 'earth');
+    const focused = await measure(page);
+    // 실제 "탐색" 버튼/Esc 와 동일 command 경로 (store action 직접 호출 우회 — 회귀 재현 핵심).
+    await freeFlyViaCommand(page);
+    const entered = await measure(page);
+    // (1) 패닝 활성: panningSensibility>0 (reset 귀결 시 0 — D-T2 회귀 시그니처).
+    const panningActive = entered.panningSensibility >= 1;
+    // (2) 시점 보존: radius 가 reset(35)으로 귀결되지 않음 (earth focus radius 유지).
+    const viewPreserved = Math.abs(entered.radius - 35) > 1;
+    // (3) 패닝 작동: 진입 후 우클릭 드래그 → target 이동.
+    const before = await measure(page);
+    await dragPan(page);
+    const after = await measure(page);
+    const panDelta = Math.hypot(
+      after.targetX - before.targetX,
+      after.targetY - before.targetY,
+      after.targetZ - before.targetZ,
+    );
+    const panWorks = panDelta >= PAN_MIN_TARGET_DELTA;
+    const pass = panningActive && viewPreserved && panWorks;
+    console.log(
+      `  focus=earth radius=${focused.radius.toFixed(1)} → 탐색(command) panning=${entered.panningSensibility.toFixed(0)} (>1) radius=${entered.radius.toFixed(1)} (≠35=시점보존) | 드래그 targetΔ=${panDelta.toFixed(3)} (≥${PAN_MIN_TARGET_DELTA}) → ${pass ? 'PASS' : 'FAIL'}`,
+    );
+    return {
+      scenario: 'S6',
+      panningSensibility: entered.panningSensibility,
+      radius: entered.radius,
+      panDelta,
+      panningActive,
+      viewPreserved,
+      panWorks,
+      pass,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function main() {
   console.log('\n=== #693 free-fly 패닝(F3) 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -271,6 +332,8 @@ async function main() {
     if (!result.scenarios.s4.pass) allPass = false;
     result.scenarios.s5 = await scenarioPanResetRestore(browser);
     if (!result.scenarios.s5.pass) allPass = false;
+    result.scenarios.s6 = await scenarioFocusToFreeFlyCommand(browser);
+    if (!result.scenarios.s6.pass) allPass = false;
   } finally {
     await browser.close();
   }

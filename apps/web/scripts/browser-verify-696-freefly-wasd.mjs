@@ -26,8 +26,20 @@
  * | S5 화살표 회전 무충돌 | free-fly ArrowUp → beta 회전 + target 평행이동 0 | WASD 가 화살표 가로채면 회전 미발생 (FAIL) |
  * | S6 프레임 레이트 독립 + 대각 정규화 | W 대각(W+D) 이동량 = 단일 W × √1 (정규화) | 미정규화 → 대각 √2배 (FAIL) |
  * | S7 Q/E world-up 직관 | 수직 하향 시점에서 Q keydown → 월드 +Y 이동(globalPos.y 증가) | local up 사용 시 수평 (FAIL) |
+ * | S8 focus→탐색(command 경로) 자유이동 활성 | earth focus → enterFreeFly **command** → panning>0 + WASD 작동 + 시점 보존(radius≠35) | command 2단 emit 이 freeFlyMode 덮어써 reset 귀결 → panning=0 (FAIL) |
+ *
+ * ## S8 — #696 D-T2 회귀 가드 (가드 사각 해소)
+ *
+ * S1~S7 의 freeFly() 헬퍼는 store action `enterFreeFly()` 를 **직접 호출**해 simulation-core
+ * command 경로(`enterFreeFly` command → `freeFlyEntered (+이전: bodySelected:null)` emit)를 우회했다.
+ * 실제 "탐색" 버튼/Esc 키는 `sendCommand({type:'enterFreeFly'})` → core.command → emit 경로를 거치며,
+ * 이전 구현은 후행 `bodySelected:null` emit 이 freeFlyMode 를 false 로 덮어써 free-fly 진입이 sun
+ * 중심 reset 으로 귀결됐다(panning/WASD 비활성). store action 직접 호출은 이 2단 set 을 재현 못 해
+ * qa 가 회귀를 놓쳤다(가드 사각). S8 은 **command 경로 + earth focus 후 진입**(메인 D-T2 재현 케이스)을
+ * 명시 검증한다 — panning>0(자유이동 활성) + radius≠35(시점 보존) + WASD 작동.
  *
  * dev 빌드 의존: window.__solarScene(getTier/floatingOrigin) / window.__simStore(setSelectedBody/enterFreeFly)
+ *               / window.__simCore(command — S8 command 경로 재현)
  * 환경변수: BASE_URL (기본 http://localhost:3000)
  */
 
@@ -47,6 +59,10 @@ const RESET_TARGET_TOLERANCE = 0.1;
 const DIAGONAL_REL_TOLERANCE = 0.15;
 // S5 — 화살표 회전 시 target 평행이동이 사실상 0 이어야 한다 (회전은 alpha/beta 만 변동).
 const ROTATE_TARGET_TOLERANCE = 0.05;
+// S8 — free-fly 진입 시 panningSensibility>0 이어야 자유이동 활성(reset 귀결 시 0).
+const PANNING_ACTIVE_MIN = 1;
+// S8 — reset 귀결 시 radius=35(개요). focus 시점 보존이면 35 와 유의미하게 다름.
+const RESET_RADIUS = 35;
 
 async function measure(page) {
   return await page.evaluate(() => {
@@ -59,6 +75,8 @@ async function measure(page) {
     return {
       tier: solar.getTier(),
       radius: cam.radius,
+      // #696 D-T2 — free-fly 진입 시 패닝 활성 여부(>0). reset 귀결 시 0 (S8 가드).
+      panningSensibility: cam.panningSensibility,
       alpha: cam.alpha,
       beta: cam.beta,
       targetX: t.x,
@@ -90,6 +108,13 @@ async function freeFly(page) {
   await page.evaluate(() => window.__simStore.getState().enterFreeFly());
   await page.waitForTimeout(1200);
 }
+// #696 D-T2 — 실제 "탐색" 버튼/Esc 와 동일한 command 경로 (sendCommand → core.command → emit).
+// store action 직접 호출(freeFly)과 달리 simulation-core 의 enterFreeFly command 2단 emit 경로를
+// 재현한다 (S8 가드 핵심 — 회귀가 store action 우회 시 가려졌던 사각 해소).
+async function freeFlyViaCommand(page) {
+  await page.evaluate(() => window.__simCore.command({ type: 'enterFreeFly' }));
+  await page.waitForTimeout(1200);
+}
 async function resetCamera(page) {
   await page.evaluate(() => window.__simStore.getState().setSelectedBody(null));
   await page.waitForTimeout(SETTLE_MS);
@@ -119,7 +144,9 @@ async function holdKeys(page, keys, holdMs = 120) {
 }
 
 async function scenarioWasdWorks(browser) {
-  console.log('\n[S1] free-fly WASD 작동 — W keydown target+position 전진 + globalPos 추적 + radius 불변');
+  console.log(
+    '\n[S1] free-fly WASD 작동 — W keydown target+position 전진 + globalPos 추적 + radius 불변',
+  );
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   try {
@@ -152,14 +179,24 @@ async function scenarioWasdWorks(browser) {
     console.log(
       `  targetΔ=${targetDelta.toFixed(3)} (≥${MOVE_MIN_TARGET_DELTA}) | globalΔ=${globalDelta.toFixed(3)} trackDrift=${trackDrift.toExponential(2)} | radiusΔ=${radiusInvariant.toExponential(2)} (≈0) | tier=${before.tier}→${after.tier} → ${pass ? 'PASS' : 'FAIL'}`,
     );
-    return { scenario: 'S1', targetDelta, globalDelta, trackDrift, radiusInvariant, tierStable, pass };
+    return {
+      scenario: 'S1',
+      targetDelta,
+      globalDelta,
+      trackDrift,
+      radiusInvariant,
+      tierStable,
+      pass,
+    };
   } finally {
     await ctx.close();
   }
 }
 
 async function scenarioFocusInactive(browser) {
-  console.log('\n[S2] focus 중 WASD 비활성 — earth focus 중 W keydown target 불변 (#509 follow 유지)');
+  console.log(
+    '\n[S2] focus 중 WASD 비활성 — earth focus 중 W keydown target 불변 (#509 follow 유지)',
+  );
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   try {
@@ -172,11 +209,19 @@ async function scenarioFocusInactive(browser) {
     const b0 = await measure(page);
     await page.waitForTimeout(320); // holdKey(120)+200 과 동일 경과.
     const b1 = await measure(page);
-    const baselineDrift = Math.hypot(b1.targetX - b0.targetX, b1.targetY - b0.targetY, b1.targetZ - b0.targetZ);
+    const baselineDrift = Math.hypot(
+      b1.targetX - b0.targetX,
+      b1.targetY - b0.targetY,
+      b1.targetZ - b0.targetZ,
+    );
     const c0 = await measure(page);
     await holdKey(page, 'w');
     const c1 = await measure(page);
-    const wDrift = Math.hypot(c1.targetX - c0.targetX, c1.targetY - c0.targetY, c1.targetZ - c0.targetZ);
+    const wDrift = Math.hypot(
+      c1.targetX - c0.targetX,
+      c1.targetY - c0.targetY,
+      c1.targetZ - c0.targetZ,
+    );
     // WASD 누수 시 wDrift 가 step(radius×0.5×0.12≈수 unit) 만큼 추가됨. baseline + 작은 여유 이내면 PASS.
     const pass = wDrift <= baselineDrift + Math.max(0.5, baselineDrift * 0.5);
     console.log(
@@ -230,7 +275,12 @@ async function scenarioResetRestore(browser) {
     console.log(
       `  이동후 targetDist=${moved.targetDist.toFixed(3)} (≥${MOVE_MIN_TARGET_DELTA}) → reset후 targetDist=${after.targetDist.toFixed(3)} (≤${RESET_TARGET_TOLERANCE}) → ${pass ? 'PASS' : 'FAIL'}`,
     );
-    return { scenario: 'S4', movedTargetDist: moved.targetDist, resetTargetDist: after.targetDist, pass };
+    return {
+      scenario: 'S4',
+      movedTargetDist: moved.targetDist,
+      resetTargetDist: after.targetDist,
+      pass,
+    };
   } finally {
     await ctx.close();
   }
@@ -277,7 +327,11 @@ async function scenarioDiagonalNormalize(browser) {
     const b1 = await measure(page);
     await holdKey(page, 'w', 600);
     const a1 = await measure(page);
-    const singleDist = Math.hypot(a1.targetX - b1.targetX, a1.targetY - b1.targetY, a1.targetZ - b1.targetZ);
+    const singleDist = Math.hypot(
+      a1.targetX - b1.targetX,
+      a1.targetY - b1.targetY,
+      a1.targetZ - b1.targetZ,
+    );
     // reset 후 대각 W+D 이동량 (동일 hold 시간).
     await resetCamera(page);
     await freeFly(page);
@@ -285,7 +339,11 @@ async function scenarioDiagonalNormalize(browser) {
     const b2 = await measure(page);
     await holdKeys(page, ['w', 'd'], 600);
     const a2 = await measure(page);
-    const diagDist = Math.hypot(a2.targetX - b2.targetX, a2.targetY - b2.targetY, a2.targetZ - b2.targetZ);
+    const diagDist = Math.hypot(
+      a2.targetX - b2.targetX,
+      a2.targetY - b2.targetY,
+      a2.targetZ - b2.targetZ,
+    );
     // 정규화 시 diag ≈ single. 미정규화면 diag ≈ single × √2.
     const relDiff = Math.abs(diagDist - singleDist) / Math.max(singleDist, 1e-9);
     const pass = singleDist >= MOVE_MIN_TARGET_DELTA && relDiff <= DIAGONAL_REL_TOLERANCE;
@@ -329,6 +387,54 @@ async function scenarioQeWorldUp(browser) {
   }
 }
 
+async function scenarioFocusToFreeFlyCommand(browser) {
+  console.log(
+    '\n[S8] focus→탐색(command 경로) 자유이동 활성 — earth focus → enterFreeFly command → panning>0 + WASD 작동 + 시점 보존 (#696 D-T2)',
+  );
+  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  try {
+    await boot(page);
+    await focus(page, 'earth');
+    const focused = await measure(page);
+    // 실제 "탐색" 버튼/Esc 와 동일 command 경로 (store action 직접 호출 우회 — 회귀 재현 핵심).
+    await freeFlyViaCommand(page);
+    const entered = await measure(page);
+    // (1) 자유이동 활성: panningSensibility>0 (reset 귀결 시 0).
+    const panningActive = entered.panningSensibility >= PANNING_ACTIVE_MIN;
+    // (2) 시점 보존: radius 가 reset(35)으로 귀결되지 않음 (earth focus radius 유지).
+    //     reset 귀결 회귀 시 radius=35, target=[0,0,0] 으로 떨어진다.
+    const viewPreserved = Math.abs(entered.radius - RESET_RADIUS) > 1;
+    // (3) WASD 작동: free-fly 진입 후 W 키 → target 이동 (reset 귀결이면 WASD 도 비활성 → 미이동).
+    await focusCanvas(page);
+    const beforeW = await measure(page);
+    await holdKey(page, 'w');
+    const afterW = await measure(page);
+    const wDelta = Math.hypot(
+      afterW.targetX - beforeW.targetX,
+      afterW.targetY - beforeW.targetY,
+      afterW.targetZ - beforeW.targetZ,
+    );
+    const wasdWorks = wDelta >= MOVE_MIN_TARGET_DELTA;
+    const pass = panningActive && viewPreserved && wasdWorks;
+    console.log(
+      `  focus=earth radius=${focused.radius.toFixed(1)} → 탐색(command) panning=${entered.panningSensibility.toFixed(0)} (>${PANNING_ACTIVE_MIN}) radius=${entered.radius.toFixed(1)} (≠${RESET_RADIUS}=시점보존) | W후 targetΔ=${wDelta.toFixed(3)} (≥${MOVE_MIN_TARGET_DELTA}) → ${pass ? 'PASS' : 'FAIL'}`,
+    );
+    return {
+      scenario: 'S8',
+      panningSensibility: entered.panningSensibility,
+      radius: entered.radius,
+      wDelta,
+      panningActive,
+      viewPreserved,
+      wasdWorks,
+      pass,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function main() {
   console.log('\n=== #696 free-fly WASD 키보드 이동 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -350,6 +456,8 @@ async function main() {
     if (!result.scenarios.s6.pass) allPass = false;
     result.scenarios.s7 = await scenarioQeWorldUp(browser);
     if (!result.scenarios.s7.pass) allPass = false;
+    result.scenarios.s8 = await scenarioFocusToFreeFlyCommand(browser);
+    if (!result.scenarios.s8.pass) allPass = false;
   } finally {
     await browser.close();
   }

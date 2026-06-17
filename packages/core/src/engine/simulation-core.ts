@@ -251,9 +251,20 @@ export class SimulationCore {
       case 'enterFreeFly':
         // #509 — 자유시점 진입. bodySelected:null (resetCamera) 과 구분 — focus tracking 만
         // 해제 + 카메라 시점 (alpha/beta/radius/target/tier) 보존.
-        // 어댑터가 freeFlyEntered + bodySelected:null 동시 처리 → store freeFlyMode=true.
+        //
+        // #696 D-T2 fix — `freeFlyEntered` **단독** emit. 어댑터의 enterFreeFly() 가
+        // `{selectedBodyId:null, freeFlyMode:true}` 를 atomic 하게 commit 하므로 별도
+        // `bodySelected:null` emit 은 selectedBodyId 동기화에 불필요하다.
+        //
+        // [회귀 원인] 이전 구현은 `freeFlyEntered → bodySelected:null` 2단 emit 이었다.
+        // 두 번째 emit 이 어댑터 onBodySelected → setSelectedBody(null) → freeFlyMode:false 로
+        // **직전 enterFreeFly() 의 freeFlyMode:true 를 덮어썼다**. 그 결과 store 최종 상태가
+        // {null, false} 가 되고, sim-canvas subscribe 의 free-fly→reset 분기(#693)가 의도치
+        // 않게 발화하여 free-fly 진입이 sun 중심 reset 으로 귀결됐다 (panning/WASD 비활성).
+        // (이전 주석은 emit 순서가 'freeFlyEntered → bodySelected:null' 임에도 "freeFlyMode 가
+        //  덮이지 않도록 후행" 이라 잘못 설명한 주석-구현 drift 였다 — 실측: store 전이
+        //  {earth,false}→{null,true}→{null,false} 로 false 덮어쓰기 확인.)
         this.#emitter.emit('freeFlyEntered', {});
-        this.#emitter.emit('bodySelected', { id: null });
         break;
       case 'setCameraRadius':
         this.#setRadiusHandler?.(cmd.radius);

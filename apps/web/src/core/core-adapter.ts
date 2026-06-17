@@ -27,9 +27,11 @@ export function attachCoreToStore(core: SimulationCore): () => void {
     store.setSelectedBody(id);
   };
 
-  // #509 — 자유시점 진입. 'bodySelected:null' 이 emit 직전에 발화하므로 freeFlyMode=true 가
-  // setSelectedBody(null) 의 freeFlyMode=false 에 덮여쓰지 않도록 enterFreeFly() 호출이 후행.
-  // simulation-core 가 emit 순서를 freeFlyEntered → bodySelected:null 로 보장.
+  // #509 — 자유시점 진입. enterFreeFly() 가 {selectedBodyId:null, freeFlyMode:true} 를 atomic
+  // 하게 commit 한다. #696 D-T2 fix 로 simulation-core 의 enterFreeFly command 는 freeFlyEntered
+  // **단독** emit 으로 변경됐다 — 이전의 후행 'bodySelected:null' emit 이 setSelectedBody(null)
+  // 의 freeFlyMode:false 로 본 enterFreeFly() 의 freeFlyMode:true 를 덮어써 free-fly 진입이
+  // reset 으로 귀결되는 회귀를 만들었다 (자세한 trace: simulation-core.ts enterFreeFly 주석).
   const onFreeFlyEntered = () => {
     store.enterFreeFly();
   };
