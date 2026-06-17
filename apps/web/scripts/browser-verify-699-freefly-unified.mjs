@@ -26,6 +26,17 @@
  * | S3b | frame-rate 독립 — 동일 hold 시간 동일 이동량(deltaTime 정규화)   | deltaTime 누락 회귀      |
  * | S4  | 무회귀 — #629 줌 % / #693 패닝 originOffset=0 / tier escalate     | 좌표계 깨짐              |
  * | S5  | 탐색버튼 경로 — focusOn/resetCamera command → enterFreeFly command| 2-emit 회귀(reset로 복귀)|
+ * | S6  | 진입 자동 포커스 — 실 버튼 click→캔버스 click 없이 WASD 이동량 > 0 | activeEl≠canvas/WASD 무반응|
+ *
+ * ## S6 가드 사각 배경 (#699 D-T2 2차 회귀 — 자동 포커스)
+ *
+ * S3(WASD 이동)/S5(command 진입)는 캔버스에 **명시적으로 포커스를 부여**(focusCanvas)하거나 store
+ * action 으로 진입해 "버튼 클릭 후 캔버스 클릭 없이 WASD" 경로를 검증하지 못했다. Babylon 키보드
+ * 입력(scene.onKeyboardObservable)은 **canvas 가 키보드 포커스를 가질 때만** 키를 수신한다(실측:
+ * window 전역 keydown 은 onKeyboardObservable=false). 탐색/focus 버튼 클릭으로 진입하면 포커스가
+ * 그 버튼에 남아(activeElement=button/BODY) WASD 가 무반응이었다. detachToFreeFly 끝에
+ * refocusCanvas() 호출로 진입 즉시 canvas 에 키보드 포커스를 부여해 해소. S6 는 **실 버튼 click +
+ * 캔버스 포커스 부여 없이** WASD 이동량을 측정해 이 자동 포커스 회귀를 SSoT 로 검증한다.
  *
  * ## S5 가드 사각 배경 (#699 D-T2 회귀)
  *
@@ -487,6 +498,65 @@ async function scenarioCommandPathEntry(browser) {
   return { scenario: 'S5', rows, pass };
 }
 
+// S6 — 진입 자동 포커스: 실 탐색 버튼 click → 캔버스 click/포커스 부여 없이 곧바로 WASD hold
+// → 카메라 target 이동량 > 임계(자동 포커스 부재 회귀 차단) + 진입 직후 activeElement === canvas.
+//
+// [회귀 검출 원리] Babylon scene.onKeyboardObservable 은 canvas 가 키보드 포커스를 가질 때만 키를
+// 수신한다(실측: window 전역 keydown 은 onKeyboardObservable=false). 버튼 click 으로 진입하면
+// activeElement 가 버튼(또는 blur 후 BODY)에 남아 WASD 무반응. detachToFreeFly 끝의 refocusCanvas()
+// 가 진입 즉시 canvas 에 포커스를 부여하면 캔버스 click 없이 바로 이동 가능. refocusCanvas() 호출이
+// 제거되면(negative) activeElement≠canvas + WASD 이동량 0 → FAIL.
+const S6_MOVE_MIN = 0.1; // 자동 포커스 有 시 WASD hold 이동량 하한 (회귀 시 0).
+const S6_HOLD_MS = 1000;
+async function scenarioEntryAutoFocus(browser) {
+  console.log(
+    '\n[S6] 진입 자동 포커스 — 실 탐색 버튼 click → 캔버스 click 없이 WASD 이동량 > 0 + activeEl=canvas',
+  );
+  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  try {
+    await boot(page);
+    // default 진입(focus 없이도 탐색 버튼은 항상 활성 — #699 ADR §5-5). 실제 버튼 click 으로 진입해
+    // 포커스가 버튼/BODY 에 남는 실 사용 경로를 재현한다 (page.evaluate/store action 아님).
+    await page.locator('[data-testid="focus-free-fly"]').click();
+    await page.waitForTimeout(1500);
+    // 진입 직후 activeElement 가 canvas 인지 — refocusCanvas() 자동 포커스 부여 검증.
+    const activeAfterEntry = await page.evaluate(() => {
+      const el = document.activeElement;
+      return {
+        tag: el?.tagName ?? null,
+        testid: el?.getAttribute?.('data-testid') ?? null,
+        isCanvas: el?.getAttribute?.('data-testid') === 'sim-canvas',
+      };
+    });
+    const before = await measure(page, null);
+    // 캔버스 click/focus 부여 없이 곧바로 WASD hold — 자동 포커스가 있어야만 이동한다.
+    await holdKey(page, 'w', S6_HOLD_MS);
+    const after = await measure(page, null);
+    const worldDelta = Math.hypot(
+      after.targetX - before.targetX,
+      after.targetY - before.targetY,
+      after.targetZ - before.targetZ,
+    );
+    const focusOk = activeAfterEntry.isCanvas === true;
+    const moveOk = worldDelta > S6_MOVE_MIN;
+    const pass = focusOk && moveOk;
+    console.log(
+      `  진입 직후 activeEl=${activeAfterEntry.tag}(${activeAfterEntry.testid ?? '-'}) isCanvas=${activeAfterEntry.isCanvas} → 캔버스 click 없이 W hold(${S6_HOLD_MS}ms) worldΔ=${worldDelta.toFixed(3)} (>${S6_MOVE_MIN}) → ${pass ? 'PASS' : 'FAIL'}`,
+    );
+    return {
+      scenario: 'S6',
+      activeAfterEntry,
+      worldDelta,
+      focusOk,
+      moveOk,
+      pass,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function main() {
   console.log('\n=== #699 free-fly 통합 재설계 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -506,6 +576,8 @@ async function main() {
     if (!result.scenarios.s4.pass) allPass = false;
     result.scenarios.s5 = await scenarioCommandPathEntry(browser);
     if (!result.scenarios.s5.pass) allPass = false;
+    result.scenarios.s6 = await scenarioEntryAutoFocus(browser);
+    if (!result.scenarios.s6.pass) allPass = false;
   } finally {
     await browser.close();
   }

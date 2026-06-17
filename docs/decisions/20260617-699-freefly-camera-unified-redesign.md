@@ -275,6 +275,10 @@ free-fly 카메라가 #509(진입)→#629(줌)→#631(허공 fix)→#693(패닝)
 
 **가드 사각 해소**: 기존 verify:699(S1~S4)/verify:693 freeFly 헬퍼는 전부 `__simStore.getState().enterFreeFly()` (store action 직접 = 단일 set) 로만 진입 → command 경로 2-emit 회귀 미검출. **신규 S5** 는 실제 버튼 경로 `__simCore.command({type:'enterFreeFly'})` 를 SSoT 로 검증 (focusOn/resetCamera command → enterFreeFly command → freeFlyMode=true + panning>0). 3중 시뮬레이션: positive(fix) PASS → negative(bodySelected:null 복원) FAIL (S5: freeFlyMode=false/panning=0/radius=35 = reset 재현, unit FAIL) → recovery PASS. 단위 가드: `simulation-core-camera-sync.test.ts` "enterFreeFly 명령은 freeFlyEntered 1회만 emit (bodySelected 미emit)".
 
+### Amendment 2 (2026-06-18) — 캔버스 키보드 포커스 자동 부여 (버튼 진입 후 WASD 무반응 회귀)
+
+사용자 D-T2 2차 보고: Amendment 1 fix 로 진입은 정상화됐으나 **진입 후 WASD 이동이 무반응**. 근본 원인: Babylon `scene.onKeyboardObservable` 은 **canvas 가 키보드 포커스를 가질 때만** 키를 수신한다(실측: window 전역 keydown 은 `onKeyboardObservable=false`). 탐색/focus 버튼 클릭으로 진입하면 포커스가 그 버튼/BODY 에 남아 사용자가 캔버스를 클릭하기 전엔 무반응. 기존 `pointerenter` refocus 는 마우스가 캔버스에 **새로 진입**할 때만 발화 → 진입 자동 포커스 아님. **Fix**: `detachToFreeFly` 끝(`wasdControl.setEnabled(true)` 직후)에 `refocusCanvas()` 호출(텍스트 입력 포커스 가드 포함) — 진입 즉시 canvas 에 키보드 포커스 부여. **가드 사각 해소**: 기존 S3(명시 focusCanvas)/S5(store action) 는 버튼 진입 자동 포커스를 검증 못 함 → **신규 S6**: 실 탐색 버튼 click → 캔버스 click/포커스 부여 없이 WASD hold → 이동량 > 0.1 + `activeElement === canvas`. 3중 시뮬레이션: positive PASS(activeEl=CANVAS, worldΔ=31.8) → negative(`refocusCanvas()` 제거) FAIL(activeEl=BUTTON, worldΔ=0.000) → recovery PASS.
+
 (이하 사용자 D-T2 / cross-validate 후속으로 결정 갱신 시 추가.)
 
 ---
@@ -291,3 +295,4 @@ free-fly 카메라가 #509(진입)→#629(줌)→#631(허공 fix)→#693(패닝)
 - 2026-06-17: 최초 작성 (Provisional). measurement-first 진단 (P1 4거동 / P2 io 85→1.3px / P3 42.57px 일정 → 계수 과대 재정의). 진입 (가)+(A)+(I)+(나) 1차 제안.
 - 2026-06-17: cross-validate (agy outcome=applied) → **Accepted** 전이. 4축 통합: 합의(P3 재정의·코어 라인 낙관) / 이견 수용(sun anomaly 1회 억제→구조적 차단 / deltaTime 산식 명시 / default 진입 target 계승) / 기각(origin shift hysteresis — floating-origin no-op 근거) / 고유 발견 후속 분리(계수 동적 설정·exit 보간·캔버스 키보드 포커스). 진입 방향/속도 계수는 D-T2 튜닝 대상 유지.
 - 2026-06-18: **Amendment 1** (§7) — 사용자 D-T2 "탐색 버튼 클릭 시 리셋만 됨" critical 회귀 fix. simulation-core enterFreeFly 의 잉여 `bodySelected:null` 후행 emit 제거(2-emit→1-emit) + command 경로 가드 사각 해소(verify:699 S5 신설) + 3중 시뮬레이션.
+- 2026-06-18: **Amendment 2** (§7) — 사용자 D-T2 2차 "진입 후 이동 안됨" 회귀 fix. detachToFreeFly 끝에 `refocusCanvas()` 호출 — 버튼 진입 후 canvas 키보드 포커스 자동 부여(Babylon onKeyboardObservable canvas-focus 의존). 가드 사각 해소(verify:699 S6 신설 — 실 버튼 click + 자동 포커스) + 3중 시뮬레이션.

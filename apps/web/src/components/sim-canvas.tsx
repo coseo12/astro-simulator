@@ -557,6 +557,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           sceneApi.setPanningEnabled(camera, true);
           // #699 — free-fly 진입 → WASD/QE 키보드 이동 활성 (ADR §5-4).
           wasdControl.setEnabled(true);
+          // #699 D-T2 — 진입 즉시 캔버스에 키보드 포커스 부여. 탐색/focus 버튼 클릭으로 진입하면
+          // 포커스가 그 버튼에 남아 scene.onKeyboardObservable 이 키를 받지 못해 WASD 가 무반응이다
+          // (Babylon 키보드 입력은 canvas 포커스 시에만 수신 — 실측 onKeyboardObservable=false).
+          // pointerenter refocus 는 마우스가 캔버스에 "새로 진입"할 때만 발화하므로, 진입 시점에
+          // 명시적으로 focus 를 부여해 캔버스 클릭 없이 바로 이동 가능케 한다. refocusCanvas 는
+          // 텍스트 입력 포커스 가드를 포함한다.
+          refocusCanvas();
         };
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
