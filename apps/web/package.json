@@ -21,7 +21,8 @@
     "verify:629-freefly-zoom": "node scripts/browser-verify-629-freefly-zoom.mjs",
     "verify:631-freefly-tier": "node scripts/browser-verify-631-freefly-tier.mjs",
     "verify:675-glow-marker": "node scripts/browser-verify-glow-marker.mjs",
-    "verify:693-freefly-panning": "node scripts/browser-verify-693-freefly-panning.mjs"
+    "verify:693-freefly-panning": "node scripts/browser-verify-693-freefly-panning.mjs",
+    "verify:699-freefly-unified": "node scripts/browser-verify-699-freefly-unified.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",

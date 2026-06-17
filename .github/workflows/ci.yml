@@ -367,6 +367,27 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # #699 — free-fly 통합 재설계 회귀 가드 (진입 일관/줌아웃 제거/이동 화면체감/frame-rate 독립/무회귀).
+      # ADR: docs/decisions/20260617-699-freefly-camera-unified-redesign.md §5 회귀 가드
+      # 검증 5축: (S1) 진입 일관성 4 tier radius 편차 < 5% (tier별 분기 거동 부활 차단)
+      #          (S2) io focus(85px)→free-fly px ≥ 40 + onScreen (#631 강제 줌아웃 회귀 차단)
+      #          (S3) WASD 1 step screen px ≤ 16 + tier 편차 < 10% (계수 0.05 과대 회귀 차단)
+      #          (S3b) frame-rate 독립 — hold 시간 비례 이동 (deltaTime 정규화 누락 회귀 차단)
+      #          (S4) 무회귀 — free-fly originOffset=0(#693) + tier 줌아웃 escalate(#629/#631)
+      - name: '#699 free-fly 통합 재설계 회귀 가드 (verify:699-freefly-unified)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-699-freefly-unified.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3012 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3012/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3012 node apps/web/scripts/browser-verify-699-freefly-unified.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
