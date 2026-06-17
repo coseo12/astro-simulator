@@ -1,0 +1,55 @@
+[
+  {
+    "label": "A. free-fly 직접 (solar)",
+    "before": {
+      "tier": "solar",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "targetX": 0,
+      "globalX": 21.433034896850586,
+      "radius": 35
+    },
+    "after": {
+      "tier": "solar",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "targetX": -1.0716517580613625,
+      "globalX": 20.36138343811035,
+      "radius": 35
+    },
+    "step": 1.75,
+    "forwardFromTargetPos": [
+      -0.6123724331779214,
+      -0.5000000061675042,
+      0.6123724331779214
+    ],
+    "forwardGetDirection": [
+      -0.6123723983764648,
+      -0.5,
+      0.6123723983764648
+    ],
+    "rightStrafe": [
+      -0.7071068051428974,
+      0,
+      -0.7071068051428974
+    ],
+    "upWorld": [
+      -0.3535533845424652,
+      0.866025447845459,
+      0.3535533845424652
+    ],
+    "forwardDotRight": 0,
+    "targetDelta": -1.0716517580613625,
+    "globalDelta": -1.0716514587402344,
+    "expectedDeltaX": -1.0716517580613625,
+    "radiusInvariant": 0,
+    "offsetBefore": 21.433034896850586,
+    "offsetAfter": 21.433035196171716
+  }
+]
