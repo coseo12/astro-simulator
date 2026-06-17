@@ -183,6 +183,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 비례 panningSensibility 를 매 프레임 재산출(줌 일관성, ADR §결정 2). 토글 SSoT 는
         // sceneApi.setPanningEnabled 1곳.
         let freeFlyActive = false;
+        // #696 — free-fly WASD/QE 키보드 이동 핸들. free-fly 진입 시 setEnabled(true), focus/reset
+        // 시 setEnabled(false)(focus follow 충돌 회피, ADR §결정 4). 패닝(#693)과 동일 freeFlyActive
+        // 토글 SSoT 를 공유한다 — 입력 채널만 별개(키 vs 드래그). reset 시 clearKeys 로 눌림 키 잔류
+        // 방지(키업 유실 대비, ADR §결정 5). unmount/HMR 시 detach 로 observer/blur 리스너 정리.
+        const wasdControl = sceneApi.attachWasdControl(camera, instance.scene);
+        // #696 — camera dispose 시 WASD observer/blur 리스너 해제 (HMR/StrictMode 재마운트 누수
+        // 방지 — #693 contextmenu handler onDisposeObservable 선례).
+        camera.onDisposeObservable.add(() => wasdControl.detach());
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
@@ -452,6 +460,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.
               freeFlyActive = false;
               sceneApi.setPanningEnabled(camera, false);
+              // #696 — focus 진입 시 WASD 비활성 (focus follow 가 매 프레임 target 을 덮어쓰므로 무의미).
+              wasdControl.setEnabled(false);
             }
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
@@ -460,6 +470,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
             freeFlyActive = false;
             sceneApi.setPanningEnabled(camera, false);
+            // #696 — reset 시 WASD 비활성 + 눌림 키 클리어 (free-fly→reset 후 키 잔류 이동 방지).
+            wasdControl.setEnabled(false);
+            wasdControl.clearKeys();
           }
         };
 
@@ -480,6 +493,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // #693 — body tier pull-back 도 free-fly 진입이므로 패닝 활성 (ADR §결정 4).
             freeFlyActive = true;
             sceneApi.setPanningEnabled(camera, true);
+            // #696 — body tier pull-back 도 free-fly 이므로 WASD 활성.
+            wasdControl.setEnabled(true);
             return;
           }
           solar.detachFocus();
@@ -488,6 +503,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // 따라 매 프레임 재산출 (ADR §결정 2).
           freeFlyActive = true;
           sceneApi.setPanningEnabled(camera, true);
+          // #696 — free-fly 진입 → WASD/QE 키보드 이동 활성 (ADR §결정 4).
+          wasdControl.setEnabled(true);
         };
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)

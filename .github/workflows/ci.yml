@@ -367,6 +367,29 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # #696 — free-fly WASD/QE 키보드 이동 회귀 가드 (target+position 평행이동 + floating origin 정합).
+      # ADR: docs/decisions/20260617-696-freefly-wasd-movement.md §결정 §회귀 가드
+      # 검증 7축: (S1) free-fly W keydown → target+position 전진 + globalPos 추적 + radius 불변
+      #          (S2) earth focus 중 W keydown → target 불변 (#509 follow 유지)
+      #          (S3) io→free-fly(pull-back) W 이동 후 originOffset=[0,0,0] + tier 일관 (#631)
+      #          (S4) WASD 이동 → reset → target 원점 복원 + 키 클리어
+      #          (S5) free-fly ArrowUp → beta 회전 + target 평행이동 0 (Q1 화살표 무충돌)
+      #          (S6) W+D 대각 이동량 = 단일 W (정규화, √2 가속 아님) — deltaTime 독립 동일 시간
+      #          (S7) 수직 하향 시점 Q keydown → 월드 +Y 이동 (local up 수평 둔갑 회피)
+      - name: '#696 free-fly WASD 회귀 가드 (verify:696-freefly-wasd)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-696-freefly-wasd.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3010 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3010/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3010 node apps/web/scripts/browser-verify-696-freefly-wasd.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
