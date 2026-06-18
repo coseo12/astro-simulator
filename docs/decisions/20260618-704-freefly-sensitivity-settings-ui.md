@@ -1,6 +1,6 @@
 # ADR: free-fly 카메라 감도 설정 UI — 4축 계수 정적 const → 런타임 가변 + localStorage 영속
 
-- **상태**: **Provisional** (cross-validate 발동 대상 — ADR 신규. agy 교차검증 결과 §교차검증 반영 사항 통합 후 Accepted 전이)
+- **상태**: **Accepted** (cross-validate 2026-06-18 agy outcome=applied — §교차검증 반영 사항 4축 분류 통합 완료. Provisional → Accepted 전이)
 - **날짜**: 2026-06-18
 - **결정자**: architect (#704 설계 단계 — 구현 직전 결정 박제)
 - **변형**: **일반 ADR** (forensic 5조건 미달 — 측정보다 설계 결정 위주. 가설 비교 N≥2 ① 충족하나 runtime 측정 필수 ②·DoD PASS 회귀 ③·5±2 옵션 ④는 미충족)
@@ -101,10 +101,17 @@ free-fly 카메라 감도 4축 계수가 #699 까지 named const "D-T2 튜닝 �
 ## 결정
 
 1. **주입 아키텍처 = 축 1-A (경로별 최소 침습)**. `attachWasdControl(camera, scene, getCoefficients?)` 에 getter 주입(매 프레임 `getCoefficients()` 로 wasd/maxStep 최신 읽기) / `computePanningSensibility` 와 `setPanningEnabled` 에 pct 인자(default = `PANNING_DELTA_PERCENTAGE`) / `camera.wheelDeltaPercentage`·`pinchDeltaPercentage` 직접 set / `FREE_FLY_ZOOMOUT_FACTOR` 를 store 값으로 읽어 `upperRadiusLimit` 재산정. **named const 4종은 default SSoT 로 잔존** — store 초기값이 const 를 import.
+   - **줌아웃 배율 실시간 반영 (agy 이견 수용)**: 줌아웃은 진입 시 1회 산정이라, free-fly 활성 중 슬라이더 변경이 즉시 반영되지 않는다(재진입 필요 → DoD-1 "재진입 불요" 위반). **해결**: `setFreeFlySensitivity('zoomoutFactor', …)` 시 sim-canvas 가 store 구독해 `freeFlyActive === true` 이면 `upperRadiusLimit = freeFlyEntryRadius × factor` 를 즉시 재산정한다(entry radius 스냅샷은 이미 sim-canvas 에 보존됨 — `freeFlyEntryRadius`). 줌아웃만 push 구독(나머지 3축은 pull). dev 인수인계 주입 경로 B 참조.
+   - **axis 리터럴 유니온 (agy 합의)**: `setFreeFlySensitivity(axis, value)` 의 `axis` 는 `'wasd' | 'zoomoutFactor' | 'panning' | 'zoom'` 리터럴 유니온 타입 — 컴파일 시점 오타 차단.
+   - **getter 시그니처 명세 (agy 합의)**: `getCoefficients()` 는 `{ wasd: number; maxStep: number }` 반환(WASD onBeforeRender 가 매 프레임 호출). maxStep 도 향후 가변 대비 포함하되 1차 슬라이더는 wasd 만 노출(maxStep=`MAX_MOVE_STEP` 고정).
 
 2. **store 스키마 = 축 2-A**. `freeFlySensitivity: { wasd, zoomoutFactor, panning, zoom }` + `setFreeFlySensitivity(axis, value)` + `resetFreeFlySensitivity()`. 초기값 = camera.ts const import(`WASD_DELTA_PERCENTAGE` 등) — default SSoT 일원화(하드코딩 0.015 재선언 금지, 주석-구현 drift 차단).
 
-3. **영속 = 축 3-A (직접 구현)**. `SENSITIVITY_SCHEMA_VERSION` + SSR 가드 + try/catch + 범위 clamp 3종 방어. setter 시점 즉시 저장. zustand persist 미사용.
+3. **영속 = 축 3-A (직접 구현)**. `SENSITIVITY_SCHEMA_VERSION` + SSR 가드 + try/catch + 범위 clamp 3종 방어. zustand persist 미사용.
+   - **Hydration 안전 (agy 이견 수용)**: store 생성 시점에 `loadPersisted()` 를 호출하면 Next.js SSR 초기 상태(default)와 클라이언트 localStorage 값 불일치로 **Hydration Mismatch** 발생 위험. **해결**: store 초기값은 **항상 const default**(서버·클라 동일)로 두고, localStorage 로드는 **클라이언트 mount 후 `useEffect` 1회**(설정 모달 컴포넌트 또는 전용 hydration hook)에서 `setFreeFlySensitivity` 로 덮어쓴다. 서버 렌더 HTML 은 default 로 고정되어 mismatch 0. (선례: `dismissedNoticeKeys` 도 store 초기값을 비영속 default 로 둠.)
+   - **저장 시점 분리 (agy 합의/정교화)**: 슬라이더 `onValueChange` → store 즉시 갱신(런타임 카메라 즉시 반영) / localStorage 디스크 쓰기는 `onValueCommit`(드래그 종료) 시점 — 드래그 중 매 픽셀 `localStorage.setItem` 폭주 회피.
+   - **reset 영속 동기화 (agy 합의)**: `resetFreeFlySensitivity()` 호출 시 **localStorage 도 즉시 갱신**(default 값 쓰기). 누락 시 복원 후 새로고침하면 이전 영속값 재로드되는 버그(agy 누락 요소 1 지적).
+   - **역직렬화 안전 할당 (agy 부분 수용)**: `JSON.parse` 결과를 store 에 병합할 때 `{ ...parsed }` spread 가 아닌 **4축 속성별 명시 할당 + clamp**(`__proto__` 등 임의 키 주입 차단 + 손상값 정정). 범위 clamp 가 이미 임의 값 주입을 무력화하므로 prototype pollution 위험은 낮으나, 명시 할당이 방어와 가독성 모두 우수.
 
 4. **UI = 축 4**. 헤더 `⚙ 카메라` 버튼 → 모달(about-modal 패턴) + Radix Slider 4개(범위/스텝 위 표) + 기본값 마커 + "기본값 복원". free-fly 비활성 중에도 조정 가능(다음 진입 시 반영) — 단 즉시 체감은 free-fly 중.
 
@@ -115,7 +122,7 @@ free-fly 카메라 감도 4축 계수가 #699 까지 named const "D-T2 튜닝 �
 ## 결과·재검토 조건
 
 - **기대 효과** (측정 가능):
-  - 4축 슬라이더 조정 → free-fly 중 즉시 카메라 거동 변화(재진입 불요) — verify:704 S1
+  - 4축 슬라이더 조정 → free-fly 중 즉시 카메라 거동 변화(재진입 불요, 줌아웃 배율 포함 — store 구독 push 재산정) — verify:704 S1
   - "기본값 복원" → 4축 = 0.015/5/0.01/0.01 — verify:704 S2
   - 새로고침 후 설정 유지 + 손상값 default 폴백 — verify:704 S3
   - focus/reset 영향 0 — verify:699 S1~S6 + verify:693 PASS — verify:704 S4
@@ -138,7 +145,30 @@ free-fly 카메라 감도 4축 계수가 #699 까지 named const "D-T2 튜닝 �
 
 ### 교차검증 반영 사항
 
-(cross-validate agy 호출 후 4축 분류 박제 — 합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견 후속 분리. 통합 후 상태 Provisional → Accepted 전이.)
+cross-validate 2026-06-18 (agy outcome=applied, exit 0, plan_bypass=false). 외부 모델 6 기준(구조/타당성/인터페이스/확장성/보안/누락) 평가. 4축 분류:
+
+**호출 전 Claude 편향 셀프 체크** — 4종 통과 여부: (1) 낙관적 일정 — Concrete Prediction "5번째 계수=주입 0줄" 에 "기존 4종 라이프사이클 매핑 시에만" 단서 명시(과도 낙관 차단, agy 가 확장성 우수로 확인) ✅ / (2) 결합 간과 — **미통과**(localStorage hydration + zoomout 실시간 반영 결합을 cross-validate 프롬프트에 명시 질문으로 삽입했고, agy 가 둘 다 고유 발견으로 확정 → 본 통합으로 보정) ⚠️→보정 / (3) 폐기 프레이밍 — N/A(additive, 폐기 0) ✅ / (4) 순수주의 — zustand persist 거부(NIH 여부)·4축 wiring 분산(단순주의 여부)을 명시 질문 삽입, agy 가 둘 다 타당으로 확인 ✅.
+
+**합의** (Claude 설계와 일치 — 본 PR 즉시 반영 항목):
+
+- 축 1-A(경로별 최소 침습) 타당 — 4축 비대칭상 B/C 강제 수렴 시 leaky abstraction. agy "매우 타당".
+- 축 3-A(직접 영속화) 3종 방어(SENSITIVITY_SCHEMA_VERSION + Number.isFinite + min/max clamp)로 오염 데이터 차단 — agy "오염 영속 데이터 유입 완벽 차단".
+- Concrete Prediction + `git diff --stat` 검증법 — agy "아키텍처 지속 가능성 검증에 모범적".
+- 중첩 객체 스키마(축 2-A)가 프리셋 확장 정합 — agy "프리셋 명칭 매핑 확장 매끄럽게 호환".
+- 저장 시점 `onValueChange`(store 즉시) / `onValueCommit`(localStorage I/O) 분리 — 결정 3 정교화 반영.
+
+**이견 수용** (Claude 원안과 다르나 agy 근거 합리 → 수정):
+
+- **Hydration Mismatch 방지** — 원안: 축 3-A "store 생성 시 `loadPersisted()`". agy: Next.js SSR 초기 상태 ↔ 클라 localStorage 불일치로 Hydration Mismatch 위험. **수용**: store 초기값 = const default(서버·클라 동일) + localStorage 로드는 mount 후 `useEffect` 1회 덮어쓰기로 변경(결정 3 Hydration 안전 항목). 원안이 SSR 가드만 두고 hydration 타이밍을 간과했음(셀프 체크 결합 간과 축 보정).
+- **줌아웃 배율 실시간 반영** — 원안: 줌아웃 "진입 시 1회 산정". agy: free-fly 중 슬라이더 변경이 즉시 반영 안 됨(DoD-1 "재진입 불요" 위반). **수용**: zoomout 만 store 구독 push 로 `freeFlyEntryRadius × factor` 즉시 재산정(결정 1 줌아웃 실시간 반영 항목). 4축을 균일 pull 로 본 원안의 사각.
+
+**Claude 재분석으로 부분 기각** (맹목 수용 회피 — volt #51):
+
+- **Prototype pollution(`__proto__`) 방어** — agy: `{ ...parsed }` 병합 전 안전 파싱 권장. **부분 수용**: 범위 clamp + `Number.isFinite` 가 이미 임의 값 주입을 무력화하므로 별도 sanitizer 라이브러리는 과잉(순수주의 역방향). 대신 **4축 속성별 명시 할당**(spread 미사용)으로 1줄 비용으로 동일 방어 확보(결정 3 역직렬화 안전 할당). agy 제안의 핵심(spread 회피)은 수용하되 무게(전용 방어 계층)는 기각.
+
+**고유 발견 (범위 밖 — 후속 분리)**:
+
+- 없음. agy 발견 2건(Hydration / zoomout 실시간)은 모두 본 이슈 DoD(즉시 반영·새로고침 유지) 범위 **내** 라 즉시 반영(후속 분리 0). 비목표(프리셋 / 키바인딩 / 모바일 별도 감도)는 agy 도 침범하지 않음.
 
 ---
 
