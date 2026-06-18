@@ -715,31 +715,48 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const focusDistSceneUnit = typeof arcCam.radius === 'number' ? arcCam.radius : 0;
           const cameraFromFocusMeters = focusDistSceneUnit * metersPerSceneUnit;
           // #699 — free-fly 진입 tier escalation gate (sun anomaly 구조적 차단 — ADR §5-2).
+          // #704 D-T2 — escalation gate ↔ zoomoutFactor 결합 모순 해소 (ADR Amendment 2026-06-18).
           //
           // 진입 직후 updateTierByCamera 가 tierFromCameraDistance 로 tier 를 즉시 재판정하면
           // runTierTransition 실거리 보존 산식이 진입 radius 를 덮어쓴다(sun 25.3→463.9 / io
           // 158386→35 강제 pull-back). "1회 억제"(snap-back 위험)가 아니라 **진입 radius 임계**로
           // gate 한다 — 사용자가 진입 radius 의 (1 + margin) 배 초과로 **줌아웃**할 때만 escalate
-          // 허용. 줌인/소폭 변동은 tier 유지 → 진입 시점 보존 + snap-back 0. 한 번 임계를 넘으면
-          // freeFlyEntryRadius=null 로 gate 해제 (그 후 정상 escalation = #631 "허공 방지" 의도 계승).
+          // 허용. 줌인/소폭 변동은 tier 유지 → 진입 시점 보존 + snap-back 0.
+          //
+          // [#704 D-T2 회귀] 구 구현은 gate 해제 시점(진입 ×1.15)에 즉시 upperRadiusLimit 을
+          // SOLAR_ZOOMOUT_LIMIT(1000)으로 덮어쓰고 freeFlyEntryRadius=null 로 만들어, 사용자의
+          // zoomoutFactor 설정(entryRadius×factor)을 15% 줌아웃 후 무력화했다(슬라이더 무의미).
+          // 게다가 radius 가 1000 까지 자유 증가 → solar escalation 임계(≈690)를 넘어 rescale
+          // 급락(690→40, 17×)을 유발해 "급격한 카메라 이동" UX 회귀를 냈다(D-T2 측정).
+          //
+          // [수정] gate 해제(escalation 억제 해제)와 upperRadiusLimit 덮어쓰기를 **분리**한다:
+          //  - gate 는 escalation 억제만 담당(진입 시점 보존). 해제 후에도 freeFlyEntryRadius 를
+          //    null 로 만들지 않아 upperRadiusLimit = entryRadius × zoomoutFactor 가 그대로 유지된다
+          //    (store 구독이 SSoT). 사용자 factor 가 작으면(entryRadius×factor < escalation 임계)
+          //    그 한계에서 줌아웃이 멈춰 escalation 자체가 안 일어난다 → rescale 급락 0.
+          //  - tier 가 **실제로 escalate** 한 순간(updateTierByCamera 반환 tier ≠ 직전 tier)에만
+          //    SOLAR_ZOOMOUT_LIMIT 로 전환 + freeFlyEntryRadius=null. body tier 거대 진입(io 158386)이나
+          //    큰 factor 로 임계를 넘긴 경우의 solar 개요 빈 공간 차단(#631 "허공 방지" 계승, ADR §5-3).
           const TIER_ESCALATION_ZOOMOUT_MARGIN = 0.15; // 진입 대비 15% 줌아웃 시 escalate 개시.
           let allowTierUpdate = true;
           if (freeFlyActive && freeFlyEntryRadius !== null) {
-            if (focusDistSceneUnit > freeFlyEntryRadius * (1 + TIER_ESCALATION_ZOOMOUT_MARGIN)) {
-              // 사용자가 진입 radius 보다 유의미하게 줌아웃 → gate 해제(이후 정상 escalation).
-              // 줌아웃 상한을 solar 개요 기준으로 좁힌다 — escalation 후 카메라가 solar/inner tier 로
-              // 재산정되므로 진입 radius 비례 상한(deep tier 거대값)은 더 이상 유효하지 않다. solar
-              // 개요에서 빈 공간 진입 차단 (ADR §5-3 허공 대체 처리).
-              freeFlyEntryRadius = null;
-              const activeCamArc = activeCam as unknown as { upperRadiusLimit?: number };
-              activeCamArc.upperRadiusLimit = SOLAR_ZOOMOUT_LIMIT;
-            } else {
+            if (focusDistSceneUnit <= freeFlyEntryRadius * (1 + TIER_ESCALATION_ZOOMOUT_MARGIN)) {
               // 진입 radius 근처(줌인 포함) → tier 재판정 보류(진입 시점 보존).
               allowTierUpdate = false;
             }
+            // 진입 ×1.15 초과 → escalation 억제만 해제(allowTierUpdate=true). upperRadiusLimit 은
+            // 덮어쓰지 않는다 — entryRadius×zoomoutFactor 가 줌아웃 상한 SSoT (위 store 구독).
           }
           if (allowTierUpdate) {
-            solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+            const newTier = solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+            // tier 가 실제로 escalate(또는 변동)한 순간에만 solar 개요 상한으로 전환. escalation 후
+            // 카메라가 solar/inner tier 로 재산정되어 진입 radius 비례 상한(deep tier 거대값)은 더 이상
+            // 유효하지 않으므로 SOLAR_ZOOMOUT_LIMIT 로 좁혀 빈 공간 진입 차단 (ADR §5-3 허공 대체).
+            if (freeFlyEntryRadius !== null && newTier !== activeTier) {
+              freeFlyEntryRadius = null;
+              const activeCamArc = activeCam as unknown as { upperRadiusLimit?: number };
+              activeCamArc.upperRadiusLimit = SOLAR_ZOOMOUT_LIMIT;
+            }
           }
 
           // #693 — free-fly 패닝 감도 줌 일관성 (ADR §결정 2, agy 고유 발견 ②).

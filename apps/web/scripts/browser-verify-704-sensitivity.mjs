@@ -16,6 +16,7 @@
  * | S2  | 기본값 복원 → 4축 = 0.015/5/0.01/0.01 + 카메라 속성 default 환원          | reset 미동기화               |
  * | S3  | localStorage 왕복 — 변경 → reload 후 유지 + 손상값 주입 시 default 폴백   | 영속 미작동/손상값 흡수      |
  * | S4  | focus/reset 무회귀 — 감도 변경이 focus follow / reset 원복에 영향 0       | 감도 변경이 focus/reset 오염 |
+ * | S5  | D-T2 — zoomoutFactor 가 줌아웃 한계 제어(upper=entryR×factor 유지) + 급락 0| gate 가 upper→1000 덮어쓰기   |
  *
  * dev 빌드 의존: window.__simStore (freeFlySensitivity / setFreeFlySensitivity / reset /
  *               setSelectedBody / enterFreeFly) / window.__solarScene (meshes/activeCamera).
@@ -249,6 +250,83 @@ async function scenarioNoRegression(browser) {
   }
 }
 
+// S5 — #704 D-T2 회귀 가드: zoomoutFactor 가 줌아웃 한계를 실제 제어 + escalation 급락 제거.
+//
+// [회귀 검출 원리] 구 escalation gate 는 진입 ×1.15 줌아웃 시 upperRadiusLimit 을 즉시
+// SOLAR_ZOOMOUT_LIMIT(1000)으로 덮어쓰고 freeFlyEntryRadius=null 로 만들어, 사용자 zoomoutFactor
+// 설정을 무력화 + radius 가 solar escalation 임계(≈690)를 넘어 rescale 급락(690→40, 17×)을 냈다.
+// fix 후: factor=5(default)면 upper=entryRadius×5(≈340) 유지 + radius 가 그 한계에서 멈춰
+// escalation 미발생(tier 불변) → 급락 0. earth focus(진입 radius≈68) 기준 측정.
+async function scenarioZoomoutCeilingControl(browser) {
+  console.log(
+    '\n[S5] D-T2 회귀 — zoomoutFactor 가 줌아웃 한계 제어 + escalation 급락 제거 (factor=5)',
+  );
+  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  try {
+    await boot(page);
+    // factor=5(default) 명시 + earth focus → free-fly.
+    await setAxis(page, 'zoomoutFactor', 5, true);
+    await page.evaluate(() => window.__simStore.getState().setSelectedBody('earth'));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => window.__simStore.getState().enterFreeFly());
+    await page.waitForTimeout(400);
+    const entry = await snapshot(page);
+    const entryRadius = entry.radius;
+    const expectedUpper = entryRadius * 5;
+
+    // 휠 줌아웃 24회 — factor=5 한계(≈340)를 충분히 넘기는 입력량. 각 스텝 radius/upper/tier 기록.
+    let maxJumpRatio = 1;
+    let prevRadius = entryRadius;
+    let escalated = false;
+    let lastSnap = entry;
+    for (let i = 0; i < 24; i++) {
+      await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+      await page.mouse.wheel(0, 120);
+      await page.waitForTimeout(150);
+      lastSnap = await snapshot(page);
+      const r = lastSnap.radius;
+      if (r !== null && prevRadius !== null && prevRadius > 0) {
+        const ratio = Math.max(r / prevRadius, prevRadius / r);
+        if (ratio > maxJumpRatio) maxJumpRatio = ratio;
+        prevRadius = r;
+      }
+    }
+    // tier 가 escalate 했는지 (inner → solar) — solar.getTier() 로 확인.
+    const finalTier = await page.evaluate(() => window.__solarScene?.getTier?.() ?? null);
+    escalated = finalTier !== 'inner';
+
+    // (1) upper 가 entryRadius×5 로 유지 (1000 으로 덮어쓰지 않음). 허용 오차 ±2%.
+    const ceilingOk =
+      lastSnap.upperRadiusLimit !== null &&
+      Math.abs(lastSnap.upperRadiusLimit - expectedUpper) / expectedUpper < 0.02;
+    // (2) radius 가 한계(≈340)에서 멈춤 — 마지막 radius ≤ upper×1.02.
+    const clampedOk =
+      lastSnap.radius !== null && lastSnap.radius <= lastSnap.upperRadiusLimit * 1.02;
+    // (3) escalation 급락 제거 — 줌아웃 시퀀스 중 radius 급변(>2×) 없음 + tier 불변.
+    const noJumpOk = maxJumpRatio < 2 && !escalated;
+    const pass = ceilingOk && clampedOk && noJumpOk;
+    console.log(
+      `  진입 radius=${entryRadius?.toFixed(1)} → 줌아웃 24회: upper=${lastSnap.upperRadiusLimit?.toFixed(0)}(=${expectedUpper.toFixed(0)} ${ceilingOk}) radius=${lastSnap.radius?.toFixed(1)}(clamp ${clampedOk}) maxJump=${maxJumpRatio.toFixed(2)}× tier=${finalTier}(급락없음 ${noJumpOk}) → ${pass ? 'PASS' : 'FAIL'}`,
+    );
+    return {
+      scenario: 'S5',
+      entryRadius,
+      expectedUpper,
+      finalUpper: lastSnap.upperRadiusLimit,
+      finalRadius: lastSnap.radius,
+      maxJumpRatio,
+      finalTier,
+      ceilingOk,
+      clampedOk,
+      noJumpOk,
+      pass,
+    };
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function main() {
   console.log('\n=== #704 free-fly 감도 설정 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -264,6 +342,8 @@ async function main() {
     if (!result.scenarios.s3.pass) allPass = false;
     result.scenarios.s4 = await scenarioNoRegression(browser);
     if (!result.scenarios.s4.pass) allPass = false;
+    result.scenarios.s5 = await scenarioZoomoutCeilingControl(browser);
+    if (!result.scenarios.s5.pass) allPass = false;
   } finally {
     await browser.close();
   }

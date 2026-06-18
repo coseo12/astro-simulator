@@ -129,6 +129,48 @@ free-fly 카메라 감도 4축 계수가 #699 까지 named const "D-T2 튜닝 �
 
 ---
 
+## Amendment 2026-06-18 (B) — D-T2 회귀 2건: escalation gate ↔ zoomoutFactor 결합 / 슬라이더 stacking
+
+사용자 D-T2 보고: "슬라이더가 안 보이고, 프리플라이에서 줌아웃 시 갑자기 급격한 카메라 이동으로 시야 문제". measurement-first 진단 후 근본 fix.
+
+### (B-1) escalation gate 가 zoomoutFactor 를 무력화 + rescale 급락 유발 (sim-canvas.tsx)
+
+**발견 (D-T2 측정, earth focus→free-fly→휠 줌아웃 sweep)**: `#699` escalation gate 는 진입 radius 의 1.15배 줌아웃 시점에 `upperRadiusLimit` 을 즉시 `SOLAR_ZOOMOUT_LIMIT(1000)` 으로 덮어쓰고 `freeFlyEntryRadius=null` 로 만들었다. 결과 2가지 회귀:
+
+| 측정 (fix 전)                    | factor=2 | factor=5        | factor=20                           |
+| -------------------------------- | -------- | --------------- | ----------------------------------- |
+| 진입 upper (=entryR 68 × factor) | 136      | 340             | 1361                                |
+| 줌아웃 2회 후 upper              | **1000** | **1000**        | **1000** (factor 20 이 오히려 축소) |
+| 최종 radius (클램프 없이 증가)   | 316+     | 690→**40 급락** | 615→**37 급락**                     |
+
+- **(a) zoomoutFactor 무력화**: 사용자가 어떤 factor 를 설정해도 15% 줌아웃 후 upper=1000 으로 통일 → 슬라이더 의미 상실. factor=20(빈 공간 직전까지) 설정 시 오히려 1361→1000 으로 **줄어드는** 모순.
+- **(b) rescale 급락**: radius 가 1000 까지 자유 증가 → solar escalation 임계(≈690 scene unit)를 넘어 `runTierTransition` apparent-size 보존 산식이 발화, radius 690→40(17×)로 2프레임 collapse → 사용자 체감 "급격한 카메라 이동".
+
+**정정**: escalation 억제 해제(진입 시점 보존)와 `upperRadiusLimit` 덮어쓰기를 **분리**한다.
+
+- gate 는 escalation 억제만 담당. 진입 ×1.15 초과 시 `allowTierUpdate=true` 로 풀되, **`upperRadiusLimit` 은 덮어쓰지 않고 `freeFlyEntryRadius` 도 null 로 만들지 않는다** → `entryRadius × zoomoutFactor`(store 구독 SSoT)가 줌아웃 상한으로 그대로 유지된다.
+- **tier 가 실제로 escalate 한 순간에만**(`updateTierByCamera` 반환 tier ≠ 직전 activeTier) `SOLAR_ZOOMOUT_LIMIT` 로 전환 + `freeFlyEntryRadius=null`. body tier 거대 진입(io 158386)·큰 factor 로 임계 초과 시의 solar 개요 빈 공간 차단(#631 "허공 방지" 계승).
+
+**측정 (fix 후)**: factor=5 → upper 340 유지, radius 340.3 에서 클램프, tier=inner 불변, maxJump=**1.13×**(급락 0). factor=20 → upper 1361 유지 후 임계 도달 시 의도된 solar overview escalation(큰 factor = 명시적 원거리 요청). **default factor 의 급락 완전 제거** = 사용자 보고 시나리오 해소. verify:699 S4(io body→solar escalation, originOffset=0) PASS — #631/#699 무회귀. verify:704 S5 신규 가드 박제.
+
+**일반화**: 다중 책임을 한 분기에 결합한 가드(escalation 억제 + 줌 상한 + tier null 화 3-in-1)는 한 책임 변경(zoomoutFactor 도입)이 다른 책임(줌 상한)을 silent 파괴한다. 가드는 단일 책임 + 트리거 조건 명시(tier 변동 순간에만 상한 전환)로 분리.
+
+### (B-2) 슬라이더 가시성 — WebGPU canvas stacking + track 대비 (sensitivity-settings-modal.tsx)
+
+**발견**: headless + headed(Playwright) 양쪽 모두 모달·슬라이더 정상 렌더(가시성 0 미재현) — CLAUDE.md "headless ≠ 실 브라우저" 교훈 영역. 두 잠재 원인을 measurement-first 로 분리:
+
+1. **WebGPU canvas stacking**: 모달이 `SimCommandProvider`(canvas 의 React 서브트리) 형제로 `z-40` 렌더 → Babylon WebGPU canvas 가 하드웨어 가속 합성 레이어를 형성하면 실 Chrome 에서 형제 DOM 을 가릴 수 있다(Playwright ANGLE 경로 미재현).
+2. **track 대비**: track `bg-bg-elevated`(#1c2032) ↔ 모달 surface(#141721) 측정 대비 거의 0 → track 바가 실 화면에서 안 보임(thumb 만 가시).
+
+**정정 (방어의 깊이 — 양쪽 동시)**:
+
+- **portal + z 상향**: 모달을 `createPortal(document.body)` 로 canvas 서브트리 밖 body 직속으로 빼고 `z-[100]`. `canvas.contains(overlay)=false` 실측 확인 → 어떤 canvas stacking context 도 모달 위로 못 온다. `open=false` 초기값이라 hydration 시점 미렌더(SSR 안전).
+- **track 대비 향상**: track `border border-border-default` + 높이 `h-1.5` + range fill `bg-primary/80`(구 `/50`) → track 바 시각 구분 확보.
+
+**일반화**: WebGPU/WebGL canvas 위 DOM 오버레이는 z-index 만으로 합성 순서를 보장 못 한다(하드웨어 레이어). portal-to-body 로 stacking context 자체를 분리하는 게 정공법. headless 검증이 가시성 회귀를 못 잡으므로 실 Chrome 수동 검증 의무(CRITICAL #3).
+
+---
+
 ## 결과·재검토 조건
 
 - **기대 효과** (측정 가능):
