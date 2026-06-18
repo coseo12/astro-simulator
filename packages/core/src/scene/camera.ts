@@ -1,4 +1,11 @@
-import { ArcRotateCamera, Vector3, type Scene } from '@babylonjs/core';
+import {
+  ArcRotateCamera,
+  KeyboardEventTypes,
+  Vector3,
+  type Observer,
+  type KeyboardInfo,
+  type Scene,
+} from '@babylonjs/core';
 
 /**
  * #629 — 줌(휠/핀치) 델타를 radius 비례(%)로 적용하는 비율 상수.
@@ -59,6 +66,146 @@ export function computePanningSensibility(camera: ArcRotateCamera): number {
  */
 export function setPanningEnabled(camera: ArcRotateCamera, enabled: boolean): void {
   camera.panningSensibility = enabled ? computePanningSensibility(camera) : 0;
+}
+
+/**
+ * #699 — free-fly WASD/QE 키보드 이동 속도 상수 (radius 비례, 프레임당 모델).
+ *
+ * 매 프레임 이동량 = `dir × clamp(radius × WASD_DELTA_PERCENTAGE, MAX_MOVE_STEP) × (deltaTime/(1/60))`
+ * — radius 비례라 tier 별 renderScale 비대칭(solar radius≈35 ↔ body radius≈158386)에서도 화면
+ * 체감 속도가 일정하다 (#629 `wheelDeltaPercentage` / #693 `PANNING_DELTA_PERCENTAGE` 비례 철학 계승).
+ *
+ * **계수 SSoT — #699 measurement-first 재정의** (ADR `20260617-699-...redesign.md` §1 P3 / §5-4):
+ * 진단 측정에서 screen px/step = 42.57 가 **모든 tier 일정**(radius 비례가 target 평면 px 투영에서
+ * 정확히 상쇄)임이 드러나, "radius 비례라 과속" 가설은 부분 기각됐다. 진짜 과속 원인은 **구 계수
+ * 0.05 자체가 과대**(화면 절반을 8.5 step=0.14s 통과). 따라서 화면공간 모델 전면 교체 대신 계수를
+ * ⅓ 하향(0.05→0.015 ≈ 12.8px/step)한다 — 모델은 radius 비례 유지(measurement-first, volt #32).
+ *
+ * **PANNING(#693, 0.01) 과 별개 상수** — 드래그(패닝) vs 키 지속(WASD)은 체감 속도가 달라 단일
+ * 공유 시 한쪽 튜닝이 다른 쪽을 오염시킨다(ADR §3 축 3). **0.015 는 1차 제안값 — D-T2 튜닝 지점**.
+ */
+export const WASD_DELTA_PERCENTAGE = 0.015;
+
+/**
+ * #699 — WASD 프레임당 이동 상한 (줌아웃 극단 과속 안전망 — ADR §5-4).
+ *
+ * #699 재설계로 body tier 진입이 더 이상 radius 35 로 강제 pull-back 되지 않고 시점을 보존하므로,
+ * io 같은 deep tier 에서는 카메라 radius≈158386 이 그대로 남는다 → `radius × 0.015 ≈ 2375` unit/frame
+ * 의 폭주가 발생할 수 있다. 본 상한이 그 극단을 잘라 화면 순간 이탈을 막는다.
+ *
+ * **임계 근거**: 정상 tier 최대인 solar 개요 radius≈464 에서 `464 × 0.015 ≈ 6.96` 이므로 7 이하의
+ * 정상 이동은 본 상한에 걸리지 않는다. 10 으로 두면 정상 tier(solar/inner) 는 항상 비례식이
+ * 그대로 적용되고, radius > 667(≈ 10/0.015) 인 deep tier 만 상한으로 잘린다. **10 은 1차 제안값 —
+ * D-T2 체감 튜닝 지점** (너무 느리면 상향, 극단 폭주가 여전하면 하향).
+ */
+export const MAX_MOVE_STEP = 10;
+
+/** #699 — WASD 이동에 관여하는 키(소문자). 화살표(keysUp/Down/...)는 ArcRotate 회전에 위임. */
+const WASD_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e']);
+
+/** #699 — attachWasdControl 이 반환하는 detach 핸들 (observer + 키 상태 정리). */
+export interface WasdControlHandle {
+  /** 리스너/observer 해제 + 눌림 키 상태 클리어 (HMR/unmount 누수 방지). */
+  detach: () => void;
+  /** free-fly ↔ focus 토글. false 면 이동 연산 자체를 건너뛴다(focus follow 충돌 회피). */
+  setEnabled: (enabled: boolean) => void;
+  /** 눌림 키 상태 클리어 (reset / blur / keyup 유실 대비 — ADR §5-4). */
+  clearKeys: () => void;
+}
+
+/**
+ * #699 — free-fly WASD/QE 키보드 이동을 카메라에 부착한다 (#696 PR #698 재구현 — 계수 통합).
+ *
+ * W/S = 시선 전·후진 / A·D = 좌우 strafe / Q·E = 상·하. 화살표 키(`keysUp/Down/Left/Right`)는
+ * 손대지 않아 ArcRotate 기본 회전이 보존된다(Q1 무충돌).
+ *
+ * 좌표계: target + position 을 **동시 평행이동**(dolly 아님 — radius/α/β offset 보존). free-fly
+ * originOffset=[0,0,0] 불변식상 #631 `cameraFromSunMeters` 가산식이 그대로 정합 → 좌표 보정 0
+ * (#693 §1 측정). forward/right 는 카메라 로컬, **Q/E 상하는 월드 절대 up**(`Vector3.Up()`) 사용 —
+ * 수직 하향 시점(pitch≈−π/2)에서 local up 이 수평으로 둔갑하는 비직관 회피.
+ *
+ * 산식 (ADR §5-4 — deltaTime 정규화로 144Hz↔60Hz 속도 불일치 회귀 방지):
+ *   step = clamp(radius × WASD_DELTA_PERCENTAGE, MAX_MOVE_STEP) × (deltaTime / (1/60))
+ * 60fps 기준 정규화 — deltaTime 누락 시 frame-rate 종속 회귀(deltaTime 큰 144Hz 에서 더 빠름).
+ *
+ * 리스너 수명 주기는 반환 핸들의 `detach()` 로 봉인(#693 contextmenu `onDisposeObservable` 선례).
+ * sim-canvas 가 free-fly 토글 시 `setEnabled`, reset/unmount 시 `clearKeys`/`detach` 호출.
+ *
+ * @returns attach/detach + setEnabled + clearKeys 인터페이스
+ */
+export function attachWasdControl(camera: ArcRotateCamera, scene: Scene): WasdControlHandle {
+  const pressed = new Set<string>();
+  let enabled = false;
+
+  // 키 다운/업 → 눌림 키 집합 추적. Shift 동반/CapsLock 대문자 변형 방어 위해 소문자 비교.
+  const keyboardObserver: Observer<KeyboardInfo> | null = scene.onKeyboardObservable.add((info) => {
+    const key = info.event.key.toLowerCase();
+    if (!WASD_KEYS.has(key)) return; // 화살표 등 비대상 키는 ArcRotate 에 위임(Q1).
+    if (info.type === KeyboardEventTypes.KEYDOWN) pressed.add(key);
+    else if (info.type === KeyboardEventTypes.KEYUP) pressed.delete(key);
+  });
+
+  // 포커스 이탈(alt-tab)로 keyup 이 유실되면 키가 "눌린 채" 남아 카메라가 계속 이동한다 → blur 시 클리어.
+  const renderingCanvas = scene.getEngine().getRenderingCanvas();
+  const onBlur = () => pressed.clear();
+  if (typeof window !== 'undefined') window.addEventListener('blur', onBlur);
+
+  // 매 프레임 이동 — free-fly 활성 + 눌린 키가 있을 때만.
+  const renderObserver = scene.onBeforeRenderObservable.add(() => {
+    if (!enabled || pressed.size === 0) return;
+    // 텍스트 입력 포커스 중 WASD 가 카메라를 움직이면 안 된다(ADR §5-6). canvas 포커스만 허용.
+    if (typeof document !== 'undefined') {
+      const active = document.activeElement;
+      const isTextInput =
+        active instanceof HTMLElement &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (isTextInput) return;
+      // canvas 가 포커스를 갖지 않으면(다른 요소 포커스) 이동 차단 — 2중 가드.
+      if (renderingCanvas && active !== renderingCanvas && active !== document.body) return;
+    }
+
+    const forward = camera.getDirection(Vector3.Forward());
+    const worldUp = Vector3.Up();
+    // right = forward × worldUp (정규직교 strafe 축).
+    const right = Vector3.Cross(forward, worldUp);
+
+    // 눌린 키 → 방향 합벡터 누적. 대각 이동이 √2/√3 가속되지 않도록 합산 후 정규화.
+    const move = Vector3.Zero();
+    if (pressed.has('w')) move.addInPlace(forward);
+    if (pressed.has('s')) move.subtractInPlace(forward);
+    if (pressed.has('d')) move.addInPlace(right);
+    if (pressed.has('a')) move.subtractInPlace(right);
+    if (pressed.has('q')) move.addInPlace(worldUp);
+    if (pressed.has('e')) move.subtractInPlace(worldUp);
+    if (move.lengthSquared() === 0) return; // W+S 등 상쇄로 합벡터 0.
+    move.normalize();
+
+    // #699 산식 (ADR §5-4): radius 비례 + 상한 clamp + deltaTime 정규화.
+    //   - clamp(radius × pct, MAX): 줌아웃 극단(deep tier radius≈158386) 과속 안전망.
+    //   - × (deltaSeconds / (1/60)): 60fps 기준 정규화 → 60/144Hz 무관 동일 시간 동일 이동량.
+    const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
+    const baseStep = Math.min(camera.radius * WASD_DELTA_PERCENTAGE, MAX_MOVE_STEP);
+    const step = baseStep * (deltaSeconds / (1 / 60));
+    move.scaleInPlace(step);
+
+    // target + position 동시 평행이동 (offset 보존 → radius/시선 방향 불변, dolly 아님).
+    camera.target.addInPlace(move);
+    camera.position.addInPlace(move);
+  });
+
+  return {
+    detach: () => {
+      if (keyboardObserver) scene.onKeyboardObservable.remove(keyboardObserver);
+      if (renderObserver) scene.onBeforeRenderObservable.remove(renderObserver);
+      if (typeof window !== 'undefined') window.removeEventListener('blur', onBlur);
+      pressed.clear();
+    },
+    setEnabled: (next: boolean) => {
+      enabled = next;
+      if (!next) pressed.clear(); // 비활성 전환 시 잔존 키 클리어(focus 진입 시 이동 잔류 방지).
+    },
+    clearKeys: () => pressed.clear(),
+  };
 }
 
 export interface ArcCameraOptions {

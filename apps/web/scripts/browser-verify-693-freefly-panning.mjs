@@ -21,7 +21,7 @@
  * |---|---|---|
  * | S1 free-fly 패닝 작동 | free-fly 진입 → panningSensibility>0 + 우클릭 드래그 → target 평면 이동 + globalPos 추적 (Δ 일치) | sensibility=0 잔존 → target 불변 (FAIL) |
  * | S2 focus 중 패닝 비활성 | body focus 중 panningSensibility=0 (follow 유지) | focus 중 활성 → jitter (FAIL) |
- * | S3 deep-tier 패닝 floating origin 정합 | io→free-fly(pull-back) 패닝 후 originOffset=[0,0,0] + tier 일관 | originOffset≠0 / tier 오판 (FAIL) |
+ * | S3 deep-tier 패닝 floating origin 정합 (#699 갱신) | io→free-fly 패닝 전후 originOffset 불변 + tier 일관 | 패닝이 origin 오염 / tier 오판 (FAIL) |
  * | S4 줌 중 패닝 감도 일관성 | free-fly 줌(radius 변동) 후 sensibility×radius 곱 불변 (진입 시점 잔존 아님) | 진입 1회 감도 잔존 → 곱 어긋남 (FAIL) |
  * | S5 free-fly 패닝 후 reset 원복 | free-fly 패닝(target 이동) → reset → target 원점 복원(targetDist≈0) + 패닝 비활성 | subscribe free-fly→reset 분기 누락 시 target 잔존 (FAIL) — qa 차단 사유 #695 |
  *
@@ -136,7 +136,13 @@ async function scenarioPanWorks(browser) {
     console.log(
       `  sensibility=${before.panningSensibility.toFixed(2)} (>0) | targetΔ=${targetDelta.toExponential(3)} (≥${PAN_MIN_TARGET_DELTA}) | offsetDrift=${offsetDrift.toExponential(3)} (track) → ${pass ? 'PASS' : 'FAIL'}`,
     );
-    return { scenario: 'S1', sensibility: before.panningSensibility, targetDelta, offsetDrift, pass };
+    return {
+      scenario: 'S1',
+      sensibility: before.panningSensibility,
+      targetDelta,
+      offsetDrift,
+      pass,
+    };
   } finally {
     await ctx.close();
   }
@@ -161,7 +167,15 @@ async function scenarioFocusInactive(browser) {
 }
 
 async function scenarioDeepTierOrigin(browser) {
-  console.log('\n[S3] deep-tier 패닝 floating origin 정합 — io→free-fly(pull-back) 후 origin=0');
+  // ⚠️ #699 의도 변경 (재설계로 갱신 — ADR `20260617-699-freefly-camera-unified-redesign.md` §5-1):
+  // 구 #693 S3 는 "io→free-fly 는 #631 pull-back 으로 solar tier 도달 → originOffset=[0,0,0]" 를
+  // 검증했다. #699 가 body tier 강제 pull-back 을 폐기하고 **진입 시점 보존**하므로 io free-fly 는
+  // body tier 에 머물고 originOffset 은 io 위치(≠0)다. 본 시나리오의 진짜 불변식은 "패닝(target 평면
+  // 이동)이 floating origin 을 **오염하지 않는다**" 이므로, originOffset==0 이 아니라 **패닝 전후
+  // originOffset 불변 + tier 일관 + 패닝 작동** 으로 갱신한다 (#693 좌표 보정 0 불변식은 그대로 보존).
+  console.log(
+    '\n[S3] deep-tier 패닝 floating origin 정합 — io→free-fly 패닝 전후 origin 불변(#699 갱신)',
+  );
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   try {
@@ -171,16 +185,20 @@ async function scenarioDeepTierOrigin(browser) {
     const before = await measure(page);
     await dragPan(page);
     const after = await measure(page);
-    const originZero = after.originOffset.every((v) => v === 0);
+    // 패닝 전후 originOffset 불변 (target 평면 이동이 floating origin 을 흔들지 않음 — #693 핵심).
+    const originStable =
+      Math.abs(after.originOffset[0] - before.originOffset[0]) < 1 &&
+      Math.abs(after.originOffset[1] - before.originOffset[1]) < 1 &&
+      Math.abs(after.originOffset[2] - before.originOffset[2]) < 1;
     const tierConsistent = after.tier === before.tier;
-    const pass = originZero && tierConsistent && before.panningSensibility > 0;
+    const pass = originStable && tierConsistent && before.panningSensibility > 0;
     console.log(
-      `  io→free-fly tier=${before.tier}→${after.tier} | originOffset=[${after.originOffset.join(',')}] (=0) | sensibility=${before.panningSensibility.toFixed(2)} → ${pass ? 'PASS' : 'FAIL'}`,
+      `  io→free-fly tier=${before.tier}→${after.tier} | originOffset 불변=${originStable} (패닝 전후 Δ<1) | sensibility=${before.panningSensibility.toFixed(2)} → ${pass ? 'PASS' : 'FAIL'}`,
     );
     return {
       scenario: 'S3',
       tier: after.tier,
-      originOffset: after.originOffset,
+      originStable,
       sensibility: before.panningSensibility,
       pass,
     };
@@ -224,7 +242,9 @@ async function scenarioZoomConsistency(browser) {
 }
 
 async function scenarioPanResetRestore(browser) {
-  console.log('\n[S5] free-fly 패닝 후 reset 원복 — target 원점 복원 + 패닝 비활성 (qa 차단 사유 #695)');
+  console.log(
+    '\n[S5] free-fly 패닝 후 reset 원복 — target 원점 복원 + 패닝 비활성 (qa 차단 사유 #695)',
+  );
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   try {
