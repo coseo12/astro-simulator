@@ -17,6 +17,7 @@ import { useSimStore } from './sim-store';
 import {
   FREE_FLY_SENSITIVITY_DEFAULT,
   FREE_FLY_SENSITIVITY_RANGES,
+  FREE_FLY_ZOOMOUT_FACTOR_DEFAULT,
   SENSITIVITY_STORAGE_KEY,
   SENSITIVITY_SCHEMA_VERSION,
   clampSensitivityAxis,
@@ -29,12 +30,22 @@ beforeEach(() => {
   useSimStore.setState({ freeFlySensitivity: { ...FREE_FLY_SENSITIVITY_DEFAULT } });
 });
 
-describe('#704 default SSoT — camera.ts const import (하드코딩 재선언 0)', () => {
-  it('4축 default = camera.ts named const', () => {
+describe('#704 default SSoT drift 가드 — 리터럴 ↔ camera.ts const 일치 (SSR 격리)', () => {
+  // free-fly-sensitivity.ts 는 SSR 격리를 위해 babylon 값 import(`scene.*`) 대신 숫자 리터럴로
+  // default 를 박제한다. 본 테스트가 SSoT 보증 — 리터럴이 camera.ts const 와 drift 하면 FAIL.
+  // (테스트 파일은 SSR 그래프 밖이라 babylon import 무방.)
+  it('4축 default 리터럴 = camera.ts named const (drift 시 FAIL)', () => {
     expect(FREE_FLY_SENSITIVITY_DEFAULT.wasd).toBe(scene.WASD_DELTA_PERCENTAGE);
     expect(FREE_FLY_SENSITIVITY_DEFAULT.panning).toBe(scene.PANNING_DELTA_PERCENTAGE);
     expect(FREE_FLY_SENSITIVITY_DEFAULT.zoom).toBe(scene.ZOOM_DELTA_PERCENTAGE);
-    expect(FREE_FLY_SENSITIVITY_DEFAULT.zoomoutFactor).toBe(5);
+  });
+
+  it('zoomoutFactor default = FREE_FLY_ZOOMOUT_FACTOR_DEFAULT = 5 (sim-canvas 와 동일 SSoT)', () => {
+    // zoomoutFactor 는 camera.ts const 가 아니라 sim-canvas 의 줌아웃 배율과 동일 SSoT.
+    // sim-canvas.tsx 는 store 의 freeFlySensitivity.zoomoutFactor 를 직접 pull 하고
+    // default 5 를 'FREE_FLY_ZOOMOUT_FACTOR_DEFAULT' 라벨로 주석 박제(중복 선언 아님).
+    expect(FREE_FLY_SENSITIVITY_DEFAULT.zoomoutFactor).toBe(FREE_FLY_ZOOMOUT_FACTOR_DEFAULT);
+    expect(FREE_FLY_ZOOMOUT_FACTOR_DEFAULT).toBe(5);
   });
 
   it('default 값이 각 축 슬라이더 범위 내', () => {

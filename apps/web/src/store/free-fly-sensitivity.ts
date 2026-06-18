@@ -1,22 +1,33 @@
-import { scene } from '@astro-simulator/core';
-
 /**
  * #704 — free-fly 카메라 감도 4축 계수 store 슬라이스 + localStorage 영속 (무패키지 직접 구현).
  *
- * ADR `docs/decisions/20260618-704-freefly-sensitivity-settings-ui.md` §결정 2/3.
+ * ADR `docs/decisions/20260618-704-freefly-sensitivity-settings-ui.md` §결정 2/3
+ * (+ §Amendment 2026-06-18 SSR 격리).
  *
- * ## 4축 + default SSoT
+ * ## 4축 + default SSoT (SSR 격리 — 리터럴 + drift 가드 테스트)
  *
- * default 값은 **camera.ts named const 를 import** 한다(하드코딩 재선언 금지 — 주석-구현 drift 차단,
- * ADR §결정 2). camera.ts const 는 default SSoT 로 잔존(제거 금지 — #699 cross-validate "압축 강제
- * 금지, 방어 로직 우선").
+ * default 값은 **숫자 리터럴로 직접 정의**한다. camera.ts named const(`scene.WASD_DELTA_PERCENTAGE`
+ * 등) 를 **값 import** 하면 `scene` 네임스페이스가 babylon(`@babylonjs/core`) → physics_wasm 체인을
+ * Next.js server component 그래프에 끌어들여 SSR prerender 가 `physics_wasm_bg.wasm` ENOENT 로 500
+ * (qa #704 회귀 진단: develop=SSR 200 / pre-fix=SSR 500 직접 대조). 따라서 babylon 의존을 제거하고
+ * 값을 리터럴로 박제하되, SSoT 보존은 **drift 가드 단위 테스트**(`free-fly-sensitivity.test.ts`)가
+ * 담당한다 — 리터럴이 camera.ts const 와 어긋나면 테스트 FAIL (테스트는 SSR 아니라 babylon import 무방).
  *
- *  | 축            | default const                  | 주입 경로 (sim-canvas/camera.ts)                       |
- *  | ------------- | ------------------------------ | ------------------------------------------------------ |
- *  | wasd          | WASD_DELTA_PERCENTAGE (0.015)  | attachWasdControl getter pull (매 프레임 최신)          |
- *  | zoomoutFactor | 5 (sim-canvas FREE_FLY_ZOOMOUT)| free-fly 활성 중 store 구독 push → upperRadiusLimit 재산정 |
- *  | panning       | PANNING_DELTA_PERCENTAGE (0.01)| computePanningSensibility(camera, pct)                 |
- *  | zoom          | ZOOM_DELTA_PERCENTAGE (0.01)   | camera.wheelDeltaPercentage/pinchDeltaPercentage set   |
+ * | 축            | 리터럴 default | camera.ts const (drift 가드 대조 SSoT)  |
+ * | ------------- | -------------- | --------------------------------------- |
+ * | wasd          | 0.015          | scene.WASD_DELTA_PERCENTAGE             |
+ * | zoomoutFactor | 5              | (camera.ts const 아님 — sim-canvas 와 동일 SSoT) |
+ * | panning       | 0.01           | scene.PANNING_DELTA_PERCENTAGE          |
+ * | zoom          | 0.01           | scene.ZOOM_DELTA_PERCENTAGE             |
+ *
+ * ## 4축 주입 경로 (sim-canvas/camera.ts)
+ *
+ *  | 축            | 리터럴 default | 주입 경로 (sim-canvas/camera.ts)                       |
+ *  | ------------- | -------------- | ------------------------------------------------------ |
+ *  | wasd          | 0.015          | attachWasdControl getter pull (매 프레임 최신)          |
+ *  | zoomoutFactor | 5              | free-fly 활성 중 store 구독 push → upperRadiusLimit 재산정 |
+ *  | panning       | 0.01           | computePanningSensibility(camera, pct)                 |
+ *  | zoom          | 0.01           | camera.wheelDeltaPercentage/pinchDeltaPercentage set   |
  *
  * ## localStorage 영속 3종 방어 (ADR §결정 3, agy "오염 영속 데이터 유입 완벽 차단")
  *
@@ -50,14 +61,19 @@ export interface FreeFlySensitivity {
 export const FREE_FLY_ZOOMOUT_FACTOR_DEFAULT = 5;
 
 /**
- * #704 — 4축 default SSoT. camera.ts named const import (하드코딩 재선언 금지).
+ * #704 — 4축 default SSoT. 숫자 리터럴 직접 정의 (SSR 격리 — babylon 값 import 금지).
+ *
+ * 각 리터럴은 camera.ts named const 와 **반드시 일치**해야 하며 (wasd=WASD_DELTA_PERCENTAGE,
+ * panning=PANNING_DELTA_PERCENTAGE, zoom=ZOOM_DELTA_PERCENTAGE), 일치 보증은 `free-fly-sensitivity.test.ts`
+ * 의 drift 가드 단위 테스트가 담당한다 (값 import 대신 리터럴을 쓰는 이유 = babylon→wasm 체인을 SSR
+ * server component 그래프에서 배제 — qa #704 회귀 fix, ADR §Amendment SSR 격리).
  * Object.freeze 로 default 객체 mutation 사고 차단(reset 시 spread 복제하므로 참조 공유 안전).
  */
 export const FREE_FLY_SENSITIVITY_DEFAULT: Readonly<FreeFlySensitivity> = Object.freeze({
-  wasd: scene.WASD_DELTA_PERCENTAGE,
-  zoomoutFactor: FREE_FLY_ZOOMOUT_FACTOR_DEFAULT,
-  panning: scene.PANNING_DELTA_PERCENTAGE,
-  zoom: scene.ZOOM_DELTA_PERCENTAGE,
+  wasd: 0.015, // = scene.WASD_DELTA_PERCENTAGE (drift 가드 테스트로 대조)
+  zoomoutFactor: FREE_FLY_ZOOMOUT_FACTOR_DEFAULT, // = 5 (sim-canvas FREE_FLY_ZOOMOUT_FACTOR_DEFAULT)
+  panning: 0.01, // = scene.PANNING_DELTA_PERCENTAGE (drift 가드 테스트로 대조)
+  zoom: 0.01, // = scene.ZOOM_DELTA_PERCENTAGE (drift 가드 테스트로 대조)
 });
 
 /**

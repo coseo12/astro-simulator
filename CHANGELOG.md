@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes (#704 — free-fly 감도 설정 UI, PR #705 진행 중)
+
+- **[#704] SSR 격리 fix — free-fly-sensitivity 의 babylon 값 import 제거 (리터럴 + drift 가드)** ([#704](https://github.com/coseo12/astro-simulator/issues/704)) — qa SSR 진단 정정. `apps/web/src/store/free-fly-sensitivity.ts` 의 `import { scene } from '@astro-simulator/core'` 가 `scene` 네임스페이스 **값**을 import → 그 `camera.ts` 가 `@babylonjs/core`(physics_wasm 체인 포함)를 끌어들여 Next.js server component 그래프에서 SSR prerender 가 `physics_wasm_bg.wasm` ENOENT 로 500 (`develop`=SSR 200 / pre-fix #704=SSR 500 직접 대조, `next build` prerender FAIL → post-fix PASS, dev `curl /ko` 500→**200**). 클라이언트 hydrate 는 정상이었으나 production(main) SSR 위험 미검증 상태. **fix**: `scene` 값 import 제거 + default 를 숫자 리터럴(`{ wasd: 0.015, zoomoutFactor: 5, panning: 0.01, zoom: 0.01 }`)로 박제. SSoT(camera.ts const 일치)는 **drift 가드 단위 테스트**(`free-fly-sensitivity.test.ts` — 테스트는 SSR 그래프 밖이라 babylon import 무방, 리터럴이 const 와 drift 하면 FAIL)가 보존. ADR `20260618-704-freefly-sensitivity-settings-ui.md` §Amendment SSR 격리 (축 2-A "const 값 import SSoT" → "리터럴 + drift 가드" 전환). 일반화: store/server-component 그래프에 babylon/wasm 값 import 금지 — type-only(`import type`)는 compile 시 erase 되어 SSR 안전.
+
 ## [0.29.0] — 2026-06-18
 
 ### Behavior Changes (#693 — free-fly 패닝 F3)

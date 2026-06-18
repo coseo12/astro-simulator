@@ -105,7 +105,7 @@ free-fly 카메라 감도 4축 계수가 #699 까지 named const "D-T2 튜닝 �
    - **axis 리터럴 유니온 (agy 합의)**: `setFreeFlySensitivity(axis, value)` 의 `axis` 는 `'wasd' | 'zoomoutFactor' | 'panning' | 'zoom'` 리터럴 유니온 타입 — 컴파일 시점 오타 차단.
    - **getter 시그니처 명세 (agy 합의)**: `getCoefficients()` 는 `{ wasd: number; maxStep: number }` 반환(WASD onBeforeRender 가 매 프레임 호출). maxStep 도 향후 가변 대비 포함하되 1차 슬라이더는 wasd 만 노출(maxStep=`MAX_MOVE_STEP` 고정).
 
-2. **store 스키마 = 축 2-A**. `freeFlySensitivity: { wasd, zoomoutFactor, panning, zoom }` + `setFreeFlySensitivity(axis, value)` + `resetFreeFlySensitivity()`. 초기값 = camera.ts const import(`WASD_DELTA_PERCENTAGE` 등) — default SSoT 일원화(하드코딩 0.015 재선언 금지, 주석-구현 drift 차단).
+2. **store 스키마 = 축 2-A**. `freeFlySensitivity: { wasd, zoomoutFactor, panning, zoom }` + `setFreeFlySensitivity(axis, value)` + `resetFreeFlySensitivity()`. 초기값 = camera.ts const import(`WASD_DELTA_PERCENTAGE` 등) — default SSoT 일원화(하드코딩 0.015 재선언 금지, 주석-구현 drift 차단). **⚠️ 정정 (Amendment 2026-06-18 SSR 격리) — 아래 §Amendment 참조: const 값 import → 리터럴 + drift 가드 테스트로 SSoT 전환.**
 
 3. **영속 = 축 3-A (직접 구현)**. `SENSITIVITY_SCHEMA_VERSION` + SSR 가드 + try/catch + 범위 clamp 3종 방어. zustand persist 미사용.
    - **Hydration 안전 (agy 이견 수용)**: store 생성 시점에 `loadPersisted()` 를 호출하면 Next.js SSR 초기 상태(default)와 클라이언트 localStorage 값 불일치로 **Hydration Mismatch** 발생 위험. **해결**: store 초기값은 **항상 const default**(서버·클라 동일)로 두고, localStorage 로드는 **클라이언트 mount 후 `useEffect` 1회**(설정 모달 컴포넌트 또는 전용 hydration hook)에서 `setFreeFlySensitivity` 로 덮어쓴다. 서버 렌더 HTML 은 default 로 고정되어 mismatch 0. (선례: `dismissedNoticeKeys` 도 store 초기값을 비영속 default 로 둠.)
@@ -116,6 +116,16 @@ free-fly 카메라 감도 4축 계수가 #699 까지 named const "D-T2 튜닝 �
 4. **UI = 축 4**. 헤더 `⚙ 카메라` 버튼 → 모달(about-modal 패턴) + Radix Slider 4개(범위/스텝 위 표) + 기본값 마커 + "기본값 복원". free-fly 비활성 중에도 조정 가능(다음 진입 시 반영) — 단 즉시 체감은 free-fly 중.
 
 5. **무회귀 = 축 5**. focus/reset 불변. verify:704 신규 가드 + verify:699/693 무회귀.
+
+---
+
+## Amendment 2026-06-18 — SSR 격리 (축 2-A "camera.ts const import SSoT" 정정)
+
+**발견 (qa #704)**: `develop` = SSR 200 / 본 #704 브랜치 = SSR 500 직접 대조. `apps/web/src/store/free-fly-sensitivity.ts` 의 `import { scene } from '@astro-simulator/core'` 가 `scene` 네임스페이스의 **값**을 import 하고, 그 `camera.ts` 가 `@babylonjs/core` 를 import → physics_wasm 체인까지 끌어들인다. 이 모듈을 `sim-store.ts`(이전엔 `import type { physics }` = type-only 라 SSR 안전)가 값 import 하면서, Next.js server component 그래프 평가 시 `physics_wasm_bg.wasm` ENOENT(`Error occurred prerendering page "/ko"`)로 SSR prerender 500. 클라이언트 hydrate 는 정상(실 사용 영향 0)이나 production(main) SSR 위험은 미검증 상태였다.
+
+**정정**: 축 2-A 의 "default = camera.ts const **값 import**" SSoT 모델을 **리터럴 + drift 가드 테스트** 모델로 전환한다. `free-fly-sensitivity.ts` 에서 `scene` import 를 제거하고 default 를 숫자 리터럴(`{ wasd: 0.015, zoomoutFactor: 5, panning: 0.01, zoom: 0.01 }`)로 박제하되, SSoT 보증은 `free-fly-sensitivity.test.ts` 의 drift 가드가 담당한다(`FREE_FLY_SENSITIVITY_DEFAULT.wasd === scene.WASD_DELTA_PERCENTAGE` 등 — 테스트는 SSR 그래프 밖이라 babylon import 무방, 리터럴이 const 와 drift 하면 FAIL). babylon 의존을 SSR 격리하면서 SSoT(drift 0)는 테스트로 보존한다.
+
+**일반화**: store/server-component 그래프에 babylon/wasm 같은 **side-effect 무거운 패키지의 값을 import 하지 않는다**. 상수 SSoT 가 필요하면 (a) 리터럴 + drift 가드 테스트 또는 (b) babylon-free 순수 상수 모듈로 분리한다. type-only(`import type`)는 컴파일 시 erase 되어 SSR 안전.
 
 ---
 
