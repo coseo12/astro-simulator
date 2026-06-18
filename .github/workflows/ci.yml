@@ -346,6 +346,48 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # #693 — free-fly 패닝(F3) 회귀 가드 (우클릭 드래그 target 평면 이동 + floating origin 정합).
+      # ADR: docs/decisions/20260616-693-freefly-panning.md §결정 §회귀 가드
+      # 검증 4축: (S1) free-fly 진입 → panningSensibility>0 + 우클릭 드래그 target 평면 이동 + globalPos 추적
+      #          (S2) earth focus 중 panningSensibility=0 (#509 follow 유지)
+      #          (S3) io→free-fly(pull-back) 패닝 후 originOffset=[0,0,0] + tier 일관 (#631)
+      #          (S4) free-fly 줌(radius 변동) 후 sensibility×radius 곱 불변 (진입 시점 잔존 아님)
+      # forensic 회귀: panningSensibility=0 잔존 → target 불변 / focus 중 활성 → jitter / 줌 후 감도 어긋남.
+      - name: '#693 free-fly 패닝 회귀 가드 (verify:693-freefly-panning)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-693-freefly-panning.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3009 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3009/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3009 node apps/web/scripts/browser-verify-693-freefly-panning.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
+      # #699 — free-fly 통합 재설계 회귀 가드 (진입 일관/줌아웃 제거/이동 화면체감/frame-rate 독립/무회귀).
+      # ADR: docs/decisions/20260617-699-freefly-camera-unified-redesign.md §5 회귀 가드
+      # 검증 5축: (S1) 진입 일관성 4 tier radius 편차 < 5% (tier별 분기 거동 부활 차단)
+      #          (S2) io focus(85px)→free-fly px ≥ 40 + onScreen (#631 강제 줌아웃 회귀 차단)
+      #          (S3) WASD 1 step screen px ≤ 16 + tier 편차 < 10% (계수 0.05 과대 회귀 차단)
+      #          (S3b) frame-rate 독립 — hold 시간 비례 이동 (deltaTime 정규화 누락 회귀 차단)
+      #          (S4) 무회귀 — free-fly originOffset=0(#693) + tier 줌아웃 escalate(#629/#631)
+      - name: '#699 free-fly 통합 재설계 회귀 가드 (verify:699-freefly-unified)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-699-freefly-unified.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3012 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3012/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3012 node apps/web/scripts/browser-verify-699-freefly-unified.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)

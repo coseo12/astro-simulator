@@ -141,6 +141,21 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     const instance = new SimulationCore(canvas);
     // Babylon이 기본 tabindex=1을 설정 — a11y(WCAG 2.4.3) 권고상 양수 금지.
     canvas.setAttribute('tabindex', '0');
+    // #699 — 캔버스 키보드 포커스 복원 (ADR §5-6, cross-validate 고유 발견 3).
+    // WASD 키 입력은 canvas 가 키보드 포커스를 가져야 attachWasdControl 의 activeElement 가드를
+    // 통과한다. 사이드바 버튼(탐색/focus 등) 클릭 후 그 버튼이 포커스를 가져가면 WASD 가 무반응
+    // → pointer 가 canvas 위로 진입할 때 자동으로 canvas 에 포커스를 되돌린다. named handler +
+    // 아래 cleanup 에서 removeEventListener (HMR/unmount 리스너 누수 방지).
+    const refocusCanvas = () => {
+      const active = document.activeElement;
+      // 텍스트 입력 포커스 중에는 가로채지 않는다(사용자 입력 보호).
+      const isTextInput =
+        active instanceof HTMLElement &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (isTextInput) return;
+      if (document.activeElement !== canvas) canvas.focus();
+    };
+    canvas.addEventListener('pointerenter', refocusCanvas);
     coreRef.current = instance;
     setCore(instance);
     // P7-C #208 — browser-verify 스크립트에서 카메라/씬 조작이 필요할 때 사용.
@@ -178,6 +193,49 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
         const camera = sceneApi.setupArcRotateCamera(instance.scene, { radius: 35 });
         const controller = new sceneApi.CameraController(camera, instance.scene);
+        // #693 — free-fly 패닝 활성 상태. free-fly 진입(detachToFreeFly) 시 true, focus/reset
+        // (syncFocusToScene) 시 false. onBeforeRender 가 이 플래그를 읽어 free-fly 중에만 radius
+        // 비례 panningSensibility 를 매 프레임 재산출(줌 일관성, ADR §결정 2). 토글 SSoT 는
+        // sceneApi.setPanningEnabled 1곳.
+        let freeFlyActive = false;
+        // #699 — free-fly 진입 시점 카메라 radius 스냅샷 (sun anomaly 구조적 차단 — ADR §5-2).
+        //
+        // [문제] focus 후 free-fly 진입 시 다음 onBeforeRender 의 updateTierByCamera 가
+        // tierFromCameraDistance 로 tier 를 재판정해 즉시 escalate → runTierTransition 의 실거리
+        // 보존 산식(radius_new = radius_old × newScale/oldScale)이 발화해 진입 radius 를 덮어쓴다
+        // (sun 25.3→463.9 = 18× 줌아웃 / io 158386→35 = #631 강제 pull-back). 둘 다 "진입 시점 시점
+        // 보존"(#509)을 깬다.
+        // [구조적 차단] "진입 직후 1회 억제"(첫 프레임 후 휠 1칸에 snap-back 위험)를 폐기하고,
+        // **진입 radius 기준 임계**로 tier escalation 을 gate 한다 — 사용자가 진입 radius 보다 유의미
+        // 하게 **줌아웃**(radius 증가)할 때만 escalate 허용. 줌인/소폭 변동은 tier 유지 → 진입 radius
+        // 보존 + snap-back 0. (ADR §5-2 "이후 사용자 줌 시에만 정상 escalate".)
+        let freeFlyEntryRadius: number | null = null;
+        // #699 — free-fly WASD/QE 키보드 이동 핸들 (#696 PR #698 통합 재구현 — 계수 0.015).
+        // free-fly 진입 시 setEnabled(true), focus/reset 시 setEnabled(false)(focus follow 충돌
+        // 회피). 패닝(#693)과 동일 freeFlyActive 토글 SSoT 를 공유한다 — 입력 채널만 별개(키 vs 드래그).
+        // reset/focus 진입 시 clearKeys 로 눌림 키 잔류 방지(키업 유실 대비). unmount/HMR 시 detach.
+        const wasdControl = sceneApi.attachWasdControl(camera, instance.scene);
+        // camera dispose 시 WASD observer/blur 리스너 해제 (HMR/StrictMode 재마운트 누수 방지 —
+        // #693 contextmenu handler onDisposeObservable 선례).
+        camera.onDisposeObservable.add(() => wasdControl.detach());
+        // #699 — free-fly 줌아웃 상한 (허공 대체 처리 — ADR §5-3). 진입 시 강제 줌아웃(#631) 대신
+        // 사용자가 줌아웃할 때 빈 공간 도달 직전에서 멈춘다.
+        //
+        // [tier-relative 설계] radius 는 tier 별 renderScale 에 종속(solar≈35 ↔ body≈158386)이라
+        // **고정 scene-unit 상한은 tier 마다 의미가 달라** 진입 radius 를 잘못 clamp 한다(body tier
+        // 158386 을 4000 으로 강제 = io 강제 pull-back 재현). 따라서 상한을 **진입 radius 비례**로 둔다:
+        //   upperRadiusLimit = entryRadius × FREE_FLY_ZOOMOUT_FACTOR
+        // 진입 radius 보존(clamp 없음) + factor 만큼 줌아웃 허용(그 사이 tier escalation gate 가
+        // 임계 초과 시 escalate → 새 tier 에서 radius 재산정). escalation 후(gate 해제)에는 solar
+        // 개요 상한(SOLAR_ZOOMOUT_LIMIT)으로 좁혀 빈 공간 진입을 차단한다.
+        const FREE_FLY_ZOOMOUT_FACTOR = 5; // 진입 radius 의 5배까지 줌아웃 허용 (D-T2 튜닝 지점).
+        // tier escalation 후 solar 개요에서의 줌아웃 상한 (scene unit). 해왕성 30 AU ≈ 3.8 scene unit
+        // (solar renderScale) 이라 1000 은 외곽 관찰 충분 + 그 너머 빈 공간 차단. D-T2 튜닝 지점.
+        const SOLAR_ZOOMOUT_LIMIT = 1000;
+        const DEFAULT_UPPER_RADIUS_LIMIT = camera.upperRadiusLimit ?? 1e14;
+        // #699 — setupArcRotateCamera 기본 lowerRadiusLimit (focusOn 이 desiredRadius×0.5 로 낮춘 것을
+        // free-fly 진입 시 원복하기 위한 SSoT — ADR §5-2 sun anomaly 차단 (a)).
+        const DEFAULT_LOWER_RADIUS_LIMIT = 0.5;
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
@@ -443,11 +501,32 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // controller.focusOn 도 동일 식 적용 (sim-canvas SSoT 단일). 명시적 radius 전달로
               // camera-controller 내부 default 식 (×5) 우회 — Amendment 3 satellite 분기 정합.
               controller.focusOn({ mesh, radius: desiredRadius });
+              // #693 — focus 진입 시 패닝 비활성 (ADR §결정 3 옵션 A). focus 중 followObserver 가
+              // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.
+              freeFlyActive = false;
+              freeFlyEntryRadius = null;
+              sceneApi.setPanningEnabled(camera, false);
+              // #699 — focus 진입 시 WASD 비활성 + 눌림 키 클리어 + free-fly 줌 상한 해제(기본 복원).
+              // focus follow 가 매 프레임 target 을 덮어쓰므로 WASD 이동 무의미. focusOn 이 동적으로
+              // lowerRadiusLimit 을 낮추므로(camera-controller.ts:150) upperRadiusLimit 만 기본 복원.
+              wasdControl.setEnabled(false);
+              wasdControl.clearKeys();
+              camera.upperRadiusLimit = DEFAULT_UPPER_RADIUS_LIMIT;
             }
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
             solar.clearFocus();
             controller.reset(35);
+            // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
+            freeFlyActive = false;
+            freeFlyEntryRadius = null;
+            sceneApi.setPanningEnabled(camera, false);
+            // #699 — reset 시 WASD 비활성 + 눌림 키 클리어(free-fly→reset 후 키 잔류 이동 방지) +
+            // 줌 한계 기본 복원(reset 은 sun 중심 개요 = 기본 좌표계).
+            wasdControl.setEnabled(false);
+            wasdControl.clearKeys();
+            camera.lowerRadiusLimit = DEFAULT_LOWER_RADIUS_LIMIT;
+            camera.upperRadiusLimit = DEFAULT_UPPER_RADIUS_LIMIT;
           }
         };
 
@@ -455,20 +534,36 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // syncFocusToScene 과 별도 helper — selectedBodyId 변화 (null 전이) 와 freeFlyMode 변화를
         // 분리 처리하기 위함 (resetCamera vs enterFreeFly 경로 구분).
         const detachToFreeFly = () => {
-          // #631 — deep tier(body, 위성/근접 focus)에서 탐색 진입 시: 시점 보존(#509)을 그대로 두면
-          // target 이 focus body 의 먼 위치(예: io ~5.2 AU)에 동결되어 줌아웃해도 태양계가 frame 밖
-          // → "허공" (D-T2). 따라서 body tier 진입은 태양계 개요로 pull-back 한다 (target→sun 원점 +
-          // solar radius). controller.reset 은 alpha/beta(시점 방향)는 유지하므로 "현재 각도로 태양계
-          // 전체를 보는" 자연스러운 탐색이 된다. inner/solar tier(행성)는 기존 #509 시점 보존 유지.
-          if (solar.getTier() === 'body') {
-            solar.clearFocus();
-            // controller.reset() 기본값 = (radius 35, target 원점) = 태양계 개요. 매직 넘버 없이
-            // 문서화된 default 사용 (cross-validate agy 권고 #1).
-            controller.reset();
-            return;
-          }
+          // #699 — 진입 단일화 (tier 무관 단일 규칙 — ADR §5-1). #631 의 body tier reset(35)
+          // pull-back 을 폐기한다. 모든 tier(sun/earth/io/default)가 **현 시점·줌을 보존**한 채로
+          // focus tracking 만 해제 + 자유 이동(패닝/WASD) 활성. #631 "허공" 위험은 진입 강제 줌아웃이
+          // 아니라 (a) 줌아웃 상한 + (b) tier escalation gate 로 대체 처리(ADR §5-3).
           solar.detachFocus();
           controller.clearFollow();
+
+          // #699 — sun anomaly 구조적 차단 (ADR §5-2). focusOn 이 lowerRadiusLimit 을 desiredRadius
+          // ×0.5 로 낮춘 것을 기본값으로 원복(완화 잔존 시 진입 후 줌인이 비정상적으로 깊이 들어감).
+          // 진입 radius 를 스냅샷해 onBeforeRender 의 tier escalation gate 기준으로 삼는다 — 사용자가
+          // 진입 radius 보다 유의미하게 줌아웃할 때만 escalate(snap-back 0).
+          camera.lowerRadiusLimit = DEFAULT_LOWER_RADIUS_LIMIT;
+          freeFlyEntryRadius = camera.radius;
+          // #699 — 진입 radius 비례 줌아웃 상한 적용(clamp 없이 factor 배 줌아웃 허용 — ADR §5-3).
+          // body tier 진입 radius(158386)를 보존하면서 escalation 트리거 여유 확보.
+          camera.upperRadiusLimit = camera.radius * FREE_FLY_ZOOMOUT_FACTOR;
+
+          // #693 — free-fly 진입 → radius 비례 패닝 활성. onBeforeRender 가 줌 중 radius 변동을
+          // 따라 매 프레임 재산출 (ADR §결정 2).
+          freeFlyActive = true;
+          sceneApi.setPanningEnabled(camera, true);
+          // #699 — free-fly 진입 → WASD/QE 키보드 이동 활성 (ADR §5-4).
+          wasdControl.setEnabled(true);
+          // #699 D-T2 — 진입 즉시 캔버스에 키보드 포커스 부여. 탐색/focus 버튼 클릭으로 진입하면
+          // 포커스가 그 버튼에 남아 scene.onKeyboardObservable 이 키를 받지 못해 WASD 가 무반응이다
+          // (Babylon 키보드 입력은 canvas 포커스 시에만 수신 — 실측 onKeyboardObservable=false).
+          // pointerenter refocus 는 마우스가 캔버스에 "새로 진입"할 때만 발화하므로, 진입 시점에
+          // 명시적으로 focus 를 부여해 캔버스 클릭 없이 바로 이동 가능케 한다. refocusCanvas 는
+          // 텍스트 입력 포커스 가드를 포함한다.
+          refocusCanvas();
         };
 
         // 엔진 스토어 변경 → 씬 setPhysicsEngine (#89 심리스 전환)
@@ -509,6 +604,26 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             } else {
               syncFocusToScene(state.selectedBodyId);
             }
+          } else if (state.freeFlyMode !== prev.freeFlyMode && state.freeFlyMode) {
+            // #693 — solar 개요(selectedBodyId 이미 null)에서 free-fly 직접 진입 경로.
+            // 이 경우 selectedBodyId 가 변하지 않아 위 분기가 발화하지 않는다(enterFreeFly 가
+            // null→null + freeFlyMode false→true 만 commit). 패닝 활성화를 위해 freeFlyMode
+            // 전이(false→true)도 detachToFreeFly 로 라우팅한다. ADR §1 측정 시나리오 A "free-fly 직접".
+            detachToFreeFly();
+          } else if (
+            state.freeFlyMode !== prev.freeFlyMode &&
+            !state.freeFlyMode &&
+            state.selectedBodyId === null
+          ) {
+            // #693 (qa 차단 fix) — free-fly 패닝 후 reset 경로.
+            // reset 버튼 → resetCamera command → setSelectedBody(null) = {selectedBodyId:null,
+            // freeFlyMode:false}. free-fly 진입 상태는 이미 selectedBodyId=null 이므로 1차 분기
+            // (selectedBodyId 변화)가 미발화하고, 2차 분기는 `&& state.freeFlyMode`(=false)라 미발화.
+            // → syncFocusToScene(null) 미호출 → 패닝으로 옮긴 target 이 원점 복원 안 됨 (DoD "reset 원복" 위반).
+            // freeFlyMode true→false 전이(selectedBodyId 불변 null)를 sun 중심 reset 으로 라우팅하여
+            // controller.reset(35) 로 target 원점 복원 + 패닝 비활성. focus→reset(selectedBodyId 변화)
+            // 경로는 1차 분기가 이미 처리하므로 본 분기는 free-fly→reset 에만 한정 발화.
+            syncFocusToScene(null);
           }
         });
         // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).
@@ -557,7 +672,42 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const arcCam = activeCam as unknown as { radius?: number };
           const focusDistSceneUnit = typeof arcCam.radius === 'number' ? arcCam.radius : 0;
           const cameraFromFocusMeters = focusDistSceneUnit * metersPerSceneUnit;
-          solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+          // #699 — free-fly 진입 tier escalation gate (sun anomaly 구조적 차단 — ADR §5-2).
+          //
+          // 진입 직후 updateTierByCamera 가 tierFromCameraDistance 로 tier 를 즉시 재판정하면
+          // runTierTransition 실거리 보존 산식이 진입 radius 를 덮어쓴다(sun 25.3→463.9 / io
+          // 158386→35 강제 pull-back). "1회 억제"(snap-back 위험)가 아니라 **진입 radius 임계**로
+          // gate 한다 — 사용자가 진입 radius 의 (1 + margin) 배 초과로 **줌아웃**할 때만 escalate
+          // 허용. 줌인/소폭 변동은 tier 유지 → 진입 시점 보존 + snap-back 0. 한 번 임계를 넘으면
+          // freeFlyEntryRadius=null 로 gate 해제 (그 후 정상 escalation = #631 "허공 방지" 의도 계승).
+          const TIER_ESCALATION_ZOOMOUT_MARGIN = 0.15; // 진입 대비 15% 줌아웃 시 escalate 개시.
+          let allowTierUpdate = true;
+          if (freeFlyActive && freeFlyEntryRadius !== null) {
+            if (focusDistSceneUnit > freeFlyEntryRadius * (1 + TIER_ESCALATION_ZOOMOUT_MARGIN)) {
+              // 사용자가 진입 radius 보다 유의미하게 줌아웃 → gate 해제(이후 정상 escalation).
+              // 줌아웃 상한을 solar 개요 기준으로 좁힌다 — escalation 후 카메라가 solar/inner tier 로
+              // 재산정되므로 진입 radius 비례 상한(deep tier 거대값)은 더 이상 유효하지 않다. solar
+              // 개요에서 빈 공간 진입 차단 (ADR §5-3 허공 대체 처리).
+              freeFlyEntryRadius = null;
+              const activeCamArc = activeCam as unknown as { upperRadiusLimit?: number };
+              activeCamArc.upperRadiusLimit = SOLAR_ZOOMOUT_LIMIT;
+            } else {
+              // 진입 radius 근처(줌인 포함) → tier 재판정 보류(진입 시점 보존).
+              allowTierUpdate = false;
+            }
+          }
+          if (allowTierUpdate) {
+            solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+          }
+
+          // #693 — free-fly 패닝 감도 줌 일관성 (ADR §결정 2, agy 고유 발견 ②).
+          // panningSensibility 는 radius 비례 정적 스칼라라 줌(radius 변동) 시 진입 시점 값이
+          // 잔존하면 화면 px↔world 비율이 어긋난다("튀는" UX). free-fly 활성 중에는 매 프레임
+          // radius 기반 재산출 (산술 1식, 비용 무시 가능). focus 중에는 sensibility=0 유지(토글이
+          // 비활성화했으므로 재산출 안 함).
+          if (freeFlyActive) {
+            sceneApi.setPanningEnabled(camera, true);
+          }
         };
         const tierObserver = instance.scene.onBeforeRenderObservable.add(onBeforeRender);
         // N1 권고 — unmount / HMR 시 observer 해제. scene dispose 시 자동 정리되지만 React
@@ -587,6 +737,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       unsubEngine?.();
       tierObserverCleanupRef.current?.();
       tierObserverCleanupRef.current = null;
+      // #699 — 캔버스 포커스 복원 리스너 해제 (HMR/unmount 누수 방지). WASD detach 는
+      // camera.onDisposeObservable 에서 처리(instance.dispose() 가 camera dispose 트리거).
+      canvas.removeEventListener('pointerenter', refocusCanvas);
       detach();
       instance.dispose();
       coreRef.current = null;

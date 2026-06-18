@@ -3,6 +3,20 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [Unreleased]
+
+## [0.29.0] — 2026-06-18
+
+### Behavior Changes (#693 — free-fly 패닝 F3)
+
+- **[#693] free-fly 패닝 (F3) — 우클릭/Ctrl 드래그 target 평면 이동 + floating origin 정합 (MINOR)** ([#693](https://github.com/coseo12/astro-simulator/issues/693)) — free-fly 모드에서 우클릭(또는 Ctrl+좌클릭) 드래그로 카메라 target 을 화면 평면 방향으로 이동(패닝). **radius 비례 `panningSensibility`** (`PANNING_DELTA_PERCENTAGE = 0.01`, `REFERENCE / (radius × pct)`) 로 tier별 renderScale 비대칭(solar≈35 ↔ body≈158386)에서도 drag 1px ↔ world 이동 비율 일정 (#629 `wheelDeltaPercentage` 철학 패닝 적용) — `onBeforeRender` 가 줌 중 radius 변동을 따라 매 프레임 재산출. **floating origin 정합**: free-fly originOffset=[0,0,0] 불변식상 좌표 보정 0 (architect measurement-first 로 #629 "floating origin × panning 위험" 정적 기각 사유를 실측 기각, 코어 12라인). focus 중에는 `panningSensibility=0` (followObserver 가 target 덮어쓰므로 무의미 + jitter 회피). 우클릭 contextmenu 차단 (canvas 한정). ADR `20260616-693-freefly-panning.md` SSoT. 비-범위: 패닝 감도 설정 UI / 모바일 2-finger 팬.
+
+### Behavior Changes (#699 — free-fly 카메라 통합 재설계)
+
+- **[#699] free-fly 카메라 통합 재설계 — 진입/줌/이동/시점 일관 모델 (MINOR)** ([#699](https://github.com/coseo12/astro-simulator/issues/699)) — free-fly 진입(시점 보존 단일 규칙) + 줌 % + WASD 이동(deltaTime 정규화) + 패닝 일관 모델. ADR `20260617-699-freefly-camera-unified-redesign.md` SSoT.
+  - **D-T2 Amendment 1 (2026-06-18) — 탐색 버튼(command 경로) free-fly 진입 정상화**: 사용자 보고 "탐색 버튼 클릭 시 리셋만 되고 조작이 안 됨" critical 회귀 fix. simulation-core `enterFreeFly` 가 `freeFlyEntered → bodySelected:null` 2-emit 하여 후행 `bodySelected:null` 이 어댑터 `setSelectedBody(null)` 로 store `freeFlyMode` 를 false 로 덮어써(§509) free-fly 가 reset 으로 되돌아가던 문제 — 후행 `bodySelected:null` emit 제거(2-emit→1-emit). `store.enterFreeFly()` 가 `{selectedBodyId:null, freeFlyMode:true}` 를 단일 set 으로 commit. `resetCamera` 경로는 자체 `bodySelected:null` emit 유지 (reset 버튼 무회귀). emit 순서 #509 부터 존재한 develop 잠복 버그를 #699 가 표면화 → #699 PR 에 fix 포함. 가드 사각 해소: verify:699 신규 S5 (실 버튼 = `__simCore.command` 경로 SSoT) + 단위 가드 + 3중 시뮬레이션.
+  - **D-T2 Amendment 2 (2026-06-18) — free-fly 진입 시 캔버스 자동 포커스 (버튼 진입 후 즉시 WASD 가능)**: Amendment 1 fix 후 사용자 2차 보고 "진입 후 이동이 안됨" 회귀 fix. Babylon `scene.onKeyboardObservable` 은 canvas 가 키보드 포커스를 가질 때만 키를 수신하는데(실측: window 전역 keydown 은 미수신), 탐색/focus 버튼 클릭으로 진입하면 포커스가 그 버튼에 남아 사용자가 캔버스를 클릭하기 전엔 WASD 무반응이던 문제 — `detachToFreeFly` 끝에 `refocusCanvas()` 호출(텍스트 입력 포커스 가드 포함)로 진입 즉시 canvas 키보드 포커스 자동 부여. 이제 버튼 진입 직후 캔버스 클릭 없이 바로 이동 가능. 가드 사각 해소: verify:699 신규 S6 (실 탐색 버튼 click → 캔버스 click 없이 WASD 이동량 > 0 + `activeElement === canvas`) + 3중 시뮬레이션(negative=`refocusCanvas()` 제거 시 activeEl=BUTTON/worldΔ=0 FAIL).
+
 ## [0.28.0] — 2026-06-16
 
 ### Behavior Changes (#688 — 궤도선 toggle UI)

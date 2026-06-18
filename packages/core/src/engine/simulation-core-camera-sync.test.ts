@@ -50,6 +50,26 @@ describe('SimulationCore store-scene sync (R1 #334+#335)', () => {
     core.dispose();
   });
 
+  it('enterFreeFly 명령은 freeFlyEntered 1회만 emit (bodySelected 미emit — #699 D-T2 회귀 fix)', () => {
+    // #699 D-T2 — enterFreeFly 가 후행 bodySelected:null 을 emit 하면 어댑터 setSelectedBody(null)
+    // 가 store freeFlyMode 를 false 로 덮어써 탐색 버튼(command 경로)에서 free-fly 가 reset 으로
+    // 되돌아간다. fix: freeFlyEntered 만 emit. store.enterFreeFly() action 이 selectedBodyId=null +
+    // freeFlyMode=true 를 단일 set 으로 commit 하므로 bodySelected:null 은 잉여이자 회귀원.
+    const core = new SimulationCore(makeCanvas());
+    const onFreeFlyEntered = vi.fn();
+    const onBodySelected = vi.fn();
+    core.on('freeFlyEntered', onFreeFlyEntered);
+    core.on('bodySelected', onBodySelected);
+
+    core.command({ type: 'enterFreeFly' });
+
+    expect(onFreeFlyEntered).toHaveBeenCalledTimes(1);
+    // 회귀 가드 — bodySelected:null 후행 emit 이 부활하면 즉시 실패 (free-fly→reset 회귀 차단).
+    expect(onBodySelected).not.toHaveBeenCalled();
+
+    core.dispose();
+  });
+
   it('setCameraRadius 명령은 등록된 핸들러를 1회만 호출 (focus 핸들러 부재 — 폐기됨)', () => {
     const core = new SimulationCore(makeCanvas());
     const setRadius = vi.fn();

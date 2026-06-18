@@ -103,19 +103,16 @@ export function FocusQuickButtons() {
       >
         reset
       </button>
-      {/* #509 — 자유시점 진입. focus 있을 때만 활성 (focus 없으면 의미 없음). */}
+      {/* #699 — 자유시점 진입 (default 진입 허용 — ADR §5-5 / 축 4). focus 전제 폐기: focus 없이도
+          (default 태양계 개요 화면에서도) 진입 가능. default 진입 = 현 카메라 뷰포트/target 계승
+          (재배치 없음 — subscribe 의 freeFlyMode false→true 전이 경로가 detachToFreeFly 로 라우팅).
+          이전 #509 의 disabled={selected===null} + opacity 50% + cursor-not-allowed 제거 → 항상 활성. */}
       <button
         type="button"
         data-testid="focus-free-fly"
-        disabled={selected === null}
-        aria-disabled={selected === null}
-        title={selected === null ? '포커스 상태에서만 사용 가능' : '자유시점 (Esc)'}
+        title="자유시점 (Esc)"
         onClick={() => sendCommand({ type: 'enterFreeFly' })}
-        className={`num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border transition-colors ${
-          selected === null
-            ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
-            : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'
-        }`}
+        className="num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
         탐색
