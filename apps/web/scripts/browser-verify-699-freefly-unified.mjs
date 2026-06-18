@@ -24,7 +24,7 @@
  * | S2  | 줌아웃 제거 — io focus(85px)→free-fly px ≥ 40 + onScreen          | 1.3px/화면밖 회귀(#631)  |
  * | S3  | 이동 화면체감 — WASD 1 step screen px ≤ 16, tier 편차 < 10%      | 계수 0.05 과대 회귀      |
  * | S3b | frame-rate 독립 — 동일 hold 시간 동일 이동량(deltaTime 정규화)   | deltaTime 누락 회귀      |
- * | S4  | 무회귀 — #629 줌 % / #693 패닝 originOffset=0 / tier escalate     | 좌표계 깨짐              |
+ * | S4  | 무회귀 — io 줌아웃 body 유지(escalate 0, #704) / default solar originOffset=0(#693) | 좌표계 깨짐 / io 튕김 |
  * | S5  | 탐색버튼 경로 — focusOn/resetCamera command → enterFreeFly command| 2-emit 회귀(reset로 복귀)|
  * | S6  | 진입 자동 포커스 — 실 버튼 click→캔버스 click 없이 WASD 이동량 > 0 | activeEl≠canvas/WASD 무반응|
  *
@@ -378,59 +378,77 @@ async function scenarioFrameRateIndependent(browser) {
   }
 }
 
-// S4 — 무회귀: io free-fly 진입 보존 → 줌아웃 시 tier escalate → solar 도달 시 originOffset=0.
+// S4 — 무회귀: io free-fly 진입 보존 → 줌아웃 시 body tier 유지(위성 근방 보존) + solar 경로 originOffset=0.
 //
-// [#699 재설계로 invariant 갱신] #693 의 "free-fly originOffset=[0,0,0]" 는 구 설계(free-fly =
-// 항상 solar tier reset)에서 성립했다. #699 는 io free-fly 가 **body tier 시점을 보존**하므로 진입
-// 직후 originOffset 은 io 위치(≠0)다 — 이게 정상(P1/P2 fix). 줌아웃해 tier 가 solar 로 escalate
-// 되면 setTier 가 origin 을 [0,0,0] 으로 reset → #693 invariant 복원. 본 시나리오는 그 전이를 검증:
-// (1) 진입 = body tier radius 보존(#509) (2) 줌아웃 = tier escalate(#629/#631 의도) (3) solar 도달
-// = originOffset=0(#693 invariant 복원).
+// [#704 (ADR `20260618-704-body-tier-zoomout-jump.md`)로 invariant 재갱신 — 행동 변화 박제]
+// **구 S4 (#699)**: io free-fly 줌아웃 → tier escalate(body→solar) → originOffset=[0,0,0] 복원을
+// 검증했다. 그러나 그 escalate 자체가 **#704 D-T2 회귀의 원인**이었다 — io(목성계 5.2AU)는
+// cameraFromSun 이 항상 solar 영역이라 줌아웃 즉시 body→solar 직행하며 rescale 급락(158386→0.53,
+// ≈300,000× 축소 = "태양계 전체로 튕김")을 냈다. **#704 fix**: body tier 진입 시 anchor(위성) 기준
+// tierFromFocus 판정으로 줌아웃해도 **body tier 유지**(위성 근방 탐색 보존, escalate 0). 따라서 본
+// S4 의 io escalate 단언은 #704 로 의도적으로 폐기되고, 새 행동(body 유지 + originOffset=io 위치≠0)을
+// 검증한다. #693 의 "solar 경로 originOffset=[0,0,0]" invariant 는 default(solar) free-fly 셀로 별도 검증.
+// (1) io 진입 = body tier radius 보존(#509) (2) io 줌아웃 = body 유지 + escalate 0(#704) +
+//     originOffset=io 위치≠0(body tier 정상) (3) default(solar) free-fly originOffset=[0,0,0](#693 보존).
 async function scenarioNoRegression(browser) {
   console.log(
-    '\n[S4] 무회귀 — io 진입 보존 → 줌아웃 escalate → solar 도달 originOffset=0(#629/#631/#693)',
+    '\n[S4] 무회귀 — io 진입 보존 → 줌아웃 body 유지(escalate 0, #704) + solar 경로 originOffset=0(#693)',
   );
-  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
-  const page = await ctx.newPage();
-  try {
-    await boot(page);
-    await focus(page, 'io');
-    const focused = await measure(page, 'io');
-    await enterFreeFly(page);
-    const entered = await measure(page, 'io');
-    // (1) 진입 = body tier radius 보존 (#509 시점 보존, P1 fix).
-    const enterPreserved =
-      entered.tier === 'body' &&
-      Math.abs(entered.radius - focused.radius) / focused.radius < RADIUS_PRESERVE_REL;
-    // (2) 줌아웃 → tier escalate (gate 임계 초과 후 정상 escalation 복원, #629/#631 의도).
-    await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
-    for (let i = 0; i < 30; i += 1) {
-      await page.mouse.wheel(0, 120);
-      await page.waitForTimeout(60);
+  let pass = true;
+  // (A) io free-fly 줌아웃 → body tier 유지 + escalate 0 (#704 body-tier-zoomout fix).
+  let ioResult;
+  {
+    const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    const page = await ctx.newPage();
+    try {
+      await boot(page);
+      await focus(page, 'io');
+      const focused = await measure(page, 'io');
+      await enterFreeFly(page);
+      const entered = await measure(page, 'io');
+      const enterPreserved =
+        entered.tier === 'body' &&
+        Math.abs(entered.radius - focused.radius) / focused.radius < RADIUS_PRESERVE_REL;
+      await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+      for (let i = 0; i < 30; i += 1) {
+        await page.mouse.wheel(0, 120);
+        await page.waitForTimeout(60);
+      }
+      await page.waitForTimeout(1500);
+      const zoomedOut = await measure(page, 'io');
+      // #704 — body tier 유지(escalate 0). originOffset 은 io 위치(≠0, body tier 정상).
+      const stayedBody = zoomedOut.tier === 'body';
+      const originAtBody = zoomedOut.originOffset.some((v) => v !== 0);
+      const ioOk = enterPreserved && stayedBody && originAtBody;
+      if (!ioOk) pass = false;
+      ioResult = { enterPreserved, stayedBody, originAtBody, zoomedTier: zoomedOut.tier };
+      console.log(
+        `  (A) io 진입 tier=${entered.tier}(보존 ${enterPreserved}) → 줌아웃 tier=${zoomedOut.tier}(body 유지 ${stayedBody}, escalate 0) originOffset=io 위치(≠0 ${originAtBody}) → ${ioOk ? 'PASS' : 'FAIL'}`,
+      );
+    } finally {
+      await ctx.close();
     }
-    await page.waitForTimeout(1500);
-    const zoomedOut = await measure(page, 'io');
-    const escalated = zoomedOut.tier !== 'body';
-    // (3) solar/inner 도달 시 originOffset=[0,0,0] (#693 invariant 복원).
-    const originRestored = zoomedOut.originOffset.every((v) => v === 0);
-    const pass = enterPreserved && escalated && originRestored;
-    console.log(
-      `  진입 tier=${entered.tier} radius=${entered.radius.toFixed(1)}(보존 ${enterPreserved}) → 줌아웃 tier=${zoomedOut.tier}(escalate ${escalated}) originOffset=[${zoomedOut.originOffset.map((v) => v.toFixed(0)).join(',')}](=0 ${originRestored}) → ${pass ? 'PASS' : 'FAIL'}`,
-    );
-    return {
-      scenario: 'S4',
-      enteredTier: entered.tier,
-      enteredRadius: entered.radius,
-      zoomedTier: zoomedOut.tier,
-      zoomedOriginOffset: zoomedOut.originOffset,
-      enterPreserved,
-      escalated,
-      originRestored,
-      pass,
-    };
-  } finally {
-    await ctx.close();
   }
+  // (B) default(solar) free-fly originOffset=[0,0,0] (#693 invariant 보존 — solar 경로는 origin 불변).
+  let solarResult;
+  {
+    const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    const page = await ctx.newPage();
+    try {
+      await boot(page);
+      await enterFreeFly(page);
+      const ff = await measure(page, null);
+      const solarOriginZero = ff.tier === 'solar' && ff.originOffset.every((v) => v === 0);
+      if (!solarOriginZero) pass = false;
+      solarResult = { tier: ff.tier, originOffset: ff.originOffset, solarOriginZero };
+      console.log(
+        `  (B) default free-fly tier=${ff.tier} originOffset=[${ff.originOffset.map((v) => v.toFixed(0)).join(',')}](=0 ${solarOriginZero}) → ${solarOriginZero ? 'PASS' : 'FAIL'}`,
+      );
+    } finally {
+      await ctx.close();
+    }
+  }
+  return { scenario: 'S4', io: ioResult, solar: solarResult, pass };
 }
 
 // S5 — 탐색버튼(command) 경로: focusOn/resetCamera command → enterFreeFly command 후

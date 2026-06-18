@@ -15,7 +15,7 @@ export {
   setPanningEnabled,
   attachWasdControl,
 } from './camera.js';
-export type { ArcCameraOptions, WasdControlHandle } from './camera.js';
+export type { ArcCameraOptions, WasdControlHandle, WasdCoefficients } from './camera.js';
 export {
   CameraController,
   FOCUS_USER_RADIUS_MULTIPLIER,

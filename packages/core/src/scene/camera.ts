@@ -41,7 +41,10 @@ export const PANNING_DELTA_PERCENTAGE = 0.01;
  * `lowerRadiusLimit`(tier 별 양수, 기본 0.5)에서 clamp 되지만 산식 분모는 방어적으로 명시 하한
  * (`Math.max(radius, lowerRadiusLimit, EPSILON)`)을 적용한다.
  */
-export function computePanningSensibility(camera: ArcRotateCamera): number {
+export function computePanningSensibility(
+  camera: ArcRotateCamera,
+  pct: number = PANNING_DELTA_PERCENTAGE,
+): number {
   // Babylon panning 내부식 기준 참조 상수: sensibility=1 일 때 1px drag ≈ 1 world unit /
   // (radius 무관). REFERENCE_SENSIBILITY 를 radius×pct 로 나눠 radius 비례를 부여한다.
   const REFERENCE_SENSIBILITY = 1000;
@@ -49,7 +52,10 @@ export function computePanningSensibility(camera: ArcRotateCamera): number {
   const lower = camera.lowerRadiusLimit ?? EPSILON;
   // NaN 방어: Number.isFinite 가 아니면 lower 로 대체 후 하한 clamp.
   const safeRadius = Number.isFinite(camera.radius) ? camera.radius : lower;
-  const denom = Math.max(safeRadius, lower, EPSILON) * PANNING_DELTA_PERCENTAGE;
+  // #704 — pct 가 store 사용자 감도(범위 clamp 된 값)일 수 있으나, NaN/0 방어로 EPSILON 하한 적용
+  // (zero-division 가드 — 분모 발산 차단). default 는 PANNING_DELTA_PERCENTAGE (SSoT).
+  const safePct = Number.isFinite(pct) && pct > 0 ? pct : PANNING_DELTA_PERCENTAGE;
+  const denom = Math.max(safeRadius, lower, EPSILON) * safePct;
   return REFERENCE_SENSIBILITY / denom;
 }
 
@@ -64,8 +70,14 @@ export function computePanningSensibility(camera: ArcRotateCamera): number {
  * free-fly 활성 중에는 줌(radius 변동)에 따라 sensibility 가 어긋나지 않도록 `onBeforeRender` 에서
  * `enabled=true` 로 매 프레임 재호출해야 한다 (ADR §결정 2, agy 고유 발견 ②).
  */
-export function setPanningEnabled(camera: ArcRotateCamera, enabled: boolean): void {
-  camera.panningSensibility = enabled ? computePanningSensibility(camera) : 0;
+export function setPanningEnabled(
+  camera: ArcRotateCamera,
+  enabled: boolean,
+  pct: number = PANNING_DELTA_PERCENTAGE,
+): void {
+  // #704 — pct 는 store 사용자 패닝 감도 (free-fly 활성 중 onBeforeRender 가 매 프레임 store 값으로
+  // 재호출). 비활성(focus) 시 0. default = PANNING_DELTA_PERCENTAGE (sim-canvas 미전달 시 SSoT).
+  camera.panningSensibility = enabled ? computePanningSensibility(camera, pct) : 0;
 }
 
 /**
@@ -103,6 +115,19 @@ export const MAX_MOVE_STEP = 10;
 /** #699 — WASD 이동에 관여하는 키(소문자). 화살표(keysUp/Down/...)는 ArcRotate 회전에 위임. */
 const WASD_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e']);
 
+/**
+ * #704 — WASD 이동 계수 (매 프레임 getter pull 로 최신 store 값 반영 — ADR §결정 1).
+ *
+ * - `wasd`: radius 비례 % (default `WASD_DELTA_PERCENTAGE`). 키 hold 중 슬라이더 변경 즉시 반영을
+ *   위해 스냅샷이 아닌 getter 로 매 프레임 읽는다.
+ * - `maxStep`: 프레임당 이동 상한 (default `MAX_MOVE_STEP`). 1차 슬라이더는 wasd 만 노출, maxStep 은
+ *   향후 가변 대비 포함하되 고정(`MAX_MOVE_STEP`).
+ */
+export interface WasdCoefficients {
+  wasd: number;
+  maxStep: number;
+}
+
 /** #699 — attachWasdControl 이 반환하는 detach 핸들 (observer + 키 상태 정리). */
 export interface WasdControlHandle {
   /** 리스너/observer 해제 + 눌림 키 상태 클리어 (HMR/unmount 누수 방지). */
@@ -131,9 +156,20 @@ export interface WasdControlHandle {
  * 리스너 수명 주기는 반환 핸들의 `detach()` 로 봉인(#693 contextmenu `onDisposeObservable` 선례).
  * sim-canvas 가 free-fly 토글 시 `setEnabled`, reset/unmount 시 `clearKeys`/`detach` 호출.
  *
+ * #704 — `getCoefficients` getter 주입 (ADR §결정 1 축 1-A). 매 프레임 `getCoefficients()` 로
+ * wasd/maxStep 최신 store 값을 읽어 "키 hold 중 슬라이더 변경 즉시 반영"을 보장한다(스냅샷 불가).
+ * 미전달 시 const default (`WASD_DELTA_PERCENTAGE` / `MAX_MOVE_STEP`) — SSoT 보존, 기존 호출 호환.
+ *
  * @returns attach/detach + setEnabled + clearKeys 인터페이스
  */
-export function attachWasdControl(camera: ArcRotateCamera, scene: Scene): WasdControlHandle {
+export function attachWasdControl(
+  camera: ArcRotateCamera,
+  scene: Scene,
+  getCoefficients: () => WasdCoefficients = () => ({
+    wasd: WASD_DELTA_PERCENTAGE,
+    maxStep: MAX_MOVE_STEP,
+  }),
+): WasdControlHandle {
   const pressed = new Set<string>();
   let enabled = false;
 
@@ -183,8 +219,15 @@ export function attachWasdControl(camera: ArcRotateCamera, scene: Scene): WasdCo
     // #699 산식 (ADR §5-4): radius 비례 + 상한 clamp + deltaTime 정규화.
     //   - clamp(radius × pct, MAX): 줌아웃 극단(deep tier radius≈158386) 과속 안전망.
     //   - × (deltaSeconds / (1/60)): 60fps 기준 정규화 → 60/144Hz 무관 동일 시간 동일 이동량.
+    // #704 — pct/maxStep 을 getter pull (매 프레임 최신 store 값). NaN/비양수 방어로 default 폴백
+    // (store clamp 가 1차 가드이나 산식 분모 안전 위해 2중 가드 — silent 흡수 아님, 명시 default).
+    const coeffs = getCoefficients();
+    const pct =
+      Number.isFinite(coeffs.wasd) && coeffs.wasd > 0 ? coeffs.wasd : WASD_DELTA_PERCENTAGE;
+    const maxStep =
+      Number.isFinite(coeffs.maxStep) && coeffs.maxStep > 0 ? coeffs.maxStep : MAX_MOVE_STEP;
     const deltaSeconds = scene.getEngine().getDeltaTime() / 1000;
-    const baseStep = Math.min(camera.radius * WASD_DELTA_PERCENTAGE, MAX_MOVE_STEP);
+    const baseStep = Math.min(camera.radius * pct, maxStep);
     const step = baseStep * (deltaSeconds / (1 / 60));
     move.scaleInPlace(step);
 
