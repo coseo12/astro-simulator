@@ -388,6 +388,26 @@ jobs:
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
+      # #704 — free-fly 카메라 감도 설정 회귀 가드 (4축 슬라이더 → 런타임 거동 + localStorage 왕복).
+      # ADR: docs/decisions/20260618-704-freefly-sensitivity-settings-ui.md §결정 5 (무회귀 = 축 5)
+      # 검증 4축: (S1) 4축 슬라이더 변경 → 런타임 카메라 거동 변화 (zoom/panning/zoomout/wasd 정적 const 잔존 차단)
+      #          (S2) 기본값 복원 → 4축 = 0.015/5/0.01/0.01 + 카메라 zoom 속성 default 환원
+      #          (S3) localStorage 왕복 — 변경→reload 유지 + 손상값 주입 시 default 폴백 (silent 흡수 차단)
+      #          (S4) focus/reset 무회귀 — 감도 변경이 focus follow(panning=0)/reset 원복에 영향 0
+      - name: '#704 free-fly 감도 설정 회귀 가드 (verify:704-sensitivity)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-704-sensitivity.mjs') != ''
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3013 &
+          WEB_PID=$!
+          for i in {1..60}; do
+            if curl -sf http://localhost:3013/ > /dev/null; then break; fi
+            sleep 2
+          done
+          BASE_URL=http://localhost:3013 node apps/web/scripts/browser-verify-704-sensitivity.mjs
+          GUARD_EXIT=$?
+          kill $WEB_PID || true
+          exit $GUARD_EXIT
+
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:
       # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)

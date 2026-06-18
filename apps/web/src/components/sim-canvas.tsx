@@ -169,6 +169,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
     let cancelled = false;
     let unsubEngine: (() => void) | null = null;
+    // #704 — free-fly 감도 zoom/zoomoutFactor push 구독 해제 핸들 (cleanup 에서 호출).
+    let unsubSensitivity: (() => void) | null = null;
     instance
       .start()
       .then(() => {
@@ -214,7 +216,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // free-fly 진입 시 setEnabled(true), focus/reset 시 setEnabled(false)(focus follow 충돌
         // 회피). 패닝(#693)과 동일 freeFlyActive 토글 SSoT 를 공유한다 — 입력 채널만 별개(키 vs 드래그).
         // reset/focus 진입 시 clearKeys 로 눌림 키 잔류 방지(키업 유실 대비). unmount/HMR 시 detach.
-        const wasdControl = sceneApi.attachWasdControl(camera, instance.scene);
+        // #704 — WASD 계수 getter pull (매 프레임 store 최신값). 슬라이더로 wasd 감도를 키 hold 중
+        // 변경해도 즉시 반영(스냅샷 아님 — ADR §결정 1 축 1-A). maxStep 은 1차 비노출이라 const 고정.
+        const wasdControl = sceneApi.attachWasdControl(camera, instance.scene, () => ({
+          wasd: useSimStore.getState().freeFlySensitivity.wasd,
+          maxStep: sceneApi.MAX_MOVE_STEP,
+        }));
         // camera dispose 시 WASD observer/blur 리스너 해제 (HMR/StrictMode 재마운트 누수 방지 —
         // #693 contextmenu handler onDisposeObservable 선례).
         camera.onDisposeObservable.add(() => wasdControl.detach());
@@ -228,7 +235,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 진입 radius 보존(clamp 없음) + factor 만큼 줌아웃 허용(그 사이 tier escalation gate 가
         // 임계 초과 시 escalate → 새 tier 에서 radius 재산정). escalation 후(gate 해제)에는 solar
         // 개요 상한(SOLAR_ZOOMOUT_LIMIT)으로 좁혀 빈 공간 진입을 차단한다.
-        const FREE_FLY_ZOOMOUT_FACTOR = 5; // 진입 radius 의 5배까지 줌아웃 허용 (D-T2 튜닝 지점).
+        // #704 — 줌아웃 배율은 store 사용자 감도 (default 5 = FREE_FLY_ZOOMOUT_FACTOR_DEFAULT).
+        // 진입 시 1회 산정이라, free-fly 활성 중 슬라이더 변경은 아래 store 구독이 즉시 재산정한다
+        // (ADR §결정 1 줌아웃 실시간 반영 — agy 이견 수용). 함수로 매 사용 시점 store 최신값 pull.
+        const getZoomoutFactor = () => useSimStore.getState().freeFlySensitivity.zoomoutFactor;
         // tier escalation 후 solar 개요에서의 줌아웃 상한 (scene unit). 해왕성 30 AU ≈ 3.8 scene unit
         // (solar renderScale) 이라 1000 은 외곽 관찰 충분 + 그 너머 빈 공간 차단. D-T2 튜닝 지점.
         const SOLAR_ZOOMOUT_LIMIT = 1000;
@@ -549,12 +559,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           freeFlyEntryRadius = camera.radius;
           // #699 — 진입 radius 비례 줌아웃 상한 적용(clamp 없이 factor 배 줌아웃 허용 — ADR §5-3).
           // body tier 진입 radius(158386)를 보존하면서 escalation 트리거 여유 확보.
-          camera.upperRadiusLimit = camera.radius * FREE_FLY_ZOOMOUT_FACTOR;
+          camera.upperRadiusLimit = camera.radius * getZoomoutFactor();
 
           // #693 — free-fly 진입 → radius 비례 패닝 활성. onBeforeRender 가 줌 중 radius 변동을
-          // 따라 매 프레임 재산출 (ADR §결정 2).
+          // 따라 매 프레임 재산출 (ADR §결정 2). #704 — pct = store 사용자 패닝 감도.
           freeFlyActive = true;
-          sceneApi.setPanningEnabled(camera, true);
+          sceneApi.setPanningEnabled(
+            camera,
+            true,
+            useSimStore.getState().freeFlySensitivity.panning,
+          );
           // #699 — free-fly 진입 → WASD/QE 키보드 이동 활성 (ADR §5-4).
           wasdControl.setEnabled(true);
           // #699 D-T2 — 진입 즉시 캔버스에 키보드 포커스 부여. 탐색/focus 버튼 클릭으로 진입하면
@@ -626,6 +640,34 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             syncFocusToScene(null);
           }
         });
+
+        // #704 — free-fly 감도 zoom / zoomoutFactor push 구독 (ADR §결정 1 축 1-A).
+        //
+        // WASD/패닝은 pull(getter/매 프레임) 경로라 자체 갱신되지만, zoom(카메라 속성)·zoomoutFactor
+        // (진입 시 1회 산정)은 push 가 필요하다:
+        //  - zoom: wheelDeltaPercentage/pinchDeltaPercentage 는 카메라 속성이라 변경 시 즉시 set.
+        //          focus 중에도 줌은 동일 속성을 쓰므로 free-fly 무관 항상 적용(거동 모델 불변 — 회귀 아님).
+        //  - zoomoutFactor: 진입 시 upperRadiusLimit=entryRadius×factor 1회 산정이라, free-fly 활성 +
+        //          진입 radius(freeFlyEntryRadius) 유효 시에만 즉시 재산정(escalation gate 해제 후
+        //          freeFlyEntryRadius=null 이면 solar 개요 상한이 지배하므로 미적용 — DoD-1 재진입 불요).
+        const applySensitivity = (
+          sens: ReturnType<typeof useSimStore.getState>['freeFlySensitivity'],
+        ) => {
+          camera.wheelDeltaPercentage = sens.zoom;
+          camera.pinchDeltaPercentage = sens.zoom;
+          if (freeFlyActive && freeFlyEntryRadius !== null) {
+            camera.upperRadiusLimit = freeFlyEntryRadius * sens.zoomoutFactor;
+          }
+        };
+        // 마운트 직후 1회 적용 — Hydration useEffect 가 localStorage 값을 store 에 덮어쓰면 본 구독이
+        // 발화해 카메라에 반영(초기 default 와 영속값이 다를 때 새로고침 후에도 즉시 반영).
+        applySensitivity(useSimStore.getState().freeFlySensitivity);
+        unsubSensitivity = useSimStore.subscribe((state, prev) => {
+          if (state.freeFlySensitivity !== prev.freeFlySensitivity) {
+            applySensitivity(state.freeFlySensitivity);
+          }
+        });
+
         // R1 #334+#335 — `setCameraRadiusHandler` 단일 인자 (focus/reset 콜백 폐기 — ADR §결정 2).
         instance.setCameraRadiusHandler((radius: number) => {
           camera.radius = radius;
@@ -706,7 +748,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // radius 기반 재산출 (산술 1식, 비용 무시 가능). focus 중에는 sensibility=0 유지(토글이
           // 비활성화했으므로 재산출 안 함).
           if (freeFlyActive) {
-            sceneApi.setPanningEnabled(camera, true);
+            // #704 — pct = store 사용자 패닝 감도 (슬라이더 변경 시 다음 프레임부터 즉시 반영).
+            sceneApi.setPanningEnabled(
+              camera,
+              true,
+              useSimStore.getState().freeFlySensitivity.panning,
+            );
           }
         };
         const tierObserver = instance.scene.onBeforeRenderObservable.add(onBeforeRender);
@@ -735,6 +782,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     return () => {
       cancelled = true;
       unsubEngine?.();
+      unsubSensitivity?.();
       tierObserverCleanupRef.current?.();
       tierObserverCleanupRef.current = null;
       // #699 — 캔버스 포커스 복원 리스너 해제 (HMR/unmount 누수 방지). WASD detach 는

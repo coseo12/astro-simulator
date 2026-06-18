@@ -1,6 +1,12 @@
 import type { physics } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
+import {
+  FREE_FLY_SENSITIVITY_DEFAULT,
+  savePersistedSensitivity,
+  type FreeFlySensitivity,
+  type FreeFlySensitivityAxis,
+} from './free-fly-sensitivity';
 
 type IntegratorKind = physics.IntegratorKind;
 
@@ -89,6 +95,15 @@ export interface SimStoreState {
    * 버튼 클릭 → setOrbitLinesVisible 액션 (store) + setOrbitLinesVisible command (scene) 동시.
    */
   orbitLinesVisible: boolean;
+  /**
+   * #704 — free-fly 카메라 감도 4축 계수 (wasd / zoomoutFactor / panning / zoom).
+   *
+   * 초기값 = camera.ts named const default (SSoT). 영속(localStorage)은 클라이언트 mount 후
+   * `loadPersistedSensitivity()` 가 useEffect 1회 로드해 setFreeFlySensitivity 로 덮어쓴다
+   * (store 생성 시 직접 로드 금지 — Next.js Hydration Mismatch 차단, ADR §결정 3 Hydration 안전).
+   * sim-canvas 가 본 객체를 구독해 4축을 카메라에 동적 주입(축 1-A 경로별 최소 침습).
+   */
+  freeFlySensitivity: FreeFlySensitivity;
   timeScale: number;
   fps: number | null;
   unitSystem: UnitSystem;
@@ -126,6 +141,20 @@ export interface SimStoreState {
   enterFreeFly: () => void;
   /** #688 — 궤도선 가시성 설정. 토글 버튼 + URL 초기값에서 호출 (버튼 표시 SSoT). */
   setOrbitLinesVisible: (visible: boolean) => void;
+  /**
+   * #704 — 단일 감도 축 갱신 (ADR §결정 1/3).
+   *
+   * @param axis  'wasd' | 'zoomoutFactor' | 'panning' | 'zoom' (리터럴 유니온 — 오타 컴파일 차단).
+   * @param value 새 값 (모달이 슬라이더 onValueChange 에서 전달 — 런타임 카메라 즉시 반영).
+   * @param persist localStorage 디스크 쓰기 여부. 슬라이더는 onValueChange=false(드래그 중 폭주 회피)
+   *               / onValueCommit=true(드래그 종료 1회). 누락 시 false (메모리만 갱신).
+   */
+  setFreeFlySensitivity: (axis: FreeFlySensitivityAxis, value: number, persist?: boolean) => void;
+  /**
+   * #704 — 4축 일괄 default 복원 + localStorage 즉시 동기화 (ADR §결정 3 reset 영속 동기화).
+   * 누락 시 복원 후 새로고침하면 이전 영속값 재로드되는 버그 (agy 누락 요소 1) → reset 은 항상 persist.
+   */
+  resetFreeFlySensitivity: () => void;
   setTimeScale: (scale: number) => void;
   setFps: (fps: number) => void;
   setUnitSystem: (unit: UnitSystem) => void;
@@ -153,6 +182,9 @@ export const useSimStore = create<SimStoreState>((set) => ({
   freeFlyMode: false,
   // #688 — 기본 ON. URL `?orbits=off` 진입 시 sim-canvas 가 mount 직후 false 로 덮어쓴다.
   orbitLinesVisible: true,
+  // #704 — 감도 4축 초기값 = camera.ts const default (SSoT). 영속 로드는 클라 mount useEffect 가 담당
+  // (Hydration Mismatch 차단 — 서버·클라 동일 default 로 첫 렌더 고정, ADR §결정 3).
+  freeFlySensitivity: { ...FREE_FLY_SENSITIVITY_DEFAULT },
   timeScale: 86_400,
   fps: null,
   unitSystem: 'astro',
@@ -187,6 +219,21 @@ export const useSimStore = create<SimStoreState>((set) => ({
     set({ selectedBodyId: id, freeFlyMode: false }),
   enterFreeFly: () => set({ selectedBodyId: null, freeFlyMode: true }),
   setOrbitLinesVisible: (visible) => set({ orbitLinesVisible: visible }),
+  setFreeFlySensitivity: (axis, value, persist = false) =>
+    set((state) => {
+      // 동일 값이면 no-op (불필요 리렌더/영속 회피 — Hydration 로드가 default 와 같을 때 등).
+      if (state.freeFlySensitivity[axis] === value) return state;
+      const next = { ...state.freeFlySensitivity, [axis]: value };
+      // onValueCommit(드래그 종료) 시점에만 디스크 쓰기 — onValueChange 매 픽셀 폭주 회피 (ADR §결정 3).
+      if (persist) savePersistedSensitivity(next);
+      return { freeFlySensitivity: next };
+    }),
+  resetFreeFlySensitivity: () => {
+    // 4축 default 복원 + localStorage 즉시 동기화 (누락 시 복원 후 새로고침에 이전 영속값 재로드 — agy).
+    const next = { ...FREE_FLY_SENSITIVITY_DEFAULT };
+    savePersistedSensitivity(next);
+    set({ freeFlySensitivity: next });
+  },
   setTimeScale: (scale) => set({ timeScale: scale }),
   setFps: (fps) => set({ fps }),
   setUnitSystem: (unit) => set({ unitSystem: unit }),
