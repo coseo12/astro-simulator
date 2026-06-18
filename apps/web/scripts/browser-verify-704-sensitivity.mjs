@@ -17,9 +17,21 @@
  * | S3  | localStorage 왕복 — 변경 → reload 후 유지 + 손상값 주입 시 default 폴백   | 영속 미작동/손상값 흡수      |
  * | S4  | focus/reset 무회귀 — 감도 변경이 focus follow / reset 원복에 영향 0       | 감도 변경이 focus/reset 오염 |
  * | S5  | D-T2 — zoomoutFactor 가 줌아웃 한계 제어(upper=entryR×factor 유지) + 급락 0| gate 가 upper→1000 덮어쓰기   |
+ * | S6  | body tier 줌아웃 — io/europa/titan 진입 점프 < 5× + body→solar setTier 0회 | escalation rescale 급락 부활  |
+ *
+ * ## S6 배경 (#704 body tier 줌아웃 급변 — forensic ADR `20260618-704-body-tier-zoomout-jump.md`)
+ *
+ * 외행성계 위성(io=목성계 5.2AU) focus → free-fly → 줌아웃 시, detachFocus 가 focus tracking 을
+ * 해제하면 updateTierByCamera 가 tierFromCameraDistance(cameraFromSun) 경로를 탔다. io 는
+ * cameraFromSun 이 본질적으로 solar 영역(5.2AU > solarUpper 3AU)이라 줌아웃 즉시 body→solar 직행
+ * escalate → rescale 급락(measurement-first: io 158386→0.53 ≈ ×3.35e-6, 인접 프레임 비 ≈1530×)을
+ * 유발해 "태양계 전체로 튕김" UX 회귀(D-T2). earth/default(inner/solar)는 cameraFromSun 정상 클램프라
+ * 무영향(#704 B-1). [fix] body tier 진입 시 anchor(탐색 위성 id)를 updateTierByCamera 에 전달 → Core 가
+ * anchor 기준 tierFromFocus 판정 → 위성 kind('moon')는 항상 body 반환 → 줌아웃해도 body 유지(escalate
+ * 0, 위성 근방 보존). ADR §4 Concrete Prediction: 인접 프레임 radius 비 < 5× + body→solar setTier 0회.
  *
  * dev 빌드 의존: window.__simStore (freeFlySensitivity / setFreeFlySensitivity / reset /
- *               setSelectedBody / enterFreeFly) / window.__solarScene (meshes/activeCamera).
+ *               setSelectedBody / enterFreeFly) / window.__solarScene (meshes/activeCamera/getTier).
  * 환경변수: BASE_URL (기본 http://localhost:3000)
  */
 
@@ -327,6 +339,94 @@ async function scenarioZoomoutCeilingControl(browser) {
   }
 }
 
+// S6 — body tier 줌아웃 급변 가드 (#704 forensic ADR §4 Concrete Prediction).
+//
+// body tier(외행성 위성 io/europa/titan) focus → free-fly → 줌아웃 sweep 의 인접 프레임 radius 비
+// (점프 배율) < 5× + body→solar setTier 0회 + 좌표 NaN 0. earth(inner)/default(solar) 대조 셀은
+// escalate 0(클램프) 무회귀 확인. anchor 기준 판정 회귀 시 io 가 줌아웃 즉시 body→solar 직행하며
+// 점프 배율 > 1000× → FAIL.
+const BODY_TIER_JUMP_MAX = 5; // 인접 프레임 radius 비 상한 (ADR Concrete Prediction).
+const S6_WHEEL_TICKS = 40;
+async function scenarioBodyTierZoomout(browser) {
+  console.log(
+    '\n[S6] body tier 줌아웃 — io/europa/titan 진입 점프 < 5× + body→solar setTier 0회 + NaN 0',
+  );
+  // body tier(위성) — 줌아웃해도 body 유지 + 점프 < 5×. earth/default 대조 셀(escalate 0 무회귀).
+  const cases = [
+    { label: 'io(body,5.2AU)', id: 'io', expectTier: 'body', expectNoEscalate: true },
+    { label: 'europa(body,5.2AU)', id: 'europa', expectTier: 'body', expectNoEscalate: true },
+    { label: 'titan(body,9.5AU)', id: 'titan', expectTier: 'body', expectNoEscalate: true },
+    { label: 'earth(inner,대조)', id: 'earth', expectTier: 'inner', expectNoEscalate: true },
+    { label: 'default(solar,대조)', id: null, expectTier: 'solar', expectNoEscalate: true },
+  ];
+  const sample = (page) =>
+    page.evaluate(() => {
+      const solar = window.__solarScene;
+      const cam = solar?.meshes?.values().next().value?.getScene()?.activeCamera;
+      const t = cam?.target;
+      const g = cam?.globalPosition;
+      return {
+        tier: solar.getTier(),
+        radius: cam?.radius ?? 0,
+        nan:
+          !!cam &&
+          (Number.isNaN(g.x) ||
+            Number.isNaN(g.y) ||
+            Number.isNaN(g.z) ||
+            (t && (Number.isNaN(t.x) || Number.isNaN(t.y) || Number.isNaN(t.z)))),
+      };
+    });
+  const rows = [];
+  let pass = true;
+  for (const c of cases) {
+    const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    const page = await ctx.newPage();
+    try {
+      await boot(page);
+      if (c.id) {
+        await page.evaluate((id) => window.__simStore.getState().setSelectedBody(id), c.id);
+        await page.waitForTimeout(SETTLE_MS);
+      }
+      await page.evaluate(() => window.__simStore.getState().enterFreeFly());
+      await page.waitForTimeout(1200);
+      const seq = [await sample(page)];
+      await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+      for (let i = 0; i < S6_WHEEL_TICKS; i += 1) {
+        await page.mouse.wheel(0, 120);
+        await page.waitForTimeout(70);
+        seq.push(await sample(page));
+      }
+      // 인접 프레임 radius 점프 배율 max + body→solar setTier 횟수 + NaN.
+      let maxJump = 1;
+      let bodyToSolar = 0;
+      let anyNaN = false;
+      for (let i = 1; i < seq.length; i += 1) {
+        const r0 = seq[i - 1].radius || 1e-9;
+        const r1 = seq[i].radius || 1e-9;
+        maxJump = Math.max(maxJump, r0 / r1, r1 / r0);
+        if (seq[i - 1].tier === 'body' && seq[i].tier === 'solar') bodyToSolar += 1;
+        if (seq[i].nan) anyNaN = true;
+      }
+      const finalTier = seq[seq.length - 1].tier;
+      // 위성 셀: body 유지 + 점프 < 5× + escalate 0 + NaN 0.
+      // 대조 셀(earth/default): tier 유지(escalate 0) + 점프 < 5× + NaN 0.
+      const jumpOk = maxJump < BODY_TIER_JUMP_MAX;
+      const tierOk = finalTier === c.expectTier;
+      const escalateOk = bodyToSolar === 0;
+      const nanOk = !anyNaN;
+      const ok = jumpOk && tierOk && escalateOk && nanOk;
+      if (!ok) pass = false;
+      rows.push({ label: c.label, maxJump, bodyToSolar, finalTier, anyNaN, ok });
+      console.log(
+        `  ${c.label}: maxJump=${maxJump.toExponential(2)}×(<${BODY_TIER_JUMP_MAX} ${jumpOk}) body→solar=${bodyToSolar}(=0 ${escalateOk}) tier=${finalTier}(=${c.expectTier} ${tierOk}) NaN=${anyNaN}(${nanOk}) → ${ok ? 'PASS' : 'FAIL'}`,
+      );
+    } finally {
+      await ctx.close();
+    }
+  }
+  return { scenario: 'S6', rows, pass };
+}
+
 async function main() {
   console.log('\n=== #704 free-fly 감도 설정 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
@@ -344,6 +444,8 @@ async function main() {
     if (!result.scenarios.s4.pass) allPass = false;
     result.scenarios.s5 = await scenarioZoomoutCeilingControl(browser);
     if (!result.scenarios.s5.pass) allPass = false;
+    result.scenarios.s6 = await scenarioBodyTierZoomout(browser);
+    if (!result.scenarios.s6.pass) allPass = false;
   } finally {
     await browser.close();
   }

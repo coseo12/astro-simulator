@@ -212,6 +212,21 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 하게 **줌아웃**(radius 증가)할 때만 escalate 허용. 줌인/소폭 변동은 tier 유지 → 진입 radius
         // 보존 + snap-back 0. (ADR §5-2 "이후 사용자 줌 시에만 정상 escalate".)
         let freeFlyEntryRadius: number | null = null;
+        // #704 (ADR `20260618-704-body-tier-zoomout-jump.md` §5 옵션 c) — free-fly 진입 시점 **body
+        // tier anchor** (탐색 시작 body id). body tier(위성 focus)에서 free-fly 진입한 경우에만 설정.
+        //
+        // [회귀] 외행성계 위성(io=목성계 5.2AU) focus → free-fly → 줌아웃 시, detachFocus 가 focus
+        // tracking 을 해제(focusBodyIdForAssert=null)하면 updateTierByCamera 가 tierFromCameraDistance
+        // (cameraFromSun) 경로를 탄다. io 는 cameraFromSun 이 본질적으로 solar 영역(5.2AU > solarUpper
+        // 3AU)이라 줌아웃하면 즉시 body→solar 직행 escalate → rescale 급락(158386→0.53, ×3.35e-6).
+        // earth/default(inner/solar)는 cameraFromSun 이 정상 클램프되어 무회귀(#704 B-1).
+        //
+        // [fix] anchor 가 설정되면 escalation gate 가 updateTierByCamera 에 anchor id 를 전달 → Core 가
+        // cameraFromSun 대신 anchor(위성) 기준 tierFromFocus 로 판정 → 위성 kind('moon')는 항상 body
+        // 반환 → 줌아웃해도 body tier 유지(위성 근방 탐색 보존, escalate 0). 외/내행성 위성 무관 동일
+        // (이견 4). 줌아웃 상한은 entryRadius×zoomoutFactor 가 차단(#631 허공 방지 계승). 진입 tier 가
+        // body 가 아니면(earth/default) null → 기존 cameraFromSun 경로 유지(#704 B-1 무회귀).
+        let freeFlyAnchorBodyId: string | null = null;
         // #699 — free-fly WASD/QE 키보드 이동 핸들 (#696 PR #698 통합 재구현 — 계수 0.015).
         // free-fly 진입 시 setEnabled(true), focus/reset 시 setEnabled(false)(focus follow 충돌
         // 회피). 패닝(#693)과 동일 freeFlyActive 토글 SSoT 를 공유한다 — 입력 채널만 별개(키 vs 드래그).
@@ -515,6 +530,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.
               freeFlyActive = false;
               freeFlyEntryRadius = null;
+              // #704 (이견 5) — focus 전환 시 free-fly anchor 스냅샷 reset (stale 판정 오작동 방지).
+              freeFlyAnchorBodyId = null;
               sceneApi.setPanningEnabled(camera, false);
               // #699 — focus 진입 시 WASD 비활성 + 눌림 키 클리어 + free-fly 줌 상한 해제(기본 복원).
               // focus follow 가 매 프레임 target 을 덮어쓰므로 WASD 이동 무의미. focusOn 이 동적으로
@@ -530,6 +547,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
             freeFlyActive = false;
             freeFlyEntryRadius = null;
+            // #704 (이견 5) — reset(focus 해제) 시 free-fly anchor 스냅샷 reset.
+            freeFlyAnchorBodyId = null;
             sceneApi.setPanningEnabled(camera, false);
             // #699 — reset 시 WASD 비활성 + 눌림 키 클리어(free-fly→reset 후 키 잔류 이동 방지) +
             // 줌 한계 기본 복원(reset 은 sun 중심 개요 = 기본 좌표계).
@@ -543,11 +562,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #509 — 자유시점 (free-fly) 진입 분기. clearFocus + reset 과 달리 tier/origin/camera 보존.
         // syncFocusToScene 과 별도 helper — selectedBodyId 변화 (null 전이) 와 freeFlyMode 변화를
         // 분리 처리하기 위함 (resetCamera vs enterFreeFly 경로 구분).
-        const detachToFreeFly = () => {
+        const detachToFreeFly = (anchorBodyId: string | null = null) => {
           // #699 — 진입 단일화 (tier 무관 단일 규칙 — ADR §5-1). #631 의 body tier reset(35)
           // pull-back 을 폐기한다. 모든 tier(sun/earth/io/default)가 **현 시점·줌을 보존**한 채로
           // focus tracking 만 해제 + 자유 이동(패닝/WASD) 활성. #631 "허공" 위험은 진입 강제 줌아웃이
           // 아니라 (a) 줌아웃 상한 + (b) tier escalation gate 로 대체 처리(ADR §5-3).
+          //
+          // #704 (ADR §5 옵션 c) — body tier 진입 시 anchor 캡처. 진입 시점 tier 가 body 이고 직전 focus
+          // body 가 있을 때만 anchor 설정 → 줌아웃 시 cameraFromSun 직행 escalate 차단(위성 근방 보존).
+          // earth(inner)/default(solar)는 anchor 없음 → 기존 cameraFromSun 경로 유지(#704 B-1 무회귀).
+          freeFlyAnchorBodyId = anchorBodyId && solar.getTier() === 'body' ? anchorBodyId : null;
           solar.detachFocus();
           controller.clearFollow();
 
@@ -614,7 +638,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // false 면 syncFocusToScene (sun 중심 reset). enterFreeFly action 이 selectedBodyId=null +
             // freeFlyMode=true 를 같은 set 으로 commit 하므로 두 상태가 동시 관찰됨.
             if (state.selectedBodyId === null && state.freeFlyMode) {
-              detachToFreeFly();
+              // #704 — 직전 focus body(prev.selectedBodyId)를 anchor 로 전달. body tier 진입 시에만
+              // detachToFreeFly 내부에서 anchor 채택(외행성 위성 줌아웃 급변 차단 — ADR §5 옵션 c).
+              detachToFreeFly(prev.selectedBodyId);
             } else {
               syncFocusToScene(state.selectedBodyId);
             }
@@ -623,7 +649,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // 이 경우 selectedBodyId 가 변하지 않아 위 분기가 발화하지 않는다(enterFreeFly 가
             // null→null + freeFlyMode false→true 만 commit). 패닝 활성화를 위해 freeFlyMode
             // 전이(false→true)도 detachToFreeFly 로 라우팅한다. ADR §1 측정 시나리오 A "free-fly 직접".
-            detachToFreeFly();
+            // #704 — solar 개요 직접 진입은 anchor 없음(selectedBodyId 이미 null) → cameraFromSun 경로.
+            detachToFreeFly(null);
           } else if (
             state.freeFlyMode !== prev.freeFlyMode &&
             !state.freeFlyMode &&
@@ -748,14 +775,46 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // 덮어쓰지 않는다 — entryRadius×zoomoutFactor 가 줌아웃 상한 SSoT (위 store 구독).
           }
           if (allowTierUpdate) {
-            const newTier = solar.updateTierByCamera(cameraFromSunMeters, cameraFromFocusMeters);
+            // #704 (ADR §5 옵션 c) — body tier anchor 가 있으면 Core 가 cameraFromSun 대신 anchor 기준
+            // (cameraFromFocus) 으로 판정한다. 외행성 위성(io)은 anchor kind('moon')가 항상 body 를
+            // 반환 → 줌아웃해도 body 유지(escalate 0, 위성 근방 보존). upperRadiusLimit 은 store 구독의
+            // entryRadius×zoomoutFactor 가 줌아웃 상한 SSoT(허공 차단). anchor 없으면(earth/default)
+            // 기존 cameraFromSun 경로 → #704 B-1 무회귀.
+            const newTier = solar.updateTierByCamera(
+              cameraFromSunMeters,
+              cameraFromFocusMeters,
+              freeFlyAnchorBodyId,
+            );
             // tier 가 실제로 escalate(또는 변동)한 순간에만 solar 개요 상한으로 전환. escalation 후
             // 카메라가 solar/inner tier 로 재산정되어 진입 radius 비례 상한(deep tier 거대값)은 더 이상
             // 유효하지 않으므로 SOLAR_ZOOMOUT_LIMIT 로 좁혀 빈 공간 진입 차단 (ADR §5-3 허공 대체).
             if (freeFlyEntryRadius !== null && newTier !== activeTier) {
               freeFlyEntryRadius = null;
+              // #704 — escalate 가 실제로 발생하면(default/earth 또는 명시적 개요 복귀) anchor 도 해제
+              // (anchor 기준 판정은 body tier 한정 — escalate 후 solar/inner 좌표계로 전환됨).
+              freeFlyAnchorBodyId = null;
               const activeCamArc = activeCam as unknown as { upperRadiusLimit?: number };
               activeCamArc.upperRadiusLimit = SOLAR_ZOOMOUT_LIMIT;
+              // #704 (이견 6) — 대규모 스케일 전환(body→solar 300,000×) + origin shift 동시 발생 시
+              // 수치 불안정(NaN/우주 미아) 가드. 전환 후 카메라 좌표 NaN 발견 시 dev 경고(저비용 1식).
+              const camPos = activeCam.globalPosition;
+              const camTarget = (
+                activeCam as unknown as { target?: { x: number; y: number; z: number } }
+              ).target;
+              if (
+                Number.isNaN(camPos.x) ||
+                Number.isNaN(camPos.y) ||
+                Number.isNaN(camPos.z) ||
+                (camTarget &&
+                  (Number.isNaN(camTarget.x) ||
+                    Number.isNaN(camTarget.y) ||
+                    Number.isNaN(camTarget.z)))
+              ) {
+                console.error(
+                  '[#704] tier escalation 후 카메라 좌표 NaN — 전환 전 좌표 동기화 트랜잭션 검토 필요',
+                  { newTier, camPos, camTarget },
+                );
+              }
             }
           }
 

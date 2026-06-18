@@ -241,7 +241,31 @@ body tier 진입 시 `TIER_HYSTERESIS`(15%) 또는 escalation margin 을 크게(
 
 ---
 
+### Amendment 2026-06-18 (B) — 구현 fix 후 실측 대조 (PR #705, dev 박제)
+
+옵션 c 구현(`updateTierByCamera` 에 `freeFlyAnchorBodyId` Core 계약 + web anchor 스냅샷 + escalation gate anchor 전달) 후 §4 Concrete Prediction 실측 대조.
+
+**측정 (전 경로 줌아웃 sweep — focus(id) → free-fly → wheel 40틱, 인접 프레임 radius 비 + body→solar setTier)**
+
+| 진입 경로               | tier (fix 후) | maxJump 전                   | maxJump 후 | body→solar 전→후 | NaN |
+| ----------------------- | ------------- | ---------------------------- | ---------- | ---------------- | --- |
+| default(solar)          | solar         | 1.15×                        | **1.14×**  | 0 → 0            | ✗   |
+| earth(inner)            | inner         | 1.14×                        | **1.13×**  | 0 → 0            | ✗   |
+| **io(body, 5.2AU)**     | **body 유지** | **1530×** (155177→1000→0.66) | **1.13×**  | **1 → 0**        | ✗   |
+| **europa(body, 5.2AU)** | **body 유지** | **1780×**                    | **1.12×**  | **1 → 0**        | ✗   |
+| titan(body, 9.5AU)      | body 유지     | (외행성 위성 동일 메커니즘)  | **1.13×**  | 1 → 0            | ✗   |
+
+- io 줌아웃 시퀀스(fix 후): `158386 → ... → 791931` (= entryRadius × zoomoutFactor 5 ≈ 791930 에서 부드러운 클램프). body tier 전 구간 유지, escalate 0.
+- **§4 예측 1 (코어 ≤16라인)**: `updateTierByCamera` 계약(파라미터 + 판정 분기) 약 8라인 + sim-canvas anchor 스냅샷/전달/cleanup 약 10라인 — anchor 변수 선언/주석 제외 실질 로직은 예측 범위 내. tier-transition.ts duration 미변경(옵션 a 보조는 c 단독으로 < 5× 달성하여 불필요 — 측정으로 생략).
+- **§4 예측 2 (점프 < 5× + setTier 0회)**: 전 body tier 셀 maxJump ≤ 1.13× (≪ 5×), body→solar setTier 0회. **충족**.
+- **§4 예측 3 (인접 무영향)**: earth/default maxJump 불변(1.13~1.15×), verify:699(S4 invariant 갱신 후)/693/704 전부 PASS. #704 B-1 무회귀.
+
+**가드**: `apps/web/scripts/browser-verify-704-sensitivity.mjs` 신규 S6(io/europa/titan body tier 점프 < 5× + setTier 0회 + NaN 0, earth/default 대조 셀). 3중 시뮬레이션: positive PASS → anchor 미전달 negative(io 1530× / europa 944× / titan 1080× FAIL, 대조 셀 PASS) → recovery PASS.
+
+**invariant 갱신 (행동 변화 박제)**: 구 verify:699 S4 "io 줌아웃 → body→solar escalate → originOffset=0" 단언은 그 escalate 자체가 본 회귀 원인이므로 #704 로 의도 폐기. S4 를 (A) io 줌아웃 body 유지(escalate 0) + originOffset=io 위치≠0(body tier 정상) (B) default(solar) free-fly originOffset=[0,0,0](#693 보존) 2-셀로 재구성. #699 ADR §5-2 "사용자 줌 시 정상 escalate" 의 **body-tier 외행성 위성 예외**를 본 ADR 이 명시(cross-link).
+
 ## 변경 이력
 
 - 2026-06-18 (Provisional): forensic 측정 + 5옵션 비교 + 옵션 c 권장 박제. cross-validate 대기.
 - 2026-06-18 (Accepted): cross-validate(agy outcome=applied) 4축 통합 — 이견 3/4/5/6 수용(Core 계약화 + 외/내행성 anchor 일관 + 스냅샷 생명주기 + NaN 가드), 기각 7/8(Adaptive Origin 전면추상 YAGNI / UX 연출 후속분리). 코어 라인 예측 12→16 상향.
+- 2026-06-18 (Amendment B): 옵션 c 구현 fix 후 실측 대조 박제 (PR #705) — io maxJump 1530×→1.13×, body→solar setTier 1→0회, NaN 0. verify:704 S6 가드 + 3중 시뮬. verify:699 S4 invariant 갱신(io escalate 폐기 → body 유지).

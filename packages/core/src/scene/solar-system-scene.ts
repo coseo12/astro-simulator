@@ -141,10 +141,24 @@ export interface SolarSystemSceneHandles {
    * focus 있으면 focus body kind + 카메라 거리로, 없으면 카메라-원점 거리로 tier 결정.
    * 히스테리시스 ±15% 로 왕복 flicker 방지 (A2 DoD).
    *
+   * #704 (ADR `20260618-704-body-tier-zoomout-jump.md` §5 옵션 c, 이견 3 Core 계약화) —
+   * free-fly 가 body tier 에서 시작한 경우 `freeFlyAnchorBodyId` (탐색 시작 body 의 id) 를 명시 전달하면,
+   * `cameraFromSunMeters` (외행성 위성은 본질적으로 solar 영역) 대신 **anchor 로부터 거리
+   * (`cameraFromFocusMeters`) 기준**으로 tier 를 판정한다. 외행성계 위성(io=5.2AU) focus → free-fly
+   * → 줌아웃 시 cameraFromSun 이 항상 solarUpper(3AU) 초과라 body→solar 직행 escalate(rescale 급락
+   * ×3.35e-6) 하던 회귀를, anchor 기준 판정으로 위성 근방 탐색을 보존(점프 배율 < 5×)한다. 판정 좌표
+   * 기준(sun vs anchor)을 Core API 가 책임지고(kind 룩업도 Core `bodiesById` 가 소유), web 은 진입 시
+   * anchor body id 만 전달한다(레이어 침범 방지 — 외/내행성 위성 무관 동일 적용, 이견 4).
+   *
    * @param cameraFromSunMeters 카메라 위치에서 원점(태양)까지 거리 (m)
-   * @param cameraFromFocusMeters focus body 에서 카메라까지 거리 (m). focusBodyId=null 이면 무시
+   * @param cameraFromFocusMeters focus body / anchor 에서 카메라까지 거리 (m). focus/anchor 부재 시 무시
+   * @param freeFlyAnchorBodyId free-fly 진입 시점 탐색 body 의 id (body tier 진입 한정). 전달 시 anchor 기준 판정
    */
-  updateTierByCamera: (cameraFromSunMeters: number, cameraFromFocusMeters: number) => Tier;
+  updateTierByCamera: (
+    cameraFromSunMeters: number,
+    cameraFromFocusMeters: number,
+    freeFlyAnchorBodyId?: string | null,
+  ) => Tier;
   /**
    * P10-D #263 — body 의 위치/속도 state vector (parent-centric, m / m·s⁻¹).
    * Newton 경로: 엔진 state 에서 직접 추출 (forward-diff noise 없음).
@@ -890,20 +904,26 @@ export function createSolarSystemScene(
     }
   };
 
-  const updateTierByCamera = (cameraFromSunMeters: number, cameraFromFocusMeters: number): Tier => {
+  const updateTierByCamera = (
+    cameraFromSunMeters: number,
+    cameraFromFocusMeters: number,
+    freeFlyAnchorBodyId?: string | null,
+  ): Tier => {
     // #408 F2 — transition 진행 중에는 재판정 no-op. cam-target tween 보간 race 차단.
     // lock 해제 후 다음 frame 에서 정상 재판정 (focus body 가 정착된 시점).
     if (tierTransitionInProgress) {
       return activeTier;
     }
-    const focusInfo = focusBodyIdForAssert
-      ? (() => {
-          const body = bodiesById.get(focusBodyIdForAssert!);
-          return body ? { kind: body.kind } : null;
-        })()
-      : null;
-    const nextTier = focusInfo
-      ? tierFromFocus(focusInfo.kind, cameraFromFocusMeters)
+    // #704 (ADR §5 옵션 c) — 판정 좌표 기준 선택. kind 룩업은 Core `bodiesById` 가 소유(이견 3):
+    //  1. 활성 focus 있음 → focus body kind + cameraFromFocus (기존 경로).
+    //  2. focus 없음 + free-fly anchor 있음(body tier 진입) → anchor kind + cameraFromFocus(=anchor 거리).
+    //     외행성 위성(io=5.2AU)은 cameraFromSun 이 항상 solar 영역이라 tierFromCameraDistance 경로가
+    //     body→solar 직행 escalate 하던 회귀를, anchor 기준으로 위성 근방 탐색을 보존한다(외/내행성 통일).
+    //  3. focus/anchor 모두 없음 → cameraFromSun (free-fly 탐색 = 자유 시점).
+    const referenceBodyId = focusBodyIdForAssert ?? freeFlyAnchorBodyId ?? null;
+    const referenceKind = referenceBodyId ? (bodiesById.get(referenceBodyId)?.kind ?? null) : null;
+    const nextTier = referenceKind
+      ? tierFromFocus(referenceKind, cameraFromFocusMeters)
       : tierFromCameraDistance(cameraFromSunMeters, activeTier);
     if (nextTier !== activeTier) {
       setTier(nextTier);
