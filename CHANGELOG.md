@@ -5,6 +5,12 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-06-18
+
+### Behavior Changes (#693 — free-fly 패닝 F3)
+
+- **[#693] free-fly 패닝 (F3) — 우클릭/Ctrl 드래그 target 평면 이동 + floating origin 정합 (MINOR)** ([#693](https://github.com/coseo12/astro-simulator/issues/693)) — free-fly 모드에서 우클릭(또는 Ctrl+좌클릭) 드래그로 카메라 target 을 화면 평면 방향으로 이동(패닝). **radius 비례 `panningSensibility`** (`PANNING_DELTA_PERCENTAGE = 0.01`, `REFERENCE / (radius × pct)`) 로 tier별 renderScale 비대칭(solar≈35 ↔ body≈158386)에서도 drag 1px ↔ world 이동 비율 일정 (#629 `wheelDeltaPercentage` 철학 패닝 적용) — `onBeforeRender` 가 줌 중 radius 변동을 따라 매 프레임 재산출. **floating origin 정합**: free-fly originOffset=[0,0,0] 불변식상 좌표 보정 0 (architect measurement-first 로 #629 "floating origin × panning 위험" 정적 기각 사유를 실측 기각, 코어 12라인). focus 중에는 `panningSensibility=0` (followObserver 가 target 덮어쓰므로 무의미 + jitter 회피). 우클릭 contextmenu 차단 (canvas 한정). ADR `20260616-693-freefly-panning.md` SSoT. 비-범위: 패닝 감도 설정 UI / 모바일 2-finger 팬.
+
 ### Behavior Changes (#699 — free-fly 카메라 통합 재설계)
 
 - **[#699] free-fly 카메라 통합 재설계 — 진입/줌/이동/시점 일관 모델 (MINOR)** ([#699](https://github.com/coseo12/astro-simulator/issues/699)) — free-fly 진입(시점 보존 단일 규칙) + 줌 % + WASD 이동(deltaTime 정규화) + 패닝 일관 모델. ADR `20260617-699-freefly-camera-unified-redesign.md` SSoT.
