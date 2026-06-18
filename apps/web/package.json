@@ -1,6 +1,6 @@
 {
   "name": "@astro-simulator/web",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -22,7 +22,8 @@
     "verify:631-freefly-tier": "node scripts/browser-verify-631-freefly-tier.mjs",
     "verify:675-glow-marker": "node scripts/browser-verify-glow-marker.mjs",
     "verify:693-freefly-panning": "node scripts/browser-verify-693-freefly-panning.mjs",
-    "verify:699-freefly-unified": "node scripts/browser-verify-699-freefly-unified.mjs"
+    "verify:699-freefly-unified": "node scripts/browser-verify-699-freefly-unified.mjs",
+    "verify:704-sensitivity": "node scripts/browser-verify-704-sensitivity.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",
