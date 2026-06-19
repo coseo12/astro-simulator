@@ -177,6 +177,16 @@ describe('#713 화면거리 fallback — 임계 내 최근접 1개', () => {
     expect(id).toBe('io');
   });
 
+  it('임계 px 정확 경계 (반경 = 12px) 는 inclusive — 선택 (strict > 비교)', () => {
+    // 비교가 distSq > thresholdSq (strict) 라 정확히 12px(distSq=144)는 포함(선택).
+    const io = mockMesh({ bodyId: 'io', world: worldForScreen(500, 500) });
+    const scene = mockScene({ pickResult: { hit: false }, meshes: [io] });
+    const id = resolvePickedBodyId(asScene(scene), asCamera(camera), 512, 500, {
+      isFocusable: allowAll,
+    });
+    expect(id).toBe('io');
+  });
+
   it('임계 px 경계 바깥 (반경 > 12px) 은 no-op (빈 우주)', () => {
     const io = mockMesh({ bodyId: 'io', world: worldForScreen(500, 500) });
     const scene = mockScene({ pickResult: { hit: false }, meshes: [io] });

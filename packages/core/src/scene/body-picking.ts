@@ -133,8 +133,11 @@ export function resolvePickedBodyId(
   let bestCamDist = Number.POSITIVE_INFINITY;
   const camPos = camera.globalPosition;
 
-  // 활성 high variant (meshes.get(id)) 만 순회하면 충분 — mid/low 는 parent=high 라 동일 위치.
-  // metadata.bodyId 존재 + allowlist 통과 mesh 만 후보 (조기 필터로 Project 연산 절감).
+  // scene.meshes 전체를 (isVisible && isEnabled) 활성 필터로 순회 — 정착 상태에서 body 당 활성
+  // variant 1개(high 또는 전환된 mid/low)만 isVisible=true 라 정확히 1회 후보. LOD fade 전환 중
+  // (~200ms, from/to 둘 다 isVisible) 동일 body 의 두 variant 가 잡힐 수 있으나 같은 bodyId·동일
+  // world 위치라 선택 결과 동일(무해, 잉여 Project 1회). metadata.bodyId 존재 + allowlist 통과
+  // mesh 만 후보 — isFocusable 조기 필터를 Project 이전 적용해 행렬 연산 절감 (cross-validate 보강 6).
   for (const mesh of scene.meshes) {
     if (!mesh.isVisible || !mesh.isEnabled()) continue;
     const id = readBodyId(mesh);
