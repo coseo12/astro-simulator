@@ -71,11 +71,19 @@ const REGRESSION_MARGIN = 0.3; // baseline 대비 30% 저하 허용 (rAF noise �
 //   LOD_SETTLE_TIMEOUT_MS: tier-c 일 때 측정 직전 override='low' 정착 대기 상한.
 //     race fix (#677) 가 정상 작동하면 즉시 충족. 미충족 (영구 'auto' 잔존) 이면 timeout 후
 //     auto LOD (sun high + mid sphere) 상태로 측정 → FAIL 표면화 (회귀 은폐 아님).
-//   MEASURE_MAX_ATTEMPTS: 1차 측정이 절대/회귀 임계 미달이면 1회만 재측정.
-//     transient (runner 이웃 부하 — 가설 2) 흡수용. 단 두 측정값을 모두 로깅하고
-//     판정은 best (max) 사용 → 진짜 회귀는 두 번 다 fail 하므로 은폐 불가 (volt #32).
+//   MEASURE_MAX_ATTEMPTS: 1차 측정이 절대/회귀 임계 미달이면 best-of-N 재측정.
+//     transient (runner 이웃 부하 — 가설 2) 흡수용. 단 측정값을 모두 로깅하고
+//     판정은 best (max) 사용 → 진짜 회귀는 매번 fail 하므로 은폐 불가 (volt #32).
+//
+// #709 measurement-first 결론 (docs/benchmarks/fps-variance-diagnosis-20260619.json):
+//   정상 run 의 scenario-내 variance 는 극히 작다 (cv 0~3.8%, p50 전부 60.1, 유일 outlier 는
+//   desktop default 첫 1~2 샘플 = 워밍업). 즉 flake 는 scenario-내 noise 가 아니라 "runner
+//   전체가 일시 느려지는 전역 부하 spike" (불운한 run 은 전 scenario 동반 40대 하락 — v0.30.0).
+//   ⇒ best-of-N (같은 run 내 재측정) 은 부하 spike 를 흡수하지 못한다 (윈도우 전체 동반 하락).
+//   2→3 은 워밍업/짧은 transient 흡수용 보조일 뿐이며, 부하 spike 의 주 방어는 워크플로
+//   레벨 1회 자동 재시도 (fps-baseline-guard.yml, 시간차/새 시도로 spike 회피 + 메일 차단).
 const LOD_SETTLE_TIMEOUT_MS = 8_000;
-const MEASURE_MAX_ATTEMPTS = 2;
+const MEASURE_MAX_ATTEMPTS = 3;
 
 const VIEWPORTS = [
   { id: 'desktop', width: 1280, height: 720 },
