@@ -1,6 +1,6 @@
 # ADR: canvas 클릭/터치로 body 선택 (raycast picking) — #713
 
-- **상태**: **Provisional** (cross-validate 발동 대상 — 신규 ADR. 메인이 cross-validate 결과 §교차검증 반영 사항 통합 후 Accepted 전이)
+- **상태**: **Accepted** (cross-validate 2026-06-20 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료)
 - **날짜**: 2026-06-20
 - **결정자**: architect (#713 설계)
 - **관련**:
@@ -76,6 +76,13 @@
 | 터치         | `onPointerObservable` 이 마우스/터치 통합 처리 (Babylon pointer 추상화) — 추가 코드 최소. 모바일 터치 = 범위 포함                                                                                                                                   |
 | 빈 우주 클릭 | pick miss + fallback miss → no-op (reset 아님, 콘솔 오류 0). `setSelectedBody(null)` 호출하지 않음                                                                                                                                                  |
 
+> **cross-validate 보강 (agy 2026-06-20)** — 결정 4 에 4개 가드 추가:
+>
+> - **멀티터치 가드**: 활성 포인터 = 1 일 때만 클릭 연산 개시 — 핀치줌/2-finger 회전 중 한 손가락 먼저 떼며 발생하는 `POINTERUP` 오선택 방지 (모바일 범위 직결).
+> - **click-through 가드**: pointer 이벤트가 canvas 직접 발생인지 확인 — UI 오버레이(shortcut bar/상태창/모달) 위 클릭/탭이 배경 천체로 전파돼 오선택되지 않게. `onPointerObservable` 은 canvas 바인딩이나 `pointer-events` 설정 차이 대비 명시 가드.
+> - **터치 jitter 임계 분리**: 터치는 탭에도 미세 좌표 이동 → `CLICK_DRAG_THRESHOLD_PX` 를 마우스/터치 분리 (터치 ~8–10px). 단순 탭이 드래그로 오판정돼 no-op 되는 것 방지.
+> - **좌표계**: `scene.pick` / `Vector3.Project` 는 **engine 내부 px** 기준 — `scene.pointerX/pointerY` 사용(또는 DPR 보정). 브라우저 CSS px 직접 전달 금지 (#623 `adaptToDeviceRatio:true` 정합).
+
 ### 결정 5 — `isRPhaseFocusable` 가드 재사용 위치
 
 - 최종 안전망은 `simulation-core.ts` `case 'focusOn'` 가 이미 `isRPhaseFocusable` 으로 비-allowlist 거부 → 클릭 경로도 동일 진입점이라 **자동 적용**.
@@ -129,13 +136,37 @@
 
 ---
 
-## §교차검증 반영 사항
+## §교차검증 반영 사항 (cross-validate 2026-06-20 agy outcome=applied)
 
-> (cross-validate 발동 대상 — 신규 ADR. 메인 오케스트레이터가 `cross-validate` 스킬 1회 호출 후 본 섹션을 합의 / 이견 수용 / 기각 / 고유 발견(후속 분리) / Claude 편향 셀프 체크 4+1 축으로 채우고 상태를 Accepted 로 전이한다.)
->
-> Claude 편향 셀프 체크 (4종) — architect 작성 시점 1차 판정:
->
-> - 낙관적 일정: 통과 (core 순수 헬퍼 + web wiring, 변경 0라인 예측은 보수적 — focusOn 진입점 재사용 검증됨)
-> - 결합 간과: **주의** — 화면거리 fallback 의 임계 px 와 glow marker 실 px 결합을 가설로 두지 않고 measurement-first 의무 박제 (결정 2). cross-validate 에 "fallback 임계가 marker 크기 변화(bodyScale/줌)에 따라 어떻게 변하는가" 명시 질문 권장.
-> - 폐기 프레이밍: 해당 없음 (신규 feature)
-> - 순수주의: 통과 (MVP 최전면 단일 선택 — cycle 후속 분리로 과설계 회피)
+agy 가 본 설계를 "코어 비즈니스 로직 변형 0 라인 + 화면거리 폴백으로 작은 marker 클릭 문제 극복 — 매우 뛰어나고 안정적인 아키텍처" 로 Accepted 지지. 6개 발견을 스프린트 범위(겹침 cycle 후속분리 / 모바일 터치 포함)와 대조해 분류:
+
+### 합의 (4)
+
+- **결정 1 (`mesh.metadata.bodyId`)** — 역Map 의 SSoT 이원화·dispose 누수 위험을 격리한 Babylon 표준 metadata 활용이 성능(O(1))·관리 양면 최선. Claude 설계와 일치.
+- **결정 2 (화면거리 fallback)** — collider 동적 생성/scale 확대 대비 클릭 시점에만 작동하는 화면 투영 폴백이 성능·복잡성 조율 최적. 일치.
+- **결정 5 (이중 방어)** — core 가드 + UI predicate 조기 필터로 warn 노이즈 제거가 안정적 UX. 일치.
+- **결정 3 (최전면 MVP)** — cycle 후속분리로 과설계 회피 + `scene.pick` 배열 깊이 확장 여지 보장. 일치.
+
+### 고유 발견 수용 — 범위 내 (본 PR 반영, 결정 4 보강 박제)
+
+모두 **모바일 터치 = 범위 포함**과 직결되어 현재 PR 에 반영 (위 결정 4 cross-validate 보강 블록):
+
+- **(1) click-through 가드** — UI 오버레이(shortcut bar/모달) 위 클릭이 배경 천체로 전파돼 오선택. DoD-4(빈 우주 no-op)와 직결되는 회귀 위험 → canvas 직접 이벤트 검증. **DoD-4 에 흡수.**
+- **(2) 멀티터치 가드** — 핀치줌/2-finger 회전 중 `POINTERUP` 오선택 → 활성 포인터=1 제약. **DoD-5(모바일) 보강.**
+- **(3) 터치 jitter 임계 분리** — 터치 탭 미세 이동이 드래그 오판정 → 마우스/터치 임계 분리(~8–10px). **결정 4 보강.**
+- **(4) DPI 좌표계** — `scene.pick`/`Project` 는 engine 내부 px → `scene.pointerX/Y` 사용. #623(`adaptToDeviceRatio:true`) 기존 정합. **구현 의무 박제.**
+
+### 구현 권고 (무해, 자명)
+
+- **(6) fallback 필터 순서** — 2차 폴백 진입 시 `isRPhaseFocusable` 통과 body 만 먼저 추린 뒤 `Vector3.Project` → 불필요 행렬 연산 절감. 27 body 라 영향 미미하나 무해 → developer 구현 시 자연 적용 권고.
+
+### 기각 / 후속 분리 (1) — 범위 밖
+
+- **(5) `opts.filter` 콜백** (궤도선/라벨 클릭 확장 대비) — 현재 **비-범위**(궤도선 클릭 = #624 candidate C). YAGNI — 지금 불필요한 추상화 추가는 과설계. 향후 궤도선/라벨 클릭 feature 진입 시 그 PR 에서 `resolvePickedBodyId` opts 확장 (§4 재검토 트리거 3 에 정합). 후속 이슈 별도 박제 불요 (#624 candidate C 가 이미 인계처).
+
+### Claude 편향 셀프 체크 (4종)
+
+- **낙관적 일정**: 통과 (core 순수 헬퍼 + web wiring, 변경 0라인 예측은 보수적 — focusOn 진입점 재사용 검증됨).
+- **결합 간과**: architect 1차 **주의** 식별(fallback 임계 px ↔ marker 실 px) → measurement-first 의무로 해소 (결정 2). agy 가 동일 결합에 추가 위험 미제기, 대신 **터치/멀티터치/click-through 결합**(모바일 입력 ↔ 픽킹)을 보강 발견 → 결정 4 흡수. 결합 사각 2종 모두 박제 완료.
+- **폐기 프레이밍**: 해당 없음 (신규 feature).
+- **순수주의**: 통과 (MVP 최전면 단일 선택 — cycle 후속 분리로 과설계 회피, agy 도 확장 여지 보장 확인).
