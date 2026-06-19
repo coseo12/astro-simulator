@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.31.0] — 2026-06-19
+
+### Behavior Changes (#709 — fps-baseline-guard flake 완화)
+
+- **[#709] fps-baseline-guard 전역 부하 spike flake 흡수 — 워크플로 1회 자동 재시도 (MINOR)** ([#709](https://github.com/coseo12/astro-simulator/issues/709)) — `fps-baseline-guard` 가 swiftshader runner 의 일시 부하로 가끔 1회 fail → `gh run rerun --failed` green 하던 flake 에서, GitHub 이 첫 실패에 "All jobs failed" 메일을 발송해 릴리스/PR 사이클마다 쌓이던 alert fatigue 를 완화. **measurement-first 진단**(`--diagnose-variance` 모드 신설, `gh workflow run --ref feature/X -f diagnose_variance=true` 로 CI swiftshader 12샘플/scenario 실측): 정상 run 의 scenario-내 variance 는 극히 작고(cv 0~3.8%, p50 전부 60.1, 유일 outlier=desktop default 워밍업 1~2 샘플), v0.30.0 fail 은 전 scenario 동반 40대 하락 = **"runner 전체가 일시 느려지는 전역 부하 spike"** (scenario-내 noise 아님). ⇒ best-of-N(같은 run 내 재측정)은 윈도우 전체 동반 하락이라 흡수 불가(v0.30.0 이 best-of-2 였는데도 40.2 fail). **fix**: `fps-baseline-guard.yml` FPS 검증 step 을 bash retry loop 로 — 1차 fail 시 15s 후 1회 자동 재측정, **2회 연속 fail 이어야 job fail** → 일시 spike 는 job 성공으로 끝나 메일 미발송. GitHub 메일은 job conclusion=`failure` 시에만 발송되므로 메일 노이즈 직접 차단. 진짜 회귀는 매 시도 fail 하므로 은폐 불가(3중 시뮬 negative 검증). 보조로 `verify-fps-baseline.mjs` `MEASURE_MAX_ATTEMPTS` 2→3(워밍업/짧은 transient 흡수). margin(30%)/baseline 무변경 → 회귀 검출 민감도 보존.
+
+### Notes
+
+- 진단 인프라 박제: `--diagnose-variance` 모드 + workflow_dispatch input(`diagnose_variance`/`variance_samples`)은 향후 fps variance 재측정 경로로 영구 보존(workflow_dispatch 전용, 일반 CI 무영향). 측정 데이터 SSoT: `docs/benchmarks/fps-variance-diagnosis-20260619.json`.
+- 본 릴리스는 CI 가드 동작 변경(에이전트 행동 무관)이며 런타임/사용자 UI 변경 없음.
+
 ## [0.30.0] — 2026-06-18
 
 ### Behavior Changes (#704 — free-fly 감도 설정 UI)
