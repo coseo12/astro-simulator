@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-06-20
+
+### Behavior Changes (#713 — canvas 클릭/터치 body 선택)
+
+- **[#713] canvas 클릭/터치로 body 선택 (raycast picking) — 위성 discoverability gap 해소 (MINOR)** ([#713](https://github.com/coseo12/astro-simulator/issues/713)) — 위성(galilean/titan/titania/triton 등)이 `showInShortcutBar=false`(#617)라 URL `?focus=io` 타이핑이 유일 선택 경로였던 **discoverability gap** 을, canvas 클릭/터치 picking 으로 해소. 이제 화면에서 body/위성을 직접 클릭(터치)해 focus 전환 가능. `#624` NO-OP ADR §4 인계 feature. **설계**: 기존 공통 진입점(`sendCommand({type:'focusOn', bodyId})` → `isRPhaseFocusable` 가드 → `bodySelected` emit → `setSelectedBody`)을 재사용 → store sync·카메라 전환·free-fly 해제 전부 자동. **Concrete Prediction 적중**: `simulation-core.ts`/`sim-store.ts`/`core-adapter` 변경 **0 라인** (`git diff --stat` 확인). 신규 `packages/core/src/scene/body-picking.ts` 순수 함수 `resolvePickedBodyId` = `scene.pick` predicate(활성 LOD variant + `mesh.metadata.bodyId` + allowlist) 1차 → occlusion 최전면 자동, miss 시 화면거리 fallback(`Vector3.Project` + `PICK_SCREEN_THRESHOLD_PX=12`) 2차로 작은 glow marker body 도 클릭 가능. **모바일 터치 포함** — cross-validate(agy) 가 보강한 입력 결합 가드 4종: click-through(UI 오버레이 위 클릭이 배경 천체 오선택 방지, `evt.target===canvas`) / 멀티터치(`activePointers.size===1` 일 때만, 핀치줌 중 오선택 방지) / 터치 jitter 임계 분리(마우스 5px / 터치 10px) / DPI 좌표계(`scene.pointerX/Y` engine px, #623 정합). ADR `20260620-713-click-body-select.md` (Accepted, cross-validate agy 통합). qa real Chrome GUI(WebGPU) DoD 7항 전부 PASS. 비-범위(후속): 겹침 cycle/multi-pick(반복 클릭 순환), 궤도선 클릭(#624 candidate C).
+
+### Notes
+
+- `PICK_SCREEN_THRESHOLD_PX=12` 는 measurement-first 실측값 — glow marker low quad 화면 px(parent 반경 3.18px = glow-marker 설계 4.5px × √2 일치) + 모바일 터치 조준 오차 여유. 변경 시 ADR Amendment + 테스트 SSoT 가드 동반.
+- 신규 picking 헬퍼는 core 순수 함수(단위 18 테스트), web(`sim-canvas.tsx`)은 pointer observable wiring + 기존 진입점 호출만 — 픽킹 로직 SSoT 분리.
+
 ## [0.31.0] — 2026-06-19
 
 ### Behavior Changes (#709 — fps-baseline-guard flake 완화)
