@@ -22,7 +22,17 @@ on:
       - '.github/**'
   # #663 — 수동 재실측 경로. workflow_dispatch 2단계 함정 (volt #45): dispatch 버튼은
   # 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 (v0.24.0 릴리스 이후 사용 가능).
+  # #709 — variance 진단 input. `--ref feature/X` 로 실행 시 ref 브랜치의 step 정의를 따름.
   workflow_dispatch:
+    inputs:
+      diagnose_variance:
+        description: 'variance 진단 모드 (판정 없이 N회 측정 후 분포 박제)'
+        type: boolean
+        default: false
+      variance_samples:
+        description: 'scenario 당 측정 샘플 수 (진단 모드)'
+        type: string
+        default: '10'
 
 jobs:
   fps-baseline-guard:
@@ -97,8 +107,42 @@ jobs:
           done
           echo "timeout"; exit 1
 
-      - name: FPS baseline 회귀 검증
-        run: BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs
+      # #709 — variance 진단 (workflow_dispatch 전용). 판정 없이 N회 측정 후 분포 박제.
+      - name: FPS variance 진단
+        if: github.event_name == 'workflow_dispatch' && inputs.diagnose_variance == true
+        run: BASE_URL=http://localhost:3001 VARIANCE_SAMPLES=${{ inputs.variance_samples }} node scripts/verify-fps-baseline.mjs --diagnose-variance
+
+      # #709 — 전역 부하 spike flake 흡수 (measurement-first 결론: best-of-N 으로는 흡수 불가,
+      #   docs/benchmarks/fps-variance-diagnosis-20260619.json). 1차 fail 시 1회 자동 재측정
+      #   (sleep 으로 시간차 → transient spike 회피). 2회 연속 fail 이어야 job fail → 일시 spike
+      #   는 메일 미발송 (alert fatigue 완화). 진짜 회귀는 매 시도 fail 하므로 은폐 불가.
+      - name: FPS baseline 회귀 검증 (1회 자동 재시도)
+        if: github.event_name != 'workflow_dispatch' || inputs.diagnose_variance != true
+        run: |
+          for attempt in 1 2; do
+            echo "::group::fps guard attempt $attempt/2"
+            if BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs; then
+              echo "::endgroup::"
+              echo "✓ fps guard passed (attempt $attempt)"
+              exit 0
+            fi
+            echo "::endgroup::"
+            if [[ $attempt -lt 2 ]]; then
+              echo "::warning::fps guard attempt $attempt 실패 — runner 부하 spike 가능, 15s 후 재측정"
+              sleep 15
+            fi
+          done
+          echo "::error::fps guard 2회 연속 실패 — 진짜 회귀 또는 지속 부하"
+          exit 1
+
+      # #709 — 진단 분포 보고서 업로드 (로그에도 출력되나 artifact 로 정밀 분석).
+      - name: variance 진단 보고서 업로드
+        if: github.event_name == 'workflow_dispatch' && inputs.diagnose_variance == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-variance-diagnosis
+          path: .verify-screenshots/fps-baseline/variance-diagnosis.json
+          retention-days: 7
 
       - name: dev server 정리
         if: always()
