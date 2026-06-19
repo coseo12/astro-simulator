@@ -34,6 +34,7 @@
     "verify:mobile-p7d": "node scripts/browser-verify-mobile-p7d.mjs",
     "verify:webgpu": "node scripts/browser-verify-webgpu.mjs",
     "verify:belt-nbody": "node scripts/browser-verify-belt-nbody.mjs",
+    "verify:713-click-select": "node scripts/browser-verify-click-select.mjs",
     "verify:lod": "node apps/web/scripts/browser-verify-lod.mjs",
     "verify:379-lod": "node apps/web/scripts/browser-verify-379-lod.mjs",
     "verify:391-billboard": "node apps/web/scripts/browser-verify-391-billboard.mjs",

@@ -72,6 +72,14 @@ export type {
   BlackHoleRenderingHandles,
   BlackHoleRenderingOptions,
 } from './black-hole-rendering.js';
+// #713 — canvas 클릭/터치 → body 선택 (raycast picking) 순수 헬퍼.
+export {
+  resolvePickedBodyId,
+  PICK_SCREEN_THRESHOLD_PX,
+  CLICK_DRAG_THRESHOLD_PX,
+  CLICK_DRAG_THRESHOLD_PX_TOUCH,
+} from './body-picking.js';
+export type { ResolvePickOptions } from './body-picking.js';
 
 // #402 — R-Phase Body Focus Allowlist SSoT 노출 경로.
 //
