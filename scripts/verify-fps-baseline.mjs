@@ -49,6 +49,19 @@ mkdirSync(reportDir, { recursive: true });
 
 const UPDATE_BASELINE = process.argv.includes('--update-baseline');
 
+// #709 — variance 진단 모드. 판정 없이 각 scenario 를 N회 연속 측정 → min/max/mean/std/cv 박제.
+//   swiftshader runner 의 fps variance 분포를 정량화해 best-of-N 의 N / margin 결정 근거로 삼는다.
+//   measurement-first (CLAUDE.md §스프린트 계약 10) — flake 임계 조정 전 분포부터 실측.
+const DIAGNOSE_VARIANCE = process.argv.includes('--diagnose-variance');
+const VARIANCE_SAMPLES = (() => {
+  const arg = process.argv.find((a) => a.startsWith('--variance-samples='));
+  const fromArg = arg ? Number.parseInt(arg.split('=')[1], 10) : Number.NaN;
+  const fromEnv = Number.parseInt(process.env.VARIANCE_SAMPLES ?? '', 10);
+  if (Number.isFinite(fromArg)) return fromArg;
+  if (Number.isFinite(fromEnv)) return fromEnv;
+  return 10;
+})();
+
 const CPU_THROTTLING_RATE = 4; // 4x slowdown — 저사양 기기 모의
 const MEASURE_DURATION_MS = 5_000; // noise 완화 위해 3초 → 5초 확장
 const MIN_FPS_ABSOLUTE = 30;
@@ -132,7 +145,11 @@ async function waitForLodSettle(page) {
   return captureLodDiag(page);
 }
 
-async function measureScenario(page, scenario) {
+/**
+ * focus 셋업 + LOD 정착 대기 — measureScenario / variance 진단 (#709) 공용.
+ *   반환: 측정 시점 LOD 진단 (tier/override/lodCounts).
+ */
+async function setupScenario(page, scenario) {
   if (scenario.focusTestId) {
     const sel = `[data-testid="${scenario.focusTestId}"]`;
     const count = await page.locator(sel).count();
@@ -149,7 +166,11 @@ async function measureScenario(page, scenario) {
   }
 
   // #680 — tier-c 면 override='low' 정착 대기 (race 제3 윈도우 처치) + 측정 시점 LOD 진단.
-  const diag = await waitForLodSettle(page);
+  return waitForLodSettle(page);
+}
+
+async function measureScenario(page, scenario) {
+  const diag = await setupScenario(page, scenario);
 
   // #680 — 1차 측정이 임계 미달이면 1회 재측정 (transient 흡수). best (max) 채택.
   //   진짜 회귀는 두 번 다 fail → 은폐 불가. 두 값 모두 attempts 에 로깅.
@@ -223,6 +244,23 @@ function compareBaseline(current, baseline) {
   return failures;
 }
 
+// #709 — variance 진단 통계. cv (변동계수 = std/mean %) 가 best-of-N / margin 결정의 핵심 지표.
+function fpsStats(arr) {
+  const n = arr.length;
+  const mean = arr.reduce((a, b) => a + b, 0) / n;
+  const variance = arr.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  const sorted = [...arr].sort((a, b) => a - b);
+  return {
+    min: Math.min(...arr),
+    max: Math.max(...arr),
+    mean: +mean.toFixed(2),
+    std: +std.toFixed(2),
+    cv: +((std / mean) * 100).toFixed(1), // 변동계수 (%)
+    p50: sorted[Math.floor(n / 2)],
+  };
+}
+
 // ===== main =====
 // #680 — 재측정 판정에 baseline 이 필요하므로 측정 전 로드 (update 모드는 baseline 부재 허용).
 if (existsSync(baselinePath)) {
@@ -238,6 +276,47 @@ const client = await context.newCDPSession(page);
 
 // CPU throttling 적용
 await client.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLING_RATE });
+
+// #709 — variance 진단 모드: 판정 없이 각 scenario N회 연속 측정 → 분포 통계 박제 후 종료.
+if (DIAGNOSE_VARIANCE) {
+  console.log(
+    `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x`,
+  );
+  const report = {
+    measuredAt: new Date().toISOString().slice(0, 10),
+    samples: VARIANCE_SAMPLES,
+    viewports: {},
+  };
+  for (const vp of VIEWPORTS) {
+    currentViewportId = vp.id;
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    try {
+      await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
+    } catch {}
+    report.viewports[vp.id] = {};
+    console.log(`\n[${vp.id}] ${vp.width}×${vp.height}`);
+    for (const sc of SCENARIOS) {
+      const diag = await setupScenario(page, sc);
+      const samples = [];
+      for (let i = 0; i < VARIANCE_SAMPLES; i += 1) {
+        samples.push(+(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1));
+      }
+      const s = fpsStats(samples);
+      report.viewports[vp.id][sc.id] = { samples, ...s, tier: diag.tier, override: diag.override };
+      console.log(
+        `  ${sc.label}: min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
+          `(tier=${diag.tier} override=${diag.override})\n    samples=[${samples.join(', ')}]`,
+      );
+    }
+  }
+  await browser.close();
+  const outPath = join(reportDir, 'variance-diagnosis.json');
+  writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
+  console.log(`\n✓ variance 진단 박제: ${outPath}`);
+  process.exit(0);
+}
 
 const viewportResults = {};
 const viewportDiagnostics = {};
