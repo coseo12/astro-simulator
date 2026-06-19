@@ -57,8 +57,9 @@ const VARIANCE_SAMPLES = (() => {
   const arg = process.argv.find((a) => a.startsWith('--variance-samples='));
   const fromArg = arg ? Number.parseInt(arg.split('=')[1], 10) : Number.NaN;
   const fromEnv = Number.parseInt(process.env.VARIANCE_SAMPLES ?? '', 10);
-  if (Number.isFinite(fromArg)) return fromArg;
-  if (Number.isFinite(fromEnv)) return fromEnv;
+  // 양수만 허용 — 0/음수는 빈 samples → fpsStats NaN/Infinity 방지 (reviewer 권고, PR #710).
+  if (Number.isFinite(fromArg) && fromArg > 0) return fromArg;
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
   return 10;
 })();
 
@@ -259,13 +260,16 @@ function fpsStats(arr) {
   const variance = arr.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
   const std = Math.sqrt(variance);
   const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(n / 2);
+  // median — 짝수 N 은 두 중앙값 평균 (reviewer 권고, PR #710).
+  const p50 = n % 2 === 0 ? +((sorted[mid - 1] + sorted[mid]) / 2).toFixed(1) : sorted[mid];
   return {
     min: Math.min(...arr),
     max: Math.max(...arr),
     mean: +mean.toFixed(2),
     std: +std.toFixed(2),
     cv: +((std / mean) * 100).toFixed(1), // 변동계수 (%)
-    p50: sorted[Math.floor(n / 2)],
+    p50,
   };
 }
 
