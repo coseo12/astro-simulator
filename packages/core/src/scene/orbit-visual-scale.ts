@@ -200,10 +200,53 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
   earth: EARTH_MOON_ORBIT_VISUAL_SCALE, // R4 #539 Amendment 2 — moon visual fusion 해결
   mars: MARS_SATELLITES_ORBIT_VISUAL_SCALE, // R5 #594 — phobos + deimos 단일 룩업 (binding constraint=phobos)
   jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io, 마진 1.69x)
-  saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형, 마진 1.75x)
+  saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형, 마진 1.75x). R11 #721 — saturn 위성은 per-body 룩업 우선 (아래 ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY). 본 parent 룩업은 fallback 안전망 (per-body 미정의 위성 보호)
   uranus: URANUS_SATELLITES_ORBIT_VISUAL_SCALE, // R8 #647 — titania 단일 룩업 (binding constraint=ring outer 2번째 인스턴스, 마진 1.65x — ×30 은 ring 미고려 함정값)
   neptune: NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE, // R9 #653 — triton 단일 룩업 (binding constraint=ring outer 3번째 인스턴스, 마진 1.65x — ×50 uranus 답습은 1.10x 함정값)
 });
+
+/**
+ * R11 #721 — body id 별 satellite orbit visual scale 룩업 (**per-body 첫 발동**).
+ *
+ * R5 §위험 #6 (2026-05-28) 에서 인터페이스 설계 인계 → R6 §재검토 트리거 #3 (2026-06-05) 발동 조건
+ * 정밀화 → **본 ADR (2026-06-20) 첫 실전 도입**. 1.5개월 인계 후 첫 발동.
+ *
+ * ## 발동 근본 원인 — a 편차 14.96배 (단일 룩업 한계)
+ *
+ * 토성계 4 위성 (titan 포함) 의 a 편차가 enceladus (최내곽 0.00159 AU) ↔ iapetus (최외곽 0.0238 AU)
+ * 로 14.96배 (R6 galilean 4.5배 / R5 phobos-deimos 2.5배 대비 3.5배 큼). 단일 saturn visual scale
+ * ×10 (titan 기준) 은 enceladus 를 ring 에 묻고 (마진 0.35x), enceladus binding 충족 위해 ×47 로
+ * 상향하면 iapetus 가 saturn mesh 의 55배로 과분리 (visual orbit 1.119 AU > 지구-태양 거리).
+ * **양극단이 단일 visual scale 로 양립 불가** → per-body 룩업으로 각 위성 binding 독립 충족.
+ *
+ * ## 박제값 (developer measurement-first 실측 2026-06-20, 산식 A margin ≥ 1.5 — 전부 PASS)
+ *
+ * binding = F ring outer mesh (140680 km × 48 = 6.7526e9 m, saturn mesh 2.8929e9 의 2.334배 — R7 유형):
+ *   - enceladus a=2.380e8 m, visual ×47 → margin 1.64x (binding, 최내곽. titania/triton 1.65x 정합)
+ *   - rhea      a=5.271e8 m, visual ×20 → margin 1.52x (×10 시 0.76x 묻힘 → ×20 분리)
+ *   - titan     a=1.222e9 m, visual ×10 → margin 1.74x (**R7 박제 보존 — 회귀 0**. 기존 사용자 인지 유지)
+ *   - iapetus   a=3.561e9 m, visual ×10 → margin 5.13x (최외곽. a 가 이미 커 ×10 으로 자동 안전, 과분리 회피)
+ *
+ * #622 NO-OP SSoT: 위 산식 A (설계 real-meter) 와 산식 B (runtime scene-unit) 직접 비교 금지.
+ *
+ * D-T2 미통과 시 fallback: enceladus ×47 → ×50 (마진 1.75x, ring 에서 더 분리, ADR §재검토 트리거 #2) /
+ *   rhea ×20 → ×22. iapetus 과분리 보고 시 ×10 → ×8 (단 binding 미달 위험, ADR §재검토 트리거 #3).
+ *
+ * ## 후속 라운드 인계
+ *
+ * saturn 추가 위성 (Dione/Tethys 등) / 천왕성·해왕성 다중 위성 진입 시 동일 per-body 룩업 답습.
+ * parent 단일 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT`) 은 **단일 위성 또는 a 편차 ≤ 5배** parent 에만 적용
+ * (titan 단독 R7 / galilean 4 편차 4.5배 R6). a 편차 > 5배 + 위성 N≥2 진입 시 per-body 전환.
+ *
+ * R11 ADR `20260620-721-saturn-moons-rhea-iapetus-enceladus.md` §축 2.
+ */
+export const ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY: Readonly<Record<string, number>> =
+  Object.freeze({
+    titan: 10, // R11 #721 — R7 박제 보존 (회귀 0, 마진 1.74x). per-body 명시로 saturn parent 룩업과 동시 존재 시 per-body 우선
+    enceladus: 47, // R11 #721 — binding (최내곽 a 0.00159 AU). ×10 시 0.35x 묻힘 → ×47 분리 (마진 1.64x, titania/triton 1.65x 정합)
+    rhea: 20, // R11 #721 — a 0.00352 AU (titan 의 0.43배). ×10 시 0.76x 묻힘 → ×20 분리 (마진 1.52x)
+    iapetus: 10, // R11 #721 — 최외곽 a 0.0238 AU (titan 의 2.9배). ×10 으로 자동 안전 (마진 5.13x). 단일 ×47 의 55배 과분리 회피 위해 최소값
+  });
 
 /**
  * 기본값 (parent 가 룩업에 없거나 visual scale 미적용 — 실측 그대로).
@@ -216,12 +259,30 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
 export const DEFAULT_ORBIT_VISUAL_SCALE = 1.0;
 
 /**
- * parent body id 에 해당하는 satellite orbit visual scale 조회.
+ * satellite orbit visual scale 조회 — 3계층 Graceful Degradation.
+ *
+ * R11 #721 (ADR §축 2, cross-validate agy 합의) — per-body 룩업을 optional 2번째 인자로 확장해
+ * 호출처 호환 유지. 우선순위:
+ *   1) per-body 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId]`) — saturn 위성 enceladus/rhea/titan/iapetus
+ *   2) parent 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT[parentId]`) — earth/mars/jupiter/uranus/neptune 위성 (기존 동작 보존)
+ *   3) `DEFAULT_ORBIT_VISUAL_SCALE` (1.0, 실측 그대로) — 미정의 parent
+ *
+ * `bodyId` 미전달 (또는 per-body 미정의) 호출처는 기존 parent fallback 으로 회귀 0.
  *
  * @param parentId satellite 의 parent body id (예: 'earth' → moon 의 parent)
+ * @param bodyId   satellite 자신의 body id (예: 'enceladus'). per-body 룩업 우선 적용. 미전달 시 parent 룩업
  * @returns visual scale 배수. 미정의 시 1.0 (실측 그대로).
  */
-export function getOrbitVisualScale(parentId: string | null | undefined): number {
+export function getOrbitVisualScale(
+  parentId: string | null | undefined,
+  bodyId?: string | null | undefined,
+): number {
+  // 1) per-body 룩업 우선 (saturn 위성 — enceladus 47 / rhea 20 / titan 10 / iapetus 10)
+  if (bodyId !== null && bodyId !== undefined) {
+    const perBody = ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId];
+    if (perBody !== undefined) return perBody;
+  }
+  // 2) parent 룩업 fallback (earth/mars/jupiter/uranus/neptune 위성 — 기존 동작 보존)
   if (parentId === null || parentId === undefined) return DEFAULT_ORBIT_VISUAL_SCALE;
   return ORBIT_VISUAL_SCALE_BY_PARENT[parentId] ?? DEFAULT_ORBIT_VISUAL_SCALE;
 }

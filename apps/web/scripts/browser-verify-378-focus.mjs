@@ -82,6 +82,9 @@ const flags = {
 // R10b #664 — 혜성 3 (halley/encke/swift-tuttle) 동기화 (CURRENT_R_PHASE=11 — 전 데이터 소진,
 // 로드맵 v3 최종 라운드). halley/swift-tuttle 은 역행 궤도 (i 162.26°/113.45° > 90°) 이나 focus
 // 진입/추적엔 무관 (R9 triton 선례 — 사실 정합). 고이심률 (e 0.848~0.967) 도 focus 비저촉.
+// R11 #721 — 토성계 위성 3 (enceladus/rhea/iapetus) 동기화 (CURRENT_R_PHASE=12 — 로드맵 v3 완주 후
+// 신규 콘텐츠 라운드). 순서는 solar-system.json 데이터 순서 (titan 다음, uranus 전) 정합 — filterBodiesByPhase
+// 가 데이터 순서로 반환하므로 #598 정적 매칭 가드 통과 위해 동일 순서 필수. showInShortcutBar=false (URL/클릭 진입).
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -98,6 +101,9 @@ const FOCUS_BODIES = [
   'callisto',
   'saturn',
   'titan',
+  'enceladus',
+  'rhea',
+  'iapetus',
   'uranus',
   'titania',
   'neptune',
