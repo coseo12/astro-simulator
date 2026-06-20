@@ -1821,6 +1821,9 @@ function createBodyMesh(
     mat.specularColor = new Color3(0.05, 0.05, 0.05);
   }
   mesh.material = mat;
+  // #713 — mesh → bodyId 역매핑 (high variant). ADR `20260620-713-click-body-select.md` §결정 1.
+  // pick 결과(pickedMesh)에서 O(1) 역변환. high/mid/low 전 variant 동일 id 박제 (단위 테스트 가드).
+  mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
   return mesh;
 }
 
@@ -1860,6 +1863,8 @@ function createBodyMeshMid(
   // alpha blend 허용 — 200ms cross-fade 에서 material.alpha 조작.
   mat.useAlphaFromDiffuseTexture = false;
   mesh.material = mat;
+  // #713 — mesh → bodyId 역매핑 (mid variant). high/low 와 동일 id (ADR §결정 1).
+  mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
   mesh.setEnabled(false); // 기본 숨김 — 첫 전환 시 enable.
   return mesh;
 }
@@ -2069,6 +2074,9 @@ function createBodyBillboard(
   mat.alphaCutOff = 0.5;
 
   mesh.material = mat;
+  // #713 — mesh → bodyId 역매핑 (low/billboard variant). high/mid 와 동일 id (ADR §결정 1).
+  // glow marker body 클릭 시 picked mesh 가 low variant 이므로 본 박제가 marker 선택의 핵심.
+  mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
   mesh.setEnabled(false); // 기본 숨김.
   return mesh;
 }

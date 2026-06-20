@@ -1,6 +1,13 @@
 'use client';
 
-import { SimulationCore, scene as sceneApi, gpu as gpuApi } from '@astro-simulator/core';
+import {
+  SimulationCore,
+  scene as sceneApi,
+  gpu as gpuApi,
+  isRPhaseFocusable,
+} from '@astro-simulator/core';
+// #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
+import { PointerEventTypes } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
 import type { CameraSyncSurface } from '@/core/sim-context';
 // P12-A #298 — Tier 엔진 유틸 (renderScaleForTier) 는 sceneApi 네임스페이스에 이미 re-export 되어 있다.
@@ -400,6 +407,77 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
+
+        // #713 — canvas 클릭/터치 → body 선택 (raycast picking).
+        // ADR `docs/decisions/20260620-713-click-body-select.md` §3 핵심 데이터 흐름.
+        //
+        // web 레이어 책임: POINTERDOWN/UP observable 등록 + 드래그/멀티터치/click-through 가드.
+        // "engine px → bodyId 역변환" 은 core 순수 헬퍼 resolvePickedBodyId 에 위임 (단위 테스트 가능).
+        // 선택은 기존 진입점 instance.command({type:'focusOn'}) 재사용 — isRPhaseFocusable 가드 +
+        // bodySelected emit → core-adapter setSelectedBody → syncFocusToScene (카메라/tier/free-fly
+        // 해제) 전부 자동. 따라서 simulation-core / sim-store / core-adapter 변경 0 라인 (Concrete Prediction).
+        const pointerScene = instance.scene;
+        if (pointerScene) {
+          // pointerdown 좌표 + pointerId 기록 (드래그 판정 기준). engine px (scene.pointerX/Y) 사용 —
+          // #623 adaptToDeviceRatio:true 정합 (CSS px 금지). cross-validate 보강 (4).
+          let downX = 0;
+          let downY = 0;
+          let downPointerId: number | null = null;
+          // 멀티터치 가드 — 활성 포인터 집합. size===1 일 때만 클릭 연산 (핀치줌/2-finger 회전 중
+          // 한 손가락 먼저 떼며 발생하는 POINTERUP 오선택 방지). cross-validate 보강 (1).
+          const activePointers = new Set<number>();
+
+          // click-through 가드 — pointer 이벤트가 canvas 직접 발생인지 (UI 오버레이 위 클릭이 배경
+          // 천체로 전파돼 오선택되지 않게). Babylon onPointerObservable 의 event.target 이 canvas 인지 확인.
+          // cross-validate 보강 (2) — DoD-4 (UI 오버레이 위 클릭 no-op) 직결.
+          const isCanvasEvent = (evt: { target?: EventTarget | null } | undefined): boolean => {
+            const canvasEl = pointerScene.getEngine().getRenderingCanvas();
+            return !evt?.target || evt.target === canvasEl;
+          };
+
+          instance.scene.onPointerObservable.add((pointerInfo) => {
+            const evt = pointerInfo.event as PointerEvent;
+            const pointerId = typeof evt?.pointerId === 'number' ? evt.pointerId : 0;
+            // 터치/마우스 구분 — 드래그 임계 분리 (터치 jitter). cross-validate 보강 (3).
+            const isTouch = evt?.pointerType === 'touch';
+            const dragThreshold = isTouch
+              ? sceneApi.CLICK_DRAG_THRESHOLD_PX_TOUCH
+              : sceneApi.CLICK_DRAG_THRESHOLD_PX;
+
+            if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+              activePointers.add(pointerId);
+              downPointerId = pointerId;
+              downX = pointerScene.pointerX;
+              downY = pointerScene.pointerY;
+              return;
+            }
+
+            if (pointerInfo.type === PointerEventTypes.POINTERUP) {
+              const wasSinglePointer = activePointers.size === 1;
+              activePointers.delete(pointerId);
+
+              // 멀티터치 / 다른 pointer up / canvas 외부 이벤트 → no-op (콘솔 오류 0).
+              if (!wasSinglePointer || pointerId !== downPointerId) return;
+              if (!isCanvasEvent(evt)) return;
+
+              const upX = pointerScene.pointerX;
+              const upY = pointerScene.pointerY;
+              const moved = Math.hypot(upX - downX, upY - downY);
+              // 드래그 (카메라 회전/패닝) → no-op.
+              if (moved > dragThreshold) return;
+
+              const activeCam = pointerScene.activeCamera;
+              if (!activeCam) return;
+              const bodyId = sceneApi.resolvePickedBodyId(pointerScene, activeCam, upX, upY, {
+                isFocusable: isRPhaseFocusable,
+              });
+              // 빈 우주 / 비-allowlist → no-op (setSelectedBody(null) 호출 금지 — reset 아님).
+              if (!bodyId) return;
+              // 기존 진입점 재사용 — isRPhaseFocusable 가드(이중 방어) + store sync 자동.
+              instance.command({ type: 'focusOn', bodyId });
+            }
+          });
+        }
 
         // P11-B #289 — `setLodOverride` command → scene 에 전달. URL `?lod=` 초기 1회 호출 경로.
         // UrlSync 가 mount 시 `sendCommand({ type: 'setLodOverride', level })` 호출 → 여기로 라우팅.
