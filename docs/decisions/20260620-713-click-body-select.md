@@ -130,7 +130,7 @@
 - **성공 기준**: §정제 DoD 7항 전부 PASS. 특히 DoD-2(위성 클릭) 로 discoverability gap 해소 — URL-only 였던 galilean/위성을 클릭으로 진입 가능.
 - **재검토 트리거**:
   1. 화면거리 fallback 의 임계 px 가 dwarf/comet marker 실 px 와 mismatch → 작은 body 클릭 실패 시 임계 재측정·재조정 (measurement-first, ADR Amendment).
-  2. occlusion cycle 요구 부상 → 후속 이슈(반복 클릭 순환) 진입 시 본 ADR `scene.pick` 결과의 N-depth 확장으로 superset 설계.
+  2. occlusion cycle 요구 부상 → 후속 이슈(반복 클릭 순환) 진입 시 본 ADR `scene.pick` 결과의 N-depth 확장으로 superset 설계. **→ [#719](https://github.com/coseo12/astro-simulator/issues/719) 로 분리·진입 (ADR [`20260620-719-overlap-cycle.md`](20260620-719-overlap-cycle.md), `scene.multiPick` 깊이순 확장 superset).**
   3. predicate 가 신규 mesh 유형(ring arcs / 향후 라벨 mesh)을 잘못 pick → predicate allowlist 명시 확장.
 - **Concrete Prediction** (data-not-code 정합): 본 feature 는 web 레이어 pointer wiring + core 순수 picking 헬퍼만 추가 — 기존 `focusOn`/store/카메라 sync 코드 **변경 0 라인** 예측. 구현 후 `git diff --stat` 으로 simulation-core.ts / sim-store.ts / core-adapter 변경 0 재현.
 

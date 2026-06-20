@@ -73,11 +73,14 @@ export type {
   BlackHoleRenderingOptions,
 } from './black-hole-rendering.js';
 // #713 — canvas 클릭/터치 → body 선택 (raycast picking) 순수 헬퍼.
+// #719 — resolvePickedBodyIds (복수형, ray 깊이순 dedup) + PICK_CYCLE_SAME_POS_PX (cycle 임계).
 export {
   resolvePickedBodyId,
+  resolvePickedBodyIds,
   PICK_SCREEN_THRESHOLD_PX,
   CLICK_DRAG_THRESHOLD_PX,
   CLICK_DRAG_THRESHOLD_PX_TOUCH,
+  PICK_CYCLE_SAME_POS_PX,
 } from './body-picking.js';
 export type { ResolvePickOptions } from './body-picking.js';
 

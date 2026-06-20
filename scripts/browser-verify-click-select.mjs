@@ -4,12 +4,15 @@
  *
  * ADR `docs/decisions/20260620-713-click-body-select.md` §결정 6 회귀 가드 (browser-verify).
  *
- * 5 케이스 (정제 DoD 1~5):
+ * 5 케이스 (#713 정제 DoD 1~5):
  *   (i)   큰 body(earth) 클릭 → selectedBodyId 갱신
  *   (ii)  위성(io) 클릭 → focus (discoverability gap 해소)
  *   (iii) glow marker body(ceres) 클릭 → focus (picking 영역 ≥ 마커 px)
  *   (iv)  빈 우주 클릭 → selectedBodyId 불변 + 콘솔 오류 0 (no-op)
  *   (v)   free-fly 진입 후 body 클릭 → freeFlyMode false 전환
+ *
+ * + #719 겹침 cycle 6 케이스 (vi~x) — ADR `20260620-719-overlap-cycle.md` §결정 7:
+ *   io 를 jupiter 앞 강제배치 후 같은 위치 반복 클릭 → ray 뒤 body 순환/wrap/리셋 + 연타 충돌.
  *
  * 실 클릭은 page.mouse.click 으로 dispatch — sim-canvas 의 onPointerObservable 경로를 그대로 탄다
  * (headless WebGPU 한계로 시각 freeze 가능하나 store 상태 전이는 검증 가능. 실 GUI 검증은 qa).
@@ -218,10 +221,130 @@ if (fv.ok) {
 }
 await page.screenshot({ path: join(shotDir, '5-freefly-click.png') });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// #719 — 겹침 cycle (같은 위치 반복 클릭 → ray 뒤 body 순환).
+// ADR `docs/decisions/20260620-719-overlap-cycle.md` §결정 7 회귀 가드 (browser-verify).
+//
+// galilean 자연 겹침은 ray pick 상 매우 희소하다 (measurement-first 실측: io radius≈0.4 scene
+// unit 로 작아 jupiter 뒤 정확 일직선 정렬이 드뭄). 또한 매 클릭이 focusOn 을 호출해 카메라가
+// 선택 body 로 이동하므로(위성 focus 시 body tier 진입 = 극단 줌인), 겹침 구성이 클릭마다 깨진다.
+// 따라서 결정론적 cycle 검증을 위해 **매 클릭 직전** jupiter focus 로 카메라를 복원 + io 활성
+// variant 를 jupiter 앞(카메라 방향)에 재배치 + 시간 정지(timeScale=0) 한다. 이렇게 동일 겹침
+// 구성을 복원하면 web 클로저의 cycle 앵커(lastSelectedBodyId)가 살아 있어(setup 의 focusOn 은
+// 클릭 핸들러를 거치지 않아 앵커 불변) 같은 화면 위치 클릭이 cycle 을 진행시킨다.
+//
+// 6 케이스 (DoD 1~5 + agy ② 더블클릭 충돌):
+//   (vi)   겹침 위치 1번째 클릭 → 최전면(io) 선택
+//   (vii)  같은 위치 2번째 클릭 → 다음(뒤) body(jupiter) 순환 (DoD-1)
+//   (viii) 같은 위치 3번째 클릭 → wrap (jupiter→io, len=2) (DoD-2)
+//   (ix)   다른 위치 클릭 → cycle 리셋 + 최전면 (DoD-3)
+//   (x)    agy ② — 겹침 위치 빠른 연타(더블클릭) 가 ArcRotateCamera 줌에 가로채이지 않고 cycle 동작
+console.log('\n[#719] 겹침 cycle — 매 클릭 전 io 를 jupiter 앞 재배치 후 같은 위치 반복 클릭');
+
+/**
+ * jupiter focus 로 카메라 복원 + io 활성 variant 를 jupiter 앞에 재배치 + 시간 정지.
+ * 클릭으로 카메라가 이동해 깨진 겹침 구성을 복원한다. jupiter 화면 중심 CSS 좌표 반환.
+ * (focusOn 은 selectedBodyId 를 jupiter 로 set 하지만 web 클로저 cycle 앵커는 클릭 핸들러만
+ *  갱신하므로 불변 — 같은 위치 클릭 시 직전 선택 앵커 기준 다음 body 로 순환.)
+ */
+const restoreOverlap = async () => {
+  await page.evaluate(() => window.__simCore?.command?.({ type: 'focusOn', bodyId: 'jupiter' }));
+  await page.waitForTimeout(1300);
+  return page.evaluate(() => {
+    const scene = window.__simCore?.scene;
+    const solar = window.__solarScene;
+    if (!scene || !solar) return null;
+    const cam = scene.activeCamera;
+    const eng = scene.getEngine();
+    const W = eng.getRenderWidth();
+    const H = eng.getRenderHeight();
+    const Vector3 = cam.position.constructor;
+    const vp = scene.getTransformMatrix();
+    const identity = vp.constructor.Identity();
+    window.__simCore?.command?.({ type: 'setTimeScale', scale: 0 });
+    const jm = solar.meshes.get('jupiter');
+    const iom = solar.meshes.get('io');
+    if (!jm || !iom) return null;
+    const jw = jm.getAbsolutePosition();
+    const camPos = cam.globalPosition || cam.position;
+    const dir = camPos.subtract(jw).normalize();
+    const rW = jm.getBoundingInfo().boundingSphere.radiusWorld;
+    iom.position.copyFrom(jw.add(dir.scale(rW * 0.4)));
+    iom.computeWorldMatrix(true);
+    for (const c of iom.getChildMeshes()) c.computeWorldMatrix(true);
+    const jp = Vector3.Project(jw, identity, vp, { x: 0, y: 0, width: W, height: H });
+    const rect = eng.getRenderingCanvas().getBoundingClientRect();
+    return {
+      cssX: rect.left + (jp.x / W) * rect.width,
+      cssY: rect.top + (jp.y / H) * rect.height,
+    };
+  });
+};
+
+const first = await restoreOverlap();
+if (!first) {
+  check('(#719) 겹침 setup', false, 'scene/solar 미노출');
+} else {
+  // 매 클릭 직전 겹침 복원 → 같은 위치 클릭 → 선택 결과 반환. 동일 CSS 좌표 사용(같은 위치 판정).
+  const cycleClick = async () => {
+    const o = await restoreOverlap();
+    await page.mouse.click(o.cssX, o.cssY);
+    await page.waitForTimeout(700);
+    return { sel: (await getState()).selectedBodyId, cssX: o.cssX, cssY: o.cssY };
+  };
+
+  // (vi) 1번째 클릭 → 최전면 io (직전 앵커 없음 → cands[0]).
+  const r1 = await cycleClick();
+  check('(vi) 겹침 위치 1클릭 → 최전면 io', r1.sel === 'io', `got ${r1.sel}`);
+
+  // (vii) 2번째 클릭 (같은 위치) → 직전 io 앵커 → 다음 jupiter (DoD-1).
+  const r2 = await cycleClick();
+  check('(vii) 같은 위치 2클릭 → 뒤 body jupiter (cycle)', r2.sel === 'jupiter', `got ${r2.sel}`);
+
+  // (viii) 3번째 클릭 → 직전 jupiter 앵커 → wrap (jupiter→io, len=2) (DoD-2).
+  const r3 = await cycleClick();
+  check('(viii) 같은 위치 3클릭 → wrap 첫 body io', r3.sel === 'io', `got ${r3.sel}`);
+
+  await page.screenshot({ path: join(shotDir, '6-cycle.png') });
+
+  // (ix) 다른 위치 클릭 → cycle 리셋 + 최전면. 겹침 복원 후, 직전 클릭 좌표에서 PICK_CYCLE_SAME_POS_PX
+  // (14px) 초과 떨어진 jupiter disk 다른 지점(io 겹침 없는 쪽)을 클릭 → reset → 최전면 jupiter.
+  const oFar = await restoreOverlap();
+  const farCssX = oFar.cssX + 60; // 60 CSS px ≫ 14 engine px → 다른 위치
+  await page.mouse.click(farCssX, oFar.cssY);
+  await page.waitForTimeout(700);
+  const s4 = (await getState()).selectedBodyId;
+  // 다른 위치는 io 겹침 없음 → jupiter 단일 (reset 후 최전면). cycle 리셋 핵심 = io 로 순환 안 됨.
+  check(
+    '(ix) 다른 위치 클릭 → cycle 리셋(최전면 jupiter, io 순환 안 함)',
+    s4 === 'jupiter',
+    `got ${s4}`,
+  );
+
+  // (x) agy ② — 겹침 위치 빠른 연타가 ArcRotateCamera 더블클릭/줌에 가로채이지 않고 cycle 동작.
+  // 1클릭으로 io 정착(앵커 io) → 겹침 복원 → 빠른 추가 클릭. 정상이면 io→jupiter 전이.
+  const errsBeforeDbl = errs.length;
+  const rA = await cycleClick(); // io 정착
+  const oDbl = await restoreOverlap();
+  await page.mouse.click(oDbl.cssX, oDbl.cssY); // 빠른 추가 클릭 (연타)
+  await page.waitForTimeout(700);
+  const afterDbl = (await getState()).selectedBodyId;
+  check(
+    '(x) 겹침 위치 연타 → cycle 전이 (더블클릭 줌 미간섭)',
+    rA.sel === 'io' && afterDbl === 'jupiter',
+    `${rA.sel}→${afterDbl}`,
+  );
+  check(
+    '(x) 연타 중 콘솔 오류 0',
+    errs.length === errsBeforeDbl,
+    errs.slice(errsBeforeDbl).join(' | '),
+  );
+}
+
 await browser.close();
 
 const passed = out.filter((o) => o.p).length;
-console.log(`\n=== #713 click-select: ${passed}/${out.length} PASS ===`);
+console.log(`\n=== #713/#719 click-select+cycle: ${passed}/${out.length} PASS ===`);
 if (passed !== out.length) {
   console.log(
     'FAIL 케이스:',

@@ -427,6 +427,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // 한 손가락 먼저 떼며 발생하는 POINTERUP 오선택 방지). cross-validate 보강 (1).
           const activePointers = new Set<number>();
 
+          // #719 — 겹침 cycle 상태 (web 클로저 로컬, core stateless 유지 — ADR §결정 2).
+          //   lastClickX/Y      : 직전 클릭 engine px 좌표 ("같은 위치" 판정 기준).
+          //   lastSelectedBodyId: 직전 선택 bodyId (cycle 다음 앵커 — ADR §결정 4 직전 id +1 wrap).
+          // downX/activePointers 가 이미 사는 클로저와 동형. instance.start().then() 내부 1회 등록이라
+          // 세션 동안 생존 (agy ① — #713 activePointers 클로저 패턴 답습, useRef 전환 불요).
+          let lastClickX: number | null = null;
+          let lastClickY: number | null = null;
+          let lastSelectedBodyId: string | null = null;
+
           // click-through 가드 — pointer 이벤트가 canvas 직접 발생인지 (UI 오버레이 위 클릭이 배경
           // 천체로 전파돼 오선택되지 않게). Babylon onPointerObservable 의 event.target 이 canvas 인지 확인.
           // cross-validate 보강 (2) — DoD-4 (UI 오버레이 위 클릭 no-op) 직결.
@@ -468,9 +477,51 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
               const activeCam = pointerScene.activeCamera;
               if (!activeCam) return;
-              const bodyId = sceneApi.resolvePickedBodyId(pointerScene, activeCam, upX, upY, {
+
+              // #719 — 겹침 cycle (ADR §3 핵심 데이터 흐름).
+              //   1. ray hit 후보 리스트(깊이순 dedup)를 multiPick 으로 얻는다.
+              //   2. hit ≥ 1: 직전 클릭과 같은 위치(≤ PICK_CYCLE_SAME_POS_PX)면 직전 선택 bodyId 를
+              //      앵커로 다음(뒤) body 로 wrap, 다른 위치면 최전면(cands[0]) 으로 리셋.
+              //   3. hit 0: 화면거리 fallback 단일 선택(resolvePickedBodyId 2차 경로) — cycle 없음.
+              //      (작은 marker 겹침 cycle 은 비-범위 — ADR §결정 5.)
+              const cands = sceneApi.resolvePickedBodyIds(pointerScene, activeCam, upX, upY, {
                 isFocusable: isRPhaseFocusable,
               });
+
+              let bodyId: string | null;
+              if (cands.length >= 1) {
+                // 같은 위치 판정 — 직전 클릭 좌표와 engine px 거리 ≤ 임계 (ADR §결정 3).
+                const samePos =
+                  lastClickX !== null &&
+                  lastClickY !== null &&
+                  Math.hypot(upX - lastClickX, upY - lastClickY) <= sceneApi.PICK_CYCLE_SAME_POS_PX;
+                // 같은 위치 + 직전 id 가 현재 후보에 있으면 다음(뒤)으로 wrap, 아니면 최전면 (ADR §결정 4).
+                // 겹침 없음(len 1)이면 (idx+1)%1=0 으로 같은 body 유지 → #713 단일 클릭 동작 동일.
+                if (samePos && lastSelectedBodyId !== null) {
+                  const idx = cands.indexOf(lastSelectedBodyId);
+                  // 인덱스 접근은 항상 유효 범위(idx∈[0,len), wrap %len) — noUncheckedIndexedAccess
+                  // 대비 ?? null 좁힘 (실제 undefined 불가, len≥1 보장).
+                  bodyId =
+                    idx !== -1 ? (cands[(idx + 1) % cands.length] ?? null) : (cands[0] ?? null);
+                } else {
+                  bodyId = cands[0] ?? null;
+                }
+                // cycle 상태 갱신 — 다음 클릭의 같은 위치 판정 + 앵커 기준.
+                lastClickX = upX;
+                lastClickY = upY;
+                lastSelectedBodyId = bodyId;
+              } else {
+                // ray hit 0 → 화면거리 fallback 단일 (marker 직격 miss 흡수). cycle 후보 아님 —
+                // fallback bodyId 는 lastSelectedBodyId 앵커에서 제외해 marker 연타 순환 방지 (ADR §결정 5).
+                bodyId = sceneApi.resolvePickedBodyId(pointerScene, activeCam, upX, upY, {
+                  isFocusable: isRPhaseFocusable,
+                });
+                // fallback 선택 시 cycle 앵커 리셋 (다음 ray hit 클릭이 최전면부터 시작).
+                lastClickX = upX;
+                lastClickY = upY;
+                lastSelectedBodyId = null;
+              }
+
               // 빈 우주 / 비-allowlist → no-op (setSelectedBody(null) 호출 금지 — reset 아님).
               if (!bodyId) return;
               // 기존 진입점 재사용 — isRPhaseFocusable 가드(이중 방어) + store sync 자동.

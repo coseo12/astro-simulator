@@ -63,6 +63,31 @@ export const CLICK_DRAG_THRESHOLD_PX = 5;
  */
 export const CLICK_DRAG_THRESHOLD_PX_TOUCH = 10;
 
+/**
+ * #719 — cycle "같은 위치" 판정 임계 (engine px). 직전 클릭과 이 반경 이내면 같은 위치로 보고
+ * ray 상 다음(뒤) body 로 cycle 진행, 초과면 cycle 리셋(새 위치 최전면 선택).
+ *
+ * 드래그/클릭 구분 임계(`CLICK_DRAG_THRESHOLD_PX`, **한 클릭 안**의 down→up 이동)와 의미가
+ * 다르므로 별도 상수다 — 본 상수는 **별개 클릭 down 좌표 간 거리**(연타 사이). 두 임계를 한
+ * 상수로 묶으면 한쪽 변경이 다른 동작을 조용히 변형(주석-구현 drift). ADR §결정 3.
+ *
+ * **measurement-first 확정값 (#719 DoD-1, 2026-06-20 실측 `_debug-719-*-tmp.mjs` 사용 후 rm)**:
+ *  - 측정 1 (동일 화면 좌표 연타 → engine px 흔들림): DPR=1 환경 `page.mouse.click` 동일 CSS
+ *    좌표 8회 연타 시 `scene.pointerX/Y` 흔들림 = **0.00px** (최대 쌍거리 0.00). 자동화 클릭은
+ *    흔들림이 없으므로 임계 하한은 **사람 손/터치 흔들림 추정치**가 결정한다:
+ *      · 마우스 연타: sub-px ~ 수 px (라운딩 + 미세 손떨림)
+ *      · 터치 연타: ~8–10px (#713 `CLICK_DRAG_THRESHOLD_PX_TOUCH` 와 동급 jitter)
+ *  - 임계 = 터치 jitter(10px) + 손떨림 여유(4px) = **14px**. 단일 임계로 마우스(≈0px)·터치(≈10px)
+ *    흔들림을 모두 안전 흡수 → `_TOUCH` 분리 불요(측정상 14px 가 양쪽 포섭).
+ *  - 상한 안전성: galilean(io/europa/ganymede/callisto)의 화면상 최소 상호거리는 focus 줌에서
+ *    **113px**(측정 2: io↔jupiter)로 14px ≪ 113px → 의도적 다른 body 클릭을 cycle 로 오인할
+ *    여지 없음.
+ *
+ * 너무 작으면 손 흔들림에 cycle 끊김(reset 오발), 너무 크면 의도적 다른 body 클릭이 cycle 로
+ * 오인. 이 값 변경 시 ADR Amendment + `body-picking.test.ts` 경계 테스트 갱신 의무.
+ */
+export const PICK_CYCLE_SAME_POS_PX = 14;
+
 /** `resolvePickedBodyId` 옵션. */
 export interface ResolvePickOptions {
   /**
@@ -166,4 +191,60 @@ export function resolvePickedBodyId(
   }
 
   return bestId;
+}
+
+/**
+ * #719 — 클릭 좌표(engine px)의 ray 상에 겹친 body 들을 **카메라 최근접→최원거리 깊이순**으로
+ * dedup 한 bodyId 리스트로 반환한다 (순수 함수 — Babylon scene 만 의존, stateless).
+ *
+ * `resolvePickedBodyId`(단수, 최전면 1개)의 N-depth 확장. web 레이어가 "같은 위치 재클릭 →
+ * ray 상 다음(뒤) body" cycle 을 구현할 수 있도록 깊이순 후보 리스트를 제공한다. 본 함수는
+ * **상태를 갖지 않으며**(같은 위치 판정·인덱스 추적·wrap 은 web 클로저 책임, ADR §결정 2),
+ * **화면거리 fallback 을 포함하지 않는다**(ray hit 만 — fallback marker 의 cycle 은 비-범위,
+ * ADR §결정 5). ray hit 이 없으면 빈 배열을 반환하고, 호출자가 `resolvePickedBodyId` 단일
+ * fallback 으로 위임한다.
+ *
+ * 알고리즘 (ADR §결정 1):
+ *  1. `scene.multiPick(x, y, predicate)` — predicate 는 `resolvePickedBodyId` 1차와 **동일**
+ *     (활성 LOD variant `isVisible && isEnabled` + `metadata.bodyId` 존재 + allowlist).
+ *  2. **distance 오름차순 정렬** — Babylon `InternalMultiPick` 은 `scene.meshes` 순회 순서대로
+ *     push 할 뿐 distance 정렬을 보장하지 않으므로(실측: ray.core.js InternalMultiPick), 여기서
+ *     명시적으로 정렬한다. ADR §결정 1 의 "distance 오름차순 내장" 전제 보정.
+ *  3. **bodyId dedup (첫 등장 = ray 최근접 variant 유지)** — 같은 bodyId 의 high/mid/low LOD
+ *     variant 가 LOD fade 전환 중(~200ms) 동시 `isVisible` 일 수 있어 둘 다 hit 될 수 있다.
+ *     `Set` seen 가드로 정렬된 순서상 첫 등장만 push → 최근접 variant 1개만 남는다.
+ *
+ * @returns 깊이순 distinct bodyId 배열 (ray hit 0 면 `[]`). 호출자는 `[0]` = 최전면.
+ */
+export function resolvePickedBodyIds(
+  scene: Scene,
+  _camera: Camera,
+  x: number,
+  y: number,
+  opts: Pick<ResolvePickOptions, 'isFocusable'>,
+): string[] {
+  const { isFocusable } = opts;
+
+  // multiPick — predicate 통과 mesh 의 ray hit 전체. predicate 는 단수형 1차와 동일 SSoT.
+  const picks = scene.multiPick(x, y, (mesh) => {
+    if (!mesh.isVisible || !mesh.isEnabled()) return false;
+    const id = readBodyId(mesh);
+    if (!id) return false;
+    return isFocusable(id);
+  });
+  if (!picks || picks.length === 0) return [];
+
+  // distance 오름차순 정렬 (Babylon 미보장 — 명시 정렬). 원본 배열 비파괴 위해 복사.
+  const sorted = [...picks].sort((a, b) => a.distance - b.distance);
+
+  // bodyId dedup — 정렬 순서상 첫 등장(최근접 variant)만 유지. LOD fade 동시 hit 흡수.
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const pick of sorted) {
+    const id = readBodyId(pick.pickedMesh);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
 }
