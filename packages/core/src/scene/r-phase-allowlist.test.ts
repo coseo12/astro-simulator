@@ -246,7 +246,9 @@ describe('#598 — browser-verify-378-focus.mjs FOCUS_BODIES SSoT 정합', () =>
     const source = fs.readFileSync(verifyScriptPath, 'utf-8');
     const match = source.match(/const\s+FOCUS_BODIES\s*=\s*\[([^\]]+)\]/);
     expect(match, 'FOCUS_BODIES 선언 패턴을 찾지 못함').toBeTruthy();
-    const focusBodies = match![1]
+    // capture group [1] 은 위 toBeTruthy 로 match 존재 보장 + 정규식에 캡처 그룹이 있어 항상 존재
+    // (noUncheckedIndexedAccess 로 string|undefined 추론되므로 non-null assertion).
+    const focusBodies = match![1]!
       .split(',')
       .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
       .filter((s) => s.length > 0);
@@ -267,7 +269,7 @@ describe('#619 — r1-ui-regression-guard.mjs targetIds SSoT 정합', () => {
   function extractArray(source: string, name: string): string[] {
     const match = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^\\]]+)\\]`));
     expect(match, `${name} 선언 패턴을 찾지 못함`).toBeTruthy();
-    return match![1]
+    return match![1]!
       .split(',')
       .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
       .filter((s) => s.length > 0);
@@ -357,7 +359,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     );
     const block = source.match(/const\s+FOCUS_BUTTONS\s*=\s*\[([\s\S]+?)\];/);
     expect(block, 'FOCUS_BUTTONS 선언을 찾지 못함').toBeTruthy();
-    const ids = [...block![1].matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
+    const ids = [...block![1]!.matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
     expect(ids).toEqual(shortcutBodies);
   });
 
@@ -371,7 +373,7 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     const extract = (name: string) => {
       const m = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^\\]]*)\\]`));
       expect(m, `${name} 선언을 찾지 못함`).toBeTruthy();
-      return m![1]
+      return m![1]!
         .split(',')
         .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
         .filter((s) => s.length > 0);

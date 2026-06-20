@@ -50,6 +50,7 @@
     "@babylonjs/core": "^8.0.0"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
     "typescript": "^6.0.0",
     "vitest": "^4.1.4"
