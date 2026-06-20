@@ -390,9 +390,10 @@ describe('#719 cycle 다음 선택 로직 (web 클로저 시뮬 — 직전 id �
     if (cands.length === 0) return null;
     if (samePos && lastId !== null) {
       const idx = cands.indexOf(lastId);
-      if (idx !== -1) return cands[(idx + 1) % cands.length];
+      // noUncheckedIndexedAccess — production sim-canvas 와 동일하게 ?? null 좁힘 (#715 typecheck clean 보존).
+      if (idx !== -1) return cands[(idx + 1) % cands.length] ?? null;
     }
-    return cands[0]; // reset / 첫 클릭 / 직전 id 부재 → 최전면
+    return cands[0] ?? null; // reset / 첫 클릭 / 직전 id 부재 → 최전면
   }
 
   const cands = ['io', 'jupiter', 'europa']; // 깊이순 (앞→뒤)
