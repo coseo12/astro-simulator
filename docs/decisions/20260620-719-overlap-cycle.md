@@ -1,6 +1,6 @@
 # ADR: 겹침 cycle — 같은 위치 반복 클릭 시 ray 상 뒤 body 순환 선택 — #719
 
-- **상태**: **Provisional** (신규 ADR cross-validate 발동 대상 — 메인 오케스트레이터가 §교차검증 반영 사항 통합 후 Accepted 전이)
+- **상태**: **Accepted** (cross-validate 2026-06-20 agy 통합 — §교차검증 반영 사항 4+1축 박제, 고유 발견 4종 developer 인계)
 - **날짜**: 2026-06-20
 - **결정자**: architect (#719 설계)
 - **관련**:
@@ -170,16 +170,34 @@ web(`sim-canvas.tsx`) `onPointerObservable` POINTERUP 핸들러 (클로저 로�
 
 ---
 
-## §교차검증 반영 사항
+## §교차검증 반영 사항 (cross-validate 2026-06-20 agy outcome=applied)
 
-> **상태 Provisional 유지** — cross-validate(agy) 1차 시도(2026-06-20, `cross-validate-architecture-20260620-152659`)에서 **agy 가 빈 응답(비-capacity fatal-error, exit 1)으로 실패** → `claude-only analysis completed — 단일 모델 편향 노출 미확보`. 외부 모델 두 번째 시각을 확보하지 못했으므로 본 ADR 은 **Provisional 로 유지**한다. 메인 오케스트레이터가 agy 복구 후 cross-validate 를 재시도하고, 4+1축(합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견 후속분리 / Claude 편향 셀프 체크)으로 통합한 뒤 §상태를 **Accepted (cross-validate YYYY-MM-DD)** 로 전이한다.
+> architect 1차 호출은 agy 빈 응답(fatal-error)으로 미확보 → 메인 오케스트레이터가 agy 복구 후 재시도(`cross-validate-architecture-20260620-153215`, outcome=applied)하여 외부 시각 확보. agy 평가: **"코어 도메인을 완벽히 stateless 보존 + 복잡한 화면 피킹 기하학을 상위 UI 상태 2개로 우아하게 가둔 모범 설계"** → Accepted 권장(조건부 — 사각지대 4종 구현 대응). 6개 결정 + 발견을 4+1축 분류:
 
-### Claude 단독 분석 (agy 미확보 — 단일 모델, 편향 노출 미달)
+### 합의 (6 — 핵심 결정 전부)
 
-agy 미응답으로 외부 시각이 없으므로, architect 가 셀프 체크에서 식별한 **결합 간과 미통과 축**을 단독으로 추가 점검한 결과만 박제(외부 합의/이견 항목 없음):
+- **결정 1 (multiPick + bodyId dedup)** — 표준 다중 픽킹 API 로 수동 raycast 재구현 방지, distance 오름차순 첫 등장만 dedup 이 LOD fade 동시 hit 해결에 타당. 일치.
+- **결정 2 (web 클로저 상태)** — cycle 상태는 입력/UX 임시 상태, 영구 core store 미기록은 아키텍처 비대화 차단의 훌륭한 결정. 일치.
+- **결정 3 (`PICK_CYCLE_SAME_POS_PX` 상수 분리)** — 드래그 임계 재사용 안 함이 기기별 탭 흔들림 독자 튜닝 여지. 일치.
+- **결정 4 (직전 id 앵커 wrap)** — 인덱스 대신 id 앵커가 공전/LOD 프레임 변화에 극도로 강건. 일치.
+- **결정 5 (marker fallback 정합)** / **결정 6 (#713 무회귀, len 1 = 단일)** — 분기 명료, 단수 시그니처 불변. 일치.
+- **Concrete Prediction** — core/store 0라인 예측 유효, 구조적 간결. 일치.
 
-- **cycle 상태(web 클로저) ↔ multiPick hit 리스트 프레임 변동 결합** — 결정 4(직전 id 앵커 + index 0 fallback)가 1차 방어. 추가 사각: 직전 선택 body 가 **공전으로 ray 에서 완전 이탈**하면 `indexOf` 부재 → `cands[0]`(최전면) 복귀. 사용자 체감상 "연타했는데 최전면으로 점프"가 가능하나, body 가 이미 ray 이탈한 상황이라 cycle 의미 자체가 소멸한 정상 동작(무해). developer 가 browser-verify (iv) 겹침 단일 유지 케이스에서 LOD fade 구간(~200ms) 연타도 1회 포함 권고.
-- **모바일 터치 jitter ↔ `PICK_CYCLE_SAME_POS_PX` 결합** — 터치 연타는 좌표 흔들림(~8–10px)이 커 `PICK_CYCLE_SAME_POS_PX` 가 너무 작으면 reset 오발(cycle 끊김). 결정 3 measurement-first 에서 **터치 jitter 보다 약간 큰 ~12–16px 후보** 박제 + 필요 시 `PICK_CYCLE_SAME_POS_PX_TOUCH` 분리 명시 — 결합 위험 사전 흡수.
-- **Concrete Prediction 보장성** — cycle 상태를 web 클로저에 둠으로써(결정 2) core/store/카메라 미접촉 → `git diff --stat` 검증 경로(§4)로 실측 가능. 단일 모델 분석이라 외부 반증 없음 — developer 구현 후 실측이 최종 가드.
+### 고유 발견 수용 — 범위 내 (developer 인계)
 
-> agy 복구 후 본 단락은 외부 모델 4+1축 통합으로 대체된다. 현 상태는 **단일 모델 편향 노출 미확보**임을 명시.
+agy 가 식별한 입력/렌더 결합 사각 4종 (전부 현재 범위 = 모바일 터치 포함, #713 cross-validate 패턴 연장):
+
+- **(②) 더블클릭 제스처 충돌** — 겹친 body **연타**(cycle 의 핵심 입력)를 OS/브라우저가 더블클릭(줌인)으로 오해해 클릭 suppress 위험. **범위 내 — developer 실측 의무**: ArcRotateCamera 더블클릭 동작 여부 확인, 간섭 시 POINTERUP 타임스탬프로 cycle 과 분리. browser-verify 연타 케이스에서 검증.
+- **(④) LOD fade dedup 정렬 흔들림** — fade 구간(~200ms) high/mid variant distance 1–2px 흔들림으로 dedup 순서 뒤바뀜 → cycle 순서 불안정. 결정 4 id 앵커가 완화하나 **`body-picking.test.ts` 에 LOD fade 구간 dedup 안정성 테스트 추가** (developer).
+
+### 이미 정합 / Claude 재분석 (2 — 능동 확인 후 비차단 분류)
+
+- **(①) React 리렌더 클로저 상태 유실** — agy 가 useRef/scene.metadata 권고. 그러나 ADR 결정 2 전제(핸들러는 `instance.start().then()` 내부 1회 등록, 세션 동안 생존)는 **#713 에서 `activePointers`/`downX` 동일 클로저 패턴이 qa real GUI PASS 로 이미 검증**됨 — 리렌더 재등록 없음. 유실되더라도 cycle 리셋(단일 클릭 복귀)으로 비치명. **developer: #713 클로저 패턴 그대로 답습 확인**(useRef 전환 불요 — 검증된 패턴 유지가 회귀면 최소). 클로저 재등록이 실측되면 그때 useRef.
+- **(③) 모바일 pointerId 재발급** — agy 가 down/up pointerId 일치 검증 간섭 우려. 그러나 **단일 탭의 down→up 은 같은 제스처 = 동일 pointerId** (#713 `pointerId !== downPointerId` 가드는 멀티터치 구분용, 단일 탭 내 무간섭). cycle 은 별개 탭 간 위치(`PICK_CYCLE_SAME_POS_PX`)+id 앵커라 pointerId 무관. **이미 정합** — developer 확인.
+
+### Claude 편향 셀프 체크 (4종)
+
+- **낙관적 일정**: 통과 (core 복수형 함수 + web 상태 2개, 변경 0라인 예측 보수적).
+- **결합 간과**: architect 1차 식별(cycle 상태 ↔ hit 리스트 변동, 터치 jitter ↔ 임계) + agy 보강(②더블클릭/④fade dedup) → 결정 3/4 + developer 인계로 흡수. 입력 결합 사각 다축 박제 완료.
+- **폐기 프레이밍**: 해당 없음 (신규 feature, #713 단수 경로 보존).
+- **순수주의**: 통과 (marker cycle/후보 UI 후속 분리로 MVP 한정, agy 도 확장 여지 보장 확인).
