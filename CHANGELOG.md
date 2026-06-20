@@ -5,6 +5,25 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-06-20
+
+### Behavior Changes (#719 — 겹침 cycle)
+
+- **[#719] 겹침 cycle — 같은 위치 반복 클릭 시 ray 뒤 body 순환 선택 (MINOR)** ([#719](https://github.com/coseo12/astro-simulator/issues/719)) — #713 클릭 선택의 occlusion 최전면 단일 선택을 확장 — jupiter disk 위/뒤 galilean 위성처럼 겹친 body 를 같은 화면 위치 반복 클릭으로 ray 상 다음(뒤) body 순환 선택(wrap). 신규 `resolvePickedBodyIds`(`scene.multiPick` + **명시 distance 정렬** + bodyId dedup 첫등장유지). cycle 상태는 web 클로저 로컬(`lastClickX/Y` + `lastSelectedBodyId`), 직전 id 앵커 `cands.indexOf(lastId)+1) % len` wrap. `PICK_CYCLE_SAME_POS_PX=14`(터치 jitter 10 + 손떨림 4 실측). 기존 `focusOn` 진입점 재사용 → core(simulation-core/sim-store/core-adapter) **변경 0라인**. ADR `20260620-719-overlap-cycle.md` (Accepted, cross-validate agy — 입력 결합 가드 4종 보강 + §결정1 Amendment: Babylon multiPick 미정렬 실측 보정). qa real Chrome GUI: 자연 겹침 galilean↔jupiter 50%(16/32 스캔) 빈도로 cycle 실효용 입증. 비-범위(후속): marker(작은 body) cycle, 겹침 후보 시각 UI.
+
+### Behavior Changes (#721 — 토성계 위성 확장 R11)
+
+- **[#721] 토성계 위성 3개 추가 — Rhea / Iapetus / Enceladus (MINOR)** ([#721](https://github.com/coseo12/astro-simulator/issues/721)) — 토성이 titan 1개뿐이던 것을 주요 위성 3개(Rhea 2대 위성 / Iapetus 두 얼굴 / Enceladus 간헐천)로 확장(R11=phase 12). 클릭(#713)/cycle(#719)/URL `?focus=rhea` 로 선택 가능. **신규 `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` per-body orbit 룩업 첫 발동** — enceladus(최내곽)·iapetus(최외곽) a 편차 15배로 단일 saturn=10 양립 불가 → enceladus ×47 / rhea ×20 / titan ×10(회귀 0) / iapetus ×10 (분리 마진 전부 ≥1.5). body scale 250(satellite 그룹, 물리비 정직). JPL Horizons **REF_PLANE=ECLIPTIC** 명시(미지정 시 Saturn 적도면 → titan 과 28° 어긋남, cross-validate 이견 수용). ADR `20260620-721-saturn-moons-rhea-iapetus-enceladus.md` (Accepted, cross-validate agy). Concrete Prediction: picking/카메라 0라인 적중(궤도선 per-body scale 은 +19줄 "코드 0 불가 축"). qa real Chrome GUI DoD 7/7, enceladus 250 유지(ring occlusion 미발생).
+
+### Fixed (#715 — PATCH)
+
+- **[#715] packages/core typecheck red 해소 — @types/node + test assertion** ([#715](https://github.com/coseo12/astro-simulator/issues/715)) — core 가 `@types/node` 직접 의존 안 해(pnpm strict) test 의 `node:*` import TS2591 + capture group TS2532. `tsconfig.build.json`(test 제외)은 통과해 빌드 게이트 무관이나 IDE/수동 typecheck red. `@types/node` devDep + `tsconfig types:["node"]` + capture group assertion 4곳으로 `tsc --noEmit -p tsconfig.json` 0 errors.
+
+### Notes
+
+- 본 릴리스는 위성 탐색 인프라(#713 클릭 선택 / #719 cycle, v0.32.0)와 그 위 첫 콘텐츠 확장(#721 토성 위성)을 묶는다. #715 는 #713 PR 에서 분리된 typecheck 정리(행동 변화 없음).
+- `PICK_CYCLE_SAME_POS_PX`/orbit per-body scale 값은 measurement-first 실측값 — 변경 시 ADR Amendment + 테스트 갱신 의무.
+
 ## [0.32.0] — 2026-06-20
 
 ### Behavior Changes (#713 — canvas 클릭/터치 body 선택)

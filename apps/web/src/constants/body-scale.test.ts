@@ -114,6 +114,40 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(BODY_SCALE['swift-tuttle']).toBe(5000);
   });
 
+  it('R11 토성계 위성 — rhea/iapetus/enceladus 전부 250 (satellite 그룹, titan=100 답습 시 0.026 과소 → 수렴대 진입)', () => {
+    expect(BODY_SCALE.rhea).toBe(250);
+    expect(BODY_SCALE.iapetus).toBe(250);
+    expect(BODY_SCALE.enceladus).toBe(250); // D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1)
+  });
+
+  it('R11 — rhea/iapetus mesh 비율 수렴대 [0.05~0.09] 정합 (vs saturn mesh)', () => {
+    // ADR 20260620-721 §축 1 — rhea(7.64e5 × 250) / saturn(6.0268e7 × 48) = 0.0660,
+    // iapetus(7.345e5 × 250) / saturn = 0.0635 (moon/earth 0.068 / titan/saturn 0.089 수렴대).
+    const saturnMesh = 6.0268e7 * BODY_SCALE.saturn!;
+    const rheaRatio = (7.64e5 * BODY_SCALE.rhea!) / saturnMesh;
+    const iapetusRatio = (7.345e5 * BODY_SCALE.iapetus!) / saturnMesh;
+    expect(rheaRatio).toBeGreaterThan(0.05);
+    expect(rheaRatio).toBeLessThan(0.09);
+    expect(iapetusRatio).toBeGreaterThan(0.05);
+    expect(iapetusRatio).toBeLessThan(0.09);
+  });
+
+  it('R11 — iapetus/rhea 사실 radius 비 0.961 자동 보존 (동일 scale 250 → mesh 비 = radius 비)', () => {
+    // ADR 20260620-721 §축 1 — rhea(764km) ≈ iapetus(734.5km) 0.961배가 동일 scale 250 으로
+    // mesh 비 0.0635/0.0660 = 0.962 정합 (R5 mars=earth / R7 saturn=jupiter 동형 단일값 패턴).
+    const ratio = (7.345e5 * BODY_SCALE.iapetus!) / (7.64e5 * BODY_SCALE.rhea!);
+    expect(ratio).toBeGreaterThan(0.951);
+    expect(ratio).toBeLessThan(0.971);
+    expect(ratio).toBeCloseTo(0.961, 2);
+  });
+
+  it('R11 — enceladus 는 rhea 의 0.33배 사실 radius 정직 반영 (동일 scale → mesh 비 0.33배)', () => {
+    // ADR 20260620-721 §축 1 — enceladus(252km) = rhea(764km) 의 0.33배. 동일 scale 250 으로
+    // mesh 비도 0.33배 (수렴대 미달이나 4px fallback billboard 흡수, phobos/deimos §결정 6 동형).
+    const ratio = (2.521e5 * BODY_SCALE.enceladus!) / (7.64e5 * BODY_SCALE.rhea!);
+    expect(ratio).toBeCloseTo(0.33, 1);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.
@@ -238,6 +272,9 @@ describe('getBodyScale — 룩업 헬퍼', () => {
     expect(getBodyScale('callisto')).toBe(100); // R6 #627 옵션 D
     expect(getBodyScale('saturn')).toBe(48); // R7 #641 — jupiter 동일값 (거성 예외 2번째)
     expect(getBodyScale('titan')).toBe(100); // R7 #641 — galilean 답습
+    expect(getBodyScale('enceladus')).toBe(250); // R11 #721 — 토성계 위성 satellite 그룹
+    expect(getBodyScale('rhea')).toBe(250); // R11 #721
+    expect(getBodyScale('iapetus')).toBe(250); // R11 #721
     expect(getBodyScale('uranus')).toBe(250); // R8 #647 — ice giant 정책 신설
     expect(getBodyScale('titania')).toBe(500); // R8 #647 — moon/earth 수렴대
     expect(getBodyScale('neptune')).toBe(250); // R9 #653 — ice giant 답습 2번째

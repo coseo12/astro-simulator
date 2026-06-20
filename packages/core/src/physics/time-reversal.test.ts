@@ -43,6 +43,11 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
   // R9 #653: triton 도 동일 이유로 제외 (주기 5.877d — titania 보다 더 짧아 step 누적 더 많음.
   // 미제외 시 1년 vel relErr 3.826e-9 로 1e-9 임계 초과 실측 — R8 Amendment 1 ④ 메커니즘 재현.
   // 역행 (inclination 129.14°) 은 대칭성과 무관 — 제외 사유는 주기 짧음뿐). 원 의도(9체) 유지.
+  // R11 #721: enceladus/rhea/iapetus 도 동일 이유로 제외 (토성 위성 일괄 — titan R7 선례 답습).
+  // enceladus 주기 1.37d / rhea 4.52d 는 triton 5.877d 보다 짧거나 근접 → step 누적 더 많음
+  // (미제외 시 1년 vel relErr 7.532e-9 로 1e-9 임계 초과 실측 — R8/R9 메커니즘 재현). iapetus 79.3d 는
+  // 긴 주기지만 토성 위성 일괄 제외로 9체 원 의도 보존 (titan/triton 등 위성 전체 제외 패턴 일관).
+  // 본 테스트 원 의도(9체 대칭성)는 유지 — 위성 N-body 정합성은 Rust 측정 테스트가 담당.
   const EXCLUDED_SATELLITES = new Set([
     'phobos', // P8
     'deimos', // P8
@@ -53,6 +58,9 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
     'titan', // R7 #641
     'titania', // R8 #647
     'triton', // R9 #653
+    'enceladus', // R11 #721 — 주기 1.37d (triton 보다 짧음, step 누적 최대)
+    'rhea', // R11 #721 — 주기 4.52d (triton 근접)
+    'iapetus', // R11 #721 — 주기 79.3d (긴 주기지만 토성 위성 일괄 제외 — 9체 원 의도 보존)
   ]);
   const fullSystem = getSolarSystem();
   const system = {

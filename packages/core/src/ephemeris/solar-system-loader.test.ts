@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 27개 바디 (sun + 8행성 + moon 10 + 왜소행성 5 + 혜성 3)', () => {
+  it('로드 성공 + 30개 바디 (sun + 8행성 + moon 13 + 왜소행성 5 + 혜성 3)', () => {
     // P8 #244: 포보스/데이모스 추가 → moon 엔티티 3개 (moon + phobos + deimos).
     // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 추가 → moon 엔티티 7개.
     // R7 #641: titan 추가 → moon 엔티티 8개, 총 25 바디.
     // R8 #647: titania 추가 → moon 엔티티 9개, 총 26 바디.
     // R9 #653: triton 추가 → moon 엔티티 10개, 총 27 바디.
+    // R11 #721: enceladus/rhea/iapetus 추가 → moon 엔티티 13개, 총 30 바디 (토성계 위성 4개째~6개째).
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(27);
-    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(10);
+    expect(data.bodies).toHaveLength(30);
+    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(13);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
     expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
   });

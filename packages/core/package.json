@@ -1,6 +1,6 @@
 {
   "name": "@astro-simulator/core",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "private": true,
   "description": "Pure TypeScript simulation core for astro-simulator — Babylon.js only, framework-agnostic",
   "type": "module",
@@ -50,6 +50,7 @@
     "@babylonjs/core": "^8.0.0"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
     "typescript": "^6.0.0",
     "vitest": "^4.1.4"

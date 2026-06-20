@@ -12,6 +12,7 @@ import {
   URANUS_SATELLITES_ORBIT_VISUAL_SCALE,
   NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE,
   ORBIT_VISUAL_SCALE_BY_PARENT,
+  ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY,
   getOrbitVisualScale,
 } from './orbit-visual-scale.js';
 
@@ -297,5 +298,131 @@ describe('orbit-visual-scale SSoT (R9 #653 — neptune-triton, binding=ring oute
     expect(marginVsMeshOnly).toBeCloseTo(2.69, 1); // 통과처럼 보이는 함정 (ring 미고려)
     expect(marginVsRingOuter).toBeLessThan(1.5); // 실제 fail (1.10x — 고리 안에 묻힘)
     expect(marginVsRingOuter).toBeCloseTo(1.1, 1);
+  });
+});
+
+describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY per-body 첫 발동)', () => {
+  // R5 §위험 #6 (2026-05-28) → R6 §재검토 트리거 #3 (2026-06-05) 인계 → 본 ADR 첫 실전.
+  // a 편차 14.96배 (enceladus 최내곽 ↔ iapetus 최외곽) 로 단일 saturn 룩업 양립 불가 → per-body 룩업.
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY 박제값 (enceladus 47 / rhea 20 / titan 10 / iapetus 10)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.enceladus).toBe(47);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.rhea).toBe(20);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.titan).toBe(10);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.iapetus).toBe(10);
+  });
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY 는 frozen (런타임 변경 차단)', () => {
+    expect(Object.isFrozen(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY)).toBe(true);
+  });
+
+  describe('getOrbitVisualScale 3계층 우선순위 (per-body > parent > default)', () => {
+    it('per-body 룩업 우선 — saturn 위성은 bodyId 로 per-body scale 반환 (parent saturn=10 무시)', () => {
+      // bodyId 전달 시 per-body 룩업이 parent 룩업 (saturn=10) 보다 우선.
+      expect(getOrbitVisualScale('saturn', 'enceladus')).toBe(47);
+      expect(getOrbitVisualScale('saturn', 'rhea')).toBe(20);
+      expect(getOrbitVisualScale('saturn', 'titan')).toBe(10);
+      expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(10);
+    });
+
+    it('per-body 미정의 위성은 parent 룩업 fallback (회귀 0 — moon/galilean/titania/triton)', () => {
+      // bodyId 가 per-body 에 없으면 parent 룩업으로 fallback. 기존 동작 보존.
+      expect(getOrbitVisualScale('earth', 'moon')).toBe(30); // EARTH_MOON parent 룩업
+      expect(getOrbitVisualScale('jupiter', 'io')).toBe(16); // JUPITER parent 룩업
+      expect(getOrbitVisualScale('uranus', 'titania')).toBe(50); // URANUS parent 룩업
+      expect(getOrbitVisualScale('neptune', 'triton')).toBe(75); // NEPTUNE parent 룩업
+      expect(getOrbitVisualScale('mars', 'phobos')).toBe(500); // MARS parent 룩업
+    });
+
+    it('bodyId 미전달 (기존 호출처) — parent 룩업 fallback (회귀 0, getOrbitVisualScale(parentId))', () => {
+      // bodyId 인자 없이 호출 시 기존 동작 그대로. saturn=10 (per-body 미적용).
+      expect(getOrbitVisualScale('saturn')).toBe(10);
+      expect(getOrbitVisualScale('earth')).toBe(30);
+      expect(getOrbitVisualScale('jupiter')).toBe(16);
+    });
+
+    it('bodyId=null/undefined — parent 룩업 fallback (per-body 미적용)', () => {
+      expect(getOrbitVisualScale('saturn', null)).toBe(10);
+      expect(getOrbitVisualScale('saturn', undefined)).toBe(10);
+    });
+
+    it('per-body 정의 + parentId=null — per-body 룩업이 여전히 우선 (parent 무관)', () => {
+      // per-body 룩업은 bodyId 만 보므로 parentId 가 null 이어도 적용 (방어적 동작).
+      expect(getOrbitVisualScale(null, 'enceladus')).toBe(47);
+    });
+
+    it('미매핑 bodyId + 미매핑 parent → 1.0 (DEFAULT_ORBIT_VISUAL_SCALE)', () => {
+      expect(getOrbitVisualScale('pluto', 'charon')).toBe(1.0); // 둘 다 미정의
+    });
+  });
+
+  describe('4 위성 분리 마진 산출 (산식 A, binding=F ring outer mesh — developer 실측 2026-06-20)', () => {
+    // ADR §축 2 박제값. binding = F ring outer mesh (140680 km × saturnScale 48 = 6.7526e9 m,
+    // saturn mesh 의 2.334배). 4 위성 각각 per-body visual scale 로 margin ≥ 1.5 충족.
+    const F_RING_OUTER_MESH_M = 140680 * 1000 * 48; // 6.7526e9
+    const KM_M = 1000;
+
+    it('enceladus 분리 마진 (binding, 최내곽) — visual ×47 → 1.64x', () => {
+      const A_M = 238040 * KM_M; // NASA Fact Sheet a
+      const SAT_MESH_M = 2.521e5 * 250; // enceladusScale=250 = 6.303e7
+      const margin =
+        (A_M * getOrbitVisualScale('saturn', 'enceladus')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
+      expect(margin).toBeGreaterThanOrEqual(1.5);
+      expect(margin).toBeCloseTo(1.64, 1);
+    });
+
+    it('rhea 분리 마진 — visual ×20 → 1.52x (×10 시 0.76x 묻힘)', () => {
+      const A_M = 527108 * KM_M;
+      const SAT_MESH_M = 7.64e5 * 250; // rheaScale=250 = 1.91e8
+      const margin =
+        (A_M * getOrbitVisualScale('saturn', 'rhea')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
+      expect(margin).toBeGreaterThanOrEqual(1.5);
+      expect(margin).toBeCloseTo(1.52, 1);
+    });
+
+    it('titan 분리 마진 (R7 박제 보존 — 회귀 0) — visual ×10 → 1.74x', () => {
+      const A_M = 1221870 * KM_M;
+      const SAT_MESH_M = 2.575e6 * 100; // titanScale=100 = 2.575e8
+      const margin =
+        (A_M * getOrbitVisualScale('saturn', 'titan')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
+      expect(margin).toBeGreaterThanOrEqual(1.5);
+      expect(margin).toBeCloseTo(1.74, 1);
+    });
+
+    it('iapetus 분리 마진 (최외곽, 자동 안전) — visual ×10 → 5.13x', () => {
+      const A_M = 3560820 * KM_M;
+      const SAT_MESH_M = 7.345e5 * 250; // iapetusScale=250 = 1.836e8
+      const margin =
+        (A_M * getOrbitVisualScale('saturn', 'iapetus')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
+      expect(margin).toBeGreaterThanOrEqual(1.5);
+      expect(margin).toBeCloseTo(5.13, 1);
+    });
+  });
+
+  describe('단일 룩업 한계 입증 (per-body 발동 근거 — 회귀 가드)', () => {
+    const F_RING_OUTER_MESH_M = 140680 * 1000 * 48;
+    const KM_M = 1000;
+
+    it('단일 ×10 (saturn 기존) 으로는 enceladus 0.35x / rhea 0.76x 묻힘 (per-body 필요 입증)', () => {
+      const encMargin = (238040 * KM_M * 10) / (F_RING_OUTER_MESH_M + 2.521e5 * 250);
+      const rheaMargin = (527108 * KM_M * 10) / (F_RING_OUTER_MESH_M + 7.64e5 * 250);
+      expect(encMargin).toBeLessThan(1.5);
+      expect(encMargin).toBeCloseTo(0.35, 1);
+      expect(rheaMargin).toBeLessThan(1.5);
+      expect(rheaMargin).toBeCloseTo(0.76, 1);
+    });
+
+    it('단일 ×47 (enceladus 충족) 으로는 iapetus 24.13x 과분리 (양립 불가 입증)', () => {
+      // 단일 visual scale 로 enceladus 를 충족하면 iapetus 가 과분리 → per-body 가 유일 해법.
+      const iapMargin = (3560820 * KM_M * 47) / (F_RING_OUTER_MESH_M + 7.345e5 * 250);
+      expect(iapMargin).toBeGreaterThan(20); // 과분리 (saturn mesh 의 55배 영역)
+      expect(iapMargin).toBeCloseTo(24.13, 0);
+    });
+
+    it('a 편차 14.96배 — 단일 룩업 한계 근본 원인 (enceladus 최내곽 ↔ iapetus 최외곽)', () => {
+      const ratio = 3560820 / 238040;
+      expect(ratio).toBeCloseTo(14.96, 1);
+      expect(ratio).toBeGreaterThan(5); // a 편차 > 5배 → per-body 룩업 발동 조건 (titan 단독 R7 / galilean 4.5배 R6 초과)
+    });
   });
 });

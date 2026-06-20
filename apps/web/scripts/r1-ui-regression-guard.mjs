@@ -204,6 +204,9 @@ async function measureBodyPxRatios(page) {
     // phobos/deimos §결정 6 답습 7번째 그룹. 회귀 가드는 allowlist(#613)/FOCUS_BODIES(#598)/본 targetIds(#619) 우회.
     // R10b #664 — 혜성 3 (halley/encke/swift-tuttle) 전부 §축 7 N/A (미박제 — 측정만). 식 px
     // 0.085~0.460 sub-px, billboard 전면 의존 — 8번째 그룹 (ADR 20260612-r10b §축 7).
+    // R11 #721 — 토성계 위성 3 (enceladus/rhea/iapetus) 전부 N/A (미박제 — 측정만). 식 px
+    // 0.45~1.35 sub-px, billboard 4px fallback 전면 의존 — 9번째 그룹 (ADR 20260620-721 §축 1).
+    // 순서는 데이터 순서 (titan 다음, uranus 전) — #619 정적 매칭 가드 통과 필수.
     const targetIds = [
       'sun',
       'mercury',
@@ -220,6 +223,9 @@ async function measureBodyPxRatios(page) {
       'callisto',
       'saturn',
       'titan',
+      'enceladus',
+      'rhea',
+      'iapetus',
       'uranus',
       'titania',
       'neptune',
