@@ -21,9 +21,11 @@ import { describe, expect, it } from 'vitest';
 import { Matrix, Vector3 } from '@babylonjs/core';
 import {
   resolvePickedBodyId,
+  resolvePickedBodyIds,
   PICK_SCREEN_THRESHOLD_PX,
   CLICK_DRAG_THRESHOLD_PX,
   CLICK_DRAG_THRESHOLD_PX_TOUCH,
+  PICK_CYCLE_SAME_POS_PX,
 } from './body-picking.js';
 
 const W = 1000;
@@ -62,6 +64,11 @@ interface MockSceneOpts {
   /** scene.pick 결과 (1차) — { hit, pickedMesh } 또는 miss. */
   pickResult?: { hit: boolean; pickedMesh?: ReturnType<typeof mockMesh> };
   meshes?: ReturnType<typeof mockMesh>[];
+  /**
+   * #719 — scene.multiPick 결과 (복수형). { distance, pickedMesh }[] 의 PickingInfo 배열 모사.
+   * **의도적으로 distance 비정렬 순서로 줄 수 있다** — resolvePickedBodyIds 가 명시 정렬하는지 검증.
+   */
+  multiPickResult?: { distance: number; pickedMesh: ReturnType<typeof mockMesh> }[];
 }
 
 function mockScene(o: MockSceneOpts) {
@@ -70,10 +77,20 @@ function mockScene(o: MockSceneOpts) {
     // predicate 를 받지만 1차 테스트는 미리 정한 pickResult 반환 (Babylon ray 모킹 회피).
     pick: (_x: number, _y: number, _pred: (m: unknown) => boolean) =>
       o.pickResult ?? { hit: false },
+    // #719 — multiPick 은 predicate 통과 mesh 만 (있으면). multiPickResult 의 mesh 에 predicate 적용.
+    multiPick: (_x: number, _y: number, pred?: (m: unknown) => boolean) => {
+      const all = o.multiPickResult ?? [];
+      return pred ? all.filter((pk) => pred(pk.pickedMesh)) : all;
+    },
     getTransformMatrix: () => Matrix.Identity(),
     getEngine: () => ({ getRenderWidth: () => W, getRenderHeight: () => H }),
     meshes,
   };
+}
+
+/** #719 — PickingInfo 모사 헬퍼 ({ distance, pickedMesh }). */
+function pickInfo(distance: number, mesh: ReturnType<typeof mockMesh>) {
+  return { distance, pickedMesh: mesh };
 }
 
 const camera = { globalPosition: new Vector3(0, 0, -10) };
@@ -263,5 +280,148 @@ describe('#713 임계 상수 SSoT (매직넘버 금지 가드)', () => {
     expect(CLICK_DRAG_THRESHOLD_PX).toBe(5);
     expect(CLICK_DRAG_THRESHOLD_PX_TOUCH).toBe(10);
     expect(CLICK_DRAG_THRESHOLD_PX_TOUCH).toBeGreaterThan(CLICK_DRAG_THRESHOLD_PX);
+  });
+
+  it('#719 PICK_CYCLE_SAME_POS_PX = 14 (measurement-first: 터치 jitter 10px + 여유 4px)', () => {
+    expect(PICK_CYCLE_SAME_POS_PX).toBe(14);
+    // 터치 드래그 임계(10px)보다 커야 함 — 별개 클릭 흔들림이 드래그 임계보다 좁으면 cycle 끊김.
+    expect(PICK_CYCLE_SAME_POS_PX).toBeGreaterThan(CLICK_DRAG_THRESHOLD_PX_TOUCH);
+  });
+});
+
+describe('#719 resolvePickedBodyIds — multiPick 깊이순 dedup', () => {
+  const A = mockMesh({ bodyId: 'io', isVisible: true });
+  const B = mockMesh({ bodyId: 'jupiter', isVisible: true });
+  const C = mockMesh({ bodyId: 'europa', isVisible: true });
+
+  it('ray hit 0 → 빈 배열 (호출자가 단일 fallback 위임)', () => {
+    const scene = mockScene({ multiPickResult: [] });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: allowAll,
+    });
+    expect(ids).toEqual([]);
+  });
+
+  it('ray hit 1 → 단일 [id] (#713 단일 클릭 동작 불변)', () => {
+    const scene = mockScene({ multiPickResult: [pickInfo(10, B)] });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: allowAll,
+    });
+    expect(ids).toEqual(['jupiter']);
+  });
+
+  it('비정렬 multiPick 입력 → distance 오름차순 정렬 (Babylon 미보장 보정)', () => {
+    // 의도적 비정렬: jupiter(45) → io(41) → europa(60) 순서로 줌.
+    const scene = mockScene({
+      multiPickResult: [pickInfo(45, B), pickInfo(41, A), pickInfo(60, C)],
+    });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: allowAll,
+    });
+    // 깊이순: io(41) < jupiter(45) < europa(60).
+    expect(ids).toEqual(['io', 'jupiter', 'europa']);
+  });
+
+  it('같은 bodyId 의 LOD variant 동시 hit → dedup 후 1개 (첫 등장=최근접 유지)', () => {
+    // io-lod-mid(41) + io-lod-low(43) 둘 다 활성(fade 구간) → io 1개로 dedup.
+    const ioMid = mockMesh({ bodyId: 'io', isVisible: true });
+    const ioLow = mockMesh({ bodyId: 'io', isVisible: true });
+    const scene = mockScene({
+      multiPickResult: [pickInfo(43, ioLow), pickInfo(41, ioMid), pickInfo(45, B)],
+    });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: allowAll,
+    });
+    // io 두 variant → 1개 (최근접 41 first), jupiter 뒤. 총 2개.
+    expect(ids).toEqual(['io', 'jupiter']);
+  });
+
+  it('agy ④ — LOD fade 구간 distance 흔들림에도 dedup 후 개수·순서 안정', () => {
+    // 동일 bodyId 두 variant 의 distance 가 1~2px 흔들려도(41↔42 뒤바뀜) dedup 결과는 동일.
+    const ioV1 = mockMesh({ bodyId: 'io', isVisible: true });
+    const ioV2 = mockMesh({ bodyId: 'io', isVisible: true });
+    const frame1 = mockScene({
+      multiPickResult: [pickInfo(41, ioV1), pickInfo(42, ioV2), pickInfo(50, B)],
+    });
+    const frame2 = mockScene({
+      // fade 흔들림으로 두 io variant 의 distance 역전 (42 ↔ 41).
+      multiPickResult: [pickInfo(42, ioV1), pickInfo(41, ioV2), pickInfo(50, B)],
+    });
+    const opts = { isFocusable: allowAll };
+    const ids1 = resolvePickedBodyIds(asScene(frame1), asCamera(camera), 500, 500, opts);
+    const ids2 = resolvePickedBodyIds(asScene(frame2), asCamera(camera), 500, 500, opts);
+    // 두 프레임 모두 [io, jupiter] — variant 순서 흔들림이 bodyId 리스트에 누설되지 않음.
+    expect(ids1).toEqual(['io', 'jupiter']);
+    expect(ids2).toEqual(['io', 'jupiter']);
+  });
+
+  it('predicate — 비-allowlist body 제외 (isFocusable=false)', () => {
+    const fake = mockMesh({ bodyId: 'nonexistent-body', isVisible: true });
+    const scene = mockScene({ multiPickResult: [pickInfo(40, fake), pickInfo(45, B)] });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: (bid) => bid !== 'nonexistent-body',
+    });
+    expect(ids).toEqual(['jupiter']);
+  });
+
+  it('predicate — 숨은 variant (isVisible=false) 제외', () => {
+    const hidden = mockMesh({ bodyId: 'io', isVisible: false });
+    const scene = mockScene({ multiPickResult: [pickInfo(40, hidden), pickInfo(45, B)] });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: allowAll,
+    });
+    expect(ids).toEqual(['jupiter']);
+  });
+
+  it('predicate — metadata.bodyId 없는 mesh 제외', () => {
+    const bg = mockMesh({ noMetadata: true });
+    const scene = mockScene({ multiPickResult: [pickInfo(30, bg), pickInfo(45, B)] });
+    const ids = resolvePickedBodyIds(asScene(scene), asCamera(camera), 500, 500, {
+      isFocusable: allowAll,
+    });
+    expect(ids).toEqual(['jupiter']);
+  });
+});
+
+describe('#719 cycle 다음 선택 로직 (web 클로저 시뮬 — 직전 id 앵커 wrap)', () => {
+  // ADR §결정 4 의 web 핸들러 로직을 순수 함수로 추출해 검증 (sim-canvas 클로저와 동일 식).
+  // cands: 깊이순 후보, lastId: 직전 선택. 같은 위치 재클릭 시 다음 선택을 산출.
+  function nextInCycle(cands: string[], lastId: string | null, samePos: boolean): string | null {
+    if (cands.length === 0) return null;
+    if (samePos && lastId !== null) {
+      const idx = cands.indexOf(lastId);
+      if (idx !== -1) return cands[(idx + 1) % cands.length];
+    }
+    return cands[0]; // reset / 첫 클릭 / 직전 id 부재 → 최전면
+  }
+
+  const cands = ['io', 'jupiter', 'europa']; // 깊이순 (앞→뒤)
+
+  it('같은 위치 연속 클릭 → 다음(뒤) body 순환', () => {
+    expect(nextInCycle(cands, null, true)).toBe('io'); // 첫 클릭 = 최전면
+    expect(nextInCycle(cands, 'io', true)).toBe('jupiter'); // io → jupiter
+    expect(nextInCycle(cands, 'jupiter', true)).toBe('europa'); // jupiter → europa
+  });
+
+  it('마지막 body 도달 후 재클릭 → 첫 body 로 wrap (DoD-2)', () => {
+    expect(nextInCycle(cands, 'europa', true)).toBe('io'); // (2+1)%3 = 0 = io
+  });
+
+  it('다른 위치 클릭 → cycle 리셋, 최전면 선택 (DoD-3)', () => {
+    expect(nextInCycle(cands, 'jupiter', false)).toBe('io'); // samePos=false → cands[0]
+  });
+
+  it('단일 body 반복 클릭 → 같은 body 유지 (DoD-4 no-op)', () => {
+    const single = ['io'];
+    expect(nextInCycle(single, 'io', true)).toBe('io'); // (0+1)%1 = 0 = io
+    expect(nextInCycle(single, 'io', true)).toBe('io'); // 반복해도 io
+  });
+
+  it('직전 id 가 현재 리스트 부재 (공전 이탈/가려짐 해소) → 최전면 복귀 (ADR §결정 4)', () => {
+    expect(nextInCycle(cands, 'callisto', true)).toBe('io'); // indexOf=-1 → cands[0]
+  });
+
+  it('빈 후보 → null (호출자 no-op)', () => {
+    expect(nextInCycle([], 'io', true)).toBeNull();
   });
 });
