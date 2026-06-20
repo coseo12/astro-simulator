@@ -76,10 +76,10 @@ const FLOATING_ORIGIN_THRESHOLD_METERS = AU;
 /**
  * P11-A #288 — dev-only assert gate.
  *
- * core 패키지는 `@types/node` 를 의존으로 두지 않으므로 `process` 가 types 에 없다.
- * runtime 에 `globalThis.process?.env?.NODE_ENV` 를 안전하게 읽고, Next.js webpack 이
- * 빌드 시점에 `NODE_ENV` 를 리터럴 치환 → prod bundle 에선 이 함수가 `false` 를 반환해
- * 하위 assert 블록이 DCE 된다.
+ * `process` 는 브라우저 번들 runtime 에 존재하지 않을 수 있다 (#715 부터 `@types/node` 로
+ * 타입은 있으나 — core 는 브라우저 타겟이라 런타임 부재 가능). 따라서 `globalThis.process?.env?.NODE_ENV`
+ * 를 안전하게 읽고, Next.js webpack 이 빌드 시점에 `NODE_ENV` 를 리터럴 치환 → prod bundle 에선
+ * 이 함수가 `false` 를 반환해 하위 assert 블록이 DCE 된다.
  */
 function floatingOriginAssertEnabled(): boolean {
   const g = globalThis as { process?: { env?: { NODE_ENV?: string } } };
@@ -1192,7 +1192,7 @@ export function createSolarSystemScene(
     }
 
     // P11-A #288 DoD β v2 — dev 빌드 assert: **focus body** local 좌표 절대값 ≤ 1e5 m (100 km).
-    // core 패키지는 `process` 타입이 없으므로 runtime guard 사용. Next.js webpack 이 `process.env.NODE_ENV`
+    // `process` 는 브라우저 번들 런타임에 없을 수 있어 runtime guard 사용. Next.js webpack 이 `process.env.NODE_ENV`
     // 를 빌드 타임 치환 → prod bundle 에서는 `'development' !== 'production'` 이 false 가 되어 DCE.
     // SSR / 테스트 환경은 `globalThis.process` 유/무 가드로 안전 접근.
     //
