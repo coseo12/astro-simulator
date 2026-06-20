@@ -77,7 +77,9 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       rhea: 'saturn', // R11 #721
       iapetus: 'saturn', // R11 #721
       titania: 'uranus', // R8 #647
+      oberon: 'uranus', // R12 #725 — uranus 위성 2개째 (titania 와 같은 LineSystem 그룹)
       triton: 'neptune', // R9 #653 — 역행 위성 첫 사례 (parent 추적/분리는 궤도 방향 무관)
+      proteus: 'neptune', // R12 #725 — neptune 위성 2개째 (triton 과 같은 LineSystem 그룹)
     };
     for (const [satId, expectedParent] of Object.entries(satellites)) {
       const body = byId.get(satId);
@@ -97,6 +99,8 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     }
     // R9 시점: earth (moon) / mars (phobos, deimos) / jupiter (galilean 4) / saturn (titan #641)
     // / uranus (titania #647) / neptune (triton #653).
+    // R12 #725: oberon (uranus 2개째) / proteus (neptune 2개째) 추가 — 기존 parent 그룹에 합류
+    // (uranus/neptune 이미 존재) → parent 집합 6개 불변 (LineSystem 그룹 수 변경 0).
     expect([...parents].sort()).toEqual([
       'earth',
       'jupiter',
@@ -123,6 +127,14 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
     expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(10);
     // bodyId 미전달 (기존 호출) 은 parent saturn 룩업 fallback (회귀 0)
     expect(getOrbitVisualScale('saturn')).toBe(SATURN_SATELLITES_ORBIT_VISUAL_SCALE);
+  });
+
+  it('R12 #725 — 거성 위성 비대칭 (proteus per-body 220 / oberon parent ×50 양립)', () => {
+    // ADR 20260621-725 §축 2 — proteus 는 triton 안쪽 → per-body ×220. oberon 은 titania 바깥 → uranus ×50 양립.
+    expect(getOrbitVisualScale('neptune', 'proteus')).toBe(220); // per-body 우선
+    expect(getOrbitVisualScale('neptune', 'triton')).toBe(75); // triton 은 per-body 미정의 → parent ×75 (회귀 0)
+    expect(getOrbitVisualScale('uranus', 'oberon')).toBe(50); // oberon per-body 미추가 → uranus parent ×50
+    expect(getOrbitVisualScale('uranus', 'titania')).toBe(50); // titania parent ×50 (R8 박제 보존)
   });
 
   it('미매핑 parentId → 1.0 fallback (visual scale 미적용, 실측 그대로)', () => {

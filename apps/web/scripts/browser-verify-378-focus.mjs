@@ -85,6 +85,11 @@ const flags = {
 // R11 #721 — 토성계 위성 3 (enceladus/rhea/iapetus) 동기화 (CURRENT_R_PHASE=12 — 로드맵 v3 완주 후
 // 신규 콘텐츠 라운드). 순서는 solar-system.json 데이터 순서 (titan 다음, uranus 전) 정합 — filterBodiesByPhase
 // 가 데이터 순서로 반환하므로 #598 정적 매칭 가드 통과 위해 동일 순서 필수. showInShortcutBar=false (URL/클릭 진입).
+// R12 #725 — 거성 위성 2 (oberon/proteus) 동기화 (CURRENT_R_PHASE=13 — R11 후 신규 콘텐츠 라운드).
+// oberon 은 titania 다음 (neptune 전), proteus 는 triton 다음 (ceres 전) — solar-system.json 데이터 순서
+// 정합 (filterBodiesByPhase 데이터 순서 반환 → #598 정적 매칭 가드 통과 위해 동일 순서 필수). 둘 다
+// showInShortcutBar=false (URL/클릭 진입). proteus 는 Neptune 적도면 근접 (i 29.06° ecliptic, REF_PLANE=ECLIPTIC)
+// 이나 focus 진입/추적엔 무관 (triton 역행 선례 — 사실 정합).
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -106,8 +111,10 @@ const FOCUS_BODIES = [
   'iapetus',
   'uranus',
   'titania',
+  'oberon',
   'neptune',
   'triton',
+  'proteus',
   'ceres',
   'pluto',
   'haumea',

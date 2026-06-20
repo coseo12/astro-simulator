@@ -587,6 +587,29 @@
       }
     },
     {
+      "id": "oberon",
+      "kind": "moon",
+      "nameKo": "오베론",
+      "nameEn": "Oberon",
+      "mass": 2.883e21,
+      "radius": 7.614e5,
+      "parentId": "uranus",
+      "introducedInRPhase": 13,
+      "showInShortcutBar": false,
+      "$comment": "R12 #725 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-21 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Uranus-centric J2000 Ecliptic (osculating), REF_PLANE=ECLIPTIC 명시 (미지정 시 Uranus 적도면 반환 위험 — ADR 20260621-725 §축 4 / #721 이견 답습). Reference frame: 'Ecliptic of J2000.0' 응답 확인. Laplace plane 값 혼입 금지 — titania frame 답습. Horizons 원시값 (CENTER=500@799): IN=97.9056 / OM=167.7098 / W=156.6162 / MA=322.3855 → ϖ=OM+W mod 360=324.3260, L=ϖ+MA mod 360=286.7115. a/e 는 NASA Fact Sheet 박제값 (a=583,520 km / e=0.0014 — Horizons a 583,607 km 와 0.015% 일치). ecliptic inclination ~97.91° — titania 97.76° 와 클러스터, 세로 궤도 렌더가 사실 정합 (uranus 계 전체 누움, tilt 97.77° 고리 평면과 정렬 — D-T2 버그 오인 금지, titania §축 3 사전 등록 답습).",
+      "colorHint": { "hex": "#7A7065", "colorSource": "observed" },
+      "dataSource": "NASA Uranus Fact Sheet + JPL Horizons API (2026-06-21 쿼리, 2026-01-01 TDB epoch, Uranus-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-21",
+      "orbit": {
+        "semiMajorAxisAU": 3.90059e-3,
+        "eccentricity": 0.0014,
+        "inclinationDeg": 97.9056,
+        "longitudeOfAscendingNodeDeg": 167.7098,
+        "longitudeOfPerihelionDeg": 324.326,
+        "meanLongitudeDeg": 286.7115
+      }
+    },
+    {
       "id": "neptune",
       "kind": "planet",
       "nameKo": "해왕성",
@@ -658,6 +681,30 @@
         "longitudeOfAscendingNodeDeg": 222.6557,
         "longitudeOfPerihelionDeg": 231.5353,
         "meanLongitudeDeg": 272.3256
+      }
+    },
+    {
+      "id": "proteus",
+      "kind": "moon",
+      "nameKo": "프로테우스",
+      "nameEn": "Proteus",
+      "mass": 4.4e19,
+      "radius": 2.1e5,
+      "$radiusComment": "R12 #725 — 불규칙 다면체 (210×208×201 km) volumetric mean ~210 km 구체 근사 렌더 (사용자 합의 — 표면 디테일 비-범위, ADR 20260621-725 §비-범위). phobos/deimos 비구체 구체 근사 선례 답습.",
+      "parentId": "neptune",
+      "introducedInRPhase": 13,
+      "showInShortcutBar": false,
+      "$comment": "R12 #725 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-21 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Neptune-centric J2000 Ecliptic (osculating), REF_PLANE=ECLIPTIC 명시. Reference frame: 'Ecliptic of J2000.0' 응답 확인. ⚠️ proteus 는 Neptune 적도면 근접 궤도 (Horizons ecliptic IN=29.0594°) 라 REF_PLANE 미지정 시 Neptune 적도면 반환 → 황도면 기준 기존 triton (i 129.14° ecliptic) 과 ~28° 평면 어긋남 위험 (해왕성계 정합 붕괴 — ADR 20260621-725 §축 4 핵심, #721 enceladus Saturn 적도면 동형 이견). REF_PLANE=ECLIPTIC 명시로 triton 과 동일 황도면 정합. Laplace plane 값 혼입 금지. Horizons 원시값 (CENTER=500@899): IN=29.0594 / OM=48.7108 / W=28.9999 / MA=51.8972 → ϖ=OM+W mod 360=77.7107, L=ϖ+MA mod 360=129.6079. a/e 는 NASA Fact Sheet 박제값 (a=117,647 km / e=0.00053 — Horizons a 117,674 km 와 0.023% 일치). 해왕성 2번째 위성 (triton 다음, 최내곽 — Adams ring 외곽 근접 a 0.000786 AU).",
+      "colorHint": { "hex": "#8A8278", "colorSource": "observed" },
+      "dataSource": "NASA Neptune Fact Sheet + JPL Horizons API (2026-06-21 쿼리, 2026-01-01 TDB epoch, Neptune-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-21",
+      "orbit": {
+        "semiMajorAxisAU": 7.86422e-4,
+        "eccentricity": 0.00053,
+        "inclinationDeg": 29.0594,
+        "longitudeOfAscendingNodeDeg": 48.7108,
+        "longitudeOfPerihelionDeg": 77.7107,
+        "meanLongitudeDeg": 129.6079
       }
     },
     {

@@ -88,7 +88,9 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
 // 후미 컨벤션). encke/swift-tuttle 는 false (focus 가능 + bar 미등록 — #617 직교 축 합류) → 비대상.
 // R11 #721 — 토성계 위성 3 (enceladus/rhea/iapetus) 진입 (CURRENT_R_PHASE=12). 3개 모두
 // showInShortcutBar=false (titan/galilean/titania/triton 위성 패턴) → 본 enabled 배열 변경 0 (비대상).
-// URL/클릭 focus 진입 검증은 browser-verify-378-focus.mjs FOCUS_BODIES 가 커버 (R7~R10b 선례 답습).
+// R12 #725 — 거성 위성 2 (oberon/proteus) 진입 (CURRENT_R_PHASE=13). 둘 다 showInShortcutBar=false
+// (위성 패턴) → 본 enabled 배열 변경 0 (비대상). #613 Concrete Prediction 재현 (배열 변경 0).
+// URL/클릭 focus 진입 검증은 browser-verify-378-focus.mjs FOCUS_BODIES 가 커버 (R7~R11 선례 답습).
 const RPHASE_EXPECTED_ENABLED = [
   'sun',
   'mercury',
