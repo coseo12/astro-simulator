@@ -57,6 +57,8 @@ web(`sim-canvas.tsx`) `onPointerObservable` POINTERUP 핸들러 (클로저 로�
 
 > **dedup 규칙 (구현 인계)**: `multiPick` 결과를 `distance` 오름차순으로 순회하며 `bodyId` 가 이미 본 적 없으면 리스트에 push(첫 등장 = ray 최근접 variant). `Set<string>` seen 가드. LOD fade 전환 중 동일 bodyId 2 variant hit 도 dedup 으로 1회만 등장(무해). 결과 = **bodyId 깊이순 distinct 리스트** `string[]`.
 
+> **⚠️ 구현 실측 보정 (Amendment 2026-06-20, developer measurement-first)** — 본 결정의 "`scene.multiPick` 이 `distance` 오름차순 **내장**" 전제는 **부정확**. Babylon `InternalMultiPick`(ray.core.js) 실측 결과 mesh array 순회 순서대로 `PickingInfo` 를 push 할 뿐 **distance 정렬을 보장하지 않는다**. 따라서 구현(`body-picking.ts` `resolvePickedBodyIds`)은 dedup 전에 **`distance` 오름차순 명시 정렬**을 추가했다(주석 박제). dedup 규칙(첫 등장=최근접)의 정확성은 이 명시 정렬에 의존하므로 정렬 단계 제거 금지. 결정 자체(채택 A)는 유효 — 정렬을 Babylon 내장으로 가정한 전제만 정정. 일반화: 외부 라이브러리의 "정렬/순서 보장" 가정은 가설로 두지 말고 실측 후 명시 보강(measurement-first).
+
 ### 결정 2 — cycle 상태 추적 위치 (web 핸들러 로컬 vs core 헬퍼 opts)
 
 | 후보                                                                 | 장점                                                                                                                                                                                                                                   | 단점                                                                                                                                                                    |
