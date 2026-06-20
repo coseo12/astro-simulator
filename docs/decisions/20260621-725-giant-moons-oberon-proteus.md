@@ -1,6 +1,6 @@
 # ADR: R12 거성 위성 확장 2개 (Oberon / Proteus) — uranus 단일 룩업 양립 (oberon) + neptune `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` per-body (proteus, 최내곽 binding)
 
-- **상태**: **Provisional** (신규 ADR cross-validate 발동 — CLAUDE.md §ADR Status 워크플로 #370. cross-validate 결과 §교차검증 반영 사항 본문 통합 후 Provisional → Accepted 전이)
+- **상태**: **Accepted** (cross-validate 2026-06-21 agy outcome=applied — §교차검증 반영 사항 합의/고유발견 2/셀프체크 박제, Adams ring 가독성 D-T2 developer/qa 인계)
 - **날짜**: 2026-06-21
 - **결정자**: architect (R12 거성 위성 확장 — 사용자 합의 범위 2026-06-21: Oberon(천왕성)/Proteus(해왕성) 2개 / showInShortcutBar=false / Proteus 구체 근사. 거성 균형 — 각 2번째 위성 1개). 메인 오케스트레이터가 사용자와 합의한 범위 위에서 scale/orbit/allowlist 결정.
 - **관련**:
@@ -411,11 +411,26 @@ predicate = 활성 LOD variant (isVisible && isEnabled) + metadata.bodyId 존재
 
 ---
 
-## 교차검증 반영 사항 (agy 2026-06-21, outcome=429-fallback-claude-only)
+## 교차검증 반영 사항 (cross-validate 2026-06-21 agy outcome=applied)
 
-> **`claude-only analysis completed — 단일 모델 편향 노출 미확보`** — cross-validate 1회 호출 (CLAUDE.md §교차검증 — 앵커 "ADR 신규") 시도 2회 모두 agy (Antigravity CLI) 비응답 (1차: empty stdout/stderr fatal-error / 2차 재시도: 300s timeout 초과 hang → kill). agy 응답성 transient 장애 (volt 기록 패턴 — 첫 호출 empty 후 단순 probe 는 복구되나 대형 ADR 프롬프트에서 재-hang). 단일 모델 편향 노출 미확보 상태로 본 ADR 은 **Provisional 유지** (cross-validate 결과 본문 통합 불가 → Accepted 전이 보류). agy 복구 후 재검증 경로 보장 — reminder 이슈 dry-run 기록 (`.claude/logs/cross-validate-architecture-20260621-002403-outcome.json`).
+> architect 1차 시도는 agy 2회 비응답(empty fatal-error + 300s timeout hang)으로 미확보 → **메인 오케스트레이터가 agy 복구(probe READY) 후 재시도**(`cross-validate-architecture-20260621-011414`, outcome=applied)하여 외부 시각 확보. agy 평가: **"R11 유산·헬퍼 100% 재사용으로 코어 코드 변경 범위를 0으로 묶은 극도로 안정적 설계, 비대칭 스케일링 정합성 뛰어남"** → Accepted 추천(조건부 — Adams ring 가독성 D-T2 실측 후).
 >
-> **claude-only 재분석 결과 (단일 모델 — 외부 시각 미확보 명시)**: 아래 4종 질문에 대한 Claude 자체 재검토. 외부 모델 합의/이견 없이 self-review 한계 인지.
+> ### 합의 (agy — 핵심 결정 전부)
+>
+> - **oberon uranus ×50 parent 양립**(마진 2.22x, per-body 불필요 = 미니멀리즘·복잡도 통제 우수) / **proteus ×220 per-body**(neptune ×75 단일 시 0.56x 본체·고리 묻힘, triton 회귀 보존 위해 proteus만 분리 = 가장 합리적 절충) / **scale 이원화**(oberon 500 사실비율, proteus billboard fallback D-T2) / **REF_PLANE=ECLIPTIC**(proteus i~28° Neptune 적도면 근접 — 미지정 시 triton ecliptic 과 28° 비틀림 원천 차단) / **Concrete Prediction 코어 0**(getOrbitVisualScale generic 재사용) — agy 전부 명시 지지.
+> - agy 일반화 인정: "기존 binding 위성보다 안쪽 궤도 → per-body, 바깥 → parent 공유+fallback" 아키텍처 확장 표준 수립 (Miranda/Nereid 등 후속 적용).
+>
+> ### 고유 발견 — 범위 내 수용 (developer/qa 인계)
+>
+> - **(② Adams ring 가독성 D-T2)** — proteus ×220 마진 1.64x 는 Adams ring 외곽에 궤도선 형성. 고리 mesh opacity/궤도선 두께에 따라 뭉쳐 클릭 피킹 어렵거나 시각 노이즈 가능 → **developer/qa D-T2 필수 체크: Adams ring outer boundary ↔ proteus 궤도선 물리 거리 가독성. 시각 침범 확인 시 ×235(마진 1.75x) scale up Amendment**. #721 enceladus ring occlusion D-T2 와 동형.
+>
+> ### 기각 / 후속 (범위 밖)
+>
+> - **(① Proteus 구체 근사 고지 문구)** — agy 가 UI 툴팁에 "불규칙 다면체를 구체 근사" 고지 권고. 그러나 **현재 모든 위성(phobos/deimos 비구체 포함)이 구체 근사**인데 proteus 만 고지하면 비일관 → 전체 위성 비구체 고지 정책은 별도 후속(본 라운드 비-범위 "표면 디테일"과 직교). 기각 — 향후 일괄 정책 시 반영.
+>
+> ### Claude 편향 셀프 체크 (4종) + 1차 claude-only 자체 재분석
+>
+> 아래는 architect 1차 claude-only 분석 — agy 재검증으로 **결합 간과(비대칭 판정)·순수주의(billboard) 셀프 통과가 외부 합의로 확인**됨(agy 질문 1·2 명시 지지), 질문 3(REF_PLANE)·4(코어 0)도 agy 합의. (본문의 "외부 검증 미확보" 표현은 1차 시점 기록 — 재시도 applied 로 해소.)
 
 ### 호출 전 Claude 편향 셀프 체크
 
