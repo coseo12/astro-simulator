@@ -206,7 +206,9 @@ async function measureBodyPxRatios(page) {
     // 0.085~0.460 sub-px, billboard 전면 의존 — 8번째 그룹 (ADR 20260612-r10b §축 7).
     // R11 #721 — 토성계 위성 3 (enceladus/rhea/iapetus) 전부 N/A (미박제 — 측정만). 식 px
     // 0.45~1.35 sub-px, billboard 4px fallback 전면 의존 — 9번째 그룹 (ADR 20260620-721 §축 1).
-    // 순서는 데이터 순서 (titan 다음, uranus 전) — #619 정적 매칭 가드 통과 필수.
+    // R12 #725 — 거성 위성 2 (oberon/proteus) 전부 N/A (미박제 — 측정만). 식 px 0.45~2.70 sub-4px,
+    // billboard 4px fallback 전면 의존 — 10번째 그룹 (ADR 20260621-725 §축 1). oberon 은 titania 다음
+    // (neptune 전), proteus 는 triton 다음 (ceres 전) — 데이터 순서 #619 정적 매칭 가드 통과 필수.
     const targetIds = [
       'sun',
       'mercury',
@@ -228,8 +230,10 @@ async function measureBodyPxRatios(page) {
       'iapetus',
       'uranus',
       'titania',
+      'oberon',
       'neptune',
       'triton',
+      'proteus',
       'ceres',
       'pluto',
       'haumea',
