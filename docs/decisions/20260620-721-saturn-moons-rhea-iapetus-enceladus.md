@@ -1,6 +1,6 @@
 # ADR: R11 토성계 위성 확장 3개 (Rhea / Iapetus / Enceladus) — body scale + orbit visual scale binding 재산출 (enceladus 최내곽 binding + `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` 신규 룩업 첫 발동)
 
-- **상태**: **Provisional** (신규 ADR — cross-validate 발동 대상. CLAUDE.md §ADR Status 워크플로 #370: cross-validate 결과 §교차검증 반영 사항 본문 통합 전까지 Provisional. 통합 후 Accepted 전이)
+- **상태**: **Accepted (cross-validate 2026-06-20 agy outcome=applied)** (신규 ADR cross-validate 발동 — CLAUDE.md §ADR Status 워크플로 #370. cross-validate 결과 §교차검증 반영 사항 본문 통합 완료 → Provisional → Accepted 전이)
 - **날짜**: 2026-06-20
 - **결정자**: architect (R11 토성계 위성 확장 — 사용자 합의 범위 2026-06-20: Rhea/Iapetus/Enceladus 3개 / showInShortcutBar=false / 모천체 saturn 기존). 메인 오케스트레이터가 사용자와 합의한 범위 위에서 scale/orbit/allowlist 결정.
 - **관련**:
@@ -241,6 +241,25 @@ enceladus 마진 1.5 충족 = ×43, 1.65 (titania/triton 선례) = ×47.
 4. **iapetus 과분리 회피** — iapetus 는 a 가 이미 크므로 (titan 의 2.9배) ×10 으로 자동 안전. 단일 ×47 (후보 A) 의 55배 과분리 회피 — iapetus 를 ×10 으로 두면 saturn mesh 의 5.5배 거리 (자연스러움)
 5. **fallback `ORBIT_VISUAL_SCALE_BY_PARENT` 호환** — 신규 per-body 룩업 미정의 시 기존 parent 룩업으로 fallback (earth/mars/jupiter/uranus/neptune 위성은 per-body 룩업 미사용 — 코드 0 회귀). titan 은 per-body 에 명시 (saturn parent 룩업과 동시 존재 시 per-body 우선)
 
+#### getter 시그니처 명문화 (cross-validate agy 합의 — 본문 승격)
+
+신규 per-body 룩업은 기존 `getOrbitVisualScale(parentId)` 를 **optional 2번째 인자로 확장**해 호출처 호환 (호출처 변경 최소화):
+
+```typescript
+// packages/core/src/scene/orbit-visual-scale.ts
+export function getOrbitVisualScale(parentId: string | null | undefined, bodyId?: string): number {
+  // 1) per-body 룩업 우선 (saturn 위성 — enceladus 47 / rhea 20 / titan 10 / iapetus 10)
+  if (bodyId !== undefined && ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId] !== undefined) {
+    return ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId];
+  }
+  // 2) parent 룩업 fallback (earth/mars/jupiter/uranus/neptune 위성 — 기존 동작 보존)
+  if (parentId === null || parentId === undefined) return DEFAULT_ORBIT_VISUAL_SCALE;
+  return ORBIT_VISUAL_SCALE_BY_PARENT[parentId] ?? DEFAULT_ORBIT_VISUAL_SCALE;
+}
+```
+
+3계층 Graceful Degradation: per-body 룩업 → parent 룩업 → `DEFAULT_ORBIT_VISUAL_SCALE` (1.0). 호출처 (`resolveWorld` / `rebuildOrbitLines`) 는 satellite 의 `bodyId` 를 2번째 인자로 전달 (변경 ≤ 2줄). bodyId 미전달 호출처는 기존 parent fallback 으로 회귀 0.
+
 > **Concrete Prediction 영향**: 본 축이 **"코드 0 보장 불가 축"** (R10b 혜성 chord 조건부 축 패턴 동형). 신규 per-body 룩업 + getter 분기 = **코어 ~10줄 신규**. 나머지 축 (scale/allowlist/picking) 은 코드 0. §결과·재검토 §Concrete Prediction 참조.
 
 > **D-T2 검증 의무** — 4 위성 궤도선이 saturn focus 에서 ring 밖으로 분리 + iapetus 가 화면 안 (×10) + enceladus 가 ring 바로 밖 (×47). 산식 A (설계 임계) 와 산식 B (runtime 실측) 직접 비교 금지 (#622 NO-OP SSoT). 궤도선-ring 시각 간섭 보고 시 enceladus ×47→×50 fallback.
@@ -294,7 +313,9 @@ Laplace plane 값 혼입 금지                                  ← P10-D galil
 3. **iapetus 경사 주의** — iapetus 는 Saturn 적도면 경사 ~7.6° 이나 Laplace plane (적도↔Ecliptic 사이) 경사가 크고 가변. **Ecliptic 변환값을 Horizons 에서 직접 취득** (수동 계산 금지 — frame 혼입 위험). developer 가 `$comment` 에 Horizons 원시값 (IN/OM/W/MA) 박제
 4. **frame 혼입 금지 명시** — 각 위성 `$comment` 에 "Laplace plane 값 혼입 금지" 박제 (titan / galilean 선례)
 
-> **developer 의무** — 3 위성 각각 JPL Horizons API 쿼리 (2026-01-01 TDB). `$comment` 에 Horizons 원시값 + 변환 공식 + frame 박제 (titan 항목 L? `$comment` 형식 답습).
+> **developer 의무** — 3 위성 각각 JPL Horizons API 쿼리 (2026-01-01 TDB). `$comment` 에 Horizons 원시값 + 변환 공식 + frame 박제 (titan 항목 `$comment` 형식 답습).
+>
+> ⚠️ **`REF_PLANE=ECLIPTIC` 명시 필수 (cross-validate agy 이견 수용 2026-06-20)** — Horizons 쿼리 시 reference plane 을 명시하지 않으면 기본값이 **Saturn 적도면 (Saturn Equator)** 으로 반환될 수 있다. 이 경우 황도면 기준으로 렌더되는 기존 titan 궤도와 신규 위성 평면이 **~28° 어긋나** 토성계 전체 궤도 정합성이 붕괴한다 (심각한 visual 버그). developer 는 Horizons 쿼리 옵션에 `REF_PLANE=ECLIPTIC` (또는 동등 황도면 지정) 을 **명시 박제** + `$comment` 에 frame 기준 평면을 명기. titan §위험 #6 의 "Laplace plane 혼입 금지" 추상 원칙을 **실행 가능한 쿼리 파라미터 가드로 승격**.
 
 ---
 
@@ -320,6 +341,8 @@ predicate = 활성 LOD variant (isVisible && isEnabled) + metadata.bodyId 존재
 4. **occlusion** — multiPick depth 정렬 + bodyId dedup (첫 등장) + 직전 id 앵커 wrap (#719 §결정). 신규 위성 자동 포함
 
 > **D-T2 검증 의무** — saturn 위 겹친 위성 반복 클릭 시 cycle 동작 (enceladus↔rhea↔titan↔saturn). #719 회귀 0 확인.
+>
+> **ring 외곽 occlusion 관찰 추가 (cross-validate agy 이견 수용 2026-06-20)** — enceladus 는 visual scale ×47 적용 후 visual orbit 가 **F ring outer mesh 바로 밖 (마진 1.64x)** 이라 ring 외곽 mesh 와 인접한다 (enceladus 실측 a 238040km 는 F ring outer 140680km 의 1.69배 밖이므로 물리적으로는 ring 밖 — E ring 은 본 프로젝트 미렌더라 E ring occlusion 위험은 없음). D-T2 에서 **enceladus billboard/궤도선이 F/A ring 외곽 alpha mesh 에 가려져 식별 불가한지** 관찰. 가려지면 enceladus ×47→×50 (마진 1.75x, ring 에서 더 분리) fallback (§재검토 트리거 #2).
 
 ---
 
@@ -370,6 +393,39 @@ predicate = 활성 LOD variant (isVisible && isEnabled) + metadata.bodyId 존재
 - **단일 룩업 재도입 검토 조건**: 후속 라운드에서 토성 위성이 **a 편차 ≤ 5배 부분집합만** 추가되거나, 위성 데이터 재정의로 enceladus/iapetus 극단이 제거되면 per-body 룩업 불필요 → `ORBIT_VISUAL_SCALE_BY_PARENT` 단일 룩업 회귀 검토. 단 본 ADR per-body 룩업이 이미 SSoT 라 회귀 비용 > 유지 비용 (현실적으로 per-body 유지)
 - **Graceful Degradation**: per-body 룩업 미정의 위성은 `ORBIT_VISUAL_SCALE_BY_PARENT` parent 룩업 fallback → `DEFAULT_ORBIT_VISUAL_SCALE` (1.0) 자동 안전
 - **재도입 시 선행 작업**: 단일 룩업 회귀 시 per-body 박제값 (enceladus 47 / rhea 20 / iapetus 10) 을 parent 단일값으로 통합 가능한지 binding 재산출 필요
+
+---
+
+## 교차검증 반영 사항 (agy 2026-06-20, outcome=applied)
+
+> cross-validate 1회 호출 (CLAUDE.md §교차검증 — 앵커 "ADR 신규"). 명시 질문 4종 (Claude 편향 셀프체크: 결합 간과 / 순수주의 / R-Phase 전이 / JPL frame) 삽입. agy 응답 outcome=applied (exit 0), plan_bypass=false (#479 가드 통과).
+
+### 호출 전 Claude 편향 셀프 체크
+
+- **낙관적 일정**: N/A (설계 ADR — 일정 추정 없음). 통과
+- **결합 간과**: enceladus binding 이동 (titan→enceladus) + iapetus 과분리 결합을 §축 2 에서 명시 분석 — **셀프 통과**. 단 cross-validate 에 핵심 질문 1 로 명시 삽입 (양립 불가 분석 타당성 + per-body 룩업 과잉설계 여부)
+- **폐기 프레이밍**: 단일 룩업을 "폐기" 아닌 "조건부 유지" + §재도입 트리거 박제 — 통과
+- **순수주의**: enceladus 사실 비율 위배 (billboard fallback) 를 Visual Fidelity §1 로 정당화 + developer D-T2 위임 — 통과. 단 질문 2 로 명시 삽입 (단일 권고 확정 vs D-T2 위임)
+
+### 합의 — Claude 설계와 일치 (즉시 반영/강화)
+
+1. **per-body 룩업 도입 = R5 §위험 #6 인계의 정당한 첫 발동** (질문 1): agy "100% 타당. 단일 ×47 시 iapetus 1.119 AU 과분리 / 단일 ×20 시 enceladus 0.70x ring 묻힘 — 양극단 양립 불가가 수학적으로 확고. per-body 룩업은 과잉설계 아닌 예견된 추상화의 실전 적용". Claude §축 2 후보 C 결정과 정확 일치 — 강화
+2. **enceladus scale 250↔500 D-T2 위임 적절** (질문 2): agy "250/500 모두 1px 미만 (0.45px/0.90px) → 동일 billboard fallback. 이론 배율이 화면 가시성 차이로 직접 이어지지 않으므로 developer GUI 대조 확정이 타당". Claude measurement-first 위임과 일치 — 강화
+3. **introducedInRPhase=12 (R11 신규 라운드) 절대 타당** (질문 3): agy "phase 11 편입은 형상 관리 drift + 릴리스 정합성 붕괴. #613 자동 처리 위해 CURRENT_R_PHASE 12 증분이 깔끔". Claude §축 3 후보 B 결정과 일치 — 강화
+4. **getOrbitVisualScale optional bodyId 시그니처** (개선 제안): agy 가 `getOrbitVisualScale(parentId: string, bodyId?: string): number` fallback 명문화 제안. Claude §Concrete Prediction 실패 대응 (a) 에 이미 박제 — agy 독립 제기로 합의 강화. **§축 2 Concrete Prediction 시그니처를 본문 명시값으로 승격**
+
+### 이견 수용 — agy 근거가 합리적이어서 보강한 항목
+
+1. **JPL Horizons `REF_PLANE=ECLIPTIC` 명시 필수** (질문 4 — agy 고유 위험 발견): Claude 원안은 "Saturn-centric J2000 Ecliptic / Laplace plane 혼입 금지" 를 **frame 이름 수준**으로 박제. agy 가 **구체적 쿼리 파라미터 위험** 을 제기 — "Horizons 쿼리 시 `REF_PLANE=ECLIPTIC` 미지정 시 기본값이 Saturn 적도면 (Saturn Equator) 으로 반환될 수 있어, 황도면 기준 기존 titan 궤도와 신규 위성 평면이 ~28° 어긋나 씬 정합성 붕괴". **수용** — §축 4 developer 의무에 `REF_PLANE=ECLIPTIC` 파라미터 명시 필수 추가 (아래 §축 4 보강). 원안 (frame 이름) → 수정안 (쿼리 파라미터 구체화) 으로 강화. titan §위험 #6 의 추상 원칙을 실행 가능한 쿼리 가드로 승격
+2. **D-T2 ring occlusion 검증 항목 추가** (agy 누락 요소 발견 — **부분 수정**): agy "enceladus 는 물리적으로 E ring 한가운데 → ring occlusion 으로 D-T2 식별 불가 가능". **실측 정정 후 부분 수용** — 본 프로젝트는 **E ring 미렌더** (R7 §비-범위, 렌더 ring = D/C/B/A/F 5층뿐). enceladus 실측 a (238040km) 는 F ring outer (140680km) 의 1.69배 밖이라 물리적으로 ring 밖. 단 **visual scale ×47 적용 후 enceladus visual orbit 가 F ring outer mesh 바로 밖 (마진 1.64x)** 이라 ring 외곽 mesh 와 인접 → D-T2 occlusion 관찰 가치 있음. agy 의 "E ring" 지목은 기각 (미렌더), "ring 외곽 인접 occlusion 관찰" 은 수용 → §축 5 D-T2 항목에 추가
+
+### Claude 재분석으로 기각한 agy 제안
+
+- **E ring 레이어 occlusion (질문 외 누락 요소)**: agy "E ring 렌더링 시 enceladus 가려짐 가능" — **기각**. 본 프로젝트 saturn.rings 데이터는 D/C/B/A/F 5층만 (E ring 은 R7 §비-범위에서 "극히 faint·범위 8배" 명시 제외). E ring 자체가 미렌더이므로 E ring occlusion 위험 0. 단 위 §이견 수용 #2 처럼 **F/A ring 외곽 mesh 인접 occlusion** 으로 재해석해 D-T2 항목만 추가 (E ring 전제는 기각)
+
+### 고유 발견 (후속 분리)
+
+- 없음. agy 발견 (REF_PLANE / ring occlusion) 모두 본 스프린트 범위 내 (§축 4 / §축 5 보강) 로 즉시 반영. 비목표 (다른 거성 위성 / 토성 추가 위성 / 표면 텍스처) 와 상충하는 고유 발견 없음 → 후속 이슈 분리 불필요
 
 ---
 
