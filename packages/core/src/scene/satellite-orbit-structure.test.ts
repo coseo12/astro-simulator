@@ -29,6 +29,7 @@ import {
   EARTH_MOON_ORBIT_VISUAL_SCALE,
   MARS_SATELLITES_ORBIT_VISUAL_SCALE,
   JUPITER_SATELLITES_ORBIT_VISUAL_SCALE,
+  SATURN_SATELLITES_ORBIT_VISUAL_SCALE,
   DEFAULT_ORBIT_VISUAL_SCALE,
 } from './orbit-visual-scale.js';
 
@@ -62,7 +63,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     }
   });
 
-  it('moon/phobos/deimos/galilean/titan 은 satellite (parent 별 분리)', () => {
+  it('moon/phobos/deimos/galilean/titan/saturn-moons 은 satellite (parent 별 분리)', () => {
     const satellites: Record<string, string> = {
       moon: 'earth',
       phobos: 'mars',
@@ -72,6 +73,9 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       ganymede: 'jupiter',
       callisto: 'jupiter',
       titan: 'saturn', // R7 #641
+      enceladus: 'saturn', // R11 #721 — saturn 위성 4개째 (titan 과 같은 LineSystem 그룹)
+      rhea: 'saturn', // R11 #721
+      iapetus: 'saturn', // R11 #721
       titania: 'uranus', // R8 #647
       triton: 'neptune', // R9 #653 — 역행 위성 첫 사례 (parent 추적/분리는 궤도 방향 무관)
     };
@@ -109,6 +113,16 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
     expect(getOrbitVisualScale('earth')).toBe(EARTH_MOON_ORBIT_VISUAL_SCALE);
     expect(getOrbitVisualScale('mars')).toBe(MARS_SATELLITES_ORBIT_VISUAL_SCALE);
     expect(getOrbitVisualScale('jupiter')).toBe(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE);
+  });
+
+  it('R11 #721 — saturn 위성은 per-body 룩업 우선 (bodyId 전달 시 enceladus 47/rhea 20/iapetus 10, titan 10)', () => {
+    // ADR 20260620-721 §축 2 — rebuildOrbitLines/resolveWorld 가 body.id 를 2번째 인자로 전달.
+    expect(getOrbitVisualScale('saturn', 'enceladus')).toBe(47);
+    expect(getOrbitVisualScale('saturn', 'rhea')).toBe(20);
+    expect(getOrbitVisualScale('saturn', 'titan')).toBe(10);
+    expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(10);
+    // bodyId 미전달 (기존 호출) 은 parent saturn 룩업 fallback (회귀 0)
+    expect(getOrbitVisualScale('saturn')).toBe(SATURN_SATELLITES_ORBIT_VISUAL_SCALE);
   });
 
   it('미매핑 parentId → 1.0 fallback (visual scale 미적용, 실측 그대로)', () => {

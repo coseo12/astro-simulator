@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 순서로 정확히 27개', () => {
+  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 + R11 토성 위성 3 순서로 정확히 30개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -40,6 +40,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'callisto',
       'saturn',
       'titan',
+      'enceladus', // R11 #721 — 토성계 위성 3 (데이터 등장 순, titan 다음 uranus 전)
+      'rhea',
+      'iapetus',
       'uranus',
       'titania',
       'neptune',
@@ -49,7 +52,7 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'haumea',
       'makemake',
       'eris',
-      'halley', // R10b #664 — 혜성 3 (데이터 등장 순, 전 데이터 소진 — 로드맵 v3 최종 라운드)
+      'halley', // R10b #664 — 혜성 3 (데이터 등장 순)
       'encke',
       'swift-tuttle',
     ]);
@@ -59,9 +62,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 27개 (CURRENT_R_PHASE=11 필터 — 전 데이터 소진, 미진입 body 0)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R10b #664 진입 27개 (위 toEqual).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(27);
+  it('자동 생성 결과 30개 (CURRENT_R_PHASE=12 필터 — R11 토성 위성 3 자동 포함)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R11 #721 진입 30개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(30);
   });
 });
 
@@ -75,8 +78,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 11 (R10b 혜성 3 까지 — 전 데이터 소진, 로드맵 v3 최종 라운드)', () => {
-    expect(CURRENT_R_PHASE).toBe(11);
+  it('CURRENT_R_PHASE 는 12 (R11 토성계 위성 3 까지 — 로드맵 v3 완주 후 신규 콘텐츠 라운드)', () => {
+    expect(CURRENT_R_PHASE).toBe(12);
   });
 
   it('filterBodiesByPhase(CURRENT_R_PHASE) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -109,11 +112,16 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     ]);
   });
 
-  it('R7 시뮬레이션 — phase 7 은 saturn + titan 까지 15개 (uranus/titania 제외)', () => {
+  it('R7 시뮬레이션 — phase 7 은 saturn + titan 까지 15개 (R11 위성 3 = phase 12 자동 제외)', () => {
+    // R11 #721 — enceladus/rhea/iapetus 가 데이터상 titan 다음 위치하나 introducedInRPhase=12 > 7
+    // 이라 phase 7 필터에서 자동 제외 → R7 시뮬 길이 15 불변 (회귀 0, 데이터 순서 비종속 입증).
     const r7 = filterBodiesByPhase(bodies, 7);
     expect(r7.length).toBe(15);
     expect(r7).toContain('saturn');
     expect(r7).toContain('titan');
+    expect(r7).not.toContain('enceladus'); // R11 위성 — phase 12, phase 7 제외
+    expect(r7).not.toContain('rhea');
+    expect(r7).not.toContain('iapetus');
     expect(r7).not.toContain('uranus');
     expect(r7).not.toContain('titania');
   });
@@ -148,14 +156,25 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     }
   });
 
-  it('R10b — phase 11 = 현재 자동 생성 allowlist 와 동치 27 body (혜성 3 자동 포함 — CURRENT_R_PHASE=11 1줄 적중)', () => {
-    // R10a 의 "phase 11 시뮬레이션 예고" 테스트를 R_PHASE_BODY_ALLOWLIST 동치 단언으로 승격 (ADR §축 2).
+  it('R10b — phase 11 고정 시뮬은 27 body (R11 위성 3 = phase 12 제외 — R10b/R11 경계 가드)', () => {
+    // R11 #721 진입 후에도 phase 11 고정 시뮬레이션은 27 body — 분리 메커니즘 경계 가드 (R10a phase 10 = 24 동형).
     const r11 = filterBodiesByPhase(bodies, 11);
-    expect(r11).toEqual([...R_PHASE_BODY_ALLOWLIST]);
     expect(r11.length).toBe(27);
     expect(r11).toContain('halley');
-    expect(r11).toContain('encke');
     expect(r11).toContain('swift-tuttle');
+    for (const id of ['enceladus', 'rhea', 'iapetus']) {
+      expect(r11, `${id} 는 phase 12 (R11) — phase 11 제외`).not.toContain(id);
+    }
+  });
+
+  it('R11 — phase 12 = 현재 자동 생성 allowlist 와 동치 30 body (위성 3 자동 포함 — CURRENT_R_PHASE=12 1줄 적중)', () => {
+    // R10b 의 "phase 11 동치" 테스트를 phase 12 동치로 승격 (ADR 20260620-721 §축 3 — #613 자동 생성 8번째 실전).
+    const r12 = filterBodiesByPhase(bodies, 12);
+    expect(r12).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+    expect(r12.length).toBe(30);
+    expect(r12).toContain('enceladus');
+    expect(r12).toContain('rhea');
+    expect(r12).toContain('iapetus');
   });
 
   it('혜성 3 body 는 introducedInRPhase === 11 (R10a/R10b 분리 메커니즘 — ADR 20260611-r10a §축 2 재박제 회귀 가드)', () => {
@@ -167,10 +186,19 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     }
   });
 
-  it('모든 body 에 introducedInRPhase 부여 (1~11 범위 — phase 11 = R10b 혜성)', () => {
+  it('토성계 위성 3 body 는 introducedInRPhase === 12 (R11 #721 — 로드맵 v3 완주 후 신규 콘텐츠 라운드)', () => {
+    const saturnMoons = bodies.filter((b) => ['enceladus', 'rhea', 'iapetus'].includes(b.id));
+    expect(saturnMoons.length).toBe(3);
+    for (const m of saturnMoons) {
+      expect(m.introducedInRPhase, `${m.id} 는 R11 (phase 12) 박제여야 함`).toBe(12);
+      expect(m.parentId, `${m.id} parent 는 saturn`).toBe('saturn');
+    }
+  });
+
+  it('모든 body 에 introducedInRPhase 부여 (1~12 범위 — phase 12 = R11 토성 위성)', () => {
     for (const b of bodies) {
       expect(b.introducedInRPhase, `${b.id} introducedInRPhase 누락`).toBeGreaterThanOrEqual(1);
-      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(11);
+      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(12);
     }
   });
 });
@@ -192,6 +220,9 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('callisto')).toBe(true); // R6 #621
     expect(isRPhaseFocusable('saturn')).toBe(true); // R7 #641
     expect(isRPhaseFocusable('titan')).toBe(true); // R7 #641
+    expect(isRPhaseFocusable('enceladus')).toBe(true); // R11 #721 — 토성계 위성 3 (URL/클릭 진입)
+    expect(isRPhaseFocusable('rhea')).toBe(true); // R11 #721
+    expect(isRPhaseFocusable('iapetus')).toBe(true); // R11 #721
     expect(isRPhaseFocusable('uranus')).toBe(true); // R8 #647
     expect(isRPhaseFocusable('titania')).toBe(true); // R8 #647
     expect(isRPhaseFocusable('neptune')).toBe(true); // R9 #653

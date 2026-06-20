@@ -137,6 +137,12 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   halley: 5000, // R10b #664 — 식 px 0.195 sub-px (billboard 전면 의존). e=0.96714 그룹 최대 이심률 + 역행 (i 162.26°). volumetric mean 구체 근사 ($radiusComment)
   encke: 5000, // R10b #664 — 식 px 0.085 그룹 최소 (radius 2.4 km). 근일점 0.337 AU = 4.23 unit > sun mesh 1.46 unit (×2.9 여유 — ADR §축 3)
   'swift-tuttle': 5000, // R10b #664 — 그룹 최대 radius (1.3e4). swift-tuttle×5000 < ceres×800 (비 0.173 — cross-group 사실 서열 보존) + 역행 (i 113.45°)
+  // R11 #721 — 토성계 위성 3개 (rhea/iapetus 250 + enceladus 250). satellite mesh 비율 수렴대 [0.05~0.09] 정합.
+  // titan=100 직접 답습 시 0.026 과소 → ~250 으로 수렴대 진입. 4개 모두 sub-pixel billboard fallback (LOD Phase 2 #391).
+  // ADR 20260620-721 §축 1. enceladus 는 measurement-first D-T2 로 250 확정 (250/500 둘 다 sub-4px, agy 합의).
+  rhea: 250, // R11 #721 — rhea/saturn mesh 비 0.0660 (moon/earth 0.068 / titan/saturn 0.089 수렴대 중앙). 실측 px 1.35 sub-4 fallback (developer 실측 2026-06-20). ADR §축 1
+  iapetus: 250, // R11 #721 — rhea 동일값 (radius 734.5km ≈ rhea 764km 0.961배 → mesh 비 0.0635/0.0660=0.962 사실 비율 자동 보존, R5 mars=earth / R7 saturn=jupiter 동형). px 1.30 sub-4 fallback. ADR §축 1
+  enceladus: 250, // R11 #721 — rhea/iapetus 동일값 (단일값 mental model). radius 252km = rhea 의 0.33배라 mesh 비 0.0218 (수렴대 미달) 이나 4px fallback billboard 흡수 (phobos/deimos §결정 6 동형, 사실 radius 0.33배 정직 반영). px 0.45. D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1). ADR §축 1
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

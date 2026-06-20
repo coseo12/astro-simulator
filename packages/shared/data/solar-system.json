@@ -441,6 +441,75 @@
       }
     },
     {
+      "id": "enceladus",
+      "kind": "moon",
+      "nameKo": "엔셀라두스",
+      "nameEn": "Enceladus",
+      "mass": 1.08e20,
+      "radius": 2.521e5,
+      "parentId": "saturn",
+      "introducedInRPhase": 12,
+      "showInShortcutBar": false,
+      "$comment": "R11 #721 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-20 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Saturn-centric J2000 Ecliptic (osculating) — REF_PLANE='ECLIPTIC' 명시 (미지정 시 Saturn 적도면 반환 → titan ecliptic 과 ~28° 어긋남, cross-validate agy 이견 ① 2026-06-20). Laplace plane 값 혼입 금지 (titan §위험 #6 / P10-D #261 galilean frame 통일 선례). Horizons 원시값: IN=28.0527 / OM=169.5148 / W=82.5246 / MA=293.0677 → ϖ=OM+W=252.0393, L=ϖ+MA mod 360=185.1071. a/e 는 NASA Enceladus Fact Sheet 박제값 (Horizons a 비 1.0016 / e 0.005043 근접). ADR 20260620-721 §축 4.",
+      "colorHint": { "hex": "#F2F5F7", "colorSource": "observed" },
+      "dataSource": "NASA Enceladus Fact Sheet + JPL Horizons API (2026-06-20 쿼리, 2026-01-01 TDB epoch, Saturn-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-20",
+      "orbit": {
+        "semiMajorAxisAU": 1.5912e-3,
+        "eccentricity": 0.0047,
+        "inclinationDeg": 28.0527,
+        "longitudeOfAscendingNodeDeg": 169.5148,
+        "longitudeOfPerihelionDeg": 252.0393,
+        "meanLongitudeDeg": 185.1071
+      }
+    },
+    {
+      "id": "rhea",
+      "kind": "moon",
+      "nameKo": "레아",
+      "nameEn": "Rhea",
+      "mass": 2.307e21,
+      "radius": 7.64e5,
+      "parentId": "saturn",
+      "introducedInRPhase": 12,
+      "showInShortcutBar": false,
+      "$comment": "R11 #721 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-20 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Saturn-centric J2000 Ecliptic (osculating) — REF_PLANE='ECLIPTIC' 명시 (cross-validate agy 이견 ① 2026-06-20). Laplace plane 값 혼입 금지 (titan §위험 #6 선례). Horizons 원시값: IN=28.2426 / OM=170.0345 / W=157.3140 / MA=270.9712 → ϖ=OM+W=327.3485, L=ϖ+MA mod 360=238.3197. a/e 는 NASA Rhea Fact Sheet 박제값 (Horizons a 비 1.0002 / e 0.0008829 근접). ADR 20260620-721 §축 4.",
+      "colorHint": { "hex": "#D4D2CC", "colorSource": "observed" },
+      "dataSource": "NASA Rhea Fact Sheet + JPL Horizons API (2026-06-20 쿼리, 2026-01-01 TDB epoch, Saturn-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-20",
+      "orbit": {
+        "semiMajorAxisAU": 3.5235e-3,
+        "eccentricity": 0.0013,
+        "inclinationDeg": 28.2426,
+        "longitudeOfAscendingNodeDeg": 170.0345,
+        "longitudeOfPerihelionDeg": 327.3485,
+        "meanLongitudeDeg": 238.3197
+      }
+    },
+    {
+      "id": "iapetus",
+      "kind": "moon",
+      "nameKo": "이아페투스",
+      "nameEn": "Iapetus",
+      "mass": 1.806e21,
+      "radius": 7.345e5,
+      "parentId": "saturn",
+      "introducedInRPhase": 12,
+      "showInShortcutBar": false,
+      "$comment": "R11 #721 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-20 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Saturn-centric J2000 Ecliptic (osculating) — REF_PLANE='ECLIPTIC' 명시 (cross-validate agy 이견 ① 2026-06-20). Laplace plane 값 혼입 금지 (titan §위험 #6 선례). iapetus 는 Saturn 적도면 경사 ~7.6° 이나 Laplace plane 효과로 Ecliptic 변환 시 IN ~17.00° — Horizons 직접 취득값 (수동 계산 금지, frame 혼입 위험 회피). Horizons 원시값: IN=16.9953 / OM=138.8959 / W=231.0227 / MA=102.0870 → ϖ=OM+W=9.9186, L=ϖ+MA mod 360=112.0056. a/e 는 NASA Iapetus Fact Sheet 박제값 (Horizons a 비 0.9995 / e 0.02905 근접). ADR 20260620-721 §축 4 §위험 i 경사.",
+      "colorHint": { "hex": "#9E8C72", "colorSource": "observed" },
+      "dataSource": "NASA Iapetus Fact Sheet + JPL Horizons API (2026-06-20 쿼리, 2026-01-01 TDB epoch, Saturn-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-20",
+      "orbit": {
+        "semiMajorAxisAU": 2.3803e-2,
+        "eccentricity": 0.0286,
+        "inclinationDeg": 16.9953,
+        "longitudeOfAscendingNodeDeg": 138.8959,
+        "longitudeOfPerihelionDeg": 9.9186,
+        "meanLongitudeDeg": 112.0056
+      }
+    },
+    {
       "id": "uranus",
       "kind": "planet",
       "nameKo": "천왕성",

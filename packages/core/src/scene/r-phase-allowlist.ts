@@ -17,12 +17,12 @@
  *     4. CHANGELOG `### Behavior Changes` 박제
  *     5. WASM 의존 도메인 sub-path 추가 금지 검증 (`scripts/verify-core-exports-immutable.sh`)
  *
- * 현재 박제: CURRENT_R_PHASE=11 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
+ * 현재 박제: CURRENT_R_PHASE=12 → sun(R1) / mercury(R2) / venus(R3) / earth·moon(R4)
  *           / mars·phobos·deimos(R5) / jupiter·galilean 4(R6) / saturn·titan(R7)
  *           / uranus·titania(R8) / neptune·triton(R9)
  *           / ceres·pluto·haumea·makemake·eris(R10a — 왜소행성 5, #659)
- *           / halley·encke·swift-tuttle(R10b — 혜성 3, #664) = 27 body (전 데이터 소진 —
- *           로드맵 v3 최종 라운드).
+ *           / halley·encke·swift-tuttle(R10b — 혜성 3, #664) = 27 body (로드맵 v3 최종 라운드)
+ *           / enceladus·rhea·iapetus(R11 — 토성계 위성 3, #721) = 30 body (로드맵 v3 완주 후 신규 콘텐츠 라운드).
  *
  * ⚠️ 로드맵 라벨 ↔ phase 정수 매핑 (R10 분할 — PM 2026-06-11, #659):
  *           **phase 10 = R10a 왜소행성 5 / phase 11 = R10b 혜성 3 (halley/encke/swift-tuttle)**.
@@ -39,7 +39,7 @@
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 /** 현재 도달한 R-Phase. R-Phase 진입 시 이 상수 1줄만 증가하면 allowlist 가 자동 확장된다. */
-export const CURRENT_R_PHASE = 11; // R10b #664 — 혜성 3 자동 포함 (#613 자동 생성 7번째 실전. 전 데이터 소진 — 로드맵 v3 최종 라운드. 위 매핑 주석 참조)
+export const CURRENT_R_PHASE = 12; // R11 #721 — 토성계 위성 3 (enceladus/rhea/iapetus) 자동 포함 (#613 자동 생성 8번째 실전. 로드맵 v3 완주 후 신규 콘텐츠 라운드. ADR 20260620-721 §축 3)
 
 /**
  * 주어진 phase 까지 등장한 body id 목록을 데이터 순서대로 반환하는 순수 함수.
