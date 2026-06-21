@@ -1,6 +1,6 @@
 # ADR: 해왕성 Adams ring arcs — 각도(azimuthal) density 변조 시각화
 
-- **상태**: **Provisional** (신규 시각 feature ADR — cross-validate 후 §교차검증 반영 사항 통합 시 Accepted 전이. ADR Status 워크플로 #370 옵션 C: cross-validate 발동 ADR 의무)
+- **상태**: **Accepted (cross-validate 2026-06-21 agy outcome=applied)** — §교차검증 반영 사항 통합 완료 (합의 3 / 이견 수용 4 [azimuth 기준축 계약 + MAX_ARCS + smoothstep + fallback warn] / measurement 기각 1 [Keplerian arc rotation — body 비-자전 실측] / 고유 발견 후속 분리 0). arc 가독성·밝기 D-T2 는 developer/qa 인계
 - **날짜**: 2026-06-21
 - **결정자**: architect (#728 설계 라운드. PM 라운드 미수행 — 본 ADR 이 범위/타당성 제안 → 사용자 D-T2 확인)
 - **관련**:
@@ -155,7 +155,7 @@ gl_FragColor = vec4(color * d * azFactor, alpha);
   - **shader 로직** (`ring-shader.ts`): **신규 ~15~30 라인** (fragment azFactor + uniform `arcCenters[]`/`arcWidths[]`/`darkFactor` + material.setFloats). **신규 mesh / draw call 0**.
   - **scene 배선** (`solar-system-scene.ts`): ring layer 의 `arcs` 데이터를 shader 옵션으로 전달 — **~5~10 라인** (조건부 uniform 주입).
   - **데이터** (`solar-system.json`): neptune `main` ring layer 에 `arcs` 필드 + `$comment` — **데이터만**.
-  - **loader 스키마** (`solar-system-loader.ts`): optional `arcs` zod 스키마 + `LoadedRingLayer.arcs` — **~10 라인**.
+  - **loader 스키마** (`solar-system-loader.ts`): optional `arcs` zod 스키마 + `LoadedRingLayer.arcs` — **~10 라인**. **`MAX_ARCS` 상한** (예: 4 — `MAX_DENSITY_POINTS=16` 동형) zod `.max(MAX_ARCS)` 로 GLSL uniform 배열 overflow 차단 (agy 확장성 발견 수용 — densityProfile `.max(16)` 선례 답습).
   - **검증 방법**: `git diff --stat packages/` — ring 외 모듈(camera/tier/orbit/picking) 변경 **0** 이면 "arc 가 ring shader 국소 확장으로 흡수됨" 입증. proteus/triton orbit 상수 변경 **0** 이면 무회귀 구조적 확인.
   - **실패 시 대응**: ring 외 모듈 변경 발생 시 azimuthal 변조가 shader 국소화 안 됨 → ADR Amendment 박제 + 구조 재검토.
 - **이 ADR 은 Concrete Prediction "코드 0" 이 아니라 "코드 국소화"** — 신규 시각 feature 이므로 shader 로직 추가는 불가피(데이터-주도 위성 추가와 다름). 예측의 핵심은 **변경이 ring shader + 데이터 + 스키마에 국소화** 되고 ring 외 모듈에 누출 안 됨.
@@ -168,6 +168,8 @@ gl_FragColor = vec4(color * d * azFactor, alpha);
 4. **r1-guard pixel-diff 회귀** (neptune 외 body) — azFactor 가 다른 ring 에 누출. opt-in 격리 검증.
 5. **5 arc 개별 해상 요구** (사용자) — px 반경 충분(고해상 / zoom-in)할 때 클러스터→개별 bump 분리. 단 sub-pixel 실측 재확인 후 (volt #32 측정 우선).
 6. **arc 시간 진화 표현 요구** (사용자) — 공명 역학(Galatea corotation) 후속 이슈 분리 (본 ADR 비-범위 불변).
+7. **body self-rotation / ring orbit 애니메이션 도입** (향후 인프라) — 현재 비-자전이라 정적 arc 가 일관(agy 누락 #1 measurement 기각, §교차검증 참조). 자전·공전 애니메이션 도입 시 arc 가 행성과 어긋나므로 `u_ringRotationAngle`/`u_Time` rotation offset 주입 필요 — ADR Amendment 박제.
+8. **arc 경계 aliasing / flickering** (D-T2, 줌아웃 시) — fragment 경계를 hard cutoff 대신 `smoothstep` 페이딩 + branchless 연산으로 정정 (agy 성능·aliasing 발견 수용).
 
 ---
 
@@ -180,6 +182,33 @@ gl_FragColor = vec4(color * d * azFactor, alpha);
 - **근거 3 (간소화)**: 개별 5 arc 는 sub-pixel(0.7~2.8px) → R9 narrow-ring 분리 기각 논리 답습. **5 arc 개별 해상이 아닌 밝은 클러스터 aggregate(~47° span 32.8px) 로 간소화**. 5 arc 실측은 `$comment` SSoT 보존. arc 시간 진화는 비-범위(정적 스냅샷).
 
 **과설계 경계선**: niche feature 이므로 (b) 별도 mesh 5개 / (c) 텍스처 인프라는 명시적으로 기각. arc 시간 진화 / Galatea 공명 역학 / 다른 행성 arc 는 비-범위로 못박음.
+
+---
+
+## 교차검증 반영 사항 (agy, 2026-06-21 outcome=applied)
+
+> **호출 전 Claude 편향 셀프 체크** (CLAUDE.md §교차검증 4종): 낙관적 일정 ⚠️미통과 아님(Concrete Prediction 으로 shader ~15~30라인 + fallback 비용 명시) / **결합 간과 ⚠️미통과 — cross-validate 프롬프트에 명시 질문 삽입** (arc 변조 × proteus/triton 궤도 × 다른 ring 층 × r1-guard baseline 결합 사각) / 폐기 프레이밍 통과(진행 권고) / 순수주의 통과(5 arc 개별 고집 안 함, sub-pixel 실측으로 aggregate). cross-validate outcome=applied (단일 모델 편향 노출 확보).
+
+### 합의 — Claude 설계와 일치한 외부 모델 지적 (즉시 반영/확인)
+
+1. **shader 기반 통합 설계 + geometry 불변 무회귀** — agy 가 "기존 링 메쉬 기하학(geometry) 변형 없음 → proteus/triton 궤도 충돌 완벽 배제" 를 독립 확인. 본 ADR §결정 4 의 구조적 무회귀 논리 합의 (결합 간과 셀프 체크 질문에 대한 외부 검증 통과 — geometry 불변이 무회귀를 구조적으로 보장함을 두 모델 합의).
+2. **measurement-first sub-pixel 분석 + 클러스터 aggregate 간소화** — agy 가 "개별 5 arc 해상 불가(0.7~2.8px) → 클러스터 bump + `$comment` 박제" 결정을 "리소스 제약 속 우수 사례" 로 합의. (b)/(c) 기각 합의.
+3. **opt-in 무회귀 격리** — neptune `main` 층만 azFactor 적용, 타 행성/층 기본값 1.0 → 기존 jupiter/saturn/uranus 무영향 격리를 합의.
+
+### 이견 수용 — 외부 모델 근거가 합리적이어서 ADR 보강한 항목
+
+1. **azimuth 기준축 / 단위 변환 계약 명시 (인터페이스 발견)** — agy: fragment `atan(vUV.y-0.5, vUV.x-0.5)` 결과는 radian `[-π,π]` 인데 JSON `centerDeg`/`widthDeg` 는 degree → **0도(azimuth=0) 가 가리키는 기준 방향(춘분점/local X축) + UV↔world 정렬 offset + degree↔radian 변환 공식** 을 ADR 계약으로 명시 의무. → **수용**: dev 구현 계약으로 추가 박제 — `arcs` 데이터의 `centerDeg` 는 disc local UV X축(`vUV.x` 양의 방향) 기준 CCW degree, fragment 에서 `radians(centerDeg)` 변환. 절대 천문 longitude(춘분점 기준)와의 정렬은 ring `rotation.x` 축 고정 근사(R8 §위험 #6)와 동일하게 **world X 고정 근사** — arc 절대 방위는 정밀하지 않음을 `$comment` 박제 (R9 tilt 방위각 근사 답습).
+2. **MAX_ARCS uniform 상한 + loader validation** — agy: GLSL uniform 배열은 런타임 동적 크기 불가 → `MAX_ARCS` 상한 + loader `.max()` 차단. → **수용**: Concrete Prediction loader 항목에 `MAX_ARCS`(예: 4) zod `.max()` 추가 (densityProfile `.max(16)` 선례 동형).
+3. **branchless shader / smoothstep 경계 페이딩 (성능·aliasing 발견)** — agy: fragment 분기(`if`) 최소화 + arc 경계 hard cutoff 시 카메라 줌아웃에서 aliasing/깜빡임 → `smoothstep` 마진. → **수용 (dev 구현 가이드)**: §재검토 트리거에 "arc 경계 aliasing/flickering (D-T2)" 추가 + 구현 시 `smoothstep` 경계 페이딩 + branchless 권고 박제.
+4. **fallback 경로 console.warn 규격화** — agy: `?ring=fallback` arc 미지원 시 `[Warn] ring arcs not supported in fallback path` 로깅. → **수용 (경미)**: §결정 1 의 "fallback arc 미지원 명시" 를 console.warn 로깅으로 구체화 (dev 구현 시).
+
+### Claude 재분석으로 (부분) 기각한 외부 모델 제안
+
+1. **누락 #1 — 링 Keplerian 공전 회전 반영 (`u_ringRotationAngle`/`u_Time` 주입)** — **measurement-grounded 부분 기각**. agy 는 "정적 arc 스냅샷이면 시간 흐를 때 arc 만 배경에 고정되어 행성과 어긋난다" 고 주장하나, **실측 검증** (`grep` rotation 애니메이션 + rotationPeriod 데이터): 본 프로젝트는 **body self-rotation 애니메이션 미구현** (scene rotation 패턴 0건 / solar-system.json rotationPeriod 필드 0건) + ring disc rotation 은 **생성 시 1회 정적 설정** (`updateAt` 루프 내 rotation 갱신 0건). 행성·ring 전체가 local frame 정적이므로 arc 정적 스냅샷이 **비-자전 행성과 일관 유지** — agy 가 가정한 "ring 이 Keplerian 공전 애니메이션 한다" 는 전제가 현 코드베이스에서 거짓. **현재 비-이슈** (volt #51 외부 툴 주장 실측 가드 — 30분 실측이 맹목 수용 회피). **단 향후 body self-rotation 도입 시 재검토 트리거로 등록** (§재검토 트리거 #7 신설 — 폐기 아닌 시간 함수 보존).
+
+### 고유 발견 (후속 분리)
+
+- 없음 — agy 발견은 전부 본 PR 범위 내 (ADR 보강) 또는 measurement 기각. arc 시간 진화(Galatea 공명 역학)는 본 ADR 이 이미 비-범위로 명시(§재검토 #6) — agy 누락 #1 이 이와 연계되나 현재 self-rotation 부재로 비-이슈화되어 별도 후속 이슈 불필요.
 
 ---
 
