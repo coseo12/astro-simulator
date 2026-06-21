@@ -248,6 +248,31 @@ describe('loadSolarSystem', () => {
     expect(uranus?.ringAlphaHint).toBe(0.8);
   });
 
+  it('#728 — neptune main 층 azimuthal arcs 로드 (Adams ring arc 데이터 SSoT) + 미지정 층 무회귀', () => {
+    const bodies = loadSolarSystem().bodies;
+    const neptune = bodies.find((b) => b.id === 'neptune');
+    expect(neptune?.rings).toHaveLength(1);
+
+    const [main] = neptune!.rings!;
+    // arcs 배열 2 bump (Fraternité 주 bump + Liberté/Égalité 보조 bump — 가시 클러스터 aggregate)
+    expect(main!.arcs).toBeDefined();
+    expect(main!.arcs).toHaveLength(2);
+    expect(main!.arcs![0]).toEqual({ centerDeg: 252, widthDeg: 24, brightness: 1.6 });
+    expect(main!.arcs![1]).toEqual({ centerDeg: 274, widthDeg: 14, brightness: 1.15 });
+    // arc bright(1.6) vs dark(0.35) 대조비 = 4.57:1 ≥ 2:1 (DoD 1)
+    expect(main!.arcDarkFactor).toBe(0.35);
+    expect(main!.arcs![0]!.brightness / main!.arcDarkFactor!).toBeGreaterThanOrEqual(2);
+
+    // 무회귀 — arc 미보유 층 (jupiter/saturn/uranus) 은 arcs/arcDarkFactor undefined (균질 환형 유지)
+    for (const id of ['jupiter', 'saturn', 'uranus']) {
+      const rings = bodies.find((b) => b.id === id)?.rings ?? [];
+      for (const layer of rings) {
+        expect(layer.arcs).toBeUndefined();
+        expect(layer.arcDarkFactor).toBeUndefined();
+      }
+    }
+  });
+
   it('R8 #647 — axialTiltDeg 로드 (uranus 97.77 / saturn 26.73) + 미지정 body 폴백 (하위 호환)', () => {
     const bodies = loadSolarSystem().bodies;
     expect(bodies.find((b) => b.id === 'uranus')?.axialTiltDeg).toBe(97.77);
