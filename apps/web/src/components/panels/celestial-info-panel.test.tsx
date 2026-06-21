@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as AstroCore from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
 import { CelestialInfoPanel } from './celestial-info-panel';
 
@@ -11,7 +12,7 @@ import { CelestialInfoPanel } from './celestial-info-panel';
 // 가드 가상 ID 실모듈 테스트가 직교 커버 (ADR §위험 #5).
 const rPhaseMock = vi.hoisted(() => ({ disabledIds: [] as string[] }));
 vi.mock('@astro-simulator/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@astro-simulator/core')>();
+  const actual = await importOriginal<typeof AstroCore>();
   return {
     ...actual,
     isRPhaseFocusable: (bodyId: string | null | undefined) =>
