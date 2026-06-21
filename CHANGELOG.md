@@ -5,6 +5,21 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-06-21
+
+### Behavior Changes (#725 — 거성 위성 확장 R12)
+
+- **[#725] 거성 위성 2개 추가 — 천왕성 Oberon + 해왕성 Proteus (MINOR)** ([#725](https://github.com/coseo12/astro-simulator/issues/725)) — 천왕성(titania만)·해왕성(triton만)에 2번째 위성 추가로 거성 균형. 클릭(#713)/cycle(#719)/URL `?focus=oberon` 선택. oberon 은 uranus ×50 parent orbit 룩업 그대로 양립(per-body 불필요), proteus 는 `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` ×220 per-body(triton ×75 유지). JPL Horizons **REF_PLANE=ECLIPTIC** 명시(proteus i 29° Neptune 적도면 근접 — 미지정 시 28° 어긋남 차단). **Concrete Prediction "코어 .ts 0" 적중**(solar-system-scene/body-picking 변경 0 — #721 generic 호출 인프라 재사용). ADR `20260621-725-giant-moons-oberon-proteus.md` (Accepted, cross-validate agy). qa real Chrome GUI DoD 7/7, proteus 식별성 300/Adams ring 마진 1.638x.
+
+### Behavior Changes (#728 — 해왕성 Adams ring arcs)
+
+- **[#728] 해왕성 Adams ring arcs — 부분 호 구조 시각화 (MINOR)** ([#728](https://github.com/coseo12/astro-simulator/issues/728)) — Adams ring 의 연속 full ring 을 실제 특징인 밝은 호(arc) 클러스터(Fraternité/Égalité/Liberté/Courage, Galatea 공명) 구조로 시각화. 해왕성 focus 시 밝은 호 + 어두운 나머지 구간 구분. **ring shader fragment azimuthal alpha 변조**(`atan2` wrap-around + smoothstep 경계 + branchless, **신규 mesh/draw call 0**). 5 arc 관측값(Voyager 2/Hubble)은 `$arcsComment` SSoT 보존, 렌더는 가시 클러스터 aggregate. **Concrete Prediction "국소화" 적중**(ring 외 모듈 + scene 배선 전부 0 — ring shader+loader+데이터에만 수렴). arc 데이터 누락 시 full ring fallback(warn). ADR `20260621-728-adams-ring-arcs.md` (Accepted, cross-validate agy — 이견 4 수용 + Keplerian rotation 우려는 self-rotation 미구현 실측 기각). qa real Chrome GUI DoD 5/5 + D-T2 3/3, arc 대조 8.07:1, 다른 ring/proteus·triton 무회귀. R9 §재검토 #8 후속 이행.
+
+### Notes
+
+- **README v0.33.0 현행화** ([#727](https://github.com/coseo12/astro-simulator/pull/727)) — 라이브 데모 도메인 링크(`astro-simulator-web.vercel.app/ko`) 추가 + 현재 상태(32 body / 위성 탐색 인터랙션) / 로드맵 v3 / Node 22.16.0 반영 (행동 변화 없는 문서).
+- 위성 orbit per-body scale / arc 밝기 값은 measurement-first 실측값 — 변경 시 ADR Amendment + 테스트 갱신 의무. ADR Amendment 박제: #725 (REF_PLANE) / #728 (ring px 285 실측 / scene 배선 0).
+
 ## [0.33.0] — 2026-06-20
 
 ### Behavior Changes (#719 — 겹침 cycle)
