@@ -143,6 +143,11 @@ export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
   rhea: 250, // R11 #721 — rhea/saturn mesh 비 0.0660 (moon/earth 0.068 / titan/saturn 0.089 수렴대 중앙). 실측 px 1.35 sub-4 fallback (developer 실측 2026-06-20). ADR §축 1
   iapetus: 250, // R11 #721 — rhea 동일값 (radius 734.5km ≈ rhea 764km 0.961배 → mesh 비 0.0635/0.0660=0.962 사실 비율 자동 보존, R5 mars=earth / R7 saturn=jupiter 동형). px 1.30 sub-4 fallback. ADR §축 1
   enceladus: 250, // R11 #721 — rhea/iapetus 동일값 (단일값 mental model). radius 252km = rhea 의 0.33배라 mesh 비 0.0218 (수렴대 미달) 이나 4px fallback billboard 흡수 (phobos/deimos §결정 6 동형, 사실 radius 0.33배 정직 반영). px 0.45. D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1). ADR §축 1
+  // R12 #725 — 거성 위성 확장 2개 (oberon 천왕성 / proteus 해왕성). satellite mesh 비율 수렴대 [0.05~0.09].
+  // oberon=titania 답습 (radius 0.966배 → 동일 scale 로 사실 비 자동 보존) / proteus=triton 답습 (sub-pixel billboard).
+  // ADR 20260621-725 §축 1. proteus 는 measurement-first D-T2 로 300 확정 (300/500 둘 다 sub-4px, enceladus 동형).
+  oberon: 500, // R12 #725 — titania 답습 (radius 761.4km ≈ titania 788.4km 0.966배 → mesh 비 0.0596/0.0617=0.966 사실 radius 비 자동 보존, R5 mars=earth / R7 saturn=jupiter / R11 iapetus=rhea 동형). 실측 px 2.70 sub-4 fallback (developer 실측 2026-06-21). ADR §축 1
+  proteus: 300, // R12 #725 — triton 답습 (radius 210km = triton 의 0.155배라 mesh 비 0.0102 수렴대 미달, enceladus 0.0218 보다 작음). 4px fallback billboard 흡수 (phobos/deimos/enceladus §결정 동형, 사실 radius 0.155배 정직 반영). 실측 px 0.45 (developer 실측 2026-06-21). D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1). ADR §축 1
 });
 
 /** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */

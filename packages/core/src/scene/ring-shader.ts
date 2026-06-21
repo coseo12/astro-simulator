@@ -52,6 +52,20 @@ const DISC_TESSELLATION = 96;
 /** uniform densityProfile 최대 길이. 3~5 포인트 → 8로 여유. P10 토성 확장 시 재검토. */
 const MAX_DENSITY_POINTS = 16;
 
+/**
+ * #728 — azimuthal arc uniform 고정 배열 상한 (GLSL 동적 길이 불가 — loader `MAX_ARCS` 정합).
+ * Adams 가시 클러스터 aggregate 는 1~2 bump 로 충분하나 5 arc 개별 박제 여지로 4.
+ * 미사용 슬롯은 width 0 → factor 계산에서 darkFactor 만 남아 무영향.
+ */
+export const MAX_ARCS = 4;
+
+/**
+ * #728 — arc 밖 영역 기본 밝기 배율 (arc 밝기 대조의 분모). data `arcDarkFactor` 미지정 시 사용.
+ * D-T2 실측 조정값 (ADR 20260621-728 §결정 2 — arc bright vs dark ≥ 2:1).
+ * arcs 미보유 층은 azFactor 1.0 로 short-circuit 되어 이 값과 무관 (무회귀).
+ */
+const DEFAULT_ARC_DARK_FACTOR = 0.35;
+
 /** M1 백업: 층당 입자 수 (ADR §R1). 3층 × 2000 = 6000 particles, 60fps 예산 내. */
 const FALLBACK_PARTICLES_PER_LAYER = 2000;
 
@@ -116,6 +130,18 @@ uniform float innerRatio;
 uniform float logDepthConstant;
 varying float vFragmentDepth;
 
+// #728 — azimuthal arc 변조 uniform. arcCount 0 이면 azFactor 1.0 (균질 환형 무회귀).
+//   - arcCenters[i]: arc 중심 방위각 (radian, disc local UV X축 기준 CCW). loader degree → radian.
+//   - arcHalfWidths[i]: arc 반각 (radian). loader widthDeg/2 → radian.
+//   - arcBrightness[i]: arc 영역 alpha 배율 (≥ 0).
+//   - arcDarkFactor: arc 밖(어두운 나머지) 밝기 배율.
+// arc 경계는 hard cutoff 대신 smoothstep 페이딩 (줌아웃 aliasing/깜빡임 방지 — agy 수용).
+uniform int arcCount;
+uniform float arcCenters[${MAX_ARCS}];
+uniform float arcHalfWidths[${MAX_ARCS}];
+uniform float arcBrightness[${MAX_ARCS}];
+uniform float arcDarkFactor;
+
 /**
  * densityProfile 배열 선형 보간.
  * profileR 은 오름차순 가정. r_norm 가 구간 밖이면 양 끝 값으로 clamp.
@@ -138,6 +164,35 @@ float interpDensity(float r_norm) {
   return densityProfileD[profileLength - 1];
 }
 
+// #728 — azimuthal arc 밝기 배율. arcCount 0 이면 1.0 (균질 무회귀).
+//   각 arc 중심에서의 각거리 (wrap-around 고려, [-π,π]) 가 half-width 안이면 arc brightness,
+//   밖이면 darkFactor 로 smoothstep 보간. 여러 arc 가 겹치면 가장 밝은 값 채택 (max).
+//   branchless smoothstep + max 누적 (GPU warp divergence / 줌아웃 aliasing 최소화).
+//   azimuth: fragment 방위각 (radian, atan2 결과 [-π,π]).
+float azimuthalArcFactor(float azimuth) {
+  if (arcCount <= 0) return 1.0;
+
+  // 기본은 어두운 나머지. arc 영역에 들어가면 brightness 로 올라간다.
+  float factor = arcDarkFactor;
+  // smoothstep 페이딩 폭 (radian). arc 경계가 1px 미만에서 너무 급하면 줌아웃 aliasing →
+  // 약 2° 페이딩으로 부드럽게 (cluster span ~47° 대비 충분히 좁아 경계 식별 유지).
+  const float EDGE_FADE = 0.035; // ≈ 2°
+
+  for (int i = 0; i < ${MAX_ARCS}; i++) {
+    if (i >= arcCount) break;
+    // 중심으로부터 각거리 (wrap-around — atan2 로 [-π,π] 정규화).
+    float delta = abs(atan(sin(azimuth - arcCenters[i]), cos(azimuth - arcCenters[i])));
+    // delta 가 (halfWidth - fade) 안이면 1, (halfWidth) 밖이면 0 으로 부드럽게 떨어진다.
+    float inArc = 1.0 - smoothstep(
+      arcHalfWidths[i] - EDGE_FADE,
+      arcHalfWidths[i] + EDGE_FADE,
+      delta
+    );
+    factor = max(factor, mix(arcDarkFactor, arcBrightness[i], inArc));
+  }
+  return factor;
+}
+
 void main(void) {
   // 디스크 중심(0.5, 0.5) 기준 반경을 [0, 1] 로. (거리 × 2 = 0~1)
   float r = length(vUV - vec2(0.5)) * 2.0;
@@ -150,13 +205,111 @@ void main(void) {
   float r_norm = (r - innerRatio) / max(1.0 - innerRatio, 1e-6);
 
   float d = interpDensity(r_norm);
-  float alpha = clamp(d * ringAlpha, 0.0, 1.0);
-  gl_FragColor = vec4(color * d, alpha);
+
+  // #728 — azimuthal arc 변조. arc 영역은 밝게(brightness), 나머지는 어둡게(darkFactor).
+  // arcCount 0 (arc 데이터 없는 모든 층) 은 1.0 → 기존 균질 환형 그대로 (무회귀).
+  // disc local UV 중심(0.5,0.5) 기준 방위각 — centerDeg 와 동일 기준축 (UV X축, +x 방향).
+  float azimuth = atan(vUV.y - 0.5, vUV.x - 0.5);
+  float azFactor = azimuthalArcFactor(azimuth);
+
+  float alpha = clamp(d * ringAlpha * azFactor, 0.0, 1.0);
+  gl_FragColor = vec4(color * d * azFactor, alpha);
 
   // #641 D-T2 fix 2 — 본체(StandardMaterial useLogarithmicDepth)와 동일한 로그 depth 공간 기록.
   gl_FragDepth = log2(max(vFragmentDepth, 1e-6)) * logDepthConstant * 0.5;
 }
 `;
+
+const DEG_TO_RAD = Math.PI / 180;
+
+/**
+ * #728 — GLSL `azimuthalArcFactor` 의 smoothstep 페이딩 폭 (radian, ≈ 2°). FRAGMENT_SHADER
+ * `EDGE_FADE` 와 정합 (주석 계약 — drift 시 azimuth 경계 테스트가 감지).
+ */
+export const ARC_EDGE_FADE_RAD = 0.035;
+
+/** GLSL smoothstep 동형 (Hermite). 단위 테스트에서 GLSL 경계 거동 재현용. */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(Math.max((x - edge0) / Math.max(edge1 - edge0, 1e-6), 0), 1);
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * #728 — fragment `azimuthalArcFactor` GLSL 함수의 **순수 JS 미러** (azimuth 기준축 계약 검증용).
+ *
+ * GLSL 과 동일 로직 — arc 데이터를 받아 주어진 방위각의 alpha 배율을 반환한다. 셰이더 GLSL 은
+ * 직접 단위 테스트 불가하므로, 이 미러로 azimuth↔centerDeg 기준축 계약 / wrap-around / smoothstep
+ * 경계 / 다중 arc max 누적 / 빈 배열 무회귀(1.0) 를 결정적으로 검증한다 (주석 계약 drift 가드).
+ *
+ * ⚠️ 이 함수와 FRAGMENT_SHADER 의 GLSL 은 동일 식이어야 한다 (SSoT — 한쪽 수정 시 양쪽 동기화 의무).
+ *
+ * @param azimuthRad fragment 방위각 (radian, atan2 결과 [-π,π])
+ * @param arcs arc 데이터 (degree). undefined/빈 배열 → 1.0 (무회귀)
+ * @param darkFactor arc 밖 영역 밝기 배율
+ */
+export function computeArcFactor(
+  azimuthRad: number,
+  arcs: ReadonlyArray<{ centerDeg: number; widthDeg: number; brightness: number }> | undefined,
+  darkFactor: number = DEFAULT_ARC_DARK_FACTOR,
+): number {
+  if (!arcs || arcs.length === 0) return 1.0;
+
+  let factor = darkFactor;
+  for (let i = 0; i < arcs.length && i < MAX_ARCS; i++) {
+    const a = arcs[i]!;
+    const centerRad = a.centerDeg * DEG_TO_RAD;
+    const halfWidthRad = a.widthDeg * 0.5 * DEG_TO_RAD;
+    // wrap-around 각거리 — atan2(sin, cos) 로 [-π,π] 정규화 후 절댓값.
+    const diff = azimuthRad - centerRad;
+    const delta = Math.abs(Math.atan2(Math.sin(diff), Math.cos(diff)));
+    const inArc =
+      1 - smoothstep(halfWidthRad - ARC_EDGE_FADE_RAD, halfWidthRad + ARC_EDGE_FADE_RAD, delta);
+    factor = Math.max(factor, darkFactor + (a.brightness - darkFactor) * inArc);
+  }
+  return factor;
+}
+
+/**
+ * #728 — arc 데이터를 고정 길이 uniform 배열로 패킹 (fallback warn 포함 — drift 가드).
+ *
+ * arc 데이터가 누락/형식 오류(NaN, 음수 폭 등) 면 console.warn + 균질 full ring 유지
+ * (arcCount 0). ADR 20260621-728 §교차검증 이견 수용 4 (fallback console.warn).
+ *
+ * @returns `{ count, centers[], halfWidths[], brightness[] }` — count 0 이면 azFactor 1.0.
+ */
+export function packArcUniforms(
+  arcs: ReadonlyArray<{ centerDeg: number; widthDeg: number; brightness: number }> | undefined,
+): { count: number; centers: number[]; halfWidths: number[]; brightness: number[] } {
+  const centers = new Array<number>(MAX_ARCS).fill(0);
+  const halfWidths = new Array<number>(MAX_ARCS).fill(0);
+  const brightness = new Array<number>(MAX_ARCS).fill(0);
+
+  if (!arcs || arcs.length === 0) {
+    return { count: 0, centers, halfWidths, brightness };
+  }
+
+  let count = 0;
+  for (const a of arcs) {
+    if (count >= MAX_ARCS) break;
+    // 형식 검증 — 유효하지 않은 arc 는 건너뛰고 경고 (full ring 유지 가드).
+    const valid =
+      Number.isFinite(a.centerDeg) &&
+      Number.isFinite(a.widthDeg) &&
+      a.widthDeg > 0 &&
+      Number.isFinite(a.brightness) &&
+      a.brightness >= 0;
+    if (!valid) {
+      console.warn('[ring-shader] #728 invalid arc data, skipping (full ring 유지):', a);
+      continue;
+    }
+    centers[count] = a.centerDeg * DEG_TO_RAD;
+    halfWidths[count] = a.widthDeg * 0.5 * DEG_TO_RAD;
+    brightness[count] = a.brightness;
+    count++;
+  }
+
+  return { count, centers, halfWidths, brightness };
+}
 
 let shaderRegistered = false;
 
@@ -187,6 +340,13 @@ export interface RingShaderParams {
   color?: readonly [number, number, number];
   /** 전역 alpha 스케일 (층간 겹침 완화). 기본 0.6. */
   ringAlpha?: number;
+  /**
+   * #728 — azimuthal arc 데이터 (optional, neptune Adams 전용). 미지정/빈 배열 시 균질 환형
+   * (arcCount 0 → azFactor 1.0 무회귀). centerDeg/widthDeg 는 degree (shader 가 radian 변환).
+   */
+  arcs?: ReadonlyArray<{ centerDeg: number; widthDeg: number; brightness: number }>;
+  /** #728 — arc 밖 영역 밝기 배율 (0~1). 미지정 시 `DEFAULT_ARC_DARK_FACTOR`. */
+  arcDarkFactor?: number;
 }
 
 export interface RingShaderHandles {
@@ -261,6 +421,12 @@ export function createRingShaderMaterial(scene: Scene, params: RingShaderParams)
         'ringAlpha',
         'innerRatio',
         'logDepthConstant',
+        // #728 — azimuthal arc 변조 uniform.
+        'arcCount',
+        'arcCenters',
+        'arcHalfWidths',
+        'arcBrightness',
+        'arcDarkFactor',
       ],
       needAlphaBlending: true,
     },
@@ -296,6 +462,14 @@ export function createRingShaderMaterial(scene: Scene, params: RingShaderParams)
   // activeCamera 부재 (테스트 등) 시 1e14 fallback.
   const maxZ = scene.activeCamera?.maxZ ?? 1e14;
   material.setFloat('logDepthConstant', 2.0 / (Math.log(maxZ + 1.0) / Math.LN2));
+
+  // #728 — azimuthal arc uniform (neptune Adams 전용). arcs 미지정 시 count 0 → azFactor 1.0 무회귀.
+  const arc = packArcUniforms(params.arcs);
+  material.setInt('arcCount', arc.count);
+  material.setFloats('arcCenters', arc.centers);
+  material.setFloats('arcHalfWidths', arc.halfWidths);
+  material.setFloats('arcBrightness', arc.brightness);
+  material.setFloat('arcDarkFactor', params.arcDarkFactor ?? DEFAULT_ARC_DARK_FACTOR);
 
   // 투명 파이프라인 — 뒷면도 렌더 (고리는 위·아래 모두 관측)
   material.backFaceCulling = false;
@@ -473,6 +647,9 @@ export function createRingShaderMesh(
           densityProfile: ring.densityProfile,
           color,
           ringAlpha,
+          // #728 — azimuthal arc (neptune Adams 전용). 미지정 층은 undefined → 균질 무회귀.
+          ...(ring.arcs ? { arcs: ring.arcs } : {}),
+          ...(ring.arcDarkFactor !== undefined ? { arcDarkFactor: ring.arcDarkFactor } : {}),
         },
         idx * 1e-4,
         sceneUnitPerMeter,
@@ -548,6 +725,13 @@ function buildFallbackHandles(
   sceneUnitPerMeter: number,
   axialTiltRad = 0,
 ): RingShaderHandles {
+  // #728 — fallback(InstancedMesh) 경로는 균등 theta 분포라 arc 미지원 (rejection sampling 의
+  // 각도 균등). arc 데이터 보유 층이 fallback 으로 렌더되면 균질 환형이 되는 것이 의도된 한계.
+  // ADR 20260621-728 §결정 1 (fallback arc 미지원 명시) + §교차검증 이견 수용 4 (console.warn).
+  if (rings.some((r) => r.arcs && r.arcs.length > 0)) {
+    console.warn('[ring-shader] #728 ring arcs not supported in fallback path (full ring 유지)');
+  }
+
   const meshes: Mesh[] = [];
   rings.forEach((ring, idx) => {
     const color = layerColors[idx] ?? baseColor;

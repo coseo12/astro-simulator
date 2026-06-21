@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 + R11 토성 위성 3 순서로 정확히 30개', () => {
+  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 + R11 토성 위성 3 + R12 거성 위성 2 순서로 정확히 32개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -45,8 +45,10 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'iapetus',
       'uranus',
       'titania',
+      'oberon', // R12 #725 — 거성 위성 (천왕성 2번째, titania 다음 neptune 전)
       'neptune',
       'triton',
+      'proteus', // R12 #725 — 거성 위성 (해왕성 2번째, triton 다음 ceres 전)
       'ceres', // R10a #659 — 왜소행성 5 (데이터 등장 순)
       'pluto',
       'haumea',
@@ -62,9 +64,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 30개 (CURRENT_R_PHASE=12 필터 — R11 토성 위성 3 자동 포함)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R11 #721 진입 30개 (위 toEqual).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(30);
+  it('자동 생성 결과 32개 (CURRENT_R_PHASE=13 필터 — R12 거성 위성 2 자동 포함)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. R12 #725 진입 32개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(32);
   });
 });
 
@@ -78,8 +80,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 12 (R11 토성계 위성 3 까지 — 로드맵 v3 완주 후 신규 콘텐츠 라운드)', () => {
-    expect(CURRENT_R_PHASE).toBe(12);
+  it('CURRENT_R_PHASE 는 13 (R12 거성 위성 2 까지 — R11 후 신규 콘텐츠 라운드)', () => {
+    expect(CURRENT_R_PHASE).toBe(13);
   });
 
   it('filterBodiesByPhase(CURRENT_R_PHASE) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -167,14 +169,25 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     }
   });
 
-  it('R11 — phase 12 = 현재 자동 생성 allowlist 와 동치 30 body (위성 3 자동 포함 — CURRENT_R_PHASE=12 1줄 적중)', () => {
-    // R10b 의 "phase 11 동치" 테스트를 phase 12 동치로 승격 (ADR 20260620-721 §축 3 — #613 자동 생성 8번째 실전).
-    const r12 = filterBodiesByPhase(bodies, 12);
-    expect(r12).toEqual([...R_PHASE_BODY_ALLOWLIST]);
-    expect(r12.length).toBe(30);
-    expect(r12).toContain('enceladus');
-    expect(r12).toContain('rhea');
-    expect(r12).toContain('iapetus');
+  it('R11 — phase 12 고정 시뮬은 30 body (R12 거성 위성 2 = phase 13 제외 — R11/R12 경계 가드)', () => {
+    // R12 #725 진입 후 phase 12 고정 시뮬은 30 body — 분리 메커니즘 경계 가드 (R10b phase 11 = 27 동형).
+    // oberon/proteus 가 데이터상 titania/triton 다음 위치하나 introducedInRPhase=13 > 12 이라 자동 제외.
+    const p12 = filterBodiesByPhase(bodies, 12);
+    expect(p12.length).toBe(30);
+    expect(p12).toContain('enceladus');
+    expect(p12).toContain('rhea');
+    expect(p12).toContain('iapetus');
+    expect(p12).not.toContain('oberon'); // R12 위성 — phase 13, phase 12 제외
+    expect(p12).not.toContain('proteus');
+  });
+
+  it('R12 — phase 13 = 현재 자동 생성 allowlist 와 동치 32 body (위성 2 자동 포함 — CURRENT_R_PHASE=13 1줄 적중)', () => {
+    // R11 의 "phase 12 동치" 테스트를 phase 13 동치로 승격 (ADR 20260621-725 §축 3 — #613 자동 생성 9번째 실전).
+    const p13 = filterBodiesByPhase(bodies, 13);
+    expect(p13).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+    expect(p13.length).toBe(32);
+    expect(p13).toContain('oberon');
+    expect(p13).toContain('proteus');
   });
 
   it('혜성 3 body 는 introducedInRPhase === 11 (R10a/R10b 분리 메커니즘 — ADR 20260611-r10a §축 2 재박제 회귀 가드)', () => {
@@ -195,10 +208,21 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     }
   });
 
-  it('모든 body 에 introducedInRPhase 부여 (1~12 범위 — phase 12 = R11 토성 위성)', () => {
+  it('거성 위성 2 body 는 introducedInRPhase === 13 (R12 #725 — oberon=uranus / proteus=neptune parent)', () => {
+    const giantMoons = bodies.filter((b) => ['oberon', 'proteus'].includes(b.id));
+    expect(giantMoons.length).toBe(2);
+    const oberon = giantMoons.find((b) => b.id === 'oberon');
+    const proteus = giantMoons.find((b) => b.id === 'proteus');
+    expect(oberon?.introducedInRPhase, 'oberon 는 R12 (phase 13) 박제여야 함').toBe(13);
+    expect(oberon?.parentId, 'oberon parent 는 uranus').toBe('uranus');
+    expect(proteus?.introducedInRPhase, 'proteus 는 R12 (phase 13) 박제여야 함').toBe(13);
+    expect(proteus?.parentId, 'proteus parent 는 neptune').toBe('neptune');
+  });
+
+  it('모든 body 에 introducedInRPhase 부여 (1~13 범위 — phase 13 = R12 거성 위성)', () => {
     for (const b of bodies) {
       expect(b.introducedInRPhase, `${b.id} introducedInRPhase 누락`).toBeGreaterThanOrEqual(1);
-      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(12);
+      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(13);
     }
   });
 });
@@ -227,6 +251,8 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('titania')).toBe(true); // R8 #647
     expect(isRPhaseFocusable('neptune')).toBe(true); // R9 #653
     expect(isRPhaseFocusable('triton')).toBe(true); // R9 #653 — 역행 위성 첫 사례 (focus 가능 여부는 궤도 방향 무관)
+    expect(isRPhaseFocusable('oberon')).toBe(true); // R12 #725 — 거성 위성 (천왕성 2번째, URL/클릭 진입)
+    expect(isRPhaseFocusable('proteus')).toBe(true); // R12 #725 — 거성 위성 (해왕성 2번째, Neptune 적도면 근접 i 29° ecliptic)
     expect(isRPhaseFocusable('ceres')).toBe(true); // R10a #659 — 왜소행성 5 (negative → positive 전환)
     expect(isRPhaseFocusable('pluto')).toBe(true); // R10a #659
     expect(isRPhaseFocusable('haumea')).toBe(true); // R10a #659

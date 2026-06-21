@@ -5,6 +5,17 @@ import solarSystemRaw from '@astro-simulator/shared/data/solar-system.json' with
 const DEG = Math.PI / 180;
 
 /**
+ * #728 — ring layer 당 azimuthal arc 최대 개수 (GLSL uniform 고정 배열 상한).
+ *
+ * WebGL/WebGPU uniform 배열은 런타임 동적 길이 불가 → ring-shader `MAX_ARCS` 와 정합하는
+ * 컴파일 타임 상한을 두고 loader 에서 `.max(MAX_ARCS)` 로 초과 데이터를 파싱 레벨 차단한다
+ * (densityProfile `.max(16)` 선례 동형 — uniform overflow / 셰이더 컴파일 실패 방지).
+ * Adams 가시 클러스터 aggregate 는 1~2 bump 로 충분하나, 5 arc 개별 데이터 박제 여지를
+ * 위해 4 로 둔다 (ADR 20260621-728 §교차검증 이견 수용 2 — agy MAX_ARCS 발견).
+ */
+export const MAX_ARCS = 4;
+
+/**
  * Raw JSON 스키마 — 소스 파일에서 읽은 궤도 요소는 도/AU 단위.
  */
 const OrbitalElementsRawSchema = z.object({
@@ -48,6 +59,36 @@ const RingLayerRawSchema = z.object({
       colorSource: z.enum(['observed', 'artistic', 'inferred']).optional(),
     })
     .optional(),
+  /**
+   * #728 — azimuthal arc (부분 호) 데이터 (optional). 해왕성 Adams ring 전용 —
+   * 밝은 호 영역(arc cluster) vs 어두운 나머지의 각도 방향 alpha 대조 변조에 사용.
+   *
+   * - `centerDeg`: arc 중심 방위각 (disc local UV X축 기준 CCW degree, 0~360). fragment 에서
+   *   `radians(centerDeg)` 변환 (ADR 20260621-728 §결정 4 azimuth 기준축 계약). 절대 천문
+   *   longitude 정렬은 ring tilt 와 동일 world X 고정 근사 (R8 §위험 #6 동형, 정밀 아님).
+   * - `widthDeg`: arc 각폭 (full width, degree, 0~360). fragment 는 half-width 로 환산해 사용.
+   * - `brightness`: arc 영역 밝기 배율 (≥ 0). 1.0 = 기본 ring alpha, > 1 = 밝게.
+   *
+   * `.max(MAX_ARCS)`: GLSL uniform 고정 배열 상한 (uniform overflow 차단 — densityProfile 동형).
+   * 미지정 층은 균질 환형 (azFactor 1.0 무회귀 — jupiter/saturn/uranus 무영향).
+   */
+  arcs: z
+    .array(
+      z.object({
+        centerDeg: z.number().min(0).max(360),
+        widthDeg: z.number().positive().max(360),
+        brightness: z.number().nonnegative(),
+      }),
+    )
+    .min(1)
+    .max(MAX_ARCS)
+    .optional(),
+  /**
+   * #728 — arc 밖(어두운 나머지) 영역의 밝기 배율 (0~1, optional). arcs 보유 층에만 의미.
+   * arc bright vs dark 대조비 = brightness / darkFactor. 미지정 시 ring-shader 기본 (0.35).
+   * D-T2 실측 조정값 (ADR 20260621-728 §결정 2).
+   */
+  arcDarkFactor: z.number().min(0).max(1).optional(),
 });
 
 /**
@@ -183,6 +224,13 @@ export interface LoadedRingLayer {
     hex?: string | undefined;
     colorSource?: 'observed' | 'artistic' | 'inferred' | undefined;
   };
+  /**
+   * #728 — azimuthal arc 데이터 (optional, neptune Adams 전용). 미지정 시 균질 환형 (무회귀).
+   * centerDeg/widthDeg 는 degree (shader 가 radian 변환), brightness 는 alpha 배율.
+   */
+  arcs?: ReadonlyArray<{ centerDeg: number; widthDeg: number; brightness: number }>;
+  /** #728 — arc 밖 영역 밝기 배율 (optional). 미지정 시 ring-shader 기본 (0.35). */
+  arcDarkFactor?: number;
 }
 
 export interface LoadedCelestialBody {
@@ -274,6 +322,9 @@ export function loadSolarSystem(): LoadedSolarSystem {
               densityProfile: r.densityProfile.map(([rn, d]) => [rn, d] as const),
               // R7 #641 — 층별 colorHint (optional, 미지정 시 필드 자체 생략 — exactOptionalPropertyTypes).
               ...(r.colorHint ? { colorHint: r.colorHint } : {}),
+              // #728 — azimuthal arc (optional, neptune Adams 전용). 미지정 시 필드 생략 (무회귀).
+              ...(r.arcs ? { arcs: r.arcs.map((a) => ({ ...a })) } : {}),
+              ...(r.arcDarkFactor !== undefined ? { arcDarkFactor: r.arcDarkFactor } : {}),
             })),
           }
         : {}),

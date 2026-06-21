@@ -426,3 +426,79 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
     });
   });
 });
+
+describe('orbit-visual-scale SSoT (R12 #725 — 거성 위성 비대칭: oberon 단일 룩업 양립 / proteus per-body)', () => {
+  // 천왕성·해왕성 두 계가 비대칭 (a 위치로 per-body vs parent 단일 판정):
+  //   oberon (titania 바깥 a 1.34배) → uranus parent ×50 양립 (per-body 미추가, 마진 2.22x)
+  //   proteus (triton 안쪽 a 0.33배) → neptune ×75 묻힘 (0.56x) → per-body ×220 (마진 1.64x)
+
+  it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.proteus = 220 (R12 #725 박제값)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.proteus).toBe(220);
+  });
+
+  it('oberon 은 per-body 룩업에 미추가 (titania 바깥 → uranus parent ×50 양립)', () => {
+    // oberon 은 per-body entry 추가 안 함 — uranus parent ×50 fallback 으로 충분 (마진 2.22x).
+    // ADR §축 2 — 천왕성 계는 진짜 데이터만 (orbit 상수 변경 0).
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.oberon).toBeUndefined();
+    expect(getOrbitVisualScale('uranus', 'oberon')).toBe(50); // parent 룩업 fallback
+    expect(getOrbitVisualScale('uranus', 'titania')).toBe(50); // titania 도 parent 룩업 (R8 박제 보존)
+  });
+
+  it('proteus per-body 룩업 우선 (neptune parent ×75 무시 → ×220)', () => {
+    expect(getOrbitVisualScale('neptune', 'proteus')).toBe(220);
+    // triton 은 per-body 미정의 → neptune parent ×75 fallback (R9 박제 보존, 회귀 0)
+    expect(getOrbitVisualScale('neptune', 'triton')).toBe(75);
+  });
+
+  it('oberon 분리 마진 산출 (uranus parent ×50, binding=ε ring outer) — 2.22x 자동 안전', () => {
+    // ADR §축 2 박제값. binding = ε ring outer mesh (5.1149e7 × uranusScale 250 = 1.2787e10 m).
+    // oberon 은 titania 바깥 (a 1.34배) 이라 동일 ×50 으로 마진 2.22x (≥ 1.5 자동 충족 — per-body 불필요).
+    const URANUS_OBERON_DISTANCE_M = 5.8352e8; // NASA Fact Sheet a 583,520 km
+    const EPSILON_RING_OUTER_MESH_M = 5.1149e7 * 250; // 1.2787e10
+    const OBERON_MESH_RADIUS_M = 7.614e5 * 500; // oberonScale=500 = 3.807e8
+    const SUM_MESH_M = EPSILON_RING_OUTER_MESH_M + OBERON_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('uranus', 'oberon');
+    const margin = (URANUS_OBERON_DISTANCE_M * visualScale) / SUM_MESH_M;
+
+    expect(margin).toBeGreaterThanOrEqual(1.5);
+    expect(margin).toBeCloseTo(2.22, 1);
+  });
+
+  it('proteus 분리 마진 산출 (per-body ×220, binding=Adams ring outer) — 1.64x', () => {
+    // ADR §축 2 박제값. binding = Adams ring outer mesh (6.293e7 × neptuneScale 250 = 1.57325e10 m).
+    // proteus 는 triton 안쪽 (최내곽) 이라 neptune ×75 에 묻힘 → per-body ×220 으로 1.64x 분리.
+    const NEPTUNE_PROTEUS_DISTANCE_M = 1.17647e8; // NASA Fact Sheet a 117,647 km
+    const ADAMS_RING_OUTER_MESH_M = 6.293e7 * 250; // 1.57325e10
+    const PROTEUS_MESH_RADIUS_M = 2.1e5 * 300; // proteusScale=300 = 6.30e7
+    const SUM_MESH_M = ADAMS_RING_OUTER_MESH_M + PROTEUS_MESH_RADIUS_M;
+
+    const visualScale = getOrbitVisualScale('neptune', 'proteus');
+    const margin = (NEPTUNE_PROTEUS_DISTANCE_M * visualScale) / SUM_MESH_M;
+
+    // ADR §축 2 — proteus 분리 마진 1.64x (titania/triton/enceladus 1.65x 정합)
+    expect(margin).toBeGreaterThanOrEqual(1.5);
+    expect(margin).toBeCloseTo(1.64, 1);
+  });
+
+  it('단일 룩업 한계 입증 — neptune ×75 (triton 기준) 으로는 proteus 0.56x 묻힘 (per-body 필요)', () => {
+    // ADR §축 2 — proteus (triton 안쪽 a 0.33배) 는 neptune parent ×75 에 묻힘 → per-body 필요 입증.
+    const NEPTUNE_PROTEUS_DISTANCE_M = 1.17647e8;
+    const ADAMS_RING_OUTER_MESH_M = 6.293e7 * 250;
+    const PROTEUS_MESH_RADIUS_M = 2.1e5 * 300;
+    const proteusMarginAt75 =
+      (NEPTUNE_PROTEUS_DISTANCE_M * 75) / (ADAMS_RING_OUTER_MESH_M + PROTEUS_MESH_RADIUS_M);
+    expect(proteusMarginAt75).toBeLessThan(1.5);
+    expect(proteusMarginAt75).toBeCloseTo(0.56, 1);
+  });
+
+  it('거성 위성 a 비대칭 — oberon 바깥 (titania ×1.34) vs proteus 안쪽 (triton ×0.33)', () => {
+    // ADR §축 2 핵심 — a 위치 비대칭이 per-body vs parent 판정 근거.
+    const oberonVsTitania = 3.90059e-3 / 2.91388e-3; // a(oberon)/a(titania)
+    const proteusVsTriton = 7.86422e-4 / 0.00237142; // a(proteus)/a(triton)
+    expect(oberonVsTitania).toBeCloseTo(1.34, 1); // 바깥 → 단일 룩업 양립
+    expect(proteusVsTriton).toBeCloseTo(0.33, 1); // 안쪽 → per-body binding
+    expect(oberonVsTitania).toBeGreaterThan(1); // titania 바깥
+    expect(proteusVsTriton).toBeLessThan(1); // triton 안쪽
+  });
+});

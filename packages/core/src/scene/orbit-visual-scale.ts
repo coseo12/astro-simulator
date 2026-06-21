@@ -232,13 +232,29 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
  * D-T2 미통과 시 fallback: enceladus ×47 → ×50 (마진 1.75x, ring 에서 더 분리, ADR §재검토 트리거 #2) /
  *   rhea ×20 → ×22. iapetus 과분리 보고 시 ×10 → ×8 (단 binding 미달 위험, ADR §재검토 트리거 #3).
  *
+ * ## R12 박제 (#725, 2026-06-21) — 거성 위성 확장 2개 (oberon/proteus), 비대칭 판정 SSoT
+ *
+ * 천왕성·해왕성 두 계가 **비대칭** (a 위치로 per-body vs parent 단일 판정):
+ *   - oberon (uranus): titania 바깥 (a 0.00390 AU = titania 0.00291 의 1.34배) → uranus parent ×50 으로 자동 양립
+ *     (마진 2.22x). **per-body entry 추가 안 함** — 시각 이득 0 (YAGNI). 천왕성 계는 진짜 데이터만 (orbit 상수 변경 0).
+ *   - proteus (neptune): triton 안쪽 (a 0.000786 AU = triton 0.00237 의 0.33배 = 3.0배 안쪽) → neptune parent ×75 에
+ *     묻힘 (마진 0.56x) → **per-body ×220 추가** (마진 1.64x, 위 entry). triton 은 per-body 미정의 → parent ×75
+ *     fallback 유지 (R9 박제 회귀 0). enceladus (R11) binding shift 와 정확히 동형.
+ *
+ * binding = Adams ring outer mesh (62930 km × 250 = 1.57325e10 m, neptune mesh 6.191e9 의 2.541배 — R9 유형):
+ *   proteus a=1.176e8 m, visual ×220 → margin = (1.176e8 × 220) / (1.57325e10 + 6.30e7) = 1.64x (산식 A, ≥ 1.5 통과).
+ *   후보: ×75 (parent) 0.56x fail / ×201 1.50x 경계 / **×220 1.64x 선택** / ×235 1.75x (D-T2 ring 침범 시 fallback).
+ *
  * ## 후속 라운드 인계
  *
  * saturn 추가 위성 (Dione/Tethys 등) / 천왕성·해왕성 다중 위성 진입 시 동일 per-body 룩업 답습.
- * parent 단일 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT`) 은 **단일 위성 또는 a 편차 ≤ 5배** parent 에만 적용
- * (titan 단독 R7 / galilean 4 편차 4.5배 R6). a 편차 > 5배 + 위성 N≥2 진입 시 per-body 전환.
+ * **거성 위성 a 비대칭 판정 SSoT (R12 #725)**: 신규 위성 a 가 기존 binding 위성보다 **안쪽이면 per-body 필요**
+ * (proteus/enceladus), **바깥이면 parent 단일 룩업 양립 검토** (oberon — 마진 ≥ 1.5 산식 A 로 실측 확정).
+ * parent 단일 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT`) 은 **단일 위성 또는 추가 위성이 binding 위성보다 바깥일 때만** 유지
+ * (titan 단독 R7 / galilean 4 편차 4.5배 R6 / oberon R12). Miranda (a 0.00087 AU = titania 안쪽) 진입 시 per-body 예상.
  *
  * R11 ADR `20260620-721-saturn-moons-rhea-iapetus-enceladus.md` §축 2.
+ * R12 ADR `20260621-725-giant-moons-oberon-proteus.md` §축 2.
  */
 export const ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY: Readonly<Record<string, number>> =
   Object.freeze({
@@ -246,6 +262,10 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY: Readonly<Record<string, numb
     enceladus: 47, // R11 #721 — binding (최내곽 a 0.00159 AU). ×10 시 0.35x 묻힘 → ×47 분리 (마진 1.64x, titania/triton 1.65x 정합)
     rhea: 20, // R11 #721 — a 0.00352 AU (titan 의 0.43배). ×10 시 0.76x 묻힘 → ×20 분리 (마진 1.52x)
     iapetus: 10, // R11 #721 — 최외곽 a 0.0238 AU (titan 의 2.9배). ×10 으로 자동 안전 (마진 5.13x). 단일 ×47 의 55배 과분리 회피 위해 최소값
+    // R12 #725 — proteus (neptune 최내곽 위성, triton 안쪽 a 0.33배 = 3.0배 안쪽). neptune parent ×75 에 묻힘 (마진 0.56x)
+    // → per-body 분리. triton 은 per-body 미정의 → parent ×75 fallback 유지 (R9 박제 회귀 0). enceladus binding shift 동형.
+    // oberon 은 per-body 미추가 — titania 바깥 (a 1.34배) 이라 uranus parent ×50 으로 자동 양립 (마진 2.22x, ADR §축 2).
+    proteus: 220, // R12 #725 — binding (neptune 최내곽 a 0.000786 AU). 마진 1.64x (titania/triton/enceladus 1.65x 정합). developer 실측 2026-06-21 (산식 A). Adams ring 가독성 (agy ②): proteus visual orbit ×220 = 2.588e10 m 가 Adams ring outer mesh (1.573e10 m) 밖 간극 1.015e10 m (ring outer 반경의 64.5% — ring 인접 아닌 충분한 분리, 물리 거리 침범 0). D-T2 실 GUI 가독성 침범 시 ×235 (마진 1.75x, 간극 75.7%, ADR §재검토 트리거 #2). ADR 20260621-725 §축 2
   });
 
 /**

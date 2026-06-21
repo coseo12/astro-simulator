@@ -148,6 +148,38 @@ describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 
     expect(ratio).toBeCloseTo(0.33, 1);
   });
 
+  it('R12 거성 위성 — oberon=500 (titania 답습) / proteus=300 (triton 답습, sub-pixel billboard)', () => {
+    // ADR 20260621-725 §축 1 — oberon 은 titania scale 답습 (radius 0.966배 → 사실 비 자동 보존).
+    // proteus 는 triton scale 답습 (developer measurement-first D-T2 300 확정 — 300/500 둘 다 sub-4px).
+    expect(BODY_SCALE.oberon).toBe(500);
+    expect(BODY_SCALE.proteus).toBe(300); // D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1)
+  });
+
+  it('R12 — oberon/uranus mesh 비율 수렴대 [0.05~0.09] 정중앙 (titania 0.0617 정합)', () => {
+    // ADR 20260621-725 §축 1 — oberon(7.614e5 × 500) / uranus(2.5559e7 × 250) = 0.0596
+    // (titania 0.0617 의 0.966배 = 사실 radius 비 정확 보존, moon/earth 0.068 수렴대 정중앙).
+    const uranusMesh = 2.5559e7 * BODY_SCALE.uranus!;
+    const oberonRatio = (7.614e5 * BODY_SCALE.oberon!) / uranusMesh;
+    expect(oberonRatio).toBeGreaterThan(0.05);
+    expect(oberonRatio).toBeLessThan(0.09);
+    expect(oberonRatio).toBeCloseTo(0.0596, 3);
+  });
+
+  it('R12 — oberon/titania 사실 radius 비 0.966 자동 보존 (동일 scale 500 → mesh 비 = radius 비)', () => {
+    // ADR 20260621-725 §축 1 — oberon(761.4km) ≈ titania(788.4km) 0.966배가 동일 scale 500 으로
+    // mesh 비 0.0596/0.0617 = 0.966 정합 (R5 mars=earth / R7 saturn=jupiter / R11 iapetus=rhea 동형).
+    const ratio = (7.614e5 * BODY_SCALE.oberon!) / (7.884e5 * BODY_SCALE.titania!);
+    expect(ratio).toBeCloseTo(0.966, 2);
+  });
+
+  it('R12 — proteus 는 triton 의 0.155배 사실 radius 정직 반영 (동일 scale → mesh 비 0.155배 sub-pixel)', () => {
+    // ADR 20260621-725 §축 1 — proteus(210km) = triton(1353.4km) 의 0.155배. proteus scale 300 /
+    // triton scale 300 동일 그룹이 아니라 답습값 — mesh 비는 radius 비 (0.155배, enceladus 0.33배보다 작음).
+    // 어떤 scale 도 수렴대 미달 → 4px fallback billboard 흡수 (phobos/deimos/enceladus §결정 동형).
+    const ratio = (2.1e5 * BODY_SCALE.proteus!) / (1.3534e6 * BODY_SCALE.triton!);
+    expect(ratio).toBeCloseTo(0.155, 2);
+  });
+
   it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
     // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
     // 어느 모드든 변경이 반영되지 않아야 한다.

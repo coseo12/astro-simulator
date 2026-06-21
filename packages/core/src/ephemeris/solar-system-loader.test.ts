@@ -2,18 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 30개 바디 (sun + 8행성 + moon 13 + 왜소행성 5 + 혜성 3)', () => {
+  it('로드 성공 + 32개 바디 (sun + 8행성 + moon 15 + 왜소행성 5 + 혜성 3)', () => {
     // P8 #244: 포보스/데이모스 추가 → moon 엔티티 3개 (moon + phobos + deimos).
     // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 추가 → moon 엔티티 7개.
     // R7 #641: titan 추가 → moon 엔티티 8개, 총 25 바디.
     // R8 #647: titania 추가 → moon 엔티티 9개, 총 26 바디.
     // R9 #653: triton 추가 → moon 엔티티 10개, 총 27 바디.
     // R11 #721: enceladus/rhea/iapetus 추가 → moon 엔티티 13개, 총 30 바디 (토성계 위성 4개째~6개째).
+    // R12 #725: oberon/proteus 추가 → moon 엔티티 15개, 총 32 바디 (거성 위성 — 천왕성/해왕성 2번째).
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(30);
-    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(13);
+    expect(data.bodies).toHaveLength(32);
+    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(15);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
     expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
   });
@@ -247,6 +248,31 @@ describe('loadSolarSystem', () => {
     expect(uranus?.ringAlphaHint).toBe(0.8);
   });
 
+  it('#728 — neptune main 층 azimuthal arcs 로드 (Adams ring arc 데이터 SSoT) + 미지정 층 무회귀', () => {
+    const bodies = loadSolarSystem().bodies;
+    const neptune = bodies.find((b) => b.id === 'neptune');
+    expect(neptune?.rings).toHaveLength(1);
+
+    const [main] = neptune!.rings!;
+    // arcs 배열 2 bump (Fraternité 주 bump + Liberté/Égalité 보조 bump — 가시 클러스터 aggregate)
+    expect(main!.arcs).toBeDefined();
+    expect(main!.arcs).toHaveLength(2);
+    expect(main!.arcs![0]).toEqual({ centerDeg: 252, widthDeg: 24, brightness: 1.6 });
+    expect(main!.arcs![1]).toEqual({ centerDeg: 274, widthDeg: 14, brightness: 1.15 });
+    // arc bright(1.6) vs dark(0.35) 대조비 = 4.57:1 ≥ 2:1 (DoD 1)
+    expect(main!.arcDarkFactor).toBe(0.35);
+    expect(main!.arcs![0]!.brightness / main!.arcDarkFactor!).toBeGreaterThanOrEqual(2);
+
+    // 무회귀 — arc 미보유 층 (jupiter/saturn/uranus) 은 arcs/arcDarkFactor undefined (균질 환형 유지)
+    for (const id of ['jupiter', 'saturn', 'uranus']) {
+      const rings = bodies.find((b) => b.id === id)?.rings ?? [];
+      for (const layer of rings) {
+        expect(layer.arcs).toBeUndefined();
+        expect(layer.arcDarkFactor).toBeUndefined();
+      }
+    }
+  });
+
   it('R8 #647 — axialTiltDeg 로드 (uranus 97.77 / saturn 26.73) + 미지정 body 폴백 (하위 호환)', () => {
     const bodies = loadSolarSystem().bodies;
     expect(bodies.find((b) => b.id === 'uranus')?.axialTiltDeg).toBe(97.77);
@@ -272,6 +298,39 @@ describe('loadSolarSystem', () => {
     // 애니메이션 방향 반전은 버그 아님 (D-T2 사전 등록, PM Q1). "보정" 시도 자체가 회귀.
     expect(triton!.orbit!.inclination).toBeGreaterThan(Math.PI / 2); // > 90° (역행)
     expect(triton!.orbit!.inclination).toBeCloseTo((129.1418 * Math.PI) / 180, 3);
+  });
+
+  it('R12 #725 — oberon 로드 (parentId=uranus, Uranus-centric J2000 Ecliptic, titania 클러스터 ~98°)', () => {
+    const oberon = loadSolarSystem().bodies.find((b) => b.id === 'oberon');
+    expect(oberon).toBeDefined();
+    expect(oberon?.kind).toBe('moon');
+    expect(oberon?.parentId).toBe('uranus');
+    expect(oberon?.introducedInRPhase).toBe(13);
+    expect(oberon?.showInShortcutBar).toBe(false); // galilean/titan/titania 패턴 (URL ?focus=oberon 진입)
+    // ADR §축 4 박제값 — a=3.90059e-3 AU (NASA Fact Sheet 583,520 km), e=0.0014
+    expect(oberon!.orbit!.semiMajorAxis).toBeCloseTo(3.90059e-3 * 1.495978707e11, -5);
+    expect(oberon!.orbit!.eccentricity).toBeCloseTo(0.0014, 4);
+    // Horizons 쿼리 (Uranus-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC, 2026-01-01 TDB) — IN=97.9056°.
+    // titania (97.76°) 와 클러스터 — 세로 궤도 (uranus tilt 97.77°) 사실 정합 (D-T2 버그 오인 금지).
+    expect(oberon!.orbit!.inclination).toBeCloseTo((97.9056 * Math.PI) / 180, 3);
+  });
+
+  it('R12 #725 — proteus 로드 (parentId=neptune, Neptune-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC i 29°)', () => {
+    const proteus = loadSolarSystem().bodies.find((b) => b.id === 'proteus');
+    expect(proteus).toBeDefined();
+    expect(proteus?.kind).toBe('moon');
+    expect(proteus?.parentId).toBe('neptune');
+    expect(proteus?.introducedInRPhase).toBe(13);
+    expect(proteus?.showInShortcutBar).toBe(false); // galilean/titan/titania/triton 패턴 (URL ?focus=proteus 진입)
+    // ADR §축 4 박제값 — a=7.86422e-4 AU (NASA Fact Sheet 117,647 km, 최내곽), e=0.00053
+    expect(proteus!.orbit!.semiMajorAxis).toBeCloseTo(7.86422e-4 * 1.495978707e11, -5);
+    expect(proteus!.orbit!.eccentricity).toBeCloseTo(0.00053, 5);
+    // ⚠️ REF_PLANE=ECLIPTIC 핵심 — proteus 는 Neptune 적도면 근접 (ecliptic IN=29.0594°). 미지정 시
+    // Neptune 적도면 반환 → triton (ecliptic 기준) 과 ~28° 어긋남 위험 (ADR §축 4, #721 enceladus 동형).
+    // ecliptic 명시로 0° < i < 90° (역행 아님 — triton 과 다름). frame 정합 회귀 가드.
+    expect(proteus!.orbit!.inclination).toBeGreaterThan(0);
+    expect(proteus!.orbit!.inclination).toBeLessThan(Math.PI / 2); // < 90° (순행, ecliptic frame 정합)
+    expect(proteus!.orbit!.inclination).toBeCloseTo((29.0594 * Math.PI) / 180, 3);
   });
 
   it('R9 #653 — neptune.rings 1 composite layer (densityProfile 12점 ≤ MAX 16) + ringAlphaHint 0.7', () => {

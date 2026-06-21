@@ -587,6 +587,29 @@
       }
     },
     {
+      "id": "oberon",
+      "kind": "moon",
+      "nameKo": "오베론",
+      "nameEn": "Oberon",
+      "mass": 2.883e21,
+      "radius": 7.614e5,
+      "parentId": "uranus",
+      "introducedInRPhase": 13,
+      "showInShortcutBar": false,
+      "$comment": "R12 #725 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-21 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Uranus-centric J2000 Ecliptic (osculating), REF_PLANE=ECLIPTIC 명시 (미지정 시 Uranus 적도면 반환 위험 — ADR 20260621-725 §축 4 / #721 이견 답습). Reference frame: 'Ecliptic of J2000.0' 응답 확인. Laplace plane 값 혼입 금지 — titania frame 답습. Horizons 원시값 (CENTER=500@799): IN=97.9056 / OM=167.7098 / W=156.6162 / MA=322.3855 → ϖ=OM+W mod 360=324.3260, L=ϖ+MA mod 360=286.7115. a/e 는 NASA Fact Sheet 박제값 (a=583,520 km / e=0.0014 — Horizons a 583,607 km 와 0.015% 일치). ecliptic inclination ~97.91° — titania 97.76° 와 클러스터, 세로 궤도 렌더가 사실 정합 (uranus 계 전체 누움, tilt 97.77° 고리 평면과 정렬 — D-T2 버그 오인 금지, titania §축 3 사전 등록 답습).",
+      "colorHint": { "hex": "#7A7065", "colorSource": "observed" },
+      "dataSource": "NASA Uranus Fact Sheet + JPL Horizons API (2026-06-21 쿼리, 2026-01-01 TDB epoch, Uranus-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-21",
+      "orbit": {
+        "semiMajorAxisAU": 3.90059e-3,
+        "eccentricity": 0.0014,
+        "inclinationDeg": 97.9056,
+        "longitudeOfAscendingNodeDeg": 167.7098,
+        "longitudeOfPerihelionDeg": 324.326,
+        "meanLongitudeDeg": 286.7115
+      }
+    },
+    {
       "id": "neptune",
       "kind": "planet",
       "nameKo": "해왕성",
@@ -633,7 +656,14 @@
             [0.95, 0.04],
             [1.0, 1.0]
           ],
-          "colorHint": { "hex": "#6F635A", "colorSource": "observed" }
+          "colorHint": { "hex": "#6F635A", "colorSource": "observed" },
+          "$arcsComment": "R12+ #728 — Adams ring 5 arcs (Fraternité / Égalité 1·2 / Liberté / Courage — Galatea 42:43 corotation eccentricity 공명으로 유지, 둘레의 ~10% 만 밝음). 출처 Voyager 2 (1989) PDS Ring-Moon Systems Node [T1 관측]. 5 arc 명목 corotating-frame longitude (Voyager 2 epoch, 선행→후행 순): Fraternité ~247-257° (~10° 폭, 최대 밝기) / Égalité 2 ~261° (~4°) / Égalité 1 ~265° (~2°) / Liberté ~276° (~4°) / Courage ~283° (~1°). 클러스터 전체 span ~36° (Fraternité 선행단~Courage 후행단). ⚠️ 개별 arc 는 5 분리 해상 안 함 — R9 narrow-ring composite 논리 답습 (focus=neptune 기본 카메라 ring major-axis px 반경 ~290px [developer 2026-06-21 실측 — ADR 40px 가정 7x 상향 교체]; Fraternité 10°=~50px 가시이나 minor-axis foreshorten 영역에선 sub-pixel. 가시 클러스터 aggregate 로 azimuthal density bump 렌더, 개별 5 arc 명목은 본 주석 SSoT 보존). arcs 배열의 2 bump = Fraternité 주 bump (밝음) + Liberté/Égalité 군집 보조 bump (약간 어둡게) 로 '한쪽이 더 밝은 호' 표현. centerDeg = disc local UV X축 (+x) 기준 CCW degree — 절대 천문 longitude 정렬은 ring tilt 와 동일 world X 고정 근사 (R8 #647 §위험 #6 동형, arc 절대 방위 정밀 아님). ⚠️ arc 는 시간 진화 (fading) [T2 정적 근사] — Liberté/Courage 1989(Voyager)→2000s(Keck/Hubble) 밝기 급감 + Courage leading ~8° 이동. 본 데이터는 정적 스냅샷 (arc 시간 진화 / Galatea 공명 역학 비-범위 — D-T2 '왜 5 arc 다 안 보임 / 시간에 안 변함' 오인 사전 등록). ADR 20260621-728-adams-ring-arcs.md §결정 2/4 + §교차검증 (azimuth 기준축 계약).",
+          "arcs": [
+            { "centerDeg": 252, "widthDeg": 24, "brightness": 1.6 },
+            { "centerDeg": 274, "widthDeg": 14, "brightness": 1.15 }
+          ],
+          "$arcDarkFactorComment": "R12+ #728 — arc 밖(어두운 나머지 ~324°) 밝기 배율. arc bright(1.6) vs dark(0.35) 대조비 4.57:1 (DoD ≥ 2:1). developer 2026-06-21 실측 (focus=neptune 균질 ring/bg 밝기비 4.4 baseline → arc 변조로 호/나머지 대조 부여). D-T2 과미세/과대조 시 0.35 → 0.5 (대조 완화) 또는 brightness 상향 (ADR 20260621-728 §재검토 트리거 #1).",
+          "arcDarkFactor": 0.35
         }
       ]
     },
@@ -658,6 +688,30 @@
         "longitudeOfAscendingNodeDeg": 222.6557,
         "longitudeOfPerihelionDeg": 231.5353,
         "meanLongitudeDeg": 272.3256
+      }
+    },
+    {
+      "id": "proteus",
+      "kind": "moon",
+      "nameKo": "프로테우스",
+      "nameEn": "Proteus",
+      "mass": 4.4e19,
+      "radius": 2.1e5,
+      "$radiusComment": "R12 #725 — 불규칙 다면체 (210×208×201 km) volumetric mean ~210 km 구체 근사 렌더 (사용자 합의 — 표면 디테일 비-범위, ADR 20260621-725 §비-범위). phobos/deimos 비구체 구체 근사 선례 답습.",
+      "parentId": "neptune",
+      "introducedInRPhase": 13,
+      "showInShortcutBar": false,
+      "$comment": "R12 #725 — 각도 요소는 JPL Horizons API 쿼리 (2026-06-21 쿼리, 2026-01-01 00:00 TDB epoch). Query Frame: Neptune-centric J2000 Ecliptic (osculating), REF_PLANE=ECLIPTIC 명시. Reference frame: 'Ecliptic of J2000.0' 응답 확인. ⚠️ proteus 는 Neptune 적도면 근접 궤도 (Horizons ecliptic IN=29.0594°) 라 REF_PLANE 미지정 시 Neptune 적도면 반환 → 황도면 기준 기존 triton (i 129.14° ecliptic) 과 ~28° 평면 어긋남 위험 (해왕성계 정합 붕괴 — ADR 20260621-725 §축 4 핵심, #721 enceladus Saturn 적도면 동형 이견). REF_PLANE=ECLIPTIC 명시로 triton 과 동일 황도면 정합. Laplace plane 값 혼입 금지. Horizons 원시값 (CENTER=500@899): IN=29.0594 / OM=48.7108 / W=28.9999 / MA=51.8972 → ϖ=OM+W mod 360=77.7107, L=ϖ+MA mod 360=129.6079. a/e 는 NASA Fact Sheet 박제값 (a=117,647 km / e=0.00053 — Horizons a 117,674 km 와 0.023% 일치). 해왕성 2번째 위성 (triton 다음, 최내곽 — Adams ring 외곽 근접 a 0.000786 AU).",
+      "colorHint": { "hex": "#8A8278", "colorSource": "observed" },
+      "dataSource": "NASA Neptune Fact Sheet + JPL Horizons API (2026-06-21 쿼리, 2026-01-01 TDB epoch, Neptune-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-06-21",
+      "orbit": {
+        "semiMajorAxisAU": 7.86422e-4,
+        "eccentricity": 0.00053,
+        "inclinationDeg": 29.0594,
+        "longitudeOfAscendingNodeDeg": 48.7108,
+        "longitudeOfPerihelionDeg": 77.7107,
+        "meanLongitudeDeg": 129.6079
       }
     },
     {

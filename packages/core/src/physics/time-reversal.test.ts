@@ -47,7 +47,11 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
   // enceladus 주기 1.37d / rhea 4.52d 는 triton 5.877d 보다 짧거나 근접 → step 누적 더 많음
   // (미제외 시 1년 vel relErr 7.532e-9 로 1e-9 임계 초과 실측 — R8/R9 메커니즘 재현). iapetus 79.3d 는
   // 긴 주기지만 토성 위성 일괄 제외로 9체 원 의도 보존 (titan/triton 등 위성 전체 제외 패턴 일관).
-  // 본 테스트 원 의도(9체 대칭성)는 유지 — 위성 N-body 정합성은 Rust 측정 테스트가 담당.
+  // R12 #725: oberon/proteus 도 동일 이유로 제외 (거성 위성 일괄 — titan/titania/triton 선례 답습).
+  // proteus 주기 1.123d (Horizons PR 9.701e4s = 325 주기/년) 는 enceladus 1.37d 보다 짧아 step 누적
+  // 최대 (전 위성 중 최단 주기 — 미제외 시 1e-9 임계 초과 위험 최대). oberon 주기 13.47d (titan 15.95d
+  // 근접) 도 위성 일괄 제외 패턴 일관. 본 테스트 원 의도(9체 대칭성)는 유지 — 위성 N-body 정합성은
+  // Rust 측정 테스트가 담당.
   const EXCLUDED_SATELLITES = new Set([
     'phobos', // P8
     'deimos', // P8
@@ -61,6 +65,8 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
     'enceladus', // R11 #721 — 주기 1.37d (triton 보다 짧음, step 누적 최대)
     'rhea', // R11 #721 — 주기 4.52d (triton 근접)
     'iapetus', // R11 #721 — 주기 79.3d (긴 주기지만 토성 위성 일괄 제외 — 9체 원 의도 보존)
+    'oberon', // R12 #725 — 주기 13.47d (titan 15.95d 근접, 거성 위성 일괄 제외)
+    'proteus', // R12 #725 — 주기 1.123d (전 위성 중 최단 — 325 주기/년, step 누적 최대. enceladus 1.37d 보다 짧음)
   ]);
   const fullSystem = getSolarSystem();
   const system = {

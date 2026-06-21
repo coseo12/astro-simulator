@@ -359,7 +359,7 @@ R8 §Concrete Prediction 의 R9 예측: "neptune (rings 보유 + tilt 28.32°) =
 5. **#5 (guard 실측 편차)** — neptune px-ratio 결정 트리 (§축 1) — 측정 방법 검증 우선 (volt #32)
 6. **#6 (모바일 cumulative 괴리)** — 예상 16.82~19.3% 범위 ±3%p 초과 → 측정 방법 검증 우선
 7. **#7 (FOCUS_BODIES/#617/#619 drift)** — 정적 매칭 가드 fail → 즉시 동기화
-8. **#8 (Adams arcs 충실도 요구)** — PM 라운드 후 각도 density 인프라 후속 이슈 분리 (R9 비-범위 불변)
+8. **#8 (Adams arcs 충실도 요구)** — PM 라운드 후 각도 density 인프라 후속 이슈 분리 (R9 비-범위 불변). **➡️ 이행됨**: [#728](https://github.com/coseo12/astro-simulator/issues/728) / [`20260621-728-adams-ring-arcs.md`](20260621-728-adams-ring-arcs.md) — ring shader azimuthal alpha 변조로 후속 분리 설계 (밝은 arc 클러스터 aggregate, "방사 densityProfile 각도 표현 불가" 는 데이터 한계이지 shader 구조 한계 아님으로 정정)
 
 ---
 
