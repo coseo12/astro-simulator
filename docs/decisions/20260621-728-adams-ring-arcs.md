@@ -94,6 +94,8 @@ Voyager 2 (1989) 관측 기준 5 arc 각폭 + R9 ring px 반경 대역(36~44px, 
 - arc 밝기 대조: `ringAlphaHint 0.7` (dusty 어두운 ring) 에서 arc bump 가 너무 미세하면 비가시 위험. **arc 영역 밝기 배율(예: arc ×1.5~2.0, 나머지 ×0.3~0.5)** 은 dev 가 D-T2 실측으로 조정 (R9 §재검토 #3 ringAlphaHint 조정 패턴 답습).
 - **measurement-first 의무**: dev 가 실 neptune focus 에서 (1) ring outer px 반경 (2) arc 클러스터 px arc-length (3) arc bright vs dark 대조 가시 여부를 `_debug-728-tmp.mjs` (즉시 rm) 로 실측 후 밝기 배율 확정. architect 의 40px 가정은 추정이며 실측이 SSoT.
 
+> **⚠️ 실측 보정 (Amendment 2026-06-21, developer)** — architect 의 "ring px 반경 40px 가정"은 **7배 과소 추정**. developer 실측(focus=neptune 기본 카메라): **ring major-axis px 반경 ~285px** (ring/body 2.541 × body ~110px). 따라서 개별 arc 도 sub-pixel 이 아니나(Égalité 1 ~2° → ~10px), **클러스터 aggregate 결정(축 2-ii)은 유지** — 5 arc 가 ~47° span 에 밀집해 개별 분리보다 밝은 호 1개로 보이는 것이 관측 정합 + 가독성 우수. 밝기: `darkFactor 0.35` / 주 arc `brightness 1.6` 확정 — arc/dark band 대조비 **실측 9.59:1**(nominal 4.57:1), DoD-1(≥2:1) 충족. 40px 가정값이 결정 자체(클러스터 aggregate)를 바꾸지 않은 이유 = sub-pixel 여부와 무관하게 5 arc 밀집 클러스터가 단일 밝은 호로 인지되는 게 의도.
+
 ---
 
 ## 결정
@@ -153,7 +155,7 @@ gl_FragColor = vec4(color * d * azFactor, alpha);
 
 - **arc 변조 추가 시 변경 범위 예측**:
   - **shader 로직** (`ring-shader.ts`): **신규 ~15~30 라인** (fragment azFactor + uniform `arcCenters[]`/`arcWidths[]`/`darkFactor` + material.setFloats). **신규 mesh / draw call 0**.
-  - **scene 배선** (`solar-system-scene.ts`): ring layer 의 `arcs` 데이터를 shader 옵션으로 전달 — **~5~10 라인** (조건부 uniform 주입).
+  - **scene 배선** (`solar-system-scene.ts`): ring layer 의 `arcs` 데이터를 shader 옵션으로 전달 — **~5~10 라인** (조건부 uniform 주입). **⚠️ 실측 보정 (Amendment 2026-06-21): 실제 0 라인** — `arcs`/`arcDarkFactor` 가 기존 ring layer 객체 spread(`{...r}`)로 자동 흐르고 shader 가 옵션을 읽어 `solar-system-scene.ts` 변경 0. 예측보다 더 국소화 — ring shader + loader 스키마 + 데이터에만 변경 수렴(camera/tier/orbit/picking/scene 전부 0, Concrete Prediction "국소화" 강화 입증).
   - **데이터** (`solar-system.json`): neptune `main` ring layer 에 `arcs` 필드 + `$comment` — **데이터만**.
   - **loader 스키마** (`solar-system-loader.ts`): optional `arcs` zod 스키마 + `LoadedRingLayer.arcs` — **~10 라인**. **`MAX_ARCS` 상한** (예: 4 — `MAX_DENSITY_POINTS=16` 동형) zod `.max(MAX_ARCS)` 로 GLSL uniform 배열 overflow 차단 (agy 확장성 발견 수용 — densityProfile `.max(16)` 선례 답습).
   - **검증 방법**: `git diff --stat packages/` — ring 외 모듈(camera/tier/orbit/picking) 변경 **0** 이면 "arc 가 ring shader 국소 확장으로 흡수됨" 입증. proteus/triton orbit 상수 변경 **0** 이면 무회귀 구조적 확인.
