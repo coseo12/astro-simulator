@@ -4,24 +4,24 @@
 
 태양계를 기점으로 근거리 항성, 은하, 관측가능우주까지 연속 스케일로 탐험 가능하며, 관측 데이터 기반의 정확성과 가상 실험의 자유도를 동시에 제공한다.
 
+**🌐 라이브 데모: <https://astro-simulator-web.vercel.app/ko>**
+
 ![Solar System](./docs/screenshots/01-solar-system.png)
 
 ---
 
 ## 현재 상태
 
-**v0.3.0-p3** — P3 Barnes-Hut + WebGPU compute 완료 (2026-04-15)
+**v0.33.0** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 위성 탐색 확장 (2026-06-20)
 
-- 태양계 18 바디 (행성 8 + 달 + 왜소행성 5 + 혜성 3 + 태양) 실시간 적분
-- 5-mode 물리 엔진 토글: `kepler` / `newton` / `barnes-hut` / `webgpu` / `auto`
-  - Kepler 2-body 해석해 (P1)
-  - Newton N-body Velocity-Verlet, WASM (P2-A)
-  - Barnes-Hut O(N log N) octree, WASM (P3-A) — theta=0.5 max err 4.99e-9
-  - WebGPU compute shader (P3-B) — capability 미지원 시 자동 폴백
-  - Auto: 환경/N에 따라 최적 엔진 자동 선택
+- **태양계 32 body** — 태양 + 행성 8 + 위성 15 + 왜소행성 5 + 혜성 3, 실시간 적분 + 관측 데이터 기반 궤도/크기 시각화
+  - 위성 15: 달 / 포보스·데이모스 / 갈릴레이 4 (이오·유로파·가니메데·칼리스토) / 타이탄·레아·이아페투스·엔셀라두스 / 티타니아·오베론 / 트리톤·프로테우스
+  - 토성·천왕성·해왕성 고리 + 위성 궤도 per-body 시각 스케일 (작은 위성 가독성 보존)
+- **body 탐색 인터랙션** — canvas 클릭/터치로 body·위성 직접 선택, 겹친 body 반복 클릭 순환(cycle), free-fly 카메라(WASD·패닝·줌 감도 조정), 작은 body glow pixel marker, 궤도선 toggle
+- **5-mode 물리 엔진** 토글: `kepler` / `newton` / `barnes-hut` / `webgpu` / `auto`
+  - Kepler 2-body 해석해 / Newton N-body Velocity-Verlet WASM / Barnes-Hut O(N log N) octree (theta=0.5 max err 4.99e-9) / WebGPU compute shader (미지원 시 자동 폴백) / Auto 최적 엔진 선택
 - 소행성대 ThinInstances `?belt=N` 1~10000 (Kepler 해석해)
-- 시간 제어 (재생/역행, ×1d/×1y 프리셋, julian date 정밀 jump)
-- 질량 슬라이더 + "만약에" 시나리오 + URL 북마크 + 4-mode UI
+- 시간 제어 (재생/역행, ×1d/×1y 프리셋, julian date 정밀 jump) + 질량 슬라이더 + "만약에" 시나리오 + URL 북마크
 
 ## 스크린샷
 
@@ -89,7 +89,7 @@
 
 ### 요구사항
 
-- Node.js 20 이상 (권장: 24)
+- Node.js **22.16.0** (`.node-version` 고정 — Playwright extract deadlock 회피, [#606](https://github.com/coseo12/astro-simulator/issues/606))
 - pnpm 10 이상
 
 ### 설치 및 실행
@@ -123,40 +123,31 @@ pnpm verify:all           # 위 5개 순차 실행
 
 ## 테스트 현황
 
-v0.3.0 종합 회귀 287/287 통과 — `docs/benchmarks/p3d-comprehensive-verify.md` 참조.
-
-- **단위 테스트**: 211 (vitest)
-  - core: 153 (gpu, physics, scene, coords, ephemeris, time)
-  - web: 57 (store, layout, panels)
-  - physics-wasm: 1 (binding smoke)
-- **Rust**: 22
-  - unit 18 (nbody + barnes_hut + capability)
-  - integration 2 (barnes_hut_accuracy theta sweep + 1-year)
-  - cargo doc-tests 0
-- **E2E (Playwright)**:
-  - verify:browser — 25 PASS
-  - verify:scale — 9 PASS
-  - verify:mobile — 7 PASS
-  - verify:perf — 5 PASS (평균 ≥ 30 fps)
-  - verify:a11y — 8 PASS (axe 위반 0건)
-- **성능 (실 GPU, M1 Pro Metal, #116)**:
-  - N=1000 / N=10000 모두 vsync cap 120 fps
-  - 헤드리스는 software renderer 한계로 N에 비례 감소
+- **단위 테스트** (Vitest): core 600+ / web 390+ / shared / physics-wasm — scene·physics·coords·ephemeris·gpu·time + store·panels·picking
+- **Rust** (cargo): nbody + barnes_hut + capability (unit + integration theta sweep / 1-year)
+- **브라우저 검증** (Playwright + agent-browser): `scripts/browser-verify-*.mjs` — body 선택/궤도/focus 정합/fps/a11y 3단계 검증
+- **CI 가드**: r1-ui-regression / fps-baseline / a11y-baseline / R-Phase allowlist 정합 / per-body orbit scale
+- **성능** (실 GPU, M1 Pro Metal): N=1000/10000 vsync cap 120 fps (헤드리스 software renderer 는 N 비례 감소)
 
 ---
 
 ## 로드맵
 
-- **P1 — 태양계 MVP** ✅ (Kepler 해석해, 8행성 + 달)
-- **P2 — N-body 전환** ✅ (Velocity-Verlet WASM, 18 바디, 소행성대)
-- **P3 — Barnes-Hut + WebGPU** ✅ (octree O(N log N), WGSL compute, 5-mode 토글)
-- **P4 — 소행성대 N-body 통합 + 일반상대론 + 모바일** (BH/GPU 가속비 실측, 수성 근일점)
-- **P5 — 항성 진화 + 외계행성**
-- **P6 — 은하·은하단**
-- **P7 — 관측가능우주**
-- **P8 — 물리 샌드박스 확장**
+### 기반 — 물리 엔진 (P1~P3) ✅
 
-상세: [`docs/phases/roadmap-v2-solar-precision.md`](./docs/phases/roadmap-v2-solar-precision.md) (현행, 진행 중). 초기 구상은 [`roadmap-v1-cosmic-scale.md`](./docs/phases/roadmap-v1-cosmic-scale.md) (archived) 참조.
+- **P1 — 태양계 MVP** (Kepler 해석해, 8행성 + 달)
+- **P2 — N-body 전환** (Velocity-Verlet WASM, 소행성대)
+- **P3 — Barnes-Hut + WebGPU** (octree O(N log N), WGSL compute, 5-mode 토글)
+
+### 현행 — 로드맵 v3: Incremental Body-by-Body Build ✅ 완주
+
+태양부터 하나씩 사용자가 실제로 보이는 body 를 점진 추가하는 재구성. (v2 Fact-First 기반 P10~P17 은 기본 진입 화면 UX 회귀로 전면 폐기 — [volt #74](https://github.com/coseo12/volt/issues/74))
+
+- **R1~R10** — 태양 → 행성 8 + 고리 → 위성 → 왜소행성 5 → 혜성 3 (27 body)
+- **R11~R12** — 토성 위성 3 (Rhea/Iapetus/Enceladus) + 거성 위성 2 (Oberon/Proteus) → 32 body
+- **인터랙션** — 클릭/터치 선택, 겹침 cycle, free-fly 카메라, glow pixel marker, 궤도선 toggle
+
+상세: [`docs/phases/roadmap-v3-incremental.md`](./docs/phases/roadmap-v3-incremental.md). 폐기된 v1/v2 구상은 [`docs/deprecated/`](./docs/deprecated/) 참조.
 
 ---
 
@@ -168,9 +159,10 @@ v0.3.0 종합 회귀 287/287 통과 — `docs/benchmarks/p3d-comprehensive-verif
 - [아키텍처 결정서](./docs/phases/architecture.md)
 - [디자인 토큰](./docs/phases/design-tokens.md)
 - [UI 아키텍처](./docs/phases/ui-architecture.md)
-- [확장 로드맵 v2 — 태양계 정밀화 (현행)](./docs/phases/roadmap-v2-solar-precision.md)
-- [확장 로드맵 v1 — 관측가능우주 (archived)](./docs/phases/roadmap-v1-cosmic-scale.md)
-- [Fact-First 원칙](./docs/principles/fact-first.md)
+- [로드맵 v3 — Incremental Body-by-Body Build (현행)](./docs/phases/roadmap-v3-incremental.md)
+- [아키텍처 원칙](./docs/architecture/principles.md) — §1 Visual Fidelity (데이터 SSoT 보존 + 렌더링 왜곡 허용)
+- [용어집](./docs/glossary.md) — R-Phase / Tier / Floating Origin / focus 등
+- 폐기된 v1/v2 구상 + Fact-First 원칙: [`docs/deprecated/`](./docs/deprecated/)
 
 ### Phase별
 
@@ -202,11 +194,12 @@ v0.3.0 종합 회귀 287/287 통과 — `docs/benchmarks/p3d-comprehensive-verif
 
 ## 데이터 출처
 
-- **궤도 요소**: Standish 1992 mean elements (JPL)
+- **행성 궤도 요소**: Standish 1992 mean elements (JPL)
+- **위성 궤도 요소**: JPL Horizons API (parent-centric J2000 Ecliptic osculating, 2026-01-01 TDB epoch) + NASA Planetary Fact Sheet (반장축·이심률)
 - **천문학 상수**: CODATA 2018, IAU 2012
-- **Tier 1 표기**: 모든 수치가 관측/표준 레퍼런스 기반
+- **데이터 신뢰성 Tier**: 모든 수치에 T1(관측)~T4(예술) 배지
 
-이후 단계에서 JPL Horizons API, NASA Exoplanet Archive, Gaia DR3 추가 예정.
+이후 단계에서 NASA Exoplanet Archive, Gaia DR3 추가 예정.
 
 ---
 
