@@ -9,8 +9,18 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ARC_EDGE_FADE_RAD, MAX_ARCS, computeArcFactor, packArcUniforms } from './ring-shader.js';
+import { MAX_ARCS as LOADER_MAX_ARCS } from '../ephemeris/solar-system-loader.js';
 
 const DEG = Math.PI / 180;
+
+// volt #69 은닉 상수 drift 가드 (reviewer 권고) — ring-shader 의 GLSL uniform 배열 상한과
+// loader 의 zod `.max(MAX_ARCS)` 파싱 상한은 독립 선언이라 정합이 깨지면 데이터 silent drop.
+// 순환 import 회피 위해 모듈 간 import 대신 test 에서 양쪽 import 후 동치 단언 (단일 SSoT 강제).
+describe('#728 MAX_ARCS 정합 — ring-shader ↔ loader drift 가드', () => {
+  it('두 독립 선언이 동일 값 (uniform 배열 상한 = zod 파싱 상한)', () => {
+    expect(LOADER_MAX_ARCS).toBe(MAX_ARCS);
+  });
+});
 
 describe('#728 azimuthal arc 변조 — computeArcFactor (GLSL 미러)', () => {
   it('arc 미지정/빈 배열 → 1.0 (균질 환형 무회귀 — 모든 방위각에서)', () => {
