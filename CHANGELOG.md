@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.34.1] — 2026-06-22
+
+### Behavior Changes: None — 회귀 가드 신설 + lint 정리 (제품 동작 무변화)
+
+- **[#732] 위성/body focus → 태양계 개요 전환 — NO-OP 종결 + reset 천이 회귀 가드 (PATCH)** ([#732](https://github.com/coseo12/astro-simulator/issues/732)) — #704 후속 인계 "위성/body focus → 태양계 개요 전환" 5항목을 architect runtime 실측 재검증 → 4항목이 이미 #699/#704 에서 해소됨을 확인하여 **NO-OP 종결**(인계 항목 실측 재검증 패턴, volt #14/#67). 유일 여지(earth 128ms vs io 48ms reset tween 속도 비일관)는 ExponentialEase 선형보간 특성상 끊김이 아닌 주관적 polish 영역으로 미구현(사용자 경로 A 선택). 현 "focus/free-fly → reset = 개요 복귀" 동작 보존 가드의 사각(verify:378=focus만 / 629·631=줌만, reset 천이 전용 부재)을 신규 `verify:732-overview` 로 해소 — io/earth/free-fly reset 종료 시 `tier=solar / radius=35 / |target|≈0` + radius 단조성 assert(입력 없는 reset 경로 한정). 코드 동작 변경 0(가드 + NO-OP ADR `20260621-732-overview-transition-no-op.md` 만, sim-canvas/camera/store 0). cross-validate agy(보간 Strategy 추상화 YAGNI 기각).
+- **[chore] pre-existing web lint 5 errors 정리 (PATCH)** ([#734](https://github.com/coseo12/astro-simulator/pull/734)) — develop 에 잠복하던 web 패키지 pre-existing lint 5건 정리. 제품 동작 무변화.
+
+### Notes
+
+- 본 PATCH 는 제품 동작 변화 없는 회귀 가드 신설 + lint 정리다. `verify:732-overview` 는 입력 없는 reset 경로에 한정된다(reset tween 중 휠 입력 시 종료 radius ≠ 35 실측 — detachControl 미호출 / 도달 시간·frame-count 미가드로 easing 결합 + 60↔144Hz flake 회피).
+
 ## [0.34.0] — 2026-06-21
 
 ### Behavior Changes (#725 — 거성 위성 확장 R12)
