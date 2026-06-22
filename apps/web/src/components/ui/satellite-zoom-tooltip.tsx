@@ -1,10 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  resolveFocusMultiplier,
-  FOCUS_USER_RADIUS_MULTIPLIER,
-} from '@astro-simulator/core/scene';
+import { resolveFocusMultiplier, FOCUS_USER_RADIUS_MULTIPLIER } from '@astro-simulator/core/scene';
 import solarSystemData from '@astro-simulator/shared/data/solar-system.json';
 import { useSimStore } from '@/store/sim-store';
 import {
@@ -135,6 +132,9 @@ export function SatelliteZoomTooltip() {
   useEffect(() => {
     // focus 해제 또는 satellite-parent 아닌 body → 즉시 숨김 (전이 시점 cleanup)
     if (selectedBodyId === null || !isSatelliteParent) {
+      // selectedBodyId(외부 store) 변화에 반응하는 cleanup — visible 은 결과이고 trigger 가 아니라
+      // cascading 무한루프 없음 (정당한 외부 상태 sync). set-state-in-effect 규칙 보수적 false-positive.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(false);
       setFadingOut(false);
       currentBodyIdRef.current = null;
@@ -167,13 +167,10 @@ export function SatelliteZoomTooltip() {
     const fadeStartTimer = window.setTimeout(() => {
       setFadingOut(true);
     }, AUTO_FADE_OUT_MS);
-    const hideTimer = window.setTimeout(
-      () => {
-        setVisible(false);
-        setFadingOut(false);
-      },
-      AUTO_FADE_OUT_MS + FADE_DURATION_MS,
-    );
+    const hideTimer = window.setTimeout(() => {
+      setVisible(false);
+      setFadingOut(false);
+    }, AUTO_FADE_OUT_MS + FADE_DURATION_MS);
     return () => {
       window.clearTimeout(fadeStartTimer);
       window.clearTimeout(hideTimer);

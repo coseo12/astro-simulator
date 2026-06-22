@@ -1,6 +1,7 @@
 import { render, cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
+import type * as AstroCore from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
 
 /**
@@ -71,7 +72,7 @@ vi.mock('@/core/sim-context', () => ({
 // simulation-core 가드) + filterBodiesByPhase 순수 함수 경계 테스트가 직교 커버 (ADR §위험 #5).
 const rPhaseMock = vi.hoisted(() => ({ disabledIds: [] as string[] }));
 vi.mock('@astro-simulator/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@astro-simulator/core')>();
+  const actual = await importOriginal<typeof AstroCore>();
   return {
     ...actual,
     isRPhaseFocusable: (bodyId: string | null | undefined) =>
