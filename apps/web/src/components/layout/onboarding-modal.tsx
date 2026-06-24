@@ -175,7 +175,7 @@ export function OnboardingModal() {
                 </button>
               </div>
 
-              <p className="text-caption text-fg-tertiary mb-5">
+              <p className="text-caption text-fg-secondary mb-5">
                 태양계 시뮬레이터에 오신 걸 환영합니다. 아래 조작으로 27개 천체를 자유롭게 둘러볼 수
                 있습니다. 이 안내는 우측 상단 &quot;조작 가이드&quot; 버튼으로 언제든 다시 볼 수
                 있습니다.
