@@ -384,3 +384,44 @@ describe('FocusQuickButtons — 궤도선 토글 (#688)', () => {
     expect(useSimStore.getState().orbitLinesVisible).toBe(true);
   });
 });
+
+/**
+ * #737 — Esc 충돌 가드 (`data-modal-open` 컨벤션 SSoT, architect 핵심결정 1).
+ *
+ * focus 중(selectedBodyId!==null) Esc 1회는 free-fly 진입이지만, 모달(about/sensitivity/onboarding)
+ * 이 열려 있으면(`[data-modal-open="true"]` 존재) Esc 는 모달 닫기 전용이라 free-fly 오발화를 막아야
+ * 한다. native window listener 라 React stopPropagation 으로 차단 불가 → DOM 속성 가드로 해소.
+ *
+ * ⚠️ R1 (architect 위험): 신규 모달은 컨테이너에 `data-modal-open="true"` 를 박제해야 본 가드가
+ * 일관 동작한다 (회귀 가드 — 본 테스트가 가드 작동을 박제).
+ */
+describe('FocusQuickButtons — Esc 충돌 가드 (#737 data-modal-open)', () => {
+  it('focus 중 모달 미오픈 + Esc → enterFreeFly 발화 (기존 #509 동작 보존)', () => {
+    useSimStore.setState({ selectedBodyId: 'earth' });
+    render(<FocusQuickButtons />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(sentCommands).toContainEqual({ type: 'enterFreeFly' });
+  });
+
+  it('focus 중 모달 오픈([data-modal-open]) + Esc → enterFreeFly 미발화 (모달 닫기 전용)', () => {
+    useSimStore.setState({ selectedBodyId: 'earth' });
+    render(<FocusQuickButtons />);
+    // 모달 컨테이너 시뮬레이션 — body 에 data-modal-open 속성 요소 삽입.
+    const modal = document.createElement('div');
+    modal.setAttribute('data-modal-open', 'true');
+    document.body.appendChild(modal);
+    try {
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
+    } finally {
+      document.body.removeChild(modal);
+    }
+  });
+
+  it('focus 없음(selectedBodyId=null) + Esc → enterFreeFly 미발화 (#509 no-op 보존)', () => {
+    useSimStore.setState({ selectedBodyId: null });
+    render(<FocusQuickButtons />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
+  });
+});

@@ -14,10 +14,12 @@ import { DateTimePicker } from './date-time-picker';
 import { UnitToggle } from './unit-toggle';
 import { PhysicsEngineToggle } from './physics-engine-toggle';
 import { SensitivitySettingsModal } from './sensitivity-settings-modal';
+import { OnboardingModal } from './onboarding-modal';
 import { BookmarkButton } from './bookmark-button';
 import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 import { SatelliteZoomTooltip } from '../ui/satellite-zoom-tooltip';
+import { FreeFlyKeyHint } from '../ui/free-fly-key-hint';
 
 /**
  * 전역 레이아웃 컨테이너.
@@ -42,6 +44,8 @@ export function AppShell() {
               <PhysicsEngineToggle />
               <SensitivitySettingsModal />
               <BookmarkButton />
+              {/* #737 — "조작 가이드"(조작법) 와 "?"(데이터 출처) 는 의미 직교 → 버튼 분리 공존. */}
+              <OnboardingModal />
               <AboutModal />
             </div>
           }
@@ -55,6 +59,7 @@ export function AppShell() {
           <TimeControls />
         </TimeBar>
         <SatelliteZoomTooltip />
+        <FreeFlyKeyHint />
       </SimCanvasDynamic>
     </div>
   );

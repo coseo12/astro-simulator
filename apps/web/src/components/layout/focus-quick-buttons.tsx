@@ -52,6 +52,10 @@ export function FocusQuickButtons() {
     if (selected === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // #737 — 모달 open 중 Esc 는 모달 닫기 전용. native window listener 라 React
+      // stopPropagation 으로 차단 불가 → DOM 속성 가드로 free-fly 오발화 차단
+      // (about/sensitivity/onboarding 3 모달 일괄 정합).
+      if (document.querySelector('[data-modal-open="true"]')) return;
       const el = document.activeElement;
       const isEditable =
         el instanceof HTMLInputElement ||
