@@ -1,5 +1,5 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { OnboardingModal } from './onboarding-modal';
 import { ONBOARDING_STORAGE_KEY, ONBOARDING_SCHEMA_VERSION } from '@/lib/onboarding-storage';
 
@@ -13,7 +13,16 @@ import { ONBOARDING_STORAGE_KEY, ONBOARDING_SCHEMA_VERSION } from '@/lib/onboard
  *   - 시작하기/닫기/backdrop/Esc 닫힘 (dismiss 박제 X)
  *   - role=dialog + aria-modal + aria-labelledby + data-modal-open 속성
  *   - 조작 안내 콘텐츠 3섹션 (마우스·키보드 / 탐색 / 터치)
+ *   - 자동화 환경(navigator.webdriver) → 자동표시 스킵 (#739, 클릭/픽셀 verify backdrop 차단 해소)
  */
+
+/** navigator.webdriver getter 를 일시 오버라이드 (jsdom 은 기본 false getter). */
+function setWebdriver(value: boolean | undefined) {
+  Object.defineProperty(navigator, 'webdriver', {
+    configurable: true,
+    get: () => value,
+  });
+}
 
 describe('OnboardingModal (#737)', () => {
   beforeEach(() => {
@@ -41,6 +50,44 @@ describe('OnboardingModal (#737)', () => {
         JSON.stringify({ version: 0, value: true }),
       );
       render(<OnboardingModal />);
+      expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
+    });
+  });
+
+  // #739 — 자동화 환경(Playwright/WebDriver)에서 자동표시 모달 backdrop 이 클릭/픽셀 verify 를
+  // 가로채는 것을 차단하기 위한 navigator.webdriver 가드. r-phase-allowlist exit2 실측 회귀 가드.
+  describe('자동화 환경 가드 (navigator.webdriver) — #739', () => {
+    afterEach(() => {
+      // 기본 jsdom getter(false) 로 복원 — 다른 테스트 격리.
+      setWebdriver(false);
+    });
+
+    it('webdriver=true + 첫 방문(localStorage 미설정) → 자동표시 안 됨', () => {
+      setWebdriver(true);
+      render(<OnboardingModal />);
+      expect(screen.queryByTestId('onboarding-modal')).toBeNull();
+    });
+
+    it('webdriver=false + 첫 방문 → 자동표시 됨 (기존 동작 보존)', () => {
+      setWebdriver(false);
+      render(<OnboardingModal />);
+      expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
+    });
+
+    it('webdriver=undefined + 첫 방문 → 자동표시 됨 (비자동화 일반 브라우저)', () => {
+      setWebdriver(undefined);
+      render(<OnboardingModal />);
+      expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
+    });
+
+    it('webdriver=true 여도 "조작 가이드" 버튼 클릭 → 수동 호출 정상 작동', () => {
+      setWebdriver(true);
+      render(<OnboardingModal />);
+      // 자동표시 스킵 확인
+      expect(screen.queryByTestId('onboarding-modal')).toBeNull();
+      act(() => {
+        fireEvent.click(screen.getByTestId('onboarding-button'));
+      });
       expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
     });
   });

@@ -94,8 +94,20 @@ export function OnboardingModal() {
 
   // 첫 방문 자동 표시 — mount 후 1회 localStorage 판정 (서버 렌더는 항상 닫힘 → Hydration 안전,
   // sensitivity Hydration 선례). 빈 deps = 마운트 1회만. dismiss 미박제 시 자동 open.
+  //
+  // ## 자동화 환경 가드 (navigator.webdriver) — #737 / #739
+  //
+  //   Playwright/WebDriver 등 자동화 브라우저(`navigator.webdriver === true`)에서는 자동표시를
+  //   스킵한다. 자동표시 모달의 backdrop(`fixed inset-0 z-[100] backdrop-blur`)이 UI 클릭/픽셀
+  //   verify 를 가로채는 것을 차단하기 위함이다. 실측: `verify:r-phase-allowlist` 의 focus-sun 버튼
+  //   클릭이 `backdrop intercepts pointer events` 로 TimeoutError exit 2 (699-freefly-unified 의
+  //   context 6곳+도 동일 영향). 테스트별 dismiss 는 context 8곳+ 분산이라 비효율 → production 1곳
+  //   가드로 근본 해결. r1-ui-regression-guard.mjs 의 localStorage dismiss(176af2c)와 이중 방어.
+  //   수동 호출("조작 가이드" 버튼)은 본 가드와 무관하게 정상 작동한다(가드는 자동표시 useEffect 한정).
+  //   SSR 안전: 자동표시 useEffect 는 클라이언트 전용이나 방어적으로 typeof navigator 가드.
   useEffect(() => {
-    if (!getOnboardingDismissed()) {
+    const isAutomation = typeof navigator !== 'undefined' && navigator.webdriver;
+    if (!isAutomation && !getOnboardingDismissed()) {
       // 외부 시스템(localStorage) 동기화 결과를 React 상태로 1회 반영 — 마운트 1회라 cascading
       // 무한루프 없음 (satellite-zoom-tooltip 의 외부 store sync 선례와 동일 정당 false-positive).
       // eslint-disable-next-line react-hooks/set-state-in-effect
