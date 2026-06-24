@@ -89,6 +89,8 @@ export function OnboardingModal() {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  // 한 번이라도 open 된 적 있는지 — open→close 전이에서만 trigger 로 focus 복원하기 위한 가드.
+  const hasOpenedRef = useRef(false);
 
   // 첫 방문 자동 표시 — mount 후 1회 localStorage 판정 (서버 렌더는 항상 닫힘 → Hydration 안전,
   // sensitivity Hydration 선례). 빈 deps = 마운트 1회만. dismiss 미박제 시 자동 open.
@@ -105,20 +107,22 @@ export function OnboardingModal() {
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setOpen(false);
-      }
+      // about/sensitivity 답습 — stopPropagation 잉여(동일 target=window 의 다른 native 리스너는
+      // 차단 불가). free-fly 오발화 가드는 focus-quick-buttons 의 `data-modal-open` 검사가 보증.
+      if (e.key === 'Escape') setOpen(false);
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  // a11y — open 시 닫기 버튼 focus / close 시 trigger 로 복원 (architect 핵심결정 2).
+  // a11y — open 시 닫기 버튼 focus / open→close 전이일 때만 trigger 로 복원 (architect 핵심결정 2).
+  // 초기 mount(open 한 번도 true 안 됨)에는 복원 미발화 — dismiss 박제된 재방문 유저(자동표시 X)의
+  // 포커스가 "조작 가이드" 버튼으로 강제 탈취되는 버그를 막는다(reviewer 권고 1).
   useEffect(() => {
     if (open) {
+      hasOpenedRef.current = true;
       closeButtonRef.current?.focus();
-    } else {
+    } else if (hasOpenedRef.current) {
       triggerRef.current?.focus();
     }
   }, [open]);

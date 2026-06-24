@@ -120,6 +120,31 @@ describe('OnboardingModal (#737)', () => {
       render(<OnboardingModal />);
       expect(screen.getByTestId('onboarding-close')).toHaveFocus();
     });
+
+    // reviewer 권고 1 — 초기 mount(open 한 번도 안 됨)에는 trigger 로 focus 가 가지 않아야 한다.
+    // dismiss 박제된 재방문 유저(자동표시 X)의 포커스 탈취 버그 회귀 가드.
+    it('초기 mount(dismiss 박제, 자동표시 X) → trigger 버튼에 focus 가 가지 않음', () => {
+      window.localStorage.setItem(
+        ONBOARDING_STORAGE_KEY,
+        JSON.stringify({ version: ONBOARDING_SCHEMA_VERSION, value: true }),
+      );
+      render(<OnboardingModal />);
+      // 모달 미표시 + trigger 미포커스 (open 한 번도 true 가 아니었으므로 복원 미발화)
+      expect(screen.queryByTestId('onboarding-modal')).toBeNull();
+      expect(screen.getByTestId('onboarding-button')).not.toHaveFocus();
+    });
+
+    // reviewer 권고 1 — open→close 전이에서는 trigger 로 focus 가 복원돼야 한다.
+    it('open→close 전이 → trigger 버튼으로 focus 복원', () => {
+      render(<OnboardingModal />);
+      // 첫 방문 자동 open 상태에서 닫기 → trigger 복원
+      expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
+      act(() => {
+        fireEvent.click(screen.getByTestId('onboarding-close'));
+      });
+      expect(screen.queryByTestId('onboarding-modal')).toBeNull();
+      expect(screen.getByTestId('onboarding-button')).toHaveFocus();
+    });
   });
 
   describe('조작 안내 콘텐츠 — 3섹션 + 실측 바인딩', () => {
