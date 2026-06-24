@@ -394,6 +394,20 @@ async function setupPage(browser, viewport, queryString = '') {
     viewport: { width: viewport.width, height: viewport.height },
     deviceScaleFactor: 1,
   });
+  // #737 — 첫 진입 온보딩 모달 자동표시가 R1 UI 캡처를 가리지 않도록 dismiss 선설정.
+  // setupPage 는 verify/--update(baseline) 양쪽이 공유하므로 baseline·비교 화면이 일관되게
+  // "온보딩 없는 R1 화면" 으로 캡처된다 (조작 가이드 버튼 등 영구 UI 는 그대로 포함).
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'astro:onboarding-dismissed',
+        JSON.stringify({ version: 1, value: true }),
+      );
+      localStorage.setItem('astro:free-fly-hint-shown', '1');
+    } catch {
+      /* SSR/차단 환경 silent fallback */
+    }
+  });
   const page = await context.newPage();
   const url = `${BASE_URL}${queryString}`;
   diag(`setupPage[${viewport.id}] goto ${url} (networkidle, 30s)`);

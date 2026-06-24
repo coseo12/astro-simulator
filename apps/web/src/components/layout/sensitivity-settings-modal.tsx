@@ -100,6 +100,7 @@ export function SensitivitySettingsModal() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="sensitivity-title"
+              data-modal-open="true"
               data-testid="sensitivity-settings-modal"
             >
               <div className="flex items-center justify-between mb-4">

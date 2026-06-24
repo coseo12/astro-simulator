@@ -79,6 +79,7 @@ export function AboutModal() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="about-title"
+            data-modal-open="true"
             data-testid="about-modal"
           >
             <div className="flex items-center justify-between mb-4">
