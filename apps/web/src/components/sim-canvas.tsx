@@ -19,6 +19,7 @@ import { parseLodLevel } from '@/core/parse-lod-level';
 import { parseGpuTier } from '@/core/parse-gpu-tier';
 import { parseGlowMarkerRatio, parseMarkerMode } from '@/core/parse-marker-mode';
 import { parseOrbitsVisible } from '@/core/parse-orbits-mode';
+import { parseStarsVisible } from '@/core/parse-stars-mode';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -344,6 +345,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #675 — ?ratio= glow marker 모행성:위성 비율 (PM 확정 기본 2:1, 디버그용 — ADR §축 7).
         const ratioParam = new URLSearchParams(window.location.search).get('ratio');
         const glowMarkerRatio = parseGlowMarkerRatio(ratioParam);
+        // #738 — 별 배경 기본 ON + `?stars=off` 옵트아웃 (ADR 20260624-738 §결정 7).
+        const starsParam = new URLSearchParams(window.location.search).get('stars');
+        const starfieldVisible = parseStarsVisible(starsParam);
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
@@ -364,6 +368,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           glowMarker: markerMode === 'glow',
           // #675 — 모행성:위성 marker 비율 (glowMarker=false 면 scene 이 무시).
           glowMarkerSatelliteRatio: glowMarkerRatio,
+          // #738 — 별 배경 + 은하수. 기본 ON 은 parseStarsVisible 기본값 (true) 이 결정 —
+          // core 옵션 기본값은 false 유지 (ADR 20260624-738 §결정 7 레이어 분리).
+          starfield: starfieldVisible,
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
