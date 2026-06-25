@@ -27,6 +27,7 @@ import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
+import { createStarfield } from './starfield.js';
 import {
   renderScaleForTier,
   initialTier as defaultInitialTier,
@@ -398,6 +399,20 @@ export interface SolarSystemSceneOptions {
    * glowMarker=false 면 미사용.
    */
   glowMarkerSatelliteRatio?: number;
+
+  /**
+   * #738 — 절차적 별 배경 + 은하수 띠 (`starfield.ts`).
+   *
+   * 기본값 **false** (core 라이브러리 보수 기본 — 기존 NullEngine 단위 테스트 무회귀, #675 레이어
+   * 분리 정합). **기본 ON 은 web 레이어 결정** — `parseStarsVisible` (apps/web) 기본값이 true 이며
+   * `?stars=off` 가 옵트아웃 (ADR §결정 7). false 면 starfield mesh 자체를 생성하지 않음 (연산 0).
+   *
+   * 동작 (true 일 때): `infiniteDistance=true` inverted sphere + 절차 fragment ShaderMaterial 을
+   * clearColor 직후 1개 추가. floating-origin/tier/줌 불변 (엔진 레벨), `isPickable=false` (raycast
+   * 비간섭), `renderingGroupId=0` (background queue — 모든 body/orbit/ring 이 그 위에 덮어씀).
+   * ADR `docs/decisions/20260624-738-procedural-starfield.md`.
+   */
+  starfield?: boolean;
 }
 
 /**
@@ -424,6 +439,7 @@ export function createSolarSystemScene(
     onTierTransitionInputAttempts,
     glowMarker = false,
     glowMarkerSatelliteRatio = GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
+    starfield = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -440,6 +456,14 @@ export function createSolarSystemScene(
 
   // 배경 톤
   scene.clearColor = new Color4(0.031, 0.035, 0.051, 1);
+
+  // #738 — 절차적 별 배경 + 은하수 띠 (clearColor 위 background queue 레이어). 기본 false —
+  // web 레이어가 `?stars=off` 옵트아웃으로 기본 ON 결정 (ADR §결정 7). infiniteDistance 가
+  // floating-origin/tier/줌 불변을 엔진 레벨로 보장 → 별 추종 코드 0 (ADR §결정 1).
+  if (starfield) {
+    const sf = createStarfield(scene);
+    disposables.push({ dispose: () => sf.dispose() });
+  }
 
   // 회귀 #372 fix — 행성 그림자측 인지 가능 ambient (AMBIENT_* 상수 SSoT, 단위 테스트 가드).
   const ambient = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
