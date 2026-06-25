@@ -5,6 +5,19 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-06-25
+
+### Behavior Changes (#737 — 첫 진입 온보딩 / #738 — 별 배경)
+
+- **[#737] 첫 진입 온보딩 + 조작 가이드 (MINOR)** ([#737](https://github.com/coseo12/astro-simulator/issues/737)) — v3 완주(27 body) 이후 첫 진입 사용자의 discoverability 갭 해소(방향성 기획 트랙 B). 첫 방문 시 온보딩 모달 자동 표시(조작 안내: 천체 이동 / 클릭·터치 선택+cycle / 휠 줌 / 드래그·방향키 회전 / free-fly WASD·Q/E·우클릭 패닝, 마우스·키보드 vs 터치 분기) + 상시 "조작 가이드" 버튼 재호출 + free-fly 진입 키 힌트 toast(글로벌 1회). `astro:onboarding-dismissed` `{version,value}` localStorage 영속. **Esc 충돌 가드** `data-modal-open`(about/sensitivity/onboarding 3 모달 일괄 — native window listener가 React stopPropagation 차단 못하던 잠복 버그 동시 해소). a11y(role=dialog / aria-modal / focus 관리, axe 0 위반). **`navigator.webdriver` testability 가드**(자동화 환경에서 자동표시 스킵 — 실사용자 무관, 클릭/픽셀 browser-verify backdrop 차단 방지). core 변경 0. 후속 #740(a11y 토큰 전수).
+- **[#738] 별 배경 + 은하수 — 절차적 starfield (MINOR)** ([#738](https://github.com/coseo12/astro-simulator/issues/738)) — "감상/탐험형" 정체성 핵심(방향성 기획 트랙 A1) — 단색 배경에 절차적 별 배경 + 은하수 띠 추가. `infiniteDistance` inverted sphere + 단일 draw call fragment shader(별 + 은하수, **신규 라이브러리·에셋 0**, ring-shader 답습). `infiniteDistance`가 floating-origin shift / tier scale / 줌 불변을 엔진 레벨 보장(D1 실측 Δ0px → 별 추종 코드 0). `?stars=off` 토글(기본 ON). **gpu tier-c(저성능/swiftshader)는 별 배경 비활성**(전체화면 shader fill-rate graceful degradation — `resolveStarfieldVisible = starsVisible && gpuTier !== 'c'`, ADR Amendment 1). WebGPU/WebGL2 shader parity 실측. ADR `20260624-738-procedural-starfield.md` (Accepted, cross-validate agy). 비-범위(후속): 실측 star catalog / 별자리 선·라벨 / 성운 에셋 / 토글 UI 버튼.
+
+### Notes
+
+- 두 기능 모두 2026-06-22 방향성 기획서의 "경험 레이어"(트랙 B 온보딩 → A 몰입) 첫 라운드 — v3(엔진·콘텐츠 완성) 이후 "도표형 → 감상형" 전환 착수.
+- **#737 testability 교훈**: 자동표시 모달 backdrop이 클릭/픽셀 browser-verify를 차단 → `navigator.webdriver` 가드로 근본 해결. 신규 자동표시 UI 추가 시 동일 가드 의무.
+- **#738 성능 교훈**: 전체화면 shader fill-rate 회귀는 CI swiftshader(tier-c)에서만 드러남(실 GPU PASS) — 시각 효과는 CI 소프트웨어 렌더 fps 검증 필수.
+
 ## [0.34.1] — 2026-06-22
 
 ### Behavior Changes: None — 회귀 가드 신설 + lint 정리 (제품 동작 무변화)

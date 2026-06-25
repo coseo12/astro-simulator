@@ -65,6 +65,9 @@ export type {
   RingShaderHandles,
   CreateRingShaderOptions,
 } from './ring-shader.js';
+// #738 — 절차적 별 배경 + 은하수 띠 (infiniteDistance inverted sphere + fragment ShaderMaterial).
+export { createStarfield } from './starfield.js';
+export type { StarfieldHandles, CreateStarfieldOptions } from './starfield.js';
 export { createGravitationalLensing } from './gravitational-lensing.js';
 export type { LensingHandles, BlackHoleOptions } from './gravitational-lensing.js';
 export { createBlackHoleRendering } from './black-hole-rendering.js';
