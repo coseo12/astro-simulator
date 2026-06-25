@@ -5,6 +5,16 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.35.1] — 2026-06-26
+
+### Behavior Changes (#745 — 별 배경 가시성 회귀 fix)
+
+- **[#745] tier-c 별 배경 과잉 비활성 회귀 fix (PATCH)** ([#745](https://github.com/coseo12/astro-simulator/issues/745)) — #738 별 배경의 fps graceful degradation 기준이 `gpu tier-c`(= "WebGPU 미지원" 데스크톱 전부, 소프트웨어 swiftshader + WebGL2 **하드웨어** 가속 무구분)였던 탓에, WebGPU 미지원이지만 WebGL2 하드웨어 가속인 **PC 크롬에서 별 배경이 기본 진입 시 사라지던 회귀**를 정정. 비활성 기준을 `tier-c` → **소프트웨어 렌더(swiftshader/llvmpipe/swrast 등) 감지**(신규 `detectSoftwareRenderer`, WebGL `UNMASKED_RENDERER_WEBGL` 1차 + WebGPU adapterInfo 보조)로 변경. **하드웨어 GPU(WebGPU tier-a/b + WebGL2 하드웨어 fallback) 전부 별 표시**, CI swiftshader(소프트웨어)는 비활성 유지로 fps 무회귀. 정규식 false positive 0(Apple/NVIDIA/Intel/Mali 등)·false negative 0(swiftshader 등) 검증. `?stars=off` / `?gpu=` override 보존. core 변경 0. ADR `20260624-738-procedural-starfield.md` §Amendment 2.
+
+### Notes
+
+- **README 스크린샷 갱신** — 전체 태양계 / 지구 / 해왕성 / 모바일 4장을 별 배경(#738)이 반영된 하드웨어 GPU 캡처본으로 교체 + "현재 상태" v0.35.1 현행화 (행동 변화 없는 문서).
+
 ## [0.35.0] — 2026-06-25
 
 ### Behavior Changes (#737 — 첫 진입 온보딩 / #738 — 별 배경)

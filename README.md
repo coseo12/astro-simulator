@@ -12,7 +12,7 @@
 
 ## 현재 상태
 
-**v0.33.0** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 위성 탐색 확장 (2026-06-20)
+**v0.35.1** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 경험 레이어 (별 배경·온보딩) (2026-06-26)
 
 - **태양계 32 body** — 태양 + 행성 8 + 위성 15 + 왜소행성 5 + 혜성 3, 실시간 적분 + 관측 데이터 기반 궤도/크기 시각화
   - 위성 15: 달 / 포보스·데이모스 / 갈릴레이 4 (이오·유로파·가니메데·칼리스토) / 타이탄·레아·이아페투스·엔셀라두스 / 티타니아·오베론 / 트리톤·프로테우스
@@ -22,6 +22,7 @@
   - Kepler 2-body 해석해 / Newton N-body Velocity-Verlet WASM / Barnes-Hut O(N log N) octree (theta=0.5 max err 4.99e-9) / WebGPU compute shader (미지원 시 자동 폴백) / Auto 최적 엔진 선택
 - 소행성대 ThinInstances `?belt=N` 1~10000 (Kepler 해석해)
 - 시간 제어 (재생/역행, ×1d/×1y 프리셋, julian date 정밀 jump) + 질량 슬라이더 + "만약에" 시나리오 + URL 북마크
+- **우주 환경 + 온보딩** — 절차적 별 배경 + 은하수 (`infiniteDistance` 천구 + 단일 draw call shader, 신규 에셋 0, `?stars=off` 토글) / 첫 진입 온보딩 + 조작 가이드 모달 (소프트웨어 렌더 환경은 별 배경 자동 비활성 — fill-rate graceful degradation)
 
 ## 스크린샷
 
