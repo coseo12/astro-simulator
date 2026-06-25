@@ -1,10 +1,11 @@
 # ADR: 절차적 starfield + 은하수 우주 배경 — #738
 
-- **상태**: **Accepted** (cross-validate 2026-06-24 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료. ADR Status 워크플로 §부분 도입 #370)
-- **날짜**: 2026-06-24
-- **결정자**: architect (#738 설계)
+- **상태**: **Accepted** (cross-validate 2026-06-24 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료. ADR Status 워크플로 §부분 도입 #370). **§Amendment 2 (#745) 는 Provisional** — developer 구현 + qa 실 GUI 후 Accepted 전이.
+- **날짜**: 2026-06-24 (§Amendment 2: 2026-06-25, #745)
+- **결정자**: architect (#738 설계 / #745 Amendment 2)
 - **관련**:
   - [#738](https://github.com/coseo12/astro-simulator/issues/738) (본 이슈 — 별 배경 + 은하수)
+  - [#745](https://github.com/coseo12/astro-simulator/issues/745) (§Amendment 2 — tier-c 과잉 비활성 회귀 → 소프트웨어 렌더만 비활성 정정)
   - 방향성 기획서 2026-06-22 트랙 A1 (몰입·정체성 핵심) — `docs/architecture/principles.md §1 Visual Fidelity`
   - [`20260422-floating-origin.md`](20260422-floating-origin.md) (P11-A #288 — floating origin 좌표 계약, 별 무한원경 정합의 출처)
   - [`20260613-675-glow-pixel-marker.md`](20260613-675-glow-pixel-marker.md) (#675 — ShaderMaterial + URL 토글 + parse-\* 패턴 선례)
@@ -237,6 +238,72 @@ starfieldVisible = (parseStarsVisible(?stars=) === true) && resolveGpuTier(gpuCa
 
 - 단위 테스트: `parse-stars-mode.test.ts` 에 "tier-c 일 때 starfield false" 합성식 단언 (web 레이어 결정식 직접 검증).
 - CI: fps-baseline-guard + r1-guard 가 tier-c (CI 항상 tier-c) 에서 회귀 시 재차단.
+
+---
+
+## §Amendment 2 — tier-c 전체 비활성 → 소프트웨어 렌더만 비활성 (과잉 비활성 회귀 정정) (2026-06-25, #745)
+
+**상태**: **Provisional** (cross-validate 2026-06-25 agy 통합 완료 — 아래 §Amendment 2 교차검증 반영 사항 박제. developer 구현 + qa 실 GUI 후 Accepted 전이). **트리거**: Amendment 1 의 `gpuTier !== 'c'` 비활성 기준이 production 에서 **과잉**으로 판명 (v0.35.0 회귀, #745 high).
+
+### 발견 (production 회귀 + Playwright 실측 — measurement-first)
+
+Amendment 1 은 fps 회귀의 진짜 원인을 **소프트웨어 렌더(swiftshader) 의 fill-rate 한계** 로 정확히 진단했으나, 비활성 **기준** 을 `detect-gpu-tier.ts` 의 `tier-c` 로 잡았다. 그런데 `detect-gpu-tier.ts §분기 2` 의 tier-c 정의는 **"WebGPU 미지원 데스크톱 전부"** (소프트웨어 swiftshader + WebGL2 **하드웨어** 가속 무구분) 이다. 따라서:
+
+- **WebGPU 미지원이지만 WebGL2 하드웨어 가속인 PC 크롬** (Firefox / 구 Safari / WebGPU·하드웨어가속 OFF Chrome 다수) 에서도 tier-c → **별이 사라짐**. 사용자 실측 — `?gpu=b` 강제 시 정상 표시 (원인 확정). qa "WebGL2 parity 별 보임" (Amendment 1 PR #742 qa) 과 모순 — 그 qa 환경이 곧 tier-c 인데 비활성이 그것을 막았다.
+- WebGPU 는 비교적 최신 기능 — 미지원 실사용자 상당수가 **기본 진입에서 별 못 봄** → "기능이 없다" 오인. v0.35.0 production 가시성 회귀.
+
+**Playwright 실측 (chromium.launch 플래그 차이 — CI 와 동일/하드웨어 비교):**
+
+| 시나리오                                        | WebGPU | WebGL `UNMASKED_RENDERER_WEBGL`                                                                    | app `__gpuTier` | 별  |
+| ----------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------- | --------------- | --- |
+| **CI-default (fps/r1-guard 와 동일, 플래그 0)** | false  | `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)` | `c`             | ✕   |
+| **WebGPU-enabled (`--enable-unsafe-webgpu`)**   | true   | `ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)`                           | `b`             | ○   |
+
+**핵심 확정 사실**: (1) CI swiftshader 는 **WebGL2 경로** (WebGPU 미지원 = 분기 2) 이고 RENDERER 에 **`SwiftShader` 문자열이 확실히 포함** → software 감지가 CI 에서 결정적으로 true → fps 무회귀 유지 가능. (2) WebGPU adapterInfo 는 빈 객체 `{}` (Chrome privacy) → WebGPU 경로 software 감지 신뢰 낮음, **WebGL UNMASKED 가 주(primary) 신뢰 소스**.
+
+### 결정
+
+별 비활성 기준을 **"WebGPU 미지원 (tier-c)" → "소프트웨어 렌더 (swiftshader/llvmpipe/swrast/...)"** 로 정정한다.
+
+- **신규 순수 함수** `detectSoftwareRenderer(rendererString): boolean` (`apps/web/src/core/detect-software-renderer.ts`) — 보수적 패턴 `/swiftshader|llvmpipe|microsoft basic render|software rasterizer|apple software renderer|swrast/i`. **확실한 software 패턴만 true, 불확실/빈 문자열이면 false (별 표시 = 보수적 — false positive 로 하드웨어에서 별 사라지는 것을 차단)**. `"software"` 단독 단어는 제외 (가상화 게스트 드라이버 false positive 위험 — agy Q2 수용).
+- **별 비활성 조건**: `resolveStarfieldVisible(starsVisible, gpuTier !== 'c')` → `resolveStarfieldVisible(starsVisible, !isSoftwareRenderer)`. 시그니처를 `(starsVisible: boolean, allowStarfield: boolean)` 의미로 일반화 (gpuTier 결합 제거).
+- **renderer 문자열 추출** (web 레이어, `sim-canvas.tsx`): WebGL `UNMASKED_RENDERER_WEBGL` **1차/주** (CI swiftshader 확실 감지 — 핵심 제약), WebGPU `adapterInfo.description` 보조 OR 결합 (빈 `{}` 라 신뢰 낮음). **임시 canvas** (`document.createElement` + `WEBGL_debug_renderer_info`) 로 추출 — 동기 + Babylon engine lifecycle 결합도 0 (agy Q3 수용). 실측상 임시 canvas 와 실 engine context 가 동일 SwiftShader 반환 확인.
+- **`detect-gpu-tier` 무수정** — software 감지는 **별도 helper** (SRP — agy Q4 수용). tier 는 LOD 억제 등 기존 graceful degradation 유지, 별 비활성만 software 기준으로 격리. tier-c 의 다른 억제 (LOD low / 파티클 0 / post-proc OFF) 는 **불변** (별 배경만 software 기준으로 분리 — WebGL2 하드웨어 tier-c 는 별 표시하되 LOD 억제는 유지가 의도).
+
+### 효과
+
+- **PC 크롬 (WebGPU 미지원, WebGL2 하드웨어)**: RENDERER 에 SwiftShader 없음 → `isSoftwareRenderer=false` → **별 표시** (회귀 해소).
+- **CI swiftshader** (항상 software): RENDERER `SwiftShader` → `isSoftwareRenderer=true` → 별 비활성 → **fps-baseline-guard / r1-guard 통과 유지** (가장 큰 위험 = 회귀 재발 차단).
+- WebGPU tier-a/b (실 GPU): software 아님 → 별 표시 (Amendment 1 효과 보존).
+- `?stars=off` / `?gpu=` override 보존 — `?gpu=` 는 tier 만 강제하므로 software 감지와 직교. (단 §재검토 조건: software 환경에서 `?gpu=b` 강제 시 별이 다시 켜지면 fps 위험 — 아래 위험 참조.)
+
+### 위험
+
+| 위험                                                        | 완화                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CI software 미감지 → fps 회귀 재발** (가장 큰 위험)       | 실측 확정 — CI RENDERER 에 `SwiftShader` 문자열 확실 포함. `detect-software-renderer.test.ts` 가 정확한 CI 문자열 fixture 단언 + browser-verify 가 CI(software) 에서 별 비활성 assertion (agy Q5 수용 — `__starfieldVisible` 전역 노출). |
+| **false positive — 하드웨어인데 software 오판 → 별 사라짐** | 보수적 정규식 (명시적 software 엔진 이름만, `"software"` 단독 제외). 하드웨어 RENDERER (Apple M1 Pro / NVIDIA RTX / Intel Iris) fixture 단언으로 false 확인.                                                                             |
+| **`?gpu=b` 강제 시 software 환경에서 별 재활성 → fps 위험** | software 비활성은 `?gpu=` 와 직교 (별도 gate). 단 `?gpu=` 는 디버그 override 라 사용자 명시 의도 — software 환경 `?gpu=b` 는 드물고 의도적. 후속 분리 여지 (software gate 가 `?gpu=` override 보다 우선할지) — §재검토 조건.             |
+
+### 회귀 가드
+
+- 단위: `detect-software-renderer.test.ts` — CI swiftshader 정확 문자열 + 하드웨어 RENDERER (Apple/NVIDIA/Intel) + 빈 문자열/null fixture. `parse-stars-mode.test.ts` 의 `resolveStarfieldVisible` 단언을 boolean 시그니처로 갱신.
+- browser-verify: `browser-verify-738-starfield.mjs` 에 software 환경 별 비활성 + 하드웨어 환경 별 표시 assertion 추가 (또는 `__starfieldVisible` / `__isSoftwareRenderer` 전역 노출 후 CI assertion).
+- CI: fps-baseline-guard + r1-guard 가 software 미감지 시 재차단 (이미 항상 software 환경이라 자동 가드).
+
+### §Amendment 2 교차검증 반영 사항
+
+- **수행**: 2026-06-25, `cross_validate.sh architecture` (agy / Antigravity). outcome=`applied` (exit 0), plan_bypass=false, rollback_failed=false. 로그: `.claude/logs/cross-validate-architecture-20260625-234622.log`.
+- **호출 전 Claude 편향 4종 셀프 체크**: 통과 — 낙관적 일정 (false negative/positive 위험 + CI 의존을 §위험에 명시) / 결합 간과 (WebGL UNMASKED + WebGPU adapterInfo 빈 객체 + CI swiftshader WebGL2 경로 결합을 agy 핵심 질문 1·5 에 명시 삽입) / 폐기 프레이밍 (Amendment 1 폐기 아님 — 진단 유지 + 기준만 정정) / 순수주의 (software 감지 보수적 — 확실한 패턴만, 과일반화 회피). **미통과 축 없음**.
+- **합의 (즉시 반영)**: ① `detectSoftwareRenderer` 별도 helper 분리 = SRP 정합 (agy Q4) ② WebGL UNMASKED 1차/주 + WebGPU 보조 = 누락 위험 극히 낮음 — "WebGPU 가속이어도 동일 브라우저 WebGL 은 동일 software 백엔드 99%+ 일치" (agy Q1) ③ 임시 canvas 방식 = 동기 + 결합도 0 (agy Q3) ④ 보수적 정규식 + `"software"` 단독 제외 (agy Q2).
+- **이견 수용**: ① **정규식에 `swrast` (Linux 소프트웨어 래스터라이저) + `apple software renderer` 추가** — 원안 `/swiftshader|llvmpipe|software|microsoft basic render/i`, agy 가 `"software"` 단독은 가상화 게스트 드라이버 false positive 위험 지적 + `swrast`/`apple software renderer` 누락 지적 → 수정안 `/swiftshader|llvmpipe|microsoft basic render|software rasterizer|apple software renderer|swrast/i` (수용 근거: 보수성 강화 + Linux/Apple software 경로 커버). ② **r1-guard/CI assertion 으로 fps 회귀 사전 차단** — `__starfieldVisible` / `__isSoftwareRenderer` 전역 노출 → browser-verify 가 software 환경 비활성 assertion (수용 근거: fps 테스트 회귀 전 로직 단계 조기 검출 — agy Q5).
+- **Claude 재분석으로 기각 (맹목 수용 회피 — volt #51)**: ① **WebGPU `powerPreference: 'low-power'` / 가상 어댑터 비표준 플래그 탐색** — 기각 (과설계). agy 자신도 "WebGL 검사만으로 CI 및 실기 커버리지 충분" 이라 명시 → 비표준 플래그는 미사용 분기 부채. WebGL UNMASKED 단일 신뢰 소스로 충분 (실측 확정).
+- **고유 발견 (후속 분리)**: 없음 — agy 발견은 모두 (a) 즉시 반영 (합의/이견 수용) 또는 (b) 기각 으로 처리. `?gpu=b` 강제 시 software 환경 별 재활성 fps 위험은 §위험 + §재검토 조건에 박제 (후속 이슈 분리는 발생 시 — 현재 드문 디버그 경로).
+
+### §Amendment 2 재검토 조건
+
+- **재검토 트리거**: (1) software 환경에서 `?gpu=b/a` 강제 시 별 재활성으로 fps 회귀가 사용자 실측되면 → software gate 를 `?gpu=` override 보다 우선시키는 정책 추가 (현재는 디버그 의도 존중). (2) WebGPU + software (미래 WebGPU swiftshader) 환경이 등장해 WebGL UNMASKED 만으로 미감지되면 → WebGPU adapterInfo.description software 패턴 보조 강화. (3) 신규 software 래스터라이저 (예: ARM software, 신규 가상화) RENDERER 가 패턴 누락이면 → fixture + 패턴 추가.
+- **Concrete Prediction 재현**: developer 머지 후 `git diff --stat` 으로 core 변경 **0** (별 비활성은 web 레이어 전용 — `parse-stars-mode.ts` 시그니처 + `detect-software-renderer.ts` 신규 + `sim-canvas.tsx` 배선) 검증. **core 0 예측** (Amendment 1 도 web 레이어 결정이었으므로 정합).
 
 ---
 

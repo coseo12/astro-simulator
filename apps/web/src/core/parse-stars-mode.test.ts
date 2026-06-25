@@ -61,27 +61,25 @@ describe('parseStarsVisible — 기본 ON + ?stars=off 옵트아웃 (ADR §결�
   });
 });
 
-describe('resolveStarfieldVisible — GPU tier-c 별 배경 비활성 (ADR §Amendment 1, PR #742)', () => {
-  // tier-c 자동 억제 — fill-rate graceful degradation. starsVisible 의향과 무관하게 항상 false.
-  // 본 단언이 fail 시 tier-c (CI 항상 tier-c) fps/r1-guard 회귀 재발 (조용한 회귀 차단).
-  it('tier-c + stars ON → false (fill-rate graceful degradation — 별 미생성)', () => {
-    expect(resolveStarfieldVisible(true, 'c')).toBe(false);
+describe('resolveStarfieldVisible — 소프트웨어 렌더 별 배경 비활성 (ADR §Amendment 2, #745)', () => {
+  // #745 — 시그니처가 (starsVisible, allowStarfield: boolean) 로 일반화됨. tier 결합 제거.
+  // allowStarfield = !isSoftwareRenderer (sim-canvas 배선). 소프트웨어 렌더 → allowStarfield=false.
+
+  // 소프트웨어 렌더 (allowStarfield=false) — fill-rate graceful degradation. starsVisible 의향과
+  // 무관하게 항상 false. 본 단언이 fail 시 CI(항상 swiftshader) fps/r1-guard 회귀 재발 (조용한 차단).
+  it('소프트웨어 렌더 (allowStarfield=false) + stars ON → false (별 미생성)', () => {
+    expect(resolveStarfieldVisible(true, false)).toBe(false);
   });
-  it('tier-c + stars OFF → false (이미 off 이므로 당연히 off)', () => {
-    expect(resolveStarfieldVisible(false, 'c')).toBe(false);
+  it('소프트웨어 렌더 (allowStarfield=false) + stars OFF → false (이미 off)', () => {
+    expect(resolveStarfieldVisible(false, false)).toBe(false);
   });
 
-  // tier-a/b (실 GPU) — starsVisible 의향 그대로 전달 (감상 미학 보존, 대다수 사용자 환경).
-  it('tier-b + stars ON → true (실 GPU 별 배경 유지)', () => {
-    expect(resolveStarfieldVisible(true, 'b')).toBe(true);
+  // 하드웨어 렌더 (allowStarfield=true) — starsVisible 의향 그대로 전달 (회귀 해소: WebGPU 미지원
+  // 하드웨어 가속 PC 도 별 표시, 대다수 사용자 환경).
+  it('하드웨어 렌더 (allowStarfield=true) + stars ON → true (별 배경 유지)', () => {
+    expect(resolveStarfieldVisible(true, true)).toBe(true);
   });
-  it('tier-a + stars ON → true (실 GPU 별 배경 유지)', () => {
-    expect(resolveStarfieldVisible(true, 'a')).toBe(true);
-  });
-  it('tier-b + stars OFF → false (?stars=off 옵트아웃 보존)', () => {
-    expect(resolveStarfieldVisible(false, 'b')).toBe(false);
-  });
-  it('tier-a + stars OFF → false', () => {
-    expect(resolveStarfieldVisible(false, 'a')).toBe(false);
+  it('하드웨어 렌더 (allowStarfield=true) + stars OFF → false (?stars=off 옵트아웃 보존)', () => {
+    expect(resolveStarfieldVisible(false, true)).toBe(false);
   });
 });

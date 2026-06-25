@@ -13,7 +13,6 @@
  * 반환은 `boolean` (visible) — scene `createSolarSystemScene({ starfield: visible })` 옵션과
  * 직접 정합. URL 초기값만 결정하며, 런타임 토글 UI 는 비-범위 (#675 marker 와 동일 — 초기 옵트아웃만).
  */
-import type { GpuTier } from './detect-gpu-tier';
 
 export function parseStarsVisible(urlParam: string | null | undefined): boolean {
   // 미지정 → true (기본 ON — 트랙 A1 몰입 기본 경험).
@@ -34,20 +33,25 @@ export function parseStarsVisible(urlParam: string | null | undefined): boolean 
 }
 
 /**
- * #738 Amendment (PR #742) — GPU tier 를 반영한 starfield 최종 가시성 결정.
+ * #738 Amendment (PR #742) / #745 Amendment 2 — starfield 최종 가시성 결정.
  *
- * **GPU tier-c (swiftshader/저성능) 에서는 별 배경을 생성하지 않는다** (fill-rate graceful
- * degradation). 전체화면 절차 fragment shader 가 tier-c 에서 fill-rate 치명타 (CI desktop
- * ~13fps, baseline 49.9 대비 진짜 회귀 — ADR §Amendment 1). `detect-gpu-tier.ts §계약 6` 의
- * tier-c 자동 억제 (파티클 0 / post-proc OFF) 철학의 starfield 확장.
+ * **소프트웨어 렌더 (swiftshader/llvmpipe/swrast) 에서는 별 배경을 생성하지 않는다** (fill-rate
+ * graceful degradation). 전체화면 절차 fragment shader 가 소프트웨어 렌더에서 fill-rate 치명타
+ * (CI desktop ~13fps, baseline 49.9 대비 진짜 회귀 — ADR §Amendment 1).
  *
- * 부수 효과: tier-c 에서 반투명 UI (shortcut-bar) 뒤 별 비침이 사라져 r1-guard baseline 일치.
- * `?gpu=b|a` URL override 로 tier-c 환경에서도 강제 ON 가능 (gpuTier 가 'b'/'a' 로 전달됨).
+ * #745 정정 (ADR §Amendment 2): Amendment 1 은 비활성 기준을 GPU tier-c 로 잡았으나, tier-c 가
+ * "WebGPU 미지원 데스크톱 전부" (소프트웨어 + WebGL2 **하드웨어** 가속 무구분) 라 하드웨어 가속
+ * PC 에서도 별이 사라지는 과잉 비활성 회귀 (v0.35.0). 비활성 진짜 기준은 **소프트웨어 렌더** 이므로
+ * tier 결합을 제거하고 `allowStarfield: boolean` 로 일반화 — 호출부(sim-canvas)가
+ * `!isSoftwareRenderer` 를 전달한다. tier 의 LOD 억제 등 다른 graceful degradation 은 불변.
+ *
+ * 부수 효과: 소프트웨어 렌더 (CI 항상 swiftshader) 에서 반투명 UI (shortcut-bar) 뒤 별 비침이
+ * 사라져 r1-guard baseline 일치. `?stars=off` 옵트아웃은 starsVisible 로 직교 보존.
  *
  * @param starsVisible `parseStarsVisible(?stars=)` 결과 (URL 기반 1차 의향)
- * @param gpuTier 감지된 GPU tier ('a' | 'b' | 'c')
- * @returns 최종 starfield 가시성 — tier-c 면 항상 false, 그 외엔 starsVisible 그대로
+ * @param allowStarfield GPU 환경이 별 배경 생성을 허용하는가 (`!isSoftwareRenderer`)
+ * @returns 최종 starfield 가시성 — 소프트웨어 렌더면 항상 false, 그 외엔 starsVisible 그대로
  */
-export function resolveStarfieldVisible(starsVisible: boolean, gpuTier: GpuTier): boolean {
-  return starsVisible && gpuTier !== 'c';
+export function resolveStarfieldVisible(starsVisible: boolean, allowStarfield: boolean): boolean {
+  return starsVisible && allowStarfield;
 }
