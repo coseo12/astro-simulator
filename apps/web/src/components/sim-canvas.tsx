@@ -20,12 +20,39 @@ import { parseGpuTier } from '@/core/parse-gpu-tier';
 import { parseGlowMarkerRatio, parseMarkerMode } from '@/core/parse-marker-mode';
 import { parseOrbitsVisible } from '@/core/parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from '@/core/parse-stars-mode';
+import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale } from '@/constants/body-scale';
 import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+
+/**
+ * #745 — WebGL `UNMASKED_RENDERER_WEBGL` 문자열을 **임시 canvas** 로 동기 추출.
+ *
+ * 소프트웨어 렌더 (swiftshader/llvmpipe/swrast) 감지의 주(primary) 신뢰 소스. CI swiftshader 는
+ * WebGL2 경로 (WebGPU 미지원) 이고 RENDERER 에 `SwiftShader` 문자열이 확실히 포함된다 (실측 확정).
+ * 임시 canvas 는 Babylon engine lifecycle 결합도 0 — 실측상 임시 canvas 와 실 engine context 가
+ * 동일 SwiftShader 를 반환한다 (ADR §Amendment 2 agy Q3 수용). 추출 실패 시 null (보수적 — 별 표시).
+ */
+function extractWebglRendererString(): string | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl =
+      (canvas.getContext('webgl2') as WebGL2RenderingContext | null) ??
+      (canvas.getContext('webgl') as WebGLRenderingContext | null);
+    if (!gl) return null;
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (!debugInfo) return null;
+    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+    return typeof renderer === 'string' ? renderer : null;
+  } catch {
+    // context 생성/확장 실패 — 보수적으로 null (별 표시 유지).
+    return null;
+  }
+}
 
 /**
  * Babylon 캔버스 + Core 초기화.
@@ -57,13 +84,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     // 엔진을 요청했는데 미지원이면 콘솔 경고 + HUD notice + newton 폴백 안내.
     //
     // #738 Amendment — 단일 Promise 를 두 async chain (capability 감지 / scene 생성) 이 공유한다.
-    // GPU tier 는 (1) 이 then 에서 LOD 강제/알림에 쓰이고, (2) scene 콜백에서 starfield tier-c
-    // 스킵 결정에 쓰인다. 두 경로가 별개로 detectGpuCapability() 를 호출하면 adapter 요청이 2회
-    // 발생 + 결과 비결정 (race) → 동일 Promise 공유로 tier 판정 SSoT 1회 (#677 race 윈도우 차단).
+    // GPU tier 는 이 then 에서 LOD 강제/알림에 쓰이고, scene 콜백은 WebGPU adapterInfo (별 배경
+    // 소프트웨어 렌더 보조 감지 — #745) 등에 gpuCap 을 쓴다. 두 경로가 별개로 detectGpuCapability()
+    // 를 호출하면 adapter 요청이 2회 발생 + 결과 비결정 (race) → 동일 Promise 공유로 SSoT 1회
+    // (#677 race 윈도우 차단).
     const gpuCapPromise = gpuApi.detectGpuCapability();
 
-    // #738 — GPU tier 판정 SSoT (URL ?gpu= override > detectGpuTier 자동 감지). capability 감지
-    // then 과 scene 콜백 (starfield tier-c 스킵) 이 동일 식을 쓰도록 추출 — drift 차단.
+    // #738 — GPU tier 판정 SSoT (URL ?gpu= override > detectGpuTier 자동 감지). LOD 강제/알림용.
+    // (#745 부터 별 배경 비활성은 tier 가 아닌 소프트웨어 렌더 감지 기준 — resolveGpuTier 와 무관.)
     const resolveGpuTier = (cap: Awaited<typeof gpuCapPromise>): GpuTier => {
       const gpuUrlParam = new URLSearchParams(window.location.search).get('gpu');
       const parsedGpu = parseGpuTier(gpuUrlParam);
@@ -106,7 +134,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       //
       // SSR 디폴트는 `GPU_TIER_SSR_DEFAULT='b'` 중립. hydration 후 실측으로 덮어쓴다.
       if (typeof navigator !== 'undefined') {
-        // #738 — tier 판정 SSoT (resolveGpuTier) 사용. starfield tier-c 스킵 (scene 콜백) 과 동일 식.
+        // #738 — tier 판정 SSoT (resolveGpuTier) 사용. LOD 강제/알림용 (별 배경 비활성은 #745 부터
+        // 소프트웨어 렌더 감지 기준 — tier 와 분리).
         const detectedTier: GpuTier = resolveGpuTier(cap);
 
         // browser-verify / dev overlay 에서 감지 tier 확인 가능하도록 전역 노출.
@@ -186,9 +215,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     // #704 — free-fly 감도 zoom/zoomoutFactor push 구독 해제 핸들 (cleanup 에서 호출).
     let unsubSensitivity: (() => void) | null = null;
     // #738 — scene 생성을 GPU capability 와 함께 await (Promise.all). createSolarSystemScene 의
-    // starfield 옵션은 GPU tier 에 의존 (tier-c 는 fill-rate graceful degradation 으로 스킵)하므로
-    // scene 콜백 진입 시점에 tier 가 확정돼야 한다. instance.start() 만 await 하면 capability 가
-    // 아직 미해결일 수 있어 tier-c 판정 race (#677 윈도우). Promise.all 로 둘 다 동기 사용 가능.
+    // starfield 옵션은 GPU 환경에 의존 (#745: 소프트웨어 렌더면 fill-rate graceful degradation
+    // 으로 스킵 — WebGPU adapterInfo 보조 감지에 gpuCap 필요)하므로 scene 콜백 진입 시점에 gpuCap
+    // 이 확정돼야 한다. instance.start() 만 await 하면 capability 가 아직 미해결일 수 있어 race
+    // (#677 윈도우). Promise.all 로 둘 다 동기 사용 가능.
     Promise.all([instance.start(), gpuCapPromise])
       .then(([, gpuCap]) => {
         if (cancelled || !instance.scene) return;
@@ -357,12 +387,30 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #738 — 별 배경 기본 ON + `?stars=off` 옵트아웃 (ADR 20260624-738 §결정 7).
         const starsParam = new URLSearchParams(window.location.search).get('stars');
         const starsParamVisible = parseStarsVisible(starsParam);
-        // #738 Amendment (PR #742) — GPU tier-c (swiftshader/저성능) 에서는 별 배경을 생성하지 않는다
-        // (fill-rate graceful degradation). 전체화면 절차 fragment shader 가 tier-c 에서 fill-rate
-        // 치명타 (CI desktop ~13fps, baseline 49.9 대비 진짜 회귀). detect-gpu-tier §계약 6 tier-c
-        // 자동 억제 철학의 starfield 확장. 결정식 SSoT = resolveStarfieldVisible (단위 테스트 가드).
-        const gpuTierForStars = resolveGpuTier(gpuCap);
-        const starfieldVisible = resolveStarfieldVisible(starsParamVisible, gpuTierForStars);
+        // #738 Amendment (PR #742) / #745 Amendment 2 — 소프트웨어 렌더 (swiftshader/llvmpipe/swrast)
+        // 에서는 별 배경을 생성하지 않는다 (fill-rate graceful degradation). 전체화면 절차 fragment
+        // shader 가 소프트웨어 렌더에서 fill-rate 치명타 (CI desktop ~13fps, baseline 49.9 대비 진짜
+        // 회귀). #745 정정: Amendment 1 은 비활성 기준을 tier-c (WebGPU 미지원 데스크톱 전부 — 소프트웨어
+        // + WebGL2 하드웨어 무구분) 로 잡아 하드웨어 가속 PC 에서도 별이 사라지는 과잉 비활성 회귀 →
+        // 진짜 기준인 소프트웨어 렌더로 정정. renderer 추출: WebGL UNMASKED 1차/주 (CI swiftshader 확실
+        // 감지 — fps 무회귀 핵심 제약) + WebGPU adapterInfo.description 보조 OR (빈 {} 라 신뢰 낮음).
+        // 결정식 SSoT = resolveStarfieldVisible + detectSoftwareRenderer (단위 테스트 가드).
+        const rendererString =
+          extractWebglRendererString() ?? gpuCap.adapterInfo?.description ?? null;
+        const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
+        const starfieldVisible = resolveStarfieldVisible(starsParamVisible, !isSoftwareRenderer);
+        // browser-verify / dev overlay 에서 별 가시성 + software 감지 결과 확인용 전역 노출.
+        // CI(software) 에서 __starfieldVisible=false / 하드웨어에서 true assertion (fps 회귀 전 조기 검출).
+        Object.defineProperty(window, '__starfieldVisible', {
+          configurable: true,
+          value: starfieldVisible,
+          writable: false,
+        });
+        Object.defineProperty(window, '__isSoftwareRenderer', {
+          configurable: true,
+          value: isSoftwareRenderer,
+          writable: false,
+        });
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
