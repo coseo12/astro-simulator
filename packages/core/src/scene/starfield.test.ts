@@ -144,3 +144,33 @@ describe('#738 starfield — 색온도 anti-pattern 부재 (ADR §결정 4 — O
     expect(g).toBeGreaterThanOrEqual(Math.min(r, b) - 1e-6);
   });
 });
+
+describe('#738 starfield — GLSL starColor ↔ JS starColorMirror SSoT drift 가드 (reviewer 권고 1, PR #742)', () => {
+  // #719 교훈 — 테스트 미러(starColorMirror) 와 GLSL 원본(starColor) 은 동일 식이어야 한다(SSoT).
+  // GLSL 은 직접 단위 테스트 불가 → 미러로 검증하는데, GLSL 단독 변경 시 미러가 stale 해도 위
+  // anti-pattern 테스트는 그대로 PASS (조용한 drift). 본 가드가 GLSL FRAGMENT_SHADER 문자열에
+  // 미러와 동일한 vec3 리터럴이 존재하는지 regex 로 단언 → 한쪽만 바뀌면 즉시 fail.
+
+  // GLSL `vec3(a, b, c)` — 공백 변형 허용 regex. 인자는 GLSL 표기 문자열(예 '1.0') 그대로 받는다.
+  // (JS number 로 받으면 `${1.0}` → '1' 로 좁혀져 GLSL '1.0' 과 불일치. GLSL 소스 표기 SSoT.)
+  const escapeDot = (s: string): string => s.replace(/\./g, '\\.');
+  const glslVec3 = (r: string, g: string, b: string): RegExp =>
+    new RegExp(`vec3\\(\\s*${escapeDot(r)}\\s*,\\s*${escapeDot(g)}\\s*,\\s*${escapeDot(b)}\\s*\\)`);
+
+  it('GLSL starColor 에 warm/white/cool vec3 리터럴 3개 모두 존재 (미러와 동기)', () => {
+    // starColorMirror: warm [1.0, 0.86, 0.72] / white [1.0, 0.98, 0.96] / cool [0.78, 0.86, 1.0].
+    expect(STARFIELD_FRAGMENT_SHADER).toMatch(glslVec3('1.0', '0.86', '0.72')); // warm (적황 M/K)
+    expect(STARFIELD_FRAGMENT_SHADER).toMatch(glslVec3('1.0', '0.98', '0.96')); // white (백색~담황 G)
+    expect(STARFIELD_FRAGMENT_SHADER).toMatch(glslVec3('0.78', '0.86', '1.0')); // cool (청백 O/B)
+  });
+
+  it('GLSL 리터럴이 starColorMirror 의 반환 끝점과 정확히 일치 (값 drift 차단)', () => {
+    // 미러 끝점 = GLSL 리터럴 값이어야 한다. 한쪽 값만 바뀌면 toEqual 또는 위 regex 단언이 fail.
+    const warm = starColorMirror(0); // mix(warm, white, 0) = warm
+    const white = starColorMirror(0.5); // 경계 = white
+    const cool = starColorMirror(1); // mix(white, cool, 1) = cool
+    expect(warm).toEqual([1.0, 0.86, 0.72]);
+    expect(white).toEqual([1.0, 0.98, 0.96]);
+    expect(cool).toEqual([0.78, 0.86, 1.0]);
+  });
+});

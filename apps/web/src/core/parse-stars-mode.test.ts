@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseStarsVisible } from './parse-stars-mode';
+import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
 
 let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -58,5 +58,30 @@ describe('parseStarsVisible — 기본 ON + ?stars=off 옵트아웃 (ADR §결�
   it('이상값 "xyz" → true + warn', () => {
     expect(parseStarsVisible('xyz')).toBe(true);
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resolveStarfieldVisible — GPU tier-c 별 배경 비활성 (ADR §Amendment 1, PR #742)', () => {
+  // tier-c 자동 억제 — fill-rate graceful degradation. starsVisible 의향과 무관하게 항상 false.
+  // 본 단언이 fail 시 tier-c (CI 항상 tier-c) fps/r1-guard 회귀 재발 (조용한 회귀 차단).
+  it('tier-c + stars ON → false (fill-rate graceful degradation — 별 미생성)', () => {
+    expect(resolveStarfieldVisible(true, 'c')).toBe(false);
+  });
+  it('tier-c + stars OFF → false (이미 off 이므로 당연히 off)', () => {
+    expect(resolveStarfieldVisible(false, 'c')).toBe(false);
+  });
+
+  // tier-a/b (실 GPU) — starsVisible 의향 그대로 전달 (감상 미학 보존, 대다수 사용자 환경).
+  it('tier-b + stars ON → true (실 GPU 별 배경 유지)', () => {
+    expect(resolveStarfieldVisible(true, 'b')).toBe(true);
+  });
+  it('tier-a + stars ON → true (실 GPU 별 배경 유지)', () => {
+    expect(resolveStarfieldVisible(true, 'a')).toBe(true);
+  });
+  it('tier-b + stars OFF → false (?stars=off 옵트아웃 보존)', () => {
+    expect(resolveStarfieldVisible(false, 'b')).toBe(false);
+  });
+  it('tier-a + stars OFF → false', () => {
+    expect(resolveStarfieldVisible(false, 'a')).toBe(false);
   });
 });

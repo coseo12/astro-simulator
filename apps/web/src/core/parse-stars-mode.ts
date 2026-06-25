@@ -13,6 +13,8 @@
  * 반환은 `boolean` (visible) — scene `createSolarSystemScene({ starfield: visible })` 옵션과
  * 직접 정합. URL 초기값만 결정하며, 런타임 토글 UI 는 비-범위 (#675 marker 와 동일 — 초기 옵트아웃만).
  */
+import type { GpuTier } from './detect-gpu-tier';
+
 export function parseStarsVisible(urlParam: string | null | undefined): boolean {
   // 미지정 → true (기본 ON — 트랙 A1 몰입 기본 경험).
   if (urlParam === null || urlParam === undefined || urlParam === '') {
@@ -29,4 +31,23 @@ export function parseStarsVisible(urlParam: string | null | undefined): boolean 
 
   console.warn(`[parse-stars-mode] 알 수 없는 ?stars=${urlParam} — ON (기본) 으로 폴백`);
   return true;
+}
+
+/**
+ * #738 Amendment (PR #742) — GPU tier 를 반영한 starfield 최종 가시성 결정.
+ *
+ * **GPU tier-c (swiftshader/저성능) 에서는 별 배경을 생성하지 않는다** (fill-rate graceful
+ * degradation). 전체화면 절차 fragment shader 가 tier-c 에서 fill-rate 치명타 (CI desktop
+ * ~13fps, baseline 49.9 대비 진짜 회귀 — ADR §Amendment 1). `detect-gpu-tier.ts §계약 6` 의
+ * tier-c 자동 억제 (파티클 0 / post-proc OFF) 철학의 starfield 확장.
+ *
+ * 부수 효과: tier-c 에서 반투명 UI (shortcut-bar) 뒤 별 비침이 사라져 r1-guard baseline 일치.
+ * `?gpu=b|a` URL override 로 tier-c 환경에서도 강제 ON 가능 (gpuTier 가 'b'/'a' 로 전달됨).
+ *
+ * @param starsVisible `parseStarsVisible(?stars=)` 결과 (URL 기반 1차 의향)
+ * @param gpuTier 감지된 GPU tier ('a' | 'b' | 'c')
+ * @returns 최종 starfield 가시성 — tier-c 면 항상 false, 그 외엔 starsVisible 그대로
+ */
+export function resolveStarfieldVisible(starsVisible: boolean, gpuTier: GpuTier): boolean {
+  return starsVisible && gpuTier !== 'c';
 }

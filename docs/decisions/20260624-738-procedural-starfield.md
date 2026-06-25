@@ -194,6 +194,52 @@ astro-simulator 의 정체성은 "감상/탐험형" (`principles.md §1 Visual F
 
 ---
 
+## §Amendment 1 — GPU tier-c 별 배경 비활성 (fill-rate graceful degradation) (2026-06-25, #738 PR #742)
+
+**상태**: Accepted. **트리거**: §8 재검토 트리거 (2) "fps 회귀가 파라미터 튜닝으로 해소 안 되면 tier-c 별 비활성 정책 추가" 가 발동. 본 ADR 이 예견한 fallback 정책의 실현.
+
+### 발견 (CI fps 실측 — measurement-first)
+
+PR #742 CI 에서 fps-baseline-guard + r1-guard 2 가드가 fail (각 2회 연속 재시도 후 fail — runner variance 가 아닌 진짜 회귀):
+
+| guard                      | scenario                                | 측정값                    | baseline / 임계 | 판정             |
+| -------------------------- | --------------------------------------- | ------------------------- | --------------- | ---------------- |
+| fps-baseline-guard         | desktop / default (tier=c override=low) | **7.0 / 12.7 / 13.5 fps** | baseline 49.9   | FAIL (~73% 하락) |
+| fps-baseline-guard         | desktop / earth focus                   | 13.0 / 13.2 / 13.3 fps    | baseline ~57    | FAIL             |
+| fps-baseline-guard         | mobile / default                        | 27.4~28.5 fps             | —               | 동반 하락        |
+| r1-guard (detect-and-test) | shortcut-bar (1920)                     | mismatch **25.062%**      | 0.5%            | FAIL             |
+| r1-guard                   | hud-top-right                           | mismatch 0.696%           | 0.5%            | FAIL             |
+
+**원인 1 (fps)**: 별 배경은 전체화면 inverted-sphere fragment shader 다. CI runner 는 항상 **gpu tier-c** (swiftshader 소프트웨어 래스터라이저). tier-c 에서 전 화면 fragment 의 cell-noise + fbm 비용이 fill-rate 치명타가 되어 desktop ~13fps 로 급락한다. sin-free hash + band-guarded fbm 등 §5 measurement-first 완화로도 tier-c 의 fill-rate 한계는 못 넘는다 (트리거 (2) 의 "파라미터 튜닝으로 해소 안 됨" 충족). 로컬 dev (실 GPU = tier-a/b) 의 fps-baseline (CPU 4x throttle, 실 GPU) 은 무회귀였으나, CI 의 swiftshader 환경은 재현 불가했던 사각.
+
+**원인 2 (r1-guard)**: tier-c 에서 반투명 UI (shortcut-bar `bg-surface/80`, hud-top-right) 뒤로 별이 비쳐 기존 baseline (별 없는 단색 배경) 과 pixel mismatch. 별을 tier-c 에서 안 그리면 mismatch 가 사라진다 (baseline 재생성 불필요).
+
+### 결정
+
+**GPU tier-c 에서는 starfield 를 생성하지 않는다** (web 레이어 `sim-canvas.tsx`):
+
+```
+starfieldVisible = (parseStarsVisible(?stars=) === true) && resolveGpuTier(gpuCap) !== 'c'
+```
+
+- **레이어 분리 정합**: starfield 기본 ON 결정권은 web 레이어 (§결정 7). tier-c 스킵도 web 레이어 책임 — core `createSolarSystemScene` 의 `starfield` 옵션 기본값 false 는 불변.
+- **tier-c 자동 억제 철학 정합**: `detect-gpu-tier.ts §계약 6` ("tier-c 자동 억제: LOD low 강제 + 파티클 0 + shadow OFF + post-proc OFF + bloom OFF") 의 **starfield 확장**. 별 배경은 post-proc 성 전체화면 효과이므로 동일 graceful-degradation 범주.
+- **race-safe 구현**: GPU capability 감지 (`detectGpuCapability`) 와 scene 생성 (`instance.start`) 은 별개 async chain (#677 race 윈도우). 단일 `gpuCapPromise` 를 두 chain 이 공유 + `Promise.all([instance.start(), gpuCapPromise])` 로 scene 콜백 진입 시점에 tier 동기 확정. tier 판정식은 `resolveGpuTier` helper 로 추출 (capability then / scene 콜백 SSoT 단일 — drift 차단).
+- **fallback 메커니즘 미박제 (결정 1-(A) 와 무관)**: 트리거 (1) `infiniteDistance` 가정은 dev 실측 PASS (Δ=0.000px) 라 결정 1-(A) fallback 은 여전히 불필요. 본 Amendment 는 트리거 (2) 전용.
+
+### 효과
+
+- tier-c: 별 미생성 → (a) fill-rate 회복 → fps 무회귀 (b) 반투명 UI 뒤 별 없음 → r1-guard 기존 baseline 일치.
+- tier-a/b (실 GPU): 별 배경 유지 (감상 미학 보존 — 사용자가 실제 보는 대다수 환경).
+- 사용자 수동 상향 경로 보존: `?gpu=b` / `?gpu=a` 로 tier-c 환경에서도 별 배경 강제 가능 (URL override 우선).
+
+### 회귀 가드
+
+- 단위 테스트: `parse-stars-mode.test.ts` 에 "tier-c 일 때 starfield false" 합성식 단언 (web 레이어 결정식 직접 검증).
+- CI: fps-baseline-guard + r1-guard 가 tier-c (CI 항상 tier-c) 에서 회귀 시 재차단.
+
+---
+
 ## §교차검증 반영 사항
 
 - **수행**: 2026-06-24, `cross_validate.sh architecture` (agy / Antigravity). outcome=`applied` (exit 0), plan_bypass=false, rollback_failed=false. 로그: `.claude/logs/cross-validate-architecture-20260624-203521.log`.
