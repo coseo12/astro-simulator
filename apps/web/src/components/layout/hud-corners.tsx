@@ -85,7 +85,7 @@ export function HudCorners() {
             data-testid="engine-notice-dismiss"
             aria-label="알림 닫기"
             onClick={() => dismissEngineNotice()}
-            className="text-fg-tertiary hover:text-fg-primary px-1"
+            className="text-fg-secondary hover:text-fg-primary px-1"
           >
             ×
           </button>
@@ -106,7 +106,7 @@ export function HudCorners() {
       <div
         data-testid="hud-bottom-right"
         data-r1-region="hud-bottom-right"
-        className="absolute bottom-20 right-2 text-caption num text-fg-tertiary bg-bg-surface/60 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle pointer-events-none flex items-center gap-2"
+        className="absolute bottom-20 right-2 text-caption num text-fg-secondary bg-bg-surface/60 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle pointer-events-none flex items-center gap-2"
       >
         <span
           className="inline-block w-2 h-2 rounded-full"

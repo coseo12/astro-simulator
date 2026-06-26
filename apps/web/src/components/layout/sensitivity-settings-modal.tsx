@@ -119,7 +119,7 @@ export function SensitivitySettingsModal() {
                 </button>
               </div>
 
-              <p className="text-caption text-fg-tertiary mb-5">
+              <p className="text-caption text-fg-secondary mb-5">
                 자유시점(free-fly) 모드의 이동·줌·패닝 감도를 조정합니다. free-fly 활성 중에는 즉시
                 반영되며, 설정은 브라우저에 저장됩니다.
               </p>
@@ -138,7 +138,7 @@ export function SensitivitySettingsModal() {
                           {range.label}
                         </label>
                         <span
-                          className="num text-caption text-fg-tertiary"
+                          className="num text-caption text-fg-secondary"
                           data-testid={`sensitivity-value-${axis}`}
                         >
                           {formatValue(axis, value)}
@@ -183,15 +183,15 @@ export function SensitivitySettingsModal() {
                         />
                       </Slider.Root>
                       <div className="flex justify-between mt-0.5">
-                        <span className="num text-[10px] text-fg-tertiary/70">
+                        <span className="num text-[10px] text-fg-secondary">
                           {formatValue(axis, range.min)}
                           {range.unit}
                         </span>
-                        <span className="num text-[10px] text-fg-tertiary/70">
+                        <span className="num text-[10px] text-fg-secondary">
                           기본 {formatValue(axis, FREE_FLY_SENSITIVITY_DEFAULT[axis])}
                           {range.unit}
                         </span>
-                        <span className="num text-[10px] text-fg-tertiary/70">
+                        <span className="num text-[10px] text-fg-secondary">
                           {formatValue(axis, range.max)}
                           {range.unit}
                         </span>

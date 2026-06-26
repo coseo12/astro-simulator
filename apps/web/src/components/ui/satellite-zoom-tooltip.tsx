@@ -211,7 +211,7 @@ export function SatelliteZoomTooltip() {
         onClick={handleDismiss}
         data-testid="satellite-zoom-tooltip-close"
         aria-label="안내 닫기"
-        className="text-fg-tertiary hover:text-fg-primary text-body transition-colors"
+        className="text-fg-secondary hover:text-fg-primary text-body transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
         ✕

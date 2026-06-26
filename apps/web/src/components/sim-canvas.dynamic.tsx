@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 const SimCanvasInner = dynamic(() => import('./sim-canvas').then((m) => m.SimCanvas), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center text-fg-tertiary text-body-sm">
+    <div className="w-full h-full flex items-center justify-center text-fg-secondary text-body-sm">
       엔진 로딩 중…
     </div>
   ),
