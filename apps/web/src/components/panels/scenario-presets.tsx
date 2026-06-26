@@ -178,7 +178,7 @@ export function ScenarioPresets() {
             }`}
           >
             <div className="text-body-sm text-fg-primary">{p.label}</div>
-            <div className="text-caption text-fg-tertiary leading-snug">{p.description}</div>
+            <div className="text-caption text-fg-secondary leading-snug">{p.description}</div>
           </button>
         );
       })}

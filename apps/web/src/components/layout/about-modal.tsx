@@ -111,8 +111,8 @@ export function AboutModal() {
                     >
                       {s.name}
                     </a>
-                    <p className="text-caption text-fg-tertiary mt-0.5">{s.purpose}</p>
-                    <p className="text-caption text-fg-tertiary italic">{s.license}</p>
+                    <p className="text-caption text-fg-secondary mt-0.5">{s.purpose}</p>
+                    <p className="text-caption text-fg-secondary italic">{s.license}</p>
                   </li>
                 ))}
               </ul>
@@ -120,7 +120,7 @@ export function AboutModal() {
 
             <section className="mb-5 pt-4 border-t border-border-subtle">
               <h3 className="text-body-sm text-fg-secondary mb-2">스케일 정책</h3>
-              <p className="text-caption text-fg-tertiary">
+              <p className="text-caption text-fg-secondary">
                 Roadmap v3 incremental build — 각 R-Phase (R1 태양, R2 수성, R3 금성, R4+ 예정) 가
                 활성된 천체만 표시 + 시각 과장 배수 박제. 카메라 거리·focus 대상에 따라 3단 tier
                 (Solar / Inner / Body) 로 자동 전환되며, 화면 이동은 ExponentialEase 300ms interp 로
@@ -129,7 +129,7 @@ export function AboutModal() {
             </section>
 
             <section className="pt-4 border-t border-border-subtle">
-              <p className="text-caption text-fg-tertiary">
+              <p className="text-caption text-fg-secondary">
                 정밀도: IAU 2015 ±0.01% 공차. 불확실성(관측 부정확, 비구형 body)은 각 천체 정보
                 패널의 오차 필드(±%)로 표시됩니다.
               </p>

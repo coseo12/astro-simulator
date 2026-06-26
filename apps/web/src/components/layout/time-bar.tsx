@@ -14,7 +14,7 @@ export function TimeBar({ children }: { children?: ReactNode }) {
     >
       <div className="pointer-events-auto flex items-center gap-2 bg-bg-surface/60 backdrop-blur border border-border-subtle rounded-md px-3 py-2">
         {children ?? (
-          <span className="text-caption text-fg-tertiary num">TimeBar — D5에서 구현</span>
+          <span className="text-caption text-fg-secondary num">TimeBar — D5에서 구현</span>
         )}
       </div>
     </footer>

@@ -5,11 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AU } from '@astro-simulator/shared';
 import { useSimCameraTier, useSimCommand } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
-import {
-  formatScaleLabel,
-  sceneUnitToAU,
-  type SceneUnitToAUDeps,
-} from './scale-control-utils';
+import { formatScaleLabel, sceneUnitToAU, type SceneUnitToAUDeps } from './scale-control-utils';
 
 /**
  * 카메라 거리(로그 스케일) 슬라이더 (#400 ADR `20260512-au-slider-semantics.md`).
@@ -134,7 +130,7 @@ export function ScaleControl() {
     >
       <span
         data-testid="scale-label"
-        className="num text-caption text-fg-tertiary bg-bg-surface/70 backdrop-blur px-1.5 py-0.5 rounded-xs border border-border-subtle"
+        className="num text-caption text-fg-secondary bg-bg-surface/70 backdrop-blur px-1.5 py-0.5 rounded-xs border border-border-subtle"
       >
         {labelText}
         {focusSuffix}

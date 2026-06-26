@@ -101,7 +101,7 @@ export function SatelliteInfoPanel(props: SatelliteInfoPanelProps) {
       <h3 className="text-body-sm text-fg-secondary">갈릴레이 위성 (Jupiter-centric)</h3>
       <table className="text-caption">
         <thead>
-          <tr className="text-fg-tertiary">
+          <tr className="text-fg-secondary">
             <th className="text-left font-normal pr-3">위성</th>
             <th className="text-right font-normal pr-3">장반경</th>
             <th className="text-right font-normal pr-3">이심률 e</th>
@@ -126,7 +126,7 @@ export function SatelliteInfoPanel(props: SatelliteInfoPanelProps) {
                 {row.singular && (
                   <span
                     data-testid={`sat-singularity-${row.id}`}
-                    className="inline-block px-1.5 py-0.5 rounded bg-fg-tertiary/20 text-fg-tertiary text-[10px]"
+                    className="inline-block px-1.5 py-0.5 rounded bg-fg-tertiary/20 text-fg-secondary text-[10px]"
                     title="eccentricity 또는 inclination 이 1e-6 미만이라 원순환 근사를 적용함"
                   >
                     원순환 근사
@@ -146,7 +146,7 @@ export function SatelliteInfoPanel(props: SatelliteInfoPanelProps) {
           ))}
         </tbody>
       </table>
-      <p className="text-caption text-fg-tertiary">
+      <p className="text-caption text-fg-secondary">
         정적 값: JPL Horizons 2026-01-01. 동적 값: 시뮬레이션 씬에서 매 초 추출 (AU 단위 참고:{' '}
         {(AU / 1_000_000).toFixed(0)} Mkm/AU).
       </p>
