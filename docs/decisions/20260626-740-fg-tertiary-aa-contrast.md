@@ -1,6 +1,6 @@
 # ADR — #740 작은 텍스트 `text-fg-tertiary` AA 대비 전수 fix + 토큰 사용 정책 가드
 
-상태: Provisional (cross-validate 후 Accepted 전이 — 메인 후속 처리)
+상태: Accepted (cross-validate 2026-06-26)
 일자: 2026-06-26
 이슈: [#740](https://github.com/coseo12/astro-simulator/issues/740)
 관련 PR: PR #739 ([#737] 온보딩 — 신규 표면 tertiary→secondary 선행 fix, 3.24→7.09:1)
@@ -147,11 +147,42 @@ WCAG "large text" = ≥ 18px(1.5rem) regular **또는** ≥ 14px bold. 위 모�
 
 ## 교차검증 반영 사항
 
-> 상태 Provisional — 본 ADR 은 **토큰 사용 정책 선언**(프로젝트 원칙) + cross-validate 발동 대상. cross-validate 는 **메인 오케스트레이터가 후속 처리** (architect sub-agent 범위에서는 호출하지 않고 발동 대상임을 표시만). 결과 통합 후 4축 분류(합의 / 이견 수용 / 기각 / 고유 발견) 박제 + Accepted 전이.
+> cross-validate 완료 (agy, 2026-06-26). 본 ADR 은 **토큰 사용 정책 선언**(프로젝트 원칙) cross-validate 발동 대상. 결과를 메인 오케스트레이터가 재분석하여 4축 분류 후 Accepted 전이. 로그: `.claude/logs/cross-validate-architecture-20260627-000250.log`.
 
-### Claude 편향 셀프 체크 (호출 전, CLAUDE.md `## 교차검증` 4종)
+### ① 합의 (양 모델 동의 — 그대로 진행)
+
+- **사용처 교체(결정 1-a)** — 토큰 값 변경(b)은 large text 등 정상 범위 명도까지 왜곡해 글로벌 디자인 시스템 붕괴. secondary 승격이 최선.
+- **axe CI 게이트(결정 3-B)** — ESLint 정적 분석은 CSS 상속 구조 × 실제 배경색 대비 계산 불가. 런타임 DOM axe 스캔이 유일 신뢰 해결책.
+- **opacity 변형 solid 전환** — `secondary/70` 도 AA 미달이라 opacity 제거 필수. 물리 대비 공식 부합 확인.
+- **면제 분류(결정 4)** — Production-DCE dev 오버레이 / disabled(WCAG 1.4.3 면제) 합리적 분리.
+
+### ② 이견 — 없음
+
+agy 가 핵심 결정 3건에 모두 동의. 이견 항목 없음.
+
+### ③ 고유 발견 — 처리
+
+| 발견                                                                       | 처리                                                                          | 근거                                                                                                                         |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| (가) 모달 페이드인 transition 중 스캔 → 일시 대비 미달 **오탐(flakiness)** | **본 PR 반영**                                                                | 가드 정확성 = DoD. open 시퀀스는 `transitionend`/명시 대기 후 axe 스캔. developer 지침                                       |
+| (다) 테스트 전용 셀렉터(`data-testid`) 계약                                | **본 PR 반영**                                                                | open 시퀀스는 마크업 변경에 침묵적 실패 안 하도록 testid 의존. developer 지침                                                |
+| (라) LodDevOverlay DCE 빌드 실측                                           | **본 PR 반영(qa)**                                                            | production 번들에 dev 오버레이 미포함 확인 (트리쉐이킹 신뢰성)                                                               |
+| (바) **위계 평탄화** (순수주의 명시 질문 답변)                             | **본 PR qa 범위**                                                             | §순수주의 답변 참조. 광범위 위계 재설계는 본 PR 비목표                                                                       |
+| **(나) 동적 canvas 배경 위 HUD 대비**                                      | **후속 분리 → [#749](https://github.com/coseo12/astro-simulator/issues/749)** | axe 정적 스캔은 더미 canvas 만 측정. 밝은 천체 투과 시 반투명 HUD 대비 저하 — text-shadow/딤 레이어는 디자인 변경 동반(직교) |
+
+### ④ 기각
+
+- (마) `data-a11y-scan-target` 자동 감지 테스트 러너 — **YAGNI**. 현 모달/패널 수가 적어 수동 open 시퀀스로 충분. §재검토 조건에 "신규 패널 추가 시 open 시퀀스 동기화" 이미 박제. 표면 수가 유의미하게 늘면 재검토.
+
+### 순수주의 명시 질문 답변 (Claude 편향 셀프 체크 — 잠재 미통과 해소)
+
+> Q: "작은 텍스트 tertiary→secondary 일괄 승격이 명도 위계(primary>secondary>tertiary)를 과하게 평탄화하는가? celestial-info-panel:147/149 같은 의도적 약화 위계가 secondary 동색으로 사라지는 것이 정보 위계 손실인가?"
+
+**A: a11y(대비 4.5:1)가 위계 표현보다 우선**한다 — a11y 는 제품 접근성 기준선이고, AA 미달 tertiary 는 "약한 위계"가 아니라 **읽을 수 없는 텍스트**다. 위계는 a11y 를 깨지 않는 다른 시각 장치(font-size 차등 — 이미 caption 11px, font-weight, 레이아웃 그룹핑)로 표현해야 한다. 단 147/149 처럼 secondary 동색이 되어 위계가 **실제로** 붕괴되는 케이스는 **qa 디자인 회귀에서 시각 확인** → 정보 손실로 판정되면 a11y-safe 위계 장치(weight/size 차등) 적용 검토 (본 PR 범위). agy 도 동일하게 "다른 시각 장치 정책 정의" 를 제안 — 합의. 전역 위계 재설계는 본 PR 비목표.
+
+### Claude 편향 셀프 체크 (호출 전 기록)
 
 - 낙관적 일정: 통과 — 색상 교체는 저위험이나 r1-guard baseline 재생성·디자인 위계 qa 를 명시 비용으로 박제
-- 결합 간과: 통과 — hud-corners/scale-control 의 r1-guard 결합, sensitivity opacity 결합을 §범위 분류에 명시
+- 결합 간과: 통과 — hud-corners/scale-control 의 r1-guard 결합, sensitivity opacity 결합을 §범위 분류에 명시. **agy 가 동적 canvas 결합(나)을 추가 발견 → #749 분리로 해소**
 - 폐기 프레이밍: 해당 없음 (신규 정책 박제)
-- 순수주의: **잠재 미통과** — "작은 텍스트 tertiary 전면 금지" 가 과도한 순수주의일 수 있음. disabled/large text 예외를 §C 에 명시해 완화. cross-validate 프롬프트에 "secondary 일괄 승격이 명도 위계(보조 정보 약화 의도)를 과하게 평탄화하는가" 를 명시 질문으로 삽입 권장
+- 순수주의: 잠재 미통과 → **위 §순수주의 명시 질문 답변으로 해소** (a11y 우선 + qa 케이스별 위계 장치 검토)
