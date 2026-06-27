@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "measuredAt": "2026-05-25",
-  "issue": "#564",
+  "measuredAt": "2026-06-26",
+  "issue": "#740",
   "previousMeasuredAt": "2026-05-25",
-  "updateReason": "#564 통합 fix — shortcut-bar 외 영역 (mode-switcher / unit-toggle / time-controls) 9 버튼 target-size 24×24 px PASS. PR #561 shortcut-bar fix 와 동일 패턴 (`min-w-6 min-h-6 shrink-0` + 부모 overflow 안전망) 답습. axe `serious:target-size` 위반 0건 확정 — WCAG 2.2 2.5.8 전 영역 정합 완료.",
+  "updateReason": "#740 — 작은 텍스트 text-fg-tertiary AA 대비 전수 fix (사용처 secondary 승격) + open 상태 모달/패널 color-contrast 가드 신설. ADR 20260626-740-fg-tertiary-aa-contrast.md 결정 3-B. 신규 openSurfaces 필드 박제 (research-panels / about-modal / sensitivity-modal 각 0 위반) — 게이트 사각(모달/패널 미오픈) 메움. shortcutBarTargetSizePass 등 #564 historical 필드는 측정 로직 부재로 미박제(비교 미사용).",
   "wcagVersion": "2.2 AA",
   "viewports": {
     "desktop": {
@@ -15,8 +15,7 @@
           "moderate": 0,
           "minor": 0
         },
-        "ids": [],
-        "shortcutBarTargetSizePass": true
+        "ids": []
       },
       "shortcutBar": {
         "fontSizePx": 12,
@@ -33,8 +32,7 @@
           "moderate": 0,
           "minor": 0
         },
-        "ids": [],
-        "shortcutBarTargetSizePass": true
+        "ids": []
       },
       "shortcutBar": {
         "fontSizePx": 12,
@@ -56,5 +54,19 @@
       "meetsAA": true
     },
     "wcagAaNonTextMin": 3
+  },
+  "openSurfaces": {
+    "research-panels": {
+      "violations": 0,
+      "nodes": []
+    },
+    "about-modal": {
+      "violations": 0,
+      "nodes": []
+    },
+    "sensitivity-modal": {
+      "violations": 0,
+      "nodes": []
+    }
   }
 }

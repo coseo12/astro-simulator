@@ -33,7 +33,7 @@ export function HudCorners() {
         className="absolute top-14 left-2 flex flex-col gap-1 text-caption num text-fg-secondary pointer-events-none"
       >
         {julianDate !== null && (
-          <div className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
+          <div data-hud-chip className="hud-chip px-2 py-1">
             JD {julianDate.toFixed(3)}
           </div>
         )}
@@ -45,7 +45,7 @@ export function HudCorners() {
         data-r1-region="hud-top-right"
         className="absolute top-14 right-2 flex flex-col gap-1 text-caption num text-fg-secondary items-end pointer-events-none"
       >
-        <div className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle">
+        <div data-hud-chip className="hud-chip px-2 py-1">
           {engineError
             ? `ERR · ${engineError}`
             : renderer
@@ -53,18 +53,12 @@ export function HudCorners() {
               : 'initializing…'}
         </div>
         {showFps && fps !== null && (
-          <div
-            data-testid="hud-fps"
-            className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle"
-          >
+          <div data-testid="hud-fps" data-hud-chip className="hud-chip px-2 py-1">
             {Math.round(fps)} fps
           </div>
         )}
         {showIntegratorBadge && (
-          <div
-            data-testid="integrator-badge"
-            className="bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle"
-          >
+          <div data-testid="integrator-badge" data-hud-chip className="hud-chip px-2 py-1">
             integrator · {integrator}
           </div>
         )}
@@ -85,7 +79,7 @@ export function HudCorners() {
             data-testid="engine-notice-dismiss"
             aria-label="알림 닫기"
             onClick={() => dismissEngineNotice()}
-            className="text-fg-tertiary hover:text-fg-primary px-1"
+            className="text-fg-secondary hover:text-fg-primary px-1"
           >
             ×
           </button>
@@ -96,7 +90,8 @@ export function HudCorners() {
       {selected && (
         <div
           data-testid="hud-bottom-left"
-          className="absolute bottom-20 left-2 text-caption num text-fg-secondary bg-bg-surface/70 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle pointer-events-none"
+          data-hud-chip
+          className="hud-chip absolute bottom-20 left-2 text-caption num text-fg-secondary px-2 py-1 pointer-events-none"
         >
           focus · {selected}
         </div>
@@ -106,7 +101,8 @@ export function HudCorners() {
       <div
         data-testid="hud-bottom-right"
         data-r1-region="hud-bottom-right"
-        className="absolute bottom-20 right-2 text-caption num text-fg-tertiary bg-bg-surface/60 backdrop-blur px-2 py-1 rounded-sm border border-border-subtle pointer-events-none flex items-center gap-2"
+        data-hud-chip
+        className="hud-chip absolute bottom-20 right-2 text-caption num text-fg-secondary px-2 py-1 pointer-events-none flex items-center gap-2"
       >
         <span
           className="inline-block w-2 h-2 rounded-full"

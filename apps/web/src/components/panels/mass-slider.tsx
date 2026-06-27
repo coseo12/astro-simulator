@@ -19,7 +19,7 @@ export function MassSlider() {
 
   if (!selected) {
     return (
-      <div data-testid="mass-slider-empty" className="text-caption text-fg-tertiary">
+      <div data-testid="mass-slider-empty" className="text-caption text-fg-secondary">
         천체를 선택하면 질량 조절이 가능합니다.
       </div>
     );
@@ -70,7 +70,7 @@ export function MassSlider() {
         </button>
       </div>
       {disabled && (
-        <div className="text-caption text-fg-tertiary">
+        <div className="text-caption text-fg-secondary">
           Newton 엔진에서만 반영됩니다. 상단에서 Newton으로 전환하세요.
         </div>
       )}

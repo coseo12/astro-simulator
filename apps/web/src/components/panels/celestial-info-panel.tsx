@@ -54,7 +54,7 @@ export function CelestialInfoPanel() {
     return (
       <div data-testid="info-panel-empty">
         <h3 className="text-body-sm text-fg-secondary mb-2">천체 정보</h3>
-        <p className="text-caption text-fg-tertiary">
+        <p className="text-caption text-fg-secondary">
           좌측 트리에서 천체를 선택하면 상세 정보가 표시됩니다.
         </p>
       </div>
@@ -71,7 +71,7 @@ export function CelestialInfoPanel() {
     return (
       <div data-testid="info-panel-r-phase-blocked">
         <h3 className="text-body-sm text-fg-secondary mb-2">천체 정보</h3>
-        <p className="text-caption text-fg-tertiary">
+        <p className="text-caption text-fg-secondary">
           {data.nameKo} 은(는) R-Phase 미진입 — 후속 R-Phase 에서 활성화 예정입니다.
         </p>
       </div>
@@ -100,9 +100,9 @@ export function CelestialInfoPanel() {
             aria-hidden
           />
           <h2 className="font-display text-h4 text-fg-primary">{data.nameKo}</h2>
-          <span className="text-caption text-fg-tertiary">{data.nameEn}</span>
+          <span className="text-caption text-fg-secondary">{data.nameEn}</span>
         </div>
-        <div className="text-caption text-fg-tertiary">{KIND_LABEL[data.kind] ?? data.kind}</div>
+        <div className="text-caption text-fg-secondary">{KIND_LABEL[data.kind] ?? data.kind}</div>
       </div>
 
       <dl className="flex flex-col gap-2 text-body-sm">
@@ -144,9 +144,9 @@ export function CelestialInfoPanel() {
           data-testid="info-panel-visual-scale"
           className="mt-2 px-2 py-1.5 bg-bg-elevated/60 backdrop-blur rounded-sm border border-border-subtle text-caption text-fg-secondary"
         >
-          <span className="text-fg-tertiary">표시 크기 · </span>
+          <span className="text-fg-secondary">표시 크기 · </span>
           <span className="num text-fg-primary">실제의 {visualScale}배</span>
-          <span className="text-fg-tertiary"> (가시성 보정)</span>
+          <span className="text-fg-secondary"> (가시성 보정)</span>
         </div>
       )}
 
@@ -156,7 +156,7 @@ export function CelestialInfoPanel() {
           className="mt-3 pt-3 border-t border-border-subtle"
           data-testid="info-panel-audit-fields"
         >
-          <h3 className="text-caption text-fg-tertiary mb-2">데이터 출처</h3>
+          <h3 className="text-caption text-fg-secondary mb-2">데이터 출처</h3>
           <dl className="flex flex-col gap-1 text-body-sm">
             {data.dataSource && (
               <AuditRow
@@ -201,12 +201,12 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-border-subtle/50 pb-1">
-      <dt className="text-caption text-fg-tertiary">{label}</dt>
+      <dt className="text-caption text-fg-secondary">{label}</dt>
       <dd className="flex items-center gap-2">
         <span className="num text-fg-primary">{value}</span>
         {uncertainty !== undefined && (
           <span
-            className="num text-caption text-fg-tertiary"
+            className="num text-caption text-fg-secondary"
             data-testid="audit-uncertainty"
             title="IAU 공식값 부재 — 상대 오차"
           >
@@ -222,7 +222,7 @@ function Row({
 function AuditRow({ label, value, testId }: { label: string; value: string; testId: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-caption text-fg-tertiary shrink-0">{label}</dt>
+      <dt className="text-caption text-fg-secondary shrink-0">{label}</dt>
       <dd
         className="num text-caption text-fg-secondary text-right truncate"
         data-testid={testId}

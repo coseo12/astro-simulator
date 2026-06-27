@@ -83,7 +83,7 @@ export function CelestialTree() {
             aria-hidden
           />
           <span className="flex-1">
-            {body.nameKo} <span className="text-fg-tertiary text-caption">{body.nameEn}</span>
+            {body.nameKo} <span className="text-fg-secondary text-caption">{body.nameEn}</span>
           </span>
         </button>
         {children.length > 0 && (

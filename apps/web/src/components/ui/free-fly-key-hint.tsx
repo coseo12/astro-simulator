@@ -123,7 +123,7 @@ export function FreeFlyKeyHint() {
         onClick={handleDismiss}
         data-testid="free-fly-key-hint-close"
         aria-label="안내 닫기"
-        className="text-fg-tertiary hover:text-fg-primary text-body transition-colors"
+        className="text-fg-secondary hover:text-fg-primary text-body transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
         ✕
