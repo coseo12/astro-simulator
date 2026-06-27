@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-06-27
+
+### Behavior Changes (#740 — fg-tertiary AA 대비 / #749 — 동적 canvas HUD 대비)
+
+- **[#740] 작은 텍스트 fg-tertiary AA 대비 전수 fix + open 모달/패널 color-contrast 가드 (MINOR)** ([#740](https://github.com/coseo12/astro-simulator/issues/740)) — 디자인 토큰 `--fg-tertiary (#626978)` 가 모든 표면 배경에서 WCAG 2.1 AA 작은 텍스트 기준(4.5:1) 미달(3.25/2.93/2.57)임이 #737 온보딩 qa 에서 드러나, 패널/모달의 작은 텍스트(`text-caption`/`text-[10px]` 등 < 18px non-bold) `text-fg-tertiary` 를 **`text-fg-secondary`(7.09/6.39/5.61, AA 통과)로 전수 교체**(13 tsx). opacity 변형(`/70`)은 `secondary/70` 도 AA 미달이라 **opacity 제거 후 solid**. 토큰 정의(globals.css) 불변. **토큰 사용 정책 선언**: 작은 텍스트에 `text-fg-tertiary` 단독 사용 금지(tertiary 는 large text / disabled / non-text 위계 한정). C군 보존(lod-dev-overlay production DCE / physics-engine-toggle disabled = WCAG 1.4.3 면제 / 비텍스트 `bg-fg-tertiary`). **회귀 가드**: 기존 a11y 가드 2종이 `/ko` 기본 상태만 스캔하던 **게이트 사각**을 메워 `verify-a11y-baseline.mjs` 에 **모달/패널 open 상태 color-contrast 스캔** 추가(framer-motion 페이드인 정착 대기 + `data-testid` 의존, fail-fast). 명도 위계 무붕괴 qa 확인(값=primary 돌출 2-tier 유지). core 변경 0. ADR `20260626-740-fg-tertiary-aa-contrast.md` (Accepted, cross-validate agy).
+- **[#749] 동적 canvas 배경 위 HUD 텍스트 대비 보장 — hud-chip backing (MINOR)** ([#749](https://github.com/coseo12/astro-simulator/issues/749)) — #740 cross-validate 고유 발견 후속. canvas 바로 위에 떠 있는 HUD 반투명 박스(`hud-corners` 4코너 + `scale-control`)는 밝은 천체(태양 disk 등)가 뒤로 투과하면 텍스트 실효 대비가 **1.86~2.65:1(AA 미달)** 로 떨어지나, axe 는 `.exclude('canvas')` 라 이 동적 결함을 원천 측정 불가. **공통 `.hud-chip` 클래스 신설**(globals.css `@layer components` SSoT) — backing 을 `bg-void(#08090d) @ α0.85`(color-mix) 로 강화해 **canvas 휘도와 무관하게 sun-white worst-case 5.39:1(AA 통과)** 고정 + text-shadow 시각 보조. α0.85 = 15% 투과로 backdrop-blur 유리 미학 보존. **회귀 가드**: `scripts/verify-hud-contrast.mjs` 신설(`[data-hud-chip]` precision 매칭 + `MIN_EXPECTED_CHIPS=3` 사각 차단 + `--simulate-fail` negative, fail-fast), `a11y-baseline-guard.yml` 통합. r1-guard baseline 재생성(hud-top/bottom-right 배경 변경). text-shadow 정적이라 `will-change` 미적용(fps 무회귀, swiftshader 검증). core 변경 0. ADR `20260627-749-dynamic-canvas-hud-contrast.md` (Accepted, cross-validate agy — Forensic 변형, runtime 실측으로 결함 실재 확정).
+
+### Notes
+
+- 본 릴리스는 a11y(WCAG 2.1 AA) 라운드 2건 묶음 — #740(정적 표면 토큰 색) + #749(동적 canvas 표면). #749 는 #740 의 정적 표면 정책을 동적 canvas 표면으로 확장(직교). 두 ADR 모두 cross-validate(agy) 발동 대상(토큰/디자인 정책 선언)이며 §교차검증 반영 사항 4축 박제.
+
 ## [0.35.1] — 2026-06-26
 
 ### Behavior Changes (#745 — 별 배경 가시성 회귀 fix)
