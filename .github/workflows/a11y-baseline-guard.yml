@@ -102,6 +102,11 @@ jobs:
       - name: a11y baseline 회귀 검증
         run: BASE_URL=http://localhost:3001 node scripts/verify-a11y-baseline.mjs
 
+      # #749 — canvas 위 HUD 텍스트 배경 무관 대비 정적 가드 (axe 가 canvas exclude 로 못 잡는
+      # 동적 배경 결함). 위 dev server 재사용 (별도 20분 job 중복 회피).
+      - name: HUD 배경 무관 대비 검증 (#749)
+        run: BASE_URL=http://localhost:3001 node scripts/verify-hud-contrast.mjs
+
       - name: dev server 정리
         if: always()
         run: |
