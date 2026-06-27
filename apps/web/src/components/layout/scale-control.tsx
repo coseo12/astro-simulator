@@ -130,7 +130,8 @@ export function ScaleControl() {
     >
       <span
         data-testid="scale-label"
-        className="num text-caption text-fg-secondary bg-bg-surface/70 backdrop-blur px-1.5 py-0.5 rounded-xs border border-border-subtle"
+        data-hud-chip
+        className="hud-chip num text-caption text-fg-secondary px-1.5 py-0.5 rounded-xs"
       >
         {labelText}
         {focusSuffix}
