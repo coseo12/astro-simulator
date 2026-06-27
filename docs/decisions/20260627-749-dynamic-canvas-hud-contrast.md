@@ -1,6 +1,6 @@
 # ADR — #749 동적 canvas 배경 위 HUD 텍스트 대비 보장 (배경 무관 대비 정책)
 
-상태: Provisional (cross-validate 발동 대상 — 디자인 정책 선언. 메인 오케스트레이터가 cross-validate 결과 통합 후 Accepted 전이)
+상태: Accepted (cross-validate 2026-06-27)
 일자: 2026-06-27
 이슈: [#749](https://github.com/coseo12/astro-simulator/issues/749)
 관련 PR: (developer 구현 PR 시 박제)
@@ -148,11 +148,39 @@ axe 는 canvas exclude 로 본 결함을 못 잡으므로(측정 3-1), 가드는
 
 ## 교차검증 반영 사항
 
-> **Provisional 상태 — cross-validate 미통합.** 본 ADR 은 **디자인 정책 선언**(canvas 위 텍스트 배경 무관 대비 보장)을 담아 cross-validate 발동 대상(프로젝트 원칙·철학 선언 앵커)이다. architect sub-agent 는 ADR 초안까지 작성하고, **cross-validate(agy) 1회 호출 + 결과 4축 분류 통합 + Accepted 전이는 메인 오케스트레이터가 후속 처리**한다 (sub-agent 격리에서 cross-validate 호출 시 outcome JSON 파싱·reminder 분기까지 메인이 일관 관리). 통합 후 본 섹션을 합의/이견/고유 발견/기각 4축으로 채우고 `상태: Accepted (cross-validate <YYYY-MM-DD>)` 로 전이한다.
+> cross-validate 완료 (agy, 2026-06-27). agy 1차 비응답(claude-only fallback) → probe 복구(`agy -p` OK) 후 재시도 applied (메모리 SSoT: agy 1차 비응답 → 메인 재시도 패턴). 메인 오케스트레이터가 결과 재분석 후 4축 분류. 로그: `.claude/logs/cross-validate-architecture-20260627-182059.log`.
 
-### Claude 편향 셀프 체크 (cross-validate 호출 전 기록)
+### ① 합의 (수용)
+
+- **결함 분석·측정 함정 지목 타당** — agy 가 Forensic 측정(headless swiftshader starfield gating / screenshot p5/p95 ≠ axe식 대비)을 "불필요한 시행착오 차단" 으로 호평. 검증 동의.
+- **②결정 2 용어 혼재 명확화** — 표(후보 C = "불투명 어두운 backing") vs 결정 2("박스 배경 약간 강화(반투명)+text-shadow") 가 모호하다는 지적 수용. → 아래 §결정 2 명확화 박제: **정량 1차 보장은 배경 강화(불투명에 가까운 backing)로, text-shadow 는 시각 보조**. white-out(255,255,255) 시 측정 1 alpha-compositing 식으로 ≥ 4.5:1 충족이 구현 PR 1회성 DoD.
+- **④Tailwind 공통 클래스 추상화** — HUD 박스 7곳+ 가 동일 패턴(`bg-bg-surface/(60|70) backdrop-blur px-2 py-1 rounded-sm border`) 반복 실측 확인. 개별 하드코딩 대신 **공통 유틸 클래스(예: `hud-chip` 또는 `bg-hud-backing`)로 추상화** → time-bar 등 확장 시 일관성. developer 지침에 반영(단 현 대상 2파일+패턴 7곳이라 과추상 경계 — 디자인 회귀 qa 로 검증).
+- **③정적 가드 코드 계약(data-\* 마커)** — agy 의 "`data-hud-contrast-guaranteed` 속성 + 명시 클래스 화이트리스트" 제안은 ADR §가드 precision 주의(data-\* 마커 권고)와 합치. developer 가 precision 매칭 기준으로 채택.
+
+### ② 이견 — 없음
+
+agy 가 ADR 핵심 결정(C+A 병용, 정적 CSS 가드)에 본질적 이견 없음. 보완·대안 제시 위주.
+
+### ③ 고유 발견 — 처리
+
+| 발견                                                                          | 처리                                      | 근거                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ①**성능 영향**(backdrop-blur 위 text-shadow + 변하는 canvas → paint overhead) | **본 PR qa DoD 추가**                     | 시각효과는 CI swiftshader fps 검증 필수(메모리 SSoT, #738). qa 가 HUD 변경 후 fps 무회귀 실측. `will-change` 는 정적 text-shadow 라 과잉 가능 — qa 측정으로 판단                                                                                                                                                                                                                                                                                               |
+| ③**jest-axe mock 가드 대안**(부모 배경 #fff 강제 주입 + axe 실제 대비 계산)   | **평가 후 본 PR 비채택 → 후속 옵션 박제** | (1) 이 프로젝트는 **vitest**(jest 아님) → jest-axe 신규 라이브러리 도입 필요(CLAUDE.md 라이브러리 사전 승인) (2) **C(불투명 backing) 해결책에선 정적 CSS 검사로 충분** — backing 이 충분히 불투명하면 canvas 무관 대비 고정 (3) text-shadow 케이스엔 axe 무력(측정 1). 정적 검사(i)+구현 PR 1회성 정량 측정 2층 구조가 현 ROI 우위. **§재검토 조건**: 정적 검사 "장치 존재 ≠ 대비 보장" 한계가 실제 회귀로 드러나면 `vitest + @axe-core` mock 가드 도입 재검토 |
+
+### ④ 기각
+
+- **②다크/라이트 테마 연동** — 어두운 backing 고정이 라이트 모드에서 역효과 우려. **기각**: 본 프로젝트는 우주 시뮬레이터 **다크 단일**(globals.css `prefers-color-scheme`/`data-theme`/라이트 미디어쿼리 grep 0 실측). 라이트/멀티 테마 미지원이라 해당 없음. 향후 테마 도입 시 §재검토 조건의 "토큰 시스템 개편" 으로 포괄.
+
+### 순수주의 명시 질문 답변 (셀프 체크 잠재 미통과 해소)
+
+> Q: "유리 미학 보존(text-shadow)이 a11y 정량 가드(불투명 backing)보다 우선되는 케이스가 있는가? text-shadow 단독 + 정적 가드 조합이 더 합리적인가?"
+
+**A: 정량 보장이 우선**이나 **유리 미학과 양립 가능**하다. text-shadow 단독은 axe/측정식에 반영되지 않아 **자동 가드도 1회성 측정도 정량 보장 불가** — "보이기엔 낫지만 수치로 증명 못 함". 따라서 정량 1차 보장은 배경 강화(C)로 확보하고, text-shadow(A)는 시각 보조로 병용한다. 단 backing 을 **완전 불투명이 아닌 "충분히 어두운 + 약간의 투과"** 로 두어 유리 미학(backdrop-blur 잔존)과 정량 ≥ 4.5:1 의 절충점을 developer 가 **디자인 회귀 qa** 로 최종 선택(결정 2). agy 도 jest-axe 로 "실제 대비 정량 측정" 을 제안 = 정량 우선에 간접 동의. 순수주의 편향 아님 — 측정 불가능한 해법(text-shadow 단독)을 배제하는 것은 a11y 의 검증 가능성 요건.
+
+### Claude 편향 셀프 체크 (호출 전 기록)
 
 - **낙관적 일정**: 통과 — className/CSS 변경 저위험이나 r1-guard baseline 재생성 + 디자인 회귀 qa + 가드 precision 정정(D1)을 명시 비용으로 박제.
-- **결합 간과**: 통과 — r1-region(hud-top-right/bottom-right) baseline 결합, axe canvas-exclude 한계(측정 3-1), headless swiftshader starfield gating 함정(측정 3-1)을 본문에 명시. **잠재 미통과 축**: cross-validate 에 "HUD 외 다른 canvas-위 컨트롤(time-bar 등) 동일 결함 누락 여부" + "text-shadow 가 fps/렌더 성능에 미치는 영향" 을 명시 질문으로 삽입 권고.
+- **결합 간과**: 통과 — r1-region baseline 결합, axe canvas-exclude 한계, headless swiftshader gating 함정 본문 명시. **agy 가 성능(text-shadow paint) 결합을 추가 발견 → qa DoD 로 해소**.
 - **폐기 프레이밍**: 해당 없음 (신규 정책 박제).
-- **순수주의**: 잠재 미통과 → text-shadow(시각 우아) vs 불투명 backing(정량 보장) 사이에서 "정량 측정 가능성" 을 우선해 C 를 주 후보로 둔 것이 a11y 순수주의 편향일 수 있음. **cross-validate 명시 질문**: "유리 미학 보존이 a11y 정량 가드보다 우선되는 케이스가 있는가? text-shadow 단독 + 정적 가드 조합이 더 합리적인가?" 삽입 권고.
+- **순수주의**: 잠재 미통과 → **위 §순수주의 명시 질문 답변으로 해소** (정량 우선 + 유리 미학 양립, 측정 불가 해법 배제는 검증 가능성 요건).
