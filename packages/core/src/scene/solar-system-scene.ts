@@ -28,6 +28,7 @@ import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield } from './starfield.js';
+import { createProceduralPlanetMaterial } from './procedural-planet-shader.js';
 import {
   renderScaleForTier,
   initialTier as defaultInitialTier,
@@ -413,6 +414,21 @@ export interface SolarSystemSceneOptions {
    * ADR `docs/decisions/20260624-738-procedural-starfield.md`.
    */
   starfield?: boolean;
+
+  /**
+   * #756 — 절차적 행성 표면 셰이더 (`procedural-planet-shader.ts`).
+   *
+   * 기본값 **false** (core 라이브러리 보수 기본 — 기존 NullEngine 단위 테스트 무회귀, #675/#738
+   * 레이어 분리 정합). **기본 ON 은 web 레이어 결정** — `parseSurfaceVisible` (apps/web) 기본값이
+   * true 이며 `?surface=off` 가 옵트아웃 (ADR §결정 4). false 면 `createBodyMesh`/`createBodyMeshMid`
+   * 가 기존 StandardMaterial 경로를 그대로 탄다 (절차 셰이더 미적용 — 현행 동작 100% 복귀).
+   *
+   * 동작 (true 일 때): `SURFACE_TYPE_BY_BODY` 테이블 등록 body (earth/mars/jupiter/moon) 의
+   * high/mid variant 머티리얼을 절차 ShaderMaterial 로 교체 (base color = colorHint.hex 위 변조).
+   * low (billboard) + tier-c (`forceOverride:'low'`) 는 자동 단색 (별도 코드 0 — ADR §결정 3).
+   * 미등록 body 는 테이블 부재로 자동 단색 (무회귀). ADR `docs/decisions/20260628-756-procedural-planet-surface.md`.
+   */
+  surfaceDetail?: boolean;
 }
 
 /**
@@ -440,6 +456,7 @@ export function createSolarSystemScene(
     glowMarker = false,
     glowMarkerSatelliteRatio = GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
     starfield = false,
+    surfaceDetail = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -486,7 +503,7 @@ export function createSolarSystemScene(
   const bodyInitialRenderScale = activeTier; // 모든 body 가 동일 tier 로 생성됨 → Tier 만 기억하면 충분.
   const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립, 진단용)
   for (const body of system.bodies) {
-    const mesh = createBodyMesh(body, scene, activeTier, bodyScale);
+    const mesh = createBodyMesh(body, scene, activeTier, bodyScale, surfaceDetail);
     meshes.set(body.id, mesh);
     bodyBaseDiameter.set(body.id, body.radius * 2);
   }
@@ -1595,7 +1612,14 @@ export function createSolarSystemScene(
     if (level === 'mid') {
       let m = midVariants.get(body.id);
       if (!m) {
-        m = createBodyMeshMid(body, scene, bodyInitialRenderScale, highMesh, bodyScale);
+        m = createBodyMeshMid(
+          body,
+          scene,
+          bodyInitialRenderScale,
+          highMesh,
+          bodyScale,
+          surfaceDetail,
+        );
         midVariants.set(body.id, m);
       }
       return m;
@@ -1838,6 +1862,7 @@ function createBodyMesh(
   scene: Scene,
   tier: Tier,
   bodyScale: (bodyId: string) => number,
+  surfaceDetail = false,
 ): Mesh {
   // P12-A #298 — 실측 직경 × 현재 tier 의 renderScale 로 메쉬 생성.
   // R1 #329 — × bodyScale (시각 과장 배수, ADR `20260425-r1-sun-visualization.md` §결정 3).
@@ -1845,17 +1870,27 @@ function createBodyMesh(
   const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
   const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
 
-  const mat = new StandardMaterial(`${body.id}-mat`, scene);
-  const hex = body.colorHint?.hex ?? '#888888';
-  const c = hexToColor3(hex);
-  if (body.kind === 'star') {
-    mat.emissiveColor = c;
-    mat.disableLighting = true;
+  // #756 — 절차적 표면 셰이더 (surfaceDetail=true + 테이블 등록 body 만). 미등록/OFF 면 null →
+  // 기존 StandardMaterial 경로 (단색, 무회귀). 항성(sun)은 표면 테이블 미등록이라 자동 단색.
+  // ADR `docs/decisions/20260628-756-procedural-planet-surface.md` §결정 1·4.
+  const surfaceMat = surfaceDetail
+    ? createProceduralPlanetMaterial(scene, body, `${body.id}-surface-mat`)
+    : null;
+  if (surfaceMat) {
+    mesh.material = surfaceMat;
   } else {
-    mat.diffuseColor = c;
-    mat.specularColor = new Color3(0.05, 0.05, 0.05);
+    const mat = new StandardMaterial(`${body.id}-mat`, scene);
+    const hex = body.colorHint?.hex ?? '#888888';
+    const c = hexToColor3(hex);
+    if (body.kind === 'star') {
+      mat.emissiveColor = c;
+      mat.disableLighting = true;
+    } else {
+      mat.diffuseColor = c;
+      mat.specularColor = new Color3(0.05, 0.05, 0.05);
+    }
+    mesh.material = mat;
   }
-  mesh.material = mat;
   // #713 — mesh → bodyId 역매핑 (high variant). ADR `20260620-713-click-body-select.md` §결정 1.
   // pick 결과(pickedMesh)에서 O(1) 역변환. high/mid/low 전 variant 동일 id 박제 (단위 테스트 가드).
   mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
@@ -1877,6 +1912,7 @@ function createBodyMeshMid(
   tier: Tier,
   parent: Mesh,
   bodyScale: (bodyId: string) => number,
+  surfaceDetail = false,
 ): Mesh {
   // R1 #329 — high variant 와 동일 식 (× bodyScale) 로 비율 보존. LOD 전환 시 사용자가 크기 변화 인지 못함.
   const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
@@ -1885,19 +1921,28 @@ function createBodyMeshMid(
   // parent local 기준 원점 (high mesh 와 동일 위치).
   mesh.position.set(0, 0, 0);
 
-  const mat = new StandardMaterial(`${body.id}-lod-mid-mat`, scene);
-  const hex = body.colorHint?.hex ?? '#888888';
-  const c = hexToColor3(hex);
-  if (body.kind === 'star') {
-    mat.emissiveColor = c;
-    mat.disableLighting = true;
+  // #756 — mid variant 도 high 와 동일 절차 셰이더 공유 (segments 만 다름 — ADR §결정 1).
+  // LOD 전환 시 표면 연속성 (사용자 인지 불변). 미등록/OFF 면 null → StandardMaterial 무회귀.
+  const surfaceMat = surfaceDetail
+    ? createProceduralPlanetMaterial(scene, body, `${body.id}-lod-mid-surface-mat`)
+    : null;
+  if (surfaceMat) {
+    mesh.material = surfaceMat;
   } else {
-    mat.diffuseColor = c;
-    mat.specularColor = new Color3(0.05, 0.05, 0.05);
+    const mat = new StandardMaterial(`${body.id}-lod-mid-mat`, scene);
+    const hex = body.colorHint?.hex ?? '#888888';
+    const c = hexToColor3(hex);
+    if (body.kind === 'star') {
+      mat.emissiveColor = c;
+      mat.disableLighting = true;
+    } else {
+      mat.diffuseColor = c;
+      mat.specularColor = new Color3(0.05, 0.05, 0.05);
+    }
+    // alpha blend 허용 — 200ms cross-fade 에서 material.alpha 조작.
+    mat.useAlphaFromDiffuseTexture = false;
+    mesh.material = mat;
   }
-  // alpha blend 허용 — 200ms cross-fade 에서 material.alpha 조작.
-  mat.useAlphaFromDiffuseTexture = false;
-  mesh.material = mat;
   // #713 — mesh → bodyId 역매핑 (mid variant). high/low 와 동일 id (ADR §결정 1).
   mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
   mesh.setEnabled(false); // 기본 숨김 — 첫 전환 시 enable.
