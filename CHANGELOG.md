@@ -5,6 +5,16 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.37.0] — 2026-06-28
+
+### Behavior Changes (#756 — 절차적 행성 표면 셰이더)
+
+- **[#756] 절차적 행성 표면 셰이더 1차 — 인프라 + 대표 4개 (MINOR)** ([#756](https://github.com/coseo12/astro-simulator/issues/756)) — 그동안 모든 천체가 단색 `StandardMaterial.diffuseColor` 로 렌더돼 표면 디테일이 0(공처럼 밋밋)이던 것을, 방향성 기획 **트랙 A(몰입 강화)** 의 잔여 항목으로 절차적 표면 디테일을 부여. 별 배경(#738)에 이은 후속이며 외부 텍스처 에셋 대신 **절차적 셰이더(에셋 0)** 를 채택 — 이 코드베이스는 `ring-shader.ts`/`starfield.ts` 가 모두 절차적 `ShaderMaterial` 로 확립돼 있어 구조 정합 + 번들/WebGPU 호환 리스크 회피. 신규 `procedural-planet-shader.ts`(ShaderMaterial 팩토리 + GLSL + log-depth `gl_FragDepth` 정합 + GLSL↔JS 미러). **표면 타입 4종**: rocky(지구 — 대륙/해양 대비), desert(화성 — dust/산화철), gas-bands(목성 — 위도 밴드), cratered(달 — 크레이터). 타입 소스는 **코드 상수 `SURFACE_TYPE_BY_BODY`**(rendering-only 분류 → 데이터 SSoT 불변, `solar-system.json` 변경 0). 셰이더 내부는 단일 셰이더 + `uniform int surfaceType` **if-else 분기**(switch 금지 — WGSL 변환 깨짐). **`colorHint.hex` → `uniform baseColor`**, 절차 변조는 그 위. **LOD/tier 차등**: high/mid 가 동일 셰이더 공유(전환 연속), low(billboard) + tier-c(`forceOverride:'low'`)는 자동 단색(fps 보호, **별도 코드 0**). **`?surface=off`** URL 플래그(기본 ON, `?marker` 패턴) — OFF 시 `StandardMaterial` 현행 100% 복귀. **무회귀**: 나머지 23개 + 태양 + 고리 + 별 배경 단색/기존 유지(테이블 미등록 자동 단색), fps 회귀 0(tier-a/b/c), r1-guard 새 baseline(eb9a32d) PASS. 단위 테스트(GLSL↔JS 미러 결정성 / surfaceType enum↔int parity 가드 / 보라-마젠타 anti-pattern). ADR `20260628-756-procedural-planet-surface.md` (Accepted, cross-validate agy). picking/camera/orbit/tier-transition 변경 0(Concrete Prediction 적중). core 셰이더 신설 + scene 배선만.
+
+### Notes
+
+- 후속 분리 #759 — 절차적 표면 디테일 **영구 회귀 가드**(`verify:756` CI 통합). 표면 scene 배선이 끊겨 단색 회귀해도 단위 테스트는 통과(조용한 퇴행)하므로 실 Chrome GUI 고주파 엔트로피 가드를 CI 정착(스프린트 계약 §6 인프라 분리).
+
 ## [0.36.0] — 2026-06-27
 
 ### Behavior Changes (#740 — fg-tertiary AA 대비 / #749 — 동적 canvas HUD 대비)
