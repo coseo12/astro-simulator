@@ -20,6 +20,7 @@ import { parseGpuTier } from '@/core/parse-gpu-tier';
 import { parseGlowMarkerRatio, parseMarkerMode } from '@/core/parse-marker-mode';
 import { parseOrbitsVisible } from '@/core/parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from '@/core/parse-stars-mode';
+import { parseSurfaceVisible } from '@/core/parse-surface-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
@@ -399,6 +400,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           extractWebglRendererString() ?? gpuCap.adapterInfo?.description ?? null;
         const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
         const starfieldVisible = resolveStarfieldVisible(starsParamVisible, !isSoftwareRenderer);
+        // #756 — 절차적 행성 표면 셰이더 기본 ON + `?surface=off` 옵트아웃 (ADR 20260628-756 §결정 4).
+        // starfield 와 달리 전체화면 fill 이 아닌 body 표면만 → tier-c 는 forceOverride:'low' 가
+        // 자동 우회 (low variant = 단색, 별도 software 감지 불필요 — ADR §결정 3).
+        const surfaceParam = new URLSearchParams(window.location.search).get('surface');
+        const surfaceVisible = parseSurfaceVisible(surfaceParam);
         // browser-verify / dev overlay 에서 별 가시성 + software 감지 결과 확인용 전역 노출.
         // CI(software) 에서 __starfieldVisible=false / 하드웨어에서 true assertion (fps 회귀 전 조기 검출).
         Object.defineProperty(window, '__starfieldVisible', {
@@ -434,6 +440,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #738 — 별 배경 + 은하수. 기본 ON 은 parseStarsVisible 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR 20260624-738 §결정 7 레이어 분리).
           starfield: starfieldVisible,
+          // #756 — 절차적 행성 표면. 기본 ON 은 parseSurfaceVisible 기본값 (true) 이 결정 —
+          // core 옵션 기본값은 false 유지 (ADR 20260628-756 §결정 4 레이어 분리).
+          surfaceDetail: surfaceVisible,
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
