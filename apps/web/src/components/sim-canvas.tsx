@@ -25,7 +25,8 @@ import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
-import { getBodyScale } from '@/constants/body-scale';
+import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
+import { parseBodyScaleP } from '@/core/parse-body-scale-p';
 import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -405,6 +406,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 자동 우회 (low variant = 단색, 별도 software 감지 불필요 — ADR §결정 3).
         const surfaceParam = new URLSearchParams(window.location.search).get('surface');
         const surfaceVisible = parseSurfaceVisible(surfaceParam);
+        // #762 — 천체 압축 곡선 지수 p (default 0.5 sqrt). `?bodyScaleP=0.55` 로 D-T2 실시간 튜닝.
+        // URL 부재 시 default p 의 getBodyScale 콜백 그대로 (모듈 로드 시 1회 산출된 BODY_SCALE).
+        // ADR 20260629-762 §5 결정 2.7.
+        const bodyScalePParam = new URLSearchParams(window.location.search).get('bodyScaleP');
+        const bodyScaleP = parseBodyScaleP(bodyScalePParam);
+        const bodyScaleFn =
+          bodyScaleP === DEFAULT_BODY_SCALE_P ? getBodyScale : getBodyScaleForP(bodyScaleP);
         // browser-verify / dev overlay 에서 별 가시성 + software 감지 결과 확인용 전역 노출.
         // CI(software) 에서 __starfieldVisible=false / 하드웨어에서 true assertion (fps 회귀 전 조기 검출).
         Object.defineProperty(window, '__starfieldVisible', {
@@ -424,9 +432,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           grMode,
           integrator,
           ringRenderMode,
-          // R1 #329 — body 별 시각 과장 배수 주입 (DI). 현재 `sun = 75` 만 정의됨.
-          // ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3.
-          bodyScale: getBodyScale,
+          // R1 #329 — body 별 시각 과장 배수 주입 (DI).
+          // #762 — sqrt 압축 곡선 단조성 회복. default p=0.5 = getBodyScale, `?bodyScaleP=` 시 factory.
+          // ADR `docs/decisions/20260425-r1-sun-visualization.md` §결정 3 + `20260629-762` §5 결정 2.
+          bodyScale: bodyScaleFn,
           // #444 — tier transition 윈도우 사용자 입력 시도 카운트. SimulationCore.metrics 누적.
           // DevTools: `__simCore.metrics.tierTransitionInputDrops`. G8b 격상 결정 데이터.
           onTierTransitionInputAttempts: (count) => {
