@@ -307,7 +307,7 @@ focus 천체 기준 사실 비율을 근사 — focus body 를 anchor 로 다른
 1. **행성(8) + 왜소행성(5) scale 을 `radius^0.5 × k` 곡선 산출값으로 전환** — `k` 는 mercury floor 고정 (mercury 7.0px 유지)
 2. **위성(8) scale 은 기존 per-parent 수렴대(0.05~0.09) 비율 유지** — parent effective 가 곡선으로 바뀌므로 위성 등가 scale 도 재산정되나 **mesh 비율은 보존**
 3. **comet·극소형 위성(phobos/deimos/halley/encke 등) 5000 그룹** — 곡선 적용 시 sub-px 유지(현 정책 동형) 또는 별도 floor. developer 가 곡선 vs 단일값 ROI 판정 (현 5000 단일값도 cross-group 단조 보존 중이면 유지)
-4. **단조성 단위 테스트 신설** — 행성 cross-body 단조 + 위성 수렴대 + 왜소 cross-group + **그룹 간 경계 assert** `max(comet 등가 scale·eff) < min(satellite eff) < min(planet eff)` 명시 (cross-validate agy 6.2 수용 — 그룹 간 상한선 교차 단조성 silent 차단)
+4. **단조성 단위 테스트 신설** — 행성 cross-body 단조 + 위성 수렴대 + 왜소 cross-group + **그룹 간 경계 assert** (cross-validate agy 6.2 수용 — 그룹 간 상한선 교차 단조성 silent 차단). ⚠️ **원안 `max(comet) < min(satellite) < min(planet)` chain 은 §7 Amendment 1.1 로 정정** — `max(comet) < min(satellite)` 는 실 데이터(proteus/enceladus 극소 위성 effective < swift-tuttle comet)로 충족 불가 (현 production 정책에서도 동일, 회귀 아님). achievable invariant `max(satellite) < min(planet)` / `max(dwarf) < min(planet)` / `max(comet) < min(planet) AND min(dwarf)` 로 대체 박제
    - **방어적 NaN guard 동반** (cross-validate agy 5.0 수용): `radius^p` 연산은 `body.radius ≤ 0` 시 NaN/복소수 → 렌더 파이프라인 crash 위험. `getBodyScale` 곡선 경로에 `radius > 0` guard clause + fallback (`DEFAULT_BODY_SCALE`) 박제 + 단위 테스트
    - **위성 등가 scale 산출 = 정적 역산 박제** (cross-validate agy 2.0 challenge 해소): 위성 scale 은 parent 의 곡선 effective 를 런타임 동적 곱이 아닌 **모듈 로드 시 1회 정적 역산** (`satellite_scale = parent_eff × 수렴대비 / satellite.radius`) 으로 `BODY_SCALE` 상수에 박제. parent 곡선 로직과 강결합 회피 (성능 0 + 결합 격리)
 5. **`20260506-body-scale-r-phase-policy.md` §결정 3 체크리스트 강화** — "사실 비율 단조성 검증" → "**cross-body 단조성 가드 (신규 body 추가 시 곡선 자동 산출 → 단조 단위 테스트 통과**)"
@@ -356,7 +356,31 @@ focus 천체 기준 사실 비율을 근사 — focus body 를 anchor 로 다른
 
 ## §7 Amendment 라운드 N
 
-(현재 없음 — cross-validate 결과는 §교차검증 반영 사항에 통합. 사용자 D-T2 p값 확정 / developer fix 단계 발견 시 본 섹션에 라운드 추가)
+### Amendment 1 (2026-06-29, developer fix 단계 — #762 PR) — 그룹 경계 assert 정정 + 라인 수 초과
+
+본 ADR 의 옵션 A2 구현 (PR `feature/762-body-scale-monotonic`) 단계에서 measurement-first 실측으로 §5 결정 2.4 의 경계 assert 와 §4 예측 1 라인 수를 정정.
+
+#### A1.1 — 경계 assert chain `max(comet) < min(satellite) < min(planet)` 실 데이터 충족 불가 (정정)
+
+- **원안** (§5 결정 2.4): "**그룹 간 경계 assert** `max(comet 등가 scale·eff) < min(satellite eff) < min(planet eff)`"
+- **실측 발견**: `max(comet eff) = swift-tuttle (13km × 5000) = 6.5e7` 이 `min(satellite eff) = proteus (210km × 264) = 5.54e7` 보다 **크다**. 곧 `max(comet) < min(satellite)` 는 **실 데이터로 충족 불가**.
+  - 원인: proteus(210km, mesh 비 0.0102) / enceladus(252km, 0.0218) 같은 극소 위성의 effective 가 swift-tuttle(13km 혜성 × 5000) 보다 작다. 이는 **현 production 정책 (develop tip `1c03643`) 에서도 동일** (OLD: swift-tuttle eff 6.5e7 > proteus eff 6.3e7 > phobos 5.54e7). **본 PR 이 도입한 회귀가 아니다.**
+  - 사실 정합: proteus 가 swift-tuttle 보다 작게 보이는 것은 사실 정합 (극소 위성 radius 0.155배 정직 반영). 두 그룹의 effective 범위가 본질적으로 겹친다 — comet 5000 단일값과 위성 정적 역산이 서로 다른 산출 체계라 그룹 간 strict total order 가 데이터 상 존재하지 않는다.
+- **정정** (achievable invariant 로 강화): 의미 있는 cross-group 상한선으로 대체 박제 (`body-scale.test.ts`):
+  1. `max(satellite eff) < min(planet eff)` — 위성이 가장 작은 행성(mercury) 보다 크게 표시되지 않음 ✅ (titan 7.56e8 < mercury 1.71e9)
+  2. `max(dwarf eff) < min(planet eff)` — 왜소행성 cross-group floor ✅ (pluto 1.19e9 < mercury 1.71e9)
+  3. `max(comet eff) < min(planet eff)` **AND** `max(comet eff) < min(dwarf eff)` — comet 5000 단일값 cross-group 상한 보존 ✅ (swift-tuttle 6.5e7 < ceres 7.49e8)
+  4. comet 그룹 내 사실 서열 (swift-tuttle > phobos > deimos > halley > encke) + comet 5 body 동일값 5000 (단일값 구조 가드)
+- **근거**: CRITICAL #6 §10 (수치 DoD 미달 시 측정 방법 검증 우선) — assert 식 자체가 데이터에 비해 과강하다. 원안의 의도("위성·왜소·혜성이 행성보다 크게 보이지 않는다 + 그룹 내 서열 보존")는 정정된 4 invariant 가 전부 포착한다. comet↔satellite 의 미세 effective 겹침은 사용자 인지 단위(둘 다 sub-4px billboard fallback)에서 무의미.
+
+#### A1.2 — §4 예측 1 라인 수 초과 (core 0 / data 0 적중, apps/web 초과)
+
+- **예측** (§4): apps/web ~35~65 라인 / **packages/core 0 라인** / **데이터 0 라인**
+- **실측** (`git diff --stat origin/develop...HEAD`):
+  - **packages/core: 0 라인 — 적중** ✅ (`bodyScale(id)` 콜백 인터페이스 불변)
+  - **데이터(solar-system.json): 0 라인 — 적중** ✅ (principles.md §Visual Fidelity 데이터 SSoT 보존)
+  - **apps/web: 초과** — body-scale.ts 전면 재작성 (룩업 테이블 → 곡선 모듈) + 신규 `parse-body-scale-p.ts`(+33) + 테스트(`body-scale.test.ts` 재작성 / `parse-body-scale-p.test.ts` +36) + sim-canvas.tsx(+17). 예측 35~65 라인은 "곡선 함수 ~15-25 + 테스트 +20-40" 가정이었으나, cross-validate §3.0 순환 의존 회피 가이드를 따라 **`BODY_RADIUS_M` 미러 테이블 (32 body) + 그룹 분류 상수 + 정적 역산 로직**을 body-scale.ts 내부에 박제 (런타임 json import 회피) → 라인 증가. + agy 6.3 `?bodyScaleP=` URL flag (§5 결정 2.7 developer 선택지) 가 신규 파일 2개 추가.
+- **판정**: 아키텍처적으로 결정적인 예측 (core 0 / data 0 / 콜백 인터페이스 불변) 은 전부 적중. 라인 수만 초과 — radius 미러는 데이터 SSoT drift 가드 (`body-scale.test.ts` 의 json 정합 테스트) 와 한 쌍이라 정당한 비용. "신규 데이터 ≠ 신규 코드" 가 아닌 "정책 전환 = 모듈 재작성" 이므로 라인 증가는 본질적 (P12 옵션 e 의 곡선 도입이 룩업 테이블을 대체).
 
 ---
 
