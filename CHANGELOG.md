@@ -5,6 +5,16 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-06-29
+
+### Behavior Changes (#762 — 천체 표시 크기 비율 단조성)
+
+- **[#762] 천체 표시 크기 비율 단조성 회복 — sqrt 압축 곡선 (MINOR)** ([#762](https://github.com/coseo12/astro-simulator/issues/762)) — 카메라 focus 를 태양이 아닌 다른 천체(예: 목성)로 옮겨 줌아웃/회전해 거성과 안쪽 행성이 **함께 보일 때(co-visible)**, 지구·화성이 목성보다 크게 보이던 **비율 역전**을 해소. 근인은 per-body `bodyScale` 비대칭(안쪽 행성 800 vs 거성 48)이 거리 보정 없이 절대 적용돼 effective(=반경×scale) 가 실제 반경 순서를 뒤집던 것 — 각 R-Phase 가 천체별 단독 viewport 점유율만 합의하고 천체 간 상대 비율은 보지 않은 누적 결과. **fix**: 행성(8)+왜소행성(5) scale 을 `effective = 반경^p × k`(p=0.5 sqrt 압축, mercury floor 고정) **압축 곡선 SSoT** 로 전환 — 작은 천체 큰 배율 / 큰 천체 작은 배율이되 최종 mesh 가 실제 반경 순서를 **단조 보존**(jupiter 1위 회복). 위성(8) 은 per-parent 수렴대(0.05~0.09) 비율 유지(모듈 로드 시 1회 정적 역산 박제), 혜성·극소형 5000 그룹 유지(cross-group 단조 보존). **측정(qa 실 Chrome GUI)**: 구 정책 earth 10.12px > jupiter 8.81px(역전) → 신 정책 jupiter 21.36px > earth 5.88px(목성 3.6배), 사용자 시나리오(목성 focus 후 회전) 7.4배. 단독 focus 가시성 무회귀(auto-frame ~345px, 점으로 사라지는 천체 0), ring occlusion 시각 가림 없음, fps 회귀 0, r1-guard baseline 무회귀. **`?bodyScaleP=`** URL 플래그(기본 p=0.5, 0.1~1.0 reject-to-default)로 압축 강도 실시간 튜닝. info-panel "실제의 N배" 정수 표시(곡선 도입으로 float → `Math.round`). 단조성 단위 테스트(행성 cross-body + 위성 수렴대 + 그룹 경계 achievable invariant + NaN guard). 데이터 SSoT 불변(`solar-system.json` 반경 0), `packages/core/scene` diameter 식 0(콜백 인터페이스 불변). Forensic ADR `20260629-762-body-scale-monotonic-forensic.md`(Accepted, cross-validate agy). 정책 ADR `20260506` SUPERSEDED-BY 역참조.
+
+### Notes
+
+- 후속 분리 **#764** — `body-scale.ts` radius 미러 drift 가드를 위성(13)·혜성(5)까지 전수 직접 단언으로 확장(현재 행성·왜소 13 직접 / 위성 band 간접 / 혜성 존재만). 현재 32 body 0 drift 정합이라 비차단, volt #69 숨은 상수 회귀 방어 강화.
+
 ## [0.37.0] — 2026-06-28
 
 ### Behavior Changes (#756 — 절차적 행성 표면 셰이더)
