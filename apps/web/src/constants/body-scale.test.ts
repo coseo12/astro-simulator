@@ -1,335 +1,283 @@
 import { describe, expect, it } from 'vitest';
-import { BODY_SCALE, getBodyScale } from './body-scale';
+import solarSystem from '@astro-simulator/shared/data/solar-system.json';
+import {
+  BODY_SCALE,
+  DEFAULT_BODY_SCALE_P,
+  DWARF_IDS,
+  PLANET_IDS,
+  getBodyScale,
+  getBodyScaleForP,
+} from './body-scale';
 
-describe('BODY_SCALE — R1 #329 + R2 #361 + R3 #369 + R4 #532 + R5 #594 시각 과장 룩업 (Q2=B SSoT)', () => {
-  it('sun = 50 (R1 Amendment 2026-05-01 — 75 → 50, 옵션 a, 라운드 1/2/3 보존)', () => {
-    expect(BODY_SCALE.sun).toBe(50);
+/**
+ * #762 — 천체 표시 크기 비율 단조성 회복 (sqrt 압축 곡선 + 그룹별 정책).
+ *
+ * ADR `20260629-762-body-scale-monotonic-forensic.md` §5 결정 2.
+ *
+ * 핵심 가드:
+ *   1. 행성 cross-body 단조 — effective(=radius×scale) 순서 = 실반경 순서
+ *   2. 위성 per-parent 수렴대(0.05~0.09) mesh 비 보존 (정적 역산)
+ *   3. 왜소행성 cross-group floor — 전부 mercury effective 아래
+ *   4. 그룹 경계 assert — max(satellite) < min(planet) 등 (achievable invariant)
+ *   5. NaN guard / 미정의 fallback
+ *   6. BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #69 숨은 상수)
+ */
+
+// 사실 radius (m) — solar-system.json SSoT 에서 동적 추출 (drift 가드).
+const RADIUS: Record<string, number> = {};
+for (const b of (solarSystem as { bodies: { id: string; radius?: number }[] }).bodies) {
+  if (typeof b.radius === 'number') RADIUS[b.id] = b.radius;
+}
+
+const eff = (id: string) => RADIUS[id]! * BODY_SCALE[id]!;
+
+describe('#762 — 행성 cross-body 단조성 (압축 곡선)', () => {
+  it('effective(=radius×scale) 순서 = 실반경 순서 (jupiter > saturn > uranus > neptune > earth > venus > mars > mercury)', () => {
+    const byRadiusDesc = [...PLANET_IDS].sort((a, b) => RADIUS[b]! - RADIUS[a]!);
+    expect(byRadiusDesc).toEqual([
+      'jupiter',
+      'saturn',
+      'uranus',
+      'neptune',
+      'earth',
+      'venus',
+      'mars',
+      'mercury',
+    ]);
+    // effective 가 실반경 내림차순으로 strict 단조 — 인접 쌍 7개 부등호.
+    for (let i = 0; i < byRadiusDesc.length - 1; i++) {
+      const hi = byRadiusDesc[i]!;
+      const lo = byRadiusDesc[i + 1]!;
+      expect(eff(hi), `${hi} effective 가 ${lo} 보다 커야 함 (실반경 순서 보존)`).toBeGreaterThan(
+        eff(lo),
+      );
+    }
   });
 
-  it('mercury = 700 (R2 Amendment 2026-05-03 라운드 3 — 900 → 700, D-1 사실 비율 강화)', () => {
-    expect(BODY_SCALE.mercury).toBe(700);
+  it('jupiter 가 최대 effective — earth > jupiter 역전 해소 (#762 핵심 회귀)', () => {
+    // forensic 측정 1: earth(10.12px) > jupiter(8.81px) 역전 → 곡선으로 jupiter 1위 회복.
+    expect(eff('jupiter')).toBeGreaterThan(eff('earth'));
+    expect(eff('jupiter')).toBe(Math.max(...PLANET_IDS.map(eff)));
   });
 
-  it('venus = 800 (R3 Amendment 2026-05-03 라운드 3 — 650 → 800, D-1 사실 비율 강화)', () => {
-    expect(BODY_SCALE.venus).toBe(800);
+  it('mercury floor — 곡선 정규화 앵커 (scale 700 고정, 현 px 7.0 유지)', () => {
+    expect(BODY_SCALE.mercury).toBeCloseTo(700, 5);
   });
 
-  it('earth = 800 (R4 #532 — venus 동일값, radius 1.054배 사실 비율 정합)', () => {
-    expect(BODY_SCALE.earth).toBe(800);
+  it('p=0.5 곡선 등가 scale (ADR §4 예측 2 baseline — ±1% 마진)', () => {
+    // forensic 산출값 (mercury floor 고정). drift 시 곡선식/상수 회귀 감지.
+    const expected: Record<string, number> = {
+      jupiter: 129.3,
+      saturn: 140.8,
+      uranus: 216.3,
+      neptune: 219.7,
+      earth: 432.9,
+      venus: 444.5,
+      mars: 593.3,
+      mercury: 700.0,
+    };
+    for (const [id, val] of Object.entries(expected)) {
+      expect(BODY_SCALE[id]!, `${id} scale`).toBeGreaterThan(val * 0.99);
+      expect(BODY_SCALE[id]!, `${id} scale`).toBeLessThan(val * 1.01);
+    }
   });
 
-  it('moon = 200 (R4 #539 Amendment 4 — 사실 비율 D-T2 인지 mismatch 후 축소, earth 6.8%)', () => {
-    expect(BODY_SCALE.moon).toBe(200);
-  });
-
-  it('mars = 800 (R5 #594 — earth 동일값, radius 53.3% 사실 비율 정확 정합, Q2=B 2번째 본 인스턴스화)', () => {
-    expect(BODY_SCALE.mars).toBe(800);
-  });
-
-  it('phobos = 5000 (R5 #594 — 사실 비율 0.326% 명시 위배, moon Amendment 4 학습 적용)', () => {
-    expect(BODY_SCALE.phobos).toBe(5000);
-  });
-
-  it('deimos = 5000 (R5 #594 — phobos 동일값, mental model "phobos ≈ deimos")', () => {
-    expect(BODY_SCALE.deimos).toBe(5000);
-  });
-
-  it('jupiter = 48 (R6 #621 — PM Q2=B 임계 완화 거성 예외, sun 대비 px 비 ~9.87%)', () => {
-    expect(BODY_SCALE.jupiter).toBe(48);
-  });
-
-  it('io = 100 (R6 #627 옵션 D — 사용자 D-T2 합의 300→200→100, galilean/jupiter 0.053 moon 정합)', () => {
-    expect(BODY_SCALE.io).toBe(100);
-  });
-
-  it('europa = 100 (R6 #627 옵션 D — io 동일값, 비율 0.046)', () => {
-    expect(BODY_SCALE.europa).toBe(100);
-  });
-
-  it('ganymede = 100 (R6 #627 옵션 D — 비율 0.077 (moon 0.068 의 1.13배), 태양계 최대 위성)', () => {
-    expect(BODY_SCALE.ganymede).toBe(100);
-  });
-
-  it('callisto = 100 (R6 #627 옵션 D — 비율 0.070)', () => {
-    expect(BODY_SCALE.callisto).toBe(100);
-  });
-
-  it('saturn = 48 (R7 #641 — jupiter 동일값 거성 예외 2번째, saturn/jupiter mesh 비 0.843 사실 보존)', () => {
-    expect(BODY_SCALE.saturn).toBe(48);
-  });
-
-  it('titan = 100 (R7 #641 — galilean 최종값 답습, titan/saturn 비 0.089 moon/earth 0.068 근접)', () => {
-    expect(BODY_SCALE.titan).toBe(100);
-  });
-
-  it('uranus = 250 (R8 #647 — ice giant 정책 신설 3번째 scale 그룹, PM 제약 uranus > earth 직관)', () => {
-    expect(BODY_SCALE.uranus).toBe(250);
-  });
-
-  it('titania = 500 (R8 #647 — titania/uranus 비 0.0617 moon/earth 0.068 수렴대 정중앙)', () => {
-    expect(BODY_SCALE.titania).toBe(500);
-  });
-
-  it('R8 ice giant 정책 — uranus mesh > earth mesh (PM 제약 "천왕성 > 지구" 정량 가드)', () => {
-    // ADR 20260610-r8 §축 1 — uranus(2.5559e7 × 250) / earth(6.378137e6 × 800) = 1.252 (1.25 ± 0.05)
-    const ratio = (2.5559e7 * BODY_SCALE.uranus!) / (6.378137e6 * BODY_SCALE.earth!);
-    expect(ratio).toBeGreaterThan(1.2);
-    expect(ratio).toBeLessThan(1.3);
-  });
-
-  it('neptune = 250 (R9 #653 — ice giant 정책 답습 2번째 인스턴스, uranus 동일값)', () => {
-    expect(BODY_SCALE.neptune).toBe(250);
-  });
-
-  it('triton = 300 (R9 #653 — triton/neptune 비 0.0656 moon/earth 0.068 최근접, titania=500 답습 기각)', () => {
-    expect(BODY_SCALE.triton).toBe(300);
-  });
-
-  it('R9 ice giant 답습 — neptune/uranus px 비 0.969 ± 0.02 (사실 radius 비 자동 보존 — DoD 1 정량 가드)', () => {
-    // ADR 20260610-r9 §축 1 — 동일 scale 그룹 내 동일값 답습 시 상대 비율 = 사실 radius 비.
-    // neptune(2.4764e7 × 250) / uranus(2.5559e7 × 250) = 0.9689 (R5 mars=earth / R7 saturn=jupiter 동형 3번째).
-    const ratio = (2.4764e7 * BODY_SCALE.neptune!) / (2.5559e7 * BODY_SCALE.uranus!);
-    expect(ratio).toBeGreaterThan(0.949);
-    expect(ratio).toBeLessThan(0.989);
-  });
-
-  it('R9 — neptune mesh > earth mesh (neptune/earth 1.21 > 1 직관 유지)', () => {
-    // ADR 20260610-r9 §축 1 — neptune(2.4764e7 × 250) / earth(6.378137e6 × 800) = 1.213.
-    const ratio = (2.4764e7 * BODY_SCALE.neptune!) / (6.378137e6 * BODY_SCALE.earth!);
-    expect(ratio).toBeGreaterThan(1.15);
-    expect(ratio).toBeLessThan(1.27);
-  });
-
-  it('R10a dwarf 그룹 — 5 body 전부 800 (4번째 scale 그룹, inner 계보 답습 — PM Q2=A)', () => {
-    expect(BODY_SCALE.ceres).toBe(800);
-    expect(BODY_SCALE.pluto).toBe(800);
-    expect(BODY_SCALE.haumea).toBe(800);
-    expect(BODY_SCALE.makemake).toBe(800);
-    expect(BODY_SCALE.eris).toBe(800);
-  });
-
-  it('R10b comet 그룹 — 3 body 전부 5000 (5번째 scale 그룹, phobos/deimos 극소형 계보 답습 — PM Q1=A)', () => {
-    expect(BODY_SCALE.halley).toBe(5000);
-    expect(BODY_SCALE.encke).toBe(5000);
-    expect(BODY_SCALE['swift-tuttle']).toBe(5000);
-  });
-
-  it('R11 토성계 위성 — rhea/iapetus/enceladus 전부 250 (satellite 그룹, titan=100 답습 시 0.026 과소 → 수렴대 진입)', () => {
-    expect(BODY_SCALE.rhea).toBe(250);
-    expect(BODY_SCALE.iapetus).toBe(250);
-    expect(BODY_SCALE.enceladus).toBe(250); // D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1)
-  });
-
-  it('R11 — rhea/iapetus mesh 비율 수렴대 [0.05~0.09] 정합 (vs saturn mesh)', () => {
-    // ADR 20260620-721 §축 1 — rhea(7.64e5 × 250) / saturn(6.0268e7 × 48) = 0.0660,
-    // iapetus(7.345e5 × 250) / saturn = 0.0635 (moon/earth 0.068 / titan/saturn 0.089 수렴대).
-    const saturnMesh = 6.0268e7 * BODY_SCALE.saturn!;
-    const rheaRatio = (7.64e5 * BODY_SCALE.rhea!) / saturnMesh;
-    const iapetusRatio = (7.345e5 * BODY_SCALE.iapetus!) / saturnMesh;
-    expect(rheaRatio).toBeGreaterThan(0.05);
-    expect(rheaRatio).toBeLessThan(0.09);
-    expect(iapetusRatio).toBeGreaterThan(0.05);
-    expect(iapetusRatio).toBeLessThan(0.09);
-  });
-
-  it('R11 — iapetus/rhea 사실 radius 비 0.961 자동 보존 (동일 scale 250 → mesh 비 = radius 비)', () => {
-    // ADR 20260620-721 §축 1 — rhea(764km) ≈ iapetus(734.5km) 0.961배가 동일 scale 250 으로
-    // mesh 비 0.0635/0.0660 = 0.962 정합 (R5 mars=earth / R7 saturn=jupiter 동형 단일값 패턴).
-    const ratio = (7.345e5 * BODY_SCALE.iapetus!) / (7.64e5 * BODY_SCALE.rhea!);
-    expect(ratio).toBeGreaterThan(0.951);
-    expect(ratio).toBeLessThan(0.971);
-    expect(ratio).toBeCloseTo(0.961, 2);
-  });
-
-  it('R11 — enceladus 는 rhea 의 0.33배 사실 radius 정직 반영 (동일 scale → mesh 비 0.33배)', () => {
-    // ADR 20260620-721 §축 1 — enceladus(252km) = rhea(764km) 의 0.33배. 동일 scale 250 으로
-    // mesh 비도 0.33배 (수렴대 미달이나 4px fallback billboard 흡수, phobos/deimos §결정 6 동형).
-    const ratio = (2.521e5 * BODY_SCALE.enceladus!) / (7.64e5 * BODY_SCALE.rhea!);
-    expect(ratio).toBeCloseTo(0.33, 1);
-  });
-
-  it('R12 거성 위성 — oberon=500 (titania 답습) / proteus=300 (triton 답습, sub-pixel billboard)', () => {
-    // ADR 20260621-725 §축 1 — oberon 은 titania scale 답습 (radius 0.966배 → 사실 비 자동 보존).
-    // proteus 는 triton scale 답습 (developer measurement-first D-T2 300 확정 — 300/500 둘 다 sub-4px).
-    expect(BODY_SCALE.oberon).toBe(500);
-    expect(BODY_SCALE.proteus).toBe(300); // D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1)
-  });
-
-  it('R12 — oberon/uranus mesh 비율 수렴대 [0.05~0.09] 정중앙 (titania 0.0617 정합)', () => {
-    // ADR 20260621-725 §축 1 — oberon(7.614e5 × 500) / uranus(2.5559e7 × 250) = 0.0596
-    // (titania 0.0617 의 0.966배 = 사실 radius 비 정확 보존, moon/earth 0.068 수렴대 정중앙).
-    const uranusMesh = 2.5559e7 * BODY_SCALE.uranus!;
-    const oberonRatio = (7.614e5 * BODY_SCALE.oberon!) / uranusMesh;
-    expect(oberonRatio).toBeGreaterThan(0.05);
-    expect(oberonRatio).toBeLessThan(0.09);
-    expect(oberonRatio).toBeCloseTo(0.0596, 3);
-  });
-
-  it('R12 — oberon/titania 사실 radius 비 0.966 자동 보존 (동일 scale 500 → mesh 비 = radius 비)', () => {
-    // ADR 20260621-725 §축 1 — oberon(761.4km) ≈ titania(788.4km) 0.966배가 동일 scale 500 으로
-    // mesh 비 0.0596/0.0617 = 0.966 정합 (R5 mars=earth / R7 saturn=jupiter / R11 iapetus=rhea 동형).
-    const ratio = (7.614e5 * BODY_SCALE.oberon!) / (7.884e5 * BODY_SCALE.titania!);
-    expect(ratio).toBeCloseTo(0.966, 2);
-  });
-
-  it('R12 — proteus 는 triton 의 0.155배 사실 radius 정직 반영 (동일 scale → mesh 비 0.155배 sub-pixel)', () => {
-    // ADR 20260621-725 §축 1 — proteus(210km) = triton(1353.4km) 의 0.155배. proteus scale 300 /
-    // triton scale 300 동일 그룹이 아니라 답습값 — mesh 비는 radius 비 (0.155배, enceladus 0.33배보다 작음).
-    // 어떤 scale 도 수렴대 미달 → 4px fallback billboard 흡수 (phobos/deimos/enceladus §결정 동형).
-    const ratio = (2.1e5 * BODY_SCALE.proteus!) / (1.3534e6 * BODY_SCALE.triton!);
-    expect(ratio).toBeCloseTo(0.155, 2);
-  });
-
-  it('frozen — 런타임 변경 차단 (시각 정합성 회귀 방지)', () => {
-    // Object.freeze 의도 검증 — strict mode 에서 throw, sloppy 에서 silent fail.
-    // 어느 모드든 변경이 반영되지 않아야 한다.
-    expect(() => {
-      // @ts-expect-error — 의도적 잘못된 할당으로 freeze 동작 확인
-      BODY_SCALE.sun = 100;
-    }).toThrow();
+  it('sun 은 곡선 미적용 — 항성 점유 정책 scale 50 별도 유지', () => {
     expect(BODY_SCALE.sun).toBe(50);
   });
 });
 
-/**
- * R10a #659 — dwarf 그룹 서열 정량 가드 (ADR 20260611-r10a §축 1).
- *
- * radius × scale 곱 (결정적 — runtime 측정 불요) 기준 3축:
- *   1. 그룹 내 사실 서열: pluto > eris > haumea > makemake > ceres (strict 부등호 4개)
- *   2. cross-group: pluto×800 < mercury×700 (pluto visual < mercury visual — PM Q2 명시 제약)
- *   3. 그룹 동일값: 5 body 전부 === 800 — 단일값 구조 자체를 가드 (개별 조정 후보 D 회귀 차단.
- *      단일값이 깨지면 그룹 내 서열이 radius 단독에서 radius×scale 산식으로 복잡화)
- */
-describe('R10a #659 — dwarf 그룹 서열 정량 가드 (ADR §축 1)', () => {
-  // 사실 radius (m) — solar-system.json 기박제 실측값 (변경 없음).
-  const RADIUS = {
-    mercury: 2.4397e6,
-    ceres: 4.696e5,
-    pluto: 1.1883e6,
-    haumea: 7.8e5,
-    makemake: 7.15e5,
-    eris: 1.163e6,
-  } as const;
-  const visual = (id: keyof typeof RADIUS) => RADIUS[id] * BODY_SCALE[id]!;
+describe('#762 — 위성 per-parent 수렴대 보존 (정적 역산)', () => {
+  // ADR §5 결정 2.2 — parent effective 가 곡선으로 바뀌어도 위성 mesh 비(0.05~0.09)는 보존.
+  const SAT_PARENT: Record<string, { parent: string; band: [number, number] }> = {
+    moon: { parent: 'earth', band: [0.05, 0.09] },
+    io: { parent: 'jupiter', band: [0.05, 0.09] },
+    europa: { parent: 'jupiter', band: [0.04, 0.09] }, // 0.046
+    ganymede: { parent: 'jupiter', band: [0.05, 0.09] },
+    callisto: { parent: 'jupiter', band: [0.05, 0.09] },
+    titan: { parent: 'saturn', band: [0.05, 0.095] }, // 0.089 상한 근접
+    rhea: { parent: 'saturn', band: [0.05, 0.09] },
+    iapetus: { parent: 'saturn', band: [0.05, 0.09] },
+    titania: { parent: 'uranus', band: [0.05, 0.09] },
+    oberon: { parent: 'uranus', band: [0.05, 0.09] },
+    triton: { parent: 'neptune', band: [0.05, 0.09] },
+  };
 
-  it('그룹 내 사실 서열 — pluto > eris > haumea > makemake > ceres (strict 부등호 4개)', () => {
-    expect(visual('pluto')).toBeGreaterThan(visual('eris'));
-    expect(visual('eris')).toBeGreaterThan(visual('haumea'));
-    expect(visual('haumea')).toBeGreaterThan(visual('makemake'));
-    expect(visual('makemake')).toBeGreaterThan(visual('ceres'));
+  it('주요 위성 mesh 비(satellite/parent) 수렴대 [0.05~0.09] 보존', () => {
+    for (const [sat, { parent, band }] of Object.entries(SAT_PARENT)) {
+      const ratio = eff(sat) / eff(parent);
+      expect(ratio, `${sat}/${parent} mesh 비 = ${ratio.toFixed(4)}`).toBeGreaterThanOrEqual(
+        band[0],
+      );
+      expect(ratio, `${sat}/${parent} mesh 비 = ${ratio.toFixed(4)}`).toBeLessThanOrEqual(band[1]);
+    }
   });
 
-  it('cross-group — pluto×800 < mercury×700 (pluto visual < mercury visual, 비 0.557)', () => {
-    expect(visual('pluto')).toBeLessThan(visual('mercury'));
-    // 비 0.557 ± 0.01 — 서열 방향뿐 아니라 크기 비도 가드 (scale 상향 Amendment 시 수학 상한 1437 인지).
-    const ratio = visual('pluto') / visual('mercury');
-    expect(ratio).toBeGreaterThan(0.547);
-    expect(ratio).toBeLessThan(0.567);
+  it('sub-band 위성 (enceladus/proteus) 은 사실 radius 비 정직 반영 (4px fallback billboard 흡수)', () => {
+    // enceladus(252km)/rhea(764km) = 0.33배 → mesh 비 0.0218 (수렴대 미달 정상).
+    expect(eff('enceladus') / eff('saturn')).toBeCloseTo(0.0218, 3);
+    // proteus(210km)/triton(1353km) — 0.0102 (수렴대 미달 정상, ADR §축 1 정직 반영).
+    expect(eff('proteus') / eff('neptune')).toBeCloseTo(0.0102, 3);
   });
 
-  it('그룹 동일값 — dwarf 5 body 전부 === 800 (단일값 구조 가드, 개별 조정 후보 D 회귀 차단)', () => {
-    const dwarfIds = ['ceres', 'pluto', 'haumea', 'makemake', 'eris'] as const;
-    for (const id of dwarfIds) {
-      expect(BODY_SCALE[id], `${id} 는 dwarf 그룹 단일값 800 이어야 함`).toBe(800);
+  it('iapetus/rhea 사실 radius 비 0.961 자동 보존 (동일 수렴대비 → mesh 비 = radius 비)', () => {
+    // 두 위성 모두 parent=saturn, 같은 정적 역산 분모이므로 mesh 비 = radius 비.
+    const ratio = eff('iapetus') / eff('rhea');
+    expect(ratio).toBeCloseTo(RADIUS.iapetus! / RADIUS.rhea!, 2);
+  });
+});
+
+describe('#762 — 왜소행성 cross-group floor (전부 mercury effective 아래)', () => {
+  it('모든 왜소행성 effective < mercury effective (cross-group 단조)', () => {
+    const mercuryEff = eff('mercury');
+    for (const id of DWARF_IDS) {
+      expect(eff(id), `${id} effective`).toBeLessThan(mercuryEff);
+    }
+  });
+
+  it('왜소행성 그룹 내 사실 서열 보존 — pluto > eris > haumea > makemake > ceres', () => {
+    const byRadiusDesc = [...DWARF_IDS].sort((a, b) => RADIUS[b]! - RADIUS[a]!);
+    expect(byRadiusDesc).toEqual(['pluto', 'eris', 'haumea', 'makemake', 'ceres']);
+    for (let i = 0; i < byRadiusDesc.length - 1; i++) {
+      expect(eff(byRadiusDesc[i]!)).toBeGreaterThan(eff(byRadiusDesc[i + 1]!));
     }
   });
 });
 
-/**
- * R10b #664 — comet 그룹 서열 정량 가드 (ADR 20260612-r10b §축 1).
- *
- * radius × scale 곱 (결정적 — runtime 측정 불요) 기준 4축:
- *   1. 그룹 내 사실 서열: swift-tuttle > halley > encke (strict 부등호 2개)
- *   2. 그룹 동일값: 3 body 전부 === 5000 — 단일값 구조 자체를 가드 (개별 조정 회귀 차단)
- *   3. cross-group: swift-tuttle×5000 < ceres×800 (max comet < min dwarf, 비 0.173)
- *   4. 5000 통합 그룹 사실 서열: swift-tuttle > phobos > deimos > halley > encke
- *      (comet + phobos/deimos 동일 scale 이므로 visual 서열 = 사실 radius 서열 — scale drift 감지.
- *       swift-tuttle visual > phobos visual 은 사실 정합, 버그 아님 — D-T2 사전 등록)
- */
-describe('R10b #664 — comet 그룹 서열 정량 가드 (ADR §축 1)', () => {
-  // 사실 radius (m) — solar-system.json 기박제 실측값 (변경 없음).
-  const RADIUS = {
-    ceres: 4.696e5,
-    phobos: 1.108e4,
-    deimos: 6.27e3,
-    halley: 5.5e3,
-    encke: 2.4e3,
-    'swift-tuttle': 1.3e4,
-  } as const;
-  const visual = (id: keyof typeof RADIUS) => RADIUS[id] * BODY_SCALE[id]!;
+describe('#762 — 그룹 간 경계 단조 assert (silent 회귀 차단)', () => {
+  // ⚠️ ADR §5 결정 2.4 원안 assert chain `max(comet) < min(satellite) < min(planet)` 중
+  // `max(comet) < min(satellite)` 는 **실 데이터로 충족 불가** (measurement-first 발견, ADR Amendment 1):
+  //   - proteus(210km, mesh 비 0.0102) / enceladus(252km, 0.0218) 같은 극소 위성의 effective 가
+  //     swift-tuttle(13km comet × 5000) 보다 작다. 이는 **현 production 정책에서도 동일** (OLD: swift-tuttle
+  //     eff 6.5e7 > proteus 6.3e7) → 본 PR 이 도입한 회귀 아님. proteus 가 swift-tuttle 보다 작아 보이는 것은
+  //     사실 정합 (극소 위성 = 13km 혜성보다 mesh 작게 — radius 0.155배 정직 반영).
+  // ∴ achievable invariant 로 정정: max(satellite) < min(planet) / max(dwarf) < min(planet) /
+  //   max(comet) < min(planet) + max(comet) < min(dwarf) (의미 있는 cross-group 상한선).
+  const PLANET = [...PLANET_IDS];
+  const DWARF = [...DWARF_IDS];
+  const SATELLITES = [
+    'moon',
+    'io',
+    'europa',
+    'ganymede',
+    'callisto',
+    'titan',
+    'enceladus',
+    'rhea',
+    'iapetus',
+    'titania',
+    'oberon',
+    'triton',
+    'proteus',
+  ];
+  const COMETS = ['phobos', 'deimos', 'halley', 'encke', 'swift-tuttle'];
+  const maxEff = (ids: string[]) => Math.max(...ids.map(eff));
+  const minEff = (ids: string[]) => Math.min(...ids.map(eff));
 
-  it('그룹 내 사실 서열 — swift-tuttle > halley > encke (strict 부등호 2개)', () => {
-    expect(visual('swift-tuttle')).toBeGreaterThan(visual('halley'));
-    expect(visual('halley')).toBeGreaterThan(visual('encke'));
+  it('max(satellite) < min(planet) — 위성이 가장 작은 행성(mercury) 보다 크게 표시되지 않음', () => {
+    expect(maxEff(SATELLITES)).toBeLessThan(minEff(PLANET));
   });
 
-  it('그룹 동일값 — comet 3 body 전부 === 5000 (단일값 구조 가드, 개별 조정 회귀 차단)', () => {
-    const cometIds = ['halley', 'encke', 'swift-tuttle'] as const;
-    for (const id of cometIds) {
-      expect(BODY_SCALE[id], `${id} 는 comet 그룹 단일값 5000 이어야 함`).toBe(5000);
+  it('max(dwarf) < min(planet) — 왜소행성이 행성 mercury floor 아래 (cross-group floor)', () => {
+    expect(maxEff(DWARF)).toBeLessThan(minEff(PLANET));
+  });
+
+  it('max(comet) < min(planet) AND max(comet) < min(dwarf) — comet 5000 단일값 cross-group 상한 보존', () => {
+    expect(maxEff(COMETS)).toBeLessThan(minEff(PLANET));
+    expect(maxEff(COMETS)).toBeLessThan(minEff(DWARF));
+  });
+
+  it('comet 그룹 내 사실 서열 — swift-tuttle > phobos > deimos > halley > encke (동일 scale → radius 서열)', () => {
+    expect(eff('swift-tuttle')).toBeGreaterThan(eff('phobos'));
+    expect(eff('phobos')).toBeGreaterThan(eff('deimos'));
+    expect(eff('deimos')).toBeGreaterThan(eff('halley'));
+    expect(eff('halley')).toBeGreaterThan(eff('encke'));
+  });
+
+  it('comet 5 body 전부 동일값 5000 (단일값 구조 가드 — 개별 조정 회귀 차단)', () => {
+    for (const id of COMETS) {
+      expect(BODY_SCALE[id], `${id} comet 단일값 5000`).toBe(5000);
     }
-  });
-
-  it('cross-group — swift-tuttle×5000 < ceres×800 (max comet < min dwarf, 비 0.173)', () => {
-    expect(visual('swift-tuttle')).toBeLessThan(visual('ceres'));
-    // 비 0.173 ± 0.01 — 서열 방향뿐 아니라 크기 비도 가드 (scale 상향 Amendment 시
-    // 수학 상한 28,898 인지 — ADR §재검토 #4).
-    const ratio = visual('swift-tuttle') / visual('ceres');
-    expect(ratio).toBeGreaterThan(0.163);
-    expect(ratio).toBeLessThan(0.183);
-  });
-
-  it('5000 통합 그룹 사실 서열 — swift-tuttle > phobos > deimos > halley > encke (scale drift 감지)', () => {
-    expect(visual('swift-tuttle')).toBeGreaterThan(visual('phobos'));
-    expect(visual('phobos')).toBeGreaterThan(visual('deimos'));
-    expect(visual('deimos')).toBeGreaterThan(visual('halley'));
-    expect(visual('halley')).toBeGreaterThan(visual('encke'));
   });
 });
 
-describe('getBodyScale — 룩업 헬퍼', () => {
-  it('정의된 body 는 룩업값 반환', () => {
-    expect(getBodyScale('sun')).toBe(50);
-    expect(getBodyScale('mercury')).toBe(700);
-    expect(getBodyScale('venus')).toBe(800);
-    expect(getBodyScale('earth')).toBe(800);
-    expect(getBodyScale('moon')).toBe(200);
-    expect(getBodyScale('mars')).toBe(800); // R5 #594
-    expect(getBodyScale('phobos')).toBe(5000); // R5 #594
-    expect(getBodyScale('deimos')).toBe(5000); // R5 #594
-    expect(getBodyScale('jupiter')).toBe(48); // R6 #621
-    expect(getBodyScale('io')).toBe(100); // R6 #627 옵션 D (300→200→100, D-T2 합의)
-    expect(getBodyScale('europa')).toBe(100); // R6 #627 옵션 D
-    expect(getBodyScale('ganymede')).toBe(100); // R6 #627 옵션 D
-    expect(getBodyScale('callisto')).toBe(100); // R6 #627 옵션 D
-    expect(getBodyScale('saturn')).toBe(48); // R7 #641 — jupiter 동일값 (거성 예외 2번째)
-    expect(getBodyScale('titan')).toBe(100); // R7 #641 — galilean 답습
-    expect(getBodyScale('enceladus')).toBe(250); // R11 #721 — 토성계 위성 satellite 그룹
-    expect(getBodyScale('rhea')).toBe(250); // R11 #721
-    expect(getBodyScale('iapetus')).toBe(250); // R11 #721
-    expect(getBodyScale('uranus')).toBe(250); // R8 #647 — ice giant 정책 신설
-    expect(getBodyScale('titania')).toBe(500); // R8 #647 — moon/earth 수렴대
-    expect(getBodyScale('neptune')).toBe(250); // R9 #653 — ice giant 답습 2번째
-    expect(getBodyScale('triton')).toBe(300); // R9 #653 — moon/earth 수렴대 (역행 위성 첫 사례 — scale 은 궤도 방향 무관)
-    expect(getBodyScale('ceres')).toBe(800); // R10a #659 — dwarf 그룹
-    expect(getBodyScale('pluto')).toBe(800); // R10a #659 — dwarf 그룹 (R9 negative → positive 전환)
-    expect(getBodyScale('haumea')).toBe(800); // R10a #659 — dwarf 그룹
-    expect(getBodyScale('makemake')).toBe(800); // R10a #659 — dwarf 그룹
-    expect(getBodyScale('eris')).toBe(800); // R10a #659 — dwarf 그룹
-    expect(getBodyScale('halley')).toBe(5000); // R10b #664 — comet 그룹 (negative → positive 전환)
-    expect(getBodyScale('encke')).toBe(5000); // R10b #664 — comet 그룹
-    expect(getBodyScale('swift-tuttle')).toBe(5000); // R10b #664 — comet 그룹
-  });
-
-  it('미정의 body 는 default 1.0 반환 (실측 그대로 — 가상 ID 가드)', () => {
-    // R10b #664 — halley positive 전환으로 negative 를 가상 ID 로 전환 (ADR §축 5 ①).
-    // semantics: "미진입" → "미정의 default fallback" — drift 가드 가치 유지, phase 진행 영구 비종속.
-    // ⚠️ 'nonexistent-body' 류 가상 ID 는 미래 phase 12+ 에서 실데이터 등록 금지 (ADR §재검토 #7).
+describe('#762 — NaN guard / 미정의 fallback', () => {
+  it('미정의 body 는 default 1.0 (실측 / 가상 ID 가드)', () => {
     expect(getBodyScale('nonexistent-body')).toBe(1.0);
     expect(getBodyScale('unknown')).toBe(1.0);
+    expect(getBodyScale('')).toBe(1.0);
   });
 
-  it('빈 문자열 / 특수 케이스도 default 폴백', () => {
-    expect(getBodyScale('')).toBe(1.0);
+  it('정의된 body 는 곡선/정적 역산 산출값 반환 (전부 ≠ 1.0 — tooltip "× N 과장 중" 정상)', () => {
+    for (const id of [...PLANET_IDS, ...DWARF_IDS, 'moon', 'io', 'titan', 'halley']) {
+      expect(getBodyScale(id), `${id}`).not.toBe(1.0);
+      expect(Number.isFinite(getBodyScale(id)), `${id} 유한값`).toBe(true);
+    }
+  });
+
+  it('모든 박제 body 의 scale 이 유한 양수 (NaN/복소수 crash 회피)', () => {
+    for (const [id, scale] of Object.entries(BODY_SCALE)) {
+      expect(Number.isFinite(scale), `${id} scale 유한`).toBe(true);
+      expect(scale, `${id} scale 양수`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('#762 — ?bodyScaleP= factory (D-T2 실시간 튜닝)', () => {
+  it('getBodyScaleForP(0.5) 는 default getBodyScale 과 동일', () => {
+    for (const id of [...PLANET_IDS, 'moon', 'io', 'pluto', 'halley', 'sun']) {
+      expect(getBodyScaleForP(DEFAULT_BODY_SCALE_P)(id)).toBeCloseTo(getBodyScale(id), 6);
+    }
+  });
+
+  it('p 가 작아질수록 압축 강화 — jupiter/mercury effective(mesh px) 비 감소', () => {
+    // 압축 측정 단위 = effective(=radius×scale) 비 (실제 mesh px 격차). mercury floor 고정에서
+    // jupiter/mercury effective 비 = (jupiter/mercury radius)^p. p→0 동일 크기(비→1), p→1 실측(비→radius 비).
+    const effRatioAt = (p: number) => {
+      const fn = getBodyScaleForP(p);
+      return (RADIUS.jupiter! * fn('jupiter')) / (RADIUS.mercury! * fn('mercury'));
+    };
+    // p 가 작을수록 거성/내행성 mesh 격차가 압축된다 (effective 비 감소).
+    expect(effRatioAt(0.3)).toBeLessThan(effRatioAt(0.5));
+    expect(effRatioAt(0.5)).toBeLessThan(effRatioAt(0.7));
+    // p=1 (실측) 에서는 effective 비 = 순수 radius 비 (압축 0).
+    expect(effRatioAt(1.0)).toBeCloseTo(RADIUS.jupiter! / RADIUS.mercury!, 1);
+  });
+
+  it('p 변경 후에도 행성 단조성 보존 (p=0.4 / p=0.6)', () => {
+    for (const p of [0.4, 0.6]) {
+      const fn = getBodyScaleForP(p);
+      const eff2 = (id: string) => RADIUS[id]! * fn(id);
+      const byRadiusDesc = [...PLANET_IDS].sort((a, b) => RADIUS[b]! - RADIUS[a]!);
+      for (let i = 0; i < byRadiusDesc.length - 1; i++) {
+        expect(eff2(byRadiusDesc[i]!), `p=${p} ${byRadiusDesc[i]}`).toBeGreaterThan(
+          eff2(byRadiusDesc[i + 1]!),
+        );
+      }
+    }
+  });
+
+  it('미정의 body 는 factory 에서도 1.0 fallback', () => {
+    expect(getBodyScaleForP(0.5)('nonexistent')).toBe(1.0);
+  });
+});
+
+describe('#762 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #69 숨은 상수)', () => {
+  // body-scale.ts 내부 radius 미러가 데이터 SSoT 와 일치하는지 검증 (모듈 미export 라
+  // effective 값으로 간접 검증 — scale = curveScale(radius) 이므로 radius drift 시 effective 가 변함).
+  // 직접 비교 대신: BODY_SCALE 에 정의된 모든 행성/왜소 의 effective 가 json radius 기반 재산출과 일치.
+  it('행성·왜소 effective 가 json radius 와 정합 (내부 미러 drift 차단)', () => {
+    const p = DEFAULT_BODY_SCALE_P;
+    const k = 700 * Math.pow(RADIUS.mercury!, 1 - p);
+    for (const id of [...PLANET_IDS, ...DWARF_IDS]) {
+      const expectedScale = Math.pow(RADIUS[id]!, p - 1) * k;
+      expect(BODY_SCALE[id]!, `${id} 곡선 산출 (radius drift 가드)`).toBeCloseTo(expectedScale, 2);
+    }
+  });
+
+  it('comet radius 가 json 에 존재 (미러 누락 시 단일값 박제 무의미)', () => {
+    for (const id of ['phobos', 'deimos', 'halley', 'encke', 'swift-tuttle']) {
+      expect(RADIUS[id], `${id} radius json 존재`).toBeGreaterThan(0);
+    }
   });
 });

@@ -1,168 +1,266 @@
 /**
- * R1 #329 — body 별 시각 과장 배수.
+ * #762 — 천체 표시 크기 비율 단조성 회복 (sqrt 압축 곡선 + 그룹별 정책).
  *
- * P12 §원칙 §1 "상대 비율 = 실측 고정" 폐기 결정
- * (`docs/deprecated/decisions/20260423-display-relative-scale-unification.md`) 의 첫 적용.
+ * ## 본 모듈의 책임
+ * `diameter = body.radius × 2 × renderScale × bodyScale(id)` 에서 `bodyScale(id)` 등가 배수 산출.
+ * 실측 데이터 (body.radius, solar-system.json) 자체는 불변 (principles.md §1 Visual Fidelity —
+ * 데이터 SSoT 보존 + rendering 시점 왜곡 허용).
  *
- * 적용 지점: `createBodyMesh*` 에서 `diameter = body.radius × 2 × renderScale × scale`.
- * 실측 데이터 (body.radius, solar-system.json) 자체는 변경 없음.
+ * ## #762 정책 전환 (옵션 A2 — ADR `20260629-762-body-scale-monotonic-forensic.md` §5 결정 2)
+ * R1~R12 각 R-Phase 가 "그 천체 단독 viewport 점유율"만 합의 → cross-body 비율 역전 누적
+ * (목성 effective 3.43M < 지구 5.10M → 지구가 목성보다 크게 표시). 본 모듈이 **5 그룹 비대칭 박제값**
+ * (inner 700~800 / gas giant 48 / ice giant 250 / dwarf 800 / comet 5000) 을 **그룹별 압축 곡선**으로
+ * 전환해 단조성 회복.
  *
- * 1.0 = 실측 그대로. > 1 = 시각 과장. < 1 은 R1 비-범위.
+ * ### 그룹별 정책
+ * 1. **행성(8) + 왜소행성(5)** — `effective_radius = radius^p × k` 곡선 산출 (p=0.5 sqrt 기본).
+ *    `k` 는 **mercury floor 고정** (mercury 현 px 7.0 = 등가 scale 700 유지). 작은 천체일수록 부스트되어
+ *    실반경 격차를 압축하되 최종 mesh 가 실반경 순서 단조 보존. 등가 scale = `radius^(p-1) × k`.
+ * 2. **위성(15)** — 기존 per-parent 수렴대(0.05~0.09) **mesh 비율 보존**. parent effective 가 곡선으로
+ *    바뀌므로 위성 등가 scale 도 바뀌나 **모듈 로드 시 1회 정적 역산** (`sat_scale = parent_eff_new ×
+ *    수렴대비_old / sat.radius`) 으로 박제. parent 곡선 로직과 강결합 회피 (cross-validate agy 2.0 수용).
+ * 3. **comet·극소형 위성(5: phobos/deimos/halley/encke/swift-tuttle)** — 현 5000 단일값 **유지**
+ *    (cross-group `max(comet) < min(planet)` + `max(comet) < min(dwarf)` 보존, ROI 판정 — ADR §5 결정 2.3).
+ *    그룹 내 사실 서열 자동 보존.
+ * 4. **sun** — 항성 점유 정책 = scale 50 별도 유지 (곡선 미적용, ADR §3 옵션 A 압축 함수 §k 결정 단서).
  *
- * Amendment 2026-05-01 (#373 D-T2 가드 발견 #1, 라운드 2 적극 재조정):
- *   - sunScale 75 → 50 (옵션 a 채택, R1 ADR Amendment 2026-05-01)
- *   - mercuryScale 8500 → 900 (옵션 c 적극 재조정 라운드 2, R2 ADR Amendment 2026-05-01 라운드 2)
- *   - venusScale 4000 → 650 (옵션 c 적극 재조정 라운드 2, R3 ADR Amendment 2026-05-01 라운드 2)
- *   - 근거 SSoT: docs/decisions/20260430-r3-followup-body-proportion.md Amendment 2026-05-01 (라운드 2)
+ * ## p 값 (압축 지수)
+ * - default p=0.5 (sqrt) — 코드 상수 SSoT (`DEFAULT_BODY_SCALE_P`). URL 부재 시 0.5.
+ * - `?bodyScaleP=0.55` URL flag 로 D-T2 사용자 검증 시 실시간 튜닝 (기존 `?surface=`/`?marker=` 동형).
+ *   `getBodyScaleForP(p)` factory 가 임의 p 의 룩업 함수 반환. 파서: `core/parse-body-scale-p.ts`.
+ * - p→1: 순수 비례(현 역전 없는 실측), p→0: 모든 천체 동일 크기. 권고 범위 0.4~0.6.
  *
- * Amendment 2026-05-03 (#385 라운드 3 — venus > mercury 사실 비율 강화 D-1):
- *   - sunScale 50 (변동 없음, 라운드 1/2/3 보존)
- *   - mercuryScale 900 → 700 (옵션 c D-1, 사실 비율 강화)
- *   - venusScale 650 → 800 (옵션 c D-1, 사실 비율 강화)
- *   - venus/mercury 시각비 1.79배 → 2.83배, 사실 비율 도달률 72% → 114%
- *   - 4축 평가 (사실 비율 도달률 / 4px fallback 안전 마진 / LOD 일관성 / 모바일 누적 disk area) D-1 채택
- *   - 근거 SSoT: docs/decisions/20260430-r3-followup-body-proportion.md Amendment 2026-05-03 (라운드 3)
+ * ## 등가 scale 표 (p=0.5, mercury floor — ADR §4 예측 2 baseline)
+ * | body    | 실반경(km) | 등가 scale | effective px 순위 |
+ * | ------- | ---------- | ---------- | ----------------- |
+ * | jupiter | 71,492     | ~129.3     | 1위 ✅            |
+ * | saturn  | 60,268     | ~140.8     | 2위 ✅            |
+ * | uranus  | 25,559     | ~216.3     | 3위 ✅            |
+ * | neptune | 24,764     | ~219.7     | 4위 ✅            |
+ * | earth   | 6,378      | ~432.9     | 5위 ✅            |
+ * | venus   | 6,052      | ~444.5     | 6위 ✅            |
+ * | mars    | 3,396      | ~593.3     | 7위 ✅            |
+ * | mercury | 2,440      | 700 (floor)| 8위 ✅            |
  *
- * R1 baseline (Amendment 2026-05-01 — sunScale 50, T1 solar / camera radius=35 / fov=0.8 rad):
- *   sun = 50 → pixel diameter ≈ 246px (1280×720), brightRatio ≈ 1.86%, diskAreaRatio ≈ 5.17%
- *             pixel diameter ≈ 246px (1920×1080) viewport 무관 (renderScale × camera 고정)
- *             pixel diameter ≈ 228px (375×667), brightRatio ≈ 5.88% (모바일 인지 가능)
+ * ## 비-범위 (ADR §5 결정 4 — 절대 손대지 말 것)
+ * - `solar-system.json` 실측 반경 (데이터 SSoT)
+ * - `tier.ts` RENDER_SCALE / diameter 식 (`bodyScale(id)` 콜백 인터페이스 유지 — 코어 0줄)
+ * - billboard variant (bodyScale 미적용) / focus auto-frame 로직 (378 가드)
  *
- * R2 baseline (Amendment 2026-05-03 라운드 3 — mercuryScale 700):
- *   mercury = 700 → sun 대비 px 비 ≈ 4.71% (DoD 임계 ≤ 4.95% 통과 목표, ±5% 마진 정책 보존)
- *                  저점 pxDiameter ≈ 5.29 px (4px fallback 마진 +1.29 px)
- *                  ADR: docs/decisions/20260428-r2-mercury-visualization.md Amendment 2026-05-03 (라운드 3)
+ * ## R1~R12 박제값 → 곡선 SSoT 흡수
+ * 행성·왜소 개별 박제값 (mercury 700 / earth 800 / jupiter 48 등) 은 본 곡선이 SSoT 로 흡수.
+ * 각 R-Phase visualization ADR 의 §결정 N scale 값은 본 ADR 곡선 산출로 cross-link (deprecate).
+ * 위성·comet 은 정책 보존 (위성=정적 역산으로 mesh 비 보존 / comet=5000 단일값).
  *
- * R3 baseline (Amendment 2026-05-03 라운드 3 — venusScale 800):
- *   venus = 800 → sun 대비 px 비 ≈ 13.58% (DoD 임계 ≤ 14.26% 통과 목표, ±5% 마진 정책 보존)
- *                고점 pxDiameter ≈ 48.4 px (mid 임계 50 미만 → mid 일관 유지)
- *                ADR: docs/decisions/20260429-r3-venus-visualization.md Amendment 2026-05-03 (라운드 3)
- *
- * R4 baseline (#532 — earthScale 800 / moonScale 800, Q2=B SSoT 첫 본 인스턴스화):
- *   earth = 800 → sun 대비 px 비 ≈ 14.67% (DoD 임계 ≤ 15% margin 0.33%, ±2% 마진 정책 보존)
- *                예상 pxDiameter ≈ 36.1 px (1280×720)
- *                ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 1
- *   moon  = 800 → sun 대비 px 비 ≈ 3.99% (DoD 임계 ≤ 4.5% margin 0.51%, ±2% 마진 정책 보존)
- *                예상 pxDiameter ≈ 9.84 px (1280×720), moon/earth 비 27.2% 사실 정합
- *                ADR: docs/decisions/20260520-r4-earth-moon-visualization.md §결정 2
- *
- * R5 baseline (#594 — marsScale 800 / phobosScale 5000 / deimosScale 5000, Q2=B 2번째 본 인스턴스화):
- *   mars   = 800 → sun 대비 px 비 ≈ 7.81% (DoD 임계 ≤ 8% margin 0.19%, ±2% 마진 정책 보존)
- *                예상 pxDiameter ≈ 11.10 px (1280×720), mars/earth 비 53.2% 사실 정합 (53.3% 정확 일치)
- *                ADR: docs/decisions/20260528-r5-mars-visualization.md §결정 1
- *   phobos = 5000 → 사실 비율 (radius 0.326%) 명시 위배. moon Amendment 4 학습 적용 —
- *                  사실 비율 깨고 사용자 천문 직관 우선. mesh pxDiameter ≈ 0.226 px (4px fallback
- *                  billboard 100% 의존, LOD Phase 2 #391). Q2=B 임계 미적용 (§결정 6).
- *                  ADR: docs/decisions/20260528-r5-mars-visualization.md §결정 2
- *   deimos = 5000 → 사실 비율 (radius 0.185%) 명시 위배. phobos 와 동일값 (단순 + mental model
- *                  "phobos ≈ deimos"). mesh pxDiameter ≈ 0.128 px (4px fallback 의존).
- *                  ADR: docs/decisions/20260528-r5-mars-visualization.md §결정 3
- *
- * R8 baseline (#647 — uranusScale 250 / titaniaScale 500, ice giant 정책 신설 — 3번째 scale 그룹):
- *   uranus  = 250 → 사실 비율 (sun 의 3.67%) 명시 위배 + earth 대비 직관 우선 (PM 제약
- *                  "천왕성 > 지구" — 실반경 4.007배). 거성 예외 48 답습 시 px 8.69 (earth 의
- *                  0.24배) 로 제약 위반. 예상 pxDiameter ≈ 45.24 px (1280×720, mid LOD 50px
- *                  미만 margin 4.76px) / sunPxRatio 식 18.37% / uranus/earth px 비 1.25.
- *                  ⚠️ uranus > jupiter(24.3px)/saturn(20.5px) 시각 역전은 PM 제약의 수학적
- *                  필연 (ADR §위험 #1 — 회귀 보고 시 PM 재합의 라운드 필수, 단독 조정 금지).
- *                  ADR: docs/decisions/20260610-r8-uranus-titania-rings-visualization.md §축 1
- *   titania = 500 → titania/uranus mesh 비 0.0617 (moon/earth 0.068 / titan/saturn 0.089
- *                  수렴대 0.05~0.09 정중앙). titan=100 답습 시 0.0123 과소 — uranus(250) 가
- *                  gas giant(48) 의 5.2배라 satellite scale 동반 상향. mesh 2.79 px →
- *                  4px fallback billboard 의존 (LOD Phase 2 #391 흡수). ADR §축 3
- *
- * R10a baseline (#659 — dwarf 그룹 5 body 전부 800, 4번째 scale 그룹 — PM Q2=A):
- *   dwarf = 800 → inner (venus/earth/mars 800) 계보 답습. 그룹 단일값으로 그룹 내 사실 서열
- *                (pluto > eris > haumea > makemake > ceres) 자동 보존 + cross-group 서열
- *                (pluto×800 = 9.5064e8 < mercury×700 = 1.70779e9, 비 0.557) 보존.
- *                식 px: pluto 6.73 / eris 6.59 / haumea 4.42 / makemake 4.05 / ceres 2.66 —
- *                solar view 실효는 depth 투영 축소 (39~68 AU) 로 5 body 전부 billboard 4px
- *                fallback 의존 예상 (LOD Phase 2 #391 흡수). focus view 는 mesh 직접 관찰.
- *                scale 4그룹 체계 완성: inner 700~800 / gas giant 48 / ice giant 250 / dwarf 800.
- *                ADR: docs/decisions/20260611-r10a-dwarf-planets-visualization.md §축 1
- *
- * R10b baseline (#664 — comet 그룹 3 body 전부 5000, 5번째 scale 그룹 — PM Q1=A):
- *   comet = 5000 → phobos/deimos 극소형 (km 급) 계보 답습 — "극소형 천체 = 5000" 단일 mental
- *                 model. 그룹 단일값으로 그룹 내 사실 서열 (swift-tuttle 1.3e4 > halley 5.5e3 >
- *                 encke 2.4e3) 자동 보존 + cross-group (swift-tuttle×5000 = 6.50e7 <
- *                 ceres×800 = 3.7568e8, 비 0.173 — max comet < min dwarf) 보존.
- *                 식 px: swift-tuttle 0.460 / halley 0.195 / encke 0.085 — 3 body 전부 sub-px,
- *                 solar view 는 billboard 4px fallback 전면 의존 (PM 명시 — LOD Phase 2 #391
- *                 흡수). focus view 는 mesh 직접 관찰 (R5 위성 선례 검증 경로).
- *                 5000 통합 그룹 사실 서열: swift-tuttle > phobos > deimos > halley > encke
- *                 (동일 scale 이므로 visual 서열 = 사실 radius 서열 — swift-tuttle visual >
- *                 phobos visual 은 사실 정합, 버그 아님. ADR §축 1 D-T2 사전 등록).
- *                 scale 5그룹 체계: inner 700~800 / gas giant 48 / ice giant 250 / dwarf 800 /
- *                 comet·극소형 위성 5000.
- *                 ADR: docs/decisions/20260612-r10b-comets-visualization.md §축 1
- *
- * R6~R10 추가 시 본 룩업에 1줄 추가만으로 처리 (Concrete Prediction —
- * `docs/decisions/20260425-r1-sun-visualization.md` §결과·재검토 조건 +
- * `docs/decisions/20260428-r2-mercury-visualization.md` §결과·재검토 조건 +
- * `docs/decisions/20260429-r3-venus-visualization.md` §결과·재검토 조건 +
- * `docs/decisions/20260520-r4-earth-moon-visualization.md` §Concrete Prediction +
- * `docs/decisions/20260528-r5-mars-visualization.md` §Concrete Prediction).
+ * 사용처:
+ *   - `apps/web/src/components/sim-canvas.tsx` `createSolarSystemScene` 옵션 `bodyScale` 콜백
+ *   - `apps/web/src/components/panels/celestial-info-panel.tsx` "× N 과장 중" tooltip
  */
-export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze({
-  sun: 50, // Amendment 2026-05-01 — 75 → 50 (R3 D-T2 가드 발견 #1, 옵션 a). 라운드 1/2/3 보존
-  mercury: 700, // Amendment 2026-05-03 라운드 3 — 900 → 700 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~4.71%)
-  venus: 800, // Amendment 2026-05-03 라운드 3 — 650 → 800 (옵션 c D-1, 사실 비율 강화, sun 대비 px 비 ~13.58%)
-  earth: 800, // R4 #532 — venus 동일값 (radius 1.054배 사실 비율 정합, sun 대비 px 비 ~14.67%)
-  moon: 200, // R4 #539 Amendment 4 (2026-05-23) — 사실 비율 (×800) D-T2 시각 인지 mismatch ("비정상적으로 큼"). earth 의 6.8% (mesh radius 3.475e8 m) 로 축소 — 사실 비율 깨지지만 사용자 천문 직관 정합. moon sun 대비 px 비 ~1.12% (Amendment 1 임계 5% 안)
-  mars: 800, // R5 #594 — earth 와 동일값 (radius 53.3% 사실 비율 정합 시각 53.2% 정확 일치, sun 대비 px 비 ~7.81%, Q2=B 임계 ≤ 8% margin 0.19%)
-  phobos: 5000, // R5 #594 — 사실 비율 (radius 0.326%) 명시 위배. moon Amendment 4 학습 — 사용자 천문 직관 우선. 4px fallback billboard 의존 (mesh 0.226 px sub-pixel, LOD Phase 2 #391)
-  deimos: 5000, // R5 #594 — 사실 비율 (radius 0.185%) 명시 위배. phobos 동일값 (mental model "phobos ≈ deimos"). 4px fallback 의존 (mesh 0.128 px)
-  jupiter: 48, // R6 #621 — PM Q2=B 임계 완화 (거성 예외). sun 대비 px 비 ~9.87% (≤ 10% margin 0.13%), mesh visible 24.3px. 사실 비율 jupiter/sun=10.276% 정합 우선
-  io: 100, // R6 #627 옵션 D (사용자 D-T2 합의 2026-06-06: 300→200→100). galilean/jupiter 비율 0.053 (moon/earth 0.068 정합). 4px fallback billboard 의존 (mesh sub-pixel, LOD Phase 2 #391 흡수)
-  europa: 100, // R6 #627 옵션 D — 비율 0.046 (io 동일값, mental model "galilean 균일")
-  ganymede: 100, // R6 #627 옵션 D — 비율 0.077 (태양계 최대 위성, moon 0.068 의 1.13배). 사실 크기 순서 보존
-  callisto: 100, // R6 #627 옵션 D — 비율 0.070. galilean 4개 moon 비율 근접 — 사용자 "목성 대비 적당" 합의
-  saturn: 48, // R7 #641 — jupiter 동일값 (거성 예외 2번째 인스턴스, "가스 거성 = scale 48" 단일 mental model). saturn/jupiter mesh 비 0.843 = 사실 radius 비 정확 보존 (R5 mars=earth=800 선례 동형). sun 대비 px 비 ~8.32% (식, Q2=B 거성 임계 ≤ 8.5% margin 0.18%), mesh visible 20.5px. ADR 20260610-r7 §축 1
-  titan: 100, // R7 #641 — galilean 최종값 (R6 Amendment 2) 답습 (300→200→100 iteration 건너뛰고 수렴값 시작). titan/saturn 비 0.089 (moon/earth 0.068 근접, ganymede-class 0.978배). 4px fallback billboard 의존 (mesh 1.82px). ADR 20260610-r7 §축 3
-  uranus: 250, // R8 #647 — ice giant 정책 신설 (3번째 scale 그룹). 사실 비율 (sun 3.67%) 명시 위배 + earth 대비 직관 우선 (PM 제약 "천왕성 > 지구", 실반경 4.007배). px 45.24 / uranus/earth 비 1.25 / mid LOD 50px 미만 (margin 4.76px). jupiter/saturn 시각 역전은 의식적 수용 (ADR 20260610-r8 §축 1 + §위험 #1)
-  titania: 500, // R8 #647 — titania/uranus mesh 비 0.0617 (moon/earth 0.068 수렴대). titan=100 답습 시 0.0123 과소 (uranus 250 이 gas giant 48 의 5.2배). 4px fallback billboard 의존 (mesh 2.79px). ADR 20260610-r8 §축 3
-  neptune: 250, // R9 #653 — ice giant 정책 답습 (2번째 인스턴스, uranus 동일값). neptune/uranus px 비 0.969 = 사실 radius 비 자동 보존 (R5 mars=earth / R7 saturn=jupiter 동형 3번째). px 43.84 / neptune/earth 비 1.21 / mid LOD 50px 미만 (margin 6.16px). "ice giant = 250" 단일 mental model 완성. ADR 20260610-r9 §축 1
-  triton: 300, // R9 #653 — triton/neptune mesh 비 0.0656 (moon/earth 0.068 최근접 — 수렴대 0.05~0.09 중앙). titania=500 답습 시 비 0.109 상한 초과 기각 (triton radius 가 titania 의 1.72배 — 비율 산출 방법론이 SSoT, scale 값 답습 아님). 4px fallback billboard 의존 (mesh 2.87px). ADR 20260610-r9 §축 3
-  // R10a #659 — dwarf 그룹 (4번째 scale 그룹, 전부 800 = inner 계보 답습 — PM Q2=A).
-  // 그룹 단일값으로 그룹 내 사실 서열 자동 보존 + cross-group (pluto < mercury) 보존.
-  // ADR 20260611-r10a §축 1. 개별 조정 (후보 D) 금지 — 단일값 구조가 서열 가드의 전제.
-  ceres: 800, // R10a #659 — 식 px 2.66 sub-4px (PM 명시 허용 — billboard 전면 의존, phobos/deimos §결정 6 동형). 소행성대 유일 < 5 AU
-  pluto: 800, // R10a #659 — 그룹 최대 radius (1.1883e6). 식 px 6.73 / pluto×800 < mercury×700 (비 0.557 — cross-group 사실 서열 보존)
-  haumea: 800, // R10a #659 — 식 px 4.42 (4px 경계 — billboard 의존 분류로 진동 무위험). volumetric mean 구체 근사 ($radiusComment)
-  makemake: 800, // R10a #659 — 식 px 4.05 (4px 경계 — billboard 의존 분류)
-  eris: 800, // R10a #659 — pluto/eris 사실 radius 비 1.0218 보존 (식 px 차 0.14 — 시각 동일 크기는 사실 정합, ADR §위험 #1). a 67.86 AU 그룹 최대
-  // R10b #664 — comet 그룹 (5번째 scale 그룹, 전부 5000 = phobos/deimos 극소형 계보 답습 — PM Q1=A).
-  // 그룹 단일값으로 그룹 내 사실 서열 자동 보존 + cross-group (max comet < min dwarf, 비 0.173) 보존.
-  // ADR 20260612-r10b §축 1. 개별 조정 금지 — 단일값 구조가 서열 가드의 전제 (R10a dwarf 동형).
-  halley: 5000, // R10b #664 — 식 px 0.195 sub-px (billboard 전면 의존). e=0.96714 그룹 최대 이심률 + 역행 (i 162.26°). volumetric mean 구체 근사 ($radiusComment)
-  encke: 5000, // R10b #664 — 식 px 0.085 그룹 최소 (radius 2.4 km). 근일점 0.337 AU = 4.23 unit > sun mesh 1.46 unit (×2.9 여유 — ADR §축 3)
-  'swift-tuttle': 5000, // R10b #664 — 그룹 최대 radius (1.3e4). swift-tuttle×5000 < ceres×800 (비 0.173 — cross-group 사실 서열 보존) + 역행 (i 113.45°)
-  // R11 #721 — 토성계 위성 3개 (rhea/iapetus 250 + enceladus 250). satellite mesh 비율 수렴대 [0.05~0.09] 정합.
-  // titan=100 직접 답습 시 0.026 과소 → ~250 으로 수렴대 진입. 4개 모두 sub-pixel billboard fallback (LOD Phase 2 #391).
-  // ADR 20260620-721 §축 1. enceladus 는 measurement-first D-T2 로 250 확정 (250/500 둘 다 sub-4px, agy 합의).
-  rhea: 250, // R11 #721 — rhea/saturn mesh 비 0.0660 (moon/earth 0.068 / titan/saturn 0.089 수렴대 중앙). 실측 px 1.35 sub-4 fallback (developer 실측 2026-06-20). ADR §축 1
-  iapetus: 250, // R11 #721 — rhea 동일값 (radius 734.5km ≈ rhea 764km 0.961배 → mesh 비 0.0635/0.0660=0.962 사실 비율 자동 보존, R5 mars=earth / R7 saturn=jupiter 동형). px 1.30 sub-4 fallback. ADR §축 1
-  enceladus: 250, // R11 #721 — rhea/iapetus 동일값 (단일값 mental model). radius 252km = rhea 의 0.33배라 mesh 비 0.0218 (수렴대 미달) 이나 4px fallback billboard 흡수 (phobos/deimos §결정 6 동형, 사실 radius 0.33배 정직 반영). px 0.45. D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1). ADR §축 1
-  // R12 #725 — 거성 위성 확장 2개 (oberon 천왕성 / proteus 해왕성). satellite mesh 비율 수렴대 [0.05~0.09].
-  // oberon=titania 답습 (radius 0.966배 → 동일 scale 로 사실 비 자동 보존) / proteus=triton 답습 (sub-pixel billboard).
-  // ADR 20260621-725 §축 1. proteus 는 measurement-first D-T2 로 300 확정 (300/500 둘 다 sub-4px, enceladus 동형).
-  oberon: 500, // R12 #725 — titania 답습 (radius 761.4km ≈ titania 788.4km 0.966배 → mesh 비 0.0596/0.0617=0.966 사실 radius 비 자동 보존, R5 mars=earth / R7 saturn=jupiter / R11 iapetus=rhea 동형). 실측 px 2.70 sub-4 fallback (developer 실측 2026-06-21). ADR §축 1
-  proteus: 300, // R12 #725 — triton 답습 (radius 210km = triton 의 0.155배라 mesh 비 0.0102 수렴대 미달, enceladus 0.0218 보다 작음). 4px fallback billboard 흡수 (phobos/deimos/enceladus §결정 동형, 사실 radius 0.155배 정직 반영). 실측 px 0.45 (developer 실측 2026-06-21). D-T2 식별 불가 시 차등 500 (ADR §재검토 트리거 #1). ADR §축 1
+
+/**
+ * 천체 실측 반경 (m) — `packages/shared/data/solar-system.json` 의 rendering 전용 미러.
+ *
+ * ⚠️ SSoT 는 `solar-system.json`. 본 테이블은 곡선 산출을 위한 모듈 로드 시 정적 미러일 뿐
+ * (런타임 json import 회피 — cross-validate agy 3.0 순환 의존 우려 해소). 데이터 변경 시 drift 차단은
+ * `body-scale.test.ts` 의 `BODY_RADIUS_M` ↔ json 정합 가드가 담당 (volt #69 숨은 상수 drift 패턴).
+ */
+const BODY_RADIUS_M: Readonly<Record<string, number>> = Object.freeze({
+  sun: 6.957e8,
+  mercury: 2.4397e6,
+  venus: 6.0518e6,
+  earth: 6.378137e6,
+  moon: 1.7374e6,
+  mars: 3.3962e6,
+  phobos: 1.108e4,
+  deimos: 6.27e3,
+  jupiter: 7.1492e7,
+  io: 1.8216e6,
+  europa: 1.5608e6,
+  ganymede: 2.6341e6,
+  callisto: 2.4103e6,
+  saturn: 6.0268e7,
+  titan: 2.575e6,
+  enceladus: 2.521e5,
+  rhea: 7.64e5,
+  iapetus: 7.345e5,
+  uranus: 2.5559e7,
+  titania: 7.884e5,
+  oberon: 7.614e5,
+  neptune: 2.4764e7,
+  triton: 1.3534e6,
+  proteus: 2.1e5,
+  ceres: 4.696e5,
+  pluto: 1.1883e6,
+  haumea: 7.8e5,
+  makemake: 7.15e5,
+  eris: 1.163e6,
+  halley: 5.5e3,
+  encke: 2.4e3,
+  'swift-tuttle': 1.3e4,
 });
 
-/** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로. */
+/** 압축 곡선 적용 그룹 — 행성(8). 단조성 회복의 핵심 대상. */
+export const PLANET_IDS = Object.freeze([
+  'mercury',
+  'venus',
+  'earth',
+  'mars',
+  'jupiter',
+  'saturn',
+  'uranus',
+  'neptune',
+] as const);
+
+/** 압축 곡선 적용 그룹 — 왜소행성(5). 전부 mercury effective 아래 (cross-group floor). */
+export const DWARF_IDS = Object.freeze(['ceres', 'pluto', 'haumea', 'makemake', 'eris'] as const);
+
+/**
+ * 위성(15) → 모행성 매핑 + 보존할 mesh 수렴대 비율 (현 정책 mesh 비 = sat_radius×sat_scale_old /
+ * parent_radius×parent_scale_old).
+ *
+ * 정적 역산: `sat_scale_new = parent_eff_new × convergenceRatio / sat_radius`.
+ * convergenceRatio 는 ADR 박제 mesh 비 (volt #69 — drift 가드 위해 명시 박제, 런타임 재계산 아님).
+ */
+const SATELLITE_CONVERGENCE: Readonly<Record<string, { parent: string; ratio: number }>> =
+  Object.freeze({
+    // moon/earth 0.068 (R4 #539 Amendment 4)
+    moon: { parent: 'earth', ratio: 0.0681 },
+    // galilean/jupiter (R6 #627 옵션 D, io 0.053 / europa 0.046 / ganymede 0.077 / callisto 0.070)
+    io: { parent: 'jupiter', ratio: 0.0531 },
+    europa: { parent: 'jupiter', ratio: 0.0455 },
+    ganymede: { parent: 'jupiter', ratio: 0.0768 },
+    callisto: { parent: 'jupiter', ratio: 0.0702 },
+    // saturn 위성 (R7 titan 0.089 / R11 enceladus 0.0218·rhea 0.066·iapetus 0.0635)
+    titan: { parent: 'saturn', ratio: 0.089 },
+    enceladus: { parent: 'saturn', ratio: 0.0218 },
+    rhea: { parent: 'saturn', ratio: 0.066 },
+    iapetus: { parent: 'saturn', ratio: 0.0635 },
+    // uranus 위성 (R8 titania 0.0617 / R12 oberon 0.0596)
+    titania: { parent: 'uranus', ratio: 0.0617 },
+    oberon: { parent: 'uranus', ratio: 0.0596 },
+    // neptune 위성 (R9 triton 0.0656 / R12 proteus 0.0102)
+    triton: { parent: 'neptune', ratio: 0.0656 },
+    proteus: { parent: 'neptune', ratio: 0.0102 },
+  });
+
+/**
+ * comet·극소형 위성 단일값 (5000) — ADR §5 결정 2.3.
+ * 현 5000 이 cross-group (`max(comet) < min(planet)` + `max(comet) < min(dwarf)`) 단조 보존 중 →
+ * 곡선 미적용 유지 (그룹 내 사실 서열은 동일 scale 이므로 radius 서열로 자동 보존).
+ */
+const COMET_SCALE = 5000;
+const COMET_IDS = Object.freeze(['phobos', 'deimos', 'halley', 'encke', 'swift-tuttle'] as const);
+
+/** sun 항성 점유 정책 — 곡선 미적용 별도 유지 (R1 Amendment 2026-05-01). */
+const SUN_SCALE = 50;
+
+/** mercury floor 등가 scale — 곡선 정규화 앵커 (mercury 현 px 7.0 = scale 700 유지). */
+const MERCURY_FLOOR_SCALE = 700;
+
+/** default 압축 지수 p (sqrt). URL `?bodyScaleP=` 부재 시 이 값. 권고 범위 0.4~0.6. */
+export const DEFAULT_BODY_SCALE_P = 0.5;
+
+/** 미정의 body id 의 기본 배수. 1.0 = 실측 그대로 (radius ≤ 0 NaN guard fallback 겸용). */
 const DEFAULT_BODY_SCALE = 1.0;
 
 /**
- * body id 의 시각 과장 배수 조회. 미정의 시 1.0 (실측).
+ * 곡선 정규화 상수 k 산출 — mercury effective(`radius × 700`) 를 floor 로 고정.
  *
- * R2~R10 에서 다른 body 추가 시 본 룩업에 1줄 추가만으로 처리. 호출 코드 변경 0
- * (Concrete Prediction — ADR `20260425-r1-sun-visualization.md` §결과·재검토 조건).
+ * `mercury.radius^p × k = mercury.radius × 700` → `k = 700 × mercury.radius^(1-p)`.
+ * p=0.5 일 때 `k = 700 × sqrt(mercury.radius)`, 등가 scale = `radius^(p-1) × k = 700 × (mercury/radius)^(1-p)`.
+ */
+function curveConstantK(p: number): number {
+  const mercuryRadius = BODY_RADIUS_M.mercury!;
+  return MERCURY_FLOOR_SCALE * Math.pow(mercuryRadius, 1 - p);
+}
+
+/**
+ * 행성·왜소행성 압축 곡선 등가 scale: `radius^(p-1) × k`.
+ * radius ≤ 0 시 NaN/복소수 → 렌더 crash 위험 → DEFAULT_BODY_SCALE fallback (cross-validate agy 5.0).
+ */
+function curveScale(radius: number, p: number): number {
+  if (!(radius > 0)) {
+    // NaN guard — radius ≤ 0 또는 NaN/undefined 시 실측 fallback (crash 회피).
+
+    console.warn(
+      `[body-scale] curveScale 비정상 radius=${radius} — DEFAULT(${DEFAULT_BODY_SCALE}) 폴백`,
+    );
+    return DEFAULT_BODY_SCALE;
+  }
+  return Math.pow(radius, p - 1) * curveConstantK(p);
+}
+
+/**
+ * 주어진 압축 지수 p 로 전체 body 등가 scale 룩업 산출 (모듈 로드 시 1회 / `?bodyScaleP=` 시 1회).
+ *
+ * - sun: SUN_SCALE 별도 유지
+ * - 행성·왜소: 곡선
+ * - 위성: 정적 역산 (parent 곡선 eff × 수렴대비 / sat.radius)
+ * - comet·극소형: COMET_SCALE 단일값
+ */
+function computeBodyScales(p: number): Record<string, number> {
+  const scales: Record<string, number> = {};
+
+  scales.sun = SUN_SCALE;
+
+  for (const id of PLANET_IDS) {
+    scales[id] = curveScale(BODY_RADIUS_M[id]!, p);
+  }
+  for (const id of DWARF_IDS) {
+    scales[id] = curveScale(BODY_RADIUS_M[id]!, p);
+  }
+
+  // 위성 정적 역산 — parent 곡선 eff 를 1회 곱해 박제 (런타임 동적 곱 회피).
+  for (const [satId, { parent, ratio }] of Object.entries(SATELLITE_CONVERGENCE)) {
+    const satRadius = BODY_RADIUS_M[satId]!;
+    const parentRadius = BODY_RADIUS_M[parent]!;
+    const parentEff = parentRadius * curveScale(parentRadius, p);
+    if (!(satRadius > 0)) {
+      scales[satId] = DEFAULT_BODY_SCALE; // NaN guard
+      continue;
+    }
+    scales[satId] = (parentEff * ratio) / satRadius;
+  }
+
+  for (const id of COMET_IDS) {
+    scales[id] = COMET_SCALE;
+  }
+
+  return scales;
+}
+
+/**
+ * body 별 시각 과장 배수 룩업 (default p=0.5 산출값, frozen).
+ *
+ * #762 이전: 5 그룹 비대칭 박제값. 이후: 그룹별 압축 곡선 산출값 (단조성 회복).
+ * 모든 값이 ≠ 1.0 (DEFAULT) 이므로 celestial-info-panel "× N 과장 중" tooltip 정상 동작.
+ */
+export const BODY_SCALE: Readonly<Record<string, number>> = Object.freeze(
+  computeBodyScales(DEFAULT_BODY_SCALE_P),
+);
+
+/**
+ * body id 의 시각 과장 배수 조회 (default p). 미정의 시 1.0 (실측 / 가상 ID 가드).
  *
  * **사용처**:
- *   - `apps/web/src/components/sim-canvas.tsx` 의 `createSolarSystemScene` 옵션 `bodyScale` 콜백
- *   - `apps/web/src/components/panels/celestial-info-panel.tsx` 의 "× N 과장 중" tooltip
+ *   - `apps/web/src/components/sim-canvas.tsx` `createSolarSystemScene` 옵션 `bodyScale` 콜백 (default)
+ *   - `apps/web/src/components/panels/celestial-info-panel.tsx` "× N 과장 중" tooltip
+ *
+ * `bodyScale(id)` 콜백 인터페이스 불변 → 코어 0줄 (ADR §4 Concrete Prediction).
  */
 export function getBodyScale(bodyId: string): number {
   return BODY_SCALE[bodyId] ?? DEFAULT_BODY_SCALE;
+}
+
+/**
+ * `?bodyScaleP=` URL flag 용 — 임의 압축 지수 p 의 룩업 함수 반환 (factory).
+ *
+ * D-T2 사용자 검증 시 매 빌드 없이 p 값(0.4~0.6) 실시간 튜닝. 산출은 호출당 1회 (`?bodyScaleP=`
+ * 는 초기 hydration 1회만 호출). 반환 함수는 `getBodyScale` 과 동형 시그니처라 scene 콜백 그대로 주입.
+ *
+ * @param p 압축 지수. parse-body-scale-p.ts 가 0.1~1.0 범위로 clamp 보장.
+ */
+export function getBodyScaleForP(p: number): (bodyId: string) => number {
+  const scales = Object.freeze(computeBodyScales(p));
+  return (bodyId: string) => scales[bodyId] ?? DEFAULT_BODY_SCALE;
 }

@@ -145,7 +145,7 @@ export function CelestialInfoPanel() {
           className="mt-2 px-2 py-1.5 bg-bg-elevated/60 backdrop-blur rounded-sm border border-border-subtle text-caption text-fg-secondary"
         >
           <span className="text-fg-secondary">표시 크기 · </span>
-          <span className="num text-fg-primary">실제의 {visualScale}배</span>
+          <span className="num text-fg-primary">실제의 {Math.round(visualScale)}배</span>
           <span className="text-fg-secondary"> (가시성 보정)</span>
         </div>
       )}

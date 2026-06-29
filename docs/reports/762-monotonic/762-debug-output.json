@@ -1,0 +1,682 @@
+{
+  "defaultSolar": {
+    "viewport": {
+      "w": 1280,
+      "h": 720
+    },
+    "tier": "solar",
+    "camRadius": 35,
+    "bodies": [
+      {
+        "id": "sun",
+        "present": true,
+        "radiusWorld": 5.060948536667805,
+        "pxDiameter": 245.147,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 35
+      },
+      {
+        "id": "mercury",
+        "present": true,
+        "radiusWorld": 0.24847024008727644,
+        "pxDiameter": 10.522,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 36.832
+      },
+      {
+        "id": "venus",
+        "present": true,
+        "radiusWorld": 0.7043920851908863,
+        "pxDiameter": 31.646,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 37.026
+      },
+      {
+        "id": "earth",
+        "present": true,
+        "radiusWorld": 0.7423756933578677,
+        "pxDiameter": 43.27,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 33.449
+      },
+      {
+        "id": "mars",
+        "present": true,
+        "radiusWorld": 0.3952966720191162,
+        "pxDiameter": 18.825,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 38.612
+      },
+      {
+        "id": "jupiter",
+        "present": true,
+        "radiusWorld": 0.4992735941815675,
+        "pxDiameter": 57.372,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 65.035
+      },
+      {
+        "id": "saturn",
+        "present": true,
+        "radiusWorld": 0.4208893439005023,
+        "pxDiameter": 896.243,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 111.426
+      },
+      {
+        "id": "uranus",
+        "present": true,
+        "radiusWorld": 0.9296592184037116,
+        "pxDiameter": 9.511,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 259.673
+      },
+      {
+        "id": "neptune",
+        "present": true,
+        "radiusWorld": 0.9007426301713491,
+        "pxDiameter": 4.366,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 389.043
+      },
+      {
+        "id": "moon",
+        "present": true,
+        "radiusWorld": 0.05055565322757881,
+        "pxDiameter": 2.864,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 33.482
+      },
+      {
+        "id": "io",
+        "present": true,
+        "radiusWorld": 0.026502871508966717,
+        "pxDiameter": 3.068,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 65.413
+      },
+      {
+        "id": "ganymede",
+        "present": true,
+        "radiusWorld": 0.038324118270624305,
+        "pxDiameter": 4.366,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 63.899
+      },
+      {
+        "id": "titan",
+        "present": true,
+        "radiusWorld": 0.03746425896771481,
+        "pxDiameter": 104.119,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 112.062
+      },
+      {
+        "id": "pluto",
+        "present": true,
+        "radiusWorld": 0.1383107694954113,
+        "pxDiameter": 0.563,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 397.544
+      }
+    ]
+  },
+  "focusJupiter": {
+    "viewport": {
+      "w": 1280,
+      "h": 720
+    },
+    "tier": "inner",
+    "camRadius": 45.76674772045837,
+    "bodies": [
+      {
+        "id": "sun",
+        "present": true,
+        "radiusWorld": 92.78405972324084,
+        "pxDiameter": 389.499,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1154.714
+      },
+      {
+        "id": "mercury",
+        "present": true,
+        "radiusWorld": 4.5552878929065255,
+        "pxDiameter": 14.372,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1229.067
+      },
+      {
+        "id": "venus",
+        "present": true,
+        "radiusWorld": 12.913855343006675,
+        "pxDiameter": 51.467,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1303.409
+      },
+      {
+        "id": "earth",
+        "present": true,
+        "radiusWorld": 13.610221516883996,
+        "pxDiameter": 95.972,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1087.123
+      },
+      {
+        "id": "mars",
+        "present": true,
+        "radiusWorld": 7.247105905006653,
+        "pxDiameter": 20.549,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 912.143
+      },
+      {
+        "id": "jupiter",
+        "present": true,
+        "radiusWorld": 9.153349544091673,
+        "pxDiameter": 345.261,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 45.767
+      },
+      {
+        "id": "saturn",
+        "present": true,
+        "radiusWorld": 7.716304905770114,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 985.569
+      },
+      {
+        "id": "uranus",
+        "present": true,
+        "radiusWorld": 17.04375292846279,
+        "pxDiameter": 8.416,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 4550.961
+      },
+      {
+        "id": "neptune",
+        "present": true,
+        "radiusWorld": 16.513615459151477,
+        "pxDiameter": 3.387,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 7100.603
+      },
+      {
+        "id": "moon",
+        "present": true,
+        "radiusWorld": 0.9268536746480301,
+        "pxDiameter": 6.038,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1095.565
+      },
+      {
+        "id": "io",
+        "present": true,
+        "radiusWorld": 0.48588599451446174,
+        "pxDiameter": 19.578,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 44.322
+      },
+      {
+        "id": "ganymede",
+        "present": true,
+        "radiusWorld": 0.7026088593272638,
+        "pxDiameter": 25.033,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 52.734
+      },
+      {
+        "id": "titan",
+        "present": true,
+        "radiusWorld": 0.6868447715605726,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1001.728
+      },
+      {
+        "id": "pluto",
+        "present": true,
+        "radiusWorld": 2.535697528684826,
+        "pxDiameter": 0.52,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 7949.591
+      }
+    ]
+  },
+  "focusJupiterTowardSun": {
+    "viewport": {
+      "w": 1280,
+      "h": 720
+    },
+    "tier": "inner",
+    "camRadius": 120,
+    "bodies": [
+      {
+        "id": "sun",
+        "present": true,
+        "radiusWorld": 92.78405972324084,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1063.372
+      },
+      {
+        "id": "mercury",
+        "present": true,
+        "radiusWorld": 4.5552878929065255,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1133.666
+      },
+      {
+        "id": "venus",
+        "present": true,
+        "radiusWorld": 12.913855343006675,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1212.22
+      },
+      {
+        "id": "earth",
+        "present": true,
+        "radiusWorld": 13.610221516883996,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 991.436
+      },
+      {
+        "id": "mars",
+        "present": true,
+        "radiusWorld": 7.247105905006653,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 833.808
+      },
+      {
+        "id": "jupiter",
+        "present": true,
+        "radiusWorld": 9.153349544091673,
+        "pxDiameter": 129.987,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 120
+      },
+      {
+        "id": "saturn",
+        "present": true,
+        "radiusWorld": 7.716304905770114,
+        "pxDiameter": 28.912,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1055.739
+      },
+      {
+        "id": "uranus",
+        "present": true,
+        "radiusWorld": 17.04375292846279,
+        "pxDiameter": 7.873,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 4621.831
+      },
+      {
+        "id": "neptune",
+        "present": true,
+        "radiusWorld": 16.513615459151477,
+        "pxDiameter": 5.506,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 7157.485
+      },
+      {
+        "id": "moon",
+        "present": true,
+        "radiusWorld": 0.9268536746480301,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 991.023
+      },
+      {
+        "id": "io",
+        "present": true,
+        "radiusWorld": 0.48588599451446174,
+        "pxDiameter": 6.855,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 118.513
+      },
+      {
+        "id": "ganymede",
+        "present": true,
+        "radiusWorld": 0.7026088593272638,
+        "pxDiameter": 8.261,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 142.038
+      },
+      {
+        "id": "titan",
+        "present": true,
+        "radiusWorld": 0.6868447715605726,
+        "pxDiameter": 2.658,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1057.986
+      },
+      {
+        "id": "pluto",
+        "present": true,
+        "radiusWorld": 2.535697528684826,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 7899.623
+      }
+    ]
+  },
+  "focusEarth": {
+    "viewport": {
+      "w": 1280,
+      "h": 720
+    },
+    "tier": "inner",
+    "camRadius": 68.05110758441998,
+    "bodies": [
+      {
+        "id": "sun",
+        "present": true,
+        "radiusWorld": 92.78405972324084,
+        "pxDiameter": 710.517,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 255.292
+      },
+      {
+        "id": "mercury",
+        "present": true,
+        "radiusWorld": 4.5552878929065255,
+        "pxDiameter": 17.284,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 354.676
+      },
+      {
+        "id": "venus",
+        "present": true,
+        "radiusWorld": 12.913855343006675,
+        "pxDiameter": 73.87,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 296.587
+      },
+      {
+        "id": "earth",
+        "present": true,
+        "radiusWorld": 13.610221516883996,
+        "pxDiameter": 345.261,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 68.051
+      },
+      {
+        "id": "mars",
+        "present": true,
+        "radiusWorld": 7.247105905006653,
+        "pxDiameter": 69.689,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 445.249
+      },
+      {
+        "id": "jupiter",
+        "present": true,
+        "radiusWorld": 9.153349544091673,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1070.769
+      },
+      {
+        "id": "saturn",
+        "present": true,
+        "radiusWorld": 7.716304905770114,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1989.593
+      },
+      {
+        "id": "uranus",
+        "present": true,
+        "radiusWorld": 17.04375292846279,
+        "pxDiameter": 15.239,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 4797.871
+      },
+      {
+        "id": "neptune",
+        "present": true,
+        "radiusWorld": 16.513615459151477,
+        "pxDiameter": 5.154,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 7170.503
+      },
+      {
+        "id": "moon",
+        "present": true,
+        "radiusWorld": 0.9268536746480301,
+        "pxDiameter": 18.624,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 76.78
+      },
+      {
+        "id": "io",
+        "present": true,
+        "radiusWorld": 0.48588599451446174,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1078.448
+      },
+      {
+        "id": "ganymede",
+        "present": true,
+        "radiusWorld": 0.7026088593272638,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 1046.495
+      },
+      {
+        "id": "titan",
+        "present": true,
+        "radiusWorld": 0.6868447715605726,
+        "pxDiameter": null,
+        "behindCamera": true,
+        "onScreen": false,
+        "camDistanceSceneUnit": 2003.802
+      },
+      {
+        "id": "pluto",
+        "present": true,
+        "radiusWorld": 2.535697528684826,
+        "pxDiameter": 0.544,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 7182.514
+      }
+    ]
+  },
+  "wideSolarView": {
+    "viewport": {
+      "w": 1280,
+      "h": 720
+    },
+    "tier": "solar",
+    "camRadius": 120,
+    "bodies": [
+      {
+        "id": "sun",
+        "present": true,
+        "radiusWorld": 5.060948536667805,
+        "pxDiameter": 63.539,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 120
+      },
+      {
+        "id": "mercury",
+        "present": true,
+        "radiusWorld": 0.24847024008727644,
+        "pxDiameter": 2.921,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 122.568
+      },
+      {
+        "id": "venus",
+        "present": true,
+        "radiusWorld": 0.7043920851908863,
+        "pxDiameter": 8.51,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 121.83
+      },
+      {
+        "id": "earth",
+        "present": true,
+        "radiusWorld": 0.7423756933578677,
+        "pxDiameter": 10.124,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 114.624
+      },
+      {
+        "id": "mars",
+        "present": true,
+        "radiusWorld": 0.3952966720191162,
+        "pxDiameter": 4.929,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 120.345
+      },
+      {
+        "id": "jupiter",
+        "present": true,
+        "radiusWorld": 0.4992735941815675,
+        "pxDiameter": 8.812,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 116.292
+      },
+      {
+        "id": "saturn",
+        "present": true,
+        "radiusWorld": 0.4208893439005023,
+        "pxDiameter": 13.119,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 129.642
+      },
+      {
+        "id": "uranus",
+        "present": true,
+        "radiusWorld": 0.9296592184037116,
+        "pxDiameter": 4.329,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 311.673
+      },
+      {
+        "id": "neptune",
+        "present": true,
+        "radiusWorld": 0.9007426301713491,
+        "pxDiameter": 2.402,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 442.302
+      },
+      {
+        "id": "moon",
+        "present": true,
+        "radiusWorld": 0.05055565322757881,
+        "pxDiameter": 0.682,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 114.952
+      },
+      {
+        "id": "io",
+        "present": true,
+        "radiusWorld": 0.026502871508966717,
+        "pxDiameter": 0.465,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 116.548
+      },
+      {
+        "id": "ganymede",
+        "present": true,
+        "radiusWorld": 0.038324118270624305,
+        "pxDiameter": 0.671,
+        "behindCamera": false,
+        "onScreen": true,
+        "camDistanceSceneUnit": 116.968
+      },
+      {
+        "id": "titan",
+        "present": true,
+        "radiusWorld": 0.03746425896771481,
+        "pxDiameter": 1.178,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 129.068
+      },
+      {
+        "id": "pluto",
+        "present": true,
+        "radiusWorld": 0.1383107694954113,
+        "pxDiameter": 0.33,
+        "behindCamera": false,
+        "onScreen": false,
+        "camDistanceSceneUnit": 464.955
+      }
+    ]
+  }
+}
