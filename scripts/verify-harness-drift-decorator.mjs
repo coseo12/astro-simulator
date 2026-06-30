@@ -120,6 +120,79 @@ const TODO_AGING_MARKER = '[TODO Aging Trigger]';
 // architect 원안 `.harness/manifest.json` `apply.*` 키 매트릭스 매칭 가정 오류 정정 (#577 developer 단계 실측).
 const HARNESS_MANAGED_COMMIT_PREFIX = 'chore(harness):';
 
+// =============================================================================
+// Amendment 13 (#766) — 영구 divergent allowlist (alert fatigue 카운트 모수 정제)
+// =============================================================================
+//
+// ADR 20260515 §Amendment 13 §변경 사항 2 SSoT.
+// N=10 임계는 불변 (변경 금지) — 변경되는 것은 "무엇을 활성 Z 패턴 적용 drift 로 셀 것인가"
+// 카운트 모수. 구조적으로 upstream 기여 불가능한 자산 (천체 시뮬 README 스크린샷 / 도메인 전용
+// 로드맵) 은 §Amendment 9 §결정점 5 가 정의한 측정 본질 (Z 패턴 활성 적용 누적) 의 모수가
+// 아니다. orphan sidecar 제외 (§결정점 5) 와 동일 계열 — 측정 정밀화 (silent 약화 아님).
+
+// Amendment 13 §변경 사항 2 (d) — allowlist 진입 조건 식별자 Enum SSoT.
+// structuralProof 원소는 반드시 이 Enum 에 정확 매칭 (includes() 부분 문자열 아님 —
+// cross-validate 2026-06-30 agy 고유 발견 2 수용, 매칭 인터페이스 규격 명시).
+//   - content-asset      : harness 데모/플레이스홀더 자산을 도메인 콘텐츠로 영구 교체
+//   - domain-doc         : 프로젝트 도메인 전용 문서 (로드맵/기획/회고), 범용성 0
+//   - perpetual-rewrite  : 정기 운영으로 sha 영구 재변경 (upstream 1회 기여로 해소 불가능)
+const STRUCTURAL_PROOF_ENUM = Object.freeze(['content-asset', 'domain-doc', 'perpetual-rewrite']);
+
+// Amendment 13 §변경 사항 2 (b) 4번 — Forbidden Path deny-list 패턴 SSoT (cross-validate 보강).
+// allowlist 에 범용 harness 가드/페르소나가 위장 등록되는 우회로 차단 (hard-fail).
+// 이들은 옵션 1 (Phase 2 upstream 기여) 의 정당한 대상이지 구조적 divergent 아님.
+// positive 진입 조건을 통과해도 deny-list 매칭 시 self-test 무조건 FAIL.
+const FORBIDDEN_ALLOWLIST_PATH_PATTERNS = Object.freeze([
+  // 범용 harness 가드 — 서브디렉토리 + .mjs/.cjs/.js/.sh 전부 (본 파일 자신 포함, Z-패턴 재귀 안전성).
+  // cross-validate 2026-06-30 권고 1 수용: .sh 가드 (verify-agent-ssot.sh 등) + 서브디렉토리 우회 차단.
+  /^scripts\/(.*\/)?verify-.*\.(mjs|cjs|js|sh)$/,
+  /(^|\/)CLAUDE\.md$/, // 범용 워크플로 SSoT (루트 + 중첩 예: apps/web/CLAUDE.md)
+  /^\.claude\/agents\/.*\.md$/, // 범용 페르소나
+  /^\.claude\/skills\/.*$/, // 범용 스킬
+  /^\.github\/workflows\/.*\.ya?ml$/, // 범용 CI 가드
+]);
+
+// Amendment 13 §변경 사항 2 — 영구 divergent allowlist SSoT (인라인, 별도 JSON 분리 거부).
+// 측정 SSoT 와 모수 정의가 같은 파일에 있어야 추적성 보장 (§결정점 5 단일 스크립트 통합 패턴).
+// 각 항목: { path, reason (1줄 한국어 사유), structuralProof (STRUCTURAL_PROOF_ENUM 배열) }.
+// 진입 전 판정 질문 (의무): "카운트에서 빼는 이유가 (A) 구조적으로 upstream 기여 불가능 입증
+// 가능해서인가, (B) 단지 발화가 잦아 부담스러워서인가?" → A 만 정당 (B 는 옵션 3 silent 약화).
+// 무한 팽창 차단: 진입 조건 (구조적 입증) + Forbidden Path deny-list + stale WARN.
+// 재귀 안전성 (§변경 사항 4): verify-harness-drift-decorator.mjs 자신을 넣지 않는다
+// (Forbidden Path 가 scripts/(서브디렉토리/)verify-*.{mjs,cjs,js,sh} 로 자동 차단 — 이중 안전, 자기참조 결함 방지).
+const PERMANENT_DIVERGENT_ALLOWLIST = Object.freeze([
+  {
+    path: 'docs/screenshots/01-solar-system.png',
+    reason:
+      '천체 시뮬 데모 스크린샷 — harness 데모 자산을 도메인 콘텐츠로 영구 교체, README 직접 참조 + 릴리스마다 갱신',
+    structuralProof: ['content-asset', 'perpetual-rewrite'],
+  },
+  {
+    path: 'docs/screenshots/02-earth-focus.png',
+    reason:
+      '천체 시뮬 데모 스크린샷 — harness 데모 자산을 도메인 콘텐츠로 영구 교체, README 직접 참조 + 릴리스마다 갱신',
+    structuralProof: ['content-asset', 'perpetual-rewrite'],
+  },
+  {
+    path: 'docs/screenshots/03-neptune.png',
+    reason:
+      '천체 시뮬 데모 스크린샷 — harness 데모 자산을 도메인 콘텐츠로 영구 교체, README 직접 참조 + 릴리스마다 갱신',
+    structuralProof: ['content-asset', 'perpetual-rewrite'],
+  },
+  {
+    path: 'docs/screenshots/04-mobile.png',
+    reason:
+      '천체 시뮬 데모 스크린샷 — harness 데모 자산을 도메인 콘텐츠로 영구 교체, README 직접 참조 + 릴리스마다 갱신',
+    structuralProof: ['content-asset', 'perpetual-rewrite'],
+  },
+  {
+    path: 'docs/phases/roadmap-v3-incremental.md',
+    reason:
+      '천체 시뮬 전용 로드맵 — harness 빈 템플릿을 프로젝트 고유 기획으로 영구 교체, 범용성 0',
+    structuralProof: ['domain-doc'],
+  },
+]);
+
 // Amendment 8 SSoT regex — 위치 A (파일 첫 줄 + shebang/DOCTYPE/YAML frontmatter 1블록 허용).
 // 형식별 분기: `<!--` (md) / `//` (ts/js/mjs) / `#` (yml/sh)
 //
@@ -280,24 +353,117 @@ function runVerify(rootDir = '.') {
 }
 
 /**
+ * Amendment 13 (#766) — 경로가 Forbidden Path deny-list 에 매칭되는지 검사.
+ * 범용 harness 가드/페르소나는 allowlist 진입 불가 (옵션 1 Phase 2 대상).
+ *
+ * @param {string} relPath — repo-relative path (POSIX 구분자)
+ * @returns {boolean}
+ */
+function isForbiddenAllowlistPath(relPath) {
+  return FORBIDDEN_ALLOWLIST_PATH_PATTERNS.some((re) => re.test(relPath));
+}
+
+/**
+ * Amendment 13 (#766) — allowlist self-test 회귀 가드 4중 검증.
+ *
+ * ADR §변경 사항 2 (b) SSoT:
+ *   (1) schema     — path / reason / structuralProof non-empty (structuralProof 비어있지 않은 배열)
+ *   (2) positive   — structuralProof 각 원소가 STRUCTURAL_PROOF_ENUM 정확 매칭 (1건 이상)
+ *   (3) stale      — path 가 manifest 등록 + 현재 drift 상태 (미충족 시 WARN, FAIL 아님)
+ *   (4) Forbidden  — path 가 deny-list 매칭 시 무조건 FAIL (positive 통과해도)
+ *
+ * @param {Array<{path: string, reason: string, structuralProof: string[]}>} allowlist
+ * @param {Set<string>} driftRelSet — 현재 drift 상태 파일의 repo-relative path Set (stale 검증용)
+ * @param {Set<string>} manifestRelSet — manifest 등록 파일 repo-relative path Set (stale 검증용)
+ * @returns {{errors: string[], warnings: string[]}}
+ */
+function validateAllowlist(allowlist, driftRelSet, manifestRelSet) {
+  const errors = [];
+  const warnings = [];
+
+  for (const item of allowlist) {
+    const label = item && item.path ? item.path : JSON.stringify(item);
+
+    // (1) schema 검증 — path / reason non-empty string, structuralProof 비어있지 않은 배열
+    if (!item || typeof item.path !== 'string' || item.path.length === 0) {
+      errors.push(`schema: path 누락/빈값 — ${label}`);
+      continue;
+    }
+    if (typeof item.reason !== 'string' || item.reason.trim().length === 0) {
+      errors.push(`schema: reason 누락/빈값 — ${item.path}`);
+    }
+    if (!Array.isArray(item.structuralProof) || item.structuralProof.length === 0) {
+      errors.push(`schema: structuralProof 누락/빈 배열 — ${item.path}`);
+      // structuralProof 없으면 positive 검증 불가 → 다음 항목
+      continue;
+    }
+
+    // (2) 진입 조건 positive — 각 원소 Enum 정확 매칭 (includes() 부분 문자열 아님)
+    const matched = item.structuralProof.filter((p) => STRUCTURAL_PROOF_ENUM.includes(p));
+    if (matched.length === 0) {
+      errors.push(
+        `positive: structuralProof Enum 미매칭 — ${item.path} (got ${JSON.stringify(
+          item.structuralProof,
+        )}, expected ⊆ ${JSON.stringify(STRUCTURAL_PROOF_ENUM)})`,
+      );
+    }
+    // 임의 사유 박제 차단 — Enum 외 원소가 섞이면 FAIL (정확 매칭 강제)
+    const invalid = item.structuralProof.filter((p) => !STRUCTURAL_PROOF_ENUM.includes(p));
+    if (invalid.length > 0) {
+      errors.push(
+        `positive: structuralProof Enum 외 원소 — ${item.path} (invalid ${JSON.stringify(invalid)})`,
+      );
+    }
+
+    // (4) Forbidden Path negative deny-list (hard-FAIL — positive 통과해도 무조건)
+    if (isForbiddenAllowlistPath(item.path)) {
+      errors.push(
+        `forbidden: 범용 harness 가드/페르소나 위장 등록 차단 — ${item.path} (옵션 1 Phase 2 대상, allowlist 진입 불가)`,
+      );
+    }
+
+    // (3) stale 검증 — manifest 등록 + 현재 drift 상태 (미충족 시 WARN)
+    if (driftRelSet && manifestRelSet) {
+      if (!manifestRelSet.has(item.path)) {
+        warnings.push(`stale: manifest 미등록 — ${item.path} (정리 후보, 후속 #768 에이징)`);
+      } else if (!driftRelSet.has(item.path)) {
+        warnings.push(`stale: drift 해소됨 — ${item.path} (정리 후보, 후속 #768 에이징)`);
+      }
+    }
+  }
+
+  return { errors, warnings };
+}
+
+/**
  * Amendment 9 (#557) — 활성 drift 파일 수 카운트 + N=10 임계 비교 (soft-warn).
  *
  * ADR §Amendment 9 §결정점 5: orphan sidecar 제외, 활성 drift 파일 수만 카운트.
  * 근거: orphan 은 Amendment 8 fail-fast 가드가 이미 처리. 본 가드는 "Z 패턴 활성 적용 누적"
  * 측정이 본질 — drift 파일 수가 정합.
  *
+ * Amendment 13 (#766) — PERMANENT_DIVERGENT_ALLOWLIST 제외 추가.
+ * 구조적으로 upstream 기여 불가능한 자산 (스크린샷 / 도메인 로드맵) 을 카운트 모수에서 제외.
+ * N 임계 불변, 모수 정제 (측정 정밀화). orphan 제외 (§결정점 5) 와 동일 지점.
+ *
  * @param {string} rootDir
- * @returns {{count: number, threshold: number, exceeded: boolean, files: string[]}}
+ * @returns {{count: number, threshold: number, exceeded: boolean, files: string[],
+ *            excluded: string[], rawCount: number}}
  */
 function runCountWarn(rootDir = '.') {
   const drifts = detectDriftFiles(rootDir);
-  const count = drifts.length;
+  const allowSet = new Set(PERMANENT_DIVERGENT_ALLOWLIST.map((a) => a.path));
+  const kept = drifts.filter((d) => !allowSet.has(d.file));
+  const excluded = drifts.filter((d) => allowSet.has(d.file)).map((d) => d.file);
+  const count = kept.length;
   const exceeded = count >= ALERT_FATIGUE_THRESHOLD_N;
   return {
     count,
     threshold: ALERT_FATIGUE_THRESHOLD_N,
     exceeded,
-    files: drifts.map((d) => d.file),
+    files: kept.map((d) => d.file),
+    excluded,
+    rawCount: drifts.length,
   };
 }
 
@@ -370,7 +536,9 @@ function getBlameForLine(filePath, lineNum, rootDir = '.') {
  * @returns {boolean}
  */
 function isHarnessManagedCommit(commitSummary) {
-  return typeof commitSummary === 'string' && commitSummary.startsWith(HARNESS_MANAGED_COMMIT_PREFIX);
+  return (
+    typeof commitSummary === 'string' && commitSummary.startsWith(HARNESS_MANAGED_COMMIT_PREFIX)
+  );
 }
 
 /**
@@ -425,7 +593,12 @@ function runTodoAging(rootDir = '.', nowMs = Date.now(), blameFn = getBlameForLi
 
     if (isHarnessManagedCommit(blame.summary)) {
       // harness-managed 영역 — 본 가드 검사 대상 외, 단 가시화 차원에서 별도 분류 추적
-      skippedHarnessManaged.push({ file: targetRel, line: firstTodoLine, agingDays, summary: blame.summary });
+      skippedHarnessManaged.push({
+        file: targetRel,
+        line: firstTodoLine,
+        agingDays,
+        summary: blame.summary,
+      });
       continue;
     }
     if (agingDays >= TODO_AGING_THRESHOLD_DAYS) {
@@ -828,6 +1001,227 @@ function runSelfTest() {
     } finally {
       rmSync(taTmp, { recursive: true, force: true });
     }
+
+    // --- Amendment 13 (#766) — allowlist 회귀 가드 4중 + 3중 시뮬레이션 ---
+    // ADR §변경 사항 2 (b) 회귀 가드 4중 + §회귀 가드 (2) 3중 시뮬레이션.
+    //
+    // 검증 축:
+    //   (1) schema      — path/reason/structuralProof non-empty (structuralProof 비어있지 않은 배열)
+    //   (2) positive    — structuralProof 각 원소 Enum 정확 매칭 (includes() 부분 문자열 아님)
+    //   (3) stale       — manifest 미등록 OR drift 해소 → WARN (FAIL 아님)
+    //   (4) Forbidden   — 범용 가드/페르소나 deny-list 매칭 → hard-FAIL (positive 통과해도)
+    //
+    // 3중 시뮬레이션: positive → negative-1 (Enum 미매칭) → negative-2 (Forbidden Path) → recovery.
+
+    // --- (A) 프로덕션 allowlist 자체 정합 (DoD 6) ---
+    // 실 manifest/drift 상태로 stale 검증 (rootDir='.').
+    {
+      const realDrifts = detectDriftFiles('.');
+      const realDriftSet = new Set(realDrifts.map((d) => d.file));
+      const realManifest = JSON.parse(readFileSync(join('.', MANIFEST_PATH), 'utf-8'));
+      const realManifestSet = new Set(Object.keys(realManifest.files || {}));
+      const prod = validateAllowlist(PERMANENT_DIVERGENT_ALLOWLIST, realDriftSet, realManifestSet);
+      expect(
+        'allowlist production: errors=0 (schema + positive + Forbidden 정합)',
+        prod.errors.length === 0,
+        JSON.stringify(prod.errors),
+      );
+      // 프로덕션 5항목은 현재 모두 manifest 등록 + drift 상태여야 함 (stale WARN 0 기대,
+      // 단 WARN 은 FAIL 아니므로 pass/fail 영향 없음 — 가시성 로그만).
+      if (prod.warnings.length > 0) {
+        results.push(`  WARN  allowlist production stale: ${JSON.stringify(prod.warnings)}`);
+      }
+    }
+
+    // --- (B) self-reference 차단 (DoD 5) — 자기 자신 미포함 + Forbidden 자동 차단 ---
+    expect(
+      'allowlist self-reference: verify-harness-drift-decorator.mjs 미포함',
+      !PERMANENT_DIVERGENT_ALLOWLIST.some((a) =>
+        a.path.endsWith('verify-harness-drift-decorator.mjs'),
+      ),
+    );
+    expect(
+      'allowlist self-reference: scripts/verify-*.mjs 패턴이 자기 파일 자동 차단',
+      isForbiddenAllowlistPath('scripts/verify-harness-drift-decorator.mjs') === true,
+    );
+
+    // --- (C) Enum SSoT 단위 검증 ---
+    expect(
+      'STRUCTURAL_PROOF_ENUM: 3 식별자 (content-asset/domain-doc/perpetual-rewrite)',
+      STRUCTURAL_PROOF_ENUM.length === 3 &&
+        STRUCTURAL_PROOF_ENUM.includes('content-asset') &&
+        STRUCTURAL_PROOF_ENUM.includes('domain-doc') &&
+        STRUCTURAL_PROOF_ENUM.includes('perpetual-rewrite'),
+      JSON.stringify(STRUCTURAL_PROOF_ENUM),
+    );
+
+    // --- (D) 3중 시뮬레이션 (positive → negative-1 → negative-2 → recovery) ---
+    // 격리 mock manifest 환경 — 실 manifest 비의존 (stale 검증은 mock drift/manifest Set 주입).
+    const alTmp = mkdtempSync(join(tmpdir(), 'harness-drift-al-'));
+    try {
+      const alHarnessDir = join(alTmp, '.harness');
+      mkdirSync(alHarnessDir, { recursive: true });
+
+      // mock manifest + drift 상태 파일 (allowlist stale 검증용)
+      writeFileSync(join(alTmp, 'docs-asset.png'), 'binary\n');
+      writeFileSync(join(alTmp, 'roadmap.md'), 'content\n');
+      const alManifest = {
+        files: {
+          'docs-asset.png': { sha256: 'a'.repeat(64) }, // drift
+          'roadmap.md': { sha256: 'b'.repeat(64) }, // drift
+        },
+      };
+      writeFileSync(join(alHarnessDir, 'manifest.json'), JSON.stringify(alManifest));
+      const alDrifts = detectDriftFiles(alTmp);
+      const alDriftSet = new Set(alDrifts.map((d) => d.file));
+      const alManifestSet = new Set(Object.keys(alManifest.files));
+
+      // positive — 진입 조건 Enum 매칭 + manifest/drift 상태 → errors=0, warnings=0
+      const positiveAllow = [
+        {
+          path: 'docs-asset.png',
+          reason: '도메인 콘텐츠 자산',
+          structuralProof: ['content-asset', 'perpetual-rewrite'],
+        },
+        { path: 'roadmap.md', reason: '도메인 전용 로드맵', structuralProof: ['domain-doc'] },
+      ];
+      const simPositive = validateAllowlist(positiveAllow, alDriftSet, alManifestSet);
+      expect(
+        'allowlist sim positive: errors=0 warnings=0',
+        simPositive.errors.length === 0 && simPositive.warnings.length === 0,
+        JSON.stringify(simPositive),
+      );
+
+      // negative-1 — 임의 사유 (Enum 미매칭) → schema 통과해도 positive FAIL
+      const negEnum = [
+        { path: 'docs-asset.png', reason: '발화 잦아 부담', structuralProof: ['too-noisy'] },
+      ];
+      const simNegEnum = validateAllowlist(negEnum, alDriftSet, alManifestSet);
+      expect(
+        'allowlist sim negative-1 (Enum 미매칭): errors>=1',
+        simNegEnum.errors.length >= 1 && simNegEnum.errors.some((e) => e.startsWith('positive')),
+        JSON.stringify(simNegEnum.errors),
+      );
+
+      // negative-2 (Forbidden Path) — 범용 가드 위장 등록 → positive 통과해도 hard-FAIL
+      const negForbidden = [
+        {
+          path: 'scripts/verify-z-pattern-health.mjs',
+          reason: '위장 등록 (CI 우회 시도)',
+          structuralProof: ['content-asset'], // positive 는 통과하나 deny-list 매칭
+        },
+      ];
+      const simNegForbidden = validateAllowlist(negForbidden, alDriftSet, alManifestSet);
+      expect(
+        'allowlist sim negative-2 (Forbidden Path): errors>=1 (hard-FAIL)',
+        simNegForbidden.errors.length >= 1 &&
+          simNegForbidden.errors.some((e) => e.startsWith('forbidden')),
+        JSON.stringify(simNegForbidden.errors),
+      );
+      // Forbidden 추가 단위 — CLAUDE.md / agents / skills / workflows 패턴
+      expect('Forbidden Path: CLAUDE.md', isForbiddenAllowlistPath('CLAUDE.md') === true);
+      expect(
+        'Forbidden Path: .claude/agents/architect.md',
+        isForbiddenAllowlistPath('.claude/agents/architect.md') === true,
+      );
+      expect(
+        'Forbidden Path: .claude/skills/create-pr/SKILL.md',
+        isForbiddenAllowlistPath('.claude/skills/create-pr/SKILL.md') === true,
+      );
+      expect(
+        'Forbidden Path: .github/workflows/harness-guards.yml',
+        isForbiddenAllowlistPath('.github/workflows/harness-guards.yml') === true,
+      );
+      // cross-validate 2026-06-30 권고 1 — deny-list 완전성 (서브디렉토리 / .sh 가드 / 중첩 CLAUDE.md)
+      expect(
+        'Forbidden Path: scripts/verify-agent-ssot.sh (.sh 가드)',
+        isForbiddenAllowlistPath('scripts/verify-agent-ssot.sh') === true,
+      );
+      expect(
+        'Forbidden Path: scripts/sub/verify-foo.mjs (서브디렉토리)',
+        isForbiddenAllowlistPath('scripts/sub/verify-foo.mjs') === true,
+      );
+      expect(
+        'Forbidden Path: apps/web/CLAUDE.md (중첩 CLAUDE.md)',
+        isForbiddenAllowlistPath('apps/web/CLAUDE.md') === true,
+      );
+      expect(
+        'Forbidden Path negative: docs/screenshots/01-solar-system.png 비매칭',
+        isForbiddenAllowlistPath('docs/screenshots/01-solar-system.png') === false,
+      );
+      expect(
+        'Forbidden Path negative: docs/MYCLAUDE.md 비매칭 (CLAUDE.md 부분일치 아님)',
+        isForbiddenAllowlistPath('docs/MYCLAUDE.md') === false,
+      );
+
+      // negative-3 (schema) — reason 빈값 → schema FAIL
+      const negSchema = [
+        { path: 'docs-asset.png', reason: '', structuralProof: ['content-asset'] },
+      ];
+      const simNegSchema = validateAllowlist(negSchema, alDriftSet, alManifestSet);
+      expect(
+        'allowlist sim negative-3 (빈 reason): schema errors>=1',
+        simNegSchema.errors.some((e) => e.startsWith('schema')),
+        JSON.stringify(simNegSchema.errors),
+      );
+
+      // stale — manifest 미등록 → WARN (FAIL 아님, errors=0)
+      const staleAllow = [
+        { path: 'ghost.png', reason: '해소된 자산', structuralProof: ['content-asset'] },
+      ];
+      const simStale = validateAllowlist(staleAllow, alDriftSet, alManifestSet);
+      expect(
+        'allowlist sim stale: warnings>=1 errors=0 (WARN not FAIL)',
+        simStale.warnings.length >= 1 && simStale.errors.length === 0,
+        JSON.stringify(simStale),
+      );
+
+      // recovery — Enum 매칭 + deny-list 비매칭 + manifest/drift 정합 사유로 정정 → errors=0
+      const recovered = validateAllowlist(positiveAllow, alDriftSet, alManifestSet);
+      expect(
+        'allowlist sim recovery: errors=0 (정정 후 PASS)',
+        recovered.errors.length === 0,
+        JSON.stringify(recovered.errors),
+      );
+
+      // --- (E) count-warn allowlist 제외 시뮬레이션 (positive: 제외 후 < N) ---
+      // mock 으로 drift=12 (allowlist 2개 포함) → 제외 후 10 (= N) vs 제외 안 하면 12.
+      // ADR §회귀 가드 (4) 메타 측정 자기 적용 안정성: 모수 정제로 카운트 변화 검증.
+      const cwAlTmp = mkdtempSync(join(tmpdir(), 'harness-drift-cw-al-'));
+      try {
+        const cwAlHarnessDir = join(cwAlTmp, '.harness');
+        mkdirSync(cwAlHarnessDir, { recursive: true });
+        // 실 allowlist 의 첫 2개 path 를 mock drift 로 등록 + 일반 drift 8개 → raw 10, 제외 후 8.
+        const allowPaths = PERMANENT_DIVERGENT_ALLOWLIST.slice(0, 2).map((a) => a.path);
+        const cwAlFiles = {};
+        for (const p of allowPaths) {
+          mkdirSync(join(cwAlTmp, dirname(p)), { recursive: true });
+          writeFileSync(join(cwAlTmp, p), 'x\n');
+          cwAlFiles[p] = { sha256: 'f'.repeat(64) };
+        }
+        for (let i = 0; i < 8; i++) {
+          const name = `plain-${i}.md`;
+          writeFileSync(join(cwAlTmp, name), `c ${i}\n`);
+          cwAlFiles[name] = { sha256: String(i).padStart(64, '0') };
+        }
+        writeFileSync(join(cwAlHarnessDir, 'manifest.json'), JSON.stringify({ files: cwAlFiles }));
+        const cwAl = runCountWarn(cwAlTmp);
+        expect(
+          'count-warn allowlist 제외: rawCount=10 → count=8 (allowlist 2 제외)',
+          cwAl.rawCount === 10 && cwAl.count === 8 && cwAl.excluded.length === 2,
+          JSON.stringify({ raw: cwAl.rawCount, count: cwAl.count, excluded: cwAl.excluded }),
+        );
+        expect(
+          'count-warn allowlist 제외: exceeded=false (8 < N=10)',
+          cwAl.exceeded === false,
+          JSON.stringify(cwAl),
+        );
+      } finally {
+        rmSync(cwAlTmp, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(alTmp, { recursive: true, force: true });
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -869,7 +1263,15 @@ function parseMode(args) {
  */
 function mainCountWarn() {
   try {
-    const { count, threshold, exceeded, files } = runCountWarn('.');
+    const { count, threshold, exceeded, files, excluded, rawCount } = runCountWarn('.');
+
+    // Amendment 13 (#766) — allowlist 제외 내역 투명성 박제 (모수 정제 가시화).
+    if (excluded.length > 0) {
+      console.log(`raw drift files: ${rawCount}`);
+      console.log(
+        `allowlist 제외 ${excluded.length}건 (영구 divergent — 구조적 기여 불가능): ${excluded.join(', ')}`,
+      );
+    }
     console.log(`harness drift files: ${count}`);
     console.log(`alert fatigue threshold (N): ${threshold}`);
 
@@ -886,6 +1288,10 @@ function mainCountWarn() {
       console.log(`  - ${f}`);
     }
     console.log('');
+    // Amendment 13 (#766) — 모수 정제 후에도 잔여 ≥ N 이면 옵션 1 (Phase 2) 이 카운트 해소 주 경로.
+    console.log(
+      'allowlist 제외 후에도 잔여 카운트 ≥ N — 옵션 1 (Phase 2 upstream 기여) 이 카운트 해소 주 경로.',
+    );
     console.log('조치 (ADR 20260515 §Amendment 9 §결정점 2 옵션 A):');
     console.log('  3 영업일 내 [Alert Fatigue Trigger] discussion 이슈 결정 분기 의무.');
     console.log('  옵션: (1) Phase 2 가속 — 점진 drift 해소');
@@ -957,7 +1363,9 @@ function mainTodoAging() {
   try {
     const { threshold, violations, skippedHarnessManaged, skippedNonTodo } = runTodoAging('.');
     console.log(`TODO aging threshold (days): ${threshold}`);
-    console.log(`violations (Phase 1 다운스트림 분기, ≥ ${threshold}일 경과): ${violations.length}`);
+    console.log(
+      `violations (Phase 1 다운스트림 분기, ≥ ${threshold}일 경과): ${violations.length}`,
+    );
     console.log(`harness-managed 제외 (upstream 영역): ${skippedHarnessManaged.length}`);
     console.log(`skipped (no [TODO] / git blame 실패): ${skippedNonTodo.length}`);
 
@@ -1069,6 +1477,8 @@ export {
   findTodoLines,
   getBlameForLine,
   isHarnessManagedCommit,
+  isForbiddenAllowlistPath,
+  validateAllowlist,
   ALERT_FATIGUE_THRESHOLD_N,
   ALERT_FATIGUE_MARKER,
   SIDECAR_CLEANUP_DRY_RUN_MARKER,
@@ -1076,4 +1486,7 @@ export {
   TODO_AGING_THRESHOLD_DAYS,
   TODO_AGING_MARKER,
   HARNESS_MANAGED_COMMIT_PREFIX,
+  PERMANENT_DIVERGENT_ALLOWLIST,
+  STRUCTURAL_PROOF_ENUM,
+  FORBIDDEN_ALLOWLIST_PATH_PATTERNS,
 };

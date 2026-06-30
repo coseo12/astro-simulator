@@ -24,17 +24,17 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 
 ## 후보 비교
 
-| 항목 | X: upstream 단독 기여 | Y: 프로젝트 단독 fork | **Z: X + Y 병행 (선반영 + upstream 동시)** |
-|---|---|---|---|
-| 즉시성 | ✗ (수일~수주 대기) | ✓ (즉시) | **✓ (즉시 + 장기 동기화)** |
-| 다운스트림 SSoT | ✓ (자동 전파) | ✗ (다른 프로젝트 재구현) | **✓ (upstream 머지 후 자동 전파)** |
-| drift 위험 | 0 (manifest 와 항상 일치) | 높음 (`harness update` 마다 충돌) | **중간 (upstream 머지 전까지만)** |
-| `harness doctor` 노이즈 | 0 | 영구 warn | **upstream 머지 전까지 warn** |
-| 다운스트림 일반화 가치 | ✓ | ✗ | **✓** |
-| 본 프로젝트 D2 가시화 시점 | upstream 릴리스 후 (`harness update` 직후) | 즉시 (본 PR 머지 직후) | **즉시 (본 PR 머지 직후)** |
-| 단기 운영 비용 | 낮음 (수동 작업 0) | 중간 (drift 관리 영구) | **중간 (drift 관리 + upstream PR 작성 = 일회성)** |
-| 장기 운영 비용 | 매우 낮음 | 높음 (모든 harness update 마다 수동 merge) | **낮음 (upstream 머지 후 본 프로젝트 변경 제거)** |
-| upstream 미반영 위험 | upstream 리뷰 반려 시 본 프로젝트도 변경 없음 | 없음 (독립) | upstream 반려 시 Y 만 잔존 → 사실상 Y 로 회귀 |
+| 항목                       | X: upstream 단독 기여                         | Y: 프로젝트 단독 fork                      | **Z: X + Y 병행 (선반영 + upstream 동시)**        |
+| -------------------------- | --------------------------------------------- | ------------------------------------------ | ------------------------------------------------- |
+| 즉시성                     | ✗ (수일~수주 대기)                            | ✓ (즉시)                                   | **✓ (즉시 + 장기 동기화)**                        |
+| 다운스트림 SSoT            | ✓ (자동 전파)                                 | ✗ (다른 프로젝트 재구현)                   | **✓ (upstream 머지 후 자동 전파)**                |
+| drift 위험                 | 0 (manifest 와 항상 일치)                     | 높음 (`harness update` 마다 충돌)          | **중간 (upstream 머지 전까지만)**                 |
+| `harness doctor` 노이즈    | 0                                             | 영구 warn                                  | **upstream 머지 전까지 warn**                     |
+| 다운스트림 일반화 가치     | ✓                                             | ✗                                          | **✓**                                             |
+| 본 프로젝트 D2 가시화 시점 | upstream 릴리스 후 (`harness update` 직후)    | 즉시 (본 PR 머지 직후)                     | **즉시 (본 PR 머지 직후)**                        |
+| 단기 운영 비용             | 낮음 (수동 작업 0)                            | 중간 (drift 관리 영구)                     | **중간 (drift 관리 + upstream PR 작성 = 일회성)** |
+| 장기 운영 비용             | 매우 낮음                                     | 높음 (모든 harness update 마다 수동 merge) | **낮음 (upstream 머지 후 본 프로젝트 변경 제거)** |
+| upstream 미반영 위험       | upstream 리뷰 반려 시 본 프로젝트도 변경 없음 | 없음 (독립)                                | upstream 반려 시 Y 만 잔존 → 사실상 Y 로 회귀     |
 
 ## 결정
 
@@ -91,7 +91,7 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 3. **다운스트림 프로젝트 ≤ 1** — 본 프로젝트가 유일한 harness 사용자가 되면 (다른 프로젝트 전부 fork 또는 폐기) X 경로 가치 0 → Y 단독으로 회귀
 4. **`harness update --apply-all-safe` 자가 복구 정책 변경** — v2.9.0+ 의 `previousSha256` 자가 복구가 비활성화되면 Phase 3 자동 동기화 보장 약화 → 재평가
 5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조). **2026-05-26 Amendment 8 로 Phase 1 드리프트 가시화 + Phase 2 중도 변경 정적 비교 가드 박제** — HARNESS-DRIFT 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 drift 자동 비교 (Amendment 5 보완, soft-warn 라벨 부착) — silent 가드 강화 방향. 측정 식 / N 임계 / 90일 임계 변경 없음 (§Amendment 8 참조).
-6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 `.harness/manifest.json` 의 sha256 과 불일치하는 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조).
+6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 `.harness/manifest.json` 의 sha256 과 불일치하는 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조). **2026-06-30 Amendment 13 — 첫 발화 ([#766](https://github.com/coseo12/astro-simulator/issues/766), drift 10 = N=10 경계) 결정 분기 이행**: 옵션 3′ (영구 divergent allowlist — 구조적 기여 불가능 자산 카운트 모수 제외) + 부분 옵션 1 채택. N=10 임계 불변 — 카운트 **모수** 정제 (측정 정밀화, orphan 제외 §결정점 5 동일 계열) ≠ 임계 완화 (옵션 3 silent 약화 거부). 자세히는 §Amendment 13.
 
 ### 측정 지표
 
@@ -105,13 +105,14 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 
 자동 탐지 workflow `.github/workflows/adr-z-pattern-health-v2.yml` 가 발화하는 가드 스크립트 (`verify-z-pattern-health.mjs`, `verify-harness-drift-decorator.mjs --mode={count-warn|sidecar-cleanup|todo-aging}`, `resolve-harness-drift-todo.mjs`) 의 exit code → CI 동작 매핑 SSoT:
 
-| 가드 스크립트 exit | 의미 | workflow 동작 | CI 결과 |
-|---|---|---|---|
-| **0** | 정상 (모든 임계값 미발화) | warn 없음, 자동 이슈 생성 없음 | **PASS** |
-| **1** | 트리거 발화 (임계값 도달/초과 — soft-warn) | `[<Trigger>] issue` 자동 생성 (중복 방지 `gh issue list --search`) + workflow `exit 0` | **PASS** (soft-warn 옵션 A 채택) |
-| **2** | 실행 에러 (gh CLI 실패 / 파일 부재 / 환경 문제) | `exit 1` | **FAIL** (hard-block — 환경 진단 의무) |
+| 가드 스크립트 exit | 의미                                            | workflow 동작                                                                          | CI 결과                                |
+| ------------------ | ----------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- |
+| **0**              | 정상 (모든 임계값 미발화)                       | warn 없음, 자동 이슈 생성 없음                                                         | **PASS**                               |
+| **1**              | 트리거 발화 (임계값 도달/초과 — soft-warn)      | `[<Trigger>] issue` 자동 생성 (중복 방지 `gh issue list --search`) + workflow `exit 0` | **PASS** (soft-warn 옵션 A 채택)       |
+| **2**              | 실행 에러 (gh CLI 실패 / 파일 부재 / 환경 문제) | `exit 1`                                                                               | **FAIL** (hard-block — 환경 진단 의무) |
 
 **결정: 옵션 A (Soft-warn)** 채택. 근거:
+
 - **현재 운영 사실 답습** — 2026-05-25 Amendment 7 (PR #555) 시점부터 옵션 A 사실상 운영 중 (workflow 가 자동 이슈 생성 후 CI `exit 0` 박제). 본 §섹션은 **운영 사실의 SSoT 명시 박제** (행동 변화 0)
 - **Amendment 2 silent 가드 약화 SSoT 정합** — 1인 운영 현실 (silent 가드 약화 트레이드오프 수용) 답습. Hard-block (옵션 B) 시 Phase 2 머지 압력 폭증 → Amendment 2/9/10/11/12 §결정점 4 silent 가드 약화 vs 강화 비대칭 정합 위반
 - **Amendment 1 점진적 진화 SSoT 정합** — Phase 2 (upstream 기여) 누적 단계적 진화 답습. Hybrid (옵션 C, 90일 hard-block 에스컬레이션) 는 Amendment 11 §교차검증 §기각한 외부 모델 제안 (agy 60일 hard-block) 답습 거부 패턴 정합
@@ -120,6 +121,7 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 **예외 (Hard-block 유지)**: exit 2 (실행 에러) 는 환경 진단 의무 차원으로 hard-block 유지 — 가드 자체 작동 보장 차원 (Amendment 8 §결정점 3a 정합).
 
 **Amendment 9/10/11/12 발화 마커 일관성** (자동 이슈 생성 트리거 stdout 마커 SSoT):
+
 - `[ADR Trigger]` — Amendment 7 §재검토 조건 #5 발화 (Phase 2 진행률)
 - `[Alert Fatigue Trigger]` — Amendment 9 §재검토 조건 #6 발화 (drift 카운트)
 - `[Phase 2 Sync Required]` — Amendment 8 §결정점 3b 발화 (Phase 2 중도 변경)
@@ -262,12 +264,12 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 
 **Phase 1 = 12 PR 분류 실측** (2026-05-25):
 
-| 분류 | PR 수 | PR 번호 | Z 패턴 적용? |
-|---|---|---|---|
-| **실제 Z 패턴 적용** | **6** | #468 #472 #475 #478 #481 #482 | ✓ Phase 1 |
-| ADR Amendment 박제 | 4 | #486 #489 #490 #501 | ✗ ADR 자체 진화 |
-| 자동화 hotfix | 1 | #491 | ✗ ADR 자체 진화 |
-| 릴리스 PR (v0.16.0) | 1 | #494 | ✗ ADR 자체 진화 |
+| 분류                 | PR 수 | PR 번호                       | Z 패턴 적용?    |
+| -------------------- | ----- | ----------------------------- | --------------- |
+| **실제 Z 패턴 적용** | **6** | #468 #472 #475 #478 #481 #482 | ✓ Phase 1       |
+| ADR Amendment 박제   | 4     | #486 #489 #490 #501           | ✗ ADR 자체 진화 |
+| 자동화 hotfix        | 1     | #491                          | ✗ ADR 자체 진화 |
+| 릴리스 PR (v0.16.0)  | 1     | #494                          | ✗ ADR 자체 진화 |
 
 → 실제 Z 적용 회차 = **6** (< N=10, 임계 미달)
 
@@ -299,7 +301,7 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 
 - ❌ **옵션 C와 무관**: N 임계값 (10) 변경 없음. silent 가드 본래 의도 보존
 - ❌ **회피 트릭 아님**: 측정 식이 자기참조로 인플레된 false-positive 제거 — 실제 회차 (6) 가 임계 (10) 미만이라는 사실은 정확한 측정의 결과
-- ✓ **CLAUDE.md §스프린트 계약 #10 정합**: "수치 DoD 미달 시 측정 방법 검증 우선" — DoD 가 미달이 아니라 임계 *초과* 였으나 동일 원칙 (측정 식 검증 우선) 적용
+- ✓ **CLAUDE.md §스프린트 계약 #10 정합**: "수치 DoD 미달 시 측정 방법 검증 우선" — DoD 가 미달이 아니라 임계 _초과_ 였으나 동일 원칙 (측정 식 검증 우선) 적용
 - ✓ **다운스트림 부담 제거**: workflow 가 매주 false-positive 발화하면 alert fatigue → 진짜 트리거 발화 시 사용자 무시 위험. 정확한 측정이 silent 가드의 효과 자체를 보호
 
 ### 측정 식 정정 회귀 가드
@@ -318,11 +320,11 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 
   **옵션 비교 결과 (#574 architect, 2026-05-27)**:
 
-  | 옵션 | 동작 | 운영 비용 | 정합성 |
-  |---|---|---|---|
-  | A: Semantic PRs Linter CI 통합 (`amannn/action-semantic-pull-request`) | 외부 GitHub Action 의존 + PR title 강제 | 외부 service 의존 추가 | 본 프로젝트 외부 의존 회피 패턴 위반 |
-  | B: `verify-pr-title-convention.mjs` 신규 가드 | 본 프로젝트 가드 답습 (`verify-pr-template-checklist.mjs` 정합) | CI step 추가 + 운영 부담 +1 | 위반 빈도 < 1건 (Amendment 7 정정 후 baseline 정상) — ROI marginal |
-  | **C: 컨벤션 박제만 (가드 신규 X)** | 본 ADR §단점 영역에 컨벤션 의무 명시 박제 | **운영 비용 0** + 미래 위반 시 옵션 B 승격 가능 | **measurement-first 정합 (volt #51) + Amendment 2 silent 약화 답습** |
+  | 옵션                                                                   | 동작                                                            | 운영 비용                                       | 정합성                                                               |
+  | ---------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------- |
+  | A: Semantic PRs Linter CI 통합 (`amannn/action-semantic-pull-request`) | 외부 GitHub Action 의존 + PR title 강제                         | 외부 service 의존 추가                          | 본 프로젝트 외부 의존 회피 패턴 위반                                 |
+  | B: `verify-pr-title-convention.mjs` 신규 가드                          | 본 프로젝트 가드 답습 (`verify-pr-template-checklist.mjs` 정합) | CI step 추가 + 운영 부담 +1                     | 위반 빈도 < 1건 (Amendment 7 정정 후 baseline 정상) — ROI marginal   |
+  | **C: 컨벤션 박제만 (가드 신규 X)**                                     | 본 ADR §단점 영역에 컨벤션 의무 명시 박제                       | **운영 비용 0** + 미래 위반 시 옵션 B 승격 가능 | **measurement-first 정합 (volt #51) + Amendment 2 silent 약화 답습** |
 
   **결정: 옵션 C** 채택 (#574, 2026-05-27). 근거: 현재 위반 빈도 0 (Amendment 7 정정 후 baseline) + 1인 운영 부담 회피 (Amendment 2 SSoT 답습) + 위반 발생 시점에 옵션 B 승격 경로 보존. 우선순위 low — 자기참조 인플레이션 재발 0건 (Amendment 7 정정 후 baseline 정상 유지). 미래 1+ 위반 발생 시 옵션 B 승격 후속 이슈 분리 의무.
 
@@ -371,10 +373,13 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 
 - **적용 대상**: Phase 1 단계에서 직접 수정하는 모든 harness-managed 파일 (`.claude/agents/*.md` / `.claude/skills/*/SKILL.md` / `.claude/commands/*.md` / `.claude/settings.json` / 기타 `.harness/manifest.json` 의 `files` 키 포함)
 - **본문 형식 SSoT**:
+
   ```text
   HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]
   ```
+
   - `upstream-link`: Phase 2 PR URL (예: `https://github.com/coseo12/harness-setting/pull/N`). Phase 1 단독 머지 시 `TODO` 허용 (Phase 2 머지 직후 실제 URL 로 교체 의무)
+
 - **파일 형식별 분기 (결정점 1)**:
   - `.md`: `<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO] -->` (HTML 주석, GitHub 렌더 시 비표시)
   - `.ts` / `.tsx` / `.js` / `.mjs` / `.cjs`: `// HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]` (line comment)
@@ -382,10 +387,13 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
   - `.json` (예: `.claude/settings.json`): JSON 표준 주석 미지원 → **sidecar 파일** `<filename>.HARNESS-DRIFT.md` 동일 디렉토리 박제. 본문은 `# HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]\n원 파일: <filename>\n변경 사유: <한 줄 요약>` 형식. 적용 빈도 낮음 (실측 0건) 으로 운영 부담 최소
   - **sidecar 라이프사이클 계약** (cross-validate agy 이견 수용 — orphan 방지): `<filename>.HARNESS-DRIFT.md` 존재 시 동일 디렉토리에 매칭되는 `<filename>` 반드시 존재 + `harness doctor` 상 drift 감지 상태 의무. orphan sidecar (본 파일 삭제/이름 변경 후 sidecar 잔존) 발견 시 verify 스크립트가 CI fail (exit 1). Phase 3 자동 동기화 후 drift 해소 시 sidecar 도 함께 삭제 의무 (developer 단계 verify 스크립트 구현 시 박제)
 - **위치 SSoT (결정점 2)**: **파일 첫 줄 의무** + shebang (`#!/usr/bin/env node` 등) / DOCTYPE (`<!DOCTYPE html>` 등) / YAML frontmatter (`---\n...\n---\n`) 1블록 직후 1줄 허용. regex SSoT (verify 스크립트 의무 패턴):
+
   ```regex
   ^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n|---\n(?:[\s\S]*?\n)?---\n)?(?:<!--|//|#) HARNESS-DRIFT: Z-PATTERN \[(?:https?://[^\]]+|TODO)\](?: -->)?
   ```
+
   - **developer 단계 보완 (2026-05-26, PR #556)**: architect 박제값 regex 는 shebang/DOCTYPE 만 허용했으나 적용 대상 `.claude/agents/*.md` 의 컨벤션 (YAML frontmatter) 미커버. YAML frontmatter 1블록 prefix 허용 추가 — 의미는 동일 (파일 메타 헤더 직후 첫 컨텐츠 라인).
+
 - **자동 가드 (결정점 3 — verify 스크립트 분리)**: `scripts/verify-harness-drift-decorator.mjs` 신규 (Node ESM). `harness doctor` 가 drift 감지한 파일 (= `.harness/manifest.json` 의 sha256 과 실제 파일 sha256 불일치 + Phase 1 PR 컨벤션 의도된 drift) 에 대해 데코레이터 존재 검증 — 누락 시 exit 1 (CI hard-fail). 로컬 사전 검증 비용 < 1초 (gh API 호출 없음, 파일 grep 만)
 - **CI 통합**: `.github/workflows/harness-guards.yml` 또는 `.github/workflows/pr-template-checklist-guard.yml` 에 step 추가 (developer 단계 결정)
 - **선택 근거 (대안 비교)**:
@@ -420,7 +428,7 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 
 - ✓ **silent 가드 강화 방향** — Amendment 2 (N 임계 완화 = 약화) 의 정반대. 가시성 추가 + 새로운 행동 규칙 추가
 - ✓ **§결정 본문 / N 임계 / 90일 임계 변경 0** — 기존 silent 가드 본래 의도 보존
-- ✓ **데코레이터 누락 = CI hard-fail (fail-fast 원칙)** vs **drift 비교 = soft-warn (1인 운영 트레이드오프)** — 비대칭 의도적. 데코레이터 누락은 *컨벤션 강제* (예방 비용 < 1줄), drift 비교는 *예방 권고* (upstream 리뷰로 자연 해소 가능)
+- ✓ **데코레이터 누락 = CI hard-fail (fail-fast 원칙)** vs **drift 비교 = soft-warn (1인 운영 트레이드오프)** — 비대칭 의도적. 데코레이터 누락은 _컨벤션 강제_ (예방 비용 < 1줄), drift 비교는 _예방 권고_ (upstream 리뷰로 자연 해소 가능)
 - ✓ **measurement-first 원칙 정합** — broad 권고 (drift 즉시 block) 가 아닌 precision 정정 (라벨 부착)
 - ⚠ **발화 빈도 ≥ 1/주 예상 잠재 위험** — 월 cron + PR check 누적 시 alert fatigue 가능. 회피 전략: cross-validate 후속 발견 #2 (경고 피로감 가드, 동시 drift N개 상한) 가 별도 이슈 #557 로 분리 박제됨
 
@@ -516,13 +524,14 @@ orphan sidecars: 0
 
 ##### 결정점 1 — N 임계값
 
-| N | 즉시 발화? | 운영 영향 | 정합성 |
-|---|---|---|---|
-| 3 | ✓ (6 > 3 즉시 발화) | 6→3 revert 강제 → 운영 부담 폭증 | Amendment 1 N=3 정합 |
-| 5 | ✓ (6 > 5 즉시 발화) | buffer 0 → 1 PR 머지 시 발화 | 중간 |
-| **10** | ✗ (6 < 10) | buffer 4 → 4 PR 적용 buffer | **Amendment 2 N=10 정합** |
+| N      | 즉시 발화?          | 운영 영향                        | 정합성                    |
+| ------ | ------------------- | -------------------------------- | ------------------------- |
+| 3      | ✓ (6 > 3 즉시 발화) | 6→3 revert 강제 → 운영 부담 폭증 | Amendment 1 N=3 정합      |
+| 5      | ✓ (6 > 5 즉시 발화) | buffer 0 → 1 PR 머지 시 발화     | 중간                      |
+| **10** | ✗ (6 < 10)          | buffer 4 → 4 PR 적용 buffer      | **Amendment 2 N=10 정합** |
 
 **결정: N=10**. 근거:
+
 - baseline 6 이 N=10 임계 buffer 내. 본 가드 도입이 즉시 위반 상태로 PR 들어가는 자기 모순 회피
 - Amendment 1 (N=3) / Amendment 2 (N=10) 사이클 정합 — Amendment 2 의 silent 가드 약화 트레이드오프 (1인 운영) 수용 결정과 **동일 N=10** 차원만 다름 (Phase 1 회차 ↔ 활성 drift 파일 수)
 - Amendment 1/2 SSoT N=10 인용으로 임계 정의 복잡도 증가 회피
@@ -530,25 +539,27 @@ orphan sidecars: 0
 
 ##### 결정점 2 — 후속 행동
 
-| 옵션 | 동작 | 정합성 |
-|---|---|---|
+| 옵션                              | 동작                                                                                                 | 정합성                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **A: 사용자 결정 분기 자동 이슈** | drift 초과 시 [Alert Fatigue Trigger] 라벨 자동 이슈 (Phase 2 가속 / 일부 Phase 1 revert / N 재조정) | Amendment 3 의 [ADR Trigger] 자동 이슈 패턴 답습 + Amendment 8 §결정점 3b 옵션 A soft-warn 정합 |
-| B: CI fail (hard-block) | drift 초과 시 모든 PR CI fail | Amendment 7 의 silent 가드 약화 사이클 차단 정합 — 단 1인 운영 부담 폭증 |
-| C: Hybrid | 임계 N 초과 시 block + 자동 이슈 생성 | 임계 정의 복잡도 증가 + Amendment 8 결정점 3b 옵션 A "soft-warn" 정합 위반 |
+| B: CI fail (hard-block)           | drift 초과 시 모든 PR CI fail                                                                        | Amendment 7 의 silent 가드 약화 사이클 차단 정합 — 단 1인 운영 부담 폭증                        |
+| C: Hybrid                         | 임계 N 초과 시 block + 자동 이슈 생성                                                                | 임계 정의 복잡도 증가 + Amendment 8 결정점 3b 옵션 A "soft-warn" 정합 위반                      |
 
 **결정: 옵션 A (사용자 결정 분기 자동 이슈)** + soft-warn 라벨 부착.
+
 - 근거: Amendment 8 §결정점 3b 옵션 A (Phase 2 sync drift → soft-warn 라벨 부착) 정합. silent 가드 강화 (Amendment 8 방향) vs 약화 (Amendment 2/7) 트레이드오프 통합 — **데코레이터 누락 = fail-fast / drift 카운트 초과 = soft-warn** 비대칭 의도적 (Amendment 8 §결정점 4 답습)
 - Amendment 3 의 `.github/workflows/adr-z-pattern-health-v2.yml` `[ADR Trigger]` 자동 이슈 패턴 답습 — 중복 방지 (gh issue list `--search`) + 3 영업일 결정 분기 의무 박제
 
 ##### 결정점 3 — 통합 위치
 
-| 후보 | 비용 | 정합성 |
-|---|---|---|
-| 신규 스크립트 (`verify-drift-count.mjs`) | 별도 파일 + CI step 추가 | 운영 부담 2배 — Amendment 8 §단점 회피 정합 위반 |
-| `verify-z-pattern-health.mjs` 확장 | 기존 cron + main flow 통합 | Phase 2 진행률 + drift 카운트 차원 혼재 — 책임 결합 |
-| **`verify-harness-drift-decorator.mjs` 통합** | 이미 `detectDriftFiles()` 보유 + drift 카운트 산출 | **drift 검증 + 카운트 동일 입력 단일 스크립트** |
+| 후보                                          | 비용                                               | 정합성                                              |
+| --------------------------------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| 신규 스크립트 (`verify-drift-count.mjs`)      | 별도 파일 + CI step 추가                           | 운영 부담 2배 — Amendment 8 §단점 회피 정합 위반    |
+| `verify-z-pattern-health.mjs` 확장            | 기존 cron + main flow 통합                         | Phase 2 진행률 + drift 카운트 차원 혼재 — 책임 결합 |
+| **`verify-harness-drift-decorator.mjs` 통합** | 이미 `detectDriftFiles()` 보유 + drift 카운트 산출 | **drift 검증 + 카운트 동일 입력 단일 스크립트**     |
 
 **결정: `verify-harness-drift-decorator.mjs` 통합**.
+
 - 근거: 본 스크립트의 `detectDriftFiles()` 가 이미 drift 카운트 산출 — N=10 비교 추가 = ~30 라인. self-test 인라인 3중 시뮬레이션 패턴 답습 가능
 - **트리거 시점 분기 (developer 단계 구현 의무)**: PR check 시점 (decorator FAIL = exit 1 hard-fail) vs 월 cron 시점 (drift 카운트 > N = soft-warn). 단일 스크립트 내 CLI 플래그 (`--mode=count-warn` 또는 `--check-count-only`) 로 분기
 - CI workflow: `.github/workflows/adr-z-pattern-health-v2.yml` 의 cron step 추가 (verify-z-pattern-health 직후 `verify-harness-drift-decorator.mjs --mode=count-warn` 호출 + `[Alert Fatigue Trigger]` 자동 이슈)
@@ -556,6 +567,7 @@ orphan sidecars: 0
 ##### 결정점 4 — silent 가드 방향
 
 **결정: soft-warn (라벨 + 자동 이슈)** — Amendment 8 §결정점 3b 옵션 A 답습.
+
 - 데코레이터 누락 (Phase 1 PR check) = **fail-fast (hard-block)** — 컨벤션 강제, 예방 비용 < 1줄
 - drift 카운트 초과 (월 cron) = **soft-warn (라벨 부착 + 자동 이슈)** — 사용자 결정 분기 (Phase 2 가속 / Phase 1 revert / N 재조정), 자동 차단 false-positive 비용 과대
 - 비대칭 의도적 — Amendment 8 §결정점 4 silent 가드 강화 vs 약화 트레이드오프 통합 답습
@@ -563,6 +575,7 @@ orphan sidecars: 0
 ##### 결정점 5 (추가) — 임계 비교 대상
 
 **활성 drift 파일 수 (`detectDriftFiles().length`) 만** vs **drift + orphan sidecar 수**:
+
 - **결정: 활성 drift 파일 수만** (orphan 제외)
 - 근거: orphan sidecar 는 Amendment 8 hard-fail 가드가 이미 처리 (exit 1). 본 가드는 "Z 패턴 활성 적용 누적" 측정이 본질 — drift 파일 수가 정합. orphan 포함 시 측정 의미 혼재 (Phase 3 정리 누락 ≠ Z 패턴 누적)
 
@@ -817,6 +830,7 @@ orphan sidecars: 0
 
 - **결정**: 옵션 C 채택. **Amendment 10 §결정점 3 패턴 답습** (사용자 인지 우선 + 부수효과 회피).
 - **dry-run 출력 형식 SSoT** (`--mode=sidecar-cleanup` 단독, `--apply` 미명시):
+
   ```text
   [Sidecar Cleanup — Dry Run] orphan sidecars detected: N
     - <path/to/sidecar1.HARNESS-DRIFT.md> — base file missing
@@ -826,6 +840,7 @@ orphan sidecars: 0
     --apply 명시 시 실제 삭제. 미명시 시 본 출력만 (exit 0).
     수동 정리: rm <sidecar path>
   ```
+
 - **--apply 실제 삭제 형식 SSoT** (`--mode=sidecar-cleanup --apply`):
   ```text
   [Sidecar Cleanup — Apply] orphan sidecars deleted: N
@@ -841,11 +856,11 @@ orphan sidecars: 0
 - **결정**: 비대칭 이중 박제. **verify 모드 = fail-fast / sidecar-cleanup 모드 = opt-in 자동화**.
 - **Amendment 8/9/10/11 비대칭 패턴 명문화 (SSoT)**:
 
-  | Amendment | 차원 | 가드 방향 | 동기 |
-  |---|---|---|---|
-  | 8 (#556) | 데코레이터 누락 | **fail-fast** (verify 모드) | 컨벤션 강제 (예방 비용 < 1줄) |
-  | 9 (#557) | drift 카운트 ≥ N=10 | **soft-warn** (count-warn 모드) | 1인 운영 alert fatigue 회피 |
-  | 10 (#569) | TODO 해소 | **soft-warn + opt-in 자동화** (resolve-todo wrapper) | 사후 행동 + Phase 2 머지 대기 |
+  | Amendment     | 차원                     | 가드 방향                                                | 동기                                                                |
+  | ------------- | ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------- |
+  | 8 (#556)      | 데코레이터 누락          | **fail-fast** (verify 모드)                              | 컨벤션 강제 (예방 비용 < 1줄)                                       |
+  | 9 (#557)      | drift 카운트 ≥ N=10      | **soft-warn** (count-warn 모드)                          | 1인 운영 alert fatigue 회피                                         |
+  | 10 (#569)     | TODO 해소                | **soft-warn + opt-in 자동화** (resolve-todo wrapper)     | 사후 행동 + Phase 2 머지 대기                                       |
   | **11 (#572)** | **sidecar 라이프사이클** | **fail-fast (verify) + opt-in 자동화 (sidecar-cleanup)** | **silent leak 차단 (fail-fast) + 사용자 시점 정리 자동화 (opt-in)** |
 
 - **비대칭 의도적 — "silent leak 차단은 fail-fast, 사용자 시점 자동화는 opt-in dry-run 기본"**: Amendment 11 가 본 SSoT 박제 (이전 Amendment 들의 비대칭 박제값 통합).
@@ -916,7 +931,7 @@ orphan sidecars: 0
   3. 인터페이스 명확성 "우수" — 형식별 정적 계약 + regex SSoT
   4. 확장성 "매우 유연" — regex 헤더 prefix (shebang / DOCTYPE / YAML frontmatter) 신규 stack 무수정 적용
   5. 보안 "매우 안전" — trustless 영속화 (HARNESS-DRIFT 식별자 박제로 SAST/검수자 즉시 식별)
-  6. **§1 §보완 누락 구조 "사후 청소(Post-Cleanup) 자동화"** — agy 직접 인용: *"Phase 3가 완료되어 로컬 파일이 업스트림 버전으로 안전하게 덮어써지면 기존 로컬 파일에 삽입했던 `HARNESS-DRIFT` 데코레이터 주석이나 sidecar 파일(`.HARNESS-DRIFT.md`)은 무용지물이 됩니다. ... 사후 라이프사이클 단계가 모호합니다."* — **본 Amendment 11 정확히 해소 영역**. agy 가 §종합 결론에서 "제안한 세부 개선 사항(사후 청소 및 주석 유출 방지)만 보완된다면 프로덕션 환경에서 즉시 신뢰하고 적용할 수 있는 매우 강력한 아키텍처" 라고 본 Amendment 11 의 영구 박제 가치 직접 인정
+  6. **§1 §보완 누락 구조 "사후 청소(Post-Cleanup) 자동화"** — agy 직접 인용: _"Phase 3가 완료되어 로컬 파일이 업스트림 버전으로 안전하게 덮어써지면 기존 로컬 파일에 삽입했던 `HARNESS-DRIFT` 데코레이터 주석이나 sidecar 파일(`.HARNESS-DRIFT.md`)은 무용지물이 됩니다. ... 사후 라이프사이클 단계가 모호합니다."_ — **본 Amendment 11 정확히 해소 영역**. agy 가 §종합 결론에서 "제안한 세부 개선 사항(사후 청소 및 주석 유출 방지)만 보완된다면 프로덕션 환경에서 즉시 신뢰하고 적용할 수 있는 매우 강력한 아키텍처" 라고 본 Amendment 11 의 영구 박제 가치 직접 인정
 - **이견 수용 (본 PR 즉시 반영)**: 0건 — agy §3 §개선 (sidecar 라이프사이클 경계 명확화 — Phase 3 직후 찰나 CI 검증 타이밍) 가 본 §결정점 3 + §회귀 가드 4축 §(2) 3중 시뮬레이션 recovery 단계에 이미 박제됨 (sidecar-cleanup --apply 후 verify 모드 호출 → orphan 0 + exit 0). 추가 박제 불필요 (이미 영속화)
 - **Claude 재분석으로 기각한 외부 모델 제안**: 0건 — agy §6 누락 요소 1/2/3 모두 합리적이나 본 PR (Amendment 11 = sidecar 라이프사이클 자동화 단일 목표) 범위 밖 → 후속 분리 또는 이미 분리됨
 - **고유 발견 (후속 분리, volt #29 3단 프로토콜 — 3건)**:
@@ -944,14 +959,14 @@ orphan sidecars: 0
 
 > **developer 단계 정정 (2026-05-27, PR Amendment 12 구현)**: architect 단계 실측은 "파일 첫 박제 commit 시점" 을 사용 → 본 §결정점 6 §정의 ("`[TODO]` 토큰 라인의 git blame 최초 commit 시점") 와 불일치. developer 단계 `node scripts/verify-harness-drift-decorator.mjs --mode=todo-aging` 실측 결과 모든 6 drift 파일 [TODO] 라인이 #556 (Amendment 8 PR #571, 2026-05-26 commit `c6ea749`) 에서 박제됨 = **공통 1일 경과** (오늘 2026-05-27 기준). **결정점 2 §결정 (30일) 영향 없음** — agy 원안 7일 채택 시도도 baseline 위반 0 (모든 파일 1일). 정정 사유: ADR architect 단계 "파일 첫 박제" vs "[TODO] 라인 첫 박제" 측정 식 차이 (CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법 검증 우선" 답습).
 
-| 파일 | [TODO] 박제 시점 (실측 git blame) | 경과 일수 (오늘 2026-05-27 기준) | 분류 |
-|---|---|---|---|
-| `CLAUDE.md` | 2026-05-26 (#571 Amendment 8, `c6ea749`) | **1일** | Phase 1 (다운스트림 분기 영역) |
-| `.claude/agents/architect.md` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
-| `.claude/agents/pm.md` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
-| `.github/workflows/harness-guards.yml` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (architect 단계 분류 "harness-managed" 는 파일 자체 출처가 #338 harness update 였음에 근거했으나, **[TODO] 라인** 자체는 #556 다운스트림 분기 commit `feat(z-pattern):` 박제 — 본 §결정점 3 §식별 휴리스틱 `chore(harness):` prefix 매칭에서 **제외 안 됨**) |
-| `scripts/verify-z-pattern-health.mjs` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
-| `docs/phases/roadmap-v3-incremental.md` | 2026-05-26 (#571 Amendment 8) | **1일** | Phase 1 (다운스트림 분기 영역) |
+| 파일                                    | [TODO] 박제 시점 (실측 git blame)        | 경과 일수 (오늘 2026-05-27 기준) | 분류                                                                                                                                                                                                                                                                 |
+| --------------------------------------- | ---------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md`                             | 2026-05-26 (#571 Amendment 8, `c6ea749`) | **1일**                          | Phase 1 (다운스트림 분기 영역)                                                                                                                                                                                                                                       |
+| `.claude/agents/architect.md`           | 2026-05-26 (#571 Amendment 8)            | **1일**                          | Phase 1 (다운스트림 분기 영역)                                                                                                                                                                                                                                       |
+| `.claude/agents/pm.md`                  | 2026-05-26 (#571 Amendment 8)            | **1일**                          | Phase 1 (다운스트림 분기 영역)                                                                                                                                                                                                                                       |
+| `.github/workflows/harness-guards.yml`  | 2026-05-26 (#571 Amendment 8)            | **1일**                          | Phase 1 (architect 단계 분류 "harness-managed" 는 파일 자체 출처가 #338 harness update 였음에 근거했으나, **[TODO] 라인** 자체는 #556 다운스트림 분기 commit `feat(z-pattern):` 박제 — 본 §결정점 3 §식별 휴리스틱 `chore(harness):` prefix 매칭에서 **제외 안 됨**) |
+| `scripts/verify-z-pattern-health.mjs`   | 2026-05-26 (#571 Amendment 8)            | **1일**                          | Phase 1 (다운스트림 분기 영역)                                                                                                                                                                                                                                       |
+| `docs/phases/roadmap-v3-incremental.md` | 2026-05-26 (#571 Amendment 8)            | **1일**                          | Phase 1 (다운스트림 분기 영역)                                                                                                                                                                                                                                       |
 
 **식별 휴리스틱 정합성 (developer 단계 추가 발견)**: `.github/workflows/harness-guards.yml` 의 [TODO] 라인이 commit prefix `feat(z-pattern):` (Amendment 8 도입 PR) 박제 — `chore(harness):` 매칭 안 됨. 즉 본 가드 §결정점 3 §식별 휴리스틱에서 **Phase 1 다운스트림 분기로 분류**. architect 단계 §baseline 실측 표의 "harness-managed (다운스트림 해소 불가)" 분류는 **파일 출처 (manifest 등록 = harness update 박제)** 기준이었으며, **[TODO] 라인 출처 (commit prefix)** 기준 정합과 차원이 다름. 본 가드는 후자 (commit prefix) 만 사용 — 발화 시 사용자가 `.github/workflows/harness-guards.yml` 에 대한 후속 조치 (Phase 2 PR 제출 vs upstream 영역 위임) 분기 결정 의무 (architect 분류 의도 유지 측면).
 
@@ -959,13 +974,13 @@ orphan sidecars: 0
 
 **임계 후보별 즉시 발화 검증** (measurement-first 원칙, agy 제안 임계 7일 baseline 검증):
 
-| 임계 후보 | 위반 파일 수 (Phase 1 영역) | 위반율 | 평가 |
-|---|---|---|---|
+| 임계 후보          | 위반 파일 수 (Phase 1 영역)       | 위반율        | 평가                                                                                                                                        |
+| ------------------ | --------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | **7일 (agy 원안)** | 1건 (verify-z-pattern-health 9일) | **25%** (1/4) | **즉시 발화 위험** — baseline 1건 위반 = 가드 도입 PR 자체가 즉시 위반 상태 진입 (Amendment 9 §결정점 1 self-test 자기 모순 회피 패턴 위반) |
-| 14일 | 0건 | 0% | buffer 5일 (verify-z-pattern-health 9일 → 14일까지 5일 여유) |
-| **30일** | 0건 | 0% | **buffer 21일** (verify-z-pattern-health 9일 → 30일까지 21일 여유) — Amendment 2 N=10 / 90일 / Amendment 1 ~1 sprint 정합 |
-| 60일 | 0건 | 0% | buffer 51일 — 가시화 효과 약함 |
-| 90일 | 0건 | 0% | Amendment 2 SSoT 동일 임계 — 차원 식별 약화 (시간 차원 중복) |
+| 14일               | 0건                               | 0%            | buffer 5일 (verify-z-pattern-health 9일 → 14일까지 5일 여유)                                                                                |
+| **30일**           | 0건                               | 0%            | **buffer 21일** (verify-z-pattern-health 9일 → 30일까지 21일 여유) — Amendment 2 N=10 / 90일 / Amendment 1 ~1 sprint 정합                   |
+| 60일               | 0건                               | 0%            | buffer 51일 — 가시화 효과 약함                                                                                                              |
+| 90일               | 0건                               | 0%            | Amendment 2 SSoT 동일 임계 — 차원 식별 약화 (시간 차원 중복)                                                                                |
 
 **harness-managed 파일 카테고리 분리 의무** (결정점 3): `.github/workflows/harness-guards.yml` 은 harness update 가 frozen 파일로 박제 — 다운스트림 자체로 [TODO] 해소 불가 (upstream PR coseo12/harness-setting 영역). 본 가드는 **Phase 1 다운스트림 분기 영역** 에 한정, harness-managed 카테고리 제외 휴리스틱 필수.
 
@@ -983,12 +998,13 @@ orphan sidecars: 0
 
 ##### 결정점 1 — 시점 추적 방식
 
-| 방식 | 장점 | 단점 | 정합성 |
-|---|---|---|---|
-| **git blame** (TODO 토큰 라인 최초 commit 시점) | 신규 메타파일 0 + 운영 부담 0 + git history 신뢰 가능 | rebase / squash 시 시점 변형 위험 | **Amendment 8/9/10/11 단일 스크립트 통합 패턴 답습 (운영 부담 2배 회피)** |
-| 별도 메타파일 (`.harness/todo-discovery.json`) | rebase 영향 0 + 추적 명시적 | 신규 파일 추가 + 동기화 의무 + Amendment 9 §결정점 3 단일 스크립트 통합 위반 | 운영 부담 2배 |
+| 방식                                            | 장점                                                  | 단점                                                                         | 정합성                                                                    |
+| ----------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **git blame** (TODO 토큰 라인 최초 commit 시점) | 신규 메타파일 0 + 운영 부담 0 + git history 신뢰 가능 | rebase / squash 시 시점 변형 위험                                            | **Amendment 8/9/10/11 단일 스크립트 통합 패턴 답습 (운영 부담 2배 회피)** |
+| 별도 메타파일 (`.harness/todo-discovery.json`)  | rebase 영향 0 + 추적 명시적                           | 신규 파일 추가 + 동기화 의무 + Amendment 9 §결정점 3 단일 스크립트 통합 위반 | 운영 부담 2배                                                             |
 
 **결정: git blame** 채택. 근거:
+
 - rebase / squash 시점 변형 위험은 **본 프로젝트 운영 현실** 에서 marginal — 1인 운영 develop merge 정책 (gitflow squash 금지, merge commit 답습) + 본 가드는 develop tip 만 검사 (rebase 빈도 0)
 - 신규 메타파일 추가 = `.harness/manifest.json` SSoT 와 분리된 트러스트 상태 — Amendment 8 §sidecar 라이프사이클 (단일 SSoT) 정합 위반
 - Amendment 9/10/11 의 "단일 스크립트 통합 + 단일 SSoT" 패턴 답습
@@ -996,15 +1012,16 @@ orphan sidecars: 0
 
 ##### 결정점 2 — 임계 기간
 
-| 임계 후보 | 즉시 발화? | 운영 영향 | 정합성 |
-|---|---|---|---|
-| 7일 (agy 원안) | ✓ (1/4 즉시 발화) | self-leak — 가드 PR 자체가 위반 상태 진입 | Amendment 9 §결정점 1 self-test 자기 모순 회피 위반 |
-| 14일 | ✗ (buffer 5일) | 1 PR 머지 시 위반 가능 (편차 흡수 부족) | 중간 |
-| **30일** | ✗ (buffer 21일) | 3 PR 누적 + 1 sprint buffer | **Amendment 2 ~1 sprint 정합 + 30일 ≪ 90일 ≪ 시간 차원 우선순위 명확화** |
-| 60일 | ✗ (buffer 51일) | 가시화 효과 약함 | Amendment 2 90일 비대칭 약함 |
-| 90일 | ✗ (buffer 81일) | Amendment 2 SSoT 중복 (시간 차원 식별 약화) | Amendment 2 SSoT 정합 — 단 차원 식별 약화 |
+| 임계 후보      | 즉시 발화?        | 운영 영향                                   | 정합성                                                                   |
+| -------------- | ----------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
+| 7일 (agy 원안) | ✓ (1/4 즉시 발화) | self-leak — 가드 PR 자체가 위반 상태 진입   | Amendment 9 §결정점 1 self-test 자기 모순 회피 위반                      |
+| 14일           | ✗ (buffer 5일)    | 1 PR 머지 시 위반 가능 (편차 흡수 부족)     | 중간                                                                     |
+| **30일**       | ✗ (buffer 21일)   | 3 PR 누적 + 1 sprint buffer                 | **Amendment 2 ~1 sprint 정합 + 30일 ≪ 90일 ≪ 시간 차원 우선순위 명확화** |
+| 60일           | ✗ (buffer 51일)   | 가시화 효과 약함                            | Amendment 2 90일 비대칭 약함                                             |
+| 90일           | ✗ (buffer 81일)   | Amendment 2 SSoT 중복 (시간 차원 식별 약화) | Amendment 2 SSoT 정합 — 단 차원 식별 약화                                |
 
 **결정: 30일** 채택. 근거:
+
 - baseline 위반 0 + buffer 21일 — Amendment 9 §결정점 1 self-test 자기 모순 회피 정합 (가드 도입 PR 자체가 즉시 위반 상태로 진입하는 자가-fail 패턴 차단)
 - Amendment 2 ~1 sprint (3 PR 누적 / 30일) 정합 — `N=10 회차` (Phase 1 회차) ↔ `30일 경과` (TODO Aging) 두 시간 차원 비대칭 (회차 누적 더 빠른 임계, 시간 누적 더 느린 임계)
 - agy 원안 7일 거부 근거 박제: agy 가 "예: 7일 이상" 제시했으나 본 프로젝트 baseline 실측 (verify-z-pattern-health.mjs 9일 경과) 검증 후 거부. **measurement-first 원칙** (CLAUDE.md §"가드 설계 원칙" + §스프린트 계약 #10) 정합 — 외부 모델 broad 권고 → 다운스트림 실측 precision 정정 답습 (volt #51 외부 툴 주장 실측 가드 + Amendment 7/9/10 답습)
@@ -1012,13 +1029,14 @@ orphan sidecars: 0
 
 ##### 결정점 3 — harness-managed 카테고리 분리
 
-| 옵션 | 동작 | 정합성 |
-|---|---|---|
-| **A: harness-managed 제외 휴리스틱** | `.harness/manifest.json` 의 managed 경로 매트릭스 매칭 → 본 가드 검사 대상 제외 | **다운스트림 분기 영역 한정 (본 가드 본질 정합) + Y-회귀 영역 (#573) 직교** |
-| B: 모든 [TODO] 검사 (구분 없음) | harness-managed 파일도 30일 경과 시 발화 | false-positive 폭증 — `.github/workflows/harness-guards.yml` 31일 경과 즉시 발화, 다운스트림 해소 불가 (upstream 영역) — 본 가드 발화 무용 |
-| C: 별도 임계 (harness-managed = 90일 / Phase 1 = 30일) | 카테고리별 임계 분리 | 임계값 정의 복잡도 증가 + Y-회귀 (#573) 영역 침범 |
+| 옵션                                                   | 동작                                                                            | 정합성                                                                                                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A: harness-managed 제외 휴리스틱**                   | `.harness/manifest.json` 의 managed 경로 매트릭스 매칭 → 본 가드 검사 대상 제외 | **다운스트림 분기 영역 한정 (본 가드 본질 정합) + Y-회귀 영역 (#573) 직교**                                                                |
+| B: 모든 [TODO] 검사 (구분 없음)                        | harness-managed 파일도 30일 경과 시 발화                                        | false-positive 폭증 — `.github/workflows/harness-guards.yml` 31일 경과 즉시 발화, 다운스트림 해소 불가 (upstream 영역) — 본 가드 발화 무용 |
+| C: 별도 임계 (harness-managed = 90일 / Phase 1 = 30일) | 카테고리별 임계 분리                                                            | 임계값 정의 복잡도 증가 + Y-회귀 (#573) 영역 침범                                                                                          |
 
 **결정: 옵션 A (harness-managed 제외 휴리스틱)** 채택. 근거:
+
 - 본 가드는 **Phase 1 다운스트림 분기 영역** silent leak 차단 본질 — harness-managed (upstream 영역) 은 #573 (Y-회귀 doctor mute) 영역
 - `.github/workflows/harness-guards.yml` (31일 경과) 은 harness update v3.6.0 → v3.7.x 등 upstream 릴리스 대기 영역 — 다운스트림 해소 불가
 - Amendment 5 (upstream 리뷰 피드백 동기화 의무) 와 직교 — harness-managed 파일의 [TODO] 갱신은 upstream PR 영역
@@ -1026,26 +1044,28 @@ orphan sidecars: 0
 
 ##### 결정점 4 — 발화 형태
 
-| 옵션 | 동작 | 정합성 |
-|---|---|---|
-| A: hard-fail (Amendment 8 답습) | 30일 경과 시 CI fail | 1인 운영 부담 폭증 (Phase 2 강제 머지 압력) — Amendment 9 §결정점 4 silent 가드 강화 vs 약화 비대칭 정합 위반 |
-| **B: soft-warn (Amendment 9/10 답습)** | 30일 경과 시 `[TODO Aging Trigger]` 자동 이슈 + 라벨 부착 (CI exit 0) | **Amendment 9/10 답습 — sidecar 라이프사이클 fail-fast 비대칭 의도적** |
-| C: Hybrid | 30일 → soft-warn / 60일 → hard-fail (에스컬레이션) | Amendment 11 §교차검증 §기각한 외부 모델 제안 (agy 60일 hard-block 에스컬레이션) 답습 거부 |
+| 옵션                                   | 동작                                                                  | 정합성                                                                                                        |
+| -------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| A: hard-fail (Amendment 8 답습)        | 30일 경과 시 CI fail                                                  | 1인 운영 부담 폭증 (Phase 2 강제 머지 압력) — Amendment 9 §결정점 4 silent 가드 강화 vs 약화 비대칭 정합 위반 |
+| **B: soft-warn (Amendment 9/10 답습)** | 30일 경과 시 `[TODO Aging Trigger]` 자동 이슈 + 라벨 부착 (CI exit 0) | **Amendment 9/10 답습 — sidecar 라이프사이클 fail-fast 비대칭 의도적**                                        |
+| C: Hybrid                              | 30일 → soft-warn / 60일 → hard-fail (에스컬레이션)                    | Amendment 11 §교차검증 §기각한 외부 모델 제안 (agy 60일 hard-block 에스컬레이션) 답습 거부                    |
 
 **결정: 옵션 B (soft-warn)** 채택. 근거:
+
 - Amendment 9 (drift 카운트) / Amendment 10 (TODO 해소) silent 가드 약화 vs 강화 비대칭 트레이드오프 답습 — **TODO 시간 누적 = 사후 행동 (Phase 2 PR 제출 또는 Phase 1 revert) → hard-block 불가 (시점 차이)**
 - Amendment 11 §교차검증 §기각 (agy 60일 hard-block 에스컬레이션 거부 — silent 가드 약화↔강화 차원에 시간 차원 신규 도입 = Amendment 2 (N=10/90일) + Amendment 9 (N=10 drift 카운트) 직교 박제 본질 훼손) 답습
 - 1인 운영 현실 (Amendment 2 옵션 C SSoT) — hard-fail 시 Phase 2 PR 머지 압력 폭증
 
 ##### 결정점 5 — 통합 위치
 
-| 후보 | 비용 | 정합성 |
-|---|---|---|
-| 신규 스크립트 (`verify-todo-aging.mjs`) | 별도 파일 + CI step 추가 | Amendment 9 §결정점 3 / Amendment 10 §결정점 1 / Amendment 11 §결정점 1 단일 스크립트 통합 패턴 답습 위반 |
-| `verify-z-pattern-health.mjs` 확장 | Phase 2 진행률 + TODO Aging 차원 혼재 | 책임 결합 — Phase 2 진행률 (회차 누적) vs TODO Aging (시간 누적) 다른 차원 |
+| 후보                                          | 비용                                                                             | 정합성                                                                                                                              |
+| --------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 신규 스크립트 (`verify-todo-aging.mjs`)       | 별도 파일 + CI step 추가                                                         | Amendment 9 §결정점 3 / Amendment 10 §결정점 1 / Amendment 11 §결정점 1 단일 스크립트 통합 패턴 답습 위반                           |
+| `verify-z-pattern-health.mjs` 확장            | Phase 2 진행률 + TODO Aging 차원 혼재                                            | 책임 결합 — Phase 2 진행률 (회차 누적) vs TODO Aging (시간 누적) 다른 차원                                                          |
 | **`verify-harness-drift-decorator.mjs` 통합** | 이미 [TODO] 토큰 탐지 보유 (`detectDriftFiles()`) + git blame 추가 = ~40-60 라인 | **drift 검증 + drift 카운트 (Amendment 9) + sidecar-cleanup (Amendment 11) + TODO Aging (본 Amendment 12) 단일 입력 단일 스크립트** |
 
 **결정: `verify-harness-drift-decorator.mjs` 통합** 채택. 근거:
+
 - 본 스크립트의 `detectDriftFiles()` 가 이미 drift 파일 + [TODO] 토큰 검색 — git blame 호출 추가 = ~40-60 라인. self-test 인라인 3중 시뮬레이션 패턴 답습 가능
 - **CLI 모드 분기 SSoT 확장**: 기존 `--mode=verify` (Amendment 8) / `--mode=count-warn` (Amendment 9) / `--mode=sidecar-cleanup` (Amendment 11) + 신규 **`--mode=todo-aging`** (Amendment 12)
 - Amendment 9/10/11 의 "단일 스크립트 통합 + 단일 SSoT" 패턴 답습
@@ -1126,16 +1146,16 @@ orphan sidecars: 0
   4. **데코레이터 + 사이드카 (Amendment 8) 추적성 탁월** — JSON 사이드카 합리적 차선책
   5. **인터페이스 명확성 — 하드블록 vs 소프트워닝 분리 = 엔지니어링 모범 사례** (Amendment 8/9/10/11/12 silent 가드 비대칭 SSoT 답습 정합)
 - **Amendment 12 직접 검증 간접 확인 (핵심)**:
-  - agy §6 §누락 요소 §CRITICAL VULNERABILITY 가 본 Amendment 12 영역을 정확히 식별: *"개발자가 `[TODO]` 상태로 머지한 후 업스트림 PR 생성을 잊어버리면, CI 가드는 데코레이터가 존재하므로 통과시키고 결과적으로 시스템은 영구 포크(Y) 상태로 조용히 전락"*
+  - agy §6 §누락 요소 §CRITICAL VULNERABILITY 가 본 Amendment 12 영역을 정확히 식별: _"개발자가 `[TODO]` 상태로 머지한 후 업스트림 PR 생성을 잊어버리면, CI 가드는 데코레이터가 존재하므로 통과시키고 결과적으로 시스템은 영구 포크(Y) 상태로 조용히 전락"_
   - agy 가 본 ADR 의 Amendment 12 자체 본문을 직접 평가하지 않고 (ADR 본문 통째 입력의 토큰 제한 영향 추정) 누락 요소로 동일 영역 지적 — **본 Amendment 12 의 영역 정당성 간접 확인** (agy ≈ Claude 합의)
 - **이견 수용 (본 PR 즉시 반영)**: 0건 — agy CRITICAL 권고 (hard-fail) 와 Claude 정정 (30일 soft-warn) 의 차원이 다르며 (즉시 차원 vs 시간 누적 차원), Claude 정정이 Amendment 10 §결정점 3 SSoT 정합. 본 §교차검증 §기각 항목 참조
 - **Claude 재분석으로 기각한 외부 모델 제안 (2건)**:
   1. **agy CRITICAL §6 — `develop`/`main` 머지 PR 검증 단계 `[TODO]` 포함 시 CI Hard-fail**:
-     - agy 권고: PR 검증 스크립트 (`verify-harness-drift-decorator.mjs`) 에 브랜치 컨텍스트 검증 추가. feature/* 에서는 [TODO] 허용, develop/main 대상 머지 PR 에서는 [TODO] = CI Hard-fail (실제 PR URL 만 허용)
+     - agy 권고: PR 검증 스크립트 (`verify-harness-drift-decorator.mjs`) 에 브랜치 컨텍스트 검증 추가. feature/\* 에서는 [TODO] 허용, develop/main 대상 머지 PR 에서는 [TODO] = CI Hard-fail (실제 PR URL 만 허용)
      - **기각 근거 1 (차원 정합)**: agy 권고는 **머지 시점 차원** (브랜치 컨텍스트 즉시 차단), 본 Amendment 12 는 **시간 누적 차원** (30일 경과 시 soft-warn). 둘은 차원이 다르며 **본 Amendment 12 시간 누적 차원이 Amendment 10 SSoT 정합** — 머지 시점 즉시 차단 = Phase 1 작업 자체 차단 (Amendment 10 자동 해소 의도 무효화)
      - **기각 근거 2 (Amendment 10 §결정점 3 §발화 형태 SSoT 정합 위반)**: Amendment 10 §결정점 3 가 "hard-fail 거부 — Phase 2 머지 직후 1~3 사이클 내 자연 해소 가능 + 1인 운영 부담 가속" 명시. agy hard-fail 권고는 Amendment 10 SSoT 직접 위반. 본 Amendment 12 의 soft-warn 채택이 정합
      - **기각 근거 3 (1인 운영 트레이드오프, Amendment 2 SSoT 정합)**: 머지 시점 hard-fail = upstream PR 제출 강제 압력 폭증 → Amendment 2 §"silent 가드 약화 트레이드오프 (CRITICAL)" §"1인 운영 현실 대응 완화" SSoT 위반
-     - **기각 근거 4 (Amendment 11 §교차검증 §기각 답습)**: Amendment 11 가 이미 agy 의 "60일 hard-block 에스컬레이션" 권고를 *"silent 가드 약화↔강화 차원에 시간 차원 신규 도입 → Amendment 2 (N=10/90일) + Amendment 9 (N=10 drift 카운트) 직교 박제 본질 훼손"* 근거로 기각. 본 Amendment 12 의 agy hard-fail 권고 기각이 답습 (시간 차원 신규 도입 자체는 본 Amendment 12 본질 — 단 hard-fail 형태가 아닌 soft-warn 형태)
+     - **기각 근거 4 (Amendment 11 §교차검증 §기각 답습)**: Amendment 11 가 이미 agy 의 "60일 hard-block 에스컬레이션" 권고를 _"silent 가드 약화↔강화 차원에 시간 차원 신규 도입 → Amendment 2 (N=10/90일) + Amendment 9 (N=10 drift 카운트) 직교 박제 본질 훼손"_ 근거로 기각. 본 Amendment 12 의 agy hard-fail 권고 기각이 답습 (시간 차원 신규 도입 자체는 본 Amendment 12 본질 — 단 hard-fail 형태가 아닌 soft-warn 형태)
      - **양립 가치 박제**: agy hard-fail 권고는 본 PR 비-범위로 거부했으나 **머지 시점 차원** 자체는 별도 후속 분리 가치 있음 (low 우선순위 — Amendment 12 30일 buffer 가 1인 운영에서 충분한지 운영 사이클 1~3 회 측정 후 정정 가능). 후속 분리 영역 박제
   2. **agy §6 §누락 요소 §2 — Prettier 무시 설정 강제화**:
      - agy 권고: ADR 배경에 `.prettierignore` 블록 보호 명시했으나 Phase 1 운영 절차에 ".prettierignore 임시 등록" 의무화 부재. lint-staged / prettier 가 데코레이터 박제 파일을 변조하여 해시 불일치 충돌 가속 위험
@@ -1149,3 +1169,230 @@ orphan sidecars: 0
   - (c) 폐기 프레이밍 → ✓ Amendment 10 (TODO 해소 자동화) 폐기 아님. 보완 (시간 누적 차원 — 매칭 실패 + 시간 경과 시 발화) — 양립. agy hard-fail 권고도 Amendment 10 폐기 프레이밍 위반으로 기각 (§기각 §1 §기각 근거 2)
   - (d) 순수주의 → ✓ "agy 제안 7일 hard-block" broad 권고 도그마 회피 — baseline 실측 (verify-z-pattern-health 9일 경과) + 30일 soft-warn + harness-managed 제외 (precision 정정) 채택. agy CRITICAL hard-fail 권고도 동일 도그마 회피 패턴으로 기각 (§기각 §1)
 - **cross-validate 후속 분리 박제 의무 (volt #29 §3)**: 본 §고유 발견 2 (CLI 헬퍼) 는 본 PR 머지 직후 즉시 후속 이슈 생성 의무 여부 사용자 결정 — PM 단계 위임 가능 (architect → PM 인계 보고에 명시 박제). 우선순위 low — 1인 운영 박제 빈도 < 5건 marginal.
+
+## Amendment 13 — 2026-06-30
+
+상태: Accepted (cross-validate 2026-06-30 — agy Antigravity, §교차검증 반영 사항 4축 분류 + Claude 편향 셀프 체크 본문 통합 완료)
+
+> **forensic 변형 채택**: 본 Amendment 는 일반 Amendment 형식을 따르되 forensic ADR 변형 (§Forensic ADR 변형, CLAUDE.md) 의 측정 데이터 박제 + 가설 비교 + 5±2 옵션 비교를 강화한다. forensic 5조건 판정은 §forensic 판정 참조.
+
+- **발의**: [#766](https://github.com/coseo12/astro-simulator/issues/766) ([Alert Fatigue Trigger] 자동 탐지 2026-06-29 — §재검토 조건 #6 / §Amendment 9 §결정점 2 옵션 A 가 규정한 결정 분기 의무 이행)
+- **트리거**: Amendment 9 §재검토 조건 #6 단일 발화 — 활성 drift 파일 수 = N=10 도달 (경계 발화). §재검토 조건 #5 (Phase 2 진행률) 는 미발화 (실측 §forensic 측정 참조) → 본 Amendment 13 은 #6 차원 단독 결정 분기.
+- **forensic 변형 사유**: §재검토 조건 #6 발화는 단순 임계 도달이 아니라 **카운트 모수 자체의 구성 (구조적 기여 가능 vs 불가능 자산 혼재)** 이 핵심 쟁점 — runtime 측정 (manifest 분류 실측) 없이 옵션 결정 불가. Amendment 4/6 (§재검토 조건 #5 발화 후속 결정) 의 단순 "Phase 2 진행" 답습으로는 본 발화의 40~50% 구조적 divergent 자산을 영구 해소 불가능.
+
+### forensic 판정 (5조건 중 4개 충족 → forensic 측정 데이터 박제)
+
+| 조건                        | 충족     | 근거                                                                                                                                                                                        |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. 가설 N≥2                 | ✓        | "drift 10 = Z 패턴 과누적" (가설 A) vs "drift 10 = 카운트 모수에 구조적 divergent 자산 혼재" (가설 B). 실측으로 가설 B 확정 (§forensic 측정 §가설 검증)                                     |
+| 2. Runtime 측정 데이터 필수 | ✓        | `--mode=count-warn` / `--mode=verify` + `.harness/manifest.json` 277 파일 분류 실측이 옵션 결정의 결정적 근거. 정적 코드 리뷰만으로 "어느 4~5개가 구조적 기여 불가능한지" 판별 불가         |
+| 3. DoD PASS 인데 회귀       | △ (부분) | `decorator PASS: 10 / FAIL: 0` (Amendment 8 가드 통과) 인데 `[Alert Fatigue Trigger]` 발화 (Amendment 9 가드 신호). "데코레이터 정합인데 카운트 임계 도달" = 측정 통과 ↔ 운영 신호 mismatch |
+| 4. 5±2 옵션 비교            | ✓        | 옵션 1 / 2 / 3 / 3′ + 조합 (3′+1) — §옵션 비교 참조                                                                                                                                         |
+| 5. Amendment 라운드 N 예상  | ✓        | (1) 본 Amendment cross-validate 후속 갱신 예상 (2) N=10 의 baseline 정제 후 buffer 재발화 가능 (3) allowlist 진입 조건의 운영 1~3 사이클 후 정정 가능                                       |
+
+→ 4개 충족 (1/2/4/5 명확, 3 부분) ≥ 3 → forensic 측정 데이터 박제 의무. 단 본 건은 §Amendment 9 §재검토 조건 #6 의 결정 분기 이행이므로 **Amendment 섹션 구조** 를 유지 (신규 forensic ADR 파일 분리 시 §재검토 조건 #6 ↔ 결정이 다른 문서로 흩어져 추적성 손실 — §Amendment vs 신규 ADR 판정 참조).
+
+### Amendment vs 신규 ADR 판정 → Amendment 13 채택
+
+- **판정: 동일 ADR 의 Amendment 13**. 근거:
+  1. **§Amendment 9 §재검토 조건 #6 의 결정 분기 이행** — Amendment 9 가 "트리거 발화 시 3 영업일 내 결정 분기 의무" 를 규정. 그 이행은 같은 ADR 의 Amendment 가 정합 (Amendment 4/6 이 §재검토 조건 #5 발화 후속 결정을 같은 ADR Amendment 로 박제한 선례 답습)
+  2. **결정이 기존 §재검토 조건 #6 / §Amendment 9 §결정점 5 (임계 비교 대상) 를 직접 갱신** — 옵션 3′ (영구 divergent allowlist) 채택 시 카운트 모수 정의 (`detectDriftFiles().length` → allowlist 제외 후 카운트) 가 변경됨. 이는 Amendment 9 §결정점 5 SSoT 갱신이므로 동일 ADR 내 박제가 추적성 보장
+  3. **신규 ADR 분리 거부 근거** — Z 패턴 / drift 가드 라이프사이클은 본 ADR 단일 SSoT. 분리 시 "왜 카운트 모수가 정제됐는가" 가 §Amendment 9 와 분리되어 미래 관찰자가 재구성 불가
+
+### 변경 사항
+
+#### 1. §재검토 조건 #6 결정 분기 결과 — 옵션 3′ + 부분 옵션 1 (조합 채택)
+
+- **결정 요약**: (3′) 영구 divergent allowlist 도입으로 카운트 모수 정제 (구조적 기여 불가능 자산 제외) + (1) allowlist 비대상 텍스트 파일 5개의 Phase 2 (upstream 기여) 점진 진행. 옵션 2 (revert) / 옵션 3 (N 재조정) 거부.
+- **옵션 3′ 가 silent 약화 (옵션 3) 가 아니라 측정 정밀화인 핵심 논거**: N=10 임계는 **변경 없이 유지**. 변경되는 것은 **카운트 모수** (무엇을 "활성 Z 패턴 적용 drift" 로 셀 것인가). 구조적으로 upstream 기여 불가능한 자산 (천체 시뮬 README 스크린샷) 은 §Amendment 9 §결정점 5 가 정의한 측정 본질 ("Z 패턴 활성 적용 누적") 의 모수가 **아니다**. 이미 §Amendment 9 §결정점 5 가 orphan sidecar 를 동일 논거 (측정 의미 혼재 회피) 로 제외한 선례와 같은 계열 — orphan 제외가 silent 약화가 아니듯, 구조적 divergent 제외도 측정 정밀화. 자세한 구분 기준은 §변경 사항 3 박제.
+
+#### 2. 영구 divergent allowlist 설계 (옵션 3′ 채택분)
+
+- **자료 구조 SSoT**: `scripts/verify-harness-drift-decorator.mjs` 내부 상수 `PERMANENT_DIVERGENT_ALLOWLIST` — `{ path, reason, structuralProof }` 객체 배열. 별도 JSON 파일 분리 거부 (Amendment 9 §결정점 5 단일 스크립트 통합 패턴 답습 — 측정 SSoT 와 모수 정의가 같은 파일에 있어야 추적성 보장)
+- **카운트 적용 지점**: `runCountWarn()` 의 `detectDriftFiles()` 결과에서 allowlist `path` 매칭 파일 제외 후 `count` 산출. `runVerify()` (Amendment 8 데코레이터 가드) 는 **영향 없음** — 데코레이터 의무는 모든 drift 파일에 유지 (allowlist 자산도 데코레이터 면제 아님. PNG binary 는 기존대로 `unknown` 포맷 면제, 단 manifest 등록 자산이므로 카운트 모수에서만 제외)
+- **(a) allowlist 항목별 사유 박제 의무**: 각 항목에 `reason` (1줄 요약) + `structuralProof` (구조적 기여 불가능 입증 — 아래 진입 조건 충족 근거) 필드 필수. 빈 사유 항목 박제 시 self-test FAIL (회귀 가드)
+- **(b) allowlist 자체 회귀 가드** (4중 — cross-validate 2026-06-30 으로 4번 Forbidden Path 추가):
+  1. **항목 schema 검증** — self-test 에서 모든 항목이 `path` / `reason` / `structuralProof` non-empty string 보유 검증. 누락 시 FAIL
+  2. **진입 조건 입증 검증 (positive — allow-list 매칭)** — 각 항목의 `structuralProof` 가 진입 조건 (§아래) 식별자 중 1건 이상 매칭 검증. 임의 사유 박제 차단. `structuralProof` 는 진입 조건 식별자 (`content-asset` / `domain-doc` / `perpetual-rewrite`) 의 Enum 배열로 관리 — `includes()` 부분 문자열이 아닌 정확 매칭 (cross-validate agy 고유 발견 2 수용 — 매칭 인터페이스 규격 명시)
+  3. **stale 항목 검증** — allowlist `path` 가 실제 manifest 에 등록되어 있고 + 현재 drift 상태인지 검증. manifest 미등록 OR drift 해소 항목은 stale → self-test WARN (Amendment 11 orphan sidecar 정리 패턴 답습 — allowlist 무한 잔존 방지). **stale WARN → FAIL 에이징 (PR=WARN / 릴리스=FAIL 이원화) 은 후속 분리** (cross-validate agy 고유 발견 3 — Amendment 12 TODO Aging Guard 동일 패턴, 운영 데이터 1~3 사이클 축적 후)
+  4. **Forbidden Path 차단 검증 (negative — deny-list 하드 가드)** — allowlist `path` 가 범용 harness 가드/페르소나 deny-list 패턴 (`FORBIDDEN_ALLOWLIST_PATH_PATTERNS` SSoT — `scripts/(서브디렉토리/)verify-*.{mjs,cjs,js,sh}`, `(루트/중첩)CLAUDE.md`, `.claude/agents/*.md`, `.claude/skills/**`, `.github/workflows/*.yml`) 에 매칭되면 **self-test FAIL** (WARN 아님 — 우회 차단은 hard-fail). 진입 조건 매칭 (positive 2번) 을 통과해도 deny-list 매칭 시 무조건 FAIL. **근거**: cross-validate agy 보안 고유 발견 1 — allowlist 가 옵션 1 (Phase 2 upstream 기여) 회피의 우회로로 악용될 위험 (개발자가 CI 통과 위해 범용 가드를 `reason`/`structuralProof` 허위 작성으로 위장 등록) 을 기계적으로 차단. **deny-list 완전성 확장 (reviewer 권고 1, 2026-06-30 본 PR 반영)**: 초기 `scripts/verify-*.mjs` 만 매칭하던 패턴을 `.sh` 가드 (`verify-agent-ssot.sh` 등) + 서브디렉토리 (`scripts/sub/verify-*.mjs`) + 중첩 `CLAUDE.md` 까지 확장 — 의도 ("범용 가드 진입 불가") 와 구현 매칭 정합. §변경 사항 2 (d) 진입 금지 자산 목록의 _설명_ 을 _기계 검증_ 으로 승격 (positive 진입 조건과 직교 보강)
+- **(c) "측정 정밀화 vs 약화" 구분 기준 (ADR 명문화)**:
+
+  | 구분        | 측정 정밀화 (allowlist 정당)                                  | silent 약화 (금지 — 옵션 3)                          |
+  | ----------- | ------------------------------------------------------------- | ---------------------------------------------------- |
+  | 변경 대상   | 카운트 **모수** (무엇을 셀 것인가)                            | 카운트 **임계** (N 값)                               |
+  | 정당화 근거 | 구조적 기여 불가능 **입증** (객관)                            | 발화 빈도 부담 (주관)                                |
+  | 측정 본질   | §Amendment 9 §결정점 5 "Z 패턴 활성 적용 누적" 모수 정합 보존 | 측정 본질 훼손 (적용 누적인데 임계만 완화)           |
+  | 선례        | orphan sidecar 제외 (§결정점 5)                               | Amendment 2 N=3→10 (의식적 silent 약화 트레이드오프) |
+  - **판정 질문 (allowlist 진입 전 의무)**: "이 자산을 카운트에서 빼는 이유가 (A) 구조적으로 upstream 기여가 불가능함을 입증할 수 있어서인가, (B) 단지 발화가 잦아 부담스러워서인가?" → A 만 allowlist 정당. B 는 옵션 3 (silent 약화) 이므로 Amendment 2/7 §결정 CRITICAL 절차 (의식적 약화 박제) 경유 의무
+
+- **(d) allowlist 진입 조건 (구조적 기여 불가능 입증 — 무한 팽창 차단)**: 아래 식별자 중 **1건 이상** 충족 + `structuralProof` 에 명시 의무:
+  1. **콘텐츠 자산 (`content-asset`)** — manifest 에 harness 데모/플레이스홀더 자산으로 등록됐으나 프로젝트가 자기 도메인 콘텐츠로 영구 교체. 범용 harness 템플릿에 기여 시 부적절 (예: 천체 시뮬 스크린샷). 추가 입증: 프로젝트 문서 (README 등) 직접 참조 + 도메인 고유성
+  2. **도메인 고유 문서 (`domain-doc`)** — 프로젝트 도메인 전용 로드맵/기획/회고 등. harness 가 빈 템플릿/예시로 제공했으나 프로젝트 고유 내용으로 영구 교체. 범용성 0 (예: `roadmap-v3-incremental.md` 천체 시뮬 전용)
+  3. **재교체 영속성 (`perpetual-rewrite`)** — 정기 운영 (릴리스마다 README 스크린샷 갱신 등) 으로 sha 가 영구 재변경되어 upstream 기여로 1회 해소 불가능. 보조 입증 — 위 1/2 와 AND 결합 가능
+- **진입 조건 미충족 자산 (allowlist 금지)**: `.claude/agents/*.md`, `CLAUDE.md`, `scripts/verify-*.mjs`, `.claude/skills/**`, `.github/workflows/*.yml` 등 **범용 harness 가드/페르소나** 는 진입 불가 — 이들은 옵션 1 (Phase 2 upstream 기여) 의 정당한 대상. allowlist 로 빼면 진짜 silent 약화. **이 목록은 §변경 사항 2 (b) 4번 Forbidden Path 회귀 가드 (negative deny-list hard-fail) 로 기계 검증** — 설명에 그치지 않고 self-test 가 deny-list 매칭 시 무조건 FAIL (cross-validate 2026-06-30 수용)
+
+#### 3. orphan 제외 로직과의 정합성
+
+- **동일 계열 입증**: §Amendment 9 §결정점 5 가 orphan sidecar 를 "측정 의미 혼재 회피 — Phase 3 정리 누락 ≠ Z 패턴 누적" 논거로 카운트에서 제외했다. allowlist 는 같은 논거의 확장 — "구조적 divergent 자산 ≠ Z 패턴 활성 적용 누적". 둘 다 **N 임계 불변 + 모수 정제**
+- **구현 정합**: `runCountWarn()` 에서 orphan 제외 (이미 `detectDriftFiles()` 가 orphan 미포함) 와 동일 지점에 allowlist 제외 추가. 측정 의미 SSoT 단일화
+
+#### 4. Z-패턴 재귀 처리 (가드가 자기 자신의 카운트 모수를 바꿈)
+
+- **재귀 구조 명시**: 옵션 3′ 구현은 `scripts/verify-harness-drift-decorator.mjs` (이미 `[TODO]` drift 상태) 를 수정한다. 이 파일은 manifest 등록 + 현재 drift 상태 + Amendment 9 카운트 모수의 일부 (= 10개 중 1개 아님 — 확인: 본 파일은 현재 drift 10 목록에 **미포함**. §forensic 측정 참조). 단 옵션 3′ 가 본 파일을 추가 수정하면 sha 가 manifest 와 더 멀어진다 (drift 심화). 그러나 **새 drift 파일 수 증가는 0** (이미 drift 상태 파일의 sha 변경일 뿐)
+- **재귀 안전성 박제**:
+  1. **카운트 모수 자기 참조 회피** — allowlist 에 `verify-harness-drift-decorator.mjs` 자신을 넣지 **않는다**. 본 파일은 범용 harness 가드 (옵션 1 대상) 이지 구조적 divergent 아님. 자기 자신을 모수에서 빼면 Amendment 7 의 자기참조 인플레이션 (측정 식이 자기 진화를 카운트) 의 역방향 변형 (측정 식이 자기를 카운트에서 누락) 발생 → 금지
+  2. **수정 후 즉시 재발화 여부 실측 의무** — developer 단계에서 옵션 3′ 구현 후 `--mode=count-warn` 재실행. allowlist 제외로 count 가 N 미만 (예: 10 → 6, 스크린샷 4 제외) 으로 떨어지는지 실측. 만약 모수 정제 후에도 여전히 ≥ N 이면 옵션 1 (Phase 2) 병행이 카운트 해소의 주 경로임을 박제
+  3. **가드가 자기 카운트를 바꾸는 것의 정당성** — Amendment 7 forensic (측정 식이 자기 진화 PR 을 카운트하는 인플레이션 정정) 과 동일 패턴. 측정 도구가 측정 대상의 일부일 때, 모수 정의를 명시적으로 정제하는 것은 self-reference 결함의 **해소** 이지 도입이 아님. 단 §재귀 안전성 1 (자기 자신 미포함) 로 역방향 결함 차단
+
+### 옵션 비교 (§재검토 조건 #6 결정 분기 — 5±2 옵션 축별 trade-off)
+
+| 축                                           | 옵션 1 (Phase 2 가속)           | 옵션 2 (Phase 1 부분 revert)     | 옵션 3 (N 임계 재조정)               | **옵션 3′ (영구 divergent allowlist)** |
+| -------------------------------------------- | ------------------------------- | -------------------------------- | ------------------------------------ | -------------------------------------- |
+| **drift 10 해소 범위**                       | 텍스트 5개만 (upstream 머지 시) | revert 한 만큼                   | 즉시 (임계만 올림)                   | 스크린샷 4 + roadmap 1 = 5개 모수 제외 |
+| **구조적 divergent (스크린샷/roadmap) 처리** | ✗ 영구 해소 불가 (기여 부적절)  | revert 시 프로젝트 자산 손실     | 카운트만 회피 (모수 그대로)          | ✓ 모수 정제로 영구 정합                |
+| **silent 약화 여부**                         | 약화 0 (정공법)                 | 약화 0 (단 자산 손실)            | **약화 (Amendment 2/7 사이클 답습)** | **약화 0 (모수 정제 = 측정 정밀화)**   |
+| **measurement-first 정합**                   | —                               | —                                | ✗ (주관적 부담 기반)                 | ✓ (구조적 입증 기반)                   |
+| **운영 부담**                                | upstream PR 5건 제출 (점진)     | 프로젝트 교훈/가드 손실 (부적절) | 0 (임계 변경)                        | allowlist 박제 + 회귀 가드 (~1회)      |
+| **§Amendment 9 §결정점 5 정합**              | —                               | —                                | 임계 변경 (결정점 1 위반)            | ✓ orphan 제외 동일 계열                |
+| **무한 팽창 위험**                           | —                               | —                                | 임계 무한 완화 사이클                | 진입 조건 (구조적 입증) 으로 차단      |
+
+- **옵션 2 거부**: 스크린샷/roadmap revert = 천체 시뮬 README/로드맵 손실 (프로젝트 정체성 손실, 부적절). 텍스트 5개 revert = 프로젝트 고유 교훈/가드 손실. CLAUDE.md §"인계 항목 실측 재검증" / 본 ADR 의 Z 패턴 (Phase 1 선반영 가치) 자체를 부정. 거부
+- **옵션 3 거부**: N=10 → 더 큰 N 은 Amendment 2 (N=3→10) / Amendment 7 (측정 식 정정) 이 경고한 silent 약화 사이클 답습. 게다가 모수 (구조적 divergent 자산 포함) 를 그대로 둔 채 임계만 올리면 진짜 Z 패턴 누적 (텍스트 5개) 까지 함께 가려져 측정 본질 훼손. 거부
+- **옵션 3′ + 부분 옵션 1 조합 채택**: 모수 정제 (구조적 divergent 제외) 로 카운트가 정직해지고 (10 → ~6), 잔여 5개 텍스트 파일은 옵션 1 (upstream 기여) 의 정당한 대상으로 남겨 Phase 2 진행률 (#5 차원) 로 자연 해소. 두 축 직교 보존
+
+### forensic 측정 데이터 박제 (2026-06-30, develop tip 907df88)
+
+#### 가설 검증
+
+- **가설 A (기각)**: "drift 10 = Z 패턴이 10회 과도하게 적용된 누적" → 만약 참이면 10개 전부 upstream 기여 가능한 Z 패턴 적용분이어야 함. **반증**: 4개 (스크린샷) 는 manifest 데모 자산을 도메인 콘텐츠로 교체한 것으로 Z 패턴 (harness 가드/페르소나 선반영) 과 무관. 1개 (roadmap) 도 도메인 전용 문서
+- **가설 B (확정)**: "drift 10 = 카운트 모수에 구조적 divergent 자산이 혼재" → manifest 분류 실측으로 확정 (아래 표)
+
+#### 측정 1 — `--mode=count-warn` (활성 drift 카운트)
+
+```text
+harness drift files: 10
+alert fatigue threshold (N): 10
+[Alert Fatigue Trigger] drift 10 >= N=10
+```
+
+#### 측정 2 — `--mode=verify` (데코레이터 정합)
+
+```text
+harness drift files: 10
+decorator PASS: 10
+decorator FAIL: 0
+orphan sidecars: 0
+```
+
+→ 데코레이터는 전부 정합. 순수하게 "drift 파일 수 도달" 이 발화 원인 (데코레이터 누락 문제 아님). DoD PASS ↔ 운영 신호 mismatch (forensic 조건 3 부분 충족).
+
+#### 측정 3 — drift 10개 카테고리 분류 (`.harness/manifest.json` 277 파일 교차)
+
+| #   | 파일                                    | manifest 등록 | 데코레이터 | 카테고리              | upstream 기여                           |
+| --- | --------------------------------------- | ------------- | ---------- | --------------------- | --------------------------------------- |
+| 1   | `CLAUDE.md`                             | ✓             | `[TODO]`   | 범용 harness 워크플로 | ✓ 옵션 1 대상                           |
+| 2   | `.claude/agents/architect.md`           | ✓             | `[TODO]`   | 범용 페르소나         | ✓ 옵션 1 대상                           |
+| 3   | `.claude/agents/pm.md`                  | ✓             | `[TODO]`   | 범용 페르소나         | ✓ 옵션 1 대상                           |
+| 4   | `.github/workflows/harness-guards.yml`  | ✓             | `[TODO]`   | 범용 CI 가드          | ✓ 옵션 1 대상                           |
+| 5   | `scripts/verify-z-pattern-health.mjs`   | ✓             | `[TODO]`   | 범용 Z 패턴 가드      | ✓ 옵션 1 대상                           |
+| 6   | `docs/phases/roadmap-v3-incremental.md` | ✓             | `[TODO]`   | **도메인 전용 문서**  | ✗ `domain-doc`                          |
+| 7   | `docs/screenshots/01-solar-system.png`  | ✓             | (PNG 면제) | **콘텐츠 자산**       | ✗ `content-asset` + `perpetual-rewrite` |
+| 8   | `docs/screenshots/02-earth-focus.png`   | ✓             | (PNG 면제) | **콘텐츠 자산**       | ✗ `content-asset` + `perpetual-rewrite` |
+| 9   | `docs/screenshots/03-neptune.png`       | ✓             | (PNG 면제) | **콘텐츠 자산**       | ✗ `content-asset` + `perpetual-rewrite` |
+| 10  | `docs/screenshots/04-mobile.png`        | ✓             | (PNG 면제) | **콘텐츠 자산**       | ✗ `content-asset` + `perpetual-rewrite` |
+
+- **구조적 기여 불가능 자산**: 5개 (#6 roadmap + #7~10 스크린샷) = **N=10 의 50%**. 메인 분석 (스크린샷 4 = 40%) 보다 roadmap 포함 시 50% — 옵션 1 (upstream 기여) 로 영구 해소 불가능한 비중이 절반
+- **스크린샷 영속성 입증**: README.md line 9 / 31 직접 참조 (천체 시뮬 데모 이미지). git log 상 `v0.35.1 prep (#745)` 등 릴리스마다 README 스크린샷 갱신 — `perpetual-rewrite` (정기 sha 재변경) 확정. upstream 1회 기여로 해소 불가능
+- **`verify-harness-drift-decorator.mjs` 자기 참조 확인**: 본 파일은 현재 drift 10 목록에 **미포함** (sha 정합 상태). 옵션 3′ 구현으로 본 파일 수정 시 drift 상태 진입 가능하나 — allowlist 에 자신을 넣지 않음 (§재귀 안전성 1). 본 파일은 범용 가드 (옵션 1 대상)
+
+#### 측정 4 — §재검토 조건 #5 (Phase 2 진행률) 동시 발화 여부
+
+- 본 Amendment 13 은 #6 (drift 파일 수) 단독 발화. §재검토 조건 #5 (Phase 2 진행률 < 33% OR 90일 경과) 와 동시 발화 시 §재검토 조건 #6 본문 SSoT 상 **#5 우선** (Phase 2 강제 우위). 본 결정 (옵션 3′ + 부분 1) 은 #5 우위와 충돌 없음 — 부분 옵션 1 (Phase 2 진행) 이 #5 차원도 함께 진전시킴
+
+### silent 가드 강화 vs 약화 자기점검
+
+본 Amendment 13 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — N 임계 변경 0. 카운트 모수 정제는 측정 정밀화 (측정 본질 정합 보존). orphan 제외 (§결정점 5) 동일 계열
+- ✓ **§결정 본문 / N=10 / 90일 임계 변경 0** — Amendment 2/9 SSoT 보존. 옵션 3 (N 재조정) 명시 거부
+- ✓ **allowlist 자체에 회귀 가드 3중 박제** — 무한 팽창 (진입 조건) + 임의 사유 (structuralProof 검증) + stale (manifest/drift 상태 검증) 차단. silent 약화 우회 경로 차단
+- ✓ **measurement-first 원칙 정합** — "발화 잦아 부담" (주관) 이 아닌 "구조적 기여 불가능 입증" (객관) 기반. §변경 사항 2 (c) 판정 질문으로 약화 우회 차단
+- ✓ **fail-fast vs soft-warn 비대칭 보존** — Amendment 8 데코레이터 (fail-fast) 영향 0 (allowlist 자산도 데코레이터 의무 유지). Amendment 9 카운트 (soft-warn) 모수만 정제
+
+### 트레이드오프
+
+- **장점**: 카운트 모수가 측정 본질 (Z 패턴 활성 적용 누적) 에 정직해짐 + 구조적 divergent 자산 (스크린샷/roadmap) 의 영구 정합 경로 확보 + 옵션 1 (텍스트 5개 upstream 기여) 의 진짜 Z 패턴 누적 신호 보존 (가려지지 않음)
+- **단점 (잠재)**:
+  - allowlist 진입 판정의 주관성 — `content-asset` / `domain-doc` 경계가 애매한 자산 발생 가능. 회피: 진입 조건 식별자 + `structuralProof` 명시 의무 + 판정 질문 (A/B) 박제. 애매 시 **allowlist 미진입** (보수적 — 카운트에 남겨 옵션 1 검토)
+  - allowlist 무한 팽창 잠재 — 회피: 진입 조건 (구조적 입증) + stale 검증 (manifest/drift 상태). 박제 빈도 모니터링 (현재 5개 후보, 운영 1~3 사이클 후 정정)
+  - 가드가 자기 카운트 모수를 바꾸는 재귀 — 회피: §재귀 안전성 (자기 자신 미포함 + 구현 후 재발화 실측 + Amendment 7 self-reference 해소 패턴 답습)
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규 코드 (`scripts/verify-harness-drift-decorator.mjs`):
+  - `PERMANENT_DIVERGENT_ALLOWLIST` 상수 (`{ path, reason, structuralProof }` 배열, 초기 5 항목) — **~30-50 라인**
+  - `runCountWarn()` 에 allowlist 제외 필터 추가 + 제외 내역 stdout 박제 (투명성) — **~15-25 라인**
+  - allowlist 회귀 가드 4중 (schema / 진입 조건 positive Enum 매칭 / stale / **Forbidden Path negative deny-list hard-fail**) self-test — **~65-100 라인** (cross-validate 2026-06-30 으로 Forbidden Path 추가)
+- CI workflow 변경: `.github/workflows/adr-z-pattern-health-v2.yml` — count-warn 출력에 "allowlist 제외 N건" 가시화 (선택, ~5-10 라인). 본질 변경은 스크립트 — developer 단계 결정
+- ADR Amendment 13 자체: ~본 §섹션 (forensic 측정 포함 ~250-300 라인)
+- harness-managed 파일 변경: `verify-harness-drift-decorator.mjs` (drift 심화, 새 drift 파일 0) — 본 파일 데코레이터 `[TODO]` 유지 (옵션 1 대상, allowlist 미진입)
+- **총 예상 라인 수**: 350-450 라인 (스크립트 + workflow + ADR + 테스트)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "월 cron 활성 drift 카운트에서 영구 divergent allowlist (구조적 기여 불가능 자산) 제외 — 카운트 모수 정제 (N=10 임계 불변)" (MINOR 릴리스 후보) — 단, 본 PR (architect) 은 ADR Amendment 만 박제 (코드/CHANGELOG 미터치, developer 단계 추가)
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/verify-harness-drift-decorator.mjs --self-test` — allowlist schema / 진입 조건 / stale 검증 + count-warn allowlist 제외 시뮬레이션 PASS 의무
+- **(2) 3중 시뮬레이션** (positive → negative → recovery):
+  - positive: drift=6 (allowlist 제외 후) < N=10 → exit 0 "OK"
+  - negative-1: allowlist 임의 사유 박제 (structuralProof 진입 조건 미매칭) → self-test FAIL
+  - negative-2 (Forbidden Path, cross-validate 추가): 범용 가드 경로 위장 등록 (예: `scripts/verify-z-pattern-health.mjs` 를 `content-asset` 로 허위 박제) → deny-list 매칭 self-test FAIL (positive 통과해도 무조건 FAIL)
+  - recovery: 진입 조건 매칭 + deny-list 비매칭 사유로 정정 → self-test PASS
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (architect → 메인 단계 의무) + 후속 developer/reviewer/qa 가 동일 결론 (옵션 3′+1 / allowlist 진입 조건 3종 / N=10 불변 / 모수 정제 = 측정 정밀화) 도출 검증
+- **(4) 메타 측정 도구 자기 적용 안정성**: 옵션 3′ 구현 후 본 가드가 자기 가드를 통과 — allowlist 제외로 count-warn 이 N 미만으로 떨어지는지 (또는 잔여가 옵션 1 대상임을 박제) developer 단계 자기 검증 의무. `verify-harness-drift-decorator.mjs` 자신은 allowlist 미진입 (자기참조 결함 차단)
+
+### cross-link
+
+- 본 Amendment, [#766](https://github.com/coseo12/astro-simulator/issues/766) 이슈 본문
+- 직전 Amendment: Amendment 12 (TODO Aging Guard, 시간 누적 차원 #7)
+- 발화 가드 SSoT: `scripts/verify-harness-drift-decorator.mjs` (`--mode=count-warn` — Amendment 9), `.github/workflows/adr-z-pattern-health-v2.yml`
+- §재검토 조건 #6 (Amendment 9) / §Amendment 9 §결정점 2 옵션 A (결정 분기 의무) / §Amendment 9 §결정점 5 (임계 비교 대상 = orphan 제외 — 본 Amendment 13 allowlist 의 동일 계열 선례)
+- 측정 정밀화 vs silent 약화 SSoT: Amendment 7 (측정 식 forensic 정정) — 자기참조 인플레이션 해소 패턴 답습
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" (volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107)), [docs/lessons/guard-design-principles.md](../lessons/guard-design-principles.md)
+- 가드 도입 PR DoD: [docs/lessons/guard-pr-dod.md](../lessons/guard-pr-dod.md) (4축 검증)
+- 외부 모델 실측 가드: volt [#51](https://github.com/coseo12/volt/issues/51) (메인 분석 "40% 스크린샷" → architect 실측 "50% (roadmap 포함)" 정정 답습)
+
+### 교차검증 반영 사항 (cross-validate 2026-06-30 — agy Antigravity, architecture 모드)
+
+> **cross-validate 발동 사유**: ADR 신규/개정 (Amendment 13 박제) — §교차검증 박제 직후 1회 루틴 대상 (4 앵커 중 "ADR 신규·개정/폐기"). 메인 오케스트레이터가 `.claude/skills/cross-validate/scripts/cross_validate.sh architecture` 로 Amendment 13 섹션 + 명시 질문 3종 전달. 결과 outcome: applied (exit 0), 워킹트리 snapshot diff empty (도구 호출 없음).
+
+#### 합의 (높은 신뢰도 — 두 모델 일치)
+
+- **옵션 3′ + 부분 옵션 1 조합 타당** — agy: "기여 불가능 정적 자산과 기여해야 하는 공통 가드 자산을 정밀하게 발라내는 접근은 매우 타당". 옵션 3 (N 재조정) silent 약화 거부에도 동의 (**폐기 프레이밍 축 명시 질문 → agy 동의**: N 단순 증가 = silent 약화 방지가 정당)
+- **단일 ADR Amendment 13 추적성** — agy: "Z-패턴/drift 가드 단일 SSoT 유지로 맥락 파편화 방지 논거는 대단히 합리적"
+- **인라인 상수 (`PERMANENT_DIVERGENT_ALLOWLIST`) 응집도** — agy: "도구 동작과 설정의 괴리를 줄이는 방향은 합리적"
+- **회귀 가드 다중 구조** — agy: "allowlist 무한 증식 방지 가드가 구체적으로 명시되어 논리적 결함 최소화"
+
+#### 이견 (양쪽 근거 — Claude 재판단)
+
+- **인라인 상수 vs JSON/모듈 분리**: agy 는 이식성 (다른 프로젝트 이식 시 가드 코드 sha 변경 누적) 을 들어 `allowlist.js` 모듈 분리 / JSON 구조 재검토 권고. **Claude 판단: 인라인 유지**. 근거 — (1) 측정 SSoT 와 모수 정의가 같은 파일에 있어야 추적성 보장 (Amendment 9 §결정점 5 단일 스크립트 통합 패턴 답습) (2) allowlist 항목은 진입 조건 (구조적 입증) 으로 무한 팽창이 차단되어 sha 변경 빈도가 낮음 (현재 5개, 운영 1~3 사이클당 0~1건). 단 **이식성 일리는 인정** → §아래 고유 발견 5 (upstream allowlist 인터페이스) 후속 분리로 흡수
+
+#### 고유 발견 (Claude 가 놓친 것 — 수용/분리/기각 분류)
+
+1. **⭐ Forbidden Path deny-list 하드 가드 (수용 — 본 PR 반영)**: agy 보안 지적이 **결합 간과 축 명시 질문 (allowlist 가 옵션 1 회피 우회로로 악용) 을 정확히 포착** — "개발자가 CI 통과 위해 범용 가드를 `reason`/`structuralProof` 허위 작성으로 위장 등록". 현 ADR 은 진입 조건 매칭 (positive) 만 기계 검증, 금지 경로 (negative) 는 _설명만_. → §변경 사항 2 (b) 4번 회귀 가드 (Forbidden Path negative deny-list hard-fail) 로 승격 반영. **결합 간과 축 답: allowlist ↔ 옵션 1 은 직교하나, 진입 판정이 우회로가 될 수 있어 deny-list 로 기계 차단 필요** (직교성 보존 + 우회 차단)
+2. **`structuralProof` 매칭 규격 (경미 수용 — 본 PR 반영)**: agy — "`includes()` 부분 문자열인지 Enum 배열인지 검증 인터페이스 규격 미비". → §변경 사항 2 (b) 2번에 "진입 조건 식별자 Enum 배열 정확 매칭" 명시
+3. **stale WARN → FAIL 에이징 (후속 분리)**: agy — "WARN 은 무시되기 쉬움, PR=WARN / 릴리스=FAIL 이원화 또는 에이징 가드". Amendment 12 (TODO Aging Guard) 와 동일 패턴 — 운영 데이터 1~3 사이클 축적 후 별건. §변경 사항 2 (b) 3번에 후속 분리 명시
+4. **Emergency Break (`DISABLE_HARNESS_DRIFT_GUARD`) (기각)**: agy — "무한 재귀/CI 막힘 시 일시 비활성화 환경변수". **기각 근거**: CLAUDE.md §"가드 설계 원칙" §fail-fast — "drift 가드는 fail-fast 만, fallback 분기 절대 금지". count-warn 은 이미 soft-warn (CI hard-block 아님) 이라 CI 를 막지 않음 → Emergency Break 불필요. 환경변수 비활성화 = 가드 무력화 우회 경로 도입 (자기모순). self-test 격리 검증이 무한 재귀를 사전 차단
+5. **upstream allowlist 인터페이스 / 범용성 (후속 분리)**: agy — "harness 가 다른 프로젝트로 이식 시 프로젝트 고유 allowlist 가 가드 스크립트에 묶이면 이식성 저하, `.harnessrc` 등 주입 인터페이스 고려". → 이는 Z-패턴 본질 (Phase 1 프로젝트 선반영) 의 정당한 형태이며, allowlist 메커니즘의 upstream 기여 (Phase 2) 는 별건. 후속 분리 (이견 항목 이식성 우려도 함께 흡수)
+6. **CI 시각화 / 예외 흐름 상세화 (developer 흡수)**: agy — "제외 항목 stdout 출력 / PR 피드백 세부 명세, allowlist 파일 물리 삭제·manifest 스키마 오류 예외 흐름". → §Concrete Prediction 의 "제외 내역 stdout 박제 (투명성)" + §회귀 가드 stale 검증에 이미 부분 포함. developer 단계 구현 디테일로 흡수
+
+#### Claude 편향 셀프 체크 (4종)
+
+- **순수주의 편향** ("정밀화" 긍정 프레이밍 과잉?): agy 도 allowlist 타당성에 동의하나 오용 차단 보강을 요구 → Forbidden Path 수용으로 보완. 도그마 회피 입증 (orphan 제외 §결정점 5 동일 계열 + deny-list 기계 검증). **통과**
+- **폐기 프레이밍 편향** (옵션 3 너무 쉽게 기각?): agy 동의. 셀프 체크 — 미래에 _진짜_ Z-패턴 누적 (텍스트 가드/페르소나) 이 10 초과 시 답은 옵션 1 (Phase 2 가속) 이지 N 완화 아님. 1인 운영 N 완화 정당 시나리오 부재 확인. **통과**
+- **결합 간과 편향** (allowlist ↔ 옵션 1 직교 가정?): agy 가 우회로 악용 위험 포착 (고유 발견 1). 직교는 맞으나 우회 차단 가드 누락 → Forbidden Path 로 해소. **셀프 체크가 가장 큰 가치 — 수용**
+- **확증 편향** (자기 결정 정당화 위해 측정 선택?): manifest 분류 실측 (50% 구조적 divergent) 은 재현 가능한 객관 측정. 가설 A 기각도 반증 기반. **통과**
+
+#### 결론: 조건부 통과 → Forbidden Path 가드 반영 후 통과
+
+cross-validate 가 핵심 안전장치 (Forbidden Path deny-list) 1건을 보강. 후속 분리 2건 ([#768](https://github.com/coseo12/astro-simulator/issues/768) stale 에이징 / [#769](https://github.com/coseo12/astro-simulator/issues/769) upstream allowlist 인터페이스) 박제 완료 (`Builds on: #766`). 상태: Provisional → **Accepted** 전이 (본 §섹션 통합 완료).
