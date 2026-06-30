@@ -354,7 +354,7 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
   // earth base = 청록 (ocean), land = 올리브-브라운. landMask 로 색조(hue) mix → "바다만" 회귀 해소.
   const EARTH_OCEAN: [number, number, number] = [0.23, 0.45, 0.6];
 
-  it('landMask=0 (continents < LO) → ocean 색 (baseColor)', () => {
+  it('rocky 대륙 mix — ocean(landMask=0) + land(landMask=1) 색 둘 다 존재', () => {
     // continents 가 LO 미만이 되는 표면점을 찾아 ocean 색 유지 확인 — 다수 샘플 중 ocean/land 둘 다 존재.
     let foundOcean = false;
     let foundLand = false;

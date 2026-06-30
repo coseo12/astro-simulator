@@ -728,7 +728,7 @@ export function surfaceColorMirror(
  * Amendment 1 (#773) — FRAGMENT_SHADER 광원식 (`shade`) 의 순수 JS 미러 (단조성/일관성 검증용).
  *
  * `shade = ambientIntensity * mix(ground, sky, dot(N,up)*0.5+0.5) + sunIntensity * sunDiffuse *
- *  smoothstep(−W, +W, dot(N, sunDir))`. GLSL main() 의 광원 합성과 동일 식 — 밤면 < 낮면 단조,
+ *  smoothstep(0.0, W, dot(N, sunDir))`. GLSL main() 의 광원 합성과 동일 식 — 밤면 < 낮면 단조,
  * terminator soft 전이, hemispheric 극 그라데이션을 결정적으로 검증한다 (단색 행성 일관성 SSoT).
  *
  * ⚠️ FRAGMENT_SHADER 의 GLSL 광원 합성과 동일 식이어야 한다 (한쪽 수정 시 양쪽 동기화).
