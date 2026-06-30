@@ -4,6 +4,13 @@ name: CI (physics-wasm)
 # Rust/wasm-pack 툴체인과 workspace 테스트 커버리지 가드를 담당한다.
 # harness가 관리하는 ci.yml 과 분리되어, 템플릿 업데이트 시 충돌을 방지한다.
 
+# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
+# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
+# cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만 남김 (포착 100%).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches: [develop, main]
