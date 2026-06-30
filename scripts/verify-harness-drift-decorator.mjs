@@ -143,8 +143,10 @@ const STRUCTURAL_PROOF_ENUM = Object.freeze(['content-asset', 'domain-doc', 'per
 // 이들은 옵션 1 (Phase 2 upstream 기여) 의 정당한 대상이지 구조적 divergent 아님.
 // positive 진입 조건을 통과해도 deny-list 매칭 시 self-test 무조건 FAIL.
 const FORBIDDEN_ALLOWLIST_PATH_PATTERNS = Object.freeze([
-  /^scripts\/verify-.*\.mjs$/, // 범용 harness 가드 (본 파일 자신 포함 — Z-패턴 재귀 안전성)
-  /^CLAUDE\.md$/, // 범용 워크플로 SSoT
+  // 범용 harness 가드 — 서브디렉토리 + .mjs/.cjs/.js/.sh 전부 (본 파일 자신 포함, Z-패턴 재귀 안전성).
+  // cross-validate 2026-06-30 권고 1 수용: .sh 가드 (verify-agent-ssot.sh 등) + 서브디렉토리 우회 차단.
+  /^scripts\/(.*\/)?verify-.*\.(mjs|cjs|js|sh)$/,
+  /(^|\/)CLAUDE\.md$/, // 범용 워크플로 SSoT (루트 + 중첩 예: apps/web/CLAUDE.md)
   /^\.claude\/agents\/.*\.md$/, // 범용 페르소나
   /^\.claude\/skills\/.*$/, // 범용 스킬
   /^\.github\/workflows\/.*\.ya?ml$/, // 범용 CI 가드
@@ -157,7 +159,7 @@ const FORBIDDEN_ALLOWLIST_PATH_PATTERNS = Object.freeze([
 // 가능해서인가, (B) 단지 발화가 잦아 부담스러워서인가?" → A 만 정당 (B 는 옵션 3 silent 약화).
 // 무한 팽창 차단: 진입 조건 (구조적 입증) + Forbidden Path deny-list + stale WARN.
 // 재귀 안전성 (§변경 사항 4): verify-harness-drift-decorator.mjs 자신을 넣지 않는다
-// (Forbidden Path 가 scripts/verify-*.mjs 로 자동 차단 — 이중 안전, 자기참조 결함 방지).
+// (Forbidden Path 가 scripts/(서브디렉토리/)verify-*.{mjs,cjs,js,sh} 로 자동 차단 — 이중 안전, 자기참조 결함 방지).
 const PERMANENT_DIVERGENT_ALLOWLIST = Object.freeze([
   {
     path: 'docs/screenshots/01-solar-system.png',
@@ -1130,9 +1132,26 @@ function runSelfTest() {
         'Forbidden Path: .github/workflows/harness-guards.yml',
         isForbiddenAllowlistPath('.github/workflows/harness-guards.yml') === true,
       );
+      // cross-validate 2026-06-30 권고 1 — deny-list 완전성 (서브디렉토리 / .sh 가드 / 중첩 CLAUDE.md)
+      expect(
+        'Forbidden Path: scripts/verify-agent-ssot.sh (.sh 가드)',
+        isForbiddenAllowlistPath('scripts/verify-agent-ssot.sh') === true,
+      );
+      expect(
+        'Forbidden Path: scripts/sub/verify-foo.mjs (서브디렉토리)',
+        isForbiddenAllowlistPath('scripts/sub/verify-foo.mjs') === true,
+      );
+      expect(
+        'Forbidden Path: apps/web/CLAUDE.md (중첩 CLAUDE.md)',
+        isForbiddenAllowlistPath('apps/web/CLAUDE.md') === true,
+      );
       expect(
         'Forbidden Path negative: docs/screenshots/01-solar-system.png 비매칭',
         isForbiddenAllowlistPath('docs/screenshots/01-solar-system.png') === false,
+      );
+      expect(
+        'Forbidden Path negative: docs/MYCLAUDE.md 비매칭 (CLAUDE.md 부분일치 아님)',
+        isForbiddenAllowlistPath('docs/MYCLAUDE.md') === false,
       );
 
       // negative-3 (schema) — reason 빈값 → schema FAIL

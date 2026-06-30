@@ -373,11 +373,13 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 
 - **적용 대상**: Phase 1 단계에서 직접 수정하는 모든 harness-managed 파일 (`.claude/agents/*.md` / `.claude/skills/*/SKILL.md` / `.claude/commands/*.md` / `.claude/settings.json` / 기타 `.harness/manifest.json` 의 `files` 키 포함)
 - **본문 형식 SSoT**:
+
   ```text
   HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]
   ```
 
   - `upstream-link`: Phase 2 PR URL (예: `https://github.com/coseo12/harness-setting/pull/N`). Phase 1 단독 머지 시 `TODO` 허용 (Phase 2 머지 직후 실제 URL 로 교체 의무)
+
 - **파일 형식별 분기 (결정점 1)**:
   - `.md`: `<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO] -->` (HTML 주석, GitHub 렌더 시 비표시)
   - `.ts` / `.tsx` / `.js` / `.mjs` / `.cjs`: `// HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]` (line comment)
@@ -385,11 +387,13 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
   - `.json` (예: `.claude/settings.json`): JSON 표준 주석 미지원 → **sidecar 파일** `<filename>.HARNESS-DRIFT.md` 동일 디렉토리 박제. 본문은 `# HARNESS-DRIFT: Z-PATTERN [upstream-link-or-TODO]\n원 파일: <filename>\n변경 사유: <한 줄 요약>` 형식. 적용 빈도 낮음 (실측 0건) 으로 운영 부담 최소
   - **sidecar 라이프사이클 계약** (cross-validate agy 이견 수용 — orphan 방지): `<filename>.HARNESS-DRIFT.md` 존재 시 동일 디렉토리에 매칭되는 `<filename>` 반드시 존재 + `harness doctor` 상 drift 감지 상태 의무. orphan sidecar (본 파일 삭제/이름 변경 후 sidecar 잔존) 발견 시 verify 스크립트가 CI fail (exit 1). Phase 3 자동 동기화 후 drift 해소 시 sidecar 도 함께 삭제 의무 (developer 단계 verify 스크립트 구현 시 박제)
 - **위치 SSoT (결정점 2)**: **파일 첫 줄 의무** + shebang (`#!/usr/bin/env node` 등) / DOCTYPE (`<!DOCTYPE html>` 등) / YAML frontmatter (`---\n...\n---\n`) 1블록 직후 1줄 허용. regex SSoT (verify 스크립트 의무 패턴):
+
   ```regex
   ^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n|---\n(?:[\s\S]*?\n)?---\n)?(?:<!--|//|#) HARNESS-DRIFT: Z-PATTERN \[(?:https?://[^\]]+|TODO)\](?: -->)?
   ```
 
   - **developer 단계 보완 (2026-05-26, PR #556)**: architect 박제값 regex 는 shebang/DOCTYPE 만 허용했으나 적용 대상 `.claude/agents/*.md` 의 컨벤션 (YAML frontmatter) 미커버. YAML frontmatter 1블록 prefix 허용 추가 — 의미는 동일 (파일 메타 헤더 직후 첫 컨텐츠 라인).
+
 - **자동 가드 (결정점 3 — verify 스크립트 분리)**: `scripts/verify-harness-drift-decorator.mjs` 신규 (Node ESM). `harness doctor` 가 drift 감지한 파일 (= `.harness/manifest.json` 의 sha256 과 실제 파일 sha256 불일치 + Phase 1 PR 컨벤션 의도된 drift) 에 대해 데코레이터 존재 검증 — 누락 시 exit 1 (CI hard-fail). 로컬 사전 검증 비용 < 1초 (gh API 호출 없음, 파일 grep 만)
 - **CI 통합**: `.github/workflows/harness-guards.yml` 또는 `.github/workflows/pr-template-checklist-guard.yml` 에 step 추가 (developer 단계 결정)
 - **선택 근거 (대안 비교)**:
@@ -1211,7 +1215,7 @@ orphan sidecars: 0
   1. **항목 schema 검증** — self-test 에서 모든 항목이 `path` / `reason` / `structuralProof` non-empty string 보유 검증. 누락 시 FAIL
   2. **진입 조건 입증 검증 (positive — allow-list 매칭)** — 각 항목의 `structuralProof` 가 진입 조건 (§아래) 식별자 중 1건 이상 매칭 검증. 임의 사유 박제 차단. `structuralProof` 는 진입 조건 식별자 (`content-asset` / `domain-doc` / `perpetual-rewrite`) 의 Enum 배열로 관리 — `includes()` 부분 문자열이 아닌 정확 매칭 (cross-validate agy 고유 발견 2 수용 — 매칭 인터페이스 규격 명시)
   3. **stale 항목 검증** — allowlist `path` 가 실제 manifest 에 등록되어 있고 + 현재 drift 상태인지 검증. manifest 미등록 OR drift 해소 항목은 stale → self-test WARN (Amendment 11 orphan sidecar 정리 패턴 답습 — allowlist 무한 잔존 방지). **stale WARN → FAIL 에이징 (PR=WARN / 릴리스=FAIL 이원화) 은 후속 분리** (cross-validate agy 고유 발견 3 — Amendment 12 TODO Aging Guard 동일 패턴, 운영 데이터 1~3 사이클 축적 후)
-  4. **Forbidden Path 차단 검증 (negative — deny-list 하드 가드)** — allowlist `path` 가 범용 harness 가드/페르소나 deny-list 패턴 (`scripts/verify-*.mjs`, `CLAUDE.md`, `.claude/agents/*.md`, `.claude/skills/**`, `.github/workflows/*.yml` 등) 에 매칭되면 **self-test FAIL** (WARN 아님 — 우회 차단은 hard-fail). 진입 조건 매칭 (positive 2번) 을 통과해도 deny-list 매칭 시 무조건 FAIL. **근거**: cross-validate agy 보안 고유 발견 1 — allowlist 가 옵션 1 (Phase 2 upstream 기여) 회피의 우회로로 악용될 위험 (개발자가 CI 통과 위해 범용 가드를 `reason`/`structuralProof` 허위 작성으로 위장 등록) 을 기계적으로 차단. §변경 사항 2 (d) 진입 금지 자산 목록의 _설명_ 을 _기계 검증_ 으로 승격 (positive 진입 조건과 직교 보강)
+  4. **Forbidden Path 차단 검증 (negative — deny-list 하드 가드)** — allowlist `path` 가 범용 harness 가드/페르소나 deny-list 패턴 (`FORBIDDEN_ALLOWLIST_PATH_PATTERNS` SSoT — `scripts/(서브디렉토리/)verify-*.{mjs,cjs,js,sh}`, `(루트/중첩)CLAUDE.md`, `.claude/agents/*.md`, `.claude/skills/**`, `.github/workflows/*.yml`) 에 매칭되면 **self-test FAIL** (WARN 아님 — 우회 차단은 hard-fail). 진입 조건 매칭 (positive 2번) 을 통과해도 deny-list 매칭 시 무조건 FAIL. **근거**: cross-validate agy 보안 고유 발견 1 — allowlist 가 옵션 1 (Phase 2 upstream 기여) 회피의 우회로로 악용될 위험 (개발자가 CI 통과 위해 범용 가드를 `reason`/`structuralProof` 허위 작성으로 위장 등록) 을 기계적으로 차단. **deny-list 완전성 확장 (reviewer 권고 1, 2026-06-30 본 PR 반영)**: 초기 `scripts/verify-*.mjs` 만 매칭하던 패턴을 `.sh` 가드 (`verify-agent-ssot.sh` 등) + 서브디렉토리 (`scripts/sub/verify-*.mjs`) + 중첩 `CLAUDE.md` 까지 확장 — 의도 ("범용 가드 진입 불가") 와 구현 매칭 정합. §변경 사항 2 (d) 진입 금지 자산 목록의 _설명_ 을 _기계 검증_ 으로 승격 (positive 진입 조건과 직교 보강)
 - **(c) "측정 정밀화 vs 약화" 구분 기준 (ADR 명문화)**:
 
   | 구분        | 측정 정밀화 (allowlist 정당)                                  | silent 약화 (금지 — 옵션 3)                          |
