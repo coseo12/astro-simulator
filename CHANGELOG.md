@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.41.0] — 2026-07-01
+
+### Behavior Changes (#779 — CI 알림 alert fatigue 완화 Phase 1)
+
+- **[#779] 이중 트리거 concurrency 중복 제거 (MINOR, Phase 1)** ([#779](https://github.com/coseo12/astro-simulator/issues/779)) — CI 실패 메일이 **alert fatigue** 수준으로 많고 flake로 "메일 와도 정상"인 경우가 빈번해 진짜 실패 판단이 무력화되던 문제(사용자 제기)의 1차 대응. 근본 원인 — 6개 워크플로(`ci`/`ci-physics-wasm`/`fps-baseline-guard`/`a11y-baseline-guard`/`prettierignore-drift`/`harness-guards`)가 `pull_request:[develop,main]` + `push:[develop,main]` **이중 트리거**라 같은 sha에 최대 15 run이 돌고(실측), 하나만 flake fail해도 메일. **fix**: 6개 워크플로에 `concurrency: { group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}, cancel-in-progress: true }` 추가 — 같은 sha의 push+PR 중복 run 중 후행이 선행을 취소(남은 1 run이 동일 코드 검증 → 포착 100%, **가드 약화 아님**). GitHub 메일은 `conclusion=failure`만 발송하므로 cancelled run은 메일 0 → **이중 트리거 노이즈 제거**. `github.workflow` 포함(워크플로 간 교차 취소 방지), `github.ref` 미포함(cross-validate에서 기각 — ref 넣으면 PR run/push run이 분리되어 중복 제거 자체가 붕괴). harness-guards는 Z-pattern(frozen, `HARNESS-DRIFT: Z-PATTERN [TODO]` 데코레이터 유지). ADR `20260701-779-ci-alert-fatigue-concurrency.md` (Accepted, cross-validate agy). branch protection 미설정(실측 404)이라 cancel이 머지 차단 안 함.
+
+### Notes
+
+- **Phase 2/3 후속** (#779 미close) — Phase 2: detect-and-test flake-prone 가드(verify:699 등) step retry / Phase 3: fps 새 머신 자동 rerun + matrix 분할.
+- **머지 후 실측 의무** (workflow_dispatch 2단계 함정) — concurrency는 default branch 반영 후 다음 PR에서 중복 제거 관찰. ADR §재검토 조건 2: branch-cross(ff-sync로 main/develop 같은 sha) cancel 시 가드 브랜치 무관성 실측.
+
 ## [0.40.0] — 2026-07-01
 
 ### Behavior Changes (#773 표면 셰이더 광원 일관성 회복 / #775 지구 대륙 표현)
