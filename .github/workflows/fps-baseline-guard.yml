@@ -4,6 +4,13 @@ name: fps-baseline-guard
 # 이슈 #536 / R4 cross-validate Gemini 고유 발견 3 후속.
 # `docs/benchmarks/fps-lowend-baseline.json` 대비 회귀 (>30% 저하 또는 <30 FPS) 감지 시 PR 차단.
 
+# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
+# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
+# cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만 남김 (포착 100%).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches: [develop, main]
