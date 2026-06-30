@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.39.0] — 2026-06-30
+
+### Behavior Changes (#766 — alert fatigue 카운트 모수 정제)
+
+- **[#766] 영구 divergent allowlist — alert fatigue 카운트 모수 정제 (MINOR)** ([#766](https://github.com/coseo12/astro-simulator/issues/766)) — 월 cron `verify-harness-drift-decorator.mjs --mode=count-warn` (ADR 20260515 Amendment 9 alert fatigue 가드) 이 `[Alert Fatigue Trigger]` 를 첫 발화(활성 drift 10 = 임계 N=10)한 데 대한 결정 분기 이행. 발화 drift 10개 중 **5개(50%)가 구조적으로 upstream(harness-setting)에 기여 불가능한 영구 divergent 자산**(천체 시뮬 스크린샷 4 + 도메인 전용 로드맵 1)임을 manifest 분류 실측으로 확정 — 옵션 1(Phase 2 upstream 기여)로 영구 해소 불가. **결정**: 옵션 3′(영구 divergent allowlist — 구조적 기여 불가능 자산을 카운트 **모수**에서 제외) + 부분 옵션 1(나머지 텍스트 5개는 upstream 기여 대상으로 잔류). **N=10 임계는 변경 없음** — 카운트 모수만 정제(orphan sidecar 제외 §결정점 5 동일 계열의 측정 정밀화이며, 옵션 3 N 재조정=silent 약화는 거부). **구현**: `PERMANENT_DIVERGENT_ALLOWLIST` 인라인 상수(진입 조건 Enum `content-asset`/`domain-doc`/`perpetual-rewrite`) + `runCountWarn()` 제외 필터(제외 내역 stdout 투명성 박제) + **회귀 가드 4중**(schema / 진입조건 positive Enum 정확 매칭 / stale WARN / **Forbidden Path negative deny-list hard-FAIL**). Forbidden Path 는 범용 harness 가드·페르소나(`scripts/(서브디렉토리/)verify-*.{mjs,cjs,js,sh}`, `(루트/중첩)CLAUDE.md`, `.claude/agents/*.md`, `.claude/skills/**`, `.github/workflows/*.yml`)를 allowlist 에 위장 등록하는 우회로를 기계 차단(cross-validate agy 보안 고유 발견 + reviewer 권고 1 완전성 확장). **실측**: count-warn raw 10 → count **5**("alert fatigue: OK", 미발화), `--mode=verify` decorator PASS 10 회귀 0, self-test 65 passed/0 failed. **Z-패턴 재귀 안전성**: `verify-harness-drift-decorator.mjs` 자신은 allowlist 미진입(Forbidden Path 자동 차단). Forensic ADR `20260515-harness-managed-divergent-pattern.md` §Amendment 13 (Accepted, cross-validate agy).
+
+### Notes
+
+- 후속 분리 **#768** — allowlist stale 항목 WARN→FAIL 에이징 가드(운영 1~3 사이클 데이터 축적 후, Amendment 12 TODO Aging 패턴).
+- 후속 분리 **#769** — 영구 divergent allowlist upstream 인터페이스(`.harnessrc` 범용화 — Z-패턴 Phase 2, 가드 스크립트 sha 와 프로젝트 allowlist 분리로 이식성 확보).
+
 ## [0.38.0] — 2026-06-29
 
 ### Behavior Changes (#762 — 천체 표시 크기 비율 단조성)
