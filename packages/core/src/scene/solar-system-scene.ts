@@ -28,7 +28,10 @@ import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield } from './starfield.js';
-import { createProceduralPlanetMaterial } from './procedural-planet-shader.js';
+import {
+  createProceduralPlanetMaterial,
+  type PlanetLightingConstants,
+} from './procedural-planet-shader.js';
 import {
   renderScaleForTier,
   initialTier as defaultInitialTier,
@@ -114,6 +117,22 @@ function floatingOriginAssertEnabled(): boolean {
  */
 export const AMBIENT_INTENSITY = 0.3;
 export const AMBIENT_GROUND_COLOR_RGB = { r: 0.15, g: 0.15, b: 0.18 } as const;
+
+/**
+ * #773 Amendment 1 — 광원 물리 상수 SSoT (PointLight + HemisphericLight).
+ *
+ * 절차 표면 셰이더 (`procedural-planet-shader.ts`) 가 단색 행성 (StandardMaterial) 과 **동일한 명암**
+ * 을 내려면 PointLight/HemisphericLight 의 값을 정확히 재현해야 한다. 셰이더는 scene 를 import 하지
+ * 않으므로 (순환 회피), 이 상수들을 `createProceduralPlanetMaterial` 인자로 주입한다 (단방향 의존,
+ * volt #69 마법 숫자 중복 금지). 아래 sunLight/ambient 생성부가 이 상수를 그대로 사용한다 (SSoT).
+ *
+ * AMBIENT_SKY 는 HemisphericLight 의 `diffuse` (Babylon 기본 흰색 (1,1,1)), AMBIENT_UP 은 light
+ * direction (0,1,0). 셰이더 hemispheric mix(ground, sky, dot(N,up)*0.5+0.5) 재현용.
+ */
+export const SUN_INTENSITY = 2.5;
+export const SUN_DIFFUSE_RGB = { r: 1, g: 0.95, b: 0.8 } as const;
+export const AMBIENT_SKY_COLOR_RGB = { r: 1, g: 1, b: 1 } as const;
+export const AMBIENT_UP_DIR = { x: 0, y: 1, z: 0 } as const;
 
 export interface SolarSystemSceneHandles {
   /** id → 메쉬 */
@@ -483,7 +502,12 @@ export function createSolarSystemScene(
   }
 
   // 회귀 #372 fix — 행성 그림자측 인지 가능 ambient (AMBIENT_* 상수 SSoT, 단위 테스트 가드).
-  const ambient = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
+  // #773 — 절차 표면 셰이더가 이 HemisphericLight 식을 재현하므로 값은 PLANET_LIGHTING 으로도 전달.
+  const ambient = new HemisphericLight(
+    'hemi',
+    new Vector3(AMBIENT_UP_DIR.x, AMBIENT_UP_DIR.y, AMBIENT_UP_DIR.z),
+    scene,
+  );
   ambient.intensity = AMBIENT_INTENSITY;
   ambient.groundColor = new Color3(
     AMBIENT_GROUND_COLOR_RGB.r,
@@ -491,10 +515,33 @@ export function createSolarSystemScene(
     AMBIENT_GROUND_COLOR_RGB.b,
   );
 
-  // 태양 중심 포인트 라이트
+  // 태양 중심 포인트 라이트 (#773 — SUN_* 상수 SSoT, 절차 표면 셰이더와 공유).
   const sunLight = new PointLight('sun-light', new Vector3(0, 0, 0), scene);
-  sunLight.intensity = 2.5;
-  sunLight.diffuse = new Color3(1, 0.95, 0.8);
+  sunLight.intensity = SUN_INTENSITY;
+  sunLight.diffuse = new Color3(SUN_DIFFUSE_RGB.r, SUN_DIFFUSE_RGB.g, SUN_DIFFUSE_RGB.b);
+
+  // #773 Amendment 1 — 절차 표면 셰이더 광원 상수 묶음 (scene SSoT → createProceduralPlanetMaterial
+  // 단방향 주입). PointLight/HemisphericLight 와 동일 값 (위 생성부) — 마법 숫자 중복 0 (volt #69).
+  const planetLighting: PlanetLightingConstants = {
+    sunIntensity: SUN_INTENSITY,
+    sunDiffuse: [SUN_DIFFUSE_RGB.r, SUN_DIFFUSE_RGB.g, SUN_DIFFUSE_RGB.b],
+    ambientIntensity: AMBIENT_INTENSITY,
+    ambientGround: [
+      AMBIENT_GROUND_COLOR_RGB.r,
+      AMBIENT_GROUND_COLOR_RGB.g,
+      AMBIENT_GROUND_COLOR_RGB.b,
+    ],
+    ambientSky: [AMBIENT_SKY_COLOR_RGB.r, AMBIENT_SKY_COLOR_RGB.g, AMBIENT_SKY_COLOR_RGB.b],
+    ambientUp: [AMBIENT_UP_DIR.x, AMBIENT_UP_DIR.y, AMBIENT_UP_DIR.z],
+  };
+  // #773 — 태양 월드 위치 provider (scene-unit world). updateAt 가 매 프레임 sunLight.position 을
+  // 갱신 (Floating Origin shift + tier scale 반영) → 셰이더 onBind 가 이 값으로 sunDir 계산.
+  const sunPositionProvider = (): Vector3 => sunLight.position;
+  // #773 — createBodyMesh/createBodyMeshMid 에 단방향 전달할 광원 배선 묶음 (surfaceDetail=true 일 때만 사용).
+  const surfaceLightingArgs: SurfaceLightingArgs = {
+    lighting: planetLighting,
+    sunPositionProvider,
+  };
 
   // 각 바디 메쉬 생성 — Phase A: 생성 시점 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
   //
@@ -503,7 +550,14 @@ export function createSolarSystemScene(
   const bodyInitialRenderScale = activeTier; // 모든 body 가 동일 tier 로 생성됨 → Tier 만 기억하면 충분.
   const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립, 진단용)
   for (const body of system.bodies) {
-    const mesh = createBodyMesh(body, scene, activeTier, bodyScale, surfaceDetail);
+    const mesh = createBodyMesh(
+      body,
+      scene,
+      activeTier,
+      bodyScale,
+      surfaceDetail,
+      surfaceLightingArgs,
+    );
     meshes.set(body.id, mesh);
     bodyBaseDiameter.set(body.id, body.radius * 2);
   }
@@ -1619,6 +1673,7 @@ export function createSolarSystemScene(
           highMesh,
           bodyScale,
           surfaceDetail,
+          surfaceLightingArgs,
         );
         midVariants.set(body.id, m);
       }
@@ -1857,12 +1912,22 @@ function defaultBodyScale(_bodyId: string): number {
   return 1.0;
 }
 
+/**
+ * #773 Amendment 1 — 절차 표면 셰이더 광원 배선 인자 (createBodyMesh/createBodyMeshMid 공유).
+ * scene 가 소유한 광원 상수 + sun position provider 를 셰이더 팩토리로 단방향 전달.
+ */
+interface SurfaceLightingArgs {
+  lighting: PlanetLightingConstants;
+  sunPositionProvider: () => Vector3;
+}
+
 function createBodyMesh(
   body: LoadedCelestialBody,
   scene: Scene,
   tier: Tier,
   bodyScale: (bodyId: string) => number,
   surfaceDetail = false,
+  surfaceLighting?: SurfaceLightingArgs,
 ): Mesh {
   // P12-A #298 — 실측 직경 × 현재 tier 의 renderScale 로 메쉬 생성.
   // R1 #329 — × bodyScale (시각 과장 배수, ADR `20260425-r1-sun-visualization.md` §결정 3).
@@ -1872,9 +1937,9 @@ function createBodyMesh(
 
   // #756 — 절차적 표면 셰이더 (surfaceDetail=true + 테이블 등록 body 만). 미등록/OFF 면 null →
   // 기존 StandardMaterial 경로 (단색, 무회귀). 항성(sun)은 표면 테이블 미등록이라 자동 단색.
-  // ADR `docs/decisions/20260628-756-procedural-planet-surface.md` §결정 1·4.
+  // ADR `docs/decisions/20260628-756-procedural-planet-surface.md` §결정 1·4 + Amendment 1 (#773).
   const surfaceMat = surfaceDetail
-    ? createProceduralPlanetMaterial(scene, body, `${body.id}-surface-mat`)
+    ? createProceduralPlanetMaterial(scene, body, `${body.id}-surface-mat`, surfaceLighting ?? {})
     : null;
   if (surfaceMat) {
     mesh.material = surfaceMat;
@@ -1913,6 +1978,7 @@ function createBodyMeshMid(
   parent: Mesh,
   bodyScale: (bodyId: string) => number,
   surfaceDetail = false,
+  surfaceLighting?: SurfaceLightingArgs,
 ): Mesh {
   // R1 #329 — high variant 와 동일 식 (× bodyScale) 로 비율 보존. LOD 전환 시 사용자가 크기 변화 인지 못함.
   const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
@@ -1923,8 +1989,14 @@ function createBodyMeshMid(
 
   // #756 — mid variant 도 high 와 동일 절차 셰이더 공유 (segments 만 다름 — ADR §결정 1).
   // LOD 전환 시 표면 연속성 (사용자 인지 불변). 미등록/OFF 면 null → StandardMaterial 무회귀.
+  // #773 Amendment 1 — 동일 광원 인자 (high/mid 명암 일관 — 각 variant 의 onBind 가 자기 sunDir 갱신).
   const surfaceMat = surfaceDetail
-    ? createProceduralPlanetMaterial(scene, body, `${body.id}-lod-mid-surface-mat`)
+    ? createProceduralPlanetMaterial(
+        scene,
+        body,
+        `${body.id}-lod-mid-surface-mat`,
+        surfaceLighting ?? {},
+      )
     : null;
   if (surfaceMat) {
     mesh.material = surfaceMat;

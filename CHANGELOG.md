@@ -5,6 +5,19 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-07-01
+
+### Behavior Changes (#773 표면 셰이더 광원 일관성 회복 / #775 지구 대륙 표현)
+
+- **[#773] 표면 셰이더 행성 광원 일관성 회복 (MINOR)** ([#773](https://github.com/coseo12/astro-simulator/issues/773)) — #756 절차적 표면 셰이더 도입의 **광원 회귀** 수정. 표면 셰이더 행성(지구/화성/목성/달)이 커스텀 `ShaderMaterial`이라 Babylon `PointLight`를 자동 반영 못 해 **고정 방향 벡터(0.5,0.7,0.5) + 0.85~1.0 균일 명암**(태양 위치 무관 / 밤면 없음 / terminator 없음)으로 렌더되던 것을, 단색 행성(금성/토성 등 `StandardMaterial`+`PointLight`+`HemisphericLight`)과 **동일한 실제 태양 광원 명암**으로 전환. **구현**: `material.onBindObservable`에서 각 draw 직전 `uSunDirection = normalize(sunPos − mesh.getAbsolutePosition())` 갱신(`tmpVector` 재사용 alloc 0, 광원 상수는 scene SSoT → core 단방향 provider 주입) + 셰이더 `shade`를 **HemisphericLight 식 완전 재현**(`mix(ambientGround, ambientSky, dot(N,up)*0.5+0.5) + sunIntensity*sunDiffuse*smoothstep(0, W, dot(N,sunDir))`, soft terminator). 회전 0(self-rotation 미구현) 전제로 world normal == local normal(normalMatrix 불필요) — dev-only 회전 어서션 + 주석/테스트 계약으로 가드. moon(cratered) 동일 적용(월식 그림자는 범위 밖). **실측(실 Chrome GUI)**: 밤면/terminator 대비비 15.9~21.4(단색 행성 15.7~22.6 동일 범위, 회귀 전 1.12x), 태양 추종 명암 71.4° 이동, fps 회귀 0(tier-c는 override=low StandardMaterial 자동 우회), mid LOD 연속. forensic ADR Amendment 1(단색 행성 라이팅 식 재현 측정 — 낮면 2.547/terminator 0.173/극 0.300/밤면하단 0.046).
+- **[#775] 지구 대륙 표현 — rocky 셰이더 육지색 mix (MINOR)** ([#775](https://github.com/coseo12/astro-simulator/issues/775)) — rocky 셰이더가 대륙/해양을 **바다색 baseColor 밝기 ±35% 변조만**(색조 불변)으로 표현해 지구가 "바다만" 보이던 것을, `continents` noise로 **ocean ↔ land 색조 mix**(`mix(baseColor, LAND_COLOR_RGB, smoothstep(LAND_THRESHOLD_LO/HI, continents))`)로 전환. 육지색 = **코드 상수 `LAND_COLOR_RGB`**(올리브-브라운 R/G 우세 자연색, rendering-only — 데이터 SSoT 보존, `colorHint` 확장 거부), ocean = 기존 baseColor read-only. **실측**: 낮면 색조 2-모드 land 49.3%/ocean 44.0%(황록 대륙 + 청록 바다), 보라/마젠타 0.
+- 공통: 절차 표면 디테일 무회귀(#756 고주파 엔트로피 hfEnergy ON>OFF, 낮면 기준), 데이터(`solar-system.json`) 변경 0, picking/camera/orbit/tier/LOD 변경 0(Concrete Prediction 적중), GLSL↔JS 미러 parity 단위 테스트(46 신규). ADR `20260628-756-procedural-planet-surface.md` §Amendment 1 (Accepted, cross-validate agy). 사용자 발견(2026-06-30).
+
+### Notes
+
+- 후속 (cross-validate 고유 발견, mesh 미구현으로 시기상조) — 대기/구름 레이어 블렌딩 순서는 대기/구름 mesh 도입 시점 분리(ADR §Amendment 1 §재검토 조건 박제).
+- #774 (태양 절차적 표면 셰이더) 는 별도 진행 예정.
+
 ## [0.39.0] — 2026-06-30
 
 ### Behavior Changes (#766 — alert fatigue 카운트 모수 정제)
