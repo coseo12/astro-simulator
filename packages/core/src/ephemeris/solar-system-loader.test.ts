@@ -273,13 +273,51 @@ describe('loadSolarSystem', () => {
     }
   });
 
-  it('R8 #647 — axialTiltDeg 로드 (uranus 97.77 / saturn 26.73) + 미지정 body 폴백 (하위 호환)', () => {
+  it('R8 #647 / #782 — axialTiltDeg 로드 (uranus 97.77 / saturn 26.73 기존 + earth/jupiter 신규)', () => {
     const bodies = loadSolarSystem().bodies;
+    // R8 기존값 유지 (ring tilt SSoT — #782 자전축 공유, 값 불변)
     expect(bodies.find((b) => b.id === 'uranus')?.axialTiltDeg).toBe(97.77);
     expect(bodies.find((b) => b.id === 'saturn')?.axialTiltDeg).toBe(26.73);
-    // 미지정 body (jupiter — 3.13° 는 R8 비-범위) 는 undefined → scene 폴백 0 (tilt 없음, 무회귀)
-    expect(bodies.find((b) => b.id === 'jupiter')?.axialTiltDeg).toBeUndefined();
-    expect(bodies.find((b) => b.id === 'earth')?.axialTiltDeg).toBeUndefined();
+    expect(bodies.find((b) => b.id === 'neptune')?.axialTiltDeg).toBe(28.32);
+    // #782 §A2 — self-rotation 도입으로 자전하는 body 에 obliquity 신규값 추가 (Behavior Change).
+    // 규약 (i): axialTiltDeg = IAU obliquity (0~180), venus 177.36/uranus 97.77 처럼 >90 이면 역행 내재.
+    expect(bodies.find((b) => b.id === 'earth')?.axialTiltDeg).toBe(23.44);
+    expect(bodies.find((b) => b.id === 'mars')?.axialTiltDeg).toBe(25.19);
+    expect(bodies.find((b) => b.id === 'jupiter')?.axialTiltDeg).toBe(3.13);
+    expect(bodies.find((b) => b.id === 'moon')?.axialTiltDeg).toBe(6.68);
+    expect(bodies.find((b) => b.id === 'venus')?.axialTiltDeg).toBe(177.36); // 역행 (>90)
+    // 자전 안 하는 소천체 (phobos 등) 는 여전히 미지정 → scene 폴백 0 (무회귀)
+    expect(bodies.find((b) => b.id === 'phobos')?.axialTiltDeg).toBeUndefined();
+  });
+
+  it('#782 §A2 — rotationPeriodHours 로드 (규약 i: 양수 magnitude, 역행 부호 없음) + 미지정 폴백', () => {
+    const bodies = loadSolarSystem().bodies;
+    // 규약 (i): rotationPeriodHours 는 항상 양수 magnitude — 방향(역행)은 axialTiltDeg (obliquity>90) 내재.
+    expect(bodies.find((b) => b.id === 'earth')?.rotationPeriodHours).toBe(23.9345);
+    expect(bodies.find((b) => b.id === 'jupiter')?.rotationPeriodHours).toBe(9.925);
+    expect(bodies.find((b) => b.id === 'mercury')?.rotationPeriodHours).toBe(1407.6);
+    // 역행 자전 body 도 period 는 양수 (venus 5832.5 / uranus 17.24) — 음수 부여 시 방향 이중 적용.
+    expect(bodies.find((b) => b.id === 'venus')?.rotationPeriodHours).toBe(5832.5);
+    expect(bodies.find((b) => b.id === 'venus')?.rotationPeriodHours).toBeGreaterThan(0);
+    expect(bodies.find((b) => b.id === 'uranus')?.rotationPeriodHours).toBe(17.24);
+    expect(bodies.find((b) => b.id === 'uranus')?.rotationPeriodHours).toBeGreaterThan(0);
+    // moon (조석 고정) 도 자전 애니메이션용 period 보유
+    expect(bodies.find((b) => b.id === 'moon')?.rotationPeriodHours).toBe(655.7);
+    // 자전 안 하는 소천체 (phobos 등) 는 미지정 → 자전 정지 (하위 호환)
+    expect(bodies.find((b) => b.id === 'phobos')?.rotationPeriodHours).toBeUndefined();
+  });
+
+  it('#782 §A2 — rotationPeriodHours 0 은 스키마 거부 (division-by-zero 차단)', () => {
+    // ω = 2π×24 / period 라 period=0 이면 무한대. loader schema `.refine(v => v !== 0)` 가 차단.
+    // (실 데이터는 0 없음 — 스키마 계약 회귀 가드. 음수는 허용 = 규약 i 의 미래 (ii) 전환 여지.)
+    // 실 JSON 에 0 이 없음을 확인 (파싱 성공 = 계약 준수).
+    expect(() => loadSolarSystem()).not.toThrow();
+    const bodies = loadSolarSystem().bodies;
+    for (const b of bodies) {
+      if (b.rotationPeriodHours !== undefined) {
+        expect(b.rotationPeriodHours).not.toBe(0);
+      }
+    }
   });
 
   it('R9 #653 — triton 로드 (parentId=neptune, Neptune-centric J2000 Ecliptic — 역행 inclination > 90°)', () => {

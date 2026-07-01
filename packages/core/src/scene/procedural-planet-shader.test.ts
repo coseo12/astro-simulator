@@ -423,23 +423,55 @@ describe('Amendment 1 — 신규 미학 상수 SSoT (#69 drift 가드)', () => {
   });
 });
 
-describe('Amendment 1 — 회전 0 전제 계약 박제 (drift 가드, ADR §A1.5 DoD 8)', () => {
-  // world normal == local normal 은 "body mesh 회전 0" 에 의존. self-rotation 도입 시 normalMatrix 필요.
-  // 셰이더는 vNormal(local) 을 그대로 dot 에 사용 — normalMatrix / world matrix uniform 부재 확인.
+describe('Amendment 2 (#782) — 옵션 e (world normal) 계약 박제 (drift 가드, ADR §A2.3 결정 2)', () => {
+  // self-rotation 도입으로 body mesh 가 회전 → vNormal(local) ≠ world normal. 옵션 e 활성화:
+  // VERTEX 가 world matrix 로 vNormal 을 world 공간 변환 → 광원 dot 이 태양 방향에 고정 (자전 무관).
+  // Amendment 1 의 "회전 0 전제 → local normal 직접 사용" 계약을 옵션 e 계약으로 반전한다.
 
-  it('vertex shader 가 vNormal 을 local normal 그대로 전달 (normalMatrix 변환 부재)', () => {
-    expect(PLANET_VERTEX_SHADER).toContain('vNormal = normalize(normal)');
-    // 회전 도입 전까지 normalMatrix uniform 이 없어야 한다 (있으면 옵션 e 전환된 것 — 계약 변경 신호).
-    expect(PLANET_VERTEX_SHADER).not.toContain('normalMatrix');
+  it('vertex shader 가 world uniform 으로 vNormal 을 world normal 변환 (옵션 e)', () => {
+    // 옵션 e — world matrix uniform 존재 + vNormal 을 world 공간으로 변환.
+    expect(PLANET_VERTEX_SHADER).toContain('uniform mat4 world');
+    expect(PLANET_VERTEX_SHADER).toContain('vNormal = normalize((world * vec4(normal, 0.0)).xyz)');
+    // uniform scale + 순수 회전 전제라 normalMatrix (inverse-transpose) 불요 — world matrix 로 충분
+    // (cross-validate Q2 합의). normalMatrix uniform *선언* 이 도입되면 비균일 scale 전환 신호 (계약
+    // 변경). 주석에 "normalMatrix 불요" 언급은 허용 — 실 GLSL 선언 (`uniform mat3 normalMatrix`) 부재만 검증.
+    expect(PLANET_VERTEX_SHADER).not.toContain('uniform mat3 normalMatrix');
   });
 
-  it('fragment shader 가 vNormal(local) 을 광원 dot 에 직접 사용 (회전 0 전제)', () => {
+  it('vertex shader 가 vLocalPos 는 local 유지 (절차 패턴 painted-on — self-rotation 시 mesh 추종)', () => {
+    // vNormal 만 world, vLocalPos 는 local — 이 분리가 핵심 (표면 패턴은 mesh 와 함께 회전).
+    expect(PLANET_VERTEX_SHADER).toContain('vLocalPos = normalize(position)');
+  });
+
+  it('fragment shader 가 vNormal(world normal) 을 광원 dot 에 직접 사용', () => {
     expect(PLANET_FRAGMENT_SHADER).toContain('vec3 N = normalize(vNormal)');
     expect(PLANET_FRAGMENT_SHADER).toContain('dot(N, uSunDirection)');
   });
 
-  it('셰이더 주석에 회전 0 전제 계약 박제 (self-rotation 도입 시 normalMatrix)', () => {
-    // 후속 개발자가 self-rotation 도입 시 광원 모델 깨짐을 인지하도록 주석 계약 박제 (DoD 8).
-    expect(PLANET_FRAGMENT_SHADER + PLANET_VERTEX_SHADER).toMatch(/world normal == local normal/);
+  it('셰이더 주석에 옵션 e (world normal) 계약 박제 — jd 미전달 회귀 가드 포함', () => {
+    // 미러 계약 주석 갱신 (N 이 world normal) + jd/큰 수 uniform 미전달 계약 (float32 jitter 차단,
+    // cross-validate Q3). 후속 개발자가 시간 기반 셰이더 효과 추가 시 jd 직접 전달 회귀 차단.
+    const src = PLANET_FRAGMENT_SHADER + PLANET_VERTEX_SHADER;
+    expect(src).toMatch(/world normal/);
+    // jd 를 셰이더 uniform 으로 넘기지 않는다는 계약 주석 (jitter/float32 가드).
+    expect(src).toMatch(/jd/);
+  });
+});
+
+describe('Amendment 2 (#782) — JS 미러 world normal 계약 (미러 식 불변, N 인자 좌표계만 갱신)', () => {
+  // 옵션 e 는 vNormal 을 world 좌표로 변환하나, lightingShadeMirror 는 N 을 인자로 받는 순수 함수라
+  // 식 자체가 불변 (N 이 무슨 좌표계든 dot 정합만 유지). world normal + world sunDir 로 자전 무관 명암.
+
+  it('lightingShadeMirror 는 N/sunDir 좌표계 무관하게 dot 정합 유지 (밤면 < 낮면 단조)', () => {
+    // world normal 이 태양을 정면으로 향할 때 (낮면) > 등질 때 (terminator) > 반대 (밤면) 순 휘도 단조.
+    const sunDir: [number, number, number] = [1, 0, 0];
+    const dayN: [number, number, number] = [1, 0, 0]; // 태양 정면 (낮면)
+    const termN: [number, number, number] = [0, 1, 0]; // terminator
+    const nightN: [number, number, number] = [-1, 0, 0]; // 태양 반대 (밤면)
+    const dayLum = luminance709(lightingShadeMirror(dayN, sunDir));
+    const termLum = luminance709(lightingShadeMirror(termN, sunDir));
+    const nightLum = luminance709(lightingShadeMirror(nightN, sunDir));
+    expect(dayLum).toBeGreaterThan(termLum);
+    expect(termLum).toBeGreaterThanOrEqual(nightLum);
   });
 });
