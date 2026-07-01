@@ -5,8 +5,10 @@ import {
   HemisphericLight,
   MeshBuilder,
   PointLight,
+  Quaternion,
   StandardMaterial,
   Texture,
+  TransformNode,
   Vector3,
   type Mesh,
   type Scene,
@@ -448,6 +450,21 @@ export interface SolarSystemSceneOptions {
    * 미등록 body 는 테이블 부재로 자동 단색 (무회귀). ADR `docs/decisions/20260628-756-procedural-planet-surface.md`.
    */
   surfaceDetail?: boolean;
+
+  /**
+   * #782 §A2 — 행성 self-rotation (자전).
+   *
+   * 기본값 **false** (core 라이브러리 보수 기본 — 기존 NullEngine 단위 테스트 무회귀, surfaceDetail
+   * 동형). **기본 ON 은 web 레이어 결정** — `parseRotateEnabled` (apps/web) 기본값이 true 이며
+   * `?rotate=off` 가 옵트아웃 (ADR §A2.3 결정 7). false 면 자전 정지 — 자전 도입 전 픽셀과 100% 동일
+   * (snapshot 가드 격리).
+   *
+   * 동작 (true 일 때): `rotationPeriodHours` 데이터를 가진 body (major 9 + moon) 의 host mesh 에
+   * `rotationQuaternion = tilt(axialTilt) ∘ spin(spinAngle(jd))` 를 매 프레임 설정. 자전각은 jd 순수
+   * 함수 (`(jd − epoch) × ω mod 2π`, 누적 금지 — frame-rate 독립·결정적). ring 있는 body 4개는
+   * ring-anchor (비회전 tilt-only 노드) 로 ring disc 를 격리해 wobble 0 (ADR §A2.3 결정 1).
+   */
+  selfRotation?: boolean;
 }
 
 /**
@@ -476,6 +493,7 @@ export function createSolarSystemScene(
     glowMarkerSatelliteRatio = GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
     starfield = false,
     surfaceDetail = false,
+    selfRotation = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -562,6 +580,30 @@ export function createSolarSystemScene(
     bodyBaseDiameter.set(body.id, body.radius * 2);
   }
 
+  // #782 §A2 — self-rotation 상태 (rotationPeriodHours 보유 body 만). selfRotation=false 면 빈 Map →
+  // updateAt 자전 루프가 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀). ADR §A2.3 결정 5/7.
+  const rotationStates = new Map<string, RotationState>();
+  // ring-anchor: ring 있는 body 의 ring disc 를 host 자전에서 격리하는 비회전 tilt-only 노드
+  // (ADR §A2.3 결정 1 — wobble 구조적 0). host 자전은 host mesh 에 직접, ring 은 이 anchor 자식으로.
+  const ringAnchors = new Map<string, TransformNode>();
+  // 자전각 quaternion 재사용 버퍼 (매 프레임 alloc 0 — cross-validate 고유 발견 1). body 별 out 은 각
+  // mesh.rotationQuaternion 이 소유하므로 여기선 spin/tilt 중간 버퍼만 공유 (단일 프레임 순차 계산).
+  const tmpSpinQuat = new Quaternion();
+  const tmpTiltQuat = new Quaternion();
+  const rotationEpoch = system.epoch;
+  if (selfRotation) {
+    for (const body of system.bodies) {
+      const state = computeRotationState(body);
+      if (state) {
+        rotationStates.set(body.id, state);
+        // host mesh 에 rotationQuaternion 을 쓰려면 초기화 필요 (Babylon 은 rotation Euler ↔ quaternion
+        // 배타 — quaternion 설정 시 rotation Euler 무시). Identity 로 초기화 후 updateAt 이 매 프레임 갱신.
+        const host = meshes.get(body.id);
+        if (host) host.rotationQuaternion = Quaternion.Identity();
+      }
+    }
+  }
+
   // P11-B #289 — LOD mid/low variant lazy-create 저장소 (ADR 20260424-p11-b §축 4).
   //
   // mid (segments=12 low-poly sphere) / low (BILLBOARDMODE_ALL quad) 변형 메쉬는 **첫 전환 시점에**
@@ -646,6 +688,23 @@ export function createSolarSystemScene(
     }
     ringHandlesByBody.set(body.id, handles);
     disposables.push({ dispose: () => handles.dispose() });
+
+    // #782 §A2.3 결정 1 — ring wobble 격리. selfRotation + 이 body 가 자전하면 host mesh 가 spin 하는데
+    // ring disc 가 host 자식이면 함께 spin → ring tilt 가 자전축 주위로 wobble (R8 세로 고리 붕괴).
+    // ring-anchor (비회전 TransformNode) 로 ring disc 를 host 자전에서 격리한다: ring meshes 를 anchor
+    // 자식으로 재parent (host 직속 해제) → host 자전 미상속. anchor 는 자체 rotation 0 이고 ring disc 는
+    // 여전히 `rotation.x = π/2 + tiltRad` (tilt 보존). anchor 의 position/scaling 은 updateAt 이 host 값으로
+    // 동기 (tier scale + origin shift 추종). host 자전(rotation) 만 상속 안 함 → wobble 구조적 0.
+    // (cross-validate 이견 수용 1 의 scene graph 격리 — 역회전 보정 없이 구조로 해결.)
+    if (selfRotation && rotationStates.has(body.id)) {
+      const ringAnchor = new TransformNode(`${body.id}-ring-anchor`, scene);
+      // 초기 host transform 복사 (첫 프레임 전 정합 — updateAt 이 이후 매 프레임 동기).
+      ringAnchor.position.copyFrom(host.position);
+      ringAnchor.scaling.copyFrom(host.scaling);
+      for (const m of handles.meshes) m.parent = ringAnchor;
+      ringAnchors.set(body.id, ringAnchor);
+      disposables.push({ dispose: () => ringAnchor.dispose() });
+    }
   }
 
   // 궤도선 — P12-A: tier 전환 시 재샘플링. 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
@@ -1230,6 +1289,37 @@ export function createSolarSystemScene(
           (parentWorld[1] - oy) * sceneUnitPerMeter,
           (parentWorld[2] - oz) * sceneUnitPerMeter,
         );
+      }
+    }
+
+    // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
+    // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
+    //
+    // ⚠️ position 루프 (위, `:1213` 계약) 는 mesh.position 만 건드리고 rotation 을 절대 건드리지 않는다
+    // (§A2.2-2 실측). 자전은 여기서 rotationQuaternion 만 설정 — position 과 TRS 분해 상 독립 (충돌 0).
+    // 자전각 = jd 순수 함수 (누적 아님) → frame-rate 독립·timeScale 자동 연동·결정적 재현.
+    if (rotationStates.size > 0) {
+      for (const [id, state] of rotationStates) {
+        const mesh = meshes.get(id);
+        if (!mesh || !mesh.rotationQuaternion) continue;
+        // host mesh 에 tilt ∘ spin quaternion 직접 (mid variant 는 parent 상속으로 자동 동기 회전).
+        computeSpinQuaternion(
+          jd,
+          rotationEpoch,
+          state,
+          tmpSpinQuat,
+          tmpTiltQuat,
+          mesh.rotationQuaternion,
+        );
+      }
+      // ring-anchor 동기 — ring disc 를 host 자전에서 격리 (wobble 0). host 의 position/scaling 만
+      // 복사 (rotation 제외) → ring 은 host 자전 미상속, tilt 만 (ring disc `rotation.x = π/2 + tiltRad`).
+      // ring host 4개 한정 (ringAnchors 는 자전하는 ring body 만 보유). tier scale = host.scaling 추종.
+      for (const [id, anchor] of ringAnchors) {
+        const host = meshes.get(id);
+        if (!host) continue;
+        anchor.position.copyFrom(host.position);
+        anchor.scaling.copyFrom(host.scaling);
       }
     }
 
@@ -1911,6 +2001,78 @@ function isArcRotateCamera(cam: unknown): cam is ArcRotateCamera {
 function defaultBodyScale(_bodyId: string): number {
   return 1.0;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #782 §A2 — self-rotation (자전) 인프라.
+//
+// 자전각 = jd 순수 함수 (`spinAngle(jd) = ((jd − epoch) × ω) mod 2π`, ADR §A2.3 결정 5). 매 프레임
+// 누적 금지 — frame-rate 독립·float drift 0·timeScale 자동 연동·결정적 재현 (`?t=<jd>&speed=0`).
+//
+// 규약 (i) (ADR §A2.3 결정 4 각주): `rotationPeriodHours` 는 항상 양수 magnitude. 자전 방향(역행)은
+// `axialTiltDeg` (IAU obliquity, 0~180) 에 내재 — uranus 97.77°/venus 177.36° 처럼 obliquity>90 이면
+// pole 이 뒤집혀 양수 spin 이 역행으로 보인다. period 부호를 음수로 주면 방향이 이중 적용되어 뒤집힌다.
+//
+// 축 방위각 (azimuth) 은 ring 답습 world X 고정 근사 — tilt 는 X 축 주위 회전 (`Quaternion.RotationAxis
+// (X, tiltRad)`). ring disc 의 `rotation.x = π/2 + tiltRad` 와 동일 축 → body 자전축 ⊥ ring plane 정합.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** #782 — body 별 자전 파라미터 (데이터에서 1회 산출, 매 프레임 재계산 회피). */
+interface RotationState {
+  /** 각속도 ω [rad/day] = 2π × 24 / rotationPeriodHours (양수 — 방향은 tiltRad 에 내재, 규약 i). */
+  omega: number;
+  /** 자전축 기울기 [rad] (axialTiltDeg — obliquity, X 축 주위. 0~π 범위). */
+  tiltRad: number;
+}
+
+/**
+ * #782 — body 데이터에서 자전 파라미터 산출. `rotationPeriodHours` 미지정 시 null (자전 없음).
+ * 규약 (i): ω 는 양수 magnitude (방향은 tiltRad 에 내재). loader schema 가 0 을 차단하나 방어적 재확인.
+ */
+function computeRotationState(body: LoadedCelestialBody): RotationState | null {
+  const periodHours = body.rotationPeriodHours;
+  if (periodHours === undefined || periodHours === 0) return null;
+  // ω [rad/day] = 2π / (period_h / 24). period 는 양수 magnitude — Math.abs 로 방어 (음수 데이터가
+  // 실수로 들어와도 방향은 tiltRad(obliquity) 가 결정하므로 magnitude 만 사용, 이중 적용 차단).
+  const omega = (2 * Math.PI * 24) / Math.abs(periodHours);
+  const tiltRad = ((body.axialTiltDeg ?? 0) * Math.PI) / 180;
+  return { omega, tiltRad };
+}
+
+/**
+ * #782 §A2.3 결정 5 — jd 순수 함수 자전각 → `tilt(axialTilt) ∘ spin(spinAngle)` quaternion.
+ *
+ * `spinAngle = ((jd − epoch) × ω) mod 2π` (float64 CPU — jd 큰 수 뺄셈을 먼저 수행해 정밀도 보존,
+ * cross-validate Q3 실측 ≤ 3.1e-8° 오차). `q = tilt.multiply(spin)` = spin(local Y) 먼저 적용 후
+ * tilt(X) — pole 을 tiltRad 만큼 기울인 뒤 그 (기운) 축 주위로 자전 (Babylon multiply 순서: A.multiply(B)
+ * 는 B 를 먼저 적용). tmpSpin/tmpTilt 재사용으로 매 프레임 alloc 0 (cross-validate 고유 발견 1).
+ *
+ * @param jd 현재 Julian Date
+ * @param epoch 기준 epoch (JD) — spinAngle 0 기준
+ * @param state 자전 파라미터
+ * @param tmpSpin 재사용 spin quaternion 버퍼
+ * @param tmpTilt 재사용 tilt quaternion 버퍼
+ * @param out 결과를 기록할 quaternion (mesh.rotationQuaternion)
+ */
+function computeSpinQuaternion(
+  jd: number,
+  epoch: number,
+  state: RotationState,
+  tmpSpin: Quaternion,
+  tmpTilt: Quaternion,
+  out: Quaternion,
+): void {
+  // (jd − epoch) 뺄셈을 float64 로 먼저 (큰 수 − 큰 수 = 작은 수) → mod 2π 로 각 누적 없이 결정적.
+  const spinAngle = (((jd - epoch) * state.omega) % (2 * Math.PI)) as number;
+  // spin: local Y (자전축) 주위. tilt: world X 주위 (ring 답습 — 자전축 ⊥ ring plane 정합).
+  Quaternion.RotationAxisToRef(ROT_SPIN_AXIS, spinAngle, tmpSpin);
+  Quaternion.RotationAxisToRef(ROT_TILT_AXIS, state.tiltRad, tmpTilt);
+  // q = tilt ∘ spin (spin 먼저 적용 후 tilt — Babylon A.multiply(B) = B 먼저).
+  tmpTilt.multiplyToRef(tmpSpin, out);
+}
+
+/** #782 — 자전축 (local Y = pole) / tilt 축 (world X = ring 답습). 모듈 상수 (alloc 0). */
+const ROT_SPIN_AXIS = new Vector3(0, 1, 0);
+const ROT_TILT_AXIS = new Vector3(1, 0, 0);
 
 /**
  * #773 Amendment 1 — 절차 표면 셰이더 광원 배선 인자 (createBodyMesh/createBodyMeshMid 공유).

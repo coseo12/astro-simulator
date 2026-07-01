@@ -464,6 +464,8 @@ axialTilt 로 기운 축 주위로 spin 해야 한다 (tilt ∘ spin 합성). �
 
   Babylon TRS 상속이 spin 을 spin-pivot 자식(표면)에만 전파하고 ring-anchor(비회전)에는 전파하지 않아, 역회전 보정 없이 ring tilt 가 구조적으로 고정된다. **비용**: ring host 4개 한정 mid variant 재parent (spin pivot 자식) + picking metadata bodyId 재확인 (Concrete Prediction §A2.4 scene 배선 ~35–55 로 상향, ring host 만). §A2.7 재검토 조건 1 은 이 계층 비용이 실측 초과할 경우로 축소.
 
+  > **구현 정정 (Amendment 2-i, #782 PR — 계층 위상 조정, 동일 보장 유지)**: 위 확정 구조는 host 를 **비회전 owner** 로 두고 표면(high)을 spin-pivot 자식으로 **재parent** 하는 위상을 명세했다. 그러나 실측 결과 high mesh 는 `meshes` Map 의 유일 owner 이자 position/scale/surface/picking/LOD-parent 역할을 동시에 지므로, 표면을 spin-pivot 자식으로 내리면 **tier scaling (`:930` `mesh.scaling.setAll`) / LOD parent (`:1425`) / picking metadata / position 루프 (`:1213`) 전반에 재배선 파급** → Concrete Prediction "picking/camera/orbit/tier/LOD 변경 0" 위배. **채택 위상 (동일 보장, 최소 파급)**: high mesh = position/scale/surface/**spin** owner 유지 (ring 없는 body 와 동일 경로 — host 직접 spin). ring disc 는 host 자식이 아닌 **ring-anchor (비회전 top-level TransformNode) 자식**으로 재parent 하고, updateAt 이 anchor 의 `position`/`scaling` 을 host 값으로 매 프레임 동기 (rotation 제외). ring 은 host 자전을 **애초에 상속하지 않으므로** (자식이 아님) wobble 이 구조적으로 0 — cross-validate 이 기각한 b-ii (역회전 매 프레임 곱) 는 사용 안 함, agy 가 우려한 b-iii "tier scale 끊김" 은 updateAt 2줄 (`anchor.scaling.copyFrom(host.scaling)` + position) 로 해소 (재설계 아님). **결과**: 확정 구조의 핵심 보장 (구조적 wobble 0 + 역회전 없음) 을 그대로 달성하면서 tier/LOD/picking 파급 0 (Concrete Prediction 정합). verify 실측 ring normal Δ: jupiter 1.2e-6°, saturn/uranus/neptune 정확히 0° (body spin π/2 진행 중). 재검토 조건 1 은 이 anchor 동기 2줄 비용이 실측 문제될 경우로 재정의.
+
 - **tier scale / origin shift 독립성**: rotationQuaternion 은 `mesh.scaling` (tier), `mesh.position` (origin shift) 과 Babylon 변환 행렬에서 독립 성분 (TRS 분해). §A2.2-2 실측대로 position 루프가 rotation 을 건드리지 않으므로 충돌 0.
 
 #### 결정 2 — 광원 옵션 e (world normal) 전환
@@ -499,9 +501,11 @@ Amendment 1 옵션 e (§A1.3 결정 1 표) 를 활성화. 회전이 생기면 `v
 | 역행 부호       | 음수 (금성 −5832.5h, 천왕성 −17.24h)                | 음수 (금성 −243d)          | 음수                  |
 | jd 연동         | `ω = 2π / (period_h / 24) [rad/day]`                | `ω = 2π / period_d`        | 변환                  |
 
-→ **(A) 시간(hours) 단위 채택** — `rotationPeriodHours`. NASA sidereal rotation period 직접 표기 (지구 23.9345h). **역행 자전은 음수** (금성 −5832.5h, 천왕성 −17.24h) — 부호가 spin 방향 (CCW/CW). `ω[rad/day] = 2π × 24 / rotationPeriodHours` (음수면 역방향). 스키마: `rotationPeriodHours: z.number().optional()` (0 금지 — `.refine(v => v !== 0)`, division-by-zero 차단. 미지정 body 는 자전 없음 = 현행 정지 유지, 하위 호환).
+→ **(A) 시간(hours) 단위 채택** — `rotationPeriodHours`. NASA sidereal rotation period 직접 표기 (지구 23.9345h). `ω[rad/day] = 2π × 24 / rotationPeriodHours`. 스키마: `rotationPeriodHours: z.number().refine(v => v !== 0).optional()` (0 금지 — division-by-zero 차단. 미지정 body 는 자전 없음 = 현행 정지 유지, 하위 호환).
 
-- **데이터 대상**: 최소 표면 4개 (earth/mars/jupiter/moon) + 권장 major body 전체 (mercury/venus/saturn/uranus/neptune 등). 위성·왜소행성·혜성은 부재 시 자전 안 함 (점진 확장, R-Phase).
+> **각주 (구현 시 정정, #782 PR — 규약 i 채택)**: 본 초안은 "역행 자전 = 음수 period" 를 명시했으나, **기존 데이터와 충돌**한다. `axialTiltDeg` 는 이미 **IAU obliquity 규약 (0~180)** 을 쓴다 (uranus 97.77° = 90° 초과 = 역행이 tilt 에 내재, venus 177.36°, saturn 26.73° — R8 ring tilt 데이터). 여기에 period 부호까지 음수로 주면 **방향 이중 적용** (uranus 가 오히려 prograde 로 뒤집힘). 따라서 **규약 (i) 채택**: `axialTiltDeg` = 물리 obliquity (0~180, 기존 데이터 일관), `rotationPeriodHours` = **양수 magnitude** (부호 없음). 자전 방향(역행)은 tilt (obliquity>90) 에서 창발한다 — pole 이 뒤집혀 양수 spin 이 역행으로 보인다. 이중 계산 없음 + 기존 uranus/venus/saturn/neptune obliquity·ring tilt 데이터 무수정. loader 스키마는 `.positive()`/`.nonnegative()` 대신 `.refine(v => v !== 0)` 만 (음수 허용 — 미래 규약 (ii) 전환 여지, cross-validate 고유 발견 3). **DoD #3 (금성/천왕성 CW) 을 verify 로 실증** (browser-verify-782-rotation.mjs — 전 9 body PASS: venus/uranus CW, 나머지 CCW, measured tilt = obliquity 정확 일치, deltaErrPct 0%). 초안의 음수 period 표기는 폐기.
+
+- **데이터 대상**: 표면 4개 (earth/mars/jupiter/moon) + major body 전체 (mercury/venus/saturn/uranus/neptune) + moon = 9개. 위성·왜소행성·혜성은 부재 시 자전 안 함 (점진 확장, R-Phase).
 
 #### 결정 5 — 자전각 = jd 순수 함수 (accumulate 금지)
 

@@ -20,16 +20,30 @@
  *   - §A1.3 결정 1 — 고정 방향 명암 (`shade = 0.85 + 0.15 * dot(N, fixed)`) 을 **실제 태양 방향**
  *     기반 명암으로 교체. `uniform vec3 uSunDirection` 을 `createProceduralPlanetMaterial` 의
  *     `onBindObservable` 클로저에서 각 draw 직전 `normalize(sunPos − meshPos)` 로 갱신.
- *     body mesh 회전 0 (self-rotation 미구현) + uniform scaling → world normal == local normal →
- *     `vNormal` (local) 을 그대로 dot 에 사용 (normalMatrix 불필요).
+ *
+ * **Amendment 2 (#782) — 옵션 e (world normal) 전환 + self-rotation** (ADR §Amendment 2):
+ *   - §A2.3 결정 2 — self-rotation 도입으로 body mesh 가 자전축 주위로 회전한다. `vNormal`(local) ≠
+ *     world normal 이 되어 광원 dot 이 표면과 함께 회전해 명암이 자전을 따라 돌아버린다 (밤면이 태양을
+ *     안 따름). **옵션 e 활성화**: VERTEX 가 `uniform mat4 world` 로 `vNormal = normalize((world *
+ *     vec4(normal,0)).xyz)` 계산 → 명암이 태양 방향에 고정 (자전 무관). **uniform scale + 순수 회전
+ *     전제** 에서 `world` matrix 로 충분 (normalMatrix inverse-transpose 불요 — 등방 scale 은 자기
+ *     자신의 상수배, cross-validate Q2 합의). `world` 는 Babylon ShaderMaterial 표준 auto-bind uniform.
+ *   - **vLocalPos 는 local 유지** — 절차 노이즈(대륙/밴드/크레이터)는 표면에 그려진(painted-on) 패턴이라
+ *     mesh 와 함께 회전해야 한다. world 로 바꾸면 패턴이 공간 고정되어 mesh 가 미끄러진다. vNormal 만
+ *     world, vLocalPos 는 local — 이 분리가 핵심 (ADR §A2.3 결정 2).
+ *   - **jd 미전달 계약** — 자전각은 CPU(float64) 에서 계산해 `mesh.rotationQuaternion` 으로 적용,
+ *     `world` matrix 로 반영된다. 셰이더는 jd 를 받지 않는다. 미래에 시간 기반 셰이더 효과 추가 시
+ *     jd(~2.4e6)를 float32 uniform 으로 넘기면 하위 비트 손실로 jitter 발생 → 금지 (cross-validate Q3).
  *   - §A1.3 결정 2 — **HemisphericLight 식 완전 재현** (`mix(ground, sky, dot(N,up)*0.5+0.5)`) +
  *     PointLight diffuse (`sunIntensity * sunDiffuse * smoothstep(0, W, dot(N, sunDir))`). 단색 행성
  *     (StandardMaterial + PointLight 2.5 + HemisphericLight ambient) 과 시각 일치 (밤면/terminator/극).
  *   - §A1.3 결정 4 (#775) — rocky 분기를 `mix(oceanColor, landColor, landMask)` 로 교체 (대륙 색 구분).
  *
- * ⚠️ **회전 0 전제 (drift 가드)**: 본 광원 모델은 "body mesh 회전 0 + uniform scaling" 에 의존한다
- *   (world normal == local normal). self-rotation / axialTilt 도입 시 `vNormal` 을 world matrix 로
- *   변환해야 한다 (ADR §A1.3 결정 1 옵션 e 전환). onBind 의 dev-only 회전 어서션이 조기 감지.
+ * ⚠️ **옵션 e 배선 계약 (drift 가드, Amendment 2)**: 본 광원 모델은 "vNormal = world normal (world
+ *   matrix 변환) + uniform scaling" 에 의존한다. `world` uniform 이 uniforms 배열에서 빠지거나 VERTEX
+ *   가 vNormal 을 local 로 되돌리면, 자전 시 명암이 표면과 함께 돌아버린다. onBind 의 dev-only 어서션이
+ *   `world` 배선 누락 / vNormal 오용을 조기 감지 (once-guard — reviewer #776, 프레임당 spam 차단).
+ *   **비균일 scale 도입 시** (미래 tier 가 비등방) 옵션 (B) normalMatrix 로 승격 (ADR §A2.7 재검토 2).
  *
  * **광원 물리 상수 SSoT 주입**: sun intensity/diffuse + ambient intensity/ground/sky/up 은
  *   `solar-system-scene.ts` 가 SSoT 로 소유한다 (PointLight/HemisphericLight 와 동일 값 — 마법 숫자
@@ -165,11 +179,16 @@ export const LAND_THRESHOLD_HI = 0.62;
 const SHADER_NAME = 'proceduralPlanet';
 
 /**
- * GLSL vertex shader — local position + normal 을 fragment 로 전달 (구면 좌표 절차 생성 기준).
+ * GLSL vertex shader — local position (절차 생성 기준) + world normal (광원 기준) 을 fragment 로 전달.
  *
- * 표면 절차 생성의 기준 = mesh local 좌표 (구의 표면점). world 가 아닌 local 을 쓰면 tier scale /
- * floating-origin shift 에 표면 패턴이 불변 (회전 추종은 별도 — 1차는 self-rotation 미구현이라
- * local 고정으로 충분). log-depth 를 위해 clip-space w 도 전달 (ring-shader #641 선례).
+ * **vLocalPos = local 구면 좌표** — 절차 패턴(대륙/밴드/크레이터)의 기준. tier scale / floating-origin
+ * shift / self-rotation 에 표면 패턴이 mesh 와 함께 움직여 "표면에 그려진(painted-on)" 것으로 보인다.
+ *
+ * **vNormal = world normal (Amendment 2 옵션 e)** — `normalize((world * vec4(normal,0)).xyz)`. self-
+ * rotation 으로 mesh 가 회전하면 local normal ≠ world normal 이 되어 광원 dot 이 표면과 함께 돌아버린다.
+ * world matrix 로 변환해 명암이 태양 방향에 고정된다 (자전 무관). uniform scale + 순수 회전 전제에서
+ * `world` matrix 로 충분 (normalMatrix inverse-transpose 불요 — cross-validate Q2 합의). log-depth 를
+ * 위해 clip-space w 도 전달 (ring-shader #641 선례).
  */
 const VERTEX_SHADER = /* glsl */ `
 precision highp float;
@@ -178,6 +197,10 @@ attribute vec3 position;
 attribute vec3 normal;
 
 uniform mat4 worldViewProjection;
+// Amendment 2 (#782) 옵션 e — world matrix (Babylon auto-bind). vNormal 을 world 공간으로 변환해
+// self-rotation 후에도 광원 dot 이 태양 방향에 고정. uniform scale + 순수 회전이라 world 곱 후
+// normalize 로 충분 (normalMatrix 불요). ⚠️ jd/큰 수 uniform 은 넘기지 않는다 (float32 jitter 차단).
+uniform mat4 world;
 
 varying vec3 vLocalPos;
 varying vec3 vNormal;
@@ -188,9 +211,11 @@ varying vec3 vNormal;
 varying float vFragmentDepth;
 
 void main(void) {
-  // local 구면 좌표 — 절차 패턴의 기준 (tier scale / floating-origin 불변).
+  // local 구면 좌표 — 절차 패턴의 기준 (tier scale / floating-origin / self-rotation 시 mesh 추종).
   vLocalPos = normalize(position);
-  vNormal = normalize(normal);
+  // Amendment 2 옵션 e — world normal (self-rotation 후에도 광원 dot 이 태양 방향 고정). w=0 으로
+  // 변환해 translation 무시 (방향 벡터), uniform scale 이므로 normalize 로 스케일 정규화.
+  vNormal = normalize((world * vec4(normal, 0.0)).xyz);
   vec4 clip = worldViewProjection * vec4(position, 1.0);
   gl_Position = clip;
   vFragmentDepth = 1.0 + clip.w;
@@ -207,8 +232,8 @@ void main(void) {
  *   - logDepthConstant: Babylon logDepth 정합 상수.
  *
  * varying:
- *   - vLocalPos: 정규화 구면 좌표 (절차 생성 기준).
- *   - vNormal: 표면 법선 (간이 명암).
+ *   - vLocalPos: 정규화 구면 좌표 (절차 생성 기준 — local, self-rotation 시 mesh 추종).
+ *   - vNormal: 표면 법선 (Amendment 2 옵션 e — world normal, 광원 dot 이 태양 방향 고정).
  *
  * **GPU warp divergence 0**: body 1개 = draw 1개 = 동일 uSurfaceType → 같은 draw 안 모든
  * fragment 가 같은 분기 (ADR §결정 2 A). **switch-case 금지** (WGSL 변환 깨짐) — if-else 만 사용.
@@ -233,8 +258,8 @@ uniform float craterDensity;
 uniform float logDepthConstant;
 
 // Amendment 1 (#773) — 광원 모델 uniform (HemisphericLight + PointLight 재현, scene SSoT 주입).
-//   uSunDirection: 실제 태양 방향 (normalize(sunPos − meshPos)) — onBind 에서 매 draw 갱신.
-//                  body mesh 회전 0 + uniform scaling → world normal == local normal 이라 local 기준.
+//   uSunDirection: 실제 태양 방향 (normalize(sunPos − meshPos), world) — onBind 에서 매 draw 갱신.
+//                  Amendment 2 옵션 e: vNormal 도 world normal 이라 동일 좌표계 dot 정합 (자전 무관).
 //   sunIntensity / sunDiffuse: PointLight (intensity 2.5 / diffuse (1,0.95,0.8)) 재현.
 //   ambientIntensity / ambientGround / ambientSky / ambientUp: HemisphericLight 재현
 //                  (mix(ground, sky, dot(N,up)*0.5+0.5) — terminator/극 그라데이션 일치).
@@ -293,13 +318,13 @@ float fbm(vec3 p) {
 
 void main(void) {
   vec3 p = normalize(vLocalPos);
-  // ⚠️ 회전 0 전제 (Amendment 1 drift 가드): body mesh 회전 0 + uniform scaling → world normal ==
-  //    local normal 이라 vNormal(local) 을 광원 dot 에 직접 사용. self-rotation / axialTilt 도입 시
-  //    vNormal 을 world matrix 로 변환해야 한다 (ADR §A1.3 결정 1 옵션 e). onBind dev 어서션이 감지.
+  // Amendment 2 (#782) 옵션 e: vNormal 은 VERTEX 에서 world matrix 변환된 world normal 이다
+  //    (self-rotation 후에도 광원 dot 이 태양 방향 고정). vLocalPos(local) 는 절차 패턴 기준으로
+  //    분리 — 표면 패턴은 mesh 와 함께 회전, 명암은 태양 고정. onBind dev 어서션이 world 배선 감지.
   vec3 N = normalize(vNormal);
 
   // Amendment 1 (#773) — 실제 태양 방향 기반 명암 (단색 행성 StandardMaterial 과 시각 일치).
-  //   회전 0 + uniform scaling → world normal == local normal 이라 vNormal(local) 을 그대로 사용.
+  //   Amendment 2 옵션 e: vNormal = world normal 이라 sunDirection(world) 과 동일 좌표계 dot 정합.
   // ① HemisphericLight 재현 — mix(ground, sky, dot(N,up)*0.5+0.5). 밤면 floor + 극 그라데이션.
   float hemiFactor = dot(N, ambientUp) * 0.5 + 0.5;
   vec3 ambientShade = ambientIntensity * mix(ambientGround, ambientSky, hemiFactor);
@@ -331,7 +356,8 @@ void main(void) {
     col.b = clamp(col.b - desertRustTint * 0.5, 0.0, 1.0);
   } else if (uSurfaceType == 2) {
     // ── gas-bands (목성) — 위도 밴드 + 난류 결 ────────────────────────────
-    // local Y 가 위도 축 (1차는 mesh local Y 근사 — axialTilt 후속, ADR §재검토 2).
+    // local Y 가 위도 축. Amendment 2 (#782): axialTilt 를 mesh rotationQuaternion 으로 적용하므로
+    // local Y 가 실제 자전축(pole)과 정렬 → 밴드가 자전축에 직교 (오히려 정확, ADR §재검토 2 해소).
     float latitude = p.y;
     // 난류 — 밴드 경계를 흐트러뜨려 자연스러운 줄무늬 (직선 밴드 회피).
     float turb = (fbm(p * 4.0) - 0.5) * 2.0 * gasTurbulence;
@@ -475,6 +501,8 @@ export function createProceduralPlanetMaterial(
       attributes: ['position', 'normal'],
       uniforms: [
         'worldViewProjection',
+        // Amendment 2 (#782) 옵션 e — world matrix auto-bind (vNormal world 변환용, self-rotation 정합).
+        'world',
         'baseColor',
         'uSurfaceType',
         'rockyContrast',
@@ -547,32 +575,34 @@ export function createProceduralPlanetMaterial(
     // onBindObservable — 각 draw 직전 mesh 핸들과 함께 호출 (scene 이 material 핸들 별도 추적 불요,
     // 옵션 d Map 대비 우월 — ADR §A1.3 결정 1 c). tmpVector 재사용으로 alloc 0 (cross-validate 이견 2).
     const tmpSunDir = new Vector3();
+    // Amendment 2 (#782) reviewer #776 — once-guard: dev 어서션은 최초 1회만 warn (프레임당 mesh당
+    // 누적 spam 차단). production 무영향 (NODE_ENV DCE — 아래 분기 전체 tree-shake).
+    let warned = false;
     material.onBindObservable.add((mesh) => {
       const sunPos = sunPositionProvider();
-      // sunDir = normalize(sunPos − meshAbsPos). 회전 0 + uniform scaling → world normal == local normal.
+      // sunDir = normalize(sunPos − meshAbsPos) (world). Amendment 2 옵션 e: vNormal 도 world normal.
       // satellite (달) 도 parent 상속 위치를 getAbsolutePosition 이 정확히 반영 (ADR §A1.3 결정 1).
       const meshPos = (mesh as Mesh).getAbsolutePosition();
       sunPos.subtractToRef(meshPos, tmpSunDir);
       tmpSunDir.normalize();
       material.setVector3('uSunDirection', tmpSunDir);
 
-      // dev-only 방어적 회전 어서션 (cross-validate 이견 3) — world normal == local normal 전제가
-      // 회전 0 에 의존. self-rotation / axialTilt 도입 시 vNormal 을 world matrix 로 변환해야 한다
-      // (ADR §A1.3 결정 1 옵션 e). production 무영향 (NODE_ENV DCE).
-      if (process.env.NODE_ENV !== 'production') {
-        const m = mesh as Mesh;
-        const rotNonZero =
-          m.rotationQuaternion != null
-            ? Math.abs(m.rotationQuaternion.w - 1) > 1e-6 ||
-              Math.abs(m.rotationQuaternion.x) > 1e-6 ||
-              Math.abs(m.rotationQuaternion.y) > 1e-6 ||
-              Math.abs(m.rotationQuaternion.z) > 1e-6
-            : Math.abs(m.rotation.x) > 1e-6 ||
-              Math.abs(m.rotation.y) > 1e-6 ||
-              Math.abs(m.rotation.z) > 1e-6;
-        if (rotNonZero) {
+      // Amendment 2 (#782) §A2.3 결정 6 — dev-only 옵션 e 배선 어서션 (의미 전환: "회전 감지" →
+      // "world 배선 누락 / vNormal 오용 감지"). 옵션 e 는 vNormal 을 world matrix 로 변환하는 데
+      // 의존하므로, uniforms 배열에 'world' 가 빠지거나 VERTEX 가 vNormal 을 local 로 되돌리면 자전
+      // 시 명암이 표면과 함께 돌아버리는 회귀가 생긴다. dev 빌드에서 조기 감지. once-guard (#776) 로
+      // 최초 1회만 warn. production 무영향 (NODE_ENV DCE).
+      if (process.env.NODE_ENV !== 'production' && !warned) {
+        // 배선 검증: (1) 셰이더 소스가 world normal 변환식을 포함 (2) uniforms 에 'world' 존재.
+        // Effect uniform 목록은 런타임 조회가 불안정하므로 셰이더 소스 정적 계약으로 확인 (테스트
+        // 가드와 동일 계약). 소스에서 옵션 e 배선이 누락되면 즉시 경고.
+        const worldNormalWired =
+          VERTEX_SHADER.includes('uniform mat4 world') &&
+          VERTEX_SHADER.includes('world * vec4(normal');
+        if (!worldNormalWired) {
+          warned = true;
           console.warn(
-            `[procedural-planet-shader] mesh "${m.name}" 회전 non-zero 감지 — 광원 모델은 world normal == local normal (회전 0) 전제. self-rotation 도입 시 normalMatrix 필요 (ADR §A1.3 결정 1 옵션 e).`,
+            `[procedural-planet-shader] mesh "${(mesh as Mesh).name}" — 옵션 e (world normal) 배선 누락 감지. self-rotation 시 명암이 표면과 함께 회전한다. VERTEX 에 'uniform mat4 world' + 'vNormal = normalize((world * vec4(normal,0)).xyz)' 필요 (ADR §A2.3 결정 2).`,
           );
         }
       }
@@ -733,8 +763,10 @@ export function surfaceColorMirror(
  *
  * ⚠️ FRAGMENT_SHADER 의 GLSL 광원 합성과 동일 식이어야 한다 (한쪽 수정 시 양쪽 동기화).
  *
- * @param N 표면 법선 (단위 벡터 — 회전 0 전제로 local == world)
- * @param sunDir 태양 방향 (단위 벡터)
+ * @param N 표면 법선 (단위 벡터 — Amendment 2 옵션 e 로 **world normal**. VERTEX 가 world matrix 로
+ *   변환하므로 미러는 이미 world 좌표계 N 을 인자로 받는다. 미러 식 자체는 불변 — N 이 무슨 좌표계든
+ *   dot 정합만 유지하면 되며, 옵션 e 는 N 과 sunDir 을 동일 world 좌표계로 맞춰 자전 무관 명암 보장).
+ * @param sunDir 태양 방향 (단위 벡터, world)
  * @param lighting 광원 물리 상수 (scene SSoT — 미전달 시 DEFAULT_PLANET_LIGHTING)
  * @returns 광원 명암 RGB (diffuseColor 곱 전 — 낮면은 1.0 초과 가능, clamp 미적용)
  */
