@@ -1030,6 +1030,20 @@ export function createSolarSystemScene(
       mesh.computeWorldMatrix(true);
     }
 
+    // #782 Amendment 2-i fix (PR #785 reviewer 권고 1 / qa 실측) — ring-anchor 를 setTier 에서도 즉시 동기.
+    // updateAt 의 anchor 동기 (`:1318`) 는 `timeChanged` 바인딩이라 speed=0 (pause) 중 tier 전환 시
+    // 미발동 → ring-anchor 가 구 tier scale/position 으로 stale (ring/host 스케일 mismatch, 실측 drift
+    // 최대 1733% = ring 이 body 대비 28배 어긋난 채 렌더). setTier 는 pause 무관 경로이므로 여기서 host
+    // 값으로 즉시 동기해야 tier 전환 즉시 ring 이 body 와 스케일 정합 (updateAt `:1318-1323` 와 동일 수식).
+    // ring host 4개 한정 (ringAnchors 는 selfRotation + 자전 ring body 만 보유). host.position/scaling 은
+    // 위 루프에서 새 tier 값으로 확정된 상태 (rotation 은 제외 — anchor 는 비회전으로 wobble 0 유지).
+    for (const [id, anchor] of ringAnchors) {
+      const host = meshes.get(id);
+      if (!host) continue;
+      anchor.position.copyFrom(host.position);
+      anchor.scaling.copyFrom(host.scaling);
+    }
+
     // Phase B — camera dolly interp. scene.activeCamera 가 ArcRotateCamera 가 아니면 skip.
     // (e.g. 테스트 셋업 / 비정상 초기화 경로). 통상 경로는 setupArcRotateCamera 에서 항상 ArcRotateCamera.
     //
