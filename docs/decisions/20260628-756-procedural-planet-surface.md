@@ -1,8 +1,8 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)**
-- **날짜**: 2026-06-28 (Amendment 1: 2026-06-30)
-- **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low)
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)**
+- **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01)
+- **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
 - **용어**: [Tier](../glossary.md#tier-t1--t2--t3), [R-Phase](../glossary.md#r-phase-roadmap-v3-phase), [LOD](../glossary.md) (high/mid/low variant)
 
@@ -391,3 +391,237 @@ cross-validate (Antigravity `agy`) 1회 수행 (2026-06-30, outcome=applied, exi
 3. **terminator aliasing 잔존** — soft terminator (smoothstep, cross-validate 이견 1) 로 1차 완화했으나 segments=12 (mid) 에서 여전히 각지면 `SOFT_TERMINATOR_WIDTH` 확대 또는 per-pixel normal 보간 검토 (Amendment 2).
 4. **다른 rocky body 추가** — 화성도 미래에 land mix 요구 시 rocky 분기 land 색을 body별 상수로 확장 (현재 earth 만 Rocky).
 5. **대기/구름 레이어 도입** (cross-validate 고유 발견 1) — 지구 표면 위 투명 대기/구름 셰이더 mesh 도입 시 알파 블렌딩 + depth 우선순위 (표면 셰이더 log-depth § 핵심 위험 1 과의 정합) 검토 필요. **현재 대기/구름 mesh 미구현이라 본 Amendment 범위 밖** — 도입 시점에 별도 이슈로 분리 (맥락 박제용 기록).
+
+---
+
+## Amendment 2 (2026-07-01) — 행성 self-rotation (자전) + 광원 world normal 옵션 e 전환 (#782)
+
+- **상태**: Accepted (cross-validate 2026-07-01 — §A2.8 4축 박제 완료). 광원 모델 변경 + 프로젝트 시각 원칙 확장이라 §교차검증 박제 직후 1회 루틴 대상이었으며, cross-validate §A2.8 통합 후 Accepted 전이.
+- **이슈**: [#782](https://github.com/coseo12/astro-simulator/issues/782) (type:feat, medium, group:B-render, 트랙 A 몰입)
+- **형식**: Amendment 1 이 §A1.3 결정 1 에서 **"회전 0 전제 → self-rotation 도입 시 옵션 e 전환"** 을 명시 예비했다 (§A1.5 DoD 8 회전 계약, §A1.8 재검토 조건 2). 본 Amendment 2 는 그 예비된 전환의 실현이다. **일반 ADR Amendment** 로 시작하되, 광원 모델 (world normal) 변경 + snapshot 가드 대응이 다중 옵션 비교를 요구하므로 축별 비교 구조를 채택한다. (Forensic 5조건 중 runtime 측정 필수/DoD PASS 인데 회귀 2조건 미해당 — 회귀 수정이 아닌 신규 기능이라 일반 Amendment.)
+
+### A2.1 배경 — Amendment 1 이 남긴 예비 전환점
+
+Amendment 1 §A1.3 결정 1 은 광원 모델을 **"body mesh 회전 0 + uniform scaling → world normal == local normal"** 단순화 위에 세웠다. `vNormal`(local) 을 `normalMatrix` 변환 없이 광원 dot 에 직접 사용 (옵션 e 회피). 이 단순화는 3중 가드로 박제됐다:
+
+1. 셰이더 주석 (`procedural-planet-shader.ts:30-32, 296-298`) — "회전 0 전제, 도입 시 옵션 e".
+2. onBind dev-only 회전 어서션 (`:559-578`) — mesh rotation non-zero 시 `console.warn` (cross-validate 이견 3 수용).
+3. 단위 테스트 계약 (`procedural-planet-shader.test.ts:426-443`) — `normalMatrix` 부재 + `vNormal` 직접 사용 + 주석 계약 존재 검증.
+
+self-rotation 도입은 이 3중 가드를 **의도적으로 발동**시킨다 — 즉 본 Amendment 는 가드가 "감지하려고 설계된 바로 그 변경"이다. 광원 모델을 옵션 e (world normal) 로 전환해야 어서션이 해소되고 명암이 자전과 무관하게 태양을 정확히 추종한다.
+
+**self-rotation 미구현의 현 상태** (이슈 실측 확인):
+
+| 요소                     | 현재                                                                                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rotationPeriod` 데이터  | **없음** (`solar-system.json` 에 orbit 공전 요소만)                                                                                                                                       |
+| 자전 애니메이션 코드     | **없음** (`updateAt` mesh 루프는 `mesh.position` 만 갱신, `:1213`)                                                                                                                        |
+| `axialTiltDeg` body 적용 | **없음** — ring tilt 전용 (`disc.rotation.x = π/2 + tiltRad`, uranus/saturn/neptune 3개만). 데이터 코멘트가 "본체 자전/텍스처 미구현이라 host 통합 불필요" 명시 (`solar-system.json:357`) |
+
+### A2.2 코드베이스 실측 (설계 결정의 근거)
+
+Grep/Read 로 확인한 구조적 사실 (재조사 불필요, 검증 완료):
+
+1. **mesh 추적**: `meshes: Map<string, Mesh>` 가 high variant 의 유일 owner (`:561`). mid variant = `parent = highMesh` + `position.set(0,0,0)` (`:1986-1988`). low variant = `parent = highMesh` + `billboardMode = 7` (`:2194-2196`). **→ high mesh 에 rotation 적용 시 mid 는 parent transform 상속으로 자동 동기 회전** (LOD 동기 문제 자동 해소). low(billboard) 는 BILLBOARDMODE_ALL 이 orientation 을 카메라로 override 하므로 자전이 시각 무효 (표면 없는 quad — 회전 무의미, 무회귀).
+2. **position vs rotation 독립성**: `updateAt` mesh 루프 (`:1208-1218`) 는 `mesh.position` 만 매 프레임 재기록 (floating-origin `toLocal` + tier scale). **rotation 은 이 루프가 절대 건드리지 않는다** → 자전 회전을 별도로 설정해도 position 갱신과 충돌 0. `mesh.scaling` 도 tier 전환에서만 조작 (`:930`), rotation 과 직교.
+3. **satellite (달)**: worldPositions 가 sun-중심 절대 좌표라 달 mesh 는 **parent 상속이 아닌 독립 position** (`meshes.get('moon')` 도 worldPositions 루프에서 직접 갱신). 자전은 각 body 독립 — 달도 자기 mesh 에 독립 회전.
+4. **time SSoT**: scene 은 `updateAt(jd)` 로 구동 (`instance.on('timeChanged', ({julianDate}) => solar.updateAt(julianDate))`, sim-canvas). `jd` (julianDate) 가 유일 시간 진실원 — `currentJd = jd` (`:1148`). timeScale 은 core `TimeController.tick(dt)` 이 흡수해 jd 증분에 반영됨 (`simulation-core.ts:315`). **→ 자전각을 `jd` 의 순수 함수로 계산하면 timeScale 자동 연동 + frame-rate 독립 + 결정적** (accumulate 불필요).
+5. **⚠️ ring 자식 결합 (핵심 위험)**: ring disc 는 `disc.parent = host` (`ring-placeholder.ts:112`, `ring-shader.ts:658/702`). tier scale 전파 목적의 의도된 결합. **body mesh 에 직접 self-rotation 을 걸면 ring disc 가 body 자전과 함께 스핀** → ring axialTilt 가 매 프레임 회전축 주위로 wobble (R8 세로 고리 showcase 붕괴). jupiter (GasBands 표면 + rings) / saturn·uranus·neptune (단색 + rings) 전부 해당.
+
+### A2.3 결정
+
+#### 결정 1 — 회전 적용 구조 (mesh.rotation 직접 vs pivot node vs quaternion 합성, ring 결합 대응 포함)
+
+axialTilt 로 기운 축 주위로 spin 해야 한다 (tilt ∘ spin 합성). 그리고 §A2.2-5 의 ring wobble 을 차단해야 한다.
+
+| 축                | (a) host mesh 에 `rotation.y += ω·Δ` 직접 | (b) host mesh `rotationQuaternion = tilt ∘ spin` 직접 | (c) **spin 전용 자식 pivot node** (surface mesh 를 pivot 자식으로, ring 은 host 직속 유지) | (d) 부모 tilt pivot + 자식 spin                           |
+| ----------------- | ----------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| axialTilt 합성    | ✗ y축만 (tilt 무시)                       | ✓ quaternion 합성                                     | ✓ pivot 이 tilt·spin quaternion 보유                                                       | ✓ 계층 분리                                               |
+| ring wobble 차단  | ✗ ring 이 host 자식이라 함께 스핀         | ✗ 동일 문제                                           | ✓ **ring 은 host 직속 (spin pivot 밖) → tilt 유지·spin 미전파**                            | ✓ ring 을 tilt pivot 밑에 두면 tilt 추종 spin 회피 (복잡) |
+| tier scale 독립   | ✓ (scaling 별개)                          | ✓                                                     | ✓ (pivot scaling=1, host.scaling 이 tier)                                                  | △ 2단                                                     |
+| origin shift 독립 | ✓ (position 별개)                         | ✓                                                     | ✓ (pivot position=0, host.position 이 origin)                                              | ✓                                                         |
+| mid variant 동기  | ✓ parent 상속                             | ✓                                                     | △ **mid 도 pivot 자식이어야 동기** (parent 재배선)                                         | △                                                         |
+| 코드 표면         | 소                                        | 소                                                    | 중 (pivot node 신설 + surface/mid 재parent)                                                | 대                                                        |
+| picking 무영향    | ✓                                         | ✓                                                     | △ pivot 이 picking 계층에 추가 (metadata bodyId 재확인)                                    | ✗                                                         |
+
+→ **(b) `rotationQuaternion = tilt ∘ spin` 직접 채택 + ring 결합은 (c)-부분 (ring 을 spin 에서 격리) 로 대응**. 근거:
+
+- **회전 합성은 (b) quaternion 이 최소**. `q = Quaternion.RotationAxis(tiltAxis, tiltRad) × Quaternion.RotationAxis(localSpinAxis, spinAngle(jd))` — axialTilt 로 pole 을 기울인 뒤 그 (기운) 축 주위로 spin. mesh.rotation.y 직접 (a) 는 tilt 를 표현 못 하고, pivot node (c/d) 는 picking 계층·mid 재parent 비용이 크다.
+- **ring wobble 차단 = ring disc 를 spin 에서 격리**. 두 하위 옵션 비교 (§A2.3 결정 1-b 로 분리):
+
+  | 하위 축        | (b-i) ring 을 host **비회전 wrapper** 밑으로 (host 는 spin 안 함, surface mesh 만 spin) | (b-ii) ring disc 에 **역회전 보정** (host spin 의 inverse 를 ring 에 매 프레임) | (b-iii) ring disc 를 host 자식에서 **분리** (독립 position 동기, satellite orbit line 패턴)    |
+  | -------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+  | 구현           | host=위치+tilt wrapper, 표면 sphere=spin 자식 (구조 재편)                               | ring 매 프레임 `-spinAngle` (연산·drift 위험)                                   | ring 을 `updateAt` 에서 host scene 좌표로 position 동기 (기존 satelliteOrbitLines 패턴 재사용) |
+  | ring tilt 보존 | ✓ (spin 밖)                                                                             | △ (역회전 float drift 잔존)                                                     | ✓ (host tilt 를 ring 생성 시 1회 반영)                                                         |
+  | tier scale     | host.scaling 전파 유지                                                                  | 유지                                                                            | ✗ **ring 이 host.scaling 밖 → tier 전파 끊김** (재배선 필요)                                   |
+  | 코드 표면      | 중 (surface mesh 를 host 자식 sphere 로 분리 = 대공사)                                  | 소 (but drift 위험)                                                             | 대 (ring tier scale 재설계)                                                                    |
+
+  → **cross-validate 확정 (§A2.8 이견 수용 1)**: **(b-i) 계층 재편은 과설계, (b-ii) 역회전은 매 프레임 inverse 곱 + wobble 잔존 위험, (b-iii) 는 tier scale 끊김**. agy 권고 수용 — **scene graph 계층 노드 분리** 로 wobble 을 **구조적으로 0** (역회전 계산 자체 불필요). **최종 확정 구조**:
+  - **ring 없는 body (대다수)**: `host` mesh 자체에 `rotationQuaternion = tilt ∘ spin` 직접 적용 (저비용, mid variant parent 상속 자동 동기).
+  - **ring 있는 body (jupiter/saturn/uranus/neptune)**: `host` mesh (position/scale/origin owner) 아래에 2개 자식 노드 명시 분리:
+    - **spin pivot** (`${id}-spin-pivot`) — 표면 sphere(high) + mid variant 를 자식으로 두고 `rotationQuaternion = tilt ∘ spin` 보유. body 자전.
+    - **ring anchor** (`${id}-ring-anchor`, 비회전 TransformNode) — ring disc 를 자식으로 두어 tilt 만 반영 (`disc.rotation.x = π/2 + tiltRad` 기존 유지), spin 미상속 → **wobble 0**.
+
+  Babylon TRS 상속이 spin 을 spin-pivot 자식(표면)에만 전파하고 ring-anchor(비회전)에는 전파하지 않아, 역회전 보정 없이 ring tilt 가 구조적으로 고정된다. **비용**: ring host 4개 한정 mid variant 재parent (spin pivot 자식) + picking metadata bodyId 재확인 (Concrete Prediction §A2.4 scene 배선 ~35–55 로 상향, ring host 만). §A2.7 재검토 조건 1 은 이 계층 비용이 실측 초과할 경우로 축소.
+
+- **tier scale / origin shift 독립성**: rotationQuaternion 은 `mesh.scaling` (tier), `mesh.position` (origin shift) 과 Babylon 변환 행렬에서 독립 성분 (TRS 분해). §A2.2-2 실측대로 position 루프가 rotation 을 건드리지 않으므로 충돌 0.
+
+#### 결정 2 — 광원 옵션 e (world normal) 전환
+
+Amendment 1 옵션 e (§A1.3 결정 1 표) 를 활성화. 회전이 생기면 `vNormal`(local) ≠ world normal 이므로 광원 dot 이 표면과 함께 회전해 명암이 자전을 따라 돌아버린다 (밤면이 태양을 안 따름). world normal 로 변환해야 명암이 태양 방향에 고정된다.
+
+| 축                | (A) `uniform mat4 world` → `vNormal = (world × vec4(normal,0)).xyz`                                                              | (B) `uniform mat3 normalMatrix` (inverse-transpose) → `vNormal = normalMatrix × normal` |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 정확성            | ✓ **uniform scaling + rotation (shear 없음)** 이면 world×normal 정규화로 충분 (§A2.2-2 tier scaling 은 uniform `scaling.setAll`) | ✓ 일반 (비균일 scale 포함) 정확 — 과잉                                                  |
+| Babylon auto-bind | ✓ `world` 는 Babylon ShaderMaterial 표준 auto-bind uniform (worldViewProjection 과 동형)                                         | △ `world` 로부터 CPU 계산 or auto-bind 확인 필요                                        |
+| 코드 표면         | 소 (uniform 1개 + vertex 1줄 + fragment normalize)                                                                               | 중 (normalMatrix 계산·전달)                                                             |
+| vLocalPos 처리    | **local 유지** (절차 패턴이 mesh 와 함께 회전 = painted-on 표면)                                                                 | 동일                                                                                    |
+
+→ **(A) `uniform mat4 world` 채택**. 근거:
+
+- **uniform scaling 실측**: tier scale 은 `mesh.scaling.setAll(absoluteScaling)` (`:930`) 로 **등방(uniform)** — shear 없음. self-rotation 은 순수 회전 (scale 무관). uniform scale + rotation 조합에서 `normalize((world × vec4(normal,0)).xyz)` 는 normalMatrix (inverse-transpose) 와 동일 결과 (등방 scale 은 inverse-transpose 가 자기 자신의 상수배). **normalMatrix (B) 는 비균일 scale 대비용이라 과잉** — Amendment 1 표에서 옵션 e 를 "normalMatrix 필요 (회전 0 이라 과잉)" 로 기술했으나, 회전 도입 후에도 **uniform scale 이면 world matrix 로 충분** (normalMatrix 불요) — 이 정정을 Amendment 2 가 박제.
+- `world` 는 Babylon `ShaderMaterial` 이 `worldViewProjection` 과 함께 표준 제공하는 auto-bind uniform (uniforms 배열에 `'world'` 추가 시 자동 주입).
+- **vLocalPos 는 local 유지**: 절차 노이즈 (대륙/밴드/크레이터) 입력은 `normalize(vLocalPos)` (local) — 표면 패턴이 mesh 와 함께 회전해야 "표면에 그려진(painted-on)" 것으로 보인다. world 로 바꾸면 패턴이 공간 고정되어 mesh 가 패턴 속을 미끄러지는 오류. **vNormal 만 world 로, vLocalPos 는 local** — 이 분리가 핵심.
+- **onBind sunDir 정합**: sunDir 은 이미 `normalize(sunPos_world − meshPos_world)` (world, §A1.3 결정 1 c). world normal 과 동일 좌표계라 dot 정합 — onBind 로직 무변경 (sunDir 계산부 그대로).
+
+#### 결정 3 — `axialTiltDeg` body 자전축 적용 + 데이터 SSoT 재사용
+
+기존 `axialTiltDeg` (ring 전용, 3개 body) 를 **body 자전축에도 적용**. ring host 와 body 가 **동일 값** 사용 (정합 — obliquity 는 물리적으로 하나).
+
+- ring 은 `disc.rotation.x = π/2 + tiltRad` 로 이미 사용 → body spin 축도 동일 `axialTiltDeg` 로 tilt. **데이터 SSoT 1값이 ring + body 양쪽 구동** (drift 0).
+- 신규 body 값 추가 필요 (자전하는 모든 표면/단색 body): earth 23.44°, mars 25.19°, jupiter 3.13°, moon 6.68° (궤도면 기준) 등. **축 방위각 (azimuth)** 은 uranus 코멘트 (`:527`) 대로 **world X 고정 근사** (pole RA/Dec 미사용) — ring 이 이미 쓰는 근사 답습 (Visual Fidelity rendering-only, 사실 pole 정렬은 후속).
+
+#### 결정 4 — `rotationPeriod` 데이터 (단위·부호·범위)
+
+| 축              | (A) 시간 단위 (hours)                               | (B) 일 단위 (days)         | (C) 초 단위 (seconds) |
+| --------------- | --------------------------------------------------- | -------------------------- | --------------------- |
+| NASA/JPL 직접성 | ✓ sidereal rotation period 흔히 hours (지구 23.93h) | △ 금성 243일 등은 day 자연 | ✗ 큰 수               |
+| 역행 부호       | 음수 (금성 −5832.5h, 천왕성 −17.24h)                | 음수 (금성 −243d)          | 음수                  |
+| jd 연동         | `ω = 2π / (period_h / 24) [rad/day]`                | `ω = 2π / period_d`        | 변환                  |
+
+→ **(A) 시간(hours) 단위 채택** — `rotationPeriodHours`. NASA sidereal rotation period 직접 표기 (지구 23.9345h). **역행 자전은 음수** (금성 −5832.5h, 천왕성 −17.24h) — 부호가 spin 방향 (CCW/CW). `ω[rad/day] = 2π × 24 / rotationPeriodHours` (음수면 역방향). 스키마: `rotationPeriodHours: z.number().optional()` (0 금지 — `.refine(v => v !== 0)`, division-by-zero 차단. 미지정 body 는 자전 없음 = 현행 정지 유지, 하위 호환).
+
+- **데이터 대상**: 최소 표면 4개 (earth/mars/jupiter/moon) + 권장 major body 전체 (mercury/venus/saturn/uranus/neptune 등). 위성·왜소행성·혜성은 부재 시 자전 안 함 (점진 확장, R-Phase).
+
+#### 결정 5 — 자전각 = jd 순수 함수 (accumulate 금지)
+
+`spinAngle(jd) = ((jd − epoch) × ω) mod 2π` (§A2.2-4). **매 프레임 누적(`angle += ω·Δ`) 금지** — 누적은 (1) frame-rate 의존 (2) float drift 누적 (3) timeScale 변경 시 불연속. jd 순수 함수는 결정적 + timeScale 자동 연동 + `?t=<jd>&speed=0` 로 **완전 재현 가능** (snapshot 가드 대응 결정 7 의 기반).
+
+#### 결정 6 — onBind 회전 어서션 처리 + reviewer once-guard (#776)
+
+self-rotation 도입 후 회전 non-zero 가 **정상**이 되므로 Amendment 1 의 "회전 감지 → warn" 어서션은 목적이 뒤집힌다.
+
+| 축                | (A) 어서션 제거 | (B) **의미 전환**: "world uniform 배선 누락 감지" | (C) 유지 (회전 정상이므로 매 프레임 발화 — 금지) |
+| ----------------- | --------------- | ------------------------------------------------- | ------------------------------------------------ |
+| 목적              | 가드 소멸       | 새 회귀 (world normal 미배선) 감지                | 잘못 (spam)                                      |
+| once-guard (#776) | N/A             | ✓ 프레임당 누적 방지 (once)                       | ✗                                                |
+
+→ **(B) 의미 전환 + reviewer once-guard 채택**. 어서션을 "**world uniform 미배선 or vLocalPos==vNormal 오용 감지**" 로 전환 — 옵션 e 배선이 빠지면 (셰이더가 여전히 local normal 사용) 회전 시 명암이 돌아버리는 회귀를 dev 빌드에서 조기 감지. **reviewer #776 once-guard**: `let warned = false` 플래그로 최초 1회만 `console.warn` (프레임당 mesh당 누적 spam 차단). dev-only (`NODE_ENV !== 'production'` DCE).
+
+#### 결정 7 — snapshot 가드 (r1-guard / verify:\*) 대응
+
+자전은 매 프레임 canvas 픽셀을 바꾼다 → 픽셀 baseline flaky 위험. **실측 결과 위험 낮음**:
+
+- **r1-guard 는 canvas 미측정**: `r1-ui-regions.mjs` 는 `[data-r1-region]` UI 영역 (top-nav/shortcut-bar/hud-\*) 만 clip 캡처 (`r1-ui-regression-guard.mjs:375`). 천체 canvas 픽셀은 baseline 대상 아님 → 자전 직접 영향 0. (반투명 HUD 가 canvas 위 합성되나 hud chip 은 `bg-void@α0.85` backing 으로 canvas 휘도 무관 — #749 fix.)
+- **결정적 재현 수단 존재**: `?t=<jd>&speed=0` 로 julianDate 고정 (결정 5 순수 함수) → 자전각 결정적. 임의 snapshot 을 프레임 독립으로 캡처 가능.
+
+| 축               | (A) `?rotate=off` URL flag (surface=off 패턴)          | (B) `?t=<jd>&speed=0` 로 프레임 고정 (기존 param) | (C) 자전 결정적 시드 (jd 순수 함수 — 이미 결정 5) |
+| ---------------- | ------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------- |
+| 신규 코드        | parse-rotate-mode.ts + scene 옵션 (surface 동형 ~35줄) | 0 (기존 t/speed param)                            | 0 (결정 5 내재)                                   |
+| verify 무회귀    | 자전 완전 정지 (기존 정지 baseline 재사용)             | jd 고정 → 자전각 고정 (정지 아님, 특정 각)        | 동일                                              |
+| 표면/광원 verify | 무영향 (surface 별개)                                  | 무영향                                            | 무영향                                            |
+
+→ **(A) `?rotate=off` + (C) 결정적 시드 병행 채택**. 근거:
+
+- **(C) 는 자동 (결정 5 순수 함수)** — 추가 비용 0. jd 고정 시 자전각 결정적.
+- **(A) `?rotate=off`** 는 저비용 (surface=off 패턴 복제 ~35줄) 로 **완전 정지 baseline** 제공 — 자전 도입 전 픽셀과 동일 (회귀 격리). 신규 verify (browser-verify-782-rotation) 는 rotate ON 에서 자전각 이동을 측정하고, 기존 픽셀 민감 가드는 `?rotate=off` 로 자전 격리 가능. **`?rotate=off` = 자전 도입 전 100% 복귀** (Amendment 1 `?surface=off` 철학 답습).
+- **r1-guard baseline 재생성 불요** (canvas 미측정) — 단 자전으로 반투명 HUD 뒤 canvas 휘도가 미세 변동할 수 있어 qa 가 r1-guard PASS 실측 확인 (backing α0.85 로 무영향 예상, #749 정합).
+
+### A2.4 Concrete Prediction (구현 후 `git diff --stat` 실측 재현)
+
+| 영역                    | 파일                                                               | 예측 라인          | 근거                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **데이터**              | `packages/shared/data/solar-system.json`                           | ~8–20 신규 값      | `rotationPeriodHours` 최소 4 (earth/mars/jupiter/moon) ~ 권장 major 전체 (+mercury/venus/saturn/uranus/neptune ≈ 9). `axialTiltDeg` 신규 값 (earth 23.44/mars 25.19/jupiter 3.13/moon 6.68 등 — 기존 3개 재사용)                                                                                                                                                          |
+| **loader 스키마·타입**  | `solar-system-loader.ts`                                           | ~8–14 변경         | `rotationPeriodHours: z.number().refine(≠0).optional()` + `LoadedCelestialBody.rotationPeriodHours?` + map 전달 (axialTiltDeg 동형 3줄 패턴)                                                                                                                                                                                                                              |
+| **scene 자전 배선**     | `solar-system-scene.ts` (`updateAt`)                               | ~35–55 변경        | mesh 루프 (`:1213`) 인접에 spinAngle(jd) → `rotationQuaternion = tilt ∘ spin` 설정 (표면 body + 자전값 있는 body). **ring host 4개는 spin pivot + ring anchor 계층 노드 분리** (cross-validate 이견 수용 1 — inverse 보정 아님). `tmpSpinQuat`/`tmpTiltQuat` 팩토리 스코프 재사용 (alloc 0, cross-validate 고유 발견 1). epoch 기준 각 (CPU float64 — 셰이더에 jd 미전달) |
+| **셰이더 옵션 e**       | `procedural-planet-shader.ts` (VERTEX + uniforms)                  | ~6–12 변경         | `uniform mat4 world` + `vNormal = normalize((world × vec4(normal,0)).xyz)` (VERTEX). uniforms 배열 `'world'` 추가. vLocalPos 는 local 유지. **jd/큰 수 uniform 미전달 계약 주석** (cross-validate Q3 회귀 가드 — 미래 시간 기반 셰이더 효과 추가 시 float32 정밀도 손실 차단)                                                                                             |
+| **onBind 어서션 전환**  | `procedural-planet-shader.ts` (createProceduralPlanetMaterial)     | ~10–20 변경        | 회전 감지 → world 배선 감지 의미 전환 + once-guard (reviewer #776)                                                                                                                                                                                                                                                                                                        |
+| **JS 미러 계약 갱신**   | `procedural-planet-shader.ts` (lightingShadeMirror 주석)           | ~4–8 변경          | 미러 식 자체 불변 (N 을 인자로 받음) — "N 이 world normal" 계약 주석 갱신. Rocky/desert 미러 무변경                                                                                                                                                                                                                                                                       |
+| **`?rotate=off` flag**  | `apps/web/src/core/parse-rotate-mode.ts` (신규) + `sim-canvas.tsx` | ~35 신규 + ~5 변경 | parse-surface-mode.ts 동형 복제 + scene 옵션 `selfRotation?: boolean`                                                                                                                                                                                                                                                                                                     |
+| **scene 옵션 타입**     | `solar-system-scene.ts` (`SolarSystemSceneOptions`)                | ~2 변경            | `selfRotation?: boolean` (surfaceDetail 동형)                                                                                                                                                                                                                                                                                                                             |
+| **단위 테스트**         | `procedural-planet-shader.test.ts`                                 | ~30–60 변경        | 회전 0 계약 테스트 (`:426-443`) → **옵션 e 계약으로 반전** (`world` uniform 존재 + `vNormal` world 변환). 광원 미러 world normal 계약 주석                                                                                                                                                                                                                                |
+| **신규 browser verify** | `apps/web/scripts/browser-verify-782-rotation.mjs` (신규)          | ~120–180 신규      | 자전각 측정 (t 두 시점 mesh.rotationQuaternion Δ) + axialTilt 확인 + 역행 부호 + ring wobble 0                                                                                                                                                                                                                                                                            |
+
+**핵심 예측**:
+
+- **`updateAt` mesh position 루프 (`:1213`) 무변경** — 자전은 인접에 rotation 설정 추가, position 식 자체 불변 (floating-origin 계약 §3 위반 0). 초과 시 = 자전이 position 좌표 파이프 침범 (재검토).
+- **picking / camera / orbit / tier / LOD 변경 0** — 자전은 rotation 성분만, mesh 기하/metadata/position/scaling 불변 (#713 bodyId 역매핑 무영향). mid variant 는 parent 상속으로 자동 동기 (재parent 0).
+- **광원 uniform +1 (`world`)** — normalMatrix 불요 (uniform scale 실측, 결정 2). uniform 2개+ 추가 시 = 과설계 신호.
+
+### A2.5 DoD (측정 가능 — 실 Chrome GUI 필수, CRITICAL #3 + 헤드리스 false positive 교훈) — §최종 메시지 표 참조
+
+측정 가능 DoD 는 스프린트 계약용으로 별도 표 (developer 인수인계 + 최종 메시지) 에 박제. 각 기준에 측정 방법 부착. 요지:
+
+1. 자전각 = jd 순수 함수 (실측 ω ±5%) 2. axialTilt body 적용 (23.4° 등) 3. 역행 부호 (금성/천왕성) 4. #773 무회귀 (world normal 후 밤면<낮면 단조, terminator 태양 추종) 5. onBind 어서션 해소 (warn 0) 6. ring wobble 0 7. fps 회귀 0 (tier-c) 8. #756 표면 무회귀 9. snapshot 가드 대응 (`?rotate=off` + r1-guard PASS).
+
+### A2.6 §Visual Fidelity 의무 체크리스트 4항목 (principles.md §1)
+
+- [x] **데이터 SSoT 보존** — `rotationPeriodHours`/`axialTiltDeg` 는 **물리 실측 데이터** (NASA/JPL sidereal period + obliquity) 라 `solar-system.json` 데이터 SSoT 에 정당 추가 (rendering-only 아님 — 표면 타입/육지색과 달리 실측 물리량). 자전각 계산은 rendering-only (mesh rotation). 축 방위각은 world X 근사 (ring 답습, rendering 왜곡 허용).
+- [x] **rendering 시점 분리** — 자전은 `mesh.rotationQuaternion` (scene 레이어) 단독. physics 엔진 (Rust+wasm) 은 heliocentric 절대 position 만 산출 — body 자전은 적분 무관 (자전은 공전 궤도에 영향 0, Newtonian point-mass). P11-A 좌표 계약 위반 0.
+- [x] **사용자 D-T2 가이드** — 자전 주기/축은 실측값 (Info 패널 표기 가능 대상). 자전 애니메이션은 시각 표현 — focus/Info 패널은 실측 rotationPeriod/obliquity 표기 (표면 디테일과 달리 실측이라 표기 정당, 후속 UI 여지).
+- [x] **점유율 / 사실 비율 baseline** — 자전은 rotation 성분만 → mesh 크기/위치/scaling 불변 (diameter 식 무변경). px diameter / 점유율 / 분리 마진 영향 0. r1-guard baseline 은 canvas 미측정이라 재생성 불요 (결정 7).
+
+### A2.7 결과 · 재검토 조건
+
+**기대 결과**: 지구 등 표면 4개 + major body 가 자전축 기울어진 채 자전 (실 Chrome GUI). 금성/천왕성 역행. #773 광원 밤면/terminator 가 자전 중에도 태양 정확 추종 (옵션 e). ring wobble 0. fps 회귀 0. #756 표면 무회귀.
+
+**재검토 조건**:
+
+1. **ring wobble 잔존** (결정 1 ring 격리 방식이 불충분) — cross-validate 질문 결과 + qa 실측으로 격리 구조 재선택 (Amendment 3).
+2. **비균일 scale 도입** (미래 tier 가 비등방 scale) — 옵션 e 를 normalMatrix (B) 로 승격 (결정 2 uniform 전제 발동).
+3. **축 방위각 사실성 요구** — 현재 world X 근사 (ring 답습). pole RA/Dec 정렬 요구 시 후속 (uranus §위험 #6 주석 계약 연장).
+4. **자전 속도 체감 부적절** — 실제 자전 주기는 timeScale 기본(86400=1일/초) 에서 지구 1회전/23.9초 = 빠름. 시각 체감 조정 (rendering-only spin scale) 요구 시 Amendment (데이터 SSoT 불변, rendering 배수만).
+
+### A2.8 교차검증 반영 사항 (cross-validate 대기 — Provisional)
+
+**호출 전 Claude 편향 셀프 체크** (4종):
+
+- **낙관적 일정** (ring wobble 차단 구조를 "저비용 inverse 보정" 으로 과소평가 의심 — 결정 1 이 미결정 개방 상태) — **미통과 의심** → cross-validate 명시 질문 삽입.
+- **결합 간과** (self-rotation ↔ ring 자식 결합 ↔ 광원 world normal ↔ tier uniform scale 4중 결합. §A2.2 에서 실측했으나 ring 격리는 미결정) — **미통과 의심** → 명시 질문.
+- **폐기 프레이밍** (Amendment 1 "회전 0 전제" 를 폐기 — 예비된 전환이라 정당, 통과 예상).
+- **순수주의** (jd 순수 함수 자전각 = frame-rate 독립 결정성 선호가 과잉인가 — accumulate 대비 명백 우월, 통과 예상).
+
+**cross-validate 명시 질문** (미통과 의심 2축):
+
+1. (결합 간과) self-rotation body 의 ring disc wobble 을 **최소 비용/최소 위험**으로 차단하는 구조는? (b-i 계층재편 / b-ii ring inverse spin / b-iii ring 분리 / anchor TransformNode 중)
+2. (낙관적 일정) 옵션 e 에서 `uniform mat4 world` 로 충분한가, 아니면 uniform scale 임에도 `normalMatrix` 가 안전한가? (등방 scale + 순수 회전 전제 검증)
+3. jd 순수 함수 자전각 (`spinAngle = (jd−epoch)×ω mod 2π`) 의 float 정밀도 — jd 가 큰 수 (2.4e6+) 라 `(jd−epoch)` 뺄셈 후 mod 가 정밀도 손실 없는지?
+
+#### 교차검증 수행 결과 (Antigravity `agy`, 2026-07-01, outcome=applied, exit 0, plan_bypass=false, rollback_failed=false)
+
+로그: `.claude/logs/cross-validate-architecture-20260701-173125.log`.
+
+##### 합의 (셀프 체크 통과 확인 / 현재 설계 유지)
+
+1. **Q2 — `uniform mat4 world` 로 충분 (normalMatrix 불요)** [결정 2, 낙관적 일정 축 통과] — agy: "자전/궤도 변환에 비등방 변형(shear/non-uniform scale)이 없고 구형 대칭만 유지되므로, 고비용 `inverse-transpose(normalMatrix)` 대신 가벼운 `world` 행렬 곱 후 `normalize` 채택은 최적화". Claude 의 "등방 scale + 순수 회전 → world matrix 로 충분" 판단이 외부 모델로 교차 확인됨.
+2. **jd 순수 함수 자전각 = 결정성** [결정 5, 순수주의 축 통과] — agy: "매 프레임 `angle += ω·dt` 누적은 frame drop / float drift / timeScale 변경 시 렌더 깨짐 발생. jd 순수 함수 채택은 훌륭한 시간 결정성(deterministic replay)". accumulate 금지 결정 지지.
+3. **데이터 SSoT 격리** — 물리 실측(rotationPeriod/obliquity)과 rendering-only(surfaceType/land color) 분리를 "물리·그래픽 엔진 완전 디커플링" 으로 합의.
+
+##### 이견 수용 (원안 수정)
+
+1. **Q1 — ring wobble 차단: b-ii(ring inverse spin) 지양 → `Spin Pivot Node + Ring Anchor Node` 명시 계층 분리 채택** [결합 간과 축] — Claude 원안은 "1차 최저 위험 = b-ii (ring disc 에 host spin inverse quaternion 매 프레임 곱)" 로 기울었다. agy 는 "b-ii 역회전 보정 / anchor 분리는 시각적 정상 작동 가능하나 **scene 그래프 상 명확한 anchor 계층 정의가 누락**. `Host Node(translation/scale/tilt)` 하위에 `Spin Pivot Node(자전용)` + `Ring Anchor Node(비자전용)` 명시 분리가 **장기 유지보수 + scene graph 순수성** 관점에서 훨씬 안전 — 셰이더 단 복잡한 역회전 행렬 연산 배제" 로 권고. **수용 (결정 1 확정)** — b-ii 역회전은 "셰이더/CPU 매 프레임 inverse 곱 + wobble 잔존 위험" 이 있고, 계층 노드 분리는 Babylon scene graph 의 자연스러운 TRS 상속으로 wobble 을 **구조적으로 0** 으로 만든다 (역회전 계산 자체가 불필요). **결정 1 을 다음으로 확정**: ring 을 가진 body (jupiter/saturn/uranus/neptune) 는 `host` mesh (position/scale owner) 아래에 (a) **spin pivot** — 표면 sphere(high) + mid variant 를 자식으로 두고 tilt∘spin quaternion 보유, (b) **ring anchor** — 비회전 TransformNode, ring disc 를 자식으로 두어 tilt 만 반영·spin 미상속. ring 없는 body 는 host mesh 직접 spin (pivot 불요 — 저비용 유지). **개방 결정 → 확정 결정으로 전이** (Amendment 2 §A2.7 재검토 조건 1 은 이 계층 구조가 mid variant 재parent / picking metadata 재확인 비용을 실측 초과할 경우로 축소).
+   - **비용 재평가 (낙관적 일정 축 정정)**: 계층 노드 분리는 mid variant 를 spin pivot 자식으로 재parent + picking metadata bodyId 재확인이 필요 (Concrete Prediction §A2.4 scene 배선 예측을 ~20–40 → **~35–55 로 상향**, ring host 4개 한정). developer 는 ring 없는 body (대다수) 는 host 직접 spin (저비용), ring host 만 pivot 계층 (구조 격리) 의 **2-경로** 구현.
+
+##### Claude 재분석으로 정정한 외부 모델 제안
+
+1. **Q3 — "절대 jd 를 셰이더 내부로 전달 말라" (🔴 중요 위험 지적)** — **부분 기각 (전제 정정) + 가드 수용**. agy: "jd ~2.4e6 를 GLSL 단정밀도(float32, 유효 7자리)로 넘겨 `jd-epoch` 연산 시 하위 비트 손실 → jittering 100% 발생. CPU(float64)에서 `spinAngle mod 2π` 완료 후 `uSpinAngle` 스칼라/quaternion 만 uniform 전달". **정정**: 본 설계(§A2.2-4, 결정 5)는 **이미 자전각을 JS(CPU float64)에서 계산해 `mesh.rotationQuaternion`(CPU) 으로 적용** — 셰이더는 jd 를 애초에 받지 않는다 (옵션 e 는 mesh rotation 을 `world` matrix 로 반영, jd 무관). agy 의 경고는 "셰이더에서 jd 연산" 이라는 **미해당 전제(strawman)** 에 대한 것. **실측 검증** (`_debug-782-jd-precision-tmp.mjs`, volt #66 sanity check, 측정 후 rm): JS float64 에서 jd=2.46e6(2026년)~3.0e6(먼 미래) 전 구간 프레임당 Δ각도 오차 **≤ 3.1e-8°**, jd float64 ULP→자전각 **≈1.7e-7°** (육안 임계 ~0.1° 대비 **6자릿수 여유**). jitter 없음 확정. **단 가드는 수용** — agy 지적의 정당한 핵심("jd 를 float32 로 넘기면 위험")을 **회귀 방어로 박제**: 셰이더에 jd/큰 수 uniform 을 넘기지 않는다는 계약을 셰이더 주석 + 단위 테스트에 명시 (미래 개발자가 시간 기반 셰이더 효과 추가 시 jd 직접 전달 회귀 차단). Concrete Prediction 셰이더 옵션 e 항목에 흡수.
+
+##### 고유 발견 (범위 판정)
+
+1. **onBind GC 회피 — `tmpQuaternion` 도 팩토리 스코프 정적 바인딩** — **수용 (계약 강화)**. agy: "onBind 는 매 프레임×mesh 실행이라 내부 `Vector3`/`Matrix`/`Quaternion` 동적 alloc 시 GC 병목. `tmpVector` 재사용 언급됐으나 **인터페이스 계약 수준에서 정적/렉시컬 스코프 격리 명시** 필요". Amendment 1 이 `tmpSunDir` 재사용(alloc 0)을 이미 박제했고, Amendment 2 의 spin quaternion 계산도 동일하게 팩토리 스코프 `tmpSpinQuat`/`tmpTiltQuat` 재사용 (매 프레임 alloc 0). developer 인수인계 + Concrete Prediction scene 배선 항목에 명시.
+2. **대기/구름 레이어 renderingGroupId/alphaMode 주입 훅** — **비대상 (기존 §A1.8 재검토 조건 5 재확인)**. agy: "후속 반투명 대기/구름 mesh 중첩 시 표면 셰이더 log-depth + 알파 블렌딩 렌더 큐 우선순위 충돌 가능 — 머티리얼 팩토리에 `renderingGroupId`/`alphaMode` 주입 여지 확보". **Amendment 1 §A1.8 재검토 조건 5 + §고유 발견 1 에서 이미 "대기/구름 mesh 미구현이라 범위 밖, 도입 시 분리" 로 박제** — Amendment 2 도 동일 (self-rotation 은 대기 레이어 무관). 현재 mesh 부재라 즉시 이슈 생성은 맥락 빈약 → §A2.7 재검토 조건에 유지. 자전 자체는 renderingGroupId 무관 (rotation 성분만).
+3. **역행 자전 스키마 음수 명문화** — **수용 (결정 4 명시 강화)**. agy: "`rotationPeriodHours` 음수(금성 -5832.5h) 표기 시 zod 에 `.positive()` 같은 제약이 남아 오류 안 나도록 사전 체크". 결정 4 는 이미 `.refine(v => v !== 0)` (0 만 금지, 음수 허용) 명시 — agy 지적은 "`.positive()` 실수 방지" 로, developer 인수인계에 "**음수 허용 (역행), 0 만 금지** — `.positive()`/`.nonnegative()` 사용 금지" 명문화.
+
+**호출 전 Claude 편향 셀프 체크 통과 여부** (1줄): 낙관적 일정 축은 **미통과** (Q1 ring 계층 비용을 b-ii 저비용으로 과소평가 → agy 이견 수용으로 pivot 계층 + 비용 상향 정정). 결합 간과 축은 **부분 통과** (ring 결합 실측했으나 격리 구조는 agy 권고로 확정). 순수주의/폐기 프레이밍 축 통과.
+
+**→ 상태 전이: Provisional → Accepted (cross-validate 2026-07-01)**. §A2.3 결정 1 을 pivot 계층 확정으로 갱신 (위 이견 수용 1).
