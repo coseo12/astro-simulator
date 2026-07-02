@@ -5,6 +5,18 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.42.0] — 2026-07-02
+
+### Behavior Changes (#782 — 행성 self-rotation 자전 + 광원 world normal 전환)
+
+- **[#782] 행성 self-rotation (자전) + 광원 world normal 옵션 e 전환 (MINOR)** ([#782](https://github.com/coseo12/astro-simulator/issues/782)) — 행성이 자전하지 않아 표면 디테일(#756)·광원 명암(#773)이 정지 상태이던 것을, **9개 major body(수·금·지·화·목·토·천·해) + 달**이 자전축 기울어진 채 자전하도록 전환(트랙 A 몰입, #773 직접 후속). **데이터**: `solar-system.json`에 `rotationPeriodHours`(NASA sidereal period — 지구 23.9345h/목성 9.925h/금성 5832.5h 등) 신규 + `axialTiltDeg`(IAU obliquity) body 자전축 적용(기존 ring 전용 3개 재사용 + earth 23.44° 등 신규 — **데이터 SSoT 1값이 ring + body 양쪽 구동**). **역행 인코딩 규약 (i)**: obliquity(0~180)가 자전 방향을 결정(금성 177.36°/천왕성 97.77° > 90° → CW 역행 창발), `rotationPeriodHours`는 항상 **양수 magnitude** — 음수 period 부호 이중 계산 금지. **자전각 = jd 순수 함수**(`spinAngle = (jd−epoch)·ω mod 2π`, 누적 금지) → frame-rate 독립 + timeScale 자동 연동 + `?t=<jd>&speed=0` 결정적 재현. **광원 옵션 e**: 셰이더 `uniform mat4 world` 추가로 `vNormal`만 world 변환(자전 중에도 밤면/terminator가 태양 방향 고정 추종 — 명암이 자전을 따라 돌지 않음), `vLocalPos`는 local 유지(절차 패턴 painted-on — 표면과 함께 회전). uniform scale 실측으로 normalMatrix 불요. onBind dev 어서션 "회전 감지"→"world 배선 누락 감지" 의미 전환 + once-guard(#776 reviewer 권고). **ring wobble 0**: ring host 4개(목/토/천/해)는 ring disc를 비회전 `ring-anchor` TransformNode로 격리(host 자전 미상속 — 역회전 보정 없이 구조적 0) + `setTier` 즉시 동기(pause 중 tier 전환 시 ring/host 스케일 drift 1733% 회귀를 qa 실측 후 즉시 fix). **`?rotate=off`** URL 플래그 — 자전 완전 정지(자전 도입 전 픽셀 100% 복귀, ring도 원본 host 자식 배선). **실측(실 Chrome GUI, DoD 9/9)**: 자전각 오차 0.0%(9 body), tilt = obliquity 정확 일치, 금성/천왕성 CW·나머지 CCW, 광원 무회귀(대비 15.9~22.7x + 자전 반바퀴 후 명암 방향 Δ 0.2~1.7° = 태양 고정), ring normal Δ≈0°, fps 회귀 0(tier-c 포함), #756 표면 무회귀(hfEnergy ON>OFF), r1-guard PASS(canvas 미측정 — baseline 재생성 불요). picking/camera/orbit/tier/LOD 변경 0(Concrete Prediction 적중). ADR `20260628-756-procedural-planet-surface.md` §Amendment 2 (Accepted, cross-validate agy — ring 격리 노드 계층 이견 수용) + 구현 정정 각주 2건(Amendment 2-i 계층 위상 조정 / 규약 i 역행 인코딩).
+
+### Notes
+
+- **자전 속도 = 물리 정확** (사용자 승인 A) — timeScale 기본(1일/초)에서 지구 1회전/23.9초. 체감 부적절 시 rendering-only 배수 조정은 후속 Amendment(ADR §A2.7 재검토 조건 4, 데이터 SSoT 불변).
+- 축 방위각은 world X 고정 근사(ring 기존 답습) — pole RA/Dec 사실 정렬은 후속(§A2.7 재검토 조건 3).
+- 위성(달 제외)·왜소행성·혜성은 `rotationPeriodHours` 부재 시 자전 없음(하위 호환, 점진 확장 R-Phase).
+
 ## [0.41.0] — 2026-07-01
 
 ### Behavior Changes (#779 — CI 알림 alert fatigue 완화 Phase 1)
