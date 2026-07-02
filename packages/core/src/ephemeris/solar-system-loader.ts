@@ -164,6 +164,22 @@ const CelestialBodyRawSchema = z.object({
    */
   axialTiltDeg: z.number().min(0).max(180).optional(),
   /**
+   * #782 §A2 결정 4 — 항성일 자전 주기 (NASA/JPL sidereal rotation period, hours, optional).
+   *
+   * 규약 (i): **항상 양수 magnitude** — 자전 방향(역행)은 `axialTiltDeg` (IAU obliquity, 0~180) 에
+   * 내재한다 (uranus 97.77°/venus 177.36° 처럼 obliquity>90 = 역행). period 를 음수로 주면 방향이
+   * 이중 적용되어 뒤집히므로 금지 (ADR §A2.3 결정 4 각주). `.refine(v => v !== 0)` = 0 만 차단
+   * (`ω = 2π×24 / period` division-by-zero 방어). `.positive()`/`.nonnegative()` 사용 금지 —
+   * 규약 (i) 은 항상 양수라 실질 동치이나, 미래 규약 (ii) 전환 시 음수 표기 여지를 스키마가 막지
+   * 않도록 `!== 0` 만 명문화 (cross-validate 고유 발견 3). 미지정 body 는 자전 없음 (현행 정지 유지,
+   * 하위 호환). scene 이 `ω[rad/day] = 2π × 24 / rotationPeriodHours` 로 자전각 산출.
+   * ADR `20260628-756-procedural-planet-surface.md` §Amendment 2.
+   */
+  rotationPeriodHours: z
+    .number()
+    .refine((v) => v !== 0, 'rotationPeriodHours must be non-zero (division-by-zero 차단)')
+    .optional(),
+  /**
    * P10-B #274 — 데이터 출처 (Fact-First 원칙 §5). 문자열 또는 배열.
    * P10-B 감사 이후 모든 body 필수 예정. 스키마 확장 기간 중에는 optional.
    */
@@ -256,8 +272,16 @@ export interface LoadedCelestialBody {
   rings?: ReadonlyArray<LoadedRingLayer>;
   /** R7 #641 — ring 전역 alpha rendering hint (saturn 0.9 / jupiter 0.15). 미지정 시 기본 0.6. */
   ringAlphaHint?: number;
-  /** R8 #647 — 자전축 기울기 (도). ring tilt 전용 (uranus 97.77 / saturn 26.73). 미지정 시 tilt 0. */
+  /**
+   * R8 #647 — 자전축 기울기 (도). ring tilt + #782 self-rotation body 자전축 공유 (동일 SSoT).
+   * uranus 97.77 / saturn 26.73 / earth 23.44 등. 미지정 시 tilt 0.
+   */
   axialTiltDeg?: number;
+  /**
+   * #782 §A2 — 항성일 자전 주기 (hours, 양수 magnitude — 방향은 axialTiltDeg 에 내재).
+   * 미지정 시 자전 없음 (현행 정지 유지). scene 이 `ω = 2π×24/period [rad/day]` 로 자전각 산출.
+   */
+  rotationPeriodHours?: number;
   /** P10-B #274 — 데이터 출처. */
   dataSource?: string | ReadonlyArray<string>;
   /** P10-B #274 — 마지막 검증 일자 (ISO YYYY-MM-DD). */
@@ -330,8 +354,12 @@ export function loadSolarSystem(): LoadedSolarSystem {
         : {}),
       // R7 #641 — ring 전역 alpha rendering hint (optional).
       ...(b.ringAlphaHint !== undefined ? { ringAlphaHint: b.ringAlphaHint } : {}),
-      // R8 #647 — 자전축 기울기 (optional, ring tilt 전용).
+      // R8 #647 — 자전축 기울기 (optional, ring tilt + #782 body 자전축 공유).
       ...(b.axialTiltDeg !== undefined ? { axialTiltDeg: b.axialTiltDeg } : {}),
+      // #782 §A2 — 자전 주기 (optional, 양수 magnitude). 미지정 시 자전 정지 (하위 호환).
+      ...(b.rotationPeriodHours !== undefined
+        ? { rotationPeriodHours: b.rotationPeriodHours }
+        : {}),
       // P10-B #274 — 감사 메타데이터 (optional, 감사 진행 중 일부 body 만 채워질 수 있음).
       ...(b.dataSource ? { dataSource: b.dataSource } : {}),
       ...(b.lastVerified ? { lastVerified: b.lastVerified } : {}),

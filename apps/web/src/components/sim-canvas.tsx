@@ -21,6 +21,7 @@ import { parseGlowMarkerRatio, parseMarkerMode } from '@/core/parse-marker-mode'
 import { parseOrbitsVisible } from '@/core/parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from '@/core/parse-stars-mode';
 import { parseSurfaceVisible } from '@/core/parse-surface-mode';
+import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
@@ -406,6 +407,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 자동 우회 (low variant = 단색, 별도 software 감지 불필요 — ADR §결정 3).
         const surfaceParam = new URLSearchParams(window.location.search).get('surface');
         const surfaceVisible = parseSurfaceVisible(surfaceParam);
+        // #782 — 행성 self-rotation (자전) 기본 ON + `?rotate=off` 옵트아웃 (ADR 20260628-756 §A2.3 결정 7).
+        // off 면 자전 정지 = 자전 도입 전 픽셀 100% 복귀 (snapshot 가드 격리). 자전각은 jd 순수 함수라
+        // `?t=<jd>&speed=0` 로 결정적 재현 가능 (rotate=on 이어도 verify 는 프레임 독립 캡처).
+        const rotateParam = new URLSearchParams(window.location.search).get('rotate');
+        const rotateEnabled = parseRotateEnabled(rotateParam);
         // #762 — 천체 압축 곡선 지수 p (default 0.5 sqrt). `?bodyScaleP=0.55` 로 D-T2 실시간 튜닝.
         // URL 부재 시 default p 의 getBodyScale 콜백 그대로 (모듈 로드 시 1회 산출된 BODY_SCALE).
         // ADR 20260629-762 §5 결정 2.7.
@@ -452,6 +458,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #756 — 절차적 행성 표면. 기본 ON 은 parseSurfaceVisible 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR 20260628-756 §결정 4 레이어 분리).
           surfaceDetail: surfaceVisible,
+          // #782 — 행성 self-rotation. 기본 ON 은 parseRotateEnabled 기본값 (true) 이 결정 —
+          // core 옵션 기본값은 false 유지 (ADR §A2.3 결정 7 레이어 분리, surfaceDetail 동형).
+          selfRotation: rotateEnabled,
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
