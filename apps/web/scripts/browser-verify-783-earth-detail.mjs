@@ -49,7 +49,7 @@ const MODE = process.env.MODE ?? 'dod';
 const T_JD = 2451626.0;
 const NEAR_WHITE_MIN = 140; // DoD 1 — min(R,G,B) 하한 (/255)
 const NEAR_WHITE_SPREAD = 40; // DoD 1 — 채널 max−min 상한
-const POLAR_BAND = 0.12; // disk 세로 극단 — |dy| ≥ (1−0.12)R (sin-space 0.88 = 극관 전이 시작과 일치)
+const POLAR_BAND = 0.12; // disk 세로 극단 — |dy| ≥ (1−0.12)R (sin-space 0.88 — ICE ramp 0.84~0.92 완료 구간 포함, #783 measurement-first 하향 후 기준)
 const MAGENTA_TAU = 15; // DoD 3 — R>G+τ && B>G+τ
 // disk 픽셀 멤버십 임계 — 성운 배경 (lum ~8–15) 배제, 밤면 ambient (~30) 포함 (실측 보정).
 const DISK_LUM_MIN = 20;

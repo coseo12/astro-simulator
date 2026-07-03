@@ -782,7 +782,7 @@ col = mix(col, iceColor, iceMask);
 5. **다른 rocky body 확장** — mars 등 을 Rocky 로 재분류하거나 위성 rocky 추가 시 biome 파라미터가 earth 전용 상수라 body 별 파라미터화 필요 (§A1.8 재검토 조건 4 연장).
 6. **극관 land/ocean 차등 디테일** (cross-validate 고유 발견) — 현재 iceMask 는 latJ (continents jitter 포함) 기반이라 경계가 지형 장을 따라 요동하지만, land 빙상 vs ocean 해빙의 분포 차이 (열용량) 는 미표현. qa 실측에서 "위도로만 잘린 흰 모자" 로 부자연하면 iceMask 에 landMask 미세 가중 검토.
 
-### A3.8 교차검증 반영 사항 (cross-validate 대기 — Provisional)
+### A3.8 교차검증 반영 사항 (agy 2026-07-04 — 통합 완료)
 
 **호출 전 Claude 편향 셀프 체크** (4종):
 

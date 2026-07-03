@@ -528,8 +528,8 @@ describe('#783 극관 — 극 위도 ice 수렴 (landMask 양극단 — continen
     Math.min(...rgb) >= NEAR_WHITE_MIN && Math.max(...rgb) - Math.min(...rgb) <= NEAR_WHITE_SPREAD;
 
   it('정확한 남북극 (p = [0,±1,0]) 에서 near-white 수렴 — jitter 최악 경우 포함', () => {
-    // 극점 latRaw=1, latJ = 1 + (continents−0.5)×0.12 ∈ [0.94, 1.06] — iceMask ≥ smoothstep(0.88,0.96,0.94)
-    // ≈ 0.84 로 어느 continents 값이든 (ocean/land 무관) near-white 에 수렴한다.
+    // 극점 latRaw=1, latJ = 1 + (continents−0.5)×0.12 ∈ [0.94, 1.06] — iceMask ≥ smoothstep(0.84,0.92,0.94)
+    // = 1.0 (포화) 로 어느 continents 값이든 (ocean/land 무관) near-white 에 수렴한다.
     for (const pole of [1, -1] as const) {
       const out = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, [0, pole, 0]);
       expect(isNearWhite(out)).toBe(true);
