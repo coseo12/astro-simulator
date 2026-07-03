@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.43.0] — 2026-07-03
+
+### Behavior Changes (#774 — 태양 emissive 절차 표면 셰이더)
+
+- **[#774] 태양 emissive 절차 표면 셰이더 — granulation + limb darkening + 색온도 (MINOR)** ([#774](https://github.com/coseo12/astro-simulator/issues/774)) — 태양이 단색 발광 disk 로만 렌더되어 표면 디테일 0 이던 것을(사용자 관찰 2026-06-30, #756 후속 트랙 A), **granulation(fbm 쌀알 무늬) + limb darkening(Eddington 주연 감광 `I(μ)=1−u(1−μ)`) + 색온도 그라데이션(중심 흰노랑 → 가장자리 주황)** 의 emissive 전용 절차 셰이더로 전환(에셋 0). 신규 `sun-shader.ts` — ring/starfield/procedural-planet 답습 4번째 절차 셰이더(ShaderMaterial 팩토리 + GLSL/JS 미러 + 상수 SSoT). **모듈 분리**: 광원 모델이 정반대(외부광 반사 `col *= shade` vs 자체발광)라 `SurfaceType.Star` 추가 기각, `SURFACE_TYPE_BY_BODY` sun 미등록 유지 — `procedural-planet-shader.ts` 변경 0 으로 planet 4종 무회귀 구조 보장. **색온도 = 채널별 limb darkening 계수 1묶음** `LIMB_DARKENING_U_RGB [0.5,0.6,0.9]`(Allen 근사, u(λ) 파장 의존 — blue 가 더 어두워짐)로 감광 + 가장자리 주황 2효과 자동 도출(별도 색 mix 0). **granulation painted-on 정적** — sun 은 `rotationPeriodHours` 데이터 부재 유지(자전 비대상 — 차등 자전을 강체로 왜곡 박제하는 것보다 부재가 정직) + 시간 변동 없음(r1-guard/verify 스크린샷 결정성). vNormal 은 #782 옵션 e(world normal) 규약 답습, vLocalPos local 유지. **emissive 메커니즘**: ShaderMaterial 광원 uniform 미선언 = fragment 출력이 곧 발광색(sun 중심 PointLight 간섭 0), 알파 1 OPAQUE. high/mid 동일 셰이더 공유(팝핑 구조 불가), low(billboard)/tier-c `forceOverride:'low'` 자동 단색 + glow-marker 정합 변경 0. log-depth `gl_FragDepth` 정합(ring #641/planet #756 과 3자 산식 동일). **`?surface=off`** 100% 현행 단색 복귀(신규 URL 파라미터 0). **실측(실 Chrome GUI, DoD 9/9 PASS)**: 고주파 엔트로피 ON 3.855 > OFF 0.449 / limb radial 단조 위반 0 + edge/center 0.1996(< 0.85) / 가장자리 B/R 0.499 < 중심 0.682 / planet 4종·ring·glow-marker·rotationStates 무회귀 / fps 회귀 0(tier-c swiftshader 포함) / core 710 tests(신규 29) / LOD mid→low 전환 휘도 스텝은 사전 존재 + 본 PR 이 22% 완화(신규 회귀 아님). Concrete Prediction 적중 — planet 셰이더 0 / web 0 / 데이터 0, 코어 scene 2파일 수렴. ADR [`20260703-774-sun-emissive-shader.md`](docs/decisions/20260703-774-sun-emissive-shader.md) (Accepted, cross-validate agy — LOD 전환 경계 관찰 부분 수용, dispose 수명주기/GlowLayer 부재/fbm 앨리어싱 3건 실측 기각).
+
+### Notes
+
+- 후속 분리: [#789](https://github.com/coseo12/astro-simulator/issues/789) (`hexToRgb01` rule-of-three 공용 추출 + noise 정적 계약 라인 확장, low) / [#790](https://github.com/coseo12/astro-simulator/issues/790) (focus 최대 줌인 시 카메라 mesh 내부 진입 암전 — 사전 존재, 본 릴리스 무관, low).
+- sunspot / 시간 변동 granulation / 차등 자전 / 코로나는 ADR §재검토 조건 2~5 로 재도입 경로 박제(요구 발생 시 착수).
+
 ## [0.42.0] — 2026-07-02
 
 ### Behavior Changes (#782 — 행성 self-rotation 자전 + 광원 world normal 전환)
