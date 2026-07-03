@@ -34,6 +34,10 @@ import {
   createProceduralPlanetMaterial,
   type PlanetLightingConstants,
 } from './procedural-planet-shader.js';
+// #774 — 태양 emissive 절차 표면 셰이더 (granulation + limb darkening + 색온도).
+// ADR `docs/decisions/20260703-774-sun-emissive-shader.md` §결정 1 — SURFACE_TYPE_BY_BODY 미등록
+// 유지 (테이블은 "외부광 반사 표면" 전용), star 분기가 직접 본 팩토리 호출.
+import { createSunSurfaceMaterial } from './sun-shader.js';
 import {
   renderScaleForTier,
   initialTier as defaultInitialTier,
@@ -2112,10 +2116,14 @@ function createBodyMesh(
   const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
 
   // #756 — 절차적 표면 셰이더 (surfaceDetail=true + 테이블 등록 body 만). 미등록/OFF 면 null →
-  // 기존 StandardMaterial 경로 (단색, 무회귀). 항성(sun)은 표면 테이블 미등록이라 자동 단색.
+  // 기존 StandardMaterial 경로 (단색, 무회귀).
   // ADR `docs/decisions/20260628-756-procedural-planet-surface.md` §결정 1·4 + Amendment 1 (#773).
+  // #774 — 항성(star)은 emissive 전용 sun 셰이더 (광원 인자 불요 — ADR 20260703-774 §결정 1·4).
+  // `?surface=off` (surfaceDetail=false) 면 기존 star 단색 emissive 100% 복귀 (§결정 8).
   const surfaceMat = surfaceDetail
-    ? createProceduralPlanetMaterial(scene, body, `${body.id}-surface-mat`, surfaceLighting ?? {})
+    ? body.kind === 'star'
+      ? createSunSurfaceMaterial(scene, body, `${body.id}-surface-mat`)
+      : createProceduralPlanetMaterial(scene, body, `${body.id}-surface-mat`, surfaceLighting ?? {})
     : null;
   if (surfaceMat) {
     mesh.material = surfaceMat;
@@ -2166,13 +2174,16 @@ function createBodyMeshMid(
   // #756 — mid variant 도 high 와 동일 절차 셰이더 공유 (segments 만 다름 — ADR §결정 1).
   // LOD 전환 시 표면 연속성 (사용자 인지 불변). 미등록/OFF 면 null → StandardMaterial 무회귀.
   // #773 Amendment 1 — 동일 광원 인자 (high/mid 명암 일관 — 각 variant 의 onBind 가 자기 sunDir 갱신).
+  // #774 — 항성(star)은 high 와 동일 sun 셰이더 공유 (팝핑 0 — ADR 20260703-774 §결정 6).
   const surfaceMat = surfaceDetail
-    ? createProceduralPlanetMaterial(
-        scene,
-        body,
-        `${body.id}-lod-mid-surface-mat`,
-        surfaceLighting ?? {},
-      )
+    ? body.kind === 'star'
+      ? createSunSurfaceMaterial(scene, body, `${body.id}-lod-mid-surface-mat`)
+      : createProceduralPlanetMaterial(
+          scene,
+          body,
+          `${body.id}-lod-mid-surface-mat`,
+          surfaceLighting ?? {},
+        )
     : null;
   if (surfaceMat) {
     mesh.material = surfaceMat;
