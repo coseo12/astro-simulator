@@ -1,6 +1,6 @@
 # ADR 20260703-774 — 태양 emissive 절차 표면 셰이더 (granulation / limb darkening / 색온도 그라데이션)
 
-- **상태**: Provisional (cross-validate 대기 — 통합 후 Accepted 전이, #370 옵션 C)
+- **상태**: Accepted (cross-validate 2026-07-03)
 - **날짜**: 2026-07-03
 - **결정자**: architect (sub-agent), 이슈 [#774](https://github.com/coseo12/astro-simulator/issues/774)
 - **관련**: #756 (절차적 행성 표면 셰이더 — 본 ADR 의 직접 선행), #782 (self-rotation + 광원 world normal 옵션 e), #675 (glow pixel marker), #738 (starfield)
@@ -148,7 +148,7 @@ ring-shader (#641 D-T2 fix) → planet-shader (#756 핵심 위험 1) 로 2회 �
 | 2   | limb darkening: disk 반경 방향 Rec.709 휘도 프로파일 **단조 감소** + 가장자리 (r≈0.9R) / 중심 휘도비 **< 0.85**                                                                   | 스크린샷 disk 중심→가장자리 radial 샘플링                                                                                                             |
 | 3   | 색온도: 가장자리 B/R 채널비 **< 중심 B/R 채널비** (가장자리가 더 주황)                                                                                                            | 동일 radial 샘플링의 채널비 비교                                                                                                                      |
 | 4   | `?surface=off` 복귀: 태양 disk 픽셀 분산 ≈ 단색 수준 (현행 동일) + planet 4종 OFF 동작 유지                                                                                       | OFF 스크린샷 disk 내부 stddev 비교                                                                                                                    |
-| 5   | glow-marker 무회귀: 대줌아웃에서 sun glow marker 발동 유지                                                                                                                        | 기존 `browser-verify-glow-marker.mjs` 시나리오 PASS                                                                                                   |
+| 5   | glow-marker 무회귀: 대줌아웃에서 sun glow marker 발동 유지 + 줌아웃 연속 경로에서 LOD mid→low 전환 경계 급변 (팝핑) 관찰 (cross-validate Q1 부분 수용)                            | 기존 `browser-verify-glow-marker.mjs` 시나리오 PASS + 전환 경계 연속 캡처 관찰                                                                        |
 | 6   | fps 회귀 0: fps-baseline-guard PASS (CI swiftshader tier-c 포함) — `?focus=sun` 대면적 fill-rate                                                                                  | CI workflow                                                                                                                                           |
 | 7   | 단위 테스트: 미러 결정성 / limb 단조성 (μ↓ ⇒ 휘도↓) / warm 색역 (R ≥ B 유지 — 보라·마젠타 부재) / 상수 SSoT / GLSL 정적 계약 (if-else only·`gl_FragDepth` 존재·world normal 배선) | `sun-shader.test.ts`                                                                                                                                  |
 | 8   | 무회귀: 26 body (planet 셰이더 4 + 단색 22) 픽셀 불변 + `pnpm --filter core typecheck` 0 (#719) + r1-guard                                                                        | 기존 가드 전수                                                                                                                                        |
@@ -169,14 +169,33 @@ ring-shader (#641 D-T2 fix) → planet-shader (#756 핵심 위험 1) 로 2회 �
 3. **시간 변동 granulation 요구** — jd 직접 전달 금지 (#782 규약) 유지. wrap-around 소수 시간 uniform (engine 시간 mod 주기) 설계 + r1-guard/verify 결정성 대책 (surface=off 캡처 등) 동시 필요.
 4. **태양 자전 사실 표현 요구** — 차등 자전 (위도별 각속도) 은 mesh 강체 회전으로 불가 — 셰이더 내 위도별 경도 offset 접근 검토. `rotationPeriodHours` 데이터 추가는 그때 재론.
 5. **코로나/플레어** — 별도 빌보드/glow 레이어 후속 이슈 (mesh fragment 범위 밖).
+6. **시각 튜닝 분리 요구** (cross-validate Q4) — 단일 `LIMB_DARKENING_U_RGB` 로 감광 프로파일과 색온도를 독립 조정할 수 없다는 요구가 실제 발생하면, 감광 지수 (exponent) 와 색 보간 (mix) 상수 분리로 전환 (fragment 수 줄 추가 예상).
 
 ---
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (agy, 2026-07-03 — 로그 `.claude/logs/cross-validate-architecture-774.log`)
 
-> cross-validate 대기 (Provisional) — 메인 오케스트레이터가 본 ADR 박제 직후 1회 수행 (CLAUDE.md `## 교차검증` 앵커: ADR 신규). 수행 결과 (합의 / 이견 수용 / 기각 / 고유 발견 / 편향 셀프 체크) 를 본 섹션에 통합 후 상태를 `Accepted (cross-validate YYYY-MM-DD)` 로 전이한다.
+**합의 (즉시 반영 또는 이미 반영됨)**:
 
-**호출 전 Claude 편향 4종 셀프 체크 (초안)**: 낙관적 일정 — 해당 없음 (라인 예측은 planet 실측 기반). 결합 간과 — **주의 축**: glow-marker 정합 (결정 5) 을 "구조적 자동 보장" 으로 단정 — cross-validate 프롬프트에 명시 질문 권장. 폐기 프레이밍 — sunspot/시간 변동을 후속 유지 (재검토 조건 2·3 으로 재도입 경로 박제, 통과). 순수주의 — 채널별 u 계수의 물리 근사가 시각 튜닝 (measurement-first) 을 배제하지 않도록 결정 8 에 developer 재량 명시 (통과).
+1. **Q2 모듈 분리 지지** — 관심사 분리 / uniform 표면 분리 근거로 별도 `sun-shader.ts` 채택 타당 판정. 결정 1 유지.
+2. **Q3 정적 granulation 단기 타당** — 스크린샷 검증 결정성 확보 평가. 장기 차등 자전은 "셰이더 내 위도별 경도 offset" 경량 GPU 접근 제안 — **재검토 조건 4 에 이미 동일 내용 박제됨** (맥락 보존 완료, 별도 이슈 불요. 발동 트리거: 사용자 요구).
+3. **cameraPosition auto-bind 신뢰성** — 결정 8 의 developer 실측 확인 + onBind 폴백과 동일 지적 (합의 재확인).
+
+**부분 수용**:
+
+4. **Q1 glow-marker "변경 0 자동 보장" 단정 반박** — agy 는 mid(셰이더)→low(billboard) LOD 전환 경계 팝핑 위험 지적. 사실관계 재검증: (i) LOD cross-fade 는 존재하나 #756 에서 ShaderMaterial alpha 1.0 고정 + high·mid 동일 셰이더로 "구조적 비문제" 실증, (ii) mid→low 전환은 #756 이후 planet 도 동일 구조 (셰이더→billboard) 로 운영 중 무보고 — 전환 거리에서 disk 가 소면적이라 휘도 차 비가시. 단 **limb darkening 은 disk 평균 휘도를 낮추므로 sun 은 신규 휘도 스텝이 생기는 것이 사실** → 설계 변경 없이 **DoD 5 실측에 "줌아웃 연속 경로에서 LOD 전환 경계 급변 관찰" 을 포함** 하는 것으로 수용. 결정 5 의 "코드 변경 0" 은 유지 (marker 발동 로직 자체는 low 전용 사실 불변).
+
+**기각 (오탐 — 근거 실측)**:
+
+5. **머티리얼 dispose 수명주기 부재** — `surfaceDetail` 은 scene **생성 시점** 옵션 (기본 false, 런타임 토글 없음 — `?surface=off` 는 페이지 로드 시 적용). 머티리얼은 1회 생성 후 LOD 는 `isVisible` 토글만 (dispose/재생성 없음, `solar-system-scene.ts` L1805 주석 계약). 런타임 교체 시나리오 자체가 부재.
+6. **Glow/HDR 톤매핑 에너지 정합 규약 부재** — 씬에 GlowLayer / 톤매퍼 / bloom 포스트 프로세싱 파이프라인이 **존재하지 않음** (grep 실측 — glow-marker 는 billboard 마커이며 포스트 프로세싱 아님). 전제 부재로 기각.
+7. **근접 시 granulation 앨리어싱/모아레** — fbm 은 밴드리미티드 smooth noise 로 텍스처 샘플링 앨리어싱과 발생 기전이 다르고, #756 planet 4종이 동일 fbm 구조로 focus 근접 운영 중 무보고. 카메라 lowerRadiusLimit 이 근접 거리를 제한. qa DoD 1 근접 캡처에서 자연 관찰되므로 별도 대책 불요.
+
+**이견 — 기각 (YAGNI, 재검토 경로 박제)**:
+
+8. **Q4 감광 지수 / 색 mix 분리 설계** — agy 는 아티스트 튜닝 유연성을 위해 감광 커브 (exponent) 와 색 보간 (mix) 분리를 권장. 기각 근거: (i) 본 프로젝트는 1인 개발 + 사용자 D-T2 피드백 구조로 "아티스트 별도 튜닝 요구" 는 현재 가설적, (ii) 물리 근사 단일 상수는 감광·색이 실제 물리처럼 결합된 정직한 표현 + 상수 표면 최소, (iii) 분리가 필요해지면 fragment 수 줄 추가로 후속 가능. → **재검토 조건 6 신설** 로 경로 박제.
+
+**Claude 편향 셀프 체크 결과**: 결합 간과 (주의 축이었던 glow-marker 단정) 는 agy 반박 → 사실 재검증 → DoD 관찰 보강으로 해소. 낙관적 일정 / 폐기 프레이밍 / 순수주의는 초안 판정 유지 (agy 도 반대 근거 미제시).
 
 ## 참고
 
