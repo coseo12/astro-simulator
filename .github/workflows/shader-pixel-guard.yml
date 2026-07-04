@@ -1,0 +1,182 @@
+name: shader-pixel-guard
+
+# 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
+# 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 6종 CI 상시 가드.
+#
+# 목적: 셰이더 feature 5개 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
+#   #782 자전 / #783 지구 디테일) 의 픽셀 회귀 (uniform 배선 절단·분기 오염·광원 붕괴·
+#   자전 정지·극관/biome 소실) 를 PR 단계에서 차단. r1-guard 는 UI 영역 diff 만 담당하고
+#   canvas 픽셀은 baseline 대상이 아니므로 (#756 ADR §A2 결정 7) 본 가드가 canvas 성질을 지킨다.
+#
+# 판정 규약 (ADR 결정 3): per-body 상대 성질 (ON vs OFF) 만 — 절대 임계 금지
+#   (swiftshader ↔ 하드웨어 값 편차). 756 마진은 D1 CI 실측으로 확정 (스크립트 주석 참조).
+#
+# CI 렌더 전제 (ADR §실측 1): ubuntu runner 는 GPU 부재 → headless chromium 이 SwiftShader
+#   (소프트웨어 렌더) 로 WebGL2 렌더. detect-gpu-tier 는 tier-c 로 판정하므로 6 스크립트 전부
+#   `?gpu=a` tier 강제 플래그 (P11-C #290) 로 표면 셰이더에 진입한다.
+#   로컬 재현: SWIFTSHADER=1 HEADFUL=0 BASE_URL=http://localhost:3001 \
+#     pnpm --filter @astro-simulator/web run verify:756-surface   (756/773/783 지원)
+#
+# retry 미포함 시작 (ADR 축 3) — 판정이 시간 비의존 성질 검증 (verify:699 deltaTime 류 아님).
+#   flake 실측 ≥ 1회/주 시 #779 Phase 2 step-retry 패턴 편입. silent 판정 완화 금지 —
+#   의식적 완화는 ADR Amendment 로만 (guard-design-principles §2).
+
+# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
+# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches: [develop, main]
+    # #626 — docs/ADR/워크플로만 바뀐 PR 은 픽셀 측정이 무의미 (런타임 무관). fps-baseline-guard
+    # 선례 그대로 답습 (자기 자신 .yml 만 변경된 PR 도 skip — fps 동일 정책). paths filter 효과는
+    # base 브랜치 반영 후 후속 PR 부터.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/**'
+  push:
+    branches: [develop, main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/**'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # ADR cross-validate 부분 수용 (1) — CI 계수가 로컬 2~3× 추정을 초과할 가능성 완충.
+    # P1 예측 ≤25분은 유지, 30분 초과 실측 시 재검토 트리거 2항 (2-job 분할) 발동.
+    timeout-minutes: 40
+    steps:
+      # ⚠ setup 구간 (checkout ~ dev server 기동) 은 fps-baseline-guard measure job 과 동일 구간의
+      #   3번째 복제 (ci.yml r1-guard / fps-baseline-guard / 본 workflow). 한쪽 수정 시 동시 수정 —
+      #   composite action 추출은 후속 이슈 #802 (rule-of-three 도달, 선행 조건 = 본 건 머지).
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # #663 fix — playwright extract 가 Node 24.16 에서 deadlock. `.node-version` (22.16.0) 핀.
+          node-version-file: '.node-version'
+          cache: 'pnpm'
+
+      # ci.yml R1 가드 패턴 따름 — wasm 빌드 후 next dev 사용 (__solarScene 핸들 의존).
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 #663 이 1차).
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: wasm + workspace 빌드
+        run: pnpm build
+
+      - name: next dev server 기동
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
+          echo $! > /tmp/next-pid
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/ko > /dev/null; then
+              echo "ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "timeout"; exit 1
+
+      # ── verify 6종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
+      # 호출 규약: HEADFUL=0 (756/773/774/782/783) / --headless (762) — CI 에 chrome channel 이
+      #   없으므로 폴백이 아닌 명시적 headless 로 결정적 실행. BASE_URL 주입 (dev server 3001).
+      # trap: 스크립트 비정상 종료 (playwright timeout/crash) 시 잔존 chromium 정리 —
+      #   스크립트 간 실패 격리 (ADR cross-validate 부분 수용 4). 정상 종료 시 no-op.
+
+      - name: verify:756-surface (절차 표면 hfEntropy ON−OFF 갭 + tier-c)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/756-surface" \
+            pnpm --filter @astro-simulator/web run verify:756-surface
+
+      - name: verify:762-monotonic (표시 크기 비율 단조성)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          BASE_URL=http://localhost:3001 \
+            pnpm --filter @astro-simulator/web run verify:762-monotonic -- --headless
+
+      - name: verify:773-light (광원 일관성 day/night + contrast + purple)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/773-light" \
+            pnpm --filter @astro-simulator/web run verify:773-light
+
+      - name: verify:774-sun (granulation 엔트로피 + limb darkening + 색온도)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/774-sun" \
+            pnpm --filter @astro-simulator/web run verify:774-sun
+
+      - name: verify:782-rotation (자전각 jd 순수 함수 + tilt + 역행 + ring wobble)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/782-rotation" \
+            pnpm --filter @astro-simulator/web run verify:782-rotation
+
+      - name: verify:783-earth-detail (극관 + biome 위도 + 마젠타 0)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/783-earth" \
+            pnpm --filter @astro-simulator/web run verify:783-earth-detail
+
+      - name: dev server 정리
+        if: always()
+        run: |
+          if [[ -f /tmp/next-pid ]]; then
+            kill $(cat /tmp/next-pid) || true
+          fi
+
+      # 실패 시 캡처/JSON artifact — retention 7일 (ADR cross-validate 부분 수용 2, 스토리지 누적 방지).
+      - name: 실패 캡처 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shader-pixel-guard-report
+          path: |
+            .verify-screenshots/shader-pixel-guard/
+            docs/reports/762-monotonic/
+          retention-days: 7
+          if-no-files-found: ignore
