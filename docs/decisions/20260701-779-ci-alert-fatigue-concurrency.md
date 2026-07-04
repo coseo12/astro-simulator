@@ -1,7 +1,7 @@
 # ADR 20260701-779 — CI 알림 alert fatigue 완화 (이중 트리거 concurrency + flake 안정화)
 
 - 상태: **Accepted** (cross-validate 2026-07-01 — agy, §교차검증 반영 사항 4축 박제 완료. group 식은 sha 유지 + Phase 1 branch-cross 가드 브랜치 무관성 실측 의무)
-  - **§Amendment 1 (Phase 2/3 구체 설계): Provisional** — cross-validate 대기 (ADR 개정 = 발동 앵커. 통합 후 Accepted 전이)
+  - **§Amendment 1 (Phase 2/3 구체 설계): Accepted** (cross-validate 2026-07-04 — agy, §A1 교차검증 반영 사항 통합)
 - 날짜: 2026-07-01
 - 이슈: [#779](https://github.com/coseo12/astro-simulator/issues/779)
 - 관련: #766 (alert fatigue 개념 — Z 패턴 health), #728 (step retry vs job rerun), #709 (fps retry 도입), #626 (paths-ignore docs skip), ADR [20260421-workflows-responsibility-split](20260421-workflows-responsibility-split.md) (frozen vs user-owned 경계)
@@ -258,7 +258,7 @@ developer 가 run history 로 flake 이력 실측 → flake-prone 가드(verify:
 
 ---
 
-## Amendment 1 (2026-07-04) — Phase 2/3 구체 설계 확정 (상태: Provisional — cross-validate 대기)
+## Amendment 1 (2026-07-04) — Phase 2/3 구체 설계 확정 (상태: Accepted — cross-validate 2026-07-04)
 
 > Phase 1 (concurrency, v0.41.0) 안정화 실측 완료 후 Phase 2/3 착수 설계. 결정 2 는 **선별 결과 정정**, 결정 3 은 **메커니즘 개정** (workflow_run rerun → 동일 워크플로 2-job escalation). 개정이므로 cross-validate 발동 대상 — 통합 전까지 Provisional.
 
@@ -373,3 +373,12 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 6. **retry-fresh-runner 도 fail 하는 지속 부하가 반복** (2 머신 연속 spike): GitHub hosted runner 전역 이벤트 가능성 — matrix 분할/시간대 회피가 아니라 발생 빈도 실측 후 판단 (현재 관찰 0건)
 7. **setup 복제 구간 drift 발생** (한쪽만 수정): composite action 추출로 SSoT 화 — 첫 drift 발견 시점이 착수 트리거
 8. **simulate input 오발사로 인한 red run 이 노이즈화**: input 제거 + 검증은 scratch 브랜치 dispatch 로 대체
+9. **branch protection 도입 시** (현재 미설정 — 실측 404): `measure` job 은 soft-fail 구조라 항상 success — required check 로 부적합. 두 job 결과를 취합하는 gatekeeper job (`needs: [measure, retry-fresh-runner]` + `if: always()`) 신설 후 그것만 required 등록 (cross-validate 고유 발견 — 도입 시점이 착수 트리거)
+
+### A1 교차검증 반영 사항 (agy 2026-07-04 — 로그 `.claude/logs/cross-validate-architecture-779-a1.log`)
+
+**합의 (설계 유지)**: Q1 verify:699 단독 한정 — 이력 기반 선별이 fail-fast 정합, 균일 retry 는 진짜 회귀 시 전체 지연 + 오진 확률 확대 (동적 옵트인 = 재검토 조건 5 와 동일 구조). Q3 simulate hook — dispatch 는 write 권한자 전용이라 fork 우회 불가, 분기 검증 가치 > 비용. Q4 workflow_run 보안 DoD supersede 타당 (PR 컨텍스트 read-only 유지로 위험 도메인 소멸 — cache poisoning 잔존은 일반 PR 빌드와 동일 범위, 무조치). **Phase 3 전제 확증**: GitHub hosted runner 는 job 단위 fresh VM 100% 보장 (needs 직렬이어도 별도 머신).
+
+**고유 발견 (수용)**: (1) **escalation 흡수 이력 관찰 가능성** — 2차 job 성공 (= flake 흡수) 시 `$GITHUB_STEP_SUMMARY` 에 "A-fail→B-pass 흡수" 기록 의무 (경계 회귀 — 2차 머신 성능 편차로 우연 통과 — 추적용. 100% 포착 원칙의 수용된 트레이드오프를 가시화). (2) **gatekeeper job** — 재검토 조건 9 로 박제 (현재 branch protection 부재라 즉시 구현은 YAGNI).
+
+**이견 (기각)**: composite action 즉시 추출 (Phase 3 병합 동시) — 재검토 조건 7 의 "첫 drift 발견 시 착수" 유지. 근거: 워크플로 구조 변경 PR 은 검증 창이 좁아 (2단계 함정) 변경 표면 최소화가 우선, 동기 주석 마커 + reviewer 대조가 1차 방어. **기각 (조치 불요)**: 공통 인프라 실패 (레지스트리 다운 등) 시 양 job fail → 메일 발송은 정당한 알림 (구제 대상 아님). escalation 경로의 스케줄링 지연은 실패 경로 한정 트레이드오프.
