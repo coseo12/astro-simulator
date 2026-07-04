@@ -25,7 +25,13 @@
     "verify:699-freefly-unified": "node scripts/browser-verify-699-freefly-unified.mjs",
     "verify:704-sensitivity": "node scripts/browser-verify-704-sensitivity.mjs",
     "verify:732-overview": "node scripts/browser-verify-732-overview.mjs",
-    "verify:737-onboarding": "node scripts/browser-verify-737-onboarding.mjs"
+    "verify:737-onboarding": "node scripts/browser-verify-737-onboarding.mjs",
+    "verify:756-surface": "node scripts/browser-verify-756-surface.mjs",
+    "verify:762-monotonic": "node scripts/browser-verify-762-monotonic.mjs",
+    "verify:773-light": "node scripts/browser-verify-773-light.mjs",
+    "verify:774-sun": "node scripts/browser-verify-774-sun.mjs",
+    "verify:782-rotation": "node scripts/browser-verify-782-rotation.mjs",
+    "verify:783-earth-detail": "node scripts/browser-verify-783-earth-detail.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",
