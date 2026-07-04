@@ -3,6 +3,11 @@ name: fps-baseline-guard
 # 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
 # 이슈 #536 / R4 cross-validate Gemini 고유 발견 3 후속.
 # `docs/benchmarks/fps-lowend-baseline.json` 대비 회귀 (>30% 저하 또는 <30 FPS) 감지 시 PR 차단.
+#
+# #779 Phase 3 — 2-job fresh-runner escalation (ADR 20260701-779 §A1 결정 3 개정):
+#   measure (머신 1, guard soft-fail) → guard 실패 시에만 retry-fresh-runner (머신 2, hard-fail).
+#   전역 부하 spike flake 는 새 머신에서 흡수 → workflow conclusion=success → 메일 0.
+#   진짜 회귀는 2 머신 × 2 attempt = 4회 전부 fail → 최종 failure 메일 1통 (은폐 불가, fail-fast 유지).
 
 # 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
 # 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
@@ -40,12 +45,28 @@ on:
         description: 'scenario 당 측정 샘플 수 (진단 모드)'
         type: string
         default: '10'
+      # #779 — escalation 시뮬레이션 test hook (ADR 20260701-779 §A1 부수 결정). 기본 none, 수동 전용.
+      #   flake: measure guard 만 강제 fail → retry-fresh-runner 실측 pass 기대 (recovery 실증, 메일 0)
+      #   regression: 양 job guard 강제 fail → workflow failure 기대 (negative 실증, fail 메일 1통 의도됨)
+      simulate:
+        description: 'escalation 시뮬레이션 (#779 test hook)'
+        type: choice
+        options:
+          - none
+          - flake
+          - regression
+        default: 'none'
 
 jobs:
-  fps-baseline-guard:
+  measure:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      guard_outcome: ${{ steps.guard.outcome }}
     steps:
+      # ⚠ measure job 과 동기 유지 — 이 setup 구간 (checkout ~ dev server 기동) 은 retry-fresh-runner
+      #   job 에 복제되어 있음. 한쪽 수정 시 반드시 양쪽 동시 수정
+      #   (ADR 20260701-779 §A1 재검토 7 — 첫 drift 발견 시 composite action 추출이 착수 트리거).
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
@@ -121,14 +142,28 @@ jobs:
 
       # #709 — 전역 부하 spike flake 흡수 (measurement-first 결론: best-of-N 으로는 흡수 불가,
       #   docs/benchmarks/fps-variance-diagnosis-20260619.json). 1차 fail 시 1회 자동 재측정
-      #   (sleep 으로 시간차 → transient spike 회피). 2회 연속 fail 이어야 job fail → 일시 spike
-      #   는 메일 미발송 (alert fatigue 완화). 진짜 회귀는 매 시도 fail 하므로 은폐 불가.
+      #   (sleep 으로 시간차 → transient spike 회피). 진짜 회귀는 매 시도 fail 하므로 은폐 불가.
+      # #779 Phase 3 — continue-on-error 는 non-blocking silent skip 이 아니라 필수 blocking
+      #   escalation job (retry-fresh-runner) 으로의 라우팅 (ADR §A1 CRITICAL 정합 — fail-fast 유지).
       - name: FPS baseline 회귀 검증 (1회 자동 재시도)
+        id: guard
+        continue-on-error: true # step-level soft-fail — outcome=failure 보존, escalation job 이 blocking 승계
         if: github.event_name != 'workflow_dispatch' || inputs.diagnose_variance != true
+        env:
+          # #779 test hook — simulate=flake|regression 시 measure guard 강제 fail (측정 스크립트 수정 0)
+          SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'flake' || inputs.simulate == 'regression' }}
         run: |
+          # simulate 주입은 guard 호출부 단일 함수로 캡슐화 (워크플로 분기 최소화 — agy 권고)
+          run_guard() {
+            if [[ "$SIMULATE_GUARD_FAIL" == "true" ]]; then
+              echo "simulate hook (#779): measure guard 강제 fail"
+              return 1
+            fi
+            BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs
+          }
           for attempt in 1 2; do
             echo "::group::fps guard attempt $attempt/2"
-            if BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs; then
+            if run_guard; then
               echo "::endgroup::"
               echo "✓ fps guard passed (attempt $attempt)"
               exit 0
@@ -139,8 +174,12 @@ jobs:
               sleep 15
             fi
           done
-          echo "::error::fps guard 2회 연속 실패 — 진짜 회귀 또는 지속 부하"
+          echo "::error::fps guard 2회 연속 실패 — fresh-runner escalation 으로 이관 (#779 Phase 3)"
           exit 1
+
+      - name: escalation 이관 알림
+        if: steps.guard.outcome == 'failure'
+        run: echo "::warning::fps 측정 실패 — fresh-runner escalation job 으로 이관 (#779 Phase 3)"
 
       # #709 — 진단 분포 보고서 업로드 (로그에도 출력되나 artifact 로 정밀 분석).
       - name: variance 진단 보고서 업로드
@@ -158,11 +197,137 @@ jobs:
             kill $(cat /tmp/next-pid) || true
           fi
 
+      # #779 — guard 가 continue-on-error 라 job-level failure() 는 guard 실패 시 false.
+      #   if 를 steps.guard.outcome 기준으로 교체 (ADR §A1 구조 스케치 — 필수 배선).
+      - name: 회귀 보고서 업로드 (guard 실패 시)
+        if: steps.guard.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-baseline-report
+          path: |
+            .verify-screenshots/fps-baseline/
+            docs/benchmarks/fps-lowend-baseline.json
+          retention-days: 7
+
+  # #779 Phase 3 — flake escalation (ADR 20260701-779 §A1 결정 3 개정 (B')).
+  #   measure guard 실패 시에만 fresh VM (GitHub hosted job = job 단위 새 머신) 에서 재측정.
+  #   여기서는 hard-fail (continue-on-error 없음) → 실패 = workflow failure = 메일 (진짜 회귀만).
+  #   무한 rerun 구조적 불가 — job 2개 고정 (상한이 토폴로지에 내장).
+  retry-fresh-runner:
+    needs: measure
+    if: needs.measure.outputs.guard_outcome == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # ⚠ measure job 과 동기 유지 — 이 setup 구간 (checkout ~ dev server 기동) 은 measure job 의
+      #   복제본 (동작 동일, 상세 배경 주석은 measure job 원본 참조). 한쪽 수정 시 반드시 양쪽 동시 수정
+      #   (ADR 20260701-779 §A1 재검토 7 — 첫 drift 발견 시 composite action 추출이 착수 트리거).
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'pnpm'
+
+      - name: Rust 툴체인 설정
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.94.1'
+          targets: wasm32-unknown-unknown
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/physics-wasm
+
+      - name: wasm-pack 설치
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright 시스템 deps (캐시 히트 — extract 생략)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: wasm + workspace 빌드
+        run: pnpm build
+
+      - name: next dev server 기동
+        run: |
+          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
+          echo $! > /tmp/next-pid
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/ko > /dev/null; then
+              echo "ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "timeout"; exit 1
+
+      - name: FPS baseline 회귀 검증 (fresh runner — hard fail)
+        env:
+          # #779 test hook — simulate=regression 만 여기까지 강제 fail (flake 는 이 job 에서 실측 pass 기대)
+          SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'regression' }}
+        run: |
+          run_guard() {
+            if [[ "$SIMULATE_GUARD_FAIL" == "true" ]]; then
+              echo "simulate hook (#779): fresh-runner guard 강제 fail (regression 시뮬레이션)"
+              return 1
+            fi
+            BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs
+          }
+          for attempt in 1 2; do
+            echo "::group::fps guard fresh-runner attempt $attempt/2"
+            if run_guard; then
+              echo "::endgroup::"
+              echo "✓ fps guard passed on fresh runner (attempt $attempt)"
+              # #779 escalation 흡수 기록 (ADR §A1 교차검증 고유 발견 1) —
+              # 경계 회귀 (2차 머신 성능 편차 우연 통과) 추적용 가시화
+              {
+                echo "### ⚠ #779 flake 흡수 — measure fail → fresh-runner pass"
+                echo "- measure job (머신 1) guard 실패 → fresh-runner (머신 2) attempt ${attempt}/2 pass"
+                echo "- 전역 부하 spike flake 판정. 반복 관찰 시 경계 회귀 의심 — ADR 20260701-779 §A1 재검토 6"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::endgroup::"
+            if [[ $attempt -lt 2 ]]; then
+              echo "::warning::fresh-runner attempt $attempt 실패 — 15s 후 재측정"
+              sleep 15
+            fi
+          done
+          echo "::error::fps guard 2 머신 × 2 attempt 전부 실패 — 진짜 회귀 (최종 failure, 메일 발송)"
+          exit 1
+
+      - name: dev server 정리
+        if: always()
+        run: |
+          if [[ -f /tmp/next-pid ]]; then
+            kill $(cat /tmp/next-pid) || true
+          fi
+
+      # hard-fail job 이므로 failure() 정상 작동. artifact 이름은 measure 와 충돌 방지 위해 구분.
       - name: 회귀 보고서 업로드 (실패 시)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: fps-baseline-report
+          name: fps-baseline-report-fresh-runner
           path: |
             .verify-screenshots/fps-baseline/
             docs/benchmarks/fps-lowend-baseline.json
