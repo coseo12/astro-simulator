@@ -1,8 +1,8 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)**
-- **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01)
-- **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium)
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)**
+- **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04)
+- **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
 - **용어**: [Tier](../glossary.md#tier-t1--t2--t3), [R-Phase](../glossary.md#r-phase-roadmap-v3-phase), [LOD](../glossary.md) (high/mid/low variant)
 
@@ -629,3 +629,190 @@ self-rotation 도입 후 회전 non-zero 가 **정상**이 되므로 Amendment 1
 **호출 전 Claude 편향 셀프 체크 통과 여부** (1줄): 낙관적 일정 축은 **미통과** (Q1 ring 계층 비용을 b-ii 저비용으로 과소평가 → agy 이견 수용으로 pivot 계층 + 비용 상향 정정). 결합 간과 축은 **부분 통과** (ring 결합 실측했으나 격리 구조는 agy 권고로 확정). 순수주의/폐기 프레이밍 축 통과.
 
 **→ 상태 전이: Provisional → Accepted (cross-validate 2026-07-01)**. §A2.3 결정 1 을 pivot 계층 확정으로 갱신 (위 이견 수용 1).
+
+---
+
+## Amendment 3 (2026-07-04) — 지구 디테일: 극관 + biome 위도 색 변화 (#783)
+
+- **상태**: Accepted (cross-validate 2026-07-04 — §A3.8 통합 완료)
+- **이슈**: [#783](https://github.com/coseo12/astro-simulator/issues/783) (type:feat, medium, group:B-render, #775 후속 — 사용자 관찰 2026-07-01 "지구가 지구 같지 않음")
+- **형식**: **Amendment** (신규 ADR 기각) — 판단 근거는 §A3.3 결정 1. 일반 Amendment (forensic 비대상 — 회귀가 아닌 신규 시각 기능, runtime 측정으로 결정이 갈리는 가설 경합 없음).
+
+### A3.1 배경 — #775 가 남긴 "1차 비목표" 의 실현
+
+Amendment 1 §A1.3 결정 4 의 rocky 분기 (`col = mix(baseColor, landColor, landMask)`) 는 ocean↔land **2색뿐** 이며, 결정 4 GLSL 스케치에 `// (선택, 후속 가능) 해안선 대비 / 극관 — 1차 비목표` 로 극관을 명시 예비했다. 본 Amendment 3 은 그 예비된 후속의 실현이다 (Amendment 2 가 A1 의 "옵션 e 전환" 예비를 실현한 것과 동형 관계).
+
+사용자 관찰 (#783): 실제 지구의 시각 상징 (흰 극관 / 다양한 대륙색) 부재로 사실감 부족. 제약 (이슈 계약): 단일 ShaderMaterial high/mid 공유 / 에셋 0 절차적 / if-else / 데이터 SSoT 보존 (rendering-only 코드 상수) / 보라·마젠타 anti-pattern 회피 / #773 광원 shade 최종 곱 유지.
+
+### A3.2 코드베이스 실측 (설계 결정의 근거 — 재조사 불필요)
+
+1. **`p.y` = sin(위도) — "정규화된 위도" 가 아니다 (이슈 판단 요청 4-c 실측)**. body sphere 는 `MeshBuilder.CreateSphere` (`solar-system-scene.ts:2116/:2169`) — Babylon 구는 pole 이 **local ±Y**. fragment 의 `p = normalize(vLocalPos)` 는 단위 구면 좌표이므로 `p.y ∈ [−1,1] = sin(latitude)` (선형 위도 아님 — 60° 에서 0.866, 75° 에서 0.966). **위도 임계 상수는 전부 sin-space 로 박제** 하며 상수 주석에 대응 각도를 병기한다. gas-bands 분기가 이미 `float latitude = p.y` 로 동일 좌표를 사용 (#782 Amendment 2 에서 "local Y = 실제 자전축(pole) 정렬" 확정 — 선례).
+2. **자전 불변 (#782 정합)**: spin quaternion 은 local Y 축 회전 → local 정점 좌표 `vLocalPos` 는 불변이고 패턴이 mesh 와 함께 돈다 (painted-on). `abs(p.y)` 위도 밴드/극관은 **자전축 대칭이라 자전해도 위도가 변하지 않는다** — 극관이 흔들리거나 미끄러질 구조 자체가 없음. tilt 도 mesh rotation 이라 local 불변.
+3. **rocky 분기는 earth 전용** (현재 `SURFACE_TYPE_BY_BODY` 에서 Rocky = earth 1개) — rocky 분기 수정은 mars(desert)/jupiter(gas-bands)/moon(cratered) 분기 식에 영향 0 (같은 fragment 소스가 재컴파일되지만 타 분기 식 불변 → 픽셀 불변).
+4. **`continents = fbm(p * 2.4)` 가 rocky 분기에서 이미 계산됨** — biome 경계 jitter 소스로 재사용 가능 (추가 noise 샘플 0, §A3.3 결정 3).
+5. **결정적 측정 수단 존재**: `?rotate=off` (parse-rotate-mode.ts, #782) 로 selfRotation=false → rotationStates 빈 Map → mesh rotation identity → **local Y = world Y = 화면 세로축** (tilt 23.44° 오염 제거) + `&speed=0&t=<jd>` 프레임 고정. 극관/biome 밴드가 disk 세로축을 따라 결정적으로 샘플링 가능.
+
+### A3.3 결정
+
+#### 결정 1 — 형식: #756 Amendment 3 (신규 ADR 기각)
+
+| 축               | (A) 본 ADR Amendment 3                                                                                                    | (B) 신규 ADR (`20260704-783-earth-detail.md`)                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 선례 정합        | ✓ #775 (rocky 분기 확장) 가 Amendment 1 로 처리된 직접 선례. A1 결정 4 가 "극관 — 1차 비목표" 로 본 건을 예비             | ✗ #774 가 신규 ADR 인 이유 (신규 모듈 `sun-shader.ts` + 광원 모델 정반대) 가 본 건에 부재 |
+| 모듈/아키텍처    | ✓ 신규 모듈 0 — 기존 rocky 분기 내부 식 + rendering-only 미학 상수 확장 (아키텍처 결정 없음)                              | △ 결정 대상이 색 체계 상수 설계라 ADR 4섹션 (배경/후보/결정/재검토) 독립 파일 밀도 미달   |
+| 결정 이력 연속성 | ✓ rocky 분기의 전 결정 이력 (§결정 5 → A1 결정 4 → A3) 이 한 파일에 수렴 — 미래 rocky 수정자가 단일 문서로 전체 맥락 회수 | ✗ rocky 분기 이력이 2 파일로 분산                                                         |
+| 파일 비대        | △ 632 → ~800 줄 (수용 가능 — 셰이더 .ts 자체가 824줄)                                                                     | ✓ 분리                                                                                    |
+
+→ **(A) Amendment 3 채택**. "범위/색 체계 결정이 크다" (이슈 판단 요청 1) 는 신규 ADR 근거로 불충분 — 크기가 아니라 **결정의 종류** (신규 모듈/광원 모델 = 신규 ADR, 기존 분기 확장 = Amendment) 가 분기 기준이다 (#774 vs #775 선례 대조).
+
+#### 결정 2 — 범위: Tier 1 한정 (극관 + biome), Tier 2 후속
+
+| 항목                                 | 포함        | 근거                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tier 1-1 극관 (polar ice caps)       | ✓           | 이슈 핵심. `smoothstep` mask 1개 + 색 상수 1개 — 저비용                                                                                                                                                                                                                                                                                                                                    |
+| Tier 1-2 biome 위도 색 (3밴드)       | ✓           | 이슈 핵심. 기존 continents fbm 재사용으로 noise 샘플 +0 (결정 3)                                                                                                                                                                                                                                                                                                                           |
+| Tier 2-3 바다 깊이 색 (deep/shallow) | ✗ 후속      | 저비용임은 인정 (§A3.7 재검토 조건 1 에 설계 스케치 박제 — continents 값 재활용). 단 (i) DoD 측정 축 +1 (deep/shallow 픽셀 판별 방법 별도 설계 필요), (ii) ocean = baseColor (데이터 SSoT read-only) 규약에 shallow 신규 상수가 얹히는 색 체계 논의 확장, (iii) Tier 1 만으로 "지구가 지구처럼 보인다" 완결 Behavior Change 집합 성립. scope 절제 우선 (CRITICAL #6)                       |
+| Tier 2-4 대기 fresnel rim            | ✗ 후속      | #774 가 `cameraPosition` auto-bind 를 실증해 viewDir 비용은 하락 (이슈 판단 요청 2 의 재평가 반영). 그러나 (i) 4 타입 공유 셰이더에 rocky 전용 varying (vWorldPos) 혼입 — #774 결정 1 이 "무의미한 uniform 동거" 를 분리 근거로 쓴 논리의 역방향 침범, (ii) 대기 표현은 구름 (Tier 3) 과 묶어 별도 레이어로 설계하는 것이 자연 (§A1.8 재검토 조건 5 대기/구름 mesh 박제와 합류). 후속 유지 |
+| Tier 3 구름 / 야간 불빛              | ✗ 별도 트랙 | 별도 mesh/레이어 — §A1.8 재검토 조건 5 그대로                                                                                                                                                                                                                                                                                                                                              |
+
+#### 결정 3 — biome 색 구조: 3밴드 연쇄 mix + continents 재사용 jitter
+
+**위도 파라미터** (sin-space, §A3.2-1):
+
+```glsl
+// rocky 분기 (uSurfaceType == 0) — 기존 continents/landMask 계산 직후
+float latRaw = abs(p.y);                                        // |sin(위도)| — 남북 대칭
+float latJ = latRaw + (continents - 0.5) * biomeLatJitter;      // 경계 자연화 — 기존 fbm 재사용 (추가 noise 0)
+// 대륙색: 적도 녹색 → 중위도 황토·갈색 → 고위도 툰드라 회백 (2 smoothstep 연쇄 mix)
+vec3 landCol = mix(biomeTropicalColor, landColor, smoothstep(biomeTemperateLo, biomeTemperateHi, latJ));
+landCol = mix(landCol, biomeTundraColor, smoothstep(biomeTundraLo, biomeTundraHi, latJ));
+col = mix(baseColor, landCol, landMask);                        // #775 해안선 전이 유지 (ocean = baseColor 불변)
+// 극관 — continents 무관 (결정 4), ocean/land 공통 최종 mix
+float iceMask = smoothstep(iceLatLo, iceLatHi, latJ);
+col = mix(col, iceColor, iceMask);
+```
+
+**하위 결정 3-a — 밴드 수 = 3 (+ 극관)**: 이슈 명세 그대로 (적도 열대 / 중위도 사막·평원 / 고위도 툰드라). 밴드 4+ (예: 아열대 분리) 는 smoothstep/상수 표면만 늘리고 px 단위 시각 구분 불가 (earth disk 는 focus 시에도 수백 px — 밴드당 수십 px). 밴드 2 는 "다양한 대륙색" 요구 미달.
+
+**하위 결정 3-b — 색 상수 (신규 3 + 기존 1 재사용)**: 전부 `procedural-planet-shader.ts` rendering-only 미학 상수 SSoT (starfield/#775 패턴 — export + 단위 테스트 가드). 출발값은 물리/자연색 근사, **최종값은 developer measurement-first 시각 튜닝 재량** (#774 결정 8 동형):
+
+| 상수                           | 출발값                                                                     | 근거·제약                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BIOME_TROPICAL_RGB` (신규)    | `(0.20, 0.38, 0.16)`                                                       | 열대 녹 — G 우세. **제약: G-share (G/(R+G+B)) 가 temperate 보다 커야 함** (DoD 2 밴드 구분 측정 가능성)                                                                      |
+| `LAND_COLOR_RGB` (기존 재사용) | 현행 `(0.34, 0.40, 0.24)` → 황토 방향 튜닝 재량 (예: `(0.44, 0.38, 0.23)`) | **중위도 temperate 밴드 색으로 의미 재문서화** — #775 상수/uniform (`landColor`) 배선 그대로 유지 (drift 0). 값 갱신 시 기존 박제값 테스트 동반 갱신 (SSoT 갱신 — 정상 경로) |
+| `BIOME_TUNDRA_RGB` (신규)      | `(0.55, 0.56, 0.52)`                                                       | 고위도 툰드라 회백 — 극관과의 연속 전이 (이슈 "툰드라→극관 연결")                                                                                                            |
+| `ICE_COLOR_RGB` (신규)         | `(0.93, 0.95, 0.96)`                                                       | 근중성 백 — G ≥ min(R,B) 유지 (anti-pattern 가드 자동 충족, B 단독 우세 아님)                                                                                                |
+
+| 위도 임계 (신규, sin-space) | 출발값      | 대응 위도                                                     |
+| --------------------------- | ----------- | ------------------------------------------------------------- |
+| `BIOME_TEMPERATE_LO/HI`     | 0.30 / 0.55 | ~17°–33° (열대→온대 전이)                                     |
+| `BIOME_TUNDRA_LO/HI`        | 0.72 / 0.88 | ~46°–62° (온대→툰드라 전이)                                   |
+| `ICE_LAT_LO/HI`             | 0.88 / 0.96 | ~62°–74° (극관 전이 — 실제 빙권 위도대 근사)                  |
+| `BIOME_LAT_JITTER`          | 0.12        | 경계 요동 진폭 (continents fbm ±0.5 × 0.12 = 위도 ±0.06 요동) |
+
+**하위 결정 3-c — 경계 자연화 = 기존 `continents` fbm 재사용 (독립 noise 샘플 기각)**:
+
+| 축            | (A) `continents` 값 재사용 jitter                                                                | (B) 독립 `fbm(p * K)` 신규 샘플                       |
+| ------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| fragment 비용 | ✓ **noise +0** (smoothstep 3 + mix 4 만 추가 — value noise 8 hash × 3 옥타브 회피)               | ✗ fbm 1회 = hash 24회 추가 (fill-rate, tier-b 실 GPU) |
+| 시각 유기성   | ✓ biome 경계가 대륙 패턴과 동일 저주파 장(場)을 따라 요동 — 지형 연동처럼 보임                   | △ 독립 요동 (지형 무관)                               |
+| 결합 리스크   | △ landMask 임계 (0.48–0.62) 와 jitter 소스가 동일 값 — 상관 자체는 의도, 아티팩트 여부는 qa 실측 | ✓ 독립                                                |
+
+→ **(A) 채택**. 비용 우위 (표면 셰이더는 earth focus 대면적 fill — #756 결정 6 fill-rate 철학) + 유기성. 상관 아티팩트 (예: 해안선 부근 biome 경계 쏠림) 가 qa 실측에서 부자연하면 (B) 승격 (§A3.7 재검토 조건 4) — cross-validate 명시 질문 1 대상.
+
+**uniform 배선**: 신규 색 3 (vec3) + 위도 임계 6 + jitter 1 = **uniform +10 (전부 rocky 전용)** — 기존 landColor/landThreshold 패턴 그대로 (uniforms 배열 + setColor3/setFloat + GLSL 선언 + JS 미러 동기 4중 SSoT).
+
+#### 결정 4 — 극관 mask: continents 무관 + ocean/land 공통 최종 mix
+
+| 축        | (A) 극관 = land 위에만 (`landMask` 곱)                                | (B) **continents 무관 — ocean/land 공통 최종 mix**                                 |
+| --------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 물리 정합 | ✗ 북극은 해빙 (ocean 위 얼음) — land 한정이면 북극이 파란 바다로 남음 | ✓ 북극 해빙 + 남극 대륙 빙상 — 둘 다 흰색 (이슈 판단 요청 4-b 의 물리 근거 그대로) |
+| 시각 상징 | ✗ 극이 얼룩덜룩 (대륙 패턴 노출)                                      | ✓ 흰 극관 — 지구 시각 상징                                                         |
+| 식 비용   | 동일                                                                  | 동일 (mix 1)                                                                       |
+
+→ **(B) 채택**. `iceMask` 는 ocean↔land mix **이후 최종 mix** 로 적용 — 극관이 해안선 전이 위를 덮는 것은 고위도 (sin-lat ≥ 0.88) 한정이라 #775 의 중·저위도 해안선 전이는 불변 (규약 (b) 정합). 극관도 albedo 단계 (`col`) 에서 결정되고 `col *= shade` 최종 곱은 무변경 — 밤면 극관은 어둡다 (#773 규약 (a) 정합, 낮/밤 대비 유지).
+
+### A3.4 Concrete Prediction (구현 후 `git diff --stat` 실측 재현)
+
+| 영역                     | 파일                                                                         | 예측 라인         | 근거                                                                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **셰이더 rocky 확장**    | `procedural-planet-shader.ts`                                                | ~90–150 변경/신규 | GLSL rocky 분기 +8–14 줄 + 상수 4 색 + 7 float (주석 포함) + uniforms 배열 +10 + setColor3/setFloat +10 + JS 미러 rocky +20–35 + 헤더 주석 갱신                        |
+| **단위 테스트**          | `procedural-planet-shader.test.ts`                                           | ~70–130 신규/변경 | 극 위도 → ice 수렴 (landMask 양극단 모두) / 적도 vs 중위도 G-share 순서 / 신규 색 anti-pattern / 상수 SSoT drift (uniform 선언 + 배선) / 기존 rocky 박제값 테스트 갱신 |
+| **browser verify**       | `apps/web/scripts/browser-verify-783-earth-detail.mjs` (신규)                | ~130–190 신규     | `?focus=earth&rotate=off&speed=0` 결정적 프레임 — 극관 whiteness / 밴드 G-share / 마젠타 0 픽셀 측정                                                                   |
+| **scene / web / 데이터** | `solar-system-scene.ts` / `sim-canvas.tsx` / `parse-*` / `solar-system.json` | **0**             | 미학 상수는 셰이더 모듈 내부 SSoT (scene 주입 불필요 — #775 landColor 동형). 데이터 0 (rendering-only)                                                                 |
+| **타 셰이더**            | `sun-shader.ts` / `ring-shader.ts` / `starfield.ts`                          | **0**             | 무관 모듈                                                                                                                                                              |
+
+**핵심 예측** (reviewer/qa 실측 대상):
+
+- **rocky 외 3종 (mars/jupiter/moon) 픽셀 불변** — rocky 분기 식만 수정, desert/gas-bands/cratered 분기 무변경 (공유 소스 재컴파일되나 식 불변). 스크린샷 diff ≈ 0 예측. 실패 시 = 분기 격리 위반 신호.
+- **noise 샘플 +0** — fbm 호출 수 불변 (continents 재사용). fbm 신규 호출 발견 시 = 결정 3-c 위반.
+- **picking / camera / orbit / tier / LOD / r1-guard 변경 0** — fragment albedo 식 + uniform 만. mesh 기하/metadata/rotation 불변. r1-guard 는 canvas 미측정 (A2 결정 7) 이라 baseline 재생성 불요 예상 (qa 실측 확인).
+
+### A3.5 DoD (측정 가능 — 실 Chrome GUI 필수, CRITICAL #3 + WebGPU readback 금지 #756/#728)
+
+| #   | 기준                                                                                                                                                                                   | 측정 방법                                                                                                                                        |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **극관 실재**: earth disk 세로 양극단 12% 영역 (낮면 측, 남북 모두) 의 near-white 픽셀 (min(R,G,B) ≥ 140/255 && max−min 채널 ≤ 40/255) 비율 ≥ 50%, OFF (`&surface=off`) 대비 유의 증가 | `?focus=earth&rotate=off&speed=0` (identity rotation → local Y = 화면 세로, §A3.2-5) — Playwright composited screenshot + pngjs (#756 qa 방법론) |
+| 2   | **biome 위도 색 변화**: 적도 밴드 (disk 중심 ±0.15R) land 픽셀 평균 G-share > 중위도 밴드 (0.4–0.65R) land 픽셀 평균 G-share (낮면 측 통계)                                            | 동일 스크린샷 위도 밴드별 샘플링 (browser-verify-783)                                                                                            |
+| 3   | **보라/마젠타 0**: 미러 전 샘플 G ≥ min(R,B) 위배 0 (단위 테스트) + GUI earth disk 에 R>G+τ && B>G+τ 픽셀 0 (τ=15/255)                                                                 | `procedural-planet-shader.test.ts` + verify 스크립트                                                                                             |
+| 4   | **#773 광원 무회귀**: 낮/밤 휘도 대비비 ≥ 5x 유지 (A1.5 DoD 1 재현) + terminator 태양 추종 + 밤면 극관도 어두움 (밤면 극 휘도 < 낮면 극 휘도 × 1/3)                                    | 기존 browser-verify-773 + 신규 극 휘도 비교                                                                                                      |
+| 5   | **#775 무회귀**: 중·저위도 land/ocean 색조 구분 유지 (해안선 전이 불변)                                                                                                                | 기존 #775 검증 축 재현                                                                                                                           |
+| 6   | **#756 무회귀**: earth 라플라시안 고주파 엔트로피 ON > OFF 유지 + **mars/jupiter/moon 스크린샷 diff ≈ 0** (분기 격리)                                                                  | browser-verify-756 + 3종 diff                                                                                                                    |
+| 7   | **fps 회귀 0**: fps-baseline-guard PASS (CI swiftshader tier-c 포함 — tier-c 는 forceOverride 자동 우회, noise +0 이라 tier-a/b 예산 내)                                               | CI workflow                                                                                                                                      |
+| 8   | **데이터 0**: `git diff --stat` 에 `solar-system.json` 부재                                                                                                                            | reviewer 실측                                                                                                                                    |
+| 9   | **core typecheck 0** (#719 — dev/메인/reviewer 3중) + 기존 procedural-planet 테스트 전체 PASS                                                                                          | `pnpm --filter core typecheck` + vitest                                                                                                          |
+
+### A3.6 §Visual Fidelity 의무 체크리스트 4항목 (principles.md §1)
+
+- [x] **데이터 SSoT 보존** — biome/극관 색·위도 임계는 전부 `procedural-planet-shader.ts` rendering-only 미학 상수. `solar-system.json` 직접 수정 0 (DoD 8). ocean = `colorHint.hex` read-only 유지.
+- [x] **rendering 시점 분리** — fragment albedo 식 단독. physics 엔진 (Rust+wasm) 무의존, P11-A 좌표 계약 위반 0.
+- [x] **사용자 D-T2 가이드** — 극관/biome 은 순수 시각 표현 (위도 밴드는 실제 기후대의 근사 왜곡). Info/focus 패널 실측값 표기 불변.
+- [x] **점유율 / 사실 비율 baseline** — mesh 크기/위치/rotation 불변 (albedo 만) → px diameter / 점유율 / 분리 마진 / #762 단조성 영향 0. r1-guard canvas 미측정 (재생성 불요 예상 — qa 실측 판정).
+
+### A3.7 결과 · 재검토 조건
+
+**기대 결과**: `?focus=earth` 에서 흰 극관 (남북) + 적도 녹 → 중위도 황토 → 고위도 회백 대륙색 + 파란 바다 (실 Chrome GUI). 자전 시 극관/밴드가 표면과 함께 회전 (painted-on, 위도 불변). mars/jupiter/moon + 단색 22 + sun 무회귀. `?surface=off` 100% 복귀.
+
+**재검토 조건**:
+
+1. **바다 깊이 색 (Tier 2-3) 요구** — 설계 스케치: `float depth = smoothstep(landThresholdLo, 0.0, continents)` (continents 재활용 — landMask 하위 구간을 깊이로 역해석, noise +0) + `DEEP_OCEAN_RGB` 상수 1개, `oceanCol = mix(baseColor, deepOcean, depth)` 를 첫 mix 의 baseColor 자리에 대입. ocean = colorHint read-only 규약과의 관계 (deep 색이 baseColor 변조인지 독립 상수인지) 재론 필요.
+2. **대기 fresnel rim (Tier 2-4) 요구** — #774 cameraPosition auto-bind 실증으로 uniform 비용 하락. 단 공유 셰이더 varying 혼입 vs 별도 대기 레이어 (§A1.8 재검토 조건 5) 비교 선행 — 구름 도입 시점과 합류 권장.
+3. **구름 / 야간 도시 불빛 (Tier 3)** — 별도 mesh/레이어 트랙 (§A1.8 재검토 조건 5 그대로). 구름은 #782 자전과 차등 offset 필요.
+4. **biome 경계 상관 아티팩트** — continents 재사용 jitter (결정 3-c) 가 해안선-biome 경계 쏠림 (contour-following) 등 부자연 발견 시 **좌표 스위즐링 fbm (`fbm(p.zyx * 2.4)`)** 으로 승격 (cross-validate 고유 발견 — landMask 와의 상관을 완전 해제하면서 신규 noise 함수 불요. 단 agy 의 "비용 0" 주장은 오류 — 이미 계산된 값 재사용이 아니라 fbm 신규 호출 = hash 24회 추가로 독립 샘플 (B) 와 동일 비용. 가치는 탈상관이지 무비용이 아님).
+5. **다른 rocky body 확장** — mars 등 을 Rocky 로 재분류하거나 위성 rocky 추가 시 biome 파라미터가 earth 전용 상수라 body 별 파라미터화 필요 (§A1.8 재검토 조건 4 연장).
+6. **극관 land/ocean 차등 디테일** (cross-validate 고유 발견) — 현재 iceMask 는 latJ (continents jitter 포함) 기반이라 경계가 지형 장을 따라 요동하지만, land 빙상 vs ocean 해빙의 분포 차이 (열용량) 는 미표현. qa 실측에서 "위도로만 잘린 흰 모자" 로 부자연하면 iceMask 에 landMask 미세 가중 검토.
+
+### A3.8 교차검증 반영 사항 (agy 2026-07-04 — 통합 완료)
+
+**호출 전 Claude 편향 셀프 체크** (4종):
+
+- **낙관적 일정** (셰이더 +10 uniform 4중 SSoT 배선 비용 — Concrete Prediction 을 미러/테스트 포함 폭넓게 잡아 통과 예상).
+- **결합 간과** (continents fbm 을 landMask 임계와 biome jitter 양쪽에 재사용 — 동일 noise 장 상관이 의도된 유기성인지 아티팩트원인지 단정 못 함) — **미통과 의심** → 명시 질문 1.
+- **폐기 프레이밍** (단일 land 색을 "단조" 로 폐기 — 사용자 관찰 #783 실측 근거라 통과).
+- **순수주의** (sin-space 임계 직접 박제가 도 단위 대비 가독성 손해 — 상수 주석에 대응 각도 병기로 완화, fragment 비용 0 이 우선. 통과 예상).
+
+**cross-validate 명시 질문** (메인 수행 시 프롬프트 삽입):
+
+1. (결합 간과) biome 경계 jitter 소스로 기존 `continents` fbm 을 재사용 (noise +0) 하는 것 vs 독립 fbm 샘플 — 동일 noise 장 상관의 시각 아티팩트 리스크 평가.
+2. 극관을 ocean/land mix **이후 최종 mix** 로 얹는 순서 (결정 4 B) 가 툰드라→극관 연속성 / #775 해안선 전이와 충돌하지 않는가.
+3. `LAND_COLOR_RGB` 재사용 (temperate 의미 재문서화 + 값 튜닝) vs biome 3색 전부 신규 상수 — 기존 #775 상수/uniform/테스트 계약과의 drift 리스크 비교.
+
+**수행 결과 (agy, 2026-07-04 — 로그 `.claude/logs/cross-validate-architecture-783.log`, 최종 판정 "Accepted 권장")**:
+
+**합의 (설계 유지)**:
+
+1. **Q2 극관 최종 mix 순서** — 충돌 없음 확인. 툰드라 (0.72–0.88) → 극관 (0.88–0.96) 순차 임계로 연속 전이, 중·저위도 iceMask=0 이라 #775 해안선 전이 100% 보존, 고위도에서 빙권이 해안선을 덮는 것은 실제 물리 정합 ("의도적이고 올바른 시각적 수렴"). 결정 4 유지.
+2. **Q3 `LAND_COLOR_RGB` 재사용 (A)** — 신규 3색 전면 교체 (B) 는 #775 uniform 배선/테스트 계약 파괴로 drift 리스크 큼. (A) 채택 유지 + **의미 재문서화 주석 가드 상세화** (temperate 밴드 색으로 동적 사용됨을 상수 선언부와 바인딩 계층 양쪽에 명시) 를 developer 지시에 반영.
+3. **Q1 continents 재사용 우선 채택 타당** — 성능 우위 압도적. 단 상관 아티팩트 리스크 High 평가 (해안선 굴곡과 biome 경계 평행 동조 가능) → qa DoD 실측 관찰 항목 유지.
+
+**고유 발견 (수용 — 사실 정정 포함)**:
+
+4. **스위즐링 백업 플랜** — 아티팩트 발현 시 독립 fbm 대신 `fbm(p.zyx * 2.4)` 좌표 스위즐링으로 탈상관 → §A3.7 재검토 조건 4 에 구체화 박제. **단 "추가 연산 비용 0" 주장은 사실 오류로 정정** — 스위즐링도 fbm 신규 호출 (hash 24회) 로 독립 샘플과 동일 비용. 채택 근거는 탈상관 + 신규 noise 함수 불요.
+5. **극관 land/ocean 차등 부재** — 실제 극빙은 지형별 분포가 다름 ("위도로만 잘린 흰 원형 모자" 우려). iceMask 가 latJ (jitter 포함) 기반이라 경계 요동은 이미 있음 — 1차 수용 범위 밖, qa 실측 관찰 + §A3.7 재검토 조건 6 신설.
+
+**부분 수용**:
+
+6. **uniform +10 인터페이스 복잡도** — struct 바인딩은 Babylon ShaderMaterial 개별 uniform 패턴 (기존 4중 SSoT) 과 이질적이라 기각, **바인딩 계층 그룹화 주석** (biome 상수 블록 명시) 으로 절충 — developer 지시 반영.
+7. **body 별 파라미터화 탈출구** — §A3.7 재검토 조건 5 에 이미 박제됨 (합의 재확인).
+
+**Claude 편향 셀프 체크 결과**: 결합 간과 (미통과 의심 축이었던 continents 이중 재사용) — agy 도 리스크 High 로 동의하나 채택 자체는 타당 판정. jitter 진폭이 작고 (위도 ±0.06) 백업 플랜이 구체화되어 실측 판정 (DoD) 으로 이관. 나머지 3종 통과 유지.
