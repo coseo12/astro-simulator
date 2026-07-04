@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.45.0] — 2026-07-04
+
+### Behavior Changes (#779 Phase 2/3 — CI flake 자동화)
+
+- **[#779] CI flake 자동화 Phase 2/3 — verify:699 step retry + fps fresh-runner escalation (MINOR)** ([#779](https://github.com/coseo12/astro-simulator/issues/779)) — 릴리스마다 1~2회 반복되던 flake 수동 rerun(v0.39/40/43 실측 4회)을 워크플로 구조로 흡수. **Phase 2**: `ci.yml` verify:699 step 내부 `for attempt in 1 2` retry(sleep 15, dev server 유지) — 대상은 rerun 이력 실측 기반 verify:699 **단독**(동적 옵트인 — 타 가드 flake 관측 시 추가, §A1 재검토 5). attempt 2 흡수 시 `::warning::` annotation. **Phase 3**: `fps-baseline-guard.yml` 1 job → **2-job fresh-runner escalation** — `measure`(guard step `continue-on-error: true` soft-fail + `outputs.guard_outcome`) fail 시 `retry-fresh-runner`(신규 VM — GitHub hosted job 단위 fresh VM 100% 보장, agy 확증)가 hard-fail 재측정. **메일 정책이 구조만으로 완성**: flake=workflow conclusion success→메일 0 / 진짜 회귀=2머신×2attempt 4회 전부 fail→최종 메일 1통(은폐 불가 — 가드 약화 아님, §A1 CRITICAL). workflow_run rerun 방식은 attempt 1 fail 메일 구조 잔존으로 기각. escalation 흡수 시 `$GITHUB_STEP_SUMMARY` 이력 기록(경계 회귀 추적 — cross-validate 수용). **simulate dispatch input**(`none|flake|regression`, 기본 none, write 권한자 전용)으로 머지 전 3중 시뮬레이션 결정적 실증: none=[run 28699730583](https://github.com/coseo12/astro-simulator/actions/runs/28699730583) success·retry skipped / flake=[28699841915](https://github.com/coseo12/astro-simulator/actions/runs/28699841915) **success·메일 0**(escalation 흡수) / regression=[28706842148](https://github.com/coseo12/astro-simulator/actions/runs/28706842148) **failure·메일 1**(의도). 측정 스크립트·앱 코드 **0줄**(Concrete Prediction 적중 — 워크플로 지휘부만). qa 부수 발견: flake run의 fresh runner에서도 attempt 1 fail→2 pass 관찰(fresh 머신도 부하 spike 가능 — §A1 재검토 6 모니터링 근거). ADR [`20260701-779-ci-alert-fatigue-concurrency.md`](docs/decisions/20260701-779-ci-alert-fatigue-concurrency.md) **§Amendment 1** (Accepted, cross-validate agy 2026-07-04 — gatekeeper job은 branch protection 도입 시 재검토 9).
+
+### Notes
+
+- **머지 후 실측 의무 3항 잔존 → #779 OPEN 유지** (workflow_dispatch 2단계 함정 — push 경로 1회 / 자연 flake 흡수 실측 / 릴리스 2회 창 수동 rerun 0 관찰 후 close). 본 릴리스가 관찰 창 1회차.
+- 폴링 중단 근본 원인 확정(세션 메모리 박제): 장수 watch 프로세스는 Conductor 세션 재시작 시 SIGKILL 동반 사망 — CI 대기는 stateless 폴링(ScheduleWakeup + one-shot check)이 기본.
+
 ## [0.44.0] — 2026-07-04
 
 ### Behavior Changes (#783 — 지구 극관 + biome 위도 색 변화)

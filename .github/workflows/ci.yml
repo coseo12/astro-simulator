@@ -390,8 +390,25 @@ jobs:
             if curl -sf http://localhost:3012/ > /dev/null; then break; fi
             sleep 2
           done
-          BASE_URL=http://localhost:3012 node apps/web/scripts/browser-verify-699-freefly-unified.mjs
-          GUARD_EXIT=$?
+          # #779 Phase 2 — S3b deltaTime 타이밍 flake 흡수 (v0.39.0 / v0.43.0 prep 실측 2회 — 가드 9종 중 유일).
+          # dev server 는 유지한 채 guard 호출만 재시도 (#709 동일 패턴). 2연속 fail = step fail (fail-fast 유지).
+          GUARD_EXIT=1
+          for attempt in 1 2; do
+            echo "::group::verify:699 attempt $attempt/2"
+            if BASE_URL=http://localhost:3012 node apps/web/scripts/browser-verify-699-freefly-unified.mjs; then
+              GUARD_EXIT=0
+              echo "::endgroup::"
+              if [[ $attempt -eq 2 ]]; then
+                echo "::warning::verify:699 attempt 1 실패를 attempt 2 가 흡수 — runner 부하 spike flake 추정 (#779 Phase 2)"
+              fi
+              break
+            fi
+            echo "::endgroup::"
+            if [[ $attempt -lt 2 ]]; then
+              echo "::warning::verify:699 attempt $attempt 실패 — 15s 후 재시도 (#779 Phase 2)"
+              sleep 15
+            fi
+          done
           kill $WEB_PID || true
           exit $GUARD_EXIT
 
