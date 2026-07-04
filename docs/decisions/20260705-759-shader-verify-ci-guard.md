@@ -123,6 +123,21 @@
 
 **Claude 편향 셀프 체크 결과**: 낙관적 일정 (의심 축) — agy 가 5~8× 반례 제시 → timeout 완충 + D1 실측 규약으로 해소. 결합 간과 (의심 축) — swiftshader 로컬 근사 ≠ CI 실측 갭은 pull_request 트리거 구조상 머지 전 실측으로 닫힘 확인. 나머지 2종 통과.
 
+## Amendment 1 — D1 마진 확정 + tier-c 판정 축 measurement-first 정정 (2026-07-05 dev, PR #803)
+
+**1. 756 가산 마진 0.15 확정** (결정 3 의 D1 규약 이행 — 3중 박제: `browser-verify-756-surface.mjs` 상단 주석 / PR #803 본문 D1 표 / 본 각주):
+
+| 환경                                    | earth         | mars          | jupiter       | moon              |
+| --------------------------------------- | ------------- | ------------- | ------------- | ----------------- |
+| CI ubuntu swiftshader (run 28712529835) | 0.768         | 0.873         | 0.688         | **0.359 (최소)**  |
+| 로컬 headless 하드웨어 (2회)            | 0.451 / 0.360 | 0.757 / 0.839 | 0.716 / 0.909 | 0.651 / **0.295** |
+
+CI 최소 갭 0.359 = 마진의 2.4×, 전체 관측 최소 (로컬 분산 포함) 0.295 = 1.97× → **0.15 유지**. 배선 절단 negative 실측 시 갭은 −0.13~0.09 로 붕괴 (마진 아래 명확 분리 — 검출력 여유 확인).
+
+**2. tier-c 판정 축 정정 — 픽셀 hfEntropy → lodStats 배선 검증** (결정 3 "tier-c 저디테일 확인" 의 구현 방식 확정): dev 판정 신설 중 기존 756 스크립트 tier-c 시나리오의 **잠재 결함 2건**이 실측으로 드러남 — (a) `?lod=auto` 가 URL `?lod=` 우선 정책 (#677) 으로 tier-c `forceOverride:'low'` 를 무효화해 표면 셰이더가 진입한 채 측정되고 있었음 (실측 lodStats high=2, hfEntropy 1.399 ≈ ON — 판정 부재로 미발각) (b) `focus=earth` 시 #546 satellite guard 가 moon 을 low→mid 승격 (override 이후 후처리 — 문서화된 설계). 픽셀 축은 billboard 축소 후 bbox 대부분이 배경 (로컬 starfield 별 오염 vs CI 검정 — 환경 의존 비결정) 이라 false-fail 원천. → **default view (`?gpu=c`, no focus/lod) 에서 `override==='low' && high===0 && mid===0` 구조 검증**으로 확정 (표면 셰이더는 high/mid variant 에만 부착되므로 구조적 미진입 증명 — 결정적·백엔드 무관). guard-design-principles §1 (measurement-first: broad 설계 → dev 실측 false-positive → precision 정정 박제) 이행.
+
+**3. P1 실측**: 신규 job 총 6m49s (setup ~2m + verify 6종 4m43s) — 예측 ≤25분 대비 27% 수준. CI 계수 실측 ≈ 1.15× (로컬 4.1분 → CI 4.7분. agy 의 5~8× 경고는 미발현 — timeout 40 완충은 유지).
+
 ## 참고
 
 - 이슈: [#759](https://github.com/coseo12/astro-simulator/issues/759) (원 범위 + 2026-07-04 확장 코멘트), [#793](https://github.com/coseo12/astro-simulator/issues/793) (산출물 수명주기 — 합류/분리 명시)

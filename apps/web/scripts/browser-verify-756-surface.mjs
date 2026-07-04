@@ -39,8 +39,10 @@ const SWIFTSHADER = process.env.SWIFTSHADER === '1';
  * #759 판정 마진 (가산, hfEntropy ON−OFF 갭 하한) — measurement-first 근거:
  *  - 하드웨어 headless 실측 최소 갭 moon 0.415 / CI 근사 swiftshader earth 0.469 (ADR §실측 3)
  *  - 고정 배수 임계 (×1.3 등) 는 moon(1.24×) 에서 즉시 false-fail → 가산 마진 방향 채택.
- *  - 초기값 0.15 (실측 최소 갭 대비 2.7× 여유). D1: 도입 PR 의 CI swiftshader 실측값으로 확정
- *    — 정정 시 silent 완화 금지, 3중 박제 의무 (본 주석 / PR 본문 / ADR Amendment).
+ *  - D1 확정 (2026-07-05, PR #803 run 28712529835 — CI ubuntu swiftshader 실측):
+ *    earth 0.768 / mars 0.873 / jupiter 0.688 / moon 0.359 (최소) → 마진 0.15 의 2.4× 여유.
+ *    로컬 하드웨어 재실행 분산 포함 전체 최소 관측 갭 0.295 (여유 1.97×) → 0.15 유지 확정.
+ *    변경 시 silent 완화 금지, 3중 박제 의무 (본 주석 / PR #803 본문 / ADR Amendment 1).
  */
 const HF_ENTROPY_MARGIN = 0.15;
 
