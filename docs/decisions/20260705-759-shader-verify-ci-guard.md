@@ -98,7 +98,7 @@
 
 ### Concrete Prediction
 
-- **P1 (시간 예산)**: 신규 job 총 소요 **≤ 25분** (timeout 30 여유), `detect-and-test` 실행 시간 증가 **0** — 검증: 도입 PR 의 Actions run 시간 실측
+- **P1 (시간 예산)**: 신규 job 총 소요 **≤ 25분** (timeout 40 여유 — cross-validate 완충 반영), `detect-and-test` 실행 시간 증가 **0** — 검증: 도입 PR 의 Actions run 시간 실측 (**실측 6m49s — 적중, CI 계수 1.15×**)
 - **P2 (negative 검출력)**: 표면 배선 절단 시뮬레이션 (예: `surfaceDetail` 강제 false 커밋) 에서 **verify:756 + verify:773 최소 2종 FAIL** — 검증: 3중 시뮬레이션 (positive→negative→recovery) 로그
 - **P3 (결정성)**: 동일 커밋 2연속 run 판정 동일 (flake 0) — 검증: 도입 PR 에서 rerun 1회
 - **P4 (코어 무변경)**: `packages/core` + `apps/web/src` 코드 변경 **0 줄** (스크립트/workflow/package.json 만) — 검증: `git diff --stat` — 실패 시 = 가드가 앱 코드 침범 (재설계 신호)

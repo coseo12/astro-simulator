@@ -134,11 +134,7 @@ async function measureLight(page, bodyId, captureName) {
       }
       if (!sunPos) return { error: 'sunLight 부재' };
       const sunWorldDir = sunPos.subtract(meshPos); // 태양 방향 (월드).
-      // 태양 방향 끝점을 화면 투영해 화면 평면 sunDir 추출.
-      const sunFar = meshPos.add(
-        sunWorldDir.scale(1e-3 * (1 / Math.max(sunWorldDir.length(), 1e-9)) + 0),
-      );
-      // 위 스케일은 불안정 → 정규화 후 mesh 반경 비례 길이로 끝점 생성.
+      // 태양 방향 끝점을 화면 투영해 화면 평면 sunDir 추출 (정규화 후 mesh 반경 비례 길이).
       const sunDirN = sunWorldDir.normalize();
       const meshRadius = bb.maximum.subtract(bb.minimum).length() * 0.5 || 1;
       const tip = meshPos.add(sunDirN.scale(meshRadius * 4));
