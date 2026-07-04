@@ -5,6 +5,18 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.44.0] — 2026-07-04
+
+### Behavior Changes (#783 — 지구 극관 + biome 위도 색 변화)
+
+- **[#783] 지구 디테일 — 극관 + biome 위도 색 변화 (MINOR)** ([#783](https://github.com/coseo12/astro-simulator/issues/783)) — 지구 rocky 분기가 ocean↔land 2색뿐이라 "지구 같지 않던" 것을(사용자 관찰 2026-07-01, #775 후속 Tier 1), **흰 극관(polar ice caps) + 위도별 biome 3밴드(적도 녹 → 중위도 황토 → 고위도 툰드라 회백)** 로 확장(에셋 0, `procedural-planet-shader.ts` rocky 분기만). **극관 = continents 무관 ocean/land mix 이후 최종 mix** — 북극 해빙 + 남극 빙상 물리 정합(§결정 4 B), albedo 단계 한정이라 `col *= shade` 최종 곱 불변(#773 밤면 극관도 어두움). **biome 경계 자연화 = 기존 continents fbm 재사용 jitter** — **신규 noise 샘플 0**(fill-rate, 테스트가 rocky 분기 fbm 1회를 정적 계약으로 가드), 경계가 대륙 패턴과 동일 저주파 장을 따라 요동. 위도 임계는 전부 sin-space(`p.y = sin(위도)`, CreateSphere pole=±local Y) + 각도 병기. `LAND_COLOR_RGB` 는 temperate 밴드 색으로 의미 재문서화(#775 uniform 배선/테스트 계약 보존 — cross-validate Q3 합의) + 황토 방향 튜닝 `(0.44,0.38,0.23)`. **measurement-first 하향**: 극관 임계 출발값(0.88/0.96)은 ice ramp 가 DoD 측정 밴드와 겹쳐 near-white 10.2% 미달 실측 → `ICE_LAT_LO/HI 0.84/0.92` + `BIOME_TUNDRA_HI 0.84`(툰드라→극관 맞닿음 연속 전이 유지). uniform +10(rocky 전용, 4중 SSoT + JS 미러 + 바인딩 biome 블록 그룹화 주석). **실측(실 Chrome GUI, DoD 9/9 PASS — dev/qa 독립 재실측 일치)**: 극관 낮면 near-white N 72.0% / S 61.5%(OFF 0%) / 적도 G-share 0.506 > 중위도 0.405 / 마젠타 0 px / #773 contrastExtreme 22.85 + 밤면 극 52.4 < 낮면 극/3 / #756 엔트로피 ON>OFF + **mars·jupiter 픽셀 diff 0px**(분기 격리 구조 입증)·moon 노이즈 플로어 내 / 자전 painted-on(대륙 경도 이동 + 극관/밴드 위도 불변, JD +45° 결정적 비교) / fps 회귀 0. cross-validate(agy) 예고 리스크 2건 — 해안선-biome 동조 아티팩트·극관 "흰 모자" — **둘 다 미발현**(§A3.7 조건 4·6 발동 불요). Concrete Prediction 적중 — scene/web/데이터/타 셰이더 0. ADR [`20260628-756-procedural-planet-surface.md`](docs/decisions/20260628-756-procedural-planet-surface.md) **§Amendment 3** (Accepted, cross-validate agy 2026-07-04 — 스위즐링 백업 플랜 "비용 0" 주장 사실 정정 포함).
+
+### Notes
+
+- 신규 `browser-verify-783-earth-detail.mjs` 는 **PR 에 커밋됨**(측정 레시피 3건 헤더 박제 — epoch 태양 극축 정렬 함정 / speed=0 로드 함정 / disk 반경 √3 투영). CI 통합은 [#759](https://github.com/coseo12/astro-simulator/issues/759) 확장 트랙(2026-07-04 회고 발 — 셰이더 verify 6종 일괄).
+- Tier 2/3 후속(바다 깊이 색 / 대기 fresnel rim / 구름 / 야간 불빛)은 ADR §A3.7 재검토 조건 1~3 박제(요구 발생 시 착수).
+- 2026-07-04 프로젝트 회고 발 개선 이슈 6건 박제: #759 확장(medium 상향) / #779 근거 보강 / #789 임계 기준 / [#793](https://github.com/coseo12/astro-simulator/issues/793) 산출물 수명주기 / [#794](https://github.com/coseo12/astro-simulator/issues/794) 트랙 A/B 로드맵 문서 / [#795](https://github.com/coseo12/astro-simulator/issues/795) 반복 마찰 박제.
+
 ## [0.43.0] — 2026-07-03
 
 ### Behavior Changes (#774 — 태양 emissive 절차 표면 셰이더)
