@@ -28,6 +28,16 @@ import {
   LAND_COLOR_RGB,
   LAND_THRESHOLD_LO,
   LAND_THRESHOLD_HI,
+  BIOME_TROPICAL_RGB,
+  BIOME_TUNDRA_RGB,
+  ICE_COLOR_RGB,
+  BIOME_TEMPERATE_LO,
+  BIOME_TEMPERATE_HI,
+  BIOME_TUNDRA_LO,
+  BIOME_TUNDRA_HI,
+  ICE_LAT_LO,
+  ICE_LAT_HI,
+  BIOME_LAT_JITTER,
   fbmMirror,
   surfaceColorMirror,
   lightingShadeMirror,
@@ -35,6 +45,25 @@ import {
   PLANET_VERTEX_SHADER,
   PLANET_FRAGMENT_SHADER,
 } from './procedural-planet-shader.js';
+
+/** 구면 골든앵글 샘플 (결정적) — 위도/경도 고른 커버리지 (#783 밴드 테스트 공용). */
+function spherePoints(n: number): Array<[number, number, number]> {
+  const pts: Array<[number, number, number]> = [];
+  const ga = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (2 * (i + 0.5)) / n;
+    const r = Math.sqrt(Math.max(1 - y * y, 0));
+    const th = ga * i;
+    pts.push([r * Math.cos(th), y, r * Math.sin(th)]);
+  }
+  return pts;
+}
+
+/** #783 검증용 — GLSL 과 동일 smoothstep (테스트 로컬 미러). */
+function smoothstepMirror(e0: number, e1: number, x: number): number {
+  const t = Math.min(Math.max((x - e0) / Math.max(e1 - e0, 1e-6), 0), 1);
+  return t * t * (3 - 2 * t);
+}
 
 describe('#756 procedural-planet — surfaceType enum ↔ uniform int 매핑 SSoT (ADR §교차검증 이견 수용 2)', () => {
   // #719 교훈 + cross-validate 이견 수용 2 — JS enum 정수가 곧 GLSL `uniform int surfaceType` 값.
@@ -354,37 +383,44 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
   // earth base = 청록 (ocean), land = 올리브-브라운. landMask 로 색조(hue) mix → "바다만" 회귀 해소.
   const EARTH_OCEAN: [number, number, number] = [0.23, 0.45, 0.6];
 
-  it('rocky 대륙 mix — ocean(landMask=0) + land(landMask=1) 색 둘 다 존재', () => {
-    // continents 가 LO 미만이 되는 표면점을 찾아 ocean 색 유지 확인 — 다수 샘플 중 ocean/land 둘 다 존재.
+  it('rocky 대륙 mix — ocean(landMask=0) + land(landMask=1) 색 둘 다 존재 (#783 밴드 조건 반영)', () => {
+    // Amendment 3 (#783) 후 land 색은 위도 의존 (biome 3밴드) + 고위도는 극관이 덮는다.
+    // 따라서 박제값 대조는 밴드가 확정되는 latJ 구간으로 조건화한다:
+    //  - ocean: continents ≤ LO && latJ ≤ ICE_LAT_LO → baseColor 그대로 (#775 read-only 규약 유지)
+    //  - land(tropical): continents ≥ HI && latJ ≤ TEMPERATE_LO → BIOME_TROPICAL_RGB
+    //  - land(temperate): continents ≥ HI && TEMPERATE_HI ≤ latJ ≤ TUNDRA_LO → LAND_COLOR_RGB
     let foundOcean = false;
-    let foundLand = false;
-    for (let i = 0; i < 400; i++) {
-      const t = i * 0.0157;
-      const x = Math.sin(t * 1.3) * Math.cos(t * 0.7);
-      const y = Math.cos(t * 1.1);
-      const z = Math.sin(t * 0.9) * Math.sin(t * 0.6);
-      const len = Math.hypot(x, y, z) || 1;
-      const p: [number, number, number] = [x / len, y / len, z / len];
+    let foundTropical = false;
+    let foundTemperate = false;
+    for (const p of spherePoints(4000)) {
       const continents = fbmMirror(p[0] * 2.4, p[1] * 2.4, p[2] * 2.4);
+      const latJ = Math.abs(p[1]) + (continents - 0.5) * BIOME_LAT_JITTER;
       const [r, g, b] = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, p);
-      if (continents <= LAND_THRESHOLD_LO) {
-        // ocean 색 (baseColor) 에 근접.
+      if (continents <= LAND_THRESHOLD_LO && latJ <= ICE_LAT_LO) {
+        // ocean 색 (baseColor) 그대로 — 중·저위도 해안선/바다 불변 (#775 무회귀, §A3.5 DoD 5).
         expect(r).toBeCloseTo(EARTH_OCEAN[0], 4);
         expect(g).toBeCloseTo(EARTH_OCEAN[1], 4);
         expect(b).toBeCloseTo(EARTH_OCEAN[2], 4);
         foundOcean = true;
       }
       if (continents >= LAND_THRESHOLD_HI) {
-        // land 색 (LAND_COLOR_RGB) 에 근접.
-        expect(r).toBeCloseTo(LAND_COLOR_RGB.r, 4);
-        expect(g).toBeCloseTo(LAND_COLOR_RGB.g, 4);
-        expect(b).toBeCloseTo(LAND_COLOR_RGB.b, 4);
-        foundLand = true;
+        if (latJ <= BIOME_TEMPERATE_LO) {
+          expect(r).toBeCloseTo(BIOME_TROPICAL_RGB.r, 4);
+          expect(g).toBeCloseTo(BIOME_TROPICAL_RGB.g, 4);
+          expect(b).toBeCloseTo(BIOME_TROPICAL_RGB.b, 4);
+          foundTropical = true;
+        } else if (latJ >= BIOME_TEMPERATE_HI && latJ <= BIOME_TUNDRA_LO) {
+          expect(r).toBeCloseTo(LAND_COLOR_RGB.r, 4);
+          expect(g).toBeCloseTo(LAND_COLOR_RGB.g, 4);
+          expect(b).toBeCloseTo(LAND_COLOR_RGB.b, 4);
+          foundTemperate = true;
+        }
       }
     }
-    // 지구 표면에 대륙과 바다가 둘 다 존재해야 (mix 가 의미 있음).
+    // 지구 표면에 바다 + 열대 대륙 + 온대 대륙이 모두 존재해야 (mix/밴드가 의미 있음).
     expect(foundOcean).toBe(true);
-    expect(foundLand).toBe(true);
+    expect(foundTropical).toBe(true);
+    expect(foundTemperate).toBe(true);
   });
 
   it('ocean 과 land 가 색조(hue) 다름 — "바다만 밝기 변조" 회귀 해소', () => {
@@ -398,8 +434,9 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
     expect(LAND_COLOR_RGB.g).toBeGreaterThanOrEqual(Math.min(LAND_COLOR_RGB.r, LAND_COLOR_RGB.b));
   });
 
-  it('GLSL rocky 분기가 mix(baseColor, landColor, landMask) 사용 (밝기 변조 → 색 mix)', () => {
-    expect(PLANET_FRAGMENT_SHADER).toContain('mix(baseColor, landColor, landMask)');
+  it('GLSL rocky 분기가 mix(baseColor, landCol, landMask) 사용 (밝기 변조 → 색 mix — #783 landCol 밴드)', () => {
+    // Amendment 3 (#783): 단일 landColor → 위도 밴드 합성 landCol 로 확장 (ocean=baseColor 불변).
+    expect(PLANET_FRAGMENT_SHADER).toContain('mix(baseColor, landCol, landMask)');
     expect(PLANET_FRAGMENT_SHADER).toContain('smoothstep(landThresholdLo, landThresholdHi');
     expect(PLANET_FRAGMENT_SHADER).toContain('uniform vec3 landColor');
   });
@@ -408,7 +445,9 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
 describe('Amendment 1 — 신규 미학 상수 SSoT (#69 drift 가드)', () => {
   it('soft terminator / 육지색 / 임계 박제값 (drift 시 시각 회귀)', () => {
     expect(SOFT_TERMINATOR_WIDTH).toBe(0.12);
-    expect(LAND_COLOR_RGB).toEqual({ r: 0.34, g: 0.4, b: 0.24 });
+    // #783 튜닝: 올리브 (0.34,0.40,0.24) → 황토 (temperate 밴드 재문서화 — §A3.3 결정 3-b,
+    // DoD 2 적도>중위도 G-share 분리 마진 확보. SSoT 갱신 = 정상 경로).
+    expect(LAND_COLOR_RGB).toEqual({ r: 0.44, g: 0.38, b: 0.23 });
     expect(LAND_THRESHOLD_LO).toBe(0.48);
     expect(LAND_THRESHOLD_HI).toBe(0.62);
   });
@@ -473,5 +512,167 @@ describe('Amendment 2 (#782) — JS 미러 world normal 계약 (미러 식 불�
     const nightLum = luminance709(lightingShadeMirror(nightN, sunDir));
     expect(dayLum).toBeGreaterThan(termLum);
     expect(termLum).toBeGreaterThanOrEqual(nightLum);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Amendment 3 (#783) — 지구 극관 + biome 위도 색 변화 (ADR §A3.3 결정 3·4 + §A3.5).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('#783 극관 — 극 위도 ice 수렴 (landMask 양극단 — continents 무관, §A3.3 결정 4 B)', () => {
+  const EARTH_OCEAN: [number, number, number] = [0.23, 0.45, 0.6];
+  // §A3.5 DoD 1 near-white 산식 (/255 → [0,1] 정규화): min(R,G,B) ≥ 140/255 && max−min ≤ 40/255.
+  const NEAR_WHITE_MIN = 140 / 255;
+  const NEAR_WHITE_SPREAD = 40 / 255;
+  const isNearWhite = (rgb: readonly [number, number, number]): boolean =>
+    Math.min(...rgb) >= NEAR_WHITE_MIN && Math.max(...rgb) - Math.min(...rgb) <= NEAR_WHITE_SPREAD;
+
+  it('정확한 남북극 (p = [0,±1,0]) 에서 near-white 수렴 — jitter 최악 경우 포함', () => {
+    // 극점 latRaw=1, latJ = 1 + (continents−0.5)×0.12 ∈ [0.94, 1.06] — iceMask ≥ smoothstep(0.84,0.92,0.94)
+    // = 1.0 (포화) 로 어느 continents 값이든 (ocean/land 무관) near-white 에 수렴한다.
+    for (const pole of [1, -1] as const) {
+      const out = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, [0, pole, 0]);
+      expect(isNearWhite(out)).toBe(true);
+    }
+  });
+
+  it('근극 위도 (|sin lat| ≥ 0.995) 전 샘플 near-white — ocean/land(landMask 양극단) 모두', () => {
+    // 남북 각각 경도 스캔 — continents 값과 무관하게 (landMask 0/1 어느 쪽이든) 극관이 덮는다.
+    let north = 0;
+    let south = 0;
+    for (let i = 0; i < 64; i++) {
+      const th = (i / 64) * Math.PI * 2;
+      const rho = Math.sqrt(1 - 0.995 * 0.995);
+      for (const sign of [1, -1] as const) {
+        const p: [number, number, number] = [rho * Math.cos(th), sign * 0.995, rho * Math.sin(th)];
+        const out = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, p);
+        expect(isNearWhite(out)).toBe(true);
+        if (sign > 0) north++;
+        else south++;
+      }
+    }
+    expect(north).toBeGreaterThan(0);
+    expect(south).toBeGreaterThan(0);
+  });
+
+  it('중·저위도 (latJ ≤ ICE_LAT_LO) 는 iceMask = 0 — 극관이 해안선 전이를 침범하지 않음 (Q2 합의)', () => {
+    for (const p of spherePoints(2000)) {
+      const continents = fbmMirror(p[0] * 2.4, p[1] * 2.4, p[2] * 2.4);
+      const latJ = Math.abs(p[1]) + (continents - 0.5) * BIOME_LAT_JITTER;
+      if (latJ > ICE_LAT_LO) continue;
+      expect(smoothstepMirror(ICE_LAT_LO, ICE_LAT_HI, latJ)).toBe(0);
+    }
+  });
+});
+
+describe('#783 biome — 적도 vs 중위도 G-share 순서 (§A3.5 DoD 2 단위축)', () => {
+  const EARTH_OCEAN: [number, number, number] = [0.23, 0.45, 0.6];
+  const gShare = (rgb: readonly [number, number, number]): number =>
+    rgb[1] / Math.max(rgb[0] + rgb[1] + rgb[2], 1e-6);
+
+  it('full-land 픽셀: 적도 밴드 (|sin lat| ≤ 0.15) 평균 G-share > 중위도 밴드 (0.4–0.65)', () => {
+    const eq: number[] = [];
+    const mid: number[] = [];
+    for (const p of spherePoints(6000)) {
+      const continents = fbmMirror(p[0] * 2.4, p[1] * 2.4, p[2] * 2.4);
+      if (continents < LAND_THRESHOLD_HI) continue; // full land 만 (해안 전이 배제)
+      const absY = Math.abs(p[1]);
+      const out = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, p);
+      if (absY <= 0.15) eq.push(gShare(out));
+      else if (absY >= 0.4 && absY <= 0.65) mid.push(gShare(out));
+    }
+    // 통계 유의성 — 밴드당 표본 최소 확보 (스캔 커버리지 가드).
+    expect(eq.length).toBeGreaterThan(20);
+    expect(mid.length).toBeGreaterThan(20);
+    const mean = (a: number[]): number => a.reduce((s, v) => s + v, 0) / a.length;
+    expect(mean(eq)).toBeGreaterThan(mean(mid));
+  });
+
+  it('색 상수 제약: G-share(BIOME_TROPICAL) > G-share(LAND_COLOR=temperate) (§A3.3 결정 3-b)', () => {
+    const gs = (c: { r: number; g: number; b: number }): number => c.g / (c.r + c.g + c.b);
+    expect(gs(BIOME_TROPICAL_RGB)).toBeGreaterThan(gs(LAND_COLOR_RGB));
+  });
+});
+
+describe('#783 anti-pattern — 신규 색 G ≥ min(R,B) (보라/마젠타 구조 회피, §A3.5 DoD 3)', () => {
+  it('biome/극관 색 4종 전부 G ≥ min(R,B)', () => {
+    for (const c of [BIOME_TROPICAL_RGB, BIOME_TUNDRA_RGB, ICE_COLOR_RGB, LAND_COLOR_RGB]) {
+      expect(c.g).toBeGreaterThanOrEqual(Math.min(c.r, c.b));
+    }
+  });
+
+  it('rocky 미러 전 표면 샘플 G ≥ min(R,B) 위배 0 (mix 결과 포함 — DoD 3 미러축)', () => {
+    const EARTH_OCEAN: [number, number, number] = [0.23, 0.45, 0.6];
+    let violations = 0;
+    for (const p of spherePoints(4000)) {
+      const [r, g, b] = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, p);
+      if (g < Math.min(r, b) - 1e-6) violations++;
+    }
+    expect(violations).toBe(0);
+  });
+});
+
+describe('#783 상수 SSoT drift 가드 (#69 — 4중 SSoT: 상수/uniforms/바인딩/GLSL + 미러)', () => {
+  it('박제값 (sin-space 위도 임계 — 주석 각도 병기, drift 시 시각 회귀)', () => {
+    expect(BIOME_TROPICAL_RGB).toEqual({ r: 0.2, g: 0.38, b: 0.16 });
+    expect(BIOME_TUNDRA_RGB).toEqual({ r: 0.55, g: 0.56, b: 0.52 });
+    expect(ICE_COLOR_RGB).toEqual({ r: 0.93, g: 0.95, b: 0.96 });
+    expect(BIOME_TEMPERATE_LO).toBe(0.3);
+    expect(BIOME_TEMPERATE_HI).toBe(0.55);
+    expect(BIOME_TUNDRA_LO).toBe(0.72);
+    // #783 measurement-first 튜닝: 출발값 (TUNDRA_HI 0.88 / ICE 0.88·0.96) 은 ice ramp 가
+    // DoD 1 측정 밴드 (≥0.88) 전체와 겹쳐 실측 10.2% 미달 → 0.84/0.84·0.92 하향 (상수 주석 참조).
+    expect(BIOME_TUNDRA_HI).toBe(0.84);
+    expect(ICE_LAT_LO).toBe(0.84);
+    expect(ICE_LAT_HI).toBe(0.92);
+    expect(BIOME_LAT_JITTER).toBe(0.12);
+  });
+
+  it('위도 임계 순서 — 밴드 겹침 없이 순차 (tropical → temperate → tundra → ice, Q2 합의)', () => {
+    expect(BIOME_TEMPERATE_LO).toBeGreaterThan(0);
+    expect(BIOME_TEMPERATE_LO).toBeLessThan(BIOME_TEMPERATE_HI);
+    expect(BIOME_TEMPERATE_HI).toBeLessThanOrEqual(BIOME_TUNDRA_LO);
+    expect(BIOME_TUNDRA_LO).toBeLessThan(BIOME_TUNDRA_HI);
+    // 툰드라→극관 연속 전이 (이슈 "툰드라→극관 연결") — TUNDRA_HI 가 ICE_LAT_LO 와 맞닿음.
+    expect(BIOME_TUNDRA_HI).toBeLessThanOrEqual(ICE_LAT_LO);
+    expect(ICE_LAT_LO).toBeLessThan(ICE_LAT_HI);
+    expect(ICE_LAT_HI).toBeLessThanOrEqual(1);
+    // jitter 진폭 (±0.06 요동) 이 밴드 폭을 넘지 않는 합리 범위.
+    expect(BIOME_LAT_JITTER).toBeGreaterThan(0);
+    expect(BIOME_LAT_JITTER).toBeLessThan(0.25);
+  });
+
+  it('GLSL fragment 에 biome/극관 uniform 10종 선언 존재 (미러와 동기)', () => {
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform vec3 biomeTropicalColor');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform vec3 biomeTundraColor');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform vec3 iceColor');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float biomeTemperateLo');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float biomeTemperateHi');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float biomeTundraLo');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float biomeTundraHi');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float iceLatLo');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float iceLatHi');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float biomeLatJitter');
+  });
+
+  it('GLSL rocky 분기 식 계약 — §A3.3 결정 3 스케치 그대로 (fbm 신규 호출 0)', () => {
+    // 위도 파라미터 (sin-space) + 기존 continents 재사용 jitter.
+    expect(PLANET_FRAGMENT_SHADER).toContain('float latRaw = abs(p.y)');
+    expect(PLANET_FRAGMENT_SHADER).toContain('(continents - 0.5) * biomeLatJitter');
+    // 2 smoothstep 연쇄 biome mix → landMask mix → iceMask 최종 mix (합성 순서 계약).
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'mix(biomeTropicalColor, landColor, smoothstep(biomeTemperateLo, biomeTemperateHi, latJ))',
+    );
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'mix(landCol, biomeTundraColor, smoothstep(biomeTundraLo, biomeTundraHi, latJ))',
+    );
+    expect(PLANET_FRAGMENT_SHADER).toContain('smoothstep(iceLatLo, iceLatHi, latJ)');
+    expect(PLANET_FRAGMENT_SHADER).toContain('mix(col, iceColor, iceMask)');
+    // 핵심 예측 "noise +0" — rocky 분기의 fbm 호출은 continents 1회뿐 (결정 3-c 위반 가드).
+    const rockyBranch = PLANET_FRAGMENT_SHADER.slice(
+      PLANET_FRAGMENT_SHADER.indexOf('uSurfaceType == 0'),
+      PLANET_FRAGMENT_SHADER.indexOf('uSurfaceType == 1'),
+    );
+    expect((rockyBranch.match(/fbm\(/g) ?? []).length).toBe(1);
   });
 });

@@ -39,6 +39,15 @@
  *     (StandardMaterial + PointLight 2.5 + HemisphericLight ambient) 과 시각 일치 (밤면/terminator/극).
  *   - §A1.3 결정 4 (#775) — rocky 분기를 `mix(oceanColor, landColor, landMask)` 로 교체 (대륙 색 구분).
  *
+ * **Amendment 3 (#783) — 지구 극관 + biome 위도 색 변화** (ADR §Amendment 3):
+ *   - §A3.3 결정 3 — rocky 분기에 biome 3밴드 (적도 녹 → 중위도 황토 → 고위도 툰드라, 2 smoothstep
+ *     연쇄 mix) + 극관 (continents 무관 최종 mix — 결정 4 B). 위도 임계는 전부 **sin-space**
+ *     (`p.y = sin(위도)`, §A3.2-1). 경계 자연화 = 기존 `continents` fbm 재사용 (**추가 noise 샘플 0**
+ *     — 결정 3-c, fill-rate 보호). `landColor` 는 temperate 밴드 색으로 의미 재문서화 (Q3 합의).
+ *   - 극관도 albedo 단계에서만 — `col *= shade` 최종 곱 불변 (#773 규약, 밤면 극관은 어둡다).
+ *   - 자전 불변 (§A3.2-2): spin 은 local Y 축 회전이라 `abs(p.y)` 위도 밴드/극관은 자전해도 불변
+ *     (painted-on 정합 — 극관이 흔들릴 구조 자체가 없음).
+ *
  * ⚠️ **옵션 e 배선 계약 (drift 가드, Amendment 2)**: 본 광원 모델은 "vNormal = world normal (world
  *   matrix 변환) + uniform scaling" 에 의존한다. `world` uniform 이 uniforms 배열에서 빠지거나 VERTEX
  *   가 vNormal 을 local 로 되돌리면, 자전 시 명암이 표면과 함께 돌아버린다. onBind 의 dev-only 어서션이
@@ -163,17 +172,83 @@ export const SOFT_TERMINATOR_WIDTH = 0.12;
 /**
  * #775 — rocky 육지색 RGB (rendering-only 미학 상수, 데이터 SSoT 무관 — ADR §A1.3 결정 4 A).
  *
- * ocean 색 = base color (colorHint.hex, 데이터 SSoT read-only). land 색 = 본 상수. 올리브-브라운
+ * ocean 색 = base color (colorHint.hex, 데이터 SSoT read-only). land 색 = 본 상수. 황토-브라운
  * 자연 톤 (R/G 우세, B 결핍 — 보라/마젠타 anti-pattern 구조적 회피, #756 가드 정합). landMask 로
  * ocean↔land 색조(hue) mix → "바다만" 회귀 (밝기 변조만) 해소.
+ *
+ * ⚠️ **Amendment 3 (#783) 의미 재문서화 — temperate(중위도 황토·갈색) 밴드 색으로 사용됨**
+ * (cross-validate Q3 합의 — 신규 상수 대신 기존 landColor uniform 배선 재사용, drift 0). biome
+ * 3밴드 (BIOME_TROPICAL → 본 상수 → BIOME_TUNDRA) 의 중간 밴드다. 값도 #775 올리브
+ * (0.34, 0.40, 0.24) 에서 황토 방향으로 튜닝 (§A3.3 결정 3-b measurement-first — DoD 2 의
+ * 적도>중위도 G-share 분리 마진 확보). 제약: G-share 가 BIOME_TROPICAL_RGB 보다 작아야 한다
+ * (테스트 가드).
  */
-export const LAND_COLOR_RGB = { r: 0.34, g: 0.4, b: 0.24 } as const;
+export const LAND_COLOR_RGB = { r: 0.44, g: 0.38, b: 0.23 } as const;
 
 /** #775 — 대륙 mask smoothstep 하한 (continents fbm < LO → 100% ocean). */
 export const LAND_THRESHOLD_LO = 0.48;
 
 /** #775 — 대륙 mask smoothstep 상한 (continents fbm > HI → 100% land). LO~HI 사이 해안선 전이. */
 export const LAND_THRESHOLD_HI = 0.62;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Amendment 3 (#783) — 지구 극관 + biome 위도 색 rendering-only 미학 상수 SSoT (§A3.3 결정 3).
+//
+// 위도 임계는 전부 **sin-space** (fragment 의 p.y = sin(위도) — §A3.2-1, 정규화 위도 아님.
+// CreateSphere pole = local ±Y, 선형 위도가 아니라 60° 에서 0.866). 각 상수 주석에 대응 각도 병기.
+// 전 색상 G ≥ min(R,B) (보라/마젠타 anti-pattern 구조 회피 — 테스트 가드). 데이터 SSoT 무관
+// (solar-system.json 0 — rendering-only). 출발값은 ADR §A3.3 결정 3-b, 최종값 measurement-first.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * #783 — 적도 열대 밴드 색 (녹 우세 — 열대 숲).
+ * 제약: G-share (G/(R+G+B)) 가 temperate(LAND_COLOR_RGB) 보다 커야 한다 (§A3.5 DoD 2
+ * 밴드 구분 측정 가능성 — 테스트 가드).
+ */
+export const BIOME_TROPICAL_RGB = { r: 0.2, g: 0.38, b: 0.16 } as const;
+
+/**
+ * #783 — 고위도 툰드라 밴드 색 (회백). 극관과의 연속 전이를 위해 BIOME_TUNDRA_HI 가
+ * ICE_LAT_LO 와 맞닿는다 (이슈 "툰드라→극관 연결" — cross-validate Q2 합의 순차 임계).
+ */
+export const BIOME_TUNDRA_RGB = { r: 0.55, g: 0.56, b: 0.52 } as const;
+
+/** #783 — 극관 색 (근중성 백 — G ≥ min(R,B) 유지, B 단독 우세 아님). */
+export const ICE_COLOR_RGB = { r: 0.93, g: 0.95, b: 0.96 } as const;
+
+/** #783 — 열대→온대 전이 시작 (sin-space 0.30 ≈ 위도 17°). */
+export const BIOME_TEMPERATE_LO = 0.3;
+
+/** #783 — 열대→온대 전이 완료 (sin-space 0.55 ≈ 위도 33°). */
+export const BIOME_TEMPERATE_HI = 0.55;
+
+/** #783 — 온대→툰드라 전이 시작 (sin-space 0.72 ≈ 위도 46°). */
+export const BIOME_TUNDRA_LO = 0.72;
+
+/**
+ * #783 — 온대→툰드라 전이 완료 (sin-space 0.84 ≈ 위도 57° — ICE_LAT_LO 와 맞닿음).
+ * 출발값 0.88 → 0.84 하향 (measurement-first — 아래 ICE_LAT_LO 튜닝과 동조).
+ */
+export const BIOME_TUNDRA_HI = 0.84;
+
+/**
+ * #783 — 극관 전이 시작 (sin-space 0.84 ≈ 위도 57°).
+ * 출발값 0.88 → 0.84 하향 튜닝 (measurement-first, §A3.3 결정 3-b 재량): 출발값에서는 ice ramp
+ * (0.88→0.96) 가 DoD 1 측정 밴드 (|sin lat| ≥ 0.88) 전체와 겹쳐 밴드 대부분이 iceMask < 0.6
+ * (ocean cyan 혼합, near-white 스펙트럼 밖) — 실측 near-white 비율 10.2% 로 미달. 하향으로
+ * 밴드 안에서 ice 가 완성돼 흰 극관 시인 + DoD 1 충족. 실제 지구 빙설선 (~55–60°) 근사 유지.
+ */
+export const ICE_LAT_LO = 0.84;
+
+/** #783 — 극관 전이 완료 (sin-space 0.92 ≈ 위도 67°). 출발값 0.96 → 0.92 (동조 튜닝 — 위 참조). */
+export const ICE_LAT_HI = 0.92;
+
+/**
+ * #783 — biome 경계 요동 진폭. 기존 `continents` fbm 재사용 (§A3.3 결정 3-c — 추가 noise 샘플 0,
+ * fill-rate 보호). (fbm − 0.5) × 0.12 = 위도 ±0.06 요동. 상관 아티팩트 발현 시 좌표 스위즐링
+ * fbm(p.zyx) 승격 (§A3.7 재검토 조건 4 — 단 fbm 신규 호출 = hash 24회 추가 비용).
+ */
+export const BIOME_LAT_JITTER = 0.12;
 
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
@@ -274,11 +349,29 @@ uniform vec3 ambientUp;
 uniform float softTerminatorWidth;
 
 // Amendment 1 (#775) — 지구 대륙 mix uniform (rendering-only 미학 상수, scene 무관).
-//   landColor: 육지색 (올리브-브라운, R/G 우세 — 보라/마젠타 회피).
+//   landColor: 육지색 (황토-브라운, R/G 우세 — 보라/마젠타 회피). ⚠️ Amendment 3 (#783):
+//              temperate(중위도) 밴드 색으로 사용됨 (의미 재문서화 — cross-validate Q3 합의).
 //   landThresholdLo/Hi: continents fbm → landMask smoothstep 임계 (해안선 전이).
 uniform vec3 landColor;
 uniform float landThresholdLo;
 uniform float landThresholdHi;
+
+// Amendment 3 (#783) — 지구 biome/극관 uniform 블록 (rocky 전용, rendering-only 미학 상수 —
+// biome 상수 블록 그룹화, cross-validate 부분 수용 6). 위도 임계는 전부 sin-space (§A3.2-1
+// — p.y = sin(위도), 주석 각도는 상수 선언부 참조).
+//   biomeTropicalColor: 적도 열대 녹. biomeTundraColor: 고위도 툰드라 회백. iceColor: 극관 백.
+//   biomeTemperateLo/Hi · biomeTundraLo/Hi · iceLatLo/Hi: 위도 밴드 smoothstep 임계.
+//   biomeLatJitter: 경계 요동 진폭 (기존 continents fbm 재사용 — 추가 noise 0, §A3.3 결정 3-c).
+uniform vec3 biomeTropicalColor;
+uniform vec3 biomeTundraColor;
+uniform vec3 iceColor;
+uniform float biomeTemperateLo;
+uniform float biomeTemperateHi;
+uniform float biomeTundraLo;
+uniform float biomeTundraHi;
+uniform float iceLatLo;
+uniform float iceLatHi;
+uniform float biomeLatJitter;
 
 // 3D hash — sin-free fract-mix (starfield.ts hash33 답습 — swiftshader/tier-c fps 보호).
 vec3 hash33(vec3 p) {
@@ -340,12 +433,21 @@ void main(void) {
 
   // #756 §결정 2 — 표면 타입별 절차 변조 (if-else 분기만). 같은 draw = 같은 타입 (divergence 0).
   if (uSurfaceType == 0) {
-    // ── rocky (지구) — 대륙↔해양 색 mix (Amendment 1 #775) ──────────────────
-    // continents fbm → landMask. ocean = baseColor (실측 청록), land = landColor (올리브-브라운).
-    // 밝기 변조만 (col=base*(1+mod)) 하던 #756 → 색조(hue) mix 로 "바다만" 회귀 해소.
+    // ── rocky (지구) — 대륙↔해양 mix (#775) + biome 위도 색 + 극관 (Amendment 3 #783) ──
+    // continents fbm → landMask. ocean = baseColor (실측 청록, read-only 규약).
     float continents = fbm(p * 2.4);
     float landMask = smoothstep(landThresholdLo, landThresholdHi, continents);
-    col = mix(baseColor, landColor, landMask);
+    // Amendment 3 (#783) §A3.3 결정 3 — 위도 파라미터 (sin-space: p.y = sin(위도), §A3.2-1).
+    float latRaw = abs(p.y);                                        // |sin(위도)| — 남북 대칭
+    float latJ = latRaw + (continents - 0.5) * biomeLatJitter;      // 경계 자연화 — 기존 fbm 재사용 (추가 noise 0)
+    // 대륙색: 적도 녹색 → 중위도 황토·갈색 (landColor=temperate) → 고위도 툰드라 회백 (2 smoothstep 연쇄 mix)
+    vec3 landCol = mix(biomeTropicalColor, landColor, smoothstep(biomeTemperateLo, biomeTemperateHi, latJ));
+    landCol = mix(landCol, biomeTundraColor, smoothstep(biomeTundraLo, biomeTundraHi, latJ));
+    col = mix(baseColor, landCol, landMask);                        // #775 해안선 전이 유지 (ocean = baseColor 불변)
+    // 극관 — continents 무관 (§A3.3 결정 4 B: 북극 해빙 + 남극 빙상 둘 다 흰색), ocean/land 공통
+    // 최종 mix. albedo 단계에서만 결정 — 아래 col *= shade 최종 곱 불변 (#773 규약, 밤면 극관은 어둡다).
+    float iceMask = smoothstep(iceLatLo, iceLatHi, latJ);
+    col = mix(col, iceColor, iceMask);
   } else if (uSurfaceType == 1) {
     // ── desert (화성) — dust/협곡 결 (fbm) + 산화철 톤 ─────────────────────
     float detail = fbm(p * 3.6);
@@ -527,6 +629,17 @@ export function createProceduralPlanetMaterial(
         'landColor',
         'landThresholdLo',
         'landThresholdHi',
+        // Amendment 3 (#783) — 지구 biome/극관 uniform 블록 (rocky 전용, +10 — vec3 3 + float 7).
+        'biomeTropicalColor',
+        'biomeTundraColor',
+        'iceColor',
+        'biomeTemperateLo',
+        'biomeTemperateHi',
+        'biomeTundraLo',
+        'biomeTundraHi',
+        'iceLatLo',
+        'iceLatHi',
+        'biomeLatJitter',
       ],
     },
   );
@@ -562,9 +675,31 @@ export function createProceduralPlanetMaterial(
   material.setFloat('softTerminatorWidth', SOFT_TERMINATOR_WIDTH);
 
   // Amendment 1 (#775) — 대륙 mix 미학 상수 uniform (rendering-only).
+  // ⚠️ Amendment 3 (#783): landColor 는 temperate(중위도 황토·갈색) 밴드 색으로 사용된다
+  // (의미 재문서화 — 상수 선언부와 본 바인딩 계층 양쪽 주석 가드, cross-validate Q3 합의).
   material.setColor3('landColor', new Color3(LAND_COLOR_RGB.r, LAND_COLOR_RGB.g, LAND_COLOR_RGB.b));
   material.setFloat('landThresholdLo', LAND_THRESHOLD_LO);
   material.setFloat('landThresholdHi', LAND_THRESHOLD_HI);
+
+  // Amendment 3 (#783) — 지구 biome/극관 미학 상수 uniform 블록 (rocky 전용, rendering-only —
+  // biome 상수 블록 그룹화, cross-validate 부분 수용 6). 4중 SSoT: 상수 → uniforms 배열 →
+  // 본 바인딩 → GLSL 선언 (+ JS 미러 동기 — 한쪽 수정 시 전부 동기화 의무, 테스트 가드).
+  material.setColor3(
+    'biomeTropicalColor',
+    new Color3(BIOME_TROPICAL_RGB.r, BIOME_TROPICAL_RGB.g, BIOME_TROPICAL_RGB.b),
+  );
+  material.setColor3(
+    'biomeTundraColor',
+    new Color3(BIOME_TUNDRA_RGB.r, BIOME_TUNDRA_RGB.g, BIOME_TUNDRA_RGB.b),
+  );
+  material.setColor3('iceColor', new Color3(ICE_COLOR_RGB.r, ICE_COLOR_RGB.g, ICE_COLOR_RGB.b));
+  material.setFloat('biomeTemperateLo', BIOME_TEMPERATE_LO);
+  material.setFloat('biomeTemperateHi', BIOME_TEMPERATE_HI);
+  material.setFloat('biomeTundraLo', BIOME_TUNDRA_LO);
+  material.setFloat('biomeTundraHi', BIOME_TUNDRA_HI);
+  material.setFloat('iceLatLo', ICE_LAT_LO);
+  material.setFloat('iceLatHi', ICE_LAT_HI);
+  material.setFloat('biomeLatJitter', BIOME_LAT_JITTER);
 
   // Amendment 1 (#773) §A1.3 결정 1 — 태양 방향 uniform.
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.
@@ -701,17 +836,35 @@ export function surfaceColorMirror(
   const [px, py, pz] = p;
 
   if (surfaceType === SurfaceType.Rocky) {
-    // Amendment 1 (#775) — 대륙↔해양 색 mix (밝기 변조 → 색조 mix). GLSL rocky 분기와 동일 식.
+    // Amendment 1 (#775) 대륙↔해양 mix + Amendment 3 (#783) biome 위도 색·극관.
+    // GLSL rocky 분기와 동일 식 (§A3.3 결정 3 — 한쪽 수정 시 양쪽 동기화 의무).
+    const sm = (e0: number, e1: number, x: number): number => {
+      const t = Math.min(Math.max((x - e0) / Math.max(e1 - e0, 1e-6), 0), 1);
+      return t * t * (3 - 2 * t);
+    };
+    const mix = (a: number, b2: number, t: number): number => a + (b2 - a) * t;
     const continents = fbmMirror(px * 2.4, py * 2.4, pz * 2.4);
-    const t =
-      (continents - LAND_THRESHOLD_LO) / Math.max(LAND_THRESHOLD_HI - LAND_THRESHOLD_LO, 1e-6);
-    const landMask = (() => {
-      const c = Math.min(Math.max(t, 0), 1);
-      return c * c * (3 - 2 * c);
-    })();
-    r = bx + (LAND_COLOR_RGB.r - bx) * landMask;
-    g = by + (LAND_COLOR_RGB.g - by) * landMask;
-    b = bz + (LAND_COLOR_RGB.b - bz) * landMask;
+    const landMask = sm(LAND_THRESHOLD_LO, LAND_THRESHOLD_HI, continents);
+    // 위도 파라미터 (sin-space) — 경계 자연화는 기존 continents fbm 재사용 (추가 noise 0).
+    const latRaw = Math.abs(py);
+    const latJ = latRaw + (continents - 0.5) * BIOME_LAT_JITTER;
+    // 대륙색: 적도 녹 → 중위도 황토 (LAND_COLOR_RGB=temperate) → 고위도 툰드라 (2 smoothstep 연쇄).
+    const temperateMix = sm(BIOME_TEMPERATE_LO, BIOME_TEMPERATE_HI, latJ);
+    const tundraMix = sm(BIOME_TUNDRA_LO, BIOME_TUNDRA_HI, latJ);
+    let lr = mix(BIOME_TROPICAL_RGB.r, LAND_COLOR_RGB.r, temperateMix);
+    let lg = mix(BIOME_TROPICAL_RGB.g, LAND_COLOR_RGB.g, temperateMix);
+    let lb = mix(BIOME_TROPICAL_RGB.b, LAND_COLOR_RGB.b, temperateMix);
+    lr = mix(lr, BIOME_TUNDRA_RGB.r, tundraMix);
+    lg = mix(lg, BIOME_TUNDRA_RGB.g, tundraMix);
+    lb = mix(lb, BIOME_TUNDRA_RGB.b, tundraMix);
+    r = mix(bx, lr, landMask);
+    g = mix(by, lg, landMask);
+    b = mix(bz, lb, landMask);
+    // 극관 — continents 무관, ocean/land 공통 최종 mix (§A3.3 결정 4 B).
+    const iceMask = sm(ICE_LAT_LO, ICE_LAT_HI, latJ);
+    r = mix(r, ICE_COLOR_RGB.r, iceMask);
+    g = mix(g, ICE_COLOR_RGB.g, iceMask);
+    b = mix(b, ICE_COLOR_RGB.b, iceMask);
   } else if (surfaceType === SurfaceType.Desert) {
     const detail = fbmMirror(px * 3.6, py * 3.6, pz * 3.6);
     const mod = (detail - 0.5) * 2 * DESERT_DETAIL;
