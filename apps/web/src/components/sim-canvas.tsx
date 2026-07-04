@@ -457,7 +457,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           starfield: starfieldVisible,
           // #756 — 절차적 행성 표면. 기본 ON 은 parseSurfaceVisible 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR 20260628-756 §결정 4 레이어 분리).
-          surfaceDetail: surfaceVisible && false, // #759 P2 negative 시뮬레이션 — 즉시 revert 예정 (머지 금지)
+          surfaceDetail: surfaceVisible,
           // #782 — 행성 self-rotation. 기본 ON 은 parseRotateEnabled 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR §A2.3 결정 7 레이어 분리, surfaceDetail 동형).
           selfRotation: rotateEnabled,
