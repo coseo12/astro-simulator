@@ -1,6 +1,6 @@
 # ADR 20260705-759 — 표면 셰이더 verify 6종 CI 상시 가드 (shader-pixel-guard workflow)
 
-- 상태: **Provisional** (cross-validate 발동 대상 — CLAUDE.md `## 교차검증` 박제 직후 1회 루틴. 메인 오케스트레이터가 agy cross-validate 수행 + §교차검증 반영 사항 통합 후 Accepted 전이 — #370 옵션 C)
+- 상태: **Accepted** (cross-validate agy 2026-07-05 — §교차검증 반영 사항 통합)
 - 날짜: 2026-07-05
 - 이슈: [#759](https://github.com/coseo12/astro-simulator/issues/759)
 - 관련: #756 (표면 셰이더 — ADR [20260628-756](20260628-756-procedural-planet-surface.md) §결정 3 tier-c 자동 단색 / §A2 결정 7 r1-guard canvas 미측정), #762/#773/#774/#782/#783 (셰이더 feature 트랙), #779 (flake step-retry / fresh-runner escalation — ADR [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md)), #728 (WebGPU readback 함정 SSoT), #626 (paths-ignore docs skip), #793 (산출물 수명주기 규약 — 합류 지점), PR #796 reviewer 권고 4 (783 diffDirs exitCode)
@@ -77,7 +77,7 @@
 
 1. **신규 프로젝트-로컬 workflow `.github/workflows/shader-pixel-guard.yml`** (후보 d)
    - 트리거: `pull_request`/`push` (develop, main) + `paths-ignore: ['**/*.md', 'docs/**', '.github/**']` (fps-baseline-guard 동일 — 단 자기 자신 `.yml` 변경 시 실행되도록 `.github/**` 제외 여부는 dev 가 fps 선례 그대로 답습) + concurrency group (#779 sha 기준)
-   - 단일 job: setup (fps-guard measure job 과 동일 구간 — checkout/pnpm/node `.node-version` 핀/rust/wasm-pack/playwright 캐시) → `pnpm build` → **dev server 1회 기동 (단일 포트)** → **6 스크립트 직렬 실행, 각각 exit code 전파 (fail-fast)** → 실패 시 캡처/JSON artifact 업로드. `timeout-minutes: 30`
+   - 단일 job: setup (fps-guard measure job 과 동일 구간 — checkout/pnpm/node `.node-version` 핀/rust/wasm-pack/playwright 캐시) → `pnpm build` → **dev server 1회 기동 (단일 포트)** → **6 스크립트 직렬 실행, 각각 exit code 전파 (fail-fast)** → 실패 시 캡처/JSON artifact 업로드 (`retention-days: 7` — cross-validate 수용). `timeout-minutes: 40` (cross-validate 부분 수용 — CI 계수가 2~3× 추정을 초과할 가능성 대비 완충. P1 예측 ≤25분은 유지, D1 실측이 확정하며 30분 초과 실측 시 재검토 트리거 2항 발동)
    - 호출 규약: `HEADFUL=0` (756/773/774/782/783) / `--headless` (762) + `BASE_URL` 주입. CI 에 chrome channel 없음 → headless chromium 폴백 경로가 아닌 **명시적 headless** 로 결정적 실행
 2. **스크립트 정비 (최소 수정 원칙 + CI 적합화만)**
    - 4종 untracked 커밋 (756/762/773/774) + `apps/web/package.json` 에 `verify:756-surface / 762-monotonic / 773-light / 774-sun / 782-rotation / 783-earth-detail` 6종 등록 (위치 표준 `apps/web/scripts/` 이미 충족 — #793 잔여와 분리)
@@ -88,7 +88,7 @@
    - 773: 4 body `dayMean > nightMean × 2` (실측 최소 saturn 2.14×) + `contrastMean(ON) > contrastMean(OFF)` (moon 포함 4/4 성립 실측) + `purplePct == 0`. **hfEntropy ON>OFF 는 moon 역전 실측으로 판정 축에서 제외** (실측 §3)
 4. **비목표**
    - 픽셀 baseline 스냅샷 확장 (r1-guard 와 책임 분리 — r1 = UI 영역 diff, 본 가드 = canvas 성질)
-   - 기존 detect-and-test 12 가드 재배치 / setup 구간 composite action 추출 (3번째 복제 발생 — ADR 20260701-779 §A1 재검토 7 "첫 drift 발견 시 착수" 트리거 유지, 후속 이슈로만 기록)
+   - 기존 detect-and-test 12 가드 재배치 / setup 구간 composite action 추출 — **후속 이슈 [#802](https://github.com/coseo12/astro-simulator/issues/802) 분리** (rule-of-three 도달 — cross-validate 재권고 2회차 수용하되 본 PR 검증 표면 최소화 원칙으로 분리, 선행 조건 = 본 건 머지)
    - `docs/reports/` 산출물 처분 규약 (#793 범위)
 
 ## 결과·재검토 조건
@@ -111,11 +111,17 @@
 - setup 구간 3중 복제에서 첫 drift 발견 → composite action 추출 착수 (ADR 20260701-779 §A1 재검토 7)
 - 신규 셰이더 feature (R-Phase 확장) 추가 시 → 해당 verify 를 본 workflow 에 등록하는 것을 feature DoD 에 포함 (로컬 전용 verify 재누적 차단)
 
-## 교차검증 반영 사항
+## 교차검증 반영 사항 (agy 2026-07-05 — 로그 `.claude/logs/cross-validate-architecture-759.log`)
 
-> Provisional — 메인 오케스트레이터가 cross-validate (agy) 수행 후 본 섹션에 4축 분류 (합의 / 이견 수용 / 기각 / 고유 발견 후속 분리) + Claude 편향 셀프 체크를 통합하고 Accepted 로 전이한다.
+**합의 (이미 반영 확인)**: Q1 moon 처리 — agy 권고 "엔트로피 축만 제외 + 대비/보라 축으로 대체 가드" 는 결정 3 의 773 판정 규약과 **동일** (역전 축 제외 = 명시 박제된 의식적 축소, 대비·purple 축이 moon 커버 유지 — 가드 약화 아님). 756 의 moon 얇은 마진 (1.24×, 갭 0.415) 은 가산 마진 0.15 대비 2.7× 여유 + D1 CI 실측 확정 규약으로 충분. 상대 성질 판정/paths-ignore/별도 workflow 채택 지지. WebGPU 경로 공백 지적은 재검토 트리거 3항에 기박제 (합의 재확인 — 로컬 qa 실 Chrome WebGPU 가 feature 단위 보완).
 
-- **호출 전 Claude 편향 셀프 체크 (architect 선행 기록)**: 4종 중 **낙관적 일정** (CI 계수 2~3× 추정이 낙관일 수 있음 — P1 로 실측 가드) + **결합 간과** (swiftshader 로컬 근사 ≠ CI runner 실측 — DoD 에 CI 실측 단계 분리로 보정) 2축 의심 → cross-validate 프롬프트에 명시 질문 삽입 권장
+**부분 수용**: (1) **Q2 시간 예산** — CI 계수 5~8× 가능성 경고 수용: `timeout-minutes` 30→**40** 완충 (조기 timeout noise 방지). P1 ≤25분 예측은 유지 — D1 실측 확정, 30분 초과 시 재검토 2항 (2-job 분할) 발동. (2) **artifact `retention-days: 7`** — 스토리지 누적 방지 (결정 1 반영). (3) **로컬 swiftshader 재현 커맨드** — architect 실측 방식 (`--use-angle=swiftshader`) 을 developer 가 스크립트 env 또는 README 스니펫으로 문서화 (CI 실패 재현 경로). (4) **스크립트 간 실패 격리** — dev server 단일 기동 구조에서 개별 스크립트 비정상 종료 시 잔존 브라우저 정리 (trap) — developer 지시 반영.
+
+**기각 (근거)**: (1) **retry `retries:1` 선주입** — agy 자신이 #779 A1 cross-validate 에서 "flake 미증명 가드에 선제 지연 주입 = 오진 확률 확대, 이력 기반 동적 옵트인이 원칙" 이라 판정한 것과 정면 모순. 축 3 결정 유지 (fail-fast 시작, flake 실측 1회 시 #779 편입). (2) **shadow phase (`continue-on-error` 3~5일)** — continue-on-error 금지 원칙 (silent 약화) + 본 workflow 는 `pull_request` 트리거라 **머지 전 PR 단계에서 실 CI 실측·rerun (P3)·마진 확정 (D1) 이 전부 가능** — 사후 shadow 가 불필요한 구조. (3) **`?gpu=a` dev-환경 게이팅** — 전제 부재: P11-C #290 부터 존재하는 사용자 노출 디버그 플래그의 재사용이며 본 ADR 이 신규 도입하는 것이 아님. 게이팅은 기존 디버그 도구 회귀 + scope 밖 (강제 시 저사양 기기 느려짐은 현재도 동일 — OOM 크래시 주장은 근거 미제시).
+
+**고유 발견 (후속 분리)**: composite action 추출 (3번째 복제 = rule-of-three) → **이슈 #802 즉시 생성** (선행: 본 건 머지. agy 동일 권고 2회 누적으로 "첫 drift 대기" 에서 승격하되 본 PR 과는 분리 — 검증 표면 최소화).
+
+**Claude 편향 셀프 체크 결과**: 낙관적 일정 (의심 축) — agy 가 5~8× 반례 제시 → timeout 완충 + D1 실측 규약으로 해소. 결합 간과 (의심 축) — swiftshader 로컬 근사 ≠ CI 실측 갭은 pull_request 트리거 구조상 머지 전 실측으로 닫힘 확인. 나머지 2종 통과.
 
 ## 참고
 
