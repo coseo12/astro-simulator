@@ -1,6 +1,7 @@
 # ADR 20260701-779 — CI 알림 alert fatigue 완화 (이중 트리거 concurrency + flake 안정화)
 
 - 상태: **Accepted** (cross-validate 2026-07-01 — agy, §교차검증 반영 사항 4축 박제 완료. group 식은 sha 유지 + Phase 1 branch-cross 가드 브랜치 무관성 실측 의무)
+  - **§Amendment 1 (Phase 2/3 구체 설계): Accepted** (cross-validate 2026-07-04 — agy, §A1 교차검증 반영 사항 통합)
 - 날짜: 2026-07-01
 - 이슈: [#779](https://github.com/coseo12/astro-simulator/issues/779)
 - 관련: #766 (alert fatigue 개념 — Z 패턴 health), #728 (step retry vs job rerun), #709 (fps retry 도입), #626 (paths-ignore docs skip), ADR [20260421-workflows-responsibility-split](20260421-workflows-responsibility-split.md) (frozen vs user-owned 경계)
@@ -254,3 +255,130 @@ developer 가 run history 로 flake 이력 실측 → flake-prone 가드(verify:
 - **확증 편향**(저비용 1순위 결론 정당화?): run history 15 run 실측 + branch protection 404 실측 기반. agy 이견(matrix)도 §재검토로 반영. **통과**
 
 #### 결론: 조건부 통과 → group 식(sha) 유지 + Phase 1 branch-cross 가드 브랜치 무관성 실측 의무 추가 후 Accepted
+
+---
+
+## Amendment 1 (2026-07-04) — Phase 2/3 구체 설계 확정 (상태: Accepted — cross-validate 2026-07-04)
+
+> Phase 1 (concurrency, v0.41.0) 안정화 실측 완료 후 Phase 2/3 착수 설계. 결정 2 는 **선별 결과 정정**, 결정 3 은 **메커니즘 개정** (workflow_run rerun → 동일 워크플로 2-job escalation). 개정이므로 cross-validate 발동 대상 — 통합 전까지 Provisional.
+
+### A1 배경 — Phase 1 이후 flake 반복 비용 실측 (measurement-first)
+
+| 릴리스          | flake 지점                                  | 처리       |
+| --------------- | ------------------------------------------- | ---------- |
+| v0.39.0         | verify:699 deltaTime (detect-and-test)      | 수동 rerun |
+| v0.40.0         | fps 부하 spike                              | 수동 rerun |
+| v0.43.0 prep    | verify:699 deltaTime (**16m 실행 후** fail) | 수동 rerun |
+| v0.43.0 release | fps 부하 spike (5m fail)                    | 수동 rerun |
+| v0.44.0         | flake 0 (한 번에 그린)                      | —          |
+
+거의 매 릴리스 1~2회 수동 개입 고정 비용. #709 진단 확립 사실: 정상 run cv 0~3.8%, fail = **전역 부하 spike** (scenario-내 noise 아님) → same-runner step retry 는 지속 부하에 무력 (설계 시점 예견이 v0.40.0/v0.43.0 에서 재확인).
+
+### A1 결정 2 정정 — Phase 2 retry 대상은 verify:699 단독
+
+원 결정 2 의 후보 "verify:699, r1-guard 등" 을 run history 실측으로 확정:
+
+- **verify:699 — 적용** (flake 2회: v0.39.0 / v0.43.0 prep). S3b 가 100ms vs 200ms hold 이동 비율 ≈2.0 을 단언하는 부하 민감 타이밍 측정.
+- **r1-guard — 미적용**. flake 원천은 #606 Playwright install extract deadlock 이었고 Node 22 핀(#663/#666) + 바이너리 캐시(#684) 로 해소. v0.39.0~v0.44.0 창에서 verify 단계 flake 0 → 결정적 가드로 분류.
+- 나머지 8종 (verify:378/408/627/629/631/675/693/704) — flake 이력 0, retry 미적용 (원 결정 2 "결정적 가드 retry 금지 — 진짜 fail 2배 지연" 유지).
+
+**방식**: `ci.yml` verify:699 step 내부에서 dev server 는 유지한 채 guard 스크립트 호출만 `for attempt in 1 2` + 실패 시 `sleep 15` (#709 동일 패턴). 2연속 fail = step fail (fail-fast). flake 원인이 runner 전역 부하이므로 server 재기동 불요 — 단 §A1 재검토 1 참조.
+
+**agy 고유 발견 (Playwright retries 옵션 대안) 비교 의무 이행**: `browser-verify-699-freefly-unified.mjs` / `verify-fps-baseline.mjs` 모두 `import { chromium } from 'playwright'` 인 plain node 스크립트 (`@playwright/test` runner 아님) → 도구 내부 `retries` 옵션 부재 → shell for-loop 가 유일 경로 (실측 확인).
+
+**기각 재확인**: (b) 분리 job — non-blocking 은 원 ADR 기각 유지 + blocking 분리 job 도 wasm/Playwright/build setup ~10분 중복으로 가드 1종 대비 비용 과잉. (c) S3b 측정 강건화 — verify:699 전용 variance 진단 데이터 부재 상태의 선행 착수는 오진 위험 (CLAUDE.md 스프린트 계약 §10 "측정 방법 검증 우선" — 진단이 먼저). §A1 재검토 1 로 이연.
+
+### A1 결정 3 개정 — fps 새 머신 rerun 은 (B) workflow_run 이 아니라 (B') 동일 워크플로 2-job escalation
+
+| 축              | (B) workflow_run + `gh run rerun --failed`                                                                     | **(B') 2-job fresh-runner escalation (채택)**                                                                               | (C) margin 재검토                                                                        |
+| --------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 메일 (핵심)     | attempt 1 이 conclusion=`failure` 로 **확정된 후** 트리거 → **fail 메일 1통 구조적 잔존** (노이즈 0 목표 미달) | flake 시 workflow conclusion=`success` → **메일 0**. 진짜 회귀만 최종 failure 메일                                          | —                                                                                        |
+| 검증 가능 시점  | workflow_run 은 default branch 반영 후에만 발화 — PR 단계 실검증 **불가** (2단계 함정 전면)                    | pull_request run 이 **PR 의 워크플로 파일을 사용** → PR 단계 실검증 가능. dispatch `--ref` 경로도 기존 등록(#663) 활용 가능 | —                                                                                        |
+| 무한 rerun 방지 | `run_attempt` 상한 체크 코드 필요                                                                              | **구조적 불가** (job 2개 고정 — 상한이 토폴로지에 내장)                                                                     | —                                                                                        |
+| 권한/보안       | `GITHUB_TOKEN: actions: write` + Run ID 엄격 한정 (원 §고유 발견 DoD)                                          | 추가 권한 **불필요** — 원 §고유 발견의 보안 DoD 는 대상 소멸 (supersede, cross-validate 라운드에서 재확인 예정)             | —                                                                                        |
+| 새 머신 여부    | rerun = 새 runner ✓                                                                                            | job B = 새 runner ✓ (GitHub hosted job 은 job 단위 fresh VM)                                                                | ✗ (머신 무관)                                                                            |
+| 평가            | **기각** — 메일 잔존이 결정타                                                                                  | **채택**                                                                                                                    | **기각** — cv 0~3.8% 정상 대비 spike 는 35~47% 하락. margin 은 원인과 무관 (silent 약화) |
+
+**구조 스케치** (`fps-baseline-guard.yml`):
+
+```yaml
+jobs:
+  measure: # 기존 job — guard step 만 soft-fail 화
+    timeout-minutes: 25
+    outputs:
+      guard_outcome: ${{ steps.guard.outcome }}
+    steps:
+      # ... 기존 setup 동일 (checkout/pnpm/node/rust/wasm-pack/playwright cache/build/dev server) ...
+      - id: guard
+        continue-on-error: true # step-level — outcome=failure 보존, job 은 success
+        run: | # 기존 #709 for attempt in 1 2 루프 그대로
+      - if: steps.guard.outcome == 'failure'
+        run: echo "::warning::fps 측정 실패 — fresh-runner escalation job 으로 이관"
+      # 회귀 보고서 업로드 step 의 if 를 failure() → steps.guard.outcome == 'failure' 로 교체
+      #   (continue-on-error 로 job failure() 가 false 가 되므로 — 필수 배선)
+  retry-fresh-runner:
+    needs: measure
+    if: needs.measure.outputs.guard_outcome == 'failure'
+    timeout-minutes: 25
+    steps:
+      # measure 와 동일 setup 복제 (⚠ 주석 마커로 동기 유지 — YAML anchor 미지원)
+      # 측정 step 은 hard-fail (continue-on-error 없음) → 여기서 fail = workflow failure = 메일
+```
+
+**동작 매트릭스** (fail-fast 정합 증명):
+
+| 시나리오          | job A (머신 1)            | job B (머신 2)                    | workflow conclusion | 메일                        |
+| ----------------- | ------------------------- | --------------------------------- | ------------------- | --------------------------- |
+| 정상              | guard pass                | skipped (`guard_outcome≠failure`) | success             | 0                           |
+| 부하 spike flake  | guard 2회 fail (soft)     | pass                              | **success**         | **0**                       |
+| 진짜 회귀         | guard 2회 fail (soft)     | **2회 fail (hard)**               | **failure**         | 1 (최종 실패만)             |
+| setup 결정적 실패 | guard 이전 step hard fail | skipped (needs failure)           | failure             | 1 (즉시 — 낭비 재시도 없음) |
+| diagnose dispatch | guard step skipped        | skipped (`outcome=skipped`)       | 진단 결과대로       | —                           |
+
+**continue-on-error 금지 원칙과의 정합 (CRITICAL)**: 원 ADR 이 기각한 것은 _non-blocking_ continue-on-error (= fail 무시, silent skip) 다. (B') 는 step-level soft-fail 을 **필수 blocking escalation job** 으로 라우팅 — fail 은 무시되지 않고 새 머신 재검증으로 승격되며, 진짜 회귀는 2 머신 × 2 attempt = 4회 전부 fail 해야만 그린이 될 수 없다 (은폐 불가). 가드 약화 아님 — [guard-design-principles.md](../lessons/guard-design-principles.md) §3 fail-fast 유지.
+
+**부수 결정 — `simulate` dispatch input (test hook)**: workflow_dispatch 에 `simulate: none|flake|regression` choice input 추가 (기본 none, #709 `diagnose_variance` 선례). `flake` = job A guard 강제 fail + job B 정상 → recovery 실증. `regression` = 양 job 강제 fail → negative 실증. dispatch `--ref feature/*` 가 ref 브랜치 워크플로 정의를 따르므로 (#709 실측 박제) **머지 전 PR 단계에서 3중 시뮬레이션이 결정적으로 가능**. 잔존 위험 (수동 오발사 시 red run 1회) 은 default none + 수동 전용으로 수용.
+
+### A1 축 4 종결 — 알림 정책 별도 조치 불필요 확정
+
+GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry 로 job 성공 유지) + Phase 3 (flake 시 escalation 흡수로 workflow 성공) → **"최종 실패만 메일" 이 워크플로 구조만으로 완성**. 별도 알림 코드/설정 0. — (B) 를 채택했다면 attempt 1 메일이 잔존해 이 축이 미완이었음 (기각 근거와 표리).
+
+### A1 Concrete Prediction (무침범 예측 — `git diff --stat` 실측 재현 의무)
+
+- `.github/workflows/ci.yml` — verify:699 step **내부만** 수정 (+15줄 내외). 다른 가드 step / job 구조 0줄
+- `.github/workflows/fps-baseline-guard.yml` — 1 job → 2 job 재편 (+80~95줄: setup 복제 ~55 + simulate input ~12 + escalation 배선 ~15)
+- **앱/가드 스크립트 무침범**: `apps/**`, `packages/**`, `scripts/verify-fps-baseline.mjs`, `apps/web/scripts/browser-verify-*.mjs` **0줄** (워크플로 지휘부만 변경, 측정 로직 불변 = 가드 본질 보존의 구조적 증거)
+- 예측 실패 (측정 스크립트 수정 필요 발생) 시 = simulate hook 설계 결함 신호 → 본 Amendment 재검토
+
+### A1 DoD — PR 단계 vs 머지 후 실측 분리 (workflow_dispatch 2단계 함정 대응)
+
+**PR 단계 (머지 전 검증 가능)**:
+
+- [ ] Phase 2 retry 루프 3중 시뮬레이션 — 로컬 stub 스크립트로 positive (1회차 pass→즉시 exit 0) / negative (2연속 fail→exit 1) / recovery (1차 fail→2차 pass→exit 0) 결정적 재현 (#709 선례)
+- [ ] PR 자체의 detect-and-test run 이 수정된 verify:699 step 으로 그린 (ci.yml 은 paths filter 없음 → PR 단계 실행 보장)
+- [ ] Phase 3 — `gh workflow run fps-baseline-guard.yml --ref feature/*` dispatch 3회: `simulate=none` (A pass + B skipped) / `flake` (A soft-fail → B pass → conclusion=success, **메일 0**) / `regression` (양 job fail → conclusion=failure, 메일 정확 1통). run link 3개 PR 박제
+  - 주의: fps 워크플로는 `paths-ignore: '.github/**'` 라 워크플로만 바꾼 PR 에서 pull_request 트리거 자체가 발화 안 함 → dispatch `--ref` 가 PR 단계 유일 실검증 경로 (설계에 반영됨)
+- [ ] setup 복제 구간 동기 주석 마커 (`⚠ measure job 과 동기 유지`) 양쪽 박제
+- [ ] 가드 도입 PR DoD 4축 명시 — 축 1(격리 동적)=stub 시뮬레이션+dispatch, 축 2(3중)=simulate 3종, 축 3(5 페르소나 self-consistency)=N/A (판정이 exit code 결정적 — verify-\*.sh 텍스트 매칭 가드 아님) 사유 박제, 축 4(메타 자기 적용)=N/A 사유 박제
+
+**머지 후 실측 의무 (후속 관찰 — 이슈 #779 에 박제 후 종결)**:
+
+- [ ] push 트리거 (develop push) 경로에서 2-job 구조 정상 1회 (PR 단계는 dispatch/pull_request 경로만 실측됨)
+- [ ] 다음 자연 flake 발생 시: verify:699 attempt 2 흡수 warning annotation 또는 fps A-fail→B-pass→메일 0 실측 박제 (현 빈도 릴리스당 1~2회 → 대기 짧음)
+- [ ] 릴리스 2회 창에서 수동 rerun 횟수 0 (baseline: 4/4 릴리스 → 목표 0)
+
+### A1 재검토 조건 (원 §재검토 1~4 에 추가)
+
+5. **verify:699 이 step retry 후에도 2연속 fail flake 재발**: (0) 측정 방법 검증 우선 — verify:699 전용 variance 진단 (fps `--diagnose-variance` 패턴 이식) 으로 S3b ratio 분포 실측 → 그 후에만 측정 강건화 (median-of-N hold 등) 검토. 임계 완화는 여전히 금지
+6. **retry-fresh-runner 도 fail 하는 지속 부하가 반복** (2 머신 연속 spike): GitHub hosted runner 전역 이벤트 가능성 — matrix 분할/시간대 회피가 아니라 발생 빈도 실측 후 판단 (현재 관찰 0건)
+7. **setup 복제 구간 drift 발생** (한쪽만 수정): composite action 추출로 SSoT 화 — 첫 drift 발견 시점이 착수 트리거
+8. **simulate input 오발사로 인한 red run 이 노이즈화**: input 제거 + 검증은 scratch 브랜치 dispatch 로 대체
+9. **branch protection 도입 시** (현재 미설정 — 실측 404): `measure` job 은 soft-fail 구조라 항상 success — required check 로 부적합. 두 job 결과를 취합하는 gatekeeper job (`needs: [measure, retry-fresh-runner]` + `if: always()`) 신설 후 그것만 required 등록 (cross-validate 고유 발견 — 도입 시점이 착수 트리거)
+
+### A1 교차검증 반영 사항 (agy 2026-07-04 — 로그 `.claude/logs/cross-validate-architecture-779-a1.log`)
+
+**합의 (설계 유지)**: Q1 verify:699 단독 한정 — 이력 기반 선별이 fail-fast 정합, 균일 retry 는 진짜 회귀 시 전체 지연 + 오진 확률 확대 (동적 옵트인 = 재검토 조건 5 와 동일 구조). Q3 simulate hook — dispatch 는 write 권한자 전용이라 fork 우회 불가, 분기 검증 가치 > 비용. Q4 workflow_run 보안 DoD supersede 타당 (PR 컨텍스트 read-only 유지로 위험 도메인 소멸 — cache poisoning 잔존은 일반 PR 빌드와 동일 범위, 무조치). **Phase 3 전제 확증**: GitHub hosted runner 는 job 단위 fresh VM 100% 보장 (needs 직렬이어도 별도 머신).
+
+**고유 발견 (수용)**: (1) **escalation 흡수 이력 관찰 가능성** — 2차 job 성공 (= flake 흡수) 시 `$GITHUB_STEP_SUMMARY` 에 "A-fail→B-pass 흡수" 기록 의무 (경계 회귀 — 2차 머신 성능 편차로 우연 통과 — 추적용. 100% 포착 원칙의 수용된 트레이드오프를 가시화). (2) **gatekeeper job** — 재검토 조건 9 로 박제 (현재 branch protection 부재라 즉시 구현은 YAGNI).
+
+**이견 (기각)**: composite action 즉시 추출 (Phase 3 병합 동시) — 재검토 조건 7 의 "첫 drift 발견 시 착수" 유지. 근거: 워크플로 구조 변경 PR 은 검증 창이 좁아 (2단계 함정) 변경 표면 최소화가 우선, 동기 주석 마커 + reviewer 대조가 1차 방어. **기각 (조치 불요)**: 공통 인프라 실패 (레지스트리 다운 등) 시 양 job fail → 메일 발송은 정당한 알림 (구제 대상 아님). escalation 경로의 스케줄링 지연은 실패 경로 한정 트레이드오프.
