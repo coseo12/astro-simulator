@@ -44,6 +44,8 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? null;
 const HEADFUL = process.env.HEADFUL !== '0';
 const MODE = process.env.MODE ?? 'dod';
+// #759 — CI 실패 로컬 재현 (--use-angle=swiftshader). browser-verify-756-surface.mjs 주석 참조.
+const SWIFTSHADER = process.env.SWIFTSHADER === '1';
 
 /** 결정적 프레임 고정 JD — 2000-03-22 (춘분 근방, 태양 ⊥ 패턴 극축 — 헤더 주석 3). */
 const T_JD = 2451626.0;
@@ -55,6 +57,10 @@ const MAGENTA_TAU = 15; // DoD 3 — R>G+τ && B>G+τ
 const DISK_LUM_MIN = 20;
 
 async function launch() {
+  if (SWIFTSHADER) {
+    console.log('[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)');
+    return chromium.launch({ headless: true, args: ['--use-angle=swiftshader'] });
+  }
   const opts = HEADFUL ? { headless: false, channel: 'chrome' } : { headless: true };
   try {
     const b = await chromium.launch(opts);
@@ -266,13 +272,19 @@ async function measureEarth(page, buf) {
   );
 }
 
-/** MODE=diff — 두 캡처 dir 의 동명 PNG 픽셀 diff (Concrete Prediction: mars/jupiter/moon ≈ 0). */
+/**
+ * MODE=diff — 두 캡처 dir 의 동명 PNG 픽셀 diff (Concrete Prediction: mars/jupiter/moon ≈ 0).
+ * #759 (PR #796 reviewer 권고 4): 판정 미달 시 'CHECK' 로그만 남기고 exit 0 이던 것을
+ * fail-fast 로 정정 — 불일치/미달 발견 시 true 반환 → 호출부가 exitCode=1 설정.
+ */
 async function diffDirs(dirA, dirB, names) {
+  let anyFail = false;
   for (const name of names) {
     const a = PNG.sync.read(await readFile(path.join(dirA, `${name}.png`)));
     const b = PNG.sync.read(await readFile(path.join(dirB, `${name}.png`)));
     if (a.width !== b.width || a.height !== b.height) {
       console.log(`  ${name}: 크기 불일치 ${a.width}x${a.height} vs ${b.width}x${b.height} — FAIL`);
+      anyFail = true;
       continue;
     }
     let diffPx = 0,
@@ -288,10 +300,13 @@ async function diffDirs(dirA, dirB, names) {
     }
     const total = a.data.length / 4;
     const pct = ((diffPx / total) * 100).toFixed(4);
+    const pass = diffPx / total < 0.001;
+    if (!pass) anyFail = true;
     console.log(
-      `  ${name}: diffPx=${diffPx}/${total} (${pct}%) maxDelta=${maxDelta} → ${diffPx / total < 0.001 ? 'PASS (≈0)' : 'CHECK'}`,
+      `  ${name}: diffPx=${diffPx}/${total} (${pct}%) maxDelta=${maxDelta} → ${pass ? 'PASS (≈0)' : 'FAIL'}`,
     );
   }
+  return anyFail;
 }
 
 const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
@@ -304,11 +319,12 @@ const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
       process.exit(2);
     }
     console.log(`=== 분기 격리 diff (${dirA} vs ${dirB}) — Concrete Prediction ≈0 ===`);
-    await diffDirs(
+    const anyFail = await diffDirs(
       dirA,
       dirB,
       OTHER_BODIES.map((id) => `qa-783-${id}`),
     );
+    if (anyFail) process.exitCode = 1; // #759 — fail-fast (PR #796 권고 4)
     return;
   }
 
