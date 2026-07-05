@@ -5,6 +5,18 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.46.0] — 2026-07-05
+
+### Behavior Changes (#759 — 표면 셰이더 verify 6종 CI 상시 가드)
+
+- **[#759] shader-pixel-guard workflow 신설 — 셰이더 픽셀 회귀 CI 상시 차단 (MINOR)** ([#759](https://github.com/coseo12/astro-simulator/issues/759)) — #756 이후 셰이더 feature 5개(표면 4종/광원/태양/자전/지구 디테일)의 verify 가 전부 로컬 전용이라 **uniform 배선 절단·분기 오염 같은 픽셀 회귀를 단위 테스트가 전부 통과한 채 조용히 퇴행**하던 CI 사각(2026-07-04 회고 High 1위, #773 사용자 발견 회귀가 실증 사례)을 해소. **신규 `.github/workflows/shader-pixel-guard.yml`** — 별도 병렬 workflow(fps-baseline-guard 선례: paths-ignore + concurrency + 실패 격리), 단일 job 에서 dev server 1회 기동 후 **verify 6종 직렬 fail-fast**(756-surface/762-monotonic/773-light/774-sun/782-rotation/783-earth-detail), timeout 40분/artifact 7일. **전제 실측**: CI swiftshader 는 tier-c 자동 단색으로 셰이더 미진입 → `?gpu=a` 강제(기존 플래그 재사용) 하 렌더 성립 + 엔트로피 상대 성질(ON>OFF) 보존 확인(hfEnergy 는 sun glow edge 역전으로 금지). **판정 규약 = per-body 상대 성질, 절대 임계 금지**: 756 가산 마진 0.15(CI 실측 최소 갭 moon 0.359 의 2.4× 여유 — D1 확정 3중 박제), 773 은 moon hfEntropy 역전 실측으로 해당 축 명시 제외 + 대비/보라 축 유지, tier-c 축은 lodStats 배선 검증으로 정정(`?lod=auto` 가 tier 강제 무효화하는 함정 실측 — Amendment 1). 스크립트 4종 신규 커밋 + `verify:*` 6종 등록 + 756/773 fail-fast 판정 신설 + 783 diffDirs exitCode(PR #796 권고 4 해소) + `SWIFTSHADER=1` 로컬 재현 경로. **실 CI 3-run 사이클 실증**: 정상 [PASS 6m49s](https://github.com/coseo12/astro-simulator/actions/runs/28712529835)(P1 ≤25분 적중, CI 계수 1.15×) → 배선 절단 [FAIL](https://github.com/coseo12/astro-simulator/actions/runs/28712879193)(verify 판정 층 — setup 아님 step 단위 확인) → 복원 [PASS](https://github.com/coseo12/astro-simulator/actions/runs/28713095486) + rerun 판정 동일(P3 flake 0). 코어/앱 코드 **0줄**(P4 적중 — 워크플로/스크립트/등록만). qa 독립 재실행 6/6 + negative stub 2종 + SWIFTSHADER smoke(로컬 moon 갭 0.357 ≈ CI 0.359 정합). ADR [`20260705-759-shader-verify-ci-guard.md`](docs/decisions/20260705-759-shader-verify-ci-guard.md) (Accepted, cross-validate agy — retry 선주입·shadow phase·gpu 게이팅 3건 근거 기각, timeout 완충·retention·재현 경로 수용).
+
+### Notes
+
+- **#759 OPEN 유지** — 머지 후 관찰 3항(develop push 첫 run / docs-only PR paths-ignore 효력 / flake 1주 — 773 contrastMean Infinity edge 포함) 충족 후 close.
+- 1차 negative 시뮬레이션(`surfaceDetail: false` 단순 치환)은 typecheck 가 verify 도달 전 선차단 — **negative 는 가드 판정 층에서 실패해야 성립**(`&& false` typecheck-clean 절단으로 정정) 교훈 박제.
+- 후속: [#802](https://github.com/coseo12/astro-simulator/issues/802) CI setup composite action(선행 조건 충족) / 신규 셰이더 feature 의 verify 등록은 feature DoD 에 포함(재검토 트리거 5 — 로컬 전용 verify 재누적 차단).
+
 ## [0.45.0] — 2026-07-04
 
 ### Behavior Changes (#779 Phase 2/3 — CI flake 자동화)
