@@ -5,6 +5,23 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.47.0] — 2026-07-06
+
+### Behavior Changes (#793 — 산출물 수명주기 규약 + qa/dev 처분 의무)
+
+- **[#793] 산출물 수명주기 규약 — verify/reports/\_debug/스크래치 처분 기준 + qa/dev 반환 직전 처분 의무 (MINOR)** ([#793](https://github.com/coseo12/astro-simulator/issues/793)) — qa/dev 산출물 커밋 기준이 세션마다 상이해 워크스페이스에 **untracked 21건(~20MB) 누적** + `_debug-*-tmp.mjs` volt #67 규약 위반 잔존하던 것(2026-07-04 회고)을 규약 5항으로 박제: (1) `docs/reports/` 는 **ADR/PR markdown embed 참조분만 커밋**(#382 표준), 나머지 세션 종료 전 rm — 기커밋 21MB 소급 정리 비대상(history rewrite 리스크), (2) verify 스크립트 커밋 의무 + 신규 위치 **`apps/web/scripts/` 단일화**(등록은 apps/web/package.json — #759 표준, legacy root scripts/ 동결), (3) `_debug-*-tmp.mjs` 즉시 rm 재확인, (4) 세션 스크래치는 `.claude/logs/`(gitignored) 통일 — `.logs/` 등 비표준 디렉토리 금지, (5) **qa/dev 반환 직전 `git status --porcelain` 산출물 처분 카나리아** + 처분 불가 잔존물 `non_blocking_suggestions` 인계(경로 + 1줄 사유). **일괄 처분 실측**: 잔존 15건 ~20MB rm(착수 시점 재검증 — #759 가 verify 4종 커밋 + \_debug rm 기해소, volt #14/#67 패턴) + `browser-verify-738-starfield.mjs` → apps/web/scripts/ 이동(현행 시대 유일 위치 이원화 해소, runtime 스모크 검증 — `verify:738-starfield` 명령은 경로만 갱신되어 동일 동작). **에이전트 행동 변화**: `.claude/agents/{qa,developer}.md` 산출물 처분 bullet — **Z-패턴** Phase 1 선반영 + Phase 2 upstream PR [harness-setting#309](https://github.com/coseo12/harness-setting/pull/309) 동시 제출(데코레이터에 URL 박제, Phase 3 은 upstream 머지 후 harness update 자동). 체크리스트 JSON 스키마 불변(`verify-agent-ssot.sh` 45/45 PASS) — extends 필드 승격은 처분 누락 재발 ≥2회/월 실측 시(measurement-first). ADR [`20260706-793-artifact-lifecycle.md`](docs/decisions/20260706-793-artifact-lifecycle.md) (Accepted, cross-validate agy — 738 runtime 스모크·인계 규격·백업 성격·CI 범위 명시 5건 수용, 공동 작업자 백업 이관·Z-패턴 부록 2건 근거 기각).
+
+### Added (docs — 행동 변화 없음)
+
+- **[#794] 트랙 A/B 로드맵 문서 신설** ([#794](https://github.com/coseo12/astro-simulator/issues/794), PR [#806](https://github.com/coseo12/astro-simulator/pull/806)) — v3 완주 이후 작업 축(트랙 A 몰입 / B 온보딩)이 이슈·세션 메모리에만 존재하던 공백(2026-07-04 회고)을 [`docs/phases/roadmap-track-ab.md`](docs/phases/roadmap-track-ab.md) 로 해소 — 완료 9건 / 진행 0 / 후보 7건(각 ADR 재검토 조건 앵커). **R11/R12 단독 회고 소급 생략 판단 박제**(1줄 요약 갈음, 근거 3축) + 트랙 A 마무리 시점 회고 1회 의무. CLAUDE.md 로드맵 포인터 v3(완주) → track-ab(현행). cross-validate(agy) 고유 발견 1건 수용(시간 변동 emissive 효과 광과민성 검토 각주).
+- **[#808] README v0.46.0 현행화 + 스크린샷 4장 재캡처** ([#808](https://github.com/coseo12/astro-simulator/issues/808), PR [#809](https://github.com/coseo12/astro-simulator/pull/809)) — v0.35.1 에 멈춰 있던 README 를 11개 릴리스분 현행화. 스크린샷 4장을 라이브 프로덕션(v0.46.0) 하드웨어 GPU 재캡처(태양 granulation / 지구 대륙·극관·biome·밤면 / 해왕성 gas-bands / 별 배경, 콘솔 에러 0) + "절차적 표면 & 광원" 불릿 신설 + 로드맵 트랙 A/B 섹션 + 테스트 현황(core 710+ / shader-pixel-guard / fps escalation).
+
+### Notes
+
+- **fps-baseline-guard 이봉(bimodal) 분포 관찰 박제** ([#779](https://github.com/coseo12/astro-simulator/issues/779) 코멘트) — PR #807(런타임 코드 0줄)에서 3 머신/7회 최종 failure 였으나 동일 코드 develop 대조군이 같은 머신 step retry 에서 27.7 → 60.3 FPS 반전 PASS. 측정값이 ~30 vs ~60 이봉 분포 = rAF vsync 반속(30Hz) 락 아티팩트 — margin 30%(임계 42.1)는 30Hz 락에서 구조적 항상 FAIL. 3축 증거(코드 0줄/대조군/분포) 박제 후 머지, **가드 임계 무변경**(silent 완화 아님). escalation 이 흡수 못한 첫 최종 failure 사례로 #779 재검토 후보([28,36] 대역 감지 시 재측정) 기록.
+- **#759 관찰 2항 충족** — docs-only PR #806 에서 shader-pixel-guard run 미생성(paths-ignore 효력 실측). 잔여 3항(flake 1주, ~07-12) 충족 시 close.
+- upstream [harness-setting#309](https://github.com/coseo12/harness-setting/pull/309) (qa/dev 처분 의무) 머지 대기 — 머지 후 `harness update` 로 Z-패턴 Phase 3 자동 해소.
+
 ## [0.46.0] — 2026-07-05
 
 ### Behavior Changes (#759 — 표면 셰이더 verify 6종 CI 상시 가드)
