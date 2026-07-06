@@ -271,7 +271,7 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 
 ### 프로젝트 접근 — Incremental Body-by-Body Build (v3)
 
-2026-04-25 기획 전면 재구성. Fact-First 원칙 / 로드맵 v2 / P10~P12 ADR (scale unification 포함) 전부 폐기 (`docs/deprecated/`). **태양부터 하나씩** 사용자가 명시적으로 visible 하게 incremental build. 각 R-Phase DoD 는 "사용자가 실제로 보이는 body" 중심. 현행 로드맵: [`docs/phases/roadmap-v3-incremental.md`](docs/phases/roadmap-v3-incremental.md).
+2026-04-25 기획 전면 재구성. Fact-First 원칙 / 로드맵 v2 / P10~P12 ADR (scale unification 포함) 전부 폐기 (`docs/deprecated/`). **태양부터 하나씩** 사용자가 명시적으로 visible 하게 incremental build. 각 R-Phase DoD 는 "사용자가 실제로 보이는 body" 중심. 로드맵: [`docs/phases/roadmap-v3-incremental.md`](docs/phases/roadmap-v3-incremental.md) (**완주** 2026-06-12, R10b #664) → 현행 [`docs/phases/roadmap-track-ab.md`](docs/phases/roadmap-track-ab.md) (v3 완주 이후 트랙 A 몰입 / B 온보딩 작업 축 + 후보 백로그, #794).
 
 - **폐기 배경**: P12 Display-Relative Scale Unification 후 기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태로 UX 회귀. DoD 수치는 모두 PASS 였음 (volt [#74](https://github.com/coseo12/volt/issues/74) 근거)
 - **유지 대상**: Floating Origin (`20260422-floating-origin.md`), LOD 3단 (`20260424-p11-b-lod-design.md`), Tier 네이밍 정책 (`20260424-tier-naming-policy.md`), Tier Preset 설계 (`20260424-tier-preset-design.md`) — 기술 가치 유지
