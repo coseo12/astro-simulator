@@ -12,7 +12,7 @@
 
 ## 현재 상태
 
-**v0.35.1** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 경험 레이어 (별 배경·온보딩) (2026-06-26)
+**v0.46.0** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 트랙 A/B (몰입·온보딩) — 절차적 표면·태양 셰이더 + 자전·실광원 (2026-07-05)
 
 - **태양계 32 body** — 태양 + 행성 8 + 위성 15 + 왜소행성 5 + 혜성 3, 실시간 적분 + 관측 데이터 기반 궤도/크기 시각화
   - 위성 15: 달 / 포보스·데이모스 / 갈릴레이 4 (이오·유로파·가니메데·칼리스토) / 타이탄·레아·이아페투스·엔셀라두스 / 티타니아·오베론 / 트리톤·프로테우스
@@ -23,6 +23,7 @@
 - 소행성대 ThinInstances `?belt=N` 1~10000 (Kepler 해석해)
 - 시간 제어 (재생/역행, ×1d/×1y 프리셋, julian date 정밀 jump) + 질량 슬라이더 + "만약에" 시나리오 + URL 북마크
 - **우주 환경 + 온보딩** — 절차적 별 배경 + 은하수 (`infiniteDistance` 천구 + 단일 draw call shader, 신규 에셋 0, `?stars=off` 토글) / 첫 진입 온보딩 + 조작 가이드 모달 (소프트웨어 렌더 환경은 별 배경 자동 비활성 — fill-rate graceful degradation)
+- **절차적 표면 & 광원 (전부 에셋 0 셰이더)** — 행성 표면 4종 (지구 대륙·극관·biome 위도색 / 화성 dust / 목성 밴드 / 달 크레이터) + 태양 emissive granulation·limb darkening·색온도 + 행성 자전 (NASA sidereal period + IAU 자전축, 금성·천왕성 역행) + 실제 태양 광원 밤면/terminator 명암 + 천체 표시 크기 비율 단조 보존 (sqrt 압축, `?surface=off`/`?rotate=off` 토글)
 
 ## 스크린샷
 
@@ -81,7 +82,7 @@
   /phases               기획/아키텍처/Phase 문서
   /retrospectives       Phase 회고 + 성능/접근성/호환성 보고서
   /screenshots          릴리스 스크린샷
-/scripts                검증 스크립트 (browser-verify-*.mjs)
+/scripts                검증 스크립트 (legacy — 신규 verify 는 apps/web/scripts, #793 규약)
 ```
 
 ---
@@ -124,10 +125,10 @@ pnpm verify:all           # 위 5개 순차 실행
 
 ## 테스트 현황
 
-- **단위 테스트** (Vitest): core 600+ / web 390+ / shared / physics-wasm — scene·physics·coords·ephemeris·gpu·time + store·panels·picking
+- **단위 테스트** (Vitest): core 710+ / web 390+ / shared / physics-wasm — scene·physics·coords·ephemeris·gpu·time + store·panels·picking + 셰이더 GLSL↔JS 미러 parity
 - **Rust** (cargo): nbody + barnes_hut + capability (unit + integration theta sweep / 1-year)
-- **브라우저 검증** (Playwright + agent-browser): `scripts/browser-verify-*.mjs` — body 선택/궤도/focus 정합/fps/a11y 3단계 검증
-- **CI 가드**: r1-ui-regression / fps-baseline / a11y-baseline / R-Phase allowlist 정합 / per-body orbit scale
+- **브라우저 검증** (Playwright + agent-browser): `browser-verify-*.mjs` — body 선택/궤도/focus 정합/fps/a11y 3단계 검증
+- **CI 가드**: r1-ui-regression / fps-baseline (fresh-runner escalation) / a11y-baseline / shader-pixel (표면·광원·자전 verify 6종) / R-Phase allowlist 정합 / per-body orbit scale
 - **성능** (실 GPU, M1 Pro Metal): N=1000/10000 vsync cap 120 fps (헤드리스 software renderer 는 N 비례 감소)
 
 ---
@@ -140,7 +141,7 @@ pnpm verify:all           # 위 5개 순차 실행
 - **P2 — N-body 전환** (Velocity-Verlet WASM, 소행성대)
 - **P3 — Barnes-Hut + WebGPU** (octree O(N log N), WGSL compute, 5-mode 토글)
 
-### 현행 — 로드맵 v3: Incremental Body-by-Body Build ✅ 완주
+### 로드맵 v3: Incremental Body-by-Body Build ✅ 완주
 
 태양부터 하나씩 사용자가 실제로 보이는 body 를 점진 추가하는 재구성. (v2 Fact-First 기반 P10~P17 은 기본 진입 화면 UX 회귀로 전면 폐기 — [volt #74](https://github.com/coseo12/volt/issues/74))
 
@@ -149,6 +150,13 @@ pnpm verify:all           # 위 5개 순차 실행
 - **인터랙션** — 클릭/터치 선택, 겹침 cycle, free-fly 카메라, glow pixel marker, 궤도선 toggle
 
 상세: [`docs/phases/roadmap-v3-incremental.md`](./docs/phases/roadmap-v3-incremental.md). 폐기된 v1/v2 구상은 [`docs/deprecated/`](./docs/deprecated/) 참조.
+
+### 현행 — 트랙 A/B (v3 완주 이후 작업 축)
+
+- **트랙 A 몰입** — 별 배경·은하수 → 표면 셰이더 4종 → 광원 일관성·대륙 → 자전 → 태양 셰이더 → 지구 극관·biome (완료 9건). 후보 백로그: 바다 깊이색 / 대기 fresnel / 구름 / 야간 불빛 / 코로나 / sunspot / 사운드
+- **트랙 B 온보딩** — 첫 진입 온보딩 + 조작 가이드, a11y AA 대비 전수 (1라운드 완료)
+
+상세: [`docs/phases/roadmap-track-ab.md`](./docs/phases/roadmap-track-ab.md)
 
 ---
 
@@ -160,7 +168,8 @@ pnpm verify:all           # 위 5개 순차 실행
 - [아키텍처 결정서](./docs/phases/architecture.md)
 - [디자인 토큰](./docs/phases/design-tokens.md)
 - [UI 아키텍처](./docs/phases/ui-architecture.md)
-- [로드맵 v3 — Incremental Body-by-Body Build (현행)](./docs/phases/roadmap-v3-incremental.md)
+- [로드맵 v3 — Incremental Body-by-Body Build (완주)](./docs/phases/roadmap-v3-incremental.md)
+- [로드맵 트랙 A/B — v3 완주 이후 작업 축 (현행)](./docs/phases/roadmap-track-ab.md)
 - [아키텍처 원칙](./docs/architecture/principles.md) — §1 Visual Fidelity (데이터 SSoT 보존 + 렌더링 왜곡 허용)
 - [용어집](./docs/glossary.md) — R-Phase / Tier / Floating Origin / focus 등
 - 폐기된 v1/v2 구상 + Fact-First 원칙: [`docs/deprecated/`](./docs/deprecated/)
