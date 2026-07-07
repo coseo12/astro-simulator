@@ -63,8 +63,13 @@
  * ⚠️ SSoT 는 `solar-system.json`. 본 테이블은 곡선 산출을 위한 모듈 로드 시 정적 미러일 뿐
  * (런타임 json import 회피 — cross-validate agy 3.0 순환 의존 우려 해소). 데이터 변경 시 drift 차단은
  * `body-scale.test.ts` 의 `BODY_RADIUS_M` ↔ json 정합 가드가 담당 (volt #69 숨은 상수 drift 패턴).
+ *
+ * export 는 #764 drift 가드 (32 body 전수 미러 == json 직접 단언) 의 테스트 접근 경로 전용 —
+ * 런타임 소비처는 본 모듈 내부 곡선 산출뿐이다. 위성 effective 는 radius 상쇄 구조
+ * (`sat_scale = parent_eff × 수렴대비 / sat.radius` → effective 에서 radius 소거) 라 간접 검증으로는
+ * 위성 radius drift 를 잡을 수 없어 직접 단언이 필수 (#763 reviewer 권고 2).
  */
-const BODY_RADIUS_M: Readonly<Record<string, number>> = Object.freeze({
+export const BODY_RADIUS_M: Readonly<Record<string, number>> = Object.freeze({
   sun: 6.957e8,
   mercury: 2.4397e6,
   venus: 6.0518e6,

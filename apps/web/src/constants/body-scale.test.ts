@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import solarSystem from '@astro-simulator/shared/data/solar-system.json';
 import {
+  BODY_RADIUS_M,
   BODY_SCALE,
   DEFAULT_BODY_SCALE_P,
   DWARF_IDS,
@@ -21,6 +22,7 @@ import {
  *   4. 그룹 경계 assert — max(satellite) < min(planet) 등 (achievable invariant)
  *   5. NaN guard / 미정의 fallback
  *   6. BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #69 숨은 상수)
+ *      — #764 에서 32 body 전수 직접 단언으로 확장 (위성·혜성 포함, #763 reviewer 권고 2)
  */
 
 // 사실 radius (m) — solar-system.json SSoT 에서 동적 추출 (drift 가드).
@@ -262,10 +264,33 @@ describe('#762 — ?bodyScaleP= factory (D-T2 실시간 튜닝)', () => {
   });
 });
 
-describe('#762 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #69 숨은 상수)', () => {
-  // body-scale.ts 내부 radius 미러가 데이터 SSoT 와 일치하는지 검증 (모듈 미export 라
-  // effective 값으로 간접 검증 — scale = curveScale(radius) 이므로 radius drift 시 effective 가 변함).
-  // 직접 비교 대신: BODY_SCALE 에 정의된 모든 행성/왜소 의 effective 가 json radius 기반 재산출과 일치.
+describe('#762/#764 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #69 숨은 상수)', () => {
+  // #764 — 미러를 export 해 32 body 전수 직접 단언으로 확장 (#763 reviewer 권고 2).
+  // 기존 가드의 사각: 행성·왜소 13 만 재산출 직접 검증 / 위성은 수렴대(band) 간접 검증인데
+  // 위성 effective 는 radius 상쇄 구조 (`sat_scale = parent_eff × 수렴대비 / sat.radius` →
+  // effective = parent_eff × 수렴대비, radius 무관... 단 테스트의 eff() 는 json radius 를 곱하므로
+  // 미러 +10% drift 시 mesh 비가 0.0681→0.0619 로 이동해도 band [0.05,0.09] 안 → 미검출) /
+  // comet 은 존재(>0)만 확인하고 값 미검증. 아래 전수 단언이 이 사각을 전부 닫는다.
+
+  it('[#764] 32 body 전수 — 미러 radius == json radius 직접 단언 (위성 13 · 혜성 5 포함)', () => {
+    const jsonBodies = (solarSystem as { bodies: { id: string; radius?: number }[] }).bodies;
+    for (const b of jsonBodies) {
+      expect(typeof b.radius, `${b.id} json radius 존재`).toBe('number');
+      // 정확 일치 (toBe) — 미러는 json 값의 복제이므로 부동소수 오차 허용 없음 (drift = 즉시 FAIL).
+      expect(BODY_RADIUS_M[b.id], `${b.id} 미러 radius ↔ json radius drift`).toBe(b.radius);
+    }
+  });
+
+  it('[#764] 미러 ↔ json id 집합 완전 일치 — 누락/잉여(stale) 항목 0', () => {
+    const jsonIds = Object.keys(RADIUS).sort();
+    const mirrorIds = Object.keys(BODY_RADIUS_M).sort();
+    expect(mirrorIds).toEqual(jsonIds);
+    // 전수 로스터 박제: 32 = sun 1 + 행성 8 + 왜소 5 + 위성 13 + comet·극소형 위성 5.
+    // 신규 body 추가 시 json + 미러 + 본 단언 3곳 동시 갱신 (의도된 checkpoint — 미러 누락 시
+    // getBodyScale 이 1.0 fallback 으로 실측 렌더되는 silent 회귀를 여기서 강제 노출).
+    expect(mirrorIds).toHaveLength(32);
+  });
+
   it('행성·왜소 effective 가 json radius 와 정합 (내부 미러 drift 차단)', () => {
     const p = DEFAULT_BODY_SCALE_P;
     const k = 700 * Math.pow(RADIUS.mercury!, 1 - p);
