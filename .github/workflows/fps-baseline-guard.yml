@@ -64,76 +64,16 @@ jobs:
     outputs:
       guard_outcome: ${{ steps.guard.outcome }}
     steps:
-      # ⚠ measure job 과 동기 유지 — 이 setup 구간 (checkout ~ dev server 기동) 은 retry-fresh-runner
-      #   job 에 복제되어 있음. 한쪽 수정 시 반드시 양쪽 동시 수정
-      #   (ADR 20260701-779 §A1 재검토 7 — 첫 drift 발견 시 composite action 추출이 착수 트리거).
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          # #663 fix (#606 ADR §Amendment 3) — playwright 1.59.1 extract 가 Node 24.16 에서
-          #   deadlock. engines ">=20.0.0" 범위 해석은 setup-node 가 최신 24.16 을 설치
-          #   → "Playwright chromium 설치" 단계 timeout cancelled (R9 시점부터 상시).
-          #   #666 (Amendment 4): 정확 버전 중앙 파일 `.node-version` (22.16.0) 로 일원화.
-          node-version-file: '.node-version'
-          cache: 'pnpm'
-
+      # setup 공통 구간 (pnpm/node/rust/wasm-pack/playwright 캐시/build/dev server) — #802 SSoT.
+      # 이전엔 본 job / retry-fresh-runner / shader-pixel-guard / ci.yml r1-guard 에 복제 +
+      # "⚠ 동기 유지" 주석 마커로 방어 (ADR 20260701-779 §A1 재검토 7 — composite 추출로 종결).
       # ci.yml R1 가드 패턴 따름 — wasm 빌드 후 next dev 사용 (__solarScene 핸들 의존).
-      - name: Rust 툴체인 설정
-        uses: dtolnay/rust-toolchain@stable
+      - name: setup + build + dev server (composite)
+        uses: ./.github/actions/setup-and-build
         with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      - name: Rust 빌드 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      - name: wasm-pack 설치
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-
-      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 #663 이 1차).
-      # 캐시 히트 시 ~/.cache/ms-playwright 복원 → extract 단계 자체 미발생.
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
-          # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
-          # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: wasm + workspace 빌드
-        run: pnpm build
-
-      - name: next dev server 기동
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
-          echo $! > /tmp/next-pid
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3001/ko > /dev/null; then
-              echo "ready"; exit 0
-            fi
-            sleep 2
-          done
-          echo "timeout"; exit 1
+          start-dev-server: 'true'
 
       # #709 — variance 진단 (workflow_dispatch 전용). 판정 없이 N회 측정 후 분포 박제.
       - name: FPS variance 진단
@@ -219,66 +159,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      # ⚠ measure job 과 동기 유지 — 이 setup 구간 (checkout ~ dev server 기동) 은 measure job 의
-      #   복제본 (동작 동일, 상세 배경 주석은 measure job 원본 참조). 한쪽 수정 시 반드시 양쪽 동시 수정
-      #   (ADR 20260701-779 §A1 재검토 7 — 첫 drift 발견 시 composite action 추출이 착수 트리거).
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      # setup 공통 구간 — measure job 과 동일 composite (#802 SSoT — 복제본 + 동기 마커 제거,
+      # ADR 20260701-779 §A1 재검토 7 종결).
+      - name: setup + build + dev server (composite)
+        uses: ./.github/actions/setup-and-build
         with:
-          node-version-file: '.node-version'
-          cache: 'pnpm'
-
-      - name: Rust 툴체인 설정
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      - name: Rust 빌드 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      - name: wasm-pack 설치
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Playwright 시스템 deps (캐시 히트 — extract 생략)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: wasm + workspace 빌드
-        run: pnpm build
-
-      - name: next dev server 기동
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
-          echo $! > /tmp/next-pid
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3001/ko > /dev/null; then
-              echo "ready"; exit 0
-            fi
-            sleep 2
-          done
-          echo "timeout"; exit 1
+          start-dev-server: 'true'
 
       - name: FPS baseline 회귀 검증 (fresh runner — hard fail)
         env:
