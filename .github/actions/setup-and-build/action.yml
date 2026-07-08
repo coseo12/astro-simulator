@@ -13,9 +13,10 @@ description: >-
 #   3. start-dev-server=true 시 PID 를 /tmp/next-pid 에 박제 — 정리 (kill) 는 호출측
 #      `dev server 정리` step (if: always()) 책임 (composite 은 post hook 미지원).
 
-# inputs 이력 (#814): 도입 시점의 `playwright` / `build` inputs 는 전 호출부 (7개소) 가
-#   default 'true' 만 사용해 실사용 0 → YAGNI 제거. 선택 실행이 필요해지면 git history
-#   (#813, 348891c) 의 구현을 재도입.
+# inputs 이력 (#814): 도입 시점의 `playwright` / `build` inputs 는 전 호출부 7 workflow
+#   (8 invocation — fps 는 measure/retry-fresh-runner 2 invocation) 가 default 'true' 만
+#   사용해 실사용 0 → YAGNI 제거. 선택 실행이 필요해지면 git history (#813, 348891c) 의
+#   구현을 재도입.
 inputs:
   setup-node:
     description: >-
