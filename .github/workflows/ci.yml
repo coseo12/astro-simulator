@@ -88,25 +88,6 @@ jobs:
       #   - apps/web → next start (Playwright BASE_URL 타깃)
       #   - apps/web/scripts/__baselines__/r1/ Linux 캡처본 12장 (PR #351 머지 후 정합)
 
-      - name: Rust 툴체인 설정 (R1 r1-guard 의존)
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && hashFiles('rust-toolchain.toml') != ''
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      - name: Rust 빌드 캐시 (R1 r1-guard 의존)
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      - name: wasm-pack 설치 (R1 r1-guard 의존)
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
       # ============================================================
       # #606 r1-guard step 4분리 (install / build / start / verify)
       # ============================================================
@@ -119,36 +100,22 @@ jobs:
       #   4) Node 22 핀 → install 28초 통과 → Node 24.16 + playwright 1.59.1 extract
       #      비호환 확정 (run 26756788369). fix: Node 22 LTS 핀 (line 39).
       # step 분리는 fix 후에도 유지 — freeze 재발 시 즉시 step 단위 격리 (ADR 옵션 f 정합).
+      # #802: 1/4 (Playwright 캐시+설치) · 2/4 (build) 는 rust/wasm-pack 툴체인과 함께
+      #   setup-and-build composite 내부 sub-step 으로 이동 (분리 구조는 composite 내부에
+      #   그대로 유지 — freeze 재발 시 sub-step 로그로 지점 격리 가능). 3/4 · 4/4 는 아래 유지.
 
-      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 line 39 가 1차).
-      # 캐시 히트 시 ~/.cache/ms-playwright 복원 → 아래 1/4 install 의 extract 단계 자체 미발생.
-      - name: 'r1-guard: Playwright 브라우저 캐시'
+      - name: 'r1-guard: 툴체인 + Playwright + build (composite #802)'
+        # 조건 통합 (#802): 기존 step 별 hashFiles 조건 중 rust-toolchain.toml /
+        #   packages/physics-wasm/Cargo.toml 은 본 저장소에서 전부 상시 참 → 지배 조건
+        #   (pnpm-lock + r1-guard 스크립트) 으로 통합. 현 저장소 상태 기준 행동 변화 0.
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        uses: actions/cache@v4
-        id: playwright-cache
+        # 기존 step 별 timeout (Playwright 설치 5분 + build 8분) 을 invocation 단일 20분으로 승계
+        # (composite 내부 step 은 timeout-minutes 미지원). rust 툴체인/캐시 복원 시간까지 포함한 상한.
+        timeout-minutes: 20
+        uses: ./.github/actions/setup-and-build
         with:
-          path: ~/.cache/ms-playwright
-          # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
-          # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
-          # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: 'r1-guard: Playwright Chromium 설치 (1/4, 캐시 미스 — 다운로드+extract)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && steps.playwright-cache.outputs.cache-hit != 'true'
-        # Node 22 핀 (line 39) 으로 extract deadlock 해소. timeout-minutes:5 는 회귀 재발 가드 유지.
-        timeout-minutes: 5
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: 'r1-guard: Playwright 시스템 deps (1/4, 캐시 히트 — extract 생략 = deadlock 2차 방어)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != '' && steps.playwright-cache.outputs.cache-hit == 'true'
-        timeout-minutes: 5
-        run: pnpm exec playwright install-deps chromium
-
-      - name: 'r1-guard: production build (2/4)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
-        # build 단독 timeout — stuck 시 scene 코드 (R5 mars/phobos/deimos) prerender 무한 루프 격리
-        timeout-minutes: 8
-        run: pnpm build
+          # pnpm/node/install 은 위 "pnpm 경로" 구간이 이미 수행 — 재수행 생략
+          setup-node: 'false'
 
       - name: 'r1-guard: next start 기동 + readiness (3/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''

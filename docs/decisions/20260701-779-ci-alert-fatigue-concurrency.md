@@ -372,6 +372,7 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 5. **verify:699 이 step retry 후에도 2연속 fail flake 재발**: (0) 측정 방법 검증 우선 — verify:699 전용 variance 진단 (fps `--diagnose-variance` 패턴 이식) 으로 S3b ratio 분포 실측 → 그 후에만 측정 강건화 (median-of-N hold 등) 검토. 임계 완화는 여전히 금지
 6. **retry-fresh-runner 도 fail 하는 지속 부하가 반복** (2 머신 연속 spike): GitHub hosted runner 전역 이벤트 가능성 — matrix 분할/시간대 회피가 아니라 발생 빈도 실측 후 판단 (현재 관찰 0건)
 7. **setup 복제 구간 drift 발생** (한쪽만 수정): composite action 추출로 SSoT 화 — 첫 drift 발견 시점이 착수 트리거
+   → **종결 (2026-07-08, [#802](https://github.com/coseo12/astro-simulator/issues/802))**: drift 발생 전 rule-of-three 도달 (3번째 복제 = shader-pixel-guard, #759) 로 착수 트리거 승격 — #759 cross-validate (agy 2026-07-05) 동일 권고 2회 누적 수용 (ADR 20260705-759 §후속 분리, 단 #759 PR 자체는 검증 표면 최소화로 비목표 유지). `.github/actions/setup-and-build` composite 추출 — ci.yml r1-guard 구간 / fps-baseline-guard 2 job / shader-pixel-guard 1 job 치환 + 동기 주석 마커 제거 (A1 DoD "동기 주석 마커 양쪽 박제" 항목은 본 composite SSoT 로 대체됨)
 8. **simulate input 오발사로 인한 red run 이 노이즈화**: input 제거 + 검증은 scratch 브랜치 dispatch 로 대체
 9. **branch protection 도입 시** (현재 미설정 — 실측 404): `measure` job 은 soft-fail 구조라 항상 success — required check 로 부적합. 두 job 결과를 취합하는 gatekeeper job (`needs: [measure, retry-fresh-runner]` + `if: always()`) 신설 후 그것만 required 등록 (cross-validate 고유 발견 — 도입 시점이 착수 트리거)
 
