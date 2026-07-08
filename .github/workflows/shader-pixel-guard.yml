@@ -33,16 +33,22 @@ on:
     # #626 — docs/ADR/워크플로만 바뀐 PR 은 픽셀 측정이 무의미 (런타임 무관). fps-baseline-guard
     # 선례 그대로 답습 (자기 자신 .yml 만 변경된 PR 도 skip — fps 동일 정책). paths filter 효과는
     # base 브랜치 반영 후 후속 PR 부터.
+    # #814 — `.github/**` → `.github/workflows/**` 축소: composite action (.github/actions/**) 은
+    # setup/build 런타임에 직접 관여하므로 변경 PR 에서 본 가드가 발화해야 함 (#813 구조적 사각 해소).
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
   push:
     branches: [develop, main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
+  # #814 — 수동 재실측 경로 (a11y/fps 정합). workflow_dispatch 2단계 함정 (volt #45):
+  # dispatch 버튼은 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 —
+  # main 반영 후 실행 검증은 머지 후 관찰 항목.
+  workflow_dispatch:
 
 jobs:
   verify:

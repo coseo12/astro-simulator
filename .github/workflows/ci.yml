@@ -98,7 +98,9 @@ jobs:
       #   3) disk/mem/node 폴링 → 자원 전부 정상 (88G avail / 14Gi mem / Node 24.16),
       #      extract I/O 0바이트 deadlock (run 26756305719)
       #   4) Node 22 핀 → install 28초 통과 → Node 24.16 + playwright 1.59.1 extract
-      #      비호환 확정 (run 26756788369). fix: Node 22 LTS 핀 (line 39).
+      #      비호환 확정 (run 26756788369). fix: Node 22 LTS 핀 — 현재는 위 "Node.js setup (pnpm)"
+      #      step 의 node-version-file (.node-version) 로 일원화 (#666, 라인 번호 참조는 drift 하므로
+      #      서술형으로 정리 — #814).
       # step 분리는 fix 후에도 유지 — freeze 재발 시 즉시 step 단위 격리 (ADR 옵션 f 정합).
       # #802: 1/4 (Playwright 캐시+설치) · 2/4 (build) 는 rust/wasm-pack 툴체인과 함께
       #   setup-and-build composite 내부 sub-step 으로 이동 (분리 구조는 composite 내부에

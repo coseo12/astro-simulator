@@ -22,16 +22,18 @@ on:
     # #626 — docs/ADR/워크플로만 바뀐 PR 은 fps 측정이 무의미(런타임 무관)한데 25분 실 브라우저
     # 측정 후 timeout cancelled (PR #625 ADR-only 실측). 런타임 영향 없는 경로는 skip (fail-safe —
     # 코드/데이터/config 가 하나라도 있으면 실행). paths filter 효과는 base 브랜치 반영 후 후속 PR 부터.
+    # #814 — `.github/**` → `.github/workflows/**` 축소: composite action (.github/actions/**) 은
+    # setup/build 런타임에 직접 관여하므로 변경 PR 에서 본 가드가 발화해야 함 (#813 구조적 사각 해소).
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
   push:
     branches: [develop, main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
   # #663 — 수동 재실측 경로. workflow_dispatch 2단계 함정 (volt #45): dispatch 버튼은
   # 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 (v0.24.0 릴리스 이후 사용 가능).
   # #709 — variance 진단 input. `--ref feature/X` 로 실행 시 ref 브랜치의 step 정의를 따름.
