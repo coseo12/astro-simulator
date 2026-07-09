@@ -20,6 +20,9 @@ export {
   CameraController,
   FOCUS_USER_RADIUS_MULTIPLIER,
   FOCUS_USER_RADIUS_MIN_PADDING,
+  // #790 — focus body 시각 반경 기반 lowerRadiusLimit 하한 (mesh 내부 진입 암전 차단).
+  FOCUS_LOWER_RADIUS_SURFACE_MARGIN,
+  computeFocusLowerRadiusFloor,
 } from './camera-controller.js';
 export type { FocusTarget } from './camera-controller.js';
 // R4 #539 Amendment 3 — satellite focus multiplier 분기 SSoT.

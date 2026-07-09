@@ -32,6 +32,72 @@ export const FOCUS_USER_RADIUS_MULTIPLIER = 5;
  */
 export const FOCUS_USER_RADIUS_MIN_PADDING = 0.01;
 
+/**
+ * #790 — focus 시 lowerRadiusLimit 의 시각 반경 (resolveMeshVisualRadius) 대비 안전 마진.
+ *
+ * 카메라 radius 가 mesh 시각 반경 이하로 내려가면 카메라가 mesh 내부로 진입해 backface
+ * culling 으로 화면 전체 암전 (#774 qa 실측: `?focus=sun` lowerRadiusLimit 0.5 < sun 시각
+ * 반경 2.92). 마진 5% 근거:
+ *  - 표면 밖 유지가 목적이므로 1.0 초과 최소치면 충분 — 과대 마진은 근접 관찰 UX 를 깎고,
+ *    inner tier 대형 planet (jupiter/saturn) 에서 body tier 진입 경계 (0.1 AU) 를 침범할
+ *    여지를 만든다 (시각 반경 15.3 × 1.05 = 16.0 < 23 unit — 경계 대비 30% 여유)
+ *  - meshVisualRadius × 0.05 가 default minZ(0.01) 대비 충분히 커지는 body (시각 반경 ≥ 0.2
+ *    unit — 32 body 전수 침범 대상 전부 해당, #790 대조표) 에서 near-plane 이 mesh 표면과
+ *    교차하지 않는 여유 확보
+ *  - T1 극소 mesh (시각 반경 < 0.2, venus 관찰 모드 등 #378 완화 경로) 에서는 floor 가
+ *    기존 완화값(≥ minZ)보다 작아 바인딩되지 않음 → #378 무회귀
+ */
+export const FOCUS_LOWER_RADIUS_SURFACE_MARGIN = 1.05;
+
+/**
+ * #790 — focus body 의 lowerRadiusLimit 하한 (시각 반경 기반) 산출.
+ *
+ * `min(meshVisualRadius × 1.05, desiredRadius)` — desiredRadius 상한 clamp 는 "focus 프레이밍
+ * radius 는 항상 도달 가능" 불변식 보장 (floor > desiredRadius 면 Babylon _checkLimits 가
+ * 프레이밍 radius 를 floor 로 강제 상향해 focus 연출 자체가 깨짐). 32 body 전수에서
+ * `meshVisualRadius ≤ floor ≤ desiredRadius` 성립 확인 (#790 대조표 — desiredRadius 는
+ * boundingSphere.radiusWorld(≥ 시각 반경) × ≥5 또는 + 0.01 이므로 수학적으로도 항상 floor 초과).
+ *
+ * meshVisualRadius 는 `resolveMeshVisualRadius` (회전 불변) 를 전달할 것 —
+ * boundingSphere.radiusWorld 는 (1) box 외접구라 시각 반경 × √3 상시 과대, (2) #782 자전
+ * quaternion 위상에 따라 world AABB 가 진동해 (jupiter 실측 33.2~34.8 unit vs 시각 반경 15.3)
+ * 비결정적. bounding 기준 floor 는 jupiter/saturn 에서 body tier 진입 경계 (0.1 AU ≈ 23 unit,
+ * inner tier) 를 초과해 줌인 escalation 을 차단하는 신규 회귀를 만든다 (2026-07-09 실측).
+ *
+ * 호출처 (2곳 — 어느 한쪽만 적용 시 나머지 경로가 floor 를 되돌리는 회귀):
+ *  - `CameraController.focusOn` — user-trigger focus (버튼 / URL). tier 무전환 케이스
+ *    (sun: solar→solar) 는 이 경로만 floor 를 세울 수 있다
+ *  - `runTierTransition` (focusMesh 경로) — focus 중 tier 전환이 lowerRadiusLimit 을
+ *    `targetRadius × 0.01` (≈ 표면 94% 안쪽) 로 재설정하므로 재적용 필수
+ */
+export function computeFocusLowerRadiusFloor(
+  meshVisualRadius: number,
+  desiredRadius: number,
+): number {
+  return Math.min(meshVisualRadius * FOCUS_LOWER_RADIUS_SURFACE_MARGIN, desiredRadius);
+}
+
+/**
+ * #790 — mesh 의 회전 불변 시각 반경 (scene unit).
+ *
+ * `max(boundingBox.extendSize(local) 각 축 × |scaling| 각 축)` — sphere mesh 의 local 반경에
+ * tier scaling 을 곱한 값으로, `diameter = radius × 2 × renderScale × bodyScale` 생성식의
+ * 반경과 일치한다 (saturn solar tier 실측 0.7130 vs 산식 0.7128).
+ *
+ * boundingSphere.radiusWorld 를 쓰지 않는 이유는 computeFocusLowerRadiusFloor 주석 참조
+ * (√3 과대 + #782 자전 위상 진동). 본 함수는 회전과 무관하게 결정적이며, 축별 곱의 max 채택으로
+ * 비균등 scaling (oblate 등) 에서도 최대 반경 기준 보수 판정을 유지한다.
+ */
+export function resolveMeshVisualRadius(mesh: Mesh): number {
+  const { extendSize } = mesh.getBoundingInfo().boundingBox;
+  const { scaling } = mesh;
+  return Math.max(
+    extendSize.x * Math.abs(scaling.x),
+    extendSize.y * Math.abs(scaling.y),
+    extendSize.z * Math.abs(scaling.z),
+  );
+}
+
 export interface FocusTarget {
   /** 대상 메쉬 */
   mesh: Mesh;
@@ -149,6 +215,22 @@ export class CameraController {
     // tier-transition.ts:189 와 동일 패턴 — focus 트리거 한정 완화 (manual zoom 영향 0).
     if (this.camera.lowerRadiusLimit != null && desiredRadius < this.camera.lowerRadiusLimit) {
       this.camera.lowerRadiusLimit = Math.max(this.camera.minZ, desiredRadius * 0.5);
+    }
+
+    // #790 — focus 트리거 한정 lowerRadiusLimit 시각 반경 하한 (상향).
+    // #378 완화(하향)와 반대 방향: default 0.5 (또는 tier 전환의 targetRadius×0.01) 가 focus
+    // body 시각 반경보다 작으면 최대 줌인 시 카메라가 mesh 내부 진입 → backface culling 암전
+    // (#774 qa 실측 sun 2.92 vs 0.5 — 대조표상 32 body 전수 침범). 회전 불변 시각 반경 × 1.05
+    // 를 하한으로 올려 카메라가 항상 mesh 표면 밖에 머물게 한다. desiredRadius clamp 로 focus
+    // 프레이밍 도달성 보존. free-fly / reset 진입 시 sim-canvas 가 default 로 원복 (기존 동작).
+    if (this.camera.lowerRadiusLimit != null) {
+      const surfaceFloor = computeFocusLowerRadiusFloor(
+        resolveMeshVisualRadius(mesh),
+        desiredRadius,
+      );
+      if (this.camera.lowerRadiusLimit < surfaceFloor) {
+        this.camera.lowerRadiusLimit = surfaceFloor;
+      }
     }
 
     const targetPos = mesh.absolutePosition.clone();
