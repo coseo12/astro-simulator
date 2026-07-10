@@ -57,4 +57,7 @@ apps/web/scripts/__diff__/
 # .claude/ 는 harness 관리 파일이므로 tracked — 런타임 생성 파일만 선별 ignore
 .claude/scheduled_tasks.lock
 .claude/logs/
+
+# 세션 로컬 런타임 상태 — dead-wait 가드(#817) pending-waits.json 등 (workspace 로컬, 커밋 대상 아님)
+.context/
 .vercel
