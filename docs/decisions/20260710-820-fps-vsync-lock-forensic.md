@@ -199,7 +199,7 @@ measureScenario(desktop, sc):
   3. compareBaseline: vsyncLock 확정 scenario 는 회귀 실패에서 제외(단 capacity 양성 입증 하에서만)
 ```
 
-- **판정식 명시 (condition 1/4)**: `vsyncLock(desktop, sc) := rafFps ∈ [28,36] ∧ renderCapacityFps ≥ CAPACITY_FULL_MIN`. `CAPACITY_FULL_MIN` = CI calibration 확정값(잠정 45~50, H2 실측 후 박제).
+- **판정식 명시 (condition 1/4)**: `vsyncLock(desktop, sc) := rafFps ∈ [28,36] ∧ renderCapacityFps ≥ CAPACITY_FULL_MIN`. `CAPACITY_FULL_MIN` = CI calibration 확정값. **Amendment 1 정정**: 초안의 잠정 "45~50"(capacity 가 fps 오더일 것으로 예상)은 실측에서 **수백~수천 fps 오더**(동기 render() 루프는 vsync 대기 없이 최대 반복)로 확인됨 → 잠정 **400** (Amendment 1 §calibration 참조, Phase 1 simulate + 자연 락 확정).
 - **margin 독립 (condition 2)**: capacity 프로브는 baseline×(1−margin) 비교와 무관한 **별도 측정 경로**. margin 완화 0.
 
 #### `measureRenderCapacity` 프로브 안전 규약 (cross-validate 반영 — §7)
@@ -336,8 +336,58 @@ capacity 프로브가 락과 회귀를 분리 못하면(H3 지배), 단일 머�
 
 ---
 
+## Amendment 1 (2026-07-10) — Phase 0 게이트 실측: H2 확정 → Phase 1 착수
+
+> Phase 0 measurement-first 게이트(사용자 확정 §5) 실행. `--diagnose-variance` 에 render-capacity 프로브를 병기(커밋 843503f)한 뒤, feature 브랜치에서 CLI dispatch 로 정상(4x)/강저하(10x) 분포를 실측했다. **결론: H2(presentation-side 락) 확정 → 옵션 (b) 유효 → Phase 1 착수. §6 contingency 미발동.**
+
+### 측정 설정
+
+- diagnostic dispatch(`gh workflow run --ref feature/820-fps-vsync-lock -f diagnose_variance=true -f cpu_throttle=<rate> -f variance_samples=8`), CI ubuntu-latest swiftshader.
+- run 4x = [29088701248](https://github.com/coseo12/astro-simulator/actions/runs/29088701248), 10x = [29088104145](https://github.com/coseo12/astro-simulator/actions/runs/29088104145).
+- **부수 관찰(운영 절차)**: 3 rate 동시 dispatch 는 concurrency group(`workflow-sha`)이 동일해 서로 취소됨(4x/8x cancelled) → **순차 실측 필요**. Phase 1 에서 diagnostic dispatch 의 group 에 `cpu_throttle` 포함(진단끼리 병렬 허용) 개선 후보(§8).
+
+### 측정 결과 (rafFps p50 / renderCapacity p50, samples=8)
+
+| throttle | viewport/scenario | rafFps p50    | capacity p50 | capacity 범위 | 비율 |
+| -------- | ----------------- | ------------- | ------------ | ------------- | ---- |
+| **4x**   | desktop/default   | **33.2** ⚠️락 | **1069**     | 557.8~1289    | 32×  |
+| 4x       | desktop/earth     | **33.5** ⚠️락 | 1246         | 705.3~1316    | 37×  |
+| 4x       | desktop/moon      | **34.0** ⚠️락 | 1307         | 1240~1450     | 38×  |
+| 4x       | mobile/default    | 60.3 정상     | 1517         | 1189~1655     | 25×  |
+| 4x       | mobile/earth      | 60.3 정상     | 1695         | 1426~1852     | 28×  |
+| 4x       | mobile/moon       | 60.3 정상     | 1490         | 1362~1532     | 25×  |
+| **10x**  | desktop/default   | 14.3          | 427          | 66.2~639      | 30×  |
+| 10x      | desktop/earth     | 14.1          | 727          | 416~758       | 51×  |
+| 10x      | desktop/moon      | 14.8          | 858          | 729~887       | 58×  |
+| 10x      | mobile/default    | 18.7          | 719          | 129~844       | 38×  |
+| 10x      | mobile/earth      | 18.3          | 772          | 459~881       | 42×  |
+| 10x      | mobile/moon       | 18.4          | 736          | 554~815       | 40×  |
+
+### 판별 (H2 확정)
+
+1. **viewport 비대칭 자연 재현(운영 throttle 4x)**: desktop rafFps p50 33(대역 [28,36]) + mobile 60 정상 = #815 시그니처 정확 재현. 즉 **4x(운영 baseline) 에서도 desktop 이 30Hz 락 boundary** — 이번 runner 가 락 상태에 배정됨(락의 확률적 발생을 dispatch 에서 우연 포착).
+2. **H2 확정 / H3 배제**: 30Hz 락 상태(desktop 4x, rafFps 33)에서 capacity 1069~1307 = rafFps 의 **32~38배**. 락 desktop capacity(1069~1307)가 **정상 mobile 60Hz capacity(1490~1695)와 같은 오더** → 락은 렌더 능력 저하(H3)가 아니라 **presentation rate 만 vsync 반속으로 snap**(H2). rAF-count 는 실제 렌더 능력을 심각히 과소평가.
+3. **capacity 의 throttle 단조 반응**: 4x capacity ~1000~1700 → 10x ~430~860 (throttle 2.5배 강화 → capacity 대략 반감). 즉 capacity 는 실제 CPU raster 작업을 반영(정지 씬 no-op 아님) → **진짜 렌더 회귀 시 capacity 도 하락 → 옵션 (b) 가 진짜 회귀를 감지 가능**(condition 4 확증).
+4. **관찰 D 강화(baseline 재-baseline 근거)**: 4x desktop 33 재현은 baseline desktop default **49.9**(30/60 중간값)가 캡처 시점 **부분 락**을 포함했음을 뒷받침 → §8 재-baseline 근거 강화(별건).
+
+### `CAPACITY_FULL_MIN` calibration (잠정 400 — Phase 1 확정)
+
+- **초안 오더 정정**: architect 초안이 예상한 잠정 "45~50"(capacity 가 fps=60 근처일 것)은 오류. 실측 capacity 는 **수백~수천 fps 오더**(동기 render() 루프는 vsync 대기 없이 최대 반복 → "1초당 render() 호출 가능 횟수").
+- **판정식 게이트 구조**: `rafFps ∈ [28,36]` 이 선행 게이트 → `CAPACITY_FULL_MIN` 은 "대역 내 rafFps 가 **락이냐 회귀냐**"만 구분. rafFps 가 대역 밖(예 ≤ 20 심한 저하)이면 판정식 미적용 → 기존 회귀 경로가 처리.
+- **실측 하한**: 4x 에서 락/정상 capacity 최저 개별 샘플 = 557.8(desktop default 첫 = 워밍업 outlier), 워밍업 제외 실질 ≥ 700.
+- **잠정 CAPACITY_FULL_MIN = 400**: 락 실측 하한(~557)의 ~70%. 락은 통과(capacity 1000+ ≫ 400), 진짜 회귀(대역 내 rafFps 인데 capacity 가 락 상태의 절반 이하로 하락)만 배제. **운영 throttle 4x 고정 전제**(capacity 절대값은 throttle/머신 의존 → throttle 변경 시 재calibration).
+- **잔여 해석 여지(정직)**: capacity 절대값이 "풀 raster 처리량"인지 "정지 씬 render() 오버헤드 상당분"인지는 추가 여지 있으나, (a) throttle 단조 반응 + (b) 락/정상 동일 오더 두 실측이 H2 를 지지하기에 판별에는 충분. Phase 1 `simulate=regression`(capacity 저 주입)으로 판정식의 회귀 배제를 결정적 검증 + 머지 후 자연 락에서 `CAPACITY_FULL_MIN` 최종 확정(§5 DoD Phase 2).
+
+### DoD Phase 0 충족 확인
+
+- [x] render-capacity diagnostic 로컬 macOS 재진입/hang 없이 신뢰 측정(dev D1, developer 보고 — capacity 캡처 + 완주 + rafFps 재진입 무해)
+- [x] CI dispatch 정상 상태 capacity 분포 실측(4x — 위 표)
+- [x] CI dispatch throttle 강화로 rafFps 저하 유발 + capacity 실측 → **H2 확정 / H3 배제**(위 판별)
+- [x] 판별 결과 §Amendment 박제(본 섹션) + **Phase 1 진행 결정**(§6 contingency 미발동)
+
 ## 변경 이력
 
 - 2026-07-10: 초안 작성 (architect, #820 forensic — Provisional)
 - 2026-07-10: §7 cross-validate (agy) 통합 — (b) 채택 수렴 + b1/b2 분기 + `maxIterations` 가드 + 재진입 단일스레드 재분석(부분 반려) + calibration Provisional 잔존
 - 2026-07-10: **사용자 옵션 확정** — (b1)+(d)+(a)+(#779) 채택 + Q2 measurement-first **Phase 0 게이트 구현 전 선행** 상향(agy 원권고 채택) + Q4 재-baseline 별건 분리. **Provisional → Accepted 전이**
+- 2026-07-10: **Amendment 1** — Phase 0 게이트 실측(4x/10x diagnostic dispatch). **H2(presentation-side 락) 확정 / H3 배제** → 옵션 (b) 유효 → Phase 1 착수. `CAPACITY_FULL_MIN` 오더 정정(45~50 → 400 잠정). 4x 에서 30Hz 락 자연 재현(관찰 D 강화)
