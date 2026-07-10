@@ -28,6 +28,9 @@
  *   - 일반 실행: `node scripts/verify-fps-baseline.mjs`
  *   - baseline 갱신: `node scripts/verify-fps-baseline.mjs --update-baseline`
  *   - CI: `BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs`
+ *   - #820 Phase 0 진단 (측정 전용, 판정 없음): render-capacity 프로브를 rafFps 옆에 병기해
+ *     H2(presentation-side, capacity 정상) vs H3(deadline-miss, capacity 저)를 판별한다.
+ *     `CPU_THROTTLING_RATE=10 node scripts/verify-fps-baseline.mjs --diagnose-variance`
  *
  * 가드 도입 PR DoD §4축 (CLAUDE.md `### 가드 도입 PR DoD`):
  *   (1) 격리 동적 테스트 — 본 스크립트 단독 실행
@@ -63,7 +66,16 @@ const VARIANCE_SAMPLES = (() => {
   return 10;
 })();
 
-const CPU_THROTTLING_RATE = 4; // 4x slowdown — 저사양 기기 모의
+// #820 Phase 0 — CPU throttle rate env 오버라이드 (VARIANCE_SAMPLES 파싱 패턴 답습).
+//   기본 4x 유지 → 일반 실행(판정 경로)은 완전 불변. diagnostic dispatch 에서 8~10x 로 강화해
+//   데드라인 미스를 결정적 유발 → render-capacity 로 H2(presentation-side, capacity 정상) vs
+//   H3(deadline-miss, capacity 저) 판별 (ADR 20260710-820 §5 Phase 0 게이트).
+const CPU_THROTTLING_RATE = (() => {
+  const fromEnv = Number.parseInt(process.env.CPU_THROTTLING_RATE ?? '', 10);
+  // 양수만 허용 — 0/음수/비수치는 기본 4x 로 폴백 (VARIANCE_SAMPLES 동형 검증).
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return 4; // 4x slowdown — 저사양 기기 모의 (기본값)
+})();
 const MEASURE_DURATION_MS = 5_000; // noise 완화 위해 3초 → 5초 확장
 const MIN_FPS_ABSOLUTE = 30;
 const REGRESSION_MARGIN = 0.3; // baseline 대비 30% 저하 허용 (rAF noise ±12% 실측 후 보수 마진)
@@ -111,6 +123,50 @@ async function measureFps(page, durationMs) {
         requestAnimationFrame(loop);
       }),
     durationMs,
+  );
+}
+
+/**
+ * #820 Phase 0 — render-capacity 프로브 (측정 전용, H2/H3 판별 게이트).
+ *
+ * rAF(vsync presentation rate) 를 우회한 순수 CPU raster 처리량을 측정한다. `page.evaluate` 내
+ * 동기 렌더 루프로 `scene.render()` 를 최대 속도로 반복해 "앱이 얼마나 빠르게 렌더 가능한가"의
+ * vsync-decoupled 프록시를 얻는다. 30Hz vsync 락 상태에서 rafFps 는 ~30 이지만 capacity 가
+ * 여전히 높으면 H2(presentation-side, 락은 아티팩트), capacity 도 낮으면 H3(deadline-miss,
+ * 진짜 렌더 느림)로 판별한다. (ADR 20260710-820-fps-vsync-lock-forensic.md §5 프로브 안전 규약)
+ *
+ * 안전 규약 (ADR §5 — cross-validate agy 수용):
+ *   - 워밍업(warmupMs, 카운트 제외) — GC/JIT 안정화로 벤치마크 오염 완화.
+ *   - 측정은 시간(windowMs) AND 반복(maxIterations) 2중 종료조건 — CPU throttle + 클럭 정밀도
+ *     하에서 시간 루프가 hang 될 위험을 반복 상한으로 원천 봉쇄(좀비 방지).
+ *   - 재진입: page.evaluate 내 동기 루프라 JS 단일 스레드가 rAF runRenderLoop 를 프로브 동안
+ *     starve → 진짜 동시성 없음 (별도 pause API 불요, 무침범 b1 유지).
+ *   - null 가드: __simCore.scene 부재 시 throw 아닌 null 반환 (미상 → 실패 방향 fail-safe).
+ *
+ * Phase 0 범위 엄수: 측정만 수행. 감지/분류/판정 로직은 Phase 1 — 본 함수는 값만 반환한다.
+ */
+async function measureRenderCapacity(
+  page,
+  { windowMs = 150, warmupMs = 50, maxIterations = 5000 } = {},
+) {
+  return page.evaluate(
+    ({ windowMs, warmupMs, maxIterations }) => {
+      const scene = /** @type {any} */ (window).__simCore?.scene;
+      if (!scene || typeof scene.render !== 'function') return null;
+      // 워밍업 — GC/JIT 안정화 (카운트 제외).
+      const w0 = performance.now();
+      while (performance.now() - w0 < warmupMs) scene.render();
+      // 측정 — 시간 AND 반복횟수 2중 종료조건.
+      let n = 0;
+      const s0 = performance.now();
+      while (performance.now() - s0 < windowMs && n < maxIterations) {
+        scene.render();
+        n += 1;
+      }
+      const elapsed = performance.now() - s0;
+      return elapsed > 0 ? (n * 1000) / elapsed : null;
+    },
+    { windowMs, warmupMs, maxIterations },
   );
 }
 
@@ -292,11 +348,17 @@ await client.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLING_RATE 
 // #709 — variance 진단 모드: 판정 없이 각 scenario N회 연속 측정 → 분포 통계 박제 후 종료.
 if (DIAGNOSE_VARIANCE) {
   console.log(
-    `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x`,
+    `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x` +
+      ` (+ #820 render-capacity 프로브 병기 — H2/H3 판별)`,
   );
   const report = {
     measuredAt: new Date().toISOString().slice(0, 10),
     samples: VARIANCE_SAMPLES,
+    // #820 Phase 0 — 실제 사용 CPU throttle rate 박제 (env 오버라이드 반영). 8~10x diagnostic
+    //   에서 어떤 rate 로 데드라인 미스를 유발했는지 보고서 단독 판독 가능하게 한다.
+    environment: {
+      cpuThrottling: `${CPU_THROTTLING_RATE}x`,
+    },
     viewports: {},
   };
   for (const vp of VIEWPORTS) {
@@ -312,14 +374,32 @@ if (DIAGNOSE_VARIANCE) {
     for (const sc of SCENARIOS) {
       const diag = await setupScenario(page, sc);
       const samples = [];
+      // #820 Phase 0 — rafFps 샘플과 나란히 render-capacity 프로브를 캡처. null(scene 부재)은
+      //   제외 수집 → 전 샘플 null 이면 renderCapacity=null 박제(실패 방향 fail-safe).
+      const capacitySamples = [];
       for (let i = 0; i < VARIANCE_SAMPLES; i += 1) {
         samples.push(+(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1));
+        const cap = await measureRenderCapacity(page);
+        if (cap !== null) capacitySamples.push(+cap.toFixed(1));
       }
       const s = fpsStats(samples);
-      report.viewports[vp.id][sc.id] = { samples, ...s, tier: diag.tier, override: diag.override };
+      // #820 — capacity 통계는 기존 fpsStats 재사용 (min/max/mean/std/cv/p50 동형).
+      const capStats = capacitySamples.length > 0 ? fpsStats(capacitySamples) : null;
+      report.viewports[vp.id][sc.id] = {
+        samples,
+        ...s,
+        tier: diag.tier,
+        override: diag.override,
+        renderCapacity: capStats ? { samples: capacitySamples, ...capStats } : null,
+      };
+      const capStr = capStats
+        ? `min=${capStats.min} max=${capStats.max} mean=${capStats.mean} std=${capStats.std} cv=${capStats.cv}% p50=${capStats.p50}`
+        : 'null (__simCore.scene 부재)';
       console.log(
-        `  ${sc.label}: min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
-          `(tier=${diag.tier} override=${diag.override})\n    samples=[${samples.join(', ')}]`,
+        `  ${sc.label}: rafFps min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
+          `(tier=${diag.tier} override=${diag.override})\n    rafFps samples=[${samples.join(', ')}]` +
+          `\n    renderCapacity: ${capStr}` +
+          (capStats ? `\n    capacity samples=[${capacitySamples.join(', ')}]` : ''),
       );
     }
   }

@@ -47,6 +47,13 @@ on:
         description: 'scenario 당 측정 샘플 수 (진단 모드)'
         type: string
         default: '10'
+      # #820 Phase 0 — CPU throttle rate 오버라이드 (진단 모드 전용). 8~10x 로 데드라인 미스를
+      #   결정적 유발 → render-capacity 프로브로 H2(presentation-side) vs H3(deadline-miss) 판별.
+      #   기본 4 유지 (판정 경로 불변). CLI `gh workflow run --ref feature/*` 는 ref 브랜치 정의를 따름.
+      cpu_throttle:
+        description: 'CPU throttling rate (진단 모드 — 8~10x 로 데드라인 미스 유발, 기본 4)'
+        type: string
+        default: '4'
       # #779 — escalation 시뮬레이션 test hook (ADR 20260701-779 §A1 부수 결정). 기본 none, 수동 전용.
       #   flake: measure guard 만 강제 fail → retry-fresh-runner 실측 pass 기대 (recovery 실증, 메일 0)
       #   regression: 양 job guard 강제 fail → workflow failure 기대 (negative 실증, fail 메일 1통 의도됨)
@@ -78,9 +85,10 @@ jobs:
           start-dev-server: 'true'
 
       # #709 — variance 진단 (workflow_dispatch 전용). 판정 없이 N회 측정 후 분포 박제.
+      # #820 Phase 0 — CPU_THROTTLING_RATE 전달로 데드라인 미스 유발 (8~10x). render-capacity 병기 캡처.
       - name: FPS variance 진단
         if: github.event_name == 'workflow_dispatch' && inputs.diagnose_variance == true
-        run: BASE_URL=http://localhost:3001 VARIANCE_SAMPLES=${{ inputs.variance_samples }} node scripts/verify-fps-baseline.mjs --diagnose-variance
+        run: BASE_URL=http://localhost:3001 VARIANCE_SAMPLES=${{ inputs.variance_samples }} CPU_THROTTLING_RATE=${{ inputs.cpu_throttle }} node scripts/verify-fps-baseline.mjs --diagnose-variance
 
       # #709 — 전역 부하 spike flake 흡수 (measurement-first 결론: best-of-N 으로는 흡수 불가,
       #   docs/benchmarks/fps-variance-diagnosis-20260619.json). 1차 fail 시 1회 자동 재측정
