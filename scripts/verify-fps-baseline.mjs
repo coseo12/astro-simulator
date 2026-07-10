@@ -28,6 +28,14 @@
  *   - 일반 실행: `node scripts/verify-fps-baseline.mjs`
  *   - baseline 갱신: `node scripts/verify-fps-baseline.mjs --update-baseline`
  *   - CI: `BASE_URL=http://localhost:3001 node scripts/verify-fps-baseline.mjs`
+ *   - #820 Phase 0 진단 (측정 전용, 판정 없음): render-capacity 프로브를 rafFps 옆에 병기해
+ *     H2(presentation-side, capacity 정상) vs H3(deadline-miss, capacity 저)를 판별한다.
+ *     `CPU_THROTTLING_RATE=10 node scripts/verify-fps-baseline.mjs --diagnose-variance`
+ *   - #820 Phase 1 판정 (H2 확정 후): 최종 rafFps 가 30Hz 락 대역 [28,36] 이면 render-capacity
+ *     프로브로 락(capacity ≥ CAPACITY_FULL_MIN, presentation 아티팩트)/회귀(capacity 저)를 분류.
+ *     락은 회귀 실패에서 제외 + STEP_SUMMARY annotation. fail-fast 불변식 — capacity 양성 입증
+ *     하에서만 흡수 (capacity 저/null 은 대역 안이어도 흡수 안 함). 결정적 검증용 script-level simulate:
+ *     `SIMULATE_VSYNC_LOCK=1 …`(→ 락, exit 0) / `SIMULATE_REGRESSION=1 …`(→ 회귀, exit 1).
  *
  * 가드 도입 PR DoD §4축 (CLAUDE.md `### 가드 도입 PR DoD`):
  *   (1) 격리 동적 테스트 — 본 스크립트 단독 실행
@@ -36,7 +44,7 @@
  *   (4) 메타 안정성 — rAF noise ±5% 인지, 회귀 임계 ±10% margin 적용
  */
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -63,7 +71,16 @@ const VARIANCE_SAMPLES = (() => {
   return 10;
 })();
 
-const CPU_THROTTLING_RATE = 4; // 4x slowdown — 저사양 기기 모의
+// #820 Phase 0 — CPU throttle rate env 오버라이드 (VARIANCE_SAMPLES 파싱 패턴 답습).
+//   기본 4x 유지 → 일반 실행(판정 경로)은 완전 불변. diagnostic dispatch 에서 8~10x 로 강화해
+//   데드라인 미스를 결정적 유발 → render-capacity 로 H2(presentation-side, capacity 정상) vs
+//   H3(deadline-miss, capacity 저) 판별 (ADR 20260710-820 §5 Phase 0 게이트).
+const CPU_THROTTLING_RATE = (() => {
+  const fromEnv = Number.parseInt(process.env.CPU_THROTTLING_RATE ?? '', 10);
+  // 양수만 허용 — 0/음수/비수치는 기본 4x 로 폴백 (VARIANCE_SAMPLES 동형 검증).
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return 4; // 4x slowdown — 저사양 기기 모의 (기본값)
+})();
 const MEASURE_DURATION_MS = 5_000; // noise 완화 위해 3초 → 5초 확장
 const MIN_FPS_ABSOLUTE = 30;
 const REGRESSION_MARGIN = 0.3; // baseline 대비 30% 저하 허용 (rAF noise ±12% 실측 후 보수 마진)
@@ -85,6 +102,27 @@ const REGRESSION_MARGIN = 0.3; // baseline 대비 30% 저하 허용 (rAF noise �
 //   레벨 1회 자동 재시도 (fps-baseline-guard.yml, 시간차/새 시도로 spike 회피 + 메일 차단).
 const LOD_SETTLE_TIMEOUT_MS = 8_000;
 const MEASURE_MAX_ATTEMPTS = 3;
+
+// #820 Phase 1 — vsync 30Hz 반속 락 감지·분류 상수 (ADR 20260710-820-fps-vsync-lock-forensic.md §5).
+//   판정식: vsyncLock(viewport, sc) := rafFps ∈ [VSYNC_BAND_LO, VSYNC_BAND_HI]
+//                                      ∧ renderCapacityFps ≥ CAPACITY_FULL_MIN
+//   낮은 rafFps 는 분류만으로 절대 PASS 안 됨 — capacity 양성 측정이 있을 때만 락으로 흡수 (fail-fast 불변식).
+const VSYNC_BAND_LO = 28; // 30Hz 락 대역 하한 (이슈 #820 명시)
+const VSYNC_BAND_HI = 36; // 30Hz 락 대역 상한 (이슈 #820 명시)
+// CAPACITY_FULL_MIN — 대역 내 rafFps 가 "락(presentation 아티팩트)이냐 진짜 회귀냐" 를 가르는
+//   render-capacity 하한. Phase 1 simulate + 자연 락 확정 기준, 4x 운영 throttle 전제,
+//   락 실측 하한 ~557 (Amendment 1, 4x desktop capacity 557.8~1450) 의 70% → 잠정 400.
+//   throttle/머신 의존 절대값이므로 머지 후 자연 락에서 최종 확정 (ADR §5 Phase 2 / §6 재검토 2).
+const CAPACITY_FULL_MIN = 400;
+
+// #820 Phase 1 — script-level simulate hook (분류 로직 결정적 검증, #779 워크플로 레벨 hook 과 직교).
+//   SIMULATE_VSYNC_LOCK=1 → desktop rafFps=대역(31) + capacity=healthy(1000) + mobile=full(60)
+//     → 분류=락 → 최종 PASS + annotation (락 흡수 경로 재현).
+//   SIMULATE_REGRESSION=1 → desktop rafFps=대역(30) + capacity=저(300) + mobile=동반 저(25)
+//     → 분류=회귀 → 최종 FAIL (진짜 회귀 미은폐 재현 — capacity 저는 대역 안이어도 흡수 안 됨).
+//   미설정 시 실측 (기존 판정 경로 완전 불변). 주입은 measureFps/measureRenderCapacity wrapper 로만 캡슐화.
+const SIMULATE_VSYNC_LOCK = process.env.SIMULATE_VSYNC_LOCK === '1';
+const SIMULATE_REGRESSION = process.env.SIMULATE_REGRESSION === '1';
 
 const VIEWPORTS = [
   { id: 'desktop', width: 1280, height: 720 },
@@ -112,6 +150,75 @@ async function measureFps(page, durationMs) {
       }),
     durationMs,
   );
+}
+
+/**
+ * #820 Phase 0 — render-capacity 프로브 (측정 전용, H2/H3 판별 게이트).
+ *
+ * rAF(vsync presentation rate) 를 우회한 순수 CPU raster 처리량을 측정한다. `page.evaluate` 내
+ * 동기 렌더 루프로 `scene.render()` 를 최대 속도로 반복해 "앱이 얼마나 빠르게 렌더 가능한가"의
+ * vsync-decoupled 프록시를 얻는다. 30Hz vsync 락 상태에서 rafFps 는 ~30 이지만 capacity 가
+ * 여전히 높으면 H2(presentation-side, 락은 아티팩트), capacity 도 낮으면 H3(deadline-miss,
+ * 진짜 렌더 느림)로 판별한다. (ADR 20260710-820-fps-vsync-lock-forensic.md §5 프로브 안전 규약)
+ *
+ * 안전 규약 (ADR §5 — cross-validate agy 수용):
+ *   - 워밍업(warmupMs, 카운트 제외) — GC/JIT 안정화로 벤치마크 오염 완화.
+ *   - 측정은 시간(windowMs) AND 반복(maxIterations) 2중 종료조건 — CPU throttle + 클럭 정밀도
+ *     하에서 시간 루프가 hang 될 위험을 반복 상한으로 원천 봉쇄(좀비 방지).
+ *   - 재진입: page.evaluate 내 동기 루프라 JS 단일 스레드가 rAF runRenderLoop 를 프로브 동안
+ *     starve → 진짜 동시성 없음 (별도 pause API 불요, 무침범 b1 유지).
+ *   - null 가드: __simCore.scene 부재 시 throw 아닌 null 반환 (미상 → 실패 방향 fail-safe).
+ *
+ * Phase 0 범위 엄수: 측정만 수행. 감지/분류/판정 로직은 Phase 1 — 본 함수는 값만 반환한다.
+ */
+async function measureRenderCapacity(
+  page,
+  { windowMs = 150, warmupMs = 50, maxIterations = 5000 } = {},
+) {
+  return page.evaluate(
+    ({ windowMs, warmupMs, maxIterations }) => {
+      const scene = /** @type {any} */ (window).__simCore?.scene;
+      if (!scene || typeof scene.render !== 'function') return null;
+      // 워밍업 — GC/JIT 안정화 (카운트 제외).
+      const w0 = performance.now();
+      while (performance.now() - w0 < warmupMs) scene.render();
+      // 측정 — 시간 AND 반복횟수 2중 종료조건.
+      let n = 0;
+      const s0 = performance.now();
+      while (performance.now() - s0 < windowMs && n < maxIterations) {
+        scene.render();
+        n += 1;
+      }
+      const elapsed = performance.now() - s0;
+      return elapsed > 0 ? (n * 1000) / elapsed : null;
+    },
+    { windowMs, warmupMs, maxIterations },
+  );
+}
+
+/**
+ * #820 Phase 1 — simulate 주입 wrapper (측정 호출 캡슐화). env 미설정 시 실측 그대로 위임.
+ *   주입 지점을 이 두 함수로 격리 → 스크립트 전반(setup/navigation/판정) 오염 0. (ADR §5 주입 캡슐화)
+ */
+async function measureFpsInjectable(page, durationMs, viewportId) {
+  if (SIMULATE_VSYNC_LOCK) {
+    // desktop 은 30Hz 락 대역(31), mobile 은 full-rate(60) — viewport 비대칭 락 재현.
+    return viewportId === 'desktop' ? 31 : 60;
+  }
+  if (SIMULATE_REGRESSION) {
+    // desktop 은 대역 내(30) 저하 → capacity 프로브 발동 → 회귀 분류 검증(대역 안 미은폐).
+    //   mobile 은 대역 밖 동반 저하(25) → 전역 회귀(비-락) 재현.
+    return viewportId === 'desktop' ? 30 : 25;
+  }
+  return measureFps(page, durationMs);
+}
+
+async function measureRenderCapacityInjectable(page) {
+  // 락 시뮬레이션 → healthy capacity(≥ CAPACITY_FULL_MIN) 로 "빠르게 렌더 가능" 양성 입증.
+  if (SIMULATE_VSYNC_LOCK) return 1000;
+  // 회귀 시뮬레이션 → 저 capacity(< CAPACITY_FULL_MIN) 로 "실제 렌더 느림" 입증 (흡수 차단).
+  if (SIMULATE_REGRESSION) return 300;
+  return measureRenderCapacity(page);
 }
 
 /**
@@ -186,7 +293,9 @@ async function measureScenario(page, scenario) {
   const attempts = [];
   let fps = 0;
   for (let i = 0; i < MEASURE_MAX_ATTEMPTS; i += 1) {
-    const v = +(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1);
+    const v = +(await measureFpsInjectable(page, MEASURE_DURATION_MS, currentViewportId)).toFixed(
+      1,
+    );
     attempts.push(v);
     fps = Math.max(fps, v);
     const base = baselineForCompare?.viewports?.[currentViewportId]?.[scenario.id];
@@ -194,7 +303,27 @@ async function measureScenario(page, scenario) {
     const passesRegression = base === undefined || v >= base * (1 - REGRESSION_MARGIN);
     if (passesAbsolute && passesRegression) break; // 첫 통과 시 재측정 불필요
   }
-  return { fps, attempts, diag };
+
+  // #820 Phase 1 — vsync 락 band 감지 + render-capacity 분류.
+  //   최종 rafFps 가 30Hz 락 대역 [VSYNC_BAND_LO, VSYNC_BAND_HI] 이면 capacity 프로브 1회로
+  //   락(presentation 아티팩트)/회귀(진짜 렌더 느림)를 판별. 대역 밖(정상 60 / 심한 저하 <28)이면
+  //   프로브 생략 → vsyncLock=false → 정상 경로 오버헤드 0 (#820 정상 경로 회귀 0 제약).
+  let vsyncLock = false;
+  let renderCapacity = null;
+  if (fps >= VSYNC_BAND_LO && fps <= VSYNC_BAND_HI) {
+    const cap = await measureRenderCapacityInjectable(page);
+    renderCapacity = cap !== null ? +cap.toFixed(1) : null;
+    // fail-fast 불변식: capacity 양성 측정(≥ CAPACITY_FULL_MIN)일 때만 락 흡수.
+    //   capacity 저(< MIN) 또는 null(scene 부재) → 락 아님 → 기존 FAIL 경로 (회귀 미은폐).
+    vsyncLock = renderCapacity !== null && renderCapacity >= CAPACITY_FULL_MIN;
+    console.log(
+      `    └ #820 band 감지: ${currentViewportId}/${scenario.id} rafFps=${fps} ∈ ` +
+        `[${VSYNC_BAND_LO},${VSYNC_BAND_HI}], capacity=${renderCapacity ?? 'null'} → ` +
+        `${vsyncLock ? 'vsync 락 (흡수 후보)' : '회귀 (capacity 미달 — 흡수 안 함)'}`,
+    );
+  }
+
+  return { fps, attempts, diag, vsyncLock, renderCapacity };
 }
 
 // 재측정 판정에 쓰는 현재 viewport/baseline (measureScenario 가 모듈 스코프에서 참조).
@@ -216,9 +345,10 @@ async function measureViewport(page, client, viewport) {
   const diagnostics = {};
   for (const sc of SCENARIOS) {
     console.log(`  ${viewport.id} / ${sc.label} 측정 중...`);
-    const { fps, attempts, diag } = await measureScenario(page, sc);
+    const { fps, attempts, diag, vsyncLock, renderCapacity } = await measureScenario(page, sc);
     results[sc.id] = fps;
-    diagnostics[sc.id] = { attempts, ...diag };
+    // #820 — vsyncLock/renderCapacity 를 진단에 병기 (compareBaseline 이 흡수 판정에 참조).
+    diagnostics[sc.id] = { attempts, vsyncLock, renderCapacity, ...diag };
     // #680 진단 로깅 — fail 분석의 핵심 (tier/override/lodCounts + 재측정 attempts).
     console.log(
       `    └ LOD diag: tier=${diag.tier} override=${diag.override} ` +
@@ -231,6 +361,7 @@ async function measureViewport(page, client, viewport) {
 
 function compareBaseline(current, baseline) {
   const failures = [];
+  const absorptions = []; // #820 — vsync 락으로 흡수된 scenario 목록 (annotation 기록용)
   for (const vp of VIEWPORTS) {
     for (const sc of SCENARIOS) {
       const cur = current.viewports[vp.id]?.[sc.id];
@@ -239,10 +370,23 @@ function compareBaseline(current, baseline) {
         failures.push(`[${vp.id}/${sc.id}] baseline 또는 측정 누락`);
         continue;
       }
-      if (cur < MIN_FPS_ABSOLUTE) {
+      const belowAbsolute = cur < MIN_FPS_ABSOLUTE;
+      const belowRegression = cur < base * (1 - REGRESSION_MARGIN);
+      if (!belowAbsolute && !belowRegression) continue; // 정상 — 실패 아님
+
+      // #820 Phase 1 — vsync 락 흡수. capacity 양성 입증(vsyncLock=true) 하에서만 회귀 실패에서 제외.
+      //   fail-fast 불변식: vsyncLock 은 measureScenario 에서 rafFps ∈ band ∧ capacity ≥ CAPACITY_FULL_MIN
+      //   일 때만 true → capacity 저/null 은 여기 도달해도 흡수 안 됨 (기존 FAIL 유지, 진짜 회귀 미은폐).
+      const diag = current.diagnostics?.[vp.id]?.[sc.id];
+      if (diag?.vsyncLock === true) {
+        absorptions.push({ vp: vp.id, sc: sc.id, rafFps: cur, capacity: diag.renderCapacity });
+        continue; // 회귀 실패 목록에서 제외
+      }
+
+      if (belowAbsolute) {
         failures.push(`[${vp.id}/${sc.id}] 절대 임계 미달: ${cur} FPS < ${MIN_FPS_ABSOLUTE} FPS`);
       }
-      if (cur < base * (1 - REGRESSION_MARGIN)) {
+      if (belowRegression) {
         const dropPct = (((base - cur) / base) * 100).toFixed(1);
         failures.push(
           `[${vp.id}/${sc.id}] baseline 회귀 ${dropPct}%: ${base} → ${cur} FPS (margin ${REGRESSION_MARGIN * 100}%)`,
@@ -250,7 +394,19 @@ function compareBaseline(current, baseline) {
       }
     }
   }
-  return failures;
+  return { failures, absorptions };
+}
+
+// #820 Phase 1 — GITHUB_STEP_SUMMARY 파일에 append (CI 는 GitHub 이 주입; 로컬/미CI 는 미설정 → no-op).
+//   #779 흡수 기록 패턴(retry-fresh-runner STEP_SUMMARY)을 script-level 로 확장. 경계 회귀 추적용.
+function appendStepSummary(lines) {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (!summaryPath) return; // 로컬 실행 — no-op (판정 무관).
+  try {
+    appendFileSync(summaryPath, lines.join('\n') + '\n');
+  } catch {
+    // STEP_SUMMARY append 실패는 판정에 영향 없음 (best-effort 기록).
+  }
 }
 
 // #709 — variance 진단 통계. cv (변동계수 = std/mean %) 가 best-of-N / margin 결정의 핵심 지표.
@@ -292,11 +448,17 @@ await client.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLING_RATE 
 // #709 — variance 진단 모드: 판정 없이 각 scenario N회 연속 측정 → 분포 통계 박제 후 종료.
 if (DIAGNOSE_VARIANCE) {
   console.log(
-    `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x`,
+    `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x` +
+      ` (+ #820 render-capacity 프로브 병기 — H2/H3 판별)`,
   );
   const report = {
     measuredAt: new Date().toISOString().slice(0, 10),
     samples: VARIANCE_SAMPLES,
+    // #820 Phase 0 — 실제 사용 CPU throttle rate 박제 (env 오버라이드 반영). 8~10x diagnostic
+    //   에서 어떤 rate 로 데드라인 미스를 유발했는지 보고서 단독 판독 가능하게 한다.
+    environment: {
+      cpuThrottling: `${CPU_THROTTLING_RATE}x`,
+    },
     viewports: {},
   };
   for (const vp of VIEWPORTS) {
@@ -312,14 +474,32 @@ if (DIAGNOSE_VARIANCE) {
     for (const sc of SCENARIOS) {
       const diag = await setupScenario(page, sc);
       const samples = [];
+      // #820 Phase 0 — rafFps 샘플과 나란히 render-capacity 프로브를 캡처. null(scene 부재)은
+      //   제외 수집 → 전 샘플 null 이면 renderCapacity=null 박제(실패 방향 fail-safe).
+      const capacitySamples = [];
       for (let i = 0; i < VARIANCE_SAMPLES; i += 1) {
         samples.push(+(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1));
+        const cap = await measureRenderCapacity(page);
+        if (cap !== null) capacitySamples.push(+cap.toFixed(1));
       }
       const s = fpsStats(samples);
-      report.viewports[vp.id][sc.id] = { samples, ...s, tier: diag.tier, override: diag.override };
+      // #820 — capacity 통계는 기존 fpsStats 재사용 (min/max/mean/std/cv/p50 동형).
+      const capStats = capacitySamples.length > 0 ? fpsStats(capacitySamples) : null;
+      report.viewports[vp.id][sc.id] = {
+        samples,
+        ...s,
+        tier: diag.tier,
+        override: diag.override,
+        renderCapacity: capStats ? { samples: capacitySamples, ...capStats } : null,
+      };
+      const capStr = capStats
+        ? `min=${capStats.min} max=${capStats.max} mean=${capStats.mean} std=${capStats.std} cv=${capStats.cv}% p50=${capStats.p50}`
+        : 'null (__simCore.scene 부재)';
       console.log(
-        `  ${sc.label}: min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
-          `(tier=${diag.tier} override=${diag.override})\n    samples=[${samples.join(', ')}]`,
+        `  ${sc.label}: rafFps min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
+          `(tier=${diag.tier} override=${diag.override})\n    rafFps samples=[${samples.join(', ')}]` +
+          `\n    renderCapacity: ${capStr}` +
+          (capStats ? `\n    capacity samples=[${capacitySamples.join(', ')}]` : ''),
       );
     }
   }
@@ -398,7 +578,32 @@ if (!existsSync(baselinePath)) {
 }
 
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-const failures = compareBaseline(current, baseline);
+const { failures, absorptions } = compareBaseline(current, baseline);
+
+// #820 Phase 1 — vsync 락 흡수 기록 (console + GITHUB_STEP_SUMMARY). 흡수는 진짜 회귀와 별개로
+//   항상 로깅 (다른 진짜 회귀와 공존해도 흡수 사실은 남긴다). 경계 회귀 추적 — #779 흡수 패턴.
+if (absorptions.length > 0) {
+  console.log('\n[#820 vsync 락 흡수]');
+  for (const a of absorptions) {
+    // (a) 보조 신호 — 반대편 viewport 대응 scenario full-rate 여부 (corroborating 로그, 단독 판정 아님).
+    const oppo = a.vp === 'desktop' ? 'mobile' : 'desktop';
+    const oppoFps = current.viewports?.[oppo]?.[a.sc];
+    const oppoStr =
+      oppoFps !== undefined && oppoFps > VSYNC_BAND_HI
+        ? `${oppo}/${a.sc}=full-rate(${oppoFps}) ✓ 비대칭 락 corroborate`
+        : `${oppo}/${a.sc}=${oppoFps ?? 'n/a'}`;
+    console.log(
+      `  ⚠ #820 vsync 락 흡수 — [${a.vp}/${a.sc}] rafFps=${a.rafFps} band, ` +
+        `capacity=${a.capacity} ≥ ${CAPACITY_FULL_MIN} → presentation 아티팩트 (진짜 회귀 아님) [보조: ${oppoStr}]`,
+    );
+    appendStepSummary([
+      `### ⚠ #820 vsync 락 흡수 — [${a.vp}/${a.sc}]`,
+      `- rafFps=${a.rafFps} ∈ [${VSYNC_BAND_LO},${VSYNC_BAND_HI}] band + capacity=${a.capacity} ≥ ${CAPACITY_FULL_MIN} → presentation 아티팩트 (진짜 회귀 아님)`,
+      `- 보조 신호: ${oppoStr}`,
+      `- ADR 20260710-820 §5 — capacity 양성 입증 하 흡수. 반복 관찰 시 CAPACITY_FULL_MIN 재calibration (§6 재검토 2)`,
+    ]);
+  }
+}
 
 if (failures.length > 0) {
   console.log('\n✗ 회귀 감지:');
@@ -416,6 +621,7 @@ if (failures.length > 0) {
         (fps < MIN_FPS_ABSOLUTE || fps < base * (1 - REGRESSION_MARGIN));
       if (!failed) continue;
       const diag = current.diagnostics[vp.id]?.[sc.id];
+      if (diag?.vsyncLock === true) continue; // #820 — 락 흡수 scenario 는 회귀 진단 대상 아님
       if (diag?.tier === 'c' && diag?.override !== 'low') raceLost.push(`${vp.id}/${sc.id}`);
       else settledButSlow.push(`${vp.id}/${sc.id}`);
     }
@@ -433,6 +639,10 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('\n✓ baseline 대비 회귀 없음');
+console.log(
+  absorptions.length > 0
+    ? `\n✓ baseline 대비 회귀 없음 (#820 vsync 락 ${absorptions.length}건 흡수 — presentation 아티팩트)`
+    : '\n✓ baseline 대비 회귀 없음',
+);
 writeFileSync(join(reportDir, 'current.json'), JSON.stringify(current, null, 2) + '\n');
 process.exit(0);
