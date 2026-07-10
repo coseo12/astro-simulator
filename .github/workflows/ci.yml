@@ -79,6 +79,16 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-zombie-check.mjs') != ''
         run: pnpm run --if-present verify:zombie-check
 
+      # #817 세션 중단 dead-wait 가드 (가드 D) SSoT 박제 + self-test 회귀 가드.
+      # CLAUDE.md 가드 D / settings.json hook 등록 / hook 파일 / ADR / sidecar 5건 정합 +
+      # --self-test 3중 시뮬(positive→negative→recovery)로 hook 동작 실측 검증.
+      # 근거: docs/decisions/20260710-817-dead-wait-guard.md
+      - name: '#817 세션 dead-wait 가드 SSoT + self-test (verify:dead-wait-check)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-dead-wait-check.mjs') != ''
+        run: |
+          pnpm run --if-present verify:dead-wait-check
+          node scripts/verify-dead-wait-check.mjs --self-test
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================

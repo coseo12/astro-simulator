@@ -346,6 +346,27 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 
 - **세션 시작 시점 좀비 검출 hook**: `.claude/hooks/session-start-zombie-check.sh` 가 SessionStart hook 으로 등록되어 (`.claude/settings.json`) Claude Code 세션 시작 시 자동 실행. ETIME 30분 이상 `next dev` / `next-server` / `cargo .*test` / `pnpm.*dev` 프로세스 발견 시 stdout 으로 PID/ETIME/command 출력 → Claude 가 사용자에게 정리 권고. exit 0 (블록 안 함, 경고만). 가드 A/B 가 **본 세션 안의 spawn 시점** 가드라면 가드 C 는 **세션 시작 진입 시점** 가드 — 사용자가 인지하기 전 자동 검출. SSoT 박제 회귀 차단은 `scripts/verify-zombie-check.mjs` (CI 통합) 가 담당.
 
+#### 가드 D — 세션 중단 dead-wait (대기 라이프사이클 + fallback heartbeat)
+
+가드 A/B/C 가 **좀비 프로세스**(포트 점유·CPU 폭주)를 다룬다면, 가드 D 는 **대기 라이프사이클** 을 다루는 직교 확장이다. 세션(Conductor) 재시작 시 background watch·sub-agent 는 SIGKILL 로 소멸(exit 137, 실측 5회)하지만 메인 컨텍스트에는 "대기 중" 만 남아 **아무것도 모델을 재호출하지 않는 무기한 침묵(dead-wait)** 이 발생한다 — 사용자는 진행 중으로 오인한다. 반면 `ScheduleWakeup` 스케줄은 세션 재시작에도 지속 발화(실측 5회+)하므로 **dead-man's switch** 로 쓸 수 있다. 3계층 방어(우선순위 순):
+
+- **(1) fallback heartbeat — 1차 하드 보증 (의무)**: 모든 background 대기(sub-agent background spawn / CI run watch)에 장기 fallback `ScheduleWakeup`(1200~1800s)를 **병행 예약**한다. notification 선착 시 no-op, 세션 재시작 시 **유일한 재호출 신호**. ScheduleWakeup 은 **단발성** 이므로 **대기 해소 시 재예약하지 않는다(자연 종료)** — 명시적 취소 API 불필요. (2026-07-09 #790 부터 선적용 — reviewer/qa heartbeat 전부 no-op = 정상.)
+- **(2) SessionStart 복구 훅 — 2차 결정적 노출**: `.claude/hooks/session-start-dead-wait-check.sh` 가 SessionStart hook 으로 등록(`.claude/settings.json`, 3번째 hook). 세션 시작 시 `.context/pending-waits.json` 의 미해소 대기(Grace Period 60s 초과)를 stdout 경고로 노출(exit 0, 블록 안 함). 모델은 대기 재개 대신 즉시 상태 재확인. **Grace Period** 는 세션 종료 직후 재시작 시 방금 진입한 대기를 오탐하지 않기 위함(가드 C ETIME 임계값과 동형). 훅은 **검출만** 하고 자동 정리하지 않는다(masking 방지, fail-visible).
+- **(3) `.context/pending-waits.json` — 3차 맥락 상세 (best-effort)**: 어떤 대기가 미해소인지 목록. 훅(2차)이 읽어 노출할 데이터 소스. 파일 write 는 best-effort — 누락돼도 heartbeat(1차)가 침묵을 깨므로 **크리티컬 패스 밖**(B2 heartbeat-우선).
+
+**pending-waits 기록/제거 규약** (메인 오케스트레이터 전용 행동):
+
+- **기록**: background 대기 진입 시 → `waits[]` 에 `{ id: "<kind>:<식별자>", kind: "sub-agent"|"ci-run", description, created_at, wakeup_scheduled }` append **+ 동시에 fallback ScheduleWakeup 예약**. 두 동작을 **하나의 정신적 원자 단위** 로 묶는다("대기 진입 = wakeup 예약 + pending-waits 기록"). 쓰기는 임시 파일 + 원자적 rename 권장(동시 write 손상 방지).
+- **제거**: 대기 해소 시(sub-agent 반환 / CI run 완료 후 처리) → 해당 `id` 항목 제거.
+
+**복구 프로토콜** (SessionStart 훅 경고를 본 메인의 행동 순서):
+
+1. **대상 상태 조회** — `gh pr/issue view --json state,labels` 또는 sub-agent `SendMessage` 로 대상의 현재 상태 확인.
+2. **생사·완료 판단** — waiter 가 이미 소멸했는지 / 대상 작업이 완료됐는지 판별.
+3. **pending-waits 항목 제거 또는 작업 재개** — 완료면 항목 제거(self-healing), 미완이면 heartbeat 재예약 + 작업 재개.
+
+> **대기를 그대로 재개하지 말 것** — waiter 는 이미 소멸했을 수 있다. SSoT 박제 회귀 차단은 `scripts/verify-dead-wait-check.mjs`(CI 통합, `--self-test` 3중 시뮬 포함) 가 담당. 설계 SSoT: `docs/decisions/20260710-817-dead-wait-guard.md`.
+
 ---
 
 ## 교차검증 (cross-validate)

@@ -52,6 +52,7 @@
     "verify:iau-data": "node scripts/verify-iau-data.mjs",
     "verify:no-scientific-grep": "node scripts/verify-no-scientific-grep.mjs",
     "verify:zombie-check": "node scripts/verify-zombie-check.mjs",
+    "verify:dead-wait-check": "node scripts/verify-dead-wait-check.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
     "bench:tier-guard-cost": "node scripts/bench-tier-guard-cost.mjs",
