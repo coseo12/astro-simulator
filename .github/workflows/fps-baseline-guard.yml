@@ -55,15 +55,20 @@ on:
         type: string
         default: '4'
       # #779 — escalation 시뮬레이션 test hook (ADR 20260701-779 §A1 부수 결정). 기본 none, 수동 전용.
-      #   flake: measure guard 만 강제 fail → retry-fresh-runner 실측 pass 기대 (recovery 실증, 메일 0)
-      #   regression: 양 job guard 강제 fail → workflow failure 기대 (negative 실증, fail 메일 1통 의도됨)
+      #   flake: measure guard 만 강제 fail (SIMULATE_GUARD_FAIL) → retry-fresh-runner 실측 pass 기대
+      #     (recovery 실증, 메일 0). 순수 escalation 토폴로지 검증 (스크립트 미실행).
+      # #820 — script-level 분류 로직 검증 (SIMULATE_VSYNC_LOCK / SIMULATE_REGRESSION, 스크립트 실행).
+      #   vsync-lock: desktop rafFps=대역 + capacity=healthy → 분류=락 → PASS (success, 메일 0, STEP_SUMMARY 흡수)
+      #   regression: desktop rafFps=대역 + capacity=저 → 분류=회귀 → measure 스크립트 exit 1 →
+      #     fresh-runner escalation(강제 fail) → workflow failure (fail 메일 1통). 진짜 회귀 미은폐 실증.
       simulate:
-        description: 'escalation 시뮬레이션 (#779 test hook)'
+        description: 'escalation/분류 시뮬레이션 (#779 / #820 test hook)'
         type: choice
         options:
           - none
           - flake
           - regression
+          - vsync-lock
         default: 'none'
 
 jobs:
@@ -100,8 +105,14 @@ jobs:
         continue-on-error: true # step-level soft-fail — outcome=failure 보존, escalation job 이 blocking 승계
         if: github.event_name != 'workflow_dispatch' || inputs.diagnose_variance != true
         env:
-          # #779 test hook — simulate=flake|regression 시 measure guard 강제 fail (측정 스크립트 수정 0)
-          SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'flake' || inputs.simulate == 'regression' }}
+          # #779 test hook — simulate=flake 시 measure guard 강제 fail (스크립트 미실행, 순수 토폴로지).
+          #   regression 은 #820 로 이관 — SIMULATE_GUARD_FAIL 대신 SIMULATE_REGRESSION 으로 스크립트를
+          #   실제 실행해 대역 내 회귀 분류(exit 1)를 exercise (진짜 회귀 미은폐 end-to-end 검증).
+          SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'flake' }}
+          # #820 script-level 분류 hook — node 스크립트가 상속받아 measureFps/measureRenderCapacity 를 주입.
+          #   vsync-lock → 분류=락(exit 0) / regression → 분류=회귀(exit 1). guard-fail 과 직교(스크립트 실행).
+          SIMULATE_VSYNC_LOCK: ${{ inputs.simulate == 'vsync-lock' && '1' || '' }}
+          SIMULATE_REGRESSION: ${{ inputs.simulate == 'regression' && '1' || '' }}
         run: |
           # simulate 주입은 guard 호출부 단일 함수로 캡슐화 (워크플로 분기 최소화 — agy 권고)
           run_guard() {
@@ -180,7 +191,9 @@ jobs:
 
       - name: FPS baseline 회귀 검증 (fresh runner — hard fail)
         env:
-          # #779 test hook — simulate=regression 만 여기까지 강제 fail (flake 는 이 job 에서 실측 pass 기대)
+          # #779 test hook — simulate=regression 만 여기까지 강제 fail (flake 는 이 job 에서 실측 pass 기대).
+          #   #820: measure job 은 SIMULATE_REGRESSION 으로 스크립트 회귀 분류(exit 1)를 exercise 하고,
+          #   fresh-runner 는 여기서 강제 fail 로 escalation 종착(workflow failure)만 확정 → 최종 fail 메일 1통.
           SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'regression' }}
         run: |
           run_guard() {
