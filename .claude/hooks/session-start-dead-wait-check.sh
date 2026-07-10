@@ -52,6 +52,12 @@ try {
   process.exit(0); // 파일 접근 실패 = 미해소 대기 없음 취급
 }
 
+// 빈 파일(또는 whitespace-only)은 원자적 rename 전이/초기 상태 — 파일 부재와 동일하게 조용히 종료.
+// "손상" 경고는 진짜 parse 실패(비어있지 않은데 JSON invalid)에만 한정(false-positive 노이즈 제거).
+if (raw.trim() === "") {
+  process.exit(0);
+}
+
 let data;
 try {
   data = JSON.parse(raw);
@@ -63,10 +69,12 @@ try {
 const waits = Array.isArray(data && data.waits) ? data.waits : [];
 const now = Date.now();
 
-// Grace Period 필터 — created_at 이 유예 초과한 항목만. 파싱 불가 항목은 보수적으로 노출.
+// Grace Period 필터 — created_at 이 유예 초과한 항목만.
+// 비정상 timestamp(파싱불가 OR 미래)는 대칭적으로 보수 노출 — 시계 왜곡/오염 항목을 조용히 숨기지 않음.
 const stale = waits.filter((w) => {
   const t = Date.parse(w && w.created_at);
-  if (Number.isNaN(t)) return true;
+  if (Number.isNaN(t)) return true; // 파싱불가 = 비정상 → 보수 노출
+  if (t > now) return true; // 미래 timestamp = 비정상 → 보수 노출 (파싱불가와 대칭)
   return (now - t) / 1000 >= graceSeconds;
 });
 

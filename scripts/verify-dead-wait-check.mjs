@@ -203,12 +203,53 @@ function runSelfTest() {
     out = runHook(pending, 60);
     expect('grace filter: 유예 미경과 항목 → 경고 0', !out.includes('WARN'), out.trim());
 
-    // --- (5) 방어적 JSON: 손상 파일 → 크래시 없이 손상 경고 + exit 0 ---
+    // --- (5) 방어적 JSON: 비어있지 않은 진짜 손상 → 크래시 없이 손상 경고 + exit 0 ---
     writeFileSync(pending, '{ this is not valid json ');
     out = runHook(pending, 60); // execFileSync 는 non-zero exit 시 throw — exit 0 이면 통과
-    expect('defensive JSON: 손상 파일 → 손상 경고 + exit 0', out.includes('손상'), out.trim());
+    expect(
+      'defensive JSON: 비어있지 않은 진짜 손상 → 손상 경고 + exit 0',
+      out.includes('손상'),
+      out.trim(),
+    );
 
-    // --- (6) 파일 부재: pending-waits.json 없음 → 조용히 exit 0 ---
+    // --- (6) 미래 timestamp: created_at 이 미래 → 파싱불가와 대칭으로 보수 노출(WARN) (reviewer 권고 1) ---
+    writeFileSync(
+      pending,
+      JSON.stringify({
+        version: 1,
+        waits: [
+          {
+            id: 'sub-agent:future:1',
+            kind: 'sub-agent',
+            description: '미래 timestamp 항목(시계 왜곡)',
+            created_at: isoAgo(-3600), // 1시간 후 (미래)
+            wakeup_scheduled: true,
+          },
+        ],
+      }),
+    );
+    out = runHook(pending, 60);
+    expect('future timestamp: 미래 created_at → 보수 노출(WARN)', out.includes('WARN'), out.trim());
+
+    // --- (7) 빈 파일: 0-byte → 손상 아님, 조용히 exit 0 (reviewer 권고 2, rename 전이 상태) ---
+    writeFileSync(pending, '');
+    out = runHook(pending, 60);
+    expect(
+      'empty file: 0-byte → 손상 경고 없이 조용 exit 0',
+      out.trim() === '' && !out.includes('손상'),
+      JSON.stringify(out),
+    );
+
+    // --- (8) whitespace-only: 공백만 → 손상 아님, 조용히 exit 0 (reviewer 권고 2) ---
+    writeFileSync(pending, '   \n\t  \n');
+    out = runHook(pending, 60);
+    expect(
+      'whitespace-only: 공백만 → 손상 경고 없이 조용 exit 0',
+      out.trim() === '' && !out.includes('손상'),
+      JSON.stringify(out),
+    );
+
+    // --- (9) 파일 부재: pending-waits.json 없음 → 조용히 exit 0 ---
     rmSync(pending, { force: true });
     out = runHook(pending, 60);
     expect('missing file: 파일 없음 → stdout 조용, exit 0', out.trim() === '', JSON.stringify(out));
