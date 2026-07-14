@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes (#822 — Z 패턴 조건 2 측정식 정정, 제안 버전 0.48.0 MINOR)
+
+- **[#822] Z 패턴 §재검토 조건 #5 조건 2 측정식 정정 — 절대 누적 → 직전 (머지된) Phase-2 이후 연속 (MINOR)** ([#822](https://github.com/coseo12/astro-simulator/issues/822)) — 월 cron 가드 `scripts/verify-z-pattern-health.mjs` 의 §재검토 조건 #5 **조건 2** 를 **절대 누적 회차** (`phase1Count >= N`) → **직전 머지된 Phase-2 기여 이후 연속 Phase-1 회차** (`consecutiveSinceLastPhase2 >= N`) 로 정정. 기존 절대 누적은 단조 증가하여 Phase-2 진행 여부와 무관하게 **영구 false-fire** (계약 원문 "N=10 회 연속 미진행" 의 "연속" 리셋 의미 탈락, alert fatigue 유발). **N=10 임계 불변** — 측정 차원 정정 (Amendment 7 자기참조 인플레 정정 / Amendment 13 모수 정제 동일 계열), 임계 완화 (옵션 C) 아님. **merged-only** (`state === 'MERGED' && mergedAt != null`) 필터로 미머지/반려 PR 이 카운터를 잘못 리셋하는 사각 차단 — `createdAt` fallback 금지 (cross-validate 고유 발견 Q3-1). ms epoch (`getTime()`) 경계 비교 (Q3-2). **Phase-2=0 레짐 backward-compat** — 머지된 Phase-2 0 건이면 `consecutiveSinceLastPhase2 = phase1Prs.length` (과거 Amendment 4 트리거 재현, 순수 확장). 신규 `--self-test` 모드 (gh 미호출, 순수 함수 fixture 주입 — positive/negative/recovery 3중 시뮬 + backward-compat + merged-only 사각 방어 5 케이스) + `computeConsecutiveSinceLastPhase2` 순수 함수 export. **실측**: self-test 5/5 PASS + 실 실행 exit 0 (연속 4 / ratio 40% / 60일 — 전 조건 미발화, 정정 전 조건 2 (누적 10 ≥ 10) 는 false-fire). Phase-2 substantiality 하한 게이밍 방어는 [#823](https://github.com/coseo12/astro-simulator/issues/823) 후속 분리 (cross-validate 고유 발견 C, 범위 밖). ADR [`20260515-harness-managed-divergent-pattern.md`](docs/decisions/20260515-harness-managed-divergent-pattern.md) **§Amendment 14** (Accepted, cross-validate agy 2026-07-14 — merged-only/ms epoch 2건 수용, substantiality 하한 #823 분리).
+
 ## [0.47.0] — 2026-07-06
 
 ### Behavior Changes (#793 — 산출물 수명주기 규약 + qa/dev 처분 의무)

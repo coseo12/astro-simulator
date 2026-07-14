@@ -8,7 +8,7 @@
  *
  * 임계값 (Amendment 1+2 정합 3중 OR):
  *   - Phase 2 진행률 < 33% (Amendment 1 health metric)
- *   - Phase 1 회차 (현재) >= N=10 (Amendment 2 재조정)
+ *   - 직전 (머지된) Phase-2 기여 이후 연속 Phase-1 회차 >= N=10 (Amendment 14 정정 — 계약 원문 "N=10 연속 미진행" 충실. 기존 절대 누적 phase1Count 는 단조 증가로 영구 false-fire 하여 폐기)
  *   - ADR 첫 적용 후 90일 경과 (Amendment 2 재조정)
  *
  * exit code (Gemini 2.5-pro cross-validate 권고 3분류):
@@ -43,6 +43,39 @@ function isAdrEvolutionPr(title) {
   if (/\bhotfix\b/i.test(title)) return true;
   if (lower.startsWith('release:') || /\brelease\s+v\d+\.\d+/i.test(title)) return true;
   return false;
+}
+
+// Amendment 14 (#822) — 조건 2 측정식 정정: 직전 (머지된) Phase-2 기여 이후 연속 Phase-1 회차 산출.
+//
+// 계약 원문 (§재검토 조건 #5 "Phase 2 N=10 회 연속 미진행") 충실 구현. 기존 절대 누적
+// (phase1Count) 은 단조 증가하여 Phase-2 진행 여부와 무관하게 영구 false-fire → 리셋 의미
+// 부여 (직전 Phase-2 머지일 이후로만 카운트).
+//
+// 인자:
+//   phase1Prs: isAdrEvolutionPr 필터 후 Phase-1 PR 배열 [{ mergedAt }]
+//   phase2Prs: upstream Phase-2 PR 배열 [{ state, mergedAt }] (state 는 gh 표기 'MERGED' 등)
+//
+// 로직 (cross-validate 정정 반영 — merged-only, #822 Q3-1/Q3-2):
+//   1. merged-only 필터: state === 'MERGED' && mergedAt != null 인 것만.
+//      미머지/반려 PR 이 카운터를 잘못 리셋하는 사각 차단 — createdAt fallback 절대 금지 (Q3-1).
+//   2. lastPhase2Date = merged Phase-2 의 mergedAt ms epoch (getTime()) 중 max.
+//      - merged Phase-2 가 0 건이면 phase1Prs.length 반환 (backward-compat — 과거 Phase-2=0 레짐).
+//   3. phase1Prs 중 mergedAt ms epoch > lastPhase2Date 인 것의 개수 반환.
+//      - 반드시 ms epoch 비교 (동일 타임스탬프 경계 결정성 — Q3-2). createdAt fallback 금지.
+export function computeConsecutiveSinceLastPhase2(phase1Prs, phase2Prs) {
+  const mergedPhase2 = (phase2Prs || []).filter(
+    (p) => p.state === 'MERGED' && p.mergedAt != null,
+  );
+  if (mergedPhase2.length === 0) {
+    // backward-compat: 머지된 Phase-2 0 건 → 직전 Phase-2 부재 = 전체 Phase-1 이 연속
+    return (phase1Prs || []).length;
+  }
+  const lastPhase2Date = Math.max(
+    ...mergedPhase2.map((p) => new Date(p.mergedAt).getTime()),
+  );
+  return (phase1Prs || []).filter(
+    (p) => p.mergedAt != null && new Date(p.mergedAt).getTime() > lastPhase2Date,
+  ).length;
 }
 
 // Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 가드 (cross-validate agy 고유 발견 #1).
@@ -304,11 +337,13 @@ try {
   // 실제 적용) 만 카운트. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법
   // 검증 우선" 원칙 정합 박제.
   const adrCitationsRaw = execSync(
-    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title`,
+    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title,mergedAt`,
     { encoding: 'utf-8' },
   ).trim();
   const adrCitationPrs = JSON.parse(adrCitationsRaw || '[]');
-  const adrCitations = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title)).length;
+  // Amendment 14 (#822): Phase-1 PR 배열 (isAdrEvolutionPr 필터 후) 을 consecutive 산출에 재사용.
+  const phase1Prs = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title));
+  const adrCitations = phase1Prs.length;
   // Amendment 7 (#554): 임계 비교 SSoT 는 adrCitations (Z 적용 PR 카운트).
   // amendmentCount 도 자기참조 (Amendment N 박제 자체로 +1 증가) 라 임계 SSoT 부적합 —
   // console.log 정보 출력에만 활용. amendmentCount > adrCitations 가능 시점: ADR
@@ -325,15 +360,22 @@ try {
   //   - "ADR 20260515" 정확 식별자만 사용 (현재 0건, 노이즈 0).
   //   - 향후 upstream PR 본문/제목에 ADR ID 박제 컨벤션 유지 필요 (Phase 2 의무 PR 규약).
   //   - CRITICAL "수치 DoD 미달 시 측정 방법 검증 우선" 원칙 정합 — 식 보정 후 임계값 평가.
+  // Amendment 14 (#822): 조건 2 (연속 카운트) 산출에 state/mergedAt 이 필요하여 배열 조회로 확장.
+  // phase2Count (조건 1 ratio 용) 은 기존 의미 보존 = state=all 배열 length (현재 동작 불변 —
+  // 조건 1 은 본 스프린트 범위 밖). phase2Prs 는 computeConsecutiveSinceLastPhase2 에 주입.
   let phase2Count = 0;
+  let phase2Prs = [];
   try {
     const phase2Result = execSync(
-      `gh pr list --repo coseo12/harness-setting --state all --search "ADR 20260515" --json number --jq 'length'`,
+      `gh pr list --repo coseo12/harness-setting --state all --search "ADR 20260515" --json number,state,mergedAt`,
       { encoding: 'utf-8' },
     ).trim();
-    phase2Count = parseInt(phase2Result, 10) || 0;
+    phase2Prs = JSON.parse(phase2Result || '[]');
+    phase2Count = phase2Prs.length;
   } catch {
-    // upstream 검색 실패 (네트워크 / 권한 등) 시 보수적으로 0 으로 가정
+    // upstream 검색 실패 (네트워크 / 권한 등) 시 보수적으로 빈 배열 → count 0.
+    // Phase-2 조회 실패 → merged 0 건 → consecutive = 전체 Phase-1 (기존 동작 fallback).
+    phase2Prs = [];
     phase2Count = 0;
   }
 
@@ -364,6 +406,9 @@ try {
 
   // 5. 임계값 검증 (3중 OR)
   const phase2Ratio = phase1Count > 0 ? phase2Count / phase1Count : 0;
+  // Amendment 14 (#822) — 조건 2 측정식 정정: 절대 누적 회차 (phase1Count) → 직전 (머지된)
+  // Phase-2 기여 이후 연속 Phase-1 회차. 계약 원문 "N=10 회 연속 미진행" 충실 구현 (리셋 활성화).
+  const consecutiveSinceLastPhase2 = computeConsecutiveSinceLastPhase2(phase1Prs, phase2Prs);
   const triggers = [];
 
   if (phase2Ratio < PHASE2_THRESHOLD) {
@@ -371,8 +416,10 @@ try {
       `Phase 2 진행률 ${(phase2Ratio * 100).toFixed(1)}% < ${PHASE2_THRESHOLD * 100}% 임계값`,
     );
   }
-  if (phase1Count >= N_THRESHOLD) {
-    triggers.push(`Phase 1 회차 ${phase1Count} >= N=${N_THRESHOLD} 임계값`);
+  if (consecutiveSinceLastPhase2 >= N_THRESHOLD) {
+    triggers.push(
+      `직전 Phase-2 이후 연속 Phase-1 ${consecutiveSinceLastPhase2}회 >= N=${N_THRESHOLD} 임계값`,
+    );
   }
   if (daysSinceFirstApply >= TIME_THRESHOLD_DAYS) {
     triggers.push(
@@ -382,6 +429,8 @@ try {
 
   // 6. 출력 + exit
   console.log(`Phase 1 (본 프로젝트): ${phase1Count} (Amendment ${amendmentCount}, PR citations ${adrCitations})`);
+  // Amendment 14 (#822): 절대 누적 (생애) + 직전 Phase-2 이후 연속 두 차원 병기 (조건 2 SSoT = 연속).
+  console.log(`  - 절대 누적 (생애): ${phase1Count} / 직전 Phase-2 이후 연속: ${consecutiveSinceLastPhase2} (조건 2 SSoT)`);
   console.log(`Phase 2 (upstream harness-setting): ${phase2Count}`);
   console.log(`Phase 2 진행률: ${(phase2Ratio * 100).toFixed(1)}%`);
   console.log(`ADR 적용 후 경과 일수: ${daysSinceFirstApply}일`);
@@ -400,9 +449,100 @@ try {
 }
 } // main() 종료 (Amendment 8 #556)
 
-// 직접 실행 시에만 main() 호출 (import 시 부작용 회피)
+// =============================================================================
+// Amendment 14 (#822) — --self-test 모드 (gh 미호출, 순수 함수 fixture 주입)
+// =============================================================================
+//
+// CLAUDE.md §"가드 도입 PR DoD" 4축 (2) 3중 시뮬 (positive → negative → recovery)
+// + backward-compat + merged-only 사각 방어. gh CLI 호출 없이
+// computeConsecutiveSinceLastPhase2 순수 함수에 fixture 를 직접 주입하여 결정적 검증.
+// 전 케이스 PASS 시 exit 0, 하나라도 실패 시 exit 1.
+function runSelfTest() {
+  let failed = 0;
+  const assert = (cond, msg) => {
+    if (cond) {
+      console.log(`  PASS: ${msg}`);
+    } else {
+      console.error(`  FAIL: ${msg}`);
+      failed++;
+    }
+  };
+  const iso = (d) => `${d}T00:00:00Z`;
+
+  console.log(
+    '[self-test] computeConsecutiveSinceLastPhase2 — 3중 시뮬 + backward-compat + merged-only 사각 방어',
+  );
+
+  // (a) positive: 직전 머지 Phase-2 (2026-01-01) 이후 Phase-1 머지 12건 (>= 10) → 발화
+  {
+    const phase2 = [{ state: 'MERGED', mergedAt: iso('2026-01-01') }];
+    const phase1 = Array.from({ length: 12 }, (_, i) => ({
+      mergedAt: iso(`2026-02-${String(i + 1).padStart(2, '0')}`),
+    }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(
+      n === 12 && n >= N_THRESHOLD,
+      `(a) positive: 연속 ${n} (기대 12, >= N=${N_THRESHOLD} 발화)`,
+    );
+  }
+
+  // (b) negative: 직전 머지 Phase-2 (2026-05-18) 이후 4건 (< 10) → 미발화 (현재 실측 재현)
+  {
+    const phase2 = [{ state: 'MERGED', mergedAt: iso('2026-05-18') }];
+    const phase1 = ['2026-05-26', '2026-05-27', '2026-06-30', '2026-07-10'].map((d) => ({
+      mergedAt: iso(d),
+    }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 4 && n < N_THRESHOLD, `(b) negative: 연속 ${n} (기대 4, < N=${N_THRESHOLD} 미발화)`);
+  }
+
+  // (c) recovery: 새 Phase-2 머지일 (2026-08-01) 이 모든 Phase-1 보다 이후 → 0 리셋
+  {
+    const phase2 = [
+      { state: 'MERGED', mergedAt: iso('2026-05-18') },
+      { state: 'MERGED', mergedAt: iso('2026-08-01') }, // 최신 Phase-2 (max) — 리셋 기준점
+    ];
+    const phase1 = ['2026-05-26', '2026-06-30', '2026-07-10'].map((d) => ({ mergedAt: iso(d) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 0, `(c) recovery: 새 Phase-2 이후 연속 ${n} (기대 0 리셋)`);
+  }
+
+  // (d) backward-compat: 머지된 Phase-2 0 건 → phase1Prs.length (과거 Phase-2=0 레짐)
+  {
+    const phase2 = [];
+    const phase1 = Array.from({ length: 7 }, (_, i) => ({ mergedAt: iso(`2026-05-${i + 10}`) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 7, `(d) backward-compat: Phase-2=0 → 연속 ${n} (기대 7 = 전체 Phase-1)`);
+  }
+
+  // (e) merged-only 사각 방어 (Q3-1): 미머지/반려 PR 은 리셋 안 함 (createdAt fallback 부재 검증).
+  // createdAt 을 모든 Phase-1 보다 이후(2026-07-01)로 주입 — 미래에 `?? createdAt` fallback 이
+  // 재도입되면 lastPhase2Date 가 07-01 로 잡혀 연속이 0 으로 붕괴, assert(n===5) 가 실패한다.
+  {
+    const phase2 = [
+      { state: 'CLOSED', mergedAt: null, createdAt: iso('2026-07-01') },
+      { state: 'OPEN', mergedAt: null, createdAt: iso('2026-07-01') },
+    ];
+    const phase1 = Array.from({ length: 5 }, (_, i) => ({ mergedAt: iso(`2026-06-${i + 10}`) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 5, `(e) merged-only: 전부 미머지 → 연속 ${n} (기대 5, 미머지 PR 리셋 차단)`);
+  }
+
+  if (failed > 0) {
+    console.error(`\n[self-test] FAIL — ${failed} 케이스 실패`);
+    process.exit(1);
+  }
+  console.log('\n[self-test] PASS — 전 케이스 통과');
+  process.exit(0);
+}
+
+// 직접 실행 시에만 main() / self-test 호출 (import 시 부작용 회피)
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  if (process.argv.includes('--self-test')) {
+    runSelfTest();
+  } else {
+    main();
+  }
 }
 
 // Amendment 8 (#556) — 함수 export (단위 테스트용)
