@@ -1690,7 +1690,7 @@ Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-
 
 - 본 Amendment, [#823](https://github.com/coseo12/astro-simulator/issues/823) 이슈 본문 (Builds on #822)
 - 직전 Amendment: Amendment 14 (조건 2 절대→연속 측정 차원 정정 — 본 Amendment 가 그 §고유 발견 C 후속)
-- 발화 가드 SSoT: `scripts/verify-z-pattern-health.mjs` (조건 1 ratio 분자 / 조건 2 `computeConsecutiveSinceLastPhase2` / 조건 3 `daysSinceFirstApply`), `.github/workflows/adr-z-pattern-health-v2.yml`
+- 발화 가드 SSoT: `scripts/verify-z-pattern-health.mjs` (조건 1 ratio 분자 = `filterSubstantiveMergedPhase2().length` / 조건 2 `computeConsecutiveSinceLastPhase2` / 조건 3 `daysSinceLastSubstantive`, Amendment 15 substantive 앵커), `.github/workflows/adr-z-pattern-health-v2.yml`
 - 모수/앵커 정밀화 vs silent 약화 SSoT: Amendment 7 (자기참조 인플레) / Amendment 13 (drift 카운트 모수) / Amendment 14 (측정 차원) — 동일 계열 (임계 불변 + 모수 정밀화)
 - 측정 방법 원칙: CLAUDE.md §스프린트 계약 #10 (volt [#32](https://github.com/coseo12/volt/issues/32) — 측정 방법 검증 우선. LoC 하한 → #248 실측 반증)
 - 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" ([docs/lessons/guard-design-principles.md](../lessons/guard-design-principles.md))
