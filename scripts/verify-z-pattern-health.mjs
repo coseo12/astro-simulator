@@ -8,7 +8,7 @@
  *
  * 임계값 (Amendment 1+2 정합 3중 OR):
  *   - Phase 2 진행률 < 33% (Amendment 1 health metric)
- *   - Phase 1 회차 (현재) >= N=10 (Amendment 2 재조정)
+ *   - 직전 (머지된) Phase-2 기여 이후 연속 Phase-1 회차 >= N=10 (Amendment 14 정정 — 계약 원문 "N=10 연속 미진행" 충실. 기존 절대 누적 phase1Count 는 단조 증가로 영구 false-fire 하여 폐기)
  *   - ADR 첫 적용 후 90일 경과 (Amendment 2 재조정)
  *
  * exit code (Gemini 2.5-pro cross-validate 권고 3분류):
@@ -515,11 +515,13 @@ function runSelfTest() {
     assert(n === 7, `(d) backward-compat: Phase-2=0 → 연속 ${n} (기대 7 = 전체 Phase-1)`);
   }
 
-  // (e) merged-only 사각 방어 (Q3-1): 미머지/반려 PR 은 리셋 안 함 (createdAt fallback 부재 검증)
+  // (e) merged-only 사각 방어 (Q3-1): 미머지/반려 PR 은 리셋 안 함 (createdAt fallback 부재 검증).
+  // createdAt 을 모든 Phase-1 보다 이후(2026-07-01)로 주입 — 미래에 `?? createdAt` fallback 이
+  // 재도입되면 lastPhase2Date 가 07-01 로 잡혀 연속이 0 으로 붕괴, assert(n===5) 가 실패한다.
   {
     const phase2 = [
-      { state: 'CLOSED', mergedAt: null },
-      { state: 'OPEN', mergedAt: null },
+      { state: 'CLOSED', mergedAt: null, createdAt: iso('2026-07-01') },
+      { state: 'OPEN', mergedAt: null, createdAt: iso('2026-07-01') },
     ];
     const phase1 = Array.from({ length: 5 }, (_, i) => ({ mergedAt: iso(`2026-06-${i + 10}`) }));
     const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
