@@ -89,6 +89,16 @@ jobs:
           pnpm run --if-present verify:dead-wait-check
           node scripts/verify-dead-wait-check.mjs --self-test
 
+      # #826 Z 패턴 health 가드 self-test 회귀 가드 (#822/#823 Amendment 14/15 도입).
+      # --self-test 는 순수 함수 fixture 주입(gh 미호출)으로 substantiality denylist /
+      # merged-only / 연속·앵커 측정식 회귀를 자동 차단 (#823 qa negative test 로 실증:
+      # .md 를 denylist 에 주입 시 8 케이스 FAIL). live 모드(무인자)는 gh 호출이라 CI 미대상,
+      # self-test 만 배선. exit 1 시 CI fail. dead-wait-check self-test(#817) 선례 답습.
+      # 근거: docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 14/15
+      - name: '#826 Z 패턴 health self-test 회귀 가드 (verify-z-pattern-health --self-test)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-z-pattern-health.mjs') != ''
+        run: node scripts/verify-z-pattern-health.mjs --self-test
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================
