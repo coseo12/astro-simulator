@@ -33,16 +33,22 @@ on:
     # #626 — docs/ADR/워크플로만 바뀐 PR 은 픽셀 측정이 무의미 (런타임 무관). fps-baseline-guard
     # 선례 그대로 답습 (자기 자신 .yml 만 변경된 PR 도 skip — fps 동일 정책). paths filter 효과는
     # base 브랜치 반영 후 후속 PR 부터.
+    # #814 — `.github/**` → `.github/workflows/**` 축소: composite action (.github/actions/**) 은
+    # setup/build 런타임에 직접 관여하므로 변경 PR 에서 본 가드가 발화해야 함 (#813 구조적 사각 해소).
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
   push:
     branches: [develop, main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
+  # #814 — 수동 재실측 경로 (a11y/fps 정합). workflow_dispatch 2단계 함정 (volt #45):
+  # dispatch 버튼은 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 —
+  # main 반영 후 실행 검증은 머지 후 관찰 항목.
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -51,69 +57,16 @@ jobs:
     # P1 예측 ≤25분은 유지, 30분 초과 실측 시 재검토 트리거 2항 (2-job 분할) 발동.
     timeout-minutes: 40
     steps:
-      # ⚠ setup 구간 (checkout ~ dev server 기동) 은 fps-baseline-guard measure job 과 동일 구간의
-      #   3번째 복제 (ci.yml r1-guard / fps-baseline-guard / 본 workflow). 한쪽 수정 시 동시 수정 —
-      #   composite action 추출은 후속 이슈 #802 (rule-of-three 도달, 선행 조건 = 본 건 머지).
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          # #663 fix — playwright extract 가 Node 24.16 에서 deadlock. `.node-version` (22.16.0) 핀.
-          node-version-file: '.node-version'
-          cache: 'pnpm'
-
+      # setup 공통 구간 (pnpm/node/rust/wasm-pack/playwright 캐시/build/dev server) — #802 SSoT.
+      # 본 구간이 3번째 복제 (rule-of-three) 였고 composite 추출 착수의 직접 트리거
+      # (ADR 20260701-779 §A1 재검토 7 종결 — 동기 주석 마커 제거).
       # ci.yml R1 가드 패턴 따름 — wasm 빌드 후 next dev 사용 (__solarScene 핸들 의존).
-      - name: Rust 툴체인 설정
-        uses: dtolnay/rust-toolchain@stable
+      - name: setup + build + dev server (composite)
+        uses: ./.github/actions/setup-and-build
         with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      - name: Rust 빌드 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      - name: wasm-pack 설치
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-
-      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 #663 이 1차).
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: wasm + workspace 빌드
-        run: pnpm build
-
-      - name: next dev server 기동
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
-          echo $! > /tmp/next-pid
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3001/ko > /dev/null; then
-              echo "ready"; exit 0
-            fi
-            sleep 2
-          done
-          echo "timeout"; exit 1
+          start-dev-server: 'true'
 
       # ── verify 6종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
       # 호출 규약: HEADFUL=0 (756/773/774/782/783) / --headless (762) — CI 에 chrome channel 이

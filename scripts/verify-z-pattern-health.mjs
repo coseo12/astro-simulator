@@ -6,10 +6,10 @@
  * Phase 1 카운트: ADR §Amendment N regex + 본 프로젝트 PR commit grep 보조
  * Phase 2 카운트: gh pr list --search (coseo12/harness-setting 다중 OR 키워드)
  *
- * 임계값 (Amendment 1+2 정합 3중 OR):
- *   - Phase 2 진행률 < 33% (Amendment 1 health metric)
- *   - Phase 1 회차 (현재) >= N=10 (Amendment 2 재조정)
- *   - ADR 첫 적용 후 90일 경과 (Amendment 2 재조정)
+ * 임계값 (Amendment 1+2 정합 3중 OR, Amendment 15 substantiality 정밀화):
+ *   - Phase 2 진행률 < 33% — 분자 = substantive 머지 Phase-2 (Amendment 15: 경로 denylist)
+ *   - 직전 substantive 머지 Phase-2 이후 연속 Phase-1 회차 >= N=10 (Amendment 14 연속 + Amendment 15 substantive 앵커)
+ *   - 직전 substantive 머지 Phase-2 이후 90일 경과 (없으면 ADR 첫 적용 fallback — Amendment 15: 고정 절대 앵커 잠복 버그 해소)
  *
  * exit code (Gemini 2.5-pro cross-validate 권고 3분류):
  *   - 0: 정상 (모든 임계값 미발화)
@@ -43,6 +43,78 @@ function isAdrEvolutionPr(title) {
   if (/\bhotfix\b/i.test(title)) return true;
   if (lower.startsWith('release:') || /\brelease\s+v\d+\.\d+/i.test(title)) return true;
   return false;
+}
+
+// Amendment 14 (#822) — 조건 2 측정식 정정: 직전 (머지된) Phase-2 기여 이후 연속 Phase-1 회차 산출.
+//
+// 계약 원문 (§재검토 조건 #5 "Phase 2 N=10 회 연속 미진행") 충실 구현. 기존 절대 누적
+// (phase1Count) 은 단조 증가하여 Phase-2 진행 여부와 무관하게 영구 false-fire → 리셋 의미
+// 부여 (직전 Phase-2 머지일 이후로만 카운트).
+//
+// 인자:
+//   phase1Prs: isAdrEvolutionPr 필터 후 Phase-1 PR 배열 [{ mergedAt }]
+//   phase2Prs: upstream Phase-2 PR 배열 [{ state, mergedAt }] (state 는 gh 표기 'MERGED' 등)
+//
+// 로직 (cross-validate 정정 반영 — merged-only, #822 Q3-1/Q3-2):
+//   1. merged-only 필터: state === 'MERGED' && mergedAt != null 인 것만.
+//      미머지/반려 PR 이 카운터를 잘못 리셋하는 사각 차단 — createdAt fallback 절대 금지 (Q3-1).
+//   2. lastPhase2Date = merged Phase-2 의 mergedAt ms epoch (getTime()) 중 max.
+//      - merged Phase-2 가 0 건이면 phase1Prs.length 반환 (backward-compat — 과거 Phase-2=0 레짐).
+//   3. phase1Prs 중 mergedAt ms epoch > lastPhase2Date 인 것의 개수 반환.
+//      - 반드시 ms epoch 비교 (동일 타임스탬프 경계 결정성 — Q3-2). createdAt fallback 금지.
+export function computeConsecutiveSinceLastPhase2(phase1Prs, phase2Prs) {
+  const mergedPhase2 = (phase2Prs || []).filter(
+    (p) => p.state === 'MERGED' && p.mergedAt != null,
+  );
+  if (mergedPhase2.length === 0) {
+    // backward-compat: 머지된 Phase-2 0 건 → 직전 Phase-2 부재 = 전체 Phase-1 이 연속
+    return (phase1Prs || []).length;
+  }
+  const lastPhase2Date = Math.max(
+    ...mergedPhase2.map((p) => new Date(p.mergedAt).getTime()),
+  );
+  return (phase1Prs || []).filter(
+    (p) => p.mergedAt != null && new Date(p.mergedAt).getTime() > lastPhase2Date,
+  ).length;
+}
+
+// Amendment 15 (#823): trivial denylist — PR의 모든 변경 파일이 매칭이면 non-substantive.
+// ⚠ markdown(.md)/docs/**/.github/workflows 는 denylist 금지 — 본 하네스는 markdown 이 substantive 자산
+// (실측 Phase-2 4건 전부 .md). cross-validate agy 의 *.md denylist 권고는 기각(ADR §Amendment 15 §trivial denylist ⚠).
+const TRIVIAL_DENYLIST = [
+  /(^|\/)README[^/]*$/i,
+  /(^|\/)LICENSE[^/]*$/i,
+  /(^|\/)\.gitignore$/,
+  /(^|\/)\.prettierignore$/,
+  /(^|\/)\.editorconfig$/,
+  /\.(png|jpe?g|svg|gif)$/i,
+  /\.txt$/i,
+  /(^|\/)package-lock\.json$/,
+  /(^|\/)pnpm-lock\.yaml$/,
+  /(^|\/)yarn\.lock$/,
+  /(^|\/)bun\.lockb$/,
+  /\.lock$/,
+];
+
+// Amendment 15 (#823) — substantiality 퀄리파이어 (경로 denylist).
+// PR 의 모든 변경 파일이 trivial denylist 매칭이면 non-substantive (false).
+// 비-trivial 파일 ≥ 1 이면 substantive (true). 파일 0개면 보수적으로 false.
+// LoC 하한 (agy 옵션 2) 은 #248 (+5줄 정당 기여) 실측 반증으로 기각 — 경로 기반만.
+export function isSubstantivePhase2(pr, denylist = TRIVIAL_DENYLIST) {
+  // pr.files: [{path}]. 파일 0개면 보수적으로 false(non-substantive).
+  // 모든 파일이 denylist 매칭이면 false. 비-trivial 파일 ≥1 이면 true.
+  const files = (pr.files || []).map((f) => f.path);
+  if (files.length === 0) return false;
+  return files.some((path) => !denylist.some((re) => re.test(path)));
+}
+
+// Amendment 15 (#823) — substantive merged Phase-2 필터 (3조건 공용 SSoT).
+// state=MERGED && mergedAt!=null && isSubstantivePhase2 인 것만. 조건 1 (ratio 분자) /
+// 조건 2 (연속 리셋 앵커) / 조건 3 (90일 클록 앵커) 모두 본 필터 결과를 사용 (통합 스코프 A).
+export function filterSubstantiveMergedPhase2(phase2Prs, denylist = TRIVIAL_DENYLIST) {
+  return (phase2Prs || []).filter(
+    (p) => p.state === 'MERGED' && p.mergedAt != null && isSubstantivePhase2(p, denylist),
+  );
 }
 
 // Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 가드 (cross-validate agy 고유 발견 #1).
@@ -304,11 +376,13 @@ try {
   // 실제 적용) 만 카운트. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법
   // 검증 우선" 원칙 정합 박제.
   const adrCitationsRaw = execSync(
-    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title`,
+    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title,mergedAt`,
     { encoding: 'utf-8' },
   ).trim();
   const adrCitationPrs = JSON.parse(adrCitationsRaw || '[]');
-  const adrCitations = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title)).length;
+  // Amendment 14 (#822): Phase-1 PR 배열 (isAdrEvolutionPr 필터 후) 을 consecutive 산출에 재사용.
+  const phase1Prs = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title));
+  const adrCitations = phase1Prs.length;
   // Amendment 7 (#554): 임계 비교 SSoT 는 adrCitations (Z 적용 PR 카운트).
   // amendmentCount 도 자기참조 (Amendment N 박제 자체로 +1 증가) 라 임계 SSoT 부적합 —
   // console.log 정보 출력에만 활용. amendmentCount > adrCitations 가능 시점: ADR
@@ -325,15 +399,24 @@ try {
   //   - "ADR 20260515" 정확 식별자만 사용 (현재 0건, 노이즈 0).
   //   - 향후 upstream PR 본문/제목에 ADR ID 박제 컨벤션 유지 필요 (Phase 2 의무 PR 규약).
   //   - CRITICAL "수치 DoD 미달 시 측정 방법 검증 우선" 원칙 정합 — 식 보정 후 임계값 평가.
+  // Amendment 14 (#822): 조건 2 (연속 카운트) 산출에 state/mergedAt 이 필요하여 배열 조회로 확장.
+  // phase2Count (전체 카운트) 는 stdout 정보 표시 + backward-compat 참조용 = state=all 배열 length.
+  // Amendment 15 (#823): 조건 1 ratio 분자 / 조건 2 연속 앵커 / 조건 3 90일 앵커 는 전부
+  // filterSubstantiveMergedPhase2(phase2Prs) 결과를 SSoT 로 사용 (substantiality 퀄리파이어).
+  // files 필드 추가 — isSubstantivePhase2 경로 판별용 (gh pr list --json files 지원 실측 확인).
   let phase2Count = 0;
+  let phase2Prs = [];
   try {
     const phase2Result = execSync(
-      `gh pr list --repo coseo12/harness-setting --state all --search "ADR 20260515" --json number --jq 'length'`,
+      `gh pr list --repo coseo12/harness-setting --state all --search "ADR 20260515" --json number,state,mergedAt,files`,
       { encoding: 'utf-8' },
     ).trim();
-    phase2Count = parseInt(phase2Result, 10) || 0;
+    phase2Prs = JSON.parse(phase2Result || '[]');
+    phase2Count = phase2Prs.length;
   } catch {
-    // upstream 검색 실패 (네트워크 / 권한 등) 시 보수적으로 0 으로 가정
+    // upstream 검색 실패 (네트워크 / 권한 등) 시 보수적으로 빈 배열 → count 0.
+    // Phase-2 조회 실패 → merged 0 건 → consecutive = 전체 Phase-1 (기존 동작 fallback).
+    phase2Prs = [];
     phase2Count = 0;
   }
 
@@ -357,34 +440,63 @@ try {
     console.log(`\n[Phase 2 Sync] OK — drift 파일 ↔ upstream open PR 매칭 0건`);
   }
 
-  // 4. 시간 경과 검증
+  // 3-c. Amendment 15 (#823) — substantive merged Phase-2 SSoT (3조건 공용 모수/앵커).
+  // 조건 1 ratio 분자 / 조건 2 연속 리셋 앵커 / 조건 3 90일 클록 앵커 전부 본 배열 기준.
+  // 4건 실측 전부 substantive → 현재 값 불변 (backward-compat). 미래 사소 PR (README/오타) 배제.
+  const substantiveMergedPhase2 = filterSubstantiveMergedPhase2(phase2Prs);
+  const substantiveCount = substantiveMergedPhase2.length;
+  // substantive merged Phase-2 의 max(mergedAt) — 조건 2/3 공용 리셋 앵커. 0 건이면 null.
+  const lastSubstantiveMs =
+    substantiveCount > 0
+      ? Math.max(...substantiveMergedPhase2.map((p) => new Date(p.mergedAt).getTime()))
+      : null;
+
+  // 4. 시간 경과 검증 — Amendment 15: 고정 절대 앵커 (ADR_FIRST_APPLY_DATE) 잠복 버그 해소.
+  // daysSinceLastSubstantive = today − max(substantive merged Phase-2 mergedAt).
+  // substantive 0 건이면 ADR_FIRST_APPLY_DATE fallback (backward-compat — 과거 Phase-2=0 레짐).
   const firstApplyDate = new Date(ADR_FIRST_APPLY_DATE);
   const today = new Date();
-  const daysSinceFirstApply = Math.floor((today - firstApplyDate) / (1000 * 60 * 60 * 24));
+  const clockAnchorMs = lastSubstantiveMs != null ? lastSubstantiveMs : firstApplyDate.getTime();
+  const daysSinceLastSubstantive = Math.floor((today.getTime() - clockAnchorMs) / (1000 * 60 * 60 * 24));
+  const clockAnchorLabel =
+    lastSubstantiveMs != null
+      ? `직전 substantive Phase-2 (${new Date(lastSubstantiveMs).toISOString().slice(0, 10)})`
+      : `ADR 첫 적용 (${ADR_FIRST_APPLY_DATE}, substantive 0 건 fallback)`;
 
-  // 5. 임계값 검증 (3중 OR)
-  const phase2Ratio = phase1Count > 0 ? phase2Count / phase1Count : 0;
+  // 5. 임계값 검증 (3중 OR) — Amendment 15: 3조건 전부 substantive 모수/앵커.
+  // 조건 1 분자 = substantive merged Phase-2 카운트. div-by-zero 가드 보존 (phase1Count>0).
+  const phase2Ratio = phase1Count > 0 ? substantiveCount / phase1Count : 0;
+  // 조건 2: 연속 산출에 substantive merged 배열 주입 (사소 PR 은 리셋 앵커 불인정).
+  const consecutiveSinceLastPhase2 = computeConsecutiveSinceLastPhase2(
+    phase1Prs,
+    substantiveMergedPhase2,
+  );
   const triggers = [];
 
   if (phase2Ratio < PHASE2_THRESHOLD) {
     triggers.push(
-      `Phase 2 진행률 ${(phase2Ratio * 100).toFixed(1)}% < ${PHASE2_THRESHOLD * 100}% 임계값`,
+      `Phase 2 진행률 ${(phase2Ratio * 100).toFixed(1)}% < ${PHASE2_THRESHOLD * 100}% 임계값 (분자 = substantive 머지 ${substantiveCount})`,
     );
   }
-  if (phase1Count >= N_THRESHOLD) {
-    triggers.push(`Phase 1 회차 ${phase1Count} >= N=${N_THRESHOLD} 임계값`);
-  }
-  if (daysSinceFirstApply >= TIME_THRESHOLD_DAYS) {
+  if (consecutiveSinceLastPhase2 >= N_THRESHOLD) {
     triggers.push(
-      `ADR 첫 적용 후 ${daysSinceFirstApply}일 경과 >= ${TIME_THRESHOLD_DAYS}일 임계값`,
+      `직전 substantive Phase-2 이후 연속 Phase-1 ${consecutiveSinceLastPhase2}회 >= N=${N_THRESHOLD} 임계값`,
+    );
+  }
+  if (daysSinceLastSubstantive >= TIME_THRESHOLD_DAYS) {
+    triggers.push(
+      `${clockAnchorLabel} 이후 ${daysSinceLastSubstantive}일 경과 >= ${TIME_THRESHOLD_DAYS}일 임계값`,
     );
   }
 
   // 6. 출력 + exit
   console.log(`Phase 1 (본 프로젝트): ${phase1Count} (Amendment ${amendmentCount}, PR citations ${adrCitations})`);
-  console.log(`Phase 2 (upstream harness-setting): ${phase2Count}`);
-  console.log(`Phase 2 진행률: ${(phase2Ratio * 100).toFixed(1)}%`);
-  console.log(`ADR 적용 후 경과 일수: ${daysSinceFirstApply}일`);
+  // Amendment 14 (#822): 절대 누적 (생애) + 직전 Phase-2 이후 연속 두 차원 병기 (조건 2 SSoT = 연속).
+  console.log(`  - 절대 누적 (생애): ${phase1Count} / 직전 Phase-2 이후 연속: ${consecutiveSinceLastPhase2} (조건 2 SSoT)`);
+  // Amendment 15 (#823): substantive 머지 / 전체 조회 병기 (조건 1/2/3 SSoT = substantive 머지).
+  console.log(`Phase 2 (upstream harness-setting): ${phase2Count} (substantive 머지: ${substantiveCount})`);
+  console.log(`Phase 2 진행률: ${(phase2Ratio * 100).toFixed(1)}% (분자 = substantive 머지 ${substantiveCount})`);
+  console.log(`조건 3 클록 앵커: ${clockAnchorLabel} 이후 ${daysSinceLastSubstantive}일 경과`);
 
   if (triggers.length > 0) {
     console.error(`\n[ADR Trigger] ADR 20260515 Z 패턴 §재검토 조건 #5 발화:`);
@@ -400,9 +512,227 @@ try {
 }
 } // main() 종료 (Amendment 8 #556)
 
-// 직접 실행 시에만 main() 호출 (import 시 부작용 회피)
+// =============================================================================
+// Amendment 14 (#822) — --self-test 모드 (gh 미호출, 순수 함수 fixture 주입)
+// =============================================================================
+//
+// CLAUDE.md §"가드 도입 PR DoD" 4축 (2) 3중 시뮬 (positive → negative → recovery)
+// + backward-compat + merged-only 사각 방어. gh CLI 호출 없이
+// computeConsecutiveSinceLastPhase2 순수 함수에 fixture 를 직접 주입하여 결정적 검증.
+// 전 케이스 PASS 시 exit 0, 하나라도 실패 시 exit 1.
+function runSelfTest() {
+  let failed = 0;
+  const assert = (cond, msg) => {
+    if (cond) {
+      console.log(`  PASS: ${msg}`);
+    } else {
+      console.error(`  FAIL: ${msg}`);
+      failed++;
+    }
+  };
+  const iso = (d) => `${d}T00:00:00Z`;
+
+  console.log(
+    '[self-test] computeConsecutiveSinceLastPhase2 — 3중 시뮬 + backward-compat + merged-only 사각 방어',
+  );
+
+  // (a) positive: 직전 머지 Phase-2 (2026-01-01) 이후 Phase-1 머지 12건 (>= 10) → 발화
+  {
+    const phase2 = [{ state: 'MERGED', mergedAt: iso('2026-01-01') }];
+    const phase1 = Array.from({ length: 12 }, (_, i) => ({
+      mergedAt: iso(`2026-02-${String(i + 1).padStart(2, '0')}`),
+    }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(
+      n === 12 && n >= N_THRESHOLD,
+      `(a) positive: 연속 ${n} (기대 12, >= N=${N_THRESHOLD} 발화)`,
+    );
+  }
+
+  // (b) negative: 직전 머지 Phase-2 (2026-05-18) 이후 4건 (< 10) → 미발화 (현재 실측 재현)
+  {
+    const phase2 = [{ state: 'MERGED', mergedAt: iso('2026-05-18') }];
+    const phase1 = ['2026-05-26', '2026-05-27', '2026-06-30', '2026-07-10'].map((d) => ({
+      mergedAt: iso(d),
+    }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 4 && n < N_THRESHOLD, `(b) negative: 연속 ${n} (기대 4, < N=${N_THRESHOLD} 미발화)`);
+  }
+
+  // (c) recovery: 새 Phase-2 머지일 (2026-08-01) 이 모든 Phase-1 보다 이후 → 0 리셋
+  {
+    const phase2 = [
+      { state: 'MERGED', mergedAt: iso('2026-05-18') },
+      { state: 'MERGED', mergedAt: iso('2026-08-01') }, // 최신 Phase-2 (max) — 리셋 기준점
+    ];
+    const phase1 = ['2026-05-26', '2026-06-30', '2026-07-10'].map((d) => ({ mergedAt: iso(d) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 0, `(c) recovery: 새 Phase-2 이후 연속 ${n} (기대 0 리셋)`);
+  }
+
+  // (d) backward-compat: 머지된 Phase-2 0 건 → phase1Prs.length (과거 Phase-2=0 레짐)
+  {
+    const phase2 = [];
+    const phase1 = Array.from({ length: 7 }, (_, i) => ({ mergedAt: iso(`2026-05-${i + 10}`) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 7, `(d) backward-compat: Phase-2=0 → 연속 ${n} (기대 7 = 전체 Phase-1)`);
+  }
+
+  // (e) merged-only 사각 방어 (Q3-1): 미머지/반려 PR 은 리셋 안 함 (createdAt fallback 부재 검증).
+  // createdAt 을 모든 Phase-1 보다 이후(2026-07-01)로 주입 — 미래에 `?? createdAt` fallback 이
+  // 재도입되면 lastPhase2Date 가 07-01 로 잡혀 연속이 0 으로 붕괴, assert(n===5) 가 실패한다.
+  {
+    const phase2 = [
+      { state: 'CLOSED', mergedAt: null, createdAt: iso('2026-07-01') },
+      { state: 'OPEN', mergedAt: null, createdAt: iso('2026-07-01') },
+    ];
+    const phase1 = Array.from({ length: 5 }, (_, i) => ({ mergedAt: iso(`2026-06-${i + 10}`) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
+    assert(n === 5, `(e) merged-only: 전부 미머지 → 연속 ${n} (기대 5, 미머지 PR 리셋 차단)`);
+  }
+
+  console.log(
+    '\n[self-test] Amendment 15 (#823) — substantiality 퀄리파이어 (경로 denylist) 3조건 방어',
+  );
+
+  // (f) 사소 PR 리셋 불인정: substantive(.claude/agents/x.md, 05-18) + README-only(08-01) 혼재.
+  //     README-only 는 filterSubstantiveMergedPhase2 에서 배제 → 리셋 앵커는 05-18 유지 →
+  //     08-01 README 트릭으로 consecutiveSinceLastPhase2 를 0 리셋 불가 (연속 유지).
+  {
+    const phase2 = [
+      { state: 'MERGED', mergedAt: iso('2026-05-18'), files: [{ path: '.claude/agents/developer.md' }] },
+      { state: 'MERGED', mergedAt: iso('2026-08-01'), files: [{ path: 'README.md' }] },
+    ];
+    const filtered = filterSubstantiveMergedPhase2(phase2);
+    assert(
+      filtered.length === 1 && filtered[0].mergedAt === iso('2026-05-18'),
+      `(f) README-only 배제 → substantive ${filtered.length} (기대 1, 앵커 05-18 유지)`,
+    );
+    const phase1 = ['2026-06-10', '2026-06-20', '2026-06-30', '2026-07-10', '2026-07-20'].map(
+      (d) => ({ mergedAt: iso(d) }),
+    );
+    const n = computeConsecutiveSinceLastPhase2(phase1, filtered);
+    assert(n === 5, `(f) 사소 PR 리셋 불인정: 연속 ${n} (기대 5, README 08-01 앵커 미인정)`);
+  }
+
+  // (g) #248 형 substantive 인정: .claude/agents/*.md ×5 (+5줄) → LoC 무관, 경로 기반 substantive.
+  //     리셋 앵커 인정 (substantive 08-01 이후 Phase-1 없으면 연속 0 리셋).
+  {
+    const pr = {
+      state: 'MERGED',
+      mergedAt: iso('2026-08-01'),
+      files: [
+        { path: '.claude/agents/architect.md' },
+        { path: '.claude/agents/developer.md' },
+        { path: '.claude/agents/reviewer.md' },
+        { path: '.claude/agents/qa.md' },
+        { path: '.claude/agents/pm.md' },
+      ],
+    };
+    assert(
+      isSubstantivePhase2(pr) === true,
+      `(g) #248 형 .claude/agents/*.md ×5 → substantive=true (경로 기반, LoC 무관)`,
+    );
+    const filtered = filterSubstantiveMergedPhase2([pr]);
+    assert(filtered.length === 1, `(g) filterSubstantiveMergedPhase2 인정 → ${filtered.length} (기대 1)`);
+    const phase1 = ['2026-06-10', '2026-07-10'].map((d) => ({ mergedAt: iso(d) }));
+    const n = computeConsecutiveSinceLastPhase2(phase1, filtered);
+    assert(n === 0, `(g) substantive 리셋 앵커 인정: 08-01 이후 연속 ${n} (기대 0 리셋)`);
+  }
+
+  // (h) 조건 3 클록 앵커 (main() 로직 재현): substantive 0 건 → firstApply fallback +
+  //     사소 PR 로는 조건 3 클록 리셋 안 됨 (substantive max 유지).
+  {
+    const firstApplyMs = new Date(ADR_FIRST_APPLY_DATE).getTime();
+    const clockAnchor = (phase2Prs) => {
+      const sub = filterSubstantiveMergedPhase2(phase2Prs);
+      return sub.length > 0
+        ? Math.max(...sub.map((p) => new Date(p.mergedAt).getTime()))
+        : firstApplyMs;
+    };
+    // (h-1) 전부 trivial (README/LICENSE) → substantive 0 → firstApply fallback
+    const allTrivial = [
+      { state: 'MERGED', mergedAt: iso('2026-08-01'), files: [{ path: 'README.md' }] },
+      { state: 'MERGED', mergedAt: iso('2026-08-15'), files: [{ path: 'LICENSE' }] },
+    ];
+    assert(
+      filterSubstantiveMergedPhase2(allTrivial).length === 0,
+      `(h-1) 전부 trivial → substantive 0 건 (firstApply fallback 조건)`,
+    );
+    assert(
+      clockAnchor(allTrivial) === firstApplyMs,
+      `(h-1) 클록 앵커 = ADR 첫 적용 (substantive 0 fallback, backward-compat)`,
+    );
+    // (h-2) substantive(05-18) + trivial(08-01) → 클록 앵커 05-18 (사소 PR 08-01 리셋 불인정)
+    const mixed = [
+      { state: 'MERGED', mergedAt: iso('2026-05-18'), files: [{ path: 'CLAUDE.md' }] },
+      { state: 'MERGED', mergedAt: iso('2026-08-01'), files: [{ path: 'README.md' }] },
+    ];
+    assert(
+      clockAnchor(mixed) === new Date(iso('2026-05-18')).getTime(),
+      `(h-2) 클록 앵커 = 05-18 substantive (사소 PR 08-01 리셋 불인정)`,
+    );
+  }
+
+  // (markdown 방어) markdown 은 substantive 자산 — 미래에 *.md / docs/** denylist 추가 회귀 차단.
+  {
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'CLAUDE.md' }] }) === true,
+      `(markdown 방어) CLAUDE.md → substantive=true (denylist 미매칭)`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [{ path: '.claude/agents/qa.md' }] }) === true,
+      `(markdown 방어) .claude/agents/qa.md → substantive=true (denylist 미매칭)`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'docs/decisions/x.md' }] }) === true,
+      `(markdown 방어) docs/decisions/x.md → substantive=true (denylist 미매칭)`,
+    );
+  }
+
+  // (i) denylist 판별 정확성: trivial 조합 / lock 변종 / 파일 0개 / 비-trivial 혼재.
+  {
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'README.md' }, { path: 'LICENSE' }] }) === false,
+      `(i) README+LICENSE 조합 → non-substantive (전부 trivial)`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'pnpm-lock.yaml' }] }) === false,
+      `(i) pnpm-lock.yaml → non-substantive (lock 변종)`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'package-lock.json' }] }) === false,
+      `(i) package-lock.json → non-substantive (lock 변종, *.lock 미매칭 커버)`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'assets/hero.png' }, { path: 'notes.txt' }] }) === false,
+      `(i) 이미지+txt 조합 → non-substantive`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [] }) === false,
+      `(i) 파일 0개 → non-substantive (보수적)`,
+    );
+    assert(
+      isSubstantivePhase2({ files: [{ path: 'README.md' }, { path: 'src/index.ts' }] }) === true,
+      `(i) README + src/index.ts (비-trivial ≥1) → substantive`,
+    );
+  }
+
+  if (failed > 0) {
+    console.error(`\n[self-test] FAIL — ${failed} 케이스 실패`);
+    process.exit(1);
+  }
+  console.log('\n[self-test] PASS — 전 케이스 통과');
+  process.exit(0);
+}
+
+// 직접 실행 시에만 main() / self-test 호출 (import 시 부작용 회피)
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  if (process.argv.includes('--self-test')) {
+    runSelfTest();
+  } else {
+    main();
+  }
 }
 
 // Amendment 8 (#556) — 함수 export (단위 테스트용)

@@ -90,8 +90,8 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 2. **drift 노출 기간 평균 ≥ 30일** — upstream 머지 + 릴리스 사이클이 지속적으로 30일을 넘으면 `harness doctor` 노이즈 영구화 → Phase 1 manifest 수동 갱신 (`harness update --bootstrap`) 검토
 3. **다운스트림 프로젝트 ≤ 1** — 본 프로젝트가 유일한 harness 사용자가 되면 (다른 프로젝트 전부 fork 또는 폐기) X 경로 가치 0 → Y 단독으로 회귀
 4. **`harness update --apply-all-safe` 자가 복구 정책 변경** — v2.9.0+ 의 `previousSha256` 자가 복구가 비활성화되면 Phase 3 자동 동기화 보장 약화 → 재평가
-5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조). **2026-05-26 Amendment 8 로 Phase 1 드리프트 가시화 + Phase 2 중도 변경 정적 비교 가드 박제** — HARNESS-DRIFT 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 drift 자동 비교 (Amendment 5 보완, soft-warn 라벨 부착) — silent 가드 강화 방향. 측정 식 / N 임계 / 90일 임계 변경 없음 (§Amendment 8 참조).
-6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 `.harness/manifest.json` 의 sha256 과 불일치하는 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조). **2026-06-30 Amendment 13 — 첫 발화 ([#766](https://github.com/coseo12/astro-simulator/issues/766), drift 10 = N=10 경계) 결정 분기 이행**: 옵션 3′ (영구 divergent allowlist — 구조적 기여 불가능 자산 카운트 모수 제외) + 부분 옵션 1 채택. N=10 임계 불변 — 카운트 **모수** 정제 (측정 정밀화, orphan 제외 §결정점 5 동일 계열) ≠ 임계 완화 (옵션 3 silent 약화 거부). 자세히는 §Amendment 13.
+5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조). **2026-05-26 Amendment 8 로 Phase 1 드리프트 가시화 + Phase 2 중도 변경 정적 비교 가드 박제** — HARNESS-DRIFT 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 drift 자동 비교 (Amendment 5 보완, soft-warn 라벨 부착) — silent 가드 강화 방향. 측정 식 / N 임계 / 90일 임계 변경 없음 (§Amendment 8 참조). **2026-07-14 Amendment 14 로 계약 원문 ("N=10 회 연속 미진행") 충실 구현** — 조건 2 측정을 절대 누적 회차 (`phase1Count >= N`) → **직전 Phase-2 기여 이후 연속 Phase-1 회차** (`consecutiveSinceLastPhase2 >= N`) 로 정정. 절대 누적은 단조 증가하여 Phase-2 진행 여부와 무관하게 영구 false-fire (계약의 "연속" 리셋 의미 탈락). N=10 임계 불변 — 측정 정밀화 (Amendment 7/13 동일 계열), 임계 완화 (옵션 C) 아님 (§Amendment 14 참조). **2026-07-14 Amendment 15 로 Phase-2 카운트에 substantiality (경로 denylist) 퀄리파이어 3조건 일관 적용** — 조건 1 (ratio 분자) / 조건 2 (연속 리셋 앵커) / 조건 3 (90일 클록 앵커) 을 substantive **머지** Phase-2 (모든 변경 파일이 trivial denylist 매칭이면 배제) 기준으로 정밀화. 머지된 사소 PR (README/오타 1줄) 로 조건 우회 (리셋 게이밍) 차단 + 조건 3 `ADR_FIRST_APPLY_DATE` 고정 절대 앵커 잠복 버그 (day 90 이후 영구 false-fire, #822 조건 2 와 동일 클래스) 를 substantive Phase-2 max 앵커 (없으면 firstApply fallback) 로 해소. N=10/33%/90일 임계 불변 — 모수/앵커 정밀화 (Amendment 7/13/14 동일 계열), 4건 실측 전부 substantive → backward-compat (§Amendment 15 참조).
+6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 `.harness/manifest.json` 의 sha256 과 불일치하는 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조). **2026-06-30 Amendment 13 — 첫 발화 ([#766](https://github.com/coseo12/astro-simulator/issues/766), drift 10 = N=10 경계) 결정 분기 이행**: 옵션 3′ (영구 divergent allowlist — 구조적 기여 불가능 자산 카운트 모수 제외) + 부분 옵션 1 채택. N=10 임계 불변 — 카운트 **모수** 정제 (측정 정밀화, orphan 제외 §결정점 5 동일 계열) ≠ 임계 완화 (옵션 3 silent 약화 거부). 자세히는 §Amendment 13. **2026-07-14 Amendment 15 (§재검토 조건 #5 substantiality 모수/앵커 정밀화) 는 본 #6 Amendment 13 (drift 카운트 모수 정제) 와 동일 계열** — 서로 다른 축 (#5 Phase-2 카운트 substantiality vs #6 drift 파일 카운트 allowlist) 이나 둘 다 "임계 불변 + 카운트 모수 정밀화" 접근 (§Amendment 15 참조).
 
 ### 측정 지표
 
@@ -1396,3 +1396,317 @@ orphan sidecars: 0
 #### 결론: 조건부 통과 → Forbidden Path 가드 반영 후 통과
 
 cross-validate 가 핵심 안전장치 (Forbidden Path deny-list) 1건을 보강. 후속 분리 2건 ([#768](https://github.com/coseo12/astro-simulator/issues/768) stale 에이징 / [#769](https://github.com/coseo12/astro-simulator/issues/769) upstream allowlist 인터페이스) 박제 완료 (`Builds on: #766`). 상태: Provisional → **Accepted** 전이 (본 §섹션 통합 완료).
+
+## Amendment 14 — 2026-07-14
+
+상태: Accepted (cross-validate 2026-07-14 — §교차검증 반영 사항 통합 완료. CLAUDE.md §ADR Status 워크플로 — cross-validate 앵커 "ADR 신규·개정/폐기")
+
+- **발의**: [#822](https://github.com/coseo12/astro-simulator/issues/822) ([ADR Trigger] 자동 탐지 2026-07-13 — §재검토 조건 #5 발화. Amendment 1 규정 3 영업일 내 결정 분기 의무 이행)
+- **트리거 발화 사유**: Amendment 1+2 정합 3중 OR 중 **조건 2 단일 발화** — `phase1Count = 10 >= N=10`. 조건 1 (Phase 2 진행률 40.0% ≥ 33%, Amendment 1 미발화) / 조건 3 (경과 60일 < 90일, Amendment 2 미발화) 는 미발화.
+- **결정 (2026-07-14, 메인 오케스트레이터 forensic 실측 확정)**: **옵션 D — 측정 정밀화** (메타 옵션). Amendment 7 (자기참조 인플레 정정) / Amendment 13 (카운트 모수 정제) 와 **동일 계열**. **N=10 임계 불변** — 옵션 C (임계 완화) 는 Amendment 4 §트리거 ("임계값 추가 완화는 silent 가드 무한 사이클 가속 위험으로 거부") 답습으로 명시 거부. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법 검증 우선" 직접 적용.
+
+### 계약 ↔ 구현 drift forensic (핵심 쟁점)
+
+§재검토 조건 #5 원문 계약과 자동 탐지 스크립트 구현 사이의 **의미 drift**:
+
+| 구분                                         | 내용                                                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **ADR §재검토 조건 #5 계약 원문**            | "Phase 2 (upstream 기여) **N=10 회 연속 미진행**" (Amendment 1 박제, Amendment 2 로 N=3→10)                          |
+| **구현** (`verify-z-pattern-health.mjs:374`) | `phase1Count >= N_THRESHOLD` — Phase 1 **절대 누적 회차** (isAdrEvolutionPr 필터 후)                                 |
+| **drift**                                    | "연속 미진행" (직전 Phase-2 이후 리셋되는 **상대** 카운터) 의미가 "생애 누적 회차" (**절대**) 로 구현됨. 리셋점 부재 |
+
+**결정적 논점 (영구 false-fire)**: `phase1Count` (= `adrCitations`) 는 **단조 증가**한다. 정정하지 않으면 **앞으로 모든 Phase-1 PR 마다 영구 false-fire** — §재검토 조건 #6 (Amendment 9) 이 경고한 alert fatigue 그 자체. 옵션 A (Phase 2 일괄 기여) 로도 해소 불가능 — Phase-2 를 아무리 진행해도 `phase1Count` (절대 누적) 는 계속 ≥ 10 이라 조건 2 는 계속 발화. 즉 **측정식 정정이 유일한 근본 해소 경로** (옵션 A 는 조건 1 (ratio) 만 개선, 조건 2 미해소).
+
+### Forensic 측정 데이터 (2026-07-14, develop tip 27453fb)
+
+#### 측정 1 — 자동 탐지 발화 출력 ([#822](https://github.com/coseo12/astro-simulator/issues/822) 이슈 본문)
+
+```text
+Phase 1 (본 프로젝트): 10 (Amendment 13, PR citations 10)
+Phase 2 (upstream harness-setting): 4
+Phase 2 진행률: 40.0%
+ADR 적용 후 경과 일수: 59일
+
+[ADR Trigger] ADR 20260515 Z 패턴 §재검토 조건 #5 발화:
+  - Phase 1 회차 10 >= N=10 임계값
+```
+
+→ **조건 2 (Phase 1 회차 10 ≥ N=10) 단독 발화**. 조건 1 (진행률 40% ≥ 33%) / 조건 3 (경과 59~60일 < 90일) 은 미발화.
+
+#### 측정 2 — Phase-2 (upstream 기여) 시간 분포
+
+| Phase-2 upstream PR                                                        | 기여일     | 인용         |
+| -------------------------------------------------------------------------- | ---------- | ------------ |
+| [harness-setting#248](https://github.com/coseo12/harness-setting/pull/248) | 2026-05-17 | ADR 20260515 |
+| [harness-setting#254](https://github.com/coseo12/harness-setting/pull/254) | 2026-05-18 | ADR 20260515 |
+| [harness-setting#257](https://github.com/coseo12/harness-setting/pull/257) | 2026-05-18 | ADR 20260515 |
+| [harness-setting#260](https://github.com/coseo12/harness-setting/pull/260) | 2026-05-18 | ADR 20260515 |
+
+→ Phase-2 기여 4건 전부 **2026-05-17~18 단일 버스트** (Amendment 4/5/6 일괄 진행 결과). **마지막 Phase-2 기여일 = 2026-05-18**.
+
+#### 측정 3 — 직전 Phase-2 (2026-05-18) 이후 연속 Phase-1 회차
+
+| Phase-1 PR (isAdrEvolutionPr 필터 후) | 머지일     | 직전 Phase-2 (05-18) 이후? |
+| ------------------------------------- | ---------- | -------------------------- |
+| #587                                  | 2026-05-26 | ✓                          |
+| #588                                  | 2026-05-26 | ✓                          |
+| #770                                  | 2026-06-30 | ✓                          |
+| #819                                  | 2026-07-10 | ✓                          |
+
+→ **직전 Phase-2 이후 연속 Phase-1 = 4회** (< N=10). 계약 원문 ("N=10 회 연속 미진행") 대로 측정하면 **4 < 10 → 미발화**. 현재 발화는 순수하게 **절대 누적 (10) ↔ 연속 (4) 측정 차원 불일치** 가 원인.
+
+#### 가설 검증
+
+- **가설 A (기각)**: "Phase-2 가 10 sprint 연속 미진행되어 Y (영구 fork) 회귀 신호" → 참이면 직전 Phase-2 이후 연속 Phase-1 ≥ 10 이어야 함. **반증**: 연속 4회 (측정 3) + Phase 2 진행률 40% (측정 1) = health 정상. Y 회귀 신호 아님.
+- **가설 B (확정)**: "구현이 계약의 '연속' 의미를 '절대 누적' 으로 측정 → 단조 증가로 영구 false-fire" → 측정 1~3 으로 확정. 조건 2 는 Phase-2 진행 여부와 무관하게 `phase1Count` 증가만으로 영구 발화.
+
+### 변경 사항
+
+#### 1. 자동화 스크립트 정정 — `scripts/verify-z-pattern-health.mjs` 조건 2
+
+- **기존** (`:374`): `if (phase1Count >= N_THRESHOLD)` — Phase 1 절대 누적 회차 (isAdrEvolutionPr 필터 후)
+- **정정**: `if (consecutiveSinceLastPhase2 >= N_THRESHOLD)` — **직전 Phase-2 기여 이후 연속 Phase-1 회차**
+- **`consecutiveSinceLastPhase2` 산출 로직** (cross-validate 정정 반영 — `merged`-only):
+  1. Phase-2 PR (upstream, "ADR 20260515" 검색) 중 **`state == MERGED` 이며 `mergedAt != null`** 인 것만 수집 (미머지 / 반려 / open 제외). 이들의 `mergedAt` epoch (`new Date(x).getTime()`) 중 **max** = 직전 Phase-2 기여일 (`lastPhase2Date`). **`createdAt` fallback 금지** — 반려된 PR 이 카운터를 잘못 리셋하는 사각 차단 (§교차검증 고유 발견 Q3-1)
+  2. Phase-1 PR (isAdrEvolutionPr 필터 후) 중 `mergedAt` epoch `> lastPhase2Date` 인 것의 개수 = `consecutiveSinceLastPhase2` (동일 타임스탬프 경계는 ms epoch 비교로 결정 — §교차검증 고유 발견 Q3-2)
+  3. **머지된 Phase-2 가 0 건이면 `consecutiveSinceLastPhase2 = phase1Count`** (backward-compat — 아래 §변경 사항 2)
+- **stdout 메시지 정정**: "Phase 1 회차 N >= N=10" → "직전 Phase-2 이후 연속 Phase-1 N회 >= N=10". 정보 출력에 절대 누적 (`phase1Count`) 도 병기하여 두 차원 가시화.
+
+#### 2. backward-compat 보장 (과거 Phase-2=0 레짐 동작 불변)
+
+- Amendment 1~3 시점 (2026-05-16~17) 은 Phase-2 = 0 레짐. 이 구간에서 "직전 Phase-2 이후" = "전체 Phase-1" 이므로 `consecutiveSinceLastPhase2 = phase1Count` — **과거 발화 이력 (Amendment 4/6 트리거) 재현 불변**.
+- Phase-2 ≥ 1 인 현재 레짐부터 리셋 의미가 활성화 → 계약 원문 충실 구현. 즉 정정은 **과거 동작 파괴 없이 최근 레짐에만 의미 부여** (순수 확장).
+
+#### 3. 조건 1 (생애 평균 ratio) 과의 직교성 — 조건 2 부활
+
+- 조건 1 (`phase2Count / phase1Count < 33%`) 은 **생애 누적 평균** — 오래된 Phase-2 버스트가 분자에 영구 잔존하여 최근 drift 를 희석한다.
+- 조건 2 (정정 후) 는 **직전 Phase-2 이후 최근 구간** 신호 — 생애 평균이 가리는 최근 정체를 포착. 두 축이 **직교 부활** (기존 조건 2 는 조건 1 과 강상관인 단조 증가라 독립 신호 가치 상실).
+- 현재 연속 4건은 sub-threshold (조건 2 미발화). 향후 Phase-2 없이 연속 Phase-1 이 10 도달 시 조건 2 가 **정직하게** Y 회귀 신호로 작동.
+
+### 비목표 — 후속 분리 (옵션 A)
+
+- **잔여 Phase-1 upstream 일괄 기여 (옵션 A) 는 본 Amendment 범위 밖** — Phase 2 진행률 40% (health 정상) 이라 강제 아님. [#769](https://github.com/coseo12/astro-simulator/issues/769) (upstream allowlist 인터페이스) 가 일부 커버 + 90일 클록 (backstop 2026-08-13 = 2026-05-15 + 90일) 자연 재점검. 본 정정 (측정식) 과 직교 — CLAUDE.md §교차검증 후속 분리 3단 프로토콜 정합 (비목표를 "타당하다"는 이유로 현재 PR 에 끌어들이지 않음).
+
+### silent 가드 강화 vs 약화 자기점검
+
+본 Amendment 14 의 방향 검증 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화):
+
+- ✓ **silent 가드 강화 방향** — N 임계 변경 0. 측정 차원 정정 (절대 누적 → 연속) 은 계약 원문 충실화 (측정 본질 정합 보존). Amendment 7 (자기참조 인플레 정정) / 13 (모수 정제) 동일 계열.
+- ✓ **§결정 본문 / N=10 / 90일 임계 변경 0** — Amendment 2 SSoT 보존. 옵션 C (N 재조정) 명시 거부.
+- ✓ **false-fire 제거 = 진짜 트리거 보호** — 매주 false-fire 는 alert fatigue → 진짜 Y 회귀 신호 발화 시 무시 위험. 정확한 측정이 silent 가드의 효과 자체를 보호 (Amendment 7 §silent 가드 무력화 위험 점검 답습).
+- ✓ **measurement-first 원칙 정합** — "발화 잦아 부담" (주관) 이 아닌 "계약 원문 (연속) ↔ 구현 (절대) 불일치" (객관) 기반 정정.
+
+### 트레이드오프
+
+- **장점**: 계약 원문 충실 구현 + 영구 false-fire 제거 + 조건 2 를 조건 1 과 직교하는 최근-drift 신호로 부활 + backward-compat (과거 레짐 불변).
+- **단점 (잠재)**:
+  - **리셋 게이밍 잠재** — 형식적 Phase-2 기여 1건으로 `consecutiveSinceLastPhase2` 를 0 으로 리셋해 조건 2 를 무한 지연 가능. **1차 방어 (본 Amendment 반영)**: `merged`-only 필터로 미머지 PR 리셋 차단 + 실질 upstream 머지 강제 (사소 PR 게이밍 문턱 상승). **잔여 위험 (cross-validate 고유 발견 — 후속 분리)**: agy 가 조건 1 (생애 ratio) 의 **볼륨 둔감성** 을 지적 — 볼륨이 커질수록 생애 평균이 최근 정체를 희석하여, 머지된 사소 PR 1건으로 조건 1+2 동시 우회 가능. 조건 1 직교 보증만으로는 불충분함이 확인됨. Phase-2 기여 substantiality 하한 (min LoC / 경로 / label) 은 별도 설계 필요 → **[#823](https://github.com/coseo12/astro-simulator/issues/823) 후속 분리** (Builds on #822).
+  - PR title / mergedAt 데이터 의존 — gh API 조회 실패 시 보수적 fallback (Phase-2 조회 실패 → count=0 → 전체 Phase-1 = 기존 동작). 기존 try/catch 패턴 답습.
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규/변경 코드 (`scripts/verify-z-pattern-health.mjs`):
+  - `adrCitationPrs` 조회에 `mergedAt` 필드 추가 (현재 `number,title` → `number,title,mergedAt`) — **~1 라인**
+  - Phase-2 조회를 `--jq 'length'` (count only) → `number,mergedAt,createdAt` (날짜 포함) 로 확장 후 count 는 배열 길이로 산출 — **~5-10 라인**
+  - `computeConsecutiveSinceLastPhase2(phase1Prs, phase2Prs)` **순수 함수 추출 + export** (기존 `isAdrEvolutionPr` export 컨벤션 답습, self-test 주입 가능하도록) — **~15-25 라인**
+  - 조건 2 정정 (`phase1Count >=` → `consecutiveSinceLastPhase2 >=`) + stdout 메시지 정정 — **~5-10 라인**
+  - `--self-test` 모드 추가 (3중 시뮬 a/b/c, 아래 §회귀 가드) — **~30-50 라인**
+- ADR Amendment 14 자체: 본 §섹션 (forensic 포함 ~150-200 라인)
+- harness-managed 파일 변경: `verify-z-pattern-health.mjs` (이미 `[TODO]` drift 상태 — 데코레이터 `// HARNESS-DRIFT: Z-PATTERN [TODO]` 2번째 줄 **유지**, 새 drift 파일 0)
+- **총 예상 라인 수**: 55-95 라인 (스크립트) + ADR ~150-200 라인
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "월 cron §재검토 조건 #5 조건 2 를 절대 누적 회차 → 직전 Phase-2 기여 이후 연속 Phase-1 회차로 정정 (계약 원문 충실 구현, N=10 임계 불변, 과거 Phase-2=0 레짐 backward-compat)" (MINOR 릴리스 후보) — 단 본 PR (architect) 은 ADR Amendment 만 박제 (코드/CHANGELOG 미터치, developer 단계 추가).
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/verify-z-pattern-health.mjs --self-test` — `computeConsecutiveSinceLastPhase2` 순수 함수에 주입 fixture 로 3중 시뮬 PASS 의무.
+- **(2) 3중 시뮬레이션** (positive → negative → recovery):
+  - **(a) positive**: 직전 Phase-2 이후 연속 Phase-1 ≥ 10 (Phase-2 count ≥ 1) → 조건 2 발화 (exit 1)
+  - **(b) negative**: 연속 Phase-1 < 10 (예: 4) **AND** ratio ≥ 33% → 조건 2 미발화 (현재 실측 재현). exit 0
+  - **(c) recovery**: Phase-2 기여 직후 (새 Phase-2 의 mergedAt 이 max) → `consecutiveSinceLastPhase2` 리셋 (0 또는 이후 Phase-1 소수) → 조건 2 미발화
+  - **추가 backward-compat 케이스**: Phase-2 count = 0 → `consecutiveSinceLastPhase2 = phase1Count` (과거 Amendment 4 트리거 재현)
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (메인 단계 의무) + 후속 developer/reviewer/qa 가 동일 결론 (옵션 D / 절대→연속 정정 / N=10 불변 / backward-compat) 도출 검증.
+- **(4) 메타 측정 도구 자기 적용 안정성**: 정정 후 스크립트 실 실행 → 현재 데이터 (연속 4, ratio 40%, 60일) 에서 exit 0 (전 조건 미발화) 확인. `verify-z-pattern-health.mjs` 자신은 데코레이터 `[TODO]` 유지 (drift 심화 없음, sha 변경만).
+
+### cross-link
+
+- 본 Amendment, [#822](https://github.com/coseo12/astro-simulator/issues/822) 이슈 본문
+- 직전 Amendment: Amendment 13 (drift 카운트 모수 정제 — §재검토 조건 #6 차원)
+- 발화 가드 SSoT: `scripts/verify-z-pattern-health.mjs` (`:374` 조건 2), `.github/workflows/adr-z-pattern-health-v2.yml`
+- 측정 정밀화 vs silent 약화 SSoT: Amendment 7 (측정 식 자기참조 인플레 forensic 정정) / Amendment 13 (카운트 모수 정제) — 동일 계열 (N 임계 불변 + 측정 차원 정정)
+- 직전 [ADR Trigger] 결정: Amendment 7 [#554](https://github.com/coseo12/astro-simulator/issues/554) (옵션 D 선례), Amendment 4 [#495](https://github.com/coseo12/astro-simulator/issues/495) (옵션 A) / Amendment 2 [#487](https://github.com/coseo12/astro-simulator/issues/487) (옵션 C — 거부 답습)
+- 측정 방법 원칙: CLAUDE.md §스프린트 계약 #10 (volt [#32](https://github.com/coseo12/volt/issues/32) — 측정 방법 검증 우선)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" ([docs/lessons/guard-design-principles.md](../lessons/guard-design-principles.md))
+
+### 교차검증 반영 사항 (cross-validate 2026-07-14 완료 — Accepted 전이)
+
+> **상태**: Accepted. cross-validate (agy, `cross_validate.sh architecture`) 로 본 Amendment 14 설계 + 3 명시 질문 (Q1 측정 정정 타당성 / Q2 리셋 게이밍 / Q3 사각지대) 전달. 로그: `.claude/logs/cross-validate-architecture-20260715-000231.log`. 아래 4종 분류 통합 후 Accepted 전이 (Amendment 13 §교차검증 반영 사항 형식 답습).
+
+**4종 분류 (Claude 재분석 — 맹목 수용 금지):**
+
+- **합의 (수용)**: (Q1) 조건 2 를 절대 누적 → 연속 측정으로 정정하는 방향은 "적극 타당" — 무상태 누적값은 프로젝트 수명 증가로 영구 참(alert fatigue)이 되는 구조적 버그이며, 임계 상향(옵션 C) 미봉책이 아닌 측정 차원 정정이 계약 본질 충실. Claude 설계와 일치.
+- **고유 발견 A (수용 — 범위 내, critical)**: (Q3-1) `mergedAt ?? createdAt` fallback 결함 — 미머지/반려 Phase-2 PR 의 `createdAt` 이 `lastPhase2Date` 를 잘못 갱신해 실 upstream 반영 없이 카운터 리셋. **정정**: `merged` 상태 + `mergedAt != null` 만 수집, `createdAt` fallback 제거 (§변경 사항 1 반영 완료).
+- **고유 발견 B (수용 — 범위 내, minor)**: (Q3-2) 타임스탬프 정밀도 — 밀접 머지 시 순서 왜곡 가능 → ms epoch (`getTime()`) 비교로 정정 (§변경 사항 1 반영 완료).
+- **고유 발견 C (후속 분리 — 범위 밖)**: (Q2) 조건 1 (생애 ratio) 직교 보증의 **볼륨 둔감성** — 볼륨 증가 시 생애 평균이 최근 정체 희석 → 머지된 사소 PR 1건으로 조건 1+2 동시 우회 가능. `merged`-only 로 1차 문턱은 상승하나 "머지된 사소 PR" 게이밍은 잔존. substantiality 하한(min LoC/경로/label)은 직교 정책 설계 필요 → **[#823](https://github.com/coseo12/astro-simulator/issues/823)** 분리 (CLAUDE.md §후속 분리 3단 프로토콜 — 비목표를 "타당하다"는 이유로 현재 PR 에 끌어들이지 않음. 1인 운영 self-gaming 특성상 priority medium).
+- **오탐 필터링**: 없음 (agy 지적 전부 유효).
+- **Claude 편향 셀프 체크 결과**: §순수주의 편향 축에서 사전 식별한 "리셋 게이밍 우회로" 잠재 미통과를 cross-validate 가 확증 (고유 발견 C) — 셀프 체크의 명시 질문 삽입이 실제 사각 노출로 이어짐 (measurement-first 정합).
+
+#### Claude 편향 셀프 체크 (4종 — cross-validate 호출 전)
+
+- **낙관적 일정 편향**: 해당 없음 (본 Amendment 는 일정/공수 추정 항목 없음 — 측정식 정정 단일 목표). N/A
+- **결합 간과 편향**: 조건 2 정정이 조건 1 (ratio) / 조건 3 (90일) 과 직교하는지 — 세 축 독립 확인 (§변경 사항 3). backward-compat 로 과거 레짐 동작 불변. **통과**
+- **폐기 프레이밍 편향**: 옵션 C (임계 완화) 를 너무 쉽게 기각? — Amendment 2/4/7/13 이 일관되게 거부한 silent 약화 사이클 답습이며, 절대 누적 단조 증가는 N 완화로 해소 불가 (계속 초과) 이므로 정정이 유일 경로. **통과**
+- **순수주의 편향** ("측정 정밀화" 긍정 프레이밍 과잉?): 계약 원문 ("연속") 충실 구현이라 measurement-first 정합. **단 미통과 잠재 축** — 리셋 의미 도입이 조건 2 를 형식적 Phase-2 1건으로 무한 지연시킬 우회로가 되지 않는가? → **cross-validate 명시 질문 삽입 대상**: "직전 Phase-2 이후 연속 카운트 리셋이 조건 2 를 게이밍 가능하게 하는가? 조건 1 (ratio ≥ 33%) 직교 보증으로 충분한가, 아니면 리셋에 최소 실질 기여 조건 (예: PR 머지 상태 필수) 이 필요한가?"
+
+## Amendment 15 — 2026-07-14
+
+상태: Accepted (cross-validate 2026-07-14 — §교차검증 반영 사항 4종 통합 완료. CLAUDE.md §ADR Status 워크플로 — cross-validate 앵커 "ADR 신규·개정/폐기").
+
+- **발의**: [#823](https://github.com/coseo12/astro-simulator/issues/823) (Builds on [#822](https://github.com/coseo12/astro-simulator/issues/822) — Amendment 14 cross-validate (agy) §고유 발견 C 후속 분리). #822 스코프 (조건 2 측정 차원 정정) 와 직교하는 substantiality 정책이라 CLAUDE.md §후속 분리 3단 프로토콜로 분리됨.
+- **트리거 발화 사유**: 자동 탐지 트리거가 아닌 **cross-validate 고유 발견 후속** (Amendment 14 §교차검증 반영 사항 §고유 발견 C). 조건 2 리셋 의미 도입 (Amendment 14) 의 잔여 사각 (리셋 게이밍) 을 조건 1 (생애 ratio) 직교 보증에 의존했으나, agy 가 그 보증의 **볼륨 둔감성** 을 지적.
+- **결정 (2026-07-14, 메인 오케스트레이터 measurement-first 실측 확정)**: **옵션 1 — 경로 기반 substantiality 퀄리파이어 (denylist), 통합 스코프 A (3조건 일관 적용)**. Amendment 7 (자기참조 인플레 정정) / Amendment 13 (drift 카운트 모수 정제) / Amendment 14 (연속 측정 차원 정정) 와 **동일 계열 — 모수/앵커 정밀화, 임계값 불변**. N=10 / 33% / 90일 수치 변경 0.
+
+### 문제 forensic (핵심 쟁점)
+
+Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-1" (`consecutiveSinceLastPhase2 >= N`) 로 정정하고, 리셋 게이밍 방어를 조건 1 (생애 ratio ≥ 33%) 의 직교 보증에 의존했다. cross-validate 가 남은 사각을 지적:
+
+| 구분                         | 내용                                                                                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **잔여 게이밍 벡터**         | `merged`-only 필터는 "미머지 PR" 게이밍은 막았으나 "머지된 **사소** PR" (오타/README 1줄) 게이밍은 잔존                                                                                               |
+| **조건 1 볼륨 둔감성**       | 조건 1 은 생애 누적 평균이라 볼륨이 커질수록 감도 급락. 오래된 Phase-2 버스트가 분자에 영구 잔존 → 최근 정체 희석                                                                                     |
+| **동시 우회 시나리오** (agy) | 정체기에 사소 PR 1건 머지 → `consecutiveSinceLastPhase2` 를 0 리셋 (조건 2 우회) **AND** `phase2Count` +1 (조건 1 ratio 유지 우회) 동시 성립. 실질 기여 없이 형식 머지 1건으로 두 조건 무한 우회 가능 |
+
+즉 조건 1 직교 보증만으로는 "머지된 사소 PR" 게이밍을 막지 못함이 확인됨.
+
+### 착수 중 추가 발견 — 조건 3 잠복 버그 (통합 대상)
+
+조건 3 (`daysSinceFirstApply >= 90`) 는 `ADR_FIRST_APPLY_DATE = '2026-05-15'` **고정 절대 시각** 을 기준으로 한다. 이는 **day 90 (2026-08-13) 이후 영구 발화** — #822 에서 고친 조건 2 "단조 증가 영구 false-fire" 와 **동일 클래스 잠복 버그** (리셋점 없는 절대 기준). 계약 원문 ("90일 경과") 의 의도는 **주기적 재검토** (분기별 점검, Amendment 2) 이지 "박제 90일 후 영구 경고" 가 아니다. 리셋 앵커 정정으로 함께 해소.
+
+### Measurement 실측 (2026-07-14, develop tip 74bbc94)
+
+기존 Phase-2 4건 diff 규모 + 변경 경로 (`gh pr view <n> --json files` 실측):
+
+| Phase-2 upstream PR                                                        | diff 규모 | 변경 경로 (요약)                                                    | denylist 판정   |
+| -------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------- | --------------- |
+| [harness-setting#248](https://github.com/coseo12/harness-setting/pull/248) | **+5/-0** | `.claude/agents/*.md` ×5 (각 +1)                                    | **substantive** |
+| [harness-setting#254](https://github.com/coseo12/harness-setting/pull/254) | +14/-0    | `CLAUDE.md`                                                         | **substantive** |
+| [harness-setting#257](https://github.com/coseo12/harness-setting/pull/257) | +45/-0    | `.claude/agents/developer.md` + `.claude/skills/create-pr/SKILL.md` | **substantive** |
+| [harness-setting#260](https://github.com/coseo12/harness-setting/pull/260) | +261/-2   | agents ×5 + scripts + CLAUDE.md + CHANGELOG + skill (×9)            | **substantive** |
+
+**핵심 발견 (임계값 설계 근거)**:
+
+1. **LoC 하한 (agy 제안 1) 기각** — #248 은 **+5줄** 인데 정당한 실질 기여 (5개 에이전트 SSoT 동시 갱신). diff 라인 수 하한 (예: ≥ 10줄) 을 두면 #248 이 **정당 PR 오탈락** → measurement 근거로 기각.
+2. **경로 기반이 옳은 신호** — 4건 전부 실질 경로 자산 (`.claude/`, `CLAUDE.md`, `scripts/`) 을 터치. 라인 수와 무관하게 경로가 substantiality 를 정직하게 판별.
+3. **label 방식 (agy 제안 2) 기각** — upstream (harness-setting) 라벨 체계 결합 + 수동 라벨 누락 시 정당 PR 오탈락. 결합도 위험.
+4. **backward-compat 확정** — 4건 전부 substantive → 조건 1 ratio 분자 = 4 불변, 조건 2 리셋 앵커 = 2026-05-18 (max mergedAt) 불변. 정정은 **과거 동작 파괴 없이 미래 사소-PR 게이밍만 차단** (순수 확장).
+
+### 후보 비교 (substantiality 퀄리파이어 — 축별 trade-off)
+
+| 옵션                  | false-negative (정당 PR 오탈락 → spurious 발화) | false-positive (게이밍 PR 통과) | upstream 결합 | measurement 근거        | 판정                 |
+| --------------------- | ----------------------------------------------- | ------------------------------- | ------------- | ----------------------- | -------------------- |
+| **1a. 경로 denylist** | **최소** (모든 파일 trivial 매칭 시에만 배제)   | 소폭 허용 (trivial 조합 게이밍) | 없음          | #248 (+5) 정상 통과     | **채택 (권고)**      |
+| 1b. 경로 allowlist    | 높음 (신규 substantive 경로 도입 시 오탈락)     | 최소                            | 없음          | 신규 경로 미대응 위험   | 기록 (denylist 채택) |
+| 2. LoC 하한           | **높음** (#248 +5 오탈락 실측)                  | 소폭 허용                       | 없음          | **#248 반증**           | 기각                 |
+| 3. label 기반         | 높음 (수동 라벨 누락 시)                        | 최소                            | **높음**      | upstream 라벨 체계 의존 | 기각                 |
+
+**denylist 채택 근거 = 위험 비대칭**: false-negative (정당 PR 오탈락 → 조건 spurious 발화 → alert fatigue, Amendment 9 §재검토 조건 #6 이 경고한 그 피로) 가 false-positive (게이밍 PR 통과) 보다 나쁘다. 1인 self-gaming 은 adversarial 이 아닌 자기 가드 무력화라 **저위험** (#823 priority medium). 따라서 denylist 로 false-negative 최소화가 옳다 — allowlist 는 신규 substantive 경로 도입 시마다 목록 갱신 부채 + 오탈락 위험을 진다. (allowlist 대안은 본 표에 기록하되 채택 안 함. cross-validate 에서 denylist 초안 커버리지 stress 예정.)
+
+**trivial denylist** (cross-validate 정제 반영): `README*`, `LICENSE*`, `.gitignore`, `.prettierignore`, `.editorconfig`, `*.png|*.jpg|*.jpeg|*.svg|*.gif`, `*.txt`, 그리고 lock 파일 변종 (`*.lock`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`). (판정 규칙: PR 의 **모든** 변경 파일이 denylist 매칭이면 non-substantive. 비-trivial 파일 ≥ 1 터치 시 substantive.)
+
+> **⚠ markdown 을 denylist 하지 말 것 (cross-validate 역방향 오류 방어)**: cross-validate (agy) 는 일반 프로젝트 직관 (`*.md` / `docs/**` = 문서 = trivial) 으로 이들을 denylist 에 추가 권고했으나 **본 하네스에서는 기각**한다. 이 하네스는 **markdown 이 곧 substantive 자산** (`.claude/agents/*.md`, `.claude/skills/*/SKILL.md`, `CLAUDE.md`, `docs/lessons/`, `docs/decisions/` 이 harness 행동 계약 SSoT). 실측 Phase-2 4건 (#248/#254/#257/#260) 이 **전부 markdown** — `*.md` / `docs/**` / `.github/workflows/**` 를 denylist 하면 정당 기여 4건 전부 non-substantive 오판 → spurious 발화 + 실 기여 거부 (denylist 도입 목적 자체 붕괴). 미래 유지보수자가 일반 직관으로 markdown 을 denylist 에 추가하는 회귀를 **명시 금지**.
+
+### 변경 사항 — substantiality 퀄리파이어 3조건 일관 적용 (통합 스코프 A)
+
+하나의 `isSubstantivePhase2(pr, denylist)` 퀄리파이어로 3조건 동시 보호:
+
+#### 1. 조건 1 (생애 ratio) — 분자 정밀화
+
+- **기존**: `phase2Count` = 전체 Phase-2 PR 개수 (state=all length)
+- **정정**: substantive **merged** Phase-2 카운트 (`filterSubstantiveMergedPhase2(phase2Prs).length`) → ratio 분자
+- 현재 데이터 4건 전부 substantive → 값 4 불변 (backward-compat). 미래 사소 PR 은 분자에 안 잡혀 ratio 유지 우회 차단.
+
+#### 2. 조건 2 (연속 카운트) — 리셋 앵커 정밀화
+
+- **기존** (Amendment 14): `lastPhase2Date` = merged Phase-2 의 max(mergedAt)
+- **정정**: **substantive** merged Phase-2 의 max(mergedAt). 사소 PR (README-only 등) 은 리셋 앵커가 되지 못함 → `consecutiveSinceLastPhase2` 를 0 으로 리셋 불가.
+- `computeConsecutiveSinceLastPhase2` 의 merged 필터를 substantive 필터로 교체 (또는 substantive 배열 주입).
+
+#### 3. 조건 3 (90일 경과) — 리셋 앵커 정밀화 + 잠복 버그 해소
+
+- **기존**: `daysSinceFirstApply` = today − `ADR_FIRST_APPLY_DATE` (**고정 2026-05-15**) → day 90 이후 영구 발화
+- **정정**: `daysSinceLastSubstantive` = today − max(substantive merged Phase-2 mergedAt). **substantive Phase-2 가 0 건이면 `ADR_FIRST_APPLY_DATE` fallback** (backward-compat).
+- 리셋 앵커 정정으로 **영구 false-fire 해소 (#822 조건 2 와 동일 클래스 잠복 버그)** + **사소 PR 로는 조건 3 클록도 리셋 불가** (게이밍 이중 차단). 계약 "90일 경과" 의도 (주기 재검토) 충실.
+
+**임계값 불변**: N=10 / 33% / 90일 수치 변경 0. **모수** (무엇을 Phase-2 로 셀지) + **앵커** (언제부터 셀지) 정밀화만. Amendment 13 "모수 정제" / Amendment 14 "측정 차원 정정" 동일 계열.
+
+### silent 가드 강화 vs 약화 자기점검 (CLAUDE.md §"가드 설계 원칙" §의식적 silent 약화)
+
+- ✓ **silent 가드 강화 방향** — 게이밍 우회로 3종 (사소 PR 리셋 / ratio 분자 오염 / 90일 클록 리셋) 차단. N 임계 변경 0.
+- ✓ **§결정 본문 / N=10 / 33% / 90일 임계 변경 0** — Amendment 1/2 SSoT 보존. 옵션 2/3 (LoC/label) 은 measurement 근거로 기각 (silent 약화 아님).
+- ✓ **조건 3 영구 false-fire 제거 = 진짜 트리거 보호** — 절대 시각 고정 잠복 버그 (day 90 이후 매주 false-fire) 해소로 alert fatigue 차단. Amendment 14 §false-fire 제거 답습.
+- ✓ **measurement-first 정합** — "게이밍이 우려됨" (주관) 이 아닌 "생애 ratio 볼륨 둔감성 + 조건 3 절대 앵커 잠복 버그" (객관 구조) + #248 실측 (LoC 하한 반증) 기반.
+
+### 트레이드오프
+
+- **장점**: 게이밍 우회로 3종 차단 (사소 PR 리셋 / ratio 분자 / 90일 클록) + 조건 3 잠복 버그 (영구 false-fire) 동시 해소 + backward-compat (4건 전부 substantive → 현재 동작 불변) + 하나의 퀄리파이어로 3조건 일관 보호 (SSoT 단일화).
+- **단점 (잠재)**:
+  - **denylist 커버리지 한계** — 초안 목록에 없는 trivial 파일 유형 (예: `*.txt`, `docs/` 순수 오타 수정) 은 substantive 로 오판 가능. denylist 확장은 발견 시 후속. (allowlist 대비 false-negative 최소 우선 — 위험 비대칭 판단. cross-validate stress 대상.)
+  - **trivial 조합 게이밍 잔존** — README + LICENSE 만 동시에 담은 PR 은 non-substantive 로 정확 판별하나, README + 무의미 1줄 `.claude/` 주석 오타를 섞으면 substantive 오판. 1인 self-gaming 저위험 + 조건 1 (ratio) 이중 방어로 medium 수용.
+  - **gh API `files` 필드 의존** — 조회 실패 시 보수적 fallback (Phase-2 조회 실패 → substantive 0 건 → 조건 1 분자 0 / 조건 2·3 firstApply fallback = 기존 동작). 기존 try/catch 패턴 답습.
+
+### Concrete Prediction (developer 단계 변경 예측 박제)
+
+- 신규/변경 코드 (`scripts/verify-z-pattern-health.mjs`):
+  - Phase-2 조회에 `files` 필드 추가 (`--json number,state,mergedAt` → `+files`) — **~1 라인** (`gh pr list --json files` 지원 실측 확인됨, per-PR fallback 불요)
+  - `isSubstantivePhase2(pr, denylist)` **순수 함수 추출 + export** (모든 변경 파일이 denylist 매칭이면 false) — **~10-15 라인**
+  - `filterSubstantiveMergedPhase2(phase2Prs)` **순수 함수 추출 + export** (state=MERGED && mergedAt!=null && isSubstantivePhase2) — **~5-10 라인**
+  - `computeConsecutiveSinceLastPhase2` 의 merged 필터 → substantive 필터 교체 (또는 substantive 배열 주입) — **~3-5 라인**
+  - 조건 1 ratio 분자 `phase2Count` → substantive merged count — **~3-5 라인**
+  - 조건 3 `daysSinceFirstApply` → `daysSinceLastSubstantive` (substantive 0 건 시 firstApply fallback) + stdout 메시지 정정 — **~8-12 라인**
+  - `--self-test` 확장 케이스 (f)(g)(h) — **~30-40 라인**
+  - 헤더 요약 주석 (`:9~12`) 조건 1/3 정정 동기화 (주석-구현 drift 차단 — #822 reviewer 교훈) — **~4 라인**
+- **총 예상 라인 수**: 65-100 라인 (스크립트) + ADR ~180-220 라인 (본 §섹션)
+- harness-managed 파일 변경: `verify-z-pattern-health.mjs` (`// HARNESS-DRIFT: Z-PATTERN [TODO]` 2번째 줄 **유지**, 새 drift 파일 0)
+- 행동 변화 (CHANGELOG `### Behavior Changes` 후보 — developer 단계 박제): "월 cron §재검토 조건 #5 의 Phase-2 카운트에 substantiality (경로 denylist) 퀄리파이어를 3조건 (ratio 분자 / 연속 리셋 앵커 / 90일 클록 앵커) 일관 적용. 머지된 사소 PR (README/오타) 로 조건 우회 차단 + 조건 3 절대 앵커 잠복 버그 (day 90 영구 발화) 해소. 임계값 N=10/33%/90일 불변, 4건 실측 substantive backward-compat" (MINOR 릴리스 후보) — 단 본 PR (architect) 은 ADR Amendment 만 박제 (코드/CHANGELOG 미터치, developer 단계 추가).
+
+### 회귀 가드 (CLAUDE.md §"가드 도입 PR DoD" 4축)
+
+- **(1) 격리 동적 테스트**: developer 단계에서 `node scripts/verify-z-pattern-health.mjs --self-test` — `isSubstantivePhase2` / `filterSubstantiveMergedPhase2` / `computeConsecutiveSinceLastPhase2` 순수 함수에 주입 fixture 로 PASS 의무.
+- **(2) 3중 시뮬레이션 + 신규 케이스** (기존 a~e 회귀 유지 + f/g/h 확장):
+  - **(f) 사소 PR 리셋 불인정**: README-only 머지 Phase-2 (denylist 전부 매칭) → non-substantive → `consecutiveSinceLastPhase2` 리셋 안 됨 (직전 substantive 앵커 유지)
+  - **(g) #248 형 substantive 인정**: `.claude/agents/*.md` ×5 (+5줄) 머지 PR → substantive 인정 (LoC 무관, 경로 기반) → 리셋 앵커 인정
+  - **(h) 조건 3 리셋 앵커**: 사소 PR 로는 조건 3 클록 리셋 안 됨 (substantive Phase-2 max 유지) + substantive 0 건 시 firstApply fallback 확인
+  - **기존 a~e** (Amendment 14): positive / negative / recovery / backward-compat / merged-only 사각 방어 전부 유지
+- **(3) 5 페르소나 self-consistency**: 본 ADR 박제 직후 cross-validate (architect → 메인 단계 의무) + 후속 developer/reviewer/qa 가 동일 결론 (옵션 1 denylist / 3조건 일관 적용 / LoC·label 기각 / 임계 불변 / backward-compat 4건 substantive) 도출 검증.
+- **(4) 메타 측정 도구 자기 적용 안정성**: 정정 후 스크립트 실 실행 → 현재 데이터 (substantive 4, 연속 4, ratio 40%, substantive 앵커 2026-05-18 기준 경과 일수) 에서 exit 0 (전 조건 미발화) 확인. `verify-z-pattern-health.mjs` 자신은 데코레이터 `[TODO]` 유지 (drift 심화 없음, sha 변경만).
+
+### Claude 편향 셀프 체크 (4종 — cross-validate 호출 전)
+
+- **낙관적 일정 편향**: 해당 없음 (본 Amendment 는 일정/공수 추정 항목 없음 — 모수/앵커 정밀화 단일 목표). N/A
+- **결합 간과 편향**: substantiality 퀄리파이어가 3조건 (ratio 분자 / 연속 앵커 / 90일 앵커) 에 일관 적용되고 하나의 denylist SSoT 를 공유하는지 — 3 적용 지점 독립 확인 (§변경 사항 1/2/3). backward-compat (4건 substantive) 로 과거 동작 불변. **통과**
+- **폐기 프레이밍 편향**: LoC 하한 (옵션 2) / label (옵션 3) 을 너무 쉽게 기각? — #248 (+5줄) 실측 반증 + upstream 라벨 결합도 위험 **객관 근거** 기반 기각 (measurement-first). 주관적 폐기 아님. **통과**
+- **순수주의 편향** ("경로 기반이 옳은 신호" 긍정 프레이밍 과잉?): measurement 4건 전부 실질 경로 근거라 정합. **단 미통과 잠재 축** — (1) denylist 초안이 실제 게이밍 벡터를 다 커버하는가 (trivial 조합 게이밍 / `*.txt` 등 누락 유형)? (2) denylist vs allowlist 선택의 위험 비대칭 판단이 1인 운영 self-gaming 가정에 과의존하지 않는가? → **cross-validate 명시 질문 삽입 대상**: "경로 denylist 초안 (`README*`/`LICENSE*`/`.gitignore`/`.prettierignore`/이미지/`*.lock`) 이 substantiality 판별에 충분한가? allowlist 대비 false-negative 최소 우선 (위험 비대칭) 이 1인 운영 가정에서 타당한가? 3조건 일관 적용 (통합 스코프 A) 이 조건별 개별 적용보다 나은가?"
+
+### cross-link
+
+- 본 Amendment, [#823](https://github.com/coseo12/astro-simulator/issues/823) 이슈 본문 (Builds on #822)
+- 직전 Amendment: Amendment 14 (조건 2 절대→연속 측정 차원 정정 — 본 Amendment 가 그 §고유 발견 C 후속)
+- 발화 가드 SSoT: `scripts/verify-z-pattern-health.mjs` (조건 1 ratio 분자 = `filterSubstantiveMergedPhase2().length` / 조건 2 `computeConsecutiveSinceLastPhase2` / 조건 3 `daysSinceLastSubstantive`, Amendment 15 substantive 앵커), `.github/workflows/adr-z-pattern-health-v2.yml`
+- 모수/앵커 정밀화 vs silent 약화 SSoT: Amendment 7 (자기참조 인플레) / Amendment 13 (drift 카운트 모수) / Amendment 14 (측정 차원) — 동일 계열 (임계 불변 + 모수 정밀화)
+- 측정 방법 원칙: CLAUDE.md §스프린트 계약 #10 (volt [#32](https://github.com/coseo12/volt/issues/32) — 측정 방법 검증 우선. LoC 하한 → #248 실측 반증)
+- 가드 설계 원칙: CLAUDE.md §"가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast" ([docs/lessons/guard-design-principles.md](../lessons/guard-design-principles.md))
+
+### 교차검증 반영 사항 (cross-validate 2026-07-14 완료 — Accepted 전이)
+
+> **상태**: Accepted. cross-validate (agy, `cross_validate.sh architecture`) 로 본 Amendment 15 설계 + §순수주의 미통과 축 명시 질문 3개 (Q1 denylist 커버리지 / Q2 위험 비대칭·threat model / Q3 통합 스코프 A·edge case) 전달. 로그: `.claude/logs/cross-validate-architecture-20260715-020342.log`. 아래 4종 분류 통합 후 Accepted 전이.
+
+**4종 분류 (Claude 재분석 — 맹목 수용 금지):**
+
+- **합의 (수용)**: (Q3) 단일 `isSubstantivePhase2` 퀄리파이어를 3조건에 일관 적용 (통합 스코프 A) 은 "매우 훌륭한 아키텍처적 결정" — 조건별 실질성 정의가 다르면 "리셋됐는데 ratio 엔 미합산" 모순 + 유지보수 비용. substantive 0 건 시 3조건 동시 발화 = Defense-in-Depth 정상 (오랜 기간 + 다수 Phase-1 + 실 기여 0 = 세 경고 모두 타당). Claude 설계와 일치.
+- **이견 수용 (범위 내)**: (Q1) `*.lock` 이 `package-lock.json` (`.json` 확장자) 미매칭 — 실제 커버리지 결함. lock 파일명 변종 (`package-lock.json` / `pnpm-lock.yaml` / `yarn.lock` / `bun.lockb`) + `*.txt` + `.editorconfig` denylist 추가 (§후보 비교 §trivial denylist 반영 완료).
+- **Claude 재분석 기각 (근거 명시)**:
+  - (Q1) agy 의 `**/*.md` / `docs/**/*` / `.github/workflows/**` denylist 추가 권고 **기각** — agy 는 일반 프로젝트 직관 (markdown = 문서 = trivial) 으로 판단했으나, **본 하네스는 markdown 이 곧 substantive 자산**이다. 실측 Phase-2 4건 전부 markdown → `*.md` denylist 시 정당 기여 4건 전부 non-substantive 오판 (denylist 목적 자체 붕괴). §trivial denylist ⚠ 경고로 회귀 명시 차단. **cross-validate 가 오히려 denylist-narrow 를 역강화** (일반 직관의 위험 노출).
+  - (Q3) div-by-zero (`phase1Count===0` → `0/0` NaN) / alert 3배 스팸 우려 **기각 (이미 처리됨)** — 기존 구현에 `phase1Count > 0 ? ... : 0` 가드 + `triggers[]` 단일 `[ADR Trigger]` 헤더 취합 + workflow 이슈 dedup 이 이미 존재. developer 는 이 가드/취합 구조 보존 의무 (신규 도입 불요).
+  - (종합) gh API 캐싱 (`.z-pattern-cache.json`) 제안 **기각 (YAGNI)** — 월 cron 이 Phase-2 4건 + Phase-1 ~10건 조회 = rate limit 무관 (조기 최적화). 현 스케일 불필요.
+- **고유 발견 (기존 §재검토 조건 연결 — 후속 분리 불요)**: (Q2) 다수 다운스트림 배포 시 Goodhart's Law 로 denylist 게이밍 우회 비용 급락 (무의미 주석 1줄로 리셋) → 그 경우 allowlist/label 하이브리드 필요. **유효하나 본 하네스는 1인 운영 전제** (CLAUDE.md §개요 "1인 개발자-AI 페어"). 이 threat model 전환은 **기존 §재검토 조건 #3 (다운스트림 ≤ 1)** 에 자연 매핑 — 다운스트림 증가 시 본 Amendment 15 denylist 접근을 allowlist/label 로 재평가하는 트리거로 §재검토 조건 #3 를 재사용. 신규 이슈/코드 변경 불요, 재검토 조건 문서화로 충분.
+- **오탐 필터링**: (Q1 markdown 확장) — 위 기각 참조. 그 외 agy 지적은 유효.
+- **Claude 편향 셀프 체크 결과**: §순수주의 축에서 사전 식별한 "denylist 커버리지 / 위험 비대칭 과의존" 미통과 잠재를 cross-validate 가 검증 — Q1 커버리지 결함 (lock 변종) 은 실재 확인·수정, Q2 위험 비대칭은 1인 운영 전제에서 타당 확증 (+ 다운스트림 확장 재검토 조건 연결). markdown-substantive 역방향 발견은 오히려 설계 강화.

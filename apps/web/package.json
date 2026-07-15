@@ -31,7 +31,8 @@
     "verify:773-light": "node scripts/browser-verify-773-light.mjs",
     "verify:774-sun": "node scripts/browser-verify-774-sun.mjs",
     "verify:782-rotation": "node scripts/browser-verify-782-rotation.mjs",
-    "verify:783-earth-detail": "node scripts/browser-verify-783-earth-detail.mjs"
+    "verify:783-earth-detail": "node scripts/browser-verify-783-earth-detail.mjs",
+    "verify:790-focus-zoom": "node scripts/browser-verify-790-focus-zoom.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",

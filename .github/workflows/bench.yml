@@ -11,6 +11,8 @@ on:
       - 'scripts/bench-scene.mjs'
       - 'docs/benchmarks/baseline.json'
       - '.github/workflows/bench.yml'
+      # #814 — setup 구간이 composite (#802 SSoT) 의존이므로 composite 변경 PR 에서도 발화
+      - '.github/actions/setup-and-build/**'
 
 jobs:
   bench:
@@ -23,62 +25,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v4
-        with:
-          # #666 (Amendment 4) — 정확 버전 중앙 파일 일원화 (기존 node-version: 20).
-          #   bench 측정 루프는 WASM + Chromium headless 로 Node 버전 비종속 (baseline
-          #   environment="gh-actions-ubuntu-chromium-headless", Node 버전 미기록) → 20→22
-          #   통일이 bench 수치에 영향 없음. #606 playwright extract deadlock 회피 정합.
-          node-version-file: '.node-version'
-          cache: pnpm
-
-      - name: Rust 툴체인 설정
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      # Rust 빌드 캐시 — cargo registry + target/ 재사용 (pnpm build 산하 wasm-pack 빌드 단축)
-      - name: Rust 빌드 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      # wasm-pack: cargo install(≈60s) → prebuilt 바이너리로 대체
-      - name: wasm-pack 설치
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
-      - name: 의존성 설치
-        run: pnpm install --frozen-lockfile
-
-      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 #663 이 1차).
-      # 캐시 히트 시 ~/.cache/ms-playwright 복원 → extract 단계 자체 미발생.
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
-          # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
-          # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Playwright 브라우저 설치 (캐시 미스 — 다운로드+extract)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: 앱 빌드
-        run: pnpm build
+      # setup 공통 구간 (pnpm/node/rust/wasm-pack/playwright 캐시/build) — #802 SSoT, #814 치환.
+      # pnpm 버전: 기존 version: 10.32.1 명시 핀 → package.json packageManager (pnpm@10.32.1)
+      #   위임으로 전환 — 동일 버전, 핀 SSoT 일원화 (ci.yml 등 기존 composite 경로와 동일 방식).
+      # bench 는 production `next start` 필요 → start-dev-server 기본값 (false) + 자체 기동 step 유지.
+      - name: setup + build (composite)
+        uses: ./.github/actions/setup-and-build
 
       - name: 웹 서버 기동 (백그라운드)
         run: |

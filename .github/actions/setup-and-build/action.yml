@@ -1,0 +1,113 @@
+name: 'setup-and-build'
+description: >-
+  CI setup 공통 구간 SSoT (#802) — pnpm/Node(.node-version 핀)/Rust/wasm-pack/
+  Playwright 캐시/빌드/next dev 기동. ci.yml r1-guard · fps-baseline-guard 2 job ·
+  shader-pixel-guard 에 복제되던 구간을 rule-of-three 도달로 추출
+  (ADR 20260701-779 §A1 재검토 7 종결, #759 cross-validate 재권고).
+
+# 사용 전제 (호출측 책임):
+#   1. actions/checkout 선행 필수 — local action (./.github/actions/...) 은 checkout
+#      이후에만 resolve 되므로 checkout 자체는 composite 에 포함할 수 없다.
+#   2. composite 내부 step 은 timeout-minutes 미지원 — bound 가 필요하면 invocation step 에
+#      timeout-minutes 지정 (ci.yml r1-guard 는 20분). freeze 시 sub-step 로그로 지점 격리 가능.
+#   3. start-dev-server=true 시 PID 를 /tmp/next-pid 에 박제 — 정리 (kill) 는 호출측
+#      `dev server 정리` step (if: always()) 책임 (composite 은 post hook 미지원).
+
+# inputs 이력 (#814): 도입 시점의 `playwright` / `build` inputs 는 전 호출부 7 workflow
+#   (8 invocation — fps 는 measure/retry-fresh-runner 2 invocation) 가 default 'true' 만
+#   사용해 실사용 0 → YAGNI 제거. 선택 실행이 필요해지면 git history (#813, 348891c) 의
+#   구현을 재도입.
+inputs:
+  setup-node:
+    description: >-
+      pnpm/action-setup + setup-node (.node-version 핀, pnpm 캐시) + pnpm install 수행 여부.
+      ci.yml 처럼 생태계 감지 구간이 이미 수행한 job 은 'false'.
+    required: false
+    default: 'true'
+  start-dev-server:
+    description: >-
+      next dev -p 3001 기동 + readiness 폴링 여부 (__solarScene 등 dev 전용 핸들 의존 가드용).
+      production next start 가 필요한 job (ci.yml r1-guard) 은 'false' + 자체 step 유지.
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: pnpm setup
+      if: inputs.setup-node == 'true'
+      uses: pnpm/action-setup@v4
+
+    - name: Node.js setup
+      if: inputs.setup-node == 'true'
+      uses: actions/setup-node@v4
+      with:
+        # #606 fix (ADR 20260531-606 §Amendment 2) — playwright 1.59.1 extract 가 Node 24.16
+        #   환경에서 deadlock ("extracting archive" 후 I/O 0바이트 hang). engines ">=20.0.0"
+        #   범위 해석은 setup-node 가 최신 24.16 을 설치 → freeze.
+        #   #666 (Amendment 4): 정확 버전 중앙 파일 `.node-version` (22.16.0) 로 일원화 —
+        #   정확 버전이라 범위 해석 함정 회피 (Amendment 3 "전수 명시 핀" 정책 양립).
+        #   재검토: playwright 업그레이드로 Node 24 extract 호환 확인되면 .node-version 갱신.
+        node-version-file: '.node-version'
+        cache: 'pnpm'
+
+    - name: Rust 툴체인 설정
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: '1.94.1'
+        targets: wasm32-unknown-unknown
+
+    - name: Rust 빌드 캐시
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: packages/physics-wasm
+
+    - name: wasm-pack 설치
+      uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-pack@0.14.0
+
+    - name: pnpm install
+      if: inputs.setup-node == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀이 1차).
+    # 캐시 히트 시 ~/.cache/ms-playwright 복원 → 아래 설치 step 의 extract 단계 자체 미발생.
+    - name: Playwright 브라우저 캐시
+      uses: actions/cache@v4
+      id: playwright-cache
+      with:
+        path: ~/.cache/ms-playwright
+        # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
+        # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
+        # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm exec playwright install --with-deps chromium
+
+    - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: pnpm exec playwright install-deps chromium
+
+    - name: wasm + workspace 빌드
+      shell: bash
+      run: pnpm build
+
+    - name: next dev server 기동
+      if: inputs.start-dev-server == 'true'
+      shell: bash
+      run: |
+        pnpm --filter @astro-simulator/web exec next dev -p 3001 &
+        echo $! > /tmp/next-pid
+        for i in $(seq 1 60); do
+          if curl -sf http://localhost:3001/ko > /dev/null; then
+            echo "ready"; exit 0
+          fi
+          sleep 2
+        done
+        echo "timeout"; exit 1

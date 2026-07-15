@@ -40,6 +40,10 @@ import {
   type Scene,
 } from '@babylonjs/core';
 
+// #790 — focus body 시각 반경 기반 lowerRadiusLimit 하한 (camera-controller SSoT).
+// camera-controller.ts 는 로컬 import 가 없어 본 방향 import 는 순환 없음.
+import { computeFocusLowerRadiusFloor, resolveMeshVisualRadius } from './camera-controller.js';
+
 /**
  * focus 대상 mesh 에서 카메라까지의 목표 radius 배수 — `meshBoundingRadius × N`.
  *
@@ -260,6 +264,9 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   // 반영된 상태이므로 boundingSphere.radiusWorld 도 새 tier 기준.
   // 없으면 실거리 보존 수식 fallback (free-fly tier 전환 등 focus 없는 경로).
   let targetRadius: number;
+  // #790 — focusMesh 경로에서 시각 반경 하한 산출용 (회전 불변 — resolveMeshVisualRadius).
+  // 없으면 null (free-fly 전환 등 floor 미적용).
+  let focusMeshVisualRadius: number | null = null;
   if (focusMesh) {
     // #378 옵션 B — boundingInfo 갱신 강제 (defense-in-depth, ADR 가설 4).
     // setTier 가 mesh.scaling 을 newScale 로 갱신했더라도 boundingSphere.radiusWorld 가
@@ -272,6 +279,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     focusMesh.refreshBoundingInfo();
     const boundingInfo = focusMesh.getBoundingInfo();
     const meshRadius = boundingInfo.boundingSphere.radiusWorld;
+    focusMeshVisualRadius = resolveMeshVisualRadius(focusMesh);
     targetRadius = Math.max(meshRadius * FOCUS_RADIUS_MULTIPLIER, meshRadius + 0.01);
   } else {
     targetRadius = computeTargetRadius(radiusOld, oldScale, newScale);
@@ -291,7 +299,19 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   // 본 가드는 tier 진입 시점마다 `computeLowerRadiusLimit(targetRadius, newMinZ)` 로 양방향
   // 동기 → tier 별 적정 줌인 한계 (`targetRadius * 0.01`) 를 항상 보장.
   if (camera.lowerRadiusLimit != null) {
-    camera.lowerRadiusLimit = computeLowerRadiusLimit(targetRadius, newMinZ);
+    let nextLowerLimit = computeLowerRadiusLimit(targetRadius, newMinZ);
+    // #790 — focus body 시각 반경 하한 (camera-controller.focusOn 과 쌍 — 어느 한쪽만 적용 시
+    // 나머지 경로가 floor 를 되돌리는 회귀). `targetRadius × 0.01` (≈ meshRadius × 0.059) 는
+    // mesh 표면의 94% 안쪽이라 focus 중 tier 전환 (planet 줌인 inner→body 등) 후 최대 줌인 시
+    // 카메라가 mesh 내부 진입 → backface culling 암전. focus body 가 있을 때만 회전 불변
+    // 시각 반경 × 1.05 로 상향 (free-fly 전환은 기존 #380 가드 A 유지 — mesh 기준점 부재).
+    if (focusMeshVisualRadius != null) {
+      nextLowerLimit = Math.max(
+        nextLowerLimit,
+        computeFocusLowerRadiusFloor(focusMeshVisualRadius, targetRadius),
+      );
+    }
+    camera.lowerRadiusLimit = nextLowerLimit;
   }
 
   // (2) Pending tween 취소 — user focusOn 직후 tier 경계를 넘을 때 애니메이션 충돌 방지.

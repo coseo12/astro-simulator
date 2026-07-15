@@ -22,16 +22,18 @@ on:
     # #626 — docs/ADR/워크플로만 바뀐 PR 은 fps 측정이 무의미(런타임 무관)한데 25분 실 브라우저
     # 측정 후 timeout cancelled (PR #625 ADR-only 실측). 런타임 영향 없는 경로는 skip (fail-safe —
     # 코드/데이터/config 가 하나라도 있으면 실행). paths filter 효과는 base 브랜치 반영 후 후속 PR 부터.
+    # #814 — `.github/**` → `.github/workflows/**` 축소: composite action (.github/actions/**) 은
+    # setup/build 런타임에 직접 관여하므로 변경 PR 에서 본 가드가 발화해야 함 (#813 구조적 사각 해소).
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
   push:
     branches: [develop, main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-      - '.github/**'
+      - '.github/workflows/**'
   # #663 — 수동 재실측 경로. workflow_dispatch 2단계 함정 (volt #45): dispatch 버튼은
   # 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 (v0.24.0 릴리스 이후 사용 가능).
   # #709 — variance 진단 input. `--ref feature/X` 로 실행 시 ref 브랜치의 step 정의를 따름.
@@ -45,16 +47,28 @@ on:
         description: 'scenario 당 측정 샘플 수 (진단 모드)'
         type: string
         default: '10'
+      # #820 Phase 0 — CPU throttle rate 오버라이드 (진단 모드 전용). 8~10x 로 데드라인 미스를
+      #   결정적 유발 → render-capacity 프로브로 H2(presentation-side) vs H3(deadline-miss) 판별.
+      #   기본 4 유지 (판정 경로 불변). CLI `gh workflow run --ref feature/*` 는 ref 브랜치 정의를 따름.
+      cpu_throttle:
+        description: 'CPU throttling rate (진단 모드 — 8~10x 로 데드라인 미스 유발, 기본 4)'
+        type: string
+        default: '4'
       # #779 — escalation 시뮬레이션 test hook (ADR 20260701-779 §A1 부수 결정). 기본 none, 수동 전용.
-      #   flake: measure guard 만 강제 fail → retry-fresh-runner 실측 pass 기대 (recovery 실증, 메일 0)
-      #   regression: 양 job guard 강제 fail → workflow failure 기대 (negative 실증, fail 메일 1통 의도됨)
+      #   flake: measure guard 만 강제 fail (SIMULATE_GUARD_FAIL) → retry-fresh-runner 실측 pass 기대
+      #     (recovery 실증, 메일 0). 순수 escalation 토폴로지 검증 (스크립트 미실행).
+      # #820 — script-level 분류 로직 검증 (SIMULATE_VSYNC_LOCK / SIMULATE_REGRESSION, 스크립트 실행).
+      #   vsync-lock: desktop rafFps=대역 + capacity=healthy → 분류=락 → PASS (success, 메일 0, STEP_SUMMARY 흡수)
+      #   regression: desktop rafFps=대역 + capacity=저 → 분류=회귀 → measure 스크립트 exit 1 →
+      #     fresh-runner escalation(강제 fail) → workflow failure (fail 메일 1통). 진짜 회귀 미은폐 실증.
       simulate:
-        description: 'escalation 시뮬레이션 (#779 test hook)'
+        description: 'escalation/분류 시뮬레이션 (#779 / #820 test hook)'
         type: choice
         options:
           - none
           - flake
           - regression
+          - vsync-lock
         default: 'none'
 
 jobs:
@@ -64,81 +78,22 @@ jobs:
     outputs:
       guard_outcome: ${{ steps.guard.outcome }}
     steps:
-      # ⚠ measure job 과 동기 유지 — 이 setup 구간 (checkout ~ dev server 기동) 은 retry-fresh-runner
-      #   job 에 복제되어 있음. 한쪽 수정 시 반드시 양쪽 동시 수정
-      #   (ADR 20260701-779 §A1 재검토 7 — 첫 drift 발견 시 composite action 추출이 착수 트리거).
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          # #663 fix (#606 ADR §Amendment 3) — playwright 1.59.1 extract 가 Node 24.16 에서
-          #   deadlock. engines ">=20.0.0" 범위 해석은 setup-node 가 최신 24.16 을 설치
-          #   → "Playwright chromium 설치" 단계 timeout cancelled (R9 시점부터 상시).
-          #   #666 (Amendment 4): 정확 버전 중앙 파일 `.node-version` (22.16.0) 로 일원화.
-          node-version-file: '.node-version'
-          cache: 'pnpm'
-
+      # setup 공통 구간 (pnpm/node/rust/wasm-pack/playwright 캐시/build/dev server) — #802 SSoT.
+      # 이전엔 본 job / retry-fresh-runner / shader-pixel-guard / ci.yml r1-guard 에 복제 +
+      # "⚠ 동기 유지" 주석 마커로 방어 (ADR 20260701-779 §A1 재검토 7 — composite 추출로 종결).
       # ci.yml R1 가드 패턴 따름 — wasm 빌드 후 next dev 사용 (__solarScene 핸들 의존).
-      - name: Rust 툴체인 설정
-        uses: dtolnay/rust-toolchain@stable
+      - name: setup + build + dev server (composite)
+        uses: ./.github/actions/setup-and-build
         with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      - name: Rust 빌드 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      - name: wasm-pack 설치
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-
-      # Playwright 바이너리 캐시 — #684. extract deadlock (#606) 2차 방어 (Node 22 핀 #663 이 1차).
-      # 캐시 히트 시 ~/.cache/ms-playwright 복원 → extract 단계 자체 미발생.
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          # key: runner OS + lockfile hash. @playwright/test 버전이 lockfile 에 포함되므로
-          # playwright 버전 변경 시 자동 무효화 (stale 바이너리 서빙 0). 무관 lock 변경 시
-          # over-eager miss (전체 재설치) 가능하나 안전 방향 (느려질 뿐, fallback = 기존 동작).
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Playwright 시스템 deps (캐시 히트 — extract 생략 = deadlock 2차 방어)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: wasm + workspace 빌드
-        run: pnpm build
-
-      - name: next dev server 기동
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
-          echo $! > /tmp/next-pid
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3001/ko > /dev/null; then
-              echo "ready"; exit 0
-            fi
-            sleep 2
-          done
-          echo "timeout"; exit 1
+          start-dev-server: 'true'
 
       # #709 — variance 진단 (workflow_dispatch 전용). 판정 없이 N회 측정 후 분포 박제.
+      # #820 Phase 0 — CPU_THROTTLING_RATE 전달로 데드라인 미스 유발 (8~10x). render-capacity 병기 캡처.
       - name: FPS variance 진단
         if: github.event_name == 'workflow_dispatch' && inputs.diagnose_variance == true
-        run: BASE_URL=http://localhost:3001 VARIANCE_SAMPLES=${{ inputs.variance_samples }} node scripts/verify-fps-baseline.mjs --diagnose-variance
+        run: BASE_URL=http://localhost:3001 VARIANCE_SAMPLES=${{ inputs.variance_samples }} CPU_THROTTLING_RATE=${{ inputs.cpu_throttle }} node scripts/verify-fps-baseline.mjs --diagnose-variance
 
       # #709 — 전역 부하 spike flake 흡수 (measurement-first 결론: best-of-N 으로는 흡수 불가,
       #   docs/benchmarks/fps-variance-diagnosis-20260619.json). 1차 fail 시 1회 자동 재측정
@@ -150,8 +105,14 @@ jobs:
         continue-on-error: true # step-level soft-fail — outcome=failure 보존, escalation job 이 blocking 승계
         if: github.event_name != 'workflow_dispatch' || inputs.diagnose_variance != true
         env:
-          # #779 test hook — simulate=flake|regression 시 measure guard 강제 fail (측정 스크립트 수정 0)
-          SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'flake' || inputs.simulate == 'regression' }}
+          # #779 test hook — simulate=flake 시 measure guard 강제 fail (스크립트 미실행, 순수 토폴로지).
+          #   regression 은 #820 로 이관 — SIMULATE_GUARD_FAIL 대신 SIMULATE_REGRESSION 으로 스크립트를
+          #   실제 실행해 대역 내 회귀 분류(exit 1)를 exercise (진짜 회귀 미은폐 end-to-end 검증).
+          SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'flake' }}
+          # #820 script-level 분류 hook — node 스크립트가 상속받아 measureFps/measureRenderCapacity 를 주입.
+          #   vsync-lock → 분류=락(exit 0) / regression → 분류=회귀(exit 1). guard-fail 과 직교(스크립트 실행).
+          SIMULATE_VSYNC_LOCK: ${{ inputs.simulate == 'vsync-lock' && '1' || '' }}
+          SIMULATE_REGRESSION: ${{ inputs.simulate == 'regression' && '1' || '' }}
         run: |
           # simulate 주입은 guard 호출부 단일 함수로 캡슐화 (워크플로 분기 최소화 — agy 권고)
           run_guard() {
@@ -219,70 +180,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      # ⚠ measure job 과 동기 유지 — 이 setup 구간 (checkout ~ dev server 기동) 은 measure job 의
-      #   복제본 (동작 동일, 상세 배경 주석은 measure job 원본 참조). 한쪽 수정 시 반드시 양쪽 동시 수정
-      #   (ADR 20260701-779 §A1 재검토 7 — 첫 drift 발견 시 composite action 추출이 착수 트리거).
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      # setup 공통 구간 — measure job 과 동일 composite (#802 SSoT — 복제본 + 동기 마커 제거,
+      # ADR 20260701-779 §A1 재검토 7 종결).
+      - name: setup + build + dev server (composite)
+        uses: ./.github/actions/setup-and-build
         with:
-          node-version-file: '.node-version'
-          cache: 'pnpm'
-
-      - name: Rust 툴체인 설정
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.94.1'
-          targets: wasm32-unknown-unknown
-
-      - name: Rust 빌드 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/physics-wasm
-
-      - name: wasm-pack 설치
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack@0.14.0
-
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Playwright chromium 설치 (캐시 미스 — 다운로드+extract)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Playwright 시스템 deps (캐시 히트 — extract 생략)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: wasm + workspace 빌드
-        run: pnpm build
-
-      - name: next dev server 기동
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3001 &
-          echo $! > /tmp/next-pid
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3001/ko > /dev/null; then
-              echo "ready"; exit 0
-            fi
-            sleep 2
-          done
-          echo "timeout"; exit 1
+          start-dev-server: 'true'
 
       - name: FPS baseline 회귀 검증 (fresh runner — hard fail)
         env:
-          # #779 test hook — simulate=regression 만 여기까지 강제 fail (flake 는 이 job 에서 실측 pass 기대)
+          # #779 test hook — simulate=regression 만 여기까지 강제 fail (flake 는 이 job 에서 실측 pass 기대).
+          #   #820: measure job 은 SIMULATE_REGRESSION 으로 스크립트 회귀 분류(exit 1)를 exercise 하고,
+          #   fresh-runner 는 여기서 강제 fail 로 escalation 종착(workflow failure)만 확정 → 최종 fail 메일 1통.
           SIMULATE_GUARD_FAIL: ${{ inputs.simulate == 'regression' }}
         run: |
           run_guard() {
