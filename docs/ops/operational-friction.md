@@ -51,7 +51,7 @@
 
 **hook 은 이미 안전**: `.claude/hooks/session-start-zombie-check.sh` 는 pgrep 이 아닌 `ps -axww | grep -E "$PATTERN" | grep -v "session-start-zombie-check\|grep -E\|verify-zombie-check"` 구조로, **`grep -v` 제외**가 이미 self-match 를 방어한다. 별도 bracket 불요(변경 없음).
 
-**upstream 기여 (후속 분리)**: qa.md 의 agent-browser 정리 절차 자체가 upstream harness-setting 에 미기여된 프로젝트 drift(bracket 만 단독 Phase 2 불가). agent-browser 정리 전체의 upstream 기여는 별도 이슈로 분리한다(Z-패턴 Phase 2 대상).
+**upstream 기여 (후속 분리)**: qa.md 의 agent-browser 정리 절차 자체가 upstream harness-setting 에 미기여된 프로젝트 drift(bracket 만 단독 Phase 2 불가). agent-browser 정리 전체의 upstream 기여는 [#830](https://github.com/coseo12/astro-simulator/issues/830) 후속 분리(Z-패턴 Phase 2 대상).
 
 ---
 
@@ -83,3 +83,11 @@ gh pr checks <PR> --json name,state --jq \
 - **release prep PR 필수**: version bump + CHANGELOG 확정은 develop 직접 push 금지라 `release/<X>-prep → develop` prep PR 로 선반영 후 release PR(develop→main).
 - **release PR 도 pr-template-checklist 가드 대상**: 7 체크박스 원문 문구("ADR 호환성"/"Test plan"/"SSoT" 등) 전부 필요 — release 전용 섹션만으론 FAIL. 로컬 사전검증: `node scripts/verify-pr-template-checklist.mjs <PR>`.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
+
+## 문서 배치 마찰 — 프로젝트 고유 lessons 는 docs/lessons/ 아님 (본 문서 자체 사례)
+
+`docs/lessons/` 와 `docs/` 루트(deployment-guide 등)는 **upstream harness-setting 이 관리**하는 managed 디렉토리다(`.harness/manifest.json` 등록, `docs/lessons/` 19개). 프로젝트 고유 문서를 여기 두면 이중 가드 캐스케이드 발생:
+
+- `docs/lessons/*.md` 신규 → `verify-lessons-readme.sh` 가 README 등록 요구 → README 편집 → README 가 managed 라 `verify-harness-drift-decorator` 가 데코레이터 요구 → Z-패턴 진입.
+
+**표준**: 프로젝트 고유 운영/lessons 문서는 **비-managed 위치**(`docs/ops/` 등 manifest 미등록 신규 dir)에 두고 CLAUDE.md 프로젝트 고유 보강 섹션에서 링크한다. 본 문서(#795)도 `docs/lessons/` → `docs/ops/` 로 이동해 캐스케이드를 회피했다(리뷰 라운드 1회 소요 — 본 문서가 다루는 "마찰"의 자기 재현).

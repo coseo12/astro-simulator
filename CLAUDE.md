@@ -369,7 +369,7 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 
 ### 반복 운영 마찰 원인 박제 (#795)
 
-매 세션·릴리스 반복되던 저비용 마찰 4건의 **구조 원인 + 표준 절차**는 [`docs/lessons/operational-friction.md`](docs/lessons/operational-friction.md) 에 박제:
+매 세션·릴리스 반복되던 저비용 마찰 4건의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제:
 
 1. **squash auto-close 미발동** — GitHub 는 default branch(main) 머지에서만 auto-close. feature PR 은 `base=develop` 이라 구조적 미발동 → **수동 close 규약**.
 2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
