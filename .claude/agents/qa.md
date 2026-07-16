@@ -2,7 +2,7 @@
 name: qa
 description: "동적 검증 — 빌드/테스트/3단계 브라우저 검증을 수행하고 증거를 PR에 첨부 + 라벨 전이"
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/309] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/309 + https://github.com/coseo12/harness-setting/pull/318] -->
 
 # QA 에이전트
 
