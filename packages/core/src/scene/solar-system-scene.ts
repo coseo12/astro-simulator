@@ -30,6 +30,7 @@ import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield } from './starfield.js';
+import { hexToColor3 } from './color-utils.js';
 import {
   createProceduralPlanetMaterial,
   type PlanetLightingConstants,
@@ -2480,12 +2481,4 @@ function sampleOrbitPoints(body: LoadedCelestialBody, tier: Tier): Vector3[] | n
   }
 
   return points;
-}
-
-function hexToColor3(hex: string): Color3 {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.slice(0, 2), 16) / 255;
-  const g = parseInt(h.slice(2, 4), 16) / 255;
-  const b = parseInt(h.slice(4, 6), 16) / 255;
-  return new Color3(r, g, b);
 }
