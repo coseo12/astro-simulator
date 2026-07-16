@@ -42,9 +42,10 @@
  *   planet 선례). **switch-case 금지** (WGSL 변환 깨짐 — #756 이견 수용 1), if-else 만 사용.
  */
 
-import { Color3, Effect, ShaderMaterial, Vector3, type Scene } from '@babylonjs/core';
+import { Effect, ShaderMaterial, Vector3, type Scene } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { fbmMirror } from './procedural-planet-shader.js';
+import { hexToColor3 } from './color-utils.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rendering-only 미학 상수 SSoT (#69 숨은 상수 drift 차단 — sun-shader.test.ts 가드 대상).
@@ -289,7 +290,7 @@ export function createSunSurfaceMaterial(
 
   // base color (실측 colorHint.hex #FFE9A8) — 발광의 기준 (데이터 SSoT, read-only).
   const hex = body.colorHint?.hex ?? '#FFE9A8';
-  material.setColor3('baseColor', hexToRgb01(hex));
+  material.setColor3('baseColor', hexToColor3(hex));
 
   // rendering-only 미학 상수 SSoT 전달 (ADR §결정 8).
   material.setVector3(
@@ -363,15 +364,6 @@ export function sunColorMirror(
     clamp01(baseColor[1] * granulation * limb[1]),
     clamp01(baseColor[2] * granulation * limb[2]),
   ];
-}
-
-/** hex → RGB tuple ∈ [0,1]³ (Color3 인스턴스 — planet hexToColor3 동형, 팩토리 내부용). */
-function hexToRgb01(hex: string): Color3 {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.slice(0, 2), 16) / 255;
-  const g = parseInt(h.slice(2, 4), 16) / 255;
-  const b = parseInt(h.slice(4, 6), 16) / 255;
-  return new Color3(r, g, b);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

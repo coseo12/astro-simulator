@@ -247,10 +247,24 @@ describe('#774 sun-shader — noise 텍스트 planet 동일성 (fbmMirror 재사
   // 전제: sun GLSL 의 hash33/valueNoise/fbm 이 planet GLSL 과 동일 텍스트. 갈라지면 미러가
   // 한쪽과 어긋난다 (조용한 drift) — 핵심 식 라인 동일성을 정적 계약으로 가드.
 
+  // #789 — sun↔planet 실제 공유 라인만 계약에 포함한다 (양쪽 동일성 계약).
+  // granulation 합성 (`fbm(p * granulationScale)`) 은 sun-specific (planet 부재) 이라 제외 —
+  // 넣으면 PLANET_FRAGMENT_SHADER 쪽 toContain 이 FAIL (그게 계약이 잡아야 할 오염).
   const NOISE_CONTRACT_LINES = [
+    // hash33 (3줄 전체 — sin-free fract-mix)
     'p = fract(p * vec3(0.1031, 0.1030, 0.0973));', // hash33 시드
     'p += dot(p, p.yxz + 33.33);', // hash33 mix
+    'return fract((p.xxy + p.yxx) * p.zyx);', // hash33 최종 반환
+    'return hash33(p).x;', // hash13 — hash33 첫 채널 축약
+    // valueNoise (trilinear smoothstep 본체)
+    'vec3 i = floor(p);', // valueNoise 격자 셀 인덱스
+    'vec3 f = fract(p);', // valueNoise 셀 내 좌표
     'vec3 u = f * f * (3.0 - 2.0 * f);', // valueNoise smoothstep 보간
+    'mix(hash13(i + vec3(0.0, 0.0, 0.0)), hash13(i + vec3(1.0, 0.0, 0.0)), u.x),', // trilinear 하단·앞 x-보간
+    'mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), u.x),', // trilinear 하단·뒤 x-보간
+    'mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), u.x),', // trilinear 상단·앞 x-보간
+    'mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), u.x),', // trilinear 상단·뒤 x-보간
+    // fbm (3-옥타브 합성)
     '0.55 * valueNoise(p) + 0.30 * valueNoise(p * 2.3) + 0.15 * valueNoise(p * 4.7)', // fbm 3-옥타브
   ];
 
