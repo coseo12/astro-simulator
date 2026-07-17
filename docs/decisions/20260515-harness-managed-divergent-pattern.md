@@ -1397,6 +1397,18 @@ orphan sidecars: 0
 
 cross-validate 가 핵심 안전장치 (Forbidden Path deny-list) 1건을 보강. 후속 분리 2건 ([#768](https://github.com/coseo12/astro-simulator/issues/768) stale 에이징 / [#769](https://github.com/coseo12/astro-simulator/issues/769) upstream allowlist 인터페이스) 박제 완료 (`Builds on: #766`). 상태: Provisional → **Accepted** 전이 (본 §섹션 통합 완료).
 
+##### #769 (allowlist upstream 인터페이스) 실측 재검증 — 유예 유지 (2026-07-17)
+
+[#769](https://github.com/coseo12/astro-simulator/issues/769) (`.harnessrc` 범용 allowlist 인터페이스) 착수 전 measurement-first 재검증 (CLAUDE.md §"인계 항목 실측 재검증 — NO-OP ADR 패턴"): **#769 의 전제("이식성 긴장 = allowlist 갱신마다 가드 sha 변경")가 실측상 미발생**. `scripts/verify-harness-drift-decorator.mjs` 는 #766 도입 커밋 (`406a801`, 2026-06-30) 이후 **allowlist 상수 변경 0회** (17일간), 항목 수 **5개 고정** (진입 조건이 팽창 차단, #766 예측대로). 즉 `.harnessrc` 인터페이스는 현재 speculative (YAGNI) — 해소할 sha-change 빈도가 0 이고, Amendment 9 §결정점 5 의 의도적 단일-스크립트 통합(추적성) 을 운영 근거 없이 되돌림. 또한 #769 는 Z-패턴 **Phase 2 (upstream 기여)** 영역으로 harness-setting repo 협의가 전제 (미착수).
+
+**재검토 트리거 (하나라도 발화 시 #769 재활성화)**:
+
+1. **allowlist 상수 변경 ≥ 3회 누적** — sha-change 빈도가 실증되어 추적성 vs 이식성 trade-off 재평가 근거 확보.
+2. **2번째 다운스트림 프로젝트가 본 harness 채택** — 프로젝트 고유 allowlist 가 가드 스크립트에 묶이는 이식성 문제가 실수요로 발현 (`다운스트림 ≤ 1` §재검토 조건 #3 과 동형 축).
+3. **harness-setting upstream 인터페이스 설계 협의 개시** — Phase 2 전제 충족.
+
+#769 는 **유예 유지 (open)** — 위 트리거 발화 시 재활성화. 트리거 미발화 상태에서 인터페이스 구축은 하지 않는다 (measurement-first + YAGNI).
+
 ## Amendment 14 — 2026-07-14
 
 상태: Accepted (cross-validate 2026-07-14 — §교차검증 반영 사항 통합 완료. CLAUDE.md §ADR Status 워크플로 — cross-validate 앵커 "ADR 신규·개정/폐기")
