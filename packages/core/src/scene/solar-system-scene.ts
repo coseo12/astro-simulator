@@ -161,8 +161,12 @@ export interface SolarSystemSceneHandles {
    *  - orbit line 재샘플링 (새 renderScale 반영)
    *  - mesh 직경 재계산 (실측 radius × 새 renderScale)
    *  - 다음 `updateAt` 호출부터 mesh.position 이 새 renderScale 로 기록
+   *
+   * #818 — `preserveFocusDistance` (기본 false): focus 중 **줌 crossing** 으로 진입한 전환이면
+   * `true` 를 전달해 focusMesh 경로에서 실거리/apparent-size 보존(`computeTargetRadius`) 으로
+   * 재프레이밍한다. focus-entry(`applyFocusTier`/`clearFocus`) 는 false 로 V5 달성 공식 유지.
    */
-  setTier: (tier: Tier) => void;
+  setTier: (tier: Tier, preserveFocusDistance?: boolean) => void;
   /**
    * P12-A #298 — 하이브리드 트리거 자동 판정 (Q7=7-d2).
    *
@@ -971,7 +975,7 @@ export function createSolarSystemScene(
    * ADR `docs/decisions/20260504-focus-tier-oscillate-fix.md` §결정 2.
    */
   let tierTransitionInProgress = false;
-  const setTier = (tier: Tier) => {
+  const setTier = (tier: Tier, preserveFocusDistance = false) => {
     if (tier === activeTier) return;
     // 가드 G8a (#380 G8 fix) — tier 전환 결정 직후 즉시 입력 잠금.
     // ADR `docs/decisions/20260509-380-zoom-camera-freeze-forensic.md` §Amendment 2026-05-11 §G8a.
@@ -1070,6 +1074,8 @@ export function createSolarSystemScene(
         newScale,
         // focusMesh 를 조건부 spread — exactOptionalPropertyTypes 대응 (undefined 명시 금지).
         ...(focusMesh ? { focusMesh } : {}),
+        // #818 — 줌 crossing 진입 시 실거리/apparent-size 보존 재프레이밍 (focusMesh 있을 때만 유효).
+        preserveFocusDistance,
         // durationMs / lockMs 기본값 (300 / 500) 사용 — ADR §결정 §주석 계약 §5.
         // #408 F2 — cleanup 완료 시 lock 해제. runTierTransition 의 released 플래그 기반
         // idempotent (정상 종료 / fallback timer / visibilitychange 어느 경로로도 1회만 호출).
@@ -1104,11 +1110,14 @@ export function createSolarSystemScene(
     //  3. focus/anchor 모두 없음 → cameraFromSun (free-fly 탐색 = 자유 시점).
     const referenceBodyId = focusBodyIdForAssert ?? freeFlyAnchorBodyId ?? null;
     const referenceKind = referenceBodyId ? (bodiesById.get(referenceBodyId)?.kind ?? null) : null;
+    // #818 — 매 프레임 줌 crossing 재판정. tierFromFocus 에 activeTier 전달 → planet body↔inner
+    // 경계 히스테리시스(±15%) 로 경계 flip-flop 차단. setTier(nextTier, true) → 줌 crossing 은
+    // 실거리/apparent-size 보존 재프레이밍(catapult runaway 진동 차단).
     const nextTier = referenceKind
-      ? tierFromFocus(referenceKind, cameraFromFocusMeters)
+      ? tierFromFocus(referenceKind, cameraFromFocusMeters, activeTier)
       : tierFromCameraDistance(cameraFromSunMeters, activeTier);
     if (nextTier !== activeTier) {
-      setTier(nextTier);
+      setTier(nextTier, true);
     }
     return activeTier;
   };

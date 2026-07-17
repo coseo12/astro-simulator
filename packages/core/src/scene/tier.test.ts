@@ -75,6 +75,59 @@ describe('tierFromFocus — Q7 focus 경로', () => {
   });
 });
 
+describe('#818 tierFromFocus — planet body↔inner 히스테리시스 (±15% 대칭)', () => {
+  const BODY_BOUNDARY = 0.1 * AU; // PLANET_FOCUS_BODY_BOUNDARY
+
+  it('currentTier 미전달 (초기 판정) → plain 경계 (기존 동작 불변)', () => {
+    // < 0.1 AU → body, ≥ 0.1 AU → inner. applyFocusTier 초기 판정 경로.
+    expect(tierFromFocus('planet', 0.05 * AU)).toBe('body');
+    expect(tierFromFocus('planet', BODY_BOUNDARY)).toBe('inner');
+    expect(tierFromFocus('planet', 0.11 * AU)).toBe('inner');
+  });
+
+  it('body 상태: 경계 115% 초과로 멀어질 때만 inner 로 업시프트', () => {
+    // 경계 바로 위 (0.11 AU, < 0.115) → body 유지 (히스테리시스 효과, flip-flop 차단)
+    expect(tierFromFocus('planet', 0.11 * AU, 'body')).toBe('body');
+    // 115% 초과 (0.12 AU) → inner 로 업시프트
+    expect(tierFromFocus('planet', 0.12 * AU, 'body')).toBe('inner');
+  });
+
+  it('inner 상태: 경계 85% 미만으로 근접할 때만 body 로 다운시프트', () => {
+    // 경계 바로 아래 (0.09 AU, > 0.085) → inner 유지 (히스테리시스 효과)
+    expect(tierFromFocus('planet', 0.09 * AU, 'inner')).toBe('inner');
+    // 85% 미만 (0.08 AU) → body 로 다운시프트
+    expect(tierFromFocus('planet', 0.08 * AU, 'inner')).toBe('body');
+  });
+
+  it('히스테리시스 대역폭 = TIER_HYSTERESIS 재사용 (tierFromCameraDistance 와 대칭 SSoT)', () => {
+    // body 유지 상한 = 0.1 × (1 + 0.15) = 0.115 AU, inner 유지 하한 = 0.1 × (1 − 0.15) = 0.085 AU
+    const upper = BODY_BOUNDARY * (1 + TIER_HYSTERESIS);
+    const lower = BODY_BOUNDARY * (1 - TIER_HYSTERESIS);
+    expect(tierFromFocus('planet', upper * 0.999, 'body')).toBe('body');
+    expect(tierFromFocus('planet', upper * 1.001, 'body')).toBe('inner');
+    expect(tierFromFocus('planet', lower * 1.001, 'inner')).toBe('inner');
+    expect(tierFromFocus('planet', lower * 0.999, 'inner')).toBe('body');
+  });
+
+  it('경계 왕복 안정성 — 0.1 AU 전후 ±10% 진동 100회 시 tier 변화 없음 (flip-flop 차단)', () => {
+    // body 에서 시작: dead-band(0.085~0.115 AU) 내 진동은 tier 유지.
+    let tier = 'body' as 'body' | 'inner';
+    for (let i = 0; i < 100; i += 1) {
+      const jitter = (Math.random() - 0.5) * 0.2; // -10%~+10%
+      const d = BODY_BOUNDARY * (1 + jitter);
+      tier = tierFromFocus('planet', d, tier) as 'body' | 'inner';
+    }
+    expect(tier).toBe('body'); // body 시작 → dead-band 진동으로 업시프트 미발생
+  });
+
+  it('star/moon/dwarf-planet 은 currentTier 무관 (거리·상태 불변 분기)', () => {
+    // currentTier 를 전달해도 non-planet 분기는 영향 없음.
+    expect(tierFromFocus('star', 1e12, 'body')).toBe('solar');
+    expect(tierFromFocus('moon', 1e6, 'inner')).toBe('body');
+    expect(tierFromFocus('dwarf-planet', 1e8, 'inner')).toBe('body');
+  });
+});
+
 describe('tierFromCameraDistance — A2 히스테리시스 ≥15%', () => {
   const INNER_UPPER = 0.3 * AU; // BOUNDARY.innerUpper (body ↔ inner)
   const SOLAR_UPPER = 3 * AU; // BOUNDARY.solarUpper (inner ↔ solar)

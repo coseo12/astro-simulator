@@ -72,6 +72,15 @@ const BOUNDARY = {
   solarUpper: 3 * AU,
 };
 
+/**
+ * planet focus 의 body ↔ inner 경계 (m). focus body 로부터 카메라 거리가 이 값 미만이면
+ * body(세부 관찰), 이상이면 inner(궤도 맥락). free-fly 의 `BOUNDARY.innerUpper`(0.3 AU) 와는
+ * 별개 축 — focus 경로는 focus body 기준 근접 거리라 더 작은 임계(0.1 AU) 를 쓴다.
+ *
+ * #818 — 매직 넘버(`0.1 * AU`) 상수화 + 히스테리시스 대칭 적용 기준점.
+ */
+const PLANET_FOCUS_BODY_BOUNDARY = 0.1 * AU;
+
 /** 히스테리시스 대역폭 (A2 DoD ≥15%). */
 export const TIER_HYSTERESIS = 0.15;
 
@@ -92,19 +101,42 @@ export function renderScaleForTier(tier: Tier): number {
  *  - planet focus → 카메라 거리로 T2 inner / T3 body 판정 (가까우면 body, 멀면 inner)
  *  - moon / dwarf-planet / comet focus → T3 body (세부 관찰 의도)
  *
+ * #818 — planet 분기 히스테리시스 (`currentTier` 전달 시). 대형 body(jupiter/saturn) focus 에서
+ * 줌인이 body tier 로 crossing 가능해진 뒤(#818 (c) apparent-size 보존 fix 로 body 안정화),
+ * body↔inner 경계(0.1 AU) 를 매 프레임 왕복하면 setTier 가 매 프레임 detachControl 을 반복해
+ * flip-flop(tier thrash) 를 노출한다. `tierFromCameraDistance` 의 free-fly ±15% 와 대칭으로,
+ * body 에서는 경계 115% 초과 시에만 inner 로, inner 에서는 85% 미만 시에만 body 로 전환한다.
+ *
+ * `currentTier` 미전달(초기 focus 판정 — `applyFocusTier`) 시 plain 경계(기존 동작 불변). 매 프레임
+ * 재판정 경로(`updateTierByCamera`) 만 `activeTier` 를 전달해 히스테리시스를 적용한다.
+ *
  * @param focusKind focus body 의 kind ('star' | 'planet' | 'moon' | 'dwarf-planet' | 'comet' 등)
  * @param cameraDistanceMeters focus body 로부터 카메라까지 거리 (m)
+ * @param currentTier 현재 tier — planet 분기 히스테리시스 적용 기준 (미전달 시 non-hysteresis)
  */
-export function tierFromFocus(focusKind: string, cameraDistanceMeters: number): Tier {
+export function tierFromFocus(
+  focusKind: string,
+  cameraDistanceMeters: number,
+  currentTier?: Tier,
+): Tier {
   if (focusKind === 'star') {
     // 태양 focus — 전체 태양계 뷰.
     return 'solar';
   }
   if (focusKind === 'planet') {
-    // planet focus — 카메라 거리로 세부 관찰 vs 궤도 맥락 구분.
-    // 0.1 AU 미만은 body 세부 관찰, 그 이상은 inner tier 로 궤도 맥락 표시.
-    if (cameraDistanceMeters < 0.1 * AU) return 'body';
-    return 'inner';
+    // planet focus — 카메라 거리로 세부 관찰(body) vs 궤도 맥락(inner) 구분.
+    // #818 히스테리시스 (tierFromCameraDistance 의 ±15% 대칭):
+    //  - currentTier 'body'(근접) → 경계 115% 초과로 멀어질 때만 inner 로 업시프트
+    //  - currentTier 'inner'(맥락) → 경계 85% 미만으로 근접할 때만 body 로 다운시프트
+    //  - 그 외(초기/solar, currentTier 미전달) → plain 경계 (기존 동작 불변)
+    const d = cameraDistanceMeters;
+    if (currentTier === 'body') {
+      return d > PLANET_FOCUS_BODY_BOUNDARY * (1 + TIER_HYSTERESIS) ? 'inner' : 'body';
+    }
+    if (currentTier === 'inner') {
+      return d < PLANET_FOCUS_BODY_BOUNDARY * (1 - TIER_HYSTERESIS) ? 'body' : 'inner';
+    }
+    return d < PLANET_FOCUS_BODY_BOUNDARY ? 'body' : 'inner';
   }
   // P12-A #298 N4 — 미지 kind silent fallback 방지. 주석-구현 drift (CLAUDE.md 교훈) 회피.
   // 알려진 세부 관찰 kind 를 명시 분기하고, 그 외는 dev 경고 + body fallback 유지.
