@@ -191,6 +191,23 @@ export interface TierTransitionOptions {
    * 없으면 실거리 보존 수식 `radius_old × (newScale / oldScale)` fallback.
    */
   focusMesh?: Mesh;
+  /**
+   * #818 — focus 중 **줌 crossing** 으로 진입한 tier 전환인지 여부 (기본 false).
+   *
+   * `false` (focus-entry — `applyFocusTier` / `clearFocus`): focusMesh 경로에서 기존 V5 달성 공식
+   * (`boundingR × FOCUS_RADIUS_MULTIPLIER`) 로 재프레이밍. 사용자가 body 를 클릭/URL 진입할 때
+   * 화면 중앙에 적당히 크게(지구 세로 40% V5 DoD) 잡는 연출.
+   *
+   * `true` (줌 crossing — `updateTierByCamera`): focusMesh 경로에서도 `computeTargetRadius`
+   * (실거리/apparent-size 보존) 로 목표 radius 산출. 사용자가 휠로 줌인하다 tier 경계(0.1 AU)를
+   * 넘을 때 `boundingR × 5.9` 재프레이밍이 카메라를 mesh 규모의 수백만 unit 밖으로 catapult 시켜
+   * `cameraFromFocus` 가 다시 경계 밖으로 튀어 tier 역판정 → 무한 진동(runaway)하던 회귀를 차단한다.
+   * apparent size 가 불변이라 crossing 이 seamless — floor 까지 연속 줌인.
+   *
+   * 어느 경우든 `focusMeshVisualRadius` floor(#790) + target 동기화는 그대로 유지된다.
+   * focusMesh 부재(free-fly) 경로에는 영향 없음(항상 `computeTargetRadius`).
+   */
+  preserveFocusDistance?: boolean;
   /** 전환 시간 (ms). 기본 300 */
   durationMs?: number;
   /** 입력 잠금 최대 시간 (ms). 기본 500 — durationMs + fallback 마진 */
@@ -228,6 +245,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     oldScale,
     newScale,
     focusMesh,
+    preserveFocusDistance = false,
     durationMs = 300,
     lockMs = 500,
     onComplete,
@@ -280,7 +298,11 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     const boundingInfo = focusMesh.getBoundingInfo();
     const meshRadius = boundingInfo.boundingSphere.radiusWorld;
     focusMeshVisualRadius = resolveMeshVisualRadius(focusMesh);
-    targetRadius = Math.max(meshRadius * FOCUS_RADIUS_MULTIPLIER, meshRadius + 0.01);
+    // #818 — 줌 crossing (preserveFocusDistance) 은 실거리/apparent-size 보존, focus-entry 는
+    // V5 달성 공식(boundingR × 5.9) 재프레이밍. 어느 쪽이든 아래 floor(#790) 는 동일 적용.
+    targetRadius = preserveFocusDistance
+      ? computeTargetRadius(radiusOld, oldScale, newScale)
+      : Math.max(meshRadius * FOCUS_RADIUS_MULTIPLIER, meshRadius + 0.01);
   } else {
     targetRadius = computeTargetRadius(radiusOld, oldScale, newScale);
   }
