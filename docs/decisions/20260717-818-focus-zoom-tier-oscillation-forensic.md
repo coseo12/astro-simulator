@@ -1,6 +1,6 @@
 # ADR: #818 대형 body focus 휠 줌인 tier 진동(runaway) stall — apparent-size 보존 + 히스테리시스
 
-- **상태**: Provisional (cross-validate 는 메인이 수행 후 Accepted 전이 — architect 진단이 cross-validate 미수행)
+- **상태**: Accepted (cross-validate 2026-07-17 — §7 §교차검증 반영 4분류 통합 완료. 메인 오케스트레이터 수행)
 - **날짜**: 2026-07-17
 - **결정자**: architect (#818 forensic 진단 — measurement-first 실측) + developer (구현·검증)
 - **관련**: #818, #790 (PR [#816](https://github.com/coseo12/astro-simulator/pull/816) — 시각 반경 하한), #834 (earth inner 정착 후속 분리), [`20260509-380-zoom-camera-freeze-forensic.md`](20260509-380-zoom-camera-freeze-forensic.md), [`20260504-focus-tier-oscillate-fix.md`](20260504-focus-tier-oscillate-fix.md), [`20260423-display-relative-scale-unification.md`](20260423-display-relative-scale-unification.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md)
@@ -206,9 +206,22 @@ fix 후 최대 줌인 상태 (전 시나리오 body tier seamless 도달):
 
 ## §7 Amendment 라운드
 
-### Amendment 라운드 1 (예정 — cross-validate 메인 수행 후)
+### Amendment 라운드 1 (cross-validate 2026-07-17 — Provisional → Accepted)
 
-- Provisional → Accepted 전이. §교차검증 결과(합의/이견/고유 발견/Claude 편향 셀프 체크) 박제.
+cross-validate (agy, `cross_validate.sh architecture`) 로 Q1(원인 진단+preserveFocusDistance 전파)/Q2(히스테리시스 non-hysteresis 계약)/Q3(놓친 시나리오) 3 질문 검증. 로그: `.claude/logs/cross-validate-architecture-20260717-105753.log`. **Claude 재분석 핵심 — agy 우려를 맹목 수용/기각 않고 실제 구현에 전수 대조**(낙관 편향 방어):
+
+- **합의 (수용 — 구현 대조로 이미 처리 확인)**: 원인 진단(catapult runaway)과 문맥 분기(줌 crossing=apparent-size 보존 / focus-entry=V5 framing)는 "매우 정확". agy 가 제기한 오전파/오염 우려 대부분이 **기존 가드로 이미 차단됨을 코드 실측**:
+  - (Q2-1 포커스 전환 중 줌) `updateTierByCamera` 가 `tierTransitionInProgress` 시 no-op (#408 F2, `solar-system-scene.ts:1102`) — transition race 이미 차단.
+  - (Q1 오전파) `setTier` 호출부 2곳뿐 — `updateTierByCamera`(`:1120` `true`=줌 crossing) / `applyFocusTier`(`:1150` **default false**=V5 framing). focus-entry V5 보존 정확.
+  - (Q2 non-hysteresis) `applyFocusTier` 가 `tierFromFocus(kind, dist)` 로 `currentTier` **미전달**(`:1148`) — 초기 판정 오염 차단.
+  - (Q3-b solar↔inner 일반화) `setTier(nextTier, true)` 가 **모든 tier crossing** 에 적용 — solar↔inner 포함 일반화됨.
+  - (Q3-c focus-switch) 다른 body focus 전환은 `applyFocusTier`(false=reframe) 경로 — apparent-size 보존 미적용(정상).
+- **고유 발견 수용 (범위 내 — test-only)**: (Q3-a) **줌아웃(body→inner) 대칭 test-gap** — `browser-verify-818` 이 줌인만 검증(줌아웃 미커버). fix 메커니즘은 대칭(`updateTierByCamera` 가 양방향 crossing 모두 `setTier(_, true)`)이나 empirical 커버 부재 → **줌아웃 왕복 시나리오 추가**(fix 로직 무변경, guard teeth 강화. Q3-a agy clamp-safe 우려 실측 포함). `test(web): #818 줌아웃 왕복 대칭` 커밋.
+- **Claude 재분석 유예 (재검토 트리거 이관 — 지금 미반영)**:
+  - (Q1 Enum `TierTransitionTrigger`) boolean+호출부 2곳 로 현재 안전. 유지보수성 개선이나 즉시 refactor 는 churn → **재검토 트리거**: `setTier`/preserve 문맥 호출부 ≥ 4 확장 시 Enum 승격.
+  - (Q3-d 히스테리시스 cooldown/delta-time) 실측 역진동 0(±15% free-fly 대칭 SSoT). fast-wheel 이론 우려는 과최적화 → **재검토 트리거**: 실사용 경계 thrash 보고 시 cooldown 도입.
+  - (Q3-c focus-switch same-tier no-reframe) jupiter(body)→saturn(body) 전환 시 tier 불변→setTier no-op→reframe 미발동은 **#818 도입 아닌 pre-existing 직교 현상** → 잠재 후속 관찰(현 계약 비목표).
+- **오탐 필터링**: 없음 (agy 지적 전부 유효하나 대부분 기존 가드로 선차단, Q3-a 만 genuine gap).
 
 ---
 
