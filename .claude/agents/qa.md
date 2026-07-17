@@ -2,7 +2,7 @@
 name: qa
 description: "동적 검증 — 빌드/테스트/3단계 브라우저 검증을 수행하고 증거를 PR에 첨부 + 라벨 전이"
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/309] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/309 + https://github.com/coseo12/harness-setting/pull/318] -->
 
 # QA 에이전트
 
@@ -119,7 +119,7 @@ sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필�
 - `auto_close_issue_states` — QA 도 머지 주체가 아니므로 기본 `{}`. 단, PR 본문/커밋 메시지의 `Closes #N` **keyword 문법** 을 정적 점검하여 잘못된 문법(`Closes: #A, #B` 콜론 / `Closes #A, #B` 콤마만 / `Closes #A #B` 공백만) 을 발견하면 `non_blocking_suggestions` 에 "closing keyword 문법 오류 — #B 미인식 위험" 경고 추가 (메인 오케스트레이터는 머지 직후 실제 state 를 직접 확인)
 - `spawned_bg_pids` / `bg_process_handoff` — QA 가 dev 서버 / 테스트 러너를 `run_in_background` 로 띄웠으면 반환 전 **완주/kill 확인 후** `spawned_bg_pids: []` + `bg_process_handoff: "sub-agent-confirmed-done"` 로 기록. 완주 확인 못 하고 반환하면 살아있는 PID 배열 + `"main-cleanup"`. dev 서버를 띄우지 않았으면 `[]` + `"none"`. volt #46/#52 — stale 서버 / cargo 좀비 누적 방지
 - **이전 세션 좀비 카나리아 검증** (다운스트림 가드 — astro-simulator incident #440 / 2026-05-10) — QA 시작 직전 + 반환 직전 의무: `pgrep -af "next dev|next-server|cargo.*test|pnpm.*dev"` 검사 후 **ETIME 30분 이상** 프로세스 발견 시 `non_blocking_suggestions` 에 좀비 후보 박제 + 메인에 정리 권고. 임계값 30분은 qa/dev 사이클 1회 이상 경과 → 본 세션이 spawn 한 게 아닐 가능성 매우 높음. CLAUDE.md 가드 B + `.claude/hooks/session-start-zombie-check.sh` 가드 C 와 동일 임계값 (SSoT). `spawned_bg_pids` 가 sub-agent 가 spawn 한 PID 만 추적하므로 **이전 세션 좀비는 추적 단위 외부** — 본 카나리아가 별도 가드. 좀비 발견 시 사용자 D-T2 EADDRINUSE 사고 (PR #437 incident) 재발 차단.
-- **agent-browser Chrome cleanup** (다운스트림 가드 — volt #79) — `browser-test` 스킬로 `agent-browser` 도구를 사용해 real Chrome 을 띄웠으면 sub-agent 반환 직전 **의무**: `pgrep -f "agent-browser-chrome-" >/dev/null && pkill -TERM -f "agent-browser-chrome-"`, 2초 대기 후 잔존 시 `pkill -KILL -f "agent-browser-chrome-"`. 사용자 본 Chrome 영향 0 (user-data-dir 식별자 `agent-browser-chrome-<UUID>` 로 정확 타겟). 좀비 잔존 시 800%+ CPU 누적 사례 (2026-04-28 실측, 6 세션 / 52 좀비 / 3일치). `spawned_bg_pids` 가 직접 spawn 한 PID 만 커버하므로 agent-browser 가 wrapper 로 띄운 Chrome Helper (gpu-process / renderer 등) 는 본 정리 절차로 별도 가드 — agent-browser 비정상 종료 시 lineage 끊긴 좀비 방지
+- **agent-browser Chrome cleanup** (다운스트림 가드 — volt #79) — `browser-test` 스킬로 `agent-browser` 도구를 사용해 real Chrome 을 띄웠으면 sub-agent 반환 직전 **의무**: `pgrep -f "agent-browser-chrome[-]" >/dev/null && pkill -TERM -f "agent-browser-chrome[-]"`, 2초 대기 후 잔존 시 `pkill -KILL -f "agent-browser-chrome[-]"`. 사용자 본 Chrome 영향 0 (user-data-dir 식별자 `agent-browser-chrome-<UUID>` 로 정확 타겟). 좀비 잔존 시 800%+ CPU 누적 사례 (2026-04-28 실측, 6 세션 / 52 좀비 / 3일치). `spawned_bg_pids` 가 직접 spawn 한 PID 만 커버하므로 agent-browser 가 wrapper 로 띄운 Chrome Helper (gpu-process / renderer 등) 는 본 정리 절차로 별도 가드 — agent-browser 비정상 종료 시 lineage 끊긴 좀비 방지
 - **산출물 처분** (다운스트림 가드 — astro-simulator #793) — 반환 직전 의무: `git status --porcelain` 로 자신이 생성한 untracked 산출물 (스크린샷 / 리포트 / 임시 스크립트 / 스크래치 로그) 을 확인하고 프로젝트 산출물 수명주기 규약 (있는 경우 — 예: `docs/decisions/` 의 artifact-lifecycle ADR) 에 따라 처분한다: 커밋 대상 (verify 스크립트, 문서 embed 참조 자료) 은 커밋, 나머지는 rm (`_debug-*-tmp.mjs` 는 즉시 rm — volt #67). 처분하지 못한 잔존물은 `non_blocking_suggestions` 에 경로 목록으로 박제해 메인에 인계한다 — 미인계 잔존물은 세션 경계에서 "커밋 기준 비일관 + untracked 누적" 부채가 된다
 
 ## 자가 점검

@@ -23,6 +23,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Animation, Vector3 } from '@babylonjs/core';
 import type { ArcRotateCamera, Mesh, Scene } from '@babylonjs/core';
+import { AU } from '@astro-simulator/shared';
 
 import {
   CameraController,
@@ -30,7 +31,13 @@ import {
   computeFocusLowerRadiusFloor,
   resolveMeshVisualRadius,
 } from './camera-controller.js';
-import { runTierTransition, computeNewMinZ, computeLowerRadiusLimit } from './tier-transition.js';
+import {
+  runTierTransition,
+  computeNewMinZ,
+  computeLowerRadiusLimit,
+  computeTargetRadius,
+} from './tier-transition.js';
+import { renderScaleForTier } from './tier.js';
 
 /** focusOn/runTierTransition 이 만지는 속성만 갖는 최소 카메라 모킹. */
 function mockCamera(lowerRadiusLimit = 0.5, minZ = 0.01): ArcRotateCamera {
@@ -226,5 +233,145 @@ describe('#790 runTierTransition — focusMesh 경로 floor 적용', () => {
     const targetRadius = (30 * 1.54e-9) / 8.4e-11;
     const expected = computeLowerRadiusLimit(targetRadius, computeNewMinZ(targetRadius));
     expect(camera.lowerRadiusLimit).toBeCloseTo(expected, 6);
+  });
+});
+
+/**
+ * #818 — 줌 crossing apparent-size 보존 (`preserveFocusDistance`) 단위 가드.
+ *
+ * ## 회귀 (architect 실측 재현)
+ *
+ * jupiter/saturn focus inner 정착 → 휠 줌인으로 cameraFromFocus 가 0.1 AU(=23.04 unit) 경계를
+ * 넘어 inner→body crossing. 기존 focusMesh 경로는 `boundingR_body × 5.9` 로 재프레이밍 →
+ * 카메라를 mesh 규모의 수백만 unit(≈0.89 AU) 밖으로 catapult → cameraFromFocus 가 다시 0.1 AU
+ * 밖으로 튐 → inner 역판정 → 무한 진동(runaway, ~34 unit stall 로 관찰).
+ *
+ * fix: 줌 crossing (`preserveFocusDistance=true`) 은 focusMesh 경로에서도 `computeTargetRadius`
+ * (실거리/apparent-size 보존) 로 목표 radius 산출 → crossing 후에도 cameraFromFocus < 0.1 AU 유지
+ * → body 안정 → floor 까지 seamless 줌인. floor(#790)/target 동기화는 그대로 유지.
+ *
+ * ## 산술 재현 (crossing inner r=22 → body targetRadius < 0.1 AU)
+ *
+ *   computeTargetRadius(22, renderScale_inner, renderScale_body)
+ *     = 22 × (2.51e-5 / 1.54e-9) ≈ 358,571 unit
+ *   cameraFromFocus_m = 358,571 / renderScale_body ≈ 1.4286e10 m ≈ 0.0955 AU < 0.1 AU → body 안정
+ */
+describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserveFocusDistance)', () => {
+  const INNER = renderScaleForTier('inner'); // 1.54e-9
+  const BODY = renderScaleForTier('body'); // 2.51e-5
+  const PLANET_BODY_BOUNDARY_AU = 0.1; // tierFromFocus planet body↔inner 경계 (AU)
+
+  /** Animation spy 에서 'tier-transition-radius' 애니메이션의 목표 radius(arg[6]) 추출. */
+  function capturedTargetRadius(): number {
+    const spy = vi.mocked(Animation.CreateAndStartAnimation);
+    const call = spy.mock.calls.find((c) => c[0] === 'tier-transition-radius');
+    if (!call) throw new Error('tier-transition-radius animation 미발동');
+    return call[6] as number;
+  }
+
+  // jupiter body tier 시각 반경 ≈ 249,000 unit. #790 test 실측 inner tier 15.28 unit 에
+  // body/inner renderScale 비(2.51e-5 / 1.54e-9 ≈ 16,299) 를 곱한 값 (display bodyScale 반영).
+  // setTier 가 crossing 시점에 이미 body scaling 을 mesh 에 적용한 상태 전제.
+  const JUPITER_BODY_VISUAL_R = 249_000;
+
+  it('preserveFocusDistance=true: targetRadius = computeTargetRadius (실거리 보존, boundingR×5.9 catapult 아님)', () => {
+    const camera = mockCamera(0.5);
+    camera.radius = 22; // crossing 직전 inner tier radius (0.1 AU 경계 안쪽)
+    const scene = mockScene();
+    const cleanup = runTierTransition({
+      scene,
+      camera,
+      oldScale: INNER,
+      newScale: BODY,
+      focusMesh: mockMesh(JUPITER_BODY_VISUAL_R),
+      preserveFocusDistance: true,
+    });
+    cleanup();
+
+    const expectedTarget = computeTargetRadius(22, INNER, BODY); // ≈ 358,571 unit
+    expect(capturedTargetRadius()).toBeCloseTo(expectedTarget, 0);
+    // boundingR × 5.9 (catapult) 이 아님 — 실거리 보존이 수백만 unit catapult 를 회피 (수십배 작다).
+    const catapult = JUPITER_BODY_VISUAL_R * Math.sqrt(3) * 5.9; // ≈ 2.54M unit
+    expect(capturedTargetRadius()).toBeLessThan(catapult);
+    expect(catapult / capturedTargetRadius()).toBeGreaterThan(5); // catapult 이 ≥5배 더 멀다
+  });
+
+  it('산술 재현: crossing 후 cameraFromFocus < 0.1 AU → body 안정 (역판정 진동 차단)', () => {
+    const camera = mockCamera(0.5);
+    camera.radius = 22;
+    const scene = mockScene();
+    const cleanup = runTierTransition({
+      scene,
+      camera,
+      oldScale: INNER,
+      newScale: BODY,
+      focusMesh: mockMesh(JUPITER_BODY_VISUAL_R),
+      preserveFocusDistance: true,
+    });
+    cleanup();
+
+    const target = capturedTargetRadius();
+    // crossing 후 카메라-focus 실거리 (m) = target / renderScale_body.
+    const cameraFromFocusAU = target / BODY / AU;
+    expect(cameraFromFocusAU).toBeLessThan(PLANET_BODY_BOUNDARY_AU); // body 안정 (0.0955 AU)
+    expect(cameraFromFocusAU).toBeCloseTo(0.0955, 3);
+  });
+
+  it('대조 — preserveFocusDistance=false 는 catapult (cameraFromFocus ≫ 0.1 AU → inner 역판정 진동)', () => {
+    // 기존 버그 재현: focus-entry 공식(boundingR × 5.9) 을 줌 crossing 에 그대로 쓰면
+    // 카메라가 0.1 AU 밖으로 튕겨나가 tierFromFocus 가 inner 를 역판정 → 무한 진동.
+    const camera = mockCamera(0.5);
+    camera.radius = 22;
+    const scene = mockScene();
+    const cleanup = runTierTransition({
+      scene,
+      camera,
+      oldScale: INNER,
+      newScale: BODY,
+      focusMesh: mockMesh(JUPITER_BODY_VISUAL_R),
+      // preserveFocusDistance 미전달 → 기본 false.
+    });
+    cleanup();
+
+    const cameraFromFocusAU = capturedTargetRadius() / BODY / AU;
+    expect(cameraFromFocusAU).toBeGreaterThan(PLANET_BODY_BOUNDARY_AU); // catapult (0.6 AU 급)
+  });
+
+  it('preserveFocusDistance=false (focus-entry): 기존 boundingR×5.9 재프레이밍 유지 — V5 무회귀', () => {
+    const camera = mockCamera(0.5);
+    camera.radius = 22;
+    const scene = mockScene();
+    const cleanup = runTierTransition({
+      scene,
+      camera,
+      oldScale: INNER,
+      newScale: BODY,
+      focusMesh: mockMesh(JUPITER_BODY_VISUAL_R),
+      // preserveFocusDistance 미전달 → 기본 false (focus-entry V5 경로).
+    });
+    cleanup();
+
+    const boundingR = JUPITER_BODY_VISUAL_R * Math.sqrt(3);
+    const expectedTarget = Math.max(boundingR * 5.9, boundingR + 0.01);
+    expect(capturedTargetRadius()).toBeCloseTo(expectedTarget, 0);
+  });
+
+  it('preserveFocusDistance=true 여도 floor(#790) 유지 — visualR ≤ lowerRadiusLimit ≤ targetRadius', () => {
+    const camera = mockCamera(0.5);
+    camera.radius = 22;
+    const scene = mockScene();
+    const cleanup = runTierTransition({
+      scene,
+      camera,
+      oldScale: INNER,
+      newScale: BODY,
+      focusMesh: mockMesh(JUPITER_BODY_VISUAL_R),
+      preserveFocusDistance: true,
+    });
+    cleanup();
+
+    const target = capturedTargetRadius();
+    expect(camera.lowerRadiusLimit!).toBeGreaterThanOrEqual(JUPITER_BODY_VISUAL_R); // 표면 밖 보장
+    expect(camera.lowerRadiusLimit!).toBeLessThanOrEqual(target); // 프레이밍 도달성
   });
 });

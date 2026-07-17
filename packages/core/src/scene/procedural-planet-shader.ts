@@ -77,6 +77,7 @@
 
 import { Color3, Effect, ShaderMaterial, Vector3, type Mesh, type Scene } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import { hexToColor3 } from './color-utils.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 표면 타입 enum ↔ uniform int 매핑 SSoT (#756 §결정 2).
@@ -956,15 +957,6 @@ export function lightingShadeMirror(
 /** Rec.709 휘도 (광원식 단조성 검증용 — 밤면 < 낮면 비교 스칼라화). */
 export function luminance709(rgb: readonly [number, number, number]): number {
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-}
-
-/** hex → RGB tuple ∈ [0,1]³ (solar-system-scene `hexToColor3` 동형 — 테스트 입력 변환용). */
-function hexToColor3(hex: string): Color3 {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.slice(0, 2), 16) / 255;
-  const g = parseInt(h.slice(2, 4), 16) / 255;
-  const b = parseInt(h.slice(4, 6), 16) / 255;
-  return new Color3(r, g, b);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -310,7 +310,7 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 - **근거**: volt [#24](https://github.com/coseo12/volt/issues/24) 의 프로세스 레벨 확장 (2026-04-20 관찰). volt 캡처 예정
 #### agent-browser Chrome 좀비 변형 (volt #79)
 
-- **agent-browser Chrome 좀비 변형** (volt [#79](https://github.com/coseo12/volt/issues/79)): qa / browser-test sub-agent 가 `agent-browser` 도구로 real Chrome 사용 후 세션 종료 시 정리 누락. 식별자 `agent-browser-chrome-<UUID>` user-data-dir (사용자 본 Chrome 영향 0). 본 세션 (2026-04-28) 실측 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU 관찰. **메인 루틴** (sub-agent 복귀 직후 의무): `pgrep -af "agent-browser-chrome-"` 검사 + 발견 시 `pkill -TERM -f "agent-browser-chrome-"` → 2초 대기 후 잔존 시 `pkill -KILL`. **sub-agent 루틴** (반환 직전 의무): `browser-test` 스킬 사용 후 동일 정리 명령 실행. agent-browser 도구 자체 cleanup 이 정상 case 에선 작동하나 sub-agent 비정상 종료 (timeout / SIGKILL / panic) 시 lineage 끊긴 좀비 잔존. cargo/next dev 의 `spawned_bg_pids` SSoT 가 직접 spawn 한 PID 만 커버하므로 도구 wrapper 가 spawn 한 child process 는 별도 검증 의무
+- **agent-browser Chrome 좀비 변형** (volt [#79](https://github.com/coseo12/volt/issues/79)): qa / browser-test sub-agent 가 `agent-browser` 도구로 real Chrome 사용 후 세션 종료 시 정리 누락. 식별자 `agent-browser-chrome-<UUID>` user-data-dir (사용자 본 Chrome 영향 0). 본 세션 (2026-04-28) 실측 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU 관찰. **메인 루틴** (sub-agent 복귀 직후 의무): `pgrep -af "agent-browser-chrome[-]"` 검사 + 발견 시 `pkill -TERM -f "agent-browser-chrome[-]"` → 2초 대기 후 잔존 시 `pkill -KILL`. **sub-agent 루틴** (반환 직전 의무): `browser-test` 스킬 사용 후 동일 정리 명령 실행. agent-browser 도구 자체 cleanup 이 정상 case 에선 작동하나 sub-agent 비정상 종료 (timeout / SIGKILL / panic) 시 lineage 끊긴 좀비 잔존. cargo/next dev 의 `spawned_bg_pids` SSoT 가 직접 spawn 한 PID 만 커버하므로 도구 wrapper 가 spawn 한 child process 는 별도 검증 의무
 
 #### 가드 A — 메인 spawn 시점 lsof 선행 (2026-05-10 incident #440 Phase 1)
 
@@ -366,6 +366,15 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 3. **pending-waits 항목 제거 또는 작업 재개** — 완료면 항목 제거(self-healing), 미완이면 heartbeat 재예약 + 작업 재개.
 
 > **대기를 그대로 재개하지 말 것** — waiter 는 이미 소멸했을 수 있다. SSoT 박제 회귀 차단은 `scripts/verify-dead-wait-check.mjs`(CI 통합, `--self-test` 3중 시뮬 포함) 가 담당. 설계 SSoT: `docs/decisions/20260710-817-dead-wait-guard.md`.
+
+### 반복 운영 마찰 원인 박제 (#795)
+
+매 세션·릴리스 반복되던 저비용 마찰 4건의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제:
+
+1. **squash auto-close 미발동** — GitHub 는 default branch(main) 머지에서만 auto-close. feature PR 은 `base=develop` 이라 구조적 미발동 → **수동 close 규약**.
+2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
+3. **pgrep self-match 오탐** — `pgrep -f "패턴"` 이 자기 셸 명령행 매칭 → **bracket `[-]`** (`agent-browser-chrome[-]`). pkill 은 자기 셸 kill 위험이라 **안전 개선**. hook 은 `grep -v` 로 이미 안전.
+4. **concurrency CANCELLED = 코스메틱** — `cancel-in-progress`(#779) 로 superseded run 이 `CANCELLED`/UNSTABLE 표기. 각 체크 최신 run 이 SUCCESS 면 안전(§릴리스 판별법).
 
 ---
 
