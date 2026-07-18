@@ -6,7 +6,7 @@ description: |
   "풀 리퀘스트", "리뷰 요청" 등의 요청, 브랜치 작업이 끝났을 때.
   DO NOT TRIGGER when: PR을 리뷰하거나 머지할 때, 이슈 생성일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/321] -->
 
 # PR 생성
 
@@ -62,7 +62,7 @@ gh pr create \
 ## 설계 참조
 - docs/architecture/관련문서.md
 
-## 테스트
+### Test plan (테스트)
 - [ ] 단위 테스트 추가/수정
 - [ ] 기존 테스트 통과 확인
 
@@ -179,6 +179,7 @@ stack 대신 각 PR을 main 기반 독립 브랜치로 만들고, 의존성은 *
 ## 규칙
 
 - PR 제목은 반드시 `[#이슈번호]`를 포함한다.
+- PR 본문에 `### Test plan` 섹션 (영문 phrase) 을 반드시 포함한다 — `verify-pr-template-checklist.mjs` keyword 7 이 영문 `Test plan` phrase 를 AND 매칭한다 (템플릿 동적 읽기 시 자동 충족).
 - PR 본문의 `Closes #이슈번호`로 이슈와 연결한다.
 - 변경 파일 10개 이하를 목표로 한다. 초과 시 PR을 분할한다.
 - 테스트가 통과하는 상태에서만 PR을 생성한다.
