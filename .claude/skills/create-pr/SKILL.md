@@ -6,7 +6,7 @@ description: |
   "풀 리퀘스트", "리뷰 요청" 등의 요청, 브랜치 작업이 끝났을 때.
   DO NOT TRIGGER when: PR을 리뷰하거나 머지할 때, 이슈 생성일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/321] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/321 + https://github.com/coseo12/harness-setting/pull/323] -->
 
 # PR 생성
 
@@ -17,12 +17,12 @@ description: |
 | PR 타입 | base | head | 머지 방식 | 비고 |
 |---|---|---|---|---|
 | 일반 feature/fix | `develop` | `feature/*` 또는 `fix/*` | `--squash` | **기본값** — 99% 의 PR 이 이 형태 |
-| Release PR | `main` | `develop` | **`--merge` (merge commit)** | `--squash` 금지. merge-back 원천 방지 (ADR 20260419-release-merge-strategy) |
+| Release PR | `main` | `develop` | **`--merge` (merge commit)** | `--squash` 금지. merge-back 원천 방지 (ADR [20260419-release-merge-strategy](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260419-release-merge-strategy.md) — upstream) |
 | Hotfix PR | `main` | `hotfix/*` | `--squash` 또는 `--merge` | prod 긴급 패치. 머지 직후 merge-back PR 별도 생성 의무 |
 | Hotfix merge-back | `develop` | `main` | `--merge` | hotfix 머지 직후 동기화 전용 |
 
 **금지**:
-- 일반 feature/fix PR 의 `base=main` — 과거 dual PR drift 재발 방지 (ADR 20260419-gitflow-main-develop)
+- 일반 feature/fix PR 의 `base=main` — 과거 dual PR drift 재발 방지 (ADR [20260419-gitflow-main-develop](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260419-gitflow-main-develop.md) — upstream)
 - Release PR 의 `--squash` 머지 — develop drift 유발 (v2.13.0 에서 관찰, v2.14.0 에서 merge commit 으로 전환)
 
 ## 절차
@@ -125,7 +125,7 @@ gh pr view <PR> --json body --jq .body | grep -c -i "<핵심 키워드>"
 ```
 
 - **양쪽 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
-- **체크박스 0 + phrase ≥ 1** → non-blocking 권고 (체크박스 prefill 누락. 동일 권고 시 위 7 체크박스 base 코드 블록 동봉 권장)
+- **체크박스 0 + phrase ≥ 1** → non-blocking 권고 (체크박스 prefill 누락. 동일 권고 시 PR 템플릿에서 동적 추출한 체크박스 base 동봉 권장 (본문 예시 블록은 참고 snapshot — 템플릿 동적 읽기가 SSoT))
 - **양쪽 동시 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단)
 
 > 참고: 동일 측정 방법이 `.claude/agents/developer.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — **동시 수정 의무**. 다운스트림 1차 사례: astro-simulator [#469](https://github.com/coseo12/astro-simulator/issues/469) PR [#472](https://github.com/coseo12/astro-simulator/pull/472).
@@ -145,23 +145,23 @@ gh issue edit <이슈번호> --remove-label "stage:dev" --add-label "stage:revie
 
 PR의 base가 다른 feature 브랜치인 경우(= stack PR), 중간 PR이 머지된 후 상위 PR은 **반드시 rebase + force-push** 필요. `gh pr edit --base` 만으로는 `mergeStateStatus=CONFLICTING`.
 
-절차 (예: base였던 `feature/p4-d` 가 main에 머지된 직후):
+절차 (예: base 였던 `feature/123-a` 가 develop 에 머지된 직후):
 
 ```bash
 # 1. head 브랜치 체크아웃
-git checkout feature/p4-a
+git checkout feature/123-b
 
 # 2. 최신 main 기준 rebase
 git fetch origin
-git rebase origin/main
-# → "skipped previously applied commit" 정상 (main에 이미 머지된 커밋)
+git rebase origin/develop
+# → "skipped previously applied commit" 정상 (develop 에 이미 머지된 커밋)
 # → 실제 conflict 시 수동 해결 + git rebase --continue
 
 # 3. force-push — --force-with-lease (원격이 내가 본 커밋과 일치할 때만)
-git push --force-with-lease origin feature/p4-a
+git push --force-with-lease origin feature/123-b
 
 # 4. base 갱신 + 머지
-gh pr edit <PR> --base main
+gh pr edit <PR> --base develop
 gh pr merge <PR> --squash
 ```
 
@@ -169,18 +169,19 @@ gh pr merge <PR> --squash
 `package.json` scripts 목록, `CHANGELOG.md`, `MEMORY.md` 같은 **append-heavy 파일**은 stack PR 간 충돌 거의 확실. 같은 섹션을 여러 PR이 수정하면 하위 PR은 rebase 필수.
 
 ### 대안 — 독립 브랜치
-stack 대신 각 PR을 main 기반 독립 브랜치로 만들고, 의존성은 **기능 플래그/옵트인 import** 로 해결. rebase 지옥 회피.
+stack 대신 각 PR 을 develop 기반 독립 브랜치로 만들고, 의존성은 **기능 플래그/옵트인 import** 로 해결. rebase 지옥 회피.
 
 ### PR 생성 시 체크
 - `--base` 가 `main`/`develop` 이 아니면 경고 + 머지 순서/rebase 필요성 사용자에게 고지
-- `gh pr edit --base main` 후 `gh pr view --json mergeStateStatus` 확인, DIRTY/CONFLICTING이면 로컬 rebase 유도
+- `gh pr edit --base <main|develop>` 후 `gh pr view --json mergeStateStatus` 확인, DIRTY/CONFLICTING이면 로컬 rebase 유도
 - `--base main` 인 경우 release/hotfix PR 인지 재확인 — 일반 feature/fix PR 은 base=main 금지 (위 "Base 선택" 표)
 
 ## 규칙
 
 - PR 제목은 반드시 `[#이슈번호]`를 포함한다.
 - PR 본문에 `### Test plan` 섹션 (영문 phrase) 을 반드시 포함한다 — `verify-pr-template-checklist.mjs` keyword 7 이 영문 `Test plan` phrase 를 AND 매칭한다 (템플릿 동적 읽기 시 자동 충족).
-- PR 본문의 `Closes #이슈번호`로 이슈와 연결한다.
+- PR 본문의 `Closes #이슈번호`로 이슈와 연결한다. 단 **base=develop 머지는 GitHub auto-close 미발동** (default branch 머지만 발동) — 머지 직후 `gh issue close <이슈번호> --comment "..."` 수동 close 의무 (운영 마찰 규약 §1).
+- 머지 시 `--delete-branch` 를 사용하지 않는다 — 멀티 워크스페이스 (Conductor worktree) 브랜치 점유와 충돌 (운영 마찰 규약 §2). 원격 삭제는 `git push origin --delete <브랜치>` 로 분리 수행한다.
 - 변경 파일 10개 이하를 목표로 한다. 초과 시 PR을 분할한다.
 - 테스트가 통과하는 상태에서만 PR을 생성한다.
 - WIP 상태라면 Draft PR로 생성한다: `gh pr create --draft`

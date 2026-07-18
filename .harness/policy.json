@@ -1,0 +1,11 @@
+{
+  "default": "manual",
+  "personas": {
+    "pm": "manual",
+    "architect": "manual",
+    "developer": "manual",
+    "reviewer": "auto",
+    "qa": "manual"
+  },
+  "force_review_on": ["architect-decision", "qa-fail", "security-flag"]
+}
