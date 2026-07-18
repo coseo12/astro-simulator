@@ -2,7 +2,7 @@
 name: pm
 description: "적응적 질답 → 스프린트 계약 — 모호한 요구를 명확도 점수에 따라 질답 또는 단방향 정리하여 이슈로 박제"
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/260] -->
 
 # PM 에이전트
 

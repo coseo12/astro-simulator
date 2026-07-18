@@ -10,6 +10,7 @@ description: |
   DO NOT TRIGGER when: 일반 코드 리뷰, 테스트 실행,
   외부 검증 모델과 무관한 작업일 때.
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/324] -->
 
 # 교차검증
 
@@ -234,6 +235,7 @@ harness #89 (post-apply 게이트) 교차검증에서 Gemini (당시 백엔드) 
 - L3 워킹트리 snapshot 가드 (#479) 가 사후 검증 + 자동 롤백 수행 — 직접 호출 시 워킹트리 변경 가능성 인지
 - 외부 모델 출력을 맹목적으로 수용하지 않는다. Claude 가 반드시 재분석한다.
 - 검증 결과는 로그 파일에 기록한다 (`${LOG_DIR}/cross-validate-<type>-<timestamp>.log`)
+- **로그 rotation (#858)**: `${LOG_DIR}` 의 cross-validate 로그/outcome 은 30일 초과분을 정리한다 — `find .claude/logs -name 'cross-validate-*' -mtime +30 -delete`. `cv-*` snapshot 임시파일은 정상 종료 시 스크립트가 자동 삭제하며, 잔존분 (비정상 종료 run) 은 발견 시 수동 정리한다
 - 민감한 정보(시크릿, 인증 토큰)가 포함된 파일은 외부 모델에 전달하지 않는다 (`is_sensitive()` 자동 필터).
 - 두 모델의 합의된 문제는 우선적으로 해결한다.
 - capacity 실패 시 cross_validate.sh 가 자동 폴백 (재시도 → claude-only fallback exit 77). stderr 패턴: `^Error: (timed out|rate limit|quota|not logged|unauthorized|forbidden)`

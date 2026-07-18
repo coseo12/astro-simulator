@@ -6,6 +6,7 @@ description: |
   PR 생성 전 검증, QA 에이전트 작업, CI 실패 디버깅.
   DO NOT TRIGGER when: 테스트를 작성만 하고 실행하지 않을 때.
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/322] -->
 
 # 테스트 실행
 
@@ -180,6 +181,11 @@ UI가 포함된 프로젝트에서는 단위/통합 테스트 후 **반드시 E2
 ### E2E 실행 절차
 
 ```bash
+# 0. 가드 A — spawn 직전 포트 점유 선행 확인 (이전 세션 좀비가 HTTP 응답해 "ready" 오인 방지, astro-simulator#440)
+if lsof -i :3000 -sTCP:LISTEN > /dev/null 2>&1; then
+  echo "WARN: 포트 3000 점유 중 — 좀비 가능. ps -p \$(lsof -t -i :3000) -o pid,etime,command 확인 후 정리"
+fi
+
 # 1. 개발 서버 기동 (백그라운드)
 npm run dev &
 DEV_PID=$!

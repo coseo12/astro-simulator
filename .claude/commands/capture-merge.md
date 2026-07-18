@@ -3,6 +3,7 @@ description: 머지된 PR을 volt 이슈 초안으로 자동 변환 (capture-vol
 argument-hint: [PR번호 | 미지정 시 최근 머지된 PR]
 allowed-tools: [Bash, Read, Skill]
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/324] -->
 
 # /capture-merge — PR 머지 → volt 캡처 초안
 
@@ -31,36 +32,14 @@ Gemini의 "마찰 없는 자동화" 통찰을 1단계 적용 (역사적 인용 �
    ```
    결과 있으면 사용자에게 보고 + 새 캡처할지 묻기.
 
-4. **분류 자동 판정**:
-   - PR 라벨에 `feat:`, `feature` → report/pattern 또는 knowledge (재사용성 높으면)
-   - `fix:`, `bug` → report/troubleshooting
-   - `docs:`, `chore:` → 캡처 가치 낮음, 사용자에게 "스킵 권장" 안내
-   - `refactor:` → 변경량/영향 따라 report/retrospective
+4. **분류 자동 판정** (1차: `type:*` 라벨, 2차: PR 제목 conventional prefix — `feat`/`fix`/`docs`/`chore`/`refactor`, scope 괄호 유무 무관 `feat:`·`feat(scope):` 모두 매칭):
+   - `type:feat` / `enhancement` 라벨 또는 제목 `feat` → report/pattern 또는 knowledge (재사용성 높으면)
+   - `bug` 라벨 또는 제목 `fix` → report/troubleshooting
+   - `type:docs` / `type:chore` 라벨 또는 제목 `docs`/`chore` → 캡처 가치 낮음, 사용자에게 "스킵 권장" 안내
+   - 제목 `refactor` → 변경량/영향 따라 report/retrospective
    - 기본 폴백: report/research
 
-5. **본문 자동 초안 생성** (capture-volt 스킬의 템플릿 사용):
-
-   ### report 초안 예시
-   ```markdown
-   ### 리포트 유형
-   {분류}
-
-   ### 출처 레포
-   {owner}/{repo} (PR #{N})
-
-   ### 태그
-   {파일 카테고리/언어/주요 모듈명에서 추출}
-
-   ### 배경/상황
-   {PR 본문 요약 — 첫 단락}
-
-   ### 내용
-   {변경 파일 카테고리별 요약 + 핵심 hunk 의미}
-
-   ### 교훈 / 다음에 적용할 점
-   ⚠ **사용자 검토 필요** — 자동 초안은 "무엇을 했는지"는 잡지만 "왜 / 다음에 어떻게"는
-   사람이 채워야 합니다. 빈칸이거나 형식적이면 캡처하지 마세요.
-   ```
+5. **본문 자동 초안 생성** — capture-volt 스킬 (`.claude/skills/capture-volt/SKILL.md`) 의 report/knowledge 템플릿을 **동적으로 읽어** 사용한다 (헤더 문자열 SSoT — 본 커맨드에 재기술하지 않는다, #858). "교훈 / 다음에 적용할 점" 은 ⚠ **사용자 검토 필수** — 자동 초안은 "무엇을 했는지"는 잡지만 "왜 / 다음에 어떻게"는 사람이 채운다. 빈칸이거나 형식적이면 캡처하지 않는다.
 
 6. **사용자 검토 단계** (필수, 자동 push 금지):
    - 초안을 화면에 표시

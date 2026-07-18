@@ -3,6 +3,7 @@ description: 재사용 가능한 지식/경험/결정을 coseo12/volt 레포에 
 argument-hint: [주제 힌트 — 생략 시 최근 대화에서 가치 있는 것을 제안]
 allowed-tools: [Bash, Read, Skill]
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/issues/319] -->
 
 # /volt — Volt 캡처
 
@@ -42,10 +43,7 @@ coseo12/volt 레포에 GitHub Issue로 지식/경험을 캡처한다. AGENTS.md 
 
 ## 자주 놓치는 규약
 
-- 라벨은 **반드시 두 개**: `capture` + (`knowledge` 또는 `report`). 누락 시 이슈 생성 실패.
-- 제목 접두사 `[knowledge] ` 또는 `[report] ` (대괄호, 소문자, 뒤 공백 1칸).
-- 본문 헤더는 `### 출처 레포` / `### 태그` / `### 요약` / `### 본문` / `### 관련 노트/링크` (knowledge) 또는 `### 리포트 유형` / `### 출처 레포` / `### 태그` / `### 배경/상황` / `### 내용` / `### 교훈 / 다음에 적용할 점` (report). 공백·기호 포함 정확히.
-- 선택 필드에 내용 없으면 `_No response_` 또는 섹션 생략.
+- 라벨 2개 (`capture` + `knowledge|report`) / 제목 접두사 / 본문 헤더 문자열은 **capture-volt 스킬 (`.claude/skills/capture-volt/SKILL.md`) 이 SSoT** — 본 커맨드에 재기술하지 않는다 (규약 변경 시 drift 원천, #858). 이슈 생성 직전 스킬 본문을 동적으로 읽어 따른다.
 
 ## 금지
 

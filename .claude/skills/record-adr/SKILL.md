@@ -7,6 +7,7 @@ description: |
   사용자가 "ADR 남겨", "결정 기록", "decision record", "아키텍처 결정 문서" 요청 시.
   DO NOT TRIGGER when: 단순 버그 수정/리팩토링, 일회성 결정, 외부 가시성 없는 사소한 선택.
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
 
 # ADR 작성
 
@@ -187,7 +188,7 @@ ADR §재검토 조건이 발화하면 (자동 탐지 workflow 또는 수동 인
 
 ### Trigger 이슈 표준 구조
 
-이슈 제목 prefix: `[ADR Trigger]`. 라벨: `type:adr-trigger` 또는 `documentation` + `priority:high`.
+이슈 제목 prefix: `[ADR Trigger]`. 라벨: `documentation` + `priority:high` (실측 라벨만 사용 — 의심 시 `gh label list`).
 
 본문 4섹션:
 

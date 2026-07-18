@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+# HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/323 + https://github.com/coseo12/harness-setting/pull/324]
 # 외부 검증 모델 (Antigravity `agy`) 를 활용한 교차검증 스크립트
-# Phase 1A (#269) 부터 gemini-cli → agy 교체. ADR: docs/decisions/20260521-gemini-to-antigravity.md
+# Phase 1A (#269) 부터 gemini-cli → agy 교체. ADR: https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260521-gemini-to-antigravity.md (upstream)
 # 보호 모델 — L1 (prompt strict prefix) + L3 (snapshot diff + 자동 롤백, #479)
 set -euo pipefail
 
@@ -233,6 +234,8 @@ snapshot_post_and_rollback() {
   # 변경이 없으면 정상 — PLAN_BYPASS 기본값 (false) 유지하고 종료
   if [ -z "${tracked_changed}" ] && [ -z "${untracked_new}" ]; then
     log "plan-bypass 가드: 사후 snapshot diff empty — 정상"
+    # 정상 종료 시 snapshot 임시파일 정리 — 비정상/롤백 케이스는 forensic 용 보존 (#858)
+    rm -f "${PRE_TRACKED_HASHES}" "${PRE_UNTRACKED}" "${post_tracked}" "${post_untracked}"
     return 0
   fi
 
@@ -255,7 +258,7 @@ snapshot_post_and_rollback() {
     done <<< "${tracked_changed}"
   fi
 
-  # untracked 신규 파일 자동 삭제 (Gemini Q1 수용)
+  # untracked 신규 파일 자동 삭제 (Q1 수용 — 과거 gemini 시점 권고)
   # git checkout -- 는 untracked 를 건드리지 않으므로 rm 이 필요
   if [ -n "${untracked_new}" ]; then
     while IFS= read -r f; do
@@ -283,7 +286,7 @@ snapshot_post_and_rollback() {
     log "plan-bypass 가드 CRITICAL: .gitignore 변경 감지 — 사용자 수동 검증 의무"
   fi
 
-  # 롤백 실패 시 추가 경고 (Gemini Q2 수용)
+  # 롤백 실패 시 추가 경고 (Q2 수용 — 과거 gemini 시점 권고)
   if [ "${ROLLBACK_FAILED}" = "true" ]; then
     echo "CRITICAL: 자동 롤백 실패 — 수동 개입 필요. outcome.rollback_failed=true" >&2
   fi
@@ -317,8 +320,8 @@ EXTERNAL_VALIDATOR_STRICT_PREFIX="STRICT INSTRUCTION: You are performing read-on
 EXTERNAL_VALIDATOR_PRINT_TIMEOUT="${EXTERNAL_VALIDATOR_PRINT_TIMEOUT:-300s}"
 
 # Exit code 규약 (CLAUDE.md API capacity 폴백 프로토콜)
-# 0  = Gemini 정상 응답 수신
-# 77 = claude-only fallback (Gemini 429/timeout 최종 실패, 단일 모델 편향 노출 미확보)
+# 0  = 외부 검증 모델 정상 응답 수신
+# 77 = claude-only fallback (외부 모델 429/timeout 최종 실패, 단일 모델 편향 노출 미확보)
 # 1  = 그 외 실패 (인자 오류 / 파일 부재 / 민감 파일 등)
 EXIT_CLAUDE_ONLY_FALLBACK=77
 
@@ -403,7 +406,7 @@ BODY
   if [ "${REMINDER_ISSUE_DRYRUN:-1}" = "0" ]; then
     log "reminder 이슈 생성 (실제)"
     # gh issue create 의 성공/실패를 실측해 REMINDER_ISSUE_RESULT 에 반영 (reviewer 차단 반영)
-    if gh issue create --title "${title}" --body "${body}" --label "enhancement" 2>&1 | tee -a "${LOG_FILE}"; then
+    if gh issue create --title "${title}" --body "${body}" --label "documentation,priority:high" 2>&1 | tee -a "${LOG_FILE}"; then
       REMINDER_ISSUE_RESULT="created"
     else
       REMINDER_ISSUE_RESULT="create-failed"
@@ -601,7 +604,7 @@ PROMPT_END
       exit 1
     fi
 
-    # diff 크기 제한 (Gemini 컨텍스트 보호)
+    # diff 크기 제한 (외부 모델 컨텍스트 보호)
     # `head` 는 2000 라인 읽은 뒤 종료해 producer 에 SIGPIPE 를 전달한다.
     # `set -euo pipefail` 하에서 파이프 버퍼(64KB) 초과 입력 시 exit 141 로 조기 종료.
     # awk 는 EOF 까지 소비하여 SIGPIPE 를 회피한다 (이슈 #207).

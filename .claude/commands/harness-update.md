@@ -3,6 +3,7 @@ description: harness 프레임워크 업데이트 확인/적용 (CLI 래퍼 + �
 argument-hint: [--check | --apply-all-safe | --interactive | --dry-run | --bootstrap]
 allowed-tools: [Bash, Read, Edit, Grep]
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/323] -->
 
 # /harness-update — Harness 업데이트
 
@@ -17,7 +18,7 @@ allowed-tools: [Bash, Read, Edit, Grep]
 ### 1. 변경 요약 (항상 먼저)
 
 ```bash
-npx @seo/harness-setting@latest update --check
+npx github:coseo12/harness-setting update --check
 ```
 
 - 인자가 비어있거나 `--check` 면 여기까지만.
@@ -53,7 +54,7 @@ gh release view --repo coseo12/harness-setting --json tagName,name,body 2>/dev/n
 3. 사용자가 승인하면 `Edit` 으로 직접 머지 적용.
 4. 머지 완료 후:
    ```bash
-   npx @seo/harness-setting@latest update --bootstrap
+   npx github:coseo12/harness-setting update --bootstrap
    ```
    로 매니페스트 갱신 안내.
 
@@ -78,6 +79,6 @@ gh release view --repo coseo12/harness-setting --json tagName,name,body 2>/dev/n
 
 ## 참고
 
-- harness CLI 명령: `harness update --help` (또는 `bin/harness.js` 참조)
-- 카테고리 정의: `lib/categorize.js`
+- harness CLI 명령: `npx github:coseo12/harness-setting update --help` (구현: upstream 저장소 coseo12/harness-setting 의 `bin/harness.js`)
+- 카테고리 정의: upstream `lib/categorize.js` (다운스트림 미배포 — upstream 저장소 참조)
 - README "업데이트 확인/적용" 절
