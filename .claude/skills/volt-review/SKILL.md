@@ -86,7 +86,7 @@ gh issue list -R coseo12/volt --state all --limit 20 \
 1. `git checkout -b feature/volt-review-YYYYMMDD` — main 직접 수정 금지 (CLAUDE.md CRITICAL DIRECTIVE).
 2. Edit 툴로 변경. 한국어 포함 파일은 저장 후 `grep -rn '�' <파일>` 으로 U+FFFD 검증.
 3. 커밋 컨벤션: `docs(harness): volt #7 스프린트 계약 회고 루틴 반영` 형태로 스코프·이슈번호 포함.
-4. `create-pr` 스킬에 위임하여 PR 생성. PR 본문에 반영한 volt 이슈 번호 전부 링크.
+4. `create-pr` 스킬에 위임하여 PR 생성. PR 본문에 반영한 volt 이슈 번호 전부 링크. **커스텀 본문(반영/스킵 요약)이 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` base 를 대체하지 않도록, 템플릿 체크리스트를 본문 하단에 그대로 병합**한다 — 미병합 시 reviewer §6 "PR 본문 7 체크박스 메타 가드" 가 발화한다 (`ADR 호환성 체크` / `ADR 호환성` / `체크리스트` grep 0 hit). 근거: PR #310 리뷰에서 커스텀 본문이 템플릿 체크리스트를 소실시켜 권고 발화.
 5. PR URL 보고.
 
 ## 금지/주의

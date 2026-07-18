@@ -1,26 +1,31 @@
 {
-  "harnessVersion": "4.2.5",
+  "harnessVersion": "4.4.0",
   "installedAt": "2026-05-22T08:27:38Z",
   "files": {
     "CLAUDE.md": {
-      "sha256": "121625eefaec33aa076aa128023b47284be28fbe3bd82f416e2a8dad3511f394",
-      "category": "managed-block"
+      "sha256": "0395d6bb7c53a0cd4206974cc8d03acf1d7655f122bd6460a9a0d0cbd833f497",
+      "category": "managed-block",
+      "previousSha256": "6e84bfd814a656d9d3f78076693e88a971850ae5efa4af4d58b7a6f8f544f3bd"
     },
     ".claude/agents/architect.md": {
-      "sha256": "621bbcb78abc82dd9b37e70e4ce072d498bcdc0284b83b9b5b49122a7ce4e3e8",
-      "category": "atomic"
+      "sha256": "f7d50bbf0bcb1c41f9860180c6031c6a716f84bd080671e9dcca1b4b233aedcf",
+      "category": "atomic",
+      "previousSha256": "a1b43ec28fee09d8509d848a8354e0a5f25d3a247e79ce3ec9b5bad0dcc9e878"
     },
     ".claude/agents/developer.md": {
       "sha256": "0b7757e56852e6411fd2287c71b29351ffd77fe6c39e0e9e73c34a2f4eeaf7cc",
-      "category": "atomic"
+      "category": "atomic",
+      "previousSha256": "86e536c2347efc867fbc771689ccc8ec835cad513a89a8c143d191dfd8cd0ee0"
     },
     ".claude/agents/pm.md": {
-      "sha256": "997c8c0790428d8bf5e3ecec64c407daf36456db5052d996d19038e13c5aa0c3",
-      "category": "atomic"
+      "sha256": "df781fc4ed337319dd4ad5c1fbe08ffd824f433151222ccf642f0d6615f952f1",
+      "category": "atomic",
+      "previousSha256": "7c29f495452a64426b3375c5bb76b996004eb45838cf7105c6453dc7c10861ec"
     },
     ".claude/agents/qa.md": {
-      "sha256": "cddf39755ce91916035bfaeee3b1c5e76695fd626bb0f353684270f49fac045a",
-      "category": "atomic"
+      "sha256": "81ec4d70d20c371731eb6ebb8d9dae382e711d1d3ecadc4098050c82b5d96108",
+      "category": "atomic",
+      "previousSha256": "defef9d1e834c046da05671b51efc5a806728399f2d625a1fa939c80e5eafb31"
     },
     ".claude/agents/reviewer.md": {
       "sha256": "72f600d2170947e95ff2c09266f3242bc72a6b73df429d966fe5678ebccfdeb0",
@@ -66,21 +71,23 @@
       "sha256": "66d574aac30c0683170fdb2ec5a25fe462cd6ea143e3a4612a99ae5e4a55ccef",
       "category": "atomic"
     },
+    ".claude/hooks/session-start-dead-wait-check.sh": {
+      "sha256": "6b769b1d59eef5c7a4d3599f57fe13458247ae8a18dbf9009b23b9dc39624435",
+      "category": "atomic",
+      "previousSha256": "3625d367d068f7d3618024269941ceef1929d699af4a07089abfa4e8e21ea266"
+    },
     ".claude/hooks/session-start-zombie-check.sh": {
       "sha256": "fb4f32790517cc20452701f58964ac2f89f81eb5462396d6ba43b4dbcf26c402",
       "category": "atomic"
     },
     ".claude/scheduled_tasks.lock": {
-      "sha256": "3ce28d26137cd3d5131c0e7913421aeb17840f4d00ff10c34022f9795f799d2a",
+      "sha256": "6c3c62523ba4b46f42a798322f0ada6fb48b06602a9691abfcfad82166574538",
       "category": "atomic"
     },
     ".claude/settings.json": {
-      "sha256": "dede6c4727d773e3b54933843a12d81902499050b19a981a942398b0e70447a9",
-      "category": "atomic"
-    },
-    ".claude/settings.local.json": {
-      "sha256": "73cfb21d907c1c5ece4c54e782649af616e9c4ca25fdb235009ae048ae685bd2",
-      "category": "atomic"
+      "sha256": "7bd730dccf38cc1c5d7d1e54476b347d1f461a66c22bc265d94b8b58f6413136",
+      "category": "atomic",
+      "previousSha256": "b701897cd95ad4206c7b0f55b5a0f3a997888e93b7863c89b9885dcd035d263c"
     },
     ".claude/skills/browser-test/SKILL.md": {
       "sha256": "cac2244a029ff813ef58671771f7af278774438a6416e4c5fcf68860e3a5d421",
@@ -119,7 +126,7 @@
       "category": "atomic"
     },
     ".claude/skills/volt-review/SKILL.md": {
-      "sha256": "523447c52e91d40d9e9dffb4977d1a47bad1cd109ab691a01994aed4dae835ba",
+      "sha256": "3f8f03349ea74db4f92122e6bc12efe5a37e4e729c01b50cfa1ea6b3be9c656e",
       "category": "atomic"
     },
     ".github/CODEOWNERS": {
@@ -138,9 +145,14 @@
       "sha256": "ec8a657681bd1313009092a388b6ff08a292e5b6b59158741ed9198f01d85a08",
       "category": "atomic"
     },
+    ".github/actions/setup-and-build/action.yml": {
+      "sha256": "dd5fc5235390d866295ecf3d547c98d37d39ca1657495e510c6c12aaad5edaae",
+      "category": "atomic"
+    },
     ".github/workflows/harness-guards.yml": {
-      "sha256": "3d15f76377a1a280525196299340abe99677a1d88fa3a5305bef5cdd651855ad",
-      "category": "frozen"
+      "sha256": "19108a4b2d3a3d102e94a444c5c84cf346392c2b150e602480fc208d14be01e5",
+      "category": "frozen",
+      "previousSha256": "d2b2be14453dc341fab46fef6cc8e83a3bcca4417d13d65b11d47cb77dcf2669"
     },
     ".github/workflows/harness-pr-review.yml": {
       "sha256": "296443c5fdeae5eb126b0ae749c8b0aa57fc19b7b9fa08f42159414311087432",
@@ -208,6 +220,10 @@
     },
     "scripts/browser-verify-bookmark.mjs": {
       "sha256": "42d3393fe42a6cb7da221df83cf0ad24c1ed9e8cada465f2abeb3da795774705",
+      "category": "frozen"
+    },
+    "scripts/browser-verify-click-select.mjs": {
+      "sha256": "45f8c490632d91fabc6f24d4fc9904885f2d39ae4ab97474fdd9a2cec25821bc",
       "category": "frozen"
     },
     "scripts/browser-verify-comets.mjs": {
@@ -318,12 +334,20 @@
       "sha256": "0d4dbb5da64843ab081bdbde9dd893e5a526e13576a0fb0b856d5fff89329566",
       "category": "frozen"
     },
+    "scripts/resolve-harness-drift-todo.mjs": {
+      "sha256": "4c0ab854403af9510ad5b101c7ecdcaa5b72a440c6435490cd520105016233ea",
+      "category": "frozen"
+    },
     "scripts/setup-stage-labels.sh": {
       "sha256": "d0d79ce5b3784dcefd7402d15ba0235d9a7a2329de88a392044abd48237d3d69",
       "category": "frozen"
     },
     "scripts/sync-prettierignore.mjs": {
       "sha256": "a24968993e927dbd0a171d75cf7d2b0a2da5c9f1315fba8983eef19dfb7f3abd",
+      "category": "frozen"
+    },
+    "scripts/verify-a11y-baseline.mjs": {
+      "sha256": "03d504480f31d82b88ad91e853167ac06f8c671c1c32f1e92836d4c853652ce9",
       "category": "frozen"
     },
     "scripts/verify-agent-return.sh": {
@@ -346,8 +370,25 @@
       "sha256": "69584667b5269cee27a9629f2b94929cd1bc05604b2ad5eb2205a43295f1b6e1",
       "category": "frozen"
     },
+    "scripts/verify-dead-wait-check.mjs": {
+      "sha256": "59a4c25ba1f8994042329f6848e72bc403e5a77e375a87f726ab8bd3cf4d6129",
+      "category": "frozen",
+      "previousSha256": "53bf1c05d874b4935b2d13e512b4067eee1d4a8ac57a1fb4e420fcc99c2851ca"
+    },
     "scripts/verify-docs-links.sh": {
       "sha256": "eb8eac1e69b2db936ba3433b6b8c077d70a0a5204236239953b065c845308fe7",
+      "category": "frozen"
+    },
+    "scripts/verify-fps-baseline.mjs": {
+      "sha256": "f72f513f2d5b67563151def7f32d94c1c60efe208f0a1036f3d69f474cbe511f",
+      "category": "frozen"
+    },
+    "scripts/verify-harness-drift-decorator.mjs": {
+      "sha256": "cc4c2a5b160e0419d0bde3f0289f98a75d0300a45056879673343d6cd0a95e59",
+      "category": "frozen"
+    },
+    "scripts/verify-hud-contrast.mjs": {
+      "sha256": "31661292dee53dc3cecce83787b6d6b1c08bc5a5a0542630f9267beba88d329b",
       "category": "frozen"
     },
     "scripts/verify-iau-data.mjs": {
@@ -387,7 +428,7 @@
       "category": "frozen"
     },
     "scripts/verify-z-pattern-health.mjs": {
-      "sha256": "f085b0d982564acb95f48e43502e83581268d38272eea0df87439fcbdbf1acac",
+      "sha256": "fc517e46298f177bf7de50f871ed501b1da446ff824783c8fdae063dc48d8f02",
       "category": "frozen"
     },
     "scripts/verify-zombie-check.mjs": {
@@ -416,6 +457,10 @@
     },
     "docs/architecture/integrator-selection.md": {
       "sha256": "8397903ff021eea110921d7262fc112061ef2c44a8e854643677c2568caa3ca1",
+      "category": "atomic"
+    },
+    "docs/architecture/principles.md": {
+      "sha256": "14143f6a6363e4100cfeba624174b8f4d173ba09656dc2e397a60ab830fd118a",
       "category": "atomic"
     },
     "docs/architecture/state-atomicity-3-layer-defense.md": {
@@ -490,6 +535,10 @@
       "sha256": "27c954966de6d3a050013254cde99cddf60d7ab3edef91ac5023e7e00d986c69",
       "category": "atomic"
     },
+    "docs/benchmarks/a11y-baseline.json": {
+      "sha256": "da3460b9391acbb6ed6af47ecfa0ebf3856bd8341d3e7a5261f074e73155e9d1",
+      "category": "atomic"
+    },
     "docs/benchmarks/asteroid-belt-n-sweep.md": {
       "sha256": "28c48335852d4324a98ee571255a42955058e1238b6db7b6dbba684147a14c16",
       "category": "atomic"
@@ -500,6 +549,14 @@
     },
     "docs/benchmarks/baseline.json": {
       "sha256": "14adfbfb4462f4bba58012464c7e3482657135349c4631584353a49166bbeac6",
+      "category": "atomic"
+    },
+    "docs/benchmarks/fps-lowend-baseline.json": {
+      "sha256": "edfb4dcbd03eb4fb8eb8832c53b1662249b1d273b439fba6564f4283f91763bd",
+      "category": "atomic"
+    },
+    "docs/benchmarks/fps-variance-diagnosis-20260619.json": {
+      "sha256": "c3dfee1420c4d41927a8d051d16ff5f5ad66861a19d6e7b297bdb11b9206f74f",
       "category": "atomic"
     },
     "docs/benchmarks/newton-1000y.md": {
@@ -575,7 +632,7 @@
       "category": "atomic"
     },
     "docs/decisions/README.md": {
-      "sha256": "f179f90dbceb92c84753d4dfc78c62548a864992664622b5d394f51a0ab19edb",
+      "sha256": "10d2e52a8cc65d126ad58060c8d4b0860570a4fb3064cb04ea0534f1d2b814b0",
       "category": "atomic"
     },
     "docs/deployment-guide.md": {
@@ -647,7 +704,7 @@
       "category": "atomic"
     },
     "docs/lessons/README.md": {
-      "sha256": "085a9f3a63e971a855a89785c1bfbc2fba2c05ba3b3a8b994b2edbd105e853a8",
+      "sha256": "ed342cee9960b3580e132e2352d27603c394bc4584abdaa163eefa03a93142fc",
       "category": "atomic"
     },
     "docs/lessons/ci-and-downstream-verification.md": {
@@ -659,7 +716,11 @@
       "category": "atomic"
     },
     "docs/lessons/data-not-code-extension.md": {
-      "sha256": "4b725263858d1256acf0be0ecfb438a3e56f17486e8b6d1a5c47edf38aa7d159",
+      "sha256": "4ce01719dae4bffe8e49f309834be8266eef5bf71e898e24497f9f12adb58ae6",
+      "category": "atomic"
+    },
+    "docs/lessons/dead-wait-guard.md": {
+      "sha256": "90a64051df297d4661f2c8e15216aad50cc6476bf8ba718f06e3f90935130513",
       "category": "atomic"
     },
     "docs/lessons/gh-cli-execsync-pitfall.md": {
@@ -726,6 +787,10 @@
       "sha256": "f4aef34786132d92b9631ab7932a2c5c76983f9805628471beda7c345f21db2c",
       "category": "atomic"
     },
+    "docs/ops/operational-friction.md": {
+      "sha256": "94f068a42bd3458fd6757ef27f59e3ce534ebd419737e803a70de36d7ad2850d",
+      "category": "atomic"
+    },
     "docs/phases/P1-solar-system-mvp.md": {
       "sha256": "bfc5cac22a97a2dee341877c6f142fb37430ec4bcf241c09ef82559f1d2b87a3",
       "category": "atomic"
@@ -742,12 +807,16 @@
       "sha256": "a0573f21e92eef72156f9956269b5971681da3fd8ab5ed36390ebef88f813270",
       "category": "atomic"
     },
+    "docs/phases/roadmap-track-ab.md": {
+      "sha256": "e2f21de27802af5c4c1a5d0b82087991b130bd1f2c611dcc7135dd211667e1bd",
+      "category": "atomic"
+    },
     "docs/phases/roadmap-v1-cosmic-scale.md": {
       "sha256": "a639b8f553c66a3aae5d7cc3b114943153a1d02239c3934adc3543725adce332",
       "category": "atomic"
     },
     "docs/phases/roadmap-v3-incremental.md": {
-      "sha256": "091d3c989d3061d56ce6048f82e3f51b89a095a320e24cbed71f10a214b14740",
+      "sha256": "b54b9e5594909caf2398769a4b5a7730ac9546ef2add013dba3924cdafafd15d",
       "category": "atomic"
     },
     "docs/phases/time-reversal.md": {
@@ -1054,6 +1123,334 @@
       "sha256": "8ffff406f27c07ad6a557363d8906f5fecfc2bfd80c060c0e7d84a79fd6248af",
       "category": "atomic"
     },
+    "docs/reports/546-forensic/546-debug-1280x720.png": {
+      "sha256": "36940e3f675c0e829e597f8b291e2f1dd684828faddd48596e25850b794dd747",
+      "category": "atomic"
+    },
+    "docs/reports/546-forensic/546-debug-1920x1080.png": {
+      "sha256": "b37ff957f005b828ca732a334843b7d1ad982b1c18ebc7c4ad87498109405975",
+      "category": "atomic"
+    },
+    "docs/reports/546-forensic/546-debug-375x667.png": {
+      "sha256": "7663d6eb04e7a71a7a5d93c6fe22c177e660302ed782abfc05e62eebbd4d6f09",
+      "category": "atomic"
+    },
+    "docs/reports/546-forensic/546-debug-output.json": {
+      "sha256": "f76689449d577f5140b9dcec658e7e64226f042c9d18b6afd3ac1242c934d5ae",
+      "category": "atomic"
+    },
+    "docs/reports/622-orbit-scale-gap-debug-output.json": {
+      "sha256": "afbf613682654cf84cd2677e4f82703be06bb1cbb9fb1783a1ee0e417340ea72",
+      "category": "atomic"
+    },
+    "docs/reports/623-dpr-pixel-basis-debug-output.json": {
+      "sha256": "b52f9774dae43a05ed23e91212d36a87c66f27e0036c0fd34af4eb836ffcc96a",
+      "category": "atomic"
+    },
+    "docs/reports/627-satellite-orbit-structure-debug-output.json": {
+      "sha256": "74c8090c170154373c8632c097d72044243ecaeb354d28c3a2f7272ea4b469c3",
+      "category": "atomic"
+    },
+    "docs/reports/629-freefly-camera-zoom-debug-output.json": {
+      "sha256": "9239b13274b2568d1c571c174b9309f262aefd653dcb8d90c9ff5442313b135b",
+      "category": "atomic"
+    },
+    "docs/reports/631-io-freefly-pullback.png": {
+      "sha256": "cb266e868761b9944daf8dc9f9af94df9dbb5d723d803d595658185953e30cc3",
+      "category": "atomic"
+    },
+    "docs/reports/641-r7-jupiter-ring-faint-1280x720.png": {
+      "sha256": "333961990289d157501848595655ca9f88c410e11e4c91397c17db9c5cd417a2",
+      "category": "atomic"
+    },
+    "docs/reports/641-r7-mobile-saturn-focus-375x667.png": {
+      "sha256": "f61634150f95e2fdc3506a4b27febbe16d6dae6772f9e5811814622520b9a764",
+      "category": "atomic"
+    },
+    "docs/reports/641-r7-mobile-shortcut-375x667.png": {
+      "sha256": "8f23179683b76bf3be931c135aa24b1312402fd9816c0be42e8f377c7827fba4",
+      "category": "atomic"
+    },
+    "docs/reports/641-r7-saturn-rings-1280x720.png": {
+      "sha256": "b0a24d19243a46e5d3ece19f996d2c379424e02892a06608e466e0b1a499cc82",
+      "category": "atomic"
+    },
+    "docs/reports/641-r7-saturn-rings-shallow-1280x720.png": {
+      "sha256": "be81eeb24c3e06e164bee6f5e8fb4b7e8e9841d138b21ff6240088abd5b73109",
+      "category": "atomic"
+    },
+    "docs/reports/641-r7-titan-1280x720.png": {
+      "sha256": "14cb771ed9ed9418e3ffee826031ae03133bdb2c433045f103ddfee70a924752",
+      "category": "atomic"
+    },
+    "docs/reports/647-r8-default-solar-view.png": {
+      "sha256": "4b99ac0db10cb9b5e8ee5a02feac84177a7bd04c2b6c185c73ddcd8e796ca936",
+      "category": "atomic"
+    },
+    "docs/reports/647-r8-jupiter-focus-no-regression.png": {
+      "sha256": "20e10fa28a44430b93a87f0d4a981f4bd0a02f9f0bbfffe555ee67cc819b6e22",
+      "category": "atomic"
+    },
+    "docs/reports/647-r8-saturn-focus-tilted-rings.png": {
+      "sha256": "1962c36c6829cce6c151e4090e54554d8dd096539e125dd5f3c82a35947c872e",
+      "category": "atomic"
+    },
+    "docs/reports/647-r8-titania-focus.png": {
+      "sha256": "8657b166dd19fbb8c0a08d7cf2d307c468e28e6db84634eca6c67cdac639ffb9",
+      "category": "atomic"
+    },
+    "docs/reports/647-r8-uranus-focus-vertical-rings.png": {
+      "sha256": "5a2e0dad913f22952926f26bccd0ac99fe67665eba123a3ccd92d9f2cb5707e6",
+      "category": "atomic"
+    },
+    "docs/reports/653-r9-default-solar-view.png": {
+      "sha256": "935e8495a2bd05abdf05af45f21af3b71e6e3558e742b35da146e4d498d42ca7",
+      "category": "atomic"
+    },
+    "docs/reports/653-r9-jupiter-focus-no-regression.png": {
+      "sha256": "ab0473547d81797f781472f5cf95da32b73c14863a7a94e5b5bddf063e176788",
+      "category": "atomic"
+    },
+    "docs/reports/653-r9-neptune-focus-tilted-rings.png": {
+      "sha256": "ec63dcd8b409573237177732a0f0b0fcdd400b475be3818473139e6ded1a0808",
+      "category": "atomic"
+    },
+    "docs/reports/653-r9-saturn-focus-no-regression.png": {
+      "sha256": "cddc5fea21e8c5823524d6d3ed9b1eaa65401802913f0fc7e52a3aec8f72ca33",
+      "category": "atomic"
+    },
+    "docs/reports/653-r9-triton-focus.png": {
+      "sha256": "2d2fec76311e04348adfa1b3a6becd99f4f44f6fc96a6923795bf55eca0987b6",
+      "category": "atomic"
+    },
+    "docs/reports/653-r9-uranus-focus-no-regression.png": {
+      "sha256": "2b1eaa8a6fd5d795ce161519bd7201e4b18189c0fe1111bbe7abaadc26407624",
+      "category": "atomic"
+    },
+    "docs/reports/659-r10a-ceres-orbit-midzoom.png": {
+      "sha256": "f523744c6b8d31810a0f58b7c4e3f313900b32670eb53215c3276a50844ede0e",
+      "category": "atomic"
+    },
+    "docs/reports/659-r10a-default-solar-view.png": {
+      "sha256": "d14fe8f2359ec5c43aba8dc7fb2d06cb674cb66fa47c708e689390e09033596a",
+      "category": "atomic"
+    },
+    "docs/reports/659-r10a-eris-focus.png": {
+      "sha256": "6637a60b551a78f9679ad8517e15be82b5001afe8ea2edcb643a7ee6f4466988",
+      "category": "atomic"
+    },
+    "docs/reports/659-r10a-eris-orbit-zoomout.png": {
+      "sha256": "045d2e62a914a5e364225f6040d2ac101deba0bbe4bbddbec7b2738c20a75a57",
+      "category": "atomic"
+    },
+    "docs/reports/659-r10a-mobile-default.png": {
+      "sha256": "20f8c848b461228126e1d07015bc9b40dc1783f45effcb5d26f78bc8449d848d",
+      "category": "atomic"
+    },
+    "docs/reports/659-r10a-pluto-focus.png": {
+      "sha256": "e3432bdb3a3715123b851c2ad54c8f4d0d789a0c737875f7c63792a73cc65fe2",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-default-solar-view.png": {
+      "sha256": "599dd52b2e8f8bdb2ef10933fbe3e0d8aa82353ed1ac15387839c9181d175ab2",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-encke-orbit-zoomout.png": {
+      "sha256": "9777975b46e7c1335bb664fdaa4c2f94ac52fee20f788bb8a420877440615fa6",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-halley-focus.png": {
+      "sha256": "2b125db4ec4bc73c19b297c4f37df0ff29a48aef5fc11a6ae8c32d30c0ffb068",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-halley-orbit-zoomout-64seg-before.png": {
+      "sha256": "50d072eb788f2f783032cb7826c90eb64d3d83aa552d4957f0d1ea21b7e86443",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-halley-orbit-zoomout.png": {
+      "sha256": "402ab0c992065539a27bf8d6c01f6abfb5628ed3bae3de46d07d35be7bc53216",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-mobile-default.png": {
+      "sha256": "cc7875c78bf5cc3a55e5578154192d4c84dd19e5c8fa030151ea2dcfe71185f6",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-swift-tuttle-focus.png": {
+      "sha256": "6e85d9097b98497f1bb532a55fae865bf764f5b26c3ccb10aec0e144f2a68484",
+      "category": "atomic"
+    },
+    "docs/reports/664-r10b-swift-tuttle-orbit-zoomout.png": {
+      "sha256": "915c8de97bea28e4d44b131e876eb65c639ac85b9ff975c1bde4334e3789cbb0",
+      "category": "atomic"
+    },
+    "docs/reports/675-glow-100au-default.png": {
+      "sha256": "80989e0a70d69b3dd428a6e3917985c7ce3b84c5fe9ee933b276caa867b2f256",
+      "category": "atomic"
+    },
+    "docs/reports/675-glow-100au-glow.png": {
+      "sha256": "ba3ce488ceff25ef925054fe5cae859d59ab9ea367dbf5ddabcf5ed1e6033d74",
+      "category": "atomic"
+    },
+    "docs/reports/675-glow-100au-off.png": {
+      "sha256": "8af8e00b026eca8d0f91175e8f4abb7d739195db6c282c12dc736f5e24e88eb3",
+      "category": "atomic"
+    },
+    "docs/reports/675-glow-40au-default.png": {
+      "sha256": "e11952765f6a1324374fe24fb77f4b94ecb7e6d571831de22e94248633d8d7a4",
+      "category": "atomic"
+    },
+    "docs/reports/675-glow-40au-glow.png": {
+      "sha256": "ae4bbefc9a4e48d5daf36be410e4179e1f278a3918702a9756af81a6cfac620a",
+      "category": "atomic"
+    },
+    "docs/reports/675-glow-40au-off.png": {
+      "sha256": "a985216234e431763a306291cae079ad8b7490267ed0c24297adad23e479fc91",
+      "category": "atomic"
+    },
+    "docs/reports/688-orbit-toggle-default-on.png": {
+      "sha256": "9d8366cfac004e210804cec7024171977dd0f10eeb875cf8016efc0a86f3743f",
+      "category": "atomic"
+    },
+    "docs/reports/688-orbit-toggle-glow-synergy.png": {
+      "sha256": "b8fa936ca6d67463f6026d5c001671df31eabac308e8a0ef01a7ce716125a7ca",
+      "category": "atomic"
+    },
+    "docs/reports/688-orbit-toggle-off.png": {
+      "sha256": "919fa0b9b3cd9c54d96e0bc91aa8c1d5fac3c14189b68982f1162bbfd4b35dca",
+      "category": "atomic"
+    },
+    "docs/reports/693-freefly-panning-debug-output.json": {
+      "sha256": "0afdcee15e55e6da3cd07ea93e9e0c49997cbd7e7d6b2bb8e8e8b4012bd2c5d0",
+      "category": "atomic"
+    },
+    "docs/reports/693-panning-after.png": {
+      "sha256": "3b7f22233d96068f215067569211bda81d53144d4eebe729b32f61d782f3d53d",
+      "category": "atomic"
+    },
+    "docs/reports/693-panning-before.png": {
+      "sha256": "25b95193c08bb8a7d280690e92dfc250cf172fde1d5754074dfb44abb883049d",
+      "category": "atomic"
+    },
+    "docs/reports/696-freefly-wasd-debug-output.json": {
+      "sha256": "19708e4b51469c19d5f158825775813adf57170600058255bfb862400a500089",
+      "category": "atomic"
+    },
+    "docs/reports/699-freefly-redesign-debug-output.json": {
+      "sha256": "d73c1d2ad8772c9a1366850a32b0ae16937f3f4dcb6f8807db74df6ada4e3ecc",
+      "category": "atomic"
+    },
+    "docs/reports/713-gui-1-static.png": {
+      "sha256": "cb59cdd63fb79e08a1a8163b820538fffe5df6ab46d8b846aae14e5c6f594dd4",
+      "category": "atomic"
+    },
+    "docs/reports/713-gui-2-satellite.png": {
+      "sha256": "0813151f8903ad05c17fc3f3a0aad0677d20951efb1522ae0976c08f4a8ecce9",
+      "category": "atomic"
+    },
+    "docs/reports/713-gui-3-marker.png": {
+      "sha256": "3d61ccf7af764fddc0da7653bab9179f6a2556f5a87f4ef136e435ec451b7374",
+      "category": "atomic"
+    },
+    "docs/reports/713-gui-5-freefly.png": {
+      "sha256": "f5b7a4a81fab45d6f9df379e9b07bc3c36f6479beaf05abf838c18a983283df6",
+      "category": "atomic"
+    },
+    "docs/reports/719-gui-1-static.png": {
+      "sha256": "02918f7e10c1b794a61f21ba310b6a7c55e0ce02c917d750af7bc3e268db9eb1",
+      "category": "atomic"
+    },
+    "docs/reports/719-gui-2-cycle.png": {
+      "sha256": "d78333ca3e43e44e0e2b5ff834c4111a34659e04728aec785d050b92e82beef8",
+      "category": "atomic"
+    },
+    "docs/reports/719-gui-3-mobile.png": {
+      "sha256": "0fcbb75466b579efb423fcf8422af03cc1f9233bd694c3bab1ba1989613bbd77",
+      "category": "atomic"
+    },
+    "docs/reports/719-gui-4-natural-overlap.png": {
+      "sha256": "e2f1b7c95221dcfa0bd91531f3c675c1370152913fb976fb0f22871547afb3f8",
+      "category": "atomic"
+    },
+    "docs/reports/721-gui-1-saturn-moons.png": {
+      "sha256": "e2e6bf6c9c82c61eeb42eae97aa7582fddecc6c01ed54370ea9bbfd70b181e9a",
+      "category": "atomic"
+    },
+    "docs/reports/721-gui-2-click-rhea.png": {
+      "sha256": "0425ae1c827b77452f240b53036dd6e8af527d3e46df415d393ed5914a73614c",
+      "category": "atomic"
+    },
+    "docs/reports/721-gui-3-enceladus.png": {
+      "sha256": "27f9802191286eecd29985a05c89e8fa7caf4ee8300f1286ace9273aad94d843",
+      "category": "atomic"
+    },
+    "docs/reports/725-gui-1-oberon.png": {
+      "sha256": "0d1513ac38db2c5b6c1a8f71aa82ef1d727cb171640f44e814a1ceef65119eb3",
+      "category": "atomic"
+    },
+    "docs/reports/725-gui-2-click-proteus.png": {
+      "sha256": "589f2beacabd11ae88df03185f43e7ed86e93762be46ac496540b41eb384d812",
+      "category": "atomic"
+    },
+    "docs/reports/725-gui-3-neptune-overview.png": {
+      "sha256": "e830be612c30acba80ce974c24179d1b2b5f065f97506f43965b024a4c3e7577",
+      "category": "atomic"
+    },
+    "docs/reports/728-alias-rotated.png": {
+      "sha256": "be79a3f580d98f100a4892a117e244487f028d9a6d0263c90b93347cf1254ab4",
+      "category": "atomic"
+    },
+    "docs/reports/728-arc-marked.png": {
+      "sha256": "e7fd0a330ca0e0032e645c52625aa9e38294d0eb0f6378fd8823c88cfbf7482e",
+      "category": "atomic"
+    },
+    "docs/reports/728-gui-2-neptune-focus.png": {
+      "sha256": "f3a485cb8fb3a450cdc2c322295abbdff1e62458ef3fe0c54d67799216f2c975",
+      "category": "atomic"
+    },
+    "docs/reports/728-reg-saturn.png": {
+      "sha256": "19ef2a3a21bcadac425386cb19864dcb43a9ec4228d5de2f35011e51d8e03dca",
+      "category": "atomic"
+    },
+    "docs/reports/762-monotonic/762-debug-output.json": {
+      "sha256": "d53cac19a4ca8398320859d8b80793f619dbbe4fdf3d8d30f884bd65bb70a3ee",
+      "category": "atomic"
+    },
+    "docs/reports/762-monotonic/762-default-solar-1280x720.png": {
+      "sha256": "105a17c07aa97e743daf9f1abb46a431ea54c7b2dffdc602cbc3b15122f3864c",
+      "category": "atomic"
+    },
+    "docs/reports/762-monotonic/762-focus-jupiter-1280x720.png": {
+      "sha256": "d3a65b1318feeb197f8c5049dfd00872d442c1984b7866db392c2bf8872d8600",
+      "category": "atomic"
+    },
+    "docs/reports/762-monotonic/762-focus-jupiter-toward-sun-1280x720.png": {
+      "sha256": "d8c4afe8763f78bd6aca1b32d3c19e3e257e60ac9796a6fc89cd8ca661331302",
+      "category": "atomic"
+    },
+    "docs/reports/762-monotonic/762-wide-solar-view-1280x720.png": {
+      "sha256": "53ec11bffde06397d273dfa8c65f8259c76b1da433c711f6fc546a0b049aa28f",
+      "category": "atomic"
+    },
+    "docs/reports/818-focus-zoom/818-earth-max-zoom.png": {
+      "sha256": "a7417ca0ca323f0e84823eb81ddec56b7c86008d501821af952a0a091aa43461",
+      "category": "atomic"
+    },
+    "docs/reports/818-focus-zoom/818-jupiter-max-zoom.png": {
+      "sha256": "506241d88e16b9d498474cb3bac5b7ed3744835376041c35a0039f9bd12fe806",
+      "category": "atomic"
+    },
+    "docs/reports/818-focus-zoom/818-saturn-max-zoom.png": {
+      "sha256": "b31e4bf6eea63349ebb5fc70844dd486e5e3f7eecd6805a2b6d396949dbca1b0",
+      "category": "atomic"
+    },
+    "docs/reports/834-earth-body-tier-1280x800.png": {
+      "sha256": "35b821cc738e0d9b523a4db1c4e631f7452e4a504830f8d8641a2fe757badf32",
+      "category": "atomic"
+    },
+    "docs/reports/834-focus-entry-earth-1280x800.png": {
+      "sha256": "71edcbbb8228b082e71fb8d8be06c6b2e069e00aaf854a3dac9d525f67b3bec1",
+      "category": "atomic"
+    },
     "docs/reports/p10b-audit-methodology.md": {
       "sha256": "49288169e7036e9ee91bc2960a2a9371063ddfaa20dc1d5b5cb6037c76525418",
       "category": "atomic"
@@ -1083,19 +1480,19 @@
       "category": "atomic"
     },
     "docs/screenshots/01-solar-system.png": {
-      "sha256": "7359e984dacae54757c1a6c02545ef68448d7743644c37ae106bc74f7ec59ae2",
+      "sha256": "6b2b0ce74a13dc4a157f5b13f5e1a0dba4ef9ac052f0479bbf36ce8330d36e33",
       "category": "atomic"
     },
     "docs/screenshots/02-earth-focus.png": {
-      "sha256": "7a780495e800c5b5a9483c852af81aa133199e206252db510e2df037ed3057f5",
+      "sha256": "1756ec8f79e077956ab9e4c1908e052d67b3a1270757f480bd0da29300e0b019",
       "category": "atomic"
     },
     "docs/screenshots/03-neptune.png": {
-      "sha256": "a10842e635f8661ebe8f39516720503556662d35a4963cb41e26abd0a2684600",
+      "sha256": "07496a1f69759e2558be42883c1affd854dc78b9adedc40c84f6dcb8e1838e5d",
       "category": "atomic"
     },
     "docs/screenshots/04-mobile.png": {
-      "sha256": "a8425b46163a2693b1d7cf1508c571e47c0b945dcff2beeef312ee72e1715440",
+      "sha256": "8a125635a48fd6b5f30e30e5b2e953ae5d37a0154ca75e6a01c68bf654a910a1",
       "category": "atomic"
     },
     "docs/security.md": {
@@ -1110,5 +1507,6 @@
       "sha256": "68d25c96bbb65c7c58765992cdd3193cc6bd63ec5392284ea8b8ca1c8a6035a8",
       "category": "atomic"
     }
-  }
+  },
+  "lastUpdatedAt": "2026-07-18T13:42:19Z"
 }

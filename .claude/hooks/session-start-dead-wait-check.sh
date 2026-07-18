@@ -1,25 +1,25 @@
 #!/bin/bash
-# 세션 시작 시점 dead-wait (미해소 background 대기) 검출 (가드 D — 이슈 #817)
+# 세션 시작 시점 dead-wait (미해소 background 대기) 검출 훅.
 #
 # 동작:
 #   - .context/pending-waits.json 을 읽어 이전 세션의 미해소 대기 항목 검출
-#   - Grace Period(기본 60s) 초과한 항목만 stdout 경고 → Claude 가 상태 재확인 유도
-#   - exit 0 (세션 블록 안 함, 경고만 — 가드 C 동형)
+#   - Grace Period(기본 60s) 초과한 항목만 stdout 경고 → 모델이 상태 재확인 유도
+#   - exit 0 (세션 블록 안 함, 경고만)
 #
 # 왜 필요한가:
-#   - Conductor 세션 재시작 시 background watch / sub-agent 는 SIGKILL 로 소멸(exit 137)
-#     하지만 메인 컨텍스트에는 "대기 중"만 남아 무기한 침묵(dead-wait) → 사용자 진행 오인
-#   - 가드 A/B/C 는 좀비 프로세스(포트/CPU)를 검출하나 미해소 대기 상태는 검출 못 함 → 본 hook 은 그 직교 확장
+#   - 세션 재시작 시 background watch / sub-agent 는 세션의 자식 프로세스라 SIGKILL 로 소멸(exit 137)
+#     하지만 메인 오케스트레이터 컨텍스트에는 "대기 중"만 남아 무기한 침묵(dead-wait) → 사용자 진행 오인
+#   - 작업 유실보다 이 "무인지 대기"가 더 치명적 (실패는 재시도되나 침묵은 신호가 없음)
 #
 # 근거:
-#   - ADR docs/decisions/20260710-817-dead-wait-guard.md §결정 A/B/C
-#   - CLAUDE.md `#### 가드 D — 세션 중단 dead-wait`
-#   - 선례: .claude/hooks/session-start-zombie-check.sh (가드 C, incident #440)
+#   - docs/lessons/dead-wait-guard.md (3계층 직교 방어 상세)
+#   - CLAUDE.md `### 세션 중단 dead-wait 방지 — 스케줄러 heartbeat 3계층 가드`
+#   - volt #121
 #
-# testability (교차검증 수용):
-#   - PENDING_WAITS_PATH  : pending-waits.json 경로 override (기본 <repo-root>/.context/pending-waits.json)
-#   - DEAD_WAIT_GRACE_SECONDS : Grace Period 초 override (기본 60)
-#   verify-dead-wait-check.mjs --self-test 가 fixture 를 주입해 본 hook 을 실제 구동한다.
+# testability:
+#   - PENDING_WAITS_PATH       : pending-waits.json 경로 override (기본 <repo-root>/.context/pending-waits.json)
+#   - DEAD_WAIT_GRACE_SECONDS  : Grace Period 초 override (기본 60)
+#   scripts/verify-dead-wait-check.mjs --self-test 가 fixture 를 주입해 본 hook 을 실제 구동한다.
 
 set -uo pipefail
 
@@ -29,7 +29,7 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 PENDING="${PENDING_WAITS_PATH:-$ROOT/.context/pending-waits.json}"
 # Grace Period — 세션 종료 직후 재시작 시 방금 정상 진입한 대기를 오탐하지 않도록 최소 유예.
-# 가드 C ETIME 30분 임계값과 동형 개념(진입 직후 항목 억제). 대기는 좀비보다 짧게 살아있으므로 60s.
+# 진입 직후 항목 억제. 대기는 좀비 프로세스보다 짧게 살아있으므로 60s.
 GRACE_SECONDS="${DEAD_WAIT_GRACE_SECONDS:-60}"
 
 # 파일 없으면 조용히 종료 (미해소 대기 없음 = 정상)
