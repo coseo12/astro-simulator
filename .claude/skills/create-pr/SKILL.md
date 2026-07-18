@@ -173,7 +173,7 @@ stack 대신 각 PR 을 develop 기반 독립 브랜치로 만들고, 의존성�
 
 ### PR 생성 시 체크
 - `--base` 가 `main`/`develop` 이 아니면 경고 + 머지 순서/rebase 필요성 사용자에게 고지
-- `gh pr edit --base main` 후 `gh pr view --json mergeStateStatus` 확인, DIRTY/CONFLICTING이면 로컬 rebase 유도
+- `gh pr edit --base <main|develop>` 후 `gh pr view --json mergeStateStatus` 확인, DIRTY/CONFLICTING이면 로컬 rebase 유도
 - `--base main` 인 경우 release/hotfix PR 인지 재확인 — 일반 feature/fix PR 은 base=main 금지 (위 "Base 선택" 표)
 
 ## 규칙
