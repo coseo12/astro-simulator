@@ -27,6 +27,7 @@ if agent-browser open about:blank > /dev/null 2>&1; then
   agent-browser close > /dev/null 2>&1 || true
   echo "  [OK] Chrome 기동 스모크 통과"
 else
+  agent-browser close > /dev/null 2>&1 || true
   echo "  [WARN] Chrome 기동 실패. 'agent-browser install' 실행 필요"
 fi
 

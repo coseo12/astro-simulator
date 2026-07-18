@@ -238,7 +238,7 @@ headless 환경(특히 `--use-webgpu-adapter=swiftshader` 류 software adapter)�
    ```bash
    agent-browser screenshot before.png
    # 카메라 조작 — --script 플래그 없음 (v0.21.0, #856). eval 로 페이지 컨텍스트 직접 조작
-   agent-browser eval "const c = window.__solarScene?.camera; if (c) { c.alpha += 0.5; }"
+   agent-browser eval "const c = window.__simCore?.scene?.activeCamera; if (c) { c.alpha += 0.5; }"
    agent-browser screenshot after.png
    # before ≠ after 인지 확인. 동일하면 freeze 의심.
    ```
