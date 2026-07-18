@@ -73,11 +73,23 @@ jobs:
       # 본 job 배선 근거: core 소스 4파일이 @astro-simulator/physics-wasm (pkg/, gitignored)
       # 을 직접 import → wasm-pack 빌드 선행 필수 — Rust 툴체인 보유 job 이 유일한 저비용 지점.
       # shared/core 는 exports 가 dist/ 기반 (gitignored) 이라 tsc 빌드도 선행한다.
+      # composite setup-and-build 미사용 (리뷰 발견): composite 는 Playwright 설치 +
+      # 루트 `pnpm build` (web next build 포함) 를 무조건 수행 — vitest 에 불필요한 비용.
+      # 인라인 3스텝 + 표적 빌드로 대체. Node 핀은 .node-version (#666 전수 명시 핀 정합).
       - name: pnpm setup (unit tests)
         if: hashFiles('pnpm-lock.yaml') != ''
-        uses: ./.github/actions/setup-and-build
+        uses: pnpm/action-setup@v4
+
+      - name: Node.js setup (unit tests)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: actions/setup-node@v4
         with:
-          start-dev-server: 'false'
+          node-version-file: '.node-version'
+          cache: 'pnpm'
+
+      - name: pnpm install (unit tests)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile
 
       - name: workspace 빌드 (wasm → shared → core)
         if: hashFiles('pnpm-lock.yaml') != ''
