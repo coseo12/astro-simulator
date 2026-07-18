@@ -6,6 +6,7 @@ description: |
   버그를 보고할 때, 기술 부채를 추적할 때, "이슈 만들어", "이슈 생성", "task 생성" 등의 요청.
   DO NOT TRIGGER when: 이슈를 조회하거나 수정만 할 때, PR 관련 작업일 때.
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
 
 # 이슈 생성
 
@@ -56,7 +57,7 @@ gh issue create \
 - 선행: 없음
 EOF
 )" \
-  --label "agent:developer,priority:medium,status:todo,size:m,type:feature"
+  --label "stage:planning,priority:medium,type:feat"
 
 # 의존성 연결
 gh issue comment <이슈번호> --body "의존성: #<선행이슈번호> 완료 후 착수"
@@ -64,18 +65,18 @@ gh issue comment <이슈번호> --body "의존성: #<선행이슈번호> 완료 
 
 ## 라벨 가이드
 
+`stage:*` 일원화 체계 (harness #127). 라벨 목록이 의심되면 `gh label list` 로 실측 후 사용한다.
+
 | 카테고리 | 값 | 설명 |
 |----------|-----|------|
-| **에이전트** | `agent:planner` `agent:pm` `agent:architect` `agent:developer` `agent:frontend-developer` `agent:backend-developer` `agent:reviewer` `agent:qa` `agent:auditor` `agent:integrator` `agent:skill-creator` `agent:cross-validator` `agent:releaser` | 담당 에이전트 |
-| **범위** | `scope:frontend` `scope:backend` `scope:fullstack` | FE/BE 구분 |
-| **우선순위** | `priority:critical` `priority:high` `priority:medium` `priority:low` | 처리 긴급도 |
-| **크기** | `size:s` `size:m` `size:l` `size:xl` | s=1-2h, m=반나절, l=1일, xl=2일+ |
-| **타입** | `type:feature` `type:bug` `type:refactor` `type:infra` | 작업 분류 |
-| **상태** | `status:todo` `status:in-progress` `status:review` `status:audit-passed` `status:qa` `status:qa-passed` `status:done` `status:blocked` | 진행 상태 |
+| **단계** | `stage:planning` `stage:design` `stage:dev` `stage:review` `stage:qa` `stage:done` | 파이프라인 단계 (pm→architect→developer→reviewer→qa→완료). 신규 이슈는 보통 `stage:planning` 또는 무단계 |
+| **우선순위** | `priority:high` `priority:medium` `priority:low` | 처리 긴급도 |
+| **타입** | `type:feat` `type:infra` `type:chore` `type:docs` `type:test` | 작업 분류 (커밋 컨벤션 type 정합. 버그 수정은 `type:feat` 또는 해당 타입 + `bug` 보조 라벨) |
+| **보조** | `bug` `documentation` `enhancement` | GitHub 기본 라벨 — 타입 보강용 |
 
 ## 규칙
 
 - 하나의 이슈는 하나의 책임만 가진다. 너무 크면 분해한다.
-- 모든 이슈에 최소 에이전트, 우선순위, 상태, 타입 라벨을 할당한다.
+- 모든 이슈에 최소 타입 + 우선순위 라벨을 할당한다 (단계 라벨은 파이프라인 진입 시).
 - 의존성이 순환하지 않도록 한다.
 - 완료 조건은 검증 가능한 형태로 작성한다 ("~를 구현한다" X → "~가 동작한다" O).

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320]
 # 외부 검증 모델 (Antigravity `agy`) 를 활용한 교차검증 스크립트
 # Phase 1A (#269) 부터 gemini-cli → agy 교체. ADR: docs/decisions/20260521-gemini-to-antigravity.md
 # 보호 모델 — L1 (prompt strict prefix) + L3 (snapshot diff + 자동 롤백, #479)
@@ -403,7 +404,7 @@ BODY
   if [ "${REMINDER_ISSUE_DRYRUN:-1}" = "0" ]; then
     log "reminder 이슈 생성 (실제)"
     # gh issue create 의 성공/실패를 실측해 REMINDER_ISSUE_RESULT 에 반영 (reviewer 차단 반영)
-    if gh issue create --title "${title}" --body "${body}" --label "enhancement" 2>&1 | tee -a "${LOG_FILE}"; then
+    if gh issue create --title "${title}" --body "${body}" --label "documentation,priority:high" 2>&1 | tee -a "${LOG_FILE}"; then
       REMINDER_ISSUE_RESULT="created"
     else
       REMINDER_ISSUE_RESULT="create-failed"

@@ -8,6 +8,7 @@ description: |
   DO NOT TRIGGER when: 단위 테스트, API 테스트, 정적 분석, 코드 리뷰(코드만 볼 때),
   브라우저가 필요 없는 백엔드 작업일 때.
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
 
 # 브라우저 테스트
 
@@ -220,7 +221,7 @@ agent-browser get html "#result"
 
 headless 환경(특히 `--use-webgpu-adapter=swiftshader` 류 software adapter)은 3D/WebGPU/카메라 조작 경로에서 **부분 freeze** 가 발생한다. 한 pipeline 은 성공하고 다른 pipeline 은 실패하는 **부분 성공** 케이스를 coarse assertion 만으로 "채택" 판정하면 실 Chrome 에서 렌더 실패가 뒤늦게 드러난다. 아래 체크리스트는 시각 효과(3D/WebGPU/camera/shader-bound) 를 포함하는 작업에 **필수**다.
 
-**체크리스트 (`status:review` 전이 전 모두 통과):**
+**체크리스트 (`stage:review` 전이 전 모두 통과):**
 
 1. **headless 기본 검증** — 비검정 canvas / fps 유지 / WebGPU adapter 초기화 성공 / 콘솔 에러 없음
 2. **도메인 특화 pixel 검증** — 기대되는 시각 요소별 픽셀/색상 존재 assertion
@@ -237,7 +238,7 @@ headless 환경(특히 `--use-webgpu-adapter=swiftshader` 류 software adapter)�
    ```
 4. **실 Chrome GUI 수동 검증 (필수, 최소 1회)** — 위 자동 검증이 전부 PASS 여도 실 Chrome 에서 육안 확인. headless 단독 신뢰 금지
    - 확인 항목: 모든 시각 요소가 의도한 대로 렌더되는지, 카메라 회전/줌/팬 모두 즉시 반응하는지
-   - 누락 시 `status:review` 전이 차단. 문서화: PR 코멘트에 "실 Chrome 검증 완료 (스크린샷)" 명시
+   - 누락 시 `stage:review` 전이 차단. 문서화: PR 코멘트에 "실 Chrome 검증 완료 (스크린샷)" 명시
 5. **부분 성공 보존** — 한 pipeline 만 성공한 경우 `?feature=1` 류 옵트인 경로로 보존하고 ADR 에 "향후 디버깅 자산" 명시. 자동 폐기 금지
 
 **headless "8/8 PASS" false positive 패턴**:
