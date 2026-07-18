@@ -3,6 +3,12 @@
 모든 중요한 변경사항은 이 파일에 기록된다.
 Semantic Versioning을 따른다.
 
+## [Unreleased]
+
+### Notes (infra/test — 행동 변화 없음)
+
+- **[#834] planet focus-entry inner 궤도 맥락 정착 = 의도된 계약 (NO-OP 실측 재검증)** ([#834](https://github.com/coseo12/astro-simulator/issues/834), Builds on [#818](https://github.com/coseo12/astro-simulator/issues/818)) — `?focus=earth` 등 focus-entry 시 카메라가 body tier 가 아닌 **inner** tier 에 정착(earth 세로 20.8%)하는 현상이 "폐기된 P12 regime 의 V5 DoD 40% 대비 회귀 아닌가" 우려됐으나, architect measurement-first 실측으로 **버그가 아니라 의도된 "궤도 맥락" 프레이밍**임을 확정 → NO-OP. 근거: (1) 회귀 아님(정착값이 [#818](https://github.com/coseo12/astro-simulator/issues/818) forensic 표와 소수점 일치, #818 fix 는 줌 crossing 전용이라 focus-entry 정착에 영향 0), (2) 렌더 건강(disc + 궤도선 + 위성 동반), (3) V5 40% 는 focus-entry 계약이 아니라 body-tier 근접(줌인 도달) 프레이밍, (4) "focus-entry=40%" 강제 자동 테스트 부재. **조치 (코드 거동 0)**: 주석 계약 3곳(`tier.ts` / `tier-transition.ts` / `camera-controller.ts` — focus-entry `× 5` inner vs V5 `× 5.9` body-tier crossing 분리) + 회귀 가드([`solar-system-scene-apply-focus-tier.test.ts`](packages/core/src/scene/solar-system-scene-apply-focus-tier.test.ts) #834 describe — 경계 0.1 AU 상향 감지, earth/mars 민감 앵커) + NO-OP ADR. ADR [`20260718-834-focus-entry-tier-no-op.md`](docs/decisions/20260718-834-focus-entry-tier-no-op.md) (Accepted, cross-validate agy 2026-07-18 — NO-OP 결정 합의, 종횡비/기술부채 추적을 재검토 트리거로 반영, static assertion·DI 제안은 회귀 가드 기존 커버·YAGNI 로 기각). **행동 변화 없음** — 테스트/주석/문서만.
+
 ## [0.49.0] — 2026-07-17
 
 ### Behavior Changes

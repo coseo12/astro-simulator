@@ -190,6 +190,20 @@ export class CameraController {
    * 감지하면 `solar-system-scene.ts:setTier` → `runTierTransition` 이 pending radius tween 을
    * `scene.getAnimatableByTarget(camera)` 로 취소하고 실거리 보존 수식 (`radius_old × newScale /
    * oldScale`) 로 재시작한다. 사용자는 두 단계 애니메이션을 하나의 부드러운 전환으로 체감.
+   *
+   * **#834 계약 (focus-entry 정착 = inner 궤도 맥락)**: 이 `× 5` (아래 `meshRadius ×
+   * FOCUS_USER_RADIUS_MULTIPLIER`) 프레이밍으로 planet 은 **inner 궤도 맥락 ~21% 로 정착**한다
+   * (earth 세로 20.8%, 실거리 0.21 AU > 0.1 AU 경계 → tierFromFocus = inner). `meshRadius` 는
+   * `boundingSphere.radiusWorld` (≈ 2.4× 시각 반경 — box 외접구 √3 과대 + #782 자전 위상 진동)
+   * 라 V5 40% (`FOCUS_RADIUS_MULTIPLIER = 5.9`) 대비 undershoot 이나, 이는 **의도된 궤도 맥락
+   * 프레이밍** (궤도선 + 위성 동반) 이며 **회귀가 아니다** (#834 NO-OP 실측 재검증 — #818 이전부터
+   * 동일). body-tier 근접 (V5 40%) 은 줌인으로 도달. 상세: ADR
+   * `docs/decisions/20260718-834-focus-entry-tier-no-op.md`.
+   *
+   * NOTE (operative 경로): production 의 실제 배수는 sim-canvas 가 `resolveFocusMultiplier(parentId)`
+   * 로 계산해 `target.radius` 로 명시 전달하며 (아래 `??` fallback 우회), 행성은 그 값도 `× 5` 라
+   * 수치 동일하다. 즉 focusOn 내부의 `meshRadius × FOCUS_USER_RADIUS_MULTIPLIER` 는 fallback 이고
+   * operative 경로는 sim-canvas 쪽 — 행성 focus-entry 정착 결과는 양 경로에서 같다.
    */
   focusOn(target: FocusTarget): void {
     const { mesh } = target;

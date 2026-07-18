@@ -180,3 +180,73 @@ describe('applyFocusTier — 회귀 가드: focusOn cam-target tween race 차단
     expect(getSetTierCalls()).toEqual(['body']);
   });
 });
+
+describe('#834 focus-entry 정착 계약 — planet 궤도 맥락 inner 정착 (V5 40% 는 줌인 도달 별도 계약)', () => {
+  /**
+   * #834 NO-OP 회귀 가드 (ADR `docs/decisions/20260718-834-focus-entry-tier-no-op.md`).
+   *
+   * ## 계약 SSoT
+   * `?focus=earth` 등 focus-entry (URL / 클릭) 시 카메라는 `focusOn` 의 `desiredRadius =
+   * boundingSphere.radiusWorld × 5` 프레이밍으로 정착한다. 그 정착 **실거리** (0.155~0.66 AU)
+   * 는 모두 `PLANET_FOCUS_BODY_BOUNDARY`(0.1 AU) 를 초과하므로 `tierFromFocus('planet', d)` =
+   * **inner** (궤도 맥락 — 궤도선 + 위성 동반, viewport 세로 ~21%). 이는 버그가 아니라 의도된
+   * "궤도 맥락" 프레이밍이다 (#834 measurement-first 실측: #818 이전부터 동일, 회귀 아님).
+   *
+   * body-tier 근접 (폐기된 P12 regime 의 V5 "세로 40%" 관찰) 은 **줌인으로 도달**하는 별도
+   * 계약이며 focus-entry 정착값이 아니다.
+   *
+   * ## 이 테스트가 차단하는 회귀
+   * 만약 `PLANET_FOCUS_BODY_BOUNDARY`(0.1 AU) 를 조용히 상향 (예: 0.25 AU) 하면 earth(0.2102)/
+   * mars(0.1552) 의 focus-entry 정착이 `inner` → `body` 로 바뀌어 본 단언이 fail → focus-entry
+   * 정착 정책 변경을 즉시 감지한다 (jupiter/saturn 은 정착 실거리가 커서 경계 상향에 둔감 —
+   * earth/mars 가 민감 앵커). #834 계약 위반 detect.
+   *
+   * ## 실측 매트릭스 (viewport 1280×800, #818 fix `preserveFocusDistance` 반영)
+   * | body    | camRadius(unit) | 실거리(AU) | 정착 tier |
+   * | ------- | --------------- | ---------- | --------- |
+   * | earth   | 48.44           | 0.2102     | inner     |
+   * | mars    | 35.76           | 0.1552     | inner     |
+   * | jupiter | 129.84          | 0.5636     | inner     |
+   * | saturn  | 152.02          | 0.6599     | inner     |
+   */
+  const bodies: FakeBody[] = [
+    { id: 'earth', kind: 'planet' },
+    { id: 'mars', kind: 'planet' },
+    { id: 'jupiter', kind: 'planet' },
+    { id: 'saturn', kind: 'planet' },
+  ];
+
+  // focus-entry 실측 정착 실거리 (AU 배수). 초기 focus 판정 → currentTier 미전달 (plain 경계).
+  //
+  // ⚠ 한계 (traceability, reviewer 권고 A): 아래 값은 production `focusOn` / sim-canvas `× 5`
+  // 경로에서 **재유도되지 않은 하드코딩 실측값**이다. 따라서 본 가드는 `PLANET_FOCUS_BODY_BOUNDARY`
+  // 상향(정착 tier 판정 이동)은 결정적으로 감지하나, `FOCUS_USER_RADIUS_MULTIPLIER`(× 5) /
+  // `boundingSphere.radiusWorld` 산식 변경으로 **실제 정착 거리 자체**가 이동하는 회귀는 감지하지
+  // 못한다(하드코딩값이 그대로라 여전히 PASS). 후자는 `focus-multiplier.test.ts`(× 5 값 pin) +
+  // ADR §7 boundingSphere→visualRadius 수동 재측정 트리거가 보완한다.
+  const SETTLE_DISTANCE_AU: Record<string, number> = {
+    earth: 0.2102,
+    mars: 0.1552,
+    jupiter: 0.5636,
+    saturn: 0.6599,
+  };
+
+  for (const [bodyId, distAu] of Object.entries(SETTLE_DISTANCE_AU)) {
+    it(`${bodyId} focus-entry (실거리 ${distAu} AU > 0.1 AU 경계) → inner 궤도 맥락 정착`, () => {
+      const { applyFocusTier } = createApplyFocusTier('solar', bodies);
+      // 초기 focus 판정 (currentTier 미전달) — solar 진입 상태에서 planet focus.
+      const result = applyFocusTier(bodyId, distAu * AU);
+      expect(result).toBe('inner');
+    });
+  }
+
+  it('earth/mars 정착 실거리 < 0.25 AU — 경계 조용한 상향 감지 앵커 (0.25 AU 상향 시 body 로 오전환)', () => {
+    // 회귀 감지 논증의 결정성 박제: earth(0.2102)/mars(0.1552) 는 0.25 AU 미만이라
+    // 경계가 0.25 AU 로 상향되면 body 로 바뀐다 (본 describe 의 inner 단언이 fail).
+    expect(SETTLE_DISTANCE_AU.earth).toBeLessThan(0.25);
+    expect(SETTLE_DISTANCE_AU.mars).toBeLessThan(0.25);
+    // jupiter/saturn 은 0.25 AU 초과라 경계 상향에 둔감 (earth/mars 가 민감 앵커임을 명시).
+    expect(SETTLE_DISTANCE_AU.jupiter).toBeGreaterThan(0.25);
+    expect(SETTLE_DISTANCE_AU.saturn).toBeGreaterThan(0.25);
+  });
+});
