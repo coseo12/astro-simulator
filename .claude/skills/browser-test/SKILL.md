@@ -8,7 +8,7 @@ description: |
   DO NOT TRIGGER when: 단위 테스트, API 테스트, 정적 분석, 코드 리뷰(코드만 볼 때),
   브라우저가 필요 없는 백엔드 작업일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/322] -->
 
 # 브라우저 테스트
 
@@ -138,13 +138,16 @@ agent-browser snapshot -i
 agent-browser screenshot implementation.png
 
 # 반응형 검증
-agent-browser --viewport 375 812 open http://localhost:3000/new-page
+agent-browser set viewport 375 812
+agent-browser open http://localhost:3000/new-page
 agent-browser screenshot mobile.png
 
-agent-browser --viewport 768 1024 open http://localhost:3000/new-page
+agent-browser set viewport 768 1024
+agent-browser open http://localhost:3000/new-page
 agent-browser screenshot tablet.png
 
-agent-browser --viewport 1920 1080 open http://localhost:3000/new-page
+agent-browser set viewport 1920 1080
+agent-browser open http://localhost:3000/new-page
 agent-browser screenshot desktop.png
 ```
 
@@ -226,13 +229,16 @@ headless 환경(특히 `--use-webgpu-adapter=swiftshader` 류 software adapter)�
 1. **headless 기본 검증** — 비검정 canvas / fps 유지 / WebGPU adapter 초기화 성공 / 콘솔 에러 없음
 2. **도메인 특화 pixel 검증** — 기대되는 시각 요소별 픽셀/색상 존재 assertion
    ```bash
-   # 예: 오렌지/노랑/빨강 accretion disk 타원의 특정 픽셀 색상 샘플링
-   agent-browser --script verify-disk-pixels.mjs
+   # 픽셀 검증은 독립 node 스크립트 (Playwright + pngjs) 로 수행 — agent-browser 에
+   # --script 플래그 없음 (v0.21.0 실측, #856). WebGPU canvas 는 drawImage readback 이
+   # 빈 버퍼라 composited screenshot 경로만 유효 (프로젝트 셰이더 검증 SSoT).
+   node scripts/browser-verify-<feature>.mjs
    ```
 3. **카메라 회전 응답 diff** — 카메라/뷰 파라미터 변경 후 픽셀 업데이트가 멈추지 않는지 (swiftshader freeze 탐지)
    ```bash
    agent-browser screenshot before.png
-   agent-browser --script rotate-camera.mjs
+   # 카메라 조작 — --script 플래그 없음 (v0.21.0, #856). eval 로 페이지 컨텍스트 직접 조작
+   agent-browser eval "const c = window.__simCore?.scene?.activeCamera; if (c) { c.alpha += 0.5; }"
    agent-browser screenshot after.png
    # before ≠ after 인지 확인. 동일하면 freeze 의심.
    ```
@@ -302,6 +308,11 @@ agent-browser auth login staging
 **폴백 판단 기준**: agent-browser로 액션 수행 후 `snapshot`으로 결과를 확인했을 때 상태 변화가 없으면 Playwright로 재시도한다.
 
 ## 규칙
+
+- **Chrome 좀비 정리 (반환/종료 직전 의무 — volt #79/#795)**: agent-browser 사용 후
+  `pgrep -f "agent-browser-chrome[-]" >/dev/null && pkill -TERM -f "agent-browser-chrome[-]"` 실행,
+  2초 대기 후 잔존 시 `pkill -KILL -f "agent-browser-chrome[-]"`. bracket 패턴은 self-match 오탐 방지 (#795).
+  정상 `agent-browser close` 가 커버 못 하는 비정상 종료 (timeout / SIGKILL / panic) 좀비 대응 — 실측 6세션/52좀비/800%+ CPU (volt #79).
 
 - `agent-browser`가 설치되어 있지 않으면 스킬 사용 전 설치를 안내한다
 - 브라우저 액션 전 반드시 `snapshot`으로 현재 상태를 파악한다
