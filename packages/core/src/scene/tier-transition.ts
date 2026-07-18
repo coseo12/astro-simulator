@@ -63,6 +63,11 @@ import { computeFocusLowerRadiusFloor, resolveMeshVisualRadius } from './camera-
  *
  * camera-controller.ts 의 기존 `focusOn` (`×5`) 은 **user-trigger 경로 한정 유지** — 본 상수는
  * tier 전환 시 `runTierTransition` 의 focusMesh 경로 전용. fov/viewport 이 변하면 수식으로 재튜닝.
+ *
+ * #834 계약: 이 `× 5.9` (V5 세로 40%) 는 **줌 crossing body-tier 근접 관찰** 경로 전용이다.
+ * **focus-entry (URL/클릭) 는 `focusOn` 의 `× 5` → 실거리 0.1 AU 초과 → inner 궤도 맥락 ~21%**
+ * 로 별도 정착한다 (의도된 궤도 맥락, 회귀 아님 — #834 NO-OP 실측 재검증). 즉 focus-entry 는
+ * 애초에 이 상수를 거치지 않으며, V5 40% 는 focus-entry 계약이 아니었다.
  */
 const FOCUS_RADIUS_MULTIPLIER = 5.9;
 

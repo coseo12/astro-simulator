@@ -78,6 +78,16 @@ const BOUNDARY = {
  * 별개 축 — focus 경로는 focus body 기준 근접 거리라 더 작은 임계(0.1 AU) 를 쓴다.
  *
  * #818 — 매직 넘버(`0.1 * AU`) 상수화 + 히스테리시스 대칭 적용 기준점.
+ *
+ * #834 계약 (focus-entry vs V5 40% 두 프레이밍 분리 — NO-OP 실측 재검증):
+ *  - **planet focus-entry (URL/클릭)** 는 `focusOn` 의 `× 5` 프레이밍으로 실거리 0.1 AU 를 초과
+ *    정착 (earth 0.21 / mars 0.16 / jupiter 0.56 / saturn 0.66 AU) → 여기서 항상 **inner
+ *    궤도 맥락** (~21%, 궤도선 + 위성 동반). 이는 버그가 아니라 **의도된 궤도 맥락 계약**이다.
+ *  - **body-tier 근접** (폐기된 P12 regime 의 V5 "세로 40%" 관찰) 은 **줌인으로 도달**하는
+ *    별개 계약이며 focus-entry 정착값이 아니다.
+ *  - 본 경계를 상향하면 earth/mars focus-entry 가 body 로 오전환 → 회귀 가드
+ *    (`solar-system-scene-apply-focus-tier.test.ts` #834 describe) 가 감지.
+ *  - 근거: #834 실측 재검증 (ADR `docs/decisions/20260718-834-focus-entry-tier-no-op.md`).
  */
 const PLANET_FOCUS_BODY_BOUNDARY = 0.1 * AU;
 
