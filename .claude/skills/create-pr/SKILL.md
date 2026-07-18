@@ -6,7 +6,7 @@ description: |
   "풀 리퀘스트", "리뷰 요청" 등의 요청, 브랜치 작업이 끝났을 때.
   DO NOT TRIGGER when: PR을 리뷰하거나 머지할 때, 이슈 생성일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/321] -->
 
 # PR 생성
 
@@ -62,7 +62,7 @@ gh pr create \
 ## 설계 참조
 - docs/architecture/관련문서.md
 
-## 테스트
+### Test plan (테스트)
 - [ ] 단위 테스트 추가/수정
 - [ ] 기존 테스트 통과 확인
 
@@ -104,7 +104,7 @@ sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | gre
 
 0 hit 시: `echo "FAIL: ### 체크리스트 섹션에 - [ ] 항목 0건. PR 템플릿 SSoT 깨짐." && exit 1`
 
-**4차 — PR 본문 생성**: 위 2차에서 추출한 결과를 PR 본문 `### 체크리스트` 섹션에 그대로 박제한다. 충족 여부에 따라 `[ ]` → `[x]` 갱신만 허용 (라인 자체 변경·삭제 금지). 다른 base 섹션 (변경 사항 / 브랜치 Base 확인 / 스프린트 계약 / 테스트 / 브라우저 3단계 / 마일스톤 회고 등 PR 템플릿이 정의한 표준 섹션) 도 동일 절차로 처리 (해당 섹션이 N/A 인 경우 `### <섹션명>` 헤더 + `- [x] N/A — <사유>` 1줄 유지, 섹션 자체 삭제 금지).
+**4차 — PR 본문 생성**: 위 2차에서 추출한 결과를 PR 본문 `### 체크리스트` 섹션에 그대로 박제한다. 충족 여부에 따라 `[ ]` → `[x]` 갱신만 허용 (라인 자체 변경·삭제 금지). 다른 base 섹션 (변경 사항 / 브랜치 Base 확인 / 스프린트 계약 / Test plan / 브라우저 3단계 / 마일스톤 회고 등 PR 템플릿이 정의한 표준 섹션) 도 동일 절차로 처리 (해당 섹션이 N/A 인 경우 `### <섹션명>` 헤더 + `- [x] N/A — <사유>` 1줄 유지, 섹션 자체 삭제 금지).
 
 **Fallback 금지 (CRITICAL)**: 위 1~3차 중 어느 단계 FAIL 시 작업 차단. 하드코딩 또는 default 본문 사용 금지 — drift 자기모순 (다운스트림 [astro-simulator#469](https://github.com/coseo12/astro-simulator/issues/469) 폐기 패턴 재현). 템플릿이 깨졌으면 먼저 `.github/PULL_REQUEST_TEMPLATE.md` 를 수리한 뒤 PR 본문 생성을 재개한다.
 
@@ -179,6 +179,7 @@ stack 대신 각 PR을 main 기반 독립 브랜치로 만들고, 의존성은 *
 ## 규칙
 
 - PR 제목은 반드시 `[#이슈번호]`를 포함한다.
+- PR 본문에 `### Test plan` 섹션 (영문 phrase) 을 반드시 포함한다 — `verify-pr-template-checklist.mjs` keyword 7 이 영문 `Test plan` phrase 를 AND 매칭한다 (템플릿 동적 읽기 시 자동 충족).
 - PR 본문의 `Closes #이슈번호`로 이슈와 연결한다.
 - 변경 파일 10개 이하를 목표로 한다. 초과 시 PR을 분할한다.
 - 테스트가 통과하는 상태에서만 PR을 생성한다.

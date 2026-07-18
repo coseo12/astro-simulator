@@ -1,3 +1,4 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/321] -->
 ## [#이슈번호] 변경 설명
 
 ### 변경 사항
@@ -14,7 +15,7 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] 구현 전 완료 기준 합의 완료
 - [ ] 모든 완료 기준 충족
 
-### 테스트
+### Test plan (테스트)
 - [ ] 단위 테스트 추가/수정
 - [ ] 기존 테스트 통과 확인
 - [ ] 모노레포: 신규/변경 워크스페이스에 `scripts.test` 존재 확인
