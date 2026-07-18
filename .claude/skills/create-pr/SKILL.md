@@ -6,6 +6,7 @@ description: |
   "풀 리퀘스트", "리뷰 요청" 등의 요청, 브랜치 작업이 끝났을 때.
   DO NOT TRIGGER when: PR을 리뷰하거나 머지할 때, 이슈 생성일 때.
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
 
 # PR 생성
 
@@ -73,7 +74,7 @@ gh pr create \
 Closes #이슈번호
 EOF
 )" \
-  --label "status:review"
+  --label "stage:review"
 ```
 
 ## Strict Assertion 동적 읽기 (drift 0 가드)
@@ -133,9 +134,11 @@ gh pr view <PR> --json body --jq .body | grep -c -i "<핵심 키워드>"
 
 ## 라벨 업데이트
 
+**PR 의 `stage:review` 부착 주체는 본 스킬이다** — PR 생성 시 `--label "stage:review"` 를 포함해 reviewer 디스패치 사슬 (reviewer 는 `stage:review` 제거로 시작) 을 연결한다.
+
 ```bash
-# 이슈 상태 전환: in-progress → review
-gh issue edit <이슈번호> --remove-label "status:in-progress" --add-label "status:review"
+# 연결 이슈 단계 전환: dev → review (stage:* 일원화 체계, harness #127)
+gh issue edit <이슈번호> --remove-label "stage:dev" --add-label "stage:review"
 ```
 
 ## Stack PR (base ≠ main/develop) 주의 (volt #17)
