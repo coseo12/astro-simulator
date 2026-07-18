@@ -71,7 +71,7 @@ gh issue comment <이슈번호> --body "의존성: #<선행이슈번호> 완료 
 |----------|-----|------|
 | **단계** | `stage:planning` `stage:design` `stage:dev` `stage:review` `stage:qa` `stage:done` | 파이프라인 단계 (pm→architect→developer→reviewer→qa→완료). 신규 이슈는 보통 `stage:planning` 또는 무단계 |
 | **우선순위** | `priority:high` `priority:medium` `priority:low` | 처리 긴급도 |
-| **타입** | `type:feat` `type:infra` `type:chore` `type:docs` `type:test` | 작업 분류 (커밋 컨벤션 type 정합. 버그 수정은 `type:feat` 또는 해당 타입 + `bug` 보조 라벨) |
+| **타입** | `type:feat` `type:infra` `type:chore` `type:docs` `type:test` | 작업 분류 (커밋 컨벤션 type 정합. 버그 수정 이슈는 해당 작업 타입 라벨에 `bug` 보조 라벨을 병행 부착) |
 | **보조** | `bug` `documentation` `enhancement` | GitHub 기본 라벨 — 타입 보강용 |
 
 ## 규칙

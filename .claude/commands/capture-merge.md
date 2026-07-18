@@ -32,7 +32,7 @@ Gemini의 "마찰 없는 자동화" 통찰을 1단계 적용 (역사적 인용 �
    ```
    결과 있으면 사용자에게 보고 + 새 캡처할지 묻기.
 
-4. **분류 자동 판정** (1차: `type:*` 라벨, 2차: PR 제목 conventional prefix — `feat(`/`fix(`/`docs(`/`chore(`/`refactor(`):
+4. **분류 자동 판정** (1차: `type:*` 라벨, 2차: PR 제목 conventional prefix — `feat`/`fix`/`docs`/`chore`/`refactor`, scope 괄호 유무 무관 `feat:`·`feat(scope):` 모두 매칭):
    - `type:feat` / `enhancement` 라벨 또는 제목 `feat` → report/pattern 또는 knowledge (재사용성 높으면)
    - `bug` 라벨 또는 제목 `fix` → report/troubleshooting
    - `type:docs` / `type:chore` 라벨 또는 제목 `docs`/`chore` → 캡처 가치 낮음, 사용자에게 "스킵 권장" 안내
