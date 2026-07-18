@@ -8,6 +8,7 @@ description: |
   DO NOT TRIGGER when: 사용자가 볼트에 기록만 요청할 때(capture-volt), 다른 레포 작업일 때,
   자동/주기 실행이 요구될 때(schedule 스킬 별도).
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/324] -->
 
 # Volt → Harness 반영 리뷰
 
@@ -70,7 +71,7 @@ gh issue list -R coseo12/volt --state all --limit 20 \
 ### [#3] 브라우저 3단계 검증 자동화 스크립트 패턴
 - 분류: report/pattern
 - 제안: skills/browser-test/SKILL.md 에 해당 패턴 스니펫 추가
-- 영향 파일: /Users/seo/.claude/skills/browser-test/SKILL.md
+- 영향 파일: .claude/skills/browser-test/SKILL.md (프로젝트 상대 경로)
 
 ### [#6] Velocity-Verlet 시간 역행 대칭성
 - 분류: knowledge (물리 수치 적분 도메인)
@@ -83,7 +84,7 @@ gh issue list -R coseo12/volt --state all --limit 20 \
 
 승인된 항목만 반영한다. 절차:
 
-1. `git checkout -b feature/volt-review-YYYYMMDD` — main 직접 수정 금지 (CLAUDE.md CRITICAL DIRECTIVE).
+1. `git checkout -b feature/<이슈번호>-volt-review origin/develop` — 브랜치 규약 `feature/<이슈번호>-<설명>` + develop 분기 (main 직접 수정 금지, CLAUDE.md CRITICAL DIRECTIVE).
 2. Edit 툴로 변경. 한국어 포함 파일은 저장 후 `grep -rn '�' <파일>` 으로 U+FFFD 검증.
 3. 커밋 컨벤션: `docs(harness): volt #7 스프린트 계약 회고 루틴 반영` 형태로 스코프·이슈번호 포함.
 4. `create-pr` 스킬에 위임하여 PR 생성. PR 본문에 반영한 volt 이슈 번호 전부 링크. **커스텀 본문(반영/스킵 요약)이 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` base 를 대체하지 않도록, 템플릿 체크리스트를 본문 하단에 그대로 병합**한다 — 미병합 시 reviewer §6 "PR 본문 7 체크박스 메타 가드" 가 발화한다 (`ADR 호환성 체크` / `ADR 호환성` / `체크리스트` grep 0 hit). 근거: PR #310 리뷰에서 커스텀 본문이 템플릿 체크리스트를 소실시켜 권고 발화.

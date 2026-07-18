@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/324]
 # verify-agent-ssot.sh
 # 5개 에이전트 파일의 `## 마무리 체크리스트 JSON 반환 (필수)` 섹션이
-# CLAUDE.md 의 공통 JSON 스키마 SSoT (코어 필드 7개) 를 모두 포함하는지 + 선언 순서대로
+# CLAUDE.md 의 공통 JSON 스키마 SSoT (코어 필드 9개) 를 모두 포함하는지 + 선언 순서대로
 # 나열되는지 검증한다. drift 발견 시 상세 원인과 함께 exit 1.
 #
 # SSoT 선언 위치: CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료`
