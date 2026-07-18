@@ -1,4 +1,4 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/260 + https://github.com/coseo12/harness-setting/pull/315] -->
 # Claude Code 워크플로우 템플릿
 
 <!-- harness:managed:critical-directives:start -->
@@ -184,6 +184,7 @@ Node.js `execSync('gh pr comment N --body "..."')` 로 백틱/`$`/`!`/`;` 포함
 파일 상단 주석 / JSDoc 이 선언한 계약과 구현의 drift 는 **버그 생성원**. default fallback 이 누락을 조용히 흡수해 테스트도 fail 하지 않는다. 주석에 선언된 규칙은 테스트 커버리지 대상이며, enum 분기 fallback 에 경고·assert 추가로 drift 감지.
 - 상세: [docs/lessons/comment-implementation-drift.md](docs/lessons/comment-implementation-drift.md)
 - **숨은 상수 변형 (volt [#69](https://github.com/coseo12/volt/issues/69))**: 위성 모듈 독립 선언 잔존 → 상대 비율/단위/스케일 drift 조용히 생성. 저장소 전체 `grep -rn "<CONST_NAME>"` + 주석 SSoT 참조 dead reference 차단 의무 (reviewer.md §4).
+- **drift 근본 제거 — 자동 생성 vs 정적 가드 구분 (volt [#120](https://github.com/coseo12/volt/issues/120))**: "drift 감지"(매칭 가드)보다 "중복 출처 제거"(데이터 메타 SSoT + 자동 생성)가 근본 해결. 단 사본마다 격리성/직교 축이 달라, **자동 생성 가능**(단일 메타 파생 + 소비처의 SUT import 허용)과 **정적 가드로 묶어야 함**(테스트 더블 격리 위반 / 직교 축은 별도 boolean 메타 + "데이터 파생 == 하드코딩" 단위 테스트)을 구분하는 게 핵심 판단. 상세: [docs/lessons/data-not-code-extension.md](docs/lessons/data-not-code-extension.md).
 
 ### HTTP 200 ≠ 올바른 리소스
 - 이미지 URL이 200을 반환해도 **내용이 의도와 다를 수 있다**
@@ -229,18 +230,6 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - 상세 (증상 / 즉시 복구 절차 / formatter 재포맷 drift / 버전 이력): [docs/lessons/manifest-partial-failure-recovery.md](docs/lessons/manifest-partial-failure-recovery.md)
 - 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴
 
-### Z 패턴 TL;DR (3단계 카드)
-
-harness-managed 파일에 프로젝트 고유 행동 규칙을 추가/수정할 때 3단계 워크플로 (ADR `20260515-harness-managed-divergent-pattern.md` 정합):
-
-1. **Phase 1 — 본 프로젝트 선반영 (Y 경로)**: feature 브랜치에서 파일 직접 수정 + PR `Closes #N` 박제 (`.harness/manifest.json` 미수정). 데코레이터 의무 (Amendment 8): `HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]` 박제. `.json` 은 sidecar `<filename>.HARNESS-DRIFT.md`
-2. **Phase 2 — upstream 기여 (X 경로)**: coseo12/harness-setting 에 동일 변경 PR 동시 제출 (cross-link 박제 — 본 프로젝트 PR title 에 본 프로젝트 이슈 `#N` ref 포함 의무, Amendment 10 자동 해소 정합)
-3. **Phase 3 — 본 프로젝트 동기화 (Z 완성)**: upstream 머지 후 `harness update --apply-all-safe` 자동 동기화 → drift 해소 + `[TODO]` → upstream PR URL 자동 교체 (Amendment 10). sidecar 잔존 시 `verify-harness-drift-decorator.mjs --mode=sidecar-cleanup --apply` 로 정리 (Amendment 11)
-
-silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (drift 카운트 soft-warn) + Amendment 10 (TODO 해소 자동화) + Amendment 11 (sidecar 라이프사이클) + Amendment 12 (TODO Aging soft-warn).
-
-- 상세: [docs/decisions/20260515-harness-managed-divergent-pattern.md](docs/decisions/20260515-harness-managed-divergent-pattern.md) §결정 + §Amendment 1~12
-
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 sub-agent(dev/qa 페르소나 등) 는 **검증** 까지는 신뢰하되 **박제** (커밋/푸시/PR 생성/`gh pr comment`/auto-close) 는 신뢰하지 말 것. sub-agent 보고는 *의도* 이고 실제 외부 가시성은 별도. 메인이 `git log --oneline -1` / `gh pr view` / `gh issue view --json state` 로 직접 확인.
 
@@ -263,11 +252,31 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 ### 가드 설계 원칙 — measurement-first / 의식적 silent 약화 / fail-fast
 가드 무력화 3축 (설계/구현/운영) 차단: (1) architect broad 권고 → dev D1 실측 false-positive → precision 정정 3중 박제 (measurement-first), (2) 발화 빈도 ≥ 1/주 시 의식적 silent 약화 + ADR §결정 CRITICAL 명시, (3) drift 가드는 fail-fast 만 — fallback 분기 절대 금지 (strict assertion 자기모순 회피).
 - 상세: [docs/lessons/guard-design-principles.md](docs/lessons/guard-design-principles.md) — volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107)
+
+### 세션 중단 dead-wait 방지 — 스케줄러 heartbeat 3계층 가드
+background 대기 / sub-agent notification 경로는 세션의 자식 프로세스라 세션 재시작 시 SIGKILL 로 소멸 → **아무것도 모델을 재호출하지 않아 무기한 침묵(dead-wait)**, 사용자는 진행 중으로 오인. 작업 유실보다 이 "무인지 대기" 가 더 치명적. `ScheduleWakeup`(세션 재시작에도 지속 발화)을 dead-man's switch 로 쓰는 3계층 직교 방어: (1) fallback heartbeat (background 대기 진입 시 장기 `ScheduleWakeup` 1200~1800s 병행 예약, 단발성) / (2) SessionStart 복구 훅 (미해소 대기 stdout 경고, exit 0 불변) / (3) 대기 상태 파일 (`.context/pending-waits.json`, best-effort).
+- **행동 규약 (메인 오케스트레이터)**: 대기 진입 = `ScheduleWakeup 예약 + 상태파일 append` 를 원자 단위로. 훅 경고 확인 시 **대기를 그대로 재개 금지** — waiter 는 이미 소멸했을 수 있으므로 `상태 조회 → 생사 판단 → 항목 제거/재개`.
+- 상세: [docs/lessons/dead-wait-guard.md](docs/lessons/dead-wait-guard.md) — volt [#121](https://github.com/coseo12/volt/issues/121)
+- 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴
 <!-- harness:managed:real-lessons:end -->
 
 ## 프로젝트 고유 보강 교훈
 
 > 위 `real-lessons` managed-block 은 harness upstream 이 관리하며 업데이트 시 자동 동기화된다. 본 섹션은 프로젝트 고유 해결책/가드를 별도로 박제한다 (block 외부이므로 upstream 업그레이드에 영향받지 않음).
+
+### Z 패턴 TL;DR (3단계 카드) — 다운스트림 보존판
+
+> upstream v4.4.0 CLAUDE.md 슬리밍에서 본 카드가 제거되어 (관리 block 외부) 프로젝트 고유 섹션으로 이전 보존한다 (#853). 원 규약 SSoT 는 ADR 20260515.
+
+harness-managed 파일에 프로젝트 고유 행동 규칙을 추가/수정할 때 3단계 워크플로 (ADR `20260515-harness-managed-divergent-pattern.md` 정합):
+
+1. **Phase 1 — 본 프로젝트 선반영 (Y 경로)**: feature 브랜치에서 파일 직접 수정 + PR `Closes #N` 박제 (`.harness/manifest.json` 미수정). 데코레이터 의무 (Amendment 8): `HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]` 박제. `.json` 은 sidecar `<filename>.HARNESS-DRIFT.md`
+2. **Phase 2 — upstream 기여 (X 경로)**: coseo12/harness-setting 에 동일 변경 PR 동시 제출 (cross-link 박제 — 본 프로젝트 PR title 에 본 프로젝트 이슈 `#N` ref 포함 의무, Amendment 10 자동 해소 정합)
+3. **Phase 3 — 본 프로젝트 동기화 (Z 완성)**: upstream 머지 후 `harness update --apply-all-safe` 자동 동기화 → drift 해소 + `[TODO]` → upstream PR URL 자동 교체 (Amendment 10). sidecar 잔존 시 `verify-harness-drift-decorator.mjs --mode=sidecar-cleanup --apply` 로 정리 (Amendment 11)
+
+silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (drift 카운트 soft-warn) + Amendment 10 (TODO 해소 자동화) + Amendment 11 (sidecar 라이프사이클) + Amendment 12 (TODO Aging soft-warn).
+
+- 상세: [docs/decisions/20260515-harness-managed-divergent-pattern.md](docs/decisions/20260515-harness-managed-divergent-pattern.md) §결정 + §Amendment 1~12
 
 ### 프로젝트 접근 — Incremental Body-by-Body Build (v3)
 

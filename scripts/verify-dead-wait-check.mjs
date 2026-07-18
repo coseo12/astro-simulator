@@ -1,19 +1,17 @@
 #!/usr/bin/env node
-// 세션 중단 dead-wait 가드 (가드 D, 이슈 #817) 회귀 가드 + self-test.
+// 세션 중단 dead-wait 가드 회귀 가드 + self-test.
 //
 // 기본 모드 (인자 없음) — SSoT 박제 정적 검증:
-//   박제(hook / settings.json 등록 / CLAUDE.md 가드 D / ADR)가 PR 머지 후에도
-//   유지되는지 검증. 의도치 않게 제거/대체되면 exit 1 로 CI 차단.
+//   박제(hook / settings.json 등록 / CLAUDE.md 실전 교훈 블록 / lessons 문서)가
+//   PR 머지 후에도 유지되는지 검증. 의도치 않게 제거/대체되면 exit 1 로 CI 차단.
 //
 // --self-test 모드 — 실제 hook 을 fixture 로 구동하는 3중 시뮬(가드 도입 PR DoD):
 //   positive(해소→clean→경고0) → negative(유예 초과 미해소→경고 발화 exit0)
 //   → recovery(제거→경고0). + Grace Period 필터 + 방어적 JSON 케이스.
-//   선례: scripts/verify-harness-drift-decorator.mjs --self-test 인라인 시뮬.
 //
-// 근거: docs/decisions/20260710-817-dead-wait-guard.md §결과·재검토 조건 (DoD 4축)
-// 관련 ADR/이슈: #817, 가드 A/B/C(#440)
+// 근거: docs/lessons/dead-wait-guard.md (3계층 방어 + 가드 도입 PR DoD 4축), volt #121
 
-import { readFileSync, statSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, statSync, mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -27,10 +25,10 @@ const HOOK_PATH = resolve(ROOT, '.claude/hooks/session-start-dead-wait-check.sh'
 
 const checks = [
   {
-    name: 'CLAUDE.md 가드 D sub-section',
+    name: 'CLAUDE.md 실전 교훈 dead-wait 블록',
     path: 'CLAUDE.md',
     type: 'contains',
-    needle: '#### 가드 D — 세션 중단 dead-wait',
+    needle: '### 세션 중단 dead-wait 방지 — 스케줄러 heartbeat 3계층 가드',
   },
   {
     name: 'settings.json dead-wait hook 등록',
@@ -44,13 +42,8 @@ const checks = [
     type: 'executable',
   },
   {
-    name: 'ADR 20260710-817 dead-wait 가드',
-    path: 'docs/decisions/20260710-817-dead-wait-guard.md',
-    type: 'exists',
-  },
-  {
-    name: 'settings.json Z-패턴 sidecar',
-    path: '.claude/settings.json.HARNESS-DRIFT.md',
+    name: 'dead-wait-guard lessons 문서',
+    path: 'docs/lessons/dead-wait-guard.md',
     type: 'exists',
   },
 ];
@@ -88,12 +81,12 @@ function runStaticChecks() {
     console.error(
       `\n❌ ${failed} / ${checks.length} 항목 실패. dead-wait 가드 SSoT 박제 회귀 의심 — 직전 변경 검토 필요.`,
     );
-    console.error('근거: docs/decisions/20260710-817-dead-wait-guard.md, 이슈 #817');
+    console.error('근거: docs/lessons/dead-wait-guard.md, volt #121');
     process.exit(1);
   }
 
   console.log(
-    `\n✅ ${checks.length} / ${checks.length} 항목 PASS — #817 dead-wait 가드 SSoT 박제 정합.`,
+    `\n✅ ${checks.length} / ${checks.length} 항목 PASS — dead-wait 가드 SSoT 박제 정합.`,
   );
 }
 
@@ -149,9 +142,9 @@ function runSelfTest() {
         version: 1,
         waits: [
           {
-            id: 'sub-agent:developer:817',
+            id: 'sub-agent:developer:1',
             kind: 'sub-agent',
-            description: 'developer sub-agent — #817 구현',
+            description: 'developer sub-agent 대기',
             created_at: isoAgo(7200), // 2시간 전 (grace 60s 초과)
             wakeup_scheduled: true,
           },
@@ -173,7 +166,7 @@ function runSelfTest() {
     );
     expect(
       'negative: 목록에 sub-agent id 노출',
-      out.includes('sub-agent:developer:817'),
+      out.includes('sub-agent:developer:1'),
       out.trim(),
     );
     expect('negative: 목록에 ci-run id 노출', out.includes('ci-run:99999999'), out.trim());
@@ -212,7 +205,7 @@ function runSelfTest() {
       out.trim(),
     );
 
-    // --- (6) 미래 timestamp: created_at 이 미래 → 파싱불가와 대칭으로 보수 노출(WARN) (reviewer 권고 1) ---
+    // --- (6) 미래 timestamp: created_at 이 미래 → 파싱불가와 대칭으로 보수 노출(WARN) ---
     writeFileSync(
       pending,
       JSON.stringify({
@@ -231,7 +224,7 @@ function runSelfTest() {
     out = runHook(pending, 60);
     expect('future timestamp: 미래 created_at → 보수 노출(WARN)', out.includes('WARN'), out.trim());
 
-    // --- (7) 빈 파일: 0-byte → 손상 아님, 조용히 exit 0 (reviewer 권고 2, rename 전이 상태) ---
+    // --- (7) 빈 파일: 0-byte → 손상 아님, 조용히 exit 0 (rename 전이 상태) ---
     writeFileSync(pending, '');
     out = runHook(pending, 60);
     expect(
@@ -240,7 +233,7 @@ function runSelfTest() {
       JSON.stringify(out),
     );
 
-    // --- (8) whitespace-only: 공백만 → 손상 아님, 조용히 exit 0 (reviewer 권고 2) ---
+    // --- (8) whitespace-only: 공백만 → 손상 아님, 조용히 exit 0 ---
     writeFileSync(pending, '   \n\t  \n');
     out = runHook(pending, 60);
     expect(
@@ -253,6 +246,35 @@ function runSelfTest() {
     rmSync(pending, { force: true });
     out = runHook(pending, 60);
     expect('missing file: 파일 없음 → stdout 조용, exit 0', out.trim() === '', JSON.stringify(out));
+
+    // --- (10) injection 면역: id/description 에 shell metachar → 미해석, 리터럴 노출 ---
+    writeFileSync(
+      pending,
+      JSON.stringify({
+        version: 1,
+        waits: [
+          {
+            id: 'sub-agent:$(touch /tmp/dead-wait-injection):1',
+            kind: 'sub-agent',
+            description: '`rm -rf .`; echo pwned',
+            created_at: isoAgo(7200),
+            wakeup_scheduled: true,
+          },
+        ],
+      }),
+    );
+    out = runHook(pending, 60);
+    expect(
+      'injection: shell metachar 미해석 리터럴 노출',
+      out.includes('$(touch') && out.includes('rm -rf'),
+      out.trim(),
+    );
+    // 부작용 negative assert — `$(touch /tmp/...)` 가 실제 실행됐다면 파일이 생겼을 것 (reviewer 권고 1)
+    expect(
+      'injection: 부작용 파일 미생성 (command substitution 미실행)',
+      !existsSync('/tmp/dead-wait-injection'),
+      '/tmp/dead-wait-injection 이 생성됨 — shell command substitution 실행 의심',
+    );
   } catch (err) {
     fail++;
     results.push(`  [FAIL] hook 실행 예외 — ${err.message}`);
