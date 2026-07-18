@@ -56,23 +56,12 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != ''
         run: pnpm install --frozen-lockfile
 
-      - name: pnpm unit tests (vitest)
-        if: hashFiles('pnpm-lock.yaml') != ''
-        # #840 — 구 `pnpm run --if-present test` 는 harness 업데이트 bb220d3 (2026-04-20)
-        # 이 루트 `test` → `test:unit` 으로 리네임한 뒤 silent no-op (출력 없이 exit 0)
-        # 이 되어 vitest 95개 파일이 약 3개월간 CI 미실행이었다 ("CI 통과 ≠ 테스트 실행").
-        # fail-fast: `--if-present` fallback 제거 + 실행 테스트 수 > 0 단언 (no-op 재발 차단).
-        # physics-wasm 은 wasm-pack 빌드 선행이 필요해 제외 — vitest 바인딩 스모크의
-        # CI 배선은 #849 (바인딩 스모크 확장, 현재 add() 1건) 에서 wasm 빌드 job 과 함께 진행.
-        run: |
-          set -o pipefail
-          pnpm --filter '!@astro-simulator/physics-wasm' -r test 2>&1 | tee /tmp/vitest-out.log
-          TOTAL=$(grep -Eo 'Tests[^0-9]*[0-9]+ passed' /tmp/vitest-out.log | grep -Eo '[0-9]+' | paste -sd+ - | bc)
-          echo "실행 테스트 합계: ${TOTAL:-0}"
-          if [ "${TOTAL:-0}" -lt 1 ]; then
-            echo "::error::단위 테스트 실행 0건 — silent no-op 재발 (#840 가드)"
-            exit 1
-          fi
+      # #840 — 단위 테스트 (vitest) 는 ci-physics-wasm.yml verify-and-rust job 에 배선.
+      # 구 'pnpm run --if-present test' 는 harness bb220d3 (2026-04-20) 루트 test→test:unit
+      # 리네임 후 silent no-op (출력 없이 exit 0) 으로 약 3개월 미실행이었다.
+      # 본 job 에 두지 않는 근거: core 가 @astro-simulator/physics-wasm (pkg/, gitignored)
+      # 을 소스 4파일에서 직접 import 하므로 wasm-pack 빌드가 선행 조건 — Rust 툴체인이
+      # 이미 있는 verify-and-rust job 이 유일한 저비용 배선 지점 (전 워크스페이스 95파일 커버).
 
       # P12-C #298 — 단일 모드 전환 회귀 가드 (R1 DoD).
       # `scientific` 식별자·리터럴이 활성 코드 경로에 재도입되면 exit 1 로 차단.

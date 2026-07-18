@@ -67,6 +67,43 @@ jobs:
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
 
+      # #840 — 단위 테스트 (vitest, 전 워크스페이스 94파일 — shared 1 + core 51 + web 41 + wasm 1 실측) CI 배선.
+      # 구 ci.yml 'pnpm run --if-present test' 는 bb220d3 (2026-04-20) 루트 test→test:unit
+      # 리네임 후 silent no-op 으로 약 3개월 미실행 ("CI 통과 ≠ 테스트 실행" 자기 재발).
+      # 본 job 배선 근거: core 소스 4파일이 @astro-simulator/physics-wasm (pkg/, gitignored)
+      # 을 직접 import → wasm-pack 빌드 선행 필수 — Rust 툴체인 보유 job 이 유일한 저비용 지점.
+      # shared/core 는 exports 가 dist/ 기반 (gitignored) 이라 tsc 빌드도 선행한다.
+      - name: pnpm setup (unit tests)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: ./.github/actions/setup-and-build
+        with:
+          start-dev-server: 'false'
+
+      - name: workspace 빌드 (wasm → shared → core)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: |
+          pnpm --filter @astro-simulator/physics-wasm build
+          pnpm --filter @astro-simulator/shared --filter @astro-simulator/core -r build
+
+      # 실행 테스트 수 > 0 단언 — silent no-op 재발 차단 (#840 가드).
+      # NO_COLOR: vitest ANSI 컬러 억제 (PR #866 리뷰 실측 — 컬러가 토큰 매칭을 깬다).
+      # awk 는 ANSI strip 후 정규식 match (필드 비의존) — NO_COLOR 미작동 환경 belt-and-braces.
+      # 합산은 단일 awk (항상 exit 0) — pipefail/bash -e 하에서 단언 경로가 죽지 않도록
+      # 명령 치환 내부 파이프라인을 배제한다. 'Tests  N passed' 만 매칭 ('Test Files' 제외).
+      - name: 단위 테스트 (vitest) + 실행 수 단언
+        if: hashFiles('pnpm-lock.yaml') != ''
+        env:
+          NO_COLOR: '1'
+        run: |
+          set -o pipefail
+          pnpm -r test 2>&1 | tee /tmp/vitest-out.log
+          TOTAL=$(awk '{ gsub(/\033\[[0-9;]*m/, ""); if (match($0, /Tests[[:space:]]+[0-9]+[[:space:]]+passed/)) { t = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", t); s += t } } END { print s + 0 }' /tmp/vitest-out.log)
+          echo "실행 테스트 합계: ${TOTAL}"
+          if [ "${TOTAL}" -lt 1 ]; then
+            echo "::error::단위 테스트 실행 0건 — silent no-op 재발 (#840 가드)"
+            exit 1
+          fi
+
   # P9 #254 M4 — 장기 적분 테스트 분리 경로.
   # `#[ignore = "long-integration"]` 로 마킹된 테스트만 실행 (수성/금성/지구 근일점
   # EIH 6건 + Laplace 공명 D5-a 1건). CPU 집약 테스트를 빠른 경로와 분리해 PR
