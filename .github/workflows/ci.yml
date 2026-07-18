@@ -56,14 +56,23 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != ''
         run: pnpm install --frozen-lockfile
 
-      - name: pnpm test
+      - name: pnpm unit tests (vitest)
         if: hashFiles('pnpm-lock.yaml') != ''
-        # `pnpm run --if-present <script>` 는 pnpm 8+ 공식 지원. `--if-present` 를
-        # pnpm 의 플래그로 인식하여 script args 로 forward 하지 않는다.
-        # 반대로 `pnpm test --if-present` 는 `--if-present` 가 script args 로 전달되어
-        # 모노레포의 `pnpm -r test --if-present` 형태가 되고, vitest/jest 등 런너가
-        # 알 수 없는 옵션으로 실패 (#181).
-        run: pnpm run --if-present test
+        # #840 — 구 `pnpm run --if-present test` 는 harness 업데이트 bb220d3 (2026-04-20)
+        # 이 루트 `test` → `test:unit` 으로 리네임한 뒤 silent no-op (출력 없이 exit 0)
+        # 이 되어 vitest 95개 파일이 약 3개월간 CI 미실행이었다 ("CI 통과 ≠ 테스트 실행").
+        # fail-fast: `--if-present` fallback 제거 + 실행 테스트 수 > 0 단언 (no-op 재발 차단).
+        # physics-wasm 은 wasm-pack 빌드 선행이 필요해 제외 — vitest 바인딩 스모크의
+        # CI 배선은 #849 (바인딩 스모크 확장, 현재 add() 1건) 에서 wasm 빌드 job 과 함께 진행.
+        run: |
+          set -o pipefail
+          pnpm --filter '!@astro-simulator/physics-wasm' -r test 2>&1 | tee /tmp/vitest-out.log
+          TOTAL=$(grep -Eo 'Tests[^0-9]*[0-9]+ passed' /tmp/vitest-out.log | grep -Eo '[0-9]+' | paste -sd+ - | bc)
+          echo "실행 테스트 합계: ${TOTAL:-0}"
+          if [ "${TOTAL:-0}" -lt 1 ]; then
+            echo "::error::단위 테스트 실행 0건 — silent no-op 재발 (#840 가드)"
+            exit 1
+          fi
 
       # P12-C #298 — 단일 모드 전환 회귀 가드 (R1 DoD).
       # `scientific` 식별자·리터럴이 활성 코드 경로에 재도입되면 exit 1 로 차단.
