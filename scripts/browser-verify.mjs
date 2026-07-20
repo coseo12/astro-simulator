@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// HARNESS-DRIFT: Z-PATTERN [TODO]
 /**
  * UI 브라우저 3단계 검증 (CRITICAL #3 준수).
  *
