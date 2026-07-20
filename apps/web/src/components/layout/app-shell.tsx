@@ -11,7 +11,6 @@ import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
 import { DateTimePicker } from './date-time-picker';
-import { UnitToggle } from './unit-toggle';
 import { PhysicsEngineToggle } from './physics-engine-toggle';
 import { SensitivitySettingsModal } from './sensitivity-settings-modal';
 import { OnboardingModal } from './onboarding-modal';
@@ -40,7 +39,8 @@ export function AppShell() {
           right={
             <div className="flex items-center gap-2">
               <DateTimePicker />
-              <UnitToggle />
+              {/* #841 — UnitToggle 제거. unitSystem 소비자 0 (display-only 버그 패턴) +
+                  "P2 확장" 은 폐기된 v2 로드맵 잔재. 재도입 시 실 포매터와 함께 신규 이슈로. */}
               <PhysicsEngineToggle />
               <SensitivitySettingsModal />
               <BookmarkButton />

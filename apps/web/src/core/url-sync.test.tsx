@@ -98,7 +98,6 @@ beforeEach(() => {
     timeScale: 86_400,
     physicsEngine: 'kepler',
     fps: null,
-    unitSystem: 'astro',
     pingCount: 0,
     lastPingAt: null,
   });
