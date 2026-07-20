@@ -14,7 +14,6 @@ beforeEach(() => {
     selectedBodyId: 'jupiter',
     timeScale: 3600,
     fps: null,
-    unitSystem: 'astro',
     physicsEngine: 'newton',
     massMultipliers: {},
     pingCount: 0,

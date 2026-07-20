@@ -4,6 +4,7 @@ import { time as timeApi } from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
 import { Pause, Play, Rewind, FastForward } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 interface ScalePreset {
   label: string;
@@ -29,9 +30,15 @@ export function TimeControls() {
   const sendCommand = useSimCommand();
 
   const setScale = (v: number) => sendCommand({ type: 'setTimeScale', scale: v });
-  // pause/play는 scale 기반으로 구현 — 0이면 정지, 이전 배율 복원
-  const lastScale = scale !== 0 ? scale : timeApi.TimeScalePreset.DAY_PER_SEC;
-  const play = () => setScale(lastScale);
+  // #841 — pause/play 는 scale 기반: 0이면 정지, play 는 이전 배율 복원 (역행 부호 포함).
+  // pause 시점에는 store scale 이 이미 0 이라 렌더 시점 파생값으로는 이전 배율을 알 수 없다
+  // (기존 구현은 항상 DAY_PER_SEC 폴백 — 주석-구현 drift). 마지막 비 0 배속을 ref 에
+  // 스냅샷해 두고 play 시 복원한다. 최초 mount 부터 정지 상태면 DAY_PER_SEC 폴백.
+  const lastNonZeroScaleRef = useRef<number>(timeApi.TimeScalePreset.DAY_PER_SEC);
+  useEffect(() => {
+    if (scale !== 0) lastNonZeroScaleRef.current = scale;
+  }, [scale]);
+  const play = () => setScale(lastNonZeroScaleRef.current);
   const pause = () => setScale(0);
 
   const utcString =

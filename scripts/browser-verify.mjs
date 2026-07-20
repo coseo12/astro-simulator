@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// HARNESS-DRIFT: Z-PATTERN [TODO]
 /**
  * UI 브라우저 3단계 검증 (CRITICAL #3 준수).
  *
@@ -78,18 +79,10 @@ if (earthBtn) {
   check('지구 포커스 클릭 시 selected 상태 전환', false, '지구 버튼 못 찾음');
 }
 
-// DateTimePicker / UnitToggle 렌더
+// DateTimePicker 렌더
 check('DateTimePicker 렌더', (await page.$('[data-testid="datetime-picker"]')) !== null);
-check('UnitToggle 렌더', (await page.$('[data-testid="unit-toggle"]')) !== null);
-
-// UnitToggle 클릭
-const siUnit = await page.$('[data-testid="unit-si"]');
-if (siUnit) {
-  await siUnit.click();
-  await page.waitForTimeout(100);
-  const cls = (await siUnit.getAttribute('class')) ?? '';
-  check('SI 단위 토글 클릭 시 active', cls.includes('bg-primary/25'));
-}
+// #841 — UnitToggle 제거 (display-only 정리). 잔재 재유입 회귀 가드.
+check('UnitToggle 부재 (#841 제거)', (await page.$('[data-testid="unit-toggle"]')) === null);
 
 // 모드 전환 — research 클릭
 const researchBtn = await page.$('[data-testid="mode-research"]');

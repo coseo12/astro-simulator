@@ -13,7 +13,6 @@ beforeEach(() => {
     selectedBodyId: null,
     timeScale: 86_400,
     fps: null,
-    unitSystem: 'astro',
     physicsEngine: 'kepler',
     massMultipliers: {},
     pingCount: 0,
@@ -27,7 +26,6 @@ describe('useSimStore', () => {
     expect(s.mode).toBe('observe');
     expect(s.timeScale).toBe(86_400);
     expect(s.rendererKind).toBeNull();
-    expect(s.unitSystem).toBe('astro');
   });
 
   it('setRenderer', () => {
@@ -61,13 +59,7 @@ describe('useSimStore', () => {
     expect(useSimStore.getState().timeScale).toBe(-86_400);
   });
 
-  it('setUnitSystem — 3가지 단위계', () => {
-    const { setUnitSystem } = useSimStore.getState();
-    setUnitSystem('si');
-    expect(useSimStore.getState().unitSystem).toBe('si');
-    setUnitSystem('natural');
-    expect(useSimStore.getState().unitSystem).toBe('natural');
-  });
+  // #841 — setUnitSystem 테스트 제거 (unitSystem 상태 자체 제거 — UnitToggle display-only 정리).
 
   it('incrementPing — 카운터 증가 + 타임스탬프 기록', () => {
     const before = Date.now();
