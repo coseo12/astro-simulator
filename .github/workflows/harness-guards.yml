@@ -67,12 +67,12 @@ jobs:
         if: hashFiles('scripts/verify-claudemd-size.sh') != '' && hashFiles('lib/verify-claudemd-size.js') != ''
         run: bash scripts/verify-claudemd-size.sh
 
-      # CLAUDE.md 상대 링크 무결성 가드 (#197 Phase 2)
-      # CLAUDE.md → docs/ 포인터가 많아질수록 link rot 위험 증가 — 파일 존재 검증.
-      # 지침: docs/guides/claudemd-governance.md §4.3
-      # 다운스트림 가드: lib/verify-docs-links.js 본체 부재 시 skip (upstream v3.6.0 lib 배포 누락 대응 — 본 PR #338 임시 패치)
-      - name: CLAUDE.md 상대 링크 무결성 가드
-        if: hashFiles('scripts/verify-docs-links.sh') != '' && hashFiles('lib/verify-docs-links.js') != ''
+      # docs 전체 상대 링크 무결성 가드 (#197 Phase 2 → #842 fail-fast 복구)
+      # link rot 위험 증가 — 파일 존재 검증. 검사 범위 계약: scripts/verify-docs-links.mjs 헤더 SSoT.
+      # #842: upstream lib 부재 hashFiles silent skip (#338 임시 패치) 을 제거하고
+      # 다운스트림 자체 체커 (scripts/verify-docs-links.mjs) 로 교체 — 무조건 실행.
+      # CLAUDE.md §가드 설계 원칙: drift 가드는 fail-fast 만, fallback 분기 금지.
+      - name: docs 상대 링크 무결성 가드
         run: bash scripts/verify-docs-links.sh
 
       # docs/lessons/ README 동기화 가드 (#213)

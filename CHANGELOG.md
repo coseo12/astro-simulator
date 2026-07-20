@@ -754,7 +754,7 @@ None — 문서 보강만 (PATCH). 본 박제 자체는 코드/에이전트 행�
 
 ### P12-B 8D 카메라 dolly 애니메이션 (Display-Relative Scale Unification Phase B)
 
-메인 이슈: #298 · ADR: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) §3 (배선 원리) / §Phase 분리 / §Concrete Prediction
+메인 이슈: #298 · ADR: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/deprecated/decisions/20260423-display-relative-scale-unification.md) §3 (배선 원리) / §Phase 분리 / §Concrete Prediction
 
 PR #304 (`208f5cb`) — Q8=8D 카메라 dolly 병행 interp + 입력 잠금. Phase A 의 Tier 엔진 기반 (v0.11.0) 위에 integration.
 
@@ -780,7 +780,7 @@ PR #304 (`208f5cb`) — Q8=8D 카메라 dolly 병행 interp + 입력 잠금. Pha
 
 ### P12-C Display-Relative Scale Unification 완결 (Phase C)
 
-메인 이슈: #298 (auto-close) / #288 (auto-close) · ADR Amendment: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) §Amendment / [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) §Amendment · 회고: [`docs/retrospectives/p12-retrospective.md`](docs/retrospectives/p12-retrospective.md)
+메인 이슈: #298 (auto-close) / #288 (auto-close) · ADR Amendment: [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/deprecated/decisions/20260423-display-relative-scale-unification.md) §Amendment / [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) §Amendment · 회고: [`docs/retrospectives/p12-retrospective.md`](docs/retrospectives/p12-retrospective.md)
 
 ### Behavior Changes
 
@@ -846,7 +846,7 @@ PR #304 (`208f5cb`) — Q8=8D 카메라 dolly 병행 interp + 입력 잠금. Pha
 
 ### P11-A Floating Origin + P12-A Tier 엔진 기반 (Display-Relative Scale Unification Phase A)
 
-메인 이슈: #288 (P11-A Floating Origin) / #298 (P12 Scale Unification 계약) · ADR: [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) / [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/decisions/20260423-display-relative-scale-unification.md) · 원칙: [`docs/principles/fact-first.md`](docs/principles/fact-first.md)
+메인 이슈: #288 (P11-A Floating Origin) / #298 (P12 Scale Unification 계약) · ADR: [`docs/decisions/20260422-floating-origin.md`](docs/decisions/20260422-floating-origin.md) / [`docs/decisions/20260423-display-relative-scale-unification.md`](docs/deprecated/decisions/20260423-display-relative-scale-unification.md) · 원칙: [`docs/principles/fact-first.md`](docs/deprecated/principles/fact-first.md)
 
 4 PR 누적 (P11-A + bench remeasure + P12 ADR + P12-A Phase A):
 
@@ -924,7 +924,7 @@ v2.28.1 유지. v0.11.0 범위에서 하네스 수정 없음.
 
 ### P10 — Fact-First 원칙 + 데이터 감사 + 사실 모드 UI
 
-메인 이슈: #266 (계약) / #268 (P10-A) / #274 (P10-B) / #278 (P10-C) · 회고: [`docs/retrospectives/p10-retrospective.md`](docs/retrospectives/p10-retrospective.md) · 원칙: [`docs/principles/fact-first.md`](docs/principles/fact-first.md) · 플랜: [`docs/phases/p10-plan.md`](docs/phases/p10-plan.md)
+메인 이슈: #266 (계약) / #268 (P10-A) / #274 (P10-B) / #278 (P10-C) · 회고: [`docs/retrospectives/p10-retrospective.md`](docs/retrospectives/p10-retrospective.md) · 원칙: [`docs/principles/fact-first.md`](docs/deprecated/principles/fact-first.md) · 플랜: [`docs/phases/p10-plan.md`](docs/deprecated/phases/p10-plan.md)
 
 10 PR 분할 릴리스 (CLAUDE.md §Phase 분리 릴리스 리듬):
 

@@ -1,6 +1,6 @@
 # ADR: 절차적 starfield + 은하수 우주 배경 — #738
 
-- **상태**: **Accepted** (cross-validate 2026-06-24 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료. ADR Status 워크플로 §부분 도입 #370). **§Amendment 2 (#745) 는 Provisional** — developer 구현 + qa 실 GUI 후 Accepted 전이.
+- **상태**: **Accepted** (cross-validate 2026-06-24 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료. ADR Status 워크플로 §부분 도입 #370). **§Amendment 2 (#745) 도 Accepted** — 2026-07-21 소급 전이 #842 (#745 CLOSED, developer 구현 + qa 실 GUI 완주 — v0.35.1 detectSoftwareRenderer 반영).
 - **날짜**: 2026-06-24 (§Amendment 2: 2026-06-25, #745)
 - **결정자**: architect (#738 설계 / #745 Amendment 2)
 - **관련**:
@@ -9,7 +9,7 @@
   - 방향성 기획서 2026-06-22 트랙 A1 (몰입·정체성 핵심) — `docs/architecture/principles.md §1 Visual Fidelity`
   - [`20260422-floating-origin.md`](20260422-floating-origin.md) (P11-A #288 — floating origin 좌표 계약, 별 무한원경 정합의 출처)
   - [`20260613-675-glow-pixel-marker.md`](20260613-675-glow-pixel-marker.md) (#675 — ShaderMaterial + URL 토글 + parse-\* 패턴 선례)
-  - [`20260610-r7-saturn-titan-visualization.md`](20260610-r7-saturn-titan-visualization.md) (#641 — `ring-shader.ts` 커스텀 ShaderMaterial + log-depth `gl_FragDepth` 선례)
+  - [`20260610-r7-saturn-titan-rings-visualization.md`](20260610-r7-saturn-titan-rings-visualization.md) (#641 — `ring-shader.ts` 커스텀 ShaderMaterial + log-depth `gl_FragDepth` 선례)
   - `packages/core/src/scene/log-depth.ts` (`enableLogarithmicDepth` — minZ 0.01 / maxZ 1e14 극단 near/far)
   - 진입점: `packages/core/src/scene/solar-system-scene.ts:442` (`scene.clearColor`), `apps/web/src/components/sim-canvas.tsx:338~367` (URL 파싱 → scene 옵션)
 - **교훈 적용**: "신규 함수 ≠ 신규 구현" (기존 `ring-shader.ts` ShaderMaterial + `log-depth.ts` + `parse-marker-mode.ts` 패턴 재사용) / "measurement-first" (별 개수·밝기는 가설이 아닌 fps + px 실측으로 박제) / "DoD PASS ≠ 제품 동작" (시각 품질은 headless 미재현 → 실 Chrome GUI 의무) / Visual Fidelity §의무 체크리스트 4항목 (rendering-only, 데이터 SSoT 0).
@@ -243,7 +243,7 @@ starfieldVisible = (parseStarsVisible(?stars=) === true) && resolveGpuTier(gpuCa
 
 ## §Amendment 2 — tier-c 전체 비활성 → 소프트웨어 렌더만 비활성 (과잉 비활성 회귀 정정) (2026-06-25, #745)
 
-**상태**: **Provisional** (cross-validate 2026-06-25 agy 통합 완료 — 아래 §Amendment 2 교차검증 반영 사항 박제. developer 구현 + qa 실 GUI 후 Accepted 전이). **트리거**: Amendment 1 의 `gpuTier !== 'c'` 비활성 기준이 production 에서 **과잉**으로 판명 (v0.35.0 회귀, #745 high).
+**상태**: **Accepted** (2026-07-21 소급 전이 #842 — #745 CLOSED, developer 구현 + qa 실 GUI 완주 v0.35.1. 원 박제: Provisional, cross-validate 2026-06-25 agy 통합 완료 — 아래 §Amendment 2 교차검증 반영 사항 박제). **트리거**: Amendment 1 의 `gpuTier !== 'c'` 비활성 기준이 production 에서 **과잉**으로 판명 (v0.35.0 회귀, #745 high).
 
 ### 발견 (production 회귀 + Playwright 실측 — measurement-first)
 
