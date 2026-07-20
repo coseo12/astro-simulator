@@ -28,6 +28,9 @@
  *      단, 다른 문서 → deprecated 파일로의 링크는 정상 검사 대상 (파일 존재 검증).
  *   7. ADR `상태:` 표기 단일화 가드 — docs/decisions/*.md 메타데이터에 영문 `Status:`
  *      표기 발견 시 FAIL (한글 `상태:` 로 단일화 — #842 ADR 상태 위생).
+ *   8. gitignored 대상 참조 — 파일이 로컬에 존재해도 `git check-ignore` 매칭 시 FAIL.
+ *      "로컬 PASS = gitignored 산출물 착시" (#840 클래스) 차단 — CI 체크아웃엔 부재해
+ *      로컬 PASS / CI FAIL 비대칭이 생긴다 (PR #872 CI 에서 `.claude/logs/` 참조로 실측).
  *
  * upstream-only 참조 allowlist:
  *   harness-managed 문서 (.harness/manifest.json 등록) 가 upstream harness-setting
@@ -57,6 +60,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -238,7 +242,28 @@ function checkTarget(root, sourceFile, rawTarget) {
   if (!existsSync(resolved)) {
     return { reason: `파일 부재: ${path.relative(root, resolved)}` };
   }
-  return null;
+  // 존재 확인된 대상은 gitignored 배치 검사 대상으로 반환 (계약 8항)
+  return { resolved };
+}
+
+/**
+ * gitignored 대상 배치 검사 (계약 8항).
+ * 존재 확인된 링크 대상 중 `git check-ignore` 매칭 건을 위반으로 반환.
+ * git 실행 실패 (repo 아님 등) 는 fail-fast — 조용한 skip 금지.
+ */
+function detectGitignoredTargets(root, entries) {
+  if (entries.length === 0) return [];
+  const relPaths = [...new Set(entries.map((e) => path.relative(root, e.resolved)))];
+  const res = spawnSync('git', ['-C', root, 'check-ignore', '--stdin'], {
+    input: relPaths.join('\n'),
+    encoding: 'utf8',
+  });
+  // exit 0: 일부 ignored / 1: ignored 없음 / 그 외 (128 등): 실행 에러
+  if (res.error || (res.status !== 0 && res.status !== 1)) {
+    throw new Error(`git check-ignore 실행 실패 (exit ${res.status}): ${res.stderr || res.error}`);
+  }
+  const ignored = new Set(res.stdout.split('\n').filter(Boolean));
+  return entries.filter((e) => ignored.has(path.relative(root, e.resolved)));
 }
 
 /**
@@ -262,6 +287,7 @@ function checkAdrStatusNotation(content) {
 function runScan(root) {
   const files = collectMdFiles(root);
   const broken = [];
+  const existingTargets = [];
   let checked = 0;
   let allowlisted = 0;
   const activated = new Set();
@@ -271,7 +297,9 @@ function runScan(root) {
     for (const { target, line } of extractLinkTargets(content)) {
       checked += 1;
       const result = checkTarget(root, file, target);
-      if (result) {
+      if (result?.resolved) {
+        existingTargets.push({ file: rel, line, target, resolved: result.resolved });
+      } else if (result) {
         const entry = findAllowlistEntry(rel, target);
         if (entry) {
           allowlisted += 1;
@@ -287,6 +315,15 @@ function runScan(root) {
         broken.push({ file: rel, line: v.line, target: '(상태 표기)', reason: v.reason });
       }
     }
+  }
+  // gitignored 대상 배치 검사 (계약 8항) — 로컬/CI 판정 비대칭 차단
+  for (const e of detectGitignoredTargets(root, existingTargets)) {
+    broken.push({
+      file: e.file,
+      line: e.line,
+      target: e.target,
+      reason: `gitignored 산출물 참조 — CI 체크아웃 부재 (계약 8항): ${path.relative(root, e.resolved)}`,
+    });
   }
   const staleAllowlist = UPSTREAM_ONLY_ALLOWLIST.filter((e) => !activated.has(e));
   return { fileCount: files.length, checked, broken, allowlisted, staleAllowlist };
@@ -340,6 +377,9 @@ function selfTest() {
     const docsDir = path.join(tmp, 'docs', 'decisions');
     mkdirSync(docsDir, { recursive: true });
     writeFileSync(path.join(tmp, 'docs', 'target.md'), '# target\n');
+    // fixture 를 git repo 로 초기화 — 계약 8항 (gitignored 대상) 검사 경로 활성
+    spawnSync('git', ['-C', tmp, 'init', '-q']);
+    writeFileSync(path.join(tmp, '.gitignore'), '*.log\n');
 
     // 1. positive — 유효 상대 링크 + 외부 URL + 앵커 + 코드 블록 내 깨진 링크 (제외 대상)
     const good = [
@@ -407,6 +447,19 @@ function selfTest() {
     writeFileSync(path.join(docsDir, 'd.md'), 'ADR Status 워크플로 참조. 상태: Accepted\n');
     r = runScan(tmp);
     assert(r.broken.length === 0, 'unit: "ADR Status 워크플로" 고유명사 오탐 없음');
+
+    // 6. 단위 — gitignored 대상 참조 (계약 8항, PR #872 CI 실측 클래스):
+    //    존재하지만 .gitignore 매칭 → FAIL / 링크 제거 → recovery PASS
+    writeFileSync(path.join(tmp, 'docs', 'local-artifact.log'), 'scratch\n');
+    writeFileSync(path.join(docsDir, 'e.md'), '[로그](../local-artifact.log)\n');
+    r = runScan(tmp);
+    assert(
+      r.broken.length === 1 && r.broken[0].reason.includes('gitignored'),
+      `unit: gitignored 대상 참조 검출 (실측 ${r.broken.length}건)`,
+    );
+    writeFileSync(path.join(docsDir, 'e.md'), '로그: `docs/local-artifact.log` (경로 표기)\n');
+    r = runScan(tmp);
+    assert(r.broken.length === 0, 'unit: gitignored 참조 제거 → recovery PASS');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

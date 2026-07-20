@@ -132,7 +132,7 @@ S2/S3 측정이 드러낸 **reset tween 거리 비례 속도 비일관**(io 48ms
 
 ## §8 교차검증 반영 사항
 
-cross-validate (agy, outcome=applied, exit 0, 2026-06-21, [로그](../../.claude/logs/cross-validate-architecture-20260621-193547.log)). 호출 전 Claude 편향 셀프 체크: 낙관 일정 = N/A(설계 전용) · 결합 = §5-1 보간 모델 drift 명시(통과) · 폐기 프레이밍 = §4 "NO-OP 성급 종결 경계" 박제(통과) · 순수주의 = (b) YAGNI 경계 + (c)/(d) 기각(통과). 미통과 의심 축(결합/폐기 프레이밍)을 호출 프롬프트 명시 질문으로 삽입.
+cross-validate (agy, outcome=applied, exit 0, 2026-06-21, 로그: `.claude/logs/cross-validate-architecture-20260621-193547.log` — gitignored 로컬 산출물이라 링크 아닌 경로 표기, #842). 호출 전 Claude 편향 셀프 체크: 낙관 일정 = N/A(설계 전용) · 결합 = §5-1 보간 모델 drift 명시(통과) · 폐기 프레이밍 = §4 "NO-OP 성급 종결 경계" 박제(통과) · 순수주의 = (b) YAGNI 경계 + (c)/(d) 기각(통과). 미통과 의심 축(결합/폐기 프레이밍)을 호출 프롬프트 명시 질문으로 삽입.
 
 ### 합의 (Claude 설계와 일치 — 본 ADR 즉시 반영)
 
