@@ -1790,7 +1790,7 @@ Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-
 
 ### cross-link
 
-- 발의: #868 / #869, 결정 코멘트 (게시 후 URL 박제)
+- 발의: #868 / #869, 결정 코멘트: [5-A (#868)](https://github.com/coseo12/astro-simulator/issues/868#issuecomment-5037605745) / [5-B (#869)](https://github.com/coseo12/astro-simulator/issues/869#issuecomment-5037605940) — 재실측 박제: [#868 재실측](https://github.com/coseo12/astro-simulator/issues/868#issuecomment-5037609528) / [#869 위생 실측](https://github.com/coseo12/astro-simulator/issues/869#issuecomment-5037612063)
 - 직전 결정 분기 이력: #487(C) → #495(A, Amendment 4) → #500(A 연속, Amendment 6) → #554(측정 정정, Amendment 7) → #766(3′, Amendment 13)
 - upstream: open #309/#318/#320~#324, merged #315, 이슈 #319/#325, U4 (생성 후 박제)
 - 측정 SSoT: `scripts/verify-z-pattern-health.mjs` / `scripts/verify-harness-drift-decorator.mjs` / `.github/workflows/adr-z-pattern-health-v2.yml`
