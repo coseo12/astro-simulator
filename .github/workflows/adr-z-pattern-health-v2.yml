@@ -19,7 +19,7 @@ name: ADR 20260515 Z Pattern Health Metric
 # Hard-block 예외 (exit 2) 는 가드 자체 작동 보장 차원.
 
 # YAML 1.1 'on:' → boolean True 함정 — quote 로 string key 강제 (volt 캡처 후보)
-"on":
+'on':
   schedule:
     - cron: '0 0 * * 1' # 매주 월요일 UTC 00:00 = KST 09:00
   workflow_dispatch:
@@ -68,7 +68,7 @@ jobs:
             --title "[ADR Trigger] Z 패턴 §재검토 조건 #5 발화 (자동 탐지 ${DATE})" \
             --label "documentation,priority:high" \
             --body "## 배경
-          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health.yml\` 발화. 임계값 충족.
+          자동 탐지 workflow \`.github/workflows/adr-z-pattern-health-v2.yml\` 발화. 임계값 충족.
 
           ## 임계값 발화 결과
           \`\`\`
@@ -80,7 +80,7 @@ jobs:
 
           ## Cross-link
           - ADR: \`docs/decisions/20260515-harness-managed-divergent-pattern.md\`
-          - workflow: \`.github/workflows/adr-z-pattern-health.yml\`
+          - workflow: \`.github/workflows/adr-z-pattern-health-v2.yml\`
           - 직전 [ADR Trigger]: #487 (옵션 C 채택)"
 
       - name: Fail on script execution error
