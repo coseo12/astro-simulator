@@ -1,15 +1,17 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+
 # 확장 로드맵 v1 — 관측가능우주 (Cosmic Scale)
 
 > **Status**: Archived (v2 에 의해 P8 이후 범위 보류)
 > **박제일 (v1)**: P1 착수 시점
 > **v2 로 이관일**: 2026-04-20 (P10-A #268)
-> **Successor**: [roadmap-v2-solar-precision.md](roadmap-v2-solar-precision.md)
+> **Successor**: [roadmap-v2-solar-precision.md](../deprecated/phases/roadmap-v2-solar-precision.md) (2026-04-25 폐기 — 현행: [roadmap-track-ab.md](roadmap-track-ab.md))
 
 ## v2 안내
 
 본 문서는 프로젝트 **초기 로드맵 (P1~P8)** 을 박제한다. "태양계 (P1) → 근거리 항성 (P4) → 은하 (P6) → 관측가능우주 (P7) → 가상 천체 (P8)" 의 스케일 확장 경로를 원안으로 삼았다.
 
-**P1~P9 구현 과정에서 다음 현실이 누적**되어 후속 방향을 재조정했다 (상세: [roadmap-v2-solar-precision.md](roadmap-v2-solar-precision.md) §재조정 배경):
+**P1~P9 구현 과정에서 다음 현실이 누적**되어 후속 방향을 재조정했다 (상세: [roadmap-v2-solar-precision.md](../deprecated/phases/roadmap-v2-solar-precision.md) §재조정 배경):
 
 - 태양계 내부 정밀도 부채 (IAU 2015 대조 미수행)
 - 시각 원칙 부재 (`educational` / `scientific` 토글 없음)
@@ -35,7 +37,7 @@
 
 ---
 
-> **이하 내용은 v1 원안 (역사 박제)**. 실제 진행 중인 Phase 는 [roadmap-v2-solar-precision.md](roadmap-v2-solar-precision.md) 참조.
+> **이하 내용은 v1 원안 (역사 박제)**. v2 는 이후 폐기됨 ([roadmap-v2-solar-precision.md](../deprecated/phases/roadmap-v2-solar-precision.md)) — 현행 로드맵은 [roadmap-v3-incremental.md](roadmap-v3-incremental.md) (완주) → [roadmap-track-ab.md](roadmap-track-ab.md) 참조.
 
 ---
 

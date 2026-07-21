@@ -1,5 +1,7 @@
 # 20260503 — #397 재평가 NO-OP — 옵션 D 머지 후 12 cells 잔존도 매트릭스 + R-Phase 정합 분석
 
+- 상태: Accepted (2026-07-21 소급 박제 #842 — 원 박제 시 상태 필드 누락. #397 CLOSED, NO-OP 종결)
+
 ## 배경
 
 이슈 [#397](https://github.com/coseo12/astro-simulator/issues/397) — focus 시 다른 body 잔존 회귀. PR #399 (옵션 D, A+B defense-in-depth) 머지 후 ADR [`20260503-378-focus-frustum-fix.md`](20260503-378-focus-frustum-fix.md) §결과·재검토 조건 §#397 재평가 의무에 따라 **12 cells × focus body 외 다른 body viewport 점유율 ≤ 0.1%** 정량 종료 조건 검증.
@@ -142,6 +144,7 @@ ADR §#397 재평가 정량 종료 조건은 strict "12/12 PASS" 인데, R-Phase
 > `apps/web/scripts/browser-verify-397-residual.mjs` + `apps/web/package.json` 의 `verify:397-residual` 스크립트를 **폐기** (PR #602). 아래 R3 시점 박제는 **역사적 기록** 으로 보존하되 실 파일은 제거.
 >
 > **폐기 사유 (ROI 역전)**:
+>
 > 1. **CI 미통합** — "CI `detect-and-test` 통합 검토" 가 끝내 미실행 (수동 전용) → **자동 회귀 검출 0**. 회귀 가드의 핵심 가치(자동 차단)가 부재
 > 2. **R-Phase 갱신 부담 > 가치** — `R_PHASE_EXPECTED` 매트릭스는 R-Phase 진입마다 dev 서버 실측 갱신 의무인데 **R4(#532)/R5(#594) 진입 시 둘 다 누락** (FOCUS_BODIES 가 R3 baseline `[sun,mercury,venus,earth,jupiter,neptune]` 잔존 — jupiter/neptune 은 미구현이라 focus 자체 불가). #598 (PR #601) 단위 테스트 구현 중 drift 발견 → #602 박제. 유지비용이 반복적으로 누락을 유발
 > 3. **focus 동작은 이미 CI 가드가 커버** — `browser-verify-378-focus.mjs` (CI `detect-and-test` 실행, #611 에서 satellite follow lag 직접 차단 입증) 가 focus 동작 회귀를 자동 검증. residual(viewport 점유율) 측면은 priority:low 이며 #397 은 이미 NO-OP 로 종결된 1회성 검증

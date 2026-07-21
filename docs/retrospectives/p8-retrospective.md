@@ -62,7 +62,7 @@
 
 ## 다음 인계 (P9 후보 + 기술부채)
 
-> **로드맵 v2 참조**: [project_p8_p16_roadmap.md](file:///Users/seo/.claude/projects/-Users-seo-project-space/memory/project_p8_p16_roadmap.md)
+> **로드맵 v2 참조**: `project_p8_p16_roadmap.md` (개인 메모리 초안 — 정식 문서화본: [roadmap-v2-solar-precision.md](../deprecated/phases/roadmap-v2-solar-precision.md), 개인 절대 경로 링크 제거 #842)
 
 ### P8 → P9 구체적 이관
 

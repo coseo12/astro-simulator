@@ -12,12 +12,13 @@
 
 ## 현재 상태
 
-**v0.46.0** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 트랙 A/B (몰입·온보딩) — 절차적 표면·태양 셰이더 + 자전·실광원 (2026-07-05)
+**v0.50.0** — 로드맵 v3 (Incremental Body-by-Body Build) 완주 + 트랙 A/B (몰입·온보딩) — 절차적 표면·태양 셰이더 + 자전·실광원 + focus 줌 안정화 (2026-07-19)
 
 - **태양계 32 body** — 태양 + 행성 8 + 위성 15 + 왜소행성 5 + 혜성 3, 실시간 적분 + 관측 데이터 기반 궤도/크기 시각화
   - 위성 15: 달 / 포보스·데이모스 / 갈릴레이 4 (이오·유로파·가니메데·칼리스토) / 타이탄·레아·이아페투스·엔셀라두스 / 티타니아·오베론 / 트리톤·프로테우스
   - 토성·천왕성·해왕성 고리 + 위성 궤도 per-body 시각 스케일 (작은 위성 가독성 보존)
 - **body 탐색 인터랙션** — canvas 클릭/터치로 body·위성 직접 선택, 겹친 body 반복 클릭 순환(cycle), free-fly 카메라(WASD·패닝·줌 감도 조정), 작은 body glow pixel marker, 궤도선 toggle
+  - focus 줌 안정화 (v0.48~0.50): 최대 줌인 mesh 내부 진입 암전 차단 (#790) + 대형 body 줌인 tier 진동 stall 해소 — apparent-size 보존 + 히스테리시스 (#818)
 - **5-mode 물리 엔진** 토글: `kepler` / `newton` / `barnes-hut` / `webgpu` / `auto`
   - Kepler 2-body 해석해 / Newton N-body Velocity-Verlet WASM / Barnes-Hut O(N log N) octree (theta=0.5 max err 4.99e-9) / WebGPU compute shader (미지원 시 자동 폴백) / Auto 최적 엔진 선택
 - 소행성대 ThinInstances `?belt=N` 1~10000 (Kepler 해석해)

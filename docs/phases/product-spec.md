@@ -1,3 +1,5 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+
 # 개발 기획서 — 웹 기반 천체물리 시뮬레이터
 
 작성일: 2026-04-13
@@ -123,7 +125,7 @@
 
 ## 5. 로드맵
 
-상세: `docs/deprecated/phases/roadmap-v2-solar-precision.md` 참조 (초기 구상은 `roadmap-v1-cosmic-scale.md` archived).
+상세: 현행 로드맵은 `docs/phases/roadmap-v3-incremental.md` (완주, 2026-06-12) → `docs/phases/roadmap-track-ab.md` 참조. v2 는 폐기 (`docs/deprecated/phases/roadmap-v2-solar-precision.md`), 초기 구상 v1 은 archived (`roadmap-v1-cosmic-scale.md`) — 현행화 #842.
 
 | Phase | 범위                 | 완결 제품                   |
 | ----- | -------------------- | --------------------------- |
@@ -286,9 +288,11 @@ type: feat | fix | refactor | test | docs | chore
 ## 부록
 
 - 아키텍처 결정: `docs/phases/architecture.md`
-- 확장 로드맵 (현행 v2): `docs/deprecated/phases/roadmap-v2-solar-precision.md`
+- 로드맵 (현행): `docs/phases/roadmap-track-ab.md` (v3 완주 후속 트랙 A/B — #794)
+- 로드맵 (v3, 완주): `docs/phases/roadmap-v3-incremental.md`
+- 확장 로드맵 (v2, 폐기): `docs/deprecated/phases/roadmap-v2-solar-precision.md`
 - 확장 로드맵 (원안 v1, archived): `docs/phases/roadmap-v1-cosmic-scale.md`
-- 프로젝트 원칙: `docs/deprecated/principles/fact-first.md`
+- 프로젝트 원칙 (폐기 — 역사 참조): `docs/deprecated/principles/fact-first.md` (현행 횡단 원칙: `docs/architecture/principles.md`)
 - P1 스프린트 계약: `docs/phases/P1-solar-system-mvp.md`
 - 프로젝트 원칙: `CLAUDE.md`
 

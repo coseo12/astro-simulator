@@ -97,6 +97,15 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-z-pattern-health.mjs') != ''
         run: node scripts/verify-z-pattern-health.mjs --self-test
 
+      # #842 docs 링크 가드 self-test 회귀 가드.
+      # 체커 자체의 검출 능력(positive→negative→recovery 3중 시뮬 + file:// / 영문 Status: /
+      # deprecated 스캔 제외 단위 케이스)을 fixture 격리로 상시 실측 — 체커가 조용히
+      # 무력화되는 회귀(#338 hashFiles silent skip 재발 클래스) 차단.
+      # 본검사(전수 스캔, fail-fast)는 harness-guards.yml "docs 상대 링크 무결성 가드" 담당.
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#842 docs 링크 가드 self-test (verify-docs-links --self-test)'
+        run: node scripts/verify-docs-links.mjs --self-test
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================

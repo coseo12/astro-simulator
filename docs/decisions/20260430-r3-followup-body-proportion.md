@@ -1,6 +1,6 @@
 # ADR: R3 후속 (#373) — body 간 시각적 비율 회귀 forensic + fix 옵션 비교
 
-- **상태**: Proposed (사용자 옵션 선택 대기)
+- **상태**: Accepted (2026-07-21 소급 전이 #842 — #373 CLOSED 2026-05-02, 옵션 채택 + fix 구현 완주. 원 박제: Proposed, 사용자 옵션 선택 대기)
 - **날짜**: 2026-04-30
 - **결정자**: architect (#373 forensic 단계 — fix 구현은 사용자 승인 후 별도 developer 단계)
 - **관련**: #373 (본 이슈), #369 (R3 venus), #371 (ambient fix PR), #372 (forensic 결과), `20260425-r1-sun-visualization.md` (R1), `20260428-r2-mercury-visualization.md` (R2), `20260429-r3-venus-visualization.md` (R3), `docs/phases/roadmap-v3-incremental.md` (Roadmap v3)
@@ -504,7 +504,7 @@ cross-validate 결과는 본 ADR 의 진행 정당성 확증. 메인 오케스�
 
 ## Amendment 2026-05-01 — §재검토 트리거 #1 발동 (옵션 c 보수값 D-T2 미통과 → 적극값 + 옵션 a 동반 채택)
 
-> **Status**: Active (2026-05-01 박제, architect 단계)
+> **상태**: Active (2026-05-01 박제, architect 단계 — 표기 단일화 #842)
 > **근거 PR**: #377 CLOSED (mercuryScale=2500 / venusScale=1850 보수값 D-T2 미통과)
 > **사용자 결정**: 옵션 c 적극값 (mercury=2000 / venus=1500) + 옵션 a (sunScale=50) 동반 채택 (2026-05-01)
 > **적용 PR**: feature/373-body-proportion-aggressive (본 amendment 박제 후 developer 단계)
@@ -986,11 +986,11 @@ qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus 
 
 #### 비교 표
 
-| 후보  | mercuryScale | venusScale | 사실 비율 도달률 | mercury 저점 pxD (1280×720, dpr=1, far) | mercury 4px 마진 | venus 고점 pxD (1920×1080, dpr=2, close) | LOD 일관성                       | 모바일 누적 disk area |
-| ----- | ------------ | ---------- | ---------------- | --------------------------------------- | ---------------- | ---------------------------------------- | -------------------------------- | --------------------- |
+| 후보    | mercuryScale | venusScale | 사실 비율 도달률 | mercury 저점 pxD (1280×720, dpr=1, far) | mercury 4px 마진 | venus 고점 pxD (1920×1080, dpr=2, close) | LOD 일관성                        | 모바일 누적 disk area |
+| ------- | ------------ | ---------- | ---------------- | --------------------------------------- | ---------------- | ---------------------------------------- | --------------------------------- | --------------------- |
 | **D-1** | 700          | 800        | 114%             | **5.29 px (low)**                       | **+1.29 px**     | 48.4 px (mid 한계)                       | venus mid 일관 유지 (high 미진입) | **16.75%**            |
-| D-2   | 600          | 700        | 117%             | **4.53 px (low)**                       | +0.53 px         | 42.3 px (mid)                            | mid 일관 유지                    | 15.66%                |
-| D-3   | 800          | 900        | 113%             | 6.04 px (low)                           | +2.04 px         | 54.4 px (**high 진입**)                  | venus high/mid 전환 (viewport별) | 17.99%                |
+| D-2     | 600          | 700        | 117%             | **4.53 px (low)**                       | +0.53 px         | 42.3 px (mid)                            | mid 일관 유지                     | 15.66%                |
+| D-3     | 800          | 900        | 113%             | 6.04 px (low)                           | +2.04 px         | 54.4 px (**high 진입**)                  | venus high/mid 전환 (viewport별)  | 17.99%                |
 
 **산출 근거** (선형 비례 — `pxDiameter ∝ scale`, Phase 1 식 정정 PR #390 후 Phase 2 forensic baseline `docs/reports/391-forensic/output.json` SSoT):
 
@@ -1026,12 +1026,12 @@ qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus 
 
 #### 1280×720 (데스크톱 viewport, 표준 평가 기준)
 
-| 항목                | 라운드 2 (현행) | 라운드 3 D-1 (예측)               | DoD 임계 (라운드 2 SSoT ±5% 마진) |
-| ------------------- | --------------- | --------------------------------- | --------------------------------- |
-| sun pxDiameter      | 246 px          | 246 px (변동 없음)                | -                                 |
-| mercury pxDiameter  | ~14.9 px        | **~11.6 px** (예측, 900→700 비례) | -                                 |
-| mercury sun 대비 비 | ~6.07%          | **~4.71%** (예측)                 | **≤ 4.95% (기존 6.30 → 라운드 3 신규)** |
-| venus pxDiameter    | ~27.2 px        | **~33.5 px** (예측, 650→800 비례) | -                                 |
+| 항목                | 라운드 2 (현행) | 라운드 3 D-1 (예측)               | DoD 임계 (라운드 2 SSoT ±5% 마진)         |
+| ------------------- | --------------- | --------------------------------- | ----------------------------------------- |
+| sun pxDiameter      | 246 px          | 246 px (변동 없음)                | -                                         |
+| mercury pxDiameter  | ~14.9 px        | **~11.6 px** (예측, 900→700 비례) | -                                         |
+| mercury sun 대비 비 | ~6.07%          | **~4.71%** (예측)                 | **≤ 4.95% (기존 6.30 → 라운드 3 신규)**   |
+| venus pxDiameter    | ~27.2 px        | **~33.5 px** (예측, 650→800 비례) | -                                         |
 | venus sun 대비 비   | ~11.03%         | **~13.58%** (예측)                | **≤ 14.26% (기존 11.55 → 라운드 3 신규)** |
 
 **임계 갱신 근거**: 라운드 3 박제값이 사실 비율 강화 목표로 **mercury 인하 + venus 인상** 의 비대칭 변화를 동반. 라운드 2 SSoT (mercury ≤ 6.30 / venus ≤ 11.55) 는 D-1 이 자연 통과 (4.71 < 6.30) 하지만 venus 13.58 > 11.55 로 strict FAIL. 따라서 r1-guard `--measure-px-ratio` 임계 자체를 라운드 3 박제값에 맞춰 ±5% 마진 SSoT 로 갱신.
@@ -1071,6 +1071,7 @@ qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus 
 - sun: 변동 없음 (16/16 high)
 
 **시각 영향**:
+
 - mercury low 비율 증가 → PR #394 Phase 2 의 alpha mask 가 더 자주 적용됨 (정상 fallback 경로). 4px ≤ pxD 영역에서 원형 disc 인지 (사용자 D-T1 회귀 #2 fix 영역).
 - venus low → mid 회복 → sphere mesh 인지 강화 (사용자 D-T2 평가 시 "venus 가 더 크고 실제 행성 같음" 인지 강화).
 - 종합: 사용자 D-T2 의 "venus > mercury 사실 비율" 인지가 mercury 인하 + venus 인상 + venus mid 회복의 **3중 경로** 로 강화.
@@ -1082,14 +1083,14 @@ qa 단계 r1-guard `--measure-px-ratio` 실측 결과 mercury **6.07%** / venus 
 ```js
 // 라운드 2 (현행)
 const PX_RATIO_THRESHOLDS = Object.freeze({
-  mercury: 6,   // 라운드 2 strict (마진 적용 전)
+  mercury: 6, // 라운드 2 strict (마진 적용 전)
   venus: 11,
 });
 
 // 라운드 3 D-1 (목표)
 const PX_RATIO_THRESHOLDS = Object.freeze({
-  mercury: 4.95,  // 라운드 3 박제값 700 의 ±5% 마진 (예측 4.71 + 5%)
-  venus: 14.26,   // 라운드 3 박제값 800 의 ±5% 마진 (예측 13.58 + 5%)
+  mercury: 4.95, // 라운드 3 박제값 700 의 ±5% 마진 (예측 4.71 + 5%)
+  venus: 14.26, // 라운드 3 박제값 800 의 ±5% 마진 (예측 13.58 + 5%)
 });
 ```
 
@@ -1159,16 +1160,16 @@ cross-validate 결과 박제 위치: 본 amendment §"### Cross-validate 결과 
 
 #### Gemini 응답 요약 (총평 6 항목)
 
-| 검증 기준        | Gemini 평가                | 핵심 의견                                                                  |
-| ---------------- | -------------------------- | -------------------------------------------------------------------------- |
-| 1. 구조적 완성도 | **Exemplary**              | 문제 정의 → 해결 → 검증 → 인계 모든 단계 누락 없이 구조화. 모범적 사례     |
-| 2. 기술 결정 타당성 | **Exemplary**              | 데이터 기반 분석 + 합리적 옵션 비교 + 점진 개선 전략 모두 훌륭            |
-| 3. 인터페이스 명확성 | **Excellent**              | 개발자 인계 + 자동화 검증(Guard) 명세 명확. 협업 오류 최소화              |
-| 4. 확장성        | **Excellent**              | 단기/장기 분리 + R-Phase 정책 개선 (Q2=B 비례 결정)                       |
-| 5. 보안          | **Not Applicable**         | 시각적 표현 결정. 보안 관련 사항 없음                                     |
-| 6. 누락 요소     | **Excellent**              | 자체 cross-validate + 사용자 D-T2 피드백 루프로 누락 요소 자체 발견       |
+| 검증 기준            | Gemini 평가        | 핵심 의견                                                              |
+| -------------------- | ------------------ | ---------------------------------------------------------------------- |
+| 1. 구조적 완성도     | **Exemplary**      | 문제 정의 → 해결 → 검증 → 인계 모든 단계 누락 없이 구조화. 모범적 사례 |
+| 2. 기술 결정 타당성  | **Exemplary**      | 데이터 기반 분석 + 합리적 옵션 비교 + 점진 개선 전략 모두 훌륭         |
+| 3. 인터페이스 명확성 | **Excellent**      | 개발자 인계 + 자동화 검증(Guard) 명세 명확. 협업 오류 최소화           |
+| 4. 확장성            | **Excellent**      | 단기/장기 분리 + R-Phase 정책 개선 (Q2=B 비례 결정)                    |
+| 5. 보안              | **Not Applicable** | 시각적 표현 결정. 보안 관련 사항 없음                                  |
+| 6. 누락 요소         | **Excellent**      | 자체 cross-validate + 사용자 D-T2 피드백 루프로 누락 요소 자체 발견    |
 
-라운드 3 D-1 채택에 대한 Gemini 직접 평가 (인용): *"4px fallback 안전 마진과 LOD 일관성을 기준으로 D-1을 채택한 것은 안정성을 우선하는 훌륭한 엔지니어링 트레이드오프 결정"*.
+라운드 3 D-1 채택에 대한 Gemini 직접 평가 (인용): _"4px fallback 안전 마진과 LOD 일관성을 기준으로 D-1을 채택한 것은 안정성을 우선하는 훌륭한 엔지니어링 트레이드오프 결정"_.
 
 #### Claude 재분석 (volt #23 / #29 기각·수용 프로토콜)
 

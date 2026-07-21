@@ -1,3 +1,5 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+
 # 반복 운영 마찰 — 원인 박제 + 절차 표준 (#795)
 
 매 세션·릴리스마다 반복되던 저비용 운영 마찰의 **구조 원인**과 **표준 절차**를 박제한다. 개별론 사소하나 누적되며, 원인 미박제 시 매 세션 "이력상 그렇더라"로만 전승되어 회수 불가능해진다.
@@ -83,6 +85,16 @@ gh pr checks <PR> --json name,state --jq \
 - **release prep PR 필수**: version bump + CHANGELOG 확정은 develop 직접 push 금지라 `release/<X>-prep → develop` prep PR 로 선반영 후 release PR(develop→main).
 - **release PR 도 pr-template-checklist 가드 대상**: 7 체크박스 원문 문구("ADR 호환성"/"Test plan"/"SSoT" 등) 전부 필요 — release 전용 섹션만으론 FAIL. 로컬 사전검증: `node scripts/verify-pr-template-checklist.mjs <PR>`.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
+- **README 「현재 상태」 갱신 의무 (#842)**: release prep PR 에서 version bump + CHANGELOG 확정과 **동일 커밋**에 README `## 현재 상태` 의 버전/날짜/기능 서술을 현행화한다. 실측: v0.47.0~v0.50.0 3릴리스 연속 누락으로 README 가 v0.46.0 표기로 방치 (전수 감사 2026-07-18 발견).
+
+## workspace 버전 정책 — 루트 단일 버전 (결정 노트, #842)
+
+**결정**: `package.json::version` 릴리스 버전 SSoT 는 **루트 1곳만** 유지한다. private workspace 패키지 (`apps/web`, `packages/core`) 의 `version` 필드는 제거 — 릴리스 버전 미러링 폐지.
+
+- **실측 배경**: v0.46.0 까지는 루트+workspace 동시 bump 였으나 v0.47.0 부터 루트만 bump 되어 apps/web·packages/core 가 0.46.0 에 3릴리스 동안 무기록 방치 (동시 bump 는 이미 사문화된 상태였음).
+- **판단 기준 (저비용·재발 방지)**: 전부 `private: true` 미배포 패키지라 npm 상 version 의미 0 + 런타임/빌드에서 workspace version 참조 0 실측 → 동시 bump 복원은 매 릴리스 반복 비용 + 재발 (누락) 여지만 남김. 필드 제거가 drift 클래스 자체를 소멸시킴.
+- **예외**: `packages/physics-wasm` (0.18.0) 은 애초에 루트 릴리스 버전을 미러링한 적 없는 독립 카운터 — 본 결정 범위 밖 (유지).
+- **가드**: `scripts/verify-release-version-bump.sh` 는 CHANGELOG ↔ 루트 `package.json::version` 일치만 검증 (기존과 동일 — workspace 검증 불요화).
 
 ## 문서 배치 마찰 — 프로젝트 고유 lessons 는 docs/lessons/ 아님 (본 문서 자체 사례)
 

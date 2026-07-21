@@ -1,3 +1,5 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+
 # 용어사전 (Glossary)
 
 > astro-simulator 의 ADR / lessons / phases / retrospectives 문서가 공유하는 프로젝트 고유 용어를 정의한다. 신규 참여자/에이전트의 onboarding 비용 절감 목적. 각 항목은 5줄 이내 정의 + 첫 도입 ADR 또는 PR 링크.
@@ -20,7 +22,7 @@ Roadmap v3 의 incremental body-by-body build 단계. **R1**=태양 가시성 / 
 
 씬 단위 renderScale 차등 단계. **T1 solar** (renderScale ≈ 8.4e-11, 전체 태양계 뷰) / **T2 inner** (≈ 1.5e-9, 내행성권) / **T3 body** (≈ 5e-5, 표면 근접). `tier-transition.ts:runTierTransition` 이 ExponentialEase 300ms 로 camera dolly + apparent size 보존 수식 (`radius_new = radius_old × newScale / oldScale`) 으로 전환.
 
-- 발화: [`docs/decisions/20260423-display-relative-scale-unification.md`](decisions/20260423-display-relative-scale-unification.md) §3 후보 D (Q8=8D 배선 원리)
+- 발화: [`docs/deprecated/decisions/20260423-display-relative-scale-unification.md`](deprecated/decisions/20260423-display-relative-scale-unification.md) §3 후보 D (Q8=8D 배선 원리 — ADR 자체는 P12 폐기, tier 개념은 현행 유지)
 - 정밀: [`docs/decisions/20260509-380-zoom-camera-freeze-forensic.md`](decisions/20260509-380-zoom-camera-freeze-forensic.md) (가드 A G1 fix)
 
 ## Floating Origin (primary follow / safety net)
@@ -65,19 +67,19 @@ tier 전환 시 입력 잠금 + camera dolly + onComplete 콜백 lifecycle 을 �
 
 일반상대성 1차 후 뉴턴 보정 (1 Post-Newtonian) 식. 수성 근일점 세차 (43''/century) 등 GR 효과를 Newton 적분에 추가. `grMode === 'eih'` 활성 시 적용. `single-1pn` 은 sun-only 단순 항.
 
-- 발화: [`docs/decisions/20260321-p5-general-relativity.md`](decisions/20260321-p5-general-relativity.md) (#178/#191)
+- 발화: [`docs/decisions/20260417-general-relativity-1pn.md`](decisions/20260417-general-relativity-1pn.md) (#178/#191 — 파일명 정정 #842)
 
 ## Yoshida (4th-order symplectic integrator)
 
 해밀턴 시스템 적분기 — velocity-verlet (2차) 대비 에너지 보존성 우수. 모바일에서 perf 비용 ~30% 추가. `integrator: 'yoshida4'` 옵션. 장기 적분 정확성 우선 시.
 
-- 발화: [`docs/decisions/20260411-p7-yoshida4-default-decision.md`](decisions/20260411-p7-yoshida4-default-decision.md) (#207)
+- 발화: [`docs/decisions/20260418-p7-integrator-upgrade.md`](decisions/20260418-p7-integrator-upgrade.md) (#207 — 파일명 정정 #842)
 
 ## Barnes-Hut (octree-based N-body)
 
 O(N²) → O(N log N) 가속 알고리즘. 소행성대 N=5000+ 같은 큰 N 에서 활성. `physicsEngine: 'barnes-hut'`. θ=0.5 가 정확도/성능 균형 기본값.
 
-- 발화: [`docs/decisions/20260227-p3-barnes-hut.md`](decisions/20260227-p3-barnes-hut.md) (#124/#138)
+- 발화: [`docs/benchmarks/p3a-barnes-hut-accuracy.md`](benchmarks/p3a-barnes-hut-accuracy.md) (#124/#138 — 전용 ADR 부재, 정확도 벤치마크 문서로 정정 #842)
 
 ## NO-OP ADR
 
@@ -102,7 +104,7 @@ ADR 라이프사이클 상태. **Provisional** = cross-validate 또는 사용자
 
 ADR / 정책 / CRITICAL DIRECTIVE 박제 직후 Gemini 2.5 Pro 로 1회 교차검증하는 루틴. 결과는 **합의 / 이견 / 고유 발견** 3축 분류 후 ADR §교차검증 반영 사항에 박제. 고유 발견은 (a) 현재 PR 반영 / (b) 후속 이슈 분리 둘 중 결정.
 
-- 발화: CLAUDE.md §"교차검증 (cross-validate)", [`docs/lessons/cross-validate-followup-pattern.md`](lessons/cross-validate-followup-pattern.md)
+- 발화: CLAUDE.md §"교차검증 (cross-validate)", [`docs/guides/cross-validate-protocol.md`](guides/cross-validate-protocol.md) (파일명 정정 #842)
 
 ## R-Phase Allowlist 가드 (defense-in-depth)
 
@@ -139,3 +141,33 @@ focus 해제 시 camera 시점 (alpha/beta/radius/target/tier) 을 그대로 유
 tier 전환 윈도우 (`detachControl ~ cleanup`) 에서 도달한 사용자 wheel/touchstart 카운트. G8a (input lock) 의 UX 비용 정량화 — 일정 운영 후 분포 관찰 → G8b (큐잉) 격상 결정 데이터. DevTools: `window.__simCore.metrics.tierTransitionInputDrops`.
 
 - 발화: [`#444`](https://github.com/coseo12/astro-simulator/issues/444) / PR [#516](https://github.com/coseo12/astro-simulator/pull/516)
+
+## dead-wait (세션 중단 무인지 침묵)
+
+background 대기 (sub-agent / CI watch) 중 세션 재시작으로 waiter 프로세스가 SIGKILL 소멸했는데 메인 컨텍스트에는 "대기 중" 만 남아 아무것도 모델을 재호출하지 않는 무기한 침묵 상태. fallback ScheduleWakeup (1200~1800s) + SessionStart 복구 훅 + `.context/pending-waits.json` 3계층 직교 방어.
+
+- 발화: [`docs/decisions/20260710-817-dead-wait-guard.md`](decisions/20260710-817-dead-wait-guard.md) (#817), [`docs/lessons/dead-wait-guard.md`](lessons/dead-wait-guard.md)
+
+## focus-entry (focus 진입 궤도 맥락 프레이밍)
+
+`focusOn` 진입 시 대상 body 를 궤도 맥락과 함께 프레이밍하는 계약 — inner tier 정착 (earth 기준 화면 점유 ~21%). body-tier 줌인 도달 계약 (V5 40%, `runTierTransition` ×5.9) 과는 **별개 계약**. #834 실측 재검증에서 "버그 아님 — 의도된 프레이밍" NO-OP 확정.
+
+- 발화: [`docs/decisions/20260718-834-focus-entry-tier-no-op.md`](decisions/20260718-834-focus-entry-tier-no-op.md) (#834)
+
+## tier 히스테리시스 (zoom crossing 진동 방지)
+
+0.1 AU tier 경계 crossing 시 focus-entry framing 재적용 → catapult → 역판정이 반복되는 무한 진동 (runaway) 을 차단하는 가드. 줌 crossing 시 apparent-size 보존 (preserveFocusDistance) + 경계 히스테리시스로 대형 body 줌인 stall 해소.
+
+- 발화: [`docs/decisions/20260717-818-focus-zoom-tier-oscillation-forensic.md`](decisions/20260717-818-focus-zoom-tier-oscillation-forensic.md) (#818)
+
+## render-capacity (rAF 우회 렌더 용량 프로브)
+
+`__simCore.scene` 동기 렌더 루프로 rAF vsync 종속을 우회해 실제 렌더 용량을 측정하는 프로브. `rafFps∈[28,36] ∧ capacity≥400` 이면 30Hz vsync 락으로 분류해 fps 가드 false-positive 를 흡수. 저 rafFps 분류만으로는 흡수 금지 — capacity 양성 입증 시에만 (fail-fast 불변식).
+
+- 발화: [`docs/decisions/20260710-820-fps-vsync-lock-forensic.md`](decisions/20260710-820-fps-vsync-lock-forensic.md) (#820)
+
+## Z 패턴 (harness-managed divergent workflow)
+
+harness-managed 파일 (`.harness/manifest.json` 등록) 에 프로젝트 고유 변경이 필요할 때의 3단계 워크플로 — Phase 1 본 프로젝트 선반영 (`HARNESS-DRIFT: Z-PATTERN [TODO]` 데코레이터 박제) → Phase 2 upstream 기여 (cross-link) → Phase 3 `harness update` 자동 동기화로 drift 해소. 데코레이터 누락 시 CI fail-fast (Amendment 8).
+
+- 발화: [`docs/decisions/20260515-harness-managed-divergent-pattern.md`](decisions/20260515-harness-managed-divergent-pattern.md) (#556), CLAUDE.md §"Z 패턴 TL;DR"

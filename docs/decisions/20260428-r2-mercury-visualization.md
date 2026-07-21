@@ -682,7 +682,7 @@ cross-validate 호출 완료 (Gemini 3.1 Pro Preview, 2026-04-28 17:16 KST). out
 
 ## Amendment 2026-05-01 — mercuryScale 8500 → 2000 확정 (적극값) + Q2=B 임계 강화
 
-> **Status**: Active (2026-05-01 박제, architect 단계)
+> **상태**: Active (2026-05-01 박제, architect 단계 — 표기 단일화 #842)
 > **근거 ADR**: [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01
 > **R1 동반 amendment**: [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) Amendment 2026-05-01 (sunScale 75 → 50)
 > **근거 PR**: #377 CLOSED (mercuryScale=2500 보수값 D-T2 미통과)
@@ -821,14 +821,14 @@ forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라
 
 ### 라운드 3 mercury 영향 박제
 
-| 항목                                       | 라운드 2 (mercury 900) | 라운드 3 D-1 (mercury 700) | 변동           |
-| ------------------------------------------ | ---------------------- | -------------------------- | -------------- |
-| pxDiameter (1280×720, dpr=1, T1 default)   | ~14.9 px               | **~11.6 px** (예측)        | -3.3 px (-22%) |
-| pxDiameter 저점 (1280×720, dpr=1, far)     | 6.80 px (low)          | **5.29 px (low)** (예측)   | -1.51 px       |
-| sun 대비 px 비 (1280×720)                  | ~6.07%                 | **~4.71%** (예측)          | -1.36%p        |
-| 모바일 disk area (375×667, baseline)       | ~1.94%                 | **~1.17%** (예측)          | -0.77%p        |
-| LOD 분포 (16 cell)                         | low 5 / mid 11         | **low ~10 / mid ~6** (예측) | low +5/16 증가 |
-| 4px fallback 마진 (저점)                   | +2.80 px               | **+1.29 px** (예측)        | -1.51 px       |
+| 항목                                     | 라운드 2 (mercury 900) | 라운드 3 D-1 (mercury 700)  | 변동           |
+| ---------------------------------------- | ---------------------- | --------------------------- | -------------- |
+| pxDiameter (1280×720, dpr=1, T1 default) | ~14.9 px               | **~11.6 px** (예측)         | -3.3 px (-22%) |
+| pxDiameter 저점 (1280×720, dpr=1, far)   | 6.80 px (low)          | **5.29 px (low)** (예측)    | -1.51 px       |
+| sun 대비 px 비 (1280×720)                | ~6.07%                 | **~4.71%** (예측)           | -1.36%p        |
+| 모바일 disk area (375×667, baseline)     | ~1.94%                 | **~1.17%** (예측)           | -0.77%p        |
+| LOD 분포 (16 cell)                       | low 5 / mid 11         | **low ~10 / mid ~6** (예측) | low +5/16 증가 |
+| 4px fallback 마진 (저점)                 | +2.80 px               | **+1.29 px** (예측)         | -1.51 px       |
 
 **4px fallback 안전성**: D-1 mercury 저점 5.29 px 가 PR #394 Phase 2 의 4px fallback 임계와 1.29 px 마진. D-2 (mercury 600) 의 0.53 px 마진 대비 **2.43배 안전**. 측정 노이즈 / floating-point 정밀도 변동 흡수 가능.
 
@@ -863,4 +863,4 @@ forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라
 
 ---
 
-[^r1-amend-v2]: 2026-05-06 R1 ADR `20260425-r1-sun-visualization.md` §"Amendment v2 (2026-05-06)" 박제 완료. 본 R2 ADR §발견 1 발견값 (3.88%) 이 R1 ADR 본문 박제값으로 정정 확정. 본 §"고유 발견" §"위험 / 미해결" §"DoD 마진 분석" 의 R1 ADR 6.18% 인용은 *발견 시점 (2026-04-28) 컨텍스트* 보존 — 역사적 인용. 이슈 [#362](https://github.com/coseo12/astro-simulator/issues/362).
+[^r1-amend-v2]: 2026-05-06 R1 ADR `20260425-r1-sun-visualization.md` §"Amendment v2 (2026-05-06)" 박제 완료. 본 R2 ADR §발견 1 발견값 (3.88%) 이 R1 ADR 본문 박제값으로 정정 확정. 본 §"고유 발견" §"위험 / 미해결" §"DoD 마진 분석" 의 R1 ADR 6.18% 인용은 _발견 시점 (2026-04-28) 컨텍스트_ 보존 — 역사적 인용. 이슈 [#362](https://github.com/coseo12/astro-simulator/issues/362).

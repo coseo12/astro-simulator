@@ -1,5 +1,7 @@
 # 20260503 — #378 focus 회귀 forensic + fix 옵션 비교 (architect 단계)
 
+- 상태: Accepted (2026-07-21 소급 박제 #842 — 원 박제 시 상태 필드 누락. #378 CLOSED, fix 구현 완주)
+
 ## 배경
 
 R3 (#369) PR #371 머지 + R3 fix PR #377 D-T2 (2026-04-30) 사용자 검증에서 focus 인터랙션 시 **focus 대상 body 가 화면 중앙에 표시되지 않고 허공만 보이는** 회귀 5건 중 #2 발견. 이슈 [#378](https://github.com/coseo12/astro-simulator/issues/378) 박제. 라운드 3 (PR #396 머지, 2026-05-03) D-T2 에서 다음과 같이 매트릭스 좁혀짐:

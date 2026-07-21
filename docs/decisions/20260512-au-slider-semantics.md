@@ -1,6 +1,6 @@
 # ADR 20260512 — AU 슬라이더 의미 정의 (DoD-2 / DoD-4)
 
-> **Status**: Proposed (2026-05-12 박제, architect 단계)
+> **상태**: Accepted (2026-07-21 소급 전이 #842 — #400 CLOSED 구현 완주. 원 박제: Proposed 2026-05-12, architect 단계)
 > **이슈**: [#400](https://github.com/coseo12/astro-simulator/issues/400) — 우측 AU 슬라이더 (ScaleControl)
 > **관련**: PR #399 (발화점 D-T2 2026-05-03) · ADR `20260424-tier-naming-policy.md` (tier renderScale SSoT) · ADR `20260424-p11-b-lod-design.md` (LOD/tier 설계) · ADR `20260422-floating-origin.md` · ADR `20260429-r3-venus-visualization.md` §재검토 트리거 #3 (R4 viewport-aware scaling 박제 의무)
 > **Supersedes**: 없음 (신규 박제)
@@ -18,18 +18,19 @@ const handleChange = (v: number[]) => {
   // v[0] 은 log10(scene unit) — `radius` = 10^v[0]
   sendCommand({ type: 'setCameraRadius', radius: Math.pow(10, logV) });
 };
-const displayAU = Math.pow(10, value);  // 라벨에 "AU" 단위로 표시
+const displayAU = Math.pow(10, value); // 라벨에 "AU" 단위로 표시
 ```
 
 라벨은 `displayAU < 1 ? '... mAU' : '... AU'` 형식. 그러나 `radius` 의 단위는 **AU 가 아니라 Babylon scene unit** 이며, scene unit 의 실제 m → AU 변환은 **현재 tier 의 `renderScaleForTier(tier)` 역수**에 의존한다 (sim-canvas.tsx:380, 453 / `packages/core/src/scene/tier.ts` SSoT):
 
-| Tier | renderScale | 1 scene unit ≈ m | 1 scene unit ≈ AU |
-| ---- | ----------- | ---------------- | ----------------- |
-| T1 solar | 8.4e-11 | 1.19e10 m | **0.0795 AU** |
-| T2 inner | 1.54e-9 | 6.50e8 m | **4.35e-3 AU** (≈ 0.0043 AU) |
-| T3 body | 2.51e-5 | 3.98e4 m | **2.66e-7 AU** (≈ 39.8 km) |
+| Tier     | renderScale | 1 scene unit ≈ m | 1 scene unit ≈ AU            |
+| -------- | ----------- | ---------------- | ---------------------------- |
+| T1 solar | 8.4e-11     | 1.19e10 m        | **0.0795 AU**                |
+| T2 inner | 1.54e-9     | 6.50e8 m         | **4.35e-3 AU** (≈ 0.0043 AU) |
+| T3 body  | 2.51e-5     | 3.98e4 m         | **2.66e-7 AU** (≈ 39.8 km)   |
 
 즉 슬라이더 라벨 "1 AU" 가 실제로는:
+
 - T1 solar 진입 상태 → 약 **0.0795 AU** (≈ 1.19e10 m, 해왕성 평균 궤도 30.1 AU 의 ~1/378)
 - T2 inner 진입 상태 → 약 **0.0043 AU** (≈ 643,000 km, 달 거리의 ~1.7배)
 - T3 body 진입 상태 → 약 **2.66e-7 AU** (≈ 39.8 km)
@@ -52,15 +53,15 @@ const displayAU = Math.pow(10, value);  // 라벨에 "AU" 단위로 표시
 
 ### 결정 A — AU 라벨 환산 공식
 
-| 축 | 후보 A1 (현행 유지 — scene unit ≡ AU) | 후보 A2 (단일 환산 — tier 무시, 고정 m/unit 가정) | 후보 A3 (**tier-aware 환산** — 현 tier × focus 모드 분기) | 후보 A4 (AU 외 단위로 전환 — scene unit 그대로 표시) |
-| --- | --- | --- | --- | --- |
-| 라벨 사실성 | × (최대 3억배 drift) | × (T1↔T3 사이 ~1e6배 drift 잔존) | **○ (실측 ± 5% 일치)** | △ (사실 정확하나 사용자 직관 ↓) |
-| 구현 복잡도 | (현행) | 낮음 (1 상수 추가) | **중간 (tier subscribe + focus 거리 lookup)** | 낮음 |
-| 사용자 직관 (AU = 천문단위 보편) | × (보편 단위 표기 자체가 거짓) | × (동일) | **○ (라벨 = 표기 = 보편 단위)** | × ("scene unit" 표기는 천문 사용자에 무의미) |
-| R-Phase 가드 직교성 | (현행) | (영향 없음) | **○ (R_PHASE_BODY_ALLOWLIST 직교, focus body 만 사용)** | (영향 없음) |
-| R4 viewport-aware 결합 위험 | × (R4 에서 모두 재작성) | × (R4 에서 식 변경 시 단일 상수 폐기) | **△ (R4 진입 시 환산 식이 viewport scale 추가 반영 필요 — Amendment 박제)** | ○ (R4 영향 없음, 표시 단위 무관) |
-| 사용자 인지 비용 | 0 (현행) | 0 | **낮음 (라벨 텍스트 변화 없음, 값만 정확화)** | 큼 (라벨 텍스트 자체 변경) |
-| volt #74 패턴 해소 | × (가짜 AU 라벨 유지) | × (tier 무시 → 부분 해소) | **○ (실 천체간 거리 일치)** | △ (사실성은 해소, "AU" 자체 폐기로 회피) |
+| 축                               | 후보 A1 (현행 유지 — scene unit ≡ AU) | 후보 A2 (단일 환산 — tier 무시, 고정 m/unit 가정) | 후보 A3 (**tier-aware 환산** — 현 tier × focus 모드 분기)                   | 후보 A4 (AU 외 단위로 전환 — scene unit 그대로 표시) |
+| -------------------------------- | ------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 라벨 사실성                      | × (최대 3억배 drift)                  | × (T1↔T3 사이 ~1e6배 drift 잔존)                  | **○ (실측 ± 5% 일치)**                                                      | △ (사실 정확하나 사용자 직관 ↓)                      |
+| 구현 복잡도                      | (현행)                                | 낮음 (1 상수 추가)                                | **중간 (tier subscribe + focus 거리 lookup)**                               | 낮음                                                 |
+| 사용자 직관 (AU = 천문단위 보편) | × (보편 단위 표기 자체가 거짓)        | × (동일)                                          | **○ (라벨 = 표기 = 보편 단위)**                                             | × ("scene unit" 표기는 천문 사용자에 무의미)         |
+| R-Phase 가드 직교성              | (현행)                                | (영향 없음)                                       | **○ (R_PHASE_BODY_ALLOWLIST 직교, focus body 만 사용)**                     | (영향 없음)                                          |
+| R4 viewport-aware 결합 위험      | × (R4 에서 모두 재작성)               | × (R4 에서 식 변경 시 단일 상수 폐기)             | **△ (R4 진입 시 환산 식이 viewport scale 추가 반영 필요 — Amendment 박제)** | ○ (R4 영향 없음, 표시 단위 무관)                     |
+| 사용자 인지 비용                 | 0 (현행)                              | 0                                                 | **낮음 (라벨 텍스트 변화 없음, 값만 정확화)**                               | 큼 (라벨 텍스트 자체 변경)                           |
+| volt #74 패턴 해소               | × (가짜 AU 라벨 유지)                 | × (tier 무시 → 부분 해소)                         | **○ (실 천체간 거리 일치)**                                                 | △ (사실성은 해소, "AU" 자체 폐기로 회피)             |
 
 **A1 (현행)**: 슬라이더 unit ↔ AU 1:1 가정 유지. 최대 3억배 drift. volt #74 미해소. **탈락**.
 
@@ -74,15 +75,15 @@ const displayAU = Math.pow(10, value);  // 라벨에 "AU" 단위로 표시
 
 ### 결정 B — focus 모드 진입 시 슬라이더 동작
 
-| 축 | 후보 B1 (현행 — 단방향 + 라벨 그대로) | 후보 B2 (focus 진입 시 disable + 시각 큐) | 후보 B3 (focus 진입 시 hide) | 후보 B4 (**focus 진입 시 의미 재정의 + 양방향 sync** — 라벨이 "카메라-focus body 거리 AU" 로 자동 전환) |
-| --- | --- | --- | --- | --- |
-| 사용자가 슬라이더로 focus 거리 조절 가능 | △ (조절은 되나 라벨 ≠ 실 의미) | × (조절 불가) | × (UI 부재) | **○ (조절 + 라벨 사실성 일치)** |
-| 라벨 의미의 일관성 | × | ○ (조절 불가하므로 라벨 의미 정의 회피) | ○ (slider 자체 부재) | **○ (focus 모드에서 명시적 "카메라-focus body 거리")** |
-| 구현 비용 | 0 (현행) | 낮음 (focus state subscribe + disabled prop) | 낮음 (조건부 unmount) | **중간 (focus state subscribe + 라벨 분기 + 카메라 양방향 sync)** |
-| focus body 클릭 후 줌인 / 줌아웃 UX | × (라벨 거짓) | × (불가능) | × (불가능) | **○ (사용자 직관 — focus 상태에서 거리 조절)** |
-| R-Phase 가드 직교성 | (현행) | ○ | ○ | **○ (focus body 가 R_PHASE_BODY_ALLOWLIST 에 있으므로 직교)** |
-| 사용자 학습 비용 | 0 (현행) | 낮음 (disable 큐) | 낮음 (사라짐) | **낮음 (라벨이 자동 전환되어 사용자가 인지)** |
-| 결정 A 와의 정합 | × | △ (조절 불가하므로 A 효과 부분) | △ (slider 자체 없음) | **○ (A 의 환산 식 + 양방향 sync 가 완전한 사실성 보장)** |
+| 축                                       | 후보 B1 (현행 — 단방향 + 라벨 그대로) | 후보 B2 (focus 진입 시 disable + 시각 큐)    | 후보 B3 (focus 진입 시 hide) | 후보 B4 (**focus 진입 시 의미 재정의 + 양방향 sync** — 라벨이 "카메라-focus body 거리 AU" 로 자동 전환) |
+| ---------------------------------------- | ------------------------------------- | -------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 사용자가 슬라이더로 focus 거리 조절 가능 | △ (조절은 되나 라벨 ≠ 실 의미)        | × (조절 불가)                                | × (UI 부재)                  | **○ (조절 + 라벨 사실성 일치)**                                                                         |
+| 라벨 의미의 일관성                       | ×                                     | ○ (조절 불가하므로 라벨 의미 정의 회피)      | ○ (slider 자체 부재)         | **○ (focus 모드에서 명시적 "카메라-focus body 거리")**                                                  |
+| 구현 비용                                | 0 (현행)                              | 낮음 (focus state subscribe + disabled prop) | 낮음 (조건부 unmount)        | **중간 (focus state subscribe + 라벨 분기 + 카메라 양방향 sync)**                                       |
+| focus body 클릭 후 줌인 / 줌아웃 UX      | × (라벨 거짓)                         | × (불가능)                                   | × (불가능)                   | **○ (사용자 직관 — focus 상태에서 거리 조절)**                                                          |
+| R-Phase 가드 직교성                      | (현행)                                | ○                                            | ○                            | **○ (focus body 가 R_PHASE_BODY_ALLOWLIST 에 있으므로 직교)**                                           |
+| 사용자 학습 비용                         | 0 (현행)                              | 낮음 (disable 큐)                            | 낮음 (사라짐)                | **낮음 (라벨이 자동 전환되어 사용자가 인지)**                                                           |
+| 결정 A 와의 정합                         | ×                                     | △ (조절 불가하므로 A 효과 부분)              | △ (slider 자체 없음)         | **○ (A 의 환산 식 + 양방향 sync 가 완전한 사실성 보장)**                                                |
 
 **B1 (현행)**: focus 진입 시 슬라이더 라벨이 거짓 (radius 의미가 카메라-focus body 거리로 바뀌었는데 라벨은 그대로). **탈락**.
 
@@ -101,15 +102,16 @@ R3 ADR `20260429-r3-venus-visualization.md` §재검토 트리거 #3 + §위험�
 > "**R4 ADR 박제 시점에 viewport-aware scaling 도입 여부 명시적 결정 박제 의무**. R4 architect 단계에서 도입 / 미도입 / 부분 도입 (모바일 only) 3 후보 비교 후 결정 박제 의무. 미결정 또는 미루기 금지."
 
 본 ADR 의 환산 식 (`metersPerSceneUnit = 1 / renderScaleForTier(tier)`) 은 tier 별 고정 renderScale 에 의존한다. R4 viewport-aware scaling 이 도입되면:
+
 - (a) renderScale 자체가 viewport 함수 → 환산 식이 viewport 도 변수로 받아야 함
 - (b) tier 경계 (`BOUNDARY.innerUpper` / `solarUpper`) 가 viewport 적응 → 슬라이더 LOG_MIN/LOG_MAX 범위 적응 필요
 - (c) 모바일 only 부분 도입 시 데스크톱은 본 ADR 그대로 유지 가능
 
-| 후보 | 본 ADR 변경 범위 |
-| --- | --- |
-| C1 R4 에서 viewport-aware 미도입 | 본 ADR 그대로 유지. Amendment 불요 |
+| 후보                                | 본 ADR 변경 범위                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| C1 R4 에서 viewport-aware 미도입    | 본 ADR 그대로 유지. Amendment 불요                                             |
 | C2 R4 에서 viewport-aware 전체 도입 | 결정 A 환산 식이 `renderScaleForTier(tier, viewport)` 로 확장 → Amendment 의무 |
-| C3 R4 에서 모바일 only 부분 도입 | 결정 A 환산 식이 viewport breakpoint 분기 → Amendment 의무 (모바일 분기만) |
+| C3 R4 에서 모바일 only 부분 도입    | 결정 A 환산 식이 viewport breakpoint 분기 → Amendment 의무 (모바일 분기만)     |
 
 **결정**: **본 ADR 은 결정 A/B 의 1차 박제 SSoT 로 유지. R4 architect 단계에서 viewport-aware scaling 도입 여부 박제 시 본 ADR 의 §재검토 조건 자동 발동 — Amendment 또는 폐기 결정**. R4 진입 전까지는 본 ADR 의 환산 식이 effective SSoT.
 
@@ -130,22 +132,24 @@ const focusBodyId: string | null = useSelectedBodyId();
 const metersPerSceneUnit = 1 / renderScaleForTier(tier);
 
 // 슬라이더 값 (scene unit) → m → AU
-const radiusSceneUnit = Math.pow(10, value);  // 슬라이더 LOG_MIN..LOG_MAX (현행 -2..2)
+const radiusSceneUnit = Math.pow(10, value); // 슬라이더 LOG_MIN..LOG_MAX (현행 -2..2)
 const radiusMeters = radiusSceneUnit * metersPerSceneUnit;
-const radiusAU = radiusMeters / AU;  // AU 상수: 149_597_870_700 m (packages/shared)
+const radiusAU = radiusMeters / AU; // AU 상수: 149_597_870_700 m (packages/shared)
 
 // 라벨 의미 (focus 모드 분기)
 const labelMeaning: 'origin-distance' | 'focus-distance' =
   focusBodyId === null ? 'origin-distance' : 'focus-distance';
 
-const displayAU = radiusAU;  // 단위 분기 (mAU / AU / kAU) 는 기존 displayAU < 1 분기 확장
+const displayAU = radiusAU; // 단위 분기 (mAU / AU / kAU) 는 기존 displayAU < 1 분기 확장
 ```
 
 **라벨 텍스트 사양** (결정 B 와 결합):
+
 - free-fly (focusBodyId === null): `"{value} AU"` (또는 mAU / kAU 자동 단위 — 현행 mAU 분기 확장)
 - focus 모드 (focusBodyId !== null): `"{value} AU (focus)"` 또는 별도 시각 큐 (예: 라벨 색상 / 작은 "📍" 아이콘 — UI 디자인 후속)
 
 **측정 가능한 expected behavior (DoD 후속 검증 기준)**:
+
 1. T1 solar / free-fly 진입 (default `/?`, sun 미 focus) 에서 슬라이더 thumb 의 라벨 표시값 ↔ `Math.sqrt(camera.position.x^2 + y^2 + z^2) / renderScaleForTier('solar') / AU` 가 **± 1% 이내 일치** (수식 자체 오차는 float32 누적 / `Math.sqrt` 계산 시에도 0% 에 근접해야 함. ± 1% 는 측정 도구 노이즈 마진. **Gemini cross-validate 2026-05-12 Q2 이견 수용** — 초안 ± 5% 는 셀프 체크 "순수주의" 미통과)
 2. T3 body / focus venus 상태 진입 (`?focus=venus`) 에서 슬라이더 thumb 의 라벨 ↔ `camera.radius / renderScaleForTier('body') / AU` 가 **± 1% 이내 일치**
 3. tier transition (T1 → T2 → T3 자연 줌인) 의 **전환 순간 1 프레임 한정**으로 라벨 값이 **± 5% 까지** 일시 drift 가능 (React render cycle 과 Babylon render cycle 사이 1~2 프레임 stale read — **Gemini cross-validate Q4 합의 — 허용 trade-off**). 전환 완료 후 다음 React render (≤ 50ms) 에 ± 1% 마진으로 수렴. 라벨 값이 순간 점프하는 것 자체는 사용자에게 보이지만 (renderScale 불연속) drift 잔존은 금지
@@ -175,6 +179,7 @@ const displayAU = radiusAU;  // 단위 분기 (mAU / AU / kAU) 는 기존 displa
 3. **focus 모드 시각 큐** — 라벨 텍스트에 `(focus: <bodyName>)` 추가 또는 작은 indicator. 디자인 후속 (developer + UX 협의)
 
 **측정 가능한 expected behavior**:
+
 1. 마우스 휠 줌 / 핀치 줌 / `?focus=X` URL 진입으로 `camera.radius` 변경 후 **≤ 50ms 이내** (throttle 33ms + React render 17ms ≈ 50ms) 슬라이더 thumb 위치 갱신
 2. tier transition (`camera.radius` 가 tier 경계 통과로 renderScale 변경) 시 슬라이더 thumb 위치가 새 tier 환산식에 맞게 즉시 (≤ 50ms) 갱신. 전환 순간 1 프레임 stale read 허용 (결정 A expected behavior #3 정합)
 3. focus 진입 시 라벨 텍스트가 `(focus: <bodyName>)` 표기 추가 — 사용자 인지 가능
@@ -240,12 +245,12 @@ ADR §재검토 조건 #1 + 결정 C 텍스트만으로는 인적 오류 (R4 arc
 
 ## R4 와의 관계
 
-| 항목 | 본 ADR (결정 A/B) | R4 viewport-aware scaling (예정) |
-| --- | --- | --- |
-| 직접 결합 | renderScale → m → AU 환산식 | renderScale 자체 (viewport 함수) |
-| 결합 위험 | △ (R4 가 환산식 시그니처 변경 시 본 ADR Amendment 의무) | (본 ADR 가 R4 의 결정 강도에 영향 미미) |
-| 결합 박제 | 본 ADR §재검토 조건 #1 + 결정 C | R4 ADR §재검토 조건 (R4 작성 시 박제) |
-| 폐기 가능성 | R4 가 슬라이더 자체 재설계 권고 시 본 ADR 폐기 + 신규 ADR | (R4 는 본 ADR 와 무관하게 진행 가능) |
+| 항목        | 본 ADR (결정 A/B)                                         | R4 viewport-aware scaling (예정)        |
+| ----------- | --------------------------------------------------------- | --------------------------------------- |
+| 직접 결합   | renderScale → m → AU 환산식                               | renderScale 자체 (viewport 함수)        |
+| 결합 위험   | △ (R4 가 환산식 시그니처 변경 시 본 ADR Amendment 의무)   | (본 ADR 가 R4 의 결정 강도에 영향 미미) |
+| 결합 박제   | 본 ADR §재검토 조건 #1 + 결정 C                           | R4 ADR §재검토 조건 (R4 작성 시 박제)   |
+| 폐기 가능성 | R4 가 슬라이더 자체 재설계 권고 시 본 ADR 폐기 + 신규 ADR | (R4 는 본 ADR 와 무관하게 진행 가능)    |
 
 R4 architect 단계 진입 시 본 ADR 의 §재검토 조건 #1 이 자동 발동되어 Amendment / 폐기 결정 박제 의무. 이는 R3 ADR §재검토 트리거 #3 의 "R4 ADR 박제 시점에 viewport-aware scaling 도입 여부 명시적 결정 박제 의무" 와 정합한다.
 

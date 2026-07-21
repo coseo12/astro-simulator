@@ -667,7 +667,7 @@ R3 ADR §재검토 조건 §재검토 트리거 #4 (body 간 비율 회귀 관�
 
 ## Amendment 2026-05-01 — venusScale 4000 → 1500 확정 (적극값) + Q2=B 임계 강화
 
-> **Status**: Active (2026-05-01 박제, architect 단계)
+> **상태**: Active (2026-05-01 박제, architect 단계 — 표기 단일화 #842)
 > **근거 ADR**: [`20260430-r3-followup-body-proportion.md`](20260430-r3-followup-body-proportion.md) Amendment 2026-05-01
 > **R1/R2 동반 amendment**: [`20260425-r1-sun-visualization.md`](20260425-r1-sun-visualization.md) (sunScale 75 → 50) + [`20260428-r2-mercury-visualization.md`](20260428-r2-mercury-visualization.md) (mercuryScale 8500 → 2000)
 > **근거 PR**: #377 CLOSED (venusScale=1850 보수값 D-T2 미통과)
@@ -820,15 +820,15 @@ forensic ADR `20260430-r3-followup-body-proportion.md` Amendment 2026-05-03 (라
 
 ### 라운드 3 venus 영향 박제
 
-| 항목                                          | 라운드 2 (venus 650) | 라운드 3 D-1 (venus 800) | 변동           |
-| --------------------------------------------- | -------------------- | ------------------------ | -------------- |
-| pxDiameter (1280×720, dpr=1, T1 default)      | ~27.2 px             | **~33.5 px** (예측)      | +6.3 px (+23%) |
-| pxDiameter 저점 (1280×720, dpr=1, far)        | 12.39 px (low/mid경계) | **15.27 px (mid)** (예측) | +2.88 px       |
-| pxDiameter 고점 (1920×1080, dpr=2, close)     | 39.26 px (mid)       | **48.4 px (mid 한계)** (예측) | +9.14 px       |
-| sun 대비 px 비 (1280×720)                     | ~11.03%              | **~13.58%** (예측)       | +2.55%p        |
-| 모바일 disk area (375×667, baseline)          | ~2.19%               | **~3.32%** (예측)        | +1.13%p        |
-| LOD 분포 (16 cell)                            | low 3 / mid 13       | **low 0 / mid 16** (예측) | low -3 (전부 mid) |
-| sphere mesh 인지 강화                         | viewport별 변동      | **모든 viewport mid 일관** | 시각 일관성 향상 |
+| 항목                                      | 라운드 2 (venus 650)   | 라운드 3 D-1 (venus 800)      | 변동              |
+| ----------------------------------------- | ---------------------- | ----------------------------- | ----------------- |
+| pxDiameter (1280×720, dpr=1, T1 default)  | ~27.2 px               | **~33.5 px** (예측)           | +6.3 px (+23%)    |
+| pxDiameter 저점 (1280×720, dpr=1, far)    | 12.39 px (low/mid경계) | **15.27 px (mid)** (예측)     | +2.88 px          |
+| pxDiameter 고점 (1920×1080, dpr=2, close) | 39.26 px (mid)         | **48.4 px (mid 한계)** (예측) | +9.14 px          |
+| sun 대비 px 비 (1280×720)                 | ~11.03%                | **~13.58%** (예측)            | +2.55%p           |
+| 모바일 disk area (375×667, baseline)      | ~2.19%                 | **~3.32%** (예측)             | +1.13%p           |
+| LOD 분포 (16 cell)                        | low 3 / mid 13         | **low 0 / mid 16** (예측)     | low -3 (전부 mid) |
+| sphere mesh 인지 강화                     | viewport별 변동        | **모든 viewport mid 일관**    | 시각 일관성 향상  |
 
 **LOD 일관성**: D-1 venus 고점 48.4px 가 high 임계 50 직전 (마진 1.6px). **모든 viewport 에서 mid 일관 유지** (high 미진입). 사용자 D-T2 평가 시 "venus 가 viewport 무관하게 일관되게 더 큰 행성으로 보임" 인지.
 
