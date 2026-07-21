@@ -1725,7 +1725,7 @@ Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-
 
 ## Amendment 16 — 2026-07-22
 
-상태: Provisional (cross-validate 대기 — CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
+상태: Accepted (cross-validate 2026-07-22 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
 
 - **발의**: [#868](https://github.com/coseo12/astro-simulator/issues/868) (§재검토 조건 #5 자동 탐지 2026-07-20) + [#869](https://github.com/coseo12/astro-simulator/issues/869) (§재검토 조건 #6 Amendment 9 동시 발화) — §Amendment 9 규정 "#5/#6 동시 발화 시 #5 우선 (Phase 2 강제 우위)" 에 따라 단일 Amendment 통합 처리.
 - **트리거**: 3중 OR 중 3건 발화 보고 (진행률 26.7% < 33% / 연속 10 ≥ N=10 / 63일 경과) + drift 19 ≥ N=10 (실측 시점 27). 단 아래 §forensic 측정이 발화 전제 일부를 정정.
@@ -1764,10 +1764,12 @@ Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-
 #### 3. Phase-2 식별 컨벤션의 ADR 본문 승격 (§운영 절차 Phase 2 갱신)
 
 - 신규 의무: **Phase 2 upstream PR 은 제목 또는 본문에 리터럴 `ADR 20260515` 포함** (스크립트 주석 → ADR 계약 승격). 소급 마킹은 게이밍 아님 — 데코레이터 SSoT 가 이미 인용하는 substantive PR 의 사실 정정 (Amendment 15 게이밍 방어는 trivial PR 대상, 본 건 무관).
+- **소급 마킹 허용 조건 명문화 (cross-validate 고유 발견 1 수용)**: 사후 마킹에 의한 분자 산입은 **(a) 머지 시점에 데코레이터 SSoT 상 해당 PR 의 Phase-2 지정이 이미 존재** + **(b) Amendment 15 substantive 필터 통과** — 두 조건 동시 충족 시에만 허용. 마킹 시점의 주장이 아닌 머지 시점의 기록이 근거여야 한다 (타임스탬프 검증 가드).
 
-#### 4. 측정 보강 3건 (후속 dev)
+#### 4. 측정 보강 3건
 
 - (a) `verifyPhase2Sync()` `--search` 제거 (파일 경로 교집합이 곧 필터) + unmarked-PR 괴리 WARN, (b) `isAdrEvolutionPr` regex 보강 (`chore(release):` / `[#822]`형 Amendment 구현 PR 누수 [실측 #829/#838/#824/#825]), (c) workflow 이슈 템플릿 stale 파일명 (`-v2` 미반영) 문자열 정정. 전부 self-test 케이스 동반.
+- 각주 (Accepted 전이 시 정정): 초안은 "(후속 dev)" 로 표기했으나 실제로는 결정 실행 라운드 (PR #873) 에서 **동시 이행** 됨 — Concrete Prediction 의 "조건 1 경계 잔존" 이 55.6% 해소로 초과 달성된 이유 (분모 정정 × 소급 마킹 복합 효과).
 
 ### silent 가드 강화 vs 약화 자기점검
 
@@ -1795,6 +1797,12 @@ Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-
 - upstream: open #309/#318/#320~#324, merged #315, 이슈 #319/#325, U4 (생성 후 박제)
 - 측정 SSoT: `scripts/verify-z-pattern-health.mjs` / `scripts/verify-harness-drift-decorator.mjs` / `.github/workflows/adr-z-pattern-health-v2.yml`
 
-### 교차검증 반영 사항
+### 교차검증 반영 사항 (cross-validate 2026-07-22 완료 — Accepted 전이)
 
-> (Provisional — 메인 오케스트레이터 cross-validate 호출 후 4축 분류 통합 + Accepted 전이 예정)
+agy (architecture 모드, L1/L3 가드) 판정: **승인 적극 권장** — 명시 질문 2건 모두 타당 확인. 로그: `.claude/logs/cross-validate-architecture-20260722-040046.log`
+
+- **합의 (즉시 신뢰)**: (1) #315 소급 마킹 = "부풀리기가 아닌 측정 데이터의 사실 관계 복원" — Amendment 15 substantive 필터가 독립 차단층으로 유효. (2) manifest carry-over 는 "존재하지 않는 대상을 allowlist 로 관리하면 거버넌스 모수 오염 — 등재 제거가 논리적으로 유일하게 올바른 조치". (3) 옵션 C 기각 근거 (#487 1일 재발화 실측) 타당. (4) `--search` → 파일 경로 교집합 전환은 내구성 개선.
+- **고유 발견 1 — 수용 (본 PR 반영)**: 소급 마킹 허용 조건의 타임스탬프 검증 가드 명문화 — §변경 3 에 2조건 (머지 시점 데코레이터 지정 + substantive) 동시 충족 규칙 추가. 마킹 시점 주장이 아닌 머지 시점 기록이 근거.
+- **고유 발견 2 — 기각 (관찰 유지)**: upstream PR 생성 시 ADR 리터럴 부재를 경고하는 CI Linter 추가 제안 — 다운스트림 c-1 unmarked-PR WARN 이 동일 회귀를 사후 감지로 이미 커버하고, upstream CI 는 별도 저장소 관할 (U 번들 스코프 팽창). 발생 빈도 실측 (7건/6주) 대비 유지 비용 — unmarked WARN 재발 시 재평가.
+- **고유 발견 3 — 기존 반영 확인**: 다중 PR 순차 머지 런북 / 재발화 수용 표기 — Amendment 16 §위험 (Track 1 순서 명시) + §자기점검 (조건 1 경계 은폐 없음) 에 기박제. 추가 조치 불요.
+- **편향 셀프 체크 해소**: 순수주의 "미통과 잠재 축" 2건이 명시 질문으로 전달되어 모두 타당 판정 — 축 해소. 나머지 3종 (낙관 일정/결합 간과/폐기 프레이밍) 은 agy 6대 기준 평가에서 반증 없음.
