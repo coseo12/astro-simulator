@@ -201,12 +201,13 @@ impl NBodySystem {
         // 보정 항을 더하기 전에 복사 보존해야 한다.
         let acc_newton = self.acc.clone();
 
-        // GM_k 사전 계산 (캐시 친화).
+        // GM_k 사전 계산 (캐시 친화). n == masses.len() 이므로 map/collect 와 동치.
         let n3 = 3 * n;
-        let mut gm = vec![0.0f64; n];
-        for k in 0..n {
-            gm[k] = GRAVITATIONAL_CONSTANT * self.masses[k];
-        }
+        let gm: Vec<f64> = self
+            .masses
+            .iter()
+            .map(|&m| GRAVITATIONAL_CONSTANT * m)
+            .collect();
 
         // 보정 항 누적용 임시 버퍼 (acc에 직접 더하면 같은 step 내에서
         // i++ 진행 중 다른 i' 가속도 계산에 영향을 줄 수 있음 — 안전하게 분리).
@@ -219,7 +220,7 @@ impl NBodySystem {
 
             // Σ_{k≠i} G m_k / r_ik — i 의 외부 위치에너지 항 (k 루프에서 j 와 별개).
             let mut sum_ext_i = 0.0;
-            for k in 0..n {
+            for (k, &gm_k) in gm.iter().enumerate() {
                 if k == i {
                     continue;
                 }
@@ -227,7 +228,7 @@ impl NBodySystem {
                 let ry = self.pos[3 * k + 1] - xi.1;
                 let rz = self.pos[3 * k + 2] - xi.2;
                 let rik = (rx * rx + ry * ry + rz * rz).sqrt();
-                sum_ext_i += gm[k] / rik;
+                sum_ext_i += gm_k / rik;
             }
 
             for j in 0..n {
@@ -249,7 +250,7 @@ impl NBodySystem {
 
                 // Σ_{k≠j} G m_k / r_jk — j 의 외부 위치에너지 항.
                 let mut sum_ext_j = 0.0;
-                for k in 0..n {
+                for (k, &gm_k) in gm.iter().enumerate() {
                     if k == j {
                         continue;
                     }
@@ -257,7 +258,7 @@ impl NBodySystem {
                     let ry = self.pos[3 * k + 1] - xj.1;
                     let rz = self.pos[3 * k + 2] - xj.2;
                     let rjk = (rx * rx + ry * ry + rz * rz).sqrt();
-                    sum_ext_j += gm[k] / rjk;
+                    sum_ext_j += gm_k / rjk;
                 }
 
                 let vj2 = vj.0 * vj.0 + vj.1 * vj.1 + vj.2 * vj.2;
@@ -309,9 +310,9 @@ impl NBodySystem {
             }
         }
 
-        // 보정 항을 acc 에 합산.
-        for k in 0..n3 {
-            self.acc[k] += delta_acc[k];
+        // 보정 항을 acc 에 합산. 양쪽 모두 길이 n3 — zip 은 인덱스 경계와 동치.
+        for (a, &d) in self.acc.iter_mut().zip(delta_acc.iter()) {
+            *a += d;
         }
     }
 
@@ -778,6 +779,10 @@ mod tests {
     ///
     /// `_gr_centuries` 에 centuries=1.0 + tol_pct assert 추가한 진단용 wrapper.
     /// 기존 diag 테스트들이 호출 — 본 회귀 가드는 `_gr_centuries` 를 직접 호출한다.
+    ///
+    /// #843 — 호출처 4곳 (diag_* 테스트) 전부 `diagnostics` feature 게이트라
+    /// 기본 테스트 빌드에서 dead_code 상시 경고 → 함수도 동일 feature 로 게이트.
+    #[cfg(feature = "diagnostics")]
     #[allow(clippy::too_many_arguments)]
     fn measure_perihelion_precession_gr_with(
         name: &str,

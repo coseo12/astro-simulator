@@ -242,13 +242,13 @@ fn compute_com_recursive(nodes: &mut Vec<Node>, idx: u32, particles: &[Particle]
         for &pi in &nodes[i].particle_indices {
             let p = &particles[pi as usize];
             total += p.mass;
-            for k in 0..3 {
-                com[k] += p.mass * p.position[k];
+            for (c, &x) in com.iter_mut().zip(&p.position) {
+                *c += p.mass * x;
             }
         }
         if total > 0.0 {
-            for k in 0..3 {
-                com[k] /= total;
+            for c in com.iter_mut() {
+                *c /= total;
             }
         }
         nodes[i].total_mass = total;
@@ -270,13 +270,13 @@ fn compute_com_recursive(nodes: &mut Vec<Node>, idx: u32, particles: &[Particle]
         }
         let cn = &nodes[c as usize];
         total += cn.total_mass;
-        for k in 0..3 {
-            com[k] += cn.total_mass * cn.com[k];
+        for (c_acc, &x) in com.iter_mut().zip(&cn.com) {
+            *c_acc += cn.total_mass * x;
         }
     }
     if total > 0.0 {
-        for k in 0..3 {
-            com[k] /= total;
+        for c_acc in com.iter_mut() {
+            *c_acc /= total;
         }
     }
     nodes[i].total_mass = total;
