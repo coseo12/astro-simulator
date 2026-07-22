@@ -9,7 +9,7 @@ import {
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
 import { PointerEventTypes } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
-import type { CameraSyncSurface } from '@/core/sim-context';
+import type { BodyStateFn, CameraSyncSurface } from '@/core/sim-context';
 // P12-A #298 — Tier 엔진 유틸 (renderScaleForTier) 는 sceneApi 네임스페이스에 이미 re-export 되어 있다.
 // `sceneApi.renderScaleForTier` 로 접근한다 (별도 import 불필요, 아래 onBeforeRender 에서 사용).
 import { attachCoreToStore } from '@/core/core-adapter';
@@ -73,9 +73,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
   // 이 완료되면 setCameraTierApi 로 끌어올린다. SimCommandProvider 가 children 에 전달.
   // - camera: `onViewMatrixChangedObservable` 구독 + `radius` 읽기 (mutate 금지)
   // - getActiveTier: `solar.getTier` 직접 전달 — 호출 시점 active tier snapshot 반환
+  // - getBodyState: #847 — `solar.getBodyState` 직접 전달. osculating 훅이 context 경유 소비
+  //   (dev 전용 `window.__solarScene` 우회 제거 — prod 정적 폴백 퇴행 해소)
   const [cameraTierApi, setCameraTierApi] = useState<{
     camera: CameraSyncSurface;
     getActiveTier: () => Tier;
+    getBodyState: BodyStateFn;
   } | null>(null);
 
   useEffect(() => {
@@ -466,8 +469,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
         // SimCommandProvider 에 전달 → ScaleControl 이 `useSimCameraTier` 로 구독.
         // camera 는 setupArcRotateCamera 의 instance, getActiveTier 는 solar.getTier 직접 전달.
+        // #847 — getBodyState 도 함께 전달 → use-osculating-sync 가 `useSimBodyState` 로 구독.
+        // prod 에서도 유효한 정식 데이터 경로 (dev 전용 `__solarScene` 전역과 무관).
         if (!cancelled) {
-          setCameraTierApi({ camera, getActiveTier: solar.getTier });
+          setCameraTierApi({
+            camera,
+            getActiveTier: solar.getTier,
+            getBodyState: solar.getBodyState,
+          });
         }
 
         // P5-C #179 — shader별 GPU ms 노출 (bench 폴링용). solar 생성 후 등록.
@@ -479,6 +488,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         }
 
         // P10-C-2 #278 — dev 빌드에서 scene handles 노출 (E2E scale 검증 목적).
+        // #847 주석 계약 — 이 전역은 verify 스크립트(browser-verify*.mjs 등) 전용 계약이다.
+        // NODE_ENV 게이트로 prod 번들에서 제거되므로 **앱 코드가 소비하면 prod 에서 조용히
+        // 퇴행**한다 (use-osculating-sync 가 그랬던 회귀 — #847). 앱 코드는 SimCommandProvider
+        // context (getBodyState 등) 경유로만 scene handle 에 접근할 것.
         if (process.env.NODE_ENV !== 'production') {
           Object.defineProperty(window, '__solarScene', {
             configurable: true,
@@ -1068,7 +1081,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         };
 
         // P11-A #288 — dev 빌드 한정 `__floatingOrigin` 전역 노출 (검증 스크립트용).
-        // prod 에서도 `__solarScene.floatingOrigin` 경유 접근 가능하지만 편의상 top-level 도 제공.
+        // #847 주석 계약 정정 — `__solarScene` 자체가 dev 한정 노출(위 P10-C-2 게이트)이라
+        // "prod 에서도 `__solarScene.floatingOrigin` 경유 접근 가능" 하지 **않다** (기존 주석은
+        // 게이트와 모순 — 주석-구현 drift). 두 전역 모두 dev 검증 스크립트 전용이며, 앱 코드는
+        // SimCommandProvider context 경유로만 scene handle 을 소비한다.
         if (process.env.NODE_ENV !== 'production') {
           Object.defineProperty(window, '__floatingOrigin', {
             configurable: true,
@@ -1111,6 +1127,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         core={core}
         camera={cameraTierApi?.camera ?? null}
         getActiveTier={cameraTierApi?.getActiveTier ?? null}
+        getBodyState={cameraTierApi?.getBodyState ?? null}
       >
         {children}
       </SimCommandProvider>

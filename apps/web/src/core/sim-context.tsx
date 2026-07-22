@@ -25,6 +25,21 @@ export interface CameraSyncSurface {
 }
 
 /**
+ * #847 — osculating 1Hz polling 용 body state 조회 최소 surface.
+ *
+ * core `SolarSceneApi.getBodyState` 와 구조적 호환 (duck type — CameraSyncSurface 동형 패턴).
+ * parent-centric (pos [m], vel [m/s]) 상태를 반환하며, Kepler 모드 / Newton 엔진 미준비 시
+ * 호출 결과가 null (호출자 폴백 책임).
+ *
+ * 과거 use-osculating-sync 가 dev 전용 전역 `window.__solarScene` 을 캐스팅 접근해 production
+ * 빌드에서 조용히 정적 JSON 폴백으로 퇴행하던 회귀(#847)를 context 정식 경로로 해소한다.
+ */
+export type BodyStateFn = (
+  id: string,
+  parentId: string,
+) => { pos: [number, number, number]; vel: [number, number, number] } | null;
+
+/**
  * SimulationCore에 대한 명령 전송 인터페이스.
  * 컴포넌트는 이 context를 통해서만 core에 접근 — core 인스턴스 직접 노출은 피한다.
  *
@@ -39,6 +54,11 @@ interface SimCommandApi {
   camera: CameraSyncSurface | null;
   /** ScaleControl 의 scene unit → m 환산용. solar.getTier 가 snapshot 으로 active tier 반환. */
   getActiveTier: (() => Tier) | null;
+  /**
+   * #847 — osculating 훅용 scene handle. scene 생성 완료 전(transient) null — camera 와 동형.
+   * null 이면 소비자(use-osculating-sync)는 정적 JSON 폴백 유지 후 배선 도착 시 재시작.
+   */
+  getBodyState: BodyStateFn | null;
 }
 
 const SimCommandContext = createContext<SimCommandApi | null>(null);
@@ -47,6 +67,7 @@ export function SimCommandProvider({
   core,
   camera,
   getActiveTier,
+  getBodyState,
   children,
 }: {
   core: SimulationCore | null;
@@ -54,6 +75,8 @@ export function SimCommandProvider({
   camera?: CameraSyncSurface | null;
   /** sim-canvas 가 `solar.getTier` 를 그대로 전달. ScaleControl 이 호출 시점 active tier 조회. */
   getActiveTier?: (() => Tier) | null;
+  /** #847 — sim-canvas 가 `solar.getBodyState` 를 그대로 전달. osculating 훅이 polling 시점 조회. */
+  getBodyState?: BodyStateFn | null;
   children: ReactNode;
 }) {
   // #419 — core null 시 children 렌더 보류 (mount 순서 정합화).
@@ -71,8 +94,9 @@ export function SimCommandProvider({
       command: (cmd) => core.command(cmd),
       camera: camera ?? null,
       getActiveTier: getActiveTier ?? null,
+      getBodyState: getBodyState ?? null,
     };
-  }, [core, camera, getActiveTier]);
+  }, [core, camera, getActiveTier, getBodyState]);
 
   if (api === null) return null;
 
@@ -118,4 +142,16 @@ export function useSimCameraTier(): {
     camera: ctx?.camera ?? null,
     getActiveTier: ctx?.getActiveTier ?? null,
   };
+}
+
+/**
+ * #847 — osculating 훅용 scene handle 조회.
+ *
+ * scene 생성 완료 전 또는 Provider 외부에서는 null — 소비자는 정적 JSON 폴백을 유지하고
+ * 배선 도착(context 갱신) 시 polling 을 재시작한다. 반환 reference 는 useMemo(api) 로 안정 —
+ * 소비자 useEffect deps 에 안전.
+ */
+export function useSimBodyState(): BodyStateFn | null {
+  const ctx = useContext(SimCommandContext);
+  return ctx?.getBodyState ?? null;
 }

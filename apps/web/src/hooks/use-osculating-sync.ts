@@ -6,6 +6,8 @@ import { ephemeris as ephemerisApi } from '@astro-simulator/core';
 import type { physics as physicsApi } from '@astro-simulator/core';
 import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import { useEffect, useRef, useState } from 'react';
+import { useSimBodyState, type BodyStateFn } from '@/core/sim-context';
+import { useSimStore } from '@/store/sim-store';
 
 type ExtractFn = typeof physicsApi.extractOsculatingElements;
 
@@ -15,15 +17,22 @@ type ExtractFn = typeof physicsApi.extractOsculatingElements;
  * ADR `docs/decisions/20260420-p9-galilean-laplace-rings.md` §인터페이스 박제 L257~L290.
  *
  * 동작 요약:
- *  - 주기적으로 `window.__solarScene.getBodyState(id, parentId)` 로 parent-centric
- *    (pos, vel) state vector 를 읽고 physics-wasm `extract_osculating_elements` 호출.
+ *  - 주기적으로 context 주입 `getBodyState(id, parentId)` (#847, `useSimBodyState`) 로
+ *    parent-centric (pos, vel) state vector 를 읽고 physics-wasm `extract_osculating_elements` 호출.
  *  - fps 자동 폴백 (ADR §R2): 기본 1Hz, fps 저하 시 2Hz/5Hz/10Hz 단계 강등 (히스테리시스 +5fps).
  *  - fps 측정: `requestAnimationFrame` 델타 이동평균 (window=2s).
  *
  * **데이터 소스 우선순위**:
- *  1. Newton 엔진 활성 — `__solarScene.getBodyState()` 로 엔진 내부 state 직접 추출
+ *  1. Newton 엔진 활성 — `getBodyState()` 로 엔진 내부 state 직접 추출
  *     (timeScale 무관, forward-diff 없음). P10-D #263 로 도입.
  *  2. Kepler 모드 또는 state 미가용 — null 반환 → 정적 JSON 폴백 (`SatelliteInfoPanel`).
+ *
+ * **#847 해결됨** (2026-07-22): 과거 dev 전용 전역 `window.__solarScene` / `window.__simStore`
+ * 캐스팅 접근 → 두 전역 모두 `NODE_ENV !== 'production'` 게이트라 production 빌드에서
+ * `sampleSceneStates()` 가 항상 null → 동적 표시·질량 배수 반영이 조용히 정적 JSON 폴백으로
+ * 퇴행. scene handle 은 `SimCommandProvider` context (`useSimBodyState`), 질량 배수는
+ * `useSimStore` 직접 import 로 전환 — window 전역 의존 0. dev 전역 노출 자체는 verify
+ * 스크립트 계약이므로 유지 (소비처만 이동).
  *
  * **P10-D #263 해결됨** (2026-04-21): forward-diff `(pos(t+Δ) - pos(t)) / Δ` 는 씬
  * `timeScale ≫ 1` 조건에서 Io 공전주기 대비 비선형 noise 과다로 UI "1Hz 배지" 미렌더.
@@ -92,6 +101,11 @@ const FPS_STEP_TABLE: ReadonlyArray<{ threshold: number; intervalMs: number }> =
 const HYSTERESIS_FPS = 5;
 const FPS_WINDOW_MS = 2000;
 
+// #847 — 구조적 배선 누락(getBodyState 함수 자체 null 지속) dev 경고 유예 시간.
+// scene 비동기 생성(sim-canvas `instance.start().then`) 완료 전 transient null 은 정상이므로
+// 즉시 경고하면 mount 마다 false-fire — 유예 후에도 미배선이면 Provider 배선 누락 의심.
+const SCENE_HANDLE_WARN_DELAY_MS = 10_000;
+
 /** 측정 fps 를 폴백 단계 인덱스로 변환. 히스테리시스 적용. */
 function resolveStep(currentStep: number, fps: number): number {
   // 상승 방향 (fps 회복) — 현재 단계의 상한 + 5fps 초과 시 복원.
@@ -110,31 +124,29 @@ function resolveStep(currentStep: number, fps: number): number {
 /**
  * P10-D #263 — Newton 엔진 state vector 직접 추출.
  *
- * `__solarScene.getBodyState(id, 'jupiter')` 로 Jupiter-centric (pos [m], vel [m/s])
- * 상태를 읽는다. Newton/Barnes-Hut/WebGPU 엔진 활성 시 시뮬 state 에서 직접 추출되어
- * timeScale 무관 정확. Kepler 모드 or 엔진 미가용 시 null (→ 정적 JSON 폴백).
+ * #847 — context 주입 `getBodyState(id, 'jupiter')` 로 Jupiter-centric (pos [m], vel [m/s])
+ * 상태를 읽는다 (dev 전용 `window.__solarScene` 우회 제거 — prod 에서도 유효한 정식 경로).
+ * Newton/Barnes-Hut 엔진 활성 시 시뮬 state 에서 직접 추출되어 timeScale 무관 정확.
+ *
+ * null 반환의 두 가지 의미 (구분 계약 — #847):
+ *  1. **정당한 폴백** — `getBodyState` "호출 결과" null: Kepler 모드 / Newton 미준비 /
+ *     WebGPU (동기 API 미지원). → 정적 JSON 폴백 유지 (설계 의도).
+ *  2. **구조적 배선 누락** — `getBodyState` "함수 자체" null 이 지속: Provider 배선 누락.
+ *     과거 dev 전역 의존이 prod 에서 "영원한 null" 로 조용히 퇴행하던 회귀와 동형 신호 —
+ *     훅이 유예 후 dev 경고로 가시화 (SCENE_HANDLE_WARN_DELAY_MS).
  */
 interface GalileanState {
   pos: [number, number, number];
   vel: [number, number, number];
 }
 
-function sampleSceneStates(): Record<GalileanId, GalileanState> | null {
-  if (typeof window === 'undefined') return null;
-  const solar = (
-    window as unknown as {
-      __solarScene?: {
-        getBodyState?: (
-          id: string,
-          parentId: string,
-        ) => { pos: [number, number, number]; vel: [number, number, number] } | null;
-      };
-    }
-  ).__solarScene;
-  if (!solar || typeof solar.getBodyState !== 'function') return null;
+function sampleSceneStates(
+  getBodyState: BodyStateFn | null,
+): Record<GalileanId, GalileanState> | null {
+  if (!getBodyState) return null;
   const out = {} as Record<GalileanId, GalileanState>;
   for (const id of GALILEAN_IDS) {
-    const s = solar.getBodyState(id, 'jupiter');
+    const s = getBodyState(id, 'jupiter');
     if (!s) return null;
     out[id] = s;
   }
@@ -173,6 +185,10 @@ function callWasmExtract(
 export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
   const enabled = opts?.enabled ?? true;
   const baseInterval = opts?.pollIntervalMs ?? 1000;
+  // #847 — scene handle 은 SimCommandProvider context 로 주입 (prod 유효 정식 경로).
+  // reference 는 provider useMemo 로 안정 — scene mount/dispose 시에만 변경되어 polling
+  // useEffect 가 재시작 (transient null → 배선 도착 시 자동 복구).
+  const getBodyState = useSimBodyState();
 
   const [elements, setElements] = useState<Record<GalileanId, OscElements> | null>(null);
   const [currentIntervalMs, setCurrentIntervalMs] = useState<number>(baseInterval);
@@ -224,21 +240,28 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
     let cancelled = false;
     let extractFn: ExtractFn | null = null;
 
+    // #847 — 구조적 배선 누락 dev 가시화. 유예(10s) 후에도 getBodyState 함수 자체가 null 이면
+    // Provider 배선 누락 의심 — 과거 prod 에서 조용히 영구 폴백 퇴행하던 회귀(#847)와 동형 신호.
+    // 배선 도착 시 effect 재실행(cleanup)으로 자동 취소. prod 는 silent (UX 안정성 — #434 동형).
+    let structuralWarnTimer: ReturnType<typeof setTimeout> | null = null;
+    if (getBodyState === null && process.env.NODE_ENV === 'development') {
+      structuralWarnTimer = setTimeout(() => {
+        console.warn(
+          '[osc-sync] scene handle(getBodyState) 이 10s 후에도 미배선 — SimCommandProvider 의 ' +
+            'getBodyState prop 배선 확인 필요 (#847). 이 상태가 지속되면 osculating 표시가 ' +
+            '정적 JSON 폴백으로 영구 퇴행한다.',
+        );
+      }, SCENE_HANDLE_WARN_DELAY_MS);
+    }
+
     // Jupiter 질량 기반 GM 계산. massMultiplier 는 useSimStore 에서 가져옴.
-    // 여기서는 훅 매 실행마다 최신 질량을 조회하기 위해 ephemeris + store 를 조합.
+    // #847 — dev 전용 window.__simStore 우회 제거, 같은 앱 store 직접 import (prod 유효).
+    // getState() 는 호출 시점 최신 스냅샷 — polling 마다 재조회하므로 구독 불필요.
     const computeJupiterMu = (): number | null => {
       const jupiter = ephemerisApi.getSolarSystem().bodies.find((b) => b.id === 'jupiter');
       if (!jupiter) return null;
-      let multiplier = 1;
-      if (typeof window !== 'undefined') {
-        const store = (
-          window as unknown as {
-            __simStore?: { getState?: () => { massMultipliers?: Record<string, number> } };
-          }
-        ).__simStore;
-        const mm = store?.getState?.().massMultipliers;
-        if (mm && typeof mm.jupiter === 'number') multiplier = mm.jupiter;
-      }
+      const mm = useSimStore.getState().massMultipliers;
+      const multiplier = typeof mm.jupiter === 'number' ? mm.jupiter : 1;
       return GRAVITATIONAL_CONSTANT * jupiter.mass * multiplier;
     };
 
@@ -246,7 +269,7 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
       if (cancelled) return;
       // P10-D #263 — Newton 엔진 state vector 직접 추출 (timeScale 내성).
       // Newton 모드 미활성 or Kepler 모드 시 null → 정적 JSON 폴백 유지.
-      const states = sampleSceneStates();
+      const states = sampleSceneStates(getBodyState);
       if (states && extractFn) {
         const mu = computeJupiterMu();
         if (mu !== null) {
@@ -298,10 +321,11 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
     return () => {
       cancelled = true;
       if (timerId !== null) clearTimeout(timerId);
+      if (structuralWarnTimer !== null) clearTimeout(structuralWarnTimer);
     };
     // observedFps 는 ref 로 참조 → 의존성 배열 제외 (매 frame 재실행 방지).
-     
-  }, [enabled, baseInterval]);
+    // getBodyState 는 deps 포함 — scene mount 완료(null → fn) 시 polling 재시작 (#847).
+  }, [enabled, baseInterval, getBodyState]);
 
   return { elements, currentIntervalMs, observedFps };
 }
