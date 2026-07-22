@@ -4,7 +4,7 @@
   - **§Amendment 1 (Phase 2/3 구체 설계): Accepted** (cross-validate 2026-07-04 — agy, §A1 교차검증 반영 사항 통합)
 - 날짜: 2026-07-01
 - 이슈: [#779](https://github.com/coseo12/astro-simulator/issues/779)
-- 관련: #766 (alert fatigue 개념 — Z 패턴 health), #728 (step retry vs job rerun), #709 (fps retry 도입), #626 (paths-ignore docs skip), ADR [20260421-workflows-responsibility-split](20260421-workflows-responsibility-split.md) (frozen vs user-owned 경계)
+- 관련: #766 (alert fatigue 개념 — Z 패턴 health), #728 (step retry vs job rerun), #709 (fps retry 도입), #626 (paths-ignore docs skip), ADR [20260421-workflows-responsibility-split](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260421-workflows-responsibility-split.md) (frozen vs user-owned 경계)
 - 용어: [glossary.md](../glossary.md) — alert fatigue / flake / dual-trigger / concurrency / ff-sync
 
 > **범위 주의**: 본 ADR 은 **설계 결정 박제** 다. 코드/워크플로 `.yml` 변경은 사용자 검토 후 별도 developer 가 수행한다 (architect 는 설계 결정만).

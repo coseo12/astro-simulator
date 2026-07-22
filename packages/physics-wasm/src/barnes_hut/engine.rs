@@ -107,9 +107,8 @@ impl BarnesHutSystem {
         let n = self.n();
         let mut ke = 0.0;
         for i in 0..n {
-            let v2 = self.vel[3 * i].powi(2)
-                + self.vel[3 * i + 1].powi(2)
-                + self.vel[3 * i + 2].powi(2);
+            let v2 =
+                self.vel[3 * i].powi(2) + self.vel[3 * i + 1].powi(2) + self.vel[3 * i + 2].powi(2);
             ke += 0.5 * self.masses[i] * v2;
         }
         let mut pe = 0.0;
@@ -144,7 +143,10 @@ fn fit_bounds(particles: &[Particle], pad: f64) -> Aabb {
     let cz = 0.5 * (mn[2] + mx[2]);
     let half = ((mx[0] - mn[0]).max(mx[1] - mn[1]).max(mx[2] - mn[2])) * 0.5 * pad;
     // 정육면체 bounds — octant 분할이 균등해 트리 깊이 최소화
-    Aabb::new([cx - half, cy - half, cz - half], [cx + half, cy + half, cz + half])
+    Aabb::new(
+        [cx - half, cy - half, cz - half],
+        [cx + half, cy + half, cz + half],
+    )
 }
 
 #[cfg(test)]
@@ -193,7 +195,11 @@ mod tests {
         let dx = bh.pos[3] - ds.pos[3];
         let dy = bh.pos[4] - ds.pos[4];
         let rel = ((dx * dx + dy * dy).sqrt()) / AU;
-        assert!(rel < 1e-9, "1년 적분 후 BH(θ=0) vs 직접합 위치 차이 {:.2e} AU", rel);
+        assert!(
+            rel < 1e-9,
+            "1년 적분 후 BH(θ=0) vs 직접합 위치 차이 {:.2e} AU",
+            rel
+        );
     }
 
     #[test]

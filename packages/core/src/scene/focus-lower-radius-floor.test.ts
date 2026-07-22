@@ -22,7 +22,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Animation, Vector3 } from '@babylonjs/core';
-import type { ArcRotateCamera, Mesh, Scene } from '@babylonjs/core';
+import type { Mesh } from '@babylonjs/core';
 import { AU } from '@astro-simulator/shared';
 
 import {
@@ -38,16 +38,8 @@ import {
   computeTargetRadius,
 } from './tier-transition.js';
 import { renderScaleForTier } from './tier.js';
-
-/** focusOn/runTierTransition 이 만지는 속성만 갖는 최소 카메라 모킹. */
-function mockCamera(lowerRadiusLimit = 0.5, minZ = 0.01): ArcRotateCamera {
-  return {
-    radius: 30,
-    minZ,
-    lowerRadiusLimit,
-    target: new Vector3(0, 0, 0),
-  } as unknown as ArcRotateCamera;
-}
+// #849 — mockCamera/mockScene 는 공용 헬퍼로 추출 (중복 3곳 통합).
+import { mockArcRotateCamera, mockControlScene } from './__test-utils__/babylon-mocks.js';
 
 /**
  * 시각 반경 기반 최소 mesh 모킹 — scaling=1 기본, local extendSize = 시각 반경 (균등 구체).
@@ -68,16 +60,6 @@ function mockMesh(visualRadius: number, scaling = { x: 1, y: 1, z: 1 }): Mesh {
     absolutePosition: new Vector3(0, 0, 0),
     isDisposed: () => false,
   } as unknown as Mesh;
-}
-
-function mockScene(): Scene {
-  return {
-    onBeforeRenderObservable: { add: vi.fn(), remove: vi.fn() },
-    detachControl: vi.fn(),
-    attachControl: vi.fn(),
-    stopAnimation: vi.fn(),
-    stopAllAnimations: vi.fn(),
-  } as unknown as Scene;
 }
 
 // Animation.CreateAndStartAnimation 은 실 scene/rendering loop 필요 — 정적 spy 로 차단.
@@ -156,8 +138,8 @@ describe('#790 resolveMeshVisualRadius — 회전 불변 시각 반경', () => {
 
 describe('#790 CameraController.focusOn — lowerRadiusLimit 시각 반경 하한 (상향)', () => {
   it('sun 재현: default 0.5 → visualR 2.922 × 1.05 로 상향 (침범 차단)', () => {
-    const camera = mockCamera(0.5);
-    const controller = new CameraController(camera, mockScene());
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
+    const controller = new CameraController(camera, mockControlScene());
     controller.focusOn({ mesh: mockMesh(2.922) });
     expect(camera.lowerRadiusLimit).toBeCloseTo(2.922 * 1.05, 4);
     expect(camera.lowerRadiusLimit!).toBeGreaterThan(2.922);
@@ -165,8 +147,8 @@ describe('#790 CameraController.focusOn — lowerRadiusLimit 시각 반경 하�
 
   it('tier 전환 잔존 limit (earth body tier 가드 A 값) → visualR × 1.05 로 상향', () => {
     // 대조표: earth visualR 6.931e4, 가드 A 잔존 limit (= targetTT × 0.01 ≈ visualR × 0.102)
-    const camera = mockCamera(4089);
-    const controller = new CameraController(camera, mockScene());
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 4089 });
+    const controller = new CameraController(camera, mockControlScene());
     controller.focusOn({ mesh: mockMesh(6.931e4) });
     expect(camera.lowerRadiusLimit).toBeCloseTo(6.931e4 * 1.05, 0);
   });
@@ -175,23 +157,23 @@ describe('#790 CameraController.focusOn — lowerRadiusLimit 시각 반경 하�
     // visualR 0.002 → boundingR 0.00346 → desiredR = boundingR + 0.01 = 0.01346 < 0.5
     // → #378 완화 = max(minZ 0.01, desiredR × 0.5 = 0.00673) = 0.01.
     // floor = min(0.002 × 1.05, 0.01346) = 0.0021 < 0.01 → floor 는 바인딩되지 않는다.
-    const camera = mockCamera(0.5, 0.01);
-    const controller = new CameraController(camera, mockScene());
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5, minZ: 0.01 });
+    const controller = new CameraController(camera, mockControlScene());
     controller.focusOn({ mesh: mockMesh(0.002) });
     expect(camera.lowerRadiusLimit).toBeCloseTo(0.01, 6);
   });
 
   it('명시 radius 전달 시에도 floor 적용 (sim-canvas satellite ×20 경로)', () => {
     // moon: visualR 4720, 명시 desiredR = 94400 → floor = min(4956, 94400) = 4956.
-    const camera = mockCamera(278.5); // 가드 A 잔존값 (대조표)
-    const controller = new CameraController(camera, mockScene());
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 278.5 }); // 가드 A 잔존값 (대조표)
+    const controller = new CameraController(camera, mockControlScene());
     controller.focusOn({ mesh: mockMesh(4720), radius: 94400 });
     expect(camera.lowerRadiusLimit).toBeCloseTo(4720 * 1.05, 0);
   });
 
   it('프레이밍 도달성: 상향 후에도 lowerRadiusLimit ≤ desiredRadius', () => {
-    const camera = mockCamera(0.5);
-    const controller = new CameraController(camera, mockScene());
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
+    const controller = new CameraController(camera, mockControlScene());
     const visualR = 2.922;
     controller.focusOn({ mesh: mockMesh(visualR) });
     // desiredRadius = boundingSphere(visualR×√3) × 5 — floor(visualR×1.05) 는 항상 그 이하.
@@ -202,8 +184,8 @@ describe('#790 CameraController.focusOn — lowerRadiusLimit 시각 반경 하�
 
 describe('#790 runTierTransition — focusMesh 경로 floor 적용', () => {
   it('focusMesh 있음: lowerRadiusLimit ≥ visualR × 1.05 (가드 A 단독값 visualR×0.102 를 상향)', () => {
-    const camera = mockCamera(0.5);
-    const scene = mockScene();
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
+    const scene = mockControlScene();
     const visualR = 6.931e4; // earth body tier 시각 반경 (대조표)
     const cleanup = runTierTransition({
       scene,
@@ -220,8 +202,8 @@ describe('#790 runTierTransition — focusMesh 경로 floor 적용', () => {
   });
 
   it('focusMesh 없음 (free-fly 전환): 기존 #380 가드 A 값 유지 — 무회귀', () => {
-    const camera = mockCamera(0.5);
-    const scene = mockScene();
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
+    const scene = mockControlScene();
     // free-fly 실거리 보존 수식: targetRadius = 30 × (1.54e-9 / 8.4e-11) ≈ 550.
     const cleanup = runTierTransition({
       scene,
@@ -275,9 +257,9 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
   const JUPITER_BODY_VISUAL_R = 249_000;
 
   it('preserveFocusDistance=true: targetRadius = computeTargetRadius (실거리 보존, boundingR×5.9 catapult 아님)', () => {
-    const camera = mockCamera(0.5);
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
     camera.radius = 22; // crossing 직전 inner tier radius (0.1 AU 경계 안쪽)
-    const scene = mockScene();
+    const scene = mockControlScene();
     const cleanup = runTierTransition({
       scene,
       camera,
@@ -297,9 +279,9 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
   });
 
   it('산술 재현: crossing 후 cameraFromFocus < 0.1 AU → body 안정 (역판정 진동 차단)', () => {
-    const camera = mockCamera(0.5);
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
     camera.radius = 22;
-    const scene = mockScene();
+    const scene = mockControlScene();
     const cleanup = runTierTransition({
       scene,
       camera,
@@ -320,9 +302,9 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
   it('대조 — preserveFocusDistance=false 는 catapult (cameraFromFocus ≫ 0.1 AU → inner 역판정 진동)', () => {
     // 기존 버그 재현: focus-entry 공식(boundingR × 5.9) 을 줌 crossing 에 그대로 쓰면
     // 카메라가 0.1 AU 밖으로 튕겨나가 tierFromFocus 가 inner 를 역판정 → 무한 진동.
-    const camera = mockCamera(0.5);
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
     camera.radius = 22;
-    const scene = mockScene();
+    const scene = mockControlScene();
     const cleanup = runTierTransition({
       scene,
       camera,
@@ -338,9 +320,9 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
   });
 
   it('preserveFocusDistance=false (focus-entry): 기존 boundingR×5.9 재프레이밍 유지 — V5 무회귀', () => {
-    const camera = mockCamera(0.5);
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
     camera.radius = 22;
-    const scene = mockScene();
+    const scene = mockControlScene();
     const cleanup = runTierTransition({
       scene,
       camera,
@@ -357,9 +339,9 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
   });
 
   it('preserveFocusDistance=true 여도 floor(#790) 유지 — visualR ≤ lowerRadiusLimit ≤ targetRadius', () => {
-    const camera = mockCamera(0.5);
+    const camera = mockArcRotateCamera({ lowerRadiusLimit: 0.5 });
     camera.radius = 22;
-    const scene = mockScene();
+    const scene = mockControlScene();
     const cleanup = runTierTransition({
       scene,
       camera,

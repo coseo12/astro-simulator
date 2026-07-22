@@ -185,20 +185,12 @@ mod tests {
         // drift 계수 합 Σ c_i = 1 (±1e-15).
         let sum_c: f64 = YOSHIDA_C.iter().sum();
         println!("Σ c_i = {:.16} (should be 1.0)", sum_c);
-        assert!(
-            (sum_c - 1.0).abs() < 1e-15,
-            "Σ c_i = {:.16} ≠ 1.0",
-            sum_c
-        );
+        assert!((sum_c - 1.0).abs() < 1e-15, "Σ c_i = {:.16} ≠ 1.0", sum_c);
 
         // kick 계수 합 Σ d_i = 1 (±1e-15).
         let sum_d: f64 = YOSHIDA_D.iter().sum();
         println!("Σ d_i = {:.16} (should be 1.0)", sum_d);
-        assert!(
-            (sum_d - 1.0).abs() < 1e-15,
-            "Σ d_i = {:.16} ≠ 1.0",
-            sum_d
-        );
+        assert!((sum_d - 1.0).abs() < 1e-15, "Σ d_i = {:.16} ≠ 1.0", sum_d);
     }
 
     #[test]

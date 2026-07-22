@@ -137,9 +137,13 @@ pub fn integrate_photon_geodesic(
     for _ in 0..MAX_NODES {
         // r-기반 step 제어: r이 작을수록 dφ 축소.
         // u = 0 근처(무한대)에서는 default step. u가 클수록 step 축소.
-        let r_over_rs = if u > 1e-12 { 1.0 / (u * RS) } else { f64::INFINITY };
+        let r_over_rs = if u > 1e-12 {
+            1.0 / (u * RS)
+        } else {
+            f64::INFINITY
+        };
         let scale = if r_over_rs.is_finite() {
-            (r_over_rs * r_over_rs / STEP_SCALE).min(1.0).max(1e-4)
+            (r_over_rs * r_over_rs / STEP_SCALE).clamp(1e-4, 1.0)
         } else {
             1.0
         };
@@ -177,7 +181,7 @@ pub fn integrate_photon_geodesic(
         }
 
         // Escape 판정 — perihelion 통과 후 u가 다시 escape 임계치 아래로.
-        if passed_perihelion && u <= U_ESCAPE && u >= 0.0 {
+        if passed_perihelion && (0.0..=U_ESCAPE).contains(&u) {
             // 종료 시점 선형 보간: 직전 (phi_prev, u_prev), 현재 (phi, u).
             // u=0 시점의 phi를 추정 — 1차 step의 dφ 누적 artifact 제거.
             let phi_zero = if (u_prev - u).abs() > 1e-15 {

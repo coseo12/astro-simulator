@@ -100,7 +100,7 @@ Safari 실기기` 이슈로 분리.
 
 ## 다음 인계 (P8 후보)
 
-> **P8+ 로드맵 v2 박제 위치**: [project_p8_p16_roadmap.md](file:///Users/seo/.claude/projects/-Users-seo-project-space/memory/project_p8_p16_roadmap.md)
+> **P8+ 로드맵 v2 박제 위치**: `project_p8_p16_roadmap.md` (개인 메모리 초안 — 정식 문서화본: [roadmap-v2-solar-precision.md](../deprecated/phases/roadmap-v2-solar-precision.md), 개인 절대 경로 링크 제거 #842)
 > (PM 라운드 2 동결, 2026-04-18)
 > v0.7.0 릴리스 완료 시점에 `/pm 로드맵 박제` 재호출 — `docs/deprecated/phases/roadmap-v2-solar-precision.md` 로 정식 문서화.
 

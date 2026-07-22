@@ -10,7 +10,9 @@ import {
 
 type IntegratorKind = physics.IntegratorKind;
 
-export type UnitSystem = 'si' | 'astro' | 'natural';
+// #841 — UnitSystem / unitSystem / setUnitSystem 제거. 소비자가 UnitToggle 자신뿐인
+// display-only 상태였고 "P2 확장" 계획은 폐기된 v2 로드맵 잔재. 단위 전환 재도입 시
+// 실제 소비자(포매터)와 함께 신규 이슈로 설계한다.
 
 /**
  * P7-D #209 — 비-fatal 알림 객체.
@@ -106,7 +108,6 @@ export interface SimStoreState {
   freeFlySensitivity: FreeFlySensitivity;
   timeScale: number;
   fps: number | null;
-  unitSystem: UnitSystem;
   physicsEngine: PhysicsEngineKind;
   /**
    * P7-B #207 — 현재 활성 적분기 (URL ?integrator=에서 결정, 초기화 시점 고정).
@@ -157,7 +158,6 @@ export interface SimStoreState {
   resetFreeFlySensitivity: () => void;
   setTimeScale: (scale: number) => void;
   setFps: (fps: number) => void;
-  setUnitSystem: (unit: UnitSystem) => void;
   setPhysicsEngine: (kind: PhysicsEngineKind) => void;
   /**
    * P7-B #207 — 초기화 시점에 URL 파라미터로 결정된 적분기를 스토어에 기록.
@@ -187,7 +187,6 @@ export const useSimStore = create<SimStoreState>((set) => ({
   freeFlySensitivity: { ...FREE_FLY_SENSITIVITY_DEFAULT },
   timeScale: 86_400,
   fps: null,
-  unitSystem: 'astro',
   physicsEngine: 'kepler',
   integrator: 'velocity-verlet',
   massMultipliers: {},
@@ -236,7 +235,6 @@ export const useSimStore = create<SimStoreState>((set) => ({
   },
   setTimeScale: (scale) => set({ timeScale: scale }),
   setFps: (fps) => set({ fps }),
-  setUnitSystem: (unit) => set({ unitSystem: unit }),
   setPhysicsEngine: (kind) => set({ physicsEngine: kind }),
   setIntegrator: (kind) => set({ integrator: kind }),
   setMassMultiplier: (bodyId, multiplier) =>

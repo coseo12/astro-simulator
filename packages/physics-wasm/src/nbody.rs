@@ -201,12 +201,13 @@ impl NBodySystem {
         // 보정 항을 더하기 전에 복사 보존해야 한다.
         let acc_newton = self.acc.clone();
 
-        // GM_k 사전 계산 (캐시 친화).
+        // GM_k 사전 계산 (캐시 친화). n == masses.len() 이므로 map/collect 와 동치.
         let n3 = 3 * n;
-        let mut gm = vec![0.0f64; n];
-        for k in 0..n {
-            gm[k] = GRAVITATIONAL_CONSTANT * self.masses[k];
-        }
+        let gm: Vec<f64> = self
+            .masses
+            .iter()
+            .map(|&m| GRAVITATIONAL_CONSTANT * m)
+            .collect();
 
         // 보정 항 누적용 임시 버퍼 (acc에 직접 더하면 같은 step 내에서
         // i++ 진행 중 다른 i' 가속도 계산에 영향을 줄 수 있음 — 안전하게 분리).
@@ -219,7 +220,7 @@ impl NBodySystem {
 
             // Σ_{k≠i} G m_k / r_ik — i 의 외부 위치에너지 항 (k 루프에서 j 와 별개).
             let mut sum_ext_i = 0.0;
-            for k in 0..n {
+            for (k, &gm_k) in gm.iter().enumerate() {
                 if k == i {
                     continue;
                 }
@@ -227,7 +228,7 @@ impl NBodySystem {
                 let ry = self.pos[3 * k + 1] - xi.1;
                 let rz = self.pos[3 * k + 2] - xi.2;
                 let rik = (rx * rx + ry * ry + rz * rz).sqrt();
-                sum_ext_i += gm[k] / rik;
+                sum_ext_i += gm_k / rik;
             }
 
             for j in 0..n {
@@ -249,7 +250,7 @@ impl NBodySystem {
 
                 // Σ_{k≠j} G m_k / r_jk — j 의 외부 위치에너지 항.
                 let mut sum_ext_j = 0.0;
-                for k in 0..n {
+                for (k, &gm_k) in gm.iter().enumerate() {
                     if k == j {
                         continue;
                     }
@@ -257,7 +258,7 @@ impl NBodySystem {
                     let ry = self.pos[3 * k + 1] - xj.1;
                     let rz = self.pos[3 * k + 2] - xj.2;
                     let rjk = (rx * rx + ry * ry + rz * rz).sqrt();
-                    sum_ext_j += gm[k] / rjk;
+                    sum_ext_j += gm_k / rjk;
                 }
 
                 let vj2 = vj.0 * vj.0 + vj.1 * vj.1 + vj.2 * vj.2;
@@ -277,10 +278,7 @@ impl NBodySystem {
                 let xji_dot_aj = -(dx * aj.0 + dy * aj.1 + dz * aj.2);
 
                 // A_ij (1/c² 포함). Will eq. 6.80 / Soffel 3.155 표준형.
-                let a_ij = (-4.0 * sum_ext_i
-                    - sum_ext_j
-                    + vi2
-                    + 2.0 * vj2
+                let a_ij = (-4.0 * sum_ext_i - sum_ext_j + vi2 + 2.0 * vj2
                     - 4.0 * vi_dot_vj
                     - 1.5 * n_dot_vj * n_dot_vj
                     + 0.5 * xji_dot_aj)
@@ -312,9 +310,9 @@ impl NBodySystem {
             }
         }
 
-        // 보정 항을 acc 에 합산.
-        for k in 0..n3 {
-            self.acc[k] += delta_acc[k];
+        // 보정 항을 acc 에 합산. 양쪽 모두 길이 n3 — zip 은 인덱스 경계와 동치.
+        for (a, &d) in self.acc.iter_mut().zip(delta_acc.iter()) {
+            *a += d;
         }
     }
 
@@ -353,9 +351,8 @@ impl NBodySystem {
         let n = self.n();
         let mut ke = 0.0;
         for i in 0..n {
-            let v2 = self.vel[3 * i].powi(2)
-                + self.vel[3 * i + 1].powi(2)
-                + self.vel[3 * i + 2].powi(2);
+            let v2 =
+                self.vel[3 * i].powi(2) + self.vel[3 * i + 1].powi(2) + self.vel[3 * i + 2].powi(2);
             ke += 0.5 * self.masses[i] * v2;
         }
         let mut pe = 0.0;
@@ -670,7 +667,8 @@ mod tests {
 
         let precession_rad = angle_final - angle_0;
         let per_century = precession_rad * 206_265.0 / centuries;
-        let rel_err = (per_century - expected_arcsec_per_century).abs() / expected_arcsec_per_century;
+        let rel_err =
+            (per_century - expected_arcsec_per_century).abs() / expected_arcsec_per_century;
 
         println!(
             "{} perihelion precession (EIH): {:.4}″/century (theory: {:.2}″, rel_err: {:.2}%, tol: ±{:.1}%)",
@@ -722,11 +720,11 @@ mod tests {
     fn venus_perihelion_eih_within_5_percent() {
         measure_perihelion_precession_eih(
             "Venus",
-            4.867e24,         // kg (NIST/IAU)
-            1.0821e11,        // 장반경 (m)
-            0.00677,          // 이심률 (매우 낮음 — 거의 원형)
-            224.701 * DAY,    // 공전주기 (s)
-            8.62,             // GR 세차 ″/century
+            4.867e24,      // kg (NIST/IAU)
+            1.0821e11,     // 장반경 (m)
+            0.00677,       // 이심률 (매우 낮음 — 거의 원형)
+            224.701 * DAY, // 공전주기 (s)
+            8.62,          // GR 세차 ″/century
             5.0,
         );
     }
@@ -739,11 +737,11 @@ mod tests {
     fn earth_perihelion_eih_within_5_percent() {
         measure_perihelion_precession_eih(
             "Earth",
-            5.972e24,         // kg
-            1.4960e11,        // 장반경 (m, ≈ 1 AU)
-            0.01671,          // 이심률
-            365.256 * DAY,    // 공전주기 (s, sidereal year)
-            3.84,             // GR 세차 ″/century
+            5.972e24,      // kg
+            1.4960e11,     // 장반경 (m, ≈ 1 AU)
+            0.01671,       // 이심률
+            365.256 * DAY, // 공전주기 (s, sidereal year)
+            3.84,          // GR 세차 ″/century
             5.0,
         );
     }
@@ -781,6 +779,10 @@ mod tests {
     ///
     /// `_gr_centuries` 에 centuries=1.0 + tol_pct assert 추가한 진단용 wrapper.
     /// 기존 diag 테스트들이 호출 — 본 회귀 가드는 `_gr_centuries` 를 직접 호출한다.
+    ///
+    /// #843 — 호출처 4곳 (diag_* 테스트) 전부 `diagnostics` feature 게이트라
+    /// 기본 테스트 빌드에서 dead_code 상시 경고 → 함수도 동일 feature 로 게이트.
+    #[cfg(feature = "diagnostics")]
     #[allow(clippy::too_many_arguments)]
     fn measure_perihelion_precession_gr_with(
         name: &str,
@@ -1114,7 +1116,13 @@ mod tests {
             (per_century - expected_arcsec_per_century).abs() / expected_arcsec_per_century;
         println!(
             "{} ({:?}, dt={}s, {}c): {:.4}″/century (theory: {:.2}″, rel_err: {:.2}%)",
-            name, integrator, dt, centuries, per_century, expected_arcsec_per_century, rel_err * 100.0
+            name,
+            integrator,
+            dt,
+            centuries,
+            per_century,
+            expected_arcsec_per_century,
+            rel_err * 100.0
         );
         per_century
     }
@@ -1367,14 +1375,14 @@ mod tests {
         // 8행성: 수성, 금성, 지구, 화성, 목성, 토성, 천왕성, 해왕성
         // 장반경(m), 이심률, 질량(kg)
         let planets: [(f64, f64, f64); 8] = [
-            (5.791e10, 0.20563, 3.301e23),    // 수성
-            (1.0821e11, 0.00677, 4.867e24),   // 금성
-            (1.4960e11, 0.01671, 5.972e24),   // 지구
-            (2.2794e11, 0.09339, 6.417e23),   // 화성
-            (7.7857e11, 0.04839, 1.898e27),   // 목성
-            (1.4335e12, 0.05415, 5.683e26),   // 토성
-            (2.8725e12, 0.04727, 8.681e25),   // 천왕성
-            (4.4951e12, 0.00859, 1.024e26),   // 해왕성
+            (5.791e10, 0.20563, 3.301e23),  // 수성
+            (1.0821e11, 0.00677, 4.867e24), // 금성
+            (1.4960e11, 0.01671, 5.972e24), // 지구
+            (2.2794e11, 0.09339, 6.417e23), // 화성
+            (7.7857e11, 0.04839, 1.898e27), // 목성
+            (1.4335e12, 0.05415, 5.683e26), // 토성
+            (2.8725e12, 0.04727, 8.681e25), // 천왕성
+            (4.4951e12, 0.00859, 1.024e26), // 해왕성
         ];
         let mu_sun = GRAVITATIONAL_CONSTANT * SUN_MASS;
 
@@ -1440,7 +1448,9 @@ mod tests {
             let hy = rz * vx - rx * vz;
             let hz = rx * vy - ry * vx;
             let h2 = hx * hx + hy * hy + hz * hz;
-            (1.0 + 2.0 * energy * h2 / (mu_sun * mu_sun)).max(0.0).sqrt()
+            (1.0 + 2.0 * energy * h2 / (mu_sun * mu_sun))
+                .max(0.0)
+                .sqrt()
         };
 
         for _ in 0..steps {
@@ -1474,7 +1484,11 @@ mod tests {
                 e_final,
                 orbits,
                 drift_per_orbit,
-                if measurable { "" } else { "  (informational, < 10 orbits)" }
+                if measurable {
+                    ""
+                } else {
+                    "  (informational, < 10 orbits)"
+                }
             );
             if measurable && drift_per_orbit > max_inner_drift_per_orbit {
                 max_inner_drift_per_orbit = drift_per_orbit;

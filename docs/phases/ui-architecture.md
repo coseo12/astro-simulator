@@ -1,3 +1,5 @@
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
+
 # UI 아키텍처
 
 프로젝트: 웹 기반 천체물리 시뮬레이터
@@ -21,12 +23,12 @@
 
 ### 1.3 Phase별 컴포넌트 배정
 
-| Phase | 일반 UI (필요분)                                                                                                          | 시뮬레이터 특화 (필수)                                                                                                           |
-| ----- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| P1    | Button, Input, Select, Slider, Switch, Tabs, Dialog, Tooltip, Toast, Card, ScrollArea, DropdownMenu, Dock/Panel/SplitPane | TimeScrubber, ScaleControl, DateTimePicker, CelestialTree, CelestialInfoPanel, UnitToggle, TierBadge, ModeSwitcher, SpeedControl |
-| P2    | NumberInput, Combobox, ContextMenu, Accordion, Table                                                                      | CameraBookmark, OrbitalElementsEditor, DataExporter                                                                              |
-| P3    | Progress, Skeleton                                                                                                        | (추가 필요 시 정의)                                                                                                              |
-| P4+   | 필요 시 정의                                                                                                              | HRDiagram, SpectrumView, GalaxyMap 등                                                                                            |
+| Phase | 일반 UI (필요분)                                                                                                          | 시뮬레이터 특화 (필수)                                                                                                                                                  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1    | Button, Input, Select, Slider, Switch, Tabs, Dialog, Tooltip, Toast, Card, ScrollArea, DropdownMenu, Dock/Panel/SplitPane | TimeScrubber, ScaleControl, DateTimePicker, CelestialTree, CelestialInfoPanel, TierBadge, ModeSwitcher, SpeedControl (UnitToggle 은 #841 에서 제거 — display-only 잔재) |
+| P2    | NumberInput, Combobox, ContextMenu, Accordion, Table                                                                      | CameraBookmark, OrbitalElementsEditor, DataExporter                                                                                                                     |
+| P3    | Progress, Skeleton                                                                                                        | (추가 필요 시 정의)                                                                                                                                                     |
+| P4+   | 필요 시 정의                                                                                                              | HRDiagram, SpectrumView, GalaxyMap 등                                                                                                                                   |
 
 ---
 

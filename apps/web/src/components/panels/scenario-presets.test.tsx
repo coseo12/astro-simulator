@@ -39,7 +39,6 @@ beforeEach(() => {
     selectedBodyId: null,
     timeScale: 86_400,
     fps: null,
-    unitSystem: 'astro',
     physicsEngine: 'kepler',
     massMultipliers: { earth: 2 },
     pingCount: 0,

@@ -196,13 +196,7 @@ fn depth_of(nodes: &[Node], idx: u32, current: u8) -> u8 {
 
 /// 입자 1개를 노드 idx 서브트리에 삽입. leaf cap=1 정책으로 분할.
 /// `particles`는 기존 leaf 입자의 위치 조회용.
-fn insert(
-    nodes: &mut Vec<Node>,
-    idx: u32,
-    particle_idx: u32,
-    particles: &[Particle],
-    depth: u8,
-) {
+fn insert(nodes: &mut Vec<Node>, idx: u32, particle_idx: u32, particles: &[Particle], depth: u8) {
     let i = idx as usize;
     let pos = particles[particle_idx as usize].position;
     if nodes[i].is_leaf() {
@@ -248,13 +242,13 @@ fn compute_com_recursive(nodes: &mut Vec<Node>, idx: u32, particles: &[Particle]
         for &pi in &nodes[i].particle_indices {
             let p = &particles[pi as usize];
             total += p.mass;
-            for k in 0..3 {
-                com[k] += p.mass * p.position[k];
+            for (c, &x) in com.iter_mut().zip(&p.position) {
+                *c += p.mass * x;
             }
         }
         if total > 0.0 {
-            for k in 0..3 {
-                com[k] /= total;
+            for c in com.iter_mut() {
+                *c /= total;
             }
         }
         nodes[i].total_mass = total;
@@ -276,13 +270,13 @@ fn compute_com_recursive(nodes: &mut Vec<Node>, idx: u32, particles: &[Particle]
         }
         let cn = &nodes[c as usize];
         total += cn.total_mass;
-        for k in 0..3 {
-            com[k] += cn.total_mass * cn.com[k];
+        for (c_acc, &x) in com.iter_mut().zip(&cn.com) {
+            *c_acc += cn.total_mass * x;
         }
     }
     if total > 0.0 {
-        for k in 0..3 {
-            com[k] /= total;
+        for c_acc in com.iter_mut() {
+            *c_acc /= total;
         }
     }
     nodes[i].total_mass = total;
@@ -417,8 +411,7 @@ mod tests {
             total_vol += (c.max[0] - c.min[0]) * (c.max[1] - c.min[1]) * (c.max[2] - c.min[2]);
         }
         // 8개 자식의 부피 합 = 부모 부피
-        let parent_vol =
-            (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
+        let parent_vol = (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
         assert!((total_vol - parent_vol).abs() < 1e-12);
     }
 
@@ -568,14 +561,20 @@ mod tests {
         tree.compute_com(&particles);
         let softening_sq = 1e-6;
         for (i, p) in particles.iter().enumerate() {
-            let bh = tree.compute_force(p.position, Some(i as u32), &particles, 0.0, softening_sq, G);
+            let bh =
+                tree.compute_force(p.position, Some(i as u32), &particles, 0.0, softening_sq, G);
             let ds = direct_sum_force(p.position, i, &particles, softening_sq);
             let mag_ds = (ds[0] * ds[0] + ds[1] * ds[1] + ds[2] * ds[2]).sqrt();
             let dx = bh[0] - ds[0];
             let dy = bh[1] - ds[1];
             let dz = bh[2] - ds[2];
             let err = (dx * dx + dy * dy + dz * dz).sqrt() / mag_ds.max(1e-30);
-            assert!(err < 1e-12, "theta=0에서 i={} 상대오차 {:.2e} > 1e-12", i, err);
+            assert!(
+                err < 1e-12,
+                "theta=0에서 i={} 상대오차 {:.2e} > 1e-12",
+                i,
+                err
+            );
         }
     }
 
@@ -595,7 +594,8 @@ mod tests {
         let mut max_rel = 0.0_f64;
         let mut count = 0_usize;
         for (i, p) in particles.iter().enumerate() {
-            let bh = tree.compute_force(p.position, Some(i as u32), &particles, 0.5, softening_sq, G);
+            let bh =
+                tree.compute_force(p.position, Some(i as u32), &particles, 0.5, softening_sq, G);
             let ds = direct_sum_force(p.position, i, &particles, softening_sq);
             let mag_ds = (ds[0] * ds[0] + ds[1] * ds[1] + ds[2] * ds[2]).sqrt();
             if mag_ds == 0.0 {

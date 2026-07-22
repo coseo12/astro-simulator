@@ -67,10 +67,6 @@
       "sha256": "864d73e6d1ba659ada98c1f6bfb33ebd62cfb7a9055f00097899a926fcb0dea4",
       "category": "atomic"
     },
-    ".claude/commands/volt.md": {
-      "sha256": "66d574aac30c0683170fdb2ec5a25fe462cd6ea143e3a4612a99ae5e4a55ccef",
-      "category": "atomic"
-    },
     ".claude/hooks/session-start-dead-wait-check.sh": {
       "sha256": "6b769b1d59eef5c7a4d3599f57fe13458247ae8a18dbf9009b23b9dc39624435",
       "category": "atomic",
@@ -78,10 +74,6 @@
     },
     ".claude/hooks/session-start-zombie-check.sh": {
       "sha256": "fb4f32790517cc20452701f58964ac2f89f81eb5462396d6ba43b4dbcf26c402",
-      "category": "atomic"
-    },
-    ".claude/scheduled_tasks.lock": {
-      "sha256": "6c3c62523ba4b46f42a798322f0ada6fb48b06602a9691abfcfad82166574538",
       "category": "atomic"
     },
     ".claude/settings.json": {
@@ -300,10 +292,6 @@
     },
     "scripts/browser-verify-webgpu.mjs": {
       "sha256": "cdc94ec13791169b6cbe07f509d007ad50a4326f992c9547238a22478da09eb1",
-      "category": "frozen"
-    },
-    "scripts/browser-verify.mjs": {
-      "sha256": "76ed126534b31bde78a73084ce5a3872f516a717ecfc5e7b5ddf0389ba18170b",
       "category": "frozen"
     },
     "scripts/capture-ring-shader-headful.mjs": {
@@ -663,10 +651,6 @@
       "sha256": "9a256cb3533beb88da8fabdc2d6e62330224c9d9e9291b7c941a5dabf316abf6",
       "category": "atomic"
     },
-    "docs/glossary.md": {
-      "sha256": "3eba55352b34f0cd929484f8df51672871f2486198a4866488cb4c5e79b9a384",
-      "category": "atomic"
-    },
     "docs/guides/branch-strategy-workflow.md": {
       "sha256": "4837ba6eff75365a02a9bcd2be9a783dde181e125f80d3abd245a11b27c7d4cc",
       "category": "atomic"
@@ -787,10 +771,6 @@
       "sha256": "f4aef34786132d92b9631ab7932a2c5c76983f9805628471beda7c345f21db2c",
       "category": "atomic"
     },
-    "docs/ops/operational-friction.md": {
-      "sha256": "94f068a42bd3458fd6757ef27f59e3ce534ebd419737e803a70de36d7ad2850d",
-      "category": "atomic"
-    },
     "docs/phases/P1-solar-system-mvp.md": {
       "sha256": "bfc5cac22a97a2dee341877c6f142fb37430ec4bcf241c09ef82559f1d2b87a3",
       "category": "atomic"
@@ -803,16 +783,8 @@
       "sha256": "ef4ecd25fa6ed492a753b4139d374a17bec31e293656694dc547ef4bd71c2bc9",
       "category": "atomic"
     },
-    "docs/phases/product-spec.md": {
-      "sha256": "a0573f21e92eef72156f9956269b5971681da3fd8ab5ed36390ebef88f813270",
-      "category": "atomic"
-    },
     "docs/phases/roadmap-track-ab.md": {
       "sha256": "e2f21de27802af5c4c1a5d0b82087991b130bd1f2c611dcc7135dd211667e1bd",
-      "category": "atomic"
-    },
-    "docs/phases/roadmap-v1-cosmic-scale.md": {
-      "sha256": "a639b8f553c66a3aae5d7cc3b114943153a1d02239c3934adc3543725adce332",
       "category": "atomic"
     },
     "docs/phases/roadmap-v3-incremental.md": {
@@ -821,10 +793,6 @@
     },
     "docs/phases/time-reversal.md": {
       "sha256": "e7c31ad03c46abd716f4f31cf4bf62b82e41bdbce73948863ffd54c42831d3d6",
-      "category": "atomic"
-    },
-    "docs/phases/ui-architecture.md": {
-      "sha256": "e6eb7304a431985993612bd85e3fd2827950caeede944a69f0fd8413a2ac49cb",
       "category": "atomic"
     },
     "docs/plans/.gitkeep": {

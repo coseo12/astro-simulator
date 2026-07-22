@@ -24,7 +24,7 @@
     "prebuild-test": "pnpm build:node",
     "test": "pnpm prebuild-test && vitest run",
     "test:watch": "vitest",
-    "lint": "echo 'lint: cargo clippy 참고'",
+    "lint": "cargo clippy --all-targets -- -D warnings",
     "typecheck": "echo 'typecheck: TS 없음, cargo check 사용'"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@
 - **날짜**: 2026-05-04
 - **결정자**: architect (#408 사용자 D-T2 forensic 확정 후 위임)
 - **관련 이슈**: [#408](https://github.com/coseo12/astro-simulator/issues/408)
-- **관련 ADR**: [`20260503-378-focus-frustum-fix.md`](20260503-378-focus-frustum-fix.md) (옵션 D 패턴 인용 — 본질 보존), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (defense-in-depth 패턴 SSoT), [`20260423-display-relative-scale-unification.md`](20260423-display-relative-scale-unification.md) (Tier 시스템 SSoT — 폐기 처리되었으나 코드는 유지), [`20260425-r1-store-scene-sync-unification.md`](20260425-r1-store-scene-sync-unification.md) (event 단일 진실원 — 본 ADR §결정 1 의 의존 역전 해결의 근거)
+- **관련 ADR**: [`20260503-378-focus-frustum-fix.md`](20260503-378-focus-frustum-fix.md) (옵션 D 패턴 인용 — 본질 보존), [`20260504-r-phase-allowlist-guard.md`](20260504-r-phase-allowlist-guard.md) (defense-in-depth 패턴 SSoT), [`20260423-display-relative-scale-unification.md`](../deprecated/decisions/20260423-display-relative-scale-unification.md) (Tier 시스템 SSoT — 폐기 처리되었으나 코드는 유지), [`20260425-r1-store-scene-sync-unification.md`](20260425-r1-store-scene-sync-unification.md) (event 단일 진실원 — 본 ADR §결정 1 의 의존 역전 해결의 근거)
 - **교훈 적용**: "주석 계약 vs 구현 drift" (volt [#49](https://github.com/coseo12/volt/issues/49) — `tierFromFocus` 의 0.1 AU 임계가 focusOn 진입 시 보장 안 됨, JSDoc 갱신 의무), "DoD PASS ≠ 제품 동작" (volt [#74](https://github.com/coseo12/volt/issues/74) — #378 옵션 D fix 후 verify 매트릭스 PASS 였으나 사용자 실측 회귀 확정), "헤드리스 ≠ 실 브라우저" (volt [#78](https://github.com/coseo12/volt/issues/78) — DoD-2 사용자 D-T2 실 Chrome 의무), "PM DoD 구조 drift" (volt [#76](https://github.com/coseo12/volt/issues/76) — 본 ADR 의 DoD-1~6 박제 시 ID/산출물/의미 변경 금지)
 
 ---
@@ -23,14 +23,14 @@ PR #399 ([#378](https://github.com/coseo12/astro-simulator/issues/378) 옵션 D 
 
 venus focus 상태 (camR=64.569, target=venus pos `(-152.6, -65.5, 7.9)`) → mercury 클릭:
 
-| 단계 | 시간 | tier | camR | target | 현상 |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 0~1800ms | inner | 64.569 | venus | stable |
-| 클릭 | 1817ms | inner | 64.569 | venus | mercury 클릭 (animations 0→2) |
-| **1단계** | 1840~2098ms | inner | 64 → 23 | venus → mercury 점진 보간 | 정상 줌 |
-| **🚨 2단계** | 2116ms | **inner→body 잘못 진입** | 22.829 → **372982** | mercury → **(0,0,0) origin reset** | **38만 unit jump** + mesh.scaling 4e4배 폭증 |
-| **🚨 3단계** | 2353ms | **body→inner 복귀** | 387만 → 26.876 | (0,0,0) → mercury | tier 복귀 + camR 정상화 |
-| stable | 2673ms~ | inner | 26.876 | mercury | 정상 |
+| 단계         | 시간        | tier                     | camR                | target                             | 현상                                         |
+| ------------ | ----------- | ------------------------ | ------------------- | ---------------------------------- | -------------------------------------------- |
+| 0            | 0~1800ms    | inner                    | 64.569              | venus                              | stable                                       |
+| 클릭         | 1817ms      | inner                    | 64.569              | venus                              | mercury 클릭 (animations 0→2)                |
+| **1단계**    | 1840~2098ms | inner                    | 64 → 23             | venus → mercury 점진 보간          | 정상 줌                                      |
+| **🚨 2단계** | 2116ms      | **inner→body 잘못 진입** | 22.829 → **372982** | mercury → **(0,0,0) origin reset** | **38만 unit jump** + mesh.scaling 4e4배 폭증 |
+| **🚨 3단계** | 2353ms      | **body→inner 복귀**      | 387만 → 26.876      | (0,0,0) → mercury                  | tier 복귀 + camR 정상화                      |
+| stable       | 2673ms~     | inner                    | 26.876              | mercury                            | 정상                                         |
 
 ### 메커니즘 (코드 추적 + 사용자 실측 매칭)
 
@@ -61,16 +61,17 @@ venus focus 상태 (camR=64.569, target=venus pos `(-152.6, -65.5, 7.9)`) → me
 
 **변경**: `focusOn(target)` 진입 시 첫 줄에서 `tierFromFocus(focusBody.kind, finalDistance)` 호출 → `solar-system-scene.setTier(finalTier)` 사전 호출 → 그 다음 `Animation.CreateAndStartAnimation` 시작. tier 가 보간 시작 전 정착되므로 frame race 자체 차단.
 
-| 축 | 평가 |
-| --- | --- |
-| 효과 | tier oscillate 원천 차단. 보간 진행 중 `updateTierByCamera` 가 동일 tier 반환 → no-op |
-| 위험 | `focusOn` 이 simulation-core 또는 solar-system-scene 의 setTier 를 호출해야 함 — **의존 역전 검토 필요** |
-| 비용 | 의존 역전 해결 방법 (a/b/c) 에 따라 5~30줄 |
-| 회귀 가드 | tier 가 사전 결정되므로 cam-target tween 보간 race 와 무관 |
+| 축        | 평가                                                                                                     |
+| --------- | -------------------------------------------------------------------------------------------------------- |
+| 효과      | tier oscillate 원천 차단. 보간 진행 중 `updateTierByCamera` 가 동일 tier 반환 → no-op                    |
+| 위험      | `focusOn` 이 simulation-core 또는 solar-system-scene 의 setTier 를 호출해야 함 — **의존 역전 검토 필요** |
+| 비용      | 의존 역전 해결 방법 (a/b/c) 에 따라 5~30줄                                                               |
+| 회귀 가드 | tier 가 사전 결정되므로 cam-target tween 보간 race 와 무관                                               |
 
 #### F1 의존 역전 해결 방법 (a/b/c)
 
 현재 의존 흐름:
+
 ```
 sim-canvas (UI) → sendCommand({type:'focusOn', bodyId})
                 → simulation-core 'focusOn' case → bodySelected event emit
@@ -83,20 +84,24 @@ sim-canvas (UI) → sendCommand({type:'focusOn', bodyId})
 `controller.focusOn` (camera-controller.ts) 가 simulation-core / solar-system-scene 을 모름 (단방향 — camera 전용 클래스). setTier 주입 방법:
 
 **(a) focusOn 에 finalTier 인자 주입** — `controller.focusOn({mesh, finalTier})` 시그니처 확장. sim-canvas 의 syncFocusToScene 이 호출 전 tierFromFocus 계산 후 전달.
+
 - 장점: camera-controller 가 setTier 자체 호출 안 함 — 단방향 의존 유지. 인자 1개 추가만.
 - 단점: setTier 호출 시점이 syncFocusToScene 으로 이동 (camera animation 시작 전).
 
 **(b) syncFocusToScene 이 setTier 직접 호출 후 focusOn** — sim-canvas:347~361 의 syncFocusToScene 헬퍼가 `solar.setTier(finalTier)` 를 setFocusOrigin 직후 + focusOn 직전에 호출.
+
 - 장점: camera-controller 변경 0. focusOn 시그니처 그대로.
 - 단점: tier 결정 로직이 sim-canvas 에 있게 됨 — 도메인 정책 (tierFromFocus) 이 UI 레이어에 노출. 향후 다른 진입점 (URL / programmatic) 추가 시 동일 로직 중복.
 
 **(c) syncFocusToScene 헬퍼 자체에 wrap** — 현재 syncFocusToScene 이 setFocusOrigin + focusOn 묶음. 여기에 setTier 추가하면 (b) 와 동일하지만 **헬퍼 추출** (예: `solar.applyFocusTier(focusBody)`) 로 도메인 로직을 scene API 로 노출.
+
 - 장점: 도메인 로직이 scene 으로 이동 — UI 가 정책 모름. 향후 진입점 추가 시 1곳 수정.
 - 단점: solar-system-scene 신규 API 추가 (1개).
 
 **채택**: **(c)** — `solar.applyFocusTier(bodyId, cameraDistMeters)` 를 solar-system-scene 에 신규 API 박제. setFocusOrigin + setTier 를 묶어 도메인 정책을 scene 단일 진실원에 집중. sim-canvas 의 syncFocusToScene 은 `applyFocusTier` 호출 후 `controller.focusOn` 호출. UI 는 정책 모름.
 
 근거:
+
 - (a) 는 camera-controller 가 tier 라는 도메인 개념을 입력 받게 되어 단일 책임 위배 (camera 는 camera 만)
 - (b) 는 sim-canvas 가 tier 정책 보유 — URL/programmatic 진입 추가 시 drift
 - (c) 는 R1 #334+#335 ADR 의 "event 단일 진실원" 정책 정합 — sim-canvas 는 store subscribe 후 scene API 1개 호출
@@ -105,12 +110,12 @@ sim-canvas (UI) → sendCommand({type:'focusOn', bodyId})
 
 **변경**: `tier-transition.ts` 의 `runTierTransition` 이 module-level 또는 closure 레벨 `transitionInProgress` 플래그를 set/clear (animation 시작/cleanup 시점). `solar-system-scene.updateTierByCamera` 가 lock 일 때 no-op (현 tier 반환만).
 
-| 축 | 평가 |
-| --- | --- |
-| 효과 | runTierTransition 진행 중 oscillate 차단 — F1 만으로 못 잡는 edge case (예: focus body 변경 + focusOn 호출 누락 경로, 또는 animation 진행 중 다른 동작) 안전망 |
-| 위험 | lock 해제 시점 결정 필요 (cleanup 콜백 / fallback timer 둘 다 idempotent 처리) |
-| 비용 | tier-transition.ts 5줄 + solar-system-scene.updateTierByCamera 1줄 |
-| 회귀 가드 | F1 만으로 정상 케이스 처리 + F2 가 edge case 안전망 (defense-in-depth — #378 옵션 D 패턴 동일) |
+| 축        | 평가                                                                                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 효과      | runTierTransition 진행 중 oscillate 차단 — F1 만으로 못 잡는 edge case (예: focus body 변경 + focusOn 호출 누락 경로, 또는 animation 진행 중 다른 동작) 안전망 |
+| 위험      | lock 해제 시점 결정 필요 (cleanup 콜백 / fallback timer 둘 다 idempotent 처리)                                                                                 |
+| 비용      | tier-transition.ts 5줄 + solar-system-scene.updateTierByCamera 1줄                                                                                             |
+| 회귀 가드 | F1 만으로 정상 케이스 처리 + F2 가 edge case 안전망 (defense-in-depth — #378 옵션 D 패턴 동일)                                                                 |
 
 #### F2 lock 메커니즘 상세
 
@@ -120,7 +125,7 @@ sim-canvas (UI) → sendCommand({type:'focusOn', bodyId})
 - **`updateTierByCamera` 분기**:
   ```ts
   if (transitionInProgress) {
-    return activeTier;  // no-op, 현 tier 반환 (호출자 스킴 변경 없음)
+    return activeTier; // no-op, 현 tier 반환 (호출자 스킴 변경 없음)
   }
   ```
 - **lock 시간 한계**: 정상 300ms (Animation 종료) ~ 500ms (fallback). 그 안에 사용자가 다른 body 클릭 시 → focusOn 의 setTier 가 lock 해제 후 발동. 이 케이스 자체가 드물고 lock 해제 후 정상 흐름.
@@ -131,12 +136,12 @@ sim-canvas (UI) → sendCommand({type:'focusOn', bodyId})
 
 **변경**: `tier.ts` 의 `TIER_HYSTERESIS = 0.15` → 0.50 으로 상수 변경. 또는 `tierFromFocus` 의 `0.1 * AU` 임계를 ±50% 마진 적용 함수로 교체.
 
-| 축 | 평가 |
-| --- | --- |
-| 효과 | tier 경계 근처 왕복 빈도 감소 — **부분 해결** |
-| 위험 | legitimate tier 전환도 지연. 사용자가 의도적 fast zoom 시 응답성 저하. ±50% 가 적절한가? venus → mercury target 보간 거리 (~150 → ~200 unit) 의 race 시간 (~250ms) 안에 0.1 AU 임계가 ±50% 마진을 넘는지 정량 산출 필요 |
-| 비용 | 1줄 (상수 변경) ~ 5줄 (함수 분기) |
-| 회귀 가드 | **불충분** — F1+F2 의 source-level 차단 대비 임시 완화 |
+| 축        | 평가                                                                                                                                                                                                                    |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 효과      | tier 경계 근처 왕복 빈도 감소 — **부분 해결**                                                                                                                                                                           |
+| 위험      | legitimate tier 전환도 지연. 사용자가 의도적 fast zoom 시 응답성 저하. ±50% 가 적절한가? venus → mercury target 보간 거리 (~150 → ~200 unit) 의 race 시간 (~250ms) 안에 0.1 AU 임계가 ±50% 마진을 넘는지 정량 산출 필요 |
+| 비용      | 1줄 (상수 변경) ~ 5줄 (함수 분기)                                                                                                                                                                                       |
+| 회귀 가드 | **불충분** — F1+F2 의 source-level 차단 대비 임시 완화                                                                                                                                                                  |
 
 **기각 사유**: forensic 데이터의 38만 unit jump 가 단순 hysteresis 부족이 아닌 race 자체. 마진을 늘려도 보간 시간 동안 임계 통과 가능. 또한 `tierFromFocus` 는 hysteresis 가 적용되지 않음 (focus 경로는 절대 임계). hysteresis 는 free-fly 경로 전용 메커니즘이므로 본 회귀에 직교.
 
@@ -144,14 +149,15 @@ sim-canvas (UI) → sendCommand({type:'focusOn', bodyId})
 
 **변경**: `camera-controller.ts focusOn()` 의 cam-target Animation 제거. `camera.target.copyFrom(targetPos)` 즉시 할당. cam-radius 만 ExponentialEase 보간.
 
-| 축 | 평가 |
-| --- | --- |
-| 효과 | target 이 처음부터 mercury 위치 → cameraFromFocusMeters 가 보간 중간값 거치지 않음 → race 차단 |
-| 위험 | UX 부자연성. 사용자 시각상 "카메라가 회전하지 않고 줌만" 보임. 다른 행성으로 시점이 jump 하는 효과 — **현재 부드러운 회전 + 줌 vs 줌만** UX 비교 필요 |
-| 비용 | 8줄 (Animation 호출 제거 + 즉시 할당) |
-| 회귀 가드 | F1 / F2 와 직교 (cam-target tween 자체 폐기) |
+| 축        | 평가                                                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 효과      | target 이 처음부터 mercury 위치 → cameraFromFocusMeters 가 보간 중간값 거치지 않음 → race 차단                                                        |
+| 위험      | UX 부자연성. 사용자 시각상 "카메라가 회전하지 않고 줌만" 보임. 다른 행성으로 시점이 jump 하는 효과 — **현재 부드러운 회전 + 줌 vs 줌만** UX 비교 필요 |
+| 비용      | 8줄 (Animation 호출 제거 + 즉시 할당)                                                                                                                 |
+| 회귀 가드 | F1 / F2 와 직교 (cam-target tween 자체 폐기)                                                                                                          |
 
 **기각 사유**:
+
 1. UX 후퇴 — 현재 venus → mercury 전환 시 **부드러운 호 회전** (camera target Animation 의 시각 효과) 가 사라짐. ArcRotateCamera 는 target 회전 + radius 줌이 결합되어 자연스러운 궤도 시각 효과를 만든다. target jump 시 1단계 줌만 남아 평면 줌 인 → 줌 아웃 효과
 2. **폐기 프레이밍 함정 회피** — F4 가 단순해 보이지만 UX 평가 누락. F1+F2 가 race 만 정확히 차단하면서 UX 보존
 3. **camera-controller 의 단일 책임 강화 방향에 역행** — focusOn 은 "특정 mesh 로 부드러운 전환" 이 SSoT. cam-target Animation 폐기는 SSoT 의 핵심을 제거
@@ -187,7 +193,7 @@ const applyFocusTier = (bodyId: string, cameraDistMeters: number): Tier => {
   // 1. setFocusOrigin + tier 결정을 묶어 단일 시점 정착
   const finalTier = tierFromFocus(body.kind, cameraDistMeters);
   if (finalTier !== activeTier) {
-    setTier(finalTier);  // 기존 setTier 가 origin shift + mesh rebuild + runTierTransition 까지 처리
+    setTier(finalTier); // 기존 setTier 가 origin shift + mesh rebuild + runTierTransition 까지 처리
   }
   return finalTier;
 };
@@ -220,6 +226,7 @@ const syncFocusToScene = (bodyId: string | null) => {
 ```
 
 **근거**:
+
 - R1 #334+#335 ADR 의 "event 단일 진실원" 정책 정합 — sim-canvas 는 store subscribe 후 scene API 호출 (도메인 정책 미보유)
 - camera-controller 의 단일 책임 (camera 전용) 보존
 - 향후 진입점 추가 시 `applyFocusTier` 1곳만 호출하면 정합
@@ -233,11 +240,11 @@ let tierTransitionInProgress = false;
 const setTier = (tier: Tier) => {
   if (tier === activeTier) return;
   // ... 기존 mesh.scaling / origin / mesh.position 재계산 ...
-  
+
   const cam = scene.activeCamera;
   if (cam && isArcRotateCamera(cam)) {
     pendingTierCleanup?.();
-    tierTransitionInProgress = true;  // F2: lock 진입
+    tierTransitionInProgress = true; // F2: lock 진입
     const focusMesh = focusBodyIdForAssert ? meshes.get(focusBodyIdForAssert) : undefined;
     pendingTierCleanup = runTierTransition({
       scene,
@@ -245,20 +252,23 @@ const setTier = (tier: Tier) => {
       oldScale,
       newScale,
       ...(focusMesh ? { focusMesh } : {}),
-      onComplete: () => { tierTransitionInProgress = false; },  // F2: lock 해제 (cleanup 시점 idempotent)
+      onComplete: () => {
+        tierTransitionInProgress = false;
+      }, // F2: lock 해제 (cleanup 시점 idempotent)
     });
   }
 };
 
 const updateTierByCamera = (cameraFromSunMeters, cameraFromFocusMeters): Tier => {
   if (tierTransitionInProgress) {
-    return activeTier;  // F2: transition 중 no-op
+    return activeTier; // F2: transition 중 no-op
   }
   // ... 기존 로직 ...
 };
 ```
 
 **lock 해제 옵션**:
+
 - (i) `runTierTransition` 의 cleanup 함수 내부에서 `tierTransitionInProgress = false` (호출자가 onComplete 콜백 주입)
 - (ii) tier-transition.ts 자체에 module-level export `isTierTransitionInProgress()` getter
 - (iii) Animation onAnimationEnd 콜백 직접 등록 — 단 fallback timer / visibilitychange 도 발동 가능 → 다중 해제 idempotent 처리 필요
@@ -341,12 +351,12 @@ PR #407 (R-Phase allowlist) 의 turbopack `__dirname` `/ROOT/...` SSR 500 회귀
 
 ### 호출 전 Claude 편향 셀프 체크 (4종)
 
-| 축 | 통과 여부 | 비고 |
-| --- | --- | --- |
-| 낙관적 일정 | 통과 | F1 의존 역전 (a/b/c) 비교 + (c) 채택 근거 명시. F1 만으로 단순 해결 함정 회피 — F2 defense-in-depth 필수 박제 |
-| 결합 간과 | 통과 | event 단일 진실원 정책 (R1 #334+#335) 과의 정합성 명시. focusOn 의 도메인 결합 (camera-controller / simulation-core / solar-system-scene) 분석 후 (c) 채택 |
-| 폐기 프레이밍 | 통과 | F4 (cam-target tween 폐기) 의 단순함 함정 회피 — UX 후퇴 + 단일 책임 위배 근거로 기각 |
-| 순수주의 | 통과 | F3 (hysteresis ±50%) 의 "제대로 fix" 함정 회피 — race 자체 차단이 아닌 부분 완화로 기각. 비-범위 (#378 옵션 D 보존) 침범 0 |
+| 축            | 통과 여부 | 비고                                                                                                                                                       |
+| ------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 낙관적 일정   | 통과      | F1 의존 역전 (a/b/c) 비교 + (c) 채택 근거 명시. F1 만으로 단순 해결 함정 회피 — F2 defense-in-depth 필수 박제                                              |
+| 결합 간과     | 통과      | event 단일 진실원 정책 (R1 #334+#335) 과의 정합성 명시. focusOn 의 도메인 결합 (camera-controller / simulation-core / solar-system-scene) 분석 후 (c) 채택 |
+| 폐기 프레이밍 | 통과      | F4 (cam-target tween 폐기) 의 단순함 함정 회피 — UX 후퇴 + 단일 책임 위배 근거로 기각                                                                      |
+| 순수주의      | 통과      | F3 (hysteresis ±50%) 의 "제대로 fix" 함정 회피 — race 자체 차단이 아닌 부분 완화로 기각. 비-범위 (#378 옵션 D 보존) 침범 0                                 |
 
 ### cross-validate 결과 분류
 
@@ -417,6 +427,7 @@ PR #407 (R-Phase allowlist) 의 turbopack `__dirname` `/ROOT/...` SSR 500 회귀
 ### dev 환경 SSR 200 사전 검증 의무 (결정 4)
 
 PR 생성 전 필수 selfcheck:
+
 ```bash
 pnpm --filter @astro-simulator/core build
 pnpm --filter @astro-simulator/web dev &  # background
@@ -424,6 +435,7 @@ sleep 5
 curl -I http://localhost:3000/ko | head -1
 # 기대: HTTP/1.1 200 OK
 ```
+
 PR 본문에 결과 (status code) 박제. PR #407 의 turbopack `__dirname` `/ROOT/...` SSR 500 회귀 재발 방지.
 
 ### 참조 문서

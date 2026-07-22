@@ -41,7 +41,6 @@ beforeEach(() => {
     selectedBodyId: null,
     timeScale: 86_400,
     fps: null,
-    unitSystem: 'astro',
     pingCount: 0,
     lastPingAt: null,
   });

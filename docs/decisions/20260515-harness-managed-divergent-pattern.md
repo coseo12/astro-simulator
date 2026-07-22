@@ -1722,3 +1722,87 @@ Amendment 14 는 조건 2 를 "직전 **머지된** Phase-2 이후 연속 Phase-
 - **고유 발견 (기존 §재검토 조건 연결 — 후속 분리 불요)**: (Q2) 다수 다운스트림 배포 시 Goodhart's Law 로 denylist 게이밍 우회 비용 급락 (무의미 주석 1줄로 리셋) → 그 경우 allowlist/label 하이브리드 필요. **유효하나 본 하네스는 1인 운영 전제** (CLAUDE.md §개요 "1인 개발자-AI 페어"). 이 threat model 전환은 **기존 §재검토 조건 #3 (다운스트림 ≤ 1)** 에 자연 매핑 — 다운스트림 증가 시 본 Amendment 15 denylist 접근을 allowlist/label 로 재평가하는 트리거로 §재검토 조건 #3 를 재사용. 신규 이슈/코드 변경 불요, 재검토 조건 문서화로 충분.
 - **오탐 필터링**: (Q1 markdown 확장) — 위 기각 참조. 그 외 agy 지적은 유효.
 - **Claude 편향 셀프 체크 결과**: §순수주의 축에서 사전 식별한 "denylist 커버리지 / 위험 비대칭 과의존" 미통과 잠재를 cross-validate 가 검증 — Q1 커버리지 결함 (lock 변종) 은 실재 확인·수정, Q2 위험 비대칭은 1인 운영 전제에서 타당 확증 (+ 다운스트림 확장 재검토 조건 연결). markdown-substantive 역방향 발견은 오히려 설계 강화.
+
+## Amendment 16 — 2026-07-22
+
+상태: Accepted (cross-validate 2026-07-22 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
+
+- **발의**: [#868](https://github.com/coseo12/astro-simulator/issues/868) (§재검토 조건 #5 자동 탐지 2026-07-20) + [#869](https://github.com/coseo12/astro-simulator/issues/869) (§재검토 조건 #6 Amendment 9 동시 발화) — §Amendment 9 규정 "#5/#6 동시 발화 시 #5 우선 (Phase 2 강제 우위)" 에 따라 단일 Amendment 통합 처리.
+- **트리거**: 3중 OR 중 3건 발화 보고 (진행률 26.7% < 33% / 연속 10 ≥ N=10 / 63일 경과) + drift 19 ≥ N=10 (실측 시점 27). 단 아래 §forensic 측정이 발화 전제 일부를 정정.
+- **결정 요약**: **#5 → 옵션 A (Phase 2 일괄/가속)** / **#6 → 옵션 1 (Phase 2 가속) + carry-over 모수 위생**. 옵션 B(폐기)/C·3(임계 재조정)/2(revert) 기각. **N=10 / 33% / 90일 임계값 변경 0** — Amendment 7/13/14/15 동일 계열 (측정 계약 이행 + 모수 정직화).
+
+### forensic 판정 (5조건 중 4 충족 → forensic 변형)
+
+1. 가설 N≥2 ✓ — "제출 부족" vs "머지 정체" vs "측정 결함" (실측: 복합 — 머지 정체가 주인, 측정 결함이 증폭)
+2. Runtime 측정 필수 ✓ — gh 실측 없이는 "매칭 0건" 모순·carry-over 클래스 판별 불가
+3. DoD PASS 인데 회귀 ✓ — [Phase 2 Sync] OK 출력과 open PR 7건 공존 (측정 통과 ↔ 운영 실태 mismatch)
+4. 5±2 옵션 비교 ✓ / 5. Amendment 라운드 예상 ✓ (cross-validate 후 갱신 가능)
+
+### forensic 측정 (2026-07-22, develop tip c8873ca)
+
+1. **[Phase 2 Sync] "매칭 0건" 모순 확정** — `verifyPhase2Sync()` 의 `--search "ADR 20260515"` 가 open PR 7건 (#309/#318/#320~#324) 에서 0건 반환. 7건 전수 제목·본문에 리터럴 부재 [실측]. 스크립트 주석의 "PR 본문/제목 ADR ID 박제 컨벤션" (D1 실측 결정, Amendment 3 계열) 이 07-06 이후 제출분에서 이행 누락.
+2. **Phase-2 분자 과소계상** — 동일 검색식이 분자 카운트에도 사용되어 (a) open 7건은 머지돼도 분자 불변, (b) merged [harness-setting#315](https://github.com/coseo12/harness-setting/pull/315) (2026-07-10, dead-wait 가드 — CLAUDE.md 데코레이터가 Phase-2 로 자기 인용, substantive) 가 이미 누락. **직전 substantive Phase-2 는 2026-05-18 이 아니라 2026-07-10** — 조건 2 (연속 10)·조건 3 (63일) 은 부분 false-fire, 조건 1 은 5/15~16 = 31~33% 경계로 실질 발화 유지.
+3. **drift 27 구성 분해** — A. open PR 커버 15 / B. merged 대기 (CLAUDE.md) 1 / C. 신규 번들 대상 3 (verify-docs-links.sh, harness-guards.yml, settings.json delta) / **D. manifest carry-over 8** (`.claude/scheduled_tasks.lock`(gitignored runtime lock!), `.claude/commands/volt.md`, `scripts/browser-verify.mjs`, `docs/glossary.md`, `docs/ops/operational-friction.md`, `docs/phases/product-spec.md`, `docs/phases/roadmap-v1-cosmic-scale.md`, `docs/phases/ui-architecture.md`) — 8건 전부 upstream 저장소에 파일 부재 [gh api 404 실측] = Phase 2 구조적 불가능.
+
+### 변경 사항
+
+#### 1. §재검토 조건 #5 결정 분기 — 옵션 A (Phase 2 일괄/가속)
+
+- 실행: (i) 소급 마킹 (open 7 + #315 본문에 `ADR 20260515` 리터럴 추가), (ii) 사용자 머지 요청 7건 (제출순 순차) + upstream 릴리스, (iii) 신규 번들 U1(verify-docs-links.sh)/U2(harness-guards.yml 범용 delta)/U3(zombie-check hook)/U4(carry-over 결함 보고 이슈), (iv) Phase 3 (harness update + Amendment 10/11 자동 해소).
+- 옵션 B 기각 — 제출 7건 존재 = 패턴 작동 중, 폐기 시 15파일 영구 fork. 옵션 C 기각 — 직전 #487 C 채택 후 1일 만에 재발화한 실측 이력 + 이번 병목 (머지 정체/측정 누락/carry-over) 중 임계값이 원인인 것이 0건.
+
+#### 2. §재검토 조건 #6 결정 분기 — 옵션 1 + carry-over 모수 위생
+
+- D 클래스 8건은 Amendment 13 allowlist 가 아니라 **manifest 등재 제거**로 해소 — allowlist 는 "upstream 배포 파일의 영구 교체" 용, D 는 "등재 자체가 결함" (구분 기준 신설, 아래 표). 제거 전 `harness update` 무해성 dry-run 실측 의무.
+
+| 구분          | Amendment 13 allowlist | 본 Amendment carry-over 위생        |
+| ------------- | ---------------------- | ----------------------------------- |
+| upstream 파일 | 존재 (템플릿/데모)     | **부재** (404)                      |
+| 결함 위치     | 없음 (정당 divergent)  | manifest 등재 자체                  |
+| 조치          | 카운트 모수 제외       | entry 제거 + upstream CLI 보고 (U4) |
+
+#### 3. Phase-2 식별 컨벤션의 ADR 본문 승격 (§운영 절차 Phase 2 갱신)
+
+- 신규 의무: **Phase 2 upstream PR 은 제목 또는 본문에 리터럴 `ADR 20260515` 포함** (스크립트 주석 → ADR 계약 승격). 소급 마킹은 게이밍 아님 — 데코레이터 SSoT 가 이미 인용하는 substantive PR 의 사실 정정 (Amendment 15 게이밍 방어는 trivial PR 대상, 본 건 무관).
+- **소급 마킹 허용 조건 명문화 (cross-validate 고유 발견 1 수용)**: 사후 마킹에 의한 분자 산입은 **(a) 머지 시점에 데코레이터 SSoT 상 해당 PR 의 Phase-2 지정이 이미 존재** + **(b) Amendment 15 substantive 필터 통과** — 두 조건 동시 충족 시에만 허용. 마킹 시점의 주장이 아닌 머지 시점의 기록이 근거여야 한다 (타임스탬프 검증 가드).
+
+#### 4. 측정 보강 3건
+
+- (a) `verifyPhase2Sync()` `--search` 제거 (파일 경로 교집합이 곧 필터) + unmarked-PR 괴리 WARN, (b) `isAdrEvolutionPr` regex 보강 (`chore(release):` / `[#822]`형 Amendment 구현 PR 누수 [실측 #829/#838/#824/#825]), (c) workflow 이슈 템플릿 stale 파일명 (`-v2` 미반영) 문자열 정정. 전부 self-test 케이스 동반.
+- 각주 (Accepted 전이 시 정정): 초안은 "(후속 dev)" 로 표기했으나 실제로는 결정 실행 라운드 (PR #873) 에서 **동시 이행** 됨 — Concrete Prediction 의 "조건 1 경계 잔존" 이 55.6% 해소로 초과 달성된 이유 (분모 정정 × 소급 마킹 복합 효과).
+
+### silent 가드 강화 vs 약화 자기점검
+
+- ✓ N=10/33%/90일 임계 변경 0. 옵션 C/3 명시 기각.
+- ✓ 소급 마킹·carry-over 위생 = 측정 계약 이행 + 모수 정직화 (Amendment 7/13/14/15 계열) — 발화 부담 (주관) 아닌 gh api 404 ×8 / 본문 리터럴 부재 ×7 (객관) 근거.
+- ✓ 조건 1 경계 잔존 (5/16=31%) 을 은폐하지 않음 — 머지 완주 전까지 재발화 가능성 명시 수용.
+
+### Concrete Prediction
+
+- 소급 마킹 직후: 조건 2 연속 10→≤3, 조건 3 63일→12일 (해소), 조건 1 31~33% (경계 잔존)
+- 7건 머지 + 마킹 후: 분자 12 → 조건 1 ≥ 75% (해소)
+- manifest 위생 후 drift 27→19, Phase 3 완주 후 ≤ 3, U1~U3 후 0~1
+
+### Claude 편향 셀프 체크 (4종)
+
+- 낙관적 일정: 머지·릴리스는 사용자 권한 — 일정 약속 없음, 요청 목록으로 한정. **통과**
+- 결합 간과: 동일 파일 다중 PR (qa.md ×3 등) 순차 머지 충돌 리스크 명시. **통과**
+- 폐기 프레이밍: 옵션 B/C 기각을 실측 이력 (#487→#495 1일 재발화, 병목 원인 0건) 근거로 수행. **통과**
+- 순수주의: **미통과 잠재 축** — (1) #315 소급 인정 기준이 "데코레이터 인용" 에 과의존하는가 (Phase-2 정의 경계)? (2) carry-over 를 allowlist 아닌 manifest 제거로 푸는 판단이 harness update 동작 미실측 상태에서 성급한가? → cross-validate 명시 질문 삽입 대상.
+
+### cross-link
+
+- 발의: #868 / #869, 결정 코멘트: [5-A (#868)](https://github.com/coseo12/astro-simulator/issues/868#issuecomment-5037605745) / [5-B (#869)](https://github.com/coseo12/astro-simulator/issues/869#issuecomment-5037605940) — 재실측 박제: [#868 재실측](https://github.com/coseo12/astro-simulator/issues/868#issuecomment-5037609528) / [#869 위생 실측](https://github.com/coseo12/astro-simulator/issues/869#issuecomment-5037612063)
+- 직전 결정 분기 이력: #487(C) → #495(A, Amendment 4) → #500(A 연속, Amendment 6) → #554(측정 정정, Amendment 7) → #766(3′, Amendment 13)
+- upstream: open #309/#318/#320~#324, merged #315, 이슈 #319/#325, U4 (생성 후 박제)
+- 측정 SSoT: `scripts/verify-z-pattern-health.mjs` / `scripts/verify-harness-drift-decorator.mjs` / `.github/workflows/adr-z-pattern-health-v2.yml`
+
+### 교차검증 반영 사항 (cross-validate 2026-07-22 완료 — Accepted 전이)
+
+agy (architecture 모드, L1/L3 가드) 판정: **승인 적극 권장** — 명시 질문 2건 모두 타당 확인. 로그: `.claude/logs/cross-validate-architecture-20260722-040046.log`
+
+- **합의 (즉시 신뢰)**: (1) #315 소급 마킹 = "부풀리기가 아닌 측정 데이터의 사실 관계 복원" — Amendment 15 substantive 필터가 독립 차단층으로 유효. (2) manifest carry-over 는 "존재하지 않는 대상을 allowlist 로 관리하면 거버넌스 모수 오염 — 등재 제거가 논리적으로 유일하게 올바른 조치". (3) 옵션 C 기각 근거 (#487 1일 재발화 실측) 타당. (4) `--search` → 파일 경로 교집합 전환은 내구성 개선.
+- **고유 발견 1 — 수용 (본 PR 반영)**: 소급 마킹 허용 조건의 타임스탬프 검증 가드 명문화 — §변경 3 에 2조건 (머지 시점 데코레이터 지정 + substantive) 동시 충족 규칙 추가. 마킹 시점 주장이 아닌 머지 시점 기록이 근거.
+- **고유 발견 2 — 기각 (관찰 유지)**: upstream PR 생성 시 ADR 리터럴 부재를 경고하는 CI Linter 추가 제안 — 다운스트림 c-1 unmarked-PR WARN 이 동일 회귀를 사후 감지로 이미 커버하고, upstream CI 는 별도 저장소 관할 (U 번들 스코프 팽창). 발생 빈도 실측 (7건/6주) 대비 유지 비용 — unmarked WARN 재발 시 재평가.
+- **고유 발견 3 — 기존 반영 확인**: 다중 PR 순차 머지 런북 / 재발화 수용 표기 — Amendment 16 §위험 (Track 1 순서 명시) + §자기점검 (조건 1 경계 은폐 없음) 에 기박제. 추가 조치 불요.
+- **편향 셀프 체크 해소**: 순수주의 "미통과 잠재 축" 2건이 명시 질문으로 전달되어 모두 타당 판정 — 축 해소. 나머지 3종 (낙관 일정/결합 간과/폐기 프레이밍) 은 agy 6대 기준 평가에서 반증 없음.

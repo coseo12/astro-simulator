@@ -3,7 +3,7 @@
 - **상태**: Accepted (cross-validate 2026-07-17 — §7 §교차검증 반영 4분류 통합 완료. 메인 오케스트레이터 수행)
 - **날짜**: 2026-07-17
 - **결정자**: architect (#818 forensic 진단 — measurement-first 실측) + developer (구현·검증)
-- **관련**: #818, #790 (PR [#816](https://github.com/coseo12/astro-simulator/pull/816) — 시각 반경 하한), #834 (earth inner 정착 후속 분리), [`20260509-380-zoom-camera-freeze-forensic.md`](20260509-380-zoom-camera-freeze-forensic.md), [`20260504-focus-tier-oscillate-fix.md`](20260504-focus-tier-oscillate-fix.md), [`20260423-display-relative-scale-unification.md`](20260423-display-relative-scale-unification.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md)
+- **관련**: #818, #790 (PR [#816](https://github.com/coseo12/astro-simulator/pull/816) — 시각 반경 하한), #834 (earth inner 정착 후속 분리), [`20260509-380-zoom-camera-freeze-forensic.md`](20260509-380-zoom-camera-freeze-forensic.md), [`20260504-focus-tier-oscillate-fix.md`](20260504-focus-tier-oscillate-fix.md), [`20260423-display-relative-scale-unification.md`](../deprecated/decisions/20260423-display-relative-scale-unification.md), [`docs/templates/forensic-adr-template.md`](../templates/forensic-adr-template.md)
 - **교훈 적용**:
   - "수치 DoD 미달 시 측정 방법 검증 우선" (CLAUDE.md §스프린트 계약 10) — stall 을 lowerRadiusLimit clamp 로 오진하지 않고 tier-불변 실거리(cameraFromFocusAU) 궤적 실측으로 진짜 원인(tier 진동) 확정
   - "주석 계약 vs 구현 drift" (CLAUDE.md 교훈) — `runTierTransition` focusMesh 경로가 focus-entry(V5) 와 줌 crossing 두 문맥을 한 공식으로 처리하던 계약 누락 → 문맥 분기(`preserveFocusDistance`)

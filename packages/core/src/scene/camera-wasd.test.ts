@@ -15,62 +15,19 @@
  *  - detach 후 키 이벤트 무시 (observer 해제)
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Observable, Vector3, KeyboardEventTypes } from '@babylonjs/core';
-import type { ArcRotateCamera, Scene, KeyboardInfo } from '@babylonjs/core';
+import { Vector3 } from '@babylonjs/core';
 import { WASD_DELTA_PERCENTAGE, MAX_MOVE_STEP, attachWasdControl } from './camera.js';
+// #849 — 키보드 씬 하니스는 공용 헬퍼로 추출 (SUT 배선은 본 파일 책임 — volt #120).
+import {
+  makeKeyboardSceneHarness,
+  type KeyboardSceneHarnessOptions,
+} from './__test-utils__/babylon-mocks.js';
 
-/**
- * 실 Observable/Vector3 + duck-typed 카메라·엔진을 갖춘 최소 씬 모킹.
- *
- * - `getDirection(Forward)` 는 forward 방향을 그대로 반환 (회전 행렬 모사 불필요 — 산식 검증 목적).
- * - `getDeltaTime()` 은 가변 deltaTime (frame-rate 독립 검증).
- * - `document.activeElement` 가드는 jsdom 기본(body 포커스)에서 통과한다.
- */
-function makeHarness(opts: { forward?: Vector3; radius?: number; deltaTimeMs?: number }) {
-  const forward = (opts.forward ?? new Vector3(0, 0, 1)).clone();
-  let deltaTimeMs = opts.deltaTimeMs ?? 16;
-  const onKeyboardObservable = new Observable<KeyboardInfo>();
-  const onBeforeRenderObservable = new Observable<Scene>();
-
-  const camera = {
-    target: Vector3.Zero(),
-    position: forward.scale(-(opts.radius ?? 100)), // position = target − forward×radius
-    radius: opts.radius ?? 100,
-    getDirection: (axis: Vector3) => {
-      // Forward → forward, Up → 카메라 local up (여기선 월드 Up 과 분리 위해 기울인 값 주입 가능).
-      if (axis.equals(Vector3.Forward())) return forward.clone();
-      return Vector3.Up().clone();
-    },
-    onDisposeObservable: new Observable<unknown>(),
-  } as unknown as ArcRotateCamera;
-
-  const engine = {
-    getRenderingCanvas: () => null,
-    getDeltaTime: () => deltaTimeMs,
-  };
-  const scene = {
-    onKeyboardObservable,
-    onBeforeRenderObservable,
-    getEngine: () => engine,
-  } as unknown as Scene;
-
-  const press = (key: string) =>
-    onKeyboardObservable.notifyObservers({
-      type: KeyboardEventTypes.KEYDOWN,
-      event: { key },
-    } as unknown as KeyboardInfo);
-  const release = (key: string) =>
-    onKeyboardObservable.notifyObservers({
-      type: KeyboardEventTypes.KEYUP,
-      event: { key },
-    } as unknown as KeyboardInfo);
-  const frame = () => onBeforeRenderObservable.notifyObservers(scene);
-  const setDeltaTime = (ms: number) => {
-    deltaTimeMs = ms;
-  };
-
-  const handle = attachWasdControl(camera, scene);
-  return { camera, scene, handle, press, release, frame, setDeltaTime, forward };
+/** 공용 키보드 씬 하니스에 SUT(attachWasdControl) 를 배선한 로컬 래퍼. */
+function makeHarness(opts: KeyboardSceneHarnessOptions) {
+  const h = makeKeyboardSceneHarness(opts);
+  const handle = attachWasdControl(h.camera, h.scene);
+  return { ...h, handle };
 }
 
 describe('#699 WASD_DELTA_PERCENTAGE / MAX_MOVE_STEP 박제값', () => {
@@ -237,33 +194,19 @@ describe('#699 Q/E 월드 절대 up', () => {
   it('카메라 local up 이 기울어도 Q 는 월드 +Y 이동 (수평 둔갑 회피)', () => {
     // getDirection(Up) 이 월드 수평(local up = +X)을 반환하도록 모킹 — pitch≈−π/2 하향 시점 모사.
     // 구현이 local up 을 썼다면 Q 가 +X(수평) 로 이동하지만, 월드 Up() 고정이라 +Y 로 이동해야 한다.
-    const onKeyboardObservable = new Observable<KeyboardInfo>();
-    const onBeforeRenderObservable = new Observable<Scene>();
-    const forward = new Vector3(0, -1, 0); // 수직 하향 시선.
-    const camera = {
-      target: Vector3.Zero(),
-      position: new Vector3(0, 100, 0),
+    const h = makeHarness({
+      forward: new Vector3(0, -1, 0), // 수직 하향 시선.
       radius: 100,
-      getDirection: (axis: Vector3) =>
-        axis.equals(Vector3.Forward()) ? forward.clone() : new Vector3(1, 0, 0), // local up = +X (수평).
-      onDisposeObservable: new Observable<unknown>(),
-    } as unknown as ArcRotateCamera;
-    const scene = {
-      onKeyboardObservable,
-      onBeforeRenderObservable,
-      getEngine: () => ({ getRenderingCanvas: () => null, getDeltaTime: () => 16 }),
-    } as unknown as Scene;
-    const handle = attachWasdControl(camera, scene);
-    handle.setEnabled(true);
+      deltaTimeMs: 16,
+      localUp: new Vector3(1, 0, 0), // local up = +X (수평).
+    });
+    h.handle.setEnabled(true);
 
-    onKeyboardObservable.notifyObservers({
-      type: KeyboardEventTypes.KEYDOWN,
-      event: { key: 'q' },
-    } as unknown as KeyboardInfo);
-    onBeforeRenderObservable.notifyObservers(scene);
+    h.press('q');
+    h.frame();
 
-    expect(camera.target.y).toBeGreaterThan(0); // 월드 +Y (위로) — 정상.
-    expect(camera.target.x).toBeCloseTo(0, 6); // local up(+X) 미사용 → 수평 이동 0.
+    expect(h.camera.target.y).toBeGreaterThan(0); // 월드 +Y (위로) — 정상.
+    expect(h.camera.target.x).toBeCloseTo(0, 6); // local up(+X) 미사용 → 수평 이동 0.
   });
 });
 
