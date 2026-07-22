@@ -87,11 +87,7 @@ pub fn extract_osculating_elements(
     // 특이점 조기 판정 — 분기에서 재사용.
     let is_circular = eccentricity < ECC_SINGULAR_THRESHOLD;
     let is_equatorial = sin_i < INC_SINGULAR_THRESHOLD;
-    let singularity: u8 = if is_circular || is_equatorial {
-        1
-    } else {
-        0
-    };
+    let singularity: u8 = if is_circular || is_equatorial { 1 } else { 0 };
 
     // 승교점 벡터 N = ẑ × h = (-hy, hx, 0). |N| = h_xy.
     let nx = -hy;
@@ -102,43 +98,42 @@ pub fn extract_osculating_elements(
     let true_longitude = ry.atan2(rx);
 
     // 케이스 분기 (ADR 결정 #3).
-    let (longitude_of_ascending_node, argument_of_periapsis, mean_anomaly) = if is_equatorial
-        && is_circular
-    {
-        // 적도 + 원순환: Ω=0, ω=0, M = λ_true.
-        (0.0, 0.0, wrap_to_pi(true_longitude))
-    } else if is_equatorial {
-        // 적도 원궤도 아님 — Ω=0, ω = atan2(ey, ex), M from true anomaly.
-        let omega_pi = ey.atan2(ex);
-        let true_anomaly = solve_true_anomaly(ex, ey, ez, rx, ry, rz, r_dot_v, eccentricity, r);
-        let mean_anomaly = true_to_mean_anomaly(true_anomaly, eccentricity);
-        (0.0, wrap_to_pi(omega_pi), wrap_to_pi(mean_anomaly))
-    } else if is_circular {
-        // 원순환 + 경사 — ω=0, M = u (argument of latitude).
-        let omega_node = ny.atan2(nx);
-        // argument of latitude u = atan2(rz / sin i, (rx cos Ω + ry sin Ω))
-        let cos_node = omega_node.cos();
-        let sin_node = omega_node.sin();
-        let x_in_plane = rx * cos_node + ry * sin_node;
-        let y_in_plane = rz / sin_i;
-        let u = y_in_plane.atan2(x_in_plane);
-        (wrap_to_pi(omega_node), 0.0, wrap_to_pi(u))
-    } else {
-        // 일반 케이스 — 6원소 정상 추출.
-        let omega_node = ny.atan2(nx);
-        // ω: n⃗ 와 e⃗ 사이 각 (부호: e_z).
-        let n_dot_e = (nx * ex + ny * ey) / n_norm;
-        let cos_omega = n_dot_e / eccentricity;
-        let arg_peri = cos_omega.clamp(-1.0, 1.0).acos();
-        let arg_peri_signed = if ez < 0.0 { -arg_peri } else { arg_peri };
-        let true_anomaly = solve_true_anomaly(ex, ey, ez, rx, ry, rz, r_dot_v, eccentricity, r);
-        let mean_anomaly = true_to_mean_anomaly(true_anomaly, eccentricity);
-        (
-            wrap_to_pi(omega_node),
-            wrap_to_pi(arg_peri_signed),
-            wrap_to_pi(mean_anomaly),
-        )
-    };
+    let (longitude_of_ascending_node, argument_of_periapsis, mean_anomaly) =
+        if is_equatorial && is_circular {
+            // 적도 + 원순환: Ω=0, ω=0, M = λ_true.
+            (0.0, 0.0, wrap_to_pi(true_longitude))
+        } else if is_equatorial {
+            // 적도 원궤도 아님 — Ω=0, ω = atan2(ey, ex), M from true anomaly.
+            let omega_pi = ey.atan2(ex);
+            let true_anomaly = solve_true_anomaly(ex, ey, ez, rx, ry, rz, r_dot_v, eccentricity, r);
+            let mean_anomaly = true_to_mean_anomaly(true_anomaly, eccentricity);
+            (0.0, wrap_to_pi(omega_pi), wrap_to_pi(mean_anomaly))
+        } else if is_circular {
+            // 원순환 + 경사 — ω=0, M = u (argument of latitude).
+            let omega_node = ny.atan2(nx);
+            // argument of latitude u = atan2(rz / sin i, (rx cos Ω + ry sin Ω))
+            let cos_node = omega_node.cos();
+            let sin_node = omega_node.sin();
+            let x_in_plane = rx * cos_node + ry * sin_node;
+            let y_in_plane = rz / sin_i;
+            let u = y_in_plane.atan2(x_in_plane);
+            (wrap_to_pi(omega_node), 0.0, wrap_to_pi(u))
+        } else {
+            // 일반 케이스 — 6원소 정상 추출.
+            let omega_node = ny.atan2(nx);
+            // ω: n⃗ 와 e⃗ 사이 각 (부호: e_z).
+            let n_dot_e = (nx * ex + ny * ey) / n_norm;
+            let cos_omega = n_dot_e / eccentricity;
+            let arg_peri = cos_omega.clamp(-1.0, 1.0).acos();
+            let arg_peri_signed = if ez < 0.0 { -arg_peri } else { arg_peri };
+            let true_anomaly = solve_true_anomaly(ex, ey, ez, rx, ry, rz, r_dot_v, eccentricity, r);
+            let mean_anomaly = true_to_mean_anomaly(true_anomaly, eccentricity);
+            (
+                wrap_to_pi(omega_node),
+                wrap_to_pi(arg_peri_signed),
+                wrap_to_pi(mean_anomaly),
+            )
+        };
 
     OscElements {
         semi_major_axis,
@@ -217,7 +212,11 @@ pub fn to_state_vector(el: &OscElements, mu_parent: f64) -> ([f64; 3], [f64; 3])
 /// M = E − e sin E. e < 0.8 범위에서 3~5 반복 수렴.
 fn solve_kepler(mean_anomaly: f64, eccentricity: f64) -> f64 {
     let m = wrap_to_pi(mean_anomaly);
-    let mut e_anom = if eccentricity < 0.8 { m } else { std::f64::consts::PI };
+    let mut e_anom = if eccentricity < 0.8 {
+        m
+    } else {
+        std::f64::consts::PI
+    };
     for _ in 0..30 {
         let f = e_anom - eccentricity * e_anom.sin() - m;
         let fp = 1.0 - eccentricity * e_anom.cos();
@@ -298,19 +297,23 @@ mod tests {
         let recovered = extract_osculating_elements(pos, vel, mu_jupiter);
 
         // 상대 오차 (semi_major_axis 는 m 단위 1e8 규모 — 절대 1e-2 는 상대 1e-10).
-        let rel_a = ((recovered.semi_major_axis - original.semi_major_axis) / original.semi_major_axis).abs();
-        assert!(
-            rel_a < 1e-10,
-            "semi_major_axis 상대 오차 {} > 1e-10",
-            rel_a
-        );
+        let rel_a = ((recovered.semi_major_axis - original.semi_major_axis)
+            / original.semi_major_axis)
+            .abs();
+        assert!(rel_a < 1e-10, "semi_major_axis 상대 오차 {} > 1e-10", rel_a);
         let rel_e = (recovered.eccentricity - original.eccentricity).abs();
         assert!(rel_e < 1e-10, "eccentricity 오차 {} > 1e-10", rel_e);
         let rel_i = (recovered.inclination - original.inclination).abs();
         assert!(rel_i < 1e-10, "inclination 오차 {} > 1e-10", rel_i);
-        let rel_node = angle_diff(recovered.longitude_of_ascending_node, original.longitude_of_ascending_node);
+        let rel_node = angle_diff(
+            recovered.longitude_of_ascending_node,
+            original.longitude_of_ascending_node,
+        );
         assert!(rel_node < 1e-10, "Ω 오차 {} > 1e-10", rel_node);
-        let rel_peri = angle_diff(recovered.argument_of_periapsis, original.argument_of_periapsis);
+        let rel_peri = angle_diff(
+            recovered.argument_of_periapsis,
+            original.argument_of_periapsis,
+        );
         assert!(rel_peri < 1e-10, "ω 오차 {} > 1e-10", rel_peri);
         let rel_m = angle_diff(recovered.mean_anomaly, original.mean_anomaly);
         assert!(rel_m < 1e-10, "M 오차 {} > 1e-10", rel_m);
@@ -335,6 +338,10 @@ mod tests {
     fn angle_diff(a: f64, b: f64) -> f64 {
         use std::f64::consts::PI;
         let d = (a - b).abs() % (2.0 * PI);
-        if d > PI { 2.0 * PI - d } else { d }
+        if d > PI {
+            2.0 * PI - d
+        } else {
+            d
+        }
     }
 }

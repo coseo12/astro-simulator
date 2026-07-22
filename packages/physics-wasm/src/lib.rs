@@ -49,7 +49,11 @@ impl NBodyEngine {
     /// P6-C #191에서 GrMode enum으로 교체됨. true → Single1PN, false → Off.
     /// P5-A 기존 호출자 보호 차원에서 시그니처 보존 — 신규 코드는 `set_gr_mode` 권장.
     pub fn set_gr(&mut self, enable: bool) {
-        self.inner.gr_mode = if enable { GrMode::Single1PN } else { GrMode::Off };
+        self.inner.gr_mode = if enable {
+            GrMode::Single1PN
+        } else {
+            GrMode::Off
+        };
     }
 
     /// 호환 getter — Off=false, 그 외=true.
