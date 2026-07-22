@@ -66,13 +66,16 @@ describe('useMouseInactivity', () => {
   });
 
   it('unmount 시 타이머/리스너 정리', () => {
+    // #849 — 구 단언 `window.setTimeout.length ≥ 0` 은 항진 명제 (Function.length 는 항상 ≥ 0).
+    // fake timer 카운트 비교로 실제 정리 여부를 검증한다.
     const { unmount } = renderHook(() => useMouseInactivity(1000));
-    const before = window.setTimeout.length; // smoke
-    expect(before).toBeGreaterThanOrEqual(0);
+    expect(vi.getTimerCount()).toBeGreaterThan(0); // mount 직후 inactivity 타이머 활성
+
     unmount();
-    // 이벤트 dispatch 해도 에러 없이 지나가야 함
-    expect(() => {
-      window.dispatchEvent(new MouseEvent('mousemove'));
-    }).not.toThrow();
+    expect(vi.getTimerCount()).toBe(0); // cleanup 이 타이머 해제
+
+    // 리스너도 해제 — dispatch 가 새 타이머를 재스케줄하지 않아야 함
+    window.dispatchEvent(new MouseEvent('mousemove'));
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
