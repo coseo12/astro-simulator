@@ -137,7 +137,11 @@ pub fn integrate_photon_geodesic(
     for _ in 0..MAX_NODES {
         // r-기반 step 제어: r이 작을수록 dφ 축소.
         // u = 0 근처(무한대)에서는 default step. u가 클수록 step 축소.
-        let r_over_rs = if u > 1e-12 { 1.0 / (u * RS) } else { f64::INFINITY };
+        let r_over_rs = if u > 1e-12 {
+            1.0 / (u * RS)
+        } else {
+            f64::INFINITY
+        };
         let scale = if r_over_rs.is_finite() {
             (r_over_rs * r_over_rs / STEP_SCALE).min(1.0).max(1e-4)
         } else {

@@ -44,12 +44,7 @@ fn build_initial() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     (masses, pos, vel)
 }
 
-fn integrate_year_direct(
-    masses: Vec<f64>,
-    pos: Vec<f64>,
-    vel: Vec<f64>,
-    dt: f64,
-) -> Vec<f64> {
+fn integrate_year_direct(masses: Vec<f64>, pos: Vec<f64>, vel: Vec<f64>, dt: f64) -> Vec<f64> {
     let mut sys = NBodySystem::new(masses, pos, vel);
     let steps = (YEAR / dt) as usize;
     for _ in 0..steps {
@@ -145,7 +140,12 @@ fn theta_sweep_accuracy_and_speed() {
         "{:>8} {:>16} {:>20}",
         "theta", "max_rel_err", "wallclock (ms)"
     );
-    println!("{:>8} {:>16.4e} {:>20.2}", "direct", 0.0, t_direct.as_secs_f64() * 1000.0);
+    println!(
+        "{:>8} {:>16.4e} {:>20.2}",
+        "direct",
+        0.0,
+        t_direct.as_secs_f64() * 1000.0
+    );
     for &theta in &[0.3, 0.5, 0.7] {
         let (bh, t_bh) = integrate_year_bh(m.clone(), p.clone(), v.clone(), dt, theta);
         let (err, _) = max_relative_position_error(&direct, &bh);
