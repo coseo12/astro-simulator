@@ -7,11 +7,6 @@
 //! 좌표계: SI 단위 (m, kg, s). 위치/속도는 3N-flat `Vec<f64>` (AoS-flat).
 //! 심플렉틱 특성상 고정 dt에서 에너지 오차가 장기적으로 bounded oscillation.
 
-// #843 negative 검증용 임시 주입 — dead_code 경고 유발 (revert 예정)
-fn negative_gate_probe_843() -> i32 {
-    42
-}
-
 use wasm_bindgen::prelude::*;
 
 pub mod barnes_hut;
