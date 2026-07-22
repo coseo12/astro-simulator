@@ -4,7 +4,9 @@
  * ADR 20260515 Z 패턴 health metric 자동 탐지 스크립트
  *
  * Phase 1 카운트: ADR §Amendment N regex + 본 프로젝트 PR commit grep 보조
- * Phase 2 카운트: gh pr list --search (coseo12/harness-setting 다중 OR 키워드)
+ *   (Amendment 16 c-2: release scope / Z 패턴 가드 구현 PR 을 진화로 분류 — 분모 오계상 차단)
+ * Phase 2 분자 카운트: gh pr list --search "ADR 20260515" (리터럴 = 의도 시그널, 유지)
+ * Phase 2 sync check: 파일 경로 교집합 기반 (Amendment 16 c-1: --search 협소화 제거)
  *
  * 임계값 (Amendment 1+2 정합 3중 OR, Amendment 15 substantiality 정밀화):
  *   - Phase 2 진행률 < 33% — 분자 = substantive 머지 Phase-2 (Amendment 15: 경로 denylist)
@@ -36,13 +38,32 @@ const HARNESS_MANIFEST_PATH = '.harness/manifest.json'; // Amendment 8 verifyPha
 // Amendment 7 (#554): ADR 자체 진화 PR 식별 — Phase 1 카운트에서 제외
 // 패턴: "Amendment N" (박제) / "hotfix" (자동화 hotfix) / "release vX.Y.Z" (릴리스 PR)
 // 제외 사유: ADR 본문 변경 PR 은 Z 패턴 "적용" 이 아니라 ADR 자체의 진화 — 카운트 자기참조 회피
+//
+// Amendment 16 (#868, c-2) regex 보강 — 실측 누수 4건 (Phase-1 분모 오계상) 차단:
+//   - `chore(release): v0.48.0` 형 conventional-commit release scope (#829/#838 실측)
+//   - `[#822] Z 패턴 조건 2 측정식 정정` 형 Amendment 구현 PR (#824/#825 실측) — 제목에
+//     "Amendment N" 리터럴 없이 Z 패턴 가드/측정 자체를 다루는 PR. "Z 패턴"/"z-pattern"
+//     제목 키워드 = 가드 인프라 진화 시그널 (Phase-1 적용 PR 은 대상 기능명으로 제목을
+//     작성 — 2026-07-22 merged 전수 실측에서 genuine Phase-1 과 충돌 0건)
 function isAdrEvolutionPr(title) {
   if (!title) return false;
   const lower = title.toLowerCase();
   if (/amendment\s+\d+/i.test(title)) return true;
   if (/\bhotfix\b/i.test(title)) return true;
   if (lower.startsWith('release:') || /\brelease\s+v\d+\.\d+/i.test(title)) return true;
+  // Amendment 16 (c-2): conventional-commit release scope (`chore(release):` 등)
+  if (/^\w+\(release\)!?:/i.test(title)) return true;
+  // Amendment 16 (c-2): Z 패턴 가드/측정 자체 구현 PR (ADR 진화 — Phase-1 적용 아님)
+  if (/z[\s-]*패턴|z-pattern/i.test(title)) return true;
   return false;
+}
+
+// Amendment 16 (#868, c-3) — workflow 이슈 템플릿 stale 파일명 가드 (순수 함수).
+// v1 파일명 `adr-z-pattern-health.yml` 은 실재하지 않음 (실재 = `adr-z-pattern-health-v2.yml`).
+// 정규식은 `-v2.yml` 을 매칭하지 않음 (`health` 직후 `.yml` 만 stale) — self-test (l) 에서
+// 실제 workflow 파일 대상 0건 회귀 가드.
+export function findStaleWorkflowRefs(content) {
+  return (content || '').match(/adr-z-pattern-health\.yml/g) || [];
 }
 
 // Amendment 14 (#822) — 조건 2 측정식 정정: 직전 (머지된) Phase-2 기여 이후 연속 Phase-1 회차 산출.
@@ -123,18 +144,26 @@ export function filterSubstantiveMergedPhase2(phase2Prs, denylist = TRIVIAL_DENY
 // CI hard-block 아님 (Amendment 2/6 1인 운영 silent 약화 트레이드오프 정합).
 //
 // 반환:
-//   { mismatches: Array<{file, upstreamPr, localSha, upstreamSha}>, error?: string,
+//   { mismatches: Array<{file, upstreamPr, localSha, upstreamSha}>,
+//     unmarked: Array<{upstreamPr, matchedFileCount}>, error?: string,
 //     todoResolutions?: Array<{file, line, upstreamPrNumber, upstreamPrUrl, downstreamIssue}> }
 //   - mismatches.length > 0 → 호출자가 [Phase 2 Sync Required] 라벨/코멘트 박제
+//   - unmarked (Amendment 16 c-1): 파일 교집합 있으나 "ADR 20260515" 리터럴 미박제 PR — WARN
 //   - error 존재 → 네트워크/권한 실패 (보수적으로 mismatches=0 처리, exit code 영향 없음)
 //   - todoResolutions (Amendment 10): includeTodoResolution=true 시 박제. merged upstream PR
 //     중 title 의 본 프로젝트 이슈 번호 AND 파일 경로 둘 다 매칭되는 후보
 //
-// 측정 방식:
-//   1. gh pr list (open, "ADR 20260515" 검색) → upstream PR 목록
-//   2. 각 PR 의 files[].path 추출 → 로컬 drift 파일과 경로 매칭
+// 측정 방식 (Amendment 16 #868 c-1 정정 — `--search` 협소화 제거):
+//   1. gh pr list (open, 검색 필터 없음) → upstream PR 목록. 파일 경로 교집합 (2단계) 이
+//      곧 필터이므로 `--search "ADR 20260515"` 는 불필요한 협소화 — 리터럴 미박제 PR 이
+//      sync 대상에서 누락되는 "매칭 0건" 모순 (#868 forensic 측정 1) 을 해소.
+//      분자 카운트 (main() Phase-2) 쪽 `--search` 는 유지 — 리터럴은 의도 시그널
+//      (Amendment 15 게이밍 방어 + Amendment 16 §변경 3 식별 컨벤션 ADR 승격).
+//   2. 각 PR 의 files[].path 추출 → 로컬 drift 파일과 경로 매칭 (matchPhase2SyncPrs)
 //   3. 매칭된 쌍의 sha256 비교 (로컬: 파일 직접 / upstream: gh API blob SHA git→sha256 변환 불가
 //      → 본 함수는 파일명 매칭만 박제, 실제 비교는 사용자에게 diff URL 안내)
+//   4. unmarked WARN (Amendment 16 c-1): 파일 교집합은 있으나 제목/본문에 "ADR 20260515"
+//      리터럴이 없는 PR — 식별 컨벤션 괴리 가시화 (soft-warn, exit code 영향 없음)
 //
 // 비교 한계 박제 (precision 정정):
 //   git blob SHA (SHA-1) ≠ sha256 → 직접 비교 불가. 본 함수는 "매칭된 파일 쌍 = 잠재 drift"
@@ -152,6 +181,33 @@ export function filterSubstantiveMergedPhase2(phase2Prs, denylist = TRIVIAL_DENY
 //        - 패턴 3: `coseo12/astro-simulator#N` (full path)
 //   - (b) PR 변경 파일 경로가 다운스트림 [TODO] 잔존 파일과 일치
 //   - (a) AND (b) 둘 다 충족 시에만 매칭 (precision ↑, false-positive 회피)
+// Amendment 16 (#868, c-1) — sync check 매칭 순수 함수 (self-test fixture 주입용).
+// localDrifts (Set<string>) ∩ upstream PR files 교집합으로 mismatches 를 산출하고,
+// 교집합이 있는데 제목/본문에 "ADR 20260515" 리터럴이 없는 PR 을 unmarked 로 분리.
+// 교집합 0건 PR 은 리터럴 유무와 무관하게 무시 (본 프로젝트와 무관한 upstream PR 노이즈 차단).
+export function matchPhase2SyncPrs(localDrifts, upstreamPrs) {
+  const MARKER = /ADR 20260515/;
+  const mismatches = [];
+  const unmarked = [];
+  for (const pr of upstreamPrs || []) {
+    const upstreamFiles = (pr.files || []).map((f) => f.path);
+    const matched = upstreamFiles.filter((path) => localDrifts.has(path));
+    if (matched.length === 0) continue;
+    for (const path of matched) {
+      mismatches.push({
+        file: path,
+        upstreamPr: pr.number,
+        upstreamHead: (pr.headRefOid || '').slice(0, 8),
+        diffUrl: `https://github.com/coseo12/harness-setting/pull/${pr.number}/files`,
+      });
+    }
+    if (!MARKER.test(pr.title || '') && !MARKER.test(pr.body || '')) {
+      unmarked.push({ upstreamPr: pr.number, matchedFileCount: matched.length });
+    }
+  }
+  return { mismatches, unmarked };
+}
+
 function verifyPhase2Sync(rootDir = '.', options = {}) {
   const { includeTodoResolution = false } = options;
   try {
@@ -176,36 +232,29 @@ function verifyPhase2Sync(rootDir = '.', options = {}) {
 
     if (localDrifts.size === 0) {
       // Amendment 10: drift 없으면 TODO 해소 후보도 없음 (단축 경로)
-      return { mismatches: [], ...(includeTodoResolution ? { todoResolutions: [] } : {}) };
+      return {
+        mismatches: [],
+        unmarked: [],
+        ...(includeTodoResolution ? { todoResolutions: [] } : {}),
+      };
     }
 
-    // upstream open PR 검색 (ADR 20260515 컨벤션 식별자)
+    // upstream open PR 조회 — Amendment 16 (c-1): `--search "ADR 20260515"` 제거.
+    // 파일 경로 교집합 (matchPhase2SyncPrs) 이 곧 필터. body 필드 추가 — unmarked WARN
+    // (식별 컨벤션 리터럴 부재) 판정용.
     let upstreamPrs = [];
     try {
       const result = execSync(
-        `gh pr list --repo coseo12/harness-setting --state open --search "ADR 20260515" --json number,headRefOid,files,title`,
+        `gh pr list --repo coseo12/harness-setting --state open --json number,headRefOid,files,title,body`,
         { encoding: 'utf-8' },
       ).trim();
       upstreamPrs = JSON.parse(result || '[]');
     } catch (e) {
-      return { mismatches: [], error: `upstream PR list failed: ${e.message}` };
+      return { mismatches: [], unmarked: [], error: `upstream PR list failed: ${e.message}` };
     }
 
-    // 매칭: upstream PR 의 files[].path ∩ 로컬 drift 파일
-    const mismatches = [];
-    for (const pr of upstreamPrs) {
-      const upstreamFiles = (pr.files || []).map((f) => f.path);
-      for (const path of upstreamFiles) {
-        if (localDrifts.has(path)) {
-          mismatches.push({
-            file: path,
-            upstreamPr: pr.number,
-            upstreamHead: (pr.headRefOid || '').slice(0, 8),
-            diffUrl: `https://github.com/coseo12/harness-setting/pull/${pr.number}/files`,
-          });
-        }
-      }
-    }
+    // 매칭: upstream PR 의 files[].path ∩ 로컬 drift 파일 + unmarked 괴리 분리 (Amendment 16)
+    const { mismatches, unmarked } = matchPhase2SyncPrs(localDrifts, upstreamPrs);
 
     // Amendment 10 (#569) — TODO 해소 후보 매칭 (옵션)
     let todoResolutions;
@@ -215,10 +264,11 @@ function verifyPhase2Sync(rootDir = '.', options = {}) {
 
     return {
       mismatches,
+      unmarked,
       ...(includeTodoResolution ? { todoResolutions: todoResolutions || [] } : {}),
     };
   } catch (err) {
-    return { mismatches: [], error: err.message };
+    return { mismatches: [], unmarked: [], error: err.message };
   }
 }
 
@@ -438,6 +488,20 @@ try {
     }
   } else {
     console.log(`\n[Phase 2 Sync] OK — drift 파일 ↔ upstream open PR 매칭 0건`);
+  }
+  // Amendment 16 (#868, c-1) — unmarked PR 괴리 WARN (soft-warn, exit code 영향 없음).
+  // 파일 교집합은 있는데 제목/본문에 "ADR 20260515" 리터럴이 없는 PR — Phase-2 분자
+  // 카운트 (--search 기반) 에서 누락되므로 머지돼도 분자 불변. 식별 컨벤션 (Amendment 16
+  // §변경 3) 위반을 가시화하여 소급 마킹을 유도한다.
+  if (!phase2Sync.error && (phase2Sync.unmarked || []).length > 0) {
+    console.log(
+      `[Phase 2 Sync WARN] unmarked PR ${phase2Sync.unmarked.length}건 — 제목/본문에 "ADR 20260515" 리터럴 부재 (Amendment 16 식별 컨벤션):`,
+    );
+    for (const u of phase2Sync.unmarked) {
+      console.log(
+        `  - upstream PR #${u.upstreamPr} (drift 파일 매칭 ${u.matchedFileCount}건) — 리터럴 박제 필요`,
+      );
+    }
   }
 
   // 3-c. Amendment 15 (#823) — substantive merged Phase-2 SSoT (3조건 공용 모수/앵커).
@@ -716,6 +780,126 @@ function runSelfTest() {
       isSubstantivePhase2({ files: [{ path: 'README.md' }, { path: 'src/index.ts' }] }) === true,
       `(i) README + src/index.ts (비-trivial ≥1) → substantive`,
     );
+  }
+
+  console.log(
+    '\n[self-test] Amendment 16 (#868) — 측정 보강 3건 (c-1 sync 교집합+unmarked / c-2 evolution regex / c-3 stale 파일명)',
+  );
+
+  // (j) c-1 matchPhase2SyncPrs — 3중 시뮬 (positive → negative → recovery)
+  {
+    const drifts = new Set(['.claude/agents/qa.md', 'CLAUDE.md']);
+    // (j-1) positive: 파일 교집합 있음 + 리터럴 부재 → mismatch 산출 + unmarked WARN
+    {
+      const prs = [
+        {
+          number: 320,
+          headRefOid: 'abcdef1234567890',
+          title: '[#854] label taxonomy 3계층 정리',
+          body: '라벨 정리 상세',
+          files: [{ path: '.claude/agents/qa.md' }],
+        },
+      ];
+      const r = matchPhase2SyncPrs(drifts, prs);
+      assert(
+        r.mismatches.length === 1 && r.mismatches[0].file === '.claude/agents/qa.md',
+        `(j-1) positive: 교집합 매칭 ${r.mismatches.length}건 (기대 1 — --search 없이 파일 경로가 필터)`,
+      );
+      assert(
+        r.unmarked.length === 1 && r.unmarked[0].upstreamPr === 320,
+        `(j-1) positive: 리터럴 부재 → unmarked ${r.unmarked.length}건 (기대 1, WARN 발화)`,
+      );
+    }
+    // (j-2) negative: 본문에 리터럴 존재 → mismatch 는 유지, unmarked 아님
+    {
+      const prs = [
+        {
+          number: 321,
+          headRefOid: 'abcdef1234567890',
+          title: '[#855] Test plan drift 해소',
+          body: 'ADR 20260515 Phase 2 — astro-simulator Z 패턴 upstream 기여',
+          files: [{ path: 'CLAUDE.md' }],
+        },
+      ];
+      const r = matchPhase2SyncPrs(drifts, prs);
+      assert(
+        r.mismatches.length === 1 && r.unmarked.length === 0,
+        `(j-2) negative: 리터럴 존재 → mismatch ${r.mismatches.length} (기대 1) + unmarked ${r.unmarked.length} (기대 0)`,
+      );
+    }
+    // (j-3) recovery: 교집합 0건 PR 은 리터럴 유무 무관 무시 (무관 upstream PR 노이즈 차단)
+    {
+      const prs = [
+        {
+          number: 999,
+          title: '무관 PR (리터럴 없음)',
+          body: '',
+          files: [{ path: 'docs/unrelated.md' }],
+        },
+      ];
+      const r = matchPhase2SyncPrs(drifts, prs);
+      assert(
+        r.mismatches.length === 0 && r.unmarked.length === 0,
+        `(j-3) recovery: 교집합 0건 → mismatch/unmarked 전부 0 (노이즈 차단)`,
+      );
+    }
+  }
+
+  // (k) c-2 isAdrEvolutionPr — 실측 누수 4건 fixture + genuine Phase-1 보존 + 기존 패턴 회귀
+  {
+    // positive: 실측 누수 4건 (#829/#838/#824/#825) → evolution 분류 (분모 제외)
+    const leaks = [
+      'chore(release): v0.48.0',
+      'chore(release): v0.49.0',
+      '[#822] Z 패턴 조건 2 측정식 정정 — 절대 누적 → 연속(merged-only) + self-test',
+      '[#823] Z 패턴 substantiality 퀄리파이어 — 리셋 게이밍 방어 + 조건3 앵커 정정',
+    ];
+    for (const t of leaks) {
+      assert(isAdrEvolutionPr(t) === true, `(k) 누수 fixture evolution 분류: "${t.slice(0, 40)}…"`);
+    }
+    // negative: genuine Phase-1 (2026-07-22 merged 전수 실측 표본) → Phase-1 유지
+    const genuine = [
+      'feat(reviewer): [#463] reviewer.md §절차 5번 ADR 호환성 의미론적 검증 신설',
+      '[#817] 세션 중단 dead-wait 가드 D — SessionStart 복구 훅 + pending-waits 라이프사이클',
+      '[#853] chore(harness): v4.2.5→v4.4.0 동기화 — dead-wait #315 흡수 + sidecar 재정비',
+      '[#841] fix(web): 사용자 노출 표시 계약 위반 3건 — 위성 공전주기 모체 μ / pause 배속 스냅샷',
+    ];
+    for (const t of genuine) {
+      assert(isAdrEvolutionPr(t) === false, `(k) genuine Phase-1 보존: "${t.slice(0, 40)}…"`);
+    }
+    // recovery (기존 패턴 회귀 유지): Amendment N / hotfix / release: 접두
+    assert(
+      isAdrEvolutionPr('docs(adr): [#556] ADR 20260515 Amendment 8 — Phase 1 드리프트 가시화') === true,
+      `(k) 기존 Amendment N 패턴 유지`,
+    );
+    assert(
+      isAdrEvolutionPr('release: v0.16.0 — R3 사이클 + 메타 인프라') === true,
+      `(k) 기존 release: 접두 패턴 유지`,
+    );
+    assert(
+      isAdrEvolutionPr('fix(workflow): [#483 hotfix] YAML on: quote') === true,
+      `(k) 기존 hotfix 패턴 유지`,
+    );
+  }
+
+  // (l) c-3 findStaleWorkflowRefs — fixture 3중 시뮬 + 실제 workflow 파일 recovery 확인
+  {
+    assert(
+      findStaleWorkflowRefs('자동 탐지 workflow `.github/workflows/adr-z-pattern-health.yml` 발화')
+        .length === 1,
+      `(l) positive: v1 stale 파일명 검출`,
+    );
+    assert(
+      findStaleWorkflowRefs('workflow: `.github/workflows/adr-z-pattern-health-v2.yml`').length === 0,
+      `(l) negative: -v2 실재 파일명 미검출 (오탐 0)`,
+    );
+    const wfPath = '.github/workflows/adr-z-pattern-health-v2.yml';
+    if (existsSync(wfPath)) {
+      const stale = findStaleWorkflowRefs(readFileSync(wfPath, 'utf-8'));
+      assert(stale.length === 0, `(l) recovery: 실제 workflow stale 참조 ${stale.length}건 (기대 0)`);
+    } else {
+      assert(false, `(l) recovery: workflow 파일 부재 (${wfPath}) — 경로 확인 필요`);
+    }
   }
 
   if (failed > 0) {
