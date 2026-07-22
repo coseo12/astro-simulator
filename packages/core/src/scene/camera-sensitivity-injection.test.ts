@@ -10,8 +10,6 @@
  *  - computePanningSensibility / setPanningEnabled pct 인자 (사용자 감도 주입 + zero-division 가드)
  */
 import { describe, it, expect } from 'vitest';
-import { Observable, Vector3, KeyboardEventTypes } from '@babylonjs/core';
-import type { ArcRotateCamera, Scene, KeyboardInfo } from '@babylonjs/core';
 import {
   WASD_DELTA_PERCENTAGE,
   MAX_MOVE_STEP,
@@ -21,6 +19,8 @@ import {
   setPanningEnabled,
   type WasdCoefficients,
 } from './camera.js';
+// #849 — 키보드 씬 하니스/mockCamera 는 공용 헬퍼로 추출 (SUT 배선은 본 파일 책임 — volt #120).
+import { makeKeyboardSceneHarness, mockArcRotateCamera } from './__test-utils__/babylon-mocks.js';
 
 /** #704 — getCoefficients getter 를 주입할 수 있는 WASD 모킹 (mutable coeffs 로 매 프레임 변경 모사). */
 function makeWasdHarness(opts: {
@@ -28,32 +28,13 @@ function makeWasdHarness(opts: {
   deltaTimeMs?: number;
   getCoefficients?: () => WasdCoefficients;
 }) {
-  const forward = new Vector3(0, 0, 1);
-  const deltaTimeMs = opts.deltaTimeMs ?? 1000 / 60;
-  const onKeyboardObservable = new Observable<KeyboardInfo>();
-  const onBeforeRenderObservable = new Observable<Scene>();
-  const camera = {
-    target: Vector3.Zero(),
-    position: forward.scale(-(opts.radius ?? 100)),
-    radius: opts.radius ?? 100,
-    getDirection: (axis: Vector3) =>
-      axis.equals(Vector3.Forward()) ? forward.clone() : Vector3.Up().clone(),
-    onDisposeObservable: new Observable<unknown>(),
-  } as unknown as ArcRotateCamera;
-  const scene = {
-    onKeyboardObservable,
-    onBeforeRenderObservable,
-    getEngine: () => ({ getRenderingCanvas: () => null, getDeltaTime: () => deltaTimeMs }),
-  } as unknown as Scene;
-  const press = (key: string) =>
-    onKeyboardObservable.notifyObservers({
-      type: KeyboardEventTypes.KEYDOWN,
-      event: { key },
-    } as unknown as KeyboardInfo);
-  const frame = () => onBeforeRenderObservable.notifyObservers(scene);
-  const handle = attachWasdControl(camera, scene, opts.getCoefficients);
+  const h = makeKeyboardSceneHarness({
+    radius: opts.radius,
+    deltaTimeMs: opts.deltaTimeMs ?? 1000 / 60,
+  });
+  const handle = attachWasdControl(h.camera, h.scene, opts.getCoefficients);
   handle.setEnabled(true);
-  return { camera, press, frame, handle };
+  return { camera: h.camera, press: h.press, frame: h.frame, handle };
 }
 
 describe('#704 WASD getCoefficients getter 주입 (축 1-A pull)', () => {
@@ -119,34 +100,36 @@ describe('#704 WASD getCoefficients getter 주입 (축 1-A pull)', () => {
 });
 
 describe('#704 패닝 pct 인자 주입 (축 1-A)', () => {
-  function mockCamera(radius: number, lowerRadiusLimit = 0.5): ArcRotateCamera {
-    return { radius, lowerRadiusLimit, panningSensibility: 0 } as unknown as ArcRotateCamera;
-  }
-
   it('pct 미전달 → PANNING_DELTA_PERCENTAGE default (기존 호환)', () => {
-    const sDefault = computePanningSensibility(mockCamera(35));
-    const sExplicit = computePanningSensibility(mockCamera(35), PANNING_DELTA_PERCENTAGE);
+    const sDefault = computePanningSensibility(mockArcRotateCamera({ radius: 35 }));
+    const sExplicit = computePanningSensibility(
+      mockArcRotateCamera({ radius: 35 }),
+      PANNING_DELTA_PERCENTAGE,
+    );
     expect(sDefault).toBeCloseTo(sExplicit, 9);
   });
 
   it('pct 2배 → sensibility 절반 (사용자 감도 ↑ = 화면 px↔world 이동량 ↑)', () => {
     // sensibility = REFERENCE / (radius × pct) → pct↑ → sensibility↓ → 1px drag world 이동량↑.
-    const sLow = computePanningSensibility(mockCamera(35), 0.01);
-    const sHigh = computePanningSensibility(mockCamera(35), 0.02);
+    const sLow = computePanningSensibility(mockArcRotateCamera({ radius: 35 }), 0.01);
+    const sHigh = computePanningSensibility(mockArcRotateCamera({ radius: 35 }), 0.02);
     expect(sHigh).toBeCloseTo(sLow / 2, 6);
   });
 
   it('pct NaN/0/음수 → default 폴백 (zero-division 발산 차단)', () => {
     for (const bad of [Number.NaN, 0, -0.01]) {
-      const s = computePanningSensibility(mockCamera(35), bad);
-      const sDefault = computePanningSensibility(mockCamera(35), PANNING_DELTA_PERCENTAGE);
+      const s = computePanningSensibility(mockArcRotateCamera({ radius: 35 }), bad);
+      const sDefault = computePanningSensibility(
+        mockArcRotateCamera({ radius: 35 }),
+        PANNING_DELTA_PERCENTAGE,
+      );
       expect(Number.isFinite(s)).toBe(true);
       expect(s).toBeCloseTo(sDefault, 9);
     }
   });
 
   it('setPanningEnabled(true, pct) → 사용자 감도 반영 / false → 0 (focus 비활성)', () => {
-    const cam = mockCamera(35);
+    const cam = mockArcRotateCamera({ radius: 35 });
     setPanningEnabled(cam, true, 0.02);
     expect(cam.panningSensibility).toBeCloseTo(computePanningSensibility(cam, 0.02), 6);
     setPanningEnabled(cam, false, 0.02);

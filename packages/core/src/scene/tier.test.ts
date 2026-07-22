@@ -17,6 +17,21 @@ import {
   computeFloatingOriginForTier,
 } from './tier.js';
 
+/**
+ * #849 — 결정적 의사난수 (mulberry32). 경계 진동 테스트가 무시드 Math.random 을 쓰면
+ * 실패 시 재현이 불가능하므로 고정 seed 시퀀스로 교체 (진동 커버 범위는 동일).
+ */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 describe('renderScaleForTier — ADR §1 수식 재현', () => {
   it('T1 solar: 해왕성 30 AU 가 ~380 scene unit (좁은 축 95% 범위 내)', () => {
     const neptuneWorldMeters = 30 * AU;
@@ -111,9 +126,10 @@ describe('#818 tierFromFocus — planet body↔inner 히스테리시스 (±15% �
 
   it('경계 왕복 안정성 — 0.1 AU 전후 ±10% 진동 100회 시 tier 변화 없음 (flip-flop 차단)', () => {
     // body 에서 시작: dead-band(0.085~0.115 AU) 내 진동은 tier 유지.
+    const rand = mulberry32(849); // 결정적 시퀀스 (#849 — 실패 재현성)
     let tier = 'body' as 'body' | 'inner';
     for (let i = 0; i < 100; i += 1) {
-      const jitter = (Math.random() - 0.5) * 0.2; // -10%~+10%
+      const jitter = (rand() - 0.5) * 0.2; // -10%~+10%
       const d = BODY_BOUNDARY * (1 + jitter);
       tier = tierFromFocus('planet', d, tier) as 'body' | 'inner';
     }
@@ -161,10 +177,11 @@ describe('tierFromCameraDistance — A2 히스테리시스 ≥15%', () => {
   });
 
   it('경계 왕복 안정성 — innerUpper 전후 반복 진동 시 tier 변화 없음', () => {
-    // 경계값 ±10% 범위에서 100회 랜덤 진동 → 초기 tier 유지 (flicker 방지)
+    // 경계값 ±10% 범위에서 100회 결정적 진동 → 초기 tier 유지 (flicker 방지)
+    const rand = mulberry32(1849); // 결정적 시퀀스 (#849 — 실패 재현성, 위와 다른 seed)
     let tier = 'body' as 'body' | 'inner';
     for (let i = 0; i < 100; i += 1) {
-      const jitter = (Math.random() - 0.5) * 0.2; // -10%~+10%
+      const jitter = (rand() - 0.5) * 0.2; // -10%~+10%
       const d = INNER_UPPER * (1 + jitter);
       tier = tierFromCameraDistance(d, tier) as 'body' | 'inner';
     }
