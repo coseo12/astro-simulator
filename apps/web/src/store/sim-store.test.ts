@@ -15,8 +15,6 @@ beforeEach(() => {
     fps: null,
     physicsEngine: 'kepler',
     massMultipliers: {},
-    pingCount: 0,
-    lastPingAt: null,
   });
 });
 
@@ -60,14 +58,6 @@ describe('useSimStore', () => {
   });
 
   // #841 — setUnitSystem 테스트 제거 (unitSystem 상태 자체 제거 — UnitToggle display-only 정리).
-
-  it('incrementPing — 카운터 증가 + 타임스탬프 기록', () => {
-    const before = Date.now();
-    useSimStore.getState().incrementPing();
-    const s = useSimStore.getState();
-    expect(s.pingCount).toBe(1);
-    expect(s.lastPingAt).toBeGreaterThanOrEqual(before);
-  });
 
   it('setPhysicsEngine — Kepler ↔ Newton 토글', () => {
     expect(useSimStore.getState().physicsEngine).toBe('kepler');

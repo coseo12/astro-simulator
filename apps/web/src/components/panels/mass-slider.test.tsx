@@ -14,8 +14,6 @@ beforeEach(() => {
     fps: null,
     physicsEngine: 'newton',
     massMultipliers: {},
-    pingCount: 0,
-    lastPingAt: null,
   });
 });
 

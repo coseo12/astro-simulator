@@ -2,7 +2,8 @@
  * 3D double-precision 벡터.
  *
  * JS `number`는 IEEE 754 64비트 double이므로 CPU 월드 좌표에 그대로 사용한다.
- * Float32Array/Babylon Vector3로 변환되는 지점은 RTE 파이프라인(`toRelativeToEye`) 뿐.
+ * Float32Array/Babylon Vector3 변환 지점은 RTE(Relative-to-Eye) 렌더 경로
+ * (solar-system-scene 의 카메라 상대 float64 뺄셈 → float32 cast) 뿐.
  */
 export type Vec3Double = readonly [number, number, number];
 

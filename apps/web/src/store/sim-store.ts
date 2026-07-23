@@ -117,10 +117,6 @@ export interface SimStoreState {
   /** 바디 id → 질량 배수 (#107). 1.0 또는 부재는 원래 질량. */
   massMultipliers: Record<string, number>;
 
-  // 개발/디버그용 라운드트립 카운터
-  pingCount: number;
-  lastPingAt: number | null;
-
   // actions (Core → store)
   setRenderer: (kind: 'webgpu' | 'webgl2' | null) => void;
   setEngineError: (message: string | null) => void;
@@ -166,7 +162,6 @@ export interface SimStoreState {
   setIntegrator: (kind: IntegratorKind) => void;
   setMassMultiplier: (bodyId: string, multiplier: number) => void;
   resetMassMultipliers: () => void;
-  incrementPing: () => void;
 }
 
 // #405 — P6-B BlackHoleDisk store (`?bh=2` accretion disk) 폐기. v3 reset 후 적용 대상 없음.
@@ -190,8 +185,6 @@ export const useSimStore = create<SimStoreState>((set) => ({
   physicsEngine: 'kepler',
   integrator: 'velocity-verlet',
   massMultipliers: {},
-  pingCount: 0,
-  lastPingAt: null,
 
   setRenderer: (kind) => set({ rendererKind: kind }),
   setEngineError: (message) => set({ engineError: message }),
@@ -245,11 +238,6 @@ export const useSimStore = create<SimStoreState>((set) => ({
       return { massMultipliers: next };
     }),
   resetMassMultipliers: () => set({ massMultipliers: {} }),
-  incrementPing: () =>
-    set((state) => ({
-      pingCount: state.pingCount + 1,
-      lastPingAt: Date.now(),
-    })),
 }));
 
 /**

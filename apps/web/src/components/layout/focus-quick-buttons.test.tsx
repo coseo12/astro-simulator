@@ -22,8 +22,6 @@ beforeEach(() => {
     orbitLinesVisible: true, // #688 — 기본 ON 결정적 리셋
     timeScale: 86_400,
     fps: null,
-    pingCount: 0,
-    lastPingAt: null,
   });
 });
 

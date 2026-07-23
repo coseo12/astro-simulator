@@ -25,11 +25,5 @@ export {
 } from './nbody-engine.js';
 export { BarnesHutNBodyEngine, type BarnesHutEngineOptions } from './barnes-hut-engine.js';
 export { WebGpuNBodyEngine, type WebGpuEngineOptions } from './webgpu-nbody-engine.js';
-export {
-  createLensingLut,
-  bToLutIndex,
-  LUT_B_MIN,
-  LUT_B_MAX,
-  type LensingLut,
-} from './lensing-lut.js';
+export { createLensingLut, LUT_B_MIN, LUT_B_MAX, type LensingLut } from './lensing-lut.js';
 export { extractOsculatingElements, type OscElements } from './osculating.js';

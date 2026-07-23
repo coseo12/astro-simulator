@@ -21,8 +21,6 @@ beforeEach(() => {
     selectedBodyId: null,
     timeScale: 86_400,
     fps: null,
-    pingCount: 0,
-    lastPingAt: null,
   });
 });
 

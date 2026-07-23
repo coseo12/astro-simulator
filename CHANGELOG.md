@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Notes (chore — 행동 변화 없음)
+
+- **[#844] 죽은 코드 일괄 정리 — core 도달불가 ~890줄 + 고아 스크립트 34개 + 미사용 의존성 21개 + agent-dispatch.yml 삭제** ([#844](https://github.com/coseo12/astro-simulator/issues/844)) — 참조 그래프 전수 재실측 (감사 07-18 이후 6 PR 머지 반영) 후 삭제: core `black-hole-rendering.ts`(689줄)/`sun-earth-demo.ts`/`near-far-probe.ts`/`coords/rte.ts`(+자기 테스트)/`bToLutIndex`/shared 함정 타입 `CelestialBody`, 고아 스크립트 34개 (verify-p2b/p2c 체인 + p290/p329/r2 계열 + 폐기 `?bh=2&ray3d=1` 측정 bench:p6e/p7 등록 포함), apps/web 미사용 의존성 21개 (Radix 15종 — slider 만 잔존, react-query/cva/clsx/tailwind-merge/zod/mitt), 죽은 store 상태 `pingCount`/`lastPingAt`/`incrementPing`, 발화 불가 `agent-dispatch.yml` (`stage:*` 체계 전환으로 `status:*` DISPATCH_MAP 영구 미발화 + 참조 스크립트 2종 저장소 부재). manifest carry-over D 클래스 25 entry 동반 제거 (upstream 404 전수 실측, #873 선례). 테스트 1,291 → 1,283건 (−8: 삭제 대상 자기 테스트 — rte 5 + bToLutIndex 2 + incrementPing 1, 전건 PASS 실측).
+
 ## [0.51.0] — 2026-07-23
 
 전수 감사 (2026-07-18) 잔여 이슈 처리 번들 — 사용자 노출 표시 버그 3건 + prod 퇴행 fix + CI/lint 게이트 2종 + docs 링크 가드 + 테스트 보강 + Z 패턴 트리거 결정 (ADR 20260515 Amendment 16). 사용자 관찰 행동 변화 + CI/에이전트 행동 변화 다수 → MINOR. 본 릴리스의 CHANGELOG 는 머지 시점 [Unreleased] 기록 누락의 소급 문서화다 (v0.48.0 교훈 재발 — prep 시점 일괄 작성).

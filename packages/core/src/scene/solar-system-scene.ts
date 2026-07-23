@@ -479,7 +479,7 @@ export interface SolarSystemSceneOptions {
 /**
  * 태양계 씬 — JPL 궤도 요소 + Kepler 해석해로 천체 배치.
  *
- * B3 createSunEarthDemo를 대체한다.
+ * B3 sun-earth 데모 씬을 대체한다 (데모 모듈 자체는 #844 에서 제거).
  * C4 (#16)에서 달 궤도 세부 조정, C5/C6에서 시간·카메라 시스템과 연동.
  */
 export function createSolarSystemScene(
@@ -1296,7 +1296,7 @@ export function createSolarSystemScene(
       const mesh = meshes.get(id);
       if (!mesh) continue;
       // float64 뺄셈 (큰 수 - 큰 수 = 작은 수) 을 먼저 수행 후 float32 scene unit 변환.
-      // `toRelativeToEye` 와 동일 원리 — double precision 유지 후 결과만 float32 cast.
+      // RTE(Relative-to-Eye) 원리 — double precision 유지 후 결과만 float32 cast.
       mesh.position.set(
         (world[0] - ox) * sceneUnitPerMeter,
         (world[1] - oy) * sceneUnitPerMeter,

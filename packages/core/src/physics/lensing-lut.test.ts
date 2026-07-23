@@ -2,13 +2,13 @@
  * P6-B #190 — lensing-lut wrapper 단위 테스트.
  *
  * Rust LUT 빌더의 flat 출력이 outcome/deflection 두 채널로 올바르게
- * 디코딩되고, 경계 인덱스 계산이 정확한지 검증한다.
+ * 디코딩되는지 검증한다.
  *
  * Rust 측 회귀(`lensing_lut_shadow_b_crit_within_5_percent`)는 cargo test 책임.
  * 본 테스트는 TS 디코딩 계층만 검증.
  */
 import { describe, expect, it } from 'vitest';
-import { createLensingLut, bToLutIndex, LUT_B_MIN, LUT_B_MAX } from './lensing-lut.js';
+import { createLensingLut, LUT_B_MIN, LUT_B_MAX } from './lensing-lut.js';
 
 describe('createLensingLut', () => {
   it('samples 2 미만은 throw', () => {
@@ -61,19 +61,5 @@ describe('createLensingLut', () => {
     const bCrit = (3 * Math.sqrt(3)) / 2; // ≈ 2.598
     const relErr = Math.abs((boundaryB! - bCrit) / bCrit);
     expect(relErr).toBeLessThan(0.05);
-  });
-});
-
-describe('bToLutIndex', () => {
-  it('b=bMin → 0, b=bMax → samples-1', () => {
-    const lut = createLensingLut(64);
-    expect(bToLutIndex(lut.bMin, lut)).toBeCloseTo(0, 6);
-    expect(bToLutIndex(lut.bMax, lut)).toBeCloseTo(lut.samples - 1, 6);
-  });
-
-  it('중간 b는 선형 보간 인덱스', () => {
-    const lut = createLensingLut(64);
-    const mid = 0.5 * (lut.bMin + lut.bMax);
-    expect(bToLutIndex(mid, lut)).toBeCloseTo((lut.samples - 1) / 2, 6);
   });
 });
