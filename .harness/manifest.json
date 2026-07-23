@@ -210,10 +210,6 @@
       "sha256": "807c7fa373387c5da616ce65c671cdc0c10b4228a26980c371b45968c26d84cf",
       "category": "frozen"
     },
-    "scripts/browser-verify-utils.mjs": {
-      "sha256": "25fb7c2db96a463cf30763dafcad7cc365922251f9cb4791cab669093e6a2417",
-      "category": "frozen"
-    },
     "scripts/browser-verify-webgpu.mjs": {
       "sha256": "cdc94ec13791169b6cbe07f509d007ad50a4326f992c9547238a22478da09eb1",
       "category": "frozen"
