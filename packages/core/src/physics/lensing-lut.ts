@@ -38,15 +38,6 @@ export interface LensingLut {
 }
 
 /**
- * b를 LUT 인덱스(부동소수)로 변환. 셰이더 측 샘플링 보조용.
- * `index = (b - bMin) / (bMax - bMin) * (samples - 1)`.
- */
-export function bToLutIndex(b: number, lut: LensingLut): number {
-  const t = (b - lut.bMin) / (lut.bMax - lut.bMin);
-  return t * (lut.samples - 1);
-}
-
-/**
  * WASM에서 LUT를 빌드하여 디코딩한다.
  *
  * @param samples 샘플 수. ADR B2 ±5% 검증에서 256으로 0.26% 오차 측정 → 기본 256.

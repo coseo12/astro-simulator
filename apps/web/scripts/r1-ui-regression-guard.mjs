@@ -174,8 +174,8 @@ async function measureBodyPxRatios(page) {
     const camera = scene.activeCamera;
     if (!camera) return { error: 'scene.activeCamera 부재' };
 
-    // Babylon 글로벌이 ESM module 빌드에서 미노출 → scene 경유로 Vector3.Project 호출.
-    // packages/core/src/scene/black-hole-rendering.ts:534 패턴 참조.
+    // Babylon 글로벌이 ESM module 빌드에서 미노출 → scene 경유로 view/projection
+    // matrix 를 직접 조회해 수동 project 한다 (Vector3.Project 등가 패턴).
     const engine = scene.getEngine();
     const viewMatrix = scene.getViewMatrix();
     const projMatrix = scene.getProjectionMatrix();

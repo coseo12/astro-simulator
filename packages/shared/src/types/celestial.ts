@@ -1,5 +1,3 @@
-import type { DataTier } from './tier.js';
-
 /**
  * 천체 카테고리.
  */
@@ -88,48 +86,12 @@ export interface OrbitalElements {
   epoch: number;
 }
 
-/**
- * 천체 단일 레코드.
+/*
+ * #844 — 함정 타입 `CelestialBody` 제거.
+ *
+ * 본 파일에 있던 `CelestialBody` 인터페이스는 import 0곳인 채 운영 스키마
+ * (`packages/core/src/ephemeris/solar-system-loader.ts` 의 `LoadedCelestialBody`,
+ * zod 파생) 와 크게 drift 한 상태였다 — `tier` 필수 필드가 실데이터에 없고
+ * rings 등 운영 필드 부재. 천체 레코드 타입이 필요하면 `LoadedCelestialBody`
+ * (@astro-simulator/core) 를 사용할 것.
  */
-export interface CelestialBody {
-  /** 고유 ID (예: 'earth', 'jupiter') */
-  id: string;
-  /** 분류 */
-  kind: CelestialKind;
-  /** 한국어 이름 */
-  nameKo: string;
-  /** 영문 이름 */
-  nameEn: string;
-  /** 질량 [kg] */
-  mass: number;
-  /** 반경 [m] */
-  radius: number;
-  /** 데이터 신뢰성 티어 */
-  tier: DataTier;
-  /** 부모 천체 ID (예: 달의 부모는 지구) — 없으면 null (태양 등) */
-  parentId: string | null;
-  /** 궤도 요소 — 태양/최상위 천체는 없을 수 있음 */
-  orbit?: OrbitalElements;
-  /** 색상 표시용 힌트 (흑체복사 온도[K] 또는 명시 색) + 출처 분류 */
-  colorHint?: { temperatureK?: number; hex?: string; colorSource?: ColorSource };
-  /**
-   * P10-B #274 — 데이터 출처. `"IAU 2015"` 또는 `["IAU 2015", "JPL Horizons (2024-06)"]`.
-   * P10-B 감사 이후 모든 body 필수. 스키마 확장 기간 중에는 optional.
-   */
-  dataSource?: DataSource;
-  /**
-   * P10-B #274 — 마지막 검증 일자 (ISO YYYY-MM-DD). 예: `"2026-04-22"`.
-   * P10-B 감사 시점부터 업데이트. 초기 값은 감사일 고정.
-   */
-  lastVerified?: IsoDate;
-  /**
-   * P10-B #274 — 불확실성. IAU 공식값 없는 body (소행성/혜성/외곽 위성) 필수.
-   * 각 필드는 상대 오차 (0.15 = ±15%).
-   */
-  uncertainty?: Uncertainty;
-  /**
-   * P10-B #274 — body 의 epoch. root 의 epoch (기본 J2000.0 = 2451545.0 JD) 과 다를 때만 명시.
-   * 문자열 (`"J2000.0"`, `"2451545.0 TDB"`) 또는 숫자 (JD). 부재 시 root epoch 상속.
-   */
-  epoch?: string | number;
-}

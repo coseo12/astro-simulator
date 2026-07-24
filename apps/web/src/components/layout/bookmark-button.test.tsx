@@ -16,8 +16,6 @@ beforeEach(() => {
     fps: null,
     physicsEngine: 'newton',
     massMultipliers: {},
-    pingCount: 0,
-    lastPingAt: null,
   });
   writeText.mockClear();
   // @ts-expect-error — jsdom navigator.clipboard 주입

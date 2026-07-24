@@ -13,8 +13,6 @@ beforeEach(() => {
     timeScale: 86_400,
     fps: null,
     physicsEngine: 'kepler',
-    pingCount: 0,
-    lastPingAt: null,
   });
 });
 

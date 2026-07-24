@@ -14,7 +14,7 @@
  *
  * 단위 테스트 범위 (Babylon mock 비용 회피):
  *  - SimulationCore 의 command 처리 + event emission 만 검증.
- *  - scene / camera 실제 동작은 통합 또는 E2E (`p329-qa-focus-lod-guard.mjs`) 가 별도 가드.
+ *  - scene / camera 실제 동작은 통합 또는 E2E 브라우저 가드 (`apps/web/scripts/browser-verify-*.mjs`) 가 별도 가드.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { SimulationCore } from './simulation-core.js';

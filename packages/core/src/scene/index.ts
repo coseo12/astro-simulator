@@ -30,11 +30,7 @@ export {
   FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE,
   resolveFocusMultiplier,
 } from './focus-multiplier.js';
-export { createSunEarthDemo } from './sun-earth-demo.js';
-export type { SunEarthDemoHandles } from './sun-earth-demo.js';
 export { enableLogarithmicDepth } from './log-depth.js';
-export { createNearFarProbe } from './near-far-probe.js';
-export type { NearFarProbeHandles } from './near-far-probe.js';
 export { createSolarSystemScene } from './solar-system-scene.js';
 export type {
   SolarSystemSceneHandles,
@@ -73,11 +69,6 @@ export { createStarfield } from './starfield.js';
 export type { StarfieldHandles, CreateStarfieldOptions } from './starfield.js';
 export { createGravitationalLensing } from './gravitational-lensing.js';
 export type { LensingHandles, BlackHoleOptions } from './gravitational-lensing.js';
-export { createBlackHoleRendering } from './black-hole-rendering.js';
-export type {
-  BlackHoleRenderingHandles,
-  BlackHoleRenderingOptions,
-} from './black-hole-rendering.js';
 // #713 — canvas 클릭/터치 → body 선택 (raycast picking) 순수 헬퍼.
 // #719 — resolvePickedBodyIds (복수형, ray 깊이순 dedup) + PICK_CYCLE_SAME_POS_PX (cycle 임계).
 export {

@@ -9,7 +9,6 @@
  *
  * 선례:
  *   - `scripts/browser-verify.mjs:131` — time-play 성공 assert 패턴
- *   - `scripts/browser-verify-integrator.mjs` — JD Δ 간접 증명
  *
  * 사용:
  *   import { pressTimePlay, hasSimErrors } from './browser-verify-utils.mjs';
