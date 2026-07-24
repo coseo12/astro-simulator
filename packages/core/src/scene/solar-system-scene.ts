@@ -13,7 +13,7 @@ import {
   type Mesh,
   type Scene,
 } from '@babylonjs/core';
-import { AU, GRAVITATIONAL_CONSTANT, J2000_JD } from '@astro-simulator/shared';
+import { AU, GRAVITATIONAL_CONSTANT, J2000_JD, SOLAR_MASS } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { positionAt } from '../physics/kepler.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
@@ -30,7 +30,7 @@ import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield } from './starfield.js';
-import { hexToColor3 } from './color-utils.js';
+import { SCENE_CLEAR_COLOR_RGBA, hexToColor3 } from './color-utils.js';
 import {
   createProceduralPlanetMaterial,
   type PlanetLightingConstants,
@@ -517,8 +517,8 @@ export function createSolarSystemScene(
   let activeTier: Tier = defaultInitialTier();
   const getTier = (): Tier => activeTier;
 
-  // 배경 톤
-  scene.clearColor = new Color4(0.031, 0.035, 0.051, 1);
+  // 배경 톤 — #845 simulation-core 와 동일 튜플 SSoT (color-utils, volt #69 숨은 상수).
+  scene.clearColor = new Color4(...SCENE_CLEAR_COLOR_RGBA);
 
   // #738 — 절차적 별 배경 + 은하수 띠 (clearColor 위 background queue 레이어). 기본 false —
   // web 레이어가 `?stars=off` 옵트아웃으로 기본 ON 결정 (ADR §결정 7). infiniteDistance 가
@@ -739,8 +739,11 @@ export function createSolarSystemScene(
   // R4 #532 — moon orbit line 색상 SSoT (결정 4). #627 — moon 은 satelliteOrbitLines.get('earth').
   const MOON_ORBIT_COLOR_DEFAULT = new Color3(0.3, 0.35, 0.5); // #552 — WCAG 1.4.11 ≥ 3:1 (3.06:1) 충족. 톤 보존으로 EARTH_FOCUS 자연 그라데이션 유지
   const MOON_ORBIT_COLOR_EARTH_FOCUS = new Color3(0.65, 0.7, 0.85); // earth focus 강조 (~2.6배 명도)
+  // #845 — planet 궤도선 색 SSoT (volt #69 숨은 상수). 과거 rebuildOrbitLines 의 리터럴과
+  // 아래 satellite 기본색이 동일 튜플을 각자 선언 — 한쪽만 바꾸면 "동일 톤" 계약이 조용히 깨짐.
+  const PLANET_ORBIT_COLOR = new Color3(0.25, 0.28, 0.4);
   // #627 — 일반 satellite 궤도선 색상 (moon 외 phobos/deimos/galilean). orbitLines (planet) 와 동일 톤.
-  const SATELLITE_ORBIT_COLOR_DEFAULT = new Color3(0.25, 0.28, 0.4);
+  const SATELLITE_ORBIT_COLOR_DEFAULT = PLANET_ORBIT_COLOR;
 
   // #627 — parent 별 satellite 궤도 LineSystem 전체 안전 dispose (agy 보강 ① 다중 LineSystem
   // 라이프사이클). rebuildOrbitLines 재호출 + scene dispose 둘 다에서 호출되어 메모리 누수 차단.
@@ -795,7 +798,8 @@ export function createSolarSystemScene(
       orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
       // 일반 (planet) 궤도선. satellite orbit 은 satelliteOrbitLines 별도 SSoT.
       // 본 색상은 #552 a11y fix 비대상 (moon orbit 만 WCAG 1.4.11 격차였음).
-      orbitLines.color = new Color3(0.25, 0.28, 0.4);
+      // #845 — 리터럴 → PLANET_ORBIT_COLOR SSoT (satellite 기본색과 동일 톤 계약 명시).
+      orbitLines.color = PLANET_ORBIT_COLOR;
       orbitLines.isVisible = orbitLinesVisible;
     }
 
@@ -896,7 +900,8 @@ export function createSolarSystemScene(
     asteroidStartIndex = -1;
     if (asteroidNbody && asteroidBelt && asteroidBelt.n > 0) {
       const sun = system.bodies.find((b) => b.id === 'sun');
-      const sunMu = GRAVITATIONAL_CONSTANT * (sun?.mass ?? 1.98892e30);
+      // #845 — 리터럴 1.98892e30 을 shared `SOLAR_MASS` SSoT 로 교체 (volt #69 숨은 상수).
+      const sunMu = GRAVITATIONAL_CONSTANT * (sun?.mass ?? SOLAR_MASS);
       const ast = asteroidBelt.getNbodyState(jd, sunMu);
       const pN = planetState.ids.length;
       const aN = ast.masses.length;
@@ -985,7 +990,7 @@ export function createSolarSystemScene(
     // 직접 변경하면, 곧이어 시작될 tween 의 시작값과 충돌해 jitter (사용자 D-T2 양상 B) 발생.
     // 본 가드는 **준비 작업 시작 전** 입력을 차단하여 race 윈도우를 0 ms 로 축소.
     //
-    // 가드 B (`tierTransitionInProgress = true`, 아래 line 663) 와 직교 — 본 가드는 입력 자체를
+    // 가드 B (위 `tierTransitionInProgress` 플래그 — #845 라인 앵커화) 와 직교 — 본 가드는 입력 자체를
     // scene 차원에서 차단, 가드 B 는 매 프레임 tier 재판정에서 setTier 재진입 차단.
     // runTierTransition 내부의 detachControl 은 idempotent 흡수.
     scene.detachControl();
@@ -1024,8 +1029,9 @@ export function createSolarSystemScene(
     }
 
     // origin 과 newScale 기준으로 mesh.position 즉시 재계산 — `runTierTransition` 이 읽는
-    // `focusMesh.absolutePosition` (tier-transition.ts:216-219) 이 새 tier 좌표계여야 카메라 target 정합.
-    // updateAt 의 mesh.position 루프 (line 595-610) 와 동일 수식 (의도된 duplication — tier 전환 시점에
+    // `focusMesh.absolutePosition` (tier-transition.ts (2-b) focus target 즉시 동기화 단계 —
+    // #845 라인 앵커화) 이 새 tier 좌표계여야 카메라 target 정합.
+    // updateAt 의 mesh.position 루프와 동일 수식 (의도된 duplication — tier 전환 시점에
     // 1회 추가 실행으로 transition 이 올바른 좌표를 읽게 함).
     const tierTransitionOrigin = floatingOrigin.originOffset;
     for (const [id, world] of worldPositions) {
@@ -1040,10 +1046,11 @@ export function createSolarSystemScene(
     }
 
     // #782 Amendment 2-i fix (PR #785 reviewer 권고 1 / qa 실측) — ring-anchor 를 setTier 에서도 즉시 동기.
-    // updateAt 의 anchor 동기 (`:1318`) 는 `timeChanged` 바인딩이라 speed=0 (pause) 중 tier 전환 시
-    // 미발동 → ring-anchor 가 구 tier scale/position 으로 stale (ring/host 스케일 mismatch, 실측 drift
-    // 최대 1733% = ring 이 body 대비 28배 어긋난 채 렌더). setTier 는 pause 무관 경로이므로 여기서 host
-    // 값으로 즉시 동기해야 tier 전환 즉시 ring 이 body 와 스케일 정합 (updateAt `:1318-1323` 와 동일 수식).
+    // updateAt 의 ring-anchor 동기 블록 (#845 라인 앵커화) 은 `timeChanged` 바인딩이라 speed=0 (pause)
+    // 중 tier 전환 시 미발동 → ring-anchor 가 구 tier scale/position 으로 stale (ring/host 스케일
+    // mismatch, 실측 drift 최대 1733% = ring 이 body 대비 28배 어긋난 채 렌더). setTier 는 pause 무관
+    // 경로이므로 여기서 host 값으로 즉시 동기해야 tier 전환 즉시 ring 이 body 와 스케일 정합
+    // (updateAt 의 ring-anchor 동기 블록과 동일 수식).
     // ring host 4개 한정 (ringAnchors 는 selfRotation + 자전 ring body 만 보유). host.position/scaling 은
     // 위 루프에서 새 tier 값으로 확정된 상태 (rotation 은 제외 — anchor 는 비회전으로 wobble 0 유지).
     for (const [id, anchor] of ringAnchors) {
@@ -1175,7 +1182,8 @@ export function createSolarSystemScene(
   // R-Phase #510 H6 fix — focus 해제는 **tier 까지 default 복원**해야 한다.
   // 이전: focusBodyIdForAssert = null 만 → tier (focus 시 sub-tier) + origin (focus body 위치) 잔존.
   // 잔존 상태에서 sim-canvas 가 controller.reset(35) Animation 시작하면 매 프레임
-  // updateTierByCamera 가 잘못된 tier 판정 → setTier 트리거 → tier-transition.ts:288-296 의
+  // updateTierByCamera 가 잘못된 tier 판정 → setTier 트리거 → tier-transition.ts (2) pending tween
+  // 취소 단계 (#845 라인 앵커화) 의
   // stopAnimation 이 cam-reset-radius/target 까지 stop + computeTargetRadius(35, oldScale, newScale)
   // 로 radius 폭증 (forensic 실측: 35 → 688,901 ≈ ×19,683).
   //
@@ -1388,8 +1396,8 @@ export function createSolarSystemScene(
     // 좌표 재기록 — 같은 프레임 내 mesh.position 은 shift 전 좌표라 1 프레임 visible delta 존재 가능.
     // 1 AU 이동 시점에서 scene scale 이 매우 wide 하므로 sub-pixel (ADR §5).
     //
-    // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (line 445-450 의
-    // `setOriginToBody`) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
+    // #292 회귀 가드: focus 활성 상태에서 safety net 이 primary origin (`setFocusOrigin` 의
+    // `setOriginToBody` — #845 라인 앵커화) 을 덮어쓰면 originOffset 이 카메라 월드 좌표를 추적 → ADR §3
     // Heliocentric 계약 위배. focus 가 없는 free-fly 탐색에만 safety net 적용한다.
     //
     // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 renderScale 이 작아
@@ -1433,7 +1441,8 @@ export function createSolarSystemScene(
       const focusWorld = focusId ? worldPositions.get(focusId) : null;
       if (focusWorld) {
         // #380 가드 C 후속 fix — 가드 C 가 setOriginToBody 호출을 mesh.position 루프 후로
-        // 옮겼기 때문에 line 826 의 ox/oy/oz 는 *변경 전 origin* 이다. assert 는 *변경 후*
+        // 옮겼기 때문에 updateAt 진입 시 스냅샷한 ox/oy/oz (#845 라인 앵커화) 는 *변경 전
+        // origin* 이다. assert 는 *변경 후*
         // origin 기준으로 focus body local 좌표를 검증해야 mercury 같이 멀리 있는 body 의
         // 첫 frame stale origin 박제로 인한 console.error spam (CI verify:378-focus FAIL 원인)
         // 을 회피. originOffset 은 setOriginToBody 호출 시 mutate 되므로 다시 읽음.

@@ -6,9 +6,12 @@
  * 6축 × 3 tier 카테고리 완비 — 항목 누락 시 `tier-profile.test.ts` 의 카테고리 enum 완비
  * 테스트가 즉시 fail. 신규 tier 또는 축 추가 시 ADR Amendment 선박제 + 본 상수 갱신.
  *
- * **Concrete Prediction 2** (ADR §Concrete Prediction): `TIER_PROFILES[tier]` 파라미터 값
- * 조정 시 `packages/core/src/scene/` 및 Babylon 렌더 코드 라인 변화 0. 적용 지점은 오직
- * `applyGpuTierPreset(profile, scene)` 1개.
+ * **실제 적용 구조** (#845 주석 계약 정정): ADR 의 Concrete Prediction 2 가 예고한
+ * `applyGpuTierPreset(profile, scene)` 단일 적용 지점은 **미구현**이다. 현행 소비처는
+ * `apps/web/src/components/sim-canvas.tsx` 1곳 — tier-c 판정 시 `TIER_PROFILES.c` 의
+ * **lod 축만** 수동 소비 (`lod.forceOverride` → LOD 'low' 강제 + graceful degradation 알림).
+ * particles / shadow / aa / postProc 축은 아직 배선되지 않았다 (소비처 0 — 데이터 상수로만
+ * 존재). 축 배선을 확장할 때 단일 적용 함수 도입 여부를 재검토할 것.
  *
  * 주석 계약 (drift 방어, CLAUDE.md "주석 계약 vs 구현 drift" 교훈, volt #49):
  *   1. tier domain: 'a' | 'b' | 'c' 만. 추가 시 ADR Amendment 선박제
@@ -19,7 +22,11 @@
 
 import type { LodLevel } from './lod.js';
 
-/** GPU tier — `20260424-tier-naming-policy.md` §1 SSoT. */
+/**
+ * GPU tier — `20260424-tier-naming-policy.md` §1 SSoT.
+ * #845 — 타입 선언의 단일 출처. apps/web `detect-gpu-tier.ts` 는 본 타입을 core 루트 경유로
+ * re-export 한다 (과거 이중 선언 해소 — 값 domain 이 갈라지면 조용한 분기 버그).
+ */
 export type GpuTier = 'a' | 'b' | 'c';
 
 /** Anti-aliasing 4단계. */

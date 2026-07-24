@@ -46,6 +46,7 @@ import { Effect, ShaderMaterial, Vector3, type Scene } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { fbmMirror } from './procedural-planet-shader.js';
 import { hexToColor3 } from './color-utils.js';
+import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rendering-only 미학 상수 SSoT (#69 숨은 상수 drift 차단 — sun-shader.test.ts 가드 대상).
@@ -225,7 +226,7 @@ void main(void) {
   gl_FragColor = vec4(col, 1.0);
 
   // ADR §결정 7 — 본체(StandardMaterial useLogarithmicDepth)와 동일한 로그 depth 공간 기록.
-  gl_FragDepth = log2(max(vFragmentDepth, 1e-6)) * logDepthConstant * 0.5;
+  ${LOG_DEPTH_FRAGMENT_WRITE_GLSL}
 }
 `;
 

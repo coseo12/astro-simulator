@@ -162,7 +162,8 @@ export function computeNewMinZ(targetRadius: number): number {
  *  - T1/T2: 사용자 줌인 한계는 mesh 직경 수준이면 충분 → `targetRadius * 0.01` 수준
  *  - T3 body: 표면까지 자유 접근 → `max(newMinZ, targetRadius * 0.01)` ≈ mesh 표면 도달 가능
  *
- * `tier-transition.ts:189-191` 의 한 방향 완화 (`lowerRadiusLimit > targetRadius` 시만 낮춤) 는
+ * #380 이전 구현의 한 방향 완화 (`lowerRadiusLimit > targetRadius` 시만 낮춤 — 현재는 본
+ * 헬퍼의 가드 A 로 대체, #845 라인 앵커화) 는
  * 누적 drift 의 부수효과 + 줌 freeze 와는 직교. 본 헬퍼는 **양방향** 동기 — 진입 tier 에 맞춰
  * lowerRadiusLimit 도 적정값으로 즉시 갱신 (확대 / 축소 모두).
  *
@@ -267,7 +268,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   //  - 호출자 (`setTier`) 가 진입 *전에* detachControl 을 선행 호출해도 본 호출은 idempotent —
   //    Babylon `Scene.detachControl()` 은 이미 detached 상태에서도 안전
   //
-  // 이전 코드는 (3) 단계 (line 252) 에서 호출했으나, mesh.boundingInfo 계산 / camera.target
+  // 이전 코드는 아래 (3) 단계 위치에서 호출했으나, mesh.boundingInfo 계산 / camera.target
   // copyFrom / pending tween 취소 등 수 ms 작업 사이 wheel/pinch race 윈도우 존재. 본 가드는
   // 이 윈도우를 **0 ms 로 축소** — runTierTransition 진입 즉시 입력 차단.
   scene.detachControl();
@@ -296,8 +297,8 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     // 다음 frame 의 world matrix recompute 전까지 잔존 값을 반환하는 timing race 가능.
     // venus 관찰 모드 회귀의 가장 그럴듯한 단일 원인 (ADR §결정 근거 3, 연구 모드 정상의 메커니즘
     // = panel resize → engine.resize() → 자연 boundingInfo 갱신 → H4 회피).
-    // solar-system-scene.ts:569 에서 이미 모든 mesh 의 computeWorldMatrix(true) 를 호출하지만,
-    // 호출 순서 / 다른 부수효과 race 시 안전망.
+    // solar-system-scene.ts `setTier` 의 mesh.scaling 루프가 이미 모든 mesh 의
+    // computeWorldMatrix(true) 를 호출하지만, 호출 순서 / 다른 부수효과 race 시 안전망.
     focusMesh.computeWorldMatrix(true);
     focusMesh.refreshBoundingInfo();
     const boundingInfo = focusMesh.getBoundingInfo();
@@ -371,7 +372,7 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     camera.target.copyFrom(worldPos);
   }
 
-  // (3) 입력 잠금은 **함수 진입 시 가드 G8a 에서 이미 발동** (line 187 부근).
+  // (3) 입력 잠금은 **함수 진입 시 가드 G8a (`scene.detachControl()`) 에서 이미 발동**.
   //     본 단계는 release 단계와의 대칭성 표시만 — Babylon detachControl 은 idempotent 이므로
   //     본 단계가 호출되지 않아도 race 윈도우는 0 ms 로 보장됨.
 

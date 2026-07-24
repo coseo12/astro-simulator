@@ -649,7 +649,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // (UrlSync 호출이 이미 지나갔어도 최신 URL 상태 복원). 두 경로 동시 적용해도 idempotent.
         //
         // #680 — tier-c 강제 LOD 보존 (race 제3 윈도우 fix). UrlSync 는 `?lod=` 미지정 시
-        // `setLodOverride('auto')` 를 **무조건** 발행한다 (url-sync.tsx:120-122). 이 'auto' command 가
+        // `setLodOverride('auto')` 를 **무조건** 발행한다 (url-sync.tsx 의 `?lod=` 미지정 기본
+        // 발행 분기 — #845 라인 앵커화). 이 'auto' command 가
         // handler 등록 **후** 도착하면 (저속/headless 의 비결정적 mount 타이밍) tier-c 강제 'low' 를
         // 'auto' 로 덮어써 sun high + mid sphere 렌더 → fps-baseline-guard FAIL.
         //   #677 Amendment 2 는 detectGpuCapability().then 의 command 직접 발행만 보강했으나,
@@ -662,8 +663,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const resolveLodWithTierForce = (level: 'high' | 'mid' | 'low' | 'auto') => {
           const lodParam = new URLSearchParams(window.location.search).get('lod');
           const hasLodUrl = lodParam !== null && lodParam !== '';
-          const tierForced = (window as { __gpuTierForceLod?: 'high' | 'mid' | 'low' })
-            .__gpuTierForceLod;
+          // #845 — 인라인 캐스팅 제거 (`types/global.d.ts` Window 전역 타입 SSoT).
+          const tierForced = window.__gpuTierForceLod;
           // 사용자 명시 URL 우선. 미지정('auto' 기본) + tier-c 강제면 강제값으로 치환.
           if (!hasLodUrl && level === 'auto' && tierForced) return tierForced;
           return level;
@@ -774,7 +775,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               sceneApi.setPanningEnabled(camera, false);
               // #699 — focus 진입 시 WASD 비활성 + 눌림 키 클리어 + free-fly 줌 상한 해제(기본 복원).
               // focus follow 가 매 프레임 target 을 덮어쓰므로 WASD 이동 무의미. focusOn 이 동적으로
-              // lowerRadiusLimit 을 낮추므로(camera-controller.ts:150) upperRadiusLimit 만 기본 복원.
+              // lowerRadiusLimit 을 낮추므로(camera-controller `focusOn` 의 #378 동적 완화 —
+              // #845 라인 앵커화) upperRadiusLimit 만 기본 복원.
               wasdControl.setEnabled(false);
               wasdControl.clearKeys();
               camera.upperRadiusLimit = DEFAULT_UPPER_RADIUS_LIMIT;
@@ -967,7 +969,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // globalPosition(shifted-origin local) × metersPerSceneUnit 만으로는 focus body 로부터의
           // 거리가 되어 sun 거리를 과소 측정한다. originOffset(m) 을 가산해 참 거리를 구한다.
           // 누락 시 free-fly 줌아웃에서 tier 가 escalate 안 됨(body 고정 → 허공). 씬 updateAt
-          // (solar-system-scene.ts:1093-1098)의 cameraWorldMeters 계산과 동일 패턴.
+          // (solar-system-scene `updateAt` safety net — #845 라인 앵커화)의 cameraWorldMeters
+          // 계산과 동일 패턴.
           // T1/T2 는 originOffset=[0,0,0] 이라 무영향, body tier 만 교정.
           const origin = solar.floatingOrigin.originOffset;
           const cx = activeCam.globalPosition.x * metersPerSceneUnit + origin[0];

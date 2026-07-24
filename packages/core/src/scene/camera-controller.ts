@@ -226,7 +226,9 @@ export class CameraController {
     // T1 시점 desiredRadius (~0.01 unit) 가 ArcRotateCamera default lowerRadiusLimit (0.5) 미만
     // 이면 카메라 radius 가 0.5 로 clamp 되어 mesh 내부에 박힘 → tier 전환 후 mesh 외각이 카메라
     // frustum 밖으로 빠져 venus 관찰 모드 "허공" 회귀 (D-T2 라운드 3 보고).
-    // tier-transition.ts:189 와 동일 패턴 — focus 트리거 한정 완화 (manual zoom 영향 0).
+    // tier-transition.ts 의 #380 이전 한 방향 완화와 동일 패턴 (그쪽은 현재 가드 A
+    // `computeLowerRadiusLimit` 양방향 동기로 대체 — #845 라인 앵커화).
+    // focus 트리거 한정 완화 (manual zoom 영향 0).
     if (this.camera.lowerRadiusLimit != null && desiredRadius < this.camera.lowerRadiusLimit) {
       this.camera.lowerRadiusLimit = Math.max(this.camera.minZ, desiredRadius * 0.5);
     }

@@ -15,7 +15,7 @@ import {
   type Mesh,
   type Scene,
 } from '@babylonjs/core';
-import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+import { AU, GRAVITATIONAL_CONSTANT, SOLAR_MASS } from '@astro-simulator/shared';
 import { positionAt } from '../physics/kepler.js';
 import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
@@ -147,7 +147,8 @@ export function createAsteroidBelt(
   }
   template.thinInstanceSetBuffer('matrix', matrixBuffer, 16, false);
 
-  const sun = GRAVITATIONAL_CONSTANT * 1.98892e30;
+  // #845 — 리터럴 1.98892e30 을 shared `SOLAR_MASS` SSoT 로 교체 (volt #69 숨은 상수).
+  const sun = GRAVITATIONAL_CONSTANT * SOLAR_MASS;
 
   const updateAt = (jd: number, sceneUnitPerMeter: number) => {
     for (let i = 0; i < n; i += 1) {
