@@ -16,10 +16,15 @@
  * 위 계약 위배 변경은 즉시 버그로 간주 (CLAUDE.md "주석 계약 vs 구현 drift" 교훈, volt #49).
  */
 
+import type { GpuTier } from '@astro-simulator/core';
 import { detectIsMobile, type NavigatorLike } from './is-mobile';
 
-/** GPU tier 3단계. ADR `20260424-tier-naming-policy.md` §1 SSoT. */
-export type GpuTier = 'a' | 'b' | 'c';
+/**
+ * GPU tier 3단계 — #845 이중 선언 해소. 선언 SSoT 는 core `render/tier-profile.ts`
+ * (ADR `20260424-tier-naming-policy.md` §1). 본 모듈은 루트 경유 re-export 만 담당 —
+ * 기존 소비처 (`parse-gpu-tier.ts` / `sim-canvas.tsx`) 의 import 경로는 불변.
+ */
+export type { GpuTier } from '@astro-simulator/core';
 
 /** `detectGpuTier` 의 입력 — 순수 함수 테스트 편의를 위해 모든 signal 을 주입받는다. */
 export interface GpuDetectionInput {
@@ -100,7 +105,7 @@ export function classifyAdapterIsDiscrete(
 ): boolean {
   if (adapter === null || adapter.vendor === '') {
     // Privacy fingerprinting 완화로 빈 adapter info — 보수적 integrated 취급 (ADR §위험 1)
-     
+
     console.warn('[detect-gpu-tier] adapter info unavailable (privacy) — integrated 폴백');
     return false;
   }
@@ -118,7 +123,7 @@ export function classifyAdapterIsDiscrete(
   }
 
   // 미지 vendor — 보수적 integrated 취급 + drift 탐지 경고 (ADR §축 1 암묵 전제)
-   
+
   console.warn(
     `[detect-gpu-tier] 미지 vendor='${adapter.vendor}' architecture='${adapter.architecture}' — integrated 폴백`,
   );

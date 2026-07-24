@@ -78,6 +78,7 @@
 import { Color3, Effect, ShaderMaterial, Vector3, type Mesh, type Scene } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { hexToColor3 } from './color-utils.js';
+import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 표면 타입 enum ↔ uniform int 매핑 SSoT (#756 §결정 2).
@@ -496,7 +497,7 @@ void main(void) {
   gl_FragColor = vec4(col, 1.0);
 
   // #756 §핵심 위험 1 — 본체(StandardMaterial useLogarithmicDepth)와 동일한 로그 depth 공간 기록.
-  gl_FragDepth = log2(max(vFragmentDepth, 1e-6)) * logDepthConstant * 0.5;
+  ${LOG_DEPTH_FRAGMENT_WRITE_GLSL}
 }
 `;
 

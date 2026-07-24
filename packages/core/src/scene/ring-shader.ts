@@ -37,6 +37,7 @@ import {
   type Scene,
 } from '@babylonjs/core';
 import type { LoadedRingLayer } from '../ephemeris/solar-system-loader.js';
+import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
 import { renderScaleForTier, type Tier } from './tier.js';
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. 생성 시점의 tier 로 반경을 계산한다.
@@ -49,8 +50,17 @@ const DEFAULT_RING_COLOR: readonly [number, number, number] = [0x88 / 255, 0x77 
 /** Disc tessellation — 관측 품질 vs draw cost 균형. */
 const DISC_TESSELLATION = 96;
 
-/** uniform densityProfile 최대 길이. 3~5 포인트 → 8로 여유. P10 토성 확장 시 재검토. */
-const MAX_DENSITY_POINTS = 16;
+/**
+ * uniform densityProfile 최대 길이.
+ *
+ * #845 주석 계약 정정 — 구 "3~5 포인트 → 8로 여유" 는 P9 목성 시점 서술이고, R8 (#647) 에서
+ * uranus composite 15점 수용을 위해 16 으로 상향된 현행 값과 모순이었다.
+ *
+ * loader (`solar-system-loader.ts`) 의 zod `.max(MAX_DENSITY_POINTS)` 파싱 상한과 독립 선언
+ * parity — 순환 import 회피를 위해 양쪽 독립 선언 + 대조 테스트 (`ring-shader-arcs.test.ts`,
+ * MAX_ARCS #728 동형 패턴). 정합이 깨지면 데이터 silent drop 또는 uniform overflow.
+ */
+export const MAX_DENSITY_POINTS = 16;
 
 /**
  * #728 — azimuthal arc uniform 고정 배열 상한 (GLSL 동적 길이 불가 — loader `MAX_ARCS` 정합).
@@ -216,7 +226,7 @@ void main(void) {
   gl_FragColor = vec4(color * d * azFactor, alpha);
 
   // #641 D-T2 fix 2 — 본체(StandardMaterial useLogarithmicDepth)와 동일한 로그 depth 공간 기록.
-  gl_FragDepth = log2(max(vFragmentDepth, 1e-6)) * logDepthConstant * 0.5;
+  ${LOG_DEPTH_FRAGMENT_WRITE_GLSL}
 }
 `;
 
@@ -762,3 +772,12 @@ function buildFallbackHandles(
 
   return { meshes, mode: 'fallback', syncToHost, dispose };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 테스트/검증용 re-export (sun/planet 셰이더 SSoT 가드 선례 — #845 log-depth parity).
+// ─────────────────────────────────────────────────────────────────────────────
+export {
+  // GLSL 소스 — log-depth 공용 조각 (`LOG_DEPTH_FRAGMENT_WRITE_GLSL`) 포함 여부를
+  // `log-depth-glsl.test.ts` 가 정적 검증 (텍스트 동일성 = 픽셀 불변 전제).
+  FRAGMENT_SHADER as RING_FRAGMENT_SHADER,
+};

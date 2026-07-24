@@ -31,4 +31,13 @@ export * as render from './render/index.js';
 export { R_PHASE_BODY_ALLOWLIST, isRPhaseFocusable } from './scene/r-phase-allowlist.js';
 export type { RPhaseBodyId } from './scene/r-phase-allowlist.js';
 
+// #845 — GpuTier / LodLevel 루트 type re-export.
+//
+// `./render` 는 package.json exports sub-path 미등재 (#402 exports 불변 가드 — 신규 sub-path
+// 추가 금지) 라 apps/web 이 render 도메인 타입을 참조할 단일 경로가 필요하다.
+// GpuTier 는 `render/tier-profile.ts` 가 선언 SSoT — apps/web `detect-gpu-tier.ts` 의 과거
+// 이중 선언을 본 루트 경유 re-export 로 통일. type-only 라 런타임 모듈 그래프 영향 0
+// (#402 SSR 회귀 무관).
+export type { GpuTier, LodLevel } from './render/index.js';
+
 export const VERSION = '0.0.0';

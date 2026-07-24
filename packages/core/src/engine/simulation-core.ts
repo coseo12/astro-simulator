@@ -9,6 +9,8 @@ import { createEngine, type CreatedEngine, type EngineKind } from './engine-fact
 // #402 — R-Phase Body Allowlist 가드 (defense-in-depth scene 측면).
 // ADR `20260504-r-phase-allowlist-guard.md` §결정 3.
 import { isRPhaseFocusable } from '../scene/r-phase-allowlist.js';
+// #845 — 씬 배경 톤 SSoT (solar-system-scene 과 동일 튜플 — volt #69 숨은 상수 단일화).
+import { SCENE_CLEAR_COLOR_RGBA } from '../scene/color-utils.js';
 
 /**
  * 시뮬레이션 코어 — Babylon 엔진/씬 + 시간 컨트롤러 + 이벤트 버스.
@@ -301,7 +303,7 @@ export class SimulationCore {
 
     const { engine, kind } = this.#created;
     const scene = new Scene(engine);
-    scene.clearColor = new Color4(0.031, 0.035, 0.051, 1);
+    scene.clearColor = new Color4(...SCENE_CLEAR_COLOR_RGBA);
     this.#scene = scene;
 
     engine.runRenderLoop(() => {

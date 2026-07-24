@@ -17,6 +17,12 @@ on:
   push:
     branches: [develop, main]
 
+# #845 — wasm-pack 버전 단일 선언 (workflow 내 SSoT). rust-toolchain.toml 은 cargo 툴체인만
+# 커버하므로 wasm-pack 은 env 로 묶는다 (과설계 금지 — 파일 간 SSoT 는 composite action
+# `setup-and-build` 의 input default 가 별도 담당).
+env:
+  WASM_PACK_VERSION: '0.14.0'
+
 jobs:
   verify-and-rust:
     runs-on: ubuntu-latest
@@ -37,11 +43,25 @@ jobs:
         run: node scripts/verify-iau-data.mjs
 
       # Rust + WASM 툴체인 (packages/physics-wasm)
+      # #845 — 툴체인 버전 SSoT = rust-toolchain.toml (channel). dtolnay action 은 toml 을
+      # 자동 인식하지 않으므로 (toolchain input 필수 — action.yml 실측) 추출 스텝으로 주입.
+      # 추출 실패 시 빈 값 → 명시 exit 1 (fail-fast, fallback 분기 금지 — 가드 설계 원칙).
+      - name: Rust 툴체인 채널 추출 (rust-toolchain.toml SSoT)
+        id: rust-toolchain
+        if: hashFiles('rust-toolchain.toml') != ''
+        run: |
+          channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+          if [ -z "${channel}" ]; then
+            echo "::error::rust-toolchain.toml 에서 channel 추출 실패"
+            exit 1
+          fi
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+
       - name: Rust 툴체인 설정
         if: hashFiles('rust-toolchain.toml') != ''
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.94.1'
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
@@ -69,7 +89,8 @@ jobs:
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         uses: taiki-e/install-action@v2
         with:
-          tool: wasm-pack@0.14.0
+          # #845 — 버전은 workflow top-level env WASM_PACK_VERSION 단일 선언.
+          tool: wasm-pack@${{ env.WASM_PACK_VERSION }}
 
       # 1000년 심플렉틱 적분(365250 step)은 release 모드에서만 빠름.
       # P9 #254 M4: 장기 적분 테스트(수성/금성/지구 근일점 EIH 6건 + Laplace 공명
@@ -139,11 +160,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # #845 — 툴체인 버전 SSoT = rust-toolchain.toml (verify-and-rust job 과 동형 추출).
+      - name: Rust 툴체인 채널 추출 (rust-toolchain.toml SSoT)
+        id: rust-toolchain
+        if: hashFiles('rust-toolchain.toml') != ''
+        run: |
+          channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+          if [ -z "${channel}" ]; then
+            echo "::error::rust-toolchain.toml 에서 channel 추출 실패"
+            exit 1
+          fi
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+
       - name: Rust 툴체인 설정
         if: hashFiles('rust-toolchain.toml') != ''
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.94.1'
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 

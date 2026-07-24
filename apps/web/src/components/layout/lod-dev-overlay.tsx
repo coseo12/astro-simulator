@@ -27,6 +27,7 @@ import { useEffect, useState } from 'react';
 
 // `window.__solarScene` 는 sim-canvas 가 dev 빌드에서 노출하는 handles (`Object.defineProperty`).
 // 본 컴포넌트가 prod 에서 early-return 으로 제거되므로 prod bundle 에 `__solarScene` 참조도 없음.
+// #845 — 전역 타입은 `types/global.d.ts` Window SSoT (과거 인라인 SceneHandlesPartial 캐스팅 제거).
 interface LodStats {
   high: number;
   mid: number;
@@ -46,11 +47,6 @@ interface LodBodyInfo {
   // #393 — billboard alpha mask 적용 여부 (low 만, sphere = null).
   // true=mask 적용 (pxDiameter ≥ 4) / false=4px fallback (사각형 quad) / null=low 아님 or 미생성.
   billboardAlphaMask: boolean | null;
-}
-
-interface SceneHandlesPartial {
-  getLodStats?: () => LodStats;
-  getLodInfo?: () => readonly LodBodyInfo[];
 }
 
 const POLL_INTERVAL_MS = 1000;
@@ -132,7 +128,8 @@ function LodDevOverlayImpl() {
     const detailed = mode === 'detailed';
 
     const timer = window.setInterval(() => {
-      const scene = (window as unknown as { __solarScene?: SceneHandlesPartial }).__solarScene;
+      // #845 — 인라인 캐스팅 제거 (`types/global.d.ts` Window 전역 타입 SSoT).
+      const scene = window.__solarScene;
       if (!scene) return;
       if (scene.getLodStats) {
         setStats(scene.getLodStats());

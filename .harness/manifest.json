@@ -137,10 +137,6 @@
       "sha256": "ec8a657681bd1313009092a388b6ff08a292e5b6b59158741ed9198f01d85a08",
       "category": "atomic"
     },
-    ".github/actions/setup-and-build/action.yml": {
-      "sha256": "dd5fc5235390d866295ecf3d547c98d37d39ca1657495e510c6c12aaad5edaae",
-      "category": "atomic"
-    },
     ".github/workflows/harness-guards.yml": {
       "sha256": "19108a4b2d3a3d102e94a444c5c84cf346392c2b150e602480fc208d14be01e5",
       "category": "frozen",

@@ -66,7 +66,7 @@ const RENDER_SCALE: Record<Tier, number> = {
  * 히스테리시스 ±15% 는 `tierFromCameraDistance` 가 currentTier 를 받아 개별 적용.
  */
 const BOUNDARY = {
-  /** T3 → T2 경계 (m). 화성 궤도 반경 1.52 AU 근처 */
+  /** T3 → T2 경계 (m). 0.3 AU — 수성 궤도 (0.39 AU) 안쪽. #845 주석 계약 정정 (구 "화성 1.52 AU" 는 값과 5배 모순) */
   innerUpper: 0.3 * AU,
   /** T2 → T1 경계 (m). 소행성대 바깥 ~3 AU 근처 */
   solarUpper: 3 * AU,
@@ -204,32 +204,10 @@ export function tierFromCameraDistance(cameraFromSunMeters: number, currentTier:
   }
 }
 
-/**
- * 현재 tier 판정 — 하이브리드 트리거 (Q7=7-d2).
- *
- * ADR §2 알고리즘:
- *  - focusBodyId 존재 → focus 경로 (`tierFromFocus`)
- *  - focusBodyId 없음 → free-fly 경로 (`tierFromCameraDistance`)
- *
- * @param prevTier 이전 프레임의 tier (히스테리시스 적용 기준). 초기값 `'solar'` 권장.
- * @param focusBodyInfo focus body 정보 또는 null (free-fly)
- * @param cameraFromSunMeters 카메라 위치에서 원점(태양)까지 거리 (m)
- * @param cameraFromFocusMeters focus body 에서 카메라까지 거리 (m). focusBodyInfo 있을 때만 사용
- *
- * P12-A #298 N3 — 과거 함수명 `currentTier` 는 파라미터 섀도잉이 발생했다. `resolveCurrentTier`
- * 로 명시적 동사명 채택. `scene/index.ts` 에서 기존 alias 도 계속 re-export 하여 API 호환 유지.
- */
-export function resolveCurrentTier(
-  prevTier: Tier,
-  focusBodyInfo: { kind: string } | null,
-  cameraFromSunMeters: number,
-  cameraFromFocusMeters: number,
-): Tier {
-  if (focusBodyInfo) {
-    return tierFromFocus(focusBodyInfo.kind, cameraFromFocusMeters);
-  }
-  return tierFromCameraDistance(cameraFromSunMeters, prevTier);
-}
+// #845 — `resolveCurrentTier` 삭제. 사용처 0 (scene 은 `tierFromFocus`/`tierFromCameraDistance` 를
+// 직접 호출) + #818 planet 분기 히스테리시스 (`tierFromFocus` 의 currentTier 인자) 미반영이라,
+// 재채택 시 body↔inner flip-flop 회귀를 재현한다. 주석의 ":scene/index.ts alias re-export" 주장도
+// 실재하지 않았다 (주석 계약 drift). 하이브리드 트리거가 필요하면 두 함수를 직접 조합할 것.
 
 /**
  * 초기 tier 결정 — 씬 생성 직후 호출. 기본은 'solar' (전체 태양계 뷰).
@@ -243,7 +221,8 @@ export function initialTier(): Tier {
  * #313 M2 QA 회귀 수정 — `setTier` 대칭 처리 헬퍼 (순수 함수).
  *
  * `runTierTransition` 은 `focusMesh.absolutePosition` 을 읽어 카메라 target 을 재계산한다
- * (tier-transition.ts line 216-219). 즉 tier 전환 **시점에** mesh.position 이 새 tier 좌표계
+ * (tier-transition.ts `runTierTransition` (2-b) focus target 즉시 동기화 단계 — #845 라인 앵커화).
+ * 즉 tier 전환 **시점에** mesh.position 이 새 tier 좌표계
  * (올바른 origin + newScale) 로 이미 재계산되어 있어야 한다.
  *
  * 비대칭 처리 (T1/T2 만 reset, T3 진입 시 origin 미갱신) 시:
