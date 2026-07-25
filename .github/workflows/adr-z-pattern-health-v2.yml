@@ -35,6 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # #666 전수 명시 핀 정책 (#846 누락 보강) — 러너 기본 Node 버전에 암묵 의존하지 않는다.
+      # `.node-version` (22.16.0) SSoT. 본 workflow 는 pnpm install 없이 node 표준 라이브러리만
+      # 쓰는 스크립트를 실행하므로 pnpm/cache 설정은 불필요.
+      - name: Node.js setup (.node-version 핀)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
       - name: Verify Z Pattern Health
         id: verify
         env:

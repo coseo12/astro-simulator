@@ -19,7 +19,7 @@ on:
     branches: [develop, main]
 
 permissions:
-  pull-requests: write  # actionable 코멘트 발송용
+  pull-requests: write # actionable 코멘트 발송용
   contents: read
 
 jobs:
@@ -29,6 +29,14 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
+
+      # #666 전수 명시 핀 정책 (#846 누락 보강) — 러너 기본 Node 버전에 암묵 의존하지 않는다.
+      # `.node-version` (22.16.0) SSoT. 가드 스크립트가 node 표준 라이브러리 + gh CLI 만
+      # 쓰므로 pnpm install / cache 설정은 불필요.
+      - name: Node.js setup (.node-version 핀)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
 
       - name: PR 템플릿 7 체크박스 base 가드
         if: hashFiles('scripts/verify-pr-template-checklist.mjs') != ''
