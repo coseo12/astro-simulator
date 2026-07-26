@@ -58,6 +58,55 @@ function extractWebglRendererString(): string | null {
 }
 
 /**
+ * 캔버스 tabindex SSoT — 0 (DOM 순서 그대로 Tab 순회에 참여).
+ *
+ * 양수 tabindex 는 요소를 sequential focus order 의 맨 앞으로 끌어올려 DOM 순서와 어긋난 Tab 순서를
+ * 만든다 (WCAG 2.4.3). Babylon 은 기본 1 을 쓰므로 `engine.canvasTabIndex` 로 덮어써야 한다.
+ */
+const CANVAS_TAB_INDEX = 0;
+
+/**
+ * #848 — 캔버스 자동 refocus 로부터 **보호할** 포커스 요소 셀렉터 (WCAG 2.4.3 Focus Order).
+ *
+ * 기존 가드는 텍스트 입력(`INPUT`/`TEXTAREA`/contentEditable)만 보호했다. 그래서 Tab 으로
+ * 단축 바 버튼이나 감도 슬라이더까지 이동한 키보드 사용자가 **마우스를 캔버스 위로 스치기만 해도**
+ * 포커스를 잃었다 (포인터를 쓰지 않는 사용자에게도 마우스가 캔버스 영역에 놓여 있으면 발생).
+ */
+const FOCUS_PRESERVE_SELECTOR =
+  'a[href], button, input, select, textarea, [role="slider"], [tabindex]:not([tabindex="-1"])';
+
+/**
+ * 캔버스 refocus 시 현재 포커스를 유지해야 하는가.
+ *
+ * ## 판정 축 = "포커스가 키보드로 도달했는가" (`:focus-visible`)
+ *
+ *   #699 가 refocus 를 도입한 이유는 **마우스로** 사이드바 버튼을 누른 뒤 WASD/화살표가 죽는
+ *   문제였다. 즉 보존해야 할 것은 *키보드* 포커스뿐이고, 마우스 클릭으로 생긴 포커스는 오히려
+ *   캔버스로 되돌려야 한다. 브라우저는 이 구분을 `:focus-visible` 로 이미 제공한다 —
+ *   자체 modality 추적을 만들지 않고 플랫폼 primitive 를 쓴다.
+ *
+ *   그래서 (a) "free-fly 활성 중으로 한정" 안은 채택하지 않았다: 화살표 키 카메라 회전은
+ *   free-fly 가 아닌 관찰/focus 모드에서도 캔버스 포커스를 요구하므로, free-fly 한정 가드는
+ *   비-free-fly 경로의 키보드 회전을 죽인다. 본 함수는 (b) interactive 요소 전반 가드다.
+ */
+function shouldPreserveFocus(active: HTMLElement): boolean {
+  // 텍스트 입력 — 입력 중 문자 유실 방지 (#699 기존 가드 유지).
+  if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) {
+    return true;
+  }
+  // 모달 열림 중에는 캔버스가 포커스를 가져가면 focus trap 이 무의미해진다 (#848 모달 계약).
+  if (active.closest('[data-modal-open="true"]') !== null) return true;
+  if (!active.matches(FOCUS_PRESERVE_SELECTOR)) return false;
+  try {
+    return active.matches(':focus-visible');
+  } catch {
+    // `:focus-visible` 미지원 브라우저 — a11y 를 우선해 보존 쪽으로 판정한다.
+    // (프로젝트 요구 사양이 WebGPU 이므로 실제 도달 불가 경로.)
+    return true;
+  }
+}
+
+/**
  * Babylon 캔버스 + Core 초기화.
  * 캔버스 위의 UI는 children/overlay에서 렌더 — 이 컴포넌트는 엔진 lifecycle에만 집중.
  */
@@ -189,6 +238,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
     const instance = new SimulationCore(canvas);
     // Babylon이 기본 tabindex=1을 설정 — a11y(WCAG 2.4.3) 권고상 양수 금지.
+    // 아래 `canvasTabIndex` 지정과 **이중 방어** — 여기 setAttribute 만으로는 engine 기동 전
+    // 초기값만 잡는다 (실제 되돌림은 InputManager 가 한다. 상세는 아래 주석).
     canvas.setAttribute('tabindex', '0');
     // #699 — 캔버스 키보드 포커스 복원 (ADR §5-6, cross-validate 고유 발견 3).
     // WASD 키 입력은 canvas 가 키보드 포커스를 가져야 attachWasdControl 의 activeElement 가드를
@@ -197,12 +248,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     // 아래 cleanup 에서 removeEventListener (HMR/unmount 리스너 누수 방지).
     const refocusCanvas = () => {
       const active = document.activeElement;
-      // 텍스트 입력 포커스 중에는 가로채지 않는다(사용자 입력 보호).
-      const isTextInput =
-        active instanceof HTMLElement &&
-        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
-      if (isTextInput) return;
-      if (document.activeElement !== canvas) canvas.focus();
+      if (active === canvas) return;
+      if (active instanceof HTMLElement && shouldPreserveFocus(active)) return;
+      canvas.focus();
     };
     canvas.addEventListener('pointerenter', refocusCanvas);
     coreRef.current = instance;
@@ -228,6 +276,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     Promise.all([instance.start(), gpuCapPromise])
       .then(([, gpuCap]) => {
         if (cancelled || !instance.scene) return;
+        // #848 — 위 `setAttribute('tabindex','0')` 의 **주석 계약 drift 정정**.
+        //
+        // Babylon `InputManager._processPointerMove` 가 포인터가 캔버스 위에서 움직일 때마다
+        // `canvas.tabIndex = engine.canvasTabIndex` 로 되돌린다 (기본 1). 즉 init 시점의 1회
+        // setAttribute 는 **첫 마우스 이동에 즉시 무효화** 됐고, "양수 금지" 계약은 선언만 남고
+        // 실제로는 tabindex=1 로 운영돼 왔다 (본 이슈에서 CDP AX 실측으로 발견).
+        //
+        // 양수 tabindex 는 해당 요소를 sequential focus order 의 **맨 앞** 으로 끌어올려 DOM 순서와
+        // 어긋난 Tab 순서를 만든다 (WCAG 2.4.3 Focus Order) — 본 이슈가 다루는 바로 그 축이다.
+        // engine 쪽 SSoT 를 0 으로 바꿔 InputManager 가 써넣는 값 자체를 교정한다.
+        if (instance.engine) instance.engine.canvasTabIndex = CANVAS_TAB_INDEX;
+        canvas.setAttribute('tabindex', String(CANVAS_TAB_INDEX));
         sceneApi.enableLogarithmicDepth(instance.scene);
         // P4-D #166 — bench 전용. `?gpuTimer=1` 진입 시 GPU frame time 측정 활성화
         // + window에 최근 평균 노출 (bench 스크립트가 폴링). 미지원 환경은 null 유지.
@@ -1120,9 +1180,24 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
   return (
     <>
+      {/*
+        #848 — 포커서블 canvas 의 접근 가능한 이름 (WCAG 4.1.2). `tabindex=0` 이라 Tab 순회에
+        들어가는데 이름이 없어 스크린 리더가 "캔버스" 로만 읽었다 (CDP AX 실측: name="").
+
+        **role 미지정** 이 실측 기반 결정이다:
+          - role 없이도 Chrome AX 트리가 name 을 정상 계산한다 (실측 role=Canvas / name 부여됨).
+            axe 는 4안(무명 / label 만 / +application / +img) 전부 위반 0 이라 판정 근거가 못 된다.
+          - `role="application"` 은 스크린 리더 브라우즈 모드를 꺼 모든 키를 앱에 넘긴다. 이 앱의
+            실질 조작 경로는 상단 단축 바·HUD 버튼이므로 캔버스만 application 으로 격리하면 손해가
+            더 크다.
+          - `role="img"` 는 정적 이미지 의미라 포커서블 + 키보드 인터랙션과 모순된다.
+        조작 방법 안내는 aria-label 이 아니라 "조작 가이드" 모달(#737)이 담당한다 — 여기엔 무엇을
+        보는 뷰인지와 1차 조작만 담는다.
+      */}
       <canvas
         ref={canvasRef}
         data-testid="sim-canvas"
+        aria-label="태양계 3D 시뮬레이션 뷰 — 드래그·방향키로 회전, 휠로 줌, 천체 클릭으로 선택"
         className="absolute inset-0 w-full h-full outline-none"
         style={{ touchAction: 'none' }}
       />

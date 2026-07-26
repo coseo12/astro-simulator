@@ -362,6 +362,19 @@ jobs:
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-704-sensitivity.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-704-sensitivity.mjs
 
+      # #848 — a11y 키보드 사각 회귀 가드 (모달 focus trap / focus 탈취 / canvas 접근 이름).
+      # axe 정적 검사(a11y-baseline-guard)는 **동적 키보드 거동** 을 못 본다 — 실제로 전수 감사
+      # (2026-07-18) 시점 a11y-baseline 0 위반인 채로 3건이 잠복했다. jsdom 단위 테스트도 실제 Tab
+      # 포커스 이동을 구현하지 않으므로 실 브라우저 키 이벤트가 유일한 검증 경로다.
+      # 검증 7축: (S1) 모달 3종 body portal + z-[100]  (S2) Tab/Shift+Tab 15회 순회 패널 내부 유지
+      #          (S3) 경계 순환(마지막→Tab→첫)         (S4) Esc/backdrop 닫힘 + 직전 포커스 복원
+      #          (S5) 키보드 포커스는 캔버스 스침에 안 뺏김 (WCAG 2.4.3)
+      #          (S6) 마우스 클릭 포커스는 캔버스로 회수 (#699 무회귀 — S5 의 양성 대조군)
+      #          (S7) canvas AX name 존재 + tabindex=0 (Babylon InputManager 의 tabindex=1 되돌림 차단)
+      - name: '#848 a11y 키보드 사각 회귀 가드 (verify:848-modal-focus)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-848-modal-focus.mjs') != ''
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-848-modal-focus.mjs
+
       # ============================================================
       # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)
       # ============================================================
