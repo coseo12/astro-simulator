@@ -8,8 +8,17 @@
  * ADR `docs/decisions/20260621-728-adams-ring-arcs.md` §결정 2/4 + §교차검증 (이견 수용 1·2·4).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ARC_EDGE_FADE_RAD, MAX_ARCS, computeArcFactor, packArcUniforms } from './ring-shader.js';
-import { MAX_ARCS as LOADER_MAX_ARCS } from '../ephemeris/solar-system-loader.js';
+import {
+  ARC_EDGE_FADE_RAD,
+  MAX_ARCS,
+  MAX_DENSITY_POINTS,
+  computeArcFactor,
+  packArcUniforms,
+} from './ring-shader.js';
+import {
+  MAX_ARCS as LOADER_MAX_ARCS,
+  MAX_DENSITY_POINTS as LOADER_MAX_DENSITY_POINTS,
+} from '../ephemeris/solar-system-loader.js';
 
 const DEG = Math.PI / 180;
 
@@ -19,6 +28,15 @@ const DEG = Math.PI / 180;
 describe('#728 MAX_ARCS 정합 — ring-shader ↔ loader drift 가드', () => {
   it('두 독립 선언이 동일 값 (uniform 배열 상한 = zod 파싱 상한)', () => {
     expect(LOADER_MAX_ARCS).toBe(MAX_ARCS);
+  });
+});
+
+// #845 — MAX_DENSITY_POINTS 동형 가드. 구 상태는 ring-shader 미export + loader `.max(16)`
+// 리터럴이라 parity 테스트 자체가 불가했다 (주석 계약 drift 이슈 배경). MAX_ARCS 패턴으로
+// 양쪽 export + 대조 단언 — 한쪽만 바뀌면 즉시 FAIL.
+describe('#845 MAX_DENSITY_POINTS 정합 — ring-shader ↔ loader drift 가드', () => {
+  it('두 독립 선언이 동일 값 (uniform densityProfile 상한 = zod 파싱 상한)', () => {
+    expect(LOADER_MAX_DENSITY_POINTS).toBe(MAX_DENSITY_POINTS);
   });
 });
 

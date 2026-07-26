@@ -2,6 +2,16 @@ name: bench:scene
 
 # PR마다 bench:scene:sweep을 실행하여 baseline 대비 fps diff를 코멘트.
 # CI 헤드리스 환경 변동성이 크므로 best-effort(continue-on-error) 운용.
+
+# 같은 sha 의 push+PR 중복 run 제거 (#779 표준 블록, #846 에서 누락 보강).
+# group 에 github.workflow 포함 → 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha
+# 로 수렴 → 같은 sha 묶임. cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만
+# 남긴다 (포착 100%). 본 workflow 는 `timeout-minutes: 30` 이라 연속 push 시 30분 job 이
+# 중첩돼 러너 점유가 특히 크다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     branches: [develop, main]

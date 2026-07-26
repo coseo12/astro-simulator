@@ -137,10 +137,6 @@
       "sha256": "ec8a657681bd1313009092a388b6ff08a292e5b6b59158741ed9198f01d85a08",
       "category": "atomic"
     },
-    ".github/actions/setup-and-build/action.yml": {
-      "sha256": "dd5fc5235390d866295ecf3d547c98d37d39ca1657495e510c6c12aaad5edaae",
-      "category": "atomic"
-    },
     ".github/workflows/harness-guards.yml": {
       "sha256": "19108a4b2d3a3d102e94a444c5c84cf346392c2b150e602480fc208d14be01e5",
       "category": "frozen",
@@ -158,20 +154,8 @@
       "sha256": "3e99357774a3495d4924fe844f5a4239ca876521bb6e771f2d97480f1e38c977",
       "category": "frozen"
     },
-    "scripts/bench-p6e.mjs": {
-      "sha256": "2b6c687024fd81ef3d53e06e487bdf4a960a2176b211c3fdf59a654697228962",
-      "category": "frozen"
-    },
-    "scripts/bench-p7-lens3d.mjs": {
-      "sha256": "0779bb03fa00921e4dc79988e706f50a8f4c9bd2cd893e3815d36dac2d6ea870",
-      "category": "frozen"
-    },
     "scripts/bench-scene-mobile.mjs": {
       "sha256": "fd5251e0686247943fd4ffded928bd82efa1bcb294592754ed4086641b8aefa4",
-      "category": "frozen"
-    },
-    "scripts/bench-scene-real-gpu.mjs": {
-      "sha256": "daeed9e8a43477ea5b7a4faf5aedff5f0a83e216fc2f55acab5acd509e2169eb",
       "category": "frozen"
     },
     "scripts/bench-scene.mjs": {
@@ -190,56 +174,16 @@
       "sha256": "e9330fab26c657e084d2744a12770835c0138a486a8d15cb3bb81d0e198f61e4",
       "category": "frozen"
     },
-    "scripts/browser-verify-a11y-p2c.mjs": {
-      "sha256": "6c8d7c17a5ad8f003b8855ab01615c2dbbbf837e6802fba8081f132f98027b44",
-      "category": "frozen"
-    },
     "scripts/browser-verify-a11y.mjs": {
       "sha256": "0a97a4c4e5c9d350117c7cb40e54b5c226eea5d9364b294a5742755299522740",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-asteroid-belt.mjs": {
-      "sha256": "f285b559a1f6fb684edb7a165bc617e65137cb1035ee6c6168696ba92d46c0b7",
       "category": "frozen"
     },
     "scripts/browser-verify-belt-nbody.mjs": {
       "sha256": "bd7cd7ed27075b87998c8d467f5e8d55596dff926a923aa2ae64c0a355fba515",
       "category": "frozen"
     },
-    "scripts/browser-verify-black-hole-ray3d.mjs": {
-      "sha256": "4fab8a12263860c411ceed7fd123e1c1edc51b06102f6088505303e5216eb06d",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-bookmark.mjs": {
-      "sha256": "42d3393fe42a6cb7da221df83cf0ad24c1ed9e8cada465f2abeb3da795774705",
-      "category": "frozen"
-    },
     "scripts/browser-verify-click-select.mjs": {
       "sha256": "45f8c490632d91fabc6f24d4fc9904885f2d39ae4ab97474fdd9a2cec25821bc",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-comets.mjs": {
-      "sha256": "13cb6c87ad1da34de3ecf8137b8102f7c5b394304630bfca0a71b4b9c20dfbcb",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-dwarf-planets.mjs": {
-      "sha256": "d69dd575873ae9ce6bf87746f367e87b167838ab6a0b5c593bf39f5ad310b50f",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-engine-toggle.mjs": {
-      "sha256": "fd9a25fd3c155434f2eb64f602143070b1ae219d308faecc36ed026be122901b",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-floating-origin.mjs": {
-      "sha256": "36696fc94dfabaaecfedfda8fff00a26a904d32246d78760763cb643e3927d2c",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-integrator.mjs": {
-      "sha256": "1bc2b8b1829c5e94012397a93d0f02e6fa025b3749e0d790ad6fcab86d574f5e",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-mass-slider.mjs": {
-      "sha256": "883af47e7edb9bb71045248a590d0d5721a40befa5ed39970e49110011133a45",
       "category": "frozen"
     },
     "scripts/browser-verify-mobile-p4c.mjs": {
@@ -254,48 +198,16 @@
       "sha256": "1a6e7ebe9457b31f77eb1269dd53da1fa1a8e06936997873eb68c90baf22b86f",
       "category": "frozen"
     },
-    "scripts/browser-verify-osculating-timescale.mjs": {
-      "sha256": "8ae3596bebdd6b898faffe0fdefb3b7650a7e5f2ff4e96f84e40cb0d4a50dc29",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-p9-pr1-rings.mjs": {
-      "sha256": "7fbf858ea8104c59b29f1515f590420e2fa2d57de26e520feb8c609470348b86",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-per-body-scale.mjs": {
-      "sha256": "56ef240c005a32b8a6a2a1ba2ea63df54904084a8914249585fcf4df3e0b7ad5",
-      "category": "frozen"
-    },
     "scripts/browser-verify-perf.mjs": {
       "sha256": "7938a7cee26c5d9d855d9c176d8bbc0a62c05c079ccc4b8203f6b1495ea9dc00",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-presets.mjs": {
-      "sha256": "d3789b1a41cefd366d77b2db10676afb47d56d48eef3a42206cebaf0638034ef",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-scale-tier.mjs": {
-      "sha256": "d48c3417f89eb124c181b31284c32656e051bb60d03fec5393dc5e897897300f",
       "category": "frozen"
     },
     "scripts/browser-verify-scale.mjs": {
       "sha256": "807c7fa373387c5da616ce65c671cdc0c10b4228a26980c371b45968c26d84cf",
       "category": "frozen"
     },
-    "scripts/browser-verify-tier-transition.mjs": {
-      "sha256": "3f6a4b969aaed0e05ca626bc7312d392dc8daaf4c2270fcbfaad295e1f8ec97e",
-      "category": "frozen"
-    },
-    "scripts/browser-verify-utils.mjs": {
-      "sha256": "25fb7c2db96a463cf30763dafcad7cc365922251f9cb4791cab669093e6a2417",
-      "category": "frozen"
-    },
     "scripts/browser-verify-webgpu.mjs": {
       "sha256": "cdc94ec13791169b6cbe07f509d007ad50a4326f992c9547238a22478da09eb1",
-      "category": "frozen"
-    },
-    "scripts/capture-ring-shader-headful.mjs": {
-      "sha256": "d85827e6ea78f925772935aa76f93a16ccb9f8e1e344883b2b330ca034a38e91",
       "category": "frozen"
     },
     "scripts/check-duplicate-functions.mjs": {
@@ -310,16 +222,8 @@
       "sha256": "5baee855690654f55aac3daac70c1254236fa8d3abdf448351ed50478897f61b",
       "category": "frozen"
     },
-    "scripts/newton-accuracy-report.mjs": {
-      "sha256": "517ce48411bf0cad2126161258a66d746e2d4d7769cf42da30bc26cac892cd57",
-      "category": "frozen"
-    },
     "scripts/parse-cross-validate-outcome.sh": {
       "sha256": "3af4f9de4eb3ba83f534b893d3a0e022df0862b6a8cb6bd98cc66c5d1c523863",
-      "category": "frozen"
-    },
-    "scripts/qa-ring-shader-headful.mjs": {
-      "sha256": "0d4dbb5da64843ab081bdbde9dd893e5a526e13576a0fb0b856d5fff89329566",
       "category": "frozen"
     },
     "scripts/resolve-harness-drift-todo.mjs": {
@@ -391,24 +295,12 @@
       "sha256": "69d564f435ad55ffa22bbab096930d03246432b0426588b63a36dc3e51d617ad",
       "category": "frozen"
     },
-    "scripts/verify-p2b.mjs": {
-      "sha256": "913330f192dc17e0ba403180ca6e6dbb57ee928eae3092ecfda5e8e290d8f134",
-      "category": "frozen"
-    },
-    "scripts/verify-p2c.mjs": {
-      "sha256": "9d5c352fbc7b72d4d3c7565b7beb81708983f733f278560276170a6937cf1f63",
-      "category": "frozen"
-    },
     "scripts/verify-pr-template-checklist.mjs": {
       "sha256": "5a715abb160bcbd41a456a223846eb7cac9729278f0e1430a1a4314ae6e23b84",
       "category": "frozen"
     },
     "scripts/verify-release-version-bump.sh": {
       "sha256": "619287d9cc9c32ab02cd03d18ca22b8b8e8e1335bb690d9eaa04bfbd66f4a835",
-      "category": "frozen"
-    },
-    "scripts/verify-ring-shader.mjs": {
-      "sha256": "e17af6954a5d949d58d4736ea241d58fe2e63dded4d11e3320091d358ae3a32c",
       "category": "frozen"
     },
     "scripts/verify-test-coverage.mjs": {

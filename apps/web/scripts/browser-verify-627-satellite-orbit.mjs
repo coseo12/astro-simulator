@@ -29,9 +29,18 @@
  * R7+ (titan/saturn moons) 진입 시 자동 확장 — EXPECTED_SATELLITE_PARENTS 갱신만 필요.
  */
 
-import { chromium } from 'playwright';
+// #846 — 공용 헬퍼 실사용 검증 대상 1건. 부트스트랩/launch 보일러플레이트를
+// `scripts/browser-verify-utils.mjs` 로 위임한다 (기존 35개 전면 전환은 비목표 —
+// 신규 유입 차단이 목표. 리뷰 체크리스트: docs/ops/browser-verify-helpers.md).
+// 판정 로직 (measure/evaluate) 과 임계값은 불변 — 동작 동일성은 변환 전후 동일 출력으로 실측.
+import {
+  bootstrapScene,
+  collectConsoleErrors,
+  launchBrowser,
+  resolveBaseUrl,
+} from '../../../scripts/browser-verify-utils.mjs';
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
+const BASE_URL = resolveBaseUrl();
 const args = process.argv.slice(2);
 const flags = { json: args.includes('--json') };
 
@@ -164,22 +173,23 @@ function evaluate(measurement) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchBrowser();
   const result = { timestamp: new Date().toISOString(), baseUrl: BASE_URL };
   let pass = false;
   try {
     const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
-    await page.goto(`${BASE_URL}/?gpu=a&lod=auto`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
+    // 진단 전용 수집 — 본 가드의 PASS/FAIL 판정은 궤도 구조 2축(A/B)만 사용한다 (판정 불변).
+    const consoleErrors = collectConsoleErrors(page);
+    await bootstrapScene(page, {
+      baseUrl: BASE_URL,
+      gotoTimeout: 30_000,
+      handleTimeout: 15_000,
+      settleMs: POST_LOAD_WAIT_MS,
     });
-    await page.waitForFunction(() => typeof window.__solarScene !== 'undefined', {
-      timeout: 15_000,
-    });
-    await page.waitForTimeout(POST_LOAD_WAIT_MS);
 
     const measurement = await measure(page);
+    result.consoleErrors = consoleErrors;
     const verdict = evaluate(measurement);
     result.measurement = measurement;
     result.verdict = verdict;
@@ -211,6 +221,9 @@ async function main() {
   }
   console.log('');
   for (const r of result.verdict?.reasons ?? []) console.log(`  ${r}`);
+  if (result.consoleErrors?.length) {
+    console.log(`  [진단] 콘솔 에러 ${result.consoleErrors.length}건 (판정 미반영)`);
+  }
   console.log(`\n  overall: ${pass ? 'PASS' : 'FAIL'}`);
 
   if (flags.json) {

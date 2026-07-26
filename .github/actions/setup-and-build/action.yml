@@ -30,6 +30,12 @@ inputs:
       production next start 가 필요한 job (ci.yml r1-guard) 은 'false' + 자체 step 유지.
     required: false
     default: 'false'
+  wasm-pack-version:
+    description: >-
+      wasm-pack 버전 (#845 — 하드코딩 산재 대신 input default 단일 선언. rust-toolchain.toml
+      은 cargo 툴체인만 커버하므로 wasm-pack 은 여기서 관리. 호출부는 default 사용).
+    required: false
+    default: '0.14.0'
 
 runs:
   using: 'composite'
@@ -51,10 +57,24 @@ runs:
         node-version-file: '.node-version'
         cache: 'pnpm'
 
+    # #845 — 툴체인 버전 SSoT = rust-toolchain.toml (channel). dtolnay action 은 toml 을
+    # 자동 인식하지 않으므로 (toolchain input 필수 — action.yml 실측) 추출 스텝으로 주입.
+    # 추출 실패 시 빈 값 → 명시 exit 1 (fail-fast, fallback 분기 금지 — 가드 설계 원칙).
+    - name: Rust 툴체인 채널 추출 (rust-toolchain.toml SSoT)
+      id: rust-toolchain
+      shell: bash
+      run: |
+        channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+        if [ -z "${channel}" ]; then
+          echo "::error::rust-toolchain.toml 에서 channel 추출 실패"
+          exit 1
+        fi
+        echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+
     - name: Rust 툴체인 설정
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: '1.94.1'
+        toolchain: ${{ steps.rust-toolchain.outputs.channel }}
         targets: wasm32-unknown-unknown
 
     - name: Rust 빌드 캐시
@@ -65,7 +85,7 @@ runs:
     - name: wasm-pack 설치
       uses: taiki-e/install-action@v2
       with:
-        tool: wasm-pack@0.14.0
+        tool: wasm-pack@${{ inputs.wasm-pack-version }}
 
     - name: pnpm install
       if: inputs.setup-node == 'true'
@@ -98,16 +118,10 @@ runs:
       shell: bash
       run: pnpm build
 
+    # #846 — 기동 + readiness 블록 SSoT = `scripts/ci-dev-server.sh` (ci.yml 가드 10종과 공용).
+    # 계약 불변: 포트 3001 / ready path `/ko` / PID 파일 `/tmp/next-pid` / 타임아웃 60x2s 후 exit 1.
+    # 호출측 `dev server 정리` step 의 `kill $(cat /tmp/next-pid)` 도 그대로 유효하다.
     - name: next dev server 기동
       if: inputs.start-dev-server == 'true'
       shell: bash
-      run: |
-        pnpm --filter @astro-simulator/web exec next dev -p 3001 &
-        echo $! > /tmp/next-pid
-        for i in $(seq 1 60); do
-          if curl -sf http://localhost:3001/ko > /dev/null; then
-            echo "ready"; exit 0
-          fi
-          sleep 2
-        done
-        echo "timeout"; exit 1
+      run: bash scripts/ci-dev-server.sh start 3001 /tmp/next-pid /ko

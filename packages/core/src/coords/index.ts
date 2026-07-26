@@ -8,5 +8,4 @@
  */
 
 export * from './vec3.js';
-export * from './rte.js';
 export * from './floating-origin.js';

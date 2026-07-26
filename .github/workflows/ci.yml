@@ -106,6 +106,13 @@ jobs:
       - name: '#842 docs 링크 가드 self-test (verify-docs-links --self-test)'
         run: node scripts/verify-docs-links.mjs --self-test
 
+      # #846 browser-verify 공용 헬퍼 (launchBrowser / bootstrapScene / collectConsoleErrors /
+      # saveCapture / resolveBaseUrl) 회귀 가드. 브라우저를 띄우지 않는 stand-alone node 테스트
+      # (루트 scripts/ 는 vitest workspace 밖 — bench-aggregate-median.test.mjs 선례).
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#846 browser-verify 헬퍼 회귀 가드 (browser-verify-utils.test)'
+        run: node scripts/browser-verify-utils.test.mjs
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================
@@ -168,9 +175,16 @@ jobs:
         timeout-minutes: 5
         env:
           R1_GUARD_DIAG: '1'
+        # #846 — Actions run step 기본 셸은 `bash -e {0}` 라, 가드가 실패하면 그 줄에서 step 이
+        #   즉시 종료된다. 즉 기존의 `GUARD_EXIT=$?` / `kill` / `exit $GUARD_EXIT` 3행은
+        #   **성공 시에만 실행되는 죽은 코드** 였고, 정작 정리가 필요한 실패 경로에서 next start
+        #   프로세스가 job 끝까지 살아남았다 (로컬 `bash -e` 재현으로 실측).
+        #   `set +e` 로 판정 구간만 -e 를 끄고, 정리는 성공/실패 양쪽에서 실행되게 한다.
         run: |
+          set +e
           BASE_URL=http://localhost:3001 node apps/web/scripts/r1-ui-regression-guard.mjs
           GUARD_EXIT=$?
+          set -e
           kill "$(cat /tmp/r1-web.pid)" 2>/dev/null || true
           exit $GUARD_EXIT
 
@@ -183,27 +197,33 @@ jobs:
           retention-days: 7
 
       # ============================================================
+      # #846 — dev 서버 1회 기동 (아래 브라우저 회귀 가드 10종 공용)
+      # ============================================================
+      # 기존: 가드 10종이 각자 `next dev -p 3002~3013 &` + readiness 루프 + kill 4행 세트를
+      #   포트만 바꿔 복제 → PR 1건당 next cold-boot 10회.
+      #   가드끼리 병렬로 도는 구조가 아니라 **같은 job 안의 직렬 step** 이므로 포트 분리는
+      #   애초에 불필요했다 (로컬 실측: `kill $WEB_PID` 는 pnpm 래퍼를 거쳐 next 자식까지
+      #   정상 종료시킨다 — 즉 성공 경로에서 포트는 곧바로 반납됐다. 포트 증분은 복붙 산물).
+      # 지금: 여기서 1회만 띄우고 가드 10종이 :3002 를 직렬 공용한다. 정리는 맨 아래
+      #   `if: always()` step 이 단독 책임 — 개별 step 의 kill 은 **실패 경로에서 도달하지
+      #   않는** 죽은 코드였고(`bash -e {0}`), 그때만 서버가 job 끝까지 잔존했다.
+      # __solarScene 등 dev 빌드 한정 전역이 필요하므로 next start(:3001) 가 아닌 next dev.
+      - name: '#846 dev 서버 기동 (가드 10종 공용, 1회)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/ci-dev-server.sh') != ''
+        # 기동+readiness 상한 (60x2s=120s) 을 넘기면 스크립트가 로그 덤프 후 exit 1.
+        timeout-minutes: 4
+        run: bash scripts/ci-dev-server.sh start 3002 /tmp/ci-dev.pid
+
+      # ============================================================
       # #378 focus 회귀 가드 — focus 시 허공 표시 차단
       # ============================================================
       # ADR: docs/decisions/20260503-378-focus-frustum-fix.md §결과·재검토 조건 §회귀 가드
       # cross-validate G3 수용 — "사용자 D-T2 재발견 비용 > CI 시간 비용" ROI 명백
       # 12 cells (6 body × 2 모드) 매트릭스 — venus 관찰 모드 PASS 확인
-      # next start 는 R1 가드 step 에서 이미 build/start 완료되므로 dev 빌드 별도 기동 필요.
-      # __solarScene 핸들이 dev 빌드 한정 노출 (sim-canvas.tsx:253) 이므로 next dev 사용.
 
       - name: '#378 focus 회귀 가드 (verify:378-focus)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-378-focus.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3002 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3002/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs
 
       # ============================================================
       # #408 focus transition 회귀 가드 — tier oscillate 차단 (사용자 D-T2 2026-05-04)
@@ -211,21 +231,10 @@ jobs:
       # ADR: docs/decisions/20260504-focus-tier-oscillate-fix.md §결정 5 (회귀 가드 신설)
       # 9 cells (3 from × 3 to) 매트릭스 — venus → mercury 등 다른 행성 전환 시 oscillate 차단 확인
       # tier 전환 횟수 ≤ 1 / target origin reset 0 / camR jump > 1000 unit 0 단언
-      # __solarScene + __simCore.sendCommand 핸들이 dev 빌드 한정 노출이므로 next dev 재사용.
 
       - name: '#408 focus transition 회귀 가드 (verify:focus-transition)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-focus-transition.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3003 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3003/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3003 node apps/web/scripts/browser-verify-focus-transition.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-focus-transition.mjs
 
       # ============================================================
       # #402 R-Phase Allowlist 자동화 hook — exports field WASM 도메인 sub-path 금지
@@ -247,17 +256,7 @@ jobs:
 
       - name: '#402 R-Phase allowlist 회귀 가드 (verify:r-phase-allowlist)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3004 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3004/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3004/ko node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002/ko node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
 
       # ============================================================
       # #627 satellite 궤도선 구조 회귀 가드 — parent 추적 + 원점 밀집 통계
@@ -270,17 +269,7 @@ jobs:
 
       - name: '#627 satellite 궤도 회귀 가드 (verify:627-satellite-orbit)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-627-satellite-orbit.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3005 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3005/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3005 node apps/web/scripts/browser-verify-627-satellite-orbit.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-627-satellite-orbit.mjs
 
       # ============================================================
       # #629 free-fly 줌 고정 회귀 가드 — wheelDeltaPercentage (scale-invariant zoom)
@@ -293,17 +282,7 @@ jobs:
 
       - name: '#629 free-fly 줌 회귀 가드 (verify:629-freefly-zoom)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-629-freefly-zoom.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3006 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3006/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3006 node apps/web/scripts/browser-verify-629-freefly-zoom.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-629-freefly-zoom.mjs
 
       # ============================================================
       # #631 free-fly deep-tier 줌아웃 허공 회귀 가드 — tier escalation + target pull-back
@@ -316,17 +295,7 @@ jobs:
 
       - name: '#631 free-fly tier escalation 회귀 가드 (verify:631-freefly-tier)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-631-freefly-tier.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3007 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3007/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3007 node apps/web/scripts/browser-verify-631-freefly-tier.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-631-freefly-tier.mjs
 
       # #675 — glow pixel marker 회귀 가드 (기본 ON Behavior Change 의 CI 상시 감시).
       # ADR: docs/decisions/20260613-675-glow-pixel-marker.md §축 6 (헤드리스/CI 가드)
@@ -337,17 +306,7 @@ jobs:
       #          (5) ?marker=glow 명시 = default 동일 (하위 호환)
       - name: '#675 glow pixel marker 회귀 가드 (verify:675-glow-marker)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-glow-marker.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3008 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3008/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3008 node apps/web/scripts/browser-verify-glow-marker.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-glow-marker.mjs
 
       # #693 — free-fly 패닝(F3) 회귀 가드 (우클릭 드래그 target 평면 이동 + floating origin 정합).
       # ADR: docs/decisions/20260616-693-freefly-panning.md §결정 §회귀 가드
@@ -358,17 +317,7 @@ jobs:
       # forensic 회귀: panningSensibility=0 잔존 → target 불변 / focus 중 활성 → jitter / 줌 후 감도 어긋남.
       - name: '#693 free-fly 패닝 회귀 가드 (verify:693-freefly-panning)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-693-freefly-panning.mjs') != ''
-        run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3009 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3009/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3009 node apps/web/scripts/browser-verify-693-freefly-panning.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-693-freefly-panning.mjs
 
       # #699 — free-fly 통합 재설계 회귀 가드 (진입 일관/줌아웃 제거/이동 화면체감/frame-rate 독립/무회귀).
       # ADR: docs/decisions/20260617-699-freefly-camera-unified-redesign.md §5 회귀 가드
@@ -380,18 +329,14 @@ jobs:
       - name: '#699 free-fly 통합 재설계 회귀 가드 (verify:699-freefly-unified)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-699-freefly-unified.mjs') != ''
         run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3012 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3012/ > /dev/null; then break; fi
-            sleep 2
-          done
           # #779 Phase 2 — S3b deltaTime 타이밍 flake 흡수 (v0.39.0 / v0.43.0 prep 실측 2회 — 가드 9종 중 유일).
           # dev server 는 유지한 채 guard 호출만 재시도 (#709 동일 패턴). 2연속 fail = step fail (fail-fast 유지).
+          # #846: 공용 dev 서버(:3002)를 쓰므로 "dev server 는 유지" 전제가 구조적으로 보장된다.
+          #   재시도 루프는 `if ... ; then` 형태라 bash -e 에 걸리지 않는다 (변환 전에도 정상 동작).
           GUARD_EXIT=1
           for attempt in 1 2; do
             echo "::group::verify:699 attempt $attempt/2"
-            if BASE_URL=http://localhost:3012 node apps/web/scripts/browser-verify-699-freefly-unified.mjs; then
+            if BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-699-freefly-unified.mjs; then
               GUARD_EXIT=0
               echo "::endgroup::"
               if [[ $attempt -eq 2 ]]; then
@@ -405,7 +350,6 @@ jobs:
               sleep 15
             fi
           done
-          kill $WEB_PID || true
           exit $GUARD_EXIT
 
       # #704 — free-fly 카메라 감도 설정 회귀 가드 (4축 슬라이더 → 런타임 거동 + localStorage 왕복).
@@ -416,17 +360,33 @@ jobs:
       #          (S4) focus/reset 무회귀 — 감도 변경이 focus follow(panning=0)/reset 원복에 영향 0
       - name: '#704 free-fly 감도 설정 회귀 가드 (verify:704-sensitivity)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-704-sensitivity.mjs') != ''
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-704-sensitivity.mjs
+
+      # #848 — a11y 키보드 사각 회귀 가드 (모달 focus trap / focus 탈취 / canvas 접근 이름).
+      # axe 정적 검사(a11y-baseline-guard)는 **동적 키보드 거동** 을 못 본다 — 실제로 전수 감사
+      # (2026-07-18) 시점 a11y-baseline 0 위반인 채로 3건이 잠복했다. jsdom 단위 테스트도 실제 Tab
+      # 포커스 이동을 구현하지 않으므로 실 브라우저 키 이벤트가 유일한 검증 경로다.
+      # 검증 7축: (S1) 모달 3종 body portal + z-[100]  (S2) Tab/Shift+Tab 15회 순회 패널 내부 유지
+      #          (S3) 경계 순환(마지막→Tab→첫)         (S4) Esc/backdrop 닫힘 + 직전 포커스 복원
+      #          (S5) 키보드 포커스는 캔버스 스침에 안 뺏김 (WCAG 2.4.3)
+      #          (S6) 마우스 클릭 포커스는 캔버스로 회수 (#699 무회귀 — S5 의 양성 대조군)
+      #          (S7) canvas AX name 존재 + tabindex=0 (Babylon InputManager 의 tabindex=1 되돌림 차단)
+      - name: '#848 a11y 키보드 사각 회귀 가드 (verify:848-modal-focus)'
+        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-848-modal-focus.mjs') != ''
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-848-modal-focus.mjs
+
+      # ============================================================
+      # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)
+      # ============================================================
+      # `if: always()` 가 정리의 단독 책임 지점이다. 개별 가드 step 안의 `kill` 은 Actions 기본
+      #   셸(`bash -e {0}`) 특성상 **가드 성공 시에만** 도달하는 죽은 코드였고, 정작 정리가
+      #   필요한 실패 경로에서 실행되지 않았다 (로컬 `bash -e` 재현 실측).
+      # 정리 스크립트는 항상 exit 0 — 여기서 non-zero 를 내면 원래 실패 원인을 덮어쓴다.
+      - name: '#846 백그라운드 서버 정리'
+        if: always() && hashFiles('scripts/ci-dev-server.sh') != ''
         run: |
-          pnpm --filter @astro-simulator/web exec next dev -p 3013 &
-          WEB_PID=$!
-          for i in {1..60}; do
-            if curl -sf http://localhost:3013/ > /dev/null; then break; fi
-            sleep 2
-          done
-          BASE_URL=http://localhost:3013 node apps/web/scripts/browser-verify-704-sensitivity.mjs
-          GUARD_EXIT=$?
-          kill $WEB_PID || true
-          exit $GUARD_EXIT
+          bash scripts/ci-dev-server.sh stop 3002 /tmp/ci-dev.pid
+          kill "$(cat /tmp/r1-web.pid 2>/dev/null)" 2>/dev/null || true
 
       # --- yarn 경로 (pnpm-lock 없을 때만) ---
       # yarn berry (v2+) vs classic (v1) 감지:

@@ -15,7 +15,7 @@ import { AU } from '@astro-simulator/shared';
 /**
  * LOD 레이어에서 사용하는 body 분류 (12 카테고리).
  *
- * `CelestialBody.kind` 의 zod enum 11종 + `planet` 의 질량 파생 분류 (giant / terrestrial) 로
+ * `LoadedCelestialBody.kind` 의 zod enum 11종 + `planet` 의 질량 파생 분류 (giant / terrestrial) 로
  * 구성. zod enum 을 직접 바꾸면 solar-system.json 전체 재작성 + P2 이후 회귀가 발생하므로,
  * LOD 레이어에서만 파생 분류를 수행한다.
  */
@@ -84,7 +84,7 @@ export const LOD_BODY_THRESHOLDS: Record<BodyLodKind, BodyLodThreshold> = {
 const PLANET_GIANT_MASS_THRESHOLD_KG = 5e25;
 
 /**
- * CelestialBody → BodyLodKind 분류기.
+ * LoadedCelestialBody → BodyLodKind 분류기.
  *
  * `planet` kind 만 질량 기반 파생 분류 (giant / terrestrial). 나머지는 kind 그대로 매핑.
  * 미지 kind 는 `null` 반환 — 호출자 (`lod.ts`) 가 `console.warn` + low fallback 처리.

@@ -103,3 +103,17 @@ gh pr checks <PR> --json name,state --jq \
 - `docs/lessons/*.md` 신규 → `verify-lessons-readme.sh` 가 README 등록 요구 → README 편집 → README 가 managed 라 `verify-harness-drift-decorator` 가 데코레이터 요구 → Z-패턴 진입.
 
 **표준**: 프로젝트 고유 운영/lessons 문서는 **비-managed 위치**(`docs/ops/` 등 manifest 미등록 신규 dir)에 두고 CLAUDE.md 프로젝트 고유 보강 섹션에서 링크한다. 본 문서(#795)도 `docs/lessons/` → `docs/ops/` 로 이동해 캐스케이드를 회피했다(리뷰 라운드 1회 소요 — 본 문서가 다루는 "마찰"의 자기 재현).
+
+## 5. 신규 verify 스크립트 보일러플레이트 복붙 → 재현 조건 drift (#846)
+
+`browser-verify-*.mjs` 신규 작성 시 기존 파일을 복붙하면서 launch 인자(`--use-angle=metal` /
+swiftshader / 무인자)가 제각각 따라붙어, **같은 가드를 로컬과 CI 에서 돌렸을 때 렌더러가 달라지는**
+drift 가 누적됐다. `pageerror` 리스너 누락으로 미포착 예외를 놓치는 사본도 다수.
+
+**표준**: [`docs/ops/browser-verify-helpers.md`](browser-verify-helpers.md) 의 헬퍼 5종
+(`launchBrowser` / `bootstrapScene` / `collectConsoleErrors` / `saveCapture` / `resolveBaseUrl`)
+사용 + 동 문서 §리뷰 체크리스트로 신규 유입 차단. 기존 파일 전면 전환은 비목표.
+
+또한 ci.yml 브라우저 가드는 **dev 서버를 각자 띄우지 않는다** — 공용 `:3002` 를 `BASE_URL` 로
+받고 정리는 `if: always()` step 이 단독 책임. 개별 step 의 `kill` 은 Actions 기본 셸이
+`bash -e {0}` 라 실패 시 도달하지 않는 죽은 코드다.

@@ -41,8 +41,6 @@ beforeEach(() => {
     fps: null,
     physicsEngine: 'kepler',
     massMultipliers: { earth: 2 },
-    pingCount: 0,
-    lastPingAt: null,
   });
 });
 

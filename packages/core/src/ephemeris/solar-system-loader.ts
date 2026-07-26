@@ -9,11 +9,21 @@ const DEG = Math.PI / 180;
  *
  * WebGL/WebGPU uniform 배열은 런타임 동적 길이 불가 → ring-shader `MAX_ARCS` 와 정합하는
  * 컴파일 타임 상한을 두고 loader 에서 `.max(MAX_ARCS)` 로 초과 데이터를 파싱 레벨 차단한다
- * (densityProfile `.max(16)` 선례 동형 — uniform overflow / 셰이더 컴파일 실패 방지).
+ * (densityProfile `.max(MAX_DENSITY_POINTS)` 선례 동형 — uniform overflow / 셰이더 컴파일 실패 방지).
  * Adams 가시 클러스터 aggregate 는 1~2 bump 로 충분하나, 5 arc 개별 데이터 박제 여지를
  * 위해 4 로 둔다 (ADR 20260621-728 §교차검증 이견 수용 2 — agy MAX_ARCS 발견).
  */
 export const MAX_ARCS = 4;
+
+/**
+ * #845 — ring layer 당 densityProfile 최대 포인트 수 (GLSL uniform 고정 배열 상한).
+ *
+ * ring-shader `MAX_DENSITY_POINTS = 16` 과 독립 선언 parity (MAX_ARCS 동형 — 순환 import
+ * 회피를 위해 양쪽 독립 선언 + `ring-shader-arcs.test.ts` 대조 테스트). R8 (#647) uranus
+ * composite 15점 + 1 여유 = 16. 정합이 깨지면 파싱 상한과 shader uniform 길이가 어긋나
+ * 데이터 silent drop 또는 uniform overflow.
+ */
+export const MAX_DENSITY_POINTS = 16;
 
 /**
  * Raw JSON 스키마 — 소스 파일에서 읽은 궤도 요소는 도/AU 단위.
@@ -41,13 +51,14 @@ const RingLayerRawSchema = z.object({
   id: z.string().min(1),
   innerRadiusKm: z.number().positive(),
   outerRadiusKm: z.number().positive(),
-  // R8 #647 (agy 고유 발견 수용 ①) — `.max(16)`: ring-shader `MAX_DENSITY_POINTS = 16` 정합.
+  // R8 #647 (agy 고유 발견 수용 ①) — `.max(MAX_DENSITY_POINTS)`: ring-shader 상수와 정합.
   // uranus composite 15점이 상한 1점 여유뿐 — 초과 데이터를 파싱 레벨에서 차단해 shader
   // uniform overflow / 컴파일 실패를 방지. ADR `20260610-r8-uranus-titania-rings-visualization.md` §교차검증.
+  // #845 — 리터럴 16 을 상수 참조로 교체 (MAX_ARCS 동형, parity 테스트 가드).
   densityProfile: z
     .array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]))
     .min(2)
-    .max(16),
+    .max(MAX_DENSITY_POINTS),
   /**
    * R7 #641 — 층별 색 (body colorHint 동형, optional). saturn 5층 (D/C/B/A/F) 층별 톤 분리.
    * 미지정 시 scene 이 undefined 전달 → ring-shader DEFAULT `#887766` 폴백 (jupiter.rings 무회귀).
