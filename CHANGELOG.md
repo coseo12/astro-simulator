@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.52.0] — 2026-07-26
+
+전수 감사 (2026-07-18) **medium 이상 전건 종결** 번들 — a11y 키보드 결함 3건 해소 (사용자 관찰 행동 변화) + CI 인프라 개선 + 주석/상수 SSoT 정정 + 죽은 코드 −7,500줄. a11y 동작 변화가 포함되므로 MINOR. 본 릴리스부터 **각 feature PR 이 머지 시점에 CHANGELOG entry 를 동반**했다 (v0.51.0 까지 3회 반복된 `[Unreleased]` 누락 → prep 소급 작성 패턴 해소).
+
 ### Behavior Changes
 
 - **[#848] a11y 키보드 사각 3건 해소 — 모달 focus trap/portal 공용화 + focus 탈취 가드 + canvas 접근 이름** ([#848](https://github.com/coseo12/astro-simulator/issues/848)) — axe 정적 검사(a11y-baseline-guard)가 **0 위반인 채로** 잠복시키던 동적 키보드 결함 3건 (전수 감사 2026-07-18). (1) **모달 focus trap** — about/sensitivity/onboarding 3종이 `aria-modal="true"` 만 있고 trap 이 없어 Tab 이 배경 UI 로 탈출하던 것을, 공용 `Modal` 셸 1개 (portal + `z-[100]` + Tab/Shift+Tab 순환 + Esc/backdrop + 초기 focus/**직전 포커스 복원**) 로 통합. about 은 비-portal `z-40` 이라 Babylon WebGPU canvas 합성 레이어에 가릴 수 있던 잠복 위험 (#704 D-T2 가 sensitivity 에서 이미 겪은 버그 클래스) 도 함께 해소 — 실 Chrome headful `elementFromPoint` 로 3종 전부 캔버스 위 합성 실측. 신규 의존성 0 (자체 구현 — `@radix-ui/react-dialog` 는 #844 에서 제거됨). (2) **캔버스 focus 탈취** — `pointerenter` refocus 가드가 텍스트 입력만 보호해 Tab 으로 버튼·슬라이더에 도달한 키보드 사용자가 **마우스 스침만으로** 포커스를 잃던 것 (WCAG 2.4.3) 을 interactive 요소 전반으로 확장. 판정 축은 `:focus-visible` — 키보드 유래 포커스는 보존하고 **마우스 클릭 유래 포커스는 종전대로 캔버스가 회수** 해 #699 WASD/화살표 동작을 유지한다 (free-fly 한정 안은 비-free-fly 화살표 회전을 죽이므로 기각). (3) **canvas 접근 이름** — `tabindex=0` 포커서블인데 AX name 이 비어 있던 것에 한국어 `aria-label` 부여 (CDP AX 실측 `name=""` → 부여 확인). `role` 은 미지정 — role 없이도 name 이 정상 계산되고 (실측), `application` 은 스크린 리더 브라우즈 모드를 꺼 인접 UI 탐색을 해치며 `img` 는 포커서블·인터랙티브와 모순. (4) **부수 — 주석 계약 drift 정정**: "Babylon 기본 tabindex=1 → a11y 권고상 양수 금지" 계약이 선언만 남고 실제로는 `InputManager._processPointerMove` 가 **포인터 이동마다 `tabIndex=1` 로 되돌려** 무효화돼 있던 것을 `engine.canvasTabIndex = 0` SSoT 로 교정 (양수 tabindex 는 sequential focus order 를 DOM 순서와 어긋나게 만든다 — 본 이슈가 다루는 WCAG 2.4.3 축). 회귀 가드 `verify:848-modal-focus` 7축 21 케이스 신설 + CI 배선 (3중 시뮬레이션 positive→negative 주입 FAIL→recovery 실증). 단위 테스트 +26 (focus-trap 11 / Modal 15) — 그중 1건이 `<button tabindex="-1">` 가 셀렉터 첫 절에 먼저 걸려 Tab 순환에 포함되던 실제 결함을 구현 중 적발. `verify:a11y` / `verify:a11y-baseline` / `verify:699`·`704`·`693` 무회귀 실측.
