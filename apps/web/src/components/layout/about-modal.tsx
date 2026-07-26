@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { Modal } from '@/components/ui/modal';
 
 const SOURCES = [
   {
@@ -40,18 +41,13 @@ const SOURCES = [
  * 토글 / 절대 비율 IAU 고정 표현 정리 (Roadmap v3 §`docs/phases/roadmap-v3-incremental.md`).
  *
  * 헤더 우측 버튼 ("?") 으로 열기, Esc 또는 닫기 버튼으로 닫기.
+ *
+ * #848 — 공용 `Modal` 로 셸 이관. 이전에는 비-portal `z-40` 이라 실 Chrome 에서 Babylon WebGPU
+ * canvas 합성 레이어에 가릴 수 있었고(#704 D-T2 가 sensitivity 에서 겪은 버그 클래스), focus trap
+ * 도 없어 Tab 이 배경 UI 로 탈출했다. portal + `z-[100]` + trap + focus 복원은 이제 `Modal` 계약.
  */
 export function AboutModal() {
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open]);
 
   return (
     <>
@@ -67,76 +63,52 @@ export function AboutModal() {
         ?
       </button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-bg-base/70 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="max-w-2xl w-full max-h-[80vh] overflow-y-auto bg-bg-surface border border-border-subtle rounded-sm p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="about-title"
-            data-modal-open="true"
-            data-testid="about-modal"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 id="about-title" className="font-display text-h3 text-fg-primary">
-                데이터 출처 · 크레딧
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                data-testid="about-close"
-                aria-label="닫기"
-                className="text-fg-secondary hover:text-fg-primary text-body transition-colors"
-                style={{ transitionDuration: 'var(--duration-fast)' }}
-              >
-                ✕
-              </button>
-            </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="데이터 출처 · 크레딧"
+        titleId="about-title"
+        testId="about-modal"
+        closeTestId="about-close"
+        panelClassName="max-w-2xl max-h-[80vh]"
+      >
+        <section className="mb-5">
+          <h3 className="text-body-sm text-fg-secondary mb-2">출처</h3>
+          <ul className="flex flex-col gap-3" data-testid="about-sources">
+            {SOURCES.map((s) => (
+              <li key={s.name} className="text-body-sm">
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-fg-primary hover:text-primary underline"
+                >
+                  {s.name}
+                </a>
+                <p className="text-caption text-fg-secondary mt-0.5">{s.purpose}</p>
+                <p className="text-caption text-fg-secondary italic">{s.license}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-            <section className="mb-5">
-              <h3 className="text-body-sm text-fg-secondary mb-2">출처</h3>
-              <ul className="flex flex-col gap-3" data-testid="about-sources">
-                {SOURCES.map((s) => (
-                  <li key={s.name} className="text-body-sm">
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-fg-primary hover:text-primary underline"
-                    >
-                      {s.name}
-                    </a>
-                    <p className="text-caption text-fg-secondary mt-0.5">{s.purpose}</p>
-                    <p className="text-caption text-fg-secondary italic">{s.license}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
+        <section className="mb-5 pt-4 border-t border-border-subtle">
+          <h3 className="text-body-sm text-fg-secondary mb-2">스케일 정책</h3>
+          <p className="text-caption text-fg-secondary">
+            Roadmap v3 incremental build — 각 R-Phase (R1 태양, R2 수성, R3 금성, R4+ 예정) 가
+            활성된 천체만 표시 + 시각 과장 배수 박제. 카메라 거리·focus 대상에 따라 3단 tier (Solar
+            / Inner / Body) 로 자동 전환되며, 화면 이동은 ExponentialEase 300ms interp 로 자연스럽게
+            연결됩니다.
+          </p>
+        </section>
 
-            <section className="mb-5 pt-4 border-t border-border-subtle">
-              <h3 className="text-body-sm text-fg-secondary mb-2">스케일 정책</h3>
-              <p className="text-caption text-fg-secondary">
-                Roadmap v3 incremental build — 각 R-Phase (R1 태양, R2 수성, R3 금성, R4+ 예정) 가
-                활성된 천체만 표시 + 시각 과장 배수 박제. 카메라 거리·focus 대상에 따라 3단 tier
-                (Solar / Inner / Body) 로 자동 전환되며, 화면 이동은 ExponentialEase 300ms interp 로
-                자연스럽게 연결됩니다.
-              </p>
-            </section>
-
-            <section className="pt-4 border-t border-border-subtle">
-              <p className="text-caption text-fg-secondary">
-                정밀도: IAU 2015 ±0.01% 공차. 불확실성(관측 부정확, 비구형 body)은 각 천체 정보
-                패널의 오차 필드(±%)로 표시됩니다.
-              </p>
-            </section>
-          </div>
-        </div>
-      )}
+        <section className="pt-4 border-t border-border-subtle">
+          <p className="text-caption text-fg-secondary">
+            정밀도: IAU 2015 ±0.01% 공차. 불확실성(관측 부정확, 비구형 body)은 각 천체 정보 패널의
+            오차 필드(±%)로 표시됩니다.
+          </p>
+        </section>
+      </Modal>
     </>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as Slider from '@radix-ui/react-slider';
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { Modal } from '@/components/ui/modal';
 import { useSimStore } from '@/store/sim-store';
 import {
   FREE_FLY_SENSITIVITY_DEFAULT,
@@ -29,6 +29,11 @@ import {
  *  store 초기값은 const default (서버·클라 동일) → Hydration Mismatch 0. 본 컴포넌트 mount 후
  *  useEffect 1회 `loadPersistedSensitivity()` → setFreeFlySensitivity 로 덮어쓴다(store 생성 시 직접
  *  로드 금지). 슬라이더 4개 모두 persist=true 로 1회 commit 해 영속값을 메모리·디스크 정합화한다.
+ *
+ * ## #848 — 공용 `Modal` 로 셸 이관
+ *  portal + `z-[100]` (본 모달이 #704 D-T2 에서 발견한 계약) 은 그대로 유지되며, focus trap /
+ *  초기 focus / 직전 포커스 복원이 추가된다. 슬라이더 thumb 4개가 trap 대상 포커서블에 포함되므로
+ *  Tab 이 배경 HUD 로 새지 않는다.
  */
 const AXES: readonly FreeFlySensitivityAxis[] = ['wasd', 'zoomoutFactor', 'panning', 'zoom'];
 
@@ -59,16 +64,6 @@ export function SensitivitySettingsModal() {
     }
   }, [setSensitivity]);
 
-  // Esc 닫기 (about-modal 선례).
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open]);
-
   return (
     <>
       <button
@@ -83,139 +78,109 @@ export function SensitivitySettingsModal() {
         ⚙ 카메라
       </button>
 
-      {open &&
-        createPortal(
-          // #704 D-T2 — 모달을 document.body 로 portal + z-index 상향. Babylon WebGPU canvas 는
-          // 하드웨어 가속 합성 레이어를 형성해 실 Chrome 에서 형제 DOM(z-40)을 가릴 수 있다(headless
-          // 미재현). canvas 의 React 서브트리(SimCommandProvider) 밖, body 직속으로 빼고 z-[100]
-          // 으로 올려 캔버스 위 합성을 보장한다. open=false 초기값이라 hydration 시점엔 미렌더(SSR 안전).
-          <div
-            className="fixed inset-0 z-[100] bg-bg-base/70 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setOpen(false)}
-            role="presentation"
-          >
-            <div
-              className="max-w-md w-full max-h-[80vh] overflow-y-auto bg-bg-surface border border-border-subtle rounded-sm p-6 shadow-lg"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="sensitivity-title"
-              data-modal-open="true"
-              data-testid="sensitivity-settings-modal"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 id="sensitivity-title" className="font-display text-h3 text-fg-primary">
-                  카메라 감도 (free-fly)
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  data-testid="sensitivity-close"
-                  aria-label="닫기"
-                  className="text-fg-secondary hover:text-fg-primary text-body transition-colors"
-                  style={{ transitionDuration: 'var(--duration-fast)' }}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="카메라 감도 (free-fly)"
+        titleId="sensitivity-title"
+        testId="sensitivity-settings-modal"
+        closeTestId="sensitivity-close"
+        panelClassName="max-w-md max-h-[80vh]"
+      >
+        <p className="text-caption text-fg-secondary mb-5">
+          자유시점(free-fly) 모드의 이동·줌·패닝 감도를 조정합니다. free-fly 활성 중에는 즉시
+          반영되며, 설정은 브라우저에 저장됩니다.
+        </p>
+
+        <div className="flex flex-col gap-5">
+          {AXES.map((axis) => {
+            const range = FREE_FLY_SENSITIVITY_RANGES[axis];
+            const value = sensitivity[axis];
+            return (
+              <div key={axis} data-testid={`sensitivity-row-${axis}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor={`sensitivity-slider-${axis}`}
+                    className="text-body-sm text-fg-secondary"
+                  >
+                    {range.label}
+                  </label>
+                  <span
+                    className="num text-caption text-fg-secondary"
+                    data-testid={`sensitivity-value-${axis}`}
+                  >
+                    {formatValue(axis, value)}
+                    {range.unit}
+                  </span>
+                </div>
+                <Slider.Root
+                  id={`sensitivity-slider-${axis}`}
+                  value={[value]}
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
+                  onValueChange={(v) => {
+                    const next = v[0];
+                    if (next !== undefined) setSensitivity(axis, next);
+                  }}
+                  onValueCommit={(v) => {
+                    const next = v[0];
+                    if (next !== undefined) setSensitivity(axis, next, true);
+                  }}
+                  data-testid={`sensitivity-slider-${axis}`}
+                  className="relative flex items-center select-none touch-none w-full h-5"
+                  aria-label={range.label}
                 >
-                  ✕
-                </button>
-              </div>
-
-              <p className="text-caption text-fg-secondary mb-5">
-                자유시점(free-fly) 모드의 이동·줌·패닝 감도를 조정합니다. free-fly 활성 중에는 즉시
-                반영되며, 설정은 브라우저에 저장됩니다.
-              </p>
-
-              <div className="flex flex-col gap-5">
-                {AXES.map((axis) => {
-                  const range = FREE_FLY_SENSITIVITY_RANGES[axis];
-                  const value = sensitivity[axis];
-                  return (
-                    <div key={axis} data-testid={`sensitivity-row-${axis}`}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label
-                          htmlFor={`sensitivity-slider-${axis}`}
-                          className="text-body-sm text-fg-secondary"
-                        >
-                          {range.label}
-                        </label>
-                        <span
-                          className="num text-caption text-fg-secondary"
-                          data-testid={`sensitivity-value-${axis}`}
-                        >
-                          {formatValue(axis, value)}
-                          {range.unit}
-                        </span>
-                      </div>
-                      <Slider.Root
-                        id={`sensitivity-slider-${axis}`}
-                        value={[value]}
-                        min={range.min}
-                        max={range.max}
-                        step={range.step}
-                        onValueChange={(v) => {
-                          const next = v[0];
-                          if (next !== undefined) setSensitivity(axis, next);
-                        }}
-                        onValueCommit={(v) => {
-                          const next = v[0];
-                          if (next !== undefined) setSensitivity(axis, next, true);
-                        }}
-                        data-testid={`sensitivity-slider-${axis}`}
-                        className="relative flex items-center select-none touch-none w-full h-5"
-                        aria-label={range.label}
-                      >
-                        {/* #704 D-T2 — track 대비 향상: bg-bg-elevated 가 모달 surface 와 거의 동색
+                  {/* #704 D-T2 — track 대비 향상: bg-bg-elevated 가 모달 surface 와 거의 동색
                           (#1c2032 vs #141721)이라 실 Chrome 에서 track 이 안 보였다. border + 높이
                           1.5 + range fill 불투명도 상향으로 시각 구분 확보. */}
-                        <Slider.Track className="relative grow h-1.5 rounded-full bg-bg-elevated border border-border-default">
-                          <Slider.Range className="absolute h-full bg-primary/80 rounded-full" />
-                          {/* 기본값 마커 — track 위 default 위치 (시각 기준점). */}
-                          <span
-                            aria-hidden="true"
-                            data-testid={`sensitivity-default-marker-${axis}`}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-0.5 h-2.5 bg-fg-tertiary/60 rounded-full"
-                            style={{ left: `${defaultMarkerPercent(axis)}%` }}
-                          />
-                        </Slider.Track>
-                        <Slider.Thumb
-                          data-testid={`sensitivity-thumb-${axis}`}
-                          className="block w-3.5 h-3.5 rounded-full bg-primary shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          aria-label={`${range.label} 값`}
-                        />
-                      </Slider.Root>
-                      <div className="flex justify-between mt-0.5">
-                        <span className="num text-[10px] text-fg-secondary">
-                          {formatValue(axis, range.min)}
-                          {range.unit}
-                        </span>
-                        <span className="num text-[10px] text-fg-secondary">
-                          기본 {formatValue(axis, FREE_FLY_SENSITIVITY_DEFAULT[axis])}
-                          {range.unit}
-                        </span>
-                        <span className="num text-[10px] text-fg-secondary">
-                          {formatValue(axis, range.max)}
-                          {range.unit}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                  <Slider.Track className="relative grow h-1.5 rounded-full bg-bg-elevated border border-border-default">
+                    <Slider.Range className="absolute h-full bg-primary/80 rounded-full" />
+                    {/* 기본값 마커 — track 위 default 위치 (시각 기준점). */}
+                    <span
+                      aria-hidden="true"
+                      data-testid={`sensitivity-default-marker-${axis}`}
+                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-0.5 h-2.5 bg-fg-tertiary/60 rounded-full"
+                      style={{ left: `${defaultMarkerPercent(axis)}%` }}
+                    />
+                  </Slider.Track>
+                  <Slider.Thumb
+                    data-testid={`sensitivity-thumb-${axis}`}
+                    className="block w-3.5 h-3.5 rounded-full bg-primary shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    aria-label={`${range.label} 값`}
+                  />
+                </Slider.Root>
+                <div className="flex justify-between mt-0.5">
+                  <span className="num text-[10px] text-fg-secondary">
+                    {formatValue(axis, range.min)}
+                    {range.unit}
+                  </span>
+                  <span className="num text-[10px] text-fg-secondary">
+                    기본 {formatValue(axis, FREE_FLY_SENSITIVITY_DEFAULT[axis])}
+                    {range.unit}
+                  </span>
+                  <span className="num text-[10px] text-fg-secondary">
+                    {formatValue(axis, range.max)}
+                    {range.unit}
+                  </span>
+                </div>
               </div>
+            );
+          })}
+        </div>
 
-              <div className="mt-6 pt-4 border-t border-border-subtle flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => resetSensitivity()}
-                  data-testid="sensitivity-reset"
-                  className="text-body-sm bg-bg-elevated hover:bg-bg-base border border-border-subtle rounded-sm px-3 py-1.5 text-fg-secondary transition-colors"
-                  style={{ transitionDuration: 'var(--duration-fast)' }}
-                >
-                  기본값 복원
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+        <div className="mt-6 pt-4 border-t border-border-subtle flex justify-end">
+          <button
+            type="button"
+            onClick={() => resetSensitivity()}
+            data-testid="sensitivity-reset"
+            className="text-body-sm bg-bg-elevated hover:bg-bg-base border border-border-subtle rounded-sm px-3 py-1.5 text-fg-secondary transition-colors"
+            style={{ transitionDuration: 'var(--duration-fast)' }}
+          >
+            기본값 복원
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }
