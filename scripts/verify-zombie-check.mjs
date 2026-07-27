@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// HARNESS-DRIFT: Z-PATTERN [TODO]
 // dev 서버 좀비 incident (#440) 회귀 가드.
 //
 // SSoT 박제가 PR 머지 후에도 유지되는지 정적 검증.
@@ -9,10 +10,17 @@
 //   2. CLAUDE.md `#### 가드 B — sub-agent-confirmed-done 카나리아` sub-section 헤더 존재
 //   3. .claude/agents/qa.md "이전 세션 좀비 카나리아" 항목 존재
 //   4. .claude/hooks/session-start-zombie-check.sh 파일 존재 + executable
-//   5. docs/reports/20260510-419-dev-server-zombie-recurrence.md forensic 보고서 존재
+//   5. .claude/settings.json 에 가드 C hook 등록 (SessionStart 배선)
+//   6. docs/reports/20260510-419-dev-server-zombie-recurrence.md forensic 보고서 존재
+//
+// 항목 5 는 #894 에서 추가됐다. 이전에는 hook **파일 존재 + 실행권한**만 검사하고
+// settings.json 등록 여부는 미검사였다 — 파일이 멀쩡해도 등록 1줄이 빠지면 가드 C 는
+// 실행되지 않는데 본 가드는 초록이었다. 자매 가드 verify-dead-wait-check.mjs 는 동일
+// 등록 검사를 이미 수행하고 있었으므로 **비대칭**이었고, 그 비대칭이 #893 에서 가드 C 가
+// "silent 소실될 뻔" 한 정확한 이유다 (#894 §0-3 실측).
 //
 // 근거: docs/reports/20260510-419-dev-server-zombie-recurrence.md
-// 관련 ADR/이슈: #440
+// 관련 ADR/이슈: #440, #894
 
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -42,6 +50,12 @@ const checks = [
     name: 'session-start-zombie-check.sh hook 파일',
     path: '.claude/hooks/session-start-zombie-check.sh',
     type: 'executable',
+  },
+  {
+    name: 'settings.json zombie-check hook 등록',
+    path: '.claude/settings.json',
+    type: 'contains',
+    needle: 'bash .claude/hooks/session-start-zombie-check.sh',
   },
   {
     name: 'forensic 보고서 (#440 incident)',

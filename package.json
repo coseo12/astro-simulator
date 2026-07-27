@@ -54,6 +54,8 @@
     "verify:zombie-check": "node scripts/verify-zombie-check.mjs",
     "verify:dead-wait-check": "node scripts/verify-dead-wait-check.mjs",
     "verify:docs-links": "node scripts/verify-docs-links.mjs",
+    "verify:harness-baseline": "node scripts/verify-harness-upstream-baseline.mjs",
+    "verify:harness-baseline:repair": "node scripts/verify-harness-upstream-baseline.mjs --mode=repair",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
     "bench:tier-guard-cost": "node scripts/bench-tier-guard-cost.mjs",
