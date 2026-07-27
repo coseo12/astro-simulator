@@ -8,7 +8,6 @@ description: |
   DO NOT TRIGGER when: 사용자가 볼트에 기록만 요청할 때(capture-volt), 다른 레포 작업일 때,
   자동/주기 실행이 요구될 때(schedule 스킬 별도).
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/324] -->
 
 # Volt → Harness 반영 리뷰
 

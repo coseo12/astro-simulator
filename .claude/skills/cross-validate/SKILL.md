@@ -10,7 +10,6 @@ description: |
   DO NOT TRIGGER when: 일반 코드 리뷰, 테스트 실행,
   외부 검증 모델과 무관한 작업일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/324] -->
 
 # 교차검증
 

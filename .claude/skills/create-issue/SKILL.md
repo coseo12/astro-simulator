@@ -6,7 +6,6 @@ description: |
   버그를 보고할 때, 기술 부채를 추적할 때, "이슈 만들어", "이슈 생성", "task 생성" 등의 요청.
   DO NOT TRIGGER when: 이슈를 조회하거나 수정만 할 때, PR 관련 작업일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
 
 # 이슈 생성
 

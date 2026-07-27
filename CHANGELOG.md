@@ -5,6 +5,14 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[Z 패턴 Phase 3] harness v4.4.0 → v4.5.0 동기화 — drift 20 → 4 + divergent 15 → 2** (ADR [20260515](docs/decisions/20260515-harness-managed-divergent-pattern.md) §Amendment 16, upstream [v4.5.0](https://github.com/coseo12/harness-setting/releases/tag/v4.5.0)) — Phase 2 로 upstream 기여한 7 PR ([#309](https://github.com/coseo12/harness-setting/pull/309)/[#318](https://github.com/coseo12/harness-setting/pull/318)/[#320](https://github.com/coseo12/harness-setting/pull/320)~[#324](https://github.com/coseo12/harness-setting/pull/324)) 이 upstream v4.5.0 에 릴리스되어 Z 패턴 Phase 3 (본 프로젝트 동기화) 을 수행. **에이전트/스킬 행동이 upstream 판으로 전환** — `developer.md` / `capture-merge.md` / `harness-update.md` / `create-issue`·`create-pr`·`cross-validate`·`record-adr`·`run-tests`·`volt-review` SKILL / `check-browser.sh` / `cross_validate.sh` / `PULL_REQUEST_TEMPLATE.md` / `verify-agent-ssot.sh` 13건이 upstream v4.5.0 과 **바이트 동일**로 수렴 (`HARNESS-DRIFT` 데코레이터 제거 = Z 완성). 실측: divergent 15건 중 13건은 로컬 ↔ upstream 차이가 **데코레이터 1줄 (+ 이슈 ref 일반화 `#856`→`astro-simulator#856`)** 뿐이었음 — upstream 이 Phase 2 기여를 완전 흡수했음을 입증. **보존 2건** — `qa.md` 는 upstream 이 가드 B 좀비 카나리아 bullet (astro-simulator incident #440) 을 미채택, `browser-test/SKILL.md` 는 프로젝트 셰이더 검증 SSoT 주석 — 다운스트림 고유 가치라 로컬 판 유지 (데코레이터 존치). **덮어쓰기 복구 3건** — `--apply-all-safe` 가 `settings.json` / `architect.md` / `pm.md` 를 pristine 오분류하여 덮어썼고 (volt [#123](https://github.com/coseo12/volt/issues/123) 클래스 — 과거 apply 가 로컬 해시를 매니페스트에 기록), 각각 **가드 C zombie-check hook 등록** / SSoT drift 회피 placeholder 개선을 잃어 즉시 복구. `verify:zombie-check` 5/5 · `verify:dead-wait-check` 4/4 · `verify-agent-ssot.sh` 45 checks · `verify-create-pr-ssot.sh` 전부 PASS 로 복구 실증. Z 패턴 health 지표: Phase 1 = 8 / Phase 2 substantive 머지 = **13** / 진행률 **162.5%** / 조건 3 클록 앵커 2026-07-27 리셋 (직전 박제값 6 / 4 / 66.7% 대비 상승). 매니페스트 v4.4.0 → v4.5.0 (339 → 359 entry). 테스트 1,320건 무회귀.
+
+### Notes (chore — 행동 변화 없음)
+
+- **Amendment 10 (`[TODO]` 자동 해소) 은 이번 사이클에서 미적용** — `resolve-harness-drift-todo.mjs --dry-run` 이 `.github/workflows/harness-guards.yml` → upstream PR [#315](https://github.com/coseo12/harness-setting/pull/315) 1건을 매칭했으나, 해당 파일의 divergence 실제 원인은 **#779 concurrency / #480 create-pr SSoT step / #338 claudemd-size skip 다중 원인** (로컬 ↔ upstream diff 45행) 이고 PR #315 는 dead-wait(#311) 건이라 **귀속이 부정확**. 단일 URL 교체 시 divergence 사유가 오도되므로 `--apply` 를 보류하고 `[TODO]` 존치. Amendment 10 의 AND 휴리스틱 (title 이슈 ref + 변경 파일 경로) 이 **다중 사유 누적 파일에서 precision 을 잃는** 한계 실측 — 후속 정밀화 후보.
+
 ## [0.52.0] — 2026-07-26
 
 전수 감사 (2026-07-18) **medium 이상 전건 종결** 번들 — a11y 키보드 결함 3건 해소 (사용자 관찰 행동 변화) + CI 인프라 개선 + 주석/상수 SSoT 정정 + 죽은 코드 −7,500줄. a11y 동작 변화가 포함되므로 MINOR. 본 릴리스부터 **각 feature PR 이 머지 시점에 CHANGELOG entry 를 동반**했다 (v0.51.0 까지 3회 반복된 `[Unreleased]` 누락 → prep 소급 작성 패턴 해소).

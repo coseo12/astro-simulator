@@ -7,7 +7,6 @@ description: |
   사용자가 "ADR 남겨", "결정 기록", "decision record", "아키텍처 결정 문서" 요청 시.
   DO NOT TRIGGER when: 단순 버그 수정/리팩토링, 일회성 결정, 외부 가시성 없는 사소한 선택.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320] -->
 
 # ADR 작성
 
