@@ -3,7 +3,6 @@ description: harness 프레임워크 업데이트 확인/적용 (CLI 래퍼 + �
 argument-hint: [--check | --apply-all-safe | --interactive | --dry-run | --bootstrap]
 allowed-tools: [Bash, Read, Edit, Grep]
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/323] -->
 
 # /harness-update — Harness 업데이트
 

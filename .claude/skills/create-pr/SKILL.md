@@ -6,7 +6,6 @@ description: |
   "풀 리퀘스트", "리뷰 요청" 등의 요청, 브랜치 작업이 끝났을 때.
   DO NOT TRIGGER when: PR을 리뷰하거나 머지할 때, 이슈 생성일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/321 + https://github.com/coseo12/harness-setting/pull/323] -->
 
 # PR 생성
 
