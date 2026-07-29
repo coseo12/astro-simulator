@@ -213,7 +213,7 @@ run_self_test() {
   local hazards
   hazards=$(grep -nE '\$\{[A-Za-z_][A-Za-z0-9_]*\[[@*]\]\}' "$SELF_TEST_TARGET" \
     | grep -vE '^[0-9]+:[[:space:]]*#' \
-    | grep -v 'bash32-safe' || true)
+    | grep -vE 'bash32-safe:[[:space:]]*[^[:space:]]' || true)
   if [ -z "$hazards" ]; then
     _expect "정적 가드: bash 3.2 빈 배열 확장 위험 패턴 0건" 0
   else

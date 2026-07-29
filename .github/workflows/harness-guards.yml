@@ -127,10 +127,12 @@ jobs:
       # 매니페스트에 등록한다 (실측 359 entry 중 264 = 73.5%). 이들은 전부 `removed-upstream`
       # 으로 분류되어 `--interactive` 의 **[d]elete 삭제 후보**로 상시 노출된다 (잠재 파괴 경로).
       #
-      # 3 불변식을 검사한다:
+      # 5 불변식을 검사한다:
       #   (S) `.harnessignore` 가 upstream 존재 경로를 무시하면 안 됨 (added/missing-locally 오분류)
       #   (K) upstream 부재 대상은 전부 커버 (carry-over 재유입 차단)
       #   (M) `.harnessignore` 매칭 경로가 매니페스트에 잔존하면 안 됨
+      #   (U) 미추적 다운스트림 고유 파일 감지 — `--check` 는 차단, 생성 모드는 경고 (#894 R2)
+      #   (D) 생성 목록이 현행 `git ls-files` 와 일치 (신규 파일 반영 누락 차단)
       # 위 baseline 가드와 같은 job 이므로 tarball 캐시(RUNNER_TEMP)를 재사용한다 — 네트워크 0.
       # (`.prettierignore` 동기화는 기존 `prettierignore-drift.yml` 이 담당 — 중복 배선하지 않는다)
       - name: .harnessignore 동기화 가드

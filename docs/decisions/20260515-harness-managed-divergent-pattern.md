@@ -1990,7 +1990,7 @@ Amendment 10 (자동 해소 계약) 을 **개정**한다.
 | `added` / `missing-locally` (`.harnessignore` 오등록 시그니처) | 0           | **0** (⚠ 안전 불변식 유지 실증)                          |
 | `modified-pristine` (자동 덮어쓰기 대상)                       | 0           | **0** (Amendment 17 보증 무회귀)                         |
 | `user-modified-stable` (Phase-1 divergent 보존)                | 9           | **8**                                                    |
-| `.prettierignore` harness 블록                                 | 133 경로    | **82 경로** (`docs/ops/*` 2건 이탈 → prettier 대상 복귀) |
+| `.prettierignore` harness 블록                                 | 132 경로    | **82 경로** (`docs/ops/*` 2건 이탈 → prettier 대상 복귀) |
 | 활성 drift 파일 수 (Amendment 9 모수)                          | 11          | **9**                                                    |
 
 `.harnessignore` 는 **58 패턴** (디렉토리 압축 10 / 개별 경로 48) 으로 266 경로를 커버한다.
