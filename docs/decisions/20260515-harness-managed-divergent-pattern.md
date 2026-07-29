@@ -1806,3 +1806,158 @@ agy (architecture 모드, L1/L3 가드) 판정: **승인 적극 권장** — 명
 - **고유 발견 2 — 기각 (관찰 유지)**: upstream PR 생성 시 ADR 리터럴 부재를 경고하는 CI Linter 추가 제안 — 다운스트림 c-1 unmarked-PR WARN 이 동일 회귀를 사후 감지로 이미 커버하고, upstream CI 는 별도 저장소 관할 (U 번들 스코프 팽창). 발생 빈도 실측 (7건/6주) 대비 유지 비용 — unmarked WARN 재발 시 재평가.
 - **고유 발견 3 — 기존 반영 확인**: 다중 PR 순차 머지 런북 / 재발화 수용 표기 — Amendment 16 §위험 (Track 1 순서 명시) + §자기점검 (조건 1 경계 은폐 없음) 에 기박제. 추가 조치 불요.
 - **편향 셀프 체크 해소**: 순수주의 "미통과 잠재 축" 2건이 명시 질문으로 전달되어 모두 타당 판정 — 축 해소. 나머지 3종 (낙관 일정/결합 간과/폐기 프레이밍) 은 agy 6대 기준 평가에서 반증 없음.
+
+---
+
+## Amendment 17 — 2026-07-28
+
+**baseline SSoT 를 manifest 에서 upstream 원본으로 전환 (#894 PR-A)**
+
+- 상태: **Accepted** (cross-validate 2026-07-28 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
+- 관련: 이슈 [#894](https://github.com/coseo12/astro-simulator/issues/894), 선행 PR [#893](https://github.com/coseo12/astro-simulator/pull/893) (회귀 유발), volt [#123](https://github.com/coseo12/volt/issues/123)
+
+### 배경
+
+Amendment 8 이 정의한 drift 판정은 `.harness/manifest.json` 의 `sha256` 을 baseline 으로 삼는다.
+그러나 upstream `lib/update.js` 의 apply() 4단계가 `buildManifest(cwd)` 로 프로젝트 디스크를
+재해싱해 매니페스트를 재구성하므로 (`lib/manifest.js::walkTracked()`), **적용되지 않은 divergent
+파일의 로컬 해시가 baseline 으로 세탁**된다. 다음 회차 `diffAgainstPackage()` 는 이를
+`modified-pristine` ("안전 업데이트 — 사용자 미수정") 으로 분류하고 `--apply-all-safe` 가
+**자동으로 덮어쓴다**.
+
+결과적으로 Amendment 8 가드는 **초록인 채로** divergent 파일이 drift 집합에서 이탈한다.
+`verify-harness-drift-decorator.mjs` 는 drift → 데코레이터 단방향만 검증하므로, baseline 이
+세탁되어 이탈한 파일의 **stale 데코레이터가 남아도 PASS** 한다. 이것이 본 Amendment 의 구조적
+시그니처다 — **가드가 초록인 채로 P0 가 열려 있다**.
+
+### 실측 (2026-07-28, `origin/develop` = `6431877`, upstream `v4.5.0`)
+
+세탁 경로는 2종이고 대상은 **6건**이다 (이슈 본문 서술 2건 / 설계 단계 추정 4건에서 정정 — dev 단계
+전수 대조로 `.github/workflows/harness-guards.yml` / `scripts/verify-docs-links.sh` 2건 추가 발견):
+
+| 파일                                   | 경로                            | manifest `sha256`                   | upstream v4.5.0 | 세탁 시 손실                        |
+| -------------------------------------- | ------------------------------- | ----------------------------------- | --------------- | ----------------------------------- |
+| `.claude/agents/qa.md`                 | C1 (baseline 세탁)              | `bffdaa7a` (= 로컬)                 | `30aedb41`      | 가드 B 좀비 카나리아 bullet 전체    |
+| `.claude/skills/browser-test/SKILL.md` | C1                              | `368c7de5` (= 로컬)                 | `587c5349`      | 셰이더 검증 SSoT 주석               |
+| `.github/workflows/harness-guards.yml` | C1                              | `2d056f6d` (= 로컬)                 | `19108a4b`      | #779 concurrency / #480 / #842 누적 |
+| `scripts/verify-docs-links.sh`         | C1                              | `b1e12770` (= 로컬)                 | `eb8eac1e`      | #842 다운스트림 체커 배선           |
+| `.claude/agents/architect.md`          | C2 (`previousSha256` 롤백 오탐) | `621bbcb7` (prev `f7d50bbf` = 로컬) | `621bbcb7`      | Z 패턴 Phase 1 변경 전체            |
+| `.claude/agents/pm.md`                 | C2                              | `997c8c07` (prev `df781fc4` = 로컬) | `997c8c07`      | 동상                                |
+
+`harness update --check` 실측 — 복원 전 `안전 업데이트 (사용자 미수정): 6` (= `--apply-all-safe`
+자동 덮어쓰기 대상), 복원 후 **0** / `사용자 변경 보존: 2 → 8`. 자매 가드 drift 집합은 5 → **11** 로
+복원되고 데코레이터 전건 PASS.
+
+> **정정 (reviewer 권고 R1, 2026-07-28)**: 본 절 초안은 "drift 9 / alert fatigue 9 < N=10 불변" 이라
+> 기록했으나 **사실 오류**다. 머지 전 재실측 결과 **`[Alert Fatigue Trigger] drift 11 >= N=10` 발화**
+> (`.claude/scheduled_tasks.lock` 이 세션마다 갱신되는 runtime lock 이라 10~11 사이에서 진동 —
+> reviewer 실측 시점은 10). 즉 본 결정은 **alert fatigue 트리거를 발화시킨다**.
+>
+> **이는 은폐할 사항이 아니라 정직화다.** 종전 카운트가 낮았던 것은 baseline 세탁이 divergent 파일을
+> drift 집합에서 이탈시켜 **억제하고 있었기 때문**이며 (§0-2), 복원으로 실제 divergence 가 드러난
+> 결과다. 임계값 N=10 은 불변이며 (Amendment 9 SSoT 보존), 발화에 대한 §Amendment 9 §결정점 2
+> 옵션 A 의 "3 영업일 내 결정 분기 의무" 는 정상 이행 대상이다 — **해소 경로는 Phase 2 upstream
+> 기여**(옵션 1)이며 임계 재조정(옵션 3)은 기각한다.
+>
+> 또한 발화 모수 11 중 2건은 artifact 다 (reviewer 권고 R2): `CLAUDE.md` 는 자매 가드가 plain
+> sha 로 로컬을 해싱해 managed-block 의 categorical manifest 와 비교하는 **선행 결함**으로 영구
+> drift 이고, `verify-zombie-check.mjs` 는 upstream 부재 carry-over 다. 신규 가드의 `divergent: 8`
+> 이 의미상 정확하며, Amendment 9 모수 정밀화는 후속(PR-B)으로 분리한다.
+
+### 결정
+
+1. **baseline SSoT 는 upstream 원본(태그된 릴리스)이다.** `.harness/manifest.json` 은 CLI 가 쓰는
+   **작업 상태**이지 Z 패턴의 진실 원천이 아니다.
+2. 신규 가드 `scripts/verify-harness-upstream-baseline.mjs` 가 upstream 태그 tarball 을 baseline 으로
+   3 불변식을 **fail-fast** 검증한다:
+   - **(A)** upstream 과 다른 managed 파일 → HARNESS-DRIFT 데코레이터 필수 (Amendment 8 정본화)
+   - **(B)** 데코레이터 보유 파일 → upstream 과 **실제로 달라야** 함 (stale 데코레이터 차단, 역방향 사각 해소)
+   - **(C)** 로컬 ≠ upstream 이면서 CLI 가 `modified-pristine` 으로 판정할 상태 → 즉시 FAIL
+     (**C1** `sha256 == 로컬` / **C2** `previousSha256 == 로컬`)
+3. **(A)(B) 와 (C) 는 서로 다른 divergence 개념을 쓴다.** (A)(B) 는 Amendment 8 데코레이터 계약이
+   지시하는 **파일 전체** divergence (plain sha256), (C) 는 CLI 분류 동형성이 목적이므로
+   `categoricalSha256` 을 쓴다. 두 개념이 갈라지는 유일한 카테고리는 `managed-block` (`CLAUDE.md`) 인데,
+   하나로 통일하면 본 가드 (B) 가 "데코레이터 제거" 를, 자매 가드가 "데코레이터 박제" 를 동시에
+   요구하는 **가드 간 교착**이 발생한다 (dev 단계 실측 — 통일안에서 실제 재현).
+4. exit 코드는 `0` 정상 / `1` 불변식 위반 / **`2` 판정 불가** (네트워크 실패·태그 부재·manifest 부재).
+   exit 2 는 fallback 이 아니라 명시적 구분이며, 판정 불가를 PASS 로 흡수하지 않는다
+   (CLAUDE.md §가드 설계 원칙 — fail-fast, fallback 분기 금지).
+5. **CRITICAL**: `harness update --apply-*` 이후 `--mode=repair --apply` 로 manifest baseline 을
+   복원하지 않은 채 커밋하는 것을 **금지**한다. 절차 SSoT 는 `.claude/commands/harness-update.md` §7.
+6. **가드 생존 검증의 비대칭 해소** — `verify-zombie-check.mjs` 에 `settings.json` hook 등록 체크를
+   추가한다 (`verify-dead-wait-check.mjs` check#2 와 동형). (A)(B)(C) 는 **파일 단위** 불변식이라
+   "파일은 divergent 인 채로 특정 조항만 사라지는 부분 손실" 을 원리적으로 볼 수 없다. 두 축은 직교다.
+7. 비-harness-managed 디렉토리 선택 (#795 `docs/ops/`) 은 **`.harnessignore` 등록과 쌍으로** 성립한다.
+   등록 없이는 `TRACKED_DIRS` 순회로 매니페스트에 재편입된다 (PR-B 에서 이행).
+
+### 결과·재검토 조건
+
+- upstream 이 `buildManifest` 결함을 수정하면 (미적용 divergent 의 `sha256` 보존, 또는 baseline/local
+  분리 필드) (C) 불변식과 repair 모드는 **중복**이 되므로 폐기 후보. upstream 이슈 종결 시 재검토.
+- tarball 다운로드 실패가 CI 에서 유의미해지면 (월 1회 이상) 캐시 전략 재설계. 현재는 버전 키
+  프로세스 외 캐시 (`$HARNESS_UPSTREAM_CACHE_DIR` > `$RUNNER_TEMP` > tmpdir) 로 job 내 1회 다운로드.
+- 데코레이터 다중 URL 문법 정식화 + Amendment 10 append 전환 (α/β) 은 **PR-B** 로 분리한다.
+  본 Amendment 는 baseline 정의 전환과 P0 차단에 한정한다.
+
+### 미해결 / 이월 (PR-B)
+
+- `.harnessignore` 자동 생성 + carry-over 264 entry 정리 (`removed-upstream` = `--interactive`
+  **[d]elete 삭제 후보** 상시 노출 — 잠재 파괴 경로)
+- `.prettierignore` 재생성 + `docs/ops/` prettier 대상 복귀
+- Amendment 10 정밀화 (α 다중 URL / β 다중 후보 시 자동 적용 보류) + `verify-z-pattern-health.mjs`
+  주석↔구현 drift 2건 정정
+- `qa.md` 양방향 divergence 해소 (로컬 가드 B bullet ↔ upstream bracket 근거 문장 — 어느 쪽도
+  superset 아님) 는 별도 후속 이슈
+- upstream 신규 이슈 (`buildManifest` 세탁 + `previousSha256` 롤백 오탐 + `TRACKED_DIRS` 통째 등록)
+
+### cross-link
+
+- 발의: [#894](https://github.com/coseo12/astro-simulator/issues/894) — 설계 코멘트
+  [#894 architect](https://github.com/coseo12/astro-simulator/issues/894#issuecomment-5093544727)
+- 회귀 유발: PR [#893](https://github.com/coseo12/astro-simulator/pull/893) (Phase 3 동기화 시 §7 절차 부재)
+- 선행 관찰: volt [#123](https://github.com/coseo12/volt/issues/123) (`--apply-all-safe` 가 안전하지 않음)
+- 측정 SSoT: `scripts/verify-harness-upstream-baseline.mjs` (`--self-test` 40 assertion)
+- 절차 SSoT: `.claude/commands/harness-update.md` §7 / CI: `.github/workflows/harness-guards.yml`
+
+### 교차검증 반영 사항
+
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-28)** — 로그
+`.claude/logs/cross-validate-architecture-20260728-030926.log`. 명시 질문 2건 (설계 §Claude 편향
+셀프 체크의 미통과 소지 2축) 을 전달했고 **양쪽 모두 "판단 타당"** 판정을 받았다.
+
+**합의 (즉시 신뢰)**
+
+- **명시 질문 1 (낙관적 일정 축)** — upstream PR 머지·릴리스 일정은 다운스트림이 통제 못 하는 외부
+  변수이고, P0 사각이 열린 상태에서 upstream 수정을 블로킹 의존으로 두는 것은 불가능하므로
+  **다운스트림 가드 우선 도입이 정답**. 병행 보고(비-블로킹) 판단 타당.
+- **명시 질문 2 (순수주의 축)** — plain / categorical 해시 분리는 "두 가드의 검증 목적이 서로 다르다"
+  (Amendment 8 전체 파일 divergence vs CLI 분류 동형성) 는 점에서 **불가피하며 합리적**. 봉합이 아님.
+- 임계값 N=10 불변 + 발화 정직화 방향 (§실측 정정 박스) 도 이견 없음.
+
+**고유 발견 1 — 수용, 단 PR-B 로 분리** : _"`--mode=repair --apply` 를 인간이 기억해서 실행하는
+구조(§7 절차)는 PR #893 처럼 반드시 재발한다. `harness update` 호출을 래퍼로 감싸
+update → repair --apply → verify 를 **원자적 1-step** 으로 만들라."_
+
+- **설계는 "래핑 스크립트 불필요 — 커맨드 문서 절차로 충분" 을 명시적 비목표로 뒀으나, #893 이
+  실제로 그 절차 누락으로 baseline 을 세탁한 실측**이 agy 편이다. 절차 문서화만으로는 동일 실패가
+  재현된다는 지적이 옳다.
+- 다만 스프린트 계약의 **비목표를 뒤집는 변경**이므로 CLAUDE.md §교차검증 수용/분리 3단 프로토콜에
+  따라 **PR-B 로 분리** (즉시 반영 시 PR-A 스코프 팽창 + P0 차단 머지 지연). PR-B 완료 조건에
+  `scripts/harness-update-safe.sh` (원자적 래퍼) 를 추가한다.
+
+**고유 발견 2 — 수용 (본 절 박제로 이행)**: categorical 사용 이유와 managed-block 도메인 특성을
+계약으로 명시하라 → §결정 3 + 본 절이 그 계약이며, 가드 소스 헤더 주석에도 동일 근거가 박제돼 있다.
+
+**Claude 편향 셀프 체크 (4종) — agy 반증 반영**
+
+- **낙관적 일정: 미통과 → 정정 수용.** 설계의 PR-A 코드량 추정 **~250줄은 과소**였고 agy 가
+  400~500줄 이상을 예측했다. **실측 1,231줄 (+18/−0 제외)** 로 agy 가 맞았다. 팽창 요인 지목
+  (tarball 3단 캐시 fallback / categorical 슬라이싱 / self-test 40 assertion) 도 정확.
+- **순수주의: 통과** — 네트워크 의존은 exit 2 (판정 불가) 로 조용한 PASS 를 차단하므로 과잉 설계
+  아님. 단 agy 의 **오프라인 대안 2안** (A: local git object/`git archive` 로 태그 추출, B:
+  `.harness/upstream-baseline.json` 해시맵 pinning) 은 **재검토 조건으로 박제** — CI 에서 exit 2 가
+  월 1회 이상 관측되면 대안 A 를 우선 검토한다.
+- 결합 간과: 통과 (가드 간 교착을 구현 중 실측해 §결정 3 으로 해소).
+- 폐기 프레이밍: 통과 (upstream `buildManifest` 수정 대기는 "블로킹 의존" 근거로 기각, 병행 보고 유지).
+
+**기각 0건** — agy 지적 중 근거 부족으로 반려한 항목은 없다.

@@ -90,3 +90,17 @@ jobs:
       - name: HARNESS-DRIFT 데코레이터 가드
         if: hashFiles('scripts/verify-harness-drift-decorator.mjs') != ''
         run: node scripts/verify-harness-drift-decorator.mjs
+
+      # upstream baseline 가드 (#894 ADR 20260515 Amendment 17)
+      # 자매 가드(위)는 `.harness/manifest.json` 을 baseline 으로 믿는다. 그러나 upstream
+      # apply() 가 `buildManifest(cwd)` 로 프로젝트 디스크를 재해싱하므로, 미적용 divergent
+      # 파일의 로컬 해시가 baseline 으로 **세탁**되어 drift 집합에서 이탈한다. 그 상태에서
+      # 자매 가드는 초록인 채로 다음 `--apply-all-safe` 가 다운스트림 가드 조항을 덮어쓴다
+      # (#894 §0-4 — 실측: 세탁 6건, 자매 가드 drift 5 / FAIL 0).
+      #
+      # 본 가드는 baseline 을 upstream 태그 tarball 원본으로 두고 3 불변식을 fail-fast 검증한다.
+      # cron 이 아니라 **PR 경로**여야 한다 — harness update PR 자체가 위험 지점이다.
+      # exit 2(네트워크 실패/태그 부재) 는 "판정 불가" 로 CI 를 실패시킨다 (PASS 흡수 금지).
+      # SSoT: docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 17
+      - name: upstream baseline 가드
+        run: node scripts/verify-harness-upstream-baseline.mjs

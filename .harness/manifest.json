@@ -8,8 +8,7 @@
     },
     ".claude/agents/architect.md": {
       "sha256": "621bbcb78abc82dd9b37e70e4ce072d498bcdc0284b83b9b5b49122a7ce4e3e8",
-      "category": "atomic",
-      "previousSha256": "f7d50bbf0bcb1c41f9860180c6031c6a716f84bd080671e9dcca1b4b233aedcf"
+      "category": "atomic"
     },
     ".claude/agents/developer.md": {
       "sha256": "68106c6b95dfaa64ec8c4533131f2feb979214b5f6ce1f06b4872e9aed26c040",
@@ -18,13 +17,11 @@
     },
     ".claude/agents/pm.md": {
       "sha256": "997c8c0790428d8bf5e3ecec64c407daf36456db5052d996d19038e13c5aa0c3",
-      "category": "atomic",
-      "previousSha256": "df781fc4ed337319dd4ad5c1fbe08ffd824f433151222ccf642f0d6615f952f1"
+      "category": "atomic"
     },
     ".claude/agents/qa.md": {
-      "sha256": "bffdaa7a89f498b599d6da1871f0a64f3d301cd233dae79754366a1ea445e60e",
-      "category": "atomic",
-      "previousSha256": "81ec4d70d20c371731eb6ebb8d9dae382e711d1d3ecadc4098050c82b5d96108"
+      "sha256": "30aedb41892187192f1f010e8354c2e7b4b7fabfcc89d02f20a835ff630a3da1",
+      "category": "atomic"
     },
     ".claude/agents/reviewer.md": {
       "sha256": "72f600d2170947e95ff2c09266f3242bc72a6b73df429d966fe5678ebccfdeb0",
@@ -97,9 +94,8 @@
       "category": "atomic"
     },
     ".claude/skills/browser-test/SKILL.md": {
-      "sha256": "368c7de57d85e6bbb36fd482fdebedcab34cc6eb709c6261d9b7c5138426850b",
-      "category": "atomic",
-      "previousSha256": "cac2244a029ff813ef58671771f7af278774438a6416e4c5fcf68860e3a5d421"
+      "sha256": "587c53495284b33dce2957c2098f716a42997753af9099117aa5442e470e8ec4",
+      "category": "atomic"
     },
     ".claude/skills/browser-test/scripts/check-browser.sh": {
       "sha256": "07fa56ad97b56a5913430a0dc91b175978d698b0a842b3d40fd48498b225cc1b",
@@ -167,9 +163,8 @@
       "category": "atomic"
     },
     ".github/workflows/harness-guards.yml": {
-      "sha256": "2d056f6d2a47b3e3e523ebbf8a9a8f24da250fb1b65afd989197ddfcf3a6feca",
-      "category": "frozen",
-      "previousSha256": "19108a4b2d3a3d102e94a444c5c84cf346392c2b150e602480fc208d14be01e5"
+      "sha256": "19108a4b2d3a3d102e94a444c5c84cf346392c2b150e602480fc208d14be01e5",
+      "category": "frozen"
     },
     ".github/workflows/harness-pr-review.yml": {
       "sha256": "296443c5fdeae5eb126b0ae749c8b0aa57fc19b7b9fa08f42159414311087432",
@@ -317,9 +312,8 @@
       "category": "frozen"
     },
     "scripts/verify-docs-links.sh": {
-      "sha256": "b1e12770888f5ea56575b80a011088e16ce963d92c7075d1df86966acce9da5d",
-      "category": "frozen",
-      "previousSha256": "eb8eac1e69b2db936ba3433b6b8c077d70a0a5204236239953b065c845308fe7"
+      "sha256": "eb8eac1e69b2db936ba3433b6b8c077d70a0a5204236239953b065c845308fe7",
+      "category": "frozen"
     },
     "scripts/verify-fps-baseline.mjs": {
       "sha256": "f72f513f2d5b67563151def7f32d94c1c60efe208f0a1036f3d69f474cbe511f",

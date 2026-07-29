@@ -3,6 +3,7 @@ description: harness 프레임워크 업데이트 확인/적용 (CLI 래퍼 + �
 argument-hint: [--check | --apply-all-safe | --interactive | --dry-run | --bootstrap]
 allowed-tools: [Bash, Read, Edit, Grep]
 ---
+<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
 
 # /harness-update — Harness 업데이트
 
@@ -67,6 +68,29 @@ gh release view --repo coseo12/harness-setting --json tagName,name,body 2>/dev/n
 
 - 적용된 파일 수 / 미해결 divergent 수 / 매니페스트 갱신 여부.
 - 다음 권장 액션 (남은 충돌 해결, 커밋, doctor 재실행 등).
+
+### 7. Phase 3 후속 (update 적용 후 의무 — astro-simulator #894)
+
+`--apply-*` 를 실행했다면 아래 4단계를 **같은 커밋 범위 안에서** 반드시 수행한다.
+upstream `buildManifest()` 가 프로젝트 디스크를 재해싱하므로, 적용되지 않은 divergent
+파일의 로컬 해시가 baseline 으로 세탁되어 **다음 회차에 `modified-pristine` 으로
+오분류 → 자동 덮어쓰기** 된다 (#894 §0-2 실측).
+
+1. manifest 위생 복원 (필수):
+   node scripts/verify-harness-upstream-baseline.mjs --mode=repair --apply
+2. `.prettierignore` 재생성:
+   pnpm sync:prettierignore
+3. Z 패턴 후속 정리:
+   node scripts/verify-harness-drift-decorator.mjs --mode=sidecar-cleanup --apply
+   node scripts/resolve-harness-drift-todo.mjs   # dry-run 확인 후 --apply
+4. 가드 생존 검증 (하나라도 FAIL 이면 커밋 금지):
+   pnpm verify:zombie-check
+   pnpm verify:dead-wait-check
+   node scripts/verify-harness-drift-decorator.mjs
+   node scripts/verify-harness-upstream-baseline.mjs
+
+금지: 위 4단계를 생략한 채 `--apply-*` 결과를 커밋하는 것. #893 이 이 누락으로
+qa.md / browser-test/SKILL.md 의 baseline 을 세탁했다.
 
 ## 금지/주의
 
