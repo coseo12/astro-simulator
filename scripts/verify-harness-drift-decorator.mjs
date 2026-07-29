@@ -200,8 +200,20 @@ const PERMANENT_DIVERGENT_ALLOWLIST = Object.freeze([
 // Amendment 8 적용 대상 `.claude/agents/*.md` 의 컨벤션 (YAML frontmatter 시작) 을 미커버.
 // 다중-prefix 허용 케이스: shebang | DOCTYPE | YAML frontmatter (--- ... ---) 1블록.
 // 결과: regex 적용 범위 확장만 (의도 동일 — 파일 메타 헤더 직후 첫 컨텐츠 라인).
-const DECORATOR_REGEX =
-  /^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n|---\n(?:[\s\S]*?\n)?---\n)?(?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN \[(?:https?:\/\/[^\]]+|TODO)\](?: -->)?/;
+//
+// Amendment 17 §(α) (#894 PR-B) — **다중 URL 문법 정식화**: `[<url>( + <url>)*|TODO]`.
+// 종전 `\[(?:https?:\/\/[^\]]+|TODO)\]` 는 `]` 만 아니면 무엇이든 통과시켰다. 그래서
+// `.claude/agents/qa.md` (`[.../309 + .../318 + .../322]`) / `browser-test/SKILL.md` /
+// `CLAUDE.md` 가 **이미 다중 URL 을 실사용 중이었는데도** Amendment 8 형식 SSoT 와
+// `TODO_LINE_REGEX` 는 단일 URL 만 규정한 문서↔구현 drift 상태였다
+// (CLAUDE.md §주석 계약 vs 구현 drift). 구분자를 ` + ` 로 못박아 정식 문법으로 승격하고,
+// 동시에 `[https://a, https://b]` 같은 임의 구분자 오박제를 차단한다 (precision ↑).
+const DECORATOR_URL = String.raw`https?:\/\/[^\]\s]+`;
+const DECORATOR_REGEX = new RegExp(
+  String.raw`^(?:#![^\n]*\n|<!DOCTYPE[^>]*>\n|---\n(?:[\s\S]*?\n)?---\n)?` +
+    String.raw`(?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN ` +
+    String.raw`\[(?:${DECORATOR_URL}(?: \+ ${DECORATOR_URL})*|TODO)\](?: -->)?`,
+);
 
 /**
  * 파일 확장자별 데코레이터 형식 분기.
@@ -645,6 +657,10 @@ function runSelfTest() {
     '<!DOCTYPE html>\n<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->',
     // developer 단계 보완 — YAML frontmatter 1블록 허용 (#556)
     '---\nname: architect\ndescription: "..."\n---\n<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->',
+    // Amendment 17 §(α) (#894) — 다중 URL 정식 문법 (실사용 선행: qa.md / SKILL.md / CLAUDE.md)
+    '<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/260 + https://github.com/coseo12/harness-setting/pull/315] -->',
+    '<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/309 + https://github.com/coseo12/harness-setting/pull/318 + https://github.com/coseo12/harness-setting/pull/322] -->',
+    '// HARNESS-DRIFT: Z-PATTERN [https://x/1 + https://x/2]',
   ];
   positives.forEach((s, i) => {
     expect(`regex positive #${i + 1}`, DECORATOR_REGEX.test(s), JSON.stringify(s.slice(0, 60)));
@@ -657,6 +673,11 @@ function runSelfTest() {
     '\n<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->', // 첫 줄 빈 줄 (위치 위반)
     '/* HARNESS-DRIFT: Z-PATTERN [TODO] */', // 블록 주석 (미지원 형식)
     'HARNESS-DRIFT: Z-PATTERN [TODO]', // 주석 prefix 누락
+    // Amendment 17 §(α) (#894) — 임의 구분자 차단 (종전 `[^\]]+` 는 전부 통과시켰다)
+    '<!-- HARNESS-DRIFT: Z-PATTERN [https://x/1, https://x/2] -->', // 쉼표 구분자
+    '<!-- HARNESS-DRIFT: Z-PATTERN [https://x/1 https://x/2] -->', // 공백만 구분
+    '<!-- HARNESS-DRIFT: Z-PATTERN [TODO + https://x/1] -->', // TODO 와 URL 혼합
+    '<!-- HARNESS-DRIFT: Z-PATTERN [메모: 나중에] -->', // URL 아닌 임의 문자열
   ];
   negatives.forEach((s, i) => {
     expect(`regex negative #${i + 1}`, !DECORATOR_REGEX.test(s), JSON.stringify(s.slice(0, 60)));

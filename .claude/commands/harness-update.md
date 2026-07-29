@@ -71,25 +71,52 @@ gh release view --repo coseo12/harness-setting --json tagName,name,body 2>/dev/n
 
 ### 7. Phase 3 후속 (update 적용 후 의무 — astro-simulator #894)
 
-`--apply-*` 를 실행했다면 아래 4단계를 **같은 커밋 범위 안에서** 반드시 수행한다.
+`--apply-*` 를 실행했다면 후속 위생 절차를 **같은 커밋 범위 안에서** 반드시 수행한다.
 upstream `buildManifest()` 가 프로젝트 디스크를 재해싱하므로, 적용되지 않은 divergent
 파일의 로컬 해시가 baseline 으로 세탁되어 **다음 회차에 `modified-pristine` 으로
 오분류 → 자동 덮어쓰기** 된다 (#894 §0-2 실측).
 
-1. manifest 위생 복원 (필수):
+#### 7-0. 기본 경로 — 원자적 래퍼 (권장)
+
+`--apply-*` 는 **래퍼로 실행한다**. update → 위생 복원 → 재생성 → 가드 검증을 1-step 으로
+묶어 절차 누락 자체를 불가능하게 한다 (#894 PR-B, cross-validate agy 고유 발견 1 수용).
+
+```bash
+pnpm harness:update:safe --check            # 비파괴 확인 (후속 단계 스킵)
+pnpm harness:update:safe --apply-all-safe   # 적용 + 후속 5단계 원자 실행
+```
+
+어느 단계든 실패하면 즉시 중단한다 (`set -euo pipefail`, fallback 분기 없음).
+`--interactive` 는 래퍼가 거부한다 — 대화형 입력이 원자성과 상충하므로 CLI 를 직접
+실행한 뒤 아래 7-1 수동 절차를 따른다.
+
+#### 7-1. 수동 절차 (참조용 — 래퍼를 쓸 수 없을 때)
+
+래퍼가 수행하는 것과 동일하다. 순서를 바꾸지 말 것.
+
+1. manifest 위생 복원 — **dry-run 선행 의무** (reviewer R6):
+   pnpm verify:harness-baseline:repair            # 무엇이 바뀌는지 먼저 확인
    node scripts/verify-harness-upstream-baseline.mjs --mode=repair --apply
-2. `.prettierignore` 재생성:
+2. `.harnessignore` 재생성 + carry-over 정리:
+   pnpm sync:harnessignore
+   pnpm sync:harnessignore:prune                  # dry-run 확인 후
+   node scripts/sync-harnessignore.mjs --prune-manifest --apply
+3. `.prettierignore` 재생성:
    pnpm sync:prettierignore
-3. Z 패턴 후속 정리:
+4. Z 패턴 후속 정리:
    node scripts/verify-harness-drift-decorator.mjs --mode=sidecar-cleanup --apply
    node scripts/resolve-harness-drift-todo.mjs   # dry-run 확인 후 --apply
-4. 가드 생존 검증 (하나라도 FAIL 이면 커밋 금지):
+   ※ 후보 PR 이 2개 이상인 파일은 자동 적용이 **보류**된다 (Amendment 17 §β).
+      보류 목록은 데코레이터를 직접 다중 URL 문법 `[<url> + <url>]` 로 편집한다.
+5. 가드 생존 검증 (하나라도 FAIL 이면 커밋 금지):
+   pnpm verify:harness-baseline
+   node scripts/verify-harness-drift-decorator.mjs
    pnpm verify:zombie-check
    pnpm verify:dead-wait-check
-   node scripts/verify-harness-drift-decorator.mjs
-   node scripts/verify-harness-upstream-baseline.mjs
+   pnpm sync:harnessignore:check
+   pnpm sync:prettierignore:check
 
-금지: 위 4단계를 생략한 채 `--apply-*` 결과를 커밋하는 것. #893 이 이 누락으로
+금지: 위 절차를 생략한 채 `--apply-*` 결과를 커밋하는 것. #893 이 이 누락으로
 qa.md / browser-test/SKILL.md 의 baseline 을 세탁했다.
 
 ## 금지/주의

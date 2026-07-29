@@ -84,16 +84,12 @@ export function findStaleWorkflowRefs(content) {
 //   3. phase1Prs 중 mergedAt ms epoch > lastPhase2Date 인 것의 개수 반환.
 //      - 반드시 ms epoch 비교 (동일 타임스탬프 경계 결정성 — Q3-2). createdAt fallback 금지.
 export function computeConsecutiveSinceLastPhase2(phase1Prs, phase2Prs) {
-  const mergedPhase2 = (phase2Prs || []).filter(
-    (p) => p.state === 'MERGED' && p.mergedAt != null,
-  );
+  const mergedPhase2 = (phase2Prs || []).filter((p) => p.state === 'MERGED' && p.mergedAt != null);
   if (mergedPhase2.length === 0) {
     // backward-compat: 머지된 Phase-2 0 건 → 직전 Phase-2 부재 = 전체 Phase-1 이 연속
     return (phase1Prs || []).length;
   }
-  const lastPhase2Date = Math.max(
-    ...mergedPhase2.map((p) => new Date(p.mergedAt).getTime()),
-  );
+  const lastPhase2Date = Math.max(...mergedPhase2.map((p) => new Date(p.mergedAt).getTime()));
   return (phase1Prs || []).filter(
     (p) => p.mergedAt != null && new Date(p.mergedAt).getTime() > lastPhase2Date,
   ).length;
@@ -176,11 +172,15 @@ export function filterSubstantiveMergedPhase2(phase2Prs, denylist = TRIVIAL_DENY
 //
 // 매칭 휴리스틱 (ADR §Amendment 10 §결정점 2 후보 다 — AND 결합):
 //   - (a) PR title 에 본 프로젝트 이슈 번호 ref 포함:
-//        - 패턴 1: `#N` (단순 hash + 숫자, GitHub 자동 자기 repo 링크 컨벤션)
+//        - 패턴 1: `coseo12/astro-simulator#N` (full path)
 //        - 패턴 2: `astro-simulator#N` (cross-repo 명시)
-//        - 패턴 3: `coseo12/astro-simulator#N` (full path)
+//        - 패턴 3: `[#N]` — **brackets 필수** (#581 정정. 단순 `#N` 은 `volt #114` 같은
+//          cross-repo 인용을 오탐해 제거됐다. 아래 extractIssueRefsFromTitle 주석 참조)
 //   - (b) PR 변경 파일 경로가 다운스트림 [TODO] 잔존 파일과 일치
 //   - (a) AND (b) 둘 다 충족 시에만 매칭 (precision ↑, false-positive 회피)
+//   - Amendment 17 §(β) (#894): 한 파일에 후보 PR 이 2개 이상이면 **자동 적용 보류**
+//     (`held: true`). 종전 `seen` first-wins 는 `gh pr list` 기본 정렬에 의존하는
+//     비결정적 승자 선정이었다.
 // Amendment 16 (#868, c-1) — sync check 매칭 순수 함수 (self-test fixture 주입용).
 // localDrifts (Set<string>) ∩ upstream PR files 교집합으로 mismatches 를 산출하고,
 // 교집합이 있는데 제목/본문에 "ADR 20260515" 리터럴이 없는 PR 을 unmarked 로 분리.
@@ -286,6 +286,62 @@ function verifyPhase2Sync(rootDir = '.', options = {}) {
 // 본 함수는 [TODO] 잔존 파일만 식별 (URL 교체된 파일은 제외).
 const TODO_LINE_REGEX = /^((?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN \[)(TODO)(\](?: -->)?)/;
 
+// =============================================================================
+// Amendment 17 §(α) (#894 PR-B) — 다중 URL 데코레이터 문법 정식화
+// =============================================================================
+//
+// 데코레이터 문법 SSoT: `[<url>( + <url>)*|TODO]`
+//
+// **이미 실사용 중이던 문법을 정식화**한 것이다 — `.claude/agents/qa.md` 는
+// `[.../pull/309 + .../pull/318 + .../pull/322]`, `.claude/skills/browser-test/SKILL.md` 는
+// `[.../pull/320 + .../pull/322]` 형태로 다중 사유를 표현해 왔으나, Amendment 8 형식 SSoT 와
+// `TODO_LINE_REGEX` 는 **단일 URL 만** 규정했다 (문서↔구현 drift — CLAUDE.md §주석 계약 vs
+// 구현 drift 위반). 파일 하나가 여러 사유로 drift 하는 것은 정상 상태이므로 문법이 이를
+// 표현할 수 있어야 한다.
+//
+// 정식화의 실질 효과는 **교체 → append 전환**이다. 종전 `applyTodoReplacement` 는 대괄호
+// 안을 통째로 새 URL 로 교체했으므로, 이미 URL 이 박제된 파일에 다른 PR 이 매칭되면
+// **기존 사유가 소실**됐다. `mergeDecoratorUrls()` 는 기존 집합에 append 하므로 그 사고
+// 자체가 소멸한다.
+const DECORATOR_CONTENT_REGEX =
+  /^((?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN \[)([^\]]*)(\](?: -->)?)/;
+
+const DECORATOR_URL_SEPARATOR = ' + ';
+
+/**
+ * 데코레이터 대괄호 내용을 URL 배열로 파싱.
+ * `TODO` 플레이스홀더는 URL 이 아니므로 빈 배열을 돌려준다 (미해소 표식).
+ * @param {string} content — 대괄호 내부 문자열
+ * @returns {string[]}
+ */
+export function parseDecoratorUrls(content) {
+  const raw = (content || '').trim();
+  if (!raw || raw === 'TODO') return [];
+  return raw
+    .split('+')
+    .map((s) => s.trim())
+    .filter((s) => /^https?:\/\/\S+$/.test(s));
+}
+
+/**
+ * 기존 URL 집합에 신규 URL 을 **append** (교체 아님).
+ * 순서는 기존 박제 순서를 보존하고 신규만 말미에 붙인다 — 시간순 추적이 가능하도록.
+ * 중복 URL 은 무시한다 (멱등).
+ *
+ * @param {string} content — 대괄호 내부 문자열 (`TODO` 또는 URL 목록)
+ * @param {string[]} newUrls
+ * @returns {string} 갱신된 대괄호 내부 문자열 (변경 없으면 원본과 동일)
+ */
+export function mergeDecoratorUrls(content, newUrls) {
+  const existing = parseDecoratorUrls(content);
+  const merged = [...existing];
+  for (const u of newUrls || []) {
+    if (!merged.includes(u)) merged.push(u);
+  }
+  if (merged.length === 0) return 'TODO';
+  return merged.join(DECORATOR_URL_SEPARATOR);
+}
+
 // PR title 에서 본 프로젝트 이슈 번호 추출.
 // 매칭 패턴 (3종): `astro-simulator#N` (cross-repo) / `coseo12/astro-simulator#N` (full path) / `[#N]` (brackets 필수).
 //
@@ -295,7 +351,13 @@ const TODO_LINE_REGEX = /^((?:<!--|\/\/|#) HARNESS-DRIFT: Z-PATTERN \[)(TODO)(\]
 //   - 본 프로젝트 PR title 컨벤션 (`feat(scope): [#N] description`) 표준 `[#N]` 답습 시
 //     brackets 강제로 cross-repo `volt #N` / 단순 `#N` 인용 회피 (false-positive 0)
 // 본 함수는 다운스트림 이슈 ref **의도된 박제** (`[#N]` brackets) 만 후보로 추출.
-// 호출자 (computeTodoResolutions) 가 다운스트림 OPEN 이슈 존재 여부 별도 검증 — 2중 안전.
+//
+// **주석 계약 정정 (#894 PR-B)**: 종전 주석은 "호출자 (computeTodoResolutions) 가 다운스트림
+// OPEN 이슈 존재 여부 별도 검증 — 2중 안전" 이라고 선언했으나 **해당 코드가 존재하지 않는다**
+// (CLAUDE.md §주석 계약 vs 구현 drift — default 없이 조용히 흡수된 허위 보증). 실제 2중
+// 안전장치는 (a) title ref AND (b) 파일 경로 매칭의 AND 결합이며, Amendment 17 §(β) 의
+// 다중 후보 보류가 3중째다. OPEN 이슈 존재 검증은 구현된 적이 없고, 도입하려면 `gh issue view`
+// N회 호출이 추가되므로 현재는 **비목표**로 명시한다.
 function extractIssueRefsFromTitle(title) {
   if (!title) return [];
   const refs = new Set();
@@ -372,30 +434,62 @@ function computeTodoResolutions(rootDir = '.') {
     return [];
   }
 
-  // 다운스트림 [TODO] 잔존 파일 Set (O(1) 매칭)
-  const todoFileSet = new Map(todoFiles.map((t) => [t.file, t]));
-  const resolutions = [];
-  const seen = new Set(); // 동일 파일 다중 매칭 회피 (첫 매칭만 박제)
+  return matchTodoResolutions(todoFiles, mergedPrs);
+}
 
-  for (const pr of mergedPrs) {
+/**
+ * Amendment 17 §(β) (#894) — 결정적 후보 매칭 순수 함수 (fixture 주입 가능).
+ *
+ * 종전 구현은 `if (seen.has(path)) continue;` 로 **첫 매칭만** 채택했는데, 그 "첫" 은
+ * `gh pr list` 기본 정렬(created desc)에 의존하는 **비결정적 승자 선정**이었다. 같은 파일을
+ * 건드린 upstream merged PR 이 N개면 무관한 PR 이 URL 로 박제될 수 있다 —
+ * `harness-guards.yml`(#779/#480/#338/#842 누적)이 무관한 #315 로 매칭된 정확한 지점.
+ *
+ * 정정:
+ *   1. PR 번호 오름차순으로 **결정적 정렬** (조회 순서 비의존)
+ *   2. 한 파일의 후보가 2개 이상이면 `held: true` — `--apply` 대상에서 제외하고
+ *      soft-warn 목록에만 올린다 (사람 판정). PR #893 에서 `harness-guards.yml` 을
+ *      **수동 보류**한 판단의 자동화다.
+ *
+ * @param {Array<{file: string, line: number}>} todoFiles
+ * @param {Array<{number: number, title: string, files?: Array<{path: string}>}>} mergedPrs
+ * @returns {Array<{file, line, upstreamPrNumber, upstreamPrUrl, upstreamPrTitle,
+ *                  downstreamIssue, held, candidates}>}
+ */
+export function matchTodoResolutions(todoFiles, mergedPrs) {
+  const todoFileSet = new Map((todoFiles || []).map((t) => [t.file, t]));
+  /** @type {Map<string, Array<object>>} */
+  const byFile = new Map();
+
+  // PR 번호 오름차순 — 조회 순서에 의존하지 않는 결정적 기준
+  const sorted = [...(mergedPrs || [])].sort((a, b) => (a.number || 0) - (b.number || 0));
+  for (const pr of sorted) {
     const issueRefs = extractIssueRefsFromTitle(pr.title);
     if (issueRefs.length === 0) continue; // (a) title 매칭 실패 — skip
-    const upstreamFiles = (pr.files || []).map((f) => f.path);
-    for (const path of upstreamFiles) {
+    for (const path of (pr.files || []).map((f) => f.path)) {
       if (!todoFileSet.has(path)) continue; // (b) 파일 경로 매칭 실패 — skip
-      if (seen.has(path)) continue; // 동일 파일 첫 매칭만
-      // (a) AND (b) 둘 다 충족 — 매칭 후보
-      const todo = todoFileSet.get(path);
-      resolutions.push({
-        file: path,
-        line: todo.line,
+      if (!byFile.has(path)) byFile.set(path, []);
+      byFile.get(path).push({
         upstreamPrNumber: pr.number,
         upstreamPrUrl: `https://github.com/coseo12/harness-setting/pull/${pr.number}`,
         upstreamPrTitle: pr.title,
-        downstreamIssue: issueRefs[0], // 첫 ref 박제 (다중 시 첫 번째)
+        downstreamIssue: issueRefs.sort((x, y) => x - y)[0],
       });
-      seen.add(path);
     }
+  }
+
+  const resolutions = [];
+  for (const file of [...byFile.keys()].sort()) {
+    const candidates = byFile.get(file);
+    const todo = todoFileSet.get(file);
+    // 후보 ≥2 → 자동 적용 보류. 첫 후보 정보는 안내용으로만 싣는다.
+    resolutions.push({
+      file,
+      line: todo.line,
+      ...candidates[0],
+      held: candidates.length > 1,
+      candidates,
+    });
   }
   return resolutions;
 }
@@ -403,177 +497,187 @@ function computeTodoResolutions(rootDir = '.') {
 // Amendment 8 (#556) — main flow 를 함수로 wrap. 직접 실행 시에만 호출하여
 // import 시 부작용 (gh CLI 호출 / process.exit) 방지. 외부 인터페이스 (stdout/exit) 동일.
 function main() {
-try {
-  // 1. ADR 파일 존재 검증
-  if (!existsSync(ADR_PATH)) {
-    console.error(`ERROR: ADR file not found: ${ADR_PATH}`);
-    process.exit(2);
-  }
-
-  const adrContent = readFileSync(ADR_PATH, 'utf-8');
-
-  // 2. Phase 1 카운트 — §Amendment N regex
-  const amendmentMatches = adrContent.matchAll(/## Amendment (\d+)/g);
-  const amendmentNumbers = Array.from(amendmentMatches).map((m) => parseInt(m[1], 10));
-  const amendmentCount = amendmentNumbers.length;
-
-  // PR commit grep 보조 — ADR 인용 PR 카운트 (본 프로젝트)
-  //
-  // Amendment 7 (#554, 2026-05-25): 측정 식 자기참조 인플레이션 회피.
-  // 기존 식은 ADR 본문 자체 변경 PR (Amendment 박제 / hotfix / release) 도 Z 적용으로
-  // 카운트 → 12회차 인플레로 N=10 임계 false-positive 트리거. 정정 식은 PR title 에서
-  // ADR 자체 진화 표식 (Amendment N / hotfix / release) 을 제외하여 Phase 1 (Z 패턴
-  // 실제 적용) 만 카운트. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법
-  // 검증 우선" 원칙 정합 박제.
-  const adrCitationsRaw = execSync(
-    `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title,mergedAt`,
-    { encoding: 'utf-8' },
-  ).trim();
-  const adrCitationPrs = JSON.parse(adrCitationsRaw || '[]');
-  // Amendment 14 (#822): Phase-1 PR 배열 (isAdrEvolutionPr 필터 후) 을 consecutive 산출에 재사용.
-  const phase1Prs = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title));
-  const adrCitations = phase1Prs.length;
-  // Amendment 7 (#554): 임계 비교 SSoT 는 adrCitations (Z 적용 PR 카운트).
-  // amendmentCount 도 자기참조 (Amendment N 박제 자체로 +1 증가) 라 임계 SSoT 부적합 —
-  // console.log 정보 출력에만 활용. amendmentCount > adrCitations 가능 시점: ADR
-  // 진화 활발 + 적용 정체기 (별도 정보로 가시화).
-  const phase1Count = adrCitations;
-
-  // 3. Phase 2 카운트 — upstream harness-setting PR 검색
-  //
-  // 측정 방법 결정 (D1 실측 기반):
-  //   - architect 9 핵심 결정 #3 은 "다중 OR 키워드 (ADR 20260515 OR harness-managed-divergent OR Z 패턴)"
-  //     를 제시했으나, D1 실측에서 false positive 5건 발견:
-  //       - "harness-managed-divergent" → 단어 분할로 "managed" 매칭 (PR #64/#61/#62/#94 무관 PR 4건)
-  //       - "Z 패턴" → "Z 옵션" 매칭 (PR #154 무관)
-  //   - "ADR 20260515" 정확 식별자만 사용 (현재 0건, 노이즈 0).
-  //   - 향후 upstream PR 본문/제목에 ADR ID 박제 컨벤션 유지 필요 (Phase 2 의무 PR 규약).
-  //   - CRITICAL "수치 DoD 미달 시 측정 방법 검증 우선" 원칙 정합 — 식 보정 후 임계값 평가.
-  // Amendment 14 (#822): 조건 2 (연속 카운트) 산출에 state/mergedAt 이 필요하여 배열 조회로 확장.
-  // phase2Count (전체 카운트) 는 stdout 정보 표시 + backward-compat 참조용 = state=all 배열 length.
-  // Amendment 15 (#823): 조건 1 ratio 분자 / 조건 2 연속 앵커 / 조건 3 90일 앵커 는 전부
-  // filterSubstantiveMergedPhase2(phase2Prs) 결과를 SSoT 로 사용 (substantiality 퀄리파이어).
-  // files 필드 추가 — isSubstantivePhase2 경로 판별용 (gh pr list --json files 지원 실측 확인).
-  let phase2Count = 0;
-  let phase2Prs = [];
   try {
-    const phase2Result = execSync(
-      `gh pr list --repo coseo12/harness-setting --state all --search "ADR 20260515" --json number,state,mergedAt,files`,
+    // 1. ADR 파일 존재 검증
+    if (!existsSync(ADR_PATH)) {
+      console.error(`ERROR: ADR file not found: ${ADR_PATH}`);
+      process.exit(2);
+    }
+
+    const adrContent = readFileSync(ADR_PATH, 'utf-8');
+
+    // 2. Phase 1 카운트 — §Amendment N regex
+    const amendmentMatches = adrContent.matchAll(/## Amendment (\d+)/g);
+    const amendmentNumbers = Array.from(amendmentMatches).map((m) => parseInt(m[1], 10));
+    const amendmentCount = amendmentNumbers.length;
+
+    // PR commit grep 보조 — ADR 인용 PR 카운트 (본 프로젝트)
+    //
+    // Amendment 7 (#554, 2026-05-25): 측정 식 자기참조 인플레이션 회피.
+    // 기존 식은 ADR 본문 자체 변경 PR (Amendment 박제 / hotfix / release) 도 Z 적용으로
+    // 카운트 → 12회차 인플레로 N=10 임계 false-positive 트리거. 정정 식은 PR title 에서
+    // ADR 자체 진화 표식 (Amendment N / hotfix / release) 을 제외하여 Phase 1 (Z 패턴
+    // 실제 적용) 만 카운트. CLAUDE.md §스프린트 계약 #10 "수치 DoD 미달 시 측정 방법
+    // 검증 우선" 원칙 정합 박제.
+    const adrCitationsRaw = execSync(
+      `gh pr list --repo coseo12/astro-simulator --state merged --search "20260515-harness-managed-divergent-pattern" --json number,title,mergedAt`,
       { encoding: 'utf-8' },
     ).trim();
-    phase2Prs = JSON.parse(phase2Result || '[]');
-    phase2Count = phase2Prs.length;
-  } catch {
-    // upstream 검색 실패 (네트워크 / 권한 등) 시 보수적으로 빈 배열 → count 0.
-    // Phase-2 조회 실패 → merged 0 건 → consecutive = 전체 Phase-1 (기존 동작 fallback).
-    phase2Prs = [];
-    phase2Count = 0;
-  }
+    const adrCitationPrs = JSON.parse(adrCitationsRaw || '[]');
+    // Amendment 14 (#822): Phase-1 PR 배열 (isAdrEvolutionPr 필터 후) 을 consecutive 산출에 재사용.
+    const phase1Prs = adrCitationPrs.filter((pr) => !isAdrEvolutionPr(pr.title));
+    const adrCitations = phase1Prs.length;
+    // Amendment 7 (#554): 임계 비교 SSoT 는 adrCitations (Z 적용 PR 카운트).
+    // amendmentCount 도 자기참조 (Amendment N 박제 자체로 +1 증가) 라 임계 SSoT 부적합 —
+    // console.log 정보 출력에만 활용. amendmentCount > adrCitations 가능 시점: ADR
+    // 진화 활발 + 적용 정체기 (별도 정보로 가시화).
+    const phase1Count = adrCitations;
 
-  // 3-b. Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 (soft-warn)
-  //
-  // upstream open PR + 로컬 drift 파일 매칭 결과를 stdout 에 박제.
-  // CI workflow (adr-z-pattern-health-v2.yml) 가 본 stdout 을 파싱해
-  // [Phase 2 Sync Required] 라벨 부착 / 자동 코멘트 박제 트리거.
-  // exit code 변경 없음 (hard-block 아님 — Amendment 8 §결정점 3b 옵션 A).
-  const phase2Sync = verifyPhase2Sync('.');
-  if (phase2Sync.error) {
-    console.log(`\n[Phase 2 Sync] check skipped: ${phase2Sync.error}`);
-  } else if (phase2Sync.mismatches.length > 0) {
-    console.log(`\n[Phase 2 Sync Drift] ${phase2Sync.mismatches.length} 파일 매칭 (soft-warn):`);
-    for (const m of phase2Sync.mismatches) {
+    // 3. Phase 2 카운트 — upstream harness-setting PR 검색
+    //
+    // 측정 방법 결정 (D1 실측 기반):
+    //   - architect 9 핵심 결정 #3 은 "다중 OR 키워드 (ADR 20260515 OR harness-managed-divergent OR Z 패턴)"
+    //     를 제시했으나, D1 실측에서 false positive 5건 발견:
+    //       - "harness-managed-divergent" → 단어 분할로 "managed" 매칭 (PR #64/#61/#62/#94 무관 PR 4건)
+    //       - "Z 패턴" → "Z 옵션" 매칭 (PR #154 무관)
+    //   - "ADR 20260515" 정확 식별자만 사용 (현재 0건, 노이즈 0).
+    //   - 향후 upstream PR 본문/제목에 ADR ID 박제 컨벤션 유지 필요 (Phase 2 의무 PR 규약).
+    //   - CRITICAL "수치 DoD 미달 시 측정 방법 검증 우선" 원칙 정합 — 식 보정 후 임계값 평가.
+    // Amendment 14 (#822): 조건 2 (연속 카운트) 산출에 state/mergedAt 이 필요하여 배열 조회로 확장.
+    // phase2Count (전체 카운트) 는 stdout 정보 표시 + backward-compat 참조용 = state=all 배열 length.
+    // Amendment 15 (#823): 조건 1 ratio 분자 / 조건 2 연속 앵커 / 조건 3 90일 앵커 는 전부
+    // filterSubstantiveMergedPhase2(phase2Prs) 결과를 SSoT 로 사용 (substantiality 퀄리파이어).
+    // files 필드 추가 — isSubstantivePhase2 경로 판별용 (gh pr list --json files 지원 실측 확인).
+    let phase2Count = 0;
+    let phase2Prs = [];
+    try {
+      const phase2Result = execSync(
+        `gh pr list --repo coseo12/harness-setting --state all --search "ADR 20260515" --json number,state,mergedAt,files`,
+        { encoding: 'utf-8' },
+      ).trim();
+      phase2Prs = JSON.parse(phase2Result || '[]');
+      phase2Count = phase2Prs.length;
+    } catch {
+      // upstream 검색 실패 (네트워크 / 권한 등) 시 보수적으로 빈 배열 → count 0.
+      // Phase-2 조회 실패 → merged 0 건 → consecutive = 전체 Phase-1 (기존 동작 fallback).
+      phase2Prs = [];
+      phase2Count = 0;
+    }
+
+    // 3-b. Amendment 8 (#556) — Phase 2 중도 변경 정적 비교 (soft-warn)
+    //
+    // upstream open PR + 로컬 drift 파일 매칭 결과를 stdout 에 박제.
+    // CI workflow (adr-z-pattern-health-v2.yml) 가 본 stdout 을 파싱해
+    // [Phase 2 Sync Required] 라벨 부착 / 자동 코멘트 박제 트리거.
+    // exit code 변경 없음 (hard-block 아님 — Amendment 8 §결정점 3b 옵션 A).
+    const phase2Sync = verifyPhase2Sync('.');
+    if (phase2Sync.error) {
+      console.log(`\n[Phase 2 Sync] check skipped: ${phase2Sync.error}`);
+    } else if (phase2Sync.mismatches.length > 0) {
+      console.log(`\n[Phase 2 Sync Drift] ${phase2Sync.mismatches.length} 파일 매칭 (soft-warn):`);
+      for (const m of phase2Sync.mismatches) {
+        console.log(
+          `  - ${m.file} ↔ upstream PR #${m.upstreamPr} (head ${m.upstreamHead}) ${m.diffUrl}`,
+        );
+      }
+    } else {
+      console.log(`\n[Phase 2 Sync] OK — drift 파일 ↔ upstream open PR 매칭 0건`);
+    }
+    // Amendment 16 (#868, c-1) — unmarked PR 괴리 WARN (soft-warn, exit code 영향 없음).
+    // 파일 교집합은 있는데 제목/본문에 "ADR 20260515" 리터럴이 없는 PR — Phase-2 분자
+    // 카운트 (--search 기반) 에서 누락되므로 머지돼도 분자 불변. 식별 컨벤션 (Amendment 16
+    // §변경 3) 위반을 가시화하여 소급 마킹을 유도한다.
+    if (!phase2Sync.error && (phase2Sync.unmarked || []).length > 0) {
       console.log(
-        `  - ${m.file} ↔ upstream PR #${m.upstreamPr} (head ${m.upstreamHead}) ${m.diffUrl}`,
+        `[Phase 2 Sync WARN] unmarked PR ${phase2Sync.unmarked.length}건 — 제목/본문에 "ADR 20260515" 리터럴 부재 (Amendment 16 식별 컨벤션):`,
+      );
+      for (const u of phase2Sync.unmarked) {
+        console.log(
+          `  - upstream PR #${u.upstreamPr} (drift 파일 매칭 ${u.matchedFileCount}건) — 리터럴 박제 필요`,
+        );
+      }
+    }
+
+    // 3-c. Amendment 15 (#823) — substantive merged Phase-2 SSoT (3조건 공용 모수/앵커).
+    // 조건 1 ratio 분자 / 조건 2 연속 리셋 앵커 / 조건 3 90일 클록 앵커 전부 본 배열 기준.
+    // 4건 실측 전부 substantive → 현재 값 불변 (backward-compat). 미래 사소 PR (README/오타) 배제.
+    const substantiveMergedPhase2 = filterSubstantiveMergedPhase2(phase2Prs);
+    const substantiveCount = substantiveMergedPhase2.length;
+    // substantive merged Phase-2 의 max(mergedAt) — 조건 2/3 공용 리셋 앵커. 0 건이면 null.
+    const lastSubstantiveMs =
+      substantiveCount > 0
+        ? Math.max(...substantiveMergedPhase2.map((p) => new Date(p.mergedAt).getTime()))
+        : null;
+
+    // 4. 시간 경과 검증 — Amendment 15: 고정 절대 앵커 (ADR_FIRST_APPLY_DATE) 잠복 버그 해소.
+    // daysSinceLastSubstantive = today − max(substantive merged Phase-2 mergedAt).
+    // substantive 0 건이면 ADR_FIRST_APPLY_DATE fallback (backward-compat — 과거 Phase-2=0 레짐).
+    const firstApplyDate = new Date(ADR_FIRST_APPLY_DATE);
+    const today = new Date();
+    const clockAnchorMs = lastSubstantiveMs != null ? lastSubstantiveMs : firstApplyDate.getTime();
+    const daysSinceLastSubstantive = Math.floor(
+      (today.getTime() - clockAnchorMs) / (1000 * 60 * 60 * 24),
+    );
+    const clockAnchorLabel =
+      lastSubstantiveMs != null
+        ? `직전 substantive Phase-2 (${new Date(lastSubstantiveMs).toISOString().slice(0, 10)})`
+        : `ADR 첫 적용 (${ADR_FIRST_APPLY_DATE}, substantive 0 건 fallback)`;
+
+    // 5. 임계값 검증 (3중 OR) — Amendment 15: 3조건 전부 substantive 모수/앵커.
+    // 조건 1 분자 = substantive merged Phase-2 카운트. div-by-zero 가드 보존 (phase1Count>0).
+    const phase2Ratio = phase1Count > 0 ? substantiveCount / phase1Count : 0;
+    // 조건 2: 연속 산출에 substantive merged 배열 주입 (사소 PR 은 리셋 앵커 불인정).
+    const consecutiveSinceLastPhase2 = computeConsecutiveSinceLastPhase2(
+      phase1Prs,
+      substantiveMergedPhase2,
+    );
+    const triggers = [];
+
+    if (phase2Ratio < PHASE2_THRESHOLD) {
+      triggers.push(
+        `Phase 2 진행률 ${(phase2Ratio * 100).toFixed(1)}% < ${PHASE2_THRESHOLD * 100}% 임계값 (분자 = substantive 머지 ${substantiveCount})`,
       );
     }
-  } else {
-    console.log(`\n[Phase 2 Sync] OK — drift 파일 ↔ upstream open PR 매칭 0건`);
-  }
-  // Amendment 16 (#868, c-1) — unmarked PR 괴리 WARN (soft-warn, exit code 영향 없음).
-  // 파일 교집합은 있는데 제목/본문에 "ADR 20260515" 리터럴이 없는 PR — Phase-2 분자
-  // 카운트 (--search 기반) 에서 누락되므로 머지돼도 분자 불변. 식별 컨벤션 (Amendment 16
-  // §변경 3) 위반을 가시화하여 소급 마킹을 유도한다.
-  if (!phase2Sync.error && (phase2Sync.unmarked || []).length > 0) {
+    if (consecutiveSinceLastPhase2 >= N_THRESHOLD) {
+      triggers.push(
+        `직전 substantive Phase-2 이후 연속 Phase-1 ${consecutiveSinceLastPhase2}회 >= N=${N_THRESHOLD} 임계값`,
+      );
+    }
+    if (daysSinceLastSubstantive >= TIME_THRESHOLD_DAYS) {
+      triggers.push(
+        `${clockAnchorLabel} 이후 ${daysSinceLastSubstantive}일 경과 >= ${TIME_THRESHOLD_DAYS}일 임계값`,
+      );
+    }
+
+    // 6. 출력 + exit
     console.log(
-      `[Phase 2 Sync WARN] unmarked PR ${phase2Sync.unmarked.length}건 — 제목/본문에 "ADR 20260515" 리터럴 부재 (Amendment 16 식별 컨벤션):`,
+      `Phase 1 (본 프로젝트): ${phase1Count} (Amendment ${amendmentCount}, PR citations ${adrCitations})`,
     );
-    for (const u of phase2Sync.unmarked) {
-      console.log(
-        `  - upstream PR #${u.upstreamPr} (drift 파일 매칭 ${u.matchedFileCount}건) — 리터럴 박제 필요`,
-      );
+    // Amendment 14 (#822): 절대 누적 (생애) + 직전 Phase-2 이후 연속 두 차원 병기 (조건 2 SSoT = 연속).
+    console.log(
+      `  - 절대 누적 (생애): ${phase1Count} / 직전 Phase-2 이후 연속: ${consecutiveSinceLastPhase2} (조건 2 SSoT)`,
+    );
+    // Amendment 15 (#823): substantive 머지 / 전체 조회 병기 (조건 1/2/3 SSoT = substantive 머지).
+    console.log(
+      `Phase 2 (upstream harness-setting): ${phase2Count} (substantive 머지: ${substantiveCount})`,
+    );
+    console.log(
+      `Phase 2 진행률: ${(phase2Ratio * 100).toFixed(1)}% (분자 = substantive 머지 ${substantiveCount})`,
+    );
+    console.log(`조건 3 클록 앵커: ${clockAnchorLabel} 이후 ${daysSinceLastSubstantive}일 경과`);
+
+    if (triggers.length > 0) {
+      console.error(`\n[ADR Trigger] ADR 20260515 Z 패턴 §재검토 조건 #5 발화:`);
+      triggers.forEach((t) => console.error(`  - ${t}`));
+      process.exit(1);
+    } else {
+      console.log(`\n[ADR OK] 모든 임계값 미발화 (Amendment 1+2 정합)`);
+      process.exit(0);
     }
+  } catch (err) {
+    console.error(`ERROR: ${err.message}`);
+    process.exit(2);
   }
-
-  // 3-c. Amendment 15 (#823) — substantive merged Phase-2 SSoT (3조건 공용 모수/앵커).
-  // 조건 1 ratio 분자 / 조건 2 연속 리셋 앵커 / 조건 3 90일 클록 앵커 전부 본 배열 기준.
-  // 4건 실측 전부 substantive → 현재 값 불변 (backward-compat). 미래 사소 PR (README/오타) 배제.
-  const substantiveMergedPhase2 = filterSubstantiveMergedPhase2(phase2Prs);
-  const substantiveCount = substantiveMergedPhase2.length;
-  // substantive merged Phase-2 의 max(mergedAt) — 조건 2/3 공용 리셋 앵커. 0 건이면 null.
-  const lastSubstantiveMs =
-    substantiveCount > 0
-      ? Math.max(...substantiveMergedPhase2.map((p) => new Date(p.mergedAt).getTime()))
-      : null;
-
-  // 4. 시간 경과 검증 — Amendment 15: 고정 절대 앵커 (ADR_FIRST_APPLY_DATE) 잠복 버그 해소.
-  // daysSinceLastSubstantive = today − max(substantive merged Phase-2 mergedAt).
-  // substantive 0 건이면 ADR_FIRST_APPLY_DATE fallback (backward-compat — 과거 Phase-2=0 레짐).
-  const firstApplyDate = new Date(ADR_FIRST_APPLY_DATE);
-  const today = new Date();
-  const clockAnchorMs = lastSubstantiveMs != null ? lastSubstantiveMs : firstApplyDate.getTime();
-  const daysSinceLastSubstantive = Math.floor((today.getTime() - clockAnchorMs) / (1000 * 60 * 60 * 24));
-  const clockAnchorLabel =
-    lastSubstantiveMs != null
-      ? `직전 substantive Phase-2 (${new Date(lastSubstantiveMs).toISOString().slice(0, 10)})`
-      : `ADR 첫 적용 (${ADR_FIRST_APPLY_DATE}, substantive 0 건 fallback)`;
-
-  // 5. 임계값 검증 (3중 OR) — Amendment 15: 3조건 전부 substantive 모수/앵커.
-  // 조건 1 분자 = substantive merged Phase-2 카운트. div-by-zero 가드 보존 (phase1Count>0).
-  const phase2Ratio = phase1Count > 0 ? substantiveCount / phase1Count : 0;
-  // 조건 2: 연속 산출에 substantive merged 배열 주입 (사소 PR 은 리셋 앵커 불인정).
-  const consecutiveSinceLastPhase2 = computeConsecutiveSinceLastPhase2(
-    phase1Prs,
-    substantiveMergedPhase2,
-  );
-  const triggers = [];
-
-  if (phase2Ratio < PHASE2_THRESHOLD) {
-    triggers.push(
-      `Phase 2 진행률 ${(phase2Ratio * 100).toFixed(1)}% < ${PHASE2_THRESHOLD * 100}% 임계값 (분자 = substantive 머지 ${substantiveCount})`,
-    );
-  }
-  if (consecutiveSinceLastPhase2 >= N_THRESHOLD) {
-    triggers.push(
-      `직전 substantive Phase-2 이후 연속 Phase-1 ${consecutiveSinceLastPhase2}회 >= N=${N_THRESHOLD} 임계값`,
-    );
-  }
-  if (daysSinceLastSubstantive >= TIME_THRESHOLD_DAYS) {
-    triggers.push(
-      `${clockAnchorLabel} 이후 ${daysSinceLastSubstantive}일 경과 >= ${TIME_THRESHOLD_DAYS}일 임계값`,
-    );
-  }
-
-  // 6. 출력 + exit
-  console.log(`Phase 1 (본 프로젝트): ${phase1Count} (Amendment ${amendmentCount}, PR citations ${adrCitations})`);
-  // Amendment 14 (#822): 절대 누적 (생애) + 직전 Phase-2 이후 연속 두 차원 병기 (조건 2 SSoT = 연속).
-  console.log(`  - 절대 누적 (생애): ${phase1Count} / 직전 Phase-2 이후 연속: ${consecutiveSinceLastPhase2} (조건 2 SSoT)`);
-  // Amendment 15 (#823): substantive 머지 / 전체 조회 병기 (조건 1/2/3 SSoT = substantive 머지).
-  console.log(`Phase 2 (upstream harness-setting): ${phase2Count} (substantive 머지: ${substantiveCount})`);
-  console.log(`Phase 2 진행률: ${(phase2Ratio * 100).toFixed(1)}% (분자 = substantive 머지 ${substantiveCount})`);
-  console.log(`조건 3 클록 앵커: ${clockAnchorLabel} 이후 ${daysSinceLastSubstantive}일 경과`);
-
-  if (triggers.length > 0) {
-    console.error(`\n[ADR Trigger] ADR 20260515 Z 패턴 §재검토 조건 #5 발화:`);
-    triggers.forEach((t) => console.error(`  - ${t}`));
-    process.exit(1);
-  } else {
-    console.log(`\n[ADR OK] 모든 임계값 미발화 (Amendment 1+2 정합)`);
-    process.exit(0);
-  }
-} catch (err) {
-  console.error(`ERROR: ${err.message}`);
-  process.exit(2);
-}
 } // main() 종료 (Amendment 8 #556)
 
 // =============================================================================
@@ -620,7 +724,10 @@ function runSelfTest() {
       mergedAt: iso(d),
     }));
     const n = computeConsecutiveSinceLastPhase2(phase1, phase2);
-    assert(n === 4 && n < N_THRESHOLD, `(b) negative: 연속 ${n} (기대 4, < N=${N_THRESHOLD} 미발화)`);
+    assert(
+      n === 4 && n < N_THRESHOLD,
+      `(b) negative: 연속 ${n} (기대 4, < N=${N_THRESHOLD} 미발화)`,
+    );
   }
 
   // (c) recovery: 새 Phase-2 머지일 (2026-08-01) 이 모든 Phase-1 보다 이후 → 0 리셋
@@ -664,7 +771,11 @@ function runSelfTest() {
   //     08-01 README 트릭으로 consecutiveSinceLastPhase2 를 0 리셋 불가 (연속 유지).
   {
     const phase2 = [
-      { state: 'MERGED', mergedAt: iso('2026-05-18'), files: [{ path: '.claude/agents/developer.md' }] },
+      {
+        state: 'MERGED',
+        mergedAt: iso('2026-05-18'),
+        files: [{ path: '.claude/agents/developer.md' }],
+      },
       { state: 'MERGED', mergedAt: iso('2026-08-01'), files: [{ path: 'README.md' }] },
     ];
     const filtered = filterSubstantiveMergedPhase2(phase2);
@@ -698,7 +809,10 @@ function runSelfTest() {
       `(g) #248 형 .claude/agents/*.md ×5 → substantive=true (경로 기반, LoC 무관)`,
     );
     const filtered = filterSubstantiveMergedPhase2([pr]);
-    assert(filtered.length === 1, `(g) filterSubstantiveMergedPhase2 인정 → ${filtered.length} (기대 1)`);
+    assert(
+      filtered.length === 1,
+      `(g) filterSubstantiveMergedPhase2 인정 → ${filtered.length} (기대 1)`,
+    );
     const phase1 = ['2026-06-10', '2026-07-10'].map((d) => ({ mergedAt: iso(d) }));
     const n = computeConsecutiveSinceLastPhase2(phase1, filtered);
     assert(n === 0, `(g) substantive 리셋 앵커 인정: 08-01 이후 연속 ${n} (기대 0 리셋)`);
@@ -769,13 +883,11 @@ function runSelfTest() {
       `(i) package-lock.json → non-substantive (lock 변종, *.lock 미매칭 커버)`,
     );
     assert(
-      isSubstantivePhase2({ files: [{ path: 'assets/hero.png' }, { path: 'notes.txt' }] }) === false,
+      isSubstantivePhase2({ files: [{ path: 'assets/hero.png' }, { path: 'notes.txt' }] }) ===
+        false,
       `(i) 이미지+txt 조합 → non-substantive`,
     );
-    assert(
-      isSubstantivePhase2({ files: [] }) === false,
-      `(i) 파일 0개 → non-substantive (보수적)`,
-    );
+    assert(isSubstantivePhase2({ files: [] }) === false, `(i) 파일 0개 → non-substantive (보수적)`);
     assert(
       isSubstantivePhase2({ files: [{ path: 'README.md' }, { path: 'src/index.ts' }] }) === true,
       `(i) README + src/index.ts (비-trivial ≥1) → substantive`,
@@ -869,7 +981,8 @@ function runSelfTest() {
     }
     // recovery (기존 패턴 회귀 유지): Amendment N / hotfix / release: 접두
     assert(
-      isAdrEvolutionPr('docs(adr): [#556] ADR 20260515 Amendment 8 — Phase 1 드리프트 가시화') === true,
+      isAdrEvolutionPr('docs(adr): [#556] ADR 20260515 Amendment 8 — Phase 1 드리프트 가시화') ===
+        true,
       `(k) 기존 Amendment N 패턴 유지`,
     );
     assert(
@@ -890,13 +1003,17 @@ function runSelfTest() {
       `(l) positive: v1 stale 파일명 검출`,
     );
     assert(
-      findStaleWorkflowRefs('workflow: `.github/workflows/adr-z-pattern-health-v2.yml`').length === 0,
+      findStaleWorkflowRefs('workflow: `.github/workflows/adr-z-pattern-health-v2.yml`').length ===
+        0,
       `(l) negative: -v2 실재 파일명 미검출 (오탐 0)`,
     );
     const wfPath = '.github/workflows/adr-z-pattern-health-v2.yml';
     if (existsSync(wfPath)) {
       const stale = findStaleWorkflowRefs(readFileSync(wfPath, 'utf-8'));
-      assert(stale.length === 0, `(l) recovery: 실제 workflow stale 참조 ${stale.length}건 (기대 0)`);
+      assert(
+        stale.length === 0,
+        `(l) recovery: 실제 workflow stale 참조 ${stale.length}건 (기대 0)`,
+      );
     } else {
       assert(false, `(l) recovery: workflow 파일 부재 (${wfPath}) — 경로 확인 필요`);
     }
@@ -928,4 +1045,7 @@ export {
   scanTodoFiles,
   computeTodoResolutions,
   TODO_LINE_REGEX,
+  // Amendment 17 §(α) (#894) — 다중 URL 데코레이터 문법
+  DECORATOR_CONTENT_REGEX,
+  DECORATOR_URL_SEPARATOR,
 };
