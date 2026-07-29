@@ -46,6 +46,8 @@
  *   (M) **매니페스트 정합**: `.harnessignore` 가 무시하는 경로는 `.harness/manifest.json` 에
  *       남아 있으면 안 된다. 남으면 `removed-upstream` 으로 분류되어 `--interactive` 의
  *       **[d]elete 삭제 후보**로 계속 제시된다. 위반 시 `--prune-manifest --apply` 안내 후 exit 1.
+ *   (U) **미추적 사각**: `git add` 이전 신규 다운스트림 고유 파일 감지 (cross-validate 수용 2).
+ *       생성 모드는 **경고**, `--check` 는 **차단** — 비대칭 근거는 `run()` 주석 참조.
  *   (D) **drift**: `--check` 시 생성 결과 ≠ 커밋본이면 exit 1.
  *
  * ## 왜 git 추적 파일 기준인가
@@ -223,6 +225,39 @@ function gitTrackedPaths(rootDir) {
 }
 
 /**
+ * git **미추적 + 비-gitignore** 파일 목록 (cross-validate agy 수용 2 — #894 R2 라운드).
+ *
+ * `git ls-files` SSoT 는 결정성(CI ↔ 로컬 동일) 때문에 유지하지만, **`git add` 이전 신규
+ * 파일이 목록에서 누락되는 사각**이 있다. 이 결함은 본 PR 안에서 실제로 발화했다 —
+ * `scripts/harness-update-safe.sh` 를 새로 만든 커밋에서 `.harnessignore` 가 자신을
+ * 누락했고, 커밋 직후 `--check` 가 exit 1 로 잡았다 (한 라운드 늦은 검출).
+ *
+ * `git status --porcelain` 은 **gitignore 된 파일을 제외**하므로 `.claude/scheduled_tasks.lock`
+ * 같은 런타임 산출물은 여기 잡히지 않는다 (수동 섹션 담당 — 역할 분리 유지).
+ *
+ * @param {string} rootDir
+ * @returns {string[]} 미추적 경로 (repo 상대)
+ */
+function gitUntrackedPaths(rootDir) {
+  let out;
+  try {
+    out = execFileSync(
+      'git',
+      ['-C', rootDir, 'status', '--porcelain', '--untracked-files=all', '-z'],
+      { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 },
+    );
+  } catch (err) {
+    throw new BaselineUnavailableError(`git status 실패: ${err.message}`);
+  }
+  // `-z` 포맷: `XY <path>\0` (rename 은 `\0` 이 하나 더 붙지만 `??` 에는 없다)
+  return out
+    .split('\0')
+    .filter(Boolean)
+    .filter((entry) => entry.startsWith('?? '))
+    .map((entry) => entry.slice(3));
+}
+
+/**
  * upstream baseline 디렉토리의 추적 대상 경로 목록.
  * @param {string} baselineDir
  * @returns {string[]}
@@ -329,6 +364,27 @@ export function findUncoveredTargets(ignoreText, targets) {
 export function findStaleManifestEntries(ignoreText, manifestKeys) {
   const patterns = loadPatternsFromText(ignoreText);
   return manifestKeys.filter((p) => isIgnored(p, patterns)).sort();
+}
+
+/**
+ * 불변식 (U) — `git add` 이전이라 목록에 반영되지 못한 다운스트림 고유 파일.
+ *
+ * cross-validate agy 수용 2 (#894 R2). `git ls-files` SSoT 의 유일한 사각이며,
+ * 이미 커버되는 경로(디렉토리 압축 하위 등)와 upstream 존재 경로는 제외한다 —
+ * 조치가 필요한 것만 남겨야 경고가 잡음이 되지 않는다.
+ *
+ * @param {string} ignoreText
+ * @param {string[]} untrackedCandidates — filterTrackedCandidates 통과분
+ * @param {string[]} upstreamPaths
+ * @returns {string[]} 조치 필요 경로 (정렬)
+ */
+export function findUntrackedGaps(ignoreText, untrackedCandidates, upstreamPaths) {
+  const patterns = loadPatternsFromText(ignoreText);
+  const upstream = new Set(upstreamPaths);
+  return untrackedCandidates
+    .filter((p) => !upstream.has(p)) // upstream 존재 = ignore 대상 아님
+    .filter((p) => !isIgnored(p, patterns)) // 이미 커버됨 = 조치 불요
+    .sort();
 }
 
 // =============================================================================
@@ -497,6 +553,33 @@ async function run(opts) {
     );
     for (const p of uncovered.slice(0, 20)) console.error(`    - ${p}`);
     return 1;
+  }
+
+  // (U) 미추적 사각 — `git add` 이전 신규 다운스트림 고유 파일 (cross-validate 수용 2).
+  //
+  // **경고(생성) vs 차단(--check) 비대칭은 의도**다:
+  //   - 생성 모드는 "바로잡는" 동작이다. 여기서 차단하면 사각을 해소할 재생성 자체가
+  //     막혀 데드락이 된다 → 경고 + `git add` 안내로 충분.
+  //   - `--check` 는 게이트다. 미추적 후보가 있으면 커밋된 `.harnessignore` 가 디스크
+  //     상태에 대해 불완전하고, 다음 `harness update --apply` 가 그 파일을 carry-over 로
+  //     등록한다 → fail-fast 정합상 차단.
+  //   - CI 에서는 fresh checkout 이라 미추적 파일이 사실상 0 → 잡음 증가 없음.
+  //     발화 지점이 사람이 조치할 수 있는 로컬로 한정된다.
+  const untrackedGaps = findUntrackedGaps(
+    next,
+    filterTrackedCandidates(gitUntrackedPaths(rootDir)),
+    upstreamPaths,
+  );
+  if (untrackedGaps.length > 0) {
+    const label = opts.check
+      ? '[Harnessignore Untracked Gap]'
+      : 'WARN: 미추적 다운스트림 고유 파일';
+    const emit = opts.check ? console.error : console.warn;
+    emit(`\n${label} ${untrackedGaps.length}건 — 생성 SSoT(git ls-files) 에 아직 없음`);
+    for (const p of untrackedGaps.slice(0, 20)) emit(`    - ${p}`);
+    emit('  조치: git add <경로> 후 pnpm sync:harnessignore 재실행');
+    emit('  미조치 시 다음 `harness update --apply` 가 carry-over 로 재등록한다.');
+    if (opts.check) return 1;
   }
 
   if (opts.check) {
@@ -722,6 +805,42 @@ function runSelfTest() {
     // recovery: 검출분 제거 후 위반 0
     const pruned = polluted.filter((p) => !stale.includes(p));
     expect('M recovery: 제거 후 잔존 0', findStaleManifestEntries(text, pruned).length === 0);
+  }
+
+  // --- 불변식 (U) 3중 시뮬레이션 — 미추적 사각 (cross-validate 수용 2) ---
+  {
+    const plan = computeIgnorePlan(UP, [...UP, 'docs/reports/a.md']);
+    const text = buildBlock(plan, '9.9.9');
+    // positive: 미추적 후보 0 → 위반 0
+    expect('U positive: 미추적 0건 → 경고 없음', findUntrackedGaps(text, [], UP).length === 0);
+    // negative: 신규 다운스트림 스크립트 미추적 → 검출 (본 PR 실발화 케이스 재현)
+    const gaps = findUntrackedGaps(text, ['scripts/harness-update-safe.sh'], UP);
+    expect(
+      'U negative: 신규 미추적 스크립트 검출 (#894 실발화 재현)',
+      gaps.length === 1 && gaps[0] === 'scripts/harness-update-safe.sh',
+      JSON.stringify(gaps),
+    );
+    // 잡음 차단 1: 이미 디렉토리 압축으로 커버되는 경로는 조치 불요
+    expect(
+      'U 잡음 차단: 압축 디렉토리 하위 미추적은 조치 불요',
+      findUntrackedGaps(text, ['docs/reports/brand-new.md'], UP).length === 0,
+    );
+    // 잡음 차단 2: upstream 존재 경로는 ignore 대상이 아니므로 조치 불요
+    expect(
+      'U 잡음 차단: upstream 존재 경로는 대상 아님',
+      findUntrackedGaps(text, ['scripts/verify-a.mjs'], UP).length === 0,
+    );
+    // recovery: git add 후 목록에 반영되면 (isIgnored) 위반 0
+    const planAfter = computeIgnorePlan(UP, [
+      ...UP,
+      'docs/reports/a.md',
+      'scripts/harness-update-safe.sh',
+    ]);
+    expect(
+      'U recovery: git add 후 재생성 → 위반 0',
+      findUntrackedGaps(buildBlock(planAfter, '9.9.9'), ['scripts/harness-update-safe.sh'], UP)
+        .length === 0,
+    );
   }
 
   // --- replaceBlock — 수동 섹션 보존 / 손상 감지 ---
