@@ -1968,7 +1968,7 @@ update → repair --apply → verify 를 **원자적 1-step** 으로 만들라."
 
 **`.harnessignore` 자동 생성 + 데코레이터 다중 URL 문법 정식화 + Amendment 10 append 전환 (#894 PR-B)**
 
-- 상태: **Provisional** (cross-validate 후 Accepted 전이 — CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
+- 상태: **Accepted** (cross-validate 2026-07-30 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
 - 관련: 이슈 [#894](https://github.com/coseo12/astro-simulator/issues/894), 선행 [Amendment 17](#amendment-17--2026-07-28) (PR [#895](https://github.com/coseo12/astro-simulator/pull/895))
 
 ### 배경
@@ -2121,18 +2121,47 @@ cross-validate(agy, 로그 `.claude/logs/cross-validate-architecture-20260730-01
 
 ### 교차검증 반영 사항
 
-**미수행 — Accepted 전이 전 의무.** CLAUDE.md §교차검증 4 앵커 중 "ADR 신규·개정/폐기" 에 해당하며
-(본 Amendment 는 Amendment 8/10 을 개정한다), developer 페르소나는 cross-validate 스킬을 직접
-호출하지 않는다 (#479 박제). 메인 오케스트레이터 또는 reviewer/architect 단계에서 수행 후
-§교차검증 반영 사항 4축(합의 / 이견 / 고유 발견 / Claude 편향 셀프 체크)을 통합하고
-`상태: Accepted (cross-validate <YYYY-MM-DD>)` 로 전이한다.
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-30)** — 로그
+`.claude/logs/cross-validate-architecture-20260730-013648.log`. 명시 질문 3건 전달, 6대 기준 평가
+동반. 총평: _"단순한 스크립트 추가를 넘어 매니페스트 편입 파일 관리와 업데이트 절차의 재발 구조를
+철저히 위생화하는 매우 우수하고 타당한 설계."_
 
-**cross-validate 호출 시 명시 질문 권고** (본 Amendment 의 Claude 편향 셀프 체크에서 도출):
+**합의 (즉시 신뢰)**
 
-1. `.harnessignore` 생성 기준을 `git ls-files` 로 잡고 gitignore 된 런타임 산출물을 **수동 섹션**에
-   남겼다. 결정성을 얻는 대신 수동 유지 지점이 생겼는데, 이 분할이 옳은가? 전부 자동화할 방법이 있는가?
-2. 디렉토리 압축은 "upstream 이 그 디렉토리에 파일을 추가하면 조용히 숨긴다" 는 위험을 `--check`
-   재생성 drift 로만 막는다. `--check` 가 돌지 않는 경로(로컬 `--apply` 직후 등)에서 이 방어가
-   충분한가?
-3. alert fatigue 11 → 9 를 "정직화" 로 판정했다. 이 판정이 자기합리화인가? 모수에서 항목을 빼는
-   변경은 언제나 은폐로 읽힐 수 있는데, 반증 가능한 기준이 제시됐는가?
+- **명시 질문 1 (생성 SSoT)** — `git ls-files` 기준은 런타임 미추적 파일(`scheduled_tasks.lock` 등)에
+  의한 **비결정성 및 CI↔로컬 갈림을 막는 합리적 선택**. 워킹트리 스캔으로의 전환은 권고하지 않음.
+- **명시 질문 2 (디렉토리 압축)** — 압축은 관리 부담·PR 충돌을 크게 줄이며, 잔여 위험(upstream 이
+  해당 디렉토리에 파일 추가 시 silent drop)은 불변식 (S) + `--check` CI 차단 + **압축 자동 해제**로
+  방어된다 → **위험 수용 타당**. 개별 경로 나열로의 후퇴 불요.
+- **명시 질문 3 (alert fatigue 정직화)** — 단순 모수 축소가 아니라 **범주 오류 파일 제거**이고 임계
+  N=10 을 보존했으므로 **정당**. 자기합리화 아님.
+- 데코레이터 다중 URL 문법 정식화(`+` 구분자 명시)·다중 후보 시 `held` 보류·PR 번호 오름차순
+  결정 정렬은 **비결정성 제거 계약으로 명확**(인터페이스 명확성 ★★★★★).
+
+**고유 발견 2건 — 전건 수용, 본 PR(R2 라운드)에 반영**
+
+1. **원자적 래퍼의 롤백 부재 (Q3 파생)** — _"래퍼는 `--apply-_`를 실제 호출하는데 실패 시 이미
+apply 된 트리를 롤백하지 않는다. '1-step 이니 안심' 심리가 사고 규모를 키울 수 있다."*
+→ **clean working tree 사전 게이트**(dirty 시 exit 2) + **실행 직전 HEAD sha 앵커 출력** +`EXIT`trap 복구 안내 3축 반영. **자동 롤백은 의도적으로 도입하지 않음** — 래퍼가`git checkout .`/`reset --hard`를 자동 실행하면 사용자 작업 유실 위험이 원 문제보다 크다
+(CRITICAL #5). 복구 **가능성**을 보장하되 복구 **실행**은 사람이 한다. 우회 플래그`--allow-dirty` 는 릴리스 준비·충돌 해결 중 반복 실행 실용성을 위해 두되 기본 차단 + 경고 동반
+= 명시적 opt-in (silent 약화 아님). 비파괴 경로(`--check`/`--dry-run`)는 dirty 여도 통과.
+2. **미추적 파일 SSoT 갭 (Q1 파생)** — _"`git add` 전 신규 파일이 목록에서 빠진다"_ → **불변식 (U)**
+   신설 (`git status --porcelain` 기반 미추적 감지). **생성 모드 = 경고(exit 0) / `--check` = 차단
+   (exit 1)** 비대칭 채택 — 생성은 "바로잡는" 동작이라 차단하면 해소용 재생성이 막혀 데드락이고,
+   `--check` 는 게이트라 fail-fast 정합. CI 는 fresh checkout 이라 미추적 0 → **발화가 로컬에 한정**.
+
+**Claude 편향 셀프 체크 (4종) — agy 반증 반영**
+
+- **순수주의: 미통과 → 정정 수용.** 래퍼를 "1-step 원자 실행" 으로 설계하면서 **실패 시 남는 상태**를
+  충분히 다루지 않았다. agy 지적으로 clean tree 게이트 + 복구 앵커가 추가됐다.
+- 낙관적 일정: 통과 (본 Amendment 는 실행분이며 upstream 의존 없음).
+- 결합 간과: **부분 미통과** — reviewer 가 bash 3.2 빈 배열 즉사(`--dry-run-followup` 경로)를
+  적발했고, 구현 중 `[*]` 도 동일 위험임이 추가 실측됐다. 3중 시뮬이 그 경로를 커버하지 않았던 것이
+  근인 → **정적 금지 가드 + 탐지기 자기 검증 + 분기 결정표 12행**으로 회귀 차단.
+- 폐기 프레이밍: 통과 (Q2 위험 수용을 근거와 함께 유지, 후퇴 아님).
+
+**기각 0건** — agy 지적 중 근거 부족으로 반려한 항목은 없다.
+
+> **부수 — L3 가드 실발화**: 본 cross-validate 실행 중 `cross_validate.sh` 의 워킹트리 snapshot
+> 가드가 **agy 의 plan-mode 우회(파일 1건 수정)를 감지해 자동 롤백**했다 (#479 가드가 설계대로
+> 작동함을 실증).
