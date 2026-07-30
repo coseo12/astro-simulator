@@ -106,6 +106,27 @@ jobs:
       - name: '#842 docs 링크 가드 self-test (verify-docs-links --self-test)'
         run: node scripts/verify-docs-links.mjs --self-test
 
+      # #894 upstream baseline 가드 self-test 회귀 가드 (ADR 20260515 Amendment 17).
+      # --self-test 는 로컬 픽스처 주입만 사용 (tarball 미다운로드 — **네트워크 미의존**)해
+      # 불변식 (A)(B)(C) 각각의 positive→negative→recovery 3중 시뮬 + managed-block 해시
+      # 충실성 + exit 2(판정 불가) 3경로를 상시 실측한다. 본검사(upstream 원본 대조, 네트워크
+      # 사용)는 harness-guards.yml "upstream baseline 가드" 담당 — 두 배선의 역할이 다르다.
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#894 upstream baseline 가드 self-test (verify-harness-upstream-baseline --self-test)'
+        run: node scripts/verify-harness-upstream-baseline.mjs --self-test
+
+      # #897 drift 데코레이터 가드 self-test 회귀 가드 (ADR 20260515 Amendment 19).
+      # 종전까지 이 self-test 는 **어느 workflow 에도 배선되지 않아** 로컬에서만 도는
+      # 장식이었다 (자매 가드는 바로 위 스텝으로 배선 — 비대칭 실측 #897).
+      # Amendment 8 데코레이터 regex / Amendment 9 boundary (N-1/N/N+1) / Amendment 11
+      # sidecar 라이프사이클 / Amendment 13 allowlist 4중 검증 / Amendment 19 categorical
+      # drift 판정 (블록 밖 오염 → 미발화, 블록 내부 변조·센티널 훼손 → 발화, malformed
+      # entry → throw) 을 fixture 격리로 상시 실측한다.
+      # 본검사(전수 판정, fail-fast)는 harness-guards.yml "Z 패턴 데코레이터 가드" 담당.
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#897 drift 데코레이터 가드 self-test (verify-harness-drift-decorator --self-test)'
+        run: node scripts/verify-harness-drift-decorator.mjs --self-test
+
       # #846 browser-verify 공용 헬퍼 (launchBrowser / bootstrapScene / collectConsoleErrors /
       # saveCapture / resolveBaseUrl) 회귀 가드. 브라우저를 띄우지 않는 stand-alone node 테스트
       # (루트 scripts/ 는 vitest workspace 밖 — bench-aggregate-median.test.mjs 선례).

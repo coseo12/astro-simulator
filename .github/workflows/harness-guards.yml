@@ -90,3 +90,50 @@ jobs:
       - name: HARNESS-DRIFT 데코레이터 가드
         if: hashFiles('scripts/verify-harness-drift-decorator.mjs') != ''
         run: node scripts/verify-harness-drift-decorator.mjs
+
+      # ── 아래 2 스텝은 `if: hashFiles(...)` 조건을 **의도적으로 두지 않는다** (#894 reviewer R3)
+      #
+      # 위 스텝들의 `hashFiles` 조건은 "해당 스크립트를 포함하지 않는 다운스트림에선 조용히
+      # 스킵" 이라는 upstream 배포 편의를 위한 것이다. 그러나 아래 2 스텝은 **본 프로젝트
+      # 고유 가드**다 — upstream harness-setting v4.5.0 에 해당 스크립트가 존재하지 않는다
+      # (`.harnessignore` 대상, 실측). 따라서 "스크립트 부재" 는 배포 시나리오가 아니라
+      # **가드가 삭제된 회귀**이며, 조용히 스킵하면 안 된다.
+      #
+      # `hashFiles` 를 붙이면 스크립트를 지우는 것만으로 CI 가 초록인 채 가드가 사라진다 —
+      # CLAUDE.md §가드 설계 원칙 "drift 가드는 fail-fast 만, fallback 분기 절대 금지" 위반이고
+      # #894 가 다룬 "가드가 초록인 채로 P0 가 열려 있다" 시그니처와 정확히 동형이다.
+      # 선례: 바로 위 `docs 상대 링크 무결성 가드` 가 #842 에서 동일 근거로 hashFiles 를 제거했다.
+      #
+      # 트레이드오프 (박제): 본 파일이 Phase 2 로 upstream 에 역기여될 때 이 2 스텝은 그대로
+      # 갈 수 없다. 그 시점에 스텝 분리(다운스트림 전용 workflow) 또는 스크립트 동반 기여
+      # 중 택일한다 — 무조건 실행이 upstream 에 들어가면 다른 프로젝트가 즉시 깨진다.
+
+      # upstream baseline 가드 (#894 ADR 20260515 Amendment 17)
+      # 자매 가드(위)는 `.harness/manifest.json` 을 baseline 으로 믿는다. 그러나 upstream
+      # apply() 가 `buildManifest(cwd)` 로 프로젝트 디스크를 재해싱하므로, 미적용 divergent
+      # 파일의 로컬 해시가 baseline 으로 **세탁**되어 drift 집합에서 이탈한다. 그 상태에서
+      # 자매 가드는 초록인 채로 다음 `--apply-all-safe` 가 다운스트림 가드 조항을 덮어쓴다
+      # (#894 §0-4 — 실측: 세탁 6건, 자매 가드 drift 5 / FAIL 0).
+      #
+      # 본 가드는 baseline 을 upstream 태그 tarball 원본으로 두고 3 불변식을 fail-fast 검증한다.
+      # cron 이 아니라 **PR 경로**여야 한다 — harness update PR 자체가 위험 지점이다.
+      # exit 2(네트워크 실패/태그 부재) 는 "판정 불가" 로 CI 를 실패시킨다 (PASS 흡수 금지).
+      # SSoT: docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 17
+      - name: upstream baseline 가드
+        run: node scripts/verify-harness-upstream-baseline.mjs
+
+      # .harnessignore 자동 생성 가드 (#894 PR-B, ADR Amendment 17 §결정 7)
+      # upstream `walkTracked()` 가 TRACKED_DIRS 를 통째로 순회해 다운스트림 고유 파일까지
+      # 매니페스트에 등록한다 (실측 359 entry 중 264 = 73.5%). 이들은 전부 `removed-upstream`
+      # 으로 분류되어 `--interactive` 의 **[d]elete 삭제 후보**로 상시 노출된다 (잠재 파괴 경로).
+      #
+      # 5 불변식을 검사한다:
+      #   (S) `.harnessignore` 가 upstream 존재 경로를 무시하면 안 됨 (added/missing-locally 오분류)
+      #   (K) upstream 부재 대상은 전부 커버 (carry-over 재유입 차단)
+      #   (M) `.harnessignore` 매칭 경로가 매니페스트에 잔존하면 안 됨
+      #   (U) 미추적 다운스트림 고유 파일 감지 — `--check` 는 차단, 생성 모드는 경고 (#894 R2)
+      #   (D) 생성 목록이 현행 `git ls-files` 와 일치 (신규 파일 반영 누락 차단)
+      # 위 baseline 가드와 같은 job 이므로 tarball 캐시(RUNNER_TEMP)를 재사용한다 — 네트워크 0.
+      # (`.prettierignore` 동기화는 기존 `prettierignore-drift.yml` 이 담당 — 중복 배선하지 않는다)
+      - name: .harnessignore 동기화 가드
+        run: node scripts/sync-harnessignore.mjs --check

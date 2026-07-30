@@ -3,7 +3,6 @@ description: 머지된 PR을 volt 이슈 초안으로 자동 변환 (capture-vol
 argument-hint: [PR번호 | 미지정 시 최근 머지된 PR]
 allowed-tools: [Bash, Read, Skill]
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/324] -->
 
 # /capture-merge — PR 머지 → volt 캡처 초안
 

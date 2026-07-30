@@ -6,7 +6,6 @@ description: |
   PR 생성 전 검증, QA 에이전트 작업, CI 실패 디버깅.
   DO NOT TRIGGER when: 테스트를 작성만 하고 실행하지 않을 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/322] -->
 
 # 테스트 실행
 

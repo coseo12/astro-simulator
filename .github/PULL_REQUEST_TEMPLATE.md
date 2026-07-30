@@ -1,4 +1,3 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/321 + https://github.com/coseo12/harness-setting/pull/324] -->
 ## [#이슈번호] 변경 설명
 
 ### 변경 사항
