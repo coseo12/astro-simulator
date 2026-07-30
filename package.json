@@ -56,6 +56,8 @@
     "verify:docs-links": "node scripts/verify-docs-links.mjs",
     "verify:harness-baseline": "node scripts/verify-harness-upstream-baseline.mjs",
     "verify:harness-baseline:repair": "node scripts/verify-harness-upstream-baseline.mjs --mode=repair",
+    "verify:harness-drift": "node scripts/verify-harness-drift-decorator.mjs",
+    "verify:harness-drift:count": "node scripts/verify-harness-drift-decorator.mjs --mode=count-warn",
     "harness:update:safe": "bash scripts/harness-update-safe.sh",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",

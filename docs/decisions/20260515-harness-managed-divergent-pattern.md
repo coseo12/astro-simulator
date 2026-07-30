@@ -91,7 +91,7 @@ Gemini cross-validate (2026-05-15) 도 본 패턴을 "재사용 가능한 핵심
 3. **다운스트림 프로젝트 ≤ 1** — 본 프로젝트가 유일한 harness 사용자가 되면 (다른 프로젝트 전부 fork 또는 폐기) X 경로 가치 0 → Y 단독으로 회귀
 4. **`harness update --apply-all-safe` 자가 복구 정책 변경** — v2.9.0+ 의 `previousSha256` 자가 복구가 비활성화되면 Phase 3 자동 동기화 보장 약화 → 재평가
 5. **Phase 2 (upstream 기여) N=10 회 연속 미진행 OR Z 패턴 첫 적용 후 90일 경과** — Y (영구 fork) 회귀 신호로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [ADR Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 일괄 처리 vs 패턴 폐기 vs N 임계값 재조정 결정 분기). **2026-05-16 Amendment 2 로 N=3→10, 30일→90일 완화** (1인 운영 현실 대응, silent 가드 약화 트레이드오프 수용 — §Amendment 2 참조). **2026-05-25 Amendment 7 로 Phase 1 카운트 측정 식 정정** — ADR 자체 진화 PR (Amendment 박제 / hotfix / release) 제외하여 자기참조 인플레이션 회피 (§Amendment 7 참조). **2026-05-26 Amendment 8 로 Phase 1 드리프트 가시화 + Phase 2 중도 변경 정적 비교 가드 박제** — HARNESS-DRIFT 데코레이터 주석 의무 (`<!-- HARNESS-DRIFT: Z-PATTERN [upstream-link] -->`) + Phase 2 중도 drift 자동 비교 (Amendment 5 보완, soft-warn 라벨 부착) — silent 가드 강화 방향. 측정 식 / N 임계 / 90일 임계 변경 없음 (§Amendment 8 참조). **2026-07-14 Amendment 14 로 계약 원문 ("N=10 회 연속 미진행") 충실 구현** — 조건 2 측정을 절대 누적 회차 (`phase1Count >= N`) → **직전 Phase-2 기여 이후 연속 Phase-1 회차** (`consecutiveSinceLastPhase2 >= N`) 로 정정. 절대 누적은 단조 증가하여 Phase-2 진행 여부와 무관하게 영구 false-fire (계약의 "연속" 리셋 의미 탈락). N=10 임계 불변 — 측정 정밀화 (Amendment 7/13 동일 계열), 임계 완화 (옵션 C) 아님 (§Amendment 14 참조). **2026-07-14 Amendment 15 로 Phase-2 카운트에 substantiality (경로 denylist) 퀄리파이어 3조건 일관 적용** — 조건 1 (ratio 분자) / 조건 2 (연속 리셋 앵커) / 조건 3 (90일 클록 앵커) 을 substantive **머지** Phase-2 (모든 변경 파일이 trivial denylist 매칭이면 배제) 기준으로 정밀화. 머지된 사소 PR (README/오타 1줄) 로 조건 우회 (리셋 게이밍) 차단 + 조건 3 `ADR_FIRST_APPLY_DATE` 고정 절대 앵커 잠복 버그 (day 90 이후 영구 false-fire, #822 조건 2 와 동일 클래스) 를 substantive Phase-2 max 앵커 (없으면 firstApply fallback) 로 해소. N=10/33%/90일 임계 불변 — 모수/앵커 정밀화 (Amendment 7/13/14 동일 계열), 4건 실측 전부 substantive → backward-compat (§Amendment 15 참조).
-6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 `.harness/manifest.json` 의 sha256 과 불일치하는 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조). **2026-06-30 Amendment 13 — 첫 발화 ([#766](https://github.com/coseo12/astro-simulator/issues/766), drift 10 = N=10 경계) 결정 분기 이행**: 옵션 3′ (영구 divergent allowlist — 구조적 기여 불가능 자산 카운트 모수 제외) + 부분 옵션 1 채택. N=10 임계 불변 — 카운트 **모수** 정제 (측정 정밀화, orphan 제외 §결정점 5 동일 계열) ≠ 임계 완화 (옵션 3 silent 약화 거부). 자세히는 §Amendment 13. **2026-07-14 Amendment 15 (§재검토 조건 #5 substantiality 모수/앵커 정밀화) 는 본 #6 Amendment 13 (drift 카운트 모수 정제) 와 동일 계열** — 서로 다른 축 (#5 Phase-2 카운트 substantiality vs #6 drift 파일 카운트 allowlist) 이나 둘 다 "임계 불변 + 카운트 모수 정밀화" 접근 (§Amendment 15 참조).
+6. **동시 활성 drift 파일 수 ≥ N=10** — 본 ADR Z 패턴이 반복 적용되어 **§Amendment 19 §모수 정의 (규범) 4조건을 모두 만족하는** 활성 drift 파일이 N=10 개를 동시에 초과하면 경고 피로감 (Alert Fatigue) 위험으로 간주. 트리거 발화 시 후속 행동: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 (Phase 2 가속 / 일부 Phase 1 revert / N 임계값 재조정 결정 분기). **2026-05-26 Amendment 9 박제** — drift 카운트 차원 (활성 drift 파일 수) 은 본 #6 / Phase 2 진행률 시간/누적 차원은 #5. 둘은 직교 (서로 다른 축으로 silent 회귀 신호 포착). soft-warn (라벨 + 자동 이슈, CI hard-block 아님) — Amendment 8 §결정점 3b 옵션 A 정합 답습. 측정 식 / N 임계 / 90일 임계 (#5) 변경 없음 (§Amendment 9 참조). **2026-06-30 Amendment 13 — 첫 발화 ([#766](https://github.com/coseo12/astro-simulator/issues/766), drift 10 = N=10 경계) 결정 분기 이행**: 옵션 3′ (영구 divergent allowlist — 구조적 기여 불가능 자산 카운트 모수 제외) + 부분 옵션 1 채택. N=10 임계 불변 — 카운트 **모수** 정제 (측정 정밀화, orphan 제외 §결정점 5 동일 계열) ≠ 임계 완화 (옵션 3 silent 약화 거부). 자세히는 §Amendment 13. **2026-07-14 Amendment 15 (§재검토 조건 #5 substantiality 모수/앵커 정밀화) 는 본 #6 Amendment 13 (drift 카운트 모수 정제) 와 동일 계열** — 서로 다른 축 (#5 Phase-2 카운트 substantiality vs #6 drift 파일 카운트 allowlist) 이나 둘 다 "임계 불변 + 카운트 모수 정밀화" 접근 (§Amendment 15 참조).
 
 ### 측정 지표
 
@@ -502,7 +502,7 @@ const phase1Count = Math.max(amendmentCount, adrCitations);
 #### 1. §재검토 조건 #6 신설 — 동시 활성 drift 파일 수 ≥ N=10
 
 - **위치**: §재검토 조건 #5 (Phase 2 진행률 시간/누적 차원) 와 직교한 **drift 파일 수 차원** 추가
-- **임계값 SSoT**: `N=10` (활성 drift 파일 수 = `.harness/manifest.json` sha256 과 실제 파일 sha256 불일치 + manifest 등록된 파일만 카운트, orphan sidecar 제외)
+- **임계값 SSoT**: `N=10` (임계 자체는 이후 어떤 Amendment 로도 변경되지 않았다). **카운트 모수의 규범 정의는 §Amendment 19 §모수 정의 (규범) 가 SSoT** — 본 줄의 원문("`.harness/manifest.json` sha256 과 실제 파일 sha256 불일치 + manifest 등록된 파일만 카운트, orphan sidecar 제외")은 Amendment 13/17/18 의 모수 정제를 반영하지 못한 채 §재검토 조건 #6 과 정의가 갈라져 있었고, Amendment 19 가 두 곳을 단일 정의로 통합했다 (#897).
 - **트리거 발화 시 후속 행동**: 3 영업일 내 [Alert Fatigue Trigger] 라벨 discussion 이슈 생성 의무 — Phase 2 가속 (점진 drift 해소) / 일부 Phase 1 revert (긴급 정리) / N 임계값 재조정 (Amendment 2/7 silent 약화 사이클 답습 — 신중)
 
 #### 2. 측정 결함 baseline 박제 — 2026-05-26 실측
@@ -2054,10 +2054,15 @@ Amendment 9 의 활성 drift 파일 수가 **11 → 9** 로 감소해, Amendment
 | `.claude/scheduled_tasks.lock`    | git 미추적 **런타임 lock**. 세션마다 갱신되어 모수가 10↔11 로 진동하던 원인 (Amendment 17 §실측 정정 박스가 기록한 그 진동) | upstream 대응물이 없어 "upstream 대비 divergence" 자체가 성립하지 않음 — **범주 오류** |
 | `scripts/verify-zombie-check.mjs` | upstream 부재 다운스트림 고유 가드 스크립트. reviewer R2 가 artifact 로 지목한 2건 중 1건                                   | 동상 — **범주 오류**                                                                   |
 
-- **정직화인 근거**: 두 항목은 Amendment 9 가 정의한 모수("harness-managed 파일의 upstream 대비
-  divergence")에 원래 속하지 않았다. `walkTracked` 의 `TRACKED_DIRS` 통째 순회 결함(§0-5)으로
-  매니페스트에 편입된 것이지 Z 패턴 Phase 1 로 생긴 drift 가 아니다. 신규 baseline 가드의
-  `divergent: 8` 이 의미상 정확한 값이며, 정리 후 9 는 그 8 + `CLAUDE.md` 1 (아래 잔존 artifact) 이다.
+- **정직화인 근거**: 두 항목은 alert fatigue 카운트 모수("harness-managed 파일의 upstream 대비
+  divergence")에 원래 속하지 않았다.
+  > **인용 정정 (Amendment 19, #897)**: 본 문장은 원래 이 정의를 "Amendment 9 가 정의한 모수"
+  > 라고 인용했으나, **그 문구는 Amendment 9 원문에 존재하지 않는다** (Amendment 9 §변경 사항 1
+  > 은 upstream 이 아니라 **manifest** 상대 정의였다). upstream 상대로의 baseline 전환은
+  > Amendment 17 §결정 1 에서 도입됐고 Amendment 9 원문은 갱신되지 않은 채였다. 즉 본 서술의
+  > **판단은 옳고 귀속만 틀렸다**. 규범 정의의 SSoT 는 §Amendment 19 §모수 정의 (규범) 이다. `walkTracked` 의 `TRACKED_DIRS` 통째 순회 결함(§0-5)으로
+  > 매니페스트에 편입된 것이지 Z 패턴 Phase 1 로 생긴 drift 가 아니다. 신규 baseline 가드의
+  > `divergent: 8` 이 의미상 정확한 값이며, 정리 후 9 는 그 8 + `CLAUDE.md` 1 (아래 잔존 artifact) 이다.
 - **은폐가 아닌 근거**: 임계값 **N=10 은 불변**이다 (Amendment 9 SSoT 보존, 의식적 silent 약화 아님).
   실제 Phase-1 divergent 8건은 **하나도 해소되지 않았고**, Amendment 17 §실측 정정 박스가 선언한
   "해소 경로는 Phase 2 upstream 기여(옵션 1), 임계 재조정(옵션 3) 기각" 은 **그대로 유효**하다.
@@ -2071,6 +2076,12 @@ Amendment 9 의 활성 drift 파일 수가 **11 → 9** 로 감소해, Amendment
 8 로 내려가 신규 가드와 완전히 일치하지만, **drift 검출 의미론을 바꾸는 변경**이라 실제 센티널
 drift 를 가릴 위험이 있다. PR-B 범위(이미 manifest 264 entry + 신규 스크립트 2종)를 고려해
 **후속 이슈로 분리**하고, 본 Amendment 는 모수에 artifact 1건이 남아 있음을 명시 박제한다.
+
+> **해소됨 → §Amendment 19 (#897)**. 다만 위 서술 중 "실제 센티널 drift 를 가릴 위험" 은
+> #897 실측으로 **반증**됐다 — categorical 전환은 센티널 훼손 검출을 오히려 **유지·강화**한다
+> (블록 내부 변조 / 센티널 전삭제 / 부분 훼손 3케이스 모두 drift 발화, self-test 고정).
+> 가려질 위험이 있었던 쪽은 반대로 **현행 plain 비교**였다: 판정이 입력과 무관한 상수라
+> `CLAUDE.md` 의 실제 센티널 훼손도 "이미 drift" 에 묻혀 구별되지 않았다.
 
 ### R2 라운드 반영 — reviewer 차단 + cross-validate 수용 (2026-07-30)
 
@@ -2165,3 +2176,427 @@ apply 된 트리를 롤백하지 않는다. '1-step 이니 안심' 심리가 사
 > **부수 — L3 가드 실발화**: 본 cross-validate 실행 중 `cross_validate.sh` 의 워킹트리 snapshot
 > 가드가 **agy 의 plan-mode 우회(파일 1건 수정)를 감지해 자동 롤백**했다 (#479 가드가 설계대로
 > 작동함을 실증).
+
+---
+
+## Amendment 19 (2026-07-30) — managed-block drift 판정 해시 도메인 정정 + 모수 정의 명문화 + 수치 박제 규약
+
+- 관련 이슈: [#897](https://github.com/coseo12/astro-simulator/issues/897) (선행: [#894](https://github.com/coseo12/astro-simulator/issues/894) PR-B §Amendment 18 "잔존 artifact 1건")
+- 상태: **Accepted** (cross-validate 2026-07-30 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로)
+
+### 배경 — Amendment 18 이 남긴 artifact 1건의 실제 성격
+
+Amendment 18 은 `CLAUDE.md` 가 `verify-harness-drift-decorator.mjs` 의 plain sha256 해싱 때문에
+영구 drift 로 잡힌다고 기록하고 "**과검출이지만 안전측**" 이라는 판단 하에 후속으로 분리했다.
+#897 실측이 그 판단을 **반증**했다.
+
+#### 정정 1 — 매니페스트에 `categoricalSha256` 이라는 필드는 없다
+
+이슈 본문의 "필드 불일치" 서술은 부정확하다. 실측 (전수 95 entry):
+
+- `categoricalSha256` 키를 가진 entry: **0개**
+- `sha256` 문자열이 없는 entry: **0개**
+
+정확한 서술은 — **필드명은 `sha256` 이지만 그 값이 `categoricalSha256()` 으로 계산된다.**
+`managed-block` 카테고리에서만 `managedSha256()` (센티널 내부만 해시) 이 쓰이고 나머지
+카테고리는 plain sha256 이라 두 값이 우연히 일치한다. 즉 필드 불일치가 아니라 **동일 필드 안에서
+카테고리별로 해시 도메인이 갈리는** 구조이며, 영향 파일은 `categorize()` 기준
+**`managed-block` 1건 = `CLAUDE.md` 뿐**이다.
+
+#### 정정 2 — "과검출이지만 안전측" 이 아니라 **정보량 0 의 상수**다
+
+4-way 해시 실측 (아래 §실측 스냅샷 A):
+
+| 값                                         | 해시                               |
+| ------------------------------------------ | ---------------------------------- |
+| `manifest.files["CLAUDE.md"].sha256`       | `0395d6bb…`                        |
+| `managedSha256(로컬 CLAUDE.md)`            | `0395d6bb…` ← manifest 와 **일치** |
+| `managedSha256(upstream v4.5.0 CLAUDE.md)` | `0395d6bb…` ← 역시 **일치**        |
+| `plain sha256(로컬 CLAUDE.md)`             | `c9e2b2b4…`                        |
+| `plain sha256(upstream CLAUDE.md)`         | `2ab04671…`                        |
+
+세 번째 행이 결정적이다. **manifest 값은 upstream 원본의 managed 해시와도 같다.** 따라서 로컬
+`CLAUDE.md` 를 upstream 원본으로 **완전히 교체해도** plain 해시는 manifest 와 여전히 다르다.
+격리 픽스처로 직접 재현했다 — 로컬 `CLAUDE.md` = upstream v4.5.0 원본 그대로 (오염 0):
+
+```text
+=== 로컬 CLAUDE.md == upstream v4.5.0 원본 (블록 밖 오염 0) ===
+harness drift files: 1
+```
+
+**오염이 0인데도 drift 1.** 이 비교는 "블록 밖 변경을 잡는 과검출"이 아니라 **입력과 무관하게
+항상 참인 상수**다. 오염이 1글자든 10,000줄이든 판정이 동일하므로 **검출 능력은 0**이다.
+센티널 블록이 존재하는 한 충돌 확률 ~0 으로 영구히 참이다.
+
+파생 결과로 **Phase 3 이 구조적으로 도달 불가**였다. `--mode=verify` (Amendment 8 fail-fast) 는
+drift 파일에 데코레이터를 요구하는데, pristine 파일에 데코레이터를 박는 행위 자체가 파일 전체
+divergence 를 만들어 요구를 **사후적으로 자기 정당화**한다. `CLAUDE.md` 는 upstream 흡수를 아무리
+완료해도 drift 목록에서 영원히 이탈할 수 없고 N=10 예산 1칸을 영구 점유한다.
+
+다른 요인은 없다 — 로컬/upstream 센티널 ID 집합이 `["critical-directives","real-lessons"]` 로 완전
+동일하고 `managedSha256` 3자 값이 모두 일치한다. 파싱 drift 는 **없다**. 단일 원인 = 해시 도메인
+불일치로 확정.
+
+### 결정
+
+#### 결정 1 — `detectDriftFiles()` 판정을 **카테고리 정합 해시**로 전환 (옵션 a)
+
+`verify-harness-drift-decorator.mjs::detectDriftFiles()` 가 `categoricalSha256(rel, abs)` 로 판정한다.
+manifest 가 기록하는 도메인과 판정 도메인을 일치시키는 것이며, **도메인이 다른 해시를 비교하지
+않는다**가 본 함수의 불변식이 된다.
+
+3안 비교:
+
+| 평가축                         | (a) categorical 전환                                | (b) plain 유지 + 모수 제외                              | (c) 현행 유지            |
+| ------------------------------ | --------------------------------------------------- | ------------------------------------------------------- | ------------------------ |
+| 블록 밖 오염 검출 능력         | 상실 없음 — 현행 검출 능력이 **애초에 0** (§정정 2) | 동일하게 0                                              | 0                        |
+| alert fatigue 모수 정확성      | 9 → 8, baseline `divergent: 8` 과 집합까지 일치     | 8 (동일 수치)                                           | 9 — artifact 1 영구 포함 |
+| 신규 baseline 가드와 개념 정합 | ✅ 각자 자기 도메인에서 유의미                      | ⚠️ 판정은 상수인 채 카운트만 가림                       | ❌ 두 가드가 상반 보고   |
+| 유지 비용                      | 1회 수정, 이후 자기유지                             | 제외 목록 영구 유지 + 신규 managed-block 마다 수기 추가 | 논쟁 재발 비용 반복      |
+| fail-fast 정합                 | ✅ 판정식 자체를 정정                               | ❌ 틀린 판정을 남긴 채 결과만 억제 = silent 약화        | ⚠️ 상수 판정 상시 유지   |
+
+**(b) 는 추가로 구조적으로 막혀 있다** — 기존 제외 기구인 `PERMANENT_DIVERGENT_ALLOWLIST` 는
+`FORBIDDEN_ALLOWLIST_PATH_PATTERNS` 에 `/(^|\/)CLAUDE\.md$/` 를 명시 등록해 hard-FAIL 한다.
+(b) 를 하려면 ① 이 deny-list 에서 `CLAUDE.md` 를 빼거나 (= Amendment 15 리셋 게이밍 방어를 **그
+대표 사례에서** 되돌림) ② 두 번째 제외 기구를 병설해야 한다 (제외 경로 이원화 = 본 논쟁의 재생산).
+둘 다 기각. **(c) 기각 근거**: 유일한 정당화였던 "과검출이지만 안전측" 이 §정정 2 로 반증됐다.
+
+**블록 밖 오염 축은 공백이 아니다.** harness 계약은 "센티널 블록 내부 = upstream 소유 / 그 밖 =
+다운스트림 소유" 이며, 본 저장소의 `## 프로젝트 고유 보강 교훈` 섹션이 정확히 그 설계 의도의
+산물이다. 블록 밖에는 위반될 upstream 계약이 없고 `apply` 가 센티널 내부만 교체하므로 덮어쓰기
+위험도 0이다. 그럼에도 파일 전체 divergence 는 **본 ADR 의 baseline 가드 불변식 (A)(B) 가 계속
+본다** (§결정 4). 진짜 위험인 **센티널 블록 자체의 훼손·삭제**는 categorical 비교가 잡는다 —
+`managedSha256()` 은 블록 0개면 전문 해시로 폴백하므로 센티널을 지우면 해시 도메인이 바뀌어 drift 가
+정상 발화한다 (upstream 규약 재현이지 본 가드의 fallback 분기가 아니다).
+
+#### 결정 2 — 해시 규약 3함수 SSoT 를 자매 가드로 이관
+
+`categorize()` / `managedSha256()` / `categoricalSha256()` 의 정본을
+`verify-harness-drift-decorator.mjs` 로 옮기고 `verify-harness-upstream-baseline.mjs` 는 import 후
+**re-export 유지** (외부 계약 불변). import 방향을 **baseline → drift-decorator 로 고정**한다 —
+baseline 가드는 이미 같은 방향으로 `DECORATOR_REGEX` / `decoratorFormatFor` 를 import 하므로 순환이
+생기지 않는다. 역방향은 ESM 순환 + TDZ 위험. 신규 `scripts/lib/*.mjs` 추출은 `.harnessignore`
+재생성 + frozen 카테고리 신규 파일이라는 부수 비용 대비 실익이 없어 기각.
+
+#### 결정 3 — `detectDriftFiles()` 의 silent fallback 제거 (fail-fast 정합)
+
+종전 `if (typeof expected === 'string' && sha !== expected)` 는 문자열 `sha256` 이 없는 entry 를
+**조용히 drift 검사에서 제외**했다. 현재 그런 entry 는 0건이라 잠복 상태였으나 CLAUDE.md
+§가드 설계 원칙 ("drift 가드는 fail-fast 만 — fallback 분기 절대 금지") 의 정면 위반이다.
+malformed entry 는 **throw** 한다. legacy 스키마 (entry 가 sha 문자열 직접) 는 계속 지원한다.
+
+#### 결정 4 — `CLAUDE.md` 데코레이터는 **유지**된다 (제거 대상 아님)
+
+전환 후 `CLAUDE.md` 는 자매 가드 drift 목록에서 빠지지만, baseline 가드 **불변식 (A)** 가
+데코레이터를 계속 요구한다 (파일 전체 divergence `true` 실측). 모순이 아니라 **비교 축이 다른
+것**이다:
+
+- 자매 가드 — 로컬 ↔ **manifest** (CLI 동형 축)
+- baseline 가드 (A)(B) — 로컬 ↔ **upstream 원본** (데코레이터 계약 축)
+
+양쪽 self-test 가 이 분리를 고정한다. 부수로 Amendment 12 TODO aging 은 drift 파일을 순회하므로
+`CLAUDE.md` 를 대상에서 제외하게 되나, 현행 `CLAUDE.md` 데코레이터는 `[TODO]` 가 아니라 URL 2건
+(`pull/260 + pull/315`) 이라 **실질 영향 0**이다. 단 이 무해성은 **현행 데코레이터 형태에
+조건적**이다 — `[TODO]` 로 회귀하면 30일 aging 이 조용히 스킵된다 (§모수 정의 각주 2).
+
+#### 결정 5 — `--self-test` CI 배선 신설 (비대칭 해소)
+
+조사 결과 배선 비대칭이 확인됐다.
+
+| 스크립트                               | 본검사 CI                              | self-test CI          |
+| -------------------------------------- | -------------------------------------- | --------------------- |
+| `verify-harness-upstream-baseline.mjs` | `harness-guards.yml` (무조건 실행)     | ✅ `ci.yml`           |
+| `verify-harness-drift-decorator.mjs`   | `harness-guards.yml` (`if: hashFiles`) | ❌ **없음** (전환 전) |
+
+`--self-test` 의 assertion 이 **CI 에서 한 번도 실행되지 않았다** — 아무리 증분을 넣어도 로컬에서만
+도는 장식이 된다 (CLAUDE.md §가드 도입 PR DoD "(1) 격리 동적 테스트" 미충족). `ci.yml` 에
+self-test 스텝을 신설하고 자매 가드 스텝의 주석 컨벤션·`--if-present` 미사용 (#840 silent no-op
+함정) 규약을 답습한다. `package.json` alias 2종 (`verify:harness-drift`,
+`verify:harness-drift:count`) 도 함께 추가해 로컬 재현 경로를 맞춘다.
+
+### 모수 정의 (규범) — 본 절이 alert fatigue 카운트 모수의 SSoT 다
+
+> **Amendment 9 alert fatigue 카운트 모수의 정의 (규범)**
+>
+> 카운트 대상은 다음 4조건을 **모두** 만족하는 파일이다.
+>
+> 1. `.harness/manifest.json` 의 `files` 에 등록되어 있다 (= harness 추적 대상).
+> 2. upstream 태그 릴리스에 **대응 원본이 존재**한다 (upstream 부재 다운스트림 고유 파일은
+>    divergence 자체가 성립하지 않는 범주 오류 — Amendment 18).
+> 3. **자기 카테고리의 정합 해시**가 manifest 값과 불일치한다. 카테고리별 해시 도메인은 upstream
+>    `lib/manifest.js::categoricalSha256()` 규약을 따른다 — `managed-block` 은 센티널 블록 내부,
+>    그 외는 파일 전체. **도메인이 다른 해시를 비교하지 않는다** (Amendment 19).
+> 4. `PERMANENT_DIVERGENT_ALLOWLIST` 에 등재되지 않았다 (Amendment 13) — 그리고 orphan sidecar 가
+>    아니다 (§Amendment 9 §결정점 5).
+>
+> **모수에서 빼는 것이 정당한 유일한 사유는 "측정 대상이 아님을 구조적으로 입증"** 이다.
+> "발화가 잦아 부담" 은 옵션 3 silent 약화이며 금지 (§Amendment 13 판정 질문 승계).
+>
+> **임계 N=10 은 본 Amendment 로 변경되지 않는다.**
+
+> **각주 1 — 조건 2 는 `runCountWarn()` 이 직접 검사하지 않는다** (#899 reviewer 지적).
+> `runCountWarn()` 은 manifest entry 만 순회하므로 "upstream 원본 존재" 를 자체 판정하지 않고,
+> **`.harnessignore` 불변식 (K)(M) 에 암묵 위임**한다 — (K) 가 upstream 부재 경로를 전건
+> `.harnessignore` 로 커버하고 (M) 이 그 경로의 manifest 잔존을 0 으로 강제하므로, manifest 에
+> 남아 있다는 사실 자체가 조건 2 의 대리 증거가 된다 (Amendment 18 §carry-over 264 정리로
+> 성립). **따라서 조건 2 의 실효는 `sync-harnessignore --check` 의 CI 배선에 의존한다** — 그
+> 배선이 사라지면 조건 2 가 조용히 무효화된다. 직접 검사로 승격할지는 후속 판단 (현행은
+> 이중 검사 = 중복 비용이라 위임이 합리적이나, 위임 사실이 문서화되지 않은 것이 결함이었다).
+
+> **각주 2 — Amendment 12 TODO aging 과의 상호작용** (#899 reviewer 지적, §결정 4 상세).
+> 본 전환으로 `CLAUDE.md` 가 drift 집합에서 **영구 이탈**하므로 `runTodoAging()` 순회 대상에서도
+> 빠진다. 현행 데코레이터가 `[TODO]` 가 아니라 URL 2건 (`pull/260 + pull/315`) 이라 실질 영향은
+> 0 이지만, **조건부다** — 향후 `CLAUDE.md` 데코레이터가 `[TODO]` 로 회귀하면 30일 aging 이
+> **조용히 스킵**된다 (검출 주체 부재). managed-block 은 구조상 이 상태가 영구화되므로
+> (§후속 4), `CLAUDE.md` 데코레이터를 `[TODO]` 로 되돌리는 변경은 aging 사각을 동반한다는
+> 사실을 그 시점에 함께 판단해야 한다.
+
+#### 왜 명문화가 필요했나 — ADR 내부의 정의 2개 충돌
+
+같은 ADR 안에 **서로 다른 모수 정의 2개**가 병존했고, 이것이 "무엇이 artifact 인가" 논쟁이 재발한
+구조적 원인이다.
+
+- §재검토 조건 #6 (2026-05-26 박제) — "`.harness/manifest.json` 의 sha256 과 불일치하는 활성
+  drift 파일" = **manifest 상대**
+- §Amendment 9 §변경 사항 1 (원 SSoT) — 동일하게 **manifest 상대**
+- §Amendment 18 (2026-07-29 박제) — "Amendment 9 가 정의한 모수(harness-managed 파일의 **upstream
+  대비** divergence)" = **upstream 상대**
+
+그리고 결정적으로 — **Amendment 18 이 "Amendment 9 가 정의한 모수" 라며 인용한 그 문구는 Amendment 9
+원문에 존재하지 않는다.** upstream 기준으로의 baseline 전환은 Amendment 17 §결정 1 에서 도입됐는데
+Amendment 9 §변경 사항 1 은 갱신되지 않았고, Amendment 18 이 새 정의를 소급 인용만 했다.
+본 Amendment 는 **두 곳을 동시에 치환**하고 Amendment 18 의 귀속 오류를 명시 정정한다 (판단은 옳고
+귀속만 틀렸다).
+
+> 제외 규칙 자체는 이미 4단으로 명문화돼 있었다 — orphan (§9 결정점 5) / allowlist (§13) /
+> carry-over 등재 제거 (§16) / artifact (§18). 빠진 것은 **"무엇을 무엇과 비교하는가" 라는 기준선
+> 정의** 하나뿐이었다. 본 Amendment 는 그 한 칸을 메운다.
+
+### 수치 박제 규약 (규범)
+
+과거 수치 오기록 **3건**의 성격을 분류한다. 셋 다 "숫자가 낡음" 이 아니다.
+
+| 오기록                                                                                                         | 성격                                         | 가드로 잡히나      |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------ |
+| §Amendment 17 초안 "drift 9 / N=10 불변" (실제 `drift 11 >= N=10` 발화)                                        | **작성 시점부터 거짓** — 손으로 옮겨 적은 값 | 부분적 ((i))       |
+| §R2 표가 "정정했다"고 서술했으나 미정정                                                                        | **문서가 자기 서술을 허위로 함**             | ❌ 원리적으로 불가 |
+| CHANGELOG `[Unreleased]` 가 §Amendment 17/18 을 `_Provisional_` 로 기재 — ADR 실제 상태는 **둘 다 `Accepted`** | **두 문서 간 상태 drift**                    | ✅ ((iii))         |
+
+3번째 사례가 나왔다는 것은 이것이 우발이 아니라 **클래스**임을 확정한다. 규범 3개를 둔다.
+
+**(i) 기계 출력 원천 의무** — 두 가드에 `--format=json` 을 신설했다
+(`{ drift, threshold, exceeded, files, … }` / `{ divergent, invariantViolations, … }` +
+`commit` / `measuredAt`). 세 오기록 모두 **사람이 도구 출력을 손으로 옮겨 적는 단계**에서
+발생했으므로, ADR/CHANGELOG 의 수치는 **이 출력을 복사해 붙인다. 손으로 옮겨 적지 않는다.**
+
+**(ii) 절대 수치는 스냅샷 박스 안에서만** — 절대 수치 (drift/divergent 개수) 는 **날짜와 commit
+SHA 가 명시된 "실측 스냅샷" 박스 안에서만** 기록한다. 규범 서술부 (§결정 / §재검토 조건) 에는
+절대 수치를 쓰지 않고 **관계와 조건**으로 표현한다. 날짜·SHA 가 붙은 스냅샷은 시간이 지나도
+틀리지 않는다 (그 시점의 사실이므로). 반면 규범부의 무시점 절대 수치는 반드시 썩는다 —
+오기록 1이 정확히 그 형태였다.
+
+**(iii) CHANGELOG ↔ ADR 상태 동시 갱신** — Amendment 를 `Provisional` 로 박제할 때 CHANGELOG 에도
+`_Provisional_` 로 쓰고, **Accepted 전이 시 두 곳을 동시에 갱신**한다. 본 PR 에서 CHANGELOG 의
+§Amendment 17/18 `_Provisional_` 표기를 실제 상태 (`Accepted`) 로 정정했다.
+
+**기각 — "ADR 표의 수치를 가드가 대조"** (이슈 원안): 정상 변경마다 ADR 을 고쳐야 발화가 멎는
+구조라 곧 "가드를 만족시키려 숫자를 고치는" 의례가 된다. 게이밍 유인이 있고 Amendment 15 가
+경계한 패턴과 동형이다.
+
+### 실측 스냅샷 (2026-07-30, `c2ff5e2`)
+
+> 본 절의 수치는 §수치 박제 규약 (i) 에 따라 `--format=json` 출력에서 복사했다.
+
+**A. 전환 전 — 3자 해시 대조 (`CLAUDE.md`)**
+
+```text
+manifest.sha256                   : 0395d6bb7c53a0cd4206974cc8d03acf1d7655f122bd6460a9a0d0cbd833f497
+managedSha256(로컬)               : 0395d6bb7c53a0cd4206974cc8d03acf1d7655f122bd6460a9a0d0cbd833f497
+managedSha256(upstream v4.5.0)    : 0395d6bb7c53a0cd4206974cc8d03acf1d7655f122bd6460a9a0d0cbd833f497
+plain sha256(로컬)                : c9e2b2b4583fd848021a861575ad2bd668d4fed6b136e4dac84d9f70e3603b0e
+plain sha256(upstream)            : 2ab04671847184cd43a67fc04cb64d722692ebdd12af231ccbe5d62a8798669a
+
+센티널 ID 집합 — 로컬 == upstream == ["critical-directives","real-lessons"]
+manifest 전수 95 entry: categoricalSha256 키 보유 0 / sha256 문자열 부재 0
+managed-block 카테고리 파일: ["CLAUDE.md"] (1건)
+```
+
+**B. 전환 전후 drift 집합 대조**
+
+```text
+현행 plain 기준 drift:        9
+옵션(a) categorical 기준:      8
+차집합 (plain 에만):           ['CLAUDE.md']
+차집합 (categorical 에만):     []
+```
+
+**C. 전환 후 두 가드 출력 (`--format=json` 원문 발췌)**
+
+```json
+{
+  "mode": "count-warn",
+  "drift": 8,
+  "rawDrift": 8,
+  "excluded": [],
+  "threshold": 10,
+  "exceeded": false,
+  "commit": "c2ff5e2aaf2a688fb7577addf7bcc01f66d4e7ab"
+}
+```
+
+```json
+{
+  "mode": "verify",
+  "manifestEntries": 95,
+  "checked": 95,
+  "identical": 87,
+  "divergent": 8,
+  "invariantViolations": 0,
+  "invariantViolationsByCode": {},
+  "commit": "c2ff5e2aaf2a688fb7577addf7bcc01f66d4e7ab"
+}
+```
+
+두 집합은 **원소까지 완전 일치**한다:
+
+```text
+.claude/agents/architect.md      .claude/commands/harness-update.md   .github/workflows/harness-guards.yml
+.claude/agents/pm.md             .claude/settings.json                scripts/verify-docs-links.sh
+.claude/agents/qa.md             .claude/skills/browser-test/SKILL.md
+```
+
+`CLAUDE.md` 의 baseline 가드 판정: `{"status":"identical","hasDecorator":true,"violations":[]}`,
+파일 전체 divergence `true`, 블록 내부 동일 `true` — §결정 4 대로 데코레이터가 유지된다.
+
+> ⚠️ **이 일치는 항등식이 아니다.** (C) 불변식이 성립한 **결과**일 뿐이다. 자매 가드는
+> 로컬↔**manifest** 를, baseline 가드는 로컬↔**upstream** 을 비교한다. `manifest.sha256` 이 낡았는데
+> 로컬 == upstream 인 경우 `differs=false` 라 (C1) 이 발화하지 않고 `drift ⊋ divergent` 가 성립할
+> 수 있다. 항등식으로 만들려면 **불변식 (D) — 모든 upstream-존재 entry 에 대해
+> `manifest.sha256 === categoricalSha256(upstream)`** 이 필요하며, 이는 본 Amendment 의 비목표
+> (baseline 가드 불변식 의미론 변경) 이므로 **후속 이슈로 분리**한다. 근거 없이 지금 넣으면
+> false-fire 위험을 안고 fail-fast 원칙을 훼손한다.
+
+### 회귀 가드
+
+`verify-harness-drift-decorator.mjs --self-test` 증분 (CLAUDE.md §가드 도입 PR DoD 4축 정합):
+
+1. **격리 동적 테스트** — `managed-block` 픽스처 4케이스: 블록 밖 오염만 → **drift 미발화** /
+   블록 내부 변조 → **발화** / 센티널 전삭제 → 전문 해시 폴백으로 **발화** / 닫는 센티널만 삭제
+   (부분 훼손) → **발화**.
+2. **3중 시뮬레이션** — positive (블록 밖 오염, 미발화) → negative (블록 내부 변조, 발화) →
+   recovery (pristine 복원, 미발화).
+3. **blast radius 봉인** — 비-`managed-block` entry 전수에 대해
+   `categoricalSha256 === plain sha256` 임을 실 manifest 로 assertion (전환이 판정을 바꾸지 않음을
+   고정) + 실 영향 파일이 `managed-block` 1건에 한정됨을 고정.
+4. **교착 회귀 차단** — baseline 가드 self-test 의 managed-block 충실성 케이스가 **여전히 PASS**.
+   두 가드가 같은 파일에 상반된 요구를 하지 않음을 양쪽에서 고정.
+5. **fail-fast negative** — malformed entry (문자열 `sha256` 부재) 주입 → **throw** (결정 3) +
+   legacy 스키마 (entry = sha 문자열) 는 정상 판정.
+6. **upstream 직렬화 규약 골든 벡터 (외부 앵커)** — #899 reviewer 차단 반영.
+
+추가로 이관된 `categorize()` 8분기 / `managedSha256()` 3도메인 단위 assertion 을 두어 SSoT 이관
+자체의 회귀를 고정한다. 본 self-test 는 §결정 5 로 `ci.yml` 에 배선되어 **상시 실행**된다.
+
+#### 골든 벡터가 필요한 이유 — 자기참조 assertion 의 사각 (#899 reviewer 실측)
+
+위 1~5 의 `managed-block` assertion 은 전부 **자기참조적**이다: 합성 픽스처에 같은 함수를 두 번
+적용해 비교하므로, **내부 직렬화 포맷이 자기일관적으로 바뀌면 검출되지 않는다.**
+
+reviewer 가 격리 사본에서 `managedSha256()` 의 concat 에서 블록 id 만 제거해 실측했다
+(`` `${b.id}\n${b.content}` `` → `b.content`). dev 가 동일 주입으로 재현한 결과:
+
+| 검사                         | 골든 벡터 도입 **전**                               | 도입 **후**        |
+| ---------------------------- | --------------------------------------------------- | ------------------ |
+| drift `--self-test`          | 93 passed, 0 failed (초록)                          | **1 FAIL** ✅      |
+| baseline `--self-test`       | 51 PASS / 0 FAIL (초록)                             | 초록 (변화 없음)   |
+| drift 본검사 `--mode=verify` | exit 0 (초록)                                       | exit 0 (변화 없음) |
+| baseline 본검사              | exit 0, 불변식 위반 0 (초록)                        | exit 0 (변화 없음) |
+| 유일한 부작용                | `drift 8 → 9` (soft-warn, N=10 미만이라 **무발화**) | 동일               |
+
+즉 `CLAUDE.md` 가 **정보량 0 의 상수로 drift 집합에 재진입해 모수가 1 부풀어도 모든 가드가
+초록**이었다 — 본 Amendment 가 제거한 결함과 **동일 시그니처**다. 종전에는 이 3함수가 baseline
+(C1)(C2) 전용이라 blast radius 가 좁았으나, 본 Amendment 가 **alert fatigue 모수 자체**를 여기에
+의존시켰으므로 외부 앵커가 필수가 됐다.
+
+골든 벡터는 upstream 규약을 손으로 전개한 바이트열 `'a\nAAA\n---\nb\nBBB'` (15 bytes) 의 해시를
+구현과 독립된 상수로 고정한다. 기대값이 **구현을 호출해 얻은 값이 아니므로** 포맷이 바뀌면
+좌변만 변해 FAIL 한다. 유도 3줄은 코드 주석에 박제했다 (상수 갱신은 upstream 규약 자체가 바뀔
+때만 정당하며, 그때도 유도를 다시 전개해 재계산한다 — §수치 박제 규약 (i)).
+
+> **대안 (b) 기각 — manifest 대조 assertion**: reviewer 가 제시한 두 번째 앵커
+> (`categoricalSha256(rel, rel) === manifest[rel].sha256` 를 실 저장소에 대해 assert) 는 manifest 가
+> upstream CLI 가 기록한 진짜 외부 값이라는 장점이 있으나, **self-test 를 저장소 drift 상태에
+> 결합시킨다.** dev 실측: `CLAUDE.md` 센티널 **내부**에 정당한 Phase-1 편집이 있는 상태를
+> 시뮬레이션하면 이 assertion 이 FAIL 한다. 그러면 "가드가 깨졌다" 와 "저장소에 drift 가 있다" 가
+> 한 신호로 뭉개져, 정당한 in-block 편집이 **가드 정합성 테스트를 CI 에서 실패**시킨다
+> (CLAUDE.md §가드 설계 원칙 measurement-first — broad 권고를 실측으로 precision 정정).
+> (a) 가 보고된 사각을 **단독으로 완전히** 닫으므로 (위 표 실증) (b) 는 채택하지 않는다.
+> (b) 가 겨냥한 별도 축 — "우리 재현이 upstream 실제 동작에서 이탈" — 은 저장소 상태에 의존하므로
+> **self-test 가 아니라 본검사 계층**에 속한다. 후속 관찰 항목으로 둔다.
+
+### 결과 / 후속
+
+- alert fatigue 모수가 **9 → 8**. **N=10 임계는 불변**이며, 감소분 1건은 §정정 2 가 입증한 측정
+  artifact 다. 실제 Phase-1 divergent 8건은 **하나도 해소되지 않았다** — Amendment 18 §alert
+  fatigue 모수 변화의 서술을 그대로 승계한다. **Phase 2 upstream 기여 압력은 축소되지 않는다.**
+  8 은 N=10 바로 아래이므로 다음 Phase-1 변경 2건이면 재발화한다.
+- **후속 분리 (본 Amendment 비범위)**:
+  1. **불변식 (D) 도입** — 교차 가드 수치 관계를 항등식으로 승격 (§실측 스냅샷 C 경고 박스).
+  2. **upstream 부재 파일의 stale 데코레이터** — `verify-harness-drift-decorator.mjs` 자신이
+     `// HARNESS-DRIFT: Z-PATTERN [TODO]` 를 달고 있으나 manifest 미등록 + upstream 부재라 가리킬
+     upstream 이 없다 (PR-B 가 정리한 `verify-zombie-check.mjs` 와 동일 클래스). baseline 가드 (B) 는
+     manifest entry 만 순회해 이를 못 본다. 비차단.
+  3. **`harness-guards.yml` 의 `if: hashFiles` 가 R3 논리와 모순** — 같은 파일의 R3 주석은
+     "upstream 부재 = 다운스트림 고유 가드이므로 `hashFiles` 를 의도적으로 미부착" 이라 선언하는데
+     `verify-harness-drift-decorator.mjs` 도 동일 전제를 만족하면서 `hashFiles` 가 붙어 있다.
+     스크립트 삭제만으로 가드가 조용히 사라진다. 비차단, 우선순위 medium.
+  4. **managed-block 데코레이터의 의미론** — managed-block 은 블록 밖 divergence 가 영구·정당하므로
+     (A) 가 데코레이터를 영원히 요구하고 (B) 는 영원히 충족 불가다. 현행 계약상 옳지만 Z 패턴
+     데코레이터의 원 의미("Phase 2 기여 대기")와는 어긋난다. 관찰 기록만.
+  5. **§Amendment 12 가 `Provisional` 로 stale** — CHANGELOG 는 구현 완료를 기록. cross-validate
+     이력 확인 후 전이 필요. 비차단.
+
+### 교차검증 반영 사항
+
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-30)** — 로그
+`.claude/logs/cross-validate-architecture-20260730-141508.log`. 명시 질문 3건 + 교차검증 항목 3건
+전달. 총평: _"승인(Accepted)하기에 충분한 논리적·기술적 타당성과 검증 체계를 갖추었다."_
+**이견·기각 0건.**
+
+**합의 (즉시 신뢰)**
+
+- **Q1 — 검출 축 손실 없음.** 블록 밖 변경을 plain 해시로 감지해 permanent drift 로 분류하는 것은
+  _"`managed-block` 카테고리 도입 취지 자체를 부정하는 버그"_ 였다는 판정. `apply` 는 센티널 사이만
+  scoped replacement 하므로 블록 밖 덮어쓰기 위험은 **구조적으로 0**. 위험 시나리오 2종 검토 결과
+  (A: 블록 밖 문법 오염 → 문맥 검사기 관할이지 drift 가드 관할 아님 / B: 센티널 태그 훼손 → 블록 수
+  mismatch 로 폴백·throw 감지) 모두 구멍 없음.
+- **Q2 — 폴백은 결함 재도입이 아니라 tripwire.** 블록 0개면 `plain(로컬)` ↔ `managed(upstream)` 을
+  비교하게 되어 **100% 불일치 → 즉시 발화**한다. 기존 결함(블록이 정상 존재하는데 전문 비교)과
+  **상황이 배타적**이므로 "센티널 삭제 방어 기구" 로서 정당.
+- **Q3 — 캘리브레이션이지 게이밍 아님.** 반증 가능 근거로 (i) 오염 0 픽스처에서 drift 1 이 나온 것이
+  측정 도구 오류임이 4-way 해시로 입증됨 (ii) 9→8 제거분은 `CLAUDE.md` 1건뿐이고 실제 divergent
+  8건은 **하나도 제외되지 않음** (iii) 편법을 쓸 거였으면 (b) allowlist 가 가장 쉬운 길인데
+  `FORBIDDEN_ALLOWLIST_PATH_PATTERNS` 준수를 위해 **스스로 기각**했음 (iv) N=10 불변 + 현재 8이라
+  2건이면 재발화 — upstream 기여 압력 미약화.
+- 교차검증 항목 3건 (센티널 부분 훼손 경로 / (D) 후속 분리 타당성 / 결정 2 의 SRP) 도 전부 "타당"
+  판정. 특히 결정 2 는 _"도메인 해시 계산 함수의 SSoT 를 소유하기에 가장 적합한 위치"_ 로 평가.
+
+**고유 발견 1건 — 수용 (후속 이슈 우선순위 상향)**
+
+- **불변식 (D) 후속 이슈를 `High` 로 지정 권고** — 누락 시 manifest 갱신 누락 상황에서 drift 가드와
+  baseline 가드의 결과가 **이격**될 수 있다는 지적. 본 Amendment 의 §실측 스냅샷 C 경고 박스가
+  "(D) 미적용 상태의 경계 조건" 을 이미 명시하고 있으나, 후속 이슈 생성 시 우선순위를 medium 이
+  아니라 **high** 로 둔다.
+
+**Claude 편향 셀프 체크 (4종)**
+
+- 낙관적 일정: 통과 (upstream 의존 없는 다운스트림 단독 변경).
+- 결합 간과: **미통과 → reviewer 가 적발 후 해소.** self-test managed-block assertion 이 전부
+  **자기참조적**이라 직렬화 포맷이 자기일관적으로 바뀌면 전 가드가 초록인 채 결함이 재진입함을
+  reviewer 가 격리 사본 주입으로 실증 → R2 에서 **upstream 규약 전개 바이트열 기반 골든 벡터**
+  외부 앵커로 해소 (기대값이 구현 호출 결과가 아니라 규약 전개의 해시라는 점이 핵심).
+- 폐기 프레이밍: 통과 ((b)(c) 기각이 실측·구조 근거 기반이며 agy 도 동의).
+- 순수주의: 통과 — R2 에서 reviewer 제안 (b)(manifest 값 대조) 를 **false-fire 실측**으로 기각한
+  판단도 정당 (센티널 내부 정당 Phase-1 편집 시 FAIL → self-test 를 저장소 drift 상태에 결합시켜
+  "가드가 깨졌다" 와 "저장소에 drift 가 있다" 를 한 신호로 뭉갬). (b) 가 겨냥한 별도 축("재현이
+  upstream _실제_ 동작에서 이탈")은 본검사 계층 소관으로 후속 관찰 박제.

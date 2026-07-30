@@ -71,8 +71,15 @@
  *     → Amendment 9 boundary 시뮬레이션 (N-1 / N / N+1) 3 cases
  *     → Amendment 11 boundary 시뮬레이션 (orphan 0 / dry-run / apply / drift 안전 거부) 4 cases
  *
+ * Amendment 19 (#897) — drift 판정 해시 도메인을 **카테고리 정합**으로 전환:
+ *   종전 plain sha256 비교는 `managed-block` 카테고리 (= `CLAUDE.md`) 에서 **정보량 0 의
+ *   상수**였다. manifest 의 sha256 은 `categoricalSha256()` 로 계산되므로 managed-block 은
+ *   센티널 내부만 해시된다. 로컬 파일을 upstream 원본으로 완전히 되돌려도 (오염 0) plain
+ *   해시는 manifest 와 영원히 불일치 → drift 1 이 상수로 발화 (#897 실측 재현).
+ *   → `categoricalSha256()` 로 판정해 CLI 와 동형화. 실질 영향 파일 1건 (`CLAUDE.md`).
+ *
  * 관련:
- *   - ADR docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8 / §Amendment 9 / §Amendment 11
+ *   - ADR docs/decisions/20260515-harness-managed-divergent-pattern.md §Amendment 8 / §Amendment 9 / §Amendment 11 / §Amendment 19
  */
 import { createHash } from 'node:crypto';
 import {
@@ -90,6 +97,93 @@ import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 
 const MANIFEST_PATH = '.harness/manifest.json';
+
+// =============================================================================
+// upstream 해시 규약 재현 (lib/categorize.js + lib/sentinels.js + lib/manifest.js)
+// =============================================================================
+//
+// **SSoT 위치** — 본 파일이 3함수 (`categorize` / `managedSha256` / `categoricalSha256`) 의
+// 정본이다. `verify-harness-upstream-baseline.mjs` 는 여기서 import 후 re-export 한다
+// (import 방향 baseline → drift-decorator 고정 — 역방향은 ESM 순환 + TDZ 위험. 본 파일은
+// baseline 가드를 import 하지 않는다).
+//
+// 매니페스트의 `sha256` 필드는 plain sha256 이 **아니라** `categoricalSha256()` 이다.
+// `managed-block` (= `CLAUDE.md`) 만 센티널 내부를 해시하고 나머지 카테고리는 파일 전체를
+// 해시하므로, 두 값이 우연히 일치해 오랫동안 문제가 드러나지 않았다 (Amendment 19 #897).
+
+const SENTINEL_START = /<!--\s*harness:managed:([\w-]+):start\s*-->/g;
+const SENTINEL_END_FOR = (id) => new RegExp(`<!--\\s*harness:managed:${id}:end\\s*-->`);
+
+/**
+ * upstream `lib/categorize.js::categorize()` 포팅.
+ * drift 판정은 managed-block 분기만 쓰지만, 규약 drift 감지를 위해 전체를 재현한다.
+ * @param {string} relPath
+ * @returns {'frozen'|'managed-block'|'atomic'|'user-only'}
+ */
+function categorize(relPath) {
+  const p = relPath.replace(/\\/g, '/');
+  if (p.startsWith('.harness/')) return 'user-only';
+  if (p.startsWith('.claude/logs/')) return 'user-only';
+  if (p === '.gitignore') return 'user-only';
+  if (p.startsWith('scripts/')) return 'frozen';
+  if (p.startsWith('.github/workflows/')) {
+    const base = p.slice('.github/workflows/'.length);
+    return base.startsWith('harness-') ? 'frozen' : 'user-only';
+  }
+  if (p === 'CLAUDE.md') return 'managed-block';
+  if (p.startsWith('docs/decisions/') && p !== 'docs/decisions/README.md') return 'user-only';
+  if (p.startsWith('docs/retrospectives/') && p !== 'docs/retrospectives/README.md') {
+    return 'user-only';
+  }
+  return 'atomic';
+}
+
+/**
+ * upstream `lib/sentinels.js::managedSha256()` 포팅.
+ *
+ * 센티널 블록이 없으면 전체 파일 해시로 폴백 — **upstream 규약 재현이지 본 가드의
+ * fallback 분기가 아니다** (같은 입력에 같은 판정을 내기 위한 동형성 요구).
+ * 이 폴백은 검출을 약화시키지 않고 오히려 강화한다: 센티널을 전부 지우면 해시 도메인이
+ * 파일 전체로 바뀌어 manifest 값과 어긋나므로 **센티널 훼손이 drift 로 발화**한다
+ * (Amendment 19 §3중 시뮬레이션 (c) 로 고정).
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function managedSha256(text) {
+  const blocks = [];
+  let m;
+  SENTINEL_START.lastIndex = 0;
+  while ((m = SENTINEL_START.exec(text)) !== null) {
+    const id = m[1];
+    const startMarkerEnd = m.index + m[0].length;
+    const endRe = SENTINEL_END_FOR(id);
+    const tail = text.slice(startMarkerEnd);
+    const endM = endRe.exec(tail);
+    if (!endM) continue; // 닫는 센티널 없음 — upstream 과 동일하게 무시
+    const inner = tail.slice(0, endM.index);
+    const content = inner.replace(/^\n/, '').replace(/\n$/, '');
+    blocks.push({ id, content });
+  }
+  if (blocks.length === 0) {
+    return createHash('sha256').update(text).digest('hex');
+  }
+  const concat = blocks.map((b) => `${b.id}\n${b.content}`).join('\n---\n');
+  return createHash('sha256').update(concat).digest('hex');
+}
+
+/**
+ * upstream `lib/manifest.js::categoricalSha256()` 포팅.
+ * @param {string} relPath
+ * @param {string} absPath
+ * @returns {string}
+ */
+function categoricalSha256(relPath, absPath) {
+  if (categorize(relPath) === 'managed-block') {
+    return managedSha256(readFileSync(absPath, 'utf-8'));
+  }
+  return createHash('sha256').update(readFileSync(absPath)).digest('hex');
+}
 
 // Amendment 9 (#557) — 경고 피로감 가드 임계값 SSoT.
 // baseline 6 (2026-05-26 develop tip) + buffer 4 = N=10.
@@ -232,8 +326,20 @@ function decoratorFormatFor(filePath) {
 
 /**
  * sha256 비교로 manifest drift 파일 목록 산출.
+ *
+ * Amendment 19 (#897) — 판정 해시는 **카테고리 정합** `categoricalSha256()` 이다.
+ * manifest 의 `sha256` 이 그 도메인으로 기록되므로, plain sha256 으로 비교하면
+ * `managed-block` (= `CLAUDE.md`) 을 **입력과 무관하게 항상** drift 로 판정한다
+ * (검출 능력 0 의 상수 — #897 격리 픽스처 실측: 오염 0 인 upstream 원본에도 drift 1).
+ * 도메인이 다른 해시를 비교하지 않는 것이 본 함수의 불변식이다.
+ *
+ * fail-fast (Amendment 19 §결정 3): entry 가 문자열 `sha256` 을 갖지 않으면 **throw**.
+ * 종전 `typeof expected === 'string'` 가드는 malformed entry 를 조용히 검사에서
+ * 제외했다 — CLAUDE.md §가드 설계 원칙 "drift 가드는 fail-fast 만, fallback 분기 금지" 위반.
+ *
  * @param {string} rootDir
  * @returns {Array<{file: string, reason: string}>}
+ * @throws {Error} manifest 부재 또는 malformed entry (sha256 문자열 부재)
  */
 function detectDriftFiles(rootDir = '.') {
   const manifestAbs = join(rootDir, MANIFEST_PATH);
@@ -249,10 +355,16 @@ function detectDriftFiles(rootDir = '.') {
       // 매니페스트 등록되어 있으나 파일 부재 — drift 의 한 형태이나 데코레이터 대상 아님
       continue;
     }
-    const content = readFileSync(abs);
-    const sha = createHash('sha256').update(content).digest('hex');
-    const expected = entry.sha256 || entry;
-    if (typeof expected === 'string' && sha !== expected) {
+    // Amendment 19 (#897) — 판정 도메인을 manifest 기록 도메인과 일치시킨다.
+    const sha = categoricalSha256(rel, abs);
+    const expected = typeof entry === 'string' ? entry : entry?.sha256;
+    if (typeof expected !== 'string') {
+      throw new Error(
+        `malformed manifest entry: ${rel} — sha256 문자열 부재 (got ${JSON.stringify(entry)}). ` +
+          'Amendment 19 §결정 3 fail-fast — silent 검사 제외 금지.',
+      );
+    }
+    if (sha !== expected) {
       drifts.push({ file: rel, reason: 'sha-mismatch' });
     }
   }
@@ -1247,9 +1359,262 @@ function runSelfTest() {
     rmSync(tmp, { recursive: true, force: true });
   }
 
+  // ===========================================================================
+  // Amendment 19 (#897) — categorical drift 판정 (격리 픽스처 + 3중 시뮬레이션)
+  // ===========================================================================
+  //
+  // ADR §Amendment 19 §회귀 가드 SSoT. CLAUDE.md §가드 도입 PR DoD 4축 정합:
+  //   (1) 격리 동적 테스트 / (2) 3중 시뮬 (positive→negative→recovery)
+  //   (3) blast radius 봉인 (비-managed-block 판정 무변경) / (5) fail-fast negative
+
+  // --- categorize() 분기 단위 검증 (이관된 함수의 회귀 고정) ---
+  expect('categorize CLAUDE.md = managed-block', categorize('CLAUDE.md') === 'managed-block');
+  expect('categorize scripts/x.mjs = frozen', categorize('scripts/x.mjs') === 'frozen');
+  expect(
+    'categorize .github/workflows/harness-guards.yml = frozen',
+    categorize('.github/workflows/harness-guards.yml') === 'frozen',
+  );
+  expect(
+    'categorize .github/workflows/ci.yml = user-only',
+    categorize('.github/workflows/ci.yml') === 'user-only',
+  );
+  expect(
+    'categorize .harness/manifest.json = user-only',
+    categorize('.harness/manifest.json') === 'user-only',
+  );
+  expect(
+    'categorize docs/decisions/x.md = user-only',
+    categorize('docs/decisions/x.md') === 'user-only',
+  );
+  expect(
+    'categorize .claude/agents/qa.md = atomic',
+    categorize('.claude/agents/qa.md') === 'atomic',
+  );
+  // Windows 구분자 정규화 (upstream 규약 동형성)
+  expect('categorize 역슬래시 정규화', categorize('scripts\\x.mjs') === 'frozen');
+
+  // --- managedSha256 도메인 단위 검증 ---
+  const mbFixture = (inner, outer) =>
+    `# CLAUDE.md\n\n<!-- harness:managed:critical-directives:start -->\n${inner}\n` +
+    `<!-- harness:managed:critical-directives:end -->\n\n${outer}\n`;
+  expect(
+    'managedSha256: 블록 밖 변경은 해시 불변',
+    managedSha256(mbFixture('UP', 'downstream A')) ===
+      managedSha256(mbFixture('UP', 'downstream B')),
+  );
+  expect(
+    'managedSha256: 블록 내부 변경은 해시 변동',
+    managedSha256(mbFixture('UP', 'X')) !== managedSha256(mbFixture('UP-tampered', 'X')),
+  );
+  expect(
+    'managedSha256: 센티널 0개 → 전문 해시 폴백 (upstream 규약 재현)',
+    managedSha256('no sentinel here\n') ===
+      createHash('sha256').update('no sentinel here\n').digest('hex'),
+  );
+
+  // --- upstream 직렬화 규약 골든 벡터 (외부 앵커) ---
+  //
+  // 위 3개 assertion 은 **자기참조적**이다 — 같은 함수를 두 번 적용해 비교하므로
+  // 내부 직렬화 포맷이 **자기일관적으로** 바뀌면 전부 초록인 채 통과한다.
+  // reviewer 실측 (#899): concat 에서 블록 id 를 제거 (`${b.id}\n${b.content}` → `b.content`)
+  // 하면 drift self-test 93/93 · baseline self-test 51/51 · 양 가드 본검사 exit 0 으로
+  // **모든 가드가 초록**인 채 `CLAUDE.md` 가 정보량 0 의 상수로 drift 집합에 재진입해
+  // 모수만 8 → 9 로 부풀었다 (soft-warn 이라 무발화). 본 PR 이 제거한 결함과 동일 시그니처다.
+  //
+  // 골든 벡터는 **직렬화 포맷 자체**를 구현과 독립된 상수에 고정한다.
+  //
+  // 기대 해시 유도 — upstream `lib/sentinels.js::managedSha256()` 규약을 손으로 전개:
+  //   blocks = [{ id: 'a', content: 'AAA' }, { id: 'b', content: 'BBB' }]
+  //   concat = blocks.map((b) => `${b.id}\n${b.content}`).join('\n---\n')
+  //          = 'a\nAAA'  +  '\n---\n'  +  'b\nBBB'
+  //          = 'a\nAAA\n---\nb\nBBB'            ← 15 bytes (GOLDEN_CONCAT 리터럴)
+  //   GOLDEN_SHA = sha256(concat)
+  //              = 77abbae17b6ba938b5c6f571efeb3ccad759bffc6260103b9a4ebca5de0ad120
+  //
+  // 즉 기대값은 **구현을 호출해 얻은 값이 아니라** 규약에서 전개한 바이트열의 해시다.
+  // 구현이 포맷을 바꾸면 좌변만 변해 FAIL 한다. 상수 갱신은 upstream 규약 자체가 바뀔 때만
+  // 정당하며, 그 경우 위 유도 3줄을 새 규약으로 다시 전개해 재계산할 것
+  // (§Amendment 19 §수치 박제 규약 (i) — 손으로 숫자를 옮겨 적지 말 것).
+  const GOLDEN_CONCAT = 'a\nAAA\n---\nb\nBBB';
+  const GOLDEN_SHA = '77abbae17b6ba938b5c6f571efeb3ccad759bffc6260103b9a4ebca5de0ad120';
+  // 상수의 출처를 **실행 가능하게** 박제 — 리터럴이 어디서 왔는지 다음 작성자가 즉시 재현 가능.
+  expect(
+    'Amd19 골든 벡터 provenance: GOLDEN_SHA === sha256("a\\nAAA\\n---\\nb\\nBBB") (15 bytes)',
+    createHash('sha256').update(GOLDEN_CONCAT).digest('hex') === GOLDEN_SHA &&
+      Buffer.byteLength(GOLDEN_CONCAT) === 15,
+  );
+  const goldenFixture =
+    '<!-- harness:managed:a:start -->\nAAA\n<!-- harness:managed:a:end -->\n' +
+    '<!-- harness:managed:b:start -->\nBBB\n<!-- harness:managed:b:end -->\n';
+  expect(
+    'Amd19 골든 벡터: managedSha256(2블록 픽스처) === GOLDEN_SHA (upstream 직렬화 포맷 고정)',
+    managedSha256(goldenFixture) === GOLDEN_SHA,
+    `got ${managedSha256(goldenFixture).slice(0, 16)}… — 직렬화 포맷이 upstream 규약에서 이탈했다 ` +
+      '(블록 id / 구분자 / 개행 트리밍 중 하나). 위 유도 주석과 대조할 것.',
+  );
+
+  const mbTmp = mkdtempSync(join(tmpdir(), 'harness-drift-mb-'));
+  try {
+    const mbHarness = join(mbTmp, '.harness');
+    mkdirSync(mbHarness, { recursive: true });
+    const claudeAbs = join(mbTmp, 'CLAUDE.md');
+    const pristine = mbFixture('UPSTREAM BLOCK BODY', '## 프로젝트 고유 섹션');
+    // manifest 는 upstream 과 동일하게 **센티널 내부만** 해시해 기록 (실 manifest 재현).
+    const mbManifestSha = managedSha256(pristine);
+    const writeMb = (content) => {
+      writeFileSync(claudeAbs, content);
+      writeFileSync(
+        join(mbHarness, 'manifest.json'),
+        JSON.stringify({ files: { 'CLAUDE.md': { sha256: mbManifestSha } } }),
+      );
+    };
+
+    // (1-a) positive — 블록 내부 동일 + 블록 밖 상이 → drift **미발화**
+    //       종전 plain 비교에서는 이 케이스가 항상 drift 1 이었다 (#897 정보량 0 의 상수).
+    writeMb(mbFixture('UPSTREAM BLOCK BODY', '## 완전히 다른 다운스트림 내용\n임의 추가 100줄'));
+    expect(
+      'Amd19 (a) 블록 밖 오염만 → drift 0 (categorical)',
+      detectDriftFiles(mbTmp).length === 0,
+      JSON.stringify(detectDriftFiles(mbTmp)),
+    );
+    // 같은 입력에 대해 **종전 plain 판정이었다면 drift 1** 이었음을 명시 고정 (회귀 대비).
+    expect(
+      'Amd19 (a) 대조: plain 도메인이었다면 drift 발화 (전환 효과 실증)',
+      createHash('sha256').update(readFileSync(claudeAbs)).digest('hex') !== mbManifestSha,
+    );
+
+    // (1-b) negative — 센티널 블록 **내부** 변조 → drift 발화 (진짜 위험 검출 유지)
+    writeMb(mbFixture('UPSTREAM BLOCK BODY <<TAMPERED>>', '## 프로젝트 고유 섹션'));
+    const mbTampered = detectDriftFiles(mbTmp);
+    expect(
+      'Amd19 (b) 블록 내부 변조 → drift 1 (센티널 훼손 검출 유지)',
+      mbTampered.length === 1 && mbTampered[0].file === 'CLAUDE.md',
+      JSON.stringify(mbTampered),
+    );
+
+    // (1-c) negative — 센티널 마커 **전삭제** → 전문 해시 폴백으로 drift 발화
+    writeMb('# CLAUDE.md\n\nUPSTREAM BLOCK BODY\n\n## 프로젝트 고유 섹션\n');
+    const mbStripped = detectDriftFiles(mbTmp);
+    expect(
+      'Amd19 (c) 센티널 전삭제 → drift 1 (전문 해시 폴백 발화)',
+      mbStripped.length === 1 && mbStripped[0].file === 'CLAUDE.md',
+      JSON.stringify(mbStripped),
+    );
+
+    // (1-d) negative — 닫는 센티널만 삭제 (부분 훼손) → 블록 미인식 → 폴백 → drift 발화
+    writeMb(
+      '# CLAUDE.md\n\n<!-- harness:managed:critical-directives:start -->\nUPSTREAM BLOCK BODY\n\n## 고유\n',
+    );
+    expect(
+      'Amd19 (d) 닫는 센티널만 삭제 → drift 1 (부분 훼손 검출)',
+      detectDriftFiles(mbTmp).length === 1,
+      JSON.stringify(detectDriftFiles(mbTmp)),
+    );
+
+    // (2) recovery — pristine 복원 → drift 0
+    writeMb(pristine);
+    expect(
+      'Amd19 (recovery) pristine 복원 → drift 0',
+      detectDriftFiles(mbTmp).length === 0,
+      JSON.stringify(detectDriftFiles(mbTmp)),
+    );
+
+    // (5) fail-fast — malformed entry (sha256 문자열 부재) → throw (결정 3)
+    writeFileSync(
+      join(mbHarness, 'manifest.json'),
+      JSON.stringify({ files: { 'CLAUDE.md': { category: 'managed-block' } } }),
+    );
+    let threw = false;
+    let threwMsg = '';
+    try {
+      detectDriftFiles(mbTmp);
+    } catch (e) {
+      threw = true;
+      threwMsg = e.message;
+    }
+    expect(
+      'Amd19 (5) malformed entry (sha256 부재) → throw (silent 제외 금지)',
+      threw && /malformed manifest entry/.test(threwMsg),
+      threwMsg,
+    );
+
+    // legacy 스키마 (entry 가 sha 문자열 직접) 는 계속 지원 — throw 아님
+    writeFileSync(claudeAbs, pristine);
+    writeFileSync(
+      join(mbHarness, 'manifest.json'),
+      JSON.stringify({ files: { 'CLAUDE.md': mbManifestSha } }),
+    );
+    expect(
+      'Amd19 (5) legacy 스키마 (entry = sha 문자열) → 정상 판정 (throw 아님)',
+      detectDriftFiles(mbTmp).length === 0,
+    );
+  } finally {
+    rmSync(mbTmp, { recursive: true, force: true });
+  }
+
+  // (3) blast radius 봉인 — 비-managed-block 은 categoricalSha256 === plain sha256 이므로
+  //     판정이 종전과 **완전히 동일**하다. 실 manifest 전수로 고정 (실행 환경에 manifest 가
+  //     있을 때만 — self-test 는 저장소 밖에서도 돌 수 있으므로 존재 확인).
+  if (existsSync(MANIFEST_PATH)) {
+    const realManifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8'));
+    const realFiles = realManifest.files || {};
+    let nonMbChecked = 0;
+    let nonMbSame = 0;
+    let mbCount = 0;
+    for (const rel of Object.keys(realFiles)) {
+      if (!existsSync(rel)) continue;
+      if (categorize(rel) === 'managed-block') {
+        mbCount++;
+        continue;
+      }
+      nonMbChecked++;
+      const plainSha = createHash('sha256').update(readFileSync(rel)).digest('hex');
+      if (categoricalSha256(rel, rel) === plainSha) nonMbSame++;
+    }
+    expect(
+      `Amd19 (3) blast radius: 비-managed-block ${nonMbChecked} entry 판정 무변경 (categorical === plain)`,
+      nonMbChecked > 0 && nonMbChecked === nonMbSame,
+      JSON.stringify({ checked: nonMbChecked, same: nonMbSame }),
+    );
+    expect(
+      `Amd19 (3) 실 영향 파일은 managed-block ${mbCount} 건에 한정`,
+      mbCount <= 1,
+      JSON.stringify({ managedBlock: mbCount }),
+    );
+  }
+
   console.log(results.join('\n'));
   console.log(`\nself-test: ${pass} passed, ${fail} failed`);
   return fail === 0 ? 0 : 1;
+}
+
+// =============================================================================
+// Amendment 19 (#897) — 기계 판독 출력 (`--format=json`)
+// =============================================================================
+//
+// ADR §Amendment 19 §수치 박제 규약 SSoT. 과거 수치 오기록 3건이 전부 **사람이 도구
+// 출력을 손으로 옮겨 적는 단계**에서 발생했다 (Amendment 17 초안 "drift 9" ↔ 실제 11,
+// §R2 표 자기 서술 허위, CHANGELOG `_Provisional_` ↔ ADR `Accepted`).
+// → ADR / CHANGELOG 의 실측 스냅샷은 이 출력을 **복사해 붙인다**. 손으로 옮겨 적지 않는다.
+
+/**
+ * 스냅샷 메타 (측정 시점 + 대상 커밋). 절대 수치를 "그 시점의 사실" 로 고정하는 앵커.
+ * git 미가용 환경 (tarball 배포 등) 에서도 판정을 막지 않는다 — 메타 필드만 null.
+ * @returns {{commit: string|null, measuredAt: string}}
+ */
+function snapshotMeta() {
+  let commit = null;
+  try {
+    commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf-8' }).trim();
+  } catch {
+    commit = null; // 메타 부재는 측정 실패가 아니다 (수치 자체는 git 무관)
+  }
+  return { commit, measuredAt: new Date().toISOString() };
+}
+
+/** stdout 에 JSON 1건 출력 (기계 판독 전용 — 사람용 텍스트와 섞지 않는다). */
+function printJson(payload) {
+  console.log(JSON.stringify(payload, null, 2));
 }
 
 // =============================================================================
@@ -1282,9 +1647,24 @@ function parseMode(args) {
  * Amendment 9 (#557) — count-warn 모드 실행.
  * soft-warn 동작: exit 0 + stdout 마커 박제 (CI workflow grep 파싱용).
  */
-function mainCountWarn() {
+function mainCountWarn({ json = false } = {}) {
   try {
     const { count, threshold, exceeded, files, excluded, rawCount } = runCountWarn('.');
+
+    // Amendment 19 (#897) — 기계 판독 경로 (ADR/CHANGELOG 스냅샷 원천).
+    if (json) {
+      printJson({
+        mode: 'count-warn',
+        drift: count,
+        rawDrift: rawCount,
+        excluded,
+        threshold,
+        exceeded,
+        files,
+        ...snapshotMeta(),
+      });
+      process.exit(0);
+    }
 
     // Amendment 13 (#766) — allowlist 제외 내역 투명성 박제 (모수 정제 가시화).
     if (excluded.length > 0) {
@@ -1431,9 +1811,12 @@ function main() {
     process.exit(runSelfTest());
   }
 
+  // Amendment 19 (#897) — `--format=json` 기계 판독 출력 (verify / count-warn 모드).
+  const json = args.includes('--format=json');
+
   const mode = parseMode(args);
   if (mode === 'count-warn') {
-    mainCountWarn();
+    mainCountWarn({ json });
     return;
   }
   if (mode === 'sidecar-cleanup') {
@@ -1449,6 +1832,21 @@ function main() {
   // mode === 'verify' (기본) — Amendment 8 데코레이터 가드 (fail-fast)
   try {
     const { drifts, passed, failed, orphans } = runVerify('.');
+
+    // Amendment 19 (#897) — 기계 판독 경로. exit code 는 텍스트 경로와 **동일** 유지
+    // (JSON 출력이 가드를 약화시키지 않는다 — fail-fast 정합).
+    if (json) {
+      printJson({
+        mode: 'verify',
+        drift: drifts,
+        decoratorPass: passed,
+        decoratorFail: failed.map((f) => ({ file: f.file, format: f.format, reason: f.reason })),
+        orphanSidecars: orphans.map((o) => o.sidecar),
+        ...snapshotMeta(),
+      });
+      process.exit(failed.length > 0 || orphans.length > 0 ? 1 : 0);
+    }
+
     console.log(`harness drift files: ${drifts}`);
     console.log(`decorator PASS: ${passed}`);
     console.log(`decorator FAIL: ${failed.length}`);
@@ -1489,6 +1887,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export {
   DECORATOR_REGEX,
   decoratorFormatFor,
+  // Amendment 19 (#897) — upstream 해시 규약 3함수 SSoT (baseline 가드가 import 후 re-export)
+  categorize,
+  managedSha256,
+  categoricalSha256,
+  // Amendment 19 (#897) — 수치 박제 규약 헬퍼 (baseline 가드가 동일 포맷으로 재사용)
+  snapshotMeta,
+  printJson,
   detectDriftFiles,
   verifyDecorator,
   detectOrphanSidecars,

@@ -92,7 +92,15 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-import { DECORATOR_REGEX, decoratorFormatFor } from './verify-harness-drift-decorator.mjs';
+import {
+  DECORATOR_REGEX,
+  decoratorFormatFor,
+  categorize,
+  managedSha256,
+  categoricalSha256,
+  snapshotMeta,
+  printJson,
+} from './verify-harness-drift-decorator.mjs';
 
 const MANIFEST_PATH = '.harness/manifest.json';
 
@@ -125,81 +133,22 @@ class BaselineUnavailableError extends Error {
 }
 
 // =============================================================================
-// upstream 해시 규약 재현 (lib/categorize.js + lib/sentinels.js + lib/manifest.js)
+// upstream 해시 규약 (SSoT 는 자매 가드)
 // =============================================================================
+//
+// Amendment 19 (#897) — `categorize` / `managedSha256` / `categoricalSha256` 의 정본은
+// `verify-harness-drift-decorator.mjs` 로 이관됐다. 자매 가드가 drift 판정에 같은 3함수를
+// 쓰게 되면서 규약 사본이 2개가 되는 것을 막기 위함이다 (사본 = drift 생성원).
+//
+// import 방향은 **baseline → drift-decorator 고정**이다 (본 파일은 이미 line 95 에서
+// `DECORATOR_REGEX` / `decoratorFormatFor` 를 같은 방향으로 import 한다). 역방향을
+// 추가하면 ESM 순환 + TDZ 위험이 생긴다.
+//
+// 외부 계약 보존: 본 파일은 3함수를 **re-export 유지**한다 (하단 export 목록).
 //
 // 매니페스트의 sha256 은 plain sha256 이 아니라 `categoricalSha256()` 이다.
 // managed-block (CLAUDE.md) 은 **센티널 내부만** 해시하므로, plain sha256 으로 비교하면
 // CLAUDE.md 를 영구 오탐한다. upstream 로직을 그대로 재현해야 판정이 CLI 와 일치한다.
-
-const SENTINEL_START = /<!--\s*harness:managed:([\w-]+):start\s*-->/g;
-const SENTINEL_END_FOR = (id) => new RegExp(`<!--\\s*harness:managed:${id}:end\\s*-->`);
-
-/**
- * upstream `lib/categorize.js::categorize()` 포팅.
- * 본 가드는 managed-block 판별에만 쓰지만, 규약 drift 감지를 위해 전체를 재현한다.
- * @param {string} relPath
- * @returns {'frozen'|'managed-block'|'atomic'|'user-only'}
- */
-function categorize(relPath) {
-  const p = relPath.replace(/\\/g, '/');
-  if (p.startsWith('.harness/')) return 'user-only';
-  if (p.startsWith('.claude/logs/')) return 'user-only';
-  if (p === '.gitignore') return 'user-only';
-  if (p.startsWith('scripts/')) return 'frozen';
-  if (p.startsWith('.github/workflows/')) {
-    const base = p.slice('.github/workflows/'.length);
-    return base.startsWith('harness-') ? 'frozen' : 'user-only';
-  }
-  if (p === 'CLAUDE.md') return 'managed-block';
-  if (p.startsWith('docs/decisions/') && p !== 'docs/decisions/README.md') return 'user-only';
-  if (p.startsWith('docs/retrospectives/') && p !== 'docs/retrospectives/README.md') {
-    return 'user-only';
-  }
-  return 'atomic';
-}
-
-/**
- * upstream `lib/sentinels.js::managedSha256()` 포팅.
- * 센티널 블록이 없으면 전체 파일 해시로 폴백 — **upstream 규약 재현이지 본 가드의
- * fallback 분기가 아니다** (같은 입력에 같은 판정을 내기 위한 동형성 요구).
- * @param {string} text
- * @returns {string}
- */
-function managedSha256(text) {
-  const blocks = [];
-  let m;
-  SENTINEL_START.lastIndex = 0;
-  while ((m = SENTINEL_START.exec(text)) !== null) {
-    const id = m[1];
-    const startMarkerEnd = m.index + m[0].length;
-    const endRe = SENTINEL_END_FOR(id);
-    const tail = text.slice(startMarkerEnd);
-    const endM = endRe.exec(tail);
-    if (!endM) continue; // 닫는 센티널 없음 — upstream 과 동일하게 무시
-    const inner = tail.slice(0, endM.index);
-    const content = inner.replace(/^\n/, '').replace(/\n$/, '');
-    blocks.push({ id, content });
-  }
-  if (blocks.length === 0) {
-    return createHash('sha256').update(text).digest('hex');
-  }
-  const concat = blocks.map((b) => `${b.id}\n${b.content}`).join('\n---\n');
-  return createHash('sha256').update(concat).digest('hex');
-}
-
-/**
- * upstream `lib/manifest.js::categoricalSha256()` 포팅.
- * @param {string} relPath
- * @param {string} absPath
- * @returns {string}
- */
-function categoricalSha256(relPath, absPath) {
-  if (categorize(relPath) === 'managed-block') {
-    return managedSha256(readFileSync(absPath, 'utf-8'));
-  }
-  return createHash('sha256').update(readFileSync(absPath)).digest('hex');
-}
 
 // =============================================================================
 // 데코레이터 존재 판정
@@ -358,8 +307,7 @@ function inspectEntry({ rel, entry, rootDir, baselineDir }) {
   // 불변식별로 **다른 divergence 개념**을 쓴다 (각 불변식이 강제하는 계약이 다르므로).
   //
   //   (A)(B) — Amendment 8 데코레이터 계약. 데코레이터는 "이 harness-managed 파일에
-  //            다운스트림 Phase 1 수정이 있다" 는 표식이며, 그 지시 대상은 **파일 전체**다
-  //            (자매 가드 verify-harness-drift-decorator.mjs 도 plain sha 로 판정).
+  //            다운스트림 Phase 1 수정이 있다" 는 표식이며, 그 지시 대상은 **파일 전체**다.
   //            → plain sha256 사용.
   //   (C)    — CLI 의 `diffAgainstPackage()` 오분류 시그니처. CLI 는 `categoricalSha256()`
   //            로 비교하므로 판정을 CLI 와 **정확히 동형**으로 맞춰야 한다.
@@ -370,6 +318,15 @@ function inspectEntry({ rel, entry, rootDir, baselineDir }) {
   //   - 덮어쓰기 위험 0 (apply 는 센티널 내부만 교체) → (C) 미발화가 정답
   //   - 데코레이터는 유효 (파일 전체는 실제로 divergent) → (B) 미발화가 정답
   // 한 개념으로 통일하면 두 가드가 서로 모순된 요구를 하게 된다 (#894 dev 단계 실측).
+  //
+  // Amendment 19 (#897) — 자매 가드와의 관계 정정. 자매 가드는 이제 drift 판정에
+  // `categoricalSha256()` 를 쓴다 (종전 plain sha256 은 managed-block 에서 정보량 0 의
+  // 상수였다). 그럼에도 **본 가드의 (A)(B) 는 plain sha256 을 계속 쓴다** — 두 가드는
+  // 비교 대상이 다르기 때문이다:
+  //   - 자매 가드: 로컬 ↔ **manifest** (CLI 동형 축 — 무엇이 CLI 관점 수정 상태인가)
+  //   - 본 가드 (A)(B): 로컬 ↔ **upstream 원본** (데코레이터 계약 축 — 파일 전체 divergence)
+  // 그래서 CLAUDE.md 는 자매 가드 drift 목록에서 빠지면서도 (A) 가 데코레이터를 계속
+  // 요구한다. 모순이 아니라 축이 다른 것이며, 양쪽 self-test 가 이 분리를 고정한다.
   const upShaCat = categoricalSha256(rel, upAbs);
   const locShaCat = categoricalSha256(rel, locAbs);
   const upShaFile = createHash('sha256').update(readFileSync(upAbs)).digest('hex');
@@ -539,11 +496,14 @@ function parseArgs(argv) {
     baselineDir: null,
     version: null,
     selfTest: false,
+    // Amendment 19 (#897) — 기계 판독 출력 (ADR/CHANGELOG 스냅샷 원천).
+    json: false,
   };
   for (const a of argv.slice(2)) {
     if (a === '--self-test') opts.selfTest = true;
     else if (a === '--apply') opts.apply = true;
     else if (a === '--dry-run') opts.apply = false;
+    else if (a === '--format=json') opts.json = true;
     else if (a.startsWith('--mode=')) opts.mode = a.slice('--mode='.length);
     else if (a.startsWith('--baseline-dir=')) opts.baselineDir = a.slice('--baseline-dir='.length);
     else if (a.startsWith('--version=')) opts.version = a.slice('--version='.length);
@@ -595,7 +555,34 @@ function printCounts(counts, baseline) {
 async function mainVerify(opts) {
   const rootDir = '.';
   const baseline = await resolveBaseline(opts, rootDir);
-  const { violations, counts } = runVerify({ rootDir, baselineDir: baseline.dir });
+  const { results, violations, counts } = runVerify({ rootDir, baselineDir: baseline.dir });
+
+  // Amendment 19 (#897) — 기계 판독 경로. exit code 는 텍스트 경로와 **동일** 유지.
+  if (opts.json) {
+    const flatJson = violations.flatMap((r) =>
+      r.violations.map((v) => ({ rel: r.rel, code: v.code })),
+    );
+    printJson({
+      mode: 'verify',
+      baselineVersion: baseline.version ?? null,
+      baselineSource: baseline.source,
+      manifestEntries: counts.total,
+      checked: counts.checked,
+      identical: counts.identical,
+      divergent: counts.divergent,
+      divergentFiles: results.filter((r) => r.status === 'divergent').map((r) => r.rel),
+      downstreamOnly: counts.downstreamOnly,
+      missingLocally: counts.missingLocally,
+      invariantViolations: flatJson.length,
+      invariantViolationsByCode: flatJson.reduce(
+        (acc, v) => ({ ...acc, [v.code]: (acc[v.code] || 0) + 1 }),
+        {},
+      ),
+      invariantViolationDetail: flatJson,
+      ...snapshotMeta(),
+    });
+    return flatJson.length === 0 ? 0 : 1;
+  }
 
   printCounts(counts, baseline);
   const flat = violations.flatMap((r) => r.violations.map((v) => ({ rel: r.rel, ...v })));
