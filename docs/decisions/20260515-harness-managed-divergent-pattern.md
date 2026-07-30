@@ -1961,3 +1961,207 @@ update → repair --apply → verify 를 **원자적 1-step** 으로 만들라."
 - 폐기 프레이밍: 통과 (upstream `buildManifest` 수정 대기는 "블로킹 의존" 근거로 기각, 병행 보고 유지).
 
 **기각 0건** — agy 지적 중 근거 부족으로 반려한 항목은 없다.
+
+---
+
+## Amendment 18 — 2026-07-29
+
+**`.harnessignore` 자동 생성 + 데코레이터 다중 URL 문법 정식화 + Amendment 10 append 전환 (#894 PR-B)**
+
+- 상태: **Accepted** (cross-validate 2026-07-30 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로, 앵커 "ADR 신규·개정/폐기")
+- 관련: 이슈 [#894](https://github.com/coseo12/astro-simulator/issues/894), 선행 [Amendment 17](#amendment-17--2026-07-28) (PR [#895](https://github.com/coseo12/astro-simulator/pull/895))
+
+### 배경
+
+Amendment 17 은 baseline SSoT 를 upstream 원본으로 옮겨 P0 (pristine 오분류 → 자동 덮어쓰기) 를
+차단했고, §결과·재검토 조건에서 **(α) 데코레이터 다중 URL 문법 정식화 / (β) Amendment 10 append
+전환** 을 PR-B 로 명시 분리했다. 본 Amendment 가 그 이행이며, Amendment 8 (데코레이터 형식 SSoT) 과
+Amendment 10 (자동 해소 계약) 을 **개정**한다.
+
+동시에 Amendment 17 §결정 7 (`.harnessignore` 등록과 쌍) 을 실제 인프라로 구현한다.
+
+### 실측 (2026-07-29, `origin/develop` = `fed8907`, upstream `v4.5.0`)
+
+| 항목                                                           | 조치 전     | 조치 후                                                  |
+| -------------------------------------------------------------- | ----------- | -------------------------------------------------------- |
+| `.harness/manifest.json` entry                                 | 359         | **95** (= upstream 추적 대상 95 전량)                    |
+| upstream 부재 entry (carry-over)                               | 264 (73.5%) | **0**                                                    |
+| `removed-upstream` (= `--interactive` **[d]elete 후보**)       | 264         | **0**                                                    |
+| `added` / `missing-locally` (`.harnessignore` 오등록 시그니처) | 0           | **0** (⚠ 안전 불변식 유지 실증)                          |
+| `modified-pristine` (자동 덮어쓰기 대상)                       | 0           | **0** (Amendment 17 보증 무회귀)                         |
+| `user-modified-stable` (Phase-1 divergent 보존)                | 9           | **8**                                                    |
+| `.prettierignore` harness 블록                                 | 132 경로    | **82 경로** (`docs/ops/*` 2건 이탈 → prettier 대상 복귀) |
+| 활성 drift 파일 수 (Amendment 9 모수)                          | 11          | **9**                                                    |
+
+`.harnessignore` 는 **58 패턴** (디렉토리 압축 10 / 개별 경로 48) 으로 266 경로를 커버한다.
+`user-modified-stable` 9 → 8 은 `scripts/verify-harness-upstream-baseline.mjs` (PR-A 신규,
+upstream 부재) 가 upstream CLI 의 `pkgSha === baseSha` (양쪽 `null`) 분기로 우연히
+`user-modified-stable` 로 분류되던 것이 `.harnessignore` 로 정상 제외된 결과다.
+
+### 결정
+
+1. **`.harnessignore` 는 손으로 유지하지 않고 upstream 원본과 대조해 자동 생성한다.**
+   `scripts/sync-harnessignore.mjs` 가 SSoT 이며 `--check` 로 CI 차단한다.
+   생성 기준은 **`git ls-files`** 다 — 디스크 walk 기준으로 만들면 gitignore 된 런타임
+   산출물(`.claude/scheduled_tasks.lock`)이 로컬에만 존재해 CI 와 결과가 갈린다.
+   그런 산출물은 마커 블록 **밖 수동 섹션**에 박제하며, 수동 섹션도 불변식 (S) 검사를 받는다.
+2. **3 불변식 fail-fast** (CLAUDE.md §가드 설계 원칙 — fallback 분기 금지):
+   - **(S) 안전** — 어떤 패턴도 upstream 존재 경로를 매칭하면 안 된다. 위반 시 그 파일은
+     `walkTracked` 에서 빠져 `added` 재도입 또는 `missing-locally` 로 오분류된다.
+     **자동 생성이 필수인 이유**이기도 하다 (수기 목록은 upstream 파일 추가 시 조용히 오염).
+   - **(K) 완전성** — upstream 부재 대상은 전부 커버 (carry-over 재유입 차단).
+   - **(M) 매니페스트 정합** — `.harnessignore` 매칭 경로가 매니페스트에 잔존하면 안 된다.
+     `.harnessignore` 도입만으로는 **이미 등록된** carry-over 가 사라지지 않으므로,
+     `--prune-manifest` (dry-run 기본) 로 1회 제거하고 (M) 이 재발을 영구 차단한다.
+3. **디렉토리 압축**: upstream 파일을 하나도 갖지 않는 **가장 얕은** 조상 디렉토리를 `dir/` 1줄로
+   낸다 (`docs/reports/` = 156 파일 → 1줄). 일상 PR 에서 해당 디렉토리에 파일을 추가해도 블록이
+   불변이라 마찰이 0 이다. upstream 이 그 디렉토리에 파일을 추가하면 압축이 **자동 해제**되어
+   개별 경로로 전환된다 (안전 우선, self-test recovery 케이스로 회귀 차단).
+4. **(α) 데코레이터 문법을 `[<url>( + <url>)*|TODO]` 로 정식화한다** (Amendment 8 형식 SSoT 개정).
+   이는 신문법 도입이 아니라 **실사용 선행의 추인**이다 — `.claude/agents/qa.md`
+   (`[.../309 + .../318 + .../322]`), `browser-test/SKILL.md`, `CLAUDE.md` 가 이미 다중 URL 을
+   써 왔으나 SSoT 와 `TODO_LINE_REGEX` 는 단일 URL 만 규정한 문서↔구현 drift 였다.
+   구분자를 `+` 로 못박아 `[https://a, https://b]` 같은 임의 구분자 오박제를 차단한다.
+   **Amendment 10 의 자동 해소는 교체가 아니라 append 로 전환한다** — 종전 구현은 대괄호를 통째
+   교체해 다중 사유 파일의 **기존 URL 을 소실**시켰다.
+5. **(β) 한 파일의 후보 upstream PR 이 2개 이상이면 자동 적용을 보류한다** (`held: true`).
+   종전 `seen` first-wins 는 `gh pr list` 기본 정렬(created desc)에 의존하는 **비결정적 승자
+   선정**이었고, `harness-guards.yml`(#779/#480/#338/#842 누적)이 무관한 #315 로 매칭된 정확한
+   지점이다. 매칭은 PR 번호 오름차순으로 결정화하고, 보류분은 soft-warn 목록에만 올려 사람이
+   다중 URL 문법으로 직접 박제한다. PR #893 의 **수동 보류 판단을 자동화**한 것이다.
+6. **`harness update --apply-*` 는 원자적 래퍼로 실행한다** — `scripts/harness-update-safe.sh`.
+   Amendment 17 §결정 5 는 절차를 `.claude/commands/harness-update.md` §7 로 박제했으나,
+   **사람이 기억해서 실행하는 구조는 재발한다** (#893 이 그 실패). cross-validate(agy) 고유 발견 1
+   수용분이며, 설계 비목표("래핑 스크립트 불필요")를 실측이 반박한 사례다. 수동 4단계는 래퍼를
+   쓸 수 없는 경우(`--interactive` 등)를 위해 §7-1 로 **보존**한다.
+7. **`harness-guards.yml` 의 다운스트림 고유 가드 스텝은 `if: hashFiles(...)` 를 두지 않는다**
+   (reviewer R3). `hashFiles` 는 "스크립트 미포함 다운스트림에선 조용히 스킵" 이라는 upstream
+   배포 편의 조건인데, 해당 스크립트들은 upstream 에 존재하지 않는 본 프로젝트 고유 가드이므로
+   "부재" 는 배포 시나리오가 아니라 **가드 삭제 회귀**다. 조건을 붙이면 스크립트를 지우는 것만으로
+   CI 가 초록인 채 가드가 사라진다 — #894 가 다룬 "가드가 초록인 채로 P0 가 열려 있다" 와 동형.
+   선례는 #842 (`docs 상대 링크 무결성 가드` hashFiles 제거). **트레이드오프 박제**: Phase 2 로
+   본 파일을 upstream 에 역기여할 때 이 스텝들은 그대로 갈 수 없다 (스텝 분리 또는 스크립트 동반 기여).
+
+### alert fatigue 모수 변화 — 정직화 판단 (은폐 아님)
+
+Amendment 9 의 활성 drift 파일 수가 **11 → 9** 로 감소해, Amendment 17 §실측 정정 박스가 기록한
+`[Alert Fatigue Trigger] drift 11 >= N=10` 발화가 **미발화로 전환**된다. 이 변화의 성격을 명시한다.
+
+**감소분 2건은 전부 측정 artifact 이며, 진짜 Z 패턴 drift 는 1건도 해소되지 않았다.**
+
+| 제거된 모수                       | 성격                                                                                                                        | 판단                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `.claude/scheduled_tasks.lock`    | git 미추적 **런타임 lock**. 세션마다 갱신되어 모수가 10↔11 로 진동하던 원인 (Amendment 17 §실측 정정 박스가 기록한 그 진동) | upstream 대응물이 없어 "upstream 대비 divergence" 자체가 성립하지 않음 — **범주 오류** |
+| `scripts/verify-zombie-check.mjs` | upstream 부재 다운스트림 고유 가드 스크립트. reviewer R2 가 artifact 로 지목한 2건 중 1건                                   | 동상 — **범주 오류**                                                                   |
+
+- **정직화인 근거**: 두 항목은 Amendment 9 가 정의한 모수("harness-managed 파일의 upstream 대비
+  divergence")에 원래 속하지 않았다. `walkTracked` 의 `TRACKED_DIRS` 통째 순회 결함(§0-5)으로
+  매니페스트에 편입된 것이지 Z 패턴 Phase 1 로 생긴 drift 가 아니다. 신규 baseline 가드의
+  `divergent: 8` 이 의미상 정확한 값이며, 정리 후 9 는 그 8 + `CLAUDE.md` 1 (아래 잔존 artifact) 이다.
+- **은폐가 아닌 근거**: 임계값 **N=10 은 불변**이다 (Amendment 9 SSoT 보존, 의식적 silent 약화 아님).
+  실제 Phase-1 divergent 8건은 **하나도 해소되지 않았고**, Amendment 17 §실측 정정 박스가 선언한
+  "해소 경로는 Phase 2 upstream 기여(옵션 1), 임계 재조정(옵션 3) 기각" 은 **그대로 유효**하다.
+  본 Amendment 는 그 의무를 이행한 것이 아니라 **모수에서 잡음을 뺐을 뿐**이다.
+- **남은 압력**: 9 는 N=10 바로 아래다. 다음 Phase-1 변경 1건이면 재발화한다. Phase 2 기여
+  압력은 축소되지 않았다.
+
+**잔존 artifact 1건 (후속 분리)**: `CLAUDE.md` 는 `verify-harness-drift-decorator.mjs` 가
+**plain sha256** 으로 로컬을 해싱해 managed-block 의 **categorical** manifest 값과 비교하는
+선행 결함 때문에 영구 drift 로 잡힌다 (reviewer R2 가 지목한 나머지 1건). 이를 고치면 모수가
+8 로 내려가 신규 가드와 완전히 일치하지만, **drift 검출 의미론을 바꾸는 변경**이라 실제 센티널
+drift 를 가릴 위험이 있다. PR-B 범위(이미 manifest 264 entry + 신규 스크립트 2종)를 고려해
+**후속 이슈로 분리**하고, 본 Amendment 는 모수에 artifact 1건이 남아 있음을 명시 박제한다.
+
+### R2 라운드 반영 — reviewer 차단 + cross-validate 수용 (2026-07-30)
+
+PR [#896](https://github.com/coseo12/astro-simulator/pull/896) 1차 리뷰 `request_changes` + 메인 수행
+cross-validate(agy, 로그 `.claude/logs/cross-validate-architecture-20260730-013648.log`) 결과 중
+**본 Amendment 계약 범위 내** 항목을 구현에 반영했다. (§교차검증 반영 사항 4축 통합 및 Accepted 전이는
+메인 담당 — 본 절은 **구현 사실 기록**이다.)
+
+| #   | 출처                    | 내용                                                                                                                                                                                                                                                                                            | 결정                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | reviewer **차단**       | `harness-update-safe.sh` 가 `set -u` 하에서 빈 배열 `"${arr[@]}"` 를 확장 → **macOS 기본 `/bin/bash` 3.2.57 에서 즉사** (실측 `REPAIR_FLAG[@]: unbound variable`). 크래시 지점이 **step 1 이 트리를 이미 변경한 뒤**라 남는 상태가 정확히 "apply 됐는데 위생 절차 미실행" = 이 래퍼의 존재 이유 | optional flag 를 **배열로 모으지 않고 명시적 분기**로 전달. `--self-test` 정적 가드가 `${VAR[@]}`/`${VAR[*]}` 확장을 금지하고 의도적 예외는 `# bash32-safe:` 마커 + 근거로만 면제                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2   | reviewer 비차단         | `--apply-* --dry-run` 조합에서 step 1 은 시뮬레이션인데 step 2~5 가 `--apply` 로 실제 write → **dry-run 계약 위반**                                                                                                                                                                             | `--dry-run` passthrough 감지 시 **후속 단계 전체 스킵** (트리 미변경 = 위생 절차 불필요)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 3   | reviewer 비차단         | 문서 수치 drift (`58/266` 를 `57/265` 로, `.prettierignore` `132` 를 `133` 으로 기재)                                                                                                                                                                                                           | 실측값으로 정정                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 4   | cross-validate **수용** | _"래퍼는 `--apply-_` 를 실제 호출하는데 실패 시 롤백하지 않는다. 오히려 '1-step 이니 안심' 심리가 사고 규모를 키울 수 있다"\*                                                                                                                                                                   | **롤백은 도입하지 않는다** (git 상태 자동 조작은 사용자 작업 유실 위험이 더 크다). 대신 **복구 가능성을 구조적으로 보장** — ① `--apply-*` 경로 진입 전 **clean working tree 강제**(dirty 면 exit 2. 사전 변경분과 apply 결과가 섞이면 `git checkout .` 이 사용자 작업까지 되돌려 복구 불가) ② 실행 직전 **HEAD sha 를 복구 앵커로 출력** ③ `EXIT` trap 이 중간 실패 시 복구 명령(`git checkout .` / `git clean -fd` / `git reset --hard <pre-sha>`)을 stderr 로 안내. 우회 플래그 `--allow-dirty` 를 두되 **기본값은 차단**이고 우회 시 위험을 경고한다 (릴리스 준비·충돌 해결 중 반복 실행 실용성 — silent 약화가 아니라 명시적 opt-in) |
+| 5   | cross-validate **수용** | _"`git ls-files` SSoT 선택 자체는 합리적. 다만 `git add` 전 신규 파일 누락 사각은 보완 필요"_ — **본 PR 안에서 실제 발화**(`harness-update-safe.sh` 자기 누락, 커밋 직후 `--check` 가 검출)                                                                                                     | SSoT 는 **유지**(워킹트리 스캔으로 바꾸면 `scheduled_tasks.lock` 류가 재유입돼 CI↔로컬이 갈린다). 불변식 **(U)** 신설 — `git status --porcelain --untracked-files=all` 로 미추적 다운스트림 고유 파일을 감지. **생성 모드는 경고(exit 0) / `--check` 는 차단(exit 1)** 비대칭: 생성은 "바로잡는" 동작이라 차단하면 해소용 재생성이 막혀 데드락이고, `--check` 는 게이트라 fail-fast 정합. CI 는 fresh checkout 이라 미추적 0 → 잡음 증가 없이 **사람이 조치 가능한 로컬로 발화가 한정**된다                                                                                                                                              |
+| —   | cross-validate 판정     | 디렉토리 압축 10건의 "upstream 진입 시 조용히 숨김" 위험                                                                                                                                                                                                                                        | agy **"위험 수용 타당"** (압축 자동 해제 + `--check` CI 차단이 이미 존재) → **변경 없음**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+### 결과·재검토 조건
+
+- upstream 이 `walkTracked` 기본 동작을 "패키지에 존재하는 경로만 등록" 으로 바꾸면
+  (§upstream 제안 4) `.harnessignore` 자동 생성과 (M) 불변식은 **중복**이 되므로 폐기 후보.
+- `.harnessignore` 문법이 upstream 에서 확장되면 (`!` 네거티브 등) `sync-harnessignore.mjs` 의
+  `patternToRegex` 포팅을 **동반 갱신**해야 한다. 포팅이 뒤처지면 (S) 판정이 CLI 와 갈린다.
+  `lib/harnessignore.js` 변경은 harness update 시 확인 대상이다.
+- (β) 보류가 상시화되면(월 1회 이상) 사유 검증(설계 §결정 4 (γ), 자연어 대조) 재검토.
+  현재는 append 전환으로 오탐 피해가 "무관한 URL 1개 추가" 로 축소돼 수용 가능하다.
+- 원자적 래퍼가 `--interactive` 를 지원하지 못하는 한계는 유지된다. `--interactive` 사용 빈도가
+  높아지면 후속 프롬프트 파싱 또는 비대화형 대체 경로를 설계한다.
+
+### 회귀 가드
+
+| 대상                                 | 가드                                                       | 3중 시뮬 (positive → negative → recovery)                                        |
+| ------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `.harnessignore` (S)/(K)/(M)/(U)/(D) | `sync-harnessignore.mjs --check` (CI `harness-guards.yml`) | `--self-test` **31 assertion** + 실제 저장소 주입 실측 5종                       |
+| 다중 URL 문법 (α)                    | `verify-harness-drift-decorator.mjs` DECORATOR_REGEX       | self-test positive 3 (실사용 3종) / negative 4 (임의 구분자·혼합·비-URL)         |
+| append 전환 (α)                      | `resolve-harness-drift-todo.mjs --self-test`               | 기존 URL 보존 append → 동일 URL 멱등 → 3중 누적                                  |
+| 다중 후보 보류 (β)                   | 동상 (`matchTodoResolutions`)                              | 단일 후보 적용 → 2후보 보류 → 후보 감소 시 복귀 + 입력 순서 무관 결정성          |
+| 래퍼 fail-fast                       | `harness-update-safe.sh`                                   | `--check` 비파괴 통과 → `--interactive` 거부(exit 2) → 가드 실패 시 중단(exit 1) |
+| manifest 원자 write (R4)             | `applyRepairPlan` / `pruneManifest` temp+rename            | 복원 후 clean 매니페스트와 byte-identical 실측                                   |
+| baseline 캐시 신뢰 (R5)              | `ensureBaseline` marker 버전 대조 + semver 검증            | 오염 캐시 재다운로드 / 정합 캐시 hit / 비-semver 7종 거부                        |
+
+### cross-link
+
+- 선행: [Amendment 17](#amendment-17--2026-07-28) (PR [#895](https://github.com/coseo12/astro-simulator/pull/895)) — baseline SSoT 전환
+- 개정 대상: [Amendment 8](#amendment-8--2026-05-26) (데코레이터 형식 SSoT) / [Amendment 10](#amendment-10--2026-05-26) (자동 해소 계약) / [Amendment 9](#amendment-9--2026-05-26) (모수 정직화 박제)
+- 측정 SSoT: `scripts/sync-harnessignore.mjs` (`--self-test`) / `scripts/verify-harness-upstream-baseline.mjs` (`--self-test`)
+- 절차 SSoT: `scripts/harness-update-safe.sh` + `.claude/commands/harness-update.md` §7
+
+### 교차검증 반영 사항
+
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-30)** — 로그
+`.claude/logs/cross-validate-architecture-20260730-013648.log`. 명시 질문 3건 전달, 6대 기준 평가
+동반. 총평: _"단순한 스크립트 추가를 넘어 매니페스트 편입 파일 관리와 업데이트 절차의 재발 구조를
+철저히 위생화하는 매우 우수하고 타당한 설계."_
+
+**합의 (즉시 신뢰)**
+
+- **명시 질문 1 (생성 SSoT)** — `git ls-files` 기준은 런타임 미추적 파일(`scheduled_tasks.lock` 등)에
+  의한 **비결정성 및 CI↔로컬 갈림을 막는 합리적 선택**. 워킹트리 스캔으로의 전환은 권고하지 않음.
+- **명시 질문 2 (디렉토리 압축)** — 압축은 관리 부담·PR 충돌을 크게 줄이며, 잔여 위험(upstream 이
+  해당 디렉토리에 파일 추가 시 silent drop)은 불변식 (S) + `--check` CI 차단 + **압축 자동 해제**로
+  방어된다 → **위험 수용 타당**. 개별 경로 나열로의 후퇴 불요.
+- **명시 질문 3 (alert fatigue 정직화)** — 단순 모수 축소가 아니라 **범주 오류 파일 제거**이고 임계
+  N=10 을 보존했으므로 **정당**. 자기합리화 아님.
+- 데코레이터 다중 URL 문법 정식화(`+` 구분자 명시)·다중 후보 시 `held` 보류·PR 번호 오름차순
+  결정 정렬은 **비결정성 제거 계약으로 명확**(인터페이스 명확성 ★★★★★).
+
+**고유 발견 2건 — 전건 수용, 본 PR(R2 라운드)에 반영**
+
+1. **원자적 래퍼의 롤백 부재 (Q3 파생)** — _"래퍼는 `--apply-_`를 실제 호출하는데 실패 시 이미
+apply 된 트리를 롤백하지 않는다. '1-step 이니 안심' 심리가 사고 규모를 키울 수 있다."*
+→ **clean working tree 사전 게이트**(dirty 시 exit 2) + **실행 직전 HEAD sha 앵커 출력** +`EXIT`trap 복구 안내 3축 반영. **자동 롤백은 의도적으로 도입하지 않음** — 래퍼가`git checkout .`/`reset --hard`를 자동 실행하면 사용자 작업 유실 위험이 원 문제보다 크다
+(CRITICAL #5). 복구 **가능성**을 보장하되 복구 **실행**은 사람이 한다. 우회 플래그`--allow-dirty` 는 릴리스 준비·충돌 해결 중 반복 실행 실용성을 위해 두되 기본 차단 + 경고 동반
+= 명시적 opt-in (silent 약화 아님). 비파괴 경로(`--check`/`--dry-run`)는 dirty 여도 통과.
+2. **미추적 파일 SSoT 갭 (Q1 파생)** — _"`git add` 전 신규 파일이 목록에서 빠진다"_ → **불변식 (U)**
+   신설 (`git status --porcelain` 기반 미추적 감지). **생성 모드 = 경고(exit 0) / `--check` = 차단
+   (exit 1)** 비대칭 채택 — 생성은 "바로잡는" 동작이라 차단하면 해소용 재생성이 막혀 데드락이고,
+   `--check` 는 게이트라 fail-fast 정합. CI 는 fresh checkout 이라 미추적 0 → **발화가 로컬에 한정**.
+
+**Claude 편향 셀프 체크 (4종) — agy 반증 반영**
+
+- **순수주의: 미통과 → 정정 수용.** 래퍼를 "1-step 원자 실행" 으로 설계하면서 **실패 시 남는 상태**를
+  충분히 다루지 않았다. agy 지적으로 clean tree 게이트 + 복구 앵커가 추가됐다.
+- 낙관적 일정: 통과 (본 Amendment 는 실행분이며 upstream 의존 없음).
+- 결합 간과: **부분 미통과** — reviewer 가 bash 3.2 빈 배열 즉사(`--dry-run-followup` 경로)를
+  적발했고, 구현 중 `[*]` 도 동일 위험임이 추가 실측됐다. 3중 시뮬이 그 경로를 커버하지 않았던 것이
+  근인 → **정적 금지 가드 + 탐지기 자기 검증 + 분기 결정표 12행**으로 회귀 차단.
+- 폐기 프레이밍: 통과 (Q2 위험 수용을 근거와 함께 유지, 후퇴 아님).
+
+**기각 0건** — agy 지적 중 근거 부족으로 반려한 항목은 없다.
+
+> **부수 — L3 가드 실발화**: 본 cross-validate 실행 중 `cross_validate.sh` 의 워킹트리 snapshot
+> 가드가 **agy 의 plan-mode 우회(파일 1건 수정)를 감지해 자동 롤백**했다 (#479 가드가 설계대로
+> 작동함을 실증).

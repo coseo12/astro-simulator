@@ -79,7 +79,15 @@
  *   - 이슈: coseo12/astro-simulator#894
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -92,6 +100,12 @@ const MANIFEST_PATH = '.harness/manifest.json';
 const UPSTREAM_REPO = 'coseo12/harness-setting';
 const TARBALL_URL = (version) =>
   `https://codeload.github.com/${UPSTREAM_REPO}/tar.gz/refs/tags/v${version}`;
+
+// reviewer R5 (#894) — harnessVersion 형식 검증 (URL·캐시 경로 주입 차단).
+// semver.org 공식 regex 의 축약형 — prerelease/build 메타데이터까지 허용하되
+// 경로 구분자(`/`)·상위 참조(`..`)·공백은 구조적으로 배제된다.
+const SEMVER_REGEX =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 // stdout 마커 — CI / 사용자 grep 식별용 (자매 가드 Amendment 9/11 컨벤션 답습).
 const REPAIR_DRY_RUN_MARKER = '[Baseline Repair — Dry Run]';
@@ -243,10 +257,33 @@ function cacheRoot() {
  * @throws {BaselineUnavailableError} 네트워크 실패 / 태그 부재 / 전개 실패 → exit 2
  */
 async function ensureBaseline(version, opts = {}) {
+  // reviewer R5 (#894) — 버전 문자열 검증.
+  // version 은 URL 과 캐시 **경로**에 그대로 들어간다. 검증 없이 `../` 나 셸 메타문자가
+  // 섞이면 캐시 루트 밖을 가리키거나(경로 탈출) 엉뚱한 태그를 받는다. manifest 가 신뢰
+  // 경계 밖(머지 커밋/외부 도구가 쓰는 파일)이므로 입력으로 취급해 fail-fast 한다.
+  if (!SEMVER_REGEX.test(String(version))) {
+    throw new BaselineUnavailableError(
+      `harnessVersion 이 semver 형식이 아님: ${JSON.stringify(version)} — ` +
+        'manifest.harnessVersion 확인 또는 --version=<x.y.z> 명시',
+    );
+  }
+
   const root = cacheRoot();
   const dir = join(root, `v${version}`);
   const marker = join(dir, '.harness-baseline-ok');
-  if (existsSync(marker)) return { dir, cacheHit: true };
+  // reviewer R5 (#894) — 캐시 신뢰 경계.
+  // 캐시는 프로세스 외부(공유 tmpdir / RUNNER_TEMP)에 있어 다른 프로세스·과거 실행이
+  // 남긴 내용일 수 있다. marker 존재만으로 신뢰하면 **잘못된 baseline 으로 PASS** 하는
+  // 조용한 약화가 된다. marker 안에 버전을 적어두고 일치 + 무결성 파일 존재까지 확인한다.
+  // 불일치 시 캐시를 버리고 재다운로드 (fallback 이 아니라 신뢰 경계 재확립).
+  if (existsSync(marker)) {
+    const stamped = readFileSync(marker, 'utf-8').trim();
+    if (stamped === version && existsSync(join(dir, 'package.json'))) {
+      return { dir, cacheHit: true };
+    }
+    console.error(`WARN: baseline 캐시 무효 (marker="${stamped}" 기대="${version}") — 재다운로드`);
+    rmSync(dir, { recursive: true, force: true });
+  }
 
   const url = TARBALL_URL(version);
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
@@ -480,7 +517,14 @@ function applyRepairPlan({ rootDir, manifest, plan }) {
     entry.sha256 = item.toSha;
     delete entry.previousSha256;
   }
-  writeFileSync(join(rootDir, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`);
+  // reviewer R4 (#894) — 원자적 write (temp + rename).
+  // 직렬화 중 예외 / 디스크 full / SIGINT 로 manifest 가 truncate 되면 CLI 가 전 파일을
+  // `added` 로 오판해 복구 불가능한 교착이 된다 (CLAUDE.md §매니페스트 최신 ≠ 파일 적용 완료).
+  // 같은 디렉토리에 temp 를 두어 rename 이 동일 파티션 원자 연산이 되게 한다 (EXDEV 회피).
+  const abs = join(rootDir, MANIFEST_PATH);
+  const tmp = `${abs}.tmp-${process.pid}`;
+  writeFileSync(tmp, `${JSON.stringify(manifest, null, 2)}\n`);
+  renameSync(tmp, abs);
   return plan.length;
 }
 
@@ -995,6 +1039,109 @@ async function runSelfTest() {
       threw instanceof BaselineUnavailableError && /ENOTFOUND/.test(threw.message),
       String(threw),
     );
+  }
+
+  // --- reviewer R5 (#894): 버전 문자열 검증 (URL·캐시 경로 주입 차단) ---
+  {
+    for (const bad of ['../../etc', '4.5.0/../x', 'latest', '', '4.5', 'v4.5.0', '4.5.0 ']) {
+      let threw = null;
+      try {
+        await ensureBaseline(bad, {
+          fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) }),
+        });
+      } catch (err) {
+        threw = err;
+      }
+      expect(
+        `R5: 비-semver 버전 거부 (${JSON.stringify(bad)}) — 네트워크 도달 전 fail-fast`,
+        threw instanceof BaselineUnavailableError && /semver/.test(threw.message),
+        String(threw),
+      );
+    }
+    // 정상 semver (prerelease 포함) 는 통과해 fetch 단계로 진입 → 404 로 실패해야 함
+    let threw = null;
+    try {
+      await ensureBaseline('0.0.0-selftest', {
+        fetchImpl: async () => ({ ok: false, status: 404 }),
+      });
+    } catch (err) {
+      threw = err;
+    }
+    expect(
+      'R5: 정상 semver(prerelease) 는 통과 — 실패 사유가 semver 아닌 404',
+      threw instanceof BaselineUnavailableError && /404/.test(threw.message),
+      String(threw),
+    );
+  }
+
+  // --- reviewer R5 (#894): 캐시 신뢰 경계 — marker 버전 불일치 시 캐시 무효화 ---
+  {
+    const cacheTmp = mkdtempSync(join(tmpdir(), 'harness-baseline-cache-'));
+    const prevEnv = process.env.HARNESS_UPSTREAM_CACHE_DIR;
+    process.env.HARNESS_UPSTREAM_CACHE_DIR = cacheTmp;
+    try {
+      // 오염된 캐시 조작: 디렉토리와 marker 는 있으나 marker 내용이 다른 버전
+      const poisoned = join(cacheTmp, 'v1.2.3');
+      mkdirSync(poisoned, { recursive: true });
+      writeFileSync(join(poisoned, '.harness-baseline-ok'), '9.9.9\n');
+      writeFileSync(join(poisoned, 'package.json'), '{}');
+      let fetched = false;
+      let threw = null;
+      try {
+        await ensureBaseline('1.2.3', {
+          fetchImpl: async () => {
+            fetched = true;
+            return { ok: false, status: 404 };
+          },
+        });
+      } catch (err) {
+        threw = err;
+      }
+      expect(
+        'R5: marker 버전 불일치 → 캐시 미신뢰 + 재다운로드 시도 (조용한 PASS 차단)',
+        fetched === true && threw instanceof BaselineUnavailableError,
+        `fetched=${fetched} threw=${threw}`,
+      );
+
+      // 정합 캐시는 네트워크 0 으로 hit
+      const good = join(cacheTmp, 'v1.2.4');
+      mkdirSync(good, { recursive: true });
+      writeFileSync(join(good, '.harness-baseline-ok'), '1.2.4\n');
+      writeFileSync(join(good, 'package.json'), '{}');
+      let fetched2 = false;
+      const r = await ensureBaseline('1.2.4', {
+        fetchImpl: async () => {
+          fetched2 = true;
+          return { ok: false, status: 404 };
+        },
+      });
+      expect(
+        'R5: 정합 캐시는 hit (네트워크 요청 0)',
+        r.cacheHit === true && fetched2 === false,
+        JSON.stringify(r),
+      );
+
+      // package.json 누락 (전개 중단 잔해) → 캐시 미신뢰
+      const partial = join(cacheTmp, 'v1.2.5');
+      mkdirSync(partial, { recursive: true });
+      writeFileSync(join(partial, '.harness-baseline-ok'), '1.2.5\n');
+      let fetched3 = false;
+      try {
+        await ensureBaseline('1.2.5', {
+          fetchImpl: async () => {
+            fetched3 = true;
+            return { ok: false, status: 404 };
+          },
+        });
+      } catch {
+        /* 404 기대 */
+      }
+      expect('R5: 무결성 파일 누락 캐시 → 재다운로드 시도', fetched3 === true);
+    } finally {
+      if (prevEnv === undefined) delete process.env.HARNESS_UPSTREAM_CACHE_DIR;
+      else process.env.HARNESS_UPSTREAM_CACHE_DIR = prevEnv;
+      rmSync(cacheTmp, { recursive: true, force: true });
+    }
   }
 
   // --- exit 2 경로: 태그 부재 (HTTP 404) ---

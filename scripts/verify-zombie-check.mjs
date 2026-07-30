@@ -1,6 +1,14 @@
 #!/usr/bin/env node
-// HARNESS-DRIFT: Z-PATTERN [TODO]
 // dev 서버 좀비 incident (#440) 회귀 가드.
+//
+// ※ HARNESS-DRIFT 데코레이터 없음 (#894 PR-B, reviewer R7) — 본 파일은 upstream
+//    harness-setting 에 **존재하지 않는** 다운스트림 고유 가드다. Amendment 8 데코레이터는
+//    "harness-managed 파일의 upstream 대비 divergence" 표식이므로 범주가 맞지 않고,
+//    Amendment 10 자동 해소(upstream PR URL 매칭)도 원리적으로 불가능해 `[TODO]` 가
+//    영구 잔존한다. 종전 데코레이터는 carry-over 로 매니페스트에 등록돼 drift 로 잡히면서
+//    붙은 것이며, `.harnessignore` 도입으로 등록 자체가 사라져 근거를 잃었다.
+//    (`verify-z-pattern-health.mjs` 등 `scanTodoFiles()` 명시 후보 4종은 Phase-2 기여
+//     의도 표식으로 데코레이터를 **유지**한다 — 본 파일은 그 목록에 없다.)
 //
 // SSoT 박제가 PR 머지 후에도 유지되는지 정적 검증.
 // 박제가 의도치 않게 제거되거나 대체되면 exit 1 로 CI 차단.
