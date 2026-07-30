@@ -1412,6 +1412,47 @@ function runSelfTest() {
       createHash('sha256').update('no sentinel here\n').digest('hex'),
   );
 
+  // --- upstream 직렬화 규약 골든 벡터 (외부 앵커) ---
+  //
+  // 위 3개 assertion 은 **자기참조적**이다 — 같은 함수를 두 번 적용해 비교하므로
+  // 내부 직렬화 포맷이 **자기일관적으로** 바뀌면 전부 초록인 채 통과한다.
+  // reviewer 실측 (#899): concat 에서 블록 id 를 제거 (`${b.id}\n${b.content}` → `b.content`)
+  // 하면 drift self-test 93/93 · baseline self-test 51/51 · 양 가드 본검사 exit 0 으로
+  // **모든 가드가 초록**인 채 `CLAUDE.md` 가 정보량 0 의 상수로 drift 집합에 재진입해
+  // 모수만 8 → 9 로 부풀었다 (soft-warn 이라 무발화). 본 PR 이 제거한 결함과 동일 시그니처다.
+  //
+  // 골든 벡터는 **직렬화 포맷 자체**를 구현과 독립된 상수에 고정한다.
+  //
+  // 기대 해시 유도 — upstream `lib/sentinels.js::managedSha256()` 규약을 손으로 전개:
+  //   blocks = [{ id: 'a', content: 'AAA' }, { id: 'b', content: 'BBB' }]
+  //   concat = blocks.map((b) => `${b.id}\n${b.content}`).join('\n---\n')
+  //          = 'a\nAAA'  +  '\n---\n'  +  'b\nBBB'
+  //          = 'a\nAAA\n---\nb\nBBB'            ← 15 bytes (GOLDEN_CONCAT 리터럴)
+  //   GOLDEN_SHA = sha256(concat)
+  //              = 77abbae17b6ba938b5c6f571efeb3ccad759bffc6260103b9a4ebca5de0ad120
+  //
+  // 즉 기대값은 **구현을 호출해 얻은 값이 아니라** 규약에서 전개한 바이트열의 해시다.
+  // 구현이 포맷을 바꾸면 좌변만 변해 FAIL 한다. 상수 갱신은 upstream 규약 자체가 바뀔 때만
+  // 정당하며, 그 경우 위 유도 3줄을 새 규약으로 다시 전개해 재계산할 것
+  // (§Amendment 19 §수치 박제 규약 (i) — 손으로 숫자를 옮겨 적지 말 것).
+  const GOLDEN_CONCAT = 'a\nAAA\n---\nb\nBBB';
+  const GOLDEN_SHA = '77abbae17b6ba938b5c6f571efeb3ccad759bffc6260103b9a4ebca5de0ad120';
+  // 상수의 출처를 **실행 가능하게** 박제 — 리터럴이 어디서 왔는지 다음 작성자가 즉시 재현 가능.
+  expect(
+    'Amd19 골든 벡터 provenance: GOLDEN_SHA === sha256("a\\nAAA\\n---\\nb\\nBBB") (15 bytes)',
+    createHash('sha256').update(GOLDEN_CONCAT).digest('hex') === GOLDEN_SHA &&
+      Buffer.byteLength(GOLDEN_CONCAT) === 15,
+  );
+  const goldenFixture =
+    '<!-- harness:managed:a:start -->\nAAA\n<!-- harness:managed:a:end -->\n' +
+    '<!-- harness:managed:b:start -->\nBBB\n<!-- harness:managed:b:end -->\n';
+  expect(
+    'Amd19 골든 벡터: managedSha256(2블록 픽스처) === GOLDEN_SHA (upstream 직렬화 포맷 고정)',
+    managedSha256(goldenFixture) === GOLDEN_SHA,
+    `got ${managedSha256(goldenFixture).slice(0, 16)}… — 직렬화 포맷이 upstream 규약에서 이탈했다 ` +
+      '(블록 id / 구분자 / 개행 트리밍 중 하나). 위 유도 주석과 대조할 것.',
+  );
+
   const mbTmp = mkdtempSync(join(tmpdir(), 'harness-drift-mb-'));
   try {
     const mbHarness = join(mbTmp, '.harness');

@@ -2296,7 +2296,8 @@ malformed entry 는 **throw** 한다. legacy 스키마 (entry 가 sha 문자열 
 
 양쪽 self-test 가 이 분리를 고정한다. 부수로 Amendment 12 TODO aging 은 drift 파일을 순회하므로
 `CLAUDE.md` 를 대상에서 제외하게 되나, 현행 `CLAUDE.md` 데코레이터는 `[TODO]` 가 아니라 URL 2건
-(`pull/260 + pull/315`) 이라 **실질 영향 0**이다.
+(`pull/260 + pull/315`) 이라 **실질 영향 0**이다. 단 이 무해성은 **현행 데코레이터 형태에
+조건적**이다 — `[TODO]` 로 회귀하면 30일 aging 이 조용히 스킵된다 (§모수 정의 각주 2).
 
 #### 결정 5 — `--self-test` CI 배선 신설 (비대칭 해소)
 
@@ -2332,6 +2333,23 @@ self-test 스텝을 신설하고 자매 가드 스텝의 주석 컨벤션·`--if
 > "발화가 잦아 부담" 은 옵션 3 silent 약화이며 금지 (§Amendment 13 판정 질문 승계).
 >
 > **임계 N=10 은 본 Amendment 로 변경되지 않는다.**
+
+> **각주 1 — 조건 2 는 `runCountWarn()` 이 직접 검사하지 않는다** (#899 reviewer 지적).
+> `runCountWarn()` 은 manifest entry 만 순회하므로 "upstream 원본 존재" 를 자체 판정하지 않고,
+> **`.harnessignore` 불변식 (K)(M) 에 암묵 위임**한다 — (K) 가 upstream 부재 경로를 전건
+> `.harnessignore` 로 커버하고 (M) 이 그 경로의 manifest 잔존을 0 으로 강제하므로, manifest 에
+> 남아 있다는 사실 자체가 조건 2 의 대리 증거가 된다 (Amendment 18 §carry-over 264 정리로
+> 성립). **따라서 조건 2 의 실효는 `sync-harnessignore --check` 의 CI 배선에 의존한다** — 그
+> 배선이 사라지면 조건 2 가 조용히 무효화된다. 직접 검사로 승격할지는 후속 판단 (현행은
+> 이중 검사 = 중복 비용이라 위임이 합리적이나, 위임 사실이 문서화되지 않은 것이 결함이었다).
+
+> **각주 2 — Amendment 12 TODO aging 과의 상호작용** (#899 reviewer 지적, §결정 4 상세).
+> 본 전환으로 `CLAUDE.md` 가 drift 집합에서 **영구 이탈**하므로 `runTodoAging()` 순회 대상에서도
+> 빠진다. 현행 데코레이터가 `[TODO]` 가 아니라 URL 2건 (`pull/260 + pull/315`) 이라 실질 영향은
+> 0 이지만, **조건부다** — 향후 `CLAUDE.md` 데코레이터가 `[TODO]` 로 회귀하면 30일 aging 이
+> **조용히 스킵**된다 (검출 주체 부재). managed-block 은 구조상 이 상태가 영구화되므로
+> (§후속 4), `CLAUDE.md` 데코레이터를 `[TODO]` 로 되돌리는 변경은 aging 사각을 동반한다는
+> 사실을 그 시점에 함께 판단해야 한다.
 
 #### 왜 명문화가 필요했나 — ADR 내부의 정의 2개 충돌
 
@@ -2474,9 +2492,47 @@ managed-block 카테고리 파일: ["CLAUDE.md"] (1건)
    두 가드가 같은 파일에 상반된 요구를 하지 않음을 양쪽에서 고정.
 5. **fail-fast negative** — malformed entry (문자열 `sha256` 부재) 주입 → **throw** (결정 3) +
    legacy 스키마 (entry = sha 문자열) 는 정상 판정.
+6. **upstream 직렬화 규약 골든 벡터 (외부 앵커)** — #899 reviewer 차단 반영.
 
 추가로 이관된 `categorize()` 8분기 / `managedSha256()` 3도메인 단위 assertion 을 두어 SSoT 이관
 자체의 회귀를 고정한다. 본 self-test 는 §결정 5 로 `ci.yml` 에 배선되어 **상시 실행**된다.
+
+#### 골든 벡터가 필요한 이유 — 자기참조 assertion 의 사각 (#899 reviewer 실측)
+
+위 1~5 의 `managed-block` assertion 은 전부 **자기참조적**이다: 합성 픽스처에 같은 함수를 두 번
+적용해 비교하므로, **내부 직렬화 포맷이 자기일관적으로 바뀌면 검출되지 않는다.**
+
+reviewer 가 격리 사본에서 `managedSha256()` 의 concat 에서 블록 id 만 제거해 실측했다
+(`` `${b.id}\n${b.content}` `` → `b.content`). dev 가 동일 주입으로 재현한 결과:
+
+| 검사                         | 골든 벡터 도입 **전**                               | 도입 **후**        |
+| ---------------------------- | --------------------------------------------------- | ------------------ |
+| drift `--self-test`          | 93 passed, 0 failed (초록)                          | **1 FAIL** ✅      |
+| baseline `--self-test`       | 51 PASS / 0 FAIL (초록)                             | 초록 (변화 없음)   |
+| drift 본검사 `--mode=verify` | exit 0 (초록)                                       | exit 0 (변화 없음) |
+| baseline 본검사              | exit 0, 불변식 위반 0 (초록)                        | exit 0 (변화 없음) |
+| 유일한 부작용                | `drift 8 → 9` (soft-warn, N=10 미만이라 **무발화**) | 동일               |
+
+즉 `CLAUDE.md` 가 **정보량 0 의 상수로 drift 집합에 재진입해 모수가 1 부풀어도 모든 가드가
+초록**이었다 — 본 Amendment 가 제거한 결함과 **동일 시그니처**다. 종전에는 이 3함수가 baseline
+(C1)(C2) 전용이라 blast radius 가 좁았으나, 본 Amendment 가 **alert fatigue 모수 자체**를 여기에
+의존시켰으므로 외부 앵커가 필수가 됐다.
+
+골든 벡터는 upstream 규약을 손으로 전개한 바이트열 `'a\nAAA\n---\nb\nBBB'` (15 bytes) 의 해시를
+구현과 독립된 상수로 고정한다. 기대값이 **구현을 호출해 얻은 값이 아니므로** 포맷이 바뀌면
+좌변만 변해 FAIL 한다. 유도 3줄은 코드 주석에 박제했다 (상수 갱신은 upstream 규약 자체가 바뀔
+때만 정당하며, 그때도 유도를 다시 전개해 재계산한다 — §수치 박제 규약 (i)).
+
+> **대안 (b) 기각 — manifest 대조 assertion**: reviewer 가 제시한 두 번째 앵커
+> (`categoricalSha256(rel, rel) === manifest[rel].sha256` 를 실 저장소에 대해 assert) 는 manifest 가
+> upstream CLI 가 기록한 진짜 외부 값이라는 장점이 있으나, **self-test 를 저장소 drift 상태에
+> 결합시킨다.** dev 실측: `CLAUDE.md` 센티널 **내부**에 정당한 Phase-1 편집이 있는 상태를
+> 시뮬레이션하면 이 assertion 이 FAIL 한다. 그러면 "가드가 깨졌다" 와 "저장소에 drift 가 있다" 가
+> 한 신호로 뭉개져, 정당한 in-block 편집이 **가드 정합성 테스트를 CI 에서 실패**시킨다
+> (CLAUDE.md §가드 설계 원칙 measurement-first — broad 권고를 실측으로 precision 정정).
+> (a) 가 보고된 사각을 **단독으로 완전히** 닫으므로 (위 표 실증) (b) 는 채택하지 않는다.
+> (b) 가 겨냥한 별도 축 — "우리 재현이 upstream 실제 동작에서 이탈" — 은 저장소 상태에 의존하므로
+> **self-test 가 아니라 본검사 계층**에 속한다. 후속 관찰 항목으로 둔다.
 
 ### 결과 / 후속
 
