@@ -572,7 +572,7 @@ function applyRepairPlan({ rootDir, manifest, plan }) {
     // (CLAUDE.md §커밋 성공 ≠ 의도한 변경 커밋됨 의 매니페스트 판). 명시적으로 멈춘다.
     if (entry === null || typeof entry !== 'object') {
       throw new Error(
-        `repair 불가 — legacy 문자열 entry: ${item.rel}. ` +
+        `repair 불가 — 객체 스키마가 아닌 entry: ${item.rel} (got ${entry === null ? 'null' : typeof entry}). ` +
           '`harness update --check` 로 manifest 를 객체 스키마로 재생성한 뒤 재시도',
       );
     }
@@ -1319,8 +1319,8 @@ async function runSelfTest() {
         repairThrew = err;
       }
       expect(
-        'D repair: legacy 문자열 entry 는 조용한 no-op 대신 throw',
-        repairThrew instanceof Error && /legacy/.test(repairThrew.message),
+        'D repair: 비-객체 entry (legacy 문자열 등) 는 조용한 no-op 대신 throw',
+        repairThrew instanceof Error && /객체 스키마가 아닌 entry/.test(repairThrew.message),
         String(repairThrew),
       );
 

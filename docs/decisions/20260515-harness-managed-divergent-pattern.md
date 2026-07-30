@@ -1869,7 +1869,8 @@ Amendment 8 이 정의한 drift 판정은 `.harness/manifest.json` 의 `sha256` 
 1. **baseline SSoT 는 upstream 원본(태그된 릴리스)이다.** `.harness/manifest.json` 은 CLI 가 쓰는
    **작업 상태**이지 Z 패턴의 진실 원천이 아니다.
 2. 신규 가드 `scripts/verify-harness-upstream-baseline.mjs` 가 upstream 태그 tarball 을 baseline 으로
-   3 불변식을 **fail-fast** 검증한다:
+   3 불변식을 **fail-fast** 검증한다 _(각주: Amendment 20 (#900) 에서 **(D)** 가 추가되어 현재는 4
+   불변식이다. 본 절은 Amendment 17 시점의 기록으로 보존한다)_:
    - **(A)** upstream 과 다른 managed 파일 → HARNESS-DRIFT 데코레이터 필수 (Amendment 8 정본화)
    - **(B)** 데코레이터 보유 파일 → upstream 과 **실제로 달라야** 함 (stale 데코레이터 차단, 역방향 사각 해소)
    - **(C)** 로컬 ≠ upstream 이면서 CLI 가 `modified-pristine` 으로 판정할 상태 → 즉시 FAIL
@@ -2622,7 +2623,7 @@ reviewer 가 격리 사본에서 `managedSha256()` 의 concat 에서 블록 id �
 ## Amendment 20 (2026-07-31) — 불변식 (D) 도입: manifest↔upstream 이격 차단으로 `drift == divergent` 항등식화
 
 - 관련 이슈: [#900](https://github.com/coseo12/astro-simulator/issues/900) (선행: [#894](https://github.com/coseo12/astro-simulator/issues/894) PR-A §Amendment 17 불변식 (A)(B)(C) / [#897](https://github.com/coseo12/astro-simulator/issues/897) §Amendment 19)
-- 상태: **Provisional** — cross-validate 결과 통합 후 Accepted 전이 (CLAUDE.md §ADR Status 워크플로: ADR 개정은 Provisional 의무)
+- 상태: **Accepted** (cross-validate 2026-07-31 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로)
 
 ### 배경 — 우연한 일치를 구조적 보증으로
 
@@ -2815,3 +2816,63 @@ provenance assertion (상수 == 리터럴의 해시 ∧ 바이트 길이) 을 �
      이 값이 늘면 원시 카운트 일치가 깨진다 (항등식 자체는 공통 스코프에서 유지). 비차단 관찰 항목.
   2. **legacy 문자열 entry 의 repair** — 현재는 fail-fast throw + 재생성 안내. upstream
      `buildManifest()` 가 항상 객체를 쓰므로 실사례 0이며, 발생 시 스키마 정규화 여부는 별도 판단.
+
+### 교차검증 반영 사항
+
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-31)** — 로그
+`.claude/logs/cross-validate-architecture-20260731-024410.log`. 명시 질문 3건 + 6대 기준 평가.
+총평: _"설계·실증·예외 처리·테스트 앵커까지 무결하게 작성된 우수한 ADR"_ — **Accepted 전이 승인 권고,
+이견·기각 0건.**
+
+**합의 (즉시 신뢰)**
+
+- **Q1 — "(D) 위반 0" 은 YAGNI 가 아니다.** _"YAGNI 는 미래에 혹시 필요할지 모를 비즈니스 기능의
+  오버엔지니어링을 경계하는 원칙이지 **시스템 무결성을 붕괴시키는 정적 사각지대 방치**를 의미하지
+  않는다."_ 판단 기준으로 (i) 위험의 심각성 — (D) 부재 시 stale 해시 주입에서 `differs=false` 로
+  (C1) 이 미발화해 **모든 가드 초록인 채 이격이 조용히 성립** (ii) 실효성 — negative 주입에서 7 FAIL
+  로 감지되므로 "발화하지 않는 죽은 코드" 가 아니라 **동작하는 회귀 방어선** (iii) ROI — manifest
+  변경 0 + 기존 해시 계산 재활용이라 런타임 오버헤드 거의 0. 세 축 모두 충족.
+- **Q2 — repair 정의역 확장은 100% 옳다.** (D) 단독 위반의 물리적 의미는 _"로컬 소스코드와 upstream
+  원본은 토시 하나 안 틀리고 완전 일치하는데, 오직 장부(manifest) 기록만 혼자 딴소리를 하고 있는
+  상태"_ 다. manifest 의 존재 목적이 "upstream 원본 해시의 기준점 기록" 이므로, 로컬 == upstream 인
+  상황에서 manifest 만 다르면 **100% 확률로 manifest 가 stale 하거나 훼손된 것**이며 upstream 해시로
+  복구하는 것이 정의상 유일한 정답. "upstream 이 잘못된 시나리오" 는 이 조건 하에서 성립 불가.
+- **Q3 — 항등식화는 직교성 상실이 아니라 false independence 제거.** (D) 이전에는 두 가드가 서로 다른
+  곳을 보기 때문에 manifest 가 오염되면 **서로 다른 결론을 내면서도 원인을 알 수 없는 착시**가
+  발생했다. (D) 는 두 축의 매개체인 manifest 의 기준점을 upstream 에 고정하는 역할이며, 축 자체는
+  여전히 다르다 (로컬↔manifest / 로컬↔upstream). 엣지: `downstream-only > 0` 이면 원시 카운트는
+  `drift >= divergent` 가 되나 본 Amendment 가 `checked` 스코프 항등식으로 정확히 정의했으므로
+  논리적 헛점 없음.
+- 6대 기준: 구조적 완성도 ★5 / 기술 결정 타당성 ★5 (대안 (b) 의 Phase-1 false-fire 파악 후 기각이
+  합리적, categorical 채택으로 `CLAUDE.md` 영구 오탐 방지) / 인터페이스 명확성 ★4.5 (`manifestSha()`
+  헬퍼로 자매 가드와 파싱 레이어 일치, malformed 를 silent skip·generic error 가 아닌 불변식 위반으로
+  확정) / 확장성 ★4.5 / 보안·무결성 ★5 (repair 가 사용자 소스를 1바이트도 안 건드림) / 누락 ★4.5.
+
+**고유 발견 2건 — 수용**
+
+1. **self-test 상수 재계산 방법을 코드 주석에 명시** — `D_ATOMIC_SHA`/`D_MB_SHA` 가 upstream 직렬화
+   규약과 tightly-coupled 이므로, 규약 변경 시 재계산 절차(유도식·명령)를 상수 정의부에 남길 것.
+   → 본 Amendment §self-test 외부 앵커의 유도 블록이 이미 그 역할을 하며, 상수 정의부 주석에도
+   동일 유도를 박제한다.
+2. **CLI 리포트 가독성** — exit 시 `D:<n>` 표기만으로는 의미가 전달되지 않으므로 _"Invariant (D)
+   violation (manifest ↔ upstream mismatch)"_ 요약 라인을 함께 출력할 것. → 후속 편승 대상으로
+   기록 (동작 영향 0, 진단 가독성 개선).
+
+**Claude 편향 셀프 체크 (4종)**
+
+- 낙관적 일정: 통과 (upstream 의존 없음, manifest 변경 0).
+- 결합 간과: **통과 — 단 reviewer 가 범위를 확장했다.** dev 는 negative 를 "identical 1건 sha 변조"
+  로만 설계했으나, reviewer 가 **divergent 파일의 manifest sha 를 제3의 값으로 변조**하는 S1 을
+  추가 주입해 develop 에서 (C1)(C2) 모두 미발화로 **조용히 통과**함을 실측 — **(D) 가 닫는 범위가
+  dev 서술보다 넓다**. 또한 `previousSha256` 보존의 "미래 C2 오탐 통로" 가능성도 주입 검증 후
+  성립 불가 확인.
+- 폐기 프레이밍: 통과 (대안 (b) 기각이 false-fire 실측 근거, agy 도 동의).
+- 순수주의: 통과 — self-test 외부 앵커가 Amendment 19 의 자기참조 사각을 재발시키지 않음을
+  reviewer 가 골든 벡터 직접 계산 + 항등식 assertion 순환 부재(호출 그래프 상 상호 호출 0)로 확인.
+
+**기각 0건.**
+
+> **부수 — reviewer 의 결정적 실증**: dev 는 "(D) 없었으면 전 가드 초록" 을 서술로만 주장했으나,
+> reviewer 가 `origin/develop` 스크립트를 **실제 로드해 같은 픽스처에 실행**했다 — develop 은
+> 불변식 위반 `[]`(초록)인데 PR head 는 `["D"]`(exit 1). 서술이 아니라 **두 리비전의 동작 차이**로
+> (D) 의 가치가 입증됐다.
