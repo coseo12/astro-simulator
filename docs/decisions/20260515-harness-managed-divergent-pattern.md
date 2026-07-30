@@ -2182,7 +2182,7 @@ apply 된 트리를 롤백하지 않는다. '1-step 이니 안심' 심리가 사
 ## Amendment 19 (2026-07-30) — managed-block drift 판정 해시 도메인 정정 + 모수 정의 명문화 + 수치 박제 규약
 
 - 관련 이슈: [#897](https://github.com/coseo12/astro-simulator/issues/897) (선행: [#894](https://github.com/coseo12/astro-simulator/issues/894) PR-B §Amendment 18 "잔존 artifact 1건")
-- 상태: **Provisional** (cross-validate 결과 통합 후 Accepted 전이 — CLAUDE.md §ADR Status 워크플로)
+- 상태: **Accepted** (cross-validate 2026-07-30 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로)
 
 ### 배경 — Amendment 18 이 남긴 artifact 1건의 실제 성격
 
@@ -2558,17 +2558,45 @@ reviewer 가 격리 사본에서 `managedSha256()` 의 concat 에서 블록 id �
 
 ### 교차검증 반영 사항
 
-**미수행 (Provisional 사유)** — 본 Amendment 는 drift 검출 **의미론 변경** + 모수 정의 명문화이므로
-CLAUDE.md §교차검증 "정책·설계·ADR 박제 직후 1회 루틴" 앵커에 해당한다. 박제 직후 메인
-오케스트레이터가 `cross-validate` 1회 호출 후 결과를 4축 (합의 / 이견 수용 / 기각 / 고유 발견) 으로
-분류해 본 절에 편입하고 **Provisional → Accepted 전이**한다. CHANGELOG 표기도 동시 갱신한다
-(§수치 박제 규약 (iii)).
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-30)** — 로그
+`.claude/logs/cross-validate-architecture-20260730-141508.log`. 명시 질문 3건 + 교차검증 항목 3건
+전달. 총평: _"승인(Accepted)하기에 충분한 논리적·기술적 타당성과 검증 체계를 갖추었다."_
+**이견·기각 0건.**
 
-**cross-validate 호출 시 명시 질문**
+**합의 (즉시 신뢰)**
 
-1. "블록 밖 오염 검출 축은 계약상 검출 대상이 아니다" 라는 §결정 1 판단이 지나친 낙관인가?
-   다운스트림이 센티널 블록을 **부분 훼손**하는 시나리오에서 categorical 비교가 놓치는 경로가 있는가?
-2. 불변식 (D) 를 후속 분리한 판단이 타당한가, 아니면 (D) 없이는 §실측 스냅샷 C 의 "8 == 8" 박제
-   자체가 오도인가?
-3. 결정 2 (신규 파일 없이 자매 가드로 이관) 가 `verify-harness-drift-decorator.mjs` 의 단일 책임을
-   과도하게 훼손하는가?
+- **Q1 — 검출 축 손실 없음.** 블록 밖 변경을 plain 해시로 감지해 permanent drift 로 분류하는 것은
+  _"`managed-block` 카테고리 도입 취지 자체를 부정하는 버그"_ 였다는 판정. `apply` 는 센티널 사이만
+  scoped replacement 하므로 블록 밖 덮어쓰기 위험은 **구조적으로 0**. 위험 시나리오 2종 검토 결과
+  (A: 블록 밖 문법 오염 → 문맥 검사기 관할이지 drift 가드 관할 아님 / B: 센티널 태그 훼손 → 블록 수
+  mismatch 로 폴백·throw 감지) 모두 구멍 없음.
+- **Q2 — 폴백은 결함 재도입이 아니라 tripwire.** 블록 0개면 `plain(로컬)` ↔ `managed(upstream)` 을
+  비교하게 되어 **100% 불일치 → 즉시 발화**한다. 기존 결함(블록이 정상 존재하는데 전문 비교)과
+  **상황이 배타적**이므로 "센티널 삭제 방어 기구" 로서 정당.
+- **Q3 — 캘리브레이션이지 게이밍 아님.** 반증 가능 근거로 (i) 오염 0 픽스처에서 drift 1 이 나온 것이
+  측정 도구 오류임이 4-way 해시로 입증됨 (ii) 9→8 제거분은 `CLAUDE.md` 1건뿐이고 실제 divergent
+  8건은 **하나도 제외되지 않음** (iii) 편법을 쓸 거였으면 (b) allowlist 가 가장 쉬운 길인데
+  `FORBIDDEN_ALLOWLIST_PATH_PATTERNS` 준수를 위해 **스스로 기각**했음 (iv) N=10 불변 + 현재 8이라
+  2건이면 재발화 — upstream 기여 압력 미약화.
+- 교차검증 항목 3건 (센티널 부분 훼손 경로 / (D) 후속 분리 타당성 / 결정 2 의 SRP) 도 전부 "타당"
+  판정. 특히 결정 2 는 _"도메인 해시 계산 함수의 SSoT 를 소유하기에 가장 적합한 위치"_ 로 평가.
+
+**고유 발견 1건 — 수용 (후속 이슈 우선순위 상향)**
+
+- **불변식 (D) 후속 이슈를 `High` 로 지정 권고** — 누락 시 manifest 갱신 누락 상황에서 drift 가드와
+  baseline 가드의 결과가 **이격**될 수 있다는 지적. 본 Amendment 의 §실측 스냅샷 C 경고 박스가
+  "(D) 미적용 상태의 경계 조건" 을 이미 명시하고 있으나, 후속 이슈 생성 시 우선순위를 medium 이
+  아니라 **high** 로 둔다.
+
+**Claude 편향 셀프 체크 (4종)**
+
+- 낙관적 일정: 통과 (upstream 의존 없는 다운스트림 단독 변경).
+- 결합 간과: **미통과 → reviewer 가 적발 후 해소.** self-test managed-block assertion 이 전부
+  **자기참조적**이라 직렬화 포맷이 자기일관적으로 바뀌면 전 가드가 초록인 채 결함이 재진입함을
+  reviewer 가 격리 사본 주입으로 실증 → R2 에서 **upstream 규약 전개 바이트열 기반 골든 벡터**
+  외부 앵커로 해소 (기대값이 구현 호출 결과가 아니라 규약 전개의 해시라는 점이 핵심).
+- 폐기 프레이밍: 통과 ((b)(c) 기각이 실측·구조 근거 기반이며 agy 도 동의).
+- 순수주의: 통과 — R2 에서 reviewer 제안 (b)(manifest 값 대조) 를 **false-fire 실측**으로 기각한
+  판단도 정당 (센티널 내부 정당 Phase-1 편집 시 FAIL → self-test 를 저장소 drift 상태에 결합시켜
+  "가드가 깨졌다" 와 "저장소에 drift 가 있다" 를 한 신호로 뭉갬). (b) 가 겨냥한 별도 축("재현이
+  upstream _실제_ 동작에서 이탈")은 본검사 계층 소관으로 후속 관찰 박제.
