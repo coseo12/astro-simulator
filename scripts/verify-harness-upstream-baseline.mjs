@@ -23,7 +23,7 @@
  * 통과할 때마다 pristine 으로 세탁되며, 다운스트림 고유 가드 조항이 소실된다.
  *
  * `.harness/manifest.json` 은 CLI 가 쓰는 **작업 상태**이지 Z 패턴의 진실 원천이 아니다.
- * 본 가드는 baseline 을 upstream 태그 tarball 원본으로 두고 3 불변식을 검증한다.
+ * 본 가드는 baseline 을 upstream 태그 tarball 원본으로 두고 4 불변식을 검증한다.
  *
  * ## 불변식 (fail-fast — CLAUDE.md §가드 설계 원칙, fallback 분기 금지)
  *
@@ -35,9 +35,12 @@
  *       - (C1) `manifest.sha256 === 로컬 해시`      — baseline 세탁 (경로 1)
  *       - (C2) `previousSha256 === 로컬 해시`       — 롤백 자가복구 오탐 (경로 2)
  *       이번 P0 의 정확한 시그니처.
+ *   (D) `manifest.sha256 === categoricalSha256(upstream 원본)` — manifest↔upstream 이격 차단.
+ *       Amendment 20 (#900). 성립하면 자매 가드의 drift 와 본 가드의 divergent 가
+ *       **항등식**이 된다 (공통 모수 = upstream·로컬 양쪽 존재 entry). 상세는 `inspectEntry()`.
  *
- * (A)(B) 와 (C) 는 **서로 다른 divergence 개념**을 쓴다 — 각자 강제하는 계약이 다르다.
- * (A)(B) 는 Amendment 8 데코레이터 계약이므로 plain sha256 (파일 전체), (C) 는 CLI
+ * (A)(B) 와 (C)(D) 는 **서로 다른 divergence 개념**을 쓴다 — 각자 강제하는 계약이 다르다.
+ * (A)(B) 는 Amendment 8 데코레이터 계약이므로 plain sha256 (파일 전체), (C)(D) 는 CLI
  * 분류 동형성이 목적이므로 `categoricalSha256` 을 쓴다. 자세한 근거는 `inspectEntry()` 주석.
  *
  * ## exit 코드
@@ -52,11 +55,11 @@
  *
  *   node scripts/verify-harness-upstream-baseline.mjs [옵션]
  *
- *   --mode=verify (기본)  — 불변식 (A)(B)(C) 검증. 위반 시 exit 1.
- *   --mode=repair         — (C) 위반 entry 의 manifest 위생 복원.
+ *   --mode=verify (기본)  — 불변식 (A)(B)(C)(D) 검증. 위반 시 exit 1.
+ *   --mode=repair         — (C)/(D) 위반 entry 의 manifest 위생 복원.
  *                           **dry-run 이 기본** — `--apply` 명시 시에만 write.
  *                             sha256        → upstream 원본 해시
- *                             previousSha256 → 삭제
+ *                             previousSha256 → 삭제 ((C) 위반 entry 한정 — §computeRepairPlan)
  *                           복원 후 CLI 는 해당 파일을 `divergent` /
  *                           `user-modified-stable` 로 **올바르게** 분류한다.
  *   --apply               — repair 모드에서 실제 파일 write (안전 기본값 해제)
@@ -100,6 +103,10 @@ import {
   categoricalSha256,
   snapshotMeta,
   printJson,
+  // Amendment 20 (#900) — self-test 의 항등식 실증 전용.
+  // 본검사 경로는 자매 가드를 호출하지 않는다 (두 가드의 독립성 유지). self-test 에서만
+  // **자매 가드의 실제 판정 함수**를 불러 `drift ⟺ divergent` 를 두 실구현으로 대조한다.
+  detectDriftFiles,
 } from './verify-harness-drift-decorator.mjs';
 
 const MANIFEST_PATH = '.harness/manifest.json';
@@ -284,7 +291,24 @@ async function ensureBaseline(version, opts = {}) {
 // =============================================================================
 
 /**
- * 매니페스트 1 entry 를 3 불변식으로 판정.
+ * manifest entry 에서 baseline sha 를 읽는다.
+ *
+ * Amendment 20 (#900) — **자매 가드와 동일한 읽기 규약**이어야 한다.
+ * `detectDriftFiles()` 는 `typeof entry === 'string' ? entry : entry?.sha256` 로 읽으므로,
+ * 본 가드가 legacy 문자열 스키마를 못 읽으면 같은 manifest 를 놓고 두 가드가 **다른 값을
+ * 비교**하게 되어 (D) 가 보장하려는 항등식이 읽기 계층에서 먼저 깨진다. 값의 이격만큼이나
+ * 읽기의 이격도 항등식을 파괴하므로, 규약을 자매 가드에 맞춘다.
+ *
+ * @param {object|string} entry
+ * @returns {string|null} 문자열 sha 가 없으면 null (malformed — (D) 가 fail-fast 로 발화)
+ */
+function manifestSha(entry) {
+  if (typeof entry === 'string') return entry;
+  return typeof entry?.sha256 === 'string' ? entry.sha256 : null;
+}
+
+/**
+ * 매니페스트 1 entry 를 4 불변식으로 판정.
  *
  * @param {object} args
  * @param {string} args.rel
@@ -331,7 +355,7 @@ function inspectEntry({ rel, entry, rootDir, baselineDir }) {
   const locShaCat = categoricalSha256(rel, locAbs);
   const upShaFile = createHash('sha256').update(readFileSync(upAbs)).digest('hex');
   const locShaFile = createHash('sha256').update(readFileSync(locAbs)).digest('hex');
-  const baseSha = typeof entry?.sha256 === 'string' ? entry.sha256 : null;
+  const baseSha = manifestSha(entry);
   const prevSha = typeof entry?.previousSha256 === 'string' ? entry.previousSha256 : null;
   const differs = locShaCat !== upShaCat; // CLI 관점 divergence — (C) 기준
   const differsFile = locShaFile !== upShaFile; // 데코레이터 계약 divergence — (A)(B) 기준
@@ -372,6 +396,55 @@ function inspectEntry({ rel, entry, rootDir, baselineDir }) {
       message:
         'previousSha256 == 로컬 해시 != upstream — 롤백 자가복구 오탐 (lib/update.js L72). ' +
         '다음 --apply-all-safe 가 덮어씀. previousSha256 제거 필요',
+    });
+  }
+
+  // (D) manifest.sha256 이 upstream 원본과 이격 → 두 가드 결과의 조용한 분기 (Amendment 20, #900)
+  //
+  //   자매 가드 drift  ⟺ categoricalSha256(로컬) !== manifest.sha256
+  //   본 가드 divergent ⟺ categoricalSha256(로컬) !== categoricalSha256(upstream)
+  //
+  // (D) 는 두 우변을 같은 값으로 못박는다. 성립하면 좌변 두 술어가 **동치**가 되어
+  // `drift ⟺ divergent` 가 항등식이 된다. 종전의 `drift 8 == divergent 8` 은 항등식이 아니라
+  // (C) 성립의 우연한 결과였다 (ADR §Amendment 19 §실측 스냅샷 C 경고 박스).
+  //
+  // **(C1) 은 (D) 의 진부분집합이다.** C1 = `differs ∧ baseSha === locShaCat` 이므로
+  // baseSha === locShaCat ≠ upShaCat ⟹ baseSha ≠ upShaCat ⟹ (D) 위반. 역은 성립하지 않는다:
+  // 로컬 == upstream 인데 manifest 만 낡은 경우 `differs=false` 라 C1 은 **구조적으로 발화 불가**
+  // 하고 오직 (D) 만 잡는다. 이 케이스가 정확히 `drift ⊋ divergent` 이격 시나리오이며
+  // (D) 의 존재 이유다 (self-test §이격 실증이 두 가드 실함수로 고정).
+  //
+  // **reviewer 대안 (b) 와의 차이** (#899 §교차검증 — (b) 는 false-fire 로 기각됨):
+  // (b) 는 `categoricalSha256(로컬) === manifest.sha256` 을 요구해 정당한 Phase-1 편집마다
+  // FAIL 했다 (= drift 자체를 금지하는 자기모순). (D) 는 좌변이 로컬이 아니라 **upstream** 이라
+  // Phase-1 편집(로컬만 변경)에 **불변**이다. (b) 가 겨냥한 진짜 축("manifest 기록이 upstream
+  // 실제 값에서 이탈")을 false-fire 없이 닫는, 더 강한 형태의 승계다.
+  //
+  // **적용 범위** — 본 함수의 checked 스코프 (upstream ∧ 로컬 양쪽 존재) 한정. (A)(B)(C) 와
+  // 동일한 early-return 을 공유한다.
+  //   - `downstream-only`  — upstream 원본이 없어 (D) 우변이 **정의되지 않는다** (범위 밖).
+  //   - `missing-locally`  — 자매 가드도 로컬 부재 entry 를 drift 판정에서 제외하므로
+  //                          항등식 모수 밖. 덮어쓰기 위험도 없다 (CLI 는 `added` 로 분류).
+  // 따라서 (D) 가 보장하는 항등식의 모수는 **공통 스코프**다. downstream-only entry 가
+  // 존재하면 그쪽은 drift 로만 잡히므로 `drift ⊇ divergent` 가 된다 — 현재 저장소는
+  // `.harnessignore` (#894 PR-B) 로 downstreamOnly=0 이라 원시 카운트까지 일치한다.
+  // self-test 가 이 경계를 **과장 없이** 고정한다 (downstream-only drift 주입 시 drift=divergent+1).
+  //
+  // fail-fast: baseSha 가 null (malformed entry) 이면 등식은 **거짓으로 확정**이므로 위반이다.
+  // 자매 가드는 같은 상황에서 throw 하지만 (판정 불가 → exit 2), 본 가드는 upstream 원본이라는
+  // 정답을 알고 있어 판정이 가능하다 — "판정 불가(exit 2)" 가 아니라 "불변식 위반(exit 1)" 이
+  // 맞고, `--mode=repair` 로 교정까지 된다. 조용한 검사 제외(silent skip)만은 하지 않는다
+  // (Amendment 19 §결정 3 정합).
+  if (baseSha !== upShaCat) {
+    violations.push({
+      code: 'D',
+      message:
+        baseSha === null
+          ? 'manifest entry 에 문자열 sha256 부재 — upstream 원본과 대조 불가 (malformed). ' +
+            `기대 baseline=${upShaCat.slice(0, 8)}. silent skip 금지 (Amendment 19 §결정 3)`
+          : 'manifest.sha256 != upstream 원본 해시 — manifest↔upstream 이격. ' +
+            '자매 가드(로컬↔manifest)와 본 가드(로컬↔upstream)의 판정 기준이 갈라져 ' +
+            `drift != divergent 가 될 수 있다. 기대=${upShaCat.slice(0, 8)}, 현재=${baseSha.slice(0, 8)}`,
     });
   }
 
@@ -433,11 +506,32 @@ function runVerify({ rootDir, baselineDir }) {
 // =============================================================================
 
 /**
- * (C) 위반 entry 의 복원 계획 산출.
- * sha256 → upstream 원본 해시 / previousSha256 → 삭제.
+ * (C)/(D) 위반 entry 의 복원 계획 산출.
+ * sha256 → upstream 원본 해시 / previousSha256 → 삭제 ((C) 위반 한정).
  *
  * (A)/(B) 는 **복원 대상이 아니다** — 사람이 데코레이터를 박제/제거해야 하는 판단이며
  * 자동 write 는 Phase 1/3 의사결정을 우회한다.
+ *
+ * ## (D) 를 복원 대상에 포함하는 판단 근거 (Amendment 20, #900)
+ *
+ * 1. **교정 대상이 정확히 일치한다.** (C1) 복원 동작이 이미 `sha256 → upstream 원본 해시`
+ *    이고, 이는 (D) 를 성립시키는 유일한 write 다. (C1) ⊊ (D) 이므로 (D) 를 포함시키는 것은
+ *    기존 복원의 **자연스러운 정의역 확장**이지 새 동작 추가가 아니다.
+ * 2. **사용자 수정 손실 위험 0.** repair 는 `.harness/manifest.json` 만 write 한다 — divergent
+ *    파일의 본문은 읽기만 하고 절대 건드리지 않는다. 로컬 Phase-1 편집은 구조적으로 보존된다.
+ * 3. **덮어쓰기 위험을 오히려 낮춘다.** upstream `diffAgainstPackage()` 는
+ *    `userSha === pkgSha → identical` 판정을 **먼저** 하므로, `baseSha = pkgSha` 로 복원하면
+ *    그 다음 분기 `userSha === baseSha → modified-pristine` (= `--apply-all-safe` 자동 덮어쓰기)
+ *    이 **도달 불가**가 된다. 즉 수정된 파일은 `divergent` 로 올바르게 분류된다.
+ * 4. **차기 버전 업데이트 의미론도 정확해진다.** 4.5.0 → 4.6.0 업데이트 시 `baseSha` 는
+ *    "우리가 직전에 준 원본" 을 뜻해야 한다. upstream 4.5.0 해시가 바로 그 값이므로,
+ *    복원 후 진짜 미수정 파일만 `modified-pristine` → 자동 갱신되고 수정 파일은 보호된다.
+ *    (세탁된 로컬 해시가 baseline 이면 이 판정이 통째로 무너진다 — 그게 #894 P0 였다.)
+ *
+ * **previousSha256 은 (C) 위반 entry 에서만 제거한다.** `previousSha256 === 로컬 해시` 는
+ * (C2) 롤백 오탐 시그니처이므로 봉인이 필요하지만, (D) 단독 위반 entry 의 previousSha256 은
+ * 오탐 시그니처가 아니다. 필요 없는 필드까지 지우는 것은 자가복구 정보의 과잉 파괴이며
+ * 종전 동작과도 달라진다 (기존 (C) 경로의 동작은 그대로 보존된다).
  *
  * @param {{rootDir: string, baselineDir: string}} args
  * @returns {{plan: Array, manifest: object, counts: object}}
@@ -447,14 +541,16 @@ function computeRepairPlan({ rootDir, baselineDir }) {
   const plan = [];
   for (const r of results) {
     const codes = r.violations.map((v) => v.code);
-    if (!codes.some((c) => c === 'C1' || c === 'C2')) continue;
+    const hasC = codes.includes('C1') || codes.includes('C2');
+    const hasD = codes.includes('D');
+    if (!hasC && !hasD) continue;
     const entry = manifest.files[r.rel];
     plan.push({
       rel: r.rel,
       codes,
-      fromSha: entry.sha256,
+      fromSha: manifestSha(entry),
       toSha: r.upSha,
-      dropPrevious: typeof entry.previousSha256 === 'string' ? entry.previousSha256 : null,
+      dropPrevious: hasC && typeof entry?.previousSha256 === 'string' ? entry.previousSha256 : null,
     });
   }
   return { plan, manifest, counts };
@@ -471,8 +567,18 @@ function computeRepairPlan({ rootDir, baselineDir }) {
 function applyRepairPlan({ rootDir, manifest, plan }) {
   for (const item of plan) {
     const entry = manifest.files[item.rel];
+    // Amendment 20 (#900) — legacy 문자열 스키마는 write 불가 (strict mode 에서 TypeError).
+    // 조용히 건너뛰면 repair 가 "복원했다" 고 보고하면서 실제로는 아무것도 안 고친 상태가 된다
+    // (CLAUDE.md §커밋 성공 ≠ 의도한 변경 커밋됨 의 매니페스트 판). 명시적으로 멈춘다.
+    if (entry === null || typeof entry !== 'object') {
+      throw new Error(
+        `repair 불가 — legacy 문자열 entry: ${item.rel}. ` +
+          '`harness update --check` 로 manifest 를 객체 스키마로 재생성한 뒤 재시도',
+      );
+    }
     entry.sha256 = item.toSha;
-    delete entry.previousSha256;
+    // (C) 위반 entry 한정 — 근거는 computeRepairPlan() 주석 참조.
+    if (item.dropPrevious) delete entry.previousSha256;
   }
   // reviewer R4 (#894) — 원자적 write (temp + rename).
   // 직렬화 중 예외 / 디스크 full / SIGINT 로 manifest 가 truncate 되면 CLI 가 전 파일을
@@ -589,11 +695,12 @@ async function mainVerify(opts) {
   const byCode = flat.reduce((acc, v) => ({ ...acc, [v.code]: (acc[v.code] || 0) + 1 }), {});
   console.log(
     `\n불변식 위반: ${flat.length} (A:${byCode.A || 0} B:${byCode.B || 0} ` +
-      `C1:${byCode.C1 || 0} C2:${byCode.C2 || 0})`,
+      `C1:${byCode.C1 || 0} C2:${byCode.C2 || 0} D:${byCode.D || 0})`,
   );
 
   if (flat.length === 0) {
-    console.log('\n[OK] upstream baseline 불변식 (A)(B)(C) 정합');
+    console.log('\n[OK] upstream baseline 불변식 (A)(B)(C)(D) 정합');
+    console.log('     (D) 성립 → drift == divergent 항등식 (공통 스코프, Amendment 20 #900)');
     return 0;
   }
 
@@ -605,7 +712,7 @@ async function mainVerify(opts) {
   console.error('  (A) 데코레이터 박제 — ADR 20260515 §Amendment 8 Phase 1 절차');
   console.error('  (B) stale 데코레이터 제거 — Phase 3 정리');
   console.error(
-    '  (C) node scripts/verify-harness-upstream-baseline.mjs --mode=repair (확인) → --apply',
+    '  (C)(D) node scripts/verify-harness-upstream-baseline.mjs --mode=repair (확인) → --apply',
   );
   console.error('  절차 SSoT: .claude/commands/harness-update.md §7');
   return 1;
@@ -617,7 +724,7 @@ async function mainRepair(opts) {
   const { plan, manifest, counts } = computeRepairPlan({ rootDir, baselineDir: baseline.dir });
 
   printCounts(counts, baseline);
-  console.log(`\n복원 대상 (C1/C2 위반): ${plan.length}`);
+  console.log(`\n복원 대상 (C1/C2/D 위반): ${plan.length}`);
 
   if (plan.length === 0) {
     console.log('\n[OK] manifest baseline 위생 정합 — 복원 대상 없음');
@@ -627,7 +734,9 @@ async function mainRepair(opts) {
   console.log(opts.apply ? `\n${REPAIR_APPLY_MARKER}` : `\n${REPAIR_DRY_RUN_MARKER}`);
   for (const item of plan) {
     console.log(`  ${item.rel} [${item.codes.join(',')}]`);
-    console.log(`      sha256: ${item.fromSha.slice(0, 8)} → ${item.toSha.slice(0, 8)} (upstream)`);
+    // fromSha 는 malformed entry (문자열 sha256 부재) 에서 null 일 수 있다 — (D) fail-fast 경로.
+    const from = item.fromSha ? item.fromSha.slice(0, 8) : '(부재)';
+    console.log(`      sha256: ${from} → ${item.toSha.slice(0, 8)} (upstream)`);
     if (item.dropPrevious) {
       console.log(`      previousSha256: ${item.dropPrevious.slice(0, 8)} → (제거)`);
     }
@@ -992,6 +1101,302 @@ async function runSelfTest() {
     );
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+  }
+
+  // ===========================================================================
+  // Amendment 20 (#900) — 불변식 (D) + `drift ⟺ divergent` 항등식
+  // ===========================================================================
+  //
+  // ## 골든 벡터가 필요한 이유 (#899 reviewer 차단의 (D) 판)
+  //
+  // (D) 는 `manifest.sha256 === categoricalSha256(upstream)` 이다. 픽스처의 manifest 값을
+  // `categoricalSha256()` 를 **호출해서** 만들면, 그 함수가 upstream 규약에서 이탈해도 좌·우변이
+  // 함께 움직여 **영원히 PASS** 한다 — #899 가 적발한 자기참조 사각과 정확히 같은 시그니처다.
+  // 그래서 아래 positive 픽스처의 manifest 값은 upstream 직렬화 규약을 **손으로 전개한 바이트열의
+  // 해시 상수**로 고정한다. 기대값이 구현 호출 결과가 아니므로, 포팅이 이탈하면 우변만 변해 FAIL 한다.
+  //
+  //   atomic 카테고리 — categoricalSha256 = 파일 전체 plain sha256
+  //     D_ATOMIC_BYTES = '---\nname: pm\n---\nupstream-d-anchor\n'   (35 bytes)
+  //     D_ATOMIC_SHA   = sha256(D_ATOMIC_BYTES)
+  //
+  //   managed-block 카테고리 — categoricalSha256 = managedSha256 = 블록 직렬화 해시
+  //     블록 1개 { id: 'd-blk', content: 'DCORE' }
+  //     → 직렬화 = `${id}\n${content}` 를 '\n---\n' 로 join = 'd-blk\nDCORE'   (11 bytes)
+  //     D_MB_SHA = sha256('d-blk\nDCORE')
+  //
+  // 상수 갱신은 **upstream 규약 자체가 바뀔 때만** 정당하며, 그때도 유도를 다시 전개해 재계산한다
+  // (ADR §Amendment 19 §수치 박제 규약 (i)).
+  {
+    const D_ATOMIC_BYTES = '---\nname: pm\n---\nupstream-d-anchor\n';
+    const D_ATOMIC_SHA = '37c75c66660b9b7e9dd25f43fe3dd0057bb9494a075e1cd7b2a6fa39b1d734ef';
+    const D_MB_CONCAT = 'd-blk\nDCORE';
+    const D_MB_SHA = '4f7540a6f73d9189dad0583084d1b8f4c2c3cd2c8c598cd4743b3dc4a1b18138';
+
+    expect(
+      'D 골든 provenance: D_ATOMIC_SHA === sha256(35 bytes 리터럴)',
+      sha(D_ATOMIC_BYTES) === D_ATOMIC_SHA && Buffer.byteLength(D_ATOMIC_BYTES) === 35,
+    );
+    expect(
+      'D 골든 provenance: D_MB_SHA === sha256("d-blk\\nDCORE") (11 bytes)',
+      sha(D_MB_CONCAT) === D_MB_SHA && Buffer.byteLength(D_MB_CONCAT) === 11,
+    );
+
+    const tmpD = mkdtempSync(join(tmpdir(), 'harness-invariant-d-'));
+    try {
+      const up = join(tmpD, 'upstream');
+      const root = join(tmpD, 'project');
+      mkdirSync(join(up, '.claude/agents'), { recursive: true });
+      mkdirSync(join(root, '.claude/agents'), { recursive: true });
+      mkdirSync(join(root, '.harness'), { recursive: true });
+
+      const A = '.claude/agents/pm.md'; // atomic — 로컬 == upstream (identical)
+      const B = '.claude/agents/qa.md'; // atomic — 로컬 != upstream (divergent + 데코레이터)
+      const MB = 'CLAUDE.md'; // managed-block
+
+      const UP_B = '---\nname: qa\n---\nupstream qa body\n';
+      const LOC_B = '---\nname: qa\n---\n<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->\nlocal qa body\n';
+      const MB_UP = `outside-upstream\n<!-- harness:managed:d-blk:start -->\nDCORE\n<!-- harness:managed:d-blk:end -->\n`;
+      const MB_LOC = `<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->\nDOWNSTREAM-OUTSIDE\n<!-- harness:managed:d-blk:start -->\nDCORE\n<!-- harness:managed:d-blk:end -->\n`;
+
+      writeFileSync(join(up, A), D_ATOMIC_BYTES);
+      writeFileSync(join(root, A), D_ATOMIC_BYTES); // identical
+      writeFileSync(join(up, B), UP_B);
+      writeFileSync(join(root, B), LOC_B); // divergent
+      writeFileSync(join(up, MB), MB_UP);
+      writeFileSync(join(root, MB), MB_LOC); // 블록 내부 동일 / 블록 밖 divergent
+
+      // 픽스처 manifest — A/MB 는 골든 상수, B 는 규약을 독립 전개한 값 (atomic = 파일 전체 해시)
+      const healthy = () => ({
+        [A]: { sha256: D_ATOMIC_SHA, category: 'atomic' },
+        [B]: { sha256: sha(UP_B), category: 'atomic' },
+        [MB]: { sha256: D_MB_SHA, category: 'managed-block' },
+      });
+      const writeD = (files) => {
+        writeFileSync(
+          join(root, MANIFEST_PATH),
+          `${JSON.stringify({ harnessVersion: '0.0.0', files }, null, 2)}\n`,
+        );
+      };
+      const verifyD = () => runVerify({ rootDir: root, baselineDir: up });
+      const codesD = (rel, res) =>
+        (res.results.find((r) => r.rel === rel)?.violations || []).map((v) => v.code);
+      // 항등식 대조 — 좌변은 **자매 가드 실함수**, 우변은 본 가드 실함수 (독립 두 구현)
+      const driftSet = () =>
+        detectDriftFiles(root)
+          .map((d) => d.file)
+          .sort();
+      const divergentSet = (res) =>
+        res.results
+          .filter((r) => r.status === 'divergent')
+          .map((r) => r.rel)
+          .sort();
+      const setEq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+      // --- positive: 골든 상수 manifest → (D) 위반 0 ---
+      writeD(healthy());
+      let res = verifyD();
+      expect(
+        'D positive: manifest=골든 상수(upstream 규약 전개) → 위반 0',
+        res.violations.length === 0,
+        JSON.stringify(
+          res.violations.map((r) => ({ rel: r.rel, c: r.violations.map((v) => v.code) })),
+        ),
+      );
+
+      // --- managed-block 적용 범위 (완료 조건 6항) ---
+      // (D) 는 categorical 도메인 위의 등식이므로 managed-block 에서 **센티널 내부만** 요구한다.
+      // 블록 밖 다운스트림 섹션이 아무리 커도 (D) 는 영향받지 않는다 — 그래서 성립한다.
+      const mbRes = res.results.find((r) => r.rel === MB);
+      expect(
+        'D managed-block: 블록 밖 divergent 여도 (D) 미발화 (categorical 도메인)',
+        !codesD(MB, res).includes('D') &&
+          mbRes.status === 'identical' &&
+          mbRes.hasDecorator === true,
+        JSON.stringify({ codes: codesD(MB, res), status: mbRes.status }),
+      );
+      expect(
+        'D managed-block: 블록 밖 편집은 (D) 판정에 불변 (plain 해시였다면 영구 위반)',
+        mbRes.upShaFile !== mbRes.locShaFile && mbRes.upSha === mbRes.locSha,
+        JSON.stringify({ upSha: mbRes.upSha?.slice(0, 8), locSha: mbRes.locSha?.slice(0, 8) }),
+      );
+
+      // --- 항등식 positive: 두 집합이 원소까지 일치 (비어있지 않음 — assertion 에 이빨) ---
+      let dv = divergentSet(res);
+      expect(
+        'D 항등식 positive: driftSet == divergentSet (비공집합)',
+        setEq(driftSet(), dv) && dv.length === 1 && dv[0] === B,
+        `drift=${JSON.stringify(driftSet())} divergent=${JSON.stringify(dv)}`,
+      );
+
+      // --- negative (이격 실증): 로컬 == upstream 인데 manifest 만 낡음 ---
+      // ADR §Amendment 19 §실측 스냅샷 C 경고 박스가 예고한 바로 그 시나리오.
+      // (C1) 은 differs=false 라 **구조적으로 발화 불가** → (D) 만이 잡는다.
+      const stale = healthy();
+      stale[A] = { sha256: sha('STALE-MANIFEST-VALUE'), category: 'atomic' };
+      writeD(stale);
+      res = verifyD();
+      expect(
+        'D negative: 로컬==upstream + manifest 낡음 → D 발화',
+        codesD(A, res).includes('D'),
+        JSON.stringify(codesD(A, res)),
+      );
+      expect(
+        'D negative: 같은 상태에서 C1 은 미발화 (differs=false — C1 의 구조적 사각)',
+        !codesD(A, res).includes('C1'),
+        JSON.stringify(codesD(A, res)),
+      );
+      const staleDrift = driftSet();
+      const staleDiv = divergentSet(res);
+      expect(
+        'D negative: 이격 실증 — driftSet != divergentSet (drift ⊋ divergent)',
+        !setEq(staleDrift, staleDiv) && staleDrift.includes(A) && !staleDiv.includes(A),
+        `drift=${JSON.stringify(staleDrift)} divergent=${JSON.stringify(staleDiv)}`,
+      );
+
+      // --- recovery: repair --apply → (D) 복구 + 항등식 재성립 ---
+      // 안전성 실증: repair 전후 **로컬 파일 본문 해시 불변** (사용자 수정 손실 0)
+      const locBefore = [A, B, MB].map((rel) => sha(readFileSync(join(root, rel), 'utf-8')));
+      let { plan: pD, manifest: mD } = computeRepairPlan({ rootDir: root, baselineDir: up });
+      expect(
+        'D repair: 계획 1건 (A) — toSha=upstream 골든 상수',
+        pD.length === 1 && pD[0].rel === A && pD[0].toSha === D_ATOMIC_SHA,
+        JSON.stringify(pD),
+      );
+      applyRepairPlan({ rootDir: root, manifest: mD, plan: pD });
+      res = verifyD();
+      expect('D recovery: repair --apply → 위반 0', res.violations.length === 0);
+      expect(
+        'D recovery: 항등식 재성립 (driftSet == divergentSet)',
+        setEq(driftSet(), divergentSet(res)),
+        `drift=${JSON.stringify(driftSet())} divergent=${JSON.stringify(divergentSet(res))}`,
+      );
+      expect(
+        'D repair 안전성: 로컬 파일 본문 불변 (manifest 만 write — 사용자 수정 손실 0)',
+        [A, B, MB].every((rel, i) => sha(readFileSync(join(root, rel), 'utf-8')) === locBefore[i]),
+      );
+
+      // --- 구조 봉인: C1 ⊊ D (C1 발화 시 D 도 반드시 발화) ---
+      const washed = healthy();
+      washed[B] = { sha256: sha(LOC_B), category: 'atomic' }; // baseline 세탁
+      writeD(washed);
+      res = verifyD();
+      expect(
+        'D 봉인: C1 발화 시 D 도 발화 (C1 ⊊ D 진부분집합 관계)',
+        codesD(B, res).includes('C1') && codesD(B, res).includes('D'),
+        JSON.stringify(codesD(B, res)),
+      );
+
+      // --- malformed entry: silent skip 금지 (fail-fast) ---
+      const malformed = healthy();
+      malformed[A] = { category: 'atomic' }; // sha256 부재
+      writeD(malformed);
+      res = verifyD();
+      expect(
+        'D fail-fast: sha256 부재 entry → D 발화 (조용한 검사 제외 금지)',
+        codesD(A, res).includes('D'),
+        JSON.stringify(codesD(A, res)),
+      );
+
+      // --- legacy 문자열 스키마: 자매 가드와 동일 읽기 → false-fire 없음 ---
+      const legacy = healthy();
+      legacy[A] = D_ATOMIC_SHA; // entry 자체가 sha 문자열 (자매 가드가 지원하는 스키마)
+      writeD(legacy);
+      res = verifyD();
+      expect(
+        'D 읽기 규약: legacy 문자열 entry → 위반 0 (자매 가드와 동일 해석)',
+        codesD(A, res).length === 0,
+        JSON.stringify(codesD(A, res)),
+      );
+      // legacy 스키마 + 위반 → repair 는 조용한 no-op 대신 throw
+      const legacyBad = healthy();
+      legacyBad[A] = sha('WRONG');
+      writeD(legacyBad);
+      let repairThrew = null;
+      try {
+        const { plan: pL, manifest: mL } = computeRepairPlan({ rootDir: root, baselineDir: up });
+        applyRepairPlan({ rootDir: root, manifest: mL, plan: pL });
+      } catch (err) {
+        repairThrew = err;
+      }
+      expect(
+        'D repair: legacy 문자열 entry 는 조용한 no-op 대신 throw',
+        repairThrew instanceof Error && /legacy/.test(repairThrew.message),
+        String(repairThrew),
+      );
+
+      // --- previousSha256 처분 분기: (C) 위반은 제거 / (D) 단독은 보존 ---
+      const dOnlyPrev = healthy();
+      dOnlyPrev[A] = {
+        sha256: sha('STALE'),
+        category: 'atomic',
+        previousSha256: sha('UNRELATED-HISTORY'),
+      };
+      writeD(dOnlyPrev);
+      const { plan: pP, manifest: mP } = computeRepairPlan({ rootDir: root, baselineDir: up });
+      expect(
+        'D repair: (D) 단독 위반은 previousSha256 보존 (오탐 시그니처 아님 — 과잉 파괴 금지)',
+        pP.length === 1 && pP[0].dropPrevious === null,
+        JSON.stringify(pP),
+      );
+      applyRepairPlan({ rootDir: root, manifest: mP, plan: pP });
+      expect(
+        'D repair: 보존 실증 — write 후에도 previousSha256 잔존',
+        JSON.parse(readFileSync(join(root, MANIFEST_PATH), 'utf-8')).files[A].previousSha256 ===
+          sha('UNRELATED-HISTORY'),
+      );
+      // 대조군 — (C2) 위반은 종전대로 제거 (기존 동작 보존 회귀 가드)
+      const c2Prev = healthy();
+      c2Prev[B] = { sha256: sha(UP_B), category: 'atomic', previousSha256: sha(LOC_B) };
+      writeD(c2Prev);
+      const { plan: pC2, manifest: mC2 } = computeRepairPlan({ rootDir: root, baselineDir: up });
+      expect(
+        'D repair 대조군: (C2) 위반은 종전대로 previousSha256 제거',
+        pC2.length === 1 && pC2[0].dropPrevious === sha(LOC_B),
+        JSON.stringify(pC2),
+      );
+      applyRepairPlan({ rootDir: root, manifest: mC2, plan: pC2 });
+      expect(
+        'D repair 대조군: write 후 previousSha256 제거됨',
+        JSON.parse(readFileSync(join(root, MANIFEST_PATH), 'utf-8')).files[B].previousSha256 ===
+          undefined,
+      );
+
+      // --- 적용 범위 경계 (과장 없는 고정) ---
+      // downstream-only: upstream 원본이 없어 (D) 우변 미정의 → 미발화.
+      // 그리고 그 entry 가 drift 하면 **항등식은 공통 스코프에서만** 성립한다는 사실이 드러난다.
+      // 현재 저장소는 .harnessignore (#894 PR-B) 로 downstreamOnly=0 이라 원시 카운트까지 일치.
+      writeFileSync(join(root, 'downstream-only.md'), 'local content\n');
+      const withDownstream = healthy();
+      withDownstream['downstream-only.md'] = { sha256: sha('DIFFERENT'), category: 'atomic' };
+      writeD(withDownstream);
+      res = verifyD();
+      expect(
+        'D scope: downstream-only 는 (D) 미발화 (upstream 원본 부재 — 우변 미정의)',
+        codesD('downstream-only.md', res).length === 0 && res.counts.downstreamOnly === 1,
+        JSON.stringify(codesD('downstream-only.md', res)),
+      );
+      expect(
+        'D scope: 항등식은 공통 스코프 한정 — downstream-only drift 는 drift 에만 계상',
+        driftSet().length === divergentSet(res).length + 1 &&
+          driftSet().includes('downstream-only.md'),
+        `drift=${JSON.stringify(driftSet())} divergent=${JSON.stringify(divergentSet(res))}`,
+      );
+      rmSync(join(root, 'downstream-only.md'));
+
+      // missing-locally: 자매 가드도 drift 판정에서 제외 → 항등식 모수 밖 → (D) 미발화
+      writeFileSync(join(up, 'ghost.md'), 'ghost\n');
+      const withGhost = healthy();
+      withGhost['ghost.md'] = { sha256: sha('WRONG-BASELINE'), category: 'atomic' };
+      writeD(withGhost);
+      res = verifyD();
+      expect(
+        'D scope: missing-locally 는 (D) 미발화 (양 가드 모두 모수 밖 + 덮어쓰기 위험 0)',
+        codesD('ghost.md', res).length === 0 && res.counts.missingLocally === 1,
+        JSON.stringify(codesD('ghost.md', res)),
+      );
+    } finally {
+      rmSync(tmpD, { recursive: true, force: true });
+    }
   }
 
   // --- exit 2 경로: --baseline-dir 부재 (오프라인 실행 인자 오타 등) ---
