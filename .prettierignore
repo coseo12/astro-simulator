@@ -7,8 +7,8 @@ pnpm-lock.yaml
 *.tsbuildinfo
 
 # --- 프로젝트 문서/에이전트 (prettier 재포맷 제외 — #907, SSoT 원문 매칭 가드 보호) ---
-# ADR 20260731-907-harness-decouple §결정 4: 구 manifest 파생 자동 생성 블록
-# (scripts/sync-prettierignore.mjs) 을 정적 curated 섹션으로 전환.
+# ADR 20260731-907-harness-decouple §결정 4: 구 manifest 파생 자동 생성 블록을
+# 정적 curated 섹션으로 전환 (생성기는 #907 Phase B 에서 제거).
 # prettier 가 에이전트 .md / CLAUDE.md 를 재포맷하면 verify-agent-ssot.sh 등의
 # 원문 문자열 매칭 SSoT 가드가 깨질 수 있어 제외한다.
 .claude/**

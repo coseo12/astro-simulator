@@ -67,9 +67,9 @@
 
 | 임계 | 동작 | 도구 |
 |---|---|---|
-| **35k chars** | 경계 경보 | `harness doctor` warn |
-| **40k chars** | PR 체크 warn | `verify-claudemd-size.sh` (신규 인라인 블록 금지 안내) |
-| **45k chars** | CI fail | `verify-claudemd-size.sh` in `harness-guards` |
+| **35k chars** | 경계 경보 | `verify-claudemd-size.mjs` warn (exit 0) |
+| **40k chars** | PR 체크 warn | `verify-claudemd-size.mjs` warn (신규 인라인 블록 금지 안내) |
+| **45k chars** | CI fail | `verify-claudemd-size.mjs` in `project-guards` (#907 재편) |
 
 > **SSoT (#203)**: 위 임계값은 [`lib/claudemd-size-constants.js`](../../lib/claudemd-size-constants.js) 에서 단일 선언되며 `lib/verify-claudemd-size.js` / `lib/doctor.js` 가 이를 import 한다. 변경 시 SSoT 1곳만 수정하면 모든 가드가 자동 동기화.
 
@@ -97,16 +97,15 @@ node lib/verify-claudemd-size.js
 
 ## 4. 강제 메커니즘
 
-### 4.1 `scripts/verify-claudemd-size.sh`
-- CI `detect-and-test` 잡에서 실행
+### 4.1 `scripts/verify-claudemd-size.mjs`
+- CI `project-guards` workflow 에서 실행 (self-test + 본검사 — #905 fail-fast 복구, #907 이설)
 - 35k 초과: stdout 경보만 (exit 0)
-- 40k 초과: stdout warn + PR 체크 코멘트 (exit 0)
+- 40k 초과: stdout warn (exit 0)
 - 45k 초과: stderr fail + exit 1
 
-### 4.2 `harness doctor` 에 "각인 예산" 항목 추가
-- 현재 CLAUDE.md char 수 보고
-- 35k/40k/45k 게이트 위치 표시
-- 예: `🟢 CLAUDE.md: 28,432 chars (예산 35k 이내)`
+### 4.2 각인 예산 보고 (로컬 수동 확인)
+- `node scripts/verify-claudemd-size.mjs` 직접 실행으로 현재 CLAUDE.md char 수 + 게이트 판정 확인
+- 예: `[PASS] CLAUDE.md 33,956 chars — 예산 35,000 이내.`
 
 ### 4.3 `scripts/verify-docs-links.sh` (Gemini 제안 2 — 링크 무결성)
 - CLAUDE.md → `docs/` 링크 전수 추출 후 `test -f` 로 파일 존재 확인

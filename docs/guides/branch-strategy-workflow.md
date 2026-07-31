@@ -44,7 +44,7 @@ develop   ← 동기화 유지 (누락 시 drift)
 
 ## drift 감지
 
-- `harness doctor` 의 "gitflow 브랜치 정합성" 항목이 `origin/main` vs `origin/develop` 커밋 격차를 점검한다 (v2.15.0 에서 `--is-ancestor` / hotfix 문맥 / unrelated histories 분류 추가)
+- `git fetch origin` 후 `git merge-base --is-ancestor origin/develop origin/main` + `git rev-list --count origin/main..origin/develop` 로 `origin/main` vs `origin/develop` 커밋 격차를 직접 점검한다 (#907 디커플 이후 도구 아닌 git 직접 명령 — CLAUDE.md §drift 감지와 동일 절차)
 - **정상 (pass)**:
   - 동일 커밋 — 릴리스 직후 또는 초기 상태
   - `develop > main` — 다음 릴리스 대기 (정상)

@@ -10,8 +10,8 @@ concurrency:
 # 프로젝트 소유 가드 workflow (#907 — 구 harness-guards.yml 재편).
 #
 # ADR 20260731-907-harness-decouple §결정 5: harness 동기화 디커플로
-# harness 전용 3 스텝 (HARNESS-DRIFT 데코레이터 / upstream baseline / .harnessignore 동기화)
-# 을 제거하고, 프로젝트 가드 6 스텝만 유지한다.
+# 구 동기화 가드 3 스텝을 제거하고 (#907 Phase B — 목록은 ADR §결정 3 참조),
+# 프로젝트 가드 6 스텝만 유지한다.
 #
 # 전 스텝 `hashFiles` 조건 의도적 제거 (#901 흡수, #894 R3 / #896 논리의 전 스텝 일관 적용):
 #   종전 `hashFiles(...) != ''` 조건은 "스크립트 미포함 다운스트림에선 조용히 스킵" 이라는
