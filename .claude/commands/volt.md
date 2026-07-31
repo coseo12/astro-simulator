@@ -4,7 +4,6 @@ argument-hint: [주제 힌트 — 생략 시 최근 대화에서 가치 있는 �
 allowed-tools: [Bash, Read, Skill]
 ---
 
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/issues/319] -->
 
 # /volt — Volt 캡처
 

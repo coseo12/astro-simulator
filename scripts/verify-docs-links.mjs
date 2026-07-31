@@ -33,10 +33,10 @@
  *      로컬 PASS / CI FAIL 비대칭이 생긴다 (PR #872 CI 에서 `.claude/logs/` 참조로 실측).
  *
  * upstream-only 참조 allowlist:
- *   harness-managed 문서 (.harness/manifest.json 등록) 가 upstream harness-setting
- *   저장소 전용 파일 (이 저장소에 미배포) 을 참조하는 건은 다운스트림 수정 대상이
- *   아니라 upstream 기여 대상 — 명시적 allowlist 로 제외하되 조용한 skip 이 아니라
- *   시작 시 allowlist 건수를 stdout 에 보고한다. 목록은 upstream 이슈 분리 대상.
+ *   upstream harness-setting 유래 문서가 upstream 저장소 전용 파일 (이 저장소에 미배포)
+ *   을 참조하는 건 — 이력 보존 문서라 다운스트림 수정 대상이 아니다 (#907 디커플 이후
+ *   신규 등록은 원칙적으로 없음). 명시적 allowlist 로 제외하되 조용한 skip 이 아니라
+ *   시작 시 allowlist 건수를 stdout 에 보고한다.
  *
  * 종료 코드:
  *   0 — 깨진 링크 0 + 상태 표기 위반 0
@@ -77,9 +77,8 @@ const EXCLUDED_SCAN_DIRS = ['docs/deprecated', 'docs/templates'];
 
 /**
  * upstream-only 참조 allowlist (#842).
- * harness-managed 문서 (.harness/manifest.json 등록 atomic / managed-block) 가
- * upstream harness-setting 저장소 전용 파일 (이 저장소에 미배포) 을 참조하는 건.
- * 다운스트림 수정 대상 아님 — upstream 기여 대상 (별도 upstream 이슈로 분리, #842).
+ * upstream harness-setting 유래 문서가 upstream 저장소 전용 파일 (이 저장소에 미배포)
+ * 을 참조하는 건. 다운스트림 수정 대상 아님 (#907 디커플 이후 이력 보존 목적만 잔존).
  * 조용한 skip 이 아님: 등록 건수 + 발동 건수를 매 실행 stdout 에 보고한다.
  * source: 참조가 위치한 문서 (repo-relative) / target: 링크 원문 (참조 표기 그대로)
  *
@@ -107,19 +106,8 @@ const UPSTREAM_ONLY_ALLOWLIST = [
   },
   { source: 'CLAUDE.md', target: 'docs/decisions/20260419-gitflow-main-develop.md' },
   { source: 'CLAUDE.md', target: 'docs/decisions/20260419-release-merge-strategy.md' },
-  // upstream ADR: workflows 책임 분리 / jq 파싱 / antigravity 마이그레이션 / CI fixture
-  {
-    source: 'docs/frozen-file-split.md',
-    target: 'decisions/20260421-workflows-responsibility-split.md',
-  },
-  {
-    source: 'docs/harness-ci-migration.md',
-    target: 'decisions/20260421-workflows-responsibility-split.md',
-  },
-  {
-    source: 'docs/harness-update-compat-checklist.md',
-    target: 'decisions/20260421-workflows-responsibility-split.md',
-  },
+  // upstream ADR: jq 파싱 / antigravity 마이그레이션
+  // (#907: 삭제된 문서를 source 로 갖던 dead entry 는 제거 — "발동 0건 항목은 제거 후보" 계약)
   {
     source: 'docs/guides/cross-validate-protocol.md',
     target: '../decisions/20260420-jq-based-parsing-no-op.md',
@@ -128,29 +116,8 @@ const UPSTREAM_ONLY_ALLOWLIST = [
     source: 'docs/guides/cross-validate-protocol.md',
     target: '../decisions/20260521-gemini-to-antigravity.md',
   },
-  {
-    source: 'docs/plans/antigravity-migration.md',
-    target: '../decisions/20260521-gemini-to-antigravity.md',
-  },
-  {
-    source: 'docs/plans/antigravity-migration.md',
-    target: '../decisions/20260423-ci-fixture-pnpm-workspace.md',
-  },
-  {
-    source: 'docs/harness-update-compat-checklist.md',
-    target: 'decisions/20260423-ci-fixture-pnpm-workspace.md',
-  },
-  // upstream lib / test fixture 경로 (harness-setting 저장소 전용)
+  // upstream lib 경로 (harness-setting 저장소 전용)
   { source: 'docs/guides/claudemd-governance.md', target: '../../lib/claudemd-size-constants.js' },
-  { source: 'docs/harness-update-compat-checklist.md', target: '../test/fixtures/pnpm-monorepo/' },
-  {
-    source: 'docs/harness-update-compat-checklist.md',
-    target: '../test/fixtures/pnpm-monorepo/packages/lib/',
-  },
-  {
-    source: 'docs/harness-update-compat-checklist.md',
-    target: '../test/fixtures/pnpm-monorepo/packages/app/',
-  },
 ];
 
 const findAllowlistEntry = (sourceRel, rawTarget) =>

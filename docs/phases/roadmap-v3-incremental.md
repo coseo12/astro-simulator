@@ -1,5 +1,3 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
-
 # 로드맵 v3 — Incremental Body-by-Body Build
 
 > **Status**: **완주 (2026-06, R10b [#664](https://github.com/coseo12/astro-simulator/issues/664))** — R1 태양 → R10b 혜성 3 까지 전 27 body 시각화 완료 (phase 11 = 전 데이터 소진). 후속 라운드 후보 (위성 데이터 확장 / ring arcs / 클릭 raycast / 궤도선 toggle / 패닝 F3) 는 [ADR 20260612-r10b](../decisions/20260612-r10b-comets-visualization.md) §축 9 인계 참조.

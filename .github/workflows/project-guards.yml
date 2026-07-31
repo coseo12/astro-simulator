@@ -1,0 +1,71 @@
+name: Project Guards
+
+# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
+# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
+# cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만 남김 (포착 100%).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+# 프로젝트 소유 가드 workflow (#907 — 구 harness-guards.yml 재편).
+#
+# ADR 20260731-907-harness-decouple §결정 5: harness 동기화 디커플로
+# harness 전용 3 스텝 (HARNESS-DRIFT 데코레이터 / upstream baseline / .harnessignore 동기화)
+# 을 제거하고, 프로젝트 가드 6 스텝만 유지한다.
+#
+# 전 스텝 `hashFiles` 조건 의도적 제거 (#901 흡수, #894 R3 / #896 논리의 전 스텝 일관 적용):
+#   종전 `hashFiles(...) != ''` 조건은 "스크립트 미포함 다운스트림에선 조용히 스킵" 이라는
+#   upstream 배포 편의였다. 디커플 후 모든 스텝은 본 프로젝트 고유 가드다 — "스크립트 부재"
+#   는 배포 시나리오가 아니라 **가드가 삭제된 회귀**이며, 조용히 스킵하면 CI 가 초록인 채
+#   가드가 사라진다 (CLAUDE.md §가드 설계 원칙: drift 가드는 fail-fast 만, fallback 분기 금지).
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  project-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # agent SSoT drift 가드 (#145)
+      # CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` 의 공통 JSON 스키마 9개 필드가
+      # 5개 에이전트 파일의 `## 마무리 체크리스트 JSON 반환` 섹션에 모두 존재하고 선언 순서를
+      # 유지하는지 검사. drift 시 exit 1 로 PR 머지 전 차단.
+      - name: agent SSoT drift 가드
+        run: bash scripts/verify-agent-ssot.sh
+
+      # create-pr SSoT drift 가드 (#480, #477 후속)
+      # 5 페르소나 .md (architect/developer/pm/qa/reviewer) 에 박제된
+      # "**PR 생성 시 반드시 `create-pr` 스킬 사용**" SSoT 문구의 존재 + 동일성 검증.
+      # 한쪽만 갱신 시 drift 발생 → exit 1 로 차단.
+      - name: create-pr SSoT drift 가드
+        run: bash scripts/verify-create-pr-ssot.sh
+
+      # release version bump 가드
+      # chore(release) PR 에서 CHANGELOG 를 업데이트했으나 package.json::version bump 를 누락하는
+      # 회귀를 차단. CHANGELOG 최신 `## [X.Y.Z]` 엔트리와 package.json::version 일치 검증.
+      - name: release version bump 가드
+        run: bash scripts/verify-release-version-bump.sh
+
+      # CLAUDE.md 각인 예산 가드 (#197 Phase 2 → #905 fail-fast 복구 → #907 이설)
+      # 45k chars 초과 시 exit 1 로 감축 PR 을 강제. 35k/40k 는 warn (exit 0).
+      # 지침: docs/guides/claudemd-governance.md §3 (정량 게이트)
+      # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행).
+      - name: CLAUDE.md 각인 예산 가드 self-test
+        run: node scripts/verify-claudemd-size.mjs --self-test
+      - name: CLAUDE.md 각인 예산 가드
+        run: node scripts/verify-claudemd-size.mjs
+
+      # docs 전체 상대 링크 무결성 가드 (#197 Phase 2 → #842 fail-fast 복구)
+      # link rot 위험 증가 — 파일 존재 검증. 검사 범위 계약: scripts/verify-docs-links.mjs 헤더 SSoT.
+      - name: docs 상대 링크 무결성 가드
+        run: bash scripts/verify-docs-links.sh
+
+      # docs/lessons/ README 동기화 가드 (#213)
+      # 신규 레슨 파일이 README "파일 목록" 표에 등록되지 않으면 exit 1 로 PR 머지 차단.
+      - name: docs/lessons README 동기화 가드
+        run: bash scripts/verify-lessons-readme.sh

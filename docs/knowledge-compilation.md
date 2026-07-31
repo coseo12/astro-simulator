@@ -90,7 +90,7 @@ CLAUDE.md/스킬의 규칙이 다음 중 하나면 **volt로만 보존하고 행
 
 ## 실무 파생 패턴
 
-- **frozen 파일 분리** — frozen 카테고리 파일에 프로젝트 고유 로직을 얹어야 할 때 `ci-<slug>.yml` 형태로 분리하고 manifest에서 추적 제외. 상세: [docs/frozen-file-split.md](frozen-file-split.md)
+- **frozen 파일 분리** — frozen 카테고리 파일에 프로젝트 고유 로직을 얹어야 할 때 `ci-<slug>.yml` 형태로 분리하고 manifest에서 추적 제외. 상세는 구 `docs/frozen-file-split.md` (git 이력 보존 — #907 디커플로 문서 제거)
 
 ## 참고
 

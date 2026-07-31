@@ -1,7 +1,5 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/260 + https://github.com/coseo12/harness-setting/pull/315] -->
 # Claude Code 워크플로우 템플릿
 
-<!-- harness:managed:critical-directives:start -->
 ## 🚫 CRITICAL DIRECTIVES (NEVER BYPASS)
 
 **아래 규칙은 세션 초기화/신규 프로젝트 셋업/모호한 지시 상황에서도 예외 없이 적용된다.**
@@ -14,8 +12,7 @@
 5. **파괴적 작업 사전 경고** — `rm -rf`, force-push, DB drop 등은 사용자 cwd/데이터 영향을 사전에 고지하고 확인.
 6. **스프린트 계약** — 구현 착수 전 검증 가능한 완료 기준 목록을 사용자와 합의한다.
 
-> **세션 시작 시 자기 점검**: 새 대화에서 첫 작업을 시작하기 전, 본 블록을 인지했는지 확인하고 위반 가능성이 있는 경우 사용자에게 명시한다. 프레임워크 구성 이상이 의심되면 `harness doctor`를 실행한다.
-<!-- harness:managed:critical-directives:end -->
+> **세션 시작 시 자기 점검**: 새 대화에서 첫 작업을 시작하기 전, 본 블록을 인지했는지 확인하고 위반 가능성이 있는 경우 사용자에게 명시한다. 구성 이상이 의심되면 `project-guards` 가드 스크립트 (`scripts/verify-*.{sh,mjs}`) 를 로컬 실행한다.
 
 ---
 
@@ -76,7 +73,7 @@ develop   ← 동기화 유지 (누락 시 drift)
 - merge commit 으로 release 를 해온 정상 운영에서는 hotfix 빈도가 적으므로 merge-back 오버헤드도 최소
 
 ### drift 감지
-- `harness doctor` 의 "gitflow 브랜치 정합성" 항목이 `origin/main` vs `origin/develop` 커밋 격차를 점검한다 (v2.15.0 에서 `--is-ancestor` / hotfix 문맥 / unrelated histories 분류 추가)
+- `git fetch origin` 후 `git merge-base --is-ancestor origin/develop origin/main` + `git rev-list --count origin/main..origin/develop` 로 `origin/main` vs `origin/develop` 커밋 격차를 직접 점검한다 (#907 디커플 이후 도구 아닌 git 직접 명령)
 - **정상 (pass)**:
   - 동일 커밋 — 릴리스 직후 또는 초기 상태
   - `develop > main` — 다음 릴리스 대기 (정상)
@@ -146,7 +143,6 @@ UI가 포함된 작업에서 4축으로 품질을 평가한다:
 
 ---
 
-<!-- harness:managed:real-lessons:start -->
 ## 실전 교훈 (portfolio-26, simple-shop 등에서 추출)
 
 > **블록 내 포인터 포맷 컨벤션**: 각 실전 교훈 블록은 내용 불릿 → `근거:` 불릿 → (선택) `일반화된 설계 지식:` 불릿 순서로 마감한다. `docs/architecture/` 나 `docs/decisions/` 로 승격된 지식이 있을 때만 마지막 포인터를 추가하고, 없으면 생략한다 (빈 placeholder 금지). 형식: `- 일반화된 설계 지식: [docs/architecture/<파일>.md](경로) — 한 줄 요약`. 근거: PR [#113](https://github.com/coseo12/harness-setting/pull/113) reviewer 권고 3, 이슈 [#114](https://github.com/coseo12/harness-setting/issues/114).
@@ -164,9 +160,6 @@ UI가 포함된 작업에서 4축으로 품질을 평가한다:
 ### CI 통과 ≠ 테스트 실행
 "언어 자동 감지" 범용 CI 템플릿이 `echo` 만 수행하고 실제 `npm test` 를 돌리지 않는 경우 — 초록 체크 머지 뒤에도 테스트 미실행. 실행 시간/Actions 로그/CI 구조 3개 진단 신호로 감지, 고의적 실패 PR 실측으로 게이트 작동 확인.
 - 상세: [docs/lessons/ci-and-downstream-verification.md](docs/lessons/ci-and-downstream-verification.md)
-
-### 다운스트림 harness update 부합성 사전 체크리스트
-`harness update` 후 다운스트림 CI push-fail-fix 루프 **사전 진단** — 4단계 체크 + 4 옵션 (A 제거 / B shim / C divergent / D upstream 확장, 애매 시 A). 상세: [docs/harness-update-compat-checklist.md](docs/harness-update-compat-checklist.md). 근거: volt [#62](https://github.com/coseo12/volt/issues/62) / [harness#190](https://github.com/coseo12/harness-setting/issues/190).
 
 ### 다운스트림 실측이 최종 가드 — upstream 3중 방어 blindspot
 upstream 의 단위 테스트 / reviewer / cross-validate 3중 방어가 통과해도 다운스트림 환경 매트릭스에서만 드러나는 결함 존재. release 를 막는 대신 **역방향 피드백 속도 최대화**. "N 적용 시나리오" 근거는 `[실측]` / `[가정]` 라벨 부착 + 박제 문턱 (실측 ≥ 1 + 가정 ≥ 3 + 공통 조건 매트릭스) 충족 필수 (#195).
@@ -225,10 +218,9 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 - 근거: volt [#13](https://github.com/coseo12/volt/issues/13) — "빌드 성공 ≠ 동작", "HTTP 200 ≠ 올바른 리소스" 원칙의 연장선
 
 ### 매니페스트 최신 ≠ 파일 적용 완료 — 부분 실패 교착 복구
-매니페스트 기반 패키지 관리자(`harness update`, Nix, brew, dpkg/apt 등)는 파일 적용과 해시 기록이 **원자적 트랜잭션이 아닐** 수 있어, 부분 롤백 시 `--apply-all-safe` 가 "동일 상태" 로 오판하고 스킵하면 **복구 불가능한 교착** 에 빠진다. 즉시 복구는 이전 머지 커밋에서 `.harness/manifest.json` 복구 후 재-apply. v2.8.0 (post-apply 검증 게이트) + v2.9.0 (`previousSha256` 자가 복구) 로 코드 레벨에서 상당 부분 해소.
+매니페스트 기반 패키지 관리자(Nix, brew, dpkg/apt 등)는 파일 적용과 해시 기록이 **원자적 트랜잭션이 아닐** 수 있어, 부분 롤백 시 "동일 상태" 오판 스킵이 **복구 불가능한 교착** 을 만든다.
 
-- 상세 (증상 / 즉시 복구 절차 / formatter 재포맷 drift / 버전 이력): [docs/lessons/manifest-partial-failure-recovery.md](docs/lessons/manifest-partial-failure-recovery.md)
-- 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴
+- 상세: [docs/lessons/manifest-partial-failure-recovery.md](docs/lessons/manifest-partial-failure-recovery.md) / 일반화: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어
 
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 sub-agent(dev/qa 페르소나 등) 는 **검증** 까지는 신뢰하되 **박제** (커밋/푸시/PR 생성/`gh pr comment`/auto-close) 는 신뢰하지 말 것. sub-agent 보고는 *의도* 이고 실제 외부 가시성은 별도. 메인이 `git log --oneline -1` / `gh pr view` / `gh issue view --json state` 로 직접 확인.
@@ -258,25 +250,12 @@ background 대기 / sub-agent notification 경로는 세션의 자식 프로세�
 - **행동 규약 (메인 오케스트레이터)**: 대기 진입 = `ScheduleWakeup 예약 + 상태파일 append` 를 원자 단위로. 훅 경고 확인 시 **대기를 그대로 재개 금지** — waiter 는 이미 소멸했을 수 있으므로 `상태 조회 → 생사 판단 → 항목 제거/재개`.
 - 상세: [docs/lessons/dead-wait-guard.md](docs/lessons/dead-wait-guard.md) — volt [#121](https://github.com/coseo12/volt/issues/121)
 - 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴
-<!-- harness:managed:real-lessons:end -->
 
 ## 프로젝트 고유 보강 교훈
 
-> 위 `real-lessons` managed-block 은 harness upstream 이 관리하며 업데이트 시 자동 동기화된다. 본 섹션은 프로젝트 고유 해결책/가드를 별도로 박제한다 (block 외부이므로 upstream 업그레이드에 영향받지 않음).
+> 본 섹션은 프로젝트 고유 해결책/가드를 박제한다.
 
-### Z 패턴 TL;DR (3단계 카드) — 다운스트림 보존판
-
-> upstream v4.4.0 CLAUDE.md 슬리밍에서 본 카드가 제거되어 (관리 block 외부) 프로젝트 고유 섹션으로 이전 보존한다 (#853). 원 규약 SSoT 는 ADR 20260515.
-
-harness-managed 파일에 프로젝트 고유 행동 규칙을 추가/수정할 때 3단계 워크플로 (ADR `20260515-harness-managed-divergent-pattern.md` 정합):
-
-1. **Phase 1 — 본 프로젝트 선반영 (Y 경로)**: feature 브랜치에서 파일 직접 수정 + PR `Closes #N` 박제 (`.harness/manifest.json` 미수정). 데코레이터 의무 (Amendment 8): `HARNESS-DRIFT: Z-PATTERN [<upstream-link-or-TODO>]` 박제. `.json` 은 sidecar `<filename>.HARNESS-DRIFT.md`
-2. **Phase 2 — upstream 기여 (X 경로)**: coseo12/harness-setting 에 동일 변경 PR 동시 제출 (cross-link 박제 — 본 프로젝트 PR title 에 본 프로젝트 이슈 `#N` ref 포함 의무, Amendment 10 자동 해소 정합)
-3. **Phase 3 — 본 프로젝트 동기화 (Z 완성)**: upstream 머지 후 `harness update --apply-all-safe` 자동 동기화 → drift 해소 + `[TODO]` → upstream PR URL 자동 교체 (Amendment 10). sidecar 잔존 시 `verify-harness-drift-decorator.mjs --mode=sidecar-cleanup --apply` 로 정리 (Amendment 11)
-
-silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (drift 카운트 soft-warn) + Amendment 10 (TODO 해소 자동화) + Amendment 11 (sidecar 라이프사이클) + Amendment 12 (TODO Aging soft-warn).
-
-- 상세: [docs/decisions/20260515-harness-managed-divergent-pattern.md](docs/decisions/20260515-harness-managed-divergent-pattern.md) §결정 + §Amendment 1~12
+Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](docs/decisions/20260731-907-harness-decouple.md)). 이력: ADR 20260515 (Superseded).
 
 ### 프로젝트 접근 — Incremental Body-by-Body Build (v3)
 
@@ -286,17 +265,6 @@ silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (dri
 - **유지 대상**: Floating Origin (`20260422-floating-origin.md`), LOD 3단 (`20260424-p11-b-lod-design.md`), Tier 네이밍 정책 (`20260424-tier-naming-policy.md`), Tier Preset 설계 (`20260424-tier-preset-design.md`) — 기술 가치 유지
 - **참고 (폐기)**: `docs/deprecated/principles/fact-first.md`, `docs/deprecated/phases/roadmap-v2-solar-precision.md`, `docs/deprecated/phases/p10-plan.md`, `docs/deprecated/decisions/20260423-display-relative-scale-unification.md`
 - **횡단 원칙**: [`docs/architecture/principles.md`](docs/architecture/principles.md) §1 **Visual Fidelity** — 데이터 SSoT 보존 + rendering 시점 왜곡 허용. R-Phase ADR 박제 시 §의무 체크리스트 4항목 적용 (#541, R4 cross-validate 후속)
-
-### prettier 컨벤션 충돌 — 프로젝트 고유 해결책 (astro-simulator)
-
-상위 "다운스트림 formatter 재포맷 경계 drift" 교훈의 프로젝트 구현:
-
-- `scripts/sync-prettierignore.mjs` — 매니페스트에서 harness-managed 경로를 추출해 `.prettierignore` 의 `# --- harness-managed ---` 블록을 자동 재생성
-- `.github/workflows/prettierignore-drift.yml` — `sync:prettierignore --check` 로 drift 감지 시 PR 차단
-- 예외 경로 (매니페스트 있어도 prettier 제외 안 함, 프로젝트 고유 live 문서): `docs/benchmarks/**`, `docs/phases/**`, `docs/reports/**`, `docs/retrospectives/p*-retrospective.md`
-- **운영 필수**: `harness update --apply-*` 직후 `pnpm sync:prettierignore` 실행 후 동일 커밋에 포함
-- 근거 ADR: `docs/decisions/20260419-prettier-harness-conflict.md`
-- 관련 이슈: [#229](https://github.com/coseo12/astro-simulator/issues/229) (인프라 도입), [#230](https://github.com/coseo12/astro-simulator/issues/230) (v2.15.0 업그레이드 실측)
 
 ### sub-agent 이탈의 프로세스 레벨 확장 — cargo/next dev 좀비 누적
 
@@ -324,7 +292,7 @@ silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (dri
 #### 가드 A — 메인 spawn 시점 lsof 선행 (2026-05-10 incident #440 Phase 1)
 
 - **메인 dev/장기 프로세스 spawn 시점 lsof 선행 의무** ([이슈 #440](https://github.com/coseo12/astro-simulator/issues/440)): 메인 오케스트레이터가 `pnpm dev` / `pnpm start` / `cargo test --release` 등 장기 프로세스를 `run_in_background=true` 로 시작하기 **직전**, 사용 포트(3000 / 4000 / 기타)에 대해 `lsof -i :<port>` 선행 확인 의무. 점유 중이면 좀비 인지 + 사용자 보고 + 정리 후 재시작. **본 가드 위반 시 발생 시퀀스** (실측 2026-05-10): 좀비 (이전 세션 PID 97333, ETIME 3h 17m) 가 포트 3000 점유 → 메인이 새 dev spawn 시도 → EADDRINUSE 로 즉사 → 좀비가 HTTP 응답 → 메인이 "dev ready" 오인 → 사용자 D-T2 안내 → 사용자 자기 터미널 `pnpm dev` 시도 → EADDRINUSE → `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` → 사용자 보고 → forensic. 상세: [`docs/reports/20260510-419-dev-server-zombie-recurrence.md`](docs/reports/20260510-419-dev-server-zombie-recurrence.md). 위 "메인 루틴" (sub-agent 복귀 직후) 가드와 **직교** — 본 가드는 **메인이 직접 spawn 하는 시점** + **이전 세션 좀비 (sub-agent 추적 단위 외)** 검증.
-- **harness real-lessons SSoT 와의 관계** (volt [#24](https://github.com/coseo12/volt/issues/24) `중복 브랜치 dev 서버 오진 방지` 가드): 상위 SSoT 는 "feature 브랜치별 worktree 에서 띄운 dev 서버가 이후 브랜치에서 동일 포트를 점유하면 HMR 이 낡은 번들을 서빙" 라는 **HMR drift 시나리오** 박제. 본 가드 A 는 그 SSoT 의 **실측 incident 구체화** — 단순 stale 번들이 아니라 좀비가 HTTP 응답해 "ready" 자체를 오인하게 만드는 변형 + 이전 세션 (sub-agent 추적 단위 외) 좀비까지 검증 범위 확장.
+- **real-lessons SSoT (volt #24) 와의 관계** (volt [#24](https://github.com/coseo12/volt/issues/24) `중복 브랜치 dev 서버 오진 방지` 가드): 상위 SSoT 는 "feature 브랜치별 worktree 에서 띄운 dev 서버가 이후 브랜치에서 동일 포트를 점유하면 HMR 이 낡은 번들을 서빙" 라는 **HMR drift 시나리오** 박제. 본 가드 A 는 그 SSoT 의 **실측 incident 구체화** — 단순 stale 번들이 아니라 좀비가 HTTP 응답해 "ready" 자체를 오인하게 만드는 변형 + 이전 세션 (sub-agent 추적 단위 외) 좀비까지 검증 범위 확장.
   ```bash
   # 메인 dev/장기 프로세스 spawn 직전 의무 가드
   PORT=3000
@@ -337,7 +305,7 @@ silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (dri
 
 #### 가드 B — sub-agent-confirmed-done 카나리아 (incident #440 Phase 2)
 
-- **`bg_process_handoff="sub-agent-confirmed-done"` 보고에서도 메인 카나리아 검증 의무**: harness real-lessons SSoT 정의상 `"sub-agent-confirmed-done"` 은 "PID 배열이 `[]` 여야 정합" 이므로 메인 검증 트리거 미발화. 그러나 본 incident 처럼 **이전 세션 좀비** 가 sub-agent 추적 단위 외에 잔존하면 정의상 정합 PASS 임에도 좀비 검출 불가. 메인은 sub-agent 가 어떤 보고를 하든 (`"main-cleanup"` / `"sub-agent-confirmed-done"` / `"none"` 무관) 포트 사용 sub-agent (qa / dev / browser-test) 복귀 직후 **카나리아 1회** (`lsof -i :<port>` + ETIME 패턴 매칭). 검증 비용 < 1초. 좀비 발견 시 사용자 보고 + 정리 후 다음 작업 진행. 가드 A 가 **메인 자신의 spawn 직전** 가드라면 가드 B 는 **sub-agent 복귀 직후** 가드 — 둘 직교.
+- **`bg_process_handoff="sub-agent-confirmed-done"` 보고에서도 메인 카나리아 검증 의무**: real-lessons SSoT (volt #24) 정의상 `"sub-agent-confirmed-done"` 은 "PID 배열이 `[]` 여야 정합" 이므로 메인 검증 트리거 미발화. 그러나 본 incident 처럼 **이전 세션 좀비** 가 sub-agent 추적 단위 외에 잔존하면 정의상 정합 PASS 임에도 좀비 검출 불가. 메인은 sub-agent 가 어떤 보고를 하든 (`"main-cleanup"` / `"sub-agent-confirmed-done"` / `"none"` 무관) 포트 사용 sub-agent (qa / dev / browser-test) 복귀 직후 **카나리아 1회** (`lsof -i :<port>` + ETIME 패턴 매칭). 검증 비용 < 1초. 좀비 발견 시 사용자 보고 + 정리 후 다음 작업 진행. 가드 A 가 **메인 자신의 spawn 직전** 가드라면 가드 B 는 **sub-agent 복귀 직후** 가드 — 둘 직교.
 - **ETIME 임계값** — 본 세션 시작 이전 추정 임계값으로 **30분** 사용. qa/dev 사이클 1회 이상 경과한 PID 는 본 세션이 spawn 한 게 아닐 가능성이 매우 높음. `.claude/hooks/session-start-zombie-check.sh` (가드 C) + `.claude/agents/qa.md` 좀비 카나리아 항목 모두 동일 임계값 적용 (정합 SSoT).
   ```bash
   # sub-agent 복귀 직후 카나리아 (의무 1회, 비용 < 1초)
@@ -428,7 +396,7 @@ silent 회귀 가드: Amendment 8 (데코레이터 fail-fast) + Amendment 9 (dri
   - 예시 MINOR: developer 에이전트 워크플로 단계 추가, 스킬 DO NOT TRIGGER 조건 변경, 금지 규칙 추가
   - 예시 PATCH: 실전 교훈 섹션에 사례 추가, README 문구 개선, 오타 수정, 버그 수정
 - **CHANGELOG 작성 규칙**:
-  - MINOR/MAJOR 릴리스는 **`### Behavior Changes`** 섹션을 필수 포함하여 다운스트림이 `harness update` 후 관찰할 행동 변화를 bullet 으로 나열한다
+  - MINOR/MAJOR 릴리스는 **`### Behavior Changes`** 섹션을 필수 포함하여 다운스트림/사용 프로젝트가 업데이트 후 관찰할 행동 변화를 bullet 으로 나열한다
   - PATCH 릴리스도 frozen 파일(`.claude/`)이 변경됐다면 `### Behavior Changes: None — 문서/문구만` 을 명시해 자동 업데이트 신뢰 모델을 보호한다
 - 볼트 반영은 변경 성격에 따라 분류 — 에이전트·스킬 행동 변경이면 MINOR, 단순 교훈·문서 보강이면 PATCH
 - 의미 있는 마일스톤마다 `git tag` + `gh release create`로 릴리스
@@ -505,4 +473,4 @@ forensic ADR 의 측정 데이터 (스크린샷 / 차트 / diagram) 는 별도 �
 - 리뷰 없이 머지 금지
 - 테스트 없이 PR 생성 금지
 - feature/fix PR 의 `base=main` 금지 — 반드시 `develop` 대상. `base=main` 은 release/hotfix PR 만 허용
-- hotfix 머지 후 `main → develop` merge-back 누락 금지 — 누락 시 `harness doctor` 가 drift 로 감지
+- hotfix 머지 후 `main → develop` merge-back 누락 금지 — 누락 시 §drift 감지 의 git 직접 점검에서 warn 으로 드러남
