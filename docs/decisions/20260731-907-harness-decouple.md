@@ -1,10 +1,10 @@
 # ADR: 하네스 동기화 디커플 — 주기 동기화 중단 + upstream 읽기 전용 강등 + 기계장치 청산
 
 - 일자: 2026-07-31
-- 상태: Provisional
+- 상태: **Accepted** (cross-validate 2026-07-31 — §교차검증 반영 사항 4축 통합 완료)
 - 관련: 이슈 [#907](https://github.com/coseo12/astro-simulator/issues/907), 전수 감사 D3 (2026-07-31), 설계 SSoT `.context/design-907.md` (untracked 인수인계 문서 — 실측 근거는 본 ADR 에 전사), ADR [20260515-harness-managed-divergent-pattern.md](20260515-harness-managed-divergent-pattern.md) (본 ADR 로 **Superseded**), ADR [20260419-prettier-harness-conflict.md](20260419-prettier-harness-conflict.md) (본 ADR §결정 4 가 대체 — Superseded 전이는 Phase B 기계 제거와 동시 수행)
 
-> 상태 워크플로: cross-validate 발동 대상 (ADR 신규 + 프로젝트 원칙 선언 이중 해당) 이므로 **Provisional** 로 박제한다. cross-validate (agy) 결과를 §교차검증 반영 사항으로 통합한 후 `Accepted (cross-validate YYYY-MM-DD)` 로 전이한다 (CLAUDE.md §ADR Status 워크플로 — #370 옵션 C).
+> 상태 워크플로: cross-validate 발동 대상 (ADR 신규 + 프로젝트 원칙 선언 이중 해당) 이므로 **Provisional** 로 박제 후, cross-validate (agy, 2026-07-31) 결과를 §교차검증 반영 사항으로 통합하고 **Accepted** 전이 완료 (CLAUDE.md §ADR Status 워크플로 — #370 옵션 C).
 
 ## 배경 (전수 감사 D3 실측, 2026-07-31)
 
@@ -14,6 +14,7 @@
 - **7월 한 달 churn 의 30.9%** 가 하네스 유지보수 (Amendment 17~20, 불변식 A~D, safe wrapper 등) 에 소비됨
 - **upstream 순유입 0** — 최근 동기화 방향은 다운스트림 → upstream 역방향 기여뿐. Z 패턴의 Phase 2 편익 (upstream 머지 후 자동 전파로 drift 해소) 이 소멸한 상태
 - 반면 **`.claude` 페르소나 파이프라인 (4,629줄) 은 리뷰 차단 실효 21%** 로 가치가 입증됨 — 문제는 파이프라인이 아니라 동기화 기계장치
+- **청산의 근거는 "완성했으니 버린다" 는 완결 서사가 아니라 기능적 불필요성이다** — 불변식 A~D 와 safe wrapper 가 전부 정상 동작하는 현재 상태에서도, upstream 유입 0 이 지속되는 한 이 가드들이 지키는 대상 (동기화 무결성) 자체의 편익이 0 이다 (교차검증 ③ 프레이밍 재정립 반영)
 - 본 결정의 집행 설계 실측 (2026-07-31, 기준 커밋 `a638a6c`): 삭제 대상 **19파일 8,537줄** + 부분 삭제 ~240줄 − 신규 상쇄 ~220줄 = **순감 ≈8,550줄** (보수 범위 8,300~8,700 — 이슈 추정 7.8k 상회, ADR/CHANGELOG 상쇄분 반영)
 
 ## 후보 비교
@@ -43,15 +44,39 @@
 ### Phase 분리 (집행 경로)
 
 - **Phase A (본 ADR)**: 결정 박제 — ADR 신설 (Provisional) + ADR 20260515 Superseded 전이 + cross-validate 1회 후 Accepted 전이. 문서만이므로 단독 배포 시에도 기계장치는 정상 동작 (backward-compat 완전)
-- **Phase B**: 기계장치 제거 + 잔존 참조 정리 + CI 재편 (§결정 3·4·5 집행). ADR 20260419-prettier-harness-conflict Superseded 전이 동반
+- **Phase B**: 기계장치 제거 + 잔존 참조 정리 + CI 재편 (§결정 3·4·5 집행). ADR 20260419-prettier-harness-conflict Superseded 전이 동반. 잔존 참조 grep 은 `.claude/hooks/`·`.husky/`·`.claude/agents/`·`.claude/skills/` 를 명시 포함 (교차검증 ② 우려 경로 — 2026-07-31 실측 결합 0 확인, Phase B 에서 회귀 재확인)
 - **Phase C**: CLAUDE.md 슬리밍 (≤35,000 chars — `verify-claudemd-size` WARN 해소) + obsolete 이슈 정리 (#898 / #901 / #769)
 - Phase B/C 는 상호 결합 (B 만 선행하면 CLAUDE.md 가 소멸한 명령을 지시하는 dead reference 창이 열림 — 주석 계약 vs 구현 drift 교훈) 이므로 **PR 2개 (A / B+C 통합) + 단일 MINOR 릴리스** 로 집행
 
 ## 결과 / 재검토 조건 (재도입 트리거)
 
 - upstream 신규 릴리스는 **수동 검토 → 필요 파일만 cherry-pick** (기계 동기화 부활 아님). 신규 프로젝트 부트스트랩은 upstream 템플릿을 직접 사용 (본 저장소 경유 아님)
+- **upstream 관찰 절차** (교차검증 고유 발견 수용): **분기 1회** upstream release note 수동 확인을 관찰 주기로 명시. cherry-pick 시 검증 절차는 기존 파이프라인 재사용 — 대상 파일을 feature 브랜치에 반영 후 reviewer/qa 게이트 통과 (별도 기계 불요). 재도입 트리거 1 의 "회당 1시간 초과" 측정 기점이기도 하다
 - **재도입 트리거** (충족 시 별도 ADR 로 기계 동기화 재평가):
   1. upstream 유입이 **분기당 2회 이상 실제 채택**으로 관찰되고, 수동 cherry-pick 비용이 **회당 1시간 초과 상태 2회 연속**일 때
   2. **다운스트림 프로젝트 2개 이상에서 동일 하네스 재사용 필요**가 발생할 때 (multi-project SSoT 편익이 부활하는 조건)
 - upstream 이슈 #325/#328/#329 는 사용자 판단으로 유지/종결 (본 ADR 무조치)
 - Z 패턴 용어·절차 (glossary / CLAUDE.md 카드) 는 Phase B/C 에서 "폐기 (2026-07-31, #907)" 로 표기 전환 — 이력 추적성을 위해 용어 항목 자체는 유지
+
+## 교차검증 반영 사항 (agy, 2026-07-31)
+
+편향 축 명시 질문 3건 (① 단독 분석 한계 / ② 결합 간과 / ③ 폐기 프레이밍) 을 프롬프트에 포함해 architecture 모드로 실행 (L1/L3 가드, 워킹트리 오염 0). 로그: `.claude/logs/cross-validate-architecture-20260731-182453.log`.
+
+### 합의 (높은 신뢰도 — 즉시 반영 불요, 설계 일치)
+
+- **청산 결정 타당** — ① 에 대해 agy 는 "churn 30.9% 를 1회성 안정화 투자로 재해석해도 결론 불변" 판정: 유지비가 급감해도 **편익 (upstream 유입) 이 0 인 자산**의 잔존은 인지 부하·온보딩 장벽·부식 위험 (#840 클래스) 을 영구 발생시킴
+- `.prettierignore` 정적 curated + `!` negation 전환 (§결정 4), `hashFiles` 제거 fail-fast (§결정 5), 재도입 트리거 수치화 (§결과) — 전부 "정밀" 평가
+
+### 고유 발견 → 수용 (본 ADR 반영)
+
+1. **③ 프레이밍 재정립** — agy 판정: sunk cost (a) 보다 **완결 서사 편향 (b) 위험이 더 큼** ("완성해봤으니 미련 없이 버린다" 는 카타르시스가 안정화 결실 수확 가능성을 가림). 수용 — §배경 말미에 "청산 근거 = 완결 서사가 아닌 기능적 불필요성 (가드 정상 동작 중에도 유입 0 이면 편익 0)" 명문화
+2. **upstream 관찰 절차 누락** — 수용: §결과에 분기 1회 release note 수동 확인 + cherry-pick 검증 절차 (기존 reviewer/qa 게이트 재사용) 명시
+3. **② 숨은 의존 3건 우려** (`.claude/hooks/` / agents·skills 지시어 / `.husky` 체인) — **실측 전수 대조 결과 결합 0** (2026-07-31 grep: hooks 0 건 / agents·skills 0 건 / `.husky/pre-commit` 은 encoding·duplicate-guard·lint-staged 만). 다만 우려 경로를 Phase B 잔존 참조 grep 대상에 명문화하는 것으로 부분 수용 (§Phase 분리 갱신) — CLAUDE.md 본문 참조는 이미 Phase C 슬리밍 범위
+
+### 고유 발견 → 이연 (범위 밖, PR-BC 소관)
+
+- **Phase B+C 단일 PR 롤백 전략 명시** — 집행 PR 본문의 Test plan/rollback 항목 소관 (ADR 은 결정 기록). PR-BC 본문에 "CI 실패 시 원인 격리 순서 (가드 재편 → 삭제 → 슬리밍 역순 revert)" 를 담을 것
+
+### Claude 편향 셀프 체크
+
+- 본 ADR 작성 주체 (Claude) 는 Amendment 17~20 을 직접 구축한 당사자로 (a)/(b) 양방향 편향 모두에 노출 — agy 의 (b) 우위 판정과 실측 (유입 0 은 가드 완성도와 무관한 외생 변수) 이 일치해 (b) 방어를 문면화하는 것으로 해소. 수치 재해석 시도 ① 이 기각된 것은 결론의 견고성을 지지
