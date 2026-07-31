@@ -11,7 +11,7 @@
  *   /ko?engine=webgpu&belt=N
  * for N in [1000, 5000, 10000]
  *
- * 결과: docs/benchmarks/p3b-{timestamp}.json + console 표
+ * 결과: .bench-out/p3b-{timestamp}.json (#905 — gitignored) + console 표
  */
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -22,7 +22,8 @@ import { pressTimePlay } from './browser-verify-utils.mjs';
 const baseUrl = process.argv[2] ?? 'http://localhost:3000';
 const DURATION_MS = 3_000;
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outDir = join(__dirname, '..', 'docs', 'benchmarks');
+// #905 — 타임스탬프 리포트는 gitignored `.bench-out/` 에 기록 (커밋 경로 오염 방지)
+const outDir = join(__dirname, '..', '.bench-out');
 mkdirSync(outDir, { recursive: true });
 
 // P3-D #154 — vsync 해제 flag로 절대 throughput 측정 가능. cap fps 우회.

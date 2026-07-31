@@ -65,4 +65,4 @@ P4에서 도출된 교훈을 가드로 박제:
 ## 메모리 갱신
 
 - `project_p4_contract.md`는 본 회고 작성 시점 **archived** 상태. P5 진입 시 신규 contract 작성.
-- P4-C 실기기 측정은 `docs/reports/p4c-mobile-실기기-YYYYMMDD.md` 경로로 향후 별도 보고.
+- P4-C 실기기 측정은 `docs/reports/p4c-mobile-device-YYYYMMDD.md` 경로로 향후 별도 보고 (한글 파일명 rename #905).

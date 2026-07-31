@@ -43,4 +43,4 @@ CLAUDE.md `## 실전 교훈` 섹션에서 추출된 상세 문서 디렉토리. 
 ## 관련 가이드
 
 - [docs/guides/claudemd-governance.md](../guides/claudemd-governance.md) — CLAUDE.md 비대화 방지 9 섹션 지침 (임계 / 가지치기 / 예외 ADR 등)
-- [docs/plans/phase3-extraction-plan.md](../plans/phase3-extraction-plan.md) — 본 디렉토리를 도입한 Phase 3-A 설계 계획
+- 구 `docs/plans/phase3-extraction-plan.md` (git 이력 보존 — #907 디커플로 문서 제거) — 본 디렉토리를 도입한 Phase 3-A 설계 계획

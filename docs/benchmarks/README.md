@@ -8,7 +8,7 @@
 # 별도 터미널: 앱 서버 기동 (3001 포트)
 pnpm dev
 
-# 벤치 실행 → docs/benchmarks/{timestamp}.json 생성
+# 벤치 실행 → .bench-out/{timestamp}.json 생성 (#905 — gitignored 산출물)
 BENCH_PHASE=p1-end pnpm bench:scene
 
 # N-sweep 모드 (소행성대 N=10,100,200,1000 각각 play-1y fps)
@@ -27,8 +27,9 @@ pnpm bench:scene:set-baseline
 
 ## 파일 규칙
 
-- `{ISO-timestamp}.json` — 개별 측정 리포트 (타임스탬프 슬러그)
-- `baseline.json` — 비교 기준선. 의미 있는 성능 기준점(예: P1 종료, P2-0 완료) 갱신 시 업데이트
+- `{ISO-timestamp}.json` — 개별 측정 리포트 (타임스탬프 슬러그). **#905 부터 gitignored
+  `.bench-out/` 에 기록** — 본 디렉토리에는 커밋하지 않는다 (실행마다 커밋 경로가 오염되던 재발 구조 제거)
+- `baseline.json` — 비교 기준선 (tracked). 의미 있는 성능 기준점(예: P1 종료, P2-0 완료) 갱신 시 업데이트
 - 각 리포트 JSON은 `{ timestamp, phase, scenarios: [{ name, fps }] }` 스키마
 
 ## 회귀 판정
