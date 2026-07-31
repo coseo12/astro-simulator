@@ -1,5 +1,3 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
-
 # 용어사전 (Glossary)
 
 > astro-simulator 의 ADR / lessons / phases / retrospectives 문서가 공유하는 프로젝트 고유 용어를 정의한다. 신규 참여자/에이전트의 onboarding 비용 절감 목적. 각 항목은 5줄 이내 정의 + 첫 도입 ADR 또는 PR 링크.
@@ -170,6 +168,6 @@ background 대기 (sub-agent / CI watch) 중 세션 재시작으로 waiter 프�
 
 ## Z 패턴 (harness-managed divergent workflow)
 
-harness-managed 파일 (`.harness/manifest.json` 등록) 에 프로젝트 고유 변경이 필요할 때의 3단계 워크플로 — Phase 1 본 프로젝트 선반영 (`HARNESS-DRIFT: Z-PATTERN [TODO]` 데코레이터 박제) → Phase 2 upstream 기여 (cross-link) → Phase 3 `harness update` 자동 동기화로 drift 해소. 데코레이터 누락 시 CI fail-fast (Amendment 8).
+**폐기** (2026-07-31, #907 / ADR [`20260731-907-harness-decouple.md`](decisions/20260731-907-harness-decouple.md)) — 하네스 동기화 디커플로 3단계 워크플로 (프로젝트 선반영 → upstream 기여 → 자동 동기화) 와 데코레이터·drift 판정 기계장치가 전부 제거됨. 이력: ADR 20260515 (Superseded).
 
-- 발화: [`docs/decisions/20260515-harness-managed-divergent-pattern.md`](decisions/20260515-harness-managed-divergent-pattern.md) (#556), CLAUDE.md §"Z 패턴 TL;DR"
+- 발화: [`docs/decisions/20260515-harness-managed-divergent-pattern.md`](decisions/20260515-harness-managed-divergent-pattern.md) (#556)

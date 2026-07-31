@@ -1,5 +1,3 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
-
 # UI 아키텍처
 
 프로젝트: 웹 기반 천체물리 시뮬레이터

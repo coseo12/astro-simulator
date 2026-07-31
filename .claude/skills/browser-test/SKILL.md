@@ -8,7 +8,6 @@ description: |
   DO NOT TRIGGER when: 단위 테스트, API 테스트, 정적 분석, 코드 리뷰(코드만 볼 때),
   브라우저가 필요 없는 백엔드 작업일 때.
 ---
-<!-- HARNESS-DRIFT: Z-PATTERN [https://github.com/coseo12/harness-setting/pull/320 + https://github.com/coseo12/harness-setting/pull/322] -->
 
 # 브라우저 테스트
 

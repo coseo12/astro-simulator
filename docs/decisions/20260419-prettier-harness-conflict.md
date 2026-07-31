@@ -1,7 +1,9 @@
 # ADR: prettier vs harness upstream 포맷 충돌 해결 — 매니페스트 기반 `.prettierignore` 자동 생성
 
+> **Superseded** — 본 결정의 대상 기계 (`scripts/sync-prettierignore.mjs`, manifest 파생 자동 생성) 는 #907 하네스 디커플로 제거되었고, [20260731-907-harness-decouple.md](20260731-907-harness-decouple.md) §결정 4 (정적 curated 섹션 + live 문서 `!` negation) 가 대체 규약이다. 본문은 이력 보존 (불변).
+
 - 일자: 2026-04-19
-- 상태: Accepted
+- 상태: Superseded (by [20260731-907-harness-decouple.md](20260731-907-harness-decouple.md), 2026-07-31, #907)
 - 관련: 이슈 [#229](https://github.com/coseo12/astro-simulator/issues/229), PR [#228](https://github.com/coseo12/astro-simulator/pull/228), volt [#27](https://github.com/coseo12/volt/issues/27) / [#29](https://github.com/coseo12/volt/issues/29), CLAUDE.md §"매니페스트 최신 ≠ 파일 적용 완료"
 
 ## 배경

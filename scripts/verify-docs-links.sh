@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# HARNESS-DRIFT: Z-PATTERN [TODO]
 # verify-docs-links.sh
 # docs 전체 상대 링크 무결성 가드 wrapper — CI `bash scripts/...` 호출 일관성 유지용.
 #

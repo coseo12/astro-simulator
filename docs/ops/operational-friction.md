@@ -1,5 +1,3 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
-
 # 반복 운영 마찰 — 원인 박제 + 절차 표준 (#795)
 
 매 세션·릴리스마다 반복되던 저비용 운영 마찰의 **구조 원인**과 **표준 절차**를 박제한다. 개별론 사소하나 누적되며, 원인 미박제 시 매 세션 "이력상 그렇더라"로만 전승되어 회수 불가능해진다.
@@ -98,11 +96,11 @@ gh pr checks <PR> --json name,state --jq \
 
 ## 문서 배치 마찰 — 프로젝트 고유 lessons 는 docs/lessons/ 아님 (본 문서 자체 사례)
 
-`docs/lessons/` 와 `docs/` 루트(deployment-guide 등)는 **upstream harness-setting 이 관리**하는 managed 디렉토리다(`.harness/manifest.json` 등록, `docs/lessons/` 19개). 프로젝트 고유 문서를 여기 두면 이중 가드 캐스케이드 발생:
+`docs/lessons/` 와 `docs/` 루트(deployment-guide 등)는 **upstream harness-setting 이 관리하는 managed 디렉토리였다** (#907 디커플로 전체 프로젝트 소유 전환 — ADR 20260731-907-harness-decouple). 당시 프로젝트 고유 문서를 여기 두면 이중 가드 캐스케이드가 발생했다:
 
 - `docs/lessons/*.md` 신규 → `verify-lessons-readme.sh` 가 README 등록 요구 → README 편집 → README 가 managed 라 `verify-harness-drift-decorator` 가 데코레이터 요구 → Z-패턴 진입.
 
-**표준**: 프로젝트 고유 운영/lessons 문서는 **비-managed 위치**(`docs/ops/` 등 manifest 미등록 신규 dir)에 두고 CLAUDE.md 프로젝트 고유 보강 섹션에서 링크한다. 본 문서(#795)도 `docs/lessons/` → `docs/ops/` 로 이동해 캐스케이드를 회피했다(리뷰 라운드 1회 소요 — 본 문서가 다루는 "마찰"의 자기 재현).
+**표준**: 프로젝트 고유 운영 문서는 `docs/ops/` 에 두고 CLAUDE.md 프로젝트 고유 보강 섹션에서 링크한다. 본 문서(#795)도 `docs/lessons/` → `docs/ops/` 로 이동해 캐스케이드를 회피했다(리뷰 라운드 1회 소요 — 본 문서가 다루는 "마찰"의 자기 재현). #907 디커플 이후 managed 제약은 소멸했으나, `docs/ops/`(운영) vs `docs/lessons/`(일반화 교훈) 문서 분류 원칙은 유지한다.
 
 ## 5. 신규 verify 스크립트 보일러플레이트 복붙 → 재현 조건 drift (#846)
 

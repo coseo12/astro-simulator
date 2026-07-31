@@ -1,6 +1,6 @@
 # 슬래시 커맨드 인덱스
 
-harness가 제공하는 9개 슬래시 커맨드 한눈에. Claude Code 세션에서 호출.
+harness가 제공하는 8개 슬래시 커맨드 한눈에. Claude Code 세션에서 호출.
 
 ## 페르소나 (5종 + 디스패처)
 
@@ -20,7 +20,6 @@ harness가 제공하는 9개 슬래시 커맨드 한눈에. Claude Code 세션�
 | 명령 | 동작 |
 |---|---|
 | `/team-status` | 페르소나별 작업 큐 + 라벨 무결성 + 권장 액션 |
-| `/harness-update [옵션]` | harness 프레임워크 업데이트 확인/적용 (CLI 래퍼) |
 
 ## 지식 루프 (volt)
 
@@ -65,26 +64,16 @@ harness가 제공하는 9개 슬래시 커맨드 한눈에. Claude Code 세션�
   → 누적된 volt 이슈 → harness 개선 PR
 ```
 
-### 3. 도구 자체 업데이트
-```
-/harness-update --check
-  → 변경 요약
-
-/harness-update --apply-all-safe
-  → 충돌 없는 변경 일괄 적용
-```
-
 ## 보조 — CLI 명령
 
 세션 외부에서 실행:
 
 ```bash
-harness init <경로>          # 신규 프로젝트 초기화
-harness update [옵션]        # 슬래시 /harness-update 의 CLI 형태
-harness doctor               # 셋업 자체 점검 (CRITICAL/manifest/policy/라벨)
-harness labels               # 기본 라벨 생성
 bash scripts/setup-stage-labels.sh   # stage:* 6종 라벨 (페르소나 핸드오프용)
 ```
+
+> 참고: 하네스 동기화 커맨드 (`/harness-update` 등) 는 #907 디커플 (ADR 20260731-907-harness-decouple) 로
+> 제거됨 — upstream 은 읽기 전용 부트스트랩 템플릿으로 강등, 필요 시 수동 cherry-pick.
 
 ## 참고 문서
 

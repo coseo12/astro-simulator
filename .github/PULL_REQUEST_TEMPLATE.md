@@ -47,7 +47,7 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] **3단계**: `git tag vX.Y.Z` + `git push origin vX.Y.Z`
 - [ ] **4단계**: `gh release create vX.Y.Z ...`
 - [ ] **5단계 (sub-PR 박제 누락 점검 — #240)**: 포함된 sub-PR 중 정책·규약 박제 PR (CLAUDE.md / 에이전트·스킬 행동 규칙 변경) 의 cross-validate outcome 박제 위치를 확인. 누락 시 release PR 본문 또는 CHANGELOG `### Notes` 에 통합 사후 박제. v3.5.0 누락 사례: PR [#238 코멘트](https://github.com/coseo12/harness-setting/pull/238#issuecomment-4318351320)
-- [ ] 사후 확인: `harness doctor` 의 gitflow 브랜치 정합성이 "동기" 로 pass
+- [ ] 사후 확인: `git fetch origin && git merge-base --is-ancestor origin/develop origin/main; git rev-list --count origin/main..origin/develop` 로 gitflow 브랜치 정합 확인
 
 ### Hotfix PR 전용 (base=main, head=hotfix/*)
 일반 PR 이면 건너뛴다.

@@ -1,5 +1,3 @@
-<!-- HARNESS-DRIFT: Z-PATTERN [TODO] -->
-
 # 확장 로드맵 v1 — 관측가능우주 (Cosmic Scale)
 
 > **Status**: Archived (v2 에 의해 P8 이후 범위 보류)

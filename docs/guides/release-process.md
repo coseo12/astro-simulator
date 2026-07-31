@@ -19,14 +19,14 @@
 
 ## CHANGELOG 작성 규칙
 
-- MINOR/MAJOR 릴리스는 **`### Behavior Changes`** 섹션을 필수 포함하여 다운스트림이 `harness update` 후 관찰할 행동 변화를 bullet 으로 나열한다
+- MINOR/MAJOR 릴리스는 **`### Behavior Changes`** 섹션을 필수 포함하여 다운스트림/사용 프로젝트가 업데이트 후 관찰할 행동 변화를 bullet 으로 나열한다
 - PATCH 릴리스도 frozen 파일(`.claude/`)이 변경됐다면 `### Behavior Changes: None — 문서/문구만` 을 명시해 자동 업데이트 신뢰 모델을 보호한다
 - 볼트 반영은 변경 성격에 따라 분류 — 에이전트·스킬 행동 변경이면 MINOR, 단순 교훈·문서 보강이면 PATCH
 - 의미 있는 마일스톤마다 `git tag` + `gh release create`로 릴리스
 
 ## `package.json::version` bump 필수
 
-chore(release) PR 에서 `CHANGELOG.md` 엔트리 추가와 **동일 커밋** 에 `package.json::version` 을 새 버전으로 bump. 누락 시 다운스트림이 `harness update` 에서 구 버전으로 인식. `scripts/verify-release-version-bump.sh` 가 CI `detect-and-test` 에서 CHANGELOG 최신 엔트리 ↔ `package.json::version` 일치를 검증하여 drift 시 exit 1 (v2.28.1 복구와 함께 도입). 로컬에서 chore release 커밋 전에 `bash scripts/verify-release-version-bump.sh` 실행 권장.
+chore(release) PR 에서 `CHANGELOG.md` 엔트리 추가와 **동일 커밋** 에 `package.json::version` 을 새 버전으로 bump. 누락 시 다운스트림/사용 프로젝트가 업데이트 시 구 버전으로 인식. `scripts/verify-release-version-bump.sh` 가 CI `detect-and-test` 에서 CHANGELOG 최신 엔트리 ↔ `package.json::version` 일치를 검증하여 drift 시 exit 1 (v2.28.1 복구와 함께 도입). 로컬에서 chore release 커밋 전에 `bash scripts/verify-release-version-bump.sh` 실행 권장.
 
 ## Phase 분리 릴리스 리듬
 
