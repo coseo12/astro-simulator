@@ -11,7 +11,7 @@
  *   - Playwright는 **Chromium 엔진** 기반 iPhone emulation (userAgent/viewport만 Safari 흉내).
  *   - 실제 WebKit+Safari WebGPU 동작은 실기기에서만 정확 측정 가능.
  *   - 본 스크립트는 1차 게이트 — 구조적 회귀(크래시/레이아웃/capability 경로)만 방지.
- *   - 실기기 측정 결과는 docs/reports/p4c-mobile-실기기-YYYYMMDD.md에 별도 기록 필요.
+ *   - 실기기 측정 결과는 docs/reports/p4c-mobile-device-YYYYMMDD.md 에 별도 기록 필요.
  *
  * 사용: node scripts/browser-verify-mobile-p4c.mjs [baseUrl]
  */

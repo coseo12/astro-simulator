@@ -66,7 +66,7 @@
 - 신규 HUD: fps 카운터 (`?fps=1`)
 - 신규 URL 파라미터: `?gr=1`, `?bh=1&bhx=N&bhy=N&bhz=N`, `?fps=1`
 - ADR 2건: `20260417-general-relativity-1pn.md`, `20260417-gravitational-lensing-pipeline.md`
-- 실기기 리포트: `docs/reports/p4c-mobile-실기기-20260417.md`
+- 실기기 리포트: `docs/reports/p4c-mobile-device-20260417.md` (한글 파일명 rename #905)
 - bench baseline: `baseline-v0.4.0.json` + `--compare` 기능
 
 ## 메모리 갱신

@@ -27,7 +27,9 @@ const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SAMPLE_MS = Number(process.env.BENCH_SAMPLE_MS ?? 10_000);
 const RATIO_THRESHOLD = Number(process.env.BENCH_RATIO_THRESHOLD ?? 0.9);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const reportsDir = join(__dirname, '..', 'docs', 'reports');
+// #905 — 날짜 스탬프 리포트는 gitignored `.bench-out/` 에 기록 (커밋 경로 오염 방지).
+// 기존 tracked 리포트 (docs/reports/p7d-mobile-20260418.json) 는 역사 기록으로 보존.
+const reportsDir = join(__dirname, '..', '.bench-out');
 mkdirSync(reportsDir, { recursive: true });
 
 const deviceProfile = devices['iPhone 14'];

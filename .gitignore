@@ -44,6 +44,10 @@ Thumbs.db
 
 .verify-screenshots/
 
+# bench 타임스탬프 리포트 (#905) — bench-scene/bench-webgpu/bench-tier-guard-cost 등의
+# 실행별 산출물. 커밋 대상은 docs/benchmarks/baseline*.json 등 소비 파일만.
+.bench-out/
+
 # QA/리뷰 스크린샷 — PR 증거는 PR 내에서 선별 커밋, 로컬 산출물은 무시
 # (이미 tracked 된 `screenshots/p9-pr25/` 는 유지됨 — git 표준 동작)
 screenshots/

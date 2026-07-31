@@ -37,7 +37,8 @@ const FPS_THRESHOLD = Number(process.env.BENCH_FPS_THRESHOLD ?? 24);
 const P95_FRAME_MS_THRESHOLD = Number(process.env.BENCH_P95_FRAME_MS ?? 60);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const benchDir = join(__dirname, '..', 'docs', 'benchmarks');
+// #905 — 타임스탬프 리포트는 gitignored `.bench-out/` 에 기록 (커밋 경로 오염 방지)
+const benchDir = join(__dirname, '..', '.bench-out');
 mkdirSync(benchDir, { recursive: true });
 
 const browser = await chromium.launch({
