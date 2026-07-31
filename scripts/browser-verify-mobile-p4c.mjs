@@ -11,7 +11,7 @@
  *   - Playwright는 **Chromium 엔진** 기반 iPhone emulation (userAgent/viewport만 Safari 흉내).
  *   - 실제 WebKit+Safari WebGPU 동작은 실기기에서만 정확 측정 가능.
  *   - 본 스크립트는 1차 게이트 — 구조적 회귀(크래시/레이아웃/capability 경로)만 방지.
- *   - 실기기 측정 결과는 docs/reports/p4c-mobile-실기기-YYYYMMDD.md에 별도 기록 필요.
+ *   - 실기기 측정 결과는 docs/reports/p4c-mobile-device-YYYYMMDD.md 에 별도 기록 필요.
  *
  * 사용: node scripts/browser-verify-mobile-p4c.mjs [baseUrl]
  */
@@ -166,7 +166,7 @@ const report = `# P4-C 모바일 1차 검증 — ${new Date().toISOString().slic
 ## 인계
 
 - **실기기 측정 TODO**: iPhone Safari 17.4+ 실물에서 동일 시나리오 측정.
-  실기기 리포트는 \`docs/reports/p4c-mobile-실기기-YYYYMMDD.md\`에 별도 저장.
+  실기기 리포트는 \`docs/reports/p4c-mobile-device-YYYYMMDD.md\`에 별도 저장.
 - iOS Safari WebGPU 활성 조건: iOS 17.4+ (2024-03 이후). 구버전은 WebGL2 barnes-hut 경로.
 `;
 writeFileSync(reportPath, report);

@@ -1,6 +1,6 @@
 # P7-D 실기기 측정 가이드 — iOS Safari 17.4+ Yoshida4 vs VV bench
 
-> **#219 자동화 불가 영역 보조 인프라**. 사용자가 실 기기로 1-step 측정 진행 가능하도록 절차 + URL + 기록 양식 박제. 측정 결과는 본 가이드 옆 신규 리포트 (`p7d-mobile-실기기-<YYYYMMDD>.md`) 로 박제 후 #219 close.
+> **#219 자동화 불가 영역 보조 인프라**. 사용자가 실 기기로 1-step 측정 진행 가능하도록 절차 + URL + 기록 양식 박제. 측정 결과는 본 가이드 옆 신규 리포트 (`p7d-mobile-device-<YYYYMMDD>.md`) 로 박제 후 #219 close.
 
 ---
 
@@ -103,9 +103,9 @@ dev 서버 또는 public URL 뒤에 다음 query parameter 를 붙여 진입:
 
 ## 기록 양식 (사용자가 새 리포트 파일로 박제)
 
-`docs/reports/p7d-mobile-실기기-<YYYYMMDD>.md` 신규 파일로 박제:
+`docs/reports/p7d-mobile-device-<YYYYMMDD>.md` 신규 파일로 박제:
 
-````markdown
+```markdown
 # P7-D 실기기 iPhone Safari 17.4+ 측정 — YYYY-MM-DD
 
 ## 환경
@@ -121,14 +121,14 @@ dev 서버 또는 public URL 뒤에 다음 query parameter 를 붙여 진입:
 
 ### 시나리오 1 — Yoshida4 + N=200
 
-| 측정 # | fps  | 비고                |
-| ------ | ---- | ------------------- |
-| 1 (0s) | <값> | <초기 안정화 직후>  |
-| 2 (12s)| <값> |                     |
-| 3 (24s)| <값> |                     |
-| 4 (36s)| <값> |                     |
-| 5 (48s)| <값> |                     |
-| **평균** | **<평균>** | <DoD 충족 여부> |
+| 측정 #   | fps        | 비고               |
+| -------- | ---------- | ------------------ |
+| 1 (0s)   | <값>       | <초기 안정화 직후> |
+| 2 (12s)  | <값>       |                    |
+| 3 (24s)  | <값>       |                    |
+| 4 (36s)  | <값>       |                    |
+| 5 (48s)  | <값>       |                    |
+| **평균** | **<평균>** | <DoD 충족 여부>    |
 
 ### 시나리오 2 — VV + N=200
 
@@ -140,25 +140,25 @@ dev 서버 또는 public URL 뒤에 다음 query parameter 를 붙여 진입:
 
 ## 비교
 
-| 항목                  | 측정값                      | DoD 기준                 | 판정       |
-| --------------------- | --------------------------- | ------------------------ | ---------- |
-| Yoshida4 vs VV ratio  | <yoshida 평균 / vv 평균>    | ≥ 0.90 (P7-D 에뮬 1.054) | ✅ / ❌    |
-| N=10000 크래시 없음   | <fps>                       | 크래시 안 함             | ✅ / ❌    |
-| WebGPU 경로 활성      | <renderer 박지>             | webgpu                   | ✅ / ❌    |
+| 항목                 | 측정값                   | DoD 기준                 | 판정    |
+| -------------------- | ------------------------ | ------------------------ | ------- |
+| Yoshida4 vs VV ratio | <yoshida 평균 / vv 평균> | ≥ 0.90 (P7-D 에뮬 1.054) | ✅ / ❌ |
+| N=10000 크래시 없음  | <fps>                    | 크래시 안 함             | ✅ / ❌ |
+| WebGPU 경로 활성     | <renderer 박지>          | webgpu                   | ✅ / ❌ |
 
 ## 관찰 사항 (선택)
 
 - 발열 / 배터리 드레인
 - iPhone 회전 / 멀티태스킹 영향
 - Safari WebGPU 의 dropped frame 패턴
-````
+```
 
 ## 측정 완료 후
 
-1. `docs/reports/p7d-mobile-실기기-<YYYYMMDD>.md` 박제 + PR
+1. `docs/reports/p7d-mobile-device-<YYYYMMDD>.md` 박제 + PR
 2. PR 본문에 위 비교 표 인용
 3. **#219 close** + close 코멘트에 본 가이드 + 결과 리포트 cross-link
-4. 본 가이드 (`p7d-mobile-실기기-가이드.md`) 는 향후 R-Phase 별 실기기 재측정 SSoT 로 유지
+4. 본 가이드 (`p7d-mobile-device-guide.md`) 는 향후 R-Phase 별 실기기 재측정 SSoT 로 유지
 
 ## 측정 미수행 시
 

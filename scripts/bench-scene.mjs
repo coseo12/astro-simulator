@@ -11,8 +11,8 @@
  * 현재 지원
  * --------
  * - 시나리오별 FPS (정지/재생/포커스) — browser-verify-perf 시나리오 재사용
- * - JSON 리포트 docs/benchmarks/{timestamp}.json 저장
- * - docs/benchmarks/baseline.json 대비 diff 콘솔 출력
+ * - JSON 리포트 .bench-out/{timestamp}.json 저장 (#905 — gitignored, 커밋 경로 오염 방지)
+ * - docs/benchmarks/baseline.json (tracked) 대비 diff 콘솔 출력
  *
  * N-sweep 모드
  * ------------
@@ -29,8 +29,11 @@ import { pressTimePlay } from './browser-verify-utils.mjs';
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SCENARIO_DURATION_MS = 3_000;
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const benchDir = join(__dirname, '..', 'docs', 'benchmarks');
-mkdirSync(benchDir, { recursive: true });
+// #905 — 타임스탬프 리포트는 gitignored `.bench-out/` 에 기록 (실행마다 커밋 경로에
+// 새 파일이 쌓이던 재발 구조 제거). baseline.json 은 tracked docs/benchmarks/ 유지.
+const outDir = join(__dirname, '..', '.bench-out');
+const baselineDir = join(__dirname, '..', 'docs', 'benchmarks');
+mkdirSync(outDir, { recursive: true });
 
 // #242 — vsync 페그 해소 (P8 선행 인프라).
 // 기존 baseline(#241, ubuntu median N=10) 은 페그 환경 기준이므로, 플래그 추가 후
@@ -124,12 +127,12 @@ const report = {
 };
 
 const slug = timestamp.replace(/[:.]/g, '-');
-const outPath = join(benchDir, `${slug}.json`);
+const outPath = join(outDir, `${slug}.json`);
 writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
 
 // baseline diff — CI 환경 변동성 고려해 임계값은 환경변수로 조정 (기본 -2 fps)
 const regressionThreshold = Number.parseFloat(process.env.BENCH_REGRESSION_FPS ?? '-2');
-const baselinePath = join(benchDir, 'baseline.json');
+const baselinePath = join(baselineDir, 'baseline.json');
 let diffLines = [];
 if (existsSync(baselinePath)) {
   const base = JSON.parse(readFileSync(baselinePath, 'utf8'));

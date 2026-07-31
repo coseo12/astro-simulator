@@ -82,12 +82,11 @@ jobs:
       - name: 리포트 JSON 수거
         run: |
           mkdir -p /tmp/bench-run-${{ matrix.run }}
-          # 이 회차에서 갱신된 JSON 만 분리 (git status 기준 새 파일).
-          # `.json` 확장자 필터로 향후 BENCH_SUMMARY_OUT 류 부산물 오수거 방어
-          # (Reviewer 권고 1).
-          git ls-files --others --exclude-standard docs/benchmarks/ \
-            | grep -E '\.json$' \
-            | xargs -I{} cp {} /tmp/bench-run-${{ matrix.run }}/ || true
+          # #905 — bench-scene 리포트가 gitignored `.bench-out/` 에 기록되므로 직접 수거.
+          # (기존 `git ls-files --others docs/benchmarks/` 는 gitignored 경로를 나열하지 못함.
+          #  CI 는 매 run fresh checkout 이라 .bench-out 전체가 이 회차 산출물.)
+          # `.json` 글롭으로 향후 BENCH_SUMMARY_OUT 류 부산물 오수거 방어 유지 (Reviewer 권고 1).
+          cp .bench-out/*.json /tmp/bench-run-${{ matrix.run }}/ || true
           ls -la /tmp/bench-run-${{ matrix.run }}
 
       - name: 아티팩트 업로드

@@ -68,12 +68,14 @@ tier 전환 시 입력 잠금 + camera dolly + onComplete 콜백 lifecycle 을 �
 일반상대성 1차 후 뉴턴 보정 (1 Post-Newtonian) 식. 수성 근일점 세차 (43''/century) 등 GR 효과를 Newton 적분에 추가. `grMode === 'eih'` 활성 시 적용. `single-1pn` 은 sun-only 단순 항.
 
 - 발화: [`docs/decisions/20260417-general-relativity-1pn.md`](decisions/20260417-general-relativity-1pn.md) (#178/#191 — 파일명 정정 #842)
+- 적분기 선택 아키텍처 (API/URL 파라미터): [`docs/architecture/integrator-selection.md`](architecture/integrator-selection.md) (#905 링크 복구)
 
 ## Yoshida (4th-order symplectic integrator)
 
 해밀턴 시스템 적분기 — velocity-verlet (2차) 대비 에너지 보존성 우수. 모바일에서 perf 비용 ~30% 추가. `integrator: 'yoshida4'` 옵션. 장기 적분 정확성 우선 시.
 
 - 발화: [`docs/decisions/20260418-p7-integrator-upgrade.md`](decisions/20260418-p7-integrator-upgrade.md) (#207 — 파일명 정정 #842)
+- 적분기 선택 아키텍처 (VV ↔ Yoshida4 선택 API): [`docs/architecture/integrator-selection.md`](architecture/integrator-selection.md) (#905 링크 복구)
 
 ## Barnes-Hut (octree-based N-body)
 

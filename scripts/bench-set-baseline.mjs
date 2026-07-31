@@ -12,7 +12,10 @@
 import { copyFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+// baseline*.json (tracked) 은 docs/benchmarks/ 유지, 타임스탬프 리포트는 #905 부터
+// gitignored `.bench-out/` 에서 수거 (bench-scene / bench-webgpu 출력 경로와 정합).
 const dir = join('docs', 'benchmarks');
+const reportDir = '.bench-out';
 const args = process.argv.slice(2);
 
 const tagIdx = args.indexOf('--tag');
@@ -69,11 +72,11 @@ const files = readdirSync(dir)
   )
   .sort();
 
+// #905 — 타임스탬프 리포트는 .bench-out/ 에서 수거 (bench 실행 전이면 디렉토리 자체가 없음)
+const reportFiles = existsSync(reportDir) ? readdirSync(reportDir) : [];
 const candidates = tag
-  ? readdirSync(dir)
-      .filter((f) => f.endsWith('.json') && f.startsWith('p3b-'))
-      .sort()
-  : readdirSync(dir)
+  ? reportFiles.filter((f) => f.endsWith('.json') && f.startsWith('p3b-')).sort()
+  : reportFiles
       .filter(
         (f) =>
           f.endsWith('.json') &&
@@ -90,5 +93,5 @@ if (!candidates.length) {
 
 const latest = candidates.at(-1);
 const dest = tag ? `baseline-${tag}.json` : 'baseline.json';
-copyFileSync(join(dir, latest), join(dir, dest));
+copyFileSync(join(reportDir, latest), join(dir, dest));
 console.log(`${dest} ← ${latest}`);

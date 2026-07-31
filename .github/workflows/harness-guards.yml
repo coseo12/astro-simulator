@@ -59,13 +59,18 @@ jobs:
         if: hashFiles('scripts/verify-release-version-bump.sh') != ''
         run: bash scripts/verify-release-version-bump.sh
 
-      # CLAUDE.md 각인 예산 가드 (#197 Phase 2)
+      # CLAUDE.md 각인 예산 가드 (#197 Phase 2 → #905 fail-fast 복구)
       # 45k chars 초과 시 exit 1 로 감축 PR 을 강제. 35k/40k 는 warn (exit 0).
       # 지침: docs/guides/claudemd-governance.md §3 (정량 게이트)
-      # 다운스트림 가드: lib/verify-claudemd-size.js 본체 부재 시 skip (upstream v3.6.0 lib 배포 누락 대응 — 본 PR #338 임시 패치)
+      # #905: upstream lib/verify-claudemd-size.js 부재 hashFiles silent skip (#338 임시 패치) 을
+      # 제거하고 다운스트림 자체 가드 (scripts/verify-claudemd-size.mjs) 로 교체 — 무조건 실행
+      # (#842 verify-docs-links 동형). 기존 .sh wrapper 는 manifest 등재 (harness-managed) 라
+      # 유지하되 CI 는 경유하지 않는다. self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행).
+      # CLAUDE.md §가드 설계 원칙: drift 가드는 fail-fast 만, fallback 분기 금지.
+      - name: CLAUDE.md 각인 예산 가드 self-test
+        run: node scripts/verify-claudemd-size.mjs --self-test
       - name: CLAUDE.md 각인 예산 가드
-        if: hashFiles('scripts/verify-claudemd-size.sh') != '' && hashFiles('lib/verify-claudemd-size.js') != ''
-        run: bash scripts/verify-claudemd-size.sh
+        run: node scripts/verify-claudemd-size.mjs
 
       # docs 전체 상대 링크 무결성 가드 (#197 Phase 2 → #842 fail-fast 복구)
       # link rot 위험 증가 — 파일 존재 검증. 검사 범위 계약: scripts/verify-docs-links.mjs 헤더 SSoT.
