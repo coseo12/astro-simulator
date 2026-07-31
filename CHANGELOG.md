@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.54.0] — 2026-07-31
+
 ### Behavior Changes
 
 - **[#907] 하네스 동기화 기계장치 제거 + CLAUDE.md 슬리밍 (Phase B/C)** ([#907](https://github.com/coseo12/astro-simulator/issues/907), ADR [20260731-907-harness-decouple](docs/decisions/20260731-907-harness-decouple.md) §결정 3·4·5 집행) — Phase A 결정의 집행. **에이전트 행동 변화**: (1) `harness update` 절차를 더 이상 수행하지 않음 — `/harness-update` 커맨드·`harness:update:safe` 등 package.json scripts 10개·동기화 기계장치 19파일 8,537줄 (manifest / 불변식 가드 A~D / drift 데코레이터 판정 / 원자적 apply 래퍼 / Z 패턴 health / 파생 sync) 전부 제거, (2) HARNESS-DRIFT 데코레이터 박제 의무 소멸 (유지 파일 14건의 데코레이터 1줄 제거), (3) CI 재편 — `harness-guards.yml → project-guards.yml` (harness 전용 3스텝 제거 + 프로젝트 가드 6스텝 유지, 전 스텝 `hashFiles` 조건 제거로 fail-fast 일관 — [#901](https://github.com/coseo12/astro-simulator/issues/901) 흡수), `ci.yml` harness 가드 self-test 3스텝 제거, `prettierignore-drift.yml`·`adr-z-pattern-health-v2.yml` workflow 삭제, (4) `.prettierignore` 는 manifest 파생 자동 생성 → **정적 curated 섹션** 전환 (live 문서 4경로 `!` negation 유지 — ADR [20260419-prettier-harness-conflict](docs/decisions/20260419-prettier-harness-conflict.md) Superseded 전이), (5) CLAUDE.md 슬리밍 36,435 → 33,956 chars (≤35,000 목표 달성, WARN 미발화) — 동기화 전제 섹션 (Z 패턴 TL;DR / harness update 부합성 체크리스트 / prettier 충돌 해결책) 제거 + managed-block 센티널 마커 제거 (프로젝트 소유 전환), 교훈 본문은 docs/lessons 포인터로 보존. glossary "Z 패턴" 은 폐기 표기 (항목 유지 — 이력 추적성).
