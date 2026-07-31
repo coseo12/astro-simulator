@@ -12,9 +12,9 @@ Semantic Versioning을 따른다.
 
 ### Notes (chore — 행동 변화 없음)
 
-- **[#905] next 16.2.3 → 16.2.12 보안 패치 + 전이 의존성 갱신** — next high advisory **11건** (SSRF / Middleware bypass / DoS, Vercel prod runtime 노출면 — `apps/web/proxy.ts` next-intl 실사용) 전부 해소. `pnpm audit` 총 44 → 20 advisories (48 → 21 vulns), **next high 0건**. 잔여 high 12건은 전부 devDependency 체인 (jsdom→undici / vitest→vite / eslint→brace-expansion·js-yaml) 또는 next 자체 고정 버전 (next→sharp·postcss — next major 필요, upstream 대기). minor 범위 lockfile 갱신만이라 Notes 분류 (runtime 이지만 API/행동 계약 무변경 — prod 빌드 + 브라우저 스모크로 검증).
+- **[#905] next 16.2.3 → 16.2.12 보안 패치 + 관련 의존성 갱신** (직접 devDep next-intl ^4.13.4 / 전이 postcss ^8.5.25 등) — next high advisory **11건** (SSRF / Middleware bypass / DoS, Vercel prod runtime 노출면 — `apps/web/proxy.ts` next-intl 실사용) 전부 해소. `pnpm audit` 총 44 → 20 advisories (48 → 21 vulns), **next high 0건**. 잔여 high 12건은 전부 devDependency 체인 (jsdom→undici / vitest→vite / eslint→brace-expansion·js-yaml) 또는 next 자체 고정 버전 (next→sharp·postcss — next major 필요, upstream 대기). minor 범위 lockfile 갱신만이라 Notes 분류 (runtime 이지만 API/행동 계약 무변경 — prod 빌드 + 브라우저 스모크로 검증).
 - **[#905] LICENSE 파일 추가** — PUBLIC repo 가 package.json 에 MIT 선언인데 본문 미부여였던 상태 해소 (MIT 표준 본문, Copyright (c) 2026 coseo12).
-- **[#905] 고아/위생 정리** — `docs/benchmarks` 무참조 19건 제거 (전건 역참조 재확인, baseline 소비 파일 제외) / `docs/report-npx-vs-plugin.md` (336줄 carry-over 고아) 삭제 + `pnpm sync:harnessignore` 재생성 / 한글 파일명 2건 romanized rename (`p4c-mobile-실기기-20260417.md` → `p4c-mobile-device-20260417.md`, `p7d-mobile-실기기-가이드.md` → `p7d-mobile-device-guide.md` — git quotePath 이스케이프로 shell 파이프라인 파손 재현 건) + 참조 3곳 갱신 / `docs/reports/397-residual/output.log` (12KB, refs=0) 제거 / `docs/architecture/integrator-selection.md` 무링크 고아를 glossary EIH/Yoshida 항목에서 링크 복구.
+- **[#905] 고아/위생 정리** — `docs/benchmarks` 무참조 19건 제거 (전건 역참조 재확인, baseline 소비 파일 제외) / `docs/report-npx-vs-plugin.md` (336줄 carry-over 고아) 삭제 + `pnpm sync:harnessignore` 재생성 / 한글 파일명 2건 romanized rename (`p4c-mobile-실기기-20260417.md` → `p4c-mobile-device-20260417.md`, `p7d-mobile-실기기-가이드.md` → `p7d-mobile-device-guide.md` — git quotePath 이스케이프로 shell 파이프라인 파손 재현 건) + 참조 9곳 갱신 (리뷰 후속: 미래 파일명 지시 템플릿 6곳 추가 정정) / `docs/reports/397-residual/output.log` (12KB, refs=0) 제거 / `docs/architecture/integrator-selection.md` 무링크 고아를 glossary EIH/Yoshida 항목에서 링크 복구.
 
 ## [0.53.0] — 2026-07-30
 

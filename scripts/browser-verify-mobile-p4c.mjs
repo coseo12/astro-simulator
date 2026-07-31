@@ -166,7 +166,7 @@ const report = `# P4-C 모바일 1차 검증 — ${new Date().toISOString().slic
 ## 인계
 
 - **실기기 측정 TODO**: iPhone Safari 17.4+ 실물에서 동일 시나리오 측정.
-  실기기 리포트는 \`docs/reports/p4c-mobile-실기기-YYYYMMDD.md\`에 별도 저장.
+  실기기 리포트는 \`docs/reports/p4c-mobile-device-YYYYMMDD.md\`에 별도 저장.
 - iOS Safari WebGPU 활성 조건: iOS 17.4+ (2024-03 이후). 구버전은 WebGL2 barnes-hut 경로.
 `;
 writeFileSync(reportPath, report);
