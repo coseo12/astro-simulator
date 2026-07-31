@@ -108,7 +108,7 @@ jobs:
 
       # #894 upstream baseline 가드 self-test 회귀 가드 (ADR 20260515 Amendment 17).
       # --self-test 는 로컬 픽스처 주입만 사용 (tarball 미다운로드 — **네트워크 미의존**)해
-      # 불변식 (A)(B)(C) 각각의 positive→negative→recovery 3중 시뮬 + managed-block 해시
+      # 불변식 (A)(B)(C)(D) 각각의 positive→negative→recovery 3중 시뮬 + managed-block 해시
       # 충실성 + exit 2(판정 불가) 3경로를 상시 실측한다. 본검사(upstream 원본 대조, 네트워크
       # 사용)는 harness-guards.yml "upstream baseline 가드" 담당 — 두 배선의 역할이 다르다.
       # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.

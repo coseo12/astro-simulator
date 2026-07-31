@@ -1869,7 +1869,8 @@ Amendment 8 이 정의한 drift 판정은 `.harness/manifest.json` 의 `sha256` 
 1. **baseline SSoT 는 upstream 원본(태그된 릴리스)이다.** `.harness/manifest.json` 은 CLI 가 쓰는
    **작업 상태**이지 Z 패턴의 진실 원천이 아니다.
 2. 신규 가드 `scripts/verify-harness-upstream-baseline.mjs` 가 upstream 태그 tarball 을 baseline 으로
-   3 불변식을 **fail-fast** 검증한다:
+   3 불변식을 **fail-fast** 검증한다 _(각주: Amendment 20 (#900) 에서 **(D)** 가 추가되어 현재는 4
+   불변식이다. 본 절은 Amendment 17 시점의 기록으로 보존한다)_:
    - **(A)** upstream 과 다른 managed 파일 → HARNESS-DRIFT 데코레이터 필수 (Amendment 8 정본화)
    - **(B)** 데코레이터 보유 파일 → upstream 과 **실제로 달라야** 함 (stale 데코레이터 차단, 역방향 사각 해소)
    - **(C)** 로컬 ≠ upstream 이면서 CLI 가 `modified-pristine` 으로 판정할 상태 → 즉시 FAIL
@@ -2468,13 +2469,28 @@ managed-block 카테고리 파일: ["CLAUDE.md"] (1건)
 `CLAUDE.md` 의 baseline 가드 판정: `{"status":"identical","hasDecorator":true,"violations":[]}`,
 파일 전체 divergence `true`, 블록 내부 동일 `true` — §결정 4 대로 데코레이터가 유지된다.
 
-> ⚠️ **이 일치는 항등식이 아니다.** (C) 불변식이 성립한 **결과**일 뿐이다. 자매 가드는
-> 로컬↔**manifest** 를, baseline 가드는 로컬↔**upstream** 을 비교한다. `manifest.sha256` 이 낡았는데
-> 로컬 == upstream 인 경우 `differs=false` 라 (C1) 이 발화하지 않고 `drift ⊋ divergent` 가 성립할
-> 수 있다. 항등식으로 만들려면 **불변식 (D) — 모든 upstream-존재 entry 에 대해
-> `manifest.sha256 === categoricalSha256(upstream)`** 이 필요하며, 이는 본 Amendment 의 비목표
-> (baseline 가드 불변식 의미론 변경) 이므로 **후속 이슈로 분리**한다. 근거 없이 지금 넣으면
-> false-fire 위험을 안고 fail-fast 원칙을 훼손한다.
+> ~~⚠️ **이 일치는 항등식이 아니다.**~~ **→ §Amendment 20 (#900) 에서 항등식으로 승격 (경고 → 보증).**
+>
+> <details><summary>원 경고문 (Amendment 19 시점, 이력 보존)</summary>
+>
+> > ⚠️ **이 일치는 항등식이 아니다.** (C) 불변식이 성립한 **결과**일 뿐이다. 자매 가드는
+> > 로컬↔**manifest** 를, baseline 가드는 로컬↔**upstream** 을 비교한다. `manifest.sha256` 이 낡았는데
+> > 로컬 == upstream 인 경우 `differs=false` 라 (C1) 이 발화하지 않고 `drift ⊋ divergent` 가 성립할
+> > 수 있다. 항등식으로 만들려면 **불변식 (D) — 모든 upstream-존재 entry 에 대해
+> > `manifest.sha256 === categoricalSha256(upstream)`** 이 필요하며, 이는 본 Amendment 의 비목표
+> > (baseline 가드 불변식 의미론 변경) 이므로 **후속 이슈로 분리**한다. 근거 없이 지금 넣으면
+> > false-fire 위험을 안고 fail-fast 원칙을 훼손한다.
+>
+> </details>
+>
+> ✅ **보증 (Amendment 20, #900)**: 불변식 (D) 가 도입되어 `manifest.sha256` 은 모든 checked entry
+> 에서 `categoricalSha256(upstream 원본)` 과 같음이 **CI 에서 강제**된다. 두 가드의 비교 우변이
+> 같은 값으로 고정되므로 `drift ⟺ divergent` 는 **공통 스코프 (upstream ∧ 로컬 양쪽 존재) 위의
+> 항등식**이다. 위 경고가 서술한 시나리오 (로컬 == upstream + manifest 낡음) 는 (C1) 의 구조적
+> 사각이지만 (D) 가 단독으로 잡는다 — 실 저장소 사본 주입 실측에서 `drift 8 → 9` / `divergent 8`
+> 이격이 재현되고 (D) 가 exit 1 로 차단함을 확인했다 (§Amendment 20 §3중 시뮬레이션).
+> 경고가 우려한 false-fire 는 발생하지 않는다: (D) 의 좌변은 로컬이 아니라 upstream 이므로
+> 정당한 Phase-1 편집에 **불변**이다 (기각된 대안 (b) 와의 결정적 차이).
 
 ### 회귀 가드
 
@@ -2541,7 +2557,8 @@ reviewer 가 격리 사본에서 `managedSha256()` 의 concat 에서 블록 id �
   fatigue 모수 변화의 서술을 그대로 승계한다. **Phase 2 upstream 기여 압력은 축소되지 않는다.**
   8 은 N=10 바로 아래이므로 다음 Phase-1 변경 2건이면 재발화한다.
 - **후속 분리 (본 Amendment 비범위)**:
-  1. **불변식 (D) 도입** — 교차 가드 수치 관계를 항등식으로 승격 (§실측 스냅샷 C 경고 박스).
+  1. ~~**불변식 (D) 도입**~~ — 교차 가드 수치 관계를 항등식으로 승격 (§실측 스냅샷 C 경고 박스).
+     **→ 완료: §Amendment 20 (#900).**
   2. **upstream 부재 파일의 stale 데코레이터** — `verify-harness-drift-decorator.mjs` 자신이
      `// HARNESS-DRIFT: Z-PATTERN [TODO]` 를 달고 있으나 manifest 미등록 + upstream 부재라 가리킬
      upstream 이 없다 (PR-B 가 정리한 `verify-zombie-check.mjs` 와 동일 클래스). baseline 가드 (B) 는
@@ -2600,3 +2617,262 @@ reviewer 가 격리 사본에서 `managedSha256()` 의 concat 에서 블록 id �
   판단도 정당 (센티널 내부 정당 Phase-1 편집 시 FAIL → self-test 를 저장소 drift 상태에 결합시켜
   "가드가 깨졌다" 와 "저장소에 drift 가 있다" 를 한 신호로 뭉갬). (b) 가 겨냥한 별도 축("재현이
   upstream _실제_ 동작에서 이탈")은 본검사 계층 소관으로 후속 관찰 박제.
+
+---
+
+## Amendment 20 (2026-07-31) — 불변식 (D) 도입: manifest↔upstream 이격 차단으로 `drift == divergent` 항등식화
+
+- 관련 이슈: [#900](https://github.com/coseo12/astro-simulator/issues/900) (선행: [#894](https://github.com/coseo12/astro-simulator/issues/894) PR-A §Amendment 17 불변식 (A)(B)(C) / [#897](https://github.com/coseo12/astro-simulator/issues/897) §Amendment 19)
+- 상태: **Accepted** (cross-validate 2026-07-31 — §교차검증 반영 사항 4축 통합 완료. CLAUDE.md §ADR Status 워크플로)
+
+### 배경 — 우연한 일치를 구조적 보증으로
+
+§Amendment 19 §실측 스냅샷 C 는 자매 가드의 `drift 8` 과 baseline 가드의 `divergent 8` 이
+**원소까지 일치**함을 기록하면서, 동시에 그 일치가 **항등식이 아니라 (C) 성립의 결과**임을
+경고 박스로 명시했다. 두 가드는 서로 다른 축을 본다:
+
+```text
+자매 가드 drift    ⟺ categoricalSha256(로컬) ≠ manifest.sha256        (로컬 ↔ manifest)
+baseline divergent ⟺ categoricalSha256(로컬) ≠ categoricalSha256(upstream)  (로컬 ↔ upstream)
+```
+
+우변이 서로 다른 값이므로, `manifest.sha256` 이 upstream 원본과 이격되는 순간 두 좌변은
+**조용히 갈라진다**. cross-validate (agy, 2026-07-30) 가 이 후속 이슈의 우선순위를 `medium`
+→ **`High`** 로 상향 권고한 근거이기도 하다 — _"누락 시 manifest 갱신 누락 상황에서 drift
+가드와 baseline 가드의 결과가 이격될 수 있다"_.
+
+### 결정
+
+**1. 불변식 (D) 를 baseline 가드에 추가한다.**
+
+```text
+(D) manifest.files[rel].sha256 === categoricalSha256(upstream 원본, rel)
+```
+
+(D) 가 성립하면 위 두 술어의 **우변이 같은 값으로 고정**되므로 좌변이 동치가 된다.
+`drift ⟺ divergent` 는 더 이상 관찰된 우연이 아니라 **CI 가 강제하는 항등식**이다.
+
+**2. (D) 의 적용 범위는 checked 스코프 (upstream ∧ 로컬 양쪽 존재) 다.** (A)(B)(C) 와 동일한
+early-return 을 공유한다.
+
+| 분류              | (D) 적용 | 근거                                                                                                   |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| checked           | ✅       | 항등식의 모수. upstream 원본이 있어 우변이 정의된다                                                    |
+| `downstream-only` | ❌       | upstream 원본 부재 → 우변이 **정의되지 않음** (범위 밖, #894 PR-B 정합)                                |
+| `missing-locally` | ❌       | 자매 가드도 로컬 부재 entry 를 drift 판정에서 제외 → 모수 밖. CLI 는 `added` 로 분류해 덮어쓰기 위험 0 |
+
+> **과장하지 않는 서술**: (D) 가 보장하는 항등식의 모수는 **공통 스코프**다. downstream-only
+> entry 가 존재하면 그쪽은 drift 에만 계상되어 `drift ⊇ divergent` 가 된다. 현재 저장소는
+> `.harnessignore` (#894 PR-B) 로 `downstreamOnly=0` 이라 **원시 카운트까지** 일치한다.
+> self-test 가 이 경계를 그대로 고정한다 (downstream-only drift 주입 시 `drift = divergent + 1`).
+
+**3. `(C1)` 은 `(D)` 의 진부분집합이다.**
+
+`C1 = differs ∧ baseSha === locShaCat` 이므로 `baseSha === locShaCat ≠ upShaCat ⟹ baseSha ≠ upShaCat`
+= (D) 위반. **역은 성립하지 않는다** — 로컬 == upstream 인데 manifest 만 낡은 경우 `differs=false`
+라 (C1) 은 **구조적으로 발화 불가**하고 오직 (D) 만 잡는다. 이것이 §Amendment 19 경고 박스가
+예고한 `drift ⊋ divergent` 시나리오이며 (D) 의 존재 이유다.
+
+**4. 기각된 대안 (b) 와의 관계 — 더 강한 형태의 승계.**
+
+#899 reviewer 가 제안한 (b) (`categoricalSha256(로컬) === manifest.sha256`) 는 **정당한 Phase-1
+편집마다 false-fire** 하여 기각됐다 (drift 자체를 금지하는 자기모순). (D) 는 좌변이 로컬이 아니라
+**upstream** 이므로 로컬만 바뀌는 Phase-1 편집에 **불변**이다. (b) 가 겨냥한 진짜 축 — "manifest
+기록이 upstream 실제 값에서 이탈" — 을 false-fire 없이 닫는다. §Amendment 19 가 "본검사 계층
+소관으로 후속 관찰 박제" 라 기록한 항목의 이행이다.
+
+**5. `--mode=repair` 를 (D) 위반까지 확장한다.** 판단 근거 4축:
+
+1. **교정 동작이 동일** — (C1) 의 복원이 이미 `sha256 → upstream 원본 해시` 이고 이것이 (D) 를
+   성립시키는 유일한 write 다. (C1) ⊊ (D) 이므로 정의역의 자연스러운 확장이지 새 동작이 아니다.
+2. **사용자 수정 손실 위험 0** — repair 는 `.harness/manifest.json` **만** write 한다. divergent
+   파일 본문은 읽기만 한다 (self-test 가 repair 전후 로컬 파일 해시 불변으로 실증).
+3. **덮어쓰기 위험을 오히려 낮춘다** — upstream `diffAgainstPackage()` 는 `userSha === pkgSha →
+identical` 을 **먼저** 판정하므로, `baseSha = pkgSha` 복원 후에는 그 다음 분기
+   `userSha === baseSha → modified-pristine` (= `--apply-all-safe` 자동 덮어쓰기) 이 **도달 불가**가
+   된다. 수정된 파일은 `divergent` 로 올바르게 분류된다.
+4. **차기 버전 업데이트 의미론 정상화** — 4.5.0 → 4.6.0 시 `baseSha` 는 "직전에 준 원본" 을
+   뜻해야 하고 upstream 4.5.0 해시가 정확히 그 값이다. 세탁된 로컬 해시가 baseline 이면 이 판정이
+   통째로 무너진다 (그것이 #894 P0 였다).
+
+**`previousSha256` 은 (C) 위반 entry 에서만 제거한다.** `previousSha256 === 로컬 해시` 는 (C2)
+롤백 오탐 시그니처라 봉인이 필요하지만, (D) 단독 위반 entry 의 `previousSha256` 은 오탐
+시그니처가 아니다. 자가복구 정보의 과잉 파괴를 피하고 기존 (C) 경로 동작을 그대로 보존한다.
+
+**6. fail-fast — malformed entry 는 silent skip 하지 않는다.** `sha256` 문자열이 없으면 등식은
+거짓으로 확정이므로 (D) 위반이다. 자매 가드는 같은 상황에서 throw 하지만 (판정 불가), 본 가드는
+upstream 원본이라는 **정답을 알고 있어 판정이 가능**하다 — "판정 불가(exit 2)" 가 아니라
+"불변식 위반(exit 1)" 이 맞고 repair 로 교정까지 된다 (§Amendment 19 §결정 3 정합).
+
+**7. manifest 읽기 규약을 자매 가드와 일치시킨다.** `detectDriftFiles()` 는
+`typeof entry === 'string' ? entry : entry?.sha256` 로 읽는다. 본 가드가 legacy 문자열 스키마를
+못 읽으면 같은 manifest 를 놓고 두 가드가 **다른 값을 비교**하게 되어, 항등식이 값이 아니라
+**읽기 계층**에서 먼저 깨진다. `manifestSha()` 헬퍼로 규약을 통일했다.
+
+### (D) 위반 실측 (measurement-first)
+
+착수 전 현행 저장소 전수 측정. **위반 0건 — 95/95 성립.**
+
+```json
+{
+  "mode": "verify",
+  "baselineVersion": "4.5.0",
+  "manifestEntries": 95,
+  "checked": 95,
+  "identical": 87,
+  "divergent": 8,
+  "downstreamOnly": 0,
+  "missingLocally": 0,
+  "invariantViolations": 0,
+  "invariantViolationsByCode": {},
+  "commit": "62b52ffb4025cce6590e0292cd0b97d615191878"
+}
+```
+
+**이 0 자체가 결론이다** — 현재는 이격이 없으며 (D) 는 **회귀 방지 가드**다. PR-A (§Amendment 17)
+가 `--mode=repair` 로 세탁된 8건의 baseline 을 upstream 값으로 복원해둔 상태가 (D) 를 이미
+만족시키고 있었다. 따라서 도입 시 `--mode=repair` 실행이 **불필요**했고 manifest 는 무변경이다.
+
+**managed-block (`CLAUDE.md`) 별도 확인 — (D) 성립.**
+
+| 값                             | 해시 (앞 12자) |
+| ------------------------------ | -------------- |
+| `manifest.sha256`              | `0395d6bb7c53` |
+| `categoricalSha256(upstream)`  | `0395d6bb7c53` |
+| `categoricalSha256(로컬)`      | `0395d6bb7c53` |
+| plain sha256 (upstream) — 참고 | `2ab046718471` |
+| plain sha256 (로컬) — 참고     | `c9e2b2b4583f` |
+
+(D) 는 **categorical 도메인 위의 등식**이므로 managed-block 에서는 센티널 내부만 요구한다.
+블록 밖 다운스트림 고유 섹션이 아무리 커도 (D) 는 영향받지 않는다 — 그래서 성립한다.
+만약 (D) 를 plain sha256 으로 정의했다면 `CLAUDE.md` 는 **영구 위반**이 됐을 것이다
+(§Amendment 19 가 자매 가드에서 제거한 결함과 동일 시그니처). self-test 가 이 두 축을 각각
+고정한다 (`upShaFile !== locShaFile` ∧ `upSha === locSha`).
+
+### 3중 시뮬레이션 (CLAUDE.md §가드 도입 PR DoD 4축)
+
+**(1) 격리 동적 테스트** — 실 저장소를 `git ls-files` 사본(811 파일)으로 격리 후 주입.
+
+| 단계         | 주입                                                         | 자매 drift | baseline divergent | baseline exit |
+| ------------ | ------------------------------------------------------------ | ---------- | ------------------ | ------------- |
+| positive     | 없음 (원본)                                                  | 8          | 8                  | 0             |
+| **negative** | identical 파일 1건의 `manifest.sha256` → `0×64` (stale 시뮬) | **9**      | **8**              | **1** (`D:1`) |
+| recovery     | `--mode=repair --apply`                                      | 8          | 8                  | 0             |
+
+**negative 행이 경고 박스가 예고한 이격의 실측 재현이다.** 로컬 == upstream 이라 `differs=false`
+→ (C1) 미발화 → **(D) 도입 전이었다면 모든 가드가 초록인 채 `drift ⊋ divergent` 이격 성립**.
+(D) 가 exit 1 로 차단하고 repair 가 1 entry 복원(`00000000 → 68106c6b`)으로 항등식을 되돌린다.
+
+**(2) 가드 조항 자체의 negative 주입** — 격리 사본에서 코드를 직접 훼손해 self-test 가 실제로
+검출하는지 확인 (죽은 코드 아님 실증).
+
+| 주입                                                                                  | self-test 결과     | 검출된 assertion                                                 |
+| ------------------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| `managedSha256` 직렬화에서 블록 id 제거 (`` `${b.id}\n${b.content}` `` → `b.content`) | **7 FAIL** (68/75) | `D positive` 골든 벡터 / `D managed-block` / `D 항등식 positive` |
+| (D) 검사 조건을 `false` 로 무력화                                                     | **7 FAIL** (68/75) | `D negative` / `D 봉인 (C1⊊D)` / `D fail-fast` / repair 3종      |
+| 주입 원복                                                                             | **75 PASS**        | —                                                                |
+
+첫 행이 #899 reviewer 가 적발한 **자기참조 사각의 (D) 판이 봉인됐음**을 실증한다 — 포팅이
+upstream 규약에서 이탈하면 골든 벡터의 **우변만** 변해 FAIL 한다.
+
+**(3) self-test 증분** — baseline 가드 **51 → 75** assertion (+24). 자매 가드 95 / harnessignore 31 /
+래퍼 23 / todo 36 / z-pattern / zombie 6 / dead-wait 18 / docs-links 11 **전건 무회귀**.
+
+### 회귀 가드 — self-test 외부 앵커 설계
+
+(D) 의 self-test 는 **기대값을 구현에서 얻지 않는다.** 픽스처 manifest 값을
+`categoricalSha256()` 호출로 만들면 그 함수가 이탈해도 좌·우변이 함께 움직여 영원히 PASS 하기
+때문이다 (#899 자기참조 사각과 동일 시그니처). upstream 직렬화 규약을 **손으로 전개한 바이트열의
+해시 상수**를 앵커로 쓴다:
+
+```text
+atomic        D_ATOMIC_BYTES = '---\nname: pm\n---\nupstream-d-anchor\n'   (35 bytes)
+              D_ATOMIC_SHA   = sha256(D_ATOMIC_BYTES)
+                             = 37c75c66660b9b7e9dd25f43fe3dd0057bb9494a075e1cd7b2a6fa39b1d734ef
+
+managed-block 블록 1개 { id: 'd-blk', content: 'DCORE' }
+              → 직렬화 = `${id}\n${content}` 를 '\n---\n' 로 join = 'd-blk\nDCORE'   (11 bytes)
+              D_MB_SHA = sha256('d-blk\nDCORE')
+                       = 4f7540a6f73d9189dad0583084d1b8f4c2c3cd2c8c598cd4743b3dc4a1b18138
+```
+
+provenance assertion (상수 == 리터럴의 해시 ∧ 바이트 길이) 을 함께 두어 상수 자체의 오타도
+잡는다. 상수 갱신은 **upstream 규약 자체가 바뀔 때만** 정당하며 그때도 유도를 다시 전개해
+재계산한다 (§Amendment 19 §수치 박제 규약 (i)).
+
+추가로 **항등식 assertion 은 두 가드의 실구현을 대조**한다 — 좌변은 자매 가드의
+`detectDriftFiles()`, 우변은 본 가드의 `runVerify()`. 합성 픽스처에 같은 함수를 두 번 적용하는
+자기참조가 아니라 **독립된 두 구현 사이의 관계**를 고정하므로, 어느 한쪽이 이탈하면 발화한다.
+본검사 경로는 자매 가드를 호출하지 않는다 (두 가드의 독립성 유지 — self-test 한정 import).
+
+### 결과 / 후속
+
+- **manifest 무변경.** (D) 위반이 0이라 repair 실행이 불필요했다. alert fatigue 모수 `drift 8`
+  불변, **N=10 임계 불변**. Phase 2 upstream 기여 압력 변화 없음.
+- **행동 변화**: `--mode=verify` 가 (D) 를 검사하고 위반 시 exit 1. `--mode=repair` 의 복원 대상이
+  `C1/C2` → `C1/C2/D` 로 확장. 출력 라인에 `D:<n>` 추가.
+- **후속 (본 Amendment 비범위)** — §Amendment 19 §결과/후속 2~5 는 그대로 유효하다.
+  1. **`downstreamOnly > 0` 회귀 시 항등식 모수 축소** — 현재 `.harnessignore` 가 0 을 유지하지만,
+     이 값이 늘면 원시 카운트 일치가 깨진다 (항등식 자체는 공통 스코프에서 유지). 비차단 관찰 항목.
+  2. **legacy 문자열 entry 의 repair** — 현재는 fail-fast throw + 재생성 안내. upstream
+     `buildManifest()` 가 항상 객체를 쓰므로 실사례 0이며, 발생 시 스키마 정규화 여부는 별도 판단.
+
+### 교차검증 반영 사항
+
+**수행 완료 (agy architecture 모드, L1/L3 가드, 2026-07-31)** — 로그
+`.claude/logs/cross-validate-architecture-20260731-024410.log`. 명시 질문 3건 + 6대 기준 평가.
+총평: _"설계·실증·예외 처리·테스트 앵커까지 무결하게 작성된 우수한 ADR"_ — **Accepted 전이 승인 권고,
+이견·기각 0건.**
+
+**합의 (즉시 신뢰)**
+
+- **Q1 — "(D) 위반 0" 은 YAGNI 가 아니다.** _"YAGNI 는 미래에 혹시 필요할지 모를 비즈니스 기능의
+  오버엔지니어링을 경계하는 원칙이지 **시스템 무결성을 붕괴시키는 정적 사각지대 방치**를 의미하지
+  않는다."_ 판단 기준으로 (i) 위험의 심각성 — (D) 부재 시 stale 해시 주입에서 `differs=false` 로
+  (C1) 이 미발화해 **모든 가드 초록인 채 이격이 조용히 성립** (ii) 실효성 — negative 주입에서 7 FAIL
+  로 감지되므로 "발화하지 않는 죽은 코드" 가 아니라 **동작하는 회귀 방어선** (iii) ROI — manifest
+  변경 0 + 기존 해시 계산 재활용이라 런타임 오버헤드 거의 0. 세 축 모두 충족.
+- **Q2 — repair 정의역 확장은 100% 옳다.** (D) 단독 위반의 물리적 의미는 _"로컬 소스코드와 upstream
+  원본은 토시 하나 안 틀리고 완전 일치하는데, 오직 장부(manifest) 기록만 혼자 딴소리를 하고 있는
+  상태"_ 다. manifest 의 존재 목적이 "upstream 원본 해시의 기준점 기록" 이므로, 로컬 == upstream 인
+  상황에서 manifest 만 다르면 **100% 확률로 manifest 가 stale 하거나 훼손된 것**이며 upstream 해시로
+  복구하는 것이 정의상 유일한 정답. "upstream 이 잘못된 시나리오" 는 이 조건 하에서 성립 불가.
+- **Q3 — 항등식화는 직교성 상실이 아니라 false independence 제거.** (D) 이전에는 두 가드가 서로 다른
+  곳을 보기 때문에 manifest 가 오염되면 **서로 다른 결론을 내면서도 원인을 알 수 없는 착시**가
+  발생했다. (D) 는 두 축의 매개체인 manifest 의 기준점을 upstream 에 고정하는 역할이며, 축 자체는
+  여전히 다르다 (로컬↔manifest / 로컬↔upstream). 엣지: `downstream-only > 0` 이면 원시 카운트는
+  `drift >= divergent` 가 되나 본 Amendment 가 `checked` 스코프 항등식으로 정확히 정의했으므로
+  논리적 헛점 없음.
+- 6대 기준: 구조적 완성도 ★5 / 기술 결정 타당성 ★5 (대안 (b) 의 Phase-1 false-fire 파악 후 기각이
+  합리적, categorical 채택으로 `CLAUDE.md` 영구 오탐 방지) / 인터페이스 명확성 ★4.5 (`manifestSha()`
+  헬퍼로 자매 가드와 파싱 레이어 일치, malformed 를 silent skip·generic error 가 아닌 불변식 위반으로
+  확정) / 확장성 ★4.5 / 보안·무결성 ★5 (repair 가 사용자 소스를 1바이트도 안 건드림) / 누락 ★4.5.
+
+**고유 발견 2건 — 수용**
+
+1. **self-test 상수 재계산 방법을 코드 주석에 명시** — `D_ATOMIC_SHA`/`D_MB_SHA` 가 upstream 직렬화
+   규약과 tightly-coupled 이므로, 규약 변경 시 재계산 절차(유도식·명령)를 상수 정의부에 남길 것.
+   → 본 Amendment §self-test 외부 앵커의 유도 블록이 이미 그 역할을 하며, 상수 정의부 주석에도
+   동일 유도를 박제한다.
+2. **CLI 리포트 가독성** — exit 시 `D:<n>` 표기만으로는 의미가 전달되지 않으므로 _"Invariant (D)
+   violation (manifest ↔ upstream mismatch)"_ 요약 라인을 함께 출력할 것. → 후속 편승 대상으로
+   기록 (동작 영향 0, 진단 가독성 개선).
+
+**Claude 편향 셀프 체크 (4종)**
+
+- 낙관적 일정: 통과 (upstream 의존 없음, manifest 변경 0).
+- 결합 간과: **통과 — 단 reviewer 가 범위를 확장했다.** dev 는 negative 를 "identical 1건 sha 변조"
+  로만 설계했으나, reviewer 가 **divergent 파일의 manifest sha 를 제3의 값으로 변조**하는 S1 을
+  추가 주입해 develop 에서 (C1)(C2) 모두 미발화로 **조용히 통과**함을 실측 — **(D) 가 닫는 범위가
+  dev 서술보다 넓다**. 또한 `previousSha256` 보존의 "미래 C2 오탐 통로" 가능성도 주입 검증 후
+  성립 불가 확인.
+- 폐기 프레이밍: 통과 (대안 (b) 기각이 false-fire 실측 근거, agy 도 동의).
+- 순수주의: 통과 — self-test 외부 앵커가 Amendment 19 의 자기참조 사각을 재발시키지 않음을
+  reviewer 가 골든 벡터 직접 계산 + 항등식 assertion 순환 부재(호출 그래프 상 상호 호출 0)로 확인.
+
+**기각 0건.**
+
+> **부수 — reviewer 의 결정적 실증**: dev 는 "(D) 없었으면 전 가드 초록" 을 서술로만 주장했으나,
+> reviewer 가 `origin/develop` 스크립트를 **실제 로드해 같은 픽스처에 실행**했다 — develop 은
+> 불변식 위반 `[]`(초록)인데 PR head 는 `["D"]`(exit 1). 서술이 아니라 **두 리비전의 동작 차이**로
+> (D) 의 가치가 입증됐다.
