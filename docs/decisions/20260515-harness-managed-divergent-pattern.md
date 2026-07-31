@@ -1,8 +1,10 @@
 # ADR: harness-managed 파일의 프로젝트 고유 확장 + upstream 기여 병행 패턴
 
 - 일자: 2026-05-15
-- 상태: Accepted
+- 상태: Superseded (by [20260731-907-harness-decouple.md](20260731-907-harness-decouple.md), 2026-07-31, #907)
 - 관련: 이슈 [#463](https://github.com/coseo12/astro-simulator/issues/463), 선행 이슈 [#455](https://github.com/coseo12/astro-simulator/issues/455) / PR [#466](https://github.com/coseo12/astro-simulator/pull/466), volt [#23](https://github.com/coseo12/volt/issues/23) / [#29](https://github.com/coseo12/volt/issues/29), CLAUDE.md §"매니페스트 최신 ≠ 파일 적용 완료"
+
+> **Superseded (2026-07-31, #907)**: 하네스 디커플 결정 ([20260731-907-harness-decouple.md](20260731-907-harness-decouple.md)) 으로 Z 패턴 (X+Y 병행) 자체가 폐기되었다 — 본문·Amendment 1~20 은 이력 보존을 위해 불변 유지한다.
 
 ## 배경
 
