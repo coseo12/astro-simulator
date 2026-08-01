@@ -57,8 +57,10 @@ screenshots/
 
 # 검증 스크립트 산출물 재누적 차단 (#909) — browser-verify-762-monotonic.mjs 의 OUT_DIR 기본값이
 # tracked 디렉토리 docs/reports/762-monotonic/ 을 가리켜 (shader-pixel-guard CI artifact 업로드 경로 정합)
-# 로컬 실행 시 qa-762-*.png 가 untracked 오염으로 누적. ADR embed 정당 커밋 (762-*.png) 은 tracked 유지.
-docs/reports/762-monotonic/qa-762-*.png
+# 로컬 실행 시 qa-762-*.png (시나리오 캡처) + qa-762-monotonic-result.json (L274 무조건 write) 이
+# untracked 오염으로 누적. 확장자 무관 qa-762-* 전체 커버 (PR #916 리뷰 차단 해소 — .png 만으론 JSON 누락).
+# ADR embed 정당 커밋 4건은 전부 762- 접두 (qa-762- 아님) 라 그림자 위험 0.
+docs/reports/762-monotonic/qa-762-*
 
 # QA 회귀 가드 아티팩트 (p329-qa-focus-lod-guard.mjs 산출물 등)
 apps/web/scripts/__artifacts__/
