@@ -38,7 +38,7 @@ page.on('console', (m) => {
 });
 page.on('pageerror', (e) => pageErrors.push(e.message));
 
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
 
 for (const t of targets) {

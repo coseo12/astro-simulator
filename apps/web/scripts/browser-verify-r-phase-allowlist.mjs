@@ -51,14 +51,14 @@
  *
  * 사용법:
  *   node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
- *   BASE_URL=http://localhost:3000/ko node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
+ *   BASE_URL=http://localhost:3000 node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
  *
  * dev 빌드 의존: `window.__simStore` / `window.__solarScene` / `window.__simCore` (sim-canvas.tsx).
  */
 
 import { chromium } from 'playwright';
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
+const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
 /**
  * 현재 R-Phase 박제값 (R1 sun + R2 mercury + R3 venus + R4 earth + moon + R5 mars + phobos + deimos).

@@ -4,7 +4,7 @@
 
 태양계를 기점으로 근거리 항성, 은하, 관측가능우주까지 연속 스케일로 탐험 가능하며, 관측 데이터 기반의 정확성과 가상 실험의 자유도를 동시에 제공한다.
 
-**🌐 라이브 데모: <https://astro-simulator-web.vercel.app/ko>**
+**🌐 라이브 데모: <https://astro-simulator-web.vercel.app>**
 
 ![Solar System](./docs/screenshots/01-solar-system.png)
 

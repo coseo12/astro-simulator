@@ -51,7 +51,7 @@ const check = (name, pass, detail = '') => {
 
 // ===== 0. WebGPU capability 감지 =====
 console.log('\n[0/3] WebGPU capability 감지');
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 const hasAdapter = await page.evaluate(async () => {
   if (!navigator.gpu) return false;
   try {
@@ -71,7 +71,7 @@ check('navigator.gpu adapter 획득', true);
 
 // ===== 1. 정적: engine=webgpu URL 진입 =====
 console.log('\n[1/3] 정적 — engine=webgpu 진입');
-await page.goto(`${baseUrl}/ko?engine=webgpu&belt=2000`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?engine=webgpu&belt=2000`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000); // Babylon 초기화 + scene mount
 
 // HUD 우상단 뱃지에서 직접 읽는다. body textContent는 인접 뱃지와 합쳐져

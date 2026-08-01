@@ -20,7 +20,7 @@ beforeEach(() => {
   writeText.mockClear();
   // @ts-expect-error — jsdom navigator.clipboard 주입
   navigator.clipboard = { writeText };
-  window.history.replaceState({}, '', '/ko');
+  window.history.replaceState({}, '', '/');
 });
 
 describe('BookmarkButton', () => {

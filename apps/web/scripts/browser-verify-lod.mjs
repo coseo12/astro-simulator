@@ -111,7 +111,7 @@ console.log(`baseUrl: ${baseUrl}`);
 console.log(`updateBaseline: ${updateBaseline}`);
 console.log(`threshold: max diff < ${MAX_DIFF_PCT_THRESHOLD}%\n`);
 
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 
 // __solarScene 노출 확인

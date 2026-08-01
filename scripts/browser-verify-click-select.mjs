@@ -75,7 +75,7 @@ const bodyScreenXY = (id) =>
   }, id);
 
 console.log('\n[1/3] 정적 — 로드 + 캔버스');
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);
 check('Babylon 캔버스 표시', (await page.locator('[data-testid="sim-canvas"]').count()) === 1);
 check('초기 콘솔 에러 없음', errs.length === 0, errs.join(' | '));

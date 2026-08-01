@@ -6,9 +6,9 @@
  * WebGPU 가용성이 다르며, lavapipe/dawn이 없으면 macOS는 Metal, Linux는 Vulkan 경유.
  *
  * 측정 시나리오 (각각 play-1y, 3초 측정):
- *   /ko?engine=newton&belt=N
- *   /ko?engine=barnes-hut&belt=N
- *   /ko?engine=webgpu&belt=N
+ *   /?engine=newton&belt=N
+ *   /?engine=barnes-hut&belt=N
+ *   /?engine=webgpu&belt=N
  * for N in [1000, 5000, 10000]
  *
  * 결과: .bench-out/p3b-{timestamp}.json (#905 — gitignored) + console 표
@@ -66,7 +66,7 @@ const measureFps = (d) =>
   );
 
 // WebGPU capability 사전 확인
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 const isWebGpu = await page.evaluate(() => 'gpu' in navigator);
 console.log(`navigator.gpu present: ${isWebGpu}`);
@@ -108,7 +108,7 @@ for (const engine of ['newton', 'barnes-hut', 'webgpu']) {
       rows.push({ engine, belt, fps: null, gpuMs: null, skipped: true });
       continue;
     }
-    const url = `${baseUrl}/ko?engine=${engine}&belt=${belt}&beltNbody=1&gpuTimer=1`;
+    const url = `${baseUrl}/?engine=${engine}&belt=${belt}&beltNbody=1&gpuTimer=1`;
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
     // P7-E #210 — silent-fail 방지.

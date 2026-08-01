@@ -1,0 +1,78 @@
+name: auto-close-issues
+
+# #915 범위 4 — base=develop 머지 시 이슈 auto-close.
+#
+# 배경 (docs/ops/operational-friction.md §1): GitHub 의 `Closes #N` auto-close 는
+# **default branch (main) 머지에서만** 발동한다. 본 저장소 feature/fix PR 은 base=develop
+# 이라 구조적 미발동 → 매 머지마다 수동 close 규약을 반복했다. 본 workflow 가 머지 이벤트에서
+# PR 본문의 close 키워드를 파싱해 이슈 close + PR 링크 코멘트를 박제한다 (수동 close 규약 대체).
+#
+# 파싱 SSoT: scripts/auto-close-issue-parser.mjs (GitHub 공식 키워드 9종 미러링).
+# self-test 는 (1) 본 workflow 사용 직전 + (2) ci.yml detect-and-test 상시 배선 이중화
+# (#897 교훈 — CI 미배선 self-test 는 0회 실행).
+#
+# ⚠ workflow_dispatch 2단계 함정과 동형 (CLAUDE.md §workflow_dispatch 2단계 함정):
+# pull_request closed 트리거는 base 브랜치에 반영된 workflow 정의를 사용하므로, 본 workflow
+# 를 도입하는 PR 자신의 머지에서는 실발동이 구조적으로 불가. 실발동 실증은 develop 반영 후
+# 다음 머지 PR (#915 PR-2) 에서 확인한다 (도입 PR 본문 DoD 에 박제).
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [develop]
+
+# GITHUB_TOKEN 최소 권한 — 이슈 close + 코멘트 (contents:read 는 checkout 용)
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  close-linked-issues:
+    # merged==true 만 — 단순 close (미머지) 는 이슈를 닫지 않는다
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 사용 직전 파서 자기 검증 — 파서 회귀 시 오발동 close 대신 fail-fast
+      - name: 파서 self-test
+        run: node scripts/auto-close-issue-parser.mjs --self-test
+
+      - name: PR 본문 close 키워드 파싱 → 이슈 close + 코멘트
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # ${{ }} 를 run 스크립트에 직접 보간하지 않고 env 로 우회 — script injection 차단 표준 패턴
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          printf '%s' "$PR_BODY" > /tmp/pr-body.txt
+          mapfile -t issues < <(node scripts/auto-close-issue-parser.mjs --body-file /tmp/pr-body.txt)
+          if [ "${#issues[@]}" -eq 0 ]; then
+            echo "close 키워드 대상 이슈 없음 — no-op"
+            exit 0
+          fi
+          for n in "${issues[@]}"; do
+            # PR/이슈 판별 — Issues API 는 PR 도 이슈 네임스페이스에 포함하므로 `gh issue view` 는
+            # PR 번호에도 exit 0 + state 를 반환한다 (PR #917 리뷰 실측, gh 2.88.1 — 판별 불가).
+            # 결정적 판별: 응답의 `pull_request` 키 존재 = PR = 스킵 (REST API 계약).
+            # 미존재 번호는 gh api 404 exit 비-0 → 스킵. 단일 호출로 판별 + state 동시 확보.
+            if ! meta=$(gh api "repos/$REPO/issues/$n" 2>/dev/null); then
+              echo "skip: #$n 조회 실패 (미존재 등)"
+              continue
+            fi
+            if jq -e 'has("pull_request")' <<< "$meta" > /dev/null; then
+              echo "skip: #$n 은 PR (pull_request 키 존재 — 오발동 close 차단)"
+              continue
+            fi
+            state=$(jq -r .state <<< "$meta")
+            if [ "$state" = "open" ]; then
+              # 진짜 close 실패 (권한 등) 는 step 실패로 표면화 (fail-visible — 조용한 미발동 금지)
+              gh issue close "$n" --repo "$REPO" \
+                --comment "PR #${PR_NUMBER} 머지로 자동 close — ${PR_URL} (#915 auto-close workflow. base=develop 는 GitHub 기본 auto-close 미발동이라 본 workflow 가 대체)."
+              echo "closed: #$n"
+            else
+              echo "skip: #$n state=$state (open 아님)"
+            fi
+          done

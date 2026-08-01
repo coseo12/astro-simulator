@@ -122,7 +122,7 @@ const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
 // ─── S6: 소프트웨어 렌더 게이트 (#745, ★ 환경 분기 + fps 무회귀 핵심) ──────────────
 // software/하드웨어 양쪽 assertion. 환경 판정 (isSoftwareEnv) 으로 이후 S1~S5 mesh 의존 검사를 gate.
 console.log('\n[S6] 소프트웨어 렌더 게이트 (#745) — __isSoftwareRenderer / __starfieldVisible');
-await page.goto(`${baseUrl}/ko?stars=on`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?stars=on`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(3000);
 const g = await probeStarfieldGlobals();
 check(
@@ -163,10 +163,10 @@ console.log('\n[S1] 별 가시 — starfield ON 화면이 OFF (단색) 보다 �
 if (isSoftwareEnv) {
   skip('S1 별 가시', 'software 환경 (별 비활성 정상) — S6 software 게이트가 대체 검증');
 } else {
-  await page.goto(`${baseUrl}/ko?stars=off`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?stars=off`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
   const offStats = await brightPixelStats('s1-stars-off');
-  await page.goto(`${baseUrl}/ko?stars=on`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?stars=on`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
   const onStats = await brightPixelStats('s1-stars-on');
   check(
@@ -219,7 +219,7 @@ async function runMeshDependentScenarios() {
   );
 
   // earth focus — tier 전환 (floating-origin shift).
-  await page.goto(`${baseUrl}/ko?focus=earth`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?focus=earth`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3500);
   const C = await probeStar();
   const tierDelta = !A.error && !C.error ? dist(A.screen, C.screen) : Infinity;
@@ -246,7 +246,7 @@ async function runMeshDependentScenarios() {
 
   // ─── S4: ?stars=off 비가시 ────────────────────────────────────────────────────
   console.log('\n[S4] ?stars=off — starfield mesh 미생성');
-  await page.goto(`${baseUrl}/ko?stars=off`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?stars=off`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
   const offProbe = await page.evaluate(() => {
     const solar = window.__solarScene;
@@ -262,7 +262,7 @@ async function runMeshDependentScenarios() {
 
   // ─── S5: picking 비간섭 ───────────────────────────────────────────────────────
   console.log('\n[S5] picking 비간섭 — starfield mesh isPickable=false (scene.pick 별 hit 0)');
-  await page.goto(`${baseUrl}/ko?stars=on`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?stars=on`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
   const pickProbe = await page.evaluate(() => {
     const solar = window.__solarScene;

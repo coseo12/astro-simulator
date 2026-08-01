@@ -70,7 +70,7 @@ jobs:
           pnpm --filter @astro-simulator/web start -p 3001 &
           echo "WEB_PID=$!" >> $GITHUB_ENV
           for i in {1..30}; do
-            if curl -sf http://localhost:3001/ko > /dev/null; then break; fi
+            if curl -sf http://localhost:3001/ > /dev/null; then break; fi
             sleep 2
           done
 

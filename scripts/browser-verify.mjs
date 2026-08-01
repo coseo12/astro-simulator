@@ -7,7 +7,7 @@
  *
  * Level 1 정적:    콘솔 에러 없음, canvas/HUD 렌더
  * Level 2 인터랙션: ping 버튼 동작
- * Level 3 흐름:    ko/en 전환, URL 동작
+ * Level 3 흐름:    / 직접 200 + /ko 308 하위호환, URL 동작
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -39,7 +39,7 @@ page.on('pageerror', (err) => pageErrors.push(err.message));
 
 // ===== Level 1: 정적 =====
 console.log('\n[Level 1] 정적 검증');
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500); // Babylon 초기화 대기
 
 // HUD 텍스트 확인
@@ -153,27 +153,39 @@ if (canvas) {
 check('캔버스 드래그 후 런타임 에러 없음', pageErrors.length === 0);
 
 // ===== Level 3: 흐름 =====
+// (#908) i18n 제거 — 한국어 단일. / 직접 200 (리다이렉트 hop 0) + /ko 는 308 하위호환.
 console.log('\n[Level 3] 흐름 검증');
-await page.goto(`${baseUrl}/en`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(1000);
+const rootResp = await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 check(
-  'en 로케일 전환 — lang 속성',
-  (await page.evaluate(() => document.documentElement.lang)) === 'en',
+  '/ 직접 200 (리다이렉트 hop 0)',
+  rootResp !== null && rootResp.status() === 200 && rootResp.request().redirectedFrom() === null,
+  `status=${rootResp?.status()}`,
 );
+check('lang="ko" 고정', (await page.evaluate(() => document.documentElement.lang)) === 'ko');
 
 // URL 동기화 검증 — 연구 모드 상태 URL에 반영
-await page.goto(`${baseUrl}/ko?mode=research`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?mode=research`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(800);
 const urlMode = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
 check('URL mode=research 복원', urlMode === 'research', `data-mode=${urlMode}`);
 
-// 루트 / → 리다이렉트 확인
-const resp = await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-check('/ → 로케일 리다이렉트', resp !== null && resp.status() < 400);
+// /ko 하위호환 리다이렉트 — 쿼리 보존 + 308 (permanent) 단언
+// 최종 200 만 보면 307 퇴행도 PASS 하므로 redirect 응답의 상태코드를 직접 단언한다 (#908 리뷰 권고).
+const koResp = await page.goto(`${baseUrl}/ko?mode=research`, { waitUntil: 'networkidle' });
 const urlAfter = page.url();
-check('기본 로케일 경로 (/ko 또는 /en)', /\/(ko|en)(\/|$)/.test(urlAfter), `URL = ${urlAfter}`);
+const redirectResp = koResp ? await koResp.request().redirectedFrom()?.response() : null;
+const redirectStatus = redirectResp?.status();
+check(
+  '/ko → / 하위호환 리다이렉트 (쿼리 보존 + 308)',
+  koResp !== null &&
+    koResp.status() === 200 &&
+    redirectStatus === 308 &&
+    !/\/ko(\/|$|\?)/.test(urlAfter) &&
+    urlAfter.includes('mode=research'),
+  `URL = ${urlAfter}, redirect=${redirectStatus}`,
+);
 
-await page.screenshot({ path: join(screenshotDir, '03-flow-en.png') });
+await page.screenshot({ path: join(screenshotDir, '03-flow.png') });
 
 // ===== 콘솔/에러 요약 =====
 console.log('\n[콘솔/에러]');

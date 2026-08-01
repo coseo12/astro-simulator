@@ -45,7 +45,7 @@ const check = (name, pass, detail = '') => {
 
 // ===== 1. 정적 =====
 console.log('\n[1/3] 정적 — beltNbody=1 + engine=webgpu 진입');
-await page.goto(`${baseUrl}/ko?engine=webgpu&belt=500&beltNbody=1`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?engine=webgpu&belt=500&beltNbody=1`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);
 
 check('canvas 엘리먼트', (await page.$('canvas')) !== null);
@@ -88,7 +88,7 @@ await page.screenshot({ path: join(shotDir, '2-after-toggle.png') });
 
 // ===== 3. 흐름 =====
 console.log('\n[3/3] 흐름 — beltNbody 미지정(Kepler 경로) 회귀 없음');
-await page.goto(`${baseUrl}/ko?engine=webgpu&belt=500`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?engine=webgpu&belt=500`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 const flowErrors = consoleErrors.length;
 check('beltNbody 미지정 시 에러 없음 (Kepler 경로 유지)', consoleErrors.length === flowErrors, '');

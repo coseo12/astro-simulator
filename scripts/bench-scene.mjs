@@ -16,7 +16,7 @@
  *
  * N-sweep 모드
  * ------------
- * `BENCH_N_SWEEP=10,100,200,1000` 설정 시 각 N마다 `/ko?belt=N`을 재방문해
+ * `BENCH_N_SWEEP=10,100,200,1000` 설정 시 각 N마다 `/?belt=N`을 재방문해
  * play-1y 시나리오 fps를 측정하고 리포트에 `nBody: [{ n, fps }]`로 기록한다.
  * 시간이 길어지므로 시나리오 측정과 병행 실행된다.
  */
@@ -61,8 +61,8 @@ const measureFps = (durationMs) =>
     durationMs,
   );
 
-// 경로 쿼리는 BENCH_PATH 환경변수로 추가 가능 (예: /ko?belt=200)
-const path = process.env.BENCH_PATH ?? '/ko';
+// 경로 쿼리는 BENCH_PATH 환경변수로 추가 가능 (예: /?belt=200)
+const path = process.env.BENCH_PATH ?? '/';
 await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 
