@@ -20,7 +20,7 @@ pnpm bench:scene:set-baseline
 
 ### 환경변수
 
-- `BENCH_PATH` — 측정 경로 (기본 `/ko`). 예: `BENCH_PATH=/ko?belt=200`
+- `BENCH_PATH` — 측정 경로 (기본 `/`). 예: `BENCH_PATH=/?belt=200`
 - `BENCH_N_SWEEP` — N-sweep 대상 (쉼표구분). 설정 시 각 N마다 `?belt=N` 재방문
 - `BENCH_REGRESSION_FPS` — 회귀 판정 임계값 (기본 `-2`, CI는 `-10`)
 - `BENCH_SUMMARY_OUT` — Markdown 요약 출력 경로 (CI 코멘트용)
@@ -39,7 +39,7 @@ bench 실행 시 baseline 대비 각 시나리오의 fps 변화율을 출력한�
 
 ## N-sweep 리포트 스키마
 
-`bench:scene:sweep` 실행 시 리포트에 `nBody: [{ n, fps }]` 필드가 추가된다. P3-0부터 N=[10, 100, 200, 1000, 5000, 10000] 샘플을 `/ko?belt=N` 경로에서 play-1y 시나리오로 측정한다 (10000은 sim-canvas의 ThinInstances cap과 일치).
+`bench:scene:sweep` 실행 시 리포트에 `nBody: [{ n, fps }]` 필드가 추가된다. P3-0부터 N=[10, 100, 200, 1000, 5000, 10000] 샘플을 `/?belt=N` 경로에서 play-1y 시나리오로 측정한다 (#908 이전 이력 리포트는 `/ko?belt=N` 경로 기준) (10000은 sim-canvas의 ThinInstances cap과 일치).
 
 ### baseline 갱신 절차
 

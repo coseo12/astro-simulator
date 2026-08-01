@@ -169,16 +169,20 @@ await page.waitForTimeout(800);
 const urlMode = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
 check('URL mode=research 복원', urlMode === 'research', `data-mode=${urlMode}`);
 
-// /ko 하위호환 리다이렉트 — 쿼리 보존 확인
+// /ko 하위호환 리다이렉트 — 쿼리 보존 + 308 (permanent) 단언
+// 최종 200 만 보면 307 퇴행도 PASS 하므로 redirect 응답의 상태코드를 직접 단언한다 (#908 리뷰 권고).
 const koResp = await page.goto(`${baseUrl}/ko?mode=research`, { waitUntil: 'networkidle' });
 const urlAfter = page.url();
+const redirectResp = koResp ? await koResp.request().redirectedFrom()?.response() : null;
+const redirectStatus = redirectResp?.status();
 check(
-  '/ko → / 하위호환 리다이렉트 (쿼리 보존)',
+  '/ko → / 하위호환 리다이렉트 (쿼리 보존 + 308)',
   koResp !== null &&
     koResp.status() === 200 &&
+    redirectStatus === 308 &&
     !/\/ko(\/|$|\?)/.test(urlAfter) &&
     urlAfter.includes('mode=research'),
-  `URL = ${urlAfter}`,
+  `URL = ${urlAfter}, redirect=${redirectStatus}`,
 );
 
 await page.screenshot({ path: join(screenshotDir, '03-flow.png') });
