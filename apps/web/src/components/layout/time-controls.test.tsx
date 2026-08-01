@@ -87,8 +87,7 @@ describe('TimeControls', () => {
     render(<TimeControls />);
     fireEvent.click(screen.getByTestId('time-reverse'));
     const cmd = sentCommands.find((c) => c.type === 'setTimeScale') as
-      | { type: 'setTimeScale'; scale: number }
-      | undefined;
+      { type: 'setTimeScale'; scale: number } | undefined;
     expect(cmd?.scale).toBeLessThan(0);
   });
 

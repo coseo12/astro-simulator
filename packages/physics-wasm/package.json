@@ -28,6 +28,6 @@
     "typecheck": "echo 'typecheck: TS 없음, cargo check 사용'"
   },
   "devDependencies": {
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.10"
   }
 }

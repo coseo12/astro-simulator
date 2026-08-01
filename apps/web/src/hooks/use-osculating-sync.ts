@@ -231,6 +231,10 @@ export function useOsculatingSync(opts?: OscSyncOptions): OscSyncResult {
   // polling 루프 — observedFps 변경에 반응해 단계 조정.
   useEffect(() => {
     if (!enabled) {
+      // #851 — eslint-plugin-react-hooks 7.1 신규 규칙 예외: 비활성 전환 시 의도된 상태 리셋.
+      // 이 hook 은 #847/#263 회귀 fix 가 얽힌 민감 경로라 dev deps 갱신 PR 에서
+      // 동작 변경 리팩토링(파생 상태 전환 등)은 범위 밖 — 후속 분리 대상.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setElements(null);
       setCurrentIntervalMs(baseInterval);
       return;

@@ -62,22 +62,22 @@
     "bench:scene:set-baseline": "node scripts/bench-set-baseline.mjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.1",
-    "@playwright/test": "^1.59.1",
-    "@typescript-eslint/eslint-plugin": "^8.58.2",
-    "@typescript-eslint/parser": "^8.58.2",
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.62.1",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.3",
+    "eslint-config-next": "^16.2.12",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "pixelmatch": "^7.1.0",
-    "playwright": "^1.59.1",
+    "lint-staged": "^17.3.0",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
-    "prettier": "^3.8.2",
-    "typescript": "^6.0.2"
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
