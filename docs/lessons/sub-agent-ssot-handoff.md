@@ -77,7 +77,7 @@ sub-agent 가 `run_in_background=true` 로 띄운 로컬 프로세스(dev 서버
 
 ## 메인 오케스트레이터 단계 게이트 (volt [#77](https://github.com/coseo12/volt/issues/77))
 
-`developer → reviewer → qa → 사용자/머지` 순서 강제. developer sub-agent 의 self-compare 자명 PASS 함정을 reviewer/qa 단계가 차단. 예외: docs only / chore.
+`developer → reviewer → qa → 사용자/머지` 순서 강제. developer sub-agent 의 self-compare 자명 PASS 함정을 reviewer/qa 단계가 차단. qa 예외는 CLAUDE.md §qa 게이트 예외 규약 (#915 — 4조건 + fail-safe) 을 따른다.
 
 상세: [headless-browser-verification.md](headless-browser-verification.md)
 

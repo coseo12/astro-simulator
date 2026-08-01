@@ -27,7 +27,7 @@ developer sub-agent 가 자기 변경분의 baseline 을 자기 변경분으로 
   2. 단순 mismatch ≤ 임계 비교만 수행 → 시각 회귀 시그니처 불특정
   3. headless chromium swiftshader 가 사용자 환경 (`channel: 'chrome'`) 과 다른 LOD/fallback 경로를 탄다 → 특정 회귀 (예: `detect-gpu-tier='c'` 강제 경로) 가 headless 에서만 트리거
 - **차단 규약**:
-  - **메인 오케스트레이터 단계 게이트**: `developer → reviewer → qa → 사용자/머지` 순서 강제. developer 마무리 후 reviewer/qa 건너뛰기 금지. 예외는 docs only / chore (행동 변화 없음)
+  - **메인 오케스트레이터 단계 게이트**: `developer → reviewer → qa → 사용자/머지` 순서 강제. developer 마무리 후 reviewer/qa 건너뛰기 금지. qa 예외는 CLAUDE.md §qa 게이트 예외 규약 (#915 — 4조건 전건 충족 + fail-safe) 을 따른다
   - **reviewer/qa 가 별도 가드 강제**: (a) `channel: 'chrome'` (실 Chrome 바이너리) (b) 도메인 특화 픽셀 검증 (sphere/billboard 판별, 특정 색상 존재, scene object visibility, 카메라 응답 diff)
   - **단순 mismatch 비교 금지**: 새 회귀 시그니처는 별도 자동화 스크립트로 박제. 자명 PASS 가능성 있는 가드는 reviewer 단계에서 도메인 가드로 보강
 - **CRITICAL #3 (UI 3단계 검증) 와의 관계**: 본 함정은 "정적 → 인터랙션 → 흐름" 의 자동화 버전. headless 스크립트가 3단계를 다 통과해도 baseline self-compare 면 모두 무효. CRITICAL #3 의 `실 Chrome 1회` 요구는 이 함정의 1차 차단선이며, 본 게이트는 2차 차단선 (reviewer/qa 단계가 사용자 검증 전에 자동 가드 실행)
