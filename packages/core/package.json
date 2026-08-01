@@ -46,7 +46,7 @@
     "lint": "eslint src"
   },
   "peerDependencies": {
-    "@babylonjs/core": "^8.0.0"
+    "@babylonjs/core": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

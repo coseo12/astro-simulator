@@ -66,8 +66,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@babylonjs/core':
-        specifier: ^9.2.1
-        version: 9.2.1
+        specifier: ^9.19.0
+        version: 9.19.0
       '@radix-ui/react-slider':
         specifier: ^1.3.6
         version: 1.3.6(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -151,8 +151,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@babylonjs/core':
-        specifier: ^8.0.0
-        version: 8.56.2
+        specifier: ^9.0.0
+        version: 9.19.0
       mitt:
         specifier: ^3.0.1
         version: 3.0.1
@@ -299,11 +299,8 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@babylonjs/core@8.56.2':
-    resolution: {integrity: sha512-UShs1pt8tSTLYOoITWclXPNrUZUpuHvB2Ur2L1D+uM8c9qaAYOi9gjkurOkQwIlbPGqwQHWImGEyiyix0mQ1dg==}
-
-  '@babylonjs/core@9.2.1':
-    resolution: {integrity: sha512-G3409wiBQTMJPzbTPV8Lz36cfmCsvp2+7nXYRisnMet1qnelogWXM+XOcZZIzDjMCwV7eII1UzETnnS0GpBfTQ==}
+  '@babylonjs/core@9.19.0':
+    resolution: {integrity: sha512-8bQfSnXnFVEUolPBl5Y3S1WDmQKpPKfguOQvGdCxjTIHlLku8Crc0DdvlFbmqeGpS/bQ3NzwtApB84GScm9v8w==}
 
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
@@ -3310,9 +3307,7 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@babylonjs/core@8.56.2': {}
-
-  '@babylonjs/core@9.2.1': {}
+  '@babylonjs/core@9.19.0': {}
 
   '@bcoe/v8-coverage@1.0.2': {}
 

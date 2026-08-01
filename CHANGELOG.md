@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Notes (chore — 행동 변화 없음)
+
+- **[#851] `@babylonjs/core` 9.2.1 → 9.19.0 (17마이너) + peer 범위 정합** ([#851](https://github.com/coseo12/astro-simulator/issues/851)) — 렌더링 코어 마이너 업그레이드 (전 의존성 중 최대 격차 해소). `packages/core` peerDependencies `^8.0.0 → ^9.0.0` 정합 — pnpm auto-install-peers 가 낡은 peer 범위를 독립 해석해 **8.56.2 사본을 별도 설치** (lockfile 이중 존재 8.56.2 + 9.2.1, unmet peer 경고 0 이라 조용했음) 하던 것을 단일 9.19.0 해석으로 통합. `packages/core` 타입체크가 이제 Babylon 9 타입 기준으로 수행됨. **Notes 분류 근거** (#905 next 패치 전례): 코드 수정 0 / API·행동 계약 무변경 / 로컬 prod 빌드 + 브라우저 3단계 (태양·토성 ring·지구·목성 gas-bands 셰이더 경로) 렌더 거동 변화 미관찰 / deprecation 경고 0. 시각 회귀 최종 판정은 CI 가드 12종 (shader-pixel / fps / a11y / r1).
+
 ## [0.55.0] — 2026-08-01
 
 ### Behavior Changes
