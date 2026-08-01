@@ -14,33 +14,96 @@ on:
     branches: [develop, main]
 
 jobs:
+  # ============================================================
+  # #915 범위 1 — diff-scope 판별 선행 job (docs-only 시 무거운 경로 스킵)
+  # ============================================================
+  # 분류 SSoT: scripts/ci-diff-scope.mjs (self-test 사용 직전 실행).
+  #   docs = docs/** ∪ *.md (전 경로) ∪ .claude/** / 그 외 전부 코드 (fail-safe: 미지 = 코드).
+  #   경계: scripts/** · .github/** 은 검증 인프라 자체 변경이므로 코드 취급 (#915 경계 계약).
+  # 판별 단위 주의: pull_request 는 **PR 전체 diff** 기준 — 코드 PR 에 docs 커밋이 뒤따라도
+  #   전 세트가 계속 돈다. per-commit 판별은 코드 최종 상태를 미검증 상태로 머지시킬 수 있어
+  #   (= 가드 약화) 의도적으로 채택하지 않았다. docs-only 스킵은 PR diff 전체가 docs 일 때만.
+  # required check 상호작용: main branch protection 의 required_status_checks = null 실측
+  #   (2026-08-01, #915) — 스킵된 job 이 머지를 막지 않으므로 skip-success 보고 패턴 불요,
+  #   단순 if: 게이트로 충분. required check 도입 시 본 전제 재검토.
+  # paths-ignore (workflow 단위) 가 아닌 job 단위 게이트인 이유: detect-and-test 의 SSoT
+  #   가드 (zombie/dead-wait 등) 는 docs 변경도 검증해야 하므로 workflow 전체 스킵 불가.
+  diff-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.scope.outputs.code_changed }}
+      app_code_changed: ${{ steps.scope.outputs.app_code_changed }}
+      changelog_touched: ${{ steps.scope.outputs.changelog_touched }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 분류기 self-test (사용 직전 자기 검증)
+        run: node scripts/ci-diff-scope.mjs --self-test
+
+      - name: 변경 파일 판별 + 분류
+        id: scope
+        run: |
+          # depth-1 checkout + 대상 sha 표적 fetch — 외부 액션/전체 clone 없이 diff 산출.
+          # fetch 실패 (force-push 로 before 소실 등) 시 빈 목록 → 분류기가 fail-safe 로
+          # code_changed=true (전 가드 실행 방향으로만 기움).
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # pull_request checkout = merge commit → base tip 과의 diff 가 PR 실효 변경 전체
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            if git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+              git diff --name-only "$BASE_SHA" HEAD > /tmp/changed-files.txt
+            else
+              echo "::warning::base sha fetch 실패 — fail-safe: 전체 코드 취급"
+              : > /tmp/changed-files.txt
+            fi
+          else
+            BEFORE="${{ github.event.before }}"
+            if [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+              && git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
+              git diff --name-only "$BEFORE" "${{ github.sha }}" > /tmp/changed-files.txt
+            else
+              echo "::warning::push before sha 미해석 (신규 브랜치/force-push) — fail-safe: 전체 코드 취급"
+              : > /tmp/changed-files.txt
+            fi
+          fi
+          echo "── 변경 파일 목록 ──"
+          cat /tmp/changed-files.txt
+          node scripts/ci-diff-scope.mjs --files-from /tmp/changed-files.txt
+
+      # #915 범위 5 — CHANGELOG soft-warn (차단 아님 — exit 0 유지).
+      # [Unreleased] 소급 작성 3회 재발 이력의 구조 가드. 코드 변경 (apps/**·packages/**·
+      # scripts/**) 이 있는데 CHANGELOG.md 미포함이면 warning annotation 만 남긴다.
+      - name: CHANGELOG soft-warn
+        if: github.event_name == 'pull_request' && steps.scope.outputs.app_code_changed == 'true' && steps.scope.outputs.changelog_touched != 'true'
+        run: |
+          echo "::warning::코드 변경 (apps/**·packages/**·scripts/**) 이 있으나 CHANGELOG.md 미갱신 — [Unreleased] entry 추가를 검토하세요 (#915 soft-warn, 차단 아님)."
+
   detect-and-test:
     runs-on: ubuntu-latest
+    # #915 — 무거운 구간 (빌드 + 브라우저 가드) 은 diff-scope 출력으로 step 단위 게이트.
+    # job 전체를 스킵하지 않는 이유: verify:zombie-check / verify:dead-wait-check 등 SSoT
+    # 가드는 CLAUDE.md·.claude/** (docs 분류) 변경으로도 깨질 수 있어 상시 실행이 필요하다
+    # (docs-only 에서 job 통스킵 = 해당 가드 약화). 상시 스텝은 총 ~2분 내 (docs-only DoD 정합).
+    needs: diff-scope
     steps:
       - uses: actions/checkout@v4
 
       # ============================================================
-      # Node.js 생태계 (pnpm > yarn > npm lock > npm fallback)
+      # pnpm 모노레포 고정 경로 (#915 범위 7 — 범용 언어 자동 감지 제거)
       # ============================================================
-      # 패키지 매니저 우선순위: pnpm-lock.yaml > yarn.lock > package-lock.json > (lock 없음, npm fallback)
-      # 배타 조건 분기 — 각 경로는 다른 경로의 lock 파일이 없을 때만 실행
-      #
-      # setup-node@v4 는 cache: 'npm'/'pnpm'/'yarn' 지정 시 해당 lock 부재면 step 실패하므로 분기 필수
-      # — volt #51 Gemini 단일화 권고 실측 오탐 확인, 다중 step 유지
+      # 구 범용 템플릿의 yarn/npm/Python(uv·poetry·pipenv·pip)/Go/Rust/Makefile 감지 분기
+      # ~190줄은 전부 도달 불가였다 — 실측 (2026-08-01): 각 분기의 트리거 파일 (yarn.lock /
+      # package-lock.json / uv.lock / poetry.lock / Pipfile.lock / pyproject.toml / setup.py /
+      # requirements.txt / go.mod / 루트 Cargo.toml / Makefile) 이 루트에 전부 부재.
+      # Rust 는 ci-physics-wasm.yml 이 manifest-path 명시로 전담 (루트 Cargo.toml 없음 →
+      # ci.yml rust step 은 한 번도 발화한 적 없음). #840 "CI 통과 ≠ 테스트 실행" 클래스의
+      # 근원 (죽은 조건 분기) 제거 — 상세 증명은 PR #915 PR-1 본문 박제.
+      # pnpm 스텝의 구 hashFiles('pnpm-lock.yaml') 조건도 감지 잔재라 제거 — lockfile 소실은
+      # 조용한 스킵이 아니라 결정적 FAIL 이어야 한다 (#901 fail-fast 정합).
 
-      - name: Node.js 프로젝트 감지
-        if: hashFiles('package.json') != ''
-        run: |
-          node_version=$(jq -r '.engines.node // "20"' package.json | grep -oE '[0-9]+' | head -1)
-          echo "Node.js ${node_version} 사용"
-
-      # --- pnpm 경로 ---
       - name: pnpm setup
-        if: hashFiles('pnpm-lock.yaml') != ''
         uses: pnpm/action-setup@v4
 
       - name: Node.js setup (pnpm)
-        if: hashFiles('pnpm-lock.yaml') != ''
         uses: actions/setup-node@v4
         with:
           # #606 fix (ADR 20260531-606 §Amendment 2) — playwright 1.59.1 extract 가
@@ -53,8 +116,13 @@ jobs:
           cache: 'pnpm'
 
       - name: pnpm install
-        if: hashFiles('pnpm-lock.yaml') != ''
         run: pnpm install --frozen-lockfile
+
+      # #915 — CI 인프라 스크립트 self-test 상시 배선 (#897 교훈: CI 미배선 self-test = 0회 실행).
+      # diff-scope 분류기는 diff-scope job 이 사용 직전 자기 검증 — 여기서는 auto-close 파서만.
+      # (auto-close-issues.yml 은 머지 이벤트에만 돌므로 PR 단계 상시 검증은 본 스텝이 담당.)
+      - name: '#915 auto-close 파서 self-test'
+        run: node scripts/auto-close-issue-parser.mjs --self-test
 
       # #840 — 단위 테스트 (vitest) 는 ci-physics-wasm.yml verify-and-rust job 에 배선.
       # 구 'pnpm run --if-present test' 는 harness bb220d3 (2026-04-20) 루트 test→test:unit
@@ -134,7 +202,7 @@ jobs:
         # 조건 통합 (#802): 기존 step 별 hashFiles 조건 중 rust-toolchain.toml /
         #   packages/physics-wasm/Cargo.toml 은 본 저장소에서 전부 상시 참 → 지배 조건
         #   (pnpm-lock + r1-guard 스크립트) 으로 통합. 현 저장소 상태 기준 행동 변화 0.
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
         # 기존 step 별 timeout (Playwright 설치 5분 + build 8분) 을 invocation 단일 20분으로 승계
         # (composite 내부 step 은 timeout-minutes 미지원). rust 툴체인/캐시 복원 시간까지 포함한 상한.
         timeout-minutes: 20
@@ -144,7 +212,7 @@ jobs:
           setup-node: 'false'
 
       - name: 'r1-guard: next start 기동 + readiness (3/4)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
         # start + readiness 단독 timeout — stuck 시 production 런타임 초기화 freeze 확정.
         # setsid 로 띄워 step 종료 시 SIGHUP 으로 죽지 않도록 (다음 verify step 에서 사용).
         timeout-minutes: 3
@@ -158,7 +226,7 @@ jobs:
           curl -sf http://localhost:3001/ > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
 
       - name: 'r1-guard: verify 실행 (4/4)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
         # verify 단독 timeout — stuck 시 Playwright/런타임 verify 경로 freeze 격리.
         # R1_GUARD_DIAG=1 — verify 경로 단계별 stderr 진단 로깅 상시 활성화 (freeze 재발 시
         #   stuck 직전 단계 즉시 보존, 성공 시 stderr 노이즈 무시. ADR §Amendment 2 정합).
@@ -199,7 +267,7 @@ jobs:
       #   않는** 죽은 코드였고(`bash -e {0}`), 그때만 서버가 job 끝까지 잔존했다.
       # __solarScene 등 dev 빌드 한정 전역이 필요하므로 next start(:3001) 가 아닌 next dev.
       - name: '#846 dev 서버 기동 (가드 10종 공용, 1회)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/ci-dev-server.sh') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/ci-dev-server.sh') != ''
         # 기동+readiness 상한 (60x2s=120s) 을 넘기면 스크립트가 로그 덤프 후 exit 1.
         timeout-minutes: 4
         run: bash scripts/ci-dev-server.sh start 3002 /tmp/ci-dev.pid
@@ -209,11 +277,32 @@ jobs:
       # ============================================================
       # ADR: docs/decisions/20260503-378-focus-frustum-fix.md §결과·재검토 조건 §회귀 가드
       # cross-validate G3 수용 — "사용자 D-T2 재발견 비용 > CI 시간 비용" ROI 명백
-      # 12 cells (6 body × 2 모드) 매트릭스 — venus 관찰 모드 PASS 확인
+      # 매트릭스 실측 (2026-08-01, #915): FOCUS_BODIES 32 body × 2 모드 = 64 cells
+      # (R3 시점 6 cells → R12 누적. 이슈 #915 의 "r1-guard 64셀" 은 본 verify:378-focus 매트릭스).
+      #
+      # #915 범위 2 — PR 경로 대표 8셀 축소 (가드 약화 아님 — 실행 시점 이동):
+      #   전체 64셀은 develop/main push 에서 그대로 유지 (squash 머지 후 push sha 가 PR head sha
+      #   와 달라 concurrency dedupe 에 걸리지 않음 — 머지 즉시 전셀 검증).
+      # 대표 8셀 선정 근거 (각 축 최소 1 커버, ':' 구분 — body id 에 하이픈 포함되므로):
+      #   sun:observe      — 항성 (T1 유지 특례 body)
+      #   venus:observe    — 내행성 + #378 원 D-T2 회귀 재현 케이스 (observe 가 FAIL 이력)
+      #   venus:research   — mode 축 (research 패널 resize 경로) — 원 회귀 body 로 양 모드 커버
+      #   phobos:observe   — 고각속도 위성 (#611 한 프레임 lag 회귀 클래스 — 가장 민감한 셀)
+      #   jupiter:observe  — 거성 (tier 스케일 상단)
+      #   triton:observe   — 역행 위성 (i > 90°)
+      #   eris:observe     — 왜소행성 + 최원거리 (a ≈ 68 AU — floating origin 극단)
+      #   halley:observe   — 혜성 (고이심률 e 0.967 + 역행)
+      # 셀 id 오타는 스크립트가 fail-fast (exit 2) — 조용한 매트릭스 축소 불가.
 
       - name: '#378 focus 회귀 가드 (verify:378-focus)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-378-focus.mjs') != ''
-        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-378-focus.mjs') != ''
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs \
+              --cells=sun:observe,venus:observe,venus:research,phobos:observe,jupiter:observe,triton:observe,eris:observe,halley:observe
+          else
+            BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs
+          fi
 
       # ============================================================
       # #408 focus transition 회귀 가드 — tier oscillate 차단 (사용자 D-T2 2026-05-04)
@@ -223,7 +312,7 @@ jobs:
       # tier 전환 횟수 ≤ 1 / target origin reset 0 / camR jump > 1000 unit 0 단언
 
       - name: '#408 focus transition 회귀 가드 (verify:focus-transition)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-focus-transition.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-focus-transition.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-focus-transition.mjs
 
       # ============================================================
@@ -245,7 +334,7 @@ jobs:
       # + 강제 click 시 store/camera 변화 0 (defense-in-depth scene 측면)
 
       - name: '#402 R-Phase allowlist 회귀 가드 (verify:r-phase-allowlist)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
 
       # ============================================================
@@ -258,7 +347,7 @@ jobs:
       # DoD PASS ≠ 제품 동작 (volt #74) — R5 satellite 궤도선 미검증 잠복 → R6 galilean 표면화 재발 방지.
 
       - name: '#627 satellite 궤도 회귀 가드 (verify:627-satellite-orbit)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-627-satellite-orbit.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-627-satellite-orbit.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-627-satellite-orbit.mjs
 
       # ============================================================
@@ -271,7 +360,7 @@ jobs:
       # DoD PASS ≠ 제품 동작 (volt #74) — 위성 free-fly 줌 정지 잠복 재발 차단.
 
       - name: '#629 free-fly 줌 회귀 가드 (verify:629-freefly-zoom)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-629-freefly-zoom.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-629-freefly-zoom.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-629-freefly-zoom.mjs
 
       # ============================================================
@@ -284,7 +373,7 @@ jobs:
       # DoD PASS ≠ 제품 동작 (volt #74) — 위성 free-fly 줌아웃 허공 재발 차단.
 
       - name: '#631 free-fly tier escalation 회귀 가드 (verify:631-freefly-tier)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-631-freefly-tier.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-631-freefly-tier.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-631-freefly-tier.mjs
 
       # #675 — glow pixel marker 회귀 가드 (기본 ON Behavior Change 의 CI 상시 감시).
@@ -295,7 +384,7 @@ jobs:
       #          (4) 100 AU 화면 안 low body 전수 발동 (sun 포함 27 body)
       #          (5) ?marker=glow 명시 = default 동일 (하위 호환)
       - name: '#675 glow pixel marker 회귀 가드 (verify:675-glow-marker)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-glow-marker.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-glow-marker.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-glow-marker.mjs
 
       # #693 — free-fly 패닝(F3) 회귀 가드 (우클릭 드래그 target 평면 이동 + floating origin 정합).
@@ -306,7 +395,7 @@ jobs:
       #          (S4) free-fly 줌(radius 변동) 후 sensibility×radius 곱 불변 (진입 시점 잔존 아님)
       # forensic 회귀: panningSensibility=0 잔존 → target 불변 / focus 중 활성 → jitter / 줌 후 감도 어긋남.
       - name: '#693 free-fly 패닝 회귀 가드 (verify:693-freefly-panning)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-693-freefly-panning.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-693-freefly-panning.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-693-freefly-panning.mjs
 
       # #699 — free-fly 통합 재설계 회귀 가드 (진입 일관/줌아웃 제거/이동 화면체감/frame-rate 독립/무회귀).
@@ -317,7 +406,7 @@ jobs:
       #          (S3b) frame-rate 독립 — hold 시간 비례 이동 (deltaTime 정규화 누락 회귀 차단)
       #          (S4) 무회귀 — free-fly originOffset=0(#693) + tier 줌아웃 escalate(#629/#631)
       - name: '#699 free-fly 통합 재설계 회귀 가드 (verify:699-freefly-unified)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-699-freefly-unified.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-699-freefly-unified.mjs') != ''
         run: |
           # #779 Phase 2 — S3b deltaTime 타이밍 flake 흡수 (v0.39.0 / v0.43.0 prep 실측 2회 — 가드 9종 중 유일).
           # dev server 는 유지한 채 guard 호출만 재시도 (#709 동일 패턴). 2연속 fail = step fail (fail-fast 유지).
@@ -349,7 +438,7 @@ jobs:
       #          (S3) localStorage 왕복 — 변경→reload 유지 + 손상값 주입 시 default 폴백 (silent 흡수 차단)
       #          (S4) focus/reset 무회귀 — 감도 변경이 focus follow(panning=0)/reset 원복에 영향 0
       - name: '#704 free-fly 감도 설정 회귀 가드 (verify:704-sensitivity)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-704-sensitivity.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-704-sensitivity.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-704-sensitivity.mjs
 
       # #848 — a11y 키보드 사각 회귀 가드 (모달 focus trap / focus 탈취 / canvas 접근 이름).
@@ -362,7 +451,7 @@ jobs:
       #          (S6) 마우스 클릭 포커스는 캔버스로 회수 (#699 무회귀 — S5 의 양성 대조군)
       #          (S7) canvas AX name 존재 + tabindex=0 (Babylon InputManager 의 tabindex=1 되돌림 차단)
       - name: '#848 a11y 키보드 사각 회귀 가드 (verify:848-modal-focus)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-848-modal-focus.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-848-modal-focus.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-848-modal-focus.mjs
 
       # ============================================================
@@ -373,206 +462,11 @@ jobs:
       #   필요한 실패 경로에서 실행되지 않았다 (로컬 `bash -e` 재현 실측).
       # 정리 스크립트는 항상 exit 0 — 여기서 non-zero 를 내면 원래 실패 원인을 덮어쓴다.
       - name: '#846 백그라운드 서버 정리'
-        if: always() && hashFiles('scripts/ci-dev-server.sh') != ''
+        # #915 — docs-only (code_changed != true) 에선 서버가 뜬 적이 없으므로 정리도 스킵
+        if: always() && needs.diff-scope.outputs.code_changed == 'true' && hashFiles('scripts/ci-dev-server.sh') != ''
         run: |
           bash scripts/ci-dev-server.sh stop 3002 /tmp/ci-dev.pid
           kill "$(cat /tmp/r1-web.pid 2>/dev/null)" 2>/dev/null || true
-
-      # --- yarn 경로 (pnpm-lock 없을 때만) ---
-      # yarn berry (v2+) vs classic (v1) 감지:
-      # - `.yarnrc.yml` 존재 → berry → `yarn install --immutable` (v2+ 필수, v4+ 는 --frozen-lockfile 제거)
-      # - `.yarnrc.yml` 부재 → classic (v1) → `yarn install --frozen-lockfile`
-      # setup-node cache: 'yarn' 은 양쪽 모두 지원
-      - name: Node.js setup (yarn)
-        if: hashFiles('yarn.lock') != '' && hashFiles('pnpm-lock.yaml') == ''
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-          cache: 'yarn'
-
-      - name: Enable corepack (yarn packageManager field 우선)
-        if: hashFiles('yarn.lock') != '' && hashFiles('pnpm-lock.yaml') == ''
-        run: corepack enable
-
-      - name: yarn install (berry — .yarnrc.yml 존재)
-        if: hashFiles('yarn.lock') != '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('.yarnrc.yml') != ''
-        run: yarn install --immutable
-
-      - name: yarn install (classic — .yarnrc.yml 부재)
-        if: hashFiles('yarn.lock') != '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('.yarnrc.yml') == ''
-        run: yarn install --frozen-lockfile
-
-      - name: yarn test
-        if: hashFiles('yarn.lock') != '' && hashFiles('pnpm-lock.yaml') == ''
-        # `yarn test` 는 berry/classic 모두 `scripts.test` 실행. --if-present 없으므로 스킵 시 실패
-        # → scripts.test 부재일 때를 위해 조건 체크 (node -e 로 파싱)
-        run: |
-          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
-            yarn test
-          else
-            echo "scripts.test 미정의 — skip"
-          fi
-
-      # --- npm 경로 (pnpm/yarn lock 없을 때만) ---
-      - name: Node.js setup (lockfile 있음, npm cache 활성)
-        if: hashFiles('package-lock.json') != '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('yarn.lock') == ''
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-          cache: 'npm'
-
-      - name: Node.js setup (lockfile 없음, cache 비활성)
-        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('yarn.lock') == ''
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-
-      - name: npm ci (lockfile 있을 때)
-        if: hashFiles('package-lock.json') != '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('yarn.lock') == ''
-        run: npm ci
-
-      - name: npm install (lockfile 없을 때 fallback)
-        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('yarn.lock') == ''
-        run: npm install --no-audit --no-fund --ignore-scripts
-
-      - name: npm test
-        if: hashFiles('package.json') != '' && hashFiles('pnpm-lock.yaml') == '' && hashFiles('yarn.lock') == ''
-        run: npm test --if-present
-
-      # ============================================================
-      # Python 생태계 (uv > poetry > pipenv > pip / requirements)
-      # ============================================================
-      # 패키지 매니저 우선순위: uv.lock > poetry.lock > Pipfile.lock > pyproject.toml (pip) > requirements.txt
-      # 배타 조건 — 하나만 실행
-      # `pytest --if-present` 같은 flag 는 없으므로, scripts.test 유무 검사 대신 pytest 가 수집한 테스트 0 건이어도 exit 5 를
-      # warning 으로 처리 (`pytest || [ $? = 5 ]`) — pytest 없는 프로젝트는 해당 step 자체가 실행되지 않도록 lock/config 감지 기반
-
-      - name: Python 프로젝트 감지
-        if: hashFiles('pyproject.toml') != '' || hashFiles('setup.py') != '' || hashFiles('requirements.txt') != ''
-        run: echo "Python 프로젝트 감지됨"
-
-      # --- uv 경로 ---
-      # 공식 astral-sh/setup-uv action 사용 — `curl | sh` 패턴 대비 (a) 버전 고정 (b) 캐싱 (c) MITM/공급망 공격 표면 축소
-      # Gemini cross-validate (PR #178) 보안 권고 수용
-      - name: uv setup
-        if: hashFiles('uv.lock') != ''
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-
-      - name: uv sync + pytest (uv.lock)
-        if: hashFiles('uv.lock') != ''
-        run: |
-          uv sync --frozen
-          uv run --no-sync pytest || [ $? = 5 ]
-
-      # --- poetry 경로 ---
-      # NOTE (reviewer #178 권고 반영):
-      # - setup-python cache 지시어를 설치 도구 정의 시점에 쓰면 첫 실행에서 캐시 스킵 경고 발생 (도구 미존재).
-      #   → `cache:` 는 도구 설치 후 별도 재설정이 이상적이나 action 한계상 생략하고 캐시 없이 진행
-      # - `python-version-file: 'pyproject.toml'` 는 `[project].requires-python` 또는 `[tool.poetry].python` 필드 부재 시 실패.
-      #   → python-version '3.x' 로 fallback (프로젝트가 특정 버전 고정 원하면 pyproject.toml 에 직접 명시)
-      # - `poetry install` 이 dev-dependencies 에 pytest 를 포함한다고 암묵 전제하면 `poetry run pytest` 가 command not found.
-      #   → `poetry install` 이후 `poetry run python -c 'import pytest'` 로 감지 실패 시 `poetry run pip install pytest` 로 명시 보강
-      - name: Python setup (poetry)
-        if: hashFiles('poetry.lock') != '' && hashFiles('uv.lock') == ''
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: poetry install + pytest
-        if: hashFiles('poetry.lock') != '' && hashFiles('uv.lock') == ''
-        run: |
-          pipx install poetry || pip install --user poetry
-          poetry install --no-interaction --no-ansi
-          poetry run python -c "import pytest" 2>/dev/null || poetry run pip install pytest
-          poetry run pytest || [ $? = 5 ]
-
-      # --- pipenv 경로 ---
-      # NOTE (reviewer #178 권고 반영): Pipfile python_version 필드 부재 시 setup-python 실패 가능 → '3.x' fallback.
-      # pipenv sync --dev 도 dev-packages 에 pytest 없으면 `pipenv run pytest` 가 실패 → 감지 후 명시 설치
-      - name: Python setup (pipenv)
-        if: hashFiles('Pipfile.lock') != '' && hashFiles('uv.lock') == '' && hashFiles('poetry.lock') == ''
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: pipenv install + pytest
-        if: hashFiles('Pipfile.lock') != '' && hashFiles('uv.lock') == '' && hashFiles('poetry.lock') == ''
-        run: |
-          pip install --user pipenv
-          pipenv sync --dev
-          pipenv run python -c "import pytest" 2>/dev/null || pipenv run pip install pytest
-          pipenv run pytest || [ $? = 5 ]
-
-      # --- pip 경로 (requirements.txt 또는 pyproject.toml 의 PEP 621 메타데이터) ---
-      # 배타 조건: uv.lock / poetry.lock / Pipfile.lock 모두 없을 때. 세 가지 감지 파일 중 하나 이상 있으면 실행:
-      #   1) requirements.txt (우선) → pip install -r
-      #   2) pyproject.toml → pip install -e .[dev] 시도 → 실패 시 pip install -e .
-      #   3) setup.py (legacy) → pip install -e .
-      # pyproject.toml 이 if 조건과 run 분기 양쪽에 등장하는 이유: uv/poetry 가 아닌 단순 PEP 621 프로젝트도 pip 가 처리
-      - name: Python setup (pip / pyproject)
-        if: (hashFiles('pyproject.toml') != '' || hashFiles('setup.py') != '' || hashFiles('requirements.txt') != '') && hashFiles('uv.lock') == '' && hashFiles('poetry.lock') == '' && hashFiles('Pipfile.lock') == ''
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-          cache: 'pip'
-
-      - name: pip install + pytest (requirements.txt 우선)
-        if: (hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != '' || hashFiles('setup.py') != '') && hashFiles('uv.lock') == '' && hashFiles('poetry.lock') == '' && hashFiles('Pipfile.lock') == ''
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          elif [ -f pyproject.toml ]; then
-            pip install -e .[dev] 2>/dev/null || pip install -e .
-          elif [ -f setup.py ]; then
-            pip install -e .
-          fi
-          pip install pytest
-          # pytest exit 5 = "no tests collected" — 경고로 처리
-          pytest || [ $? = 5 ]
-
-      # ============================================================
-      # Go 생태계
-      # ============================================================
-      - name: Go setup
-        if: hashFiles('go.mod') != ''
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - name: go test
-        if: hashFiles('go.mod') != ''
-        run: go test ./...
-
-      # ============================================================
-      # Rust 생태계
-      # ============================================================
-      # cargo test --lib 기본 실행 (debug 빌드). 장기 테스트 이원화 (volt #54) 는 다운스트림이
-      # 별도 test-long-integration job 으로 확장 — 본 step 은 일상 경로만
-      # NOTE (reviewer #178 권고 반영): 기존 `--release` 옵션은 "일상 경로" 의도와 상충 (일상은 빠른 debug 빌드).
-      # release 빌드 검증이 필요한 프로젝트는 별도 job 에서 `cargo test --release --lib` 실행 권장.
-      - name: Rust toolchain setup
-        if: hashFiles('Cargo.toml') != ''
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: cargo test (일상 경로, --lib, debug)
-        if: hashFiles('Cargo.toml') != ''
-        run: cargo test --lib
-
-      # ============================================================
-      # 기타 (Makefile 폴백)
-      # ============================================================
-      - name: Make 테스트
-        if: hashFiles('Makefile') != ''
-        run: |
-          if grep -q "^test:" Makefile; then
-            make test
-          fi
 
       # ============================================================
       # NOTE: 프로젝트 소유 가드 (agent SSoT / docs 링크 본검사 / CLAUDE.md 예산 등) 는

@@ -19,6 +19,19 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            // #915 범위 6 — 리뷰 후 단계 (stage:qa / stage:done) 라벨이 이미 있으면 재부착 스킵.
+            // 종전: synchronize (push) 마다 stage:review 를 무조건 재부착 → qa/done 라벨과
+            //   이중화 → 매 push 수동 정리 마찰 (#795 운영 마찰 §연관). 신규 PR (open 시점,
+            //   후단계 라벨 없음) 의 부착 동작은 보존. payload.labels 는 이벤트 시점 스냅샷.
+            const currentLabels = (context.payload.pull_request.labels ?? []).map((l) => l.name);
+            const postReviewStages = ['stage:qa', 'stage:done'];
+            if (postReviewStages.some((l) => currentLabels.includes(l))) {
+              console.log(
+                `리뷰 후 단계 라벨 존재 (${currentLabels.join(', ')}) — stage:review 재부착 + 이슈 전이 스킵 (#915)`,
+              );
+              return;
+            }
+
             // stage:* 체계로 일원화 (#127 Plan 1) — 에이전트 파일/setup-stage-labels.sh 와 prefix 일치
             // PR 이 열리는 시점은 developer 단계 종료 → reviewer 단계 대기이므로 stage:review 부착
             await github.rest.issues.addLabels({

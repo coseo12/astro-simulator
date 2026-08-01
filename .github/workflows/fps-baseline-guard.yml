@@ -28,12 +28,18 @@ on:
       - '**/*.md'
       - 'docs/**'
       - '.github/workflows/**'
+      # #915 — diff-scope 분류기 (scripts/ci-diff-scope.mjs) 의 docs 계약과 정합:
+      # .claude/** 는 런타임 무관 (SSoT 가드는 ci.yml 상시 스텝이 담당) — 실 브라우저 측정 스킵
+      - '.claude/**'
   push:
     branches: [develop, main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - '.github/workflows/**'
+      # #915 — diff-scope 분류기 (scripts/ci-diff-scope.mjs) 의 docs 계약과 정합:
+      # .claude/** 는 런타임 무관 (SSoT 가드는 ci.yml 상시 스텝이 담당) — 실 브라우저 측정 스킵
+      - '.claude/**'
   # #663 — 수동 재실측 경로. workflow_dispatch 2단계 함정 (volt #45): dispatch 버튼은
   # 본 트리거가 default branch (main) 에 반영된 후에만 표시됨 (v0.24.0 릴리스 이후 사용 가능).
   # #709 — variance 진단 input. `--ref feature/X` 로 실행 시 ref 브랜치의 step 정의를 따름.

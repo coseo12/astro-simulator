@@ -6,9 +6,14 @@
  * cross-validate G3 수용 — "사용자 D-T2 재발견 비용 > CI 시간 비용" ROI 명백.
  *
  * 사용법:
- *   node apps/web/scripts/browser-verify-378-focus.mjs              # R-Phase 매트릭스 검증
+ *   node apps/web/scripts/browser-verify-378-focus.mjs              # R-Phase 매트릭스 검증 (전셀)
  *   node apps/web/scripts/browser-verify-378-focus.mjs --json       # JSON 결과만 (CI artifact)
  *   node apps/web/scripts/browser-verify-378-focus.mjs --update     # baseline 업데이트
+ *   node apps/web/scripts/browser-verify-378-focus.mjs --cells=venus:observe,phobos:observe
+ *       # #915 — 대표 셀 서브셋만 실행 (PR CI 경로. body id 에 하이픈이 있어 ':' 구분).
+ *       # 전체 매트릭스는 develop/main push CI 에서 유지 — 가드 약화 아님, 실행 시점 이동.
+ *       # 미지 body/mode 는 exit 2 fail-fast (오타로 인한 조용한 매트릭스 축소 차단).
+ *       # --update 와 조합 금지 (부분 baseline 박제 방지).
  *
  * 검증 매트릭스: **R-Phase allowlist body × 2 모드 = 6 cells (R3 시점)**
  *  - bodies: sun / mercury / venus (R-Phase R3 진입 완료, ADR `20260504-r-phase-allowlist-guard.md`)
@@ -46,6 +51,7 @@ const args = process.argv.slice(2);
 const flags = {
   json: args.includes('--json'),
   update: args.includes('--update'),
+  cells: args.find((a) => a.startsWith('--cells='))?.slice('--cells='.length) ?? null,
 };
 
 /**
@@ -125,6 +131,41 @@ const FOCUS_BODIES = [
   'swift-tuttle',
 ];
 const MODES = ['observe', 'research'];
+
+/**
+ * #915 — 실행 셀 결정. 기본 전셀 (MODES × FOCUS_BODIES — 기존 순회 순서 보존).
+ * `--cells=body:mode,...` 지정 시 서브셋만 (PR CI 대표셀 경로 — 선정 근거는 ci.yml
+ * verify:378-focus step 주석 SSoT). 해석 불가 항목은 exit 2 fail-fast — 오타가
+ * 조용한 매트릭스 축소로 이어지는 것을 차단 (가드 설계 원칙: silent 약화 금지).
+ */
+function resolveCells() {
+  if (!flags.cells) {
+    return MODES.flatMap((mode) => FOCUS_BODIES.map((body) => ({ body, mode })));
+  }
+  if (flags.update) {
+    console.error('--cells 는 --update 와 조합 금지 — 부분 baseline 박제 방지 (#915)');
+    process.exit(2);
+  }
+  return flags.cells.split(',').map((raw) => {
+    const [body, mode, ...rest] = raw.split(':');
+    if (
+      !body ||
+      !mode ||
+      rest.length > 0 ||
+      !FOCUS_BODIES.includes(body) ||
+      !MODES.includes(mode)
+    ) {
+      console.error(
+        `--cells 항목 해석 불가: "${raw}" — 형식 body:mode (body ∈ FOCUS_BODIES ${FOCUS_BODIES.length}종, mode ∈ ${MODES.join('|')})`,
+      );
+      process.exit(2);
+    }
+    return { body, mode };
+  });
+}
+
+// 모듈 로드 시점 해석 — 잘못된 --cells 는 브라우저 기동 전에 exit 2 (fail-fast)
+const SELECTED_CELLS = resolveCells();
 
 const VIEWPORT = { width: 1280, height: 800, dpr: 1 };
 const POST_FOCUS_WAIT_MS = 2500; // tier transition (300ms) + dolly + LOD 안정화 마진
@@ -294,44 +335,44 @@ async function setupPageWithFocus(browser, body, mode) {
 }
 
 async function run12CellMatrix(browser) {
-  console.log(
-    `\n=== #378 ${FOCUS_BODIES.length * MODES.length} cells matrix (${FOCUS_BODIES.length} R-Phase bodies × ${MODES.length} modes) ===\n`,
-  );
+  const cells = SELECTED_CELLS;
+  const matrixLabel = flags.cells
+    ? `--cells 서브셋 (전체 ${FOCUS_BODIES.length * MODES.length} cells 는 develop/main push CI — #915)`
+    : `${FOCUS_BODIES.length} R-Phase bodies × ${MODES.length} modes`;
+  console.log(`\n=== #378 ${cells.length} cells matrix (${matrixLabel}) ===\n`);
   const cellResults = [];
   let allPass = true;
 
-  for (const mode of MODES) {
-    for (const body of FOCUS_BODIES) {
-      const cellId = `${body}-${mode}`;
-      const { context, page } = await setupPageWithFocus(browser, body, mode);
-      const measurement = await measureFocusCell(page, body);
-      const verdict = evaluateCellDoD(measurement);
+  for (const { body, mode } of cells) {
+    const cellId = `${body}-${mode}`;
+    const { context, page } = await setupPageWithFocus(browser, body, mode);
+    const measurement = await measureFocusCell(page, body);
+    const verdict = evaluateCellDoD(measurement);
 
-      const status = verdict.pass ? 'PASS' : 'FAIL';
-      console.log(
-        `  ${cellId.padEnd(20)}: ${status}` +
-          `  | tier=${measurement.tier ?? 'n/a'}` +
-          `  | camR=${measurement.camRadius?.toFixed(3) ?? 'n/a'}` +
-          `  | meshR=${measurement.meshRadiusWorld?.toFixed(3) ?? 'n/a'}` +
-          `  | ratio=${verdict.radiusRatio?.toFixed(2) ?? 'n/a'}` +
-          `  | targetΔ=${verdict.targetDistance?.toFixed(3) ?? 'n/a'}` +
-          `  | inFrustum=${measurement.isInFrustum ?? 'unknown'}`,
-      );
-      if (!verdict.pass) {
-        for (const r of verdict.reasons) {
-          console.log(`        ${r}`);
-        }
-        allPass = false;
+    const status = verdict.pass ? 'PASS' : 'FAIL';
+    console.log(
+      `  ${cellId.padEnd(20)}: ${status}` +
+        `  | tier=${measurement.tier ?? 'n/a'}` +
+        `  | camR=${measurement.camRadius?.toFixed(3) ?? 'n/a'}` +
+        `  | meshR=${measurement.meshRadiusWorld?.toFixed(3) ?? 'n/a'}` +
+        `  | ratio=${verdict.radiusRatio?.toFixed(2) ?? 'n/a'}` +
+        `  | targetΔ=${verdict.targetDistance?.toFixed(3) ?? 'n/a'}` +
+        `  | inFrustum=${measurement.isInFrustum ?? 'unknown'}`,
+    );
+    if (!verdict.pass) {
+      for (const r of verdict.reasons) {
+        console.log(`        ${r}`);
       }
-      cellResults.push({
-        cellId,
-        body,
-        mode,
-        measurement,
-        verdict,
-      });
-      await context.close();
+      allPass = false;
     }
+    cellResults.push({
+      cellId,
+      body,
+      mode,
+      measurement,
+      verdict,
+    });
+    await context.close();
   }
 
   return { pass: allPass, cellResults };

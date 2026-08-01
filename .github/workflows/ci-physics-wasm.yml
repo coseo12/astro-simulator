@@ -24,8 +24,51 @@ env:
   WASM_PACK_VERSION: '0.14.0'
 
 jobs:
+  # #915 범위 1 — diff-scope 판별 선행 job (docs-only 시 무거운 job 스킵).
+  # 분류 SSoT + 판별 단위/required check 전제 주석: ci.yml diff-scope job 참조 (패턴 원본).
+  # 본 workflow 의 3 job (Rust/wasm/vitest/중복함수) 은 전부 코드 검증 — docs/**·*.md·.claude/**
+  # 만의 변경으로는 깨질 수 없어 job 단위 통스킵이 안전하다 (ci.yml 과 달리 상시 스텝 없음).
+  diff-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.scope.outputs.code_changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 분류기 self-test (사용 직전 자기 검증)
+        run: node scripts/ci-diff-scope.mjs --self-test
+
+      - name: 변경 파일 판별 + 분류
+        id: scope
+        run: |
+          # depth-1 checkout + 표적 fetch — 실패 시 빈 목록 → fail-safe code_changed=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            if git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+              git diff --name-only "$BASE_SHA" HEAD > /tmp/changed-files.txt
+            else
+              echo "::warning::base sha fetch 실패 — fail-safe: 전체 코드 취급"
+              : > /tmp/changed-files.txt
+            fi
+          else
+            BEFORE="${{ github.event.before }}"
+            if [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+              && git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
+              git diff --name-only "$BEFORE" "${{ github.sha }}" > /tmp/changed-files.txt
+            else
+              echo "::warning::push before sha 미해석 (신규 브랜치/force-push) — fail-safe: 전체 코드 취급"
+              : > /tmp/changed-files.txt
+            fi
+          fi
+          echo "── 변경 파일 목록 ──"
+          cat /tmp/changed-files.txt
+          node scripts/ci-diff-scope.mjs --files-from /tmp/changed-files.txt
+
   verify-and-rust:
     runs-on: ubuntu-latest
+    # #915 — docs-only 스킵 (required check 미설정 실측이라 skip 이 머지를 막지 않음 — ci.yml 참조)
+    needs: diff-scope
+    if: needs.diff-scope.outputs.code_changed == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -156,7 +199,9 @@ jobs:
   # 실패 시에도 빠른 경로 PASS 면 PR 차단되지 않음 — 장기 경로는 별도 관찰용.
   long-integration-rust:
     runs-on: ubuntu-latest
-    # 병렬 실행 (빠른 경로 + 장기 경로 독립).
+    # 병렬 실행 (빠른 경로 + 장기 경로 독립). #915 — docs-only 스킵 (diff-scope 게이트).
+    needs: diff-scope
+    if: needs.diff-scope.outputs.code_changed == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -201,6 +246,9 @@ jobs:
   # pre-commit 우회 시 PR diff 로 재검사. exit 0 기본 (머지 차단 X).
   duplicate-function-guard:
     runs-on: ubuntu-latest
+    # #915 — docs-only 스킵 (함수 diff 분석 대상은 코드뿐 — diff-scope 게이트).
+    needs: diff-scope
+    if: needs.diff-scope.outputs.code_changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
