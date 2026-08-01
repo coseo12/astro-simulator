@@ -52,7 +52,7 @@ const measureFps = async (durationMs) => {
   );
 };
 
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 
 const scenarios = [];

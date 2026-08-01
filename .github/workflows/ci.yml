@@ -152,10 +152,10 @@ jobs:
           setsid pnpm --filter @astro-simulator/web start -p 3001 > /tmp/r1-web.log 2>&1 &
           echo $! > /tmp/r1-web.pid
           for i in {1..30}; do
-            if curl -sf http://localhost:3001/ko > /dev/null; then echo "READY after ${i}x2s"; break; fi
+            if curl -sf http://localhost:3001/ > /dev/null; then echo "READY after ${i}x2s"; break; fi
             sleep 2
           done
-          curl -sf http://localhost:3001/ko > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
+          curl -sf http://localhost:3001/ > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
 
       - name: 'r1-guard: verify 실행 (4/4)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
@@ -246,7 +246,7 @@ jobs:
 
       - name: '#402 R-Phase allowlist 회귀 가드 (verify:r-phase-allowlist)'
         if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
-        run: BASE_URL=http://localhost:3002/ko node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
 
       # ============================================================
       # #627 satellite 궤도선 구조 회귀 가드 — parent 추적 + 원점 밀집 통계

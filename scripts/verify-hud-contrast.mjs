@@ -98,7 +98,7 @@ async function measure() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
   // negative 입증 — 더미 미달 backing 을 주입한 chip 을 추가해 가드 fail 을 강제.
@@ -138,7 +138,7 @@ async function measure() {
 const chips = await measure();
 
 console.log('========================================');
-console.log(`HUD 텍스트 배경 무관 대비 가드 (#749) — ${baseUrl}/ko`);
+console.log(`HUD 텍스트 배경 무관 대비 가드 (#749) — ${baseUrl}/`);
 console.log(`worst-case canvas = sun-white rgb(255,255,255), WCAG AA ≥ ${WCAG_AA_TEXT_MIN}:1\n`);
 
 const failures = [];

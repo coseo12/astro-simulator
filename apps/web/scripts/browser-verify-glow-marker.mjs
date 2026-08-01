@@ -21,7 +21,7 @@
  *
  * 사용법:
  *   node apps/web/scripts/browser-verify-glow-marker.mjs
- *   BASE_URL=http://localhost:3000/ko node apps/web/scripts/browser-verify-glow-marker.mjs
+ *   BASE_URL=http://localhost:3000 node apps/web/scripts/browser-verify-glow-marker.mjs
  *   CAPTURE_DIR=docs/reports node ...  # 캡처 PNG 저장 (PR 박제용 — 미지정 시 저장 생략)
  *
  * dev 빌드 의존: `window.__solarScene` / `window.__simStore` / `window.__simCore` (sim-canvas.tsx).
@@ -32,7 +32,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000/ko';
+const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? '';
 
 const VIEWPORT = { width: 1280, height: 720 };

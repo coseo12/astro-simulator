@@ -275,7 +275,7 @@ async function setupScenario(page, scenario) {
     } else {
       // moon focus 가 default 진입 시 셀렉터 미노출 가능 — URL override 사용
       if (scenario.id === 'moon-focus') {
-        await page.goto(`${baseUrl}/ko?focus=moon`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl}/?focus=moon`, { waitUntil: 'networkidle' });
         await page.waitForTimeout(1500);
       }
     }
@@ -333,7 +333,7 @@ let baselineForCompare = null;
 async function measureViewport(page, client, viewport) {
   currentViewportId = viewport.id; // #680 재측정 판정 컨텍스트
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
-  await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
   // 정지 (pause) 로 시작점 안정화 — 모든 시나리오 동일 시작
@@ -464,7 +464,7 @@ if (DIAGNOSE_VARIANCE) {
   for (const vp of VIEWPORTS) {
     currentViewportId = vp.id;
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
     try {
       await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });

@@ -288,6 +288,8 @@ core.command({ type: 'setTimeScale', value: 86400 });
 
 ## 8. 국제화 (i18n)
 
+> **[제거됨 — #908, 2026-08-01]** 아래는 P1 시점 계획. 카탈로그 소비 0 (전 화면 한국어 하드코딩) 상태로 배선만 유지되어 i18n 인프라를 전면 제거했다 (한국어 단일 + `/ko` → `/` 308 하위호환). 재도입 시 이슈 [#908](https://github.com/coseo12/astro-simulator/issues/908) 의 제거 커밋 revert 기점 참조.
+
 - 한국어 우선, 영어 병행
 - 라이브러리: `next-intl` (Next App Router 호환 우수)
 - 천체 이름: 한국천문연구원 공식 명칭 우선, 영문 병기

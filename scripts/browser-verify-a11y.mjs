@@ -23,7 +23,7 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
 
-await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 
 const results = { pass: [], fail: [] };
@@ -49,7 +49,7 @@ if (axe.violations.length > 0) {
 }
 
 // ===== 키보드 탭 순회 =====
-await page.goto(`${baseUrl}/ko?mode=research`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?mode=research`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
 
 // 모든 focusable 요소 수집

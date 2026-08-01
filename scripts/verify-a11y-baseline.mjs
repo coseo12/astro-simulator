@@ -10,7 +10,7 @@
  *   2. shortcut bar 폰트 크기 — `--text-mini = 0.625rem` 이 모바일에서 가시성 확보 가능한지
  *   3. moon orbit 라인 색상 명도 대비 — WCAG 2.2 AA non-text contrast ≥ 3:1
  *      - default (sun 시점) + earth focus 두 색상 모두 측정
- *   4. (#740) 주요 모달/패널 OPEN 상태 color-contrast 스캔 — 기존 3 항목은 `/ko`
+ *   4. (#740) 주요 모달/패널 OPEN 상태 color-contrast 스캔 — 기존 3 항목은 `/`
  *      기본 상태만 측정해 패널/모달을 열지 않아 본 결함을 못 봤다 (게이트 사각).
  *      research 패널 + about/sensitivity 모달을 열어 axe `color-contrast` violation 을
  *      surface 별로 측정. baseline 초과 시 fail-fast.
@@ -83,7 +83,7 @@ const SPACE_BACKGROUND = { r: 0, g: 0, b: 0 };
 
 async function measureViewport(page, viewport) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
-  await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
   // ===== axe-core WCAG 2.2 AA =====
@@ -212,7 +212,7 @@ async function measureOpenSurfaces(page) {
 
   // ----- 1. research 패널 (좌/우 사이드 패널 — celestial-info / satellite-info / scenario / tree) -----
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
   const modeResearch = page.locator('[data-testid="mode-research"]');

@@ -97,10 +97,11 @@ await run('resolveBaseUrl — 후행 슬래시 제거 (`//?gpu=a` 이중 슬래�
     resolveBaseUrl(undefined, { BASE_URL: 'http://localhost:3002///' }),
     'http://localhost:3002',
   );
-  // 경로 세그먼트는 보존 — ci.yml #402 가드가 `BASE_URL=.../ko` 를 쓴다.
+  // 경로 세그먼트는 보존 — BASE_URL 에 경로가 포함될 수 있는 일반 계약.
+  // (#908 이전에는 ci.yml #402 가드가 `BASE_URL=.../ko` 를 썼던 이력)
   assert.equal(
-    resolveBaseUrl(undefined, { BASE_URL: 'http://localhost:3002/ko' }),
-    'http://localhost:3002/ko',
+    resolveBaseUrl(undefined, { BASE_URL: 'http://localhost:3002/base' }),
+    'http://localhost:3002/base',
   );
 });
 

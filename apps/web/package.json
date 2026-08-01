@@ -61,7 +61,6 @@
     "@vitest/ui": "^4.1.4",
     "autoprefixer": "^10.5.0",
     "jsdom": "^29.0.2",
-    "next-intl": "^4.13.4",
     "postcss": "^8.5.25",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
