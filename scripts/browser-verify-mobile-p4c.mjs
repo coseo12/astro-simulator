@@ -75,7 +75,7 @@ const measureFps = (ms) =>
 
 // ===== Scenario 1: N=200 60fps 유지 =====
 console.log('\n[1/3] N=200 60fps 유지 (iPhone 14 emulation, 5초 평균)');
-await page.goto(`${baseUrl}/ko?belt=200`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?belt=200`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
 // P7-E #210 — silent-fail 방지 (pre-assert).
 await pressTimePlay(page, { skipIfAbsent: true });
@@ -91,7 +91,7 @@ await page.screenshot({ path: join(shotDir, '1-n200.png') });
 // ===== Scenario 2: N=10000 크래시 없음 =====
 console.log('\n[2/3] N=10000 크래시 없음 (best-effort fps)');
 const errsBeforeBig = pageErrors.length;
-await page.goto(`${baseUrl}/ko?belt=10000`, { waitUntil: 'networkidle' });
+await page.goto(`${baseUrl}/?belt=10000`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(3000);
 // P7-E #210 — silent-fail 방지 (pre-assert).
 await pressTimePlay(page, { skipIfAbsent: true });
@@ -116,7 +116,7 @@ const consoleErrors2 = [];
 page2.on('console', (m) => {
   if (m.type() === 'error') consoleErrors2.push(m.text());
 });
-await page2.goto(`${baseUrl}/ko?engine=webgpu&belt=500`, { waitUntil: 'networkidle' });
+await page2.goto(`${baseUrl}/?engine=webgpu&belt=500`, { waitUntil: 'networkidle' });
 await page2.waitForTimeout(2000);
 const hud = (await page2.textContent('[data-testid="hud-top-right"]')) ?? '';
 const rendererInFallback = hud.match(/renderer\s*·\s*(\w+)/)?.[1];

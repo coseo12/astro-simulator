@@ -4,7 +4,7 @@ import type { CoreCommand } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
 import { TimeControls } from './time-controls';
 
-// next-intl 의존성 없고, SimCommandContext만 필요 — 단순 provider mock
+// 외부 provider 의존성 없고, SimCommandContext만 필요 — 단순 provider mock
 let sentCommands: CoreCommand[] = [];
 vi.mock('@/core/sim-context', () => ({
   useSimCommand: () => (cmd: CoreCommand) => {

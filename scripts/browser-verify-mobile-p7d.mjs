@@ -56,7 +56,7 @@ console.log('\n[1/4] `?bh=2` iPhone 14 emulation 로드 + JD 진행 가드');
   });
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
-  await page.goto(`${baseUrl}/ko?bh=2`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?bh=2`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   // JD 초기값 획득 → 재생 → 3초 후 증가 확인.
   const jdBefore = await page.evaluate(() =>
@@ -98,7 +98,7 @@ console.log('\n[2/4] `?bh=2&integrator=yoshida4` 조합 로드 + 5초 재생 에
   page.on('console', (m) => {
     if (m.type() === 'error') consoleErrors.push(m.text());
   });
-  await page.goto(`${baseUrl}/ko?bh=2&integrator=yoshida4`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?bh=2&integrator=yoshida4`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   // P7-E #210 — pre-assert 후 click.
   await pressTimePlay(page, { skipIfAbsent: true });
@@ -130,7 +130,7 @@ console.log('\n[3/4] 모바일 + navigator.gpu 차단 → mobile-webgpu-best-eff
     Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
   });
   const page = await ctx.newPage();
-  await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
   const notice = page.locator('[data-testid="engine-notice"]');
   check('engine-notice 노출', (await notice.count()) >= 1);
@@ -154,7 +154,7 @@ console.log('\n[4/4] key-scoped dismiss — mobile 키 닫아도 다른 key 알�
     Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
   });
   const page = await ctx.newPage();
-  await page.goto(`${baseUrl}/ko`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
   // Pre-assert: dev-only `window.__simStore` 가 반드시 노출되어야 한다.

@@ -1,8 +1,5 @@
-import { NextIntlClientProvider, hasLocale } from 'next-intl';
-import { notFound } from 'next/navigation';
 import { JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
-import { routing } from '@/i18n/routing';
 import type { ReactNode } from 'react';
 import 'pretendard/dist/web/variable/pretendardvariable.css';
 import './globals.css';
@@ -24,33 +21,17 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains',
 });
 
-export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
-}
-
-export default async function LocaleLayout({
-  children,
-  params,
-}: {
-  children: ReactNode;
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-
-  if (!hasLocale(routing.locales, locale)) {
-    notFound();
-  }
-
+// (#908) i18n 제거 — 전 화면 한국어 하드코딩 상태(카탈로그 소비 0)라 locale 라우팅 없이 ko 단일 고정.
+// /ko 하위호환 리다이렉트는 next.config.mjs redirects (308) 담당. 재도입 시 제거 커밋 revert 기점은 이슈 #908 코멘트 참조.
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
-      lang={locale}
+      lang="ko"
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
       data-mode="observe"
     >
       <body>
-        <NuqsAdapter>
-          <NextIntlClientProvider>{children}</NextIntlClientProvider>
-        </NuqsAdapter>
+        <NuqsAdapter>{children}</NuqsAdapter>
       </body>
     </html>
   );

@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#908] next-intl 제거 — 한국어 단일 + `/ko` → `/` 308 하위호환 리다이렉트 (감사 D4, MINOR)** ([#908](https://github.com/coseo12/astro-simulator/issues/908)) — 전수 감사 D4 실측 (next-intl 완전 배선 but **카탈로그 소비 0** — 전 화면 한국어 하드코딩, `/` → 307 → `/ko` 1 hop 오버헤드만 지불) 에 따른 사용자 결정 (2026-07-31 "i18n 제거, 한국어만 사용") 집행. **라우팅 행동 변화**: (1) `/` 가 **직접 200** (리다이렉트 hop 0, 기존 307 hop 제거) — 루트 라우트가 middleware 경유 동적 렌더에서 **정적 prerender** 로 전환, (2) 기존 `/ko`·`/ko/*` 외부 링크는 **308 Permanent Redirect** 로 `/` 이전 (next.config redirects, 쿼리 파라미터 `?focus=` 등 자동 보존), (3) `/en` 은 404 (영어 화면이 실존한 적 없음 — 스코프 의도적 제외), (4) `<html lang>` 은 `ko` 하드코딩. **제거 대상**: `next-intl` devDep (lockfile 포함) / `proxy.ts` middleware (i18n 전용이라 파일 삭제) / `next.config` plugin / `src/i18n/` 3파일 / `messages/` 카탈로그 2파일 / `app/[locale]` 세그먼트 루트 평탄화. **검증 인프라 동반 갱신**: browser-verify·bench·r1 계열 스크립트 20개 + CI workflow 4개 + composite action 의 `/ko` URL 을 `/` 로 전환 (r1-guard 는 `BASE_URL` 루트 직접 사용이라 baseline 재캡처 불요 — 렌더 내용 불변). 하드코딩 문구는 현행 유지 (재도입 시 일괄 — 제거 커밋 SHA 는 이슈 #908 코멘트에 revert 기점으로 박제).
+
 ## [0.54.0] — 2026-07-31
 
 ### Behavior Changes
