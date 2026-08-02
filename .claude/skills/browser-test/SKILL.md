@@ -308,9 +308,18 @@ agent-browser auth login staging
 
 ## 규칙
 
-- **Chrome 좀비 정리 (반환/종료 직전 의무 — volt #79/#795)**: agent-browser 사용 후
-  `pgrep -f "agent-browser-chrome[-]" >/dev/null && pkill -TERM -f "agent-browser-chrome[-]"` 실행,
-  2초 대기 후 잔존 시 `pkill -KILL -f "agent-browser-chrome[-]"`. bracket 패턴은 self-match 오탐 방지 (#795).
+- **에러 도중 경로 — 페이지가 안 열리면 먼저 정리 (#926)**: `open` 실패/타임아웃 시
+  진단을 계속하기 전에 **먼저 `bash scripts/cleanup-browser.sh` 실행 후 재시도**한다.
+  agent-browser 는 상주 daemon 이 Chrome 을 소유하는 구조라, hang 세션에서는 `close` 가
+  그 뒤에 줄을 서거나 함께 hang 하므로 무력하며 **pkill 이 정상 경로**다. 재시도 후에도
+  실패하면 그때 진단/부분 반환으로 진행한다 (정리 없이 진단만 계속하면 hang daemon 이
+  잔존 누적 — 실측 10일 묵은 daemon 2개, 2026-08-02).
+
+- **Chrome 좀비 정리 (반환/종료 직전 의무 — volt #79/#795/#926)**: agent-browser 사용 후
+  `bash scripts/cleanup-browser.sh` 를 실행하고 요약 라인의 `잔존=0` (exit 0) 을 확인한다.
+  스크립트가 close (10s timeout) → `pkill -TERM -f "agent-browser-chrome[-]"` → 2s → 잔존 `-KILL`
+  → stale daemon (ETIME ≥ 30분) 정리를 결정적으로 수행한다 (기억할 명령 4개 → 1개 축약,
+  bracket 패턴 self-match 방지 #795 내장. 포트 3000 은 검출·경고만 — dev 서버 오살 방지).
   정상 `agent-browser close` 가 커버 못 하는 비정상 종료 (timeout / SIGKILL / panic) 좀비 대응 — 실측 6세션/52좀비/800%+ CPU (volt #79).
 
 - `agent-browser`가 설치되어 있지 않으면 스킬 사용 전 설치를 안내한다
