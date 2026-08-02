@@ -24,13 +24,53 @@
  *      GPU/렌더러 경로(metal vs swiftshader)가 판정을 바꿀 여지가 없다.
  *      (이슈 #932 가 의심한 "로컬 렌더러 경로 의존" 가설은 이 지점에서 기각된다.)
  *
+ * ## CI 배선 범위 = 시나리오 3/4 만 (#932 축 분할 — ubuntu 실측 근거)
+ *
+ * ### 시나리오 1/2 는 **로컬 전용**. CI 미배선 사유 (추정 아님 — CI 실측):
+ *
+ * PR #934 1차 배선에서 전 시나리오를 ubuntu 러너에 올렸다가 **step FAIL** 했다
+ * (run [30751043285](https://github.com/coseo12/astro-simulator/actions/runs/30751043285), 2026-08-02):
+ *
+ *     [1/4] ✓ JD 3초 이상 진행 (bh=2) — before=2451546.318 after=2451549.937
+ *           ✗ 콘솔 에러 0건 — BJS: A fatal error occurred during WebGPU creation/initialization.
+ *           ✗ pageerror 0건 — Could not retrieve a WebGPU adapter (adapter is null or undefined).
+ *     [2/4] locator.count: Target crashed        ← 탭 크래시, exit 1
+ *
+ * 원인은 **ubuntu 러너의 WebGPU adapter 부재**다. 본 스크립트는 launch 인자로
+ * `--enable-unsafe-webgpu` 를 주므로 `navigator.gpu` 는 **존재**하지만 `requestAdapter()` 가
+ * null 을 반환해, Babylon 이 WebGPUEngine 생성을 시도하다 fatal → 시나리오 1/2 의
+ * `콘솔 에러 0건` / `pageerror 0건` assertion 위반 + 시나리오 2 는 탭 크래시.
+ *
+ * ### 왜 `--use-angle=swiftshader` 로는 사전에 재현되지 않았나 (판단 오류 정정)
+ *
+ * `GPU_LAUNCH_ARGS.swiftshader` 는 **ANGLE(WebGL) 백엔드** 스위치이지 **WebGPU(Dawn) adapter
+ * 경로를 지배하지 않는다**. macOS 는 이 플래그를 줘도 adapter 를 획득하므로 로컬
+ * `metal` / `swiftshader` 양쪽 17/17 PASS 는 **macOS 국소 실증**이었고, ubuntu 의 adapter-null
+ * 조건은 위 CI run 이 **최초 실측**이자 FAIL 이었다. 렌더러 축 SSoT 로는 이 축을 못 덮는다.
+ *
+ * ### 왜 (A) tier 파라미터 고정이나 launch 플래그 제거가 아닌 (C) 축 분할인가
+ *
+ * `?gpu=a` 는 **tier**(LOD/알림) 를 강제할 뿐 엔진 백엔드(WebGPU vs WebGL) 선택을 바꾸지 않는다.
+ * `--enable-unsafe-webgpu` 를 빼면 ubuntu 는 통과하겠지만, **시나리오 1/2 가 macOS 에서 재던
+ * "모바일 emulation + WebGPU 엔진 초기화 무결" 축 자체가 소멸**한다 (위 CI 로그가 그 축의 실재
+ * 증거 — 플래그가 있을 때 Babylon 이 실제로 WebGPU 경로를 탄다). 그 축은 ubuntu 에서 **애초에
+ * 측정 불가능**(adapter 부재)하므로, 측정 가능한 곳(로컬 macOS)에 남기고 환경 비의존이 증명된
+ * 시나리오 3/4 만 CI 로 올린다. 프로젝트 선례와도 정합 — `--enable-unsafe-webgpu` 를 쓰는
+ * 스크립트 6종(`bench-webgpu` / `bench-scene-mobile` / `browser-verify-webgpu` /
+ * `browser-verify-belt-nbody` / `browser-verify-mobile-p4c` / 본 파일)은 **전부 CI 미배선**이고,
+ * ubuntu green 인 브라우저 가드 13종은 **하나도 이 플래그를 쓰지 않는다**.
+ *
  * 한계 (P4-C 선례와 동일):
  *   - Playwright는 Chromium 기반 iPhone emulation — UA/viewport만 Safari 흉내.
  *   - 실제 iOS Safari WebGPU 동작은 실기기에서만 정확 측정 가능.
  *   - 본 스크립트는 **구조적 회귀**(크래시/경고 경로/UI 렌더)만 차단한다.
  *   - 성능 측정은 `scripts/bench-scene-mobile.mjs` 또는 실기기 수동 측정.
  *
- * 사용: node scripts/browser-verify-mobile-p7d.mjs [baseUrl]
+ * 사용:
+ *   node scripts/browser-verify-mobile-p7d.mjs [baseUrl] [--scenarios=1,2,3,4]
+ *
+ *   `--scenarios` 미지정 = 전 시나리오 (로컬 기본). CI 는 `--scenarios=3,4`.
+ *   알 수 없는 id 는 **exit 2 fail-fast** — 조용한 매트릭스 축소 불가 (#378 `--cells` 선례).
  */
 import { devices } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -44,9 +84,54 @@ import {
   resolveBaseUrl,
 } from './browser-verify-utils.mjs';
 
+const argv = process.argv.slice(2);
+// 위치 인자(baseUrl) 와 `--` 플래그를 분리 — `--scenarios=` 가 baseUrl 로 오인되면 안 된다.
+const positional = argv.filter((a) => !a.startsWith('--'));
+
 // argv[2] 는 로컬 수동 실행 편의 (포트 임의 지정). 미지정 시 resolveBaseUrl() 로
 // BASE_URL 해석 + 후행 슬래시 정규화 (docs/ops/browser-verify-helpers.md 체크리스트).
-const baseUrl = process.argv[2]?.replace(/\/+$/, '') ?? resolveBaseUrl('http://localhost:3001');
+const baseUrl = positional[0]?.replace(/\/+$/, '') ?? resolveBaseUrl('http://localhost:3001');
+
+/** 전 시나리오 id — 축 분할 배선(#932)의 선택 domain. */
+const ALL_SCENARIOS = [1, 2, 3, 4];
+
+/**
+ * `--scenarios=3,4` 파싱. 미지정이면 전 시나리오.
+ *
+ * 알 수 없는 id 는 exit 2 fail-fast — 오타가 조용히 "0개 실행 + PASS" 로 흡수되면
+ * 가드가 공허해진다 (CLAUDE.md §가드 설계 원칙 — fallback 분기 금지, #378 `--cells` 선례).
+ */
+function parseScenarios(args) {
+  const flag = args.find((a) => a.startsWith('--scenarios='));
+  if (flag === undefined) return ALL_SCENARIOS;
+  const raw = flag.slice('--scenarios='.length);
+  const ids = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  const unknown = ids.filter((s) => !ALL_SCENARIOS.includes(Number(s)));
+  if (ids.length === 0 || unknown.length > 0) {
+    console.error(
+      `[mobile-p7d] --scenarios 인자 오류: '${raw}' — 허용 id: ${ALL_SCENARIOS.join(',')}` +
+        (unknown.length > 0 ? ` (알 수 없는 id: ${unknown.join(',')})` : ''),
+    );
+    process.exit(2);
+  }
+  return ids.map(Number).sort((a, b) => a - b);
+}
+
+const scenarios = parseScenarios(argv);
+const runs = (id) => scenarios.includes(id);
+
+// 스킵은 **반드시 출력**한다 — 조용한 스킵은 "가드가 돌았다" 는 착시를 만든다 (#840 클래스).
+console.log(`[mobile-p7d] base=${baseUrl} | 실행 시나리오: ${scenarios.join(',')}`);
+if (scenarios.length < ALL_SCENARIOS.length) {
+  const skipped = ALL_SCENARIOS.filter((id) => !runs(id));
+  console.log(
+    `[mobile-p7d] 스킵: ${skipped.join(',')} — 사유는 파일 헤더 §CI 배선 범위 참조 ` +
+      '(시나리오 1/2 는 ubuntu WebGPU adapter 부재로 로컬 전용)',
+  );
+}
 
 /**
  * tier-c graceful degradation 알림 키 (#290 SSoT — `detect-gpu-tier.ts` 헤더 §7).
@@ -87,8 +172,9 @@ await withBrowser(
   }),
   async (browser) => {
     // ===== Scenario 1: iPhone 14 emulation `?bh=2` 로드 =====
-    console.log('\n[1/4] `?bh=2` iPhone 14 emulation 로드 + JD 진행 가드');
-    {
+    // 로컬 전용 축 — ubuntu 는 WebGPU adapter 부재로 측정 불가 (헤더 §CI 배선 범위).
+    if (runs(1)) {
+      console.log('\n[1/4] `?bh=2` iPhone 14 emulation 로드 + JD 진행 가드');
       const ctx = await browser.newContext({ ...deviceProfile });
       const page = await ctx.newPage();
       const consoleErrors = [];
@@ -136,8 +222,9 @@ await withBrowser(
     }
 
     // ===== Scenario 2: `?bh=2&integrator=yoshida4` 조합 =====
-    console.log('\n[2/4] `?bh=2&integrator=yoshida4` 조합 로드 + 5초 재생 에러 가드');
-    {
+    // 로컬 전용 축 — ubuntu 에서 WebGPU 초기화 fatal → 탭 크래시 실측 (헤더 §CI 배선 범위).
+    if (runs(2)) {
+      console.log('\n[2/4] `?bh=2&integrator=yoshida4` 조합 로드 + 5초 재생 에러 가드');
       const ctx = await browser.newContext({ ...deviceProfile });
       const page = await ctx.newPage();
       const consoleErrors = [];
@@ -168,8 +255,9 @@ await withBrowser(
     }
 
     // ===== Scenario 3: 모바일 UA + WebGPU 차단 → tier-c-graceful-degradation 노티 =====
-    console.log(`\n[3/4] 모바일 + navigator.gpu 차단 → ${TIER_C_NOTICE_KEY} 노티`);
-    {
+    // CI 배선 축 — navigator.gpu 명시 차단이라 호스트 WebGPU adapter 유무와 무관 (환경 비의존).
+    if (runs(3)) {
+      console.log(`\n[3/4] 모바일 + navigator.gpu 차단 → ${TIER_C_NOTICE_KEY} 노티`);
       const ctx = await browser.newContext({ ...deviceProfile });
       // iOS Safari <17.4 환경 시뮬레이션 — navigator.gpu 명시 차단.
       await ctx.addInitScript(() => {
@@ -189,8 +277,9 @@ await withBrowser(
     // ===== Scenario 4: key 분리 dismiss — A key 닫은 뒤 B key 표시 가능 =====
     // P7-E #210 / #221 — dev-only `window.__simStore` 노출로 스킵 분기 제거, 실제
     // dismiss 통합 검증 (architect §핵심 결정 4). store 미노출 환경에서는 명시 FAIL.
-    console.log('\n[4/4] key-scoped dismiss — mobile 키 닫아도 다른 key 알림은 정상 (UI 통합)');
-    {
+    // CI 배선 축 — 시나리오 3 과 동일하게 navigator.gpu 차단 (환경 비의존).
+    if (runs(4)) {
+      console.log('\n[4/4] key-scoped dismiss — mobile 키 닫아도 다른 key 알림은 정상 (UI 통합)');
       const ctx = await browser.newContext({ ...deviceProfile });
       await ctx.addInitScript(() => {
         Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
@@ -287,11 +376,20 @@ await withBrowser(
 console.log('\n========================================');
 const pass = results.filter((r) => r.pass).length;
 const fail = results.filter((r) => !r.pass).length;
-console.log(`통과: ${pass} / 실패: ${fail}`);
+console.log(`통과: ${pass} / 실패: ${fail} (시나리오 ${scenarios.join(',')})`);
+
+// 공허 가드 차단 — 선택된 시나리오가 있는데 assertion 이 0건이면 판정이 성립하지 않는다.
+// (블록 게이팅 오류·조기 return 을 "0 실패 = PASS" 로 흡수하지 않는다.)
+if (results.length === 0) {
+  console.error('[mobile-p7d] assertion 0건 — 시나리오가 실제로 실행되지 않았다. 배선 점검 필요.');
+  process.exit(2);
+}
 
 if (fail > 0) {
   console.log('\n실패 항목:');
   results.filter((r) => !r.pass).forEach((r) => console.log(`  ✗ ${r.name} — ${r.detail}`));
   process.exit(1);
 }
-console.log(`✓ P7-D 모바일 1차 게이트 통과 (스크린샷: ${shotDir})`);
+console.log(
+  `✓ P7-D 모바일 1차 게이트 통과 — 시나리오 ${scenarios.join(',')} (스크린샷: ${shotDir})`,
+);
