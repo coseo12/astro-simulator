@@ -1,17 +1,15 @@
 import {
   Color3,
   Color4,
-  DynamicTexture,
   HemisphericLight,
   MeshBuilder,
   PointLight,
   Quaternion,
-  StandardMaterial,
-  Texture,
   TransformNode,
   Vector3,
   type Mesh,
   type Scene,
+  type StandardMaterial,
 } from '@babylonjs/core';
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD, SOLAR_MASS } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
@@ -31,14 +29,25 @@ import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-place
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield } from './starfield.js';
 import { SCENE_CLEAR_COLOR_RGBA, hexToColor3 } from './color-utils.js';
+import type { PlanetLightingConstants } from './procedural-planet-shader.js';
+// #850 Phase 1 — 아래 4 모듈은 본 파일 테일 (구 2041-2502) 에서 순수 이동한 헬퍼다 (동작 변경 0).
 import {
-  createProceduralPlanetMaterial,
-  type PlanetLightingConstants,
-} from './procedural-planet-shader.js';
-// #774 — 태양 emissive 절차 표면 셰이더 (granulation + limb darkening + 색온도).
-// ADR `docs/decisions/20260703-774-sun-emissive-shader.md` §결정 1 — SURFACE_TYPE_BY_BODY 미등록
-// 유지 (테이블은 "외부광 반사 표면" 전용), star 분기가 직접 본 팩토리 호출.
-import { createSunSurfaceMaterial } from './sun-shader.js';
+  createBodyMesh,
+  createBodyMeshMid,
+  createBodyBillboard,
+  type SurfaceLightingArgs,
+} from './body-mesh-factory.js';
+import {
+  shouldApplyBillboardAlphaMask,
+  getOrCreateBillboardAlphaMask,
+  disposeBillboardAlphaMask,
+} from './billboard-alpha-mask.js';
+import {
+  computeRotationState,
+  computeSpinQuaternion,
+  type RotationState,
+} from './self-rotation.js';
+import { sampleOrbitPoints, isSatelliteOrbit } from './orbit-sampling.js';
 import {
   renderScaleForTier,
   initialTier as defaultInitialTier,
@@ -53,7 +62,6 @@ import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
   GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
-  GLOW_MARKER_RESTORE_EMISSIVE_SCALE_NON_STAR,
   resolveGlowMarker,
   resolveGlowMarkerRestoreEmissiveScale,
 } from './glow-marker.js';
@@ -575,7 +583,6 @@ export function createSolarSystemScene(
   // Tier 전환 시 mesh.scaling 을 **절대 값** `newScale / initialRenderScale` 로 설정한다.
   // 과거 `scaleInPlace(ratio)` 반복 호출은 부동소수점 누적 오차를 남겼다 (N2 권고).
   const bodyInitialRenderScale = activeTier; // 모든 body 가 동일 tier 로 생성됨 → Tier 만 기억하면 충분.
-  const bodyBaseDiameter = new Map<string, number>(); // body.radius × 2 (m, tier 중립, 진단용)
   for (const body of system.bodies) {
     const mesh = createBodyMesh(
       body,
@@ -586,7 +593,6 @@ export function createSolarSystemScene(
       surfaceLightingArgs,
     );
     meshes.set(body.id, mesh);
-    bodyBaseDiameter.set(body.id, body.radius * 2);
   }
 
   // #782 §A2 — self-rotation 상태 (rotationPeriodHours 보유 body 만). selfRotation=false 면 빈 Map →
@@ -651,7 +657,6 @@ export function createSolarSystemScene(
   //   - 'shader' (기본): `densityProfile[]` uniform + GLSL 선형 보간
   //   - 'fallback': M1 InstancedMesh 입자 분포 (shader 실패 또는 `?ring=fallback`)
   //   - 'placeholder': PR-1 단색 disk (회귀 검증용)
-  const ringHandlesByBody = new Map<string, RingPlaceholderHandles | RingShaderHandles>();
   for (const body of system.bodies) {
     if (!body.rings || body.rings.length === 0) continue;
     const host = meshes.get(body.id);
@@ -695,7 +700,6 @@ export function createSolarSystemScene(
         ...(body.ringAlphaHint !== undefined ? { ringAlpha: body.ringAlphaHint } : {}),
       });
     }
-    ringHandlesByBody.set(body.id, handles);
     disposables.push({ dispose: () => handles.dispose() });
 
     // #782 §A2.3 결정 1 — ring wobble 격리. selfRotation + 이 body 가 자전하면 host mesh 가 spin 하는데
@@ -2037,466 +2041,4 @@ function isArcRotateCamera(cam: unknown): cam is ArcRotateCamera {
  */
 function defaultBodyScale(_bodyId: string): number {
   return 1.0;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// #782 §A2 — self-rotation (자전) 인프라.
-//
-// 자전각 = jd 순수 함수 (`spinAngle(jd) = ((jd − epoch) × ω) mod 2π`, ADR §A2.3 결정 5). 매 프레임
-// 누적 금지 — frame-rate 독립·float drift 0·timeScale 자동 연동·결정적 재현 (`?t=<jd>&speed=0`).
-//
-// 규약 (i) (ADR §A2.3 결정 4 각주): `rotationPeriodHours` 는 항상 양수 magnitude. 자전 방향(역행)은
-// `axialTiltDeg` (IAU obliquity, 0~180) 에 내재 — uranus 97.77°/venus 177.36° 처럼 obliquity>90 이면
-// pole 이 뒤집혀 양수 spin 이 역행으로 보인다. period 부호를 음수로 주면 방향이 이중 적용되어 뒤집힌다.
-//
-// 축 방위각 (azimuth) 은 ring 답습 world X 고정 근사 — tilt 는 X 축 주위 회전 (`Quaternion.RotationAxis
-// (X, tiltRad)`). ring disc 의 `rotation.x = π/2 + tiltRad` 와 동일 축 → body 자전축 ⊥ ring plane 정합.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** #782 — body 별 자전 파라미터 (데이터에서 1회 산출, 매 프레임 재계산 회피). */
-interface RotationState {
-  /** 각속도 ω [rad/day] = 2π × 24 / rotationPeriodHours (양수 — 방향은 tiltRad 에 내재, 규약 i). */
-  omega: number;
-  /** 자전축 기울기 [rad] (axialTiltDeg — obliquity, X 축 주위. 0~π 범위). */
-  tiltRad: number;
-}
-
-/**
- * #782 — body 데이터에서 자전 파라미터 산출. `rotationPeriodHours` 미지정 시 null (자전 없음).
- * 규약 (i): ω 는 양수 magnitude (방향은 tiltRad 에 내재). loader schema 가 0 을 차단하나 방어적 재확인.
- */
-function computeRotationState(body: LoadedCelestialBody): RotationState | null {
-  const periodHours = body.rotationPeriodHours;
-  if (periodHours === undefined || periodHours === 0) return null;
-  // ω [rad/day] = 2π / (period_h / 24). period 는 양수 magnitude — Math.abs 로 방어 (음수 데이터가
-  // 실수로 들어와도 방향은 tiltRad(obliquity) 가 결정하므로 magnitude 만 사용, 이중 적용 차단).
-  const omega = (2 * Math.PI * 24) / Math.abs(periodHours);
-  const tiltRad = ((body.axialTiltDeg ?? 0) * Math.PI) / 180;
-  return { omega, tiltRad };
-}
-
-/**
- * #782 §A2.3 결정 5 — jd 순수 함수 자전각 → `tilt(axialTilt) ∘ spin(spinAngle)` quaternion.
- *
- * `spinAngle = ((jd − epoch) × ω) mod 2π` (float64 CPU — jd 큰 수 뺄셈을 먼저 수행해 정밀도 보존,
- * cross-validate Q3 실측 ≤ 3.1e-8° 오차). `q = tilt.multiply(spin)` = spin(local Y) 먼저 적용 후
- * tilt(X) — pole 을 tiltRad 만큼 기울인 뒤 그 (기운) 축 주위로 자전 (Babylon multiply 순서: A.multiply(B)
- * 는 B 를 먼저 적용). tmpSpin/tmpTilt 재사용으로 매 프레임 alloc 0 (cross-validate 고유 발견 1).
- *
- * @param jd 현재 Julian Date
- * @param epoch 기준 epoch (JD) — spinAngle 0 기준
- * @param state 자전 파라미터
- * @param tmpSpin 재사용 spin quaternion 버퍼
- * @param tmpTilt 재사용 tilt quaternion 버퍼
- * @param out 결과를 기록할 quaternion (mesh.rotationQuaternion)
- */
-function computeSpinQuaternion(
-  jd: number,
-  epoch: number,
-  state: RotationState,
-  tmpSpin: Quaternion,
-  tmpTilt: Quaternion,
-  out: Quaternion,
-): void {
-  // (jd − epoch) 뺄셈을 float64 로 먼저 (큰 수 − 큰 수 = 작은 수) → mod 2π 로 각 누적 없이 결정적.
-  const spinAngle = (((jd - epoch) * state.omega) % (2 * Math.PI)) as number;
-  // spin: local Y (자전축) 주위. tilt: world X 주위 (ring 답습 — 자전축 ⊥ ring plane 정합).
-  Quaternion.RotationAxisToRef(ROT_SPIN_AXIS, spinAngle, tmpSpin);
-  Quaternion.RotationAxisToRef(ROT_TILT_AXIS, state.tiltRad, tmpTilt);
-  // q = tilt ∘ spin (spin 먼저 적용 후 tilt — Babylon A.multiply(B) = B 먼저).
-  tmpTilt.multiplyToRef(tmpSpin, out);
-}
-
-/** #782 — 자전축 (local Y = pole) / tilt 축 (world X = ring 답습). 모듈 상수 (alloc 0). */
-const ROT_SPIN_AXIS = new Vector3(0, 1, 0);
-const ROT_TILT_AXIS = new Vector3(1, 0, 0);
-
-/**
- * #773 Amendment 1 — 절차 표면 셰이더 광원 배선 인자 (createBodyMesh/createBodyMeshMid 공유).
- * scene 가 소유한 광원 상수 + sun position provider 를 셰이더 팩토리로 단방향 전달.
- */
-interface SurfaceLightingArgs {
-  lighting: PlanetLightingConstants;
-  sunPositionProvider: () => Vector3;
-}
-
-function createBodyMesh(
-  body: LoadedCelestialBody,
-  scene: Scene,
-  tier: Tier,
-  bodyScale: (bodyId: string) => number,
-  surfaceDetail = false,
-  surfaceLighting?: SurfaceLightingArgs,
-): Mesh {
-  // P12-A #298 — 실측 직경 × 현재 tier 의 renderScale 로 메쉬 생성.
-  // R1 #329 — × bodyScale (시각 과장 배수, ADR `20260425-r1-sun-visualization.md` §결정 3).
-  // `mesh.scaling` 은 1 유지 (tier 전환 시 scaling.scaleInPlace 로 비율 적용, ADR §주석 §2).
-  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
-  const mesh = MeshBuilder.CreateSphere(body.id, { diameter, segments: 32 }, scene);
-
-  // #756 — 절차적 표면 셰이더 (surfaceDetail=true + 테이블 등록 body 만). 미등록/OFF 면 null →
-  // 기존 StandardMaterial 경로 (단색, 무회귀).
-  // ADR `docs/decisions/20260628-756-procedural-planet-surface.md` §결정 1·4 + Amendment 1 (#773).
-  // #774 — 항성(star)은 emissive 전용 sun 셰이더 (광원 인자 불요 — ADR 20260703-774 §결정 1·4).
-  // `?surface=off` (surfaceDetail=false) 면 기존 star 단색 emissive 100% 복귀 (§결정 8).
-  const surfaceMat = surfaceDetail
-    ? body.kind === 'star'
-      ? createSunSurfaceMaterial(scene, body, `${body.id}-surface-mat`)
-      : createProceduralPlanetMaterial(scene, body, `${body.id}-surface-mat`, surfaceLighting ?? {})
-    : null;
-  if (surfaceMat) {
-    mesh.material = surfaceMat;
-  } else {
-    const mat = new StandardMaterial(`${body.id}-mat`, scene);
-    const hex = body.colorHint?.hex ?? '#888888';
-    const c = hexToColor3(hex);
-    if (body.kind === 'star') {
-      mat.emissiveColor = c;
-      mat.disableLighting = true;
-    } else {
-      mat.diffuseColor = c;
-      mat.specularColor = new Color3(0.05, 0.05, 0.05);
-    }
-    mesh.material = mat;
-  }
-  // #713 — mesh → bodyId 역매핑 (high variant). ADR `20260620-713-click-body-select.md` §결정 1.
-  // pick 결과(pickedMesh)에서 O(1) 역변환. high/mid/low 전 variant 동일 id 박제 (단위 테스트 가드).
-  mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
-  return mesh;
-}
-
-/**
- * P11-B #289 — mid LOD variant: 저폴리 sphere (segments=12).
- *
- * ADR `docs/decisions/20260424-p11-b-lod-design.md` §축 4.
- * high (segments=32) 대비 약 85% 버텍스 감소 — draw call 비용 동일하나 GPU fill-rate / transform 절감.
- *
- * parent 를 high variant 로 지정 — position / scale 은 high 에서 자동 상속.
- * `scaling = 1` 유지 → tier 전환 시 high 와 동일 배수로 확대 (parent 상속).
- */
-function createBodyMeshMid(
-  body: LoadedCelestialBody,
-  scene: Scene,
-  tier: Tier,
-  parent: Mesh,
-  bodyScale: (bodyId: string) => number,
-  surfaceDetail = false,
-  surfaceLighting?: SurfaceLightingArgs,
-): Mesh {
-  // R1 #329 — high variant 와 동일 식 (× bodyScale) 로 비율 보존. LOD 전환 시 사용자가 크기 변화 인지 못함.
-  const diameter = body.radius * 2 * renderScaleForTier(tier) * bodyScale(body.id);
-  const mesh = MeshBuilder.CreateSphere(`${body.id}-lod-mid`, { diameter, segments: 12 }, scene);
-  mesh.parent = parent;
-  // parent local 기준 원점 (high mesh 와 동일 위치).
-  mesh.position.set(0, 0, 0);
-
-  // #756 — mid variant 도 high 와 동일 절차 셰이더 공유 (segments 만 다름 — ADR §결정 1).
-  // LOD 전환 시 표면 연속성 (사용자 인지 불변). 미등록/OFF 면 null → StandardMaterial 무회귀.
-  // #773 Amendment 1 — 동일 광원 인자 (high/mid 명암 일관 — 각 variant 의 onBind 가 자기 sunDir 갱신).
-  // #774 — 항성(star)은 high 와 동일 sun 셰이더 공유 (팝핑 0 — ADR 20260703-774 §결정 6).
-  const surfaceMat = surfaceDetail
-    ? body.kind === 'star'
-      ? createSunSurfaceMaterial(scene, body, `${body.id}-lod-mid-surface-mat`)
-      : createProceduralPlanetMaterial(
-          scene,
-          body,
-          `${body.id}-lod-mid-surface-mat`,
-          surfaceLighting ?? {},
-        )
-    : null;
-  if (surfaceMat) {
-    mesh.material = surfaceMat;
-  } else {
-    const mat = new StandardMaterial(`${body.id}-lod-mid-mat`, scene);
-    const hex = body.colorHint?.hex ?? '#888888';
-    const c = hexToColor3(hex);
-    if (body.kind === 'star') {
-      mat.emissiveColor = c;
-      mat.disableLighting = true;
-    } else {
-      mat.diffuseColor = c;
-      mat.specularColor = new Color3(0.05, 0.05, 0.05);
-    }
-    // alpha blend 허용 — 200ms cross-fade 에서 material.alpha 조작.
-    mat.useAlphaFromDiffuseTexture = false;
-    mesh.material = mat;
-  }
-  // #713 — mesh → bodyId 역매핑 (mid variant). high/low 와 동일 id (ADR §결정 1).
-  mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
-  mesh.setEnabled(false); // 기본 숨김 — 첫 전환 시 enable.
-  return mesh;
-}
-
-/**
- * #391 Phase 2 — billboard quad 의 alpha mask fallback 임계 (pxDiameter, 픽셀).
- *
- * ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 + cross-validate 이견 수용 #1.
- *
- * **계약 (drift 방어)**:
- *  - pxDiameter ≥ 4px → alpha mask 적용 (원형 disc 인지)
- *  - pxDiameter < 4px → alpha mask 바이패스, 사각형 quad 그대로 유지
- *  - 근거: smoothstep(0.4, 0.5) 의 0.53px 전이 구간이 1 hardware pixel 미만 → GPU sampler aliasing
- *    + sub-pixel flickering 발생. 사용자 D-T2 가 3px 이하 객체에서 원/사각형 구분 불가 →
- *    사각형 quad 가 시각 안정성 우위.
- *
- * 본 임계값을 변경하려면 ADR Amendment 박제 의무 (volt #49 — 주석 계약 vs 구현 drift).
- */
-export const LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER = 4;
-
-/**
- * #391 Phase 2 — billboard alpha mask 적용 여부 결정 헬퍼.
- *
- * ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"4px fallback 분기".
- * runLodPass 가 매 프레임 호출 + lod.test.ts 단위 테스트에서 경계 검증 (3.9 / 4.1px).
- *
- * @param pxDiameter — 현재 측정된 billboard 직경 (pixel). `screenCoverage * 2` SSoT.
- * @returns true = alpha mask 적용 / false = 사각형 quad 유지 (fallback)
- */
-export function shouldApplyBillboardAlphaMask(pxDiameter: number): boolean {
-  // NaN / 음수 / undefined → fallback (alpha mask 미적용 안전 측).
-  if (!Number.isFinite(pxDiameter) || pxDiameter <= 0) return false;
-  return pxDiameter >= LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER;
-}
-
-/**
- * #391 Phase 2 — alpha mask 텍스처 캐시 키 (scene.metadata 단일 SSoT).
- *
- * scene 단위 1회 생성 + 모든 billboard material 공유. per-body 생성 금지 (메모리 24배).
- * scene dispose 시 함께 dispose 의무 (cross-validate 이견 수용 #2).
- */
-const ALPHA_MASK_METADATA_KEY = '__lodBillboardAlphaMask';
-
-/**
- * #391 Phase 2 — billboard 용 procedural 원형 alpha mask 텍스처 (scene 공유 인스턴스).
- *
- * ADR `docs/decisions/20260502-391-phase2-billboard.md` §"developer 단계 작업 명세" §1
- * (옵션 A 채택 — DynamicTexture 64×64 + scene 공유).
- *
- * 동작:
- *  - 첫 호출 시 64×64 DynamicTexture 생성 (≈ 16KB VRAM, Babylon Uber-shader 캐시 호환)
- *  - radial gradient: alpha = 1 - smoothstep(0.4 * size, 0.5 * size, length(uv - 0.5))
- *    → 64.6% 면적이 opaque 원형 disc, 가장자리 ~3.2px 안티앨리어싱 전이
- *  - 두 번째+ 호출은 캐시된 동일 인스턴스 반환 (메모리 1× 보장)
- *  - 캐시는 `scene.metadata.__lodBillboardAlphaMask` 에 저장 — scene dispose 시 함께 정리
- *
- * 텍스처 자체는 모든 billboard material 의 `opacityTexture` 로 공유 참조. material 인스턴스는
- * body 별 emissiveColor / diffuseColor 를 분리 유지하되 mask 만 공유.
- */
-function getOrCreateBillboardAlphaMask(scene: Scene): DynamicTexture {
-  const meta = (scene.metadata ?? (scene.metadata = {})) as Record<string, unknown>;
-  const cached = meta[ALPHA_MASK_METADATA_KEY];
-  if (cached instanceof DynamicTexture) return cached;
-
-  const SIZE = 64;
-  const texture = new DynamicTexture(
-    'lod-billboard-alpha-mask',
-    { width: SIZE, height: SIZE },
-    scene,
-    /* generateMipMaps */ false,
-    Texture.TRILINEAR_SAMPLINGMODE,
-  );
-  texture.hasAlpha = true;
-  // Babylon DynamicTexture 가 wrap clamp 미설정 시 sub-pixel 가장자리에서 1px 라인 누설 가능.
-  texture.wrapU = Texture.CLAMP_ADDRESSMODE;
-  texture.wrapV = Texture.CLAMP_ADDRESSMODE;
-
-  const ctx = texture.getContext() as CanvasRenderingContext2D;
-  // 투명 초기화 (clearRect 사용 — fillStyle 'transparent' 보다 명시적).
-  ctx.clearRect(0, 0, SIZE, SIZE);
-
-  // smoothstep(0.4, 0.5) 의 직접 캔버스 구현 — radial gradient 로 근사.
-  // 0.0 ~ 0.4 = alpha 1.0 (완전 opaque)
-  // 0.4 ~ 0.5 = smoothstep 전이 구간
-  // 0.5 ~ 1.0 = alpha 0 (완전 transparent)
-  // 캔버스 픽셀 직접 조작이 가장 정확 (gradient API 의 cubic interp 와 smoothstep 미일치).
-  const imageData = ctx.createImageData(SIZE, SIZE);
-  const data = imageData.data;
-  const cx = (SIZE - 1) / 2;
-  const cy = (SIZE - 1) / 2;
-  const halfSize = SIZE / 2;
-  for (let y = 0; y < SIZE; y += 1) {
-    for (let x = 0; x < SIZE; x += 1) {
-      const dx = (x - cx) / halfSize; // -1 ~ 1
-      const dy = (y - cy) / halfSize;
-      const dist = Math.sqrt(dx * dx + dy * dy); // 0 ~ √2 (코너 = 1.414)
-      // smoothstep(edge0, edge1, x) = clamp((x - edge0) / (edge1 - edge0), 0, 1) ^ 2 * (3 - 2 * t)
-      // ADR SSoT — 0.4/0.5 경계 (반지름 기준).
-      // dist 는 캔버스 가장자리에서 1.0 (반지름 = halfSize) 이므로 0.4/0.5 = 캔버스 반경의 80%/100%.
-      // 단, ADR 박제 0.4/0.5 는 quad UV 0~1 좌표계 (0.5 = 중심, 0~0.5 = 반지름) 기준이라 dist 직접 사용.
-      const t = Math.max(0, Math.min(1, (dist - 0.8) / (1.0 - 0.8))); // 0.4*2/0.5*2 = 0.8/1.0
-      const smoothstep = t * t * (3 - 2 * t);
-      const alpha = 1 - smoothstep;
-      const idx = (y * SIZE + x) * 4;
-      data[idx + 0] = 255; // R — opacity 텍스처라 RGB 무시되나 white 박제
-      data[idx + 1] = 255; // G
-      data[idx + 2] = 255; // B
-      data[idx + 3] = Math.round(alpha * 255); // A
-    }
-  }
-  ctx.putImageData(imageData, 0, 0);
-  texture.update(false /* invertY 무관 */);
-
-  meta[ALPHA_MASK_METADATA_KEY] = texture;
-  return texture;
-}
-
-/**
- * #391 Phase 2 — scene dispose 시 alpha mask 텍스처 정리 (cross-validate 이견 수용 #2).
- *
- * scene 단위 1회 생성된 DynamicTexture 가 누수되지 않도록 명시 dispose. scene 의 dispose 콜백에서
- * 호출. metadata 키도 함께 정리하여 dispose 후 stale 참조 회피.
- */
-function disposeBillboardAlphaMask(scene: Scene): void {
-  const meta = scene.metadata as Record<string, unknown> | null;
-  if (!meta) return;
-  const cached = meta[ALPHA_MASK_METADATA_KEY];
-  if (cached instanceof DynamicTexture) {
-    cached.dispose();
-    delete meta[ALPHA_MASK_METADATA_KEY];
-  }
-}
-
-/**
- * P11-B #289 — low LOD variant: billboard quad (BILLBOARDMODE_ALL).
- *
- * ADR `docs/decisions/20260424-p11-b-lod-design.md` §축 4.
- * 2 triangle. T1 solar 뷰에서 sub-pixel 로 모이는 100+ body 에 대해 draw call 최소화.
- *
- * billboard 는 카메라를 항상 바라보므로 albedo 단색 quad 가 sphere 느낌을 대체.
- *
- * Phase 2 #333 — billboard 는 sphere/mid variant 와 달리 `bodyScale` 미적용.
- * 책임 분리: sphere/mid 가 시각 과장 (sun ×75) 을 전담, billboard 는 sub-pixel draw call 절감만.
- * focus 강제 해제 + 1 AU+ 카메라 거리 + 픽셀 경계 부족 케이스에서 거대 quad 회귀 차단.
- * ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333)" amendment 참조.
- *
- * #391 Phase 2 — alpha mask 적용 의무 (drift 방어).
- *  - quad 의 정사각형 윤곽이 픽셀 그리드에 그대로 노출 → 사용자 D-T2 회귀 (mercury/venus 사각형)
- *  - 본 함수는 항상 alpha mask 적용된 material 로 생성 (기본 상태). LOD pass 가 매 프레임 측정한
- *    pxDiameter < 4px 진입 시 runLodPass 가 opacityTexture = null + transparencyMode = 0 (OPAQUE)
- *    로 fallback 토글. ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"4px fallback".
- *  - 공유 텍스처는 `getOrCreateBillboardAlphaMask(scene)` 가 scene 단위 1회 생성, 24 body 가 동일
- *    인스턴스를 `opacityTexture` 로 참조 → 메모리 ≈ 16KB VRAM (per-body 생성 금지).
- *  - alpha mask threshold (smoothstep 0.4/0.5) 변경 시 ADR Amendment 의무.
- *  - transparencyMode = 1 (ALPHATEST) — ALPHABLEND (2) 는 24 body back-to-front CPU 정렬 부하.
- */
-function createBodyBillboard(
-  body: LoadedCelestialBody,
-  scene: Scene,
-  tier: Tier,
-  parent: Mesh,
-  bodyScale: (bodyId: string) => number,
-): Mesh {
-  // Phase 2 #333 — billboard 는 sphere/mid variant 와 달리 bodyScale 미적용.
-  // 책임 분리: sphere/mid = 가시 과장 책임 (sun ×75), billboard = sub-pixel draw call 절감 책임 단독.
-  // ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333) — billboard 에서 bodyScale 제거 (후보 A 채택)" 참조.
-  // bodyScale 인자 자체는 시그니처 호환성 유지 위해 보존 (호출부 통일 + 미래 변경 가능성).
-  void bodyScale; // Phase 2 #333 — 시그니처 보존, 식에서 미사용 명시.
-  const diameter = body.radius * 2 * renderScaleForTier(tier);
-  const mesh = MeshBuilder.CreatePlane(
-    `${body.id}-lod-low`,
-    { size: diameter, sideOrientation: 2 /* DOUBLESIDE */ },
-    scene,
-  );
-  mesh.parent = parent;
-  mesh.position.set(0, 0, 0);
-  mesh.billboardMode = 7; // BILLBOARDMODE_ALL
-
-  const mat = new StandardMaterial(`${body.id}-lod-low-mat`, scene);
-  const hex = body.colorHint?.hex ?? '#888888';
-  const c = hexToColor3(hex);
-  if (body.kind === 'star') {
-    mat.emissiveColor = c;
-    mat.disableLighting = true;
-  } else {
-    mat.diffuseColor = c;
-    // billboard 는 구형 음영이 없으므로 약한 emissive 로 가시성 보장 — 값은 glow-marker.ts
-    // RESTORE 상수와 양방향 SSoT (#675 reviewer 권고 2: 인라인 리터럴은 cross-assert 불가한 단방향 pin)
-    mat.emissiveColor = c.scale(GLOW_MARKER_RESTORE_EMISSIVE_SCALE_NON_STAR);
-    mat.specularColor = new Color3(0, 0, 0);
-  }
-
-  // #391 Phase 2 — alpha mask 적용 (기본 상태).
-  // ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"developer 단계 작업 명세" §1.
-  // - opacityTexture 로 procedural 원형 alpha mask 적용 (scene 공유 1회 생성)
-  // - transparencyMode = ALPHATEST (1) — ALPHABLEND (2) 는 24 body back-to-front 정렬 매 프레임 부하
-  //   ALPHATEST 는 fragment shader discard + Z-buffer write → CPU 정렬 비용 0 + 하드웨어 occlusion
-  // - useAlphaFromDiffuseTexture = false — opacityTexture 채널 단독 사용 (diffuse 와 분리)
-  // 4px fallback 진입 시 runLodPass 가 opacityTexture = null + transparencyMode = OPAQUE (0) 토글.
-  mat.opacityTexture = getOrCreateBillboardAlphaMask(scene);
-  // Babylon `Material.MATERIAL_ALPHATEST = 1`. 정적 상수 직접 import 시 일부 빌드 환경에서
-  // tree-shake 충돌 가능 — 숫자 리터럴 + 주석 SSoT 로 박제 (ADR `20260502-391-phase2-billboard.md`).
-  mat.transparencyMode = 1; // ALPHATEST
-  mat.useAlphaFromDiffuseTexture = false;
-  // ALPHATEST 의 cutoff. opacityTexture alpha < alphaCutOff 면 fragment discard.
-  // smoothstep 0.4~0.5 전이 구간의 중간값 (alpha ≈ 0.5) 을 cutoff 로 두면 원형 외곽 ≈ 1px 안티앨리어싱.
-  mat.alphaCutOff = 0.5;
-
-  mesh.material = mat;
-  // #713 — mesh → bodyId 역매핑 (low/billboard variant). high/mid 와 동일 id (ADR §결정 1).
-  // glow marker body 클릭 시 picked mesh 가 low variant 이므로 본 박제가 marker 선택의 핵심.
-  mesh.metadata = { ...(mesh.metadata as object | null), bodyId: body.id };
-  mesh.setEnabled(false); // 기본 숨김.
-  return mesh;
-}
-
-/**
- * #627 — 궤도선이 satellite 궤도 (parent 추적 + visual scale 필요) 인지 판정 SSoT.
- *
- * ADR `docs/decisions/20260606-627-satellite-orbit-structure-forensic.md` §5 옵션 A.
- *
- * satellite (moon/phobos/deimos/galilean 등) 의 `sampleOrbitPoints` 는 parent 0 원점 기준
- * ellipse 점을 반환하므로, sun 중심 `orbit-lines` batch 에 넣으면 태양 원점에 잘못 렌더된다
- * (forensic 실측 vertex 54% 원점 밀집). 따라서 parent 가 sun 이 아닌 (= 행성을 도는) body 는
- * parent 별 별도 LineSystem 으로 분리해 (a) position 을 parent scene 좌표로 동기화 +
- * (b) `getOrbitVisualScale(parentId)` scaling 을 적용한다.
- *
- * - parentId === null (sun) → planet batch (false)
- * - parentId === 'sun' (행성) → planet batch (false)
- * - parentId === 'earth'/'mars'/'jupiter' 등 (satellite) → satellite 분리 (true)
- *
- * @param parentId body 의 parentId (LoadedCelestialBody.parentId)
- */
-export function isSatelliteOrbit(parentId: string | null | undefined): parentId is string {
-  return parentId !== null && parentId !== undefined && parentId !== 'sun';
-}
-
-function sampleOrbitPoints(body: LoadedCelestialBody, tier: Tier): Vector3[] | null {
-  if (!body.orbit || !body.parentId) return null;
-  const orbit = body.orbit;
-  // 궤도 한 바퀴 샘플링 (진근점각 기준 등간격)
-  // R10b #664 — 고이심률 (e ≥ 0.6) body 는 256 seg: 진근점각 등간격은 근일점 자동 밀집 +
-  // 원일점 희소가 구조라, halley (e 0.967) 원일점측 chord sagitta 가 프레임핏 13.97px 로
-  // 다각형 꺾임이 육안 식별됨 (D-T2 실측 발동 — ADR 20260612-r10b §축 3 fix 1순위.
-  // 256 seg → 1.52px, eris 식별-불가 기준선 1.10px 근접). 임계 0.6 근거: 실측 검증된 최대
-  // OK (eris 0.436 — 꺾임 식별 불가) 와 최소 혜성 (encke 0.848) 사이 — e < 0.6 인 기존
-  // 24 body 는 seg 64 불변 (vertex 동일, pixel-diff 기존 궤도선 무영향).
-  const segments = orbit.eccentricity >= 0.6 ? 256 : 64; // 성능 최적화 (P1 E3) + 고이심률 예외
-  const points: Vector3[] = [];
-
-  const cosO = Math.cos(orbit.longitudeOfAscendingNode);
-  const sinO = Math.sin(orbit.longitudeOfAscendingNode);
-  const cosI = Math.cos(orbit.inclination);
-  const sinI = Math.sin(orbit.inclination);
-  const cosW = Math.cos(orbit.argumentOfPeriapsis);
-  const sinW = Math.sin(orbit.argumentOfPeriapsis);
-
-  for (let s = 0; s <= segments; s += 1) {
-    const nu = (s / segments) * Math.PI * 2;
-    const r =
-      (orbit.semiMajorAxis * (1 - orbit.eccentricity * orbit.eccentricity)) /
-      (1 + orbit.eccentricity * Math.cos(nu));
-    const xOrb = r * Math.cos(nu);
-    const yOrb = r * Math.sin(nu);
-    const x1 = cosW * xOrb - sinW * yOrb;
-    const y1 = sinW * xOrb + cosW * yOrb;
-    const y2 = cosI * y1;
-    const z2 = sinI * y1;
-    const x = cosO * x1 - sinO * y2;
-    const y = sinO * x1 + cosO * y2;
-    // P12-A #298 — orbit line 점도 현재 tier 의 renderScale 로 환산 (원칙 #4 거리 동일 스케일).
-    const scale = renderScaleForTier(tier);
-    points.push(new Vector3(x * scale, y * scale, z2 * scale));
-  }
-
-  return points;
 }

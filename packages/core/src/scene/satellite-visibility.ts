@@ -66,7 +66,7 @@
  */
 
 import type { LodLevel } from '../render/lod.js';
-import { LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER } from './solar-system-scene.js';
+import { LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER } from './billboard-alpha-mask.js';
 
 /**
  * Satellite visibility guard 입력.

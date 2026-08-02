@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
-import { LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER } from './solar-system-scene.js';
+import { LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER } from './billboard-alpha-mask.js';
 
 describe('satellite-visibility guard (#546 R4 Amendment 4 후속)', () => {
   describe('Q3=(c) parent-child 결합 가드 (정상 발동 케이스)', () => {

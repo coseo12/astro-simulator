@@ -21,11 +21,12 @@
 
 또 인라인 console 수집본 상당수가 `pageerror` 리스너를 빠뜨려 **미포착 예외를 놓쳤다**.
 
-## 헬퍼 5종
+## 헬퍼 6종
 
 ```js
 import {
   launchBrowser, // chromium.launch + 렌더러 축(gpu) 단일 선언 + HEADFUL/HEADED 흡수
+  withBrowser, // launch → try fn → finally close (에러 경로 잔존 차단, #927)
   bootstrapScene, // goto + window.__solarScene 등 dev 전역 노출 대기 + settle
   collectConsoleErrors, // console.error + pageerror 두 채널 동시 등록 (라이브 배열 반환)
   saveCapture, // mkdir -p + writeFile
@@ -50,6 +51,13 @@ import {
 신규 `browser-verify-*.mjs` 가 PR 에 포함되면 아래를 확인한다.
 
 - [ ] `chromium.launch(...)` 직접 호출 대신 `launchBrowser()` — 렌더러는 `gpu` 옵션으로 명시
+- [ ] **위 1·2 조합**: 렌더러 옵션을 쓰면서 에러 경로 보장도 필요하면
+      `withBrowser(buildLaunchOptions({ gpu: 'swiftshader' }), fn)` — `withBrowser` 는 인자를
+      **가공 없이 `launch` 로 전달**하므로 `withBrowser({ gpu: … })` 는 조용히 무시된다
+      (`buildLaunchOptions` 의 렌더러 fail-fast 를 우회하게 되므로 금지)
+- [ ] `launch → … → close` 를 일직선으로 나열하지 말고 `withBrowser(launchOptions, fn)` — `page.goto`
+      실패 등 **에러 경로에서도 `close()` 도달**을 보장한다 (#927). 콜백 안에서 `process.exit()` 를
+      부르면 finally 가 실행되지 않으므로, 조기 종료는 값을 반환해 호출부에서 처리한다
 - [ ] `page.goto` + `waitForFunction(window.__solarScene …)` 수기 조합 대신 `bootstrapScene()`
 - [ ] `page.on('console', …)` 인라인 대신 `collectConsoleErrors()` — `pageerror` 누락 방지
 - [ ] `mkdir` + `writeFile` 수기 조합 대신 `saveCapture()`
@@ -70,7 +78,7 @@ import {
 
 브라우저 회귀 가드는 **dev 서버를 각자 띄우지 않는다.** `ci.yml` 이
 [`scripts/ci-dev-server.sh`](../../scripts/ci-dev-server.sh) 로 `:3002` 에 1회 기동하고,
-가드 10종이 이를 직렬 공용한다. 정리는 맨 아래 `if: always()` step 이 단독 책임진다.
+가드 13종이 이를 직렬 공용한다 (#888/#932 배선으로 11 → 13). 정리는 맨 아래 `if: always()` step 이 단독 책임진다.
 
 개별 step 안에 `kill` 을 두지 말 것 — Actions run step 기본 셸은 `bash -e {0}` 라
 **가드가 실패하면 그 줄에서 step 이 즉시 종료되어 뒤따르는 `kill` 이 실행되지 않는다.**

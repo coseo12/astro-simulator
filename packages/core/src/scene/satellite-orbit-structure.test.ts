@@ -23,7 +23,7 @@
 import { describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
-import { isSatelliteOrbit } from './solar-system-scene.js';
+import { isSatelliteOrbit } from './orbit-sampling.js';
 import {
   getOrbitVisualScale,
   EARTH_MOON_ORBIT_VISUAL_SCALE,

@@ -255,18 +255,18 @@ jobs:
           retention-days: 7
 
       # ============================================================
-      # #846 — dev 서버 1회 기동 (아래 브라우저 회귀 가드 10종 공용)
+      # #846 — dev 서버 1회 기동 (아래 브라우저 회귀 가드 13종 공용)
       # ============================================================
-      # 기존: 가드 10종이 각자 `next dev -p 3002~3013 &` + readiness 루프 + kill 4행 세트를
+      # 기존: 가드 11종이 각자 `next dev -p 3002~3013 &` + readiness 루프 + kill 4행 세트를
       #   포트만 바꿔 복제 → PR 1건당 next cold-boot 10회.
       #   가드끼리 병렬로 도는 구조가 아니라 **같은 job 안의 직렬 step** 이므로 포트 분리는
       #   애초에 불필요했다 (로컬 실측: `kill $WEB_PID` 는 pnpm 래퍼를 거쳐 next 자식까지
       #   정상 종료시킨다 — 즉 성공 경로에서 포트는 곧바로 반납됐다. 포트 증분은 복붙 산물).
-      # 지금: 여기서 1회만 띄우고 가드 10종이 :3002 를 직렬 공용한다. 정리는 맨 아래
+      # 지금: 여기서 1회만 띄우고 가드 13종이 :3002 를 직렬 공용한다 (#888/#932 배선으로 11 → 13). 정리는 맨 아래
       #   `if: always()` step 이 단독 책임 — 개별 step 의 kill 은 **실패 경로에서 도달하지
       #   않는** 죽은 코드였고(`bash -e {0}`), 그때만 서버가 job 끝까지 잔존했다.
       # __solarScene 등 dev 빌드 한정 전역이 필요하므로 next start(:3001) 가 아닌 next dev.
-      - name: '#846 dev 서버 기동 (가드 10종 공용, 1회)'
+      - name: '#846 dev 서버 기동 (가드 13종 공용, 1회)'
         if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/ci-dev-server.sh') != ''
         # 기동+readiness 상한 (60x2s=120s) 을 넘기면 스크립트가 로그 덤프 후 exit 1.
         timeout-minutes: 4
@@ -453,6 +453,52 @@ jobs:
       - name: '#848 a11y 키보드 사각 회귀 가드 (verify:848-modal-focus)'
         if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-848-modal-focus.mjs') != ''
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-848-modal-focus.mjs
+
+      # ============================================================
+      # #888 / #932 — 선재 FAIL 로 방치돼 있던 verify 2종 배선
+      # ============================================================
+      # 두 가드 모두 **CI 미배선 상태로 base(develop) 에서 FAIL** 이었다 (#840 클래스 — "가드가
+      # 존재하나 아무도 실행하지 않아 계약 drift 가 조용히 누적"). 기대치를 실측 기준으로 정합시킨
+      # 뒤 여기 배선해 재발을 차단한다.
+      #
+      # 배선 범위는 **동일하지 않다** — #737 은 전 시나리오, p7d 는 3/4 만 (아래 사유).
+      # 1차 배선 시 "두 스크립트 모두 DOM/스토어 판정이라 렌더러 편차에 둔감" 으로 판정했으나,
+      # p7d 시나리오 1/2 에 한해 **반증**됐다 (run 30751043285 ubuntu FAIL). 근거였던 로컬
+      # metal/swiftshader 17/17 은 **macOS 국소 실증** — swiftshader 는 ANGLE(WebGL) 스위치라
+      # WebGPU(Dawn) adapter 경로를 지배하지 못해 ubuntu adapter-null 조건을 재현한 적이 없다.
+      #
+      # #737 온보딩 — 검증 6축: (S1) 자동표시 양측 계약(자동화 스킵 #739 + 비자동화 표시·portal)
+      #          (S2) Esc 충돌 회피(모달만 닫힘, free-fly 미발화)  (S3) dismiss localStorage 왕복
+      #          (S4) 버튼 재호출 + backdrop 닫기  (S5) 모바일 375px 3섹션 + 가로 overflow 0
+      #          (S6) about/sensitivity Esc 비충돌 (모달 컨벤션 SSoT)
+      - name: '#737 온보딩 회귀 가드 (verify:737-onboarding)'
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-737-onboarding.mjs') != ''
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-737-onboarding.mjs
+
+      # P7-D 모바일 — 전 4축 중 **3/4 만 배선** (#932 축 분할):
+      #   (3) navigator.gpu 차단 → tier-c-graceful-degradation 노티   ← 배선
+      #   (4) key-scoped dismiss 격리 (A 닫아도 B 표시)               ← 배선
+      #   (1) `?bh=2` JD 진행 + 콘솔 에러 0                            ← 로컬 전용
+      #   (2) `?bh=2&integrator=yoshida4` 조합 5초 재생 무에러         ← 로컬 전용
+      #
+      # 배선 축(3/4)은 `navigator.gpu` 를 addInitScript 로 **명시 차단**하므로 호스트 adapter 유무와
+      #   무관하다 — detectGpuTier() 분기 1/2 양쪽이 tier-c 를 반환하고 adapter 분류(분기 3)에
+      #   도달하지 않는다 (순수 함수 증명). 그래서 ubuntu 에서도 결정적이다.
+      # 로컬 전용 축(1/2)은 launch 인자 `--enable-unsafe-webgpu` 때문에 `navigator.gpu` 는 존재하나
+      #   ubuntu 러너는 `requestAdapter()` 가 null → Babylon WebGPUEngine 생성 fatal → 시나리오 1 의
+      #   `콘솔 에러 0건`/`pageerror 0건` 위반 + 시나리오 2 탭 크래시 (run 30751043285 실측).
+      #   `--enable-unsafe-webgpu` 를 빼면 통과하지만 macOS 에서 재던 "WebGPU 엔진 초기화 무결" 축이
+      #   소멸한다 — 그 축은 ubuntu 에서 애초에 측정 불가라, 측정 가능한 로컬에 남긴다.
+      #   선례 정합: 이 플래그를 쓰는 스크립트 6종은 전부 CI 미배선이고, ubuntu green 인 브라우저
+      #   가드 13종은 하나도 이 플래그를 쓰지 않는다.
+      # `BROWSER_VERIFY_GPU=swiftshader` — 스크립트 로컬 기본값 metal 은 macOS 전용이라 ubuntu
+      #   러너에서 쓸 수 없다. 렌더러 축은 `GPU_LAUNCH_ARGS` SSoT 로 주입한다 (#932).
+      - name: '#209 P7-D 모바일 구조 게이트 (verify:mobile-p7d — 시나리오 3/4)'
+        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/browser-verify-mobile-p7d.mjs') != ''
+        env:
+          BROWSER_VERIFY_GPU: swiftshader
+          BASE_URL: http://localhost:3002
+        run: node scripts/browser-verify-mobile-p7d.mjs --scenarios=3,4
 
       # ============================================================
       # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)
