@@ -56,9 +56,12 @@
  * 증거 — 플래그가 있을 때 Babylon 이 실제로 WebGPU 경로를 탄다). 그 축은 ubuntu 에서 **애초에
  * 측정 불가능**(adapter 부재)하므로, 측정 가능한 곳(로컬 macOS)에 남기고 환경 비의존이 증명된
  * 시나리오 3/4 만 CI 로 올린다. 프로젝트 선례와도 정합 — `--enable-unsafe-webgpu` 를 쓰는
- * 스크립트 6종(`bench-webgpu` / `bench-scene-mobile` / `browser-verify-webgpu` /
- * `browser-verify-belt-nbody` / `browser-verify-mobile-p4c` / 본 파일)은 **전부 CI 미배선**이고,
- * ubuntu green 인 브라우저 가드 13종은 **하나도 이 플래그를 쓰지 않는다**.
+ * 스크립트 7종(`bench-webgpu` / `bench-scene-mobile` / `browser-verify-webgpu` /
+ * `browser-verify-belt-nbody` / `browser-verify-mobile-p4c` / `browser-verify-738-starfield` /
+ * 본 파일) 중 **CI 배선은 본 파일 하나뿐**이고, 나머지 6종은 전부 미배선이다. 즉 ubuntu green 을
+ * 유지해 온 **기존 브라우저 가드 12종은 하나도 이 플래그를 쓰지 않는다** (본 파일이 13번째로
+ * 그 경계를 넘은 유일 사례). 본 파일이 배선을 유지할 수 있는 근거는 플래그 부재가 아니라
+ * **배선 축 3/4 가 `navigator.gpu` 를 `addInitScript` 로 명시 차단해 adapter 유무에 무관**하다는 점이다.
  *
  * 한계 (P4-C 선례와 동일):
  *   - Playwright는 Chromium 기반 iPhone emulation — UA/viewport만 Safari 흉내.
