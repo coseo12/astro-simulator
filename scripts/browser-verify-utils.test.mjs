@@ -243,7 +243,11 @@ await run('withBrowser — fn throw 여도 close 도달 (본 헬퍼의 존재 �
 await run('withBrowser — launch 옵션을 가공 없이 그대로 전달', async () => {
   const browser = stubBrowser();
   const stub = launchStub(browser);
-  const opts = { headless: true, args: ['--use-angle=metal'] };
+  // ⚠️ 픽스처 선정 계약 (PR #931 리뷰 뮤테이션 M3): `{ headless, args }` 만 쓰면
+  // 기본 env 하에서 buildLaunchOptions 의 **고정점**이라 경유 여부를 판별하지 못한다
+  // (구현을 buildLaunchOptions 경유로 바꿔도 초록 = assertion 진공).
+  // `gpu` 키는 buildLaunchOptions 가 소비·변환하므로 경유 시 deepEqual 이 깨진다 — 판별 가능.
+  const opts = { headless: true, args: ['--use-angle=metal'], gpu: 'swiftshader' };
   await withBrowser(opts, async () => {}, stub);
   // buildLaunchOptions 를 경유하지 않는다 — 기존 스크립트 launch 인자 보존이 전환의 전제.
   assert.deepEqual(stub.calls[0], opts);

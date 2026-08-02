@@ -51,6 +51,10 @@ import {
 신규 `browser-verify-*.mjs` 가 PR 에 포함되면 아래를 확인한다.
 
 - [ ] `chromium.launch(...)` 직접 호출 대신 `launchBrowser()` — 렌더러는 `gpu` 옵션으로 명시
+- [ ] **위 1·2 조합**: 렌더러 옵션을 쓰면서 에러 경로 보장도 필요하면
+      `withBrowser(buildLaunchOptions({ gpu: 'swiftshader' }), fn)` — `withBrowser` 는 인자를
+      **가공 없이 `launch` 로 전달**하므로 `withBrowser({ gpu: … })` 는 조용히 무시된다
+      (`buildLaunchOptions` 의 렌더러 fail-fast 를 우회하게 되므로 금지)
 - [ ] `launch → … → close` 를 일직선으로 나열하지 말고 `withBrowser(launchOptions, fn)` — `page.goto`
       실패 등 **에러 경로에서도 `close()` 도달**을 보장한다 (#927). 콜백 안에서 `process.exit()` 를
       부르면 finally 가 실행되지 않으므로, 조기 종료는 값을 반환해 호출부에서 처리한다
