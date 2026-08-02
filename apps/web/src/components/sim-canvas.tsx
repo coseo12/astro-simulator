@@ -374,6 +374,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #699 — setupArcRotateCamera 기본 lowerRadiusLimit (focusOn 이 desiredRadius×0.5 로 낮춘 것을
         // free-fly 진입 시 원복하기 위한 SSoT — ADR §5-2 sun anomaly 차단 (a)).
         const DEFAULT_LOWER_RADIUS_LIMIT = 0.5;
+        // ── #850 URL 파싱 주석 계약 (감사 권고 즉시 발효, 코드 변경 0) ────────────────────────
+        // 신규 URL 파라미터는 `apps/web/src/core/parse-*.ts` 모듈을 신설하고 이 블록 안에서만 읽는다.
+        // `new URLSearchParams` 신규 호출 금지 (#850 감사 — 현행 22회 재파싱의 성장 중단).
+        // 기존 22회의 레지스트리 수렴은 #850 Phase 3 범위 — 본 계약은 그때까지 증가만 차단한다.
+        // ─────────────────────────────────────────────────────────────────────────────────────
         // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
         const beltParam = new URLSearchParams(window.location.search).get('belt');
         const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
