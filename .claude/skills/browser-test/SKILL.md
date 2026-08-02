@@ -308,10 +308,26 @@ agent-browser auth login staging
 
 ## 규칙
 
-- **Chrome 좀비 정리 (반환/종료 직전 의무 — volt #79/#795)**: agent-browser 사용 후
-  `pgrep -f "agent-browser-chrome[-]" >/dev/null && pkill -TERM -f "agent-browser-chrome[-]"` 실행,
-  2초 대기 후 잔존 시 `pkill -KILL -f "agent-browser-chrome[-]"`. bracket 패턴은 self-match 오탐 방지 (#795).
-  정상 `agent-browser close` 가 커버 못 하는 비정상 종료 (timeout / SIGKILL / panic) 좀비 대응 — 실측 6세션/52좀비/800%+ CPU (volt #79).
+- **에러 도중 경로 — 페이지가 안 열리면 먼저 정리 (#926)**: `open` 실패/타임아웃 시 순서:
+  ① **서버 생존 선확인** — `curl -sI <URL>` 로 대상 서버 응답을 먼저 확인한다. 서버 부재/빌드
+  실패면 cleanup 대상이 아니라 **서버 문제**다 (원인 분기 — dev 서버 기동/빌드부터 진단).
+  ② 서버는 살아 있는데 안 열리면 진단을 계속하기 전에 **먼저 `bash scripts/cleanup-browser.sh`
+  (기본 모드) 실행 후 재시도** — agent-browser 는 상주 daemon 이 Chrome 을 소유하는 구조라
+  hang 세션에서 `close` 는 무력하며 pkill 이 정상 경로다 (실측 10일 묵은 daemon 2개, 2026-08-02).
+  ③ **재시도는 최대 1회** — 재실패 시 cleanup 반복 금지, 원인 진단 단계로 전환 (무한 cleanup 루프 차단).
+  ④ **재실패 + 자기 신선 세션 잔존 시** (`chrome_preserved>0` — 기본 모드가 30분 미만 세션을
+  보존해 hang 이 안 풀린 경우): 요약 라인을 그대로 반환 보고에 박제하고 **메인에 `--all` 판단을
+  위임**한다 — sub-agent 가 직접 `--all` 을 실행하지 않는다.
+  `--all` (ETIME 무관 전량 정리) 은 병행 브라우저 작업 부재를 아는 **메인 오케스트레이터 전용** —
+  sub-agent 는 기본 모드만 사용한다 (병행 에이전트의 신선한 세션 오살 방지).
+
+- **Chrome 좀비 정리 (반환/종료 직전 의무 — volt #79/#795/#926)**: agent-browser 사용 후
+  `bash scripts/cleanup-browser.sh` 를 실행하고 요약 라인의 `잔존=0` (exit 0) 을 확인한다.
+  스크립트가 close (10s timeout) → stale (ETIME ≥ 30분) Chrome/daemon TERM → 2s → 잔존 `-KILL`
+  escalation 을 결정적으로 수행한다 (기억할 명령 4개 → 1개 축약, bracket 패턴 self-match 방지
+  #795 내장. 신선한 프로세스는 보존 — 병행 에이전트 오살 방지. 포트 3000 은 검출·경고만 —
+  dev 서버 오살 방지). 정상 `agent-browser close` 가 커버 못 하는 비정상 종료
+  (timeout / SIGKILL / panic) 좀비 대응 — 실측 6세션/52좀비/800%+ CPU (volt #79).
 
 - `agent-browser`가 설치되어 있지 않으면 스킬 사용 전 설치를 안내한다
 - 브라우저 액션 전 반드시 `snapshot`으로 현재 상태를 파악한다

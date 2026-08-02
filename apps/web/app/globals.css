@@ -187,12 +187,23 @@
   --shadow-lg: var(--shadow-lg);
 }
 
-/* ===== 리셋 & 베이스 ===== */
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
+/* ===== 리셋 & 베이스 =====
+ *
+ * #887 — 커스텀 `* { box-sizing; padding; margin }` 리셋 제거 (재도입 금지 계약).
+ *
+ * 언레이어드 선언은 CSS cascade 규칙상 모든 `@layer` 보다 우선하므로, 언레이어드 `*` 리셋이
+ * `@layer utilities` 의 Tailwind spacing 유틸(p-* 123곳 / m-* 29곳)을 전역 무효화하고 있었다
+ * (specificity 는 layer 판정 이후라 0,0,0 `*` 가 0,1,0 유틸을 이김 — #848/PR #886 A/B 실증).
+ *
+ * 리셋 자체는 Tailwind v4 preflight 가 이미 제공한다 — `@import 'tailwindcss'` (1행) 가
+ * `@layer base` 안에 `*, ::after, ::before, ::backdrop, ::file-selector-button
+ * { box-sizing: border-box; margin: 0; padding: 0; border: 0 solid }` 를 인라인한다
+ * (tailwindcss@4.3.3 index.css:535 실측). 즉 커스텀 리셋은 3개 프로퍼티 전부 100% 이중이었고,
+ * preflight 가 pseudo-element 까지 더 넓게 커버한다. `@layer base` 이동 대신 삭제를 택한 근거:
+ * 동작 동일(base < utilities)하면서 이중 출처 drift(volt #69 클래스)를 근본 제거.
+ *
+ * 아래 html/body/a 등 나머지 언레이어드 규칙은 spacing 유틸과 프로퍼티 충돌이 없어 본 계약 밖.
+ */
 
 html,
 body {
