@@ -32,7 +32,7 @@
 #   bash scripts/ci-dev-server.sh start <port> <pid-file> [ready-path]
 #   bash scripts/ci-dev-server.sh stop  <port> <pid-file>
 #
-# 호출부: `.github/workflows/ci.yml` (가드 10종 공용, 포트 3002) /
+# 호출부: `.github/workflows/ci.yml` (가드 12종 공용, 포트 3002 — #888/#932 배선으로 10 → 12) /
 #         `.github/actions/setup-and-build/action.yml` (start-dev-server=true, 포트 3001)
 
 set -euo pipefail

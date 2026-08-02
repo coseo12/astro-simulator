@@ -78,7 +78,7 @@ import {
 
 브라우저 회귀 가드는 **dev 서버를 각자 띄우지 않는다.** `ci.yml` 이
 [`scripts/ci-dev-server.sh`](../../scripts/ci-dev-server.sh) 로 `:3002` 에 1회 기동하고,
-가드 10종이 이를 직렬 공용한다. 정리는 맨 아래 `if: always()` step 이 단독 책임진다.
+가드 12종이 이를 직렬 공용한다 (#888/#932 배선으로 10 → 12). 정리는 맨 아래 `if: always()` step 이 단독 책임진다.
 
 개별 step 안에 `kill` 을 두지 말 것 — Actions run step 기본 셸은 `bash -e {0}` 라
 **가드가 실패하면 그 줄에서 step 이 즉시 종료되어 뒤따르는 `kill` 이 실행되지 않는다.**
