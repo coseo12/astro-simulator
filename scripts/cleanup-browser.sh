@@ -8,21 +8,28 @@
 #   (실측: 6세션/52좀비/800%+ CPU — volt #79 / 10일 묵은 daemon 2개 — 2026-08-02).
 #   "사람(에이전트)이 기억하는 절차는 재발한다" → 스크립트 1회 호출로 결정화 (#894 래퍼 전례와 동형).
 #
+# 모드 (cross-validate 보완 — 병행 에이전트 오살 방지):
+#   기본 모드   : close (graceful) + **stale 만** 정리 (Chrome/daemon 공히 ETIME ≥ 30분).
+#                 병행 중인 다른 에이전트의 신선한 브라우저는 보존. sub-agent 는 이 모드만 사용.
+#   --all 모드  : Chrome/daemon **전량** pkill (ETIME 무관). 병행 브라우저 작업 부재를
+#                 아는 주체 (메인 오케스트레이터) 전용 — 실행 시 경고 출력.
+#
 # 단계:
 #   [1/5] `agent-browser close` 시도 (10s timeout — hang 대비. macOS 에 GNU timeout
 #         부재 실측 → bash 내장 폴링 래퍼 run_with_timeout 로 대체. 미설치 시 스킵)
-#   [2/5] Chrome 렌더러 정리: pkill -TERM -f "agent-browser-chrome[-]" → 2s → 잔존 -KILL
-#         (bracket 패턴 — pgrep/pkill self-match 오탐 방지, #795)
-#   [3/5] daemon 정리: agent-browser-darwin 계열 중 ETIME ≥ 30분만 TERM → 2s → 잔존 KILL.
+#   [2/5] Chrome 렌더러 정리: 기본 모드 = ETIME ≥ 30분 stale 만 / --all = 전량.
+#         TERM → 2s → 잔존 -KILL (bracket 패턴 — pgrep/pkill self-match 오탐 방지, #795)
+#   [3/5] daemon 정리: agent-browser-darwin|linux 계열 — 기본 모드 = ETIME ≥ 30분만 / --all = 전량.
 #         임계 30분 + ETIME awk 파싱은 가드 C SSoT 정합
 #         (.claude/hooks/session-start-zombie-check.sh 와 동일). 신선한 daemon
-#         (동시 진행 중인 정당한 세션 소유 가능) 은 보존.
+#         (동시 진행 중인 정당한 세션 소유 가능) 은 기본 모드에서 보존.
 #   [4/5] 포트 3000 점유 — 검출·경고만 (LISTEN 만 — ESTABLISHED kill 사고 방지).
 #         kill 은 --kill-port 명시 플래그 시에만 (dev 서버 오살 방지).
-#   [5/5] 요약 출력 + 잔존 재검증 — 잔존 0 이면 exit 0, 잔존 있으면 exit 1 (fail-visible)
+#   [5/5] 요약 출력 + 잔존 재검증 — 잔존(정리 대상 중 미정리) 0 이면 exit 0, 있으면 exit 1 (fail-visible)
 #
 # 사용:
-#   bash scripts/cleanup-browser.sh                # 표준 정리
+#   bash scripts/cleanup-browser.sh                # 기본 모드 (stale 만 — sub-agent 표준 경로)
+#   bash scripts/cleanup-browser.sh --all          # 전량 정리 (메인 오케스트레이터 전용)
 #   bash scripts/cleanup-browser.sh --kill-port    # 포트 3000 LISTEN 점유도 TERM
 #   bash scripts/cleanup-browser.sh --self-test    # mock 프로세스 격리 3중 시뮬
 #                                                  # (selftest 접미사 — 실 프로세스 무접촉)
@@ -33,12 +40,12 @@
 set -uo pipefail
 
 # ── 상수 ────────────────────────────────────────────────────────────────
-CLOSE_TIMEOUT_SECONDS=10           # agent-browser close hang 대비 상한
-TERM_GRACE_SECONDS=2               # TERM → KILL escalation 대기
-DAEMON_ETIME_THRESHOLD_MINUTES=30  # 가드 C SSoT (session-start-zombie-check.sh 와 동일 임계)
+CLOSE_TIMEOUT_SECONDS=10          # agent-browser close hang 대비 상한
+TERM_GRACE_SECONDS=2              # TERM → KILL escalation 대기
+STALE_ETIME_THRESHOLD_MINUTES=30  # 가드 C SSoT (session-start-zombie-check.sh 와 동일 임계)
 DEV_SERVER_PORT=3000
-CHROME_PATTERN="agent-browser-chrome[-]"  # bracket — self-match 방지 (#795)
-DAEMON_PATTERN="agent-browser-darwi[n]"   # 실 바이너리: agent-browser-darwin-<arch>
+CHROME_PATTERN="agent-browser-chrome[-]"           # bracket — self-match 방지 (#795)
+DAEMON_PATTERN="agent-browser-(darwi[n]|linu[x])"  # 실 바이너리: agent-browser-darwin-<arch> / -linux-<arch> (CI ubuntu 커버)
 
 # kill 계열 함수의 결과 보고용 전역 (bash 3.2 — 배열/nameref 미사용)
 LAST_KILLED=0
@@ -49,28 +56,36 @@ PORT_STATE="skipped"
 # ── 공용 함수 ───────────────────────────────────────────────────────────
 
 # run_with_timeout <초> <명령...>
-# macOS 에 GNU timeout/gtimeout 부재 (실측 2026-08-02) → 폴링 래퍼로 대체.
-# timeout 시 TERM → 1s → KILL 후 124 반환 (GNU timeout 관례와 동일 코드).
+# macOS 에 GNU timeout/gtimeout 부재 (실측 2026-08-02) → 폴링 래퍼로 대체 (0.2s 폴링).
+# timeout 시 자식 프로세스 먼저 정리 (pkill -P — 고아 방지. setsid 없는 bash 3.2 경로에서
+# 프로세스 그룹 kill 의 대체) 후 본체 TERM → 잔존 KILL, 124 반환 (GNU timeout 관례 코드).
 run_with_timeout() {
   local limit="$1"
   shift
   "$@" &
   local cmd_pid=$!
-  local waited=0
+  local limit_ticks=$((limit * 5)) # 0.2s 폴링 tick
+  local ticks=0
   while kill -0 "$cmd_pid" 2>/dev/null; do
-    if [ "$waited" -ge "$limit" ]; then
+    if [ "$ticks" -ge "$limit_ticks" ]; then
       # bash job 종료 notice ("Terminated: 15") 는 셸 자체 stderr 로 출력됨 —
-      # 에이전트 로그 박제 잡음 억제를 위해 kill~wait 구간만 stderr 임시 우회
+      # 에이전트 로그 박제 잡음 억제를 위해 kill~wait 구간만 stderr 임시 우회.
+      # 시그널 중단 대비 trap 으로 FD 복구 보장 (EXIT trap 은 건드리지 않음 — self-test 정리 보존)
       exec 3>&2 2>/dev/null
+      trap 'exec 2>&3 3>&- 2>/dev/null; trap - INT TERM; exit 130' INT
+      trap 'exec 2>&3 3>&- 2>/dev/null; trap - INT TERM; exit 143' TERM
+      pkill -TERM -P "$cmd_pid" 2>/dev/null # 자식 먼저 (고아 방지)
       kill -TERM "$cmd_pid" 2>/dev/null
       sleep 1
+      pkill -KILL -P "$cmd_pid" 2>/dev/null
       kill -KILL "$cmd_pid" 2>/dev/null
       wait "$cmd_pid" 2>/dev/null
       exec 2>&3 3>&-
+      trap - INT TERM
       return 124
     fi
-    sleep 1
-    waited=$((waited + 1))
+    sleep 0.2
+    ticks=$((ticks + 1))
   done
   wait "$cmd_pid" 2>/dev/null
   return $?
@@ -81,7 +96,7 @@ count_procs() {
   pgrep -f "$1" 2>/dev/null | wc -l | tr -d '[:space:]'
 }
 
-# kill_by_pattern <패턴> <라벨> — TERM → grace → 잔존 시 KILL escalation.
+# kill_by_pattern <패턴> <라벨> — **전량** TERM → grace → 잔존 시 KILL escalation (--all 경로).
 # 결과 전역 보고: LAST_KILLED / LAST_RESIDUAL / LAST_USED_KILL
 kill_by_pattern() {
   local pattern="$1"
@@ -134,31 +149,33 @@ list_stale_pids() {
     '
 }
 
-# cleanup_stale_daemons <패턴> <임계분> — ETIME 임계 이상 daemon 만 TERM → grace → 잔존 KILL.
-# 결과 전역 보고: LAST_KILLED / LAST_RESIDUAL / LAST_USED_KILL
-cleanup_stale_daemons() {
+# cleanup_stale_by_pattern <패턴> <임계분> <라벨> — ETIME 임계 이상만 TERM → grace → 잔존 KILL.
+# 기본 모드 공용 (Chrome/daemon) — 신선한 프로세스 (병행 에이전트의 정당 세션) 는 보존.
+# 결과 전역 보고: LAST_KILLED / LAST_RESIDUAL(stale 기준) / LAST_USED_KILL
+cleanup_stale_by_pattern() {
   local pattern="$1"
   local threshold="$2"
+  local label="$3"
   LAST_KILLED=0
   LAST_RESIDUAL=0
   LAST_USED_KILL=0
   local stale_pids
   stale_pids=$(list_stale_pids "$pattern" "$threshold")
   if [ -z "$stale_pids" ]; then
-    echo "  daemon: ETIME ≥ ${threshold}분 대상 없음 (no-op — 신선한 daemon 보존)"
+    echo "  ${label}: ETIME ≥ ${threshold}분 대상 없음 (no-op — 신선한 프로세스 보존)"
     return 0
   fi
   local before=0
   local pid
   for pid in $stale_pids; do
     before=$((before + 1))
-    echo "  daemon: PID ${pid} (ETIME ≥ ${threshold}분) → TERM"
+    echo "  ${label}: PID ${pid} (ETIME ≥ ${threshold}분) → TERM"
     kill -TERM "$pid" 2>/dev/null
   done
   sleep "$TERM_GRACE_SECONDS"
   for pid in $stale_pids; do
     if kill -0 "$pid" 2>/dev/null; then
-      echo "  daemon: PID ${pid} TERM 후 잔존 → KILL escalation"
+      echo "  ${label}: PID ${pid} TERM 후 잔존 → KILL escalation"
       LAST_USED_KILL=1
       kill -KILL "$pid" 2>/dev/null
     fi
@@ -174,7 +191,7 @@ cleanup_stale_daemons() {
   done
   LAST_RESIDUAL=$residual
   LAST_KILLED=$((before - residual))
-  echo "  daemon: 정리 ${LAST_KILLED}개 / 잔존 ${LAST_RESIDUAL}개"
+  echo "  ${label}: 정리 ${LAST_KILLED}개 / 잔존 ${LAST_RESIDUAL}개"
   return 0
 }
 
@@ -207,7 +224,7 @@ check_port() {
   return 0
 }
 
-# ── self-test (mock 격리 3중 시뮬: positive → negative → recovery) ──────
+# ── self-test (mock 격리 3중 시뮬: positive → negative → recovery + 모드 분리) ──
 
 SELF_TEST_FAILURES=0
 
@@ -242,7 +259,7 @@ run_self_test() {
   local daemon_pattern="agent-browser-darwin-${suffix}[-]"
 
   # 오살 방지 하드 가드 — self-test 패턴에 'selftest' 미포함이면 즉시 중단.
-  # 실 프로세스 (agent-browser-chrome-<UUID> / agent-browser-darwin-<arch>) 는
+  # 실 프로세스 (agent-browser-chrome-<UUID> / agent-browser-darwin|linux-<arch>) 는
   # 'selftest' 문자열을 포함하지 않으므로 매칭 자체가 불가능하다.
   case "${chrome_pattern}+${daemon_pattern}" in
     *selftest*) : ;;
@@ -266,6 +283,11 @@ run_self_test() {
   rc=0
   run_with_timeout 1 sleep 30 || rc=$?
   assert_eq "hang 명령 timeout rc (GNU timeout 관례)" 124 "$rc"
+  # 자식 고아 방지 (pkill -P) — 본체(bash) timeout 시 자식(sleep 299.7)도 정리돼야 함
+  rc=0
+  run_with_timeout 1 bash -c 'sleep 299.7' || rc=$?
+  assert_eq "자식 보유 명령 timeout rc" 124 "$rc"
+  assert_eq "자식 고아 0 (pkill -P 정리)" 0 "$(count_procs "sleep 299[.]7")"
 
   echo ""
   echo "--- Phase 1: positive (mock 정리) ---"
@@ -275,29 +297,35 @@ run_self_test() {
   assert_eq "chrome mock 2개 spawn" 2 "$(count_procs "$chrome_pattern")"
   assert_eq "daemon mock 1개 spawn" 1 "$(count_procs "$daemon_pattern")"
 
-  kill_by_pattern "$chrome_pattern" "chrome(mock)"
-  assert_eq "positive: chrome mock 정리 건수" 2 "$LAST_KILLED"
-  assert_eq "positive: chrome mock 잔존 0" 0 "$LAST_RESIDUAL"
-  assert_eq "positive: TERM 만으로 정리 (KILL 불사용)" 0 "$LAST_USED_KILL"
+  # 모드 분리 — 기본 모드는 신선한 Chrome 을 **보존** (병행 에이전트 오살 방지)
+  cleanup_stale_by_pattern "$chrome_pattern" "$STALE_ETIME_THRESHOLD_MINUTES" "chrome(stale,mock)"
+  assert_eq "기본 모드: 신선 chrome 보존 (정리 0)" 0 "$LAST_KILLED"
+  assert_eq "기본 모드: chrome 생존 확인" 2 "$(count_procs "$chrome_pattern")"
+
+  # --all 경로 (전량) — 신선 여부 무관 정리
+  kill_by_pattern "$chrome_pattern" "chrome(전량,mock)"
+  assert_eq "positive(--all 경로): chrome mock 정리 건수" 2 "$LAST_KILLED"
+  assert_eq "positive(--all 경로): chrome mock 잔존 0" 0 "$LAST_RESIDUAL"
+  assert_eq "positive(--all 경로): TERM 만으로 정리 (KILL 불사용)" 0 "$LAST_USED_KILL"
 
   # ETIME 임계 게이트 — 신선한 daemon 은 기본 임계 (30분) 에서 보존되어야 한다
   # (실 환경에서 동시 진행 중인 정당한 세션의 daemon 오살 방지 증거)
-  cleanup_stale_daemons "$daemon_pattern" "$DAEMON_ETIME_THRESHOLD_MINUTES"
+  cleanup_stale_by_pattern "$daemon_pattern" "$STALE_ETIME_THRESHOLD_MINUTES" "daemon(stale,mock)"
   assert_eq "임계 게이트: 신선 daemon 보존 (정리 0)" 0 "$LAST_KILLED"
   assert_eq "임계 게이트: daemon 생존 확인" 1 "$(count_procs "$daemon_pattern")"
 
   # 임계 0분 → 즉시 stale 취급되어 정리 (ETIME 파싱 경로 검증)
-  cleanup_stale_daemons "$daemon_pattern" 0
+  cleanup_stale_by_pattern "$daemon_pattern" 0 "daemon(stale,mock)"
   assert_eq "positive: stale daemon 정리 건수" 1 "$LAST_KILLED"
   assert_eq "positive: daemon 잔존 0" 0 "$LAST_RESIDUAL"
 
   echo ""
   echo "--- Phase 2: negative (무잔존 no-op) ---"
   assert_eq "negative 전제: chrome 대상 0" 0 "$(count_procs "$chrome_pattern")"
-  kill_by_pattern "$chrome_pattern" "chrome(mock)"
+  kill_by_pattern "$chrome_pattern" "chrome(전량,mock)"
   assert_eq "negative: no-op 정리 0" 0 "$LAST_KILLED"
   assert_eq "negative: no-op 잔존 0" 0 "$LAST_RESIDUAL"
-  cleanup_stale_daemons "$daemon_pattern" 0
+  cleanup_stale_by_pattern "$daemon_pattern" 0 "daemon(stale,mock)"
   assert_eq "negative: daemon no-op 정리 0" 0 "$LAST_KILLED"
 
   echo ""
@@ -325,7 +353,15 @@ run_self_test() {
 # ── main ────────────────────────────────────────────────────────────────
 
 main() {
-  echo "=== cleanup-browser (#926) ==="
+  local mode="default"
+  if [ "$ALL_MODE" -eq 1 ]; then
+    mode="all"
+    echo "=== cleanup-browser (#926) — mode=all ==="
+    echo "경고: --all 은 Chrome/daemon 을 ETIME 무관 전량 정리한다. 병행 브라우저 작업"
+    echo "      부재를 아는 주체 (메인 오케스트레이터) 전용 — sub-agent 는 기본 모드만 사용."
+  else
+    echo "=== cleanup-browser (#926) — mode=default (stale 만 정리, 신선 프로세스 보존) ==="
+  fi
 
   local close_result="skipped"
   echo "[1/5] agent-browser close (timeout ${CLOSE_TIMEOUT_SECONDS}s)"
@@ -346,26 +382,48 @@ main() {
     echo "  agent-browser 미설치 — 스킵 (pkill 경로만 수행)"
   fi
 
-  echo "[2/5] Chrome 렌더러 정리 (패턴: ${CHROME_PATTERN})"
-  kill_by_pattern "$CHROME_PATTERN" "chrome"
-  local chrome_killed=$LAST_KILLED
-  local chrome_residual=$LAST_RESIDUAL
+  local chrome_killed=0
+  local chrome_residual=0
+  local chrome_preserved=0
+  if [ "$mode" = "all" ]; then
+    echo "[2/5] Chrome 렌더러 정리 — 전량 (패턴: ${CHROME_PATTERN})"
+    kill_by_pattern "$CHROME_PATTERN" "chrome(전량)"
+  else
+    echo "[2/5] Chrome 렌더러 정리 — stale 만 (패턴: ${CHROME_PATTERN}, ETIME ≥ ${STALE_ETIME_THRESHOLD_MINUTES}분)"
+    cleanup_stale_by_pattern "$CHROME_PATTERN" "$STALE_ETIME_THRESHOLD_MINUTES" "chrome(stale)"
+  fi
+  chrome_killed=$LAST_KILLED
+  chrome_residual=$LAST_RESIDUAL
+  if [ "$mode" = "default" ]; then
+    # 보존 수 = 현재 매칭 전량 − stale 잔존 (병행 세션의 신선한 Chrome)
+    chrome_preserved=$(($(count_procs "$CHROME_PATTERN") - chrome_residual))
+    if [ "$chrome_preserved" -gt 0 ]; then
+      echo "  chrome: 신선 프로세스 ${chrome_preserved}개 보존 (병행 세션 가능 — 전량 정리는 --all)"
+    fi
+  fi
 
-  echo "[3/5] daemon 정리 (패턴: ${DAEMON_PATTERN}, ETIME ≥ ${DAEMON_ETIME_THRESHOLD_MINUTES}분 — 신선한 daemon 보존)"
-  cleanup_stale_daemons "$DAEMON_PATTERN" "$DAEMON_ETIME_THRESHOLD_MINUTES"
-  local daemon_killed=$LAST_KILLED
-  local daemon_residual=$LAST_RESIDUAL
+  local daemon_killed=0
+  local daemon_residual=0
+  if [ "$mode" = "all" ]; then
+    echo "[3/5] daemon 정리 — 전량 (패턴: ${DAEMON_PATTERN})"
+    kill_by_pattern "$DAEMON_PATTERN" "daemon(전량)"
+  else
+    echo "[3/5] daemon 정리 — stale 만 (패턴: ${DAEMON_PATTERN}, ETIME ≥ ${STALE_ETIME_THRESHOLD_MINUTES}분)"
+    cleanup_stale_by_pattern "$DAEMON_PATTERN" "$STALE_ETIME_THRESHOLD_MINUTES" "daemon(stale)"
+  fi
+  daemon_killed=$LAST_KILLED
+  daemon_residual=$LAST_RESIDUAL
 
   echo "[4/5] 포트 ${DEV_SERVER_PORT} 점검 (검출·경고만 — kill 은 --kill-port 시에만)"
   check_port "$DEV_SERVER_PORT" "$KILL_PORT"
 
   local residual=$((chrome_residual + daemon_residual))
   echo "[5/5] 요약"
-  echo "[cleanup-browser] 요약: close=${close_result} chrome_killed=${chrome_killed} daemon_stale_killed=${daemon_killed} port_${DEV_SERVER_PORT}=${PORT_STATE} 잔존=${residual}"
+  echo "[cleanup-browser] 요약: mode=${mode} close=${close_result} chrome_killed=${chrome_killed} chrome_preserved=${chrome_preserved} daemon_killed=${daemon_killed} port_${DEV_SERVER_PORT}=${PORT_STATE} 잔존=${residual}"
   if [ "$residual" -eq 0 ]; then
     exit 0
   fi
-  echo "[cleanup-browser] 잔존 ${residual}개 — 수동 확인 필요: ps -axww | grep -E 'agent-browse[r]'"
+  echo "[cleanup-browser] 잔존 ${residual}개 (정리 대상 중 미정리) — 수동 확인 필요: ps -axww | grep -E 'agent-browse[r]'"
   exit 1
 }
 
@@ -373,13 +431,17 @@ main() {
 
 KILL_PORT=0
 SELF_TEST=0
+ALL_MODE=0
 
 usage() {
   cat <<'EOF'
-사용: bash scripts/cleanup-browser.sh [--kill-port] [--self-test]
-  (기본)       agent-browser close(10s timeout) → Chrome pkill TERM→KILL
-               → stale daemon (ETIME ≥ 30분) 정리 → 포트 3000 검출·경고
-               → 요약 출력 (잔존 0 이면 exit 0, 잔존 시 exit 1)
+사용: bash scripts/cleanup-browser.sh [--all] [--kill-port] [--self-test]
+  (기본)       agent-browser close(10s timeout) → Chrome/daemon **stale 만**
+               (ETIME ≥ 30분) 정리 → 포트 3000 검출·경고 → 요약
+               (잔존 0 이면 exit 0, 잔존 시 exit 1). 신선한 프로세스는 보존
+               (병행 에이전트 오살 방지) — sub-agent 표준 경로.
+  --all        Chrome/daemon ETIME 무관 전량 정리 (경고 출력). 병행 브라우저
+               작업 부재를 아는 주체 (메인 오케스트레이터) 전용.
   --kill-port  포트 3000 LISTEN 점유 프로세스도 TERM (기본은 검출·경고만)
   --self-test  mock 프로세스 격리 3중 시뮬 (positive → negative → recovery)
                실 agent-browser 프로세스 무접촉 (selftest 접미사 패턴)
@@ -388,6 +450,7 @@ EOF
 
 for arg in ${1+"$@"}; do
   case "$arg" in
+    --all) ALL_MODE=1 ;;
     --kill-port) KILL_PORT=1 ;;
     --self-test) SELF_TEST=1 ;;
     -h | --help)
