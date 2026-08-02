@@ -315,6 +315,9 @@ agent-browser auth login staging
   (기본 모드) 실행 후 재시도** — agent-browser 는 상주 daemon 이 Chrome 을 소유하는 구조라
   hang 세션에서 `close` 는 무력하며 pkill 이 정상 경로다 (실측 10일 묵은 daemon 2개, 2026-08-02).
   ③ **재시도는 최대 1회** — 재실패 시 cleanup 반복 금지, 원인 진단 단계로 전환 (무한 cleanup 루프 차단).
+  ④ **재실패 + 자기 신선 세션 잔존 시** (`chrome_preserved>0` — 기본 모드가 30분 미만 세션을
+  보존해 hang 이 안 풀린 경우): 요약 라인을 그대로 반환 보고에 박제하고 **메인에 `--all` 판단을
+  위임**한다 — sub-agent 가 직접 `--all` 을 실행하지 않는다.
   `--all` (ETIME 무관 전량 정리) 은 병행 브라우저 작업 부재를 아는 **메인 오케스트레이터 전용** —
   sub-agent 는 기본 모드만 사용한다 (병행 에이전트의 신선한 세션 오살 방지).
 
