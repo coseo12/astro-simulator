@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.57.0] — 2026-08-03
+
 ### Notes (chore — 앱 행동 변화 없음)
 
 - **[#850] Phase 1 — `solar-system-scene.ts` 테일 462줄 4모듈 분리 + 데드 상태 2건 제거 (순수 이동, PATCH)** ([#850](https://github.com/coseo12/astro-simulator/issues/850)) — 2,502줄 파일의 top-level 헬퍼 테일 (클로저 참조 0) 을 `body-mesh-factory.ts` (231) / `billboard-alpha-mask.ts` (138) / `self-rotation.ts` (82) / `orbit-sampling.ts` (71) 로 분리. **행동 변화 0 — 순수 이동 기계 실증**: 구 테일 462줄과 신규 4파일 본문을 정규화 (빈 줄 제거 + 이동 시 추가된 `export` 키워드 정규화) 후 라인 multiset 대조 → **434/434 완전 일치, 차이 0** (설계 §4(e) 권장 검증). 추가분 **60줄**은 전부 모듈 스캐폴딩 (헤더 docblock 33 + import 문 24 + 함께 이동한 `#774` ADR 주석 3) 이며 **로직 라인 0** — 빈 줄은 순증 0 (신규 4파일 28 == 구 테일 28). _(정정: 초판은 65줄 / '구분 빈 줄 8' 로 적었으나 리뷰 실측에서 소계 60·내역 배분 오류가 확인돼 바로잡음 — 수치 박제 규약 #897)_ **데드 상태 제거**: `bodyBaseDiameter` / `ringHandlesByBody` — 선언·write 만 있고 read 0 을 제거 시점 재 grep 으로 재확인 (#844 교훈). **부수 해소**: `satellite-visibility.ts → solar-system-scene.ts` 순환 import 가 상수 이동으로 자연 소멸. **신규 테스트 +26** (1,320 → 1,346) — `self-rotation` 13 (규약 (i) 음수 period magnitude 흡수 / 역행 obliquity>90° 보존 / jd 순수 함수 결정성·주기성·100년 정밀도 / tmp 버퍼 재사용) + `orbit-sampling` 13 (R10b #664 임계 e≥0.6 → 256seg 거동 검증 — 종전 `orbit-line-segments.test.ts` 는 소스 정규식 매칭만 수행해 함수를 호출하지 않았음 / tier renderScale 선형성 / 근·원점거리 / 폐곡선). **기존 테스트 assertion 본문 변경 0** (import 경로만 6곳 — `orbit-line-segments.test.ts` 의 `readFileSync` 대상 파일명 포함). `packages/core/src/scene/index.ts` export 표면 무변경. **동봉 (감사 권고 즉시 발효)**: `sim-canvas.tsx` URL 파싱 밀집대 상단에 주석 계약 3줄 — 신규 파라미터는 `parse-*.ts` 모듈 신설 + 밀집대 내부에서만 읽고 `new URLSearchParams` 신규 호출 금지 (현행 22회 재파싱의 성장 중단. 기존 22회의 레지스트리 수렴은 Phase 3 범위). **비목표**: 동작·시각·성능·타입 재설계 일절 (Phase 2~5 는 유예 — 이슈 open 유지).
