@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Notes (chore — 앱 행동 변화 없음)
+
+- **[#927] 구세대 browser-verify 10종 try/finally 표준화 — `withBrowser` 헬퍼** ([#927](https://github.com/coseo12/astro-simulator/issues/927)) — `scripts/` 루트의 구세대 verify 스크립트가 top-level await 로 `launch → … → close` 를 일직선 나열해, `page.goto` 실패·셀렉터 부재 throw 등 **에러 경로에서 `browser.close()` 에 도달하지 못하던** 구조 해소. `scripts/browser-verify-utils.mjs` 에 `withBrowser(launchOptions, fn)` 추가 (launch → try fn → finally close, `launchOptions` 는 `chromium.launch` 로 원본 그대로 전달 — 기존 launch 인자 무변경 보존, close 실패가 원 에러를 덮지 않도록 경고로 강등). 전환 대상은 이슈가 추정한 12개가 아니라 **10개** — `browser-verify*.mjs` glob 12개 중 `browser-verify-utils.mjs`(헬퍼 모듈) 와 `.test.mjs`(테스트) 를 제외한 실제 스크립트 수. **동작 무변경 실증**: 동일 dev 서버(:3000) 에 전환 전/후를 연달아 실행해 stdout·종료 코드 대조 (경로 문자열·fps 등 실측 노이즈 제외 시 전건 동일). **에러 주입 실증**: 도달 불가 URL(`http://localhost:59999`) 로 전 10종 실행 시 chromium 프로세스 잔존 0 — 단 **전환 전도 잔존 0** 이므로 이 측정만으로는 개선이 드러나지 않는다 (node 정상 종료 시 Playwright 자체 exit 핸들러가 회수). 차이가 드러나는 것은 **프로세스가 살아 있는 구간의 메커니즘 레벨 측정** — 미전환 4개 잔존 vs `withBrowser` 0개. 따라서 **실효 범위는 좁다**: hang → SIGKILL 구간 / 에러를 포착하고 계속 진행하는 경로 / 신규 스크립트 예방 (정상 종료 경로의 좀비 감소가 아님). `docs/ops/browser-verify-helpers.md` 리뷰 체크리스트에 항목 추가, 회귀 가드 `browser-verify-utils.test.mjs` +5 assertion (21 → 26, ci.yml 기배선). **비목표**: 판정 로직·임계값·launch 인자 변경, `scripts/verify-{a11y,fps}-baseline.mjs`·`verify-hud-contrast.mjs`·`bench-*.mjs` (동일 클래스이나 이슈 범위 밖 — 후속 분리 대상).
+
 ## [0.56.0] — 2026-08-02
 
 ### Behavior Changes

@@ -26,6 +26,7 @@ import {
   collectConsoleErrors,
   resolveBaseUrl,
   saveCapture,
+  withBrowser,
 } from './browser-verify-utils.mjs';
 
 let passed = 0;
@@ -69,6 +70,42 @@ function stubPage() {
 }
 
 const consoleMsg = (type, text) => ({ type: () => type, text: () => text });
+
+/** Playwright Browser 의 `close` 계약만 흉내내는 스텁 (#927). */
+function stubBrowser({ closeError } = {}) {
+  return {
+    closeCount: 0,
+    async close() {
+      this.closeCount += 1;
+      if (closeError) throw closeError;
+    },
+  };
+}
+
+/** `withBrowser` 의 launcher 주입 인자 — 호출 옵션을 기록한다. */
+function launchStub(browser) {
+  const calls = [];
+  return {
+    calls,
+    launch: async (launchOptions) => {
+      calls.push(launchOptions);
+      return browser;
+    },
+  };
+}
+
+/** `console.warn` 을 가로채 배열로 수집 (테스트 출력 오염 방지). */
+async function captureWarnings(fn) {
+  const original = console.warn;
+  const warnings = [];
+  console.warn = (msg) => warnings.push(String(msg));
+  try {
+    await fn();
+  } finally {
+    console.warn = original;
+  }
+  return warnings;
+}
 
 console.log('\n=== #846 browser-verify-utils 공용 헬퍼 ===\n');
 
@@ -167,6 +204,79 @@ await run('buildLaunchOptions — 추가 args 는 gpu 인자 뒤에 이어붙임
     '--use-angle=metal',
     '--mute-audio',
   ]);
+});
+
+// --- withBrowser ----------------------------------------------------------
+// #927 — 에러 경로 close 도달 보장. 실 브라우저 없이 `launch` 주입으로 계약만 검증한다.
+await run('withBrowser — 정상 경로: fn 반환값 그대로 + close 1회', async () => {
+  const browser = stubBrowser();
+  const captured = [];
+  const value = await withBrowser(
+    { headless: true },
+    async (b) => {
+      captured.push(b);
+      return 'ok';
+    },
+    launchStub(browser),
+  );
+  assert.equal(value, 'ok');
+  assert.equal(captured[0], browser, 'fn 은 launch 된 browser 를 받아야 한다');
+  assert.equal(browser.closeCount, 1);
+});
+
+await run('withBrowser — fn throw 여도 close 도달 (본 헬퍼의 존재 이유)', async () => {
+  const browser = stubBrowser();
+  await assert.rejects(
+    withBrowser(
+      {},
+      async () => {
+        throw new Error('page.goto 실패');
+      },
+      launchStub(browser),
+    ),
+    /page\.goto 실패/,
+  );
+  // try/finally 없던 구세대 스크립트는 여기서 close 에 도달하지 못했다.
+  assert.equal(browser.closeCount, 1, '에러 경로에서 close 미도달');
+});
+
+await run('withBrowser — launch 옵션을 가공 없이 그대로 전달', async () => {
+  const browser = stubBrowser();
+  const stub = launchStub(browser);
+  // ⚠️ 픽스처 선정 계약 (PR #931 리뷰 뮤테이션 M3): `{ headless, args }` 만 쓰면
+  // 기본 env 하에서 buildLaunchOptions 의 **고정점**이라 경유 여부를 판별하지 못한다
+  // (구현을 buildLaunchOptions 경유로 바꿔도 초록 = assertion 진공).
+  // `gpu` 키는 buildLaunchOptions 가 소비·변환하므로 경유 시 deepEqual 이 깨진다 — 판별 가능.
+  const opts = { headless: true, args: ['--use-angle=metal'], gpu: 'swiftshader' };
+  await withBrowser(opts, async () => {}, stub);
+  // buildLaunchOptions 를 경유하지 않는다 — 기존 스크립트 launch 인자 보존이 전환의 전제.
+  assert.deepEqual(stub.calls[0], opts);
+});
+
+await run('withBrowser — close 실패 시 원 에러 보존 (close 에러가 덮지 않음)', async () => {
+  const browser = stubBrowser({ closeError: new Error('close 실패') });
+  const warnings = await captureWarnings(async () => {
+    await assert.rejects(
+      withBrowser(
+        {},
+        async () => {
+          throw new Error('진짜 원인');
+        },
+        launchStub(browser),
+      ),
+      /진짜 원인/,
+    );
+  });
+  assert.equal(warnings.length, 1, 'close 실패는 경고로 노출돼야 한다 (조용한 삼킴 금지)');
+  assert.match(warnings[0], /close\(\) 실패/);
+});
+
+await run('withBrowser — fn 성공 + close 실패면 close 에러를 노출', async () => {
+  const browser = stubBrowser({ closeError: new Error('close 실패') });
+  await assert.rejects(
+    withBrowser({}, async () => 'ok', launchStub(browser)),
+    /close 실패/,
+  );
 });
 
 // --- collectConsoleErrors -------------------------------------------------

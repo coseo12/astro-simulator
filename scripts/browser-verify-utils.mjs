@@ -32,6 +32,7 @@
  *   3. `page.on('console' …)` 인라인 대신 `collectConsoleErrors()` — `pageerror` 누락 방지
  *   4. `mkdir` + `writeFile` 수기 조합 대신 `saveCapture()`
  *   5. `process.env.BASE_URL ?? 'http://localhost:3000'` 대신 `resolveBaseUrl()`
+ *   6. `launch → … → close` 일직선 나열 대신 `withBrowser()` — 에러 경로 브라우저 잔존 차단 (#927)
  *
  * **기존 스크립트 전면 전환은 비목표** (#846 스프린트 계약) — 신규 유입 차단이 목표다.
  * 기존 파일은 손대는 김에 점진 전환하되, 동작 불변이 확인된 범위에서만 바꾼다.
@@ -180,6 +181,59 @@ export function buildLaunchOptions(options = {}) {
 export async function launchBrowser(options = {}) {
   const { chromium } = await import('playwright');
   return chromium.launch(buildLaunchOptions(options));
+}
+
+/**
+ * 브라우저 수명주기를 `try/finally` 로 감싸 **에러 경로에서도 `close()` 도달을 보장**.
+ *
+ * 구세대 verify 스크립트 (#927 대상 10종) 는 top-level await 로 `launch → … → close` 를
+ * 일직선으로 나열해, `page.goto` 실패 / 셀렉터 부재 throw 가 나면 마지막 `close()` 에
+ * 도달하지 못했다. 정상 종료 시엔 Playwright 가 브라우저를 회수하지만
+ * hang → SIGKILL 경로에서는 잔존 프로세스가 남는다 (agent-browser 좀비와 동일 클래스).
+ *
+ * `launchOptions` 는 `chromium.launch` 로 **그대로 전달**한다 — 기존 스크립트의 launch 인자를
+ * 한 글자도 바꾸지 않고 수명주기만 위임하기 위함 (#846 §기존 스크립트 전환 정책 "동작 불변").
+ * 옵션 조립까지 위임하려면 `withBrowser(buildLaunchOptions({ gpu: 'swiftshader' }), fn)` 처럼
+ * 순수 함수를 통과시킨다.
+ *
+ * `process.exit()` 를 콜백 **안에서** 호출하면 finally 가 실행되지 않는다 (Node 즉시 종료).
+ * 조기 종료가 필요하면 콜백은 값을 반환하고 종료는 호출부에서 한다.
+ *
+ * @param {object} [launchOptions] `chromium.launch` 원본 옵션 (그대로 전달)
+ * @param {(browser: import('playwright').Browser) => Promise<T> | T} fn 브라우저 사용 본문
+ * @param {object} [options]
+ * @param {(launchOptions: object) => Promise<import('playwright').Browser>} [options.launch]
+ *   주입용 (테스트에서 chromium 대체) — 미지정 시 `playwright` 동적 import
+ * @returns {Promise<T>} `fn` 의 반환값
+ * @template T
+ */
+export async function withBrowser(launchOptions = {}, fn, options = {}) {
+  const launch = options.launch ?? defaultLaunch;
+  const browser = await launch(launchOptions);
+  let failed = false;
+  try {
+    return await fn(browser);
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    try {
+      await browser.close();
+    } catch (closeError) {
+      // 원 에러 보존 — close 실패가 진짜 실패 원인을 덮으면 진단이 뒤집힌다.
+      // 실패가 없던 경로에서만 close 에러를 그대로 노출한다 (조용한 삼킴 금지).
+      if (!failed) throw closeError;
+      console.warn(
+        `[browser-verify-utils] browser.close() 실패 — 원 에러 유지: ${closeError?.message ?? closeError}`,
+      );
+    }
+  }
+}
+
+/** `withBrowser` 기본 launcher — `launchBrowser` 와 동일하게 playwright 를 동적 import. */
+async function defaultLaunch(launchOptions) {
+  const { chromium } = await import('playwright');
+  return chromium.launch(launchOptions);
 }
 
 /**

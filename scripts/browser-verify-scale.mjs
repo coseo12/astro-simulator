@@ -9,10 +9,10 @@
  * 태양계 내 스케일에서 지터 없음을 보장한다. 행성 표면 수준의
  * 극단 줌은 C6/P2에서 per-body 스케일/Floating Origin으로 개선 예정.
  */
-import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,59 +27,61 @@ const targets = [
 ];
 
 const results = { pass: [], fail: [] };
-const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await context.newPage();
-
+// 요약 출력은 브라우저 종료 뒤라 수집 배열은 콜백 밖에 둔다 (#927).
 const consoleErrors = [];
 const pageErrors = [];
-page.on('console', (m) => {
-  if (m.type() === 'error') consoleErrors.push(m.text());
-});
-page.on('pageerror', (e) => pageErrors.push(e.message));
 
-await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(1500);
+// #927 — 에러 경로(goto 실패 등)에서도 close 도달 보장.
+await withBrowser({}, async (browser) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
 
-for (const t of targets) {
-  const before = consoleErrors.length + pageErrors.length;
-  const btn = await page.$(`[data-testid="focus-${t.id}"]`);
-  if (!btn) {
-    results.fail.push(`${t.label}: 버튼 없음`);
-    continue;
-  }
-  await btn.click();
-  await page.waitForTimeout(600); // 카메라 애니메이션 + 렌더 안정화
-  await page.screenshot({ path: join(screenshotDir, `${t.id}.png`) });
-
-  const after = consoleErrors.length + pageErrors.length;
-  const newErrors = after - before;
-  if (newErrors === 0) results.pass.push(`${t.label} 포커스 — 에러 없음`);
-  else results.fail.push(`${t.label} 포커스 시 에러 ${newErrors}건 추가`);
-
-  // 캔버스가 비어있지 않은지 확인 (모두 배경색이면 실패)
-  const isBlank = await page.evaluate(() => {
-    const cv = document.querySelector('canvas');
-    if (!cv) return true;
-    const ctx = cv.getContext('webgl2') || cv.getContext('webgpu');
-    return !ctx;
+  page.on('console', (m) => {
+    if (m.type() === 'error') consoleErrors.push(m.text());
   });
-  if (!isBlank) results.pass.push(`${t.label} — 캔버스 렌더링 컨텍스트 존재`);
-  else results.fail.push(`${t.label} — 캔버스 컨텍스트 없음`);
-}
+  page.on('pageerror', (e) => pageErrors.push(e.message));
 
-// reset
-const resetBtn = await page.$('[data-testid="focus-reset"]');
-if (resetBtn) {
-  await resetBtn.click();
-  await page.waitForTimeout(600);
-  await page.screenshot({ path: join(screenshotDir, 'reset.png') });
-  results.pass.push('reset 버튼 클릭 — 에러 없음');
-} else {
-  results.fail.push('reset 버튼 없음');
-}
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
 
-await browser.close();
+  for (const t of targets) {
+    const before = consoleErrors.length + pageErrors.length;
+    const btn = await page.$(`[data-testid="focus-${t.id}"]`);
+    if (!btn) {
+      results.fail.push(`${t.label}: 버튼 없음`);
+      continue;
+    }
+    await btn.click();
+    await page.waitForTimeout(600); // 카메라 애니메이션 + 렌더 안정화
+    await page.screenshot({ path: join(screenshotDir, `${t.id}.png`) });
+
+    const after = consoleErrors.length + pageErrors.length;
+    const newErrors = after - before;
+    if (newErrors === 0) results.pass.push(`${t.label} 포커스 — 에러 없음`);
+    else results.fail.push(`${t.label} 포커스 시 에러 ${newErrors}건 추가`);
+
+    // 캔버스가 비어있지 않은지 확인 (모두 배경색이면 실패)
+    const isBlank = await page.evaluate(() => {
+      const cv = document.querySelector('canvas');
+      if (!cv) return true;
+      const ctx = cv.getContext('webgl2') || cv.getContext('webgpu');
+      return !ctx;
+    });
+    if (!isBlank) results.pass.push(`${t.label} — 캔버스 렌더링 컨텍스트 존재`);
+    else results.fail.push(`${t.label} — 캔버스 컨텍스트 없음`);
+  }
+
+  // reset
+  const resetBtn = await page.$('[data-testid="focus-reset"]');
+  if (resetBtn) {
+    await resetBtn.click();
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: join(screenshotDir, 'reset.png') });
+    results.pass.push('reset 버튼 클릭 — 에러 없음');
+  } else {
+    results.fail.push('reset 버튼 없음');
+  }
+});
 
 console.log('\n========================================');
 console.log(`PASS: ${results.pass.length}건`);
