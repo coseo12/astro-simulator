@@ -18,30 +18,17 @@
  * 주의: 환경이 WebGPU 미지원이면 (헤드리스 구버전 등) Barnes-Hut 폴백이 정상 동작.
  *       그 경우 본 스크립트는 SKIP 처리하고 exit 0 — 단, warning 로그.
  */
-import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const shotDir = join(__dirname, '..', '.verify-screenshots', 'webgpu');
 mkdirSync(shotDir, { recursive: true });
 
-// P3-D #154 · P4-B #164 — vsync 해제 + WebGPU flag 명시 (기본값 의존 금지).
-const browser = await chromium.launch({
-  headless: true,
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=metal'],
-});
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await context.newPage();
-
-const consoleErrors = [];
-page.on('console', (m) => {
-  if (m.type() === 'error') consoleErrors.push(m.text());
-});
-
+// 결과 집계는 브라우저 종료 뒤라 콜백 밖에 둔다 (#927).
 const results = [];
 const check = (name, pass, detail = '') => {
   results.push({ name, pass, detail });
@@ -49,83 +36,103 @@ const check = (name, pass, detail = '') => {
   console.log(`  ${mark} ${name}${detail ? ' — ' + detail : ''}`);
 };
 
-// ===== 0. WebGPU capability 감지 =====
-console.log('\n[0/3] WebGPU capability 감지');
-await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-const hasAdapter = await page.evaluate(async () => {
-  if (!navigator.gpu) return false;
-  try {
-    return (await navigator.gpu.requestAdapter()) !== null;
-  } catch {
+// P3-D #154 · P4-B #164 — vsync 해제 + WebGPU flag 명시 (기본값 의존 금지).
+// #927 — 에러 경로(goto 실패 등)에서도 close 도달 보장. launch 인자는 원본 그대로.
+const skipped = await withBrowser(
+  {
+    headless: true,
+    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=metal'],
+  },
+  async (browser) => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+
+    const consoleErrors = [];
+    page.on('console', (m) => {
+      if (m.type() === 'error') consoleErrors.push(m.text());
+    });
+
+    // ===== 0. WebGPU capability 감지 =====
+    console.log('\n[0/3] WebGPU capability 감지');
+    await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+    const hasAdapter = await page.evaluate(async () => {
+      if (!navigator.gpu) return false;
+      try {
+        return (await navigator.gpu.requestAdapter()) !== null;
+      } catch {
+        return false;
+      }
+    });
+
+    if (!hasAdapter) {
+      console.log('  ⊘ WebGPU adapter 없음 — 환경 미지원, 가드 SKIP (exit 0)');
+      console.log('     (프로덕션 Chrome/Edge는 자동 폴백으로 Barnes-Hut 사용 — 정상)');
+      // 콜백 안에서 process.exit 하면 finally(close)가 실행되지 않는다 — 종료는 호출부에서.
+      return true;
+    }
+    check('navigator.gpu adapter 획득', true);
+
+    // ===== 1. 정적: engine=webgpu URL 진입 =====
+    console.log('\n[1/3] 정적 — engine=webgpu 진입');
+    await page.goto(`${baseUrl}/?engine=webgpu&belt=2000`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000); // Babylon 초기화 + scene mount
+
+    // HUD 우상단 뱃지에서 직접 읽는다. body textContent는 인접 뱃지와 합쳐져
+    // "webgpuTier 1" 같은 토큰 경계 없는 문자열이 되므로 selector 기반으로 격리.
+    const hudText = (await page.textContent('[data-testid="hud-top-right"]')) ?? '';
+    const rendererMatch = hudText.match(/renderer\s*·\s*(webgpu|webgl2)/)?.[1];
+    check(
+      'HUD renderer · webgpu 표시',
+      rendererMatch === 'webgpu',
+      `실제: renderer · ${rendererMatch ?? '없음'}`,
+    );
+
+    const noticeText = await page
+      .locator('[data-testid="engine-notice"]')
+      .textContent()
+      .catch(() => null);
+    check(
+      'capability polling notice 미표시',
+      !noticeText || !/WebGPU 미지원/.test(noticeText),
+      noticeText ? `notice: ${noticeText.slice(0, 80)}` : '없음',
+    );
+
+    await page.screenshot({ path: join(shotDir, '1-webgpu-static.png') });
+
+    // ===== 2. 인터랙션: 시간 재생 중 런타임 오류 없음 =====
+    console.log('\n[2/3] 인터랙션 — 시간 재생 + GPU compute 경로');
+    // P7-E #210 — silent-fail 방지.
+    await pressTimePlay(page, { skipIfAbsent: true });
+    await page.waitForTimeout(2500);
+
+    const hasWebGpuErr = consoleErrors.some((e) =>
+      /webgpu|WebGPUEngine|createComputeShader|ComputeShader/i.test(e),
+    );
+    check(
+      'WebGPU 관련 console error 없음',
+      !hasWebGpuErr,
+      hasWebGpuErr ? consoleErrors.filter((e) => /webgpu/i.test(e)).join(' | ') : '',
+    );
+    await page.screenshot({ path: join(shotDir, '2-webgpu-playing.png') });
+
+    // ===== 3. 흐름: reload 후에도 webgpu 유지 =====
+    console.log('\n[3/3] 흐름 — reload 후 WebGPU 경로 유지');
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    const hudAfterReload = (await page.textContent('[data-testid="hud-top-right"]')) ?? '';
+    const rendererAfter = hudAfterReload.match(/renderer\s*·\s*(webgpu|webgl2)/)?.[1];
+    check(
+      'reload 후 renderer · webgpu 유지',
+      rendererAfter === 'webgpu',
+      `실제: renderer · ${rendererAfter ?? '없음'}`,
+    );
+    await page.screenshot({ path: join(shotDir, '3-webgpu-reload.png') });
+
     return false;
-  }
-});
-
-if (!hasAdapter) {
-  console.log('  ⊘ WebGPU adapter 없음 — 환경 미지원, 가드 SKIP (exit 0)');
-  console.log('     (프로덕션 Chrome/Edge는 자동 폴백으로 Barnes-Hut 사용 — 정상)');
-  await browser.close();
-  process.exit(0);
-}
-check('navigator.gpu adapter 획득', true);
-
-// ===== 1. 정적: engine=webgpu URL 진입 =====
-console.log('\n[1/3] 정적 — engine=webgpu 진입');
-await page.goto(`${baseUrl}/?engine=webgpu&belt=2000`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000); // Babylon 초기화 + scene mount
-
-// HUD 우상단 뱃지에서 직접 읽는다. body textContent는 인접 뱃지와 합쳐져
-// "webgpuTier 1" 같은 토큰 경계 없는 문자열이 되므로 selector 기반으로 격리.
-const hudText = (await page.textContent('[data-testid="hud-top-right"]')) ?? '';
-const rendererMatch = hudText.match(/renderer\s*·\s*(webgpu|webgl2)/)?.[1];
-check(
-  'HUD renderer · webgpu 표시',
-  rendererMatch === 'webgpu',
-  `실제: renderer · ${rendererMatch ?? '없음'}`,
+  },
 );
 
-const noticeText = await page
-  .locator('[data-testid="engine-notice"]')
-  .textContent()
-  .catch(() => null);
-check(
-  'capability polling notice 미표시',
-  !noticeText || !/WebGPU 미지원/.test(noticeText),
-  noticeText ? `notice: ${noticeText.slice(0, 80)}` : '없음',
-);
-
-await page.screenshot({ path: join(shotDir, '1-webgpu-static.png') });
-
-// ===== 2. 인터랙션: 시간 재생 중 런타임 오류 없음 =====
-console.log('\n[2/3] 인터랙션 — 시간 재생 + GPU compute 경로');
-// P7-E #210 — silent-fail 방지.
-await pressTimePlay(page, { skipIfAbsent: true });
-await page.waitForTimeout(2500);
-
-const hasWebGpuErr = consoleErrors.some((e) =>
-  /webgpu|WebGPUEngine|createComputeShader|ComputeShader/i.test(e),
-);
-check(
-  'WebGPU 관련 console error 없음',
-  !hasWebGpuErr,
-  hasWebGpuErr ? consoleErrors.filter((e) => /webgpu/i.test(e)).join(' | ') : '',
-);
-await page.screenshot({ path: join(shotDir, '2-webgpu-playing.png') });
-
-// ===== 3. 흐름: reload 후에도 webgpu 유지 =====
-console.log('\n[3/3] 흐름 — reload 후 WebGPU 경로 유지');
-await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
-const hudAfterReload = (await page.textContent('[data-testid="hud-top-right"]')) ?? '';
-const rendererAfter = hudAfterReload.match(/renderer\s*·\s*(webgpu|webgl2)/)?.[1];
-check(
-  'reload 후 renderer · webgpu 유지',
-  rendererAfter === 'webgpu',
-  `실제: renderer · ${rendererAfter ?? '없음'}`,
-);
-await page.screenshot({ path: join(shotDir, '3-webgpu-reload.png') });
-
-await browser.close();
+if (skipped) process.exit(0);
 
 console.log('\n========================================');
 const pass = results.filter((r) => r.pass).length;

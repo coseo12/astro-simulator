@@ -12,11 +12,10 @@
  *  4. 지구 포커스 (클로즈업)
  *  5. 해왕성 포커스 (원거리)
  */
-import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const MIN_FPS = 30; // 헤드리스 Chromium 하드웨어 가속 제한 — 실 브라우저 60 기대
@@ -25,66 +24,67 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const reportDir = join(__dirname, '..', '.verify-screenshots', 'perf');
 mkdirSync(reportDir, { recursive: true });
 
-const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await context.newPage();
-
+// 보고서는 브라우저 종료 뒤에 쓰므로 수집 배열은 콜백 밖에 둔다 (#927).
 const consoleErrors = [];
-page.on('console', (m) => {
-  if (m.type() === 'error') consoleErrors.push(m.text());
-});
-
-/** 현재 페이지에서 durationMs 동안 rAF 카운트 → FPS 계산 */
-const measureFps = async (durationMs) => {
-  return page.evaluate(
-    (d) =>
-      new Promise((resolve) => {
-        let count = 0;
-        const start = performance.now();
-        const loop = () => {
-          count += 1;
-          if (performance.now() - start < d) requestAnimationFrame(loop);
-          else resolve((count * 1000) / (performance.now() - start));
-        };
-        requestAnimationFrame(loop);
-      }),
-    durationMs,
-  );
-};
-
-await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
-
 const scenarios = [];
 
-// 1. 정지 상태
-await page.click('[data-testid="time-pause"]').catch(() => {});
-await page.waitForTimeout(300);
-scenarios.push({ name: '정지 상태', fps: await measureFps(SCENARIO_DURATION_MS) });
+// #927 — 에러 경로(goto 실패 등)에서도 close 도달 보장.
+await withBrowser({}, async (browser) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
 
-// 2. 재생 ×1일/초 (기본)
-// P7-E #210 — silent-fail 방지.
-await pressTimePlay(page, { skipIfAbsent: true });
-await page.click('[data-testid="time-preset-1d"]').catch(() => {});
-await page.waitForTimeout(300);
-scenarios.push({ name: '재생 ×1일/초', fps: await measureFps(SCENARIO_DURATION_MS) });
+  page.on('console', (m) => {
+    if (m.type() === 'error') consoleErrors.push(m.text());
+  });
 
-// 3. 재생 ×1년/초
-await page.click('[data-testid="time-preset-1y"]').catch(() => {});
-await page.waitForTimeout(300);
-scenarios.push({ name: '재생 ×1년/초', fps: await measureFps(SCENARIO_DURATION_MS) });
+  /** 현재 페이지에서 durationMs 동안 rAF 카운트 → FPS 계산 */
+  const measureFps = async (durationMs) => {
+    return page.evaluate(
+      (d) =>
+        new Promise((resolve) => {
+          let count = 0;
+          const start = performance.now();
+          const loop = () => {
+            count += 1;
+            if (performance.now() - start < d) requestAnimationFrame(loop);
+            else resolve((count * 1000) / (performance.now() - start));
+          };
+          requestAnimationFrame(loop);
+        }),
+      durationMs,
+    );
+  };
 
-// 4. 지구 포커스
-await page.click('[data-testid="focus-earth"]').catch(() => {});
-await page.waitForTimeout(600);
-scenarios.push({ name: '지구 포커스 (클로즈업)', fps: await measureFps(SCENARIO_DURATION_MS) });
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2000);
 
-// 5. 해왕성 포커스
-await page.click('[data-testid="focus-neptune"]').catch(() => {});
-await page.waitForTimeout(600);
-scenarios.push({ name: '해왕성 포커스 (원거리)', fps: await measureFps(SCENARIO_DURATION_MS) });
+  // 1. 정지 상태
+  await page.click('[data-testid="time-pause"]').catch(() => {});
+  await page.waitForTimeout(300);
+  scenarios.push({ name: '정지 상태', fps: await measureFps(SCENARIO_DURATION_MS) });
 
-await browser.close();
+  // 2. 재생 ×1일/초 (기본)
+  // P7-E #210 — silent-fail 방지.
+  await pressTimePlay(page, { skipIfAbsent: true });
+  await page.click('[data-testid="time-preset-1d"]').catch(() => {});
+  await page.waitForTimeout(300);
+  scenarios.push({ name: '재생 ×1일/초', fps: await measureFps(SCENARIO_DURATION_MS) });
+
+  // 3. 재생 ×1년/초
+  await page.click('[data-testid="time-preset-1y"]').catch(() => {});
+  await page.waitForTimeout(300);
+  scenarios.push({ name: '재생 ×1년/초', fps: await measureFps(SCENARIO_DURATION_MS) });
+
+  // 4. 지구 포커스
+  await page.click('[data-testid="focus-earth"]').catch(() => {});
+  await page.waitForTimeout(600);
+  scenarios.push({ name: '지구 포커스 (클로즈업)', fps: await measureFps(SCENARIO_DURATION_MS) });
+
+  // 5. 해왕성 포커스
+  await page.click('[data-testid="focus-neptune"]').catch(() => {});
+  await page.waitForTimeout(600);
+  scenarios.push({ name: '해왕성 포커스 (원거리)', fps: await measureFps(SCENARIO_DURATION_MS) });
+});
 
 // 보고서
 console.log('\n========================================');

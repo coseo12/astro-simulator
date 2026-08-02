@@ -21,11 +21,12 @@
 
 또 인라인 console 수집본 상당수가 `pageerror` 리스너를 빠뜨려 **미포착 예외를 놓쳤다**.
 
-## 헬퍼 5종
+## 헬퍼 6종
 
 ```js
 import {
   launchBrowser, // chromium.launch + 렌더러 축(gpu) 단일 선언 + HEADFUL/HEADED 흡수
+  withBrowser, // launch → try fn → finally close (에러 경로 잔존 차단, #927)
   bootstrapScene, // goto + window.__solarScene 등 dev 전역 노출 대기 + settle
   collectConsoleErrors, // console.error + pageerror 두 채널 동시 등록 (라이브 배열 반환)
   saveCapture, // mkdir -p + writeFile
@@ -50,6 +51,9 @@ import {
 신규 `browser-verify-*.mjs` 가 PR 에 포함되면 아래를 확인한다.
 
 - [ ] `chromium.launch(...)` 직접 호출 대신 `launchBrowser()` — 렌더러는 `gpu` 옵션으로 명시
+- [ ] `launch → … → close` 를 일직선으로 나열하지 말고 `withBrowser(launchOptions, fn)` — `page.goto`
+      실패 등 **에러 경로에서도 `close()` 도달**을 보장한다 (#927). 콜백 안에서 `process.exit()` 를
+      부르면 finally 가 실행되지 않으므로, 조기 종료는 값을 반환해 호출부에서 처리한다
 - [ ] `page.goto` + `waitForFunction(window.__solarScene …)` 수기 조합 대신 `bootstrapScene()`
 - [ ] `page.on('console', …)` 인라인 대신 `collectConsoleErrors()` — `pageerror` 누락 방지
 - [ ] `mkdir` + `writeFile` 수기 조합 대신 `saveCapture()`

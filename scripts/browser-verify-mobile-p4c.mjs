@@ -15,10 +15,10 @@
  *
  * 사용: node scripts/browser-verify-mobile-p4c.mjs [baseUrl]
  */
-import { chromium, devices } from 'playwright';
+import { devices } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 import { dirname, join } from 'node:path';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
@@ -30,109 +30,117 @@ mkdirSync(reportsDir, { recursive: true });
 
 // iPhone 14 — A15 Bionic, 현대 기준점. 실기기와 성능 프로필은 다름(Chromium/데스크톱 CPU).
 const deviceProfile = devices['iPhone 14'];
-const browser = await chromium.launch({
-  headless: true,
-  args: [
-    // 모바일 리얼리티와 별개로 WebGPU 경로 검증은 가능하게 한다 (실기기 iOS Safari는 별도).
-    '--enable-unsafe-webgpu',
-    '--enable-features=Vulkan',
-    '--use-angle=metal',
-    '--disable-gpu-vsync',
-    '--disable-frame-rate-limit',
-  ],
-});
-const ctx = await browser.newContext({ ...deviceProfile });
-const page = await ctx.newPage();
 
-const consoleErrors = [];
-page.on('console', (m) => {
-  if (m.type() === 'error') consoleErrors.push(m.text());
-});
-const pageErrors = [];
-page.on('pageerror', (e) => pageErrors.push(e.message));
-
+// 리포트는 브라우저 종료 뒤에 쓰므로 결과 집계는 콜백 밖에 둔다 (#927).
 const results = [];
 const check = (name, pass, detail = '') => {
   results.push({ name, pass, detail });
   console.log(`  ${pass ? '✓' : '✗'} ${name}${detail ? ' — ' + detail : ''}`);
 };
 
-const measureFps = (ms) =>
-  page.evaluate(
-    (duration) =>
-      new Promise((resolve) => {
-        let count = 0;
-        const t0 = performance.now();
-        const loop = () => {
-          count += 1;
-          if (performance.now() - t0 < duration) requestAnimationFrame(loop);
-          else resolve((count * 1000) / (performance.now() - t0));
-        };
-        requestAnimationFrame(loop);
-      }),
-    ms,
-  );
+// #927 — 에러 경로(goto 실패 등)에서도 close 도달 보장. launch 인자는 원본 그대로.
+const { fps200, fps10k, bigErrs, rendererInFallback } = await withBrowser(
+  {
+    headless: true,
+    args: [
+      // 모바일 리얼리티와 별개로 WebGPU 경로 검증은 가능하게 한다 (실기기 iOS Safari는 별도).
+      '--enable-unsafe-webgpu',
+      '--enable-features=Vulkan',
+      '--use-angle=metal',
+      '--disable-gpu-vsync',
+      '--disable-frame-rate-limit',
+    ],
+  },
+  async (browser) => {
+    const ctx = await browser.newContext({ ...deviceProfile });
+    const page = await ctx.newPage();
 
-// ===== Scenario 1: N=200 60fps 유지 =====
-console.log('\n[1/3] N=200 60fps 유지 (iPhone 14 emulation, 5초 평균)');
-await page.goto(`${baseUrl}/?belt=200`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
-// P7-E #210 — silent-fail 방지 (pre-assert).
-await pressTimePlay(page, { skipIfAbsent: true });
-await page.waitForTimeout(500);
-const fps200 = await measureFps(5000);
-check(
-  `N=200 fps ≥ 55 (5s 평균)`,
-  fps200 >= 55,
-  `${fps200.toFixed(2)} fps (vsync cap = 60fps, 55로 완화)`,
+    const consoleErrors = [];
+    page.on('console', (m) => {
+      if (m.type() === 'error') consoleErrors.push(m.text());
+    });
+    const pageErrors = [];
+    page.on('pageerror', (e) => pageErrors.push(e.message));
+
+    const measureFps = (ms) =>
+      page.evaluate(
+        (duration) =>
+          new Promise((resolve) => {
+            let count = 0;
+            const t0 = performance.now();
+            const loop = () => {
+              count += 1;
+              if (performance.now() - t0 < duration) requestAnimationFrame(loop);
+              else resolve((count * 1000) / (performance.now() - t0));
+            };
+            requestAnimationFrame(loop);
+          }),
+        ms,
+      );
+
+    // ===== Scenario 1: N=200 60fps 유지 =====
+    console.log('\n[1/3] N=200 60fps 유지 (iPhone 14 emulation, 5초 평균)');
+    await page.goto(`${baseUrl}/?belt=200`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    // P7-E #210 — silent-fail 방지 (pre-assert).
+    await pressTimePlay(page, { skipIfAbsent: true });
+    await page.waitForTimeout(500);
+    const fps200 = await measureFps(5000);
+    check(
+      `N=200 fps ≥ 55 (5s 평균)`,
+      fps200 >= 55,
+      `${fps200.toFixed(2)} fps (vsync cap = 60fps, 55로 완화)`,
+    );
+    await page.screenshot({ path: join(shotDir, '1-n200.png') });
+
+    // ===== Scenario 2: N=10000 크래시 없음 =====
+    console.log('\n[2/3] N=10000 크래시 없음 (best-effort fps)');
+    const errsBeforeBig = pageErrors.length;
+    await page.goto(`${baseUrl}/?belt=10000`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    // P7-E #210 — silent-fail 방지 (pre-assert).
+    await pressTimePlay(page, { skipIfAbsent: true });
+    await page.waitForTimeout(500);
+    const fps10k = await measureFps(3000);
+    const bigErrs = pageErrors.slice(errsBeforeBig);
+    check('N=10000 page error 없음', bigErrs.length === 0, bigErrs.join(' | ').slice(0, 120));
+    check('N=10000 canvas 유지', (await page.$('canvas')) !== null);
+    console.log(`  (best-effort) N=10000 fps=${fps10k.toFixed(2)}`);
+    await page.screenshot({ path: join(shotDir, '2-n10000.png') });
+
+    // ===== Scenario 3: WebGPU 미지원 환경 폴백 =====
+    console.log('\n[3/3] WebGPU 미지원 시뮬레이션 — navigator.gpu 제거 후 barnes-hut 폴백');
+    // iPhone 16 Pro도 iOS 17 이전에는 webgpu 없음. 여기서는 navigator.gpu를 명시 차단하여
+    // 모바일 Safari 구버전을 흉내.
+    const ctx2 = await browser.newContext({ ...deviceProfile });
+    await ctx2.addInitScript(() => {
+      Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
+    });
+    const page2 = await ctx2.newPage();
+    const consoleErrors2 = [];
+    page2.on('console', (m) => {
+      if (m.type() === 'error') consoleErrors2.push(m.text());
+    });
+    await page2.goto(`${baseUrl}/?engine=webgpu&belt=500`, { waitUntil: 'networkidle' });
+    await page2.waitForTimeout(2000);
+    const hud = (await page2.textContent('[data-testid="hud-top-right"]')) ?? '';
+    const rendererInFallback = hud.match(/renderer\s*·\s*(\w+)/)?.[1];
+    check(
+      'navigator.gpu 없을 때 WebGL2로 폴백 (barnes-hut 경로)',
+      rendererInFallback === 'webgl2',
+      `renderer=${rendererInFallback ?? '없음'}`,
+    );
+    check(
+      'capability 안내 notice 표시 (engine=webgpu 요청 시)',
+      !!(await page2.$('[data-testid="engine-notice"]')),
+    );
+    await page2.screenshot({ path: join(shotDir, '3-webgpu-fallback.png') });
+    await ctx2.close();
+
+    // 리포트 표에 쓰이는 측정값만 반환 (판정 로직은 원본 그대로 호출부에 남긴다).
+    return { fps200, fps10k, bigErrs, rendererInFallback };
+  },
 );
-await page.screenshot({ path: join(shotDir, '1-n200.png') });
-
-// ===== Scenario 2: N=10000 크래시 없음 =====
-console.log('\n[2/3] N=10000 크래시 없음 (best-effort fps)');
-const errsBeforeBig = pageErrors.length;
-await page.goto(`${baseUrl}/?belt=10000`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(3000);
-// P7-E #210 — silent-fail 방지 (pre-assert).
-await pressTimePlay(page, { skipIfAbsent: true });
-await page.waitForTimeout(500);
-const fps10k = await measureFps(3000);
-const bigErrs = pageErrors.slice(errsBeforeBig);
-check('N=10000 page error 없음', bigErrs.length === 0, bigErrs.join(' | ').slice(0, 120));
-check('N=10000 canvas 유지', (await page.$('canvas')) !== null);
-console.log(`  (best-effort) N=10000 fps=${fps10k.toFixed(2)}`);
-await page.screenshot({ path: join(shotDir, '2-n10000.png') });
-
-// ===== Scenario 3: WebGPU 미지원 환경 폴백 =====
-console.log('\n[3/3] WebGPU 미지원 시뮬레이션 — navigator.gpu 제거 후 barnes-hut 폴백');
-// iPhone 16 Pro도 iOS 17 이전에는 webgpu 없음. 여기서는 navigator.gpu를 명시 차단하여
-// 모바일 Safari 구버전을 흉내.
-const ctx2 = await browser.newContext({ ...deviceProfile });
-await ctx2.addInitScript(() => {
-  Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
-});
-const page2 = await ctx2.newPage();
-const consoleErrors2 = [];
-page2.on('console', (m) => {
-  if (m.type() === 'error') consoleErrors2.push(m.text());
-});
-await page2.goto(`${baseUrl}/?engine=webgpu&belt=500`, { waitUntil: 'networkidle' });
-await page2.waitForTimeout(2000);
-const hud = (await page2.textContent('[data-testid="hud-top-right"]')) ?? '';
-const rendererInFallback = hud.match(/renderer\s*·\s*(\w+)/)?.[1];
-check(
-  'navigator.gpu 없을 때 WebGL2로 폴백 (barnes-hut 경로)',
-  rendererInFallback === 'webgl2',
-  `renderer=${rendererInFallback ?? '없음'}`,
-);
-check(
-  'capability 안내 notice 표시 (engine=webgpu 요청 시)',
-  !!(await page2.$('[data-testid="engine-notice"]')),
-);
-await page2.screenshot({ path: join(shotDir, '3-webgpu-fallback.png') });
-await ctx2.close();
-
-await browser.close();
 
 console.log('\n========================================');
 const pass = results.filter((r) => r.pass).length;
