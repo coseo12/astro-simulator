@@ -255,18 +255,18 @@ jobs:
           retention-days: 7
 
       # ============================================================
-      # #846 — dev 서버 1회 기동 (아래 브라우저 회귀 가드 12종 공용)
+      # #846 — dev 서버 1회 기동 (아래 브라우저 회귀 가드 13종 공용)
       # ============================================================
-      # 기존: 가드 10종이 각자 `next dev -p 3002~3013 &` + readiness 루프 + kill 4행 세트를
+      # 기존: 가드 11종이 각자 `next dev -p 3002~3013 &` + readiness 루프 + kill 4행 세트를
       #   포트만 바꿔 복제 → PR 1건당 next cold-boot 10회.
       #   가드끼리 병렬로 도는 구조가 아니라 **같은 job 안의 직렬 step** 이므로 포트 분리는
       #   애초에 불필요했다 (로컬 실측: `kill $WEB_PID` 는 pnpm 래퍼를 거쳐 next 자식까지
       #   정상 종료시킨다 — 즉 성공 경로에서 포트는 곧바로 반납됐다. 포트 증분은 복붙 산물).
-      # 지금: 여기서 1회만 띄우고 가드 12종이 :3002 를 직렬 공용한다 (#888/#932 배선으로 10 → 12). 정리는 맨 아래
+      # 지금: 여기서 1회만 띄우고 가드 13종이 :3002 를 직렬 공용한다 (#888/#932 배선으로 11 → 13). 정리는 맨 아래
       #   `if: always()` step 이 단독 책임 — 개별 step 의 kill 은 **실패 경로에서 도달하지
       #   않는** 죽은 코드였고(`bash -e {0}`), 그때만 서버가 job 끝까지 잔존했다.
       # __solarScene 등 dev 빌드 한정 전역이 필요하므로 next start(:3001) 가 아닌 next dev.
-      - name: '#846 dev 서버 기동 (가드 12종 공용, 1회)'
+      - name: '#846 dev 서버 기동 (가드 13종 공용, 1회)'
         if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/ci-dev-server.sh') != ''
         # 기동+readiness 상한 (60x2s=120s) 을 넘기면 스크립트가 로그 덤프 후 exit 1.
         timeout-minutes: 4
@@ -479,7 +479,8 @@ jobs:
         if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/browser-verify-mobile-p7d.mjs') != ''
         env:
           BROWSER_VERIFY_GPU: swiftshader
-        run: node scripts/browser-verify-mobile-p7d.mjs http://localhost:3002
+          BASE_URL: http://localhost:3002
+        run: node scripts/browser-verify-mobile-p7d.mjs
 
       # ============================================================
       # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)

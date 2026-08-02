@@ -41,9 +41,12 @@ import {
   hasSimErrors,
   withBrowser,
   buildLaunchOptions,
+  resolveBaseUrl,
 } from './browser-verify-utils.mjs';
 
-const baseUrl = process.argv[2] ?? process.env.BASE_URL ?? 'http://localhost:3001';
+// argv[2] 는 로컬 수동 실행 편의 (포트 임의 지정). 미지정 시 resolveBaseUrl() 로
+// BASE_URL 해석 + 후행 슬래시 정규화 (docs/ops/browser-verify-helpers.md 체크리스트).
+const baseUrl = process.argv[2]?.replace(/\/+$/, '') ?? resolveBaseUrl('http://localhost:3001');
 
 /**
  * tier-c graceful degradation 알림 키 (#290 SSoT — `detect-gpu-tier.ts` 헤더 §7).

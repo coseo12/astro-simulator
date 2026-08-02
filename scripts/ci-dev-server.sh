@@ -3,7 +3,7 @@
 #
 # ## 배경 (전수 감사 2026-07-18)
 #
-# `ci.yml` 의 브라우저 회귀 가드 10종이 아래 4행 세트를 포트만 3002~3013 으로 바꿔 복제했다.
+# `ci.yml` 의 브라우저 회귀 가드 11종이 아래 4행 세트를 포트만 3002~3013 으로 바꿔 복제했다.
 #
 #   pnpm --filter @astro-simulator/web exec next dev -p 30XX &
 #   WEB_PID=$!
@@ -12,7 +12,7 @@
 #
 # 결과 (1) PR 1건당 next dev cold-boot 이 10회 발생, (2) `kill` 이 pnpm 래퍼만 종료해 next
 # 자식 프로세스가 job 내내 누적, (3) readiness 루프가 타임아웃 후에도 단언 없이 폴스루.
-# 본 스크립트로 기동/정리 블록을 추출하고 `ci.yml` 은 **1회만** 호출한다 (가드 10종 직렬 공용).
+# 본 스크립트로 기동/정리 블록을 추출하고 `ci.yml` 은 **1회만** 호출한다 (가드 11종 직렬 공용).
 #
 # ## readiness fail-fast 계약
 #
@@ -32,7 +32,7 @@
 #   bash scripts/ci-dev-server.sh start <port> <pid-file> [ready-path]
 #   bash scripts/ci-dev-server.sh stop  <port> <pid-file>
 #
-# 호출부: `.github/workflows/ci.yml` (가드 12종 공용, 포트 3002 — #888/#932 배선으로 10 → 12) /
+# 호출부: `.github/workflows/ci.yml` (가드 13종 공용, 포트 3002 — #888/#932 배선으로 11 → 13) /
 #         `.github/actions/setup-and-build/action.yml` (start-dev-server=true, 포트 3001)
 
 set -euo pipefail
