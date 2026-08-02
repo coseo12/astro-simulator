@@ -23,7 +23,7 @@ import {
   resolveGlowMarkerRestoreEmissiveScale,
   type GlowMarkerInput,
 } from './glow-marker.js';
-import { LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER } from './solar-system-scene.js';
+import { LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER } from './billboard-alpha-mask.js';
 
 /** 기본 입력 — 발동 케이스 (low + 실 billboard px ≪ 4). 개별 케이스는 필요한 필드만 override. */
 function input(overrides: Partial<GlowMarkerInput> = {}): GlowMarkerInput {

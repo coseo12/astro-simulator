@@ -20,7 +20,7 @@ import type { LodLevel } from '../render/lod.js';
 /**
  * glow 발동 임계 (실 billboard 렌더 px 기준).
  *
- * 값 4 는 `LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER` (solar-system-scene.ts) 와 동일값 SSoT —
+ * 값 4 는 `LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER` (billboard-alpha-mask.ts) 와 동일값 SSoT —
  * 직접 import 시 scene ↔ glow-marker 순환 의존 (scene 이 본 모듈을 import) 으로 TDZ 위험이 있어
  * 값 박제 + 단위 테스트 (`glow-marker.test.ts`) 가 양쪽 동일성을 drift 가드한다.
  * 비교 대상이 effective px 가 아닌 **실 billboard px** 인 점이 alpha mask 임계와 다르다 (ADR §축 6).
@@ -57,7 +57,7 @@ export const GLOW_MARKER_EMISSIVE_SCALE_SATELLITE = 2.0;
 /**
  * glow 해제 시 non-star emissive 원복 배율.
  *
- * SSoT: `createBodyBillboard` (solar-system-scene.ts) 의 non-star 기본값 `c.scale(0.3)` 과 동일 —
+ * SSoT: `createBodyBillboard` (body-mesh-factory.ts) 의 non-star 기본값 `c.scale(0.3)` 과 동일 —
  * star 는 full emissive (배율 1). 원복 값이 생성 기본값과 drift 하면 glow 1회 발동 후
  * 영구 휘도 변화가 남는다 (단위 테스트 대조 박제).
  */

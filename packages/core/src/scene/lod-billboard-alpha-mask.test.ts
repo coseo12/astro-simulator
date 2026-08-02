@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LOD_BILLBOARD_ALPHA_MASK_MIN_PX_DIAMETER,
   shouldApplyBillboardAlphaMask,
-} from './solar-system-scene.js';
+} from './billboard-alpha-mask.js';
 
 describe('#391 Phase 2 — shouldApplyBillboardAlphaMask 4px fallback 분기', () => {
   it('SSoT 임계값은 4px (ADR 박제 변경 시 Amendment 의무)', () => {

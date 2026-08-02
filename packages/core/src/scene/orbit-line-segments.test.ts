@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /**
  * R10b #664 — 고이심률 궤도선 동적 segments 가드 (ADR 20260612-r10b §축 3 조건부 축 발동).
  *
- * `sampleOrbitPoints` (solar-system-scene.ts) 의 `segments = e >= 0.6 ? 256 : 64` 는
+ * `sampleOrbitPoints` (orbit-sampling.ts — #850 Phase 1 이전 위치 solar-system-scene.ts) 의
  * D-T2 실측에서 halley (e 0.967) 원일점측 chord 꺾임 식별로 발동된 fix (사전 산출 13.97px =
  * eris 식별-불가 기준선 1.10px 의 12.7배 — 예측 적중).
  *
@@ -26,7 +26,7 @@ describe('R10b #664 — sampleOrbitPoints 고이심률 동적 segments 가드 (A
   const bodies = getSolarSystem().bodies;
 
   it('소스 정적 매칭 — segments 임계식 (e >= 0.6 ? 256 : 64) 이 sampleOrbitPoints 에 존재', () => {
-    const source = fs.readFileSync(path.join(__dirname, 'solar-system-scene.ts'), 'utf-8');
+    const source = fs.readFileSync(path.join(__dirname, 'orbit-sampling.ts'), 'utf-8');
     expect(source).toMatch(/orbit\.eccentricity\s*>=\s*0\.6\s*\?\s*256\s*:\s*64/);
   });
 
