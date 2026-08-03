@@ -71,8 +71,9 @@ set -euo pipefail
 # 채 응답하지 않는 squatter) 실제 상한은 `60 × (10 + 2) = 720s = 12분` 이었다. 호출부
 # `ci.yml` 의 `timeout-minutes: 4` 가 먼저 발화해 **스크립트의 로그 덤프가 실행되지 못하는**
 # 경로가 생긴다 — 관측성이 가장 필요한 케이스에서 정확히 로그가 사라진다.
-# 벽시계 마감으로 바꾸면 최악 상한이 `READY_TIMEOUT_SEC + 마지막 curl 1회` 로 닫힌다
-# (기본 120 + 10 = 130s < 240s = timeout-minutes 4). 표기 = 실제.
+# 벽시계 마감으로 바꾸면 최악 상한이 `READY_TIMEOUT_SEC + 마지막 curl 1회 + 마지막 sleep 1회` 로
+# 닫힌다 (기본 120 + 10 + 2 = 132s < 240s = timeout-minutes 4). 표기 = 실제 (#885 리뷰 권고 2 —
+# 마지막 probe 가 deadline 직전 진입 시 sleep 1회를 더 소진하므로 POLL 을 산식에 포함).
 READY_TIMEOUT_SEC="${CI_DEV_SERVER_READY_TIMEOUT_SEC:-120}"
 READY_POLL_SEC="${CI_DEV_SERVER_POLL_SEC:-2}"
 # 개별 curl 상한 — 포트를 점유했지만 응답하지 않는 프로세스(좀비/EADDRINUSE squatter)를 만나면
@@ -161,6 +162,9 @@ status_server() {
     proc="present"
   fi
 
+  # ready-path 인자를 받지 않고 루트 고정 — start 의 readiness 는 "페이지 컴파일 보증" 이 목적이라
+  # 경로가 의미를 갖지만, status 는 "서버 프로세스가 HTTP 를 응답하는가" 만 판정하면 충분하다
+  # (#885 리뷰 권고 4 — 동형화 대신 목적 차이를 계약으로 박제).
   local status
   status="$(http_status "http://localhost:${port}/")"
   [[ "${status}" == "200" ]] && verdict="ALIVE"

@@ -276,7 +276,7 @@ jobs:
         #   즉시 FAIL 한다 (#901/#915 가 project-guards 에서 hashFiles 를 걷어낸 것과 동형).
         if: needs.diff-scope.outputs.code_changed == 'true'
         # #885 — 상한 정합. 스크립트 readiness 는 **벽시계 120s** 마감이고 마지막 curl
-        #   (`--max-time 10`) 까지 더해도 최악 130s < 240s 라, 스크립트의 로그 덤프 + exit 1 이
+        #   (`--max-time 10`) + 마지막 sleep (2s) 까지 더해도 최악 132s < 240s 라, 스크립트의 로그 덤프 + exit 1 이
         #   항상 step timeout 보다 먼저 발화한다. (구 구현은 횟수 기반 60회 × 최대 12s = 720s 로
         #   표기 120s 와 어긋나, squatter 케이스에서 step 이 먼저 죽어 로그 덤프가 실행되지 않았다.)
         timeout-minutes: 4

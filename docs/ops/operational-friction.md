@@ -114,6 +114,10 @@ drift 가 누적됐다. `pageerror` 리스너 누락으로 미포착 예외를 �
 
 ---
 
+또한 ci.yml 브라우저 가드는 **dev 서버를 각자 띄우지 않는다** — 공용 `:3002` 를 `BASE_URL` 로
+받고 정리는 `if: always()` step 이 단독 책임. 개별 step 의 `kill` 은 Actions 기본 셸이
+`bash -e {0}` 라 실패 시 도달하지 않는 죽은 코드다.
+
 ## 6. CI 소요 시간 표기 기준 = job-level API (#885)
 
 **증상**: CI 시간 개선을 PR 본문/코멘트에 박제할 때 같은 run 을 두고 수치가 몇 초씩 어긋난다.
@@ -146,6 +150,3 @@ gh api repos/coseo12/astro-simulator/actions/runs/<RUN_ID>/jobs \
   (#935 "가드 N종" 표기가 2회 연속 승계 drift 한 것과 동형).
 - 근거: PR [#882 리뷰 권고 8·9](https://github.com/coseo12/astro-simulator/pull/882#issuecomment-5082085880).
 
-또한 ci.yml 브라우저 가드는 **dev 서버를 각자 띄우지 않는다** — 공용 `:3002` 를 `BASE_URL` 로
-받고 정리는 `if: always()` step 이 단독 책임. 개별 step 의 `kill` 은 Actions 기본 셸이
-`bash -e {0}` 라 실패 시 도달하지 않는 죽은 코드다.
