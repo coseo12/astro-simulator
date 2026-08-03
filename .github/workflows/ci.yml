@@ -269,10 +269,22 @@ jobs:
       #   누락해도 아무 신호가 없어 2회 연속 drift 했다. 배선 이력은 CHANGELOG 가 SSoT.
       # __solarScene 등 dev 빌드 한정 전역이 필요하므로 next start(:3001) 가 아닌 next dev.
       - name: '#846 dev 서버 기동 (브라우저 회귀 가드 공용, 1회)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/ci-dev-server.sh') != ''
-        # 기동+readiness 상한 (60x2s=120s) 을 넘기면 스크립트가 로그 덤프 후 exit 1.
+        # #885 — hashFiles 조건 제거. 위 "pnpm 모노레포 고정 경로" 주석이 선언한 계약
+        #   ("lockfile 소실은 조용한 스킵이 아니라 결정적 FAIL", #901 fail-fast) 과 자기
+        #   불일치였다. 파일이 사라지면 조용히 스킵돼 **아래 브라우저 가드 전부가 서버 없이
+        #   실행**되는, 정확히 가드가 막아야 할 상태로 수렴한다. 이제 `bash: No such file` 로
+        #   즉시 FAIL 한다 (#901/#915 가 project-guards 에서 hashFiles 를 걷어낸 것과 동형).
+        if: needs.diff-scope.outputs.code_changed == 'true'
+        # #885 — 상한 정합. 스크립트 readiness 는 **벽시계 120s** 마감이고 마지막 curl
+        #   (`--max-time 10`) + 마지막 sleep (2s) 까지 더해도 최악 132s < 240s 라, 스크립트의 로그 덤프 + exit 1 이
+        #   항상 step timeout 보다 먼저 발화한다. (구 구현은 횟수 기반 60회 × 최대 12s = 720s 로
+        #   표기 120s 와 어긋나, squatter 케이스에서 step 이 먼저 죽어 로그 덤프가 실행되지 않았다.)
         timeout-minutes: 4
-        run: bash scripts/ci-dev-server.sh start 3002 /tmp/ci-dev.pid
+        # ready-path 를 명시 전달한다 (#885). 기본값과 같은 `/` 지만, 이 인자가 **페이지 컴파일
+        #   보증 지점**이라는 계약을 호출부에서 보이게 한다. `/ko` 는 #908 (i18n 제거) 이후
+        #   308 → `/` 이고, `curl` 은 리다이렉트를 따라가지 않아 대상 라우트를 컴파일하지 않는다.
+        #   스크립트가 READY 를 **HTTP 200** 으로만 인정하므로 3xx 경로는 즉시 FAIL 한다.
+        run: bash scripts/ci-dev-server.sh start 3002 /tmp/ci-dev.pid /
 
       # ============================================================
       # #378 focus 회귀 가드 — focus 시 허공 표시 차단
@@ -509,10 +521,21 @@ jobs:
       #   셸(`bash -e {0}`) 특성상 **가드 성공 시에만** 도달하는 죽은 코드였고, 정작 정리가
       #   필요한 실패 경로에서 실행되지 않았다 (로컬 `bash -e` 재현 실측).
       # 정리 스크립트는 항상 exit 0 — 여기서 non-zero 를 내면 원래 실패 원인을 덮어쓴다.
-      - name: '#846 백그라운드 서버 정리'
+      #
+      # #885 — 정리 **직전에 `status`** 를 찍는다. 공용 서버는 SPOF 라, 중도 사망하면 잔여
+      #   가드가 전부 `connection refused` 로 죽어 "가드 여러 개가 동시 회귀" 로 오도된다
+      #   (통합 전에는 1 가드만 영향받았다). `status` 는 (a) PID 생존 (b) next dev 프로세스
+      #   (c) HTTP 200 3축을 찍고, 죽어 있으면 `::error::` annotation 으로 run 요약 최상단에
+      #   노출한다. 동시에 서버 로그를 tail 해 **가드 실패의 서버측 원인**을 보여준다 —
+      #   구조상 로그는 readiness 타임아웃 때만 덤프됐고, 정작 가드가 실패한 경우엔 서버가
+      #   무엇을 뱉었는지 볼 방법이 없었다. tail 은 `::group::` 으로 접혀 성공 run 에선 무소음.
+      - name: '#846 백그라운드 서버 정리 (+ #885 서버 생존/로그 관측)'
         # #915 — docs-only (code_changed != true) 에선 서버가 뜬 적이 없으므로 정리도 스킵
-        if: always() && needs.diff-scope.outputs.code_changed == 'true' && hashFiles('scripts/ci-dev-server.sh') != ''
+        # #885 — hashFiles 제거 (기동 step 과 동일 근거). 스크립트가 없으면 기동 step 이 이미
+        #   FAIL 이므로 여기서만 조용히 스킵하는 것은 의미가 없다.
+        if: always() && needs.diff-scope.outputs.code_changed == 'true'
         run: |
+          bash scripts/ci-dev-server.sh status 3002 /tmp/ci-dev.pid
           bash scripts/ci-dev-server.sh stop 3002 /tmp/ci-dev.pid
           kill "$(cat /tmp/r1-web.pid 2>/dev/null)" 2>/dev/null || true
 
