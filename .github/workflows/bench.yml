@@ -3,6 +3,18 @@ name: bench:scene
 # PR마다 bench:scene:sweep을 실행하여 baseline 대비 fps diff를 코멘트.
 # CI 헤드리스 환경 변동성이 크므로 best-effort(continue-on-error) 운용.
 
+# ── hashFiles silent-skip 정책 (#950) — SSoT 는 ci.yml §hashFiles silent-skip 정책 블록 (#945) ──
+# 본 파일의 유일한 hashFiles 조건 (`bench-summary.md`) 은 **(a) 정상 케이스**였다 — 가드 자산이
+#   아니라 `bench:scene:sweep` 이 run 중 생성하는 **런타임 산출물** (BENCH_SUMMARY_OUT,
+#   scripts/bench-scene.mjs:196~221. 저장소 미tracked) 이라 "부재" = bench 가 요약 기록 전에
+#   죽은 정상 시나리오이지 가드 소멸이 아니다.
+# 그럼에도 조건으로 남기면 "가드 부재" 와 "산출물 부재" 가 같은 문법을 써서 정책이 다시 갈라진다.
+#   #945 가 ci.yml 에서 R1 diff 이미지 업로드를 `if-no-files-found: ignore` 로 옮겨 **예외 0** 을
+#   달성한 것과 동일하게, 본 스텝도 조건이 아니라 **액션 옵션** (`ignore_empty`) 으로 표현한다.
+#   sticky-pull-request-comment 의 등가 옵션임은 action.yml + src 실측 확인 —
+#   path glob 이 0건 매칭이면 body 가 빈 문자열이 되고 `!body && ignoreEmpty` 로 조기 return
+#   (src/main.ts) 하므로 `if-no-files-found: ignore` 와 의미가 같다.
+
 # 같은 sha 의 push+PR 중복 run 제거 (#779 표준 블록, #846 에서 누락 보강).
 # group 에 github.workflow 포함 → 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha
 # 로 수렴 → 같은 sha 묶임. cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만
@@ -59,12 +71,16 @@ jobs:
           BENCH_REGRESSION_FPS: '-10'
         run: pnpm bench:scene:sweep
 
+      # `if: always()` 는 앞 스텝 실패 시에도 게시하려는 **결과 조건** 이라 유지 (파일 존재 조건 아님).
+      # 산출물 부재는 위 §정책대로 액션 옵션으로 흡수 — 부재 시 "skip step by ignoreEmpty" 로그만 남고
+      # 스텝은 성공한다 (조건부 스킵과 달리 **왜 안 올렸는지가 로그에 남는다**).
       - name: PR 코멘트 게시
-        if: always() && hashFiles('bench-summary.md') != ''
+        if: always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: bench-scene
           path: bench-summary.md
+          ignore_empty: 'true'
 
       - name: 서버 종료
         if: always()
