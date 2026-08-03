@@ -17,10 +17,41 @@
  */
 
 /**
- * 표준 포커서블 셀렉터 세트.
+ * 표준 포커서블 셀렉터 세트 — **본 상수가 SSoT**.
  *
- * `scripts/browser-verify-a11y.mjs` 의 focusable 수집 셀렉터와 동일 계열이며, Radix Slider 처럼
- * `role="slider"` + `tabindex="0"` 인 커스텀 위젯은 마지막 `[tabindex]` 절이 흡수한다.
+ * Radix Slider 처럼 `role="slider"` + `tabindex="0"` 인 커스텀 위젯은 마지막 `[tabindex]` 절이 흡수한다.
+ *
+ * ## 문자열 사본 2곳 — 변경 시 동시 갱신 의무 (#889 / volt #69 숨은 상수 패턴)
+ *
+ *   `.mjs` 브라우저 가드는 TS 모듈을 import 할 수 없어 셀렉터 **문자열 사본**이 불가피하다.
+ *   본 상수를 고치면 아래 2곳을 함께 고쳐야 한다 (양방향 — 두 사본에도 본 파일 역참조 주석이 있다):
+ *
+ *   | # | 사본 위치 | 사용 방식 |
+ *   |---|---|---|
+ *   | 1 | `scripts/browser-verify-a11y.mjs` (focusable 수집) | 개수 집계만 — first/last 미사용 |
+ *   | 2 | `apps/web/scripts/browser-verify-848-modal-focus.mjs` (S3 경계 순환) | first/last 마커 계산 |
+ *
+ *   **위험** — 두 사본은 셀렉터만 복제하고 아래 `isFocusableNow` 의 5축 필터 중 `tabindex="-1"`
+ *   **1축만** 복제한다 (`disabled` / `aria-hidden="true"` / `hidden`·`[inert]` /
+ *   `display:none`·`visibility:hidden` 미복제). 모달 경계(첫·마지막 포커서블)에 `disabled` 버튼이나
+ *   조건부 `aria-hidden` 요소가 들어오면 사본 2 의 `data-848-pos` 마커가 구현이 계산하는 first/last 와
+ *   어긋나 false FAIL(또는 false PASS)이 난다.
+ *
+ *   **현행 미발현 근거** (qa 실측, PR #886 실 Chrome) — 모달 3종 패널에서
+ *   `가드 셀렉터 수집 개수 == 구현 필터 후 개수` (about 5==5 / sensitivity 6==6 / onboarding 3==3),
+ *   경계에 놓인 `disabled`·`aria-hidden="true"`·`hidden`·`[inert]` 포커서블 **0개**. sensitivity 의
+ *   `aria-hidden` 은 기본값 마커 `<span>` 이라 비포커서블 → 무영향. 즉 **이론적 위험만 잔존**한다.
+ *   → 모달에 `disabled` 버튼이나 조건부 숨김 요소를 추가할 때 사본 2 의 필터도 함께 확장할 것.
+ *
+ * ## 커버리지 엣지 — 인지 기록 (#889, 현재 이론적)
+ *
+ *   - `input:not([disabled])` 는 `<input type="hidden">` 도 매칭한다. 실브라우저는 UA 스타일시트의
+ *     `display:none` 덕에 아래 `isFocusableNow` 가 걸러내지만, **jsdom 은 그 UA 규칙을 보장하지 않아**
+ *     단위 테스트 환경에서만 포커서블로 집계될 수 있다.
+ *   - `details`/`summary`/`iframe`/`audio[controls]`/`video[controls]`/`[contenteditable]` 미포함.
+ *
+ *   현행 모달 3종 콘텐츠에 해당 요소가 없어 이론적이며, 선제 확장은 YAGNI 로 보류했다
+ *   (reviewer 권고 7, PR #886). 위 요소를 모달에 넣게 되면 본 셀렉터부터 확장할 것.
  */
 export const FOCUSABLE_SELECTOR = [
   'a[href]',
