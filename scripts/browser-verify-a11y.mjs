@@ -54,6 +54,15 @@ const { axe, focusableCount } = await withBrowser({}, async (browser) => {
   await page.waitForTimeout(1500);
 
   // 모든 focusable 요소 수집
+  //
+  // SSoT: `apps/web/src/lib/focus-trap.ts` 의 `FOCUSABLE_SELECTOR` — 변경 시 동기화 필수 (#889).
+  // `.mjs` 가드는 TS 모듈을 import 할 수 없어 문자열 사본이 불가피하다. 같은 사본이 한 곳 더 있다:
+  // `apps/web/scripts/browser-verify-848-modal-focus.mjs` (S3 경계 순환).
+  //
+  // 본 사본은 `isFocusableNow` 의 5축 필터(`tabindex="-1"` / `disabled` / `aria-hidden` /
+  // `hidden`·`[inert]` / `display:none`·`visibility:hidden`)를 **하나도 복제하지 않는다** — 아래
+  // 단언이 "10개 이상" 이라는 하한 집계라 필터 차이가 판정을 뒤집지 않기 때문. first/last 경계를
+  // 계산하는 848 사본과 달리 여기서는 개수 과대집계가 안전 방향이다.
   const focusableCount = await page.evaluate(() => {
     const selector =
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
