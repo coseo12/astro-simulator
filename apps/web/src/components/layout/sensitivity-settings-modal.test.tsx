@@ -23,7 +23,7 @@ import { SensitivitySettingsModal } from './sensitivity-settings-modal';
  *   의도적으로 다루지 않는다. `onValueChange`(즉시 store) / `onValueCommit`(디스크 쓰기) 분리는
  *   Radix 내부 pointer capture + layout 측정에 의존해 jsdom 에서 구축 비용이 검증 대상 대비 과하고,
  *   런타임 축은 브라우저 가드 `verify:704-sensitivity`(S1~S4)가 이미 커버한다.
- *   반대로 아래 7건은 jsdom 인프라가 이미 갖춰져 있어(`vitest.setup.ts` 의 ResizeObserver stub,
+ *   반대로 아래 케이스들은 jsdom 인프라가 이미 갖춰져 있어(`vitest.setup.ts` 의 ResizeObserver stub,
  *   #400) 비용이 사실상 0이면서 조용한 퇴행을 잡는다 → 추가가 명백히 이득이라 판단해 채택했다.
  */
 const AXES: readonly FreeFlySensitivityAxis[] = ['wasd', 'zoomoutFactor', 'panning', 'zoom'];
@@ -81,7 +81,7 @@ describe('SensitivitySettingsModal (#704 / #848 공용 Modal 이관 / #889 전�
     }
   });
 
-  it('mount 후 useEffect 1회 — localStorage 영속값을 store 로 로드 (Hydration 안전 경로)', () => {
+  it('mount 후 localStorage 영속값을 store 로 로드 (Hydration 안전 경로)', () => {
     seedPersisted({ wasd: 0.02, zoomoutFactor: 8, panning: 0.02, zoom: 0.02 });
     render(<SensitivitySettingsModal />);
 
