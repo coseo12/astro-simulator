@@ -17,7 +17,7 @@ P6-D는 EIH 식이 다체에서 의도대로 작동함을 직접 보이는 검�
 위험: 금성·지구는 신호 크기가 수성의 1/5~1/11(절대 허용 ±0.43″/±0.19″)이고 거의 원형 궤도라
 근일점 측정이 노이즈에 민감하다. 100년 적분에서 step 크기·적분기 truncation이 이 신호 아래로 떨어져야 한다.
 
-또한 P6-C에서 이미 `mercury_perihelion_precession_eih` / `mercury_perihelion_precession_43_arcsec` 두 테스트가
+또한 P6-C에서 이미 `long_mercury_perihelion_precession_eih` / `mercury_perihelion_precession_43_arcsec` 두 테스트가
 유사한 perihelion 측정 패턴을 사용하므로, 행성을 추가할 때 코드 중복을 막을 구조 결정이 필요하다.
 
 ## 후보 비교
@@ -58,9 +58,9 @@ P6-D는 EIH 식이 다체에서 의도대로 작동함을 직접 보이는 검�
 
 1. **헬퍼 추출**: P6-C의 `measure_perihelion_angle()`은 `MERCURY_PERIOD` 상수에 하드코딩돼 있다.
    이를 행성-일반 헬퍼 `measure_perihelion_precession_eih(name, mass, a, e, period, expected_arcsec, tol_pct)`로 승격한다.
-   - 기존 `mercury_perihelion_precession_eih` 함수 본체는 헬퍼 호출 1줄로 변경 (보너스 가드 보존)
+   - 기존 `long_mercury_perihelion_precession_eih` 함수 본체는 헬퍼 호출 1줄로 변경 (보너스 가드 보존)
    - `mercury_perihelion_precession_43_arcsec` (Single 모드 회귀 가드)는 **무수정 보존** — 헬퍼 추출 대상 제외
-   - 신규 테스트: `venus_perihelion_eih_within_5_percent`, `earth_perihelion_eih_within_5_percent`
+   - 신규 테스트: `long_venus_perihelion_eih_within_5_percent`, `long_earth_perihelion_eih_within_5_percent`
 2. **초기 조건**: simplified Keplerian (근일점 시작 + vis-viva 속도). P6-C `eih_9body_100yr_eccentricity_drift`와 동일 패턴.
    GR 세차는 secular 효과라 노드/경사 평면 무관.
 3. **적분 정밀도 1차 시도**: 기존 패턴 그대로 — `dt = 60s`, 100년 적분.
@@ -116,8 +116,8 @@ P6-C `measure_perihelion_angle` 패턴(`min_r` 추적으로 근일점 통과 시
 ### 기대 효과 (DoD)
 
 - **D1**: `mercury_perihelion_precession_43_arcsec` 통과 유지 (Single 모드 회귀 가드) — 41.46″/century (P5-A 동일)
-- **D2**: `venus_perihelion_eih_within_5_percent` — 8.67″/century (rel_err 0.63%) PASS
-- **D3**: `earth_perihelion_eih_within_5_percent` — 3.74″/century (rel_err 2.48%) PASS
+- **D2**: `long_venus_perihelion_eih_within_5_percent` — 8.67″/century (rel_err 0.63%) PASS
+- **D3**: `long_earth_perihelion_eih_within_5_percent` — 3.74″/century (rel_err 2.48%) PASS
 
 #### 적용 dt (실측)
 

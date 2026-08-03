@@ -62,6 +62,27 @@ function extractWebglRendererString(): string | null {
  *
  * 양수 tabindex 는 요소를 sequential focus order 의 맨 앞으로 끌어올려 DOM 순서와 어긋난 Tab 순서를
  * 만든다 (WCAG 2.4.3). Babylon 은 기본 1 을 쓰므로 `engine.canvasTabIndex` 로 덮어써야 한다.
+ *
+ * ## 업스트림 문서와의 관계 — Babylon 업그레이드 시 재검토 트리거 (#889)
+ *
+ *   PR #886 리뷰 시점(`@babylonjs/core` **9.2.1**)의 공식 d.ts 주석은
+ *   `Engines/abstractEngine.d.ts:369` 에서 *"**1 is the minimum value** to set to be able to capture
+ *   keyboard events"* 라고 권고해 본 프로젝트의 `0` 채택과 **정면 상충**했다. 실무적으로 `tabindex=0`
+ *   도 포커서블이라 키 이벤트는 정상이며, 반증 근거는 headful 실측(`W` hold 900ms → 이동량 20.875)
+ *   과 `verify:699-freefly-unified` / `verify:848-modal-focus` S7(`tabindex === '0'` 단언) PASS 다.
+ *
+ *   **9.19.0 (#851 / PR #921 업그레이드) 재확인 결과 — 업스트림이 문구를 개정해 상충이 해소됐다.**
+ *   현행 선언은 `Engines/abstractEngine.pure.d.ts:377` 로 이동했고 문구는
+ *   *"Any value >= 0 makes the canvas focusable to capture keyboard events and adds it to the tab
+ *   order; use -1 to keep it focusable programmatically but out of the tab order"* — 즉 `0` 을
+ *   명시적으로 허용한다. 본 채택은 이제 공식 문서와 정합.
+ *
+ *   다만 **기본값 1 과 되돌림 동작은 그대로**여서 본 override 는 여전히 필수다:
+ *   `Engines/abstractEngine.pure.js:1036` (`this.canvasTabIndex = 1`) +
+ *   `Inputs/scene.inputManager.js:149` (`canvas.tabIndex = engine.canvasTabIndex` — `_processPointerMove`
+ *   내부라 포인터가 캔버스 위에서 움직일 때마다 재적용).
+ *
+ *   → Babylon 메이저 업그레이드 시 위 **3 경로(문서 문구 / 기본값 / InputManager 되돌림)** 를 재확인할 것.
  */
 const CANVAS_TAB_INDEX = 0;
 
@@ -88,6 +109,25 @@ const FOCUS_PRESERVE_SELECTOR =
  *   그래서 (a) "free-fly 활성 중으로 한정" 안은 채택하지 않았다: 화살표 키 카메라 회전은
  *   free-fly 가 아닌 관찰/focus 모드에서도 캔버스 포커스를 요구하므로, free-fly 한정 가드는
  *   비-free-fly 경로의 키보드 회전을 죽인다. 본 함수는 (b) interactive 요소 전반 가드다.
+ *
+ * ## 알려진 경계 — mixed-modality `:focus-visible` 잔류는 **의도된 trade-off** (#889)
+ *
+ *   Tab 으로 버튼에 도달(`:focus-visible=true`) → **같은 버튼**을 마우스로 클릭 → 포커스가 이동하지
+ *   않으므로 Chrome 이 `:focus-visible` 을 true 로 유지 → 이후 캔버스를 스쳐도 focus 를 회수하지
+ *   못한다 (그 상태에서 ArrowLeft 800ms 유지 시 alpha Δ=0).
+ *
+ *   qa 가 `develop` A/B 대조로 실측했다 (PR #886, detached `origin/develop` 3927c6b, 같은 스크립트):
+ *   Esc 닫힘 후 focus·`W` 결과는 양쪽 동일하고, **유일한 차이는 "마우스 스침으로 키보드 focus 를
+ *   뺏던 경로가 사라진 것" 하나**다. 그리고 그것이 #848 완료 기준 3(focus 탈취 가드)이 **요구한
+ *   동작 자체**다 → 버그가 아니라 의도된 trade-off 로 확정한다. 근거 3축:
+ *
+ *     1. 회복 경로가 자명 — 캔버스 1회 클릭이면 즉시 복구 (ArrowLeft Δ=4.616 실측)
+ *     2. #699 원 신고 경로(순수 마우스 클릭 → 캔버스 회수)는 `verify:848-modal-focus` S6 이 커버
+ *     3. 반대편 손실(키보드 사용자의 포커스를 마우스 스침이 탈취)이 더 크다
+ *
+ *   S6 은 **순수 마우스 경로만** 양성 대조군으로 세운다 — 키를 한 번이라도 누르면 Chrome 의 modality
+ *   가 keyboard 로 바뀌어 시나리오 전제가 깨지기 때문이다(가드 스크립트 자체 주석). 즉 본 경계는
+ *   가드 커버리지 **밖**이며, 관련 회귀 신고가 오면 "이미 알고 있는 경계" 로 즉시 분류한다.
  */
 function shouldPreserveFocus(active: HTMLElement): boolean {
   // 텍스트 입력 — 입력 중 문자 유실 방지 (#699 기존 가드 유지).

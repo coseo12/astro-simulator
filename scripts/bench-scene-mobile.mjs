@@ -17,11 +17,11 @@
  *   node scripts/bench-scene-mobile.mjs [baseUrl]
  *   BENCH_SAMPLE_MS=10000 node scripts/bench-scene-mobile.mjs
  */
-import { chromium, devices } from 'playwright';
+import { devices } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SAMPLE_MS = Number(process.env.BENCH_SAMPLE_MS ?? 10_000);
@@ -33,57 +33,64 @@ const reportsDir = join(__dirname, '..', '.bench-out');
 mkdirSync(reportsDir, { recursive: true });
 
 const deviceProfile = devices['iPhone 14'];
-const browser = await chromium.launch({
-  headless: true,
-  args: [
-    '--enable-unsafe-webgpu',
-    '--enable-features=Vulkan',
-    '--use-angle=metal',
-    '--disable-gpu-vsync',
-    '--disable-frame-rate-limit',
-  ],
-});
 
-// 동일 세션/동일 context에서 두 URL 순차 측정 — 환경 노이즈 상쇄.
-const ctx = await browser.newContext({ ...deviceProfile });
-const page = await ctx.newPage();
+// #933 — 에러 경로(goto 실패 등)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   launch 인자는 원본 그대로 전달 — vsync/WebGPU 플래그가 측정값을 좌우하므로 한 글자도 바꾸지 않는다.
+//   리포트 write/판정은 브라우저 종료 뒤 수행하므로 콜백은 측정값만 반환한다.
+const { vvFps, yoshidaFps } = await withBrowser(
+  {
+    headless: true,
+    args: [
+      '--enable-unsafe-webgpu',
+      '--enable-features=Vulkan',
+      '--use-angle=metal',
+      '--disable-gpu-vsync',
+      '--disable-frame-rate-limit',
+    ],
+  },
+  async (browser) => {
+    // 동일 세션/동일 context에서 두 URL 순차 측정 — 환경 노이즈 상쇄.
+    const ctx = await browser.newContext({ ...deviceProfile });
+    const page = await ctx.newPage();
 
-const measureFps = (durationMs) =>
-  page.evaluate(
-    (d) =>
-      new Promise((resolve) => {
-        let count = 0;
-        const start = performance.now();
-        const loop = () => {
-          count += 1;
-          if (performance.now() - start < d) requestAnimationFrame(loop);
-          else resolve((count * 1000) / (performance.now() - start));
-        };
-        requestAnimationFrame(loop);
-      }),
-    durationMs,
-  );
+    const measureFps = (durationMs) =>
+      page.evaluate(
+        (d) =>
+          new Promise((resolve) => {
+            let count = 0;
+            const start = performance.now();
+            const loop = () => {
+              count += 1;
+              if (performance.now() - start < d) requestAnimationFrame(loop);
+              else resolve((count * 1000) / (performance.now() - start));
+            };
+            requestAnimationFrame(loop);
+          }),
+        durationMs,
+      );
 
-async function sampleIntegrator(kind) {
-  // 각 샘플은 페이지 재로드로 진행 (동일 context — CPU/GPU 캐시 특성 유지).
-  await page.goto(`${baseUrl}/?integrator=${kind}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(2000);
-  // P7-E #210 — silent-fail 방지.
-  await pressTimePlay(page, { skipIfAbsent: true });
-  await page.click('[data-testid="time-preset-1y"]').catch(() => {});
-  await page.waitForTimeout(500);
-  return measureFps(SAMPLE_MS);
-}
+    async function sampleIntegrator(kind) {
+      // 각 샘플은 페이지 재로드로 진행 (동일 context — CPU/GPU 캐시 특성 유지).
+      await page.goto(`${baseUrl}/?integrator=${kind}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(2000);
+      // P7-E #210 — silent-fail 방지.
+      await pressTimePlay(page, { skipIfAbsent: true });
+      await page.click('[data-testid="time-preset-1y"]').catch(() => {});
+      await page.waitForTimeout(500);
+      return measureFps(SAMPLE_MS);
+    }
 
-console.log(`\n[1/2] VV 샘플 측정 (${SAMPLE_MS}ms) — iPhone 14 emulation`);
-const vvFps = await sampleIntegrator('velocity-verlet');
-console.log(`  VV fps = ${vvFps.toFixed(2)}`);
+    console.log(`\n[1/2] VV 샘플 측정 (${SAMPLE_MS}ms) — iPhone 14 emulation`);
+    const vv = await sampleIntegrator('velocity-verlet');
+    console.log(`  VV fps = ${vv.toFixed(2)}`);
 
-console.log(`\n[2/2] Yoshida4 샘플 측정 (${SAMPLE_MS}ms) — 동일 context`);
-const yoshidaFps = await sampleIntegrator('yoshida4');
-console.log(`  Yoshida4 fps = ${yoshidaFps.toFixed(2)}`);
+    console.log(`\n[2/2] Yoshida4 샘플 측정 (${SAMPLE_MS}ms) — 동일 context`);
+    const yoshida = await sampleIntegrator('yoshida4');
+    console.log(`  Yoshida4 fps = ${yoshida.toFixed(2)}`);
 
-await browser.close();
+    return { vvFps: vv, yoshidaFps: yoshida };
+  },
+);
 
 const ratio = vvFps > 0 ? yoshidaFps / vvFps : 0;
 const pass = ratio >= RATIO_THRESHOLD;

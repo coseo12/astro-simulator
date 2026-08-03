@@ -39,6 +39,21 @@ import { resolveFocusTrapTarget } from '@/lib/focus-trap';
  *   열림 시점 activeElement 가 `body` 라 복원할 곳이 없으므로, `fallbackFocusRef` 로 트리거 버튼을
  *   받아 그쪽으로 되돌린다. 초기 mount 에서 한 번도 열리지 않았다면 복원 자체를 하지 않는다
  *   (#737 reviewer 권고 1 — 재방문 유저의 포커스를 트리거 버튼이 탈취하는 버그 차단).
+ *
+ * ## 동시에 2개 이상 `open` 은 **미지원** (#889 — 계약 명시)
+ *
+ *   본 컴포넌트는 인스턴스마다 `window` keydown 리스너를 단다. 두 인스턴스가 동시에 `open={true}`
+ *   면 두 리스너가 각각 `preventDefault()` + 자기 패널로 `focus()` 를 걸어 **포커스를 상호 탈취**
+ *   하고, Esc 한 번에 둘 다 닫힌다 (`onCloseRef` 가 각자 발화).
+ *
+ *   **현재 도달 경로 0** — backdrop 이 화면 전체를 덮고 Tab 이 패널 안에 갇히므로 열린 모달에서
+ *   다른 모달의 트리거 버튼에 닿을 수 없다 (about / sensitivity / onboarding 상호 배타, qa 실측
+ *   PR #886 "5회 연속 열고닫기 → 복원 대상 전부 정확"). 그래서 지금은 실동작 결함이 아니라
+ *   **계약의 공백**이었고, 본 주석이 그 공백을 메운다 (reviewer 권고 4).
+ *
+ *   "확인 모달 위의 확인 모달" 같은 중첩 요구가 들어오면 **여기가 설계 판단 지점**이다 — 전역
+ *   모달 스택을 두고 최상단 인스턴스만 keydown 을 처리하도록 승격하거나, 네이티브 `<dialog>`
+ *   top-layer 로 전환할 것. 그 전까지 호출부는 동시 open 을 만들지 않을 책임을 진다.
  */
 export interface ModalProps {
   /** 열림 여부. `false` 면 아무것도 렌더하지 않는다(언마운트 = SSR/hydration 안전). */

@@ -43,7 +43,7 @@
  *   (3) 5 페르소나 self-consistency — 본 PR 범위 밖
  *   (4) 메타 안정성 — rAF noise ±5% 인지, 회귀 임계 ±10% margin 적용
  */
-import { chromium } from 'playwright';
+import { withBrowser } from './browser-verify-utils.mjs';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -437,89 +437,101 @@ if (existsSync(baselinePath)) {
   } catch {}
 }
 
-const browser = await chromium.launch();
-const context = await browser.newContext();
-const page = await context.newPage();
-const client = await context.newCDPSession(page);
+// #933 — 에러 경로(goto 실패 / CDP throw / evaluate 예외)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   본 스크립트는 close() 호출이 2곳(진단 모드 / 판정 모드)이라 일직선 나열의 누락 위험이 배가된다.
+//   두 분기를 하나의 콜백으로 합치고 **어느 분기인지를 반환값으로 표현**해, 판정·박제·process.exit 은
+//   전부 브라우저가 닫힌 뒤 호출부에서 수행한다 (콜백 안 process.exit 은 finally 를 건너뛴다 — 헬퍼 계약).
+//   launch 인자는 원본 그대로 (무인자) — 수명주기만 위임하고 판정 로직/임계값은 무변경.
+const measured = await withBrowser({}, async (browser) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const client = await context.newCDPSession(page);
 
-// CPU throttling 적용
-await client.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLING_RATE });
+  // CPU throttling 적용
+  await client.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLING_RATE });
 
-// #709 — variance 진단 모드: 판정 없이 각 scenario N회 연속 측정 → 분포 통계 박제 후 종료.
-if (DIAGNOSE_VARIANCE) {
-  console.log(
-    `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x` +
-      ` (+ #820 render-capacity 프로브 병기 — H2/H3 판별)`,
-  );
-  const report = {
-    measuredAt: new Date().toISOString().slice(0, 10),
-    samples: VARIANCE_SAMPLES,
-    // #820 Phase 0 — 실제 사용 CPU throttle rate 박제 (env 오버라이드 반영). 8~10x diagnostic
-    //   에서 어떤 rate 로 데드라인 미스를 유발했는지 보고서 단독 판독 가능하게 한다.
-    environment: {
-      cpuThrottling: `${CPU_THROTTLING_RATE}x`,
-    },
-    viewports: {},
-  };
-  for (const vp of VIEWPORTS) {
-    currentViewportId = vp.id;
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
-    try {
-      await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
-    } catch {}
-    report.viewports[vp.id] = {};
-    console.log(`\n[${vp.id}] ${vp.width}×${vp.height}`);
-    for (const sc of SCENARIOS) {
-      const diag = await setupScenario(page, sc);
-      const samples = [];
-      // #820 Phase 0 — rafFps 샘플과 나란히 render-capacity 프로브를 캡처. null(scene 부재)은
-      //   제외 수집 → 전 샘플 null 이면 renderCapacity=null 박제(실패 방향 fail-safe).
-      const capacitySamples = [];
-      for (let i = 0; i < VARIANCE_SAMPLES; i += 1) {
-        samples.push(+(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1));
-        const cap = await measureRenderCapacity(page);
-        if (cap !== null) capacitySamples.push(+cap.toFixed(1));
+  // #709 — variance 진단 모드: 판정 없이 각 scenario N회 연속 측정 → 분포 통계 박제 후 종료.
+  if (DIAGNOSE_VARIANCE) {
+    console.log(
+      `[diagnose-variance] N=${VARIANCE_SAMPLES} 샘플/scenario, CPU ${CPU_THROTTLING_RATE}x` +
+        ` (+ #820 render-capacity 프로브 병기 — H2/H3 판별)`,
+    );
+    const report = {
+      measuredAt: new Date().toISOString().slice(0, 10),
+      samples: VARIANCE_SAMPLES,
+      // #820 Phase 0 — 실제 사용 CPU throttle rate 박제 (env 오버라이드 반영). 8~10x diagnostic
+      //   에서 어떤 rate 로 데드라인 미스를 유발했는지 보고서 단독 판독 가능하게 한다.
+      environment: {
+        cpuThrottling: `${CPU_THROTTLING_RATE}x`,
+      },
+      viewports: {},
+    };
+    for (const vp of VIEWPORTS) {
+      currentViewportId = vp.id;
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(2000);
+      try {
+        await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
+      } catch {}
+      report.viewports[vp.id] = {};
+      console.log(`\n[${vp.id}] ${vp.width}×${vp.height}`);
+      for (const sc of SCENARIOS) {
+        const diag = await setupScenario(page, sc);
+        const samples = [];
+        // #820 Phase 0 — rafFps 샘플과 나란히 render-capacity 프로브를 캡처. null(scene 부재)은
+        //   제외 수집 → 전 샘플 null 이면 renderCapacity=null 박제(실패 방향 fail-safe).
+        const capacitySamples = [];
+        for (let i = 0; i < VARIANCE_SAMPLES; i += 1) {
+          samples.push(+(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1));
+          const cap = await measureRenderCapacity(page);
+          if (cap !== null) capacitySamples.push(+cap.toFixed(1));
+        }
+        const s = fpsStats(samples);
+        // #820 — capacity 통계는 기존 fpsStats 재사용 (min/max/mean/std/cv/p50 동형).
+        const capStats = capacitySamples.length > 0 ? fpsStats(capacitySamples) : null;
+        report.viewports[vp.id][sc.id] = {
+          samples,
+          ...s,
+          tier: diag.tier,
+          override: diag.override,
+          renderCapacity: capStats ? { samples: capacitySamples, ...capStats } : null,
+        };
+        const capStr = capStats
+          ? `min=${capStats.min} max=${capStats.max} mean=${capStats.mean} std=${capStats.std} cv=${capStats.cv}% p50=${capStats.p50}`
+          : 'null (__simCore.scene 부재)';
+        console.log(
+          `  ${sc.label}: rafFps min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
+            `(tier=${diag.tier} override=${diag.override})\n    rafFps samples=[${samples.join(', ')}]` +
+            `\n    renderCapacity: ${capStr}` +
+            (capStats ? `\n    capacity samples=[${capacitySamples.join(', ')}]` : ''),
+        );
       }
-      const s = fpsStats(samples);
-      // #820 — capacity 통계는 기존 fpsStats 재사용 (min/max/mean/std/cv/p50 동형).
-      const capStats = capacitySamples.length > 0 ? fpsStats(capacitySamples) : null;
-      report.viewports[vp.id][sc.id] = {
-        samples,
-        ...s,
-        tier: diag.tier,
-        override: diag.override,
-        renderCapacity: capStats ? { samples: capacitySamples, ...capStats } : null,
-      };
-      const capStr = capStats
-        ? `min=${capStats.min} max=${capStats.max} mean=${capStats.mean} std=${capStats.std} cv=${capStats.cv}% p50=${capStats.p50}`
-        : 'null (__simCore.scene 부재)';
-      console.log(
-        `  ${sc.label}: rafFps min=${s.min} max=${s.max} mean=${s.mean} std=${s.std} cv=${s.cv}% p50=${s.p50} ` +
-          `(tier=${diag.tier} override=${diag.override})\n    rafFps samples=[${samples.join(', ')}]` +
-          `\n    renderCapacity: ${capStr}` +
-          (capStats ? `\n    capacity samples=[${capacitySamples.join(', ')}]` : ''),
-      );
     }
+    return { mode: 'diagnose', report };
   }
-  await browser.close();
+
+  const viewportResults = {};
+  const viewportDiagnostics = {};
+  for (const vp of VIEWPORTS) {
+    console.log(`[verify-fps-baseline] ${vp.id} (${vp.width}×${vp.height}) 측정 중...`);
+    const { results, diagnostics } = await measureViewport(page, client, vp);
+    viewportResults[vp.id] = results;
+    viewportDiagnostics[vp.id] = diagnostics;
+  }
+
+  return { mode: 'measure', viewportResults, viewportDiagnostics };
+});
+
+// 진단 모드 — 브라우저 종료 후 박제 + 종료 (원본과 동일 순서: close → write → log → exit 0).
+if (measured.mode === 'diagnose') {
   const outPath = join(reportDir, 'variance-diagnosis.json');
-  writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
+  writeFileSync(outPath, JSON.stringify(measured.report, null, 2) + '\n');
   console.log(`\n✓ variance 진단 박제: ${outPath}`);
   process.exit(0);
 }
 
-const viewportResults = {};
-const viewportDiagnostics = {};
-for (const vp of VIEWPORTS) {
-  console.log(`[verify-fps-baseline] ${vp.id} (${vp.width}×${vp.height}) 측정 중...`);
-  const { results, diagnostics } = await measureViewport(page, client, vp);
-  viewportResults[vp.id] = results;
-  viewportDiagnostics[vp.id] = diagnostics;
-}
-
-await browser.close();
+const { viewportResults, viewportDiagnostics } = measured;
 
 // baseline 의 environment 메타데이터 보존 (measuredOn / note 등 사람이 박제한 정보)
 let preservedEnvironment = {};

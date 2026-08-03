@@ -166,6 +166,17 @@ async function scenarioBoundaryCycle(page) {
     const count = await page.evaluate((testId) => {
       const panel = document.querySelector(`[data-testid="${testId}"]`);
       if (!panel) return 0;
+      // SSoT: `apps/web/src/lib/focus-trap.ts` 의 `FOCUSABLE_SELECTOR` — 변경 시 동기화 필수 (#889).
+      // `.mjs` 가드는 TS 모듈을 import 할 수 없어 문자열 사본이 불가피하다. 같은 사본이 한 곳 더 있다:
+      // `scripts/browser-verify-a11y.mjs` (focusable 개수 집계).
+      //
+      // **필터는 부분 복제** — 아래 `.filter()` 는 `isFocusableNow` 의 5축 중 `tabindex="-1"` 1축만
+      // 복제하고 `disabled` / `aria-hidden="true"` / `hidden`·`[inert]` /
+      // `display:none`·`visibility:hidden` 은 복제하지 않는다. 본 시나리오는 first/last **경계**에
+      // 마커를 심으므로, 모달 경계에 그런 요소가 들어오는 순간 구현이 계산하는 경계와 어긋나
+      // false FAIL(또는 false PASS)이 난다. 현행 3 모달 DOM 에는 해당 요소가 0개라 미발현
+      // (qa 실측 PR #886: about 5==5 / sensitivity 6==6 / onboarding 3==3).
+      // → 모달에 `disabled` 버튼·조건부 숨김 요소를 추가하면 여기 필터부터 확장할 것.
       const sel =
         'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
       const els = Array.from(panel.querySelectorAll(sel)).filter(

@@ -285,6 +285,7 @@ developer 가 run history 로 flake 이력 실측 → flake-prone 가드(verify:
 **방식**: `ci.yml` verify:699 step 내부에서 dev server 는 유지한 채 guard 스크립트 호출만 `for attempt in 1 2` + 실패 시 `sleep 15` (#709 동일 패턴). 2연속 fail = step fail (fail-fast). flake 원인이 runner 전역 부하이므로 server 재기동 불요 — 단 §A1 재검토 1 참조.
 
 **agy 고유 발견 (Playwright retries 옵션 대안) 비교 의무 이행**: `browser-verify-699-freefly-unified.mjs` / `verify-fps-baseline.mjs` 모두 `import { chromium } from 'playwright'` 인 plain node 스크립트 (`@playwright/test` runner 아님) → 도구 내부 `retries` 옵션 부재 → shell for-loop 가 유일 경로 (실측 확인).
+*(각주 — #933/PR #939: 두 스크립트는 이후 `withBrowser()` 헬퍼 경유로 전환되어 `import { chromium }` 직접 호출 형태는 아니다. 다만 `@playwright/test` runner 가 아니라는 사실은 불변이므로 위 결론(retries 부재 → shell for-loop)은 그대로 유효하다.)*
 
 **기각 재확인**: (b) 분리 job — non-blocking 은 원 ADR 기각 유지 + blocking 분리 job 도 wasm/Playwright/build setup ~10분 중복으로 가드 1종 대비 비용 과잉. (c) S3b 측정 강건화 — verify:699 전용 variance 진단 데이터 부재 상태의 선행 착수는 오진 위험 (CLAUDE.md 스프린트 계약 §10 "측정 방법 검증 우선" — 진단이 먼저). §A1 재검토 1 로 이연.
 

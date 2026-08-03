@@ -118,9 +118,14 @@ runs:
       shell: bash
       run: pnpm build
 
-    # #846 — 기동 + readiness 블록 SSoT = `scripts/ci-dev-server.sh` (ci.yml 가드 10종과 공용).
-    # 계약 불변: 포트 3001 / ready path `/` / PID 파일 `/tmp/next-pid` / 타임아웃 60x2s 후 exit 1.
+    # #846 — 기동 + readiness 블록 SSoT = `scripts/ci-dev-server.sh` (ci.yml 브라우저 회귀 가드와 공용).
+    # 계약: 포트 3001 / ready path `/` / PID 파일 `/tmp/next-pid` / readiness 실패 시 로그 덤프 후 exit 1.
     # 호출측 `dev server 정리` step 의 `kill $(cat /tmp/next-pid)` 도 그대로 유효하다.
+    # #885 — readiness 상한 표기 정정: 구 주석의 "60x2s" 는 횟수 기반 산식이라 개별 curl
+    #   (`--max-time 10`) 이 걸리는 squatter 케이스에서 실제 상한 (최악 720s) 과 어긋났다.
+    #   지금은 **벽시계 120s** 마감 (+ 마지막 curl 10s) 이 상한이다.
+    # #885 — READY 판정은 HTTP **200** 이다. ready path 가 3xx 면 대상 라우트가 컴파일되지
+    #   않은 채 통과하므로 즉시 exit 1 한다 (`/ko` 는 #908 이후 308 → `/`).
     - name: next dev server 기동
       if: inputs.start-dev-server == 'true'
       shell: bash

@@ -177,7 +177,7 @@ P5-A ADR 그대로 계승:
 | --- | ------------------------------------------------ | -------------------------------------------------- |
 | C1  | `eih_2body_reduces_to_single_1pn`                | 2체 EIH 가속도 == P5 single 1PN 가속도, rel < 1e-6 |
 | C1  | (회귀) `mercury_perihelion_precession_43_arcsec` | Single 모드, 41~46″/century 그대로 보존            |
-| C1  | (보너스) `mercury_perihelion_precession_eih`     | EIH 모드, 41~46″/century (P5-A 결과와 ±5% 이내)    |
+| C1  | (보너스) `long_mercury_perihelion_precession_eih` | EIH 모드, 41~46″/century (P5-A 결과와 ±5% 이내)    |
 | C2  | `eih_9body_100yr_eccentricity_drift`             | 행성별 (e_final - e_initial) / orbits < 1e-6       |
 | C3  | URL 매핑 통합                                    | `?gr=1`, `?gr=1pn`, `?gr=eih`, `?gr=off`, invalid  |
 

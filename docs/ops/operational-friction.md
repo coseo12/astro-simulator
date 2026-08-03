@@ -112,6 +112,41 @@ drift 가 누적됐다. `pageerror` 리스너 누락으로 미포착 예외를 �
 (`launchBrowser` / `bootstrapScene` / `collectConsoleErrors` / `saveCapture` / `resolveBaseUrl`)
 사용 + 동 문서 §리뷰 체크리스트로 신규 유입 차단. 기존 파일 전면 전환은 비목표.
 
+---
+
 또한 ci.yml 브라우저 가드는 **dev 서버를 각자 띄우지 않는다** — 공용 `:3002` 를 `BASE_URL` 로
 받고 정리는 `if: always()` step 이 단독 책임. 개별 step 의 `kill` 은 Actions 기본 셸이
 `bash -e {0}` 라 실패 시 도달하지 않는 죽은 코드다.
+
+## 6. CI 소요 시간 표기 기준 = job-level API (#885)
+
+**증상**: CI 시간 개선을 PR 본문/코멘트에 박제할 때 같은 run 을 두고 수치가 몇 초씩 어긋난다.
+실측: PR [#882](https://github.com/coseo12/astro-simulator/pull/882) 에서 job 전체 절감폭이
+코멘트 −81s / 리뷰 재현 −78s 로 **3초** 갈렸다 (before 를 1,116s 로 잡느냐 1,113s 로 잡느냐 차이).
+
+**구조 원인**: 시간을 세는 방법이 두 가지다. (a) **job-level** — `jobs[].started_at` ~
+`completed_at`. (b) **스텝 파생** — 각 step 의 `started_at/completed_at` 차를 합산하거나 로그
+타임스탬프에서 눈으로 딴 값. (b) 는 step 사이 간격 (러너 오버헤드 · post 액션 · 반올림) 을
+흘리므로 (a) 와 항상 몇 초 어긋난다. 둘을 한 문서에서 섞으면 재현자가 차이를 회귀로 오독한다.
+
+**표준**: **총 소요 시간은 job-level 값만 인용**한다. 개별 step 수치는 "가드 합계" 처럼
+**step 단위 비교**에만 쓰고, 두 축을 한 표에 섞지 않는다 (섞을 땐 열 이름에 기준 명시).
+
+```bash
+# job-level (총 소요 시간 인용 기준)
+gh api repos/coseo12/astro-simulator/actions/runs/<RUN_ID>/jobs \
+  --jq '.jobs[] | {name, started_at, completed_at}'
+
+# step 단위 (가드별 비교 전용)
+gh api repos/coseo12/astro-simulator/actions/runs/<RUN_ID>/jobs \
+  --jq '.jobs[].steps[] | {name, started_at, completed_at}'
+```
+
+- 단일 run 대조는 러너 편차가 섞이므로 **한계를 함께 적는다** (#882 본문이 이 부분은 정직했다).
+- **같은 클래스 — PR 본문 판정표 셀도 기억이 아니라 실측 출력을 인용한다**: #882 본문의
+  harness-managed 판정표가 `CHANGELOG.md` 를 "등재" 로 적었으나 실측은 미등재였다
+  ([리뷰 권고 8](https://github.com/coseo12/astro-simulator/pull/882#issuecomment-5082085880)).
+  보수적 방향 오기라 실害 0 이었지만 이런 표는 다음 PR 의 참조 근거로 **승계**된다
+  (#935 "가드 N종" 표기가 2회 연속 승계 drift 한 것과 동형).
+- 근거: PR [#882 리뷰 권고 8·9](https://github.com/coseo12/astro-simulator/pull/882#issuecomment-5082085880).
+
