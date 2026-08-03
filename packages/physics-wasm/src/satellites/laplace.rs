@@ -527,8 +527,8 @@ mod tests {
     /// D5-a Laplace 공명 잔차 ≤ 0.01 (100 Io 주기).
     /// **long-integration 테스트** — 빠른 경로에서 제외.
     #[test]
-    #[ignore = "long-integration; run with --include-ignored in CI"]
-    fn test_laplace_resonance_residual_1pct() {
+    #[ignore = "long-integration; CI 는 --ignored long_ 필터로 실행 (#877)"]
+    fn long_laplace_resonance_residual_1pct() {
         let result = measure_laplace_resonance();
         eprintln!(
             "Laplace 측정: residual={:.6} amplitude={:.4}° std={:.4}°",

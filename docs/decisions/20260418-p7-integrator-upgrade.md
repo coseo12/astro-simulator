@@ -222,9 +222,9 @@ w0 = -1.7024143839193153
 | A2 조화 진동자 1000주기       | `yoshida_harmonic_oscillator_1000_periods`        | 에너지 drift ≤ 1e-6 (VV는 1e-4 수준 — 차수 우위 검증)               |
 | A3 태양-지구 1년 궤도         | `yoshida_sun_earth_1y_radius_drift`               | 반경 drift ≤ 1e-4 AU (현재 VV 1e-3 수준)                            |
 | A4 케플러 에너지 보존         | `yoshida_kepler_energy_conservation`              | sun-earth 100년, drift < 1e-8 (VV 1e-3 허용)                        |
-| A5 지구 근일점 EIH (메인 DoD) | `yoshida_earth_perihelion_regression`             | rel_err ≤ 1.25% (Phase C 개정: 3 centuries + LRL + Newton baseline) |
-| A6 수성 근일점 회귀           | `yoshida_mercury_perihelion_regression`           | rel_err ≤ 1.0% (1 century, 실측 0.11%)                              |
-| A6' 금성 근일점 EIH           | `yoshida_venus_perihelion_regression`             | rel_err ≤ 1.5% (Phase C 개정, 10 centuries, 실측 1.39%)             |
+| A5 지구 근일점 EIH (메인 DoD) | `long_yoshida_earth_perihelion_regression`        | rel_err ≤ 1.25% (Phase C 개정: 3 centuries + LRL + Newton baseline) |
+| A6 수성 근일점 회귀           | `long_yoshida_mercury_perihelion_regression`      | rel_err ≤ 1.0% (1 century, 실측 0.11%)                              |
+| A6' 금성 근일점 EIH           | `long_yoshida_venus_perihelion_regression`        | rel_err ≤ 1.5% (Phase C 개정, 10 centuries, 실측 1.39%)             |
 | A7 VV 회귀 보호               | 기존 `mercury_perihelion_precession_43_arcsec` 등 | **무수정** — 기본값 VV 유지로 자동 통과                             |
 | A8 bench 증분                 | `bench_yoshida_vs_vv_step_cost`                   | Yoshida step = VV step × 3 ± 10%                                    |
 
