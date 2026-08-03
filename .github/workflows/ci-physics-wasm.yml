@@ -123,9 +123,15 @@ jobs:
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo fmt --check --manifest-path packages/physics-wasm/Cargo.toml
 
-      - name: Rust clippy 게이트 (physics-wasm, -D warnings)
+      # #877 — `--all-features` 추가. 기본 feature 만 검사하면 `diagnostics` gated 코드
+      # (nbody.rs diag_* 12건 + geodesic.rs 1건) 가 compile 제외라 lint CI 사각이었다.
+      # 본 crate 에 `cfg(not(feature = ...))` 코드가 0건이므로 `--all-features` 는 기본
+      # 구성의 **순수 상위집합** — 커버리지 손실 없이 사각만 제거한다.
+      # 비용 실측 (냉시작, cargo clean 후): 기본 5.47s vs --all-features 5.05s
+      # → 차이는 측정 노이즈 범위 (진단 코드 13개 함수 추가 lint 는 사실상 무비용). 도입.
+      - name: Rust clippy 게이트 (physics-wasm, -D warnings, --all-features)
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        run: cargo clippy --all-targets --manifest-path packages/physics-wasm/Cargo.toml -- -D warnings
+        run: cargo clippy --all-targets --all-features --manifest-path packages/physics-wasm/Cargo.toml -- -D warnings
 
       # wasm-pack: cargo install(≈60~70s) → prebuilt 바이너리로 대체
       - name: wasm-pack 설치
@@ -193,10 +199,19 @@ jobs:
           fi
 
   # P9 #254 M4 — 장기 적분 테스트 분리 경로.
-  # `#[ignore = "long-integration"]` 로 마킹된 테스트만 실행 (수성/금성/지구 근일점
+  # `long_` 접두 + `#[ignore]` 로 마킹된 테스트만 실행 (수성/금성/지구 근일점
   # EIH 6건 + Laplace 공명 D5-a 1건). CPU 집약 테스트를 빠른 경로와 분리해 PR
   # 피드백 5분 목표 달성 + 장기 경로는 별도 job 으로 병렬 실행.
   # 실패 시에도 빠른 경로 PASS 면 PR 차단되지 않음 — 장기 경로는 별도 관찰용.
+  #
+  # #877 — `--ignored` 전체 실행에서 `--ignored long_` 필터로 전환. 기존엔 CI 실행
+  # 의도가 없는 `#[ignore]` 2건까지 딸려 실행됐다:
+  #   - diagnose_laplace_window_sweep — 주석이 "CI 에선 실행 안 함" 을 선언했는데도
+  #     실행 (주석 계약 ↔ 구현 drift). n ∈ {50..2000} Io 주기 sweep = 3850 주기 적분
+  #   - test_laplace_phase_amplitude_2deg_scope_deferred — assertion 0 (#282 대기).
+  #     100 Io 주기를 적분하고 아무것도 검증하지 않는 공허 PASS
+  # `long_` 접두는 "CI 장기 경로에서 실행됨" 을 이름 자체로 선언하는 계약이다.
+  # 신규 장기 적분 테스트 추가 시 `long_` 을 붙여야 CI 가 집어간다.
   long-integration-rust:
     runs-on: ubuntu-latest
     # 병렬 실행 (빠른 경로 + 장기 경로 독립). #915 — docs-only 스킵 (diff-scope 게이트).
@@ -233,11 +248,30 @@ jobs:
           # 빠른 경로와 다른 캐시 키 — 동시 빌드 충돌 방지.
           key: long-integration
 
-      # `--include-ignored` 로 ignore 테스트만 실행하려면 `--ignored` 필요.
-      # `--include-ignored` 는 전체 실행. 여기서는 ignore 된 것만 실행해 시간 절약.
-      - name: Rust 장기 적분 테스트 (physics-wasm, ignored only)
+      # #877 선택 가드 — `long_` 이 0건을 매칭해도 libtest 는 exit 0 (silent no-op).
+      # 아래 실행 스텝은 continue-on-error 라 배선 붕괴가 조용히 초록으로 통과한다.
+      # 따라서 선택 건수 단언만 별도 스텝 (continue-on-error 없음) 으로 분리해 fail-fast.
+      # "CI 통과 ≠ 테스트 실행" 의 재발 차단 (#840 실행 수 단언 가드와 동형).
+      # `--list` 는 실행 없이 선택만 출력 — release 컴파일은 다음 스텝과 공유되어 추가 비용 ~0.
+      - name: 장기 적분 테스트 선택 가드 (long_ 매칭 ≥ 1)
         if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
-        run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --ignored --nocapture
+        run: |
+          set -o pipefail
+          cargo test --release --manifest-path packages/physics-wasm/Cargo.toml \
+            -- --ignored long_ --list 2>&1 | tee /tmp/long-list.log
+          SELECTED=$(grep -c ': test$' /tmp/long-list.log || true)
+          echo "선택된 장기 적분 테스트: ${SELECTED}"
+          if [ "${SELECTED}" -lt 1 ]; then
+            echo "::error::long_ 필터 매칭 0건 — 테스트 이름 규약 drift (#877 가드)"
+            exit 1
+          fi
+
+      # `--ignored` 는 ignore 마킹된 것만 실행 (`--include-ignored` 는 전체 실행).
+      # 뒤따르는 `long_` 은 libtest 이름 필터 (부분 문자열 매칭) — #877 로 추가.
+      # 이로써 diagnostic / scope-deferred `#[ignore]` 는 장기 경로에서 제외된다.
+      - name: Rust 장기 적분 테스트 (physics-wasm, long_ ignored only)
+        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
+        run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --ignored long_ --nocapture
         # 장기 경로 실패는 머지 차단하지 않음 — CI 로그 관찰용.
         continue-on-error: true
 
