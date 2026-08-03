@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Notes (chore — 앱 행동 변화 없음)
+
+- **[#933 / #935] verify-baseline·bench 7종 try/finally 표준화 + "가드 N종" 개수 표기 제거** ([#933](https://github.com/coseo12/astro-simulator/issues/933) / [#935](https://github.com/coseo12/astro-simulator/issues/935)) — 앱 코드 변경 0. **(1) #933 (#927 잔여 클래스)** — `verify-fps-baseline` / `verify-a11y-baseline` / `verify-hud-contrast` / `bench-scene` / `bench-scene-mobile` / `bench-webgpu` / `bench-tier-guard-cost` 7종이 top-level await 로 `launch → … → close` 를 일직선 나열해 **에러 경로에서 `browser.close()` 에 도달하지 못하던** 구조를 `withBrowser(launchOptions, fn)` 로 전환 (#927 헬퍼 재사용, 신규 헬퍼 0). launch 인자는 **전건 원본 그대로 전달** — vsync 해제 (`--disable-gpu-vsync` / `--disable-frame-rate-limit`) · WebGPU (`--enable-unsafe-webgpu` 등) 플래그는 측정값 자체를 좌우하므로 한 글자도 바꾸지 않았고, 헬퍼 계약상 금지된 `withBrowser({ gpu: … })` 는 사용하지 않았다 (조용히 무시되는 형태 — `docs/ops/browser-verify-helpers.md` 체크리스트 1·2 조합). **`verify-fps-baseline` 은 close() 2회 분기** (variance 진단 모드 / 판정 모드) 라 별도 계약 — 두 분기를 한 콜백으로 합치고 **어느 분기인지를 반환값(`mode`)으로 표현**해, `process.exit` 은 전부 브라우저가 닫힌 뒤 호출부에서 호출한다 (콜백 안 `process.exit` 은 finally 를 건너뛴다). **동작 무변경 실증**: 동일 dev 서버(:3001)에 전환 전/후를 연달아 실행해 종료 코드 + 출력 구조 대조 — 8 실행 전건 동일 (`verify-fps-baseline` 은 `SIMULATE_VSYNC_LOCK=1` → exit 0 / `SIMULATE_REGRESSION=1` → exit 1 결정적 hook 으로 판정 경로 양쪽 대조). **에러 주입**: 도달 불가 URL 로 전 7종 실행 시 chromium 잔존 0. **(2) #935** — `ci.yml` / `ci-dev-server.sh` / `setup-and-build/action.yml` / `docs/ops/browser-verify-helpers.md` / `browser-verify-mobile-p7d.mjs` 의 **"가드 N종" 수치 표기 전건 제거** (옵션 A). 이 표기는 가드 추가 PR 마다 5곳을 손으로 갱신해야 했고 누락해도 신호가 없어 **2회 연속 drift** 했다 (#848 이 11번째 가드를 추가하며 표기 10 잔존 → PR #934 가 그 오차를 승계해 12 로 표기 → 리뷰에서 13 으로 정정). 본 PR 착수 시점에도 `setup-and-build/action.yml` 에 **10종 표기가 남아 있었다** (정정 대상 5곳에서 누락된 6번째 위치 — drift 클래스의 추가 실증). "아래 브라우저 회귀 가드 전부" 같은 비수치 표현으로 전환하고 각 위치에 "개수를 표기하지 않는다 (#935)" 계약 주석을 박제. 배선 이력은 CHANGELOG (시점 기록 SSoT) 가 단독 보유 — CHANGELOG·ADR 의 과거 entry 는 시점 기록이므로 수정하지 않았다.
+
 ## [0.57.0] — 2026-08-03
 
 ### Notes (chore — 앱 행동 변화 없음)

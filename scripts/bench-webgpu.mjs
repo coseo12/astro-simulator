@@ -13,11 +13,10 @@
  *
  * 결과: .bench-out/p3b-{timestamp}.json (#905 — gitignored) + console 표
  */
-import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3000';
 const DURATION_MS = 3_000;
@@ -27,114 +26,124 @@ const outDir = join(__dirname, '..', '.bench-out');
 mkdirSync(outDir, { recursive: true });
 
 // P3-D #154 — vsync 해제 flag로 절대 throughput 측정 가능. cap fps 우회.
-const browser = await chromium.launch({
-  headless: true,
-  args: [
-    '--enable-unsafe-webgpu',
-    '--enable-features=Vulkan',
-    '--use-angle=metal',
-    '--enable-gpu-rasterization',
-    '--ignore-gpu-blocklist',
-    // vsync/frame-rate cap 해제 (절대 throughput 측정용)
-    '--disable-gpu-vsync',
-    '--disable-frame-rate-limit',
-    '--disable-renderer-backgrounding',
-    '--disable-background-timer-throttling',
-    // P4-D #166 — headless Chromium에서 WebGPU timestamp-query resolve 활성화.
-    // 이 flag 없이는 count는 증가하지만 값이 전부 0ns로 기록되어 측정 불가.
-    '--enable-webgpu-developer-features',
-    '--enable-dawn-features=allow_unsafe_apis',
-  ],
-});
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
-
-const measureFps = (d) =>
-  page.evaluate(
-    (ms) =>
-      new Promise((resolve) => {
-        let c = 0;
-        const t0 = performance.now();
-        const loop = () => {
-          c += 1;
-          if (performance.now() - t0 < ms) requestAnimationFrame(loop);
-          else resolve((c * 1000) / (performance.now() - t0));
-        };
-        requestAnimationFrame(loop);
-      }),
-    d,
-  );
-
-// WebGPU capability 사전 확인
-await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
-const isWebGpu = await page.evaluate(() => 'gpu' in navigator);
-console.log(`navigator.gpu present: ${isWebGpu}`);
-const engineKind = await page.evaluate(() => {
-  const canvas = document.querySelector('canvas');
-  // @ts-ignore — Babylon engine reflection
-  const engine = canvas?._babylonEngine ?? null;
-  return engine?.isWebGPU === true ? 'webgpu' : 'webgl2';
-});
-console.log(`Babylon engine kind: ${engineKind}`);
-
-// P4-D #166 — `?gpuTimer=1`로 Babylon EngineInstrumentation 활성.
-// 미지원 환경(WebGL2 timer query 없음, WebGPU timestamp-query feature 거부)은 null 유지.
-const readGpuMs = () =>
-  page.evaluate(
-    () => /** @type {number | null} */ (/** @type {any} */ (window).__gpuFrameTimeMs ?? null),
-  );
-
-// P5-C #179 — shader별 GPU ms 읽기.
-const readShaderTimings = () =>
-  page.evaluate(() => {
-    const t = /** @type {any} */ (window).__gpuShaderTimings;
-    return t ?? null;
-  });
-
-// P4-A #165 — beltNbody=1 모드로 측정. 소행성대가 N-body 엔진에 편입되어
-// engine 선택(newton/barnes-hut/webgpu)이 실제 N=행성+belt 전체에 대해 적용된다.
 //
-// 시간 프리셋 미사용 이유: time-preset-1y는 timescale을 31.5M sec/sec로 키워
-// frame당 dt~6일이 되고 N=10000 O(N²) × 6 sub-step으로 hang 발생. 기본 속도에서
-// 프레임당 연산량이 현실적이고 fps만 정확히 측정되면 충분.
-//
-// newton은 O(N²) 한계로 N=10000에서 불가 — 명시적 skip.
-const rows = [];
-for (const engine of ['newton', 'barnes-hut', 'webgpu']) {
-  for (const belt of [1000, 5000, 10000]) {
-    if (engine === 'newton' && belt >= 5000) {
-      console.log(`${engine.padEnd(11)} N=${String(belt).padEnd(5)}: skipped (O(N²) 한계)`);
-      rows.push({ engine, belt, fps: null, gpuMs: null, skipped: true });
-      continue;
-    }
-    const url = `${baseUrl}/?engine=${engine}&belt=${belt}&beltNbody=1&gpuTimer=1`;
-    await page.goto(url, { waitUntil: 'networkidle' });
+// #933 — 에러 경로(goto 실패 / WebGPU 초기화 fatal)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   launch 인자는 원본 그대로 전달 (WebGPU/vsync 플래그가 측정 자체의 전제 — 무변경 보존).
+//   리포트 write·가속비 표·P4-A 가드는 브라우저 종료 뒤 수행하므로 콜백은 측정 결과만 반환한다.
+const { rows, isWebGpu, engineKind } = await withBrowser(
+  {
+    headless: true,
+    args: [
+      '--enable-unsafe-webgpu',
+      '--enable-features=Vulkan',
+      '--use-angle=metal',
+      '--enable-gpu-rasterization',
+      '--ignore-gpu-blocklist',
+      // vsync/frame-rate cap 해제 (절대 throughput 측정용)
+      '--disable-gpu-vsync',
+      '--disable-frame-rate-limit',
+      '--disable-renderer-backgrounding',
+      '--disable-background-timer-throttling',
+      // P4-D #166 — headless Chromium에서 WebGPU timestamp-query resolve 활성화.
+      // 이 flag 없이는 count는 증가하지만 값이 전부 0ns로 기록되어 측정 불가.
+      '--enable-webgpu-developer-features',
+      '--enable-dawn-features=allow_unsafe_apis',
+    ],
+  },
+  async (browser) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+
+    const measureFps = (d) =>
+      page.evaluate(
+        (ms) =>
+          new Promise((resolve) => {
+            let c = 0;
+            const t0 = performance.now();
+            const loop = () => {
+              c += 1;
+              if (performance.now() - t0 < ms) requestAnimationFrame(loop);
+              else resolve((c * 1000) / (performance.now() - t0));
+            };
+            requestAnimationFrame(loop);
+          }),
+        d,
+      );
+
+    // WebGPU capability 사전 확인
+    await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
-    // P7-E #210 — silent-fail 방지.
-    await pressTimePlay(page, { skipIfAbsent: true });
-    await page.waitForTimeout(500);
-    const fps = await measureFps(DURATION_MS);
-    const gpuMs = await readGpuMs();
-    const shaderT = await readShaderTimings();
-    rows.push({
-      engine,
-      belt,
-      fps: Number(fps.toFixed(2)),
-      gpuMs: gpuMs === null ? null : Number(gpuMs.toFixed(3)),
-      forceMs: shaderT?.forceMs != null ? Number(shaderT.forceMs.toFixed(3)) : null,
-      integratorMs: shaderT?.integratorMs != null ? Number(shaderT.integratorMs.toFixed(3)) : null,
+    const gpuPresent = await page.evaluate(() => 'gpu' in navigator);
+    console.log(`navigator.gpu present: ${gpuPresent}`);
+    const kind = await page.evaluate(() => {
+      const canvas = document.querySelector('canvas');
+      // @ts-ignore — Babylon engine reflection
+      const engine = canvas?._babylonEngine ?? null;
+      return engine?.isWebGPU === true ? 'webgpu' : 'webgl2';
     });
-    const gpuStr = gpuMs === null ? 'n/a' : `${gpuMs.toFixed(3)}ms`;
-    const forceStr = shaderT?.forceMs != null ? `${shaderT.forceMs.toFixed(3)}ms` : 'n/a';
-    const intStr = shaderT?.integratorMs != null ? `${shaderT.integratorMs.toFixed(3)}ms` : 'n/a';
-    console.log(
-      `${engine.padEnd(11)} N=${String(belt).padEnd(5)}: ${fps.toFixed(2).padStart(7)} fps · gpu ${gpuStr} · force ${forceStr} · integrator ${intStr}`,
-    );
-  }
-}
+    console.log(`Babylon engine kind: ${kind}`);
 
-await browser.close();
+    // P4-D #166 — `?gpuTimer=1`로 Babylon EngineInstrumentation 활성.
+    // 미지원 환경(WebGL2 timer query 없음, WebGPU timestamp-query feature 거부)은 null 유지.
+    const readGpuMs = () =>
+      page.evaluate(
+        () => /** @type {number | null} */ (/** @type {any} */ (window).__gpuFrameTimeMs ?? null),
+      );
+
+    // P5-C #179 — shader별 GPU ms 읽기.
+    const readShaderTimings = () =>
+      page.evaluate(() => {
+        const t = /** @type {any} */ (window).__gpuShaderTimings;
+        return t ?? null;
+      });
+
+    // P4-A #165 — beltNbody=1 모드로 측정. 소행성대가 N-body 엔진에 편입되어
+    // engine 선택(newton/barnes-hut/webgpu)이 실제 N=행성+belt 전체에 대해 적용된다.
+    //
+    // 시간 프리셋 미사용 이유: time-preset-1y는 timescale을 31.5M sec/sec로 키워
+    // frame당 dt~6일이 되고 N=10000 O(N²) × 6 sub-step으로 hang 발생. 기본 속도에서
+    // 프레임당 연산량이 현실적이고 fps만 정확히 측정되면 충분.
+    //
+    // newton은 O(N²) 한계로 N=10000에서 불가 — 명시적 skip.
+    const collected = [];
+    for (const engine of ['newton', 'barnes-hut', 'webgpu']) {
+      for (const belt of [1000, 5000, 10000]) {
+        if (engine === 'newton' && belt >= 5000) {
+          console.log(`${engine.padEnd(11)} N=${String(belt).padEnd(5)}: skipped (O(N²) 한계)`);
+          collected.push({ engine, belt, fps: null, gpuMs: null, skipped: true });
+          continue;
+        }
+        const url = `${baseUrl}/?engine=${engine}&belt=${belt}&beltNbody=1&gpuTimer=1`;
+        await page.goto(url, { waitUntil: 'networkidle' });
+        await page.waitForTimeout(2000);
+        // P7-E #210 — silent-fail 방지.
+        await pressTimePlay(page, { skipIfAbsent: true });
+        await page.waitForTimeout(500);
+        const fps = await measureFps(DURATION_MS);
+        const gpuMs = await readGpuMs();
+        const shaderT = await readShaderTimings();
+        collected.push({
+          engine,
+          belt,
+          fps: Number(fps.toFixed(2)),
+          gpuMs: gpuMs === null ? null : Number(gpuMs.toFixed(3)),
+          forceMs: shaderT?.forceMs != null ? Number(shaderT.forceMs.toFixed(3)) : null,
+          integratorMs:
+            shaderT?.integratorMs != null ? Number(shaderT.integratorMs.toFixed(3)) : null,
+        });
+        const gpuStr = gpuMs === null ? 'n/a' : `${gpuMs.toFixed(3)}ms`;
+        const forceStr = shaderT?.forceMs != null ? `${shaderT.forceMs.toFixed(3)}ms` : 'n/a';
+        const intStr =
+          shaderT?.integratorMs != null ? `${shaderT.integratorMs.toFixed(3)}ms` : 'n/a';
+        console.log(
+          `${engine.padEnd(11)} N=${String(belt).padEnd(5)}: ${fps.toFixed(2).padStart(7)} fps · gpu ${gpuStr} · force ${forceStr} · integrator ${intStr}`,
+        );
+      }
+    }
+
+    return { rows: collected, isWebGpu: gpuPresent, engineKind: kind };
+  },
+);
 
 const ts = new Date().toISOString();
 const outPath = join(outDir, `p3b-${ts.replace(/[:.]/g, '-')}.json`);

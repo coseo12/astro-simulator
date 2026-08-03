@@ -24,11 +24,10 @@
  *   BENCH_SAMPLE_MS=10000 node scripts/bench-tier-guard-cost.mjs
  *   BENCH_CPU_SLOWDOWN=6 node scripts/bench-tier-guard-cost.mjs  # 6x 더 엄격
  */
-import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SAMPLE_MS = Number(process.env.BENCH_SAMPLE_MS ?? 5_000);
@@ -41,97 +40,104 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const benchDir = join(__dirname, '..', '.bench-out');
 mkdirSync(benchDir, { recursive: true });
 
-const browser = await chromium.launch({
-  args: ['--disable-frame-rate-limit', '--disable-gpu-vsync'],
-});
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await context.newPage();
+// #933 — 에러 경로(goto 실패 / CDP throw)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   launch 인자는 원본 그대로 전달 (vsync 해제 플래그가 측정값을 좌우 — 무변경 보존).
+//   임계값 검증·리포트 write 는 브라우저 종료 뒤 수행하므로 콜백은 측정 결과만 반환한다.
+const scenarios = await withBrowser(
+  {
+    args: ['--disable-frame-rate-limit', '--disable-gpu-vsync'],
+  },
+  async (browser) => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
 
-// #448 — CDP CPU throttling (Gemini 권고 F5). headless Chromium 기본 호스트 CPU full 사용
-// → 저사양 시뮬레이션 안 됨. setCPUThrottlingRate 로 명시 slowdown.
-const cdp = await context.newCDPSession(page);
-await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
+    // #448 — CDP CPU throttling (Gemini 권고 F5). headless Chromium 기본 호스트 CPU full 사용
+    // → 저사양 시뮬레이션 안 됨. setCPUThrottlingRate 로 명시 slowdown.
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
 
-await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
+    await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
 
-/**
- * fps + frame time 분포 측정.
- * @param {number} durationMs
- * @returns {Promise<{ fps: number, frames: number, p50FrameMs: number, p95FrameMs: number, maxFrameMs: number }>}
- */
-const measureFrameStats = (durationMs) =>
-  page.evaluate(
-    (d) =>
-      new Promise((resolve) => {
-        const frameTimes = [];
-        let last = performance.now();
-        const start = last;
-        const loop = () => {
-          const now = performance.now();
-          frameTimes.push(now - last);
-          last = now;
-          if (now - start < d) requestAnimationFrame(loop);
-          else {
-            const sorted = [...frameTimes].sort((a, b) => a - b);
-            const p50 = sorted[Math.floor(sorted.length * 0.5)] ?? 0;
-            const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
-            const maxF = sorted[sorted.length - 1] ?? 0;
-            resolve({
-              fps: (frameTimes.length * 1000) / (performance.now() - start),
-              frames: frameTimes.length,
-              p50FrameMs: p50,
-              p95FrameMs: p95,
-              maxFrameMs: maxF,
-            });
-          }
-        };
-        requestAnimationFrame(loop);
-      }),
-    durationMs,
-  );
+    /**
+     * fps + frame time 분포 측정.
+     * @param {number} durationMs
+     * @returns {Promise<{ fps: number, frames: number, p50FrameMs: number, p95FrameMs: number, maxFrameMs: number }>}
+     */
+    const measureFrameStats = (durationMs) =>
+      page.evaluate(
+        (d) =>
+          new Promise((resolve) => {
+            const frameTimes = [];
+            let last = performance.now();
+            const start = last;
+            const loop = () => {
+              const now = performance.now();
+              frameTimes.push(now - last);
+              last = now;
+              if (now - start < d) requestAnimationFrame(loop);
+              else {
+                const sorted = [...frameTimes].sort((a, b) => a - b);
+                const p50 = sorted[Math.floor(sorted.length * 0.5)] ?? 0;
+                const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
+                const maxF = sorted[sorted.length - 1] ?? 0;
+                resolve({
+                  fps: (frameTimes.length * 1000) / (performance.now() - start),
+                  frames: frameTimes.length,
+                  p50FrameMs: p50,
+                  p95FrameMs: p95,
+                  maxFrameMs: maxF,
+                });
+              }
+            };
+            requestAnimationFrame(loop);
+          }),
+        durationMs,
+      );
 
-const scenarios = [];
+    const collected = [];
 
-// === Scenario 1 — idle baseline (가드 미발화, throttling 영향만) ===
-await page.click('[data-testid="time-pause"]').catch(() => {});
-await page.waitForTimeout(500);
-{
-  const stat = await measureFrameStats(SAMPLE_MS);
-  scenarios.push({ name: 'idle-throttled', ...roundStat(stat) });
-}
+    // === Scenario 1 — idle baseline (가드 미발화, throttling 영향만) ===
+    await page.click('[data-testid="time-pause"]').catch(() => {});
+    await page.waitForTimeout(500);
+    {
+      const stat = await measureFrameStats(SAMPLE_MS);
+      collected.push({ name: 'idle-throttled', ...roundStat(stat) });
+    }
 
-// === Scenario 2 — focus mercury (Option D in-flight 플래그 + onAfterRender 발화) ===
-await pressTimePlay(page, { skipIfAbsent: true });
-await page.click('[data-testid="focus-mercury"]').catch(() => {});
-await page.waitForTimeout(800);
-{
-  const stat = await measureFrameStats(SAMPLE_MS);
-  scenarios.push({ name: 'focus-mercury-throttled', ...roundStat(stat) });
-}
+    // === Scenario 2 — focus mercury (Option D in-flight 플래그 + onAfterRender 발화) ===
+    await pressTimePlay(page, { skipIfAbsent: true });
+    await page.click('[data-testid="focus-mercury"]').catch(() => {});
+    await page.waitForTimeout(800);
+    {
+      const stat = await measureFrameStats(SAMPLE_MS);
+      collected.push({ name: 'focus-mercury-throttled', ...roundStat(stat) });
+    }
 
-// === Scenario 3 — wheel zoom 반복 (G8a detachControl/attachControl 반복 발화) ===
-// 5초 동안 800ms 마다 wheel zoom (총 6회) — tier transition 가드 4개 반복 발화.
-for (let i = 0; i < 6; i++) {
-  await page.mouse.wheel(0, i % 2 === 0 ? -400 : 400);
-  await page.waitForTimeout(800);
-}
-await page.waitForTimeout(300);
-{
-  // 별도 측정 5초 (zoom 반복 이후 즉시) — 가드 발화 직후 안정 fps 측정
-  const stat = await measureFrameStats(SAMPLE_MS);
-  scenarios.push({ name: 'post-zoom-cycles-throttled', ...roundStat(stat) });
-}
+    // === Scenario 3 — wheel zoom 반복 (G8a detachControl/attachControl 반복 발화) ===
+    // 5초 동안 800ms 마다 wheel zoom (총 6회) — tier transition 가드 4개 반복 발화.
+    for (let i = 0; i < 6; i++) {
+      await page.mouse.wheel(0, i % 2 === 0 ? -400 : 400);
+      await page.waitForTimeout(800);
+    }
+    await page.waitForTimeout(300);
+    {
+      // 별도 측정 5초 (zoom 반복 이후 즉시) — 가드 발화 직후 안정 fps 측정
+      const stat = await measureFrameStats(SAMPLE_MS);
+      collected.push({ name: 'post-zoom-cycles-throttled', ...roundStat(stat) });
+    }
 
-// === Scenario 4 — focus 해제 (Option D 가드 cleanup + clearFocus) ===
-await page.click('[data-testid="focus-reset"]').catch(() => {});
-await page.waitForTimeout(800);
-{
-  const stat = await measureFrameStats(SAMPLE_MS);
-  scenarios.push({ name: 'post-reset-throttled', ...roundStat(stat) });
-}
+    // === Scenario 4 — focus 해제 (Option D 가드 cleanup + clearFocus) ===
+    await page.click('[data-testid="focus-reset"]').catch(() => {});
+    await page.waitForTimeout(800);
+    {
+      const stat = await measureFrameStats(SAMPLE_MS);
+      collected.push({ name: 'post-reset-throttled', ...roundStat(stat) });
+    }
 
-await browser.close();
+    return collected;
+  },
+);
 
 function roundStat(s) {
   return {

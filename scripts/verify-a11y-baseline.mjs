@@ -35,7 +35,7 @@
  *     안 하도록 `data-testid` 셀렉터에만 의존 (임의 CSS 클래스 금지). 트리거 부재 시
  *     명시 throw — 가드가 조용히 통과하지 않음.
  */
-import { chromium } from 'playwright';
+import { withBrowser } from './browser-verify-utils.mjs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -339,21 +339,25 @@ function compareBaseline(current, baseline) {
 }
 
 // ===== main =====
-const browser = await chromium.launch();
-const context = await browser.newContext();
-const page = await context.newPage();
+// #933 — 에러 경로(goto 실패 / testid 부재 throw / axe 실패)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   측정 이후 판정·박제는 브라우저가 닫힌 뒤 수행하므로 콜백은 측정 결과만 반환한다.
+//   launch 인자는 원본 그대로 (무인자) — 수명주기만 위임한다.
+const { viewportResults, openSurfaces } = await withBrowser({}, async (browser) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
-const viewportResults = {};
-for (const vp of VIEWPORTS) {
-  console.log(`[verify-a11y-baseline] ${vp.id} (${vp.width}×${vp.height}) 측정 중...`);
-  viewportResults[vp.id] = await measureViewport(page, vp);
-}
+  const results = {};
+  for (const vp of VIEWPORTS) {
+    console.log(`[verify-a11y-baseline] ${vp.id} (${vp.width}×${vp.height}) 측정 중...`);
+    results[vp.id] = await measureViewport(page, vp);
+  }
 
-// #740 — open 상태 모달/패널 color-contrast 측정 (게이트 사각 메움).
-console.log('[verify-a11y-baseline] open 상태 모달/패널 color-contrast 측정 중...');
-const openSurfaces = await measureOpenSurfaces(page);
+  // #740 — open 상태 모달/패널 color-contrast 측정 (게이트 사각 메움).
+  console.log('[verify-a11y-baseline] open 상태 모달/패널 color-contrast 측정 중...');
+  const surfaces = await measureOpenSurfaces(page);
 
-await browser.close();
+  return { viewportResults: results, openSurfaces: surfaces };
+});
 
 const current = {
   version: 1,
