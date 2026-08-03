@@ -3,16 +3,16 @@
 #
 # ## 배경 (전수 감사 2026-07-18)
 #
-# `ci.yml` 의 브라우저 회귀 가드 11종이 아래 4행 세트를 포트만 3002~3013 으로 바꿔 복제했다.
+# `ci.yml` 의 브라우저 회귀 가드가 저마다 아래 4행 세트를 포트만 3002~3013 으로 바꿔 복제했다.
 #
 #   pnpm --filter @astro-simulator/web exec next dev -p 30XX &
 #   WEB_PID=$!
 #   for i in {1..60}; do curl -sf .../ && break; sleep 2; done
 #   ... ; GUARD_EXIT=$?; kill $WEB_PID || true; exit $GUARD_EXIT
 #
-# 결과 (1) PR 1건당 next dev cold-boot 이 10회 발생, (2) `kill` 이 pnpm 래퍼만 종료해 next
+# 결과 (1) PR 1건당 next dev cold-boot 이 가드 수만큼 발생, (2) `kill` 이 pnpm 래퍼만 종료해 next
 # 자식 프로세스가 job 내내 누적, (3) readiness 루프가 타임아웃 후에도 단언 없이 폴스루.
-# 본 스크립트로 기동/정리 블록을 추출하고 `ci.yml` 은 **1회만** 호출한다 (가드 11종 직렬 공용).
+# 본 스크립트로 기동/정리 블록을 추출하고 `ci.yml` 은 **1회만** 호출한다 (가드 전부 직렬 공용).
 #
 # ## readiness fail-fast 계약
 #
@@ -32,8 +32,12 @@
 #   bash scripts/ci-dev-server.sh start <port> <pid-file> [ready-path]
 #   bash scripts/ci-dev-server.sh stop  <port> <pid-file>
 #
-# 호출부: `.github/workflows/ci.yml` (가드 13종 공용, 포트 3002 — #888/#932 배선으로 11 → 13) /
+# 호출부: `.github/workflows/ci.yml` (브라우저 회귀 가드 전부 공용, 포트 3002) /
 #         `.github/actions/setup-and-build/action.yml` (start-dev-server=true, 포트 3001)
+#
+# 가드 개수는 의도적으로 표기하지 않는다 (#935) — 가드 추가 PR 마다 이 파일 / `ci.yml` /
+# docs 를 손으로 갱신해야 하고 누락해도 신호가 없어 실제로 2회 연속 drift 했다.
+# 배선 이력이 필요하면 CHANGELOG (시점 기록 SSoT) 를 본다.
 
 set -euo pipefail
 

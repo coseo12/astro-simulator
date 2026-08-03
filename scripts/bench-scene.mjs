@@ -20,11 +20,10 @@
  * play-1y 시나리오 fps를 측정하고 리포트에 `nBody: [{ n, fps }]`로 기록한다.
  * 시간이 길어지므로 시나리오 측정과 병행 실행된다.
  */
-import { chromium } from 'playwright';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay } from './browser-verify-utils.mjs';
+import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SCENARIO_DURATION_MS = 3_000;
@@ -35,85 +34,97 @@ const outDir = join(__dirname, '..', '.bench-out');
 const baselineDir = join(__dirname, '..', 'docs', 'benchmarks');
 mkdirSync(outDir, { recursive: true });
 
+// 경로 쿼리는 BENCH_PATH 환경변수로 추가 가능 (예: /?belt=200)
+const path = process.env.BENCH_PATH ?? '/';
+
 // #242 — vsync 페그 해소 (P8 선행 인프라).
 // 기존 baseline(#241, ubuntu median N=10) 은 페그 환경 기준이므로, 플래그 추가 후
 // `bench:baseline-remeasure` workflow_dispatch 재실행하여 baseline 재재측정 필요.
 // 선례: PR #234 (bench-p7-lens3d), PR #243 (bench-scene-real-gpu).
-const browser = await chromium.launch({
-  args: ['--disable-frame-rate-limit', '--disable-gpu-vsync'],
-});
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await context.newPage();
-
-const measureFps = (durationMs) =>
-  page.evaluate(
-    (d) =>
-      new Promise((resolve) => {
-        let count = 0;
-        const start = performance.now();
-        const loop = () => {
-          count += 1;
-          if (performance.now() - start < d) requestAnimationFrame(loop);
-          else resolve((count * 1000) / (performance.now() - start));
-        };
-        requestAnimationFrame(loop);
-      }),
-    durationMs,
-  );
-
-// 경로 쿼리는 BENCH_PATH 환경변수로 추가 가능 (예: /?belt=200)
-const path = process.env.BENCH_PATH ?? '/';
-await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
-
-// P7-E #210 — time-play silent-fail 방지 (유틸 pressTimePlay 선적용).
-// 다른 셀렉터(pause/preset/focus)는 시나리오 의존 — bench 맥락상 관대 허용 유지.
-const steps = [
-  { name: 'idle', prep: async () => page.click('[data-testid="time-pause"]').catch(() => {}) },
+//
+// #933 — 에러 경로(goto 실패 등)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   launch 인자는 원본 그대로 전달 (위 #242 vsync 플래그 — 측정값을 좌우하므로 무변경).
+//   리포트 write/baseline diff 는 브라우저 종료 뒤 수행하므로 콜백은 측정값만 반환한다.
+const { scenarios, nBody } = await withBrowser(
   {
-    name: 'play-1d',
-    prep: async () => {
-      await pressTimePlay(page, { skipIfAbsent: true });
-      await page.click('[data-testid="time-preset-1d"]').catch(() => {});
-    },
+    args: ['--disable-frame-rate-limit', '--disable-gpu-vsync'],
   },
-  { name: 'play-1y', prep: () => page.click('[data-testid="time-preset-1y"]').catch(() => {}) },
-  { name: 'focus-earth', prep: () => page.click('[data-testid="focus-earth"]').catch(() => {}) },
-  {
-    name: 'focus-neptune',
-    prep: () => page.click('[data-testid="focus-neptune"]').catch(() => {}),
+  async (browser) => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+
+    const measureFps = (durationMs) =>
+      page.evaluate(
+        (d) =>
+          new Promise((resolve) => {
+            let count = 0;
+            const start = performance.now();
+            const loop = () => {
+              count += 1;
+              if (performance.now() - start < d) requestAnimationFrame(loop);
+              else resolve((count * 1000) / (performance.now() - start));
+            };
+            requestAnimationFrame(loop);
+          }),
+        durationMs,
+      );
+
+    await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+
+    // P7-E #210 — time-play silent-fail 방지 (유틸 pressTimePlay 선적용).
+    // 다른 셀렉터(pause/preset/focus)는 시나리오 의존 — bench 맥락상 관대 허용 유지.
+    const steps = [
+      { name: 'idle', prep: async () => page.click('[data-testid="time-pause"]').catch(() => {}) },
+      {
+        name: 'play-1d',
+        prep: async () => {
+          await pressTimePlay(page, { skipIfAbsent: true });
+          await page.click('[data-testid="time-preset-1d"]').catch(() => {});
+        },
+      },
+      { name: 'play-1y', prep: () => page.click('[data-testid="time-preset-1y"]').catch(() => {}) },
+      {
+        name: 'focus-earth',
+        prep: () => page.click('[data-testid="focus-earth"]').catch(() => {}),
+      },
+      {
+        name: 'focus-neptune',
+        prep: () => page.click('[data-testid="focus-neptune"]').catch(() => {}),
+      },
+    ];
+
+    const collected = [];
+    for (const s of steps) {
+      await s.prep();
+      await page.waitForTimeout(500);
+      const fps = await measureFps(SCENARIO_DURATION_MS);
+      collected.push({ name: s.name, fps: Number(fps.toFixed(2)) });
+    }
+
+    // N-sweep: 소행성대 개수별 fps 측정 (play-1y 시나리오 기준)
+    const sweep = [];
+    const sweepEnv = process.env.BENCH_N_SWEEP;
+    if (sweepEnv) {
+      const ns = sweepEnv
+        .split(',')
+        .map((x) => Number.parseInt(x.trim(), 10))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      for (const n of ns) {
+        await page.goto(`${baseUrl}${path.split('?')[0]}?belt=${n}`, { waitUntil: 'networkidle' });
+        await page.waitForTimeout(1500);
+        // P7-E #210 — pre-assert 후 click.
+        await pressTimePlay(page, { skipIfAbsent: true });
+        await page.click('[data-testid="time-preset-1y"]').catch(() => {});
+        await page.waitForTimeout(500);
+        const fps = await measureFps(SCENARIO_DURATION_MS);
+        sweep.push({ n, fps: Number(fps.toFixed(2)) });
+      }
+    }
+
+    return { scenarios: collected, nBody: sweep };
   },
-];
-
-const scenarios = [];
-for (const s of steps) {
-  await s.prep();
-  await page.waitForTimeout(500);
-  const fps = await measureFps(SCENARIO_DURATION_MS);
-  scenarios.push({ name: s.name, fps: Number(fps.toFixed(2)) });
-}
-
-// N-sweep: 소행성대 개수별 fps 측정 (play-1y 시나리오 기준)
-const nBody = [];
-const sweepEnv = process.env.BENCH_N_SWEEP;
-if (sweepEnv) {
-  const ns = sweepEnv
-    .split(',')
-    .map((x) => Number.parseInt(x.trim(), 10))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  for (const n of ns) {
-    await page.goto(`${baseUrl}${path.split('?')[0]}?belt=${n}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
-    // P7-E #210 — pre-assert 후 click.
-    await pressTimePlay(page, { skipIfAbsent: true });
-    await page.click('[data-testid="time-preset-1y"]').catch(() => {});
-    await page.waitForTimeout(500);
-    const fps = await measureFps(SCENARIO_DURATION_MS);
-    nBody.push({ n, fps: Number(fps.toFixed(2)) });
-  }
-}
-
-await browser.close();
+);
 
 const timestamp = new Date().toISOString();
 const report = {

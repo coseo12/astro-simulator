@@ -118,7 +118,7 @@ runs:
       shell: bash
       run: pnpm build
 
-    # #846 — 기동 + readiness 블록 SSoT = `scripts/ci-dev-server.sh` (ci.yml 가드 10종과 공용).
+    # #846 — 기동 + readiness 블록 SSoT = `scripts/ci-dev-server.sh` (ci.yml 브라우저 회귀 가드와 공용).
     # 계약 불변: 포트 3001 / ready path `/` / PID 파일 `/tmp/next-pid` / 타임아웃 60x2s 후 exit 1.
     # 호출측 `dev server 정리` step 의 `kill $(cat /tmp/next-pid)` 도 그대로 유효하다.
     - name: next dev server 기동

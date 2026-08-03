@@ -29,7 +29,7 @@
  *   - 3중 시뮬레이션 (가드 자기검증, ADR DoD negative 입증):
  *       `node scripts/verify-hud-contrast.mjs --simulate-fail`  → 더미 미달 backing 주입 후 fail 확인
  */
-import { chromium } from 'playwright';
+import { withBrowser } from './browser-verify-utils.mjs';
 
 const positionalUrl = process.argv.slice(2).find((a) => !a.startsWith('--'));
 const baseUrl = process.env.BASE_URL ?? positionalUrl ?? 'http://localhost:3001';
@@ -94,45 +94,47 @@ function parseColor(str) {
   return null;
 }
 
+// #933 — 에러 경로(goto 실패 / evaluate throw)에서도 close 도달 보장 (#927 헬퍼 재사용).
+//   launch 인자는 원본 그대로 (무인자) — 수명주기만 위임하고 렌더러 축은 건드리지 않는다.
 async function measure() {
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(2000);
+  return withBrowser({}, async (browser) => {
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
 
-  // negative 입증 — 더미 미달 backing 을 주입한 chip 을 추가해 가드 fail 을 강제.
-  if (SIMULATE_FAIL) {
-    await page.evaluate(() => {
-      const el = document.createElement('div');
-      el.setAttribute('data-hud-chip', '');
-      // 반투명 밝은 배경 → sun-white 위 미달 (회귀 시나리오 재현).
-      el.style.backgroundColor = 'rgba(20, 23, 33, 0.6)';
-      el.style.color = 'rgb(155, 163, 184)';
-      el.style.position = 'fixed';
-      el.style.top = '0';
-      el.style.left = '0';
-      el.textContent = 'SIMULATED FAIL CHIP';
-      document.body.appendChild(el);
-    });
-  }
+    // negative 입증 — 더미 미달 backing 을 주입한 chip 을 추가해 가드 fail 을 강제.
+    if (SIMULATE_FAIL) {
+      await page.evaluate(() => {
+        const el = document.createElement('div');
+        el.setAttribute('data-hud-chip', '');
+        // 반투명 밝은 배경 → sun-white 위 미달 (회귀 시나리오 재현).
+        el.style.backgroundColor = 'rgba(20, 23, 33, 0.6)';
+        el.style.color = 'rgb(155, 163, 184)';
+        el.style.position = 'fixed';
+        el.style.top = '0';
+        el.style.left = '0';
+        el.textContent = 'SIMULATED FAIL CHIP';
+        document.body.appendChild(el);
+      });
+    }
 
-  // [data-hud-chip] 박스 전수 computed style 수집 (precision 매칭 — 마커 기반).
-  const chips = await page.evaluate(() => {
-    const nodes = Array.from(document.querySelectorAll('[data-hud-chip]'));
-    return nodes.map((n) => {
-      const cs = window.getComputedStyle(n);
-      return {
-        testid: n.getAttribute('data-testid') ?? n.getAttribute('data-r1-region') ?? '(unnamed)',
-        backgroundColor: cs.backgroundColor,
-        color: cs.color,
-        textShadow: cs.textShadow,
-      };
+    // [data-hud-chip] 박스 전수 computed style 수집 (precision 매칭 — 마커 기반).
+    const chips = await page.evaluate(() => {
+      const nodes = Array.from(document.querySelectorAll('[data-hud-chip]'));
+      return nodes.map((n) => {
+        const cs = window.getComputedStyle(n);
+        return {
+          testid: n.getAttribute('data-testid') ?? n.getAttribute('data-r1-region') ?? '(unnamed)',
+          backgroundColor: cs.backgroundColor,
+          color: cs.color,
+          textShadow: cs.textShadow,
+        };
+      });
     });
+
+    return chips;
   });
-
-  await browser.close();
-  return chips;
 }
 
 const chips = await measure();
