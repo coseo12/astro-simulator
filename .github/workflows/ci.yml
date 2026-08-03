@@ -100,6 +100,32 @@ jobs:
       # pnpm 스텝의 구 hashFiles('pnpm-lock.yaml') 조건도 감지 잔재라 제거 — lockfile 소실은
       # 조용한 스킵이 아니라 결정적 FAIL 이어야 한다 (#901 fail-fast 정합).
 
+      # ============================================================
+      # hashFiles silent-skip 정책 (#945) — 본 파일 전 스텝 SSoT
+      # ============================================================
+      # `if: hashFiles('<path>') != ''` 는 파일이 없으면 step 을 **조용히 스킵**한다.
+      # 본 워크플로에서 그 조건이 붙어 있던 대상은 전부 **저장소에 상시 존재하는 가드
+      #   스크립트 / lockfile / 패키지 매니페스트** 였다 (2026-08-03 `git ls-files` 전수 실측).
+      #   즉 "부재" 는 배포 시나리오가 아니라 **가드가 삭제된 회귀**이고, 조용히 스킵하면
+      #   CI 가 초록인 채 가드만 사라진다 (#840 "CI 통과 ≠ 테스트 실행" 클래스 /
+      #   #338 upstream 파일 부재로 인한 영구 silent skip 실사례).
+      # 선례 정합: #901/#915 는 project-guards.yml 에서 전 스텝 hashFiles 를 걷어냈고
+      #   (해당 파일 헤더 주석이 근거 SSoT), #885(PR #944) 는 dev 서버 기동·정리 step 에서
+      #   걷어냈다. #945 가 나머지 전부에 같은 정책을 적용해 **한 파일 안의 이중 정책**을
+      #   해소한다 (걷어낸 조건 40개 / 남긴 예외 1개).
+      #
+      # 정책: **가드 대상 파일의 존재를 실행 조건으로 걸지 않는다.** 부재 시 실행 명령이
+      #   ENOENT / "Command not found" 로 즉시 FAIL 하는 것이 유일한 정상 동작이다
+      #   (CLAUDE.md §가드 설계 원칙 — drift 가드는 fail-fast 만, fallback 분기 금지).
+      # 유일한 예외는 **런타임 생성 산출물** — 아래 "R1 diff 이미지 업로드" 1곳뿐이며 그
+      #   자리에 왜 부재가 정상인지 근거를 명시한다. 예외 추가 시 같은 근거 주석을 의무화한다.
+      #
+      # 같은 클래스의 두 번째 표면인 `pnpm run --if-present` 도 함께 걷어냈다 — 스크립트와
+      #   package.json entry 가 **함께** 지워지는 실제 "가드 제거" 경로에서 `--if-present` 는
+      #   출력 없이 exit 0 한다 (#840 근원. hashFiles 만 걷어내면 이 경로가 그대로 남아
+      #   조치가 표면적으로 그친다). 본 파일이 이미 두 스텝에서 선언해 온 규칙
+      #   ("`--if-present` 미사용 — 스크립트 부재 시 결정적 FAIL") 을 전 스텝으로 일관화.
+
       - name: pnpm setup
         uses: pnpm/action-setup@v4
 
@@ -134,25 +160,25 @@ jobs:
       # P12-C #298 — 단일 모드 전환 회귀 가드 (R1 DoD).
       # `scientific` 식별자·리터럴이 활성 코드 경로에 재도입되면 exit 1 로 차단.
       # 주석(역사 맥락)은 허용. 자세한 규칙은 scripts/verify-no-scientific-grep.mjs 헤더 참조.
+      # #945 — hashFiles + `--if-present` 제거 (위 §hashFiles silent-skip 정책).
       - name: R1 회귀 가드 (verify:no-scientific-grep)
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-no-scientific-grep.mjs') != ''
-        run: pnpm run --if-present verify:no-scientific-grep
+        run: pnpm run verify:no-scientific-grep
 
       # #440 dev 서버 좀비 incident SSoT 박제 회귀 가드.
       # CLAUDE.md 가드 A/B sub-section / qa.md 좀비 카나리아 / hook 파일 / forensic 보고서 5건 정합 검증.
       # 박제가 의도치 않게 제거되면 exit 1 로 차단. 근거: docs/reports/20260510-419-dev-server-zombie-recurrence.md
+      # #945 — hashFiles + `--if-present` 제거 (위 §hashFiles silent-skip 정책).
       - name: '#440 dev 서버 좀비 SSoT 회귀 가드 (verify:zombie-check)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-zombie-check.mjs') != ''
-        run: pnpm run --if-present verify:zombie-check
+        run: pnpm run verify:zombie-check
 
       # #817 세션 중단 dead-wait 가드 (가드 D) SSoT 박제 + self-test 회귀 가드.
       # CLAUDE.md 가드 D / settings.json hook 등록 / hook 파일 / ADR / sidecar 5건 정합 +
       # --self-test 3중 시뮬(positive→negative→recovery)로 hook 동작 실측 검증.
       # 근거: docs/decisions/20260710-817-dead-wait-guard.md
+      # #945 — hashFiles + `--if-present` 제거 (위 §hashFiles silent-skip 정책).
       - name: '#817 세션 dead-wait 가드 SSoT + self-test (verify:dead-wait-check)'
-        if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/verify-dead-wait-check.mjs') != ''
         run: |
-          pnpm run --if-present verify:dead-wait-check
+          pnpm run verify:dead-wait-check
           node scripts/verify-dead-wait-check.mjs --self-test
 
       # #842 docs 링크 가드 self-test 회귀 가드.
@@ -199,10 +225,12 @@ jobs:
       #   그대로 유지 — freeze 재발 시 sub-step 로그로 지점 격리 가능). 3/4 · 4/4 는 아래 유지.
 
       - name: 'r1-guard: 툴체인 + Playwright + build (composite #802)'
-        # 조건 통합 (#802): 기존 step 별 hashFiles 조건 중 rust-toolchain.toml /
-        #   packages/physics-wasm/Cargo.toml 은 본 저장소에서 전부 상시 참 → 지배 조건
-        #   (pnpm-lock + r1-guard 스크립트) 으로 통합. 현 저장소 상태 기준 행동 변화 0.
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        # #802 는 step 별 hashFiles 조건 (rust-toolchain.toml / physics-wasm/Cargo.toml 등
+        #   상시 참인 것들) 을 지배 조건 2개로 **통합**했고, #945 가 그 2개마저 제거했다 —
+        #   "상시 참" 은 조건을 줄일 근거일 뿐 아니라 애초에 조건을 둘 근거가 없다는 뜻이고,
+        #   상시 참이 깨지는 유일한 경로 (파일 삭제) 는 정확히 FAIL 해야 할 회귀다
+        #   (위 §hashFiles silent-skip 정책). 남은 게이트는 diff-scope 뿐.
+        if: needs.diff-scope.outputs.code_changed == 'true'
         # 기존 step 별 timeout (Playwright 설치 5분 + build 8분) 을 invocation 단일 20분으로 승계
         # (composite 내부 step 은 timeout-minutes 미지원). rust 툴체인/캐시 복원 시간까지 포함한 상한.
         timeout-minutes: 20
@@ -212,7 +240,7 @@ jobs:
           setup-node: 'false'
 
       - name: 'r1-guard: next start 기동 + readiness (3/4)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         # start + readiness 단독 timeout — stuck 시 production 런타임 초기화 freeze 확정.
         # setsid 로 띄워 step 종료 시 SIGHUP 으로 죽지 않도록 (다음 verify step 에서 사용).
         timeout-minutes: 3
@@ -226,7 +254,7 @@ jobs:
           curl -sf http://localhost:3001/ > /dev/null || { echo "::error::next start readiness 실패"; cat /tmp/r1-web.log; exit 1; }
 
       - name: 'r1-guard: verify 실행 (4/4)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         # verify 단독 timeout — stuck 시 Playwright/런타임 verify 경로 freeze 격리.
         # R1_GUARD_DIAG=1 — verify 경로 단계별 stderr 진단 로깅 상시 활성화 (freeze 재발 시
         #   stuck 직전 단계 즉시 보존, 성공 시 stderr 노이즈 무시. ADR §Amendment 2 정합).
@@ -246,6 +274,12 @@ jobs:
           kill "$(cat /tmp/r1-web.pid)" 2>/dev/null || true
           exit $GUARD_EXIT
 
+      # #945 §hashFiles silent-skip 정책의 **유일한 예외** — 여기서 검사하는 경로는 가드
+      #   자산이 아니라 **런타임 생성 산출물**이다 (`.gitignore:69` 로 저장소에 존재하지
+      #   않으며, r1-ui-regression-guard.mjs 가 픽셀 diff 를 낼 때만 __diff__/r1/ 에 쓴다).
+      #   즉 "부재" 는 (i) r1-guard 가 diff 도달 전에 죽었거나 (ii) 다른 step 이 먼저 실패한
+      #   정상 시나리오다 — 업로드할 게 없을 뿐 가드가 사라진 게 아니다. 조건을 걷어내면
+      #   실패 run 마다 "no files found" 잡음이 원인 step 로그를 덮는다.
       - name: R1 diff 이미지 업로드 (실패 시)
         if: failure() && hashFiles('apps/web/scripts/__diff__/r1/**/*.png') != ''
         uses: actions/upload-artifact@v4
@@ -309,7 +343,7 @@ jobs:
       # 셀 id 오타는 스크립트가 fail-fast (exit 2) — 조용한 매트릭스 축소 불가.
 
       - name: '#378 focus 회귀 가드 (verify:378-focus)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-378-focus.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-378-focus.mjs \
@@ -326,7 +360,7 @@ jobs:
       # tier 전환 횟수 ≤ 1 / target origin reset 0 / camR jump > 1000 unit 0 단언
 
       - name: '#408 focus transition 회귀 가드 (verify:focus-transition)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-focus-transition.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-focus-transition.mjs
 
       # ============================================================
@@ -336,8 +370,10 @@ jobs:
       # 라운드 1 회귀 (PR #407, turbopack ${__dirname} SSR 500) 직접 가드.
       # jq 로 packages/core/package.json exports field 검사. WASM 의존 도메인 sub-path 추가 시 차단.
 
+      # #945 — hashFiles 제거 (위 §hashFiles silent-skip 정책). 가드 스크립트와 검사 대상
+      #   매니페스트 둘 다 부재 = 회귀이며, 스크립트 부재는 `bash: No such file`, 매니페스트
+      #   부재는 스크립트 자체의 jq 검사 실패로 각각 결정적 FAIL 한다.
       - name: '#402 core exports immutable 가드 (verify-core-exports-immutable.sh)'
-        if: hashFiles('scripts/verify-core-exports-immutable.sh') != '' && hashFiles('packages/core/package.json') != ''
         run: bash scripts/verify-core-exports-immutable.sh
 
       # ============================================================
@@ -348,7 +384,7 @@ jobs:
       # + 강제 click 시 store/camera 변화 0 (defense-in-depth scene 측면)
 
       - name: '#402 R-Phase allowlist 회귀 가드 (verify:r-phase-allowlist)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-r-phase-allowlist.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-r-phase-allowlist.mjs
 
       # ============================================================
@@ -361,7 +397,7 @@ jobs:
       # DoD PASS ≠ 제품 동작 (volt #74) — R5 satellite 궤도선 미검증 잠복 → R6 galilean 표면화 재발 방지.
 
       - name: '#627 satellite 궤도 회귀 가드 (verify:627-satellite-orbit)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-627-satellite-orbit.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-627-satellite-orbit.mjs
 
       # ============================================================
@@ -374,7 +410,7 @@ jobs:
       # DoD PASS ≠ 제품 동작 (volt #74) — 위성 free-fly 줌 정지 잠복 재발 차단.
 
       - name: '#629 free-fly 줌 회귀 가드 (verify:629-freefly-zoom)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-629-freefly-zoom.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-629-freefly-zoom.mjs
 
       # ============================================================
@@ -387,7 +423,7 @@ jobs:
       # DoD PASS ≠ 제품 동작 (volt #74) — 위성 free-fly 줌아웃 허공 재발 차단.
 
       - name: '#631 free-fly tier escalation 회귀 가드 (verify:631-freefly-tier)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-631-freefly-tier.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-631-freefly-tier.mjs
 
       # #675 — glow pixel marker 회귀 가드 (기본 ON Behavior Change 의 CI 상시 감시).
@@ -398,7 +434,7 @@ jobs:
       #          (4) 100 AU 화면 안 low body 전수 발동 (sun 포함 27 body)
       #          (5) ?marker=glow 명시 = default 동일 (하위 호환)
       - name: '#675 glow pixel marker 회귀 가드 (verify:675-glow-marker)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-glow-marker.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-glow-marker.mjs
 
       # #693 — free-fly 패닝(F3) 회귀 가드 (우클릭 드래그 target 평면 이동 + floating origin 정합).
@@ -409,7 +445,7 @@ jobs:
       #          (S4) free-fly 줌(radius 변동) 후 sensibility×radius 곱 불변 (진입 시점 잔존 아님)
       # forensic 회귀: panningSensibility=0 잔존 → target 불변 / focus 중 활성 → jitter / 줌 후 감도 어긋남.
       - name: '#693 free-fly 패닝 회귀 가드 (verify:693-freefly-panning)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-693-freefly-panning.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-693-freefly-panning.mjs
 
       # #699 — free-fly 통합 재설계 회귀 가드 (진입 일관/줌아웃 제거/이동 화면체감/frame-rate 독립/무회귀).
@@ -420,7 +456,7 @@ jobs:
       #          (S3b) frame-rate 독립 — hold 시간 비례 이동 (deltaTime 정규화 누락 회귀 차단)
       #          (S4) 무회귀 — free-fly originOffset=0(#693) + tier 줌아웃 escalate(#629/#631)
       - name: '#699 free-fly 통합 재설계 회귀 가드 (verify:699-freefly-unified)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-699-freefly-unified.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: |
           # #779 Phase 2 — S3b deltaTime 타이밍 flake 흡수 (v0.39.0 / v0.43.0 prep 실측 2회 — 브라우저 회귀 가드 중 유일).
           # dev server 는 유지한 채 guard 호출만 재시도 (#709 동일 패턴). 2연속 fail = step fail (fail-fast 유지).
@@ -452,7 +488,7 @@ jobs:
       #          (S3) localStorage 왕복 — 변경→reload 유지 + 손상값 주입 시 default 폴백 (silent 흡수 차단)
       #          (S4) focus/reset 무회귀 — 감도 변경이 focus follow(panning=0)/reset 원복에 영향 0
       - name: '#704 free-fly 감도 설정 회귀 가드 (verify:704-sensitivity)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-704-sensitivity.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-704-sensitivity.mjs
 
       # #848 — a11y 키보드 사각 회귀 가드 (모달 focus trap / focus 탈취 / canvas 접근 이름).
@@ -465,7 +501,7 @@ jobs:
       #          (S6) 마우스 클릭 포커스는 캔버스로 회수 (#699 무회귀 — S5 의 양성 대조군)
       #          (S7) canvas AX name 존재 + tabindex=0 (Babylon InputManager 의 tabindex=1 되돌림 차단)
       - name: '#848 a11y 키보드 사각 회귀 가드 (verify:848-modal-focus)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-848-modal-focus.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-848-modal-focus.mjs
 
       # ============================================================
@@ -486,7 +522,7 @@ jobs:
       #          (S4) 버튼 재호출 + backdrop 닫기  (S5) 모바일 375px 3섹션 + 가로 overflow 0
       #          (S6) about/sensitivity Esc 비충돌 (모달 컨벤션 SSoT)
       - name: '#737 온보딩 회귀 가드 (verify:737-onboarding)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/browser-verify-737-onboarding.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-737-onboarding.mjs
 
       # P7-D 모바일 — 전 4축 중 **3/4 만 배선** (#932 축 분할):
@@ -508,7 +544,7 @@ jobs:
       # `BROWSER_VERIFY_GPU=swiftshader` — 스크립트 로컬 기본값 metal 은 macOS 전용이라 ubuntu
       #   러너에서 쓸 수 없다. 렌더러 축은 `GPU_LAUNCH_ARGS` SSoT 로 주입한다 (#932).
       - name: '#209 P7-D 모바일 구조 게이트 (verify:mobile-p7d — 시나리오 3/4)'
-        if: needs.diff-scope.outputs.code_changed == 'true' && hashFiles('pnpm-lock.yaml') != '' && hashFiles('scripts/browser-verify-mobile-p7d.mjs') != ''
+        if: needs.diff-scope.outputs.code_changed == 'true'
         env:
           BROWSER_VERIFY_GPU: swiftshader
           BASE_URL: http://localhost:3002
