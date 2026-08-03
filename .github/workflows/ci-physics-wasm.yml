@@ -265,6 +265,16 @@ jobs:
             echo "::error::long_ 필터 매칭 0건 — 테스트 이름 규약 drift (#877 가드)"
             exit 1
           fi
+          # 상한 단언 (#946 리뷰 권고 ①) — libtest 이름 필터는 **부분 문자열 매칭**이라
+          # `belong_to_*` 같은 이름이 의도치 않게 장기 경로로 딸려 들어올 수 있다.
+          # 선택된 전건이 `::long_` 경계에서 시작하는지 확인해 과잉 매칭을 차단한다.
+          # (하한만으로는 과잉을 못 잡는다 — 하한·상한 양방향 단언.)
+          OVERMATCH=$(grep ': test$' /tmp/long-list.log | grep -vc '::long_' || true)
+          if [ "${OVERMATCH}" -gt 0 ]; then
+            echo "::error::long_ 부분 문자열 과잉 매칭 ${OVERMATCH}건 — 아래 목록 확인 (#877/#946 가드)"
+            grep ': test$' /tmp/long-list.log | grep -v '::long_'
+            exit 1
+          fi
 
       # `--ignored` 는 ignore 마킹된 것만 실행 (`--include-ignored` 는 전체 실행).
       # 뒤따르는 `long_` 은 libtest 이름 필터 (부분 문자열 매칭) — #877 로 추가.
