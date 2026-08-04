@@ -45,7 +45,7 @@
  * 3D/shader 경로 + headless 환경에서 partial freeze 가능성. 본 스크립트는 수치 검증
  * (diff pct) 만 수행하며, 시각 실 Chrome 검증은 `README` 수동 체크리스트로 보완.
  */
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -96,41 +96,63 @@ const TIER_FOCUS_BODY = {
 
 const results = [];
 
-const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: VIEWPORT });
-const page = await context.newPage();
-
 const consoleErrors = [];
-page.on('console', (msg) => {
-  if (msg.type() === 'error') consoleErrors.push(msg.text());
+
+// #940 — 본 스크립트는 top-level await 로 `launch → … → close` 를 일직선 나열해, `page.goto`
+//   실패나 `evaluate` throw 가 나면 마지막 `browser.close()` 에 도달하지 못했다 (#927 이 정리한
+//   클래스와 동일. 본 파일은 `finally` 자체가 없던 세대다). 수명주기를 `withBrowser` 로 위임한다.
+//   launch 인자는 원본 그대로 **무인자** — 렌더러 축 무변경 (본 가드는 픽셀 diff 판정이다).
+//   조기 종료는 콜백 안에서 `process.exit` 하면 안 된다 (Node 즉시 종료 → close 미도달).
+//   sentinel 을 반환하고 실제 종료는 호출부에서 한다 (#939 `verify-fps-baseline` 전례).
+const outcome = await withBrowser({}, async (browser) => {
+  const context = await browser.newContext({ viewport: VIEWPORT });
+  const page = await context.newPage();
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', (err) => consoleErrors.push(err.message));
+
+  console.log('\n[P11-B.2 D3b] LOD Screenshot diff E2E — 9 조합');
+  console.log(`baseUrl: ${baseUrl}`);
+  console.log(`updateBaseline: ${updateBaseline}`);
+  console.log(`threshold: max diff < ${MAX_DIFF_PCT_THRESHOLD}%\n`);
+
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2000);
+
+  // __solarScene 노출 확인
+  const sceneReady = await page.evaluate(
+    () => typeof window.__solarScene === 'object' && window.__solarScene !== null,
+  );
+  if (!sceneReady) {
+    console.error('[FAIL] __solarScene 전역 미노출 — dev 빌드 아님 또는 초기화 실패');
+    return 'scene-not-ready';
+  }
+
+  // `runCombo` 는 아래에 선언돼 있으나 함수 선언 호이스팅으로 여기서 호출 가능 —
+  // 본문 위치를 옮기지 않아 diff 를 수명주기 변경분으로 한정한다.
+  for (const combo of COMBOS) {
+    const result = await runCombo(page, combo);
+    results.push(result);
+    const mark = result.pass ? 'PASS' : 'FAIL';
+    console.log(`  [${mark}] ${result.combo}: ${result.reason}`);
+  }
+  return 'ran';
 });
-page.on('pageerror', (err) => consoleErrors.push(err.message));
 
-console.log('\n[P11-B.2 D3b] LOD Screenshot diff E2E — 9 조합');
-console.log(`baseUrl: ${baseUrl}`);
-console.log(`updateBaseline: ${updateBaseline}`);
-console.log(`threshold: max diff < ${MAX_DIFF_PCT_THRESHOLD}%\n`);
-
-await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2000);
-
-// __solarScene 노출 확인
-const sceneReady = await page.evaluate(
-  () => typeof window.__solarScene === 'object' && window.__solarScene !== null,
-);
-if (!sceneReady) {
-  console.error('[FAIL] __solarScene 전역 미노출 — dev 빌드 아님 또는 초기화 실패');
-  await browser.close();
-  process.exit(1);
-}
+// 원 동작 보존 — 씬 미노출은 리포트 없이 exit 1 (브라우저는 위에서 이미 닫힘).
+if (outcome === 'scene-not-ready') process.exit(1);
 
 /**
  * tier + LOD 조합 적용 후 안정화 대기 → screenshot 캡처 → baseline diff.
  *
+ * @param {import('playwright').Page} page `withBrowser` 콜백이 생성한 페이지 (#940 — 모듈 스코프
+ *   `page` 클로저를 인자로 승격. 브라우저 수명주기가 콜백 안으로 들어가면서 필요해졌다)
  * @param {{ tier: string, lod: string }} combo
  * @returns {Promise<{ combo: string, diffPct: number, pass: boolean, reason: string }>}
  */
-async function runCombo(combo) {
+async function runCombo(page, combo) {
   const key = `${combo.tier}-${combo.lod}`;
   const baselinePath = join(baselineDir, `lod-${key}.png`);
 
@@ -237,15 +259,6 @@ async function runCombo(combo) {
         : `diff ${diffPct.toFixed(2)}% ≥ ${MAX_DIFF_PCT_THRESHOLD}% (회귀)`,
   };
 }
-
-for (const combo of COMBOS) {
-  const result = await runCombo(combo);
-  results.push(result);
-  const mark = result.pass ? 'PASS' : 'FAIL';
-  console.log(`  [${mark}] ${result.combo}: ${result.reason}`);
-}
-
-await browser.close();
 
 // 최종 리포트.
 console.log('\n========================================');

@@ -22,6 +22,7 @@
  */
 
 import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -206,122 +207,126 @@ async function launch() {
 }
 
 (async () => {
-  const browser = await launch();
   const out = { rotateOn: {}, rotateOff: {}, consoleErrors: {}, optionEWarns: {}, dodSummary: {} };
   let allPass = true;
-  try {
-    console.log('\n=== DoD 1+2+3+6 — self-rotation ON (기본) ===');
-    for (const body of ROTATING) {
-      // Δjd 를 자전 1/4 회전 근처로 (측정 유의미). 이론 spinAngle Δ = ω·Δjd = 2π×24/period × Δjd.
-      // 1/4 회전 = π/2 → Δjd = (period/24) / 4 = period/96 [days].
-      const quarterDjd = body.periodH / 96;
-      const jd1 = JD0 + quarterDjd;
-      const { context, page, consoleErrors, consoleWarns } = await setupPage(
-        browser,
-        `?gpu=a&focus=${body.id}&lod=auto`,
-      );
-      const m = await measureRotation(page, body, JD0, jd1);
-      out.rotateOn[body.id] = m;
-      out.consoleErrors[body.id] = consoleErrors.length;
-      // 옵션 e 배선 누락 경고 (once-guard) — 0 이어야 정상.
-      out.optionEWarns[body.id] = consoleWarns.filter((w) => w.includes('옵션 e')).length;
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  //   `launch()` 는 chrome 채널 부재 시 chromium 폴백이라 옵션 조립만으로 표현 불가 →
+  //   launcher 주입 seam 으로 그대로 넘긴다 (launch 인자 무변경 = 자전각 픽셀 측정 축 보존).
+  await withBrowser(
+    {},
+    async (browser) => {
+      console.log('\n=== DoD 1+2+3+6 — self-rotation ON (기본) ===');
+      for (const body of ROTATING) {
+        // Δjd 를 자전 1/4 회전 근처로 (측정 유의미). 이론 spinAngle Δ = ω·Δjd = 2π×24/period × Δjd.
+        // 1/4 회전 = π/2 → Δjd = (period/24) / 4 = period/96 [days].
+        const quarterDjd = body.periodH / 96;
+        const jd1 = JD0 + quarterDjd;
+        const { context, page, consoleErrors, consoleWarns } = await setupPage(
+          browser,
+          `?gpu=a&focus=${body.id}&lod=auto`,
+        );
+        const m = await measureRotation(page, body, JD0, jd1);
+        out.rotateOn[body.id] = m;
+        out.consoleErrors[body.id] = consoleErrors.length;
+        // 옵션 e 배선 누락 경고 (once-guard) — 0 이어야 정상.
+        out.optionEWarns[body.id] = consoleWarns.filter((w) => w.includes('옵션 e')).length;
 
-      if (m.error) {
-        console.log(`  ${body.id.padEnd(8)} ERROR: ${m.error}`);
-        allPass = false;
+        if (m.error) {
+          console.log(`  ${body.id.padEnd(8)} ERROR: ${m.error}`);
+          allPass = false;
+          await context.close();
+          continue;
+        }
+
+        // 시각 확인 캡처 (옵션).
+        if (CAPTURE_DIR) {
+          const canvas = page.locator('canvas').first();
+          const buf = await canvas.screenshot();
+          await mkdir(CAPTURE_DIR, { recursive: true });
+          await writeFile(path.join(CAPTURE_DIR, `qa-782-${body.id}.png`), buf);
+        }
+
+        // DoD 1 — 자전각 Δ = 이론 ω·Δjd (±5%).
+        const omega = (2 * Math.PI * 24) / body.periodH; // rad/day
+        const theoryDelta = angleDiffMod2Pi(omega * quarterDjd);
+        const measuredDelta = angleDiffMod2Pi(m.relAngleRad);
+        const deltaErrPct =
+          theoryDelta > 1e-6 ? Math.abs((measuredDelta - theoryDelta) / theoryDelta) * 100 : 0;
+        const dod1 = deltaErrPct <= 5;
+
+        // DoD 2 — axialTilt 적용 (측정 tilt ≈ obliquity, obliquity>90 은 pole 이 뒤집혀 180-tilt 로 측정될
+        // 수 있어 min(tilt, 180-tilt) vs min(obliquity, 180-obliquity) 로 비교하지 않고 직접 obliquity 비교).
+        // pole = rotate((0,1,0), tilt(X)) → pole.y = cos(tiltRad). tiltMeasuredDeg = acos(pole.y) = obliquity.
+        const tiltErr = Math.abs(m.tiltMeasuredDeg - body.tiltDeg);
+        const dod2 = tiltErr <= 1.5; // 0.034° 같은 미세값 floor 여유
+
+        // DoD 3 — 역행 부호 (금성/천왕성 = CW/retrograde, 나머지 CCW/prograde).
+        const expectedSign = body.dir === 'retrograde' ? 'CW(retrograde)' : 'CCW(prograde)';
+        const dod3 = m.eclipticSpinSign === expectedSign;
+
+        // DoD 6 — ring wobble 0 (ring body 만): ring normal 두 시점 불변 (Δ angle < 0.5°) 인데 body spin Δ>0.
+        let dod6 = true;
+        let ringDeltaDeg = null;
+        if (body.hasRing && m.ringNormal0 && m.ringNormal1) {
+          const dot =
+            m.ringNormal0.x * m.ringNormal1.x +
+            m.ringNormal0.y * m.ringNormal1.y +
+            m.ringNormal0.z * m.ringNormal1.z;
+          ringDeltaDeg = (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI;
+          dod6 = ringDeltaDeg < 0.5 && measuredDelta > 0.01; // ring 불변 + body 는 실제 spin
+        } else if (body.hasRing) {
+          dod6 = false; // ring normal 측정 실패
+          ringDeltaDeg = 'N/A';
+        }
+
+        const bodyPass = dod1 && dod2 && dod3 && dod6;
+        allPass = allPass && bodyPass;
+        out.dodSummary[body.id] = {
+          dod1_angle: dod1,
+          theoryDeltaRad: Number(theoryDelta.toFixed(4)),
+          measuredDeltaRad: Number(measuredDelta.toFixed(4)),
+          deltaErrPct: Number(deltaErrPct.toFixed(2)),
+          dod2_tilt: dod2,
+          tiltMeasuredDeg: m.tiltMeasuredDeg,
+          tiltExpectedDeg: body.tiltDeg,
+          dod3_sign: dod3,
+          measuredSign: m.eclipticSpinSign,
+          expectedSign,
+          dod6_ringWobble: dod6,
+          ringDeltaDeg,
+          pass: bodyPass,
+        };
+        console.log(
+          `  ${body.id.padEnd(8)} DoD1(angle)=${dod1 ? 'PASS' : 'FAIL'}(err${deltaErrPct.toFixed(1)}%) ` +
+            `DoD2(tilt)=${dod2 ? 'PASS' : 'FAIL'}(${m.tiltMeasuredDeg}°vs${body.tiltDeg}°) ` +
+            `DoD3(sign)=${dod3 ? 'PASS' : 'FAIL'}(${m.eclipticSpinSign}) ` +
+            `DoD6(ring)=${body.hasRing ? (dod6 ? 'PASS' : 'FAIL') + `(Δ${ringDeltaDeg}°)` : 'n/a'} ` +
+            `optionEWarn=${out.optionEWarns[body.id]} err=${consoleErrors.length}`,
+        );
         await context.close();
-        continue;
       }
 
-      // 시각 확인 캡처 (옵션).
-      if (CAPTURE_DIR) {
-        const canvas = page.locator('canvas').first();
-        const buf = await canvas.screenshot();
-        await mkdir(CAPTURE_DIR, { recursive: true });
-        await writeFile(path.join(CAPTURE_DIR, `qa-782-${body.id}.png`), buf);
+      console.log('\n=== ?rotate=off 대조 (자전 정지 = rotationQuaternion 부재 or 불변) ===');
+      for (const body of ROTATING.slice(0, 3)) {
+        const { context, page } = await setupPage(
+          browser,
+          `?gpu=a&focus=${body.id}&lod=auto&rotate=off`,
+        );
+        const m = await measureRotation(page, body, JD0, JD0 + body.periodH / 96);
+        out.rotateOff[body.id] = m.error
+          ? { stopped: true, reason: m.error }
+          : { relAngleRad: m.relAngleRad };
+        // rotate=off 면 rotationQuaternion 미설정 → measureRotation 이 error 반환 (자전 정지 = 정상).
+        const stopped = !!m.error || (m.relAngleRad !== undefined && m.relAngleRad < 1e-6);
+        console.log(
+          `  ${body.id.padEnd(8)} 자전정지=${stopped ? 'PASS' : 'FAIL'} ${m.error ? `(${m.error})` : `relAngle=${m.relAngleRad}`}`,
+        );
+        allPass = allPass && stopped;
+        await context.close();
       }
-
-      // DoD 1 — 자전각 Δ = 이론 ω·Δjd (±5%).
-      const omega = (2 * Math.PI * 24) / body.periodH; // rad/day
-      const theoryDelta = angleDiffMod2Pi(omega * quarterDjd);
-      const measuredDelta = angleDiffMod2Pi(m.relAngleRad);
-      const deltaErrPct =
-        theoryDelta > 1e-6 ? Math.abs((measuredDelta - theoryDelta) / theoryDelta) * 100 : 0;
-      const dod1 = deltaErrPct <= 5;
-
-      // DoD 2 — axialTilt 적용 (측정 tilt ≈ obliquity, obliquity>90 은 pole 이 뒤집혀 180-tilt 로 측정될
-      // 수 있어 min(tilt, 180-tilt) vs min(obliquity, 180-obliquity) 로 비교하지 않고 직접 obliquity 비교).
-      // pole = rotate((0,1,0), tilt(X)) → pole.y = cos(tiltRad). tiltMeasuredDeg = acos(pole.y) = obliquity.
-      const tiltErr = Math.abs(m.tiltMeasuredDeg - body.tiltDeg);
-      const dod2 = tiltErr <= 1.5; // 0.034° 같은 미세값 floor 여유
-
-      // DoD 3 — 역행 부호 (금성/천왕성 = CW/retrograde, 나머지 CCW/prograde).
-      const expectedSign = body.dir === 'retrograde' ? 'CW(retrograde)' : 'CCW(prograde)';
-      const dod3 = m.eclipticSpinSign === expectedSign;
-
-      // DoD 6 — ring wobble 0 (ring body 만): ring normal 두 시점 불변 (Δ angle < 0.5°) 인데 body spin Δ>0.
-      let dod6 = true;
-      let ringDeltaDeg = null;
-      if (body.hasRing && m.ringNormal0 && m.ringNormal1) {
-        const dot =
-          m.ringNormal0.x * m.ringNormal1.x +
-          m.ringNormal0.y * m.ringNormal1.y +
-          m.ringNormal0.z * m.ringNormal1.z;
-        ringDeltaDeg = (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI;
-        dod6 = ringDeltaDeg < 0.5 && measuredDelta > 0.01; // ring 불변 + body 는 실제 spin
-      } else if (body.hasRing) {
-        dod6 = false; // ring normal 측정 실패
-        ringDeltaDeg = 'N/A';
-      }
-
-      const bodyPass = dod1 && dod2 && dod3 && dod6;
-      allPass = allPass && bodyPass;
-      out.dodSummary[body.id] = {
-        dod1_angle: dod1,
-        theoryDeltaRad: Number(theoryDelta.toFixed(4)),
-        measuredDeltaRad: Number(measuredDelta.toFixed(4)),
-        deltaErrPct: Number(deltaErrPct.toFixed(2)),
-        dod2_tilt: dod2,
-        tiltMeasuredDeg: m.tiltMeasuredDeg,
-        tiltExpectedDeg: body.tiltDeg,
-        dod3_sign: dod3,
-        measuredSign: m.eclipticSpinSign,
-        expectedSign,
-        dod6_ringWobble: dod6,
-        ringDeltaDeg,
-        pass: bodyPass,
-      };
-      console.log(
-        `  ${body.id.padEnd(8)} DoD1(angle)=${dod1 ? 'PASS' : 'FAIL'}(err${deltaErrPct.toFixed(1)}%) ` +
-          `DoD2(tilt)=${dod2 ? 'PASS' : 'FAIL'}(${m.tiltMeasuredDeg}°vs${body.tiltDeg}°) ` +
-          `DoD3(sign)=${dod3 ? 'PASS' : 'FAIL'}(${m.eclipticSpinSign}) ` +
-          `DoD6(ring)=${body.hasRing ? (dod6 ? 'PASS' : 'FAIL') + `(Δ${ringDeltaDeg}°)` : 'n/a'} ` +
-          `optionEWarn=${out.optionEWarns[body.id]} err=${consoleErrors.length}`,
-      );
-      await context.close();
-    }
-
-    console.log('\n=== ?rotate=off 대조 (자전 정지 = rotationQuaternion 부재 or 불변) ===');
-    for (const body of ROTATING.slice(0, 3)) {
-      const { context, page } = await setupPage(
-        browser,
-        `?gpu=a&focus=${body.id}&lod=auto&rotate=off`,
-      );
-      const m = await measureRotation(page, body, JD0, JD0 + body.periodH / 96);
-      out.rotateOff[body.id] = m.error
-        ? { stopped: true, reason: m.error }
-        : { relAngleRad: m.relAngleRad };
-      // rotate=off 면 rotationQuaternion 미설정 → measureRotation 이 error 반환 (자전 정지 = 정상).
-      const stopped = !!m.error || (m.relAngleRad !== undefined && m.relAngleRad < 1e-6);
-      console.log(
-        `  ${body.id.padEnd(8)} 자전정지=${stopped ? 'PASS' : 'FAIL'} ${m.error ? `(${m.error})` : `relAngle=${m.relAngleRad}`}`,
-      );
-      allPass = allPass && stopped;
-      await context.close();
-    }
-  } finally {
-    await browser.close();
-  }
+    },
+    { launch },
+  );
 
   console.log(`\n=== 종합: ${allPass ? 'ALL PASS' : 'FAIL 존재'} ===`);
   console.log('\n=== JSON ===');

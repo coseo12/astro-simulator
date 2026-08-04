@@ -47,6 +47,10 @@ Thumbs.db
 # bench 타임스탬프 리포트 (#905) — bench-scene/bench-webgpu/bench-tier-guard-cost 등의
 # 실행별 산출물. 커밋 대상은 docs/benchmarks/baseline*.json 등 소비 파일만.
 .bench-out/
+# bench.yml 이 BENCH_SUMMARY_OUT 으로 run 중 생성하는 PR 코멘트 본문 (#950). 미등재였으나
+# "런타임 산출물" 판정의 근거를 명시화 — 실수로 tracked 되면 bench.yml 의 (a) 판정이
+# 조용히 (b) 가드 자산으로 뒤집힌다 (ci.yml 이 __diff__/ 를 .gitignore 로 근거 삼은 것과 동형).
+bench-summary.md
 
 # QA/리뷰 스크린샷 — PR 증거는 PR 내에서 선별 커밋, 로컬 산출물은 무시
 # (qa 세션 ad-hoc 산출물이 루트/apps/web 등 임의 깊이에 생성되므로 무접두 유지)

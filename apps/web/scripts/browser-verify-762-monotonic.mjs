@@ -19,7 +19,7 @@
  *
  * 실 GUI: headless=false (swiftshader freeze / WebGPU readback false-positive 회피 — #663/#728).
  */
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -195,9 +195,10 @@ function evalMonotonic(measurement, label) {
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const browser = await chromium.launch({ headless: !HEADED });
   const results = [];
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: !HEADED }, async (browser) => {
     // S1 default solar (radius 35)
     {
       const { context, page } = await setup(browser, `${BASE_URL}/?gpu=a&lod=auto`);
@@ -267,9 +268,7 @@ async function main() {
         console.log(`    ${c.rule}: ${c.pass ? 'PASS' : 'FAIL'}  (${JSON.stringify(c)})`);
       await context.close();
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   const outPath = path.join(OUT_DIR, 'qa-762-monotonic-result.json');
   fs.writeFileSync(outPath, JSON.stringify(results, null, 2));

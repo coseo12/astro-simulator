@@ -28,7 +28,7 @@
  *
  * 실 Chrome GUI 시각 품질 (은하수 미학 / 색온도) 은 qa + 사용자 D-T2 (headless 미재현).
  */
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { PNG } from 'pngjs';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -39,11 +39,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const shotDir = join(__dirname, '..', '.verify-screenshots', 'starfield');
 mkdirSync(shotDir, { recursive: true });
 
-const browser = await chromium.launch();
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+// #940 — 본 스크립트는 top-level await 로 `launch → … → close` 를 일직선 나열해, `page.goto`
+//   실패나 `evaluate` throw 가 나면 `finishAndReport()` 안의 `browser.close()` 에 도달하지
+//   못했다 (#927 이 정리한 클래스와 동일. 본 파일은 `finally` 자체가 없던 세대다).
+//   `page` 는 모듈 스코프 헬퍼 (`probeStarfieldGlobals` / `brightPixelStats` / `probeStar` /
+//   `runMeshDependentScenarios`) 가 클로저로 참조하므로 바인딩만 최상위에 남기고,
+//   생성은 `withBrowser` 콜백 안에서 한다.
+/** @type {import('playwright').Page} */
+let page;
 
 const errs = [];
-page.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
 
 const out = [];
 const check = (n, p, d = '') => {
@@ -119,74 +124,86 @@ const probeStar = () =>
 
 const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
 
-// ─── S6: 소프트웨어 렌더 게이트 (#745, ★ 환경 분기 + fps 무회귀 핵심) ──────────────
-// software/하드웨어 양쪽 assertion. 환경 판정 (isSoftwareEnv) 으로 이후 S1~S5 mesh 의존 검사를 gate.
-console.log('\n[S6] 소프트웨어 렌더 게이트 (#745) — __isSoftwareRenderer / __starfieldVisible');
-await page.goto(`${baseUrl}/?stars=on`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(3000);
-const g = await probeStarfieldGlobals();
-check(
-  'S6 전역 노출 — __isSoftwareRenderer / __starfieldVisible 정의됨',
-  g.isSoftwareRenderer !== null && g.starfieldVisible !== null,
-  `isSoftwareRenderer=${g.isSoftwareRenderer}, starfieldVisible=${g.starfieldVisible}`,
-);
-const isSoftwareEnv = g.isSoftwareRenderer === true;
-if (isSoftwareEnv) {
-  // CI swiftshader (headless 플래그 0) — 별 비활성 + mesh 미생성이 정상 (fps 무회귀 핵심 제약).
-  check(
-    'S6 software 환경 (CI swiftshader) — __starfieldVisible=false (별 비활성, fps 무회귀)',
-    g.starfieldVisible === false,
-    `starfieldVisible=${g.starfieldVisible}`,
-  );
-  const swMesh = await page.evaluate(() => {
-    const solar = window.__solarScene;
-    let scene = solar?.scene;
-    if (!scene) scene = solar?.meshes?.values?.().next?.().value?.getScene?.();
-    return { hasStarfield: !!scene?.meshes?.find?.((m) => m.name === 'starfield') };
-  });
-  check(
-    'S6 software 환경 — starfield mesh 미생성 (별 fragment shader 부하 0)',
-    swMesh.hasStarfield === false,
-  );
-} else {
-  // 하드웨어 GPU — 별 활성 (회귀 해소: WebGPU 미지원 하드웨어 가속 PC 포함).
-  check(
-    'S6 하드웨어 환경 — __starfieldVisible=true (별 활성, 회귀 해소)',
-    g.starfieldVisible === true,
-    `starfieldVisible=${g.starfieldVisible}`,
-  );
-}
+// #940 — launch 인자는 원본 그대로 **무인자** (파일 상단 §환경 자동 분기 계약: 무플래그 headless
+//   = swiftshader = software 환경). `buildLaunchOptions` 경유 금지 — env `BROWSER_VERIFY_GPU` 가
+//   암묵 개입하면 S6 게이트가 판정하는 환경 축 자체가 바뀐다.
+await withBrowser({}, async (browser) => {
+  page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  page.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
 
-// ─── S1: 별 가시 (ON vs OFF 대비) ──────────────────────────────────────────────
-// #745 — software 환경은 별 비활성이 정상이라 mesh 의존 S1~S5 는 SKIP (S6 가 software 게이트 검증).
-console.log('\n[S1] 별 가시 — starfield ON 화면이 OFF (단색) 보다 밝은 픽셀 보유');
-if (isSoftwareEnv) {
-  skip('S1 별 가시', 'software 환경 (별 비활성 정상) — S6 software 게이트가 대체 검증');
-} else {
-  await page.goto(`${baseUrl}/?stars=off`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(3000);
-  const offStats = await brightPixelStats('s1-stars-off');
+  // ─── S6: 소프트웨어 렌더 게이트 (#745, ★ 환경 분기 + fps 무회귀 핵심) ──────────────
+  // software/하드웨어 양쪽 assertion. 환경 판정 (isSoftwareEnv) 으로 이후 S1~S5 mesh 의존 검사를 gate.
+  console.log('\n[S6] 소프트웨어 렌더 게이트 (#745) — __isSoftwareRenderer / __starfieldVisible');
   await page.goto(`${baseUrl}/?stars=on`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
-  const onStats = await brightPixelStats('s1-stars-on');
+  const g = await probeStarfieldGlobals();
   check(
-    'S1 별 ON 이 OFF 보다 밝은 픽셀 비율 증가 (별/은하수 가시)',
-    onStats.ratio > offStats.ratio,
-    `ON=${(onStats.ratio * 100).toFixed(2)}% > OFF=${(offStats.ratio * 100).toFixed(2)}%`,
+    'S6 전역 노출 — __isSoftwareRenderer / __starfieldVisible 정의됨',
+    g.isSoftwareRenderer !== null && g.starfieldVisible !== null,
+    `isSoftwareRenderer=${g.isSoftwareRenderer}, starfieldVisible=${g.starfieldVisible}`,
   );
-}
+  const isSoftwareEnv = g.isSoftwareRenderer === true;
+  if (isSoftwareEnv) {
+    // CI swiftshader (headless 플래그 0) — 별 비활성 + mesh 미생성이 정상 (fps 무회귀 핵심 제약).
+    check(
+      'S6 software 환경 (CI swiftshader) — __starfieldVisible=false (별 비활성, fps 무회귀)',
+      g.starfieldVisible === false,
+      `starfieldVisible=${g.starfieldVisible}`,
+    );
+    const swMesh = await page.evaluate(() => {
+      const solar = window.__solarScene;
+      let scene = solar?.scene;
+      if (!scene) scene = solar?.meshes?.values?.().next?.().value?.getScene?.();
+      return { hasStarfield: !!scene?.meshes?.find?.((m) => m.name === 'starfield') };
+    });
+    check(
+      'S6 software 환경 — starfield mesh 미생성 (별 fragment shader 부하 0)',
+      swMesh.hasStarfield === false,
+    );
+  } else {
+    // 하드웨어 GPU — 별 활성 (회귀 해소: WebGPU 미지원 하드웨어 가속 PC 포함).
+    check(
+      'S6 하드웨어 환경 — __starfieldVisible=true (별 활성, 회귀 해소)',
+      g.starfieldVisible === true,
+      `starfieldVisible=${g.starfieldVisible}`,
+    );
+  }
 
-// ─── S2~S5: mesh 의존 (하드웨어 환경 전용) ──────────────────────────────────────
-if (isSoftwareEnv) {
-  skip(
-    'S2~S5 (floating-origin / 회전 / ?stars=off / picking)',
-    'software 환경 — starfield mesh 미생성',
-  );
-} else {
-  await runMeshDependentScenarios();
-}
+  // ─── S1: 별 가시 (ON vs OFF 대비) ──────────────────────────────────────────────
+  // #745 — software 환경은 별 비활성이 정상이라 mesh 의존 S1~S5 는 SKIP (S6 가 software 게이트 검증).
+  console.log('\n[S1] 별 가시 — starfield ON 화면이 OFF (단색) 보다 밝은 픽셀 보유');
+  if (isSoftwareEnv) {
+    skip('S1 별 가시', 'software 환경 (별 비활성 정상) — S6 software 게이트가 대체 검증');
+  } else {
+    await page.goto(`${baseUrl}/?stars=off`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const offStats = await brightPixelStats('s1-stars-off');
+    await page.goto(`${baseUrl}/?stars=on`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const onStats = await brightPixelStats('s1-stars-on');
+    check(
+      'S1 별 ON 이 OFF 보다 밝은 픽셀 비율 증가 (별/은하수 가시)',
+      onStats.ratio > offStats.ratio,
+      `ON=${(onStats.ratio * 100).toFixed(2)}% > OFF=${(offStats.ratio * 100).toFixed(2)}%`,
+    );
+  }
 
-await finishAndReport();
+  // ─── S2~S5: mesh 의존 (하드웨어 환경 전용) ──────────────────────────────────────
+  if (isSoftwareEnv) {
+    skip(
+      'S2~S5 (floating-origin / 회전 / ?stars=off / picking)',
+      'software 환경 — starfield mesh 미생성',
+    );
+  } else {
+    await runMeshDependentScenarios();
+  }
+
+  // 콘솔 에러 점검은 **브라우저가 닫히기 전** 수행 — 원 `finishAndReport()` 의 출력 순서
+  // (콘솔 에러 check → close → 리포트) 를 그대로 보존한다.
+  check('콘솔 에러 없음', errs.length === 0, errs.slice(0, 3).join(' | '));
+});
+
+reportAndExit();
 
 /** S2~S5 — starfield mesh 존재 전제 (하드웨어 환경 전용). #745 software 환경에선 호출 안 함. */
 async function runMeshDependentScenarios() {
@@ -300,13 +317,14 @@ async function runMeshDependentScenarios() {
   );
 }
 
-/** 콘솔 에러 점검 + 브라우저 종료 + 결과 리포트 + exit code. */
-async function finishAndReport() {
-  // ─── 콘솔 에러 ──────────────────────────────────────────────────────────────
-  check('콘솔 에러 없음', errs.length === 0, errs.slice(0, 3).join(' | '));
-
-  await browser.close();
-
+/**
+ * 결과 리포트 + exit code.
+ *
+ * #940 — 원래는 `finishAndReport()` 가 콘솔 에러 점검 + `browser.close()` 까지 겸했다.
+ * 브라우저 종료는 `withBrowser` 가, 콘솔 에러 점검은 콜백 말미가 담당하도록 분리했다
+ * (`process.exit` 을 콜백 안에서 호출하면 Node 가 즉시 종료해 close 에 도달하지 못한다).
+ */
+function reportAndExit() {
   const failed = out.filter((o) => !o.p);
   console.log(`\n결과: ${out.length - failed.length}/${out.length} PASS`);
   console.log(`스크린샷: ${shotDir}`);
