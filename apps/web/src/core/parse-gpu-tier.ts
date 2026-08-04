@@ -28,7 +28,7 @@ export function parseGpuTier(urlParam: string | null | undefined): GpuTier | 'au
     return normalized as GpuTier;
   }
   // 알 수 없는 값 — 기존 parse-* 패턴과 동일한 폴백 + warn.
-   
+
   console.warn(`[parse-gpu-tier] 알 수 없는 ?gpu=${urlParam} — 'auto' 로 폴백`);
   return 'auto';
 }

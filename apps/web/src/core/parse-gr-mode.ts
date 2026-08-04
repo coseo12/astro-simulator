@@ -30,7 +30,7 @@ export function parseGrMode(urlParam: string | null | undefined): GrMode {
   }
   if (normalized === 'eih') return 'eih';
   // 알 수 없는 값 — parseIntegratorKind 와 동일한 폴백 + warn.
-   
+
   console.warn(`[parse-gr-mode] 알 수 없는 ?gr=${urlParam} — 'off'로 폴백`);
   return 'off';
 }
