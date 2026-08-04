@@ -27,7 +27,7 @@
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -384,7 +384,6 @@ async function main() {
   console.log('\n=== #380 줌 freeze + jitter 회귀 가드 (Option D+G8a 4 가드) ===');
   console.log(`  base URL: ${BASE_URL}`);
 
-  const browser = await chromium.launch({ headless: true });
   const fullResult = {
     timestamp: new Date().toISOString(),
     baseUrl: BASE_URL,
@@ -392,7 +391,9 @@ async function main() {
   };
   let allPass = true;
 
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     fullResult.scenarios.s1 = await scenarioS1Wall(browser);
     if (!fullResult.scenarios.s1.pass) allPass = false;
 
@@ -404,9 +405,7 @@ async function main() {
 
     fullResult.scenarios.s4 = await scenarioS4FreezeFreeFly(browser);
     if (!fullResult.scenarios.s4.pass) allPass = false;
-  } finally {
-    await browser.close();
-  }
+  });
 
   if (flags.update) {
     fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });

@@ -56,7 +56,7 @@
  * dev 빌드 의존: `window.__simStore` / `window.__solarScene` / `window.__simCore` (sim-canvas.tsx).
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
@@ -719,10 +719,11 @@ async function verifyScenarioPresetsGuards(browser) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
   let allPass = true;
 
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     const { context, page } = await setupPage(browser);
 
     console.log('\n=== #402 R-Phase Allowlist 가드 회귀 검증 ===\n');
@@ -805,9 +806,7 @@ async function main() {
         allPass = false;
       }
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   console.log('\n=== 최종 요약 ===');
   console.log(`  overall: ${allPass ? 'PASS' : 'FAIL'}`);

@@ -36,6 +36,7 @@
  */
 
 import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PNG } from 'pngjs';
@@ -328,72 +329,76 @@ const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
     return;
   }
 
-  const browser = await launch();
-  try {
-    if (MODE === 'others') {
-      console.log('=== mars/jupiter/moon 결정적 캡처 (분기 격리 diff 용) ===');
-      for (const id of OTHER_BODIES) {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  //   `launch()` 는 chrome 채널 부재 시 chromium 폴백이라 옵션 조립만으로 표현 불가 →
+  //   launcher 주입 seam 으로 그대로 넘긴다 (launch 인자 무변경 = 극관/biome 픽셀 측정 축 보존).
+  await withBrowser(
+    {},
+    async (browser) => {
+      if (MODE === 'others') {
+        console.log('=== mars/jupiter/moon 결정적 캡처 (분기 격리 diff 용) ===');
+        for (const id of OTHER_BODIES) {
+          const { context, page, consoleErrors } = await setupPage(
+            browser,
+            `?gpu=a&focus=${id}&lod=auto&rotate=off&orbits=off`,
+          );
+          await captureBody(page, id, `qa-783-${id}`);
+          console.log(`  ${id} 캡처 완료 (err=${consoleErrors.length})`);
+          await context.close();
+        }
+        return;
+      }
+
+      // MODE=dod — DoD 측정 (ON vs OFF).
+      const out = {};
+      for (const [label, extra] of [
+        ['on', ''],
+        ['off', '&surface=off'],
+      ]) {
         const { context, page, consoleErrors } = await setupPage(
           browser,
-          `?gpu=a&focus=${id}&lod=auto&rotate=off&orbits=off`,
+          `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off${extra}`,
         );
-        await captureBody(page, id, `qa-783-${id}`);
-        console.log(`  ${id} 캡처 완료 (err=${consoleErrors.length})`);
+        // 적도면 시점 (beta=π/2) — 기본 beta 1.2566 (북쪽 18° 상방) 은 남극이 실루엣 뒤로 숨어
+        // 남측 밴드가 저위도를 비춘다 (실측 남측 whiteness 1.6% vs 북측 72.7%). 적도면 시점에서
+        // 양극이 실루엣 상/하단에 위치 → 화면 dy/R = sin(위도) 정확 매핑 (§A3.2-5 결정적 측정).
+        await page.evaluate(() => {
+          window.__simCore.scene.activeCamera.beta = Math.PI / 2;
+        });
+        await page.waitForTimeout(600);
+        const buf = await captureBody(page, 'earth', `qa-783-earth-${label}`);
+        const m = await measureEarth(page, buf);
+        out[label] = { ...m, consoleErrors: consoleErrors.length };
+        console.log(`\n=== earth surface=${label} ===`);
+        console.log(JSON.stringify(m, null, 2));
+        if (consoleErrors.length) console.log(`  ↳ console errors: ${consoleErrors.length}`);
         await context.close();
       }
-      return;
-    }
 
-    // MODE=dod — DoD 측정 (ON vs OFF).
-    const out = {};
-    for (const [label, extra] of [
-      ['on', ''],
-      ['off', '&surface=off'],
-    ]) {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off${extra}`,
+      // 판정 (§A3.5 산식).
+      const on = out.on,
+        off = out.off;
+      const capPass = (side) =>
+        on[side].whiteDayPct !== null &&
+        on[side].whiteDayPct >= 50 &&
+        (off[side].whiteDayPct === null || on[side].whiteDayPct > off[side].whiteDayPct);
+      const dod1 = capPass('north') && capPass('south');
+      const dod2 = on.eqGShare !== null && on.midGShare !== null && on.eqGShare > on.midGShare;
+      const dod3 = on.magenta === 0;
+      const dod4 = on.nightPolarLum < on.dayPolarLum / 3;
+      console.log('\n=== 판정 (§A3.5) ===');
+      console.log(
+        `DoD 1 극관(낮면 남북): N ${on.north.whiteDayPct}% / S ${on.south.whiteDayPct}% (≥50, OFF N ${off.north.whiteDayPct}% / S ${off.south.whiteDayPct}%) → ${dod1 ? 'PASS' : 'FAIL'}`,
       );
-      // 적도면 시점 (beta=π/2) — 기본 beta 1.2566 (북쪽 18° 상방) 은 남극이 실루엣 뒤로 숨어
-      // 남측 밴드가 저위도를 비춘다 (실측 남측 whiteness 1.6% vs 북측 72.7%). 적도면 시점에서
-      // 양극이 실루엣 상/하단에 위치 → 화면 dy/R = sin(위도) 정확 매핑 (§A3.2-5 결정적 측정).
-      await page.evaluate(() => {
-        window.__simCore.scene.activeCamera.beta = Math.PI / 2;
-      });
-      await page.waitForTimeout(600);
-      const buf = await captureBody(page, 'earth', `qa-783-earth-${label}`);
-      const m = await measureEarth(page, buf);
-      out[label] = { ...m, consoleErrors: consoleErrors.length };
-      console.log(`\n=== earth surface=${label} ===`);
-      console.log(JSON.stringify(m, null, 2));
-      if (consoleErrors.length) console.log(`  ↳ console errors: ${consoleErrors.length}`);
-      await context.close();
-    }
-
-    // 판정 (§A3.5 산식).
-    const on = out.on,
-      off = out.off;
-    const capPass = (side) =>
-      on[side].whiteDayPct !== null &&
-      on[side].whiteDayPct >= 50 &&
-      (off[side].whiteDayPct === null || on[side].whiteDayPct > off[side].whiteDayPct);
-    const dod1 = capPass('north') && capPass('south');
-    const dod2 = on.eqGShare !== null && on.midGShare !== null && on.eqGShare > on.midGShare;
-    const dod3 = on.magenta === 0;
-    const dod4 = on.nightPolarLum < on.dayPolarLum / 3;
-    console.log('\n=== 판정 (§A3.5) ===');
-    console.log(
-      `DoD 1 극관(낮면 남북): N ${on.north.whiteDayPct}% / S ${on.south.whiteDayPct}% (≥50, OFF N ${off.north.whiteDayPct}% / S ${off.south.whiteDayPct}%) → ${dod1 ? 'PASS' : 'FAIL'}`,
-    );
-    console.log(
-      `DoD 2 biome: 적도 G-share ${on.eqGShare} (n=${on.eqN}) > 중위도 ${on.midGShare} (n=${on.midN}) → ${dod2 ? 'PASS' : 'FAIL'}`,
-    );
-    console.log(`DoD 3 마젠타: ${on.magenta} px → ${dod3 ? 'PASS' : 'FAIL'}`);
-    console.log(
-      `DoD 4 극 휘도: 밤면 ${on.nightPolarLum} < 낮면 ${on.dayPolarLum}/3=${(on.dayPolarLum / 3).toFixed(1)} → ${dod4 ? 'PASS' : 'FAIL'}`,
-    );
-    if (!(dod1 && dod2 && dod3 && dod4)) process.exitCode = 1;
-  } finally {
-    await browser.close();
-  }
+      console.log(
+        `DoD 2 biome: 적도 G-share ${on.eqGShare} (n=${on.eqN}) > 중위도 ${on.midGShare} (n=${on.midN}) → ${dod2 ? 'PASS' : 'FAIL'}`,
+      );
+      console.log(`DoD 3 마젠타: ${on.magenta} px → ${dod3 ? 'PASS' : 'FAIL'}`);
+      console.log(
+        `DoD 4 극 휘도: 밤면 ${on.nightPolarLum} < 낮면 ${on.dayPolarLum}/3=${(on.dayPolarLum / 3).toFixed(1)} → ${dod4 ? 'PASS' : 'FAIL'}`,
+      );
+      if (!(dod1 && dod2 && dod3 && dod4)) process.exitCode = 1;
+    },
+    { launch },
+  );
 })();

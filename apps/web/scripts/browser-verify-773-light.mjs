@@ -31,6 +31,7 @@
  */
 
 import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -300,54 +301,61 @@ async function launch() {
 }
 
 (async () => {
-  const browser = await launch();
   const out = { surfaceOn: {}, surfaceOff: {}, plain: {}, consoleErrors: {}, rotWarns: {} };
-  try {
-    console.log('\n=== DoD 1+2+4+6 — 표면 셰이더 행성 (surface ON, 기본) ===');
-    for (const { id, type } of SURFACE_BODIES) {
-      const { context, page, consoleErrors, consoleWarns } = await setupPage(
-        browser,
-        `?gpu=a&focus=${id}&lod=auto`,
-      );
-      const m = await measureLight(page, id, `qa-773-on-${id}`);
-      out.surfaceOn[id] = { type, ...m };
-      out.consoleErrors[`on-${id}`] = consoleErrors.length;
-      out.rotWarns[`on-${id}`] = consoleWarns.filter((w) => w.includes('회전 non-zero')).length;
-      console.log(
-        `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct} land/ocean=${m.landCount}/${m.oceanCount} err=${consoleErrors.length}`,
-      );
-      if (consoleErrors.length)
-        console.log(`     ↳ errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
-      await context.close();
-    }
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  //   `launch()` 는 chrome 채널 부재 시 chromium 폴백이라 옵션 조립만으로 표현 불가 →
+  //   launcher 주입 seam 으로 그대로 넘긴다 (launch 인자 무변경 = 광원 픽셀 측정 축 보존).
+  await withBrowser(
+    {},
+    async (browser) => {
+      console.log('\n=== DoD 1+2+4+6 — 표면 셰이더 행성 (surface ON, 기본) ===');
+      for (const { id, type } of SURFACE_BODIES) {
+        const { context, page, consoleErrors, consoleWarns } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto`,
+        );
+        const m = await measureLight(page, id, `qa-773-on-${id}`);
+        out.surfaceOn[id] = { type, ...m };
+        out.consoleErrors[`on-${id}`] = consoleErrors.length;
+        out.rotWarns[`on-${id}`] = consoleWarns.filter((w) => w.includes('회전 non-zero')).length;
+        console.log(
+          `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct} land/ocean=${m.landCount}/${m.oceanCount} err=${consoleErrors.length}`,
+        );
+        if (consoleErrors.length)
+          console.log(`     ↳ errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
+        await context.close();
+      }
 
-    console.log('\n=== 단색 행성 (baseline — terminator/대비비 기준) ===');
-    for (const { id } of PLAIN_BODIES) {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=${id}&lod=auto`,
-      );
-      const m = await measureLight(page, id, `qa-773-plain-${id}`);
-      out.plain[id] = m;
-      console.log(
-        `  ${id.padEnd(8)} contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} purple%=${m.purplePct} err=${consoleErrors.length}`,
-      );
-      await context.close();
-    }
+      console.log('\n=== 단색 행성 (baseline — terminator/대비비 기준) ===');
+      for (const { id } of PLAIN_BODIES) {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto`,
+        );
+        const m = await measureLight(page, id, `qa-773-plain-${id}`);
+        out.plain[id] = m;
+        console.log(
+          `  ${id.padEnd(8)} contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} purple%=${m.purplePct} err=${consoleErrors.length}`,
+        );
+        await context.close();
+      }
 
-    console.log('\n=== DoD 5 — ?surface=off 대조 (낮면 hfEntropy ON>OFF) ===');
-    for (const { id, type } of SURFACE_BODIES) {
-      const { context, page } = await setupPage(browser, `?gpu=a&focus=${id}&lod=auto&surface=off`);
-      const m = await measureLight(page, id, `qa-773-off-${id}`);
-      out.surfaceOff[id] = { type, ...m };
-      console.log(
-        `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct}`,
-      );
-      await context.close();
-    }
-  } finally {
-    await browser.close();
-  }
+      console.log('\n=== DoD 5 — ?surface=off 대조 (낮면 hfEntropy ON>OFF) ===');
+      for (const { id, type } of SURFACE_BODIES) {
+        const { context, page } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto&surface=off`,
+        );
+        const m = await measureLight(page, id, `qa-773-off-${id}`);
+        out.surfaceOff[id] = { type, ...m };
+        console.log(
+          `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct}`,
+        );
+        await context.close();
+      }
+    },
+    { launch },
+  );
   console.log('\n=== JSON ===');
   console.log(JSON.stringify(out, null, 2));
 

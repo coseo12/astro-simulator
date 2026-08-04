@@ -32,7 +32,7 @@
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -298,7 +298,6 @@ async function run9CellMatrix(browser) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
   const fullResult = {
     timestamp: new Date().toISOString(),
     baseUrl: BASE_URL,
@@ -306,13 +305,13 @@ async function main() {
   };
   let allPass = true;
 
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     const matrix = await run9CellMatrix(browser);
     fullResult.matrix = matrix;
     if (!matrix.pass) allPass = false;
-  } finally {
-    await browser.close();
-  }
+  });
 
   console.log('\n=== 최종 요약 ===');
   const passCount = fullResult.matrix.cellResults.filter((c) => c.verdict.pass).length;

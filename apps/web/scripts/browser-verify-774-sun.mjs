@@ -19,6 +19,7 @@
  */
 
 import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -247,63 +248,69 @@ function judgeRadial(radial) {
 }
 
 (async () => {
-  const browser = await launch();
   const out = { sunOn: null, sunOff: null, planets: {}, consoleErrors: {} };
-  try {
-    console.log('\n=== DoD 1·2·3 — ?focus=sun (surface ON, 기본) ===');
-    {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=sun&lod=auto`,
-      );
-      const m = await measureSunDisk(page, 'sun', 'sun-on');
-      out.sunOn = m;
-      out.consoleErrors['sun-on'] = consoleErrors;
-      const judge = m.radial ? judgeRadial(m.radial) : { ok: false, reason: m.error };
-      out.sunOn.judge = judge;
-      console.log(`  granulation: hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} area=${m.area}`);
-      console.log(`  radial lum : ${m.radial?.map((s) => s.lum).join(' ')}`);
-      console.log(`  radial B/R : ${m.radial?.map((s) => s.bOverR).join(' ')}`);
-      console.log(
-        `  limb judge : edge/center=${judge.edgeCenterRatio} (<0.85?) monoViol=${judge.monotonicViolations} B/R center=${judge.bOverRCenter} edge=${judge.bOverREdge} → ${judge.ok ? 'PASS' : 'FAIL'}`,
-      );
-      if (consoleErrors.length)
-        console.log(`  console errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
-      await context.close();
-    }
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  //   `launch()` 는 chrome 채널 부재 시 chromium 폴백이라 옵션 조립만으로 표현 불가 →
+  //   launcher 주입 seam 으로 그대로 넘긴다 (launch 인자 무변경 = granulation 픽셀 측정 축 보존).
+  await withBrowser(
+    {},
+    async (browser) => {
+      console.log('\n=== DoD 1·2·3 — ?focus=sun (surface ON, 기본) ===');
+      {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=sun&lod=auto`,
+        );
+        const m = await measureSunDisk(page, 'sun', 'sun-on');
+        out.sunOn = m;
+        out.consoleErrors['sun-on'] = consoleErrors;
+        const judge = m.radial ? judgeRadial(m.radial) : { ok: false, reason: m.error };
+        out.sunOn.judge = judge;
+        console.log(
+          `  granulation: hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} area=${m.area}`,
+        );
+        console.log(`  radial lum : ${m.radial?.map((s) => s.lum).join(' ')}`);
+        console.log(`  radial B/R : ${m.radial?.map((s) => s.bOverR).join(' ')}`);
+        console.log(
+          `  limb judge : edge/center=${judge.edgeCenterRatio} (<0.85?) monoViol=${judge.monotonicViolations} B/R center=${judge.bOverRCenter} edge=${judge.bOverREdge} → ${judge.ok ? 'PASS' : 'FAIL'}`,
+        );
+        if (consoleErrors.length)
+          console.log(`  console errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
+        await context.close();
+      }
 
-    console.log('\n=== DoD 4 — ?focus=sun&surface=off 단색 복귀 ===');
-    {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=sun&lod=auto&surface=off`,
-      );
-      const m = await measureSunDisk(page, 'sun', 'sun-off');
-      out.sunOff = m;
-      out.consoleErrors['sun-off'] = consoleErrors;
-      console.log(
-        `  hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} area=${m.area}`,
-      );
-      console.log(`  radial lum : ${m.radial?.map((s) => s.lum).join(' ')}`);
-      await context.close();
-    }
+      console.log('\n=== DoD 4 — ?focus=sun&surface=off 단색 복귀 ===');
+      {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=sun&lod=auto&surface=off`,
+        );
+        const m = await measureSunDisk(page, 'sun', 'sun-off');
+        out.sunOff = m;
+        out.consoleErrors['sun-off'] = consoleErrors;
+        console.log(
+          `  hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} area=${m.area}`,
+        );
+        console.log(`  radial lum : ${m.radial?.map((s) => s.lum).join(' ')}`);
+        await context.close();
+      }
 
-    console.log('\n=== DoD 4 — planet 4종 무회귀 (surface ON) ===');
-    for (const id of ['earth', 'mars', 'jupiter', 'moon']) {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=${id}&lod=auto`,
-      );
-      const m = await measureSunDisk(page, id, `planet-${id}`);
-      out.planets[id] = { hfEnergy: m.hfEnergy, hfEntropy: m.hfEntropy, area: m.area };
-      console.log(
-        `  ${id.padEnd(8)} hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} area=${m.area} err=${consoleErrors.length}`,
-      );
-      await context.close();
-    }
-  } finally {
-    await browser.close();
-  }
+      console.log('\n=== DoD 4 — planet 4종 무회귀 (surface ON) ===');
+      for (const id of ['earth', 'mars', 'jupiter', 'moon']) {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto`,
+        );
+        const m = await measureSunDisk(page, id, `planet-${id}`);
+        out.planets[id] = { hfEnergy: m.hfEnergy, hfEntropy: m.hfEntropy, area: m.area };
+        console.log(
+          `  ${id.padEnd(8)} hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} area=${m.area} err=${consoleErrors.length}`,
+        );
+        await context.close();
+      }
+    },
+    { launch },
+  );
 
   console.log('\n=== JSON ===');
   console.log(JSON.stringify(out, null, 2));
