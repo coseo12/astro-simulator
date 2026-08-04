@@ -33,7 +33,7 @@
  *   - 출력: JSON `pxRatios` / `diskAreas` / `guardResult` 필드
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
@@ -721,31 +721,44 @@ async function main() {
   ensureDirSync(DIFF_DIR);
 
   diag('main: chromium.launch({ headless: true })');
-  const browser = await chromium.launch({ headless: true });
-  diag('main: chromium launched');
   let overallPass = true;
 
-  try {
-    if (flags.measurePxRatio) {
-      // #373 ADR §결정 2 §5 — px ratio 측정 전용 흐름.
-      overallPass = await runPxRatioMeasurement(browser);
-    } else {
-      const targets = flags.viewportFilter
-        ? R1_VIEWPORTS.filter((v) => v.id === flags.viewportFilter)
-        : R1_VIEWPORTS;
-      if (targets.length === 0) {
-        console.error(`[r1-guard] --viewport=${flags.viewportFilter} 매칭 viewport 없음.`);
-        process.exit(2);
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  //
+  // `--viewport` 미매칭 조기 종료는 콜백 **안에서** `process.exit` 하면 안 된다 — Node 가
+  // 즉시 종료해 `finally` 의 `close()` 에 도달하지 못하고 브라우저가 잔존한다 (본 파일은
+  // #606 freeze/deadlock 이력이 있어 잔존 위험이 가장 큰 가드다). 콜백은 sentinel 을 반환하고
+  // 실제 종료는 호출부에서 한다 (#939 `verify-fps-baseline` 전례와 동형).
+  //
+  // 내부 `try/finally` 는 **진단 로그 순서 보존 전용** — close 자체는 `withBrowser` 가 한다.
+  const outcome = await withBrowser({ headless: true }, async (browser) => {
+    diag('main: chromium launched');
+    try {
+      if (flags.measurePxRatio) {
+        // #373 ADR §결정 2 §5 — px ratio 측정 전용 흐름.
+        overallPass = await runPxRatioMeasurement(browser);
+      } else {
+        const targets = flags.viewportFilter
+          ? R1_VIEWPORTS.filter((v) => v.id === flags.viewportFilter)
+          : R1_VIEWPORTS;
+        if (targets.length === 0) {
+          console.error(`[r1-guard] --viewport=${flags.viewportFilter} 매칭 viewport 없음.`);
+          return 'no-viewport';
+        }
+        for (const viewport of targets) {
+          const { pass } = await runForViewport(browser, viewport);
+          if (!pass) overallPass = false;
+        }
       }
-      for (const viewport of targets) {
-        const { pass } = await runForViewport(browser, viewport);
-        if (!pass) overallPass = false;
-      }
+    } finally {
+      diag('main: browser.close()');
     }
-  } finally {
-    diag('main: browser.close()');
-    await browser.close();
-  }
+    return 'ran';
+  });
+
+  // 원 동작 보존 — `--viewport` 미매칭은 요약 출력 없이 exit 2.
+  if (outcome === 'no-viewport') process.exit(2);
 
   if (!flags.measurePxRatio) {
     console.log('\n=== 요약 ===');

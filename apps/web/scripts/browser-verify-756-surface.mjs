@@ -24,6 +24,7 @@
  */
 
 import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -252,7 +253,6 @@ async function launch() {
 }
 
 (async () => {
-  const browser = await launch();
   const out = {
     surfaceOn: {},
     surfaceOff: {},
@@ -261,96 +261,103 @@ async function launch() {
     tierC: {},
     consoleErrors: {},
   };
-  try {
-    console.log('\n=== DoD 1 — 4 body 표면 디테일 (surface ON, 기본) ===');
-    for (const { id, type } of SURFACE_BODIES) {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=${id}&lod=auto`,
-      );
-      const m = await measureDisk(page, id, `surface-on-${id}`);
-      out.surfaceOn[id] = { type, ...m };
-      out.consoleErrors[`on-${id}`] = consoleErrors.length;
-      console.log(
-        `  ${id.padEnd(8)} [${type}] hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} uniqColors=${m.uniqueColors} area=${m.area} err=${consoleErrors.length}`,
-      );
-      if (consoleErrors.length)
-        console.log(`     ↳ console errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
-      await context.close();
-    }
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  //   본 파일의 `launch()` 는 chrome 채널 부재 시 chromium 으로 **폴백** 하므로 옵션 조립만으로는
+  //   표현 불가하다. 그래서 `launch` 를 헬퍼의 launcher 주입 seam 으로 그대로 넘긴다 —
+  //   launch 인자가 한 글자도 바뀌지 않아 픽셀 측정(hfEntropy) 의 렌더러 축이 보존된다.
+  //   (`buildLaunchOptions` 경유 금지 — env `BROWSER_VERIFY_GPU`/`HEADFUL` 이 암묵 개입한다.)
+  await withBrowser(
+    {},
+    async (browser) => {
+      console.log('\n=== DoD 1 — 4 body 표면 디테일 (surface ON, 기본) ===');
+      for (const { id, type } of SURFACE_BODIES) {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto`,
+        );
+        const m = await measureDisk(page, id, `surface-on-${id}`);
+        out.surfaceOn[id] = { type, ...m };
+        out.consoleErrors[`on-${id}`] = consoleErrors.length;
+        console.log(
+          `  ${id.padEnd(8)} [${type}] hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} uniqColors=${m.uniqueColors} area=${m.area} err=${consoleErrors.length}`,
+        );
+        if (consoleErrors.length)
+          console.log(`     ↳ console errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
+        await context.close();
+      }
 
-    console.log('\n=== DoD 5 — ?surface=off 단색 복귀 대조 ===');
-    for (const { id, type } of SURFACE_BODIES) {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=${id}&lod=auto&surface=off`,
-      );
-      const m = await measureDisk(page, id, `surface-off-${id}`);
-      out.surfaceOff[id] = { type, ...m };
-      out.consoleErrors[`off-${id}`] = consoleErrors.length;
-      console.log(
-        `  ${id.padEnd(8)} [${type}] hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} uniqColors=${m.uniqueColors} area=${m.area} err=${consoleErrors.length}`,
-      );
-      await context.close();
-    }
+      console.log('\n=== DoD 5 — ?surface=off 단색 복귀 대조 ===');
+      for (const { id, type } of SURFACE_BODIES) {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto&surface=off`,
+        );
+        const m = await measureDisk(page, id, `surface-off-${id}`);
+        out.surfaceOff[id] = { type, ...m };
+        out.consoleErrors[`off-${id}`] = consoleErrors.length;
+        console.log(
+          `  ${id.padEnd(8)} [${type}] hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} uniqColors=${m.uniqueColors} area=${m.area} err=${consoleErrors.length}`,
+        );
+        await context.close();
+      }
 
-    console.log('\n=== DoD 2 — 무회귀 (미등록 body 단색, surface ON) ===');
-    for (const { id } of PLAIN_BODIES) {
-      const { context, page, consoleErrors } = await setupPage(
-        browser,
-        `?gpu=a&focus=${id}&lod=auto`,
-      );
-      const m = await measureDisk(page, id, `plain-${id}`);
-      out.plain[id] = m;
-      console.log(
-        `  ${id.padEnd(8)} hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} uniqColors=${m.uniqueColors} area=${m.area} err=${consoleErrors.length}`,
-      );
-      await context.close();
-    }
+      console.log('\n=== DoD 2 — 무회귀 (미등록 body 단색, surface ON) ===');
+      for (const { id } of PLAIN_BODIES) {
+        const { context, page, consoleErrors } = await setupPage(
+          browser,
+          `?gpu=a&focus=${id}&lod=auto`,
+        );
+        const m = await measureDisk(page, id, `plain-${id}`);
+        out.plain[id] = m;
+        console.log(
+          `  ${id.padEnd(8)} hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} stddev=${m.stddev} uniqColors=${m.uniqueColors} area=${m.area} err=${consoleErrors.length}`,
+        );
+        await context.close();
+      }
 
-    console.log('\n=== DoD 3 — LOD mid 전환 표면 연속성 (reviewer 권고 1: cross-fade 팝핑) ===');
-    {
-      const { context, page } = await setupPage(browser, `?gpu=a&focus=earth&lod=auto`);
-      const high = await measureDisk(page, 'earth', 'lod-earth-high');
-      await page.evaluate(() => window.__solarScene?.setLodOverride?.('mid'));
-      await page.waitForTimeout(100); // fade 중간 프레임 (200ms 윈도우)
-      const midFade = await measureDisk(page, 'earth', 'lod-earth-mid-fade100');
-      await page.waitForTimeout(400); // fade 정착
-      const midSettled = await measureDisk(page, 'earth', 'lod-earth-mid-settled');
-      out.lodMid = { high, midFade, midSettled };
-      console.log(
-        `  earth high   : hfEnergy=${high.hfEnergy} hfEntropy=${high.hfEntropy} area=${high.area}`,
-      );
-      console.log(
-        `  earth midFade: hfEnergy=${midFade.hfEnergy} hfEntropy=${midFade.hfEntropy} area=${midFade.area}`,
-      );
-      console.log(
-        `  earth midSet : hfEnergy=${midSettled.hfEnergy} hfEntropy=${midSettled.hfEntropy} area=${midSettled.area}`,
-      );
-      await context.close();
-    }
+      console.log('\n=== DoD 3 — LOD mid 전환 표면 연속성 (reviewer 권고 1: cross-fade 팝핑) ===');
+      {
+        const { context, page } = await setupPage(browser, `?gpu=a&focus=earth&lod=auto`);
+        const high = await measureDisk(page, 'earth', 'lod-earth-high');
+        await page.evaluate(() => window.__solarScene?.setLodOverride?.('mid'));
+        await page.waitForTimeout(100); // fade 중간 프레임 (200ms 윈도우)
+        const midFade = await measureDisk(page, 'earth', 'lod-earth-mid-fade100');
+        await page.waitForTimeout(400); // fade 정착
+        const midSettled = await measureDisk(page, 'earth', 'lod-earth-mid-settled');
+        out.lodMid = { high, midFade, midSettled };
+        console.log(
+          `  earth high   : hfEnergy=${high.hfEnergy} hfEntropy=${high.hfEntropy} area=${high.area}`,
+        );
+        console.log(
+          `  earth midFade: hfEnergy=${midFade.hfEnergy} hfEntropy=${midFade.hfEntropy} area=${midFade.area}`,
+        );
+        console.log(
+          `  earth midSet : hfEnergy=${midSettled.hfEnergy} hfEntropy=${midSettled.hfEntropy} area=${midSettled.area}`,
+        );
+        await context.close();
+      }
 
-    console.log('\n=== DoD 4 — tier-c (?gpu=c) 단색 ===');
-    {
-      // #759 판정 신설 시 발견한 기존 시나리오 결함 정정 (2건, 실측):
-      //  (1) `?lod=auto` 를 붙이면 URL `?lod=` 우선 정책 (sim-canvas.tsx #677) 이 tier-c
-      //      `forceOverride:'low'` 를 건너뛰어 표면 셰이더가 그대로 진입 (lodStats high=2,
-      //      hfEntropy 1.399 ≈ ON) → lod 파라미터 제거.
-      //  (2) `focus=earth` 시 #546 satellite visibility guard 가 moon 을 low→mid 승격 (override
-      //      이후 후처리 — 문서화된 설계) → mid=1 로 전수 low 판정 불가 → default view (no focus,
-      //      가드 비활성 Q2=(a)) 에서 forceOverride 배선을 검증.
-      const { context, page } = await setupPage(browser, `?gpu=c`);
-      const lod = await getLodStats(page);
-      const m = await measureDisk(page, 'earth', 'tierc-earth');
-      out.tierC = { ...m, lod };
-      console.log(
-        `  earth tier-c : hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} area=${m.area} lodStats=${JSON.stringify(lod.stats)}`,
-      );
-      await context.close();
-    }
-  } finally {
-    await browser.close();
-  }
+      console.log('\n=== DoD 4 — tier-c (?gpu=c) 단색 ===');
+      {
+        // #759 판정 신설 시 발견한 기존 시나리오 결함 정정 (2건, 실측):
+        //  (1) `?lod=auto` 를 붙이면 URL `?lod=` 우선 정책 (sim-canvas.tsx #677) 이 tier-c
+        //      `forceOverride:'low'` 를 건너뛰어 표면 셰이더가 그대로 진입 (lodStats high=2,
+        //      hfEntropy 1.399 ≈ ON) → lod 파라미터 제거.
+        //  (2) `focus=earth` 시 #546 satellite visibility guard 가 moon 을 low→mid 승격 (override
+        //      이후 후처리 — 문서화된 설계) → mid=1 로 전수 low 판정 불가 → default view (no focus,
+        //      가드 비활성 Q2=(a)) 에서 forceOverride 배선을 검증.
+        const { context, page } = await setupPage(browser, `?gpu=c`);
+        const lod = await getLodStats(page);
+        const m = await measureDisk(page, 'earth', 'tierc-earth');
+        out.tierC = { ...m, lod };
+        console.log(
+          `  earth tier-c : hfEnergy=${m.hfEnergy} hfEntropy=${m.hfEntropy} area=${m.area} lodStats=${JSON.stringify(lod.stats)}`,
+        );
+        await context.close();
+      }
+    },
+    { launch },
+  );
   console.log('\n=== JSON ===');
   console.log(JSON.stringify(out, null, 2));
 

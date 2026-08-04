@@ -41,7 +41,7 @@
  *                                 3중 시뮬(가드 도입 PR DoD)에서 가드 자체 작동 입증용. 정상 운영 미설정.
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const flags = { json: process.argv.slice(2).includes('--json') };
@@ -186,10 +186,11 @@ async function main() {
       `  ⚠️ SIMULATE_RESET_RADIUS_FAULT=${FAULT} (negative 시뮬 — 종료 radius 결함 주입)`,
     );
 
-  const browser = await chromium.launch({ headless: true });
   const result = { timestamp: new Date().toISOString(), baseUrl: BASE_URL, scenarios: {} };
   let allPass = true;
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     result.scenarios.s1 = await runScenario(browser, 'S1', 'io(위성) focus → reset', async (p) => {
       await focus(p, 'io');
     });
@@ -211,9 +212,7 @@ async function main() {
       },
     );
     for (const s of Object.values(result.scenarios)) if (!s.pass) allPass = false;
-  } finally {
-    await browser.close();
-  }
+  });
 
   console.log('\n=== 최종 요약 ===');
   for (const [k, s] of Object.entries(result.scenarios)) {

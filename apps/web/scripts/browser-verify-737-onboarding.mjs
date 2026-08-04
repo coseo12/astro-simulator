@@ -45,7 +45,7 @@
  * 환경변수: BASE_URL (기본 http://localhost:3000)
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const flags = { json: process.argv.slice(2).includes('--json') };
@@ -359,10 +359,11 @@ async function scenarioOtherModalsEscGuard(browser) {
 async function main() {
   console.log('\n=== #737 첫 진입 온보딩 + 조작 가이드 회귀 가드 ===');
   console.log(`  base URL: ${BASE_URL}`);
-  const browser = await chromium.launch({ headless: true });
   const result = { timestamp: new Date().toISOString(), baseUrl: BASE_URL, scenarios: {} };
   let allPass = true;
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     result.scenarios.s1 = await scenarioAutoShow(browser);
     if (!result.scenarios.s1.pass) allPass = false;
     result.scenarios.s2 = await scenarioEscConflict(browser);
@@ -375,9 +376,7 @@ async function main() {
     if (!result.scenarios.s5.pass) allPass = false;
     result.scenarios.s6 = await scenarioOtherModalsEscGuard(browser);
     if (!result.scenarios.s6.pass) allPass = false;
-  } finally {
-    await browser.close();
-  }
+  });
   console.log('\n=== 최종 요약 ===');
   for (const [k, s] of Object.entries(result.scenarios))
     console.log(`  ${k}: ${s.pass ? 'PASS' : 'FAIL'}`);

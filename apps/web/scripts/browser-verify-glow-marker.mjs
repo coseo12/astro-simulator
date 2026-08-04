@@ -30,7 +30,7 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? '';
@@ -200,14 +200,15 @@ async function collectLowVariantState(page) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
   let allPass = true;
   const check = (label, pass, detail) => {
     console.log(`   ${pass ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
     if (!pass) allPass = false;
   };
 
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     console.log('\n=== #675 glow pixel marker 회귀 가드 ===');
     console.log(`BASE_URL=${BASE_URL}\n`);
 
@@ -366,9 +367,7 @@ async function main() {
       );
       await context.close();
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   console.log('\n=== 최종 요약 ===');
   console.log(`  overall: ${allPass ? 'PASS' : 'FAIL'}`);

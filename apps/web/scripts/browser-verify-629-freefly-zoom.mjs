@@ -28,7 +28,7 @@
  * 환경변수: BASE_URL (기본 http://localhost:3000)
  */
 
-import { chromium } from 'playwright';
+import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const args = process.argv.slice(2);
@@ -171,17 +171,16 @@ async function main() {
     `  base URL: ${BASE_URL}  임계: 줌 5틱 누적 rel ≥ ${ZOOM_PERCEPTIBLE_THRESHOLD * 100}%`,
   );
 
-  const browser = await chromium.launch({ headless: true });
   const result = { timestamp: new Date().toISOString(), baseUrl: BASE_URL, scenarios: {} };
   let allPass = true;
-  try {
+  // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
+  // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
+  await withBrowser({ headless: true }, async (browser) => {
     result.scenarios.s1 = await scenarioBaseline(browser);
     if (!result.scenarios.s1.pass) allPass = false;
     result.scenarios.s2 = await scenarioSatellite(browser);
     if (!result.scenarios.s2.pass) allPass = false;
-  } finally {
-    await browser.close();
-  }
+  });
 
   console.log('\n=== 최종 요약 ===');
   for (const [k, s] of Object.entries(result.scenarios)) {
