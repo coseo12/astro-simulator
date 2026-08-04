@@ -4,6 +4,22 @@ name: CI (physics-wasm)
 # Rust/wasm-pack 툴체인과 workspace 테스트 커버리지 가드를 담당한다.
 # harness가 관리하는 ci.yml 과 분리되어, 템플릿 업데이트 시 충돌을 방지한다.
 
+# ── hashFiles silent-skip 정책 (#950) — SSoT 는 ci.yml §hashFiles silent-skip 정책 블록 (#945) ──
+# 요지: **가드 대상 파일의 존재를 실행 조건으로 걸지 않는다.** 부재 시 실행 명령이
+#   ENOENT / 명시 exit 1 로 즉시 FAIL 하는 것이 유일한 정상 동작이다
+#   (CLAUDE.md §가드 설계 원칙 — drift 가드는 fail-fast 만, fallback 분기 금지).
+# 본 파일의 `if: hashFiles(...) != ''` **19곳을 전량 제거**했다. 조건이 참조하던 대상 5종
+#   (rust-toolchain.toml / packages/physics-wasm/Cargo.toml / pnpm-lock.yaml /
+#   scripts/verify-test-coverage.mjs / scripts/verify-iau-data.mjs) 은 `git ls-files`
+#   전수 실측 (2026-08-04) 에서 **전부 tracked** 라 조건이 상시 참이었다 — 즉 "부재" 는
+#   배포 시나리오가 아니라 **가드가 삭제된 회귀**이고, 조용히 스킵하면 CI 가 초록인 채
+#   Rust 툴체인·fmt·clippy·cargo test·vitest 전 경로가 통째로 사라진다
+#   (#840 "CI 통과 ≠ 테스트 실행" 클래스 / #338 영구 silent skip 실사례).
+# 선례 정합: #901/#915 (project-guards.yml 전 스텝) → #885 (ci.yml 기동·정리) →
+#   #945 (ci.yml 전량, 예외 0) → 본 변경 (잔여 워크플로). 동형이며 같은 근거.
+# **예외 0** — 런타임 생성 산출물의 "부재 정상" 은 조건이 아니라 액션 옵션으로 표현한다
+#   (본 파일엔 해당 사례 없음. bench.yml 의 `ignore_empty` 참조).
+
 # 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
 # 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
 # cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만 남김 (포착 100%).
@@ -74,7 +90,6 @@ jobs:
 
       # 모든 워크스페이스에 Vitest 설정 존재 강제 (조용히 스킵되는 테스트 방지)
       - name: verify:test-coverage
-        if: hashFiles('scripts/verify-test-coverage.mjs') != ''
         run: node scripts/verify-test-coverage.mjs
 
       # P10-B-3 #274 — IAU 2015 데이터 회귀 차단 게이트.
@@ -82,7 +97,6 @@ jobs:
       # 벗어나거나 감사 필드 (dataSource / lastVerified / colorSource) 가 누락되면 exit 1.
       # 순수 Node.js (의존성 없음) 이므로 pnpm install 이전 실행 가능.
       - name: verify:iau-data (Fact-First 원칙 §2 공차 게이트)
-        if: hashFiles('scripts/verify-iau-data.mjs') != ''
         run: node scripts/verify-iau-data.mjs
 
       # Rust + WASM 툴체인 (packages/physics-wasm)
@@ -91,7 +105,6 @@ jobs:
       # 추출 실패 시 빈 값 → 명시 exit 1 (fail-fast, fallback 분기 금지 — 가드 설계 원칙).
       - name: Rust 툴체인 채널 추출 (rust-toolchain.toml SSoT)
         id: rust-toolchain
-        if: hashFiles('rust-toolchain.toml') != ''
         run: |
           channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
           if [ -z "${channel}" ]; then
@@ -101,7 +114,6 @@ jobs:
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
 
       - name: Rust 툴체인 설정
-        if: hashFiles('rust-toolchain.toml') != ''
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ steps.rust-toolchain.outputs.channel }}
@@ -110,7 +122,6 @@ jobs:
 
       # Rust 빌드 캐시 — cargo registry + target/ 재사용 (cargo test --release 단축)
       - name: Rust 빌드 캐시
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: packages/physics-wasm
@@ -120,7 +131,6 @@ jobs:
       # ("CI 통과 ≠ 테스트 실행" 교훈의 lint 변형). 테스트 스텝 앞 배치로 빠른 fail.
       # fmt 는 컴파일 불필요 (수 초), clippy 는 rust-cache 재사용. -D warnings 로 경고=실패.
       - name: Rust fmt 게이트 (physics-wasm)
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo fmt --check --manifest-path packages/physics-wasm/Cargo.toml
 
       # #877 — `--all-features` 추가. 기본 feature 만 검사하면 `diagnostics` gated 코드
@@ -130,12 +140,10 @@ jobs:
       # 비용 실측 (냉시작, cargo clean 후): 기본 5.47s vs --all-features 5.05s
       # → 차이는 측정 노이즈 범위 (진단 코드 13개 함수 추가 lint 는 사실상 무비용). 도입.
       - name: Rust clippy 게이트 (physics-wasm, -D warnings, --all-features)
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo clippy --all-targets --all-features --manifest-path packages/physics-wasm/Cargo.toml -- -D warnings
 
       # wasm-pack: cargo install(≈60~70s) → prebuilt 바이너리로 대체
       - name: wasm-pack 설치
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         uses: taiki-e/install-action@v2
         with:
           # #845 — 버전은 workflow top-level env WASM_PACK_VERSION 단일 선언.
@@ -146,7 +154,6 @@ jobs:
       # 2건)는 `#[ignore = "long-integration"]` 로 분리됐다. 빠른 경로는 이를 스킵
       # 하여 PR 피드백 < 5분을 유지한다. 장기 경로는 아래 long-integration job.
       - name: Rust 테스트 (physics-wasm, 빠른 경로)
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --nocapture
 
       # #840 — 단위 테스트 (vitest, 전 워크스페이스 94파일 — shared 1 + core 51 + web 41 + wasm 1 실측) CI 배선.
@@ -159,22 +166,18 @@ jobs:
       # 루트 `pnpm build` (web next build 포함) 를 무조건 수행 — vitest 에 불필요한 비용.
       # 인라인 3스텝 + 표적 빌드로 대체. Node 핀은 .node-version (#666 전수 명시 핀 정합).
       - name: pnpm setup (unit tests)
-        if: hashFiles('pnpm-lock.yaml') != ''
         uses: pnpm/action-setup@v4
 
       - name: Node.js setup (unit tests)
-        if: hashFiles('pnpm-lock.yaml') != ''
         uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
           cache: 'pnpm'
 
       - name: pnpm install (unit tests)
-        if: hashFiles('pnpm-lock.yaml') != ''
         run: pnpm install --frozen-lockfile
 
       - name: workspace 빌드 (wasm → shared → core)
-        if: hashFiles('pnpm-lock.yaml') != ''
         run: |
           pnpm --filter @astro-simulator/physics-wasm build
           pnpm --filter @astro-simulator/shared --filter @astro-simulator/core -r build
@@ -185,7 +188,6 @@ jobs:
       # 합산은 단일 awk (항상 exit 0) — pipefail/bash -e 하에서 단언 경로가 죽지 않도록
       # 명령 치환 내부 파이프라인을 배제한다. 'Tests  N passed' 만 매칭 ('Test Files' 제외).
       - name: 단위 테스트 (vitest) + 실행 수 단언
-        if: hashFiles('pnpm-lock.yaml') != ''
         env:
           NO_COLOR: '1'
         run: |
@@ -223,7 +225,6 @@ jobs:
       # #845 — 툴체인 버전 SSoT = rust-toolchain.toml (verify-and-rust job 과 동형 추출).
       - name: Rust 툴체인 채널 추출 (rust-toolchain.toml SSoT)
         id: rust-toolchain
-        if: hashFiles('rust-toolchain.toml') != ''
         run: |
           channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
           if [ -z "${channel}" ]; then
@@ -233,7 +234,6 @@ jobs:
           echo "channel=${channel}" >> "$GITHUB_OUTPUT"
 
       - name: Rust 툴체인 설정
-        if: hashFiles('rust-toolchain.toml') != ''
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ steps.rust-toolchain.outputs.channel }}
@@ -241,7 +241,6 @@ jobs:
           components: rustfmt, clippy
 
       - name: Rust 빌드 캐시
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: packages/physics-wasm
@@ -254,7 +253,6 @@ jobs:
       # "CI 통과 ≠ 테스트 실행" 의 재발 차단 (#840 실행 수 단언 가드와 동형).
       # `--list` 는 실행 없이 선택만 출력 — release 컴파일은 다음 스텝과 공유되어 추가 비용 ~0.
       - name: 장기 적분 테스트 선택 가드 (long_ 매칭 ≥ 1)
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: |
           set -o pipefail
           cargo test --release --manifest-path packages/physics-wasm/Cargo.toml \
@@ -280,7 +278,6 @@ jobs:
       # 뒤따르는 `long_` 은 libtest 이름 필터 (부분 문자열 매칭) — #877 로 추가.
       # 이로써 diagnostic / scope-deferred `#[ignore]` 는 장기 경로에서 제외된다.
       - name: Rust 장기 적분 테스트 (physics-wasm, long_ ignored only)
-        if: hashFiles('packages/physics-wasm/Cargo.toml') != ''
         run: cargo test --release --manifest-path packages/physics-wasm/Cargo.toml -- --ignored long_ --nocapture
         # 장기 경로 실패는 머지 차단하지 않음 — CI 로그 관찰용.
         continue-on-error: true

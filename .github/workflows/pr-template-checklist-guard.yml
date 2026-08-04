@@ -12,6 +12,12 @@ name: PR Template Checklist Guard
 #
 # 측정 방법 C — 1차 구조 (체크박스 prefix `- [ ]`) + 2차 phrase (키워드 문구) AND.
 # 둘 중 하나라도 hit 하면 PASS, 둘 다 0 → FAIL + actionable 코멘트.
+#
+# ── hashFiles silent-skip 정책 (#950) — SSoT 는 ci.yml §hashFiles silent-skip 정책 블록 (#945) ──
+# 종전 `if: hashFiles('scripts/verify-pr-template-checklist.mjs') != ''` 제거. 해당 스크립트는
+#   tracked 가드 자산 (`git ls-files` 실측 2026-08-04) 이라 "부재" 는 배포 시나리오가 아니라
+#   **가드가 삭제된 회귀**다. 조용히 스킵하면 본 워크플로가 backstop 역할을 잃은 채 초록이 된다
+#   — 즉 #471 (스킬 사전 차단) 우회분을 아무도 막지 않는다. 부재 시 node ENOENT 로 즉시 FAIL.
 
 on:
   pull_request:
@@ -39,7 +45,6 @@ jobs:
           node-version-file: '.node-version'
 
       - name: PR 템플릿 7 체크박스 base 가드
-        if: hashFiles('scripts/verify-pr-template-checklist.mjs') != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           POST_COMMENT: 'true'
