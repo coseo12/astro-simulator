@@ -13,13 +13,17 @@ pnpm-lock.yaml
 # 그래서 cargo/wasm-pack 를 한 번이라도 돌린 작업 트리에서 `format:check` 가 빌드 산출물
 # (`target/.fingerprint/*.json` 등) 89건을 위반으로 보고했다 — 실제 소스 위반 6건이 그 안에
 # 묻혀 백스톱이 사실상 무력했다.
-# **생성물만** 열거한다 (SSoT: packages/physics-wasm/.gitignore 의 동명 3항목).
-# 소스 디렉토리 (src/ · tests/) 는 의도적으로 포함하지 않는다 — 여기에 넓은 glob 을 쓰면
-# 백스톱에 구멍이 생긴다. Rust crate 가 추가되면 이 목록에 한 줄 추가해야 하고, 누락 시
-# CI format:check 가 산출물 위반으로 즉시 시끄러워져 드러난다 (조용한 실패 아님).
-# 경로 열거 대신 **전역 패턴** — 신규 crate/워크스페이스가 추가돼도 같은 누락이 반복되지
-# 않도록 구조적으로 차단한다 (#952 cross-validate 권고 1). tracked 소스 중 이 이름의
-# 디렉토리는 0건 실측 확인 (`git ls-files | grep -E '(^|/)(target|pkg|pkg-bundler)/'`).
+# **생성물 디렉토리 이름**을 전역 패턴으로 잡는다 (SSoT: packages/physics-wasm/.gitignore 의
+# 동명 3항목). 경로 열거 대신 전역 패턴인 이유는 신규 crate/워크스페이스 추가 시 같은 누락이
+# 반복되는 것을 구조적으로 막기 위함이다 (#952 cross-validate 권고 1).
+#
+# ⚠ **트레이드오프 — 이름이 같으면 소스도 가려진다.** PR #957 리뷰 실측: `apps/web/src/pkg/`,
+#   `packages/core/pkg/`, `apps/web/src/target/` 에 위반을 주입하면 전부 무보고다 (동시 주입한
+#   `packages/physics-wasm/src/` 대조군만 보고). 현재 tracked 소스 중 이 이름의 디렉토리는
+#   **0건**이고 이 저장소는 워크스페이스 루트가 `packages/` 라 `pkg/` 유입 확률이 낮지만,
+#   "0건" 은 시간이 지나면 깨질 수 있는 가정이다.
+#   → 그래서 이 가정 자체를 **CI 불변식**으로 고정했다 (`ci.yml` §포맷 백스톱의 선행 스텝).
+#     소스가 이 이름으로 들어오면 조용히 가려지는 대신 CI 가 hard fail 한다.
 **/target/**
 **/pkg/**
 **/pkg-bundler/**

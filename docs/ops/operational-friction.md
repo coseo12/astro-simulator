@@ -184,4 +184,3 @@ npx prettier --check .                  # 금지 — 캐시 버전이 지배
   install 된 lockfile 바이너리라 버전 출처가 하나로 유지된다. 워크플로에 `npx prettier@<버전>` 을
   하드핀하면 네 번째 출처가 생겨 같은 클래스를 재생산한다.
 - 근거: [#952](https://github.com/coseo12/astro-simulator/issues/952) (PR [#951](https://github.com/coseo12/astro-simulator/pull/951) 리뷰 권고 4-i/4-ii).
-
