@@ -152,7 +152,9 @@ gh api repos/coseo12/astro-simulator/actions/runs/<RUN_ID>/jobs \
 
 ## 7. 격리 worktree 의 `npx prettier` 버전 skew → 코드 스팬 손상 (#952)
 
-**규약 (1줄)**: 격리 worktree 에서 포맷을 다룰 때 **맨손 `npx prettier` 금지** — `pnpm exec prettier`
+**1순위 — 구조적 해소**: 격리 worktree 작업 시작 시 `pnpm install --frozen-lockfile` 을 먼저 돌린다 (실측 **4.6초**). `node_modules` 가 서면 pre-commit 훅이 정상 동작해 `--no-verify` 자체가 불필요해지고 `pnpm exec prettier` 가 lockfile 버전으로 고정돼 아래 skew 가 소멸한다. cross-validate (agy, 2026-08-04) 판정: *"문서에 주의사항을 쓰는 것은 보조 수단이어야 하며, 시스템 구조가 실수 자체를 불가능하게 만들어야 한다"* — 규약은 컨텍스트가 길어지면 잊히는 실패 모드가 있다.
+
+**2순위 규약 (install 이 불가능할 때)**: **맨손 `npx prettier` 금지** — `pnpm exec prettier`
 (node_modules 있을 때) 또는 **`npx prettier@3.9.6` 처럼 lockfile 버전을 명시**해서 부른다.
 
 **증상**: 격리 worktree 는 `node_modules` 가 없어 sub-agent 가 `npx prettier` 로 우회한다. `npx` 는

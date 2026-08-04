@@ -17,9 +17,12 @@ pnpm-lock.yaml
 # 소스 디렉토리 (src/ · tests/) 는 의도적으로 포함하지 않는다 — 여기에 넓은 glob 을 쓰면
 # 백스톱에 구멍이 생긴다. Rust crate 가 추가되면 이 목록에 한 줄 추가해야 하고, 누락 시
 # CI format:check 가 산출물 위반으로 즉시 시끄러워져 드러난다 (조용한 실패 아님).
-packages/physics-wasm/target/**
-packages/physics-wasm/pkg/**
-packages/physics-wasm/pkg-bundler/**
+# 경로 열거 대신 **전역 패턴** — 신규 crate/워크스페이스가 추가돼도 같은 누락이 반복되지
+# 않도록 구조적으로 차단한다 (#952 cross-validate 권고 1). tracked 소스 중 이 이름의
+# 디렉토리는 0건 실측 확인 (`git ls-files | grep -E '(^|/)(target|pkg|pkg-bundler)/'`).
+**/target/**
+**/pkg/**
+**/pkg-bundler/**
 
 # --- 프로젝트 문서/에이전트 (prettier 재포맷 제외 — #907, SSoT 원문 매칭 가드 보호) ---
 # ADR 20260731-907-harness-decouple §결정 4: 구 manifest 파생 자동 생성 블록을
