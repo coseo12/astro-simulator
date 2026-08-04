@@ -32,7 +32,7 @@ export function parseLodLevel(urlParam: string | null | undefined): LodOverride 
     return normalized as LodOverride;
   }
   // 알 수 없는 값 — parse-integrator 패턴과 동일한 폴백 + warn.
-   
+
   console.warn(`[parse-lod-level] 알 수 없는 ?lod=${urlParam} — 'auto' 로 폴백`);
   return 'auto';
 }
