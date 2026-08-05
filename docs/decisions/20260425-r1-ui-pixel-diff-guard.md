@@ -513,6 +513,8 @@ git diff develop...HEAD -- apps/web/scripts/r1-ui-regression-guard.mjs apps/web/
    - PR base = `develop`, branch = `chore/r1-baseline-linux-${{ github.run_id }}`
 3. **`.github/workflows/ci.yml` `detect-and-test` job 에 step 추가** — pnpm 경로 직후 (line ~60 `verify:no-scientific-grep` step 옆):
 
+   > ⚠ **현행 구현 아님 — 복붙 금지** (#953 표식). 아래 스니펫의 `if: hashFiles(...) != ''` 조건은 #945 (PR #949) / #950 (PR #951) 에서 `.github/**` 전량 제거됐다 (silent-skip 금지 정책 — 가드 대상 파일의 존재를 실행 조건으로 걸지 않는다). 현행 정책 SSoT: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) §hashFiles silent-skip 정책 블록. 아래는 **도입 시점 (2026-04) 설계 기록**이므로 그대로 옮기면 청산된 관용구가 재유입된다.
+
    ```yaml
    - name: R1 UI 회귀 가드 (r1-guard)
      if: hashFiles('pnpm-lock.yaml') != '' && hashFiles('apps/web/scripts/r1-ui-regression-guard.mjs') != ''
@@ -752,6 +754,8 @@ Amendment 1 §결정 2 의 부트스트래핑 절차 (a)~(e) 는 **단일 PR 로
 ### 결정 — ci.yml r1-guard step 2개 + wasm-pack 3 step 통합 형태
 
 **최종 step 매트릭스** (ci.yml `detect-and-test` job 의 기존 `pnpm test` step 직후 또는 `verify:no-scientific-grep` step 직후 — developer 가 가독성 기준 결정):
+
+> ⚠ **현행 구현 아님 — 복붙 금지** (#953 표식). 아래 스니펫의 `if: hashFiles(...) != ''` 조건 5곳 (+ 직후 §보강 사항 1 의 근거) 은 #945 (PR #949) / #950 (PR #951) 에서 `.github/**` 전량 제거됐다. 현행 정책 SSoT: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) §hashFiles silent-skip 정책 블록 — "가드 대상 파일의 존재를 실행 조건으로 걸지 않는다. 부재 시 즉시 FAIL 이 유일한 정상 동작" (예외 0. 런타임 생성 산출물은 조건이 아니라 액션 옵션 `if-no-files-found: ignore` 로 표현). 본 §결정 은 **2026-04-26 시점 기록**이라 원문 보존하며, 현행 구현으로 갱신하지 않는다 (ADR 시점 기록 원칙).
 
 ```yaml
 # ============================================================

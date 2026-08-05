@@ -1,12 +1,12 @@
 ---
-description: coseo12/volt 이슈를 읽고 harness 반영 개선안을 제안 → 승인 → feature 브랜치 PR
+description: coseo12/volt 이슈를 읽고 harness 반영 개선안을 제안 → 승인 → 작업 브랜치 PR
 argument-hint: [이슈번호 | --label knowledge|report | --since YYYY-MM-DD — 생략 시 최근 10건 자동 선별]
 allowed-tools: [Bash, Read, Edit, Grep, Glob, Skill]
 ---
 
 # /volt-review — Volt → Harness 반영 리뷰
 
-`coseo12/volt` 저장소에 축적된 knowledge/report 이슈를 읽고, harness_setting(CLAUDE.md · agents · skills · docs)에 어떻게 반영할지 개선안을 제시한다. 사용자 승인 후에만 feature 브랜치에서 변경하고 PR로 올린다.
+`coseo12/volt` 저장소에 축적된 knowledge/report 이슈를 읽고, harness_setting(CLAUDE.md · agents · skills · docs)에 어떻게 반영할지 개선안을 제시한다. 사용자 승인 후에만 작업 브랜치에서 변경하고 PR로 올린다.
 
 상세 절차는 **`volt-review` 스킬**에 정의돼 있으니 먼저 그 스킬을 호출한다.
 
@@ -37,7 +37,7 @@ allowed-tools: [Bash, Read, Edit, Grep, Glob, Skill]
 6. **제안 목록 제시** — 이슈별로 분류/제안/근거/영향 파일을 표시하고 **사용자 승인 대기**. 이 단계에서 파일 수정 금지.
 
 7. **승인된 항목만 반영**:
-   - `git checkout -b feature/volt-review-$(date +%Y%m%d)` — main 직접 수정 금지.
+   - `git checkout -b <type>/<이슈번호>-volt-review origin/develop` — main 직접 수정 금지 (type 은 커밋 컨벤션 type. volt 반영은 통상 `docs`).
    - Edit 후 한국어 파일은 `grep -rn '�' <파일>` 으로 U+FFFD 검증.
    - 커밋: `docs(harness): volt #7 <요지>` 형식.
    - `create-pr` 스킬로 PR 생성. PR 본문에 반영한 volt 이슈 번호 전부 링크.
