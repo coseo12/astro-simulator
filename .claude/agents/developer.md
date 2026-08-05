@@ -37,7 +37,7 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
       "spawned_bg_pids": [],
       "bg_process_handoff": "sub-agent-confirmed-done",
       "extends": {
-        "branch": "feature/...",
+        "branch": "<type>/...",
         "files_changed": ["path/a", "path/b"],
         "tests": {"passed": 12, "failed": 0},
         "browser_verified_levels": [1, 2, 3],

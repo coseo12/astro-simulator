@@ -349,7 +349,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 매 세션·릴리스 반복되던 저비용 마찰 4건의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제:
 
-1. **squash auto-close 미발동** — GitHub 는 default branch(main) 머지에서만 auto-close. feature PR 은 `base=develop` 이라 구조적 미발동 → **수동 close 규약**.
+1. **squash auto-close 미발동** — GitHub 는 default branch(main) 머지에서만 auto-close. 일상 개발 PR 은 `base=develop` 이라 구조적 미발동 → **수동 close 규약**.
 2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
 3. **pgrep self-match 오탐** — `pgrep -f "패턴"` 이 자기 셸 명령행 매칭 → **bracket `[-]`** (`agent-browser-chrome[-]`). pkill 은 자기 셸 kill 위험이라 **안전 개선**. hook 은 `grep -v` 로 이미 안전.
 4. **concurrency CANCELLED = 코스메틱** — `cancel-in-progress`(#779) 로 superseded run 이 `CANCELLED`/UNSTABLE 표기. 각 체크 최신 run 이 SUCCESS 면 안전(§릴리스 판별법).

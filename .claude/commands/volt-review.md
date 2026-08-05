@@ -37,7 +37,7 @@ allowed-tools: [Bash, Read, Edit, Grep, Glob, Skill]
 6. **제안 목록 제시** — 이슈별로 분류/제안/근거/영향 파일을 표시하고 **사용자 승인 대기**. 이 단계에서 파일 수정 금지.
 
 7. **승인된 항목만 반영**:
-   - `git checkout -b feature/volt-review-$(date +%Y%m%d)` — main 직접 수정 금지.
+   - `git checkout -b <type>/<이슈번호>-volt-review origin/develop` — main 직접 수정 금지 (type 은 커밋 컨벤션 type. volt 반영은 통상 `docs`).
    - Edit 후 한국어 파일은 `grep -rn '�' <파일>` 으로 U+FFFD 검증.
    - 커밋: `docs(harness): volt #7 <요지>` 형식.
    - `create-pr` 스킬로 PR 생성. PR 본문에 반영한 volt 이슈 번호 전부 링크.
