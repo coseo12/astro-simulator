@@ -3,7 +3,7 @@
  * #915 — auto-close 대상 이슈 파서 (auto-close-issues.yml 의 파싱 SSoT).
  *
  * 배경 (docs/ops/operational-friction.md §1): GitHub 의 `Closes #N` auto-close 는
- * **default branch (main) 머지에서만** 발동한다. 본 저장소 feature PR 은 base=develop 이라
+ * **default branch (main) 머지에서만** 발동한다. 본 저장소 일상 개발 PR 은 base=develop 이라
  * 구조적 미발동 → 매 머지마다 수동 close 마찰. `.github/workflows/auto-close-issues.yml`
  * 이 머지 이벤트에서 본 파서로 대상 이슈를 추출해 close 한다.
  *

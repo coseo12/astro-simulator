@@ -4,11 +4,11 @@
 
 ## 원칙
 
-`main = production / develop = staging / feature·fix/* = preview` 의 3단계 환경 매핑.
+`main = production / develop = staging / <type>/* = preview` 의 3단계 환경 매핑.
 
 - **main**: production 배포 대상. 릴리스 태그가 이곳에만 존재. push 는 release PR (merge commit) 또는 hotfix PR 로만 발생
 - **develop**: staging / integration environment. 여러 feature 가 상호작용하는 기능을 main 승격 전에 검증하는 공간. PaaS 의 staging environment 에 매핑 권장
-- **feature/\*, fix/\***: 일시적 preview environment. PR 단위 독립 URL. 개별 feature 확인용
+- **`<type>/*`**: 일시적 preview environment. PR 단위 독립 URL. 개별 feature 확인용
 
 ### develop 의 역할이 왜 중요한가
 
@@ -68,7 +68,7 @@ tag 기반 배포만 쓰는 프로젝트는 gitflow 의 배포 격리 이익은 
 | develop 의 역할 | 통합 스테이징 + 릴리스 타이밍 제어 | 통합 스테이징 + staging env 매핑 |
 | gitflow 필요성 | 통합 스테이징만 (배포 격리는 수동으로도 가능) | 통합 스테이징 + 배포 격리 둘 다 필수 |
 
-**공통**: 양쪽 모두 gitflow 브랜치 전략 (`main` / `develop` / `feature/*` / `fix/*` / `hotfix/*`) 은 동일하게 적용. 배포 트리거만 다르다.
+**공통**: 양쪽 모두 gitflow 브랜치 전략 (`main` / `develop` / `<type>/*` / `hotfix/*`) 은 동일하게 적용. 배포 트리거만 다르다.
 
 ## 릴리스 워크플로 재인용 (CLAUDE.md 참조)
 

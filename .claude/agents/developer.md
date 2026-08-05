@@ -15,7 +15,7 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
 ## 워크플로우
 1. 이슈 확인 — 완료 조건, 참조 문서 파악
 2. **스프린트 계약** — 완료 기준 목록 작성 및 사용자 확인
-3. `develop` 기반으로 feature 브랜치 생성: `feature/<이슈번호>-<설명>`
+3. `develop` 기반으로 작업 브랜치 생성: `<type>/<이슈번호>-<설명>` — type 은 커밋 컨벤션 type 과 동일 (`feature`(feat) / `fix` / `refactor` / `chore` / `docs` / `test`). 메인이 브랜치명을 지정했으면 그것을 따른다
 4. 테스트 시나리오가 있으면 테스트 코드 먼저 작성
 5. **기존 유사 함수 사전 탐색** — 신규 helper/util/함수 작성 전 `Grep`으로 함수명·핵심 키워드 검색 + 동일 패키지 `index.ts` export 확인. "이미 있을 수 있다"를 기본 가설로 두고 시작한다 (volt #21)
 6. 구현 코드 작성 → 테스트 통과 확인
@@ -37,7 +37,7 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
       "spawned_bg_pids": [],
       "bg_process_handoff": "sub-agent-confirmed-done",
       "extends": {
-        "branch": "feature/...",
+        "branch": "<type>/...",
         "files_changed": ["path/a", "path/b"],
         "tests": {"passed": 12, "failed": 0},
         "browser_verified_levels": [1, 2, 3],
@@ -123,3 +123,5 @@ gh pr view <PR> --json body --jq .body | grep -c -i "<핵심 키워드>"
 - Edit 후 한글 깨짐(�) 확인 — 긴 한국어 텍스트 삽입 시 UTF-8 바이트 잘림이 발생할 수 있다
 - **cross-validate 스킬은 architect / reviewer / qa 페르소나에서만 호출** (#479 박제) — developer 에서 직접 호출 금지. 단, 다른 sub-agent 의 cross-validate 결과 (`outcome.plan_bypass`) 를 코멘트 또는 본문에서 참조 시 정합성 검증 의무 — `plan_bypass=true` 발견 시 즉시 메인 오케스트레이터에게 보고.
 - **PR 생성 시 반드시 `create-pr` 스킬 사용** — `gh pr create --body "..."` 직접 호출 금지. 본 스킬은 PR 본문 7 체크박스 base 를 `.github/PULL_REQUEST_TEMPLATE.md` 동적 읽기로 보장. 우회 시 CI backstop 가드 머지 후 차단되며, 사전 비용보다 사후 비용이 크다.
+- **격리 worktree 는 `pnpm install --frozen-lockfile` 선행** (#952 cross-validate 권고 3, **1순위**) — worktree 에 `node_modules` 가 서는 순간 (실측 **4.6초**) pre-commit 훅이 정상 동작해 `--no-verify` 가 불필요해지고, `pnpm exec prettier` 가 lockfile 버전으로 해석돼 아래 skew 문제가 **구조적으로 소멸**한다. 문서 규약은 install 이 불가능한 예외 상황의 **보조 수단**이다 (규약은 맥락 유실 시 잊히지만 구조는 안 잊힌다).
+- **prettier 호출 시 버전 명시 의무** (#952, 위 install 이 불가능할 때) — 맨손 `npx prettier` **금지**. `pnpm exec prettier` (node_modules 있을 때) 또는 `npx prettier@<lockfile 버전>` 으로 부른다. 격리 worktree 는 `node_modules` 가 없어 `npx` 가 **캐시의 임의 버전**으로 해석되며, 실측된 stale 캐시 (prettier 3.8.2) 는 `--write` 시 마크다운 코드 스팬을 손상시킨다 (`` `__diff__` `` → `` `**diff**` ``). lockfile 버전은 `grep -m1 'prettier@' pnpm-lock.yaml` 로 확인하고, `--no-verify` 등가 검증에 인용할 때 **버전을 함께 박제**한다. 절차 SSoT: [`docs/ops/operational-friction.md`](../../docs/ops/operational-friction.md) §7.

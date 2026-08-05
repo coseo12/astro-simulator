@@ -5,7 +5,7 @@
 
 ### 브랜치 / Base 확인 (gitflow)
 PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허용 (CLAUDE.md 금지 사항).
-- [ ] **일반 feature/fix**: `base=develop`, `head=feature/*` 또는 `fix/*`
+- [ ] **일반 개발 PR**: `base=develop`, `head=<type>/*` (type = 커밋 컨벤션 type — `feature`(feat) / `fix` / `refactor` / `chore` / `docs` / `test`)
 - [ ] **Release PR**: `base=main`, `head=develop` (CHANGELOG 범위 + 태그 계획 하단 release 섹션에 기재)
 - [ ] **Hotfix PR**: `base=main`, `head=hotfix/*` (머지 직후 `main → develop` merge-back PR 생성 의무)
 - [ ] **Hotfix merge-back**: `base=develop`, `head=main` (hotfix 직후 동기화 전용)

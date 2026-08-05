@@ -8,13 +8,13 @@
 
 ## 1. squash auto-close 매회 미발동 → 수동 close 규약
 
-**증상**: feature/fix PR 에 `Closes #N` 을 박제해도 머지 후 이슈가 자동 close 되지 않는다. 매 세션 수동 `gh issue close` 필요.
+**증상**: 일상 개발 PR 에 `Closes #N` 을 박제해도 머지 후 이슈가 자동 close 되지 않는다. 매 세션 수동 `gh issue close` 필요.
 
-**구조 원인**: GitHub 는 **default branch(main) 로 머지될 때만** closing keyword(`Closes`/`Fixes`/`Resolves`)를 auto-close 처리한다. 본 프로젝트 gitflow 는 feature PR 의 `base=develop` 이므로 **구조적으로 auto-close 미발동**. 버그가 아니라 GitHub 사양.
+**구조 원인**: GitHub 는 **default branch(main) 로 머지될 때만** closing keyword(`Closes`/`Fixes`/`Resolves`)를 auto-close 처리한다. 본 프로젝트 gitflow 는 일상 개발 PR 의 `base=develop` 이므로 **구조적으로 auto-close 미발동**. 버그가 아니라 GitHub 사양.
 
 **표준 절차**:
 
-- feature/fix PR(base=develop) 머지 직후 **수동 close 가 규약** — `gh issue close <N> --reason completed` (근거 코멘트 동반 권장).
+- 일상 개발 PR(`<type>/*` → `base=develop`) 머지 직후 **수동 close 가 규약** — `gh issue close <N> --reason completed` (근거 코멘트 동반 권장).
 - 릴리스 PR(develop→main)에서 번들된 이슈들은 이미 각 sub-PR 에서 수동 close 됨 (release PR 은 개별 이슈 close 대상 아님).
 - 실측: 2026-07-15 세션에서 #822/#823/#826 전부 develop 머지 → 자동 미발동 → 수동 close ×3.
 
@@ -150,3 +150,37 @@ gh api repos/coseo12/astro-simulator/actions/runs/<RUN_ID>/jobs \
   (#935 "가드 N종" 표기가 2회 연속 승계 drift 한 것과 동형).
 - 근거: PR [#882 리뷰 권고 8·9](https://github.com/coseo12/astro-simulator/pull/882#issuecomment-5082085880).
 
+## 7. 격리 worktree 의 `npx prettier` 버전 skew → 코드 스팬 손상 (#952)
+
+**1순위 — 구조적 해소**: 격리 worktree 작업 시작 시 `pnpm install --frozen-lockfile` 을 먼저 돌린다 (실측 **4.6초**). `node_modules` 가 서면 pre-commit 훅이 정상 동작해 `--no-verify` 자체가 불필요해지고 `pnpm exec prettier` 가 lockfile 버전으로 고정돼 아래 skew 가 소멸한다. cross-validate (agy, 2026-08-04) 판정: *"문서에 주의사항을 쓰는 것은 보조 수단이어야 하며, 시스템 구조가 실수 자체를 불가능하게 만들어야 한다"* — 규약은 컨텍스트가 길어지면 잊히는 실패 모드가 있다.
+
+**2순위 규약 (install 이 불가능할 때)**: **맨손 `npx prettier` 금지** — `pnpm exec prettier`
+(node_modules 있을 때) 또는 **`npx prettier@3.9.6` 처럼 lockfile 버전을 명시**해서 부른다.
+
+**증상**: 격리 worktree 는 `node_modules` 가 없어 sub-agent 가 `npx prettier` 로 우회한다. `npx` 는
+로컬 해석에 실패하면 **캐시에 있는 아무 버전**을 쓴다 — 실측(2026-08-04) `~/.npm/_npx/` 3개 캐시 중
+하나가 **3.8.2** 였고(나머지 2개와 lockfile 은 3.9.6), 3.8.2 로 `CHANGELOG.md --write` 하면 마크다운
+**코드 스팬 내부**를 건드려 `` `…/__diff__/r1/**/*.png` `` → `` `…/**diff**/r1/**/\*.png` `` 로 **손상**된다
+(3.9.6 에서 수정된 버그). 즉 "포맷을 맞추려는 행위 자체가 본문을 깨뜨린다".
+
+**구조 원인**: 버전 출처가 셋이다 — `package.json`(`^3.9.6`, 범위) / `pnpm-lock.yaml`(3.9.6, 확정) /
+**npx 캐시**(임의). 앞의 둘은 정합인데 세 번째가 worktree 에서만 지배권을 갖는다. 훅(lint-staged)이
+정상 동작하는 일반 체크아웃에서는 이 경로가 열리지 않으므로 "정상 개발자" 는 재현하지 못한다.
+
+**표준 절차**:
+
+```bash
+# lockfile 확정 버전 확인 (인용 근거)
+grep -m1 'prettier@' pnpm-lock.yaml     # → prettier@3.9.6:
+
+pnpm exec prettier --check .            # node_modules 있을 때 (1순위)
+npx prettier@3.9.6 --check .            # 격리 worktree (버전 명시 필수)
+npx prettier --check .                  # 금지 — 캐시 버전이 지배
+```
+
+- `--write` 후에는 **의도 밖 파일이 안 바뀌었는지 `git diff --stat` 로 확인**하고, 특히 마크다운
+  코드 스팬(`` `__diff__` `` 등)이 온전한지 `grep` 한다. 손상 클래스는 조용해서 리뷰에서도 잘 안 보인다.
+- CI 백스톱은 `ci.yml` `#952 포맷 백스톱 (format:check)` 스텝이며 **`pnpm run format:check`** 를 쓴다 —
+  install 된 lockfile 바이너리라 버전 출처가 하나로 유지된다. 워크플로에 `npx prettier@<버전>` 을
+  하드핀하면 네 번째 출처가 생겨 같은 클래스를 재생산한다.
+- 근거: [#952](https://github.com/coseo12/astro-simulator/issues/952) (PR [#951](https://github.com/coseo12/astro-simulator/pull/951) 리뷰 권고 4-i/4-ii).

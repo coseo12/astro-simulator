@@ -1,9 +1,6 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import {
-  SatelliteZoomTooltip,
-  __isSatelliteParentBody,
-} from './satellite-zoom-tooltip';
+import { SatelliteZoomTooltip, __isSatelliteParentBody } from './satellite-zoom-tooltip';
 import { useSimStore } from '@/store/sim-store';
 
 /**
@@ -228,10 +225,7 @@ describe('SatelliteZoomTooltip (#534)', () => {
       render(<SatelliteZoomTooltip />);
       focusBody('mars', 1500);
       expect(screen.getByTestId('satellite-zoom-tooltip')).toBeInTheDocument();
-      expect(screen.getByTestId('satellite-zoom-tooltip')).toHaveAttribute(
-        'data-body-id',
-        'mars',
-      );
+      expect(screen.getByTestId('satellite-zoom-tooltip')).toHaveAttribute('data-body-id', 'mars');
       expect(window.localStorage.getItem('r4.satellite-zoom-tooltip-shown.mars')).toBe('1');
     });
 

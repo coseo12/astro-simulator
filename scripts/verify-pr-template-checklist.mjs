@@ -76,7 +76,7 @@ function postComment(prNumber, missing) {
     '',
     ...missing.map(
       (m) =>
-        `- **[${m.keyword.id}] ${m.keyword.name}** — phrase "\`${m.keyword.phrase}\`" 매칭 0 hit (1차 구조 ${m.structureHits} / 2차 phrase ${m.phraseHits})`
+        `- **[${m.keyword.id}] ${m.keyword.name}** — phrase "\`${m.keyword.phrase}\`" 매칭 0 hit (1차 구조 ${m.structureHits} / 2차 phrase ${m.phraseHits})`,
     ),
     '',
     '### 해결',
@@ -124,7 +124,7 @@ function main() {
   console.error(`❌ PR #${prNumber} 7 체크박스 base 누락 ${missing.length}/7:`);
   for (const m of missing) {
     console.error(
-      `  - [${m.keyword.id}] ${m.keyword.name}: phrase "${m.keyword.phrase}" → 1차 구조 ${m.structureHits} / 2차 phrase ${m.phraseHits}`
+      `  - [${m.keyword.id}] ${m.keyword.name}: phrase "${m.keyword.phrase}" → 1차 구조 ${m.structureHits} / 2차 phrase ${m.phraseHits}`,
     );
   }
 

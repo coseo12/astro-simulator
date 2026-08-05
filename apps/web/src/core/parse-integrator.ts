@@ -29,7 +29,7 @@ export function parseIntegratorKind(urlParam: string | null | undefined): Integr
     return 'yoshida4';
   }
   // 알 수 없는 값 — GrMode 패턴과 동일한 폴백 + warn.
-   
+
   console.warn(`[parse-integrator] 알 수 없는 ?integrator=${urlParam} — 'velocity-verlet'로 폴백`);
   return 'velocity-verlet';
 }

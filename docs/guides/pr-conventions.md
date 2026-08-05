@@ -20,7 +20,7 @@
   - ✅ `Closes #A, closes #B` — 각 이슈에 keyword 반복
   - ✅ 줄 분리 — `Closes #A\nCloses #B`
   - ❌ `Closes: #A, #B` / `Closes #A, #B` / `Closes #A #B` — 모두 #B 앞 keyword 부재 (콜론·콤마·공백은 동일 결함의 표면 변형)
-- **머지 직후 auto-close 검증 루틴** — release/feature PR 머지 후 close 대상 이슈 전부에 `gh issue view <n> --json state` 로 실제 close 여부를 확인. default branch (main) 머지가 아닌 경우 (feature PR → develop) 는 릴리스 시점까지 OPEN 유지가 정상
+- **머지 직후 auto-close 검증 루틴** — release PR·일상 개발 PR 머지 후 close 대상 이슈 전부에 `gh issue view <n> --json state` 로 실제 close 여부를 확인. default branch (main) 머지가 아닌 경우 (일상 개발 PR → develop) 는 릴리스 시점까지 OPEN 유지가 정상
 - 근거: volt [#41](https://github.com/coseo12/volt/issues/41) — harness PR [#108](https://github.com/coseo12/harness-setting/pull/108) (v2.14.0) 커밋 메시지 `Closes: #105, #110` 에서 #105 만 auto-close 되고 #110 은 수동 close 필요했던 실측 사례
 
 ## 관련
