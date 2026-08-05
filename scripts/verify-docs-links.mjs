@@ -104,8 +104,8 @@ const UPSTREAM_ONLY_ALLOWLIST = [
     source: 'docs/guides/release-process.md',
     target: '../decisions/20260419-release-merge-strategy.md',
   },
-  { source: 'CLAUDE.md', target: 'docs/decisions/20260419-gitflow-main-develop.md' },
-  { source: 'CLAUDE.md', target: 'docs/decisions/20260419-release-merge-strategy.md' },
+  // (#962: CLAUDE.md 의 두 gitflow ADR 링크는 A1/A2 가지치기로 제거됨 → 발동 0건 stale 방지를 위해
+  //  source: 'CLAUDE.md' entry 2건 삭제. 다른 source 의 동일 target entry 4건은 계속 발동하므로 유지)
   // upstream ADR: jq 파싱 / antigravity 마이그레이션
   // (#907: 삭제된 문서를 source 로 갖던 dead entry 는 제거 — "발동 0건 항목은 제거 후보" 계약)
   {

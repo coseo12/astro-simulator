@@ -12,6 +12,8 @@
 - 인접 유닛 테스트 / 타입 가드 / 문서로 간접 보증 가능한가?
 - 미래 fixture 인프라 구축 후 저렴해질 수 있는가? → **별도 인프라 이슈로 분리**
 
+**근거**: volt [#31](https://github.com/coseo12/volt/issues/31) — harness #92 Phase 2 merge 스킵 테스트에서 git fixture 구축 비용이 검증 대상 1줄 대비 역전되어 주석 계약 + 인접 속성 테스트로 대체한 사례. (CLAUDE.md `## 스프린트 계약` 9항의 근거 인용 원본)
+
 ### 보강 3문 (volt [#71](https://github.com/coseo12/volt/issues/71))
 
 위 5문이 "yes 편향" 으로 수렴할 때 교차점검:
