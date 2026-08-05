@@ -7,7 +7,7 @@
 ### 1. 일상 개발
 
 ```
-feature/123-xxx   (develop 에서 분기)
+<type>/123-xxx    (develop 에서 분기. 예: feature/942-…, docs/953-…)
    ↓ PR (base=develop)
 develop
 ```
