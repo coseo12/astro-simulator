@@ -5,7 +5,7 @@
 **아래 규칙은 세션 초기화/신규 프로젝트 셋업/모호한 지시 상황에서도 예외 없이 적용된다.**
 세부 근거는 하단 섹션에 있으며, 이 블록은 어텐션 환기용 요약이다.
 
-1. **브랜치 보호** — `main` 직접 수정/푸시 금지. 모든 변경은 `feature/*` 또는 `fix/*` 브랜치에서 PR로만 반영.
+1. **브랜치 보호** — `main` 직접 수정/푸시 금지. 모든 변경은 `<type>/*` 브랜치에서 PR로만 반영 (type 정의는 §브랜치 전략).
 2. **모호한 지시 사전 확인** — "리뉴얼", "개선", "셋팅해줘" 등 범위 불명 지시는 **작업 전** 범위를 사용자에게 제시하고 승인받는다. 보수적 해석으로 임의 진행 금지.
 3. **UI 작업 3단계 검증** — 빌드/테스트 통과는 "동작" 증거가 아니다. 정적 → 인터랙션 → 흐름 3단계를 브라우저에서 확인 후 커밋.
 4. **한글 인코딩 검증** — 한국어 포함 파일 Edit 후 `grep -rn '�'` 실행. U+FFFD 발견 시 즉시 수정.
@@ -25,16 +25,16 @@ AI 에이전트 기반 개발 워크플로우 템플릿. 1인 개발자-AI 페�
 
 > 과거 이력: v2.12.0 이전까지 `feature → develop` + `feature → main` 의 **dual PR** 변형을 썼고, 고비용으로 인해 2026-04-15 부터 `develop` 이 방치되는 drift 가 발생했다. v2.13.0 부터 정석 gitflow 로 복원 — 자세한 결정 근거는 [ADR 20260419](docs/decisions/20260419-gitflow-main-develop.md) 참조.
 
-> **develop 의 두 가지 핵심 역할**: (1) **통합 스테이징** — 여러 feature 가 상호작용하는 기능일 때 main 으로 가기 전에 함께 동작하는지 검증하는 공간. tag trigger 로는 대체 불가. (2) **PaaS staging environment 매핑** — Vercel/Netlify/Amplify 등 브랜치 기반 자동 배포 도구에서 `main=production / develop=staging / feature/*=preview` 로 자연스럽게 매핑. 자세한 패턴: [docs/deployment-patterns.md](docs/deployment-patterns.md).
+> **develop 의 두 가지 핵심 역할**: (1) **통합 스테이징** — 여러 feature 가 상호작용하는 기능일 때 main 으로 가기 전에 함께 동작하는지 검증하는 공간. tag trigger 로는 대체 불가. (2) **PaaS staging environment 매핑** — Vercel/Netlify/Amplify 등 브랜치 기반 자동 배포 도구에서 `main=production / develop=staging / <type>/*=preview` 로 자연스럽게 매핑. 자세한 패턴: [docs/deployment-patterns.md](docs/deployment-patterns.md).
 
 > **이 저장소 자체의 릴리스 vs 하네스 사용 프로젝트 릴리스**: 이 하네스 저장소는 수동 `git tag + gh release create` 방식이라 `main push = 배포` 가 아니다. 반면 하네스를 사용하는 웹 앱 프로젝트 대부분은 PaaS 자동 배포 (브랜치 기반 push 트리거) 를 쓴다. 양쪽 모두 **gitflow 브랜치 전략은 동일**하게 적용되며 배포 트리거만 다르다.
 
 | 브랜치 | 역할 | 진입 경로 | 금지 사항 |
 |---|---|---|---|
-| `main` | **배포 anchor**. 태그된 릴리스만 존재 | `develop → main` **release PR** 로만 / `hotfix/* → main` PR | 직접 push 금지. feature/fix PR 의 `base=main` 금지 |
-| `develop` | **개발 통합**. 모든 완성된 변경이 먼저 도착 | `feature/*`, `fix/*` PR / `main → develop` merge-back (hotfix 후) | 직접 push 금지 |
-| `feature/<이슈번호>-<설명>` | 신기능 | `develop` 에서 분기 | `main` 대상 PR 생성 금지 |
-| `fix/<이슈번호>-<설명>` | 개발 중 발견된 버그 수정 | `develop` 에서 분기 | `main` 대상 PR 생성 금지 |
+| `main` | **배포 anchor**. 태그된 릴리스만 존재 | `develop → main` **release PR** 로만 / `hotfix/* → main` PR | 직접 push 금지. `base=main` 은 release/hotfix 전용 |
+| `develop` | **개발 통합**. 모든 완성된 변경이 먼저 도착 | `<type>/*` PR / `main → develop` merge-back (hotfix 후) | 직접 push 금지 |
+| `<type>/<이슈번호>-<설명>` | 일상 개발. type 은 §커밋 컨벤션 의 type 과 동일 (신기능 = `feature`) | `develop` 에서 분기 | `main` 대상 PR 생성 금지 |
+| `release/<버전>-prep` | 릴리스 준비 (이슈번호 없는 예외) | `develop` 에서 분기 | 기능 변경 금지 |
 | `hotfix/<이슈번호>-<설명>` | **prod 긴급 패치** | `main` 에서 분기. 머지 후 즉시 `main → develop` merge-back | 드물게 사용. develop merge-back 누락 금지 |
 
 ### 워크플로 3단계
@@ -59,7 +59,7 @@ develop  (main tip 과 완전 동기화)
 - release PR 본문에 CHANGELOG 범위, Behavior Changes, 태그 계획 명시
 - **release PR 은 반드시 `--merge` (merge commit) 방식으로 머지** — `--squash` 금지. squash 로 머지하면 main 에 새 커밋이 생겨 develop 과 diverge 하며 매 릴리스마다 merge-back PR 이 강제된다. merge commit 은 main tip 이 develop tip 을 직계 조상으로 포함하게 하여 **merge-back 이 불필요**해진다. 결정 근거: [ADR 20260419-release-merge-strategy](docs/decisions/20260419-release-merge-strategy.md)
 - **merge commit 직후 `git push origin main:develop` (fast-forward) 필수** — main 의 merge commit 자체가 develop 에 없으므로 doctor 가 일시적으로 warn (main 이 1 커밋 앞섬). fast-forward push 로 즉시 해소. force-push 가 아니며 (main 이 develop 의 후손), CRITICAL #5 해당 없음
-- **dual PR 재발 방지**: feature/fix PR 은 `base=main` 을 사용하지 않는다 (PR 템플릿 가드)
+- **dual PR 재발 방지**: 일상 개발 PR 은 `base=main` 을 사용하지 않는다 (PR 템플릿 가드)
 
 **3. 핫픽스 (prod 이슈)**
 ```
@@ -473,5 +473,5 @@ forensic ADR 의 측정 데이터 (스크린샷 / 차트 / diagram) 는 별도 �
 - main 브랜치 직접 수정 금지
 - 리뷰 없이 머지 금지
 - 테스트 없이 PR 생성 금지
-- feature/fix PR 의 `base=main` 금지 — 반드시 `develop` 대상. `base=main` 은 release/hotfix PR 만 허용
+- `<type>/*` PR 의 `base=main` 금지 — 반드시 `develop` 대상. `base=main` 은 release/hotfix PR 만 허용
 - hotfix 머지 후 `main → develop` merge-back 누락 금지 — 누락 시 §drift 감지 의 git 직접 점검에서 warn 으로 드러남

@@ -68,7 +68,7 @@ tag 기반 배포만 쓰는 프로젝트는 gitflow 의 배포 격리 이익은 
 | develop 의 역할 | 통합 스테이징 + 릴리스 타이밍 제어 | 통합 스테이징 + staging env 매핑 |
 | gitflow 필요성 | 통합 스테이징만 (배포 격리는 수동으로도 가능) | 통합 스테이징 + 배포 격리 둘 다 필수 |
 
-**공통**: 양쪽 모두 gitflow 브랜치 전략 (`main` / `develop` / `feature/*` / `fix/*` / `hotfix/*`) 은 동일하게 적용. 배포 트리거만 다르다.
+**공통**: 양쪽 모두 gitflow 브랜치 전략 (`main` / `develop` / `<type>/*` / `hotfix/*`) 은 동일하게 적용. 배포 트리거만 다르다.
 
 ## 릴리스 워크플로 재인용 (CLAUDE.md 참조)
 

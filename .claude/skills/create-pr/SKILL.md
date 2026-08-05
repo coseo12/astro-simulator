@@ -15,13 +15,13 @@ description: |
 
 | PR 타입 | base | head | 머지 방식 | 비고 |
 |---|---|---|---|---|
-| 일반 feature/fix | `develop` | `feature/*` 또는 `fix/*` | `--squash` | **기본값** — 99% 의 PR 이 이 형태 |
+| 일반 개발 PR | `develop` | `<type>/*` (type = 커밋 컨벤션 type — `feature`(feat) / `fix` / `refactor` / `chore` / `docs` / `test`) | `--squash` | **기본값** — 99% 의 PR 이 이 형태 |
 | Release PR | `main` | `develop` | **`--merge` (merge commit)** | `--squash` 금지. merge-back 원천 방지 (ADR [20260419-release-merge-strategy](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260419-release-merge-strategy.md) — upstream) |
 | Hotfix PR | `main` | `hotfix/*` | `--squash` 또는 `--merge` | prod 긴급 패치. 머지 직후 merge-back PR 별도 생성 의무 |
 | Hotfix merge-back | `develop` | `main` | `--merge` | hotfix 머지 직후 동기화 전용 |
 
 **금지**:
-- 일반 feature/fix PR 의 `base=main` — 과거 dual PR drift 재발 방지 (ADR [20260419-gitflow-main-develop](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260419-gitflow-main-develop.md) — upstream)
+- 일반 개발 PR (`<type>/*`) 의 `base=main` — 과거 dual PR drift 재발 방지 (ADR [20260419-gitflow-main-develop](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260419-gitflow-main-develop.md) — upstream)
 - Release PR 의 `--squash` 머지 — develop drift 유발 (v2.13.0 에서 관찰, v2.14.0 에서 merge commit 으로 전환)
 
 ## 절차
@@ -173,7 +173,7 @@ stack 대신 각 PR 을 develop 기반 독립 브랜치로 만들고, 의존성�
 ### PR 생성 시 체크
 - `--base` 가 `main`/`develop` 이 아니면 경고 + 머지 순서/rebase 필요성 사용자에게 고지
 - `gh pr edit --base <main|develop>` 후 `gh pr view --json mergeStateStatus` 확인, DIRTY/CONFLICTING이면 로컬 rebase 유도
-- `--base main` 인 경우 release/hotfix PR 인지 재확인 — 일반 feature/fix PR 은 base=main 금지 (위 "Base 선택" 표)
+- `--base main` 인 경우 release/hotfix PR 인지 재확인 — 일반 개발 PR (`<type>/*`) 은 base=main 금지 (위 "Base 선택" 표)
 
 ## 규칙
 
