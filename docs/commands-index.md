@@ -10,7 +10,7 @@ harness가 제공하는 8개 슬래시 커맨드 한눈에. Claude Code 세션�
 |---|---|---|---|
 | `/pm <요구>` | 적응적 질답 → 스프린트 계약 | 사용자 요구 (모호 가능) | 이슈 본문 = 완료 기준 목록 |
 | `/architect <이슈>` | 설계 결정 + ADR | 이슈 + 코드베이스 | 이슈 코멘트 + `docs/decisions/*.md` |
-| `/dev <이슈>` | 구현 (developer.md) | 이슈 + architect 산출 | feature 브랜치 + PR |
+| `/dev <이슈>` | 구현 (developer.md) | 이슈 + architect 산출 | 작업 브랜치 (`<type>/*`) + PR |
 | `/review <PR>` | 정적 5축 리뷰 | PR diff + 이슈 | PR 코멘트 + 라벨 전이 |
 | `/qa <PR>` | 동적 검증 (3단계) | PR + 이슈 | PR 코멘트(증거) + 라벨 전이 |
 | `/next [번호]` | thin orchestrator | 이슈/PR 라벨 | 정책에 따라 다음 페르소나 추천/호출 |

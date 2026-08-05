@@ -1,12 +1,12 @@
 ---
-description: coseo12/volt 이슈를 읽고 harness 반영 개선안을 제안 → 승인 → feature 브랜치 PR
+description: coseo12/volt 이슈를 읽고 harness 반영 개선안을 제안 → 승인 → 작업 브랜치 PR
 argument-hint: [이슈번호 | --label knowledge|report | --since YYYY-MM-DD — 생략 시 최근 10건 자동 선별]
 allowed-tools: [Bash, Read, Edit, Grep, Glob, Skill]
 ---
 
 # /volt-review — Volt → Harness 반영 리뷰
 
-`coseo12/volt` 저장소에 축적된 knowledge/report 이슈를 읽고, harness_setting(CLAUDE.md · agents · skills · docs)에 어떻게 반영할지 개선안을 제시한다. 사용자 승인 후에만 feature 브랜치에서 변경하고 PR로 올린다.
+`coseo12/volt` 저장소에 축적된 knowledge/report 이슈를 읽고, harness_setting(CLAUDE.md · agents · skills · docs)에 어떻게 반영할지 개선안을 제시한다. 사용자 승인 후에만 작업 브랜치에서 변경하고 PR로 올린다.
 
 상세 절차는 **`volt-review` 스킬**에 정의돼 있으니 먼저 그 스킬을 호출한다.
 

@@ -3,7 +3,7 @@ name: auto-close-issues
 # #915 범위 4 — base=develop 머지 시 이슈 auto-close.
 #
 # 배경 (docs/ops/operational-friction.md §1): GitHub 의 `Closes #N` auto-close 는
-# **default branch (main) 머지에서만** 발동한다. 본 저장소 feature/fix PR 은 base=develop
+# **default branch (main) 머지에서만** 발동한다. 본 저장소 일상 개발 PR 은 base=develop
 # 이라 구조적 미발동 → 매 머지마다 수동 close 규약을 반복했다. 본 workflow 가 머지 이벤트에서
 # PR 본문의 close 키워드를 파싱해 이슈 close + PR 링크 코멘트를 박제한다 (수동 close 규약 대체).
 #

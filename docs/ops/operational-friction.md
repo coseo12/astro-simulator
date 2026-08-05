@@ -8,13 +8,13 @@
 
 ## 1. squash auto-close 매회 미발동 → 수동 close 규약
 
-**증상**: feature/fix PR 에 `Closes #N` 을 박제해도 머지 후 이슈가 자동 close 되지 않는다. 매 세션 수동 `gh issue close` 필요.
+**증상**: 일상 개발 PR 에 `Closes #N` 을 박제해도 머지 후 이슈가 자동 close 되지 않는다. 매 세션 수동 `gh issue close` 필요.
 
-**구조 원인**: GitHub 는 **default branch(main) 로 머지될 때만** closing keyword(`Closes`/`Fixes`/`Resolves`)를 auto-close 처리한다. 본 프로젝트 gitflow 는 feature PR 의 `base=develop` 이므로 **구조적으로 auto-close 미발동**. 버그가 아니라 GitHub 사양.
+**구조 원인**: GitHub 는 **default branch(main) 로 머지될 때만** closing keyword(`Closes`/`Fixes`/`Resolves`)를 auto-close 처리한다. 본 프로젝트 gitflow 는 일상 개발 PR 의 `base=develop` 이므로 **구조적으로 auto-close 미발동**. 버그가 아니라 GitHub 사양.
 
 **표준 절차**:
 
-- feature/fix PR(base=develop) 머지 직후 **수동 close 가 규약** — `gh issue close <N> --reason completed` (근거 코멘트 동반 권장).
+- 일상 개발 PR(`<type>/*` → `base=develop`) 머지 직후 **수동 close 가 규약** — `gh issue close <N> --reason completed` (근거 코멘트 동반 권장).
 - 릴리스 PR(develop→main)에서 번들된 이슈들은 이미 각 sub-PR 에서 수동 close 됨 (release PR 은 개별 이슈 close 대상 아님).
 - 실측: 2026-07-15 세션에서 #822/#823/#826 전부 develop 머지 → 자동 미발동 → 수동 close ×3.
 

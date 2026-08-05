@@ -9,7 +9,7 @@ description: |
 
 # PR 생성
 
-구현 완료된 feature 브랜치에서 develop 브랜치로의 PR을 생성한다.
+구현 완료된 작업 브랜치 (`<type>/*`) 에서 develop 브랜치로의 PR을 생성한다.
 
 ## Base 선택 + 머지 방식 (gitflow)
 
@@ -47,7 +47,7 @@ git log develop..HEAD --oneline
 
 ```bash
 # 브랜치 푸시
-git push -u origin feature/<이슈번호>-<설명>
+git push -u origin <type>/<이슈번호>-<설명>
 
 # PR 생성
 gh pr create \

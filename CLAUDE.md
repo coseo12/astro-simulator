@@ -31,8 +31,8 @@ AI 에이전트 기반 개발 워크플로우 템플릿. 1인 개발자-AI 페�
 
 | 브랜치 | 역할 | 진입 경로 | 금지 사항 |
 |---|---|---|---|
-| `main` | **배포 anchor**. 태그된 릴리스만 존재 | `develop → main` **release PR** 로만 / `hotfix/* → main` PR | 직접 push 금지. `base=main` 은 release/hotfix 전용 |
-| `develop` | **개발 통합**. 모든 완성된 변경이 먼저 도착 | `<type>/*` PR / `main → develop` merge-back (hotfix 후) | 직접 push 금지 |
+| `main` | **배포 anchor**. 태그된 릴리스만 존재 | `develop → main` **release PR** 로만 / `hotfix/* → main` PR | 직접 push 금지 |
+| `develop` | **개발 통합**. 모든 완성된 변경이 먼저 도착 | `<type>/*`·`release/*-prep` PR / `main → develop` merge-back (hotfix 후) | 직접 push 금지 |
 | `<type>/<이슈번호>-<설명>` | 일상 개발. type 은 §커밋 컨벤션 의 type 과 동일 (신기능 = `feature`) | `develop` 에서 분기 | `main` 대상 PR 생성 금지 |
 | `release/<버전>-prep` | 릴리스 준비 (이슈번호 없는 예외) | `develop` 에서 분기 | 기능 변경 금지 |
 | `hotfix/<이슈번호>-<설명>` | **prod 긴급 패치** | `main` 에서 분기. 머지 후 즉시 `main → develop` merge-back | 드물게 사용. develop merge-back 누락 금지 |
@@ -473,5 +473,5 @@ forensic ADR 의 측정 데이터 (스크린샷 / 차트 / diagram) 는 별도 �
 - main 브랜치 직접 수정 금지
 - 리뷰 없이 머지 금지
 - 테스트 없이 PR 생성 금지
-- `<type>/*` PR 의 `base=main` 금지 — 반드시 `develop` 대상. `base=main` 은 release/hotfix PR 만 허용
+- `<type>/*`·`release/*-prep` PR 의 `base=main` 금지 — `base=main` 은 release PR(head=develop)/hotfix 전용
 - hotfix 머지 후 `main → develop` merge-back 누락 금지 — 누락 시 §drift 감지 의 git 직접 점검에서 warn 으로 드러남
