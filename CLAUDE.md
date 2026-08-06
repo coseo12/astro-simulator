@@ -23,11 +23,7 @@ AI 에이전트 기반 개발 워크플로우 템플릿. 1인 개발자-AI 페�
 
 ## 브랜치 전략 (classic gitflow)
 
-> 과거 이력: v2.12.0 이전까지 `feature → develop` + `feature → main` 의 **dual PR** 변형을 썼고, 고비용으로 인해 2026-04-15 부터 `develop` 이 방치되는 drift 가 발생했다. v2.13.0 부터 정석 gitflow 로 복원 — 자세한 결정 근거는 [ADR 20260419](docs/decisions/20260419-gitflow-main-develop.md) 참조.
-
-> **develop 의 두 가지 핵심 역할**: (1) **통합 스테이징** — 여러 feature 가 상호작용하는 기능일 때 main 으로 가기 전에 함께 동작하는지 검증하는 공간. tag trigger 로는 대체 불가. (2) **PaaS staging environment 매핑** — Vercel/Netlify/Amplify 등 브랜치 기반 자동 배포 도구에서 `main=production / develop=staging / <type>/*=preview` 로 자연스럽게 매핑. 자세한 패턴: [docs/deployment-patterns.md](docs/deployment-patterns.md).
-
-> **이 저장소 자체의 릴리스 vs 하네스 사용 프로젝트 릴리스**: 이 하네스 저장소는 수동 `git tag + gh release create` 방식이라 `main push = 배포` 가 아니다. 반면 하네스를 사용하는 웹 앱 프로젝트 대부분은 PaaS 자동 배포 (브랜치 기반 push 트리거) 를 쓴다. 양쪽 모두 **gitflow 브랜치 전략은 동일**하게 적용되며 배포 트리거만 다르다.
+> 배경 (dual PR 폐기 이력 / develop 2역할 / PaaS 환경 매핑): [docs/deployment-patterns.md](docs/deployment-patterns.md)
 
 | 브랜치 | 역할 | 진입 경로 | 금지 사항 |
 |---|---|---|---|
@@ -38,50 +34,15 @@ AI 에이전트 기반 개발 워크플로우 템플릿. 1인 개발자-AI 페�
 | `hotfix/<이슈번호>-<설명>` | **prod 긴급 패치** | `main` 에서 분기. 머지 후 즉시 `main → develop` merge-back | 드물게 사용. develop merge-back 누락 금지 |
 
 ### 워크플로 3단계
-
-**1. 일상 개발**
-```
-feature/123-xxx   (develop 에서 분기)
-   ↓ PR (base=develop)
-develop
-```
-
-**2. 릴리스 (MAJOR/MINOR/PATCH 공통)**
-```
-develop   (충분히 쌓이면)
-   ↓ 단일 release PR (base=main, head=develop)
-   ↓ merge commit 방식으로 머지 — gh pr merge <PR> --merge
-main   (merge commit 이 develop tip 을 부모로 포함)
-   ↓ git push origin main:develop   (fast-forward, force 아님)
-develop  (main tip 과 완전 동기화)
-   ↓ git tag vX.Y.Z + gh release create
-```
-- release PR 본문에 CHANGELOG 범위, Behavior Changes, 태그 계획 명시
-- **release PR 은 반드시 `--merge` (merge commit) 방식으로 머지** — `--squash` 금지. squash 로 머지하면 main 에 새 커밋이 생겨 develop 과 diverge 하며 매 릴리스마다 merge-back PR 이 강제된다. merge commit 은 main tip 이 develop tip 을 직계 조상으로 포함하게 하여 **merge-back 이 불필요**해진다. 결정 근거: [ADR 20260419-release-merge-strategy](docs/decisions/20260419-release-merge-strategy.md)
-- **merge commit 직후 `git push origin main:develop` (fast-forward) 필수** — main 의 merge commit 자체가 develop 에 없으므로 doctor 가 일시적으로 warn (main 이 1 커밋 앞섬). fast-forward push 로 즉시 해소. force-push 가 아니며 (main 이 develop 의 후손), CRITICAL #5 해당 없음
-- **dual PR 재발 방지**: 일상 개발 PR 은 `base=main` 을 사용하지 않는다 (PR 템플릿 가드)
-
-**3. 핫픽스 (prod 이슈)**
-```
-hotfix/99-critical   (main 에서 분기)
-   ↓ PR (base=main, squash 또는 merge commit 가능)
-main   ← 머지 + 태그 vX.Y.Z+1
-   ↓ 즉시 merge-back PR (base=develop, head=main)
-develop   ← 동기화 유지 (누락 시 drift)
-```
-- hotfix 는 release 경로를 우회하므로 main 이 develop 보다 앞서게 되어 **merge-back 필수**. 이 경우만 merge-back PR 로 develop 을 동기화
-- merge commit 으로 release 를 해온 정상 운영에서는 hotfix 빈도가 적으므로 merge-back 오버헤드도 최소
+1. **일상 개발** — `<type>/*` → PR(base=develop) → develop
+2. **릴리스** — develop → release PR(base=main) → **`gh pr merge <PR> --merge` 의무** (`--squash` 금지 — main/develop diverge + merge-back 강제) → **`git push origin main:develop`(fast-forward) 필수** → tag + release
+3. **핫픽스** — `hotfix/*`(main) → PR(base=main) → 태그 → **즉시 merge-back PR(base=develop)** 필수
+- **dual PR 금지**: 일상 개발 PR 은 `base=main` 사용 금지 (PR 템플릿 가드)
+- 상세: [branch-strategy-workflow.md](docs/guides/branch-strategy-workflow.md)
 
 ### drift 감지
-- `git fetch origin` 후 `git merge-base --is-ancestor origin/develop origin/main` + `git rev-list --count origin/main..origin/develop` 로 `origin/main` vs `origin/develop` 커밋 격차를 직접 점검한다 (#907 디커플 이후 도구 아닌 git 직접 명령)
-- **정상 (pass)**:
-  - 동일 커밋 — 릴리스 직후 또는 초기 상태
-  - `develop > main` — 다음 릴리스 대기 (정상)
-  - `main > develop` 이지만 `git merge-base --is-ancestor develop main` 가 참 — **fast-forward 동기화 대기 중** (release PR merge commit 직후 정상 상태. `git push origin main:develop` 로 해소)
-- **경고 (warn)**:
-  - `hotfix/*` 브랜치 존재 + `main > develop` — hotfix 진행 중 (머지 후 merge-back PR 필요)
-  - develop 이 main 의 조상이 아닌 채 `main > develop` — hotfix merge-back 누락 또는 release PR 을 실수로 `--squash` 로 머지한 가능성. `git show main --format=%P | wc -w` 로 merge commit 여부 확인 (2 이면 merge commit, 1 이면 squash)
-  - `git rev-list` 실패 (unrelated histories 등) — `git merge-base origin/main origin/develop` 로 공통 조상 확인
+- `git fetch origin` + `git merge-base --is-ancestor origin/develop origin/main` + `git rev-list --count origin/main..origin/develop`
+- 반직관 함정: `main > develop` 여도 develop 이 조상이면 **정상** (ff 대기 — `git push origin main:develop`) / 아니면 warn
 
 ## 커밋 컨벤션
 ```
@@ -108,19 +69,14 @@ AI는 자기 작업을 과도하게 긍정 평가하는 경향이 있으므로, 
 3. 기준 미충족 시 **구체적 피드백과 함께 반려** — 단순 "실패"가 아닌 원인+수정점 명시
 4. 표면적 테스트가 아닌 **엣지 케이스까지 탐색**한다
 5. 합의된 기준은 실측 후 **재조정 가능** — 단, 사용자와 명시적으로 합의 후 갱신
-6. 재조정 시 **테스트 ROI 5문 체크** 후 대체재를 우선 검토한다:
-   - 테스트 환경 구축 비용이 검증 대상 코드 라인 수의 5배 이상인가? (git fixture / DB seed / 네트워크 mock 등)
-   - 몇 줄을 보호하는가? 1~2줄짜리 스킵 조건은 **주석 계약 + 인접 속성 테스트**가 충분할 수 있다
-   - 회귀 시 조용히 퇴행 vs 빌드 실패? 조용히 퇴행 → 테스트 필수, 빌드 실패 → 주석 계약으로 충분 가능
-   - 인접 유닛 테스트 / 타입 가드 / 문서로 간접 보증 가능한가?
-   - 미래 fixture 인프라 구축 후 저렴해질 수 있는가? → **별도 인프라 이슈로 분리**
+6. 재조정 시 **테스트 ROI 5문 체크** 후 대체재 우선 — [상세](docs/lessons/sprint-contract-roi.md)
 7. 재조정 사실은 **세 위치에 동시 박제** (누락 방지):
    - **코드 주석** — 계약 자체 (무엇을 의도적으로 스킵했는지)
    - **PR 본문** — 결정 근거 (왜 재조정했는지)
    - **CHANGELOG Notes** — 미래 관찰자용 기록 (재발견 시 "누락"으로 오인 방지)
 8. 반대 함정: "완료 기준에 있으니 무조건 테스트 작성" (의존성 복잡도 무시한 단발성 부채) vs "ROI 낮다고 조용히 스킵" (재조정 박제 누락). 둘 다 금지.
-9. 근거: volt [#31](https://github.com/coseo12/volt/issues/31) — harness #92 Phase 2 merge 스킵 테스트에서 git fixture 구축 비용이 검증 대상 1줄 대비 역전되어 주석 계약 + 인접 속성 테스트로 대체한 사례
-10. **수치 DoD 미달 시 측정 방법 검증 우선** — DoD 수치가 미달이면 **(0) 측정 방법 검증 → (1) 식/구현 수정 → (2) 알고리즘 교체** 순으로 접근한다. 샘플링/윈도우/노이즈 특성이 미달의 진짜 원인인 경우가 잦다. 특히 신호가 약할 때(측정 대상 ≪ baseline) noise 가 이론값 방향으로 우연히 pull 되어 선행 Phase 의 "우연 성공" 기록으로 남아 있을 수 있다. 측정법 전환 전 식부터 수정하면 이미 올바른 식을 "틀렸다" 고 오진하는 역방향 손실이 발생한다. 근거: volt [#32](https://github.com/coseo12/volt/issues/32) — 지구 GR 세차 측정에서 EIH 식 structural bias 로 오진한 현상이 실제로는 `min_r` 샘플링 노이즈였고, LRL 벡터 + Newton baseline subtraction 측정법 전환으로 드러남.
+9. 근거: volt [#31](https://github.com/coseo12/volt/issues/31)
+10. **수치 DoD 미달 시 측정 방법 검증 우선** — **(0) 측정 방법 → (1) 식/구현 → (2) 알고리즘 → (3) 데이터 신뢰성** 순. 상세 [sprint-contract-roi.md](docs/lessons/sprint-contract-roi.md) §10항
 
 ### 마일스톤 회고 루틴
 
@@ -132,14 +88,7 @@ AI는 자기 작업을 과도하게 긍정 평가하는 경향이 있으므로, 
 
 ## 디자인 품질 루브릭 (UI 프로젝트)
 
-UI가 포함된 작업에서 4축으로 품질을 평가한다:
-
-| 기준 | 가중치 | 설명 |
-|------|-------|------|
-| Design Quality | 30% | 색상, 타이포그래피, 레이아웃이 일관된 전체로 느껴지는가 |
-| Originality | 30% | 템플릿/라이브러리 기본값/AI 생성 패턴(보라색 그라데이션 등)을 탈피했는가 |
-| Craft | 20% | 타이포그래피 계층, 간격 일관성, 색상 조화, 대비 비율 |
-| Functionality | 20% | 미학과 무관한 사용성 (내비게이션, 폼, 인터랙션) |
+4축: Design Quality 30% / Originality 30% / Craft 20% / Functionality 20% — [상세](docs/guides/design-quality-rubric.md)
 
 ---
 
@@ -247,10 +196,10 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 - 상세: [docs/lessons/guard-design-principles.md](docs/lessons/guard-design-principles.md) — volt [#101](https://github.com/coseo12/volt/issues/101) / [#106](https://github.com/coseo12/volt/issues/106) / [#107](https://github.com/coseo12/volt/issues/107)
 
 ### 세션 중단 dead-wait 방지 — 스케줄러 heartbeat 3계층 가드
-background 대기 / sub-agent notification 경로는 세션의 자식 프로세스라 세션 재시작 시 SIGKILL 로 소멸 → **아무것도 모델을 재호출하지 않아 무기한 침묵(dead-wait)**, 사용자는 진행 중으로 오인. 작업 유실보다 이 "무인지 대기" 가 더 치명적. `ScheduleWakeup`(세션 재시작에도 지속 발화)을 dead-man's switch 로 쓰는 3계층 직교 방어: (1) fallback heartbeat (background 대기 진입 시 장기 `ScheduleWakeup` 1200~1800s 병행 예약, 단발성) / (2) SessionStart 복구 훅 (미해소 대기 stdout 경고, exit 0 불변) / (3) 대기 상태 파일 (`.context/pending-waits.json`, best-effort).
-- **행동 규약 (메인 오케스트레이터)**: 대기 진입 = `ScheduleWakeup 예약 + 상태파일 append` 를 원자 단위로. 훅 경고 확인 시 **대기를 그대로 재개 금지** — waiter 는 이미 소멸했을 수 있으므로 `상태 조회 → 생사 판단 → 항목 제거/재개`.
-- 상세: [docs/lessons/dead-wait-guard.md](docs/lessons/dead-wait-guard.md) — volt [#121](https://github.com/coseo12/volt/issues/121)
-- 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어 패턴
+세션 재시작 시 waiter 는 소멸하고 대기만 남는다 (무인지 침묵).
+- **행동 규약 (메인)**: 대기 진입 = fallback `ScheduleWakeup`(1200~1800s) 예약 + 상태파일 append 를 **원자 단위**로. 훅 경고 시 **재개 금지** — `상태 조회 → 생사 판단 → 항목 제거/재개`.
+- 상세: [dead-wait-guard.md](docs/lessons/dead-wait-guard.md) — volt [#121](https://github.com/coseo12/volt/issues/121)
+- 일반화: [state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어
 
 ## 프로젝트 고유 보강 교훈
 
@@ -326,24 +275,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 #### 가드 D — 세션 중단 dead-wait (대기 라이프사이클 + fallback heartbeat)
 
-가드 A/B/C 가 **좀비 프로세스**(포트 점유·CPU 폭주)를 다룬다면, 가드 D 는 **대기 라이프사이클** 을 다루는 직교 확장이다. 세션(Conductor) 재시작 시 background watch·sub-agent 는 SIGKILL 로 소멸(exit 137, 실측 5회)하지만 메인 컨텍스트에는 "대기 중" 만 남아 **아무것도 모델을 재호출하지 않는 무기한 침묵(dead-wait)** 이 발생한다 — 사용자는 진행 중으로 오인한다. 반면 `ScheduleWakeup` 스케줄은 세션 재시작에도 지속 발화(실측 5회+)하므로 **dead-man's switch** 로 쓸 수 있다. 3계층 방어(우선순위 순):
-
-- **(1) fallback heartbeat — 1차 하드 보증 (의무)**: 모든 background 대기(sub-agent background spawn / CI run watch)에 장기 fallback `ScheduleWakeup`(1200~1800s)를 **병행 예약**한다. notification 선착 시 no-op, 세션 재시작 시 **유일한 재호출 신호**. ScheduleWakeup 은 **단발성** 이므로 **대기 해소 시 재예약하지 않는다(자연 종료)** — 명시적 취소 API 불필요. (2026-07-09 #790 부터 선적용 — reviewer/qa heartbeat 전부 no-op = 정상.)
-- **(2) SessionStart 복구 훅 — 2차 결정적 노출**: `.claude/hooks/session-start-dead-wait-check.sh` 가 SessionStart hook 으로 등록(`.claude/settings.json`, 3번째 hook). 세션 시작 시 `.context/pending-waits.json` 의 미해소 대기(Grace Period 60s 초과)를 stdout 경고로 노출(exit 0, 블록 안 함). 모델은 대기 재개 대신 즉시 상태 재확인. **Grace Period** 는 세션 종료 직후 재시작 시 방금 진입한 대기를 오탐하지 않기 위함(가드 C ETIME 임계값과 동형). 훅은 **검출만** 하고 자동 정리하지 않는다(masking 방지, fail-visible).
-- **(3) `.context/pending-waits.json` — 3차 맥락 상세 (best-effort)**: 어떤 대기가 미해소인지 목록. 훅(2차)이 읽어 노출할 데이터 소스. 파일 write 는 best-effort — 누락돼도 heartbeat(1차)가 침묵을 깨므로 **크리티컬 패스 밖**(B2 heartbeat-우선).
-
-**pending-waits 기록/제거 규약** (메인 오케스트레이터 전용 행동):
-
-- **기록**: background 대기 진입 시 → `waits[]` 에 `{ id: "<kind>:<식별자>", kind: "sub-agent"|"ci-run", description, created_at, wakeup_scheduled }` append **+ 동시에 fallback ScheduleWakeup 예약**. 두 동작을 **하나의 정신적 원자 단위** 로 묶는다("대기 진입 = wakeup 예약 + pending-waits 기록"). 쓰기는 임시 파일 + 원자적 rename 권장(동시 write 손상 방지).
-- **제거**: 대기 해소 시(sub-agent 반환 / CI run 완료 후 처리) → 해당 `id` 항목 제거.
-
-**복구 프로토콜** (SessionStart 훅 경고를 본 메인의 행동 순서):
-
-1. **대상 상태 조회** — `gh pr/issue view --json state,labels` 또는 sub-agent `SendMessage` 로 대상의 현재 상태 확인.
-2. **생사·완료 판단** — waiter 가 이미 소멸했는지 / 대상 작업이 완료됐는지 판별.
-3. **pending-waits 항목 제거 또는 작업 재개** — 완료면 항목 제거(self-healing), 미완이면 heartbeat 재예약 + 작업 재개.
-
-> **대기를 그대로 재개하지 말 것** — waiter 는 이미 소멸했을 수 있다. SSoT 박제 회귀 차단은 `scripts/verify-dead-wait-check.mjs`(CI 통합, `--self-test` 3중 시뮬 포함) 가 담당. 설계 SSoT: `docs/decisions/20260710-817-dead-wait-guard.md`.
+가드 A/B/C 가 **좀비 프로세스**(포트 점유·CPU 폭주)를 다룬다면, 가드 D 는 **대기 라이프사이클** 을 다루는 직교 확장이다. 행동 규약은 §실전 교훈 dead-wait 블록, 상세는 [docs/lessons/dead-wait-guard.md](docs/lessons/dead-wait-guard.md).
 
 ### 반복 운영 마찰 원인 박제 (#795)
 
@@ -358,17 +290,9 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 ## 교차검증 (cross-validate)
 
-정답이 없는 의사결정에서 Gemini의 두 번째 시각을 활용한다.
-- Gemini 실패 시 스킵하고 "Claude 단독 분석"을 명시한다
-- 경량 모델 폴백은 하지 않는다 — 교차검증의 가치는 깊은 분석에 있다
-- **정책·설계·ADR 박제 직후 1회 루틴** — 정책 문서, ADR, CRITICAL DIRECTIVE 등을 박제한 직후 cross-validate 스킬을 1회 호출한다. 단일 모델 편향(범주 오류/암묵 전제 누락)은 박제 직후가 노출 효율이 가장 높다. v2.6.2→v2.6.3(SemVer 세분화) 사례 참조.
-- **교차검증 결과는 Claude가 재분석**: Gemini 산출물을 합의/이견/고유발견으로 분류하고, 과대 대응은 근거와 함께 반려. 맹목 수용 금지.
-- **고유 발견의 수용 vs 후속 분리 3단 프로토콜** — #23 의 반려 기준을 보완하는 수용/분리 기준:
-  1. **합의 선별** — Claude 설계와 일치하는 Gemini 지적은 현재 PR 에 즉시 반영. 이견은 근거 비교 후 취사
-  2. **고유 발견의 범위 체크** — Gemini 만의 제안이면 현재 스프린트 계약(특히 **비목표**)과 대조. 범위 내면 반영, 범위 밖(비목표와 상충)이면 **후속 이슈로 분리**. 판단 질문: "이 변경이 현재 PR 의 `Behavior Changes` 에 원 완료 기준과 직교하는 항목을 추가하는가?"
-  3. **분리 시 박제 규칙** — 후속 이슈를 **즉시 생성**해 맥락 유실 방지. 본문에 Gemini 설계 스케치 인용 + `Builds on: #원PR` 링크 + 우선순위 초안(high / medium / low) 명시
-- 금지: 스프린트 비목표를 "Gemini 제안이 타당하다"는 이유만으로 무시 (CRITICAL #6 침범). 근본 해결책이라도 현재 스프린트 범위 밖이면 분리
-- 근거: volt [#23](https://github.com/coseo12/volt/issues/23), volt [#29](https://github.com/coseo12/volt/issues/29) — harness #89 (post-apply 게이트) 교차검증에서 Gemini 가 `previousSha256` 스키마 확장을 제안했고, 비목표 "매니페스트 스키마 변경 없음"과 상충하여 후속 이슈 #92 로 분리. 결과적으로 3 PR / 3 릴리스로 자연 분할되어 각 단계 위험 독립
+- **박제 직후 1회 루틴** — 정책·ADR·CRITICAL DIRECTIVE 박제 직후 1회 호출. 실패 시 스킵 + **"Claude 단독 분석" 명시** (경량 모델 폴백 금지)
+- 결과는 Claude 가 **재분석** (맹목 수용 금지). 고유 발견이 스프린트 **비목표**와 상충하면 후속 이슈 분리 — 비목표 무시는 CRITICAL #6 침범
+- 상세: [docs/guides/cross-validate-protocol.md](docs/guides/cross-validate-protocol.md)
 
 ---
 
@@ -387,27 +311,13 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 - 확신이 없으면 3번 재작업보다 1번 질문
 
 ### 릴리스
-- **Semantic Versioning 분류 기준** (판정 애매 시 낮은 쪽 선택):
-  - **MAJOR** — 하위 호환을 깨는 변경. CLI 인자 제거/시그니처 변경, 기존 스킬·에이전트 계약 파괴, `.harness` 스키마 breaking, 설정 키 제거
-  - **MINOR** — 코드 **또는 에이전트 행동**이 포함된 신규 기능·행동 변화 추가
-    - 신규 CLI 서브커맨드, 신규 에이전트/스킬, 신규 hook/automation, 신규 옵션(기본값이 기존 동작 유지)
-    - **에이전트 지시어·스킬 절차·체크리스트·행동 제약의 추가·수정** (`.claude/agents/*.md`, `.claude/skills/*/SKILL.md` 의 **행동을 바꾸는** 변경)
-  - **PATCH** — **행동 변화가 없는** 문서·문구 변경. CLAUDE.md 교훈/배경 설명 추가, README·docs 문서화 보강, 주석·문구·오타 개선, 버그 수정
-- **행동 변화 vs 문서 변경 판정 질문**: 이 변경으로 에이전트가 같은 입력에 다르게 동작하는가? 예(= 행동 변화 = MINOR), 아니오(= 문서 = PATCH).
-  - 예시 MINOR: developer 에이전트 워크플로 단계 추가, 스킬 DO NOT TRIGGER 조건 변경, 금지 규칙 추가
-  - 예시 PATCH: 실전 교훈 섹션에 사례 추가, README 문구 개선, 오타 수정, 버그 수정
-- **CHANGELOG 작성 규칙**:
-  - MINOR/MAJOR 릴리스는 **`### Behavior Changes`** 섹션을 필수 포함하여 다운스트림/사용 프로젝트가 업데이트 후 관찰할 행동 변화를 bullet 으로 나열한다
-  - PATCH 릴리스도 frozen 파일(`.claude/`)이 변경됐다면 `### Behavior Changes: None — 문서/문구만` 을 명시해 자동 업데이트 신뢰 모델을 보호한다
-- 볼트 반영은 변경 성격에 따라 분류 — 에이전트·스킬 행동 변경이면 MINOR, 단순 교훈·문서 보강이면 PATCH
-- 의미 있는 마일스톤마다 `git tag` + `gh release create`로 릴리스
-- **Phase 분리 릴리스 리듬** — 완료 기준이 많은 이슈는 한 스프린트에 몰아 처리하지 말고, 각 Phase 가 **독립 릴리스 가능한 관찰 단위**가 되도록 나눈다. 적용 조건(3가지 전부 필요):
-  - **backward-compat** — 앞 Phase 만 배포돼도 시스템이 정상 동작
-  - 각 Phase 가 **완결 Behavior Change 집합** — 중간 Phase 가 부분 구현 상태가 아님
-  - 사용자가 **점진 릴리스 리듬에 동의** — 주간 단위로 여러 릴리스 허용
-- 적용 불가: Phase 간 필수 의존(앞 Phase 단독 배포 시 불안정), 파이프라인 변경이 전체를 통째로 요구. 판정 애매 시 단일 릴리스로 통합
-- 분할 시 CHANGELOG 는 Phase 별 별도 entry + 상호 링크 박제 (사용자에게 "왜 쪼개졌는지"가 drift 되지 않도록). 원 이슈는 마지막 Phase 완료 시 한 번에 close
-- 근거: volt [#30](https://github.com/coseo12/volt/issues/30) — harness [#92](https://github.com/coseo12/harness-setting/issues/92) (`previousSha256` 자가 복구) 를 Phase 1 (로직, v2.9.0) / Phase 2 (가시성 + 회귀 가드, v2.10.0) 로 분할. 리뷰 분산 + 중간 관찰 + 롤백 독립성 확보
+- **SemVer 분류** (판정 애매 시 낮은 쪽): **MAJOR** = 하위 호환 파괴 / **MINOR** = 코드 **또는 에이전트 행동**의 신규 기능·행동 변화 / **PATCH** = **행동 변화 없는** 문서·문구 변경, 버그 수정
+- **판정 질문**: 이 변경으로 에이전트가 같은 입력에 다르게 동작하는가? 예 → MINOR, 아니오 → PATCH
+- MINOR/MAJOR 는 CHANGELOG `### Behavior Changes` **필수**. PATCH 도 `.claude/` 변경 시 `### Behavior Changes: None — 문서/문구만` 명시
+- 상세 (예시 / Phase 분리 리듬 / version bump / 근거): [docs/guides/release-process.md](docs/guides/release-process.md)
+
+### CLAUDE.md 예산 (각인층)
+신규 블록 전 **① 동일 주제 `docs/` 파일 존재?** (있으면 포인터만) → **② 안 읽으면 즉시 오작동?** (아니오 → `docs/`). 35k 경보 / 45k fail: `verify-claudemd-size.mjs` — [governance](docs/guides/claudemd-governance.md)
 
 ### 문서 동기화
 - 에이전트/스킬/설정을 삭제하거나 변경할 때, docs/ 하위 관련 문서를 확인하고 업데이트한다

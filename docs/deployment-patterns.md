@@ -2,6 +2,10 @@
 
 이 문서는 harness-setting 이 권장하는 gitflow 를 PaaS 자동 배포 도구와 매핑하는 방법을 설명한다.
 
+## 채택 배경 — dual PR 변형 폐기
+
+v2.12.0 이전까지는 `feature → develop` + `feature → main` 의 **dual PR** 변형을 썼다. 고비용으로 인해 2026-04-15 부터 `develop` 이 방치되는 drift 가 발생했고, v2.13.0 부터 정석 gitflow 로 복원했다. 결정 근거: [ADR 20260419-gitflow-main-develop](decisions/20260419-gitflow-main-develop.md).
+
 ## 원칙
 
 `main = production / develop = staging / <type>/* = preview` 의 3단계 환경 매핑.
