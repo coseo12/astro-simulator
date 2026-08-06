@@ -65,6 +65,37 @@ jobs:
       - name: docs 상대 링크 무결성 가드
         run: bash scripts/verify-docs-links.sh
 
+      # 브랜치명 규약 SSoT drift 가드 (#962 축 B)
+      # `scripts/verify-branch-name.mjs` 의 상수가 브랜치 규약의 **정본**이고, 산문 3곳
+      # (PULL_REQUEST_TEMPLATE.md / developer.md / create-pr/SKILL.md) 의 type 열거는 그
+      # 파생이다. 한쪽만 갱신하면 drift → exit 1 로 차단. 추가로 workflow 의 `branch:`
+      # 리터럴(봇 브랜치 생성 지점)이 전부 허용 집합으로 설명되는지 검사해, 3번째 봇 패턴이
+      # 등장하는 순간 의식적 갱신을 강제한다 (통째 skip 으로 무마 금지 — fail-fast 정합).
+      # 5단계로 `docs/guides/branch-strategy-workflow.md` §허용 집합 표 4행도 대조한다
+      # (reviewer 권고 R1 — 그 표는 type 열거뿐 아니라 gitflow head / 릴리스 형태 / 봇
+      # 리터럴까지 축자 재기술하므로, 검증 밖에 두면 상수 변경 시 조용히 drift 한다).
+      #
+      # 추출 계약 D1 정정 (2026-08-06 실측, ADR §5-4 / 스크립트 ENUM_RE 주석과 3중 박제):
+      #   원안 "해당 라인의 백틱 인용 토큰만 추출" 을 **라인 전체**로 해석하면
+      #   `base=develop` / `<type>/*` / `--squash` 같은 잉여 토큰이 유입돼 3파일 전부
+      #   양방향 대조가 **상시 false-fire** 한다. 따라서 추출 범위를 locator 이후의
+      #   **열거 구간**(`` `type` `` + 선택적 `(alias)` + ` / ` 반복의 최장 선두 run)으로
+      #   한정한다. 원안의 의도(백틱 범위 한정이 `feat` 를 배제)는 실측으로 확인됐다.
+      #   **대가 (의도적 미대응)**: 열거 구간 **밖**에 추가된 type 토큰은 미검출이다.
+      #   하드닝하면 `create-pr/SKILL.md` 의 `` `develop` `` 이 같은 패턴이라 D1 이 제거한
+      #   상시 false-fire 가 즉시 재유입된다. 실제 drift 편집 경로는 전부 잡히므로 지불한다.
+      #
+      # 런타임 브랜치명 검사는 `branch-name-guard.yml` 이 담당한다 (선결 조건이 다름 —
+      # 이 워크플로는 이벤트 무관 정적 검사라는 불변식을 유지).
+      - name: 브랜치명 규약 SSoT drift 가드
+        run: node scripts/verify-branch-name.mjs --verify-ssot
+      # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행).
+      # 자식 프로세스 프로브 4건 포함 — 진입점 silent no-op(D-negative) 1건 +
+      # CLI 인자 파싱 우회(reviewer B1) 3건. 후자는 `--branch '--self-test'` 처럼 모드
+      # 플래그가 값으로 왔을 때 브랜치 검사가 건너뛰어지지 않는지를 CI 로그에 남긴다.
+      - name: 브랜치명 규약 가드 self-test
+        run: node scripts/verify-branch-name.mjs --self-test
+
       # docs/lessons/ README 동기화 가드 (#213)
       # 신규 레슨 파일이 README "파일 목록" 표에 등록되지 않으면 exit 1 로 PR 머지 차단.
       - name: docs/lessons README 동기화 가드
