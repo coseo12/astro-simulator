@@ -81,7 +81,7 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
    - **이견 수용** — Claude 원안과 다르지만 외부 모델 근거가 합리적이어서 수정한 항목. 원안·수정안 대비 + 수용 근거 명시
    - **Claude 재분석으로 기각한 외부 모델 제안** — 근거와 함께 반려. 맹목 수용 회피 실증 (volt #51 외부 툴 주장 실측 가드 참조)
    - **고유 발견 (후속 분리)** — 범위 밖으로 판정되어 후속 이슈로 분리된 항목. 생성된 이슈 번호 링크
-   - **호출 전 Claude 편향 셀프 체크** — CLAUDE.md `## 교차검증` 의 "Claude 자체 편향 4종 체크리스트" (낙관적 일정 / 결합 간과 / 폐기 프레이밍 / 순수주의) 통과 여부 1줄 기록. 미통과 축은 cross-validate 호출 프롬프트에 명시 질문으로 삽입
+   - **호출 전 Claude 편향 셀프 체크** — [cross-validate-protocol.md](../../docs/guides/cross-validate-protocol.md) §5 "Claude 자체 편향 4종 셀프 체크리스트" (낙관적 일정 / 결합 간과 / 폐기 프레이밍 / 순수주의) 통과 여부 1줄 기록. 미통과 축은 cross-validate 호출 프롬프트에 명시 질문으로 삽입
 
    단일 모델 편향 노출은 박제 직후가 효율 최고 (volt #23 / #55). **앵커** 는 `CRITICAL DIRECTIVE 개정` / `ADR 신규·개정/폐기` / `MINOR 이상 릴리스 Behavior Changes` / `프로젝트 원칙·철학 선언` 4개 — CLAUDE.md `## 교차검증` 섹션 참조
 8. **429 fallback 분기 자동 매핑 (BC#4 실행 단계, Phase 3 / Phase B 헬퍼화)** — step 7 의 cross-validate 호출은 `cross_validate.sh` 스크립트를 경유하며, 종료 시 **outcome JSON 파일** (`${LOG_DIR}/cross-validate-<type>-<timestamp>-outcome.json`) 을 생성한다. architect 는 공통 헬퍼 `scripts/parse-cross-validate-outcome.sh` (v2.21.0~ #131 Phase B) 로 이 파일을 파싱해 `extends.cross_validate_outcome` 을 **자동 매핑**:

@@ -116,8 +116,10 @@ const UPSTREAM_ONLY_ALLOWLIST = [
     source: 'docs/guides/cross-validate-protocol.md',
     target: '../decisions/20260521-gemini-to-antigravity.md',
   },
-  // upstream lib 경로 (harness-setting 저장소 전용)
-  { source: 'docs/guides/claudemd-governance.md', target: '../../lib/claudemd-size-constants.js' },
+  // (#975: `lib/claudemd-size-constants.js` entry 1건 삭제. `lib/` 는 upstream-only 가 아니라
+  //  #907 디커플 이후 **어디에도 없는** 경로였다 — allowlist 가 upstream-only 예외가 아니라
+  //  진짜 dead link 를 억제하고 있었다. 임계값 SSoT 를 실재하는 scripts/verify-claudemd-size.mjs
+  //  로 repoint 한 뒤 entry 제거 → 동일 링크 재유입 시 이제 FAIL 로 차단된다)
 ];
 
 const findAllowlistEntry = (sourceRel, rawTarget) =>

@@ -75,12 +75,12 @@ grep/sed 파이프라인의 `\"` escape 처리 한계는 **실측 확인됨** �
 
 ### 2.9 L1/L2/L3 plan-mode 가드 약어 정의 (SSoT)
 
-plan-mode 우회 자동 가드 (#479) 의 3 계층 약어. CLAUDE.md §교차검증 plan-mode 가드 본문에서 inline 으로 사용되며, 본 § 가 단일 정의처 (SSoT).
+plan-mode 우회 자동 가드 (#479) 의 3 계층 약어. **본 § 가 단일 정의처 (SSoT)** — 5 페르소나 `.claude/agents/*.md` 는 L3 산출물인 `outcome.plan_bypass` 검증 의무만 인용한다.
 
 | 약어 | 역할 | 구현 | agy 지원 여부 |
 |---|---|---|---|
 | **L1** | prompt strict prefix — 도구 호출 사전 차단 | `cross_validate.sh` 가 `EXTERNAL_VALIDATOR_STRICT_PREFIX` 를 PROMPT 에 자동 prepend. agy `-p` 모드의 silent 도구 자동 실행 방지 (Phase 0 PoC #268 T10/T11 실측 — agy 가 "DO NOT execute" 지시 준수) | ✅ 적용 |
-| **L2** | cwd 격리 — 외부 모델 작업 디렉토리를 호출자 워크트리에서 분리 | gemini-cli 시점의 `--approval-mode plan` 등가. **agy 미지원** (Phase 0 PoC #268 — agy 는 cwd 격리 옵션 부재). 미적용 사유는 CLAUDE.md §교차검증 plan-mode 가드 본문에 인라인 박제 | ❌ 미적용 (agy 등가 옵션 부재) |
+| **L2** | cwd 격리 — 외부 모델 작업 디렉토리를 호출자 워크트리에서 분리 | gemini-cli 시점의 `--approval-mode plan` 등가. **agy 미지원** (Phase 0 PoC #268 — agy 는 cwd 격리 옵션 부재). 미적용 사유는 본 행과 아래 **§근거** ADR 에 박제 | ❌ 미적용 (agy 등가 옵션 부재) |
 | **L3** | 사후 snapshot diff + 자동 롤백 | `cross_validate.sh::snapshot_pre()` + `snapshot_post_and_rollback()` 가 호출 전/후 워킹트리 hash 비교. 변경 발견 시 tracked = `git checkout --`, untracked = `rm -f`. outcome JSON 3 필드 (`plan_bypass` / `bypass_files` / `rollback_failed`) 박제. `.gitignore` 변경 시 CRITICAL 격상 | ✅ 적용 |
 
 **agy 보호 모델**: L1 + L3 이중 가드 (L2 부재 — agy 의 `--approval-mode plan` / cwd 격리 옵션 양쪽 모두 부재로 인한 설계 trade-off). 메인 오케스트레이터는 sub-agent 복귀 직후 `scripts/parse-cross-validate-outcome.sh` 로 outcome JSON 파싱 후 `plan_bypass == false` 확인 의무 (5 페르소나 SSoT — architect/reviewer/qa §절차 + developer/pm §금지, drift 0).

@@ -23,8 +23,12 @@ SSoT drift 자동 가드 (`verify-*.sh` + CI step) 같은 negative-test 성격�
 ### 격리 동적 테스트와의 직교성
 
 - **격리 동적 테스트** (`mktemp` + env override 4~5 케이스) — **스크립트 로직** 검증 ([verify-script-authoring.md](verify-script-authoring.md) §2)
-- **3중 시뮬레이션** — **CI 통합 + hashFiles 조건 + 실제 차단** 검증
+- **3중 시뮬레이션** — **CI 통합 + 가드 발화 조건 + 실제 차단** 검증
 - 둘 다 통과해야 가드 작동이 완전 입증됨 (둘 중 하나만 통과 시 어딘가에 함정 잔존)
+
+> **"가드 발화 조건" 이란** — negative 단계에서 gate step 이 **실제로 실행되어 FAILURE 를 냈는지**. step 이 조용히 skip 된 채 job 이 초록이면 3중 시뮬레이션은 통과처럼 보여도 아무것도 입증하지 못한다. 그래서 negative 단계의 판정은 "job 이 빨간가" 가 아니라 **"해당 step 이 실행됐고 그 step 이 FAILURE 인가"** 다.
+>
+> 발화 조건을 `if: hashFiles(...) != ''` 로 거는 관용구는 **#945 / #950 에서 저장소 전역 제거됐다** (예외 0). 가드 대상 파일의 부재는 배포 시나리오가 아니라 **가드가 삭제된 회귀**이므로 즉시 FAIL 이 유일한 정상 동작이다. 현행 정책 SSoT: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) §hashFiles silent-skip 정책 블록.
 
 ### 비용
 
