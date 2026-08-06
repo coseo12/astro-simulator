@@ -42,9 +42,21 @@ name: Branch Name Guard
 # `develop` 은 **보호 자체 없음**. 즉 본 가드는 붉은 X 를 띄우지만 GitHub 이 머지를
 # 기계적으로 막지는 않는다. 전 워크플로 공통 상태이며 보호 정책 전반의 별건 (후속 이슈).
 
-# 같은 sha 의 중복 run 제거 (#779). group 에 github.workflow 포함 → 워크플로 간 교차 취소 방지.
+# 중복 run 제거 (#779) — 단, group 키는 **sha 가 아니라 PR 번호**다.
+#
+# 저장소의 다른 워크플로는 `head.sha` 로 묶는다. 그것은 검사 대상이 **내용**인 가드에는
+# 옳지만 본 가드에는 틀리다 — 본 가드의 검사 대상은 내용이 아니라 **ref(브랜치명)** 이다.
+# 서로 다른 두 브랜치가 같은 커밋을 가리키는 일은 정상적으로 발생하며(예: develop 과
+# 같은 sha 에서 잘라낸 release/*-prep, 재생성된 브랜치), sha 로 묶으면 한쪽 PR 의
+# 브랜치명 판정이 `cancel-in-progress` 로 **취소되어 아무 판정도 남지 않는다**.
+# CANCELLED 는 실패가 아니라 관례상 코스메틱으로 취급되므로(docs/ops/operational-friction.md §4)
+# 아무도 눈치채지 못한다 — 본 설계가 금지하는 silent skip 이다.
+# 2026-08-06 일회용 PR 실증에서 실제로 재현됐다 (#967 CANCELLED / #968 만 판정).
+#
+# PR 번호로 묶으면 같은 PR 안의 연속 push 만 supersede 되고(의도한 dedup), 서로 다른 PR 은
+# 절대 교차 취소되지 않는다. `pull_request` 전용 트리거라 번호는 항상 존재한다 (fallback 불요).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 on:
