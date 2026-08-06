@@ -15,7 +15,7 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
 ## 워크플로우
 1. 이슈 확인 — 완료 조건, 참조 문서 파악
 2. **스프린트 계약** — 완료 기준 목록 작성 및 사용자 확인
-3. `develop` 기반으로 작업 브랜치 생성: `<type>/<이슈번호>-<설명>` — type 은 커밋 컨벤션 type 과 동일 (`feature`(feat) / `fix` / `refactor` / `chore` / `docs` / `test`). 메인이 브랜치명을 지정했으면 그것을 따른다
+3. `develop` 기반으로 작업 브랜치 생성: `<type>/<이슈번호>-<설명>` — type 은 커밋 컨벤션 type 과 동일 (`feature`(feat) / `fix` / `refactor` / `chore` / `docs` / `test`). 메인이 브랜치명을 지정했으면 그것을 따른다. 브랜치 생성 직후 `node scripts/verify-branch-name.mjs` 로 규약 적합성을 확인한다 (CI `branch-name-guard` 와 동일 판정 — 여기서 걸러야 PR 재생성 비용이 안 든다)
 4. 테스트 시나리오가 있으면 테스트 코드 먼저 작성
 5. **기존 유사 함수 사전 탐색** — 신규 helper/util/함수 작성 전 `Grep`으로 함수명·핵심 키워드 검색 + 동일 패키지 `index.ts` export 확인. "이미 있을 수 있다"를 기본 가설로 두고 시작한다 (volt #21)
 6. 구현 코드 작성 → 테스트 통과 확인
