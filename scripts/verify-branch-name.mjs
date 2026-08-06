@@ -595,7 +595,16 @@ function runSelfTest() {
   // 순진한 URL 비교였을 때 아무 출력 없이 exit 0 이 나던 silent skip 을 pin 한다 (#962).
   if (IS_PROBE_CHILD) {
     // 프로브가 띄운 자식이다 (재진입 가드). 여기서 다시 프로브를 돌리면 무한 재귀가 된다.
-    console.log(`  [SKIP] 자식 프로세스 프로브 — 프로브 재진입 (${PROBE_ENV}=1)`);
+    //
+    // 단 **skip 이 아니라 fail 이다** (reviewer 2차 🟡1). 이 분기는 프로브 자식에서만 정당한데,
+    // `PROBE_ENV` 가 CI env 로 누출되면 최상위 실행이 이 분기를 타 회귀 프로브 4건이 통째로
+    // 사라진 채 exit 0 초록이 된다 — 본 가드가 봉인하려는 silent skip 클래스의 세 번째 층이다.
+    // 부모는 자식 종료 코드가 아니라 출력 텍스트로 판정하므로 여기서 fail 을 올려도
+    // 재진입 방지(무한 재귀 차단)는 그대로 성립한다.
+    fail++;
+    console.error(
+      `  [MISS] 자식 프로세스 프로브 — 최상위 실행인데 ${PROBE_ENV}=1 이다 (env 누출 시 프로브 4건 소실)`,
+    );
   } else {
     const linkResult = probeSymlinkedInvocation();
     if (linkResult.ok) {
@@ -816,7 +825,10 @@ const USAGE =
 
 /**
  * 모드별 기대 인자 개수 (모드 플래그 자신 포함). 초과분은 즉시 거부한다.
- * 프로토타입 오염 경로를 막기 위해 조회는 반드시 `Object.hasOwn` 으로 한다
+ * 프로토타입 오염 경로를 막기 위해 조회는 반드시 `Object.hasOwn` 으로 한다.
+ * 정확히는 `in` 으로 되돌려도 오염 8종은 `default` 분기가 exit 2 로 잡는다 (reviewer 2차 실측) —
+ * 즉 `Object.hasOwn` 과 `default` 는 **각각 독립적으로 fail-closed** 이고, 여기서 `hasOwn` 을 쓰는 건
+ * B1 결함(exit 0 우회)의 부활 방지가 아니라 **모드 조회 자체를 자기 소유 키로 한정**하기 위함이다
  * (`'constructor' in {}` 는 true 라, 단순 `in` 검사는 임의 문자열을 모드로 통과시킨다).
  */
 const MODE_ARITY = { '--self-test': 1, '--verify-ssot': 1, '--branch': 2, '--check-corpus': 2 };

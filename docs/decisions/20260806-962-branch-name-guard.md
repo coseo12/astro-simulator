@@ -220,11 +220,12 @@ scripts/verify-branch-name.mjs
 
 **5단계 추가 (reviewer 권고 R1, 2026-08-06) — guide 허용 집합 표를 검증 대상에 편입**
 
-본 PR 은 `docs/guides/branch-strategy-workflow.md` §허용 집합에 표를 **신설**했는데, 이 표는 산문 3곳과 달리 type 열거만이 아니라 허용 집합 **4행 전체**(gitflow head / type 열거 / 릴리스 형태 / 봇 리터럴)를 축자 재기술한다. 검증 대상 밖에 두면 `BOT_BRANCH_PATTERNS` 나 `RE_RELEASE` 를 고쳤을 때 이 표가 **조용히 drift** 한다 — CLAUDE.md 가 "숨은 상수 drift" 로 이름 붙인 클래스이고, "정본을 스크립트로 이전한다" 는 본 PR 의 서사와 정면 충돌한다.
+본 PR 은 `docs/guides/branch-strategy-workflow.md` §허용 집합에 표를 **신설**했는데, 이 표는 산문 3곳과 달리 type 열거만이 아니라 허용 집합 **4행 전체**(gitflow head / type 열거 / 릴리스 형태 / 봇 리터럴)를 축자 재기술한다. 검증 대상 밖에 두면 `BOT_BRANCH_PATTERNS` 나 `RE_RELEASE` 를 **좁혔을 때** 이 표가 **조용히 drift** 한다 — CLAUDE.md 가 "숨은 상수 drift" 로 이름 붙인 클래스이고, "정본을 스크립트로 이전한다" 는 본 PR 의 서사와 정면 충돌한다.
 
 - **택일 근거** — reviewer 는 (a) 문구를 "type 열거 한정" 으로 좁히기 (비용 0) 와 (b) 표를 검증 대상에 추가 (파서 비용) 를 제시했다. **(b) 를 택한다**: 본 PR 의 명제 자체가 *"검증되지 않은 산문 사본이 문제"* 인데, 그 PR 이 새 미검증 사본을 만들고 문구만 좁히는 것은 명제의 자기 적용 실패다. 다만 (b) 만으로는 CLAUDE.md §브랜치 전략 표의 **기존** 사본(`release/*-prep` · `hotfix`)이 남으므로, 문구도 함께 "type 열거 사본 3 → 0" 으로 정밀화한다 (a 와 b 는 배타가 아니다).
 - **구현 — 별도 파서를 만들지 않는다.** workflow `branch:` 리터럴 검사와 동일하게 **런타임 판정기 자신**(`classifyBranch`)을 재사용한다: `형태`·`예` 열의 백틱 토큰 중 형태 자리표시자(`<...>` / `v?` / `X.Y.Z`)가 아닌 **구체 브랜치명**은 전부 그 행의 rule 로 분류돼야 한다. 2행 비고의 `type = ` 열거만 `ALL_TYPES` 와 양방향 대조한다 (이 표는 산문 3곳과 달리 `hotfix` 까지 적는다).
 - **fail-fast**: locator 미발견 / 행 부재 / 행당 대조 가능 토큰 0건은 전부 즉시 FAIL. 표만 남고 대조는 사라지는 상태를 허용하지 않는다.
+- **잔여 한계 (reviewer 2차 🟡2, 실측)**: 양방향 대조는 **2행(type 열거)만**이다. 1·3·4행은 "표의 구체 토큰이 정본 규칙으로 분류되는가" 단방향이라, 정본을 **확장**하는 방향(`GITFLOW_HEADS` 에 `staging` 추가 / `RE_RELEASE` 를 `-(prep|rc)` 로 확장)은 미발화한다(실측 exit 0). 즉 위 문장의 "조용히 drift" 는 **축소·개명 방향 한정**이다. 확장 방향까지 닫으려면 행별 역방향 대조가 필요한데, 형태 자리표시자(`<...>` / `v?` / `X.Y.Z`)를 정본에서 역생성해야 해 비용이 크다. **ENUM_RE 잔여 false-negative 와 동일하게 "대가를 적는다"** — 적지 않으면 완결 서사 편향이다.
 - **negative 실증 5종** (2026-08-06, 격리 편집 후 원복): `BOT_BRANCH_PATTERNS` 이름 변경 → 4행 FAIL ✓ / 2행에서 `hotfix` 제거 → 누락 검출 ✓ / 3행 예시를 `release/0.60.0` 으로 훼손 → FAIL ✓ / locator 훼손 → FAIL ✓ / 4행 삭제 → FAIL ✓. 원복 시 PASS 복귀 ✓.
 
 **D-negative 실측 (developer, 2026-08-06) — 진입점 가드의 silent no-op**
