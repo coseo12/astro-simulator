@@ -8,10 +8,16 @@
  * exec 했으나 lib 배포 누락 (upstream v3.6.0) 으로 로컬 MODULE_NOT_FOUND + CI hashFiles
  * 조건 silent skip (#338 임시 패치) 상태가 지속 — CLAUDE.md 가 35k warn 을 초과한
  * (실측 36,817 chars) 상태에서도 경보가 0회 발화했다. #842 가 verify-docs-links 에
- * 적용한 것과 동형으로 다운스트림 자체 가드로 신설. 기존 .sh wrapper 는 manifest
- * 등재 (harness-managed) 라 유지하고 CI 만 본 파일을 무조건 실행하도록 교체.
+ * 적용한 것과 동형으로 다운스트림 자체 가드로 신설. 당시 .sh wrapper 는 manifest
+ * 등재 (harness-managed) 라 유지했으나, #907 디커플로 manifest 체제가 소멸해 유지
+ * 근거가 사라졌고 실행 시 MODULE_NOT_FOUND 만 내므로 #975 에서 삭제했다.
  *
- * 임계 계약 SSoT: docs/guides/claudemd-governance.md §3 (정량 게이트)
+ * SSoT 분담 (#975 — 순환 참조 아님):
+ *   - 임계 **계약** (게이트 의미 / 재조정 절차) : docs/guides/claudemd-governance.md §3
+ *   - 임계 **값** (실행 기준)                   : 본 파일 아래 DEFAULT_* 상수
+ *     (가드가 이 파일 하나뿐이라 값 변경은 1곳. 재조정 시 양쪽을 동일 PR 에서 갱신)
+ *
+ * 임계 계약 상세 (SSoT 는 위 가이드 §3):
  *   - 측정 단위: Unicode code point (`[...str].length`) — locale 독립 (#203 근거:
  *     `wc -m` 은 locale 미설치 runner 에서 바이트 폴백 → 한글 62% 부풀림 오탐)
  *   - x < 35k          : pass (조용)

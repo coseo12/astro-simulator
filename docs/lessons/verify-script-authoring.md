@@ -132,7 +132,7 @@ AGENT_DIR="$TMPDIR/agents" bash scripts/verify-X.sh || true
 
 ## 3. 회귀 가드 시뮬레이션과의 직교성
 
-격리 동적 테스트 (본 문서) 는 **스크립트 로직** 검증. 별도로 **CI 통합 + hashFiles 조건 + 실제 차단** 검증은 [guard-pr-dod.md](guard-pr-dod.md) 의 3중 시뮬레이션 (positive → negative → recovery) 으로 입증. 둘 다 통과해야 가드 작동이 완전 입증된다 (둘 중 하나만 통과 시 어딘가에 함정 잔존).
+격리 동적 테스트 (본 문서) 는 **스크립트 로직** 검증. 별도로 **CI 통합 + 가드 발화 조건 + 실제 차단** 검증은 [guard-pr-dod.md](guard-pr-dod.md) 의 3중 시뮬레이션 (positive → negative → recovery) 으로 입증. 둘 다 통과해야 가드 작동이 완전 입증된다 (둘 중 하나만 통과 시 어딘가에 함정 잔존). "가드 발화 조건" 의 정의와 `hashFiles` 관용구 제거 정책 (#945 / #950) 은 [guard-pr-dod.md](guard-pr-dod.md) §1 참조.
 
 ---
 

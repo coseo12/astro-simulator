@@ -86,24 +86,24 @@
 | **40k chars** | PR 체크 warn | `verify-claudemd-size.mjs` warn (신규 인라인 블록 금지 안내) |
 | **45k chars** | CI fail | `verify-claudemd-size.mjs` in `project-guards` (#907 재편) |
 
-> **SSoT (#203)**: 위 임계값은 [`lib/claudemd-size-constants.js`](../../lib/claudemd-size-constants.js) 에서 단일 선언되며 `lib/verify-claudemd-size.js` / `lib/doctor.js` 가 이를 import 한다. 변경 시 SSoT 1곳만 수정하면 모든 가드가 자동 동기화.
+> **SSoT (#203, #907 이설 / #975 정정)**: 위 표는 임계 **계약** (게이트 의미 + 재조정 절차) 의 SSoT 이고, 임계 **값** 은 [`scripts/verify-claudemd-size.mjs`](../../scripts/verify-claudemd-size.mjs) 의 `DEFAULT_WARN_BOUNDARY` / `DEFAULT_WARN_PR` / `DEFAULT_FAIL` 상수가 SSoT 다 (가드가 이 파일 하나뿐이라 값 변경은 1곳만 수정). 값 재조정 시 양쪽을 동일 PR 에서 갱신한다 — §3.1 참조.
 
 ### 3.1 절대불변 아님 (Gemini 제안 4)
 위 수치는 **현재 Claude Code 내부 경고(40k)와 본 저장소의 실측 기반(42.6k)** 을 근거로 설정한 실용적 경계이다.
 
 - 향후 에이전트 컨텍스트 크기 / 어텐션 특성 데이터가 축적되면 **재조정 가능**
 - 중요한 것은 임계값이 아니라 **임계를 통한 검토·제어 시스템** 그 자체
-- 재조정 시 `lib/claudemd-size-constants.js` 한 곳만 수정 + 본 가이드 표 갱신 (동일 PR)
+- 재조정 시 `scripts/verify-claudemd-size.mjs` 상수 한 곳만 수정 + 본 가이드 표 갱신 (동일 PR)
 
 ### 3.2 char 카운트 방법
 
-Node 기반 구현 (`lib/verify-claudemd-size.js`) 이 `[...str].length` 로 **Unicode code point 단위** 측정. locale 독립 (#203).
+Node 기반 구현 (`scripts/verify-claudemd-size.mjs`) 이 `[...str].length` 로 **Unicode code point 단위** 측정. locale 독립 (#203).
 
 ```bash
 # 공식 게이트 실행 — locale 영향 없음
-bash scripts/verify-claudemd-size.sh
-# 또는 직접 Node 호출
-node lib/verify-claudemd-size.js
+node scripts/verify-claudemd-size.mjs
+# 가드 자체 회귀 검사 (CI project-guards 가 본검사 직전 실행)
+node scripts/verify-claudemd-size.mjs --self-test
 ```
 
 > **이전 shell 구현의 한계 (#203 해소)**: `LC_ALL=en_US.UTF-8 wc -m` 은 self-hosted runner 에서 해당 locale 미설치 시 POSIX 로 폴백 → 바이트 수 (한글 62% 부풀림, 실측: 70,500 vs 실제 43,305) 오탐 유발. Node 포트로 완전 해소.
@@ -133,7 +133,7 @@ CLAUDE.md 또는 `docs/` 를 수정하는 PR 에서:
 ```markdown
 - [ ] CLAUDE.md 신규 블록 추가 시: 이 블록은 세션 시작 즉시 상기돼야 행동이 바뀌는가? (No 면 `docs/` 로 이동)
 - [ ] 현재 CLAUDE.md size 가 40k 초과 시 이 PR 이 감축 PR 인가, 신규 추가 PR 인가?
-- [ ] `bash scripts/verify-claudemd-size.sh` 통과
+- [ ] `node scripts/verify-claudemd-size.mjs` 통과
 - [ ] `bash scripts/verify-docs-links.sh` 통과
 ```
 
