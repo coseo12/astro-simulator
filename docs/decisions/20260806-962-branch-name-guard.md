@@ -1,6 +1,6 @@
 # ADR: 브랜치명 규약의 정본을 산문에서 실행 가능한 가드로 이전 (#962 축 B)
 
-- **상태**: **Provisional** — cross-validate 결과 §7 통합 후 Accepted 전이 (CLAUDE.md §ADR Status 워크플로, #370 옵션 C)
+- **상태**: **Accepted (cross-validate agy 2026-08-06)** — §7 교차검증 반영 사항 4축 통합 완료. Provisional 박제 → 통합 → 전이 (CLAUDE.md §ADR Status 워크플로, #370 옵션 C)
 - **날짜**: 2026-08-06
 - **결정자**: architect (실측 기반 설계) + developer (구현·D1 정정) + cross-validate (외부 검증)
 - **관련**:
@@ -171,6 +171,8 @@ PR [#961](https://github.com/coseo12/astro-simulator/pull/961) (#942) 의 cross-
 
 **CRITICAL — script injection 회피**: `${{ github.event.pull_request.head.ref }}` 를 `run:` 본문에 직접 보간하면 브랜치명이 셸로 해석된다. 반드시 `env:` 로 받아 `"$HEAD_REF"` 로 인용 전달한다.
 
+**CRITICAL — `pull_request_target` 금지**: 트리거는 반드시 `pull_request` 다. `pull_request_target` 은 base 리포 컨텍스트에서 쓰기 가능 토큰과 함께 실행되므로, fork 가 제어하는 브랜치명을 다루는 본 가드에서는 권한 상승 경로가 된다. 본 가드는 secret 도 write 권한도 필요 없다 (§7 이견-b).
+
 **#945/#950 정책 준수**: 전 step `if: hashFiles(...)` **미사용**. 스크립트 부재는 배포 시나리오가 아니라 **가드가 삭제된 회귀**이므로 node ENOENT 즉시 FAIL 이 유일한 정상 동작이다. `--if-present` 미사용. 런타임 산출물이 없어 `if-no-files-found` 예외도 해당 없음.
 
 **self-test 동시 배선** — #897 교훈 (CI 미배선 self-test 는 0회 실행).
@@ -182,8 +184,17 @@ scripts/verify-branch-name.mjs
   ├─ --branch <name>   → CI 런타임 검사 (branch-name-guard.yml)
   ├─ --verify-ssot     → 산문 3곳 + workflow branch: 리터럴 2곳 대조 (project-guards.yml)
   ├─ --self-test       → 픽스처 매트릭스 ≥24 케이스 (project-guards.yml)
-  └─ (인자 없음)        → git rev-parse HEAD 로컬 pre-flight (developer / create-pr 스킬)
+  └─ (인자 없음)        → git rev-parse --abbrev-ref HEAD 로컬 pre-flight (developer / create-pr 스킬)
 ```
+
+**`--verify-ssot` 추출 계약** (§7 이견-a 반영 — "D1 실측에 위임" 에서 계약 고정으로 강화):
+
+1. 대상 3파일에서 **고정 문자열 locator** 로 SSoT 라인을 찾는다 (`PULL_REQUEST_TEMPLATE.md` / `create-pr/SKILL.md` = `type = 커밋 컨벤션 type —`, `developer.md` = `type 은 커밋 컨벤션 type 과 동일`). **locator 미발견 = 즉시 exit 1** (fallback 없음).
+2. 해당 라인에서 **백틱으로 인용된 토큰만** 추출해 집합으로 만든다. 이 범위 한정이 `feat` 오탐을 구조적으로 배제한다 — 산문의 표기가 `` `feature`(feat) `` 라 `feature` 만 백틱 안이고 `feat` 는 밖이다 (2026-08-06 3파일 실측).
+3. 추출 집합 == `BRANCH_TYPES` 를 **누락·잉여 양방향**으로 대조한다.
+4. `.github/workflows/*.yml` 의 `branch:` 리터럴 중 `chore/` 로 시작하는 값이 전부 `BOT_BRANCH_PATTERNS` 로 설명되는지 검사 — 3번째 봇 패턴 등장 시 강제 발화.
+
+**로컬 pre-flight 의 detached HEAD 처리** (§7 이견-a 반영): `git rev-parse --abbrev-ref HEAD` 는 detached 상태에서 리터럴 `HEAD` 를 반환한다. 이를 브랜치명으로 검사하면 "규약 위반" 이라는 **오도하는 실패**가 난다. detached 를 별도로 감지해 전용 메시지와 함께 종료하고, 규약 위반과 구분한다. 격리 worktree sub-agent 가 특정 커밋을 체크아웃한 상태에서 실제로 발생 가능한 경로다.
 
 ### 5-5 CLAUDE.md 순증 0
 
@@ -217,7 +228,7 @@ scripts/verify-branch-name.mjs
 
 1. **발화 빈도가 ≥ 1/주** 로 관측되면 guard-design-principles §2 에 따라 임계 완화를 ADR Amendment 로 검토 (현재 추정 < 1/월)
 2. **3번째 봇 브랜치 패턴**이 필요해지면 `BOT_BRANCH_PATTERNS` 갱신 — `--verify-ssot` 가 강제 발화하므로 조용한 누락은 불가
-3. **required status check 정책**이 도입되면 본 가드를 required 로 승격 (§6-2)
+3. **required status check 정책**이 도입되면 본 가드를 required 로 승격 (§6-2). 정책 수립 자체는 후속 이슈이며, **그 이슈 생성을 본 PR 의 DoD 항목으로 고정**해 유실을 막는다 (§7 기각-3)
 4. `release/*-prep` 의 `v` 표기가 통일되면 `v?` 를 좁힌다
 5. 커밋 컨벤션 type 이 추가·제거되면 정본 상수 1곳만 고치고 `--verify-ssot` 가 산문 3곳을 강제한다 (본 ADR 이 만든 구조의 첫 회수 시점)
 
@@ -225,23 +236,38 @@ scripts/verify-branch-name.mjs
 
 ## §7 교차검증 반영 사항
 
-> **Provisional** — dev 가 PR 박제 직후 `cross-validate` 스킬 1회 호출 후 본 섹션을 아래 4축으로 채우고 §상태를 `Accepted (cross-validate <YYYY-MM-DD>)` 로 전이한다.
+> 수행: architect, 2026-08-06. `cross_validate.sh architecture docs/decisions/20260806-962-branch-name-guard.md`
+> outcome `applied` (exit 0) / `plan_bypass: false` / `reminder_issue: none`
+> 로그: `.claude/logs/cross-validate-architecture-20260806-154303.log`
 
 ### 합의
 
-_(cross-validate 후 기재)_
+외부 모델이 독립적으로 지지한 항목 — 본 ADR 에 이미 반영돼 있어 추가 변경 없음.
+
+1. **후보 C 채택** — 이슈번호 필수 대원칙을 유지하되 봇 브랜치 28건 오차단과 릴리스 `v?`/`-prep` 진동을 정규식이 포용한 것을 "자동화 파손 방지" 로 평가.
+2. **배선 분할** — 런타임은 `head_ref` 가 확실히 존재하는 `pull_request` 전용 신규 워크플로 (fail-fast <30s), 정적 검사는 의존성 0 워크플로 유지.
+3. **script injection 차단** — `env:` 간접 전달을 "완벽한 차단" 으로 평가.
+4. **봇 통째 skip 기각** — `github.actor != 'github-actions[bot]'` 포괄 예외가 검증되지 않은 봇 브랜치를 사각지대로 만든다는 §5-1 논거를 fail-closed 원칙 준수로 지지.
+5. **rerun 분석 (§2-6)** — 신규 가드가 과거 run 의 rerun 에 영향을 주지 않음을 논리적 입증으로 인정.
+6. **SSoT 단일 정본 구조 (§4-d)** — 신규 type 추가 시 상수 1곳 수정 + `--verify-ssot` 가 산문 drift 를 원천 차단하는 확장성 평가.
 
 ### 이견 수용
 
-_(cross-validate 후 기재 — 원안·수정안 대비 + 수용 근거)_
+| 항목 | 원안 | 수정안 | 수용 근거 |
+|---|---|---|---|
+| (a-1) `--verify-ssot` 파싱 계약 | "백틱 인용 토큰만 대상. `feat` 오탐 경계는 **dev D1 실측으로 확인**" — 메커니즘을 구현 단계에 위임 | §5-4 **추출 계약 4단계를 ADR 에 고정** (locator 고정 문자열 / 백틱 범위 한정 / 양방향 대조 / locator 미발견 hard FAIL) | 외부 모델이 "파싱 메커니즘이 모호하다" 고 지적. measurement-first 는 *수치* 를 실측으로 확정하라는 원칙이지 *계약* 을 미정으로 남기라는 게 아니다. 계약을 ADR 에 고정하고 D1 은 그 계약의 실측 확인으로 역할을 좁혔다 |
+| (a-2) detached HEAD 처리 | 로컬 pre-flight 를 "인자 없으면 현재 브랜치" 로만 서술 | detached 감지 + **전용 메시지로 규약 위반과 구분** 을 §5-4 에 명시 | 외부 모델 고유 지적. `git rev-parse --abbrev-ref HEAD` 가 detached 에서 리터럴 `HEAD` 를 반환해 **오도하는 "규약 위반"** 을 낸다. 격리 worktree sub-agent 가 특정 커밋을 체크아웃하는 실제 경로가 있어 유효 |
+| (b) `pull_request_target` 금지 명시 | 트리거를 `pull_request` 로 적기만 함 | §5-3 에 **`pull_request_target` 금지 + 근거** 를 CRITICAL 로 박제 | 외부 모델의 fork PR 우려는 §7 기각-2 대로 이미 커버되나, 그 우려가 현실이 되는 **유일한 경로가 `pull_request_target` 오용** 이다. 우려 자체는 기각하되 그 경로를 명시적으로 봉인하는 보강은 수용 |
 
 ### Claude 재분석으로 기각한 외부 모델 제안
 
-_(cross-validate 후 기재 — 근거 명시)_
+1. **husky 등 git hook (`pre-push`) 연동 권고 — 기각.** 이 저장소에는 정확히 반대 방향의 실측이 있다: 격리 worktree 기반 sub-agent 는 `node_modules` 부재로 lint-staged 훅을 실행할 수 없어 `--no-verify` 를 **상시** 사용한다 (#877 / #945 / #950 / #951 전례). **#952 가 CI 백스톱을 만든 이유가 바로 "훅은 이 프로젝트에서 신뢰할 수 없는 방어선" 이라는 실측**이다. hook 을 방어선으로 추가하면 실제로는 지켜지지 않는 가드를 하나 더 만들면서 "이중 방어" 라는 잘못된 안전감만 준다. 외부 모델은 이 프로젝트 고유 운영 실측을 알 수 없다.
+2. **fork PR 권한·특수문자 예외 처리 필요 — 기각 (이미 커버).** ① 실측상 fork PR 0건 (머지 PR 560건 = `coseo12` 533 + `app/github-actions` 27). ② 트리거가 `pull_request` 이므로 fork 에서는 read-only 토큰으로 실행되고 본 가드는 secret·write 권한을 쓰지 않는다. ③ 브랜치명 특수문자는 `env:` 간접 전달이 셸 해석을 차단하고, 정규식이 문자 집합을 화이트리스트로 좁힌다. 다만 이 우려가 현실이 되는 단일 경로(`pull_request_target`)는 이견-(b) 로 봉인했다.
+3. **required status check 를 본 PR 에서 동시 등록 — 부분 기각 (후속 유지).** 실측상 `develop` 은 **branch protection 자체가 없고** `main` 은 `required_status_checks` 가 부재다. 즉 체크 하나를 등록하는 작업이 아니라 **보호 정책 전반을 새로 세우는 결정**이며, 잘못 세우면 릴리스 경로를 막는다 (본 설계 최대 리스크와 동일 클래스). 본 PR 범위 밖 유지. 단 외부 모델 지적대로 **"후속 이슈 생성" 을 DoD 항목으로 고정** 해 유실을 막는다 (§6-4-3 강화).
 
 ### 고유 발견 (후속 분리)
 
-_(cross-validate 후 기재 — 생성된 이슈 번호 링크)_
+**없음.** 외부 모델이 제기한 3건(§기각)과 2건(§이견)은 전부 본 설계의 기존 범위 안에서 해소·봉인됐고, 범위 밖으로 분리해야 할 신규 발견은 산출되지 않았다. 기존 후속 항목(base 선택 규칙 가드 / required check 정책 / `release` `v` 표기 통일)은 cross-validate 이전에 architect 가 이미 분리한 것이며 외부 모델 기여분이 아니다 — 이 구분을 명시해 기여 귀속을 정직하게 유지한다.
 
 ### 호출 전 Claude 편향 셀프 체크 (architect 단계, 2026-08-06)
 
