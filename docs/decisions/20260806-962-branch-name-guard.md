@@ -194,6 +194,25 @@ scripts/verify-branch-name.mjs
 3. 추출 집합 == `BRANCH_TYPES` 를 **누락·잉여 양방향**으로 대조한다.
 4. `.github/workflows/*.yml` 의 `branch:` 리터럴 중 `chore/` 로 시작하는 값이 전부 `BOT_BRANCH_PATTERNS` 로 설명되는지 검사 — 3번째 봇 패턴 등장 시 강제 발화.
 
+**D1 실측 정정 (developer, 2026-08-06) — 추출 범위를 "라인 전체" 가 아니라 "열거 구간" 으로 한정**
+
+위 2단계의 백틱 범위 한정이 실제로 `feat` 를 배제하는지 3파일에 1회 실측했다 (guard-design-principles §1 measurement-first):
+
+| 파일 | (A) 라인 전체 백틱 토큰 | (B) locator 이후 열거 구간 |
+|---|---|---|
+| `.github/PULL_REQUEST_TEMPLATE.md:8` | `base=develop` · `head=<type>/*` + 6 type | 정확히 6 type |
+| `.claude/skills/create-pr/SKILL.md:18` | `develop` · `<type>/*` · `--squash` + 6 type | 정확히 6 type |
+| `.claude/agents/developer.md:18` | `develop` · `<type>/<이슈번호>-<설명>` + 6 type | 정확히 6 type |
+
+- **원안의 의도는 확인됨** — 3파일 전부 산문 표기가 `` `feature`(feat) `` 라 `feat` 가 백틱 **밖**이다. 백틱 범위 한정이 `feat` 오탐을 구조적으로 배제한다는 주장은 그대로 성립한다.
+- **그러나 "해당 라인에서" 를 라인 전체로 구현하면** 규약과 무관한 잉여 토큰(열 A)이 유입돼 3단계 양방향 대조가 **3파일 전부에서 상시 FAIL** 한다. 원안대로 구현했다면 가드가 첫 실행부터 영구 false-fire 했을 것이다.
+- **정정**: 추출 범위를 locator 이후의 **열거 구간** — `` `type` `` + 선택적 `(alias)` + ` / ` 반복이라는 고정 구조의 **최장 선두 run** — 으로 한정한다. 열 B 가 3파일 전부 정확히 `BRANCH_TYPES` 6개다.
+- 3중 박제: `scripts/verify-branch-name.mjs` 의 `ENUM_RE` 주석 / `.github/workflows/project-guards.yml` 스텝 주석 / 본 절.
+
+**D-negative 실측 (developer, 2026-08-06) — 진입점 가드의 silent no-op**
+
+격리 픽스처(`/tmp` 사본)에서 negative 시뮬을 돌렸을 때 **아무 출력 없이 exit 0** 이 반환됐다. 원인은 관용적 진입점 가드 `import.meta.url === pathToFileURL(process.argv[1]).href` 로, macOS `/tmp` → `/private/tmp` 심볼릭 링크처럼 **호출 경로와 realpath 가 다르면 거짓이 되어 스크립트 전체가 no-op** 이 된다 — 본 설계가 금지하는 silent skip 그 자체이며, 심링크된 체크아웃 디렉토리에서는 CI 도 동일하게 조용히 초록이 된다. 양쪽을 realpath 로 정규화해 정정하고, `--self-test` 에 "심링크 경로 직접 실행 시 exit 1 + 진단 출력" 회귀 케이스를 추가했다. **격리 동적 테스트(DoD 축 1)가 없었으면 발견 불가능했던 결함**이다.
+
 **로컬 pre-flight 의 detached HEAD 처리** (§7 이견-a 반영): `git rev-parse --abbrev-ref HEAD` 는 detached 상태에서 리터럴 `HEAD` 를 반환한다. 이를 브랜치명으로 검사하면 "규약 위반" 이라는 **오도하는 실패**가 난다. detached 를 별도로 감지해 전용 메시지와 함께 종료하고, 규약 위반과 구분한다. 격리 worktree sub-agent 가 특정 커밋을 체크아웃한 상태에서 실제로 발생 가능한 경로다.
 
 ### 5-5 CLAUDE.md 순증 0
