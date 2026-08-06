@@ -177,6 +177,8 @@ PR [#961](https://github.com/coseo12/astro-simulator/pull/961) (#942) 의 cross-
 
 **self-test 동시 배선** — #897 교훈 (CI 미배선 self-test 는 0회 실행).
 
+**concurrency 키는 sha 가 아니라 PR 번호** (developer 실측 정정, 2026-08-06): 저장소의 다른 워크플로는 concurrency group 을 `head.sha` 로 묶는다. 그것은 검사 대상이 **내용**인 가드에는 옳지만 본 가드에는 **틀리다** — 본 가드의 검사 대상은 내용이 아니라 **ref(브랜치명)** 다. 서로 다른 두 브랜치가 같은 커밋을 가리키는 일은 정상적으로 발생하며(develop 과 같은 sha 에서 잘라낸 `release/*-prep`, 재생성된 브랜치 등), sha 로 묶으면 한쪽 PR 의 브랜치명 판정이 `cancel-in-progress` 로 **취소되어 아무 판정도 남지 않는다**. CANCELLED 는 관례상 코스메틱으로 취급되므로([operational-friction](../ops/operational-friction.md) §4) 아무도 눈치채지 못한다 — 본 설계가 금지하는 silent skip 이다. §7-2 live 실증에서 실제로 재현됐다(run `31079932693` CANCELLED). group 키를 `pr-${{ github.event.pull_request.number }}` 로 고정한다 — 같은 PR 안의 연속 push 만 supersede 되고 서로 다른 PR 은 교차 취소되지 않으며, `pull_request` 전용 트리거라 번호가 항상 존재해 fallback 분기가 불필요하다.
+
 ### 5-4 하나의 스크립트, 네 소비처
 
 ```
@@ -234,6 +236,20 @@ scripts/verify-branch-name.mjs
 | 정상 `<type>/<번호>-<설명>` | 458 | PASS | 일상 개발 차단 |
 | `architect/*` · `dev/*` | 13 | FAIL | **의도된 차단** (#942 폐기 결정 집행) |
 | 이슈번호 없는 `<type>/*` (사람) | 73 | FAIL | 30일 기준 1/62 |
+
+### 6-1-b live 실증 결과 (developer, 2026-08-06 — 일회용 PR 2건, 정리 완료)
+
+브랜치명은 PR 생성 후 변경 불가라 파일 수정식 negative 가 불가능하다. 일회용 PR 로 변형해 수행했다 (§7-2).
+
+| 단계 | 브랜치 / PR | 기대 | 실측 run | 결과 |
+|---|---|---|---|---|
+| positive (릴리스 안전 — **최고 리스크**) | `release/9.99.9-prep` / [#967](https://github.com/coseo12/astro-simulator/pull/967) | SUCCESS | [31080065158](https://github.com/coseo12/astro-simulator/actions/runs/31080065158) | ✅ `[PASS] ... (rule: release)` |
+| negative | `feat/962-guard-negative` / [#968](https://github.com/coseo12/astro-simulator/pull/968) | FAILURE | [31080068444](https://github.com/coseo12/astro-simulator/actions/runs/31080068444) | ✅ exit 1 + 허용 집합 노출 |
+| positive (본 PR) · recovery | `feature/962-branch-name-guard` / [#969](https://github.com/coseo12/astro-simulator/pull/969) | SUCCESS 유지 | `opened` / `synchronize` | ✅ |
+
+일회용 PR 2건은 검증 후 **close + 원격 브랜치 삭제** 완료 (운영 마찰 §2 대로 `--delete-branch` 가 아니라 `git push origin --delete` 분리 실행). `develop`/`main` head PR 은 실환경 재현 시 릴리스 경로를 건드리므로 live 실증에서 **의도적으로 제외**하고 `--self-test` 픽스처 + §7-5 코퍼스 전수로 대체했다.
+
+코퍼스 실측은 설계 예측과 **정확히 일치**했다 (merged 560 / PASS 458 / FAIL 102). `--state all` 기준(569/465/104)과의 차이 9건은 전부 CLOSED(미머지) PR 이며 판정 로직 차이가 아니다.
 
 ### 6-2 한계 — "물리적 차단" 은 required check 없이는 절반만 성립
 
