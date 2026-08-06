@@ -7,13 +7,17 @@
  * 배경: #942 가 브랜치 접두사 규약을 `<type>/<이슈번호>-<설명>` 으로 일반화했으나
  * 강제 수단이 0 이었고, type 열거는 산문 3곳에 **축자 복제**돼 있었다 (정본 부재).
  * 본 스크립트의 상수가 정본이고, 산문 3곳은 `--verify-ssot` 가 검증하는 **파생**이다.
- * 사본 수는 4 로 같지만 "검증되지 않은 사본" 이 3 → 0 이 된다.
+ * 사본 수는 4 로 같지만 **type 열거의** "검증되지 않은 사본" 이 3 → 0 이 된다.
+ * (범위 한정에 주의: `--verify-ssot` 가 강제하는 것은 type 열거 + workflow `branch:` 리터럴
+ *  + guide 허용 집합 표다. CLAUDE.md §브랜치 전략 표의 `release/*-prep` · `hotfix` 서술은
+ *  기존 사본으로 남아 있으며 검증 대상이 아니다 — reviewer 권고 R1, 2026-08-06.)
  *
  * 계약 SSoT: docs/decisions/20260806-962-branch-name-guard.md §5
  *
  * 네 소비처 (하나의 스크립트):
  *   --branch <name>          → CI 런타임 검사 (.github/workflows/branch-name-guard.yml)
- *   --verify-ssot            → 산문 3곳 + workflow `branch:` 리터럴 대조 (project-guards.yml)
+ *   --verify-ssot            → 산문 3곳 + workflow `branch:` 리터럴 + guide 허용 집합 표 대조
+ *                              (project-guards.yml)
  *   --self-test              → 격리 픽스처 매트릭스 (project-guards.yml)
  *   --check-corpus <json>    → 머지 PR head 전수 실측 (1회성 증거. CI 미배선 — 네트워크 의존)
  *   (인자 없음)               → 로컬 pre-flight (developer / create-pr 스킬, push 전)
@@ -41,8 +45,9 @@ import {
 } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import process from 'node:process';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -210,6 +215,153 @@ const PROSE_SOURCES = [
  */
 const ENUM_RE = /^[^`\n]*`([a-z]+)`(?:\([a-z]+\))?(?:\s*\/\s*`[a-z]+`(?:\([a-z]+\))?)*/;
 
+/**
+ * **잔여 false-negative (의도적 미대응)** — reviewer 주입 실측 #7, 2026-08-06.
+ *
+ * 범위를 "최장 선두 run" 으로 좁힌 대가로, **열거 구간 밖**(닫는 괄호 뒤 등)에 추가된
+ * type 토큰은 검출되지 않는다. 하드닝하려면 "열거 뒤 잔여 백틱 토큰 중 `^[a-z]+$` 금지"
+ * 같은 규칙이 필요한데, `create-pr/SKILL.md` 의 `` `develop` `` 이 정확히 그 패턴이라
+ * **false-fire 가 즉시 재유입**된다 — D1 이 제거한 상시 발화가 그대로 돌아온다.
+ * 실제 drift 편집 경로(열거 확장·축소·오타)는 전부 잡히므로 대가를 지불한다.
+ * (3중 박제: 본 주석 / project-guards.yml step 주석 / ADR §5-4)
+ */
+
+/**
+ * `docs/guides/branch-strategy-workflow.md` §허용 집합 표 — **본 PR 이 신설한 4번째 사본**.
+ *
+ * 산문 3곳(`PROSE_SOURCES`)이 type 열거만 복제하는 것과 달리, 이 표는 허용 집합 **4행 전체**
+ * (gitflow head / type 열거 / 릴리스 형태 / 봇 리터럴) 를 축자 재기술한다. 검증 대상에 넣지
+ * 않으면 `BOT_BRANCH_PATTERNS` 나 `RE_RELEASE` 를 고쳤을 때 이 표가 **조용히 drift** 한다 —
+ * CLAUDE.md 가 "숨은 상수 drift" 로 이름 붙인 클래스이고, 정본을 스크립트로 이전한다는 본
+ * PR 의 서사와 정면 충돌한다. (reviewer 권고 R1, 2026-08-06)
+ *
+ * 별도 파서를 만들지 않고 **런타임 판정기 자신**(`classifyBranch`)을 재사용한다 — workflow
+ * `branch:` 리터럴 검사와 동일한 기법이다:
+ *   - `형태`·`예` 열의 백틱 토큰 중 **구체적 브랜치명**(형태 자리표시자가 아닌 것)은
+ *     전부 그 행의 rule 로 분류돼야 한다. 행당 0건이면 fail-fast (표만 남고 대조는 사라지는 상태 차단).
+ *   - 2행 비고의 `type = ` 열거는 `ALL_TYPES` 와 양방향 대조한다 (산문 3곳과 달리 이 표는
+ *     `hotfix` 까지 적으므로 `BRANCH_TYPES` 가 아니라 `ALL_TYPES` 가 기준이다).
+ */
+const GUIDE_TABLE = {
+  path: 'docs/guides/branch-strategy-workflow.md',
+  locator: '### 허용 집합',
+  typeEnumLocator: 'type = ',
+  rows: [
+    { n: '1', rule: 'gitflow' },
+    { n: '2', rule: 'work' },
+    { n: '3', rule: 'release' },
+    { n: '4', rule: 'bot' },
+  ],
+};
+
+/** 형태 자리표시자 판별 — `<...>` / `v?` / `X.Y.Z` 를 포함하면 구체 브랜치명이 아니다 */
+function isFormPlaceholder(token) {
+  return /[<>?]/.test(token) || token.includes('X.Y.Z');
+}
+
+/**
+ * guide 허용 집합 표 대조. `{ok, msg}` 배열을 반환한다 (호출부가 집계).
+ * 파일 부재 / locator 미발견 / 행 부재는 전부 즉시 FAIL — fallback 없음.
+ */
+function verifyGuideTable() {
+  const { path, locator, typeEnumLocator, rows } = GUIDE_TABLE;
+  const abs = resolve(ROOT, path);
+  if (!existsSync(abs)) return [{ ok: false, msg: `대상 파일 부재: ${path}` }];
+
+  const lines = readFileSync(abs, 'utf8').split('\n');
+  const start = lines.findIndex((l) => l.includes(locator));
+  if (start === -1) {
+    return [
+      {
+        ok: false,
+        msg:
+          `locator 미발견: ${path} 에 고정 문자열 "${locator}" 가 없습니다.\n` +
+          `         표를 옮기거나 제목을 바꿨다면 GUIDE_TABLE 도 함께 갱신해야 합니다.`,
+      },
+    ];
+  }
+
+  const out = [];
+  for (const { n, rule } of rows) {
+    const idx = lines.findIndex((l, i) => i > start && l.startsWith(`| ${n} |`));
+    if (idx === -1) {
+      out.push({
+        ok: false,
+        msg: `${path} §허용 집합 표에 ${n}행이 없습니다 (기대 rule: ${rule}).`,
+      });
+      continue;
+    }
+    // 마크다운 표 셀: ['', '#', '형태', '예', '비고', '']
+    const cells = lines[idx].split('|').map((c) => c.trim());
+    const tokens = [...`${cells[2] ?? ''} ${cells[3] ?? ''}`.matchAll(/`([^`]+)`/g)]
+      .map((m) => m[1])
+      .filter((t) => !isFormPlaceholder(t));
+
+    if (tokens.length === 0) {
+      out.push({
+        ok: false,
+        msg: `${path}:${idx + 1} — ${n}행의 형태·예 열에 대조 가능한 구체 브랜치명이 0건입니다 (fail-fast).`,
+      });
+    }
+    for (const t of tokens) {
+      const { ok, rule: got } = classifyBranch(t);
+      out.push(
+        ok && got === rule
+          ? { ok: true, msg: `${path}:${idx + 1} — ${n}행 '${t}'  (rule: ${got})` }
+          : {
+              ok: false,
+              msg:
+                `${path}:${idx + 1} — ${n}행 '${t}' 이 rule '${rule}' 로 분류되지 않습니다 (실제: ${ok ? got : '허용 집합 밖'}).\n` +
+                `         정본 상수를 바꿨다면 이 표의 형태·예도 함께 갱신해야 합니다.`,
+            },
+      );
+    }
+
+    if (n !== '2') continue;
+
+    // 2행 비고의 type 열거 — ALL_TYPES 양방향 대조 (ENUM_RE 와 동일하게 최장 선두 run 만 소비)
+    const remark = cells[4] ?? '';
+    const at = remark.indexOf(typeEnumLocator);
+    if (at === -1) {
+      out.push({
+        ok: false,
+        msg: `${path}:${idx + 1} — 2행 비고에 고정 문자열 "${typeEnumLocator}" 로 시작하는 type 열거가 없습니다.`,
+      });
+      continue;
+    }
+    const run = remark.slice(at + typeEnumLocator.length).match(/^(?:`[a-z]+`\s*)+/);
+    if (!run) {
+      out.push({
+        ok: false,
+        msg: `${path}:${idx + 1} — 2행 type 열거 파싱 실패 ("${typeEnumLocator}" 뒤에 \`type\` 나열이 없습니다).`,
+      });
+      continue;
+    }
+    const got = [...new Set([...run[0].matchAll(/`([a-z]+)`/g)].map((m) => m[1]))].sort();
+    const want = [...ALL_TYPES].sort();
+    const missing = want.filter((t) => !got.includes(t));
+    const extra = got.filter((t) => !want.includes(t));
+    out.push(
+      missing.length === 0 && extra.length === 0
+        ? {
+            ok: true,
+            msg: `${path}:${idx + 1} — 2행 type 열거 [${got.join(', ')}] == BRANCH_TYPES + ${HOTFIX_TYPE}`,
+          }
+        : {
+            ok: false,
+            msg:
+              `${path}:${idx + 1} — 2행 type 열거 불일치\n` +
+              `         추출: [${got.join(', ')}]\n` +
+              `         정본: [${want.join(', ')}]\n` +
+              (missing.length ? `         누락: [${missing.join(', ')}]\n` : '') +
+              (extra.length ? `         잉여: [${extra.join(', ')}]\n` : '') +
+              `         → 표를 정본에 맞추거나, 규약을 바꿨다면 BRANCH_TYPES / HOTFIX_TYPE 을 먼저 고치세요.`,
+          },
+    );
+  }
+  return out;
+}
+
 function extractProseTypes(filePath, locator) {
   const abs = resolve(ROOT, filePath);
   if (!existsSync(abs)) {
@@ -317,6 +469,17 @@ function runVerifySsot() {
         );
         failed++;
       }
+    }
+  }
+
+  // --- 5단계: guide 허용 집합 표 (본 PR 신설 사본 — reviewer 권고 R1) ---
+  console.log('');
+  for (const { ok, msg } of verifyGuideTable()) {
+    if (ok) {
+      console.log(`  [PASS] ${msg}`);
+    } else {
+      console.error(`  [FAIL] ${msg}`);
+      failed++;
     }
   }
 
@@ -430,18 +593,57 @@ function runSelfTest() {
 
   // 진입점 가드 회귀 — 심링크 경로로 직접 실행해도 **실제로 판정이 돈다** 는 것을 실증.
   // 순진한 URL 비교였을 때 아무 출력 없이 exit 0 이 나던 silent skip 을 pin 한다 (#962).
-  const linkResult = probeSymlinkedInvocation();
-  if (linkResult.ok) {
-    pass++;
-    console.log(`  [OK]   진입점 — ${linkResult.detail}`);
+  if (IS_PROBE_CHILD) {
+    // 프로브가 띄운 자식이다 (재진입 가드). 여기서 다시 프로브를 돌리면 무한 재귀가 된다.
+    console.log(`  [SKIP] 자식 프로세스 프로브 — 프로브 재진입 (${PROBE_ENV}=1)`);
   } else {
-    fail++;
-    console.error(`  [MISS] 진입점 — ${linkResult.detail}`);
+    const linkResult = probeSymlinkedInvocation();
+    if (linkResult.ok) {
+      pass++;
+      console.log(`  [OK]   진입점 — ${linkResult.detail}`);
+    } else {
+      fail++;
+      console.error(`  [MISS] 진입점 — ${linkResult.detail}`);
+    }
+
+    // CLI 인자 파싱 회귀 (reviewer B1) — 규약 위반 입력이 모드 플래그로 위장해 통과하지 못한다.
+    for (const p of probeArgvParsing()) {
+      if (p.ok) {
+        pass++;
+        console.log(`  [OK]   인자 파싱 — ${p.detail}`);
+      } else {
+        fail++;
+        console.error(`  [MISS] 인자 파싱 — ${p.detail}`);
+      }
+    }
   }
 
   console.log(`\nself-test: ${pass} passed, ${fail} failed (픽스처 ${FIXTURES.length}건)`);
+  // 축 3 (5 페르소나 self-consistency) 대조용 3-tuple — 각 페르소나가 계산하지 않고 이 줄을 읽는다.
+  console.log(
+    `self-consistency 3-tuple (총 검사, PASS, FAIL 픽스처 지문) = (${pass + fail}, ${pass}, ${failFixtureFingerprint()})`,
+  );
   return fail === 0 ? 0 : 1;
 }
+
+/**
+ * 자식 프로세스 프로브의 **재진입 가드**.
+ *
+ * 프로브는 자기 자신을 자식으로 띄운다. 인자 파싱 결함이 살아 있으면
+ * `--branch --self-test` 가 브랜치 검사가 아니라 self-test 로 라우팅되므로 프로브가
+ * 프로브를 낳아 **무한 재귀**가 된다 — 되돌린 구현으로 negative 시뮬을 돌렸을 때
+ * 실제로 자식이 지수적으로 증식했다 (2026-08-06). 그러면 결함의 신호가 깨끗한 `[MISS]`
+ * 가 아니라 **CI 행(job timeout)** 이 되어 진단 품질이 떨어진다.
+ * 자식에게 이 환경변수를 넘겨 프로브 깊이를 1 로 묶고, 결함이 `[MISS]` 로 드러나게 한다.
+ * (`timeout` 은 그래도 남긴다 — 이중 방어.)
+ */
+const PROBE_ENV = 'VERIFY_BRANCH_NAME_PROBE';
+const IS_PROBE_CHILD = process.env[PROBE_ENV] === '1';
+const PROBE_SPAWN_OPTS = {
+  encoding: 'utf8',
+  timeout: 30_000,
+  env: { ...process.env, [PROBE_ENV]: '1' },
+};
 
 /**
  * 심링크된 경로로 본 스크립트를 자식 프로세스로 실행해, 규약 위반 입력에 대해
@@ -452,7 +654,7 @@ function probeSymlinkedInvocation() {
   const link = join(dir, 'linked-verify-branch-name.mjs');
   try {
     symlinkSync(SCRIPT_PATH, link);
-    const r = spawnSync(process.execPath, [link, '--branch', 'feat/962-x'], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [link, '--branch', 'feat/962-x'], PROBE_SPAWN_OPTS);
     const emitted = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
     if (r.status === 1 && emitted.includes('규약 위반')) {
       return {
@@ -471,6 +673,68 @@ function probeSymlinkedInvocation() {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * CLI 인자 파싱 회귀 — 모드 플래그가 `--branch` 의 **값**으로 왔을 때 브랜치 검사가
+ * 건너뛰어지지 않는지, 그리고 두 모드의 병합 호출이 조용히 한쪽을 버리지 않는지 확인한다.
+ *
+ * 결함 이력은 `main()` 주석 참조 (reviewer B1). **자식 프로세스여야 한다** —
+ * 같은 프로세스에서 `classifyBranch` 를 직접 부르면 순수 함수는 언제나 정상이라
+ * `main()` 의 인자 파싱 순서라는 실제 결함 지점을 전혀 건드리지 못한다.
+ */
+function probeArgvParsing() {
+  const cases = [
+    {
+      args: ['--branch', '--self-test'],
+      status: 1,
+      text: '규약 위반',
+      label: "--branch '--self-test' — 모드 플래그가 값으로 와도 브랜치 검사가 돈다",
+    },
+    {
+      args: ['--branch', '--verify-ssot'],
+      status: 1,
+      text: '규약 위반',
+      label: "--branch '--verify-ssot' — 동일",
+    },
+    {
+      args: ['--branch', 'feature/962-x', '--self-test'],
+      status: 2,
+      text: '잉여 인자',
+      label: '두 모드 병합 호출 — 한쪽을 조용히 버리지 않고 exit 2 로 거부',
+    },
+  ];
+  return cases.map((c) => {
+    const r = spawnSync(process.execPath, [SCRIPT_PATH, ...c.args], PROBE_SPAWN_OPTS);
+    const emitted = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+    const ok = r.status === c.status && emitted.includes(c.text);
+    return {
+      ok,
+      detail: ok
+        ? c.label
+        : `${c.label} — 기대 exit ${c.status} + "${c.text}", 실제 exit ${r.status} / 출력 ${emitted.trim().length}자`,
+    };
+  });
+}
+
+/**
+ * 페르소나 간 self-consistency 대조 지문 (가드 도입 PR DoD 축 3 — reviewer 권고 R4).
+ *
+ * **직렬화 규약** — 이것이 명시되지 않으면 셀 값이 재현 불가능해 축 3 의 증거력이 사라진다
+ * (reviewer 가 8종 형태를 시도해 전부 불일치, 2026-08-06):
+ *   1. FAIL 을 기대하는 픽스처의 브랜치명만 취한다.
+ *   2. 각 이름을 `JSON.stringify` 로 인용한다 — 빈 문자열과 개행 주입
+ *      (`develop\nmain`) 케이스가 구분 가능해야 한다. 원시 문자열 join 은 둘을 뭉갠다.
+ *   3. 인용된 문자열들을 기본 `Array#sort` (UTF-16 코드유닛 오름차순) 로 정렬한다.
+ *   4. `'\n'` 으로 join → SHA-256 → hex 앞 12자.
+ *
+ * 다섯 페르소나는 이 값을 **직접 계산하지 않고 `--self-test` 출력에서 읽는다**.
+ * 대조가 목적인 값을 각자 계산하면 직렬화 해석 차이가 곧 불일치로 오인된다.
+ */
+export function failFixtureFingerprint() {
+  const quoted = FIXTURES.filter(([, expected]) => !expected).map(([name]) => JSON.stringify(name));
+  quoted.sort();
+  return createHash('sha256').update(quoted.join('\n')).digest('hex').slice(0, 12);
 }
 
 // =============================================================================
@@ -547,32 +811,77 @@ function runCheckCorpus(jsonPath) {
 // CLI
 // =============================================================================
 
+const USAGE =
+  'usage: verify-branch-name.mjs [--branch <name> | --verify-ssot | --self-test | --check-corpus <json>]';
+
+/**
+ * 모드별 기대 인자 개수 (모드 플래그 자신 포함). 초과분은 즉시 거부한다.
+ * 프로토타입 오염 경로를 막기 위해 조회는 반드시 `Object.hasOwn` 으로 한다
+ * (`'constructor' in {}` 는 true 라, 단순 `in` 검사는 임의 문자열을 모드로 통과시킨다).
+ */
+const MODE_ARITY = { '--self-test': 1, '--verify-ssot': 1, '--branch': 2, '--check-corpus': 2 };
+
+/**
+ * CLI — **모드는 `args[0]` 로만 판정한다.**
+ *
+ * 결함 이력 (reviewer B1, 2026-08-06): 종전 구현은 `args.includes('--self-test')` 로
+ * 배열 **전체**를 훑어 모드를 정했기 때문에, 모드 플래그가 `--branch` 의 **값**으로 오면
+ * (`--branch '--self-test'`) 브랜치 검사가 통째로 건너뛰어지고 **exit 0** 이 났다.
+ * 규약 위반 입력에 가드가 초록을 반환하는, 진입점 D-negative 와 **동일 클래스**의
+ * silent skip 이다. 도달 경로가 둘인데 하나는 적대자가 필요 없다 — 누군가 두 CI 스텝을
+ * `--branch "$HEAD_REF" --self-test` 로 합치면 브랜치 검사가 조용히 사라지고 스텝은 초록이다.
+ *
+ * 추가로 **잉여 인자를 거부**한다 (fail-closed). `args[0]` 판정만으로는 위 병합 호출에서
+ * 브랜치 검사는 살아나지만 이번엔 `--self-test` 가 조용히 무시되는데, 그것도 같은 클래스다.
+ * 모드별 인자 개수가 전부 고정이므로 초과분은 exit 2 로 끊어 병합 자체를 불가능하게 한다.
+ *
+ * 회귀 가드: `--self-test` 의 "인자 파싱" 프로브 3케이스 (자식 프로세스 — 같은 프로세스에서
+ * `classifyBranch` 를 부르면 순수 함수는 언제나 정상이라 파싱 순서를 전혀 검증하지 못한다).
+ */
 function main(argv) {
   const args = argv.slice(2);
-  if (args.includes('--self-test')) return runSelfTest();
-  if (args.includes('--verify-ssot')) return runVerifySsot();
+  const mode = args[0];
 
-  const corpusIdx = args.indexOf('--check-corpus');
-  if (corpusIdx !== -1) return runCheckCorpus(args[corpusIdx + 1]);
+  if (mode === undefined) return runPreflight();
 
-  const branchIdx = args.indexOf('--branch');
-  if (branchIdx !== -1) {
-    const name = args[branchIdx + 1];
-    if (name === undefined) {
-      console.error('[ERROR] --branch <이름> 인자가 필요합니다.');
-      return 2;
-    }
-    return runBranchCheck(name);
-  }
-
-  if (args.length > 0) {
+  if (!Object.hasOwn(MODE_ARITY, mode)) {
     console.error(`[ERROR] 알 수 없는 인자: ${args.join(' ')}`);
-    console.error(
-      'usage: verify-branch-name.mjs [--branch <name> | --verify-ssot | --self-test | --check-corpus <json>]',
-    );
+    console.error(USAGE);
     return 2;
   }
-  return runPreflight();
+
+  const arity = MODE_ARITY[mode];
+  if (args.length > arity) {
+    console.error(
+      `[ERROR] 잉여 인자: ${args.slice(arity).join(' ')}\n` +
+        `        '${mode}' 는 인자 ${arity}개를 받습니다. 두 모드를 한 호출로 합칠 수 없습니다 —\n` +
+        `        합치면 한쪽 검사가 조용히 무시되므로, CI 스텝을 나눠 각각 호출하세요.`,
+    );
+    console.error(USAGE);
+    return 2;
+  }
+
+  switch (mode) {
+    case '--self-test':
+      return runSelfTest();
+    case '--verify-ssot':
+      return runVerifySsot();
+    case '--check-corpus':
+      return runCheckCorpus(args[1]);
+    case '--branch':
+      if (args[1] === undefined) {
+        console.error('[ERROR] --branch <이름> 인자가 필요합니다.');
+        console.error(USAGE);
+        return 2;
+      }
+      return runBranchCheck(args[1]);
+    default:
+      // MODE_ARITY 를 통과했는데 여기 도달 = 모드 테이블과 분기의 drift. 조용히 통과시키지 않는다.
+      console.error(
+        `[ERROR] 내부 오류: 모드 '${mode}' 에 대응하는 분기가 없습니다 (MODE_ARITY drift).`,
+      );
+      return 2;
+  }
 }
 
 /**
@@ -587,14 +896,23 @@ function main(argv) {
  * 따라서 양쪽을 realpath 로 정규화해 비교한다. `import.meta.url` 은 Node 가 이미
  * 실경로로 해석하므로 argv[1] 만 정규화하면 충분하다.
  * 회귀 가드: --self-test 의 "심링크 경로 직접 실행" 케이스.
+ *
+ * `catch` 폴백은 **fail-loud** 다 (reviewer 권고 R3). 종전 폴백은 결함 이전의 순진한
+ * URL 비교로 되돌아갔는데, 그것이 거짓이면 결국 같은 silent no-op 이라 "조용히 스킵하지
+ * 않는다" 는 주석이 사실과 어긋났다 — 이 저장소가 버그 생성원으로 박제한 주석↔구현 drift다.
+ * realpath 실패는 정상 경로가 아니므로, 경고를 남기고 **직접 실행으로 간주해 판정을 강행**한다.
+ * (import 문맥에서 오발화하면 잡음이 나지만, 가드가 조용히 사라지는 쪽보다 언제나 낫다.)
  */
 function isDirectRun() {
   if (!process.argv[1]) return false;
   try {
     return realpathSync(process.argv[1]) === realpathSync(SCRIPT_PATH);
-  } catch {
-    // realpath 실패 시에도 조용히 스킵하지 않는다 — 원시 경로로 한 번 더 비교
-    return pathToFileURL(process.argv[1]).href === import.meta.url;
+  } catch (e) {
+    console.error(
+      `[WARN] 진입점 realpath 정규화 실패 (${e.message}) — 직접 실행으로 간주하고 판정을 강행합니다.\n` +
+        `       조용한 스킵(exit 0)은 본 가드가 금지하는 실패 모드이므로 fail-loud 로 처리합니다.`,
+    );
+    return true;
   }
 }
 

@@ -67,6 +67,8 @@ develop   ← 동기화 유지 (누락 시 drift)
 | 3 | `release/v?X.Y.Z-prep` | `release/0.60.0-prep`, `release/v0.53.0-prep` | `v` 유무 **양쪽 허용** (표기가 실제로 진동 중 — ADR §2-3). `-prep` 은 필수 |
 | 4 | `chore/<봇패턴>-<run_id>` | `chore/r1-baseline-linux-30725438161` | 봇 전용. CI run 이 만들어 이슈번호가 **구조적으로 부재** |
 
+> 이 표는 `node scripts/verify-branch-name.mjs --verify-ssot` 가 **기계 대조**한다 — 각 행의 예시를 런타임 판정기로 분류하고 2행의 type 열거를 정본 상수와 양방향 대조하므로, 표만 고치면 CI 가 차단한다. **정본(스크립트 상수)을 먼저 고치고 표를 맞추는** 순서로 편집할 것.
+
 **가장 흔한 오류**: 커밋 type 은 `feat` 이지만 브랜치 type 은 `feature` 다 (#942). `feat/962-x` 는 차단된다.
 
 `architect/*` · `dev/*` 는 #942 가 폐기한 접두사라 차단된다 (과거 이력 13건은 소급 정리하지 않는다 — rerun 은 트리거 SHA 의 workflow 정의를 재생하므로 신규 가드가 과거 run 에서 실행될 경로 자체가 없다, ADR §2-6).

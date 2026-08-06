@@ -126,7 +126,9 @@ PR [#961](https://github.com/coseo12/astro-simulator/pull/961) (#942) 의 cross-
 | (c) 신규 데이터 파일 + 4곳 대조 | 데이터가 정본 | 0 | 차선 — (d) 대비 이점 없이 파일 1개 추가 |
 | **(d) 스크립트 상수가 정본 + 산문 3곳 정적 대조** | **실행 가능한 정의가 정본** | **0** | **채택** |
 
-(d) 에서 가드는 **4번째 출처가 아니라 유일한 정본**이고, 기존 3곳을 *검증된 파생*으로 강등한다. 사본 수는 4 로 같지만 **검증되지 않은 사본이 3 → 0** 이 된다.
+(d) 에서 가드는 **4번째 출처가 아니라 유일한 정본**이고, 기존 3곳을 *검증된 파생*으로 강등한다. 사본 수는 4 로 같지만 **type 열거의 검증되지 않은 사본이 3 → 0** 이 된다.
+
+> **범위 한정 (reviewer 권고 R1, 2026-08-06)** — 위 "3 → 0" 은 **type 열거** 기준의 진술이다. `--verify-ssot` 가 강제하는 범위는 type 열거(산문 3곳) + workflow `branch:` 리터럴 + guide 허용 집합 표(§5-4 5단계에서 추가)이며, CLAUDE.md §브랜치 전략 표의 `release/*-prep` · `hotfix` 서술은 **기존 미검증 사본으로 남는다**. 허용 집합 *전체* 기준의 "0" 이 아니다 — 서사가 이 표면을 가리지 않도록 명시한다.
 
 ---
 
@@ -184,8 +186,10 @@ PR [#961](https://github.com/coseo12/astro-simulator/pull/961) (#942) 의 cross-
 ```
 scripts/verify-branch-name.mjs
   ├─ --branch <name>   → CI 런타임 검사 (branch-name-guard.yml)
-  ├─ --verify-ssot     → 산문 3곳 + workflow branch: 리터럴 2곳 대조 (project-guards.yml)
-  ├─ --self-test       → 픽스처 매트릭스 ≥24 케이스 (project-guards.yml)
+  ├─ --verify-ssot     → 산문 3곳 + workflow branch: 리터럴 2곳 + guide 허용 집합 표 대조
+  │                       (project-guards.yml)
+  ├─ --self-test       → 픽스처 매트릭스 ≥24 케이스 + 자식 프로세스 프로브 4건
+  │                       (project-guards.yml)
   └─ (인자 없음)        → git rev-parse --abbrev-ref HEAD 로컬 pre-flight (developer / create-pr 스킬)
 ```
 
@@ -204,16 +208,48 @@ scripts/verify-branch-name.mjs
 |---|---|---|
 | `.github/PULL_REQUEST_TEMPLATE.md:8` | `base=develop` · `head=<type>/*` + 6 type | 정확히 6 type |
 | `.claude/skills/create-pr/SKILL.md:18` | `develop` · `<type>/*` · `--squash` + 6 type | 정확히 6 type |
-| `.claude/agents/developer.md:18` | `develop` · `<type>/<이슈번호>-<설명>` + 6 type | 정확히 6 type |
+| `.claude/agents/developer.md:18` | `develop` · `<type>/<이슈번호>-<설명>` · `node scripts/verify-branch-name.mjs` · `branch-name-guard` + 6 type | 정확히 6 type |
+
+> **수치 주석 (reviewer 권고 R8, 2026-08-06)** — `developer.md` 행의 (A) 는 최초 박제 시점에 잉여 2개였으나, 본 PR 이 **같은 라인에 pre-flight 호출 문장을 추가**해 현재 실측은 **4개**다 (위 표는 현재 값으로 갱신). 결론 방향은 오히려 강화된다 — 라인 전체 해석의 false-fire 폭이 커졌다.
 
 - **원안의 의도는 확인됨** — 3파일 전부 산문 표기가 `` `feature`(feat) `` 라 `feat` 가 백틱 **밖**이다. 백틱 범위 한정이 `feat` 오탐을 구조적으로 배제한다는 주장은 그대로 성립한다.
 - **그러나 "해당 라인에서" 를 라인 전체로 구현하면** 규약과 무관한 잉여 토큰(열 A)이 유입돼 3단계 양방향 대조가 **3파일 전부에서 상시 FAIL** 한다. 원안대로 구현했다면 가드가 첫 실행부터 영구 false-fire 했을 것이다.
 - **정정**: 추출 범위를 locator 이후의 **열거 구간** — `` `type` `` + 선택적 `(alias)` + ` / ` 반복이라는 고정 구조의 **최장 선두 run** — 으로 한정한다. 열 B 가 3파일 전부 정확히 `BRANCH_TYPES` 6개다.
+- **대가 — 잔여 false-negative 1건 (의도적 미대응)** (reviewer 권고 R2, 주입 실측 13종 중 #7): 범위를 좁힌 결과 **열거 구간 밖**(닫는 괄호 뒤 등)에 추가된 type 토큰은 **미검출**이다. 하드닝하려면 "열거 뒤 잔여 백틱 토큰 중 `^[a-z]+$` 금지" 같은 규칙이 필요한데, `create-pr/SKILL.md` 의 `` `develop` `` 이 정확히 그 패턴이라 **D1 이 제거한 상시 false-fire 가 즉시 재유입**된다. 즉 값싼 하드닝 수단이 없다. 반면 실제 drift 편집 경로(열거의 확장·축소·오타 — 주입 #1~#4·#8)는 전부 검출되므로, **이 대가는 지불할 값어치가 있다**는 판단으로 미대응을 택한다. 정정의 이득만 적고 대가를 적지 않으면 그 자체가 완결 서사 편향이다.
 - 3중 박제: `scripts/verify-branch-name.mjs` 의 `ENUM_RE` 주석 / `.github/workflows/project-guards.yml` 스텝 주석 / 본 절.
+
+**5단계 추가 (reviewer 권고 R1, 2026-08-06) — guide 허용 집합 표를 검증 대상에 편입**
+
+본 PR 은 `docs/guides/branch-strategy-workflow.md` §허용 집합에 표를 **신설**했는데, 이 표는 산문 3곳과 달리 type 열거만이 아니라 허용 집합 **4행 전체**(gitflow head / type 열거 / 릴리스 형태 / 봇 리터럴)를 축자 재기술한다. 검증 대상 밖에 두면 `BOT_BRANCH_PATTERNS` 나 `RE_RELEASE` 를 고쳤을 때 이 표가 **조용히 drift** 한다 — CLAUDE.md 가 "숨은 상수 drift" 로 이름 붙인 클래스이고, "정본을 스크립트로 이전한다" 는 본 PR 의 서사와 정면 충돌한다.
+
+- **택일 근거** — reviewer 는 (a) 문구를 "type 열거 한정" 으로 좁히기 (비용 0) 와 (b) 표를 검증 대상에 추가 (파서 비용) 를 제시했다. **(b) 를 택한다**: 본 PR 의 명제 자체가 *"검증되지 않은 산문 사본이 문제"* 인데, 그 PR 이 새 미검증 사본을 만들고 문구만 좁히는 것은 명제의 자기 적용 실패다. 다만 (b) 만으로는 CLAUDE.md §브랜치 전략 표의 **기존** 사본(`release/*-prep` · `hotfix`)이 남으므로, 문구도 함께 "type 열거 사본 3 → 0" 으로 정밀화한다 (a 와 b 는 배타가 아니다).
+- **구현 — 별도 파서를 만들지 않는다.** workflow `branch:` 리터럴 검사와 동일하게 **런타임 판정기 자신**(`classifyBranch`)을 재사용한다: `형태`·`예` 열의 백틱 토큰 중 형태 자리표시자(`<...>` / `v?` / `X.Y.Z`)가 아닌 **구체 브랜치명**은 전부 그 행의 rule 로 분류돼야 한다. 2행 비고의 `type = ` 열거만 `ALL_TYPES` 와 양방향 대조한다 (이 표는 산문 3곳과 달리 `hotfix` 까지 적는다).
+- **fail-fast**: locator 미발견 / 행 부재 / 행당 대조 가능 토큰 0건은 전부 즉시 FAIL. 표만 남고 대조는 사라지는 상태를 허용하지 않는다.
+- **negative 실증 5종** (2026-08-06, 격리 편집 후 원복): `BOT_BRANCH_PATTERNS` 이름 변경 → 4행 FAIL ✓ / 2행에서 `hotfix` 제거 → 누락 검출 ✓ / 3행 예시를 `release/0.60.0` 으로 훼손 → FAIL ✓ / locator 훼손 → FAIL ✓ / 4행 삭제 → FAIL ✓. 원복 시 PASS 복귀 ✓.
 
 **D-negative 실측 (developer, 2026-08-06) — 진입점 가드의 silent no-op**
 
 격리 픽스처(`/tmp` 사본)에서 negative 시뮬을 돌렸을 때 **아무 출력 없이 exit 0** 이 반환됐다. 원인은 관용적 진입점 가드 `import.meta.url === pathToFileURL(process.argv[1]).href` 로, macOS `/tmp` → `/private/tmp` 심볼릭 링크처럼 **호출 경로와 realpath 가 다르면 거짓이 되어 스크립트 전체가 no-op** 이 된다 — 본 설계가 금지하는 silent skip 그 자체이며, 심링크된 체크아웃 디렉토리에서는 CI 도 동일하게 조용히 초록이 된다. 양쪽을 realpath 로 정규화해 정정하고, `--self-test` 에 "심링크 경로 직접 실행 시 exit 1 + 진단 출력" 회귀 케이스를 추가했다. **격리 동적 테스트(DoD 축 1)가 없었으면 발견 불가능했던 결함**이다.
+
+**B1 실측 (reviewer, 2026-08-06) — CLI 인자 파싱이 같은 silent skip 을 CLI 계층에서 재현했다**
+
+진입점 D-negative 를 고친 뒤에도 **한 계층 아래**에 동일 증상이 남아 있었다. `main()` 이 모드를 `args.includes('--self-test')` 로 **배열 전체를 훑어** 판정했기 때문에, 모드 플래그가 `--branch` 의 **값**으로 오면 브랜치 검사가 통째로 건너뛰어지고 **exit 0** 이 났다:
+
+| 입력 | 수정 전 | 수정 후 |
+|---|---|---|
+| `--branch '--self-test'` | **exit 0** (브랜치 미검사, self-test 초록) | exit 1 |
+| `--branch '--verify-ssot'` | **exit 0** (브랜치 미검사) | exit 1 |
+| `--branch 'feat/962-x'` | exit 1 | exit 1 |
+| `--branch 'feature/962-x' --self-test` | exit 0 (self-test 만 실행, 브랜치 검사 소실) | **exit 2** (잉여 인자 거부) |
+
+- **격하하지 않은 이유** — 도달 경로가 둘인데 하나는 **적대자가 필요 없다**. 브랜치명이 `--self-test` 인 입력 경로(경로 2)는 희귀하지만, 누군가 두 CI 스텝을 `--branch "$HEAD_REF" --self-test` 로 합치는 유지보수 경로(경로 1)는 자연스러운 유혹이고, 그 순간 브랜치 검사가 **조용히 사라지면서 스텝은 SUCCESS** 다. 본 ADR 이 D-negative 를 "본 설계가 금지하는 silent skip 그 자체" 로 분류해 놓고 같은 증상을 CLI 계층에서 넘기면 자기모순이다.
+- **정정 (2축)**: ① 모드를 `args[0]` **로만** 판정한다 — 네 소비처 전부 첫 인자로 진입하므로 호출부 변경 0. ② **잉여 인자를 거부**한다 (`MODE_ARITY` 초과 시 exit 2). ①만으로는 병합 호출에서 브랜치 검사는 살아나지만 이번엔 `--self-test` 가 조용히 무시되는데, 그것도 같은 클래스다. 모드별 인자 개수가 전부 고정이라 병합 자체를 불가능하게 만드는 편이 정직하다. 모드 조회는 `Object.hasOwn` 으로 한다 — `'constructor' in {}` 가 `true` 라 단순 `in` 검사는 임의 문자열을 모드로 통과시켜 같은 결함을 되살린다.
+- **회귀 가드**: `classifyBranch` 단위 테스트로는 잡히지 않는다 (순수 함수는 언제나 정상이고, 결함은 `main()` 의 파싱 순서에 있다). 따라서 `--self-test` 에 **자식 프로세스 프로브 3케이스**를 추가했다 (위 표의 1·2·4행). 진입점 프로브와 합쳐 자식 프로세스 프로브는 총 4건이며, `project-guards.yml` 의 self-test 스텝 로그에 남는다.
+- **부수 발견 — 프로브 재진입에 의한 무한 재귀**: negative 시뮬(결함 재도입)에서 `--branch --self-test` 가 self-test 로 라우팅되자 프로브가 프로브를 낳아 자식이 **지수적으로 증식**했다. 결함의 신호가 깨끗한 `[MISS]` 가 아니라 **CI 행(job timeout)** 이 되면 진단 품질이 떨어지므로, 자식에게 `VERIFY_BRANCH_NAME_PROBE=1` 을 넘겨 프로브 깊이를 1 로 묶었다 (+ `spawnSync` `timeout` 이중 방어). 재측정 결과 결함 상태에서 **재귀 없이 3 MISS / exit 1** 로 드러난다.
+
+**진입점 `catch` 폴백의 fail-loud 전환** (reviewer 권고 R3): 종전 폴백은 realpath 실패 시 **결함 이전의 순진한 URL 비교**로 되돌아갔다. 그 비교가 거짓이면 결국 같은 silent no-op 이므로, *"조용히 스킵하지 않는다"* 는 주석이 사실과 어긋났다 — 이 저장소가 버그 생성원으로 박제한 **주석↔구현 drift** 다. realpath 실패는 정상 경로가 아니므로 stderr 경고 후 **직접 실행으로 간주해 판정을 강행**하도록 바꿨다. import 문맥에서 오발화하면 잡음이 나지만, 가드가 조용히 사라지는 쪽보다 언제나 낫다.
+
+**self-consistency 지문의 직렬화 규약** (reviewer 권고 R4): §7-3 축 3 의 3-tuple 중 해시 성분이 *"FAIL 브랜치명 정렬 목록의 SHA-256 앞 12자"* 로만 서술돼 **직렬화 규약이 미명시**였고, reviewer 가 8종 형태를 시도해 전부 불일치했다. 대조가 목적인 값이 재현 불가능하면 축 3 의 증거력이 사라진다. 근본 해결로 **`--self-test` 가 3-tuple 을 직접 출력**하게 했다 — 다섯 페르소나가 값을 각자 계산하지 않고 같은 줄을 읽으므로 직렬화 해석 차이가 불일치로 오인될 여지가 구조적으로 없다. 규약도 함께 고정했다: FAIL 기대 픽스처명을 `JSON.stringify` 로 인용(빈 문자열·개행 주입 케이스가 구분돼야 한다) → 기본 `Array#sort` → `'\n'` join → SHA-256 → 앞 12자.
 
 **로컬 pre-flight 의 detached HEAD 처리** (§7 이견-a 반영): `git rev-parse --abbrev-ref HEAD` 는 detached 상태에서 리터럴 `HEAD` 를 반환한다. 이를 브랜치명으로 검사하면 "규약 위반" 이라는 **오도하는 실패**가 난다. detached 를 별도로 감지해 전용 메시지와 함께 종료하고, 규약 위반과 구분한다. 격리 worktree sub-agent 가 특정 커밋을 체크아웃한 상태에서 실제로 발생 가능한 경로다.
 
