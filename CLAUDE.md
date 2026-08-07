@@ -222,9 +222,11 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 - **메인, 복귀 직후**: `ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep` + `pgrep -af "agent-browser-chrome[-]"` (bracket 필수 — 오탐 방지) → 세션 이전 것만 정리.
 - 상세: [zombie-process-guards.md](docs/ops/zombie-process-guards.md) — volt #24 / #79
 
+> **잔여 계약** (#980): 아래 가드 A~C 는 **행동 규칙만** 남기고 서사는 [zombie-process-guards.md](docs/ops/zombie-process-guards.md) 로 이관. **인간-루프 의무(사용자 보고·확인)는 잔여 필수** — 1차 이관이 8회→1회로 강등시킨 전례.
+
 #### 가드 A — 메인 spawn 시점 lsof 선행
 
-장기 프로세스 spawn **직전** 사용 포트(3000/4000 등) `lsof -i :$PORT` 의무 — 좀비가 HTTP 응답해 "ready" 오인 (#440). 점유 시 `ps -p $(lsof -t -i :$PORT) -o pid,etime,command` → 좀비 인지 + **사용자 보고** + 정리 후 재시작.
+장기 프로세스 spawn **직전** 사용 포트(3000/4000 등) `lsof -i :$PORT` 의무 — 좀비가 HTTP 응답해 "ready" 오인 (#440). 점유 시 `ps -p $(lsof -t -i :$PORT) -o pid,etime,command` → 좀비 인지 + **사용자 보고·확인 후** 정리·재시작 (kill 승인 게이트).
 
 #### 가드 B — sub-agent-confirmed-done 카나리아
 
@@ -232,7 +234,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 #### 가드 C — 세션 시작 hook
 
-`.claude/hooks/session-start-zombie-check.sh` (SessionStart hook) 이 ETIME 30분 이상 dev/test 프로세스를 경고. 회귀 차단 `verify-zombie-check.mjs`.
+`.claude/hooks/session-start-zombie-check.sh` (SessionStart hook) 이 ETIME 30분 이상 dev/test 프로세스를 경고. 회귀 차단 `verify-zombie-check.mjs`. 경고 시 **사용자에게 정리 권고**.
 
 #### 가드 D — 세션 중단 dead-wait (대기 라이프사이클 + fallback heartbeat)
 

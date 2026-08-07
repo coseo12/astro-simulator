@@ -1,6 +1,6 @@
 # 좀비 프로세스 가드 — 계층 구조 + incident 서사 (#440 / volt #24·#46·#52·#79)
 
-> ⚠️ **본 문서의 인용 블록은 이관 시점(2026-08-07, #980)의 동결 스냅샷이다.** 행동 규칙의 **정본은 CLAUDE.md** 이며, CLAUDE.md 잔여가 갱신되면 여기 인용은 조용히 stale 해진다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 리뷰 🟡-2). 인용과 정본이 어긋나 보이면 **CLAUDE.md 를 신뢰**하고 본 문서를 갱신하라. `ETIME 30분` 처럼 기계 가드(`verify-zombie-check.mjs`)가 검사하는 값만 자동 정합이 보장된다.
+> ⚠️ **본 문서의 인용 블록은 이관 시점(2026-08-07, #980)의 동결 스냅샷이다.** 행동 규칙의 **정본은 CLAUDE.md** 이며, CLAUDE.md 잔여가 갱신되면 여기 인용은 조용히 stale 해진다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 리뷰 🟡-2). 인용과 정본이 어긋나 보이면 **CLAUDE.md 를 신뢰**하고 본 문서를 갱신하라. ⚠️ **자동 정합은 없다** — `verify-zombie-check.mjs` 의 6 checks 는 전부 **헤더 문자열 pin + 파일 존재 확인**이고 `ETIME`/`30` 을 검사하는 assertion 은 **0건**이다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 2차 리뷰 🔴-A — 초판이 반대로 서술했다). `ETIME 30분` 은 §8 표대로 **4곳을 사람이 동시에 갱신**해야 하며, 그 값은 `scripts/cleanup-browser.sh` 가 프로세스를 실제로 kill 하는 판정 기준이다.
 
 sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버 / cargo test / agent-browser Chrome)가 정리되지 않고 누적되는 클래스의 **원인·실측·가드 계층 SSoT**.
 
@@ -143,3 +143,15 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 `pgrep -f "패턴"` 은 자기 셸의 명령행을 매칭해 **오탐**한다. 좀비 검출 패턴에는 bracket 을 넣는다 (`agent-browser-chrome[-]`). `pkill` 은 자기 셸을 죽일 위험이 있어 bracket 이 안전 개선까지 겸한다. hook 은 `grep -v` 로 이미 안전하다.
 
 상세는 [`operational-friction.md`](operational-friction.md) §3 ([#795](https://github.com/coseo12/astro-simulator/issues/795)).
+
+## 잔여 계약의 근거 (PR #981 리뷰)
+
+CLAUDE.md 잔여 블록 상단의 **잔여 계약**은 실패 전례에서 나왔다. #980 1차 이관은 **인간-루프 의무를 원본 8회 → 1회로 강등**시켰다:
+
+- **가드 A** — `점유 시 ps -p $(...)` 로 문장이 끝나 **조건절만 있고 귀결절이 없었다**. 좀비를 탐지하라고만 하고 **사용자에게 보고하라는 지시가 사라졌다**
+- **`--all`** — *"병행 브라우저 작업 부재 확인 후"* 전제가 소실돼 **허가만 남았다**. #926 모드 분리(병행 에이전트 오살 방지)의 존재 이유가 지워진 것
+- **가드 B** — 발견 시 대응(사용자 보고 + 정리)이 소실
+
+reviewer 판정: *"잔여만으로 **탐지 절차는 100%, 대응 절차는 0%** 재현된다."* 원인은 메인이 부과한 `≤23,000` 임계였다 — **기계 가드는 35,000 warn 인데 자기 부과 목표가 행동 규칙을 축출**하고 있었다. 임계를 완화해 복원했다.
+
+> **미래 다이어트 작업자에게**: 예산이 빠듯하면 **서사를 더 옮기지 행동 규칙을 자르지 마라.** 특히 *"사용자에게 보고/확인"* 류는 CRITICAL #5 (`rm -rf`/force-push/DB drop) 열거가 **프로세스 kill 을 덮지 못하므로** 이 잔여가 유일한 방어선이다.
