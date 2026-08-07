@@ -218,60 +218,21 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 ### sub-agent 이탈의 프로세스 레벨 확장 — cargo/next dev 좀비 누적
 
-상위 "sub-agent 검증 완료 ≠ GitHub 박제 완료" 교훈의 **프로세스 리크 확장**. volt #24 가 코멘트·라벨 등 외부 가시성 박제 누락을 다룬다면, 본 교훈은 **백그라운드 프로세스 정리 누락** 이다.
+- **sub-agent 반환 직전**: 띄운 PID → `spawned_bg_pids`, 미확인 시 `bg_process_handoff` 인계. `agent-browser` 사용 시 `bash scripts/cleanup-browser.sh` **기본 모드** (전량 pkill 금지 — 병행 오살 방지 #926). `--all` 은 **메인 전용**.
+- **메인, 복귀 직후**: `ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep` + `pgrep -af "agent-browser-chrome[-]"` (bracket 필수 — 오탐 방지) → 세션 이전 것만 정리.
+- 상세: [zombie-process-guards.md](docs/ops/zombie-process-guards.md) — volt #24 / #79
 
-- **현상**: sub-agent(dev/reviewer/qa) 가 `run_in_background=true` 로 `cargo test --lib` 또는 `pnpm dev` 를 시작한 뒤, PID 종료 확인 없이 보고서 반환. 메인 오케스트레이터가 복귀 후 프로세스 정리 안 하면 다음 sub-agent 가 동일 타겟 디렉토리에 새 cargo 를 시작 → 테스트 바이너리 4개+ 병렬 경쟁 → 어느 것도 완주 못 함
-- **관찰 사례**: P9 PR-1 (#258) 에서 dev(초기)/dev(재작업)/reviewer/qa 가 각자 cargo test 시작 후 누적. `physics_wasm-<hash>` 바이너리 4개 동시 실행, 각 CPU 94~388% 점유, 30~176분 경과. 정상 4~5분 대비 10배+ 지연 후에도 완주 못 함
-- **메인 루틴** (sub-agent 복귀 직후 의무):
-  ```bash
-  # sub-agent 가 띄웠을 수 있는 장기 프로세스 독립 확인
-  ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep
-  # 의도치 않은 좀비 발견 시 kill (시작 시각 비교로 현재 세션 이전 것만 정리)
-  ```
-- **sub-agent 루틴** (반환 직전 의무):
-  - `run_in_background=true` 로 시작한 프로세스가 있으면 PID 기록 + 마무리 체크리스트 JSON 의 `spawned_bg_pids` 필드에 박제
-  - 완주 확인 못 하고 반환 시 명시적 "프로세스 인계" 플래그 (메인이 정리 책임 인지)
-- **cargo test 호출 규범** (PR-2 에서 도입 예정):
-  - 장기 적분 테스트 (`mercury/yoshida_*_perihelion_*`, `earth/venus_perihelion_eih_*`) 에 `#[ignore]` 어트리뷰트 + CI 전용 `--include-ignored` 경로
-  - 일상 개발에서는 `cargo test --lib` 가 5분 내 완주하도록 재설계
-- **근거**: volt [#24](https://github.com/coseo12/volt/issues/24) 의 프로세스 레벨 확장 (2026-04-20 관찰). volt 캡처 예정
-#### agent-browser Chrome 좀비 변형 (volt #79)
+#### 가드 A — 메인 spawn 시점 lsof 선행
 
-- **agent-browser Chrome 좀비 변형** (volt [#79](https://github.com/coseo12/volt/issues/79)): qa / browser-test sub-agent 가 `agent-browser` 도구로 real Chrome 사용 후 세션 종료 시 정리 누락. 식별자 `agent-browser-chrome-<UUID>` user-data-dir (사용자 본 Chrome 영향 0). 본 세션 (2026-04-28) 실측 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU 관찰. **메인 루틴** (sub-agent 복귀 직후 의무): `pgrep -af "agent-browser-chrome[-]"` 검사 + 좀비 확인 시 `bash scripts/cleanup-browser.sh --all` (병행 브라우저 작업 부재 확인 후 — 메인 전용). **sub-agent 루틴** (반환 직전 의무): `bash scripts/cleanup-browser.sh` 기본 모드 (전량 pkill 금지 — 병행 오살 방지, #926). agent-browser 도구 자체 cleanup 이 정상 case 에선 작동하나 sub-agent 비정상 종료 (timeout / SIGKILL / panic) 시 lineage 끊긴 좀비 잔존. cargo/next dev 의 `spawned_bg_pids` SSoT 가 직접 spawn 한 PID 만 커버하므로 도구 wrapper 가 spawn 한 child process 는 별도 검증 의무
+장기 프로세스 spawn **직전** 사용 포트(3000/4000 등) `lsof -i :$PORT` 의무 — 좀비가 HTTP 응답해 "ready" 오인 (#440). 점유 시 `ps -p $(lsof -t -i :$PORT) -o pid,etime,command`.
 
-#### 가드 A — 메인 spawn 시점 lsof 선행 (2026-05-10 incident #440 Phase 1)
+#### 가드 B — sub-agent-confirmed-done 카나리아
 
-- **메인 dev/장기 프로세스 spawn 시점 lsof 선행 의무** ([이슈 #440](https://github.com/coseo12/astro-simulator/issues/440)): 메인 오케스트레이터가 `pnpm dev` / `pnpm start` / `cargo test --release` 등 장기 프로세스를 `run_in_background=true` 로 시작하기 **직전**, 사용 포트(3000 / 4000 / 기타)에 대해 `lsof -i :<port>` 선행 확인 의무. 점유 중이면 좀비 인지 + 사용자 보고 + 정리 후 재시작. **본 가드 위반 시 발생 시퀀스** (실측 2026-05-10): 좀비 (이전 세션 PID 97333, ETIME 3h 17m) 가 포트 3000 점유 → 메인이 새 dev spawn 시도 → EADDRINUSE 로 즉사 → 좀비가 HTTP 응답 → 메인이 "dev ready" 오인 → 사용자 D-T2 안내 → 사용자 자기 터미널 `pnpm dev` 시도 → EADDRINUSE → `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` → 사용자 보고 → forensic. 상세: [`docs/reports/20260510-419-dev-server-zombie-recurrence.md`](docs/reports/20260510-419-dev-server-zombie-recurrence.md). 위 "메인 루틴" (sub-agent 복귀 직후) 가드와 **직교** — 본 가드는 **메인이 직접 spawn 하는 시점** + **이전 세션 좀비 (sub-agent 추적 단위 외)** 검증.
-- **real-lessons SSoT (volt #24) 와의 관계** (volt [#24](https://github.com/coseo12/volt/issues/24) `중복 브랜치 dev 서버 오진 방지` 가드): 상위 SSoT 는 "feature 브랜치별 worktree 에서 띄운 dev 서버가 이후 브랜치에서 동일 포트를 점유하면 HMR 이 낡은 번들을 서빙" 라는 **HMR drift 시나리오** 박제. 본 가드 A 는 그 SSoT 의 **실측 incident 구체화** — 단순 stale 번들이 아니라 좀비가 HTTP 응답해 "ready" 자체를 오인하게 만드는 변형 + 이전 세션 (sub-agent 추적 단위 외) 좀비까지 검증 범위 확장.
-  ```bash
-  # 메인 dev/장기 프로세스 spawn 직전 의무 가드
-  PORT=3000
-  if lsof -i :$PORT > /dev/null 2>&1; then
-    echo "WARN: 포트 $PORT 점유 중 — 좀비 가능"
-    ps -p $(lsof -t -i :$PORT) -o pid,etime,command
-    # 사용자 확인 후 kill -TERM <PID> 진행
-  fi
-  ```
+포트 사용 sub-agent 복귀 직후 **보고와 무관하게** 위 명령 1회. `spawned_bg_pids` 는 자기 spawn PID 만 추적 → 이전 세션 좀비는 추적 밖 (`"sub-agent-confirmed-done"` 도 정의상 정합 PASS). **ETIME ≥ 30분 = 이전 세션 좀비 의심** (가드 C hook / `qa.md` — 3곳 SSoT).
 
-#### 가드 B — sub-agent-confirmed-done 카나리아 (incident #440 Phase 2)
+#### 가드 C — 세션 시작 hook
 
-- **`bg_process_handoff="sub-agent-confirmed-done"` 보고에서도 메인 카나리아 검증 의무**: real-lessons SSoT (volt #24) 정의상 `"sub-agent-confirmed-done"` 은 "PID 배열이 `[]` 여야 정합" 이므로 메인 검증 트리거 미발화. 그러나 본 incident 처럼 **이전 세션 좀비** 가 sub-agent 추적 단위 외에 잔존하면 정의상 정합 PASS 임에도 좀비 검출 불가. 메인은 sub-agent 가 어떤 보고를 하든 (`"main-cleanup"` / `"sub-agent-confirmed-done"` / `"none"` 무관) 포트 사용 sub-agent (qa / dev / browser-test) 복귀 직후 **카나리아 1회** (`lsof -i :<port>` + ETIME 패턴 매칭). 검증 비용 < 1초. 좀비 발견 시 사용자 보고 + 정리 후 다음 작업 진행. 가드 A 가 **메인 자신의 spawn 직전** 가드라면 가드 B 는 **sub-agent 복귀 직후** 가드 — 둘 직교.
-- **ETIME 임계값** — 본 세션 시작 이전 추정 임계값으로 **30분** 사용. qa/dev 사이클 1회 이상 경과한 PID 는 본 세션이 spawn 한 게 아닐 가능성이 매우 높음. `.claude/hooks/session-start-zombie-check.sh` (가드 C) + `.claude/agents/qa.md` 좀비 카나리아 항목 모두 동일 임계값 적용 (정합 SSoT).
-  ```bash
-  # sub-agent 복귀 직후 카나리아 (의무 1회, 비용 < 1초)
-  PORT=3000
-  THRESHOLD_MINUTES=30
-  ZOMBIES=$(lsof -t -i :$PORT 2>/dev/null)
-  if [[ -n "$ZOMBIES" ]]; then
-    echo "WARN: sub-agent 복귀 후 포트 $PORT 점유 잔존"
-    ps -p $ZOMBIES -o pid,etime,command
-    # ETIME ≥ ${THRESHOLD_MINUTES}분 PID 는 이전 세션 좀비 의심 (정리 필요)
-  fi
-  ```
-
-#### 가드 C — 세션 시작 hook (incident #440 Phase 2b)
-
-- **세션 시작 시점 좀비 검출 hook**: `.claude/hooks/session-start-zombie-check.sh` 가 SessionStart hook 으로 등록되어 (`.claude/settings.json`) Claude Code 세션 시작 시 자동 실행. ETIME 30분 이상 `next dev` / `next-server` / `cargo .*test` / `pnpm.*dev` 프로세스 발견 시 stdout 으로 PID/ETIME/command 출력 → Claude 가 사용자에게 정리 권고. exit 0 (블록 안 함, 경고만). 가드 A/B 가 **본 세션 안의 spawn 시점** 가드라면 가드 C 는 **세션 시작 진입 시점** 가드 — 사용자가 인지하기 전 자동 검출. SSoT 박제 회귀 차단은 `scripts/verify-zombie-check.mjs` (CI 통합) 가 담당.
+`.claude/hooks/session-start-zombie-check.sh` (SessionStart hook) 이 ETIME 30분 이상 dev/test 프로세스를 경고. 회귀 차단 `verify-zombie-check.mjs`.
 
 #### 가드 D — 세션 중단 dead-wait (대기 라이프사이클 + fallback heartbeat)
 
