@@ -108,7 +108,9 @@ diff-scope 실패 → detect-and-test 는 conclusion=skipped → GitHub 은 통�
 
 즉 `detect-and-test` 만 required 로 올리면 **상류 실패가 그대로 통과한다**. `ci-physics-wasm.yml` 의 3개 job 도 동일 구조 (`needs: diff-scope`). 구멍을 닫으려면 `diff-scope` 자체를 required 로 올려야 한다 — 그런데 §2-5 의 이름 충돌이 걸린다.
 
-### 2-5 동명 체크런은 **축이 4개**다 — workflow 축 × event 축 × event *type* 축 × PR 다중성 축
+### 2-5 동명 체크런의 축은 **최소 4개**다 — workflow 축 × event 축 × event *type* 축 × PR 다중성 축
+
+> ⚠️ **"4개" 는 상한이 아니라 현재까지 열거된 수다** (PR #979 3차 리뷰 🟡-9). 본 ADR 은 3라운드 연속으로 새 축을 발견했고 (event *type* → PR 다중성 → 아래 제5축), **열거가 닫혔다는 근거는 없다**. 실제로 reviewer 3차가 **제5축 — `push` 다중 ref** 를 실측했다: `58ccfcf` (v0.61.0 release merge) 는 `pull_request` run 이 **0개**인데 `project-guards` 가 `{push/develop=success, push/main=cancelled}` 로 갈린다 — 한 SHA 가 **N개 브랜치의 tip** 인 경우이며(ff-sync 산물), 신설된 PR 다중성 축의 **정확한 쌍둥이**다. **required 판정 대상(PR head SHA)과 만나는 경로가 확인되지 않아 결정 조항에는 영향이 없으나**, 축 열거의 미완결성 자체를 §10-1 **한계 13** 으로 박제한다. 다음 축이 발견되면 그것은 **뒤집힘이 아니라 예고된 관측**이다.
 
 > **개정 1 (2026-08-07, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰 🔴-1)**: 초판은 축을 2개로 서술했다. **제3의 축 (event `types`) 이 실재하며, 그 노출은 Phase 1 required 후보 위에서 이미 발화한 이력이 있다.** 근거는 아래 표 3행 + §2-12.
 >
@@ -1230,9 +1232,16 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 12. **PR 다중성 축은 사후 게이트로 닿지 않는다 — 그리고 발화 시 rerun 으로 회복되지 않는다** (신설 2026-08-07, PR [#979](https://github.com/coseo12/astro-simulator/pull/979) 리뷰 🔴-2). 한 SHA 가 N개 PR 의 head 이면 `pull_request` 컨텍스트가 ×N 으로 쌓이고, 판정이 **브랜치 이름의 함수**인 `branch-name` 은 N개 결론이 **정당하게** 갈린다 (§2-12 원인 ③ / 실측 5: `4f7366e` = `{failure, success, success}`).
     - **base rate 는 0** — 20일 창에서 `base=main` PR head 가 복수 PR 의 head 였던 사례는 **0건**이다. 관측된 2건 (`4f7366e` / `995b8b5`) 은 전부 2026-08-06 의 **인위적 단일 사건** ([#962](https://github.com/coseo12/astro-simulator/issues/962) 가드 라이브 실증) 이고 둘 다 `base=develop` 이다. 이 저장소는 **한 커밋에 여러 브랜치를 다는 패턴을 실제로 쓰므로**, 그 패턴이 릴리스 SHA 와 만나면 발화한다.
     - **실현 시 복구가 비대칭이다** — 갈린 `failure` 체크런은 그 SHA 에 **영구 기록**된다. 재실행해도 그 PR 의 브랜치명이 그대로라 다시 실패한다. 복구는 §9-R1 롤백 (2초) 또는 develop 커밋 1개 추가 후 release PR 재생성 (릴리스 1주기) 뿐이다 (§10-6 시나리오 D — 5 시나리오 중 유일하게 rerun 회복 불가).
-    - **왜 사후 게이트로 닿지 않는가**: 한계 11 의 완화책 **S2 가 표본을 `base=main` PR head 로 고정**하면서 이 축을 구조적으로 배제한다 — 관측된 2건이 둘 다 `base=develop` 이라 **영원히 표본에 들어오지 않는다**. *"표본을 고치는 동작이 새 사각을 만들었다."*
+    - **왜 사후 게이트로 닿지 않는가**: 한계 11 의 완화책 **S2 의 표본 선정 관행(`base=main` PR head 고정)** 이 이 축을 배제한다 (형식 조건 `max_n ≥ 2` 자체는 `4f7366e` 도 충족한다 — PR #979 3차 리뷰 🟡-11). 또한 `4f7366e` 는 **"S1~S3 만으로 오통과한다" 는 증명이 아니다** — 그 SHA 를 표본으로 골랐다면 본체가 2건을 출력해 판정표 2행(차단)에 떨어진다. S4 의 유효 근거는 **"표본이 깨끗해도 적용 대상이 오염될 수 있다"** 하나이며 그것으로 충분하다 — 관측된 2건이 둘 다 `base=develop` 이라 **영원히 표본에 들어오지 않는다**. *"표본을 고치는 동작이 새 사각을 만들었다."*
     - **완화 (적용됨)**: §8-P1-G **S4** (`distinct_head_branch = 1`) 를 **적용 대상 SHA 에 대한 사전 확인**으로 신설. S1~S3 (표본 SHA 조건) 과 적용 대상·시점이 다르다.
-    - **잔존**: S4 는 *"확인 시점"* 의 상태만 본다. A1 이후 릴리스 head SHA 를 다른 브랜치에 얹고 PR 을 열면 새 체크런이 붙는다. 기술 게이트만으로는 닫히지 않으므로 §10-5 재검토 조건 12 를 **작업 습관 쪽**에 병행해 건다.
+    - **잔존**: **S4 자신의 cap 한계 (PR #979 3차 리뷰 🟡-10)**: `S4` 는 `actions/runs?per_page=100` 을 쓰므로 **S3 가 `check-runs` 에서 닫은 cap 오통과 클래스가 여기서 재개방**된다. 잘리면 `distinct_head_branch` 가 **과소 집계**되어 `1` 로 오통과하는 방향이라 위험 쪽이다. 따라서 S4 실행 시 `total_count ≤ 100` 을 함께 확인한다 (현재 여유 29/100 — `4f7366e` 가 46). S4 는 *"확인 시점"* 의 상태만 본다. A1 이후 릴리스 head SHA 를 다른 브랜치에 얹고 PR 을 열면 새 체크런이 붙는다. 기술 게이트만으로는 닫히지 않으므로 §10-5 재검토 조건 12 를 **작업 습관 쪽**에 병행해 건다.
+
+13. **동명 축 열거는 닫히지 않았다 — 본 ADR 이 아는 축은 "현재까지 4개" 이지 "전부 4개" 가 아니다** (신설 2026-08-07, PR [#979](https://github.com/coseo12/astro-simulator/pull/979) 3차 리뷰 🟡-9).
+
+    - **실적이 그렇게 말한다** — 초판(workflow 축 × event 축) → 2차(event *type* 축) → 3차(PR 다중성 축) → 3차 리뷰(**`push` 다중 ref 축**). **라운드마다 새 축이 나왔고, 매번 직전 라운드가 "이번엔 닫았다" 고 서술한 뒤였다.**
+    - **제5축 실측** — `58ccfcf` (v0.61.0 release merge commit) 는 `pull_request` run 이 **0개**인데 `project-guards` 가 `{push/develop = success, push/main = cancelled}` 로 갈린다. 한 SHA 가 **N개 브랜치의 tip** 인 경우이며(ff-sync 가 `main` 의 merge commit 을 `develop` tip 으로 만든 산물), **PR 다중성 축의 정확한 쌍둥이**다.
+    - **정책 영향 0 (현재까지)** — required 판정 단위는 **PR head SHA** 인데(§8 서두), 제5축은 `pull_request` run 이 0인 SHA 에서 발현하므로 **만나는 경로가 확인되지 않았다**. 다만 *"확인되지 않았다"* 는 *"없다"* 가 아니다 — 한계 11 이 진단한 **"측정하지 않은 축을 위험 없음으로 결론"** 이 정확히 이 자리에 다시 선다.
+    - **운영 규약**: 다음 축이 발견되면 그것은 **뒤집힘이 아니라 예고된 관측**이다. 발견 시 §2-5 표에 행을 추가하고 required 판정 대상과의 접점만 판정한다 — ADR 전체 재작성은 불요.
 
 ### 10-2 Accepted 전이 조건
 
