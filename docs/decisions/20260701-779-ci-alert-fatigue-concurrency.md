@@ -481,7 +481,7 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 >
 > **동일 ref 재트리거 자체는 드물지 않다**: 같은 `(headSha, name, event, headBranch)` 가 2회 이상 등장한 group 이 **6.15일에 23개 / 50 run** (19.95일에 54개) 관측된다. 그럼에도 `cancelled` C 클래스가 0인 이유는 **그 재트리거를 겪는 워크플로에 concurrency 블록이 없어 취소가 일어나지 않았기 때문**이다 — 6일 창의 23 group 은 **전부 `PR Template Checklist Guard`** 이고, 이 워크플로는 concurrency 미보유다 (그 group 안 run 의 conclusion: `success` 48 / `failure` 2 / `cancelled` **0**).
 >
-> 이 사실은 §A2-6 조건 13 과 ADR 971 결정 9-2 의 *"concurrency 추가 금지"* 를 **원리 주장에서 실측 주장으로 격상**시킨다: 넣었다면 취소가 실제로 발생했을 것이다. **단 규모는 23 이 아니라 5 다** — `cancel-in-progress` 는 *진행 중인* run 만 취소하므로, 연속 쌍 27 중 시간이 겹치는 **5쌍**만 발화한다 (겹침 1~9초). 그리고 실제 관측된 불일치 사례 (`ee64871`) 는 run 간격이 10분 31초·12초라 **겹침 0 → concurrency 를 넣었어도 결과가 동일**하다. 상세는 ADR 971 결정 9-2.
+> 이 사실은 §A2-6 조건 13 과 ADR 971 결정 9-2 의 *"concurrency 추가 금지"* 를 **원리 주장에서 실측 주장으로 격상**시킨다: 넣었다면 취소가 실제로 발생했을 것이다. **단 규모는 23 이 아니라 5 다** — `cancel-in-progress` 는 *진행 중인* run 만 취소하므로, 연속 쌍 27 중 시간이 겹치는 **5쌍**만 발화한다 (겹침 1~9초). 그리고 실제 관측된 불일치 사례 (`ee64871`) 는 **run 레벨** 여유가 10분 28초·**2초**라 **겹침 0 → concurrency 를 넣었어도 결과가 동일**하다. 상세는 ADR 971 결정 9-2 / §2-12 실측 1-b.
 
 **§축 4 (알림 정책) 영향 0**: GitHub 메일은 conclusion=`failure` 에만 발송되고 `cancelled`·`success` 는 미발송이다. 취소가 완주로 바뀌어도 **성공 run 은 메일을 만들지 않는다** — "최종 실패만 메일" 은 유지된다.
 
@@ -535,7 +535,9 @@ branch-name            0건
 
 **Phase 1 착수 전 점검 항목**: Phase 1 은 *"Phase 0 머지 직후 — 릴리스 대기 없음"* 이라 **관찰 게이트가 없고**, 그 면제 근거는 *"release PR 6/6 에서 cancel 0 + 롤백 2초"* 였다. 그러나 ② 는 `cancelled` 가 아니라 `failure`+`success` 혼재이므로 **그 근거가 원리적으로 커버하지 못한다**. 따라서 `pr-template-checklist` 를 required 로 올리기 전에 위 `G2` 식을 **후보 SHA 에 직접** 1회 실행해 빈 출력을 확인해야 한다.
 
-> ⚠️ **해소책으로 `pr-template-checklist-guard.yml` 에 concurrency 를 추가하지 말 것.** 근거가 두 겹이다. **1차** — 실제 관측된 사례에서 concurrency 는 **애초에 발화하지 않는다**: `ee64871` 의 세 run 은 간격 10분 31초 / 12초, 각 10~13초 완주라 **겹침이 0** 이다. `cancel-in-progress` 는 진행 중인 run 만 취소하므로 `{failure, failure, success}` 가 **한 글자도 바뀌지 않는다**. **2차** — 겹쳐서 발화하는 경우엔 같은 head SHA 위에 `cancelled` 를 남기고, `cancelled` 는 GitHub 의 통과 3종에 없으므로 required check 하에서 **더 나쁘다** (`{failure, success}` → `{cancelled, success}`). 어느 경로든 `G2` 는 계속 발화한다.
+> ⚠️ **해소책으로 `pr-template-checklist-guard.yml` 에 concurrency 를 추가하지 말 것.** 근거가 두 겹이며, 둘은 **배타적 케이스 분할** (겹침 0 / 겹침 >0) 이라 **합쳐야 전체를 덮는다**. **1차 (27쌍 중 22쌍)** — 관측된 사례에서 concurrency 는 **발화하지 않는다**: `ee64871` 의 세 run 은 **run 레벨** (`created_at → updated_at` — concurrency 의 실동작 단위) 여유가 10분 28초 / **2초**로 **겹침이 0** 이다. `cancel-in-progress` 는 진행 중인 run 만 취소하므로 `{failure, failure, success}` 가 **한 글자도 바뀌지 않는다**. **2차 (27쌍 중 5쌍)** — 겹쳐서 발화하는 경우엔 같은 head SHA 위에 `cancelled` 를 남기고, `cancelled` 는 GitHub 의 통과 3종에 없으므로 required check 하에서 **더 나쁘다** (`{failure, success}` → `{cancelled, success}`). 어느 경로든 `G2` 는 계속 발화한다.
+>
+> **단위 주의 (2026-08-07 정정, ADR 971 PR [#979](https://github.com/coseo12/astro-simulator/pull/979) 리뷰 🟡-1)**: 초판은 이 여유를 *"간격 10분 31초 / 12초"* 로 적었는데 그것은 **job (check-run) 레벨** (`started_at → completed_at`) 이라 러너 픽업 지연이 빠져 있었다 — §A2-3 이 신설한 단위 라벨 (*"run 5 ≠ job 7, 혼용 금지"*) 의 자기 위반이다. **run 레벨 정본은 2초**이며, 이는 관측된 겹침 분포 (1~9초) **안쪽** 값이다. 따라서 1차 근거는 *"발화할 수 없다"* 가 아니라 *"이 사례에서는 발화하지 않았다"* 로 읽어야 하고, 그래서 2차 근거가 불필요해지지 않는다. 실측 원문은 ADR 971 §2-12 실측 1-b.
 >
 > **[2026-08-07 회수 완료]** 본 Amendment 는 *"사실 박제까지만"* 하고 결정을 ADR 971 로 넘겼다. 그 결정이 내려졌다 — **ADR [20260807-971](20260807-971-required-status-checks.md) 결정 9**: (9-1) `pr-template-checklist` 를 required 에서 **제외**, (9-2) 본 워크플로에 **concurrency 추가 금지** (위 2겹 근거), (9-3) `label-pr` 은 `edited` 부재라 **조건부 유지** + 재검토 트리거 신설. `edited` 트리거 제거안은 §10-3 후속 5 로 분리됐다 (복구 경로 비대칭과의 교환).
 
