@@ -413,7 +413,9 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 | release PR 생성 (develop push ↔ PR) | `c2732ae` | `CI` / `CI (physics-wasm)` / `a11y` / `fps` / `shader` 의 `event=push, head_branch=develop` run 이 전부 `cancelled`. 생존자는 `event=pull_request` run |
 | ff-sync (`git push origin main:develop`) | `58ccfcf` (main tip) | `CI` / `CI (physics-wasm)` / `Project Guards` 의 `head_branch=main` run 3개가 `cancelled`. 생존자는 `head_branch=develop` run |
 
-따라서 branch-cross 중복은 **별도 group 이 아니었고**, "못 잡은" 것도 아니었다 — **잡되 유해한 방향으로** 잡고 있었다. 그리고 이 취소는 정확히 **릴리스 경로의 SHA 에서만** 발생한다. 일상 feature PR 에서는 push 이벤트가 `branches: [develop, main]` 필터에 걸러져 발생하지 않는다.
+따라서 branch-cross 중복은 **별도 group 이 아니었고**, "못 잡은" 것도 아니었다 — **잡되 유해한 방향으로** 잡고 있었다.
+
+**위 표의 두 경로(push↔PR / ff-sync)는 릴리스 경로의 SHA 에서만 발생한다** — 일상 feature PR 에서는 push 이벤트가 `branches: [develop, main]` 필터에 걸러지기 때문이다. 단 이것을 *"교차 취소는 릴리스 경로에서만 일어난다"* 로 일반화하면 **틀린다**: 한 SHA 가 여러 PR 의 head 가 되면 `refs/pull/N/merge` 가 PR 마다 달라 **일상 PR 사이에서도** 교차 취소가 일어난다 (실측 — §A2-3 분류표 B2). 세 클래스 전부 `github.ref` 삽입으로 분리된다.
 
 ### A2-3 (ii) 결정 1 의 적용 범위 축소 — 릴리스 SHA 에서 push↔PR dedup 을 **철회**한다
 
@@ -428,7 +430,28 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 
 **왜 축소가 정당한가**: §결정 1 의 CRITICAL 은 *"concurrency cancel = 중복 제거, 가드 약화 아님"* 이었고 이는 **사람이 판정하는 한 여전히 참**이다. 그러나 required status check 를 켜는 순간 **판정 주체가 GitHub 으로 바뀌고**, GitHub 이 통과로 인정하는 결론은 `success` / `skipped` / `neutral` **3종뿐**이다 — `cancelled` 는 여기 없다. 즉 종전에는 코스메틱이던 취소가 **머지 하드 블록**이 된다. 그리고 그 취소는 release PR **6/6 전건**에서 재현되므로 확률적 위험이 아니라 확정 사고다.
 
-**대가 (의도적 수용)**: 릴리스 경로 SHA 에서 무거운 워크플로가 **2회 완주**한다 (월 수 회). 남는 정당한 dedup 은 "같은 ref·같은 SHA 의 재트리거" 뿐인데, 이는 본 ADR §축 1 이 이미 *"다른 sha (새 커밋 push) → group 식 값이 달라 취소 안 됨"* 이라 명시했듯 실무상 드물게 발생하는 잔여분이다.
+**대가 (의도적 수용)**: 릴리스 경로 SHA 에서 무거운 워크플로가 **2회 완주**한다 (월 수 회).
+
+**남는 dedup 은 "같은 ref·같은 SHA 의 재트리거" 뿐이며, 그 빈도는 실측 0 이다.**
+
+#### A2-3 분류표 — `cancelled` 전수 분류 (2026-08-01 ~ 08-07, run 1,000건)
+
+`(headSha, workflow name)` 로 묶어 peer run 의 `event` / `head_branch` 가 갈리는 축으로 분류했다. `cancelled` 총 **72건**:
+
+| 클래스                                                | 건수     | 갈리는 축                                       | 대표 SHA                              | `github.ref` 삽입이 분리하는가          |
+| ----------------------------------------------------- | -------- | ----------------------------------------------- | ------------------------------------- | --------------------------------------- |
+| **A** push ↔ pull_request                            | 35       | `refs/heads/develop` vs `refs/pull/N/merge`     | `c2732ae` `370d1c6` `5479837`         | **예**                                  |
+| **B1** push ↔ push, 다른 branch (ff-sync)            | 21       | `refs/heads/main` vs `refs/heads/develop`       | `58ccfcf` `a4b43c8` `9452339`         | **예**                                  |
+| **B2** PR ↔ PR, 한 SHA 가 여러 PR 의 head            | 16       | `refs/pull/967/merge` vs `refs/pull/969/merge`  | `4f7366e` `995b8b5`                   | **예**                                  |
+| **C** 동일 ref 재트리거 (= 잔존 dedup)                | **0** | 없음 (동일 ref·동일 event)                      | —                                     | 아니오 — **유지되는 것이 이 클래스다** |
+
+**핵심 두 가지.** ① 관측된 `cancelled` **72/72 (100%)** 가 A/B1/B2 이며 전부 `github.ref` 삽입으로 분리된다. ② Phase 0 가 **보존**하는 C 클래스는 관측 window 내 **발화 0건**이다.
+
+**B2 는 본 Amendment 초안이 놓쳤던 클래스다.** `4f7366e` 는 세 PR (#967 `release/9.99.9-prep` / #968 `feat/962-guard-negative` / #969 `feature/962-branch-name-guard`) 의 head 였고, `pull_request` run 의 `github.ref` 는 `refs/pull/<번호>/merge` 라 PR 마다 다르다. 구 group 키에는 ref 가 없어 셋이 한 group 으로 붕괴해 서로를 취소했다. **push 이벤트가 0인 일상 PR 경로에서도 교차 취소가 발생한다는 직접 증거**이며, Phase 0 의 이득이 릴리스 경로에 국한되지 않음을 보인다.
+
+머지 시점 head SHA 층위에서도 C 클래스는 최근 머지 PR 25건 중 **0건**이다 (`base=main` 5건이 각 7건씩 보유하나 전부 A 클래스라 Phase 0 가 제거한다).
+
+**단 이 잔존분을 "보존한 이득" 으로만 읽으면 안 된다 (양면).** required check 체제에서 이것은 **Phase 0 이후 head SHA 위에 `cancelled` 를 남길 수 있는 유일한 잔여 경로** — 즉 Phase 0 가 없애려던 바로 그 조건의 잔재다. 실측 0건이라 현재 위험은 없지만 **"0 이므로 안전" 이 아니라 "0 인지 매번 확인" 이 옳은 자세**이며, 그 확인 절차가 §A2-6 재검토 조건 13 이다.
 
 **§축 4 (알림 정책) 영향 0**: GitHub 메일은 conclusion=`failure` 에만 발송되고 `cancelled`·`success` 는 미발송이다. 취소가 완주로 바뀌어도 **성공 run 은 메일을 만들지 않는다** — "최종 실패만 메일" 은 유지된다.
 
@@ -444,12 +467,57 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 - **바뀐 것은 판정 기준이지 사실이 아니다.** 2026-07-01 당시 목적 함수는 "alert fatigue 절감" 단독이었고 required check 는 **부재 실측 (404)** 이었다 (§핵심 환경 사실). 그 제약 하에서 "주 목적 붕괴" 는 정당한 기각 사유다. #971 은 required check 라는 **새 제약**을 도입하며, 그 제약 하에서는 붕괴 자체가 **지불 의사가 있는 비용**이 된다.
 - **교훈**: 기각 기록은 *결론* 이 아니라 *결론 + 그때의 제약* 으로 읽어야 한다. 제약이 바뀌면 같은 근거가 반대 결론을 지지할 수 있다. 본 ADR 이 §핵심 환경 사실에 "required check 부재" 를 명시 실측 박제해 둔 덕분에 이 재평가가 가능했다 — **전제를 박제하지 않았다면 기각만 남아 후속 회수를 막았을 것이다.**
 
-### A2-5 잔존 미해소 — 동명 체크런은 Phase 0 로 사라지지 않는다
+### A2-5 잔존 미해소 — 동명 체크런은 Phase 0 로 사라지지 않으며, 결론 불일치 원인은 **2종**이다
 
-Phase 0 가 제거하는 것은 **`cancelled` 결론**이지 **동명 체크런**이 아니다. 오히려 교차 취소가 사라지며 양쪽이 완주해 **동명 완주 쌍이 3 → 7 로 늘어난다** (ADR 971 §2-11 실측). 안전한 이유는 동명 N개가 **전부 통과 결론**이면 어떤 해석 규칙에서도 통과하기 때문이며, 따라서 실질 잔여 위험은 **flake 발 결론 불일치** 하나로 좁혀진다. 이 잔여 위험은 ADR 971 §8-P0 의 `G2` 게이트가 관측한다.
+Phase 0 가 제거하는 것은 **`cancelled` 결론**이지 **동명 체크런**이 아니다. 오히려 교차 취소가 사라지며 양쪽이 완주해 **동명 완주 쌍이 3 → 7 로 늘어난다** (ADR 971 §2-11 실측). 안전한 이유는 동명 N개가 **전부 통과 결론**이면 어떤 해석 규칙에서도 통과하기 때문이다.
+
+**결론 불일치를 만드는 원인은 하나가 아니라 둘이다.** 초판 Amendment 는 이를 *"flake 하나로 좁혀진다"* 로 적었으나 **본 #971 Phase 0 PR 자신의 데이터로 반증됐다** — 두 번째 원인은 확률적이지 않고 **결정론적**이며, Phase 1 required 후보 위에서 **이미 발화한 이력**이 있다.
+
+| 원인                                                                  | 성격                | 관측 게이트                | Phase 0 가 해소하는가                             |
+| --------------------------------------------------------------------- | ------------------- | -------------------------- | ------------------------------------------------- |
+| ① flake 발 `failure`+`success` 혼재                                   | 확률적              | ADR 971 §8-P0 `G2`         | 아니오 (직교 — retry 설계가 담당)                 |
+| ② **다중 `types:` + concurrency 부재 워크플로의 동일 SHA 누적** | **결정론적** | 동일 `G2` (원인만 다름) | **아니오** — Phase 0 는 이 축을 건드리지 않는다 |
+
+**② 의 메커니즘**: `pr-template-checklist-guard.yml` 은 `types: [opened, edited, synchronize]` 인데 **concurrency 블록이 없다**. PR 본문을 편집(`edited`)할 때마다 **같은 SHA 에 체크런이 누적**되고, 처음 실패했다가 고쳐서 통과하면 `failure` + `success` 가 그 SHA 에 **영구히** 공존한다. 이것은 본 ADR 과 ADR 971 이 분석한 **event 축(`push` × `pull_request`)이 아니라 event *type* 축**이라 두 ADR 어디에도 기술돼 있지 않았다.
+
+**실측 (measurement-first)**:
+
+```
+# ② 의 실발화 — PR #964 (release/0.60.0-prep, base=develop) 머지 시점 head SHA
+$ gh api ".../commits/ee6487178ec590663cd25368750efa5b29b472b7/check-runs?per_page=100" \
+    -q '.check_runs[] | select(.name=="pr-template-checklist") | "\(.started_at)\t\(.conclusion)"'
+2026-08-05T12:50:51Z    failure
+2026-08-05T13:01:35Z    failure
+2026-08-05T13:01:59Z    success        ← 통과/미통과 혼재. flake 0 — 가드가 설계대로 유도한 정상 루프의 결과다
+
+# concurrency 블록 보유 여부 (Phase 1 required 후보)
+pr-template-checklist-guard.yml   없음   types: [opened, edited, synchronize]
+harness-pr-review.yml (label-pr)  없음   types: [opened, synchronize, ready_for_review]
+branch-name-guard.yml             있음   group: ${{ github.workflow }}-pr-${{ ...number }}
+
+# 최근 머지 PR 25건 head SHA 의 동명 누적 (n>1)
+pr-template-checklist  4건 (#964 n=3 혼재 / #959 #957 #944 는 n=2 전부 success)
+label-pr               0건
+branch-name            0건
+```
+
+**후보별 노출도 차이 (혼동 주의)**: `label-pr` 은 concurrency 가 없으나 `types` 에 **`edited` 가 없어** 본문 편집으로 누적되지 않는다 (`ready_for_review` 는 draft→ready 1회성) — 실측 n>1 0건. `branch-name` 은 **concurrency 를 갖고** 있고 `edited` 도 없다. 즉 ② 의 실질 노출은 **`pr-template-checklist` 단독**이며, 이 워크플로가 하필 *"본문을 고치라고 요구하는 가드"* 라 편집 루프가 설계상 유도된다는 점이 위험을 키운다.
+
+**Phase 1 착수 전 점검 항목**: Phase 1 은 *"Phase 0 머지 직후 — 릴리스 대기 없음"* 이라 **관찰 게이트가 없고**, 그 면제 근거는 *"release PR 6/6 에서 cancel 0 + 롤백 2초"* 였다. 그러나 ② 는 `cancelled` 가 아니라 `failure`+`success` 혼재이므로 **그 근거가 원리적으로 커버하지 못한다**. 따라서 `pr-template-checklist` 를 required 로 올리기 전에 위 `G2` 식을 **후보 SHA 에 직접** 1회 실행해 빈 출력을 확인해야 한다.
+
+> ⚠️ **해소책으로 `pr-template-checklist-guard.yml` 에 concurrency 를 추가하지 말 것.** `cancel-in-progress` 는 같은 head SHA 위에 `cancelled` 를 남기고, `cancelled` 는 GitHub 의 통과 3종에 없으므로 required check 하에서는 **더 나쁘다** (`{failure, success}` → `{cancelled, success}`). 진짜 대응은 Phase 1 구성 조정(해당 가드를 required 에서 제외하거나 `edited` 를 트리거에서 빼는 것)이며 이는 ADR 971 의 개정 범위다 — 본 Amendment 는 **사실 박제까지만** 한다.
 
 ### A2-6 재검토 조건 (원 §재검토 1~4 / §A1 5~9 에 추가)
 
 10. **`github.ref` 삽입 후에도 릴리스 SHA 에 `cancelled` 잔존**: Phase 0 가 의도대로 동작하지 않은 것 — required check 도입 (ADR 971 Phase 2) 진입 금지. ADR 971 §8-P0 `G1` 이 게이트다.
+    - **`G1` 발화 시 선분류 의무 (오차단 방지)**: `cancelled` 를 발견하면 즉시 Phase 0 실패로 판정하지 말고 **각 `cancelled` run 의 `event` 와 `head_branch` 를 먼저 분류**한다 (§A2-3 분류표 A / B1 / B2 / C). Phase 0 가 보존하기로 한 **C 클래스(동일 ref 재트리거)는 Phase 0 실패가 아니다** — 이 경우 `G1` 은 붉어져도 Phase 2 진입을 막지 않는다. A / B1 / B2 가 잔존할 때만 Phase 0 실패다.
+      ```bash
+      gh api "repos/<owner>/<repo>/commits/<sha>/check-runs?per_page=100" \
+        -q '.check_runs[]|select(.conclusion=="cancelled")|.name' | sort -u
+      gh run list --limit 200 --json headSha,event,headBranch,name,conclusion \
+        --jq '.[]|select(.headSha|startswith("<sha 앞 7자>"))|"\(.event)\t\(.headBranch)\t\(.name)\t\(.conclusion)"'
+      ```
 11. **릴리스 경로 2회 완주가 러너 비용/대기 문제로 부상**: 현재는 월 수 회 × ~13분이라 수용. 문제화되면 §5 (c) (push 트리거 제거) 를 **관측 손실을 감수하고** 재검토하거나, 릴리스 전용 경로만 분리한다. 임계 완화·가드 스킵은 여전히 금지.
 12. **required check 자체를 철회하는 경우**: 본 Amendment 의 범위 축소 근거가 소멸하므로 §결정 1 원안 (ref 미포함) 복원을 검토한다 — 단 복원은 자동이 아니라 **재측정 후 결정**이다 (그 사이 워크플로 구성이 바뀌었을 수 있다).
+13. **C 클래스(동일 ref 재트리거) 발화 관측**: 현재 실측 0건이나 (§A2-3 분류표) 0 이 구조적 보장은 아니다. PR reopen 등으로 C 가 관측되면 **그 SHA 가 required check 대상일 때만** 문제이며, 이때는 ① 해당 SHA 에 새 커밋을 얹어 head 를 넘기거나 ② 취소된 체크를 rerun 해 `cancelled` 를 덮는다. 상시 확인 지점은 위 조건 10 의 `G1` 선분류다.
+14. **[인계 — Phase 1 적용 PR 범위]** `CLAUDE.md` §반복 운영 마찰 4 의 *"concurrency CANCELLED = 코스메틱"* 은 **무조건문**이라 required check 도입 후에는 각인층에서 오독을 만든다. 현재는 required check 부재라 참이므로 본 PR 차단 사유가 아니다 — **Phase 1 (실제 required 적용) PR 에서** `docs/ops/operational-friction.md` §4-1 로 향하는 포인터 1줄을 추가한다.
