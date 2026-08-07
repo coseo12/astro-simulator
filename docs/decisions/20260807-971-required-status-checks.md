@@ -176,7 +176,7 @@ gh api "repos/coseo12/astro-simulator/commits/c2732ae/check-runs?per_page=100" \
       | "\(.[0].name)\tn=\(length)\t\(map(.conclusion) | sort | join(","))"'
 ```
 
-**출력 원문** (2026-08-07 실측, 15 이름 / 26 체크런):
+**출력 원문** (2026-08-07 실측, 15 이름 / 27 체크런):
 
 ```text
 GitGuardian Security Checks	n=1	success
@@ -219,7 +219,7 @@ verify-and-rust	n=2	cancelled,success
 
 즉 **required 후보 10개 중 7개가 동명 쌍을 갖고**, 동명 쌍이 전부 완주하는 이름은 **3개 (`project-guards` / `diff-scope` / `duplicate-function-guard`) → 7개**로 **증가**한다. 동명이 원천적으로 없는 것은 `pull_request` 전용인 클래스 B 3개뿐이다.
 
-**그럼에도 안전한 이유 — 잔여 위험의 정확한 위치.** 동명 N개가 **전부 `success` 면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿인 것" 자체가 아니라 **오직 결론이 갈리는 경우**다. Phase 0 가 실제로 사기는 것은 "동명 소멸" 이 아니라 **결론 불일치 확률의 하락**이다 — `cancelled` (미통과 결론) 을 구조적으로 제거하므로 불일치의 **가장 빈번하고 100% 재현되던 원인 (6/6)** 이 사라진다. 남는 불일치 원인은 **flake** 뿐이며, 이것이 본 정책의 실질 잔여 위험이다 (§10-1 한계 3).
+**Phase 0 는 이 노출을 "남기는" 게 아니라 <b>새로 연다</b>** (reviewer 2차 🟡-D 수용): 교차 취소 하에서는 무거운 3개가 6/6 `cancelled` 라 **두 결론이 원천적으로 공존할 수 없었다**. 즉 Phase 0 는 **확정 차단(cancelled) ↔ 확률적 차단(flake)** 의 교환이며, 그럼에도 채택하는 것은 확정 차단이 릴리스마다 100% 발생하는 반면 flake 는 확률적이고 §9-R1 2초 롤백으로 흡수되기 때문이다. **그럼에도 안전한 이유 — 잔여 위험의 정확한 위치.** 동명 N개가 **전부 **통과 결론**(`success` / `skipped` / `neutral` — §2-2) 이면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿인 것" 자체가 아니라 **오직 결론이 갈리는 경우**다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **결론 불일치 확률의 하락**이다 — `cancelled` (미통과 결론) 을 구조적으로 제거하므로 불일치의 **가장 빈번하고 100% 재현되던 원인 (6/6)** 이 사라진다. 남는 불일치 원인은 **flake** 뿐이며, 이것이 본 정책의 실질 잔여 위험이다 (§10-1 한계 3).
 
 ---
 
@@ -425,15 +425,20 @@ gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
 
 ```bash
 gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-  -q '[.check_runs[] | {name, conclusion}] | group_by(.name)[]
-      | select((map(.conclusion) | unique | length) > 1) | .[0].name'
+  -q '[.check_runs[] | select(.status=="completed")
+       | {name, pass: (.conclusion | IN("success","skipped","neutral"))}]
+      | group_by(.name)[] | select((map(.pass) | unique | length) > 1) | .[0].name'
 ```
+
+> **판정 기준이 "결론 문자열 불일치" 가 아니라 "통과/미통과 불일치" 인 이유** (reviewer 2차 🟡-C 수용):
+> 초판은 `(map(.conclusion) | unique | length) > 1` 이라 §2-2 가 확정한 **통과 3종 분할을 쓰지 않았다**. 그 결과 `success`+`skipped`(조건부 job) / 금지 목록 체크의 flake / 미완주 `null` **세 경로에서 양성이나 무해한 발화**가 가능하고, `G2` 빈 출력은 **Phase 2 하드 진입 조건 + Accepted 조건 2** 이므로 게이트가 스스로 진행을 막는 자기모순이 된다. 정밀화 후에도 **발화력 손실은 0** — `c2732ae` 에서 현행식과 **동일 7건**을 잡는다(메인·reviewer 각각 실행 확인). `retry-fresh-runner`(`cancelled,skipped`)가 여전히 잡히는 것이 근거다 — `cancelled` 는 미통과, `skipped` 는 통과라 **이것도 진짜 통과/미통과 불일치**이기 때문이다.
+
 
 > **G1 과 G2 는 직교다 — 어느 쪽도 다른 쪽을 포함하지 않는다.**
 > - **G1 만 잡는 것**: 동명 N개가 *전부* `cancelled` 인 경우 — 결론이 일치하므로 G2 는 침묵한다.
 > - **G2 만 잡는 것**: **`failure` + `success` 혼재** — flake 발 결론 불일치이며 §10-1 한계 3 이 지목하는 실질 잔여 위험이다. `cancelled` 가 하나도 없으므로 **G1 은 이를 원리적으로 검출하지 못한다.**
 >
-> **게이트 발화 확인 (negative baseline)**: Phase 0 *이전* 상태인 `c2732ae` 에 G2 를 돌리면 7개 이름이 출력된다 (§2-11 의 `cancelled,success` 7건 + `cancelled,skipped` 1건 = `a11y-baseline-guard` / `detect-and-test` / `long-integration-rust` / `measure` / `retry-fresh-runner` / `verify` / `verify-and-rust`). 게이트가 침묵하는 가드가 아님을 확인한 값이며, **Phase 0 이후 이 출력이 비는 것**이 진입 조건이다.
+> **게이트 발화 확인 (negative baseline)**: Phase 0 *이전* 상태인 `c2732ae` 에 G2 를 돌리면 7개 이름이 출력된다 (§2-11 의 `cancelled,success` **6건** + `cancelled,skipped` 1건 = 7 = `a11y-baseline-guard` / `detect-and-test` / `long-integration-rust` / `measure` / `retry-fresh-runner` / `verify` / `verify-and-rust`). 게이트가 침묵하는 가드가 아님을 확인한 값이며, **Phase 0 이후 이 출력이 비는 것**이 진입 조건이다.
 
 ### A1 — Phase 1 적용 (main: 초 단위 체크 4개)
 
@@ -575,7 +580,7 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 1. **클래스 A 가드 5종은 required 화 불가** — 실행 시간 상위 4개 중 3개 (`verify` / `measure` / `a11y-baseline-guard`) 가 여기 속한다. 즉 본 정책이 커버하는 것은 "빠르고 항상 도는 가드" 이지 "무거운 시각·성능 회귀 가드" 가 아니다.
 2. **`develop` 직접 push 는 기계적으로 막히지 않는다** — 산문 규약과 기계 강제 사이의 격차가 남는다 (결정 2). ff-sync 를 지키기 위한 의도적 선택이다.
 3. **동명 체크런은 상존한다 — Phase 0 는 조건을 없애지 않고 완주 쌍을 늘린다** (초판 서술 정정). 초판은 *"Phase 0 이 그 조건을 소멸시켜 회피한다"* 고 썼으나 **실측이 반증했다** (§2-11). `push` + `pull_request` 양 트리거를 가진 required context — `project-guards` / `diff-scope` / `diff-scope-wasm` / `detect-and-test` (+ Phase 3 의 `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) — 는 release PR SHA 에서 **항상 동명 2개**를 내고, `project-guards` 는 **Phase 0 이전인 지금 이미 그렇다** (`n=2 success,success`). 동명이 원천적으로 없는 것은 `pull_request` 전용 클래스 B 3개 (`branch-name` / `label-pr` / `pr-template-checklist`) 뿐이다. 나아가 Phase 0 는 `cancelled` 를 완주로 바꾸므로 **완주 동명 쌍을 3 → 7 로 늘린다**.
-   - **그럼에도 안전한 이유 (calibration — 이 정정이 공포 조장이 아닌 근거)**: 동명 N개가 **전부 `success` 면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿" 자체가 아니라 **결론 불일치** 하나로 국한된다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **불일치 확률의 하락**이다 — 100% 재현되던 불일치 원인 (`cancelled`, release PR 6/6) 을 구조적으로 제거한다.
+   - **그럼에도 안전한 이유 (calibration — 이 정정이 공포 조장이 아닌 근거)**: 동명 N개가 **전부 **통과 결론**(`success` / `skipped` / `neutral` — §2-2) 이면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿" 자체가 아니라 **결론 불일치** 하나로 국한된다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **불일치 확률의 하락**이다 — 100% 재현되던 불일치 원인 (`cancelled`, release PR 6/6) 을 구조적으로 제거한다.
    - **실질 잔여 위험 = flake 발 `failure` + `success` 혼재.** Phase 0 는 flake 를 제거하지 못한다. 본 저장소는 flake 전례를 보유한다 (`verify:699 deltaTime` / r1-guard Playwright / fps 부하 spike — #779 §매핑표에 자체 박제). 무거운 required check 의 **push run 만** flake 로 `failure` 가 되면 GitHub 의 해소 규칙은 미규정이고 (§2-2) 릴리스가 `BLOCKED` 될 수 있다. **이것이 본 정책의 최종 잔여 위험이며 설계로 제거되지 않는다.**
    - **관측 수단**: §8-P0 의 **G2 게이트**가 이 조건을 직접 검사한다 (G1 의 `cancelled` 검사로는 원리적으로 검출 불가). 발생 시 대응은 §9-R1 (2초) 로 required 를 걷어내고 릴리스를 완주시킨 뒤, 재실행으로 결론을 수렴시키는 순서다 — **릴리스를 인질로 잡고 디버깅하지 않는다** (§10-4).
    - **잔존 미검증**: GitHub 의 동명 **해소 규칙 자체**는 여전히 모른다 (§2-8 대로 사전 실증이 불가능하다). 본 정책은 규칙을 알아낸 것이 아니라 **불일치가 잘 일어나지 않게 만들고, 일어나면 잡히게** 한 것이다.
