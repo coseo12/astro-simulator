@@ -1,7 +1,18 @@
 # ADR: branch protection required status check 정책 — main 한정 단계적 도입, develop 은 required check 미채택 (#971)
 
-- **상태**: **Provisional** (cross-validate agy 2026-08-07 2회 반영 완료 — §11 / reviewer 정적 리뷰 1회 반영 — 아래) — 교차검증·리뷰는 통합했으나 **저장소 설정이 미변경**이라 Accepted 로 올리지 않는다. 본 ADR 은 설계·근거·절차만 확정하며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 로 수행한다. Accepted 전이 조건은 §10-2.
-- **reviewer 반영** (2026-08-07, PR [#977](https://github.com/coseo12/astro-simulator/pull/977)): 초판의 *"Phase 0 이 동명 체크런 조건을 소멸시킨다"* 서술이 **실측과 반대**임이 독립 재현으로 드러났다. §2-2 / §5 (b) / §6-2 / §10-1 한계 3 을 정정하고 **§2-11 (동명 체크런 전수 집계) 신설** + **§8-P0 `G2` 게이트 (동명 결론 불일치 검출) 신설**. 설계 자체 (단계 구성 / required 집합 / develop 보호 수준 / `enforce_admins` 판정) 는 **무변경** — reviewer 가 판정 6건을 전부 정합으로 확인했다.
+- **상태**: **Provisional** (cross-validate agy 2026-08-07 3회 반영 완료 — §11 / reviewer 정적 리뷰 2회 반영 — 아래) — 교차검증·리뷰는 통합했으나 **저장소 설정이 미변경**이라 Accepted 로 올리지 않는다. 본 ADR 은 설계·근거·절차만 확정하며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 로 수행한다. Accepted 전이 조건은 §10-2.
+- **reviewer 반영 1차** (2026-08-07, PR [#977](https://github.com/coseo12/astro-simulator/pull/977)): 초판의 *"Phase 0 이 동명 체크런 조건을 소멸시킨다"* 서술이 **실측과 반대**임이 독립 재현으로 드러났다. §2-2 / §5 (b) / §6-2 / §10-1 한계 3 을 정정하고 **§2-11 (동명 체크런 전수 집계) 신설** + **§8-P0 `G2` 게이트 (동명 결론 불일치 검출) 신설**. 설계 자체 (단계 구성 / required 집합 / develop 보호 수준 / `enforce_admins` 판정) 는 **무변경** — reviewer 가 판정 6건을 전부 정합으로 확인했다.
+- **reviewer 반영 2차 — Phase 1 착수 전 필수 정정** (2026-08-07, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) = Phase 0 머지분의 리뷰): **사실 전제 3건이 반증됐고, 결정 조항이 그 위에 서 있었다.** 1차 정정과 달리 이번에는 **설계 자체가 바뀐다**.
+
+  | 반증 | 초판 서술 | 실측 |
+  |---|---|---|
+  | 1 | "잔여 위험은 flake 하나" (§2-11 / §10-1 한계 3) | **거짓** — event *type* 축이라는 **결정론적** 제2 원인이 실재하고 Phase 1 후보 위에서 이미 발화했다 (§2-12) |
+  | 2 | "교차 취소는 릴리스 경로 SHA 에서만" (§2-7) | **거짓** — B2 (PR↔PR) 가 일상 PR 경로에서 실재 (단 base rate 는 낮음 — §2-7 / [779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-3) |
+  | 3 | C 클래스 0 = "재트리거가 드물어서" (암묵) | **거짓** — 재트리거는 6일에 23 group. C=0 은 **취소할 concurrency 가 없어서** (§2-12 실측 4) |
+
+  **결정 변경**: **결정 9 신설** (`pr-template-checklist` required 제외 + concurrency 추가 금지 + `label-pr` 조건부) / **Phase 1 required 4개 → 3개** / **`G2` 를 Phase 1 진입 조건으로 격상** (§8-P1-G 신설). **사실 정정**: §2-5 (축 2개 → **3개**) / §2-7 / §2-11 / §2-12 신설 / §10-1 한계 3·10 / §5 (a) 잣대 일관성 주석. **선행 ADR 회수**: [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-3 (단위 라벨 + 창 경계 + B2 base rate + C=0 원인) / §A2-5 (결정 회수) / §A2-6 조건 10 **[2/2] 명령 교체** (창 종속 → 창 무관 API — qa 발견).
+- **수치 재현 규약** (#897 §수치 박제 규약): 본 라운드의 모든 수치 주장은 2026-08-07T11:50~11:55Z (UTC) 에 재실행해 출력을 박제했다. 창 종속 수치는 **창 경계를 함께** 기록한다 (§2-6 스냅샷 / §10-1 한계 10).
+- **상태 판정 (architect, 2026-08-07)**: 본 라운드에서 cross-validate 를 **수행·통합했으므로** CLAUDE.md §ADR Status 워크플로의 *"cross-validate 결과 본문 통합 전까지 Provisional"* 조건은 **해소**됐다. 그럼에도 **Provisional 을 유지한다** — 그 조건은 Accepted 의 **필요조건**이지 충분조건이 아니고, 본 ADR 스스로 §10-2 에 **4+1 개의 추가 전이 조건** (사용자 승인 / Phase 0 후 `G1`+`G2` 실측 / **Phase 1 진입 게이트 통과** / Phase 1 후 release PR 오차단 0 / 롤백 런북 링크) 을 박제했고 **하나도 충족되지 않았다**. 여기서 Accepted 로 올리면 §10-2 를 스스로 위반하며, 이는 ADR 을 **사후 정당화 도구로 쓰는** 전형이다.
 - **날짜**: 2026-08-07
 - **결정자**: architect (실측 기반 설계). 적용 권한은 사용자
 - **관련**:
@@ -75,7 +86,9 @@ diff-scope 실패 → detect-and-test 는 conclusion=skipped → GitHub 은 통�
 
 즉 `detect-and-test` 만 required 로 올리면 **상류 실패가 그대로 통과한다**. `ci-physics-wasm.yml` 의 3개 job 도 동일 구조 (`needs: diff-scope`). 구멍을 닫으려면 `diff-scope` 자체를 required 로 올려야 한다 — 그런데 §2-5 의 이름 충돌이 걸린다.
 
-### 2-5 동명 체크런은 **축이 2개**다 — workflow 축 × event 축
+### 2-5 동명 체크런은 **축이 3개**다 — workflow 축 × event 축 × event *type* 축
+
+> **개정 (2026-08-07, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰 🔴-1)**: 초판은 축을 2개로 서술했다. **제3의 축 (event `types`) 이 실재하며, 그 노출은 Phase 1 required 후보 위에서 이미 발화한 이력이 있다.** 근거는 아래 표 3행 + §2-12.
 
 `ci.yml` 과 `ci-physics-wasm.yml` 이 **둘 다 job id `diff-scope`** 를 쓴다. 여기에 이벤트 2종 (`pull_request` + `push`) 이 겹쳐 release PR head SHA 마다 **`diff-scope` 체크런이 4개** 생성된다 (실측: release PR 6/6 전건 `pass=4`).
 
@@ -83,8 +96,11 @@ diff-scope 실패 → detect-and-test 는 conclusion=skipped → GitHub 은 통�
 |---|---|---|---|
 | **workflow 축** | 서로 다른 워크플로가 같은 job id 사용 | ×2 (`diff-scope` 한정) | 결정 6-2 리네임 (`diff-scope-wasm`) |
 | **event 축** | 같은 워크플로가 `pull_request` + `push` 양쪽 트리거 보유 | ×2 (**push 트리거를 가진 모든 컨텍스트**) | **없음** — 제거하려면 §5 (c) (push 트리거 삭제) 인데 기각됨 |
+| **event *type* 축** (신설) | 같은 워크플로가 **한 SHA 위에서 여러 번 트리거**됨 — `types:` 에 `edited` 등 SHA 를 바꾸지 않는 이벤트가 있고 concurrency 가 없을 때 | ×N (**편집 횟수만큼 무한**) | **없음 — 그리고 concurrency 추가는 해법이 아니다** (결정 9). 실질 대응은 required 제외 또는 `edited` 트리거 제거 |
 
-**결정 6-2 의 리네임은 workflow 축만 없앤다 (4→2). event 축은 그대로 남는다.** 그리고 event 축은 `diff-scope` 만의 문제가 아니라 클래스 C 전체 (`project-guards` / `detect-and-test` / `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) 에 해당한다 — 셋 다 `on: {pull_request, push}` `branches: [develop, main]` 이다.
+**결정 6-2 의 리네임은 workflow 축만 없앤다 (4→2). event 축과 event *type* 축은 그대로 남는다.** 그리고 event 축은 `diff-scope` 만의 문제가 아니라 클래스 C 전체 (`project-guards` / `detect-and-test` / `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) 에 해당한다 — 셋 다 `on: {pull_request, push}` `branches: [develop, main]` 이다.
+
+**event *type* 축이 왜 별개인가**: 앞의 두 축은 *서로 다른 트리거 원천*이 한 SHA 에 모이는 구조라 배수가 유한하고 (×2, ×4) 정적으로 계산된다. 세 번째 축은 **같은 원천이 같은 SHA 위에서 반복**되는 구조라 배수가 사용자 행동 (본문 편집 횟수) 에 종속돼 상한이 없다. 결정적으로, 앞의 두 축이 만드는 동명 쌍은 **동시 실행이라 concurrency 로 취소 가능**했던 반면, 세 번째 축의 반복은 **시간적으로 떨어져 있어 concurrency 가 발화조차 하지 않는다** (§2-12 실측: 관측된 실발화 사례의 run 간격 10분 31초 / 12초, 겹침 0).
 
 §2-2 대로 동명 체크런 N개의 **해소 규칙**은 GitHub 이 문서화하지 않았고, 그 **위험**은 명시 경고돼 있다. 전수 집계와 Phase 0 이후 투영은 §2-11.
 
@@ -103,10 +119,36 @@ diff-scope 실패 → detect-and-test 는 conclusion=skipped → GitHub 은 통�
 | #938 | pass 2 | **부재** | pass 1 | pass 1 | pass 4 | pass 1 / **cancel 1** | pass 1 / **cancel 1** | pass 1 / **cancel 1** | pass 2 |
 | #930 | pass 2 | **부재** | pass 1 | pass 1 | pass 4 | pass 1 / **cancel 1** | pass 1 / **cancel 1** | pass 1 / **cancel 1** | pass 2 |
 
+**단위**: 위 표의 `pass` / `cancel` 수치는 전부 **check-run (job) 레벨**이다 (`GET /commits/{sha}/check-runs`). run 레벨 (`GET /actions/runs?head_sha=`) 과 값이 다르므로 혼용 금지 — 아래 스냅샷 참조. **required check 의 판정 단위는 job (= check-run context) 이므로 본 ADR 의 정책 판단은 전부 job 레벨을 쓴다.** run 레벨 수치는 "무엇이 취소됐는가" 의 원인 추적 (event / head_branch 분류) 에만 쓴다.
+
 읽는 법:
 - `branch-name` **부재 5건** = 가드가 2026-08-06 에 신설돼 그 이전 release PR 에는 존재하지 않음. 소급 근거는 `n=1` 뿐 (#974). 현재 열린 PR 0건이라 "옛 PR 이 영구 pending 으로 남는" 리스크는 없다.
 - 무거운 3개 (`detect-and-test` / `verify-and-rust` / `long-integration-rust`) 는 **6/6 전건에서 cancelled 쌍둥이 보유**. 우연이 아니라 구조다.
-- Phase 1 후보 4개 (`project-guards` / `branch-name` / `pr-template-checklist` / `label-pr`) 는 **cancel 0 / 부재 0** (branch-name 은 존재하는 1건 기준).
+- Phase 1 후보 4개 (`project-guards` / `branch-name` / `pr-template-checklist` / `label-pr`) 는 **cancel 0 / 부재 0** (branch-name 은 존재하는 1건 기준). ⚠️ **`cancel 0` 을 "위험 0" 으로 읽으면 안 된다** — `pr-template-checklist` 는 `cancelled` 가 아닌 **`failure` + `success` 혼재**로 이미 실발화한 이력이 있다 (§2-12). 위 표는 `cancelled` 축만 본 것이라 그 축을 원리적으로 담지 못한다.
+
+#### 2-6 측정 스냅샷 (#897 §수치 박제 규약 — 측정 시각 박제)
+
+수치가 창 (window) 에 종속되는 명령이 섞여 있어, **측정 시각과 창 경계를 함께 박제**한다. `gh run list --limit N` 의 `N` 은 **날짜 범위가 아니라 개수 cap** 이므로 창의 시작 경계가 **측정 시각마다 이동한다** — 같은 명령이 다른 날 다른 답을 낸다.
+
+```text
+측정 주체: architect / 측정 시각: 2026-08-07T11:51~11:55Z (UTC)
+저장소 run 생성률: 100.3 run/일 (20일 창) / 162.7 run/일 (직전 6일 창)
+
+[창 종속 — gh run list --limit N]
+  --limit 1000  → 창 2026-08-01T08:19:08Z ~ 2026-08-07T11:48:08Z (6.15일)
+                  cancelled 72 (run 레벨) = A 35 / B1 21 / B2 16 / C 0
+  --limit 2000  → 창 2026-07-18T13:03:48Z ~ 2026-08-07T11:48:08Z (19.95일)
+                  cancelled 118 (run 레벨) = A 62 / B1 40 / B2 16 / C 0
+  --limit 200   → 창 2026-08-05T14:43:32Z ~ 2026-08-07T11:48:08Z (1.88일)  ← §10-1 한계 10
+
+[창 무관 — gh api actions/runs?head_sha=<full>]
+  c2732ae (release PR #974 head, merged 2026-08-06T09:54:14Z)
+    run  레벨: total 15 / cancelled 5
+    job  레벨: check_runs 27 / names 15 / cancelled 7
+    → 같은 SHA 인데 run 5 ≠ job 7. 단위 혼용이 곧 오독이다
+```
+
+> 재현: `gh run list --limit 1000 --json databaseId,headSha,event,headBranch,name,conclusion,createdAt` 후 `(headSha, name)` 그룹의 peer `event`/`head_branch` 로 분류. 위 A/B1/B2/C 정의는 [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-3 분류표와 동일하다.
 
 ### 2-7 취소 메커니즘 확정 — concurrency 그룹 키에 **ref 가 없다**
 
@@ -125,7 +167,12 @@ concurrency:
 
 즉 현재 concurrency 설정의 **실질 효과 대부분이 이 유해한 교차 취소**다. 일상 feature PR 에서는 push 이벤트가 `branches: [develop, main]` 로 걸러져 발생하지 않고, PR 에 새 커밋을 올리면 SHA 가 바뀌어 키도 달라지므로 취소가 일어나지 않는다. 남는 정당한 dedup 은 "같은 ref·같은 SHA 의 재트리거" 뿐이다.
 
-**그리고 이 취소는 정확히 릴리스 경로의 SHA 에서만 발생한다** — 즉 required check 가 가장 위험한 지점과 정확히 겹친다.
+**이 두 경로는 릴리스 경로의 SHA 에서 발생한다. 단 "교차 취소는 릴리스 경로에서만 일어난다" 로 일반화하면 틀린다** (초판 서술 정정 — PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰):
+
+- 세 번째 경로 **B2 (PR ↔ PR)** 가 실재한다. 한 SHA 가 여러 PR 의 head 가 되면 `pull_request` run 의 `github.ref` 가 `refs/pull/<번호>/merge` 로 PR 마다 다른데, 구 group 키에 ref 가 없어 셋이 한 group 으로 붕괴해 서로를 취소했다. **push 이벤트가 0인 일상 PR 경로에서도 교차 취소가 발생한다는 직접 증거**다 ([20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-3 분류표 B2 — 실측 16건).
+- **단 B2 의 base rate 는 낮다** (§2-6 하단 스냅샷): 20일 표본 118 `cancelled` 중 B2 16건이 **전부 2026-08-06 하루 / SHA 2개** (`4f7366e` 9건 + `995b8b5` 7건) 에 몰려 있다 — #962 축 B 실험에서 한 커밋을 세 브랜치가 공유한 단일 사건이다. 즉 **∃ 주장 (일상 경로에서도 일어난다) 은 유효하되 상시 현상은 아니다**. 이 구분을 지우면 이번엔 반대 방향으로 과장하게 된다.
+
+따라서 정확한 서술은 *"릴리스 경로 SHA 에서 **확정적으로** (6/6), 일상 PR 경로에서 **조건부로** (한 SHA 다중 PR head) 발생한다"* 이며, required check 가 가장 위험한 지점 (릴리스) 과 최대 빈도 지점이 겹치는 것은 그대로 참이다.
 
 ### 2-8 동명 cancelled/success 해석은 **사전 실증이 불가능하다**
 
@@ -136,6 +183,10 @@ concurrency:
 - ruleset `enforcement: evaluate` (dry-run) 은 **organization 소유 저장소 전용**이고 본 저장소는 `owner.type: User` → 사용 불가 (§3-3).
 
 따라서 **가정에 기대지 않고 구조적으로 제거**하는 것 외에 안전한 선택지가 없다 (§6 결정 3).
+
+> **⚠️ 이 불가능 주장은 2026-08-07 에 <b>좁혀졌다</b>** (cross-validate Q1 이견 수용, §11). 위 논거는 *"임의 conclusion 의 체크런을 **합성**할 수 없다"* 를 근거로 삼는데, **합성할 필요가 없다** — 자연 발생한 불일치가 이미 존재한다 (`ee64871`: `pr-template-checklist` = `failure, failure, success`, §2-12 실측 1). 이 SHA 를 **일회용 probe 브랜치**의 PR head 로 세우고 그 브랜치에만 required check 를 걸면, GitHub 이 동명 불일치를 어떻게 판정하는지 **`mergeStateStatus` 로 직접 읽을 수 있다**. 설계는 §10-4 **단계 2-bis**.
+>
+> 정정된 서술: *"사전 실증이 불가능하다"* → **"체크런 합성은 불가능하나, 자연 발생 표본을 쓰면 실증 가능하다. 본 ADR 은 아직 수행하지 않았다."** 이 구분이 중요한 이유는 §5 (a) 기각과 결정 9-1 이 **둘 다 "규칙을 모른다" 를 근거의 일부로 쓰기** 때문이다 — 규칙을 알아낼 경로가 있다면 그 근거는 영구가 아니라 **잠정**이다 (§10-5 재검토 조건 10).
 
 ### 2-9 봇 PR 실측
 
@@ -217,9 +268,92 @@ verify-and-rust	n=2	cancelled,success
 | 3 | `long-integration-rust` | push + PR | n=2 `cancelled,success` | n=2 **양쪽 완주로 전환** |
 | 3 | `duplicate-function-guard` | push + PR | n=2 `success,success` | n=2 (불변) |
 
-즉 **required 후보 10개 중 7개가 동명 쌍을 갖고**, 동명 쌍이 전부 완주하는 이름은 **3개 (`project-guards` / `diff-scope` / `duplicate-function-guard`) → 7개**로 **증가**한다. 동명이 원천적으로 없는 것은 `pull_request` 전용인 클래스 B 3개뿐이다.
+즉 **required 후보 10개 중 7개가 동명 쌍을 갖고**, 동명 쌍이 전부 완주하는 이름은 **3개 (`project-guards` / `diff-scope` / `duplicate-function-guard`) → 7개**로 **증가**한다.
 
-**Phase 0 는 이 노출을 "남기는" 게 아니라 <b>새로 연다</b>** (reviewer 2차 🟡-D 수용): 교차 취소 하에서는 무거운 3개가 6/6 `cancelled` 라 **두 결론이 원천적으로 공존할 수 없었다**. 즉 Phase 0 는 **확정 차단(cancelled) ↔ 확률적 차단(flake)** 의 교환이며, 그럼에도 채택하는 것은 확정 차단이 릴리스마다 100% 발생하는 반면 flake 는 확률적이고 §9-R1 2초 롤백으로 흡수되기 때문이다. **그럼에도 안전한 이유 — 잔여 위험의 정확한 위치.** 동명 N개가 **전부 **통과 결론**(`success` / `skipped` / `neutral` — §2-2) 이면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿인 것" 자체가 아니라 **오직 결론이 갈리는 경우**다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **결론 불일치 확률의 하락**이다 — `cancelled` (미통과 결론) 을 구조적으로 제거하므로 불일치의 **가장 빈번하고 100% 재현되던 원인 (6/6)** 이 사라진다. 남는 불일치 원인은 **flake** 뿐이며, 이것이 본 정책의 실질 잔여 위험이다 (§10-1 한계 3).
+> ⚠️ **위 표의 "동명 없음" 3칸은 틀렸다** (2026-08-07 정정, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰 🔴-1). 초판은 여기서 *"동명이 원천적으로 없는 것은 `pull_request` 전용인 클래스 B 3개뿐이다"* 로 마감했으나, **클래스 B 안에서도 `pr-template-checklist` 는 동명이 원천적으로 없지 않다** — event *type* 축 (§2-5 3행) 으로 한 SHA 위에 N개가 누적되며, 그 누적이 **통과/미통과 혼재로 실발화한 이력**이 있다. 위 표는 event 축 (`push` × `pull_request`) 만 투영했기 때문에 이 축을 구조적으로 못 본다. 정정된 사실과 전수 실측은 **§2-12**.
+>
+> 표의 나머지 (event 축 투영 자체) 는 유효하다 — Phase 0 이후 `0e193d2` (PR #978 head, base=develop) 실측에서 `diff-scope` / `diff-scope-wasm` 이 각각 `n=1` 로 분리됐고 (workflow 축 제거 확인), 같은 SHA 에서 `pr-template-checklist` 만 `n=2` 였다.
+
+**Phase 0 는 이 노출을 "남기는" 게 아니라 <b>새로 연다</b>** (reviewer 2차 🟡-D 수용): 교차 취소 하에서는 무거운 3개가 6/6 `cancelled` 라 **두 결론이 원천적으로 공존할 수 없었다**. 즉 Phase 0 는 **확정 차단(cancelled) ↔ 확률적 차단(flake)** 의 교환이며, 그럼에도 채택하는 것은 확정 차단이 릴리스마다 100% 발생하는 반면 flake 는 확률적이고 §9-R1 2초 롤백으로 흡수되기 때문이다. **그럼에도 안전한 이유 — 잔여 위험의 정확한 위치.** 동명 N개가 **전부 **통과 결론**(`success` / `skipped` / `neutral` — §2-2) 이면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿인 것" 자체가 아니라 **오직 결론이 갈리는 경우**다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **결론 불일치 확률의 하락**이다 — `cancelled` (미통과 결론) 을 구조적으로 제거하므로 불일치의 **가장 빈번하고 100% 재현되던 원인 (6/6)** 이 사라진다.
+
+> ⚠️ **초판은 여기서 *"남는 불일치 원인은 flake 뿐"* 으로 마감했다. 이는 거짓이다** (2026-08-07 정정). 두 번째 원인이 실재하며 **확률적이지 않고 결정론적**이고, Phase 1 required 후보 위에서 **이미 발화했다**. §2-12.
+
+### 2-12 결론 불일치 원인은 **2종**이다 — event *type* 축은 flake 가 아니라 결정론적이다
+
+> **신설 (2026-08-07, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰 🔴-1).** 초판 §2-11 / §10-1 한계 3 의 *"잔여 위험은 flake 하나"* 서술을 반증한다. 반증 근거는 **본 ADR 의 Phase 0 PR 자신의 데이터**다.
+
+| # | 원인 | 성격 | Phase 0 가 해소하는가 | 관측 게이트 |
+|---|---|---|---|---|
+| ① | flake 발 `failure` + `success` 혼재 | **확률적** | 아니오 (직교 — retry 설계 영역) | §8-P0 `G2` |
+| ② | **다중 `types:` + concurrency 부재 워크플로의 동일 SHA 누적** | **결정론적** | **아니오** — Phase 0 는 이 축을 건드리지도 않는다 | 동일 `G2` (원인만 다름) |
+
+**② 의 메커니즘.** `pr-template-checklist-guard.yml` 은 `types: [opened, edited, synchronize]` 인데 **concurrency 블록이 없다**. PR 본문을 편집 (`edited`) 할 때마다 **같은 SHA 에 체크런이 누적**되고, 처음 실패했다가 지적대로 고쳐서 통과하면 `failure` + `success` 가 그 SHA 에 **영구히** 공존한다. 이 가드가 하필 *"본문을 고치라고 요구하는 가드"* 라 **편집 루프가 설계상 유도된다** — 즉 이것은 이상 동작이 아니라 **가드가 의도대로 작동한 정상 루프의 부산물**이다.
+
+**실측 1 — 실발화 (PR [#964](https://github.com/coseo12/astro-simulator/pull/964) head `ee64871`, `release/0.60.0-prep`, 2026-08-07T11:50Z 재조회)**
+
+```bash
+gh api "repos/$REPO/commits/ee6487178ec590663cd25368750efa5b29b472b7/check-runs?per_page=100" \
+  -q '.check_runs[] | select(.name=="pr-template-checklist")
+      | "\(.started_at)  →  \(.completed_at)  \(.conclusion)"'
+```
+```text
+2026-08-05T12:50:51Z  →  2026-08-05T12:51:04Z  failure
+2026-08-05T13:01:35Z  →  2026-08-05T13:01:47Z  failure
+2026-08-05T13:01:59Z  →  2026-08-05T13:02:09Z  success   ← 통과/미통과 혼재. flake 0
+```
+
+`G2` 를 이 SHA 에 돌리면 `pr-template-checklist` 1건이 출력된다 (실행 확인).
+
+**실측 2 — 실시간 재현 (PR [#978](https://github.com/coseo12/astro-simulator/pull/978) head `0e193d2`)**
+
+Phase 0 PR 본문을 편집하자 같은 SHA 에서 `n=1 → n=2` 로 늘었다. **같은 SHA 의 다른 14개 이름은 전부 `n=1`** 이라 대조군이 자체 내장돼 있다.
+
+```text
+branch-name             n=1  success
+detect-and-test         n=1  success
+diff-scope              n=1  success        ← Phase 0 6-2 리네임 효과 (종전 n=4)
+diff-scope-wasm         n=1  success
+label-pr                n=1  success
+pr-template-checklist   n=2  success,success  ← 편집 1회로 누적. 이번엔 둘 다 통과라 G2 침묵
+project-guards          n=1  success
+(외 7개 전부 n=1)
+```
+
+이번엔 두 run 이 모두 `success` 라 `G2` 는 침묵한다 — **즉 ② 는 "항상 터지는" 게 아니라 "첫 run 이 실패하면 터지는" 조건부다.** 그리고 첫 run 실패는 이 가드에서 드물지 않다 (본문 체크박스 7개 원문 대조라 초안이 자주 걸린다).
+
+**실측 3 — 노출 범위는 `pr-template-checklist` 단독이다 (전수)**
+
+| 워크플로 (체크 이름) | `types:` | concurrency | 동일 SHA 누적 관측 |
+|---|---|---|---|
+| `pr-template-checklist-guard.yml` (`pr-template-checklist`) | `[opened, edited, synchronize]` | **없음** | **35 group** (20일) / **23 group** (6일) |
+| `harness-pr-review.yml` (`label-pr`) | `[opened, synchronize, ready_for_review]` | **없음** | **0** |
+| `branch-name-guard.yml` (`branch-name`) | `[opened, synchronize]` | 있음 (PR 번호 키) | **0** |
+
+`label-pr` 은 concurrency 가 없다는 **구조는 같으나** `types` 에 `edited` 가 없어 노출이 낮다 — `ready_for_review` 는 draft→ready 1회성이고 `synchronize` 는 SHA 를 바꾼다. 즉 **누적을 만드는 것은 "concurrency 부재" 가 아니라 "SHA 를 바꾸지 않는 반복 이벤트" 이며, `edited` 가 그 유일한 실사례**다. 이 구분을 흐리면 `branch-name` 까지 같은 클래스로 오분류하게 된다 (reviewer 2차에서 자기 증거 철회한 지점).
+
+**실측 4 — 동일 ref 재트리거는 드물지 않다. C=0 의 원인은 "취소할 concurrency 가 없어서" 다**
+
+이것이 결정 9 의 `concurrency 추가 금지` 를 원리 주장에서 **실측 주장**으로 바꾼다.
+
+```text
+동일 (headSha, name, event, headBranch) 가 2회 이상 등장한 group
+  6.15일 창: 23 group / 50 run  — 전부 "PR Template Checklist Guard"
+ 19.95일 창: 54 group           — PR Template Checklist Guard 35 + agent-dispatch 19(*)
+  (*) agent-dispatch.yml 은 bc7f3db(#844)에서 삭제됨 → 현행 저장소에서는 pr-template-checklist 단독
+그 group 안 run 의 conclusion 분포: success 48 / failure 2 / cancelled 0
+```
+
+즉 [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-3 분류표의 **C 클래스 = 0** 은 *"동일 ref 재트리거가 드물어서"* 가 **아니다**. 재트리거는 6일에 23 group 발생한다. C=0 인 이유는 **그것을 겪는 유일한 워크플로에 concurrency 가 없어 취소가 일어나지 않았기 때문**이다. `cancel-in-progress: true` 를 넣었다면 그 취소가 실제로 발생했을 것이고, `cancelled` 는 통과 3종에 없다.
+
+**단 "23회 취소" 는 과대 추정이다 — 정확값은 5** (본 정정의 자기 적용). `cancel-in-progress` 는 **진행 중인** run 만 취소하므로, 후행 run 이 선행 run 완료 *전에* 시작한 쌍만 발화한다:
+
+```text
+6.15일 창 재트리거 group 23 / 연속 쌍 27
+  후행이 선행 완료 전 시작 (취소 발화 조건 충족): 5     ← 겹침 1~9초
+  선행 완료 후 시작 (취소 미발생):              22
+```
+
+**그리고 이 과대/과소 논쟁 전체가 무의미해지는 지점이 있다 — 실제로 관측된 불일치 사례에서는 concurrency 가 애초에 발화하지 않는다.** 실측 1 의 타임라인을 보면 run 간격이 **10분 31초**와 **12초**이고 각 run 은 10~13초에 완주해 **겹침이 0** 이다. 즉 `pr-template-checklist-guard.yml` 에 concurrency 를 추가했더라도 `ee64871` 의 `{failure, failure, success}` 는 **한 글자도 바뀌지 않는다**. 이것이 결정 9 의 concurrency 금지 조항이 서는 **1차 근거**이며, "`cancelled` 로 더 나빠진다" 는 발화하는 5건에 대한 **2차 근거**다.
 
 ---
 
@@ -275,12 +409,28 @@ verify-and-rust	n=2	cancelled,success
 
 | 후보 | 내용 | 판정 |
 |---|---|---|
-| (a) 무대응 — "최신 success 가 채택될 것" 가정 | 현행 concurrency 유지 | **기각**. §2-8 대로 검증 불가한 가정이고, 틀리면 **모든 release PR 이 하드 블록**된다 (6/6 재현이므로 확률적 사고가 아니라 확정 사고) |
+| (a) 무대응 — "최신 success 가 채택될 것" 가정 | 현행 concurrency 유지 | **기각**. §2-8 대로 검증 불가한 가정이고, 틀리면 **모든 release PR 이 하드 블록**된다 (6/6 재현이므로 확률적 사고가 아니라 확정 사고). **잣대 일관성 (아래 주석)** |
 | (b) **concurrency 키에 `github.ref` 추가** | `group: ${{ github.workflow }}-${{ github.ref }}-${{ ...sha }}` | **채택**. `pull_request` 는 `refs/pull/N/merge`, push 는 `refs/heads/*` 로 분리 → **교차 *취소* 의 소멸**. ⚠️ **동명 체크런 자체는 소멸하지 않는다 — 오히려 완주 쌍이 3→7 로 늘어난다** (§2-11). 정확히는 **#779 결정 1 의 적용 범위를 릴리스 SHA 에서 철회**하는 것이다: #779 가 정의한 중복의 본질이 *"같은 sha 가 두 event 로 2번 검증"* 이었고 Phase 0 가 없애는 것이 바로 그 dedup 이다. 잔존 dedup (같은 ref·같은 SHA 재트리거) 은 #779 스스로 *"다른 sha (새 커밋 push) → group 식 값이 달라 취소 안 됨"* 이라 명시했듯 실무상 거의 발생하지 않는 잔여분이다. 대가: 릴리스 경로 SHA 에서 무거운 워크플로가 2회 완주 (월 수 회) |
 | (c) push 트리거 제거 | `on.push` 를 무거운 워크플로에서 삭제 | 기각 — 통합 브랜치의 머지 후 신호를 잃는다. 취소 문제는 해결되나 관측 손실이 대가 |
 | (d) cancelled 를 required 대상에서 빼기 | 무거운 체크를 영구 비-required 로 | 기각 — `detect-and-test` (13분, 최대 커버리지) 를 영원히 포기하게 된다 |
 | (e) **`cancel-in-progress` 를 PR 에 한정** (#779 §재검토 조건 1 의 자체 제안) | `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` | **기각 — 효과가 없다.** `cancel-in-progress` 는 *새로 들어오는* run 의 속성이라, 뒤늦게 도착한 `pull_request` run (값 `true`) 이 진행 중인 push run 을 **여전히 취소한다**. release PR 실측 (§2-7 경로 1) 이 정확히 이 순서다. 취소를 막으려면 PR run 쪽을 `false` 로 해야 하는데 그러면 dedup 자체가 사라진다 |
 | (f) cancelled 감지 시 자동 재실행 (#779 §재검토 조건 1 의 다른 제안) | 별도 워크플로가 cancelled 를 감시해 rerun | 기각 — CLAUDE.md §가드 설계 원칙의 "drift 가드에 fallback 분기 금지" 와 같은 구조. 취소의 **원인**을 두고 증상만 되돌리며, 재실행 자체가 또 취소될 경합을 만든다 |
+
+> **잣대 일관성 — (a) 기각과 §2-11 "동명 완주 쌍 7개 수용" 은 같은 기준을 쓴다** (2026-08-07 신설, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰).
+>
+> 표면적으로 두 판단은 모순처럼 보인다. (a) 는 *"GitHub 의 동명 해소 규칙을 모르니 가정에 기대지 말라"* 로 기각되는데, §2-11 / §10-1 한계 3 은 *"동명 완주 쌍이 3→7 로 늘어도 안전하다"* 를 **받아들인다**. 같은 미지수 위에서 한쪽은 기각, 한쪽은 수용이면 잣대가 둘이다.
+>
+> **실제로는 잣대가 하나다 — 구분선은 "가정의 유무" 가 아니라 <b>가정이 해석 규칙에 종속되는가</b>이다.**
+>
+> | | (a) 의 근거 | §2-11 의 근거 |
+> |---|---|---|
+> | 주장 | "동명 중 **최신** `success` 가 채택된다" | "동명이 **전부 통과 결론**이면 통과한다" |
+> | 성격 | **규칙 종속** — `latest 채택` 에서만 참. `all-must-pass` 나 `first 채택` 이면 거짓 | **규칙 독립** — latest / all-must-pass / first 어느 규칙에서도 참 |
+> | 미지수 노출 | 미지의 규칙이 곧 결론을 뒤집는다 | 미지의 규칙과 무관하게 결론이 같다 |
+>
+> 즉 본 ADR 이 일관되게 요구하는 것은 *"가정 금지"* 가 아니라 **"미지의 해석 규칙 위에서 결론이 불변일 것"** 이다. (a) 는 이 요구를 통과하지 못하고, §2-11 의 수용은 통과한다. 그리고 이 잣대가 그대로 `G2` 게이트의 판정식 (§8-P0) 을 규정한다 — `G2` 가 결론 문자열이 아니라 **통과/미통과 이분법**으로 묶는 이유가 여기다. 규칙 독립성이 깨지는 순간 (= 통과/미통과가 갈리는 순간) 에만 발화해야 하기 때문이다.
+>
+> **§2-12 추가 후에도 이 잣대는 그대로다**: event *type* 축 (②) 이 만드는 `{failure, success}` 는 규칙 독립성이 깨진 상태이므로 (a) 와 같은 편에 선다 → 수용 불가 → 결정 9.
 
 ---
 
@@ -292,11 +442,24 @@ verify-and-rust	n=2	cancelled,success
 
 | 단계 | 추가 컨텍스트 | 누적 대기 | 진입 게이트 | 근거 |
 |---|---|---|---|---|
-| **Phase 1** | `project-guards`, `branch-name`, `pr-template-checklist`, `label-pr` | ~10s | **Phase 0 머지 직후 — 릴리스 대기 없음** | 전부 클래스 B/C, path 필터 0, release PR 6/6 에서 cancel 0. 실패 시 원인이 즉시 자명하고 롤백이 2초 |
-| **Phase 2** | `diff-scope`, `diff-scope-wasm`, `detect-and-test` | ~13분 | **release PR 1회 관찰 통과 후** | §2-4 의 `needs` 스킵 구멍을 닫으려면 `diff-scope` 계열이 필수. 이 3개가 정확히 cancelled 쌍둥이 6/6 을 갖던 대상이라 관찰 게이트를 여기에 집중한다 |
+| **Phase 1** | `project-guards`, `branch-name`, `label-pr` **(3개)** | ~10s | **`G2` 직접 실행 1회 (아래)** — 릴리스 대기는 없음 | 전부 path 필터 0. `cancelled` 축은 release PR 6/6 에서 cancel 0 이고, **event *type* 축은 `G2` 직접 실행으로 별도 확인**한다. 실패 시 원인이 즉시 자명하고 롤백이 2초 |
+| — | ~~`pr-template-checklist`~~ | — | — | **required 제외** — 결정 9 (event *type* 축 실발화 이력) |
+| **Phase 2** | `diff-scope`, `diff-scope-wasm`, `detect-and-test` | ~13분 | **release PR 1회 관찰 통과 후** (`G1` + `G2` 동시 빈 출력) | §2-4 의 `needs` 스킵 구멍을 닫으려면 `diff-scope` 계열이 필수. 이 3개가 정확히 cancelled 쌍둥이 6/6 을 갖던 대상이라 관찰 게이트를 여기에 집중한다 |
 | **Phase 3** (선택) | `verify-and-rust`, `long-integration-rust`, `duplicate-function-guard` | ~13분 (병렬) | release PR 1회 관찰 통과 후 | job 단위 `if` 로 코드 무변경 PR 에서는 `skipped` = 통과. Phase 2 관찰 후 판단 |
 
-> **관찰 게이트를 Phase 2 앞에만 두는 이유** (cross-validate 이견 수용, §11): 원안은 Phase 0→1 사이에도 release PR 1회 관찰을 요구해 도입에 릴리스 3주기가 필요했다. 그러나 위험은 **cancelled 쌍둥이를 실제로 갖던 무거운 3개** 에 집중돼 있고 (§2-6), Phase 1 후보 4개는 cancel 0 + 롤백 2초다. 관찰 비용을 위험이 있는 곳에만 지출한다.
+#### Phase 1 면제 근거 — 재작성 (2026-08-07)
+
+> **초판의 면제 근거는 이 실패 모드를 원리적으로 커버하지 못했다** (PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰 🔴-1 수용). 초판은 *"release PR 6/6 에서 cancel 0 + 롤백 2초"* 를 근거로 Phase 1 에 관찰 게이트를 두지 않았다. 그러나 §2-12 의 원인 ② 는 **`cancelled` 가 아니라 `failure` + `success` 혼재**다 — `cancel 0` 이라는 관측은 이 축을 **측정하지도 않았다**. 근거와 위험이 서로 다른 축에 있었다.
+
+관찰 게이트를 Phase 2 앞에만 두는 판단 자체는 유지한다 (cross-validate 이견 수용, §11 — 릴리스 3주기 소요 회피). 다만 **면제의 근거를 교체**한다:
+
+| | 초판 | 개정 |
+|---|---|---|
+| 근거 | "release PR 6/6 cancel 0 + 롤백 2초" | **`G2` 를 후보 SHA 에 직접 1회 실행해 빈 출력 확인** + 롤백 2초 |
+| 커버 축 | `cancelled` 축만 | `cancelled` + flake + event *type* **전 축** (`G2` 는 원인을 구분하지 않고 결과인 통과/미통과 불일치를 본다) |
+| 비용 | 0 | **수 초** (릴리스 대기 아님 — 릴리스 3주기 회피는 그대로 유지) |
+
+**즉 Phase 1 은 "게이트 없음" 에서 "릴리스 무관 게이트 1개" 로 바뀐다.** 이것이 `G2` 를 **Phase 1 의 진입 조건으로 격상**한다는 의미이며, 절차 원문은 §8-P1-G 다. `G2` 는 원래 Phase 2 진입 조건으로만 정의돼 있었으나, 그 판정식이 (원인 무관하게) 결론 불일치를 직접 보므로 event *type* 축에도 **수정 없이 그대로 적용**된다 — 실제로 `ee64871` 에서 `pr-template-checklist` 1건을 잡는 것이 확인됐다 (§2-12 실측 1).
 
 **required 절대 금지 목록** (ADR 로 박제 — 미래에 "왜 안 넣었지?" 재발 방지):
 `a11y-baseline-guard` / `measure` / `retry-fresh-runner` / `verify` (shader-pixel) / `bench` (`bench.yml`) — **workflow 단위 path 필터** 보유 (docs-only PR 에서 영구 pending).
@@ -319,7 +482,7 @@ verify-and-rust	n=2	cancelled,success
 
 > ⚠️ **제거 대상은 `cancelled` 결론이지 동명 체크런이 아니다.** Phase 0 이후에도 동명 쌍은 남으며 오히려 **완주 쌍이 3 → 7 로 는다** (§2-11). 이 결정이 사는 것은 "결론 불일치의 100% 재현되던 원인" 이고, flake 발 불일치는 §10-1 한계 3 의 잔여 위험으로 남아 §8-P0 `G2` 게이트가 관측한다.
 
-Phase 1 후보 4개는 실측상 cancel 0 이지만, 그것은 "짧아서 두 번째 이벤트 run 이 시작되기 전에 끝났다" 는 **경합 결과**일 뿐 보장이 아니다 (#974 실측: push run 09:34:29 종료, PR run 09:35:26 시작 — 57초 여유가 우연히 있었을 뿐). 하드 블록의 비대칭 비용을 감안하면 PR 1건의 선행 비용이 훨씬 싸다.
+Phase 1 후보 (초판 4개 → 결정 9 로 3개) 는 실측상 cancel 0 이지만, 그것은 "짧아서 두 번째 이벤트 run 이 시작되기 전에 끝났다" 는 **경합 결과**일 뿐 보장이 아니다 (#974 실측: push run 09:34:29 종료, PR run 09:35:26 시작 — 57초 여유가 우연히 있었을 뿐). 하드 블록의 비대칭 비용을 감안하면 PR 1건의 선행 비용이 훨씬 싸다.
 
 `docs/ops/operational-friction.md` §4 의 "CANCELLED = 코스메틱" 판별법은 **사람이 눈으로 판정할 때만** 유효하다. required check 하에서는 GitHub 이 판정하며 그 규칙은 문서화돼 있지 않다 — 같은 문서를 갱신해 이 경계를 박제한다 (§8-P0 산출물).
 
@@ -374,6 +537,45 @@ required 목록은 **job 이름 문자열**로 저장되므로, 훗날 누군가
 
 이 가드가 있어야 결정 7 의 JSON 선언이 장식이 아니라 **강제력**을 갖는다. 구현은 §10-3 후속 2 에 포함.
 
+### 결정 9 — `pr-template-checklist` 는 required 에서 **제외**한다. 그리고 `concurrency` 를 추가하지 **않는다** (신설, 2026-08-07)
+
+> 신설 근거: §2-12 (event *type* 축). PR [#978](https://github.com/coseo12/astro-simulator/pull/978) 리뷰 🔴-1.
+
+#### 9-1 결정 — required 제외
+
+`pr-template-checklist` 를 **Phase 1 required 집합에서 뺀다** (결정 1 표). Phase 2/3 에서도 재편입하지 않는다.
+
+**근거**: 이 컨텍스트는 event *type* 축 노출을 가진 **유일한 required 후보**이며 (§2-12 실측 3), 그 노출이 **이미 실발화했다** (`ee64871`: `failure, failure, success`). 그리고 노출의 원인이 버그가 아니라 **가드의 설계 목적 그 자체** — *"본문을 고쳐라"* 라고 요구하는 가드이므로 편집 루프가 구조적으로 유도된다. 즉 시간이 지나도 자연 소멸하지 않는다.
+
+**대가 (명시)**: PR 템플릿 7 체크박스 가드가 **권고로 남는다** (붉은 X 는 표시되나 머지를 막지 않음). 그러나 이 가드의 대상은 `base=develop` 일상 PR 이 대부분이고, develop 에는 애초에 required check 를 영구 미채택한다 (결정 2). **즉 이 가드를 main 의 required 로 올려도 실제 강제력이 미치는 범위는 release/hotfix PR 뿐**이라, 제외로 잃는 실효는 처음부터 작았다. 손실을 과장하지 않기 위해 박제한다.
+
+#### 9-2 결정 — `pr-template-checklist-guard.yml` 에 `concurrency` 를 **추가 금지**
+
+⚠️ **이것은 해결책이 아니다.** 직관적으로는 "concurrency 를 넣어 누적을 없애면 required 로 올릴 수 있다" 로 보이지만, 실측이 두 겹으로 반박한다.
+
+**1차 근거 — 관측된 사례에서 concurrency 는 애초에 발화하지 않는다.** `ee64871` 의 세 run 은 시간적으로 완전히 분리돼 있다 (간격 10분 31초 / 12초, 각 run 10~13초 완주 → **겹침 0**). `cancel-in-progress` 는 *진행 중인* run 만 취소하므로 **한 번도 발동하지 않으며**, `{failure, failure, success}` 는 **한 글자도 바뀌지 않는다**. 저장소 전체로도 재트리거 연속 쌍 27 중 겹치는 것은 **5** 뿐이다 (§2-12 실측 4).
+
+**2차 근거 — 발화하는 경우엔 오히려 나빠진다.** 겹치는 5건에서 `cancel-in-progress: true` 는 선행 run 을 `cancelled` 로 만든다. `cancelled` 는 GitHub 의 통과 3종 (`success`/`skipped`/`neutral`) 에 **없다** (§2-2). 즉 결과 집합이 `{failure, success}` → `{cancelled, success}` 로 바뀔 뿐 **여전히 `G2` 기준 불일치**다. Phase 0 가 저장소 전체에서 없애려던 바로 그 결론을, 한 워크플로에 국소 재도입하는 셈이다.
+
+**결론**: 두 근거 중 어느 쪽 경로를 타든 `G2` 는 계속 발화한다. concurrency 추가는 **문제를 옮길 뿐 해소하지 않는다.**
+
+**그럼 진짜 대응은?** 두 가지뿐이며 본 ADR 은 (i) 을 택한다.
+
+| | 대응 | 판정 |
+|---|---|---|
+| (i) | **required 제외** (9-1) | **채택** — 워크플로 무변경. 가드의 동작·목적을 그대로 보존한다 |
+| (ii) | `types` 에서 `edited` 제거 | **본 ADR 범위 밖 → 후속 분리** (§10-3 후속 5). 누적 원인은 근절되나 *"본문 고치면 즉시 재검사"* 라는 UX 를 잃고, §10-1 한계 6 이 박제한 **유일한 초 단위 복구 경로**까지 함께 사라진다 — required 화를 위해 가드의 사용성을 깎는 교환이라 별도 판단이 필요하다 |
+
+#### 9-3 조건부 기술 — `label-pr` 은 **같은 구조이나 같은 클래스가 아니다**
+
+`harness-pr-review.yml` (`label-pr`) 도 **concurrency 블록이 없다** — 구조는 `pr-template-checklist-guard.yml` 과 동일하다. 그럼에도 Phase 1 required 에 **유지**한다.
+
+**근거**: 누적을 만드는 것은 concurrency 부재가 아니라 **SHA 를 바꾸지 않는 반복 이벤트**이고, `label-pr` 의 `types: [opened, synchronize, ready_for_review]` 에는 그런 이벤트가 없다 — `opened` 는 1회, `ready_for_review` 는 draft→ready 1회성, `synchronize` 는 정의상 SHA 를 바꾼다. 실측 동일 SHA 누적 **0건** (20일 창).
+
+**단 이것은 조건부다 — 재검토 트리거를 건다** (§10-5 재검토 조건 8): `harness-pr-review.yml` 의 `types` 에 `edited`·`labeled`·`unlabeled`·`reopened` 등 **SHA 를 바꾸지 않는 이벤트가 추가되면** 즉시 `pr-template-checklist` 와 같은 클래스가 되며, 그때는 required 에서 빼거나 트리거를 되돌려야 한다. 현재 안전한 이유가 "concurrency 를 갖췄기 때문" 이 아니라 **"트리거 목록이 우연히 좁기 때문"** 이므로, 그 좁음이 유지되는지가 감시 대상이다.
+
+> **`branch-name` 은 이 논의에 해당하지 않는다** (오분류 주의). `types: [opened, synchronize]` 로 `edited` 가 없고 **concurrency 도 보유**한다 (PR 번호 키). 두 겹 방어라 event *type* 축 노출이 0 이다. 초기 분석에서 이를 같은 클래스로 묶은 서술이 있었으나 실측으로 철회됐다 (§2-12 실측 3).
+
 ---
 
 ## §7 비목표 (이번 범위에서 절대 손대지 않음)
@@ -406,12 +608,16 @@ export REPO=coseo12/astro-simulator
 
 ### P0 — Phase 0 (코드 PR. 설정 변경 없음)
 
-developer 디스패치. 결정 6 의 6-1~6-5. 머지 후 **바로 A1 로 진행**한다.
+developer 디스패치. 결정 6 의 6-1~6-5. 머지 후 **P1-G (Phase 1 진입 게이트) → A1** 순으로 진행한다.
 
-아래 **게이트 2개**가 **Phase 2 (A3) 의 진입 조건**이다 — 다음 release PR 1건에서 **둘 다 빈 출력**이어야 한다. SHA 를 한 번만 잡아 둔다:
+아래 **게이트 2개**가 **Phase 2 (A3) 의 진입 조건**이다 — 다음 release PR 1건에서 **둘 다 빈 출력**이어야 한다. (`G2` 는 추가로 **Phase 1 진입 조건**이기도 하다 — §8-P1-G.)
+
+> ⚠️ **`G1`·`G2` 에도 §8-P1-G 의 [전제 확인] 과 `exit` 판정이 동일하게 적용된다.** 빈 출력은 *"위반 0"* 과 *"측정 실패"* 를 구분하지 못하므로, 두 게이트 모두 **① required 대상 이름이 실제로 존재하고 ② `gh api` 가 exit 0** 인 경우에만 빈 출력을 통과로 읽는다 (cross-validate Q4 이견 수용, §11). 이 실패 클래스는 §10-1 한계 10 (창 cap 오통과) 과 **같은 클래스** — *"없는 것"* 과 *"못 본 것"* 이 같은 모양으로 나오는 구조다.
+
+SHA 를 한 번만 잡아 둔다:
 
 ```bash
-SHA=$(gh pr view <releasePR> --json headRefOid -q .headRefOid)
+SHA=$(gh pr view <releasePR> --json headRefOid -q .headRefOid)   # full SHA 가 반환된다
 ```
 
 **G1 — `cancelled` 체크런 0** (Phase 0 의 직접 효과 확인):
@@ -421,7 +627,12 @@ gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
   -q '.check_runs[] | select(.conclusion=="cancelled") | .name'
 ```
 
-**G2 — 동명 체크런의 결론 불일치 0** (§2-11 의 실질 잔여 위험 확인):
+> ⚠️ **`G1` 이 붉어져도 즉시 Phase 0 실패로 판정하지 말 것 — 선분류 의무가 있다.**
+> [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) **§A2-6 재검토 조건 10** 이 이 게이트의 정본 판정 절차다. Phase 0 는 C 클래스 (동일 ref 재트리거) 의 취소를 **의도적으로 보존**하므로, C 잔존은 Phase 0 실패가 **아니다**. A / B1 / B2 가 잔존할 때만 실패다. 분류 명령 원문과 클래스 정의는 §A2-6 조건 10 을 따른다 (본 ADR 이 명령을 사본으로 갖지 않는 이유 — 두 곳에 두면 drift 한다).
+>
+> 반대 방향 참조도 성립한다: §A2-6 조건 10 은 *"ADR 971 §8-P0 `G1` 이 게이트다"* 로 본 절을 가리킨다. **판정식은 여기, 분류 절차는 저기** 가 두 문서의 역할 분담이다.
+
+**G2 — 동명 체크런의 결론 불일치 0** (§2-12 의 잔여 위험 2종을 **원인 무관하게** 한 번에 확인):
 
 ```bash
 gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
@@ -436,11 +647,70 @@ gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
 
 > **G1 과 G2 는 직교다 — 어느 쪽도 다른 쪽을 포함하지 않는다.**
 > - **G1 만 잡는 것**: 동명 N개가 *전부* `cancelled` 인 경우 — 결론이 일치하므로 G2 는 침묵한다.
-> - **G2 만 잡는 것**: **`failure` + `success` 혼재** — flake 발 결론 불일치이며 §10-1 한계 3 이 지목하는 실질 잔여 위험이다. `cancelled` 가 하나도 없으므로 **G1 은 이를 원리적으로 검출하지 못한다.**
+> - **G2 만 잡는 것**: **`failure` + `success` 혼재** — §10-1 한계 3 이 지목하는 잔여 위험 **2종 모두** (① flake 발 / ② event *type* 축 누적 — §2-12) 가 여기 속한다. `cancelled` 가 하나도 없으므로 **G1 은 이를 원리적으로 검출하지 못한다.** `G2` 가 원인이 아니라 **결과**를 보는 판정식이라 축이 하나 더 발견돼도 **식을 고칠 필요가 없었던** 것이 이 설계의 실효 증거다.
 >
-> **게이트 발화 확인 (negative baseline)**: Phase 0 *이전* 상태인 `c2732ae` 에 G2 를 돌리면 7개 이름이 출력된다 (§2-11 의 `cancelled,success` **6건** + `cancelled,skipped` 1건 = 7 = `a11y-baseline-guard` / `detect-and-test` / `long-integration-rust` / `measure` / `retry-fresh-runner` / `verify` / `verify-and-rust`). 게이트가 침묵하는 가드가 아님을 확인한 값이며, **Phase 0 이후 이 출력이 비는 것**이 진입 조건이다.
+> **게이트 발화 확인 (negative baseline)**: Phase 0 *이전* 상태인 `c2732ae` 에 G2 를 돌리면 7개 이름이 출력된다 (§2-11 의 `cancelled,success` **6건** + `cancelled,skipped` 1건 = 7 = `a11y-baseline-guard` / `detect-and-test` / `long-integration-rust` / `measure` / `retry-fresh-runner` / `verify` / `verify-and-rust`). 게이트가 침묵하는 가드가 아님을 확인한 값이며, **Phase 0 이후 이 출력이 비는 것**이 진입 조건이다. 2026-08-07T11:50Z 재실행에서 동일 7건 재현.
 
-### A1 — Phase 1 적용 (main: 초 단위 체크 4개)
+### P1-G — **Phase 1 진입 게이트** (A1 실행 전 필수, 신설 2026-08-07)
+
+> 결정 1 §Phase 1 면제 근거 재작성 / 결정 9. **릴리스를 기다리지 않는다** — 소요 수 초.
+>
+> **왜 필요한가**: Phase 1 의 면제 근거였던 *"release PR 6/6 cancel 0"* 은 `cancelled` 축만 측정한 값이라 event *type* 축 (§2-12) 을 원리적으로 커버하지 못한다. `G2` 는 원인을 구분하지 않고 **결과인 통과/미통과 불일치**를 보므로 전 축을 한 번에 덮는다.
+
+**대상 SHA 선정** — Phase 1 required 3개가 전부 보고된 **최근 PR head** 아무거나. 릴리스 PR 일 필요 없다 (일상 PR 도 세 컨텍스트를 전부 낸다).
+
+```bash
+export REPO=coseo12/astro-simulator
+SHA=$(gh pr list --state merged --base develop --limit 1 --json headRefOid -q '.[0].headRefOid')
+echo "대상 SHA: $SHA   (측정 시각: $(date -u '+%Y-%m-%dT%H:%M:%SZ'))"
+```
+
+**[전제 확인 — 반드시 먼저]** `G2` 의 빈 출력은 *"불일치 없음"* 과 *"측정 대상이 없음"* 을 **구분하지 못한다**. 아래를 먼저 통과시켜 빈 출력의 의미를 고정한다 (cross-validate Q4 이견 수용, §11):
+
+```bash
+gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+  -q '[.check_runs[] | select(.name | IN("project-guards","branch-name","label-pr"))]
+      | "completed=\([.[]|select(.status=="completed")]|length)  names=\([.[]|.name]|unique|join(","))"'
+```
+
+**기대 출력**: `names=` 에 **3개 이름이 전부** 있고 `completed` ≥ 3. 하나라도 없으면 **다른 SHA 를 고른다** (게이트 실행 금지 — 실행해 봐야 빈 출력이 나오고 그것은 통과가 아니다).
+
+> **실측 근거**: 저장소 초기 커밋 `11c7b4f` 는 유효한 SHA 이고 체크런이 2개 존재하지만 required 3개는 **하나도 없다**. 여기에 `G2` 를 돌리면 **빈 출력** — 즉 아무것도 검증하지 않고 "통과" 로 읽힌다 (2026-08-07T11:5xZ 실행 확인). 이것이 이 전제 확인이 필수인 이유다.
+
+**게이트 본체 — Phase 1 required 3개로 한정한 `G2`**:
+
+```bash
+gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+  -q '[.check_runs[]
+       | select(.status=="completed")
+       | select(.name | IN("project-guards","branch-name","label-pr"))
+       | {name, pass: (.conclusion | IN("success","skipped","neutral"))}]
+      | group_by(.name)[] | select((map(.pass) | unique | length) > 1) | .[0].name'
+echo "exit=$?"
+```
+
+**판정 기준**:
+
+| 조건 | 판정 | 조치 |
+|---|---|---|
+| 전제 확인 통과 **그리고** `exit=0` **그리고** 빈 출력 | **통과** | A1 진행 |
+| 이름이 1개 이상 출력 | **차단** | 해당 컨텍스트를 required 집합에서 제외하거나 원인 해소 후 재실행. **A1 진행 금지** |
+| `exit≠0` (API 오류 / 4xx / 5xx / rate limit) | **판정 불가 — 차단** | 빈 출력을 통과로 읽지 말 것. 재실행 |
+| 전제 확인 실패 (이름 누락) | **판정 불가 — 차단** | SHA 재선정 |
+
+> **`exit=$?` 를 함께 보는 이유**: `gh api` 가 HTTP 오류로 실패하면 stdout 은 비고 에러는 stderr 로 간다. **파이프 끝만 보면 성공과 구분되지 않는다.** 존재하지 않는 SHA 는 `422` 로 시끄럽게 실패하지만 (실측), rate limit·5xx 는 조용할 수 있다. 이 게이트가 막으려는 것 자체가 "조용한 오통과" 이므로 게이트가 조용히 오통과하면 자기모순이다 — [guard-design-principles](../lessons/guard-design-principles.md) §fail-fast.
+
+**보조 확인 — 동명 누적 자체의 가시화** (게이트는 아니나 원인 파악용. `n>1` 이어도 결론이 전부 통과면 정상):
+
+```bash
+gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+  -q '[.check_runs[] | {name, conclusion}] | group_by(.name)[]
+      | "\(.[0].name)\tn=\(length)\t\(map(.conclusion) | sort | join(","))"'
+```
+
+> **게이트 발화 확인 (negative baseline)** — 이 게이트가 침묵하는 가드가 아님을 확인한 값. 위 본체 명령의 `IN(...)` 목록에 `"pr-template-checklist"` 를 임시로 넣고 `SHA=ee6487178ec590663cd25368750efa5b29b472b7` (PR #964 head) 로 실행하면 `pr-template-checklist` 1건이 출력된다 (2026-08-07T11:50Z 실행 확인). **결정 9 로 이 컨텍스트를 required 에서 뺐기 때문에** 정규 게이트에서는 나오지 않는다 — 즉 이 negative baseline 은 *"게이트가 작동한다"* 와 *"제외 결정이 바로 이걸 피한 것이다"* 를 동시에 보인다.
+
+### A1 — Phase 1 적용 (main: 초 단위 체크 3개)
 
 현재 보호값을 그대로 보존하고 `required_status_checks` 만 추가하는 **전체 PUT** 이다 (부분 PATCH 는 기존 필드를 잃을 수 있다). `app_id: 15368` 은 GitHub Actions — 다른 앱이 동명 체크로 요구를 만족시키는 경로를 막는다.
 
@@ -454,7 +724,6 @@ gh api -X PUT "repos/$REPO/branches/main/protection" --input - <<'JSON'
     "checks": [
       { "context": "project-guards",        "app_id": 15368 },
       { "context": "branch-name",           "app_id": 15368 },
-      { "context": "pr-template-checklist", "app_id": 15368 },
       { "context": "label-pr",              "app_id": 15368 }
     ]
   },
@@ -513,7 +782,6 @@ gh api -X PATCH "repos/$REPO/branches/main/protection/required_status_checks" --
   "checks": [
     { "context": "project-guards",        "app_id": 15368 },
     { "context": "branch-name",           "app_id": 15368 },
-    { "context": "pr-template-checklist", "app_id": 15368 },
     { "context": "label-pr",              "app_id": 15368 },
     { "context": "diff-scope",            "app_id": 15368 },
     { "context": "diff-scope-wasm",       "app_id": 15368 },
@@ -522,6 +790,8 @@ gh api -X PATCH "repos/$REPO/branches/main/protection/required_status_checks" --
 }
 JSON
 ```
+
+> `pr-template-checklist` 가 이 배열에 없는 것은 누락이 아니라 **결정 9 의 명시적 제외**다. 추가하지 말 것.
 
 > `diff-scope-wasm` 은 Phase 0 6-2 가 머지·1회 실행된 뒤에만 존재한다. **존재 확인 전 추가 금지** — 없는 컨텍스트를 요구하면 영구 pending 이다.
 > ```bash
@@ -567,7 +837,7 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 
 ### R4 — Phase 2/3 → Phase 1 부분 축소
 
-§8-A1 의 `checks` 배열 4개짜리로 §8-A3 형식의 PATCH 재실행.
+§8-A1 의 `checks` 배열 3개짜리 (`project-guards` / `branch-name` / `label-pr`) 로 §8-A3 형식의 PATCH 재실행.
 
 > **런북 배치**: R1/R2/R3 원문을 `docs/guides/branch-strategy-workflow.md` 의 릴리스 절차 옆에 링크로 노출하는 것이 Phase 1 산출물이다 (결정 5 조건).
 
@@ -579,9 +849,13 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 
 1. **클래스 A 가드 5종은 required 화 불가** — 실행 시간 상위 4개 중 3개 (`verify` / `measure` / `a11y-baseline-guard`) 가 여기 속한다. 즉 본 정책이 커버하는 것은 "빠르고 항상 도는 가드" 이지 "무거운 시각·성능 회귀 가드" 가 아니다.
 2. **`develop` 직접 push 는 기계적으로 막히지 않는다** — 산문 규약과 기계 강제 사이의 격차가 남는다 (결정 2). ff-sync 를 지키기 위한 의도적 선택이다.
-3. **동명 체크런은 상존한다 — Phase 0 는 조건을 없애지 않고 완주 쌍을 늘린다** (초판 서술 정정). 초판은 *"Phase 0 이 그 조건을 소멸시켜 회피한다"* 고 썼으나 **실측이 반증했다** (§2-11). `push` + `pull_request` 양 트리거를 가진 required context — `project-guards` / `diff-scope` / `diff-scope-wasm` / `detect-and-test` (+ Phase 3 의 `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) — 는 release PR SHA 에서 **항상 동명 2개**를 내고, `project-guards` 는 **Phase 0 이전인 지금 이미 그렇다** (`n=2 success,success`). 동명이 원천적으로 없는 것은 `pull_request` 전용 클래스 B 3개 (`branch-name` / `label-pr` / `pr-template-checklist`) 뿐이다. 나아가 Phase 0 는 `cancelled` 를 완주로 바꾸므로 **완주 동명 쌍을 3 → 7 로 늘린다**.
+3. **동명 체크런은 상존한다 — Phase 0 는 조건을 없애지 않고 완주 쌍을 늘린다** (초판 서술 정정). 초판은 *"Phase 0 이 그 조건을 소멸시켜 회피한다"* 고 썼으나 **실측이 반증했다** (§2-11). `push` + `pull_request` 양 트리거를 가진 required context — `project-guards` / `diff-scope` / `diff-scope-wasm` / `detect-and-test` (+ Phase 3 의 `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) — 는 release PR SHA 에서 **항상 동명 2개**를 내고, `project-guards` 는 **Phase 0 이전인 지금 이미 그렇다** (`n=2 success,success`). 나아가 Phase 0 는 `cancelled` 를 완주로 바꾸므로 **완주 동명 쌍을 3 → 7 로 늘린다**.
+   - **2026-08-07 2차 정정 — "동명이 원천적으로 없는 것은 클래스 B 3개뿐" 도 거짓이다.** 초판 정정문은 여기서 `branch-name` / `label-pr` / `pr-template-checklist` 를 "동명 없음" 으로 묶었으나, **`pr-template-checklist` 는 event *type* 축으로 동명이 누적된다** (§2-5 3행 / §2-12). 동명이 실제로 원천 부재인 것은 **`branch-name` (concurrency 보유 + `edited` 부재) 과 `label-pr` (`edited` 부재)** 2개다. 이 오류의 구조적 원인: 초판 투영표가 event 축 (`push` × `pull_request`) 만 축으로 잡아, **같은 event 가 한 SHA 위에서 반복되는 축을 볼 자리가 없었다.**
    - **그럼에도 안전한 이유 (calibration — 이 정정이 공포 조장이 아닌 근거)**: 동명 N개가 **전부 **통과 결론**(`success` / `skipped` / `neutral` — §2-2) 이면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿" 자체가 아니라 **결론 불일치** 하나로 국한된다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **불일치 확률의 하락**이다 — 100% 재현되던 불일치 원인 (`cancelled`, release PR 6/6) 을 구조적으로 제거한다.
-   - **실질 잔여 위험 = flake 발 `failure` + `success` 혼재.** Phase 0 는 flake 를 제거하지 못한다. 본 저장소는 flake 전례를 보유한다 (`verify:699 deltaTime` / r1-guard Playwright / fps 부하 spike — #779 §매핑표에 자체 박제). 무거운 required check 의 **push run 만** flake 로 `failure` 가 되면 GitHub 의 해소 규칙은 미규정이고 (§2-2) 릴리스가 `BLOCKED` 될 수 있다. **이것이 본 정책의 최종 잔여 위험이며 설계로 제거되지 않는다.**
+   - **실질 잔여 위험은 <b>2종</b>이다 — 초판의 "flake 하나" 는 거짓** (2026-08-07 정정, §2-12).
+     - **① flake 발 `failure` + `success` 혼재 (확률적).** Phase 0 는 flake 를 제거하지 못한다. 본 저장소는 flake 전례를 보유한다 (`verify:699 deltaTime` / r1-guard Playwright / fps 부하 spike — #779 §매핑표에 자체 박제). 무거운 required check 의 **push run 만** flake 로 `failure` 가 되면 GitHub 의 해소 규칙은 미규정이고 (§2-2) 릴리스가 `BLOCKED` 될 수 있다.
+     - **② event *type* 축 누적 (결정론적).** `types` 에 SHA 를 바꾸지 않는 이벤트 (`edited`) 를 가진 워크플로가 한 SHA 위에 체크런을 누적하고, 첫 run 이 실패했다 통과하면 `failure` + `success` 가 **영구 공존**한다. **확률적이지 않고, Phase 1 required 후보 위에서 이미 발화했다** (`ee64871`). 본 ADR 은 이를 **결정 9 (required 제외) 로 봉인**하므로 required 집합에 대한 잔여 위험은 아니지만, **required 집합이 확대되면 다시 열린다** — 그래서 `G2` 를 Phase 1 진입 조건으로 상시 배치했다 (§8-P1-G).
+     - **초판이 ② 를 놓친 구조적 이유**: 소급 리허설 (§10-4 단계 1) 이 `cancelled` 축만 집계했고, ② 는 `cancelled` 를 하나도 만들지 않는다. **측정하지 않은 축을 "위험 없음" 으로 결론지은 것** — 근거와 결론의 축이 어긋난 전형이다.
    - **관측 수단**: §8-P0 의 **G2 게이트**가 이 조건을 직접 검사한다 (G1 의 `cancelled` 검사로는 원리적으로 검출 불가). 발생 시 대응은 §9-R1 (2초) 로 required 를 걷어내고 릴리스를 완주시킨 뒤, 재실행으로 결론을 수렴시키는 순서다 — **릴리스를 인질로 잡고 디버깅하지 않는다** (§10-4).
    - **잔존 미검증**: GitHub 의 동명 **해소 규칙 자체**는 여전히 모른다 (§2-8 대로 사전 실증이 불가능하다). 본 정책은 규칙을 알아낸 것이 아니라 **불일치가 잘 일어나지 않게 만들고, 일어나면 잡히게** 한 것이다.
 4. **`branch-name` 의 소급 근거는 `n=1`** (#974) — release PR 에서의 보고 안정성 표본이 1건이다.
@@ -591,13 +865,18 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 7. **GitHub Actions 장애 시 릴리스가 멈춘다** — 체크가 보고되지 않으면 required 는 pending 이다. 대응은 §9-R1 (2초) 후 릴리스 완주.
 8. **fork PR 이 `main` 을 대상으로 하면 차단된다** — `label-pr` 은 `pull-requests: write` 가 필요한데 fork PR 의 `GITHUB_TOKEN` 은 read-only 라 실패한다. 단 **본 정책의 영향은 0** 이다: fork PR 은 `develop` 을 대상으로 하고 develop 에는 required check 가 없다 (결정 2). `main` 은 release/hotfix 전용이라 fork PR 이 도달할 경로가 정책상 존재하지 않으며, 도달한다면 차단이 옳은 동작이다.
 9. **hotfix 경로는 실측 표본이 0건이다** — 정적으로는 통과한다 (`hotfix` 는 `branch-name` 허용 type, base=main 이라 클래스 B/C 전부 트리거). 그러나 소급 대조에 쓸 실제 hotfix PR 이 없다 → §10-4 단계 4 에서 확인.
+10. **본 ADR 의 run 레벨 수치는 창 (window) 종속이며, 그 창은 측정 시각마다 이동한다** (신설 2026-08-07). `gh run list --limit N` 의 `N` 은 **날짜 범위가 아니라 개수 cap** 이라, 저장소 run 생성률 (실측 100~163 run/일) 에 따라 창 길이가 달라진다. 본 ADR 과 [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-3 의 분류 수치가 측정 주체마다 미세하게 다른 것은 오류가 아니라 **cap 경계 이동** 때문이다. 그래서 §2-6 스냅샷에 **측정 시각과 창 경계를 명시 박제**했다.
+    - **위험 방향이 비대칭이다** — 창이 짧아지면 결과가 **빈 출력**이 되는데, 이는 *"위반 0"* 과 형태가 **구분 불가능**하다. 즉 오차가 **안전 방향이 아니라 오통과 방향**으로 난다. 실측: `--limit 200` 은 2026-08-07T11:53Z 시점에 **1.88일**만 덮어, 2026-08-05 머지된 release PR #965 (`370d1c6`) 조회가 **0건**을 반환한다 — 같은 SHA 를 창 무관 API 로 조회하면 **run 15 / cancelled 5** 다.
+    - **완화**: SHA 를 아는 조회는 **창 무관 API** (`GET /actions/runs?head_sha=<full-sha>`) 를 쓴다. [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-6 조건 10 이 이 방식으로 개정됐다. `head_sha` 는 **full SHA 필수** — 축약형은 에러가 아니라 조용히 `total_count: 0` 을 반환해 같은 오독을 만든다.
+    - **잔존**: 창 종속이 불가피한 조회 (SHA 를 모르는 전수 분류) 는 여전히 창 안에서만 유효하다. 그 결론 (예: C 클래스 0건) 을 인용할 때는 **창 경계를 함께 인용**해야 한다.
 
 ### 10-2 Accepted 전이 조건
 
 아래 **전건** 충족 시 상태를 `Accepted` 로 갱신한다.
 
 1. 사용자가 §8 적용을 승인.
-2. Phase 0 머지 + release PR 1건에서 §8-P0 의 **G1 (`cancelled` 0) 과 G2 (동명 결론 불일치 0) 동시** 실측.
+2. Phase 0 머지 + release PR 1건에서 §8-P0 의 **G1 (`cancelled` 0) 과 G2 (동명 결론 불일치 0) 동시** 실측. `G1` 이 붉으면 [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §A2-6 조건 10 의 **선분류** 를 거쳐 A/B1/B2 잔존일 때만 실패로 판정한다 (C 잔존은 설계상 정상).
+2-bis. **Phase 1 진입 게이트 `G2` (§8-P1-G) 통과** — 릴리스 무관, 수 초. 신설 2026-08-07.
 3. Phase 1 적용 후 **release PR 1건** (+ 가능하면 hotfix PR 1건 — §10-1 한계 9) 에서 오차단 0 실증 (§10-4 판정 기준). ⚠️ **일상 PR 은 검증력이 0 이라 조건에서 제외한다** — 일상 개발 PR 은 `base=develop` 이고 develop 에는 required check 를 영구 미채택하므로 (결정 2) **main 의 required check 를 한 번도 통과하지 않는다**. *"일상 PR 이 통과했으니 안전"* 은 거짓 확신이다. `main` 을 대상으로 하는 PR 은 release PR 과 hotfix PR 뿐이며, 그래서 Phase 1 의 첫 실전은 어차피 release PR 이다.
 4. §9 롤백 명령이 릴리스 런북에 링크됨.
 
@@ -607,13 +886,14 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 2. **선언적 관리 구현 + 이름 정적 가드** — `.github/branch-protection/*.json` + `apply`/`verify` 스크립트 2종 (결정 7) + **결정 8 의 context↔job 이름 대조 가드** (`project-guards` 배선). 릴리스 런북 (`docs/guides/branch-strategy-workflow.md`) 에 `verify` 수동 실행 체크리스트 항목 추가 포함.
 3. **봇 PR base 정책** — 봇 PR 을 develop 대상으로 되돌릴 필요가 생기면 `GITHUB_TOKEN` 워크플로 트리거를 먼저 실증 (결정 4).
 4. **작업 토큰 권한 분리 검토** (cross-validate 고유 발견) — 일상 에이전트 토큰에서 `Administration` 권한을 제거하고 비상용 admin 토큰을 분리하면 보호의 실효 강제력이 오른다. 단 §9 롤백이 "토큰 교체" 를 거치게 되어 **탈출 경로가 2초에서 수 분으로 늘어난다** — 강제력 ↔ 복구 속도의 정면 교환이라 별도 결정이 필요하다. 본 ADR 은 현 토큰 상태를 전제로만 유효하다 (§10-5 재검토 조건 6).
+5. **`pr-template-checklist` 의 required 복권 경로** (신설 2026-08-07, 결정 9-2 (ii)) — `types` 에서 `edited` 를 제거하면 event *type* 축 누적이 근절돼 required 화가 가능해진다. 그러나 (a) *"본문 고치면 즉시 재검사"* UX 를 잃고 (b) §10-1 한계 6 이 박제한 **유일한 초 단위 복구 경로** (본문 편집으로 재실행) 가 함께 사라진다. **required 강제력 ↔ 가드 사용성 + 복구 속도**의 3자 교환이라 별건. 착수 시 §10-1 한계 6 의 복구 비대칭 표를 함께 갱신해야 한다.
 
 ### 10-4 릴리스 리허설 계획 — "오차단 0" 판정 기준
 
 > **설계 단계에서 실행하지 않는다.** 아래는 절차 정의다.
 
 **단계 1 — 소급 리허설 (무위험, §2-6 에서 이미 수행 완료)**
-최근 release PR 6건 × 후보 9개 전수 대조. 결과: Phase 1 후보 4개는 cancel 0 / 부재 0 (`branch-name` 은 존재 1건 기준). 무거운 3개는 cancel 6/6 → Phase 0 필요성의 근거.
+최근 release PR 6건 × 후보 9개 전수 대조 (check-run 레벨). 결과: Phase 1 후보 (당시 4개) 는 cancel 0 / 부재 0 (`branch-name` 은 존재 1건 기준). 무거운 3개는 cancel 6/6 → Phase 0 필요성의 근거. ⚠️ **이 리허설은 `cancelled` 축만 덮는다** — event *type* 축 (§2-12) 은 여기서 검출되지 않으며 §8-P1-G 가 담당한다.
 
 **단계 2 — push 의미론 리허설 (일회용 브랜치. `main`/`develop` 무접촉)**
 `develop` 최소 보호(§8-A2)가 ff-sync 를 막지 않음을 **실제 push 로** 확인한다. 대조군으로 required check 를 건 변형이 직접 push 를 거부하는 것까지 확인해 §4 (c) 기각 근거를 실증한다.
@@ -649,7 +929,54 @@ git push origin --delete chore/971-protection-probe
 ```
 
 > probe 브랜치명은 `chore/971-protection-probe` — `branch-name` 가드의 허용 집합 (`<type>/<이슈번호>-<설명>`) 을 만족시켜 리허설 자체가 규약을 위반하지 않게 한다.
-> **required check 의 "동명 cancelled 쌍둥이" 거동은 이 리허설로 재현할 수 없다** (§2-8: 임의 conclusion 체크런 합성은 GitHub App 토큰 전용). 그래서 Phase 0 로 조건 자체를 없앤다.
+> **required check 의 "동명 `cancelled` 쌍둥이" 거동은 이 리허설로 재현할 수 없다** (§2-8: 임의 conclusion 체크런 합성은 GitHub App 토큰 전용). 그래서 Phase 0 로 조건 자체를 없앤다. 단 **`{failure, success}` 불일치는 재현 가능하다** — 단계 2-bis.
+
+**단계 2-bis — 동명 결론 불일치의 실제 판정 관측 (신설 2026-08-07, cross-validate Q1 이견 수용)**
+
+> **설계만 박제한다. 실행은 사용자 승인 후.** 본 ADR 라운드에서는 수행하지 않았다.
+
+§2-8 은 *"동명 해소 규칙은 사전 실증 불가"* 로 결론지었으나 그 논거는 **체크런 합성 불가**에 기댄다. **합성이 필요 없다** — `ee64871` 이 `pr-template-checklist` = `{failure, failure, success}` 를 자연 보유한다 (§2-12 실측 1).
+
+```bash
+export REPO=coseo12/astro-simulator
+MIXED=ee6487178ec590663cd25368750efa5b29b472b7      # 불일치를 자연 보유한 SHA
+
+# (1) probe 브랜치 2개 — base(보호 대상) 와 head
+git push origin ${MIXED}:refs/heads/chore/971-mixed-head
+git push origin origin/develop:refs/heads/chore/971-mixed-base
+
+# (2) base 에만 pr-template-checklist 를 required 로 건다 (main/develop 무접촉)
+gh api -X PUT "repos/$REPO/branches/chore%2F971-mixed-base/protection" --input - <<'JSON'
+{ "required_status_checks": { "strict": false,
+    "checks": [ { "context": "pr-template-checklist", "app_id": 15368 } ] },
+  "enforce_admins": true, "required_pull_request_reviews": null,
+  "restrictions": null, "required_linear_history": false, "allow_force_pushes": false,
+  "allow_deletions": false, "block_creations": false, "required_conversation_resolution": false,
+  "lock_branch": false, "allow_fork_syncing": false }
+JSON
+
+# (3) PR 을 열고 GitHub 의 판정을 읽는다 (새 체크런을 만들지 않으므로 head SHA 의 기존 결론이 그대로 평가된다)
+PR=$(gh pr create --base chore/971-mixed-base --head chore/971-mixed-head \
+      --title "[#971] probe — 동명 결론 불일치 판정 관측" --body "probe. 머지하지 않음." --json number -q .number)
+gh pr view $PR --json mergeable,mergeStateStatus,statusCheckRollup \
+  -q '{mergeable, state: .mergeStateStatus, rollup: [.statusCheckRollup[]|select(.name=="pr-template-checklist")|{name, conclusion}]}'
+
+# (4) 정리 — PR 닫고, 규칙 먼저, 브랜치 나중
+gh pr close $PR
+gh api -X DELETE "repos/$REPO/branches/chore%2F971-mixed-base/protection"
+git push origin --delete chore/971-mixed-head chore/971-mixed-base
+```
+
+**해석표**:
+
+| `mergeStateStatus` | 시사 | 본 ADR 에의 영향 |
+|---|---|---|
+| `BLOCKED` | 불일치가 **차단을 만든다** (all-must-pass 또는 first 채택 계열) | 결정 9-1 (제외) 이 **필수**임이 실증됨. §5 (a) 기각도 강화 |
+| `CLEAN` / `UNSTABLE` | **최신 `success` 가 채택**된다 (latest 계열) | 결정 9-1 은 **과잉 회피**일 수 있다 → §10-5 재검토 조건 10 발동, 결정 9-1 재검토 |
+
+**⚠️ 결과가 `CLEAN` 이어도 자동 복권은 아니다.** latest 채택이 확인되면 남는 위험은 *"가장 마지막에 완료된 run 이 실패인 경우"* 로 좁혀지는데, concurrency 부재 상태에서는 **선행 run 이 후행보다 늦게 끝나는 순서 역전**이 가능하다 (cross-validate Q2 지적). 즉 `CLEAN` 은 결정 9-1 을 **재검토 대상으로 만들 뿐 뒤집지 않는다** — 복권하려면 순서 역전 부재까지 별도 실증이 필요하다.
+
+**비용 대비**: probe 브랜치 2개 + 보호 규칙 1회 PUT/DELETE + PR 1건. `main`/`develop` 무접촉. §10-4 단계 2 와 동일한 위험 등급이다.
 
 **단계 3 — Phase 1 적용 직후 라이브 관찰**
 
@@ -662,7 +989,7 @@ gh pr view <release 또는 hotfix PR> --json mergeable,mergeStateStatus,statusCh
 
 **오차단 0 판정 기준** (전건 충족):
 - `mergeStateStatus` 가 **`BLOCKED` 이 아님** (`CLEAN` 또는 `UNSTABLE` — `UNSTABLE` 은 비-required 체크 실패라 머지 가능).
-- required 4개 컨텍스트가 전부 `SUCCESS` 또는 `SKIPPED`.
+- required 3개 컨텍스트 (`project-guards` / `branch-name` / `label-pr`) 가 전부 `SUCCESS` 또는 `SKIPPED`.
 - release PR 에서 §8-P0 **G1 + G2 가 동시에 빈 출력** (`cancelled` 0 **그리고** 동명 결론 불일치 0).
 - ff-sync `git push origin main:develop` 가 거부 없이 완료.
 
@@ -687,12 +1014,86 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 5. 봇 PR 의 base 가 develop 으로 환원 → 결정 4 재검토.
 6. **작업 토큰이 저장소 admin 권한을 잃음** (fine-grained PAT 전환 등) → 결정 5 의 전제가 깨지므로 **required check 를 즉시 §9-R1 로 내리고** 재설계. 판정 1줄: `gh api repos/coseo12/astro-simulator -q '.permissions.admin'`.
 7. 저장소가 organization 으로 이전 → classic `restrictions` (push allowance) 가 사용 가능해져 §11 기각-5 의 전제가 바뀐다. develop 직접 push 의 기계적 강제가 릴리스 의례를 깨지 않고 가능해지므로 결정 2 재검토.
+8. **`harness-pr-review.yml` (`label-pr`) 의 `types:` 에 SHA 를 바꾸지 않는 이벤트가 추가됨** (`edited` / `labeled` / `unlabeled` / `reopened` 등) → 결정 9-3 의 조건부 안전 전제가 깨진다. 즉시 `pr-template-checklist` 와 같은 클래스가 되므로 **required 에서 제외하거나 트리거를 되돌린다**. 판정 1줄 (현재 기대: `[opened, synchronize, ready_for_review]`):
+   ```bash
+   grep -A3 "^on:" .github/workflows/harness-pr-review.yml | grep "types:"
+   ```
+9. **required 집합에 새 컨텍스트를 추가할 때 (Phase 2/3 포함)** → 추가 대상 워크플로의 `types:` 를 먼저 확인하고, SHA 를 바꾸지 않는 반복 이벤트가 있으면 §8-P1-G 의 `G2` 를 **그 컨텍스트를 포함한 목록으로** 1회 실행한다. 결정 9 는 `pr-template-checklist` 하나를 처리한 것이지 **축 자체를 닫은 것이 아니다**.
+10. **§10-4 단계 2-bis (동명 결론 불일치 판정 관측) 를 수행했고 결과가 `CLEAN`/`UNSTABLE`** → GitHub 이 최신 `success` 를 채택한다는 뜻이므로 **결정 9-1 (required 제외) 이 과잉일 수 있다**. 다만 자동 복권은 금지 — 순서 역전 (선행 run 이 후행보다 늦게 완료) 부재를 별도 실증한 뒤에만 재검토한다. 결과가 `BLOCKED` 이면 결정 9-1 이 실증된 것이며 재검토 불필요.
+11. **GitHub 의 branch protection API 자체가 장애** → §9 롤백이 호출 불가해진다. 한계 7 (Actions 장애) 과 **다른 층**이다: Actions 장애는 체크가 안 오는 것이고, 이쪽은 **탈출구가 안 열리는 것**이다. 현재 완화책 없음 — 장애 복구까지 릴리스 대기가 유일한 경로다. 이것이 required check 도입의 **잔여 가용성 비용**이며 설계로 제거되지 않는다 (cross-validate Q5 부분 수용).
 
 ---
 
 ## §11 교차검증 반영 사항
 
-> 수행: architect, 2026-08-07. **2회 호출**.
+> **라운드 1 (초판, 2026-08-07 오전)** — 아래 §11-1. 2회 호출.
+> **라운드 2 (Phase 1 착수 전 정정, 2026-08-07 오후)** — §11-2. 2회 호출. **결정 9 신설이 신규 결정 조항이라 수행 판정.**
+
+---
+
+## §11-2 교차검증 — 라운드 2 (결정 9 신설 / Phase 1 게이트 격상)
+
+> **수행 판정 근거**: 본 라운드의 A (사실 정정) 는 cross-validate 불요이나, **B-4 (Phase 1 면제 근거 재작성) 와 B-5 (결정 9 신설) 는 결정 조항의 신설·변경**이다. CLAUDE.md §교차검증 의 앵커 4종 중 *"ADR 신규·개정/폐기"* 에 해당 → **수행**.
+>
+> **1차**: `.claude/skills/cross-validate/scripts/cross_validate.sh architecture docs/decisions/20260807-971-required-status-checks.md`
+> — outcome **`applied`** (exit 0) / `plan_bypass: **false**` / `rollback_failed: false` / `reminder_issue: none`
+> — 로그: `.claude/logs/cross-validate-architecture-20260807-210725.log` / outcome: `...-210725-outcome.json`
+> — `scripts/parse-cross-validate-outcome.sh` 로 파싱해 `plan_bypass == false` 확인 (#479 의무).
+>
+> **2차 (반증 전용)**: 1차가 6기준 전부 ★★★★☆~★★★★★ 로 수렴해 **반증 산출이 사실상 0** 이었다 (미세 제안 3건뿐). `cross_validate.sh` 는 프롬프트가 고정이라 편향 셀프 체크 질문을 주입할 수 없으므로, 스킬 문서가 명시한 **직접 호출 경로** (`agy -p` + L1 strict prefix 수동 포함) 로 **"동의 금지, 반대 논거만" 프롬프트** 를 재호출했다. 질문 5개는 아래 §편향 셀프 체크의 미통과 축에서 직접 도출했다.
+> — L3 등가 검증: 호출 전후 `git status --porcelain` **동일** (워킹트리 변경 0, `diff` 실행 확인).
+
+### 합의 (라운드 2)
+
+외부 모델이 독립적으로 지지 — 추가 변경 없음.
+
+1. **결정 9-1 (`pr-template-checklist` required 제외)** — *"본문 수정을 유도하는 가드 특성상 동일 SHA 에 failure/success 가 영구 공존하므로 required 화 시 결정론적 릴리스 블록"* 이라는 §2-12 판정에 동의.
+2. **결정 9-2 (concurrency 추가 금지)** — *"직관적으로는 넣고 싶어지지만, 겹침 0 이라 발화하지 않고 발화하면 cancelled 로 더 나빠진다"* 는 2겹 근거를 그대로 재구성.
+3. **`G2` 판정식이 통과/미통과 이분법인 것** — *"규칙 독립성(Rule Independence)을 확보한 판정 인터페이스"* 로 평가. §5 (a) 잣대 일관성 주석과 독립적으로 같은 결론에 도달.
+4. **Phase 1 게이트를 릴리스 비의존으로 둔 것** — 릴리스 3주기 회피와 안전 확보의 양립.
+
+### 이견 수용 (라운드 2)
+
+| # | 원안 | 수정안 | 수용 근거 |
+|---|---|---|---|
+| 1 | **`G2`/`G1`/`P1-G` 의 "빈 출력 = 통과"** (Q4) | **전제 확인 + `exit` 판정 추가** — required 이름이 실제 존재하는지 먼저 확인하고, `gh api` 가 exit 0 일 때만 빈 출력을 통과로 읽는다 (§8-P1-G / §8-P0) | **본 라운드 최대 수확.** 게이트가 *"측정 실패"* 와 *"위반 0"* 을 구분하지 못하는 구조였다. **실측으로 확정**: 저장소 초기 커밋 `11c7b4f` 는 유효 SHA 이고 체크런 2개가 있으나 required 3개는 하나도 없어, `G2` 가 **빈 출력 = 통과**를 낸다. 이는 방금 정정한 qa 발견 (창 cap 오통과, §10-1 한계 10) 과 **정확히 같은 클래스** — 게이트 자신이 그 클래스에 걸려 있었다. 조용한 오통과를 막는 가드가 조용히 오통과하면 자기모순 |
+| 2 | **§2-8 "동명 해소 규칙은 사전 실증 불가"** (Q1) | **불가능 주장을 좁힘** — 체크런 *합성*은 불가하나 **자연 발생 불일치 표본** (`ee64871`) 이 이미 있으므로 probe 브랜치로 **실증 가능**. §10-4 **단계 2-bis** 신설 (설계만, 실행은 사용자 승인 후) + §10-5 재검토 조건 10 | 원 논거는 *"임의 conclusion 합성 = GitHub App 전용"* 에 기댔는데, **합성할 필요가 없다는 것을 놓쳤다**. 이 구분이 중요한 이유: §5 (a) 기각과 결정 9-1 이 둘 다 *"규칙을 모른다"* 를 근거의 일부로 쓰므로, 알아낼 경로가 있다면 그 근거는 영구가 아니라 **잠정**이다. 단 **결정 9-1 자체는 유지** — `BLOCKED` 이면 실증되고 `CLEAN` 이어도 순서 역전 (아래 #3) 이 남아 자동 복권이 아니다 |
+| 3 | 결정 9-2 의 근거를 "겹침 5/27" 실측으로만 제시 (Q2) | **순서 역전 위험을 단계 2-bis 해석표에 편입** — concurrency 부재 시 선행 run 이 후행보다 늦게 완료돼 stale 결론이 최신을 덮을 수 있다 | 외부 모델은 이를 *"concurrency 를 넣어야 할 이유"* 로 제시했으나 **재분석 결과 반대 방향으로 작동한다** — 순서 역전은 latest 채택 규칙 하에서 위험하고, 그 위험은 `pr-template-checklist` 를 **required 에서 뺀 결정 9-1 을 더 정당화**한다. 즉 지적은 유효하되 결론은 원안 강화. 단계 2-bis 의 *"`CLEAN` 이어도 자동 복권 아님"* 단서가 이 수용의 산물 |
+| 4 | §10-1 한계 7 (GitHub Actions 장애) 만 기술 (Q5) | **재검토 조건 11 신설** — branch protection **API 자체**의 장애 시 §9 롤백이 호출 불가 | 두 장애는 **다른 층**이다: Actions 장애는 *체크가 안 오는 것*, protection API 장애는 *탈출구가 안 열리는 것*. 후자는 완화책이 없으며 **required check 도입의 잔여 가용성 비용**이다. 숨기지 않고 명시 |
+
+### Claude 재분석으로 기각한 외부 모델 제안 (라운드 2)
+
+| # | 제안 | 기각 근거 |
+|---|---|---|
+| 1 | **`jq` 의 `IN()` 이 구버전 호환성 문제를 낼 수 있으니 `or` 체인으로 바꿔라** (1차 제안 1) | **실측 후 기각.** 본 환경 (`gh 2.88.1`) 에서 `IN()` 식과 `or` 체인 식이 `c2732ae` 에 대해 **동일 7건**을 반환함을 직접 대조 확인했다. 더 결정적으로, 만약 비호환이 발생하면 게이트는 **parse error 로 시끄럽게 죽는다** — 조용한 오통과가 아니라 **fail-loud** 다. 본 게이트의 안전 속성 (빈 출력 오독 방지) 을 위협하지 않으므로 교체 이익이 없다. 다만 미래에 실제로 마주칠 경우를 위해 **동치 대체식을 이 표에 남긴다**: `pass: (.conclusion=="success" or .conclusion=="skipped" or .conclusion=="neutral")` |
+| 2 | **`label-pr` 도 `labeled`/`unlabeled`/`reopened` 로 동일 SHA 중복을 만드니 이중잣대다** (Q3) | **사실 오류 — 실측 반증.** `harness-pr-review.yml` 의 `types` 는 `[opened, synchronize, ready_for_review]` 로, `labeled`·`unlabeled`·`reopened` 가 **없다** (2026-08-07 파일 직접 확인). 라벨을 아무리 갈아 끼워도 이 워크플로는 트리거되지 않는다. 실측 동일 SHA 누적도 20일 창 **0건**이다. 외부 모델이 *"구조가 같으니 거동도 같을 것"* 으로 추정한 오류 — 본 ADR 이 §2-12 실측 3 에서 정확히 이 오분류를 경계한 지점이다. **단 "우연에 의존하는 안전" 이라는 프레이밍 자체는 타당**하므로 §10-5 재검토 조건 8 (트리거 추가 시 재검토) 로 이미 수용돼 있다 |
+| 3 | `label-pr` 의 권한 부재 / rate limit / 봇 계정 실패도 위험이다 (Q3) | **required check 가 의도대로 작동하는 경우이지 오차단이 아니다.** 이 경로들은 `failure` **단일** 결론을 만들 뿐 동명 불일치를 만들지 않는다 (`label-pr` 은 n=1). 실패한 가드가 머지를 막는 것은 **설계 목적 그 자체**다. fork PR 의 read-only 토큰 경로는 §10-1 한계 8 에 이미 기술돼 있고 영향 0 이다 |
+| 4 | 결정 9-1 대신 **"릴리스 직전 rerun 강제"** 로 대체하라 (Q1) | **메커니즘상 무효.** rerun 은 기존 체크런을 **제거하지 않고 새 체크런을 추가**한다. `{failure, success}` → `{failure, success, success}` 가 될 뿐 불일치는 그대로다. 이 대안이 성립하려면 latest 채택이 참이어야 하는데, 그렇다면 rerun 없이도 이미 통과다 — **즉 이 제안은 문제가 없을 때만 작동한다** |
+| 5 | 결정 9-1 대신 **"PR 본문 편집 금지 규약"** 으로 대체하라 (Q1) | **가드의 목적과 정면 충돌.** `pr-template-checklist` 는 *"본문 7 체크박스를 채워라"* 를 요구하는 가드다. 편집을 금지하면 가드가 요구하는 수정 자체가 불가능해진다. 규약으로 사람 행동을 제약해 기계 결함을 우회하는 것은 CLAUDE.md §가드 설계 원칙 (silent 약화 금지) 위반 |
+| 6 | **`P1-G` 대상 SHA 자동 추출에 에지 케이스 검증을 덧붙여라** (1차 제안 2) | **기각 아님 — 이견 수용 1 로 흡수.** 외부 모델은 이를 "편의 개선" 으로 제시했으나, 재분석 결과 **안전 속성의 결함**이었다 (측정 실패 = 통과 오독). 제안보다 강한 형태 (전제 확인 + `exit` 판정 + 실측 근거 박제) 로 수용했다 |
+| 7 | 복구 런북에 `gh run rerun <run-id>` 를 추가하라 (1차 제안 3) | **범위 밖 — §10-3 후속 2 에 이미 포함.** 릴리스 런북 편입은 후속 2 (선언적 관리 구현 + 런북 체크리스트) 의 산출물이며, 본 ADR 라운드는 저장소 설정·워크플로 무변경이 전제다. §10-1 한계 6 이 복구 경로 비대칭을 이미 박제하고 있어 맥락 유실 위험도 없다 |
+
+### 고유 발견 (후속 분리 — 라운드 2)
+
+1. **동명 결론 불일치의 실제 판정 관측 실험** (§10-4 단계 2-bis) — 본 ADR 은 **설계만** 박제하고 실행하지 않았다. 실행에 보호 설정 PUT/DELETE 가 필요해 사용자 승인 사항이며, 본 라운드의 범위 (설정 변경 0) 밖이다. 결과에 따라 결정 9-1 이 재검토된다 (§10-5 재검토 조건 10).
+2. **`pr-template-checklist` 의 `edited` 트리거 제거안** — §10-3 후속 5 로 분리 (복구 경로 비대칭과의 3자 교환).
+
+### 호출 전 Claude 편향 셀프 체크 (라운드 2, architect, 2026-08-07)
+
+| 축 | 판정 | 조치 |
+|---|---|---|
+| 낙관적 일정 | **미통과** — Phase 1 게이트를 *"수 초"* 로 적었으나 실패 시 대응 비용을 정량화하지 않았다 | 2차 호출 **Q5** 로 주입 → 재검토 조건 11 (protection API 장애 시 롤백 불가) 신설 |
+| 결합 간과 | **미통과** — 결정 9-1 이 `pr-template-checklist` 를 required 에서 뺀 것이 **§10-1 한계 6 의 유일한 초 단위 복구 경로** (본문 편집 재실행) 와 결합돼 있음을 초안 작성 후에야 인지 | 2차 호출 **Q3** 로 주입 (자의적 이중잣대 반증 요구) → 결정 9-2 (ii) 의 교환 구조를 §10-3 후속 5 에 명시 분리 |
+| 폐기 프레이밍 | **미통과** — *"concurrency 추가는 해법이 아니다"* 를 원리로 단정하려는 관성이 있었다 (실측 없이) | 2차 호출 **Q2** 로 주입 → 겹침 5/27 실측 + `ee64871` 겹침 0 타임라인으로 **2겹 근거화**. 그 과정에서 **"6일 23회 취소" 라는 자기 과대 주장을 5회로 정정**했다 (본 라운드의 자기 적용 사례) |
+| 순수주의 | **미통과** — *"규칙을 모르니 required 에서 뺀다"* 가 과잉 회피일 가능성 | 2차 호출 **Q1** 로 주입 → §2-8 불가능 주장이 **좁혀짐** (합성 불가 ≠ 실증 불가). 단계 2-bis 로 실증 경로 확보. 결정 9-1 은 유지하되 **잠정 근거임을 명시** |
+
+> **4축 전부 미통과** 였다는 사실 자체를 박제한다. 라운드 1 은 3/4 미통과였고 라운드 2 는 4/4 다 — 셀프 체크가 통과 도장이 아니라 **질문 생성기**로 작동했다는 증거이며, 실제로 4개 축 전부가 §11-2 의 이견 수용·기각 항목으로 이어졌다.
+
+---
+
+## §11-1 교차검증 — 라운드 1 (초판)
+
+> 수행: architect, 2026-08-07 오전. **2회 호출**.
 > 1차: `cross_validate.sh architecture docs/decisions/20260807-971-required-status-checks.md` — outcome `applied` (exit 0) / `plan_bypass: false` / `rollback_failed: false` / `reminder_issue: none`. 로그: `.claude/logs/cross-validate-architecture-20260807-130621.log`
 > 2차: 1차가 전 항목 5/5 동의로 수렴해 반증 산출이 0이었다. `cross_validate.sh` 는 프롬프트가 고정이라 편향 셀프 체크 질문을 주입할 수 없으므로, 스킬 문서가 명시한 **직접 호출 경로** (`agy -p`, L1 strict prefix 수동 포함) 로 **반증 전용 프롬프트** 를 재호출했다. L3 등가 검증: 호출 전후 `git status --porcelain` 동일 (워킹트리 변경 0).
 
@@ -711,7 +1112,7 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 
 | # | 원안 | 수정안 | 수용 근거 |
 |---|---|---|---|
-| 1 | Phase 0→1→2 각 단계마다 release PR 1회 관찰 (릴리스 3주기) | **관찰 게이트를 Phase 2 앞에만** 배치. Phase 0 머지 직후 Phase 1 적용 | 위험이 균등하지 않다. cancelled 쌍둥이 6/6 은 **Phase 2 대상 3개에만** 관측됐고 Phase 1 후보 4개는 cancel 0 + 롤백 2초다. 관찰 비용을 위험이 있는 곳에만 지출하는 것이 옳다 (결정 1 표) |
+| 1 | Phase 0→1→2 각 단계마다 release PR 1회 관찰 (릴리스 3주기) | **관찰 게이트를 Phase 2 앞에만** 배치. Phase 0 머지 직후 Phase 1 적용 | 위험이 균등하지 않다. cancelled 쌍둥이 6/6 은 **Phase 2 대상 3개에만** 관측됐고 Phase 1 후보 4개는 cancel 0 + 롤백 2초다. 관찰 비용을 위험이 있는 곳에만 지출하는 것이 옳다 (결정 1 표). **⚠️ 2026-08-07 부분 정정** — *"릴리스 대기 없음"* 은 유지하되, 이 수용의 근거였던 `cancel 0` 이 event *type* 축을 커버하지 못함이 드러나 **릴리스와 무관한 게이트 `G2` 1회 (§8-P1-G) 를 추가**했다. 즉 "게이트 없음" 이 아니라 "릴리스 비의존 게이트" 다 |
 | 2 | 결정 5 논거 = "DELETE 한 줄이 탈출구" | **감사 궤적 논거 추가** — `false` 의 우회 머지는 무흔적, `true` + DELETE 는 기록이 남는다. 즉 `true` 는 탈출을 **관찰 가능하게** 만든다 | 같은 결론의 더 강한 근거. 단 개인 계정은 org audit log 가 아닌 security log 범위임을 calibration 으로 명시 |
 | 3 | 결정 5 의 토큰 전제 암묵 | **전제 명시 + §8 필수 사전 게이트** (`.permissions.admin == true`) + §10-5 재검토 조건 6 신설 | fine-grained PAT 로 `Administration` 이 빠지면 §9-R1 이 403 → **탈출구가 실제로 사라진다**. 원안은 현 토큰 상태에 암묵 의존하고 있었다 |
 | 4 | job 이름 변경 시 영구 `Expected` 위험에 대한 가드 없음 (§8-A3 의 `diff-scope-wasm` 존재 확인 1건뿐) | **결정 8 신설** — in-repo required 목록 선언 ↔ `.github/workflows/**` job 이름 정적 대조 가드, `project-guards` 배선 | 본 ADR 최대 수확. §3-2 의 "CI 는 admin 권한이 없어 검증 불가" 한계는 *보호 상태를 읽는* 방향에만 적용된다. **반대 방향은 YAML 만으로 검사 가능**하다는 것을 놓치고 있었다 — 결정 7 의 JSON 선언에 강제력을 부여한다 |

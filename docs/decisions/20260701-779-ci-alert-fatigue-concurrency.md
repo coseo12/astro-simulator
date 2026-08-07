@@ -435,9 +435,18 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 
 **남는 dedup 은 "같은 ref·같은 SHA 의 재트리거" 뿐이며, 그 빈도는 실측 0 이다.**
 
-#### A2-3 분류표 — `cancelled` 전수 분류 (2026-08-01 ~ 08-07, run 1,000건)
+#### A2-3 분류표 — `cancelled` 전수 분류 (**run 레벨**)
 
-`(headSha, workflow name)` 로 묶어 peer run 의 `event` / `head_branch` 가 갈리는 축으로 분류했다. `cancelled` 총 **72건**:
+> **단위 라벨 (2026-08-07 신설)**: 본 표의 건수는 전부 **run 레벨** (`gh run list` = workflow run) 이다. 아래 본문의 *"각 7건씩"* 은 **check-run (job) 레벨**이라 단위가 다르다. 두 단위는 같은 SHA 에서도 값이 다르다 — `c2732ae` 실측: **run 5 / job 7**. **required check 의 판정 단위는 job** 이므로, 정책 판정에는 job 레벨을, 취소 **원인 분류** (event / head_branch) 에는 run 레벨을 쓴다.
+>
+> **창 (window) 경계 박제** (ADR 971 §10-1 한계 10): `--limit N` 은 날짜 범위가 아니라 **개수 cap** 이라 창 시작 경계가 **측정 시각마다 이동한다**. 아래 두 표본은 재현 시각과 창을 명시한다.
+>
+> ```text
+> 측정 시각 2026-08-07T11:51Z  --limit 1000 → 창 2026-08-01T08:19:08Z ~ 2026-08-07T11:48:08Z (6.15일, 162.7 run/일)
+> 측정 시각 2026-08-07T11:54Z  --limit 2000 → 창 2026-07-18T13:03:48Z ~ 2026-08-07T11:48:08Z (19.95일, 100.3 run/일)
+> ```
+
+`(headSha, workflow name)` 로 묶어 peer run 의 `event` / `head_branch` 가 갈리는 축으로 분류했다. 6.15일 창의 `cancelled` 총 **72건 (run 레벨)**:
 
 | 클래스                                                | 건수     | 갈리는 축                                       | 대표 SHA                              | `github.ref` 삽입이 분리하는가          |
 | ----------------------------------------------------- | -------- | ----------------------------------------------- | ------------------------------------- | --------------------------------------- |
@@ -446,13 +455,33 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 | **B2** PR ↔ PR, 한 SHA 가 여러 PR 의 head            | 16       | `refs/pull/967/merge` vs `refs/pull/969/merge`  | `4f7366e` `995b8b5`                   | **예**                                  |
 | **C** 동일 ref 재트리거 (= 잔존 dedup)                | **0** | 없음 (동일 ref·동일 event)                      | —                                     | 아니오 — **유지되는 것이 이 클래스다** |
 
-**핵심 두 가지.** ① 관측된 `cancelled` **72/72 (100%)** 가 A/B1/B2 이며 전부 `github.ref` 삽입으로 분리된다. ② Phase 0 가 **보존**하는 C 클래스는 관측 window 내 **발화 0건**이다.
+**20일 확장 표본 (`--limit 2000`) 재확인** — 결론 불변:
+
+| 클래스 | 6.15일 창 (run 1,000) | 19.95일 창 (run 2,000) |
+| --- | --- | --- |
+| **A** push ↔ pull_request | 35 | 62 |
+| **B1** push ↔ push (ff-sync) | 21 | 40 |
+| **B2** PR ↔ PR | 16 | **16 (증가 0)** |
+| **C** 동일 ref 재트리거 | **0** | **0** |
+| 합계 | **72** | **118** |
+
+**핵심 세 가지.** ① 관측된 `cancelled` **72/72 · 118/118 (100%)** 가 A/B1/B2 이며 전부 `github.ref` 삽입으로 분리된다. ② Phase 0 가 **보존**하는 C 클래스는 두 창 모두 **발화 0건**이다. ③ **B2 는 단일 사건이다** (아래).
 
 **B2 는 본 Amendment 초안이 놓쳤던 클래스다.** `4f7366e` 는 세 PR (#967 `release/9.99.9-prep` / #968 `feat/962-guard-negative` / #969 `feature/962-branch-name-guard`) 의 head 였고, `pull_request` run 의 `github.ref` 는 `refs/pull/<번호>/merge` 라 PR 마다 다르다. 구 group 키에는 ref 가 없어 셋이 한 group 으로 붕괴해 서로를 취소했다. **push 이벤트가 0인 일상 PR 경로에서도 교차 취소가 발생한다는 직접 증거**이며, Phase 0 의 이득이 릴리스 경로에 국한되지 않음을 보인다.
 
-머지 시점 head SHA 층위에서도 C 클래스는 최근 머지 PR 25건 중 **0건**이다 (`base=main` 5건이 각 7건씩 보유하나 전부 A 클래스라 Phase 0 가 제거한다).
+> **B2 의 base rate — ∃ 주장은 유효하나 상시 현상은 아니다** (2026-08-07 신설). 20일 창의 B2 16건은 **전부 2026-08-06 하루**, **SHA 2개** (`4f7366e` 9건 + `995b8b5` 7건) 에서 나왔다 — #962 축 B 작업에서 한 커밋을 세 브랜치가 공유한 **단일 사건**이다. 창을 6일 → 20일로 넓혀도 B2 가 **16 → 16 (증가 0)** 인 것이 그 증거다.
+>
+> 따라서 정확한 서술은 두 방향 모두 필요하다: **(a)** *"교차 취소는 릴리스 경로에서만 일어난다"* 는 **거짓** — 일상 PR 경로에서 실제로 일어났다. **(b)** *"일상 PR 에서도 상시 일어난다"* 도 **거짓** — 한 SHA 가 여러 PR 의 head 가 되는 조건부이며 20일에 1회다. 한쪽만 쓰면 반대 방향으로 과장하게 된다.
+
+머지 시점 head SHA 층위에서도 C 클래스는 최근 머지 PR 25건 중 **0건**이다 (`base=main` 5건이 **각 7건씩** — 이 7 은 **check-run (job) 레벨**이다, 위 72 와 단위가 다름 — 보유하나 전부 A 클래스라 Phase 0 가 제거한다).
 
 **단 이 잔존분을 "보존한 이득" 으로만 읽으면 안 된다 (양면).** required check 체제에서 이것은 **Phase 0 이후 head SHA 위에 `cancelled` 를 남길 수 있는 유일한 잔여 경로** — 즉 Phase 0 가 없애려던 바로 그 조건의 잔재다. 실측 0건이라 현재 위험은 없지만 **"0 이므로 안전" 이 아니라 "0 인지 매번 확인" 이 옳은 자세**이며, 그 확인 절차가 §A2-6 재검토 조건 13 이다.
+
+> **⚠️ C=0 의 원인을 오독하지 말 것 — "재트리거가 드물어서" 가 아니다** (2026-08-07 신설, ADR 971 §2-12 실측 4).
+>
+> **동일 ref 재트리거 자체는 드물지 않다**: 같은 `(headSha, name, event, headBranch)` 가 2회 이상 등장한 group 이 **6.15일에 23개 / 50 run** (19.95일에 54개) 관측된다. 그럼에도 `cancelled` C 클래스가 0인 이유는 **그 재트리거를 겪는 워크플로에 concurrency 블록이 없어 취소가 일어나지 않았기 때문**이다 — 6일 창의 23 group 은 **전부 `PR Template Checklist Guard`** 이고, 이 워크플로는 concurrency 미보유다 (그 group 안 run 의 conclusion: `success` 48 / `failure` 2 / `cancelled` **0**).
+>
+> 이 사실은 §A2-6 조건 13 과 ADR 971 결정 9-2 의 *"concurrency 추가 금지"* 를 **원리 주장에서 실측 주장으로 격상**시킨다: 넣었다면 취소가 실제로 발생했을 것이다. **단 규모는 23 이 아니라 5 다** — `cancel-in-progress` 는 *진행 중인* run 만 취소하므로, 연속 쌍 27 중 시간이 겹치는 **5쌍**만 발화한다 (겹침 1~9초). 그리고 실제 관측된 불일치 사례 (`ee64871`) 는 run 간격이 10분 31초·12초라 **겹침 0 → concurrency 를 넣었어도 결과가 동일**하다. 상세는 ADR 971 결정 9-2.
 
 **§축 4 (알림 정책) 영향 0**: GitHub 메일은 conclusion=`failure` 에만 발송되고 `cancelled`·`success` 는 미발송이다. 취소가 완주로 바뀌어도 **성공 run 은 메일을 만들지 않는다** — "최종 실패만 메일" 은 유지된다.
 
@@ -506,18 +535,40 @@ branch-name            0건
 
 **Phase 1 착수 전 점검 항목**: Phase 1 은 *"Phase 0 머지 직후 — 릴리스 대기 없음"* 이라 **관찰 게이트가 없고**, 그 면제 근거는 *"release PR 6/6 에서 cancel 0 + 롤백 2초"* 였다. 그러나 ② 는 `cancelled` 가 아니라 `failure`+`success` 혼재이므로 **그 근거가 원리적으로 커버하지 못한다**. 따라서 `pr-template-checklist` 를 required 로 올리기 전에 위 `G2` 식을 **후보 SHA 에 직접** 1회 실행해 빈 출력을 확인해야 한다.
 
-> ⚠️ **해소책으로 `pr-template-checklist-guard.yml` 에 concurrency 를 추가하지 말 것.** `cancel-in-progress` 는 같은 head SHA 위에 `cancelled` 를 남기고, `cancelled` 는 GitHub 의 통과 3종에 없으므로 required check 하에서는 **더 나쁘다** (`{failure, success}` → `{cancelled, success}`). 진짜 대응은 Phase 1 구성 조정(해당 가드를 required 에서 제외하거나 `edited` 를 트리거에서 빼는 것)이며 이는 ADR 971 의 개정 범위다 — 본 Amendment 는 **사실 박제까지만** 한다.
+> ⚠️ **해소책으로 `pr-template-checklist-guard.yml` 에 concurrency 를 추가하지 말 것.** 근거가 두 겹이다. **1차** — 실제 관측된 사례에서 concurrency 는 **애초에 발화하지 않는다**: `ee64871` 의 세 run 은 간격 10분 31초 / 12초, 각 10~13초 완주라 **겹침이 0** 이다. `cancel-in-progress` 는 진행 중인 run 만 취소하므로 `{failure, failure, success}` 가 **한 글자도 바뀌지 않는다**. **2차** — 겹쳐서 발화하는 경우엔 같은 head SHA 위에 `cancelled` 를 남기고, `cancelled` 는 GitHub 의 통과 3종에 없으므로 required check 하에서 **더 나쁘다** (`{failure, success}` → `{cancelled, success}`). 어느 경로든 `G2` 는 계속 발화한다.
+>
+> **[2026-08-07 회수 완료]** 본 Amendment 는 *"사실 박제까지만"* 하고 결정을 ADR 971 로 넘겼다. 그 결정이 내려졌다 — **ADR [20260807-971](20260807-971-required-status-checks.md) 결정 9**: (9-1) `pr-template-checklist` 를 required 에서 **제외**, (9-2) 본 워크플로에 **concurrency 추가 금지** (위 2겹 근거), (9-3) `label-pr` 은 `edited` 부재라 **조건부 유지** + 재검토 트리거 신설. `edited` 트리거 제거안은 §10-3 후속 5 로 분리됐다 (복구 경로 비대칭과의 교환).
 
 ### A2-6 재검토 조건 (원 §재검토 1~4 / §A1 5~9 에 추가)
 
 10. **`github.ref` 삽입 후에도 릴리스 SHA 에 `cancelled` 잔존**: Phase 0 가 의도대로 동작하지 않은 것 — required check 도입 (ADR 971 Phase 2) 진입 금지. ADR 971 §8-P0 `G1` 이 게이트다.
     - **`G1` 발화 시 선분류 의무 (오차단 방지)**: `cancelled` 를 발견하면 즉시 Phase 0 실패로 판정하지 말고 **각 `cancelled` run 의 `event` 와 `head_branch` 를 먼저 분류**한다 (§A2-3 분류표 A / B1 / B2 / C). Phase 0 가 보존하기로 한 **C 클래스(동일 ref 재트리거)는 Phase 0 실패가 아니다** — 이 경우 `G1` 은 붉어져도 Phase 2 진입을 막지 않는다. A / B1 / B2 가 잔존할 때만 Phase 0 실패다.
+
+      **[1/2] 어떤 이름이 취소됐는가** (check-run = job 레벨. required 판정 단위와 동일):
       ```bash
-      gh api "repos/<owner>/<repo>/commits/<sha>/check-runs?per_page=100" \
+      gh api "repos/<owner>/<repo>/commits/<full-sha>/check-runs?per_page=100" \
         -q '.check_runs[]|select(.conclusion=="cancelled")|.name' | sort -u
-      gh run list --limit 200 --json headSha,event,headBranch,name,conclusion \
-        --jq '.[]|select(.headSha|startswith("<sha 앞 7자>"))|"\(.event)\t\(.headBranch)\t\(.name)\t\(.conclusion)"'
       ```
+
+      **[2/2] 그 취소가 어느 클래스인가** (run 레벨. `event` / `head_branch` 로 A/B1/B2/C 분류):
+      ```bash
+      gh api "repos/<owner>/<repo>/actions/runs?head_sha=<full-sha>&per_page=100" \
+        -q '.workflow_runs[]|"\(.event)\t\(.head_branch)\t\(.name)\t\(.conclusion)"'
+      ```
+
+      > ⚠️ **[2/2] 는 2026-08-07 에 `gh run list --limit 200` 에서 위 API 로 교체됐다** (PR [#978](https://github.com/coseo12/astro-simulator/pull/978) qa 발견). 근거·주의 3가지:
+      >
+      > 1. **옛 명령은 오통과 방향으로 틀렸다.** `--limit 200` 은 날짜 범위가 아니라 **개수 cap** 이고, 이 저장소의 run 생성률 (실측 100~163 run/일) 에서 **약 1.2~1.9일**만 덮는다. 조건 10 은 **릴리스 SHA** 판정 절차인데 릴리스는 월 수 회라, 며칠 지나 확인하면 **빈 출력**이 나온다 — 그리고 빈 출력은 *"cancelled 0"* 과 형태가 같아 **Phase 0 성공으로 오독**된다. 조건 10 이 막으려는 것의 정반대다.
+      > 2. **실측 (2026-08-07T11:53Z)**: `--limit 200` 이 덮은 창은 `2026-08-05T14:43:32Z ~ 2026-08-07T11:48:08Z` (1.88일). 같은 시각에 세 release PR 을 두 방식으로 조회한 결과 —
+      >    ```text
+      >    PR #974 merged 2026-08-06  c2732ae : run list  15건 | API 15건 (cancelled 5)
+      >    PR #965 merged 2026-08-05  370d1c6 : run list   0건 | API 15건 (cancelled 5)   ← 오통과
+      >    PR #956 merged 2026-08-04  5479837 : run list   0건 | API 15건 (cancelled 5)   ← 오통과
+      >    ```
+      >    창 안에 있는 `c2732ae` 에서는 두 방식이 **15건으로 완전 일치**한다 — 즉 교체는 동치성을 유지한 채 창 종속만 제거한다.
+      > 3. **`head_sha` 는 full SHA 필수.** 축약형 (`c2732ae`) 은 에러가 아니라 조용히 `total_count: 0` 을 반환해 **같은 오독을 재생산**한다. `SHA=$(gh pr view <PR> --json headRefOid -q .headRefOid)` 는 full SHA 를 주므로 그대로 쓰면 된다.
+      >
+      > 창 종속 조회가 불가피한 경우 (SHA 를 모르는 전수 분류) 는 여전히 `gh run list` 를 쓰되, **결론을 인용할 때 창 경계를 함께 인용**한다 (ADR 971 §10-1 한계 10).
 11. **릴리스 경로 2회 완주가 러너 비용/대기 문제로 부상**: 현재는 월 수 회 × ~13분이라 수용. 문제화되면 §5 (c) (push 트리거 제거) 를 **관측 손실을 감수하고** 재검토하거나, 릴리스 전용 경로만 분리한다. 임계 완화·가드 스킵은 여전히 금지.
 12. **required check 자체를 철회하는 경우**: 본 Amendment 의 범위 축소 근거가 소멸하므로 §결정 1 원안 (ref 미포함) 복원을 검토한다 — 단 복원은 자동이 아니라 **재측정 후 결정**이다 (그 사이 워크플로 구성이 바뀌었을 수 있다).
 13. **C 클래스(동일 ref 재트리거) 발화 관측**: 현재 실측 0건이나 (§A2-3 분류표) 0 이 구조적 보장은 아니다. PR reopen 등으로 C 가 관측되면 **그 SHA 가 required check 대상일 때만** 문제이며, 이때는 ① 해당 SHA 에 새 커밋을 얹어 head 를 넘기거나 ② 취소된 체크를 rerun 해 `cancelled` 를 덮는다. 상시 확인 지점은 위 조건 10 의 `G1` 선분류다.
