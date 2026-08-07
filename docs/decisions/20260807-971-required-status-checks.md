@@ -1,6 +1,6 @@
 # ADR: branch protection required status check 정책 — main 한정 단계적 도입, develop 은 required check 미채택 (#971)
 
-- **상태**: **Provisional** — 본 ADR 은 설계·근거만 확정한다. 저장소 설정은 **미변경**이며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 절차로 수행한다. Accepted 전이 조건은 §10-2.
+- **상태**: **Provisional** (cross-validate agy 2026-08-07 2회 반영 완료 — §11) — 교차검증은 통합했으나 **저장소 설정이 미변경**이라 Accepted 로 올리지 않는다. 본 ADR 은 설계·근거·절차만 확정하며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 로 수행한다. Accepted 전이 조건은 §10-2.
 - **날짜**: 2026-08-07
 - **결정자**: architect (실측 기반 설계). 적용 권한은 사용자
 - **관련**:
@@ -222,11 +222,13 @@ concurrency:
 
 `strict: false` (= "Require branches to be up to date before merging" **미사용**) 고정. `strict: true` 는 release PR 머지 직전마다 develop 이 main tip 을 포함할 것을 요구해 릴리스 직후 상태와 순환 교착을 만든다.
 
-| 단계 | 추가 컨텍스트 | 누적 대기 | 근거 |
-|---|---|---|---|
-| **Phase 1** | `project-guards`, `branch-name`, `pr-template-checklist`, `label-pr` | ~10s | 전부 클래스 B/C, path 필터 0, release PR 6/6 에서 cancel 0. 실패 시 원인이 즉시 자명 |
-| **Phase 2** | `diff-scope`, `diff-scope-wasm`, `detect-and-test` | ~13분 | §2-4 의 `needs` 스킵 구멍을 닫으려면 `diff-scope` 계열이 필수. Phase 0 의 리네임 (§결정 6) 이 전제 |
-| **Phase 3** (선택) | `verify-and-rust`, `long-integration-rust`, `duplicate-function-guard` | ~13분 (병렬) | job 단위 `if` 로 코드 무변경 PR 에서는 `skipped` = 통과. Phase 2 관찰 후 판단 |
+| 단계 | 추가 컨텍스트 | 누적 대기 | 진입 게이트 | 근거 |
+|---|---|---|---|---|
+| **Phase 1** | `project-guards`, `branch-name`, `pr-template-checklist`, `label-pr` | ~10s | **Phase 0 머지 직후 — 릴리스 대기 없음** | 전부 클래스 B/C, path 필터 0, release PR 6/6 에서 cancel 0. 실패 시 원인이 즉시 자명하고 롤백이 2초 |
+| **Phase 2** | `diff-scope`, `diff-scope-wasm`, `detect-and-test` | ~13분 | **release PR 1회 관찰 통과 후** | §2-4 의 `needs` 스킵 구멍을 닫으려면 `diff-scope` 계열이 필수. 이 3개가 정확히 cancelled 쌍둥이 6/6 을 갖던 대상이라 관찰 게이트를 여기에 집중한다 |
+| **Phase 3** (선택) | `verify-and-rust`, `long-integration-rust`, `duplicate-function-guard` | ~13분 (병렬) | release PR 1회 관찰 통과 후 | job 단위 `if` 로 코드 무변경 PR 에서는 `skipped` = 통과. Phase 2 관찰 후 판단 |
+
+> **관찰 게이트를 Phase 2 앞에만 두는 이유** (cross-validate 이견 수용, §11): 원안은 Phase 0→1 사이에도 release PR 1회 관찰을 요구해 도입에 릴리스 3주기가 필요했다. 그러나 위험은 **cancelled 쌍둥이를 실제로 갖던 무거운 3개** 에 집중돼 있고 (§2-6), Phase 1 후보 4개는 cancel 0 + 롤백 2초다. 관찰 비용을 위험이 있는 곳에만 지출한다.
 
 **required 절대 금지 목록** (ADR 로 박제 — 미래에 "왜 안 넣었지?" 재발 방지):
 `a11y-baseline-guard` / `measure` / `retry-fresh-runner` / `verify` (shader-pixel) / `bench` — **workflow 단위 path 필터** 보유 (docs-only PR 에서 영구 pending).
@@ -262,6 +264,10 @@ develop 에 required check 를 도입하지 않고 (결정 2) 봇 PR 은 main �
 
 반대로 `false` 로 낮추면 "빨간 체크인 채로 실수 머지" 라는 **새로운 사고 클래스**가 열린다. 이 저장소는 자기 자신을 머지하는 1인 환경이라 그 실수를 잡아 줄 관찰자가 없다 — `enforce_admins: true` 야말로 유일한 관찰자다.
 
+**추가 논거 (cross-validate 이견 수용, §11)**: 두 선택지는 "우회 가능 여부" 가 아니라 **흔적이 남는가**에서 갈린다. `enforce_admins: false` 의 우회 머지는 아무 기록도 남기지 않는 반면, `true` 를 유지한 채 §8-R1 로 규칙을 걷어내면 보호 규칙 변경이 **계정 보안 로그와 API 상태에 남는다**. 즉 `true` 유지는 탈출구를 없애는 게 아니라 **탈출을 관찰 가능하게 만든다**. (Organization 수준 audit log 만큼 상세하지는 않다 — 개인 계정은 security log 범위다.)
+
+**전제 (성립 조건)**: 본 결정은 **작업 토큰이 해당 저장소의 admin 권한을 갖는다**는 사실에 의존한다. fine-grained PAT 로 전환해 `Administration` 권한이 빠지면 §8-R1 이 `403` 으로 실패하고 **탈출구가 실제로 사라진다**. 따라서 §8 의 사전 확인 1줄 (`.permissions.admin == true`) 은 선택이 아니라 **적용 전 필수 게이트**이며, 토큰 정책 변경은 §10-5 재검토 조건 6 에 걸어 둔다.
+
 **단 조건부 결정이다**: 탈출구가 문서화되지 않으면 존재하지 않는 것과 같다. §8-R1/R2/R3 롤백 명령 원문을 본 ADR 과 이슈 #971 코멘트 양쪽에 박제하고, 릴리스 런북 (`docs/guides/branch-strategy-workflow.md`) 에서 링크하는 것을 Phase 1 의 산출물로 고정한다.
 
 ### 결정 6 — Phase 0 (코드 선행 작업, 설정 변경 0)
@@ -274,7 +280,7 @@ develop 에 required check 를 도입하지 않고 (결정 2) 봇 PR 은 main �
 | 6-4 | `docs/ops/operational-friction.md` §4 에 "required check 하에서는 코스메틱 전제가 무효" 경계 박제 | 동 문서 | 결정 3 후단 |
 | 6-5 | [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) 에 Amendment 추가 — §재검토 조건 2 의 "ref 가 달라 별도 group" 가정을 실측으로 정정 + 본 ADR 역링크 | 동 ADR | §2-10. 사실 오류를 원 ADR 에 남겨 두면 다음 회수자가 같은 오판을 반복한다 |
 
-Phase 0 은 일반 dev PR (base=develop) 이며 저장소 설정을 만지지 않는다. **Phase 0 머지 후 release PR 1건에서 cancelled 0 을 실측한 뒤** Phase 1 로 진행한다.
+Phase 0 은 일반 dev PR (base=develop) 이며 저장소 설정을 만지지 않는다. **머지 직후 Phase 1 로 진행한다** (release PR 대기 없음 — 결정 1 의 관찰 게이트 표 참조). Phase 0 의 효과 실측 (release PR 에서 cancelled 0) 은 **Phase 2 의 진입 게이트**다.
 
 ### 결정 7 — 선언적 관리: repo 내 JSON + 스크립트 (§3-2 (b))
 
@@ -282,6 +288,19 @@ Phase 0 은 일반 dev PR (base=develop) 이며 저장소 설정을 만지지 �
 - 적용: `scripts/apply-branch-protection.sh <branch> [--dry-run]`
 - 드리프트 검사: `scripts/verify-branch-protection.sh` — **로컬/메인 전용** (§3-2 한계). CI 배선 안 함.
 - 구현은 developer 후속 (§10-3 후속 2). Phase 1/2 는 §8 의 heredoc 명령으로 선행 가능하다 — 스크립트 부재가 정책 도입을 막지 않도록 순서를 분리한다.
+
+### 결정 8 — required 컨텍스트 이름의 정적 가드 (신설, cross-validate 이견 수용)
+
+required 목록은 **job 이름 문자열**로 저장되므로, 훗날 누군가 `.github/workflows/**` 의 job 이름을 바꾸면 GitHub 은 사라진 옛 이름을 **영구 `Expected`** 로 기다린다. 보호 설정과 워크플로가 서로를 모르는 채 drift 하는 구조다.
+
+이 구멍은 **admin 권한 없이 CI 에서 닫을 수 있다**. §3-2 의 한계는 "보호 상태를 *읽는* 것" 에 관한 것이고, 반대 방향 — **repo 안의 required 목록 선언이 실재하는 job 이름과 일치하는가** — 는 워크플로 YAML 만으로 검사 가능하기 때문이다.
+
+- SSoT: `.github/branch-protection/main.json` (결정 7) 의 `required_status_checks.checks[].context` 배열.
+- 가드: 각 context 가 `.github/workflows/**` 의 job id 또는 job `name:` 으로 **실재**하는지 대조. 불일치 시 exit 1.
+- 배선: `project-guards` 워크플로 (path 필터 0 — 자기 자신이 required 후보라 항상 돈다).
+- fail-fast — fallback 분기 금지 (CLAUDE.md §가드 설계 원칙). 파일 부재는 "배포 시나리오" 가 아니라 가드 삭제 회귀다.
+
+이 가드가 있어야 결정 7 의 JSON 선언이 장식이 아니라 **강제력**을 갖는다. 구현은 §10-3 후속 2 에 포함.
 
 ---
 
@@ -302,7 +321,11 @@ Phase 0 은 일반 dev PR (base=develop) 이며 저장소 설정을 만지지 �
 ## §8 적용 절차 (사용자 승인 후 메인이 실행)
 
 > 전부 복붙 가능한 원문. **`REPO` 를 한 번만 export** 하고 나머지는 그대로 붙여 넣는다.
-> 사전 확인 1줄: `gh api repos/coseo12/astro-simulator -q .permissions` → `"admin": true` 여야 한다.
+>
+> **필수 사전 게이트 (결정 5 의 성립 조건)** — `true` 가 아니면 **어떤 단계도 적용하지 않는다**. admin 권한 없이 required check 를 켜면 §9 롤백이 `403` 으로 실패해 탈출구가 사라진다.
+> ```bash
+> gh api repos/coseo12/astro-simulator -q '.permissions.admin'   # 기대: true
+> ```
 
 ```bash
 export REPO=coseo12/astro-simulator
@@ -310,7 +333,9 @@ export REPO=coseo12/astro-simulator
 
 ### P0 — Phase 0 (코드 PR. 설정 변경 없음)
 
-developer 디스패치. 결정 6 의 6-1~6-4. 머지 후 **다음 release PR 1건에서 아래가 빈 출력**이어야 Phase 1 진행:
+developer 디스패치. 결정 6 의 6-1~6-5. 머지 후 **바로 A1 로 진행**한다.
+
+아래는 **Phase 2 (A3) 의 진입 게이트**다 — 다음 release PR 1건에서 빈 출력이어야 한다:
 
 ```bash
 # release PR head SHA 에 cancelled 체크런이 하나도 없어야 한다
@@ -457,7 +482,11 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 2. **`develop` 직접 push 는 기계적으로 막히지 않는다** — 산문 규약과 기계 강제 사이의 격차가 남는다 (결정 2). ff-sync 를 지키기 위한 의도적 선택이다.
 3. **동명 체크런 해석은 여전히 미검증** — Phase 0 이 그 조건을 소멸시켜 회피하는 것이지, 규칙을 알아낸 것이 아니다. GitHub 이 향후 concurrency 외의 경로로 동명 체크런을 만들면 재발할 수 있다.
 4. **`branch-name` 의 소급 근거는 `n=1`** (#974) — release PR 에서의 보고 안정성 표본이 1건이다.
-5. **보호 상태 드리프트를 CI 가 감시하지 못한다** — 사람이 스크립트를 돌려야 한다 (§3-2).
+5. **보호 상태 드리프트를 CI 가 감시하지 못한다** — 사람이 스크립트를 돌려야 한다 (§3-2). 반대 방향 (선언 ↔ job 이름 실재) 은 결정 8 이 CI 로 닫는다. 실행 절차는 §10-3 후속 2 에서 릴리스 런북 체크리스트로 편입한다 (cross-validate 보완 제안 ① 수용).
+6. **가드가 없던 시절 열린 PR 을 reopen 하면 영구 pending 이 될 수 있다** — `branch-name` 은 `types: [opened, synchronize]` 라 reopen 으로 재실행되지 않는다 (#962 ADR §5-2 의 **의도된** 설계). 현재 열린 PR 이 0건이라 노출은 없으나, 장수 PR 이 생기면 해당된다. **완화**: 빈 커밋 1개 push (`git commit --allow-empty` → `synchronize` 발화) 또는 Actions UI 재실행. required check 를 켠 뒤에는 이 절차를 알고 있어야 한다.
+7. **GitHub Actions 장애 시 릴리스가 멈춘다** — 체크가 보고되지 않으면 required 는 pending 이다. 대응은 §9-R1 (2초) 후 릴리스 완주.
+8. **fork PR 이 `main` 을 대상으로 하면 차단된다** — `label-pr` 은 `pull-requests: write` 가 필요한데 fork PR 의 `GITHUB_TOKEN` 은 read-only 라 실패한다. 단 **본 정책의 영향은 0** 이다: fork PR 은 `develop` 을 대상으로 하고 develop 에는 required check 가 없다 (결정 2). `main` 은 release/hotfix 전용이라 fork PR 이 도달할 경로가 정책상 존재하지 않으며, 도달한다면 차단이 옳은 동작이다.
+9. **hotfix 경로는 실측 표본이 0건이다** — 정적으로는 통과한다 (`hotfix` 는 `branch-name` 허용 type, base=main 이라 클래스 B/C 전부 트리거). 그러나 소급 대조에 쓸 실제 hotfix PR 이 없다 → §10-4 단계 4 에서 확인.
 
 ### 10-2 Accepted 전이 조건
 
@@ -471,8 +500,9 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 ### 10-3 후속 이슈 (분리 필요 — 본 ADR 범위 밖)
 
 1. **클래스 A 가드의 required 화 경로** — `paths-ignore` (workflow 단위) 를 `dorny/paths-filter` 등 job 단위 게이트로 전환하면 스킵이 `skipped` = 통과로 보고돼 required 화가 가능해진다. 다만 이는 5개 워크플로의 트리거 재설계라 별건.
-2. **선언적 관리 구현** — `.github/branch-protection/*.json` + `apply`/`verify` 스크립트 2종 (결정 7).
+2. **선언적 관리 구현 + 이름 정적 가드** — `.github/branch-protection/*.json` + `apply`/`verify` 스크립트 2종 (결정 7) + **결정 8 의 context↔job 이름 대조 가드** (`project-guards` 배선). 릴리스 런북 (`docs/guides/branch-strategy-workflow.md`) 에 `verify` 수동 실행 체크리스트 항목 추가 포함.
 3. **봇 PR base 정책** — 봇 PR 을 develop 대상으로 되돌릴 필요가 생기면 `GITHUB_TOKEN` 워크플로 트리거를 먼저 실증 (결정 4).
+4. **작업 토큰 권한 분리 검토** (cross-validate 고유 발견) — 일상 에이전트 토큰에서 `Administration` 권한을 제거하고 비상용 admin 토큰을 분리하면 보호의 실효 강제력이 오른다. 단 §9 롤백이 "토큰 교체" 를 거치게 되어 **탈출 경로가 2초에서 수 분으로 늘어난다** — 강제력 ↔ 복구 속도의 정면 교환이라 별도 결정이 필요하다. 본 ADR 은 현 토큰 상태를 전제로만 유효하다 (§10-5 재검토 조건 6).
 
 ### 10-4 릴리스 리허설 계획 — "오차단 0" 판정 기준
 
@@ -530,6 +560,16 @@ gh pr view <PR> --json mergeable,mergeStateStatus,statusCheckRollup \
 - release PR 에서 `cancelled` 체크런 0.
 - ff-sync `git push origin main:develop` 가 거부 없이 완료.
 
+**단계 4 — hotfix 경로 정적 확인 (§10-1 한계 9)**
+hotfix PR 은 실측 표본이 0건이다. Phase 1 적용 후 **hotfix 가 실제로 필요해지는 시점 이전에** 아래로 확인한다 — 긴급 상황에서 처음 마주치면 안 된다.
+
+```bash
+node scripts/verify-branch-name.mjs --branch hotfix/999-probe    # 기대: 통과 (허용 type)
+# 클래스 B/C 워크플로가 base=main PR 에서 트리거되는지: on.pull_request.branches 에 main 포함 확인
+grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-template-checklist-guard.yml \
+  .github/workflows/project-guards.yml .github/workflows/ci.yml | grep -c "main"
+```
+
 **미달 시**: 즉시 §9-R1 실행 → 릴리스 완주 → 원인 분석 후 재설계. **릴리스를 인질로 잡고 디버깅하지 않는다.**
 
 ### 10-5 재검토 조건
@@ -539,9 +579,59 @@ gh pr view <PR> --json mergeable,mergeStateStatus,statusCheckRollup \
 3. GitHub 이 동명 체크런 해석 규칙을 문서화 → §2-8 의 회피 구조 재검토.
 4. 저장소가 organization 소유로 이전 → ruleset `enforcement: evaluate` 사용 가능해지므로 §3-3 기각 재검토.
 5. 봇 PR 의 base 가 develop 으로 환원 → 결정 4 재검토.
+6. **작업 토큰이 저장소 admin 권한을 잃음** (fine-grained PAT 전환 등) → 결정 5 의 전제가 깨지므로 **required check 를 즉시 §9-R1 로 내리고** 재설계. 판정 1줄: `gh api repos/coseo12/astro-simulator -q '.permissions.admin'`.
+7. 저장소가 organization 으로 이전 → classic `restrictions` (push allowance) 가 사용 가능해져 §11 기각-5 의 전제가 바뀐다. develop 직접 push 의 기계적 강제가 릴리스 의례를 깨지 않고 가능해지므로 결정 2 재검토.
 
 ---
 
 ## §11 교차검증 반영 사항
 
-> (cross-validate 수행 후 본 섹션을 채운다)
+> 수행: architect, 2026-08-07. **2회 호출**.
+> 1차: `cross_validate.sh architecture docs/decisions/20260807-971-required-status-checks.md` — outcome `applied` (exit 0) / `plan_bypass: false` / `rollback_failed: false` / `reminder_issue: none`. 로그: `.claude/logs/cross-validate-architecture-20260807-130621.log`
+> 2차: 1차가 전 항목 5/5 동의로 수렴해 반증 산출이 0이었다. `cross_validate.sh` 는 프롬프트가 고정이라 편향 셀프 체크 질문을 주입할 수 없으므로, 스킬 문서가 명시한 **직접 호출 경로** (`agy -p`, L1 strict prefix 수동 포함) 로 **반증 전용 프롬프트** 를 재호출했다. L3 등가 검증: 호출 전후 `git status --porcelain` 동일 (워킹트리 변경 0).
+
+### 합의
+
+외부 모델이 독립적으로 지지 — 추가 변경 없음.
+
+1. **클래스 A required 금지** — workflow 단위 path 스킵이 영구 pending 을 만든다는 §2-3 판정.
+2. **Phase 0 (`github.ref` 추가)** — 교차 취소의 구조적 원인 규명과 해법.
+3. **`develop` required check 미채택** — fast-forward 릴리스 전략과의 호환이 상위라는 §4 판정.
+4. **Rulesets 기각** — User 소유라 `evaluate` 미지원 + bypass actor 무력화.
+5. **Probot Settings App 기각** — 서드파티 `administration: write` 상시 부여 회피.
+6. **`app_id: 15368` 명시** — 외부 앱의 동명 체크런 주입 차단.
+
+### 이견 수용
+
+| # | 원안 | 수정안 | 수용 근거 |
+|---|---|---|---|
+| 1 | Phase 0→1→2 각 단계마다 release PR 1회 관찰 (릴리스 3주기) | **관찰 게이트를 Phase 2 앞에만** 배치. Phase 0 머지 직후 Phase 1 적용 | 위험이 균등하지 않다. cancelled 쌍둥이 6/6 은 **Phase 2 대상 3개에만** 관측됐고 Phase 1 후보 4개는 cancel 0 + 롤백 2초다. 관찰 비용을 위험이 있는 곳에만 지출하는 것이 옳다 (결정 1 표) |
+| 2 | 결정 5 논거 = "DELETE 한 줄이 탈출구" | **감사 궤적 논거 추가** — `false` 의 우회 머지는 무흔적, `true` + DELETE 는 기록이 남는다. 즉 `true` 는 탈출을 **관찰 가능하게** 만든다 | 같은 결론의 더 강한 근거. 단 개인 계정은 org audit log 가 아닌 security log 범위임을 calibration 으로 명시 |
+| 3 | 결정 5 의 토큰 전제 암묵 | **전제 명시 + §8 필수 사전 게이트** (`.permissions.admin == true`) + §10-5 재검토 조건 6 신설 | fine-grained PAT 로 `Administration` 이 빠지면 §9-R1 이 403 → **탈출구가 실제로 사라진다**. 원안은 현 토큰 상태에 암묵 의존하고 있었다 |
+| 4 | job 이름 변경 시 영구 `Expected` 위험에 대한 가드 없음 (§8-A3 의 `diff-scope-wasm` 존재 확인 1건뿐) | **결정 8 신설** — in-repo required 목록 선언 ↔ `.github/workflows/**` job 이름 정적 대조 가드, `project-guards` 배선 | 본 ADR 최대 수확. §3-2 의 "CI 는 admin 권한이 없어 검증 불가" 한계는 *보호 상태를 읽는* 방향에만 적용된다. **반대 방향은 YAML 만으로 검사 가능**하다는 것을 놓치고 있었다 — 결정 7 의 JSON 선언에 강제력을 부여한다 |
+| 5 | reopen/draft·GHA 장애·fork PR·hotfix 경로 미기술 | **§10-1 한계 6~9 신설** + §10-4 단계 4 (hotfix 정적 확인) | 각각 실재하는 경로다. 특히 한계 6 (reopen 시 `branch-name` 미재실행 → 영구 pending) 은 #962 §5-2 의 **의도된** 설계와 required check 가 충돌하는 지점이라 완화 절차 (빈 커밋) 를 알고 있어야 한다 |
+
+### Claude 재분석으로 기각한 외부 모델 제안
+
+| # | 제안 | 기각 근거 |
+|---|---|---|
+| 1 | "과거 release PR 의 check-runs 를 정적 조회하면 100% 검증되므로 **Phase 0/1/2 를 단일 적용으로 통합**하라" | 과거 데이터가 증명하는 것은 **컨텍스트의 존재**뿐이다. 미지수는 "cancelled 쌍둥이가 있을 때 GitHub 이 required 를 어떻게 판정하는가" 이고, **required check 가 없던 시절의 데이터로는 원리적으로 알 수 없다** (§2-8). Phase 2 앞 관찰 게이트는 유지 — 부분 수용에 그친다 |
+| 2 | "`branch-name` 이 release PR 의 head=`develop` 에서 실패·스킵할 수 있다" | **실측 반증.** #974 (head=develop) 에서 `branch-name` = `success`. 정본 상수 `GITFLOW_HEADS = ['develop', 'main']` 이 허용 집합 1행이다. 외부 모델이 문서만 보고 추정한 오류 |
+| 3 | "모든 PR 워크플로의 `types` 에 `[opened, synchronize, reopened, ready_for_review]` 를 필수 명시하라" | **#962 ADR §5-2 를 되돌리는 제안.** `reopened` 제외는 실수가 아니라 "과거 PR reopen 이라는 유일한 잔여 노출을 닫는" 명시적 결정이었다. 무비판 수용 시 그 구멍이 재개방된다. 잔여 위험 (한계 6) 은 가드를 약화하는 대신 **완화 절차 박제**로 처리 |
+| 4 | "required 대상 워크플로에서 workflow 단위 `paths`/`paths-ignore` 를 전면 제거하라" | 방향은 옳으나 **본 ADR 범위 밖**이다. 이미 §10-3 후속 1 로 분리돼 있다 (5개 워크플로 트리거 재설계). 정책 도입 PR 에 끼워 넣으면 오차단 원인 분리가 불가능해진다 |
+| 5 | "**`develop` 에 push allowance (직접 push 제한) 를 걸고 릴리스 주체만 bypass 로 등록**하면 의례 변경 없이 100% 기계적 강제가 가능하다 — 설계안의 '강제 0' 주장은 허위 대립이다" | **두 축 모두 본 저장소에서 불성립.** (a) classic branch protection 의 `restrictions` (push allowance) 는 **organization 소유 저장소 전용**이다 (GitHub Docs). 본 저장소는 `owner.type: User` — 현재 보호 응답에 `restrictions` 키가 아예 없는 것과 정합한다. (b) rulesets 로 우회하려 해도 지정 가능한 bypass actor 는 사실상 repository admin = **사용자 본인 = 에이전트가 쓰는 동일 토큰**이라, 릴리스 스크립트와 일상 push 를 구분할 신원이 존재하지 않는다 (§3-3 결함 2). 별도 릴리스 봇 신원을 만들면 성립하나 그것은 §10-3 후속 4 의 토큰 분리 결정에 종속된다. 다만 지적 자체는 **조건부로 옳으므로** §10-5 재검토 조건 7 (org 이전 시) 로 박제 |
+| 6 | "fork PR 이 secret 부재로 실패해 릴리스가 블록된다" | fork PR 은 `develop` 을 대상으로 하고 **develop 에는 required check 가 없다** (결정 2). `main` 은 release/hotfix 전용이라 fork PR 이 도달할 정책 경로가 없다. 영향 0 — 근거는 §10-1 한계 8 에 명시 |
+
+### 고유 발견 (후속 분리)
+
+1. **작업 토큰 권한 분리** — 일상 에이전트 토큰에서 `Administration` 을 제거하고 비상용 admin 토큰을 분리. 강제력은 오르지만 §9 롤백이 2초 → 수 분으로 늘어나는 **정면 교환**이라 별도 결정이 필요하다 → §10-3 후속 4.
+2. **릴리스 런북에 보호 상태 수동 검증 체크리스트** (1차 호출 보완 제안 ①) → §10-3 후속 2 에 편입.
+
+### 호출 전 Claude 편향 셀프 체크 (architect, 2026-08-07)
+
+| 축 | 판정 | 조치 |
+|---|---|---|
+| 낙관적 일정 | **미통과** — 3단계 × release 주기 = 3주 소요를 ADR 이 정량화하지 않았다 | 2차 호출 Q1 로 명시 질문 삽입 → 이견 수용 1 (관찰 게이트 1개 제거) |
+| 결합 간과 | **미통과** — 선행 ADR 20260701-779 (concurrency) 와의 결합을 초안 작성 후 자체 점검에서야 발견 | §2-10 신설 + 2차 호출 Q4 로 잔여 결합 질문 → 이견 수용 4·5 |
+| 폐기 프레이밍 | 통과 — rulesets / settings.yml 기각이 전부 문서·실측 근거 기반이며, 외부 반박 (Q5) 도 문서로 재검증 후 기각 | — |
+| 순수주의 | **미통과** — "가정에 의존 금지" 를 이유로 Phase 0 를 release 관찰 게이트로 승격한 것이 과잉일 가능성 | 2차 호출 Q2 로 명시 질문 삽입 → Phase 0 는 선행 유지하되 **release 대기 게이트에서 같은 세션 선행으로 완화** |
