@@ -426,6 +426,7 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 | 같은 ref · 같은 sha 재트리거 | 취소 (dedup) | **유지 (불변)** |
 | 같은 sha · push ↔ PR (release PR 생성 시점) | 취소 | **취소 안 함 — 양쪽 완주** |
 | 같은 sha · develop ↔ main (ff-sync) | 취소 | **취소 안 함 — 양쪽 완주** |
+| 같은 sha · PR ↔ PR (한 sha 가 여러 PR 의 head) | 취소 | **취소 안 함 — 각자 완주** |
 | 다른 sha (새 커밋 push) | 취소 안 함 | 취소 안 함 (불변) |
 
 **왜 축소가 정당한가**: §결정 1 의 CRITICAL 은 *"concurrency cancel = 중복 제거, 가드 약화 아님"* 이었고 이는 **사람이 판정하는 한 여전히 참**이다. 그러나 required status check 를 켜는 순간 **판정 주체가 GitHub 으로 바뀌고**, GitHub 이 통과로 인정하는 결론은 `success` / `skipped` / `neutral` **3종뿐**이다 — `cancelled` 는 여기 없다. 즉 종전에는 코스메틱이던 취소가 **머지 하드 블록**이 된다. 그리고 그 취소는 release PR **6/6 전건**에서 재현되므로 확률적 위험이 아니라 확정 사고다.
