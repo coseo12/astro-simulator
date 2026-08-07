@@ -2,6 +2,7 @@
 
 - 상태: **Accepted** (cross-validate 2026-07-01 — agy, §교차검증 반영 사항 4축 박제 완료. group 식은 sha 유지 + Phase 1 branch-cross 가드 브랜치 무관성 실측 의무)
   - **§Amendment 1 (Phase 2/3 구체 설계): Accepted** (cross-validate 2026-07-04 — agy, §A1 교차검증 반영 사항 통합)
+  - **§Amendment 2 (재검토 조건 1·2 회수 + 결정 1 적용 범위 축소): Accepted (파생)** — 결정 실체는 ADR [20260807-971-required-status-checks](20260807-971-required-status-checks.md) 이며 그 ADR 이 cross-validate 2회 + reviewer 1회를 통과했다. 본 Amendment 는 **신규 결정을 만들지 않고** 그 실측·범위 변경을 선행 ADR 쪽에 회수 박제하는 것이라 별도 cross-validate 를 발동하지 않는다. (단 ADR 971 자체는 저장소 설정 미적용 상태라 **Provisional** 이다 — 본 Amendment 가 기술하는 concurrency 코드 변경만 #971 Phase 0 로 적용됐다.)
 - 날짜: 2026-07-01
 - 이슈: [#779](https://github.com/coseo12/astro-simulator/issues/779)
 - 관련: #766 (alert fatigue 개념 — Z 패턴 health), #728 (step retry vs job rerun), #709 (fps retry 도입), #626 (paths-ignore docs skip), ADR [20260421-workflows-responsibility-split](https://github.com/coseo12/harness-setting/blob/main/docs/decisions/20260421-workflows-responsibility-split.md) (frozen vs user-owned 경계)
@@ -220,7 +221,9 @@ developer 가 run history 로 flake 이력 실측 → flake-prone 가드(verify:
 ### 재검토 조건
 
 1. **branch protection 도입 시**: required status check 가 생기면 concurrency cancel 이 required check 를 cancelled 로 만들어 PR 머지를 막을 수 있다. 그 시점에 **required check 를 PR 트리거에만 연결** + cancelled→재실행 또는 cancel-in-progress 를 PR 에 한정하는 재설계 필요. (현재는 protection 부재로 무관)
+   → **발동 (2026-08-07, [#971](https://github.com/coseo12/astro-simulator/issues/971))**: 예고대로 발동했고 여기 적힌 두 제안은 실측 후 **둘 다 기각**됐다 (`cancel-in-progress` 를 PR 한정 = 무효, cancelled 자동 재실행 = 증상 되돌리기). 채택된 것은 세 번째 경로인 **group 키에 `github.ref` 추가**다. §Amendment 2 참조.
 2. **concurrency 가 release ff-sync 의 develop/main branch-cross 중복을 못 잡는 경우**: group 식이 sha 기준이라 같은 sha 가 develop+main 양쪽 push 시 group 값은 같으나 **ref 가 달라** 별도 group 으로 동작할 수 있음 — Phase 1 실측에서 branch-cross 중복 잔존 시 group 에 ref 미포함 확인 또는 별건 분리.
+   → **해소 (2026-08-07, [#971](https://github.com/coseo12/astro-simulator/issues/971))**: 여기 남긴 진단 지시 ("group 에 ref 미포함 확인") 를 그대로 수행한 결과 **가설은 반증됐다** — ref 는 별도 group 을 만들지 않으며, branch-cross 중복은 "못 잡은" 게 아니라 **잡되 유해한 방향으로** 잡고 있었다. §Amendment 2 참조.
 3. **Phase 1 후에도 flake 메일 잔존**: Phase 2 착수 트리거.
 4. **retry 가 진짜 회귀를 2회 다 통과시키는 경우 발견**: 즉시 §fail-fast 위반 — retry 제거 + 가드 결정성 복원.
 
@@ -384,3 +387,69 @@ GitHub 메일 = conclusion=`failure` 만 발송. Phase 2 (flake 시 step retry �
 **고유 발견 (수용)**: (1) **escalation 흡수 이력 관찰 가능성** — 2차 job 성공 (= flake 흡수) 시 `$GITHUB_STEP_SUMMARY` 에 "A-fail→B-pass 흡수" 기록 의무 (경계 회귀 — 2차 머신 성능 편차로 우연 통과 — 추적용. 100% 포착 원칙의 수용된 트레이드오프를 가시화). (2) **gatekeeper job** — 재검토 조건 9 로 박제 (현재 branch protection 부재라 즉시 구현은 YAGNI).
 
 **이견 (기각)**: composite action 즉시 추출 (Phase 3 병합 동시) — 재검토 조건 7 의 "첫 drift 발견 시 착수" 유지. 근거: 워크플로 구조 변경 PR 은 검증 창이 좁아 (2단계 함정) 변경 표면 최소화가 우선, 동기 주석 마커 + reviewer 대조가 1차 방어. **기각 (조치 불요)**: 공통 인프라 실패 (레지스트리 다운 등) 시 양 job fail → 메일 발송은 정당한 알림 (구제 대상 아님). escalation 경로의 스케줄링 지연은 실패 경로 한정 트레이드오프.
+
+---
+
+## Amendment 2 (2026-08-07) — 재검토 조건 1·2 회수 + 결정 1 의 적용 범위 축소 (상태: Accepted (파생))
+
+> **회수 트리거**: [#971](https://github.com/coseo12/astro-simulator/issues/971) branch protection required status check 도입 설계. 본 ADR 이 §재검토 조건 1 로 예고한 바로 그 시점이다.
+> **결정 실체**: ADR [20260807-971-required-status-checks](20260807-971-required-status-checks.md) §2-7 / §2-10 / §5 (b) / 결정 3. 본 Amendment 는 그 결과를 **선행 ADR 쪽에 회수 박제**하는 것이며 신규 결정을 만들지 않는다.
+> **코드 적용**: #971 Phase 0 (결정 6-1) — 7개 워크플로의 concurrency 그룹 키에 `${{ github.ref }}` 삽입.
+
+### A2-1 프레이밍 — "사실 오류의 정정" 이 아니라 "예고된 가설의 실측 해소"
+
+본 ADR 의 §재검토 조건 2 는 단정이 아니었다. 원문은 hedge (*"별도 group 으로 동작할 **수 있음**"*) 를 달았고, 거기서 그치지 않고 **정확한 진단 지시**까지 남겼다 — *"group 에 ref 미포함 확인 또는 별건 분리"*. #971 은 그 절차를 그대로 수행해 답을 채운 것이다.
+
+즉 선행 저자가 남긴 것은 **오판이 아니라 미해소 가설 + 검증 절차**이며, 본 Amendment 는 그 절차의 산출물이다. 이 구분은 미래 회수자에게 중요하다 — 후속 ADR 이 선행 ADR 을 "정정" 하는 서사를 반복하면, 실제로는 정직하게 hedge 를 단 기록이 사후적으로 오류처럼 읽힌다.
+
+### A2-2 (i) 재검토 조건 2 — 가설 반증 (실측)
+
+**가설**: 같은 sha 가 develop + main 양쪽에 push 될 때, group 문자열 값은 같으나 **ref 가 달라 별도 group 으로 동작할 수 있음**.
+
+**실측 결과 — 반증.** GitHub 의 concurrency group 은 **평가된 문자열 그 자체**이고 ref 는 암묵적으로 포함되지 않는다.
+
+| 경로 | 실측 SHA | 관측 |
+| --- | --- | --- |
+| release PR 생성 (develop push ↔ PR) | `c2732ae` | `CI` / `CI (physics-wasm)` / `a11y` / `fps` / `shader` 의 `event=push, head_branch=develop` run 이 전부 `cancelled`. 생존자는 `event=pull_request` run |
+| ff-sync (`git push origin main:develop`) | `58ccfcf` (main tip) | `CI` / `CI (physics-wasm)` / `Project Guards` 의 `head_branch=main` run 3개가 `cancelled`. 생존자는 `head_branch=develop` run |
+
+따라서 branch-cross 중복은 **별도 group 이 아니었고**, "못 잡은" 것도 아니었다 — **잡되 유해한 방향으로** 잡고 있었다. 그리고 이 취소는 정확히 **릴리스 경로의 SHA 에서만** 발생한다. 일상 feature PR 에서는 push 이벤트가 `branches: [develop, main]` 필터에 걸러져 발생하지 않는다.
+
+### A2-3 (ii) 결정 1 의 적용 범위 축소 — 릴리스 SHA 에서 push↔PR dedup 을 **철회**한다
+
+이것이 본 Amendment 의 실질이다. #971 Phase 0 이 `github.ref` 를 group 키에 넣으면서, **§결정 1 이 정의한 dedup 의 본질 — *"같은 sha 가 두 event 로 2번 검증"* — 이 바로 그 지점에서 사라진다.**
+
+| 축 | 결정 1 (2026-07-01 ~ 2026-08-07) | Amendment 2 이후 |
+| --- | --- | --- |
+| 같은 ref · 같은 sha 재트리거 | 취소 (dedup) | **유지 (불변)** |
+| 같은 sha · push ↔ PR (release PR 생성 시점) | 취소 | **취소 안 함 — 양쪽 완주** |
+| 같은 sha · develop ↔ main (ff-sync) | 취소 | **취소 안 함 — 양쪽 완주** |
+| 다른 sha (새 커밋 push) | 취소 안 함 | 취소 안 함 (불변) |
+
+**왜 축소가 정당한가**: §결정 1 의 CRITICAL 은 *"concurrency cancel = 중복 제거, 가드 약화 아님"* 이었고 이는 **사람이 판정하는 한 여전히 참**이다. 그러나 required status check 를 켜는 순간 **판정 주체가 GitHub 으로 바뀌고**, GitHub 이 통과로 인정하는 결론은 `success` / `skipped` / `neutral` **3종뿐**이다 — `cancelled` 는 여기 없다. 즉 종전에는 코스메틱이던 취소가 **머지 하드 블록**이 된다. 그리고 그 취소는 release PR **6/6 전건**에서 재현되므로 확률적 위험이 아니라 확정 사고다.
+
+**대가 (의도적 수용)**: 릴리스 경로 SHA 에서 무거운 워크플로가 **2회 완주**한다 (월 수 회). 남는 정당한 dedup 은 "같은 ref·같은 SHA 의 재트리거" 뿐인데, 이는 본 ADR §축 1 이 이미 *"다른 sha (새 커밋 push) → group 식 값이 달라 취소 안 됨"* 이라 명시했듯 실무상 드물게 발생하는 잔여분이다.
+
+**§축 4 (알림 정책) 영향 0**: GitHub 메일은 conclusion=`failure` 에만 발송되고 `cancelled`·`success` 는 미발송이다. 취소가 완주로 바뀌어도 **성공 run 은 메일을 만들지 않는다** — "최종 실패만 메일" 은 유지된다.
+
+### A2-4 2026-07-01 교차검증 §기각 항목의 재평가 — 기각은 **당시 제약 하에서 옳았다**
+
+§교차검증 반영 사항 §기각 에 다음이 있다:
+
+> **agy: group 에 `github.ref` 추가(branch-cross 분리)** → **기각**. ref 추가 시 PR run(`refs/pull/N`) vs develop push(`refs/heads/develop`)가 **다른 group → 이중 트리거 중복 제거 자체가 실패**(주 목적 붕괴).
+
+#971 Phase 0 은 정확히 이 기각된 변경을 채택한다. **그러나 이는 "agy 가 옳았고 Claude 가 틀렸다" 가 아니다.**
+
+- **기각의 *기술적 서술*은 100% 정확했다** — ref 추가 시 이중 트리거 dedup 이 붕괴한다는 예측 그대로다. Phase 0 이후 실제로 붕괴하며, 위 A2-3 표가 그 붕괴를 명시 박제한 것이다.
+- **바뀐 것은 판정 기준이지 사실이 아니다.** 2026-07-01 당시 목적 함수는 "alert fatigue 절감" 단독이었고 required check 는 **부재 실측 (404)** 이었다 (§핵심 환경 사실). 그 제약 하에서 "주 목적 붕괴" 는 정당한 기각 사유다. #971 은 required check 라는 **새 제약**을 도입하며, 그 제약 하에서는 붕괴 자체가 **지불 의사가 있는 비용**이 된다.
+- **교훈**: 기각 기록은 *결론* 이 아니라 *결론 + 그때의 제약* 으로 읽어야 한다. 제약이 바뀌면 같은 근거가 반대 결론을 지지할 수 있다. 본 ADR 이 §핵심 환경 사실에 "required check 부재" 를 명시 실측 박제해 둔 덕분에 이 재평가가 가능했다 — **전제를 박제하지 않았다면 기각만 남아 후속 회수를 막았을 것이다.**
+
+### A2-5 잔존 미해소 — 동명 체크런은 Phase 0 로 사라지지 않는다
+
+Phase 0 가 제거하는 것은 **`cancelled` 결론**이지 **동명 체크런**이 아니다. 오히려 교차 취소가 사라지며 양쪽이 완주해 **동명 완주 쌍이 3 → 7 로 늘어난다** (ADR 971 §2-11 실측). 안전한 이유는 동명 N개가 **전부 통과 결론**이면 어떤 해석 규칙에서도 통과하기 때문이며, 따라서 실질 잔여 위험은 **flake 발 결론 불일치** 하나로 좁혀진다. 이 잔여 위험은 ADR 971 §8-P0 의 `G2` 게이트가 관측한다.
+
+### A2-6 재검토 조건 (원 §재검토 1~4 / §A1 5~9 에 추가)
+
+10. **`github.ref` 삽입 후에도 릴리스 SHA 에 `cancelled` 잔존**: Phase 0 가 의도대로 동작하지 않은 것 — required check 도입 (ADR 971 Phase 2) 진입 금지. ADR 971 §8-P0 `G1` 이 게이트다.
+11. **릴리스 경로 2회 완주가 러너 비용/대기 문제로 부상**: 현재는 월 수 회 × ~13분이라 수용. 문제화되면 §5 (c) (push 트리거 제거) 를 **관측 손실을 감수하고** 재검토하거나, 릴리스 전용 경로만 분리한다. 임계 완화·가드 스킵은 여전히 금지.
+12. **required check 자체를 철회하는 경우**: 본 Amendment 의 범위 축소 근거가 소멸하므로 §결정 1 원안 (ref 미포함) 복원을 검토한다 — 단 복원은 자동이 아니라 **재측정 후 결정**이다 (그 사이 워크플로 구성이 바뀌었을 수 있다).

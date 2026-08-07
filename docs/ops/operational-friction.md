@@ -73,6 +73,21 @@ gh pr checks <PR> --json name,state --jq \
 - 실측: 2026-07-15 v0.48.0 release PR #829 에서 6 CANCELLED(전부 SUCCESS 대응본 보유) + UNSTABLE → 코스메틱 확인 후 `--merge` 진행, 정상 완료.
 - 근거: [#779](https://github.com/coseo12/astro-simulator/issues/779) 코멘트(concurrency 취소 = 가드 약화 아님, 포착 100%).
 
+### 4-1. ⚠️ 경계 — required status check 하에서는 위 "코스메틱" 전제가 무효 (#971)
+
+위 판별법은 **판정 주체가 사람일 때만** 유효하다. 눈으로 볼 때는 "동일 이름의 SUCCESS 가 있으니 안전" 이 성립하지만, **required status check 를 켜는 순간 판정 주체가 GitHub 으로 바뀐다** — 그리고 GitHub 의 동명 체크런 해소 규칙은 **문서화돼 있지 않다**.
+
+- **`cancelled` 는 통과 결론이 아니다**: GitHub 이 통과로 인정하는 것은 `success` / `skipped` / `neutral` **3종뿐**이고 `cancelled` 는 여기에 없다. 즉 required 로 등록된 이름이 `cancelled` 로 남으면 **머지가 실제로 막힌다**.
+- **동명 다중은 명시된 위험이다**: GitHub Docs "About protected branches" 원문 — *"Using the same job name in multiple workflows can cause ambiguous status check results and **block pull requests from being merged**."* 어느 체크런이 채택되는지는 미기술이며, **미기술인 것은 해소 규칙이지 위험의 존재가 아니다**.
+- **사전 실증이 불가능하다**: 임의 conclusion 의 체크런 합성은 Checks API `POST /check-runs` = GitHub App 토큰 전용 (PAT 403), ruleset `enforcement: evaluate` (dry-run) 은 organization 소유 저장소 전용 — 본 저장소는 `owner.type: User`. 따라서 "최신 success 가 채택될 것" 이라는 가정은 **검증할 수 없다**.
+- **하필 릴리스 경로에 집중된다**: 이 CANCELLED 는 무작위가 아니라 구조적이다. release PR 6/6 전건에서 무거운 3개 (`detect-and-test` / `verify-and-rust` / `long-integration-rust`) 가 cancelled 쌍둥이를 가졌다. 즉 "코스메틱" 이 하드 블록으로 바뀌는 지점이 **정확히 릴리스 순간**이다.
+
+**표준 절차**: required check 를 켜기 전에 **가정하지 말고 구조적으로 제거**한다 — concurrency 그룹 키에 `${{ github.ref }}` 를 넣어 `pull_request`(`refs/pull/N/merge`) 와 `push`(`refs/heads/*`) 를 별도 group 으로 분리하면 교차 취소 자체가 소멸한다 (#971 Phase 0 적용 완료).
+
+> 단 Phase 0 는 **`cancelled` 결론을 없애는 것이지 동명 체크런을 없애는 게 아니다**. 오히려 교차 취소가 사라지면서 양쪽이 완주해 **동명 완주 쌍이 3 → 7 로 늘어난다**. 남는 잔여 위험은 flake 발 결론 불일치이며, 이는 ADR §8-P0 의 `G2` 게이트 (동명 체크런의 통과/미통과 불일치 검출) 가 관측한다.
+
+- 상세 + 적용/롤백 절차: ADR [`20260807-971-required-status-checks`](../decisions/20260807-971-required-status-checks.md) §2-2 / §2-6 / §2-8 / §2-11 / 결정 3.
+
 ---
 
 ## 릴리스 부수 마찰 (2026-07-15 v0.48.0 실측 — 추가 박제)
