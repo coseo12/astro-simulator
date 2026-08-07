@@ -21,10 +21,14 @@ name: shader-pixel-guard
 #   flake 실측 ≥ 1회/주 시 #779 Phase 2 step-retry 패턴 편입. silent 판정 완화 금지 —
 #   의식적 완화는 ADR Amendment 로만 (guard-design-principles §2).
 
-# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
-# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
+# 중복 run 제거 (#779). group 에 github.workflow 포함 → 워크플로 간 교차 취소 방지.
+# group 에 github.ref 포함 (#971 Phase 0) → pull_request(refs/pull/N/merge) 와 push(refs/heads/*)
+#   가 별도 group. 같은 sha 의 push↔PR 교차 취소와 ff-sync 의 main↔develop 교차 취소가 소멸한다
+#   (required check 하에서 cancelled 는 미통과 결론 = 릴리스 하드 블록). SSoT: ADR
+#   docs/decisions/20260807-971-required-status-checks.md §2-7 / §5 (b) / 결정 3.
+# cancel 은 가드 약화 아님 — 같은 ref·같은 sha 의 재트리거 중복만 제거 (포착 100%).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 on:

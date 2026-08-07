@@ -73,6 +73,42 @@ gh pr checks <PR> --json name,state --jq \
 - 실측: 2026-07-15 v0.48.0 release PR #829 에서 6 CANCELLED(전부 SUCCESS 대응본 보유) + UNSTABLE → 코스메틱 확인 후 `--merge` 진행, 정상 완료.
 - 근거: [#779](https://github.com/coseo12/astro-simulator/issues/779) 코멘트(concurrency 취소 = 가드 약화 아님, 포착 100%).
 
+### 4-1. ⚠️ 경계 — required status check 하에서는 위 "코스메틱" 전제가 무효 (#971)
+
+위 판별법은 **판정 주체가 사람일 때만** 유효하다. 눈으로 볼 때는 "동일 이름의 SUCCESS 가 있으니 안전" 이 성립하지만, **required status check 를 켜는 순간 판정 주체가 GitHub 으로 바뀐다** — 그리고 GitHub 의 동명 체크런 해소 규칙은 **문서화돼 있지 않다**.
+
+- **`cancelled` 는 통과 결론이 아니다**: GitHub 이 통과로 인정하는 것은 `success` / `skipped` / `neutral` **3종뿐**이고 `cancelled` 는 여기에 없다. 즉 required 로 등록된 이름이 `cancelled` 로 남으면 **머지가 실제로 막힌다**.
+- **동명 다중은 명시된 위험이다**: GitHub Docs "About protected branches" 원문 — *"Using the same job name in multiple workflows can cause ambiguous status check results and **block pull requests from being merged**."* 어느 체크런이 채택되는지는 미기술이며, **미기술인 것은 해소 규칙이지 위험의 존재가 아니다**.
+- **사전 실증이 불가능하다**: 임의 conclusion 의 체크런 합성은 Checks API `POST /check-runs` = GitHub App 토큰 전용 (PAT 403), ruleset `enforcement: evaluate` (dry-run) 은 organization 소유 저장소 전용 — 본 저장소는 `owner.type: User`. 따라서 "최신 success 가 채택될 것" 이라는 가정은 **검증할 수 없다**.
+- **릴리스 경로에 집중되나 거기서만 나는 것은 아니다**: 이 CANCELLED 는 무작위가 아니라 구조적이다. release PR 6/6 전건에서 무거운 3개 (`detect-and-test` / `verify-and-rust` / `long-integration-rust`) 가 cancelled 쌍둥이를 가졌다. 즉 "코스메틱" 이 하드 블록으로 바뀌는 지점이 **주로 릴리스 순간**이다. 다만 **한 SHA 가 여러 PR 의 head 가 되면 일상 PR 사이에서도** 교차 취소가 난다 (`refs/pull/N/merge` 가 PR 마다 다름 — 실측 `4f7366e` 가 PR #967/#968/#969 세 곳의 head 였다).
+
+**표준 절차**: required check 를 켜기 전에 **가정하지 말고 구조적으로 제거**한다 — concurrency 그룹 키에 `${{ github.ref }}` 를 넣어 `pull_request`(`refs/pull/N/merge`) 와 `push`(`refs/heads/*`) 를 별도 group 으로 분리하면 교차 취소 자체가 소멸한다 (#971 Phase 0 적용 완료). 실측 근거 — 2026-08-01 ~ 08-07 run 1,000건의 `cancelled` **72건 전수가** 교차 ref 클래스(push↔PR 35 / ff-sync 21 / PR↔PR 16)라 **72/72 가 이 한 줄로 분리**된다. 보존되는 "동일 ref 재트리거" 클래스는 같은 window 에서 **0건**이었다.
+
+> 단 Phase 0 는 **`cancelled` 결론을 없애는 것이지 동명 체크런을 없애는 게 아니다**. 오히려 교차 취소가 사라지면서 양쪽이 완주해 **동명 완주 쌍이 3 → 7 로 늘어난다**.
+
+**남는 잔여 위험은 하나가 아니라 2종이다** (초판은 flake 하나로 적었으나 실측 반증됨):
+
+| 원인                                                                            | 성격                | Phase 0 가 해소하는가 |
+| ------------------------------------------------------------------------------- | ------------------- | --------------------- |
+| ① flake 발 `failure`+`success` 혼재                                             | 확률적              | 아니오 (직교)         |
+| ② 다중 `types:` + **concurrency 부재** 워크플로의 동일 SHA 누적            | **결정론적** | 아니오 (축 자체가 다름) |
+
+②는 **event 축(push × PR)이 아니라 event `types` 축**이다. `pr-template-checklist-guard.yml` 은 `types: [opened, edited, synchronize]` 인데 concurrency 블록이 **없어서**, PR 본문을 편집할 때마다 같은 SHA 에 체크런이 누적된다. 처음 실패했다가 고쳐 통과하면 `failure`+`success` 가 그 SHA 에 영구 공존한다 — 실측 PR #964 `ee64871` 에서 `failure`/`failure`/`success`(flake 0, 가드가 설계대로 유도한 정상 루프). 최근 머지 PR 25건 중 이 가드가 n>1 인 것이 4건, 통과/미통과 혼재가 1건이다.
+
+**concurrency 블록이 없는 PR 워크플로 (6-1 적용 제외 사유 = 넣을 블록 자체가 없음)**:
+
+| 워크플로                             | concurrency | `types`                                     | 동일 SHA 누적 노출              |
+| ------------------------------------ | ----------- | ------------------------------------------- | ------------------------------- |
+| `pr-template-checklist-guard.yml`    | **없음**    | `opened, edited, synchronize`               | **높음** — `edited` 로 반복 누적 |
+| `harness-pr-review.yml` (`label-pr`) | **없음**    | `opened, synchronize, ready_for_review`     | 낮음 — `edited` 없음 (실측 n>1 0건) |
+| `branch-name-guard.yml`              | 있음 (PR 번호 키) | `opened, synchronize`                  | 없음 (실측 n>1 0건)             |
+
+> ⚠️ **해소책으로 이 둘에 concurrency 를 추가하지 말 것.** `cancel-in-progress` 는 같은 head SHA 에 `cancelled` 를 남기고 `cancelled` 는 통과 3종에 없으므로 required check 하에서 **더 나쁘다** (`{failure, success}` → `{cancelled, success}`). 대응은 Phase 1 구성 조정(required 제외 또는 `edited` 트리거 제거)이며 ADR 개정 범위다.
+
+**`G1` 발화 시 선분류 1줄**: `cancelled` 발견 시 즉시 Phase 0 실패로 판정하지 말고 각 run 의 `event`·`head_branch` 를 먼저 분류한다 — 보존하기로 한 "동일 ref 재트리거" 클래스는 **Phase 0 실패가 아니다**. 절차: ADR [`20260701-779`](../decisions/20260701-779-ci-alert-fatigue-concurrency.md) §A2-6 재검토 조건 10.
+
+- 상세 + 적용/롤백 절차: ADR [`20260807-971-required-status-checks`](../decisions/20260807-971-required-status-checks.md) §2-2 / §2-6 / §2-8 / §2-11 / 결정 3. 잔여 위험 2종 + `cancelled` 전수 분류표: ADR [`20260701-779`](../decisions/20260701-779-ci-alert-fatigue-concurrency.md) §A2-3 / §A2-5.
+
 ---
 
 ## 릴리스 부수 마찰 (2026-07-15 v0.48.0 실측 — 추가 박제)
