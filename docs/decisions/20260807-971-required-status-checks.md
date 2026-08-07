@@ -1,6 +1,7 @@
 # ADR: branch protection required status check 정책 — main 한정 단계적 도입, develop 은 required check 미채택 (#971)
 
-- **상태**: **Provisional** (cross-validate agy 2026-08-07 2회 반영 완료 — §11) — 교차검증은 통합했으나 **저장소 설정이 미변경**이라 Accepted 로 올리지 않는다. 본 ADR 은 설계·근거·절차만 확정하며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 로 수행한다. Accepted 전이 조건은 §10-2.
+- **상태**: **Provisional** (cross-validate agy 2026-08-07 2회 반영 완료 — §11 / reviewer 정적 리뷰 1회 반영 — 아래) — 교차검증·리뷰는 통합했으나 **저장소 설정이 미변경**이라 Accepted 로 올리지 않는다. 본 ADR 은 설계·근거·절차만 확정하며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 로 수행한다. Accepted 전이 조건은 §10-2.
+- **reviewer 반영** (2026-08-07, PR [#977](https://github.com/coseo12/astro-simulator/pull/977)): 초판의 *"Phase 0 이 동명 체크런 조건을 소멸시킨다"* 서술이 **실측과 반대**임이 독립 재현으로 드러났다. §2-2 / §5 (b) / §6-2 / §10-1 한계 3 을 정정하고 **§2-11 (동명 체크런 전수 집계) 신설** + **§8-P0 `G2` 게이트 (동명 결론 불일치 검출) 신설**. 설계 자체 (단계 구성 / required 집합 / develop 보호 수준 / `enforce_admins` 판정) 는 **무변경** — reviewer 가 판정 6건을 전부 정합으로 확인했다.
 - **날짜**: 2026-08-07
 - **결정자**: architect (실측 기반 설계). 적용 권한은 사용자
 - **관련**:
@@ -47,7 +48,8 @@
 | `cancelled` | 위 3종에 **없음 → 미통과** | 동상 (부재로 확인) |
 | **workflow 단위** 스킵 (`paths` / `paths-ignore` / `branches` 필터 / 커밋 메시지) | 체크가 **아예 생성되지 않음** → 영구 `Pending` → **머지 영구 차단**. 공식 권고는 *"Avoid requiring workflows that can be skipped"* | GitHub Docs "Troubleshooting required status checks" |
 | **job 단위** 스킵 (`if:` 조건 false, 또는 `needs` 실패로 인한 스킵) | 체크런이 `skipped` 로 **보고됨 → 통과** | 동상 |
-| 동명 체크가 여럿일 때의 해석 | *"If a check and a commit status have the same name, both must pass"* 만 기술. **동명 체크런 N개 중 어느 것이 채택되는지는 미기술** | 동상 (미기술 확인) |
+| 동명 체크가 여럿일 때의 **해소 규칙** | *"If a check and a commit status have the same name, both must pass"* 만 기술. **동명 체크런 N개 중 어느 것이 채택되는지는 미기술** | 동상 (미기술 확인) |
+| 동명 체크가 여럿일 때의 **위험** | **미기술이 아니라 명시 경고**다 — *"Using the same job name in multiple workflows can cause ambiguous status check results and **block pull requests from being merged**."* 즉 회색지대가 아니라 GitHub 이 문서화한 위험이며, 침묵하는 것은 *해소 규칙*이지 *위험의 존재*가 아니다 | GitHub Docs "About protected branches" (2026-08-07 원문 대조) |
 | 직접 push (PR 아님) | required check 가 있으면 **push 되는 커밋의 required context 가 전부 통과해야** 하며, 아니면 `Protected branch update failed` 로 거부 | GitHub Docs / community discussion #170641 |
 
 ### 2-3 workflow 13개 트리거 전수 분류
@@ -57,9 +59,9 @@ required 후보 자격은 **"모든 대상 PR 에서 반드시 체크런을 보�
 | 클래스 | 체크 이름 (워크플로) | 실측 소요 (PR #969) | 판정 |
 |---|---|---|---|
 | **A — workflow 단위 path 필터 보유** | `a11y-baseline-guard` (a11y) / `measure`·`retry-fresh-runner` (fps) / `verify` (shader-pixel) / `bench` (bench) | 140s / 156s·— / 363s / — | **required 절대 금지**. docs-only PR 에서 workflow 자체가 스킵 → 체크 미생성 → 영구 pending. `bench` 는 positive `paths:` 라 더 좁다 |
-| **B — path 필터 없음 + `pull_request` 전용** | `branch-name` (branch-name-guard) / `label-pr` (harness-pr-review) / `pr-template-checklist` (pr-template-checklist-guard) | 9s / 5s / 10s | **main required 가능**. 단 **push 커밋에는 영원히 미보고** → develop 직접 push 와 구조적 비호환 (§6 결정 2) |
+| **B — path 필터 없음 + `pull_request` 전용** | `branch-name` (branch-name-guard) / `label-pr` (harness-pr-review) / `pr-template-checklist` (pr-template-checklist-guard) | 9s / 5s / 10s | **main required 가능**. 단 **push 커밋에는 영원히 미보고** → develop 직접 push 와 구조적 비호환 (§6 결정 2). 셋 다 job 단위 `if:` 보유 — `label-pr` = `github.event.pull_request.draft == false` / `pr-template-checklist` = `github.actor != 'github-actions[bot]'` / `branch-name` = 없음. **전부 `skipped` = 통과라 안전** (§2-2 job 단위 스킵 행) |
 | **C — path 필터 없음 + `pull_request`·`push` 양쪽** | `project-guards` (project-guards) / `diff-scope` (ci) / `detect-and-test` (ci) / `diff-scope`·`verify-and-rust`·`long-integration-rust`·`duplicate-function-guard` (ci-physics-wasm) | 6s / 9s / 779s / 8s·113s·514s·12s | **required 가능**. `verify-and-rust`·`long-integration-rust`·`duplicate-function-guard` 는 job 단위 `if: code_changed == 'true'` → 미해당 시 `skipped` = 통과 |
-| **D — 구조적 부적격** | `close-linked-issues` (PR `closed` 이벤트 전용) / `bootstrap` (`workflow_dispatch` 전용) / `Vercel Preview Comments` (외부 앱) / `GitGuardian Security Checks` (외부 앱) | — | **required 절대 금지**. 앞 둘은 대상 PR 에서 미보고, 뒤 둘은 외부 서비스 장애가 릴리스 하드 블록으로 직결 |
+| **D — 구조적 부적격** | `close-linked-issues` (PR `closed` 이벤트 전용) / `bootstrap` (`workflow_dispatch` 전용) / `plan`·`bench`·`aggregate` (bench-baseline-remeasure, `workflow_dispatch` 전용) / `Vercel Preview Comments` (외부 앱) / `GitGuardian Security Checks` (외부 앱) | — | **required 절대 금지**. 앞 셋은 대상 PR 에서 미보고, 뒤 둘은 외부 서비스 장애가 릴리스 하드 블록으로 직결 |
 
 > 클래스 A 가 그대로 **본 정책의 최대 손실**이다. 실행 시간 상위 4개 중 3개 (`verify` 363s / `measure` 156s / `a11y-baseline-guard` 140s) 가 여기 속해 required 화가 불가능하다. 회복 경로는 §10-3 후속 1.
 
@@ -73,11 +75,20 @@ diff-scope 실패 → detect-and-test 는 conclusion=skipped → GitHub 은 통�
 
 즉 `detect-and-test` 만 required 로 올리면 **상류 실패가 그대로 통과한다**. `ci-physics-wasm.yml` 의 3개 job 도 동일 구조 (`needs: diff-scope`). 구멍을 닫으려면 `diff-scope` 자체를 required 로 올려야 한다 — 그런데 §2-5 의 이름 충돌이 걸린다.
 
-### 2-5 `diff-scope` 동명 충돌 — 한 SHA 에 4개
+### 2-5 동명 체크런은 **축이 2개**다 — workflow 축 × event 축
 
 `ci.yml` 과 `ci-physics-wasm.yml` 이 **둘 다 job id `diff-scope`** 를 쓴다. 여기에 이벤트 2종 (`pull_request` + `push`) 이 겹쳐 release PR head SHA 마다 **`diff-scope` 체크런이 4개** 생성된다 (실측: release PR 6/6 전건 `pass=4`).
 
-§2-2 대로 동명 체크런 N개의 해석은 GitHub 이 문서화하지 않았다. 지금은 4개 전부 success 라 무해하지만, 두 워크플로의 판정이 갈리는 순간 (한쪽 분류기 실패) required 결과가 **비결정적**이 된다.
+| 축 | 원인 | 배수 | 제거 수단 |
+|---|---|---|---|
+| **workflow 축** | 서로 다른 워크플로가 같은 job id 사용 | ×2 (`diff-scope` 한정) | 결정 6-2 리네임 (`diff-scope-wasm`) |
+| **event 축** | 같은 워크플로가 `pull_request` + `push` 양쪽 트리거 보유 | ×2 (**push 트리거를 가진 모든 컨텍스트**) | **없음** — 제거하려면 §5 (c) (push 트리거 삭제) 인데 기각됨 |
+
+**결정 6-2 의 리네임은 workflow 축만 없앤다 (4→2). event 축은 그대로 남는다.** 그리고 event 축은 `diff-scope` 만의 문제가 아니라 클래스 C 전체 (`project-guards` / `detect-and-test` / `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) 에 해당한다 — 셋 다 `on: {pull_request, push}` `branches: [develop, main]` 이다.
+
+§2-2 대로 동명 체크런 N개의 **해소 규칙**은 GitHub 이 문서화하지 않았고, 그 **위험**은 명시 경고돼 있다. 전수 집계와 Phase 0 이후 투영은 §2-11.
+
+> **부수 발견 — `diff-scope` 는 유일한 동명 쌍이 아니다.** `bench.yml` 의 job id `bench` (L40) 와 `bench-baseline-remeasure.yml` 의 job id `bench` (L51) 도 동명이다. 양쪽 다 required 절대 금지 목록 (클래스 A / 클래스 D) 이라 **정책 영향 0** 이고, 결정 8 의 가드는 *선언된 context 가 실재하는가* 를 대조하므로 오탐도 없다. 다만 "동명은 `diff-scope` 하나뿐" 이라는 인상을 남기지 않기 위해 박제한다.
 
 ### 2-6 CANCELLED — release PR 6/6 에서 100% 재현되는 구조적 현상
 
@@ -153,6 +164,63 @@ concurrency:
 
 이 정정은 #779 의 §CRITICAL ("concurrency cancel = 중복 제거, 가드 약화 아님") 을 뒤집지 않는다 — **사람이 판정하는 한** 여전히 참이다. 다만 **판정 주체가 GitHub 으로 바뀌는 순간** (required check) 그 전제가 무효가 된다는 경계가 추가된다.
 
+### 2-11 동명 체크런 전수 집계 — **Phase 0 은 동명을 없애지 않고 늘린다**
+
+> 본 절은 초판의 사실 오류를 정정한 결과다. 초판은 §10-1 한계 3 / §5 (b) / §6-2 에서 *"Phase 0 이 동명 조건을 소멸시킨다"* 고 서술했으나 **실측이 반대를 가리킨다**. 정정 근거를 재현 명령 + 출력 원문으로 박제한다 (reviewer 독립 재현과 대조 가능).
+
+**재현 명령** (release PR [#974](https://github.com/coseo12/astro-simulator/pull/974) head `c2732ae`):
+
+```bash
+gh api "repos/coseo12/astro-simulator/commits/c2732ae/check-runs?per_page=100" \
+  -q '[.check_runs[] | {name, conclusion}] | group_by(.name)[]
+      | "\(.[0].name)\tn=\(length)\t\(map(.conclusion) | sort | join(","))"'
+```
+
+**출력 원문** (2026-08-07 실측, 15 이름 / 26 체크런):
+
+```text
+GitGuardian Security Checks	n=1	success
+Vercel Preview Comments	n=1	success
+a11y-baseline-guard	n=2	cancelled,success
+branch-name	n=1	success
+detect-and-test	n=2	cancelled,success
+diff-scope	n=4	success,success,success,success
+duplicate-function-guard	n=2	success,success
+label-pr	n=1	success
+long-integration-rust	n=2	cancelled,success
+measure	n=2	cancelled,success
+pr-template-checklist	n=1	success
+project-guards	n=2	success,success
+retry-fresh-runner	n=2	cancelled,skipped
+verify	n=2	cancelled,success
+verify-and-rust	n=2	cancelled,success
+```
+
+**세 가지가 동시에 참이다.**
+
+1. **동명 다중은 미래 조건이 아니라 현재 상태다.** `project-guards` 는 **Phase 0 이전인 지금도 동명 2개**이고 (6초짜리라 push run 과 PR run 이 교차 취소 전에 둘 다 완주한다), 이것이 바로 **Phase 1 의 required 후보**다. `duplicate-function-guard` (2), `diff-scope` (4) 도 마찬가지다.
+2. **Phase 0 는 동명을 줄이는 게 아니라 늘린다.** 교차 취소가 사라지면 위 `cancelled` 7건이 전부 완주로 바뀐다.
+3. **결정 6-2 리네임은 workflow 축만 없앤다** (§2-5). `diff-scope` 4 → `diff-scope` 2 + `diff-scope-wasm` 2 이며, event 축 ×2 는 남는다.
+
+**Phase 0 이후 투영** (required 후보 10개):
+
+| 단계 | context | 트리거 축 | 현재 (`c2732ae`) | Phase 0 이후 |
+|---|---|---|---|---|
+| 1 | `project-guards` | push + PR | n=2 `success,success` | n=2 (불변 — 이미 양쪽 완주) |
+| 1 | `branch-name` | PR 전용 | n=1 | **n=1** (동명 없음) |
+| 1 | `pr-template-checklist` | PR 전용 | n=1 | **n=1** (동명 없음) |
+| 1 | `label-pr` | PR 전용 | n=1 | **n=1** (동명 없음) |
+| 2 | `diff-scope` | push + PR (× workflow 2) | n=4 | n=2 (workflow 축 제거) |
+| 2 | `diff-scope-wasm` | push + PR | 미존재 | n=2 (신설) |
+| 2 | `detect-and-test` | push + PR | n=2 `cancelled,success` | n=2 **양쪽 완주로 전환** |
+| 3 | `verify-and-rust` | push + PR | n=2 `cancelled,success` | n=2 **양쪽 완주로 전환** |
+| 3 | `long-integration-rust` | push + PR | n=2 `cancelled,success` | n=2 **양쪽 완주로 전환** |
+| 3 | `duplicate-function-guard` | push + PR | n=2 `success,success` | n=2 (불변) |
+
+즉 **required 후보 10개 중 7개가 동명 쌍을 갖고**, 동명 쌍이 전부 완주하는 이름은 **3개 (`project-guards` / `diff-scope` / `duplicate-function-guard`) → 7개**로 **증가**한다. 동명이 원천적으로 없는 것은 `pull_request` 전용인 클래스 B 3개뿐이다.
+
+**그럼에도 안전한 이유 — 잔여 위험의 정확한 위치.** 동명 N개가 **전부 `success` 면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿인 것" 자체가 아니라 **오직 결론이 갈리는 경우**다. Phase 0 가 실제로 사기는 것은 "동명 소멸" 이 아니라 **결론 불일치 확률의 하락**이다 — `cancelled` (미통과 결론) 을 구조적으로 제거하므로 불일치의 **가장 빈번하고 100% 재현되던 원인 (6/6)** 이 사라진다. 남는 불일치 원인은 **flake** 뿐이며, 이것이 본 정책의 실질 잔여 위험이다 (§10-1 한계 3).
+
 ---
 
 ## §3 후보 비교 — 관리 방식
@@ -208,7 +276,7 @@ concurrency:
 | 후보 | 내용 | 판정 |
 |---|---|---|
 | (a) 무대응 — "최신 success 가 채택될 것" 가정 | 현행 concurrency 유지 | **기각**. §2-8 대로 검증 불가한 가정이고, 틀리면 **모든 release PR 이 하드 블록**된다 (6/6 재현이므로 확률적 사고가 아니라 확정 사고) |
-| (b) **concurrency 키에 `github.ref` 추가** | `group: ${{ github.workflow }}-${{ github.ref }}-${{ ...sha }}` | **채택**. `pull_request` 는 `refs/pull/N/merge`, push 는 `refs/heads/*` 로 분리 → 교차 취소 구조적 소멸. 기존 dedup 의도 (같은 ref·같은 SHA 재트리거) 는 보존. 비용: 릴리스 경로 SHA 에서만 run 2배 (월 수 회) |
+| (b) **concurrency 키에 `github.ref` 추가** | `group: ${{ github.workflow }}-${{ github.ref }}-${{ ...sha }}` | **채택**. `pull_request` 는 `refs/pull/N/merge`, push 는 `refs/heads/*` 로 분리 → **교차 *취소* 의 소멸**. ⚠️ **동명 체크런 자체는 소멸하지 않는다 — 오히려 완주 쌍이 3→7 로 늘어난다** (§2-11). 정확히는 **#779 결정 1 의 적용 범위를 릴리스 SHA 에서 철회**하는 것이다: #779 가 정의한 중복의 본질이 *"같은 sha 가 두 event 로 2번 검증"* 이었고 Phase 0 가 없애는 것이 바로 그 dedup 이다. 잔존 dedup (같은 ref·같은 SHA 재트리거) 은 #779 스스로 *"다른 sha (새 커밋 push) → group 식 값이 달라 취소 안 됨"* 이라 명시했듯 실무상 거의 발생하지 않는 잔여분이다. 대가: 릴리스 경로 SHA 에서 무거운 워크플로가 2회 완주 (월 수 회) |
 | (c) push 트리거 제거 | `on.push` 를 무거운 워크플로에서 삭제 | 기각 — 통합 브랜치의 머지 후 신호를 잃는다. 취소 문제는 해결되나 관측 손실이 대가 |
 | (d) cancelled 를 required 대상에서 빼기 | 무거운 체크를 영구 비-required 로 | 기각 — `detect-and-test` (13분, 최대 커버리지) 를 영원히 포기하게 된다 |
 | (e) **`cancel-in-progress` 를 PR 에 한정** (#779 §재검토 조건 1 의 자체 제안) | `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` | **기각 — 효과가 없다.** `cancel-in-progress` 는 *새로 들어오는* run 의 속성이라, 뒤늦게 도착한 `pull_request` run (값 `true`) 이 진행 중인 push run 을 **여전히 취소한다**. release PR 실측 (§2-7 경로 1) 이 정확히 이 순서다. 취소를 막으려면 PR run 쪽을 `false` 로 해야 하는데 그러면 dedup 자체가 사라진다 |
@@ -231,9 +299,11 @@ concurrency:
 > **관찰 게이트를 Phase 2 앞에만 두는 이유** (cross-validate 이견 수용, §11): 원안은 Phase 0→1 사이에도 release PR 1회 관찰을 요구해 도입에 릴리스 3주기가 필요했다. 그러나 위험은 **cancelled 쌍둥이를 실제로 갖던 무거운 3개** 에 집중돼 있고 (§2-6), Phase 1 후보 4개는 cancel 0 + 롤백 2초다. 관찰 비용을 위험이 있는 곳에만 지출한다.
 
 **required 절대 금지 목록** (ADR 로 박제 — 미래에 "왜 안 넣었지?" 재발 방지):
-`a11y-baseline-guard` / `measure` / `retry-fresh-runner` / `verify` (shader-pixel) / `bench` — **workflow 단위 path 필터** 보유 (docs-only PR 에서 영구 pending).
-`close-linked-issues` / `bootstrap` — 대상 PR 에서 미보고.
+`a11y-baseline-guard` / `measure` / `retry-fresh-runner` / `verify` (shader-pixel) / `bench` (`bench.yml`) — **workflow 단위 path 필터** 보유 (docs-only PR 에서 영구 pending).
+`close-linked-issues` / `bootstrap` / `plan`·`bench`·`aggregate` (`bench-baseline-remeasure.yml`) — 대상 PR 에서 미보고 (각각 PR `closed` 이벤트 전용 / `workflow_dispatch` 전용).
 `Vercel Preview Comments` / `GitGuardian Security Checks` — 외부 서비스 장애 = 릴리스 하드 블록.
+
+> `bench` 가 두 줄에 등장하는 것은 오기가 아니다 — `bench.yml` 과 `bench-baseline-remeasure.yml` 이 **동명 job id `bench`** 를 쓴다 (§2-5 부수 발견). 금지 사유는 서로 다르지만 (path 필터 / `workflow_dispatch` 전용) 양쪽 다 금지다.
 
 ### 결정 2 — `develop` 보호: **최소 보호 채택, required check 는 미채택 (영구)**
 
@@ -246,6 +316,8 @@ concurrency:
 ### 결정 3 — CANCELLED: **가정하지 않고 구조적으로 제거**
 
 §5 (b) 채택. concurrency 그룹 키에 `${{ github.ref }}` 를 추가해 교차 취소를 소멸시킨다. 이것을 **Phase 1 을 포함한 모든 단계의 선행 조건 (Phase 0)** 으로 둔다.
+
+> ⚠️ **제거 대상은 `cancelled` 결론이지 동명 체크런이 아니다.** Phase 0 이후에도 동명 쌍은 남으며 오히려 **완주 쌍이 3 → 7 로 는다** (§2-11). 이 결정이 사는 것은 "결론 불일치의 100% 재현되던 원인" 이고, flake 발 불일치는 §10-1 한계 3 의 잔여 위험으로 남아 §8-P0 `G2` 게이트가 관측한다.
 
 Phase 1 후보 4개는 실측상 cancel 0 이지만, 그것은 "짧아서 두 번째 이벤트 run 이 시작되기 전에 끝났다" 는 **경합 결과**일 뿐 보장이 아니다 (#974 실측: push run 09:34:29 종료, PR run 09:35:26 시작 — 57초 여유가 우연히 있었을 뿐). 하드 블록의 비대칭 비용을 감안하면 PR 1건의 선행 비용이 훨씬 싸다.
 
@@ -275,10 +347,10 @@ develop 에 required check 를 도입하지 않고 (결정 2) 봇 PR 은 main �
 | # | 변경 | 대상 | 이유 |
 |---|---|---|---|
 | 6-1 | concurrency 그룹 키에 `${{ github.ref }}` 삽입 | `ci.yml`, `ci-physics-wasm.yml`, `project-guards.yml`, `a11y-baseline-guard.yml`, `fps-baseline-guard.yml`, `shader-pixel-guard.yml`, `bench.yml` (7개. `branch-name-guard.yml` 은 PR 번호 키라 제외) | 결정 3 |
-| 6-2 | `ci-physics-wasm.yml` 의 `diff-scope` job 에 `name: diff-scope-wasm` 부여 | `ci-physics-wasm.yml` | §2-5 동명 4중 충돌 해소. job id 는 유지하고 `name:` 만 추가하면 `needs:` 참조 3곳을 건드리지 않는다 |
+| 6-2 | `ci-physics-wasm.yml` 의 `diff-scope` job 에 `name: diff-scope-wasm` 부여 | `ci-physics-wasm.yml` | §2-5 **workflow 축** 제거 (`diff-scope` 4 → `diff-scope` 2 + `diff-scope-wasm` 2). ⚠️ **event 축 ×2 는 남으므로 동명 "해소" 가 아니라 "축소"** 다. job id 는 유지하고 `name:` 만 추가하면 `needs:` 참조 3곳을 건드리지 않는다 |
 | 6-3 | `ci.yml` 상단 주석의 *"required check 도입 시 본 전제 재검토"* 를 본 ADR 링크로 갱신 | `ci.yml` | 이미 있는 예고 주석의 회수 |
 | 6-4 | `docs/ops/operational-friction.md` §4 에 "required check 하에서는 코스메틱 전제가 무효" 경계 박제 | 동 문서 | 결정 3 후단 |
-| 6-5 | [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) 에 Amendment 추가 — §재검토 조건 2 의 "ref 가 달라 별도 group" 가정을 실측으로 정정 + 본 ADR 역링크 | 동 ADR | §2-10. 사실 오류를 원 ADR 에 남겨 두면 다음 회수자가 같은 오판을 반복한다 |
+| 6-5 | [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) 에 Amendment 추가 — **(i)** §재검토 조건 2 의 "ref 가 달라 별도 group" **가설을 실측으로 해소** + **(ii) 결정 1 (push+PR 교차 dedup) 의 적용 범위가 릴리스 SHA 에서 축소됨을 박제** + 본 ADR 역링크 | 동 ADR | §2-10 / §5 (b). **"사실 오류" 가 아니라 "예고된 가설의 실측 해소"** 다 — #779 원문은 hedge (*"별도 group 으로 동작할 **수 있음**"*) 에 더해 정확한 진단 지시 (*"group 에 ref 미포함 확인"*) 까지 남겼고, 본 ADR 은 그 절차를 그대로 수행해 답을 채웠다. 선행 저자가 남긴 것은 오판이 아니라 **미해소 가설 + 검증 절차**다. (ii) 를 함께 박제해야 다음 회수자가 "왜 concurrency 가 릴리스 경로에서 안 먹지?" 를 추적할 수 있다 |
 
 Phase 0 은 일반 dev PR (base=develop) 이며 저장소 설정을 만지지 않는다. **머지 직후 Phase 1 로 진행한다** (release PR 대기 없음 — 결정 1 의 관찰 게이트 표 참조). Phase 0 의 효과 실측 (release PR 에서 cancelled 0) 은 **Phase 2 의 진입 게이트**다.
 
@@ -326,6 +398,7 @@ required 목록은 **job 이름 문자열**로 저장되므로, 훗날 누군가
 > ```bash
 > gh api repos/coseo12/astro-simulator -q '.permissions.admin'   # 기대: true
 > ```
+> **이 게이트의 정밀도 한계 — 그리고 왜 무해한가**: `.permissions.admin` 은 **사용자의 저장소 역할**을 반환하므로, fine-grained PAT 로 전환해 `Administration` 권한만 빠진 경우에도 `true` 를 반환할 수 있다. 즉 §10-5 재검토 조건 6 이 걱정하는 바로 그 시나리오를 못 잡을 수 있다. **그러나 위험은 구조적으로 자기 제한된다** — GitHub REST 문서상 `PUT .../branches/{b}/protection` (§8-A1) 과 `DELETE .../protection/required_status_checks` (§9-R1) 은 **동일한 admin/owner 권한 클래스**다. 따라서 **A1 이 성공하면 R1 은 반드시 허용된다**: 적용과 롤백 사이에 토큰을 교체하지 않는 한 탈출구를 잃을 수 없다. 게이트의 정밀도 부족이 하드 블록으로 이어지는 경로가 없다. (부수: §2-1 의 `GET .../protection` 성공 자체가 admin 을 요구하므로 `.permissions` 조회보다 강한 신호다.)
 
 ```bash
 export REPO=coseo12/astro-simulator
@@ -335,17 +408,38 @@ export REPO=coseo12/astro-simulator
 
 developer 디스패치. 결정 6 의 6-1~6-5. 머지 후 **바로 A1 로 진행**한다.
 
-아래는 **Phase 2 (A3) 의 진입 게이트**다 — 다음 release PR 1건에서 빈 출력이어야 한다:
+아래 **게이트 2개**가 **Phase 2 (A3) 의 진입 조건**이다 — 다음 release PR 1건에서 **둘 다 빈 출력**이어야 한다. SHA 를 한 번만 잡아 둔다:
 
 ```bash
-# release PR head SHA 에 cancelled 체크런이 하나도 없어야 한다
-gh api "repos/$REPO/commits/$(gh pr view <releasePR> --json headRefOid -q .headRefOid)/check-runs?per_page=100" \
+SHA=$(gh pr view <releasePR> --json headRefOid -q .headRefOid)
+```
+
+**G1 — `cancelled` 체크런 0** (Phase 0 의 직접 효과 확인):
+
+```bash
+gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
   -q '.check_runs[] | select(.conclusion=="cancelled") | .name'
 ```
+
+**G2 — 동명 체크런의 결론 불일치 0** (§2-11 의 실질 잔여 위험 확인):
+
+```bash
+gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+  -q '[.check_runs[] | {name, conclusion}] | group_by(.name)[]
+      | select((map(.conclusion) | unique | length) > 1) | .[0].name'
+```
+
+> **G1 과 G2 는 직교다 — 어느 쪽도 다른 쪽을 포함하지 않는다.**
+> - **G1 만 잡는 것**: 동명 N개가 *전부* `cancelled` 인 경우 — 결론이 일치하므로 G2 는 침묵한다.
+> - **G2 만 잡는 것**: **`failure` + `success` 혼재** — flake 발 결론 불일치이며 §10-1 한계 3 이 지목하는 실질 잔여 위험이다. `cancelled` 가 하나도 없으므로 **G1 은 이를 원리적으로 검출하지 못한다.**
+>
+> **게이트 발화 확인 (negative baseline)**: Phase 0 *이전* 상태인 `c2732ae` 에 G2 를 돌리면 7개 이름이 출력된다 (§2-11 의 `cancelled,success` 7건 + `cancelled,skipped` 1건 = `a11y-baseline-guard` / `detect-and-test` / `long-integration-rust` / `measure` / `retry-fresh-runner` / `verify` / `verify-and-rust`). 게이트가 침묵하는 가드가 아님을 확인한 값이며, **Phase 0 이후 이 출력이 비는 것**이 진입 조건이다.
 
 ### A1 — Phase 1 적용 (main: 초 단위 체크 4개)
 
 현재 보호값을 그대로 보존하고 `required_status_checks` 만 추가하는 **전체 PUT** 이다 (부분 PATCH 는 기존 필드를 잃을 수 있다). `app_id: 15368` 은 GitHub Actions — 다른 앱이 동명 체크로 요구를 만족시키는 경로를 막는다.
+
+> **실행 전 준비**: §9-R1 명령 한 줄을 손 닿는 곳 (다른 터미널 탭) 에 띄워 둔다. Phase 1 의 첫 실전은 구조상 어차피 release PR 이므로 (§10-2 조건 3), 오차단이 나는 순간은 **릴리스가 진행 중인 상태**다.
 
 ```bash
 gh api -X PUT "repos/$REPO/branches/main/protection" --input - <<'JSON'
@@ -480,10 +574,15 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 
 1. **클래스 A 가드 5종은 required 화 불가** — 실행 시간 상위 4개 중 3개 (`verify` / `measure` / `a11y-baseline-guard`) 가 여기 속한다. 즉 본 정책이 커버하는 것은 "빠르고 항상 도는 가드" 이지 "무거운 시각·성능 회귀 가드" 가 아니다.
 2. **`develop` 직접 push 는 기계적으로 막히지 않는다** — 산문 규약과 기계 강제 사이의 격차가 남는다 (결정 2). ff-sync 를 지키기 위한 의도적 선택이다.
-3. **동명 체크런 해석은 여전히 미검증** — Phase 0 이 그 조건을 소멸시켜 회피하는 것이지, 규칙을 알아낸 것이 아니다. GitHub 이 향후 concurrency 외의 경로로 동명 체크런을 만들면 재발할 수 있다.
+3. **동명 체크런은 상존한다 — Phase 0 는 조건을 없애지 않고 완주 쌍을 늘린다** (초판 서술 정정). 초판은 *"Phase 0 이 그 조건을 소멸시켜 회피한다"* 고 썼으나 **실측이 반증했다** (§2-11). `push` + `pull_request` 양 트리거를 가진 required context — `project-guards` / `diff-scope` / `diff-scope-wasm` / `detect-and-test` (+ Phase 3 의 `verify-and-rust` / `long-integration-rust` / `duplicate-function-guard`) — 는 release PR SHA 에서 **항상 동명 2개**를 내고, `project-guards` 는 **Phase 0 이전인 지금 이미 그렇다** (`n=2 success,success`). 동명이 원천적으로 없는 것은 `pull_request` 전용 클래스 B 3개 (`branch-name` / `label-pr` / `pr-template-checklist`) 뿐이다. 나아가 Phase 0 는 `cancelled` 를 완주로 바꾸므로 **완주 동명 쌍을 3 → 7 로 늘린다**.
+   - **그럼에도 안전한 이유 (calibration — 이 정정이 공포 조장이 아닌 근거)**: 동명 N개가 **전부 `success` 면 어떤 해석 규칙에서도 통과한다** (latest 채택 / all-must-pass / first 채택 무관). 따라서 위험은 "동명이 여럿" 자체가 아니라 **결론 불일치** 하나로 국한된다. Phase 0 가 실제로 사는 것은 "동명 소멸" 이 아니라 **불일치 확률의 하락**이다 — 100% 재현되던 불일치 원인 (`cancelled`, release PR 6/6) 을 구조적으로 제거한다.
+   - **실질 잔여 위험 = flake 발 `failure` + `success` 혼재.** Phase 0 는 flake 를 제거하지 못한다. 본 저장소는 flake 전례를 보유한다 (`verify:699 deltaTime` / r1-guard Playwright / fps 부하 spike — #779 §매핑표에 자체 박제). 무거운 required check 의 **push run 만** flake 로 `failure` 가 되면 GitHub 의 해소 규칙은 미규정이고 (§2-2) 릴리스가 `BLOCKED` 될 수 있다. **이것이 본 정책의 최종 잔여 위험이며 설계로 제거되지 않는다.**
+   - **관측 수단**: §8-P0 의 **G2 게이트**가 이 조건을 직접 검사한다 (G1 의 `cancelled` 검사로는 원리적으로 검출 불가). 발생 시 대응은 §9-R1 (2초) 로 required 를 걷어내고 릴리스를 완주시킨 뒤, 재실행으로 결론을 수렴시키는 순서다 — **릴리스를 인질로 잡고 디버깅하지 않는다** (§10-4).
+   - **잔존 미검증**: GitHub 의 동명 **해소 규칙 자체**는 여전히 모른다 (§2-8 대로 사전 실증이 불가능하다). 본 정책은 규칙을 알아낸 것이 아니라 **불일치가 잘 일어나지 않게 만들고, 일어나면 잡히게** 한 것이다.
 4. **`branch-name` 의 소급 근거는 `n=1`** (#974) — release PR 에서의 보고 안정성 표본이 1건이다.
 5. **보호 상태 드리프트를 CI 가 감시하지 못한다** — 사람이 스크립트를 돌려야 한다 (§3-2). 반대 방향 (선언 ↔ job 이름 실재) 은 결정 8 이 CI 로 닫는다. 실행 절차는 §10-3 후속 2 에서 릴리스 런북 체크리스트로 편입한다 (cross-validate 보완 제안 ① 수용).
 6. **가드가 없던 시절 열린 PR 을 reopen 하면 영구 pending 이 될 수 있다** — `branch-name` 은 `types: [opened, synchronize]` 라 reopen 으로 재실행되지 않는다 (#962 ADR §5-2 의 **의도된** 설계). 현재 열린 PR 이 0건이라 노출은 없으나, 장수 PR 이 생기면 해당된다. **완화**: 빈 커밋 1개 push (`git commit --allow-empty` → `synchronize` 발화) 또는 Actions UI 재실행. required check 를 켠 뒤에는 이 절차를 알고 있어야 한다.
+   - **복구 경로는 체크마다 다르다 (비대칭)** — `types` 에 `edited` 를 가진 것은 `pr-template-checklist` (`[opened, edited, synchronize]`) **하나뿐**이라 **PR 본문 수정만으로 즉시 재실행**되어 초 단위로 복구된다. 반면 `branch-name` (`[opened, synchronize]`) 과 `label-pr` (`[opened, synchronize, ready_for_review]`) 은 본문 편집으로 재실행되지 않아 **빈 커밋 또는 Actions 재실행**이 필요하다. 릴리스 중 대응 속도가 갈리는 지점이므로 "어느 체크가 막혔는가" 를 먼저 확인해야 한다.
 7. **GitHub Actions 장애 시 릴리스가 멈춘다** — 체크가 보고되지 않으면 required 는 pending 이다. 대응은 §9-R1 (2초) 후 릴리스 완주.
 8. **fork PR 이 `main` 을 대상으로 하면 차단된다** — `label-pr` 은 `pull-requests: write` 가 필요한데 fork PR 의 `GITHUB_TOKEN` 은 read-only 라 실패한다. 단 **본 정책의 영향은 0** 이다: fork PR 은 `develop` 을 대상으로 하고 develop 에는 required check 가 없다 (결정 2). `main` 은 release/hotfix 전용이라 fork PR 이 도달할 경로가 정책상 존재하지 않으며, 도달한다면 차단이 옳은 동작이다.
 9. **hotfix 경로는 실측 표본이 0건이다** — 정적으로는 통과한다 (`hotfix` 는 `branch-name` 허용 type, base=main 이라 클래스 B/C 전부 트리거). 그러나 소급 대조에 쓸 실제 hotfix PR 이 없다 → §10-4 단계 4 에서 확인.
@@ -493,8 +592,8 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 아래 **전건** 충족 시 상태를 `Accepted` 로 갱신한다.
 
 1. 사용자가 §8 적용을 승인.
-2. Phase 0 머지 + release PR 1건에서 `cancelled` 체크런 0 실측.
-3. Phase 1 적용 후 **일상 PR 1건 + release PR 1건**에서 오차단 0 실증 (§10-4 판정 기준).
+2. Phase 0 머지 + release PR 1건에서 §8-P0 의 **G1 (`cancelled` 0) 과 G2 (동명 결론 불일치 0) 동시** 실측.
+3. Phase 1 적용 후 **release PR 1건** (+ 가능하면 hotfix PR 1건 — §10-1 한계 9) 에서 오차단 0 실증 (§10-4 판정 기준). ⚠️ **일상 PR 은 검증력이 0 이라 조건에서 제외한다** — 일상 개발 PR 은 `base=develop` 이고 develop 에는 required check 를 영구 미채택하므로 (결정 2) **main 의 required check 를 한 번도 통과하지 않는다**. *"일상 PR 이 통과했으니 안전"* 은 거짓 확신이다. `main` 을 대상으로 하는 PR 은 release PR 과 hotfix PR 뿐이며, 그래서 Phase 1 의 첫 실전은 어차피 release PR 이다.
 4. §9 롤백 명령이 릴리스 런북에 링크됨.
 
 ### 10-3 후속 이슈 (분리 필요 — 본 ADR 범위 밖)
@@ -549,15 +648,17 @@ git push origin --delete chore/971-protection-probe
 
 **단계 3 — Phase 1 적용 직후 라이브 관찰**
 
+대상은 **release PR 또는 hotfix PR** 이다 (일상 PR 은 `base=develop` 이라 main 의 required check 를 통과하지 않는다 — §10-2 조건 3).
+
 ```bash
-gh pr view <PR> --json mergeable,mergeStateStatus,statusCheckRollup \
+gh pr view <release 또는 hotfix PR> --json mergeable,mergeStateStatus,statusCheckRollup \
   -q '{mergeable, state: .mergeStateStatus, required: [.statusCheckRollup[] | {name, conclusion}]}'
 ```
 
 **오차단 0 판정 기준** (전건 충족):
 - `mergeStateStatus` 가 **`BLOCKED` 이 아님** (`CLEAN` 또는 `UNSTABLE` — `UNSTABLE` 은 비-required 체크 실패라 머지 가능).
 - required 4개 컨텍스트가 전부 `SUCCESS` 또는 `SKIPPED`.
-- release PR 에서 `cancelled` 체크런 0.
+- release PR 에서 §8-P0 **G1 + G2 가 동시에 빈 출력** (`cancelled` 0 **그리고** 동명 결론 불일치 0).
 - ff-sync `git push origin main:develop` 가 거부 없이 완료.
 
 **단계 4 — hotfix 경로 정적 확인 (§10-1 한계 9)**
