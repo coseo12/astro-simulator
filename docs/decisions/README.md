@@ -19,6 +19,7 @@
 | 2026-04-20 | [jq-based-parsing-no-op](20260420-jq-based-parsing-no-op.md) | Accepted (NO-OP) | cross-validate outcome JSON 파싱의 jq 전환 **기각** — grep/sed 파이프라인 유지 + 경계 가드 테스트 추가 |
 | 2026-07-31 | [907-harness-decouple](20260731-907-harness-decouple.md) | Accepted | 하네스 동기화 디커플 — 주기 동기화 중단 + upstream 읽기 전용 강등 + 기계장치 청산. Supersedes: `20260515-harness-managed-divergent-pattern`, `20260419-prettier-harness-conflict` |
 | 2026-08-06 | [962-branch-name-guard](20260806-962-branch-name-guard.md) | Accepted | 브랜치명 규약의 정본을 산문 3곳에서 실행 가능한 가드 상수로 이전 — CI 런타임 검사 + 산문 파생 정적 대조. #942 규약의 강제 수단 |
+| 2026-08-07 | [971-required-status-checks](20260807-971-required-status-checks.md) | **Provisional** | branch protection required status check 정책 — `main` 한정 3단계 도입 + `develop` 은 최소 보호(force-push·삭제 차단)만 하고 required check **영구 미채택** (ff-sync 보호). 선행 ADR: `20260806-962-branch-name-guard` §6-2 인계 |
 
 ## 언제 작성하는가
 
