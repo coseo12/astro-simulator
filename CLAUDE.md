@@ -218,17 +218,17 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 ### sub-agent 이탈의 프로세스 레벨 확장 — cargo/next dev 좀비 누적
 
-- **sub-agent 반환 직전**: 띄운 PID → `spawned_bg_pids`, 미확인 시 `bg_process_handoff` 인계. `agent-browser` 사용 시 `bash scripts/cleanup-browser.sh` **기본 모드** (전량 pkill 금지 — 병행 오살 방지 #926). `--all` 은 **메인 전용**.
+- **sub-agent 반환 직전**: 띄운 PID → `spawned_bg_pids`, 미확인 시 `bg_process_handoff` 인계. `agent-browser` 사용 시 `bash scripts/cleanup-browser.sh` **기본 모드** (전량 pkill 금지 — 병행 오살 방지 #926). `--all` 은 **병행 브라우저 작업 부재 확인 후** **메인 전용**.
 - **메인, 복귀 직후**: `ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep` + `pgrep -af "agent-browser-chrome[-]"` (bracket 필수 — 오탐 방지) → 세션 이전 것만 정리.
 - 상세: [zombie-process-guards.md](docs/ops/zombie-process-guards.md) — volt #24 / #79
 
 #### 가드 A — 메인 spawn 시점 lsof 선행
 
-장기 프로세스 spawn **직전** 사용 포트(3000/4000 등) `lsof -i :$PORT` 의무 — 좀비가 HTTP 응답해 "ready" 오인 (#440). 점유 시 `ps -p $(lsof -t -i :$PORT) -o pid,etime,command`.
+장기 프로세스 spawn **직전** 사용 포트(3000/4000 등) `lsof -i :$PORT` 의무 — 좀비가 HTTP 응답해 "ready" 오인 (#440). 점유 시 `ps -p $(lsof -t -i :$PORT) -o pid,etime,command` → 좀비 인지 + **사용자 보고** + 정리 후 재시작.
 
 #### 가드 B — sub-agent-confirmed-done 카나리아
 
-포트 사용 sub-agent 복귀 직후 **보고와 무관하게** 위 명령 1회. `spawned_bg_pids` 는 자기 spawn PID 만 추적 → 이전 세션 좀비는 추적 밖 (`"sub-agent-confirmed-done"` 도 정의상 정합 PASS). **ETIME ≥ 30분 = 이전 세션 좀비 의심** (가드 C hook / `qa.md` — 3곳 SSoT).
+포트 사용 sub-agent 복귀 직후 **보고와 무관하게** 위 명령 1회. `spawned_bg_pids` 는 자기 spawn PID 만 추적 → 이전 세션 좀비는 추적 밖 (`"sub-agent-confirmed-done"` 도 정의상 정합 PASS). **ETIME ≥ 30분 = 이전 세션 좀비 의심** (가드 C hook / `qa.md` — 3곳 SSoT). 발견 시 **사용자 보고 + 정리 후** 다음 작업.
 
 #### 가드 C — 세션 시작 hook
 

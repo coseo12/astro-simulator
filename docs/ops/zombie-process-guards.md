@@ -1,5 +1,7 @@
 # 좀비 프로세스 가드 — 계층 구조 + incident 서사 (#440 / volt #24·#46·#52·#79)
 
+> ⚠️ **본 문서의 인용 블록은 이관 시점(2026-08-07, #980)의 동결 스냅샷이다.** 행동 규칙의 **정본은 CLAUDE.md** 이며, CLAUDE.md 잔여가 갱신되면 여기 인용은 조용히 stale 해진다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 리뷰 🟡-2). 인용과 정본이 어긋나 보이면 **CLAUDE.md 를 신뢰**하고 본 문서를 갱신하라. `ETIME 30분` 처럼 기계 가드(`verify-zombie-check.mjs`)가 검사하는 값만 자동 정합이 보장된다.
+
 sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버 / cargo test / agent-browser Chrome)가 정리되지 않고 누적되는 클래스의 **원인·실측·가드 계층 SSoT**.
 
 `CLAUDE.md` 에는 **행동 규칙**(명령 리터럴 / 임계값 / 금지)만 남기고, *왜 그 규칙이 지금의 형태인지* 를 재구성할 수 있는 근거(재현 시퀀스 / 실측 수치 / 계층 간 직교성 논증)는 본 문서가 보유한다 — [#980](https://github.com/coseo12/astro-simulator/issues/980) 축 A 이관. **§1~§2·§4~§6 의 인용 블록은 이관 전 CLAUDE.md 원문 그대로**이며(지식 유실 0 계약), 그 바깥 산문이 본 문서에서 보강한 맥락이다.
