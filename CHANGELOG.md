@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Notes (chore — 앱 행동 변화 없음)
+
+- **[#971] required status check 롤백 런북 박제 — §10-2 전이 조건 4 충족** ([#971](https://github.com/coseo12/astro-simulator/issues/971)) — [`docs/guides/branch-strategy-workflow.md`](docs/guides/branch-strategy-workflow.md) 에 **§required status check 롤백** 절 신설. ADR [20260807-971](docs/decisions/20260807-971-required-status-checks.md) §9-R1 의 1줄 명령(`gh api -X DELETE .../protection/required_status_checks`)을 **릴리스 런북에서 도달 가능**하게 만든 것이다 — ADR 이 _"탈출구가 문서화되지 않으면 존재하지 않는 것과 같다"_ 며 Phase 1 산출물로 고정한 항목(§10-2 조건 4). **핵심 지침**: 릴리스 도중 오차단 시 **릴리스를 인질로 잡고 디버깅하지 말 것** — R1 로 걷어내고 완주시킨 뒤 원인 분석. `enforce_admins: true` 가 규칙의 **우회**만 막고 **편집**은 막지 않으므로 admin 토큰으로 약 2초에 동작한다. 5시나리오 중 **D(동일 SHA 복수 PR head)만 rerun 으로 회복 불가**임과 사전 확인 1줄(`actions/runs?head_sha=` 로 `distinct head_branch == 1`)을 함께 박제했다. **저장소 보호 설정은 본 PR 에서도 변경되지 않았다** (`gh api` GET 만).
+
 ## [0.62.0] — 2026-08-07
 
 ### Behavior Changes

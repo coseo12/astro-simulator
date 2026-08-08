@@ -97,6 +97,34 @@ node scripts/verify-branch-name.mjs --branch feature/962-x   # 임의 이름 검
 
 `main` branch protection 에 `required_status_checks` 가 **부재**하고 `develop` 은 보호 자체가 **없다** (2026-08-06 실측). 본 가드는 붉은 X 를 띄우지만 GitHub 이 머지를 기계적으로 막지는 **않는다**. 전 워크플로 공통 상태이며 보호 정책 전반의 별건이다.
 
+## required status check 롤백 (릴리스가 막혔을 때 — #971)
+
+> **전제**: 아래는 `main` 에 required status check 가 **적용된 뒤에만** 의미가 있다. 현재 적용 상태는
+> `gh api "repos/coseo12/astro-simulator/branches/main/protection" -q '.required_status_checks'` 로 확인한다 (`null` = 미적용).
+
+릴리스 도중 required check 가 오차단하면 **릴리스를 인질로 잡고 디버깅하지 말 것.** 아래 1줄로 걷어내고 릴리스를 완주시킨 뒤 원인을 분석한다. `enforce_admins: true` 는 규칙의 **우회**만 막고 **편집**은 막지 않으므로 이 명령은 admin 토큰으로 즉시 동작한다 (약 2초).
+
+```bash
+REPO=coseo12/astro-simulator
+
+# R1 — required check 만 제거 (1차 대응. 나머지 보호는 유지)
+gh api -X DELETE "repos/$REPO/branches/main/protection/required_status_checks"
+
+# 검증 (기대: null)
+gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks'
+```
+
+**언제 R1 을 쓰는가** — ADR [20260807-971](../decisions/20260807-971-required-status-checks.md) §10-6 의 5시나리오 중 **D (동일 SHA 가 복수 PR 의 head)** 는 **rerun 으로 회복되지 않는다**. `branch-name` 은 판정이 브랜치 *이름*의 함수라 한 SHA 위에 정당한 모순 결론이 영구 공존하기 때문이다. A·B·C·E 는 rerun 으로 회복된다.
+
+**사전 확인 1줄** (A1 직전 / 릴리스 직전):
+
+```bash
+gh api "repos/$REPO/actions/runs?head_sha=<full-sha>&per_page=100" \
+  -q '[.workflow_runs[]|select(.event=="pull_request")|.head_branch]|unique|length'   # 기대: 1
+```
+
+전체 롤백 절차(R2 `develop` 보호 해제 / R3 전량 해제)와 적용 payload 는 **ADR §8·§9** 가 정본이다.
+
 ## 커밋 컨벤션 / PR 규칙
 
 PR #290 reviewer 권고 3 (PR #293) 부터 단독 분리. 상세: [docs/guides/pr-conventions.md](pr-conventions.md).
