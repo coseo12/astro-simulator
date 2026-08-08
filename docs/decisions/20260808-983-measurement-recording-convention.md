@@ -1,7 +1,7 @@
 # ADR: 수치 박제 규약 — 부분 재측정·술어 미명시 클래스 차단 (#983)
 
 - 일자: 2026-08-08
-- **상태**: **Accepted**
+- **상태**: **Accepted** (cross-validate agy 2026-08-08 — outcome 은 CHANGELOG `[Unreleased]` entry. 본 ADR 은 원조 §Amendment 19 확장분의 **거처 이동**이며 조문 신설이 아니다 — 초판이 추가한 90줄 중 **본 ADR 에 부재한 줄 0**, reviewer 실측)
 - 관련: 이슈 [#983](https://github.com/coseo12/astro-simulator/issues/983) / [#989](https://github.com/coseo12/astro-simulator/issues/989) (자매 규약 — 전수 grep) / PR [#994](https://github.com/coseo12/astro-simulator/pull/994)
 - **원조**: [20260515-harness-managed-divergent-pattern.md](20260515-harness-managed-divergent-pattern.md) §Amendment 19 §수치 박제 규약 (#897)
 
@@ -121,5 +121,5 @@ _"링크·번호"_ 인데 실제 계수는 `#N` 한정)였다 — 값이 틀린 
 ## 결과 · 재검토 조건
 
 1. **본 규약이 다시 위반되면** — 위반 사례를 §오기록 분류표에 행으로 추가하고, 해당 클래스를 겨누는 항을 신설한다. 표가 길어지는 것은 문제가 아니다 — **분류되지 않은 클래스가 문제다**
-2. **기계화 재검토** — 아래 §기각 2 참조. 재검토 트리거는 *"정밀도 향상"* 이 아니라 **"수치가 구조화 블록(표·JSON)으로만 박제되는 관행이 정착했는가"** 이며, 관측 술어는 **직전 10개 PR 의 CHANGELOG entry 중 산문에 raw 수치를 넣은 비율 ≤ 20%** 다
+2. **기계화 재검토** — 위 §기각 2 참조. 재검토 트리거는 *"정밀도 향상"* 이 아니라 **"수치가 구조화 블록(표·JSON)으로만 박제되는 관행이 정착했는가"** 이며, 관측 술어는 ****직전 10개 머지 PR** 의 CHANGELOG entry(분모 = entry 수, PR 수 아님) 중 **산문 raw 수치**(= 표·JSON·코드펜스 **밖**의 숫자. **버전 문자열 / 이슈·PR 번호 / 날짜는 제외**)를 포함한 entry 비율 **≤ 20%**** 다
 3. **원조 ADR 과의 관계** — 원조가 `Superseded` 상태이므로 본 ADR 이 실무 정본이다. 원조를 편집하지 않는다
