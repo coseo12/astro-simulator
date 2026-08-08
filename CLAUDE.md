@@ -222,7 +222,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 - **메인, 복귀 직후**: `ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep` + `pgrep -af "agent-browser-chrome[-]"` (bracket 필수 — 오탐 방지) → 세션 이전 것만 정리.
 - 상세: [zombie-process-guards.md](docs/ops/zombie-process-guards.md) — volt #24 / #79
 
-> **잔여 계약** (#980): 아래 가드 A~C 는 **행동 규칙만** 남기고 서사는 [zombie-process-guards.md](docs/ops/zombie-process-guards.md) 로 이관. **인간-루프 의무(사용자 보고·확인)는 잔여 필수** — 1차 이관이 8회→1회로 강등시킨 전례.
+> **잔여 계약** (#980): 본 절(위 `--all` 전제 포함) 의 가드 A~C 는 **행동 규칙만** 남기고 서사는 [zombie-process-guards.md](docs/ops/zombie-process-guards.md) 로 이관. **인간-루프 의무(사용자 보고·확인)는 잔여 필수** — 1차 이관이 8회→1회로 강등시킨 전례.
 
 #### 가드 A — 메인 spawn 시점 lsof 선행
 
