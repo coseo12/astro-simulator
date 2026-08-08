@@ -55,7 +55,7 @@ jobs:
         run: bash scripts/verify-release-version-bump.sh
 
       # CLAUDE.md 각인 예산 가드 (#197 Phase 2 → #905 fail-fast 복구 → #907 이설)
-      # 45k chars 초과 시 exit 1 로 감축 PR 을 강제. 35k/40k 는 warn (exit 0).
+      # 45k chars 이상 exit 1 로 감축 PR 을 강제. 33k/40k 는 warn (exit 0). 임계 SSoT = scripts/verify-claudemd-size.mjs
       # 지침: docs/guides/claudemd-governance.md §3 (정량 게이트)
       # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행).
       - name: CLAUDE.md 각인 예산 가드 self-test

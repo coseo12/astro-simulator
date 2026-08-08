@@ -6,9 +6,9 @@
  *
  * 배경: 기존 scripts/verify-claudemd-size.sh 는 upstream lib/verify-claudemd-size.js 를
  * exec 했으나 lib 배포 누락 (upstream v3.6.0) 으로 로컬 MODULE_NOT_FOUND + CI hashFiles
- * 조건 silent skip (#338 임시 패치) 상태가 지속 — CLAUDE.md 가 35k warn 을 초과한
- * (실측 36,817 chars) 상태에서도 경보가 0회 발화했다. #842 가 verify-docs-links 에
- * 적용한 것과 동형으로 다운스트림 자체 가드로 신설. 당시 .sh wrapper 는 manifest
+ * 조건 silent skip (#338 임시 패치) 상태가 지속 — CLAUDE.md 가 당시 경보 임계 35k 를
+ * 초과한 (실측 36,817 chars) 상태에서도 경보가 0회 발화했다. #842 가 verify-docs-links
+ * 에 적용한 것과 동형으로 다운스트림 자체 가드로 신설. 당시 .sh wrapper 는 manifest
  * 등재 (harness-managed) 라 유지했으나, #907 디커플로 manifest 체제가 소멸해 유지
  * 근거가 사라졌고 실행 시 MODULE_NOT_FOUND 만 내므로 #975 에서 삭제했다.
  *
@@ -20,19 +20,19 @@
  * 임계 계약 상세 (SSoT 는 위 가이드 §3):
  *   - 측정 단위: Unicode code point (`[...str].length`) — locale 독립 (#203 근거:
  *     `wc -m` 은 locale 미설치 runner 에서 바이트 폴백 → 한글 62% 부풀림 오탐)
- *   - x < 35k          : pass (조용)
- *   - 35k <= x < 40k   : 경계 경보 (stdout, exit 0)
+ *   - x < 33k          : pass (조용)
+ *   - 33k <= x < 40k   : 경계 경보 (stdout, exit 0)
  *   - 40k <= x < 45k   : PR warn (stdout, exit 0 — 신규 인라인 블록 금지 안내)
  *   - x >= 45k         : fail (stderr, exit 1 — 감축 PR 강제)
  *
  * 환경변수 override (기존 .sh 헤더가 문서화한 인터페이스 유지):
  *   CLAUDEMD_FILE                     : 검사 대상 파일 (기본 <repo>/CLAUDE.md)
- *   CLAUDEMD_SIZE_LIMIT_WARN_BOUNDARY : 경계 경보 임계 (기본 35000)
+ *   CLAUDEMD_SIZE_LIMIT_WARN_BOUNDARY : 경계 경보 임계 (기본 33000)
  *   CLAUDEMD_SIZE_LIMIT_WARN_PR       : PR warn 임계 (기본 40000)
  *   CLAUDEMD_SIZE_LIMIT_FAIL          : fail 임계 (기본 45000)
  *
  * 종료 코드:
- *   0 — pass 또는 warn (35k/40k 구간)
+ *   0 — pass 또는 warn (33k/40k 구간)
  *   1 — fail (45k 이상)
  *   2 — 실행 에러 (대상 파일 부재 / 임계값 비정상 / 임계 역전)
  *
@@ -56,7 +56,8 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = resolve(dirname(SCRIPT_PATH), '..');
 
 // 임계 기본값 — governance §3 표와 동일 (재조정 시 가이드 표와 동일 PR 로 갱신)
-const DEFAULT_WARN_BOUNDARY = 35_000;
+// 35,000 → 33,000 하향 (#980 축 B). 근거·재조정 이력은 governance §3.1.1
+const DEFAULT_WARN_BOUNDARY = 33_000;
 const DEFAULT_WARN_PR = 40_000;
 const DEFAULT_FAIL = 45_000;
 
@@ -196,11 +197,13 @@ function runSelfTest() {
     assert('recovery: PASS 마커 출력', rec.stdout.includes(MARK_PASS));
 
     // --- 경계 전수 (off-by-one — governance §3 표의 "이상/미만" 계약) ---
-    const b1 = invoke(asciiFixture('b34999.md', 34_999));
-    assert('경계: 34,999 → 조용한 pass', b1.status === 0 && b1.stdout.includes(MARK_PASS));
-    const b2 = invoke(asciiFixture('b35000.md', 35_000));
+    const b1 = invoke(asciiFixture('b32999.md', 32_999));
+    assert('경계: 32,999 → 조용한 pass', b1.status === 0 && b1.stdout.includes(MARK_PASS));
+    // 33,000 하향(#980 축 B) 회귀 가드 — 상수가 35,000 으로 되돌아가면 이 케이스가 PASS 마커를
+    // 내며 FAIL 한다 (구 임계에서는 33,000 이 조용한 pass 구간이었다).
+    const b2 = invoke(asciiFixture('b33000.md', 33_000));
     assert(
-      '경계: 35,000 → 경계 경보 (exit 0)',
+      '경계: 33,000 → 경계 경보 (exit 0)',
       b2.status === 0 && b2.stdout.includes(MARK_WARN_BOUNDARY),
       `status=${b2.status} stdout=${b2.stdout.trim()}`,
     );
@@ -238,9 +241,10 @@ function runSelfTest() {
     // --- fail-fast 계약 (실행 에러 exit 2) ---
     const missing = invoke(join(dir, 'does-not-exist.md'));
     assert('fail-fast: 대상 부재 → exit 2', missing.status === 2, `status=${missing.status}`);
+    // 값은 "역전" 만 만들면 되므로 실제 임계와 무관한 숫자를 쓴다 (기본 임계 grep 감사 오탐 방지)
     const inverted = invoke(posPath, {
       CLAUDEMD_SIZE_LIMIT_WARN_BOUNDARY: '45000',
-      CLAUDEMD_SIZE_LIMIT_FAIL: '35000',
+      CLAUDEMD_SIZE_LIMIT_FAIL: '30000',
     });
     assert('fail-fast: 임계 역전 → exit 2', inverted.status === 2, `status=${inverted.status}`);
     const badEnv = invoke(posPath, { CLAUDEMD_SIZE_LIMIT_FAIL: 'abc' });

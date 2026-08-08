@@ -14,6 +14,8 @@ develop
 
 ### 2. 릴리스 (MAJOR/MINOR/PATCH 공통)
 
+> 🔴 **릴리스가 required check 로 막히면** → [§required status check 롤백](#required-status-check-롤백-릴리스가-막혔을-때--971) (R1 한 줄, 약 2초)
+
 ```
 develop   (충분히 쌓이면)
    ↓ 단일 release PR (base=main, head=develop)
@@ -96,6 +98,70 @@ node scripts/verify-branch-name.mjs --branch feature/962-x   # 임의 이름 검
 ### 한계
 
 `main` branch protection 에 `required_status_checks` 가 **부재**하고 `develop` 은 보호 자체가 **없다** (2026-08-06 실측). 본 가드는 붉은 X 를 띄우지만 GitHub 이 머지를 기계적으로 막지는 **않는다**. 전 워크플로 공통 상태이며 보호 정책 전반의 별건이다.
+
+## required status check 롤백 (릴리스가 막혔을 때 — #971)
+
+> **적용 여부부터 확인** — 아래는 `main` 에 required status check 가 **적용된 뒤에만** 의미가 있다.
+>
+> ```bash
+> REPO=coseo12/astro-simulator
+> gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks | tojson'
+> # null  = 미적용 (현재 상태)    /    {...} = 적용 중
+> ```
+>
+> ⚠️ `| tojson` **필수**. `-q '.required_status_checks'` 만 쓰면 미적용 시 **빈 줄**이 나와 *"명령이 조용히 실패한 것"* 과 구분되지 않는다 (실측 2026-08-07).
+
+릴리스 도중 required check 가 오차단하면 **릴리스를 인질로 잡고 디버깅하지 말 것.** 걷어내고 완주시킨 뒤 원인을 분석한다. `enforce_admins: true` 는 규칙의 **우회**만 막고 **편집**은 막지 않으므로 admin 토큰으로 즉시 동작한다 (약 2초 — R1 은 아직 실 발동 이력이 없어 추정치다).
+
+```bash
+REPO=coseo12/astro-simulator
+
+# R1 — required check 만 제거 (1차 대응. 나머지 보호는 유지)
+gh api -X DELETE "repos/$REPO/branches/main/protection/required_status_checks"
+gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks | tojson'   # 기대: null
+# ⚠️ R1 실행 = Phase 1 이 조용히 롤백된 상태. 원인 해소 후 §8-A1 로 **재적용**해야 한다
+
+# R3 — R1 이 듣지 않을 때만 (보호 전량 해제). ⚠️ 릴리스 완주 직후 §8-A1 로 반드시 재적용
+gh api -X DELETE "repos/$REPO/branches/main/protection"
+```
+
+### 시나리오별 1차 대응 (ADR §10-6 축자)
+
+> ⚠️ **letter 는 load-bearing** — ADR·PR·CHANGELOG 가 *"시나리오 D"* 처럼 letter 로 참조한다. 아래는 [ADR §10-6](../decisions/20260807-971-required-status-checks.md) 을 **그대로 옮긴 것**이며, 재해석하지 말 것.
+
+| # | 시나리오 | 증상 | 대응 |
+|---|---|---|---|
+| **A** | `project-guards` 가 **`cancelled`** 로 남음 (Phase 0 미작동) | 회색 취소 + *"Required statuses must pass"* | **rerun** → `success` 면 진행. **반복되면 §9-R1** |
+| **B** | 세 체크 중 하나가 **flake `failure`** | 빨간 X + 머지 차단 | **rerun** (같은 머신 재시도로 충분한 클래스) |
+| **C** | **동명 쌍 결론 불일치** (`{failure, success}`) | GitHub 이 어느 쪽을 채택하는지 **미문서화** — 초록인데 차단되거나 `mergeStateStatus=BLOCKED` 가 **이유 없이** 붙은 것처럼 보인다 | rerun 으로 회복 안 되면 **즉시 §9-R1** |
+| **D** | **PR 다중성** — release head SHA 가 다른 PR 의 head 이기도 해 `branch-name` 이 `{failure, success}` | rerun 해도 **`failure` 가 사라지지 않는다** (다른 PR 의 브랜치명은 그대로) | **§9-R1 필수** |
+| **E** | Actions 장애 / 외부 지연 | 체크가 **영구 Pending** — 빨강도 초록도 아님 | **§9-R1** — ⚠️ **Pending 은 rerun 대상이 없다.** 누를 버튼을 찾지 말 것 |
+
+**자가 진단이 원리적으로 불가능한 건 C 다** — 증상이 *"이유 없이 BLOCKED"* 라 원인 분석 모드로 진입하기 쉽다. **초록인데 막히면 C 를 먼저 의심**하고 R1 로 넘어간다.
+
+> **정상 경로와 혼동하지 말 것**: 머지 버튼이 10~15초 늦게 활성화되는 것은 오차단이 아니라 required check 대기다. 위 표는 **빨강·회색·영구 Pending** 이 뜬 경우다.
+
+> **D 는 롤백해도 흔적이 남는다** — 갈린 `failure` 체크런은 그 SHA 에 **영구 기록**된다. R1 은 *머지를 뚫을 뿐* 기록을 지우지 않는다. 기록까지 깨끗해지는 유일한 경로는 **새 head SHA 로 릴리스를 재생성**하는 것이고, 그 비용이 ADR 이 말하는 *"릴리스 1주기"* 다.
+
+### 사전 확인 — A1 직전 / 릴리스 머지 직전 1줄
+
+```bash
+REPO=coseo12/astro-simulator
+SHA=$(gh pr view <PR번호> --json headRefOid -q .headRefOid)   # ADR §10-4 정본. full SHA 반환
+# ⚠️ `git rev-parse <ref>` 로 대체하지 말 것 — 로컬 stale / merge-back 커밋을 집어 조용히 n=0 을 낸다 (실측)
+gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+  -q '[.workflow_runs[]|select(.event=="pull_request")|.head_branch] | unique | "n=\(length)  \(join(","))"'
+```
+
+| 출력 | 의미 |
+|---|---|
+| `n=1  develop` | ✅ 정상 — 진행 |
+| `n=0` | ⚠️ **안전 신호가 아니다.** 이 SHA 는 **PR head 가 아니라** 판정 대상 부적격이다. 원인: 축약 SHA / 잘못된 ref(로컬 stale·merge-back 커밋) / run 보존기간 90일 만료 / `paths-ignore` 로 run 미생성. **어느 쪽이든 결론은 같다 — A1 연기** |
+| `n≥2` | 🔴 **D 시나리오 성립** — A1 을 연기하거나 head SHA 를 교체한다 |
+
+⚠️ **A1 직전 실행은 본 축약본이 아니라 ADR [§8-P1-G](../decisions/20260807-971-required-status-checks.md) 원문**(전제 확인 S1~S4 포함)으로 한다.
+
+전체 롤백 절차(R2 `develop` 보호 해제 / R4)와 적용 payload 는 **ADR [§8·§9](../decisions/20260807-971-required-status-checks.md)** 가 정본이다.
 
 ## 커밋 컨벤션 / PR 규칙
 
