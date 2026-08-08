@@ -1,6 +1,20 @@
 # ADR: branch protection required status check 정책 — main 한정 단계적 도입, develop 은 required check 미채택 (#971)
 
-- **상태**: **Provisional** (cross-validate agy 2026-08-07 3회 반영 완료 — §11 / reviewer 정적 리뷰 **4회** 반영 — 아래) — 교차검증·리뷰는 통합했으나 **저장소 설정이 미변경**이라 Accepted 로 올리지 않는다. 본 ADR 은 설계·근거·절차만 확정하며, 적용은 사용자 승인 후 메인 오케스트레이터가 §8 로 수행한다. Accepted 전이 조건은 §10-2.
+- **상태**: **Accepted** (2026-08-08 — §10-2 전이 조건 **6/6 전건 충족**. cross-validate agy 3회 반영 §11 / reviewer 정적 리뷰 **4회** 반영 — 아래)
+
+  | 전이 조건 | 충족 근거 |
+  |---|---|
+  | 1. 사용자 §8 적용 승인 | 2026-08-07 |
+  | 2. release PR G1+G2 동시 실측 | v0.62.0 ([#985](https://github.com/coseo12/astro-simulator/pull/985)) — `cancelled` **7 → 0** |
+  | 2-bis. P1-G 통과 | S1~S4 전건 + 빈 출력 |
+  | 3. Phase 1 후 release PR 1건 오차단 0 | **v0.63.0** ([#992](https://github.com/coseo12/astro-simulator/pull/992)) — required 3종 전부 `success`, `mergeStateStatus=CLEAN` |
+  | 4. §9 롤백 런북 링크 | [#986](https://github.com/coseo12/astro-simulator/pull/986) |
+  | 5. 다음 release PR 관찰 | v0.62.0 |
+  | 6. Phase 0 이후 head 로 P1-G 재실행 | `2553c80` |
+
+  > **조건 3 의 핵심 관측**: release PR #992 head `614f1d9` 에서 `project-guards` 가 **`n=2` 인 채 둘 다 `success`** 였고 GitHub 이 머지를 허용했다. §2-11 이 예측한 *"Phase 0 는 동명을 없애는 게 아니라 **완주 쌍을 늘린다**. 그럼에도 전부 통과 결론이면 어떤 해석 규칙에서도 통과한다"* 가 **required check 하에서 실증**된 것이며, §2-2 가 *"미문서화"* 로 분류한 동명 해석 규칙이 **적어도 전부 `success` 인 경우에는 통과**임이 관측으로 확인된다. Phase 2/3 은 별도 판단 (§6 결정 1).
+
+- **errata 정정 (Accepted 전이 동봉, 2026-08-08)**: reviewer 가 4라운드에 걸쳐 지적한 4클래스 8줄. ① 결정 5 의 `§8-R1/R2/R3` → 실제 **§9** (5곳) ② §10-6 *"**실측** 2초"* → **추정** (R1~R4 실 발동 이력 **0**) ③ §9 *"2~3초"* 동일 ④ §9-R1 검증 줄의 `→ null` → **`| tojson` 필수** — 없으면 미적용 시 **빈 줄**이 나와 *"조용한 실패"* 와 구분되지 않는다. ④ 는 PR [#986](https://github.com/coseo12/astro-simulator/pull/986) 🔴-2 가 **런북에서 먼저 잡은 결함이 ADR 본문에 잔존**한 것이고, §8-A1 *"실행 전 준비"* 가 운영자를 §9-R1 로 직접 보내므로 **다음 A1 전 필수**였다.
 - **reviewer 반영 1차** (2026-08-07, PR [#977](https://github.com/coseo12/astro-simulator/pull/977)): 초판의 *"Phase 0 이 동명 체크런 조건을 소멸시킨다"* 서술이 **실측과 반대**임이 독립 재현으로 드러났다. §2-2 / §5 (b) / §6-2 / §10-1 한계 3 을 정정하고 **§2-11 (동명 체크런 전수 집계) 신설** + **§8-P0 `G2` 게이트 (동명 결론 불일치 검출) 신설**. 설계 자체 (단계 구성 / required 집합 / develop 보호 수준 / `enforce_admins` 판정) 는 **무변경** — reviewer 가 판정 6건을 전부 정합으로 확인했다.
 - **reviewer 반영 2차 — Phase 1 착수 전 필수 정정** (2026-08-07, PR [#978](https://github.com/coseo12/astro-simulator/pull/978) = Phase 0 머지분의 리뷰): **사실 전제 3건이 반증됐고, 결정 조항이 그 위에 서 있었다.** 1차 정정과 달리 이번에는 **설계 자체가 바뀐다**.
 
@@ -609,7 +623,7 @@ c2732ae  distinct_head_branch=1  develop
 
 "develop 직접 push 금지" 라는 CLAUDE.md 산문 규약은 **기계적으로 강제하지 않는다**. 강제하면 §4 (c)/(d) 대로 릴리스 의례가 깨지기 때문이다. 이 격차는 은폐하지 않고 §10-1 에 한계로 명시한다.
 
-부수 효과 (수용): develop 의 긴급 force-push 복구가 불가능해진다. 대체 경로는 revert 커밋이며, 정말 필요하면 §8-R2 롤백으로 5초 내 해제 가능.
+부수 효과 (수용): develop 의 긴급 force-push 복구가 불가능해진다. 대체 경로는 revert 커밋이며, 정말 필요하면 §9-R2 롤백으로 5초 내 해제 가능.
 
 ### 결정 3 — CANCELLED: **가정하지 않고 구조적으로 제거**
 
@@ -630,15 +644,15 @@ develop 에 required check 를 도입하지 않고 (결정 2) 봇 PR 은 main �
 
 ### 결정 5 — `enforce_admins`: **`true` 유지 (낮추지 않음)**
 
-`enforce_admins` 는 **규칙의 우회**를 통제할 뿐 **규칙의 편집·삭제**를 막지 않는다. 토큰이 `repo` scope + repo `admin: true` 이므로 (§2-1) §8-R1 의 한 줄로 **약 2초 만에** required check 를 걷어낼 수 있다. 즉 탈출구는 이미 존재한다.
+`enforce_admins` 는 **규칙의 우회**를 통제할 뿐 **규칙의 편집·삭제**를 막지 않는다. 토큰이 `repo` scope + repo `admin: true` 이므로 (§2-1) §9-R1 의 한 줄로 **약 2초 만에** required check 를 걷어낼 수 있다. 즉 탈출구는 이미 존재한다.
 
 반대로 `false` 로 낮추면 "빨간 체크인 채로 실수 머지" 라는 **새로운 사고 클래스**가 열린다. 이 저장소는 자기 자신을 머지하는 1인 환경이라 그 실수를 잡아 줄 관찰자가 없다 — `enforce_admins: true` 야말로 유일한 관찰자다.
 
-**추가 논거 (cross-validate 이견 수용, §11)**: 두 선택지는 "우회 가능 여부" 가 아니라 **흔적이 남는가**에서 갈린다. `enforce_admins: false` 의 우회 머지는 아무 기록도 남기지 않는 반면, `true` 를 유지한 채 §8-R1 로 규칙을 걷어내면 보호 규칙 변경이 **계정 보안 로그와 API 상태에 남는다**. 즉 `true` 유지는 탈출구를 없애는 게 아니라 **탈출을 관찰 가능하게 만든다**. (Organization 수준 audit log 만큼 상세하지는 않다 — 개인 계정은 security log 범위다.)
+**추가 논거 (cross-validate 이견 수용, §11)**: 두 선택지는 "우회 가능 여부" 가 아니라 **흔적이 남는가**에서 갈린다. `enforce_admins: false` 의 우회 머지는 아무 기록도 남기지 않는 반면, `true` 를 유지한 채 §9-R1 로 규칙을 걷어내면 보호 규칙 변경이 **계정 보안 로그와 API 상태에 남는다**. 즉 `true` 유지는 탈출구를 없애는 게 아니라 **탈출을 관찰 가능하게 만든다**. (Organization 수준 audit log 만큼 상세하지는 않다 — 개인 계정은 security log 범위다.)
 
-**전제 (성립 조건)**: 본 결정은 **작업 토큰이 해당 저장소의 admin 권한을 갖는다**는 사실에 의존한다. fine-grained PAT 로 전환해 `Administration` 권한이 빠지면 §8-R1 이 `403` 으로 실패하고 **탈출구가 실제로 사라진다**. 따라서 §8 의 사전 확인 1줄 (`.permissions.admin == true`) 은 선택이 아니라 **적용 전 필수 게이트**이며, 토큰 정책 변경은 §10-5 재검토 조건 6 에 걸어 둔다.
+**전제 (성립 조건)**: 본 결정은 **작업 토큰이 해당 저장소의 admin 권한을 갖는다**는 사실에 의존한다. fine-grained PAT 로 전환해 `Administration` 권한이 빠지면 §9-R1 이 `403` 으로 실패하고 **탈출구가 실제로 사라진다**. 따라서 §8 의 사전 확인 1줄 (`.permissions.admin == true`) 은 선택이 아니라 **적용 전 필수 게이트**이며, 토큰 정책 변경은 §10-5 재검토 조건 6 에 걸어 둔다.
 
-**단 조건부 결정이다**: 탈출구가 문서화되지 않으면 존재하지 않는 것과 같다. §8-R1/R2/R3 롤백 명령 원문을 본 ADR 과 이슈 #971 코멘트 양쪽에 박제하고, 릴리스 런북 (`docs/guides/branch-strategy-workflow.md`) 에서 링크하는 것을 Phase 1 의 산출물로 고정한다.
+**단 조건부 결정이다**: 탈출구가 문서화되지 않으면 존재하지 않는 것과 같다. §9-R1/R2/R3 롤백 명령 원문을 본 ADR 과 이슈 #971 코멘트 양쪽에 박제하고, 릴리스 런북 (`docs/guides/branch-strategy-workflow.md`) 에서 링크하는 것을 Phase 1 의 산출물로 고정한다.
 
 ### 결정 6 — Phase 0 (코드 선행 작업, 설정 변경 0)
 
@@ -1160,7 +1174,7 @@ A3 의 `checks` 배열에 `verify-and-rust` / `long-integration-rust` / `duplica
 
 ## §9 롤백 절차
 
-각 명령은 **단독으로 완결**되며 사전 상태 조회가 필요 없다. 실행 시간 2~3초.
+각 명령은 **단독으로 완결**되며 사전 상태 조회가 필요 없다. 실행 시간은 **약 2~3초 (추정)** — R1~R4 는 **아직 실 발동 이력이 0** 이라 실측치가 아니다 (PR [#986](https://github.com/coseo12/astro-simulator/pull/986) 리뷰).
 
 ### R1 — required check 만 제거 (Phase 1/2/3 공통, **1차 대응**)
 
@@ -1170,7 +1184,9 @@ gh api -X DELETE "repos/$REPO/branches/main/protection/required_status_checks"
 
 보호의 나머지 (PR 필수 / force-push 차단 / enforce_admins) 는 그대로 유지된다. **릴리스가 막혔을 때 최우선으로 이것만 실행**하고, 원인 분석은 릴리스 완료 후에 한다.
 
-검증: `gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks'` → `null`.
+검증: `gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks | tojson'` → `null`.
+
+> ⚠️ **`| tojson` 필수** — 없으면 미적용 시 **빈 줄**이 출력돼 *"명령이 조용히 실패한 것"* 과 구분되지 않는다 (실측 2026-08-07). 릴리스가 막힌 상태에서 이 모호함은 치명적이다. PR [#986](https://github.com/coseo12/astro-simulator/pull/986) 🔴-2 가 런북에서 먼저 잡은 결함이 **ADR 본문에 잔존**해 있던 것이며, §8-A1 *"실행 전 준비"* 가 운영자를 여기로 직접 보내므로 **다음 A1 전 필수 정정**이었다.
 
 ### R2 — `develop` 보호 전체 제거 (A2 롤백)
 
@@ -1458,7 +1474,7 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 
 > **한 줄 요약 (사용자용)**: **A·B·C·E 는 rerun 또는 2초 롤백으로 회복된다. D 만 회복이 비싸다.** 그리고 D 의 base rate 는 20일 창 **0건** (§10-1 한계 12) 이고, 발생 조건 (*"릴리스 SHA 가 다른 PR 의 head 이기도 함"*) 은 **A1 직전 1줄로 사전 확인 가능**하다 (§8-P1-G **S4**). 그 1줄을 절차에 넣었으므로 **D 는 사실상 닫힌다** — 남는 것은 *"확인을 건너뛰는"* 운영 실수뿐이고, 그쪽은 §10-5 재검토 조건 12 가 담당한다.
 
-**롤백 — §9-R1, 실측 2초.** 증상 확인 즉시 실행한다. 판단을 오래 끌지 않는다. 명령 원문은 §9-R1.
+**롤백 — §9-R1, 약 2초 (추정 — 실 발동 이력 0).** 증상 확인 즉시 실행한다. 판단을 오래 끌지 않는다. 명령 원문은 §9-R1.
 
 ---
 
