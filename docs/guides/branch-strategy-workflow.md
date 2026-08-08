@@ -119,22 +119,27 @@ REPO=coseo12/astro-simulator
 # R1 — required check 만 제거 (1차 대응. 나머지 보호는 유지)
 gh api -X DELETE "repos/$REPO/branches/main/protection/required_status_checks"
 gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks | tojson'   # 기대: null
+# ⚠️ R1 실행 = Phase 1 이 조용히 롤백된 상태. 원인 해소 후 §8-A1 로 **재적용**해야 한다
 
 # R3 — R1 이 듣지 않을 때만 (보호 전량 해제). ⚠️ 릴리스 완주 직후 §8-A1 로 반드시 재적용
 gh api -X DELETE "repos/$REPO/branches/main/protection"
 ```
 
-### 시나리오별 1차 대응 (ADR §10-6)
+### 시나리오별 1차 대응 (ADR §10-6 축자)
 
-| # | 증상 | 1차 대응 |
-|---|---|---|
-| A | 일시적 실패 | rerun. **반복되면 R1** |
-| B | 느린 체크 대기 | 대기 |
-| C | flake | rerun. **회복 안 되면 즉시 R1** |
-| **D** | 동일 SHA 가 **복수 PR 의 head** | **R1** — rerun 불가 |
-| **E** | 영구 **Pending** | **R1** — ⚠️ **rerun 할 대상이 자체가 없다.** 누를 버튼을 찾지 말 것 |
+> ⚠️ **letter 는 load-bearing** — ADR·PR·CHANGELOG 가 *"시나리오 D"* 처럼 letter 로 참조한다. 아래는 [ADR §10-6](../decisions/20260807-971-required-status-checks.md) 을 **그대로 옮긴 것**이며, 재해석하지 말 것.
 
-**D 와 E 는 rerun 이 원리적으로 듣지 않는다.** D 는 `branch-name` 판정이 브랜치 *이름*의 함수라 한 SHA 위에 **둘 다 정당한 모순 결론**이 공존하고, E 는 체크런이 생성조차 안 돼 재실행 대상이 없다.
+| # | 시나리오 | 증상 | 대응 |
+|---|---|---|---|
+| **A** | `project-guards` 가 **`cancelled`** 로 남음 (Phase 0 미작동) | 회색 취소 + *"Required statuses must pass"* | **rerun** → `success` 면 진행. **반복되면 §9-R1** |
+| **B** | 세 체크 중 하나가 **flake `failure`** | 빨간 X + 머지 차단 | **rerun** (같은 머신 재시도로 충분한 클래스) |
+| **C** | **동명 쌍 결론 불일치** (`{failure, success}`) | GitHub 이 어느 쪽을 채택하는지 **미문서화** — 초록인데 차단되거나 `mergeStateStatus=BLOCKED` 가 **이유 없이** 붙은 것처럼 보인다 | rerun 으로 회복 안 되면 **즉시 §9-R1** |
+| **D** | **PR 다중성** — release head SHA 가 다른 PR 의 head 이기도 해 `branch-name` 이 `{failure, success}` | rerun 해도 **`failure` 가 사라지지 않는다** (다른 PR 의 브랜치명은 그대로) | **§9-R1 필수** |
+| **E** | Actions 장애 / 외부 지연 | 체크가 **영구 Pending** — 빨강도 초록도 아님 | **§9-R1** — ⚠️ **Pending 은 rerun 대상이 없다.** 누를 버튼을 찾지 말 것 |
+
+**자가 진단이 원리적으로 불가능한 건 C 다** — 증상이 *"이유 없이 BLOCKED"* 라 원인 분석 모드로 진입하기 쉽다. **초록인데 막히면 C 를 먼저 의심**하고 R1 로 넘어간다.
+
+> **정상 경로와 혼동하지 말 것**: 머지 버튼이 10~15초 늦게 활성화되는 것은 오차단이 아니라 required check 대기다. 위 표는 **빨강·회색·영구 Pending** 이 뜬 경우다.
 
 > **D 는 롤백해도 흔적이 남는다** — 갈린 `failure` 체크런은 그 SHA 에 **영구 기록**된다. R1 은 *머지를 뚫을 뿐* 기록을 지우지 않는다. 기록까지 깨끗해지는 유일한 경로는 **새 head SHA 로 릴리스를 재생성**하는 것이고, 그 비용이 ADR 이 말하는 *"릴리스 1주기"* 다.
 
@@ -142,15 +147,16 @@ gh api -X DELETE "repos/$REPO/branches/main/protection"
 
 ```bash
 REPO=coseo12/astro-simulator
-FULL=$(git rev-parse <ref>)          # ⚠️ full SHA 필수 — 축약형은 조용히 0 을 반환한다
-gh api "repos/$REPO/actions/runs?head_sha=$FULL&per_page=100" \
+SHA=$(gh pr view <PR번호> --json headRefOid -q .headRefOid)   # ADR §10-4 정본. full SHA 반환
+# ⚠️ `git rev-parse <ref>` 로 대체하지 말 것 — 로컬 stale / merge-back 커밋을 집어 조용히 n=0 을 낸다 (실측)
+gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
   -q '[.workflow_runs[]|select(.event=="pull_request")|.head_branch] | unique | "n=\(length)  \(join(","))"'
 ```
 
 | 출력 | 의미 |
 |---|---|
 | `n=1  develop` | ✅ 정상 — 진행 |
-| `n=0` | ⚠️ **안전 신호가 아니다.** 이 SHA 는 **PR head 가 아니라** 판정 대상 부적격이다 (축약 SHA 를 넣었거나 잘못된 ref) |
+| `n=0` | ⚠️ **안전 신호가 아니다.** 이 SHA 는 **PR head 가 아니라** 판정 대상 부적격이다. 원인: 축약 SHA / 잘못된 ref(로컬 stale·merge-back 커밋) / run 보존기간 90일 만료 / `paths-ignore` 로 run 미생성. **어느 쪽이든 결론은 같다 — A1 연기** |
 | `n≥2` | 🔴 **D 시나리오 성립** — A1 을 연기하거나 head SHA 를 교체한다 |
 
 ⚠️ **A1 직전 실행은 본 축약본이 아니라 ADR [§8-P1-G](../decisions/20260807-971-required-status-checks.md) 원문**(전제 확인 S1~S4 포함)으로 한다.
