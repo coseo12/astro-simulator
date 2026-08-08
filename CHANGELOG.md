@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Notes (chore — 앱 행동 변화 없음)
+
+- **[#971] ADR `20260807-971` Provisional → Accepted 전이 + errata 4클래스 8줄** ([#971](https://github.com/coseo12/astro-simulator/issues/971)) — §10-2 전이 조건 **6/6 전건 충족**으로 상태를 전이했다. 마지막으로 닫힌 **조건 3**(Phase 1 적용 후 release PR 1건 오차단 0)은 **v0.63.0** ([#992](https://github.com/coseo12/astro-simulator/pull/992))이 표본이며, head `614f1d9` 에서 required 3종(`project-guards` / `branch-name` / `label-pr`) 전부 `success` + `mergeStateStatus=CLEAN` 으로 통과했다. **핵심 관측**: `project-guards` 가 **`n=2` 인 채 둘 다 `success`** 였고 GitHub 이 머지를 허용했다 — §2-11 이 예측한 _"Phase 0 는 동명을 없애는 게 아니라 **완주 쌍을 늘린다**. 그럼에도 전부 통과 결론이면 어떤 해석 규칙에서도 통과한다"_ 가 **required check 하에서 실증**됐고, §2-2 가 _"미문서화"_ 로 분류한 동명 해석 규칙이 **적어도 전부 `success` 인 경우에는 통과**임이 관측으로 확인된다. **errata 4클래스**: ① 결정 5 의 `§8-R1/R2/R3` → 실제 **§9** (5곳) ② §10-6 _"**실측** 2초"_ → **추정**(R1~R4 실 발동 이력 **0**) ③ §9 _"2~3초"_ 동일 ④ §9-R1 검증 줄의 `→ null` → **`| tojson` 필수** — 없으면 미적용 시 **빈 줄**이 나와 _"명령이 조용히 실패한 것"_ 과 구분되지 않는다(실측). ④ 는 PR [#986](https://github.com/coseo12/astro-simulator/pull/986) 🔴-2 가 **런북에서 먼저 잡은 결함이 ADR 본문에 잔존**한 것으로, **파생본을 고치고 정본을 안 고치면 다음 회수자가 정본에서 같은 함정을 밟는다**는 사례다. §8-A1 _"실행 전 준비"_ 가 운영자를 §9-R1 로 직접 보내므로 다음 A1(Phase 2) 전 필수 정정이었다.
+
 ## [0.63.0] — 2026-08-08
 
 ### Behavior Changes
