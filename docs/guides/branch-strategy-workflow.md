@@ -14,6 +14,8 @@ develop
 
 ### 2. 릴리스 (MAJOR/MINOR/PATCH 공통)
 
+> 🔴 **릴리스가 required check 로 막히면** → [§required status check 롤백](#required-status-check-롤백-릴리스가-막혔을-때--971) (R1 한 줄, 약 2초)
+
 ```
 develop   (충분히 쌓이면)
    ↓ 단일 release PR (base=main, head=develop)
@@ -99,31 +101,61 @@ node scripts/verify-branch-name.mjs --branch feature/962-x   # 임의 이름 검
 
 ## required status check 롤백 (릴리스가 막혔을 때 — #971)
 
-> **전제**: 아래는 `main` 에 required status check 가 **적용된 뒤에만** 의미가 있다. 현재 적용 상태는
-> `gh api "repos/coseo12/astro-simulator/branches/main/protection" -q '.required_status_checks'` 로 확인한다 (`null` = 미적용).
+> **적용 여부부터 확인** — 아래는 `main` 에 required status check 가 **적용된 뒤에만** 의미가 있다.
+>
+> ```bash
+> REPO=coseo12/astro-simulator
+> gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks | tojson'
+> # null  = 미적용 (현재 상태)    /    {...} = 적용 중
+> ```
+>
+> ⚠️ `| tojson` **필수**. `-q '.required_status_checks'` 만 쓰면 미적용 시 **빈 줄**이 나와 *"명령이 조용히 실패한 것"* 과 구분되지 않는다 (실측 2026-08-07).
 
-릴리스 도중 required check 가 오차단하면 **릴리스를 인질로 잡고 디버깅하지 말 것.** 아래 1줄로 걷어내고 릴리스를 완주시킨 뒤 원인을 분석한다. `enforce_admins: true` 는 규칙의 **우회**만 막고 **편집**은 막지 않으므로 이 명령은 admin 토큰으로 즉시 동작한다 (약 2초).
+릴리스 도중 required check 가 오차단하면 **릴리스를 인질로 잡고 디버깅하지 말 것.** 걷어내고 완주시킨 뒤 원인을 분석한다. `enforce_admins: true` 는 규칙의 **우회**만 막고 **편집**은 막지 않으므로 admin 토큰으로 즉시 동작한다 (약 2초 — R1 은 아직 실 발동 이력이 없어 추정치다).
 
 ```bash
 REPO=coseo12/astro-simulator
 
 # R1 — required check 만 제거 (1차 대응. 나머지 보호는 유지)
 gh api -X DELETE "repos/$REPO/branches/main/protection/required_status_checks"
+gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks | tojson'   # 기대: null
 
-# 검증 (기대: null)
-gh api "repos/$REPO/branches/main/protection" -q '.required_status_checks'
+# R3 — R1 이 듣지 않을 때만 (보호 전량 해제). ⚠️ 릴리스 완주 직후 §8-A1 로 반드시 재적용
+gh api -X DELETE "repos/$REPO/branches/main/protection"
 ```
 
-**언제 R1 을 쓰는가** — ADR [20260807-971](../decisions/20260807-971-required-status-checks.md) §10-6 의 5시나리오 중 **D (동일 SHA 가 복수 PR 의 head)** 는 **rerun 으로 회복되지 않는다**. `branch-name` 은 판정이 브랜치 *이름*의 함수라 한 SHA 위에 정당한 모순 결론이 영구 공존하기 때문이다. A·B·C·E 는 rerun 으로 회복된다.
+### 시나리오별 1차 대응 (ADR §10-6)
 
-**사전 확인 1줄** (A1 직전 / 릴리스 직전):
+| # | 증상 | 1차 대응 |
+|---|---|---|
+| A | 일시적 실패 | rerun. **반복되면 R1** |
+| B | 느린 체크 대기 | 대기 |
+| C | flake | rerun. **회복 안 되면 즉시 R1** |
+| **D** | 동일 SHA 가 **복수 PR 의 head** | **R1** — rerun 불가 |
+| **E** | 영구 **Pending** | **R1** — ⚠️ **rerun 할 대상이 자체가 없다.** 누를 버튼을 찾지 말 것 |
+
+**D 와 E 는 rerun 이 원리적으로 듣지 않는다.** D 는 `branch-name` 판정이 브랜치 *이름*의 함수라 한 SHA 위에 **둘 다 정당한 모순 결론**이 공존하고, E 는 체크런이 생성조차 안 돼 재실행 대상이 없다.
+
+> **D 는 롤백해도 흔적이 남는다** — 갈린 `failure` 체크런은 그 SHA 에 **영구 기록**된다. R1 은 *머지를 뚫을 뿐* 기록을 지우지 않는다. 기록까지 깨끗해지는 유일한 경로는 **새 head SHA 로 릴리스를 재생성**하는 것이고, 그 비용이 ADR 이 말하는 *"릴리스 1주기"* 다.
+
+### 사전 확인 — A1 직전 / 릴리스 머지 직전 1줄
 
 ```bash
-gh api "repos/$REPO/actions/runs?head_sha=<full-sha>&per_page=100" \
-  -q '[.workflow_runs[]|select(.event=="pull_request")|.head_branch]|unique|length'   # 기대: 1
+REPO=coseo12/astro-simulator
+FULL=$(git rev-parse <ref>)          # ⚠️ full SHA 필수 — 축약형은 조용히 0 을 반환한다
+gh api "repos/$REPO/actions/runs?head_sha=$FULL&per_page=100" \
+  -q '[.workflow_runs[]|select(.event=="pull_request")|.head_branch] | unique | "n=\(length)  \(join(","))"'
 ```
 
-전체 롤백 절차(R2 `develop` 보호 해제 / R3 전량 해제)와 적용 payload 는 **ADR §8·§9** 가 정본이다.
+| 출력 | 의미 |
+|---|---|
+| `n=1  develop` | ✅ 정상 — 진행 |
+| `n=0` | ⚠️ **안전 신호가 아니다.** 이 SHA 는 **PR head 가 아니라** 판정 대상 부적격이다 (축약 SHA 를 넣었거나 잘못된 ref) |
+| `n≥2` | 🔴 **D 시나리오 성립** — A1 을 연기하거나 head SHA 를 교체한다 |
+
+⚠️ **A1 직전 실행은 본 축약본이 아니라 ADR [§8-P1-G](../decisions/20260807-971-required-status-checks.md) 원문**(전제 확인 S1~S4 포함)으로 한다.
+
+전체 롤백 절차(R2 `develop` 보호 해제 / R4)와 적용 payload 는 **ADR [§8·§9](../decisions/20260807-971-required-status-checks.md)** 가 정본이다.
 
 ## 커밋 컨벤션 / PR 규칙
 
