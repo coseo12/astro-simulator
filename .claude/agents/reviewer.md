@@ -38,6 +38,7 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
 3. **5축 검사** — 변경 hunk 별로 분류
 4. **파괴적 리팩토링 체크리스트 (volt [#69](https://github.com/coseo12/volt/issues/69))** — 상수 제거·SSoT 이동·함수 폐기 같은 **파괴적 리팩토링** 이 포함된 PR 이면 추가 점검:
    - **(Grep) 저장소 전수 검색** — 제거·변경된 상수의 잔존을 전 저장소에서 검사. 위성 모듈 독립 선언 잔존 시 "은닉 상수 drift" (상대 비율 / 단위 / 스케일 drift 를 조용히 생성) 로 차단. **아래 4항을 모두 밟기 전에는 _"잔존 0"_ 을 선언하지 않는다** — PR [#987](https://github.com/coseo12/astro-simulator/pull/987) 에서 이 선언이 **2회 연속 반증**됐고, 두 번 다 grep 이 **에러 없이 조용히 빈 결과**를 냈다 ([#989](https://github.com/coseo12/astro-simulator/issues/989)):
+     - **자매 규약** — 검사 결과의 **수치**를 박제할 때는 [`20260808-983-measurement-recording-convention.md`](../../docs/decisions/20260808-983-measurement-recording-convention.md) §수치 박제 규약 4항(일괄 도출 / 부분 재측정 금지 / **술어 명시**)을 따른다. *"28 hits"* 가 아니라 *"28 hits (술어: `git grep -F` 5종 합집합, 경로 무제한)"* 로 적는다.
 
      ```bash
      # 정본 — 고정 문자열 · 표기 5종 · 경로 무제한
