@@ -280,7 +280,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 - 상세 (예시 / Phase 분리 리듬 / version bump / 근거): [docs/guides/release-process.md](docs/guides/release-process.md)
 
 ### CLAUDE.md 예산 (각인층)
-신규 블록 전 **① 동일 주제 `docs/` 파일 존재?** (있으면 포인터만) → **② 안 읽으면 즉시 오작동?** (아니오 → `docs/`). 35k 경보 / 45k fail: `verify-claudemd-size.mjs` — [governance](docs/guides/claudemd-governance.md)
+신규 블록 전 **① 동일 주제 `docs/` 파일 존재?** (있으면 포인터만) → **② 안 읽으면 즉시 오작동?** (아니오 → `docs/`). 33k 경보 / 40k PR warn / 45k fail: `verify-claudemd-size.mjs` — [governance](docs/guides/claudemd-governance.md). 근거 링크(볼트 번호)는 자르지 않는다 — `grep` 도달 불가능한 유일 회수 키
 
 ### 문서 동기화
 - 에이전트/스킬/설정을 삭제하거나 변경할 때, docs/ 하위 관련 문서를 확인하고 업데이트한다
