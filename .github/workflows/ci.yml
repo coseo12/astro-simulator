@@ -1,10 +1,13 @@
 name: CI
 
-# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
-# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
-# cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만 남김 (포착 100%).
+# 중복 run 제거 (#779). group 에 github.workflow 포함 → 워크플로 간 교차 취소 방지.
+# group 에 github.ref 포함 (#971 Phase 0) → pull_request(refs/pull/N/merge) 와 push(refs/heads/*)
+#   가 별도 group. 같은 sha 의 push↔PR 교차 취소와 ff-sync 의 main↔develop 교차 취소가 소멸한다
+#   (required check 하에서 cancelled 는 미통과 결론 = 릴리스 하드 블록). SSoT: ADR
+#   docs/decisions/20260807-971-required-status-checks.md §2-7 / §5 (b) / 결정 3.
+# cancel 은 가드 약화 아님 — 같은 ref·같은 sha 의 재트리거 중복만 제거 (포착 100%).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 on:
@@ -25,7 +28,17 @@ jobs:
   #   (= 가드 약화) 의도적으로 채택하지 않았다. docs-only 스킵은 PR diff 전체가 docs 일 때만.
   # required check 상호작용: main branch protection 의 required_status_checks = null 실측
   #   (2026-08-01, #915) — 스킵된 job 이 머지를 막지 않으므로 skip-success 보고 패턴 불요,
-  #   단순 if: 게이트로 충분. required check 도입 시 본 전제 재검토.
+  #   단순 if: 게이트로 충분.
+  # ↑ 위 예고("required check 도입 시 본 전제 재검토") 회수 (#971): ADR
+  #   docs/decisions/20260807-971-required-status-checks.md 가 전제를 실측 재검토했고 결론은
+  #   **본 job 단위 게이트 유지**다. GitHub 은 job 단위 스킵 (`if:` false / `needs` 실패) 을
+  #   `skipped` 로 **보고**하고 이는 통과 3종 (success/skipped/neutral) 에 들어간다 — 영구
+  #   pending 을 만드는 것은 **workflow 단위** 스킵 (`paths` 필터 등) 뿐이다 (ADR §2-2).
+  #   따라서 ci.yml 이 paths 필터 없이 job 단위 `if:` 를 쓰는 현 구조가 required 화의 전제조건
+  #   자체이며, `diff-scope` / `detect-and-test` 는 ADR §6 결정 1 의 Phase 2 후보다.
+  # ⚠ 단 `detect-and-test` 는 job 단위 `if:` 없이 `needs: diff-scope` 만 가지므로 diff-scope 실패
+  #   시 `skipped` = 통과로 인정된다 — 단독 required 는 무의미하고 `diff-scope` 와 **함께** 올려야
+  #   구멍이 닫힌다 (ADR §2-4). Phase 2 적용 시 이 쌍을 분리하지 말 것.
   # paths-ignore (workflow 단위) 가 아닌 job 단위 게이트인 이유: detect-and-test 의 SSoT
   #   가드 (zombie/dead-wait 등) 는 docs 변경도 검증해야 하므로 workflow 전체 스킵 불가.
   diff-scope:

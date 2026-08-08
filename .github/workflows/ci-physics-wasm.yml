@@ -20,11 +20,14 @@ name: CI (physics-wasm)
 # **예외 0** — 런타임 생성 산출물의 "부재 정상" 은 조건이 아니라 액션 옵션으로 표현한다
 #   (본 파일엔 해당 사례 없음. bench.yml 의 `ignore_empty` 참조).
 
-# 같은 sha 의 push+PR 중복 run 제거 (#779). group 에 github.workflow 포함 →
-# 워크플로 간 교차 취소 방지. PR head sha == 머지 후 push sha 로 수렴 → 같은 sha 묶임.
-# cancel 은 가드 약화 아님 — 동일 코드를 검증하는 중복 run 중 하나만 남김 (포착 100%).
+# 중복 run 제거 (#779). group 에 github.workflow 포함 → 워크플로 간 교차 취소 방지.
+# group 에 github.ref 포함 (#971 Phase 0) → pull_request(refs/pull/N/merge) 와 push(refs/heads/*)
+#   가 별도 group. 같은 sha 의 push↔PR 교차 취소와 ff-sync 의 main↔develop 교차 취소가 소멸한다
+#   (required check 하에서 cancelled 는 미통과 결론 = 릴리스 하드 블록). SSoT: ADR
+#   docs/decisions/20260807-971-required-status-checks.md §2-7 / §5 (b) / 결정 3.
+# cancel 은 가드 약화 아님 — 같은 ref·같은 sha 의 재트리거 중복만 제거 (포착 100%).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 on:
@@ -45,6 +48,15 @@ jobs:
   # 본 workflow 의 3 job (Rust/wasm/vitest/중복함수) 은 전부 코드 검증 — docs/**·*.md·.claude/**
   # 만의 변경으로는 깨질 수 없어 job 단위 통스킵이 안전하다 (ci.yml 과 달리 상시 스텝 없음).
   diff-scope:
+    # #971 Phase 0 (결정 6-2) — 체크런 이름을 `diff-scope-wasm` 으로 분리한다. ci.yml 의 job id 도
+    #   `diff-scope` 라 두 워크플로가 **동명 체크런**을 만들고, required status check 는 이름
+    #   문자열로 매칭되므로 GitHub 이 명시 경고한 "ambiguous status check results" 에 해당한다
+    #   (ADR 20260807-971-required-status-checks §2-5 workflow 축 / §2-2).
+    # job **id** 는 유지 — 아래 `needs: diff-scope` 3곳 (verify-and-rust / long-integration-rust /
+    #   duplicate-function-guard) 과 `needs.diff-scope.outputs.*` 참조가 id 를 쓰므로 무접촉이다.
+    # ⚠ event 축 (`pull_request` + `push`) ×2 는 남는다 — 본 리네임은 동명 "해소" 가 아니라
+    #   "축소" 다 (4 → 2 + 2). ADR §2-11 참조.
+    name: diff-scope-wasm
     runs-on: ubuntu-latest
     outputs:
       code_changed: ${{ steps.scope.outputs.code_changed }}
