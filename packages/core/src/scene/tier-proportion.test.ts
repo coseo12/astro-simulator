@@ -135,7 +135,27 @@ describe('B1 회귀 가드 — tier 전환 시 모든 렌더 레이어 동일 �
   });
 });
 
-// 소스 파일 내 `const SCENE_UNIT_PER_METER` 선언 재발 방지 grep 검증은 core 패키지의
-// node types 부재로 test 레벨에서 재현하지 않는다. 대신 DoD 체크리스트에 박제된 grep 명령
-// (`grep -rn "const SCENE_UNIT_PER_METER" packages/core/src/`) 으로 PR 리뷰 시 검증한다.
+// scene-unit 하드코딩 재발 방지 grep 검증은 core 패키지의 node types 부재로 test 레벨에서
+// 재현하지 않는다. 대신 DoD 체크리스트에 박제된 아래 명령으로 PR 리뷰 시 검증한다.
+// 명령 형태는 `.claude/agents/reviewer.md` §절차 4 (Grep) 정본을 따른다:
+//
+//   git grep -nFi -e 'SCENE_UNIT_PER_METER' -e '1 / AU' -e '1/AU'
+//
+// - 경로를 `packages/core/src/` 로 좁히지 않는다. 금지 대상은 "tier 함수를 우회한 고정 배수"이고
+//   그 재발은 apps/ 소비처에서도 가능하다. 제외는 검색 시점이 아니라 분류 시점에 한다.
+// - 표기 변형: 상수명(`SCENE_UNIT_PER_METER`)만 걸면 `const sceneUnitPerMeter = 1 / AU` 형태의
+//   camelCase 재선언이 침묵한다. 실제 금지 값인 `1 / AU` · `1/AU` 를 함께 건다 (공백 유무로 갈림).
+//   `-i` 가 대소문자를 흡수하므로 이 3종이 최소 집합이다 (닫힌 열거 아님).
+// - hit 은 5분류(활성 선언 / 이력 기록 / 무관 / 역참조 회귀 가드 / 규약 본문 자체) 후 판정한다.
+//   본 주석 블록 자체가 "규약 본문 자체" 계급이라 정정 대상이 아니다. 정상 패턴
+//   `const sceneUnitPerMeter = renderScaleForTier(tier)` 는 "무관" 이다.
+// - 알려진 의도적 예외 1건 (2026-08-09 실측, PR #997 리뷰 BLOCK-C): `asteroid-belt.ts` 의
+//   `updateAt(epoch, 1 / AU)` 는 tier 우회가 아니라 씬 생성 시점의 placeholder 다. 정정 대상이
+//   아닌 근거는 **덮어쓰기 경로가 실재한다**는 것 하나뿐이며, 그 경로는 이 파일이 아니라
+//   `solar-system-scene.ts` 에 있다 — 프레임 `updateAt` 이 `renderScaleForTier(activeTier)` 를
+//   계산해 `writeWorldPositions` / `asteroidBelt.updateAt` **양 분기 모두**에 주입한다.
+//   ⚠️ `1 / AU` 는 `renderScaleForTier('solar')` 의 근사값이 **아니다** (12.57배 차이). 새 hit 이
+//   이 형태면 "solar 와 가까우니 괜찮다"로 판단하지 말고 **덮어쓰기 경로의 존속**을 확인한다.
+//   구 명령은 `const` 도 상수명도 없는 이 지점을 **구조적으로 볼 수 없었다** — 값 변형을 함께
+//   거는 이유의 실증이다.
 // 산술 불변식은 위 describe 블록이 커버 (tier 전환 시 모든 레이어 동일 배수 확대).

@@ -125,7 +125,7 @@ Node.js `execSync('gh pr comment N --body "..."')` 로 백틱/`$`/`!`/`;` 포함
 ### 주석 계약 vs 구현 drift — 버그 생성원
 파일 상단 주석 / JSDoc 이 선언한 계약과 구현의 drift 는 **버그 생성원**. default fallback 이 누락을 조용히 흡수해 테스트도 fail 하지 않는다. 주석에 선언된 규칙은 테스트 커버리지 대상이며, enum 분기 fallback 에 경고·assert 추가로 drift 감지.
 - 상세: [docs/lessons/comment-implementation-drift.md](docs/lessons/comment-implementation-drift.md)
-- **숨은 상수 변형 (volt [#69](https://github.com/coseo12/volt/issues/69))**: 위성 모듈 독립 선언 잔존 → 상대 비율/단위/스케일 drift 조용히 생성. 저장소 전체 `grep -rn "<CONST_NAME>"` + 주석 SSoT 참조 dead reference 차단 의무 (reviewer.md §4).
+- **숨은 상수 변형 (volt [#69](https://github.com/coseo12/volt/issues/69))**: 위성 모듈 독립 선언 잔존 → 상대 비율/단위/스케일 drift 조용히 생성. 저장소 전체 `git grep -F "<CONST_NAME>"` + 주석 SSoT 참조 dead reference 차단 의무 (reviewer.md §4).
 - **drift 근본 제거 — 자동 생성 vs 정적 가드 구분 (volt [#120](https://github.com/coseo12/volt/issues/120))**: "drift 감지"(매칭 가드)보다 "중복 출처 제거"(데이터 메타 SSoT + 자동 생성)가 근본 해결. 단 사본마다 격리성/직교 축이 달라, **자동 생성 가능**(단일 메타 파생 + 소비처의 SUT import 허용)과 **정적 가드로 묶어야 함**(테스트 더블 격리 위반 / 직교 축은 별도 boolean 메타 + "데이터 파생 == 하드코딩" 단위 테스트)을 구분하는 게 핵심 판단. 상세: [docs/lessons/data-not-code-extension.md](docs/lessons/data-not-code-extension.md).
 
 ### HTTP 200 ≠ 올바른 리소스
