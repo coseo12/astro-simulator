@@ -179,7 +179,8 @@ stack 대신 각 PR 을 develop 기반 독립 브랜치로 만들고, 의존성�
 
 - PR 제목은 반드시 `[#이슈번호]`를 포함한다.
 - PR 본문에 `### Test plan` 섹션 (영문 phrase) 을 반드시 포함한다 — `verify-pr-template-checklist.mjs` keyword 7 이 영문 `Test plan` phrase 를 AND 매칭한다 (템플릿 동적 읽기 시 자동 충족).
-- PR 본문의 `Closes #이슈번호`로 이슈와 연결한다. 단 **base=develop 머지는 GitHub auto-close 미발동** (default branch 머지만 발동) — 머지 직후 `gh issue close <이슈번호> --comment "..."` 수동 close 의무 (운영 마찰 규약 §1).
+- PR 본문의 `Closes #이슈번호`로 이슈와 연결한다. 단 **base=develop 머지는 GitHub 네이티브 auto-close 미발동** (default branch 머지만 발동) — 대신 [`.github/workflows/auto-close-issues.yml`](../../../.github/workflows/auto-close-issues.yml) (#915) 이 PR **본문**의 close 키워드를 파싱해 자동 close 한다. 머지 후 메인은 `gh issue view <이슈번호> --json state` 로 **결과만 확인**하고, `OPEN` 이면 폴백으로 수동 close 한다 (운영 마찰 규약 [§1 / §1-1 미발동 조건](../../../docs/ops/operational-friction.md)).
+  - ⚠️ 키워드는 **PR 본문**에 있어야 한다 — 커밋 메시지 / PR 제목에만 쓰면 workflow 가 파싱하지 못한다.
 - 머지 시 `--delete-branch` 를 사용하지 않는다 — 멀티 워크스페이스 (Conductor worktree) 브랜치 점유와 충돌 (운영 마찰 규약 §2). 원격 삭제는 `git push origin --delete <브랜치>` 로 분리 수행한다.
 - 변경 파일 10개 이하를 목표로 한다. 초과 시 PR을 분할한다.
 - 테스트가 통과하는 상태에서만 PR을 생성한다.

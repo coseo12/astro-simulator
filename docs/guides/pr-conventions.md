@@ -20,7 +20,8 @@
   - ✅ `Closes #A, closes #B` — 각 이슈에 keyword 반복
   - ✅ 줄 분리 — `Closes #A\nCloses #B`
   - ❌ `Closes: #A, #B` / `Closes #A, #B` / `Closes #A #B` — 모두 #B 앞 keyword 부재 (콜론·콤마·공백은 동일 결함의 표면 변형)
-- **머지 직후 auto-close 검증 루틴** — release PR·일상 개발 PR 머지 후 close 대상 이슈 전부에 `gh issue view <n> --json state` 로 실제 close 여부를 확인. default branch (main) 머지가 아닌 경우 (일상 개발 PR → develop) 는 릴리스 시점까지 OPEN 유지가 정상
+  - 이 문법 가드는 [`scripts/auto-close-issue-parser.mjs`](../../scripts/auto-close-issue-parser.mjs) 가 그대로 미러링한다 — GitHub 네이티브뿐 아니라 본 저장소 auto-close workflow 에도 동일하게 적용된다.
+- **머지 직후 auto-close 검증 루틴** — release PR·일상 개발 PR 머지 후 close 대상 이슈 전부에 `gh issue view <n> --json state` 로 실제 close 여부를 확인. 일상 개발 PR (→ develop) 은 GitHub **네이티브** auto-close 가 미발동하지만 [`.github/workflows/auto-close-issues.yml`](../../.github/workflows/auto-close-issues.yml) (#915) 이 대체하므로 **머지 직후 `CLOSED` 가 정상**이다 (*"릴리스 시점까지 OPEN 유지가 정상"* 은 workflow 도입 이전 서술 — 2026-08-09 [#999](https://github.com/coseo12/astro-simulator/issues/999) 로 갱신). `OPEN` 이면 [운영 마찰 §1-1 미발동 조건](../ops/operational-friction.md) 대조 후 폴백 수동 close
 - 근거: volt [#41](https://github.com/coseo12/volt/issues/41) — harness PR [#108](https://github.com/coseo12/harness-setting/pull/108) (v2.14.0) 커밋 메시지 `Closes: #105, #110` 에서 #105 만 auto-close 되고 #110 은 수동 close 필요했던 실측 사례
 
 ## 관련
