@@ -20,6 +20,7 @@
 | 2026-07-31 | [907-harness-decouple](20260731-907-harness-decouple.md) | Accepted | 하네스 동기화 디커플 — 주기 동기화 중단 + upstream 읽기 전용 강등 + 기계장치 청산. Supersedes: `20260515-harness-managed-divergent-pattern`, `20260419-prettier-harness-conflict` |
 | 2026-08-06 | [962-branch-name-guard](20260806-962-branch-name-guard.md) | Accepted | 브랜치명 규약의 정본을 산문 3곳에서 실행 가능한 가드 상수로 이전 — CI 런타임 검사 + 산문 파생 정적 대조. #942 규약의 강제 수단 |
 | 2026-08-07 | [971-required-status-checks](20260807-971-required-status-checks.md) | **Provisional** | branch protection required status check 정책 — `main` 한정 3단계 도입 + `develop` 은 최소 보호(force-push·삭제 차단)만 하고 required check **영구 미채택** (ff-sync 보호). 선행 ADR: `20260806-962-branch-name-guard` §6-2 인계 |
+| 2026-08-08 | [983-measurement-recording-convention](20260808-983-measurement-recording-convention.md) | Accepted | 수치 박제 규약 — 일괄 도출 / 부분 재측정 금지 / **술어 명시**. **원조**: `20260515-harness-managed-divergent-pattern` §Amendment 19 (`Superseded` + _"불변 유지"_ 선언이라 **편집하지 않고** 본 ADR 로 승격). 자매 규약: 전수 grep (`.claude/agents/reviewer.md` §절차 4) |
 
 ## 언제 작성하는가
 

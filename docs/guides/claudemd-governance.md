@@ -269,13 +269,23 @@ CLAUDE.md 본문 감축 시 **에이전트/스크립트 참조 결합**이 깨�
 - 일부 에이전트 파일이 CLAUDE.md 특정 섹션 앵커를 링크로 참조할 가능성
 
 ### 7.2 감축 PR 사전 조사 (리서치 phase)
-감축 대상 블록을 선정하기 **전에** 참조 depth 전수 조사:
+감축 대상 블록을 선정하기 **전에** 참조 depth 전수 조사. 명령은 [`.claude/agents/reviewer.md`](../../.claude/agents/reviewer.md) §절차 4 (Grep) **정본**을 따른다 — 고정 문자열(`-F`) / 표기 변형 / **경로 무제한**:
 
 ```bash
 # CLAUDE.md 섹션 앵커를 참조하는 파일 전수 검색
-# 예: "### sub-agent 검증 완료" 를 추출 대상으로 삼을 때
-grep -rn "sub-agent 검증 완료" .claude/ scripts/ docs/
+# 예: "### sub-agent 검증 완료 ≠ GitHub 박제 완료" 를 추출 대상으로 삼을 때
+git grep -nFi -e 'sub-agent 검증 완료' -e 'sub-agent-검증-완료'
 ```
+
+- **경로를 좁히지 않는다.** 구 문언은 `.claude/ scripts/ docs/` 로 제한돼 있었는데, 그러면 `.github/` 가 통째로 빠진다 — **그리고 감축이 끊을 참조가 정확히 거기에 있다**. 이 앵커는 `.github/PULL_REQUEST_TEMPLATE.md` 와 `.github/workflows/project-guards.yml` 이 참조한다. `--include` 확장자 제한도 같은 함정이다.
+- **표기 변형** — 산문·헤더 표기(`sub-agent 검증 완료`)와 마크다운 앵커 slug(`sub-agent-검증-완료`)는 갈린다. `](CLAUDE.md#sub-agent-검증-완료--github-박제-완료)` 형태의 링크는 앞 변형만으로는 잡히지 않는다. 이는 **섹션 앵커의 최소 집합**이지 닫힌 열거가 아니다.
+- **제외는 검색 시점이 아니라 분류 시점에** — 전 hit 을 §절차 4 의 5분류(활성 선언 / 이력 기록 / 무관 / 역참조 회귀 가드 / 규약 본문 자체)로 나눈 뒤 감축 대상을 정한다. 검색 단계에서 좁히면 그 판단 자체가 불가능해진다.
+
+> **자기 적용 실증** (#995). 술어 = 매치 파일 수 / hit 줄 수, rev `2f64d76` = 본 절 개정 직전 develop head.
+> 구 명령 (`grep -rn` + 경로 `.claude/ scripts/ docs/`) **15 files / 21 hits**, `.github/` **0 files**.
+> 정본 (`git grep -nFi` 2변형 + 경로 무제한) **19 files / 25 hits**, `.github/` **2 files**.
+> 차분 **4 files** — `.github/PULL_REQUEST_TEMPLATE.md` / `.github/workflows/project-guards.yml` / `CHANGELOG.md` / `CLAUDE.md`.
+> 즉 구 명령을 믿고 감축했으면 **`.github/` 참조 2건을 끊은 채 _"전수 조사 완료"_ 를 선언**하게 된다. 본 절이 명령 리터럴을 포함해 head 계수는 **자기 참조**이므로 고정 수치를 박제하지 않고, 위 명령을 rev 와 함께 재실행해 확인한다.
 
 ### 7.3 감축 PR 체크리스트
 감축 실행 PR (Phase 3 예정) 에 포함:

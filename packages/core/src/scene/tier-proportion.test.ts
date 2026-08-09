@@ -135,7 +135,18 @@ describe('B1 회귀 가드 — tier 전환 시 모든 렌더 레이어 동일 �
   });
 });
 
-// 소스 파일 내 `const SCENE_UNIT_PER_METER` 선언 재발 방지 grep 검증은 core 패키지의
-// node types 부재로 test 레벨에서 재현하지 않는다. 대신 DoD 체크리스트에 박제된 grep 명령
-// (`grep -rn "const SCENE_UNIT_PER_METER" packages/core/src/`) 으로 PR 리뷰 시 검증한다.
+// scene-unit 하드코딩 재발 방지 grep 검증은 core 패키지의 node types 부재로 test 레벨에서
+// 재현하지 않는다. 대신 DoD 체크리스트에 박제된 아래 명령으로 PR 리뷰 시 검증한다.
+// 명령 형태는 `.claude/agents/reviewer.md` §절차 4 (Grep) 정본을 따른다:
+//
+//   git grep -nFi -e 'SCENE_UNIT_PER_METER' -e '1 / AU' -e '1/AU'
+//
+// - 경로를 `packages/core/src/` 로 좁히지 않는다. 금지 대상은 "tier 함수를 우회한 고정 배수"이고
+//   그 재발은 apps/ 소비처에서도 가능하다. 제외는 검색 시점이 아니라 분류 시점에 한다.
+// - 표기 변형: 상수명(`SCENE_UNIT_PER_METER`)만 걸면 `const sceneUnitPerMeter = 1 / AU` 형태의
+//   camelCase 재선언이 침묵한다. 실제 금지 값인 `1 / AU` · `1/AU` 를 함께 건다 (공백 유무로 갈림).
+//   `-i` 가 대소문자를 흡수하므로 이 3종이 최소 집합이다 (닫힌 열거 아님).
+// - hit 은 5분류(활성 선언 / 이력 기록 / 무관 / 역참조 회귀 가드 / 규약 본문 자체) 후 판정한다.
+//   본 주석 블록 자체가 "규약 본문 자체" 계급이라 정정 대상이 아니다. 정상 패턴
+//   `const sceneUnitPerMeter = renderScaleForTier(tier)` 는 "무관" 이다.
 // 산술 불변식은 위 describe 블록이 커버 (tier 전환 시 모든 레이어 동일 배수 확대).
