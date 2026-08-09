@@ -29,10 +29,18 @@
 
 | 조건                             | 결과                                                                                                                      |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `base` 가 `develop` 이 아님       | **본 workflow 미발동.** release/hotfix PR(`base=main`)은 default branch 머지라 GitHub **네이티브** auto-close 가 대신 발동 |
+| `base` 가 `main`                  | 본 workflow 미발동. default branch 머지라 GitHub **네이티브** auto-close 가 대신 발동                                       |
+| `base` 가 `develop`·`main` **둘 다 아님** | ⚠️ **양쪽 다 미발동 — 폴백이 유일 경로.** stacked PR (`base=<type>/*`) 이 여기 해당한다. 실측: 머지된 PR **584건 중 22건** (PR [#1002](https://github.com/coseo12/astro-simulator/pull/1002) 리뷰). `develop` / `main` 이분법으로 읽지 말 것 |
 | 머지 없이 close (`merged=false`) | 미발동 — `if: github.event.pull_request.merged == true` (의도된 설계. 반려 PR 이 이슈를 닫으면 안 된다)                   |
 
-**정의 로드 축** — `pull_request` closed 트리거는 **base 브랜치에 반영된** workflow 정의를 사용한다. 따라서 **본 workflow 나 파서를 수정하는 PR 자신의 머지에서는 개정판이 발동하지 않는다** (workflow 헤더 주석에 박제된 `workflow_dispatch` 2단계 함정 동형). 이런 PR 은 폴백 수동 close 를 기본값으로 잡는다.
+**정의 로드 축 — 미발동 조건이 아니다** (PR [#1002](https://github.com/coseo12/astro-simulator/pull/1002) 리뷰 실측으로 반증). 본 절 초판은 workflow 헤더 주석을 따라 _"본 workflow·파서를 수정하는 PR 자신의 머지에서는 개정판이 발동하지 않는다 → 폴백 수동 close 를 기본값으로"_ 라고 적었으나 **거짓**이다.
+
+| 반증                                                            | 실측                                                                                                                                        |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 본 workflow 를 **신설한** PR [#917](https://github.com/coseo12/astro-simulator/pull/917) | 자신의 머지에서 run `30695395893` 생성 + self-test PASS. **파일이 그 머지로 처음 생겼으므로**, 정의가 로드되지 않았다면 run 자체가 존재할 수 없다 (구성적 증명) |
+| workflow + 파서를 **둘 다 수정한** PR [#961](https://github.com/coseo12/astro-simulator/pull/961) | 자신의 머지 run `31007305890` 이 `#942` / `#953` 을 실제 close (`gh issue view 942` timeline actor = `github-actions[bot]`)                        |
+
+원리: `pull_request closed(merged == true)` 는 머지 커밋이 base 에 올라간 **뒤** 발화하므로 개정판이 이미 base 에 있다. `workflow_dispatch` 2단계 함정은 **default branch** 반영을 요구하는 별개 조건이고 `base=develop` 은 `main` 에 닿지 않으므로 **동형이 아니다**. 원출처인 workflow 헤더 주석도 함께 정정했다.
 
 **파싱 축** (`parseCloseTargets`, 정규식 `\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\s*:\s*|\s+)#(\d+)`):
 
@@ -44,8 +52,9 @@
 | `Closes #1, #2` 처럼 **번호 나열**                          | `#1` 만 발동, `#2` 미발동. 각 번호 **직전**에 키워드가 인접해야 한다. 올바른 형식은 **줄 분리** — `Closes #1` 개행 `Closes #2` ([§PR 규칙](../guides/pr-conventions.md) 문법 가드와 동일 원리) |
 | cross-repo 표기 (`Closes owner/repo#N`)                     | 미발동. 키워드 **직후**가 `#` 여야 하므로 `owner/` 에서 매칭이 끊긴다 (본 저장소 이슈만 대상)          |
 | PR 본문 비어 있음                                           | no-op (파서 빈 배열 → workflow 조기 종료)                                                             |
+| ⚠️ **코드블록·인용 내부** (` ``` ` / `>` / 표 셀)             | **파싱된다 — 유일한 초과 발동 방향.** 파서는 마크다운 구조를 제거하지 않고 raw 텍스트에 정규식을 건다. **본 문서를 PR 본문에 인용하면 위 예시 번호가 실제 close 대상이 된다** (PR [#1002](https://github.com/coseo12/astro-simulator/pull/1002) 리뷰 실측: 본문이 `[13, 999]` 로 파싱돼 무관 이슈 `#13` 에 close 시도. `#13` 이 이미 closed 라 `skip:` 으로 무해했을 뿐이다). close 문법을 **예시로 적을 때는 키워드와 `#` 사이를 띄우거나**(`Closes → #13`) 번호를 비-숫자로 둔다 |
 
-**실행 축** (파싱은 됐으나 close 하지 않는 경우 — 전부 run 로그에 `skip:` 으로 남는다):
+**실행 축** (파싱은 됐으나 close 하지 않는 경우). 아래 5행 중 **앞 3행은 run 로그에 `skip:` 으로 남고, 뒤 2행은 step 실패**로 표면화된다 — 특히 self-test 실패는 파싱 **이전** 단계라 `skip:` 이 아예 찍히지 않는다:
 
 | 조건                             | 결과                                                                                     |
 | -------------------------------- | ------------------------------------------------------------------------------------------ |

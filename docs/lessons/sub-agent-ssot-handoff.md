@@ -21,7 +21,7 @@ sub-agent 보고 수신 직후 메인 컨텍스트가 다음을 실행:
 GitHub closing keyword (`Closes #N` / `Fixes #N` / `Resolves #N`) 는 **PR 의 base 가 default branch (보통 main) 일 때만 발화**. gitflow 운영 (base=develop) PR 머지 시 정확 문법이어도 100% 미발화 — 통계 증거 13/13 PR.
 
 **메커니즘 분리** (두 함정 독립):
-- **함정 A — 콜론 문법** (`Closes: #N` — base 무관 미인식, volt [#93](https://github.com/coseo12/volt/issues/93))
+- **함정 A — 번호 나열** (`Closes #A, #B` / `Closes: #A, #B` — **뒤 번호 `#B` 만 미인식**. 각 번호 **직전**에 키워드가 인접해야 한다. volt [#93](https://github.com/coseo12/volt/issues/93) 은 이를 _"콜론 문법"_ 으로 명명했으나 **실패 축은 콜론이 아니라 나열**이다 — 2026-08-09 실측: 본 저장소 파서는 `Closes: #7` → `[7]` 로 **콜론을 인식**하고 `Closes #1, #2` → `[1]` 로 **나열에서만** 끊긴다. [`pr-conventions.md`](../guides/pr-conventions.md) 이 인용한 volt [#41](https://github.com/coseo12/volt/issues/41) 도 `Closes: #105, #110` 에서 `#105` 는 close 됐다고 실측한다)
 - **함정 B — base 함정** (정확 문법이어도 base=develop 시 미발화, volt [#115](https://github.com/coseo12/volt/issues/115) / [#117](https://github.com/coseo12/volt/issues/117))
 
 함정 A 우회해도 함정 B 면 미작동.
@@ -31,7 +31,7 @@ GitHub closing keyword (`Closes #N` / `Fixes #N` / `Resolves #N`) 는 **PR 의 b
 - **본 저장소 밖으로 이 교훈을 옮길 때만** 해당: 대체 workflow 가 없는 저장소(본 함정의 원 관찰 대상인 harness 계열 포함)는 여전히 무조건 수동 close 다. 함정 B 자체는 GitHub 사양이라 소멸하지 않았고 **처방만 저장소별로 갈린다** — 그래서 처방을 옮길 때는 workflow 존재 여부를 먼저 확인한다
 - release PR (`develop → main`) 의 closing keyword 는 작동 → release PR 본문에 누적된 sub-PR 의 `Closes #N` 명시 박제 권고 (sub-PR base=develop 함정 우회)
 
-auto-close 검증은 PR 규칙 keyword 문법 가드와 연결 — `Closes: #A, #B` 같은 콜론 문법은 #B 미인식. 문법이 틀려도 sub-agent 는 "close 완료" 로 보고하므로 메인이 state 를 직접 확인.
+auto-close 검증은 PR 규칙 keyword 문법 가드와 연결 — `Closes #A, #B` 는 **번호 나열**이라 `#B` 미인식 (콜론 유무와 무관. 올바른 형식은 **줄 분리** — `Closes #A` 개행 `Closes #B`). 문법이 틀려도 sub-agent 는 "close 완료" 로 보고하므로 메인이 state 를 직접 확인.
 
 ## 공통 JSON 스키마 (SSoT 9 필드)
 

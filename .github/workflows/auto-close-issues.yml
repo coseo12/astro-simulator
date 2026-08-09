@@ -11,10 +11,16 @@ name: auto-close-issues
 # self-test 는 (1) 본 workflow 사용 직전 + (2) ci.yml detect-and-test 상시 배선 이중화
 # (#897 교훈 — CI 미배선 self-test 는 0회 실행).
 #
-# ⚠ workflow_dispatch 2단계 함정과 동형 (CLAUDE.md §workflow_dispatch 2단계 함정):
-# pull_request closed 트리거는 base 브랜치에 반영된 workflow 정의를 사용하므로, 본 workflow
-# 를 도입하는 PR 자신의 머지에서는 실발동이 구조적으로 불가. 실발동 실증은 develop 반영 후
-# 다음 머지 PR (#915 PR-2) 에서 확인한다 (도입 PR 본문 DoD 에 박제).
+# ⚠ 정정 (2026-08-09, #999 / PR #1002 리뷰): 도입 시 여기에 "workflow_dispatch 2단계 함정과
+# 동형이라 본 workflow 를 도입·수정하는 PR 자신의 머지에서는 실발동 불가" 라고 적었으나
+# **실측 2건으로 반증**됐다.
+#   - run 30695395893 — 본 workflow 를 **신설한** PR #917 자신의 머지에서 생성 + self-test PASS.
+#     파일이 그 머지로 처음 생겼으므로, 정의가 로드되지 않았다면 run 자체가 존재할 수 없다.
+#   - run 31007305890 — workflow + 파서를 **둘 다 수정한** PR #961 자신의 머지가 #942 / #953 을
+#     실제 close (`gh issue view 942` timeline actor = github-actions[bot]).
+# 원리: pull_request closed(merged==true) 는 머지 커밋이 base 에 올라간 **뒤** 발화하므로
+# 개정판이 이미 base 에 있다. workflow_dispatch 함정은 **default branch** 반영을 요구하는
+# 별개 조건이며 base=develop 은 main 에 닿지 않는다 — 동형이 아니다.
 
 on:
   pull_request:
