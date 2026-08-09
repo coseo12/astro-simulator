@@ -149,9 +149,13 @@ describe('B1 회귀 가드 — tier 전환 시 모든 렌더 레이어 동일 �
 // - hit 은 5분류(활성 선언 / 이력 기록 / 무관 / 역참조 회귀 가드 / 규약 본문 자체) 후 판정한다.
 //   본 주석 블록 자체가 "규약 본문 자체" 계급이라 정정 대상이 아니다. 정상 패턴
 //   `const sceneUnitPerMeter = renderScaleForTier(tier)` 는 "무관" 이다.
-// - 알려진 의도적 예외 1건 (2026-08-09 실측, PR #997 리뷰 Y-2): `asteroid-belt.ts` 의
-//   `updateAt(epoch, 1 / AU)` 는 tier 우회가 아니라 **씬 생성 시점의 초기값**이며 첫 프레임
-//   `updateAt` 에서 정확한 값으로 덮어써진다 (근거는 같은 파일 주석에 박제). 정정 대상이 아니다.
+// - 알려진 의도적 예외 1건 (2026-08-09 실측, PR #997 리뷰 BLOCK-C): `asteroid-belt.ts` 의
+//   `updateAt(epoch, 1 / AU)` 는 tier 우회가 아니라 씬 생성 시점의 placeholder 다. 정정 대상이
+//   아닌 근거는 **덮어쓰기 경로가 실재한다**는 것 하나뿐이며, 그 경로는 이 파일이 아니라
+//   `solar-system-scene.ts` 에 있다 — 프레임 `updateAt` 이 `renderScaleForTier(activeTier)` 를
+//   계산해 `writeWorldPositions` / `asteroidBelt.updateAt` **양 분기 모두**에 주입한다.
+//   ⚠️ `1 / AU` 는 `renderScaleForTier('solar')` 의 근사값이 **아니다** (12.57배 차이). 새 hit 이
+//   이 형태면 "solar 와 가까우니 괜찮다"로 판단하지 말고 **덮어쓰기 경로의 존속**을 확인한다.
 //   구 명령은 `const` 도 상수명도 없는 이 지점을 **구조적으로 볼 수 없었다** — 값 변형을 함께
-//   거는 이유의 실증이다. 새 hit 이 이 형태면 위 근거 주석의 존속 여부부터 확인한다.
+//   거는 이유의 실증이다.
 // 산술 불변식은 위 describe 블록이 커버 (tier 전환 시 모든 레이어 동일 배수 확대).

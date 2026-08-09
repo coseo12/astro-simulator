@@ -165,8 +165,14 @@ export function createAsteroidBelt(
     template.thinInstanceBufferUpdated('matrix');
   };
 
-  // 초기 위치 — tier 는 씬 생성 시 solar 로 시작하므로 renderScaleForTier('solar')=1/AU 근사값
-  // (기존 상수와 수치상 근접) 을 초기값으로 사용. 첫 프레임 `updateAt` 호출에서 정확한 값으로 덮어써짐.
+  // 초기 위치 — 첫 프레임 `solar-system-scene.ts` `updateAt` 이 `renderScaleForTier(activeTier)` 를
+  // 주입해 덮어쓰기 전까지만 유효한 placeholder.
+  //
+  // ⚠️ `renderScaleForTier('solar')` 의 근사값이 **아니다** (2026-08-09 실측, PR #997 리뷰 BLOCK-C):
+  // `1/AU` = 6.685e-12 vs `RENDER_SCALE.solar` = 8.4e-11 → **12.57배** 차이. `solar` 는 `1/AU` 파생이
+  // 아니라 viewport 유도값이다 (`tier.ts` — 해왕성 30.3 AU 를 380 unit 에 맞춘 값).
+  // 즉 이 하드코딩이 안전한 근거는 "근접"이 아니라 **"덮어써짐"** 하나뿐이며, 그 경로가 끊기면
+  // 첫 프레임에 벨트가 12.57배 작게 그려진다. 대체 가부는 #998 5항.
   updateAt(epoch, 1 / AU);
 
   // P4-A #165 — N-body 경로에서 사용할 초기 state vector.
