@@ -27,7 +27,8 @@ GitHub closing keyword (`Closes #N` / `Fixes #N` / `Resolves #N`) 는 **PR 의 b
 함정 A 우회해도 함정 B 면 미작동.
 
 **메인 오케스트레이터 의무**:
-- base=develop PR 머지 후 **무조건 수동 close** (`gh issue close <N> --reason completed --comment "..."`). auto-close 가정 폐기
+- base=develop PR 머지 후 `gh issue view <N> --json state` 로 **결과 확인**. 본 저장소는 [`.github/workflows/auto-close-issues.yml`](../../.github/workflows/auto-close-issues.yml) (#915) 이 네이티브 미발화를 대체하므로 **`CLOSED` 가 정상**이다 — *"무조건 수동 close"* 는 2026-08-09 [#999](https://github.com/coseo12/astro-simulator/issues/999) 로 폐기됐다 (당시 처방). `OPEN` 이 남으면 폴백으로 수동 close (`gh issue close <N> --reason completed --comment "..."`), 미발동 조건은 [운영 마찰 §1-1](../ops/operational-friction.md)
+- **본 저장소 밖으로 이 교훈을 옮길 때만** 해당: 대체 workflow 가 없는 저장소(본 함정의 원 관찰 대상인 harness 계열 포함)는 여전히 무조건 수동 close 다. 함정 B 자체는 GitHub 사양이라 소멸하지 않았고 **처방만 저장소별로 갈린다** — 그래서 처방을 옮길 때는 workflow 존재 여부를 먼저 확인한다
 - release PR (`develop → main`) 의 closing keyword 는 작동 → release PR 본문에 누적된 sub-PR 의 `Closes #N` 명시 박제 권고 (sub-PR base=develop 함정 우회)
 
 auto-close 검증은 PR 규칙 keyword 문법 가드와 연결 — `Closes: #A, #B` 같은 콜론 문법은 #B 미인식. 문법이 틀려도 sub-agent 는 "close 완료" 로 보고하므로 메인이 state 를 직접 확인.

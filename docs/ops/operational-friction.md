@@ -6,17 +6,54 @@
 
 ---
 
-## 1. squash auto-close 매회 미발동 → 수동 close 규약
+## 1. squash auto-close 매회 미발동 → workflow 자동 close (#915)
 
-**증상**: 일상 개발 PR 에 `Closes #N` 을 박제해도 머지 후 이슈가 자동 close 되지 않는다. 매 세션 수동 `gh issue close` 필요.
+**증상 (구 상태)**: 일상 개발 PR 에 `Closes #N` 을 박제해도 머지 후 이슈가 자동 close 되지 않았다. 매 세션 수동 `gh issue close` 가 필요했다.
 
-**구조 원인**: GitHub 는 **default branch(main) 로 머지될 때만** closing keyword(`Closes`/`Fixes`/`Resolves`)를 auto-close 처리한다. 본 프로젝트 gitflow 는 일상 개발 PR 의 `base=develop` 이므로 **구조적으로 auto-close 미발동**. 버그가 아니라 GitHub 사양.
+**구조 원인 (여전히 참)**: GitHub 의 **네이티브** auto-close 는 **default branch(main) 로 머지될 때만** closing keyword(`Closes`/`Fixes`/`Resolves`)를 처리한다. 본 프로젝트 gitflow 는 일상 개발 PR 의 `base=develop` 이므로 **네이티브 auto-close 는 구조적으로 미발동**. 버그가 아니라 GitHub 사양이며, 이 사양은 바뀌지 않았다.
+
+**처방 갱신 (2026-08-09, [#999](https://github.com/coseo12/astro-simulator/issues/999))**: [#915](https://github.com/coseo12/astro-simulator/issues/915) 범위 4 가 [`.github/workflows/auto-close-issues.yml`](../../.github/workflows/auto-close-issues.yml) 을 도입해 그 공백을 메웠다. 이 workflow 가 `base=develop` 머지 이벤트에서 PR **본문**의 close 키워드를 파싱해 이슈를 close 하고 PR 링크 코멘트를 박제한다. 따라서 **수동 close 는 규약이 아니라 폴백**이다.
 
 **표준 절차**:
 
-- 일상 개발 PR(`<type>/*` → `base=develop`) 머지 직후 **수동 close 가 규약** — `gh issue close <N> --reason completed` (근거 코멘트 동반 권장).
-- 릴리스 PR(develop→main)에서 번들된 이슈들은 이미 각 sub-PR 에서 수동 close 됨 (release PR 은 개별 이슈 close 대상 아님).
-- 실측: 2026-07-15 세션에서 #822/#823/#826 전부 develop 머지 → 자동 미발동 → 수동 close ×3.
+- 일상 개발 PR(`<type>/*` → `base=develop`) 머지 후 메인은 `gh issue view <N> --json state` 로 **결과만 확인**한다. `CLOSED` 가 정상이며, 실측상 머지 후 수 초 내에 반영된다 (PR [#997](https://github.com/coseo12/astro-simulator/pull/997) 머지 → 11초 후 `github-actions[bot]` close).
+- `OPEN` 이 남아 있으면 아래 **미발동 조건**에 해당하는지 확인한 뒤 폴백으로 수동 close — `gh issue close <N> --reason completed` (근거 코멘트 동반 권장).
+- 릴리스 PR(develop→main)에서 번들된 이슈들은 이미 각 sub-PR 머지 시점에 close 됨 (release PR 은 개별 이슈 close 대상 아님).
+- 실측 (구 상태): 2026-07-15 세션에서 #822/#823/#826 전부 develop 머지 → 자동 미발동 → 수동 close ×3. **이 실측은 workflow 도입 이전의 사실**이다.
+
+### 1-1. auto-close 미발동 조건 — 폴백이 언제 필요한가
+
+아래는 [`auto-close-issues.yml`](../../.github/workflows/auto-close-issues.yml) 과 파싱 SSoT [`scripts/auto-close-issue-parser.mjs`](../../scripts/auto-close-issue-parser.mjs) 에서 도출한 조건이다. **여기 없는 사유로 OPEN 이 남았다면 workflow run 로그를 직접 확인**한다 (`gh run list --workflow=auto-close-issues.yml`).
+
+**트리거 축** (`on: pull_request: types: [closed]`, `branches: [develop]`):
+
+| 조건                             | 결과                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `base` 가 `develop` 이 아님       | **본 workflow 미발동.** release/hotfix PR(`base=main`)은 default branch 머지라 GitHub **네이티브** auto-close 가 대신 발동 |
+| 머지 없이 close (`merged=false`) | 미발동 — `if: github.event.pull_request.merged == true` (의도된 설계. 반려 PR 이 이슈를 닫으면 안 된다)                   |
+
+**정의 로드 축** — `pull_request` closed 트리거는 **base 브랜치에 반영된** workflow 정의를 사용한다. 따라서 **본 workflow 나 파서를 수정하는 PR 자신의 머지에서는 개정판이 발동하지 않는다** (workflow 헤더 주석에 박제된 `workflow_dispatch` 2단계 함정 동형). 이런 PR 은 폴백 수동 close 를 기본값으로 잡는다.
+
+**파싱 축** (`parseCloseTargets`, 정규식 `\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\s*:\s*|\s+)#(\d+)`):
+
+| 조건                                                       | 결과                                                                                                 |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 키워드가 PR **본문 밖**에만 있음                            | **미발동.** 파서 입력은 `github.event.pull_request.body` 뿐 — 커밋 메시지 / PR 제목 / 코멘트는 미파싱 |
+| 공식 키워드 9종 외 표기 (오타 / 한글 *"해결 #N"* 등)         | 미발동. 인식 대상은 `close`/`closes`/`closed`/`fix`/`fixes`/`fixed`/`resolve`/`resolves`/`resolved`  |
+| 비-close 참조 (`Part of #N` / `Builds on #N`)               | 미발동 (의도 — 초과 매칭 금지)                                                                        |
+| `Closes #1, #2` 처럼 **번호 나열**                          | `#1` 만 발동, `#2` 미발동. 각 번호 **직전**에 키워드가 인접해야 한다 ([§PR 규칙](../guides/pr-conventions.md) 문법 가드와 동일 원리) |
+| cross-repo 표기 (`Closes owner/repo#N`)                     | 미발동. 키워드 **직후**가 `#` 여야 하므로 `owner/` 에서 매칭이 끊긴다 (본 저장소 이슈만 대상)          |
+| PR 본문 비어 있음                                           | no-op (파서 빈 배열 → workflow 조기 종료)                                                             |
+
+**실행 축** (파싱은 됐으나 close 하지 않는 경우 — 전부 run 로그에 `skip:` 으로 남는다):
+
+| 조건                             | 결과                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| 대상 번호가 **PR**               | 스킵 — REST 응답의 `pull_request` 키로 판별 (오발동 close 차단)                            |
+| 대상 번호 미존재                 | 스킵 — `gh api` 404                                                                        |
+| 대상 이슈가 이미 `open` 아님     | 스킵                                                                                        |
+| 파서 self-test 실패              | **step 실패 → close 전체 중단** (fail-fast. 파서 회귀 시 오발동 close 대신 멈춘다)         |
+| close 자체 실패 (권한 등)        | step 실패로 표면화 (fail-visible — 조용한 미발동이 아니므로 Actions 탭에서 빨간 체크로 보임) |
 
 ---
 

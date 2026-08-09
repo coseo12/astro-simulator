@@ -5,6 +5,19 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#999] auto-close 자동화(#915) 도입 후 잔존한 "수동 close 규약" 처방 회수 — 처방의 수명 관리 실패 (MINOR)** ([#999](https://github.com/coseo12/astro-simulator/issues/999)) — [#915](https://github.com/coseo12/astro-simulator/issues/915) 범위 4 가 [`.github/workflows/auto-close-issues.yml`](.github/workflows/auto-close-issues.yml) 을 도입해 `base=develop` 머지의 이슈 close 를 자동화했고 **workflow 헤더 주석 자신이 *"(수동 close 규약 대체)"* 를 명시**하는데, 그 자동화가 대체한 수동 규약이 문서에 그대로 남아 있었다. 실피해: PR [#997](https://github.com/coseo12/astro-simulator/pull/997) 머지 시 이슈 [#995](https://github.com/coseo12/astro-simulator/issues/995) 가 **11초 후 `github-actions[bot]` 에 의해 이미 close** 됐는데도, stale 문서를 읽은 reviewer 가 라운드 1·2·3 에서 _"수동 close 필요"_ 를 3회 권고하고 qa 가 마무리 체크리스트에서 1회 더 권고해 **한 사이클에서 오지시 4회**(술어: 권고를 발화한 에이전트 턴 수 — reviewer 3 + qa 1)가 재생산됐다. 메인이 그대로 `gh issue close` 를 실행해 `! already closed` 를 받았다. 실행은 멱등이라 무해했으나, **문서가 지시한 행동이 이미 자동화됐음을 세 에이전트가 아무도 몰랐다**는 것이 결함이다.
+
+  **정정 범위 — 구조 원인은 보존, 처방만 교체.** GitHub **네이티브** auto-close 가 default branch(main) 머지에서만 발동한다는 서술은 **여전히 참**이고(`gh repo view --json defaultBranchRef` = `main` 재확인), 이를 지우면 workflow 가 왜 존재하는지가 사라진다. 그래서 _"→ 수동 close 규약"_ 만 _"`auto-close-issues.yml` 이 자동 처리 → 메인은 `gh issue view <N> --json state` 로 **결과만 확인**, `OPEN` 이면 폴백 수동 close"_ 로 바꿨다. 수동 close 는 **규약에서 폴백으로 강등**됐을 뿐 삭제되지 않았다.
+
+  **미발동 조건 명시 (DoD 2 — 실질 가치).** 폴백이 **언제** 필요한지 판정 가능해야 강등이 안전하다. [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 **§1-1** 을 신설해 workflow 와 파서 [`scripts/auto-close-issue-parser.mjs`](scripts/auto-close-issue-parser.mjs) **코드에서 도출한** 조건만 4축(트리거 / 정의 로드 / 파싱 / 실행) 표로 박제했다. 핵심 3건: ① **파서 입력은 `github.event.pull_request.body` 뿐** — 커밋 메시지나 PR 제목에만 키워드를 쓰면 미발동한다(기존 문서 어디에도 없던 조건). ② `pull_request` closed 트리거는 **base 브랜치에 반영된 정의**를 쓰므로 **workflow·파서 자신을 고치는 PR 의 머지에서는 개정판이 발동하지 않는다** — 이 클래스는 폴백을 기본값으로 잡아야 한다(workflow 헤더의 `workflow_dispatch` 2단계 함정 동형). ③ 파서 self-test 실패는 **step 실패로 close 전체를 중단**하고(fail-fast), close 실패는 **step 실패로 표면화**된다(fail-visible) — 즉 _"조용한 미발동"_ 은 파싱 축에서만 생기고 나머지는 Actions 탭에 빨간 체크로 보인다.
+
+  **동종 사례 전수 (DoD 4 — [`reviewer.md`](.claude/agents/reviewer.md) §절차 4 정본).** 술어 = `git grep -nFi --untracked` 11 변형(`auto-close` / `auto close` / `autoclose` / `auto_close` / `수동 close` / `gh issue close` / `closes #` / `closing keyword` / `close 키워드` / `자동 close` / `--reason completed`) 합집합, **경로 무제한**, rev `b26994d`(= 착수 시점 develop head): **96 hits / 29 files**. 5분류 = **활성 선언 8**(전부 정정) / **활성 선언 — 정합 42**(workflow·파서 구현체 22, 문법 가드·템플릿·포인터 20 — 유지) / **이력 기록 27**(CHANGELOG 10 + ADR 8 + 회고·레포트 4 + 근거 각주 5 — 시점 사실이라 보존) / **역참조 회귀 가드 8**(파서 self-test 픽스처 6 = GitHub 미매칭 문법을 **의도적으로** 재현, `verify-agent-ssot.sh` 2 = 필드명 `auto_close_issue_states` 존재 강제) / **규약 본문 자체 11**(5 에이전트 SSoT 9 필드 스키마 10 + 스키마 원본 1) / **무관 0**. 합 96 정합. **개정 후 활성 stale 0.** — **이슈가 지목한 3곳은 닫힌 집합이 아니었다**: 전수가 **2곳을 더** 찾았다. [`docs/lessons/sub-agent-ssot-handoff.md`](docs/lessons/sub-agent-ssot-handoff.md) 의 _"base=develop PR 머지 후 **무조건 수동 close**. auto-close 가정 폐기"_ 와 [`docs/guides/pr-conventions.md`](docs/guides/pr-conventions.md) 의 _"일상 개발 PR → develop 은 **릴리스 시점까지 OPEN 유지가 정상**"_ 이고, **후자가 특히 위험**했다 — 자동 close 된 이슈를 보고 _"비정상"_ 으로 오판하게 만드는 **역방향 오지시**라 폴백 규약보다 피해가 크다. 전자는 CLAUDE.md §sub-agent 블록의 상세 문서라 5 에이전트가 모두 경유하는 경로였고, 이것이 **오지시 4회의 실제 급원**이었을 가능성이 높다(CLAUDE.md:247 은 한 줄 요약이라 _"수동 close"_ 4글자만 전달한다).
+  **소급 편집 금지 준수** — 이력 27건은 전부 보존했고, 현재형 오독이 우려되는 운영 문서 2곳은 삭제 대신 _"(구 상태)"_ / _"workflow 도입 이전 서술"_ 표기로 막았다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"에이전트가 같은 입력에 다르게 동작하는가"_): **예.** 앱 runtime 0줄이지만 ① 머지 후 reviewer·qa·메인이 `gh issue close` 대신 `gh issue view --json state` 를 실행한다 ② 폴백 판정에 §1-1 표를 대조하는 단계가 새로 생긴다 ③ `create-pr` 스킬이 _"키워드는 PR 본문에"_ 를 새로 지시한다.
+
 ## [0.64.0] — 2026-08-09
 
 ### Behavior Changes
