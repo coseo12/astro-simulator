@@ -41,7 +41,7 @@
 | 키워드가 PR **본문 밖**에만 있음                            | **미발동.** 파서 입력은 `github.event.pull_request.body` 뿐 — 커밋 메시지 / PR 제목 / 코멘트는 미파싱 |
 | 공식 키워드 9종 외 표기 (오타 / 한글 *"해결 #N"* 등)         | 미발동. 인식 대상은 `close`/`closes`/`closed`/`fix`/`fixes`/`fixed`/`resolve`/`resolves`/`resolved`  |
 | 비-close 참조 (`Part of #N` / `Builds on #N`)               | 미발동 (의도 — 초과 매칭 금지)                                                                        |
-| `Closes #1, #2` 처럼 **번호 나열**                          | `#1` 만 발동, `#2` 미발동. 각 번호 **직전**에 키워드가 인접해야 한다 ([§PR 규칙](../guides/pr-conventions.md) 문법 가드와 동일 원리) |
+| `Closes #1, #2` 처럼 **번호 나열**                          | `#1` 만 발동, `#2` 미발동. 각 번호 **직전**에 키워드가 인접해야 한다. 올바른 형식은 **줄 분리** — `Closes #1` 개행 `Closes #2` ([§PR 규칙](../guides/pr-conventions.md) 문법 가드와 동일 원리) |
 | cross-repo 표기 (`Closes owner/repo#N`)                     | 미발동. 키워드 **직후**가 `#` 여야 하므로 `owner/` 에서 매칭이 끊긴다 (본 저장소 이슈만 대상)          |
 | PR 본문 비어 있음                                           | no-op (파서 빈 배열 → workflow 조기 종료)                                                             |
 
