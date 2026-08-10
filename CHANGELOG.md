@@ -7,8 +7,6 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-**cross-validate (agy, 2026-08-10, `cross_validate.sh code 1009`) — 결론 승인 (_"추가 수정 없이 즉시 머지 권장"_).** 메인 수행(`developer.md` #479). **합의**: 모듈 자기 계약 위반 정돈 + `1/AU` 하드코딩의 초기 프레임 스케일 왜곡 리스크 **근본 제거**로 평가. **권고 1건 반영** — `sceneUnitPerMeter` **런타임 유효성 검증**. 타입은 **존재**를 강제하지만 **값**은 강제하지 못하고, 본 이슈가 고친 결함이 정확히 _"잘못된 스케일이 조용히 통과해 12.57배 오차"_ 였다. `0` / `NaN` / 음수 / `Infinity` 주입 시 throw 하도록 fail-fast 가드를 넣고 4값 회귀 테스트를 추가했다 (CLAUDE.md §가드 설계 원칙 — **fallback 분기 금지**). agy 는 _"strict 모드상 누락 위험 거의 0, 방어적 코딩 차원"_ 이라 필수가 아니라 했으나, **이 PR 의 결함 양태가 무음 통과**였으므로 채택했다.
-
 - **[#998 축 C] 소행성대 초기 배치 스케일 — 모듈 자기 계약 위반 제거 (`sceneUnitPerMeter` 필수 주입) (MINOR)** ([#998](https://github.com/coseo12/astro-simulator/issues/998)) — 축 A (PR [#1003](https://github.com/coseo12/astro-simulator/pull/1003)) · 축 B (PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004)) 에 이어 **마지막 축 (이슈 항 5)** 을 반영한다.
 
   **판정 — 이슈 원안 (a) 기각, 옵션 (b) 채택.** 이슈는 _"`1 / AU` 를 `renderScaleForTier('solar')` 로 대체 가능한가"_ 를 물었으나 **그 대체는 설계 역행**이다. `asteroid-belt.ts:23-27` 이 P12-A #298 B1 계약으로 _"호출자가 `sceneUnitPerMeter` 를 주입한다"_ 를 명시하고 **`tier.js` 를 import 하지 않는 것 자체가 계약의 본체**다 (실측: 본 모듈 import 전수 = `@babylonjs/core` / `@astro-simulator/shared` / `../physics/kepler.js` / `../physics/state-vector.js` / `../ephemeris/solar-system-loader.js` — `tier.js` 없음. 역방향도 없어 순환 위험은 애초에 0 이었다 — `tier.ts` 의 `asteroid` 언급 1건은 `focusKind === 'asteroid'` 문자열 비교다). (a) 를 택하면 하드코딩 **대상만** `1 / AU` → tier 리터럴 `'solar'` 로 옮겨간다.
@@ -47,7 +45,7 @@ Semantic Versioning을 따른다.
 
   ⚠️ **모집단 술어 — 리포 외부 매체 제외.** 위 수치는 **tracked + untracked 파일** 기준이며 PR·이슈 본문은 작업 트리 밖이라 포함되지 않는다 (§절차 4 2항 매체 축). **구체적 잔존을 하나 알고 있다** — 이슈 [#998](https://github.com/coseo12/astro-simulator/issues/998) §5 본문이 `renderScaleForTier('solar')` 직접 사용을 _"리스크가 사라진다"_ 로 서술하는데 본 PR 이 그것을 **기각**했다. 이슈 본문은 제안 시점 기록이라 편집하지 않고, **본 entry 와 PR 본문이 판정 기록**이 된다.
 
-## [0.65.0] — 2026-08-10
+  **cross-validate (agy, 2026-08-10, `cross_validate.sh code 1009`) — 결론 승인 (_"추가 수정 없이 즉시 머지 권장"_).** 메인 수행(`developer.md` #479). **합의**: 모듈 자기 계약 위반 정돈 + `1/AU` 하드코딩의 초기 프레임 스케일 왜곡 리스크 **근본 제거**로 평가. **권고 1건 반영** — `sceneUnitPerMeter` **런타임 유효성 검증**. 타입은 **존재**를 강제하지만 **값**은 강제하지 못하고, 본 이슈가 고친 결함이 정확히 _"잘못된 스케일이 조용히 통과해 12.57배 오차"_ 였다. `0` / `NaN` / 음수 / `Infinity` 주입 시 throw 하도록 fail-fast 가드를 넣고 4값 회귀 테스트를 추가했다 (CLAUDE.md §가드 설계 원칙 — **fallback 분기 금지**). agy 는 _"strict 모드상 누락 위험 거의 0, 방어적 코딩 차원"_ 이라 필수가 아니라 했으나, **이 PR 의 결함 양태가 무음 통과**였으므로 채택했다.## [0.65.0] — 2026-08-10
 
 ### Behavior Changes
 
