@@ -24,7 +24,7 @@
 
 ### 1.1 #989 — 규약화 시점 (`reviewer.md` §4 에서 이관, verbatim)
 
-아래 blockquote 는 `reviewer.md` 57–61행(rev `b9c273a`)에서 **본문 바이트 그대로** 옮긴 것이다 (술어: 리스트 중첩용 선행 5칸 들여쓰기만 제거 후 `cmp` — IDENTICAL). 규약이 아니라 **그 시점의 측정 기록**이므로 §3.1 표의 **이력 기록** 계급이고, 정본이 바뀌어도 갱신하지 않는다.
+아래 blockquote 는 `reviewer.md` 57–61행(rev `b9c273a`)에서 **본문 바이트 그대로** 옮긴 것이다 (술어: 리스트 중첩용 선행 5칸 들여쓰기만 제거 후 `cmp` — IDENTICAL). 규약이 아니라 **그 시점의 측정 기록**이므로 정본 [`reviewer.md`](../../.claude/agents/reviewer.md) §4 4항 결정 절차의 **2항 = 이력 기록** 계급이고, 정본이 바뀌어도 갱신하지 않는다.
 
 > **자기 적용 실증** (#989, `dddeb4811` = #987 이 _"25/25 PASS / 모든 위치 정합"_ 을 선언한 시점). 술어 = grep hit 줄 수 / 매치 파일 수.
 > 구 규약 (경로 제한 + `-E` 4변형 = 개정 5종 − `35 k`, `-i` 없음) **10 hits / 5 files**, `.github/` **0** — 단 이는 **당시 실행 경로 기준**이다. 구 문언은 *"저장소 전체 검색"* 을 2회 명시했으므로 **좁은 경로를 강제하지 않았고**, 같은 `-E` 로도 **경로만 풀면 `.github/`=1** (18 hits / 7 files) 로 7번째 지점이 잡힌다.
@@ -162,7 +162,7 @@ tsc --removeComments --noResolve --skipLibCheck --target esnext --module esnext 
 
 - **귀결은 같다** — 두 계급 모두 정정 대상이 아니다.
 - **수명이 다르다** — 규약 본문 자체는 **정본이 바뀌면 함께 갱신**되고, 이력 기록은 **보존**된다. 섞으면 후자가 갱신 대상으로 오인된다.
-- 그 blockquote 는 rev 앵커 (`2f64d76`) 가 붙은 **시점 측정 기록**이고, 구 명령을 **반례로** 인용한다. 개정판 정의의 _"구 값·구 명령의 before·반례 인용"_ 에 문언 그대로 해당하므로 **이력 기록**이다.
+- 그 blockquote 는 rev 앵커 (`2f64d76`) 가 붙은 **시점 측정 기록**이고, 구 명령을 **반례로** 인용한다. 개정판 정의의 _"구 값·구 명령의 반례 인용"_ 에 문언 그대로 해당하므로 **이력 기록**이다.
 
 → **제6계급을 만들 필요가 없다.** 필요했던 것은 _"위치가 아니라 기능으로 판정한다"_ 는 적용 규칙이다.
 
@@ -186,3 +186,11 @@ tsc --removeComments --noResolve --skipLibCheck --target esnext --module esnext 
 
 1. **열거 사본 동기화** — 5계급 명칭은 [`claudemd-governance.md`](claudemd-governance.md) §7.2 와 [`packages/core/src/scene/tier-proportion.test.ts`](../../packages/core/src/scene/tier-proportion.test.ts) 주석에 열거돼 있다. 술어: `git grep -lF '역참조 회귀 가드'` rev `b9c273a` **4 files** = 정본 1 (`reviewer.md`) + **갱신 대상 열거 사본 2** + 이력 기록 1 (`CHANGELOG.md` — 보존 대상이라 갱신 비용에 들어가지 않는다). 명칭·개수를 유지하면 동기화 비용이 **0** 이다.
 2. **hit 당 판정 비용** — N-way 판정은 계급 수에 비례해 오분류 확률을 올린다.
+
+---
+
+## 6. 표제 개명이 만드는 dead reference
+
+`reviewer.md` §4 `(Dead Reference)` 의 후자 케이스 실례. PR [#1003](https://github.com/coseo12/astro-simulator/pull/1003) 이 §4 4항 표제를 `hit 3분류 후 선언` → `hit 5분류 후 선언` 으로 바꾸자, ADR [`20260808-983`](../decisions/20260808-983-measurement-recording-convention.md) 의 _"§4 (Grep) 4항의 **3분류 표**가 같은 형식이다"_ 가 **그 순간 dead** 가 됐다. 박제 시점에는 정확했다.
+
+**파일 제거와 달리 링크 검사가 못 잡는다** — `verify-docs-links.mjs` 는 경로 유효성만 보고 대상 파일은 그대로 존재한다. 절·표제를 인용하는 참조는 **개명하는 PR 이 같은 PR 안에서** 회수해야 하며, 이는 *"본 PR 이 유발한 부채"* 라 비-범위 선언과 충돌하지 않는다 (선행 부채와 구분).
