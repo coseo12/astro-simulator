@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.66.0] — 2026-08-10
+
 ### Behavior Changes
 
 - **[#998 축 C] 소행성대 초기 배치 스케일 — 모듈 자기 계약 위반 제거 (`sceneUnitPerMeter` 필수 주입) (MINOR)** ([#998](https://github.com/coseo12/astro-simulator/issues/998)) — 축 A (PR [#1003](https://github.com/coseo12/astro-simulator/pull/1003)) · 축 B (PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004)) 에 이어 **마지막 축 (이슈 항 5)** 을 반영한다.
