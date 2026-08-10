@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.65.0] — 2026-08-10
+
 ### Behavior Changes
 
 - **[#998 축 B] ADR 인덱스 계약 명문화 + 술어 비교환 클래스 규약화 + upstream-only 표기 — 상태 열 drift 2건 정정 (MINOR)** ([#998](https://github.com/coseo12/astro-simulator/issues/998)) — 축 A (PR [#1003](https://github.com/coseo12/astro-simulator/pull/1003)) 가 [`reviewer.md`](.claude/agents/reviewer.md) §절차 4 를 재구조화한 데 이어, 본 PR 은 **축 B (이슈 항 2 · 3 · 4)** 를 반영한다. 항 5 (축 C — `asteroid-belt.ts` 대체 가부) 는 범위 밖이다.
