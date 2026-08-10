@@ -31,11 +31,21 @@
    밀려나는 반면 **본 표는 항구적이라 drift 가 더 오래 산다.** 실제 위반 1건이 #998 에서 발각됐다:
    `971-required-status-checks` 가 2026-08-08 에 Accepted 로 전이됐는데 (PR
    [#993](https://github.com/coseo12/astro-simulator/pull/993)) 본 표는 `Provisional` 로 남아 있었다.
-3. **upstream-only 항목 — `(upstream-only)` 표기 의무.** 이 저장소에 **로컬 파일이 없는** upstream
-   `harness-setting` 유래 ADR 은 주제 셀에 표기를 달고 `scripts/verify-docs-links.mjs` 의
-   `UPSTREAM_ONLY_ALLOWLIST` 에 `(source, target)` 쌍으로 등록한다 (아래 범례). 표기가 없으면 **링크가
-   깨진 것인지 로컬에 없는 것인지 구분할 수 없다.** #907 하네스 디커플 이후 **신규 등재는 원칙적으로
-   없다** — 기존 3건은 이력 보존 목적으로만 잔존한다.
+3. **upstream-only 항목 — `(upstream-only)` 표기 의무 + 상태는 upstream GET 으로 대조.** 이 저장소에
+   **로컬 파일이 없는** upstream `harness-setting` 유래 ADR 은 주제 셀에 표기를 달고
+   `scripts/verify-docs-links.mjs` 의 `UPSTREAM_ONLY_ALLOWLIST` 에 `(source, target)` 쌍으로 등록한다
+   (아래 범례). 표기가 없으면 **링크가 깨진 것인지 로컬에 없는 것인지 구분할 수 없다.** #907 하네스
+   디커플 이후 **신규 등재는 원칙적으로 없다** — 기존 3건은 이력 보존 목적으로만 잔존한다.
+   - ⚠️ **로컬 파일 부재는 _"대조 불가"_ 가 아니다.** 상태 열은 아래 **1줄 GET** 으로 upstream 실물과
+     직접 대조된다 (쓰기 계열 `-X PUT/PATCH/DELETE` 금지, GET 전용):
+     ```bash
+     gh api repos/coseo12/harness-setting/contents/docs/decisions/<파일>.md --jq .content | base64 -d | grep -m1 '상태'
+     ```
+     upstream 이 이 3건 중 하나를 `Superseded` 로 전이시키면 본 표는 조용히 틀리므로, 등재 항목 전수
+     대조 시 **로컬 4행은 파일 헤더로 · upstream 3행은 위 명령으로** 대조한다. _"실물이 없어 원리적으로
+     대조 불가"_ 라는 서술은 **재확인 시도 자체를 봉인**하므로 쓰지 않는다 (PR
+     [#1004](https://github.com/coseo12/astro-simulator/pull/1004) reviewer 라운드 1 BLOCK-2 — 초판이
+     정확히 그 서술을 썼고 실측으로 반증됐다).
 
 | 날짜 | 주제 | 상태 | 상하 관계 |
 |---|---|---|---|
@@ -49,7 +59,8 @@
 
 > **범례 — `(upstream-only)`**: 이 저장소에 **로컬 파일이 없다.** 링크 대상은 upstream
 > [`harness-setting/docs/decisions/`](https://github.com/coseo12/harness-setting/tree/main/docs/decisions)
-> 의 동명 ADR 이며 (2026-08-10 실측: 3건 전부 upstream 에 실재), **이 저장소의 GitHub 렌더에서
+> 의 동명 ADR 이며 (2026-08-10 GET 실측: 3건 전부 upstream 에 실재하고 **상태 열도 전건 일치** —
+> 위 계약 (3) 의 1줄 명령), **이 저장소의 GitHub 렌더에서
 > 클릭하면 404** 다. `scripts/verify-docs-links.mjs` 는 `UPSTREAM_ONLY_ALLOWLIST` 로 이 3쌍을
 > 통과시키되 **조용한 skip 이 아니라** 발동 건수를 매 실행 stdout 에 보고한다. 즉 링크 검사 PASS 는
 > _"파일이 있다"_ 가 아니라 **_"부재가 알려져 있다"_** 를 뜻한다. 표기 없는 항목은 로컬 파일이 있다.
