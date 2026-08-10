@@ -22,11 +22,42 @@ import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js'
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. tier 전환 시 본 모듈의
 // ThinInstance 좌표가 body mesh 의 renderScaleForTier(tier) 와 동일 배수로 스케일되도록
-// 호출자가 `updateAt` / `writeWorldPositions` 에 `sceneUnitPerMeter` 를 주입한다.
+// 호출자가 **모든 진입점** — 생성 시점 `options.sceneUnitPerMeter` + 매 프레임 `updateAt` /
+// `writeWorldPositions` — 에 `sceneUnitPerMeter` 를 주입한다.
 // 주석 계약: `sceneUnitPerMeter === renderScaleForTier(activeTier)` 이어야 rings/행성과
-// 상대 비율이 보존됨 (원칙 #1·#4). ADR `20260423-display-relative-scale-unification.md` §결정 §1.
+// 상대 비율이 보존됨.
+//
+// 본 모듈은 **의도적으로 tier-agnostic** 이다 — `tier.js` 를 import 하지 않으며, 그것이 계약의
+// 본체다. `renderScaleForTier('solar')` 를 여기서 직접 부르는 대안(#998 5항 원안)은 하드코딩의
+// 대상만 `1 / AU` → tier 리터럴 `'solar'` 로 옮길 뿐 계약을 되돌린다 (#998 축 C 에서 기각).
+//
+// 근거 계보 (#998 축 C 판정) — 계약의 원 출처 ADR `20260423-display-relative-scale-unification.md`
+// 는 2026-04-25 roadmap reset 으로 **폐기**되어 `docs/deprecated/decisions/` 로 이동했다. 폐기된 것은
+// §원칙 §1 "상대 비율 = 실측 고정" 과 단일 모드 UX 계층이고, **tier 엔진(renderScale = tier 함수)
+// 은 코드 잔존 + 현행 유지**다 (폐기 ADR 머리말 §참고 / `docs/decisions/20260504-focus-tier-oscillate-fix.md`
+// §관련 ADR — "폐기 처리되었으나 코드는 유지"). 따라서 본 계약의 **현행 근거**는 아래이며, 폐기 ADR
+// 은 이력 근거로만(경로 `docs/deprecated/decisions/…`) 인용한다:
+//   - `./tier.ts` 머리말 §계약 1~4 (renderScale 은 tier 함수 — `SCENE_UNIT_PER_METER` 하드코딩 금지)
+//   - `docs/architecture/principles.md` §1 Visual Fidelity §적용 위치 원칙 (왜곡은 rendering 시점에만)
+//   - 회귀 가드 `./tier-proportion.test.ts` (산술 불변식) + `./asteroid-belt-scale-contract.test.ts`
+//     (본 모듈 초기 배치 실측)
 
 export interface AsteroidBeltOptions {
+  /**
+   * **필수** — 초기 ThinInstance 배치에 적용할 renderScale (m → scene unit).
+   * 호출자가 `renderScaleForTier(activeTier)` 를 주입한다 (위 주석 계약).
+   *
+   * #998 축 C 이전에는 본 모듈이 자기 init 에서 `1 / AU` 를 하드코딩했다 — *"호출자가 주입"* 이라
+   * 선언해놓고 **자기 계약을 자기가 위반**한 지점이다. NullEngine 실측(`asteroid-belt-scale-contract.test.ts`)
+   * 기준 초기 배치 반경이 **1.90~3.59 scene unit** 이었고, solar tier 정답은 **27.65~40.21** 이다
+   * (`8.4e-11 ÷ (1/AU)` = **12.566배**). 덮어쓰기 경로가 끊기면 이 값이 그대로 화면에 나가고
+   * 자가 교정 경로가 없어 증상이 영구다.
+   *
+   * **선택 필드 + 기본값으로 두지 않는다** — 기본값은 같은 함정을 그대로 남기는 fallback 분기다
+   * (CLAUDE.md §가드 설계 원칙 — drift 경로 fallback 금지). 필수 필드로 두면 주입 누락이
+   * **컴파일 시점에** 걸린다.
+   */
+  sceneUnitPerMeter: number;
   /** 생성할 소행성 수. 기본 200. */
   n?: number;
   /** 결정적 생성을 위한 seed. 기본 42. */
@@ -101,12 +132,13 @@ const ASTEROID_VISUAL_DIAMETER_AU = 0.008;
 
 export function createAsteroidBelt(
   scene: Scene,
-  options: AsteroidBeltOptions = {},
+  options: AsteroidBeltOptions,
 ): AsteroidBeltHandles {
   const n = Math.max(0, Math.min(10_000, options.n ?? 200));
   const seed = options.seed ?? 42;
   const epoch = options.epoch ?? 2_451_545.0;
   const assetMass = options.assetMass ?? 3e18;
+  const { sceneUnitPerMeter } = options;
 
   const rnd = mulberry32(seed);
   const elements: LoadedOrbitalElements[] = [];
@@ -165,17 +197,13 @@ export function createAsteroidBelt(
     template.thinInstanceBufferUpdated('matrix');
   };
 
-  // 초기 위치 — `solar-system-scene.ts` 의 `updateAt(initialJulianDate)` (씬 생성 말미 **동기** 호출)
-  // 가 `renderScaleForTier(activeTier)` 를 주입해 덮어쓰기 전까지만 유효한 placeholder. 첫 페인트
-  // 이전에 교체되므로 이 값이 화면에 나가는 프레임은 없다.
+  // 초기 위치 — #998 축 C 이전에는 여기서 `1 / AU` 를 하드코딩해 **호출자 주입 계약을 모듈이
+  // 자기 init 에서 위반**했다. 이제 호출자가 넘긴 `options.sceneUnitPerMeter` 를 그대로 쓴다.
   //
-  // ⚠️ `renderScaleForTier('solar')` 의 근사값이 **아니다** (2026-08-09 실측, PR #997 리뷰 BLOCK-C):
-  // `1/AU` = 6.685e-12 vs `RENDER_SCALE.solar` = 8.4e-11 → **12.57배** 차이. `solar` 는 `1/AU` 파생이
-  // 아니라 viewport 유도값이다 (`tier.ts` — 해왕성 30.3 AU 를 380 unit 에 맞춘 값).
-  // 즉 이 하드코딩이 안전한 근거는 "근접"이 아니라 **"덮어써짐"** 하나뿐이다. 그 경로가 끊기면
-  // 벨트 **반경**이 1/12.57 로 뭉치고 (`writeTranslation` 은 3×3 항등 + translation 만 쓰므로
-  // 소행성 개별 크기는 불변), 자가 교정 경로가 없어 증상이 **영구**다. 대체 가부는 #998 5항.
-  updateAt(epoch, 1 / AU);
+  // 이 호출은 여전히 프레임 `updateAt` 이 덮어쓰지만, 안전 근거가 **"덮어써짐" 하나 → "값 자체가
+  // 이미 맞음" 으로 바뀐** 것이 본 변경의 요지다. `solar-system-scene.ts` 의 씬 생성 말미 동기
+  // `updateAt(initialJulianDate)` 경로가 향후 끊기거나 순서가 밀려도 초기 프레임이 정답 스케일이다.
+  updateAt(epoch, sceneUnitPerMeter);
 
   // P4-A #165 — N-body 경로에서 사용할 초기 state vector.
   const getNbodyState = (jd: number, sunMu: number) => {
