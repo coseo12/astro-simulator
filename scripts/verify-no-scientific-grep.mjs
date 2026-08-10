@@ -160,7 +160,8 @@ function main() {
   }
   process.stderr.write(
     '힌트: 주석(//, /* */, JSDoc) 은 허용됩니다. 식별자/리터럴 사용이면 제거해주세요.\n' +
-      '     ADR `docs/decisions/20260423-display-relative-scale-unification.md` §Amendment 참조.\n',
+      // #998 축 C — dead reference 정정. 파일은 2026-04-25 roadmap reset 으로 `docs/deprecated/` 이동.
+      '     ADR `docs/deprecated/decisions/20260423-display-relative-scale-unification.md` §Amendment 참조.\n',
   );
   return 1;
 }

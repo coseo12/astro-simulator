@@ -64,4 +64,4 @@
 - volt [#33](https://github.com/coseo12/volt/issues/33) (headless 브라우저 false positive) — headless PASS 여도 실 Chrome 에서 다를 수 있음. 본 교훈의 **형제**
 - CLAUDE.md 실전 교훈 "빌드 성공 ≠ 동작하는 앱" — 본 교훈은 그 **원칙/UX 버전 확장**
 - volt [#68](https://github.com/coseo12/volt/issues/68) (원본 캡처 이슈)
-- astro-simulator ADR `docs/decisions/20260423-display-relative-scale-unification.md` — P12 재설계 계약
+- astro-simulator ADR `docs/deprecated/decisions/20260423-display-relative-scale-unification.md` — P12 재설계 계약 (2026-04-25 roadmap reset 으로 폐기·이동. #998 축 C dead reference 정정)

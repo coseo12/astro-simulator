@@ -135,9 +135,17 @@ describe('B1 회귀 가드 — tier 전환 시 모든 렌더 레이어 동일 �
   });
 });
 
-// scene-unit 하드코딩 재발 방지 grep 검증은 core 패키지의 node types 부재로 test 레벨에서
-// 재현하지 않는다. 대신 DoD 체크리스트에 박제된 아래 명령으로 PR 리뷰 시 검증한다.
-// 명령 형태는 `.claude/agents/reviewer.md` §절차 4 (Grep) 정본을 따른다:
+// scene-unit 하드코딩 재발 방지는 **행동 가드 + PR 리뷰 grep 2층**으로 검증한다.
+//
+// (1) 행동 가드 (#998 축 C) — `asteroid-belt-scale-contract.test.ts` 가 NullEngine 위에서 초기
+//     ThinInstance 좌표를 실제로 읽어 주입 스케일과 대조한다. 소스에 `1 / AU` 를 다시 써 넣으면
+//     텍스트 우회 여부와 무관하게 **4개 단언이 fail** 한다 (negative test 실측).
+//     ⚠️ 텍스트 grep 을 테스트로 옮기는 방식은 채택하지 않았다 — 주석 경계 판정이 필요해지고
+//     (`.claude/agents/reviewer.md` §절차 4 (Comment-Only)) 설명 산문 자신이 걸린다.
+//     (기존 이 자리의 *"core 패키지의 node types 부재"* 사유는 2026-08-10 실측으로 반증됐다 —
+//      `@types/node` 는 devDependencies 에 있고 `starfield.test.ts` 등이 이미 `node:fs` 를 쓴다.)
+//
+// (2) PR 리뷰 grep — 아래 명령. 형태는 `.claude/agents/reviewer.md` §절차 4 (Grep) 정본을 따른다:
 //
 //   git grep -nFi -e 'SCENE_UNIT_PER_METER' -e '1 / AU' -e '1/AU'
 //
@@ -149,13 +157,15 @@ describe('B1 회귀 가드 — tier 전환 시 모든 렌더 레이어 동일 �
 // - hit 은 5분류(활성 선언 / 이력 기록 / 무관 / 역참조 회귀 가드 / 규약 본문 자체) 후 판정한다.
 //   본 주석 블록 자체가 "규약 본문 자체" 계급이라 정정 대상이 아니다. 정상 패턴
 //   `const sceneUnitPerMeter = renderScaleForTier(tier)` 는 "무관" 이다.
-// - 알려진 의도적 예외 1건 (2026-08-09 실측, PR #997 리뷰 BLOCK-C): `asteroid-belt.ts` 의
-//   `updateAt(epoch, 1 / AU)` 는 tier 우회가 아니라 씬 생성 시점의 placeholder 다. 정정 대상이
-//   아닌 근거는 **덮어쓰기 경로가 실재한다**는 것 하나뿐이며, 그 경로는 이 파일이 아니라
-//   `solar-system-scene.ts` 에 있다 — 프레임 `updateAt` 이 `renderScaleForTier(activeTier)` 를
-//   계산해 `writeWorldPositions` / `asteroidBelt.updateAt` **양 분기 모두**에 주입한다.
-//   ⚠️ `1 / AU` 는 `renderScaleForTier('solar')` 의 근사값이 **아니다** (12.57배 차이). 새 hit 이
-//   이 형태면 "solar 와 가까우니 괜찮다"로 판단하지 말고 **덮어쓰기 경로의 존속**을 확인한다.
-//   구 명령은 `const` 도 상수명도 없는 이 지점을 **구조적으로 볼 수 없었다** — 값 변형을 함께
+// - **prod 소스의 의도적 예외는 현재 0건** (#998 축 C, 2026-08-10). 이력: #997 리뷰 BLOCK-C 가
+//   `asteroid-belt.ts` 의 `updateAt(epoch, 1 / AU)` 를 "덮어써지는 placeholder" 로 판정해 1건을
+//   허용했었다. 안전 근거가 **덮어쓰기 경로의 실재** 하나뿐이라 경로가 끊기면 증상이 영구였고,
+//   #998 축 C 가 `AsteroidBeltOptions.sceneUnitPerMeter` **필수 필드**로 그 경로 의존 자체를
+//   제거했다 (호출자 = `solar-system-scene.ts`).
+//   ⚠️ 보존할 판정 (소급 편집 금지 — §절차 4 4항 2계급): `1 / AU` 는 `renderScaleForTier('solar')`
+//   의 근사값이 **아니다**. `8.4e-11 ÷ 6.6846e-12` = **12.566배** 차이이고, 벨트 반경 실측으로는
+//   23.89~45.15 이어야 할 것이 1.90~3.59 scene unit 로 뭉친다 (수성 궤도 안쪽). 새 hit 이 이
+//   형태면 "solar 와 가까우니 괜찮다"로 판단하지 않는다.
+//   구 명령은 `const` 도 상수명도 없는 그 지점을 **구조적으로 볼 수 없었다** — 값 변형을 함께
 //   거는 이유의 실증이다.
 // 산술 불변식은 위 describe 블록이 커버 (tier 전환 시 모든 레이어 동일 배수 확대).
