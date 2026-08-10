@@ -1,7 +1,11 @@
 /**
  * P12-A #298 — Tier 엔진 (Display-Relative Scale Unification)
  *
- * ADR: `docs/decisions/20260423-display-relative-scale-unification.md`
+ * ADR: `docs/deprecated/decisions/20260423-display-relative-scale-unification.md`
+ *   (#998 축 C dead reference 정정 — 원 경로 `docs/decisions/…` 는 2026-04-25 roadmap reset 으로
+ *   파일이 이동해 존재하지 않는다. **폐기된 것은 §원칙 §1 "상대 비율 = 실측 고정" 과 단일 모드 UX
+ *   계층이고, 본 tier 엔진은 코드 잔존 + 현행 유지**다 — `docs/decisions/20260504-focus-tier-oscillate-fix.md`
+ *   §관련 ADR "폐기 처리되었으나 코드는 유지". 아래 §계약 1~4 가 그 현행 정본이다.)
  *
  * ## 계약 (ADR §결정 §주석 계약)
  *

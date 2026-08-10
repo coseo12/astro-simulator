@@ -1,7 +1,9 @@
 /**
  * P12-B #298 — Tier 전환 애니메이션 (Q8=8D 배선 원리)
  *
- * ADR: `docs/decisions/20260423-display-relative-scale-unification.md` §3 후보 D
+ * ADR: `docs/deprecated/decisions/20260423-display-relative-scale-unification.md` §3 후보 D
+ *   (#998 축 C dead reference 정정 — 파일은 2026-04-25 roadmap reset 으로 `docs/deprecated/` 로
+ *   이동. 배선 원리는 코드 잔존 + 현행 유지. 계약 정본은 `./tier.ts` 머리말.)
  *
  * ## 배선 원리 (apparent size 불변)
  *

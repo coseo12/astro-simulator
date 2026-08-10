@@ -874,6 +874,10 @@ export function createSolarSystemScene(
     asteroidBelt = createAsteroidBelt(scene, {
       n: asteroidBeltN,
       epoch: initialJulianDate,
+      // P12-A #298 B1 (#998 축 C) — 생성 시점 배치도 프레임 경로와 **동일 SSoT** 로 주입한다.
+      // 이전에는 belt 모듈이 자기 init 에서 `1 / AU` 를 하드코딩해 초기 배치가 solar tier 정답의
+      // 1/12.566 였다 (덮어쓰기 경로에 의존해야만 화면이 맞는 상태).
+      sceneUnitPerMeter: renderScaleForTier(activeTier),
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
   }

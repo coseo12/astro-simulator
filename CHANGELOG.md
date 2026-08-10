@@ -5,6 +5,50 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.66.0] — 2026-08-10
+
+### Behavior Changes
+
+- **[#998 축 C] 소행성대 초기 배치 스케일 — 모듈 자기 계약 위반 제거 (`sceneUnitPerMeter` 필수 주입) (MINOR)** ([#998](https://github.com/coseo12/astro-simulator/issues/998)) — 축 A (PR [#1003](https://github.com/coseo12/astro-simulator/pull/1003)) · 축 B (PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004)) 에 이어 **마지막 축 (이슈 항 5)** 을 반영한다.
+
+  **판정 — 이슈 원안 (a) 기각, 옵션 (b) 채택.** 이슈는 _"`1 / AU` 를 `renderScaleForTier('solar')` 로 대체 가능한가"_ 를 물었으나 **그 대체는 설계 역행**이다. `asteroid-belt.ts:23-27` 이 P12-A #298 B1 계약으로 _"호출자가 `sceneUnitPerMeter` 를 주입한다"_ 를 명시하고 **`tier.js` 를 import 하지 않는 것 자체가 계약의 본체**다 (실측: 본 모듈 import 전수 = `@babylonjs/core` / `@astro-simulator/shared` / `../physics/kepler.js` / `../physics/state-vector.js` / `../ephemeris/solar-system-loader.js` — `tier.js` 없음. 역방향도 없어 순환 위험은 애초에 0 이었다 — `tier.ts` 의 `asteroid` 언급 1건은 `focusKind === 'asteroid'` 문자열 비교다). (a) 를 택하면 하드코딩 **대상만** `1 / AU` → tier 리터럴 `'solar'` 로 옮겨간다.
+
+  **진짜 결함은 다른 곳에 있었다 — 모듈이 자기 init 에서 자기 계약을 위반**했다. `updateAt(epoch, 1 / AU)` 는 _"호출자가 주입"_ 이라 선언해놓고 **모듈 자신이 값을 정한** 지점이다. 채택안은 `AsteroidBeltOptions.sceneUnitPerMeter` 를 **필수 필드**로 신설해 호출자 (`solar-system-scene.ts:874`) 가 `renderScaleForTier(activeTier)` 를 주입하게 한다 — 호출자는 belt 생성 시점(L874)보다 **앞(L525)** 에서 이미 `activeTier` 를 갖고 있어 배선 비용이 0 이다. **선택 필드 + 기본값은 채택하지 않았다** — 기본값은 같은 함정을 남기는 fallback 분기다 (CLAUDE.md §가드 설계 원칙). 필수 필드는 주입 누락을 **컴파일 시점에** 세운다.
+
+  **실측 — 12.566배는 「1 AU 를 solar tier scene unit 으로 읽은 값」과 같은 수다.** `renderScaleForTier('solar')` = `8.4e-11` ÷ `1/AU` = `6.6846e-12` → **12.566**. 이는 `AU × 8.4e-11` 과 대수적으로 동일하며, 저장소에 **독립 박제가 이미 둘** 있다 ([`20260520-r4`](docs/decisions/20260520-r4-earth-moon-visualization.md)`:365` _"1 AU × renderScale ≈ 12.57 scene unit"_ / [`20260612-r10b`](docs/decisions/20260612-r10b-comets-visualization.md)`:100` _"1 AU = 12.566 unit"_). 즉 구 하드코딩은 **scene 좌표를 AU 숫자 그대로 쓰는** 것이었고, NullEngine 실측 초기 배치 반경이 **1.90~3.59 scene unit** (정답 **27.65~40.21**) 으로 **수성 궤도 (0.39 AU × solar ≈ 4.9 unit) 안쪽**에 뭉쳤다 (술어: `n=200` `seed=42` `epoch=J2000`, `mesh.thinInstanceGetWorldMatrices()` translation 의 `Math.hypot` min/max, 2026-08-10). ⚠️ **qa 정정 (PR [#1009](https://github.com/coseo12/astro-simulator/pull/1009))** — 초판이 정답 대역을 `27.65~40.21` 로 적었으나 그 수는 **장반경 `a∈[2.2, 3.2] AU` 환산값**이지 순간 반경이 아니다. `27.65 / 1.90 = 14.55 ≠ 12.566` 으로 **같은 문장 안에서 비율이 어긋났고**, `e<0.2` 라 순간 반경은 `a` 대역보다 넓다. 실측 정답은 **`23.89~45.15`**. 테스트 assertion(`lower=22.1165` / `upper=48.25`)은 두 대역 모두 통과해 판정에는 무영향이었다 — **본 PR 의 주제가 _"거짓 근거 주석 제거"_ 인데 같은 클래스를 새로 반입할 뻔했다.**
+
+  **관찰 가능한 런타임 변화는 0 이다** — 씬 생성 말미의 동기 `updateAt(initialJulianDate)` (`solar-system-scene.ts:1963`) 이 첫 페인트 전에 덮어쓰므로 화면 결과는 이전과 동일하다 (덮어쓰기 경로 무회귀는 단위 테스트 2건이 별도 고정). 본 PR 이 바꾼 것은 **안전 근거**다 — _"덮어써지니까 괜찮다"_ (경로 단절 시 증상 영구, 자가 교정 없음) → _"값 자체가 이미 맞다"_. 소행성대는 `?belt=NNN` 옵트인이라 (`sim-canvas.tsx:424`, 기본 `0`) 영향 표면은 해당 URL 경로에 한정된다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** `createAsteroidBelt(scene, { n: 200 })` 는 더 이상 **컴파일되지 않는다** (`options` 파라미터의 `= {}` 기본값 제거 + 필수 필드 신설). 렌더 결과는 불변이라 MAJOR 는 아니며 (판정 애매 시 낮은 쪽), 저장소 내 호출처는 **1곳**, `packages/core` 밖 호출처는 **0곳**이다 (술어: `git grep -n 'createAsteroidBelt'` — 정의 1 / re-export 1 / import 1 / 호출 1).
+
+  **회귀 가드 — 텍스트 grep 이 아니라 행동 가드.** [`asteroid-belt-scale-contract.test.ts`](packages/core/src/scene/asteroid-belt-scale-contract.test.ts) 신설 (8 케이스): per-instance 좌표 = `positionAt(el) × 주입값` / 초기 대역 = `renderScaleForTier(initialTier())` / 역참조 회귀 가드 (구 `1/AU` 재현 시 12.566배 축소 + 수성 궤도 안쪽) / `updateAt` · `writeWorldPositions` 무회귀 / `@ts-expect-error` 타입 계약 / `tier.js` 미import 모듈 경계. **negative test 실측**: init 을 `1 / AU` 로 되돌리면 **4/8 fail**. 텍스트 가드를 쓰지 않은 이유는 주석 경계 판정이 필요해지고 (`reviewer.md` §절차 4 (Comment-Only)) **설명 산문 자신이 걸리기** 때문이다 — 행동 가드는 텍스트 우회가 불가능하다.
+
+  ⚠️ **Babylon 9.19.0 실측 함정 (테스트 작성 중 발견)** — `Mesh.thinInstanceGetWorldMatrices()` 는 결과를 캐시하고 `thinInstanceBufferUpdated('matrix')` 로 **무효화되지 않는다** (`thinInstanceMesh.pure.js` L362-373 vs L242). 한 mesh 에서 두 번 읽으면 두 번째가 첫 스냅샷이라 **버퍼가 바뀌었는데 비율 1.0 이 나온다** (초판 테스트가 이 false negative 로 fail). `getVerticesData('world0')` 는 `null` 이라 대체 경로가 못 된다. 본 테스트는 **mesh 당 1회 읽기**로 우회했다.
+
+  **폐기 ADR 인용 판정 (이슈 항 5 의 파생 — 계약의 근거 계보).** `asteroid-belt.ts` 주석이 계약 근거로 인용하던 [`20260423-display-relative-scale-unification.md`](docs/deprecated/decisions/20260423-display-relative-scale-unification.md) 는 2026-04-25 roadmap reset 으로 **폐기**됐다. **인용은 유효하되 계급이 다르다** — 폐기된 것은 §원칙 §1 _"상대 비율 = 실측 고정"_ 과 단일 모드 UX 계층이고, **tier 엔진 (renderScale = tier 함수) 은 코드 잔존 + 현행 유지**다 (폐기 ADR 머리말 §참고 / [`20260504-focus-tier-oscillate-fix.md`](docs/decisions/20260504-focus-tier-oscillate-fix.md)`:7` _"폐기 처리되었으나 코드는 유지"_). 따라서 폐기 ADR 은 **이력 근거**로 강등하고 **현행 근거**를 `tier.ts` §계약 1~4 + [`principles.md`](docs/architecture/principles.md) §1 + 회귀 가드 2종으로 명시했다.
+
+  **dead reference 4건 정정 (같은 판정의 기계적 귀결).** `.md` 문서들은 이미 `../deprecated/decisions/` 로 갱신돼 있었으나 **`.ts` 주석과 가드 스크립트 문자열은 남아 있었다** — `verify-docs-links.mjs` 는 `docs/**/*.md` + 루트 md 만 스캔하므로 **원리적으로 볼 수 없는 사각**이다. 정정: [`tier.ts`](packages/core/src/scene/tier.ts)`:4` / [`tier-transition.ts`](packages/core/src/scene/tier-transition.ts)`:4` / [`verify-no-scientific-grep.mjs`](scripts/verify-no-scientific-grep.mjs)`:163` (stderr 힌트) / [`strict-principle-dynamic-context.md`](docs/lessons/strict-principle-dynamic-context.md)`:67` (§관련 계보 포인터 — 마크다운 **링크가 아닌 백틱 텍스트**라 링크 검사가 못 잡는다). **CHANGELOG 과거 entry 3건 (L1084 / L1110 / L1176) 은 정정하지 않았다** — 링크 text 는 당시 경로이나 **href 는 이미 `docs/deprecated/` 로 해소**되고 (실측 3/3), 릴리스 로그는 §절차 4 4항 **2계급 (이력 기록)** 이라 소급 편집이 기록 위조다.
+
+  **`tier-proportion.test.ts` 주석 계약 갱신 (2건).** ① _"알려진 의도적 예외 1건"_ → **0건** (본 PR 이 해소). 단 _"`1 / AU` 는 solar 의 근사값이 아니다 (12.57배)"_ 판정과 _"구 명령은 이 지점을 구조적으로 볼 수 없었다"_ 는 **이력 기록이라 보존**하고 실측 대역만 보강했다. ② _"grep 검증은 **core 패키지의 node types 부재**로 test 레벨에서 재현하지 않는다"_ 는 **2026-08-10 실측으로 반증**됐다 — `@types/node` 는 `packages/core` devDependencies 에 있고 `starfield.test.ts` / `r-phase-allowlist.test.ts` / `orbit-line-segments.test.ts` 가 이미 `node:fs` 를 쓴다. 거짓 사유를 지우고 **실제 사유** (주석 경계 판정 회피 → 행동 가드 채택) 로 교체했다. 이는 #995 의 `1/AU` 거짓 근거 주석과 **같은 클래스**다 — 거짓 사유가 저비용 대안을 「불가」로 봉인한다.
+
+  **자기 적용 — 개정판 §절차 4 로 본 PR 을 sweep** (술어: `git grep -nFi --untracked -e <아래 전문> -- ':!*/dist/*'`, **경로 무제한**, 본 CHANGELOG entry **작성 전** 작업 트리. rev 와 `--untracked` 는 병용 불가라 rev 대신 트리 상태를 anchor 로 적는다 — PR [#1003](https://github.com/coseo12/astro-simulator/pull/1003) BLOCK-B). 값의 술어는 **hit 줄 수 / 매치 파일 수**이며 축별로 한 번씩 일괄 도출했다:
+
+  ```
+  낱말 (5)        SCENE_UNIT_PER_METER | 1 / AU | 1/AU | 1 /AU | 1/ AU
+  크기·수치 (12)  12.57 | 12.566 | 12.5662 | 6.685e-12 | 6.6846e-12 | 8.4e-11
+                  23.89 | 45.15 | 1.90~3.59 | 1/12.57 | 1/12.566 | 12.566배
+  동작 서술 (7)   덮어써 | 덮어쓰기 | placeholder 다 | 주입한다 | 대체 가부 | tier 우회 | 자기 계약
+  dead ref (2)    docs/decisions/20260423 | decisions/20260423-display
+  ```
+
+  **축별**: 낱말 **56 / 14** · 크기·수치 **86 / 33** · 동작 서술 **60 / 27** · dead ref **33 / 19**. **모집단 = 합집합 221 hits (anchor: `5a0fd84` 트리 — 이후 2커밋이 만든 크기·수치 축 hit 1건 `12.57배` 는 표 밖이며 계급은 활성 선언·정합) / 68 files** (축별 합 235 − 중복 14). **5분류**: 활성 선언 **33** (전건 정합 — 정정 후 재확인) / 이력 기록 **113** / 역참조 회귀 가드 **21** (신설 테스트 파일의 `LEGACY_*` 상수 계열) / 규약 본문 자체 **3** (`tier-proportion.test.ts` grep 명령 리터럴) / 무관 **51** (`-F` 과매칭 — `8.4e-11 / AU` 가 `1 / AU` 를 포함한다 · `덮어쓰기`/`주입` 의 카메라·store·harness 도메인 hit · ADR 기하 산출의 정상 `8.4e-11`). **합 = 221** → **실잔존 0**.
+
+  ⚠️ **coarse 분류가 §절차 4 4항 규칙 (나) 를 두 지점에서 위반해 재분류했다.** 파일 단위 규칙은 `tier-proportion.test.ts` 주석 블록 **전체**를 _규약 본문 자체_ 로, `docs/lessons/**` **전체**를 _이력 기록_ 으로 뭉쳤다. 실제로는 같은 주석 블록 안에서 **grep 명령 리터럴 (규약 본문 자체) 과 「예외 N건 / node types 부재」라는 저장소 현 상태 주장 산문 (활성 선언) 이 별개 hit** 이고, `docs/lessons` §관련 계보는 위치가 docs 여도 기능이 **_"지금 여기를 보라"_ 포인터 (활성 선언)** 다 — 규칙 (가) _"위치가 아니라 기능"_. **정정 대상 7건 중 3건이 이 재분류로만 드러났다** — `tier-proportion.test.ts:138` (거짓 사유 _"node types 부재"_) · 같은 파일 `:152` (_"예외 1건"_) · `strict-principle-dynamic-context.md:67` (dead path). 나머지 4건 (`asteroid-belt.ts` 계약 위반 + dead path 3) 은 coarse 분류에서도 활성 선언이라 재분류 없이 드러났다. #999 항 10 (_"스키마 리터럴과 필드 설명 산문을 한 계급으로 뭉쳤다"_) 이 예고한 클래스의 **2차 발현**이며, 이번엔 **주석 블록 ↔ 그 안의 명령 리터럴** 축에서 재현됐다.
+
+  ⚠️ **모집단 술어 — 리포 외부 매체 제외.** 위 수치는 **tracked + untracked 파일** 기준이며 PR·이슈 본문은 작업 트리 밖이라 포함되지 않는다 (§절차 4 2항 매체 축). **구체적 잔존을 하나 알고 있다** — 이슈 [#998](https://github.com/coseo12/astro-simulator/issues/998) §5 본문이 `renderScaleForTier('solar')` 직접 사용을 _"리스크가 사라진다"_ 로 서술하는데 본 PR 이 그것을 **기각**했다. 이슈 본문은 제안 시점 기록이라 편집하지 않고, **본 entry 와 PR 본문이 판정 기록**이 된다.
+
+  **cross-validate (agy, 2026-08-10, `cross_validate.sh code 1009`) — 결론 승인 (_"추가 수정 없이 즉시 머지 권장"_).** 메인 수행(`developer.md` #479). **합의**: 모듈 자기 계약 위반 정돈 + `1/AU` 하드코딩의 초기 프레임 스케일 왜곡 리스크 **근본 제거**로 평가. **권고 1건 반영** — `sceneUnitPerMeter` **런타임 유효성 검증**. 타입은 **존재**를 강제하지만 **값**은 강제하지 못하고, 본 이슈가 고친 결함이 정확히 _"잘못된 스케일이 조용히 통과해 12.57배 오차"_ 였다. `0` / `NaN` / 음수 / `Infinity` 주입 시 throw 하도록 fail-fast 가드를 넣고 4값 회귀 테스트를 추가했다 (CLAUDE.md §가드 설계 원칙 — **fallback 분기 금지**). agy 는 _"strict 모드상 누락 위험 거의 0, 방어적 코딩 차원"_ 이라 필수가 아니라 했으나, **이 PR 의 결함 양태가 무음 통과**였으므로 채택했다.
+
 ## [0.65.0] — 2026-08-10
 
 ### Behavior Changes
