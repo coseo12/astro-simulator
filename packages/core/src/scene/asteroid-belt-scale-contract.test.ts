@@ -169,8 +169,11 @@ describe('#998 축 C — 생성 시점 sceneUnitPerMeter 주입 계약', () => {
     expect(min).toBeGreaterThanOrEqual(lower);
     expect(max).toBeLessThanOrEqual(upper);
 
-    // 실측 박제 (2026-08-10, n=200 seed=42): minR ≈ 27.65 / maxR ≈ 40.21 scene unit.
+    // 실측 박제 (2026-08-10, n=200 seed=42): minR ≈ 23.89 / maxR ≈ 45.15 scene unit.
     // 회귀 시 아래가 1.90 / 3.59 로 떨어진다 (= 12.566배 축소).
+    // ⚠️ 초판이 적었던 27.65~40.21 은 **장반경 a∈[2.2, 3.2] AU 환산값**이지 순간 반경이
+    //    아니다 (27.65 / 1.90 = 14.55 ≠ 12.566 — 같은 문장 안에서 비율이 어긋났다).
+    //    e<0.2 이므로 순간 반경은 a 대역보다 넓다. PR #1009 qa 실측 정정.
     expect(min).toBeGreaterThan(20);
     expect(max).toBeGreaterThan(30);
 

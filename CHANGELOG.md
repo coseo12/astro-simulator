@@ -13,7 +13,7 @@ Semantic Versioning을 따른다.
 
   **진짜 결함은 다른 곳에 있었다 — 모듈이 자기 init 에서 자기 계약을 위반**했다. `updateAt(epoch, 1 / AU)` 는 _"호출자가 주입"_ 이라 선언해놓고 **모듈 자신이 값을 정한** 지점이다. 채택안은 `AsteroidBeltOptions.sceneUnitPerMeter` 를 **필수 필드**로 신설해 호출자 (`solar-system-scene.ts:874`) 가 `renderScaleForTier(activeTier)` 를 주입하게 한다 — 호출자는 belt 생성 시점(L874)보다 **앞(L525)** 에서 이미 `activeTier` 를 갖고 있어 배선 비용이 0 이다. **선택 필드 + 기본값은 채택하지 않았다** — 기본값은 같은 함정을 남기는 fallback 분기다 (CLAUDE.md §가드 설계 원칙). 필수 필드는 주입 누락을 **컴파일 시점에** 세운다.
 
-  **실측 — 12.566배는 「1 AU 를 solar tier scene unit 으로 읽은 값」과 같은 수다.** `renderScaleForTier('solar')` = `8.4e-11` ÷ `1/AU` = `6.6846e-12` → **12.566**. 이는 `AU × 8.4e-11` 과 대수적으로 동일하며, 저장소에 **독립 박제가 이미 둘** 있다 ([`20260520-r4`](docs/decisions/20260520-r4-earth-moon-visualization.md)`:365` _"1 AU × renderScale ≈ 12.57 scene unit"_ / [`20260612-r10b`](docs/decisions/20260612-r10b-comets-visualization.md)`:100` _"1 AU = 12.566 unit"_). 즉 구 하드코딩은 **scene 좌표를 AU 숫자 그대로 쓰는** 것이었고, NullEngine 실측 초기 배치 반경이 **1.90~3.59 scene unit** (정답 **27.65~40.21**) 으로 **수성 궤도 (0.39 AU × solar ≈ 4.9 unit) 안쪽**에 뭉쳤다 (술어: `n=200` `seed=42` `epoch=J2000`, `mesh.thinInstanceGetWorldMatrices()` translation 의 `Math.hypot` min/max, 2026-08-10).
+  **실측 — 12.566배는 「1 AU 를 solar tier scene unit 으로 읽은 값」과 같은 수다.** `renderScaleForTier('solar')` = `8.4e-11` ÷ `1/AU` = `6.6846e-12` → **12.566**. 이는 `AU × 8.4e-11` 과 대수적으로 동일하며, 저장소에 **독립 박제가 이미 둘** 있다 ([`20260520-r4`](docs/decisions/20260520-r4-earth-moon-visualization.md)`:365` _"1 AU × renderScale ≈ 12.57 scene unit"_ / [`20260612-r10b`](docs/decisions/20260612-r10b-comets-visualization.md)`:100` _"1 AU = 12.566 unit"_). 즉 구 하드코딩은 **scene 좌표를 AU 숫자 그대로 쓰는** 것이었고, NullEngine 실측 초기 배치 반경이 **1.90~3.59 scene unit** (정답 **27.65~40.21**) 으로 **수성 궤도 (0.39 AU × solar ≈ 4.9 unit) 안쪽**에 뭉쳤다 (술어: `n=200` `seed=42` `epoch=J2000`, `mesh.thinInstanceGetWorldMatrices()` translation 의 `Math.hypot` min/max, 2026-08-10). ⚠️ **qa 정정 (PR [#1009](https://github.com/coseo12/astro-simulator/pull/1009))** — 초판이 정답 대역을 `27.65~40.21` 로 적었으나 그 수는 **장반경 `a∈[2.2, 3.2] AU` 환산값**이지 순간 반경이 아니다. `27.65 / 1.90 = 14.55 ≠ 12.566` 으로 **같은 문장 안에서 비율이 어긋났고**, `e<0.2` 라 순간 반경은 `a` 대역보다 넓다. 실측 정답은 **`23.89~45.15`**. 테스트 assertion(`lower=22.1165` / `upper=48.25`)은 두 대역 모두 통과해 판정에는 무영향이었다 — **본 PR 의 주제가 _"거짓 근거 주석 제거"_ 인데 같은 클래스를 새로 반입할 뻔했다.**
 
   **관찰 가능한 런타임 변화는 0 이다** — 씬 생성 말미의 동기 `updateAt(initialJulianDate)` (`solar-system-scene.ts:1963`) 이 첫 페인트 전에 덮어쓰므로 화면 결과는 이전과 동일하다 (덮어쓰기 경로 무회귀는 단위 테스트 2건이 별도 고정). 본 PR 이 바꾼 것은 **안전 근거**다 — _"덮어써지니까 괜찮다"_ (경로 단절 시 증상 영구, 자가 교정 없음) → _"값 자체가 이미 맞다"_. 소행성대는 `?belt=NNN` 옵트인이라 (`sim-canvas.tsx:424`, 기본 `0`) 영향 표면은 해당 URL 경로에 한정된다.
 
@@ -34,7 +34,7 @@ Semantic Versioning을 따른다.
   ```
   낱말 (5)        SCENE_UNIT_PER_METER | 1 / AU | 1/AU | 1 /AU | 1/ AU
   크기·수치 (12)  12.57 | 12.566 | 12.5662 | 6.685e-12 | 6.6846e-12 | 8.4e-11
-                  27.65 | 40.21 | 1.90~3.59 | 1/12.57 | 1/12.566 | 12.566배
+                  23.89 | 45.15 | 1.90~3.59 | 1/12.57 | 1/12.566 | 12.566배
   동작 서술 (7)   덮어써 | 덮어쓰기 | placeholder 다 | 주입한다 | 대체 가부 | tier 우회 | 자기 계약
   dead ref (2)    docs/decisions/20260423 | decisions/20260423-display
   ```

@@ -49,7 +49,7 @@ export interface AsteroidBeltOptions {
    *
    * #998 축 C 이전에는 본 모듈이 자기 init 에서 `1 / AU` 를 하드코딩했다 — *"호출자가 주입"* 이라
    * 선언해놓고 **자기 계약을 자기가 위반**한 지점이다. NullEngine 실측(`asteroid-belt-scale-contract.test.ts`)
-   * 기준 초기 배치 반경이 **1.90~3.59 scene unit** 이었고, solar tier 정답은 **27.65~40.21** 이다
+   * 기준 초기 배치 반경이 **1.90~3.59 scene unit** 이었고, solar tier 정답은 **23.89~45.15** 이다
    * (`8.4e-11 ÷ (1/AU)` = **12.566배**). 덮어쓰기 경로가 끊기면 이 값이 그대로 화면에 나가고
    * 자가 교정 경로가 없어 증상이 영구다.
    *
