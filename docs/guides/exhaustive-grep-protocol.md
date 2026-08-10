@@ -123,6 +123,8 @@ tsc --removeComments --noResolve --skipLibCheck --target esnext --module esnext 
 
 컴파일러가 주석 경계를 판정하므로 **정규식 사각이 없고**, _"런타임 표면 변화 0"_ 을 **emit 바이트 동일**로 직접 주장한다. #997 실측: `asteroid-belt.js` 122줄 / `tier-proportion.test.js` 76줄 모두 **IDENTICAL** (술어: 산출 JS 바이트 `cmp`).
 
+> **emit 실패 시** (cross-validate agy 2026-08-10 권고) — 대상이 `.ts` 가 아니면 위 플래그만으로 `tsc` 가 파일을 받지 않는다. 단독 `.js` / JSDoc 은 `--allowJs`, `.tsx` / `.jsx` 는 `--jsx preserve` 를 추가한다. **emit 자체가 실패하면 대조가 성립하지 않으므로**, 산출 파일이 생성됐는지부터 확인하고 그래도 안 되면 §4.1 의 grep 보조 지표 + stripped 라인 전수 감사로 내려간다 (약한 근거임을 함께 박제).
+
 ### 4.3 병행 — 시맨틱 주석 패턴 0건
 
 주석이 **컴파일·번들 의미를 갖는** 경우가 있으므로 emit 대조와 함께 확인한다. diff 의 `+` 라인 전수에 아래 패턴을 건다.
