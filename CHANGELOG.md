@@ -19,7 +19,7 @@ Semantic Versioning을 따른다.
 
   **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** `createAsteroidBelt(scene, { n: 200 })` 는 더 이상 **컴파일되지 않는다** (`options` 파라미터의 `= {}` 기본값 제거 + 필수 필드 신설). 렌더 결과는 불변이라 MAJOR 는 아니며 (판정 애매 시 낮은 쪽), 저장소 내 호출처는 **1곳**, `packages/core` 밖 호출처는 **0곳**이다 (술어: `git grep -n 'createAsteroidBelt'` — 정의 1 / re-export 1 / import 1 / 호출 1).
 
-  **회귀 가드 — 텍스트 grep 이 아니라 행동 가드.** [`asteroid-belt-scale-contract.test.ts`](packages/core/src/scene/asteroid-belt-scale-contract.test.ts) 신설 (7 케이스): per-instance 좌표 = `positionAt(el) × 주입값` / 초기 대역 = `renderScaleForTier(initialTier())` / 역참조 회귀 가드 (구 `1/AU` 재현 시 12.566배 축소 + 수성 궤도 안쪽) / `updateAt` · `writeWorldPositions` 무회귀 / `@ts-expect-error` 타입 계약 / `tier.js` 미import 모듈 경계. **negative test 실측**: init 을 `1 / AU` 로 되돌리면 **4/7 fail**. 텍스트 가드를 쓰지 않은 이유는 주석 경계 판정이 필요해지고 (`reviewer.md` §절차 4 (Comment-Only)) **설명 산문 자신이 걸리기** 때문이다 — 행동 가드는 텍스트 우회가 불가능하다.
+  **회귀 가드 — 텍스트 grep 이 아니라 행동 가드.** [`asteroid-belt-scale-contract.test.ts`](packages/core/src/scene/asteroid-belt-scale-contract.test.ts) 신설 (8 케이스): per-instance 좌표 = `positionAt(el) × 주입값` / 초기 대역 = `renderScaleForTier(initialTier())` / 역참조 회귀 가드 (구 `1/AU` 재현 시 12.566배 축소 + 수성 궤도 안쪽) / `updateAt` · `writeWorldPositions` 무회귀 / `@ts-expect-error` 타입 계약 / `tier.js` 미import 모듈 경계. **negative test 실측**: init 을 `1 / AU` 로 되돌리면 **4/8 fail**. 텍스트 가드를 쓰지 않은 이유는 주석 경계 판정이 필요해지고 (`reviewer.md` §절차 4 (Comment-Only)) **설명 산문 자신이 걸리기** 때문이다 — 행동 가드는 텍스트 우회가 불가능하다.
 
   ⚠️ **Babylon 9.19.0 실측 함정 (테스트 작성 중 발견)** — `Mesh.thinInstanceGetWorldMatrices()` 는 결과를 캐시하고 `thinInstanceBufferUpdated('matrix')` 로 **무효화되지 않는다** (`thinInstanceMesh.pure.js` L362-373 vs L242). 한 mesh 에서 두 번 읽으면 두 번째가 첫 스냅샷이라 **버퍼가 바뀌었는데 비율 1.0 이 나온다** (초판 테스트가 이 false negative 로 fail). `getVerticesData('world0')` 는 `null` 이라 대체 경로가 못 된다. 본 테스트는 **mesh 당 1회 읽기**로 우회했다.
 
@@ -39,13 +39,15 @@ Semantic Versioning을 따른다.
   dead ref (2)    docs/decisions/20260423 | decisions/20260423-display
   ```
 
-  **축별**: 낱말 **56 / 14** · 크기·수치 **86 / 33** · 동작 서술 **60 / 27** · dead ref **33 / 19**. **모집단 = 합집합 221 hits / 68 files** (축별 합 235 − 중복 14). **5분류**: 활성 선언 **33** (전건 정합 — 정정 후 재확인) / 이력 기록 **113** / 역참조 회귀 가드 **21** (신설 테스트 파일의 `LEGACY_*` 상수 계열) / 규약 본문 자체 **3** (`tier-proportion.test.ts` grep 명령 리터럴) / 무관 **51** (`-F` 과매칭 — `8.4e-11 / AU` 가 `1 / AU` 를 포함한다 · `덮어쓰기`/`주입` 의 카메라·store·harness 도메인 hit · ADR 기하 산출의 정상 `8.4e-11`). **합 = 221** → **실잔존 0**.
+  **축별**: 낱말 **56 / 14** · 크기·수치 **86 / 33** · 동작 서술 **60 / 27** · dead ref **33 / 19**. **모집단 = 합집합 221 hits (anchor: `5a0fd84` 트리 — 이후 2커밋이 만든 크기·수치 축 hit 1건 `12.57배` 는 표 밖이며 계급은 활성 선언·정합) / 68 files** (축별 합 235 − 중복 14). **5분류**: 활성 선언 **33** (전건 정합 — 정정 후 재확인) / 이력 기록 **113** / 역참조 회귀 가드 **21** (신설 테스트 파일의 `LEGACY_*` 상수 계열) / 규약 본문 자체 **3** (`tier-proportion.test.ts` grep 명령 리터럴) / 무관 **51** (`-F` 과매칭 — `8.4e-11 / AU` 가 `1 / AU` 를 포함한다 · `덮어쓰기`/`주입` 의 카메라·store·harness 도메인 hit · ADR 기하 산출의 정상 `8.4e-11`). **합 = 221** → **실잔존 0**.
 
   ⚠️ **coarse 분류가 §절차 4 4항 규칙 (나) 를 두 지점에서 위반해 재분류했다.** 파일 단위 규칙은 `tier-proportion.test.ts` 주석 블록 **전체**를 _규약 본문 자체_ 로, `docs/lessons/**` **전체**를 _이력 기록_ 으로 뭉쳤다. 실제로는 같은 주석 블록 안에서 **grep 명령 리터럴 (규약 본문 자체) 과 「예외 N건 / node types 부재」라는 저장소 현 상태 주장 산문 (활성 선언) 이 별개 hit** 이고, `docs/lessons` §관련 계보는 위치가 docs 여도 기능이 **_"지금 여기를 보라"_ 포인터 (활성 선언)** 다 — 규칙 (가) _"위치가 아니라 기능"_. **정정 대상 7건 중 3건이 이 재분류로만 드러났다** — `tier-proportion.test.ts:138` (거짓 사유 _"node types 부재"_) · 같은 파일 `:152` (_"예외 1건"_) · `strict-principle-dynamic-context.md:67` (dead path). 나머지 4건 (`asteroid-belt.ts` 계약 위반 + dead path 3) 은 coarse 분류에서도 활성 선언이라 재분류 없이 드러났다. #999 항 10 (_"스키마 리터럴과 필드 설명 산문을 한 계급으로 뭉쳤다"_) 이 예고한 클래스의 **2차 발현**이며, 이번엔 **주석 블록 ↔ 그 안의 명령 리터럴** 축에서 재현됐다.
 
   ⚠️ **모집단 술어 — 리포 외부 매체 제외.** 위 수치는 **tracked + untracked 파일** 기준이며 PR·이슈 본문은 작업 트리 밖이라 포함되지 않는다 (§절차 4 2항 매체 축). **구체적 잔존을 하나 알고 있다** — 이슈 [#998](https://github.com/coseo12/astro-simulator/issues/998) §5 본문이 `renderScaleForTier('solar')` 직접 사용을 _"리스크가 사라진다"_ 로 서술하는데 본 PR 이 그것을 **기각**했다. 이슈 본문은 제안 시점 기록이라 편집하지 않고, **본 entry 와 PR 본문이 판정 기록**이 된다.
 
-  **cross-validate (agy, 2026-08-10, `cross_validate.sh code 1009`) — 결론 승인 (_"추가 수정 없이 즉시 머지 권장"_).** 메인 수행(`developer.md` #479). **합의**: 모듈 자기 계약 위반 정돈 + `1/AU` 하드코딩의 초기 프레임 스케일 왜곡 리스크 **근본 제거**로 평가. **권고 1건 반영** — `sceneUnitPerMeter` **런타임 유효성 검증**. 타입은 **존재**를 강제하지만 **값**은 강제하지 못하고, 본 이슈가 고친 결함이 정확히 _"잘못된 스케일이 조용히 통과해 12.57배 오차"_ 였다. `0` / `NaN` / 음수 / `Infinity` 주입 시 throw 하도록 fail-fast 가드를 넣고 4값 회귀 테스트를 추가했다 (CLAUDE.md §가드 설계 원칙 — **fallback 분기 금지**). agy 는 _"strict 모드상 누락 위험 거의 0, 방어적 코딩 차원"_ 이라 필수가 아니라 했으나, **이 PR 의 결함 양태가 무음 통과**였으므로 채택했다.## [0.65.0] — 2026-08-10
+  **cross-validate (agy, 2026-08-10, `cross_validate.sh code 1009`) — 결론 승인 (_"추가 수정 없이 즉시 머지 권장"_).** 메인 수행(`developer.md` #479). **합의**: 모듈 자기 계약 위반 정돈 + `1/AU` 하드코딩의 초기 프레임 스케일 왜곡 리스크 **근본 제거**로 평가. **권고 1건 반영** — `sceneUnitPerMeter` **런타임 유효성 검증**. 타입은 **존재**를 강제하지만 **값**은 강제하지 못하고, 본 이슈가 고친 결함이 정확히 _"잘못된 스케일이 조용히 통과해 12.57배 오차"_ 였다. `0` / `NaN` / 음수 / `Infinity` 주입 시 throw 하도록 fail-fast 가드를 넣고 4값 회귀 테스트를 추가했다 (CLAUDE.md §가드 설계 원칙 — **fallback 분기 금지**). agy 는 _"strict 모드상 누락 위험 거의 0, 방어적 코딩 차원"_ 이라 필수가 아니라 했으나, **이 PR 의 결함 양태가 무음 통과**였으므로 채택했다.
+
+## [0.65.0] — 2026-08-10
 
 ### Behavior Changes
 
