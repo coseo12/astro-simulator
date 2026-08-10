@@ -110,6 +110,19 @@ function probeBelt(
 }
 
 describe('#998 축 C — 생성 시점 sceneUnitPerMeter 주입 계약', () => {
+  it('무효 스케일(0 / NaN / 음수) 주입은 fail-fast — 무음 통과 금지', () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    // 본 이슈의 결함 양태가 "잘못된 값의 무음 통과" 였으므로 값 검증도 계약이다.
+    for (const bad of [0, Number.NaN, -1e-11, Number.POSITIVE_INFINITY]) {
+      expect(() => createAsteroidBelt(scene, { n: 1, sceneUnitPerMeter: bad })).toThrow(
+        /sceneUnitPerMeter must be a positive finite number/,
+      );
+    }
+    scene.dispose();
+    engine.dispose();
+  });
+
   it('초기 ThinInstance 좌표 = Kepler 위치(m) × 주입 스케일 (per-instance 실측)', () => {
     const scale = renderScaleForTier('solar');
     const engine = new NullEngine();

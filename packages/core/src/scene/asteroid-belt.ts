@@ -140,6 +140,15 @@ export function createAsteroidBelt(
   const assetMass = options.assetMass ?? 3e18;
   const { sceneUnitPerMeter } = options;
 
+  // fail-fast — 타입은 존재를 강제하지만 **값**은 강제하지 못한다. 본 이슈가 고친 결함이
+  // 정확히 "잘못된 스케일이 조용히 통과해 12.57배 오차를 냄" 이었으므로, 0 / NaN / 음수
+  // 주입을 무음 통과시키지 않는다 (CLAUDE.md §가드 설계 원칙 — fallback 분기 금지).
+  if (!Number.isFinite(sceneUnitPerMeter) || sceneUnitPerMeter <= 0) {
+    throw new Error(
+      `[createAsteroidBelt] sceneUnitPerMeter must be a positive finite number, got: ${sceneUnitPerMeter}`,
+    );
+  }
+
   const rnd = mulberry32(seed);
   const elements: LoadedOrbitalElements[] = [];
   for (let i = 0; i < n; i += 1) {
