@@ -103,7 +103,7 @@ const CHECKBOX_PATTERN = /^\s*-\s*\[[ xX]\]/;
 // 헤더는 **ATX 레벨을 가리지 않는다** (`#`~`######`). 템플릿이 쓰는 레벨은 `###` 이지만,
 // 묻는 것은 *"섹션 헤더로 존재하는가"* 이지 레벨이 아니다. 실측 민감도 (60 PR × 7 kw = 420 셀):
 //   `#{1,6}` → PASS 387 / WARN 21 / FAIL 12     ← 채택
-//   `#{3}`   → PASS 385 / WARN 23 / FAIL 12     (release PR 의 `## Test plan` 2셀이 WARN 으로 오분류)
+//   `#{3}`   → PASS 385 / WARN 23 / FAIL 12     (봇 PR `#924`·`#925` 의 `## Test plan` 2셀 (술어: `--check-corpus` 60 PR 중 `#{3}` 패턴에서만 WARN 으로 갈리는 셀. **release PR 아님** — release 클래스 WARN 집합은 두 패턴에서 불변이고, 두 봇 PR 은 CI 에서 job 스킵이라 **실제 가시 차이 0**)이 WARN 으로 오분류)
 // 구조 축은 WARN 전용이라 느슨한 쪽이 오탐(거짓 WARN)을 줄이고, blocking 경계에는 어떤 영향도 없다.
 const HEADER_PATTERN = /^\s*#{1,6}\s/;
 const STRUCTURE_PATTERNS = { checkbox: CHECKBOX_PATTERN, header: HEADER_PATTERN };
@@ -352,7 +352,9 @@ const ANCHOR_KW6_HEADER =
  * verdict 만 단언하면 structureHits 가 다시 잉여로 퇴화해도 못 잡는다.
  *
  * `legacyVerdict` = #1010 이전 2계급 판정 (`phrase≥1 ∨ structure≥1`) 의 결과.
- * 개정 전후가 **갈리는 셀**(F2·F3·F5·F8)과 **불변 셀**(F1·F4·F6·F7·F9)을 같은 표에서 증명한다.
+ * 개정 전후가 **갈리는 셀 5**(F2·F3·F5·F8·**F9**)와 **불변 셀 4**(F1·F4·F6·F7)를 같은 표에서 증명한다.
+ * (F9 는 `보안` ⊂ `정보안내` 과매칭 고정 픽스처인데 `F9/kw3: PASS → WARN` 으로 갈린다 — 초판 주석이
+ *  이를 불변으로 오기했다. PR #1015 리뷰 권고 1: 주석↔구현 drift 는 본 PR 이 겨눈 클래스 그 자체다.)
  */
 function buildFixtures() {
   const template = readTemplate();

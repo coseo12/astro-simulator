@@ -7,7 +7,7 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-- **[#1010] 측정 방법 C 3계급 판정 + 판정식 SSoT 를 가드 스크립트로 수렴 (MINOR)** ([#1010](https://github.com/coseo12/astro-simulator/issues/1010)) — ADR [`20260811-1010-measurement-c-verdict-tiers.md`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) (**Provisional**).
+- **[#1010] 측정 방법 C 3계급 판정 + 판정식 SSoT 를 가드 스크립트로 수렴 (MINOR)** ([#1010](https://github.com/coseo12/astro-simulator/issues/1010)) — ADR [`20260811-1010-measurement-c-verdict-tiers.md`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) (**Accepted** — cross-validate agy 2026-08-11).
 
   **이슈 전제 2건이 실측으로 반박됐다.** 이슈는 _"문서는 AND, 가드는 OR — 느슨한 쪽이 실행돼 여태 안 드러났다"_ 로 문제를 세웠으나, ① **원 의도는 OR** 이다 (#469 채택안 원문 _"체크박스 0 hit + phrase 0 hit **동시 만족 시 FAIL**"_ / 신설 커밋 `a1c1373` 메시지 / #473 종결 코멘트 / 코드 출력 문자열이 전부 OR. AND 를 boolean AND 로 의도했다는 근거는 이슈·PR·커밋 어디에도 없다) — 가드가 맞고 **"AND" 라는 단어가 오기**다. ② **실발화했다** — workflow run **719건 중 failure 76건** (10.6%, 최초 2026-05-17 / 최근 2026-08-06). `--limit 50` 조회는 최근 구간이 전부 success 라 0건으로 보인다. 문서 측 자기모순도 선천적이다 — `developer.md` 의 _"AND 로 판정한다"_ 와 3계급 bullet 은 **같은 커밋 `f576770` (PR #472) 의 인접 6줄**에서 동시에 태어났다.
 
@@ -25,7 +25,7 @@ Semantic Versioning을 따른다.
 
   **부수 정정 2건.** ① 가드 헤더 주석의 _"`### 체크리스트` **6 항목** + 상위 Test plan 1 항목"_ 은 stale — 템플릿 실측은 **체크박스 5 항목 + `###` 헤더 2 항목**이다 (재현: `sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | grep -c "^- \[ \]"` → 5). ② `.claude/skills/volt-review/SKILL.md` 가 reviewer §6 의 삭제된 하드코딩 grep 을 가리키던 **dead reference** 해소.
 
-  **HEADER_PATTERN 은 ATX 레벨을 가리지 않는다 (측정 기반 선택).** 템플릿이 쓰는 레벨은 `###` 이지만 묻는 것은 _"섹션 헤더로 존재하는가"_ 이지 레벨이 아니다. 420 셀 민감도: `#{1,6}` → **387/21/12** (채택) vs `#{3}` 엄격 → **385/23/12** (release PR 의 `## Test plan` 2셀을 거짓 WARN 으로). 구조 축은 WARN 전용이라 느슨한 쪽이 거짓 WARN 을 줄이고 blocking 경계에는 영향이 없다. **코드 펜스 안 구조 hit 은 세지 않되 현 시점 영향은 0** 이다 — 펜스 안 hit **0건** (술어: 최근 머지 PR 60건 본문 전수, 라인이 계급 패턴 ∧ 해당 kw phrase 를 동시 만족한 hit 수 — 체크박스 계급 펜스 밖 **328** / 헤더 계급 펜스 밖 **118** / 닫히지 않은 펜스를 가진 PR 0). _"펜스 오탐을 잡았다"_ 는 과대 주장을 금지한다 (volt #101 measurement-first). **phrase 축은 펜스를 제외하지 않는다** — 제외하면 blocking 경계가 움직여 동치 증명이 깨진다.
+  **HEADER_PATTERN 은 ATX 레벨을 가리지 않는다 (측정 기반 선택).** 템플릿이 쓰는 레벨은 `###` 이지만 묻는 것은 _"섹션 헤더로 존재하는가"_ 이지 레벨이 아니다. 420 셀 민감도: `#{1,6}` → **387/21/12** (채택) vs `#{3}` 엄격 → **385/23/12** (봇 PR `#924`·`#925` 의 `## Test plan` 2셀 (술어: `--check-corpus` 60 PR 중 `#{3}` 패턴에서만 WARN 으로 갈리는 셀. **release PR 아님** — release 클래스 WARN 집합은 두 패턴에서 불변이고, 두 봇 PR 은 CI 에서 job 스킵이라 **실제 가시 차이 0**)을 거짓 WARN 으로). 구조 축은 WARN 전용이라 느슨한 쪽이 거짓 WARN 을 줄이고 blocking 경계에는 영향이 없다. **코드 펜스 안 구조 hit 은 세지 않되 현 시점 영향은 0** 이다 — 펜스 안 hit **0건** (술어: 최근 머지 PR 60건 본문 전수, 라인이 계급 패턴 ∧ 해당 kw phrase 를 동시 만족한 hit 수 — 체크박스 계급 펜스 밖 **328** / 헤더 계급 펜스 밖 **118** / 닫히지 않은 펜스를 가진 PR 0). _"펜스 오탐을 잡았다"_ 는 과대 주장을 금지한다 (volt #101 measurement-first). **phrase 축은 펜스를 제외하지 않는다** — 제외하면 blocking 경계가 움직여 동치 증명이 깨진다.
 
   **자기 적용 — `reviewer.md` §절차 4 로 본 PR 을 sweep** (술어: `git grep -nF --untracked -e '<패턴>' -- ':!*/dist/*'`, **경로 무제한**, 본 CHANGELOG entry **작성 전** 작업 트리. rev 와 `--untracked` 는 병용 불가라 트리 상태를 anchor 로 적는다). 표기 축 + **동작 서술 술어** 축 + **크기·수치** 축 3방향:
 
