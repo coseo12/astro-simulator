@@ -81,11 +81,18 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    4. **PR 본문 체크박스 검증** — PR 템플릿의 `ADR 호환성 체크` 항목 체크 여부 확인 (`gh pr view <번호> --json body`). 미체크 + ADR 수정 포함 시 `non_blocking_suggestions` 에 권고 추가. 미체크 + ADR 수정 미포함 시 무시 (자명 PASS)
 6. **PR 본문 7 체크박스 메타 가드** (다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) PR [#475](https://github.com/coseo12/astro-simulator/pull/475) 박제) — PR 본문에 `.github/PULL_REQUEST_TEMPLATE.md` 의 `### 체크리스트` 항목 base 가 보존되었는지 점검:
 
-   1. **1차 구조 grep**: `gh pr view <번호> --json body --jq .body | grep -c "ADR 호환성 체크"` (현재 가드 대상 1 항목 — 다운스트림 [astro-simulator#469](https://github.com/coseo12/astro-simulator/issues/469) 박제. 미래 노출 시 항목별 grep 키워드 박제)
-   2. **2차 phrase grep**: `gh pr view <번호> --json body --jq .body | grep -c -i "ADR 호환성"`
-   3. **양쪽 0 hit 시**: PR 본문에 prefill 무시 권고 박제 (`non_blocking_suggestions`) + 미래 다른 항목 (커밋 컨벤션 / 불필요 변경 / 보안 / SSoT / cross-validate / Test plan) 의 양가성 노출 발견 시 즉시 본 메타 규칙 발화 (developer.md 본문에 grep 키워드 박제 후속 요청)
+   **판정식을 재서술하지 않고 정본 가드를 호출한다** (#1010). 종전 이 항목은 `ADR 호환성` **1 항목**만 보는 하드코딩 2-grep 이었고, 그 결과 같은 규칙이 4가지 서로 다른 형태(문서 3계급 / 가드 2계급 7키워드 / reviewer 2계급 1키워드 / qa 1-grep 1키워드)로 갈려 있었다. 사본이 독립 판정식을 가지면 규약형 "동시 수정 의무"로는 drift 를 막을 수 없다 (volt [#120](https://github.com/coseo12/volt/issues/120) — drift 감지보다 중복 출처 제거).
 
-   근거: `.claude/agents/developer.md` §메타 규칙 (다운스트림 #470 동기화).
+   ```bash
+   node scripts/verify-pr-template-checklist.mjs <번호>
+   ```
+
+   1. **exit code 만 보지 않는다** — WARN 은 **exit 0** 이다. stdout 첫 줄 `측정 방법 C 3계급 — PASS n / WARN n / FAIL n` 을 읽는다
+   2. **WARN ≥ 1**: 해당 키워드를 `non_blocking_suggestions` 로 **승격**한다 (차단 아님). 문구 예: `PR 본문 kw3(보안) 구조 소실 — 템플릿 체크박스가 ### 헤더로 대체됨 (측정 방법 C WARN)`
+   3. **FAIL ≥ 1**: phrase 자체가 0 hit = 가시성 0. `blocking_issues` 로 올리고 PR 본문 재작성 요청. 단 본 가드는 required status check 가 **아니므로** (ADR `20260807-971` 결정 9-1) 빨간 X 가 곧 머지 차단은 아니다 — 차단 판단은 reviewer 가 한다
+   4. **7 키워드 밖의 신규 템플릿 항목**이 양가성을 노출하면 즉시 메타 규칙 발화 — 문서가 아니라 가드의 `CHECKLIST_KEYWORDS` 에 `structureClass` 계급과 함께 박제하도록 후속 요청
+
+   근거: `.claude/agents/developer.md` §측정 방법 C / §메타 규칙 (다운스트림 #470 동기화), #1010 (3계급 + 판정식 SSoT 수렴).
 7. **결과 PR 코멘트 작성**:
    ```markdown
    ## Reviewer 정적 리뷰

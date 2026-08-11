@@ -166,6 +166,7 @@ gh pr checks <PR> --json name,state --jq \
 - **CHANGELOG `[Unreleased]` 누락 전수 대조 의무**: develop 이 main 보다 앞선 커밋이 CHANGELOG 항목보다 많을 수 있다(이전 세션들이 항목 누락). 릴리스 전 `git log origin/main..origin/develop` 로 **포함 PR 전수 대조** → 누락분 소급 문서화. v0.48.0 은 9 커밋 중 6건 CHANGELOG 누락 발견.
 - **release prep PR 필수**: version bump + CHANGELOG 확정은 develop 직접 push 금지라 `release/<X>-prep → develop` prep PR 로 선반영 후 release PR(develop→main).
 - **release PR 도 pr-template-checklist 가드 대상**: 7 체크박스 원문 문구("ADR 호환성"/"Test plan"/"SSoT" 등) 전부 필요 — release 전용 섹션만으론 FAIL. 로컬 사전검증: `node scripts/verify-pr-template-checklist.mjs <PR>`.
+  - ⚠️ **문구만으로는 WARN 이 남는다 (#1010)**: 3계급 판정에서 phrase 는 blocking 축이고 **구조**(`kw1~5` 체크박스 / `kw6~7` `###` 헤더)는 WARN 축이다. 체크박스 항목을 `### 보안` 같은 헤더 절로 옮기면 FAIL 은 면해도 WARN 이 뜬다 — 실측으로 최근 머지 PR 60건 중 **release PR 8건이 이 경로**였다 (술어: 60 PR × 7 kw = 420 셀 중 WARN 21 셀, WARN PR 10건 중 8건이 release). 체크박스는 `[ ] → [x]` 갱신만 하고 라인 형태를 유지한다.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
 - **README 「현재 상태」 갱신 의무 (#842)**: release prep PR 에서 version bump + CHANGELOG 확정과 **동일 커밋**에 README `## 현재 상태` 의 버전/날짜/기능 서술을 현행화한다. 실측: v0.47.0~v0.50.0 3릴리스 연속 누락으로 README 가 v0.46.0 표기로 방치 (전수 감사 2026-07-18 발견).
 
