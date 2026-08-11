@@ -10,8 +10,23 @@ name: PR Template Checklist Guard
 # 둘은 타이밍이 달라 직교. 본 워크플로는 사용자가 수동 `gh pr create --body "..."`
 # 로 prefill 우회 시 최종 차단.
 #
-# 측정 방법 C — 1차 구조 (체크박스 prefix `- [ ]`) + 2차 phrase (키워드 문구) AND.
-# 둘 중 하나라도 hit 하면 PASS, 둘 다 0 → FAIL + actionable 코멘트.
+# 측정 방법 C — 3계급 판정 (#1010). 판정 정본은 스크립트이며 아래는 그 요약이다.
+#   FAIL (exit 1) : 2차 phrase (키워드 문구) 0 hit          → 빨간 X + actionable 코멘트
+#   WARN (exit 0) : phrase ≥ 1 이나 1차 구조 0 hit          → ::warning:: 어노테이션 + step summary
+#   PASS (exit 0) : phrase ≥ 1 이고 1차 구조 ≥ 1 hit
+#
+# 1차 구조의 정의는 키워드 계급마다 다르다 — 템플릿에서 그 항목이 갖는 원래 형태를 묻기 때문이다.
+#   키워드 1~5 → 같은 라인에 체크박스 prefix (`- [ ]` / `- [x]`) + phrase
+#   키워드 6~7 (ADR 호환성 / Test plan) → 같은 라인에 `###` 헤더 + phrase
+#
+# **blocking 경계는 #1010 이전과 동일하다** — 구조 hit 이 있으면 그 라인이 phrase 를 포함하므로
+# `구조 ≥ 1 ⟹ phrase ≥ 1` 이고, 종전 `phrase ≥ 1 OR 구조 ≥ 1` 은 `phrase ≥ 1` 과 동치였다.
+# 즉 FAIL 집합은 불변이고, 종전에 판정 기여도가 0 이던 구조 항이 WARN 축으로 승격됐을 뿐이다.
+# (종전 주석은 *"… AND. 둘 중 하나라도 hit 하면 PASS"* 라는 한 문장 안 자기모순이었다 — #1010)
+#
+# 본 워크플로는 required status check 가 **아니다** (ADR 20260807-971 결정 9-1 명시 제외).
+# exit 1 은 빨간 X + 코멘트이지 머지 차단이 아니다. WARN 은 코멘트를 남기지 않는다
+# (release PR 클래스 상습 발화 → alert fatigue, #766 계보).
 #
 # ── hashFiles silent-skip 정책 (#950) — SSoT 는 ci.yml §hashFiles silent-skip 정책 블록 (#945) ──
 # 종전 `if: hashFiles('scripts/verify-pr-template-checklist.mjs') != ''` 제거. 해당 스크립트는

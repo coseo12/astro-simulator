@@ -57,7 +57,7 @@ monorepo 에서 core/shared 패키지 (`packages/*`) 가 수정된 PR 은 **브�
 이슈 본문의 완료 기준 중 동적 검증 가능한 항목을 직접 확인. 미충족 항목 명시.
 
 ### 4. PR 본문 7 체크박스 base 보존 backstop (다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) 박제)
-- PR 본문 7 체크박스 base 보존 backstop — `gh pr view <번호> --json body --jq .body | grep -c "ADR 호환성"` ≥ 1 (반환 0 시 reviewer 단계로 되돌림 권고). reviewer §절차 6번이 1차 가드, 본 backstop 은 메타 가드의 깊이 (방어의 깊이). 근거: developer.md §메타 규칙 (다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) PR [#475](https://github.com/coseo12/astro-simulator/pull/475) 동기화).
+- PR 본문 7 키워드 base 보존 backstop — **판정식을 재서술하지 않고 정본 가드를 호출한다** (#1010): `node scripts/verify-pr-template-checklist.mjs <번호>`. **exit code 만 보지 않는다** — WARN 은 exit 0 이므로 stdout 첫 줄 `측정 방법 C 3계급 — PASS n / WARN n / FAIL n` 을 읽는다. **FAIL ≥ 1** 시 reviewer 단계로 되돌림 권고, **WARN ≥ 1** 인데 reviewer 코멘트의 `non_blocking_suggestions` 에 승격 흔적이 없으면 그 누락 자체를 backstop 지적으로 박제한다. reviewer §절차 6번이 1차 가드, 본 backstop 은 메타 가드의 깊이 (방어의 깊이). 근거: developer.md §측정 방법 C (다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) PR [#475](https://github.com/coseo12/astro-simulator/pull/475) 동기화), #1010.
 
 ### 5. cross-validate outcome 검증
 - **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.

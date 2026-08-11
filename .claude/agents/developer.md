@@ -53,7 +53,26 @@ description: "풀스택 구현 (프론트엔드 + 백엔드)"
 
 ### 측정 방법 C (혼합) — DoD #2 가시성 검증
 
-PR 본문 가시성 자기 검증 (dev 단계 + reviewer 재검증) 은 다음 두 grep 의 **AND** 로 판정한다 (다운스트림 architect cross-validate 합의):
+PR 본문 가시성 자기 검증 (dev 단계 + reviewer 재검증) 은 **3계급**으로 판정한다. 판정 정본은 `scripts/verify-pr-template-checklist.mjs` 이며, 본 표는 사람이 읽는 계약이다 — 두 곳이 갈리면 스크립트가 옳다 (#1010).
+
+```bash
+# 정본 — 7 키워드 전건을 3계급으로 판정 (CI `pr-template-checklist-guard.yml` 과 동일 코드)
+node scripts/verify-pr-template-checklist.mjs <PR>
+# exit 0 = PASS 또는 WARN / exit 1 = FAIL. WARN 은 stdout 표에 계급별 구조 hit 이 0 으로 찍힌다
+```
+
+- **phrase ≥ 1 hit ∧ 구조 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
+- **phrase ≥ 1 hit ∧ 구조 0 hit** → WARN / non-blocking 권고 (템플릿 원 구조 소실 — reviewer 가 `non_blocking_suggestions` 로 승격)
+- **phrase 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단). 구조 hit 은 phrase hit 을 함의하므로 이 조건이 곧 "양쪽 0" 이다
+
+**구조 hit 의 정의는 키워드 계급마다 다르다** — 템플릿에서 그 항목이 갖는 원래 형태를 보존했는지를 묻기 때문이다.
+
+- 키워드 1~5 (커밋 컨벤션 / 불필요 / 보안 / SSoT / cross-validate): `### 체크리스트` 절의 **체크박스 항목** → 같은 라인에 `- [ ]` 또는 `- [x]` + phrase
+- 키워드 6~7 (ADR 호환성 / Test plan): 템플릿에서 **`###` 섹션 헤더로만 존재** → 같은 라인에 `###` + phrase
+
+> 구조 판정의 헤더는 **ATX 레벨을 가리지 않는다** (`#`~`######`) — 템플릿이 쓰는 레벨은 `###` 이지만 묻는 것은 "섹션 헤더로 존재하는가"이지 레벨이 아니다. 구조 축은 WARN 전용이라 느슨한 쪽이 거짓 WARN 을 줄이고 blocking 경계에는 영향이 없다 (#1010).
+
+수동 확인이 필요할 때의 근사 2-grep (정본 아님 — 1차가 체크박스 구문을 요구하지 않아 실제로는 구조를 재지 않는다. 재작성은 후속 이슈 [#1013](https://github.com/coseo12/astro-simulator/issues/1013)):
 
 ```bash
 # 1차 구조 grep — 체크박스 prefill 보존 확인
@@ -65,16 +84,12 @@ gh pr view <PR> --json body --jq .body | grep -c -i "<핵심 키워드>"
 # 기대: ≥ 1 hit (체크박스 + prose 중 어디든)
 ```
 
-- **양쪽 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
-- **체크박스 0 + phrase ≥ 1** → non-blocking 권고 (체크박스 prefill 누락 — 동일 권고 시 7 체크박스 base 코드 블록 동봉 권장)
-- **양쪽 동시 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단)
-
 **메타 규칙** (PR 템플릿 신규 항목 양가성 노출 시 절차):
-1. 즉시 본 메타 규칙 발화 — 측정 방법 C 양쪽 0 hit 시 reviewer/qa 가 권고 박제
-2. 노출된 항목별 grep 키워드 박제 (developer.md 본문에 추가)
+1. 즉시 본 메타 규칙 발화 — 측정 방법 C 가 FAIL(phrase 0) 또는 WARN(구조 0) 을 내면 reviewer/qa 가 권고 박제
+2. 노출된 항목의 `structureClass` 계급 판정 후 가드 `CHECKLIST_KEYWORDS` 에 박제 (문서가 아니라 스크립트가 정본)
 3. 후속 이슈 분리 박제 (volt #29) — 본 메타 규칙 발화의 1차 사례 인덱싱
 
-> 참고: 동일 측정 방법이 `.claude/skills/create-pr/SKILL.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — **동시 수정 의무**. 다운스트림 1차 사례: astro-simulator [#469](https://github.com/coseo12/astro-simulator/issues/469) "ADR 호환성 체크" 측정 방법 C 박제 PR [#472](https://github.com/coseo12/astro-simulator/pull/472).
+> 참고: 위 **3계급 bullet 3줄 + 계급별 구조 정의 2줄**이 `.claude/skills/create-pr/SKILL.md` 에도 **바이트 동일**하게 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — **동시 수정 의무**. 반면 `.claude/agents/reviewer.md` §절차 6 / `.claude/agents/qa.md` §4 는 판정식을 **재서술하지 않고 가드를 호출**한다 (#1010 — 파생본이 독립 판정식을 갖는 것이 결함이었지, 중복 자체가 결함은 아니다). 다운스트림 1차 사례: astro-simulator [#469](https://github.com/coseo12/astro-simulator/issues/469) "ADR 호환성 체크" 측정 방법 C 박제 PR [#472](https://github.com/coseo12/astro-simulator/pull/472).
 
 > 참고: 동일 메타 규칙이 `.claude/agents/reviewer.md` §절차 6번 + `.claude/agents/qa.md` §검증 단계 backstop 에서 발화 (방어의 깊이). 다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) PR [#475](https://github.com/coseo12/astro-simulator/pull/475) 동기화.
 
