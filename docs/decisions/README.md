@@ -56,7 +56,7 @@
 | 2026-08-06 | [962-branch-name-guard](20260806-962-branch-name-guard.md) | Accepted | 브랜치명 규약의 정본을 산문 3곳에서 실행 가능한 가드 상수로 이전 — CI 런타임 검사 + 산문 파생 정적 대조. #942 규약의 강제 수단 |
 | 2026-08-07 | [971-required-status-checks](20260807-971-required-status-checks.md) | Accepted | branch protection required status check 정책 — `main` 한정 3단계 도입 + `develop` 은 최소 보호(force-push·삭제 차단)만 하고 required check **영구 미채택** (ff-sync 보호). 선행 ADR: `20260806-962-branch-name-guard` §6-2 인계 |
 | 2026-08-08 | [983-measurement-recording-convention](20260808-983-measurement-recording-convention.md) | Accepted | 수치 박제 규약 — 일괄 도출 / 부분 재측정 금지 / **술어 명시**. **원조**: `20260515-harness-managed-divergent-pattern` §Amendment 19 (`Superseded` + _"불변 유지"_ 선언이라 **편집하지 않고** 본 ADR 로 승격). 자매 규약: 전수 grep (`.claude/agents/reviewer.md` §절차 4) |
-| 2026-08-11 | [1010-measurement-c-verdict-tiers](20260811-1010-measurement-c-verdict-tiers.md) | Accepted | 측정 방법 C **3계급 판정**(PASS / WARN / FAIL) + 판정식 SSoT 를 가드 스크립트로 수렴 — 파생 5곳이 독립 판정식을 갖던 drift 제거. blocking 경계는 종전과 **수학적으로 동일** |
+| 2026-08-11 | [1010-measurement-c-verdict-tiers](20260811-1010-measurement-c-verdict-tiers.md) | Accepted | 측정 방법 C **3계급 판정**(PASS / WARN / FAIL) + 판정식 SSoT 를 가드 스크립트로 수렴 — 파생 5곳이 독립 판정식을 갖던 drift 제거. blocking 경계는 종전과 **수학적으로 동일**. 선행 ADR: [`20260807-971`](20260807-971-required-status-checks.md) 결정 9-1 (본 가드는 required check **아님**) |
 
 > **범례 — `(upstream-only)`**: 이 저장소에 **로컬 파일이 없다.** 링크 대상은 upstream
 > [`harness-setting/docs/decisions/`](https://github.com/coseo12/harness-setting/tree/main/docs/decisions)
