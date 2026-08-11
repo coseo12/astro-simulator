@@ -1,7 +1,7 @@
 # ADR: 측정 방법 C 3계급 판정 + 판정식 SSoT 를 가드 스크립트로 수렴 (#1010)
 
 - 일자: 2026-08-11
-- **상태**: **Provisional** — cross-validate 결과 §교차검증 반영 사항 4축 통합 후 `Accepted (cross-validate YYYY-MM-DD)` 전이. 발동 앵커 2건 동시 해당: **ADR 신규** + **MINOR 이상 Behavior Changes** (5 에이전트/스킬 행동 규칙 변경). CLAUDE.md §ADR Status 워크플로 (#370 옵션 C)
+- **상태**: **Accepted** (cross-validate agy 2026-08-11 — §교차검증 반영 사항 4축 통합 완료). 원 박제: `Provisional` (발동 앵커 2건 — ADR 신규 / MINOR Behavior Changes)
 - 관련: 이슈 [#1010](https://github.com/coseo12/astro-simulator/issues/1010) / 후속 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) (release PR 클래스) · [#1013](https://github.com/coseo12/astro-simulator/issues/1013) (문서 예시 명령줄)
 - 계보: [#469](https://github.com/coseo12/astro-simulator/issues/469) (측정 방법 C 원안) → [#470](https://github.com/coseo12/astro-simulator/issues/470) / [#473](https://github.com/coseo12/astro-simulator/issues/473) (D4 CI backstop) / [#471](https://github.com/coseo12/astro-simulator/issues/471) (스킬 사전 차단) / [#475](https://github.com/coseo12/astro-simulator/pull/475) (메타 규칙) / [#855](https://github.com/coseo12/astro-simulator/issues/855) (템플릿↔가드 정합)
 - 필수 cross-link: [20260807-971-required-status-checks.md](20260807-971-required-status-checks.md) **결정 9-1** (본 가드 required 제외 — WARN 을 exit 0 로 두는 근거의 절반)
@@ -256,9 +256,10 @@ ADR [20260807-971](20260807-971-required-status-checks.md) **결정 9-1** 이 �
 
 ## 교차검증 반영 사항
 
-> **미수행 — Provisional 사유.** 본 ADR 은 cross-validate 발동 앵커 2건(ADR 신규 / MINOR Behavior Changes)에 해당하나, `developer.md` 규칙상 developer 페르소나는 cross-validate 를 직접 호출하지 않는다 (#479). **메인 오케스트레이터가 수행**한 뒤 아래 4축으로 본 절을 채우고 Status 를 `Accepted (cross-validate YYYY-MM-DD)` 로 전이한다.
+**cross-validate (agy, 2026-08-11, `cross_validate.sh code 1015`) — 결론 승인** (_"코드 품질·테스트 설계·수학적 검증·문서화 수준 모두 매우 뛰어나며 즉시 머지하기에 적합"_). 메인 오케스트레이터 수행 (`developer.md` #479 로 developer 페르소나 직접 호출 금지).
 
-- 합의 항목:
-- 이견 항목 (양쪽 근거 — Claude 재판단):
-- 고유 발견:
-- Claude 편향 셀프 체크:
+- **합의 항목** — ① **SSoT 수렴이 근본 처방**임을 인정: 파편화된 하드코딩 grep(`grep -c "ADR 호환성"`)을 제거하고 `node scripts/verify-pr-template-checklist.mjs <PR>` 호출로 단일화해 _"파생 문서가 독자 판정식을 가질 수 없도록 차단"_ 한 것이 문서↔가드 drift 의 **근본 원인 제거**라는 평가. ② **DoD 4축 충족** 확인 (격리 동적 `--self-test` 28 단언 / 3중 시뮬레이션 / 5 페르소나 self-consistency 표 / 메타 도구 자기 적용 `--check-corpus` 60 PR). ③ **변경 11파일 범위 타당** — _"SSoT 수렴 특성상 전 파생 지점을 동시 변경하지 않으면 오히려 drift 창이 열린다"_.
+- **이견 항목** — **없음.** agy 가 제기한 2건은 모두 반대 의견이 아니라 **후속 이행 사항**이었다 (아래 고유 발견).
+- **고유 발견** — ① **ADR Status 전이 인계 확인** 요구. 본 절이 그 이행이다. ② **release PR 클래스 WARN 모니터링** — 최근 60 PR 중 release PR **8건**이 체크박스 대신 `###` 헤더 절을 써 WARN 대상을 형성하므로, §재검토 조건 1항(_"WARN 이 3 릴리스 연속 발생 시"_)에 걸리면 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) 로 release 템플릿 예외를 정식화하라는 권고. **두 건 다 코드 변경 없이 이행 절차**이므로 본 PR 에 반영할 diff 가 없다.
+- **Claude 편향 셀프 체크** — ⚠️ **이슈 #1010 을 연 것이 메인 자신이고, 그 이슈의 전제 2건이 설계 단계에서 실측 반박됐다** (_"원 의도는 AND"_ → 실제 **OR**, 문서의 "AND" 가 오기 / _"느슨한 쪽이 실행돼 여태 안 드러났다"_ → 실제 **719 run 중 76건 FAIL 실발화**). 메인은 `--limit 50` 표본이 최근 success 구간에 몰린 것을 모르고 *"안 드러났다"* 로 단정했다. **자기가 세운 프레이밍을 검증 없이 설계 입력으로 넘긴 편향**이며, architect 의 measurement-first 가 이를 차단했다. 본 ADR 이 채택한 3계급도 메인 가설(_"계급별 structure 정의로 AND 를 살린다"_)의 **절반만** 수용한 것이다 — 계급별 정의는 옳았으나 **AND 를 살리는 도구가 아니라 WARN 계급을 정의하는 도구**였다.
+

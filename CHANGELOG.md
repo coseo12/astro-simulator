@@ -49,7 +49,7 @@ Semantic Versioning을 따른다.
 
   **후속 분리** (설계 §비목표): [#1014](https://github.com/coseo12/astro-simulator/issues/1014) release PR 본문 클래스 미스매치 (FAIL 10 PR + WARN 8 PR 실측 — ADR §재검토 조건 1 과 연동) / [#1013](https://github.com/coseo12/astro-simulator/issues/1013) 문서의 _"1차 구조 grep"_ 예시가 실제로는 구조를 재지 않는 문제.
 
-  **cross-validate 미수행 — 메인 인계.** ADR 이 발동 앵커 2건(ADR 신규 / MINOR Behavior Changes)에 해당하나 developer 페르소나는 cross-validate 를 직접 호출하지 않는다 (#479). ADR Status 를 **Provisional** 로 박제했고, 메인이 수행 후 §교차검증 반영 사항 4축을 채우고 `Accepted` 로 전이한다.
+  **cross-validate (agy, 2026-08-11, `cross_validate.sh code 1015`) — 결론 승인** (_"코드 품질·테스트 설계·수학적 검증·문서화 수준 모두 매우 뛰어나며 즉시 머지하기에 적합"_). 메인 수행(`developer.md` #479 로 developer 페르소나 직접 호출 금지). **합의**: SSoT 수렴이 문서↔가드 drift 의 **근본 원인 제거**라는 평가 / DoD 4축 충족 확인 / 11파일 범위는 _"동시 변경하지 않으면 오히려 drift 창이 열린다"_ 로 타당. **이견 0** — 제기된 2건은 반대가 아니라 **후속 이행 사항**(ADR 전이 확인 / release PR **8건**의 WARN 모니터링 → [#1014](https://github.com/coseo12/astro-simulator/issues/1014))이라 반영할 diff 가 없다. ADR [`20260811-1010`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) 을 **Accepted 전이**하고 §교차검증 4축을 채웠다. ⚠️ **편향 셀프 체크** — 본 이슈를 연 것이 메인 자신이고 **그 전제 2건이 설계 단계에서 실측 반박**됐다(원 의도는 `AND` 가 아니라 **`OR`** / _"안 드러났다"_ 가 아니라 **719 run 중 76건 FAIL 실발화**). `--limit 50` 표본이 최근 success 구간에 몰린 것을 모르고 단정한 것이며, **자기 프레이밍을 검증 없이 설계 입력으로 넘긴 편향**을 architect 의 measurement-first 가 차단했다.
 
 ## [0.66.0] — 2026-08-10
 
