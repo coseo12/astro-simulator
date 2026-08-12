@@ -1,6 +1,6 @@
 # ADR: PR base 선택 규칙 CI 가드 — shape 기반 판정 + 관할 분리 (#970)
 
-- **상태**: **Provisional** — CLAUDE.md §ADR Status 워크플로. 본 ADR 은 cross-validate 발동 앵커(ADR 신규)이며, `developer` 페르소나는 cross-validate 호출이 금지돼 있다 (#479). 결과 통합 후 메인이 Accepted 로 전이한다.
+- **상태**: **Accepted** (cross-validate agy 2026-08-12 — §교차검증 반영 사항 4축 통합 완료. `Provisional` 에서 전이)
 - **이슈**: [#970](https://github.com/coseo12/astro-simulator/issues/970) — [#962](https://github.com/coseo12/astro-simulator/issues/962) 축 B 후속 F1
 - **선행 ADR**:
   - [20260806-962-branch-name-guard](20260806-962-branch-name-guard.md) — 브랜치 *명명* 절반. 본 ADR 은 그 §11-1 이 후속으로 분리한 base *선택* 절반이다
@@ -342,3 +342,34 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 | 3 | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
 
 > cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행한다 (`developer` 페르소나 금지 — #479). 결과 통합 후 §교차검증 반영 사항 4축을 추가하고 Accepted 로 전이한다.
+
+## §10 교차검증 반영 사항 (cross-validate agy, 2026-08-12)
+
+`cross_validate.sh code 1023`. 메인 오케스트레이터 수행 — `developer` 페르소나는 직접 호출 금지 ([#479](https://github.com/coseo12/astro-simulator/issues/479)). CLAUDE.md §교차검증 의 4축 분류로 정리한다.
+
+### 합의
+
+결론 **승인** — _"제안드린 소소한 개선 사항 외에 블로킹 이슈는 없으며 … 즉시 머지(APPROVE)를 추천"_. 명시적으로 지지된 3가지:
+
+1. **실측으로 전제를 정정한 접근** — stacked PR 17건이 관행인지 아닌지를 추정하지 않고 head 저자 구성으로 판정(§4).
+2. **설정 변경 0 으로 required 강제력 상속** — 신규 job 이 아니라 이미 `main` required 인 `branch-name` job 의 스텝으로 태운 배선(§6). [20260807-971](20260807-971-required-status-checks.md) 이 정의한 required 집합을 건드리지 않는다.
+3. **자기 silent skip 프로브** — 가드가 조용히 아무것도 검사하지 않는 상태를 자기 self-test 로 고정(§7 축 B).
+
+### 이견
+
+없음. 블로킹 0.
+
+### 고유 발견
+
+**없음.** `base` 편집 우회(§9-1)는 agy 도 언급하지 않았고, 본 PR 이 이미 일회용 PR 로 실측·박제하고 [#1027](https://github.com/coseo12/astro-simulator/issues/1027) 로 분리한 항목이다. agy 가 남긴 유일한 실행 권고는 _"메인이 cross-validate 수행 후 `Accepted` 승격"_ 으로, 절차 확인이지 코드 지적이 아니다.
+
+### Claude 편향 셀프 체크
+
+**이번 회차 외부 검증의 결함 발견 기여 = 0** 이라는 사실을 그대로 적는다. 승인 일색이었다는 이유로 본 PR 의 확신도를 격상하지 않는다 — 합의는 독립 증거가 아니라 **같은 문서를 읽은 층이 같은 결론에 도달한 것**일 수 있고, 이 저장소는 이미 그 실패를 실측했다 ([#999](https://github.com/coseo12/astro-simulator/issues/999) — 문서·주석·cross-validate 3층이 공유한 거짓을 workflow run 이력만이 반증). 실제로 본 PR 에서 잡힌 결함 2건은 **둘 다 외부 검증 밖**에서 나왔다:
+
+| 결함 | 발견 경로 |
+|---|---|
+| `GITFLOW_HEADS[0]/[1]` 위치 인덱스 — 배열 재정렬 시 `feature/970-x → main` 이 `pass` 로 뒤집힘 | dev 의 **가드 자기 적용** |
+| `types: [opened, synchronize]` 가 `base` 편집을 놓쳐 **stale green** | 메인의 **일회용 PR 독립 재현** (PR [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
+
+즉 이 ADR 의 신뢰 근거는 cross-validate 합의가 아니라 **자기 적용 + 독립 재현 + 594 PR 전수 실측**이다.
