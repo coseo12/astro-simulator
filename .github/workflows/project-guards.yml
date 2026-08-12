@@ -75,7 +75,7 @@ jobs:
       # upstream-only 행(로컬 파일 부재)은 제외하되 제외 사실·근거·수동 GET 절차를 stdout 에
       # 명시한다 (silent skip 금지). 범위·토큰 규칙 SSoT = scripts/verify-adr-index.mjs 헤더.
       # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행). 도입 시점 drift 가 0 이라
-      # 본검사 PASS 는 작동 증거가 아니다 — 증거는 F1~F15 격리 픽스처 쪽이다.
+      # 본검사 PASS 는 작동 증거가 아니다 — 증거는 F1~F16 격리 픽스처 쪽이다.
       - name: ADR 인덱스 상태 대조 가드 self-test
         run: node scripts/verify-adr-index.mjs --self-test
       - name: ADR 인덱스 상태 대조 가드

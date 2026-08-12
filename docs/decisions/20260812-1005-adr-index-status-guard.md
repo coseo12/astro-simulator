@@ -52,7 +52,7 @@
 |---|---|---|
 | 책임 | 링크 무결성 계약 8항에 _"표 셀 의미(상태 토큰) 대조"_ 라는 이질 도메인 9항 추가 | 인덱스 정합이라는 단일 책임. 이름이 검사 대상을 정확히 서술 |
 | 실패 메시지 | `[docs-links] FAIL` 로 뭉뚱그려짐 | `[adr-index] FAIL — 표 'Provisional' vs 실물 'Accepted'` 로 actionable |
-| self-test | 기존 11 단언에 혼재 | F1~F15 **21 단언** 독립 (경계 고정 F10 포함) |
+| self-test | 기존 11 단언에 혼재 | F1~F16 **23 단언** 독립 (경계 고정 F10 포함) |
 | 배선 비용 | 0 | `project-guards.yml` 2 스텝 + `package.json` 1 스크립트 |
 | 제외 판정 SSoT | allowlist 가 같은 파일에 있음 | **모듈 분리로 해결** (아래 3) |
 
@@ -117,7 +117,7 @@ self-test `F15` 가 정적으로 막는다.
 
 | 축 | 이행 |
 |---|---|
-| 1. 격리 동적 테스트 | `--self-test` 픽스처 F1~F15 / **21 단언**. tmpdir 격리, 네트워크 비의존 |
+| 1. 격리 동적 테스트 | `--self-test` 픽스처 F1~F16 / **23 단언**. tmpdir 격리, 네트워크 비의존 |
 | 2. 3중 시뮬레이션 | **픽스처**: positive `F1` → negative `F2`(#993 형태) → recovery `F3`. **라이브(실 저장소)**: 971 행을 `Provisional` 로 되돌려 `exit 1` → 복구 `exit 0`, 역방향(실물만 `Superseded` 전이)도 `exit 1`. 두 negative 는 서로 다른 방향의 drift 다 |
 | 3. self-consistency | 제외 판정 근거가 `verify-docs-links.mjs` 와 **같은 모듈**임을 `F15` 가 정적 단언 (인라인 사본 재유입 0). 실 저장소 실행에서 제외 3행 == README source allowlist 3쌍 |
 | 4. 메타 측정 자기 적용 | 변경된 가드를 **현재 저장소**에 적용 — 도입 전 `8행 / 대조 5 / 제외 3` PASS, 본 ADR 등재 후 `9행 / 대조 6 / 제외 3` PASS (6번째가 본 ADR 자신의 `Provisional`) |
@@ -127,8 +127,13 @@ self-test `F15` 가 정적으로 막는다.
 **결과**
 
 1. 계약 (2) 가 규범에서 **CI 발화 지점**을 얻는다. ADR 상태를 전이시키면서 표를 잊은 PR 은 머지 전
-   빨간 X 로 드러난다 (본 가드는 required status check 가 **아니다** — ADR
-   [`20260807-971`](20260807-971-required-status-checks.md) 결정 9-1 의 범위. 차단이 아니라 신호다).
+   빨간 X 로 드러난다. ⚠️ **본 가드는 `main` 의 required status check 다** — 라이브 실측
+   `GET /branches/main/protection` = `["project-guards","branch-name","label-pr"]` 이고, 본 가드는
+   그 job id (`project-guards`) 에 배선된다. 따라서 `base=main` PR(release/hotfix)에서 `exit 1` 은
+   **머지 하드 블록**이다. (초판이 [`20260807-971`](20260807-971-required-status-checks.md) 결정 9-1 을
+   인용해 _"required 아님 · 차단 아니라 신호"_ 라 적었으나 **거짓**이다 — 결정 9-1 은
+   `pr-template-checklist` 를 **제외**하는 조항이고, 같은 ADR §Phase 1 이 `project-guards` 를
+   required 3개로 **직접 열거**한다. PR #1018 리뷰 BLOCK-1 실측 반증.)
 2. 본 ADR 자신이 첫 자기 적용 사례다 — `Provisional` 로 박제하고 같은 PR 에서 인덱스 표에 등재했다.
    cross-validate 후 `Accepted` 전이 시 **표를 같이 갱신하지 않으면 본 가드가 FAIL** 한다.
 3. upstream-only 3건의 제외가 **매 실행 가시화**되어, 로컬 부재가 _"모르는 상태"_ 가 아니라

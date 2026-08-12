@@ -75,7 +75,7 @@
  *
  * 호출:
  *   node scripts/verify-adr-index.mjs               # 검사 (CI 기본)
- *   node scripts/verify-adr-index.mjs --self-test   # 격리 픽스처 F1~F15 (positive/negative/recovery)
+ *   node scripts/verify-adr-index.mjs --self-test   # 격리 픽스처 F1~F16 (positive/negative/recovery)
  *   ADR_INDEX_ROOT=<dir> node scripts/verify-adr-index.mjs   # 스캔 루트 override (self-test 용)
  *
  * 관련: 이슈 #1005 / PR #1004 (계약 명문화) / #998 축 B / ADR
@@ -387,7 +387,7 @@ function main() {
   return 0;
 }
 
-// ── --self-test: 격리 픽스처 F1~F15 (가드 도입 PR DoD 축 1~3) ───────────────
+// ── --self-test: 격리 픽스처 F1~F16 (가드 도입 PR DoD 축 1~3) ───────────────
 function selfTest() {
   let pass = 0;
   let fail = 0;
