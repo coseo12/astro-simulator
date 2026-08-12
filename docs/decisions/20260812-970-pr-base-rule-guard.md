@@ -253,6 +253,24 @@ head shape 'work' 는 base='main' (shape: main) 로 PR 을 열 수 없습니다.
 
 앞 스텝이 **PASS 한 채로** 뒤 스텝만 FAIL 했다. 즉 차단의 주체가 신규 스텝임이 실증되며, 기존 브랜치명 가드가 우연히 잡은 것이 아니다. positive run `31597839434` 은 `[PASS] base='main' ← head='hotfix/970-guard-positive' (hotfix → main)` 으로 **base=main 이 통째로 막히지 않음**을 함께 실증한다.
 
+### 7-2-c 진단 가림 완화의 before/after live 실측 (2026-08-12, 일회용 PR 2건 — 정리 완료)
+
+§8-1 한계 2 개정(`if: ${{ !cancelled() }}`)의 근거다. 위 negative(#1024)는 **브랜치명이 PASS 한** 셀이라 가림 현상이 드러나지 않는다 — 가림은 **두 판정이 동시에 실패할 때만** 발생한다. 그래서 `architect/970-mask-*` (폐기 접두사 → 축 B FAIL) → `base=main` (base 규칙 `violation` 확정) 조합으로 별도 측정했다. 두 브랜치의 차이는 **`if` 조건 한 줄뿐**이다 (before 는 커밋 `b02c811` 트리, after 는 `2a1edea` 트리).
+
+| 축 | [#1028](https://github.com/coseo12/astro-simulator/pull/1028) **before** (`if` 미적용) | [#1029](https://github.com/coseo12/astro-simulator/pull/1029) **after** (`if: ${{ !cancelled() }}`) |
+|---|---|---|
+| run id | `31604809249` | `31604814344` |
+| job `branch-name` conclusion | **`failure`** | **`failure`** ← **불변** |
+| required check `branch-name` (SHA 체크런) | **`failure`** | **`failure`** ← **불변** |
+| 스텝 `브랜치명 규약 가드 (#962)` | `failure` | `failure` |
+| 스텝 `PR base 선택 규칙 가드 (#970)` | **`skipped`** | **`failure`** |
+| 로그 `허용되지 않습니다` hit | **0** | **2** |
+| 로그 `교정: PR 의 base` hit | **0** | **2** |
+
+**두 가지가 동시에 실증됐다.** ① *"실패가 성공으로 뒤집히지 않는다"* — job 결론과 required 체크런 결론이 before/after 모두 `failure` 로 **동일**하다. ② *"가려지던 진단이 실제로 가려져 있었다"* — before 에서 base 스텝은 `skipped` 였고 교정 지시 문자열이 로그에 **0회** 등장한다. reviewer 🟡5 의 지적은 분석이 아니라 **관측 가능한 사실**이었다.
+
+정리: 두 PR 모두 `state=CLOSED` · `mergedAt=null` (머지 0), 원격 브랜치 삭제 완료 (`git ls-remote --heads origin | grep -c 970-mask` → **0**). 삭제는 [`operational-friction.md`](../ops/operational-friction.md) §2 대로 `git push origin --delete` 로 분리 실행했다.
+
 **정리 확인**: 두 PR 모두 `state=CLOSED` / `mergedAt=null` (**머지 0**), 원격·로컬 브랜치 삭제 완료 (`git push origin --delete` 분리 실행 — [`operational-friction.md`](../ops/operational-friction.md) §2). 각 PR 에 close 사유 코멘트 박제.
 
 > **부수 실측 — 일회용 브랜치는 각자 다른 SHA 여야 한다.** 세 브랜치가 같은 커밋을 가리키면 한 SHA 가 3개 PR 의 head 가 되어 `branch-name` 체크런이 `{success, failure, success}` 로 공존한다 — [20260807-971](20260807-971-required-status-checks.md) §2-12 원인 ③ (PR 다중성 축) 이 `4f7366e` 에서 실측한 바로 그 형태이고, **required check 위에서 본 PR 자신의 판정이 오염된다**. 그래서 일회용 브랜치마다 `--allow-empty` 커밋 1개씩을 얹어 SHA 를 분리했다 (`201ca1c` / `74b6a5c` / `a246ece`).
