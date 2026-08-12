@@ -74,15 +74,28 @@ const ROOT = resolve(dirname(SCRIPT_PATH), '..');
  *
  * 순서 의존: `bot` → `hotfix` → `work`. 봇 브랜치는 `chore/` 접두사라 `work` 보다 먼저
  * 걸러야 하고, `hotfix` 는 `BRANCH_TYPES` 에 없으므로 (축 B `HOTFIX_TYPE` 별도) 독립 행이다.
+ *
+ * **gitflow 2행은 `GITFLOW_HEADS` 에서 이름 그대로 파생한다 — 위치 인덱스 금지.**
+ * `GITFLOW_HEADS[0]` / `[1]` 로 쓰면 축 B 에서 배열 순서가 바뀌는 순간 `develop` 과 `main`
+ * 의 shape 가 **조용히 뒤바뀐다**. 그 결과는 릴리스 셀(`develop→main`)과 merge-back 셀
+ * (`main→develop`)이 서로의 판정을 받는 것인데, **양쪽 다 허용 셀이라 뒤바뀌어도 여전히
+ * pass** 다 — 즉 오류가 아무 흔적을 남기지 않는다 (라벨 필수 인자를 도입한 것과 같은
+ * 실패 모드가 상수 쪽에서 재현된다). role 이름을 브랜치 이름 자신으로 두면 순서가
+ * 바뀌어도 매핑이 따라가므로 이 경로가 구조적으로 닫힌다.
  */
 const SHAPES = [
-  { role: 'develop', test: (n) => n === GITFLOW_HEADS[0] },
-  { role: 'main', test: (n) => n === GITFLOW_HEADS[1] },
+  ...GITFLOW_HEADS.map((h) => ({ role: h, test: (n) => n === h })),
   { role: 'bot', test: (n) => classifyBranch(n).rule === 'bot' },
-  { role: 'hotfix', test: (n) => n.startsWith(`${HOTFIX_TYPE}/`) },
+  { role: HOTFIX_TYPE, test: (n) => n.startsWith(`${HOTFIX_TYPE}/`) },
+  // ⚠️ `release/` 는 축 B 가 **상수로 export 하지 않는** 유일한 접두사다 (`RE_RELEASE` 안에
+  // 인라인). 즉 이 리터럴만은 파생이 아니라 사본이라, 축 B 가 접두사를 바꾸면 여기서
+  // 조용히 drift 한다. 방어선은 아래 `--self-test` 의 **축 B 판정기 정합 대조**다.
   { role: 'release', test: (n) => n.startsWith('release/') },
   { role: 'work', test: (n) => BRANCH_TYPES.some((t) => n.startsWith(`${t}/`)) },
 ];
+
+/** `SHAPES` 가 실제로 생산하는 role 목록 — `BASE_RULES` 정합 불변식의 대조 기준 */
+const SHAPE_ROLES = SHAPES.map((s) => s.role);
 
 /**
  * 브랜치 shape 판정. 순수 함수 — I/O 없음.
@@ -509,6 +522,23 @@ const FIXTURES = [
   ['develop2', 'feature/970-x', 'violation', 'gitflow 접미 base'],
 ];
 
+/**
+ * `[브랜치명, 축 B 의 rule, 본 스크립트의 shape]` — 두 판정기가 같은 브랜치를 어떻게 보는지
+ * 대조한다. 관할 분리는 "shape 는 느슨하고 축 B 는 엄격하다" 가 아니라 **둘이 같은 대상을
+ * 같은 종류로 본다** 는 전제 위에 서 있다. 한쪽 상수·정규식이 바뀌면 여기서 먼저 깨진다.
+ * 전부 축 B 가 PASS 시키는 이름만 쓴다 (양쪽이 판정 가능한 교집합이어야 대조가 성립).
+ */
+const CROSS_CHECKS = [
+  ['develop', 'gitflow', 'develop'],
+  ['main', 'gitflow', 'main'],
+  ['release/9.99.9-prep', 'release', 'release'],
+  ['release/v0.53.0-prep', 'release', 'release'],
+  ['feature/970-x', 'work', 'work'],
+  ['hotfix/970-x', 'work', 'hotfix'],
+  ['chore/r1-baseline-linux-1', 'bot', 'bot'],
+  ['chore/970-x', 'work', 'work'],
+];
+
 function runSelfTest() {
   console.log('self-test: verify-pr-base-rule.mjs (격리 픽스처)\n');
   let pass = 0;
@@ -537,6 +567,20 @@ function runSelfTest() {
       'BASE_RULES 키 == [develop, main, work]',
       Object.keys(BASE_RULES).sort().join(',') === 'develop,main,work',
     ],
+    // 아래 2건은 `BASE_RULES` 의 문자열이 `SHAPES` 가 실제로 생산하는 role 과 갈리는 순간을
+    // 잡는다. 갈리면 그 base/head 는 영원히 매칭되지 않는데, base 쪽은 전건 violation 이라
+    // 시끄럽지만 **head 쪽은 조용히 좁아진다** (허용 셀 하나가 소리 없이 사라진다).
+    // 축 B 가 `GITFLOW_HEADS` 나 `HOTFIX_TYPE` 을 리네임하면 정확히 이 경로가 열린다.
+    [
+      'BASE_RULES 키가 전부 SHAPES 가 생산하는 role',
+      Object.keys(BASE_RULES).every((k) => SHAPE_ROLES.includes(k)),
+    ],
+    [
+      'BASE_RULES 허용 head 가 전부 SHAPES 가 생산하는 role',
+      Object.values(BASE_RULES)
+        .flat()
+        .every((h) => SHAPE_ROLES.includes(h)),
+    ],
     [
       'base=main 허용 head 는 develop·hotfix 뿐',
       BASE_RULES.main.slice().sort().join(',') === 'develop,hotfix',
@@ -545,6 +589,13 @@ function runSelfTest() {
     ['일상 개발의 base=main 은 위반', classifyPair('main', 'feature/1-x').verdict === 'violation'],
     ['픽스처 30 케이스 이상', FIXTURES.length >= 30],
     ['픽스처가 3 verdict 를 모두 포함', VERDICTS.every((v) => FIXTURES.some(([, , e]) => e === v))],
+    // --- 축 B 판정기와의 정합 (관할 분리의 전제) ---
+    // 두 스크립트가 같은 브랜치를 다른 종류로 보면 관할 분리가 무너진다. 특히 `release/`
+    // 는 축 B 가 상수로 export 하지 않아 본 대조가 **유일한 방어선**이다.
+    ...CROSS_CHECKS.map(([name, axisBRule, shape]) => [
+      `축 B 정합 — '${name}' → 축 B '${axisBRule}' / shape '${shape}'`,
+      classifyBranch(name).rule === axisBRule && branchShape(name) === shape,
+    ]),
   ];
   console.log('');
   for (const [label, ok] of invariants) {
