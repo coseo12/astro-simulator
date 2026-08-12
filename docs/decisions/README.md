@@ -31,18 +31,43 @@
    밀려나는 반면 **본 표는 항구적이라 drift 가 더 오래 산다.** 실제 위반 1건이 #998 에서 발각됐다:
    `971-required-status-checks` 가 2026-08-08 에 Accepted 로 전이됐는데 (PR
    [#993](https://github.com/coseo12/astro-simulator/pull/993)) 본 표는 `Provisional` 로 남아 있었다.
+   - **강제 지점 — [`scripts/verify-adr-index.mjs`](../../scripts/verify-adr-index.mjs)**
+     ([#1005](https://github.com/coseo12/astro-simulator/issues/1005)). 본 표의 상태 열과 ADR 실물
+     첫 `상태:` 라인의 **상태 토큰**을 대조해 불일치 시 CI 를 FAIL 시킨다 (`project-guards.yml`).
+     로컬 재현: `node scripts/verify-adr-index.mjs` (`pnpm verify:adr-index`). 본 조항이 명문화
+     ([#998](https://github.com/coseo12/astro-simulator/issues/998) 축 B) 된 뒤에도 **강제 지점이
+     0** 이라 drift 가 **두 번** 실측됐다 — 위 #993 (전이 PR 의 변경 파일이 정확히 2개라 본 표를
+     **정의상 열지 않음**) + PR [#1015](https://github.com/coseo12/astro-simulator/pull/1015)
+     (신규 ADR `20260811-1010` 미등재, 명문화 **바로 다음 PR**). 둘 다 사람이 잡았고, 본 가드는
+     그 수동 정정이 **다시 어긋나지 않게** 한다.
+   - ⚠️ **가드가 덮지 않는 2건** (범위 밖 — "없어서 안 잡히는 것" 이 아니라 **의도된 경계**):
+     ① **미등재 검출** — 등재 기준(조항 1)이 _"이 결정을 모른 채 …"_ 라는 **의미론적 판정**이라
+     기계가 precision 1.0 으로 결정할 수 없다 (실측 2026-08-12: ADR 실물 **95건 중 인덱스 등재
+     로컬 5건** → 전수 등재 강제 시 오탐 90건 / _"`CLAUDE.md`·`.claude`·`scripts` 에서 참조되면
+     횡단"_ 휴리스틱은 **precision 3/17 · recall 3/5**). ADR 자기 선언 마커가 precision 1.0
+     대안이나 **신규 규약 신설**이라 별도 이슈로 분리했다. 미검출은 가드 self-test `F10` 이
+     경계로 고정한다 (미래 관찰자가 _"누락"_ 으로 오인하지 않도록).
+     ② **산문 역참조** — 본문 안의 상태 서술 (예: 다른 문서가 어떤 ADR 을 `Provisional` 로 적는
+     문장) 은 표 셀이 아니라 자연어라 별개 난이도다. **본 조항 자체도 이 클래스를 덮지 않는다.**
 3. **upstream-only 항목 — `(upstream-only)` 표기 의무 + 상태는 upstream GET 으로 대조.** 이 저장소에
    **로컬 파일이 없는** upstream `harness-setting` 유래 ADR 은 주제 셀에 표기를 달고
-   `scripts/verify-docs-links.mjs` 의 `UPSTREAM_ONLY_ALLOWLIST` 에 `(source, target)` 쌍으로 등록한다
+   [`scripts/upstream-only-allowlist.mjs`](../../scripts/upstream-only-allowlist.mjs) 의
+   `UPSTREAM_ONLY_ALLOWLIST` 에 `(source, target)` 쌍으로 등록한다 (#1005 이전에는 이 목록이
+   `verify-docs-links.mjs` 안에 있었다 — 두 가드가 같은 목록을 쓰게 되면서 모듈로 분리했다).
    (아래 범례). 표기가 없으면 **링크가 깨진 것인지 로컬에 없는 것인지 구분할 수 없다.** #907 하네스
    디커플 이후 **신규 등재는 원칙적으로 없다** — 기존 3건은 이력 보존 목적으로만 잔존한다.
+   **표기 · 로컬 파일 부재 · allowlist 등록 3원 일치**는 위 조항 2 의 가드가 기계 검사한다 — 셋 중
+   하나만 바꾸면 FAIL 이라, 표기를 빠뜨린 채 등록만 하는 경로가 막힌다.
    - ⚠️ **로컬 파일 부재는 _"대조 불가"_ 가 아니다.** 상태 열은 아래 **1줄 GET** 으로 upstream 실물과
      직접 대조된다 (쓰기 계열 `-X PUT/PATCH/DELETE` 금지, GET 전용):
      ```bash
      gh api repos/coseo12/harness-setting/contents/docs/decisions/<파일>.md --jq .content | base64 -d | grep -m1 '상태'
      ```
      upstream 이 이 3건 중 하나를 `Superseded` 로 전이시키면 본 표는 조용히 틀리므로, 등재 항목 전수
-     대조 시 **로컬 4행은 파일 헤더로 · upstream 3행은 위 명령으로** 대조한다. _"실물이 없어 원리적으로
+     대조 시 **로컬 행은 파일 헤더로 · upstream 3행은 위 명령으로** 대조한다 (로컬 쪽은 #1005 이후
+     [`verify-adr-index.mjs`](../../scripts/verify-adr-index.mjs) 가 기계화 — 위 조항 2. 종전 이
+     자리에 있던 _"로컬 4행"_ 은 1010 등재로 이미 5행이 됐던 **stale 수치**라 개수 표기를 걷어냈다.
+     upstream 3 은 _"신규 등재는 원칙적으로 없다"_ 로 고정된 수라 유지). _"실물이 없어 원리적으로
      대조 불가"_ 라는 서술은 **재확인 시도 자체를 봉인**하므로 쓰지 않는다 (PR
      [#1004](https://github.com/coseo12/astro-simulator/pull/1004) reviewer 라운드 1 BLOCK-2 — 초판이
      정확히 그 서술을 썼고 실측으로 반증됐다).
@@ -57,14 +82,19 @@
 | 2026-08-07 | [971-required-status-checks](20260807-971-required-status-checks.md) | Accepted | branch protection required status check 정책 — `main` 한정 3단계 도입 + `develop` 은 최소 보호(force-push·삭제 차단)만 하고 required check **영구 미채택** (ff-sync 보호). 선행 ADR: `20260806-962-branch-name-guard` §6-2 인계 |
 | 2026-08-08 | [983-measurement-recording-convention](20260808-983-measurement-recording-convention.md) | Accepted | 수치 박제 규약 — 일괄 도출 / 부분 재측정 금지 / **술어 명시**. **원조**: `20260515-harness-managed-divergent-pattern` §Amendment 19 (`Superseded` + _"불변 유지"_ 선언이라 **편집하지 않고** 본 ADR 로 승격). 자매 규약: 전수 grep (`.claude/agents/reviewer.md` §절차 4) |
 | 2026-08-11 | [1010-measurement-c-verdict-tiers](20260811-1010-measurement-c-verdict-tiers.md) | Accepted | 측정 방법 C **3계급 판정**(PASS / WARN / FAIL) + 판정식 SSoT 를 가드 스크립트로 수렴 — 파생 5곳이 독립 판정식을 갖던 drift 제거. blocking 경계는 종전과 **수학적으로 동일**. 선행 ADR: [`20260807-971`](20260807-971-required-status-checks.md) 결정 9-1 (본 가드는 required check **아님**) |
+| 2026-08-12 | [1005-adr-index-status-guard](20260812-1005-adr-index-status-guard.md) | Provisional | 인덱스 계약 (2) **상태 열 갱신 책임의 강제 지점** — 본 표 상태 열 ↔ ADR 실물 `상태:` 토큰을 CI 에서 기계 대조. 미등재·산문 역참조는 명시적 범위 밖. 선행 ADR: [`20260808-983`](20260808-983-measurement-recording-convention.md) (자매 규약 — CHANGELOG ↔ ADR 상태 동시 갱신) |
 
 > **범례 — `(upstream-only)`**: 이 저장소에 **로컬 파일이 없다.** 링크 대상은 upstream
 > [`harness-setting/docs/decisions/`](https://github.com/coseo12/harness-setting/tree/main/docs/decisions)
 > 의 동명 ADR 이며 (2026-08-10 GET 실측: 3건 전부 upstream 에 실재하고 **상태 열도 전건 일치** —
 > 위 계약 (3) 의 1줄 명령), **이 저장소의 GitHub 렌더에서
-> 클릭하면 404** 다. `scripts/verify-docs-links.mjs` 는 `UPSTREAM_ONLY_ALLOWLIST` 로 이 3쌍을
+> 클릭하면 404** 다. `scripts/verify-docs-links.mjs` 는
+> [`upstream-only-allowlist.mjs`](../../scripts/upstream-only-allowlist.mjs) 의
+> `UPSTREAM_ONLY_ALLOWLIST` 로 이 3쌍을
 > 통과시키되 **조용한 skip 이 아니라** 발동 건수를 매 실행 stdout 에 보고한다. 즉 링크 검사 PASS 는
 > _"파일이 있다"_ 가 아니라 **_"부재가 알려져 있다"_** 를 뜻한다. 표기 없는 항목은 로컬 파일이 있다.
+> `verify-adr-index.mjs` 도 **같은 목록을 import** 해 제외를 판정하고, 제외 3행 각각에 대해 위
+> 1줄 GET 명령을 매 실행 stdout 에 재출력한다 (제외가 곧 인계임을 매번 노출).
 
 ## 언제 작성하는가
 

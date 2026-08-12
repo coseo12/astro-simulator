@@ -5,6 +5,42 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1005] ADR 인덱스 상태 열 ↔ ADR 실물 기계 대조 — 인덱스 계약 (2) 의 강제 지점 (MINOR)** ([#1005](https://github.com/coseo12/astro-simulator/issues/1005)) — ADR [`20260812-1005-adr-index-status-guard.md`](docs/decisions/20260812-1005-adr-index-status-guard.md) (**Provisional** — cross-validate 미수행. developer 페르소나는 직접 호출 금지([#479](https://github.com/coseo12/astro-simulator/issues/479))라 메인 오케스트레이터에 인계).
+
+  **지금 틀린 것을 고치는 PR 이 아니다 — 수동으로 맞춘 것이 다시 어긋나지 않게 하는 PR 이다.** 착수 시점 drift 는 **0** 이다 (술어: rev `65d9f45` 에서 `docs/decisions/README.md` 인덱스 표 **8행** 중 로컬 파일이 있는 **5행** 전건이 ADR 실물 첫 `상태:` 라인의 상태 토큰과 일치 / upstream-only **3행**은 로컬 파일 부재). 그 0 은 사람이 두 번 손으로 맞춘 결과다 — PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004)(#998 축 B) 가 계약 **(2) 상태 열 갱신 책임**을 명문화했지만 **강제 지점은 0** 이었고 (PR 템플릿 0건 / 에이전트 파일 0건 / 가드 0건), 그 상태로 재발이 **두 번 실측**됐다: ① PR [#993](https://github.com/coseo12/astro-simulator/pull/993) — ADR `971` 전이 PR 의 변경 파일이 **정확히 2개**(`CHANGELOG.md` + 해당 ADR)라 계약 (2) 는 **그 PR 이 정의상 열지 않는 파일** 안에 있었다 ② PR [#1015](https://github.com/coseo12/astro-simulator/pull/1015) — 신규 ADR `20260811-1010` 미등재, 계약 명문화 **바로 다음 PR**. 따라서 **positive PASS 는 작동 증거가 아니며**, 본 PR 의 증거는 negative 쪽이다.
+
+  **가드 — [`scripts/verify-adr-index.mjs`](scripts/verify-adr-index.mjs) 신설** (`project-guards.yml` 2 스텝: 본검사 + `--self-test`, `pnpm verify:adr-index`). 표 상태 셀과 ADR 실물 상태 라인을 **문자열이 아니라 상태 토큰**으로 대조한다 (두 자리의 서술 형식이 애초에 다르다 — 표 `Accepted` vs 실물 `**Accepted** (cross-validate agy 2026-08-11 — …)`). 어휘 {`Accepted`·`Provisional`·`Proposed`·`Superseded`·`Deprecated`·`Rejected`} 중 **가장 먼저 등장하는** 토큰이 정본이고, **`NO-OP` 은 상태가 아니라 결정 성격 수식어라 어휘에서 뺐다** — 그래서 표 `Accepted (NO-OP)` ↔ 실물 `**NO-OP** (Accepted, …)` 가 정합 판정된다(F6). `Supersedes`(능동) 는 `Superseded`(상태) 와 다른 낱말이라 `\b` 경계에서 오탐하지 않는다(F5). **fallback 분기 없음** — 상태 라인 부재 / 어휘 밖 토큰 / 표 앵커·열 수 파손은 _"판정 불가라서 통과"_ 가 아니라 **그 자체가 FAIL** 이다.
+
+  **upstream-only 제외는 3원 일치를 요구한다.** 1차 근거는 이슈 지정대로 **로컬 파일 부재**지만, 그것만 보면 _"방금 실수로 지운 ADR"_ 과 _"원래 없는 upstream ADR"_ 이 구분되지 않는다. 그래서 `로컬 파일 부재 ⟺ 주제 셀 (upstream-only) 표기 ⟺ allowlist 등록` 셋이 같을 때만 제외하고 갈리면 FAIL(F9). 세 번째 신호의 목록은 [`scripts/upstream-only-allowlist.mjs`](scripts/upstream-only-allowlist.mjs) 로 분리해 `verify-docs-links.mjs` 와 **같은 객체를 import** 한다 — 사본을 두면 두 가드의 제외 집합이 갈릴 수 있고 그건 drift 를 감지하기 전에 **drift 원을 새로 만드는** 짓이다 (volt [#120](https://github.com/coseo12/volt/issues/120)). 인라인 사본 재유입은 `F15` 가 정적으로 막는다. **제외는 silent skip 이 아니다** — 제외 3행 각각에 대해 계약 (3) 의 **수동 1줄 GET 명령**을 매 실행 stdout 에 재출력해, 제외가 봉인이 아니라 **인계**임을 남긴다.
+
+  **미등재 검출은 범위 밖 — 판정 근거 5.** #1015 의 실제 재발이 이 클래스라 실효성 질문이 정당하나, 기계 판정의 precision 이 1.0 에 못 미친다. ① 등재 기준(계약 1)이 _"이 결정을 모른 채 무관한 작업을 하면 규약을 위반하는가"_ 라는 **의미론적 판정** ② **전수 등재 강제 시 오탐 90건** (술어: rev `65d9f45` 에서 `docs/decisions/*.md` 중 `README.md`·`_amendment-template.md` 제외 **95건** vs 인덱스 등재 로컬 **5건**. 본 PR 이 ADR 1건을 더해 96/6 이 된다) ③ _"`CLAUDE.md`·`.claude/**`·`scripts/**` 에서 참조되면 횡단 거버넌스"_ 휴리스틱은 **precision 3/17 · recall 3/5** (술어: 같은 rev 에서 각 ADR **파일명 문자열**을 `git grep -l -F -- CLAUDE.md .claude scripts` 로 조회해 hit ≥ 1 인 17건 vs 등재 로컬 5건, 교집합 `907`·`962`·`983`. 오탐 14건은 forensic·R-Phase ADR 이 CLAUDE.md 에 _"모범 사례"_ 로 링크된 것들이고, 미포착 2건은 `971`·`1010`. 술어를 `.md` 없는 ADR id 로 느슨하게 잡으면 수가 달라진다는 점 자체가 이 휴리스틱의 불안정성이다) ④ PR diff 기반 알림은 신규 ADR 대부분이 비등재 대상이라 **alert fatigue** ([#766](https://github.com/coseo12/astro-simulator/issues/766) 계보) ⑤ precision 1.0 대안인 **ADR 자기 선언 마커**는 `record-adr` 스킬·템플릿·계약 동시 개정을 요구하는 **신규 규약 신설**이라 cross-validate 발동 앵커다 → **별도 이슈 분리**. 미검출은 self-test **`F10`** 이 픽스처로 고정한다 — 경계를 산문이 아니라 **테스트**로 못 박아 미래 관찰자가 _"가드 결함"_ 으로 오인하지 못하게 한다. **산문 역참조**(본문 안 상태 서술)도 범위 밖이며 **계약 (2) 자체도 덮지 않는다**(#1005 완료 기준 4항).
+
+  **가드 도입 PR DoD 4축.** ① **격리 동적 테스트** — `--self-test` 픽스처 F1~F15 / **21 단언** (tmpdir 격리, 네트워크 비의존). ② **3중 시뮬레이션** — 픽스처 `F1`(positive) → `F2`(#993 형태: 표 `Provisional` vs 실물 `Accepted`) → `F3`(recovery) + **실 저장소 라이브 재현**: 971 행을 `Provisional` 로 되돌려 `exit 1`(README:57 라인 번호 + 양쪽 토큰 보고) → `git checkout` 복구 `exit 0`, **역방향**(ADR 실물만 `Superseded` 전이, 표 미갱신)도 `exit 1`. ③ **self-consistency** — 제외 판정 근거가 `verify-docs-links.mjs` 와 같은 모듈임을 `F15` 가 정적 단언(인라인 사본 재유입 0), 실 저장소에서 제외 3행 == README source allowlist 3쌍. ④ **메타 측정 자기 적용** — 도입 전 `8행 / 대조 5 / 제외 3` PASS, 본 ADR 등재 후 **`9행 / 대조 6 / 제외 3` PASS** (6번째가 본 ADR 자신의 `Provisional` ↔ `Provisional`). **#1015 형태(미등재)는 실 저장소에서도 미검출임을 확인**했다 — 1010 행을 지우면 `7행 / 대조 4` 로 줄어든 채 두 가드 모두 `exit 0`. 범위 밖 판정의 실측 근거이자, 후속 이슈가 겨눌 정확한 표적이다.
+
+  **자기 적용 — `reviewer.md` §절차 4 sweep** (술어: `git grep -nF --untracked -e '<패턴>' -- ':!*/dist/*' ':!pnpm-lock.yaml'`, **경로 무제한**, 본 CHANGELOG entry **작성 전** 작업 트리. rev 와 `--untracked` 는 병용 불가라 트리 상태를 anchor 로 적는다). 표기 축 + 동작 서술 술어 축 + **크기·수치** 축 3방향:
+
+  ```text
+  표기 (5)      UPSTREAM_ONLY_ALLOWLIST | 강제 지점 | 로컬 4행 | 인덱스 계약 | upstream-only
+  동작 서술 (4)  가드 0건 | 발화 지점 | 강제 수단 | 미등재
+  크기·수치 (5)  등재 6 | 6 vs 94 | 7/7 | 3쌍 | 95
+  ```
+
+  | 술어                                   | 총 hit    | ① 활성 선언 (정정 대상) | ② 이력 기록 | ③ 역참조 가드 | ④ 규약 본문 자체 | ⑤ 무관 |
+  | -------------------------------------- | --------- | ----------------------- | ----------- | ------------- | ---------------- | ------ |
+  | `UPSTREAM_ONLY_ALLOWLIST`              | 12        | **2 → 정정**            | 1           | 1             | 0                | 8      |
+  | `강제 지점` / `발화 지점` / `가드 0건` | 8 / 5 / 2 | 0                       | 2           | 0             | 6                | 7      |
+  | `로컬 4행`                             | 2         | **1 → 정정**            | 1           | 0             | 0                | 0      |
+  | `등재 6` / `6 vs 94` / `7/7`           | 6 / 1 / 8 | **0**                   | 4           | 0             | 3                | 8      |
+  | `강제 수단` (962 계보)                 | 5         | 0                       | 1           | 0             | 3                | 1      |
+
+  **정정 3건 (구 기록 회수)** — ⓐ `docs/decisions/README.md` 계약 (3) 의 _"`scripts/verify-docs-links.mjs` 의 `UPSTREAM_ONLY_ALLOWLIST` 에 등록한다"_ + ⓑ 범례의 같은 귀속 = **allowlist 이설로 stale 해진 활성 지시문** (작성자에게 _어디에 등록하라_ 고 지시하는 문장이라 정정 의무. 반면 ADR `20260808-983` §4 의 _"verify-docs-links.mjs allowlist 로 링크 검사를 통과한다"_ 는 **동작 귀속 서술**이고 이설 후에도 참이라 무접촉 — 이 구분이 정정/비정정을 가른다) ⓒ 계약 (3) 의 _"**로컬 4행**은 파일 헤더로"_ 는 1010 등재로 **이미 5행이 됐던 stale 수치**라 개수 표기를 걷어냈다 (로컬 행은 늘어나는 수, upstream 3 은 _"신규 등재 원칙적 없음"_ 으로 고정된 수). **크기·수치 축 0 정정** — `등재 6`/`94` hit 은 전부 rev(`2f64d76`) 술어가 붙은 이력 측정이거나 규약 예시라 stale 이 아니다 (ADR 983 자신이 _"등재 수는 자기 참조 계수라 고정값 대신 `grep -cE '^\| 20[0-9]{2}-' docs/decisions/README.md` 를 rev 와 함께 재실행한다"_ 로 이미 방어). **0 hit 으로 _"잔여 0"_ 을 선언하지 않았다** — 넓게 훑어 N hit 을 얻고 5분류로 실잔존 0 을 보였다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"에이전트가 같은 입력에 다르게 동작하는가"_): **예.** 앱 runtime 0줄이지만 ① ADR 상태를 전이시키는 PR 이 표를 잊으면 이제 **CI 가 빨간 X 를 낸다** (종전: 무신호) ② upstream-only 등재 시 표기·allowlist 를 빠뜨리면 FAIL ③ `docs/decisions/README.md` 계약 (2)·(3) 문언이 강제 지점·범위 경계를 포함하도록 바뀌어 **에이전트가 읽는 규약 자체가 달라졌다**. 본 가드는 required status check 가 **아니다** (ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 결정 9-1) — `exit 1` 은 신호이지 머지 차단이 아니다.
+
+  **잔여 인계** — ADR 은 `Provisional` 이다. cross-validate 수행 후 §교차검증 반영 사항을 채우고 `Accepted` 로 전이하되, **같은 커밋에서 인덱스 표의 상태 열도 갱신**해야 한다. 잊으면 본 PR 이 도입한 가드가 정확히 그것을 FAIL 시킨다 — 계약 (2) 의 자기 적용이자 첫 실전 검증이다.
+
 ## [0.67.0] — 2026-08-11
 
 ### Behavior Changes

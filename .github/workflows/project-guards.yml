@@ -68,6 +68,19 @@ jobs:
       - name: docs 상대 링크 무결성 가드
         run: bash scripts/verify-docs-links.sh
 
+      # ADR 인덱스 상태 열 ↔ ADR 실물 대조 가드 (#1005)
+      # `docs/decisions/README.md` §인덱스 계약 (2) — "ADR 상태를 전이시키는 PR 이 같은 PR 에서
+      # 표를 갱신한다" — 의 강제 지점. 명문화(PR #1004)만 있고 발화 지점이 0 이던 구간에서
+      # drift 가 두 번 실측됐다 (#993 전이 PR 이 표를 정의상 열지 않음 / #1015 신규 ADR 미등재).
+      # upstream-only 행(로컬 파일 부재)은 제외하되 제외 사실·근거·수동 GET 절차를 stdout 에
+      # 명시한다 (silent skip 금지). 범위·토큰 규칙 SSoT = scripts/verify-adr-index.mjs 헤더.
+      # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행). 도입 시점 drift 가 0 이라
+      # 본검사 PASS 는 작동 증거가 아니다 — 증거는 F1~F15 격리 픽스처 쪽이다.
+      - name: ADR 인덱스 상태 대조 가드 self-test
+        run: node scripts/verify-adr-index.mjs --self-test
+      - name: ADR 인덱스 상태 대조 가드
+        run: node scripts/verify-adr-index.mjs
+
       # 브랜치명 규약 SSoT drift 가드 (#962 축 B)
       # `scripts/verify-branch-name.mjs` 의 상수가 브랜치 규약의 **정본**이고, 산문 3곳
       # (PULL_REQUEST_TEMPLATE.md / developer.md / create-pr/SKILL.md) 의 type 열거는 그
