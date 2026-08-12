@@ -1,7 +1,7 @@
 # ADR: ADR 인덱스 상태 열 ↔ ADR 실물 기계 대조 — 계약 (2) 의 강제 지점 (#1005)
 
 - 일자: 2026-08-12
-- **상태**: **Provisional** (cross-validate 발동 앵커 2건 — ADR 신규 / 가드 규약 신설. 메인 오케스트레이터가 cross-validate 수행 후 §교차검증 반영 사항 통합 → `Accepted` 전이. 전이 시 [`README.md`](README.md) 인덱스 표의 상태 열을 **같은 커밋에서** 갱신할 것 — 본 ADR 이 강제하는 계약 (2) 의 자기 적용이며, 누락하면 본 가드가 CI 에서 FAIL 시킨다)
+- **상태**: **Accepted** (cross-validate agy 2026-08-12 — §교차검증 반영 사항 4축 통합 완료. `Provisional` 에서 전이). ⚠️ 본 라인은 §재검토 조건의 **어순 제약** 대상이다 — 현재 상태 토큰이 최선두여야 하며 그 앞에 다른 상태 어휘를 두지 않는다.
 - 관련: 이슈 [#1005](https://github.com/coseo12/astro-simulator/issues/1005) / PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004) (계약 (2) 명문화, [#998](https://github.com/coseo12/astro-simulator/issues/998) 축 B) / PR [#993](https://github.com/coseo12/astro-simulator/pull/993) · [#1015](https://github.com/coseo12/astro-simulator/pull/1015) (재발 실측 2건)
 - 자매 규약: [`20260808-983-measurement-recording-convention.md`](20260808-983-measurement-recording-convention.md) (iii) — _"CHANGELOG ↔ ADR 상태 동시 갱신"_. 같은 조항이고 **대상만 다르다**
 - 계보: [`20260806-962-branch-name-guard.md`](20260806-962-branch-name-guard.md) — _"산문 규약의 정본을 실행 가능한 가드로 이전"_ 의 두 번째 사례
@@ -159,8 +159,10 @@ self-test `F15` 가 정적으로 막는다.
 
 ## 교차검증 반영 사항
 
-> **미수행.** 본 ADR 은 `Provisional` 이다. developer 페르소나는 cross-validate 직접 호출이 금지돼
-> 있어 (`.claude/agents/developer.md` — [#479](https://github.com/coseo12/astro-simulator/issues/479))
-> 메인 오케스트레이터에게 인계한다. 수행 후 4축 분류 (합의 / 이견 / 고유 발견 / Claude 편향 셀프 체크)
-> 를 이 절에 채우고 상태를 `Accepted` 로 전이하며, **같은 커밋에서**
-> [`README.md`](README.md) 인덱스 표의 상태 열을 `Provisional → Accepted` 로 갱신한다.
+**cross-validate (agy, 2026-08-12, `cross_validate.sh code 1018`) — 결론 승인** (_"Approve (권고사항 반영 후 머지)"_). 메인 오케스트레이터 수행 (`developer.md` [#479](https://github.com/coseo12/astro-simulator/issues/479) 로 developer 페르소나 직접 호출 금지).
+
+- **합의 항목** — 4축 **양호**: ① 로직 정확성(어휘 기반 토큰 추출 + 3원 일치 제외 로직) ② 보안(`child_process` import **0**, `gh api …` 문자열은 출력 전용) ③ 성능 ④ 설계 준수(SSoT, DoD 4축, Provisional 인계). 총평 _"3원 일치·DoD 4축·격리 픽스처 덕분에 코드 정합성과 안정성이 매우 높다"_.
+- **이견 항목** — **없음.**
+- **고유 발견** — **마크다운 링크 앵커(`#…`) 미처리.** 링크에 앵커가 붙으면 파일명 추출 정규식이 실패해 **링크가 있는데도** _"ADR 링크 부재"_ 라는 **거짓 진단으로 FAIL** 한다. 실 저장소에서 재현 후 정규식에 `(?:[#?][^)\s]*)?` 를 추가하고 **회귀 픽스처 `F16`** 으로 고정했다 (self-test 21 → 23). fail-fast 라 조용히 통과하진 않지만 **진단이 틀리는** 형태라 반영 가치가 컸다.
+- **Claude 편향 셀프 체크** — ⚠️ **본 PR 에서 메인 커밋이 4회 차단을 만들었고, 네 번 다 _로컬 가드 전건 PASS_ 상태였다.** 매번 잡은 것은 독립 sweep · 릴리스 태그 대조 · 라이브 API GET 이다. 특히 두 건이 **거울상 오류**였다 — BLOCK-1 은 _"`pr-template-checklist` 는 required 아님"_(참)을 `verify-adr-index` 에, BLOCK-3 는 _"`project-guards` 는 required 임"_(참)을 `verify-pr-template-checklist` 에 잘못 붙였다. **워크플로 ↔ job id ↔ required 컨텍스트의 3자 관계를 주어별로 확인하지 않으면 required 서술이 양방향으로 틀린다.** BLOCK-3 는 그 위에 **릴리스된 `[0.67.0]` 섹션 소급 편집**까지 겹쳐 태그 원문 복원으로 되돌렸다. 부수 경로도 실측됐다 — reviewer 가 5분류 표에서 파일명을 축약해 한 hit 을 누락했고, 메인은 _"열거에 없는 hit"_ 을 미처리 거짓으로 판단했다. **5분류 표는 축약 없이 전 hit 을 위치까지 열거해야** 이 경로가 닫힌다.
+
