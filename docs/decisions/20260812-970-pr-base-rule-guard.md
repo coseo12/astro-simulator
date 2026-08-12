@@ -301,6 +301,23 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
 ### 8-1 한계
 
+0. ⚠️ **base 를 나중에 바꾸면 우회된다 (실측 확인, 미해결).** `branch-name-guard.yml` 의 `types: [opened, synchronize]` 는 **base 변경을 포착하지 못한다**. base 변경은 `pull_request` 의 **`edited`** 액션이고 head SHA 를 바꾸지 않으므로 `synchronize` 도 아니다.
+
+   **실측** (일회용 PR [#1026](https://github.com/coseo12/astro-simulator/pull/1026), 2026-08-12, 검증 후 close + 브랜치 삭제):
+
+   | 단계 | 관측 |
+   |---|---|
+   | `docs/970-guard-baseedit` → `base=develop` 로 open | run `31599206309` → **success** (`[PASS] base='develop' ← head='docs/970-guard-baseedit'`) |
+   | `gh pr edit 1026 --base main` | **새 run 0건** — workflow run `total_count` 가 **1 그대로** |
+   | 변경 후 head SHA 의 체크런 | `branch-name: success` **하나뿐** = **stale green** |
+   | 같은 조합의 로컬 판정 | `exit 1` **violation** (`head shape 'work' 는 base='main' 로 PR 을 열 수 없습니다`) |
+
+   즉 **"open with `base=develop` → 초록 확인 → base 를 `main` 으로 편집"** 경로가 열려 있다. 이것은 본 가드가 봉인하려는 silent skip 클래스 그 자체이므로 축소해 적지 않는다.
+
+   **왜 본 PR 에서 고치지 않는가 (범위 밖 — 후속 §9-1).** 자명한 수정은 `types` 에 `edited` 를 넣는 것이지만, 그 순간 `branch-name` 은 [20260807-971](20260807-971-required-status-checks.md) **결정 9-1** 이 `pr-template-checklist` 를 **required 에서 제외한 바로 그 성질**(event *type* 축 — SHA 를 바꾸지 않는 반복 이벤트가 같은 SHA 에 결론이 갈리는 체크런을 쌓는다)을 획득한다. 동 ADR §Phase 1 면제 근거는 *"required 3개 중 `edited` 처럼 SHA 를 바꾸지 않는 반복 이벤트로 통과 3종 밖 결론을 만들 수 있는 것은 하나도 없다"* 는 **정적 전수 확인** 위에 서 있고, `edited` 추가는 **그 전제를 직접 깬다** — 즉 릴리스 게이팅 결정의 재개봉이다. 본 이슈 범위(base 규칙의 기계 SSoT)를 훨씬 넘고 위험도 크므로 **분리**한다 (CLAUDE.md §교차검증 — *"고유 발견이 스프린트 비목표와 상충하면 후속 이슈 분리"*). 후속 이슈 **[#1027](https://github.com/coseo12/astro-simulator/issues/1027)** 생성 완료.
+
+   **그때까지의 완화**: (i) 본 가드의 실효는 *"실수로 잘못 연 PR"* 차단이며 **의도적 우회는 막지 못한다** — 규율이 이미 정착한 저장소(472 PR 연속 위반 0)에서 이 구분은 실질적이다. (ii) 릴리스·핫픽스 PR 은 사람이 base 를 의식적으로 고르는 소수 경로다. (iii) 후속에서 `edited` 대신 **머지 시점 검사**(`pull_request` `edited` 를 별도 non-required job 으로 두거나, ruleset 기반 base 제약)를 함께 비교한다.
+
 1. **`develop` 대상 PR 에서는 여전히 권고**다. `develop` 은 보호 자체가 없고 ([20260807-971](20260807-971-required-status-checks.md) 결정 2 로 **영구 미채택**), 실효 강제 범위는 release/hotfix PR 뿐이다. 다만 본 규칙이 막으려는 것이 정확히 `base=main` 오지정이므로 **위험 표면과 강제 범위가 일치**한다.
 2. **`unresolved` 는 CI 에서 도달 불가**라 실환경 발화 증거를 남기지 않는다. 픽스처 3건이 유일한 증거다.
 3. **`develop→main` 셀의 live 실증 부재** (§7-2 재조정).
@@ -320,7 +337,8 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
 | # | 항목 | 근거 |
 |---|---|---|
-| 1 | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
-| 2 | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
+| **1** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) | ⚠️ **base 편집 우회 봉인** — `types` 에 `edited` 추가 vs 별도 non-required job vs ruleset 비교. **ADR 20260807-971 결정 9-1 / Phase 1 면제 근거와 동시에 판단해야 한다** (required check 에 event *type* 축을 들이는 결정) | §8-1 한계 0 (실측 [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
+| 2 | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
+| 3 | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
 
 > cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행한다 (`developer` 페르소나 금지 — #479). 결과 통합 후 §교차검증 반영 사항 4축을 추가하고 Accepted 로 전이한다.

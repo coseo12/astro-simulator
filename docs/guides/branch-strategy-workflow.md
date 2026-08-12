@@ -167,6 +167,23 @@ node scripts/verify-pr-base-rule.mjs --pr base=develop head="$(git branch --show
 
 ⚠️ **폭발 반경**: 같은 job 에 넣는다는 것은 본 가드가 `main` 의 required check 강제력을 **상속**한다는 뜻이다. 오차단이 나면 릴리스가 하드 블록되고 `enforce_admins: true` 라 우회로가 없다. 그래서 릴리스·핫픽스 4셀(`develop→main` / `main→develop` / `hotfix/*→main` / `release/*-prep→develop`)은 `--self-test` 픽스처 **맨 앞에 불변식으로 고정**돼 있다. 막혔을 때의 탈출구는 아래 §required status check 롤백 R1.
 
+### ⚠️ 알려진 우회 — base 를 **나중에** 바꾸면 잡지 못한다 (미해결)
+
+`types: [opened, synchronize]` 는 **base 변경을 포착하지 못한다.** base 변경은 `pull_request` 의 **`edited`** 액션이고 head SHA 를 바꾸지 않아 `synchronize` 도 아니다. 브랜치명 가드가 `reopened` 를 제외한 근거(*"head_ref 는 PR 생성 후 변경 불가"*)는 **base 에 전이되지 않는다** — base 는 언제든 바꿀 수 있다.
+
+**실측** (일회용 PR [#1026](https://github.com/coseo12/astro-simulator/pull/1026), 2026-08-12, 검증 후 close + 브랜치 삭제):
+
+| 단계 | 관측 |
+| --- | --- |
+| `docs/970-guard-baseedit` → `base=develop` 로 open | **success** |
+| `gh pr edit 1026 --base main` | **새 run 0건** (workflow run `total_count` = 1 그대로) |
+| 변경 후 head SHA 체크런 | `branch-name: success` 하나뿐 = **stale green** |
+| 같은 조합 로컬 판정 | `exit 1` **violation** |
+
+즉 **"`base=develop` 으로 열어 초록 확인 → base 를 `main` 으로 편집"** 경로가 열려 있다. **본 가드는 "실수로 잘못 연 PR" 을 막지, 의도적 우회를 막지 못한다.**
+
+봉인은 후속 과제다 — `types` 에 `edited` 를 넣는 자명한 수정은 `branch-name` 에 **event *type* 축**을 들이는 것이라, [ADR 20260807-971](../decisions/20260807-971-required-status-checks.md) **결정 9-1**(`pr-template-checklist` 를 required 에서 제외한 근거)과 **Phase 1 면제 근거**를 동시에 재검토해야 한다. 후속 이슈: [#1027](https://github.com/coseo12/astro-simulator/issues/1027). 상세: [ADR 20260812-970](../decisions/20260812-970-pr-base-rule-guard.md) §8-1 한계 0 / §9-1.
+
 ## required status check 롤백 (릴리스가 막혔을 때 — #971)
 
 > **적용 여부부터 확인** — 아래는 `main` 에 required status check 가 **적용된 뒤에만** 의미가 있다.
