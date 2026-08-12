@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.67.0] — 2026-08-11
+
 ### Behavior Changes
 
 - **[#1010] 측정 방법 C 3계급 판정 + 판정식 SSoT 를 가드 스크립트로 수렴 (MINOR)** ([#1010](https://github.com/coseo12/astro-simulator/issues/1010)) — ADR [`20260811-1010-measurement-c-verdict-tiers.md`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) (**Accepted** — cross-validate agy 2026-08-11).
