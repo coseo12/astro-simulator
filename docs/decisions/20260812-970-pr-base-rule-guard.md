@@ -204,7 +204,10 @@ base 는 **PR 생성 후에도 바꿀 수 있다** (GitHub UI 의 base 드롭다
 
 ### 7-1 격리 픽스처 구성
 
-43 픽스처 = 최고 리스크 4 + 일상 경로 9 + 봇 4 + violation(dual PR) 6 + violation(사람 stacked) 3 + violation(역방향·자기참조) 3 + violation(base 자체 규칙 밖) 4 + unresolved 3 + 입력 위생 7.
+**43 픽스처**를 두 축으로 센다 (술어가 다르므로 병기한다 — [20260808-983](20260808-983-measurement-recording-convention.md) §수치 박제 규약).
+
+- **소스 배열의 주석 구획별** (43) — 최고 리스크 4 / 일상 경로 9 / 봇 4 / violation·dual PR 6 / violation·사람 stacked 3 / violation·역방향·자기참조 3 / violation·base 자체 규칙 밖 4 / unresolved 3 / 입력 위생 7.
+- **기대 verdict 별** (43) — `pass` **17** / `violation` **21** / `unresolved` **5**. 두 축이 어긋나는 이유는 "입력 위생" 구획 7건이 verdict 로는 `violation` 5 + `unresolved` 2 로 갈리기 때문이다 (`""`→`develop` 과 `main-backup`→`develop` 이 후자).
 
 전 코퍼스 594쌍을 박아넣지 않는다 (부피 + 네트워크 의존). 전수 실측은 `--check-corpus` 의 1회성 증거로 분리한다 — 축 B 와 동일 구조.
 
@@ -222,6 +225,30 @@ base 는 **PR 생성 후에도 바꿀 수 있다** (GitHub UI 의 base 드롭다
 > **`develop→main` (release PR) 은 live 실증 대상에서 제외한다.** head=develop, base=main 인 PR 은 정의상 **실제 release PR** 이며, 일회용으로 만들면 develop 전체 diff 가 열려 오머지 위험이 생긴다. 대체 근거: (i) 픽스처 + 불변식 이중 고정, (ii) 판정이 순수 함수라 `hotfix/*→main` 이 통과하면 base=main 경로의 기계는 동일하게 동작하고 남는 변수는 head shape 하나뿐, (iii) 코퍼스 65건 소급 PASS. **이 재조정은 스프린트 계약 §7 대로 코드 주석(픽스처 헤더) / PR 본문 / CHANGELOG 세 곳에 박제한다.**
 >
 > 일회용 브랜치는 **본 feature 브랜치에서 잘라낸다** — `pull_request` 이벤트는 merge ref 의 workflow 정의를 쓰므로, `main` 에서 자르면 신규 스텝이 아예 존재하지 않아 negative 가 성립하지 않는다. 정리는 [`docs/ops/operational-friction.md`](../ops/operational-friction.md) §2 대로 `gh pr merge --delete-branch` 를 쓰지 않고 close + `git push origin --delete` 로 분리한다.
+
+### 7-2-b live 실증 결과 (developer, 2026-08-12 — 일회용 PR 2건, 정리 완료)
+
+| 단계 | PR | head → base | `branch-name` 결론 |
+|---|---|---|---|
+| positive | [#1023](https://github.com/coseo12/astro-simulator/pull/1023) (본 PR) | `feature/970-pr-base-rule-guard` → `develop` | **SUCCESS** |
+| **negative** | [#1024](https://github.com/coseo12/astro-simulator/pull/1024) *(일회용)* | `docs/970-guard-negative` → `main` | **FAILURE** |
+| **positive (base=main 축)** | [#1025](https://github.com/coseo12/astro-simulator/pull/1025) *(일회용)* | `hotfix/970-guard-positive` → `main` | **SUCCESS** |
+| recovery | [#1023](https://github.com/coseo12/astro-simulator/pull/1023) 에 후속 커밋 push (`synchronize`) | 동상 | **SUCCESS 유지** |
+
+**negative run `31597835456` 이 결정적 증거다** — 두 스텝의 결론이 갈렸다:
+
+```
+[PASS] 브랜치명 'docs/970-guard-negative' — 규약 적합 (rule: work)
+##[error]base='main' ← head='docs/970-guard-negative' 는 허용되지 않습니다.
+head shape 'work' 는 base='main' (shape: main) 로 PR 을 열 수 없습니다. 허용: develop / hotfix.
+… 허용 집합 3행 + "교정: PR 의 base 브랜치를 develop 으로 바꾸면 됩니다 (PR 재생성 불요)"
+```
+
+앞 스텝이 **PASS 한 채로** 뒤 스텝만 FAIL 했다. 즉 차단의 주체가 신규 스텝임이 실증되며, 기존 브랜치명 가드가 우연히 잡은 것이 아니다. positive run `31597839434` 은 `[PASS] base='main' ← head='hotfix/970-guard-positive' (hotfix → main)` 으로 **base=main 이 통째로 막히지 않음**을 함께 실증한다.
+
+**정리 확인**: 두 PR 모두 `state=CLOSED` / `mergedAt=null` (**머지 0**), 원격·로컬 브랜치 삭제 완료 (`git push origin --delete` 분리 실행 — [`operational-friction.md`](../ops/operational-friction.md) §2). 각 PR 에 close 사유 코멘트 박제.
+
+> **부수 실측 — 일회용 브랜치는 각자 다른 SHA 여야 한다.** 세 브랜치가 같은 커밋을 가리키면 한 SHA 가 3개 PR 의 head 가 되어 `branch-name` 체크런이 `{success, failure, success}` 로 공존한다 — [20260807-971](20260807-971-required-status-checks.md) §2-12 원인 ③ (PR 다중성 축) 이 `4f7366e` 에서 실측한 바로 그 형태이고, **required check 위에서 본 PR 자신의 판정이 오염된다**. 그래서 일회용 브랜치마다 `--allow-empty` 커밋 1개씩을 얹어 SHA 를 분리했다 (`201ca1c` / `74b6a5c` / `a246ece`).
 
 ### 7-3 메타 측정 도구 자기 적용 (이슈 DoD 4)
 
