@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.69.0] — 2026-08-13
+
 ### Behavior Changes
 
 - **[#970] PR `base` 선택 규칙 CI 가드 — `base=main` 은 release PR(head=develop)/hotfix 전용 (MINOR)** ([#970](https://github.com/coseo12/astro-simulator/issues/970)) — ADR [`20260812-970-pr-base-rule-guard.md`](docs/decisions/20260812-970-pr-base-rule-guard.md) (**Accepted** — cross-validate 2026-08-12 수행 후 전이. 메인 오케스트레이터 수행([#479](https://github.com/coseo12/astro-simulator/issues/479))). [#962](https://github.com/coseo12/astro-simulator/issues/962) 축 B 가 CLAUDE.md §금지 사항의 **브랜치 _명명_** 절반을 기계 SSoT 로 옮겼고, 본 PR 이 나머지 **base _선택_** 절반을 옮긴다.
