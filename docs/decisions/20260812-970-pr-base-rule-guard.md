@@ -341,7 +341,7 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 | 2 | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
 | 3 | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
 
-> cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행한다 (`developer` 페르소나 금지 — #479). 결과 통합 후 §교차검증 반영 사항 4축을 추가하고 Accepted 로 전이한다.
+> cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행했다 (`developer` 페르소나 금지 — #479). 결과는 **§10** 에 4축으로 통합했고 상태는 `Accepted` 로 전이했다.
 
 ## §10 교차검증 반영 사항 (cross-validate agy, 2026-08-12)
 
@@ -361,15 +361,24 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
 ### 고유 발견
 
-**없음.** `base` 편집 우회(§9-1)는 agy 도 언급하지 않았고, 본 PR 이 이미 일회용 PR 로 실측·박제하고 [#1027](https://github.com/coseo12/astro-simulator/issues/1027) 로 분리한 항목이다. agy 가 남긴 유일한 실행 권고는 _"메인이 cross-validate 수행 후 `Accepted` 승격"_ 으로, 절차 확인이지 코드 지적이 아니다.
+**1건 — 로그 §3 제안 1** (L99): `parsePrArgs` 가 `base=` 처럼 **값이 빈 인자**를 정상 파싱해 `classifyPair('' , …)` 로 흘려보낸다. 결과는 `violation` + `base '' 는 어떤 브랜치 shape 에도 해당하지 않습니다` 라서 **fail-closed 이고 기능 손상은 0** 이지만, 인자 오류가 *규칙 위반*으로 보고되어 진단이 한 겹 어긋난다. agy 는 `parsePrArgs` 단계에서 `exit 2`(인자 오류)로 분리하는 수정 스니펫까지 제시했다 (L104-109). **dev 도 메인도 제기하지 않은 축**이라 정의상 고유 발견이다. **본 PR 에서 채택하기로 판정**했다 — 반영 지점은 [`scripts/verify-pr-base-rule.mjs`](../../scripts/verify-pr-base-rule.mjs) 의 `parsePrArgs` 와 그 회귀 픽스처이며, **구현·수치 갱신은 dev 후속 커밋에 귀속**한다 (메인은 기록 층만 수정 — reviewer BLOCK-1 의 수정 주체 구분).
+
+`base` 편집 우회는 **고유 발견이 아니라 독립 재발견**이다. agy 는 5축 중 **유일하게 `주의`** 등급을 준 사유로 이를 지목했고 (L22), §2-④-1 에서 stale green 메커니즘을 기술했으며 (L72-75), *"조속히 검토할 필요"* 로 마감했다 (L75). 본 PR 이 이미 [#1026](https://github.com/coseo12/astro-simulator/pull/1026) 로 실측·박제하고 [#1027](https://github.com/coseo12/astro-simulator/issues/1027) 로 분리한 항목이므로 **결론은 바뀌지 않지만**, *"외부 검증도 같은 지점을 독립적으로 짚었다"* 는 사실은 분리 판단의 근거를 **강화**한다.
 
 ### Claude 편향 셀프 체크
 
-**이번 회차 외부 검증의 결함 발견 기여 = 0** 이라는 사실을 그대로 적는다. 승인 일색이었다는 이유로 본 PR 의 확신도를 격상하지 않는다 — 합의는 독립 증거가 아니라 **같은 문서를 읽은 층이 같은 결론에 도달한 것**일 수 있고, 이 저장소는 이미 그 실패를 실측했다 ([#999](https://github.com/coseo12/astro-simulator/issues/999) — 문서·주석·cross-validate 3층이 공유한 거짓을 workflow run 이력만이 반증). 실제로 본 PR 에서 잡힌 결함 2건은 **둘 다 외부 검증 밖**에서 나왔다:
+**이 절의 초판(커밋 `1e4a2ba`)이 거짓이었고, 그 거짓의 저자는 메인이다.** 초판은 *"agy 가 남긴 유일한 실행 권고는 절차 확인"* · *"base 편집 우회는 agy 도 언급하지 않았고"* · *"고유 발견 없음"* · *"외부 검증의 결함 발견 기여 = 0"* 이라고 적었다. 로그 137줄 중 **§3 에 번호 붙은 제안이 3건** 있었고 그중 1건은 코드 지적이었으며, `base` 편집 우회는 **총평 표의 유일한 `주의` 사유**였다.
+
+**원인은 판단 착오가 아니라 읽지 않음이다.** 메인은 `cross_validate.sh` 출력을 **`tail -25` 로만** 확인하고 4축 요약을 작성했다. 그 25줄에는 제안 2·3 과 결론만 담겨 있었다 — 즉 *"승인 일색"* · *"기여 0"* 은 검증의 결론이 아니라 **잘림이 만들어낸 문장**이고, 하필 **자신의 PR 에 유리한 방향**으로 만들어졌다. 편향 셀프 체크를 표방한 문단이 **자기 검증의 부재를 자기 칭찬으로 포장**한 셈이라, 이 절은 스스로가 경계 대상이었다.
+
+이 클래스의 선례가 이미 두 개 있다. [#999](https://github.com/coseo12/astro-simulator/issues/999) — 문서·주석·cross-validate 3층이 공유한 거짓을 workflow run 이력만이 반증했다. 그리고 한 릴리스 전 [CHANGELOG `[0.68.0]`](../../CHANGELOG.md) 에 박제된 PR [#1018](https://github.com/coseo12/astro-simulator/pull/1018) **BLOCK-2** — *"agy 발화를 사후 치환하면 외부 모델 발언 위조"*. **삭제는 치환보다 무겁다.** 본 건은 그 선례를 세운 저장소에서 같은 층이 재생산한 것이다.
+
+**남는 결론.** 이번 회차 외부 검증의 기여는 0 이 아니라 **고유 발견 1건 + 독립 재발견 1건**이다. 동시에, 본 ADR 의 신뢰 근거가 cross-validate **합의**가 아니라는 원래 판단은 유지된다 — 실제로 잡힌 결함은 다음 3건이고 **셋 다 합의 밖**에서 나왔다:
 
 | 결함 | 발견 경로 |
 |---|---|
 | `GITFLOW_HEADS[0]/[1]` 위치 인덱스 — 배열 재정렬 시 `feature/970-x → main` 이 `pass` 로 뒤집힘 | dev 의 **가드 자기 적용** |
-| `types: [opened, synchronize]` 가 `base` 편집을 놓쳐 **stale green** | 메인의 **일회용 PR 독립 재현** (PR [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
+| `types: [opened, synchronize]` 가 `base` 편집을 놓쳐 **stale green** | 메인의 **일회용 PR 독립 재현** ([#1026](https://github.com/coseo12/astro-simulator/pull/1026)) · agy 독립 지적 |
+| **본 §10 초판의 허위 요약** | reviewer 의 **로그 원문 대조** (BLOCK-1) |
 
-즉 이 ADR 의 신뢰 근거는 cross-validate 합의가 아니라 **자기 적용 + 독립 재현 + 594 PR 전수 실측**이다.
+세 번째 행이 이 표에서 가장 중요하다. 앞의 두 결함은 코드가 대상이라 가드·테스트가 언젠가는 잡지만, **기록의 거짓은 어떤 기계 가드도 원리적으로 검출하지 못한다** — 로컬 가드 전건 PASS 상태에서 커밋됐다. 검출 조건은 단 하나, **원문을 끝까지 읽는 독립 층**이었다.
