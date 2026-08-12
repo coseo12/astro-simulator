@@ -127,8 +127,10 @@ jobs:
       # 그 job 은 `main` 의 required status check (`enforce_admins: true`) 이므로, 그 4셀에서
       # 오차단이 나면 릴리스가 하드 블록된다 — 실환경 negative 실증이 불가능한 셀이라
       # (release PR 을 일회용으로 만들 수 없다) 이 픽스처가 유일한 상시 방어선이다.
-      # 자식 프로세스 프로브 8건 포함 — 진입점 silent no-op 1건 + CLI 인자 파싱 7건
-      # (모드 플래그가 값으로 위장 / 두 모드 병합 / 라벨 중복·누락·위치인자 / 프로토타입 오염).
+      # 자식 프로세스 프로브 12건 포함 — 진입점 silent no-op 1건 + CLI 인자 파싱 11건
+      # (모드 플래그가 값으로 위장 / 두 모드 병합 / 라벨 중복·누락·위치인자 / 프로토타입 오염 /
+      #  빈 값 3종 → exit 2 + **대조군 1종** → exit 1). 마지막 쌍은 종료 코드를 구분해 단언한다 —
+      # exit 1 과 2 가 둘 다 non-zero 라 "실패했다" 로 뭉뚱그리면 회귀를 못 잡는다 (#1023 reviewer).
       - name: PR base 선택 규칙 가드 self-test
         run: node scripts/verify-pr-base-rule.mjs --self-test
 

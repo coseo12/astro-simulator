@@ -56,9 +56,31 @@ name: Branch Name Guard
 # 계약 SSoT: docs/decisions/20260812-970-pr-base-rule-guard.md §5
 #
 # 스텝 순서 (base 를 **뒤에**) 는 의도적이다. base 가드의 `unresolved` 판정은 head 이름
-# 규약 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하다. 실제로는 앞 스텝이
-# 실패하면 뒤 스텝이 실행되지 않아 `unresolved` 는 CI 에서 구조적으로 도달 불가다
-# (그럼에도 스크립트는 fail-closed 로 구현한다 — 도달 불가를 근거로 통과시키지 않는다).
+# 규약 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하다.
+#
+# ── `if: ${{ !cancelled() }}` — 진단 가림 완화 (#1023 reviewer 🟡5) ──────────────
+# 종전 이 자리에는 *"앞 스텝이 실패하면 뒤 스텝이 실행되지 않아 `unresolved` 는 CI 에서
+# 구조적으로 도달 불가"* 라고 적혀 있었다. 서술 자체는 맞았으나 **가려지는 것이
+# `unresolved` 만이 아니었다** — §5 귀속 규칙상 `base=main` + head shape 불명은 `violation`
+# **확정**인데(비대칭의 핵심), 정확히 그 조합이 앞 스텝에서 먼저 죽어 base 진단이 안 보였다.
+# head 이름과 base 가 둘 다 틀린 PR 은 브랜치·PR 재생성(~3분) 후에야 base 진단을 처음 보는
+# **왕복 2회**가 된다.
+#
+# 완화는 조건 1줄이다. **required check 의 결론은 불변**임을 근거와 함께 명시한다:
+#   - 이 조건은 스텝 실행을 **추가**만 한다. 앞 스텝이 성공했으면 원래도 실행됐고, 앞 스텝이
+#     실패했으면 job 은 이미 실패다. 즉 **성공이 실패로 뒤집히는 경로가 없고, 실패가 성공으로
+#     뒤집히는 경로도 없다** (이미 실패한 job 에 진단 한 줄이 더 나올 뿐).
+#   - `always()` 가 아니라 `!cancelled()` 인 이유: 위 `concurrency.cancel-in-progress` 로
+#     superseded run 이 일상적으로 취소되는데, `always()` 는 **취소 중에도** 스텝을 돌려
+#     코스메틱 CANCELLED run 에 무의미한 어노테이션을 남긴다
+#     (docs/ops/operational-friction.md §4). `!cancelled()` 는 "앞 스텝 실패와 무관하게 돌되
+#     취소 시에는 돌지 않는다" 는 의도를 정확히 표현한다.
+#
+# ⚠️ **부수 효과 — `unresolved` 가 CI 에서 도달 가능해진다.** `base=develop` + 이름 규약 위반
+# head 가 이제 두 스텝을 모두 타고, 뒤 스텝은 `unresolved`(exit 1, 귀속: branch-name) 를 낸다.
+# 이는 의도된 것이다 — 그 셀의 교정 지시가 *"base 는 정상이니 head 이름만 고쳐라"* 라서
+# 진단 가치가 있고, 앞 스텝이 이미 실패했으므로 새로 막히는 PR 은 **0** 이다.
+# (스크립트는 계속 fail-closed 로 구현한다 — 도달 가능성 여부를 근거로 통과시키지 않는다.)
 #
 # 별도 job 으로 분리하지 않은 이유: 새 job 은 새 체크 이름이 되고, 그것을 required 로
 # 등록하려면 저장소 보호 설정 변경(`PUT`)이 필요하다. 같은 job 의 스텝으로 두면 기존
@@ -111,6 +133,9 @@ jobs:
       # 라벨 형식(`base=` / `head=`)은 스크립트가 강제한다 — 위치 인자였다면 순서를
       # 뒤바꿔도 `develop→main` 과 `main→develop` 이 둘 다 허용 셀이라 조용한 오답이 된다.
       - name: PR base 선택 규칙 가드 (#970)
+        # 앞 스텝(브랜치명) 실패가 base 진단을 가리지 않게 한다 — 헤더 §진단 가림 완화 참조.
+        # 취소 시에는 돌지 않는다 (`always()` 미채택 근거도 헤더).
+        if: ${{ !cancelled() }}
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}

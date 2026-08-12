@@ -183,13 +183,20 @@ base 는 **PR 생성 후에도 바꿀 수 있다** (GitHub UI 의 base 드롭다
 
 ### 6-3 구 기록 회수 (동시 의무)
 
-*"`main` 에 `required_status_checks` 부재"* 라는 2026-08-06 실측이 **3곳**에 살아 있었고, 그중 2곳은 본 PR 이 손대는 파일이다. 남겨두면 본 가드의 강제력 서술과 정면 모순한다.
+*"`main` 에 `required_status_checks` 부재"* 라는 2026-08-06 실측이 **4곳**에 살아 있었고, 그중 2곳은 본 PR 이 손대는 파일이다. 남겨두면 본 가드의 강제력 서술과 정면 모순한다.
 
 | 위치 | 조치 |
 |---|---|
 | [`.github/workflows/branch-name-guard.yml`](../../.github/workflows/branch-name-guard.yml) 헤더 §한계 | §강제력 으로 **교체** + 폭발 반경 경고 |
 | [`docs/guides/branch-strategy-workflow.md`](../guides/branch-strategy-workflow.md) §한계 | *"해소됨"* 으로 **교체**. 같은 파일 40줄 뒤 §required status check 롤백 절과 자기모순이었다 |
 | [20260806-962](20260806-962-branch-name-guard.md) §6-2 | **Amendment 주석 추가** (ADR 본문은 이력이므로 덮어쓰지 않고 회수 표시) |
+| [`.github/workflows/ci-physics-wasm.yml`](../../.github/workflows/ci-physics-wasm.yml) `verify-and-rust` | **전제 교체** (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer 🟡2 — 아래) |
+
+**4번째는 낱말 그물에 걸리지 않았다 — 술어 변형 축에서만 나왔다.** 최초 회수는 `required_status_checks` / `branch protection` 계열 **낱말 6종(84 hits)** 으로 훑어 3곳을 잡았는데, `# #915 — docs-only 스킵 (required check 미설정 실측이라 skip 이 머지를 막지 않음 — ci.yml 참조)` 는 그 그물을 통과했다. reviewer 가 술어 5종(`막지 못한다`/`막지는 않`/`막지 않`/`강제력이 없`/`미설정`)을 병행해 발견했다 — [`exhaustive-grep-protocol.md`](../guides/exhaustive-grep-protocol.md) §2 *"낱말 그물은 주장 문장을 통과시킨다"* 의 실증 사례다.
+
+**정정 내용**: 전제(*"required check 미설정 실측"*)만 거짓이고 결론(*"skip 이 머지를 막지 않음"*)은 참이다. 정정된 전제는 2겹이다 — ① 본 workflow 의 체크런은 required 3종에 **없다**, ② 설령 required 가 되어도 **job 단위** 스킵은 `skipped` 로 보고되어 통과 3종에 든다([20260807-971](20260807-971-required-status-checks.md) §2-2). 위임처 `ci.yml` 이 이미 정정본을 갖고 있어 **실해는 0** 이었다.
+
+**5번째를 찾기 위한 재sweep (술어 축을 또 바꿔 실행, 2026-08-12)**: 본 정정이 쓴 술어(`미설정`/`막지 않`)와 **겹치지 않는** 9종 — `차단하지` / `강제하지` / `실효` / `표시만` / `붉은 X` / `초록인 채` / `부재` / `아직` / `현재는` — 을 `git grep -nIiE --untracked` 로 훑고(합집합 846 hits), 주제 토큰(`required|protection|보호|머지|merge|체크런|check`)과 **교집합 143 hits** 를 전건 분류했다. 추가로 시제·등록 축 9종(`등록되지 않`/`등록 전`/`아직 required`/`required 아님`/`not required`/`warn-only`/`non-blocking` 등)을 병행했다. **활성 선언(stale) 실잔존 = 0.** 분류 내역: ① **이력 기록** — [20260806-962](20260806-962-branch-name-guard.md) `:103`(§2-7 은 `## §2 실측 (2026-08-06)` 아래라 날짜가 헤딩에 명기됨) / `:293`(§6-2, 인라인 Amendment 보유) / `:340`(기각 근거의 시점 실측), CHANGELOG 릴리스 구간, [20260807-971](20260807-971-required-status-checks.md) 본문. ② **여전히 참인 설계 서술** — `ci-physics-wasm.yml:302` (`continue-on-error: true` 라 required 여부와 무관하게 참) / `duplicate-function-guard` (warn-only, exit 0 설계) / `verify-pr-template-checklist.mjs` (해당 가드가 required 가 아니라는 별개의 참인 사실). ③ **무관** — `부재` 의 대다수(`파일 부재` / `보호 부재` 등 동음이의).
 
 ---
 
@@ -197,7 +204,7 @@ base 는 **PR 생성 후에도 바꿀 수 있다** (GitHub UI 의 base 드롭다
 
 | 축 | 적용 | 근거 |
 |---|---|---|
-| (1) 격리 동적 테스트 | **적용** | `--self-test` 픽스처 43 + 불변식 19 + 자기 적용 프로브 8 = **70 검사**. 판정 대상이 순수 문자열 2개라 격리가 자명 |
+| (1) 격리 동적 테스트 | **적용** | `--self-test` 픽스처 43 + 불변식 19 + 자기 적용 프로브 12 = **74 검사**. 판정 대상이 순수 문자열 2개라 격리가 자명 |
 | (2) 3중 시뮬레이션 | **적용 (필수)** | §7-2 — 입력이 파일이 아니라 **ref 쌍**이라 일회용 PR 필요 |
 | (3) 5 페르소나 self-consistency | **적용 (경량)** | N = `--self-test` 출력 3-tuple. 각 페르소나가 계산하지 않고 **읽는다** (직렬화 해석차가 곧 불일치로 오인되는 것 방지 — 축 B 전례) |
 | (4) 메타 도구 자기 적용 | **적용 (강)** | §7-3 |
@@ -262,6 +269,13 @@ head shape 'work' 는 base='main' (shape: main) 로 PR 을 열 수 없습니다.
 | 라벨 중복 / 누락 / 위치 인자 | **본 가드 고유 4종째** — 아래 |
 | `--constructor` | 프로토타입 오염으로 임의 문자열이 모드가 되는 경로 → `Object.hasOwn` |
 | 재진입 가드가 **skip 이 아니라 fail** | `PROBE_ENV` 가 CI env 로 누출되면 프로브 전건이 사라진 채 초록이 되는 3층째 |
+| **빈 값 3종 + 대조군 1종** | **인자 오류가 *규칙 위반* 으로 보고되는 진단 어긋남** → `parsePrArgs` exit 2 (아래) |
+
+**빈 값 = 인자 오류 (exit 2) 분리 — 종료 코드를 구분해서 단언한다.** `--pr base= head=feature/970-x` 는 종전 `classifyPair('', …)` 로 흘러 `violation`(exit 1) 이 됐다. **fail-closed 라 기능 손상은 0** 이었으나 *"base '' 는 어떤 브랜치 shape 에도 해당하지 않습니다"* 는 호출자에게 **틀린 교정 지시**다 — 고칠 곳은 base 브랜치가 아니라 인자 전달이다. `violation`/`unresolved` 를 나눈 것과 같은 이유(통과 여부가 아니라 **귀속**)로 `parsePrArgs` 단계에서 분리했다. 공백만 있는 값도 동일 취급이다(`trim()`) — git refname 은 공백을 포함할 수 없으므로 존재 가능한 ref 가 아니다.
+
+> ⚠️ **픽스처는 "non-zero" 가 아니라 정확한 종료 코드를 단언한다.** exit 1 과 exit 2 가 둘 다 non-zero 라 뭉뚱그리면 회귀를 못 잡는다. 그래서 빈 값 3종(`base=` / `head=` / `base='   '` → **exit 2**) 옆에 **대조군**(`base=main head=feature/970-x` → **exit 1**)을 붙였다. negative 주입 실측(빈 값 검사 3줄 제거): `self-test: 71 passed, 3 failed`, 세 MISS 가 전부 *"기대 exit 2 … 실제 exit 1"* 로 찍힌다.
+>
+> **fail-closed 는 깨지지 않는다.** ① exit 2 도 non-zero 라 CI 스텝은 그대로 실패한다(`run:` 기본 셸 `bash -e {0}`). ② 애초에 **CI 실사용 경로에서 도달 불가**다 — `pull_request` 이벤트의 `base.ref`/`head.ref` 는 항상 존재하므로 빈 값이 만들어질 수 없다. 이 분기는 로컬 pre-flight 오타·수동 호출 전용이다. ③ 순수 함수 층(`classifyPair`)의 빈 문자열 처리는 **건드리지 않았다** — 픽스처 `['', 'feature/970-x', 'violation']` / `['develop', '', 'unresolved']` 가 그대로 남아 `import` 소비처에도 2층 방어가 유지된다.
 
 **고유 4종째 — 라벨 필수 인자.** `--pr <base> <head>` 같은 위치 인자를 쓰지 않는다. 순서를 뒤바꾸면 `develop→main`(release PR)과 `main→develop`(merge-back)이 **둘 다 허용 셀**이라 스왑이 판정에 아무 흔적을 남기지 않는다 — 최고 위험 경로에서 정확히 **조용한 오답**이다. `base=` / `head=` 라벨을 요구하면 스왑이 구조적으로 불가능하고, 중복·누락·`=` 없는 인자는 전부 exit 2 다.
 
@@ -272,7 +286,9 @@ head shape 'work' 는 base='main' (shape: main) 로 PR 을 열 수 없습니다.
 | `develop` → `main` (release PR) | `pass` — 스왑이 흔적을 남기지 않음 | `pass` |
 | `main` → `develop` (merge-back) | `pass` — 동상 | `pass` |
 | **`feature/970-x` → `main` (dual PR)** | **`pass`** ← 가드의 존재 이유가 무력화 | **`violation`** |
-| `--self-test` | 36 passed / **34 failed** | **70 passed / 0 failed** |
+| `--self-test` | 39 passed / **35 failed** | **74 passed / 0 failed** |
+
+> 위 표는 **현행 코드(74 검사) 기준으로 전 셀 재측정**한 값이다 ([20260808-983](20260808-983-measurement-recording-convention.md) §(i) 부분 재측정 금지 — self-test 총계가 70 → 74 로 바뀌었으므로 오른쪽 열만 갱신할 수 없다). 초판 열은 현행 사본에 결함 2종(위치 인덱스 복원 + `GITFLOW_HEADS` 순서 반전)을 다시 주입해 재현했다. 초판 실패 수가 34 → 35 로 는 것은 신설 **대조군 프로브**(`base=main head=feature/970-x` → exit 1 기대)가 이 스왑도 함께 잡기 때문이다 — 스왑 시 `base=main` 이 shape `develop` 으로 해석돼 `work → develop` 이 되고 프로브가 기대한 exit 1 대신 exit 0 이 나온다.
 
 self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: gitflow 2행을 `GITFLOW_HEADS.map((h) => ({ role: h, ... }))` 로 **이름에서 파생**해 순서 의존을 구조적으로 제거했다 (위 표 오른쪽 열 — 반전해도 무해). 더해 **불변식 2건**(`BASE_RULES` 의 키·허용 head 가 전부 `SHAPES` 가 실제로 생산하는 role 인가)과 **축 B 판정기 정합 대조 8건**을 추가했다. 후자는 `release/` 접두사 때문에 필요하다 — 축 B 가 **상수로 export 하지 않는 유일한 접두사**(`RE_RELEASE` 안에 인라인)라 본 대조가 **유일한 방어선**이다.
 
@@ -280,9 +296,9 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
 | 주입 | 결과 |
 |---|---|
-| `HOTFIX_TYPE` → `'urgentfix'` 리네임 | **exit 1** (5 failed — hotfix 최고 리스크 셀 + 신규 불변식 `BASE_RULES 허용 head`) |
-| `GITFLOW_HEADS` 순서 반전 | **exit 0** (0 failed) — **정정 후에는 실제로 무해**하므로 이것이 정답이다 |
-| `RE_RELEASE` 접두사 `release/` → `rel/` | **exit 1** (2 failed — **축 B 정합 대조만이** 잡는다) |
+| `HOTFIX_TYPE` → `'urgentfix'` 리네임 | **exit 1** (69 passed / **5 failed** — hotfix 최고 리스크 셀 + 신규 불변식 `BASE_RULES 허용 head`) |
+| `GITFLOW_HEADS` 순서 반전 | **exit 0** (74 passed / **0 failed**) — **정정 후에는 실제로 무해**하므로 이것이 정답이다 |
+| `RE_RELEASE` 접두사 `release/` → `rel/` | **exit 1** (72 passed / **2 failed** — **축 B 정합 대조만이** 잡는다) |
 
 부수로 **본 PR 의 (base, head) 자신이 가드의 첫 검사 대상**이다 (`feature/970-pr-base-rule-guard` → `develop`). 회피 불가능한 자기참조이며, 픽스처에도 같은 쌍이 들어 있다.
 
@@ -319,10 +335,22 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
    **그때까지의 완화**: (i) 본 가드의 실효는 *"실수로 잘못 연 PR"* 차단이며 **의도적 우회는 막지 못한다** — 규율이 이미 정착한 저장소(472 PR 연속 위반 0)에서 이 구분은 실질적이다. (ii) 릴리스·핫픽스 PR 은 사람이 base 를 의식적으로 고르는 소수 경로다. (iii) 후속에서 `edited` 대신 **머지 시점 검사**(`pull_request` `edited` 를 별도 non-required job 으로 두거나, ruleset 기반 base 제약)를 함께 비교한다.
 
 1. **`develop` 대상 PR 에서는 여전히 권고**다. `develop` 은 보호 자체가 없고 ([20260807-971](20260807-971-required-status-checks.md) 결정 2 로 **영구 미채택**), 실효 강제 범위는 release/hotfix PR 뿐이다. 다만 본 규칙이 막으려는 것이 정확히 `base=main` 오지정이므로 **위험 표면과 강제 범위가 일치**한다.
-2. **`unresolved` 는 CI 에서 도달 불가**라 실환경 발화 증거를 남기지 않는다. 픽스처 3건이 유일한 증거다.
+2. **`unresolved` 는 실환경 발화 증거가 얇다.** 픽스처 3건이 주 증거다.
+
+   > **개정 (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer 🟡5).** 종전 이 항목은 *"CI 에서 도달 불가"* 라고 적었다. 그 서술은 **스텝 순서의 부작용**을 한계로 오인한 것이었다 — 앞 스텝(브랜치명)이 실패하면 뒤 스텝이 실행되지 않아 가려졌을 뿐이다. 그리고 **가려진 것은 `unresolved` 만이 아니었다**: §5 귀속 규칙상 `base=main` + head shape 불명은 `violation` **확정**인데(비대칭의 핵심), 정확히 그 조합이 앞 스텝에서 먼저 죽어 base 진단이 보이지 않았다. head 이름과 base 가 둘 다 틀린 PR 은 브랜치·PR 재생성(~3분) 후에야 base 진단을 처음 보는 **왕복 2회**가 됐다.
+   >
+   > 조치: base 스텝에 `if: ${{ !cancelled() }}` 를 붙였다. 이 조건은 스텝 실행을 **추가**만 하므로 **성공이 실패로도, 실패가 성공으로도 뒤집히지 않는다** (앞 스텝 성공 시엔 원래도 실행됐고, 앞 스텝 실패 시엔 job 이 이미 실패다). `always()` 를 쓰지 않은 이유는 위 `concurrency.cancel-in-progress` 로 취소되는 run 에서도 스텝이 돌아 코스메틱 CANCELLED run 에 무의미한 어노테이션을 남기기 때문이다([`operational-friction.md`](../ops/operational-friction.md) §4). 결과적으로 `unresolved` 는 **CI 에서 도달 가능**해졌고, 그 셀의 교정 지시(*"base 는 정상이니 head 이름만 고쳐라"*)가 실제로 노출된다. 새로 막히는 PR 은 **0** 이다.
 3. **`develop→main` 셀의 live 실증 부재** (§7-2 재조정).
 4. **`main→develop` merge-back 과 `hotfix/*→main` 은 실측 0건**이다. 규약 우선으로 허용했으나 실사용 근거가 없어, 첫 hotfix 발생 시가 사실상의 첫 실증이 된다.
 5. 봇 허용은 **패턴 열거**에 의존한다 (`BOT_BRANCH_PATTERNS` — 축 B 정본). 3번째 봇 workflow 가 새 패턴을 쓰면 축 B 의 `--verify-ssot` 가 먼저 FAIL 하며 의식적 갱신을 강제한다.
+
+   **5-b. 봇 판정은 "정체" 가 아니라 "이름 패턴" 이고, 사람이 그 패턴을 쓸 수 있다** (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer 🟡1). 판정은 `classifyBranch(n).rule === 'bot'` → `^chore/(r1-baseline-linux|baseline-remeasure)-[0-9]+$` **이름 매칭 단독**이며 `user.login`/`user.type` 은 보지 않는다. 종전 §3 주석과 본 ADR 이 이를 *"봇은 종류가 아니라 **정체**라 정확 매칭"* 으로 정당화한 것은 **구현이 하지 않는 일을 주장한 것**이다 (주석 계약 ↔ 구현 drift — CLAUDE.md §실전 교훈). 주석은 본 PR 에서 정정했다.
+
+   **이 저장소에 실례가 있다.** 봇 head 패턴을 가진 머지 PR 은 **29건이고 28건이 `user.type: "Bot"`(`github-actions[bot]`), 1건이 사람**이다 — [#241](https://github.com/coseo12/astro-simulator/pull/241) (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `User` / `OWNER`). 즉 *"봇 head ⇒ 봇"* 은 이력에서 이미 반증돼 있다 (실측 2026-08-12, REST `pulls?state=closed&per_page=100` 페이지네이션).
+
+   **폭발 반경은 좁다.** ① `base=main` 은 봇 shape 로도 `violation` 이므로(픽스처 `['main', 'chore/r1-baseline-linux-30725438161', 'violation']` 고정) 1차 목적인 **dual PR 차단(위반 85건 클래스)은 무손상**이다. 새는 것은 *"사람 stacked PR 금지"* 라는 부차 규칙뿐이다. ② 유일한 실례인 #241 조차 `base=develop` 이라 `bot`/`work` 어느 shape 로 분류해도 판정이 **동일하게 `pass`** 다 — 실해 0.
+
+   **저자 축(`user.login`/`user.type`) 도입은 미채택.** 근거 3항: (i) **판정 표면 확대의 비대칭 위험** — 배선처 `branch-name` 은 `main` 의 required check 이고 `enforce_admins: true` 라 오차단 시 우회로가 없다(§6-2). 봇 PR 이 `GITHUB_TOKEN` 이 아닌 PAT 로 열리는 순간(토큰 정책 변경은 저장소 운영에서 흔하다) `bot → work` 셀이 `violation` 으로 뒤집혀 `r1-baseline-bootstrap` 자동화가 **하드 블록**된다. 얻는 것(부차 규칙의 잔여 구멍)보다 잃을 수 있는 것이 크다. (ii) **CLI 계약 확장이 필요하다** — `--pr` 는 `base=`/`head=` 2 라벨만 받는데 저자 축은 3번째 라벨을 요구하고, 로컬 pre-flight 는 PR 생성 **전** 이라 저자를 알 수 없어 pre-flight 가 성립하지 않는다. (iii) 근본 조치는 shape 판정기(축 B `classifyBranch`)의 관할이지 `BASE_RULES` 의 관할이 아니다. → **재검토 조건 5** 로 분리한다.
 
 ### 8-2 재검토 조건
 
@@ -330,6 +358,7 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 2. **`branch-name` 이 required 에서 내려가거나** ([20260807-971](20260807-971-required-status-checks.md) §9 롤백 실행 등) **job 이름이 바뀌면** — §6-1 의 "설정 변경 0 으로 강제력" 전제가 무너진다.
 3. **`r1-baseline-bootstrap` 이 폐지되면** `work: ['bot']` 행은 즉시 제거 대상이다 (실사용 0 이 되므로).
 4. `release/*` shape 를 접두사로 판정하므로 `release/v0.28.0` (`-prep` 없음) 도 base=develop 통과다. `-prep` 강제는 축 B 관할이며, [#962](https://github.com/coseo12/astro-simulator/issues/962) 후속 F3 (`v` 표기 통일) 과 함께 다룰 항목이다.
+5. **사람이 봇 head 패턴으로 stacked PR 을 여는 사례가 실제로 관측되면** — §8-1 한계 5-b 의 저자 축(`user.type == "Bot"` 대조) 도입을 재론한다. 착수 전 확인 순서는 (i) `r1-baseline-bootstrap` 이 PR 을 여는 토큰이 여전히 `GITHUB_TOKEN` 인가(PAT 로 바뀌었다면 저자 축은 **자동화를 깨는** 방향이 된다), (ii) CI 컨텍스트에서 `github.event.pull_request.user.type` 이 실제로 전달되는가를 **일회용 run 으로 실측**(오지 않는데 참조하면 silent skip 이 생긴다), (iii) 그다음에야 `--pr` 라벨 확장. 현재 근거는 *"실해 0 · 실례 1건(#241)도 판정 동일"* 이므로 반증이 나오기 전에는 열지 않는다.
 
 ---
 

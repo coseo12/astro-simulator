@@ -68,9 +68,19 @@ const ROOT = resolve(dirname(SCRIPT_PATH), '..');
  * 고칠 것은 이름뿐" 이라고 정확히 말할 수 있다. 여기서 엄격 정규식을 재사용하면 축 B 의
  * 판정을 **중복 재판**하게 되고, 교정 지시가 두 갈래로 갈라져 진단 품질이 떨어진다.
  *
- * 예외는 `bot` 하나 — 봇은 "종류" 가 아니라 **정체**라 정확 매칭이어야 한다.
- * `chore/` 로 시작하기만 하면 봇으로 쳐 주면 사람이 만든 `chore/970-x` 가 봇 특권
- * (임의 base) 을 얻는다. 그래서 축 B 의 `classifyBranch` 를 그대로 호출한다.
+ * 예외는 `bot` 하나 — 여기만 접두사가 아니라 **정확 매칭**이다. `chore/` 로 시작하기만
+ * 하면 봇으로 쳐 주면 사람이 만든 `chore/970-x` 가 봇 특권(임의 base)을 얻기 때문이다.
+ * 그래서 축 B 의 `classifyBranch` 를 그대로 호출한다.
+ *
+ * ⚠️ **이것은 "정체" 검사가 아니라 "이름 패턴" 검사다** (PR #1023 reviewer 🟡1 정정 — 종전
+ * 이 자리는 *"봇은 종류가 아니라 정체라 정확 매칭"* 이라고 적어 구현이 하지 않는 일을
+ * 주장했다. 주석 계약 ↔ 구현 drift). 판정에 `user.login`/`user.type` 은 **쓰지 않으므로**
+ * 사람이 봇 패턴 이름을 그대로 쓰면 봇으로 분류된다. 이 저장소에 실례가 있다 —
+ * PR #241 (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `user.type: "User"`).
+ * 봇 패턴 머지 PR 29건 중 **28건 `Bot` / 1건 사람** (실측 2026-08-12, REST `pulls?state=closed`).
+ * 폭발 반경은 좁다 — `base=main` 은 봇 shape 로도 `violation` 이고(픽스처 고정) 새는 것은
+ * *"사람 stacked PR 금지"* 라는 부차 규칙뿐이다. #241 자신도 `base=develop` 이라 `bot`/`work`
+ * 어느 쪽으로 분류해도 판정이 같다(`pass`). 저자 축 **미채택** 근거는 ADR §8-1 한계 5.
  *
  * 순서 의존: `bot` → `hotfix` → `work`. 봇 브랜치는 `chore/` 접두사라 `work` 보다 먼저
  * 걸러야 하고, `hotfix` 는 `BRANCH_TYPES` 에 없으므로 (축 B `HOTFIX_TYPE` 별도) 독립 행이다.
@@ -252,7 +262,28 @@ function allowSummary() {
  * 순서를 뒤바꾸면 `develop→main` (release PR) 과 `main→develop` (merge-back) 이 **둘 다
  * 허용 셀**이라 스왑이 판정에 아무 흔적을 남기지 않는다 — 최고 위험 경로에서 정확히
  * **조용한 오답**이 된다. 라벨을 요구하면 스왑이 구조적으로 불가능하다.
- * 순서는 무관하며 (`head=` 를 먼저 써도 된다), 중복·누락은 exit 2 로 거부한다.
+ * 순서는 무관하며 (`head=` 를 먼저 써도 된다), 중복·누락·**빈 값**은 exit 2 로 거부한다.
+ *
+ * ── 빈 값을 `violation`(exit 1) 이 아니라 **인자 오류**(exit 2) 로 분리하는 이유 ─────────
+ * `base=` 처럼 값이 빈 인자는 *브랜치 선택이 규칙에 어긋난 것* 이 아니라 **호출이 잘못된
+ * 것**이다. 그대로 `classifyPair('', …)` 로 흘리면 fail-closed 이긴 하나(exit 1) 진단이 한 겹
+ * 어긋난다 — *"base '' 는 어떤 브랜치 shape 에도 해당하지 않습니다"* 는 호출자에게 **틀린
+ * 교정 지시**다 (고칠 곳은 base 브랜치가 아니라 인자 전달이다). 본 스크립트가 `violation` 과
+ * `unresolved` 를 나눈 것과 같은 이유이며, 나누는 것은 통과 여부가 아니라 **귀속**이다.
+ *
+ * ⚠️ **fail-closed 는 깨지지 않는다.** exit 2 도 non-zero 이므로 CI 스텝은 그대로 실패한다
+ * (`run:` 기본 셸은 `bash -e {0}` — 실측: `.github/workflows/branch-name-guard.yml` 스텝이
+ * exit 2 를 낸 run 에서 job conclusion `failure`). 게다가 실사용 경로에서는 **도달 불가**다 —
+ * `pull_request` 이벤트의 `base.ref`/`head.ref` 는 항상 존재하므로 빈 값이 CI 에서 만들어질
+ * 수 없다. 이 분기는 로컬 pre-flight 오타·수동 호출 전용이다.
+ *
+ * ⚠️ **공백만 있는 값도 같은 취급이다** (`trim()`). git refname 은 공백을 포함할 수 없으므로
+ * (`git check-ref-format` 거부) `base='   '` 는 존재 가능한 ref 가 아니라 인자 전달 사고다.
+ * 이 결정은 아래 `probeArgvParsing` 픽스처로 고정한다.
+ *
+ * ⚠️ **순수 함수 층(`classifyPair`)의 빈 문자열 처리는 건드리지 않는다.** `FIXTURES` 의
+ * `['', 'feature/970-x', 'violation']` / `['develop', '', 'unresolved']` 는 그대로 남는다 —
+ * 파싱 층이 걸러 준다는 이유로 판정 층을 열면 `import` 소비처에서 구멍이 된다 (2층 방어).
  */
 function parsePrArgs(args) {
   const got = {};
@@ -268,6 +299,10 @@ function parsePrArgs(args) {
     }
     if (Object.hasOwn(got, label)) {
       return { error: `라벨 '${label}' 이 중복됐습니다.` };
+    }
+    // 빈 값(공백만 포함 포함)은 규칙 위반이 아니라 **인자 오류**다 — 위 주석 참조.
+    if (value.trim().length === 0) {
+      return { error: `라벨 '${label}' 의 값이 비어있습니다. 형태: base=<ref> head=<ref>` };
     }
     got[label] = value;
   }
@@ -750,6 +785,34 @@ function probeArgvParsing() {
       status: 2,
       text: '알 수 없는 인자',
       label: '프로토타입 오염 시도 — Object.hasOwn 으로 모드 조회를 자기 소유 키에 한정',
+    },
+    // --- 빈 값 = 인자 오류 (PR #1023 reviewer 반영 / ADR §10 고유 발견 1) ---
+    // ⚠️ 아래 3건과 그 다음 **대조군 1건**은 한 쌍이다. exit 1 과 exit 2 가 둘 다 non-zero 라
+    //    "실패했다" 로 뭉뚱그리면 회귀를 못 잡는다 — 픽스처는 **정확한 종료 코드**를 단언한다.
+    {
+      args: ['--pr', 'base=', 'head=feature/970-x'],
+      status: 2,
+      text: '비어있습니다',
+      label: '빈 값 base= — 규칙 위반(exit 1)이 아니라 인자 오류(exit 2)로 귀속',
+    },
+    {
+      args: ['--pr', 'base=develop', 'head='],
+      status: 2,
+      text: '비어있습니다',
+      label: '빈 값 head= — 동상 (base 쪽만 막고 head 를 흘리지 않는다)',
+    },
+    {
+      args: ['--pr', 'base=   ', 'head=feature/970-x'],
+      status: 2,
+      text: '비어있습니다',
+      label: '공백만 있는 값 — git refname 은 공백 불가라 빈 값과 동일 취급 (결정 고정)',
+    },
+    {
+      args: ['--pr', 'base=main', 'head=feature/970-x'],
+      status: 1,
+      text: '허용되지 않습니다',
+      label:
+        '대조군 — 실 규칙 위반은 **여전히 exit 1**. 빈 값 분리가 위반까지 exit 2 로 삼키지 않는다',
     },
   ];
   return cases.map((c) => {
