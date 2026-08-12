@@ -37,6 +37,9 @@
  *   을 참조하는 건 — 이력 보존 문서라 다운스트림 수정 대상이 아니다 (#907 디커플 이후
  *   신규 등록은 원칙적으로 없음). 명시적 allowlist 로 제외하되 조용한 skip 이 아니라
  *   시작 시 allowlist 건수를 stdout 에 보고한다.
+ *   목록 SSoT 는 `scripts/upstream-only-allowlist.mjs` 다 (#1005 로 분리 — 같은 목록을
+ *   `scripts/verify-adr-index.mjs` 가 인덱스 표 제외 판정의 교차 근거로 쓴다. 사본을
+ *   두면 그 자체가 새 drift 원이므로 1곳에서 양쪽이 import 한다).
  *
  * 종료 코드:
  *   0 — 깨진 링크 0 + 상태 표기 위반 0
@@ -65,6 +68,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { UPSTREAM_ONLY_ALLOWLIST } from './upstream-only-allowlist.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -75,52 +79,9 @@ const ROOT_MD_CANDIDATES = ['README.md', 'CHANGELOG.md', 'CLAUDE.md', 'AGENTS.md
 // 스캔 제외 디렉토리 (repo-relative) — 계약 6항 (deprecated) + 계약 3항 (템플릿)
 const EXCLUDED_SCAN_DIRS = ['docs/deprecated', 'docs/templates'];
 
-/**
- * upstream-only 참조 allowlist (#842).
- * upstream harness-setting 유래 문서가 upstream 저장소 전용 파일 (이 저장소에 미배포)
- * 을 참조하는 건. 다운스트림 수정 대상 아님 (#907 디커플 이후 이력 보존 목적만 잔존).
- * 조용한 skip 이 아님: 등록 건수 + 발동 건수를 매 실행 stdout 에 보고한다.
- * source: 참조가 위치한 문서 (repo-relative) / target: 링크 원문 (참조 표기 그대로)
- *
- * 검증 완결성 계약: (source, target) 쌍이 실제로 발동하지 않으면 (참조가 사라지면)
- * stale 항목이므로 주기 점검 대상 — 발동 0건 항목은 제거 후보로 보고된다.
- */
-const UPSTREAM_ONLY_ALLOWLIST = [
-  // upstream ADR: gitflow 브랜치 전략 (harness-setting docs/decisions/)
-  { source: 'docs/decisions/README.md', target: '20260419-gitflow-main-develop.md' },
-  { source: 'docs/decisions/README.md', target: '20260419-release-merge-strategy.md' },
-  { source: 'docs/decisions/README.md', target: '20260420-jq-based-parsing-no-op.md' },
-  { source: 'docs/deployment-patterns.md', target: 'decisions/20260419-gitflow-main-develop.md' },
-  { source: 'docs/deployment-patterns.md', target: 'decisions/20260419-release-merge-strategy.md' },
-  {
-    source: 'docs/guides/branch-strategy-workflow.md',
-    target: '../decisions/20260419-gitflow-main-develop.md',
-  },
-  {
-    source: 'docs/guides/branch-strategy-workflow.md',
-    target: '../decisions/20260419-release-merge-strategy.md',
-  },
-  {
-    source: 'docs/guides/release-process.md',
-    target: '../decisions/20260419-release-merge-strategy.md',
-  },
-  // (#962: CLAUDE.md 의 두 gitflow ADR 링크는 A1/A2 가지치기로 제거됨 → 발동 0건 stale 방지를 위해
-  //  source: 'CLAUDE.md' entry 2건 삭제. 다른 source 의 동일 target entry 4건은 계속 발동하므로 유지)
-  // upstream ADR: jq 파싱 / antigravity 마이그레이션
-  // (#907: 삭제된 문서를 source 로 갖던 dead entry 는 제거 — "발동 0건 항목은 제거 후보" 계약)
-  {
-    source: 'docs/guides/cross-validate-protocol.md',
-    target: '../decisions/20260420-jq-based-parsing-no-op.md',
-  },
-  {
-    source: 'docs/guides/cross-validate-protocol.md',
-    target: '../decisions/20260521-gemini-to-antigravity.md',
-  },
-  // (#975: `lib/claudemd-size-constants.js` entry 1건 삭제. `lib/` 는 upstream-only 가 아니라
-  //  #907 디커플 이후 **어디에도 없는** 경로였다 — allowlist 가 upstream-only 예외가 아니라
-  //  진짜 dead link 를 억제하고 있었다. 임계값 SSoT 를 실재하는 scripts/verify-claudemd-size.mjs
-  //  로 repoint 한 뒤 entry 제거 → 동일 링크 재유입 시 이제 FAIL 로 차단된다)
-];
+// upstream-only 참조 allowlist (#842) — 목록 SSoT 는 `./upstream-only-allowlist.mjs` (#1005 분리).
+// 같은 목록을 `verify-adr-index.mjs` 가 인덱스 표 upstream-only 행의 **제외 판정 교차 근거**로
+// 쓴다. 사본을 두면 두 가드의 제외 집합이 갈릴 수 있어 1곳에서 양쪽이 import 한다.
 
 const findAllowlistEntry = (sourceRel, rawTarget) =>
   UPSTREAM_ONLY_ALLOWLIST.find((e) => e.source === sourceRel && e.target === rawTarget);
