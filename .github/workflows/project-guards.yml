@@ -112,6 +112,28 @@ jobs:
       - name: 브랜치명 규약 가드 self-test
         run: node scripts/verify-branch-name.mjs --self-test
 
+      # PR base 선택 규칙 SSoT drift 가드 (#970 — 축 B 후속 F1)
+      # `scripts/verify-pr-base-rule.mjs` 의 `BASE_RULES` 매트릭스가 base 규칙의 **정본**이고,
+      # `docs/guides/branch-strategy-workflow.md` §base 선택 규칙 표는 그 파생이다.
+      # 대조는 **양방향**이다 — 표의 각 행 예시를 런타임 판정기(`classifyPair`)로 돌리는
+      # 방향(→)만 두면, 정본에 base shape 를 **추가**했을 때 표가 조용히 뒤처진다. 그래서
+      # `BASE_RULES` 의 모든 키가 표에 정확히 한 행씩 등장하는지(←)도 함께 본다.
+      # 런타임 base×head 검사는 `branch-name-guard.yml` 이 담당한다 (선결 조건이 다름 —
+      # 이 워크플로는 이벤트 무관 정적 검사라는 불변식을 유지).
+      - name: PR base 선택 규칙 SSoT drift 가드
+        run: node scripts/verify-pr-base-rule.mjs --verify-ssot
+      # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행).
+      # 픽스처 맨 앞 4건은 **릴리스·핫픽스 셀**이다. 본 가드는 `branch-name` job 에 배선되고
+      # 그 job 은 `main` 의 required status check (`enforce_admins: true`) 이므로, 그 4셀에서
+      # 오차단이 나면 릴리스가 하드 블록된다 — 실환경 negative 실증이 불가능한 셀이라
+      # (release PR 을 일회용으로 만들 수 없다) 이 픽스처가 유일한 상시 방어선이다.
+      # 자식 프로세스 프로브 12건 포함 — 진입점 silent no-op 1건 + CLI 인자 파싱 11건
+      # (모드 플래그가 값으로 위장 / 두 모드 병합 / 라벨 중복·누락·위치인자 / 프로토타입 오염 /
+      #  빈 값 3종 → exit 2 + **대조군 1종** → exit 1). 마지막 쌍은 종료 코드를 구분해 단언한다 —
+      # exit 1 과 2 가 둘 다 non-zero 라 "실패했다" 로 뭉뚱그리면 회귀를 못 잡는다 (#1023 reviewer).
+      - name: PR base 선택 규칙 가드 self-test
+        run: node scripts/verify-pr-base-rule.mjs --self-test
+
       # PR 템플릿 체크리스트 가드 self-test (#1010)
       # `pr-template-checklist-guard.yml` 은 PR 본문(네트워크·이벤트 의존)을 재므로 판정식
       # 자체의 회귀를 못 잡는다. 격리 픽스처 F1~F9 는 여기서 결정적으로 돈다

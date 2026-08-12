@@ -292,6 +292,8 @@ scripts/verify-branch-name.mjs
 
 실측 (2026-08-06): `main` branch protection 에 `required_status_checks` **부재**, `develop` 은 **보호 자체 없음**. 본 가드는 붉은 X 를 띄우지만 GitHub 이 머지를 기계적으로 막지는 않는다. 이는 본 가드만의 문제가 아니라 **전 워크플로 공통 상태**이며 (#915 가 동일 사실을 박제), 브랜치 보호 정책 전반의 별건이다 → 후속 이슈로 분리.
 
+> **Amendment (2026-08-12, [#970](https://github.com/coseo12/astro-simulator/issues/970)) — 위 한계는 `main` 에 한해 해소됐다.** 후속으로 분리했던 [#971](https://github.com/coseo12/astro-simulator/issues/971) 의 Phase 1 이 2026-08-08 에 적용됐다. 실측 2026-08-12 `GET /repos/coseo12/astro-simulator/branches/main/protection` → `required_status_checks.contexts = ["project-guards", "branch-name", "label-pr"]` / `enforce_admins: true`. 즉 **`branch-name` 은 `main` 대상 PR 에서 머지를 기계적으로 막는다.** `develop` 은 여전히 404 이며 [20260807-971](20260807-971-required-status-checks.md) 결정 2 로 **영구 미채택**이므로, 위 문단은 `develop` 대상 PR 에 한해 계속 참이다. 파생 사본 2곳([`branch-name-guard.yml`](../../.github/workflows/branch-name-guard.yml) 헤더 / [`branch-strategy-workflow.md`](../guides/branch-strategy-workflow.md) §한계)은 #970 PR 에서 교체됐다. 상세: [20260812-970-pr-base-rule-guard](20260812-970-pr-base-rule-guard.md) §2-4 / §6-3.
+
 ### 6-3 교정 비용의 비대칭 — 그래서 pre-flight 가 본체다
 
 브랜치명은 PR 생성 후 변경 불가이므로, CI 가 잡으면 **브랜치·PR 재생성**이 유일한 교정 경로다 (~3분). 따라서 실질적 방어선은 `developer.md` / `create-pr` 의 **push 전 pre-flight** 이고, CI 가드는 그것이 잊혔을 때의 backstop 이다 — 이는 agy 가 지적한 실패 모드("문서 규약은 컨텍스트가 길어지면 잊힌다")의 정확한 대응 구조다.

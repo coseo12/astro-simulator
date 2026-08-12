@@ -94,7 +94,15 @@ jobs:
 
   verify-and-rust:
     runs-on: ubuntu-latest
-    # #915 — docs-only 스킵 (required check 미설정 실측이라 skip 이 머지를 막지 않음 — ci.yml 참조)
+    # #915 — docs-only 스킵. skip 이 머지를 막지 않는다 (결론 불변, 전제는 #970 에서 정정).
+    # ⚠ 종전 이 자리의 전제 *"required check 미설정 실측"* 은 2026-08-08 이후 **거짓**이다
+    #   (#971 Phase 1 적용). 정정된 전제 2겹 — 실측 2026-08-12 `GET /branches/main/protection`:
+    #   ① 본 workflow 의 체크런(`diff-scope-wasm` / `verify-and-rust` 등) 은 required 3종
+    #      `["project-guards","branch-name","label-pr"]` 에 **없다**.
+    #   ② 설령 required 가 되어도 **job 단위** 스킵(`if:` false / `needs` 실패)은 `skipped` 로
+    #      보고되고 이는 통과 3종(success/skipped/neutral)에 든다 — 영구 pending 을 만드는 것은
+    #      **workflow 단위** 스킵(`paths` 필터)뿐이다 (ADR 20260807-971 §2-2).
+    #   위임처 ci.yml diff-scope job 주석이 같은 정정본을 갖는다 (#971 회수).
     needs: diff-scope
     if: needs.diff-scope.outputs.code_changed == 'true'
     steps:
