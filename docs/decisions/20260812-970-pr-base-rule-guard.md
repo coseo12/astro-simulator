@@ -165,6 +165,8 @@ export const BASE_RULES = {
 
 **스텝 순서는 브랜치명 뒤**다. `unresolved` 는 head 이름 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하고, 실제로는 앞 스텝이 실패하면 뒤 스텝이 실행되지 않아 **`unresolved` 는 CI 에서 구조적으로 도달 불가**다. 그럼에도 스크립트는 fail-closed 로 구현한다 — 도달 불가를 근거로 통과시키지 않는다.
 
+> ⚠️ **회수 (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer 🟡5).** 위 문단의 *"뒤 스텝이 실행되지 않아 `unresolved` 는 CI 에서 구조적으로 도달 불가"* 는 **더 이상 참이 아니다.** base 스텝에 `if: ${{ !cancelled() }}` 를 붙여 앞 스텝(브랜치명) 실패가 base 진단을 가리지 않게 했기 때문이다 — 상세와 before/after 실측은 **§7-2-c**, 한계 개정은 **§8-1 한계 2**. 실측 반증: run [`31604814344`](https://github.com/coseo12/astro-simulator/actions/runs/31604814344) 에서 앞 스텝 failure **직후** base 스텝이 `skipped` 가 아니라 `failure` 로 실행됐다(before 인 run [`31604809249`](https://github.com/coseo12/astro-simulator/actions/runs/31604809249) 는 `skipped`). **남는 부분**: *"그럼에도 fail-closed 로 구현한다 — 도달 불가를 근거로 통과시키지 않는다"* 는 여전히 참이며, 오히려 이 회수가 그 설계 판단을 사후적으로 정당화한다. 도달 불가를 근거로 구현을 느슨하게 했다면 지금 실제 결함이 됐을 것이다.
+
 ### 6-2 폭발 반경 (CRITICAL)
 
 §2-4 대로 `branch-name` 은 `main` 의 required check 이고 `enforce_admins: true` 다. 릴리스·핫픽스 셀에서 오차단이 나면 **머지가 하드 블록되고 admin 우회로가 없다.** 대응:

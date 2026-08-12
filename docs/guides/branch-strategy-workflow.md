@@ -163,7 +163,7 @@ node scripts/verify-pr-base-rule.mjs --pr base=develop head="$(git branch --show
 | 런타임 base × head (`--pr`) | `branch-name-guard.yml` | `branch-name` (**main 의 required check**) | 이벤트 페이로드의 `base.ref` · `head.ref` |
 | SSoT drift (`--verify-ssot`) + `--self-test` | `project-guards.yml` | `project-guards` | 체크아웃된 파일 (이벤트 무관) |
 
-런타임 검사는 브랜치명 스텝 **뒤에** 둔다. `unresolved` 는 head 이름 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하고, 실제로는 그 스텝이 먼저 실패해 base 스텝이 실행되지 않는다 (`unresolved` 는 CI 에서 구조적으로 도달 불가 — 그럼에도 fail-closed 로 구현한다).
+런타임 검사는 브랜치명 스텝 **뒤에** 둔다. `unresolved` 는 head 이름 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하기 때문이다. 다만 **앞 스텝이 실패해도 base 검사는 돈다** — `if: ${{ !cancelled() }}` 를 붙여 놨다. 그렇지 않으면 head 이름과 base 가 **둘 다** 틀린 PR 에서 base 진단이 가려져 수정 왕복이 2회가 된다. 이 조건은 스텝 실행을 **추가**만 하므로 job 결론을 어느 방향으로도 뒤집지 않고, 취소된 run 에서는 돌지 않는다(`always()` 미채택). 따라서 `unresolved` 도 **CI 에서 도달 가능**하며, 스크립트는 그것을 fail-closed 로 처리한다.
 
 ⚠️ **폭발 반경**: 같은 job 에 넣는다는 것은 본 가드가 `main` 의 required check 강제력을 **상속**한다는 뜻이다. 오차단이 나면 릴리스가 하드 블록되고 `enforce_admins: true` 라 우회로가 없다. 그래서 릴리스·핫픽스 4셀(`develop→main` / `main→develop` / `hotfix/*→main` / `release/*-prep→develop`)은 `--self-test` 픽스처 **맨 앞에 불변식으로 고정**돼 있다. 막혔을 때의 탈출구는 아래 §required status check 롤백 R1.
 
