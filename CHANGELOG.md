@@ -7,6 +7,8 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+**cross-validate (agy, 2026-08-12, `cross_validate.sh code 1018`) — 결론 승인** (_"Approve (권고사항 반영 후 머지)"_). 메인 수행(`developer.md` #479). **합의**: 로직 정확성 / 보안 / 성능 / 설계 준수 **4축 양호** — _"3원 일치, DoD 4축, F1~F15 self-test 덕분에 코드 정합성과 안정성이 매우 높다"_. **권고 1건 반영** — 마크다운 링크에 **앵커(`#…`)** 가 붙으면 파일명 추출 정규식이 실패해 링크가 **있는데도** _"ADR 링크 부재"_ 라는 **거짓 진단으로 FAIL** 한다(실 저장소에서 재현). fail-fast 라 조용히 통과하진 않지만 **진단이 틀린다**. 정규식에 `(?:[#?][^)\s]*)?` 를 추가하고 **회귀 픽스처 `F16`** 으로 고정했다 (self-test **21 → 23 단언**).
+
 - **[#1005] ADR 인덱스 상태 열 ↔ ADR 실물 기계 대조 — 인덱스 계약 (2) 의 강제 지점 (MINOR)** ([#1005](https://github.com/coseo12/astro-simulator/issues/1005)) — ADR [`20260812-1005-adr-index-status-guard.md`](docs/decisions/20260812-1005-adr-index-status-guard.md) (**Provisional** — cross-validate 미수행. developer 페르소나는 직접 호출 금지([#479](https://github.com/coseo12/astro-simulator/issues/479))라 메인 오케스트레이터에 인계).
 
   **지금 틀린 것을 고치는 PR 이 아니다 — 수동으로 맞춘 것이 다시 어긋나지 않게 하는 PR 이다.** 착수 시점 drift 는 **0** 이다 (술어: rev `65d9f45` 에서 `docs/decisions/README.md` 인덱스 표 **8행** 중 로컬 파일이 있는 **5행** 전건이 ADR 실물 첫 `상태:` 라인의 상태 토큰과 일치 / upstream-only **3행**은 로컬 파일 부재). 그 0 은 사람이 두 번 손으로 맞춘 결과다 — PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004)(#998 축 B) 가 계약 **(2) 상태 열 갱신 책임**을 명문화했지만 **강제 지점은 0** 이었고 (PR 템플릿 0건 / 에이전트 파일 0건 / 가드 0건), 그 상태로 재발이 **두 번 실측**됐다: ① PR [#993](https://github.com/coseo12/astro-simulator/pull/993) — ADR `971` 전이 PR 의 변경 파일이 **정확히 2개**(`CHANGELOG.md` + 해당 ADR)라 계약 (2) 는 **그 PR 이 정의상 열지 않는 파일** 안에 있었다 ② PR [#1015](https://github.com/coseo12/astro-simulator/pull/1015) — 신규 ADR `20260811-1010` 미등재, 계약 명문화 **바로 다음 PR**. 따라서 **positive PASS 는 작동 증거가 아니며**, 본 PR 의 증거는 negative 쪽이다.

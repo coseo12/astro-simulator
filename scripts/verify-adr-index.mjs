@@ -169,7 +169,9 @@ function parseIndexTable(content) {
 
 /** 주제 셀에서 ADR 파일명 추출 (첫 `.md` 링크) */
 function extractAdrFileName(topicCell) {
-  const m = /\[[^\]]*\]\(\s*([^)\s]+\.md)\s*\)/.exec(topicCell);
+  // 앵커(`#…`)·쿼리를 허용한다 — 없으면 링크가 **있는데도** "링크 부재" 라는
+  // 거짓 진단으로 FAIL 한다 (cross-validate agy 2026-08-12 권고, 실측 재현).
+  const m = /\[[^\]]*\]\(\s*([^)\s#?]+\.md)(?:[#?][^)\s]*)?\s*\)/.exec(topicCell);
   return m ? m[1] : null;
 }
 
@@ -427,6 +429,8 @@ function selfTest() {
   const UPSTREAM_FILE = ADR_INDEX_UPSTREAM_ONLY_TARGETS[0];
   const upstreamRow = `| 2026-04-19 | [gitflow](${UPSTREAM_FILE}) **(upstream-only)** | Accepted | 상위 |`;
   const localRow = (status) => `| 2026-08-06 | [local](20260806-local-adr.md) | ${status} | 세부 |`;
+  const anchoredRow = (status) =>
+    `| 2026-08-06 | [local](20260806-local-adr.md#결정) | ${status} | 세부 |`;
 
   try {
     // F1 positive — 로컬 1행(일치) + upstream-only 1행
@@ -558,6 +562,17 @@ function selfTest() {
       r.violations.length === 1 && /날짜 셀 ↔ 파일명 접두 불일치/.test(r.violations[0].reason),
       'F14 negative: 날짜 셀 오기 → FAIL',
     );
+
+    // F16 앵커 허용 — 링크에 `#…` 가 붙어도 파일명을 추출한다.
+    //  회귀 시 링크가 **있는데도** "ADR 링크 부재" 라는 거짓 진단으로 FAIL 한다
+    //  (cross-validate agy 2026-08-12 권고, 실 저장소에서 재현 후 수정).
+    {
+      writeAdr('20260806-local-adr.md', '- 상태: **Accepted** (cross-validate agy 2026-08-06)');
+      writeIndex([upstreamRow, anchoredRow('Accepted')]);
+      const r = runCheck(tmp);
+      assert(r.violations.length === 0, 'F16 앵커 링크: 파일명 추출 성공 → 위반 0');
+      assert(r.compared.length === 1, 'F16 앵커 링크: 대조 1건 (링크 부재 오진 아님)');
+    }
 
     // F15 self-consistency — 제외 판정 근거가 verify-docs-links 와 같은 SSoT 를 쓰는가.
     //  사본을 다시 인라인하면 두 가드의 제외 집합이 갈릴 수 있으므로 정적으로 못 박는다.
