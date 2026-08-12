@@ -253,6 +253,8 @@ head shape 'work' 는 base='main' (shape: main) 로 PR 을 열 수 없습니다.
 
 앞 스텝이 **PASS 한 채로** 뒤 스텝만 FAIL 했다. 즉 차단의 주체가 신규 스텝임이 실증되며, 기존 브랜치명 가드가 우연히 잡은 것이 아니다. positive run `31597839434` 은 `[PASS] base='main' ← head='hotfix/970-guard-positive' (hotfix → main)` 으로 **base=main 이 통째로 막히지 않음**을 함께 실증한다.
 
+**정리 확인 ([#1024](https://github.com/coseo12/astro-simulator/pull/1024) / [#1025](https://github.com/coseo12/astro-simulator/pull/1025))**: 두 PR 모두 `state=CLOSED` / `mergedAt=null` (**머지 0**), 원격·로컬 브랜치 삭제 완료 (`git push origin --delete` 분리 실행 — [`operational-friction.md`](../ops/operational-friction.md) §2). 각 PR 에 close 사유 코멘트 박제.
+
 ### 7-2-c 진단 가림 완화의 before/after live 실측 (2026-08-12, 일회용 PR 2건 — 정리 완료)
 
 §8-1 한계 2 개정(`if: ${{ !cancelled() }}`)의 근거다. 위 negative(#1024)는 **브랜치명이 PASS 한** 셀이라 가림 현상이 드러나지 않는다 — 가림은 **두 판정이 동시에 실패할 때만** 발생한다. 그래서 `architect/970-mask-*` (폐기 접두사 → 축 B FAIL) → `base=main` (base 규칙 `violation` 확정) 조합으로 별도 측정했다. 두 브랜치의 차이는 **`if` 조건 한 줄뿐**이다 (before 는 커밋 `b02c811` 트리, after 는 `2a1edea` 트리).
@@ -269,9 +271,7 @@ head shape 'work' 는 base='main' (shape: main) 로 PR 을 열 수 없습니다.
 
 **두 가지가 동시에 실증됐다.** ① *"실패가 성공으로 뒤집히지 않는다"* — job 결론과 required 체크런 결론이 before/after 모두 `failure` 로 **동일**하다. ② *"가려지던 진단이 실제로 가려져 있었다"* — before 에서 base 스텝은 `skipped` 였고 교정 지시 문자열이 로그에 **0회** 등장한다. reviewer 🟡5 의 지적은 분석이 아니라 **관측 가능한 사실**이었다.
 
-정리: 두 PR 모두 `state=CLOSED` · `mergedAt=null` (머지 0), 원격 브랜치 삭제 완료 (`git ls-remote --heads origin | grep -c 970-mask` → **0**). 삭제는 [`operational-friction.md`](../ops/operational-friction.md) §2 대로 `git push origin --delete` 로 분리 실행했다.
-
-**정리 확인**: 두 PR 모두 `state=CLOSED` / `mergedAt=null` (**머지 0**), 원격·로컬 브랜치 삭제 완료 (`git push origin --delete` 분리 실행 — [`operational-friction.md`](../ops/operational-friction.md) §2). 각 PR 에 close 사유 코멘트 박제.
+**정리 ([#1028](https://github.com/coseo12/astro-simulator/pull/1028) / [#1029](https://github.com/coseo12/astro-simulator/pull/1029))**: 두 PR 모두 `state=CLOSED` · `mergedAt=null` (머지 0), 원격 브랜치 삭제 완료 (`git ls-remote --heads origin | grep -c 970-mask` → **0**). 삭제는 [`operational-friction.md`](../ops/operational-friction.md) §2 대로 `git push origin --delete` 로 분리 실행했다.
 
 > **부수 실측 — 일회용 브랜치는 각자 다른 SHA 여야 한다.** 세 브랜치가 같은 커밋을 가리키면 한 SHA 가 3개 PR 의 head 가 되어 `branch-name` 체크런이 `{success, failure, success}` 로 공존한다 — [20260807-971](20260807-971-required-status-checks.md) §2-12 원인 ③ (PR 다중성 축) 이 `4f7366e` 에서 실측한 바로 그 형태이고, **required check 위에서 본 PR 자신의 판정이 오염된다**. 그래서 일회용 브랜치마다 `--allow-empty` 커밋 1개씩을 얹어 SHA 를 분리했다 (`201ca1c` / `74b6a5c` / `a246ece`).
 
@@ -364,11 +364,25 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
    **5-b. 봇 판정은 "정체" 가 아니라 "이름 패턴" 이고, 사람이 그 패턴을 쓸 수 있다** (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer 🟡1). 판정은 `classifyBranch(n).rule === 'bot'` → `^chore/(r1-baseline-linux|baseline-remeasure)-[0-9]+$` **이름 매칭 단독**이며 `user.login`/`user.type` 은 보지 않는다. 종전 §3 주석과 본 ADR 이 이를 *"봇은 종류가 아니라 **정체**라 정확 매칭"* 으로 정당화한 것은 **구현이 하지 않는 일을 주장한 것**이다 (주석 계약 ↔ 구현 drift — CLAUDE.md §실전 교훈). 주석은 본 PR 에서 정정했다.
 
-   **이 저장소에 실례가 있다.** 봇 head 패턴을 가진 머지 PR 은 **29건이고 28건이 `user.type: "Bot"`(`github-actions[bot]`), 1건이 사람**이다 — [#241](https://github.com/coseo12/astro-simulator/pull/241) (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `User` / `OWNER`). 즉 *"봇 head ⇒ 봇"* 은 이력에서 이미 반증돼 있다 (실측 2026-08-12, REST `pulls?state=closed&per_page=100` 페이지네이션).
+   **이 저장소에 실례가 있다.** 술어는 본 ADR 전체가 쓰는 **머지 PR** 로 고정한다 (§2-3 코퍼스 594건과 같은 모집단). 봇 head 패턴을 가진 **머지** PR 은 **28건이고 27건이 `user.type: "Bot"`(`github-actions[bot]`), 1건이 사람**이다 — [#241](https://github.com/coseo12/astro-simulator/pull/241) (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `User` / `OWNER`). 즉 *"봇 head ⇒ 봇"* 은 이력에서 이미 반증돼 있다. 이 28 은 §2-1 (*"28건 = `develop` 11 + 작업 브랜치 17"*) · §5 (*"실측 28건"*) 과 **같은 값**이다 — 세 곳이 같은 술어를 쓴다.
+
+   > **술어별 값 (2026-08-13 재측정, 두 API 표면에서 독립 재현).** merged ∩ 봇 패턴 = **28 (Bot 27 / 사람 1)** · all-closed ∩ 봇 패턴 = **30 (Bot 29 / 사람 1)** · open ∩ 봇 패턴 = **0** (모집단 누락 없음). 술어: REST `pulls?state=closed&per_page=100` 페이지네이션 + `user.type`, 교차 확인은 GraphQL `gh pr list --state all` + `author.is_bot` — **두 경로가 셀 단위로 일치**한다.
+   >
+   > ⚠️ 초판은 **`29건 중 28건`** 이라고 적었다. 이는 all-closed 의 **Bot 수 29** 와 merged 의 **총계 28** 을 섞은 **하이브리드**로, 명시한 술어(*"머지 PR"*)로 재현되지 않는다 ([20260808-983](20260808-983-measurement-recording-convention.md) §(i) **부분 재측정 금지** — PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer BLOCK-3). 같은 문서의 §2·§5 가 이미 28 을 적고 있어 **외부 측정 없이도 내부 모순으로 판정 가능**했다.
 
    **폭발 반경은 좁다.** ① `base=main` 은 봇 shape 로도 `violation` 이므로(픽스처 `['main', 'chore/r1-baseline-linux-30725438161', 'violation']` 고정) 1차 목적인 **dual PR 차단(위반 85건 클래스)은 무손상**이다. 새는 것은 *"사람 stacked PR 금지"* 라는 부차 규칙뿐이다. ② 유일한 실례인 #241 조차 `base=develop` 이라 `bot`/`work` 어느 shape 로 분류해도 판정이 **동일하게 `pass`** 다 — 실해 0.
 
-   **저자 축(`user.login`/`user.type`) 도입은 미채택.** 근거 3항: (i) **판정 표면 확대의 비대칭 위험** — 배선처 `branch-name` 은 `main` 의 required check 이고 `enforce_admins: true` 라 오차단 시 우회로가 없다(§6-2). 봇 PR 이 `GITHUB_TOKEN` 이 아닌 PAT 로 열리는 순간(토큰 정책 변경은 저장소 운영에서 흔하다) `bot → work` 셀이 `violation` 으로 뒤집혀 `r1-baseline-bootstrap` 자동화가 **하드 블록**된다. 얻는 것(부차 규칙의 잔여 구멍)보다 잃을 수 있는 것이 크다. (ii) **CLI 계약 확장이 필요하다** — `--pr` 는 `base=`/`head=` 2 라벨만 받는데 저자 축은 3번째 라벨을 요구하고, 로컬 pre-flight 는 PR 생성 **전** 이라 저자를 알 수 없어 pre-flight 가 성립하지 않는다. (iii) 근본 조치는 shape 판정기(축 B `classifyBranch`)의 관할이지 `BASE_RULES` 의 관할이 아니다. → **재검토 조건 5** 로 분리한다.
+   **저자 축(`user.login`/`user.type`) 도입은 미채택.** 근거 3항:
+
+   (i) **저자 표기 자체가 새 drift 축이다.** 같은 봇이 API 표면마다 다른 이름으로 나온다 — GraphQL `author.login` = `app/github-actions` / REST `user.login` = `github-actions[bot]` / REST `user.type` = `Bot` (2026-08-13 실측, 봇 패턴 PR 30건에서 세 표기 전부 관측). 저자 축을 도입한다는 것은 이 셋 중 하나를 골라 스크립트에 박는 일이고, 그것은 **새 SSoT 사본**을 만드는 것이다 — 본 스크립트가 `BASE_RULES` 외의 모든 리터럴을 축 B 에서 `import` 해 구조적으로 배제한 바로 그 클래스(CLAUDE.md §숨은 상수 변형, volt [#120](https://github.com/coseo12/volt/issues/120))다. 반면 `BOT_BRANCH_PATTERNS` 는 이미 축 B 의 정본이고 `--verify-ssot` 가 지킨다. (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer 가 제시한 대체 근거를 채택한다.)
+
+   (ii) **CLI 계약 확장이 필요하다** — `--pr` 는 `base=`/`head=` 2 라벨만 받는데 저자 축은 3번째 라벨을 요구하고, 로컬 pre-flight 는 PR 생성 **전** 이라 저자를 알 수 없어 pre-flight 가 성립하지 않는다.
+
+   (iii) 근본 조치는 shape 판정기(축 B `classifyBranch`)의 관할이지 `BASE_RULES` 의 관할이 아니다. → **재검토 조건 5** 로 분리한다.
+
+   > ⚠️ **초판의 (i) 은 거짓이었다** (PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer **BLOCK-4**). 종전 (i) 은 *"봇 PR 이 PAT 로 열리는 순간 `bot → work` 셀이 뒤집혀 `r1-baseline-bootstrap` 자동화가 **하드 블록**된다"* 였다. `bot → work` 셀의 base 는 정의상 `feature/*` 등 **작업 브랜치**인데, 이 저장소에서 보호 대상은 **`main` 하나뿐**이다 — 실측 2026-08-13: `GET /repos/coseo12/astro-simulator/branches?protected=true` → `["main"]`, `GET .../rulesets` → **0건** (`?includes_parents=true` 도 0). required status check 는 보호 규칙이 걸린 브랜치에서만 머지를 막으므로 오차단의 결과는 **빨간 X 이지 머지 차단이 아니다**. 본 문서 안에서 `하드 블록` 은 §6-2 의 정의(`enforce_admins` 하의 기계적 머지 차단)로 고정돼 있어 비보호 base 에 쓰면 **용어 오용**이고, §8-1 한계 1(*"실효 강제 범위는 release/hotfix PR 뿐"*)이 스스로 반박한다.
+   >
+   > 오차단이 무해하다는 뜻은 아니다 — 자동화 PR 에 **상시 빨간 X** 를 만드는 것은 [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) 가 이름 붙인 alert fatigue 그 자체다. 다만 그것은 **(i) 이 주장한 급의 위험이 아니며**, 기각 결론은 위 (i)(ii)(iii) 로 유지된다. **재검토 조건 5 가 되돌아올 앵커가 이 문단이므로** 거짓을 남기면 미래 판단이 오염된다.
 
 ### 8-2 재검토 조건
 
@@ -376,7 +390,7 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 2. **`branch-name` 이 required 에서 내려가거나** ([20260807-971](20260807-971-required-status-checks.md) §9 롤백 실행 등) **job 이름이 바뀌면** — §6-1 의 "설정 변경 0 으로 강제력" 전제가 무너진다.
 3. **`r1-baseline-bootstrap` 이 폐지되면** `work: ['bot']` 행은 즉시 제거 대상이다 (실사용 0 이 되므로).
 4. `release/*` shape 를 접두사로 판정하므로 `release/v0.28.0` (`-prep` 없음) 도 base=develop 통과다. `-prep` 강제는 축 B 관할이며, [#962](https://github.com/coseo12/astro-simulator/issues/962) 후속 F3 (`v` 표기 통일) 과 함께 다룰 항목이다.
-5. **사람이 봇 head 패턴으로 stacked PR 을 여는 사례가 실제로 관측되면** — §8-1 한계 5-b 의 저자 축(`user.type == "Bot"` 대조) 도입을 재론한다. 착수 전 확인 순서는 (i) `r1-baseline-bootstrap` 이 PR 을 여는 토큰이 여전히 `GITHUB_TOKEN` 인가(PAT 로 바뀌었다면 저자 축은 **자동화를 깨는** 방향이 된다), (ii) CI 컨텍스트에서 `github.event.pull_request.user.type` 이 실제로 전달되는가를 **일회용 run 으로 실측**(오지 않는데 참조하면 silent skip 이 생긴다), (iii) 그다음에야 `--pr` 라벨 확장. 현재 근거는 *"실해 0 · 실례 1건(#241)도 판정 동일"* 이므로 반증이 나오기 전에는 열지 않는다.
+5. **사람이 봇 head 패턴으로 stacked PR 을 여는 사례가 실제로 관측되면** — §8-1 한계 5-b 의 저자 축(`user.type == "Bot"` 대조) 도입을 재론한다. 착수 전 확인 순서는 (i) `r1-baseline-bootstrap` 이 PR 을 여는 토큰이 여전히 `GITHUB_TOKEN` 인가(PAT 로 바뀌었다면 저자 축은 자동화 PR 에 **상시 빨간 X** 를 만드는 방향이 된다 — 머지 차단은 아니다. `bot → work` 셀의 base 는 비보호 작업 브랜치이므로. §8-1 한계 5-b 의 BLOCK-4 정정 참조), (ii) 저자 표기를 **어느 API 표면에서 읽을지 먼저 고정**하고(`app/github-actions` / `github-actions[bot]` / `Bot` 3표기 — 고르는 순간 새 SSoT 사본이 생긴다), (iii) CI 컨텍스트에서 `github.event.pull_request.user.type` 이 실제로 전달되는가를 **일회용 run 으로 실측**(오지 않는데 참조하면 silent skip 이 생긴다), (iv) 그다음에야 `--pr` 라벨 확장. 현재 근거는 *"실해 0 · 실례 1건(#241)도 판정 동일"* 이므로 반증이 나오기 전에는 열지 않는다.
 
 ---
 

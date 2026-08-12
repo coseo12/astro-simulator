@@ -77,10 +77,15 @@ const ROOT = resolve(dirname(SCRIPT_PATH), '..');
  * 주장했다. 주석 계약 ↔ 구현 drift). 판정에 `user.login`/`user.type` 은 **쓰지 않으므로**
  * 사람이 봇 패턴 이름을 그대로 쓰면 봇으로 분류된다. 이 저장소에 실례가 있다 —
  * PR #241 (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `user.type: "User"`).
- * 봇 패턴 머지 PR 29건 중 **28건 `Bot` / 1건 사람** (실측 2026-08-12, REST `pulls?state=closed`).
+ * 술어는 **머지 PR** 로 고정한다 — 봇 패턴 **머지** PR **28건 = `Bot` 27 + 사람 1**
+ * (실측 2026-08-13, REST `pulls?state=closed&per_page=100` 페이지네이션 ∩ `merged_at != null`.
+ * 종전 `29건 중 28건` 은 all-closed 의 Bot 수 29 와 merged 총계 28 을 섞은 하이브리드였다
+ * — PR #1023 reviewer BLOCK-3. 술어별 값은 ADR §8-1 한계 5-b 참조).
  * 폭발 반경은 좁다 — `base=main` 은 봇 shape 로도 `violation` 이고(픽스처 고정) 새는 것은
  * *"사람 stacked PR 금지"* 라는 부차 규칙뿐이다. #241 자신도 `base=develop` 이라 `bot`/`work`
- * 어느 쪽으로 분류해도 판정이 같다(`pass`). 저자 축 **미채택** 근거는 ADR §8-1 한계 5.
+ * 어느 쪽으로 분류해도 판정이 같다(`pass`). 저자 축 **미채택** 근거는 ADR §8-1 한계 5-b
+ * (핵심: 저자 표기가 `app/github-actions`/`github-actions[bot]`/`Bot` 3종으로 갈려 **새 SSoT
+ * 사본**이 된다. 종전 근거였던 *"자동화 하드 블록"* 은 거짓이라 철회 — reviewer BLOCK-4).
  *
  * 순서 의존: `bot` → `hotfix` → `work`. 봇 브랜치는 `chore/` 접두사라 `work` 보다 먼저
  * 걸러야 하고, `hotfix` 는 `BRANCH_TYPES` 에 없으므로 (축 B `HOTFIX_TYPE` 별도) 독립 행이다.
@@ -271,9 +276,20 @@ function allowSummary() {
  * 교정 지시**다 (고칠 곳은 base 브랜치가 아니라 인자 전달이다). 본 스크립트가 `violation` 과
  * `unresolved` 를 나눈 것과 같은 이유이며, 나누는 것은 통과 여부가 아니라 **귀속**이다.
  *
- * ⚠️ **fail-closed 는 깨지지 않는다.** exit 2 도 non-zero 이므로 CI 스텝은 그대로 실패한다
- * (`run:` 기본 셸은 `bash -e {0}` — 실측: `.github/workflows/branch-name-guard.yml` 스텝이
- * exit 2 를 낸 run 에서 job conclusion `failure`). 게다가 실사용 경로에서는 **도달 불가**다 —
+ * ⚠️ **fail-closed 는 깨지지 않는다.** exit 2 도 non-zero 이므로 CI 스텝은 그대로 실패한다.
+ * 근거는 두 겹이며, **exit 2 를 낸 CI run 은 존재하지 않으므로** 그 둘을 나눠 적는다 —
+ * (1) `run:` 기본 셸은 `bash -e {0}` 이고, 스텝 본문을 파일로 떠 `bash -e` 로 돌리면 node 의
+ * exit 2 가 셸 종료 코드 **2** 로 그대로 전파된다 (로컬 실측 2026-08-13: `BASE_REF=''
+ * HEAD_REF=feature/970-x bash -e <step>` → `2` / 대조군 `BASE_REF=main` → `1`).
+ * (2) Actions 가 non-zero 를 스텝 실패로 판정하는 경로는 exit 1 과 **동일**하고, 그 경로는
+ * PR #1029 (run `31604814344`) 에서 본 스텝이 exit 1 → 스텝 `failure` → job `failure` 로
+ * live 실측됐다 (ADR §7-2-c).
+ *
+ * (종전 이 자리는 *"exit 2 를 낸 run 에서 job conclusion `failure`"* 라는 **존재하지 않는
+ * CI 실측**을 인용했고, 바로 아래 "도달 불가" 와 자기모순이었다 — PR #1023 reviewer BLOCK-2.
+ * `branch-name-guard.yml` 의 실패 run 은 역사상 5건뿐이고 원시 job 로그의 종료 코드는 전건 `1` 이다.)
+ *
+ * 게다가 실사용 경로에서는 **도달 불가**다 —
  * `pull_request` 이벤트의 `base.ref`/`head.ref` 는 항상 존재하므로 빈 값이 CI 에서 만들어질
  * 수 없다. 이 분기는 로컬 pre-flight 오타·수동 호출 전용이다.
  *
