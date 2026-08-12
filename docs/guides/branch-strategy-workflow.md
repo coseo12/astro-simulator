@@ -95,9 +95,77 @@ node scripts/verify-branch-name.mjs --branch feature/962-x   # 임의 이름 검
 
 두 검사의 선결 조건이 달라 배선도 갈라진다. 봇 PR 은 `if: github.actor != 'github-actions[bot]'` 로 **통째 스킵하지 않는다** — 그것은 한 클래스 전체의 silent skip 이라 3번째 봇 workflow 가 임의 브랜치명을 써도 아무도 모른다. 패턴을 허용 집합에 명시해 두면 신규 패턴 등장 시 가드가 FAIL 하며 의식적 갱신을 강제한다.
 
-### 한계
+### 한계 — **해소됨** (2026-08-08, 구 기록 회수)
 
-`main` branch protection 에 `required_status_checks` 가 **부재**하고 `develop` 은 보호 자체가 **없다** (2026-08-06 실측). 본 가드는 붉은 X 를 띄우지만 GitHub 이 머지를 기계적으로 막지는 **않는다**. 전 워크플로 공통 상태이며 보호 정책 전반의 별건이다.
+> 본 절은 *"`main` 에 `required_status_checks` 부재 → 붉은 X 는 뜨지만 머지를 막지 못한다"* 고 적고 있었다. **더 이상 참이 아니다.** [#971](https://github.com/coseo12/astro-simulator/issues/971) Phase 1 이 적용돼 `branch-name` 은 `main` 의 **required status check** 이며 `enforce_admins: true` 다 (실측 2026-08-12 `GET /branches/main/protection` → `contexts: ["project-guards", "branch-name", "label-pr"]`). 아래 §required status check 롤백 절이 그 전제 위에 서 있으므로, 구 서술을 남겨두면 같은 문서가 자기모순이었다. 회수 근거: [#970](https://github.com/coseo12/astro-simulator/issues/970).
+
+`main` 대상 PR 에서 본 가드는 **머지를 기계적으로 막는다**. 우회로는 `enforce_admins: true` 때문에 admin 에게도 없으며, 탈출구는 아래 §required status check 롤백 의 R1 한 줄뿐이다. 반면 **`develop` 은 보호 자체가 없으므로** (`GET /branches/develop/protection` → 404, [ADR 20260807-971](../decisions/20260807-971-required-status-checks.md) 결정 2 로 **영구 미채택**) 일상 개발 PR 에서는 여전히 붉은 X 에 그친다. 즉 강제력의 실효 범위는 **release / hotfix PR** 이다.
+
+## base 선택 규칙 가드 (#970 — 축 B 후속 F1)
+
+브랜치명 가드가 CLAUDE.md §금지 사항의 **브랜치 *명명*** 절반을 강제했다면, 본 가드는 나머지 절반인 **base *선택***을 강제한다 — *"`<type>/*`·`release/*-prep` PR 의 `base=main` 금지"*. 정본은 `scripts/verify-pr-base-rule.mjs` 의 `BASE_RULES` 매트릭스이며, 아래 표는 `--verify-ssot` 가 기계 대조하는 **파생**이다. 결정 배경: [ADR 20260812-970-pr-base-rule-guard](../decisions/20260812-970-pr-base-rule-guard.md).
+
+### base 선택 규칙
+
+| # | base | 허용 head | 예 (head → base) | 비고 |
+|---|---|---|---|---|
+| 1 | `develop` | 일상 개발 / 릴리스 준비 / 봇 / `main` | `feature/970-pr-base-rule-guard` → `develop` | `main` 은 hotfix **merge-back** 의 head |
+| 2 | `main` | `develop` / `hotfix/*` | `develop` → `main` | release PR / prod 긴급 패치 **전용** |
+| 3 | `<type>/*` | **봇 전용** | `chore/r1-baseline-linux-30725438161` → `fix/887-css-reset-layer` | `r1-baseline-bootstrap` 의 `workflow_dispatch` 입력이 원 작업 브랜치를 base 로 지정한다. **사람 stacked PR 은 금지** |
+
+> 이 표는 `node scripts/verify-pr-base-rule.mjs --verify-ssot` 가 **양방향 대조**한다 — 각 행의 예시를 런타임 판정기(`classifyPair`)에 그대로 돌리고, `BASE_RULES` 의 모든 키가 표에 정확히 한 행씩 등장하는지도 함께 본다. **정본(스크립트 상수)을 먼저 고치고 표를 맞추는** 순서로 편집할 것.
+
+**가장 흔한 오류**: 일상 개발 PR 을 `base=main` 으로 여는 것 (#942 gitflow 이전의 dual PR 관행). 교정 비용은 브랜치명 위반보다 훨씬 싸다 — **PR 재생성 없이 GitHub UI 의 base 드롭다운만 바꾸면 된다.**
+
+### 판정 3종과 관할 분리
+
+base 규칙은 브랜치 *이름의 적합성* 이 아니라 *종류*(shape)를 본다. 그래서 `fix/webgl-fallback` (이슈번호 없음) 은 브랜치명 가드가 FAIL 시키더라도 base 판정에서는 `work` shape 로 통과한다 — **중복 재판을 피하고 교정 지시를 한 갈래로 유지**하기 위함이다.
+
+| 판정 | 종료 코드 | 의미 | 교정 |
+|---|---|---|---|
+| `pass` | 0 | 허용 셀 | — |
+| `violation` | 1 | base 선택이 틀렸다 | PR 의 base 를 바꾼다 |
+| `unresolved` | 1 | head shape 불명 + `base=develop` | **head 이름**을 고친다 (관할: 브랜치명 가드). base 는 정정할 것이 없다 |
+
+`unresolved` 는 fallback 이 **아니다** — 통과로 흘리지 않으며(종료 코드 1) 다른 것은 귀속과 교정 지시뿐이다. 귀속 기준은 *"무엇을 고쳐야 통과하는가"* 다: `base=main` + shape 불명은 head 를 어떻게 고쳐도 통과하지 못하므로 `violation` 확정이고 (main 의 허용 head 는 `develop` 리터럴 · `hotfix/` 접두사 둘뿐이라 이름 규약과 무관하게 판정된다), `base=develop` + shape 불명은 이름만 고치면 통과하므로 `unresolved` 다.
+
+### 실측 (머지 PR 594 전수, 2026-08-12)
+
+```bash
+gh pr list --state merged --limit 3000 --json number,headRefName,baseRefName,mergedAt,author > /tmp/corpus.json
+node scripts/verify-pr-base-rule.mjs --check-corpus /tmp/corpus.json
+```
+
+| 항목 | 값 |
+|---|---|
+| 전체 | 594 |
+| PASS | 496 |
+| **base 규칙 위반** | **85** — 전부 `2026-04-14 ~ 2026-04-19` (dual PR 시대) |
+| 판정 보류 | 13 — `architect/*`·`dev/*` 폐기 접두사, 전부 `2026-05-04 ~ 2026-05-29` |
+| 마지막 위반 이후 | **472 PR 연속 위반 0** |
+
+즉 본 가드는 실사용 괴리를 해소하는 것이 아니라 **회귀를 방지**한다 (축 B 가 "24.1% 괴리 해소" 였던 것과 성격이 다르다).
+
+### 로컬 pre-flight
+
+base 는 로컬 상태에서 도출할 수 없으므로 **추측하지 않는다** (인자 없는 호출은 exit 2). PR 을 열기 전 의도한 base 를 직접 넣어 확인한다.
+
+```bash
+node scripts/verify-pr-base-rule.mjs --pr base=develop head="$(git branch --show-current)"
+```
+
+인자는 **라벨 필수**다 (`--pr <base> <head>` 같은 위치 인자는 거부). 순서를 뒤바꾸면 `develop→main`(release PR)과 `main→develop`(merge-back)이 **둘 다 허용 셀**이라 스왑이 아무 흔적도 남기지 않기 때문이다 — 최고 위험 경로에서 정확히 조용한 오답이 된다.
+
+### CI 배선
+
+| 검사 | workflow | job | 선결 조건 |
+|---|---|---|---|
+| 런타임 base × head (`--pr`) | `branch-name-guard.yml` | `branch-name` (**main 의 required check**) | 이벤트 페이로드의 `base.ref` · `head.ref` |
+| SSoT drift (`--verify-ssot`) + `--self-test` | `project-guards.yml` | `project-guards` | 체크아웃된 파일 (이벤트 무관) |
+
+런타임 검사는 브랜치명 스텝 **뒤에** 둔다. `unresolved` 는 head 이름 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하고, 실제로는 그 스텝이 먼저 실패해 base 스텝이 실행되지 않는다 (`unresolved` 는 CI 에서 구조적으로 도달 불가 — 그럼에도 fail-closed 로 구현한다).
+
+⚠️ **폭발 반경**: 같은 job 에 넣는다는 것은 본 가드가 `main` 의 required check 강제력을 **상속**한다는 뜻이다. 오차단이 나면 릴리스가 하드 블록되고 `enforce_admins: true` 라 우회로가 없다. 그래서 릴리스·핫픽스 4셀(`develop→main` / `main→develop` / `hotfix/*→main` / `release/*-prep→develop`)은 `--self-test` 픽스처 **맨 앞에 불변식으로 고정**돼 있다. 막혔을 때의 탈출구는 아래 §required status check 롤백 R1.
 
 ## required status check 롤백 (릴리스가 막혔을 때 — #971)
 
