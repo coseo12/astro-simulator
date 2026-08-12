@@ -141,6 +141,12 @@ self-test `F15` 가 정적으로 막는다.
 
 **재검토 조건**
 
+> ⚠️ **상태 라인 어순 제약 (PR [#1018](https://github.com/coseo12/astro-simulator/pull/1018) 리뷰 Y-1).**
+> 본 가드는 상태 라인의 **최선두 어휘 토큰**을 현재 상태로 읽는다. 전이를 기록할 때
+> **현재 상태 토큰보다 앞에 다른 상태 어휘를 두지 않는다.** 실측: `**Accepted** (… — Provisional 에서 전이)`
+> → `exit 0` / `Provisional → **Accepted**` → `exit 1` **에 진단까지 반전**된다 (표가 맞는데 실물이 틀렸다고 보고).
+> 전이 PR 은 `node scripts/verify-adr-index.mjs` 로 **PASS 를 확인한 뒤** 커밋한다.
+
 1. **미등재 검출 이슈가 채택되면** — ADR 자기 선언 마커 도입 시 §범위 경계 (i) 을 Amendment 로
    갱신하고 `F10` 경계 픽스처를 검출 케이스로 전환한다.
 2. **상태 어휘 확장 시** — `Rejected`/`Deprecated` 외 새 상태어가 등장하면
