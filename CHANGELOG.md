@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.68.0] — 2026-08-12
+
 ### Behavior Changes
 
 - **[#1005 후속] ADR `20260812-1005` `Provisional` → `Accepted` 전이 — 신설 가드의 첫 실전 자기 적용** ([#1005](https://github.com/coseo12/astro-simulator/issues/1005)) — cross-validate 4축을 §교차검증 반영 사항에 통합하고 상태를 전이했다. **같은 커밋에서 [`docs/decisions/README.md`](docs/decisions/README.md) 인덱스 표 상태 열도 갱신**했다 — 누락하면 PR [#1018](https://github.com/coseo12/astro-simulator/pull/1018) 이 신설한 가드가 **스스로 FAIL 시킨다**(dev 가 심은 자기 적용 덫). ⚠️ **어순 제약도 실전 적용**했다 — 가드가 상태 라인의 **최선두 어휘 토큰**을 읽으므로 `Provisional → **Accepted**` 로 쓰면 `exit 1` **에 진단까지 반전**된다(표가 맞는데 실물이 틀렸다고 보고). ADR §재검토 조건이 지시한 `**Accepted** (… — Provisional 에서 전이)` 표기를 써서 **커밋 전 `node scripts/verify-adr-index.mjs` PASS 를 확인**했다: `대조 OK … 표 'Accepted' == 실물 'Accepted'`. **가드 · 어순 규약 · 절차 3중이 설계대로 맞물린 첫 사례**다.
