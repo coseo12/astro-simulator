@@ -111,25 +111,30 @@ sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | gre
 
 ## 측정 방법 C (혼합) — PR 본문 가시성 자기 검증
 
-PR 본문 작성 후 거버넌스 체크 항목 (예: "ADR 호환성 체크") 의 가시성을 다음 두 grep 의 **AND** 로 판정한다 (다운스트림 architect cross-validate 합의):
+PR 본문 작성 후 거버넌스 체크 항목 (예: "ADR 호환성 체크") 의 가시성은 **3계급**으로 판정한다. 판정 정본은 `scripts/verify-pr-template-checklist.mjs` 이며, 본 표는 사람이 읽는 계약이다 — 두 곳이 갈리면 스크립트가 옳다 (#1010).
 
 ```bash
-# 1차 구조 grep — 체크박스 prefill 보존 확인
-gh pr view <PR> --json body --jq .body | grep -c "<체크박스 항목명>"
-# 기대: ≥ 1 hit (체크박스 항목명 그대로)
-
-# 2차 phrase grep — 별도 위치 박제까지 포괄 확인 (대소문자 무시)
-gh pr view <PR> --json body --jq .body | grep -c -i "<핵심 키워드>"
-# 기대: ≥ 1 hit (체크박스 + prose 중 어디든)
+# 정본 — 7 키워드 전건을 3계급으로 판정 (CI `pr-template-checklist-guard.yml` 과 동일 코드)
+node scripts/verify-pr-template-checklist.mjs <PR>
+# exit 0 = PASS 또는 WARN / exit 1 = FAIL. WARN 은 stdout 표에 계급별 구조 hit 이 0 으로 찍힌다
 ```
 
-- **양쪽 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
-- **체크박스 0 + phrase ≥ 1** → non-blocking 권고 (체크박스 prefill 누락. 동일 권고 시 PR 템플릿에서 동적 추출한 체크박스 base 동봉 권장 (본문 예시 블록은 참고 snapshot — 템플릿 동적 읽기가 SSoT))
-- **양쪽 동시 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단)
+- **phrase ≥ 1 hit ∧ 구조 ≥ 1 hit** → PASS (구조 + phrase 둘 다 가시성 확보)
+- **phrase ≥ 1 hit ∧ 구조 0 hit** → WARN / non-blocking 권고 (템플릿 원 구조 소실 — reviewer 가 `non_blocking_suggestions` 로 승격)
+- **phrase 0 hit** → FAIL (가시성 0 — PR 본문 재작성 또는 reviewer 가 차단). 구조 hit 은 phrase hit 을 함의하므로 이 조건이 곧 "양쪽 0" 이다
 
-> 참고: 동일 측정 방법이 `.claude/agents/developer.md` 에도 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — **동시 수정 의무**. 다운스트림 1차 사례: astro-simulator [#469](https://github.com/coseo12/astro-simulator/issues/469) PR [#472](https://github.com/coseo12/astro-simulator/pull/472).
+**구조 hit 의 정의는 키워드 계급마다 다르다** — 템플릿에서 그 항목이 갖는 원래 형태를 보존했는지를 묻기 때문이다.
 
-> 참고: PR 템플릿 신규 항목 양가성 가드 (체크박스 prefill 0 hit + phrase 0 hit 시 발화) 는 `.claude/agents/developer.md` §메타 규칙 (다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) PR [#475](https://github.com/coseo12/astro-simulator/pull/475) 동기화) 에 박제됨. reviewer.md §절차 6번 + qa.md §검증 단계 backstop 양쪽이 방어의 깊이.
+- 키워드 1~5 (커밋 컨벤션 / 불필요 / 보안 / SSoT / cross-validate): `### 체크리스트` 절의 **체크박스 항목** → 같은 라인에 `- [ ]` 또는 `- [x]` + phrase
+- 키워드 6~7 (ADR 호환성 / Test plan): 템플릿에서 **`###` 섹션 헤더로만 존재** → 같은 라인에 `###` + phrase
+
+> 구조 판정의 헤더는 **ATX 레벨을 가리지 않는다** (`#`~`######`) — 템플릿이 쓰는 레벨은 `###` 이지만 묻는 것은 "섹션 헤더로 존재하는가"이지 레벨이 아니다. 구조 축은 WARN 전용이라 느슨한 쪽이 거짓 WARN 을 줄이고 blocking 경계에는 영향이 없다 (#1010).
+
+⚠️ WARN 을 피하려고 `[ ]` → `[x]` 외의 편집 (체크박스를 `###` 헤더 절로 옮기기 등) 을 하지 않는다. 위 4차 절차의 *"라인 자체 변경·삭제 금지"* 가 그대로 구조 보존 규약이다 — 최근 머지 PR 60건 중 10건이 이 침식을 겪었고 (술어: 60 PR × 7 kw = 420 셀 중 WARN 21 셀), 종전 2계급 가드는 그것을 전부 초록으로 통과시켰다.
+
+> 참고: 위 **3계급 bullet 3줄 + 계급별 구조 정의 2줄**이 `.claude/agents/developer.md` 에도 **바이트 동일**하게 박제됨 (cross-link SSoT). 한쪽만 갱신하면 drift 발생 — **동시 수정 의무**. 다운스트림 1차 사례: astro-simulator [#469](https://github.com/coseo12/astro-simulator/issues/469) PR [#472](https://github.com/coseo12/astro-simulator/pull/472).
+
+> 참고: PR 템플릿 신규 항목 양가성 가드 (구조 0 hit → WARN / phrase 0 hit → FAIL 발화, #1010) 는 `.claude/agents/developer.md` §메타 규칙 (다운스트림 [astro-simulator#470](https://github.com/coseo12/astro-simulator/issues/470) PR [#475](https://github.com/coseo12/astro-simulator/pull/475) 동기화) 에 박제됨. reviewer.md §절차 6번 + qa.md §검증 단계 backstop 양쪽이 방어의 깊이.
 
 ## 라벨 업데이트
 
@@ -178,7 +183,7 @@ stack 대신 각 PR 을 develop 기반 독립 브랜치로 만들고, 의존성�
 ## 규칙
 
 - PR 제목은 반드시 `[#이슈번호]`를 포함한다.
-- PR 본문에 `### Test plan` 섹션 (영문 phrase) 을 반드시 포함한다 — `verify-pr-template-checklist.mjs` keyword 7 이 영문 `Test plan` phrase 를 AND 매칭한다 (템플릿 동적 읽기 시 자동 충족).
+- PR 본문에 `### Test plan` 섹션 (영문 phrase) 을 반드시 포함한다 — `verify-pr-template-checklist.mjs` keyword 7 이 영문 `Test plan` phrase 를 매칭하며, 구조 계급이 **헤더**라 `###` 없이 산문으로만 쓰면 WARN 이다 (템플릿 동적 읽기 시 자동 충족).
 - PR 본문의 `Closes #이슈번호`로 이슈와 연결한다. 단 **base=develop 머지는 GitHub 네이티브 auto-close 미발동** (default branch 머지만 발동) — 대신 [`.github/workflows/auto-close-issues.yml`](../../../.github/workflows/auto-close-issues.yml) (#915) 이 PR **본문**의 close 키워드를 파싱해 자동 close 한다. 머지 후 메인은 `gh issue view <이슈번호> --json state` 로 **결과만 확인**하고, `OPEN` 이면 폴백으로 수동 close 한다 (운영 마찰 규약 [§1 / §1-1 미발동 조건](../../../docs/ops/operational-friction.md)).
   - ⚠️ 키워드는 **PR 본문**에 있어야 한다 — 커밋 메시지 / PR 제목에만 쓰면 workflow 가 파싱하지 못한다.
 - 머지 시 `--delete-branch` 를 사용하지 않는다 — 멀티 워크스페이스 (Conductor worktree) 브랜치 점유와 충돌 (운영 마찰 규약 §2). 원격 삭제는 `git push origin --delete <브랜치>` 로 분리 수행한다.

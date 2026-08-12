@@ -5,6 +5,54 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.67.0] — 2026-08-11
+
+### Behavior Changes
+
+- **[#1010] 측정 방법 C 3계급 판정 + 판정식 SSoT 를 가드 스크립트로 수렴 (MINOR)** ([#1010](https://github.com/coseo12/astro-simulator/issues/1010)) — ADR [`20260811-1010-measurement-c-verdict-tiers.md`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) (**Accepted** — cross-validate agy 2026-08-11).
+
+  **이슈 전제 2건이 실측으로 반박됐다.** 이슈는 _"문서는 AND, 가드는 OR — 느슨한 쪽이 실행돼 여태 안 드러났다"_ 로 문제를 세웠으나, ① **원 의도는 OR** 이다 (#469 채택안 원문 _"체크박스 0 hit + phrase 0 hit **동시 만족 시 FAIL**"_ / 신설 커밋 `a1c1373` 메시지 / #473 종결 코멘트 / 코드 출력 문자열이 전부 OR. AND 를 boolean AND 로 의도했다는 근거는 이슈·PR·커밋 어디에도 없다) — 가드가 맞고 **"AND" 라는 단어가 오기**다. ② **실발화했다** — workflow run **719건 중 failure 76건** (10.6%, 최초 2026-05-17 / 최근 2026-08-06). `--limit 50` 조회는 최근 구간이 전부 success 라 0건으로 보인다. 문서 측 자기모순도 선천적이다 — `developer.md` 의 _"AND 로 판정한다"_ 와 3계급 bullet 은 **같은 커밋 `f576770` (PR #472) 의 인접 6줄**에서 동시에 태어났다.
+
+  **진짜 결함은 AND/OR 이 아니라 계급 수(3 vs 2)다.** 종전 판정 `pass = phraseHits ≥ 1 || structureHits ≥ 1` 에서 `structureHits` 를 세는 라인은 반드시 phrase 를 포함하고 그 라인은 body 의 부분문자열이므로 **`structureHits ≥ 1 ⟹ phraseHits ≥ 1`** 이다. 즉 `(ph≥1 ∨ st≥1) ≡ (ph≥1)` 이고 _"1차 구조 grep"_ 은 **판정에 0 기여**하는 논리적 잉여였다. 그 탓에 문서가 선언한 **중간 계급(WARN)이 미구현**이었고, **템플릿 체크박스가 `###` 헤더로 대체되는 침식**이 무신호로 진행됐다 — **21 셀 / 10 PR** (술어: 최근 머지 PR 60건 × 7 kw = 420 셀, 전부 kw3 보안·kw4 SSoT·kw5 cross-validate, 10 PR 중 8건이 release PR, #964 이후 발생). 종전 가드는 이 21 셀을 전부 초록으로 통과시켰다. **침식은 작성자 일탈이 아니라 가드가 만든 균형점**이다 — #964 의 가드 자동 코멘트가 _"수동: 누락 항목 **체크박스** 추가"_ 를 안내했는데 작성자는 `### 보안` 헤더 절을 넣었고 OR 가드는 통과시켰다.
+
+  **채택 — 3계급.** `FAIL(exit 1) = phrase 0` / `WARN(exit 0) = phrase ≥ 1 ∧ 구조 0` / `PASS = 둘 다 ≥ 1`. 구조 정의는 **계급별**이다 (`kw1~5` = 같은 라인 체크박스 / `kw6~7` = 같은 라인 ATX 헤더) — 계급 구분은 실측상 **비대칭적으로 유효**하다 (헤더 계급이 체크박스로만 존재하는 셀 **0/420** vs 체크박스 계급이 헤더로만 존재하는 셀 **21/420**). **blocking 경계는 종전과 수학적으로 동일**하다 (위 함의로 `(ph=0 ∧ st=0) ≡ (ph=0)`) — **회귀 0 이 실측이 아니라 증명으로 보장**되고, base 스크립트를 같은 코퍼스에 적용한 실측도 FAIL 셀 12 / FAIL PR `{#924, #925}` 로 **동일**하다. 기각안: **A(가드를 AND)** 는 **템플릿 원문 자기 적용에서 kw6·7 이 FAIL** 해 _"라인 변경 금지"_ 규약과 동시 성립 불가 / **B(문서를 OR, 현행 유지)** 는 침식 21 셀 전량 미검출 / **C·D(blocking 화)** 는 규약 준수 PR **10건 오검출** (8건이 release PR → alert fatigue, #766 계보) / **D2(계급 합집합)** 는 침식 신호가 통째로 소멸. **`.github/PULL_REQUEST_TEMPLATE.md` 는 고치지 않았다** — 원 의도가 OR 인 이상 개정 근거가 소멸한다.
+
+  **판정식 SSoT 수렴 — 중복이 아니라 파생본의 독립 판정식이 결함이었다.** 같은 규칙이 **4가지 형태**로 갈려 있었다 (문서 3계급 / 가드 2계급 7키워드 / `reviewer.md` 2계급 1키워드 하드코딩 2-grep / `qa.md` 1-grep 1키워드). `developer.md` 가 _"한쪽만 갱신하면 drift — 동시 수정 의무"_ 라는 **규약형 방어**를 이미 걸어 뒀으나 실제 drift 는 그 규약이 커버하지 않는 reviewer/qa·가드 축에서 났다 — **규약형 방어의 한계 실증**. 처방: 정본을 `scripts/verify-pr-template-checklist.mjs` 1곳에 두고, `developer.md`·`create-pr/SKILL.md` 는 _"사람이 읽는 계약"_ 으로 3계급 표를 **바이트 동일** 유지하되 _"정본은 스크립트"_ 를 명시, **`reviewer.md`·`qa.md` 는 판정식을 재서술하지 않고 가드를 호출**한다 (WARN → `non_blocking_suggestions` 승격 / FAIL → `blocking_issues`). 파생본이 독립 판정식을 가질 수 없어 **drift 클래스가 구조적으로 소멸**한다 (volt [#120](https://github.com/coseo12/volt/issues/120)).
+
+  **WARN 은 fallback 이 아니다.** fallback = _판정 불가 시 통과로 흘리는_ 분기이나, WARN 은 **판정 성공 후의 명시적 제3 결론**이며 조건이 결정적이다. FAIL 경로는 그대로 fail-fast (exit 1, 경계 불변). **WARN 이 없을 때 침식이 PASS 로 흘러가던 것이 오히려 silent fallback** 이었고 본 개정은 그것을 제거한다. 구현에도 fallback 분기를 두지 않았다 — 미등록 `structureClass` 는 **throw**, 미등록 CLI 모드·잉여 인자는 **exit 2**, 픽스처 앵커 부재는 **throw**. 본 가드는 **required status check 가 아니므로** (ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 결정 9-1) `exit 1` 은 빨간 X + 코멘트이지 머지 차단이 아니다.
+
+  **가드 도입 PR DoD 4축.** ① **격리 동적 테스트** — `--self-test` 로 F1~F9 + 불변식 단언(`st≥1 ⟹ ph≥1` 반례 0 / 9 픽스처 × 7 kw) + 자식 프로세스 인자 파싱 프로브 6건 = **28 단언**. `phraseHits`/`structureHits` **수치까지** 단언한다 (verdict 만 단언하면 잉여 회귀를 못 잡는다). 개정 전후가 **갈리는 셀 5 는 F2·F3·F5·F8·**F9**, **불변 셀 4 는 F1·F4·F6·F7** (회귀 0 의 증거). `project-guards.yml` 에 배선 (#897 — CI 미배선 self-test 는 0회 실행). **F1 은 live 템플릿을 base 로 쓴다** — 하드코딩 스냅샷은 #855 클래스(템플릿이 phrase 를 잃어 전 PR FAIL)를 원리적으로 못 잡는데, 그 사고가 실제로 failure 76건 중 **40건의 원인**이다. ② **3중 시뮬레이션** positive→WARN→FAIL→recovery (PR 코멘트 박제). ③ **5 페르소나 self-consistency** — 문언 복제를 **줄이는** 설계라 대조표는 _"모든 파일이 같은 문장"_ 이 아니라 **"파일별 역할에 맞는 값"** 이다 (developer/create-pr = bullet 1/1/1 + 호출 1 / reviewer·qa = 0/0/0 + 호출 1 / architect·pm = **비보유가 정답** 0/0/0 + 0). **6 파일 × 4 셀 = 24 셀 결정적 일치**, 미래 관찰자가 0 hit 을 누락으로 오인하지 않도록 ADR 에 박제. ④ **메타 측정 자기 적용** — 변경된 가드를 본 PR 자신에 적용 + `--check-corpus` 60 PR 전수 = **PASS 387 / WARN 21 / FAIL 12** (술어: 60 PR × 7 kw = 420 셀, 구조는 `structureClass` 계급별, 코드 펜스 안 구조 hit 제외. FAIL 12 = bot PR 2건 × 6 kw, CI job 스킵 대상).
+
+  **§2-4 failure 분포 `[가정]` → `[실측]` 전수 승격.** 설계는 18/76 샘플이었다. **76 run 전수** (술어: workflow run 719건 중 `conclusion=failure` 76건 전수, 각 run 의 `gh run view <id> --log-failed` 파싱): 인프라 실패 **1** / dogfood negative **6** (#497 #967 #968) / **kw7 단독 = 템플릿 영문 `Test plan` phrase 부재 (가드 자체 결함) `40` (고유 PR 30)** / **release PR 클래스 미스매치 `11` (고유 PR 10)** / 봇 PR **2** / 일상 개발 prefill 누락 **16**. **(c) 는 `e57c60d` (2026-07-19, #855) 이후 0건** — 템플릿↔가드 정합 fix 가 완전히 해소했고 그 이후 failure 는 전체 7 run 이다. _"prefill 통째 삭제"_ (7/7 누락) 는 **10 run / 8 PR**, 그중 2건이 dogfood ⇒ 진성 **6**. ⇒ **가드가 실제로 잡아온 것은 prefill 말소가 아니라 (a) 가드 자신의 템플릿 부정합 + (b) PR 클래스 미스매치다** — (c)+(d) = **51/76 (67.1%)** vs 진성 prefill 말소 **6/76 (7.9%)**.
+
+  **부수 정정 2건.** ① 가드 헤더 주석의 _"`### 체크리스트` **6 항목** + 상위 Test plan 1 항목"_ 은 stale — 템플릿 실측은 **체크박스 5 항목 + `###` 헤더 2 항목**이다 (재현: `sed -n '/^### 체크리스트$/,/^### /p' .github/PULL_REQUEST_TEMPLATE.md | grep -c "^- \[ \]"` → 5). ② `.claude/skills/volt-review/SKILL.md` 가 reviewer §6 의 삭제된 하드코딩 grep 을 가리키던 **dead reference** 해소.
+
+  **HEADER_PATTERN 은 ATX 레벨을 가리지 않는다 (측정 기반 선택).** 템플릿이 쓰는 레벨은 `###` 이지만 묻는 것은 _"섹션 헤더로 존재하는가"_ 이지 레벨이 아니다. 420 셀 민감도: `#{1,6}` → **387/21/12** (채택) vs `#{3}` 엄격 → **385/23/12** (봇 PR `#924`·`#925` 의 `## Test plan` 2셀 (술어: `--check-corpus` 60 PR 중 `#{3}` 패턴에서만 WARN 으로 갈리는 셀. **release PR 아님** — release 클래스 WARN 집합은 두 패턴에서 불변이고, 두 봇 PR 은 CI 에서 job 스킵이라 **실제 가시 차이 0**)을 거짓 WARN 으로). 구조 축은 WARN 전용이라 느슨한 쪽이 거짓 WARN 을 줄이고 blocking 경계에는 영향이 없다. **코드 펜스 안 구조 hit 은 세지 않되 현 시점 영향은 0** 이다 — 펜스 안 hit **0건** (술어: 최근 머지 PR 60건 본문 전수, 라인이 계급 패턴 ∧ 해당 kw phrase 를 동시 만족한 hit 수 — 체크박스 계급 펜스 밖 **328** / 헤더 계급 펜스 밖 **118** / 닫히지 않은 펜스를 가진 PR 0). _"펜스 오탐을 잡았다"_ 는 과대 주장을 금지한다 (volt #101 measurement-first). **phrase 축은 펜스를 제외하지 않는다** — 제외하면 blocking 경계가 움직여 동치 증명이 깨진다.
+
+  **자기 적용 — `reviewer.md` §절차 4 로 본 PR 을 sweep** (술어: `git grep -nF --untracked -e '<패턴>' -- ':!*/dist/*'`, **경로 무제한**, 본 CHANGELOG entry **작성 전** 작업 트리. rev 와 `--untracked` 는 병용 불가라 트리 상태를 anchor 로 적는다). 표기 축 + **동작 서술 술어** 축 + **크기·수치** 축 3방향:
+
+  ```text
+  표기 (6)      AND | 측정 방법 C | 1차 구조 | 2차 phrase | 양쪽 | 0 hit
+  동작 서술 (5)  하나라도 hit | 동시 만족 | AND 로 판정 | AND 매칭 | OR 매칭
+  크기·수치 (7)  6 항목 | 7 체크박스 | 387 | 21 셀 | 420 | 76건 | 328
+  ```
+
+  | 술어                                   | 총 hit    | ① 활성 선언                            | ② 이력 기록 | ③ 역참조 가드 | ④ 규약 본문 자체 | ⑤ 무관 |
+  | -------------------------------------- | --------- | -------------------------------------- | ----------- | ------------- | ---------------- | ------ |
+  | `AND`                                  | 177       | **0**                                  | 3           | 0             | 2                | 172    |
+  | `측정 방법 C`                          | 20        | 14 (전부 3계급 정합)                   | 2           | 0             | 4                | 0      |
+  | `1차 구조`                             | 11        | 8 (근사 블록 1건은 _"정본 아님"_ 명시) | 0           | 0             | 1                | 2      |
+  | `2차 phrase`                           | 6         | 6                                      | 0           | 0             | 0                | 0      |
+  | `양쪽`                                 | 130       | 3                                      | 0           | 0             | 0                | 127    |
+  | `하나라도 hit`                         | 1         | 0                                      | 1           | 0             | 0                | 0      |
+  | `AND 로 판정` / `AND 매칭` / `OR 매칭` | 1 / 0 / 0 | **0**                                  | 1           | 0             | 0                | 0      |
+
+  **완료 기준 1 (본 측정 관련 `AND` 활성 hit = 0) 충족** — 잔존 5 hit 은 전부 본 PR 이 새로 쓴 문장 안의 **구 문언 반례 인용(②)** 과 **ADR 자신의 옵션 라벨(④)** 이다. **0 hit 으로 _"잔여 0"_ 을 선언하지 않았다** — 넓게 훑어 N hit 을 얻고 5분류로 실잔존 0 을 보였다. ⑤ 무관의 대종은 `-F` 과매칭이다 (`ROOT_MD_CANDIDATES` / `VSYNC_BAND_LO` / `CONFIG_CANDIDATES` 의 `AND`, 타 도메인의 `양쪽`).
+
+  **후속 분리** (설계 §비목표): [#1014](https://github.com/coseo12/astro-simulator/issues/1014) release PR 본문 클래스 미스매치 (FAIL 10 PR + WARN 8 PR 실측 — ADR §재검토 조건 1 과 연동) / [#1013](https://github.com/coseo12/astro-simulator/issues/1013) 문서의 _"1차 구조 grep"_ 예시가 실제로는 구조를 재지 않는 문제.
+
+  **cross-validate (agy, 2026-08-11, `cross_validate.sh code 1015`) — 결론 승인** (_"코드 품질·테스트 설계·수학적 검증·문서화 수준 모두 매우 뛰어나며 즉시 머지하기에 적합"_). 메인 수행(`developer.md` #479 로 developer 페르소나 직접 호출 금지). **합의**: SSoT 수렴이 문서↔가드 drift 의 **근본 원인 제거**라는 평가 / DoD 4축 충족 확인 / 11파일 범위는 _"동시 변경하지 않으면 오히려 drift 창이 열린다"_ 로 타당. **이견 0** — 제기된 2건은 반대가 아니라 **후속 이행 사항**(ADR 전이 확인 / release PR **8건**의 WARN 모니터링 → [#1014](https://github.com/coseo12/astro-simulator/issues/1014))이라 반영할 diff 가 없다. ADR [`20260811-1010`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) 을 **Accepted 전이**하고 §교차검증 4축을 채웠다. ⚠️ **편향 셀프 체크** — 본 이슈를 연 것이 메인 자신이고 **그 전제 2건이 설계 단계에서 실측 반박**됐다(원 의도는 `AND` 가 아니라 **`OR`** / _"안 드러났다"_ 가 아니라 **719 run 중 76건 FAIL 실발화**). `--limit 50` 표본이 최근 success 구간에 몰린 것을 모르고 단정한 것이며, **자기 프레이밍을 검증 없이 설계 입력으로 넘긴 편향**을 architect 의 measurement-first 가 차단했다.
+
 ## [0.66.0] — 2026-08-10
 
 ### Behavior Changes
