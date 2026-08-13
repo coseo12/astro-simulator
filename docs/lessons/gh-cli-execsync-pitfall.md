@@ -102,14 +102,18 @@ _"셸을 경유해 마크다운·코드를 전달하는 모든 명령"_ 으로 �
 
 **대상 아님 (실측 근거)**
 
-- `gh pr edit` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며, `--title` (`docs/skills-guide.md:22`) 은 본문이 아니라 한 줄 제목이라 마크다운 전달 경로가 아니다
+- `gh pr edit` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며, `--title` (`docs/skills-guide.md:22`) 은 **본 저장소 PR 제목 `0/400` 이 백틱 보유**라 실제 전달량이 없다 (`gh pr list --state all --limit 400 --json title`, 술어 = 제목에 `` ` `` 포함한 PR 수)
+
+  > ⚠️ **_"제목은 한 줄이라 마크다운 경로가 아니다"_ 라고 쓰지 않는다** — categorical 근거는 반증된다. 같은 저장소 **이슈 제목은 `2/400` 이 백틱을 보유**하고 ([#318](https://github.com/coseo12/astro-simulator/issues/318) 의 `` `Tier` ``·`` `activeTier` ``, [#221](https://github.com/coseo12/astro-simulator/issues/221) 의 `` `window.__simStore` ``), 무엇보다 **커밋 subject 도 한 줄인데 §대상**이라 문서 내부와도 어긋난다. 위 제외는 **`gh pr edit --title` 이라는 좁은 축의 실측**일 뿐이다.
+  >
+  > **형제 명령 `--title` 축은 미판정**이다 — `gh issue create --title` (`.claude/agents/pm.md:109` / `.claude/skills/cross-validate/scripts/cross_validate.sh:408`) 과 `gh pr create --title` (`.claude/skills/create-pr/SKILL.md:55`) 로 전이하면 이슈 제목 `2/400` 때문에 위 근거가 **거짓이 된다**. 후속 [#1045](https://github.com/coseo12/astro-simulator/issues/1045) 소관.
 - `gh release create --notes` — `--notes` 를 리터럴로 넘기는 사용처 0 (`gh release create <tag>` / `--target` 만)
 - `gh pr create --body` — `create-pr` 스킬 경유가 **의무**라 직접 호출 자체가 금지 (에이전트 5개 파일에 박제)
 - `scripts/verify-pr-template-checklist.mjs` — 이미 `spawnSync` + `--body-file -` (volt #114 fix 적용분)
 - `.claude/skills/cross-validate/scripts/cross_validate.sh` — `--body "${body}"` 변수 확장이라 §리터럴만 위험하다 에 의해 안전
 - `.claude/skills/{create-issue,capture-volt,create-pr}/SKILL.md` — 이미 `--body "$(cat <<'EOF'` **따옴표 친 heredoc** (`create-issue:48` / `capture-volt:125`·`:156` / `create-pr:56`)
 
-> 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 본 문서가 §변형 에서 제시한 형태가 저장소 스킬 3종에 **이미 정착해 있었다**. 신규 관행을 요구하는 게 아니라, `git commit` 과 위 반례가 그 관행에서 빠져 있었을 뿐이다.
+> 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 단, **축을 좁혀야 참이다**. 스킬 3종이 정착시킨 것은 **따옴표 친 heredoc (`<<'EOF'`)** 이고, 그 축에서는 본 문서가 요구하는 것이 **신규 관행이 아니다**. 반면 **전달 경로는 다르다** — 스킬 3종은 `--body "$(cat <<'EOF')"` 로 **명령 치환**을 거쳐 argv 로 넘기고, §변형 의 처방은 `-F -` 로 **stdin** 에 흘린다. 즉 _"이미 정착해 있었다"_ 는 **구분자 따옴표 축 한정**이며, stdin 축까지 정착했다는 뜻은 아니다.
 
 ## 회귀 가드 — 채택 기각 (#996)
 
@@ -145,9 +149,18 @@ git log -1 --format=%s   # -> docs: threshold `n>=3` rule   (백틱 1 → 가드
 git log -1 --format=%s   # -> docs: threshold  rule         (백틱 0 → 가드 침묵)
 ```
 
-가드는 **안전한 커밋에만 발화하고 손상된 커밋에는 침묵한다**. 정밀도가 낮은 게 아니라 **부호가 뒤집혀 있다** — 임계를 조정해 구제할 수 있는 종류의 실패가 아니다.
+정확히 말하면 **소비된 토큰은 어떤 경로에서도 신호를 남기지 않는다**. 발화 원인은 언제나 **살아남은(= 안전한) 토큰**이므로, 이 가드의 **손상 민감도는 구조적으로 `0`** 이다.
 
-> **이 논거는 모집단 선택에 의존하지 않는다** — 의도적으로 그렇게 골랐다. 초판은 _"metachar 는 정상 관행이라 상시 발화한다"_ 는 **base rate 논거**(`%B` 300커밋 백틱 `319`)를 썼는데, PR [#1044](https://github.com/coseo12/astro-simulator/pull/1044) 리뷰가 **모집단이 틀렸음**을 지적했다: `%B` 300커밋의 **97.3%** 는 squash·merge 로 **GitHub 이 조성**한 본문이라 로컬 셸 `-m` 을 통과한 적이 없다. 실제 위험 모집단인 **subject** 로 좁히면 백틱 보유는 rev `9ca671b` 기준 **`0/300`** (`git log -n 300 --format=%s | grep -cF` 백틱)이라 _"상시 발화"_ 가 **뒤집힌다**. 결론은 축 1·2 로 이미 결정적이었으나, **논거 하나가 재측정으로 무너지는 상태를 남기지 않기 위해** 모집단 독립 형태로 교체했다.
+> ⚠️ _"손상되면 침묵한다"_ 라고는 쓸 수 없다 — **혼합 케이스가 반증한다**. 한 메시지에 이스케이프쌍과 비이스케이프쌍이 섞이면 **발화하면서 동시에 손상된다**.
+>
+> ```sh
+> /bin/sh -c 'git commit -m "docs: keep \`this\` but run `echo GONE`"'
+> git log -1 --format=%s   # -> docs: keep `this` but run GONE   (백틱 1 → 발화, 그런데 손상됨)
+> ```
+>
+> 그럼에도 결론은 **약해지지 않고 넓어진다**. 발화를 만든 것은 살아남은 `` `this` `` 이지 소비된 `` `echo GONE` `` 이 아니기 때문이다. 대조군 2개가 기여도를 분리한다 — **손상은 같은데 안전 토큰만 없애면 침묵**(`docs: run GONE` → 백틱 `0`), **손상이 없어도 안전 토큰만 있으면 발화**(``docs: keep `this` only`` → 백틱 `1`). 즉 손상 항의 가중치가 `0` 이라 **임계뿐 아니라 어떤 가중치 조합으로도** 이 신호를 손상 검출기로 만들 수 없다.
+
+> **이 논거는 모집단 선택에 의존하지 않는다** — 의도적으로 그렇게 골랐다. 초판은 _"metachar 는 정상 관행이라 상시 발화한다"_ 는 **base rate 논거**(`%B` 300커밋 백틱 `319`)를 썼는데, PR [#1044](https://github.com/coseo12/astro-simulator/pull/1044) 리뷰가 **모집단이 틀렸음**을 지적했다: `%B` 300커밋의 **97.3%** (rev `9ca671b`, squash `237` + merge `55` = `292/300`. 술어: subject 가 `(#N)$` 또는 `Merge pull request` 로 시작) 는 **GitHub 이 조성**한 본문이라 로컬 셸 `-m` 을 통과한 적이 없다. 실제 위험 모집단인 **subject** 로 좁히면 백틱 보유는 rev `9ca671b` 기준 **`0/300`** (`git log -n 300 --format=%s | grep -cF` 백틱)이라 _"상시 발화"_ 가 **뒤집힌다**. 결론은 축 1·2 로 이미 결정적이었으나, **논거 하나가 재측정으로 무너지는 상태를 남기지 않기 위해** 모집단 독립 형태로 교체했다.
 
 ### 채택 가능한 부분집합이 있는가 — 없다 (측정으로 기각)
 
@@ -161,7 +174,7 @@ git log -1 --format=%s   # -> docs: threshold  rule         (백틱 0 → 가드
   | `fix: bump to $VERSION`              | `fix: bump to`           | 0         |
   | ``refactor: `helper` split``         | `refactor:  split`       | 1         |
 
-첫 행이 이 판정의 핵심이다 — `fix: drop path handling` 은 **문법적으로 완전하고 자연스러운 커밋 메시지**다. 어떤 검사도 이것을 손상으로 분류할 수 없고, 사람도 원문을 모르면 못 알아본다. **재현율이 구조적으로 `1/3` 로 묶이고, 놓치는 `2/3` 는 축 1 에 의해 다른 어떤 방법으로도 복구 불가능하다** — 정밀도를 아무리 끌어올려도 지배적 실패 모드가 통째로 남는다.
+첫 행이 이 판정의 핵심이다 — `fix: drop path handling` 은 **문법적으로 완전하고 자연스러운 커밋 메시지**다. 어떤 검사도 이것을 손상으로 분류할 수 없고, 사람도 원문을 모르면 못 알아본다. **재현율이 구조적으로 `1/3` 로 묶인다** (술어: 소실 토큰의 **위치 3분류** — 앞 토큰에 인접 / 뒤 토큰에 인접 / 양쪽 공백 사이 — 중 흔적 보유는 **마지막 1분류뿐**). 놓치는 **`2/3`** 는 축 1 에 의해 다른 어떤 방법으로도 복구 불가능하므로, 정밀도를 아무리 끌어올려도 지배적 실패 모드가 통째로 남는다.
 
 > **정밀도(오탐) 축은 근거로 쓰지 않는다** — 축 3 과 같은 모집단 함정이 있다. `%B` 기준 연속 공백은 rev `9ca671b` 에서 **36줄**(`git log -n 300 --format=%B | grep -cE '[^ ]  +[^ ]'`, 술어 = 매칭 줄 수)이고 표본은 전부 표 정렬 서식이지만, **위험 모집단인 subject 로 좁히면 `0/300`** 이다. 즉 오탐은 실제로 적다. 기각 근거는 오탐이 아니라 **위 재현율 상한**이다.
 
