@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.71.0] — 2026-08-13
+
 ### Changed
 
 - **ADR `20260808-983` §Amendment 2 — 오기록 6(술어 비교환) 병치 **검출 가드** 채택 기각** ([#1006](https://github.com/coseo12/astro-simulator/issues/1006), **Accepted** — cross-validate agy 2026-08-13, architect 수행). (iv) §확장 이 남긴 _"정밀도·재현율 튜닝이 남은 문제"_ 를 실측으로 종결한다. **기각 근거는 *"원리적 불가"* 가 아니라 측정된 정밀도**다 — 그 문장의 반증이 이슈 #1006 의 존재 이유이므로 회귀하지 않는다. **행동 변화 0 · 코드 변경 0 · 규범 조문 변경 0** (§결정 / §결과 / (iv) 본문 전부 무접촉, dated 포인터만 부기 — 소급 치환 금지).
