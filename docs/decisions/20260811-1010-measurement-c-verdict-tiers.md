@@ -246,7 +246,7 @@ ADR [20260807-971](20260807-971-required-status-checks.md) **결정 9-1** 이 �
 
 ## 재검토 조건
 
-1. **WARN 이 영구 배경음이 되면 그 자체가 silent 약화다.** WARN 이 **연속 3 릴리스에서 release PR 클래스에 지속 발화**하면 (a) 템플릿 개정 또는 (b) release PR 예외 정식화 중 **택일한다 — 무기한 WARN 방치 금지**. 실측 base rate: 최근 60 PR 중 release PR **8건 WARN**. 추적 이슈 [#1014](https://github.com/coseo12/astro-simulator/issues/1014)
+1. ⚠️ **[대체됨 → [20260813-1014](20260813-1014-release-pr-class-no-op.md) §재검토 조건 1-A / 1-B]** **WARN 이 영구 배경음이 되면 그 자체가 silent 약화다.** WARN 이 **연속 3 릴리스에서 release PR 클래스에 지속 발화**하면 (a) 템플릿 개정 또는 (b) release PR 예외 정식화 중 **택일한다 — 무기한 WARN 방치 금지**. 실측 base rate: 최근 60 PR 중 release PR **8건 WARN**. 추적 이슈 [#1014](https://github.com/coseo12/astro-simulator/issues/1014)
 
    > **Amendment 1 (2026-08-13, [#1014](https://github.com/coseo12/astro-simulator/issues/1014)) — 본 항은 대체됐다.** 정본은 [20260813-1014-release-pr-class-no-op.md](20260813-1014-release-pr-class-no-op.md) **§재검토 조건 1-A / 1-B** 다.
    >
