@@ -66,7 +66,7 @@ develop   ← 동기화 유지 (누락 시 drift)
 |---|---|---|---|
 | 1 | `develop` / `main` | — | release PR / hotfix merge-back 의 **head** |
 | 2 | `<type>/<이슈번호>-<설명>` | `feature/962-branch-name-guard` | type = `feature` `fix` `refactor` `chore` `docs` `test` `hotfix`. 이슈번호·설명 **둘 다 필수**, 소문자 전용, 슬래시 1개 |
-| 3 | `release/v?X.Y.Z-prep` | `release/0.60.0-prep`, `release/v0.53.0-prep` | `v` 유무 **양쪽 허용** (표기가 실제로 진동 중 — ADR §2-3). `-prep` 은 필수 |
+| 3 | `release/X.Y.Z-prep` | `release/0.60.0-prep`, `release/0.71.0-prep` | `v` 접두 **불허** (#972 — 이 자리는 *버전* 이지 *태그* 가 아니다). `-prep` 은 필수 |
 | 4 | `chore/<봇패턴>-<run_id>` | `chore/r1-baseline-linux-30725438161` | 봇 전용. CI run 이 만들어 이슈번호가 **구조적으로 부재** |
 
 > 이 표는 `node scripts/verify-branch-name.mjs --verify-ssot` 가 **기계 대조**한다 — 각 행의 예시를 런타임 판정기로 분류하고 2행의 type 열거를 정본 상수와 양방향 대조하므로, 표만 고치면 CI 가 차단한다. **정본(스크립트 상수)을 먼저 고치고 표를 맞추는** 순서로 편집할 것.
