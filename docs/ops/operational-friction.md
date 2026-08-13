@@ -165,6 +165,7 @@ gh pr checks <PR> --json name,state --jq \
 
 - **CHANGELOG `[Unreleased]` 누락 전수 대조 의무**: develop 이 main 보다 앞선 커밋이 CHANGELOG 항목보다 많을 수 있다(이전 세션들이 항목 누락). 릴리스 전 `git log origin/main..origin/develop` 로 **포함 PR 전수 대조** → 누락분 소급 문서화. v0.48.0 은 9 커밋 중 6건 CHANGELOG 누락 발견.
 - **release prep PR 필수**: version bump + CHANGELOG 확정은 develop 직접 push 금지라 `release/<X>-prep → develop` prep PR 로 선반영 후 release PR(develop→main).
+  - ⚠️ **본문 생성은 `create-pr` 스킬 경로로 한다 (#1014)**: prep PR 도 예외가 아니다. `gh pr create --body`/`--body-file` 직접 호출은 스킬의 템플릿 동적 읽기 + pre-flight 를 통째로 우회해 체크리스트 누락 → `pr-template-checklist` **FAIL** 로 릴리스 흐름이 끊긴다. 실측: #912 · #964 · #1032 의 첫 run `failure` **3건이 전부 prep PR** 이고 (13일 창, 같은 창 prep PR 17건 중 **17.6%**), #1032 는 FAIL 6/7 로 체크리스트가 통째로 빠져 있었다. 판정 근거는 [ADR 20260813-1014](../decisions/20260813-1014-release-pr-class-no-op.md) §잔여 갭.
 - **release PR 도 pr-template-checklist 가드 대상**: 7 체크박스 원문 문구("ADR 호환성"/"Test plan"/"SSoT" 등) 전부 필요 — release 전용 섹션만으론 FAIL. 로컬 사전검증: `node scripts/verify-pr-template-checklist.mjs <PR>`.
   - ⚠️ **문구만으로는 WARN 이 남는다 (#1010)**: 3계급 판정에서 phrase 는 blocking 축이고 **구조**(`kw1~5` 체크박스 / `kw6~7` `###` 헤더)는 WARN 축이다. 체크박스 항목을 `### 보안` 같은 헤더 절로 옮기면 FAIL 은 면해도 WARN 이 뜬다 — 실측으로 최근 머지 PR 60건 중 **release PR 8건이 이 경로**였다 (술어: 60 PR × 7 kw = 420 셀 중 WARN 21 셀, WARN PR 10건 중 8건이 release). 체크박스는 `[ ] → [x]` 갱신만 하고 라인 형태를 유지한다.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
