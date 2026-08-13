@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.70.0] — 2026-08-13
+
 ### Behavior Changes
 
 - **[#1013] 측정 방법 C 의 근사 2-grep 블록 제거 — 정본 가드 호출만 남긴다 (MINOR)** ([#1013](https://github.com/coseo12/astro-simulator/issues/1013)) — [#1010](https://github.com/coseo12/astro-simulator/issues/1010) 후속 B. `.claude/agents/developer.md` §측정 방법 C 가 싣던 _"1차 구조 grep"_ 은 **이름과 동작이 달랐다** — `grep -c "<체크박스 항목명>"` 에는 `- [ ]` / `- [x]` 구문 요구가 없어 산문 한 줄에도 hit 했고, 결국 바로 아래 _"2차 phrase grep"_ 과 **판정이 동일**했다. 즉 문서 안에서 두 명령이 같은 것을 재면서 다른 이름을 달고 있었다.
