@@ -111,16 +111,33 @@ function runCheck() {
   const count = countCodePoints(target);
   const pctOfFail = ((count / failLimit) * 100).toFixed(1);
 
+  // 문구 계약 (#988): 아래 3개 판정이 모두 `>=` 이므로 stdout 은 "이상" 이다. 구 문구 "초과" 는
+  // 33,000 정각에서 `33,000 chars — 경계 경보 임계 33,000 초과` 라는 자기모순을 냈다 (#980 축 B 가
+  // governance §4.1 산문 3줄만 "이상" 으로 고치고 stdout 은 부채로 남긴 것).
+  //
+  // 당시 미수정 사유였던 "외부 grep 계약 우려" 는 실측으로 반박됐다 — 술어는
+  //   git grep -nF -e 'WARN-BOUNDARY' -e 'WARN-PR' -e '경계 경보 임계' -e 'PR warn 임계' -e 'fail 임계' -- .
+  // 를 리포 루트에서 **경로 무제한**으로 실행한 것이다 (경로 인자로 자르지 않는 것이 요점 — #980
+  // 축 B 자신이 경로 제한 grep 으로 .github/ 를 놓친 전례가 있다). 본 파일 외 hit 은 전부
+  // CHANGELOG 안의 **과거 출력 인용**이고 파서가 아니다 — 즉 stdout 을 파싱하는 소비처는 **0**
+  // (인용문은 시점 기록이라 보존이 옳다. hit 수는 CHANGELOG 가 자라며 늘어나므로 고정 수치를
+  // 적지 않는다). 유일 호출처 `.github/workflows/project-guards.yml` 도 exit code 만 쓴다
+  // (stdout 을 파이프·grep 하지 않음). 다음 라운드에서 같은 가설을 다시 세우지 않도록
+  // 술어째로 박제한다.
+  //
+  // 회귀 방지: 아래 self-test 의 경계 3케이스(33,000 / 40,000 / 45,000 정각)가 "이상" 을 단언하고
+  // "초과" 잔존을 금지한다. 본 파일에 남은 "초과" 는 헤더 :10 (과거 실측 36,817 > 35,000 서술) 과
+  // negative 픽스처 주석 (46,000 > 45,000) 뿐이며 둘 다 진짜 강부등호라 의도적 존치다.
   if (count >= failLimit) {
     console.error(
-      `${MARK_FAIL} CLAUDE.md ${fmt(count)} chars — fail 임계 ${fmt(failLimit)} 초과. ` +
+      `${MARK_FAIL} CLAUDE.md ${fmt(count)} chars — fail 임계 ${fmt(failLimit)} 이상. ` +
         `감축 PR 필수 (docs/guides/claudemd-governance.md §1 각인층/참조층 분리).`,
     );
     process.exit(1);
   }
   if (count >= warnPr) {
     console.log(
-      `${MARK_WARN_PR} CLAUDE.md ${fmt(count)} chars — PR warn 임계 ${fmt(warnPr)} 초과 ` +
+      `${MARK_WARN_PR} CLAUDE.md ${fmt(count)} chars — PR warn 임계 ${fmt(warnPr)} 이상 ` +
         `(fail ${fmt(failLimit)} 의 ${pctOfFail}%). 신규 인라인 블록 추가 금지 — ` +
         `docs/ 참조층으로 추출할 것 (governance §2 추출 기준).`,
     );
@@ -128,7 +145,7 @@ function runCheck() {
   }
   if (count >= warnBoundary) {
     console.log(
-      `${MARK_WARN_BOUNDARY} CLAUDE.md ${fmt(count)} chars — 경계 경보 임계 ${fmt(warnBoundary)} 초과 ` +
+      `${MARK_WARN_BOUNDARY} CLAUDE.md ${fmt(count)} chars — 경계 경보 임계 ${fmt(warnBoundary)} 이상 ` +
         `(fail ${fmt(failLimit)} 의 ${pctOfFail}%). 신규 블록 추가 시 governance §1.3 판정 질문 적용 권장.`,
     );
     process.exit(0);
@@ -170,6 +187,14 @@ function runSelfTest() {
     return p;
   };
 
+  /**
+   * 문구 계약 (#988) — 세 판정이 모두 `>=` 이므로 대역 메시지는 "이상" 이어야 하고 "초과" 는 금지.
+   * 아래 경계 3케이스(정각 픽스처)에 합쳐 단언한다 — 정각이야말로 두 낱말의 진리값이 갈리는
+   * 유일한 지점이라 별도 케이스보다 여기 붙는 게 옳고, 단언 수가 안 변해 케이스 수를 인용한
+   * 기존 기록(CHANGELOG 등)과의 drift 도 생기지 않는다.
+   */
+  const wordingOk = (out) => out.includes('이상') && !out.includes('초과');
+
   try {
     console.log('self-test: verify-claudemd-size.mjs (fixture 주입)');
 
@@ -203,8 +228,8 @@ function runSelfTest() {
     // 내며 FAIL 한다 (구 임계에서는 33,000 이 조용한 pass 구간이었다).
     const b2 = invoke(asciiFixture('b33000.md', 33_000));
     assert(
-      '경계: 33,000 → 경계 경보 (exit 0)',
-      b2.status === 0 && b2.stdout.includes(MARK_WARN_BOUNDARY),
+      '경계: 33,000 정각 → 경계 경보 + "이상" 문구 (exit 0)',
+      b2.status === 0 && b2.stdout.includes(MARK_WARN_BOUNDARY) && wordingOk(b2.stdout),
       `status=${b2.status} stdout=${b2.stdout.trim()}`,
     );
     const b3 = invoke(asciiFixture('b39999.md', 39_999));
@@ -214,8 +239,8 @@ function runSelfTest() {
     );
     const b4 = invoke(asciiFixture('b40000.md', 40_000));
     assert(
-      '경계: 40,000 → PR warn (exit 0)',
-      b4.status === 0 && b4.stdout.includes(MARK_WARN_PR),
+      '경계: 40,000 정각 → PR warn + "이상" 문구 (exit 0)',
+      b4.status === 0 && b4.stdout.includes(MARK_WARN_PR) && wordingOk(b4.stdout),
       `status=${b4.status} stdout=${b4.stdout.trim()}`,
     );
     const b5 = invoke(asciiFixture('b44999.md', 44_999));
@@ -224,7 +249,11 @@ function runSelfTest() {
       b5.status === 0 && b5.stdout.includes(MARK_WARN_PR),
     );
     const b6 = invoke(asciiFixture('b45000.md', 45_000));
-    assert('경계: 45,000 → fail (exit 1)', b6.status === 1 && b6.stderr.includes(MARK_FAIL));
+    assert(
+      '경계: 45,000 정각 → fail + "이상" 문구 (exit 1)',
+      b6.status === 1 && b6.stderr.includes(MARK_FAIL) && wordingOk(b6.stderr),
+      `status=${b6.status} stderr=${b6.stderr.trim()}`,
+    );
 
     // --- 멀티바이트 회귀 (#203 원 버그 클래스: 바이트 카운트 시 한글 3배 부풀림) ---
     // 한글 36k code points = UTF-8 108KB. 바이트 측정 버그면 fail(45k) 오탐,

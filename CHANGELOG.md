@@ -5,6 +5,22 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#988] 가드 stdout `초과` → `이상` — 구현(`>=`)과의 off-by-one 자기모순 해소** ([#988](https://github.com/coseo12/astro-simulator/issues/988)) — `scripts/verify-claudemd-size.mjs` 의 대역 판정 3개는 전부 `count >= 임계` 인데 stdout 3줄은 `초과` 라고 적어, **정각에서 자기 자신을 초과한다**고 말했다. 착수 전 실측(`mktemp` 격리 정각 픽스처): `[WARN-BOUNDARY] CLAUDE.md 33,000 chars — 경계 경보 임계 33,000 초과` / `PR warn 임계 40,000 초과` / `fail 임계 45,000 초과`. [#980](https://github.com/coseo12/astro-simulator/issues/980) 축 B 가 [`claudemd-governance.md`](docs/guides/claudemd-governance.md) §4.1 산문 3줄(`33k 이상` / `40k 이상` / `45k 이상`)만 고치고 stdout 은 부채로 남긴 것이라, 같은 계약의 두 표현이 서로 반대말인 상태였다. 그 PR 의 cross-validate 도 후속 권고로 올렸으나 _"외부 grep 계약 우려"_ 로 미수정됐다.
+
+  **그 미수정 사유를 술어째 박제한다** (#988 §범위 3항 — 다음 라운드에서 같은 가설이 재수립되지 않도록). 술어는 `git grep -nF -e 'WARN-BOUNDARY' -e 'WARN-PR' -e '경계 경보 임계' -e 'PR warn 임계' -e 'fail 임계' -- .` 를 리포 루트에서 **경로 무제한**으로 실행한 것이다 — 경로 인자로 자르지 않는 것이 요점이고, 바로 #980 축 B 자신이 경로 제한 grep 으로 `.github/` 를 놓쳐 _"모든 위치 정합"_ 주장이 반증된 전례다. ⚠️ **이슈 본문의 _"hit 0"_ 은 엄밀히는 부정확했다** — 착수 시점에 본 파일 외 hit 이 **1건** 있었다(#980 축 B entry 가 _"행동 변화 실증"_ 으로 인용해 둔 stdout 원문). 다만 그것은 **과거 출력 텍스트**(시점 기록이라 보존이 옳다)이고 파서가 아니므로, **stdout 을 파싱하는 소비처 `0`** 이라는 결론과 _"깨질 계약이 없다"_ 는 판단은 그대로 성립한다. 본 entry 자체도 stdout 을 인용하므로 위 술어의 CHANGELOG hit 수는 앞으로 계속 늘어난다 — **그래서 스크립트 주석에는 고정 수치 대신 술어와 _"CHANGELOG hit 은 전부 인용"_ 이라는 성질만 박제했다**. 추적 밖 파일을 포함하는 `grep -rn -e 'WARN-BOUNDARY' -e 'WARN-PR' -e '경계 경보 임계' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next -l` 도 같은 2파일만 낸다. 유일 호출처 `.github/workflows/project-guards.yml:62,64` 는 `run: node scripts/verify-claudemd-size.mjs [--self-test]` 라 **exit code 만** 쓴다(stdout 을 파이프·grep 하지 않음). 같은 술어를 스크립트 주석에도 남겼다.
+
+  **문구를 아무도 단언하지 않았다는 것이 이 부채가 살아남은 경로다** — 착수 시점 `--self-test` 18 단언은 전부 마커(`[WARN-BOUNDARY]` 등)와 `status` 만 봤고 `초과`/`이상` 은 보지 않았다. 경계 3케이스(`33,000` / `40,000` / `45,000` **정각**)에 _"`이상` 포함 + `초과` 부재"_ 단언을 **기존 단언에 합쳐** 넣었다 — 정각이 두 낱말의 진리값이 갈리는 유일한 지점이라 자리가 맞고, **단언 수가 `18` 로 불변**이라 케이스 수를 인용한 기존 기록과의 drift 및 그에 따른 전수 sweep 이 발생하지 않는다. **negative 실증**: 3문구 전부 `초과` 로 되돌린 사본 → `15 passed, 3 failed` (exit `1`) / 경계 1문구만 되돌린 사본 → `17 passed, 1 failed` (exit `1`) — 세 단언이 **독립 발화**한다.
+
+  **범위 밖 판정 2건 (조용한 스킵 아님)** — 본 파일에 남는 `초과` 2곳은 **진짜 강부등호**라 존치가 옳다. 헤더 `:10` 의 _"당시 경보 임계 35k 를 초과한 (실측 36,817 chars)"_ 는 `36,817 > 35,000` 인 **과거 실측 서술**(이력 기록)이고, self-test `negative` 주석 _"45k 초과 → exit 1"_ 은 픽스처가 `46,000` 이라 `46,000 > 45,000` 인 **픽스처 서술**이다. 둘 다 대역 계약(`>=`)이 아니라 특정 수치 쌍의 관계를 말하므로 `이상` 으로 바꾸면 오히려 약해진다.
+
+  **검증** (전부 파이프 없이 `$?` 확인): `node scripts/verify-claudemd-size.mjs` → `[PASS] CLAUDE.md 23,479 chars — 예산 33,000 이내.` exit `0` / `--self-test` **18/18 PASS** exit `0`. 정각 픽스처 사후 재실행 3종이 전부 `이상` 을 내고 **exit code 는 전후 동일**(`33,000` → `0` / `40,000` → `0` / `45,000` → `1`), 대역 경계도 불변(`32,999` → `[PASS] … 예산 33,000 이내.`).
+
+  **PATCH 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"이 변경으로 에이전트가 같은 입력에 다르게 동작하는가"_): **아니오.** 비교 연산자 3개와 `DEFAULT_*` 상수는 무접촉이고, 위 실측대로 대역 경계와 exit code 가 전건 동일하다. 유일 호출처가 exit code 만 쓰므로 CI 판정도 불변이며 `.claude/**` 는 무접촉이라 에이전트가 로드하는 지시 내용도 불변이다. **쟁점은 _"사람이 읽는 진단이 바뀌는 것을 행동 변화로 볼 것인가"_** 인데, 에이전트에게 지시로 주어지는 계약(governance §3 표 / §4.1)은 이미 `이상` 이었고 본 PR 은 runtime 진단을 그 지시 쪽으로 맞춘 것이라 입력 → 행동 사상이 바뀌지 않는다. §SemVer 의 _"판정 애매 시 낮은 쪽"_ 도 PATCH 를 지지한다.
+
+### Behavior Changes: None — 문서/문구만
+
 ## [0.71.0] — 2026-08-13
 
 ### Changed
