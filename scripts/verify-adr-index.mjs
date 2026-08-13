@@ -412,13 +412,14 @@ function main(args = process.argv.slice(2), env = process.env) {
   return 0;
 }
 
-// ── --self-test: 격리 픽스처 F1~F19 / 46 단언 (가드 도입 PR DoD 축 1~3) ──────
+// ── --self-test: 격리 픽스처 F1~F19 / 47 단언 (가드 도입 PR DoD 축 1~3) ──────
 //  F19 는 CLI 표면(모드 디스패치 + main() 종료 코드 + 배선)이라 세부 케이스가 많아
-//  `F19a`~`F19n` 으로 나뉜다. 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
+//  `F19a`~`F19o` 로 나뉜다. 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
 //  ADR `20260813-1020-adr-index-membership-marker-rejected.md` §결정 3 이 정본이다.
 //  ⚠️ 그 grep 문자열을 **본 파일 안에 인용하지 않는다** — 인용하는 순간 주석 자신이 hit 이 되어
-//  `grep 결과 == 'N passed'` 라는 자기 검증 등식이 영구히 1 어긋난다 (실측: 47 vs 46).
-//  같은 클래스를 F19l·F19m·F19n 이 별도로 다룬다 (volt #995 자기-매칭).
+//  `grep 결과 == 'N passed'` 라는 자기 검증 등식이 영구히 1 어긋난다 (실측: 당시 47 vs 46).
+//  같은 클래스를 F18·F19l~F19o 가 각각 다른 표면에서 다룬다 (volt #995 자기-매칭 — 패턴
+//  리터럴 / 감사 술어 오염 / 우회 관용구 박제 / 단언 메시지·주석 4표면. PR #1036 §Y-1·Y-2).
 function selfTest() {
   let pass = 0;
   let fail = 0;
@@ -681,8 +682,13 @@ function selfTest() {
         r.violations.length === 1 && /인덱스 표 앵커 중복/.test(r.violations[0].reason),
         `F18 앵커 중복 negative: 같은 헤더 표 2개 → FAIL (실측 ${r.violations.length}건)`,
       );
+      // ⚠️ **부정형 술어 + 빈 fallback 금지** (PR #1036 reviewer Y-2 — 자기-매칭 클래스의 3번째 멤버).
+      //  `!/…/.test(x ?? '')` 는 위반이 0건이면 `''` 를 검사해 **항상 참**이라 vacuous 하게 통과한다
+      //  (findIndex 회귀 주입에서 형제 2건은 FAIL 인데 이것만 PASS 로 실증됐다). 존재를 **먼저**
+      //  요구해 닫는다. 긍정형(`/…/.test(x ?? '')`)은 빈 문자열에서 안전하게 FAIL 하므로 같은
+      //  fallback 을 써도 무해하다 — 위험한 것은 fallback 자체가 아니라 **부정형과의 조합**이다.
       assert(
-        !/앵커 부재/.test(r.violations[0]?.reason ?? ''),
+        r.violations.length === 1 && !/앵커 부재/.test(r.violations[0].reason),
         'F18 앵커 중복 negative: "부재" 와 다른 사유 — 중복/부재를 같은 문자열로 보고하지 않는다',
       );
       assert(
@@ -778,7 +784,16 @@ function selfTest() {
       //  재현됐다 (배선 한 줄 제거 주입 → `46 passed, 0 failed`). 그래서 셋 다 **정규식**으로
       //  겸용한다: 메타문자 이스케이프(`\(` · `\.`) 때문에 정규식 **소스 텍스트가 자기 패턴과
       //  매칭되지 않고**, `^…$` + `m` 플래그가 들여쓰기 없는 **최상위 라인**만 겨눈다.
-      //  (셋 다 아래 주입으로 FAIL 재현 확인 — 배선 제거 / 시그니처 되돌림 / import 유입)
+      //  (넷 다 아래 주입으로 FAIL 재현 확인 — 배선 제거 / 시그니처 되돌림 / 리터럴·합성 모듈 유입)
+      //
+      // ⚠️ **자기-매칭의 나머지 표면 — 단언 메시지와 주석**. 정규식 *소스* 만 자기 매칭에서
+      //  빼면 부족하다. `F19o` 의 금지 토큰(동적 로더 호출 표기)을 **메시지에 그대로 적으면**
+      //  그 문자열이 자기 패턴에 매칭돼 HEAD 에서 false positive 가 난다 (reviewer 자기 고백).
+      //  **주석도 같다** — dev 가 이 블록에 우회 관용구를 *설명하려고* 그대로 인용했다가
+      //  HEAD 가 `46 passed, 1 failed` 로 떨어지는 것을 실측했다 (hit 2건 전부 주석).
+      //  ⇒ **본 가드가 금지하는 토큰은 이 파일의 산문에도 등장할 수 없다.** 비용은 우회
+      //  관용구를 축자 인용할 수 없다는 것이고, 이득은 주석까지 검사 대상이 된다는 것이다.
+      //  그래서 아래 메시지·주석은 전부 `동적 모듈 로드` 같은 **서술형**으로 쓴다.
       const selfSrc = readFileSync(path.join(SCRIPT_DIR, 'verify-adr-index.mjs'), 'utf8');
       const WIRING_RE = /^process\.exit\(dispatch\(process\.argv\.slice\(2\)\)\);$/gm;
       const MAIN_SIG_RE =
@@ -791,16 +806,38 @@ function selfTest() {
         (selfSrc.match(MAIN_SIG_RE) ?? []).length === 1,
         'F19m 배선: main() 이 argv/env 를 인자 기본값으로 주입받는다 (전역 직접 참조 회귀 차단)',
       );
-      // ⚠️ 모듈명을 **조각에서 합성**한다 — 리터럴로 적으면 본 단언 자신이 hit 이 되어
-      //  `grep -c '자식프로세스모듈명' scripts/verify-adr-index.mjs` 라는 **가장 흔한 감사 술어가
-      //  영구히 0 을 잃는다** (사람이 쓰는 술어를 가드가 오염시키는 형태의 자기-매칭).
-      //  합성 결과: 파일 전체에 그 낱말의 리터럴 occurrence 는 **0** 이면서 검사는 성립한다.
-      const CHILD_PROC_MODULE = ['child', 'process'].join('_');
-      const importRe = new RegExp(`import[^\\n]*['"](?:node:)?${CHILD_PROC_MODULE}['"]`);
-      const requireRe = new RegExp(`require\\(\\s*['"](?:node:)?${CHILD_PROC_MODULE}['"]`);
+      // F19n·F19o — 의존성 유입 차단. **denylist 가 아니라 allowlist 다** (PR #1036 reviewer Y-1).
+      //
+      //  denylist(금지 모듈명을 적고 없음을 확인)는 두 가지를 동시에 잃는다: ① 금지 낱말을
+      //  **소스에 적어야** 하므로 `grep -c <모듈명>` 이라는 사람의 감사 술어가 영구히 오염되고,
+      //  ② 그 오염을 피하려 모듈명을 조각에서 합성하면 **그 합성 관용구 자체가 우회 경로**가 된다.
+      //  실측 (reviewer 재현 + dev 독립 재현): 모듈명을 조각에서 합성한 뒤 **동적 로더로**
+      //  `'node:' + <합성값>` 을 부르는 3줄이면 모듈이 **실제로 로드**되는데도 (`spawnSync`
+      //  타입 `function` 확인) self-test 는 `46 passed, 0 failed`, `grep -c` 도 0 —
+      //  **가드와 사람이 동시에 침묵**한다. 축자 코드는 인용할 수 없다(위 ⚠️ 참조).
+      //
+      //  allowlist 로 뒤집으면 금지 낱말을 **적을 필요가 없어져** 두 문제가 함께 소멸한다.
+      //  검출 범위도 넓다 — 특정 모듈이 아니라 **allowlist 밖 모든 유입**을 잡는다.
+      //  ESM 이라 `require` 경로는 `node:module` 의 `createRequire` 를 거쳐야 하는데 그 import
+      //  자체가 allowlist 밖이므로 **구조적으로 닫힌다** (별도 검사 불요).
+      const ALLOWED_IMPORTS = [
+        './upstream-only-allowlist.mjs',
+        'node:fs',
+        'node:os',
+        'node:path',
+        'node:process',
+        'node:url',
+      ];
+      const declared = [...selfSrc.matchAll(/^import\s[^\n]*['"]([^'"]+)['"];\s*$/gm)]
+        .map((m) => m[1])
+        .sort();
       assert(
-        !importRe.test(selfSrc) && !requireRe.test(selfSrc),
-        'F19n 배선: 자식 프로세스 모듈 import 0 (#1018 cross-validate 보안 축 통과 근거 불변)',
+        JSON.stringify(declared) === JSON.stringify(ALLOWED_IMPORTS),
+        `F19n 배선: 정적 import 모듈 집합 == allowlist (실측 ${JSON.stringify(declared)})`,
+      );
+      assert(
+        (selfSrc.match(/\bimport\s*\(/g) ?? []).length === 0,
+        'F19o 배선: 동적 모듈 로드 0 — 합성 모듈명 우회 경로 차단 (Y-1 실측 근거)',
       );
     }
   } finally {

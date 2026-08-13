@@ -208,17 +208,27 @@ process.exit(dispatch(process.argv.slice(2)));
 grep -c 'assert(' scripts/verify-adr-index.mjs
 node scripts/verify-adr-index.mjs --self-test | tail -1
 # (2) 갱신 대상 전수 — F10 이상 표기는 본 가드 고유 (자매 가드는 F1~F9)
-git grep -nE 'F1~F1[0-9]' -- .
+#     ⚠️ 자릿수를 고정하지 않는다. 초판은 `F1~F1[0-9]` 였고 지금은 정확하지만 픽스처가 `F20` 에
+#     닿는 순간 `F1~F20` 을 **에러 없이 조용히 놓친다** — 본 ADR 이 겨눈 #1018 갱신 누락(3/3)의
+#     재발 경로를 술어 자신이 품고 있었다 (PR #1036 reviewer Y-4. "0 hit 은 결과가 아니라 신호").
+git grep -nE 'F1~F[0-9]+' -- .
 git grep -nE '[0-9]+ 단언' -- scripts/verify-adr-index.mjs .github/workflows/project-guards.yml docs/decisions/20260812-1005-adr-index-status-guard.md CHANGELOG.md
 ```
 
-**갱신한다** (현재 값 → 최종값):
+**갱신한다** (현재 값 → 최종값) — 아래 위치·표기는 **rev `fda9475` 착수 전 스냅샷**이다:
 
-| 위치 | 현재 표기 |
-|---|---|
-| `scripts/verify-adr-index.mjs:78` (호출 예시 주석) | `F1~F16` |
-| `scripts/verify-adr-index.mjs:390` (self-test 섹션 헤더) | `F1~F16` |
-| `.github/workflows/project-guards.yml:78` | `F1~F16` |
+| 착수 전 위치 (rev `fda9475`) | 착수 전 표기 | 구현 후 위치 (참고) |
+|---|---|---|
+| `scripts/verify-adr-index.mjs:78` (호출 예시 주석) | `F1~F16` | `:80` |
+| `scripts/verify-adr-index.mjs:390` (self-test 섹션 헤더) | `F1~F16` | `:415` |
+| `.github/workflows/project-guards.yml:78` | `F1~F16` | `:78` (불변) |
+
+> **시점 한정자 부기** (PR [#1036](https://github.com/coseo12/astro-simulator/pull/1036) reviewer Y-3).
+> 표의 값을 최종값으로 **치환하지 않은** 것은 옳다 — 착수 전 rev 에서 정확했던 기록이라
+> 치환하면 (a) 기록 위조이고 (b) 지시가 `F1~F19` → `F1~F19` 로 무의미해진다 (계급 ② 이력 기록).
+> 다만 본 §결정 3 이 [`20260812-1005`](20260812-1005-adr-index-status-guard.md) `:55`·`:120` 에
+> 처방한 **제3의 길(치환이 아닌 시점 명시)** 을 자기 표에만 적용하지 않았던 것이 결함이라,
+> 열 제목과 캡션에 시점을 못 박고 구현 후 라인 번호를 병기한다. 라인 drift 도 같은 한정자가 덮는다.
 
 **갱신하지 않는다 — 편집 금지 (계급 ② 이력 기록)**:
 
