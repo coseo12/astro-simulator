@@ -22,8 +22,10 @@
  * — 증거는 negative 픽스처다. `docs/lessons/guard-pr-dod.md`).
  *
  * ── 검사 계약 ───────────────────────────────────────────────────────────────
- *   1. 표 앵커 — `| 날짜 | 주제 | 상태 | 상하 관계 |` 헤더 + 구분선. 부재 시 FAIL
- *      (마크다운 표 파손 = 인덱스 자체 소실. PR #1009 헤딩 파손 클래스).
+ *   1. 표 앵커 — `| 날짜 | 주제 | 상태 | 상하 관계 |` 헤더 + 구분선. 헤더 **발생 수 != 1 이면
+ *      FAIL** — 0건은 마크다운 표 파손 = 인덱스 자체 소실 (PR #1009 헤딩 파손 클래스), 2건 이상은
+ *      첫 표만 검사되고 나머지가 **조용히 미검사**로 남는 경로다 (#1020 3항). 두 진단은 사유
+ *      문자열로 구분한다.
  *   2. 행 well-formedness — 데이터 셀 정확히 4개 / 주제 셀에 `.md` 링크 1건 이상 /
  *      날짜 셀 `YYYY-MM-DD` ↔ 파일명 `YYYYMMDD` 접두 일치 / 같은 파일 중복 등재 0.
  *   3. **상태 대조 (본체)** — 표 상태 셀의 상태 토큰 == ADR 실물 첫 `상태:` 메타데이터 라인의
@@ -75,7 +77,7 @@
  *
  * 호출:
  *   node scripts/verify-adr-index.mjs               # 검사 (CI 기본)
- *   node scripts/verify-adr-index.mjs --self-test   # 격리 픽스처 F1~F16 (positive/negative/recovery)
+ *   node scripts/verify-adr-index.mjs --self-test   # 격리 픽스처 F1~F19 (positive/negative/recovery)
  *   ADR_INDEX_ROOT=<dir> node scripts/verify-adr-index.mjs   # 스캔 루트 override (self-test 용)
  *
  * 관련: 이슈 #1005 / PR #1004 (계약 명문화) / #998 축 B / ADR
@@ -146,12 +148,29 @@ const isSeparatorRow = (line) => /^\s*\|(?:\s*:?-{3,}:?\s*\|)+\s*$/.test(line);
  */
 function parseIndexTable(content) {
   const lines = content.split('\n');
-  const headerIdx = lines.findIndex((l) => l.trim() === TABLE_HEADER);
-  if (headerIdx === -1) {
+  // 전수 스캔 — `findIndex` 로 첫 앵커만 잡으면 같은 헤더 표가 2개일 때 **두 번째가 조용히
+  // 미검사**된다 (#1020 3항). 발생 수 != 1 은 전부 FAIL 이고 fallback 분기는 두지 않는다
+  // (CLAUDE.md §가드 설계 원칙 — drift 가드는 fail-fast 만). 진단은 "부재" 와 "중복" 을
+  // 구분한다 — 같은 사유로 보고하면 어느 쪽을 고칠지 알 수 없다.
+  const headerIdxs = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].trim() === TABLE_HEADER) headerIdxs.push(i);
+  }
+  if (headerIdxs.length === 0) {
     return {
       error: `인덱스 표 앵커 부재 — 헤더 라인 '${TABLE_HEADER}' 를 찾지 못했습니다. 표가 파손됐거나 열 구성이 바뀌었습니다 (바뀐 것이 의도라면 verify-adr-index.mjs 의 TABLE_HEADER 를 같이 갱신).`,
     };
   }
+  if (headerIdxs.length > 1) {
+    return {
+      error:
+        `인덱스 표 앵커 중복 — 헤더 라인 '${TABLE_HEADER}' 가 ${headerIdxs.length}건 발견됐습니다 ` +
+        `(README ${headerIdxs.map((i) => i + 1).join('행 · ')}행). 인덱스 표는 정확히 1개여야 합니다 — ` +
+        `2개 이상이면 첫 표만 검사되고 나머지 행은 조용히 미검사로 남습니다. ` +
+        `표를 하나로 합치거나, 두 번째가 인덱스가 아닌 다른 표라면 헤더 열 구성을 다르게 하십시오.`,
+    };
+  }
+  const headerIdx = headerIdxs[0];
   if (!isSeparatorRow(lines[headerIdx + 1] ?? '')) {
     return {
       error: `인덱스 표 구분선 부재 — README ${headerIdx + 2}행이 '|---|...' 형식이 아닙니다.`,
@@ -337,8 +356,14 @@ function runCheck(root) {
   return { rows, compared, excluded, violations };
 }
 
-function main() {
-  const args = process.argv.slice(2);
+/**
+ * CLI 본체. 종료 코드를 **return** 한다 (`process.exit` 호출 없음 — 그래야 self-test 가
+ * 순수 호출로 덮는다). 전역 의존(`process.argv` / `process.env`)은 **인자 기본값으로 주입**해
+ * **자식 프로세스 spawn 없이** 커버리지를 얻는다 (#1020 2항 / ADR 20260813-1020 §결정 2-1).
+ * 본 가드의 **자식 프로세스 모듈 import 0** 성질은 #1018 cross-validate 보안 축 통과 근거라
+ * 불변이며, self-test `F19n` 이 정적으로 고정한다.
+ */
+function main(args = process.argv.slice(2), env = process.env) {
   if (args.length > 0) {
     console.error(
       `[ERROR] 잉여 인자: ${args.join(' ')}\n` +
@@ -346,7 +371,7 @@ function main() {
     );
     return 2;
   }
-  const root = process.env.ADR_INDEX_ROOT ? path.resolve(process.env.ADR_INDEX_ROOT) : DEFAULT_ROOT;
+  const root = env.ADR_INDEX_ROOT ? path.resolve(env.ADR_INDEX_ROOT) : DEFAULT_ROOT;
   if (!existsSync(root)) {
     console.error(`[adr-index] 스캔 루트 부재: ${root}`);
     return 2;
@@ -387,7 +412,13 @@ function main() {
   return 0;
 }
 
-// ── --self-test: 격리 픽스처 F1~F16 (가드 도입 PR DoD 축 1~3) ───────────────
+// ── --self-test: 격리 픽스처 F1~F19 / 46 단언 (가드 도입 PR DoD 축 1~3) ──────
+//  F19 는 CLI 표면(모드 디스패치 + main() 종료 코드 + 배선)이라 세부 케이스가 많아
+//  `F19a`~`F19n` 으로 나뉜다. 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
+//  ADR `20260813-1020-adr-index-membership-marker-rejected.md` §결정 3 이 정본이다.
+//  ⚠️ 그 grep 문자열을 **본 파일 안에 인용하지 않는다** — 인용하는 순간 주석 자신이 hit 이 되어
+//  `grep 결과 == 'N passed'` 라는 자기 검증 등식이 영구히 1 어긋난다 (실측: 47 vs 46).
+//  같은 클래스를 F19l·F19m·F19n 이 별도로 다룬다 (volt #995 자기-매칭).
 function selfTest() {
   let pass = 0;
   let fail = 0;
@@ -589,6 +620,189 @@ function selfTest() {
       ADR_INDEX_UPSTREAM_ONLY_TARGETS.length > 0,
       'F15 self-consistency: 인덱스 README source 의 allowlist target 이 1건 이상 (제외 판정 근거 존재)',
     );
+
+    // F17 negative — 상태 라인 **어순**. 가드는 최선두 어휘 토큰을 현재 상태로 읽으므로
+    //  `Provisional → **Accepted**` 표기는 `exit 1` 에 **진단까지 반전**된다 (표가 맞는데 실물이
+    //  틀렸다고 보고). #1018 은 이 경계를 ADR 산문에만 박제했고 픽스처는 #1020 4항으로 미뤘다.
+    //  FAIL 여부만이 아니라 **반전된 사유 문자열까지** 단언해야 경계가 고정된다.
+    {
+      writeAdr('20260806-local-adr.md', '- 상태: Provisional → **Accepted** (2026-08-13)');
+      writeIndex([upstreamRow, localRow('Accepted')]);
+      const r = runCheck(tmp);
+      assert(
+        r.violations.length === 1 && /상태 불일치/.test(r.violations[0].reason),
+        `F17 어순 negative: 'Provisional → **Accepted**' 는 최선두 토큰이 Provisional → FAIL (실측 ${r.violations.length}건)`,
+      );
+      assert(
+        /인덱스 표 'Accepted' vs ADR 실물 'Provisional'/.test(r.violations[0]?.reason ?? ''),
+        'F17 어순 negative: 진단이 반전된다 — 표가 맞는데 실물이 틀렸다고 보고 (사유 문자열까지 고정)',
+      );
+
+      // F17 recovery — 현재 상태 토큰을 최선두로 되돌리면 PASS. ADR 20260812-1005 §재검토 조건
+      //  어순 제약이 요구하는 정본 표기 형태다.
+      writeAdr(
+        '20260806-local-adr.md',
+        '- 상태: **Accepted** (2026-08-13 — `Provisional` 에서 전이)',
+      );
+      const r2 = runCheck(tmp);
+      assert(
+        r2.violations.length === 0 && r2.compared.length === 1,
+        'F17 recovery: 현재 상태 토큰을 최선두로 두면 위반 0 (전이 이력은 뒤에 적는다)',
+      );
+    }
+
+    // F18 negative — 표 앵커 **중복**. `findIndex` 시절엔 첫 표만 파싱돼 두 번째 표의 행이
+    //  **조용히 미검사**로 남았다 (#1020 3항). 0건은 F11 이 이미 덮으므로 본 픽스처는 2건 이상만
+    //  겨눈다. 진단은 "부재" 와 구분돼야 어느 쪽을 고칠지 알 수 있다.
+    {
+      const brokenRow = `| 2026-08-06 | [second](20260806-local-adr.md) | Provisional | 세부 |`;
+      writeFileSync(
+        path.join(decisions, 'README.md'),
+        [
+          '# ADR',
+          '',
+          '## 현재 ADR 인덱스',
+          '',
+          TABLE_HEADER,
+          '|---|---|---|---|',
+          upstreamRow,
+          localRow('Accepted'),
+          '',
+          '## 두 번째 표 (같은 헤더)',
+          '',
+          TABLE_HEADER,
+          '|---|---|---|---|',
+          brokenRow,
+          '',
+        ].join('\n'),
+      );
+      const r = runCheck(tmp);
+      assert(
+        r.violations.length === 1 && /인덱스 표 앵커 중복/.test(r.violations[0].reason),
+        `F18 앵커 중복 negative: 같은 헤더 표 2개 → FAIL (실측 ${r.violations.length}건)`,
+      );
+      assert(
+        !/앵커 부재/.test(r.violations[0]?.reason ?? ''),
+        'F18 앵커 중복 negative: "부재" 와 다른 사유 — 중복/부재를 같은 문자열로 보고하지 않는다',
+      );
+      assert(
+        /5행 · 12행/.test(r.violations[0]?.reason ?? ''),
+        'F18 앵커 중복 negative: 두 앵커의 README 라인 번호를 사유에 명시 (actionable)',
+      );
+
+      // F18 recovery — 두 번째 표를 제거하면 PASS 복원 (첫 표만 조용히 검사하던 경로 소멸)
+      writeIndex([upstreamRow, localRow('Accepted')]);
+      const r2 = runCheck(tmp);
+      assert(r2.violations.length === 0, 'F18 recovery: 표를 1개로 되돌리면 위반 0 복원');
+    }
+
+    // F19 모드 디스패치 + main() 종료 코드 — #840 계보(배선이 끊겨도 테스트가 초록) 차단.
+    //  F1~F18 은 전부 runCheck() 를 직접 부르므로 CLI 표면 단언이 0건이었다 (#1020 2항).
+    //  `main()` 은 종료 코드를 **return** 하고 전역 의존을 인자로 받으므로 자식 프로세스 없이
+    //  순수 호출로 덮는다 — 본 가드의 자식 프로세스 모듈 import 0 성질은 불변이다.
+    {
+      // main() 은 stdout/stderr 를 쓴다. 미캡처 시 self-test 출력에 `[adr-index] FAIL` 이 섞여
+      //  오독을 유발하므로 캡처 후 finally 복원한다.
+      const captured = (fn) => {
+        const origLog = console.log;
+        const origError = console.error;
+        const out = [];
+        console.log = (...a) => out.push(a.join(' '));
+        console.error = (...a) => out.push(a.join(' '));
+        try {
+          return { code: fn(), output: out.join('\n') };
+        } finally {
+          console.log = origLog;
+          console.error = origError;
+        }
+      };
+      const callMain = (args, env) => captured(() => main(args, env));
+
+      // 술어 4 — self-test 가 `dispatch(['--self-test'])` 를 실행하면 무한 재귀이므로,
+      //  그 분기만은 실행이 아니라 **순수 술어**를 단언한다.
+      assert(
+        isSelfTestMode(['--self-test']) === true,
+        'F19a 술어: 단독 --self-test → self-test 모드',
+      );
+      assert(isSelfTestMode([]) === false, 'F19b 술어: 무인자 → 본검사 모드');
+      assert(
+        isSelfTestMode(['--self-test', 'foo']) === false,
+        'F19c 술어: --self-test + 잉여 인자는 self-test 모드가 아니다 (두 모드 합침 차단)',
+      );
+      assert(isSelfTestMode(['--bogus']) === false, 'F19d 술어: 미지 플래그 → 본검사 모드');
+
+      // 종료 코드 5경로 — 인자 오류 2 / 루트 부재 2 / README 부재 2 / PASS 0 / FAIL 1
+      assert(callMain(['--bogus'], {}).code === 2, 'F19e main(): 잉여 인자 → 2');
+      assert(
+        callMain(['--self-test', 'foo'], {}).code === 2,
+        'F19f main(): --self-test + 잉여 인자도 잉여 인자 검사로 떨어진다 → 2',
+      );
+      assert(
+        callMain([], { ADR_INDEX_ROOT: path.join(tmp, 'no-such-root') }).code === 2,
+        'F19g main(): 스캔 루트 부재 → 2',
+      );
+      const emptyRoot = path.join(tmp, 'empty-root');
+      mkdirSync(emptyRoot, { recursive: true });
+      assert(
+        callMain([], { ADR_INDEX_ROOT: emptyRoot }).code === 2,
+        'F19h main(): README 부재 → 2',
+      );
+
+      writeAdr('20260806-local-adr.md', '- 상태: **Accepted** (2026-08-13)');
+      writeIndex([upstreamRow, localRow('Accepted')]);
+      const ok = callMain([], { ADR_INDEX_ROOT: tmp });
+      assert(ok.code === 0, 'F19i main(): 정합 인덱스 → 0');
+      assert(
+        /\[adr-index\] PASS/.test(ok.output),
+        'F19i main(): PASS 경로가 실제로 stdout 을 쓴다 (배선 단절 시 조용한 0 차단)',
+      );
+
+      writeIndex([upstreamRow, localRow('Provisional')]);
+      const ng = callMain([], { ADR_INDEX_ROOT: tmp });
+      assert(ng.code === 1, 'F19j main(): 상태 불일치 → 1');
+      assert(
+        /\[adr-index\] FAIL/.test(ng.output) && /상태 불일치/.test(ng.output),
+        'F19j main(): FAIL 경로가 위반 사유를 실제로 출력한다',
+      );
+      assert(
+        captured(() => dispatch(['--bogus'])).code === 2,
+        'F19k dispatch(): 비-self-test 인자는 main() 으로 흘러 같은 종료 코드 (배선 실행 경로)',
+      );
+
+      // 배선 정적 단언 — 실행 불가능한 마지막 한 줄(process.exit)과 인자 주입 시그니처를
+      //  자기 소스 대조로 고정한다 (F15 가 쓰는 골든 벡터 패턴).
+      //
+      // ⚠️ **자기-매칭 함정** (volt #995 — _"가드가 자기 자신만 찾고 있었음"_). 찾는 문자열을
+      //  `includes('…')` 로 그대로 쓰면 **그 리터럴 자신이 소스에 있으므로** 대상 코드를 통째로
+      //  지워도 hit 이 남아 단언이 **vacuous** 해진다. 본 PR 의 negative 주입에서 실제로
+      //  재현됐다 (배선 한 줄 제거 주입 → `46 passed, 0 failed`). 그래서 셋 다 **정규식**으로
+      //  겸용한다: 메타문자 이스케이프(`\(` · `\.`) 때문에 정규식 **소스 텍스트가 자기 패턴과
+      //  매칭되지 않고**, `^…$` + `m` 플래그가 들여쓰기 없는 **최상위 라인**만 겨눈다.
+      //  (셋 다 아래 주입으로 FAIL 재현 확인 — 배선 제거 / 시그니처 되돌림 / import 유입)
+      const selfSrc = readFileSync(path.join(SCRIPT_DIR, 'verify-adr-index.mjs'), 'utf8');
+      const WIRING_RE = /^process\.exit\(dispatch\(process\.argv\.slice\(2\)\)\);$/gm;
+      const MAIN_SIG_RE =
+        /^function main\(args = process\.argv\.slice\(2\), env = process\.env\) \{$/gm;
+      assert(
+        (selfSrc.match(WIRING_RE) ?? []).length === 1,
+        'F19l 배선: 최상위 마지막 한 줄이 dispatch() 결과를 그대로 process.exit 에 넘긴다 (정확히 1회)',
+      );
+      assert(
+        (selfSrc.match(MAIN_SIG_RE) ?? []).length === 1,
+        'F19m 배선: main() 이 argv/env 를 인자 기본값으로 주입받는다 (전역 직접 참조 회귀 차단)',
+      );
+      // ⚠️ 모듈명을 **조각에서 합성**한다 — 리터럴로 적으면 본 단언 자신이 hit 이 되어
+      //  `grep -c '자식프로세스모듈명' scripts/verify-adr-index.mjs` 라는 **가장 흔한 감사 술어가
+      //  영구히 0 을 잃는다** (사람이 쓰는 술어를 가드가 오염시키는 형태의 자기-매칭).
+      //  합성 결과: 파일 전체에 그 낱말의 리터럴 occurrence 는 **0** 이면서 검사는 성립한다.
+      const CHILD_PROC_MODULE = ['child', 'process'].join('_');
+      const importRe = new RegExp(`import[^\\n]*['"](?:node:)?${CHILD_PROC_MODULE}['"]`);
+      const requireRe = new RegExp(`require\\(\\s*['"](?:node:)?${CHILD_PROC_MODULE}['"]`);
+      assert(
+        !importRe.test(selfSrc) && !requireRe.test(selfSrc),
+        'F19n 배선: 자식 프로세스 모듈 import 0 (#1018 cross-validate 보안 축 통과 근거 불변)',
+      );
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -596,8 +810,23 @@ function selfTest() {
   return fail === 0 ? 0 : 1;
 }
 
-// 모드 디스패치 — `--self-test` 는 **단독 인자일 때만**. `--self-test foo` 처럼 잉여 인자가
-// 붙으면 main() 의 잉여 인자 검사(exit 2)로 떨어진다 (두 모드를 한 호출로 합쳐 한쪽 검사가
-// 조용히 무시되는 경로 차단 — verify-pr-template-checklist.mjs 의 MODE_ARITY 와 같은 취지).
-const CLI_ARGS = process.argv.slice(2);
-process.exit(CLI_ARGS.length === 1 && CLI_ARGS[0] === '--self-test' ? selfTest() : main());
+// ── 모드 디스패치 ───────────────────────────────────────────────────────────
+// `--self-test` 는 **단독 인자일 때만**. `--self-test foo` 처럼 잉여 인자가 붙으면 main() 의
+// 잉여 인자 검사(exit 2)로 떨어진다 (두 모드를 한 호출로 합쳐 한쪽 검사가 조용히 무시되는 경로
+// 차단 — verify-pr-template-checklist.mjs 의 MODE_ARITY 와 같은 취지).
+//
+// 판정을 **순수 술어** `isSelfTestMode` 로 분리한 이유 (#1020 2항): self-test 가
+// `dispatch(['--self-test'])` 를 실행하면 무한 재귀이므로, 그 경로만은 실행이 아니라 **술어를
+// 단언**한다 (F19). 실행 불가능한 마지막 한 줄은 `F15` 가 쓰는 **정적 자기 참조 단언**이 덮는다.
+
+/** `--self-test` 단독 호출인가 (순수 술어 — 부수효과 0) */
+function isSelfTestMode(args) {
+  return args.length === 1 && args[0] === '--self-test';
+}
+
+/** 모드 선택 후 종료 코드를 return (순수 호출 — `process.exit` 는 아래 한 줄에만) */
+function dispatch(args) {
+  return isSelfTestMode(args) ? selfTest() : main(args);
+}
+
+process.exit(dispatch(process.argv.slice(2)));

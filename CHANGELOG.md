@@ -5,7 +5,31 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-### Behavior Changes: None — 문서/결정 기록만 (`.claude/**` 미변경, 가드·워크플로·템플릿 미변경)
+### Behavior Changes
+
+- **[#1020] ADR 인덱스 가드 잔여 3항 — `main()` 커버리지 / 표 앵커 중복 FAIL / 어순 픽스처 + 자기 선언 마커 기각 (MINOR)** ([#1020](https://github.com/coseo12/astro-simulator/issues/1020)) — ADR [`20260813-1020-adr-index-membership-marker-rejected.md`](docs/decisions/20260813-1020-adr-index-membership-marker-rejected.md) (**Accepted** — cross-validate agy 2026-08-13, architect 수행). PR [#1018](https://github.com/coseo12/astro-simulator/pull/1018)(#1005) 이 남긴 잔여 4항의 종결이다.
+
+  **MINOR 판정 근거는 `.claude/skills/record-adr/SKILL.md` §절차 단 하나다.** 신규 4단계 _"인덱스 등재 판정"_ 이 들어가 ADR 을 쓰는 에이전트가 **같은 입력에 다르게 동작**한다 (계약 (1) 판정 질문을 적용하고 "예" 면 같은 PR 에서 등재). 나머지 변경(가드 스크립트 · 워크플로 주석 · ADR)은 그 자체로는 PATCH 급이다. ⚠️ **강제 지점이 아니다** — 지키지 않아도 CI 는 초록이고, 개선되는 것은 **청중** 하나뿐이다. 근거는 **청중 갭**이다: 계약 (1) 은 `docs/decisions/README.md` 안에 있어 ADR 작성자가 **열지 않아도** ADR 을 쓸 수 있는 반면 `record-adr` SKILL.md 는 정의상 반드시 읽는 파일이고, 계약 명문화(PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004)) **바로 다음 PR** 에서 미등재가 재발했다([#1015](https://github.com/coseo12/astro-simulator/pull/1015)).
+
+  **1항 자기 선언 마커는 기각했다 — 근거는 _"의미론적이라 불가"_ 가 아니라 네 점 측정이다.** 이슈 완료 기준 1항이 요구한 형식이다. rev `fda9475` 실측(후보 집합 = 로컬 ADR 98건, recall 분모 = 로컬 등재 8): 참조 휴리스틱 단독 precision **26.3%**(19 후보 / TP 5) · 도입 커밋 co-change 단독 **16.7%**(30 / 5) · **AND 36.4%**(11 / 4, recall 50.0%) · **OR 15.8%**(38 / 6, recall 75.0%). 네 점 중 어느 것도 1.0 모서리에 닿지 않고 트레이드오프 곡선 위를 이동할 뿐이며, 그 뒤에 남는 **선언**은 base rate **8/98 = 8.2%** 에서 저마찰 답(`비대상`)이 **91.8% 맞는** 구조라 _"원하는 행동의 반대로 비용 기울기"_ 를 만든다. **영구 기각이 아니다** — 미등재 재발 **누적 2건째**(현재 1건)에서 재도입하며 그때 실행할 설계(`MARKER_REQUIRED_FROM` cutoff 상수 + 등재 8건만 retrofit)를 ADR §재검토 조건 1 에 완성 형태로 박제했다.
+
+  **2항 `main()` 커버리지 — 이슈가 우려한 트레이드오프는 발생하지 않았다.** 이슈 본문은 _"`process.exit` 우회 리팩토링 또는 `child_process` spawn 필요"_ 라 적었으나 **전제가 틀렸다** — `main()` 은 이미 종료 코드를 **return** 하고 있었고 `process.exit` 는 최상위 껍질 한 줄뿐이었다. 전역 의존(`process.argv`/`process.env`)을 **인자 기본값으로 주입**해 순수 호출로 덮었다. **자식 프로세스 모듈 import 는 0 을 유지한다**(#1018 cross-validate 보안 축 통과 근거 불변). 판정을 순수 술어 `isSelfTestMode` 로 분리한 것이 요점 — self-test 가 `dispatch(['--self-test'])` 를 실행하면 **무한 재귀**라 그 분기만은 실행이 아니라 술어를 단언하고, 실행 불가능한 마지막 한 줄은 정적 자기 참조 단언이 덮는다.
+
+  **3항 표 앵커 — `findIndex` → 전수 스캔 + 발생 수 `!= 1` FAIL.** 같은 헤더 표가 2개면 첫 표만 파싱되고 **나머지 행이 조용히 미검사**로 남던 경로다. **fallback 분기 없음**(CLAUDE.md §가드 설계 원칙 — drift 가드는 fail-fast 만). 진단은 _"부재"_ 와 _"중복"_ 을 구분하고 중복 시 **두 앵커의 README 라인 번호**를 싣는다. 현행 무해는 실측 확인 — `TABLE_HEADER` 정확 일치 라인은 `docs/decisions/README.md:75` **1건**. 0건은 기존 `F11` 이 덮으므로 신규 픽스처는 2건 이상 케이스만 추가했다.
+
+  **4항 어순 픽스처 `F17` — 미룬 근거가 소멸했다.** #1018 이 미룬 이유는 _"단언 수 변경이 3라운드 연속 drift(3/3)"_ 였는데 그 위험은 픽스처가 아니라 **sweep 절차 부재**에서 왔고, 2·3항이 이미 단언 수를 바꾸므로 F17 을 빼도 sweep 은 어차피 발생한다. 가드는 상태 라인의 **최선두 어휘 토큰**을 읽으므로 `Provisional → **Accepted**` 표기는 `exit 1` **에 진단까지 반전**된다(표가 맞는데 실물이 틀렸다고 보고). 픽스처는 FAIL 여부만이 아니라 **반전된 사유 문자열**(`인덱스 표 'Accepted' vs ADR 실물 'Provisional'`)까지 단언하고, 정본 표기(`**Accepted** (… — Provisional 에서 전이)`) 로 되돌리는 recovery 를 붙였다.
+
+  **가드 도입 PR DoD 4축.** ① **격리 동적 테스트** — `--self-test` 픽스처 **F1~F19 / 46 단언** (`23 → 46`. tmpdir 격리, 네트워크 비의존, 자식 프로세스 0). 신규분은 `F17` 어순 3 · `F18` 앵커 중복 4 · `F19a`~`F19n` CLI 표면 14(순수 술어 4 + `main()` 종료 코드 6 + `dispatch()` 실행 1 + 배선 정적 3). ② **3중 시뮬레이션** — 세 항목 각각 positive→negative→recovery 를 픽스처로 갖고, 그 위에 **격리 사본 negative 주입 5종**을 실측했다(baseline `46 passed, 0 failed` 대비): `findIndex` 되돌림 → **44/2**(F18 2건) / `main()` 전역 직접참조 → **41/5**(F19i·F19j·F19m) / 상태 토큰을 최후 등장으로 반전 → **42/4**(F17 3건 + F18 recovery) / 배선 한 줄 제거 → **45/1**(F19l) / 자식 프로세스 모듈 import 유입 → **45/1**(F19n). **5종 전건 exit 1** 이고 MISS 귀속이 주입 지점과 일치한다. ③ **self-consistency** — `grep -c 'assert(' scripts/verify-adr-index.mjs` == `--self-test` 출력 `N passed` == **46** (술어 자기 검증). 기존 `F15`(allowlist SSoT 정적 단언) 불변. ④ **메타 도구 자기 적용** — 변경된 가드를 현재 저장소에 적용해 **`11행 / 대조 8 / 제외 3` PASS**(exit 0). 본 PR 이 ADR 1005 에 Amendment 1 을 붙이면서 **상태 라인·표 행은 불변**으로 뒀으므로 가드는 자기 변경분 위에서 계속 PASS 한다.
+
+  ⚠️ **negative 주입이 결함 1건을 실제로 잡았다 — 정적 자기참조 단언의 자기-매칭 (volt [#995](https://github.com/coseo12/volt/issues/995) 계보).** 초판의 배선 단언 2건은 `selfSrc.includes('process.exit(dispatch(process.argv.slice(2)));')` 형태였는데, **찾는 문자열의 리터럴이 자기 소스에 있으므로** 대상 코드를 통째로 지워도 hit 이 남는다. 실측: 배선 한 줄 제거 주입 → **`46 passed, 0 failed`**(vacuous, 회귀 무감지). 정규식 + `^…$`/`m` 최상위 라인 앵커 + **매치 수 `=== 1`** 로 고쳐(메타문자 이스케이프 덕에 정규식 소스 텍스트가 자기 패턴과 매칭되지 않는다) 같은 주입이 **45/1** 로 잡히는 것을 재확인했다. 같은 이유로 자식 프로세스 모듈명은 **조각에서 합성**한다(`['child', 'process'].join('_')`) — 리터럴로 적으면 `grep -c` 라는 **가장 흔한 감사 술어가 영구히 0 을 잃기** 때문이다. 실측: 파일 전체 리터럴 occurrence **0 hit** 이면서 F19n 은 성립.
+
+  **CLI 종료 코드 6경로 실측**(파이프 없이 직접 확인 — `| tail` 이 exit 0 을 위조 보고한 전례): 무인자 **0** / `--self-test` **0** / `--self-test foo` **2** / `--bogus` **2** / `ADR_INDEX_ROOT` 부재 **2** / README 부재 루트 **2**. 리팩토링 전후 불변이다.
+
+  **단언 수 sweep — 최종값 1회 일괄** ([`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) §(i) 부분 재측정 금지. #1018 의 갱신 실패율 3/3 재현 방지). 갱신 **3곳**: `scripts/verify-adr-index.mjs` 호출 예시 주석 · self-test 섹션 헤더 · `.github/workflows/project-guards.yml` 주석 (전부 `F1~F16` → `F1~F19`). **편집 금지 2계급은 무접촉** — `CHANGELOG.md` 의 agy 발화 원문 인용(`F1~F15`)은 치환 시 **외부 모델 발언 위조**이고, `F1~F16`/`23 단언` 이 든 나머지 hit 은 전부 **릴리스 확정 `[0.68.0]` 섹션 내부**라 소급 편집 금지다(PR #1018 BLOCK-3 전례). ADR [`20260812-1005`](docs/decisions/20260812-1005-adr-index-status-guard.md) 의 2곳은 **치환이 아니라 시점 명시**(`(PR #1018 시점)`)로 참을 복구하고 현재값은 같은 ADR **§Amendment 1**(마커 fork 종결 / `F10` 경계 **유지** 확인 / 현재 픽스처·단언 수)이 실었다.
+
+  **`F10` 경계 픽스처는 유지된다.** ADR 1005 §재검토 조건 1항(_"미등재 검출 이슈가 **채택되면** `F10` 을 검출 케이스로 전환"_)은 **조건부**이고 조건이 성립하지 않았으므로 발화하지 않는다. `docs/decisions/README.md` 계약 (2) ⚠️ ① / 스크립트 §범위 경계 (i) / ADR 1005 §범위 경계 (i) 의 기존 서술은 **전부 참으로 남는다** — 기각의 부수 이득이다.
+
+  **비-범위** (착수 금지 준수): 마커 규약 구현(`- 인덱스:` 필드 / cutoff 상수 / 98건 retrofit) / `F10` 검출 전환 / `docs/decisions/README.md` 계약 (1)·(2) 본문 개정 / 산문 역참조 검출 / upstream 본문 fetch CI (이슈 §비목표).
 
 ### Added
 
@@ -19,7 +43,7 @@ Semantic Versioning을 따른다.
 
 ### Notes
 
-- **구현 변경 0** — 가드 스크립트 / 워크플로 / PR 템플릿 / 판정식 무변경. 선택지 (c)(스킬 자동 병합)는 신규 작업이 아니라 **2026-05-16 (`94bf614`, #471) 부터 이미 이행 중**임이 `git log -S` 로 확인됐다.
+- **구현 변경 0 (#1014 항목 한정)** — 가드 스크립트 / 워크플로 / PR 템플릿 / 판정식 무변경. 선택지 (c)(스킬 자동 병합)는 신규 작업이 아니라 **2026-05-16 (`94bf614`, #471) 부터 이미 이행 중**임이 `git log -S` 로 확인됐다.
 - **_"관행이 이미 고쳤다"_ 는 박제하지 않았다**: 현재 6 사이클 WARN=0 의 **메커니즘은 미확인**이다. 스킬 규약(2026-05-16)은 측정된 WARN 이력 전 구간에서 이미 발효 중인 **상수**라 변화를 설명할 수 없고, #1010 의 PR(2026-08-11)은 침묵 시작(#1000, 2026-08-09)보다 뒤다. 미확인 인과를 방어 기제로 기록하면 미래 관찰자가 없는 보호를 신뢰한다.
 - **cross-validate (agy, 2026-08-13) 결론 승인** — outcome `applied` / `plan_bypass=false`. 2건 수용 (§재검토 조건 1-A 의 `--limit` 구속 대상 명시 / Provisional→Accepted 전이 주체·기계 조건 박제), **1건 기각**: _"PR 템플릿에 `create-pr` 안내 HTML 주석 1줄 추가"_ 제안은 **가드가 HTML 주석 안의 phrase 를 센다**는 실측(합성 본문 투입 → kw3·kw6 이 FAIL 아닌 WARN)으로 반려했다 — 렌더링에 보이지 않으면서 blocking 축을 만족시키는 텍스트를 **템플릿**에 넣으면 모든 미래 PR 에 상속되고, phrase 매칭이 순진한 부분문자열이라(`--self-test` F9) 이후 문구 수정이 blocking 축을 영구 무효화할 수 있다.
 - **회귀 감시는 신규 가드 없이 기존 자산으로**: `--self-test` 픽스처 **F2**(kw3 체크박스 → `### 보안` 헤더 침식 = #965~#992 클러스터의 정확한 재현) / **F5**(계급 비대칭) 가 이미 `project-guards.yml` 에 배선돼 있고, 스킬 우회 축은 CI 가드가 backstop 이다 — **탐지율 100% (첫 run `failure` 11/11 정상 발화)**.

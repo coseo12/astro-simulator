@@ -52,7 +52,7 @@
 |---|---|---|
 | 책임 | 링크 무결성 계약 8항에 _"표 셀 의미(상태 토큰) 대조"_ 라는 이질 도메인 9항 추가 | 인덱스 정합이라는 단일 책임. 이름이 검사 대상을 정확히 서술 |
 | 실패 메시지 | `[docs-links] FAIL` 로 뭉뚱그려짐 | `[adr-index] FAIL — 표 'Provisional' vs 실물 'Accepted'` 로 actionable |
-| self-test | 기존 11 단언에 혼재 | F1~F16 **23 단언** 독립 (경계 고정 F10 포함) |
+| self-test | 기존 11 단언에 혼재 | F1~F16 **23 단언** (PR #1018 시점) 독립 (경계 고정 F10 포함) |
 | 배선 비용 | 0 | `project-guards.yml` 2 스텝 + `package.json` 1 스크립트 |
 | 제외 판정 SSoT | allowlist 가 같은 파일에 있음 | **모듈 분리로 해결** (아래 3) |
 
@@ -117,7 +117,7 @@ self-test `F15` 가 정적으로 막는다.
 
 | 축 | 이행 |
 |---|---|
-| 1. 격리 동적 테스트 | `--self-test` 픽스처 F1~F16 / **23 단언**. tmpdir 격리, 네트워크 비의존 |
+| 1. 격리 동적 테스트 | `--self-test` 픽스처 F1~F16 / **23 단언** (**PR #1018 시점** — 현재값은 §Amendment 1). tmpdir 격리, 네트워크 비의존 |
 | 2. 3중 시뮬레이션 | **픽스처**: positive `F1` → negative `F2`(#993 형태) → recovery `F3`. **라이브(실 저장소)**: 971 행을 `Provisional` 로 되돌려 `exit 1` → 복구 `exit 0`, 역방향(실물만 `Superseded` 전이)도 `exit 1`. 두 negative 는 서로 다른 방향의 drift 다 |
 | 3. self-consistency | 제외 판정 근거가 `verify-docs-links.mjs` 와 **같은 모듈**임을 `F15` 가 정적 단언 (인라인 사본 재유입 0). 실 저장소 실행에서 제외 3행 == README source allowlist 3쌍 |
 | 4. 메타 측정 자기 적용 | 변경된 가드를 **현재 저장소**에 적용 — 도입 전 `8행 / 대조 5 / 제외 3` PASS, 본 ADR 등재 후 `9행 / 대조 6 / 제외 3` PASS (6번째가 본 ADR 자신의 `Provisional`) |
@@ -166,3 +166,54 @@ self-test `F15` 가 정적으로 막는다.
 - **고유 발견** — **마크다운 링크 앵커(`#…`) 미처리.** 링크에 앵커가 붙으면 파일명 추출 정규식이 실패해 **링크가 있는데도** _"ADR 링크 부재"_ 라는 **거짓 진단으로 FAIL** 한다. 실 저장소에서 재현 후 정규식에 `(?:[#?][^)\s]*)?` 를 추가하고 **회귀 픽스처 `F16`** 으로 고정했다 (self-test 21 → 23). fail-fast 라 조용히 통과하진 않지만 **진단이 틀리는** 형태라 반영 가치가 컸다.
 - **Claude 편향 셀프 체크** — ⚠️ **본 PR 에서 메인 커밋이 4회 차단을 만들었고, 네 번 다 _로컬 가드 전건 PASS_ 상태였다.** 매번 잡은 것은 독립 sweep · 릴리스 태그 대조 · 라이브 API GET 이다. 특히 두 건이 **거울상 오류**였다 — BLOCK-1 은 _"`pr-template-checklist` 는 required 아님"_(참)을 `verify-adr-index` 에, BLOCK-3 는 _"`project-guards` 는 required 임"_(참)을 `verify-pr-template-checklist` 에 잘못 붙였다. **워크플로 ↔ job id ↔ required 컨텍스트의 3자 관계를 주어별로 확인하지 않으면 required 서술이 양방향으로 틀린다.** BLOCK-3 는 그 위에 **릴리스된 `[0.67.0]` 섹션 소급 편집**까지 겹쳐 태그 원문 복원으로 되돌렸다. 부수 경로도 실측됐다 — reviewer 가 5분류 표에서 파일명을 축약해 한 hit 을 누락했고, 메인은 _"열거에 없는 hit"_ 을 미처리 거짓으로 판단했다. **5분류 표는 축약 없이 전 hit 을 위치까지 열거해야** 이 경로가 닫힌다.
 
+## Amendment 1 (2026-08-13) — 마커 fork 종결 + 잔여 3항 반영 후 현재값
+
+### 배경
+
+본 ADR §범위 경계 (i) 근거 5 가 _"precision 1.0 대안은 신규 규약이다 … **별도 이슈로 분리**한다"_
+로 남긴 fork 가 이슈 [#1020](https://github.com/coseo12/astro-simulator/issues/1020) 에서 닫혔다.
+같은 이슈가 PR [#1018](https://github.com/coseo12/astro-simulator/pull/1018) 리뷰의 잔여 권고 3건
+(`main()` 커버리지 / 표 앵커 중복 / 어순 픽스처)도 함께 처리해 **본 ADR 이 기록한 픽스처·단언 수가
+이동**했다. 본문 §결정 2 표와 §가드 도입 PR DoD 4축 표의 `F1~F16 23 단언` 은 **PR #1018 시점
+측정값**이므로 덮어쓰지 않고 시점을 명시했고 (Amendment B 형식 — 본문은 이력), 현재값을 본 절이
+싣는다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §(i) 부분 재측정 금지 —
+최종값 1회 일괄 도출).
+
+### 변경 사항
+
+**(i) 마커 fork 종결 — 자기 선언 마커는 기각됐다.**
+[`20260813-1020-adr-index-membership-marker-rejected.md`](20260813-1020-adr-index-membership-marker-rejected.md)
+가 정본이다. 근거는 _"의미론적이라 불가"_ 가 아니라 **네 점 측정**이다 — 참조 휴리스틱 precision
+**26.3%** / 도입 커밋 co-change **16.7%** / AND **36.4%** / OR **15.8%** (rev `fda9475`, recall 분모
+= 로컬 등재 8). 네 점 중 어느 것도 1.0 모서리에 닿지 않고, 그 뒤에 남는 **선언**은 base rate
+8/98 = 8.2% 에서 저마찰 답(`비대상`)이 91.8% 맞는 구조라 **원하는 행동의 반대로 비용 기울기**를
+만든다. ⚠️ **영구 기각이 아니다** — 미등재 재발 **누적 2건째**(현재 1건 = #1015)에서 재도입하며,
+그때 실행할 설계(cutoff 상수 `MARKER_REQUIRED_FROM` + 등재 8건만 retrofit)는 1020 §재검토 조건 1 에
+완성 형태로 박제됐다. 마커 대신 **작성 시점 개입 1줄**이 `record-adr` 스킬 §절차에 들어갔다
+(1020 §결정 5 — 강제 지점이 아니라 **청중** 개선).
+
+**(ii) `F10` 경계 픽스처는 유지된다.**
+본 ADR §재검토 조건 1항(_"미등재 검출 이슈가 **채택되면** … `F10` 경계 픽스처를 검출 케이스로
+전환한다"_)은 **조건부**이고 그 조건이 성립하지 않았으므로 **발화하지 않는다**. 따라서
+`docs/decisions/README.md` 계약 (2) ⚠️ ① / [`scripts/verify-adr-index.mjs`](../../scripts/verify-adr-index.mjs)
+§범위 경계 (i) / 본 ADR §범위 경계 (i) 의 기존 서술은 **전부 참으로 남는다**.
+
+**(iii) 현재 픽스처·단언 수 — `F1~F19` / `46` 단언** (2026-08-13, 이슈 #1020 반영 후).
+`23 → 46`. 신규분은 `F17` 어순(negative 2 + recovery 1) · `F18` 앵커 중복(negative 3 + recovery 1) ·
+`F19a`~`F19n` CLI 표면(순수 술어 4 + `main()` 종료 코드 6 + `dispatch()` 실행 1 + 배선 정적 3).
+술어 자기 검증: `grep -c 'assert(' scripts/verify-adr-index.mjs` == `--self-test` 출력의 `N passed`
+== **46**. 갱신 지점은 `verify-adr-index.mjs` 호출 예시 주석 · self-test 섹션 헤더 ·
+`project-guards.yml` 주석 **3곳**이며, `CHANGELOG.md` 의 `[0.68.0]` 섹션과 agy 발화 인용은
+**계급 ② 이력 기록**이라 무접촉이다 (1020 §결정 3 편집 금지 표).
+
+**검사 계약 1항이 넓어졌다.** 표 앵커는 _"부재 시 FAIL"_ 에서 **_"발생 수 != 1 이면 FAIL"_** 이 됐다
+— 같은 헤더 표가 2개면 첫 표만 파싱되고 나머지가 **조용히 미검사**로 남던 경로(`findIndex`)를 닫은
+것이고, 진단은 _"부재"_ 와 _"중복"_ 을 구분한다. **fallback 분기는 없다** (CLAUDE.md §가드 설계 원칙).
+
+### 영향 범위
+
+- **상태 라인·인덱스 표 행 불변** — 본 ADR 은 여전히 `Accepted` 이고 인덱스 표 행도 그대로다.
+  따라서 `node scripts/verify-adr-index.mjs` 는 계속 PASS 한다 (Amendment 자신이 가드의 검사 대상).
+- **자식 프로세스 모듈 import 0 불변** — 본 ADR §교차검증 반영 사항 의 보안 축 통과 근거가
+  유지된다. `main()` 커버리지는 spawn 이 아니라 **인자 기본값 주입**으로 얻었다.
+- 본 ADR §결정 2 표 / §가드 도입 PR DoD 4축 표의 수치는 **PR #1018 시점** 이력으로 읽는다.
