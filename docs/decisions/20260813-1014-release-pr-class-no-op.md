@@ -1,7 +1,8 @@
 # ADR: release PR 클래스 미스매치 — NO-OP 판정 + §재검토 조건 기계화 (#1014)
 
 - 일자: 2026-08-13
-- **상태**: **Provisional** (발동 앵커 1건 — ADR 신규 + 선행 ADR §재검토 조건 개정). cross-validate 결과 §교차검증 반영 사항 통합 후 Accepted 전이
+- **상태**: **Accepted** (cross-validate agy 2026-08-13 — §교차검증 반영 사항 4축 통합 완료). 원 박제: `Provisional` (발동 앵커 1건 — ADR 신규 + 선행 ADR §재검토 조건 개정)
+  - **전이 주체·시점**: 본 ADR 을 기안한 architect 가 **같은 PR 안에서** 수행한다 (커밋 1 = Provisional 박제 → `cross_validate.sh architecture` 1회 → 커밋 2 = §교차검증 반영 사항 통합 + 전이). 전이의 기계 조건은 **`outcome.plan_bypass == false` ∧ `outcome` 이 `applied`** 이며 (`scripts/parse-cross-validate-outcome.sh`), 본 건 실측은 `applied` / `plan_bypass=false` / `rollback_failed=false` 다. 인덱스 표 상태 열은 같은 커밋에서 갱신한다 (`verify-adr-index.mjs`)
 - 관련: 이슈 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) — 선행 [#1010](https://github.com/coseo12/astro-simulator/issues/1010) 설계 §9 비목표 6 에서 분리
 - 개정 대상: [20260811-1010-measurement-c-verdict-tiers.md](20260811-1010-measurement-c-verdict-tiers.md) **§재검토 조건 1항** (본 ADR 이 대체 문언을 확정)
 - 필수 cross-link: [20260807-971-required-status-checks.md](20260807-971-required-status-checks.md) **결정 9-1** (본 가드는 required check 아님 — 실해 상한의 근거)
@@ -210,6 +211,8 @@ gh pr list --state merged --limit 300 \
 node scripts/verify-pr-template-checklist.mjs --check-corpus /tmp/rel.json
 ```
 
+> **`--limit 300` 의 구속 대상은 *과거 깊이* 이지 판정 창이 아니다** (cross-validate 보완). `gh pr list` 는 **최신순** 반환이라 판정에 필요한 *최신 3 사이클* 은 어떤 limit 값에서도 항상 포함된다 (실측: 300건이 2026-05-25 까지 도달해 릴리스 클래스 107 PR / 54 사이클을 덮는다). limit 을 올려야 하는 경우는 **base rate 를 재산출할 때뿐**이며, 그때는 위 §배경 표의 54 사이클을 기준선으로 삼고 창을 명시한다.
+
 - **사이클 정의**: release PR (`base=main`) 1건 + 그 직전 prep PR (`head=release/*-prep`) 1건 = 1 사이클. 둘 중 **하나라도** WARN 셀 ≥ 1 이면 그 사이클을 WARN 으로 계상
 - **발화 판정**: 최신 3 사이클이 **전부** WARN 사이클
 - **재개봉 시 필수 입력**: WARN 키워드 서명. §배경 정정 2 대로 원인이 회전하므로, **3 사이클의 kw 집합이 동일한 경우에만** (a) 클래스 분기를 후보로 되살린다. 서명이 다르면 (a)/(b) 는 재차 기각이고 원인별 개별 처방으로 간다
@@ -242,3 +245,24 @@ gh api "repos/coseo12/astro-simulator/commits/${SHA}/check-runs?per_page=100" \
 
 - **판정식·계급 정의 변경**은 본 ADR 이 아니라 [20260811-1010](20260811-1010-measurement-c-verdict-tiers.md) §재검토 조건 2·3·5 경로로만 한다
 - **required status check 편입 재론**은 [20260807-971](20260807-971-required-status-checks.md) §재검토 조건 경로로만 한다 (ADR 1010 결정 9 불변)
+
+---
+
+## 교차검증 반영 사항
+
+**cross-validate (agy, 2026-08-13, `cross_validate.sh architecture docs/decisions/20260813-1014-release-pr-class-no-op.md`) — 결론 승인** (_"별도의 코드 수정 없이 현행 유지(NO-OP)를 결정한 기술적 타당성이 완벽히 입증되었으므로 Provisional → Accepted 전이를 진행할 것을 적극 추천"_). outcome `applied` / `plan_bypass=false` / `rollback_failed=false`.
+
+**호출 전 Claude 편향 셀프 체크** ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5 4종) — 낙관적 일정 **해당 없음**(일정 산출물 없음) / 결합 간과 **통과**(개정 표면 5파일을 `verify-adr-index` · `verify-docs-links` · `verify-agent-ssot` 로 기계 확인) / **폐기 프레이밍 ⚠️ 미통과 자인** — 착수 전 잠정 판단을 3건 연속 반박하는 구조라 *"반박이 곧 엄밀함"* 으로 흐를 위험이 있어, 호출 프롬프트에 *"NO-OP 결론 자체가 과잉 교정은 아닌가"* 를 명시 질문으로 삽입했다 / **순수주의 ⚠️ 미통과 자인** — 결정 2(*"메커니즘 미확인"*)가 *"인과를 모르면 아무것도 쓰지 않는다"* 는 순수주의로 읽힐 수 있어 함께 질의했다. 외부 모델은 두 축 모두에서 원안을 지지했다 (아래 합의 ②③).
+
+- **합의 항목** — ① **(a)/(b) 기각이 보안 사각 방지**: `kw3 보안` 이 실제 WARN 클러스터(#965~#992)의 구성 키워드였으므로, *"릴리스 PR 이라는 이유로 보안 항목 검사를 우회·약화하는"* 클래스 예외를 기각한 것이 사각지대 발생을 막았다는 평가. ② **YAGNI 준수** — 포착률 100%(빨간 X 머지 0건) 상황에서 *"수율 0 짜리 신규 CI 가드"* 대신 문서 1줄을 택한 것이 불필요한 복잡도 증가를 차단. **폐기 프레이밍 자인 축에 대한 외부 반증은 제기되지 않았다.** ③ **단계적 격상 모델** — 1-B(30일 창 FAIL ≥ 2건 → (iii) 격상)가 문서 처방 실패 시의 경로를 사전 확보했다는 평가. ④ **상위 경로 위임 분리** — §재검토 조건 3 이 판정식(ADR 1010) / required check(ADR 971) 관할을 본 ADR 과 명확히 분리.
+- **이견 수용** — ① **§재검토 조건 1-A 의 `--limit 300` 경계 조건 미서술** (agy 제안 1). 원안은 limit 값만 적고 그 값이 무엇을 구속하는지 침묵했다. **수용하되 진단은 정정**한다 — agy 는 *"PR 이 300개를 초과하는 미래에 판정이 깨진다"* 로 읽었으나, `gh pr list` 는 **최신순** 반환이라 판정 창(최신 3 사이클)은 어떤 limit 에서도 항상 포함된다. 실제 구속 대상은 **base rate 재산출 시의 과거 깊이**뿐이다. 1-A 에 이 구분을 명시하는 주석 박스를 신설했다. ② **Provisional → Accepted 전이 주체·기계 조건 미서술** (agy 누락 2). 수용 — 메타데이터에 전이 주체(기안 architect, 동일 PR 내 2커밋)와 기계 조건(`outcome=applied ∧ plan_bypass=false`)을 박제했다.
+- **Claude 재분석으로 기각한 외부 모델 제안** — **`.github/PULL_REQUEST_TEMPLATE.md` 상단에 HTML 주석으로 `create-pr` 스킬 안내 1줄 추가** (agy 제안 2 / 누락 1). agy 는 *"코드·워크플로 변경이 아니므로 NO-OP 기조를 해치지 않음"* 으로 무해하다고 봤다. **실측으로 기각한다.**
+
+  ```text
+  # 술어: phrase 가 HTML 주석 안에만 있는 합성 본문을 판정 정본에 투입
+  본문: <!-- - [x] 보안 취약점 없음 ... -->  /  <!-- ### ADR 호환성 체크 -->
+  결과: kw3 = WARN, kw6 = WARN  (FAIL 아님 → phraseHits ≥ 1 로 계상됨)
+  ```
+
+  **가드는 HTML 주석 안의 phrase 를 센다.** 즉 주석은 *렌더링에 보이지 않으면서 blocking 축(phrase)을 만족시키는* 텍스트다. 이를 **템플릿**에 넣으면 그 효과가 **모든 미래 PR 에 상속**된다. agy 가 제시한 문구 자체는 7 phrase(`커밋 컨벤션`/`불필요`/`보안`/`SSoT`/`cross-validate`/`ADR 호환성`/`Test plan`) 를 포함하지 않아 오늘은 무해하나, phrase 매칭이 **순진한 부분문자열**이라 (`--self-test` **F9** 가 `보안` ⊂ `정보안내` 를 고정 픽스처로 박제) 이후 누구든 주석 문구를 손볼 때 blocking 축이 **영구히 무효화**될 수 있다. 게다가 [20260811-1010](20260811-1010-measurement-c-verdict-tiers.md) **결정 2** 가 *"템플릿은 고치지 않는다 — 모든 미래 PR 영향 대비 이득 0"* 을 이미 확정했다. ⇒ **이득은 안내 1줄, 비용은 blocking 축에 보이지 않는 주입 경로 신설.** 기각한다.
+- **고유 발견 (후속 분리)** — **없음.** agy 가 제기한 항목은 위 3건이 전부이며 전부 본 ADR 범위 안에서 처리됐다 (2건 수용 / 1건 기각). 후속 이슈로 분리한 항목 없음.
