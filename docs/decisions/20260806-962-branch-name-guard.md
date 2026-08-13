@@ -139,13 +139,13 @@ PR [#961](https://github.com/coseo12/astro-simulator/pull/961) (#942) 의 cross-
 ```
 ^(develop|main)$
 ^(feature|fix|refactor|chore|docs|test|hotfix)/[0-9]+-[a-z0-9][a-z0-9._-]*$
-^release/v?[0-9]+\.[0-9]+\.[0-9]+-prep$
+^release/[0-9]+\.[0-9]+\.[0-9]+-prep$
 ^chore/(r1-baseline-linux|baseline-remeasure)-[0-9]+$
 ```
 
 - `feature`(≠`feat`) 유지 — #942 결정. 실측 `feature/` 306 / `feat/` 0
 - `hotfix` 는 실사용 0건이나 CLAUDE.md §브랜치 전략 표의 규약이므로 포함 (규약 우선)
-- `release` 의 `v?` **허용** — §2-3 진동 실측. 강제 시 릴리스 오차단
+- ~~`release` 의 `v?` **허용** — §2-3 진동 실측. 강제 시 릴리스 오차단~~ → **`v` 불허** (Amendment 2026-08-14, [#972](https://github.com/coseo12/astro-simulator/issues/972) — §6-4 재검토 조건 4 집행. 아래 §9)
 - `release` 의 `-prep` **필수** — §2-3 24회 연속
 - 봇 패턴 **명시 허용** — 봇 PR 통째 스킵(`github.actor != 'github-actions[bot]'`)을 쓰지 않는다. 그것은 한 클래스 전체의 silent skip 이라, 3번째 봇 workflow 가 임의 브랜치명을 써도 아무도 모른다. 패턴을 명시하면 신규 패턴 등장 시 가드가 FAIL 하며 의식적 갱신을 강제한다 (fail-fast 정합)
 
@@ -269,6 +269,8 @@ scripts/verify-branch-name.mjs
 | `develop` / `main` (head) | 57 / 0 | PASS | **릴리스·merge-back 전면 차단** |
 | `release/0.60.0-prep` · `release/v0.53.0-prep` | 22 / 13 | PASS | **릴리스 전면 차단** |
 | `release/v0.28.0` (`-prep` 없음) | 16 | FAIL | 잔여 위험 0 — 마지막 2026-06-16, §2-6 로 rerun 불가 |
+
+> **Amendment (2026-08-14, [#972](https://github.com/coseo12/astro-simulator/issues/972))** — 2행의 `release/v0.53.0-prep` 은 이제 **FAIL** 이다 (§9). 잔여 위험은 3행과 같은 근거로 **0** 이며, 근거가 3행보다 **한 겹 더 두껍다**: `v` 접두 prep 17건 중 12건은 트리거 SHA 에 `branch-name-guard.yml` 이 **아예 없고**(실측), 가드 도입 이후의 5건(`v0.64.0~v0.68.0`-prep)은 파일은 있으나 그 SHA 의 `scripts/verify-branch-name.mjs` 가 **`v?` 판정본**이다(실측). 위 표의 실측 수치(22 / 13)는 2026-08-06 시점 값이므로 갱신하지 않는다.
 | 봇 2패턴 | 27 | PASS | 자동화 파손 |
 | 정상 `<type>/<번호>-<설명>` | 458 | PASS | 일상 개발 차단 |
 | `architect/*` · `dev/*` | 13 | FAIL | **의도된 차단** (#942 폐기 결정 집행) |
@@ -303,7 +305,7 @@ scripts/verify-branch-name.mjs
 1. **발화 빈도가 ≥ 1/주** 로 관측되면 guard-design-principles §2 에 따라 임계 완화를 ADR Amendment 로 검토 (현재 추정 < 1/월)
 2. **3번째 봇 브랜치 패턴**이 필요해지면 `BOT_BRANCH_PATTERNS` 갱신 — `--verify-ssot` 가 강제 발화하므로 조용한 누락은 불가
 3. **required status check 정책**이 도입되면 본 가드를 required 로 승격 (§6-2). 정책 수립 자체는 후속 이슈이며, **그 이슈 생성을 본 PR 의 DoD 항목으로 고정**해 유실을 막는다 (§7 기각-3)
-4. `release/*-prep` 의 `v` 표기가 통일되면 `v?` 를 좁힌다
+4. ~~`release/*-prep` 의 `v` 표기가 통일되면 `v?` 를 좁힌다~~ → **집행됨** (2026-08-14, [#972](https://github.com/coseo12/astro-simulator/issues/972) — §9). 단 **종결은 다음 릴리스 1회 실통과 후**다 (#972 DoD 4)
 5. 커밋 컨벤션 type 이 추가·제거되면 정본 상수 1곳만 고치고 `--verify-ssot` 가 산문 3곳을 강제한다 (본 ADR 이 만든 구조의 첫 회수 시점)
 
 ---
@@ -353,3 +355,75 @@ scripts/verify-branch-name.mjs
 | 순수주의 | **부분 미통과 → 보정** — "이슈번호 100% 강제" 가 봇 자동화를 깬다는 사실을 실측 후 봇 예외를 명시 허용으로 전환 |
 
 미통과 2축은 cross-validate 호출 프롬프트에 명시 질문으로 삽입한다: *"봇 생성 브랜치·릴리스 prep 브랜치 외에, 이슈번호 필수화가 깨뜨릴 수 있는 자동화 경로가 더 있는가?"*
+
+---
+
+## §9 Amendment (2026-08-14, [#972](https://github.com/coseo12/astro-simulator/issues/972)) — 릴리스 `v` 표기 통일 + `v?` 축소
+
+§6-4 재검토 조건 4 (_"`release/*-prep` 의 `v` 표기가 통일되면 `v?` 를 좁힌다"_) 의 집행이다.
+
+### 9-1 결정 — `v` **없음** (`release/<X.Y.Z>-prep`)
+
+`^release/v?[0-9]+\.[0-9]+\.[0-9]+-prep$` → `^release/[0-9]+\.[0-9]+\.[0-9]+-prep$`
+
+### 9-2 채택 근거는 빈도가 아니다 — 창을 선언한다
+
+**빈도 축은 약하다.** 창을 명시하지 않으면 정반대 결론이 나오기 때문에, 세 창을 전부 적는다 (실측 2026-08-14, 머지 PR head `release/*`).
+
+| 창 | v 없음 | v 있음 | 이 창만 보면 |
+|---|---|---|---|
+| (α) `release/*` 전체 (n=62) | 28 | **34** | **v 있음** |
+| (β) `release/*-prep` 만 (n=45) | **28** | 17 | v 없음 |
+| (γ) 최근 8건 (`2026-08-09~13`) | 3 | **5** | **v 있음** |
+
+- **(α) 는 두 명명 시대를 섞은 값이다.** 차이 17건은 전부 `-prep` 이 **없는** 구형(`release/vX.Y.Z`, 마지막 #691 `release/v0.28.0` 2026-06-16)이고, 이들은 **현행 정규식이 이미 거부**한다(§6-1 3행). 규칙의 적용 대상이 아닌 표본을 세면 규칙과 무관한 것을 측정하게 된다. 규정 모집단은 (β) 다.
+- **(γ) 는 신뢰할 수 없다.** 최근 3건(`0.69.0`/`0.70.0`/`0.71.0`-prep)은 메인 오케스트레이터가 **관행을 인지하지 못한 채** 만든 것이라, 관행의 증거가 아니라 관행 부재의 증거다. 반대 방향(직전 5건이 `v` 있음)도 같은 이유로 약하다. **"최근 관행" 을 근거로 삼는 것은 창 종속**이며, 이 저장소가 [#1014](https://github.com/coseo12/astro-simulator/issues/1014)·[#1020](https://github.com/coseo12/astro-simulator/issues/1020) 에서 반복 지적한 결함이다.
+- 규정 모집단 (β) 조차 **28 : 17 (62%)** 로, 단독으로 결정을 지탱하기엔 얇다. **그래서 빈도를 결정 근거로 쓰지 않는다.**
+
+### 9-3 결정을 지탱하는 축 — 버전 ↔ 태그
+
+`v` 는 버전 문자열의 일부가 아니라 **태그 ref 의 네임스페이스 표지**다. 저장소가 같은 숫자를 쓰는 자리를 전수하면 이 축은 예외 없이 갈린다 (실측 2026-08-14, `v0.71.0` 기준):
+
+| 자리 | 표기 | 성질 |
+|---|---|---|
+| git 태그 | `v0.71.0` | **ref 이름** — 네임스페이스가 없으므로 `v` 가 그 역할을 한다 |
+| `package.json` `version` | `0.71.0` | **버전 값** |
+| CHANGELOG 섹션 헤딩 | `## [0.71.0]` | **버전 값** |
+
+`release/<X>-prep` 의 `<X>` 는 **버전** 이다 — 브랜치는 태그보다 먼저 존재하며 그 버전을 *준비* 한다. 게다가 `release/` 세그먼트가 이미 네임스페이스를 담당하므로 `v` 는 중복 표지다. 즉 CLAUDE.md §브랜치 전략 표가 원래 쓰던 `release/<버전>-prep` 의 _"버전"_ 을 저장소의 다른 두 자리와 같은 뜻으로 읽으면 **답은 이미 `v` 없음이었다**. 본 Amendment 는 그 독해를 기계로 강제 가능하게 만들 뿐이며, 자리표시자를 `<X.Y.Z>` 로 바꿔 _"버전"_ 의 해석 여지를 제거한다.
+
+### 9-4 축소는 과거 브랜치를 FAIL 시키지 않는다 — 재확인 (실측 2026-08-14)
+
+§2-6 의 일반 명제(_"run 은 트리거 SHA 의 workflow 정의에 고정된다"_)를 이번 축소 대상 모집단에 직접 재확인했다. `v` 접두 prep **17건**은 두 층으로 갈리고, **양쪽 다 신규 정규식에 도달할 수 없다**.
+
+| 층 | 대상 | 실측 | 도달 불가 근거 |
+|---|---|---|---|
+| ① 가드 이전 (12건, ≤2026-08-06) | 예: [#902](https://github.com/coseo12/astro-simulator/pull/902) `release/v0.53.0-prep` | 트리거 SHA `7c7ddb4` 에 `.github/workflows/branch-name-guard.yml` **404** | workflow 파일이 없어 **실행 자체가 불가** |
+| ② 가드 이후 (5건, `v0.64.0~v0.68.0`-prep) | [#1021](https://github.com/coseo12/astro-simulator/pull/1021) `607db17` / [#1016](https://github.com/coseo12/astro-simulator/pull/1016) `7dfc87e` | 그 SHA 의 `scripts/verify-branch-name.mjs:92` == `` /^release\/v?[0-9]+\.[0-9]+\.[0-9]+-prep$/ `` | 판정 코드가 체크아웃돼 오는 **구 `v?` 판정본** |
+
+②가 결정적이다 — 파일이 존재하는데도 통과하는 이유가 "가드가 없어서" 가 아니라 **판정 코드 자체가 그 SHA 의 것**이기 때문임을 보인다. `actions/checkout@v4` 가 `pull_request` 이벤트 페이로드의 SHA 를 체크아웃하고, rerun 은 같은 페이로드를 재생한다. 5건의 실제 run 결론도 전부 `success` 로 남아 있다.
+
+보강 2건: (i) 트리거 types 가 `[opened, synchronize]` 라 **`reopened` 가 제외**돼 있어(§5-2) 과거 PR 을 다시 열어도 발화하지 않는다. (ii) 착수 시점 `release/*` head 를 가진 **열린 PR 0건** (실측) — 축소로 즉시 차단되는 활성 PR 이 없다.
+
+> ⚠️ 도달 가능한 유일한 경로는 `--check-corpus` 이며 **CI 미배선**이다(§5-4). 그 모드의 FAIL 분류 라벨은 본 Amendment 에서 `v` 접두 prep 클래스를 별도 행으로 분리했다 — 축소 후 `release/*` FAIL 이 두 클래스가 되므로, 한 버킷에 뭉치면 진단이 틀린 이름을 단다.
+
+### 9-5 픽스처 — 양방향 고정 (#972 DoD 3)
+
+종전 `--self-test` 는 `release/0.60.0-prep` 과 `release/v0.53.0-prep` 을 **둘 다 PASS** 로 못박고 있었다. **정규식만 좁히고 이 픽스처를 두면 회귀를 못 잡는다** — 표기 진동 자체가 계약이었기 때문이다. 미채택 표기를 negative 로 **이동**했다(추가가 아니라 이동).
+
+- 리스크 라벨도 갱신 — 축소 후 `v` 접두는 "최고 리스크" 가 아니라 **정책 위반**이다. `최고 리스크 3종` 은 이제 `develop` / `main` / `release/*-prep` 이고 항목 수가 서술과 일치한다(종전 4항목).
+- **negative 3건에서 `v` 를 걷어냈다** (`release/v0.60-prep` → `release/0.60-prep` 등). 축소 후에는 `v` 가 남아 있으면 라벨이 말하는 축(2-segment 버전 / 접미 잉여)과 `v` 축 **두 이유로** 실패해 축이 섞인다.
+- **단언 수 불변** — `49 passed (픽스처 40건)`. positive 1건 제거 + negative 1건 추가라 총계가 그대로여서, 수치를 인용한 기존 기록의 전수 sweep 이 발생하지 않는다([#988](https://github.com/coseo12/astro-simulator/issues/988) 전례). 단 FAIL 픽스처 지문은 정의상 바뀐다: `c61981759417` → **`2b5b977411c1`**.
+- **live negative 실증** (`--branch` CLI, 다음 릴리스 버전으로): `release/0.72.0-prep` → exit `0` `[PASS] ... (rule: release)` / `release/v0.72.0-prep` → exit `1` `[FAIL] ... 규약 위반` + 허용 집합 노출.
+
+### 9-6 결합 — 축 B 판정기가 [#970](https://github.com/coseo12/astro-simulator/issues/970) 가드에서 먼저 깨졌다
+
+`scripts/verify-pr-base-rule.mjs` 의 `CROSS_CHECKS` 는 _"전부 축 B 가 PASS 시키는 이름만 쓴다"_ 를 전제로 두 판정기를 대조한다. `v?` 를 좁히자 `release/v0.53.0-prep` 이 그 교집합 밖으로 나가 **`[MISS] 불변식 — 축 B 정합`** 으로 즉시 발화했다(`73 passed, 1 failed`, exit `1`).
+
+**설계 의도대로 동작한 것이다** — [20260812-970](20260812-970-pr-base-rule-guard.md) 이 그 대조를 둔 이유가 정확히 _"한쪽 상수·정규식이 바뀌면 여기서 먼저 깨진다"_ 였고, 본 Amendment 가 그 첫 회수 시점이다. 채택 표기 실측값(`release/0.71.0-prep`)으로 교체해 해소했고 총계·지문은 불변이다(`74 passed` / `040f261d9e10`).
+
+같은 파일의 base 픽스처 `['develop', 'release/v0.53.0-prep', 'pass']` 는 **존치**한다 — 이름은 축 B 위반이나 base 선택은 정상이라는 **관할 분리 실증**이 그 픽스처의 목적이고, 바로 아래 `release/v0.28.0` 행과 같은 역할이다. 라벨의 근거 문구(_"표기 진동 수용"_)만 갱신했다.
+
+### 9-7 종결 조건 — 이 Amendment 로 닫히지 않는다
+
+#972 DoD 4 는 _"다음 릴리스 1회 실통과 후 종결"_ 이다. 정규식만 고치고 릴리스를 돌리지 않으면 **오차단을 관측할 기회가 없다** — §6-3 이 적은 대로 브랜치명은 PR 생성 후 변경 불가라 오차단의 교정 비용이 비대칭이고, 그 비대칭이 실현되는 지점이 바로 다음 prep 브랜치 생성 시점이다. 따라서 본 Amendment 를 담은 PR 은 `Closes` 가 아니라 `Part of` 로 연결하고, **다음 릴리스(`release/0.72.0-prep`)가 채택 표기로 생성돼 `branch-name` 체크가 SUCCESS** 인 것을 확인한 뒤 이슈를 닫는다.
