@@ -95,16 +95,21 @@ _"셸을 경유해 마크다운·코드를 전달하는 모든 명령"_ 으로 �
 **대상 (리터럴 타이핑 경로)**
 
 - `git commit -m` — 전 에이전트 상시 사용
-- `gh issue create --body` — `.claude/agents/pm.md`
-- `gh issue comment --body` — `.claude/skills/create-issue/SKILL.md`
+- `gh issue create --body` — `.claude/agents/pm.md:109`, 그리고 **라이브 반례** 아래
+- `gh issue comment --body` — `.claude/skills/create-issue/SKILL.md:62`
+
+> ⚠️ **라이브 반례 — 자매 문서가 위험 형태를 템플릿으로 싣고 있다.** [`docs/lessons/workflow-dispatch-pitfalls.md`](workflow-dispatch-pitfalls.md) `:74` · `:89` 의 `gh issue create --body "$(cat <<HEREEND` 는 **구분자에 따옴표가 없다**. 위 §변형 이 _"따옴표 친 heredoc 이 핵심"_ 이라고 못박은 바로 그 지점의 반례다. 현재 본문에 metachar 가 없어 무해하지만, 에이전트가 그 템플릿에 실제 내용을 채우면 조용히 손상된다 (`<<'HEREEND'` → `` `n>=3` `` · `$VERSION` 보존 / `<<HEREEND` → `GONE` · `9.9.9` 로 확장 — 실측). **해당 문서 수정은 본 PR 범위 밖이며 후속 [#1045](https://github.com/coseo12/astro-simulator/issues/1045) 가 흡수한다.**
 
 **대상 아님 (실측 근거)**
 
-- `gh pr edit` — 본 저장소에서는 `--add-label` / `--remove-label` / `--base` 로만 쓰인다. `--body` 사용처 0
+- `gh pr edit` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며, `--title` (`docs/skills-guide.md:22`) 은 본문이 아니라 한 줄 제목이라 마크다운 전달 경로가 아니다
 - `gh release create --notes` — `--notes` 를 리터럴로 넘기는 사용처 0 (`gh release create <tag>` / `--target` 만)
 - `gh pr create --body` — `create-pr` 스킬 경유가 **의무**라 직접 호출 자체가 금지 (에이전트 5개 파일에 박제)
 - `scripts/verify-pr-template-checklist.mjs` — 이미 `spawnSync` + `--body-file -` (volt #114 fix 적용분)
 - `.claude/skills/cross-validate/scripts/cross_validate.sh` — `--body "${body}"` 변수 확장이라 §리터럴만 위험하다 에 의해 안전
+- `.claude/skills/{create-issue,capture-volt,create-pr}/SKILL.md` — 이미 `--body "$(cat <<'EOF'` **따옴표 친 heredoc** (`create-issue:48` / `capture-volt:125`·`:156` / `create-pr:56`)
+
+> 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 본 문서가 §변형 에서 제시한 형태가 저장소 스킬 3종에 **이미 정착해 있었다**. 신규 관행을 요구하는 게 아니라, `git commit` 과 위 반례가 그 관행에서 빠져 있었을 뿐이다.
 
 ## 회귀 가드 — 채택 기각 (#996)
 
@@ -120,24 +125,34 @@ for h in $(git log -2 --format=%H); do git cat-file -p $h; done
 # -> 양쪽 다 tree / parent / author / committer / <message> 뿐. invocation 필드 없음
 ```
 
-`git log` 의 format placeholder 는 **커밋 객체에 있는 것만** 노출할 수 있고, 위 `cat-file` 출력이 곧 그 객체의 전부다 — 즉 _"placeholder 를 못 찾았다"_ 가 아니라 **노출할 대상이 객체에 없다**. 커밋 이력에 남은 것은 **이미 셸을 통과한 결과 문자열** 뿐이므로, 사후 검사가 볼 수 있는 입력 자체가 존재하지 않는다.
+`git log` 이 노출하는 **커밋 객체 필드**는 위 `cat-file` 출력이 전부다 — 즉 _"placeholder 를 못 찾았다"_ 가 아니라 **객체가 닫힌 자료구조라 노출할 대상이 없다**. 커밋 이력에 남은 것은 **이미 셸을 통과한 결과 문자열** 뿐이므로, 사후 검사가 볼 수 있는 입력 자체가 존재하지 않는다.
+
+> ⚠️ **"커밋 객체 필드" 한정이 중요하다.** `git log` 에는 객체 밖을 읽는 placeholder 도 있다 — `git log -g --format='%gs'` 는 **reflog** 를 노출한다 (`reset: moving to HEAD`). 그러나 결론은 그대로다: reflog 도 `commit: <subject>` 형태로 **셸을 통과한 뒤의 메시지만** 기록한다 (실측 — 백틱이 치환된 커밋의 reflog 엔트리는 `commit (initial): docs: threshold rule` 로 **이미 손상된 subject** 를 담는다). 객체든 reflog 든 **post-shell 기록**이라 원본 대조 대상이 되지 못한다.
 
 **축 2 — 훅도 원본을 못 본다.** 손상은 **git 이 메시지를 받기 전에** 셸에서 끝난다. `commit-msg` 훅에 `echo "$(cat "$1")"` 를 걸고 위 백틱 메시지를 커밋하면 훅이 받는 값은 `docs: threshold  rule` — **이미 손상된 문자열**이다. 대조할 원본이 훅의 입력에 없으므로 훅은 _"손상됐다"_ 를 판정할 수 없다.
 
-**축 3 — base rate 가 가드를 무의미하게 만든다.** 최근 300 커밋 메시지 실측: metachar(`` ` `` / `$X` / `<X`) 포함 **929줄**, 그중 백틱 **319줄**.
+**축 3 — 검출 신호가 손상과 _반상관_ 이다.** 제안된 가드는 _"메시지에 백틱·`$` 가 남아 있는데 `-F` 를 안 썼다"_ 를 신호로 쓴다. 그런데 **손상은 metachar 를 제거한다** — 백틱이 살아남았다는 것은 그 메시지가 **셸 파서를 건드리지 않았다**는 증거, 즉 안전 경로(변수 전달 / `-F`)를 탔다는 증거다. 신호와 대상이 **반대 방향**이다.
 
 ```sh
-git log -n 300 --format=%B | grep -cE '`|\$[A-Za-z_{(]|<[A-Za-z_]'   # 929
-git log -n 300 --format=%B | grep -cF '`'                            # 319
+# 안전 경로 — 원문 보존
+git commit -F - <<'EOF'
+docs: threshold `n>=3` rule
+EOF
+git log -1 --format=%s   # -> docs: threshold `n>=3` rule   (백틱 1 → 가드 발화)
+
+# 위험 경로 — 리터럴 -m
+/bin/sh -c 'git commit -m "docs: threshold `n>=3` rule"'
+git log -1 --format=%s   # -> docs: threshold  rule         (백틱 0 → 가드 침묵)
 ```
 
-**메타문자 존재는 정상 관행**이다 (커밋 메시지에서 식별자를 인라인 코드로 감싸는 것이 본 저장소 컨벤션). 존재만으로 경고하면 상시 발화 — [#766](https://github.com/coseo12/astro-simulator/issues/766) alert fatigue 계보.
+가드는 **안전한 커밋에만 발화하고 손상된 커밋에는 침묵한다**. 정밀도가 낮은 게 아니라 **부호가 뒤집혀 있다** — 임계를 조정해 구제할 수 있는 종류의 실패가 아니다.
+
+> **이 논거는 모집단 선택에 의존하지 않는다** — 의도적으로 그렇게 골랐다. 초판은 _"metachar 는 정상 관행이라 상시 발화한다"_ 는 **base rate 논거**(`%B` 300커밋 백틱 `319`)를 썼는데, PR [#1044](https://github.com/coseo12/astro-simulator/pull/1044) 리뷰가 **모집단이 틀렸음**을 지적했다: `%B` 300커밋의 **97.3%** 는 squash·merge 로 **GitHub 이 조성**한 본문이라 로컬 셸 `-m` 을 통과한 적이 없다. 실제 위험 모집단인 **subject** 로 좁히면 백틱 보유는 rev `9ca671b` 기준 **`0/300`** (`git log -n 300 --format=%s | grep -cF` 백틱)이라 _"상시 발화"_ 가 **뒤집힌다**. 결론은 축 1·2 로 이미 결정적이었으나, **논거 하나가 재측정으로 무너지는 상태를 남기지 않기 위해** 모집단 독립 형태로 교체했다.
 
 ### 채택 가능한 부분집합이 있는가 — 없다 (측정으로 기각)
 
-세 축은 _"입력을 못 본다"_ 는 논거다. 그렇다면 **결과에 남은 흔적**으로 역추적할 수 있는가. 유일한 후보는 내용이 사라진 자리의 **연속 공백**이다 (`threshold  rule` / `rename  to`). 필요조건·충분조건 양쪽에서 실패한다.
+세 축은 _"입력을 못 본다"_ 는 논거다. 그렇다면 **결과에 남은 흔적**으로 역추적할 수 있는가. 유일한 후보는 내용이 사라진 자리의 **연속 공백**이다 (`threshold  rule` / `rename  to`). **필요조건이 아니라서** 실패한다.
 
-- **충분조건 아님** — 최근 300 커밋에 연속 공백 **37줄**(`git log -n 300 --format=%B | grep -cE '[^ ]  +[^ ]'`). 표본을 보면 전부 표 정렬·들여쓰기 서식이다.
 - **필요조건 아님 (결정적)** — 손상이 흔적을 **안 남기는 경우가 더 흔하다**. 토큰 경계에 붙으면 공백이 애초에 생기지 않는다.
 
   | 의도                                 | 기록된 결과              | 연속 공백 |
@@ -146,7 +161,9 @@ git log -n 300 --format=%B | grep -cF '`'                            # 319
   | `fix: bump to $VERSION`              | `fix: bump to`           | 0         |
   | ``refactor: `helper` split``         | `refactor:  split`       | 1         |
 
-첫 행이 이 판정의 핵심이다 — `fix: drop path handling` 은 **문법적으로 완전하고 자연스러운 커밋 메시지**다. 어떤 검사도 이것을 손상으로 분류할 수 없고, 사람도 원문을 모르면 못 알아본다.
+첫 행이 이 판정의 핵심이다 — `fix: drop path handling` 은 **문법적으로 완전하고 자연스러운 커밋 메시지**다. 어떤 검사도 이것을 손상으로 분류할 수 없고, 사람도 원문을 모르면 못 알아본다. **재현율이 구조적으로 `1/3` 로 묶이고, 놓치는 `2/3` 는 축 1 에 의해 다른 어떤 방법으로도 복구 불가능하다** — 정밀도를 아무리 끌어올려도 지배적 실패 모드가 통째로 남는다.
+
+> **정밀도(오탐) 축은 근거로 쓰지 않는다** — 축 3 과 같은 모집단 함정이 있다. `%B` 기준 연속 공백은 rev `9ca671b` 에서 **36줄**(`git log -n 300 --format=%B | grep -cE '[^ ]  +[^ ]'`, 술어 = 매칭 줄 수)이고 표본은 전부 표 정렬 서식이지만, **위험 모집단인 subject 로 좁히면 `0/300`** 이다. 즉 오탐은 실제로 적다. 기각 근거는 오탐이 아니라 **위 재현율 상한**이다.
 
 물리적 흔적은 **하나** 있다. 치환된 명령이 리다이렉트를 포함하면 (`` `n>=3` `` → 명령 `n`, 리다이렉트 `>=3`) 작업 트리에 **`=3` 이라는 untracked 파일**이 남는다 (`git status --porcelain` → `?? =3`). 그러나 이는 (a) 커밋 이력이 아니라 작업 트리에 있고, (b) 정리하면 사라지며, (c) `$VAR` 확장이나 리다이렉트 없는 백틱에는 **생기지 않는다**. 회귀 가드의 기반으로는 부족하다.
 
