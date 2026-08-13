@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.72.0] — 2026-08-14
+
 ### Added
 
 - **[#982] `scripts/verify-md-tilde.mjs` — prettier 소유 markdown 의 bare `~~` 금지 강제 지점 신설 (MINOR)** ([#982](https://github.com/coseo12/astro-simulator/issues/982), ADR [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) 채택 판정의 **발효**) — 같은 `[Unreleased]` 의 `### Changed` ADR entry 가 _"규약은 있는데 강제 지점이 0"_ 이라고 적은 그 지점을 채운다. `prettier --write` 가 인라인 코드 **밖**의 단일 물결을 GFM 취소선 delimiter 로 정규화하는 손상은 `--check` 로 탐지되지 않으므로(정규화된 형태가 prettier 기준 **정답**), 포맷 백스톱 **위**가 아니라 **옆**에 두는 직교 가드다.
