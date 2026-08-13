@@ -57,7 +57,7 @@ PR 본문 가시성 자기 검증 (dev 단계 + reviewer 재검증) 은 **3계�
 
 ```bash
 # 정본 — 7 키워드 전건을 3계급으로 판정 (CI `pr-template-checklist-guard.yml` 과 동일 코드)
-node scripts/verify-pr-template-checklist.mjs <PR>
+node scripts/verify-pr-template-checklist.mjs <PR번호>
 # exit 0 = PASS 또는 WARN / exit 1 = FAIL. WARN 은 stdout 표에 계급별 구조 hit 이 0 으로 찍힌다
 ```
 
@@ -72,7 +72,7 @@ node scripts/verify-pr-template-checklist.mjs <PR>
 
 > 구조 판정의 헤더는 **ATX 레벨을 가리지 않는다** (`#`~`######`) — 템플릿이 쓰는 레벨은 `###` 이지만 묻는 것은 "섹션 헤더로 존재하는가"이지 레벨이 아니다. 구조 축은 WARN 전용이라 느슨한 쪽이 거짓 WARN 을 줄이고 blocking 경계에는 영향이 없다 (#1010).
 
-**수동 grep 대체재는 두지 않는다** ([#1013](https://github.com/coseo12/astro-simulator/issues/1013)) — 위 정본 호출(`node scripts/verify-pr-template-checklist.mjs <PR번호>`)이 유일한 지원 경로다. 구조 축은 단일 grep 로 재현되지 않는다: (i) 계급이 키워드마다 갈려 (`kw1~5` 체크박스 / `kw6~7` 헤더) 한 명령으로 두 계급을 못 재고, (ii) 코드 펜스 **안**의 체크박스·헤더를 제외하려면 펜스 상태를 들고 가는 라인 스캔이 필요하다. 근사 명령을 문서에 두면 그 자체가 **파생 판정식**이 되어 #1010 이 제거한 drift 클래스를 되살린다. 스크립트를 부를 수 없는 상황은 성립하지 않는다 — 본 지시문을 읽을 수 있다는 것이 곧 저장소 체크아웃을 갖고 있다는 뜻이다.
+**수동 grep 대체재는 두지 않는다** ([#1013](https://github.com/coseo12/astro-simulator/issues/1013)) — 위 정본 호출(`node scripts/verify-pr-template-checklist.mjs <PR번호>`)이 유일한 지원 경로다. 구조 축은 단일 grep 로 재현되지 않는다: (i) 계급이 키워드마다 갈려 (`kw1~5` 체크박스 / `kw6~7` 헤더) 한 명령으로 두 계급을 못 재고, (ii) 코드 펜스 **안**의 체크박스·헤더를 제외하려면 펜스 상태를 들고 가는 라인 스캔이 필요하다. 위 계급 정의 2줄 같은 **산문 사본**은 _"갈리면 스크립트가 옳다"_ 로 명시 종속돼 판정 권한이 없지만, **grep 명령은 그 종속을 가질 수 없다** — 실행되는 순간 스스로 답을 내는 **독립 판정식**이라 #1010 이 제거한 drift 클래스를 되살린다. 스크립트를 부를 수 없는 컨텍스트(체크아웃 없음 / `node` 실행 권한 없음)에서의 올바른 폴백은 틀린 grep 이 아니라 **PR 본문 육안 확인**이다.
 
 **메타 규칙** (PR 템플릿 신규 항목 양가성 노출 시 절차):
 1. 즉시 본 메타 규칙 발화 — 측정 방법 C 가 FAIL(phrase 0) 또는 WARN(구조 0) 을 내면 reviewer/qa 가 권고 박제

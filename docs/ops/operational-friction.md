@@ -270,3 +270,19 @@ npx prettier --check .                  # 금지 — 캐시 버전이 지배
   install 된 lockfile 바이너리라 버전 출처가 하나로 유지된다. 워크플로에 `npx prettier@<버전>` 을
   하드핀하면 네 번째 출처가 생겨 같은 클래스를 재생산한다.
 - 근거: [#952](https://github.com/coseo12/astro-simulator/issues/952) (PR [#951](https://github.com/coseo12/astro-simulator/pull/951) 리뷰 권고 4-i/4-ii).
+
+### 7-1. 버전이 맞아도 손상된다 — 인라인 코드 **밖**의 `~` 범위 표기 (#1013)
+
+§7 은 **버전 skew** 가 원인이지만, **lockfile 정본 버전(3.9.6)에서도** 마크다운이 손상되는 직교 경로가 하나 더 있다. `prettier --write` 는 인라인 코드 **밖**의 `~` 를 GFM 취소선 문법으로 정규화한다 — 한 문단에 `~` 가 2개 있으면 짝지어 버린다.
+
+```bash
+# 실측 (prettier 3.9.6 = lockfile 버전, --parser markdown)
+# 입력:  kw1~5 체크박스 / kw6~7 헤더
+# 출력:  kw1~~5 체크박스 / kw6~~7 헤더     ← 렌더링 시 "5 체크박스 / kw6" 이 취소선
+# 인라인 코드로 감싸면 불변: `kw1~5` / `kw6~7`
+```
+
+**표준 절차 — 범위·구간 표기는 반드시 인라인 코드로 감싼다** (`` `kw1~5` `` / `` `1~5` `` / `` `v0.67~0.69` ``). 같은 뿌리의 규약이 이미 `verify-pr-template-checklist.mjs` 의 PR 코멘트 문자열 주석에 있다 — *"한 문단에 `~` 가 2개 있으면 GFM 이 strikethrough 로 페어링하므로 범위 표기는 반드시 인라인 코드로 감싼다"*. 차이는 **누가 깨뜨리는가**다: 거기서는 GitHub 렌더러, 여기서는 **포맷터가 소스를 직접 고쳐 쓴다**.
+
+- **왜 조용한가** — `--write` 가 통과시킨 뒤에는 `--check` 도 초록이다(정규화된 형태가 prettier 기준으로는 정답). 즉 **CI 백스톱이 잡지 않으며**, diff 를 육안으로 봐야만 보인다. 저장소 잔여는 **0** (술어: `prettier --check "**/*.md"` 통과) 이라 회수 대상은 없고, 이 절은 **작성 시점 예방**이 목적이다.
+- 근거: [#1013](https://github.com/coseo12/astro-simulator/issues/1013) — PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038) 작성 중 CHANGELOG 산문의 `kw1~5` 가 실제로 이 경로로 손상됐고(커밋 전 발견), reviewer 가 격리 재현(`printf … | prettier --parser markdown`)으로 독립 확인했다.
