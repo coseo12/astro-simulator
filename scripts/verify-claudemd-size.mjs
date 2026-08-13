@@ -125,9 +125,15 @@ function runCheck() {
   // (stdout 을 파이프·grep 하지 않음). 다음 라운드에서 같은 가설을 다시 세우지 않도록
   // 술어째로 박제한다.
   //
-  // 회귀 방지: 아래 self-test 의 경계 3케이스(33,000 / 40,000 / 45,000 정각)가 "이상" 을 단언하고
-  // "초과" 잔존을 금지한다. 본 파일에 남은 "초과" 는 헤더 :10 (과거 실측 36,817 > 35,000 서술) 과
-  // negative 픽스처 주석 (46,000 > 45,000) 뿐이며 둘 다 진짜 강부등호라 의도적 존치다.
+  // 회귀 방지: 아래 self-test 의 경계 3케이스(33,000 / 40,000 / 45,000 정각)가 `임계 <값> 이상`
+  // 구절을 단언하고 "초과" 잔존을 금지한다. 기계가 지키는 성질은 "**진단 메시지로 출력되는** 초과가
+  // 없다" 이지 소스 주석에 낱말이 안 보인다가 아니다.
+  //
+  // 그래서 소스에 남는 "초과" 를 셀 때는 술어를 함께 적는다 (PR #1050 리뷰 🟡-1 — 술어 없는 전칭
+  // 열거는 자기 문장에 반증된다). 술어: `grep -nF '초과' scripts/verify-claudemd-size.mjs` 의 원시
+  // hit 에서 **이 계약을 서술·검사하는 줄**(#988 문구 계약 주석 블록 2곳 + `wordingOk` 정의줄)을
+  // 뺀 나머지. 그 나머지는 현재 **1줄** — 파일 헤더의 #905 배경 서술(36,817 > 35,000)이고, 진짜
+  // 강부등호라 의도적 존치다("이상" 으로 바꾸면 서술이 약해진다).
   if (count >= failLimit) {
     console.error(
       `${MARK_FAIL} CLAUDE.md ${fmt(count)} chars — fail 임계 ${fmt(failLimit)} 이상. ` +
@@ -192,8 +198,13 @@ function runSelfTest() {
    * 아래 경계 3케이스(정각 픽스처)에 합쳐 단언한다 — 정각이야말로 두 낱말의 진리값이 갈리는
    * 유일한 지점이라 별도 케이스보다 여기 붙는 게 옳고, 단언 수가 안 변해 케이스 수를 인용한
    * 기존 기록(CHANGELOG 등)과의 drift 도 생기지 않는다.
+   *
+   * 낱말을 **임계 절에 묶어서** 본다 (PR #1050 리뷰 🟡-3). 낱말만 훑으면 장래에 메시지가
+   * `임계 33,000 넘음 … (fail 45,000 이상)` 처럼 바뀌어도 통과해 버린다 — "이상" 이 다른
+   * 자리에 남아 있기 때문이다. `임계 <값> 이상` 구절 전체를 요구해 그 우회를 막는다.
    */
-  const wordingOk = (out) => out.includes('이상') && !out.includes('초과');
+  const wordingOk = (out, limit) =>
+    out.includes(`임계 ${fmt(limit)} 이상`) && !out.includes('초과');
 
   try {
     console.log('self-test: verify-claudemd-size.mjs (fixture 주입)');
@@ -209,7 +220,7 @@ function runSelfTest() {
       !pos.stdout.includes('WARN') && !pos.stderr.includes(MARK_FAIL),
     );
 
-    // negative: 45k 초과 → exit 1 + stderr fail 마커
+    // negative: 46k (45k 이상) → exit 1 + stderr fail 마커
     const negPath = asciiFixture('negative.md', 46_000);
     const neg = invoke(negPath);
     assert('negative: 46k → exit 1', neg.status === 1, `status=${neg.status}`);
@@ -229,7 +240,9 @@ function runSelfTest() {
     const b2 = invoke(asciiFixture('b33000.md', 33_000));
     assert(
       '경계: 33,000 정각 → 경계 경보 + "이상" 문구 (exit 0)',
-      b2.status === 0 && b2.stdout.includes(MARK_WARN_BOUNDARY) && wordingOk(b2.stdout),
+      b2.status === 0 &&
+        b2.stdout.includes(MARK_WARN_BOUNDARY) &&
+        wordingOk(b2.stdout, DEFAULT_WARN_BOUNDARY),
       `status=${b2.status} stdout=${b2.stdout.trim()}`,
     );
     const b3 = invoke(asciiFixture('b39999.md', 39_999));
@@ -240,7 +253,7 @@ function runSelfTest() {
     const b4 = invoke(asciiFixture('b40000.md', 40_000));
     assert(
       '경계: 40,000 정각 → PR warn + "이상" 문구 (exit 0)',
-      b4.status === 0 && b4.stdout.includes(MARK_WARN_PR) && wordingOk(b4.stdout),
+      b4.status === 0 && b4.stdout.includes(MARK_WARN_PR) && wordingOk(b4.stdout, DEFAULT_WARN_PR),
       `status=${b4.status} stdout=${b4.stdout.trim()}`,
     );
     const b5 = invoke(asciiFixture('b44999.md', 44_999));
@@ -251,7 +264,7 @@ function runSelfTest() {
     const b6 = invoke(asciiFixture('b45000.md', 45_000));
     assert(
       '경계: 45,000 정각 → fail + "이상" 문구 (exit 1)',
-      b6.status === 1 && b6.stderr.includes(MARK_FAIL) && wordingOk(b6.stderr),
+      b6.status === 1 && b6.stderr.includes(MARK_FAIL) && wordingOk(b6.stderr, DEFAULT_FAIL),
       `status=${b6.status} stderr=${b6.stderr.trim()}`,
     );
 
