@@ -200,7 +200,10 @@ self-test `F15` 가 정적으로 막는다.
 
 **(iii) 현재 픽스처·단언 수 — `F1~F19` / `46` 단언** (2026-08-13, 이슈 #1020 반영 후).
 `23 → 46`. 신규분은 `F17` 어순(negative 2 + recovery 1) · `F18` 앵커 중복(negative 3 + recovery 1) ·
-`F19a`~`F19n` CLI 표면(순수 술어 4 + `main()` 종료 코드 6 + `dispatch()` 실행 1 + 배선 정적 3).
+`F19a`~`F19n` CLI 표면 16(순수 술어 4 + `main()` 종료 코드 **8** + `dispatch()` 실행 1 + 배선 정적 3).
+신규 합계 `3 + 4 + 16 = 23` 이고 `23 + 23 = 46` 으로 총계와 닫힌다. ⚠️ `main()` 축은 **6 경로 /
+8 단언**이다 — PASS·FAIL 두 경로만 종료 코드와 **출력 문자열**을 각각 단언하기 때문이며(배선이
+끊겨 조용히 0 을 반환하는 경로 차단), 경로 수를 단언 수로 적으면 합계가 2 어긋난다.
 술어 자기 검증: `grep -c 'assert(' scripts/verify-adr-index.mjs` == `--self-test` 출력의 `N passed`
 == **46**. 갱신 지점은 `verify-adr-index.mjs` 호출 예시 주석 · self-test 섹션 헤더 ·
 `project-guards.yml` 주석 **3곳**이며, `CHANGELOG.md` 의 `[0.68.0]` 섹션과 agy 발화 인용은
