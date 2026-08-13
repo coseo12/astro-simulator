@@ -19,6 +19,23 @@ Semantic Versioning을 따른다.
 
   ⚠️ **본 PR 은 ADR 과 인덱스 행만 담는다.** 이슈 §DoD 2 (`docs/ops/operational-friction.md` 박제) 와 `.gitignore` 역포인터 · `.claude/agents/developer.md` 1줄은 **developer 인계분**이며, §DoD 3 (_"실제 sub-agent 디스패치 1회에서 적용 확인"_) 은 메인 오케스트레이터가 다음 디스패치에서 닫는다. 그래서 `Closes` 가 아니라 `Part of #960` 이다.
 
+- **[#960] 격리 worktree typecheck 정본 레시피 박제 — `docs/ops/operational-friction.md` §8 + 에이전트 규칙 1줄 (MINOR)** ([#960](https://github.com/coseo12/astro-simulator/issues/960), 위 ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md) 채택 판정의 **발효**) — 같은 `[Unreleased]` 의 ADR entry 가 판정만 담고 남긴 §DoD 2 를 채운다. 박제 3곳: **(1)** `docs/ops/operational-friction.md` **§8 신설** (#952 §7 인접 — `install` 규약의 **확장이지 대체가 아니다**), **(2)** `.gitignore` 의 `apps/web/next-env.d.ts` 주석에 #960 재확인 근거 + ADR §재검토 조건 4 역포인터, **(3)** `.claude/agents/developer.md` §규칙 1줄.
+
+  **§8 은 `TS2882` / `TS2307` 리터럴을 본문에 포함한다** — 결손이 레시피 부재가 아니라 **오진**이기 때문이다 (증상 2회 보고가 모두 원인을 `next-env.d.ts` 하나로 지목했고, 실제로는 `packages/{shared,core}/dist` 부재가 baseline 부터 공존한다). 에이전트가 실제로 보는 토큰으로 grep 도달이 가능해야 한다.
+
+  **dev 독립 재현** (rev `8e230e3` — `git worktree add` 직후 `node_modules` 부재 상태에서 순차 측정) — `pnpm install --frozen-lockfile` exit `0` (`4s`) → baseline `pnpm --filter web typecheck` exit `2` / `error TS` **76 행** (`TS2307` 52 / `TS7006` 13 / `TS2339` 4 / `TS18048` 4 / `TS2882` 2 / `TS7031` 1) → **`pnpm build`** exit `0` (`27s`) → typecheck exit `0` / `error TS` **0 행** (`3s`). ADR §E 표 (rev `7ca1cd1`) 와 **행 수·내역이 전건 일치**하며 `pnpm build` 소요만 `17s` 대 `27s` 로 갈린다 (같은 머신의 부하 편차 — 본문은 `17~27s` 로 병기).
+
+  **폴백과 함정도 재현했다** — `packages/physics-wasm/pkg` 를 치운 상태 (= Rust 툴체인 부재 시뮬레이션) 에서 `pnpm --filter web exec next typegen` (exit `0`) + `shared`·`core` `-r build` (exit `2`, `TS2307` 4건) 뒤 typecheck 가 exit `0` / `error TS` 0 행이었고, `core` 의 `dist` `.d.ts` 는 **`58` 개**로 ADR §결과 3 과 일치했다. `.tsbuildinfo` 함정은 양방향 확인 — `rm -rf packages/shared/dist` 만 하면 `tsc` 가 exit `0` 을 내고 **`dist` 를 만들지 않으며**, `tsconfig.build.tsbuildinfo` 까지 지워야 재생성된다 (`composite: true`).
+
+  **옵션 B 기각 근거의 md5 도 독립 재현** — `next build` / `next typegen` 산출은 `2a74d390…` (`import "./.next/types/routes.d.ts";`), `next dev` 산출은 `d0f8375a…` (`import "./.next/dev/types/routes.d.ts";`) 이고 `next dev` 기동 **1초 이내** (폴링 간격 `1s`) 에 덮어써졌다. 파일은 2줄이 아니라 6줄이다. 그래서 §8 은 _"표준 2줄 수동 작성"_ 을 **금지**로 적었다 — 가변 산출물을 절차 문서에 하드코딩하는 것은 B 와 같은 실패 클래스를 문서로 옮기는 것이다.
+
+  ⚠️ **이슈 §DoD 3** (_"실제 sub-agent 디스패치 1회에서 적용 확인"_) 은 여전히 열려 있다 — 메인 오케스트레이터가 다음 디스패치에서 닫는다. 그래서 본 변경도 `Closes` 가 아니라 `Part of #960` 이다.
+
+### Behavior Changes
+
+- **developer 페르소나 — 격리 worktree 에서 `typecheck` 가 필요하면 `pnpm build` 를 선행한다** ([#960](https://github.com/coseo12/astro-simulator/issues/960)) — `.claude/agents/developer.md` §규칙에 1줄 추가. 이전에는 `pnpm install --frozen-lockfile` (#952 규약) 만 선행했고 typecheck 가 exit `2` 로 실패했을 때의 대응이 **재량**이었다 (실제로 `next-env.d.ts` 를 손으로 만드는 오진 처방이 2회 보고됐다). 이제 같은 상황에서 **`pnpm build` 를 돌리는 쪽으로 행동이 갈린다** — SemVer 판정 질문 (_"이 변경으로 에이전트가 같은 입력에 다르게 동작하는가"_) 에 **예**이므로 MINOR 다. 나머지 2곳 (`docs/ops/operational-friction.md` §8 / `.gitignore` 주석) 은 문서·주석이라 단독으로는 PATCH 이며, ADR entry 도 PATCH 로 분류돼 있다.
+- **앱 런타임 행동 변화 없음** — `apps/**` · `packages/**` 소스 무접촉. 변경 파일 전건이 `.md` · `.gitignore` 다.
+
 ## [0.72.0] — 2026-08-14
 
 ### Added
