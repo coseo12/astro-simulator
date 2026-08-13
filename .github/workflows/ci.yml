@@ -205,6 +205,29 @@ jobs:
       - name: '#952 포맷 백스톱 (format:check)'
         run: pnpm run format:check
 
+      # #982 — 위 format:check 이 **구조적으로 못 잡는** 직교 손상 경로.
+      #   `prettier --write` 는 인라인 코드 밖의 단일 `~` 를 GFM 취소선 delimiter 로 정규화하고,
+      #   그렇게 만들어진 형태는 prettier 기준으로 정답이라 이후 `--check` 도 초록이다
+      #   (docs/ops/operational-friction.md §7-1). 즉 백스톱 위에 얹는 것이 아니라 **옆에** 둔다.
+      #   ADR: docs/decisions/20260814-982-changelog-tilde-guard.md
+      # self-test 는 이벤트 무관 상시 (#897 교훈: CI 미배선 self-test = 0회 실행).
+      - name: '#982 md tilde 가드 self-test (사용 직전 자기 검증)'
+        run: node scripts/verify-md-tilde.mjs --self-test
+
+      # 본검사는 `pull_request` 한정 (ADR §결정 3): main/develop 직접 push 는 CLAUDE.md §금지
+      #   사항이고, `<type>/*` 브랜치 push 는 PR 이벤트로 다시 검사된다.
+      # base 해석은 diff-scope job 과 같은 패턴 (기본 depth checkout + 표적 --depth=1 fetch).
+      #   ⚠ diff-scope 는 fetch 실패를 fail-safe(전체 코드 취급) 로 흡수하지만 **본 스텝은
+      #   fail-fast** 다 — 여기서 base 미해석은 "무겁게 돌자" 로 흡수할 수 있는 값이 아니라
+      #   판정 불가이며, 조용히 통과시키면 가드가 초록인 채 사라진다. `bash -e` 기본 셸에서
+      #   fetch 실패는 곧 스텝 실패이고, 스크립트도 `--base` 미해석 시 exit 1 이다.
+      - name: '#982 markdown bare tilde 가드 (pull_request diff 스코프)'
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          node scripts/verify-md-tilde.mjs --base "$BASE_SHA"
+
       # #915 — CI 인프라 스크립트 self-test 상시 배선 (#897 교훈: CI 미배선 self-test = 0회 실행).
       # diff-scope 분류기는 diff-scope job 이 사용 직전 자기 검증 — 여기서는 auto-close 파서만.
       # (auto-close-issues.yml 은 머지 이벤트에만 돌므로 PR 단계 상시 검증은 본 스텝이 담당.)

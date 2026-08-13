@@ -55,6 +55,7 @@
     "verify:dead-wait-check": "node scripts/verify-dead-wait-check.mjs",
     "verify:docs-links": "node scripts/verify-docs-links.mjs",
     "verify:adr-index": "node scripts/verify-adr-index.mjs",
+    "verify:md-tilde": "node scripts/verify-md-tilde.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
     "bench:tier-guard-cost": "node scripts/bench-tier-guard-cost.mjs",

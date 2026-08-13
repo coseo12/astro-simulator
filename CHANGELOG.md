@@ -5,6 +5,26 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#982] `scripts/verify-md-tilde.mjs` — prettier 소유 markdown 의 bare `~~` 금지 강제 지점 신설 (MINOR)** ([#982](https://github.com/coseo12/astro-simulator/issues/982), ADR [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) 채택 판정의 **발효**) — 같은 `[Unreleased]` 의 `### Changed` ADR entry 가 _"규약은 있는데 강제 지점이 0"_ 이라고 적은 그 지점을 채운다. `prettier --write` 가 인라인 코드 **밖**의 단일 물결을 GFM 취소선 delimiter 로 정규화하는 손상은 `--check` 로 탐지되지 않으므로(정규화된 형태가 prettier 기준 **정답**), 포맷 백스톱 **위**가 아니라 **옆**에 두는 직교 가드다.
+
+  **술어 = 코드 펜스 밖 ∧ 인라인 코드 스팬 밖의 `~~`** (ADR 채택 술어 C). **스코프 = diff 의 추가 라인 ∩ post-image 위반 라인** — 전수 스캔이 아니다(확정 구간 존량 21줄은 [#1040](https://github.com/coseo12/astro-simulator/issues/1040) 판정 전까지 손댈 수 없어, 전수는 _"고칠 수 없는 것을 매번 보고하는 가드"_ 가 된다). **모집단 = `prettier --file-info` 가 `ignored: false` 로 판정하는 `*.md`** — 파일 목록을 하드코딩하지 않아 `.prettierignore` 와 두 번째 출처가 생기지 않는다(volt [#120](https://github.com/coseo12/volt/issues/120)).
+
+  **배선 4곳** — `.husky/pre-commit` 의 `pnpm lint-staged` **다음 줄**(`--staged`, 손상이 _생성되는_ 지점 직후 = 가장 이른 검출) / `ci.yml` `detect-and-test` 의 `pull_request` 한정 본검사(`--base <sha>`, 훅 우회 backstop) / 같은 job 의 상시 `--self-test` / 수동 `--population`. `|| true` · soft-exit · allowlist · 예외 경로 **없음**. base 미해석은 통과가 아니라 **exit 1**(판정 불가)이며, `diff-scope` job 이 fetch 실패를 fail-safe 로 흡수하는 것과 **의도적으로 다르다** — 여기서 조용히 통과하면 가드가 초록인 채 사라진다.
+
+  **구현체로 ADR 실측을 독립 재현했다** (rev `5651980`, architect 의 임시 분류기가 아니라 **본 PR 이 커밋하는 코드**로): `CHANGELOG.md` **21 줄 / 44 발생** — ADR 박제값과 일치하고 넓은 그물(**22 줄 / 45 발생**)이 잡는 `CHANGELOG.md:123`(§7-1 술어 자신의 인용, 인라인 코드 안)을 정확히 거른다. README 4개는 **0 줄 / 0 발생**. 209 커밋 이력 재시뮬레이션도 **발화 2 / 오검출 0** 으로 일치했다 — `4f4544d` **20 줄 / 42 발생**, `909c55c` **1 줄 / 2 발생**, 그리고 인라인 코드 안에 술어를 인용한 `aeb6c07` 은 **미발화**.
+
+  **negative 실증 양방향 (`--self-test`)** — (A) 분류기 격리 픽스처 **26 케이스**: 백틱 런 1·2·3 개폐 / 런 길이 불일치 / 한 줄 다중 스팬(가운데 하나만 위반) / 미닫힌 백틱 / 물결 펜스 delimiter 자기 계수 금지 / 백틱 펜스 안의 물결 펜스가 블록을 닫지 않음(및 그 역) / 닫는 펜스 길이·info string 규칙 / 닫히지 않은 펜스는 EOF 에서 닫힘 + ADR §Developer 인계가 표로 못박은 결정적 픽스처 3건(`4f4544d` **FAIL** / `909c55c` **FAIL** / `aeb6c07` **PASS**) + `git diff -U0` hunk 헤더 파싱 5건. (B) 임시 git 저장소 **3중 시뮬레이션 8 단계**: 변경 없음 PASS → **사전 손상은 diff 밖이라 무보고**(스코프 계약 실증) → 위반 주입 시 **exit 1 + `파일:줄:열` 국소화 + 처방 문구** → 인라인 코드로 감싸면 PASS(recovery) → prettier 미소유 파일은 위반이 있어도 무보고(모집단 계약) → `--base` FAIL → base 미해석 FAIL → `--base` recovery.
+
+  **모집단 감시는 관측만 기계화하고 차단하지 않는다** (ADR §재검토 조건 1 배선 판정) — `--population` 이 `ignored: false` 계수와 소유 파일 목록을 출력하지만 **항상 exit 0** 이다. 계수 증가는 그 자체로 결함이 아니라서(신규 패키지 `README.md` 추가가 그렇다) 기대값 `5` 를 상수로 박고 차단하면 **정당한 PR 이 반드시 FAIL** 하고, 그 상수는 ADR §후보 비교 (g) 가 기각한 매직 넘버 baseline 과 같은 클래스다. ADR 이 규정한 트리거 동작도 _"즉시 재측정한다"_ 라는 **사람의 행위**다 — 관측은 기계, 판단은 사람.
+
+  **의도적 미검출·과보고 4건 (조용한 스킵 아님, 스크립트 헤더 §범위 경계에 박제)** — ① 확정 구간 존량(diff 밖, #1040) ② prettier 미소유 md(손상 불가 + 의도된 취소선 48 발생이 거기 있다) ③ 인라인 코드 스팬을 **라인 단위**로 판정(CommonMark 는 줄바꿈을 넘는 스팬을 허용하나 편차 방향이 **과보고** = fail-loud) ④ 4칸 들여쓰기 코드 블록 미해석(모집단 5 파일 전수 실측 **0 건**이고, 도입하면 리스트 연속 라인을 코드로 오인해 **과소보고** 방향으로 기운다).
+
+  **자기 적용** — 본 PR 자신이 `CHANGELOG.md` 를 수정하므로 가드의 검사 대상이다. 그래서 이 entry 의 모든 물결쌍·범위 표기는 인라인 코드 안에 있고, 커밋 시 pre-commit 훅이 실제로 그것을 판정했다. ⚠️ ADR 초판이 **산문에 엣지 케이스 예시를 쓰다가 자기 분류기에 3 발생으로 걸린** 전례가 있어(코드 블록으로 옮겨 해소), 스크립트의 self-test 픽스처도 물결 리터럴을 상수로 분리해 같은 함정을 구조적으로 피했다.
+
+  **`docs/ops/operational-friction.md` §7-1 갱신 3항** (ADR §명시적 비-범위 가 본 PR 범위로 지정) — (a) 강제 지점 신설 사실 + 스크립트 경로 + 호출 지점 4행 표 (b) 탐지 술어를 채택 술어로 교체하고 기존 2 grep 은 **이력용 하한/상한**으로 강등 (c) ADR 역참조. 부수로 _"정밀한 술어 확정은 #1040 소관"_ 이라는 선재 서술을 정정했다 — 술어는 본 ADR 이 확정했고 #1040 에 남은 것은 **존량 회수 가부** 판정이다.
+
 ### Fixed
 
 - **[#988] 가드 stdout `초과` → `이상` — 구현(`>=`)과의 off-by-one 자기모순 해소** ([#988](https://github.com/coseo12/astro-simulator/issues/988)) — `scripts/verify-claudemd-size.mjs` 의 대역 판정 3개는 전부 `count >= 임계` 인데 stdout 3줄은 `초과` 라고 적어, **정각에서 자기 자신을 초과한다**고 말했다. 착수 전 실측(`mktemp` 격리 정각 픽스처): `[WARN-BOUNDARY] CLAUDE.md 33,000 chars — 경계 경보 임계 33,000 초과` / `PR warn 임계 40,000 초과` / `fail 임계 45,000 초과`. [#980](https://github.com/coseo12/astro-simulator/issues/980) 축 B 가 [`claudemd-governance.md`](docs/guides/claudemd-governance.md) §4.1 산문 3줄(`33k 이상` / `40k 이상` / `45k 이상`)만 고치고 stdout 은 부채로 남긴 것이라, 같은 계약의 두 표현이 서로 반대말인 상태였다. 그 PR 의 cross-validate 도 후속 권고로 올렸으나 _"외부 grep 계약 우려"_ 로 미수정됐다.
@@ -41,7 +61,11 @@ Semantic Versioning을 따른다.
 
   **PATCH 판정 근거** (CLAUDE.md §SemVer 판정 질문): **아니오.** 본 변경의 산출물은 ADR · 인덱스 행 · 본 entry 뿐이고 `.claude/**` · `scripts/**` · `.github/**` · `docs/ops/**` 는 무접촉이다. 규약의 **발효 지점(가드 배선)과 §7-1 갱신은 dev 구현 PR 소관**이라, 본 PR 만으로는 에이전트가 로드하는 지시도 CI 판정도 바뀌지 않는다. §SemVer 의 _"판정 애매 시 낮은 쪽"_ 도 PATCH 를 지지한다.
 
-### Behavior Changes: None — 문서/문구만
+### Behavior Changes
+
+- **[#982] prettier 소유 markdown 에 bare `~~` 가 들어가면 커밋과 PR 이 차단된다.** 판정 질문(_"이 변경으로 에이전트가 같은 입력에 다르게 동작하는가"_)에 **예**다 — 같은 diff 를 커밋해도 `.husky/pre-commit` 이 `--staged` 검사에서 exit 1 을 내고, 훅을 우회해도 `ci.yml` `pull_request` 본검사가 `--base` 로 다시 차단한다. 대상은 `prettier --file-info` 가 `ignored: false` 로 판정하는 `*.md` (현재 `CHANGELOG.md` + README 4개)이며, `docs/**` · `.claude/**` · `CLAUDE.md` 는 prettier 미소유라 **행동 변화가 없다**. **의도된 취소선도 함께 금지**된다 — 손상과 의도를 가르는 구문적 판별자가 없기 때문이며(ADR §결정 2), 우회로를 규약에도 가드 출력에도 두지 않았다. FAIL 을 만났을 때의 처방은 하나다: **범위 표기를 인라인 코드로 감싼다.**
+- **[#982] `docs/ops/operational-friction.md` §7-1 의 탐지 술어가 교체됐다.** 에이전트가 그 절을 읽고 실행하는 명령이 `git grep -nE '[0-9A-Za-z]+~~[0-9A-Za-z]+'`(줄 단위 recall `19/21` 인 **하한**)에서 `node scripts/verify-md-tilde.mjs` 로 바뀐다. 기존 2 grep 은 삭제하지 않고 **이력용 하한/상한**으로 강등해, 과거 기록의 수치가 어느 술어에서 나온 값인지 추적 가능하게 남겼다.
+- ADR 박제만 있던 나머지 변경(`### Changed` 의 `20260814-982` entry)은 **행동 변화 없음** — 본 PR 이 그 결정을 발효시킨 것이 위 두 항목이다.
 
 ## [0.71.0] — 2026-08-13
 
