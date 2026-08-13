@@ -325,10 +325,13 @@ npx prettier --check .                  # 금지 — 캐시 버전이 지배
 **신규 스크립트를 만들지 않는다** — 이미 있는 명령이다.
 
 ```bash
-pnpm install --frozen-lockfile     # exit 0 / 4s    (§7 의 1순위)
-pnpm build                         # exit 0 / 27s   ← §7 에 없던 부분
-pnpm --filter web typecheck        # exit 0 / 3s    error TS 0 행
+pnpm install --frozen-lockfile     # exit 0          (§7 의 1순위)
+pnpm build                         # exit 0          ← §7 에 없던 부분
+pnpm --filter web typecheck        # exit 0 / error TS 0 행
 ```
+
+세 명령 모두 exit `0` 이며, **추가되는 것은 `pnpm build` 한 줄뿐**이다. 소요는 `install` 과 **같은
+자릿수**라 절차를 늘릴 이유가 되지 못한다 — 절대 수치는 아래 §측정 조건 불릿의 스냅샷을 본다.
 
 CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하는 것과 **같은 2 명령**이다 — 로컬
 절차가 CI 를 미러링하므로 절차의 두 번째 출처가 생기지 않는다 (volt [#120](https://github.com/coseo12/volt/issues/120)).
@@ -361,7 +364,8 @@ CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하�
 | `next build` / `next typegen` | `import "./.next/types/routes.d.ts";` | `2a74d3909800ca5467fa83b0ab4a4890` |
 | `next dev` | `import "./.next/dev/types/routes.d.ts";` | `d0f8375ae1199dc7acd3977fc33b78b8` |
 
-`next dev` 를 띄우면 **1초 이내**(폴링 간격 `1s`)에 덮어써진다. 가변 산출물을 절차 문서에
+`next dev` 를 띄우면 **기동 직후** (실측 `1~2s` — 관측 폴링 간격이 `1s` 라 이 값이 곧 해상도 하한이다)
+덮어써진다. 상한이 `1s` 든 `2s` 든 논지는 같다. 가변 산출물을 절차 문서에
 하드코딩하는 것은 이 파일을 tracked 로 만드는 것(옵션 B)과 **같은 실패 클래스**를 문서로 옮기는
 것에 불과하다 — 둘 다 ADR [`20260814-960`](../decisions/20260814-960-worktree-typecheck-recipe.md) §B-1 이 기각했다. 폴백이 필요하면 아래 first-party 서브커맨드를 쓴다.
 
@@ -395,15 +399,30 @@ rm -rf packages/shared/dist packages/shared/tsconfig.build.tsbuildinfo
 pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 11개)
 ```
 
-- **본 건은 정확성 결손이 아니라 개발자 경험 마찰이다** — 타입 오류가 CI 를 빠져나가지는 않는다.
-  `setup-and-build` 가 도는 `pnpm build` 안의 `next build` 가 TypeScript 검사를 수행하고
-  (`apps/web/next.config.*` 에 `ignoreBuildErrors` **없음**), `packages/{shared,core}` 의 `build` 는
-  `tsc -p tsconfig.build.json` 자체다. 그래서 처방이 자동화(루트 `postinstall` / `typecheck` 스크립트
-  체이닝)가 아니라 **레시피 + 발견가능성**이다 — 기각 근거는 ADR §D · §E.
-- **측정 조건** — 위 소요는 pnpm store / cargo registry 캐시가 **warm** 한 머신 기준이며, rev `8e230e3`
-  worktree 를 `git worktree add` 직후 (`node_modules` 부재) 순차 측정한 값이다. 같은 머신에서 ADR §E 는
-  `pnpm build` 를 `17s` 로 기록했다 — 같은 명령의 부하 편차 범위(`17~27s`)로 본다. 콜드 머신에서는 특히
+- **본 건은 정확성 결손이 아니라 개발자 경험 마찰이다 — 단 예외가 하나 있다.** `setup-and-build` 가
+  도는 `pnpm build` 안의 `next build` 가 TypeScript 검사를 수행하고 (`apps/web/next.config.*` 에
+  `ignoreBuildErrors` **없음**), `packages/{shared,core}` 의 `build` 는 `tsc -p tsconfig.build.json`
+  자체라, **앱·라이브러리 소스**의 타입 오류는 CI 를 빠져나가지 않는다. 그래서 처방이 자동화(루트
+  `postinstall` / `typecheck` 스크립트 체이닝)가 아니라 **레시피 + 발견가능성**이다 — 기각 근거는
+  ADR §D · §E.
+  ⚠️ **예외 — `packages/{shared,core}` 의 `*.test.ts` 는 CI 타입 검사 밖이다.** 근거로 든 바로 그
+  `tsconfig.build.json` 이 `**/*.test.ts` 를 `exclude` 하고, CI 에는 `typecheck` 를 직접 호출하는
+  스텝이 **없다** (`detect-and-test` 의 vitest 는 esbuild 트랜스파일이라 타입 검사가 아니다). 강제
+  지점이 없다는 뜻이며 후속 [#1060](https://github.com/coseo12/astro-simulator/issues/1060) 으로
+  분리돼 있다. 위 *"빠져나가지 않는다"* 를 무조건형으로 읽지 말 것.
+- **측정 조건 (스냅샷)** — 소요는 pnpm store / cargo registry 캐시가 **warm** 한 동일 머신 기준이며,
+  `git worktree add` 직후 (`node_modules` 부재) 순차 측정한 값이다. 콜드 머신에서는 특히
   `physics-wasm` (Rust) 이 더 걸린다.
+
+  | rev | `install` | `pnpm build` | `typecheck` (build 후) |
+  | --- | --- | --- | --- |
+  | `7ca1cd1` (ADR §E) | `4.5s` | `17s` | `3s` |
+  | `8e230e3` (본 절) | `4s` | `27s` | `3s` |
+
+  두 값은 **드리프트가 아니라 둘 다 참인 두 사실**이다 (rev·머신 조건이 각각 명시돼 있다). 그래서
+  규범면 (위 1순위 코드블록 · `developer.md` 행동 규칙) 에는 절대 수치를 두지 않고 **관계**로만 적는다
+  — ADR [`20260808-983`](../decisions/20260808-983-measurement-recording-convention.md) §수치 박제
+  규약 (i) 부분 재측정 금지 · (ii) 규범면 관계 표현.
 - **에이전트 행동 규칙 사본**: `.claude/agents/developer.md` §규칙 (§7 규약 바로 다음 줄). 본 절이 절차 SSoT 다.
 - 근거: [#960](https://github.com/coseo12/astro-simulator/issues/960) — 증상 2회 독립 보고
   (PR [#941](https://github.com/coseo12/astro-simulator/pull/941) · [#959](https://github.com/coseo12/astro-simulator/pull/959)).
