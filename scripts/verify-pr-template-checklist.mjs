@@ -3,7 +3,7 @@
  * verify-pr-template-checklist.mjs
  *
  * PR 본문이 `.github/PULL_REQUEST_TEMPLATE.md` 의 7 키워드 base 를 보존하는지 검증한다
- * (측정 방법 C — 2차 phrase grep 이 blocking 축, 1차 구조 grep 이 WARN 축).
+ * (측정 방법 C — 2차 phrase 축이 blocking, 1차 구조 축이 WARN).
  *
  * **본 스크립트가 측정 방법 C 판정식의 정본(SSoT)이다.** `.claude/agents/developer.md`
  * §측정 방법 C / `.claude/skills/create-pr/SKILL.md` 의 3계급 표는 *사람이 읽는 계약* 이고,
@@ -98,7 +98,12 @@ const CHECKLIST_KEYWORDS = [
   { id: '7', name: 'Test plan (단위 테스트)', phrase: 'Test plan', structureClass: 'header' },
 ];
 
-// 1차 구조 — 계급별 패턴
+// 1차 구조 — 계급별 패턴.
+// ⚠️ *"1차 구조"* / *"2차 phrase"* 는 **판정 축의 이름**이지 grep 명령이 아니다. 구조 축은
+//    계급이 키워드마다 갈리고(아래 2 패턴) 펜스 상태를 들고 가는 라인 스캔이라 단일 grep 로
+//    재현되지 않는다. `developer.md` 가 *"1차 구조 grep"* 이라는 이름으로 근사 예시를 싣던
+//    관행은 #1013 에서 제거했다 — 근사 명령은 그 자체가 파생 판정식이라 #1010 이 없앤
+//    문서↔가드 drift 를 되살린다.
 const CHECKBOX_PATTERN = /^\s*-\s*\[[ xX]\]/;
 // 헤더는 **ATX 레벨을 가리지 않는다** (`#`~`######`). 템플릿이 쓰는 레벨은 `###` 이지만,
 // 묻는 것은 *"섹션 헤더로 존재하는가"* 이지 레벨이 아니다. 실측 민감도 (60 PR × 7 kw = 420 셀):

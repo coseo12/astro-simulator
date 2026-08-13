@@ -115,7 +115,7 @@ PR 본문 작성 후 거버넌스 체크 항목 (예: "ADR 호환성 체크") �
 
 ```bash
 # 정본 — 7 키워드 전건을 3계급으로 판정 (CI `pr-template-checklist-guard.yml` 과 동일 코드)
-node scripts/verify-pr-template-checklist.mjs <PR>
+node scripts/verify-pr-template-checklist.mjs <PR번호>
 # exit 0 = PASS 또는 WARN / exit 1 = FAIL. WARN 은 stdout 표에 계급별 구조 hit 이 0 으로 찍힌다
 ```
 
