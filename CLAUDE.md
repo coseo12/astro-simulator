@@ -104,7 +104,7 @@ AI는 자기 작업을 과도하게 긍정 평가하는 경향이 있으므로, 
 
 > 스크린샷 = Level 1. "렌더링 = 동작" 아님.
 
-변형 3종 (lessons): **monorepo dist stale** ([docs/lessons/monorepo-dist-stale.md](docs/lessons/monorepo-dist-stale.md), volt #70) / **엄격 원칙 + 동적 적응 부재** ([docs/lessons/strict-principle-dynamic-context.md](docs/lessons/strict-principle-dynamic-context.md), volt #68) / **DoD PASS ≠ 제품 동작** ([docs/lessons/ux-dod-vs-product-behavior.md](docs/lessons/ux-dod-vs-product-behavior.md), volt #72/#74)
+- 상세: 변형 3종 — **monorepo dist stale** ([docs/lessons/monorepo-dist-stale.md](docs/lessons/monorepo-dist-stale.md), volt #70) / **엄격 원칙 + 동적 적응 부재** ([docs/lessons/strict-principle-dynamic-context.md](docs/lessons/strict-principle-dynamic-context.md), volt #68) / **DoD PASS ≠ 제품 동작** ([docs/lessons/ux-dod-vs-product-behavior.md](docs/lessons/ux-dod-vs-product-behavior.md), volt #72/#74)
 
 ### CI 통과 ≠ 테스트 실행
 "언어 자동 감지" 범용 CI 템플릿이 `echo` 만 수행하고 실제 `npm test` 를 돌리지 않는 경우 — 초록 체크 머지 뒤에도 테스트 미실행. 실행 시간/Actions 로그/CI 구조 3개 진단 신호로 감지, 고의적 실패 PR 실측으로 게이트 작동 확인.
@@ -120,7 +120,8 @@ upstream 의 단위 테스트 / reviewer / cross-validate 3중 방어가 통과�
 - **함정의 양면성 — release 가속 트리거 변형 (volt [#97](https://github.com/coseo12/volt/issues/97))**: 검증 차단이 사용자에게 release 결정 강제 노출하는 부산물 + 자연 리듬 정렬 효과. 단 모든 차단이 정당화 아님 — 누적 < 10 커밋이면 옵션 B (대기) / C (cherry-pick) 합리. release-cadence-check workflow 신설로 함정 의존 제거 가능.
 
 ### gh CLI 마크다운 본문 발송 — execSync shell metachar 함정 (volt #114)
-Node.js `execSync('gh pr comment N --body "..."')` 로 백틱/`$`/`!`/`;` 포함 본문 발송 시 shell 이 명령 치환·변수 확장으로 해석 → silent syntax error. **`spawnSync('gh', [...args])` + `--body-file -` + `{ input: body, stdio: ['pipe', 'inherit', 'inherit'] }` 3축 우회** 의무. 상세: [docs/lessons/gh-cli-execsync-pitfall.md](docs/lessons/gh-cli-execsync-pitfall.md).
+Node.js `execSync('gh pr comment N --body "..."')` 로 백틱/`$`/`!`/`;` 포함 본문 발송 시 shell 이 명령 치환·변수 확장으로 해석 → silent syntax error. **`spawnSync('gh', [...args])` + `--body-file -` + `{ input: body, stdio: ['pipe', 'inherit', 'inherit'] }` 3축 우회** 의무.
+- 상세: [docs/lessons/gh-cli-execsync-pitfall.md](docs/lessons/gh-cli-execsync-pitfall.md)
 
 ### 주석 계약 vs 구현 drift — 버그 생성원
 파일 상단 주석 / JSDoc 이 선언한 계약과 구현의 drift 는 **버그 생성원**. default fallback 이 누락을 조용히 흡수해 테스트도 fail 하지 않는다. 주석에 선언된 규칙은 테스트 커버리지 대상이며, enum 분기 fallback 에 경고·assert 추가로 drift 감지.
@@ -144,7 +145,9 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 반드시 사전 경고한다.
 
 ### 인계 항목 실측 재검증 — NO-OP ADR 패턴
-인계 "수정 필요 항목" 이 환경 변화로 착수 시점 이미 해소된 경우 — 실측 → NO-OP ADR (`docs/decisions/<YYYYMMDD>-<topic>-no-op.md`) + 회귀 가드. Explore 미결정 시 debug 스크립트 (`scripts/_debug-<topic>-tmp.mjs`, 즉시 `rm`) 로 runtime 실측 선행. 상세: [docs/lessons/no-op-adr-pattern.md](docs/lessons/no-op-adr-pattern.md). 근거: volt [#14](https://github.com/coseo12/volt/issues/14) / [#67](https://github.com/coseo12/volt/issues/67).
+인계 "수정 필요 항목" 이 환경 변화로 착수 시점 이미 해소된 경우 — 실측 → NO-OP ADR (`docs/decisions/<YYYYMMDD>-<topic>-no-op.md`) + 회귀 가드. Explore 미결정 시 debug 스크립트 (`scripts/_debug-<topic>-tmp.mjs`, 즉시 `rm`) 로 runtime 실측 선행.
+- 상세: [docs/lessons/no-op-adr-pattern.md](docs/lessons/no-op-adr-pattern.md)
+- 근거: volt [#14](https://github.com/coseo12/volt/issues/14) / [#67](https://github.com/coseo12/volt/issues/67)
 
 ### 신규 함수 ≠ 신규 구현
 새 함수/헬퍼/유틸리티를 쓰기 전 "이미 있을 수 있다"를 기본 가설로 둔다. AI는 "없다"고 가정하고 바로 구현으로 들어가는 편향이 있어, 이전 마일스톤에서 구축된 공용 함수를 재발견하지 못한 채 중복 코드와 테스트를 생성한 사례가 반복된다.
@@ -174,14 +177,14 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 sub-agent(dev/qa 페르소나 등) 는 **검증** 까지는 신뢰하되 **박제** (커밋/푸시/PR 생성/`gh pr comment`/auto-close) 는 신뢰하지 말 것. sub-agent 보고는 *의도* 이고 실제 외부 가시성은 별도. 메인이 `git log --oneline -1` / `gh pr view` / `gh issue view --json state` 로 직접 확인.
 
-- **공통 SSoT 9 필드 + 메인 게이트 + bg 인계 + base=develop 함정** 통합 상세: [docs/lessons/sub-agent-ssot-handoff.md](docs/lessons/sub-agent-ssot-handoff.md)
+- 상세: [docs/lessons/sub-agent-ssot-handoff.md](docs/lessons/sub-agent-ssot-handoff.md) — **공통 SSoT 9 필드 + 메인 게이트 + bg 인계 + base=develop 함정** 통합
 - **SSoT 동기화 자동 가드** (#145, v2.23.0~): 9 필드는 5 에이전트 `.md` 의 체크리스트 JSON 에 그대로 등장해야 하며 `scripts/verify-agent-ssot.sh` 가 CI `detect-and-test` 에서 drift 차단. SSoT 블록 수정 PR 은 5 에이전트 파일 동시 갱신 + 로컬 verify 사전 확인 필수.
 - **메인 오케스트레이터 단계 게이트** (volt [#77](https://github.com/coseo12/volt/issues/77)): `developer → reviewer → qa → 사용자/머지` 순서 강제. 상세: [docs/lessons/headless-browser-verification.md](docs/lessons/headless-browser-verification.md)
 - **qa 게이트 예외 규약** (#915 — 전례 PR #910/#911/#916/#917 추출): 메인은 아래 4조건 **전건 충족** 시에만 qa 디스패치를 생략할 수 있다. (a) **앱 runtime 표면 0** — docs·리포 자산 / CI·workflow 설정 / 인프라 스크립트 전용, `apps/**`·`packages/**` 소스 무접촉을 diff 로 실증 (소스 = 빌드·번들 유입 경로. `apps/*/scripts/**` 검증 스크립트는 인프라 범주) (b) **동적 검증 대체 실증** — 본 PR CI run 가드 실발화 / 실 스크립트 1회 실행 / reviewer 독립 재현 등, **변경 대상의 동작을 직접 발화시킨 구체 증거** 명시 의무 ("docs 라서 생략"·"CI green 이니 충분" 단독 사유 금지 — CI green 은 실행 사실이지 대체 실증이 아님) (c) **근거 코멘트 박제** — `## qa 게이트 예외 판단` 제목으로 (a)(b) 근거를 PR 코멘트에 박제 (d) **메인 직접 전이** — `stage:qa → stage:done` 은 메인이 직접 수행. **예외 불가 (정식 qa 의무)**: runtime 의존/라우팅/렌더 경로 변경 (next 업그레이드 #906 / i18n 라우팅 #914 전례), runtime 의존성·lockfile 갱신, 시각 효과 (실 Chrome GUI 수동 검증 별도 의무 — 아래 headless 교훈). **회색지대**: 검증 스크립트 (`scripts/**` 로직) 수정은 해당 스크립트 실제 1회 실행 로그 박제 시에만 예외 허용 (#911/#917 전례, 실행 증거 요구는 #916), 에이전트 행동 규칙 (`.claude/**`) 은 SSoT·정적 가드 실발화가 대체 실증. **Fail-safe**: 4조건·회색지대 판정이 조금이라도 애매하면 정식 qa 디스패치 (비용 절감 < 회귀 차단 — cross-validate 2026-08-01 반영)
 
 ### sub-agent multi-turn 라운드 이탈 — 매트릭스 일관성 검증
 sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운드에서 이탈. SendMessage 는 **이전 라운드 매트릭스를 본문에 인라인 재첨부** ("권고 A" 참조 레이블만으론 부족). 메인 오케스트레이터가 핵심 키워드 대조로 이탈 즉시 감지. PM 재계약 시 DoD 자체 재구조화 금지 — 사용자 응답은 파라미터만 조정.
-- 상세 (라운드 이탈 / PM DoD drift 재현 / 예방 규약): [docs/lessons/sub-agent-multiturn-drift.md](docs/lessons/sub-agent-multiturn-drift.md) — volt [#34](https://github.com/coseo12/volt/issues/34) / [#76](https://github.com/coseo12/volt/issues/76)
+- 상세: [docs/lessons/sub-agent-multiturn-drift.md](docs/lessons/sub-agent-multiturn-drift.md) (라운드 이탈 / PM DoD drift 재현 / 예방 규약) — volt [#34](https://github.com/coseo12/volt/issues/34) / [#76](https://github.com/coseo12/volt/issues/76)
 
 ### headless 브라우저 검증 ≠ 실 브라우저 동작
 `agent-browser` / Playwright headless (특히 swiftshader adapter) 는 3D/WebGPU 경로에서 부분 freeze 로 false positive 를 낸다. "headless 8/8 PASS" 만 믿지 말 것. 시각 효과 포함 작업은 `status:review` 전 **실 Chrome GUI 수동 검증 최소 1회** 필수. CRITICAL #3 의 확장.
