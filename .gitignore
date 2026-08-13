@@ -18,6 +18,9 @@ node_modules/
 out/
 # P7-E #210 / P6 회고 인계 — next-env.d.ts 는 `next dev`/`next build` 마다
 # 자동 재생성되는 타입 shim. tracked 시 diff 노이즈 + 협업자간 재생성 충돌 유발.
+# #960 재확인 (2026-08-14): 동일 rev·동일 Next 16.2.12 에서 `next dev` 산출과
+# `next typegen` 산출의 md5 가 다르다. 이 행을 지우려는 변경은 ADR
+# docs/decisions/20260814-960-worktree-typecheck-recipe.md §재검토 조건 4 로 차단된다.
 apps/web/next-env.d.ts
 
 # 빌드 산출물

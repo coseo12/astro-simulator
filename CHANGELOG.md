@@ -5,6 +5,39 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#960] ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md) — 격리 worktree typecheck 선행 조건 정본 + `apps/web/next-env.d.ts` tracked 화 **기각** (PATCH)** ([#960](https://github.com/coseo12/astro-simulator/issues/960)) — 증상은 2회 보고됐고([#941](https://github.com/coseo12/astro-simulator/pull/941) · [#959](https://github.com/coseo12/astro-simulator/pull/959)) 원인은 `next-env.d.ts` 부재로 지목돼 있었으나, rev `7ca1cd1` 격리 worktree 재현에서 **결손이 2축**임이 드러났다 — `install` 직후 baseline 이 이미 `error TS` **76 행** (`TS2882` 2 + `TS2307` 52 + 파생 22) 이고, `next-env.d.ts` 를 채워도 **74 행이 남는다** (`packages/{shared,core}/dist` 부재). 즉 이슈 §DoD 1 은 축 (i) 만으로 닫히지 않는다.
+
+  **정본은 신규 스크립트가 아니라 기존 명령 2개다** — `pnpm install --frozen-lockfile` (`4.5s`) 다음에 **`pnpm build`** (`17s`, exit `0`) 를 돌리면 `next build` 가 축 (i) 을, `-r build` 가 축 (ii) 를 **동시에** 닫고 `pnpm --filter web typecheck` 가 exit `0` / `error TS` **0 행**이 된다. 이는 CI `setup-and-build` composite (워크플로 8개가 소비) 이 수행하는 것과 **같은 2 명령**이라 절차의 두 번째 출처가 생기지 않는다.
+
+  **`next-env.d.ts` tracked 화(옵션 B) 는 기각한다** — 이슈가 _"내용이 2줄 고정이라 실질 위험 낮음"_ 으로 평가한 전제가 반증됐다. **동일 worktree · 동일 rev `7ca1cd1` · 동일 Next `16.2.12`** 에서 `next typegen` 은 `import "./.next/types/routes.d.ts";` (md5 `2a74d390…`) 를, `next dev` 는 `import "./.next/dev/types/routes.d.ts";` (md5 `d0f8375a…`) 를 낳고, 실제 파일은 2줄이 아니라 **6줄**이다. `next dev` 기동 **약 2초** 만에 덮어써진다. 따라서 B 는 [#210](https://github.com/coseo12/astro-simulator/issues/210) 의 번복이 아니라 그 `.gitignore` 주석 (_"tracked 시 diff 노이즈 + 협업자간 재생성 충돌"_) 의 **재확인**으로 귀결한다. 다만 기각 근거를 과장하지 않는다 — `skipLibCheck: true` 때문에 B 가 typecheck 를 **깨뜨리지는 않으며** 비용은 순수하게 diff 진동이다.
+
+  **`postinstall` 자동화와 `typecheck` 스크립트 체이닝도 기각** — 전자는 `pnpm install` 지점 (워크플로 4개 + composite 1개) 에 상시 과세하고, 후자는 프로토타입 실행에서 `packages/core` 빌드의 exit `2` 때문에 **`tsc` 에 도달하지 못했다**. 비례성 근거는 빈도 실측이다 — `.claude/` · CLAUDE.md 의 `typecheck` 언급 **0회**, `typecheck` 직접 호출 CI 스텝 **0개**, 이슈 등록 후 `10` 일 / 머지 PR `88` 건 동안 3번째 보고 **0건**. ⚠️ 단 **타입 오류가 CI 를 빠져나가지는 않는다** — `pnpm build` 안의 `next build` 가 TypeScript 검사를 수행한다 (`next.config` 에 `ignoreBuildErrors` 없음). 즉 본 건은 정확성 결손이 아니라 **개발자 경험 마찰**이다.
+
+  **교차검증** (agy 2026-08-14, outcome `applied`) — `next typegen` 호출 형태를 `pnpm --filter web exec next typegen` 으로 교체(monorepo CWD 민감도)했고, _"`postinstall` vs 문서" 이분법이 거짓_ 이라는 지적을 수용한 결과가 루트 `pnpm build` 실측이다. 반면 _"부분 실패 `dist` 는 불완전한 `.d.ts` 를 남긴다"_ 는 **반증**했다 — `tsc` 는 전량 방출하며 실측 `58/58` (의도 대상 전량), 공개 `.d.ts` 의 `physics-wasm` 참조 **0건** (wasm 핸들이 `private` 로 캡슐화). _"Next CLI 가 `tsconfig.json` 을 자동 변조한다"_ 도 **미재현** (`git status --porcelain` 빈 출력).
+
+  ⚠️ **본 PR 은 ADR 과 인덱스 행만 담는다.** 이슈 §DoD 2 (`docs/ops/operational-friction.md` 박제) 와 `.gitignore` 역포인터 · `.claude/agents/developer.md` 1줄은 **developer 인계분**이며, §DoD 3 (_"실제 sub-agent 디스패치 1회에서 적용 확인"_) 은 메인 오케스트레이터가 다음 디스패치에서 닫는다. 그래서 `Closes` 가 아니라 `Part of #960` 이다.
+
+- **[#960] 격리 worktree typecheck 정본 레시피 박제 — `docs/ops/operational-friction.md` §8 + 에이전트 규칙 1줄 (MINOR)** ([#960](https://github.com/coseo12/astro-simulator/issues/960), 위 ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md) 채택 판정의 **발효**) — 같은 `[Unreleased]` 의 ADR entry 가 판정만 담고 남긴 §DoD 2 를 채운다. 박제 3곳: **(1)** `docs/ops/operational-friction.md` **§8 신설** (#952 §7 인접 — `install` 규약의 **확장이지 대체가 아니다**), **(2)** `.gitignore` 의 `apps/web/next-env.d.ts` 주석에 #960 재확인 근거 + ADR §재검토 조건 4 역포인터, **(3)** `.claude/agents/developer.md` §규칙 1줄.
+
+  **§8 은 `TS2882` / `TS2307` 리터럴을 본문에 포함한다** — 결손이 레시피 부재가 아니라 **오진**이기 때문이다 (증상 2회 보고가 모두 원인을 `next-env.d.ts` 하나로 지목했고, 실제로는 `packages/{shared,core}/dist` 부재가 baseline 부터 공존한다). 에이전트가 실제로 보는 토큰으로 grep 도달이 가능해야 한다.
+
+  **dev 독립 재현** (rev `8e230e3` — `git worktree add` 직후 `node_modules` 부재 상태에서 순차 측정) — `pnpm install --frozen-lockfile` exit `0` (`4s`) → baseline `pnpm --filter web typecheck` exit `2` / `error TS` **76 행** (`TS2307` 52 / `TS7006` 13 / `TS2339` 4 / `TS18048` 4 / `TS2882` 2 / `TS7031` 1) → **`pnpm build`** exit `0` (`27s`) → typecheck exit `0` / `error TS` **0 행** (`3s`). ADR §E 표 (rev `7ca1cd1`) 와 **행 수·내역이 전건 일치**하며 `pnpm build` 소요만 `17s` 대 `27s` 로 갈린다. **드리프트가 아니라 rev 가 다른 두 스냅샷**이므로 (ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) §(i) **부분 재측정 금지** — ADR 은 무접촉) §8 은 두 rev 를 **스냅샷 표**로 나란히 싣고, **규범면** (1순위 코드블록 · `developer.md` 행동 규칙) 에서는 절대 수치를 빼고 _"`install` 과 같은 자릿수"_ 라는 **관계**로만 적는다 (같은 규약 §(ii)).
+
+  **폴백과 함정도 재현했다** — `packages/physics-wasm/pkg` 를 치운 상태 (= Rust 툴체인 부재 시뮬레이션) 에서 `pnpm --filter web exec next typegen` (exit `0`) + `shared`·`core` `-r build` (exit `2`, `TS2307` 4건) 뒤 typecheck 가 exit `0` / `error TS` 0 행이었고, `core` 의 `dist` `.d.ts` 는 **`58` 개**로 ADR §결과 3 과 일치했다. `.tsbuildinfo` 함정은 양방향 확인 — `rm -rf packages/shared/dist` 만 하면 `tsc` 가 exit `0` 을 내고 **`dist` 를 만들지 않으며**, `tsconfig.build.tsbuildinfo` 까지 지워야 재생성된다 (`composite: true`).
+
+  **옵션 B 기각 근거의 md5 도 독립 재현** — `next build` / `next typegen` 산출은 `2a74d390…` (`import "./.next/types/routes.d.ts";`), `next dev` 산출은 `d0f8375a…` (`import "./.next/dev/types/routes.d.ts";`) 이고 **기동 직후** 덮어써졌다 (dev 실측 `1s` 째 / ADR §B-1 은 _"약 2초"_ — **관측 폴링 간격이 `1s` 라 해상도와 주장 상한이 같다**. §8 은 더 좁은 쪽으로 단정하지 않고 `1~2s` 로 적었다). 파일은 2줄이 아니라 6줄이다. 그래서 §8 은 _"표준 2줄 수동 작성"_ 을 **금지**로 적었다 — 가변 산출물을 절차 문서에 하드코딩하는 것은 B 와 같은 실패 클래스를 문서로 옮기는 것이다.
+
+  ⚠️ **_"타입 오류가 CI 를 빠져나가지 않는다"_ 는 무조건형이 아니다** (reviewer 권고 반영) — 근거로 든 `tsconfig.build.json` 이 바로 `**/*.test.ts` 를 `exclude` 하고 CI 에 `typecheck` 직접 호출 스텝이 **`0` 개**라, `packages/{shared,core}` 의 테스트 파일 (**`57` 개** — 술어: `find packages/{shared,core}/src -name '*.test.ts'`) 은 타입 검사 밖이다. §8 은 조건절 + 후속 [#1060](https://github.com/coseo12/astro-simulator/issues/1060) 포인터를 함께 싣는다. 절차 SSoT 를 읽는 에이전트가 반례를 모른 채 회수하지 않도록 하기 위함이며, 처방(자동화가 아니라 레시피 + 발견가능성)은 그대로다.
+
+  ⚠️ **이슈 §DoD 3** (_"실제 sub-agent 디스패치 1회에서 적용 확인"_) 은 여전히 열려 있다 — 메인 오케스트레이터가 다음 디스패치에서 닫는다. 그래서 본 변경도 `Closes` 가 아니라 `Part of #960` 이다.
+
+### Behavior Changes
+
+- **developer 페르소나 — 격리 worktree 에서 `typecheck` 가 필요하면 `pnpm build` 를 선행한다** ([#960](https://github.com/coseo12/astro-simulator/issues/960)) — `.claude/agents/developer.md` §규칙에 1줄 추가. 이전에는 `pnpm install --frozen-lockfile` (#952 규약) 만 선행했고 typecheck 가 exit `2` 로 실패했을 때의 대응이 **재량**이었다 (실제로 `next-env.d.ts` 를 손으로 만드는 오진 처방이 2회 보고됐다). 이제 같은 상황에서 **`pnpm build` 를 돌리는 쪽으로 행동이 갈린다** — SemVer 판정 질문 (_"이 변경으로 에이전트가 같은 입력에 다르게 동작하는가"_) 에 **예**이므로 MINOR 다. 나머지 2곳 (`docs/ops/operational-friction.md` §8 / `.gitignore` 주석) 은 문서·주석이라 단독으로는 PATCH 이며, ADR entry 도 PATCH 로 분류돼 있다.
+- **앱 런타임 행동 변화 없음** — `apps/**` · `packages/**` 소스 무접촉. 변경 파일 전건이 `.md` · `.gitignore` 다.
+
 ## [0.72.0] — 2026-08-14
 
 ### Added
