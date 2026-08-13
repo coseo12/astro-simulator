@@ -166,7 +166,7 @@ gh pr checks <PR> --json name,state --jq \
 - **CHANGELOG `[Unreleased]` 누락 전수 대조 의무**: develop 이 main 보다 앞선 커밋이 CHANGELOG 항목보다 많을 수 있다(이전 세션들이 항목 누락). 릴리스 전 `git log origin/main..origin/develop` 로 **포함 PR 전수 대조** → 누락분 소급 문서화. v0.48.0 은 9 커밋 중 6건 CHANGELOG 누락 발견.
 - **release prep PR 필수**: version bump + CHANGELOG 확정은 develop 직접 push 금지라 `release/<X>-prep → develop` prep PR 로 선반영 후 release PR(develop→main).
   - ⚠️ **본문 생성은 `create-pr` 스킬 경로로 한다 (#1014)**: prep PR 도 예외가 아니다. `gh pr create --body`/`--body-file` 직접 호출은 스킬의 템플릿 동적 읽기 + pre-flight 를 통째로 우회해 체크리스트 누락 → `pr-template-checklist` **FAIL** 로 릴리스 흐름이 끊긴다. 실측: #912 · #964 · #1032 의 첫 run `failure` **3건이 전부 prep PR** 이고 (13일 창, 같은 창 prep PR 17건 중 **17.6%**), #1032 는 FAIL 6/7 로 체크리스트가 통째로 빠져 있었다. 판정 근거는 [ADR 20260813-1014](../decisions/20260813-1014-release-pr-class-no-op.md) §잔여 갭.
-- **release PR 도 pr-template-checklist 가드 대상**: 7 체크박스 원문 문구("ADR 호환성"/"Test plan"/"SSoT" 등) 전부 필요 — release 전용 섹션만으론 FAIL. 로컬 사전검증: `node scripts/verify-pr-template-checklist.mjs <PR>`.
+- **release PR 도 pr-template-checklist 가드 대상**: 7 체크박스 원문 문구("ADR 호환성"/"Test plan"/"SSoT" 등) 전부 필요 — release 전용 섹션만으론 FAIL. 로컬 사전검증: `node scripts/verify-pr-template-checklist.mjs <PR번호>`.
   - ⚠️ **문구만으로는 WARN 이 남는다 (#1010)**: 3계급 판정에서 phrase 는 blocking 축이고 **구조**(`kw1~5` 체크박스 / `kw6~7` `###` 헤더)는 WARN 축이다. 체크박스 항목을 `### 보안` 같은 헤더 절로 옮기면 FAIL 은 면해도 WARN 이 뜬다 — 실측으로 최근 머지 PR 60건 중 **release PR 8건이 이 경로**였다 (술어: 60 PR × 7 kw = 420 셀 중 WARN 21 셀, WARN PR 10건 중 8건이 release). 체크박스는 `[ ] → [x]` 갱신만 하고 라인 형태를 유지한다.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
 - **README 「현재 상태」 갱신 의무 (#842)**: release prep PR 에서 version bump + CHANGELOG 확정과 **동일 커밋**에 README `## 현재 상태` 의 버전/날짜/기능 서술을 현행화한다. 실측: v0.47.0~v0.50.0 3릴리스 연속 누락으로 README 가 v0.46.0 표기로 방치 (전수 감사 2026-07-18 발견).
@@ -270,3 +270,31 @@ npx prettier --check .                  # 금지 — 캐시 버전이 지배
   install 된 lockfile 바이너리라 버전 출처가 하나로 유지된다. 워크플로에 `npx prettier@<버전>` 을
   하드핀하면 네 번째 출처가 생겨 같은 클래스를 재생산한다.
 - 근거: [#952](https://github.com/coseo12/astro-simulator/issues/952) (PR [#951](https://github.com/coseo12/astro-simulator/pull/951) 리뷰 권고 4-i/4-ii).
+
+### 7-1. 버전이 맞아도 손상된다 — 인라인 코드 **밖**의 `~` 범위 표기 (#1013)
+
+§7 은 **버전 skew** 가 원인이지만, **lockfile 정본 버전(3.9.6)에서도** 마크다운이 손상되는 직교 경로가 하나 더 있다. `prettier --write` 는 인라인 코드 **밖**의 `~` 를 GFM 취소선 문법으로 정규화한다 — 한 문단에 `~` 가 2개 있으면 짝지어 버린다.
+
+```bash
+# 실측 (prettier 3.9.6 = lockfile 버전, --parser markdown)
+# 입력:  kw1~5 체크박스 / kw6~7 헤더
+# 출력:  kw1~~5 체크박스 / kw6~~7 헤더     ← 렌더링 시 "5 체크박스 / kw6" 이 취소선
+# 인라인 코드로 감싸면 불변: `kw1~5` / `kw6~7`
+```
+
+**표준 절차 — 범위·구간 표기는 반드시 인라인 코드로 감싼다** (`` `kw1~5` `` / `` `1~5` `` / `` `v0.67~0.69` ``). 같은 뿌리의 규약이 이미 `verify-pr-template-checklist.mjs` 의 PR 코멘트 문자열 주석에 있다 — *"한 문단에 `~` 가 2개 있으면 GFM 이 strikethrough 로 페어링하므로 범위 표기는 반드시 인라인 코드로 감싼다"*. 차이는 **누가 깨뜨리는가**다: 거기서는 GitHub 렌더러, 여기서는 **포맷터가 소스를 직접 고쳐 쓴다**.
+
+- **왜 조용한가** — `--write` 가 통과시킨 뒤에는 `--check` 도 초록이다(정규화된 형태가 prettier 기준으로는 **정답**). 즉 **CI 백스톱이 구조적으로 못 잡는다.**
+- ⚠️ **그러므로 `prettier --check` 는 이 손상의 탐지 술어가 될 수 없다** — *"통과했으니 잔여 0"* 은 **무능한 술어로 부재를 증명**하는 것이다(이 절의 초판이 실제로 그렇게 적었다가 리뷰에서 차단됐다). **탐지 술어는 문자열 검색**이다:
+
+  ```bash
+  # 손상형 — `~~` 양쪽에 영숫자가 붙은 형태 (범위 표기가 페어링된 흔적)
+  git grep -nE --untracked '[0-9A-Za-z]+~~[0-9A-Za-z]+' -- '*.md'
+  # 대조: 의도된 취소선은 여는 `~~` 앞이 공백이라 위 패턴에 안 걸린다
+  git grep -nF --untracked -- '~~' -- '*.md'      # 넓은 그물 (의도분 포함)
+  ```
+
+- **실측 — 모집단은 `CHANGELOG.md` 로 한정한다.** 손상형 **19 줄 / 33 발생 / 31 고유 종**, **전부 코드 펜스 밖**(= 실제 렌더링 손상)이며 **19 줄 전건이 릴리스 확정 구간**이다(`[Unreleased]` 내 **0**). ⚠️ **이 값은 하한이다** — 위 술어는 `~~` 양쪽이 영숫자인 경우만 잡으므로 경계가 `#`·`(`·**공백**인 손상을 놓친다(예: `:623` 의 `#320~~#324`, `:1219` 의 `#2~~#4`, `:786` 의 ` ~~345px`). `~~` 전량으로 재면 **22 줄 / 45 발생**이고, 그중 의도된 취소선을 걸러낸 회수 후보는 **21 줄 / 44 발생**이다. **"여는 `~~` 앞이 공백이면 의도된 취소선" 이라는 대조 규칙은 쓰지 마라** — ` ~~345px` 같은 실손상을 의도분으로 분류한다. 정밀한 술어 확정은 [#1040](https://github.com/coseo12/astro-simulator/issues/1040) 소관이다. 예: `` R1~~R4 `` · `` 7~~12 `` · `` 92k~~122 `` — 원래 `R1~R4` 등 단일 `~` 범위 표기였다. 술어 rev `42e9618` 과 본 커밋에서 **같은 값**이다(본 라운드 편집이 `CHANGELOG.md` 에 손상형을 더하지 않았음을 실측 확인).
+- ⚠️ **넓은 그물(`-F -- '~~'`)의 hit 수와 _본 문서 자신의_ 손상형 계수는 고정값으로 싣지 않는다 — 자기 참조 계수다.** 위 예시·시연 문자열이 그대로 모집단에 들어가므로 이 절을 고칠 때마다 값이 움직인다(초판이 `47` 로 적었다가 본 문단을 추가하자 `53` 이 됐다). 재측정 시 **본 문서의 예시는 모집단에서 뺀다.** 판정에 쓰는 값은 위 `CHANGELOG.md` 한정 계수이고, 그쪽은 자기 참조가 아니라 안정적이다.
+- **회수는 본 절의 범위가 아니다** — 19 줄 전건이 릴리스 확정 구간이라 *"기록 위조 금지"* 와 *"렌더링 결함 정정"* 중 무엇인지 **별도 판정**이 필요하다. 후속 [#1040](https://github.com/coseo12/astro-simulator/issues/1040) 으로 분리했고, 본 절은 **작성 시점 예방**만 담당한다.
+- 근거: [#1013](https://github.com/coseo12/astro-simulator/issues/1013) — PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038) 작성 중 CHANGELOG 산문의 `kw1~5` 가 실제로 이 경로로 손상됐고(커밋 전 발견), reviewer 가 격리 재현(`printf … | prettier --parser markdown`)으로 독립 확인했다.
