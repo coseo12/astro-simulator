@@ -791,9 +791,16 @@ function selfTest() {
       //  그 문자열이 자기 패턴에 매칭돼 HEAD 에서 false positive 가 난다 (reviewer 자기 고백).
       //  **주석도 같다** — dev 가 이 블록에 우회 관용구를 *설명하려고* 그대로 인용했다가
       //  HEAD 가 `46 passed, 1 failed` 로 떨어지는 것을 실측했다 (hit 2건 전부 주석).
-      //  ⇒ **본 가드가 금지하는 토큰은 이 파일의 산문에도 등장할 수 없다.** 비용은 우회
-      //  관용구를 축자 인용할 수 없다는 것이고, 이득은 주석까지 검사 대상이 된다는 것이다.
+      //  ⇒ **`F19o` 가 금지하는 토큰은 이 파일의 산문에도 등장할 수 없다.** 비용은 우회
+      //  관용구를 축자 인용할 수 없다는 것이고, 이득은 주석까지 검사 대상이 된다는 것이다
+      //  (주석 안에 남겨둔 실코드를 나중에 주석 해제하는 경로까지 덮는다 — AST 기반이면 놓친다).
       //  그래서 아래 메시지·주석은 전부 `동적 모듈 로드` 같은 **서술형**으로 쓴다.
+      //
+      //  ⚠️ **두 단언의 스캔 범위는 다르다** (PR #1036 reviewer B 판정). 위 성질은 **`F19o` 에만**
+      //  참이다 — `F19o` 는 파일 **전문**을 훑지만 `F19n` 은 `^import` 로 시작하는 **줄만** 본다.
+      //  따라서 산문에 모듈명을 적는 것은 `F19n` 에 무해하다 (그래서 이 주석이 `node:module` 을
+      //  언급해도 통과한다). 이 성질은 의도된 설계라기보다 텍스트 전수 검사의 **승격된 부작용**이며,
+      //  대안(주석 영역 제외 파싱 / 설명 별도 파일 이관)이 더 비싸서 정당한 대가로 수용한 것이다.
       const selfSrc = readFileSync(path.join(SCRIPT_DIR, 'verify-adr-index.mjs'), 'utf8');
       const WIRING_RE = /^process\.exit\(dispatch\(process\.argv\.slice\(2\)\)\);$/gm;
       const MAIN_SIG_RE =
@@ -828,16 +835,31 @@ function selfTest() {
         'node:process',
         'node:url',
       ];
+      // `declared` 는 **한 줄로 끝나는** 선언만 수집한다. 그래서 **선언 수**를 함께 고정한다
+      //  (PR #1036 reviewer N-1). 다중행 선언은 `declared` 에 안 잡히므로 집합 비교만으로는
+      //  **새 다중행 유입이 조용히 통과**한다 (실측: 다중행·세미콜론 누락 2형태 `47/0` exit 0).
+      //  `^import` 로 시작하는 **줄 수**는 두 형태 모두에서 늘어나므로 한 조건이 둘을 같이 닫는다.
+      //  ⚠️ 이 경로는 적대적 시나리오가 아니다 — prettier 가 `printWidth: 100` 초과 시 **스스로**
+      //  다중행으로 쪼갠다 (실측). 게다가 위 `node:fs` 선언은 현재 **98자 = 여유 2자**라 명명
+      //  export 하나만 더해도 쪼개진다. 그때는 `declared` 에서 `node:fs` 가 빠져 FAIL 하는데
+      //  (안전 방향이지만) 진단이 _"선언이 없다"_ 로 읽혀 오도하므로 메시지에 형태를 명시한다.
+      const declaredLineCount = (selfSrc.match(/^import\b/gm) ?? []).length;
       const declared = [...selfSrc.matchAll(/^import\s[^\n]*['"]([^'"]+)['"];\s*$/gm)]
         .map((m) => m[1])
         .sort();
       assert(
-        JSON.stringify(declared) === JSON.stringify(ALLOWED_IMPORTS),
-        `F19n 배선: 정적 import 모듈 집합 == allowlist (실측 ${JSON.stringify(declared)})`,
+        declaredLineCount === ALLOWED_IMPORTS.length &&
+          JSON.stringify(declared) === JSON.stringify(ALLOWED_IMPORTS),
+        `F19n 배선: **단일 라인** 정적 import 선언 집합 == allowlist ` +
+          `(선언 시작 줄 ${declaredLineCount} / 기대 ${ALLOWED_IMPORTS.length} / 수집 ${JSON.stringify(declared)}). ` +
+          `⚠️ 다중행 선언은 수집되지 않는다 — 줄 수만 어긋나면 새 유입을, 수집 목록에서만 빠졌으면 ` +
+          `기존 선언이 printWidth 초과로 쪼개진 것을 의심하라`,
       );
       assert(
         (selfSrc.match(/\bimport\s*\(/g) ?? []).length === 0,
-        'F19o 배선: 동적 모듈 로드 0 — 합성 모듈명 우회 경로 차단 (Y-1 실측 근거)',
+        'F19o 배선: 동적 모듈 로드 0 — 합성 모듈명 우회 경로 차단 (Y-1 실측 근거). ' +
+          '⚠️ 스캔 범위가 파일 전문이라 **산문(주석·단언 메시지)에 해당 호출 표기를 축자로 적어도 ' +
+          '여기서 FAIL** 한다 — 코드 무변경인데 실패하면 이 경로다. 서술형으로 바꿔 쓸 것',
       );
     }
   } finally {
