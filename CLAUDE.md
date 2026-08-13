@@ -30,7 +30,7 @@ AI 에이전트 기반 개발 워크플로우 템플릿. 1인 개발자-AI 페�
 | `main` | **배포 anchor**. 태그된 릴리스만 존재 | `develop → main` **release PR** 로만 / `hotfix/* → main` PR | 직접 push 금지 |
 | `develop` | **개발 통합**. 모든 완성된 변경이 먼저 도착 | `<type>/*`·`release/*-prep` PR / `main → develop` merge-back (hotfix 후) | 직접 push 금지 |
 | `<type>/<이슈번호>-<설명>` | 일상 개발. type 은 §커밋 컨벤션 의 type 과 동일 (신기능 = `feature`) | `develop` 에서 분기 | `main` 대상 PR 생성 금지 |
-| `release/<버전>-prep` | 릴리스 준비 (이슈번호 없는 예외) | `develop` 에서 분기 | 기능 변경 금지 |
+| `release/<X.Y.Z>-prep` | 릴리스 준비 (이슈번호 없는 예외) | `develop` 에서 분기 | 기능 변경 금지. `v` 접두 금지 (#972 — 태그만 `v0.71.0`) |
 | `hotfix/<이슈번호>-<설명>` | **prod 긴급 패치** | `main` 에서 분기. 머지 후 즉시 `main → develop` merge-back | 드물게 사용. develop merge-back 누락 금지 |
 
 ### 워크플로 3단계

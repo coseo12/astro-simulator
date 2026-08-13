@@ -10,3 +10,9 @@ node scripts/check-duplicate-functions.mjs --staged || true
 
 # lint-staged 실행 (변경된 파일만 lint + format)
 pnpm lint-staged
+
+# #982 — prettier 소유 markdown 의 bare `~~` 금지 (ADR 20260814-982-changelog-tilde-guard.md)
+# **반드시 lint-staged 다음 줄**이다. 손상을 만드는 주체가 위 줄의 `prettier --write` 이므로
+# (인라인 코드 밖 단일 `~` → GFM 취소선 정규화), 그 직후가 가장 이른 검출 지점이다.
+# `|| true` 없음 — fail-fast (CLAUDE.md §가드 설계 원칙).
+node scripts/verify-md-tilde.mjs --staged

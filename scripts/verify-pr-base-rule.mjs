@@ -511,7 +511,7 @@ const FIXTURES = [
   ['develop', 'chore/933-verify-rest-finally', 'pass', 'chore'],
   ['develop', 'test/943-selector-static-guard', 'pass', 'test'],
   ['develop', 'refactor/850-phase1-core-tail', 'pass', 'refactor'],
-  ['develop', 'release/v0.53.0-prep', 'pass', '릴리스 v 접두 (표기 진동 수용)'],
+  ['develop', 'release/v0.53.0-prep', 'pass', 'v 접두 — 이름은 축 B 위반(#972)이나 base 는 정상'],
   ['develop', 'release/v0.28.0', 'pass', '-prep 없음 — 이름은 축 B 위반이나 base 는 정상'],
   ['develop', 'fix/webgl-fallback', 'pass', '이슈번호 없음 — 동상 (관할 분리 실증)'],
   // --- 봇 (오차단 시 자동화 파손) ---
@@ -583,7 +583,9 @@ const CROSS_CHECKS = [
   ['develop', 'gitflow', 'develop'],
   ['main', 'gitflow', 'main'],
   ['release/9.99.9-prep', 'release', 'release'],
-  ['release/v0.53.0-prep', 'release', 'release'],
+  // #972 로 `v` 접두가 축 B 에서 FAIL 이 되면서 종전 `release/v0.53.0-prep` 이 교집합 밖으로
+  // 나갔다 (이 대조가 먼저 깨져 알려줬다 — 설계 의도대로). 채택 표기 실측값으로 교체한다.
+  ['release/0.71.0-prep', 'release', 'release'],
   ['feature/970-x', 'work', 'work'],
   ['hotfix/970-x', 'work', 'hotfix'],
   ['chore/r1-baseline-linux-1', 'bot', 'bot'],

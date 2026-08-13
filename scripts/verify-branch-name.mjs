@@ -88,8 +88,16 @@ const RE_GITFLOW = new RegExp(`^(?:${GITFLOW_HEADS.join('|')})$`);
 /** ^(feature|fix|refactor|chore|docs|test|hotfix)/[0-9]+-[a-z0-9][a-z0-9._-]*$ */
 const RE_WORK = new RegExp(`^(?:${ALL_TYPES.join('|')})/[0-9]+-[a-z0-9][a-z0-9._-]*$`);
 
-/** ^release/v?[0-9]+\.[0-9]+\.[0-9]+-prep$  ( `v?` 는 실측된 표기 진동 수용 — ADR §2-3 ) */
-const RE_RELEASE = /^release\/v?[0-9]+\.[0-9]+\.[0-9]+-prep$/;
+/**
+ * ^release/[0-9]+\.[0-9]+\.[0-9]+-prep$
+ *
+ * `v` **불허** (#972 — ADR §2-3 진동을 `v?` 로 흡수하던 것을 좁혔다. ADR §6-4 재검토 조건 4 집행).
+ * 채택 근거는 빈도가 아니라 **버전 ↔ 태그 축**이다: 이 자리의 토큰은 *버전* 이고
+ * (`package.json` `"0.71.0"` · CHANGELOG `## [0.71.0]` 와 같은 것), `v` 는 *태그 ref* 의
+ * 네임스페이스 표지다 (`v0.71.0`). 여기서는 `release/` 가 이미 네임스페이스를 담당하므로
+ * `v` 는 중복이다. CLAUDE.md §브랜치 전략 표의 `release/<X.Y.Z>-prep` 과 같은 것을 가리킨다.
+ */
+const RE_RELEASE = /^release\/[0-9]+\.[0-9]+\.[0-9]+-prep$/;
 
 /** ^chore/(r1-baseline-linux|baseline-remeasure)-[0-9]+$ */
 const RE_BOT = new RegExp(`^chore/(?:${BOT_BRANCH_PATTERNS.join('|')})-[0-9]+$`);
@@ -121,7 +129,8 @@ function allowSummary() {
     `  1. gitflow  : ${GITFLOW_HEADS.join(' | ')}                (release PR / merge-back 의 head)`,
     `  2. 일상 개발 : <type>/<이슈번호>-<설명>   type = ${ALL_TYPES.join(' | ')}`,
     `                 이슈번호 필수 / 설명 필수 / 소문자 전용 / 슬래시 1개`,
-    `  3. 릴리스   : release/v?X.Y.Z-prep        (예: release/0.60.0-prep, release/v0.53.0-prep)`,
+    `  3. 릴리스   : release/X.Y.Z-prep         (예: release/0.60.0-prep, release/0.71.0-prep)`,
+    `                 'v' 접두 불허 — 이 자리는 버전이지 태그가 아니다 (#972)`,
     `  4. 봇       : chore/(${BOT_BRANCH_PATTERNS.join('|')})-<run_id>`,
     ``,
     `주의: 커밋 type 은 'feat' 이지만 브랜치 type 은 'feature' 다 (#942).`,
@@ -496,18 +505,22 @@ function runVerifySsot() {
  * 전 코퍼스 513 브랜치명을 박아넣지 않는다 (~15KB 부피 + 네트워크 의존).
  * 전수 실측은 --check-corpus 의 1회성 증거로 분리한다.
  *
- * **최고 리스크 3종** (develop / main / release/*-prep `v` 유무 양쪽) 은 오차단 시
+ * **최고 리스크 3종** (develop / main / release/*-prep) 은 오차단 시
  * 릴리스·merge-back 이 전면 차단되므로 필수 케이스로 고정한다.
+ *
+ * **릴리스 `v` 축은 양방향으로 고정한다** (#972). 종전 두 픽스처는 `v` 유무를 **둘 다 PASS**
+ * 로 못박아 표기 진동 자체를 계약이었다 — `v?` 를 좁혀도 그 픽스처가 남아 있으면 회귀를
+ * 못 잡는다. 채택 표기는 positive, **미채택 표기는 negative** 로 이동했다: 축소 후 `v` 접두는
+ * "리스크" 가 아니라 **정책 위반**이므로 리스크 라벨도 함께 걷어낸다.
  */
 const FIXTURES = [
   // --- 최고 리스크 3종 (오차단 시 릴리스/merge-back 전면 차단) ---
   ['develop', true, '최고 리스크 — release PR 의 head'],
   ['main', true, '최고 리스크 — hotfix merge-back 의 head'],
-  ['release/0.60.0-prep', true, '최고 리스크 — v 없음 (실측 2026-08-05)'],
-  ['release/v0.53.0-prep', true, '최고 리스크 — v 있음 (실측 2026-07-30)'],
+  ['release/0.60.0-prep', true, '최고 리스크 — 채택 표기 (실측 2026-08-05)'],
   // --- 릴리스 경계 ---
   ['release/0.34.1-prep', true, 'patch 버전'],
-  ['release/v10.20.30-prep', true, '2자리 이상 세그먼트'],
+  ['release/10.20.30-prep', true, '2자리 이상 세그먼트'],
   // --- 일상 개발 (전 type 커버) ---
   ['feature/962-branch-name-guard', true, '본 PR 자신 (메타 측정 자기 적용)'],
   ['fix/952-format-backstop', true, 'fix'],
@@ -536,8 +549,11 @@ const FIXTURES = [
   // --- FAIL: 릴리스 오류 ---
   ['release/0.60.0', false, '-prep 없음'],
   ['release/prep', false, '버전 없음'],
-  ['release/v0.60-prep', false, '2-segment 버전'],
-  ['release/v0.53.0-prep-extra', false, '접미 잉여'],
+  ['release/0.60-prep', false, '2-segment 버전'],
+  ['release/0.53.0-prep-extra', false, '접미 잉여'],
+  // 미채택 표기 (#972). 위 3건에서 `v` 를 걷어낸 것은 의도적이다 — negative 는 라벨이 말하는
+  // **그 축 하나 때문에만** 실패해야 한다. `v` 가 남아 있으면 두 이유로 실패해 축이 섞인다.
+  ['release/v0.53.0-prep', false, 'v 접두 — #972 미채택 표기 (2026-07-30 실측 형태)'],
   // --- FAIL: 봇 오류 ---
   ['chore/r1-baseline-linux-abc', false, 'run_id 가 숫자 아님'],
   ['chore/r1-baseline-windows-123', false, '미등록 봇 패턴'],
@@ -788,6 +804,12 @@ function runCheckCorpus(jsonPath) {
   // FAIL 을 ADR §6-1 오차단 리스크 표의 행으로 분류
   const classes = [
     ['architect/* · dev/* (#942 폐기 접두사 — 의도된 차단)', (n) => /^(architect|dev)\//.test(n)],
+    // #972 이후 release FAIL 은 **두 클래스**다. `v` 접두 prep 을 먼저 걸러야 한다 —
+    // 뒤 술어가 `^release/` 전체를 삼키므로 순서가 곧 귀속이다.
+    [
+      'release/v*-prep (#972 미채택 표기 — 마지막 2026-08-12, §2-6 로 rerun 불가)',
+      (n) => /^release\/v[0-9]+\.[0-9]+\.[0-9]+-prep$/.test(n),
+    ],
     ['release/* (-prep 없음 — 마지막 2026-06-16)', (n) => /^release\//.test(n)],
     ['이슈번호 없는 <type>/* (사람)', (n) => new RegExp(`^(?:${ALL_TYPES.join('|')})/`).test(n)],
   ];
