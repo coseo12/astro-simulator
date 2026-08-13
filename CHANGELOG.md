@@ -33,9 +33,30 @@ Semantic Versioning을 따른다.
 
   ⚠️ **이슈 §DoD 3** (_"실제 sub-agent 디스패치 1회에서 적용 확인"_) 은 여전히 열려 있다 — 메인 오케스트레이터가 다음 디스패치에서 닫는다. 그래서 본 변경도 `Closes` 가 아니라 `Part of #960` 이다.
 
+### Fixed
+
+- **[#958] `.prettierignore` live 문서 `!` negation 무효 수리 — 디렉토리 재포함 + markdown 한정 (MINOR)** ([#958](https://github.com/coseo12/astro-simulator/issues/958), ADR [`20260814-958`](docs/decisions/20260814-958-prettier-live-docs-scope.md)) — `.prettierignore` 가 _"live 문서 예외 4경로 — prettier 포맷 대상 유지"_ 라고 선언한 4줄이 **도입 시점부터 무효**였다. 상위 `docs/**` 가 디렉토리째 제외된 뒤에는 하위 파일만 `!` 로 되돌릴 수 없다(gitignore 문법). 실측 — 4경로 전건 `ignored: true` 로 **선언의 정반대**. 도입 커밋은 `b474902` (#907 Phase B/C) 이며 그 직전에는 `.prettierignore` 가 열거 목록이라 4경로가 **누락에 의해** 포맷 대상이었다. 즉 현재 동작은 **결정이 아니라 사고**이고 발견까지 `14` 일 유지됐다.
+
+  **수리 형식 — `docs/**` 를 해체하지 않는다.** gitignore 표준 우회(**디렉토리를 먼저 재포함**)로 4줄 추가만에 성립한다. 격리 픽스처 대조군: `docs/**` 만 → `ignored: true` / 디렉토리 줄 **없이** 파일 줄만 → `ignored: true` (**무효 재현**) / 디렉토리 줄 + 파일 줄 → `ignored: false`. 이슈가 상정한 (B) _"개별 경로 열거 전환"_ 은 불필요하며, 그 전환은 신규 `docs/` 하위 디렉토리가 열거 누락 시 조용히 유입되는 **fail-open** 구조를 새로 만든다.
+
+  **`**/*.md` 한정 (H1)** — `docs/benchmarks/*.json` (`baseline.json` 등) 은 `bench-baseline-remeasure.yml` 이 자동 생성·커밋하고 `verify-fps-baseline.mjs` 가 소비한다. 소박한 `!docs/benchmarks/**` 는 이것들을 포맷 대상으로 끌어들여 생성기 출력 ↔ prettier 포맷 사이에 상시 drift 를 만든다. 실측 — 편입 **`39` 파일 전건 `.md`**, `docs/**` 하위 JSON·PNG 소유 **0건**.
+
+  **`p*-retrospective.md` → `*-retrospective.md` (H2)** — `p*` 는 `P1`·`P2`·`P2-B`·`P2-C` `4` 건의 포함을 prettier ignore 매칭의 **문서화되지 않은 case-insensitive 동작**에 의존한다(실측 계수 `p*` = `13` / `*` = `15`, 차이는 `harness-update-2.2.0`·`r10`). 리터럴 소문자 접미사 매칭으로 바꿔 그 의존을 **0** 으로 만든다. 확장된 `15` 건은 CLAUDE.md §마일스톤 회고 루틴 의 위치 규약과 정합이다.
+
+  **물결 선처리를 재포맷보다 먼저 수행했다** — 순서가 뒤바뀌면 손상 형태가 커밋에 한 번 들어갔다 나온다. `--write` 스크래치 측정(측정 후 원복)으로 손상 대상을 특정: **`10` 발생 / `4` 라인 / `3` 파일** (`docs/phases/roadmap-v3-incremental.md` · `docs/retrospectives/p6-retrospective.md` · `p7-retrospective.md`). 이들을 [`operational-friction.md`](docs/ops/operational-friction.md) §7-1 표준 절차대로 인라인 코드로 감싼 **뒤** 재포맷했고, 그 결과 **diff 추가 라인의 물결쌍은 `0`** 이다. 재포맷 실적 — `docs/` 한정 **`5` 파일 / `13 insertions` / `12 deletions`**.
+
+  ⚠️ **착수 전 사전 측정 `92` 는 프록시 과대추정이었다** — `git grep -oE` 정규식이 ① 이미 인라인 코드 스팬 안에 있는(= §7-1 이 처방한 **안전 형태**) 물결과 ② 문단에 **짝이 없는** 물결까지 셌다. 실제 변환 대상은 짝이 맞는 쌍뿐이라 `--write` 실측은 `10` 이다(**`9.2` 배 과대**). 대상 파일 수도 `44` → `34` 로 정정됐다(`docs/retrospectives` 를 디렉토리 전체 `19` 로 셌으나 선언 단위는 `p*-retrospective.md` = `9`). **문자열 계수는 포맷터 동작의 프록시가 될 수 없다.**
+
+  **negative 실증 (DoD 4)** — 주입 **전에** 대상이 `ignored: false` 임을 `--file-info` 로 선확인한 뒤 `docs/phases/P1-solar-system-mvp.md` 에 포맷 위반을 주입 → `pnpm run format:check` **exit `1`** + 해당 파일 보고 → 원복 → **exit `0`**. **대조군 동시 주입** — 여전히 제외 상태인 `docs/lessons/no-op-adr-pattern.md` 에 **같은 위반**을 주입했으나 **무보고**였다. 이 비대칭이 실증의 핵심이다: 제외된 파일에 주입하면 위반이 아니라 **무보고**가 나오고, **그것을 PASS 로 오독하는 것이 바로 본 이슈가 다루는 결함 클래스**다.
+
+  **동반 ADR 갱신 2건** — [`20260731-907`](docs/decisions/20260731-907-harness-decouple.md) §결정 4 에 **기전 정정 포인터** (그 조항의 *의도*는 유효하고 *기전*만 무효였으므로 번복이 아니다) / [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) 는 `v0.72.0` 릴리스분이라 §재검토 조건 1 원문을 **소급 치환하지 않고** 포인터 + **Amendment** 로 부기했다. 그 ADR §재검토 조건 1(_"모집단 확대"_)이 **실제로 발동**했다.
+
+  ⚠️ **dev 단계 실측이 ADR 초판 서술 `2` 건을 정정했다** (ADR §Amendment 2026-08-14) — ① **H2 의 _"macOS ↔ Linux 모집단 분기"_ 는 반증됐다.** 격리 픽스처에서 디스크에 **존재하지 않는** 경로(`docs/fakedir/x.md`)가 대문자 패턴에 매칭되는 것을 확인했다 — 이 case-folding 은 **순수 문자열 수준**이고 파일시스템과 무관하므로 Linux CI 결과도 **같다**. `*-retrospective.md` 채택은 유지되나 근거가 *플랫폼 분기*에서 *미문서화 동작 의존*으로 바뀐다. ② **감시값은 `39` 가 아니라 `44` 다** — `39` 는 편입 delta 이고 `20260814-982` §재검토 조건 1 이 감시하는 것은 **모집단 계수**(기존 `5` + 편입 `39`)다. `--population` 실측 `44` 로 확인했고 감시값을 뜻하던 `6` 곳을 정정했다.
+
 ### Behavior Changes
 
 - **developer 페르소나 — 격리 worktree 에서 `typecheck` 가 필요하면 `pnpm build` 를 선행한다** ([#960](https://github.com/coseo12/astro-simulator/issues/960)) — `.claude/agents/developer.md` §규칙에 1줄 추가. 이전에는 `pnpm install --frozen-lockfile` (#952 규약) 만 선행했고 typecheck 가 exit `2` 로 실패했을 때의 대응이 **재량**이었다 (실제로 `next-env.d.ts` 를 손으로 만드는 오진 처방이 2회 보고됐다). 이제 같은 상황에서 **`pnpm build` 를 돌리는 쪽으로 행동이 갈린다** — SemVer 판정 질문 (_"이 변경으로 에이전트가 같은 입력에 다르게 동작하는가"_) 에 **예**이므로 MINOR 다. 나머지 2곳 (`docs/ops/operational-friction.md` §8 / `.gitignore` 주석) 은 문서·주석이라 단독으로는 PATCH 이며, ADR entry 도 PATCH 로 분류돼 있다.
+- **prettier 포맷 대상 집합 확대 — `docs/` live 문서 4경로의 markdown 이 소유로 편입** ([#958](https://github.com/coseo12/astro-simulator/issues/958)) — 모집단 계수 `5` → **`44`** (편입 `39`, 전건 `.md`). SemVer 판정 질문(_"이 변경으로 같은 입력에 다르게 동작하는가"_)에 **예**다: 동일한 `docs/phases/**` · `docs/reports/**` · `docs/benchmarks/**` · `docs/retrospectives/*-retrospective.md` 편집이 이전에는 `lint-staged` · `format:check` 어느 쪽도 통과시키던 것이, 이제 **재포맷 대상이 되고 `format:check` 가 게이트한다**. 같은 확대로 `verify-md-tilde` 가드의 모집단도 `5` → `44` 가 되어 그 `39` 파일의 신규 물결 범위 표기가 **차단 대상**이 된다. 따라서 MINOR.
 - **앱 런타임 행동 변화 없음** — `apps/**` · `packages/**` 소스 무접촉. 변경 파일 전건이 `.md` · `.gitignore` 다.
 
 ## [0.72.0] — 2026-08-14
