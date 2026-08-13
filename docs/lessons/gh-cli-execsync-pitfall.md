@@ -120,7 +120,7 @@ for h in $(git log -2 --format=%H); do git cat-file -p $h; done
 # -> 양쪽 다 tree / parent / author / committer / <message> 뿐. invocation 필드 없음
 ```
 
-`git log` 에도 이를 노출하는 format placeholder 가 없다. 커밋 이력에 남은 것은 **이미 셸을 통과한 결과 문자열** 뿐이므로, 사후 검사가 볼 수 있는 입력 자체가 존재하지 않는다.
+`git log` 의 format placeholder 는 **커밋 객체에 있는 것만** 노출할 수 있고, 위 `cat-file` 출력이 곧 그 객체의 전부다 — 즉 _"placeholder 를 못 찾았다"_ 가 아니라 **노출할 대상이 객체에 없다**. 커밋 이력에 남은 것은 **이미 셸을 통과한 결과 문자열** 뿐이므로, 사후 검사가 볼 수 있는 입력 자체가 존재하지 않는다.
 
 **축 2 — 훅도 원본을 못 본다.** 손상은 **git 이 메시지를 받기 전에** 셸에서 끝난다. `commit-msg` 훅에 `echo "$(cat "$1")"` 를 걸고 위 백틱 메시지를 커밋하면 훅이 받는 값은 `docs: threshold  rule` — **이미 손상된 문자열**이다. 대조할 원본이 훅의 입력에 없으므로 훅은 _"손상됐다"_ 를 판정할 수 없다.
 
