@@ -71,12 +71,14 @@ const TP_FIXTURES = [
   'cargo nextest run',
 ];
 
-// 하네스 래퍼 접두/접미. **모든** Bash 도구 호출에 `< /dev/null` 이 붙는 것이 #1066 의 핵심이다.
+// 하네스 래퍼 접두/접미. **모든** Bash 도구 호출에 `< /dev/null` 이 붙는 것이 #1066 의 1차 매개다.
+// ⚠️ 매개는 `<` 하나가 아니다 — 명령이 스스로 붙이는 `> /dev/null` · `2>/dev/null` 도 같은
+// `/dev` 를 명령행에 올린다 (PR #1077 dev 교차 관측). 아래 FP 코퍼스가 양방향을 모두 싣는다.
 const W_PRE =
   "/bin/zsh -c source /Users/seo/.claude/shell-snapshots/snapshot-zsh-1786687667281-uiooar.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval '";
 const W_POST = "' < /dev/null && pwd -P >| /tmp/claude-cb83-cwd";
 
-// 미검출 **의무** 형태 — 구 패턴은 여기 전건에 거짓 양성을 냈다 (2026-08-14 실측 8/8).
+// 미검출 **의무** 형태 — 구 패턴은 이 목록 전건에 거짓 양성을 냈다 (2026-08-14 실측 11/11).
 const FP_FIXTURES = [
   `${W_PRE}cd /Users/seo/project/space && pnpm store path && sleep 200${W_POST}`,
   `${W_PRE}pnpm install --frozen-lockfile${W_POST}`,
@@ -89,6 +91,11 @@ const FP_FIXTURES = [
   // 실 dev 서버의 **래퍼 셸**. 신 패턴은 이걸 보고하지 않는다 (`dev'` 뒤가 공백/EOL 이 아님).
   // 검출 능력 손실 0 — 같은 트리의 자식 4건(pnpm 2 · next · next-server)이 전부 잡힌다.
   `${W_PRE}cd /Users/seo/project/space && pnpm dev${W_POST}`,
+  // --- 출력 리다이렉션 축 (PR #1077 dev 교차 관측 — 실측 hit 1, ETIME 00:04) ---
+  `${W_PRE}cd /Users/seo/project/space/.claude/worktrees/agent-infra1060 && pnpm --filter @astro-simulator/web typecheck > /dev/null 2>&1${W_POST}`,
+  // 위 케이스는 래퍼의 `< /dev/null` 도 함께 실어 축이 섞인다 — 아래 2건이 `>` 축을 **단독 격리**한다.
+  '/bin/sh -c pnpm --filter @astro-simulator/web typecheck > /dev/null 2>&1',
+  '/bin/sh -c pnpm run lint 2>/dev/null',
 ];
 
 /** hook PATTERN 을 실제 `grep -E` 에 먹여 매칭된 줄 집합을 돌려준다. */

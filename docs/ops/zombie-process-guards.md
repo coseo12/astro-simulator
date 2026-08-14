@@ -163,7 +163,16 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 §9 가 **누가 매칭 풀에 들어오는가**(자기 오탐 2축)를 다룬다면, 본 절은 **패턴이 무엇을 잡는가**를 다룬다. 두 축은 직교하며 `grep -v grep` 으로는 본 절의 결함이 해소되지 않는다 — 그 필터는 *패턴 리터럴을 실은 셸*을 거르는데, 여기서 잡히는 것은 셸이 아니라 **실제 무관한 프로세스**다.
 
-**결함**: 구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 의 `.*` 는 명령행 뒷부분까지 이어진다. 하네스 래퍼는 **모든** Bash 도구 호출 뒤에 `< /dev/null` 을 덧붙이므로, `pnpm.*dev` 의 `.*` 가 그 `/dev/null` 의 `dev` 에 도달해 **`pnpm` 을 포함한 임의 명령**이 좀비로 보고됐다. `cargo .*test` 도 동종 구조다 (`cargo build --release && pnpm test:unit` 이 걸린다). [#440](https://github.com/coseo12/astro-simulator/issues/440) 이래 hook `PATTERN` 에 선행했고 [#1065](https://github.com/coseo12/astro-simulator/pull/1065) 는 `qa.md` 를 이 패턴에 **정렬**시켰을 뿐 정밀도를 바꾸지 않았다.
+**결함**: 구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 의 `.*` 는 명령행 뒷부분까지 이어져 `/dev/null` 의 `dev` 에 도달했다 → **`pnpm` 을 포함한 임의 명령**이 좀비로 보고됐다. `cargo .*test` 도 동종 구조다 (`cargo build --release && pnpm test:unit` 이 걸린다). [#440](https://github.com/coseo12/astro-simulator/issues/440) 이래 hook `PATTERN` 에 선행했고 [#1065](https://github.com/coseo12/astro-simulator/pull/1065) 는 `qa.md` 를 이 패턴에 **정렬**시켰을 뿐 정밀도를 바꾸지 않았다.
+
+⚠️ **`/dev` 를 명령행에 올리는 매개는 하나가 아니다 — 리다이렉션 양방향이다.**
+
+| 방향 | 형태 | 출처 | 적용 범위 |
+| --- | --- | --- | --- |
+| 입력 | `< /dev/null` | 하네스 래퍼가 자동 부착 | Bash 도구 호출 **전건** |
+| 출력 | `> /dev/null` · `2>/dev/null` | 명령 자신이 작성 | 조용한 실행을 원하는 호출 |
+
+출력 축은 [PR #1077](https://github.com/coseo12/astro-simulator/pull/1077) 작업 중 다른 dev 가 **독립 관측**했다 (`pnpm --filter web typecheck > /dev/null 2>&1`, 실측 hit `1` / ETIME `00:04` — 활성 프로세스라 무접촉). **한쪽만 막으면 절반만 닫힌다**는 것이 이 표의 요점이며, 아래 교정은 `/dev` 앞의 `/` 를 보므로 **방향에 무관하게** 두 축을 동시에 닫는다.
 
 **교정 원리**: `dev` / `test` 를 **공백 구분 토큰**으로만 인정한다 — 앞은 공백, 뒤는 공백 또는 EOL. `/dev/null` 의 `dev` 는 앞이 `/` 라 배제되고, 실제 인자로 등장하는 `dev` 는 그대로 남는다.
 
@@ -171,18 +180,29 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 next dev|next-server|cargo( [^ ]+)* (nextest|test)( |$)|pnpm( [^ ]+)* dev( |$)
 ```
 
-**기각된 후보 2건** (이슈 본문이 제시했으나 실측이 뒤집었다):
+**기각된 후보 3건** (이슈 본문 2건 + PR #1077 dev 제안 1건. 전부 실측으로 판정했다):
 
 - `pnpm( run)? dev` — **거짓 음성**. 실 dev 서버 트리의 중간 프로세스가 `node …/bin/pnpm --filter @astro-simulator/web dev` 라 잡히지 않는다 (실측 argv).
 - `pnpm [^|]*dev` — **결함 미해소**. 문제의 구간(`pnpm store path && sleep 200' < /dev/null`)에 `|` 가 없어 그대로 매칭된다. 경계로 삼아야 할 문자는 `|` 가 아니라 **공백/`/`** 였다.
+- `pnpm( |$).*( dev|dev )` (PR #1077 dev 제안) — **채택 코퍼스에서는 동률**이다. 22건 위장 프로세스의 pnpm 축에서 거짓 양성 `0` / 거짓 음성 `0` 으로 채택안과 결과가 갈리지 않았다 (양방향 `/dev/null` 케이스 포함). 기각 사유는 **결과가 아니라 구조**다 — `( dev|dev )` 는 `dev` 의 **한쪽 경계만** 요구하므로 반대쪽이 열려 있다. 아래는 실 프로세스가 아닌 **합성 프로브**이며, 그 열린 쪽을 시연한다:
+
+  ```bash
+  # 앞쪽만 경계 → 통과(=거짓 양성) / 채택안은 뒤쪽 경계까지 요구해 배제
+  printf 'pnpm build && echo development\npnpm install && node x.mjs --mode dev-preview\n' \
+    | grep -cE 'pnpm( |$).*( dev|dev )'                     # 2
+  printf 'pnpm build && echo development\npnpm install && node x.mjs --mode dev-preview\n' \
+    | grep -cE 'pnpm( [^ ]+)* dev( |$)'                     # 0
+  ```
+
+  덧붙여 이 후보는 **pnpm 축만** 다루므로 동종 결함인 `cargo .*test` 가 남는다. 채택안은 두 축을 같은 원리로 닫는다.
 
 ⚠️ **`nextest` 는 `next`+`test` 가 아니라 `nex`+`test` 다.** `(next)?test` 로 흡수하려던 초안이 `cargo nextest run` 을 놓쳤고(실측), `(nextest|test)` 명시 열거로 교정했다. 문자열 겹침을 눈으로 세지 말고 코퍼스로 판정해야 하는 사례다.
 
-**실측** (2026-08-14, `exec -a` 위장 프로세스 **19건** = 실 형태 11 + 무관 8):
+**실측** (2026-08-14, `exec -a` 위장 프로세스 **22건** = 실 형태 11 + 무관 11. 무관 11건에는 위 표의 입력·출력 리다이렉션이 **양방향 모두** 포함되며, `> /dev/null` 축은 래퍼의 `< /dev/null` 이 섞이지 않는 `/bin/sh -c …` 형태로 **단독 격리**한 케이스 2건을 따로 둔다):
 
 | 축 | 구 패턴 | 신 패턴 |
 | --- | --- | --- |
-| 거짓 양성 (무관 8건 중) | **8** | **0** |
+| 거짓 양성 (무관 11건 중) | **11** | **0** |
 | 거짓 음성 (실 형태 11건 중) | 0 | 0 |
 
 검출 능력 손실 없이 오탐만 사라졌다. 실 `pnpm dev` 프로세스 트리에 대한 대조에서도 구 5 hit → 신 4 hit 으로, 줄어든 1건은 **하네스 래퍼 셸 자신**이다 (`eval '… pnpm dev' < /dev/null` — 뒤가 `'` 라 토큰 경계를 만족하지 않는다). 같은 트리의 자식 4건(`pnpm` 2 · `next` · `next-server`)이 전부 남으므로 **포트를 쥔 프로세스는 여전히 검출**되며, 사라진 것은 중복 노이즈뿐이다.
