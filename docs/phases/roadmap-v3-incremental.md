@@ -10,7 +10,7 @@
 
 ## 재구성 배경
 
-v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사용자 브라우저 실측 결과 **기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태** 로 UX 회귀 확인. DoD 수치 (screenshot diff / bench / fps) 는 전부 PASS 였으나 사용자가 인지하는 제품이 "초기 기획 상태보다 못한 상태". 상세 원인은 volt [#74](https://github.com/coseo12/volt/issues/74) 참조.
+v2 (`P10~P17`, Fact-First 기반) 는 `P10~P12` 단계까지 완료되었으나, 사용자 브라우저 실측 결과 **기본 진입 화면이 궤도 라인 + 해왕성 1개만 보이는 빈 상태** 로 UX 회귀 확인. DoD 수치 (screenshot diff / bench / fps) 는 전부 PASS 였으나 사용자가 인지하는 제품이 "초기 기획 상태보다 못한 상태". 상세 원인은 volt [#74](https://github.com/coseo12/volt/issues/74) 참조.
 
 사용자 결정 (2026-04-25): **기획 의도 전면 폐기 + 현재 UI 기준 재구성 + 태양부터 하나씩 incremental build**.
 
@@ -194,7 +194,7 @@ v2 (P10~P17, Fact-First 기반) 는 P10~P12 단계까지 완료되었으나, 사
 ### 적용 의무
 
 - 새 R-Phase 이슈 생성 시 PM 라운드에서 위 3개 가드를 architect ADR 박제값으로 인스턴스화 + 이슈 DoD 에 포함
-- R2 (#361) / R3 (#369) 는 ADR amendment 로 소급 박제. 코드 변경 여부는 D-T2 사용자 검증 결과에 따라 결정 (initial 초안: mercuryScale 2500 → 2000~3000, venusScale 4000 → 1500~2200)
+- R2 (#361) / R3 (#369) 는 ADR amendment 로 소급 박제. 코드 변경 여부는 D-T2 사용자 검증 결과에 따라 결정 (initial 초안: mercuryScale 2500 → `2000~3000`, venusScale 4000 → `1500~2200`)
 - **Visual Fidelity 원칙 참조 의무** (#541 박제, 2026-05-24) — R5+ R-Phase ADR 박제 시 [`docs/architecture/principles.md`](../architecture/principles.md) §1 §의무 체크리스트 4항목 (데이터 SSoT 보존 / rendering 시점 분리 / 사용자 D-T2 가이드 / 점유율 baseline 박제) 을 ADR §결정 N 또는 §점유율 산출 섹션에 명시. satellite 가 있는 R-Phase (R5 phobos/deimos, R6 galilean, R7 titan 등) 는 R4 §결정 6 Amendment 2 의 orbit visual scale 평가 절차도 의무 적용
 
 ---

@@ -34,6 +34,7 @@
 2. **`.claude/` / `CLAUDE.md` / 프로젝트 가드 스크립트의 프로젝트 소유 전환** — "harness-managed (frozen)" 개념 소멸. 페르소나 파이프라인·가드는 본 저장소가 직접 소유·진화
 3. **동기화 전용 기계장치 제거** — manifest (`.harness/manifest.json`, `.harnessignore`) / 불변식 가드 (`verify-harness-upstream-baseline.mjs`) / drift 판정 (`verify-harness-drift-decorator.mjs`, `resolve-harness-drift-todo.mjs`) / 원자적 apply 래퍼 (`harness-update-safe.sh`) / Z 패턴 health (`verify-z-pattern-health.mjs`) / manifest 파생 sync (`sync-harnessignore.mjs`, `sync-prettierignore.mjs`) 등 삭제 19파일 8,537줄 (전수 인벤토리는 §배경 실측 + Phase B PR 의 `git diff --stat` 로 확정)
 4. **`.prettierignore` 는 manifest 파생 자동 생성 → 정적 curated 섹션 전환** — prettier 재포맷이 에이전트 `.md`/`CLAUDE.md` 의 원문 문자열 매칭 SSoT 가드 (`verify-agent-ssot.sh` 등) 를 깨는 것을 방지. 기존 live 문서 예외 4경로 (`docs/benchmarks/**`, `docs/phases/**`, `docs/reports/**`, `docs/retrospectives/p*-retrospective.md`) 는 `!` negation 으로 포맷 대상 유지 (ADR 20260419-prettier-harness-conflict 의 대체 규약)
+   - ⚠️ **기전 정정 (#958, 2026-08-14)** — 본 항의 **의도**(4경로를 포맷 대상으로 유지)는 유효하나 **기전**은 무효였다. `docs/**` 가 디렉토리째 제외된 뒤에는 하위 파일만 `!` 로 되돌릴 수 없어(gitignore 문법) 이 4줄은 **도입 시점부터 죽어 있었고**, 실측상 4경로는 전건 `ignored: true` 였다. 작동하는 형식(디렉토리 재포함 + markdown 한정)으로의 교체는 [`20260814-958`](20260814-958-prettier-live-docs-scope.md) 이 승계한다. 아래 §교차검증 §합의 가 이 전환을 _"정밀"_ 로 평가했으나 **읽어서 판정했을 뿐 실행해 보지 않았다**
 5. **`harness-guards.yml` → `project-guards.yml` 재편** — harness 전용 3 스텝 제거 + 프로젝트 가드 6 스텝 유지, 전 스텝 `hashFiles` 조건 제거 (부재 = 가드 삭제 회귀 = hard fail 의 fail-fast 일관, #901 흡수)
 
 ### 유지 / 제거 경계 (결정의 적용 범위)

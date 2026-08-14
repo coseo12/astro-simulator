@@ -166,13 +166,14 @@ HUD 요소는 `backdrop-filter: blur(8px)` + 반투명.
 ## 4. URL 상태 동기화 (전체)
 
 딥링크 대상:
-| 파라미터 | 예시 |
-|---|---|
-| mode | `?mode=research` |
-| time | `?t=2026-04-13T00:00:00Z` |
-| focus | `?focus=jupiter` |
-| camera | `?cam=<compact>` |
-| speed | `?speed=86400` |
+
+| 파라미터 | 예시                      |
+| -------- | ------------------------- |
+| mode     | `?mode=research`          |
+| time     | `?t=2026-04-13T00:00:00Z` |
+| focus    | `?focus=jupiter`          |
+| camera   | `?cam=<compact>`          |
+| speed    | `?speed=86400`            |
 
 - URL이 길어지므로 **Base64 compact encoding** 또는 **시나리오 ID 간접 참조** 적용
 - 구현 라이브러리: `nuqs` (타입 안전)
