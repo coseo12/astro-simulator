@@ -89,7 +89,51 @@
 
 **구조 원인**: `pgrep -f "패턴"` 은 프로세스 **전체 명령행**을 매칭한다. 에이전트가 셸에서 `pgrep -f "agent-browser-chrome-"` 를 직접 실행하면, 그 명령을 감싼 형제 셸(`bash -c '...pgrep -f "agent-browser-chrome-"...'`)의 명령행에 패턴 문자열이 포함되어 **자기 자신을 매칭**한다. 셸 래핑/파이프 구성에 따라 **간헐 재현**(2026-07-04 세션 2회 오탐, 2026-07-15 세션 재확인).
 
+⚠️ **기전 정정 (#1054, 2026-08-14)** — 위 **관측은 맞으나 기전 설명이 불완전**하다. "형제 셸의 명령행에 패턴 문자열이 포함" 은 필요조건일 뿐이고, **왜 그 프로세스가 매칭 후보에 들어왔는가**가 빠져 있다. 답은 **직교 2축**이며, 어느 한쪽만으로는 설명도 방어도 되지 않는다.
+
+| 축 | 기전 | `-a` 제거로 해소? | bracket 로 해소? | `grep -v grep` 로 해소? |
+| --- | --- | :---: | :---: | :---: |
+| **① 조상 셸** | macOS `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ⚠️ **argv 순도 조건부** | ✅ |
+| **② 형제 subshell** | 비-exec fork 가 부모 argv 를 상속. pgrep 의 **조상이 아니라 형제**라 기본 제외 대상이 아니다 | ❌ | ⚠️ **argv 순도 조건부** | ✅ |
+
+**두 축은 같은 argv 문자열을 본다** (형제가 조상 argv 를 상속하므로). 다른 것은 **매칭 풀 소속**뿐이다. 따라서 bracket 의 효력은 축과 무관하고 오직 **argv 순도** — _명령행 어디에도 un-bracketed 리터럴이 없을 것_ — 에만 걸린다. 4케이스 격리 실측 (각 케이스를 **별도 스크립트 파일**로 분리 — 같은 tool call 에 넣으면 heredoc 리터럴이 조상 argv 를 오염시켜 측정 자체가 무효가 된다):
+
+| | 조상 argv | 패턴 | `-a` | 결과 |
+| --- | --- | --- | :---: | --- |
+| C1 | un-bracketed 리터럴 | un-bracketed | ✓ | **hit** |
+| C2 | **bracketed 만 (순수)** | bracketed | ✓ | **exit 1** — bracket 이 **축 ①도 막는다** |
+| C3 | **un-bracketed 리터럴 있음 (불순)** | bracketed | ✓ | **hit** — 조건은 축이 아니라 **argv 순도** |
+| C4 | un-bracketed 리터럴 | un-bracketed | ✗ | exit 1 — **단 형제 부재 전제** |
+| C5 | un-bracketed 리터럴 | un-bracketed | ✗ | **hit** — C4 와 동일 조건 + **형제 subshell 생존**. `-a` 제거는 **축 ① 만** 죽인다 |
+
+⚠️ **C1~C4 는 「형제 부재」 전제 위의 측정이다** — 표를 단독 인용할 때 C5 가 없으면 _"`-a` 만 빼면 exit 1"_ → _"`-a` 제거로 충분"_ 이라는 오독이 나온다(그것이 정확히 본 절이 정정한 오류다). C5 실측에서 hit 한 PID 는 fork 된 형제 subshell 자신이었다.
+
+⚠️ 따라서 _"bracket 을 걸었는데도 뚫렸다"_ 는 관찰은 **C3** 이지 bracket 무력화가 아니다 — 같은 줄 **다른 명령**의 un-bracketed 리터럴이 argv 를 오염시킨 것이다. 반면 `grep -v grep` 은 **argv 순도와 무관하게** 두 축을 막는다. 이것이 정확한 차별점이며 채택 근거다.
+
+**축 ①** — macOS `man pgrep` 축자: _"`-a` Include process ancestors in the match list. **By default, the current pgrep or pkill process and all of its ancestors are excluded** (unless `-v` is used)."_ 기본값이 자기 + 조상 전건 제외라 조상 축 self-match 는 구조적으로 불가능한데, `-a` 가 그 방어를 **되살린다**. 실측 (rev `90fa2a6`, 명령행에 un-bracketed 리터럴 노출):
+
+```
+pgrep -af 'zzz1054-canary[-]'   → 12938(조상 셸) 12946(실 프로세스) 12950(일시 subshell)
+pgrep  -f 'zzz1054-canary[-]'   → 12946(실 프로세스만)
+```
+
+**축 ②** — 기본 제외 범위는 **자기 + 조상**이지 **형제가 아니다**. 셸이 fork 한 비-exec subshell 은 부모 argv 를 그대로 상속하므로, `-a` 를 떼도 매칭된다. 실측 (형제 subshell 을 살려 둔 상태, **bracket 을 건 채로**):
+
+```
+self=25244  형제 subshell=25250 (부모 argv 상속)
+pgrep -f "next[ ]dev|next-serve[r]|cargo.*tes[t]|pnpm.*de[v]"        → 25250   exit=0   ← -a 없는데 hit
+ps -axww -o pid=,etime=,command= | grep -E … | grep -v grep          →         exit=1   ← 정상
+```
+
+따라서 **본 절 서두의 _"매 호출 다른 PID + 즉시 소멸"_ 중 변동 PID 성분이 바로 축 ②** 이고, `-a` 제거만으로는 **사라지지 않는다**. 위 "간헐 재현" 을 _"`-a` 사용 여부의 결정론적 귀결"_ 로 환원해 읽으면 **역방향 오진**이 된다 — 실제로는 형제 subshell 의 동시 생존 여부가 회차별 변동을 만든다. `-a` 가 남기는 별개의 해악은 macOS 에서 **명령행을 찍지 않는다**는 것이다 (Linux procps 의 `-a` = `--list-full` 과 이름만 같다) — 오탐이 늘면서 **무엇이 잡혔는지 볼 수단도 사라진다**.
+
 **bracket 표준**: 패턴의 한 글자를 문자 클래스로 감싼다 — `pgrep -f "agent-browser-chrome[-]"`.
+
+⚠️ **보호 범위 단서 (#1054)** — bracket 이 지키는 것은 **그 패턴 문자열 자신**이며, 명령행 **전체**가 아니다. 따라서 상속 argv 안에 un-bracketed 리터럴이 하나라도 있으면 뚫린다: 같은 command line 의 **형제 명령**이 평문 리터럴을 노출하는 경우(실측: `ps … | grep -E "…next dev…"` 와 같은 줄에 둔 `next[ ]dev` 술어가 hit), 그리고 패턴 안에 `.*` 가 있어 bracket 앞의 un-bracketed 조각이 명령행의 **무관한 뒷부분**과 이어지는 경우(실측: `pnpm.*de[v]` 가 자기 패턴의 `pnpm` 과 래퍼가 모든 명령에 덧붙이는 `< /dev/null` 의 `dev` 를 잇는다). **그럼에도 pgrep 을 쓸 수밖에 없는 경로에서는 bracket 이 축 ② 를 막는 유일한 수단이므로 제거 대상이 아니다** — 아래 **pkill 은 안전 이슈** 항이 규정하듯 자기-kill 차단까지 겸한다.
+
+반면 `grep -v grep` 은 **명령행 전체**를 필터링해 **두 축을 동시에** 막으므로 카나리아 정본이다. 패턴 리터럴을 실은 셸은 그 자신이 `grep` 파이프라인이라 걸러지고, 명령을 더 이어 붙여도 그 줄에서 `grep` 이라는 낱말이 사라지지 않는다. ⚠️ 다만 _"항상"_ 은 **이 구성에 한정된 진술**이다 — 필터가 거르는 것은 `grep` 문자열이지 "자기 자신" 이라는 신원이 아니므로, `grep` 을 포함하지 않는 경로(별도 프로세스가 패턴 리터럴만 들고 있는 경우 등)까지 덮지는 못한다. 대가는 명령행에 `grep` 을 포함한 **실 프로세스를 놓치는 것**(false negative)이고, dev 서버 / cargo 계열에는 해당 사례가 없어 #440 이래 hook 이 이 형태로 운용돼 왔다.
+
+⚠️ **패턴 자체의 선행 결함 (#1054 비차단)** — `pnpm.*dev` 는 `.*` 가 래퍼의 `< /dev/null` 까지 이으므로 **`pnpm` 을 포함한 임의 명령**을 매칭한다 (본 절 축 ② 와 독립인 **패턴 정밀도** 문제라 카나리아 형태 교체로는 해소되지 않는다). 후속 분리: [#1066](https://github.com/coseo12/astro-simulator/issues/1066).
 
 - `[-]` 는 정규식상 `-` 문자와 동일하게 매칭하지만, pgrep 자신의 명령행 문자열은 리터럴 `agent-browser-chrome[-]` 이라 정규식 `agent-browser-chrome[-]` 이 `agent-browser-chrome[`(대괄호)로 이어지는 자기 명령행과 매칭되지 않아 **self-match 제거**.
 
@@ -98,6 +142,10 @@
 **적용 완료 (본 PR)**: `.claude/agents/qa.md`, `CLAUDE.md`(프로젝트 고유 보강 섹션)의 pgrep/pkill 명령을 `agent-browser-chrome[-]` 로 정정.
 
 **hook 은 이미 안전**: `.claude/hooks/session-start-zombie-check.sh` 는 pgrep 이 아닌 `ps -axww | grep -E "$PATTERN" | grep -v "session-start-zombie-check\|grep -E\|verify-zombie-check"` 구조로, **`grep -v` 제외**가 이미 self-match 를 방어한다. 별도 bracket 불요(변경 없음).
+
+⚠️ **hook 필터를 그대로 복사하지 말 것 (#1054)** — hook 이 안전한 이유는 **스크립트 파일 안에서 실행되기 때문**이다. 패턴이 `PATTERN` 변수에 있어 호출 셸 argv 에 리터럴이 실리지 않고, 위 `grep -v` 목록이 파이프라인 자신의 `grep -E` 프로세스를 거른다. 이 조건은 **에이전트가 셸에 직접 치는 카나리아에는 성립하지 않는다**: 그 환경에서 `grep` 은 셸 스냅샷이 `ugrep -G` 로 재작성한 **셸 함수**라(실측 `type grep` → _"grep is a shell function from …/shell-snapshots/…"_) 실행 프로세스 argv 에 `grep -E` **연속 문자열이 남지 않아** hook 필터가 헛돈다. 그래서 `qa.md` · CLAUDE.md §가드 B 의 카나리아는 필터를 `grep -v grep` 으로 **의도적으로 더 강하게** 잡았다 — `ugrep` 은 `grep` 을 부분문자열로 포함하므로 재작성 후에도 걸러진다.
+
+**공유 범위를 정확히**: 세 위치가 공유하는 SSoT 는 **ETIME 30분 임계뿐**이다 (§8 _"3곳 정합 SSoT"_ 참조). **패턴 리터럴의 축자 일치는 hook ↔ `qa.md` 2곳의 사실**이고, CLAUDE.md §가드 B 는 `physics_wasm-` 를 포함한 **의도적으로 다른 검출 범위**를 쓴다 — 이를 3곳으로 확대 기술하면 _"통일하라"_ 는 오독을 낳고 그 통일은 `physics_wasm-` **커버리지 소실**로 이어진다. 필터 형태는 셋 다 공유 대상이 아니다.
 
 **upstream 기여 (후속 분리)**: qa.md 의 agent-browser 정리 절차 자체가 upstream harness-setting 에 미기여된 프로젝트 drift(bracket 만 단독 Phase 2 불가). agent-browser 정리 전체의 upstream 기여는 [#830](https://github.com/coseo12/astro-simulator/issues/830) 후속 분리(Z-패턴 Phase 2 대상).
 
@@ -317,3 +365,114 @@ npx prettier --check .                  # 금지 — 캐시 버전이 지배
 - ⚠️ **넓은 그물(`-F -- '~~'`)의 hit 수와 _본 문서 자신의_ 손상형 계수는 고정값으로 싣지 않는다 — 자기 참조 계수다.** 위 예시·시연 문자열이 그대로 모집단에 들어가므로 이 절을 고칠 때마다 값이 움직인다(초판이 `47` 로 적었다가 본 문단을 추가하자 `53` 이 됐다). 재측정 시 **본 문서의 예시는 모집단에서 뺀다.** 판정에 쓰는 값은 위 `CHANGELOG.md` 한정 계수이고, 그쪽은 자기 참조가 아니라 안정적이다.
 - **회수는 본 절의 범위가 아니다** — 19 줄 전건이 릴리스 확정 구간이라 *"기록 위조 금지"* 와 *"렌더링 결함 정정"* 중 무엇인지 **별도 판정**이 필요하다. 후속 [#1040](https://github.com/coseo12/astro-simulator/issues/1040) 으로 분리했고, 본 절은 **작성 시점 예방**만 담당한다.
 - 근거: [#1013](https://github.com/coseo12/astro-simulator/issues/1013) — PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038) 작성 중 CHANGELOG 산문의 `kw1~5` 가 실제로 이 경로로 손상됐고(커밋 전 발견), reviewer 가 격리 재현(`printf … | prettier --parser markdown`)으로 독립 확인했다. 강제 지점·정본 술어는 [#982](https://github.com/coseo12/astro-simulator/issues/982) / [ADR 20260814-982](../decisions/20260814-982-changelog-tilde-guard.md).
+
+## 8. 격리 worktree typecheck 2축 결손 — `pnpm build` 선행 (#960)
+
+**1순위 — 기존 명령 2개.** 격리 worktree 에서 `pnpm --filter web typecheck` 을 돌려야 하면, §7 이
+의무화한 `pnpm install --frozen-lockfile` **다음에 `pnpm build` 를 한 번 더** 돌린다.
+**신규 스크립트를 만들지 않는다** — 이미 있는 명령이다.
+
+```bash
+pnpm install --frozen-lockfile     # exit 0          (§7 의 1순위)
+pnpm build                         # exit 0          ← §7 에 없던 부분
+pnpm --filter web typecheck        # exit 0 / error TS 0 행
+```
+
+세 명령 모두 exit `0` 이며, **추가되는 것은 `pnpm build` 한 줄뿐**이다. 소요는 `install` 과 **같은
+자릿수**라 절차를 늘릴 이유가 되지 못한다 — 절대 수치는 아래 §측정 조건 불릿의 스냅샷을 본다.
+
+CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하는 것과 **같은 2 명령**이다 — 로컬
+절차가 CI 를 미러링하므로 절차의 두 번째 출처가 생기지 않는다 (volt [#120](https://github.com/coseo12/volt/issues/120)).
+
+**증상은 오진 유발형이다.** `install` 만 하고 typecheck 를 돌리면 exit `2` 이고, 그때 화면에 보이는
+토큰이 **`TS2882`** 와 **`TS2307`** 이다. 실제 결손은 레시피 부재가 아니라 **오진**이므로 (원인을
+`next-env.d.ts` 하나로 지목한 보고가 2회 있었다) 이 절은 그 두 리터럴로 검색돼야 한다.
+
+**결손 2축** — 실측 (rev `8e230e3`, `install` 직후 baseline = exit `2` / `error TS` **76 행**):
+
+| 축 | 결손 (둘 다 gitignored 빌드 산출물) | 증상 토큰 | 행 | 닫는 명령 |
+| --- | --- | --- | --- | --- |
+| (i) | `apps/web/next-env.d.ts` 부재 | **`TS2882`** — `app/layout.tsx` 의 CSS side-effect import | `2` | `next build` (= `pnpm build` 내부) |
+| (ii) | `packages/{shared,core}/dist` 부재 | **`TS2307`** — `Cannot find module '@astro-simulator/shared'` · `'@astro-simulator/core'` | `52` + 파생 `22` | `-r build` (= `pnpm build` 내부) |
+
+⚠️ **축 (ii) 는 baseline 부터 존재한다** — 축 (i) 을 고쳐야 "드러나는" 것이 아니다. `TS2882` 가
+헤드라인이라 그렇게 보일 뿐이고, `next-env.d.ts` 만 채우면 **74 행이 남는다**. 파생 `22` 행은
+`TS2307` 로 타입이 유실되며 생기는 implicit-any 계열이다 (`TS7006` 13 / `TS18048` 4 / `TS2339` 4 / `TS7031` 1).
+
+⚠️ **왜 `install` 만으로는 안 되는가** — §7 의 `pnpm install` 은 `node_modules` 를 세울 뿐
+**빌드 산출물을 만들지 않는다**. 두 축은 모두 빌드 산출물이고 모두 gitignored 다. 본 절은 §7 의
+**확장이지 대체가 아니다** (`install` 은 여전히 1순위 선행 단계다).
+
+**⚠️ `next-env.d.ts` 를 "표준 2줄" 로 손수 쓰지 마라.** 축 (i) 만 닫고 (ii) 를 남기는 것이 첫 번째
+이유이고, 더 근본적으로 **그 2줄은 표류하는 산출물의 한 스냅샷**이다. 실제 파일은 6줄이며 생성
+명령에 따라 내용이 갈린다 (동일 worktree · 동일 rev · 동일 Next `16.2.12` 실측):
+
+| 생성 명령 | import 행 | md5 |
+| --- | --- | --- |
+| `next build` / `next typegen` | `import "./.next/types/routes.d.ts";` | `2a74d3909800ca5467fa83b0ab4a4890` |
+| `next dev` | `import "./.next/dev/types/routes.d.ts";` | `d0f8375ae1199dc7acd3977fc33b78b8` |
+
+`next dev` 를 띄우면 **기동 직후** (실측 `1~2s` — 관측 폴링 간격이 `1s` 라 이 값이 곧 해상도 하한이다)
+덮어써진다. 상한이 `1s` 든 `2s` 든 논지는 같다. 가변 산출물을 절차 문서에
+하드코딩하는 것은 이 파일을 tracked 로 만드는 것(옵션 B)과 **같은 실패 클래스**를 문서로 옮기는
+것에 불과하다 — 둘 다 ADR [`20260814-960`](../decisions/20260814-960-worktree-typecheck-recipe.md) §B-1 이 기각했다. 폴백이 필요하면 아래 first-party 서브커맨드를 쓴다.
+
+**폴백 — Rust 툴체인(`wasm-pack`)이 없어 `pnpm build` 가 불가할 때**:
+
+```bash
+pnpm --filter web exec next typegen                                            # 축 (i)  exit 0 / 1s 미만
+pnpm --filter @astro-simulator/shared --filter @astro-simulator/core -r build  # 축 (ii) exit 2 ← 예상된 것
+pnpm --filter web typecheck                                                    # exit 0  error TS 0 행
+```
+
+⚠️ **두 번째 줄의 exit `2` 는 예상된 것이다.** `packages/core` 가 `@astro-simulator/physics-wasm` 을
+못 찾아 `TS2307` `4` 건을 내지만, `tsc` 는 `noEmitOnError` 기본값에서 **전량 방출**하므로 `dist` 는
+완전하다 — 실측 `core` 의 `.d.ts` **`58` 개** (= `tsconfig.build.json` 이 `exclude` 하는
+`__test-utils__` 를 뺀 의도 대상 전량) / `shared` **`11` 개**. 공개 `.d.ts` 의 `physics-wasm` 참조는
+**`0` 건**이라 (wasm 핸들이 `private wasm;` 으로 캡슐화) 세 번째 줄이 exit `0` 이 된다.
+**exit `2` 를 보고 절차가 실패했다고 판단하지 말 것** — 다만 `&&` 로 체이닝하면 세 번째 줄이
+실행되지 않으므로 줄을 나눠 돌린다.
+
+**⚠️ `.tsbuildinfo` 함정 — `rm -rf dist` 만으로는 재빌드가 안 된다.** 레시피를 검증하거나 `dist` 를
+강제로 다시 만들 때 걸린다. `packages/*/tsconfig.build.json` 이 `composite: true` 라 남기는
+`tsconfig.build.tsbuildinfo` 를 `tsc` 가 보고 up-to-date 로 판정하기 때문이다.
+
+```bash
+# 실측 — dist 만 지우면 tsc 가 exit 0 을 내고 아무것도 emit 하지 않는다
+rm -rf packages/shared/dist
+pnpm --filter @astro-simulator/shared build   # exit 0 인데 dist 미생성 ⚠️
+
+# 완전 초기화 = .tsbuildinfo 까지 지운다
+rm -rf packages/shared/dist packages/shared/tsconfig.build.tsbuildinfo
+pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 11개)
+```
+
+- **본 건은 정확성 결손이 아니라 개발자 경험 마찰이다 — 단 예외가 하나 있다.** `setup-and-build` 가
+  도는 `pnpm build` 안의 `next build` 가 TypeScript 검사를 수행하고 (`apps/web/next.config.*` 에
+  `ignoreBuildErrors` **없음**), `packages/{shared,core}` 의 `build` 는 `tsc -p tsconfig.build.json`
+  자체라, **앱·라이브러리 소스**의 타입 오류는 CI 를 빠져나가지 않는다. 그래서 처방이 자동화(루트
+  `postinstall` / `typecheck` 스크립트 체이닝)가 아니라 **레시피 + 발견가능성**이다 — 기각 근거는
+  ADR §D · §E.
+  ⚠️ **예외 — `packages/{shared,core}` 의 `*.test.ts` 는 CI 타입 검사 밖이다.** 근거로 든 바로 그
+  `tsconfig.build.json` 이 `**/*.test.ts` 를 `exclude` 하고, CI 에는 `typecheck` 를 직접 호출하는
+  스텝이 **없다** (`detect-and-test` 의 vitest 는 esbuild 트랜스파일이라 타입 검사가 아니다). 강제
+  지점이 없다는 뜻이며 후속 [#1060](https://github.com/coseo12/astro-simulator/issues/1060) 으로
+  분리돼 있다. 위 *"빠져나가지 않는다"* 를 무조건형으로 읽지 말 것.
+- **측정 조건 (스냅샷)** — 소요는 pnpm store / cargo registry 캐시가 **warm** 한 동일 머신 기준이며,
+  `git worktree add` 직후 (`node_modules` 부재) 순차 측정한 값이다. 콜드 머신에서는 특히
+  `physics-wasm` (Rust) 이 더 걸린다.
+
+  | rev | `install` | `pnpm build` | `typecheck` (build 후) |
+  | --- | --- | --- | --- |
+  | `7ca1cd1` (ADR §E) | `4.5s` | `17s` | `3s` |
+  | `8e230e3` (본 절) | `4s` | `27s` | `3s` |
+
+  두 값은 **드리프트가 아니라 둘 다 참인 두 사실**이다 (rev·머신 조건이 각각 명시돼 있다). 그래서
+  규범면 (위 1순위 코드블록 · `developer.md` 행동 규칙) 에는 절대 수치를 두지 않고 **관계**로만 적는다
+  — ADR [`20260808-983`](../decisions/20260808-983-measurement-recording-convention.md) §수치 박제
+  규약 (i) 부분 재측정 금지 · (ii) 규범면 관계 표현.
+- **에이전트 행동 규칙 사본**: `.claude/agents/developer.md` §규칙 (§7 규약 바로 다음 줄). 본 절이 절차 SSoT 다.
+- 근거: [#960](https://github.com/coseo12/astro-simulator/issues/960) — 증상 2회 독립 보고
+  (PR [#941](https://github.com/coseo12/astro-simulator/pull/941) · [#959](https://github.com/coseo12/astro-simulator/pull/959)).
+  판정은 ADR [`20260814-960-worktree-typecheck-recipe.md`](../decisions/20260814-960-worktree-typecheck-recipe.md)
+  (옵션 `A~E` 비교 — C 채택, B·D·E 기각). 선행은 §7 [#952](https://github.com/coseo12/astro-simulator/issues/952) 의 `install` 규약.

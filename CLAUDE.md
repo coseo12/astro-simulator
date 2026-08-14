@@ -222,7 +222,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 ### sub-agent 이탈의 프로세스 레벨 확장 — cargo/next dev 좀비 누적
 
 - **sub-agent 반환 직전**: 띄운 PID → `spawned_bg_pids`, 미확인 시 `bg_process_handoff` 인계. `agent-browser` 사용 시 `bash scripts/cleanup-browser.sh` **기본 모드** (전량 pkill 금지 — 병행 오살 방지 #926). `--all` 은 **병행 브라우저 작업 부재 확인 후** **메인 전용**.
-- **메인, 복귀 직후**: `ps auxww | grep -E "cargo|next dev|physics_wasm-" | grep -v grep` + `pgrep -af "agent-browser-chrome[-]"` (bracket 필수 — 오탐 방지) → 세션 이전 것만 정리.
+- **메인, 복귀 직후**: `ps -axww -o pid=,etime=,command= | grep -E "cargo|next dev|physics_wasm-" | grep -v grep` + `pgrep -f "agent-browser-chrome[-]"` (bracket **유지 필수** + **`-a` 금지** — #1054) → 세션 이전 것만 정리. 자기 오탐은 **조상 셸 축**(`-a` 가 유입 → `-a` 제거로 해소)과 **형제 subshell 축**(비-exec fork 의 argv 상속 → `-a` 제거로 **안 없어짐**)의 직교 2축이다. bracket 은 두 축 모두 **argv 순도 조건부**로만 막고(명령행에 un-bracketed 리터럴이 없어야 함), `grep -v grep` 은 **순도와 무관하게** 둘 다 막는다. ETIME 은 `[[dd-]hh:]mm:ss` — 전환점이 1시간이라 `30~59분` 도 2필드(`mm:ss`)다.
 - 상세: [zombie-process-guards.md](docs/ops/zombie-process-guards.md) — volt #24 / #79
 
 > **잔여 계약** (#980): 본 절(위 `--all` 전제 포함) 의 가드 A~C 는 **행동 규칙만** 남기고 서사는 [zombie-process-guards.md](docs/ops/zombie-process-guards.md) 로 이관. **인간-루프 의무(사용자 보고·확인)는 잔여 필수** — 1차 이관이 8회→1회로 강등시킨 전례.
@@ -249,7 +249,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 1. **squash auto-close 미발동** — GitHub **네이티브** auto-close 는 default branch(main) 머지만. `base=develop` 은 구조적 미발동이나 `auto-close-issues.yml`(#915)이 대체 → 메인은 `gh issue view <N> --json state` 로 **결과만 확인**, OPEN 이면 폴백 수동 close (§1-1 미발동 조건).
 2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
-3. **pgrep self-match 오탐** — `pgrep -f "패턴"` 이 자기 셸 명령행 매칭 → **bracket `[-]`** (`agent-browser-chrome[-]`). pkill 은 자기 셸 kill 위험이라 **안전 개선**. hook 은 `grep -v` 로 이미 안전.
+3. **pgrep self-match 오탐** — `pgrep -f "패턴"` 이 자기 셸 명령행 매칭 → **bracket `[-]`** (`agent-browser-chrome[-]`). pkill 은 자기 셸 kill 위험이라 **안전 개선**. hook 은 `grep -v` 로 이미 안전. ⚠️ 자기 오탐은 **직교 2축** (#1054): **조상 셸**(macOS `pgrep -a` 가 유입 — **`-a` 금지**) + **형제 subshell**(비-exec fork 의 argv 상속 — `-a` 제거로 안 없어짐). bracket 은 두 축 다 **argv 순도 조건부**라 좀비 카나리아 정본은 **순도와 무관하게** 둘 다 막는 `ps … | grep -E … | grep -v grep` (§3).
 4. **concurrency CANCELLED = 코스메틱** — `cancel-in-progress`(#779) 로 superseded run 이 `CANCELLED`/UNSTABLE 표기. 각 체크 최신 run 이 SUCCESS 면 안전(§릴리스 판별법).
 
 ---

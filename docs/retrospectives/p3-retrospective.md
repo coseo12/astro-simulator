@@ -12,7 +12,7 @@
 | P3-A Barnes-Hut     | theta=0.5 정확도 <0.1%, N=5000 PASS        | ✅   | max err 4.99e-9 (1e-3 대비 6 자릿수 여유)                                         |
 | P3-B WebGPU compute | N=10000 best-effort, CPU 대비 ≥2× 가속     | ✅~  | best-effort 충족(220fps), 가속비는 측정 불가 (인계)                               |
 | P3-D 검증·마감      | 종합 회귀 + v0.3.0 릴리스                  | ✅   | 287/287, [v0.3.0](https://github.com/coseo12/astro-simulator/releases/tag/v0.3.0) |
-| P3-C 모바일         | iPhone 60fps@N=200                         | ⏭   | P4로 이연 (소행성대 N-body 통합과 함께)                                           |
+| P3-C 모바일         | iPhone 60fps@N=200                         | ⏭    | P4로 이연 (소행성대 N-body 통합과 함께)                                           |
 
 ## 잘 된 것
 
