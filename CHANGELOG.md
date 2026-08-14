@@ -5,6 +5,30 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1035] ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) §10-5 재검토 조건 13 신설 — escape 재발 트리거 (PATCH)** ([#1035](https://github.com/coseo12/astro-simulator/issues/1035)) — PR [#1034](https://github.com/coseo12/astro-simulator/pull/1034) ([#1014](https://github.com/coseo12/astro-simulator/issues/1014)) 의 NO-OP 판정이 escape 재발 감시를 971 §재검토 조건에 위임했는데 **수신처에 착지점이 없었다**. 12항 중 escape 를 트리거로 삼는 항이 **0** 이고, 결정 9-1 (`pr-template-checklist` 를 required 에서 제외) 을 되여는 유일한 항(10번)의 트리거는 971 자신이 _"실행하지 않았다"_ 고 밝힌 §10-4 단계 2-bis **미수행 실험**이다. 즉 _"escape 가 재발하면 971 이 다룬다"_ 는 서술이 **참이 아니었다**.
+
+  **신설이 옳은 이유는 관할이다** — escape 4건(#636 #646 #652 #658)은 **탐지 실패가 아니라 차단 실패**다 (가드 4/4 정상 발화, 사람이 빨간 X 를 단 채 머지). 탐지 축 신규 가드의 한계 수율은 **0** 이고(1014 §잔여 갭 (iii) 기각), 차단력을 주는 유일한 수단이 required 편입 = 결정 9-1 관할이다. 그래서 **기각이 아니라 신설**이다.
+
+  **술어는 기계 판정이다 (정성 표현 0)** — escape ≔ 릴리스 클래스(`baseRefName == "main"` ∨ `headRefName` 이 `release/` 로 시작) 머지 PR 의 head SHA 위 `pr-template-checklist` 체크런 중 **`started_at ≤ mergedAt` 인 것만** 추려 `success = 0 ∧ failure ≥ 1` (**머지 시점 앵커** — _"머지 시점에 이미 발화한 판정"_). **창은 90일 rolling, 하한 `2026-08-14`**(본 항 신설일). 하한이 없으면 소급 4건 때문에 **신설 당일 자동 발화**한다 — 그 4건은 발화 입력이 아니라 기준선이며, 1014 §1-B 가 창 하한을 _"결정 4 머지 이후"_ 로 둔 것과 동형이다. **임계는 2단** — **T1 `≥ 1`** 대장 박제 후 사후 정정(결정 9-1 **유지**) / **T2 `≥ 2`** 결정 9-1 **재개봉**(자동 required 편입 금지 — 재개봉은 옵션 비교의 재개시이지 승인이 아니다). 관측 시점은 릴리스 사이클 종료 직후 해당 PR **1건** 판정(`O(1)`).
+
+  **머지 시점 앵커가 T2 를 도달 가능하게 한다** (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 🔴-2 반영). `pr-template-checklist-guard.yml` 은 트리거가 `types: [opened, edited, synchronize]` 이고 job 가드에 **PR state 조건이 없어**, 머지된 PR 본문을 정정하면 같은 head SHA 에 `success` 체크런이 붙는다. 무앵커 술어였다면 **T1 조치가 자기 계수를 지워 `escape ≥ 2` 가 원리적으로 성립 불가능**했다. 앵커 전환의 **정확도 비용은 0 이다** — 릴리스 클래스 117 PR 전건에 **세 술어**(무앵커 / `completed_at` 앵커 / `started_at` 앵커)를 돌려 대조한 결과 escape 집합이 전부 `{#636, #646, #652, #658}` 로 **동일**하고 갈리는 PR **`0`건**, 머지 후 run 보유 PR **`0`건**, in-flight run 보유 PR **`0`건**, `started_at == null` 보유 PR **`0`건**. 세 값이 `0` 인 것은 _"앵커가 불필요하다"_ 가 아니라 _"아직 발현하지 않았다"_ 는 뜻이다. **`started_at` 앵커 채택 — reviewer 🟡-7 을 후속으로 미루지 않았다.** 초판 앵커 `completed_at ≤ mergedAt` 은 **머지 시점에 돌고 있던 run**(`started_at ≤ mergedAt < completed_at`)을 배제하는데, 그 run 이 결국 `failure` 였다면 **가드는 잡았고 사람은 완료를 기다리지 않고 머지한 것**이라 차단 실패의 가장 순수한 형태다 (가드가 non-required — 결정 9-1 — 라 경로가 구조적으로 열려 있고 소요는 `12`초). 본 PR 에서 닫은 근거 4가지: ① 🔴-1(모집단 절단)·`gh` 일시 실패와 **같은 «조용한 거짓 음성» 클래스**라 둘은 닫고 셋째만 남기는 것이 비일관 ② 비용이 **`completed_at` → `started_at` 1 토큰 + 산문 1줄**이고 재검증은 매 라운드 이미 수행하는 추출·실행과 동일 ③ 미루면 #1014 → #1035 → … 의 **3세대 위임**이 되는데 후속 [#1073](https://github.com/coseo12/astro-simulator/issues/1073) 은 _"누가 매 사이클 돌리는가"_ 로 스코프가 달라 초점이 흐려진다 ④ **가장 결정적** — ADR 이 _"머지 버튼을 누른 사람이 실제로 본 상태"_ 라 선언하는데 구현이 다른 집합을 재면, 이 저장소가 반복 청산해 온 «주석 계약 ↔ 구현 drift» 를 **Accepted ADR 조항에 처음부터 심는** 것이 된다. 서술도 _"머지 시점에 이미 발화한 판정"_ 으로 함께 정정해 계약과 구현을 일치시켰다. 부수로 `!= null` 분기가 사라진다 — `started_at` 이 `null` 이면 jq 정렬 규약상 포함되며 이는 거짓 양성 방향이라 안전하다.
+
+  ⚠️ reviewer 권장안(_"T2 를 T1 대장 행 수로 센다"_)은 **기각**했다 — T2 가 _"사람이 표를 채웠는가"_ 에 종속되어 **#1035 가 고친 «조건은 있는데 발화 경로가 닫힘» 이 한 층 아래에서 재생산**된다. 대장은 계수원이 아니라 술어가 복원 못 하는 것(원인 분류·당시 본문 형태)만 담는 **증거 기록**으로 남겼다.
+
+  **박제한 술어를 그대로 추출해 실행했다** (2026-08-14, `gh` GET 전용) — 하한을 창 시작으로 내린 실행(`SINCE=2026-05-16T00:00:00Z`, `LIMIT=1000`, 릴리스 클래스 **117 PR**)에서 **4건 = `{#636, #646, #652, #658}`** 이 나와 ADR [`20260813-1014`](docs/decisions/20260813-1014-release-pr-class-no-op.md) §FAIL 축 표를 **전건 재현**했고, 하한을 건 실효 창(릴리스 클래스 **2 PR** — #1067 #1068)에서는 **0** 이다.
+
+  ⚠️ **초판의 모집단 `115` 는 절단 산물이었다** (reviewer 🔴-1). `gh pr list` 는 **최신순 반환**이라 `--limit 300` 이 창의 **오래된 쪽부터** 버린다 — 2026-08-14 실측으로 `limit 300` 은 정확히 `300` 건 포화 / 바닥 `#592` `2026-05-27T09:25:23Z` 였고, 90일 창의 실제 머지 PR 은 **`376`** 건이라 이미 잘려 있었다. 실값은 **117**(누락 `#519` · `#494` — 둘 다 escape 아님이라 **escape 4건은 무영향**). 게다가 그 상태로 두면 실효 창 누적이 300 에 닿는 시점부터 **판정 창 자체가 거짓 음성 방향으로 절단**된다. 처방은 값 교정에 그치지 않는다 — `LIMIT=1000` 으로 올리고 **포화 assertion**(반환 건수 `== LIMIT` 이면 `exit 1`)을 술어에 넣어 같은 결함이 창을 더 늘릴 때 **재발하지 못하게** 했다. 같은 검증 중 `gh` 의 `HTTP 504`/`422` 일시 실패가 PR 1건을 **조용히 평가에서 빼는** 동종 결함(거짓 음성)도 실제로 발생해, 조회 실패 `exit 1` 가드를 함께 넣었다. **negative 실증**: `LIMIT=300` → `FAIL: --limit 300 포화 — 창 절단` exit `1` / 조회 불가 PR 주입 → `FAIL: … headRefOid 조회 실패` exit `1`.
+
+  **창을 30일이 아니라 90일로 잡은 근거는 밀도 차다** — 1014 §1-B 의 "첫 run failure" 축은 기준선이 `6.92건/30일` 이라 30일 창에서도 T2 도달이 관측되지만, escape 축은 `0 / 63일`(`#667` 이후 96 PR)이라 30일 창에서는 간헐 재발(예: 45일 간격)이 **영구히 T1 에 머물러 T2 가 원리적으로 도달 불가능**해진다. 반대급부로 T2 가 더 이르게 발화하나, T2 의 조치가 _"재검토"_ 이지 편입이 아니므로 방향이 보수적이다.
+
+  **1014 의 양쪽 위임 서술에 해소 부기를 박제**했다 (§재검토 조건 1-B 부기 / §재검토 조건 3). _"#1035 종결 전까지 자동 발화하는 조건은 어디에도 없다 · 수동 집계해야 한다"_ 는 **더 이상 유효하지 않다**. 원문은 이력이라 치환하지 않고 승계 주석만 덧댔으며, 같은 규약으로 971 상태 블록의 _"재검토 조건 12개"_(Accepted 전이 시점 값)에도 _"현재 13개"_ 부기를 달았다.
+
+  **1014 §1-B 의 *"첫 run"* 술어와의 형태 차이를 병기**했다 (reviewer 🟡-4). 항 13 은 `success = 0 ∧ failure ≥ 1`(머지 시점), 1-B 는 `sort_by(.started_at) | .[0].conclusion == "failure"` 라 `첫 run = cancelled, 이후 failure` 에서 갈린다(**항 13 이 초집합**, 방향 보수적). 현재 이 갈림은 **실측 0** 이다 — 117 PR 전건에서 `pr-template-checklist` 의 `cancelled` run **`0`건**(첫 run 분포 `success 104 / failure 12 / run 없음 1`). 우연이 아니라 971 **결정 9-2**(해당 워크플로에 `concurrency` 추가 금지, `concurrency` grep **0 hit**)의 귀결이므로, 결정 9-2 가 뒤집히면 재정합 대상이라는 조건을 함께 박제했다. 부수 확인 — 첫 run `failure` 는 117 창에서 **12건**이고 1014 선언 모집단(`#592` 이후)으로 좁히면 **11건**으로 1014 §FAIL 축과 **정확히 일치**한다.
+
+  ⚠️ **잔여 — 관측 의무가 ADR 안에만 있다.** 본 항은 _"조건이 존재하는가"_ 를 닫았지 _"누가 매 사이클 돌리는가"_ 를 닫지 않았다 (CLAUDE.md · `docs/ops/operational-friction.md` 무접촉 — #1035 완료 기준 범위 밖). 1014 §1-B 도 같은 성격이라 본 변경이 만든 갭은 아니다.
+
 ### Changed
 
 - **[#1063] 감시값 동시 갱신 의무 이행 — `20260814-958` 3곳 + `§결정 3` Amendment 승격 + 가드 하드코딩 제거 (PATCH)** ([#1063](https://github.com/coseo12/astro-simulator/issues/1063), PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) reviewer 라운드 1 BLOCK-1 · 권고 1·2) — **본 PR 이 수정한 ADR 자신이 선언한 의무를 `1/4` 만 이행한 상태**였다. `20260814-958:422` 가 _"`20260814-958` §결정 5 · §성공 신호 · §재검토 조건 1 과 `20260814-982` §Amendment 의 감시값이 **동시에** 돼야 한다"_ 고 규정하는데 `20260814-982` 1곳만 갱신됐다.
@@ -53,12 +77,27 @@ Semantic Versioning을 따른다.
 
   **실측 대조표** (같은 내용의 ignore 파일을 두 위치에 두고 `--file-info`) — `docs/**` · `.claude/**` · `.github/PULL_REQUEST_TEMPLATE.md` (앵커) 는 루트 배치 `true` → `/tmp` 배치 **`false`** 로 뒤집히는 반면, `CLAUDE.md` (**베어 이름**) 는 양쪽 `true` 다. ⚠️ **그래서 대조군을 잘못 고르면 함정이 숨는다** — 슬래시 없는 패턴은 gitignore 문법상 모든 깊이에 매칭되므로 `CLAUDE.md` 하나만 대조군으로 두면 _"대조군이 살아 있으니 측정 정상"_ 이라는 결론이 나온다. **대조군은 반드시 앵커된 패턴에서 고른다.** 표준 절차는 변형본을 **리포 루트에 임시 파일명**으로 두고 즉시 삭제하는 것이며, 모집단 계수의 정본 술어는 `node scripts/verify-md-tilde.mjs --population` 이다 (기본 `.prettierignore` 를 쓰므로 본 함정에 노출되지 않는다).
 
+### Fixed
+
+- **[#1039] ADR [`20260811-1010`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) §축 3 재현 recipe 정본화 — Amendment 2 (PATCH)** ([#1039](https://github.com/coseo12/astro-simulator/issues/1039)) — §축 3 이 5 페르소나 self-consistency 표(6 파일 × 4 셀)의 재현 recipe 로 `grep -cF -- '<bullet 원문>' <파일>` 을 실었는데 **그 recipe 로 표가 재현되지 않았다** (PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038) reviewer 🟡-2 / dev 자기 적발).
+
+  **결함은 2개이고 서로 다르다.** ① **플레이스홀더 종속** — 정본 호출을 인용하는 4 파일의 플레이스홀더가 갈린다(`developer.md` · `create-pr/SKILL.md` 는 `<PR번호>`, `reviewer.md` · `qa.md` 는 `<번호>`). 고정 리터럴 하나로 재면 **어느 쪽을 골라도 2 셀씩 어긋난다** (실측 rev `38b6c8a` — `<PR번호>` → `2 / 1 / 0 / 0 / 0 / 0`, `<번호>` → `0 / 0 / 1 / 1 / 0 / 0`, 표는 `1 / 1 / 1 / 1 / 0 / 0`). ② **hit 수 독법의 시간 종속** — 플레이스홀더를 뗀 리터럴 `node scripts/verify-pr-template-checklist.mjs` 은 **본 ADR 박제 시점 `ebd9866` 에서 표와 완전히 일치**(`1 / 1 / 1 / 1 / 0 / 0`)했으나, `aeb6c07`([#1013](https://github.com/coseo12/astro-simulator/issues/1013) / PR #1038)이 `developer.md` 에 정본 호출을 **한 번 더 인용**하면서 그 셀이 **2** 가 됐다. **측정 대상 파일이 측정 문자열을 포함하는 자기 참조**라 hit 수는 원리적으로 움직인다 — ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) §(iv) 가 ADR 인덱스 등재 수에 쓴 처방과 같은 클래스다.
+
+  **정정 2건** — (ㄱ) 표의 셀은 **`보유(1) / 비보유(0)` 판정**이지 hit 수가 아니다. §축 3 서두가 이미 대조 기준을 _"모든 파일이 같은 문장"_ 이 아니라 **"파일별 역할에 맞는 값"** 으로 선언했으므로 이 독법이 원 의도와도 정합한다. (ㄴ) recipe 를 **placeholder-agnostic · boolean** 블록으로 교체했다.
+
+  **박제한 recipe 를 그대로 추출해 실행하고 재현을 실증했다** — 출력이 §축 3 표와 **24 / 24 셀 일치**하며, **rev `38b6c8a`(현행)와 rev `ebd9866`(박제 시점) 두 곳에서 출력이 동일**하다(후자는 6 파일을 그 커밋 내용으로 체크아웃해 같은 블록 실행). 반면 hit 수 독법은 두 rev 에서 갈린다(`developer.md` `1` → `2`). **이 대조가 (ㄱ)의 실측 근거다** — 표의 `1` 을 hit 수로 읽으면 ADR 이 스스로 stale 해지고, 보유/비보유로 읽으면 불변량이 된다.
+
+  **본문은 이력이라 소급 치환하지 않았다** — 원 recipe 문장은 바이트 그대로 두고 바로 아래에 Amendment 2 블록을 덧댔으며, 헤더에 **Amendment 이력 2줄**(1 = #1014 / 2 = #1039)을 신설해 발견가능성을 확보했다. **표의 24 셀 값 자체는 불변**이고, 정정 대상은 셀의 _의미_ 와 _recipe 문언_ 둘뿐이다.
+
+  ⚠️ **본 recipe 는 측정 방법 C 판정식이 아니다** — PR 본문 가시성 판정의 정본은 `scripts/verify-pr-template-checklist.mjs` 이고 그 **수동 grep 대체재는 두지 않는다**(#1013). 본 recipe 가 재는 것은 _"6 파일이 각자의 역할에 맞는 문언을 보유하는가"_ 라는 **별개 축**이라 ADR 1010 결정 7 의 SSoT 수렴을 침범하지 않는다. Amendment 본문에 이 구분과 자기 참조 caveat 를 함께 박제했다.
+
 ### Behavior Changes
 
 - **`.claude/agents/developer.md` §규칙 — `pnpm build` 선행 트리거가 넓어진다.** 이전: _"격리 worktree 에서 **`typecheck` 를 돌리려면**"_. 이후: _"격리 worktree 에서 **워크스페이스 패키지(`@astro-simulator/*`)를 해석하는 명령**을 돌리려면"_ (SSoT `operational-friction.md` §8 과 **낱말까지 동일** — reviewer 권고 6). 같은 입력(격리 worktree + `pnpm test:unit` 또는 `pnpm dev` 만 필요한 작업)에서 dev 에이전트가 **다르게 동작한다** — 이전 규칙은 `typecheck` 를 안 부르면 발화하지 않아 `install` 만으로 진행했고, 그 결과가 #1062 가 박제한 오진 경로다.
 - **하위 규칙 3개 추가** — (i) `lint` / `format:check` / 정적 `verify:*` 는 **비의존 집합**이라 `install` 만으로 충분하다는 명시 (불필요한 `build` 호출 억제), (ii) `pnpm dev` 는 **exit code 로 드러나지 않는다**는 경고, (iii) 축 (ii) 결손 대상이 `packages/physics-wasm/{pkg,pkg-bundler}` 를 포함한다는 정정.
 - **문서 SSoT 정합** — `docs/ops/operational-friction.md` §8 이 절차 SSoT 이고 `developer.md` 가 사본이므로 **두 곳을 동시에** 갱신했다. `scripts/verify-agent-ssot.sh` exit `0` (5 files × 9 fields = 45 checks).
 - **`.prettierignore` 소유 모집단 확대** — `45` → `49`. prettier 가 `docs/retrospectives/` 의 md 를 전건 소유하므로 이후 그 4건 편집 시 pre-commit `lint-staged` 가 재포맷한다.
+- **[#1035] · [#1039] — 없음.** 두 건의 변경 파일이 ADR `3` 건 + CHANGELOG 뿐이라 `.claude/**` · `scripts/**` · `.github/**` · `apps/**` · `packages/**` 무접촉이고, 에이전트가 같은 입력에 다르게 동작하지 않는다. #1035 가 신설한 971 §10-5 재검토 조건 13 은 **조건부 미발화 상태**(실효 창 escape `0`)이며 발화 시 조치도 _"재검토"_ 이지 정책 전환이 아니므로 SemVer 판정 질문에 **아니오**다 (판정 애매 시 낮은 쪽 — CLAUDE.md §릴리스). 선례: `[0.73.0]` 의 #960 ADR entry 가 PATCH, 같은 이슈의 `.claude/agents/developer.md` 1줄이 MINOR 로 갈린 것과 동일 기준. ⚠️ **본 항의 *"없음"* 은 #1035/#1039 범위 한정**이다 — 같은 `[Unreleased]` 의 #1062 항목은 MINOR 이며 위 불릿들이 그쪽 소관이다.
 
 ### Notes
 
@@ -67,6 +106,10 @@ Semantic Versioning을 따른다.
   **고유 발견 `1` 건 채택 — §7-2 임시 파일 방치 위험.** `.prettierignore.trial` 을 만들고 `rm` 을 **마지막 줄**에 두면 중간 실패·중단 시 잔존한다는 지적이다. **메인이 전제를 독립 실측**해 성립을 확인했다 — `git check-ignore` → **NOT ignored** / `.gitignore` 에 해당 패턴 **없음**. 이 저장소는 `git status --porcelain` 잔존물을 **sub-agent 반환 게이트**로 쓰므로 다음 에이전트가 정체불명 untracked 를 물려받는다. → **`trap ... EXIT` 채택** (획득 즉시 해제 예약). ⚠️ **`.gitignore` 추가안은 기각** — 그 파일은 **존재 자체가 이상 신호**라 무시 대상으로 만들면 신호가 사라진다.
 
   **Claude 편향 셀프 체크 — 외부 검증이 dev·메인 둘 다 못 본 각도 `1` 개를 짚었다.** 본 PR 은 §8-1 의 **비의존 집합**(`14` 개)을 _"전수 주장을 성립시키기 위한 완결성"_ 근거로 실었는데, agy 는 그것이 **불필요한 `pnpm build` 호출을 막아 에이전트 루프 비용을 줄인다**는 **운영 효용**을 갖는다고 평가했다. 즉 같은 표가 _"주장의 완결성"_ 뿐 아니라 _"행동 억제"_ 로도 기능한다 — dev 도 메인도 전자로만 정당화하고 있었다. 그 밖에 `pnpm dev` 의 **exit `0` + HTTP `500` 침묵 실패**, `pnpm -r` 의 **fail-fast 마스킹**, `prebuild-test` 의 **실행 순서 의존**, `--ignore-path` 의 **앵커 패턴 무효화** 를 _"고난도 엣지 케이스"_ 로 평가했다.
+
+- **cross-validate (agy, 2026-08-14) — `code 1069` / anchor `ADR-new-or-amendment` / outcome `applied`.** 본 변경은 **ADR Amendment 신규 + §재검토 조건 신설**이라 CLAUDE.md §교차검증의 _"박제 직후 1회 루틴"_ 대상이다. **메인 오케스트레이터가 수행**했다 — developer 페르소나는 직접 호출이 금지돼 있다 ([#479](https://github.com/coseo12/astro-simulator/issues/479)). exit `0` 으로 **폴백이 아니며**, 따라서 `claude-only analysis completed — 단일 모델 편향 노출 미확보` 표기는 해당 없다. 판정은 **머지 승인**, 평가 `5` 개 항목 중 `4` 개 `양호` · `1` 개 `주의`. 축자 결과는 PR 코멘트 [#1069 (comment)](https://github.com/coseo12/astro-simulator/pull/1069#issuecomment-5290305124) — 본 항이 **정본**이고 그쪽이 참조본이다 (박제 위치 우선순위: CHANGELOG Notes > ADR 각주 > 커밋 > PR 코멘트).
+
+  **제안 `3` 건 중 `2` 건 채택 · `1` 건 기각.** **채택 ①** escape PR 번호 `tee` 보존 — `| wc -l` 이 번호를 소비해 **T1 _"사례 박제"_ 조치가 무엇을 박제할지 알 수 없게** 된다 (트리거는 닫혔는데 조치가 열린 형태 — #1035 가 고친 것과 같은 꼴). **채택 ②** 단일 PR 판정 원라이너 신설 — `O(1)` 관측 경로가 `(1)` 산출물에 의존해 복붙 실행이 불가능했다. 둘 다 라운드 1 수정에 반영됐다. **기각** `headRefName // ""` null-safety — **메인이 전제를 실측 반박**했다: GraphQL 스키마 **`NON_NULL`**, PR `400` 건 중 null **`0`**. 넣으면 _"이 필드는 null 일 수 있다"_ 는 **거짓 신호**를 코드에 새긴다 (이 저장소가 반복 청산해 온 «주석 계약 ↔ 구현 drift» 를 새로 만드는 쪽).
 
 ## [0.73.0] — 2026-08-14
 
