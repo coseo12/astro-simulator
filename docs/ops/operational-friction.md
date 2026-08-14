@@ -89,7 +89,18 @@
 
 **구조 원인**: `pgrep -f "패턴"` 은 프로세스 **전체 명령행**을 매칭한다. 에이전트가 셸에서 `pgrep -f "agent-browser-chrome-"` 를 직접 실행하면, 그 명령을 감싼 형제 셸(`bash -c '...pgrep -f "agent-browser-chrome-"...'`)의 명령행에 패턴 문자열이 포함되어 **자기 자신을 매칭**한다. 셸 래핑/파이프 구성에 따라 **간헐 재현**(2026-07-04 세션 2회 오탐, 2026-07-15 세션 재확인).
 
+⚠️ **기전 정정 (#1054, 2026-08-14)** — 위 **관측은 맞으나 기전 설명이 불완전**하다. "형제 셸의 명령행에 패턴 문자열이 포함" 은 필요조건일 뿐이고, **왜 그 형제 셸이 매칭 후보에 들어왔는가**가 빠져 있다. 답은 `-a` 플래그다. macOS `man pgrep` 축자: _"`-a` Include process ancestors in the match list. **By default, the current pgrep or pkill process and all of its ancestors are excluded** (unless `-v` is used)."_ 즉 macOS 는 기본값이 이미 **자기 + 조상 전건 제외**라 self-match 가 구조적으로 불가능하고, `-a` 가 그 방어를 **되살린다**. 실측 (rev `90fa2a6`, 명령행에 un-bracketed 리터럴 노출):
+
+```
+pgrep -af 'zzz1054-canary[-]'   → 12938(조상 셸) 12946(실 프로세스) 12950(일시 subshell)
+pgrep  -f 'zzz1054-canary[-]'   → 12946(실 프로세스만)
+```
+
+`-a` 는 Linux procps 의 `-a`(= `--list-full`, **명령행 출력**)와 **이름만 같고 의미가 다르다**. macOS 에서는 명령행을 찍지 않으므로 `-af` 를 쓰면 오탐이 늘면서 동시에 **무엇이 잡혔는지 볼 수단도 사라진다**. 따라서 본 절의 "간헐 재현" 도 셸 래핑의 우연이 아니라 **`-a` 사용 여부의 결정론적 귀결**로 읽어야 한다. 좀비 카나리아 정본은 아래 **hook 은 이미 안전** 항의 `ps … | grep -E … | grep -v grep` 이며, `pgrep` 을 쓸 때는 **`-a` 를 붙이지 않는다**.
+
 **bracket 표준**: 패턴의 한 글자를 문자 클래스로 감싼다 — `pgrep -f "agent-browser-chrome[-]"`.
+
+⚠️ **보호 범위 단서 (#1054)** — bracket 이 지키는 것은 **그 패턴 문자열 자신**뿐이다. 명령행 **전체**를 보호하지 않으므로 두 방향으로 뚫린다: ① 같은 command line 의 **형제 명령**이 un-bracketed 리터럴을 노출하면(예: `ps … | grep -E "…next dev…"` 뒤에 `pgrep -af "next[ ]dev"`) bracket 은 무력하다 ② 패턴 안에 `.*` 가 있으면 bracket 앞의 un-bracketed 조각이 명령행의 **무관한 뒷부분**과 이어진다(실측: `pnpm.*de[v]` 가 자기 패턴의 `pnpm` 과 래퍼가 모든 명령에 덧붙이는 `< /dev/null` 의 `dev` 를 잇는다). 반면 `grep -v grep` 은 **명령행 전체**를 필터링하고, 패턴 리터럴을 실은 셸은 정의상 `grep` 파이프라인이라 **항상** 걸러진다 — 명령을 더 이어 붙여도 그 줄에서 `grep` 이라는 낱말이 사라지지 않기 때문이다. 대가는 명령행에 `grep` 을 포함한 **실 프로세스를 놓치는 것**(false negative)이고, dev 서버 / cargo 계열에는 해당 사례가 없어 #440 이래 hook 이 이 형태로 운용돼 왔다.
 
 - `[-]` 는 정규식상 `-` 문자와 동일하게 매칭하지만, pgrep 자신의 명령행 문자열은 리터럴 `agent-browser-chrome[-]` 이라 정규식 `agent-browser-chrome[-]` 이 `agent-browser-chrome[`(대괄호)로 이어지는 자기 명령행과 매칭되지 않아 **self-match 제거**.
 

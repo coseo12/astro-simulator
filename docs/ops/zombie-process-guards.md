@@ -48,6 +48,8 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 > - **agent-browser Chrome 좀비 변형** (volt [#79](https://github.com/coseo12/volt/issues/79)): qa / browser-test sub-agent 가 `agent-browser` 도구로 real Chrome 사용 후 세션 종료 시 정리 누락. 식별자 `agent-browser-chrome-<UUID>` user-data-dir (사용자 본 Chrome 영향 0). 본 세션 (2026-04-28) 실측 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU 관찰. **메인 루틴** (sub-agent 복귀 직후 의무): `pgrep -af "agent-browser-chrome[-]"` 검사 + 좀비 확인 시 `bash scripts/cleanup-browser.sh --all` (병행 브라우저 작업 부재 확인 후 — 메인 전용). **sub-agent 루틴** (반환 직전 의무): `bash scripts/cleanup-browser.sh` 기본 모드 (전량 pkill 금지 — 병행 오살 방지, #926). agent-browser 도구 자체 cleanup 이 정상 case 에선 작동하나 sub-agent 비정상 종료 (timeout / SIGKILL / panic) 시 lineage 끊긴 좀비 잔존. cargo/next dev 의 `spawned_bg_pids` SSoT 가 직접 spawn 한 PID 만 커버하므로 도구 wrapper 가 spawn 한 child process 는 별도 검증 의무
 
+⚠️ **명령 정정 (#1054, 2026-08-14)** — 위 인용 블록은 #980 이관 시점의 CLAUDE.md 원문을 **축자 보존**한 것이라 손대지 않는다. 다만 그 안의 메인 루틴 명령은 **`pgrep -f "agent-browser-chrome[-]"` 로 읽어야 한다** — macOS `pgrep` 의 `-a` 는 _"조상 프로세스를 매칭 대상에 포함"_ 이라(Linux procps 의 _"명령행 출력"_ 과 동명이의) 기본값이 제공하는 자기 + 조상 제외를 되돌려 **자기 셸을 좀비로 보고**한다. bracket 은 이 경우 우연히 방어에 성공하지만 그 보호 범위는 **패턴 문자열 자신뿐**이므로 의존 대상이 아니다. 상세: [`operational-friction.md`](operational-friction.md) §3 기전 정정.
+
 **추가 실측**: 2026-08-02 에 10일 묵은 daemon 2개가 관찰됐다 ([#926](https://github.com/coseo12/astro-simulator/issues/926)) — 종전 가드가 Chrome 렌더러만 보고 상주 daemon 을 방치한 결과다.
 
 **모드 분리의 이유 (#926)**: `scripts/cleanup-browser.sh` 기본 모드는 `agent-browser close`(10s timeout) 후 **stale 만**(ETIME ≥ 30분) 정리하고 신선한 프로세스는 보존한다 — **병행 에이전트 오살 방지**. `--all` 은 ETIME 무관 전량 정리이므로 **병행 브라우저 작업 부재를 아는 메인 오케스트레이터 전용**이며, sub-agent 는 기본 모드만 사용한다.
@@ -142,7 +144,9 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 `pgrep -f "패턴"` 은 자기 셸의 명령행을 매칭해 **오탐**한다. 좀비 검출 패턴에는 bracket 을 넣는다 (`agent-browser-chrome[-]`). `pkill` 은 자기 셸을 죽일 위험이 있어 bracket 이 안전 개선까지 겸한다. hook 은 `grep -v` 로 이미 안전하다.
 
-상세는 [`operational-friction.md`](operational-friction.md) §3 ([#795](https://github.com/coseo12/astro-simulator/issues/795)).
+⚠️ **정정 (#1054, 2026-08-14)** — 위 3문장은 **우선순위가 뒤집혀 있다**. 1순위는 bracket 이 아니라 **`-a` 를 쓰지 않는 것**이다. macOS `pgrep`/`pkill` 은 기본값이 **자기 + 조상 전건 제외**라 self-match 가 구조적으로 불가능하고, `-a`(= _"조상을 매칭 대상에 포함"_, Linux procps 의 _"명령행 출력"_ 과 동명이의) 가 그 방어를 되살린다. bracket 은 **패턴 문자열 자신만** 보호하므로 `.*` 우회와 형제 명령의 un-bracketed 리터럴에 뚫린다. 따라서 검출 명령의 실제 의무는 순서대로 — ① **좀비 카나리아 정본은 `ps -axww -o pid=,etime=,command= | grep -E "…" | grep -v grep`** (가드 C hook 과 동형. 명령행 전체를 필터링하고 **ETIME 을 함께 산출**해 30분 임계 판정이 한 명령으로 닫힌다) ② `pgrep`/`pkill` 을 쓸 때는 **`-a` 금지** ③ bracket 은 그 위의 보조 (`pkill` 자기-kill 방지 + Linux 이식성). `pgrep -af` 는 macOS 에서 명령행을 출력하지 않아 **무엇이 잡혔는지 볼 수단조차 없다**.
+
+상세는 [`operational-friction.md`](operational-friction.md) §3 ([#795](https://github.com/coseo12/astro-simulator/issues/795) / 기전 정정 [#1054](https://github.com/coseo12/astro-simulator/issues/1054)).
 
 ## 잔여 계약의 근거 (PR #981 리뷰)
 
