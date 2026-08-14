@@ -93,8 +93,19 @@
 
 | 축 | 기전 | `-a` 제거로 해소? | bracket 로 해소? | `grep -v grep` 로 해소? |
 | --- | --- | :---: | :---: | :---: |
-| **① 조상 셸** | macOS `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ❌ | ✅ |
-| **② 형제 subshell** | 비-exec fork 가 부모 argv 를 상속. pgrep 의 **조상이 아니라 형제**라 기본 제외 대상이 아니다 | ❌ | ⚠️ 상속 argv 안 리터럴이 **전부 bracketed 일 때만** | ✅ |
+| **① 조상 셸** | macOS `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ⚠️ **argv 순도 조건부** | ✅ |
+| **② 형제 subshell** | 비-exec fork 가 부모 argv 를 상속. pgrep 의 **조상이 아니라 형제**라 기본 제외 대상이 아니다 | ❌ | ⚠️ **argv 순도 조건부** | ✅ |
+
+**두 축은 같은 argv 문자열을 본다** (형제가 조상 argv 를 상속하므로). 다른 것은 **매칭 풀 소속**뿐이다. 따라서 bracket 의 효력은 축과 무관하고 오직 **argv 순도** — _명령행 어디에도 un-bracketed 리터럴이 없을 것_ — 에만 걸린다. 4케이스 격리 실측 (각 케이스를 **별도 스크립트 파일**로 분리 — 같은 tool call 에 넣으면 heredoc 리터럴이 조상 argv 를 오염시켜 측정 자체가 무효가 된다):
+
+| | 조상 argv | 패턴 | `-a` | 결과 |
+| --- | --- | --- | :---: | --- |
+| C1 | un-bracketed 리터럴 | un-bracketed | ✓ | **hit** |
+| C2 | **bracketed 만 (순수)** | bracketed | ✓ | **exit 1** — bracket 이 **축 ①도 막는다** |
+| C3 | **un-bracketed 리터럴 있음 (불순)** | bracketed | ✓ | **hit** — 조건은 축이 아니라 **argv 순도** |
+| C4 | un-bracketed 리터럴 | un-bracketed | ✗ | exit 1 — `-a` 제거는 **축 ① 만** 죽인다 |
+
+⚠️ 따라서 _"bracket 을 걸었는데도 뚫렸다"_ 는 관찰은 **C3** 이지 bracket 무력화가 아니다 — 같은 줄 **다른 명령**의 un-bracketed 리터럴이 argv 를 오염시킨 것이다. 반면 `grep -v grep` 은 **argv 순도와 무관하게** 두 축을 막는다. 이것이 정확한 차별점이며 채택 근거다.
 
 **축 ①** — macOS `man pgrep` 축자: _"`-a` Include process ancestors in the match list. **By default, the current pgrep or pkill process and all of its ancestors are excluded** (unless `-v` is used)."_ 기본값이 자기 + 조상 전건 제외라 조상 축 self-match 는 구조적으로 불가능한데, `-a` 가 그 방어를 **되살린다**. 실측 (rev `90fa2a6`, 명령행에 un-bracketed 리터럴 노출):
 
@@ -119,7 +130,7 @@ ps -axww -o pid=,etime=,command= | grep -E … | grep -v grep          →      
 
 반면 `grep -v grep` 은 **명령행 전체**를 필터링해 **두 축을 동시에** 막으므로 카나리아 정본이다. 패턴 리터럴을 실은 셸은 그 자신이 `grep` 파이프라인이라 걸러지고, 명령을 더 이어 붙여도 그 줄에서 `grep` 이라는 낱말이 사라지지 않는다. ⚠️ 다만 _"항상"_ 은 **이 구성에 한정된 진술**이다 — 필터가 거르는 것은 `grep` 문자열이지 "자기 자신" 이라는 신원이 아니므로, `grep` 을 포함하지 않는 경로(별도 프로세스가 패턴 리터럴만 들고 있는 경우 등)까지 덮지는 못한다. 대가는 명령행에 `grep` 을 포함한 **실 프로세스를 놓치는 것**(false negative)이고, dev 서버 / cargo 계열에는 해당 사례가 없어 #440 이래 hook 이 이 형태로 운용돼 왔다.
 
-⚠️ **패턴 자체의 선행 결함 (#1054 비차단)** — `pnpm.*dev` 는 `.*` 가 래퍼의 `< /dev/null` 까지 이으므로 **`pnpm` 을 포함한 임의 명령**을 매칭한다 (본 절 축 ② 와 독립인 **패턴 정밀도** 문제라 카나리아 형태 교체로는 해소되지 않는다). 후속 분리 대상.
+⚠️ **패턴 자체의 선행 결함 (#1054 비차단)** — `pnpm.*dev` 는 `.*` 가 래퍼의 `< /dev/null` 까지 이으므로 **`pnpm` 을 포함한 임의 명령**을 매칭한다 (본 절 축 ② 와 독립인 **패턴 정밀도** 문제라 카나리아 형태 교체로는 해소되지 않는다). 후속 분리: [#1066](https://github.com/coseo12/astro-simulator/issues/1066).
 
 - `[-]` 는 정규식상 `-` 문자와 동일하게 매칭하지만, pgrep 자신의 명령행 문자열은 리터럴 `agent-browser-chrome[-]` 이라 정규식 `agent-browser-chrome[-]` 이 `agent-browser-chrome[`(대괄호)로 이어지는 자기 명령행과 매칭되지 않아 **self-match 제거**.
 
@@ -129,7 +140,9 @@ ps -axww -o pid=,etime=,command= | grep -E … | grep -v grep          →      
 
 **hook 은 이미 안전**: `.claude/hooks/session-start-zombie-check.sh` 는 pgrep 이 아닌 `ps -axww | grep -E "$PATTERN" | grep -v "session-start-zombie-check\|grep -E\|verify-zombie-check"` 구조로, **`grep -v` 제외**가 이미 self-match 를 방어한다. 별도 bracket 불요(변경 없음).
 
-⚠️ **hook 필터를 그대로 복사하지 말 것 (#1054)** — hook 이 안전한 이유는 **스크립트 파일 안에서 실행되기 때문**이다. 패턴이 `PATTERN` 변수에 있어 호출 셸 argv 에 리터럴이 실리지 않고, 위 `grep -v` 목록이 파이프라인 자신의 `grep -E` 프로세스를 거른다. 이 조건은 **에이전트가 셸에 직접 치는 카나리아에는 성립하지 않는다**: 그 환경에서 `grep` 은 셸 스냅샷이 `ugrep -G` 로 재작성한 **셸 함수**라(실측 `type grep` → _"grep is a shell function from …/shell-snapshots/…"_) 실행 프로세스 argv 에 `grep -E` **연속 문자열이 남지 않아** hook 필터가 헛돈다. 그래서 `qa.md` · CLAUDE.md §가드 B 의 카나리아는 hook 과 **패턴 리터럴만 축자 일치**시키고 필터는 `grep -v grep` 으로 **의도적으로 더 강하게** 잡았다 — `ugrep` 은 `grep` 을 부분문자열로 포함하므로 재작성 후에도 걸러진다. 즉 세 위치가 공유하는 SSoT 는 **패턴 리터럴과 ETIME 30분 임계**이지 **필터 형태가 아니다**.
+⚠️ **hook 필터를 그대로 복사하지 말 것 (#1054)** — hook 이 안전한 이유는 **스크립트 파일 안에서 실행되기 때문**이다. 패턴이 `PATTERN` 변수에 있어 호출 셸 argv 에 리터럴이 실리지 않고, 위 `grep -v` 목록이 파이프라인 자신의 `grep -E` 프로세스를 거른다. 이 조건은 **에이전트가 셸에 직접 치는 카나리아에는 성립하지 않는다**: 그 환경에서 `grep` 은 셸 스냅샷이 `ugrep -G` 로 재작성한 **셸 함수**라(실측 `type grep` → _"grep is a shell function from …/shell-snapshots/…"_) 실행 프로세스 argv 에 `grep -E` **연속 문자열이 남지 않아** hook 필터가 헛돈다. 그래서 `qa.md` · CLAUDE.md §가드 B 의 카나리아는 필터를 `grep -v grep` 으로 **의도적으로 더 강하게** 잡았다 — `ugrep` 은 `grep` 을 부분문자열로 포함하므로 재작성 후에도 걸러진다.
+
+**공유 범위를 정확히**: 세 위치가 공유하는 SSoT 는 **ETIME 30분 임계뿐**이다 (§8 _"3곳 정합 SSoT"_ 참조). **패턴 리터럴의 축자 일치는 hook ↔ `qa.md` 2곳의 사실**이고, CLAUDE.md §가드 B 는 `physics_wasm-` 를 포함한 **의도적으로 다른 검출 범위**를 쓴다 — 이를 3곳으로 확대 기술하면 _"통일하라"_ 는 오독을 낳고 그 통일은 `physics_wasm-` **커버리지 소실**로 이어진다. 필터 형태는 셋 다 공유 대상이 아니다.
 
 **upstream 기여 (후속 분리)**: qa.md 의 agent-browser 정리 절차 자체가 upstream harness-setting 에 미기여된 프로젝트 drift(bracket 만 단독 Phase 2 불가). agent-browser 정리 전체의 upstream 기여는 [#830](https://github.com/coseo12/astro-simulator/issues/830) 후속 분리(Z-패턴 Phase 2 대상).
 

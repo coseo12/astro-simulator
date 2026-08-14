@@ -150,8 +150,10 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 | 축 | 기전 | `-a` 제거 | bracket | `grep -v grep` |
 | --- | --- | :---: | :---: | :---: |
-| **조상 셸** | `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ❌ | ✅ |
-| **형제 subshell** | 비-exec fork 가 부모 argv 상속 (형제는 기본 제외 대상이 **아니다**) | ❌ | ⚠️ 상속 argv 안 리터럴이 전부 bracketed 일 때만 | ✅ |
+| **조상 셸** | `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ⚠️ **argv 순도 조건부** | ✅ |
+| **형제 subshell** | 비-exec fork 가 부모 argv 상속 (형제는 기본 제외 대상이 **아니다**) | ❌ | ⚠️ **argv 순도 조건부** | ✅ |
+
+두 축은 **같은 argv 문자열**을 보고 **매칭 풀 소속만** 다르다. 그래서 bracket 의 효력은 축과 무관하게 **argv 순도**(명령행 어디에도 un-bracketed 리터럴이 없을 것) 하나에만 걸리고, `grep -v grep` 만 **순도와 무관하게** 두 축을 막는다. 4케이스 격리 실측은 [`operational-friction.md`](operational-friction.md) §3.
 
 따라서 검출 명령의 의무는 — ① **좀비 카나리아 정본은 두 축을 동시에 막는** `ps -axww -o pid=,etime=,command= | grep -E "next dev|next-server|cargo .*test|pnpm.*dev" | grep -v grep` (dev/test 계열. 메인 §가드 B 는 `physics_wasm-` 를 포함한 **다른 검출 범위**를 쓴다 — 패턴은 위치마다 의도적으로 다르며 3곳이 공유하는 SSoT 는 **ETIME 30분 임계**다. 필터가 `grep -v grep` 인 것도 hook 과의 **의도적 차이**다 — 근거는 [`operational-friction.md`](operational-friction.md) §3 _"hook 필터를 그대로 복사하지 말 것"_) ② `pgrep`/`pkill` 을 쓸 때는 **`-a` 금지** ③ **bracket 은 유지** — 강등이 아니다. `-a` 를 뗀 뒤 pgrep 경로에서 형제 축을 막는 것은 bracket 뿐이고, 위 §_"pkill 은 안전 이슈"_ 대로 자기-kill 차단까지 겸한다. 덧붙여 `pgrep -af` 는 macOS 에서 명령행을 출력하지 않아 **무엇이 잡혔는지 볼 수단조차 없다**.
 
