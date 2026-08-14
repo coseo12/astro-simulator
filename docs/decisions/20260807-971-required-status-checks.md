@@ -15,6 +15,8 @@
   > **A1 실행: 2026-08-08** (#985 head 인용 `05:30Z` 이후 ~ #992 머지 `13:33Z` 이전). 조건 **2·5·6 은 v0.62.0 단일 사건이 동시 충족**한 것이며(§10-2 부기가 설계 의도로 명시), 중복 계상이 아니다.
   >
   > ⚠️ **Accepted 는 한계를 닫지 않는다** — §10-1 **한계 13개**(특히 한계 13 *"동명 축 열거 미완결"*)와 §10-5 **재검토 조건 12개**는 전이 이후에도 **그대로 유효**하다.
+  >
+  > — **승계 부기 (2026-08-14, [#1035](https://github.com/coseo12/astro-simulator/issues/1035))**: 위 *"재검토 조건 12개"* 는 **Accepted 전이 시점(2026-08-08) 값**이다. 이후 §10-5 에 **재검토 조건 13** (`pr-template-checklist` escape 재발 → 결정 9-1 재검토) 이 신설돼 **현재 13개**다. 원문은 이력이므로 치환하지 않는다.
 
   > **조건 3 의 핵심 관측**: release PR #992 head `614f1d9` 에서 `project-guards` 가 **`n=2` 인 채 둘 다 `success`** 였고 GitHub 이 머지를 허용했다. §2-11 이 예측한 *"Phase 0 는 동명을 없애는 게 아니라 **완주 쌍을 늘린다**. 그럼에도 전부 통과 결론이면 어떤 해석 규칙에서도 통과한다"* 가 **required check 하에서 실증**된 것이며, §2-2 가 *"미문서화"* 로 분류한 동명 해석 규칙이 **적어도 전부 `success` 인 경우에는 통과**임이 관측으로 확인된다. ⚠️ **다만 규칙 자체는 미판별이다** — `{success, success}` 는 세 해석 규칙(latest / all-must-pass / first)이 **같은 답**을 내므로 어느 규칙인지 구별되지 않는다. **불일치 시 동작은 여전히 미관측**이고(표본 n=1), §2-2 의 미기술 행과 §10-4 단계 2-bis(**미실행**)는 유효하다. Phase 2/3 은 별도 판단 (§6 결정 1).
 
@@ -1461,6 +1463,60 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
       --jq '[.workflow_runs[] | select(.event=="pull_request") | .head_branch] | unique | length'
     ```
     발화 시 조치: 그 커밋을 릴리스 head 로 삼지 않는다 (develop 에 커밋 1개 추가 후 release PR 재생성) 또는 그 릴리스 동안 §9-R1 로 required 를 내린다.
+13. **`pr-template-checklist` 의 escape (무정정 머지) 재발** (신설 2026-08-14, [#1035](https://github.com/coseo12/astro-simulator/issues/1035)) → **결정 9-1 (required 제외) 재검토.** 본 항은 [20260813-1014](20260813-1014-release-pr-class-no-op.md) §재검토 조건 1-B 부기 · §재검토 조건 3 이 본 ADR 로 보낸 위임의 **수신 착지점**이다.
+
+    **왜 본 ADR 관할인가** — escape 4건 (#636 #646 #652 #658) 은 **탐지 실패가 아니라 차단 실패**다. 가드는 4/4 정상 발화했고 사람이 빨간 X 를 단 채 머지했다. 따라서 탐지 축의 신규 가드는 한계 수율 **0** 이고 (ADR 1014 §잔여 갭 (iii) 기각), 차단력을 주는 유일한 수단이 **required 편입** = 결정 9-1 관할이다. 그런데 종전 12항 중 결정 9-1 을 되여는 항은 **10번뿐**이고 그 트리거는 §10-4 단계 2-bis 라는 **미수행 실험**이라, escape 가 재발해도 발화하는 조건이 **없었다**.
+
+    **escape 정의 (기계 판정)** — 릴리스 클래스 (`baseRefName == "main"` ∨ `headRefName` 이 `release/` 로 시작) **머지** PR 의 head SHA 위 `pr-template-checklist` 체크런에서 `success run = 0 ∧ failure run ≥ 1`.
+
+    **관측 창** — **90일 rolling, 하한은 본 항 신설일 `2026-08-14`**. 실효 창 = `[max(2026-08-14T00:00:00Z, now-90d), now]`. 하한을 두는 이유는 소급 4건이 전부 `2026-06-08~10` 에 몰려 있어 하한이 없으면 **신설 당일 자동 발화**하기 때문이다 — 그 4건은 발화 입력이 아니라 **기준선**이다 (1014 §1-B 가 창 하한을 _"결정 4 머지 이후"_ 로 둔 것과 동형).
+
+    **관측 시점** — 릴리스 사이클 종료 직후 (release PR 머지 직후) 그 PR **1건**에 대해 아래 (2) 만 돌린다 (`O(1)`). 창 전수 재산출이 필요할 때만 (1) + (2) 를 돌린다.
+
+    ```bash
+    REPO=coseo12/astro-simulator
+    # (1) 모집단 — 창 안의 릴리스 클래스 머지 PR (ADR 20260813-1014 §1-A 와 동일 필터)
+    SINCE=$(date -u -v-90d +%Y-%m-%dT%H:%M:%SZ)   # GNU: date -u -d '90 days ago' +%Y-%m-%dT%H:%M:%SZ
+    LOWER=2026-08-14T00:00:00Z                    # 본 항 신설일 하한
+    if [[ "$SINCE" < "$LOWER" ]]; then SINCE=$LOWER; fi
+    gh pr list --repo "$REPO" --state merged --limit 300 \
+      --json number,baseRefName,headRefName,mergedAt \
+      | jq -r --arg since "$SINCE" \
+          '.[] | select((.baseRefName=="main" or (.headRefName|startswith("release/")))
+                        and .mergedAt > $since) | .number' > /tmp/rel-esc.txt
+
+    # (2) escape 판정 — success run = 0 ∧ failure run ≥ 1
+    while read -r N; do
+      SHA=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)
+      R=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+            --jq '[.check_runs[] | select(.name=="pr-template-checklist")]
+                  | {s:([.[]|select(.conclusion=="success")]|length),
+                     f:([.[]|select(.conclusion=="failure")]|length)}
+                  | select(.s==0 and .f>=1) | "escape"')
+      [ -n "$R" ] && echo "$N"
+    done < /tmp/rel-esc.txt | wc -l
+    ```
+
+    **임계 — 2단.** 단발과 재발을 가른다.
+
+    | 단계 | 조건 (실효 창) | 조치 | 결정 9-1 |
+    | --- | --- | --- | --- |
+    | **T1** | `escape ≥ 1` | (a) 사례를 본 항 아래 표로 박제 — PR / head SHA / 첫 run `started_at` / 머지 시각 / 간격 / run 수 / 원인 분류 (작성 행위 · 도구 · 게이트) (b) 그 PR 본문을 사후 정정해 재발화시켜 빨간 X 해소 | **유지** |
+    | **T2** | `escape ≥ 2` | **결정 9-1 재개봉.** 필수 입력 3건 — §10-3 후속 5 (required 복권 경로의 3자 교환) / §10-1 한계 6 (복구 비대칭) / §10-6 (첫 릴리스 5 시나리오) | **재개봉** |
+
+    ⚠️ **T2 는 재개봉이지 편입 승인이 아니다** — 자동 required 화 금지. 옵션 비교를 다시 여는 것까지가 본 항의 효력이다.
+
+    **기준선 (창 명시)** — 술어 검증: 위 블록을 **하한 없이 90일 창** (`2026-05-16` ~ `2026-08-14`, 릴리스 클래스 **115 PR**) 으로 1회 실행해 **4건 = `{#636, #646, #652, #658}`** 를 얻었다 — ADR [20260813-1014](20260813-1014-release-pr-class-no-op.md) §FAIL 축 표의 **전건 재현**이다 (실행 2026-08-14, `gh` GET 전용).
+
+    | 창 | 릴리스 클래스 PR | escape |
+    | --- | --- | --- |
+    | 전수 (`#592` 2026-05-27 ~ `#1033` 2026-08-13) | 107 | **4** — 전부 `2026-06-08~10` (3일) |
+    | `#667` 이후 (2026-06-11 ~ 2026-08-13, 63일) | 96 | **0** |
+    | **본 항 실효 창 (신설 시점 실행)** | **2** (#1067 #1068) | **0** |
+
+    ⇒ 현 체제 base rate 가 **`0 / 63일`** 이므로 `escape ≥ 1` 은 이탈 신호로 충분하고, T2 의 `≥ 2` 는 결정 9-1 재개봉 비용 (§10-6 오차단 시나리오 A~E) 에 비례하는 **최소 재발 증거**다 (1014 §1-B 의 임계 근거와 같은 논법 — 단발은 일회성 머지 판단과 구별되지 않는다).
+
+    **창을 30일이 아니라 90일로 잡은 근거는 밀도 차다.** 1014 §1-B 의 "첫 run failure" 축은 기준선이 `6.92건/30일` 이라 30일 창에서도 T2 도달이 관측되지만, escape 축은 `0 / 63일` 이라 30일 창에서는 **간헐 재발 (예: 45일 간격) 이 영구히 T1 에 머문다** — T2 가 원리적으로 도달 불가능해진다. 90일은 그 대역을 사정권에 넣는다. ⚠️ 반대급부로 T2 가 더 이르게 발화하나, T2 의 조치가 **재검토**이지 편입이 아니므로 방향이 보수적이다.
 
 ### 10-6 Phase 1 첫 릴리스 예측 — 5 시나리오 (신설 2026-08-07)
 
