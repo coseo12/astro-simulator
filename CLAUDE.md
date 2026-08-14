@@ -120,7 +120,7 @@ upstream 의 단위 테스트 / reviewer / cross-validate 3중 방어가 통과�
 - **함정의 양면성 — release 가속 트리거 변형 (volt [#97](https://github.com/coseo12/volt/issues/97))**: 검증 차단이 사용자에게 release 결정 강제 노출하는 부산물 + 자연 리듬 정렬 효과. 단 모든 차단이 정당화 아님 — 누적 < 10 커밋이면 옵션 B (대기) / C (cherry-pick) 합리. release-cadence-check workflow 신설로 함정 의존 제거 가능.
 
 ### 셸 경유 마크다운·코드 전달 — metachar 함정 (volt #114 / #996)
-대상은 **명령 이름이 아니라 문자열이 셸 파서에 리터럴로 닿는 경로** — `gh` 계열뿐 아니라 **`git commit -m`** 도 같은 클래스다. 큰따옴표는 `<` `>` `;` `!` `|` `&` 를 이미 막고 **관통하는 것은 백틱과 `$` 둘뿐**인데, 이 둘은 **exit 0 인 채** 본문 일부를 지운 채 영구 박제한다 (exit code 는 경보가 되지 못한다). Node.js 는 `spawnSync('gh', [...args])` + `--body-file -` + `{ input: body, stdio: ['pipe', 'inherit', 'inherit'] }`, **셸 직접 타이핑** (에이전트 Bash 도구) 은 `--body-file -` / `git commit -F -` + **따옴표 친 heredoc** (`<<'EOF'`) 의무.
+대상은 **명령 이름이 아니라 문자열이 셸 파서에 리터럴로 닿는 경로** — `gh` 계열뿐 아니라 **`git commit -m`** 도 같은 클래스다. 큰따옴표가 `<` `>` `;` `|` `&` 는 격리하지만 **최소 `` ` `` · `$` · `\` · `"` 넷은 관통**하며 (닫힌 열거 아님), 이들은 **exit 0 인 채** 본문 일부를 지운 채 영구 박제한다 — 축이 둘이라 **치환·확장** (`` ` `` `$`) 만 세면 **소실** (`\` `"`) 을 놓친다. Node.js 는 `spawnSync('gh', [...args])` + `--body-file -` + `{ input: body, stdio: ['pipe', 'inherit', 'inherit'] }`, **셸 직접 타이핑** (에이전트 Bash 도구) 은 넷 중 **하나라도 있으면** `--body-file -` / `git commit -F -` + **따옴표 친 heredoc** (`<<'EOF'`) 의무.
 - 상세: [docs/lessons/gh-cli-execsync-pitfall.md](docs/lessons/gh-cli-execsync-pitfall.md) — 사거리 판정 (`gh issue create` · `gh issue comment` 의 `--body` / `--title` 포함) / 회귀 가드 기각 3축
 
 ### 주석 계약 vs 구현 drift — 버그 생성원
