@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.73.0] — 2026-08-14
+
 ### Added
 
 - **[#960] ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md) — 격리 worktree typecheck 선행 조건 정본 + `apps/web/next-env.d.ts` tracked 화 **기각** (PATCH)** ([#960](https://github.com/coseo12/astro-simulator/issues/960)) — 증상은 2회 보고됐고([#941](https://github.com/coseo12/astro-simulator/pull/941) · [#959](https://github.com/coseo12/astro-simulator/pull/959)) 원인은 `next-env.d.ts` 부재로 지목돼 있었으나, rev `7ca1cd1` 격리 worktree 재현에서 **결손이 2축**임이 드러났다 — `install` 직후 baseline 이 이미 `error TS` **76 행** (`TS2882` 2 + `TS2307` 52 + 파생 22) 이고, `next-env.d.ts` 를 채워도 **74 행이 남는다** (`packages/{shared,core}/dist` 부재). 즉 이슈 §DoD 1 은 축 (i) 만으로 닫히지 않는다.
