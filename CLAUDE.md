@@ -94,7 +94,7 @@ AI는 자기 작업을 과도하게 긍정 평가하는 경향이 있으므로, 
 
 ## 실전 교훈 (portfolio-26, simple-shop 등에서 추출)
 
-> **블록 내 포인터 포맷 컨벤션**: 각 실전 교훈 블록은 내용 불릿 → `근거:` 불릿 → (선택) `일반화된 설계 지식:` 불릿 순서로 마감한다. `docs/architecture/` 나 `docs/decisions/` 로 승격된 지식이 있을 때만 마지막 포인터를 추가하고, 없으면 생략한다 (빈 placeholder 금지). 형식: `- 일반화된 설계 지식: [docs/architecture/<파일>.md](경로) — 한 줄 요약`. 근거: PR [#113](https://github.com/coseo12/harness-setting/pull/113) reviewer 권고 3, 이슈 [#114](https://github.com/coseo12/harness-setting/issues/114).
+> **블록 내 포인터 포맷 컨벤션**: 각 실전 교훈 블록은 내용 불릿 → **회수 포인터 불릿** (`근거:` / `상세:`) → (선택) `일반화된 설계 지식:` 불릿 순서로 마감한다. `docs/architecture/` 나 `docs/decisions/` 로 승격된 지식이 있을 때만 마지막 포인터를 추가하고, 없으면 생략한다 (빈 placeholder 금지). 형식: `- 일반화된 설계 지식: [docs/architecture/<파일>.md](경로) — 한 줄 요약` (축약 `일반화:` 금지 — #1047). 본 컨벤션은 **작성 순서**를 규정하고, 형식 충족의 **계수 술어** (`^- (근거|상세):`) 는 [claudemd-governance.md](docs/guides/claudemd-governance.md) §2.1 이 정본이다 — 승격 포인터는 회수 키가 아니라 계수 대상 밖이다. 근거: PR [#113](https://github.com/coseo12/harness-setting/pull/113) reviewer 권고 3, 이슈 [#114](https://github.com/coseo12/harness-setting/issues/114) / [#1047](https://github.com/coseo12/astro-simulator/issues/1047).
 
 ### 빌드 성공 ≠ 동작하는 앱
 빌드/단위 테스트 통과 ≠ 브라우저 동작. 커밋 전 **3단계 브라우저 검증 의무**:
@@ -119,9 +119,9 @@ upstream 의 단위 테스트 / reviewer / cross-validate 3중 방어가 통과�
 - 상세: [docs/lessons/workflow-dispatch-pitfalls.md](docs/lessons/workflow-dispatch-pitfalls.md)
 - **함정의 양면성 — release 가속 트리거 변형 (volt [#97](https://github.com/coseo12/volt/issues/97))**: 검증 차단이 사용자에게 release 결정 강제 노출하는 부산물 + 자연 리듬 정렬 효과. 단 모든 차단이 정당화 아님 — 누적 < 10 커밋이면 옵션 B (대기) / C (cherry-pick) 합리. release-cadence-check workflow 신설로 함정 의존 제거 가능.
 
-### gh CLI 마크다운 본문 발송 — execSync shell metachar 함정 (volt #114)
-Node.js `execSync('gh pr comment N --body "..."')` 로 백틱/`$`/`!`/`;` 포함 본문 발송 시 shell 이 명령 치환·변수 확장으로 해석 → silent syntax error. **`spawnSync('gh', [...args])` + `--body-file -` + `{ input: body, stdio: ['pipe', 'inherit', 'inherit'] }` 3축 우회** 의무.
-- 상세: [docs/lessons/gh-cli-execsync-pitfall.md](docs/lessons/gh-cli-execsync-pitfall.md)
+### 셸 경유 마크다운·코드 전달 — metachar 함정 (volt #114 / #996)
+대상은 **명령 이름이 아니라 문자열이 셸 파서에 리터럴로 닿는 경로** — `gh` 계열뿐 아니라 **`git commit -m`** 도 같은 클래스다. 큰따옴표는 `<` `>` `;` `!` `|` `&` 를 이미 막고 **관통하는 것은 백틱과 `$` 둘뿐**인데, 이 둘은 **exit 0 인 채** 본문 일부를 지운 채 영구 박제한다 (exit code 는 경보가 되지 못한다). Node.js 는 `spawnSync('gh', [...args])` + `--body-file -` + `{ input: body, stdio: ['pipe', 'inherit', 'inherit'] }`, **셸 직접 타이핑** (에이전트 Bash 도구) 은 `--body-file -` / `git commit -F -` + **따옴표 친 heredoc** (`<<'EOF'`) 의무.
+- 상세: [docs/lessons/gh-cli-execsync-pitfall.md](docs/lessons/gh-cli-execsync-pitfall.md) — 사거리 판정 (`gh issue create` · `gh issue comment` 의 `--body` / `--title` 포함) / 회귀 가드 기각 3축
 
 ### 주석 계약 vs 구현 drift — 버그 생성원
 파일 상단 주석 / JSDoc 이 선언한 계약과 구현의 drift 는 **버그 생성원**. default fallback 이 누락을 조용히 흡수해 테스트도 fail 하지 않는다. 주석에 선언된 규칙은 테스트 커버리지 대상이며, enum 분기 fallback 에 경고·assert 추가로 drift 감지.
@@ -172,7 +172,8 @@ AI가 생성하는 코드에서 반복되는 실패 패턴:
 ### 매니페스트 최신 ≠ 파일 적용 완료 — 부분 실패 교착 복구
 매니페스트 기반 패키지 관리자(Nix, brew, dpkg/apt 등)는 파일 적용과 해시 기록이 **원자적 트랜잭션이 아닐** 수 있어, 부분 롤백 시 "동일 상태" 오판 스킵이 **복구 불가능한 교착** 을 만든다.
 
-- 상세: [docs/lessons/manifest-partial-failure-recovery.md](docs/lessons/manifest-partial-failure-recovery.md) / 일반화: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어
+- 상세: [docs/lessons/manifest-partial-failure-recovery.md](docs/lessons/manifest-partial-failure-recovery.md)
+- 일반화된 설계 지식: [docs/architecture/state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어
 
 ### sub-agent 검증 완료 ≠ GitHub 박제 완료
 sub-agent(dev/qa 페르소나 등) 는 **검증** 까지는 신뢰하되 **박제** (커밋/푸시/PR 생성/`gh pr comment`/auto-close) 는 신뢰하지 말 것. sub-agent 보고는 *의도* 이고 실제 외부 가시성은 별도. 메인이 `git log --oneline -1` / `gh pr view` / `gh issue view --json state` 로 직접 확인.
@@ -202,7 +203,7 @@ sub-agent 에 multi-turn 세션 위임 시 세부 매트릭스가 다음 라운�
 세션 재시작 시 waiter 는 소멸하고 대기만 남는다 (무인지 침묵).
 - **행동 규약 (메인)**: 대기 진입 = fallback `ScheduleWakeup`(1200~1800s) 예약 + 상태파일 append 를 **원자 단위**로. 훅 경고 시 **재개 금지** — `상태 조회 → 생사 판단 → 항목 제거/재개`.
 - 상세: [dead-wait-guard.md](docs/lessons/dead-wait-guard.md) — volt [#121](https://github.com/coseo12/volt/issues/121)
-- 일반화: [state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어
+- 일반화된 설계 지식: [state-atomicity-3-layer-defense.md](docs/architecture/state-atomicity-3-layer-defense.md) — 도중/사후/안내 3계층 직교 방어
 
 ## 프로젝트 고유 보강 교훈
 

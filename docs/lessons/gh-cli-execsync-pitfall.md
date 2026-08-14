@@ -1,6 +1,8 @@
-# gh CLI 마크다운 본문 발송 — execSync shell metachar 함정
+# 셸 경유 마크다운·코드 전달 — metachar 함정 (원 제목: gh CLI execSync)
 
-> CLAUDE.md `### gh CLI 마크다운 본문 발송 — execSync shell metachar 함정` 가지치기 위임 (이슈 #266 / PR #290). CLAUDE.md 본문은 1줄 포인터만 유지. **근거**: volt [#114](https://github.com/coseo12/volt/issues/114).
+> CLAUDE.md `### 셸 경유 마크다운·코드 전달 — metachar 함정` 가지치기 위임 (이슈 #266 / PR #290). CLAUDE.md 본문은 1줄 포인터만 유지. **근거**: volt [#114](https://github.com/coseo12/volt/issues/114).
+>
+> ⚠️ **제목 확장 ([#1045](https://github.com/coseo12/astro-simulator/issues/1045))** — 원 제목은 `gh CLI 마크다운 본문 발송 — execSync shell metachar 함정` 이었다. #996 이 사거리를 `git commit -m` 까지 넓혔는데 제목·CLAUDE.md 진입점이 `gh CLI` / `execSync` 로 좁아 **에이전트가 규약 사거리를 명령 이름으로 오독**했다. 파일명(`gh-cli-execsync-pitfall.md`)은 유입 링크 보존을 위해 유지한다. 릴리스 확정 CHANGELOG (`[0.71.0]` 의 #990 entry) 가 인용한 구 제목은 **그 시점 사실**이므로 소급 편집하지 않는다.
 
 Node.js 에서 `execSync('gh pr comment N --body "..."')` 로 마크다운 본문 (백틱 / `$` / `!` / `;` 등 특수 문자 포함) 발송 시 **shell metachar 가 명령 치환·변수 확장으로 해석**되어 syntax error 발생. 자동 코멘트 / actionable 보고 발송이 silent fail.
 
@@ -95,25 +97,37 @@ _"셸을 경유해 마크다운·코드를 전달하는 모든 명령"_ 으로 �
 **대상 (리터럴 타이핑 경로)**
 
 - `git commit -m` — 전 에이전트 상시 사용
-- `gh issue create --body` — `.claude/agents/pm.md:109`, 그리고 **라이브 반례** 아래
-- `gh issue comment --body` — `.claude/skills/create-issue/SKILL.md:62`
+- `gh issue create --body` — `.claude/agents/pm.md` §절차 5 (`gh issue create --title "<요지>" --body "<스프린트 계약>"`)
+- `gh issue comment --body` — `.claude/skills/create-issue/SKILL.md` §코멘트 추가
+- **`--title` 계열 전체** ([#1045](https://github.com/coseo12/astro-simulator/issues/1045) 판정 — 아래 §제목 축) — 리터럴로 타이핑하는 `gh issue create --title` / `gh pr create --title` / `gh pr edit --title`
 
-> ⚠️ **라이브 반례 — 자매 문서가 위험 형태를 템플릿으로 싣고 있다.** [`docs/lessons/workflow-dispatch-pitfalls.md`](workflow-dispatch-pitfalls.md) `:74` · `:89` 의 `gh issue create --body "$(cat <<HEREEND` 는 **구분자에 따옴표가 없다**. 위 §변형 이 _"따옴표 친 heredoc 이 핵심"_ 이라고 못박은 바로 그 지점의 반례다. 현재 본문에 metachar 가 없어 무해하지만, 에이전트가 그 템플릿에 실제 내용을 채우면 조용히 손상된다 (`<<'HEREEND'` → `` `n>=3` `` · `$VERSION` 보존 / `<<HEREEND` → `GONE` · `9.9.9` 로 확장 — 실측). **해당 문서 수정은 본 PR 범위 밖이며 후속 [#1045](https://github.com/coseo12/astro-simulator/issues/1045) 가 흡수한다.**
+> ✅ **라이브 반례 — 해소됨 ([#1045](https://github.com/coseo12/astro-simulator/issues/1045)).** [`docs/lessons/workflow-dispatch-pitfalls.md`](workflow-dispatch-pitfalls.md) §함정 4 의 두 예시가 `gh issue create --body "$(cat <<HEREEND` 로 **구분자에 따옴표가 없어**, 위 §변형 이 _"따옴표 친 heredoc 이 핵심"_ 이라고 못박은 지점의 반례를 저장소 자신이 싣고 있었다 (본문에 metachar 가 없어 무해했으나, 에이전트가 그 템플릿을 채우면 조용히 손상 — `<<'HEREEND'` → `` `n>=3` `` · `$VERSION` 보존 / `<<HEREEND` → `GONE` · `9.9.9` 로 확장, 실측). 두 예시를 `<<'HEREEND'` 로 교체했다. **구분자 따옴표는 §함정 4 가 다루는 indent 거동과 직교**하므로 그 교훈은 불변이다 (`<<-` 만이 indent 를 건드린다).
 
 **대상 아님 (실측 근거)**
 
-- `gh pr edit` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며, `--title` (`docs/skills-guide.md:22`) 은 **본 저장소 PR 제목 `0/400` 이 백틱 보유**라 실제 전달량이 없다 (`gh pr list --state all --limit 400 --json title`, 술어 = 제목에 `` ` `` 포함한 PR 수)
-
-  > ⚠️ **_"제목은 한 줄이라 마크다운 경로가 아니다"_ 라고 쓰지 않는다** — categorical 근거는 반증된다. 같은 저장소 **이슈 제목은 `2/400` 이 백틱을 보유**하고 ([#318](https://github.com/coseo12/astro-simulator/issues/318) 의 `` `Tier` ``·`` `activeTier` ``, [#221](https://github.com/coseo12/astro-simulator/issues/221) 의 `` `window.__simStore` ``), 무엇보다 **커밋 subject 도 한 줄인데 §대상**이라 문서 내부와도 어긋난다. 위 제외는 **`gh pr edit --title` 이라는 좁은 축의 실측**일 뿐이다.
-  >
-  > **형제 명령 `--title` 축은 미판정**이다 — `gh issue create --title` (`.claude/agents/pm.md:109` / `.claude/skills/cross-validate/scripts/cross_validate.sh:408`) 과 `gh pr create --title` (`.claude/skills/create-pr/SKILL.md:55`) 로 전이하면 이슈 제목 `2/400` 때문에 위 근거가 **거짓이 된다**. 후속 [#1045](https://github.com/coseo12/astro-simulator/issues/1045) 소관.
+- `gh pr edit --body` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며 `--title` 은 위 §대상 으로 이동했다 (아래 §제목 축)
 - `gh release create --notes` — `--notes` 를 리터럴로 넘기는 사용처 0 (`gh release create <tag>` / `--target` 만)
 - `gh pr create --body` — `create-pr` 스킬 경유가 **의무**라 직접 호출 자체가 금지 (에이전트 5개 파일에 박제)
 - `scripts/verify-pr-template-checklist.mjs` — 이미 `spawnSync` + `--body-file -` (volt #114 fix 적용분)
 - `.claude/skills/cross-validate/scripts/cross_validate.sh` — `--body "${body}"` 변수 확장이라 §리터럴만 위험하다 에 의해 안전
 - `.claude/skills/{create-issue,capture-volt,create-pr}/SKILL.md` — 이미 `--body "$(cat <<'EOF'` **따옴표 친 heredoc** (`create-issue:48` / `capture-volt:125`·`:156` / `create-pr:56`)
 
-> 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 단, **축을 좁혀야 참이다**. 스킬 3종이 정착시킨 것은 **따옴표 친 heredoc (`<<'EOF'`)** 이고, 그 축에서는 본 문서가 요구하는 것이 **신규 관행이 아니다**. 반면 **전달 경로는 다르다** — 스킬 3종은 `--body "$(cat <<'EOF')"` 로 **명령 치환**을 거쳐 argv 로 넘기고, §변형 의 처방은 `-F -` 로 **stdin** 에 흘린다. 즉 _"이미 정착해 있었다"_ 는 **구분자 따옴표 축 한정**이며, stdin 축까지 정착했다는 뜻은 아니다.
+### 제목 축 — `--title` 은 대상이다 (#1045, 재측정이 구 근거를 반증)
+
+#996 은 `gh pr edit --title` 을 _"본 저장소 PR 제목 `0/400` 이 백틱 보유라 실제 전달량이 없다"_ 로 제외하면서, 형제 명령(`gh issue create --title` / `gh pr create --title`)은 **미판정**으로 남기고 #1045 에 인계했다. 재측정이 그 제외 근거 자체를 무너뜨렸다.
+
+| 모집단 (술어) | #996 (rev `9ca671b`) | 재측정 (2026-08-14) |
+| --- | --- | --- |
+| PR 제목 백틱 보유 — `gh pr list --state all --limit 400 --json title -q '.[].title' \| grep -cF` 백틱 | `0 / 400` | **`2 / 400`** |
+| 이슈 제목 백틱 보유 — `gh issue list` 동일 술어 | `2 / 400` | `2 / 400` |
+
+PR 제목 쪽 `2` 는 [#1054](https://github.com/coseo12/astro-simulator/issues/1054) (`` `.*` ``·`` `pgrep -a` ``) 와 [#958](https://github.com/coseo12/astro-simulator/issues/958) (`` `!` ``) 의 머지 PR 이다 — **#996 박제 후 6일 만에 발생**했다. 즉 `0/400` 은 틀린 측정이 아니라 **썩는 종류의 근거**였고, _"전달량이 없다"_ 는 다음 백틱 제목 하나로 뒤집힌다. 제외 근거를 유지하려면 매번 재측정해야 하는데 그 비용이 규약 준수 비용보다 크다.
+
+따라서 **`--title` 은 명령을 가리지 않고 §대상**이다. 처방은 §선택 가이드 와 동일하다 — 제목에 백틱·`$` 를 리터럴로 넣지 않거나, 넣어야 하면 변수(`--title "${title}"`)로 넘긴다. `.claude/skills/cross-validate/scripts/cross_validate.sh` 가 이미 변수 형태라 **안전 선례**이고, 리터럴 타이핑 경로(`.claude/agents/pm.md` §절차 5 / `.claude/skills/create-pr/SKILL.md` §PR 생성)만 주의 대상이다.
+
+> **_"제목은 한 줄이라 마크다운 경로가 아니다"_ 라고는 여전히 쓰지 않는다** — categorical 근거는 반증된다. **커밋 subject 도 한 줄인데 §대상**이라 문서 내부와도 어긋난다. 위 표는 그 categorical 논거가 아니라 **모집단 실측**이며, 실측이 뒤집혔으므로 결론도 뒤집혔다.
+
+> 위 §대상 아님 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 단, **축을 좁혀야 참이다**. 스킬 3종이 정착시킨 것은 **따옴표 친 heredoc (`<<'EOF'`)** 이고, 그 축에서는 본 문서가 요구하는 것이 **신규 관행이 아니다**. 반면 **전달 경로는 다르다** — 스킬 3종은 `--body "$(cat <<'EOF')"` 로 **명령 치환**을 거쳐 argv 로 넘기고, §변형 의 처방은 `-F -` 로 **stdin** 에 흘린다. 즉 _"이미 정착해 있었다"_ 는 **구분자 따옴표 축 한정**이며, stdin 축까지 정착했다는 뜻은 아니다.
 
 ## 회귀 가드 — 채택 기각 (#996)
 
