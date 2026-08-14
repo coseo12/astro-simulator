@@ -226,7 +226,7 @@ done | uniq -c            # 45×76 / 48×47 / 47×62 / 46×65  (최신 → 과�
 
 **그러나 유일한 감소가 오탐이다.** `48 → 45` 전이의 원인 커밋은 `0c316f0` (**#905 감사 P0 위생 — 고아 정리**, PR #906) 이며, 삭제된 live-set 파일은 `docs/benchmarks/newton-1000y.md` · `p11-b-bench-20260424.md` · `p11-b-osculating-observation-20260424.md` **3건의 정당한 고아 문서**다 (같은 커밋의 live-set **추가 `0`건** — 그래서 `−3` 이 정확히 닫힌다). `.prettierignore` 회귀가 아니다.
 
-> ⚠️ **위 술어의 `RE` 는 rev `38b6c8a` 시점 `.prettierignore` 게이트의 파생이다.** PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072)([#1063](https://github.com/coseo12/astro-simulator/issues/1063))가 `docs/retrospectives/` 게이트를 `**/*-retrospective.md` → `**/*.md` 로 통일하므로, 머지 후 재실행하려면 `RE` 의 마지막 대안을 `docs/retrospectives/.*\.md` 로 바꿔야 한다 (그 결과 계수는 `45` → `49`, 편입 4건 = `README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md`). **술어를 갱신하지 않고 재실행하면 표가 재현되지 않으며**, 그것이 PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) 가 [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) §축 3 에서 발견한 것과 같은 형태다. 아래 결론은 **파일 삭제/추가 이력** 위에 서 있어 게이트 정의 변경에 영향받지 않는다.
+> ⚠️ **위 술어의 `RE` 는 rev `38b6c8a` 시점 `.prettierignore` 게이트의 파생이다.** PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072)([#1063](https://github.com/coseo12/astro-simulator/issues/1063))가 `docs/retrospectives/` 게이트를 `**/*-retrospective.md` → `**/*.md` 로 **통일해 머지됐으므로**(develop `79ed14c`), 현행 트리에서 재실행하려면 `RE` 의 마지막 대안을 `docs/retrospectives/.*\.md` 로 바꿔야 한다 (그 결과 계수는 `45` → `49`, 편입 4건 = `README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md`. 실측 확인: 갱신한 `RE` 로 `origin/develop` = **`49`** = `--population` 실측과 일치). **술어를 갱신하지 않고 재실행하면 표가 재현되지 않으며**, 그것이 PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) 가 [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) §축 3 에서 발견한 것과 같은 형태다. 아래 결론은 **파일 삭제/추가 이력** 위에 서 있어 게이트 정의 변경에 영향받지 않는다.
 
 > **⇒ *"감소 ⇒ 회귀"* 는 관측된 유일 사례에서 반증된다. 방향별 FAIL 계급의 정밀도는 `0/1`.**
 
@@ -265,7 +265,7 @@ node scripts/verify-md-tilde.mjs --population
 
 **#1064 가 *"감시값이 문서에만 있다"* 고 적었으나, 실제로는 더 나쁘다 — 감시값이 문서와 스크립트 **두 곳에** 있고 이미 갈렸으며, 관측 도구가 틀린 기대값을 옳은 실측값 **바로 옆 줄에** 출력하면서 아무것도 발화하지 않는다.** 이것은 산문 술어 실행 문제가 아니라 **SSoT 중복** 문제이며, volt [#120](https://github.com/coseo12/volt/issues/120) (_"drift 감지보다 중복 출처 제거가 근본"_)의 관할이다.
 
-> **독립 재현 (병행 PR)** — PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 가 같은 drift 를 독립 발견하고 **누락 횟수까지 실측했다**: 하드코딩 `5` 는 `5` → `45`([#958](https://github.com/coseo12/astro-simulator/issues/958)) · `45` → `49`([#1063](https://github.com/coseo12/astro-simulator/issues/1063)) **두 갱신에서 연속 2회** 누락됐다. 이 `n=2` 가 §결정 5 의 방향 판정을 (f-A)에서 (f-B)로 뒤집은 결정적 증거다 — **사본을 옮기면 세 번째 누락이 스크립트 쪽에서 나고, 사본을 없애야 누락 자체가 불가능해진다.** ⚠️ 위 `45` 는 rev `38b6c8a` 기준이고, #1072 브랜치에서는 **`49`** 가 나온다. **명령 문자열은 같지만 술어는 같지 않다** — `--population` 이 읽는 `.prettierignore` 를 #1072 자신이 바꾸므로 **모집단 정의가 달라진다**. 즉 `45` 와 `49` 는 «트리 rev» 가 아니라 «트리 rev + 게이트 정의» 조합의 값이며, 병치 시 이 관계를 명시해야 한다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) (iv) 확장, 술어 비교환). 본 ADR 의 `45` 는 **`38b6c8a` 트리 + 그 시점 게이트**로 정합하다.
+> **독립 재현 (병행 PR)** — PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 가 같은 drift 를 독립 발견하고 **누락 횟수까지 실측했다**: 하드코딩 `5` 는 `5` → `45`([#958](https://github.com/coseo12/astro-simulator/issues/958)) · `45` → `49`([#1063](https://github.com/coseo12/astro-simulator/issues/1063)) **두 갱신에서 연속 2회** 누락됐다. 이 `n=2` 가 §결정 5 의 방향 판정을 (f-A)에서 (f-B)로 뒤집은 결정적 증거다 — **사본을 옮기면 세 번째 누락이 스크립트 쪽에서 나고, 사본을 없애야 누락 자체가 불가능해진다.** ⚠️ 위 `45` 는 rev `38b6c8a` 기준이고, #1072 머지 후 develop(`79ed14c`)에서는 **`49`** 가 나온다. **명령 문자열은 같지만 술어는 같지 않다** — `--population` 이 읽는 `.prettierignore` 를 #1072 자신이 바꾸므로 **모집단 정의가 달라진다**. 즉 `45` 와 `49` 는 «트리 rev» 가 아니라 «트리 rev + 게이트 정의» 조합의 값이며, 병치 시 이 관계를 명시해야 한다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) (iv) 확장, 술어 비교환). 본 ADR 의 `45` 는 **`38b6c8a` 트리 + 그 시점 게이트**로 정합하다. (`38b6c8a` 트리에 **신** 게이트를 적용하면 `49` 이므로, 두 값의 차는 트리가 아니라 **게이트**에서 온다.)
 
 ### 측정 8 — #1031 경미 사항: `--limit` 미명시 (채택 여부와 무관)
 
@@ -429,24 +429,26 @@ qa·reviewer 가 지적한 두 미검출은 각각 **이미 기각된 클래스�
 
 ### 결과
 
-- **코드 수정 0** (본 ADR 자체). §결정 5 의 스크립트 쪽 이행은 PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 가 이미 수행했고, ADR 쪽 문구 정합은 아래 §동시 진행 PR 과의 관계 로 인계
+- **코드 수정 0** (본 ADR 자체). §결정 5 의 스크립트 쪽 이행은 PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 가 **이미 수행해 머지**했고(develop `79ed14c`), ADR 쪽 문구 정합은 아래 §동시 진행 PR 과의 관계 «인계 1» 로 인계
 - **규범 조문 신설 0.** [`20260808-983`](20260808-983-measurement-recording-convention.md) §결정 의 _"4항이 정본"_ **무접촉**
 - **동반 갱신 3곳** — `983` §Amendment 3 (오기록 7·8 분류) / `970` §8-1 5-b `--limit` 정정 / `README.md` 인덱스 등재. **`982` 는 본 PR 에서 무접촉** (사유는 §동시 진행 PR 과의 관계)
 - **정본 방어선 불변** — 인용 식별자·박제 술어의 검증은 **작성자 1회 실행 + reviewer 재실행**이다. 본 ADR 은 이를 기계로 **대체하지 않는다는 것**을 확정할 뿐이다
 
-### 동시 진행 PR 과의 관계 (2026-08-14 시점)
+### 동시 진행 PR 과의 관계 (2026-08-14, **머지 상태 반영판**)
 
-본 ADR 은 미머지 PR 3건과 파일을 공유한다. **판정과 인계를 여기 고정**한다 — 이 절이 없으면 각 PR 이 머지되는 순서에 따라 본 ADR 의 서술이 조용히 낡는다.
+본 ADR 은 병행 PR 4건과 파일을 공유했다. **판정과 인계를 여기 고정**한다 — 이 절이 없으면 각 PR 이 머지되는 순서에 따라 본 ADR 의 서술이 조용히 낡는다. **`#1072` · `#1069` 는 머지됐고**(develop `79ed14c`), 본 브랜치는 그 develop 을 **병합한 상태**다.
 
-| PR | 공유 파일 | 관계 | 조치 |
-| --- | --- | --- | --- |
-| [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | [`20260814-982`](20260814-982-changelog-tilde-guard.md) | **동일 훅 앵커** (`@@ -336` · `@@ -533` 양쪽 바이트 동일) | **본 PR 무접촉으로 회피.** 아래 «인계 1» |
-| [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | `scripts/verify-md-tilde.mjs` | §결정 5 를 **이미 이행** (하드코딩 `5` 제거) | 본 ADR 이 방향을 (f-B) 로 맞춤 (§결정 5 번복 박스) |
-| [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | [`20260812-970`](20260812-970-pr-base-rule-guard.md) | §후속 표 항목 2·3 (`@@ -402`) ↔ 본 PR §8-1 5-b (`@@ -371`) | **훅 분리 — 충돌 없음** |
-| [#1070](https://github.com/coseo12/astro-simulator/pull/1070) | [`20260808-983`](20260808-983-measurement-recording-convention.md) | (ii) `> 확장` **동일 삽입점** | **의미론적으로 직교, 순수 텍스트 충돌.** 아래 «인계 2» |
-| [#1069](https://github.com/coseo12/astro-simulator/pull/1069) | — | `971` · `1010` · `1014` 3파일 | **본 PR 전건 무접촉** (`git diff --name-only` 확인) |
+| PR | 상태 | 공유 파일 | 관계 | 결과 |
+| --- | --- | --- | --- | --- |
+| [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | **MERGED** | [`20260814-982`](20260814-982-changelog-tilde-guard.md) | **동일 훅 앵커** (`@@ -336` · `@@ -533` 양쪽 바이트 동일) | **본 PR 무접촉으로 회피 — 앵커 충돌 0 으로 머지됨.** 아래 «인계 1» |
+| [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | **MERGED** | `scripts/verify-md-tilde.mjs` | §결정 5 를 **이미 이행** (하드코딩 `5` 제거) | 본 ADR 이 방향을 (f-B) 로 맞춤 (§결정 5 번복 박스). **develop 에서 이행 완료** |
+| [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | **MERGED** | [`20260812-970`](20260812-970-pr-base-rule-guard.md) | §후속 표 항목 2·3 (`@@ -402`) ↔ 본 PR §8-1 5-b (`@@ -371`) | **예측대로 훅 분리 — develop 병합 시 자동 머지, 충돌 `0`** |
+| [#1070](https://github.com/coseo12/astro-simulator/pull/1070) | **OPEN** | [`20260808-983`](20260808-983-measurement-recording-convention.md) | (ii) `> 확장` **동일 삽입점** | **의미론적으로 직교, 순수 텍스트 충돌.** 아래 «인계 2» |
+| [#1069](https://github.com/coseo12/astro-simulator/pull/1069) | **MERGED** | — | `971` · `1010` · `1014` 3파일 | **본 PR 전건 무접촉** — develop 병합 시 충돌 `0` |
 
-**인계 1 — `20260814-982` 착지는 #1072 머지 후 후속이다.** §결정 6(_"대조 주체는 사람"_)과 §측정 6(_"감소 = 회귀"_ 반증)을 그 ADR 본문에 착지시키는 편집은 **#1072 의 §Amendment 2 와 바이트 동일 앵커**를 갖는다. 초판은 두 편집을 담았으나 **되돌렸다.** ⚠️ **이 인계는 메모가 아니라 추적 대상이다** — 선언만 하고 착지가 갈리는 형태를 이 저장소가 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) → [#1035](https://github.com/coseo12/astro-simulator/issues/1035) 로 이미 겪었으므로, 착지는 **[#1075](https://github.com/coseo12/astro-simulator/issues/1075) 의 완료 기준**으로 승격했다. 착지 시점의 감시값은 #1072 가 확정하는 값(**`49`** — #1063 게이트 통일 반영)이며 본 ADR 의 `45` 는 **rev `38b6c8a` 시점 기록**이라 소급 치환하지 않는다.
+**인계 1 — `20260814-982` 착지는 후속이며, 순서 제약은 이미 해제됐다.** §결정 6(_"대조 주체는 사람"_)과 §측정 6(_"감소 = 회귀"_ 반증)을 그 ADR 본문에 착지시키는 편집은 **#1072 의 §Amendment 2 와 바이트 동일 앵커**를 갖는다. 초판은 두 편집을 담았으나 **되돌렸다.** ⚠️ **이 인계는 메모가 아니라 추적 대상이다** — 선언만 하고 착지가 갈리는 형태를 이 저장소가 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) → [#1035](https://github.com/coseo12/astro-simulator/issues/1035) 로 이미 겪었으므로, 착지는 **[#1075](https://github.com/coseo12/astro-simulator/issues/1075) 의 완료 기준**으로 승격했다. 착지 시점의 감시값은 #1072 가 확정한 값(**`49`** — #1063 게이트 통일 반영. develop 병합 후 `node scripts/verify-md-tilde.mjs --population` 실측 **`49`** 로 ADR `982` §Amendment 2 와 일치 확인)이며, 본 ADR 의 `45` 는 **rev `38b6c8a` 시점 + 그 시점 게이트** 기록이라 소급 치환하지 않는다.
+
+> ✅ **순서 제약 해제 (2026-08-14)** — #1072 가 머지됐으므로 «인계 1» 의 유일한 차단 사유(앵커 점유)가 **소멸**했다. 본 PR 에서 착지시키지 **않는 이유는 충돌이 아니라 범위**다 — 본 PR 은 판정 ADR 이고 리뷰가 진행 중이며, 착지는 [#1075](https://github.com/coseo12/astro-simulator/issues/1075) 에 **완료 기준 + 순서 제약**으로 이미 승격돼 추적된다. #1075 의 순서 제약은 **충족 상태**이므로 즉시 착수 가능하다.
 
 **인계 2 — `983` (ii) 확장 2건은 공존이 정답이다.** #1070 은 (ii) 에 `> 확장 (#1051)`(줄 번호 참조 금지)을, 본 PR 은 `> 확장 (#1064)`(자기 참조 노화)을 **같은 삽입점**에 넣는다. 두 클래스는 직교하고(전자는 **참조 좌표계**, 후자는 **계수 모집단**), #1070 은 오기록 분류표에 **행을 추가하지 않는다**고 명시하므로 본 PR 의 _"현재 분류표는 **8행**"_ 서술과도 충돌하지 않는다. **머지 순서 무관 — 나중 PR 이 두 블록을 모두 보존하도록 해소한다.**
 
