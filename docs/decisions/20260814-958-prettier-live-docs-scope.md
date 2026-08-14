@@ -155,6 +155,7 @@ docs/**
 ### 의도적 비-범위
 
 - `docs/retrospectives/README.md` / `P1-a11y.md` / `P1-browser-compat.md` / `P1-perf.md` — `-retrospective.md` 로 끝나지 않아 편입되지 않는다. 회고 **본문**이 아닌 인덱스·부속 측정이라 선언 단위 밖이며, 편입하려면 별도 판정이 필요하다
+  - ⚠️ **그 별도 판정이 하루 뒤 내려졌다 — 편입** ([#1063](https://github.com/coseo12/astro-simulator/issues/1063), 2026-08-14). 위 *"인덱스·부속 측정은 선언 단위 밖"* 근거를 4경로에 **일관 적용하면** 이미 편입돼 있는 `docs/benchmarks/README.md` · `docs/reports/**/README.md` 도 빠져야 하는데 그렇지 않다 — 즉 이 경계는 원리가 아니라 구 ADR `20260419` 가 유일하게 이 경로만 디렉토리 대신 **파일명**(`docs/retrospectives/p*`)으로 선언한 데서 온 **잔존 협소**였다. `.prettierignore` 는 `!docs/retrospectives/**/*.md` 로 통일됐고 모집단은 `45` → `49` (churn **1 파일 1 행**, 편입분 물결 `0` hit). 감시값 갱신은 [`20260814-982`](20260814-982-changelog-tilde-guard.md) **§Amendment 2**. 본 항 원문은 판정 시점의 기록이므로 **소급 치환하지 않는다**
 - `docs/lessons/` / `docs/decisions/` / `docs/guides/` / `docs/architecture/` / `docs/ops/` — 제외 유지. 여기에 의도된 취소선 **23 줄 / 48 발생**이 있고(`20260814-982` 실측), 편입하면 그 ADR 의 정밀도 논거가 실제로 깨진다
 - `docs/**` 전체를 포맷 대상으로 되돌리는 안 — 위 사유로 채택하지 않는다
 
@@ -251,7 +252,7 @@ docs/**
 ### 명시적 비-범위
 
 - `docs/lessons/` · `docs/decisions/` · `docs/guides/` · `docs/architecture/` · `docs/ops/` 의 소유 상태 — **무접촉**
-- `docs/retrospectives/README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md` — **무접촉**
+- `docs/retrospectives/README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md` — **무접촉** (⚠️ 후속 [#1063](https://github.com/coseo12/astro-simulator/issues/1063) 이 편입 판정 — 위 §의도적 비-범위 참조)
 - bench/forensic JSON·PNG — **무접촉** (H1)
 - `verify-prettier-coverage.mjs` 신설 — 후속 분리
 - `#1040` 존량 회수 — 별개 판정

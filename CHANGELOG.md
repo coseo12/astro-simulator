@@ -5,6 +5,41 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Changed
+
+- **[#1062] `operational-friction.md` §8 트리거 조건 확장 — `typecheck` 가 아니라 "워크스페이스 패키지를 해석하는 모든 명령" (MINOR)** ([#1062](https://github.com/coseo12/astro-simulator/issues/1062)) — [#960](https://github.com/coseo12/astro-simulator/issues/960) 이 §8 과 `.claude/agents/developer.md` 사본에 박제한 트리거가 _"격리 worktree 에서 **`typecheck` 를 돌리려면** `pnpm build` 선행"_ 이었는데 **좁다**. 결손 축 (ii)(워크스페이스 빌드 산출물 부재)는 `test:unit` 도 `pnpm dev` 도 똑같이 깨뜨리므로, `test:unit` 만 돌리는 에이전트는 **레시피에 도달하지 못한 채** 화면의 _"테스트 30개 실패"_ 를 자기 변경 탓으로 오진한다. PR [#1061](https://github.com/coseo12/astro-simulator/pull/1061) 이 실제로 그 직전까지 갔고, 메인이 디스패치 프롬프트에 §8 을 통째로 넣어서 피했을 뿐이다.
+
+  **§8-1 전수 매트릭스 신설** — rev `38b6c8a` 격리 worktree 에서 루트 스크립트를 **전건 실측**했다 (추측 0, exit code 는 파이프 없이 `$?` 채취). **의존 집합**: `pnpm typecheck` exit `2` / `error TS` `29` 행 · `pnpm --filter web typecheck` exit `2` / `76` 행 · `pnpm test:unit` exit `1` / `Failed to resolve entry` `28` 건 · `pnpm --filter web test` exit `1` (`12 failed | 33 passed`) · `pnpm --filter web build` exit `1` (`Module not found` `19` 건) · 브라우저 계열 `verify:*` exit `1` (`ERR_CONNECTION_REFUSED` — 직교 사유). **비의존 집합** (`install` 만으로 exit `0`): `lint` · `lint:core` · `lint:shared` · `format:check` · `check-encoding` · `verify:test-coverage` · `verify:iau-data` · `verify:no-scientific-grep` · `verify:zombie-check` · `verify:dead-wait-check` · `verify:docs-links` · `verify:adr-index` · `verify:r1-tier-untouched` · `verify:md-tilde --population`. `pnpm build` 후에는 의존 집합 전건 exit `0` (`1,370` tests passed).
+
+  **가장 위험한 항목은 `pnpm dev` 이며 exit code 로 드러나지 않는다** — 서버는 `✓ Ready in 342ms` 를 찍고 살아 있는데 `GET /` 만 **HTTP `500`** (`Module not found: Can't resolve '@astro-simulator/core'`) 이다. `pnpm build` 후 같은 요청은 HTTP `200`. 브라우저 검증을 붙이면 _"서버는 떴는데 화면이 비었다"_ 로 보여 **앱 회귀로 오진**하기 가장 쉬운 형태다.
+
+  **부수 실측 3건** — **(1)** `pnpm -r` 은 첫 실패에서 멈추므로(`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`) 루트 `typecheck` / `test:unit` 은 `packages/core` 에서 끊겨 **`apps/web` 에 도달하지 못하고**, 축 (i)(`TS2882`)이 루트 명령에서는 **아예 보이지 않는다** — `29` 와 `76` 이 갈리는 이유이자 §8 baseline 이 `--filter web` 기준인 이유. **(2)** 축 (ii) 의 결손 대상은 둘이 아니라 **셋**이다 — `packages/{shared,core}/dist` + `packages/physics-wasm/{pkg,pkg-bundler}` (루트 `TS2307` `28` = `shared` `24` + `physics-wasm` `4`). **(3)** `packages/physics-wasm` 의 `test` 는 `prebuild-test` 훅으로 `pkg` 를 자가 생성하므로 `test:unit` 을 먼저 돌리면 `TS2307` 이 `24` 로 관측된다 — 매트릭스가 **측정 순서**를 병기하는 이유.
+
+  ⚠️ **`error TS` `76` 행과 코드별 분해는 rev `8e230e3` 스냅샷과 일치**했다(재현 확인). 반면 **소요 표에는 행을 추가하지 않았다** — 매트릭스 채취 과정에서 `cargo` · `next` 캐시가 warm 해져 측정 조건이 기존 두 행과 다르기 때문이며, ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) §부분 재측정 금지 의 적용이다.
+
+- **[#1030] `operational-friction.md` §1-2 신설 — _"stacked PR"_ 이 아니라 봇이다 (PATCH)** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030)) — ADR [`20260812-970`](docs/decisions/20260812-970-pr-base-rule-guard.md) §9 후속 표의 항목 2·3 이 이슈 번호 없이 표에만 남아 있던 건이다 (그 ADR 이 스스로 인용한 _"표에만 있는 후속은 유실된다"_ 패턴 — [#962](https://github.com/coseo12/astro-simulator/issues/962) 축 B → #970 재발견). §1-1 트리거 축 표의 `` `base` 가 `develop`·`main` 둘 다 아님 `` 행이 그 사례를 _"stacked PR"_ 로만 적어 **사람의 stacked 관행을 함의**했고, [#970](https://github.com/coseo12/astro-simulator/issues/970) 착수 시 메인이 실제로 그렇게 오독해 전제 갭이 생겼다.
+
+  **구성 실측** (rev `38b6c8a` / 2026-08-14, 재현 술어 3개를 본문에 동반 박제) — base 분포 `develop` `445` / `main` `155` / 그 외 `17`, `search/issues` total_count `617` 로 교차 확인. 제3 브랜치 `17` 건은 **저자 `app/github-actions` `17 / 17` = 100%**, **head 접두 `chore/r1-baseline-linux-<runId>` `17 / 17` = 100%**. 구조 원인은 [`r1-baseline-bootstrap.yml`](.github/workflows/r1-baseline-bootstrap.yml) 의 `base: ${{ inputs.target_branch }}` 이며, R1 baseline 을 **작업 브랜치로 되돌려 주는** 설계상 정상 산출물이다. **이 저장소에 사람이 만든 stacked PR 은 `0` 건이다.** (2026-08-09 스냅샷은 `416 / 146 / 17` / 총 `579` 였다 — **그 외 `17` 은 불변**.)
+
+  **봇 PR auto-close 는 미발동 조건 표에 넣지 않는다 — 실해 `0` 이라 폴백 필요로 오독되기 때문이다.** 근거도 실측했다: 위 `17` 건 전수의 PR 본문 close 키워드 hit 이 **`17 / 17` `hits=0`** 이고, workflow 의 `body:` 가 close 키워드 없는 **고정 템플릿**이라 이 `0` 은 구조적이다. 트리거 축 표에는 §1-2 포인터만 두었다.
+
+- **[#1063] `.prettierignore` 4경로 게이트 형식 통일 — `docs/retrospectives/` 도 `**/*.md` (PATCH)** ([#1063](https://github.com/coseo12/astro-simulator/issues/1063)) — [#958](https://github.com/coseo12/astro-simulator/issues/958) 이후 4경로 중 `docs/retrospectives/` 만 파일명 게이트(`**/*-retrospective.md`)라 같은 디렉토리의 md `4` 건(`README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md`)이 `ignored: true` 로 남아 있었다. **회귀는 아니었으나**(선언에 충실 = fail-closed) **동형 파일이 경로에 따라 갈렸다** — `docs/reports/379-forensic/README.md` 는 편입, `docs/retrospectives/README.md` 는 제외.
+
+  **판정: 의도적 경계가 아니라 잔존 협소 → (나) 통일 채택.** 좁은 게이트의 근거로 제시됐던 _"인덱스·부속 측정은 선언 단위 밖"_ (ADR [`20260814-958`](docs/decisions/20260814-958-prettier-live-docs-scope.md) §의도적 비-범위) 을 4경로에 **일관 적용하면** 이미 편입된 `docs/benchmarks/README.md` · `docs/reports/**/README.md` 도 빠져야 하는데 그렇지 않다. 뿌리는 구 ADR `20260419` §제외 대상 정책이 유일하게 이 경로만 디렉토리가 아닌 **파일명**(`docs/retrospectives/p*`)으로 선언한 것이고, 그 선언에는 자체 근거가 없다. CLAUDE.md §마일스톤 회고 루틴 의 위치 규약(`<phase-or-milestone>-retrospective.md`)은 **회고 문서의 위치**를 정할 뿐 **prettier 소유 경계**를 정하지 않으므로 좁은 게이트를 정당화하지 않는다.
+
+  **churn 실측 `1` 파일 `1` 행** — `docs/retrospectives/README.md` 에 리스트 앞 빈 줄 1개 추가, 나머지 `3` 건은 `prettier --write` 무변경. 편입분의 물결 hit 은 **넓은 그물 `~~` `0` / 단일 `~` 도 `0`** 이라 ADR [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) §정밀도의 출처 논거는 무손상이다. 모집단 `45` → **`49`**, 감시값 갱신은 그 ADR **§Amendment 2** (§재검토 조건 1 **재발동** — Amendment 1 §후속 감시 가 예고한 이탈이 하루 뒤 실제로 일어났다).
+
+- **[#1063] `operational-friction.md` §7-2 신설 — `.prettierignore` negative-test 의 `--ignore-path` 거짓 PASS (PATCH)** ([#1063](https://github.com/coseo12/astro-simulator/issues/1063)) — 변형 `.prettierignore` 를 리포 **밖**(`/tmp` 등)에 두고 `--ignore-path` 로 넘기면 패턴이 **그 파일의 디렉토리 기준**으로 해석돼 `/` 를 포함한 **앵커 패턴이 통째로 무효**가 된다. 대상이 전부 `ignored: false` 로 보이고 그것이 곧 _"negation 이 작동한다"_ 는 거짓 PASS 다. PR [#1061](https://github.com/coseo12/astro-simulator/pull/1061) qa 가 자기 측정에서 적발한 함정이며, `.prettierignore` 를 negative-test 하는 **모든 후속 작업**에 재발한다.
+
+  **실측 대조표** (같은 내용의 ignore 파일을 두 위치에 두고 `--file-info`) — `docs/**` · `.claude/**` · `.github/PULL_REQUEST_TEMPLATE.md` (앵커) 는 루트 배치 `true` → `/tmp` 배치 **`false`** 로 뒤집히는 반면, `CLAUDE.md` (**베어 이름**) 는 양쪽 `true` 다. ⚠️ **그래서 대조군을 잘못 고르면 함정이 숨는다** — 슬래시 없는 패턴은 gitignore 문법상 모든 깊이에 매칭되므로 `CLAUDE.md` 하나만 대조군으로 두면 _"대조군이 살아 있으니 측정 정상"_ 이라는 결론이 나온다. **대조군은 반드시 앵커된 패턴에서 고른다.** 표준 절차는 변형본을 **리포 루트에 임시 파일명**으로 두고 즉시 삭제하는 것이며, 모집단 계수의 정본 술어는 `node scripts/verify-md-tilde.mjs --population` 이다 (기본 `.prettierignore` 를 쓰므로 본 함정에 노출되지 않는다).
+
+### Behavior Changes
+
+- **`.claude/agents/developer.md` §규칙 — `pnpm build` 선행 트리거가 넓어진다.** 이전: _"격리 worktree 에서 **`typecheck` 를 돌리려면**"_. 이후: _"격리 worktree 에서 **워크스페이스 패키지에 의존하는 명령**을 돌리려면"_. 같은 입력(격리 worktree + `pnpm test:unit` 또는 `pnpm dev` 만 필요한 작업)에서 dev 에이전트가 **다르게 동작한다** — 이전 규칙은 `typecheck` 를 안 부르면 발화하지 않아 `install` 만으로 진행했고, 그 결과가 #1062 가 박제한 오진 경로다.
+- **하위 규칙 3개 추가** — (i) `lint` / `format:check` / 정적 `verify:*` 는 **비의존 집합**이라 `install` 만으로 충분하다는 명시 (불필요한 `build` 호출 억제), (ii) `pnpm dev` 는 **exit code 로 드러나지 않는다**는 경고, (iii) 축 (ii) 결손 대상이 `packages/physics-wasm/{pkg,pkg-bundler}` 를 포함한다는 정정.
+- **문서 SSoT 정합** — `docs/ops/operational-friction.md` §8 이 절차 SSoT 이고 `developer.md` 가 사본이므로 **두 곳을 동시에** 갱신했다. `scripts/verify-agent-ssot.sh` exit `0` (5 files × 9 fields = 45 checks).
+- **`.prettierignore` 소유 모집단 확대** — `45` → `49`. prettier 가 `docs/retrospectives/` 의 md 를 전건 소유하므로 이후 그 4건 편집 시 pre-commit `lint-staged` 가 재포맷한다.
+
 ## [0.73.0] — 2026-08-14
 
 ### Added
