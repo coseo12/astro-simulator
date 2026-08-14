@@ -1,7 +1,7 @@
 # ADR: 커밋된 산출물의 「검증 가능한 거짓」 기계 대조 — 인용 식별자·박제 술어 양축 기각, 감시값 SSoT 수렴만 채택 (#1031 / #1064)
 
 - 일자: 2026-08-14
-- **상태**: **Provisional** — cross-validate 결과 통합 전. 통합 후 `Accepted` 전이 (CLAUDE.md §ADR Status 워크플로, [#370](https://github.com/coseo12/astro-simulator/issues/370) 옵션 C). ⚠️ 본 라인은 [`20260812-1005`](20260812-1005-adr-index-status-guard.md) §재검토 조건의 **어순 제약** 대상이다 — 현재 상태 토큰이 최선두여야 한다
+- **상태**: **Accepted** (cross-validate agy 2026-08-14 — `code 1074`, anchor `ADR-new-or-amendment`, outcome `applied`. §교차검증 반영 사항 4축 통합 완료. `Provisional` 에서 전이 — CLAUDE.md §ADR Status 워크플로, [#370](https://github.com/coseo12/astro-simulator/issues/370) 옵션 C). ⚠️ 본 라인은 [`20260812-1005`](20260812-1005-adr-index-status-guard.md) §재검토 조건의 **어순 제약** 대상이다 — 현재 상태 토큰이 최선두여야 한다
 - 관련: 이슈 [#1031](https://github.com/coseo12/astro-simulator/issues/1031) (인용 식별자 축) / [#1064](https://github.com/coseo12/astro-simulator/issues/1064) (박제 술어 축) / 후속 [#1075](https://github.com/coseo12/astro-simulator/issues/1075) (잔여 2건) / 근거 PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) (블로킹 4건) · [#1061](https://github.com/coseo12/astro-simulator/pull/1061) (수치 오류 4라운드)
 - **병행 PR** (파일 공유 — 판정·인계는 §동시 진행 PR 과의 관계): [#1072](https://github.com/coseo12/astro-simulator/pull/1072) (§결정 5 를 이미 이행 + `982` 앵커 충돌) / [#1070](https://github.com/coseo12/astro-simulator/pull/1070) (`983` (ii) 확장 동일 삽입점) / [#1069](https://github.com/coseo12/astro-simulator/pull/1069) (본 PR 무접촉)
 - 선행 ADR: [`20260808-983`](20260808-983-measurement-recording-convention.md) §기각 2 · §Amendment 2 (동일 클래스 2연속 기각 — 본 ADR 이 세 번째) / [`20260814-982`](20260814-982-changelog-tilde-guard.md) §재검토 조건 1 · §후속 감시 (감시값의 거처) / [`20260814-958`](20260814-958-prettier-live-docs-scope.md) §고유 발견 (#1064 발의 출처) / [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) §결정 3 (3계급 선례) · §결정 7 (SSoT 수렴 선례) / [`20260812-970`](20260812-970-pr-base-rule-guard.md) §8-1 5-b (#1031 경미 사항 대상)
@@ -112,7 +112,7 @@ git grep -chE '^[[:space:]]*```(bash|sh|shell|console)[[:space:]]*$' 38b6c8a -- 
 
 셸 펜스 **194** (`docs` 130 / `.claude` 64).
 
-> ⚠️ **축 A 와 축 B 는 코퍼스 경계가 다르다** (reviewer 라운드 2 — 실해 `0` 이나 명시한다). 축 A(§측정 1)는 `docs .claude CLAUDE.md CHANGELOG.md` **4경로**, 축 B 는 **`docs` + `.claude` 2경로**다. 같은 rev 무제한 계수는 **`202`** 이고 차 `8` 의 내역은 `CHANGELOG.md` **3** + 그 밖(`.github` · `scripts` 등) **5** 이며 `CLAUDE.md` 는 **0** 이다. 축 B 가 2경로인 이유는 *"박제 술어 + 기대값"* 쌍의 거처가 **규범 문서**이기 때문이고, 축 A 가 `CHANGELOG.md` 를 포함하는 이유는 **인용 식별자가 릴리스 기록에 다수 등장**하기 때문이다. 두 모집단은 **포함 관계가 아니다** ([`20260808-983`](20260808-983-measurement-recording-convention.md) (iv) 확장 — 술어 비교환).
+> ⚠️ **축 A 와 축 B 는 코퍼스 경계가 다르다** (reviewer 라운드 2 — 실해 `0` 이나 명시한다). 축 A(§측정 1)는 `docs .claude CLAUDE.md CHANGELOG.md` **4경로**, 축 B 는 **`docs` + `.claude` 2경로**다. 같은 rev 무제한 계수는 **`202`** 이고 차 `8` 의 내역은 `CHANGELOG.md` **3** + **`README.md` 계열 5**(루트 `README.md` **2** / `packages/core/README.md` **1** / `packages/physics-wasm/README.md` **2**)이며 `CLAUDE.md` · `.github` · `scripts` · `apps` 는 **전건 `0`** 이다. ⚠️ 초판은 이 `5` 를 _"그 밖(`.github`·`scripts` 등)"_ 으로 귀속했는데 **값은 맞고 귀속이 틀렸다** — 실측하면 그 두 경로는 `0` 이다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) 오기록 5 형태. PR [#1074](https://github.com/coseo12/astro-simulator/pull/1074) reviewer 라운드 3). 축 B 가 2경로인 이유는 *"박제 술어 + 기대값"* 쌍의 거처가 **규범 문서**이기 때문이고, 축 A 가 `CHANGELOG.md` 를 포함하는 이유는 **인용 식별자가 릴리스 기록에 다수 등장**하기 때문이다. 두 모집단은 **포함 관계가 아니다** ([`20260808-983`](20260808-983-measurement-recording-convention.md) (iv) 확장 — 술어 비교환).
 
 이 중 *"박제 술어 + 기대값"* 쌍을 추리기 위해 1회성 분류기를 적용했다 — 기대값 동반 **81**, 그중 모든 명령 줄이 읽기 전용 allowlist(`git ls-files` / `git grep` / `git rev-list` / `git log` / `node scripts/verify-*` / `pnpm verify:*` / `pnpm exec prettier --file-info` / `gh api`)에 드는 것 **8**.
 
@@ -229,6 +229,8 @@ done | uniq -c            # 45×76 / 48×47 / 47×62 / 46×65  (최신 → 과�
 > ⚠️ **위 술어의 `RE` 는 rev `38b6c8a` 시점 `.prettierignore` 게이트의 파생이다.** PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072)([#1063](https://github.com/coseo12/astro-simulator/issues/1063))가 `docs/retrospectives/` 게이트를 `**/*-retrospective.md` → `**/*.md` 로 **통일해 머지됐으므로**(develop `79ed14c`), 현행 트리에서 재실행하려면 `RE` 의 마지막 대안을 `docs/retrospectives/.*\.md` 로 바꿔야 한다 (그 결과 계수는 `45` → `49`, 편입 4건 = `README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md`. 실측 확인: 갱신한 `RE` 로 `origin/develop` = **`49`** = `--population` 실측과 일치). **술어를 갱신하지 않고 재실행하면 표가 재현되지 않으며**, 그것이 PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) 가 [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) §축 3 에서 발견한 것과 같은 형태다. 아래 결론은 **파일 삭제/추가 이력** 위에 서 있어 게이트 정의 변경에 영향받지 않는다.
 
 > **⇒ *"감소 ⇒ 회귀"* 는 관측된 유일 사례에서 반증된다. 방향별 FAIL 계급의 정밀도는 `0/1`.**
+>
+> [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) 의 WARN 축이 성립한 이유는 `phraseHits ≥ 1 ∧ structureHits = 0` 이라는 **관측 가능한 중간 상태가 실재**했기 때문이다. 본 건의 *"감소"* 는 중간 상태가 아니라 **정상과 회귀가 같은 관측값을 공유**하는 구간이며, 계급을 가를 축이 없다.
 
 ### 측정 6-1 — `T0` 자기 적용이 이 결함을 통과시켰다 (§결정 3 잔여 위의 한 층)
 
@@ -247,11 +249,12 @@ done | uniq -c            # 45×76 / 48×47 / 47×62 / 46×65  (최신 → 과�
 3층을 닫은 것은 재실행이 아니라 **산술 정합 검산**이었다 — reviewer 가 _"감소 `−1` 인데 삭제 열거는 3건"_ 이라는 **문서 내부 모순**으로 잡았고, 이는 [`20260808-983`](20260808-983-measurement-recording-convention.md) (i) 확장이 요구한 _"차분·비율은 **피연산자와 함께** 적어 재측정자가 정합을 눈으로 검산할 수 있게 한다"_ 가 **설계대로 작동한 사례**다. 초판이 삭제 3건을 열거해 두지 않았다면 이 결함은 남았다.
 
 **그러므로 3층에 대한 처방은 새 규약이 아니라 (i) 확장의 이행이다** — 계수를 박제할 때 **그 계수를 설명하는 델타(추가/삭제 목록)를 함께 적는다.** 규약 신설 없이 닫히므로 §결정 3(표기 규약 신설 기각)은 **불변**이다.
-> [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) 의 WARN 축이 성립한 이유는 `phraseHits ≥ 1 ∧ structureHits = 0` 이라는 **관측 가능한 중간 상태가 실재**했기 때문이다. 본 건의 *"감소"* 는 중간 상태가 아니라 **정상과 회귀가 같은 관측값을 공유**하는 구간이며, 계급을 가를 축이 없다.
 
 ### 측정 7 — 살아 있는 drift: 관측 도구 자신이 틀린 기대값을 출력한다
 
-설계 중 발견한 **현행 결함**이다.
+설계 시점(rev `38b6c8a`)에 발견한 **당시 현행 결함**이다.
+
+> ✅ **[2026-08-14 — 닫혔다]** PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 머지(develop `fe922bb`)로 하드코딩이 제거됐다. 현재 트리 실측 — `git grep -cF 'ADR 박제값은 5 다' -- scripts/verify-md-tilde.mjs` → **`0` hit**. 아래 서술은 **`38b6c8a` 시점 기록으로 보존**한다 (소급 치환 금지 — [`20260808-983`](20260808-983-measurement-recording-convention.md) §결과 3). §결정 5 가 이 결함을 근거로 확정한 방향(f-B)은 그 머지로 **이미 발효**돼 있다.
 
 ```bash
 node scripts/verify-md-tilde.mjs --population
@@ -443,14 +446,14 @@ qa·reviewer 가 지적한 두 미검출은 각각 **이미 기각된 클래스�
 | [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | **MERGED** | [`20260814-982`](20260814-982-changelog-tilde-guard.md) | **동일 훅 앵커** (`@@ -336` · `@@ -533` 양쪽 바이트 동일) | **본 PR 무접촉으로 회피 — 앵커 충돌 0 으로 머지됨.** 아래 «인계 1» |
 | [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | **MERGED** | `scripts/verify-md-tilde.mjs` | §결정 5 를 **이미 이행** (하드코딩 `5` 제거) | 본 ADR 이 방향을 (f-B) 로 맞춤 (§결정 5 번복 박스). **develop 에서 이행 완료** |
 | [#1072](https://github.com/coseo12/astro-simulator/pull/1072) | **MERGED** | [`20260812-970`](20260812-970-pr-base-rule-guard.md) | §후속 표 항목 2·3 (`@@ -402`) ↔ 본 PR §8-1 5-b (`@@ -371`) | **예측대로 훅 분리 — develop 병합 시 자동 머지, 충돌 `0`** |
-| [#1070](https://github.com/coseo12/astro-simulator/pull/1070) | **OPEN** | [`20260808-983`](20260808-983-measurement-recording-convention.md) | (ii) `> 확장` **동일 삽입점** | **의미론적으로 직교, 순수 텍스트 충돌.** 아래 «인계 2» |
+| [#1070](https://github.com/coseo12/astro-simulator/pull/1070) | **MERGED** | [`20260808-983`](20260808-983-measurement-recording-convention.md) | (ii) `> 확장` **동일 삽입점** | **«인계 2» 판정대로 본 PR 이 「나중 PR」 이 되어 두 블록 보존으로 해소.** 실측: (ii) 절에 `확장 (#1051)` **1** + `확장 (#1064)` **1** 공존 |
 | [#1069](https://github.com/coseo12/astro-simulator/pull/1069) | **MERGED** | — | `971` · `1010` · `1014` 3파일 | **본 PR 전건 무접촉** — develop 병합 시 충돌 `0` |
 
 **인계 1 — `20260814-982` 착지는 후속이며, 순서 제약은 이미 해제됐다.** §결정 6(_"대조 주체는 사람"_)과 §측정 6(_"감소 = 회귀"_ 반증)을 그 ADR 본문에 착지시키는 편집은 **#1072 의 §Amendment 2 와 바이트 동일 앵커**를 갖는다. 초판은 두 편집을 담았으나 **되돌렸다.** ⚠️ **이 인계는 메모가 아니라 추적 대상이다** — 선언만 하고 착지가 갈리는 형태를 이 저장소가 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) → [#1035](https://github.com/coseo12/astro-simulator/issues/1035) 로 이미 겪었으므로, 착지는 **[#1075](https://github.com/coseo12/astro-simulator/issues/1075) 의 완료 기준**으로 승격했다. 착지 시점의 감시값은 #1072 가 확정한 값(**`49`** — #1063 게이트 통일 반영. develop 병합 후 `node scripts/verify-md-tilde.mjs --population` 실측 **`49`** 로 ADR `982` §Amendment 2 와 일치 확인)이며, 본 ADR 의 `45` 는 **rev `38b6c8a` 시점 + 그 시점 게이트** 기록이라 소급 치환하지 않는다.
 
 > ✅ **순서 제약 해제 (2026-08-14)** — #1072 가 머지됐으므로 «인계 1» 의 유일한 차단 사유(앵커 점유)가 **소멸**했다. 본 PR 에서 착지시키지 **않는 이유는 충돌이 아니라 범위**다 — 본 PR 은 판정 ADR 이고 리뷰가 진행 중이며, 착지는 [#1075](https://github.com/coseo12/astro-simulator/issues/1075) 에 **완료 기준 + 순서 제약**으로 이미 승격돼 추적된다. #1075 의 순서 제약은 **충족 상태**이므로 즉시 착수 가능하다.
 
-**인계 2 — `983` (ii) 확장 2건은 공존이 정답이다.** #1070 은 (ii) 에 `> 확장 (#1051)`(줄 번호 참조 금지)을, 본 PR 은 `> 확장 (#1064)`(자기 참조 노화)을 **같은 삽입점**에 넣는다. 두 클래스는 직교하고(전자는 **참조 좌표계**, 후자는 **계수 모집단**), #1070 은 오기록 분류표에 **행을 추가하지 않는다**고 명시하므로 본 PR 의 _"현재 분류표는 **8행**"_ 서술과도 충돌하지 않는다. **머지 순서 무관 — 나중 PR 이 두 블록을 모두 보존하도록 해소한다.**
+**인계 2 — `983` (ii) 확장 2건은 공존이 정답이다. ✅ 이행 완료.** #1070 은 (ii) 에 `> 확장 (#1051)`(줄 번호 참조 금지)을, 본 PR 은 `> 확장 (#1064)`(자기 참조 노화)을 **같은 삽입점**에 넣는다. 두 클래스는 직교하고(전자는 **참조 좌표계**, 후자는 **계수 모집단**), #1070 은 오기록 분류표에 **행을 추가하지 않는다**고 명시하므로 본 PR 의 _"현재 분류표는 **8행**"_ 서술과도 충돌하지 않는다. **머지 순서 무관 — 나중 PR 이 두 블록을 모두 보존하도록 해소한다.** ✅ **#1070 이 먼저 머지돼 본 PR 이 「나중 PR」 이 됐고, develop 병합에서 두 블록을 보존해 해소했다** (무손실 술어: `grep -c '^> \*\*확장 (\[#1051\]'` → `1` / `'^> \*\*확장 (\[#1064\]'` → `2` = (ii) 오기록 8 + (iv) 오기록 7). 예측대로 **의미론 충돌 `0`** 이었다.
 
 ### 재검토 조건
 
@@ -531,3 +534,35 @@ qa·reviewer 가 지적한 두 미검출은 각각 **이미 기각된 클래스�
 - **[`20260807-971`](20260807-971-required-status-checks.md) · [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) · [`20260813-1014`](20260813-1014-release-pr-class-no-op.md) — 무접촉** (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) 동시 편집 중)
 - **[#1040](https://github.com/coseo12/astro-simulator/issues/1040) 존량 회수 — 별개 판정**
 - **`docs/**` 의 stale 수치 소급 정정 — 하지 않는다.** §측정 3 이 보인 대로 이탈 2건은 **문서가 옳고 rev 가 다를 뿐**이다. 소급 편집은 기록 위조다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §결과 3)
+
+---
+
+## 교차검증 반영 사항 (agy, 2026-08-14 — `code 1074`, anchor `ADR-new-or-amendment`, outcome `applied`)
+
+**메인 오케스트레이터가 수행**했다 — `architect` 는 직접 호출이 금지돼 있다 ([#479](https://github.com/coseo12/astro-simulator/issues/479)). exit `0` (폴백 아님). 5개 항목 **전건 `양호`**, 판정 **승인 권고**. 로그: `.claude/logs/cross-validate-code-20260814-161816.log`.
+
+> ⚠️ **한정자** — 위 로그 경로는 gitignore 대상이라 **인용의 무치환 여부는 트리 안에서 재검증 불가**하다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §Amendment 2 가 같은 한정자를 달았다). 반면 **아래 판정의 근거는 전부 트리 안에서 재현 가능**하다 — §측정 1~8 의 술어 전문이 그것이다. **인용은 신뢰의 대상이고 근거는 검증의 대상이다.**
+
+### 합의
+
+- **로직 정확성 및 실측 무결성** `양호` — 기각 근거의 실측 데이터 무결성 확인
+- **실행 안전성** `양호` — allowlist 불가 논거(`awk` 의 `system()` 보유)를 포함한 안전성 결여 규명을 인정
+- **모집단 감소의 회귀 판정 반증** — 유일 감소가 정당한 삭제라 정밀도 `0/1` 이라는 §측정 6 결론에 동의
+- **통합 ADR 판정의 정합성** — 4 근거 + 반례 조건 명시가 [`README.md`](README.md) §규약 11(_"1 ADR = 1 결정"_)과 정합
+- 최종 결론 축자: _"수치 검증 자동화의 이상과 현실적 한계(정밀도 0%, 안전성 결여, Anaphora 결속 한계)를 명확한 실측 데이터로 규명하고 올바른 거버넌스를 확립한 모범적인 ADR"_
+
+### Claude 재분석으로 기각한 외부 모델 제안
+
+**제안 2 — _"후속 구현 PR 시 `scripts/verify-md-tilde.mjs` 의 `ADR_POPULATION_WATCH = 45` 상수화"_ → 기각.** 본 ADR 이 채택한 것은 상수화가 **아니라** «값을 스크립트에서 제거» 다 (§결정 5 (f-B), §결정 6). **상수화는 `5` 를 `45` 로 바꾸는 것과 같은 클래스의 실수**이며 — 값이 스크립트에 남는 한 다음 갱신에서 **세 번째 누락**이 난다 (앞선 둘: #958 `5`→`45` / #1063 `45`→`49`). PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 가 이미 반대 방향으로 구현해 머지됐다. cross-validate 는 _"SSoT 수렴"_ 을 **「한 곳에 상수로 모은다」** 로 읽었으나 **본 ADR 의 수렴 지점은 ADR 자신이지 스크립트가 아니다** (volt [#51](https://github.com/coseo12/volt/issues/51) 외부 툴 주장 실측 가드).
+
+> ⚠️ **이 오독은 ADR 문언이 유발했을 여지가 있다** — _"감시값 SSoT 수렴"_ 만 보면 상수화로 읽힌다. 그래서 §결정 5 제목을 _"**ADR 쪽으로** 수렴시킨다 (스크립트는 숫자를 복제하지 않는다)"_ 로 두고 5-2 에 _"값 갱신이 아니라 **제거** 대상"_ 을 못박았다. **외부 모델이 오독한 지점이 곧 문언의 약한 지점**이라는 신호로 받아 문면을 조인 것이며, 판정 자체는 바뀌지 않았다.
+
+### 고유 발견 (채택, 단 범위 조정 — 후속 이슈 미생성)
+
+**`--limit 1000` 의 장기 상한** — _"저장소 총 PR 이 `1,000` 건을 초과하면 그 GraphQL 쿼리도 초기 1,000건만 조회해 누락이 발생한다(`T3`/`T4`)"_. **타당하다.** 다만 이는 본 ADR 만의 문제가 아니라 **이 저장소의 반복 결함**이며, PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 가 **정확히 같은 클래스**를 차단으로 잡았다(`--limit 300` 이 90일 창을 이미 절단). **개별 PR 마다 힌트를 부기하는 것 자체가 다문서 drift** 이고 그것이 본 ADR 이 겨누는 클래스이므로, §측정 8 의 `T4` 한정자로 흡수하고 **별도 이슈를 만들지 않는다** — 근본 처방(_"limit 이 창을 덮는지 자체를 술어에 포함"_)은 #1069 관할이다.
+
+### Claude 편향 셀프 체크 ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5)
+
+- **처방 충돌을 먼저 확인했다** — 제안 2 를 받기 전에 **#1072 와 본 PR 의 실제 diff 를 대조**해 두 PR 이 같은 방향으로 수렴했음을 확인했다. 대조 없이 제안만 봤으면 _"상수화하라"_ 를 dev 에 그대로 넘겼을 것이고, 그것은 **#1072 가 방금 제거한 값을 되살리는** 결과가 된다
+- **어긋난 것은 처방이지 판정이 아니다** — 5개 `양호` 는 유효하고 기각 결론에 이견이 없다. ⚠️ **기각 ADR 은 _"가드를 만들지 않는다"_ 는 결정이라 근거가 틀리면 실재 결함을 영구히 덮는다** — 그래서 reviewer 에게 **모집단 정의 민감도**를 중점으로 걸었고, 실제로 라운드 2 에서 §측정 6 술어의 `core.quotePath` 결함이 그 축에서 적발됐다
+- **4축 판정** — 낙관적 일정(구현 산출물 `0`) / 결합 간과(#1069·#1070·#1072 3 PR 과 파일 공유를 §동시 진행 PR 절로 전수 대조) / 폐기 프레이밍(기각 3축 각각을 실측 정밀도로 지지) / 순수주의(§결정 5 를 외부 구현에 맞춰 **번복**) — **4축 통과**

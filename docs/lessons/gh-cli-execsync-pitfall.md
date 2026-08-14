@@ -1,6 +1,8 @@
-# gh CLI 마크다운 본문 발송 — execSync shell metachar 함정
+# 셸 경유 마크다운·코드 전달 — metachar 함정 (원 제목: gh CLI execSync)
 
-> CLAUDE.md `### gh CLI 마크다운 본문 발송 — execSync shell metachar 함정` 가지치기 위임 (이슈 #266 / PR #290). CLAUDE.md 본문은 1줄 포인터만 유지. **근거**: volt [#114](https://github.com/coseo12/volt/issues/114).
+> CLAUDE.md `### 셸 경유 마크다운·코드 전달 — metachar 함정` 가지치기 위임 (이슈 #266 / PR #290). CLAUDE.md 본문은 1줄 포인터만 유지. **근거**: volt [#114](https://github.com/coseo12/volt/issues/114).
+>
+> ⚠️ **제목 확장 ([#1045](https://github.com/coseo12/astro-simulator/issues/1045))** — 원 제목은 `gh CLI 마크다운 본문 발송 — execSync shell metachar 함정` 이었다. #996 이 사거리를 `git commit -m` 까지 넓혔는데 제목·CLAUDE.md 진입점이 `gh CLI` / `execSync` 로 좁아 **에이전트가 규약 사거리를 명령 이름으로 오독**했다. 파일명(`gh-cli-execsync-pitfall.md`)은 유입 링크 보존을 위해 유지한다. 릴리스 확정 CHANGELOG (`[0.71.0]` 의 #990 entry) 가 인용한 구 제목은 **그 시점 사실**이므로 소급 편집하지 않는다.
 
 Node.js 에서 `execSync('gh pr comment N --body "..."')` 로 마크다운 본문 (백틱 / `$` / `!` / `;` 등 특수 문자 포함) 발송 시 **shell metachar 가 명령 치환·변수 확장으로 해석**되어 syntax error 발생. 자동 코멘트 / actionable 보고 발송이 silent fail.
 
@@ -11,7 +13,7 @@ Node.js 에서 `execSync('gh pr comment N --body "..."')` 로 마크다운 본�
 두 갈래이고, **위험한 쪽은 조용한 쪽**이다.
 
 - **시끄러운 실패** — `/bin/sh: 1: Syntax error: end of file unexpected` 등 shell 단계 에러. exit non-zero 라 즉시 드러난다.
-- **조용한 성공** — 백틱·`$` 가 치환·확장되어 **exit 0 으로 성공**하고, 본문 일부가 **통째로 사라진 채** 박제된다. 되돌릴 수 없다.
+- **조용한 성공** — 백틱·`$` 가 치환·확장되거나 `\`·`"` 가 이스케이프·인용으로 소비되어 **exit 0 으로 성공**하고, 본문 일부가 **사라진 채** 박제된다. 되돌릴 수 없다.
 
 ## 원인
 
@@ -32,18 +34,103 @@ printf 'A|%s|\n' "$body"     # -> A|has `date` and $HOME and <TOK>|   (원문 �
 ### 큰따옴표가 막아주는 것과 못 막는 것 (실측)
 
 ```sh
-for m in '<TOK>' 'a;b' 'a!b' 'a|b' 'a&b' '$VAR' '`cmd`' '$(cmd)'; do
-  /bin/sh -c "printf '%s\n' \"pre ${m} post\""
+for m in '<TOK>' 'a;b' 'a!b' 'a|b' 'a&b' '$VAR' '`cmd`' '$(cmd)' 'a\b' 'a\\b' 'q"x"q'; do
+  eval "printf '%-10s -> [%s]\n' \"\$m\" \"pre ${m} post\"" 2>&1 | tail -1
 done
 ```
 
-| 큰따옴표 안 metachar         | 결과                        | 판정                        |
-| ---------------------------- | --------------------------- | --------------------------- |
+| 큰따옴표 안 metachar             | 결과                          | 판정                        |
+| -------------------------------- | ----------------------------- | --------------------------- |
 | `<TOK>` `a;b` `a!b` `a\|b` `a&b` | 그대로 출력 (`pre <TOK> post`) | **리터럴 — 안전**           |
-| `$VAR`                       | 빈 문자열로 확장            | **조용한 소실**             |
-| `` `cmd` `` / `$(cmd)`       | 명령 치환 (stderr 만 남음)  | **조용한 소실**             |
+| `$VAR`                           | 빈 문자열로 확장              | **조용한 소실** (치환·확장) |
+| `` `cmd` `` / `$(cmd)`           | 명령 치환 (stderr 만 남음)    | **조용한 소실** (치환·확장) |
+| `a\b`                            | `pre a\b post` (보존)         | **리터럴 — 안전** (아래 단서) |
+| `a\\b`                           | `pre a\b post` (**백슬래시 1개 소실**) | **조용한 손상** (이스케이프) |
+| `q"x"q`                          | `pre qxq post` (**따옴표 소실**, argv 1개로 병합) | **조용한 손상** (따옴표 종료) |
 
-즉 **큰따옴표는 `<` `>` `;` `!` `|` `&` 를 이미 막아준다.** 남는 위험은 `` ` `` 와 `$` **둘뿐**이며, 이 둘은 큰따옴표를 뚫는다. `<` 가 리다이렉트로 터지는 것은 **따옴표가 없거나 앞선 백틱이 따옴표를 깨뜨린 뒤**의 이야기다 (`git commit -q -m fix:\ guard\ <CONST_NAME>` → `syntax error near unexpected token`, exit `2`).
+> ⚠️ **`둘뿐` 이라고 쓰지 않는다 — 닫힌 양화사는 픽스처 밖에서 반증된다.** 초판 표는 위 **앞
+> 8행만** 돌고 _"남는 위험은 `` ` `` 와 `$` 둘뿐"_ 이라는 **닫힌 전칭**을 냈는데, 픽스처가 `\` 와
+> `"` 를 **한 번도 안 걸었다** (#995 _"0-hit sweep ≠ 전수 증명"_ 의 동형 — 가드가 자기가 안 거는
+> 축을 못 본다). PR [#1070](https://github.com/coseo12/astro-simulator/pull/1070) 리뷰가 뒤 3행을
+> 주입해 반증했다. **POSIX 큰따옴표 안에서 특수성을 유지하는 것은 `` ` `` · `$` · `\` · `"` 이며,
+> 이 열거도 닫힌 것으로 취급하지 않는다** — 새 축이 나오면 픽스처에 행을 추가한다.
+
+**축이 둘이다 — 치환 축과 손상 축.** 둘을 합쳐 세면 위 오류가 재발한다.
+
+- **치환·확장 축 (`` ` `` · `$`)** — 내용이 **다른 것으로 바뀌거나 사라진다**. 이 축에 한정하면
+  _"둘뿐"_ 은 **참**이다.
+- **손상 축 (`\` · `"`)** — 치환은 안 일으키지만 **문자 자체가 소실**된다. `\` 는 `$` · `` ` `` ·
+  `"` · `\` · **개행** 앞에서만 이스케이프로 작동하므로 `C:\path` 는 보존되고 `\\.` 는 `\.` 이
+  된다. `"` 는 **짝수 개이고 비인용 구간에 공백이 없으면** 조용히 사라지고(argv 병합), **홀수
+  개면** `unexpected EOF` 로 시끄럽게 죽는다.
+
+  > ⚠️ **_"짝수면 조용"_ 도 닫힌 이분법이라 경계에서 반증된다** (PR
+  > [#1070](https://github.com/coseo12/astro-simulator/pull/1070) 리뷰 🟡-1 — 위에서 닫힌 양화사를
+  > 금지해 놓고 여섯 줄 아래에 새로 세웠다). 짝수여도 **비인용 구간에 공백이 있으면 argv 가
+  > 갈린다**: `"docs: 값 "ab" 를 고침"` → `ARGC 1` (조용) vs `"docs: 값 "a b" 를 고침"` →
+  > **`ARGC 2`**, 그래서 `git commit -q -m` 이 `error: pathspec 'b 를 고침' did not match` 로
+  > **rc `1`, 커밋 안 됨** (실측). 이쪽은 **시끄러운 방향**이라 조용한 손상 목록을 넓히지는 않지만,
+  > 술어에 _"비인용 구간에 공백이 없으면"_ 한정어가 빠지면 거짓이다.
+- 개행 앞의 `\` 는 **줄 이음**이라 개행이 통째로 사라진다 (`"tail\`+개행+`cont"` → `tailcont`,
+  `bash`·`zsh` 동일 rc `0`). 마크다운 hard break 를 리터럴로 넘길 때 실제로 밟는다.
+
+> **이 축 분리가 없으면 검증 3중이 전부 통과한다 — 실제로 통과했다.** PR
+> [#1070](https://github.com/coseo12/astro-simulator/pull/1070) 에서 dev 가 _"둘뿐"_ 을 각인층에
+> 올렸고, **cross-validate 도 `양호` 로 통과**시켰다. cross-validate 의 축자 판정은 _"실제로
+> 관통하여 **명령 치환 및 변수 확장을 유발**하는 것은 백틱과 `$` 뿐"_ 이었는데 — **그 문장 자체는
+> 참이다.** 틀린 것은 그 **좁은 명제(치환 축)** 를 **넓은 명제(문자열 손상 일반)** 로 확대한 쪽이고,
+> 확대는 인용문 안에 없어서 검증 대상이 되지 못했다. **참인 근거로 거짓 결론을 받치는 형태**라
+> 근거만 검토하는 절차로는 안 잡힌다. reviewer 의 **실주입 재현**만이 적발했다 (선례: 세션
+> 2026-08-14 #1054 — _"단일 원인 서사를 Claude·cross-validate·dev 가 공유하고 reviewer 만 diff
+> 재현으로 적발"_). 따라서 이 문서는 두 축을 **항상 분리해 적는다.**
+
+> **`!` 는 결론은 안전이나 기전이 다르다 — 그리고 게이트가 둘이다.** 큰따옴표가 막는 것이
+> **아니다** (`!` 는 위 POSIX 특수문자 넷에 애초에 없다). history expansion 이 실제로 일어나려면
+> **두 조건이 모두** 필요하다: ① `histexpand` 가 `on` ② 그 문자열이 **셸이 읽어들인 라인**일 것.
+> **`-c` 로 넘긴 명령 문자열은 `histexpand` 가 `on` 이어도 확장 대상이 아니다.** 실측
+> (`GNU bash 3.2.57(1)-release`, 각 경로를 **별도 호출**로 측정):
+>
+> ```sh
+> bash -c 'shopt -o histexpand'                 # (A) off
+> bash -c 'echo "wow!ls"'                       # (B) wow!ls        rc 0
+> bash -i -c 'shopt -o histexpand'              # (C) on
+> bash -i -c 'echo "wow!ls"'                    # (D) wow!ls        rc 0  ← on 인데도 보존
+> printf 'echo "wow!ls"\n' | bash -i            # (E) !ls": event not found
+> printf "echo 'wow!ls'\n" | bash -i            # (F) wow!ls              ← 작은따옴표는 막는다
+> printf 'echo wow!ls\n'   | bash -i            # (G) !ls: event not found
+> ```
+>
+> 세 행의 역할이 다르다 — **(G) 트리거 성립** (무인용 baseline: 이 라인 읽기 경로에서 확장이
+> 실제로 일어난다) → **(E) 큰따옴표 무력** (같은 경로에 큰따옴표만 씌워도 여전히 확장되므로
+> _"큰따옴표는 `!` 를 안 막는다"_ 의 **직접 증거는 (E) 단독**) → **(F) 작은따옴표 유효** (대조군).
+> **(C) 대 (D)** 가 두 번째 게이트를 보여 준다 — `histexpand` 가 `on` 인데도
+> `-c` 문자열은 확장되지 않는다. 여기서 **실무 함의**가 나온다: 에이전트가 밟는 경로는 Bash 도구를
+> 포함해 **전부 `-c` 계열**이라 `!` 는 사실상 무해하고, 위험한 것은 **사람이 터미널에 직접 칠
+> 때**뿐이다. 이 구분이 없으면 `!` 를 과대 경계하게 된다. 게다가 이 실패는 **시끄러운 쪽**이라
+> 조용한 손상 목록에도 들어가지 않는다.
+>
+> (술어를 표 셀이 아니라 **코드펜스**에 둔 것도 의도다 — 마크다운 표 안에서는 파이프를 `\|` 로
+> 이스케이프해야 해서 **셀을 복사하면 그대로 실행되지 않는다.** 추출해 실행하는 자기 점검이 이
+> 결함을 잡았다.)
+>
+> ⚠️ **이 각주 자체가 _"결론은 맞고 재현 술어가 틀림"_ 을 한 번 밟았다.** 초판은 `shopt` 상태를
+> 재는 명령과 파이프로 확장을 재는 명령을 **같은 배치에서 각각 실행해 놓고**, 서술할 때 둘을 합쳐
+> _"`bash -i -c` 에서 실패한다"_ 로 적었다 — 실제로 `bash -i -c` 는 rc `0` 으로 **보존**한다.
+> **`shopt` 상태로 확장 발생을 추론한 것**이 오류의 형태이고, 박제한 술어를 **그대로 추출해 실행**
+> 했다면 즉시 드러났을 것이다. 위 표는 각 행을 별도 호출로 다시 측정한 값이다.
+
+즉 **큰따옴표는 `<` `>` `;` `|` `&` 를 리터럴로 격리한다** (`!` 는 위 각주대로 기전이 다르다). 남는 위험은 최소 **`` ` `` · `$` · `\` · `"`** 이고, 이 넷은 큰따옴표를 뚫는다. `<` 가 리다이렉트로 터지는 것은 **따옴표가 없거나 앞선 백틱·따옴표가 인용을 깨뜨린 뒤**의 이야기다 (`git commit -q -m fix:\ guard\ <CONST_NAME>` → `syntax error near unexpected token`, exit `2`).
+
+**종단 재현 — 백틱 `0` 개 · `$` `0` 개인데 3중으로 조용히 손상된다** (격리 `git init` 픽스처, rc `0`):
+
+```sh
+git commit -q -m "fix: 정규식 \\.(mjs|ts) 와 경로 C:\path 그리고 he said "hello" 끝"
+git log -1 --format=%s
+# -> fix: 정규식 \.(mjs|ts) 와 경로 C:\path 그리고 he said hello 끝
+#      ^^ 백슬래시 1개 소실                          ^^^^^ 따옴표 2개 소실
+```
+
+`C:\path` 가 **보존**되는 것이 이 축의 함정이다 — 같은 `\` 인데 특수문자 앞이 아니라 살아남는다. 따라서 _"백슬래시가 있으면 위험"_ 같은 단순 술어도 성립하지 않고, 판정은 **`\` 다음 문자**까지 봐야 한다.
 
 ## 해결 — `spawnSync` + stdin (3축 우회)
 
@@ -77,6 +164,9 @@ EOF
 | ``git commit -m "... `n>=3` ..."`` (staged 있음) | `0`  | `docs: threshold  rule` 로 기록 (`n>=3` 소실)      | **영구 기록**            |
 | `git commit -m "... $CONST_NAME ..."`           | `0`  | `fix: rename  to newName` 로 기록 (`$CONST_NAME` 소실) | **영구 기록**            |
 | ``gh issue comment --body "... `n≥3` ..."``     | `0`  | `n≥3` 이 통째로 소실된 채 코멘트 박제              | **영구 기록**            |
+| `git commit -m "... \\.(mjs\|ts) ..."` (**백틱·`$` 0개**) | `0` | `\.(mjs\|ts)` 로 기록 (백슬래시 1개 소실) | **영구 기록** |
+| `git commit -m "... he said "hello" ..."` (짝수 따옴표) | `0` | `he said hello` 로 기록 (따옴표 2개 소실) | **영구 기록** |
+| `git commit -m "... a"b ..."` (**홀수** 따옴표)  | `2`  | `unexpected EOF` — 커밋 실패                      | **즉시 드러남** — 재시도 |
 
 이슈 [#996](https://github.com/coseo12/astro-simulator/issues/996) 은 한 세션에서 이 클래스를 2회 밟았다 — `gh issue comment` 의 `n≥3` 소실(마지막 행, **조용한 성공**)과 `git commit` 실패(**시끄러운 실패**). **드러난 것은 후자뿐**이고, 전자는 exit `0` 이라 사람이 눈으로 발견했다. exit code 는 이 함정의 경보가 되지 못한다.
 
@@ -85,8 +175,15 @@ EOF
 ## 선택 가이드
 
 - **Node.js 에서 `gh` 호출** — 본문이 사용자/template 생성이면 `spawnSync` + stdin **의무**. `execSync` 는 고정 문자열 + 환경 변수 없는 명령에만 사용.
-- **셸에 직접 타이핑 (에이전트 Bash 도구)** — 본문에 `` ` `` 또는 `$` 가 리터럴로 하나라도 있으면 `--body-file -` / `git commit -F -` + 따옴표 친 heredoc **의무**. `<` `>` `;` 만 있으면 큰따옴표로 충분하다.
+- **셸에 직접 타이핑 (에이전트 Bash 도구)** — 본문에 `` ` `` · `$` · `\` · `"` 중 **하나라도** 리터럴로 있으면 `--body-file -` / `git commit -F -` + 따옴표 친 heredoc **의무**. `<` `>` `;` `|` `&` 만 있으면 큰따옴표로 충분하다.
 - **`.sh` 스크립트 안에서 변수 전달** — `--body "${body}"` 는 그대로 안전. 바꿀 필요 없다.
+
+> ⚠️ **판정 술어를 넓힌 이유 — 구 술어가 실제로 오작동했다.** 초판은 조건을 _"`` ` `` 또는 `$` 가
+> 하나라도"_ 로 적고 _"`<` `>` `;` 만 있으면 큰따옴표로 충분"_ 이라고 면제했다. §큰따옴표가
+> 막아주는 것과 못 막는 것 의 종단 재현 커밋 (`\\.(mjs|ts)` · `"hello"`) 은 **백틱 `0` · `$` `0`**
+> 이라 이 게이트를 **통과하는데 3중으로 손상**됐다. 게이트가 손상 축을 안 보고 치환 축만 봤기
+> 때문이다. **판정이 애매하면 `-F -` 를 쓴다** — 오탐 비용은 heredoc 3줄이고, 누락 비용은 영구
+> 기록이다.
 
 ## 사거리 (#996)
 
@@ -95,25 +192,50 @@ _"셸을 경유해 마크다운·코드를 전달하는 모든 명령"_ 으로 �
 **대상 (리터럴 타이핑 경로)**
 
 - `git commit -m` — 전 에이전트 상시 사용
-- `gh issue create --body` — `.claude/agents/pm.md:109`, 그리고 **라이브 반례** 아래
-- `gh issue comment --body` — `.claude/skills/create-issue/SKILL.md:62`
+- `gh issue create --body` — `.claude/agents/pm.md` §절차 5 (`gh issue create --title "<요지>" --body "<스프린트 계약>"`)
+- `gh issue comment --body` — `.claude/skills/create-issue/SKILL.md` §명령어 의 `gh issue comment <이슈번호> --body "의존성: …"`
+- **`--title` 계열 전체** ([#1045](https://github.com/coseo12/astro-simulator/issues/1045) 판정 — 아래 §제목 축) — 리터럴로 타이핑하는 `gh issue create --title` / `gh pr create --title` / `gh pr edit --title`
 
-> ⚠️ **라이브 반례 — 자매 문서가 위험 형태를 템플릿으로 싣고 있다.** [`docs/lessons/workflow-dispatch-pitfalls.md`](workflow-dispatch-pitfalls.md) `:74` · `:89` 의 `gh issue create --body "$(cat <<HEREEND` 는 **구분자에 따옴표가 없다**. 위 §변형 이 _"따옴표 친 heredoc 이 핵심"_ 이라고 못박은 바로 그 지점의 반례다. 현재 본문에 metachar 가 없어 무해하지만, 에이전트가 그 템플릿에 실제 내용을 채우면 조용히 손상된다 (`<<'HEREEND'` → `` `n>=3` `` · `$VERSION` 보존 / `<<HEREEND` → `GONE` · `9.9.9` 로 확장 — 실측). **해당 문서 수정은 본 PR 범위 밖이며 후속 [#1045](https://github.com/coseo12/astro-simulator/issues/1045) 가 흡수한다.**
+> ✅ **라이브 반례 — 해소됨 ([#1045](https://github.com/coseo12/astro-simulator/issues/1045)).** [`docs/lessons/workflow-dispatch-pitfalls.md`](workflow-dispatch-pitfalls.md) §함정 4 의 두 예시가 `gh issue create --body "$(cat <<HEREEND` 로 **구분자에 따옴표가 없어**, 위 §변형 이 _"따옴표 친 heredoc 이 핵심"_ 이라고 못박은 지점의 반례를 저장소 자신이 싣고 있었다 (본문에 metachar 가 없어 무해했으나, 에이전트가 그 템플릿을 채우면 조용히 손상 — `<<'HEREEND'` → `` `n>=3` `` · `$VERSION` 보존 / `<<HEREEND` → `GONE` · `9.9.9` 로 확장, 실측). 두 예시를 `<<'HEREEND'` 로 교체했다. **구분자 따옴표는 §함정 4 가 다루는 indent 거동과 직교**하므로 그 교훈은 불변이다 (`<<-` 만이 indent 를 건드린다).
 
 **대상 아님 (실측 근거)**
 
-- `gh pr edit` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며, `--title` (`docs/skills-guide.md:22`) 은 **본 저장소 PR 제목 `0/400` 이 백틱 보유**라 실제 전달량이 없다 (`gh pr list --state all --limit 400 --json title`, 술어 = 제목에 `` ` `` 포함한 PR 수)
-
-  > ⚠️ **_"제목은 한 줄이라 마크다운 경로가 아니다"_ 라고 쓰지 않는다** — categorical 근거는 반증된다. 같은 저장소 **이슈 제목은 `2/400` 이 백틱을 보유**하고 ([#318](https://github.com/coseo12/astro-simulator/issues/318) 의 `` `Tier` ``·`` `activeTier` ``, [#221](https://github.com/coseo12/astro-simulator/issues/221) 의 `` `window.__simStore` ``), 무엇보다 **커밋 subject 도 한 줄인데 §대상**이라 문서 내부와도 어긋난다. 위 제외는 **`gh pr edit --title` 이라는 좁은 축의 실측**일 뿐이다.
-  >
-  > **형제 명령 `--title` 축은 미판정**이다 — `gh issue create --title` (`.claude/agents/pm.md:109` / `.claude/skills/cross-validate/scripts/cross_validate.sh:408`) 과 `gh pr create --title` (`.claude/skills/create-pr/SKILL.md:55`) 로 전이하면 이슈 제목 `2/400` 때문에 위 근거가 **거짓이 된다**. 후속 [#1045](https://github.com/coseo12/astro-simulator/issues/1045) 소관.
+- `gh pr edit --body` — **`--body` 사용처 0**. 실사용 플래그는 `--add-label` / `--remove-label` / `--base` / `--title` 이며 `--title` 은 위 §대상 으로 이동했다 (아래 §제목 축)
 - `gh release create --notes` — `--notes` 를 리터럴로 넘기는 사용처 0 (`gh release create <tag>` / `--target` 만)
 - `gh pr create --body` — `create-pr` 스킬 경유가 **의무**라 직접 호출 자체가 금지 (에이전트 5개 파일에 박제)
 - `scripts/verify-pr-template-checklist.mjs` — 이미 `spawnSync` + `--body-file -` (volt #114 fix 적용분)
 - `.claude/skills/cross-validate/scripts/cross_validate.sh` — `--body "${body}"` 변수 확장이라 §리터럴만 위험하다 에 의해 안전
-- `.claude/skills/{create-issue,capture-volt,create-pr}/SKILL.md` — 이미 `--body "$(cat <<'EOF'` **따옴표 친 heredoc** (`create-issue:48` / `capture-volt:125`·`:156` / `create-pr:56`)
+- `.claude/skills/{create-issue,capture-volt,create-pr}/SKILL.md` — 이미 `--body "$(cat <<'EOF'` **따옴표 친 heredoc** (`create-issue` §이슈 템플릿 / `capture-volt` §gh 명령 템플릿 의 `### knowledge`·`### report` / `create-pr` §PR 생성)
 
-> 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 단, **축을 좁혀야 참이다**. 스킬 3종이 정착시킨 것은 **따옴표 친 heredoc (`<<'EOF'`)** 이고, 그 축에서는 본 문서가 요구하는 것이 **신규 관행이 아니다**. 반면 **전달 경로는 다르다** — 스킬 3종은 `--body "$(cat <<'EOF')"` 로 **명령 치환**을 거쳐 argv 로 넘기고, §변형 의 처방은 `-F -` 로 **stdin** 에 흘린다. 즉 _"이미 정착해 있었다"_ 는 **구분자 따옴표 축 한정**이며, stdin 축까지 정착했다는 뜻은 아니다.
+### 제목 축 — `--title` 은 대상이다 (#1045, 재측정이 구 근거를 반증)
+
+#996 은 `gh pr edit --title` 을 _"본 저장소 PR 제목 `0/400` 이 백틱 보유라 실제 전달량이 없다"_ 로 제외하면서, 형제 명령(`gh issue create --title` / `gh pr create --title`)은 **미판정**으로 남기고 #1045 에 인계했다. 재측정이 그 제외 근거 자체를 무너뜨렸다.
+
+술어 (**표 셀이 아니라 펜스에 둔다** — 아래 ⚠️):
+
+```sh
+gh pr list    --state all --limit 400 --json title -q '.[].title' | grep -cF '`'
+gh issue list --state all --limit 400 --json title -q '.[].title' | grep -cF '`'
+```
+
+| 모집단 | #996 (rev `9ca671b`) | 재측정 (2026-08-14) |
+| --- | --- | --- |
+| PR 제목 백틱 보유 (위 1행) | `0 / 400` | **`2 / 400`** |
+| 이슈 제목 백틱 보유 (위 2행) | `2 / 400` | `2 / 400` |
+
+> ⚠️ **마크다운 표 셀에 파이프가 든 명령을 넣지 않는다.** 표 셀은 파이프를 `\|` 로 이스케이프해야
+> 하는데, 그 셀을 복사해 실행하면 **셸이 파이프로 인식하지 않고** `grep` 이 `\|` 를 인자로 받는다
+> — **rc `0` 인 채 값이 조용히 틀린다** (`ERE` 에서 `\|` 는 리터럴 파이프라 계수가 무너진다).
+> 초판은 이 표에 명령을 담아 놓고 같은 PR 안에서 _"술어는 표 셀이 아니라 코드펜스에"_ 를 발견해
+> `!` 표에만 적용했다 — **자기 발견을 자기 표에 안 쓴 것**이라 여기서 정정한다 (리뷰 🟡-2).
+
+PR 제목 쪽 `2` 는 [#1054](https://github.com/coseo12/astro-simulator/issues/1054) (`` `.*` ``·`` `pgrep -a` ``) 와 [#958](https://github.com/coseo12/astro-simulator/issues/958) (`` `!` ``) 의 머지 PR 이다 — **#996 박제 후 6일 만에 발생**했다. 즉 `0/400` 은 틀린 측정이 아니라 **썩는 종류의 근거**였고, _"전달량이 없다"_ 는 다음 백틱 제목 하나로 뒤집힌다. 제외 근거를 유지하려면 매번 재측정해야 하는데 그 비용이 규약 준수 비용보다 크다.
+
+따라서 **`--title` 은 명령을 가리지 않고 §대상**이다. 처방은 §선택 가이드 와 동일하다 — 제목에 `` ` `` · `$` · `\` · `"` 를 리터럴로 넣지 않거나, 넣어야 하면 변수(`--title "${title}"`)로 넘긴다. `.claude/skills/cross-validate/scripts/cross_validate.sh` 가 이미 변수 형태라 **안전 선례**이고, 리터럴 타이핑 경로(`.claude/agents/pm.md` §절차 5 / `.claude/skills/create-pr/SKILL.md` §PR 생성)만 주의 대상이다.
+
+> **_"제목은 한 줄이라 마크다운 경로가 아니다"_ 라고는 여전히 쓰지 않는다** — categorical 근거는 반증된다. **커밋 subject 도 한 줄인데 §대상**이라 문서 내부와도 어긋난다. 위 표는 그 categorical 논거가 아니라 **모집단 실측**이며, 실측이 뒤집혔으므로 결론도 뒤집혔다.
+
+> 위 §대상 아님 마지막 항목은 단순 제외가 아니라 **처방의 실현성 근거**다 — 단, **축을 좁혀야 참이다**. 스킬 3종이 정착시킨 것은 **따옴표 친 heredoc (`<<'EOF'`)** 이고, 그 축에서는 본 문서가 요구하는 것이 **신규 관행이 아니다**. 반면 **전달 경로는 다르다** — 스킬 3종은 `--body "$(cat <<'EOF')"` 로 **명령 치환**을 거쳐 argv 로 넘기고, §변형 의 처방은 `-F -` 로 **stdin** 에 흘린다. 즉 _"이미 정착해 있었다"_ 는 **구분자 따옴표 축 한정**이며, stdin 축까지 정착했다는 뜻은 아니다.
 
 ## 회귀 가드 — 채택 기각 (#996)
 
