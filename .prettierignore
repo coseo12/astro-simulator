@@ -46,23 +46,34 @@ scripts/verify-dead-wait-check.mjs
 # ⚠ **디렉토리 재포함 줄(`!docs/x/`)이 없으면 하위 파일 재포함은 성립하지 않는다** (gitignore 문법
 #   — 부모가 제외된 뒤에는 하위 파일만 `!` 로 되돌릴 수 없다). 그 줄이 빠진 형식이 #907 에서
 #   14일간 조용히 무효였다 (선언은 "포맷 대상 유지", 실제는 4경로 전건 `ignored: true`).
+# ⚠ **디렉토리 재포함은 한 단계씩만 성립한다 — 그래서 줄이 3개다** (`!docs/x/` + `!docs/x/**/`
+#   + `!docs/x/**/*.md`). 가운데 `**/` 줄이 없으면 `!docs/x/` 는 그 디렉토리 **자신만** 되돌리고
+#   중첩 하위(`docs/reports/379-forensic/`)는 `docs/**` 로 제외된 채 남는다 — 즉 파일 패턴이
+#   재귀(`**/*.md`)인데 실제 동작은 깊이 1 이라 **선언 ↔ 동작 drift 가 재발한다**. 초판(#958 1차)이
+#   실제로 이 형태였고 PR #1061 리뷰에서 적발됐다 (`379-forensic/README.md` 만 `ignored: true`).
+#   `docs/reports/<이슈>-<주제>/` 번들은 확립된 반복 패턴(현재 8개)이라 재발 확률이 높다.
 # ⚠ **`**/*.md` 로 한정하는 이유** — bench/forensic JSON 은 생성기가 소유한다 (H1).
 #   `docs/benchmarks/*.json` 은 bench-baseline-remeasure.yml 이 자동 생성·커밋하고
 #   verify-fps-baseline.mjs 가 소비하므로, prettier 소유가 되면 생성기 출력 ↔ prettier 포맷
 #   사이에 상시 drift 가 생긴다.
 # ⚠ **`*-retrospective.md` 의 `p` 접두사를 뺀 이유** (H2) — `p*` 는 `P1`·`P2`·`P2-B`·`P2-C`
-#   4건을 **prettier ignore 매칭의 case-insensitive 동작에 기대어** 포함한다. 실측 (#958, 격리
-#   픽스처): 이 매칭은 **순수 문자열 수준**이라 파일시스템과 무관하다 — 디스크에 존재하지 않는
-#   `docs/fakedir/x.md` 도 대문자 패턴 `docs/FAKEDIR/**/*.md` 에 매칭된다. 즉 macOS ↔ Linux
-#   결과는 **같다** (모집단 분기는 일어나지 않는다).
+#   4건을 **prettier ignore 매칭의 case-insensitive 동작에 기대어** 포함한다. 이 동작은 번들
+#   소스에 상수로 박혀 있다 — `Ignore` 생성자의 `ignorecase = true` 기본값이 **무조건**이고,
+#   prettier 호출부(`src/utilities/ignore.js`)는 `{ allowRelativePaths: true }` 만 넘겨 그 값을
+#   덮지 않으며, 적용부는 `this.ignoreCase ? new RegExp(str, "i") : new RegExp(str)` 다.
+#   **플랫폼 분기가 없으므로 macOS ↔ Linux 결과는 같다** (모집단 분기는 일어나지 않는다).
 #   그래도 `p*` 를 쓰지 않는 이유는 그 4건의 포함이 **문서화되지 않은 구현 동작에 의존**하기
 #   때문이다. `*-retrospective.md` 는 리터럴 소문자 접미사로만 매칭해 그 의존이 0 이다.
 #   실측 계수: `p*` = 13 파일 / `*` = 15 파일 (차이는 harness-update-2.2.0 · r10 2건).
 !docs/benchmarks/
+!docs/benchmarks/**/
 !docs/benchmarks/**/*.md
 !docs/phases/
+!docs/phases/**/
 !docs/phases/**/*.md
 !docs/reports/
+!docs/reports/**/
 !docs/reports/**/*.md
 !docs/retrospectives/
-!docs/retrospectives/*-retrospective.md
+!docs/retrospectives/**/
+!docs/retrospectives/**/*-retrospective.md
