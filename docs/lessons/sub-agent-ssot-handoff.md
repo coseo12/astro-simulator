@@ -64,7 +64,7 @@ sub-agent 가 `run_in_background=true` 로 띄운 로컬 프로세스(dev 서버
   - `"sub-agent-confirmed-done"` — sub-agent 가 반환 전 완주 확인 완료 (PID 배열이 `[]` 여야 정합)
   - `"none"` — 백그라운드 프로세스 시작 안 함
 
-**메인 오케스트레이터 책임**: `bg_process_handoff="main-cleanup"` 이고 `spawned_bg_pids` 가 비어있지 않으면 sub-agent 반환 직후 `ps auxww | grep -E '<PID 패턴>'` 또는 `lsof -i :<port>` 로 독립 확인 + 필요 시 kill. 다음 sub-agent 호출 전 포트/경로 경쟁 해소.
+**메인 오케스트레이터 책임**: `bg_process_handoff="main-cleanup"` 이고 `spawned_bg_pids` 가 비어있지 않으면 sub-agent 반환 직후 `ps -axww -o pid=,etime=,command= | grep -E '<PID 패턴>' | grep -v grep` 또는 `lsof -i :<port>` 로 독립 확인 + 필요 시 kill. 다음 sub-agent 호출 전 포트/경로 경쟁 해소. (`grep -v grep` 은 self-match 오탐 차단 의무 — #1054. `-o etime=` 는 ETIME 30분 임계 판정용이며 `ps auxww` 에는 그 열이 없다.)
 
 **중복 브랜치 dev 서버 오진 방지**: feature 브랜치별 worktree 에서 띄운 dev 서버가 이후 브랜치에서 동일 포트를 점유하면 HMR 이 낡은 번들을 서빙한다. 메인이 새 dev 서버 띄우기 전 `lsof -i :<port>` 선행 확인.
 

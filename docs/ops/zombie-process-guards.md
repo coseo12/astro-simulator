@@ -38,6 +38,8 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 >   - 일상 개발에서는 `cargo test --lib` 가 5분 내 완주하도록 재설계
 > - **근거**: volt [#24](https://github.com/coseo12/volt/issues/24) 의 프로세스 레벨 확장 (2026-04-20 관찰). volt 캡처 예정
 
+⚠️ **명령 정정 (#1054, 2026-08-14)** — 위 인용 블록은 #980 이관 시점 CLAUDE.md 원문의 **축자 보존**이라 손대지 않는다. 다만 그 안의 `ps auxww | grep -E … | grep -v grep` 은 **`ps -axww -o pid=,etime=,command= | grep -E … | grep -v grep` 으로 읽어야 한다** — `ps auxww` 에는 **ETIME 열이 없어**(START·TIME 만 제공) 바로 아래 가드들이 공유하는 **ETIME 30분 임계 판정을 그 명령만으로 닫을 수 없다**. self-match 방어(`grep -v grep`)는 원문 그대로 유효하며, 바뀌는 것은 출력 열뿐이다. 현행 정본은 CLAUDE.md §가드 B 와 [`operational-friction.md`](operational-friction.md) §3.
+
 **왜 "완주 못 함"이 핵심인가**: 실패가 아니라 **미완주**라서 아무도 신호를 받지 못한다. 테스트는 실패 보고를 하지 않고 그냥 느려지며, 에이전트는 "테스트가 원래 오래 걸린다"로 해석해 대기를 늘린다. 정상 4~5분 대비 10배+ 지연은 그 해석을 강화하는 방향으로만 작용한다 — 그래서 사람이 개입할 때까지 자체 교정되지 않는다.
 
 `cargo test --lib` 호출 시간이 길수록 위 경쟁이 발생할 창이 넓어진다. 위 "cargo test 호출 규범"이 `#[ignore]` 로 장기 적분 테스트를 일상 경로에서 떼어내는 이유가 이것이다.
@@ -48,7 +50,7 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 > - **agent-browser Chrome 좀비 변형** (volt [#79](https://github.com/coseo12/volt/issues/79)): qa / browser-test sub-agent 가 `agent-browser` 도구로 real Chrome 사용 후 세션 종료 시 정리 누락. 식별자 `agent-browser-chrome-<UUID>` user-data-dir (사용자 본 Chrome 영향 0). 본 세션 (2026-04-28) 실측 6 세션 / 52 좀비 / 3일치 누적 → 800%+ CPU 관찰. **메인 루틴** (sub-agent 복귀 직후 의무): `pgrep -af "agent-browser-chrome[-]"` 검사 + 좀비 확인 시 `bash scripts/cleanup-browser.sh --all` (병행 브라우저 작업 부재 확인 후 — 메인 전용). **sub-agent 루틴** (반환 직전 의무): `bash scripts/cleanup-browser.sh` 기본 모드 (전량 pkill 금지 — 병행 오살 방지, #926). agent-browser 도구 자체 cleanup 이 정상 case 에선 작동하나 sub-agent 비정상 종료 (timeout / SIGKILL / panic) 시 lineage 끊긴 좀비 잔존. cargo/next dev 의 `spawned_bg_pids` SSoT 가 직접 spawn 한 PID 만 커버하므로 도구 wrapper 가 spawn 한 child process 는 별도 검증 의무
 
-⚠️ **명령 정정 (#1054, 2026-08-14)** — 위 인용 블록은 #980 이관 시점의 CLAUDE.md 원문을 **축자 보존**한 것이라 손대지 않는다. 다만 그 안의 메인 루틴 명령은 **`pgrep -f "agent-browser-chrome[-]"` 로 읽어야 한다** — macOS `pgrep` 의 `-a` 는 _"조상 프로세스를 매칭 대상에 포함"_ 이라(Linux procps 의 _"명령행 출력"_ 과 동명이의) 기본값이 제공하는 자기 + 조상 제외를 되돌려 **자기 셸을 좀비로 보고**한다. bracket 은 이 경우 우연히 방어에 성공하지만 그 보호 범위는 **패턴 문자열 자신뿐**이므로 의존 대상이 아니다. 상세: [`operational-friction.md`](operational-friction.md) §3 기전 정정.
+⚠️ **명령 정정 (#1054, 2026-08-14)** — 위 인용 블록은 #980 이관 시점의 CLAUDE.md 원문을 **축자 보존**한 것이라 손대지 않는다. 다만 그 안의 메인 루틴 명령은 **`pgrep -f "agent-browser-chrome[-]"` 로 읽어야 한다** (`-a` 제거, **bracket 은 유지**) — macOS `pgrep` 의 `-a` 는 _"조상 프로세스를 매칭 대상에 포함"_ 이라(Linux procps 의 _"명령행 출력"_ 과 동명이의) 기본값이 제공하는 자기 + 조상 제외를 되돌려 **조상 셸을 좀비로 보고**한다. 단 `-a` 제거로 없어지는 것은 **조상 축뿐**이고, 부모 argv 를 상속한 **형제 subshell 축은 남는다** — 그 축을 pgrep 경로에서 막는 것이 bracket 이므로 bracket 은 **제거 대상이 아니다**. 상세: [`operational-friction.md`](operational-friction.md) §3 기전 정정 2축 표.
 
 **추가 실측**: 2026-08-02 에 10일 묵은 daemon 2개가 관찰됐다 ([#926](https://github.com/coseo12/astro-simulator/issues/926)) — 종전 가드가 Chrome 렌더러만 보고 상주 daemon 을 방치한 결과다.
 
@@ -144,7 +146,14 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 `pgrep -f "패턴"` 은 자기 셸의 명령행을 매칭해 **오탐**한다. 좀비 검출 패턴에는 bracket 을 넣는다 (`agent-browser-chrome[-]`). `pkill` 은 자기 셸을 죽일 위험이 있어 bracket 이 안전 개선까지 겸한다. hook 은 `grep -v` 로 이미 안전하다.
 
-⚠️ **정정 (#1054, 2026-08-14)** — 위 3문장은 **우선순위가 뒤집혀 있다**. 1순위는 bracket 이 아니라 **`-a` 를 쓰지 않는 것**이다. macOS `pgrep`/`pkill` 은 기본값이 **자기 + 조상 전건 제외**라 self-match 가 구조적으로 불가능하고, `-a`(= _"조상을 매칭 대상에 포함"_, Linux procps 의 _"명령행 출력"_ 과 동명이의) 가 그 방어를 되살린다. bracket 은 **패턴 문자열 자신만** 보호하므로 `.*` 우회와 형제 명령의 un-bracketed 리터럴에 뚫린다. 따라서 검출 명령의 실제 의무는 순서대로 — ① **좀비 카나리아 정본은 `ps -axww -o pid=,etime=,command= | grep -E "…" | grep -v grep`** (가드 C hook 과 동형. 명령행 전체를 필터링하고 **ETIME 을 함께 산출**해 30분 임계 판정이 한 명령으로 닫힌다) ② `pgrep`/`pkill` 을 쓸 때는 **`-a` 금지** ③ bracket 은 그 위의 보조 (`pkill` 자기-kill 방지 + Linux 이식성). `pgrep -af` 는 macOS 에서 명령행을 출력하지 않아 **무엇이 잡혔는지 볼 수단조차 없다**.
+⚠️ **보강 (#1054, 2026-08-14)** — 위 3문장은 **맞지만 불완전**하다. self-match 는 **직교 2축**이고 bracket 은 그중 한 축만 담당한다.
+
+| 축 | 기전 | `-a` 제거 | bracket | `grep -v grep` |
+| --- | --- | :---: | :---: | :---: |
+| **조상 셸** | `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ❌ | ✅ |
+| **형제 subshell** | 비-exec fork 가 부모 argv 상속 (형제는 기본 제외 대상이 **아니다**) | ❌ | ⚠️ 상속 argv 안 리터럴이 전부 bracketed 일 때만 | ✅ |
+
+따라서 검출 명령의 의무는 — ① **좀비 카나리아 정본은 두 축을 동시에 막는** `ps -axww -o pid=,etime=,command= | grep -E "next dev|next-server|cargo .*test|pnpm.*dev" | grep -v grep` (dev/test 계열. 메인 §가드 B 는 `physics_wasm-` 를 포함한 **다른 검출 범위**를 쓴다 — 패턴은 위치마다 의도적으로 다르며 3곳이 공유하는 SSoT 는 **ETIME 30분 임계**다. 필터가 `grep -v grep` 인 것도 hook 과의 **의도적 차이**다 — 근거는 [`operational-friction.md`](operational-friction.md) §3 _"hook 필터를 그대로 복사하지 말 것"_) ② `pgrep`/`pkill` 을 쓸 때는 **`-a` 금지** ③ **bracket 은 유지** — 강등이 아니다. `-a` 를 뗀 뒤 pgrep 경로에서 형제 축을 막는 것은 bracket 뿐이고, 위 §_"pkill 은 안전 이슈"_ 대로 자기-kill 차단까지 겸한다. 덧붙여 `pgrep -af` 는 macOS 에서 명령행을 출력하지 않아 **무엇이 잡혔는지 볼 수단조차 없다**.
 
 상세는 [`operational-friction.md`](operational-friction.md) §3 ([#795](https://github.com/coseo12/astro-simulator/issues/795) / 기전 정정 [#1054](https://github.com/coseo12/astro-simulator/issues/1054)).
 

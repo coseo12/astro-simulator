@@ -89,18 +89,37 @@
 
 **구조 원인**: `pgrep -f "패턴"` 은 프로세스 **전체 명령행**을 매칭한다. 에이전트가 셸에서 `pgrep -f "agent-browser-chrome-"` 를 직접 실행하면, 그 명령을 감싼 형제 셸(`bash -c '...pgrep -f "agent-browser-chrome-"...'`)의 명령행에 패턴 문자열이 포함되어 **자기 자신을 매칭**한다. 셸 래핑/파이프 구성에 따라 **간헐 재현**(2026-07-04 세션 2회 오탐, 2026-07-15 세션 재확인).
 
-⚠️ **기전 정정 (#1054, 2026-08-14)** — 위 **관측은 맞으나 기전 설명이 불완전**하다. "형제 셸의 명령행에 패턴 문자열이 포함" 은 필요조건일 뿐이고, **왜 그 형제 셸이 매칭 후보에 들어왔는가**가 빠져 있다. 답은 `-a` 플래그다. macOS `man pgrep` 축자: _"`-a` Include process ancestors in the match list. **By default, the current pgrep or pkill process and all of its ancestors are excluded** (unless `-v` is used)."_ 즉 macOS 는 기본값이 이미 **자기 + 조상 전건 제외**라 self-match 가 구조적으로 불가능하고, `-a` 가 그 방어를 **되살린다**. 실측 (rev `90fa2a6`, 명령행에 un-bracketed 리터럴 노출):
+⚠️ **기전 정정 (#1054, 2026-08-14)** — 위 **관측은 맞으나 기전 설명이 불완전**하다. "형제 셸의 명령행에 패턴 문자열이 포함" 은 필요조건일 뿐이고, **왜 그 프로세스가 매칭 후보에 들어왔는가**가 빠져 있다. 답은 **직교 2축**이며, 어느 한쪽만으로는 설명도 방어도 되지 않는다.
+
+| 축 | 기전 | `-a` 제거로 해소? | bracket 로 해소? | `grep -v grep` 로 해소? |
+| --- | --- | :---: | :---: | :---: |
+| **① 조상 셸** | macOS `pgrep -a` 가 조상을 매칭 풀에 유입 | ✅ | ❌ | ✅ |
+| **② 형제 subshell** | 비-exec fork 가 부모 argv 를 상속. pgrep 의 **조상이 아니라 형제**라 기본 제외 대상이 아니다 | ❌ | ⚠️ 상속 argv 안 리터럴이 **전부 bracketed 일 때만** | ✅ |
+
+**축 ①** — macOS `man pgrep` 축자: _"`-a` Include process ancestors in the match list. **By default, the current pgrep or pkill process and all of its ancestors are excluded** (unless `-v` is used)."_ 기본값이 자기 + 조상 전건 제외라 조상 축 self-match 는 구조적으로 불가능한데, `-a` 가 그 방어를 **되살린다**. 실측 (rev `90fa2a6`, 명령행에 un-bracketed 리터럴 노출):
 
 ```
 pgrep -af 'zzz1054-canary[-]'   → 12938(조상 셸) 12946(실 프로세스) 12950(일시 subshell)
 pgrep  -f 'zzz1054-canary[-]'   → 12946(실 프로세스만)
 ```
 
-`-a` 는 Linux procps 의 `-a`(= `--list-full`, **명령행 출력**)와 **이름만 같고 의미가 다르다**. macOS 에서는 명령행을 찍지 않으므로 `-af` 를 쓰면 오탐이 늘면서 동시에 **무엇이 잡혔는지 볼 수단도 사라진다**. 따라서 본 절의 "간헐 재현" 도 셸 래핑의 우연이 아니라 **`-a` 사용 여부의 결정론적 귀결**로 읽어야 한다. 좀비 카나리아 정본은 아래 **hook 은 이미 안전** 항의 `ps … | grep -E … | grep -v grep` 이며, `pgrep` 을 쓸 때는 **`-a` 를 붙이지 않는다**.
+**축 ②** — 기본 제외 범위는 **자기 + 조상**이지 **형제가 아니다**. 셸이 fork 한 비-exec subshell 은 부모 argv 를 그대로 상속하므로, `-a` 를 떼도 매칭된다. 실측 (형제 subshell 을 살려 둔 상태, **bracket 을 건 채로**):
+
+```
+self=25244  형제 subshell=25250 (부모 argv 상속)
+pgrep -f "next[ ]dev|next-serve[r]|cargo.*tes[t]|pnpm.*de[v]"        → 25250   exit=0   ← -a 없는데 hit
+ps -axww -o pid=,etime=,command= | grep -E … | grep -v grep          →         exit=1   ← 정상
+```
+
+따라서 **본 절 서두의 _"매 호출 다른 PID + 즉시 소멸"_ 중 변동 PID 성분이 바로 축 ②** 이고, `-a` 제거만으로는 **사라지지 않는다**. 위 "간헐 재현" 을 _"`-a` 사용 여부의 결정론적 귀결"_ 로 환원해 읽으면 **역방향 오진**이 된다 — 실제로는 형제 subshell 의 동시 생존 여부가 회차별 변동을 만든다. `-a` 가 남기는 별개의 해악은 macOS 에서 **명령행을 찍지 않는다**는 것이다 (Linux procps 의 `-a` = `--list-full` 과 이름만 같다) — 오탐이 늘면서 **무엇이 잡혔는지 볼 수단도 사라진다**.
 
 **bracket 표준**: 패턴의 한 글자를 문자 클래스로 감싼다 — `pgrep -f "agent-browser-chrome[-]"`.
 
-⚠️ **보호 범위 단서 (#1054)** — bracket 이 지키는 것은 **그 패턴 문자열 자신**뿐이다. 명령행 **전체**를 보호하지 않으므로 두 방향으로 뚫린다: ① 같은 command line 의 **형제 명령**이 un-bracketed 리터럴을 노출하면(예: `ps … | grep -E "…next dev…"` 뒤에 `pgrep -af "next[ ]dev"`) bracket 은 무력하다 ② 패턴 안에 `.*` 가 있으면 bracket 앞의 un-bracketed 조각이 명령행의 **무관한 뒷부분**과 이어진다(실측: `pnpm.*de[v]` 가 자기 패턴의 `pnpm` 과 래퍼가 모든 명령에 덧붙이는 `< /dev/null` 의 `dev` 를 잇는다). 반면 `grep -v grep` 은 **명령행 전체**를 필터링하고, 패턴 리터럴을 실은 셸은 정의상 `grep` 파이프라인이라 **항상** 걸러진다 — 명령을 더 이어 붙여도 그 줄에서 `grep` 이라는 낱말이 사라지지 않기 때문이다. 대가는 명령행에 `grep` 을 포함한 **실 프로세스를 놓치는 것**(false negative)이고, dev 서버 / cargo 계열에는 해당 사례가 없어 #440 이래 hook 이 이 형태로 운용돼 왔다.
+⚠️ **보호 범위 단서 (#1054)** — bracket 이 지키는 것은 **그 패턴 문자열 자신**이며, 명령행 **전체**가 아니다. 따라서 상속 argv 안에 un-bracketed 리터럴이 하나라도 있으면 뚫린다: 같은 command line 의 **형제 명령**이 평문 리터럴을 노출하는 경우(실측: `ps … | grep -E "…next dev…"` 와 같은 줄에 둔 `next[ ]dev` 술어가 hit), 그리고 패턴 안에 `.*` 가 있어 bracket 앞의 un-bracketed 조각이 명령행의 **무관한 뒷부분**과 이어지는 경우(실측: `pnpm.*de[v]` 가 자기 패턴의 `pnpm` 과 래퍼가 모든 명령에 덧붙이는 `< /dev/null` 의 `dev` 를 잇는다). **그럼에도 pgrep 을 쓸 수밖에 없는 경로에서는 bracket 이 축 ② 를 막는 유일한 수단이므로 제거 대상이 아니다** — 아래 **pkill 은 안전 이슈** 항이 규정하듯 자기-kill 차단까지 겸한다.
+
+반면 `grep -v grep` 은 **명령행 전체**를 필터링해 **두 축을 동시에** 막으므로 카나리아 정본이다. 패턴 리터럴을 실은 셸은 그 자신이 `grep` 파이프라인이라 걸러지고, 명령을 더 이어 붙여도 그 줄에서 `grep` 이라는 낱말이 사라지지 않는다. ⚠️ 다만 _"항상"_ 은 **이 구성에 한정된 진술**이다 — 필터가 거르는 것은 `grep` 문자열이지 "자기 자신" 이라는 신원이 아니므로, `grep` 을 포함하지 않는 경로(별도 프로세스가 패턴 리터럴만 들고 있는 경우 등)까지 덮지는 못한다. 대가는 명령행에 `grep` 을 포함한 **실 프로세스를 놓치는 것**(false negative)이고, dev 서버 / cargo 계열에는 해당 사례가 없어 #440 이래 hook 이 이 형태로 운용돼 왔다.
+
+⚠️ **패턴 자체의 선행 결함 (#1054 비차단)** — `pnpm.*dev` 는 `.*` 가 래퍼의 `< /dev/null` 까지 이으므로 **`pnpm` 을 포함한 임의 명령**을 매칭한다 (본 절 축 ② 와 독립인 **패턴 정밀도** 문제라 카나리아 형태 교체로는 해소되지 않는다). 후속 분리 대상.
 
 - `[-]` 는 정규식상 `-` 문자와 동일하게 매칭하지만, pgrep 자신의 명령행 문자열은 리터럴 `agent-browser-chrome[-]` 이라 정규식 `agent-browser-chrome[-]` 이 `agent-browser-chrome[`(대괄호)로 이어지는 자기 명령행과 매칭되지 않아 **self-match 제거**.
 
@@ -109,6 +128,8 @@ pgrep  -f 'zzz1054-canary[-]'   → 12946(실 프로세스만)
 **적용 완료 (본 PR)**: `.claude/agents/qa.md`, `CLAUDE.md`(프로젝트 고유 보강 섹션)의 pgrep/pkill 명령을 `agent-browser-chrome[-]` 로 정정.
 
 **hook 은 이미 안전**: `.claude/hooks/session-start-zombie-check.sh` 는 pgrep 이 아닌 `ps -axww | grep -E "$PATTERN" | grep -v "session-start-zombie-check\|grep -E\|verify-zombie-check"` 구조로, **`grep -v` 제외**가 이미 self-match 를 방어한다. 별도 bracket 불요(변경 없음).
+
+⚠️ **hook 필터를 그대로 복사하지 말 것 (#1054)** — hook 이 안전한 이유는 **스크립트 파일 안에서 실행되기 때문**이다. 패턴이 `PATTERN` 변수에 있어 호출 셸 argv 에 리터럴이 실리지 않고, 위 `grep -v` 목록이 파이프라인 자신의 `grep -E` 프로세스를 거른다. 이 조건은 **에이전트가 셸에 직접 치는 카나리아에는 성립하지 않는다**: 그 환경에서 `grep` 은 셸 스냅샷이 `ugrep -G` 로 재작성한 **셸 함수**라(실측 `type grep` → _"grep is a shell function from …/shell-snapshots/…"_) 실행 프로세스 argv 에 `grep -E` **연속 문자열이 남지 않아** hook 필터가 헛돈다. 그래서 `qa.md` · CLAUDE.md §가드 B 의 카나리아는 hook 과 **패턴 리터럴만 축자 일치**시키고 필터는 `grep -v grep` 으로 **의도적으로 더 강하게** 잡았다 — `ugrep` 은 `grep` 을 부분문자열로 포함하므로 재작성 후에도 걸러진다. 즉 세 위치가 공유하는 SSoT 는 **패턴 리터럴과 ETIME 30분 임계**이지 **필터 형태가 아니다**.
 
 **upstream 기여 (후속 분리)**: qa.md 의 agent-browser 정리 절차 자체가 upstream harness-setting 에 미기여된 프로젝트 drift(bracket 만 단독 Phase 2 불가). agent-browser 정리 전체의 upstream 기여는 [#830](https://github.com/coseo12/astro-simulator/issues/830) 후속 분리(Z-패턴 Phase 2 대상).
 
