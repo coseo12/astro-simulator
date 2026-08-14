@@ -252,6 +252,8 @@ ADR [20260807-971](20260807-971-required-status-checks.md) **결정 9-1** 이 �
 > ⚠️ **본 recipe 는 측정 방법 C 판정식이 아니다.** PR 본문 가시성 판정의 정본은 `scripts/verify-pr-template-checklist.mjs` 이고 그 **수동 grep 대체재는 두지 않는다** ([#1013](https://github.com/coseo12/astro-simulator/issues/1013)). 본 recipe 가 재는 것은 _"6 파일이 각자의 역할에 맞는 문언을 보유하는가"_ 라는 **별개 축**이라 결정 7 의 SSoT 수렴을 침범하지 않는다.
 >
 > ⚠️ **자기 참조 caveat** — 본 Amendment 가 박제한 리터럴은 측정 대상 6 파일 **밖** (`docs/decisions/`) 이라 판정에 영향이 0 이다. 그러나 누구든 6 파일 **안**에 정본 호출이나 3계급 bullet 을 재인용하면 hit 수는 또 움직인다. boolean 독법이 그 클래스를 **구조적으로 무해화**한다.
+>
+> ⚠️ **잔존 결합 1건 — `BULLETS` 는 여전히 산문 원문에 리터럴 결합돼 있다** (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 🟡-6). `GUARD` 는 placeholder-agnostic 해졌으나 3계급 bullet 문언이 바뀌면 recipe 는 그 열에 `0` 을 낸다. 결정 7 상 산문 사본은 _"갈리면 스크립트가 옳다"_ 로 **드리프트가 허용**되므로 이 결합은 원리적으로 남는다. **다만 침묵 실패가 아니다** — 그 순간 출력이 위 표와 **불일치**해 fail-loud 로 드러나고, 조치는 _"표를 고친다"_ 가 아니라 _"recipe 의 `BULLETS` 를 새 문언으로 갱신한다"_ 이다 (표가 재는 것은 문언 자체가 아니라 **역할별 보유 여부**이므로 값 `1/1/1` 은 불변이어야 한다).
 
 #### 축 4 — 메타 측정 도구 자기 적용
 
