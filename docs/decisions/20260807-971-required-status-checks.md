@@ -1467,7 +1467,9 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 
     **왜 본 ADR 관할인가** — escape 4건 (#636 #646 #652 #658) 은 **탐지 실패가 아니라 차단 실패**다. 가드는 4/4 정상 발화했고 사람이 빨간 X 를 단 채 머지했다. 따라서 탐지 축의 신규 가드는 한계 수율 **0** 이고 (ADR 1014 §잔여 갭 (iii) 기각), 차단력을 주는 유일한 수단이 **required 편입** = 결정 9-1 관할이다. 그런데 종전 12항 중 결정 9-1 을 되여는 항은 **10번뿐**이고 그 트리거는 §10-4 단계 2-bis 라는 **미수행 실험**이라, escape 가 재발해도 발화하는 조건이 **없었다**.
 
-    **escape 정의 (기계 판정, 머지 시점 앵커)** — 릴리스 클래스 (`baseRefName == "main"` ∨ `headRefName` 이 `release/` 로 시작) **머지** PR 의 head SHA 위 `pr-template-checklist` 체크런 중 **`completed_at ≤ mergedAt` 인 것만** 추려 `success = 0 ∧ failure ≥ 1`. 즉 _"머지 버튼을 누른 사람이 실제로 본 상태"_ 를 잰다. **머지 이후에 붙은 run 은 계수에 들어오지 않는다** — 이 앵커가 T1 조치의 자기 소거를 구조적으로 막는다 (아래 §T1 이 계수를 지우지 않는 이유).
+    **escape 정의 (기계 판정, 머지 시점 앵커)** — 릴리스 클래스 (`baseRefName == "main"` ∨ `headRefName` 이 `release/` 로 시작) **머지** PR 의 head SHA 위 `pr-template-checklist` 체크런 중 **`started_at ≤ mergedAt` 인 것만** 추려 `success = 0 ∧ failure ≥ 1`. 즉 **머지 시점에 이미 발화한 판정**을 잰다 — _"머지 버튼을 누른 사람의 눈에 보인 색"_ 이 아니다 (아래 ⚠️). **머지 이후에 시작된 run 은 계수에 들어오지 않는다** — 이 앵커가 T1 조치의 자기 소거를 구조적으로 막는다 (아래 §T1 이 계수를 지우지 않는 이유).
+
+    ⚠️ **앵커 기준이 `completed_at` 이 아니라 `started_at` 인 이유** (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 🟡-7). `completed_at ≤ mergedAt` 은 **머지 시점에 돌고 있던 run** (`started_at ≤ mergedAt < completed_at`) 을 배제하는데, 그 run 이 결국 `failure` 였다면 **가드는 잡았고 사람은 완료를 기다리지 않고 머지한 것**이다 — 차단 실패의 가장 순수한 형태이며, 본 가드가 non-required (**결정 9-1**) 라 그 경로가 구조적으로 열려 있다 (소요 `12`초). `started_at` 기준은 그 구멍을 닫으면서 자기 소거 면역도 유지한다 (사후 정정 run 은 `started_at > mergedAt`). 부수로 `!= null` 분기가 사라진다 — `started_at` 이 `null` 이면 jq 정렬 규약상 `null ≤ <문자열>` 이 **참**이라 그 run 은 **포함**되고, 이는 거짓 양성 방향이라 안전하다 (실측 `null` 보유 `0 / 117`).
 
     **관측 창** — **90일 rolling, 하한은 본 항 신설일 `2026-08-14`**. 실효 창 = `[max(2026-08-14T00:00:00Z, now-90d), now]`. 하한을 두는 이유는 소급 4건이 전부 `2026-06-08~10` 에 몰려 있어 하한이 없으면 **신설 당일 자동 발화**하기 때문이다 — 그 4건은 발화 입력이 아니라 **기준선**이다 (1014 §1-B 가 창 하한을 _"결정 4 머지 이후"_ 로 둔 것과 동형).
 
@@ -1481,7 +1483,7 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
     gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
     | jq -r --arg ma "$MERGED_AT" \
         '[.check_runs[] | select(.name=="pr-template-checklist")
-                        | select(.completed_at != null and .completed_at <= $ma)]
+                        | select(.started_at <= $ma)]
          | {s:([.[]|select(.conclusion=="success")]|length),
             f:([.[]|select(.conclusion=="failure")]|length)}
          | if .s==0 and .f>=1 then "ESCAPE" else "clean" end'
@@ -1506,7 +1508,7 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
                     and .mergedAt > $since) | "\(.number)\t\(.mergedAt)"' \
       /tmp/merged.json > /tmp/rel-esc.tsv
 
-    # (2) escape 판정 — 머지 시점 앵커 (completed_at ≤ mergedAt 인 run 만)
+    # (2) escape 판정 — 머지 시점 앵커 (started_at ≤ mergedAt 인 run 만)
     : > /tmp/escaped-prs.txt
     while IFS=$'\t' read -r N MERGED_AT; do
       SHA=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid) \
@@ -1516,7 +1518,7 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
         || { echo "FAIL: #$N check-runs 조회 실패 — 일시 오류. 전건 재실행"; exit 1; }
       jq -r --arg n "$N" --arg ma "$MERGED_AT" \
           '[.check_runs[] | select(.name=="pr-template-checklist")
-                          | select(.completed_at != null and .completed_at <= $ma)]
+                          | select(.started_at <= $ma)]
            | {s:([.[]|select(.conclusion=="success")]|length),
               f:([.[]|select(.conclusion=="failure")]|length)}
            | select(.s==0 and .f>=1) | $n' /tmp/cr.json >> /tmp/escaped-prs.txt
@@ -1528,9 +1530,17 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 
     **머지 시점 앵커를 쓰는 이유 — T1 조치가 계수를 지우지 못하게 한다**
 
-    `pr-template-checklist-guard.yml` 은 트리거가 `types: [opened, edited, synchronize]` 이고 job 가드가 `if: github.actor != 'github-actions[bot]'` **뿐이라 PR state 조건이 없다** (실측 2026-08-14). 따라서 **머지된 PR 본문을 정정하면 같은 head SHA 에 `success` 체크런이 추가된다.** 종전 초판이 쓴 _"전역 `success run = 0`"_ 술어였다면 아래 T1 (b) 를 수행하는 순간 그 PR 이 계수에서 사라져 **`escape ≥ 2` 가 원리적으로 성립 불가능**했다 (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 🔴-2). 머지 시점 앵커는 사후 run 을 `completed_at > mergedAt` 으로 배제하므로 이 자기 소거가 **구조적으로 불가능**하다.
+    `pr-template-checklist-guard.yml` 은 트리거가 `types: [opened, edited, synchronize]` 이고 job 가드가 `if: github.actor != 'github-actions[bot]'` **뿐이라 PR state 조건이 없다** (실측 2026-08-14). 따라서 **머지된 PR 본문을 정정하면 같은 head SHA 에 `success` 체크런이 추가된다.** 종전 초판이 쓴 _"전역 `success run = 0`"_ 술어였다면 아래 T1 (b) 를 수행하는 순간 그 PR 이 계수에서 사라져 **`escape ≥ 2` 가 원리적으로 성립 불가능**했다 (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 🔴-2). 머지 시점 앵커는 사후 run 을 `started_at > mergedAt` 으로 배제하므로 이 자기 소거가 **구조적으로 불가능**하다.
 
-    > **앵커 전환의 정확도 비용은 0 이다 (실측).** 창 `SINCE=2026-05-16T00:00:00Z` 의 릴리스 클래스 **117 PR 전건**에 두 술어를 각각 돌려 대조한 결과 — 전역 술어 `{#636, #646, #652, #658}` / 머지 시점 앵커 `{#636, #646, #652, #658}`, **갈리는 PR `0`건**. `completed_at == null` (머지 시점 미완 run) 보유 PR 도 **`0`건**. 즉 앵커는 오늘의 판정을 바꾸지 않고 **미래의 구멍만 닫는다**.
+    > **앵커 전환의 정확도 비용은 0 이다 (실측).** 창 `SINCE=2026-05-16T00:00:00Z` 의 릴리스 클래스 **117 PR 전건**에 세 술어를 돌려 대조했다 (2026-08-14).
+    >
+    > | 술어 | escape 집합 | 갈림 |
+    > | --- | --- | --- |
+    > | 전역 (무앵커) `success = 0 ∧ failure ≥ 1` | `{#636, #646, #652, #658}` | — |
+    > | 앵커 `completed_at ≤ mergedAt` | `{#636, #646, #652, #658}` | **`0`** |
+    > | **앵커 `started_at ≤ mergedAt` (채택)** | `{#636, #646, #652, #658}` | **`0`** |
+    >
+    > 부수 계수 — **머지 후 run** (`completed_at > mergedAt`) 보유 PR **`0`건** (즉 앵커가 실제로 배제한 run 은 현재 `0`), **in-flight run** (`started_at ≤ mergedAt < completed_at`) 보유 PR **`0`건** (🟡-7 구멍은 현재 미발현), `started_at == null` 보유 PR **`0`건**. ⇒ 앵커는 오늘의 판정을 바꾸지 않고 **미래의 구멍만 닫는다.** 세 값이 모두 `0` 이라는 것은 _"앵커가 불필요하다"_ 가 아니라 _"아직 발현하지 않았다"_ 는 뜻이다 — 본 항이 감시하는 사건 자체가 실효 창에서 `0` 인 것과 같은 성격이다.
 
     **임계 — 2단.** 단발과 재발을 가른다.
 
