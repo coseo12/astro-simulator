@@ -103,7 +103,10 @@
 | C1 | un-bracketed 리터럴 | un-bracketed | ✓ | **hit** |
 | C2 | **bracketed 만 (순수)** | bracketed | ✓ | **exit 1** — bracket 이 **축 ①도 막는다** |
 | C3 | **un-bracketed 리터럴 있음 (불순)** | bracketed | ✓ | **hit** — 조건은 축이 아니라 **argv 순도** |
-| C4 | un-bracketed 리터럴 | un-bracketed | ✗ | exit 1 — `-a` 제거는 **축 ① 만** 죽인다 |
+| C4 | un-bracketed 리터럴 | un-bracketed | ✗ | exit 1 — **단 형제 부재 전제** |
+| C5 | un-bracketed 리터럴 | un-bracketed | ✗ | **hit** — C4 와 동일 조건 + **형제 subshell 생존**. `-a` 제거는 **축 ① 만** 죽인다 |
+
+⚠️ **C1~C4 는 「형제 부재」 전제 위의 측정이다** — 표를 단독 인용할 때 C5 가 없으면 _"`-a` 만 빼면 exit 1"_ → _"`-a` 제거로 충분"_ 이라는 오독이 나온다(그것이 정확히 본 절이 정정한 오류다). C5 실측에서 hit 한 PID 는 fork 된 형제 subshell 자신이었다.
 
 ⚠️ 따라서 _"bracket 을 걸었는데도 뚫렸다"_ 는 관찰은 **C3** 이지 bracket 무력화가 아니다 — 같은 줄 **다른 명령**의 un-bracketed 리터럴이 argv 를 오염시킨 것이다. 반면 `grep -v grep` 은 **argv 순도와 무관하게** 두 축을 막는다. 이것이 정확한 차별점이며 채택 근거다.
 
