@@ -447,10 +447,21 @@ npx prettier --check .                  # 금지 — 캐시 버전이 지배
 **표준 절차** — 변형본을 **리포 루트에 임시 파일명으로** 두고 `--ignore-path` 로 가리킨 뒤 즉시 지운다:
 
 ```bash
+# trap 을 먼저 건다 — 중간 실패·중단에도 잔존 0 (cross-validate agy 2026-08-14 채택)
+trap 'rm -f .prettierignore.trial' EXIT
 sed 's#^!docs/x/\*\*/\*-old\.md$#!docs/x/**/*.md#' .prettierignore > .prettierignore.trial
 pnpm exec prettier --ignore-path .prettierignore.trial --file-info <대상>   # 앵커 패턴 유효
-rm -f .prettierignore.trial                                                 # 잔존 금지
 ```
+
+⚠️ **`rm` 을 마지막 줄에 두면 부족하다** — 가운데 줄이 실패하거나 사람이 중단하면 `.prettierignore.trial`
+이 **untracked 로 남는다**. 실측: `git check-ignore -v .prettierignore.trial` → **NOT ignored**
+(`.gitignore` 에 해당 패턴 **`0` 건**), `git status --porcelain` 에 `??` 로 뜬다. 이 저장소는 그
+잔존물 목록을 **sub-agent 반환 게이트**로 쓰므로 다음 에이전트가 정체불명 untracked 를 물려받는다.
+그래서 `trap … EXIT` 로 **획득 즉시 해제를 예약**한다.
+
+⚠️ **`.gitignore` 에 `.prettierignore.trial` 을 추가하는 처방은 기각한다** — 그 파일은 **존재 자체가
+이상 신호**(정리 누락)라서 무시 대상으로 만들면 신호가 사라진다. 잔존을 *"보이게 두되 생기지 않게"*
+하는 것이 맞고, `trap` 이 정확히 그 형태다.
 
 - **감지 신호**: 대조군까지 `ignored: false` 로 뒤집히면 측정 자체를 의심한다. 실제로 PR
   [#1061](https://github.com/coseo12/astro-simulator/pull/1061) qa 가 **자기 측정에서 이 신호로 거짓
@@ -518,6 +529,34 @@ CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하�
 **측정 조건**: rev `38b6c8a` / macOS / `git worktree add` 직후 `pnpm install --frozen-lockfile` 만
 수행한 상태에서 **아래 표 순서대로** 1회씩 호출 (`pnpm build` 는 최후). 순서를 병기하는 이유는 위
 `prebuild-test` 자가 생성 때문이다. exit code 는 파이프 없이 `$?` 로 채취했다.
+
+**모집단 = 루트 `package.json` 의 `scripts` 전건 `47` 개** (술어: `node -e "console.log(Object.keys(require('./package.json').scripts).length)"`).
+아래 4 분류가 `47` 을 **덮는다** (`4 + 14 + 24 + 5 = 47`). ⚠️ *"전건 실측"* 은 **47 개를 다 실행했다는
+뜻이 아니다** — 실행한 것은 아래 두 표의 `18` 개(의존 `4` + 비의존 `14`)이고, 나머지 `29` 개는
+**분류 술어로 귀속**시킨 뒤 각 분류의 **대표 1~3 개만 실행해 확인**했다. 무엇이 실측이고 무엇이
+귀속인지 아래 표가 구분한다.
+
+| 분류 | 계수 | 판정 근거 |
+| --- | ---: | --- |
+| **의존 집합** | `4` | `dev` · `build` · `typecheck` · `test:unit` — **전건 실행** |
+| **비의존 집합** | `14` | `lint` · `lint:core` · `lint:shared` · `format:check` · `check-encoding` · `verify:{test-coverage,iau-data,no-scientific-grep,zombie-check,dead-wait-check,docs-links,adr-index,r1-tier-untouched,md-tilde}` — **전건 실행**, 전부 exit `0` |
+| **브라우저/서버 계열** | `24` | 스크립트 본문이 `browser-verify-utils` 또는 `localhost:` 를 참조 (술어: 아래 코드블록). `bench:scene` · `bench:scene:mobile` · `bench:scene:sweep` · `bench:tier-guard-cost` · `bench:webgpu` **5 종이 여기 속한다**. 대표 `3` 개 실행 → 전부 exit `1` / `ERR_CONNECTION_REFUSED` |
+| **기타** | `5` | `clean` · `prepare` · `format` (파괴적·부수효과라 미실행) · `verify:all` (위 계열들의 합성) · `bench:scene:set-baseline` |
+
+```bash
+# 브라우저/서버 계열 귀속 술어 — scripts 값에서 .mjs 경로를 뽑아 본문을 검사
+node -e '
+const s=require("./package.json").scripts, fs=require("fs");
+for (const n of Object.keys(s)) {
+  const m=(s[n].match(/(?:apps\/web\/)?scripts\/[a-z0-9-]+\.mjs/)||[])[0]; if(!m) continue;
+  try { if(/browser-verify-utils|localhost:/.test(fs.readFileSync(m,"utf8"))) console.log(n); } catch {}
+}' | wc -l      # → 24
+```
+
+⚠️ **`bench:scene:set-baseline` 은 세 집합 어디에도 넣지 않는다.** 실행하면 exit `1` 이지만 사유가
+**선행 bench 리포트 부재**(`리포트 없음. 먼저 bench를 실행하세요.`)라 축 (ii) 와도 서버 부재와도
+무관한 **제3 사유**다. *"exit 1 이니 의존 집합"* 으로 묶으면 분류가 거짓이 된다 — 브라우저 계열의
+`ERR_CONNECTION_REFUSED` 를 (ii) 로 세지 않는 것과 같은 이유다.
 
 **의존 집합 — `install` 만으로는 깨진다:**
 
