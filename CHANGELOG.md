@@ -21,7 +21,7 @@ Semantic Versioning을 따른다.
 
   ⚠️ **`bench:scene:set-baseline` 은 세 집합 어디에도 넣지 않았다** — 실행 시 exit `1` 이지만 사유가 **선행 bench 리포트 부재**라 축 (ii) 와도 서버 부재와도 무관한 **제3 사유**다. _"exit 1 이니 의존 집합"_ 으로 묶으면 분류가 거짓이 된다.
 
-  **§7-2 표준 절차에 `trap 'rm -f .prettierignore.trial' EXIT` 도입** (cross-validate agy 2026-08-14, outcome `applied`) — `rm` 을 마지막 줄에 두면 중간 실패·중단 시 임시 파일이 **untracked 로 잔존**한다. 전제를 독립 실측했다: `git check-ignore -v` **NOT ignored** / `.gitignore` 해당 패턴 **`0` 건** / `git status --porcelain` 에 `??`. 이 저장소는 그 잔존물 목록을 **sub-agent 반환 게이트**로 쓰므로 다음 에이전트가 정체불명 untracked 를 물려받는다. ⚠️ **`.gitignore` 추가안은 기각** — 그 파일은 **존재 자체가 이상 신호**라 무시 대상으로 만들면 신호가 사라진다.
+  **§7-2 표준 절차에 `trap 'rm -f .prettierignore.trial' EXIT` 도입** (cross-validate 고유 발견 채택 — outcome 기록은 아래 `### Notes`) — `rm` 을 마지막 줄에 두면 중간 실패·중단 시 임시 파일이 **untracked 로 잔존**한다. 전제를 독립 실측했다: `git check-ignore -v` **NOT ignored** / `.gitignore` 해당 패턴 **`0` 건** / `git status --porcelain` 에 `??`. 이 저장소는 그 잔존물 목록을 **sub-agent 반환 게이트**로 쓰므로 다음 에이전트가 정체불명 untracked 를 물려받는다. ⚠️ **`.gitignore` 추가안은 기각** — 그 파일은 **존재 자체가 이상 신호**라 무시 대상으로 만들면 신호가 사라진다.
 
 - **[#1062] SSoT ↔ 사본 낱말 통일 (PATCH)** ([#1062](https://github.com/coseo12/astro-simulator/issues/1062), PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) reviewer 권고 6) — SSoT (`operational-friction.md` §8) 는 _"워크스페이스 패키지(`@astro-simulator/*`)를 **해석하는**"_, 사본 (`.claude/agents/developer.md`) 은 _"워크스페이스 패키지에 **의존하는**"_ 으로 갈려 있었다. ⚠️ **본 PR 이 같은 커밋에서 신설한 «트리거 조건은 두 곳이 같은 낱말이어야 한다» 규칙의 문면 위반**이다 (사본이 더 좁지 않아 실해 `0` 이나 규칙 자체가 문면으로 깨졌다). 사본을 SSoT 표기로 통일했다.
 
@@ -55,10 +55,18 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-- **`.claude/agents/developer.md` §규칙 — `pnpm build` 선행 트리거가 넓어진다.** 이전: _"격리 worktree 에서 **`typecheck` 를 돌리려면**"_. 이후: _"격리 worktree 에서 **워크스페이스 패키지에 의존하는 명령**을 돌리려면"_. 같은 입력(격리 worktree + `pnpm test:unit` 또는 `pnpm dev` 만 필요한 작업)에서 dev 에이전트가 **다르게 동작한다** — 이전 규칙은 `typecheck` 를 안 부르면 발화하지 않아 `install` 만으로 진행했고, 그 결과가 #1062 가 박제한 오진 경로다.
+- **`.claude/agents/developer.md` §규칙 — `pnpm build` 선행 트리거가 넓어진다.** 이전: _"격리 worktree 에서 **`typecheck` 를 돌리려면**"_. 이후: _"격리 worktree 에서 **워크스페이스 패키지(`@astro-simulator/*`)를 해석하는 명령**을 돌리려면"_ (SSoT `operational-friction.md` §8 과 **낱말까지 동일** — reviewer 권고 6). 같은 입력(격리 worktree + `pnpm test:unit` 또는 `pnpm dev` 만 필요한 작업)에서 dev 에이전트가 **다르게 동작한다** — 이전 규칙은 `typecheck` 를 안 부르면 발화하지 않아 `install` 만으로 진행했고, 그 결과가 #1062 가 박제한 오진 경로다.
 - **하위 규칙 3개 추가** — (i) `lint` / `format:check` / 정적 `verify:*` 는 **비의존 집합**이라 `install` 만으로 충분하다는 명시 (불필요한 `build` 호출 억제), (ii) `pnpm dev` 는 **exit code 로 드러나지 않는다**는 경고, (iii) 축 (ii) 결손 대상이 `packages/physics-wasm/{pkg,pkg-bundler}` 를 포함한다는 정정.
 - **문서 SSoT 정합** — `docs/ops/operational-friction.md` §8 이 절차 SSoT 이고 `developer.md` 가 사본이므로 **두 곳을 동시에** 갱신했다. `scripts/verify-agent-ssot.sh` exit `0` (5 files × 9 fields = 45 checks).
 - **`.prettierignore` 소유 모집단 확대** — `45` → `49`. prettier 가 `docs/retrospectives/` 의 md 를 전건 소유하므로 이후 그 4건 편집 시 pre-commit `lint-staged` 가 재포맷한다.
+
+### Notes
+
+- **cross-validate (agy, 2026-08-14) — `code 1072` / anchor `MINOR-behavior-change` / outcome `applied`.** `.claude/agents/developer.md` 행동 규칙을 수정하는 MINOR 변경이라 CLAUDE.md §교차검증 의 _"박제 직후 1회 루틴"_ 대상이다. **메인 오케스트레이터가 수행**했다 — developer 페르소나는 직접 호출이 금지돼 있다 ([#479](https://github.com/coseo12/astro-simulator/issues/479)). exit `0` 으로 **폴백이 아니며**, 따라서 `claude-only analysis completed — 단일 모델 편향 노출 미확보` 표기는 해당 없다. 판정은 **승인 권고**, 평가 `5` 개 항목 **전건 `양호`**. 축자 결과는 PR 코멘트 [#1072 (comment)](https://github.com/coseo12/astro-simulator/pull/1072#issuecomment-5290419452) — 본 항이 **정본**이고 그쪽이 참조본이다 (박제 위치 우선순위: CHANGELOG Notes > ADR 각주 > 커밋 > PR 코멘트).
+
+  **고유 발견 `1` 건 채택 — §7-2 임시 파일 방치 위험.** `.prettierignore.trial` 을 만들고 `rm` 을 **마지막 줄**에 두면 중간 실패·중단 시 잔존한다는 지적이다. **메인이 전제를 독립 실측**해 성립을 확인했다 — `git check-ignore` → **NOT ignored** / `.gitignore` 에 해당 패턴 **없음**. 이 저장소는 `git status --porcelain` 잔존물을 **sub-agent 반환 게이트**로 쓰므로 다음 에이전트가 정체불명 untracked 를 물려받는다. → **`trap ... EXIT` 채택** (획득 즉시 해제 예약). ⚠️ **`.gitignore` 추가안은 기각** — 그 파일은 **존재 자체가 이상 신호**라 무시 대상으로 만들면 신호가 사라진다.
+
+  **Claude 편향 셀프 체크 — 외부 검증이 dev·메인 둘 다 못 본 각도 `1` 개를 짚었다.** 본 PR 은 §8-1 의 **비의존 집합**(`14` 개)을 _"전수 주장을 성립시키기 위한 완결성"_ 근거로 실었는데, agy 는 그것이 **불필요한 `pnpm build` 호출을 막아 에이전트 루프 비용을 줄인다**는 **운영 효용**을 갖는다고 평가했다. 즉 같은 표가 _"주장의 완결성"_ 뿐 아니라 _"행동 억제"_ 로도 기능한다 — dev 도 메인도 전자로만 정당화하고 있었다. 그 밖에 `pnpm dev` 의 **exit `0` + HTTP `500` 침묵 실패**, `pnpm -r` 의 **fail-fast 마스킹**, `prebuild-test` 의 **실행 순서 의존**, `--ignore-path` 의 **앵커 패턴 무효화** 를 _"고난도 엣지 케이스"_ 로 평가했다.
 
 ## [0.73.0] — 2026-08-14
 
