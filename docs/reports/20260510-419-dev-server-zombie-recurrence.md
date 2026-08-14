@@ -134,6 +134,8 @@ fi
 
 **규칙**: 세션 시작 시점에 `pgrep -af "next dev|next-server|pnpm.*dev|cargo.*test"` 실행. ETIME 30분 이상 프로세스 발견 시 사용자에게 좀비 보고 + 정리 옵션 제시.
 
+> ⚠️ **승계 주석 (#1054, 2026-08-14)** — 본 리포트는 **2026-05-10 시점의 역사 기록**이라 위 원문을 치환하지 않는다. 다만 위 `pgrep -af …` 는 이 프로젝트에서 그 술어의 **원출처**이므로 승계 관계만 밝혀 둔다: macOS `pgrep` 의 `-a` 는 _"조상 프로세스를 매칭 대상에 포함"_ (Linux procps 의 _"명령행 출력"_ 과 동명이의) 이라 **자기 셸을 좀비로 오탐**하고, 명령행을 출력하지 않아 위 규칙이 요구하는 **ETIME 30분 판정 자체가 불가능**하다. 바로 아래 §구현 이 이미 `pgrep` 이 아닌 `ps … | grep -E …` 로 적혀 있다는 점에 유의 — **규칙과 구현의 괴리는 이 문서 안에 처음부터 존재했고**, 실제 배포된 hook 은 구현 쪽을 따랐다. 현행 정본은 `ps -axww -o pid=,etime=,command= | grep -E "…" | grep -v grep` 이며 근거는 [`../ops/operational-friction.md`](../ops/operational-friction.md) §3 기전 정정.
+
 **구현**: hook script
 
 ```bash
