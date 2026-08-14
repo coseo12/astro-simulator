@@ -55,7 +55,7 @@ Semantic Versioning을 따른다.
 
 ### Fixed
 
-- **[#1066] 좀비 카나리아 패턴 정밀도 — `.*` 가 래퍼의 `< /dev/null` 까지 도달하던 결함 제거 (MINOR)** ([#1066](https://github.com/coseo12/astro-simulator/issues/1066)) — 구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 의 `.*` 는 명령행 뒷부분까지 이어진다. 하네스 래퍼가 **모든** Bash 도구 호출 뒤에 `< /dev/null` 을 덧붙이므로 `pnpm.*dev` 가 그 `/dev/null` 의 `dev` 에 도달해 **`pnpm` 을 포함한 임의 명령**이 좀비로 보고됐다 (`pnpm install` · `pnpm build` · `pnpm format:check` 전부). `cargo .*test` 도 동종 구조다. [#440](https://github.com/coseo12/astro-simulator/issues/440) 이래 hook `PATTERN` 에 **선행**했고, PR [#1065](https://github.com/coseo12/astro-simulator/pull/1065) 는 `qa.md` 를 이 패턴에 **정렬**시켰을 뿐 정밀도를 바꾸지 않았다.
+- **[#1066] 좀비 카나리아 패턴 정밀도 — `.*` 가 래퍼의 `< /dev/null` 까지 도달하던 결함 제거 (MINOR)** ([#1066](https://github.com/coseo12/astro-simulator/issues/1066), PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080)) — 구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 의 `.*` 는 명령행 뒷부분까지 이어진다. 하네스 래퍼가 **모든** Bash 도구 호출 뒤에 `< /dev/null` 을 덧붙이므로 `pnpm.*dev` 가 그 `/dev/null` 의 `dev` 에 도달해 **`pnpm` 을 포함한 임의 명령**이 좀비로 보고됐다 (`pnpm install` · `pnpm build` · `pnpm format:check` 전부). `cargo .*test` 도 동종 구조다. [#440](https://github.com/coseo12/astro-simulator/issues/440) 이래 hook `PATTERN` 에 **선행**했고, PR [#1065](https://github.com/coseo12/astro-simulator/pull/1065) 는 `qa.md` 를 이 패턴에 **정렬**시켰을 뿐 정밀도를 바꾸지 않았다.
 
   ⚠️ **[#1054](https://github.com/coseo12/astro-simulator/issues/1054) 과 직교라 형태 교체로는 안 풀린다** — `grep -v grep` 은 *패턴 리터럴을 실은 셸*을 거르는데, 여기서 잡히는 것은 셸이 아니라 **실제 무관한 프로세스**라 필터가 무력하다.
 
@@ -74,7 +74,7 @@ Semantic Versioning을 따른다.
 
   ⚠️ **CLAUDE.md §가드 B 는 변경하지 않았다 — 실측 판정이다.** 그 패턴 `cargo|next dev|physics_wasm-` 에는 `.*` 가 **없어** `< /dev/null` 로 이어질 경로가 성립하지 않는다. 폭이 넓은 것은 결함이 아니라 **의도**다(복귀 직후 정리는 `cargo build` 를 포함한 cargo 전부를 봐야 하고, hook 이 보지 않는 `physics_wasm-` 바이너리가 그쪽 범위다). PR #1065 판정 — _3곳이 공유하는 SSoT 는 ETIME 30분 임계뿐_ — 을 유지한다.
 
-- **[#1066] `verify-zombie-check.mjs` 회귀 가드 — 정적 pin `6` → 동적 판정 포함 `9` 항목 (MINOR)** ([#1066](https://github.com/coseo12/astro-simulator/issues/1066)) — 항목 7 은 hook 에서 `PATTERN` 을 그대로 뽑아 위 코퍼스를 **실제 `grep -E` 로 재판정**한다. 정적 형태 검사(금지 문자열 목록)로는 `.*` 우회 형태가 무한해 못 막지만 코퍼스 판정으로는 즉시 드러나며, 부수로 **ERE 방언 차이**(로컬 macOS BSD grep ↔ CI ubuntu GNU grep)도 같은 검사가 걸러낸다. 항목 8·9 는 `qa.md` · `docs/ops/zombie-process-guards.md` 사본이 hook 과 **축자 일치**하는지 대조한다 — 종전에 이 일치를 지탱한 것은 `qa.md` 산문의 _"축자 일치"_ 선언뿐이었다.
+- **[#1066] `verify-zombie-check.mjs` 회귀 가드 — 정적 pin `6` → 동적 판정 포함 `9` 항목 (MINOR)** ([#1066](https://github.com/coseo12/astro-simulator/issues/1066), PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080)) — 항목 7 은 hook 에서 `PATTERN` 을 그대로 뽑아 위 코퍼스를 **실제 `grep -E` 로 재판정**한다. 정적 형태 검사(금지 문자열 목록)로는 `.*` 우회 형태가 무한해 못 막지만 코퍼스 판정으로는 즉시 드러나며, 부수로 **ERE 방언 차이**(로컬 macOS BSD grep ↔ CI ubuntu GNU grep)도 같은 검사가 걸러낸다. 항목 8·9 는 `qa.md` · `docs/ops/zombie-process-guards.md` 사본이 hook 과 **축자 일치**하는지 대조한다 — 종전에 이 일치를 지탱한 것은 `qa.md` 산문의 _"축자 일치"_ 선언뿐이었다.
 
   ```bash
   node scripts/verify-zombie-check.mjs   # exit 0 / "9 / 9 항목 PASS"
