@@ -4,7 +4,8 @@
 - **상태**: **Accepted** (cross-validate agy 2026-08-08 — outcome 은 CHANGELOG `[Unreleased]` entry. 본 ADR 은 원조 §Amendment 19 확장분의 **거처 이동**이며 조문 신설이 아니다 — 초판이 추가한 90줄 중 **본 ADR 에 부재한 줄 0**, reviewer 실측)
   - **§Amendment 1 (§결과 1 의 _"항 신설"_ 의무 → _"항 신설 또는 기존 항의 `> 확장` 블록 흡수"_ 로 개정): Accepted (파생)** — [#998](https://github.com/coseo12/astro-simulator/issues/998) 축 B 가 §결과 1 을 **처음 행사**하며 드러난 조문 자기모순의 해소. **신규 결정을 만들지 않고** §결과 1 이 이미 위임한 재검토 권한을 행사하는 것이라 별도 cross-validate 를 발동하지 않는다 (선례: [20260701-779](20260701-779-ci-alert-fatigue-concurrency.md) §Amendment 2 — `Accepted` ADR 의 _"결정 1 적용 범위 축소"_ 를 dated Amendment 로 수행)
   - **§Amendment 2 (오기록 6 방어선의 열린 후속 — 병치 검출 가드 채택 가부): Accepted (cross-validate agy 2026-08-13)** — [#1006](https://github.com/coseo12/astro-simulator/issues/1006). (iv) §확장 의 _"정밀도·재현율 튜닝이 남은 문제"_ 를 실측으로 종결 — **가드 채택 기각**. §결정·§결과 **무접촉**이고 (iv) 본문도 무접촉이라 규범 조문 변경 0
-- 관련: 이슈 [#983](https://github.com/coseo12/astro-simulator/issues/983) / [#989](https://github.com/coseo12/astro-simulator/issues/989) (자매 규약 — 전수 grep) / [#1006](https://github.com/coseo12/astro-simulator/issues/1006) (오기록 6 가드 기각) / PR [#994](https://github.com/coseo12/astro-simulator/pull/994)
+  - **§(ii) `> 확장` ([#1051](https://github.com/coseo12/astro-simulator/issues/1051)) — 줄 번호 참조 금지 (소급 편집 불가 기록물 한정): Accepted (cross-validate agy 2026-08-14)** — 본 규약을 선언한 CHANGELOG entry 자신이 `verify-claudemd-size.mjs` 를 줄 번호로 참조해 **조용한 dead reference** 가 된 사례의 처방. §결정·§결과·§오기록 분류표 **무접촉**이라 _"**4항** 이 정본"_ 표기 불변. cross-validate 는 **메인 오케스트레이터가 수행**했다 (`developer` 페르소나는 직접 호출 금지 — [#479](https://github.com/coseo12/astro-simulator/issues/479)). outcome `applied` / 5개 항목 전건 `양호` / 고유 발견 1건 채택. 4축 분류는 아래 §교차검증 반영 사항 (#1051)
+- 관련: 이슈 [#983](https://github.com/coseo12/astro-simulator/issues/983) / [#989](https://github.com/coseo12/astro-simulator/issues/989) (자매 규약 — 전수 grep) / [#1006](https://github.com/coseo12/astro-simulator/issues/1006) (오기록 6 가드 기각) / [#1051](https://github.com/coseo12/astro-simulator/issues/1051) (줄 번호 참조 규약) / PR [#994](https://github.com/coseo12/astro-simulator/pull/994)
 - **원조**: [20260515-harness-managed-divergent-pattern.md](20260515-harness-managed-divergent-pattern.md) §Amendment 19 §수치 박제 규약 (#897)
 
 ## 배경 — 왜 원조 ADR 을 고치지 않고 승격하는가
@@ -79,6 +80,99 @@ _"§수치 박제 규약 **4항**이 정본"_ 은 **그대로 유효**하다.
 > 산문 여러 문단에 수치를 흩뿌리면 (i) 의 _"전체를 갈아끼운다"_ 를 이행할 **지점 자체가
 > 없어진다** — 갱신 대상을 열거할 수 없으니 반드시 일부가 남는다. PR #981 이 이 항을 스스로
 > 위반해 오기록 4를 만들었다.
+
+> **확장 ([#1051](https://github.com/coseo12/astro-simulator/issues/1051)) — 줄 번호는 무시점 절대
+> 수치다.** **소급 편집이 금지된 기록물**(릴리스 확정 CHANGELOG 섹션 / `Accepted`·`Superseded` ADR
+> 본문)에서 코드·문서의 한 지점을 가리킬 때는 **줄 번호를 쓰지 않는다.** 대신 **심볼명**
+> (`DEFAULT_WARN_BOUNDARY`) / **인용문** (_"상수가 35,000 으로 되돌아가면"_) / **헤더 앵커**
+> (§4.4) 로 가리킨다. 본항 본문이 _"무시점 절대 수치는 반드시 썩는다"_ 라고 적은 것과 같은
+> 이유이며, 다른 점은 **썩는 주체가 값이 아니라 위치**라는 것뿐이다.
+>
+> **왜 오기록 분류표에 행을 추가하지 않는가** — 본 클래스는 §결과 1 이 말하는 _"규약 위반"_ 이
+> 아니다. 오기록 `1~6` 은 **기록 시점부터 값이 틀렸거나 술어가 어긋난** 것이지만, 줄 번호 참조는
+> **기록 시점에 정확했고** 나중에 참조 **대상**이 움직여 죽는다. 값에도 술어에도 손댈 곳이 없다는
+> 점에서 오기록 6 과 닮았으나, 6 은 병치라는 **배치**가 문제였고 본 클래스는 **참조 좌표계**가
+> 문제다. 따라서 (ii) 의 확장으로 흡수한다 (§Amendment 1 이 정본화한 경로).
+>
+> **실측 — 이 부패는 기계로 거의 안 잡힌다** (술어: `docs/` + `.claude/` + `CHANGELOG.md` 에서
+> `<경로>.<확장자>:<줄번호>` 토큰 전수. 경로는 저장소 루트 · 참조 파일 기준 상대 · basename 순으로
+> 해석. 2026-08-14, rev `38b6c8a`):
+>
+> | 분류 | 값 |
+> | --- | --- |
+> | 참조 토큰 총계 | **339** |
+> | 경로 미해석 (판정 보류) | 19 |
+> | 범위 밖 = 파일 줄 수 초과 (**기계 검출 가능**) | **1** |
+> | 범위 안 (**원리적으로 조용함**) | **319** |
+>
+> 즉 `<파일>:<줄>` 이 dangling 인지 기계가 판정할 수 있는 것은 **339 중 1건 (0.3%)** 이고, 나머지
+> **319건 (94.1%)** 은 그 줄이 존재하기만 하면 통과하므로 **내용이 바뀌어도 조용히 죽는다**.
+>
+> **재현** — 저장소 루트에서 그대로 실행한다 (가드가 아니라 **인용 수치의 재현 명령**이다. 임계가
+> 없어 CI 배선 대상이 아니라는 판정은 [`claudemd-governance.md`](../guides/claudemd-governance.md)
+> §2.1 _"왜 `scripts/verify-*.mjs` 가 아니라 코드펜스인가"_ 와 같다):
+>
+> ```bash
+> node - <<'EOF'
+> const { execSync } = require('child_process');
+> const fs = require('fs'), path = require('path');
+> const RE = '[A-Za-z0-9_./-]+\\.(mjs|ts|tsx|js|sh|yml|yaml|json):[0-9]+';
+> const files = execSync(`git grep -lE '${RE}' -- docs .claude CHANGELOG.md`, { encoding: 'utf8' }).trim().split('\n');
+> const byBase = new Map();
+> for (const p of execSync('git ls-files', { encoding: 'utf8' }).trim().split('\n'))
+>   if (!byBase.has(path.basename(p))) byBase.set(path.basename(p), p);
+> const TOK = new RegExp(`(${RE.replace(':[0-9]+', '')}):(\\d+)`, 'g');
+> const len = new Map(), r = { total: 0, unresolved: 0, outOfRange: 0, inRange: 0 };
+> for (const f of files)
+>   for (const m of fs.readFileSync(f, 'utf8').matchAll(TOK)) {
+>     r.total++;
+>     const rel = m[1], n = +m[3];
+>     const hit = [rel, path.join(path.dirname(f), rel), byBase.get(path.basename(rel))]
+>       .filter(Boolean).find((c) => fs.existsSync(c) && fs.statSync(c).isFile());
+>     if (!hit) { r.unresolved++; continue; }
+>     if (!len.has(hit)) len.set(hit, fs.readFileSync(hit, 'utf8').split('\n').length);
+>     n > len.get(hit) ? r.outOfRange++ : r.inRange++;
+>   }
+> console.log(r);
+> EOF
+> ```
+>
+> ⚠️ **위 표는 rev `38b6c8a` (본 확장 반영 **전**) 값이다.** 본 확장을 담은 커밋에서 재실행하면
+> `total` 이 커지는데, **금지 조항을 서술하는 문서가 그 패턴을 자기 매칭**하기 때문이다 — 위
+> §자기 사례가 3중으로 stale 이 부패 예시로 `verify-claudemd-size.mjs` 의 그 줄을 인용하고,
+> CHANGELOG entry 도 같은 사례를 싣는다 (반대로 자매 문서에서 `cross_validate.sh` 줄 번호 참조
+> 1건이 제거돼 상쇄된다). 잔존 hit 을 술어 없이 세면 _"규약이 안 지켜졌다"_ 로 오독되므로 적어
+> 둔다. **사례 인용은 금지 대상이 아니다** — 금지되는 것은 **가리키는 용도**의 줄 번호이지
+> **부패를 예시하는 인용**이 아니다. 베이스라인을 비교하려면 위 표의 rev 를 함께 인용한다.
+>
+> 또한 구분자를 따옴표 친 `<<'EOF'` 로 적은 것은 본 저장소 규약이다 — 위 스크립트가 백틱과 `$` 를
+> 담고 있어 따옴표를 빼면 셸이 치환한다
+> ([`gh-cli-execsync-pitfall.md`](../lessons/gh-cli-execsync-pitfall.md) §변형).
+>
+> **자기 사례가 3중으로 stale 이다.** ① 본 규약을 선언한 그 CHANGELOG entry 자신이
+> `verify-claudemd-size.mjs:202` 를 줄 번호로 참조했는데, PR #1050 이 그 줄을 밀어내 **`:202` 에는
+> 그럴듯한 다른 주석**이 앉았다 (오류로 드러나지 않는다). ② 참조 대상인 _"33,000 하향(#980 축 B)
+> 회귀 가드"_ 주석은 #1051 작성 시점 `:227` 이었고 **지금은 `:238`** 이다 — 이슈가 적은 정정값도
+> 이미 썩었다. ③ 그 CHANGELOG entry 자체가 이슈 본문의 `CHANGELOG.md:439` 에서 **`:618`** 로
+> 이동했다. **한 사슬에서 세 좌표가 전부 움직였다.**
+>
+> **대조군 — 같은 대상을 인용문으로 가리킨 참조는 살아 있다.** `.claude/agents/reviewer.md` 는
+> 같은 회귀 가드를 _"상수가 35,000 으로 되돌아가면 …"_ 으로 인용한다. 원 주석이 2줄로 접히며
+> 문구가 축약됐는데도 **식별 접두가 `git grep -cF` 로 `1` hit** 이라 재도달이 된다 (술어:
+> `git grep -cF '상수가 35,000 으로 되돌아가면' -- scripts/verify-claudemd-size.mjs`). 요지는
+> _"인용문은 안 썩는다"_ 가 **아니다** — 인용문도 대상이 재작성되면 썩는다. 다른 것은 **실패
+> 양식**이다: 인용문은 `0 hit` 으로 **시끄럽게** 죽고 줄 번호는 그럴듯한 다른 줄을 가리키며
+> **조용히** 죽는다. 위 실측이 말하는 `319/339` 가 정확히 그 조용한 쪽이다.
+>
+> **전수 교체는 기각한다** — 위 339 토큰을 일괄 치환하는 것은 예산 초과이고, 가변 문서의 dead
+> reference 는 **다음 편집에서 고칠 수 있어** 비용이 영구가 아니다. 규약의 사거리를 **소급 편집
+> 불가 기록물로 한정**하는 근거가 정확히 이 비대칭이다. 릴리스 확정 CHANGELOG 는 소급 편집이
+> **금지**(PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) BLOCK-3 전례)라 한 번
+> 썩으면 되돌릴 수 없다.
+>
+> **회귀 가드는 두지 않는다** — 위 표가 근거다. 검출 가능한 것이 `1/339` 인 가드는 발화율이
+> 손상률과 무관하며, 이는 [`gh-cli-execsync-pitfall.md`](../lessons/gh-cli-execsync-pitfall.md)
+> §회귀 가드 기각 축 3 과 같은 형태다. 방어는 **작성 시점 절차**뿐이다.
 
 **(iii) CHANGELOG ↔ ADR 상태 동시 갱신** — Amendment 를 `Provisional` 로 박제할 때 CHANGELOG 에도
 `_Provisional_` 로 쓰고, **Accepted 전이 시 두 곳을 동시에 갱신**한다. #897 PR 에서 CHANGELOG 의
@@ -384,3 +478,12 @@ git grep -nE '[0-9][0-9,.]*\*{0,2}[^0-9]{0,26} (vs\.?|VS) [^0-9]{0,26}\*{0,2}[0-
 - **고유 발견 (후속 분리 없음)** — agy 의 대안 2(한국어 형태소 분석기 기반 수량수사 vs 서수·식별자 구별)는 _"CI 에 형태소 분석 의존성 추가 — 배보다 배꼽"_ 이라고 **agy 자신이 기각**했다. Claude 도 동의한다 — 위 §구조 원인 이 보인 상쇄는 형태소 층에서도 남는다(절 제목 서수와 계수는 **품사가 같다**). 별도 이슈를 만들지 않는다
 
 - **cross-link**: 본 Amendment / [#1006](https://github.com/coseo12/astro-simulator/issues/1006) / PR [#1004](https://github.com/coseo12/astro-simulator/pull/1004) (라운드 1 BLOCK-4 — _"원리적 불가"_ 반증) / 선례 [#1020](https://github.com/coseo12/astro-simulator/issues/1020) · [`20260811-1010`](20260811-1010-measurement-c-verdict-tiers.md) · [#766](https://github.com/coseo12/astro-simulator/issues/766) / 상위 §(iv) 확장 · §기각 2
+
+## 교차검증 반영 사항 — §(ii) `> 확장` (agy, 2026-08-14 — `code 1070`, outcome `applied`)
+
+[#1051](https://github.com/coseo12/astro-simulator/issues/1051) 의 §(ii) 확장(줄 번호 참조 금지)을 `Provisional` → `Accepted` 로 전이시킨 근거다. **메인 오케스트레이터가 수행**했다 (`developer` 페르소나 직접 호출 금지 — [#479](https://github.com/coseo12/astro-simulator/issues/479)). anchor `MINOR-behavior-change` / exit `0` (폴백 아님) / 판정 **승인 권고**, 5개 평가 항목 **전건 `양호`**. 발화 원문의 트리 보존 한정자는 위 Amendment 2 §교차검증 반영 사항 의 ⚠️ 와 동일하게 적용된다.
+
+- **합의** — ① **조용한 부패의 격리**가 타당하다: 줄 번호 참조 `339` 중 기계 검출 가능이 `1`(`0.3%`)이고 조용한 것이 `319`(`94.1%`) 라는 실측 위에서, 규약 사거리를 **소급 편집 불가 기록물로 한정**한 조치를 _"탁월"_ 로 평가 ② **썩는 근거의 반증** — `0/400` → `2/400` 을 근거로 `--title` 을 제외에서 **포괄 대상으로 승격**한 것을 _"매우 견고한 설계"_ 로 평가 ③ **자기 매칭 사전 명시** — 금지 규약을 서술하는 문서가 자기 패턴에 걸리는 현상을 미리 적어 후속 혼선을 차단한 점
+- **이견** — **없음** (5개 항목 전건 `양호`)
+- **고유 발견 (1건 채택)** — [`gh-cli-execsync-pitfall.md`](../lessons/gh-cli-execsync-pitfall.md) **상단 §대상 목록은 앵커로 정규화됐는데 하단 §대상 아님 목록에는 줄 번호가 남아** 같은 문서 안에서 두 스타일이 갈렸다. agy 스스로 _"가변 문서이므로 #1051 규약 위반은 아니다"_ 라고 정확히 판정했으나, **규약을 가장 먼저 읽을 문서**가 자기 안에서 갈리는 것은 규약의 설득력을 깎는다 → 하단도 섹션 앵커로 정규화해 반영했다
+- **Claude 편향 셀프 체크** — ⚠️ **가장 위험한 변경에 이견이 안 나왔다.** metachar 목록 **축소**(`둘뿐`)는 틀리면 조용히 통과하는 유일한 축이었는데 cross-validate 가 `양호` 로 통과시켰고, **실제로 거짓이었다**. 축자 판정(_"**치환 및 변수 확장을 유발**하는 것은 백틱과 `$` 뿐"_)은 **참**이고 틀린 것은 그 좁은 명제를 **문자열 손상 일반으로 확대**한 쪽이라, **참인 근거로 거짓 결론을 받치는 형태**였다 — 근거만 검토하는 절차로는 원리적으로 안 잡히고 **reviewer 의 실주입 재현**만이 적발했다. 처방(치환 축 ↔ 소실 축 분리)은 그 문서 §축이 둘이다 에 박제했다. **cross-validate 통과를 결론 승인으로 취급하지 않는다**
