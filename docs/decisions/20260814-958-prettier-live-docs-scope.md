@@ -149,12 +149,15 @@ docs/**
    따옴표만 벗기는 대안은 **셸 의존**이라 또 다른 재현 함정을 만든다
 2. **죽은 4줄은 주석 처리가 아니라 제거한다.** 주석으로 남긴 죽은 규칙은 미래 관찰자에게 _"주석만 풀면 되는 정상 규칙"_ 으로 오인되며, 그 오인이 바로 #907 의 재현 경로다. 대신 **작동하는 형식**을 남기고 그 형식이 왜 그 모양인지(디렉토리 줄 필수 / md 한정)를 주석 3줄로 박제한다
 3. **`p*-retrospective.md` → `*-retrospective.md`.** varying 접두사를 `*` 가 흡수하므로 매칭이 **리터럴 소문자 접미사**만 보게 되고, `P*` 4건의 포함이 case-folding 동작에 의존하지 않게 되어 H2 가 소멸한다. 부수 효과로 선언 단위가 `p*` 실측 **13건** → `-retrospective.md` 전건 **15건**으로 확장되며(차이는 `harness-update-2.2.0` · `r10` 2건), 이는 CLAUDE.md §마일스톤 회고 루틴 이 규정한 위치 규약 `docs/retrospectives/<phase-or-milestone>-retrospective.md` 과 **정합**이다 — `r10` / `harness-update-2.2.0` / `P1` / `P2` 계열도 같은 클래스의 회고다
+   - ⚠️ **본 항의 operative clause 는 대체됐다 — §Amendment 2 (2026-08-14, [#1063](https://github.com/coseo12/astro-simulator/issues/1063)) 참조.** 현행 `.prettierignore` 는 `*-retrospective.md` 가 아니라 **`**/*.md`** 이며 **파일 게이트가 없다**. 본 항 원문은 판정 시점의 기록이므로 **소급 치환하지 않는다**
 4. **ADR `20260731-907` §결정 4 는 정정하되 번복하지 않는다.** 그 조항의 **의도**(4경로를 포맷 대상으로 유지)는 유효하고 **기전**(`!` negation 단독)만 무효였다. 해당 §에 본 ADR 로의 정정 포인터 1줄을 추가한다
 5. **ADR `20260814-982` §재검토 조건 1 의 감시값을 `5` → `45` 로 갱신**하고, 갱신 사유(편입 모집단의 의도된 취소선 실측 0)를 병기한다. 그 ADR 이 규정한 트리거 동작은 _"즉시 재측정"_ 이며 본 ADR 이 그 재측정이다
+   - ⚠️ **현행 감시값은 `49` 다** (2026-08-14, [#1063](https://github.com/coseo12/astro-simulator/issues/1063)) — 본 항의 `45` 는 박제 시점의 기록이므로 **소급 치환하지 않는다**. 근거는 `20260814-982` **§Amendment 2**
 
 ### 의도적 비-범위
 
 - `docs/retrospectives/README.md` / `P1-a11y.md` / `P1-browser-compat.md` / `P1-perf.md` — `-retrospective.md` 로 끝나지 않아 편입되지 않는다. 회고 **본문**이 아닌 인덱스·부속 측정이라 선언 단위 밖이며, 편입하려면 별도 판정이 필요하다
+  - ⚠️ **그 별도 판정이 하루 뒤 내려졌다 — 편입** ([#1063](https://github.com/coseo12/astro-simulator/issues/1063), 2026-08-14). 위 *"인덱스·부속 측정은 선언 단위 밖"* 근거를 4경로에 **일관 적용하면** 이미 편입돼 있는 `docs/benchmarks/README.md` · `docs/reports/**/README.md` 도 빠져야 하는데 그렇지 않다 — 즉 이 경계는 원리가 아니라 구 ADR `20260419` 가 유일하게 이 경로만 디렉토리 대신 **파일명**(`docs/retrospectives/p*`)으로 선언한 데서 온 **잔존 협소**였다. `.prettierignore` 는 `!docs/retrospectives/**/*.md` 로 통일됐고 모집단은 `45` → `49` (churn **1 파일 1 행**, 편입분 물결 `0` hit). 감시값 갱신은 [`20260814-982`](20260814-982-changelog-tilde-guard.md) **§Amendment 2**. 본 항 원문은 판정 시점의 기록이므로 **소급 치환하지 않는다**
 - `docs/lessons/` / `docs/decisions/` / `docs/guides/` / `docs/architecture/` / `docs/ops/` — 제외 유지. 여기에 의도된 취소선 **23 줄 / 48 발생**이 있고(`20260814-982` 실측), 편입하면 그 ADR 의 정밀도 논거가 실제로 깨진다
 - `docs/**` 전체를 포맷 대상으로 되돌리는 안 — 위 사유로 채택하지 않는다
 
@@ -167,12 +170,14 @@ docs/**
 - `pnpm run format:check` exit `0` — 편입 40 파일 포함
 - 4경로 `--file-info` 전건 `ignored: false` (md) / `docs/benchmarks/*.json` 전건 `ignored: true`
 - `node scripts/verify-md-tilde.mjs --population` 이 `45` 를 보고하고, 그 계수가 본 ADR §결정 5 의 박제값과 일치 (`45` = 기존 소유 `5` + 편입 `40`)
+  - ⚠️ **현행 실측은 `49` 다** (2026-08-14, [#1063](https://github.com/coseo12/astro-simulator/issues/1063) 이 `docs/retrospectives/` 게이트를 `**/*.md` 로 통일해 `4` 건 추가 편입). 위 `45` 는 본 ADR 시점의 성공 신호이므로 **소급 치환하지 않는다** — 현행값 근거는 `20260814-982` **§Amendment 2**
 - 편입 40 파일의 코드 펜스·인라인 코드 스팬 밖 `~~` **0 발생** (물결 선처리 후)
 - 4경로의 **중첩 하위 디렉토리** md 도 `ignored: false` (깊이 1 에서 끊기지 않는다 — §Amendment 정정 3)
 
 ### 재검토 조건
 
 1. **`--population` 계수가 `45` 에서 이탈** — 신규 live 문서 추가는 정상 증가다. 감소는 `.prettierignore` 회귀 신호이므로 즉시 원인 규명
+   - ⚠️ **본 트리거는 발동했고 대조 기준선은 이제 `49` 다** (2026-08-14, [#1063](https://github.com/coseo12/astro-simulator/issues/1063)). **이 항을 `45` 로 읽지 마라** — 실측 `49` 대비 영구 발화 상태가 되고, 역으로 `49` → `45` 감소를 _"정상 복귀"_ 로 오독시킨다. **살아 있는 트리거이므로 대조는 `49` 로 한다.** 위 `45` 는 박제 시점의 기록이라 **소급 치환하지 않으며**, 현행값 정본은 `20260814-982` **§Amendment 2 §후속 감시** 다
 2. **신규 디렉토리 — 축이 둘이고 처방이 다르다** (Y-4, PR [#1061](https://github.com/coseo12/astro-simulator/pull/1061) 리뷰 권고). 둘 다 `docs/**` blanket 때문에 **fail-closed**(조용히 제외)라는 결과는 같지만, 고치는 방법이 다르므로 분리해 적는다.
    - **2-A. `docs/` 최상위에 신규 디렉토리** (예: `docs/postmortems/`) 가 생기고 live 문서 성격일 때 — 본 ADR §결정 형식에 **3줄**(`!docs/<신규>/` + `!docs/<신규>/**/` + `!docs/<신규>/**/*.md`)을 추가할지 판정
    - **2-B. 기존 4경로 *자신의* 하위에 신규 디렉토리** (예: `docs/reports/<이슈>-<주제>/`) 가 생길 때 — **이미 깊이 체인이 있으므로 추가 조치 불요**다. 단 체인의 `**/` 줄이 어떤 이유로 제거되면 그 순간 깊이 1 로 되돌아가 **선언 ↔ 동작 drift 가 재발**한다(초판이 그랬다). 즉 2-B 의 재검토 트리거는 *"신규 디렉토리 발생"* 이 아니라 **`**/` 줄의 제거·변형**이다
@@ -251,7 +256,7 @@ docs/**
 ### 명시적 비-범위
 
 - `docs/lessons/` · `docs/decisions/` · `docs/guides/` · `docs/architecture/` · `docs/ops/` 의 소유 상태 — **무접촉**
-- `docs/retrospectives/README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md` — **무접촉**
+- `docs/retrospectives/README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md` — **무접촉** (⚠️ 후속 [#1063](https://github.com/coseo12/astro-simulator/issues/1063) 이 편입 판정 — 위 §의도적 비-범위 참조)
 - bench/forensic JSON·PNG — **무접촉** (H1)
 - `verify-prettier-coverage.mjs` 신설 — 후속 분리
 - `#1040` 존량 회수 — 별개 판정
@@ -437,3 +442,66 @@ delta ↔ 계수 혼용이 새 형태로 재발한다.
 > ⚠️ 위 두 줄의 `39` 는 **정정 3(깊이 체인 보강) 이전 시점의 편입 집합**이다. 그 시점 검증 기록이므로
 > 소급 치환하지 않는다. **현행 편입 delta 는 `40`** 이며, 40번째 파일의 개별 검증은 §정정 3 의
 > _"40번째 편입 파일 개별 검증"_ 표에 있다 (두 축 모두 `0` hit 로 재확인됐다).
+
+## Amendment 2 2026-08-14 — #1063 파일 게이트 제거 (§결정 3 operative clause 대체)
+
+> **상태**: Active (2026-08-14 박제, developer 단계)
+> **트리거**: 본 ADR §의도적 비-범위 가 _"편입하려면 별도 판정이 필요하다"_ 로 **명시 위임**한 항목의 이행
+> **발동 사건**: [#1063](https://github.com/coseo12/astro-simulator/issues/1063) — `.prettierignore` 4경로 중 `docs/retrospectives/` 만 파일명 게이트였던 비대칭 해소
+> **측정 rev**: `38b6c8a` (`origin/develop` tip) / prettier `3.9.6` (`pnpm exec` = lockfile 정본) / macOS
+
+### 무엇이 대체됐는가
+
+| 축 | §결정 3 (초판) | **Amendment 2** |
+| --- | --- | --- |
+| `docs/retrospectives/` 파일 게이트 | `!docs/retrospectives/**/*-retrospective.md` | **`!docs/retrospectives/**/*.md`** |
+| 선언 단위 | `-retrospective.md` 전건 **`15`** | 디렉토리 md 전건 **`19`** |
+| 4경로 게이트 형식 | retrospectives 만 파일명 게이트 (**비대칭**) | **4경로 전건 동일 형식** |
+
+`git ls-files 'docs/retrospectives/*.md' | wc -l` = `19` / 그중 `-retrospective.md` = `15`.
+
+### §결정 3 의 어느 부분이 살아남는가 — 판정은 유효, 술어는 대체
+
+- **살아남는다**: _"`p*` 를 쓰지 않는다"_. 근거(미문서화 case-folding 동작 의존 제거, H2)는 그대로다.
+  현행 `**/*.md` 는 **파일명 술어 자체가 없어** 그 의존이 `0` 이며, `p*` 로의 회귀를 막을 이유는
+  오히려 강해졌다. `.prettierignore` 주석에 그 금지를 명시 박제했다.
+- **대체된다**: _"`*-retrospective.md` 를 채택한다"_ 는 **operative clause**. 현행 파일과 문언이
+  다르므로 하위 불릿이 아니라 **Amendment 로 승격**한다.
+
+### 왜 번복이 아닌가
+
+본 ADR §의도적 비-범위 는 4건(`README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md`)에
+대해 _"편입하려면 별도 판정이 필요하다"_ 고 **판단을 유보하고 위임**했다. #1063 이 그 위임을 이행한
+것이므로 **결정의 번복이 아니라 위임된 후속의 완료**다.
+
+#1063 의 판정 근거는 **일관성 귀류법**이다 — 좁은 게이트의 사유로 제시됐던 _"인덱스·부속 측정은
+선언 단위 밖"_ 을 4경로에 일관 적용하면 이미 편입돼 있는 `docs/benchmarks/README.md` 와
+`docs/reports/**/README.md` 도 빠져야 하는데 그렇지 않다. 즉 그 사유는 4경로 중 하나에만 적용된
+**사후 합리화**이고, 실제 뿌리는 구 ADR [`20260419`](20260419-prettier-harness-conflict.md)
+§제외 대상 정책이 유일하게 이 경로만 디렉토리가 아닌 **파일명**(`docs/retrospectives/p*`)으로 선언한
+것이다. 그 선언에는 자체 근거가 붙어 있지 않다 (나머지 셋은 `docs/phases/` · `docs/benchmarks/` ·
+`docs/reports/` 로 디렉토리 선언).
+
+⚠️ CLAUDE.md §마일스톤 회고 루틴 의 위치 규약(`docs/retrospectives/<phase-or-milestone>-retrospective.md`)
+은 좁은 게이트를 **정당화하지 않는다** — 그 규약은 **회고 문서를 어디에 쓸 것인가**를 정하지
+**prettier 소유 경계**를 정하지 않는다. 두 축이 다르다.
+
+### 실측
+
+| 축 | 값 | 술어 |
+| --- | ---: | --- |
+| 편입 파일 | `4` | `README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md` |
+| 모집단 | `45` → **`49`** | `node scripts/verify-md-tilde.mjs --population` |
+| churn | **`1` 파일 `1` 행** | `pnpm exec prettier --write <편입 4>` 후 `git diff --stat` (`README.md` 리스트 앞 빈 줄. 나머지 3건 unchanged) |
+| 편입분 `~~` (상한) | `0` hit | `git grep -nF -- '~~' -- <편입 4>` |
+| 편입분 단일 `~` | `0` hit | `git grep -nF -- '~' -- <편입 4>` |
+
+`~` 가 `0` 이므로 **장래 손상 후보도 없다** — [`20260814-982`](20260814-982-changelog-tilde-guard.md)
+§정밀도의 출처 논거는 `49` 에서도 무손상이며, 감시값 갱신은 그 ADR **§Amendment 2** 다.
+
+### 갱신되지 않는 것
+
+- **§결정 1 · 2 · 4** — 무접촉 (따옴표 미사용 / 죽은 줄 제거 / `20260731-907` 정정)
+- **H1 (`**/*.md` 한정)** — 무접촉. bench/forensic JSON 은 여전히 생성기 소유다
+- **나머지 3경로의 게이트** — 무접촉 (이미 `**/*.md`)
+- **§결정 3 원문 · §의도적 비-범위 원문 · §성공 신호 원문** — 판정 시점의 기록이므로 **소급 치환하지 않는다**. 현행값 포인터만 부기했다
