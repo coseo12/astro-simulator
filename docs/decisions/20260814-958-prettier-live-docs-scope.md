@@ -137,7 +137,16 @@ docs/**
 
 ### 결정 세부
 
-1. **소유 단위는 markdown 뿐이다.** `.json` / `.png` 등 비-markdown 산출물은 `docs/**` 로 제외 유지. 실측 — 편입 **40 파일 전건 `.md`**, JSON·PNG **0건**. 중첩 번들의 비-md 도 전건 제외 유지 — 술어 `git ls-files 'docs/{benchmarks,phases,reports,retrospectives}/' | awk -F/ 'NF>3'` 기준 **4경로 중첩 PNG `54` · JSON `8`**
+1. **소유 단위는 markdown 뿐이다.** `.json` / `.png` 등 비-markdown 산출물은 `docs/**` 로 제외 유지. 실측 — 편입 **40 파일 전건 `.md`**, JSON·PNG **0건**. 중첩 번들의 비-md 도 전건 제외 유지다 — **4경로 중첩 PNG `54` · JSON `8`**. 술어:
+
+   ```bash
+   git ls-files docs/benchmarks/ docs/phases/ docs/reports/ docs/retrospectives/ | awk -F/ 'NF>3'
+   # 중첩(깊이 2+) 전체 63 → PNG 54 / JSON 8 / md 1
+   ```
+
+   ⚠️ **경로를 나열한다.** `'docs/{a,b}/'` 처럼 따옴표 안에 brace 를 쓰면 git 이 리터럴 pathspec 으로
+   읽어 **`0` 건**이 나온다 — 초판 술어가 그 형태였고 PR [#1061](https://github.com/coseo12/astro-simulator/pull/1061) 리뷰 라운드 3 에서 적발됐다.
+   따옴표만 벗기는 대안은 **셸 의존**이라 또 다른 재현 함정을 만든다
 2. **죽은 4줄은 주석 처리가 아니라 제거한다.** 주석으로 남긴 죽은 규칙은 미래 관찰자에게 _"주석만 풀면 되는 정상 규칙"_ 으로 오인되며, 그 오인이 바로 #907 의 재현 경로다. 대신 **작동하는 형식**을 남기고 그 형식이 왜 그 모양인지(디렉토리 줄 필수 / md 한정)를 주석 3줄로 박제한다
 3. **`p*-retrospective.md` → `*-retrospective.md`.** varying 접두사를 `*` 가 흡수하므로 매칭이 **리터럴 소문자 접미사**만 보게 되고, `P*` 4건의 포함이 case-folding 동작에 의존하지 않게 되어 H2 가 소멸한다. 부수 효과로 선언 단위가 `p*` 실측 **13건** → `-retrospective.md` 전건 **15건**으로 확장되며(차이는 `harness-update-2.2.0` · `r10` 2건), 이는 CLAUDE.md §마일스톤 회고 루틴 이 규정한 위치 규약 `docs/retrospectives/<phase-or-milestone>-retrospective.md` 과 **정합**이다 — `r10` / `harness-update-2.2.0` / `P1` / `P2` 계열도 같은 클래스의 회고다
 4. **ADR `20260731-907` §결정 4 는 정정하되 번복하지 않는다.** 그 조항의 **의도**(4경로를 포맷 대상으로 유지)는 유효하고 **기전**(`!` negation 단독)만 무효였다. 해당 §에 본 ADR 로의 정정 포인터 1줄을 추가한다
@@ -401,9 +410,9 @@ _"`5` → `39` 로 7.8배"_ / §고유 발견)은 **대화 시점의 기록이�
 
 | 술어 | 실측 |
 | --- | ---: |
-| README 보유 번들 (`git ls-files 'docs/reports/<번들>/*.md'`) | **`1` / `8`** (`379-forensic` 뿐) |
-| 그 README 를 본문 참조하는 **외부** ADR (`git grep 'reports/379-forensic/README'`) | **`0` 건** (hit `2` 는 전부 본 ADR 자기 참조) |
-| ADR 이 실제로 참조하는 번들 자산 | `output.json` **`15`** · `matrix.json` · PNG 등 |
+| README 보유 번들 (`git ls-files 'docs/reports/*/*.md' \| cut -d/ -f3 \| sort -u` vs 같은 식의 `*/*`) | **`1` / `8`** (`379-forensic` 뿐) |
+| 그 README 를 본문 참조하는 **외부** ADR (`git grep -l 'reports/379-forensic/README' -- 'docs/decisions/*.md'` 에서 본 ADR 제외) | **`0` 건** (hit 은 전부 본 ADR 자기 참조 — 계수는 본 문서를 고칠 때마다 변하므로 박제하지 않는다) |
+| ADR 이 실제로 참조하는 번들 자산 | `output.json` · `matrix.json` · PNG — **README 가 아니다** |
 
 즉 ADR 들이 참조하는 것은 **`output.json` 과 디렉토리**이지 README 가 아니다. **기각 결론은 위 두 축으로
 유지**되며, 반증된 축은 근거에서 뺀다.

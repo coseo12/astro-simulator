@@ -39,7 +39,7 @@ Semantic Versioning을 따른다.
 
   **수리 형식 — `docs/**` 를 해체하지 않는다.** gitignore 표준 우회(**디렉토리를 먼저 재포함**)로 4줄 추가만에 성립한다. 격리 픽스처 대조군: `docs/**` 만 → `ignored: true` / 디렉토리 줄 **없이** 파일 줄만 → `ignored: true` (**무효 재현**) / 디렉토리 줄 + 파일 줄 → `ignored: false`. 이슈가 상정한 (B) _"개별 경로 열거 전환"_ 은 불필요하며, 그 전환은 신규 `docs/` 하위 디렉토리가 열거 누락 시 조용히 유입되는 **fail-open** 구조를 새로 만든다.
 
-  **`**/*.md` 한정 (H1)** — `docs/benchmarks/*.json` (`baseline.json` 등) 은 `bench-baseline-remeasure.yml` 이 자동 생성·커밋하고 `verify-fps-baseline.mjs` 가 소비한다. 소박한 `!docs/benchmarks/**` 는 이것들을 포맷 대상으로 끌어들여 생성기 출력 ↔ prettier 포맷 사이에 상시 drift 를 만든다. 실측 — 편입 **`40` 파일 전건 `.md`**, `docs/**` 하위 JSON·PNG 소유 **0건**. 중첩 번들의 비-md 도 전건 제외 유지 — 술어 `git ls-files '<4경로>' | awk -F/ 'NF>3'` 기준 **4경로 중첩 PNG `54` · JSON `8`** (단일 번들 `379-forensic` 은 PNG `40` · JSON `1` · md `1` = `42` 파일).
+  **`**/*.md` 한정 (H1)** — `docs/benchmarks/*.json` (`baseline.json` 등) 은 `bench-baseline-remeasure.yml` 이 자동 생성·커밋하고 `verify-fps-baseline.mjs` 가 소비한다. 소박한 `!docs/benchmarks/**` 는 이것들을 포맷 대상으로 끌어들여 생성기 출력 ↔ prettier 포맷 사이에 상시 drift 를 만든다. 실측 — 편입 **`40` 파일 전건 `.md`**, `docs/**` 하위 JSON·PNG 소유 **0건**. 중첩 번들의 비-md 도 전건 제외 유지 — 술어 `git ls-files <4경로를 공백으로 나열> | awk -F/ 'NF>3'` 기준 **4경로 중첩 PNG `54` · JSON `8`** (단일 번들 `379-forensic` 은 PNG `40` · JSON `1` · md `1` = `42` 파일).
 
   **`p*-retrospective.md` → `*-retrospective.md` (H2)** — `p*` 는 `P1`·`P2`·`P2-B`·`P2-C` `4` 건의 포함을 prettier ignore 매칭의 **문서화되지 않은 case-insensitive 동작**에 의존한다(실측 계수 `p*` = `13` / `*` = `15`, 차이는 `harness-update-2.2.0`·`r10`). 리터럴 소문자 접미사 매칭으로 바꿔 그 의존을 **0** 으로 만든다. 확장된 `15` 건은 CLAUDE.md §마일스톤 회고 루틴 의 위치 규약과 정합이다.
 
