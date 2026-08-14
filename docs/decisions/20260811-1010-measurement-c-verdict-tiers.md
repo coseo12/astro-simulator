@@ -3,6 +3,9 @@
 - 일자: 2026-08-11
 - **상태**: **Accepted** (cross-validate agy 2026-08-11 — §교차검증 반영 사항 4축 통합 완료). 원 박제: `Provisional` (발동 앵커 2건 — ADR 신규 / MINOR Behavior Changes)
 - 관련: 이슈 [#1010](https://github.com/coseo12/astro-simulator/issues/1010) / 후속 [#1014](https://github.com/coseo12/astro-simulator/issues/1014) (release PR 클래스) · [#1013](https://github.com/coseo12/astro-simulator/issues/1013) (문서 예시 명령줄)
+- **Amendment 이력** (본문은 이력이므로 소급 치환하지 않는다 — 원문 유지 + 승계 주석):
+  - **1** (2026-08-13, [#1014](https://github.com/coseo12/astro-simulator/issues/1014)) → **§재검토 조건 1** — WARN 발화 조건을 [20260813-1014](20260813-1014-release-pr-class-no-op.md) §재검토 조건 1-A / 1-B 로 대체
+  - **2** (2026-08-14, [#1039](https://github.com/coseo12/astro-simulator/issues/1039)) → **§결과 › 축 3** — 5 페르소나 self-consistency 표의 **재현 recipe 정본화** (셀 의미를 hit 수 → 보유/비보유로 확정). 표의 24 셀 **값은 불변**
 - 계보: [#469](https://github.com/coseo12/astro-simulator/issues/469) (측정 방법 C 원안) → [#470](https://github.com/coseo12/astro-simulator/issues/470) / [#473](https://github.com/coseo12/astro-simulator/issues/473) (D4 CI backstop) / [#471](https://github.com/coseo12/astro-simulator/issues/471) (스킬 사전 차단) / [#475](https://github.com/coseo12/astro-simulator/pull/475) (메타 규칙) / [#855](https://github.com/coseo12/astro-simulator/issues/855) (템플릿↔가드 정합)
 - 필수 cross-link: [20260807-971-required-status-checks.md](20260807-971-required-status-checks.md) **결정 9-1** (본 가드 required 제외 — WARN 을 exit 0 로 두는 근거의 절반)
 
@@ -198,6 +201,59 @@ ADR [20260807-971](20260807-971-required-status-checks.md) **결정 9-1** 이 �
 | `.claude/agents/pm.md` | 0 / 0 / 0 | 0 | **비보유가 정답** |
 
 6 파일 × 4 셀 = **24 셀 결정적 일치**. 재현: `grep -cF -- '<bullet 원문>' <파일>`.
+
+> ⚠️ **Amendment 2 (2026-08-14, [#1039](https://github.com/coseo12/astro-simulator/issues/1039)) — 위 재현 recipe 는 "가드 호출" 열에서 재현되지 않는다.** 위 원문은 이력이므로 그대로 둔다. 표의 **24 셀 값도 불변**이며, 정정 대상은 (ㄱ) 셀의 **의미**와 (ㄴ) **recipe 문언** 둘뿐이다. 발견: PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038) reviewer 🟡-2 / dev 자기 적발.
+>
+> **결함 1 — 고정 리터럴 하나로는 "가드 호출" 6 셀이 동시에 재현되지 않는다.** 정본 호출을 인용하는 4 파일의 **플레이스홀더가 갈리기 때문**이다 (`developer.md` · `create-pr/SKILL.md` 는 `<PR번호>`, `reviewer.md` · `qa.md` 는 `<번호>`). 실측 (rev `38b6c8a`, `grep -cF -- '<리터럴>' <파일>`):
+>
+> | 고정 리터럴 | developer | SKILL | reviewer | qa | architect | pm |
+> | --- | --- | --- | --- | --- | --- | --- |
+> | `node scripts/verify-pr-template-checklist.mjs <PR번호>` | 2 | 1 | **0** | **0** | 0 | 0 |
+> | `node scripts/verify-pr-template-checklist.mjs <번호>` | **0** | **0** | 1 | 1 | 0 | 0 |
+>
+> 어느 쪽도 표의 `1 / 1 / 1 / 1 / 0 / 0` 과 일치하지 않는다 — 각각 **2 셀씩** 어긋난다.
+>
+> **결함 2 — "hit 수" 독법은 시간 종속이다.** 플레이스홀더를 뗀 리터럴 `node scripts/verify-pr-template-checklist.mjs` 은 **본 ADR 박제 시점 `ebd9866` 에서 `1 / 1 / 1 / 1 / 0 / 0` 으로 표와 완전히 일치**했다. 이후 `aeb6c07` ([#1013](https://github.com/coseo12/astro-simulator/issues/1013) / PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038)) 이 `developer.md` 에 정본 호출을 **한 번 더 인용**하면서 그 셀이 **2** 가 됐다. 즉 **측정 대상 파일이 측정 문자열을 포함하는 자기 참조** 탓에 hit 수는 원리적으로 움직인다 — [20260808-983](20260808-983-measurement-recording-convention.md) §(iv) 가 ADR 인덱스 등재 수에 쓴 처방과 **같은 클래스**다.
+>
+> **정정 1 — 표의 셀은 `보유(1) / 비보유(0)` 판정이다. hit 수가 아니다.** §축 3 서두가 이미 대조 기준을 _"모든 파일이 같은 문장"_ 이 아니라 **"파일별 역할에 맞는 값"** 으로 선언했으므로 이 독법이 원 의도와도 정합한다. 재인용이 늘어도 판정은 불변이다.
+>
+> **정정 2 — 정본 recipe (placeholder-agnostic · boolean).** 저장소 루트에서 실행한다:
+>
+> ```bash
+> # 출력은 6행 × 4열의 0/1 판정표 (hit 수가 아니다)
+> BULLETS=('- **phrase ≥ 1 hit ∧ 구조 ≥ 1 hit** → PASS'
+>          '- **phrase ≥ 1 hit ∧ 구조 0 hit** → WARN'
+>          '- **phrase 0 hit** → FAIL')
+> GUARD='node scripts/verify-pr-template-checklist.mjs'   # 플레이스홀더(<PR번호>/<번호>)를 뗀다
+> for f in .claude/agents/developer.md .claude/skills/create-pr/SKILL.md \
+>          .claude/agents/reviewer.md .claude/agents/qa.md \
+>          .claude/agents/architect.md .claude/agents/pm.md; do
+>   row=''
+>   for p in "${BULLETS[@]}" "$GUARD"; do
+>     if grep -qF -- "$p" "$f"; then row="$row 1"; else row="$row 0"; fi
+>   done
+>   printf '%-34s%s\n' "$f" "$row"
+> done
+> ```
+>
+> **재현 실증 (2026-08-14)** — 위 블록의 출력이 §축 3 표와 **24 / 24 셀 일치**한다. 그리고 **두 rev 에서 출력이 동일**하다 (rev `38b6c8a` 현행 / rev `ebd9866` 본 ADR 박제 시점 — 후자는 6 파일을 그 커밋 내용으로 체크아웃해 같은 블록을 실행):
+>
+> ```text
+> .claude/agents/developer.md        1 1 1 1
+> .claude/skills/create-pr/SKILL.md  1 1 1 1
+> .claude/agents/reviewer.md         0 0 0 1
+> .claude/agents/qa.md               0 0 0 1
+> .claude/agents/architect.md        0 0 0 0
+> .claude/agents/pm.md               0 0 0 0
+> ```
+>
+> hit 수 독법은 두 rev 에서 갈리고 (`developer.md` `1` → `2`), boolean 독법은 갈리지 않는다. **이 대조가 정정 1 의 실측 근거다** — 표의 `1` 을 hit 수로 읽으면 ADR 이 스스로 stale 해지고, 보유/비보유로 읽으면 불변량이 된다.
+>
+> ⚠️ **본 recipe 는 측정 방법 C 판정식이 아니다.** PR 본문 가시성 판정의 정본은 `scripts/verify-pr-template-checklist.mjs` 이고 그 **수동 grep 대체재는 두지 않는다** ([#1013](https://github.com/coseo12/astro-simulator/issues/1013)). 본 recipe 가 재는 것은 _"6 파일이 각자의 역할에 맞는 문언을 보유하는가"_ 라는 **별개 축**이라 결정 7 의 SSoT 수렴을 침범하지 않는다.
+>
+> ⚠️ **자기 참조 caveat** — 본 Amendment 가 박제한 리터럴은 측정 대상 6 파일 **밖** (`docs/decisions/`) 이라 판정에 영향이 0 이다. 그러나 누구든 6 파일 **안**에 정본 호출이나 3계급 bullet 을 재인용하면 hit 수는 또 움직인다. boolean 독법이 그 클래스를 **구조적으로 무해화**한다.
+>
+> ⚠️ **잔존 결합 1건 — `BULLETS` 는 여전히 산문 원문에 리터럴 결합돼 있다** (PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 🟡-6). `GUARD` 는 placeholder-agnostic 해졌으나 3계급 bullet 문언이 바뀌면 recipe 는 그 열에 `0` 을 낸다. 결정 7 상 산문 사본은 _"갈리면 스크립트가 옳다"_ 로 **드리프트가 허용**되므로 이 결합은 원리적으로 남는다. **다만 침묵 실패가 아니다** — 그 순간 출력이 위 표와 **불일치**해 fail-loud 로 드러나고, 조치는 _"표를 고친다"_ 가 아니라 _"recipe 의 `BULLETS` 를 새 문언으로 갱신한다"_ 이다 (표가 재는 것은 문언 자체가 아니라 **역할별 보유 여부**이므로 값 `1/1/1` 은 불변이어야 한다).
 
 #### 축 4 — 메타 측정 도구 자기 적용
 
