@@ -336,6 +336,9 @@ cross-validate 가 YAGNI 위반으로 지목해 **철회했다** (§교차검증
      위 _"죽은 부정 패턴 4줄"_ 을 작동하는 형식으로 교체해 모집단이 **`5` → `45`** 가 됐다.
      갱신된 감시값과 precision 논거의 유지 근거는 본 문서 말미 **§Amendment 2026-08-14** 참조.
      본 항의 원문(박제값 `5`)은 발동 시점의 기록이므로 **소급 치환하지 않는다**
+   - ⚠️ **하루 뒤 재발동** — [#1063](https://github.com/coseo12/astro-simulator/issues/1063) 이
+     `.prettierignore` 4경로의 게이트 형식 비대칭을 해소해 **`45` → `49`**. **현행 감시값은 `49`**
+     이며 근거는 **§Amendment 2** 다
 2. **취소선 수요 발생** — prettier 소유 파일에서 **의도된 취소선을 쓰려다 가드가 FAIL 한 사례가
    1건이라도** 나오면 재검토한다. 초판은 이 트리거를 _"`<del>` 우회 2건 이상"_ 으로 적었는데,
    그것은 **철회된 탈출구의 존재를 전제**하는 사후 트리거였다 (cross-validate 이견 수용 1의
@@ -533,3 +536,66 @@ _"의도분과 손상분을 가를 구문적 판별자가 없다"_ 는 본 ADR �
 다음 재검토 트리거는 **계수가 `45` 에서 이탈**할 때다. 증가는 정상(신규 live 문서 / 신규 패키지 `README.md`)
 이고, **감소는 `.prettierignore` 회귀 신호**이므로 즉시 원인을 규명한다. 박제값 ↔ 실측의 대조 주체가
 문서에만 존재한다는 구조적 공백은 `20260814-958` §고유 발견 이 후속 이슈로 분리했다.
+
+> ⚠️ **이 감시값은 하루 뒤 실제로 이탈했다** — 아래 **§Amendment 2 (2026-08-14, #1063)** 에서
+> `45` → **`49`** 로 갱신됐다. 위 `45` 는 Amendment 1 시점의 기록이므로 소급 치환하지 않는다.
+
+## Amendment 2 2026-08-14 — #1063 게이트 비대칭 해소 (`45` → `49`), precision 논거 유지
+
+> **상태**: Active (2026-08-14 박제, developer 단계)
+> **트리거**: §재검토 조건 1 **재발동** — Amendment 1 §후속 감시 가 예고한 *"계수가 `45` 에서 이탈"*
+> **발동 사건**: [#1063](https://github.com/coseo12/astro-simulator/issues/1063) — `.prettierignore` 4경로 중 `docs/retrospectives/` 만 파일명 게이트(`**/*-retrospective.md`)였던 비대칭을 `**/*.md` 로 통일
+> **측정 rev**: `38b6c8a` (`origin/develop` tip) / prettier `3.9.6` (`pnpm exec` = lockfile 정본) / macOS
+
+### 갱신된 감시값
+
+정본 호출 `node scripts/verify-md-tilde.mjs --population` 재측정:
+
+| 축 | Amendment 1 (`45`) | **Amendment 2 실측** |
+| --- | ---: | ---: |
+| prettier 소유 `*.md` 계수 | `45` | **`49`** |
+| 편입 파일 (delta) | — | **`4`** |
+
+편입 4건은 전부 `docs/retrospectives/` 안에 있고, `-retrospective.md` 로 끝나지 않아 이전 게이트에서
+제외돼 있던 것들이다 — `README.md` · `P1-a11y.md` · `P1-browser-compat.md` · `P1-perf.md`.
+ADR [`20260814-958`](20260814-958-prettier-live-docs-scope.md) §의도적 비-범위 가 *"편입하려면 별도
+판정이 필요하다"* 로 위임했던 항목이며, #1063 이 그 판정을 **잔존 협소**로 내렸다 (같은 근거를 일관
+적용하면 이미 편입된 `docs/benchmarks/README.md` · `docs/reports/**/README.md` 도 빠져야 하는데
+그렇지 않다).
+
+### precision 논거는 깨지지 않는다 — 편입분 물결 `0`
+
+- 술어 ① (상한, 넓은 그물): `git grep -nF -- '~~' -- <편입 4 파일>` → **0 hit**
+- 술어 ② (더 넓게 — 단일 물결까지): `git grep -nF -- '~' -- <편입 4 파일>` → **0 hit**
+
+즉 편입분에는 의도된 취소선도, 손상형도, **장래 손상 후보(단일 `~`)도 없다.** 상한 술어로 0 이므로
+하한 술어로도 0 이다. 본 ADR §정밀도의 출처 를 지탱하는 *"소유 모집단 안의 의도된 취소선 = 0 발생"*
+은 `49` 에서도 유지된다. Amendment 1 의 편입 40 파일이 `~~` 0 hit 이었던 것과 같은 결론이며,
+이번에는 단일 `~` 까지 0 이라 §잔여 노출 표에도 행이 늘지 않는다.
+
+### churn 실측
+
+편입 4건을 prettier 정합화하는 비용:
+
+| 파일 | `prettier --write` 결과 |
+| --- | --- |
+| `docs/retrospectives/README.md` | **1 행 추가** (리스트 앞 빈 줄) |
+| `docs/retrospectives/P1-a11y.md` | unchanged |
+| `docs/retrospectives/P1-browser-compat.md` | unchanged |
+| `docs/retrospectives/P1-perf.md` | unchanged |
+
+합계 **1 파일 / 1 행**. `pnpm format:check` 는 정합화 후 리포 전체 exit `0`.
+
+### 갱신되지 않는 것
+
+- **술어** — 변경 없음 (코드 펜스 밖 ∧ 인라인 코드 스팬 밖의 `~~`)
+- **차단 정책** — 변경 없음. 계수는 여전히 **차단하지 않는다**. 본 Amendment 가 그 *"사람의 판단"* 이다
+- **diff 스코프** — 변경 없음. #1040 존량 21줄은 전부 `CHANGELOG.md` 이고 편입 4건과 **disjoint**
+- **§재검토 조건 1 원문 / Amendment 1 원문** — 발동 시점의 기록이므로 **소급 치환하지 않는다**
+
+### 후속 감시
+
+다음 재검토 트리거는 **계수가 `49` 에서 이탈**할 때다. 판정 규칙은 Amendment 1 과 동일 —
+증가는 정상, **감소는 `.prettierignore` 회귀 신호**. `.prettierignore` 의 4경로는 이제 **전건 동일
+형식**(`!docs/x/` + `!docs/x/**/` + `!docs/x/**/*.md`)이므로, 다음 이탈이 게이트 형식 비대칭에서
+비롯될 여지는 닫혔다.
