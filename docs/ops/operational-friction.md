@@ -525,7 +525,7 @@ CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하�
 | --- | --- | --- | --- |
 | `pnpm typecheck` | exit `2` / `error TS` **`29`** 행 (`TS2307` 28 · `TS2322` 1). **`packages/core` 에서 중단** | exit `0` | (ii) |
 | `pnpm --filter web typecheck` | exit `2` / `error TS` **`76`** 행 (`TS2307` 52 · `TS7006` 13 · `TS2339` 4 · `TS18048` 4 · **`TS2882` 2** · `TS7031` 1) | exit `0` | (i) + (ii) |
-| `pnpm test:unit` | exit `1` / `Failed to resolve entry for package` **`28`** 건. **`packages/core` 에서 중단** | exit `0` (`1,370` passed) | (ii) |
+| `pnpm test:unit` (= `pnpm -r test`) | exit `1` / `packages/core` **`Test Files 30 failed \| 26 passed (56)`**. **거기서 중단** | exit `0` (`1,370` passed) | (ii) |
 | `pnpm --filter web test` | exit `1` / `12 failed \| 33 passed` (45 파일) | exit `0` (`527` passed) | (ii) |
 | `pnpm --filter web build` | exit `1` / `Module not found` **`19`** 건. `next-env.d.ts` **미생성** (typegen 이전에 실패) | exit `0` | (ii) |
 | `pnpm dev` (`next dev`) | ⚠️ **exit code 로 드러나지 않는다** — 서버는 `✓ Ready` 로 뜨고 종료하지 않는다. `GET /` 가 **HTTP `500`** (`Module not found: Can't resolve '@astro-simulator/core'`) | `GET /` = HTTP `200` | (ii) |
@@ -546,6 +546,25 @@ CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하�
 이 루트 명령에서는 **아예 보이지 않는다**. 위 표의 `29` 와 `76` 이 갈리는 이유이며, 본 절의 baseline
 스냅샷이 `--filter web` 기준인 이유이기도 하다. **두 축은 독립적으로 발화한다** — 축 (i) 을 닫아도
 축 (ii) 는 남고(`74` 행), 축 (ii) 만 걸리는 명령(위 표의 나머지 전부)은 축 (i) 을 영영 노출하지 않는다.
+
+⚠️ **`test` 축은 독립 재현 2건이 있다 — 그리고 계수를 인용할 때 단위를 밝혀야 한다.**
+PR [#1061](https://github.com/coseo12/astro-simulator/pull/1061) dev 보고와 PR
+[#1070](https://github.com/coseo12/astro-simulator/pull/1070) dev 의 부수 관찰(2026-08-14, 격리
+worktree)이 각각 독립적으로 같은 결손을 재현했고, 본 절 실측과 **파일 계수가 정확히 일치**한다
+(`30 / 56`). ⚠️ **`pnpm -r test` 와 `test:unit` 은 다른 결손이 아니다** — 루트 `package.json` 의
+`"test:unit": "pnpm -r test"` 이므로 **문자 그대로 같은 명령**이다.
+
+그런데 같은 실행에서 **두 개의 다른 계수**가 나온다. 둘 다 참이며 **단위가 다르다**:
+
+| 계수 | 값 | 무엇을 세는가 |
+| --- | ---: | --- |
+| 실패 **스위트(파일)** | **`30`** | Vitest `Failed Suites` 헤드라인 · `Test Files 30 failed` |
+| 출력된 **에러 블록** | **`28`** | `Failed to resolve entry for package "@astro-simulator/shared"` 문자열 등장 수 |
+
+차이 `2` 는 **Vitest 가 연속한 스위트의 동일 에러를 한 블록으로 묶기 때문**이다 (실측: `long-term-drift` ↔
+`time-reversal`, `log-depth-glsl` ↔ `ring-shader-arcs` 두 쌍이 `FAIL` 라인 2개에 `Error:` 블록 1개를
+공유한다). 원인은 `30` 건 전부 동일하다. **인용할 때는 단위를 붙인다** — *"28 건"* 만 적으면 다음
+관찰자가 `30` 을 보고 불일치로 오인한다 (본 라운드에 실제로 그 대조가 발생했고, 단위 규명으로 해소됐다).
 
 ⚠️ **가장 위험한 항목은 `pnpm dev` 다.** 나머지는 전부 non-zero exit 로 자기를 신고하지만 dev 서버는
 `✓ Ready` 를 찍고 살아 있는다. 브라우저 검증을 붙이면 *"서버는 떴는데 화면이 비어 있다"* 로 보여
