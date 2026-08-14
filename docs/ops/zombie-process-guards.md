@@ -1,6 +1,6 @@
 # 좀비 프로세스 가드 — 계층 구조 + incident 서사 (#440 / volt #24·#46·#52·#79)
 
-> ⚠️ **본 문서의 인용 블록은 이관 시점(2026-08-07, #980)의 동결 스냅샷이다.** 행동 규칙의 **정본은 CLAUDE.md** 이며, CLAUDE.md 잔여가 갱신되면 여기 인용은 조용히 stale 해진다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 리뷰 🟡-2). 인용과 정본이 어긋나 보이면 **CLAUDE.md 를 신뢰**하고 본 문서를 갱신하라. ⚠️ **자동 정합은 없다** — `verify-zombie-check.mjs` 의 6 checks 는 전부 **헤더 문자열 pin + 파일 존재 확인**이고 `ETIME`/`30` 을 검사하는 assertion 은 **0건**이다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 2차 리뷰 🔴-A — 초판이 반대로 서술했다). `ETIME 30분` 은 §8 표대로 **4곳을 사람이 동시에 갱신**해야 하며, 그 값은 `scripts/cleanup-browser.sh` 가 프로세스를 실제로 kill 하는 판정 기준이다.
+> ⚠️ **본 문서의 인용 블록은 이관 시점(2026-08-07, #980)의 동결 스냅샷이다.** 행동 규칙의 **정본은 CLAUDE.md** 이며, CLAUDE.md 잔여가 갱신되면 여기 인용은 조용히 stale 해진다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 리뷰 🟡-2). 인용과 정본이 어긋나 보이면 **CLAUDE.md 를 신뢰**하고 본 문서를 갱신하라. ⚠️ **`ETIME 30분` 에 대한 자동 정합은 없다** — `verify-zombie-check.mjs` 의 항목 1~6 은 **헤더 문자열 pin + 파일 존재 확인**이고 `ETIME`/`30` 을 검사하는 assertion 은 **0건**이다 (PR [#981](https://github.com/coseo12/astro-simulator/pull/981) 2차 리뷰 🔴-A — 초판이 반대로 서술했다). **범위 한정 (#1066)**: 항목 7~9 가 추가돼 **패턴 리터럴**은 이제 기계 검증된다(hook `PATTERN` 을 실제 `grep -E` 로 코퍼스 판정 + `qa.md`·본 문서 사본과 축자 대조 — §10). 자동화된 것은 그 축뿐이고 임계값 축은 그대로다. `ETIME 30분` 은 §8 표대로 **4곳을 사람이 동시에 갱신**해야 하며, 그 값은 `scripts/cleanup-browser.sh` 가 프로세스를 실제로 kill 하는 판정 기준이다.
 
 sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버 / cargo test / agent-browser Chrome)가 정리되지 않고 누적되는 클래스의 **원인·실측·가드 계층 SSoT**.
 
@@ -117,7 +117,7 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 ## 6. 가드 C — 세션 시작 hook (incident #440 Phase 2b)
 
-> - **세션 시작 시점 좀비 검출 hook**: `.claude/hooks/session-start-zombie-check.sh` 가 SessionStart hook 으로 등록되어 (`.claude/settings.json`) Claude Code 세션 시작 시 자동 실행. ETIME 30분 이상 `next dev` / `next-server` / `cargo .*test` / `pnpm.*dev` 프로세스 발견 시 stdout 으로 PID/ETIME/command 출력 → Claude 가 사용자에게 정리 권고. exit 0 (블록 안 함, 경고만). 가드 A/B 가 **본 세션 안의 spawn 시점** 가드라면 가드 C 는 **세션 시작 진입 시점** 가드 — 사용자가 인지하기 전 자동 검출. SSoT 박제 회귀 차단은 `scripts/verify-zombie-check.mjs` (CI 통합) 가 담당.
+> - **세션 시작 시점 좀비 검출 hook**: `.claude/hooks/session-start-zombie-check.sh` 가 SessionStart hook 으로 등록되어 (`.claude/settings.json`) Claude Code 세션 시작 시 자동 실행. ETIME 30분 이상 `next dev` / `next-server` / `cargo (nextest|test)` / `pnpm … dev` 프로세스 발견 시 (패턴 리터럴 정본은 hook 의 `PATTERN` 변수 — 아래 §10) stdout 으로 PID/ETIME/command 출력 → Claude 가 사용자에게 정리 권고. exit 0 (블록 안 함, 경고만). 가드 A/B 가 **본 세션 안의 spawn 시점** 가드라면 가드 C 는 **세션 시작 진입 시점** 가드 — 사용자가 인지하기 전 자동 검출. SSoT 박제 회귀 차단은 `scripts/verify-zombie-check.mjs` (CI 통합) 가 담당.
 
 **회귀 차단 범위**: `scripts/verify-zombie-check.mjs` 는 6 항목을 정적 검사한다 — CLAUDE.md 가드 A/B sub-section 헤더 2건 / `.claude/agents/qa.md` "이전 세션 좀비 카나리아" 항목 / hook 파일 존재+실행권한 / `settings.json` hook **등록** 1줄 / forensic 보고서 존재. 등록 검사는 [#894](https://github.com/coseo12/astro-simulator/issues/894) 에서 추가됐다 — 그전에는 파일이 멀쩡해도 등록 1줄이 빠지면 가드 C 가 실행되지 않는데 가드는 초록이었다.
 
@@ -155,9 +155,43 @@ sub-agent 가 `run_in_background=true` 로 띄운 장기 프로세스(dev 서버
 
 두 축은 **같은 argv 문자열**을 보고 **매칭 풀 소속만** 다르다. 그래서 bracket 의 효력은 축과 무관하게 **argv 순도**(명령행 어디에도 un-bracketed 리터럴이 없을 것) 하나에만 걸리고, `grep -v grep` 만 **순도와 무관하게** 두 축을 막는다. 4케이스 격리 실측은 [`operational-friction.md`](operational-friction.md) §3.
 
-따라서 검출 명령의 의무는 — ① **좀비 카나리아 정본은 두 축을 동시에 막는** `ps -axww -o pid=,etime=,command= | grep -E "next dev|next-server|cargo .*test|pnpm.*dev" | grep -v grep` (dev/test 계열. 메인 §가드 B 는 `physics_wasm-` 를 포함한 **다른 검출 범위**를 쓴다 — 패턴은 위치마다 의도적으로 다르며 3곳이 공유하는 SSoT 는 **ETIME 30분 임계**다. 필터가 `grep -v grep` 인 것도 hook 과의 **의도적 차이**다 — 근거는 [`operational-friction.md`](operational-friction.md) §3 _"hook 필터를 그대로 복사하지 말 것"_) ② `pgrep`/`pkill` 을 쓸 때는 **`-a` 금지** ③ **bracket 은 유지** — 강등이 아니다. `-a` 를 뗀 뒤 pgrep 경로에서 형제 축을 막는 것은 bracket 뿐이고, 위 §_"pkill 은 안전 이슈"_ 대로 자기-kill 차단까지 겸한다. 덧붙여 `pgrep -af` 는 macOS 에서 명령행을 출력하지 않아 **무엇이 잡혔는지 볼 수단조차 없다**.
+따라서 검출 명령의 의무는 — ① **좀비 카나리아 정본은 두 축을 동시에 막는** `ps -axww -o pid=,etime=,command= | grep -E 'next dev|next-server|cargo( [^ ]+)* (nextest|test)( |$)|pnpm( [^ ]+)* dev( |$)' | grep -v grep` (dev/test 계열. 패턴 리터럴의 근거는 아래 §10, 인용부호가 홑따옴표인 것은 `$` 확장 차단 의무다. 메인 §가드 B 는 `physics_wasm-` 를 포함한 **다른 검출 범위**를 쓴다 — 패턴은 위치마다 의도적으로 다르며 3곳이 공유하는 SSoT 는 **ETIME 30분 임계**다. 필터가 `grep -v grep` 인 것도 hook 과의 **의도적 차이**다 — 근거는 [`operational-friction.md`](operational-friction.md) §3 _"hook 필터를 그대로 복사하지 말 것"_) ② `pgrep`/`pkill` 을 쓸 때는 **`-a` 금지** ③ **bracket 은 유지** — 강등이 아니다. `-a` 를 뗀 뒤 pgrep 경로에서 형제 축을 막는 것은 bracket 뿐이고, 위 §_"pkill 은 안전 이슈"_ 대로 자기-kill 차단까지 겸한다. 덧붙여 `pgrep -af` 는 macOS 에서 명령행을 출력하지 않아 **무엇이 잡혔는지 볼 수단조차 없다**.
 
 상세는 [`operational-friction.md`](operational-friction.md) §3 ([#795](https://github.com/coseo12/astro-simulator/issues/795) / 기전 정정 [#1054](https://github.com/coseo12/astro-simulator/issues/1054)).
+
+## 10. 패턴 정밀도 — `.*` 무경계 확장 제거 (#1066)
+
+§9 가 **누가 매칭 풀에 들어오는가**(자기 오탐 2축)를 다룬다면, 본 절은 **패턴이 무엇을 잡는가**를 다룬다. 두 축은 직교하며 `grep -v grep` 으로는 본 절의 결함이 해소되지 않는다 — 그 필터는 *패턴 리터럴을 실은 셸*을 거르는데, 여기서 잡히는 것은 셸이 아니라 **실제 무관한 프로세스**다.
+
+**결함**: 구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 의 `.*` 는 명령행 뒷부분까지 이어진다. 하네스 래퍼는 **모든** Bash 도구 호출 뒤에 `< /dev/null` 을 덧붙이므로, `pnpm.*dev` 의 `.*` 가 그 `/dev/null` 의 `dev` 에 도달해 **`pnpm` 을 포함한 임의 명령**이 좀비로 보고됐다. `cargo .*test` 도 동종 구조다 (`cargo build --release && pnpm test:unit` 이 걸린다). [#440](https://github.com/coseo12/astro-simulator/issues/440) 이래 hook `PATTERN` 에 선행했고 [#1065](https://github.com/coseo12/astro-simulator/pull/1065) 는 `qa.md` 를 이 패턴에 **정렬**시켰을 뿐 정밀도를 바꾸지 않았다.
+
+**교정 원리**: `dev` / `test` 를 **공백 구분 토큰**으로만 인정한다 — 앞은 공백, 뒤는 공백 또는 EOL. `/dev/null` 의 `dev` 는 앞이 `/` 라 배제되고, 실제 인자로 등장하는 `dev` 는 그대로 남는다.
+
+```
+next dev|next-server|cargo( [^ ]+)* (nextest|test)( |$)|pnpm( [^ ]+)* dev( |$)
+```
+
+**기각된 후보 2건** (이슈 본문이 제시했으나 실측이 뒤집었다):
+
+- `pnpm( run)? dev` — **거짓 음성**. 실 dev 서버 트리의 중간 프로세스가 `node …/bin/pnpm --filter @astro-simulator/web dev` 라 잡히지 않는다 (실측 argv).
+- `pnpm [^|]*dev` — **결함 미해소**. 문제의 구간(`pnpm store path && sleep 200' < /dev/null`)에 `|` 가 없어 그대로 매칭된다. 경계로 삼아야 할 문자는 `|` 가 아니라 **공백/`/`** 였다.
+
+⚠️ **`nextest` 는 `next`+`test` 가 아니라 `nex`+`test` 다.** `(next)?test` 로 흡수하려던 초안이 `cargo nextest run` 을 놓쳤고(실측), `(nextest|test)` 명시 열거로 교정했다. 문자열 겹침을 눈으로 세지 말고 코퍼스로 판정해야 하는 사례다.
+
+**실측** (2026-08-14, `exec -a` 위장 프로세스 **19건** = 실 형태 11 + 무관 8):
+
+| 축 | 구 패턴 | 신 패턴 |
+| --- | --- | --- |
+| 거짓 양성 (무관 8건 중) | **8** | **0** |
+| 거짓 음성 (실 형태 11건 중) | 0 | 0 |
+
+검출 능력 손실 없이 오탐만 사라졌다. 실 `pnpm dev` 프로세스 트리에 대한 대조에서도 구 5 hit → 신 4 hit 으로, 줄어든 1건은 **하네스 래퍼 셸 자신**이다 (`eval '… pnpm dev' < /dev/null` — 뒤가 `'` 라 토큰 경계를 만족하지 않는다). 같은 트리의 자식 4건(`pnpm` 2 · `next` · `next-server`)이 전부 남으므로 **포트를 쥔 프로세스는 여전히 검출**되며, 사라진 것은 중복 노이즈뿐이다.
+
+**회귀 가드**: `scripts/verify-zombie-check.mjs` 항목 7~9. 위 코퍼스를 hook 의 `PATTERN` 으로 **재판정**하고(정적 형태 검사가 아니라 실제 `grep -E` 호출 — `.*` 우회 형태는 무한하므로 금지 문자열 목록으로는 못 막는다), `qa.md` · 본 문서의 사본이 hook 과 **축자 일치**하는지 대조한다. 부수로 ERE 방언 차이(로컬 macOS BSD grep ↔ CI ubuntu GNU grep)도 같은 검사가 걸러낸다.
+
+⚠️ **CLAUDE.md §가드 B 는 변경 대상이 아니다** — 실측 판정이다. 그 패턴 `cargo|next dev|physics_wasm-` 에는 `.*` 가 **없고**, `cargo` 는 리터럴 부분문자열이라 `< /dev/null` 로 이어질 경로 자체가 성립하지 않는다. 폭이 넓은 것은 결함이 아니라 **의도**다 (복귀 직후 정리는 `cargo build` 를 포함한 cargo 프로세스 전부를 봐야 하고, hook 이 보지 않는 `physics_wasm-` 테스트 바이너리가 그쪽 범위에 있다). #1065 판정 — *3곳이 공유하는 SSoT 는 ETIME 30분 임계뿐* — 을 유지하며, 통일은 목표가 아니다. 위 회귀 가드가 §가드 B 를 축자 일치 대상에서 **의도적으로 제외**하는 이유도 같다.
+
+---
 
 ## 잔여 계약의 근거 (PR #981 리뷰)
 
