@@ -181,6 +181,8 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **좀비 카나리아가 잡는 대상이 바뀐다 (#1066).** 같은 입력(`pnpm` 을 포함한 임의 Bash 도구 호출이 떠 있는 상태)에서 qa 에이전트와 SessionStart hook 이 **다르게 동작한다** — 이전에는 `pnpm install` · `pnpm build` · `pnpm format:check` 래퍼 셸과 `pnpm … typecheck > /dev/null 2>&1` 같은 **출력 리다이렉션 명령**까지 좀비 후보로 보고했고(ETIME 조건만 맞으면), 이제는 보고하지 않는다. 반대로 검출 의무 형태(`pnpm dev` · `pnpm run dev` · `pnpm --filter <pkg> dev` · `next dev` · `next-server` · `cargo test` · `cargo test --lib` · `cargo nextest run`)는 **전건 유지**된다. 오탐이 사라지면서 _"카나리아가 울면 진짜 좀비"_ 라는 신뢰가 회복되는 것이 본 변경의 목적이다 — 종전에는 발화 대부분이 자기 세션의 정상 명령이라 무시 습관이 붙는 구조였다.
+- **`qa.md` 카나리아 인용부호가 겹따옴표 → 홑따옴표.** ⚠️ **초판이 적은 근거(_"`$` 때문에 셸 확장에 노출"_)는 실측으로 반증됐다** (PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080) 리뷰) — 패턴의 `$` 는 뒤가 `)` 라 **bash·zsh 어디서도 확장되지 않는다** (겹따옴표 / 홑따옴표 / 원본 출력의 `md5` 4종 **전건 동일**). **진짜 근거는 파서 계약**이다 — `scripts/verify-zombie-check.mjs` 의 hook `PATTERN` 추출이 `/^PATTERN='([^']*)'$/m` 으로 **홑따옴표를 하드 요구**하므로, 겹따옴표로 쓰면 회귀 가드가 패턴을 못 뽑아 fail-fast 한다 (negative N3 로 실발화 확인). 결론은 불변이고 근거만 정정한다.
 - **`.claude/agents/developer.md` §규칙 — `pnpm build` 선행 트리거가 넓어진다.** 이전: _"격리 worktree 에서 **`typecheck` 를 돌리려면**"_. 이후: _"격리 worktree 에서 **워크스페이스 패키지(`@astro-simulator/*`)를 해석하는 명령**을 돌리려면"_ (SSoT `operational-friction.md` §8 과 **낱말까지 동일** — reviewer 권고 6). 같은 입력(격리 worktree + `pnpm test:unit` 또는 `pnpm dev` 만 필요한 작업)에서 dev 에이전트가 **다르게 동작한다** — 이전 규칙은 `typecheck` 를 안 부르면 발화하지 않아 `install` 만으로 진행했고, 그 결과가 #1062 가 박제한 오진 경로다.
 - **하위 규칙 3개 추가** — (i) `lint` / `format:check` / 정적 `verify:*` 는 **비의존 집합**이라 `install` 만으로 충분하다는 명시 (불필요한 `build` 호출 억제), (ii) `pnpm dev` 는 **exit code 로 드러나지 않는다**는 경고, (iii) 축 (ii) 결손 대상이 `packages/physics-wasm/{pkg,pkg-bundler}` 를 포함한다는 정정.
 - **문서 SSoT 정합** — `docs/ops/operational-friction.md` §8 이 절차 SSoT 이고 `developer.md` 가 사본이므로 **두 곳을 동시에** 갱신했다. `scripts/verify-agent-ssot.sh` exit `0` (5 files × 9 fields = 45 checks).
@@ -237,6 +239,46 @@ Semantic Versioning을 따른다.
 - **앱 런타임 행동 변화 없음** — `apps/**` · `packages/**` 소스 무접촉. 변경 파일 전건이 `.md` 다
 
 ### Fixed
+
+- **[#1066] 좀비 카나리아 패턴 정밀도 — `.*` 가 `/dev/null` 까지 도달하던 결함 제거 (MINOR)** ([#1066](https://github.com/coseo12/astro-simulator/issues/1066), PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080)) — 구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 의 `.*` 는 명령행 뒷부분까지 이어져 `/dev/null` 의 `dev` 에 도달했고, 그 결과 **`pnpm` 을 포함한 임의 명령**이 좀비로 보고됐다 (`pnpm install` · `pnpm build` · `pnpm format:check` 전부). `cargo .*test` 도 동종 구조다. [#440](https://github.com/coseo12/astro-simulator/issues/440) 이래 hook `PATTERN` 에 **선행**했고, PR [#1065](https://github.com/coseo12/astro-simulator/pull/1065) 는 `qa.md` 를 이 패턴에 **정렬**시켰을 뿐 정밀도를 바꾸지 않았다.
+
+  ⚠️ **`/dev` 를 명령행에 올리는 매개는 하나가 아니라 리다이렉션 양방향이다.** 이슈 본문이 지목한 것은 하네스 래퍼가 **모든** Bash 도구 호출에 자동 부착하는 **입력** 리다이렉션 `< /dev/null` 이었는데, PR [#1077](https://github.com/coseo12/astro-simulator/pull/1077) 작업 중 다른 dev 가 **출력** 축을 독립 관측했다 — 명령이 스스로 붙이는 `> /dev/null` · `2>/dev/null` (실측 `pnpm --filter web typecheck > /dev/null 2>&1`, hit `1` / ETIME `00:04`, 활성이라 무접촉). **한쪽만 막으면 절반만 닫힌다.** 아래 교정은 `/dev` **앞의 `/`** 를 보므로 방향과 무관하게 두 축을 동시에 닫으며, 코퍼스에 `>` 축을 래퍼의 `<` 가 섞이지 않는 `/bin/sh -c …` 형태로 **단독 격리**해 실증했다.
+
+  ⚠️ **[#1054](https://github.com/coseo12/astro-simulator/issues/1054) 과 직교라 형태 교체로는 안 풀린다** — `grep -v grep` 은 *패턴 리터럴을 실은 셸*을 거르는데, 여기서 잡히는 것은 셸이 아니라 **실제 무관한 프로세스**라 필터가 무력하다.
+
+  **교정 원리는 `dev` / `test` 를 공백 구분 토큰으로만 인정하는 것** (앞은 공백, 뒤는 공백 또는 EOL). `/dev/null` 의 `dev` 는 앞이 `/` 라 배제되고 실제 인자로 등장하는 `dev` 는 남는다.
+
+  ```bash
+  # 카나리아 정본 (신 패턴). 홑따옴표 의무 — verify-zombie-check.mjs 의 PATTERN 추출 정규식이 홑따옴표를 요구한다
+  ps -axww -o pid=,etime=,command= | grep -E 'next dev|next-server|cargo( [^ ]+)* (nextest|test)( |$)|pnpm( [^ ]+)* dev( |$)' | grep -v grep
+  ```
+
+  **후보 `3` 건 기각 — 전부 실측 판정이다.** `pnpm( run)? dev` 는 **거짓 음성** — 실 dev 서버 트리의 중간 프로세스가 `node …/bin/pnpm --filter @astro-simulator/web dev` 다 (실측 argv). `pnpm [^|]*dev` 는 **결함 미해소** — 문제 구간(`pnpm store path && sleep 200' < /dev/null`)에 `|` 가 없어 그대로 매칭된다. 경계로 삼아야 할 문자는 `|` 가 아니라 **공백/`/`** 였다.
+
+  세 번째는 PR #1077 dev 가 제안한 `pnpm( |$).*( dev|dev )` 다. ⚠️ **이 후보는 측정 코퍼스에서 채택안과 결과가 갈리지 않았다** — pnpm 축 거짓 양성 `0` / 거짓 음성 `0` 으로 **동률**이며, 양방향 `/dev/null` 케이스도 전부 통과한다. 기각 사유는 **결과가 아니라 구조**다: `( dev|dev )` 는 `dev` 의 **한쪽 경계만** 요구해 반대쪽이 열려 있다. 아래는 실 프로세스가 아닌 **합성 프로브**이며 그 열린 쪽을 시연한다 (`2` ↔ `0` 으로 갈린다).
+
+  ```bash
+  printf 'pnpm build && echo development\npnpm install && node x.mjs --mode dev-preview\n' \
+    | grep -cE 'pnpm( |$).*( dev|dev )'    # 2 — 앞쪽만 경계
+  printf 'pnpm build && echo development\npnpm install && node x.mjs --mode dev-preview\n' \
+    | grep -cE 'pnpm( [^ ]+)* dev( |$)'    # 0 — 양쪽 경계
+  ```
+
+  덧붙여 이 후보는 **pnpm 축만** 다뤄 동종 결함인 `cargo .*test` 가 남는다. 채택안은 두 축을 같은 원리로 닫는다. ⚠️ `dev:web` 같은 `:` 경계 형태는 채택안이 놓치지만 **모집단에 존재하지 않는다** — `git ls-files '*package.json'` 전건에서 `/dev/` 매칭 스크립트명은 `dev` 4개(루트 · web · core · shared)뿐이다.
+
+  ⚠️ **`nextest` 는 `next`+`test` 가 아니라 `nex`+`test` 다.** `(next)?test` 로 흡수하려던 초안이 `cargo nextest run` 을 놓쳤고(실측), `(nextest|test)` 명시 열거로 교정했다. 문자열 겹침을 눈으로 세지 말고 코퍼스로 판정해야 하는 사례다.
+
+  **실측** (2026-08-14, `exec -a` 위장 프로세스 **`22`** 건 = 실 형태 `11` + 무관 `11`): 거짓 양성 구 **`11`** → 신 **`0`**, 거짓 음성 구 **`0`** → 신 **`0`**. 실 `pnpm dev` 프로세스 트리 대조에서는 구 `5` hit → 신 `4` hit 이고 줄어든 `1` 건은 **하네스 래퍼 셸 자신**이다 (`eval '… pnpm dev' < /dev/null` — 뒤가 `'` 라 토큰 경계 불만족). 같은 트리의 자식 `4` 건(`pnpm` 2 · `next` · `next-server`)이 전부 남아 **포트를 쥔 프로세스는 여전히 검출**되며 사라진 것은 중복 노이즈뿐이다.
+
+  ⚠️ **CLAUDE.md §가드 B 는 변경하지 않았다 — 실측 판정이다.** 그 패턴 `cargo|next dev|physics_wasm-` 에는 `.*` 가 **없어** 리다이렉션 어느 방향으로도 `/dev/null` 로 이어질 경로가 성립하지 않는다. 폭이 넓은 것은 결함이 아니라 **의도**다(복귀 직후 정리는 `cargo build` 를 포함한 cargo 전부를 봐야 하고, hook 이 보지 않는 `physics_wasm-` 바이너리가 그쪽 범위다). PR #1065 판정 — _3곳이 공유하는 SSoT 는 ETIME 30분 임계뿐_ — 을 유지한다.
+
+- **[#1066] `verify-zombie-check.mjs` 회귀 가드 — 정적 pin `6` → 동적 판정 포함 `9` 항목 (MINOR)** ([#1066](https://github.com/coseo12/astro-simulator/issues/1066), PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080)) — 항목 7 은 hook 에서 `PATTERN` 을 그대로 뽑아 위 코퍼스를 **실제 `grep -E` 로 재판정**한다. 정적 형태 검사(금지 문자열 목록)로는 `.*` 우회 형태가 무한해 못 막지만 코퍼스 판정으로는 즉시 드러나며, 부수로 **ERE 방언 차이**(로컬 macOS BSD grep ↔ CI ubuntu GNU grep)도 같은 검사가 걸러낸다. 항목 8·9 는 `qa.md` · `docs/ops/zombie-process-guards.md` 사본이 hook 과 **축자 일치**하는지 대조한다 — 종전에 이 일치를 지탱한 것은 `qa.md` 산문의 _"축자 일치"_ 선언뿐이었다.
+
+  ```bash
+  node scripts/verify-zombie-check.mjs   # exit 0 / "9 / 9 항목 PASS"
+  ```
+
+  ⚠️ **CLAUDE.md §가드 B 는 축자 일치 대상에서 의도적으로 제외**했다 — 검출 범위가 다르므로 끼우면 통일 오독 → `physics_wasm-` 커버리지 소실을 부른다. `ETIME`/`30` 축의 자동 정합은 여전히 **`0` 건**이며(§8 표대로 사람이 4곳 동시 갱신), `zombie-process-guards.md` 상단 경고문을 그 범위 한정에 맞게 정정했다.
 
 - **[#1039] ADR [`20260811-1010`](docs/decisions/20260811-1010-measurement-c-verdict-tiers.md) §축 3 재현 recipe 정본화 — Amendment 2 (PATCH)** ([#1039](https://github.com/coseo12/astro-simulator/issues/1039)) — §축 3 이 5 페르소나 self-consistency 표(6 파일 × 4 셀)의 재현 recipe 로 `grep -cF -- '<bullet 원문>' <파일>` 을 실었는데 **그 recipe 로 표가 재현되지 않았다** (PR [#1038](https://github.com/coseo12/astro-simulator/pull/1038) reviewer 🟡-2 / dev 자기 적발).
 

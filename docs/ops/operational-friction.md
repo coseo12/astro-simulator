@@ -189,7 +189,7 @@ ps -axww -o pid=,etime=,command= | grep -E … | grep -v grep          →      
 
 반면 `grep -v grep` 은 **명령행 전체**를 필터링해 **두 축을 동시에** 막으므로 카나리아 정본이다. 패턴 리터럴을 실은 셸은 그 자신이 `grep` 파이프라인이라 걸러지고, 명령을 더 이어 붙여도 그 줄에서 `grep` 이라는 낱말이 사라지지 않는다. ⚠️ 다만 _"항상"_ 은 **이 구성에 한정된 진술**이다 — 필터가 거르는 것은 `grep` 문자열이지 "자기 자신" 이라는 신원이 아니므로, `grep` 을 포함하지 않는 경로(별도 프로세스가 패턴 리터럴만 들고 있는 경우 등)까지 덮지는 못한다. 대가는 명령행에 `grep` 을 포함한 **실 프로세스를 놓치는 것**(false negative)이고, dev 서버 / cargo 계열에는 해당 사례가 없어 #440 이래 hook 이 이 형태로 운용돼 왔다.
 
-⚠️ **패턴 자체의 선행 결함 (#1054 비차단)** — `pnpm.*dev` 는 `.*` 가 래퍼의 `< /dev/null` 까지 이으므로 **`pnpm` 을 포함한 임의 명령**을 매칭한다 (본 절 축 ② 와 독립인 **패턴 정밀도** 문제라 카나리아 형태 교체로는 해소되지 않는다). 후속 분리: [#1066](https://github.com/coseo12/astro-simulator/issues/1066).
+⚠️ **패턴 자체의 선행 결함 (#1054 비차단) → #1066 에서 해소** — `pnpm.*dev` 는 `.*` 가 래퍼의 `< /dev/null` 까지 이으므로 **`pnpm` 을 포함한 임의 명령**을 매칭했다 (본 절 축 ② 와 독립인 **패턴 정밀도** 문제라 카나리아 형태 교체로는 해소되지 않았다). [#1066](https://github.com/coseo12/astro-simulator/issues/1066) 이 `dev`·`test` 를 **공백 구분 토큰**으로 좁혀 제거했다 (실측 거짓 양성 `11` → `0`, 거짓 음성 양쪽 `0`). ⚠️ 매개는 래퍼의 `< /dev/null` 하나가 아니라 명령이 스스로 붙이는 `> /dev/null`·`2>/dev/null` 을 포함한 **리다이렉션 양방향**이다 (출력 축은 PR [#1077](https://github.com/coseo12/astro-simulator/pull/1077) dev 독립 관측). 판정 근거·기각 후보·회귀 가드는 [`zombie-process-guards.md`](zombie-process-guards.md) §10. ⚠️ **위 문단의 bracket 실측은 그대로 유효하다** — `pnpm.*de[v]` 예시는 **`.*` 가 있던 시점의 관찰**이고, bracket 의 보호 범위가 argv 순도 조건부라는 결론은 패턴과 무관하게 성립한다.
 
 - `[-]` 는 정규식상 `-` 문자와 동일하게 매칭하지만, pgrep 자신의 명령행 문자열은 리터럴 `agent-browser-chrome[-]` 이라 정규식 `agent-browser-chrome[-]` 이 `agent-browser-chrome[`(대괄호)로 이어지는 자기 명령행과 매칭되지 않아 **self-match 제거**.
 
