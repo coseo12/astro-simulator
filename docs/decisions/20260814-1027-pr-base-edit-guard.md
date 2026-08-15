@@ -84,7 +84,7 @@ totalCount(필터 무시)=20
 - PR 은 이미 `13:00:10Z` 에 열려 있었고 `opened` 는 `13:00:13Z` 에 이미 발화 → `opened` 아님.
 - ⇒ 남는 것은 `edited` 뿐. **전제 B 참** — 산문 인용이 아니라 **저장소 내 배타 소거**로 확정된다.
 
-부수로, `changes.base` 의 존재는 [octokit 페이로드 스키마](https://github.com/octokit/webhooks/blob/main/payload-schemas/api.github.com/pull_request/edited.schema.json) 에서 `changes.base.ref.from` / `changes.base.sha.from` 로 확인된다 (`changes` 하위 3속성 `body` / `title` / `base` 전부 optional). ⚠️ **다만 GitHub Actions 의 `github.event.changes.base` 표현식이 실제로 그 값을 받는지는 본 ADR 에서 실측하지 않았다** — §4-2 가 이 미실증 전제를 설계에서 제거한다.
+부수로, `changes.base` 의 존재는 [octokit 페이로드 스키마](https://github.com/octokit/webhooks/blob/main/payload-schemas/api.github.com/pull_request/edited.schema.json) 에서 `changes.base.ref.from` / `changes.base.sha.from` 로 확인된다 (`changes` 하위 3속성 `body` / `title` / `base` 전부 optional). ⚠️ **다만 GitHub Actions 의 `github.event.changes.base` 표현식이 실제로 그 값을 받는지는 본 ADR 에서 실측하지 않았다** — §4 결정 3 가 이 미실증 전제를 설계에서 제거한다.
 
 > ⚠️ **재현 시 함정 — `timelineItems.totalCount` 는 `itemTypes` 필터를 무시한다.** 위 출력의 `20` 은 base 변경 횟수가 아니라 그 PR 의 **전체 timeline 항목 수**다. 계수는 반드시 `nodes` 배열 길이로 한다. 이 함정에 걸리면 아래 2-3 이 "640 PR 전건이 base 를 바꿨다" 는 거짓을 낸다 (초회 실행에서 실제로 발생).
 
@@ -237,7 +237,7 @@ echo "모집단 = 최근 머지 PR $N_PR 건 / delta 총합 (occurrence 단위) 
 
 핵심은 두 가지다.
 
-1. **`branch-name` 은 40/40 전건 `n=1`.** 현재 required 컨텍스트 중 이 이름은 동명 누적이 전혀 없다 (§2-12 실측 3 의 event _type_ 축 `0` 이 오늘도 유지된다).
+1. **`branch-name` 은 40/40 전건 `n=1`.** 현재 required 컨텍스트 중 이 이름은 동명 누적이 전혀 없다 (§2-6 실측 3 의 event _type_ 축 `0` 이 오늘도 유지된다).
 2. **후보 1 채택 시 그 `n=1` 이 `8/40` (`20%`) 의 PR 에서 `n>=2` 로 바뀐다.** delta 는 `1` 또는 `2` (`#1036` `#1018` 이 `2`).
 
 ### 2-7 게이팅 경로 (`base=main`) 한정 — 155 PR 전건
@@ -256,7 +256,7 @@ ptc_n >= 2 (edited 누적 발생) = 3 PR
 
 즉 게이팅 경로에서 `edited` 가 누적을 만든 비율은 **`3 / 59`** (가드 도입 이후 모집단 기준, `155 - 96 = 59`) 다.
 
-⚠️ **이 `3` 을 후보 1 의 위험량으로 그대로 읽으면 안 된다 — 판정 입력이 다르다.** `pr-template-checklist` 의 판정 입력은 **PR 본문**이고 `edited` 가 바꾸는 것이 정확히 그 본문이라 결론이 갈리는 것이 **설계상 유도**된다 (§2-12 원인 ②). 반면 `branch-name` 의 판정 입력은 **`(base, head)` 두 ref** 뿐이므로 제목·본문 편집으로는 결론이 바뀌지 않는다 — `{success, success}` 누적일 뿐이고, 전건 통과 누적이 머지를 막지 않는다는 것은 [20260807-971](20260807-971-required-status-checks.md) §10-2 조건 3 (`project-guards` `n=2` 둘 다 `success` → `mergeStateStatus=CLEAN`) 에서 이미 실증됐다.
+⚠️ **이 `3` 을 후보 1 의 위험량으로 그대로 읽으면 안 된다 — 판정 입력이 다르다.** `pr-template-checklist` 의 판정 입력은 **PR 본문**이고 `edited` 가 바꾸는 것이 정확히 그 본문이라 결론이 갈리는 것이 **설계상 유도**된다 (§2-6 원인 ②). 반면 `branch-name` 의 판정 입력은 **`(base, head)` 두 ref** 뿐이므로 제목·본문 편집으로는 결론이 바뀌지 않는다 — `{success, success}` 누적일 뿐이고, 전건 통과 누적이 머지를 막지 않는다는 것은 [20260807-971](20260807-971-required-status-checks.md) §10-2 조건 3 (`project-guards` `n=2` 둘 다 `success` → `mergeStateStatus=CLEAN`) 에서 이미 실증됐다.
 
 **후보 1 에서 결론이 갈리는 유일한 경로는 「base 를 나쁜 값으로 바꿨다가 되돌리는 것」** (`{success, failure, success}`) 이고, 그 base rate 는 2-3 이 이미 준다 — **한 PR 에서 base 를 2회 이상 바꾼 사례 `0 / 640`**.
 
@@ -268,7 +268,7 @@ ptc_n >= 2 (edited 누적 발생) = 3 PR
 
 | 후보 | ① 강제력 | ② 불변식 | ③ 설정 변경 | ④ 최악 시나리오 | ⑤ 실현 |
 | --- | --- | --- | --- | --- | --- |
-| **1. `types` 에 `edited` 추가** | **하드 블록** | **파괴** — required 컨텍스트가 SHA 불변 반복 이벤트로 통과 3종 밖 결론 생성 가능 | 0 | `{success, failure, success}` 영구 공존 → 해석 규칙이 all-must-pass 면 릴리스 하드 블록. 복구는 §9-R1 (2초) 또는 head SHA 교체 | 가능 |
+| **1. `types` 에 `edited` 추가** | **하드 블록** | **파괴** — required 컨텍스트가 SHA 불변 반복 이벤트로 통과 3종 밖 결론 생성 가능 | 0 | `{success, failure, success}` 영구 공존 → 해석 규칙이 all-must-pass 면 릴리스 하드 블록. 복구는 §9-2 (2초) 또는 head SHA 교체 | 가능 |
 | **2. 별도 비-required 컨텍스트** | 붉은 X (가시성 `0 → 1`) | **보존** — required 3개의 `types:` 무변경 | 0 | 새 컨텍스트가 오탐해도 **머지 차단 없음** | 가능 |
 | **3. 머지 시점 검사 (`closed(merged)`)** | 없음 (사후) | 보존 | 0 | 없음 | 가능하나 **가치가 술어로 대체된다** (아래) |
 | **4. GitHub ruleset** | — | — | **필요 (PUT)** | — | **불가능 — 규칙 타입이 없다** |
@@ -285,7 +285,7 @@ ptc_n >= 2 (edited 누적 발생) = 3 PR
 
 **그럼에도 채택하지 않는 근거 3항** (기각이 아니라 **명시적 유예** — §6 · §재도입 트리거):
 
-1. **971 이 스스로 정한 안전 확인 절차를 사전에 수행할 수 없다.** §10-5 재검토 조건 9 는 required 축에 SHA 불변 반복 이벤트가 들어올 때 _"`G2` 를 그 컨텍스트를 포함한 목록으로 1회 실행"_ 하되 _"대상 SHA 가 그 컨텍스트에 대해 `n >= 2` 인지 먼저 확인"_ 하라고 요구한다. `branch-name` 은 오늘 **40/40 전건 `n=1`** (§2-6) 이므로 그런 표본이 **구조적으로 존재하지 않는다.** 즉 후보 1 의 안전은 971 의 판정식으로 **사전 확정 불가**이며, 확정하려면 일회용 PR 로 그 상태를 **먼저 만들어야** 한다. 그것이 곧 본 이슈 DoD 3 의 negative 실증이고, 본 ADR 은 그 실험을 후보 2 채택의 **부산물**로 확보한다 (§4-4).
+1. **971 이 스스로 정한 안전 확인 절차를 사전에 수행할 수 없다.** §10-5 재검토 조건 9 는 required 축에 SHA 불변 반복 이벤트가 들어올 때 _"`G2` 를 그 컨텍스트를 포함한 목록으로 1회 실행"_ 하되 _"대상 SHA 가 그 컨텍스트에 대해 `n >= 2` 인지 먼저 확인"_ 하라고 요구한다. `branch-name` 은 오늘 **40/40 전건 `n=1`** (§2-6) 이므로 그런 표본이 **구조적으로 존재하지 않는다.** 즉 후보 1 의 안전은 971 의 판정식으로 **사전 확정 불가**이며, 확정하려면 일회용 PR 로 그 상태를 **먼저 만들어야** 한다. 그것이 곧 본 이슈 DoD 3 의 negative 실증이고, 본 ADR 은 그 실험을 후보 2 채택의 **부산물**로 확보한다 (§7).
 2. **`if:` 로 좁히는 변형은 이 저장소가 명시 금지한 구조다.** `github.event.changes.base` 유무로 job 을 좁히면 (a) `opened` / `synchronize` 에서도 `changes` 가 없어 함께 스킵되므로 `github.event.action != 'edited' || …` 형태의 **이벤트 분기**가 필수인데, 이는 `branch-name-guard.yml` 헤더가 스스로 _"CLAUDE.md §가드 설계 원칙이 금지하는 fallback 분기와 구조가 같다 (한쪽 이벤트에서 조용히 스킵)"_ 며 배제한 형태다. (b) 게다가 스킵된 job 도 `skipped` 체크런을 만들므로 (`#1026` 의 `retry-fresh-runner -> skipped` 실측) required 컨텍스트의 누적 자체는 사라지지 않는다. (c) `github.event.changes.base` 가 Actions 표현식으로 실제 전달되는지는 **미실측**이다 (§2-2 말미).
 3. **비대칭 비용.** 971 §1 이 세운 원칙 — _"켜지 않으면 가드가 권고에 머무를 뿐이지만, 잘못 켜면 릴리스가 하드 블록된다"_ — 하에서, base rate `0 / 110일` (§2-4) 인 사건을 막기 위해 릴리스 경로의 하드 블록 표면을 넓히는 것은 **아직 근거가 서지 않는다**. 후보 2 는 같은 사건을 `0` 비용으로 **관측 가능**하게 만들고, 관측이 쌓이면 후보 1 로 승격할 근거가 생긴다.
 
@@ -470,12 +470,12 @@ pr-template-checklist  n=2     ← 같은 SHA · 같은 PR. 차이는 `types` �
 
 1. **base 편집 escape 재발** → **후보 1 (required 편입) 재검토.** 971 §10-5 항 14 와 **같은 술어**다.
 
-   **escape 정의 (기계 판정, 머지 시점 앵커)** — 머지 PR 중 `BaseRefChangedEvent` 를 보유하고 (§2-3 술어), 그 **최종 `(base, head)`** 가 `verify-pr-base-rule.mjs` 로 `exit != 0` 인 것. 관측 창은 **본 ADR 머지일 하한의 90일 rolling** 이며, 하한을 두는 이유는 971 항 13 과 같다 — 소급 3건 (`#170` `#212` `#217`) 은 발화 입력이 아니라 **기준선**이고 (dual PR 시기, §2-4), 하한이 없으면 **신설 당일 자동 발화**한다.
+   **escape 정의 (기계 판정, 머지 시점 앵커)** — 머지 PR 중 `BaseRefChangedEvent` 를 보유하고 (§2-3 술어), 그 **최종 `(base, head)`** 가 `verify-pr-base-rule.mjs` 로 `exit != 0` 인 것. 관측 창은 **90일 rolling, 하한은 본 항 신설일 `2026-08-15`** 이며, 실효 창 = `[max(2026-08-15T00:00:00Z, now-90d), now]` 다 (971 항 13 형식 승계 — _"본 ADR 머지일"_ 같은 **미확정 앵커를 쓰지 않는다**. 리뷰가 971 항 14 와의 이중 명세를 적발했고, 정본은 **본 절**이며 971 은 값을 복제하지 않는다). 하한을 두는 이유는 971 항 13 과 같다 — 소급 3건 (`#170` `#212` `#217`) 은 발화 입력이 아니라 **기준선**이고 (dual PR 시기, §2-4), 하한이 없으면 **신설 당일 자동 발화**한다.
 
    ```bash
    REPO=coseo12/astro-simulator
    # (1) 창 안의 머지 PR 중 base 편집 보유분 — §2-3 의 페이지네이션 결과를 재사용한다
-   jq -s -r --arg since "<하한 ISO8601>" \
+   jq -s -r --arg since "2026-08-15T00:00:00Z" \
      '[.[].data.repository.pullRequests.nodes[]]
       | .[] | select(.state=="MERGED")
       | select([.timelineItems.nodes[] | select(.createdAt > $since)] | length > 0)
