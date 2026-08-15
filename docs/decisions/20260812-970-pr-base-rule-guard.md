@@ -368,7 +368,17 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
    **이 저장소에 실례가 있다.** 술어는 본 ADR 전체가 쓰는 **머지 PR** 로 고정한다 (§2-3 코퍼스 594건과 같은 모집단). 봇 head 패턴을 가진 **머지** PR 은 **28건이고 27건이 `user.type: "Bot"`(`github-actions[bot]`), 1건이 사람**이다 — [#241](https://github.com/coseo12/astro-simulator/pull/241) (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `User` / `OWNER`). 즉 *"봇 head ⇒ 봇"* 은 이력에서 이미 반증돼 있다. 이 28 은 §2-1 (*"28건 = `develop` 11 + 작업 브랜치 17"*) · §5 (*"실측 28건"*) 과 **같은 값**이다 — 세 곳이 같은 술어를 쓴다.
 
-   > **술어별 값 (2026-08-13 재측정, 두 API 표면에서 독립 재현).** merged ∩ 봇 패턴 = **28 (Bot 27 / 사람 1)** · all-closed ∩ 봇 패턴 = **30 (Bot 29 / 사람 1)** · open ∩ 봇 패턴 = **0** (모집단 누락 없음). 술어: REST `pulls?state=closed&per_page=100` 페이지네이션 + `user.type`, 교차 확인은 GraphQL `gh pr list --state all` + `author.is_bot` — **두 경로가 셀 단위로 일치**한다.
+   > **술어별 값 (2026-08-13 재측정, 두 API 표면에서 독립 재현).** merged ∩ 봇 패턴 = **28 (Bot 27 / 사람 1)** · all-closed ∩ 봇 패턴 = **30 (Bot 29 / 사람 1)** · open ∩ 봇 패턴 = **0** (모집단 누락 없음). 술어: REST `pulls?state=closed&per_page=100` 페이지네이션 + `user.type`, 교차 확인은 GraphQL `gh pr list --state all --limit 1000` + `author.is_bot` — **두 경로가 셀 단위로 일치**한다.
+   >
+   > ⚠️ **[2026-08-14 — `--limit` 정정, [#1031](https://github.com/coseo12/astro-simulator/issues/1031) 경미 사항]** 초판은 `--limit` 을 명시하지 않아 **기본값 `30`** 으로 동작했고, 그 형태로는 위 _"셀 단위 일치"_ 가 **재현되지 않는다**. 2026-08-14 실측 (저장소 PR 총계 `636` — `gh pr list --state all --limit 2000 --json number --jq 'length'`):
+   >
+   > ```bash
+   > BOT='^chore/(r1-baseline-linux|baseline-remeasure)-[0-9]+$'
+   > gh pr list --state all            --json headRefName --jq "[.[] | select(.headRefName | test(\"$BOT\"))] | length"   #  0
+   > gh pr list --state all --limit 1000 --json headRefName --jq "[.[] | select(.headRefName | test(\"$BOT\"))] | length"   # 30
+   > ```
+   >
+   > 즉 기본 limit 로는 봇 패턴이 **`0` 건** 잡힌다 (#1031 본문은 이를 _"22건"_ 으로 적었으나 실측은 `0` 이다 — 재현 불가 술어를 다루는 이슈가 재현 불가 수치를 인용한 사례이며 [`20260814-1031-1064`](20260814-1031-1064-committed-claim-guard-rejected.md) §측정 8 이 박제한다). `--limit 1000` 을 명시하면 **`30`** 으로 위 박제값과 일치한다. **값 `28`/`30`/`29` 는 무접촉** — 정정 대상은 재현 명령뿐이다 (REST 경로는 이미 `per_page=100` 페이지네이션이라 영향 없음).
    >
    > ⚠️ 초판은 **`29건 중 28건`** 이라고 적었다. 이는 all-closed 의 **Bot 수 29** 와 merged 의 **총계 28** 을 섞은 **하이브리드**로, 명시한 술어(*"머지 PR"*)로 재현되지 않는다 ([20260808-983](20260808-983-measurement-recording-convention.md) §(i) **부분 재측정 금지** — PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer BLOCK-3). 같은 문서의 §2·§5 가 이미 28 을 적고 있어 **외부 측정 없이도 내부 모순으로 판정 가능**했다.
 
@@ -402,8 +412,16 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 | # | 항목 | 근거 |
 |---|---|---|
 | **1** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) | ⚠️ **base 편집 우회 봉인** — `types` 에 `edited` 추가 vs 별도 non-required job vs ruleset 비교. **ADR 20260807-971 결정 9-1 / Phase 1 면제 근거와 동시에 판단해야 한다** (required check 에 event *type* 축을 들이는 결정) | §8-1 한계 0 (실측 [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
-| 2 | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
-| 3 | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
+| **2** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030), **완료**) | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
+| **3** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030), **완료**) | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
+
+> **항목 2·3 종결 (2026-08-14)** — [#1030](https://github.com/coseo12/astro-simulator/issues/1030) 이
+> 둘을 묶어 처리했다. 반영 지점은 [`operational-friction.md`](../ops/operational-friction.md) **§1-2**
+> (신설) 이며, 재현 술어 3개 + 구성 실측표 + 봇 PR 본문 close 키워드 **`17 / 17` `hits=0`** 를 박제했다.
+> 항목 3 의 판정은 **미발동 조건 표에 넣지 않는다** — 실해 0 이라 폴백 필요로 오독되기 때문이며,
+> 트리거 축 표의 해당 행에 §1-2 포인터만 두었다.
+> ⚠️ 본 표의 항목 1 이 이슈 번호를 갖고 2·3 은 표에만 있던 상태가 **이 ADR 이 스스로 인용한 유실
+> 패턴**(#962 축 B → #970 재발견)과 같은 형태였다. #1030 이 그것을 이슈로 승격해 닫은 사례다.
 
 > cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행했다 (`developer` 페르소나 금지 — #479). 결과는 **§10** 에 4축으로 통합했고 상태는 `Accepted` 로 전이했다.
 

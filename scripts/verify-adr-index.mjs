@@ -412,7 +412,7 @@ function main(args = process.argv.slice(2), env = process.env) {
   return 0;
 }
 
-// ── --self-test: 격리 픽스처 F1~F19 / 47 단언 (가드 도입 PR DoD 축 1~3) ──────
+// ── --self-test: 격리 픽스처 F1~F19 / 49 단언 (가드 도입 PR DoD 축 1~3) ──────
 //  F19 는 CLI 표면(모드 디스패치 + main() 종료 코드 + 배선)이라 세부 케이스가 많아
 //  `F19a`~`F19o` 로 나뉜다. 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
 //  ADR `20260813-1020-adr-index-membership-marker-rejected.md` §결정 3 이 정본이다.
@@ -835,31 +835,86 @@ function selfTest() {
         'node:process',
         'node:url',
       ];
-      // `declared` 는 **한 줄로 끝나는** 선언만 수집한다. 그래서 **선언 수**를 함께 고정한다
-      //  (PR #1036 reviewer N-1). 다중행 선언은 `declared` 에 안 잡히므로 집합 비교만으로는
-      //  **새 다중행 유입이 조용히 통과**한다 (실측: 다중행·세미콜론 누락 2형태 `47/0` exit 0).
-      //  `^import` 로 시작하는 **줄 수**는 두 형태 모두에서 늘어나므로 한 조건이 둘을 같이 닫는다.
-      //  ⚠️ 이 경로는 적대적 시나리오가 아니다 — prettier 가 `printWidth: 100` 초과 시 **스스로**
-      //  다중행으로 쪼갠다 (실측). 게다가 위 `node:fs` 선언은 현재 **98자 = 여유 2자**라 명명
-      //  export 하나만 더해도 쪼개진다. 그때는 `declared` 에서 `node:fs` 가 빠져 FAIL 하는데
-      //  (안전 방향이지만) 진단이 _"선언이 없다"_ 로 읽혀 오도하므로 메시지에 형태를 명시한다.
+      // `declared` 는 **선언 1건 = 매치 1건**으로 수집한다 (#1037 N-1 근본 해소). 시작을 `^import`
+      //  로, 종료를 `';` **+ 줄 끝**으로 앵커하고 그 사이에 `[^;]` 만 허용해 세미콜론을 넘지 못하게
+      //  한다. 사이에 줄바꿈이 와도 되므로 prettier 가 `printWidth: 100` 초과로 **스스로 쪼갠**
+      //  다중행 선언이 그대로 수집된다.
+      //
+      //  ⚠️ **직전 판정본은 여기서 "코드 무변경 FAIL" 을 냈다.** 한 줄로 끝나는 선언만 수집해서,
+      //  allowlist 가 **불변인데도** `node:fs` 에 명명 export 하나(`, X` = +3자)만 더하면 98자
+      //  선언이 임계 `100` 을 넘어 쪼개지고, 수집 목록에서 빠져 FAIL 했다 (PR #1036 qa 실측:
+      //  `statSync` 추가 → 9줄 분할 → `46 passed, 1 failed`). 이 가드는 `main` 의 required check
+      //  이라 그 상태에서 후속 PR 이 전부 하드 블록됐다. 진단 메시지로 안내하는 대신 **수집
+      //  자체를 넓혀** 경로를 없앤다 — 형태를 제약하는 것은 가드의 목적(유입 차단)이 아니다.
+      //
+      //  ⚠️ **선언 수 조건 ②는 그대로 둔다 — 넓힌 뒤에도 두 조건은 독립이다.** 세미콜론 누락
+      //  선언은 종료 앵커가 없어 여전히 수집되지 않고, 한 줄에 선언 2건을 이어 쓰면 앞 선언의
+      //  `;` 뒤가 줄 끝이 아니라 그 줄이 통째로 수집에서 빠진다. 두 형태 다 `^import` **줄 수**
+      //  로는 드러나므로 ②가 닫는다. 이 성질을 아래 `F19p`·`F19q` 가 합성 소스로 고정한다.
       const declaredLineCount = (selfSrc.match(/^import\b/gm) ?? []).length;
-      const declared = [...selfSrc.matchAll(/^import\s[^\n]*['"]([^'"]+)['"];\s*$/gm)]
-        .map((m) => m[1])
-        .sort();
+      const IMPORT_DECL_RE = /^import\b[^;]*?['"]([^'"]+)['"];[ \t]*$/gm;
+      const declared = [...selfSrc.matchAll(IMPORT_DECL_RE)].map((m) => m[1]).sort();
       assert(
         declaredLineCount === ALLOWED_IMPORTS.length &&
           JSON.stringify(declared) === JSON.stringify(ALLOWED_IMPORTS),
-        `F19n 배선: **단일 라인** 정적 import 선언 집합 == allowlist ` +
+        `F19n 배선: **컬럼 0 에서 시작하는** 정적 import 선언 집합 == allowlist ` +
           `(선언 시작 줄 ${declaredLineCount} / 기대 ${ALLOWED_IMPORTS.length} / 수집 ${JSON.stringify(declared)}). ` +
-          `⚠️ 다중행 선언은 수집되지 않는다 — 줄 수만 어긋나면 새 유입을, 수집 목록에서만 빠졌으면 ` +
-          `기존 선언이 printWidth 초과로 쪼개진 것을 의심하라`,
+          `⚠️ 다중행 선언도 수집된다 — 줄 수와 수집 목록이 **함께** 어긋나면 allowlist 밖 유입을, ` +
+          `줄 수만 어긋나면 세미콜론 누락 또는 한 줄 2선언을 의심하라. ` +
+          `⚠️ **산문에도 걸린다** — 컬럼 0 에서 import 키워드로 시작하는 줄은 **블록 주석 안이어도** ` +
+          `세어진다 (실행 코드가 무변경이어도 FAIL). 그 줄을 들여쓰거나 다른 낱말로 시작하게 바꿔라`,
       );
       assert(
         (selfSrc.match(/\bimport\s*\(/g) ?? []).length === 0,
         'F19o 배선: 동적 모듈 로드 0 — 합성 모듈명 우회 경로 차단 (Y-1 실측 근거). ' +
           '⚠️ 스캔 범위가 파일 전문이라 **산문(주석·단언 메시지)에 해당 호출 표기를 축자로 적어도 ' +
-          '여기서 FAIL** 한다 — 코드 무변경인데 실패하면 이 경로다. 서술형으로 바꿔 쓸 것',
+          '여기서 FAIL** 한다 — 코드 무변경인데 **여기서** 실패했다면 그 경로다 (같은 클래스가 ' +
+          'F19n 의 컬럼 0 앵커에도 있다). 서술형으로 바꿔 쓸 것',
+      );
+      // ⓘ **`F19o` 는 안내를 더하지 않는다** (#1037 N-2 판정 — 기각). 되돌림은 이슈 §비목표가
+      //  금지하고(PR #1036 에서 근거와 함께 수용된 대가), 위 메시지는 이미 *원인*(스캔 범위가
+      //  파일 전문) · *표지*(_"코드 무변경인데 실패하면"_) · *처방*(서술형으로 바꿔 쓸 것) 3요소를
+      //  갖췄다. 덧붙일 것은 안내가 아니라 중복이다.
+      //
+      //  ⚠️ **초판은 여기서 _"이제 저 문장이 배타적으로 참"_ 이라 적었다 — 거짓이다** (PR #1077
+      //  reviewer 🟡-4 반증). 위에서 소멸한 것은 **prettier 분할 경로 하나**일 뿐이고, `F19n` 은
+      //  여전히 "코드 무변경 FAIL" 경로를 갖는다: 컬럼 0 에서 import 키워드로 시작하는 줄을
+      //  **블록 주석**에 넣으면 `^import` 앵커가 그것을 세어 FAIL 한다. 실측 — 그런 주석 3줄 주입
+      //  시 **실행 코드 607행 동일**인데 `48 passed, 1 failed`.
+      //  ⚠️ **술어와 rev 를 함께 적는다** (PR #1077 reviewer 라운드 2 — 이 값이 초판에 둘 다
+      //  없었다). rev `8cec8bd` / 술어: 블록 주석을 **비탐욕 전역 제거**한 뒤 행 주석·공백 전용
+      //  줄을 빼고 계수 (`perl -0777 -pe 's{/\*.*?\*/}{}gs'` + `grep -vE '^\s*//'` + 비공백 계수).
+      //  **술어를 바꾸면 결론이 뒤집힌다** — 줄 접두만 보는 나이브 판정(`grep -vE '^\s*(//|/\*|\*|\*/)'`)
+      //  은 주입 블록의 가운데 줄이 주석 접두를 갖지 않아 살아남아 `607` → `608` 로 갈리고, 그러면
+      //  "코드가 변했다" 는 반대 결론이 나온다. 현 head 는 같은 술어로 `609` 이므로 위 값은
+      //  **rev 종속**이다. 저장소 정본(`tsc --removeComments` emit `cmp`)으로도 동일 확인됐다.
+      //  ⇒ 두 단언은 "코드 무변경 FAIL" 클래스를 **공유**한다 (F19o 는 파일 전문 스캔, F19n 은
+      //  컬럼 0 앵커). 그래서 위 F19n 메시지에도 산문 분기를 적었다. 전칭 단정을 쓸 때 술어의
+      //  사각을 함께 적는다는 것이 같은 커밋의 ADR 962 §9-3 부기 요지인데, 초판이 그 부기를
+      //  쓰면서 **바로 옆에 새 전칭 단정을 박제**했다 — 자기모순이라 완화한다.
+
+      // F19p·F19q — #1037 N-1 의 경계를 **합성 소스**로 고정한다. 실물 파일이 아니라 문자열에
+      //  적용하므로 이 파일의 선언 형태가 앞으로 어떻게 바뀌든 판정이 결정적이다. (합성 소스는
+      //  JS 문자열 리터럴이라 `\n` 이 escape 다 — 물리적 줄 시작이 아니므로 위 `^import` 앵커
+      //  기반 단언들에 유입되지 않는다. 자기-매칭 4표면 중 ①의 재발 방지.)
+      const collectDecls = (src) => [...src.matchAll(IMPORT_DECL_RE)].map((m) => m[1]);
+      const countDeclStarts = (src) => (src.match(/^import\b/gm) ?? []).length;
+      const SPLIT_DECL = "import {\n  readFileSync,\n  statSync,\n} from 'node:fs';\n";
+      assert(
+        countDeclStarts(SPLIT_DECL) === 1 &&
+          JSON.stringify(collectDecls(SPLIT_DECL)) === JSON.stringify(['node:fs']),
+        'F19p 수집: prettier 가 쪼갠 다중행 선언도 1건으로 수집된다 ' +
+          '(#1037 — allowlist 불변인데 FAIL 하던 "코드 무변경 FAIL" 경로가 닫혔다는 증거)',
+      );
+      const NO_SEMICOLON = "import { x } from 'node:vm'\n";
+      const TWO_PER_LINE = "import { a } from 'node:fs'; import { b } from 'node:vm';\n";
+      assert(
+        collectDecls(NO_SEMICOLON).length === 0 &&
+          countDeclStarts(NO_SEMICOLON) === 1 &&
+          collectDecls(TWO_PER_LINE).length === 0 &&
+          countDeclStarts(TWO_PER_LINE) === 1,
+        'F19q 수집: 세미콜론 누락·한 줄 2선언은 수집에서 빠지고 **선언 시작 줄 수**로만 드러난다 ' +
+          '— 수집을 넓힌 뒤에도 조건 ②가 독립 방어선으로 남는다는 증거',
       );
     }
   } finally {

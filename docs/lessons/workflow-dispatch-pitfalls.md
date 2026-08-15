@@ -71,7 +71,7 @@ workflow 파일이 한 번 invalid 상태로 인덱싱되면 GitHub 가 ID 를 f
 - name: Create issue
   run: |
     gh issue create \
-      --body "$(cat <<HEREEND
+      --body "$(cat <<'HEREEND'
 ## 배경
 자동 탐지 workflow 발화. 임계값 충족.
 HEREEND
@@ -86,7 +86,7 @@ HEREEND
 - name: Create issue
   run: |
     gh issue create \
-      --body "$(cat <<HEREEND
+      --body "$(cat <<'HEREEND'
           ## 배경
           자동 탐지 workflow 발화. 임계값 충족.
           HEREEND
@@ -94,6 +94,10 @@ HEREEND
 ```
 
 bash heredoc 의 `<<HEREEND` 는 indent 보존 (`<<-HEREEND` 는 leading tab 만 제거). 본문에 10 space 가 그대로 박혀 issue body 로 출력되지만 마크다운 렌더링은 leading whitespace 무시 → **rendered 의도 유지** ✓.
+
+> **구분자 따옴표는 위 indent 축과 직교 ([#1045](https://github.com/coseo12/astro-simulator/issues/1045))** — 위 두 예시의 구분자를 `<<'HEREEND'` 로 적은 것은 본 함정 4 때문이 아니라 [`gh-cli-execsync-pitfall.md`](gh-cli-execsync-pitfall.md) §변형 때문이다. 따옴표를 안 치면 heredoc 본문의 백틱·`$` 가 **명령 치환·변수 확장**되어 issue body 가 조용히 손상된다 (실측: `<<'HEREEND'` → `` `n>=3` `` · `$VERSION` 보존 / `<<HEREEND` → `GONE` · `9.9.9`). indent 거동을 바꾸는 것은 `<<-` 뿐이므로 **따옴표를 쳐도 위 10 space 처방의 `body` indent 축은 그대로 유효**하다.
+>
+> ⚠️ **단, 종료 구분자는 따옴표 없이 `HEREEND` 이면서 반드시 `column 0` 이어야 한다.** 위 우회 예시는 종료 구분자까지 인덴트해 두었는데, `<<-` 가 아닌 한 **인덴트된 구분자는 heredoc 을 종료시키지 못한다** — 실측: 종료 구분자를 10 space 인덴트하면 `ARGV` 에 `## 배경 / 본문 / HEREEND` 가 그대로 실려 나오고 **rc `0`** 이다 (구분자 문자열이 body 에 혼입). column 0 으로 내리면 정상 종료한다. 이 결함은 본 문서 base 부터 있던 것이고 **따옴표 축과 무관**하지만, 위 문장이 레시피 유효성을 보증하므로 함께 적는다. `run: |` block scalar 는 공통 indent 를 벗겨 내므로 **벗겨진 뒤 기준으로 column 0** 이어야 한다.
 
 대안 (검토 후 미채택):
 
