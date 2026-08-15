@@ -368,7 +368,17 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
    **이 저장소에 실례가 있다.** 술어는 본 ADR 전체가 쓰는 **머지 PR** 로 고정한다 (§2-3 코퍼스 594건과 같은 모집단). 봇 head 패턴을 가진 **머지** PR 은 **28건이고 27건이 `user.type: "Bot"`(`github-actions[bot]`), 1건이 사람**이다 — [#241](https://github.com/coseo12/astro-simulator/pull/241) (`chore/baseline-remeasure-24621714905`, 저자 `coseo12` / `User` / `OWNER`). 즉 *"봇 head ⇒ 봇"* 은 이력에서 이미 반증돼 있다. 이 28 은 §2-1 (*"28건 = `develop` 11 + 작업 브랜치 17"*) · §5 (*"실측 28건"*) 과 **같은 값**이다 — 세 곳이 같은 술어를 쓴다.
 
-   > **술어별 값 (2026-08-13 재측정, 두 API 표면에서 독립 재현).** merged ∩ 봇 패턴 = **28 (Bot 27 / 사람 1)** · all-closed ∩ 봇 패턴 = **30 (Bot 29 / 사람 1)** · open ∩ 봇 패턴 = **0** (모집단 누락 없음). 술어: REST `pulls?state=closed&per_page=100` 페이지네이션 + `user.type`, 교차 확인은 GraphQL `gh pr list --state all` + `author.is_bot` — **두 경로가 셀 단위로 일치**한다.
+   > **술어별 값 (2026-08-13 재측정, 두 API 표면에서 독립 재현).** merged ∩ 봇 패턴 = **28 (Bot 27 / 사람 1)** · all-closed ∩ 봇 패턴 = **30 (Bot 29 / 사람 1)** · open ∩ 봇 패턴 = **0** (모집단 누락 없음). 술어: REST `pulls?state=closed&per_page=100` 페이지네이션 + `user.type`, 교차 확인은 GraphQL `gh pr list --state all --limit 1000` + `author.is_bot` — **두 경로가 셀 단위로 일치**한다.
+   >
+   > ⚠️ **[2026-08-14 — `--limit` 정정, [#1031](https://github.com/coseo12/astro-simulator/issues/1031) 경미 사항]** 초판은 `--limit` 을 명시하지 않아 **기본값 `30`** 으로 동작했고, 그 형태로는 위 _"셀 단위 일치"_ 가 **재현되지 않는다**. 2026-08-14 실측 (저장소 PR 총계 `636` — `gh pr list --state all --limit 2000 --json number --jq 'length'`):
+   >
+   > ```bash
+   > BOT='^chore/(r1-baseline-linux|baseline-remeasure)-[0-9]+$'
+   > gh pr list --state all            --json headRefName --jq "[.[] | select(.headRefName | test(\"$BOT\"))] | length"   #  0
+   > gh pr list --state all --limit 1000 --json headRefName --jq "[.[] | select(.headRefName | test(\"$BOT\"))] | length"   # 30
+   > ```
+   >
+   > 즉 기본 limit 로는 봇 패턴이 **`0` 건** 잡힌다 (#1031 본문은 이를 _"22건"_ 으로 적었으나 실측은 `0` 이다 — 재현 불가 술어를 다루는 이슈가 재현 불가 수치를 인용한 사례이며 [`20260814-1031-1064`](20260814-1031-1064-committed-claim-guard-rejected.md) §측정 8 이 박제한다). `--limit 1000` 을 명시하면 **`30`** 으로 위 박제값과 일치한다. **값 `28`/`30`/`29` 는 무접촉** — 정정 대상은 재현 명령뿐이다 (REST 경로는 이미 `per_page=100` 페이지네이션이라 영향 없음).
    >
    > ⚠️ 초판은 **`29건 중 28건`** 이라고 적었다. 이는 all-closed 의 **Bot 수 29** 와 merged 의 **총계 28** 을 섞은 **하이브리드**로, 명시한 술어(*"머지 PR"*)로 재현되지 않는다 ([20260808-983](20260808-983-measurement-recording-convention.md) §(i) **부분 재측정 금지** — PR [#1023](https://github.com/coseo12/astro-simulator/pull/1023) reviewer BLOCK-3). 같은 문서의 §2·§5 가 이미 28 을 적고 있어 **외부 측정 없이도 내부 모순으로 판정 가능**했다.
 
