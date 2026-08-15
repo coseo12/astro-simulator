@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.74.0] — 2026-08-16
+
 ### Added
 
 - **[#1027] ADR [`20260814-1027`](docs/decisions/20260814-1027-pr-base-edit-guard.md) 신설 (`Provisional`) — PR `base` 편집 우회 봉인 설계 + 971 §10-5 재검토 조건 14 (PATCH)** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) — [#970](https://github.com/coseo12/astro-simulator/issues/970) 이 §8-1 한계 0 으로 박제한 stale green (_"`base=develop` 으로 열어 초록 확인 → `base` 를 `main` 으로 편집"_) 의 **설계 판정**이다. 본 PR 은 **문서만** — workflow·스크립트 무접촉이며 구현은 후속 (`stage:dev`).
