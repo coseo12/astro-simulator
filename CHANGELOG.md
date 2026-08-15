@@ -164,7 +164,7 @@ Semantic Versioning을 따른다.
 ### Behavior Changes
 
 - **좀비 카나리아가 잡는 대상이 바뀐다 (#1066).** 같은 입력(`pnpm` 을 포함한 임의 Bash 도구 호출이 떠 있는 상태)에서 qa 에이전트와 SessionStart hook 이 **다르게 동작한다** — 이전에는 `pnpm install` · `pnpm build` · `pnpm format:check` 래퍼 셸과 `pnpm … typecheck > /dev/null 2>&1` 같은 **출력 리다이렉션 명령**까지 좀비 후보로 보고했고(ETIME 조건만 맞으면), 이제는 보고하지 않는다. 반대로 검출 의무 형태(`pnpm dev` · `pnpm run dev` · `pnpm --filter <pkg> dev` · `next dev` · `next-server` · `cargo test` · `cargo test --lib` · `cargo nextest run`)는 **전건 유지**된다. 오탐이 사라지면서 _"카나리아가 울면 진짜 좀비"_ 라는 신뢰가 회복되는 것이 본 변경의 목적이다 — 종전에는 발화 대부분이 자기 세션의 정상 명령이라 무시 습관이 붙는 구조였다.
-- **`qa.md` 카나리아 인용부호가 겹따옴표 → 홑따옴표.** 패턴에 `$` 가 들어가므로 겹따옴표로 감싸면 셸 확장에 노출된다. 에이전트가 복사해 실행하는 술어라 인용부호 선택이 동작에 직결된다.
+- **`qa.md` 카나리아 인용부호가 겹따옴표 → 홑따옴표.** ⚠️ **초판이 적은 근거(_"`$` 때문에 셸 확장에 노출"_)는 실측으로 반증됐다** (PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080) 리뷰) — 패턴의 `$` 는 뒤가 `)` 라 **bash·zsh 어디서도 확장되지 않는다** (겹따옴표 / 홑따옴표 / 원본 출력의 `md5` 4종 **전건 동일**). **진짜 근거는 파서 계약**이다 — `scripts/verify-zombie-check.mjs` 의 hook `PATTERN` 추출이 `/^PATTERN='([^']*)'$/m` 으로 **홑따옴표를 하드 요구**하므로, 겹따옴표로 쓰면 회귀 가드가 패턴을 못 뽑아 fail-fast 한다 (negative N3 로 실발화 확인). 결론은 불변이고 근거만 정정한다.
 - **`.claude/agents/developer.md` §규칙 — `pnpm build` 선행 트리거가 넓어진다.** 이전: _"격리 worktree 에서 **`typecheck` 를 돌리려면**"_. 이후: _"격리 worktree 에서 **워크스페이스 패키지(`@astro-simulator/*`)를 해석하는 명령**을 돌리려면"_ (SSoT `operational-friction.md` §8 과 **낱말까지 동일** — reviewer 권고 6). 같은 입력(격리 worktree + `pnpm test:unit` 또는 `pnpm dev` 만 필요한 작업)에서 dev 에이전트가 **다르게 동작한다** — 이전 규칙은 `typecheck` 를 안 부르면 발화하지 않아 `install` 만으로 진행했고, 그 결과가 #1062 가 박제한 오진 경로다.
 - **하위 규칙 3개 추가** — (i) `lint` / `format:check` / 정적 `verify:*` 는 **비의존 집합**이라 `install` 만으로 충분하다는 명시 (불필요한 `build` 호출 억제), (ii) `pnpm dev` 는 **exit code 로 드러나지 않는다**는 경고, (iii) 축 (ii) 결손 대상이 `packages/physics-wasm/{pkg,pkg-bundler}` 를 포함한다는 정정.
 - **문서 SSoT 정합** — `docs/ops/operational-friction.md` §8 이 절차 SSoT 이고 `developer.md` 가 사본이므로 **두 곳을 동시에** 갱신했다. `scripts/verify-agent-ssot.sh` exit `0` (5 files × 9 fields = 45 checks).
@@ -231,7 +231,7 @@ Semantic Versioning을 따른다.
   **교정 원리는 `dev` / `test` 를 공백 구분 토큰으로만 인정하는 것** (앞은 공백, 뒤는 공백 또는 EOL). `/dev/null` 의 `dev` 는 앞이 `/` 라 배제되고 실제 인자로 등장하는 `dev` 는 남는다.
 
   ```bash
-  # 카나리아 정본 (신 패턴). 인용부호는 홑따옴표 의무 — 패턴에 `$` 가 있다
+  # 카나리아 정본 (신 패턴). 홑따옴표 의무 — verify-zombie-check.mjs 의 PATTERN 추출 정규식이 홑따옴표를 요구한다
   ps -axww -o pid=,etime=,command= | grep -E 'next dev|next-server|cargo( [^ ]+)* (nextest|test)( |$)|pnpm( [^ ]+)* dev( |$)' | grep -v grep
   ```
 
