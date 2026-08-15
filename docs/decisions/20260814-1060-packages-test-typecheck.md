@@ -1,7 +1,7 @@
 # ADR: `packages/{shared,core}` 테스트 파일 타입 검사 강제 지점 — `verify-and-rust` 배선 + 다중 `--filter` 단일 호출 금지 (#1060)
 
 - 일자: 2026-08-14
-- **상태**: **Provisional** (cross-validate 미수행 — 메인 오케스트레이터 수행 후 `Accepted` 전이. architect 는 직접 호출 금지 [#479](https://github.com/coseo12/astro-simulator/issues/479)). ⚠️ 본 라인은 [`20260812-1005`](20260812-1005-adr-index-status-guard.md) §재검토 조건의 **어순 제약** 대상이다 — 현재 상태 토큰이 최선두여야 한다
+- **상태**: **Accepted** (cross-validate agy 2026-08-15 — `Provisional` 에서 전이)
 - 관련: 이슈 [#1060](https://github.com/coseo12/astro-simulator/issues/1060) / 분리 출처 [#960](https://github.com/coseo12/astro-simulator/issues/960) §교차검증 반영 사항 고유 발견 / 선행 ADR [`20260814-960`](20260814-960-worktree-typecheck-recipe.md) (typecheck 선행 조건 2축) · [`20260807-971`](20260807-971-required-status-checks.md) 결정 1·9-1 (required check 관할) · [`20260808-983`](20260808-983-measurement-recording-convention.md) (수치 박제 규약)
 - 측정 rev: `fe922bb` (`origin/develop` tip, 2026-08-14). 본 문서의 모든 수치는 이 rev 단일 시점에 **격리 worktree** 1개에서 `pnpm install --frozen-lockfile` + `pnpm build` 후 일괄 도출 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §부분 재측정 금지). 실행 환경은 macOS / pnpm `10.32.1` / TypeScript `6.0.3` / Next `16.2.12`
 
@@ -185,6 +185,19 @@ pnpm --fail-if-no-match --filter @astro-simulator/nonexistent typecheck ; echo $
 # 1
 ```
 
+⚠️ **위 4행은 pnpm 메이저 버전에 종속된다 — 처방의 검출력이 핀 버전에 걸려 있다.** 메인이 격리 워크스페이스로 재현하다 픽스처에 `packageManager` 를 안 넣어 전역 `9.15.4` 로 돌았고, 거기서 **(ii) 단일 `--filter` 가 갈렸다**:
+
+| 형태 | `10.32.1` (핀) | `9.15.4` |
+| --- | ---: | ---: |
+| (i) 이중 `--filter` 스크립트 소실 | `0` | `0` |
+| **(ii) 단일 `--filter` 스크립트 소실** | **`1`** | **`0`** ← 갈림 |
+| (iii) 필터 0 매칭 | `0` | `0` |
+| (iv) `--fail-if-no-match` | `1` | `1` |
+
+즉 _"단일 `--filter` 는 스크립트 소실 시 exit 1"_ 은 **pnpm `10` 의 성질**이고 `9` 에서는 성립하지 않는다. **채택 처방(패키지별 분리 호출)의 검출력이 핀 버전에 종속**되며, **다운그레이드 방향도 위험**하다 — `10 → 9` 로 내려가면 분리 호출만으로는 조용히 통과한다. ⚠️ **핀 값을 여기 복제하지 않는다** — SSoT 는 루트 `package.json` 의 **`packageManager` 필드**이고, 이 표는 _"그 필드가 바뀌면 재측정하라"_ 는 트리거다 (§재검토 조건의 pnpm 메이저 항이 **가정이 아니라 실측된 반례를 가진 조건**이 된다).
+
+⚠️ **측정 함정** — 격리 픽스처에 `packageManager` 를 넣지 않으면 **전역 pnpm 으로 돌아 저장소와 다른 결과**가 나온다. _"대상 rev · 대상 환경에서 실행하라"_ 의 pnpm 판본이다.
+
 (i) 은 **`--if-present` 와 정확히 같은 클래스**다 (#840 — 스크립트 entry 소실이 출력 없이 exit `0`). (iii) 은 `hashFiles` silent-skip 정책 (#945) 이 다루는 것과 같은 클래스다 — _"가드 대상의 부재는 배포 시나리오가 아니라 가드가 삭제된 회귀"_.
 
 | 형태 | (i) 스크립트 소실 | (iii) 필터 0 매칭 | 판정 |
@@ -274,7 +287,15 @@ gh api repos/coseo12/astro-simulator/actions/runs/<RUN_ID>/jobs \
 
 ## 교차검증 반영 사항
 
-**미수행.** 본 ADR 은 cross-validate 발동 대상(ADR 신규)이나 architect 는 직접 호출이 금지돼 있다 ([#479](https://github.com/coseo12/astro-simulator/issues/479)). **메인 오케스트레이터가 수행**한 뒤 4축(합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견)을 본 절에 통합하고 `Provisional → Accepted` 로 전이한다.
+**수행 완료** — 메인 오케스트레이터, `code 1083` / anchor `ADR-new-or-amendment` / outcome **`applied`** (exit 0, 폴백 아님) / 판정 **양호 (Approve / LGTM for Provisional)**, 5개 항목 전건 `양호` (로직 정확성은 **`탁월`**).
+
+**① 합의** — silent no-op 기전 포착과 **분리 호출 + `--fail-if-no-match`** 차단, `next build` 실측을 통한 **이슈 전제 교정** 및 #1082 분리, 기존 `verify-and-rust` 의 **선행 빌드 산출물 재활용**(추가 `~3s`), `bash -e` 러너에서 첫 명령 실패 시 스텝 즉시 중단 = **의도한 fail-fast 와 일치**, `Refs` vs `Closes` 판단, ADR 헤더 상태 토큰 최선두 배치로 `20260812-1005` **어순 제약 가드 정상 충족**.
+
+**② 이견** — 없음.
+
+**③ 고유 발견 — `--limit 1000` 의 장기 상한** (참고 채택). 저장소 PR 이 `1,000` 을 넘으면 GraphQL 쿼리도 초기 1,000건만 조회해 누락이 생긴다(`T3`/`T4`). ⚠️ 다만 **이 저장소의 반복 결함**이라(PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) reviewer 가 `--limit 300` 창 절단을 차단으로 잡았다) 개별 PR 마다 힌트를 부기하면 **또 다른 다문서 drift** 가 된다 — 근본 처방은 그쪽에서 다뤘으므로 중복하지 않는다.
+
+**④ Claude 편향 셀프 체크 (메인)** — cross-validate 이견 `0` 을 근거로 쓰지 않았다. 본 배치에서 cross-validate 가 **좁은 참 명제로 넓은 거짓 결론을 받친 사례**(PR #1070 metachar)와 **처방이 코드를 깨뜨린 사례**(#1074 상수화 / #1077 역참조)가 있었다. 최대 발견(silent no-op)은 **메인이 격리 워크스페이스로 직접 재현**했고, 그 과정에서 **버전 의존이라는 추가 사실**이 나왔다 (아래 §pnpm 버전 종속).
 
 **호출 전 Claude 편향 셀프 체크** ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5 4종):
 
