@@ -21,7 +21,7 @@ grep -rniE 'type[-_ ]?check' .github/ ; echo "rc=$?"  # rc=1 — 0 hit
 grep -rnE '\btsc\b' .github/                          # 1 hit — ci-physics-wasm.yml:184 (주석)
 ```
 
-⚠️ **이슈 본문의 `grep -rn "typecheck\|tsc " .github/` 는 `fe922bb` 에서 재현되지 않는다** — 이슈는 _"주석 1건만 hit"_ 이라 적었으나 `typecheck` 문자열 자체는 **0 hit** 이고 남은 1건은 `tsc` 쪽이다. 결론(호출 스텝 `0`)은 같고 계수만 갈린다. `tsc ` 의 **후행 공백**이 줄 끝 `tsc` 를 놓치므로 위 형태(`\btsc\b`)로 대체한다.
+⚠️ **초판이 적은 _"이슈 술어 재현 불가"_ 는 실측으로 반증됐다** (PR [#1083](https://github.com/coseo12/astro-simulator/pull/1083) 리뷰) — 이슈 본문 술어 `grep -rn "typecheck\|tsc " .github/` 를 **원문 그대로** 돌리면 `fe922bb` · `c51d38a` · 워킹트리 **3경로 전건 `1` hit** 로, 이슈가 적은 _"주석 1건만 hit"_ 과 **완전히 일치**한다. 제시했던 기전(_"`tsc ` 의 후행 공백이 줄 끝 `tsc` 를 놓친다"_)도 **전제가 공집합**이다 — `git grep -nP 'tsc\s*$' -- .github/` → **`0` hit**. ⚠️ 게다가 대체안으로 적었던 `\btsc\b` 는 **`git grep -E` 에서 침묵 실패**한다 (`-E` → **`0`** / `-P` → `1` / `-F` → `1`) — `exhaustive-grep-protocol.md` §1 이 경고한 그 함정이라, **작동하는 술어를 침묵 실패 술어로 교체**할 뻔했다. **결손 결론(`.github/` 전체 `typecheck` 호출 스텝 `0`)은 불변**이고, 술어는 **이슈 원문을 그대로 쓴다**.
 
 `pnpm typecheck` 를 호출하는 지점은 CI 외에도 없다 — pre-commit hook (`.husky/pre-commit`) 은 인코딩 검사 · 중복 함수 가드 · `lint-staged` · md tilde 가드 `4` 스텝이고, `lint-staged` 설정은 `prettier --write` 뿐이다. `.husky/pre-push` 는 **존재하지 않는다**.
 
