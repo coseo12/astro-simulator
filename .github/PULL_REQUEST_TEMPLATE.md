@@ -37,11 +37,14 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 - [ ] `docs/retrospectives/<phase>-retrospective.md` 작성 (달성도/잘된것/어려웠던것/인수인계)
 
 ### Release PR 전용 (base=main, head=develop)
-일반 PR 이면 건너뛴다. 릴리스 워크플로 4단계 (ADR 20260419-release-merge-strategy):
+일반 PR 이면 건너뛴다. 릴리스 워크플로 4단계 (ADR 20260419-release-merge-strategy).
+
+> ⚠️ **`v` 는 태그 ref 의 네임스페이스 표지이지 버전 문자열의 일부가 아니다** (ADR 20260806-962 §9-3). **태그 자리에만** 붙인다 — **버전 값** 자리(CHANGELOG 헤딩 · `package.json` · `release/<X.Y.Z>-prep` 브랜치)에는 붙이지 않는다.
+
 - [ ] 포함된 PR 번호 범위: #xxx ~ #yyy
-- [ ] CHANGELOG `[vX.Y.Z]` entry 작성 (Added / Behavior Changes / Notes)
-- [ ] `package.json` version bump
-- [ ] 태그 계획: `vX.Y.Z` (SemVer 분류 근거 명시)
+- [ ] CHANGELOG `[X.Y.Z]` entry 작성 — **버전 값**, `v` 없음 (Added / Behavior Changes / Notes)
+- [ ] `package.json` version bump — **버전 값** `X.Y.Z`, `v` 없음
+- [ ] 태그 계획: `vX.Y.Z` — **태그**, `v` 있음 (SemVer 분류 근거 명시)
 - [ ] **1단계**: `gh pr merge <PR> --merge` (merge commit) 로 머지 — `--squash` 절대 사용 금지
 - [ ] **2단계**: `git push origin main:develop` (fast-forward push — force 아님. main 의 merge commit 이 develop 을 직계 조상으로 포함하므로 안전)
 - [ ] **3단계**: `git tag vX.Y.Z` + `git push origin vX.Y.Z`
@@ -51,7 +54,7 @@ PR 타입에 맞는 한 줄만 체크. `base=main` 은 release/hotfix PR 만 허
 
 ### Hotfix PR 전용 (base=main, head=hotfix/*)
 일반 PR 이면 건너뛴다.
-- [ ] 패치 버전 bump (vX.Y.Z+1)
+- [ ] 패치 버전 bump — **버전 값** `X.Y.Z+1`, `v` 없음 (태그는 `vX.Y.Z+1`)
 - [ ] **머지 직후 `main → develop` merge-back PR 생성 의무** (누락 시 develop drift 발생)
 - [ ] merge-back PR 링크:
 
