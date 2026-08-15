@@ -1,6 +1,6 @@
 # ADR: PR base 편집 우회 봉인 — 신규 비-required 컨텍스트로 분리, required 3개의 event 축 불변식 보존 (#1027)
 
-- **상태**: **Provisional** — cross-validate **미수행**. CLAUDE.md §ADR Status 워크플로의 "cross-validate 발동 ADR" 에 해당하므로 (ADR 신규 + [20260807-971](20260807-971-required-status-checks.md) 개정 동반), 결과를 §11 에 4축으로 통합한 뒤 **메인**이 `Accepted` 로 전이한다. architect 는 cross-validate 를 직접 호출하지 않는다 ([#479](https://github.com/coseo12/astro-simulator/issues/479)).
+- **상태**: **Accepted** (cross-validate agy 2026-08-15 — `Provisional` 에서 전이)
 - **날짜**: 2026-08-14
 - **결정자**: architect (실측 기반 설계). 저장소 보호 설정 변경 권한은 사용자
 - **관련**:
@@ -470,12 +470,12 @@ pr-template-checklist  n=2     ← 같은 SHA · 같은 PR. 차이는 `types` �
 
 1. **base 편집 escape 재발** → **후보 1 (required 편입) 재검토.** 971 §10-5 항 14 와 **같은 술어**다.
 
-   **escape 정의 (기계 판정, 머지 시점 앵커)** — 머지 PR 중 `BaseRefChangedEvent` 를 보유하고 (§2-3 술어), 그 **최종 `(base, head)`** 가 `verify-pr-base-rule.mjs` 로 `exit != 0` 인 것. 관측 창은 **90일 rolling, 하한은 본 항 신설일 `2026-08-15`** 이며, 실효 창 = `[max(2026-08-15T00:00:00Z, now-90d), now]` 다 (971 항 13 형식 승계 — _"본 ADR 머지일"_ 같은 **미확정 앵커를 쓰지 않는다**. 리뷰가 971 항 14 와의 이중 명세를 적발했고, 정본은 **본 절**이며 971 은 값을 복제하지 않는다). 하한을 두는 이유는 971 항 13 과 같다 — 소급 3건 (`#170` `#212` `#217`) 은 발화 입력이 아니라 **기준선**이고 (dual PR 시기, §2-4), 하한이 없으면 **신설 당일 자동 발화**한다.
+   **escape 정의 (기계 판정, 머지 시점 앵커)** — 머지 PR 중 `BaseRefChangedEvent` 를 보유하고 (§2-3 술어), 그 **최종 `(base, head)`** 가 `verify-pr-base-rule.mjs` 로 `exit != 0` 인 것. 관측 창은 **90일 rolling, 하한은 본 항 신설일 `2026-08-14`** 이며, 실효 창 = `[max(2026-08-14T00:00:00Z, now-90d), now]` 다 (971 항 13 형식 승계 — **하한은 본 ADR 헤더 날짜·971 개정일·§9-2 검증 단락과 동일한 `2026-08-14` 로 통일한다**(cross-validate 가 `08-15` 표기 불일치를 적발). _"본 ADR 머지일"_ 같은 **미확정 앵커를 쓰지 않는다**. 리뷰가 971 항 14 와의 이중 명세를 적발했고, 정본은 **본 절**이며 971 은 값을 복제하지 않는다). 하한을 두는 이유는 971 항 13 과 같다 — 소급 3건 (`#170` `#212` `#217`) 은 발화 입력이 아니라 **기준선**이고 (dual PR 시기, §2-4), 하한이 없으면 **신설 당일 자동 발화**한다.
 
    ```bash
    REPO=coseo12/astro-simulator
    # (1) 창 안의 머지 PR 중 base 편집 보유분 — §2-3 의 페이지네이션 결과를 재사용한다
-   jq -s -r --arg since "2026-08-15T00:00:00Z" \
+   jq -s -r --arg since "2026-08-14T00:00:00Z" \
      '[.[].data.repository.pullRequests.nodes[]]
       | .[] | select(.state=="MERGED")
       | select([.timelineItems.nodes[] | select(.createdAt > $since)] | length > 0)
@@ -550,20 +550,17 @@ CLAUDE.md §Forensic ADR 변형 의 5조건을 항목별로 판정한다 (3개 �
 
 ---
 
-## §11 교차검증 반영 사항 — **미수행**
+## §11 교차검증 반영 사항 — **수행 완료**
 
-본 ADR 은 `Provisional` 로 박제된다. cross-validate 는 **메인 오케스트레이터가 수행**하며 (architect 직접 호출 금지 — [#479](https://github.com/coseo12/astro-simulator/issues/479)), 결과를 CLAUDE.md §교차검증 의 4축 (합의 / 이견 수용 / Claude 재분석 기각 / 고유 발견) 으로 본 절에 통합한 뒤 `Accepted` 로 전이한다. 전이 시 [`docs/decisions/README.md`](README.md) 인덱스 표의 상태 열도 **같은 커밋**에서 갱신한다 ([20260812-1005](20260812-1005-adr-index-status-guard.md) 가 강제).
+메인 오케스트레이터 수행 (`code 1085` / anchor `ADR-new-or-amendment` / outcome **`applied`** — exit 0, 폴백 아님). 판정 **승인 권고 (Approve with Minor Polish)**. 5개 항목 중 4개 `양호`, 1개 **`주의`**.
 
-**호출 전 Claude 편향 셀프 체크** ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5 4종):
+**① 합의** — `contents: read` 최소 권한 + `::error::` 어노테이션만 써 **봇 토큰 권한 확장 차단** / `if:` 미부여의 `~12초` 오버헤드 실용 타당 / 승격 시 permanent `Pending` 함정 사전 박제 / auto-retarget · GraphQL 함정 방어 / **단일 SSoT(`verify-pr-base-rule.mjs`) 재사용으로 워크플로 내 판정 로직 중복 `0`** (Concrete Prediction: 새 규칙 추가 시 workflow diff `0`줄).
 
-| 축 | 통과 | 자기 진단 |
-| --- | --- | --- |
-| 낙관적 일정 | **통과** | 구현을 이번 범위에서 하지 않고 `stage:dev` 로 넘겼다. DoD 축 2 의 일회용 PR 실험을 "선택" 이 아니라 **필수**로 고정했다 |
-| 결합 간과 | **미통과 → 프롬프트 삽입 대상** | 본 ADR 의 핵심 주장이 정확히 "971 과의 결합" 이라 자기 검증이 순환이다. 특히 **§2-7 의 «판정 입력이 다르므로 `pr-template-checklist` 의 `3/59` 를 `branch-name` 에 전이하면 안 된다»** 가 후보 1 위험을 낮추는 방향의 논증인데, 그 논증을 만든 주체가 후보 1 을 유예하려는 주체와 같다. cross-validate 호출 시 **"§2-7 의 판정 입력 비대칭 논증이 후보 1 위험을 과소평가하는가"** 를 명시 질문으로 삽입할 것 |
-| 폐기 프레이밍 | **통과** | 후보 1 을 기각이 아니라 유예로 두고 §재도입 트리거를 4조건으로 명시했다. 후보 3·4 는 기각이나 각각 **대체 수단 존재** / **기술적 불가**라는 확정 근거를 댔다 |
-| 순수주의 | **미통과 → 프롬프트 삽입 대상** | 결정 3 (`if:` 미부여) 의 근거 중 하나가 _"fallback 분기 금지 원칙"_ 인데, 원칙 준수를 위해 **불필요한 CI 발화를 감수**하는 구조다. 실용 비용 (`~12초 × 10 occurrence / 40 PR`) 이 작다는 계산을 함께 댔으나, 원칙이 결론을 끌었을 가능성을 배제하지 못한다. cross-validate 에 **"결정 3 이 원칙 준수를 위해 실용 비용을 과소평가했는가"** 를 명시 질문으로 삽입할 것 |
+**② 이견 수용 — §9-2 하한 일자 불일치 (`주의` 축)**. 리뷰 라운드에서 메인이 `2026-08-15` 로 넣었으나 **같은 절의 검증 단락은 `2026-08-14T00:00:00Z`** 였고, ADR 헤더 날짜 · 971 개정일 · CHANGELOG 도 전부 `2026-08-14` 다. **문서 작성일 `2026-08-14` 로 통일**했다 (본문 · 실효 창 공식 · bash `--arg since` **3곳**). ⚠️ 이 불일치는 **BLOCK-1(이중 명세) 을 고치는 과정에서 메인이 새로 만든 것**이다 — 정정이 새 drift 를 낳는 형태이며 본 배치에서 반복 확인됐다.
 
----
+**③ Claude 재분석 — 질의 2건 모두 «타당» 확인.** Q1(§2-7 «판정 입력 비대칭» 이 후보 1 위험을 과소평가하는가) → **과소평가 아님**: `pr-template-checklist` 는 본문 텍스트로 결론이 뒤바뀌지만 `branch-name` 은 **`(base, head)` ref 쌍만 입력**이라 본문·제목 편집으로 결론이 안 바뀐다. 불일치 경로는 _"base 를 2회 이상 편집"_ 뿐인데 **640건 전수에서 `0`건**이다. Q2 → **오히려 실용적 리스크 제거**.
+
+**④ 고유 발견 — 구현 PR DoD 증적 형태 지정**. §7 DoD 2축 일회용 PR 시뮬레이션에서 **base 편집 시점 `N` 에 `branch-name` 의 run 수(`n=1`)가 증가하지 않고 `pr-base-edit` 만 새로 생성되는지 check-runs API 로 라이브 캡처**하라는 것. 기존 DoD 는 _"발화하는가"_ 만 요구했는데 이 제안은 **_"기존 required 축을 건드리지 않는가"_ 라는 음성 축**을 더한다 — 본 ADR §결정 1 의 핵심 주장(required 3개 `types:` 무변경)을 **직접 실증하는 증적**이라 채택한다. **구현 PR 로 인계**한다.
 
 ## §12 참고
 
