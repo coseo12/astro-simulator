@@ -41,6 +41,14 @@
  * 침식이 PASS 로 흘러가던 것이 오히려 silent fallback 이었고, 본 구현은 그것을 **제거**한다.
  * (`docs/lessons/guard-design-principles.md` — drift 가드는 fail-fast 만)
  *
+ * ── 계급 표면은 전부 `CHECKLIST_KEYWORDS` 파생이다 (#1040) ───────────────────
+ * 계급이 갖는 세 표면(구조 판정 `pattern` / 사람용 `label` / 수동 복구 `manualHint`)을
+ * `STRUCTURE_CLASSES` 한 곳에 모으고, FAIL 코멘트의 범위 표기(`1~5` / `6~7`)를 키워드
+ * 테이블에서 **계산**한다. 종전에는 그 범위가 문자열 리터럴이라 kw8 추가 시
+ * **사용자에게 발송되는 복구 지시가 조용히 stale** 됐다 (volt #120 처방 대상).
+ * 회귀는 `--self-test` §계급 매핑 파생 프로브가 잡는다 — 판별력은 positive 가 아니라
+ * **kw8 주입 negative** 에서 나온다 (현행 7 키워드에서는 하드코딩과 파생의 출력이 같다).
+ *
  * #471 (create-pr 스킬 사전 차단) 의 CI 측 backstop. 사용자가 수동
  * `gh pr create --body "..."` 로 prefill 우회 시 본 가드가 발화.
  * 단 **required status check 가 아니다** (ADR `20260807-971` 결정 9-1 이 명시 제외) —
@@ -51,7 +59,7 @@
  *     → PASS/WARN: exit 0 (WARN 은 ::warning:: 어노테이션 + step summary)
  *     → FAIL: exit 1, 누락 키워드 stderr + (CI 환경에서) PR 코멘트로 actionable 보고
  *   node scripts/verify-pr-template-checklist.mjs --self-test
- *     → 격리 픽스처 F1~F9 (가드 도입 PR DoD 축 1). 네트워크 비의존
+ *     → 격리 픽스처 F1~F9 + 계급 매핑 파생 프로브 4 (가드 도입 PR DoD 축 1·2). 네트워크 비의존
  *   node scripts/verify-pr-template-checklist.mjs --check-corpus <json>
  *     → `gh pr list --json number,body,author,...` 산출물 전수 재현 (1회성 증거, CI 미배선)
  *
@@ -83,6 +91,9 @@ const TEMPLATE_PATH = resolve(REPO_ROOT, '.github/PULL_REQUEST_TEMPLATE.md');
 //
 // `structureClass` — 구조 hit 판정 계급. 키워드 목록·phrase 문자열은 #1010 범위 밖(불변)이고
 // 본 필드만 신설됐다.
+//   ⚠️ **본 배열이 계급 표면 전체의 SSoT 다** (#1040). 항목을 추가·삭제하면 구조 판정 패턴,
+//   WARN 표 라벨, FAIL 코멘트의 수동 복구 지시문(범위 `1~5` / `6~7`)이 **전부 자동으로**
+//   따라온다. 어느 표면에도 id 범위를 문자열로 다시 적지 마라 — 그게 kw8 stale 의 원인이었다.
 const CHECKLIST_KEYWORDS = [
   { id: '1', name: '커밋 컨벤션', phrase: '커밋 컨벤션', structureClass: 'checkbox' },
   { id: '2', name: '불필요한 변경', phrase: '불필요', structureClass: 'checkbox' },
@@ -111,7 +122,52 @@ const CHECKBOX_PATTERN = /^\s*-\s*\[[ xX]\]/;
 //   `#{3}`   → PASS 385 / WARN 23 / FAIL 12     (봇 PR `#924`·`#925` 의 `## Test plan` 2셀 (술어: `--check-corpus` 60 PR 중 `#{3}` 패턴에서만 WARN 으로 갈리는 셀. **release PR 아님** — release 클래스 WARN 집합은 두 패턴에서 불변이고, 두 봇 PR 은 CI 에서 job 스킵이라 **실제 가시 차이 0**)이 WARN 으로 오분류)
 // 구조 축은 WARN 전용이라 느슨한 쪽이 오탐(거짓 WARN)을 줄이고, blocking 경계에는 어떤 영향도 없다.
 const HEADER_PATTERN = /^\s*#{1,6}\s/;
-const STRUCTURE_PATTERNS = { checkbox: CHECKBOX_PATTERN, header: HEADER_PATTERN };
+
+// 계급 정본 (#1040) — 한 계급이 갖는 **모든** 표면을 한 곳에 모은다.
+//   `pattern`    — 구조 hit 판정 (기계)
+//   `label`      — WARN 어노테이션 / step summary 표 (사람)
+//   `manualHint` — FAIL 코멘트의 수동 복구 지시문 (사람, **PR 코멘트로 발송되는 런타임 문자열**)
+//
+// ⚠️ 종전에는 이 셋이 세 곳에 흩어져 있었고 뒤 둘은 `CHECKLIST_KEYWORDS` **파생이 아니라
+//    하드코딩**이었다 — `structureLabel()` 은 `=== 'checkbox'` 삼항이라 신설 계급이 조용히
+//    `` `###` 헤더 `` 로 찍혔고, 수동 복구 지시문은 `1~5` / `6~7` 이라는 **범위를 문자열에
+//    박아** kw8 이 추가되면 조용히 stale 됐다. 사용자에게 발송되는 문자열이라 stale 은
+//    **틀린 복구 지시**가 된다. volt #120 _"drift 감지보다 중복 출처 제거"_ 처방으로
+//    `CHECKLIST_KEYWORDS` 파생으로 전환했다 (#1040 배경 3).
+//
+// 계급을 신설하면 여기 **3필드 동시** 추가가 강제된다 — 누락 시 모듈 로드 시점에 throw 한다
+// (아래 `assertStructureClassesCover`). 조용한 fallback 은 두지 않는다 (CLAUDE.md §가드 설계 원칙).
+const STRUCTURE_CLASSES = {
+  checkbox: {
+    pattern: CHECKBOX_PATTERN,
+    label: '체크박스',
+    manualHint: '체크박스 (`- [ ] <키워드>`, N/A 항목도 `[x] N/A — <사유>` 로 유지, #469)',
+  },
+  header: {
+    pattern: HEADER_PATTERN,
+    label: '`###` 헤더',
+    manualHint: '`### <키워드>` 섹션 헤더',
+  },
+};
+
+/** 계급 조회 — 미정의 계급은 조용히 흘리지 않고 즉시 throw (drift fail-fast). */
+function structureClassMeta(structureClass) {
+  const meta = STRUCTURE_CLASSES[structureClass];
+  if (!meta) {
+    // 조용히 0 을 반환하거나 기본 라벨로 흘리면 전 셀이 WARN 으로 흘러 원인이 은폐된다.
+    throw new Error(
+      `알 수 없는 structureClass: '${structureClass}' — STRUCTURE_CLASSES 에 ` +
+        `pattern / label / manualHint 3필드를 동시에 추가하라 (#1040).`,
+    );
+  }
+  return meta;
+}
+
+/** 모듈 로드 시점 정합 — 키워드 테이블의 전 계급이 정본에 존재해야 한다. */
+function assertStructureClassesCover(keywords) {
+  for (const kw of keywords) structureClassMeta(kw.structureClass);
+}
+assertStructureClassesCover(CHECKLIST_KEYWORDS);
 
 // 코드 펜스 — 펜스 **안**의 체크박스/헤더는 구조 hit 으로 세지 않는다.
 //   PR 본문·ADR 이 템플릿 조각을 ```text 블록으로 인용하는 관행이 있어 잠재 오탐 경로가
@@ -138,12 +194,7 @@ function fetchPRBody(prNumber) {
  * 않으므로 fail-loud 쪽이다.
  */
 function countStructureHits(body, phraseLower, structureClass) {
-  const pattern = STRUCTURE_PATTERNS[structureClass];
-  if (!pattern) {
-    // 키워드 테이블과 패턴 테이블의 drift. 조용히 0 을 반환하면 전 셀이 WARN 으로 흘러
-    // 원인이 은폐된다 — fail-fast.
-    throw new Error(`알 수 없는 structureClass: '${structureClass}' (STRUCTURE_PATTERNS drift)`);
-  }
+  const { pattern } = structureClassMeta(structureClass);
   let hits = 0;
   let inFence = false;
   for (const line of body.split('\n')) {
@@ -183,7 +234,56 @@ function analyzeBody(body) {
 }
 
 function structureLabel(keyword) {
-  return keyword.structureClass === 'checkbox' ? '체크박스' : '`###` 헤더';
+  return structureClassMeta(keyword.structureClass).label;
+}
+
+/**
+ * id 목록 → 사람이 읽는 범위 표기. 연속 구간은 압축한다 (`['1','2','3','4','5']` → `1~5`).
+ * 비연속이면 구간을 쉼표로 잇는다 (`['1','2','4']` → `1~2, 4`).
+ *
+ * ⚠️ 반환값은 **반드시 인라인 코드로 감싸서** 쓴다 — 한 문단에 `~` 가 2개 있으면 GFM 이
+ *    취소선으로 페어링한다 (`docs/ops/operational-friction.md` §7-1 / 가드 `verify-md-tilde.mjs`).
+ *    `manualRecoveryInstruction` 이 백틱을 붙이고, `--self-test` 가 그 사실을 단언한다.
+ */
+function formatIdRange(ids) {
+  const nums = ids.map((id) => {
+    const n = Number(id);
+    if (!Number.isInteger(n)) {
+      throw new Error(`범위 압축 불가 — 정수가 아닌 키워드 id: ${JSON.stringify(id)} (#1040)`);
+    }
+    return n;
+  });
+  nums.sort((a, b) => a - b);
+  const runs = [];
+  for (const n of nums) {
+    const last = runs[runs.length - 1];
+    if (last && n === last[1] + 1) last[1] = n;
+    else runs.push([n, n]);
+  }
+  return runs.map(([a, b]) => (a === b ? `${a}` : `${a}~${b}`)).join(', ');
+}
+
+/**
+ * FAIL 코멘트의 **수동 복구 지시문** — `CHECKLIST_KEYWORDS` 파생 (#1040 배경 3).
+ *
+ * 종전에는 _"키워드 `1~5` 는 체크박스 … 키워드 `6~7` 은 `### <키워드>` 섹션 헤더"_ 가
+ * 문자열 리터럴이었다. kw8 이 추가되면 이 문장만 조용히 stale 되고, 그 stale 은
+ * **PR 코멘트로 사용자에게 발송되는 틀린 복구 지시**가 된다.
+ *
+ * 계급 이름(`ADR 호환성` / `Test plan`)은 병기하지 않는다 — 같은 코멘트의 `### FAIL 키워드`
+ * 절이 이미 `[id] name` 을 전건 나열하므로 중복이고, 중복은 다시 drift 원이 된다.
+ */
+export function manualRecoveryInstruction(keywords = CHECKLIST_KEYWORDS) {
+  assertStructureClassesCover(keywords);
+  const groups = new Map();
+  for (const kw of keywords) {
+    if (!groups.has(kw.structureClass)) groups.set(kw.structureClass, []);
+    groups.get(kw.structureClass).push(kw.id);
+  }
+  const clauses = [...groups].map(
+    ([cls, ids]) => `키워드 \`${formatIdRange(ids)}\` 는 ${structureClassMeta(cls).manualHint}`,
+  );
+  return `2. **수동**: PR 본문에 누락 항목을 **템플릿 원래 형태로** 추가 — ${clauses.join(' / ')}`;
 }
 
 // =============================================================================
@@ -208,7 +308,8 @@ function postComment(prNumber, failed) {
     '1. **권장**: `create-pr` 스킬 사용 (#471) — PR 본문 7 체크박스 base 를 PR 템플릿에서 동적 읽기',
     // ⚠️ 본 문자열은 **PR 코멘트로 렌더링되는 마크다운**이다. 한 문단에 `~` 가 2개 있으면
     // GFM 이 strikethrough 로 페어링하므로 범위 표기는 반드시 인라인 코드로 감싼다.
-    '2. **수동**: PR 본문에 누락 항목을 **템플릿 원래 형태로** 추가 — 키워드 `1~5` 는 체크박스 (`- [ ] <키워드>`, N/A 항목도 `[x] N/A — <사유>` 로 유지, #469), 키워드 `6~7` (ADR 호환성 / Test plan) 은 `### <키워드>` 섹션 헤더',
+    // 범위·계급 매핑은 `CHECKLIST_KEYWORDS` 파생이다 (#1040 — 하드코딩 시 kw8 추가에 stale).
+    manualRecoveryInstruction(),
     '',
     '> 3계급 판정: `phrase 0` → FAIL(본 코멘트) / `phrase≥1 ∧ 구조 0` → WARN(어노테이션만, 머지 차단 없음) / 둘 다 ≥1 → PASS.',
     '> 본 가드는 required status check 가 **아닙니다** (ADR `20260807-971` 결정 9-1) — 빨간 X 는 머지 차단이 아니라 신호입니다.',
@@ -495,6 +596,61 @@ function runArgParseProbes() {
   });
 }
 
+/**
+ * 계급 매핑 파생 프로브 (#1040) — 가드 도입 PR DoD 축 2 (3중 시뮬레이션).
+ *
+ * 이 프로브가 없으면 *"파생으로 바꿨다"* 가 자기 신고로만 남는다. 하드코딩 회귀는 positive
+ * 만으로는 안 잡힌다 — 현행 7 키워드에서는 하드코딩 문자열과 파생 결과가 **같기 때문**이다.
+ * 판별력은 **negative (kw8 주입)** 에서만 나온다.
+ */
+function runDerivationProbes() {
+  const probes = [];
+  const base = CHECKLIST_KEYWORDS;
+
+  // (1) positive — 현행 테이블 파생이 실제 계급 구성과 일치한다.
+  const now = manualRecoveryInstruction(base);
+  probes.push({
+    ok: now.includes('`1~5`') && now.includes('`6~7`'),
+    detail: `positive: 현행 7 키워드 파생 → \`1~5\` (체크박스) / \`6~7\` (헤더) 포함 — 실제: ${now.includes('`1~5`') && now.includes('`6~7`') ? 'OK' : JSON.stringify(now)}`,
+  });
+
+  // (2) negative — kw8(header) 주입 시 범위가 자동으로 `6~8` 로 갱신되어야 한다.
+  //     하드코딩이면 `6~7` 로 남는다 = 이 프로브가 회귀를 잡는 지점.
+  const withKw8 = manualRecoveryInstruction([
+    ...base,
+    { id: '8', name: '가상 항목', phrase: '가상', structureClass: 'header' },
+  ]);
+  probes.push({
+    ok: withKw8.includes('`6~8`') && !withKw8.includes('`6~7`'),
+    detail: `negative: kw8(header) 주입 → \`6~8\` 로 갱신 (하드코딩이면 \`6~7\` 잔존) — 실제: ${withKw8.includes('`6~8`') && !withKw8.includes('`6~7`') ? 'OK' : JSON.stringify(withKw8)}`,
+  });
+
+  // (3) recovery / fail-fast — 미정의 계급은 조용히 흐르지 않고 throw.
+  let threw = false;
+  try {
+    manualRecoveryInstruction([
+      ...base,
+      { id: '9', name: '미정의 계급', phrase: '미정의', structureClass: 'footnote' },
+    ]);
+  } catch {
+    threw = true;
+  }
+  probes.push({
+    ok: threw,
+    detail: `recovery: 미정의 계급('footnote') 주입 → throw (조용한 라벨 fallback 없음) — 실제: ${threw ? 'throw' : '조용히 통과'}`,
+  });
+
+  // (4) 자기 규약 — 발송 문자열의 범위 표기는 인라인 코드 **안**에 있어야 한다.
+  //     (§7-1 / verify-md-tilde.mjs. 이 가드 자신이 GFM 취소선 손상을 만들면 안 된다.)
+  const outsideCode = now.replace(/`[^`]*`/g, '');
+  probes.push({
+    ok: !outsideCode.includes('~'),
+    detail: `자기 규약: 코드 스팬 밖 \`~\` 0개 (GFM 취소선 손상 방지) — 실제: ${outsideCode.includes('~') ? JSON.stringify(outsideCode) : '0개'}`,
+  });
+
+  return probes;
+}
+
 function runSelfTest() {
   console.log('self-test: verify-pr-template-checklist.mjs (격리 픽스처 F1~F9)\n');
   let pass = 0;
@@ -558,6 +714,19 @@ function runSelfTest() {
     console.log(`    [PASS] 반례 0건 (${fixtures.length} 픽스처 × 7 kw)`);
   } else {
     fail += counterexamples;
+  }
+
+  // 계급 매핑 파생 프로브 (#1040) — 3중 시뮬레이션 (positive → negative → recovery).
+  // 하드코딩으로 되돌리면 negative 가 즉시 FAIL 한다: kw8 을 주입해도 문자열이 안 움직인다.
+  console.log('\n  계급 매핑 파생 프로브 (#1040 — CHECKLIST_KEYWORDS 파생 여부):');
+  for (const p of runDerivationProbes()) {
+    if (p.ok) {
+      pass++;
+      console.log(`    [PASS] ${p.detail}`);
+    } else {
+      fail++;
+      console.error(`    [FAIL] ${p.detail}`);
+    }
   }
 
   console.log('\n  인자 파싱 프로브 (자식 프로세스):');
