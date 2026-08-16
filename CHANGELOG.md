@@ -147,7 +147,6 @@ Semantic Versioning을 따른다.
 - **좀비 카나리아가 잡는 대상이 또 한 번 바뀐다 (#1086).** 같은 입력에서 SessionStart hook(가드 C)과 qa 에이전트 카나리아가 **다르게 동작한다**. **새로 보고하지 않는 것**: `cargo build --release && pnpm test` 처럼 명령 분리자(`&&` `;` `|`)를 넘어 뒤쪽 `test` 에 닿던 형태(= cargo 축 **오귀속**), `next development` · `next dev-preview` 처럼 `next dev` 우경계가 없어 걸리던 형태. **새로 보고하는 것**: `sh -c 'pnpm  dev'` 처럼 한 argv 원소 안에 공백이 2개 이상 보존된 형태. **검출 의무 형태는 전건 유지**(`pnpm dev` · `pnpm run dev` · `pnpm --filter <pkg> dev` · `next dev` · `next-server` · `cargo test` 계열 · `cargo nextest run` · `cargo +nightly test`).
 - ⚠️ **확정 `[0.74.0]` §Behavior Changes 의 «검출 능력 손실 `0`» 은 전칭 단정이었고 #1086 이 코퍼스 한정으로 낮췄다** (2026-08-16 부기 — 확정 섹션은 _그 시점 사실_ 이므로 소급 편집하지 않는다). 반례는 `pnpm  dev`(공백 2개)로 구 `1` → #1066 `0`. 정확한 서술은 _"손실이 `0`"_ 이 아니라 _"코퍼스 밖 손실은 무해한 중복(하네스 래퍼 셸 자신)"_ 이며, 정정본은 [`docs/ops/zombie-process-guards.md`](docs/ops/zombie-process-guards.md) §10-1 에 있다.
 - **`.claude/agents/qa.md` 카나리아 명령 리터럴 갱신** — 패턴이 바뀌었으므로 qa 가 복사해 실행하는 명령도 바뀐다. hook ↔ `qa.md` ↔ `zombie-process-guards.md` §9·§10 **4곳 동시 갱신**이며 `scripts/verify-zombie-check.mjs` 항목 8·9 가 기계 검증한다 (`축자 사본 1/1` · `2/2`, exit `0`).
-  \=======
 
 ### Fixed
 

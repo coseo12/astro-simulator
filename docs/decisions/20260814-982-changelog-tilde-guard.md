@@ -642,7 +642,12 @@ ADR [`20260814-958`](20260814-958-prettier-live-docs-scope.md) §의도적 비-�
 # 아래 4개 rev 는 pnpm-lock.yaml 의 prettier 가 전부 3.9.6 이라 심볼릭 링크로 대신할 수 있다
 # (술어: `git show <rev>:pnpm-lock.yaml | grep -m1 'prettier@'` → 4/4 `prettier@3.9.6:`).
 for REV in 38b6c8a fe922bb 79ed14c 804dce6; do
-  git worktree add --detach ".tmp-md-tilde-$REV" "$REV" >/dev/null 2>&1
+  # ⚠️ 침묵 fallback 금지 — `>/dev/null 2>&1` 로 실패를 삼키면 **직전 회차의 stale worktree
+  #    가 그대로 재사용**되어 「헤더 rev 에 다른 트리 값」이 exit 0 으로 박제된다. 그것이
+  #    바로 이 Amendment 가 신설하는 오기록 클래스라, 재현 펜스가 그 결함을 생산하게 된다
+  #    (PR #1101 reviewer 실측 — stale 잔존 시 `38b6c8a … 240 … 49`, 진단 0).
+  #    CLAUDE.md §가드 설계 원칙 «fail-fast 만, fallback 분기 금지».
+  git worktree add --detach ".tmp-md-tilde-$REV" "$REV" || exit 1
   ln -s "$PWD/node_modules" ".tmp-md-tilde-$REV/node_modules"
   printf '%s ' "$REV"
   (cd ".tmp-md-tilde-$REV" && node scripts/verify-md-tilde.mjs --population |
