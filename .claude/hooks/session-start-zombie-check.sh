@@ -17,7 +17,7 @@ set -uo pipefail
 # ETIME 임계값 (분) — 본 세션 시작 이전 추정. 30분 = qa/dev 사이클 1회 이상 경과
 THRESHOLD_MINUTES=30
 
-# 검출 대상 패턴 (#1066 — 무경계 `.*` 제거)
+# 검출 대상 패턴 (#1066 무경계 `.*` 제거 → #1086 경계 자기적용 · 분리자 · 공백 보정)
 #
 #   구 패턴 `next dev|next-server|cargo .*test|pnpm.*dev` 는 `.*` 가 명령행 뒷부분까지
 #   이어져 `/dev/null` 의 `dev` 에 도달했다 → `pnpm` 을 포함한 임의 명령이 매칭
@@ -33,10 +33,23 @@ THRESHOLD_MINUTES=30
 #      동률이지만 ` development` / ` dev-preview` 를 흘린다 (구조 차이 — zombie-process-guards.md §10).
 #   ⚠️ 단일 인용부호 의무 — 패턴에 `$` 가 있어 확장 차단이 필요하다.
 #
-#   실측 (2026-08-14, `exec -a` 위장 프로세스 22건 = 실 형태 11 + 무관 11):
-#   거짓 양성 구 11 → 신 0, 거짓 음성 구 0 → 신 0 (검출 능력 손실 없이 오탐만 제거).
+#   #1086 보정 3건 (#1066 채택안의 잔여. 전부 코퍼스 실측 판정 — zombie-process-guards.md §10):
+#     (1) `next dev( |$)` — 바로 위 "경계는 양쪽 다" 원칙이 **`next dev` 분기에는 자기적용되지
+#         않았다**. 우경계가 없어 `next development` · `next dev-preview` 가 매칭됐다(실측 hit 1
+#         → 0). 좌경계는 붙이지 않는다 — 실 argv 가 `…/bin/next dev` 라 앞이 `/` 다.
+#     (2) `[^ &|;]` — 중간 토큰이 `&&` · `;` · `|` 를 넘어 `cargo build --release && pnpm test` 를
+#         **cargo 축으로 오귀속**했다. bare `test` 스크립트는 워크스페이스 4곳에 실재하므로
+#         (apps/web · packages/{core,physics-wasm,shared}) 가상 형태가 아니다.
+#     (3) `( +…)* +` — 구분자를 공백 **1개**로 못박아 `pnpm  dev`(공백 2개)를 놓쳤다(구 1 → 신 0).
+#         ⚠️ 중간 토큰만 `( +[^ ]+)*` 로 넓히면 **안 고쳐진다**(측정 0) — 마지막 구분자의 ` ` 를
+#         ` +` 로 바꾸는 것이 실제 교정이다. ps 는 argv 를 공백 1개로 잇지만 `sh -c '…'` 처럼
+#         한 argv 원소 안에 들어간 공백은 그대로 보존된다.
+#
+#   실측 (2026-08-16, `exec -a` 위장 프로세스 형태 29건 = 검출 의무 13 + 미검출 의무 16):
+#   거짓 양성 구 11 → 신 0, 거짓 음성 0 → 0. ⚠️ "검출 능력 손실 0" 은 **본 코퍼스 한정**이며
+#   전칭 주장이 아니다 — 하네스 래퍼 셸 자신(`eval '… pnpm dev' < /dev/null`)은 의도적 미검출이다.
 #   회귀 가드 = scripts/verify-zombie-check.mjs (같은 코퍼스를 hook PATTERN 으로 재판정)
-PATTERN='next dev|next-server|cargo( [^ ]+)* (nextest|test)( |$)|pnpm( [^ ]+)* dev( |$)'
+PATTERN='next dev( |$)|next-server|cargo( +[^ &|;]+)* +(nextest|test)( |$)|pnpm( +[^ &|;]+)* +dev( |$)'
 
 # ps 로 PID/ETIME/command 추출. ETIME 형식 (분 단위) 추출 후 임계값 비교
 ZOMBIES=$(ps -axww -o pid=,etime=,command= 2>/dev/null \
