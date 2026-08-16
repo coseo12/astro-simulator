@@ -418,7 +418,7 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
 | # | 항목 | 근거 |
 |---|---|---|
-| **1** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) | ⚠️ **base 편집 우회 봉인** — `types` 에 `edited` 추가 vs 별도 non-required job vs ruleset 비교. **ADR 20260807-971 결정 9-1 / Phase 1 면제 근거와 동시에 판단해야 한다** (required check 에 event *type* 축을 들이는 결정) | §8-1 한계 0 (실측 [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
+| **1** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027), **완료**) | ⚠️ **base 편집 우회 봉인** — `types` 에 `edited` 추가 vs 별도 non-required job vs ruleset 비교. **ADR 20260807-971 결정 9-1 / Phase 1 면제 근거와 동시에 판단해야 한다** (required check 에 event *type* 축을 들이는 결정) | §8-1 한계 0 (실측 [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
 | **2** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030), **완료**) | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
 | **3** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030), **완료**) | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
 
@@ -429,6 +429,12 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 > 트리거 축 표의 해당 행에 §1-2 포인터만 두었다.
 > ⚠️ 본 표의 항목 1 이 이슈 번호를 갖고 2·3 은 표에만 있던 상태가 **이 ADR 이 스스로 인용한 유실
 > 패턴**(#962 축 B → #970 재발견)과 같은 형태였다. #1030 이 그것을 이슈로 승격해 닫은 사례다.
+
+> **항목 1 종결 (2026-08-16)** — [#1027](https://github.com/coseo12/astro-simulator/issues/1027) 이
+> 세 안을 비교해 **«별도 non-required job»** 을 채택했다 (ADR [20260814-1027](20260814-1027-pr-base-edit-guard.md)).
+> `types` 추가안은 **기각이 아니라 유예**, ruleset 안은 **기술적으로 표현 불가능**으로 기각이다.
+> 산출물은 신규 workflow [`pr-base-edit-guard.yml`](../../.github/workflows/pr-base-edit-guard.yml)
+> (체크 이름 `pr-base-edit`) 이며, 위 §8-1 한계 0 의 개정 주석이 상태 갱신을 담는다.
 
 > cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행했다 (`developer` 페르소나 금지 — #479). 결과는 **§10** 에 4축으로 통합했고 상태는 `Accepted` 로 전이했다.
 
