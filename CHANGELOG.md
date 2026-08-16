@@ -86,6 +86,18 @@ Semantic Versioning을 따른다.
 
   ⚠️ **cross-validate 미수행 — `Provisional` 이다.** 메인이 수행 후 §교차검증 반영 사항 4축 통합 + `Accepted` 전이 + 인덱스 상태 열 동시 갱신([#1005](https://github.com/coseo12/astro-simulator/issues/1005) 가 강제). 리뷰 라운드 1 에서 **전칭 단정 1건 + 술어 비재현 1건**이 차단으로 잡혀 ADR §교차검증 반영 사항에 정정 이력 표로 박제했고, 호출 프롬프트에 _"실측이 덮지 못하는 범위까지 일반화한 문장이 있는가"_ 를 세 번째 명시 질문으로 추가했다.
 
+- **[#1078] `20260814-982` §Amendment 2 헤더의 `측정 rev` 게이트 조건 부기 + 수치 박제 규약에 오기록 10 (rev 결속 무효) 신설 (MINOR, ADR §Amendment 5 는 `_Provisional_`)** ([#1078](https://github.com/coseo12/astro-simulator/issues/1078)) — 헤더가 `측정 rev: 38b6c8a` 만 적었는데 **그 rev 를 체크아웃해 정본 호출을 돌리면 박제값이 안 나온다.** 값은 «그 트리 + **그 PR 자신의 `.prettierignore` 변경**» 의 산물이고, 측정 시점 그 변경은 **어느 커밋에도 없는 브랜치 워킹트리** 상태였다 — 헤더가 적은 것은 측정한 트리가 아니라 **base rev** 다.
+
+  **부기 형식이다 (소급 치환 `0`).** §Amendment 는 이력이므로 원문 `측정 rev` 줄은 그대로 두고 dated `>` 블록을 그 아래에 얹었다 ([`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) §결과 3). 재현 가능한 anchor 로 **PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 의 develop 머지 커밋 `fe922bb`** 를 사후 부기했다 — 트리와 게이트가 한 커밋에 함께 들어 있다.
+
+  **박제한 술어를 그대로 추출해 실행한 재현 로그**를 ADR 본문 **§재현 — 박제 술어를 그대로 추출해 실행 (#1078)** 에 4 rev 표로 실었다. **수치 재기재 `0`** — 본 entry 는 그 표를 참조만 하며 값을 옮겨 적지 않는다 (규약 (ii) 자기 적용). 결정적 관찰만 옮기면, 앞 두 rev 는 **추적 `*.md` 집합이 동일한데 계수만 갈린다** — 차이가 트리가 아니라 **게이트**에서 온다는 기계 증거다. 네 행 모두 **고정 SHA** 로 적었고 `origin/develop` 같은 이동하는 ref 이름은 쓰지 않았다 (본 부기 작업 중에도 develop 이 실제로 이동했다).
+
+  **대조군이 축을 확정했다.** 같은 PR 이 만든 형제 Amendment([`20260814-958`](docs/decisions/20260814-958-prettier-live-docs-scope.md) §Amendment 2)는 **같은 헤더 문구**인데도 `38b6c8a` 에서 그대로 재현된다 — 그쪽 술어가 `git ls-files` 라 **rev 로 닫히기** 때문이다. 즉 가르는 것은 헤더 형식이 아니라 **술어가 워킹트리의 다른 입력 파일을 읽는가**다.
+
+  **일반화는 채택하되 발의 문구를 정정했다.** 이슈 원안 _"입력 **설정 파일**에 의존하는 술어는 **그 파일의 rev·상태**를 함께 적는다"_ 는 ① 클래스보다 좁고(설정 파일에 한정되지 않는다) ② _"그 파일의 rev"_ 가 **발의 사건에서 정의되지 않는다**(그 변경은 미커밋이라 rev 가 없었다). 채택 형태는 파일 단위가 아니라 트리 단위 — _"박제하는 rev 는 **측정한 트리**의 커밋이어야 한다"_. 거처는 (iv) 가 아니라 **(ii) `> 확장 (#1078)`** 이다: (iv) 와 그 `> 확장 (#1064)`(_"박제 직전 술어 1회 실행"_)은 본건에서 **전건 충족돼 있었고**, 실행이 저자 자신의 트리에서 이뤄지므로 원리적으로 검출되지 않는다. 틀린 축은 술어의 존재·유효성이 아니라 **값과 rev 의 결속**이다.
+
+  **가드 신설 `0`** — _"박제 rev 를 체크아웃해 재실행하는 가드"_ 는 [`20260814-1031-1064`](docs/decisions/20260814-1031-1064-committed-claim-guard-rejected.md) 가 실측으로 이미 기각했다. 본 변경은 그 판정을 재론하지 않고 재실행의 **위치 조건** 하나만 더한다.
+
 ### Changed
 
 - **[#1086] 좀비 카나리아 — 가드 사본 대조 사각 봉인 + 패턴 경계 자기적용 (MINOR)** ([#1086](https://github.com/coseo12/astro-simulator/issues/1086)) — [#1066](https://github.com/coseo12/astro-simulator/issues/1066)(PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080))이 _"산문 선언 → 기계 검증"_ 취지로 넣은 **항목 9** 가 같은 문서 안의 다른 사본을 못 봤다. 항목 9 는 `grep -E '<PATTERN>'` **형태 하나만** 찾았고 `docs/ops/zombie-process-guards.md` §10 의 **bare 코드펜스**는 대조 밖이었다 — reviewer 실증: 그 펜스만 구 패턴으로 되돌려도 `9/9 PASS`. 본 PR 에서 **#1086 이전 가드를 그대로 꺼내 같은 변조에 물려 재현**했다 (시나리오 `S1-prev` → `PASS`, 즉 사각 확인).
@@ -122,6 +134,7 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **수치 박제 시 «측정한 트리»의 커밋을 적는다 (#1078, ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) (ii) `> 확장 (#1078)` — `_Provisional_`).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 rev 를 **동반**하기만 하면 규약을 충족했고, 이제 술어가 워킹트리의 다른 입력 파일(`.prettierignore` · 린터/컴파일러 설정 등)을 읽는 경우 **그 rev 만 체크아웃한 트리에서 값이 나오는지**까지 확인한다. 측정을 유발한 변경이 그 입력 자체를 바꾸는 PR 이면 헤더에 조합을 적고 **머지 후 재현 rev 를 사후 부기**한다. 입력이 전부 git 객체인 술어(`git ls-files` / `git grep <pat> <rev>`)는 **종전과 동일** — 추가 절차가 없다.
 - **`packages/{shared,core}` 테스트 파일의 타입 오류가 CI 를 통과하지 못한다 (#1060).** 같은 입력(두 패키지의 `*.test.ts` 또는 `__test-utils__/**` 에 타입 오류가 든 PR)에서 CI 가 **다르게 동작한다** — 이전에는 `verify-and-rust` 가 초록이었고(빌드는 해당 파일을 `exclude`, vitest 는 타입 미검사), 이제 `packages 타입 검사 (테스트 파일 포함, #1060)` 스텝이 exit `2` 로 job 을 실패시킨다. 소스 파일의 타입 검사 범위는 **불변**이다.
 - **강제력 등급은 "체크런 붉은 X + 메인의 CI 확인" 이다** (ADR 결정 4). 본 스텝은 required status check 가 아니며 `develop` 은 branch protection 미채택이라, `pnpm -r test` 를 포함해 이 저장소 CI 가드 대부분과 **같은 등급**이다. required 승격은 ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 결정 1 (Phase 2·3) 관할이며 본 변경은 그 일정에 개입하지 않는다.
 - **pnpm 기반 CI 가드 배선의 일반 규약이 생겼다** (ADR 결정 3). 다중 `--filter` 단일 호출은 **가드 배선에 쓰지 않는다** — 본 스텝에 한정되지 않으며, 앞으로 pnpm 스크립트를 CI 가드로 거는 모든 작업에 적용된다. 근거와 실측은 위 표 · 워크플로 인라인 주석 · ADR §후보 비교 2 세 곳에 있고 판정 정본은 ADR 이다.
@@ -134,7 +147,6 @@ Semantic Versioning을 따른다.
 - **좀비 카나리아가 잡는 대상이 또 한 번 바뀐다 (#1086).** 같은 입력에서 SessionStart hook(가드 C)과 qa 에이전트 카나리아가 **다르게 동작한다**. **새로 보고하지 않는 것**: `cargo build --release && pnpm test` 처럼 명령 분리자(`&&` `;` `|`)를 넘어 뒤쪽 `test` 에 닿던 형태(= cargo 축 **오귀속**), `next development` · `next dev-preview` 처럼 `next dev` 우경계가 없어 걸리던 형태. **새로 보고하는 것**: `sh -c 'pnpm  dev'` 처럼 한 argv 원소 안에 공백이 2개 이상 보존된 형태. **검출 의무 형태는 전건 유지**(`pnpm dev` · `pnpm run dev` · `pnpm --filter <pkg> dev` · `next dev` · `next-server` · `cargo test` 계열 · `cargo nextest run` · `cargo +nightly test`).
 - ⚠️ **확정 `[0.74.0]` §Behavior Changes 의 «검출 능력 손실 `0`» 은 전칭 단정이었고 #1086 이 코퍼스 한정으로 낮췄다** (2026-08-16 부기 — 확정 섹션은 _그 시점 사실_ 이므로 소급 편집하지 않는다). 반례는 `pnpm  dev`(공백 2개)로 구 `1` → #1066 `0`. 정확한 서술은 _"손실이 `0`"_ 이 아니라 _"코퍼스 밖 손실은 무해한 중복(하네스 래퍼 셸 자신)"_ 이며, 정정본은 [`docs/ops/zombie-process-guards.md`](docs/ops/zombie-process-guards.md) §10-1 에 있다.
 - **`.claude/agents/qa.md` 카나리아 명령 리터럴 갱신** — 패턴이 바뀌었으므로 qa 가 복사해 실행하는 명령도 바뀐다. hook ↔ `qa.md` ↔ `zombie-process-guards.md` §9·§10 **4곳 동시 갱신**이며 `scripts/verify-zombie-check.mjs` 항목 8·9 가 기계 검증한다 (`축자 사본 1/1` · `2/2`, exit `0`).
-  \=======
 
 ### Fixed
 
