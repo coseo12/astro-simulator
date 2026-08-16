@@ -3,10 +3,12 @@ name: shader-pixel-guard
 # 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
 # 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 6종 CI 상시 가드.
 #
-# 목적: 셰이더 feature 5개 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
-#   #782 자전 / #783 지구 디테일) 의 픽셀 회귀 (uniform 배선 절단·분기 오염·광원 붕괴·
-#   자전 정지·극관/biome 소실) 를 PR 단계에서 차단. r1-guard 는 UI 영역 diff 만 담당하고
-#   canvas 픽셀은 baseline 대상이 아니므로 (#756 ADR §A2 결정 7) 본 가드가 canvas 성질을 지킨다.
+# 목적: 셰이더 feature 7개 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
+#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크) 의 픽셀 회귀 (uniform 배선 절단·
+#   분기 오염·광원 붕괴·자전 정지·극관/biome 소실·대륙 마스크 미적용) 를 PR 단계에서 차단.
+#   r1-guard 는 UI 영역 diff 만 담당하고 canvas 픽셀은 baseline 대상이 아니므로
+#   (#756 ADR §A2 결정 7) 본 가드가 canvas 성질을 지킨다.
+#   ⚠️ 지대 계수는 종전 "5개" 였으나 열거는 6개였다 (선재 off-by-one). #1119 추가와 함께 7 로 정정.
 #
 # 판정 규약 (ADR 결정 3): per-body 상대 성질 (ON vs OFF) 만 — 절대 임계 금지
 #   (swiftshader ↔ 하드웨어 값 편차). 756 마진은 D1 CI 실측으로 확정 (스크립트 주석 참조).
@@ -78,8 +80,8 @@ jobs:
         with:
           start-dev-server: 'true'
 
-      # ── verify 6종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
-      # 호출 규약: HEADFUL=0 (756/773/774/782/783) / --headless (762) — CI 에 chrome channel 이
+      # ── verify 7종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
+      # 호출 규약: HEADFUL=0 (756/773/774/782/783/1119) / --headless (762) — CI 에 chrome channel 이
       #   없으므로 폴백이 아닌 명시적 headless 로 결정적 실행. BASE_URL 주입 (dev server 3001).
       # trap: 스크립트 비정상 종료 (playwright timeout/crash) 시 잔존 chromium 정리 —
       #   스크립트 간 실패 격리 (ADR cross-validate 부분 수용 4). 정상 종료 시 no-op.
@@ -124,6 +126,37 @@ jobs:
           HEADFUL=0 BASE_URL=http://localhost:3001 \
             CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/783-earth" \
             pnpm --filter @astro-simulator/web run verify:783-earth-detail
+
+      # #1119 — 대륙 마스크. ADR `20260628-756` §A4.3 결정 7 이 계약한 *"조용히 예전 지구로
+      # 돌아가 있는 상태가 CI 를 통과할 수 없다"* 의 **강제 지점**이다. 이 step 이 없으면 그
+      # 문장은 거짓이 된다 — 보완 가드로 기대되던 `browser-verify-lod.mjs` 는 지구 disk 가
+      # 프레임의 `3.295%` 뿐이라 임계 `15%` 를 **구조적으로 넘길 수 없어** 눈이 멀어 있다.
+      # MODE 별로 step 을 나눈다 (783 선례 그대로 1 step = 1 명령) — 루프로 묶으면 어느 축이
+      # 깨졌는지 step 이름으로 안 드러나고 셸 옵션에 fail-fast 를 의존하게 된다.
+      - name: verify:1119-earth-mask MODE=dod (대륙 형상 IoU ≥ 0.80 + negative 주입)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1119-earth-mask-dod" \
+            pnpm --filter @astro-simulator/web run verify:1119-earth-mask
+
+      - name: verify:1119-earth-mask MODE=lod (원거리 축소 uMaskEnabled 0 전환)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          MODE=lod HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1119-earth-mask-lod" \
+            pnpm --filter @astro-simulator/web run verify:1119-earth-mask
+
+      # seam 은 페이지 로드 8회 (JD 2종 × 카메라 4방위) 라 본 워크플로에서 가장 비싼 step 이다.
+      # 그럼에도 상시 배선하는 이유: `u = 0/1` 자오선은 Phase 0 이 미측정으로 남긴 유일한 좌표
+      # 축이고, 낮면 반구가 JD 로만 정해져 **다른 어떤 step 도 그 대역을 덮지 않는다**.
+      # 실측 소요가 job timeout(40분) 을 압박하면 ADR Amendment 로 주기 실행 전환 (silent 완화 금지).
+      - name: verify:1119-earth-mask MODE=seam (자오선 u=0/1 경계 — JD 2종 × 카메라 4방위)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          MODE=seam HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1119-earth-mask-seam" \
+            pnpm --filter @astro-simulator/web run verify:1119-earth-mask
 
       - name: dev server 정리
         if: always()

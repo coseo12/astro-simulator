@@ -37,12 +37,14 @@ const SURFACE_MASK_PLACEHOLDER_KEY = '__surfaceMaskPlaceholder';
  */
 const PLACEHOLDER_FILL_STYLE = '#000000';
 
-/** 마스크 텍스처 핸들 — 로드 완료 통지 + 인스턴스 접근. */
+/**
+ * 마스크 텍스처 핸들 — **로드 완료 통지 1개만** 노출한다.
+ *
+ * 초판은 `getTexture()` / `hasFailed()` 도 함께 내보냈으나 **호출처가 `0`건**이었다 (reviewer 지적
+ * 수용, 2026-08-17). 미사용 public 표면은 계약처럼 보이면서 아무도 지키지 않는 층이라 제거했다 —
+ * 상태가 필요해지는 시점에 `entry` 의 `ready`/`failed` 를 그때 노출하면 된다 (YAGNI).
+ */
 export interface SurfaceMaskHandle {
-  /** 로드 완료 시 `Texture`, 미도착·실패 시 `null`. */
-  getTexture(): Texture | null;
-  /** 로드 실패가 확정됐는지 (once-guard warn 이 이미 발화). */
-  hasFailed(): boolean;
   /** 로드 완료 콜백 등록. 이미 완료됐으면 **동기 즉시** 호출한다. */
   onReady(callback: (texture: Texture) => void): void;
 }
@@ -119,8 +121,6 @@ export function getOrCreateSurfaceMaskTexture(scene: Scene, url: string): Surfac
     ready: false,
     failed: false,
     waiters: [],
-    getTexture: () => (entry.ready ? entry.texture : null),
-    hasFailed: () => entry.failed,
     onReady: (callback) => {
       if (entry.ready) {
         callback(entry.texture);
