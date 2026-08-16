@@ -105,7 +105,7 @@ PR #936 은 설계안 §4(e) 순수 이동 실증을 **이미 수행**했다 —
 
 > 스캐폴딩(헤더 docblock + import)이 편차를 만드는 것은 **1→N 분할의 필연**이지 순수성 위반이 아니다. 이 대체가 그 둘을 분리한다.
 
-### 결정 3 — Phase 1 **종결**. Phase 2 재평가는 **실물 이슈**로 분리
+### 결정 3 — Phase 1 **종결**. Phase 2 재평가는 **실물 이슈**로 분리 → [#1113](https://github.com/coseo12/astro-simulator/issues/1113)
 
 설계안 §7 은 *"Phase 2 는 Phase 1 완주 후 재평가"* 라 했다. 그 재평가를 **표에만 남기지 않는다** — 이 저장소는 「표에만 남은 후속은 유실된다」를 [#962](https://github.com/coseo12/astro-simulator/issues/962)→[#970](https://github.com/coseo12/astro-simulator/issues/970) / [#1014](https://github.com/coseo12/astro-simulator/issues/1014)→[#1035](https://github.com/coseo12/astro-simulator/issues/1035) 로 **두 번** 겪었고, [`20260816-1073`](20260816-1073-clause13-observation-wiring.md) 이 세 번째 고리를 끊었다.
 
@@ -117,6 +117,15 @@ PR #936 은 설계안 §4(e) 순수 이동 실증을 **이미 수행**했다 —
 - 이슈의 마지막 코멘트가 설계 제안이라 **「승인 대기」가 최신 상태로 보였다**
 
 ⇒ **계약 발행 전 머지 이력 조회를 의무화**한다. 술어는 §1 의 3줄이며, 비용은 `O(1)` 이다.
+
+> ⚠️ **제목 검색은 전수가 아니다** (cross-validate 고유 발견). PR 제목에 이슈 번호가 빠졌거나 오타가 나면 놓친다 — 본 저장소는 PR 제목 규약(`[#이슈번호] 설명`)이 있어 실효하나 **전칭은 아니다**. `0` hit 이 나오면 **「없다」로 단정하기 전에** 축이 다른 보조 술어를 돌린다:
+>
+> ```bash
+> gh pr list --search '<번호> in:body' --state merged --json number,title    # 본문 문자열 축
+> gh issue view <번호> --json timelineItems                                   # GitHub 링크 그래프 축
+> ```
+>
+> 세 술어가 **서로 다른 축**을 본다 (제목 문자열 / 본문 문자열 / 링크 그래프). 하나라도 hit 이면 「이미 구현됨」 가설을 세운다. 본 사고 3건은 **제목 축만으로 전부 잡혔으나**, 그것이 다음에도 참이라는 보장은 없다.
 
 ⚠️ **이 사고는 같은 세션에서 3회 반복됐다** — #850 (이미 v0.57.0 포함) / [#884](https://github.com/coseo12/astro-simulator/issues/884) 범위 1 (#915 가 6일 뒤 선행 제거) / [#851](https://github.com/coseo12/astro-simulator/issues/851) (PR #921·#922 로 초과 달성). **셋 다 「본문이 아니라 나중 코멘트·다른 PR 이 잔여 범위의 SSoT」** 였다. 단발 실수가 아니라 **구조**다.
 
@@ -155,5 +164,6 @@ PR #936 은 설계안 §4(e) 순수 이동 실증을 **이미 수행**했다 —
 
 - 구현 PR: [#936](https://github.com/coseo12/astro-simulator/pull/936) (`824e9fa`) — §4(e) 순수 이동 실증 `434/434` 포함
 - 계약 원문 + 정정: 이슈 [#850 코멘트](https://github.com/coseo12/astro-simulator/issues/850#issuecomment-5306834072) (계약) / [정정](https://github.com/coseo12/astro-simulator/issues/850#issuecomment-5306862269)
+- Phase 2 재평가 후속: [#1113](https://github.com/coseo12/astro-simulator/issues/1113)
 - 동종 사고 2건: [#884](https://github.com/coseo12/astro-simulator/issues/884#issuecomment-5306898640) · [#851](https://github.com/coseo12/astro-simulator/issues/851#issuecomment-5307080163)
 - 수치 박제 규약: [`20260808-983`](20260808-983-measurement-recording-convention.md)

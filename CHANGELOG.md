@@ -147,7 +147,7 @@ Semantic Versioning을 따른다.
 
   ⚠️ **구조 원인 — 같은 세션에서 3회 반복됐다.** 설계안이 `.context/**`(gitignored)에 있어 **머지 이력과 대조되는 경로가 없었고**, 이슈의 마지막 코멘트가 설계 제안이라 「승인 대기」가 최신 상태로 보였다. 동형 사고 2건이 같은 날 더 나왔다 — [#884](https://github.com/coseo12/astro-simulator/issues/884) 범위 1(#915 가 6일 뒤 선행 제거) · [#851](https://github.com/coseo12/astro-simulator/issues/851)(PR #921·#922 로 초과 달성). **셋 다 「본문이 아니라 나중 코멘트·다른 PR 이 잔여 범위의 SSoT」** 였다. ⇒ **계약 발행 전 머지 이력 조회를 의무화**했다 (`gh pr list --search '<번호> in:title' --state merged` + `git tag --contains` — 비용 `O(1)`).
 
-  **Phase 2 재평가는 실물 이슈로 분리**했다. 이 저장소는 「표에만 남은 후속은 유실된다」를 #962→#970 / #1014→#1035 로 **두 번** 겪었다.
+  **Phase 2 재평가는 실물 이슈 [#1113](https://github.com/coseo12/astro-simulator/issues/1113) 로 분리**했다 (cross-validate 고유 발견 — ADR·이슈 종결 코멘트에 **번호 상호 링크**를 걸어 유실 방지 고리를 닫았다). 이 저장소는 「표에만 남은 후속은 유실된다」를 #962→#970 / #1014→#1035 로 **두 번** 겪었다.
 
 ### Changed
 
