@@ -5,7 +5,48 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1119] 지구가 실제 대륙 윤곽으로 렌더된다 (MINOR)** — `?focus=earth` 에서 아프리카·아메리카·유라시아가 **알아볼 수 있는 형상**으로 보인다. 그 위에 Amendment 3 의 biome 3밴드 + 극관 + #773 광원 + #782 자전이 **전부 그대로** 얹힌다. `?surface=off` 는 100% 복귀하고, 마스크 로드 실패·원거리 축소 시에는 Amendment 3 시점 절차 경로로 **조용히 degrade** 한다 (제품은 degrade / 검증은 fail-fast). 저장소에 **런타임 텍스처 에셋이 1장 생긴다** — `apps/web/public/textures/earth-land-mask.png` (`27,295` B, public domain). mars / jupiter / moon / 단색 22 / sun 은 **무변경**이다.
+
 ### Added
+
+- **[#1119] 지구 대륙 윤곽 실제화 구현 — Natural Earth 육지 마스크 1장 (MINOR)** ([#1119](https://github.com/coseo12/astro-simulator/issues/1119)) — ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 4** (`Accepted`) 의 §결정 1~8 이행. 설계는 재개봉하지 않았다.
+
+  **에셋 생성기가 ADR 헤드라인 바이트를 독립 재현했다.** `scripts/generate-earth-land-mask.mjs` 는 `pngjs` + `node:zlib` 만 쓰고 (**신규 의존 `0`** — `sharp` 는 §결정 2 가 기각한 전이 의존이다) ZIP 리더 · SHP Polygon 파서 · scanline even-odd 래스터라이저 · 8×8 면적평균을 자체 구현한다. ADR 이 박제한 수치를 **다시 유도한 결과가 전건 일치**했다 — 원천 zip SHA256 `0b8e670c…162` / 8192×4096 이진 래스터 육지 서브픽셀 비율 **`33.054%`** / 마스크 면적(cos φ)가중 육지 **`28.75%`** / 고유 계조 **정확히 `65`개** / 산출 **`27,295` B**. `colorType:0` · `bitDepth:8` · `filterType:0` · `deflateStrategy:3` · `deflateLevel:9` 5개를 상수로 박제했고 스크립트가 산출 직후 **IHDR 바이트 + round-trip 재디코드**(불일치 `0`)로 자기 검증한다. ⚠️ 재현 중 **round-trip 검증이 실제로 결함을 잡았다** — `pngjs` 는 `inputHasAlpha: false` 일 때 RGBA 입력 stride 를 `4 → 3` 으로 줄여 읽어 픽셀 `417,229`개가 어긋났고, 자기 검증이 없었으면 **그 파일이 그대로 커밋**됐을 것이다.
+
+  **좌표 계약도 독립 재현했다** — A-집합 14점을 **채택 샘플링 `BILINEAR`** 로 재면 `14/14` PASS (`NEAREST` 는 Sydney `60/255` FAIL 로 `13/14`), Tokyo `213.9` · Sydney `143.2` 까지 ADR 값과 일치한다. 판별력 한정도 재현됐다 — 위도 반전 오규약 잔존 **`6/14`**, 경도 180° 시프트 잔존 **`9/14`**. 이 골든 벡터를 `apps/web/src/core/earth-land-mask.test.ts` 가 **약함 자체를 어서션**으로 박아 뒀다 (강한 증거는 IoU 축이라는 서열을 테스트가 문서화한다). 해당 테스트는 `node:zlib` 로 PNG 를 **직접 디코드**해 스캔라인 필터 바이트가 실제로 전부 `0` 인지까지 확인한다 — 라이브러리를 쓰면 이 축이 디코더 뒤로 숨는다.
+
+  **셰이더는 `landMask` 한 줄의 소스만 바꿨다** (§결정 5). `continents` fbm 은 폐기하지 않고 **역할 전환** — 마스크가 저주파 **형상**, fbm 이 고주파 **디테일**(도메인 워프) + `latJ` biome jitter 를 맡는다. **`fbm(` 호출 수 불변** (소스 전체 `5`회, 단위 테스트 가드). 마스크 샘플은 §결정 7 대로 **분기 밖 무조건 1회**이고 `landMask = mix(proceduralMask, maskLand, uMaskEnabled)` 로 섞으므로 `uMaskEnabled = 0` 이 Amendment 3 식과 **부동소수 수준으로 동일**하다 (JS 미러 64점 전건 `toEqual` 로 기계 확인). ⚠️ **`continents` 는 rocky 분기 안에서만 계산**한다 — 마스크 샘플 위로 끌어올리되 fbm 자체는 분기에 남겨야 mars / jupiter / moon 의 fragment 비용이 불변이다. 데이터 필드가 아니라 코드 상수 `SURFACE_MASK_BY_BODY` 를 쓰므로 `solar-system.json` **변경 `0`**.
+
+  **DoD 전건 실측 (§A4.5)** — 측정 조합은 `Chromium 151.0.7922.x` · Babylon `9.19.0` · Apple M1 Pro(metal-3) / SwiftShader Vulkan, `1280×720 dsf1`, 측정 트리 rev `f0b3f9a` + 본 변경. **전칭으로 읽지 말 것.**
+
+  | DoD                               | 결과                                                                                                                            |
+  | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+  | 1 대륙 형상 IoU ≥ `0.80`          | **PASS** — WebGPU 실 Chrome GUI **`0.9365`** / WebGL2 swiftshader **`0.9360`**. 대조군: 절차 경로 `0.3118` · `?surface=off` `0` |
+  | 2 negative (마스크 `0` 고착 주입) | **PASS** — IoU `0.3118 < 0.80` 으로 DoD 1 이 실제로 FAIL                                                                        |
+  | 3 자전·tilt 정합                  | **PASS** — `verify:782-rotation` 9 body ALL PASS (earth tilt `23.44°`, ring wobble `Δ0°`)                                       |
+  | 4 #783 무회귀                     | **PASS** — 극관 N `71.3%` / S `57.2%` (≥50), 적도 G-share `0.5198` > 중위도 `0.4038`, magenta `0`                               |
+  | 5 #773 광원 무회귀                | **PASS** — 4 body 전건 day/night ×2 초과 + contrast ON>OFF + purple `0%`                                                        |
+  | 6 분기 격리                       | **PASS** — 동일 머신 before/after diff: jupiter `0` · moon `0` · mars `502/921600` (`0.0545%`)                                  |
+  | 7 LOD baseline                    | **PASS** — 9/9, max `5.25% < 15%`. **재캡처 `0`건** (허용됐으나 불필요했다)                                                     |
+  | 8 fps 회귀                        | **PASS** — desktop `66 / 68.5 / 67.4` · mobile `119.9 / 120.1 / 120.2` FPS, 회귀 없음                                           |
+  | 9 번들 절대 임계                  | ①`27,295 ≤ 28,660` ✅ ②`10,945,002 ≤ 10,970,000` ✅ ④IHDR `colorType 0` ✅ / **③ JS 증가 `+11,300` B ≠ `0` ❌**                 |
+  | 10 에셋 무결성                    | **PASS** — 신규 22 케이스 포함 web `551` / core `845` 전건 통과                                                                 |
+  | 11 데이터 `0`                     | **PASS** — `git diff --stat` 에 `solar-system.json` 부재                                                                        |
+  | 12 typecheck + 기존 테스트        | **PASS** — 전 워크스페이스 `tsc --noEmit` 통과, lint error `0`                                                                  |
+  | 13 실 Chrome GUI                  | dev 단계에서 headful(`channel: chrome`) 1회 수행. **정식 판정은 qa 소관**                                                       |
+  | 14 원거리 축소 LOD                | **PASS** — focus `R=98.32px` 고착 주입 diff `32,527px` (양성 대조군) / 조감 `R=5.619px` diff `0`                                |
+
+  🔴 **DoD 9 ③ 미달을 숨기지 않는다.** 술어는 _"JS 총계 증가 정확히 `0` B"_ 인데 실측은 **`+11,300` B** 다. 다만 그 술어의 **근거**(§2-d _"`import` 가 아니라 URL 문자열"_)는 성립한다 — 분해가 정확히 맞는다: JS 청크 `2`개 × `5,634` B + 기타 `32` B, 각 청크의 `5,634` 는 **GLSL 문자열 `3,134`**(런타임 문자열이라 minify 대상이 아니다) + **minify 된 신규 코드 `2,500`** 이다. 마스크 바이트는 **어디에도 유입되지 않았다** — `.next/static` 전체에서 `data:image/png` 를 포함한 파일은 Babylon 내장 텍스처 청크 `1`개(**변경 전후 바이트 동일** `5,234,917`)뿐이고, `.next/` 하위에 `*.png` 는 `0`건이다 (`public/` 은 정적 서빙이라 `.next/static` 집계에 애초에 들어가지 않는다 — ②의 `10,960,872` 예상치가 마스크를 더해 계산된 것도 같은 이유로 빗나갔다). ⇒ **술어가 「코드 증가 `0`」과 「에셋 미유입」을 conflate 했다.** ③ 은 _"JS 청크에 마스크 바이트 유입 `0`"_ 으로 정정돼야 하며, **판정은 reviewer 에게 넘긴다** (dev 가 자기 미달 술어를 스스로 고쳐 쓰면 그게 조용한 임계 완화다).
+
+  ⚠️ **번들 증가는 API 선택으로 `3`배 갈렸다** — 초판은 §결정 7 문구 그대로 `RawTexture` 로 1×1 placeholder 를 만들었고 JS 가 **`+34,640` B** 늘었다. `RawTexture` 는 저장소 어디서도 쓰이지 않아 `Engines/Extensions/engine.rawTexture` 서브트리를 **새로** 끌어들이기 때문이다. 이미 `billboard-alpha-mask.ts` 가 쓰는 `DynamicTexture` 로 바꾸니 **`+11,300` B** 가 됐고 1×1 단색 결과는 동일하다 (`Axis` → 모듈 스코프 `Vector3` 상수 치환 포함). **placeholder 자체는 편의가 아니라 렌더 조건**이다 — `ShaderMaterial` 은 선언된 sampler 에 텍스처가 없으면 `isReady()` 가 `false` 라 **mars/jupiter/moon mesh 가 아예 렌더되지 않는다.**
+
+  ✅ **Phase 0 이 남긴 잔여 미측정 4건 중 2건을 닫았다.** ① **`samplers` 생략 거동** — 생략본을 실제로 빌드해 재니 두 백엔드가 명시본과 **동일**했다 (WebGPU `0.9365` / WebGL2 `0.936`). 즉 Babylon `9.19.0` 에서 `setTexture` 만으로 sampler 가 등록된다. 그래도 **명시를 유지**한다 (계약 가시성 + Phase 0 측정 구성 보존). ② **자오선 `u = 0/1` 경계** — `MODE=seam` 신설로 닫았다. ⚠️ **카메라를 돌려서는 도달할 수 없다**: `rotate=off` 면 낮면 반구가 **JD 로만** 정해지고 `T_JD` 의 sub-solar 경도가 `0°` 라 ±180° 자오선은 **구조적으로 밤면**이다 — 첫 구현이 카메라만 4방위 돌렸다가 `alpha+270°` 에서 낮면 표본 `0` 을 얻고 IoU 를 `0` 으로 **오판**했다. 반년 뒤 JD (`2451809.5`, sub-solar `−180°`) 를 추가해 자오선을 낮면 한가운데 놓으니 IoU **`0.8778`** (본초자오선 쪽은 `0.9601`) — **seam 없음**. ③ `textureGrad`/`dFdx` WGSL 변환과 ④ mipmap seam 은 §결정 4 의 `noMipmap` 이 **구조적으로 회피**하므로 여전히 **비-경로 · 미측정**이다 (셰이더 소스에 `textureGrad`/`dFdx` `0`건 정적 확인). §A4.7 재검토 조건 2 발동 시 그때 실측한다.
+
+  ⚠️ **워프의 한계를 한정으로 남긴다** (§결정 5 서술 대비). `MASK_WARP_AMP = 0.006` 은 v 축 ±1.5 texel 변위인데, 재사용하는 `continents = fbm(p * 2.4)` 의 최고 옥타브 파장은 약 **`32°`** 이고 마스크 texel 은 **`0.352°`** 다. 즉 본 워프는 **texel 수십 개에 걸쳐 서서히 변하는 변위**이지 결정 5 표가 적은 _"텍셀 이하 불규칙"_ 이 아니다. 결론(fbm 유지 + 도메인 워프)은 그대로 두되 — 새 `fbm(` 호출은 결정 5 위반이므로 **여기서 고치지 않는다** — 해안선 텍셀 계단이 실사용에서 인지되면 §A4.7 재검토 조건 2·3 으로 다룬다.
+
+  **부수 관측 2건.** ① DoD 6 의 mars `502` px 는 **disk 픽셀이 아니다** — 변화 픽셀 bbox 가 `(516,676)–(711,699)` 로 **화면 하단 시간 컨트롤 바 밴드**에 전량 갇혀 있고, 그 밖은 바이트 동일이다 (mars disk 는 화면 중앙). 앱 렌더가 아니라 HUD 타이밍 흔들림이다. ② `browser-verify-lod.mjs` 의 `body-high` diff `3.20%` 는 지구 disk 면적 비율(`π·98.3² / 921,600 ≈ 3.26%`)과 거의 같다 — **지구 disk 가 사실상 전부 바뀌었는데도 임계 `15%` 를 통과**한다. 즉 이 가드는 지구 표면 변경을 **구조적으로 검출하지 못한다** (프레임 대비 disk 가 작아 상한이 `3.3%`). DoD 7 판정에는 영향이 없으나(재캡처 `0`), 후속 이슈 후보로 기록한다.
 
 - **[검증 강도 게이트] PR 검증 강도를 변경 성격에 맞춘다 — 인프라 이슈 증식 차단 (MINOR)** — CLAUDE.md §검증 강도 게이트 신설 + `deferred:no-incident` 라벨 도입. **코드 변경 `0`**.
 

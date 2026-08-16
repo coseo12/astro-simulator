@@ -38,6 +38,9 @@ import {
   ICE_LAT_LO,
   ICE_LAT_HI,
   BIOME_LAT_JITTER,
+  SURFACE_MASK_BY_BODY,
+  MASK_WARP_AMP,
+  SURFACE_MASK_MIN_DISK_PX,
   fbmMirror,
   surfaceColorMirror,
   lightingShadeMirror,
@@ -84,13 +87,22 @@ describe('#756 procedural-planet — surfaceType enum ↔ uniform int 매핑 SSo
     expect(PLANET_FRAGMENT_SHADER).toMatch(/uSurfaceType\s*==\s*3/);
   });
 
-  it('enum 멤버 수 = GLSL 분기 수 (4종 완비, 추가 시 양쪽 동기화 강제)', () => {
-    // enum 멤버 (숫자 키만) 개수.
-    const enumCount = Object.values(SurfaceType).filter((v) => typeof v === 'number').length;
-    // GLSL `uSurfaceType ==` 분기 개수.
-    const glslBranches = PLANET_FRAGMENT_SHADER.match(/uSurfaceType\s*==\s*\d/g) ?? [];
-    expect(enumCount).toBe(4);
-    expect(glslBranches.length).toBe(enumCount);
+  it('enum 멤버 집합 = GLSL 분기 정수 집합 (4종 완비, 추가 시 양쪽 동기화 강제)', () => {
+    // enum 멤버 (숫자 키만).
+    const enumValues = Object.values(SurfaceType).filter((v): v is number => typeof v === 'number');
+    // GLSL `uSurfaceType ==` 분기가 참조하는 **정수 집합**.
+    //
+    // ⚠️ #1119 이전에는 등장 **횟수**를 셌으나, Amendment 4 가 rocky 전용 fbm 을 마스크 샘플
+    // 위로 끌어올리면서 `uSurfaceType == 0` 이 정당하게 2회 등장한다 (dispatch 분기 + fbm 가드).
+    // 횟수 술어는 그 정당한 반복을 회귀로 오판하므로 **집합 술어**로 교체했다 — 가드의 원래 의도
+    // (enum 을 늘렸는데 GLSL 분기를 안 늘림 / 그 반대) 는 집합 비교로 그대로 잡힌다.
+    const glslValues = new Set(
+      (PLANET_FRAGMENT_SHADER.match(/uSurfaceType\s*==\s*\d/g) ?? []).map((m) =>
+        Number(m.replace(/\D/g, '')),
+      ),
+    );
+    expect(enumValues.length).toBe(4);
+    expect([...glslValues].sort((a, b) => a - b)).toEqual(enumValues.slice().sort((a, b) => a - b));
   });
 });
 
@@ -674,5 +686,157 @@ describe('#783 상수 SSoT drift 가드 (#69 — 4중 SSoT: 상수/uniforms/바�
       PLANET_FRAGMENT_SHADER.indexOf('uSurfaceType == 1'),
     );
     expect((rockyBranch.match(/fbm\(/g) ?? []).length).toBe(1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Amendment 4 (#1119) — 지구 대륙 마스크 (ADR §A4.3 결정 2~7 / §A4.4 핵심 예측)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('Amendment 4 (#1119) — SURFACE_MASK_BY_BODY 테이블 (§A4.3 결정 6, 데이터 SSoT 불변)', () => {
+  it('지구만 등록 (마스크 파일명 — 물리 데이터 아닌 rendering 에셋 참조)', () => {
+    expect(SURFACE_MASK_BY_BODY.earth).toBe('earth-land-mask.png');
+    expect(Object.keys(SURFACE_MASK_BY_BODY)).toHaveLength(1);
+  });
+
+  it('테이블은 파일명만 보유 — base URL(웹 라우팅) 누수 0 (core 단방향 의존)', () => {
+    for (const fileName of Object.values(SURFACE_MASK_BY_BODY)) {
+      expect(fileName).not.toContain('/');
+      expect(fileName).not.toMatch(/^https?:/);
+    }
+  });
+
+  it('마스크 등록 body 는 표면 타입 테이블에도 있어야 한다 (셰이더 미진입 body 에 마스크 무의미)', () => {
+    for (const bodyId of Object.keys(SURFACE_MASK_BY_BODY)) {
+      expect(SURFACE_TYPE_BY_BODY[bodyId]).toBeDefined();
+    }
+  });
+
+  it('타 표면 타입 body (mars/jupiter/moon) 는 미등록 → uMaskEnabled 0 고정 (분기 격리)', () => {
+    expect(SURFACE_MASK_BY_BODY.mars).toBeUndefined();
+    expect(SURFACE_MASK_BY_BODY.jupiter).toBeUndefined();
+    expect(SURFACE_MASK_BY_BODY.moon).toBeUndefined();
+  });
+});
+
+describe('Amendment 4 (#1119) — 마스크 상수 SSoT (#69 drift 가드)', () => {
+  it('박제값 (drift 시 시각 회귀 — 워프 진폭 / 원거리 LOD 임계)', () => {
+    expect(MASK_WARP_AMP).toBe(0.006);
+    expect(SURFACE_MASK_MIN_DISK_PX).toBe(16);
+  });
+
+  it('워프 진폭은 texel 수 개 규모 (마스크 형상을 파괴하지 않는 상한)', () => {
+    // v 축 1024×512 기준 1 texel = 1/512 ≈ 0.00195. 진폭 ±MASK_WARP_AMP/2 가 5 texel 을 넘으면
+    // 대륙 윤곽 자체가 뭉개져 DoD 1 (IoU ≥ 0.80) 을 잃는다.
+    const texelV = 1 / 512;
+    expect(MASK_WARP_AMP / 2).toBeLessThan(5 * texelV);
+    expect(MASK_WARP_AMP).toBeGreaterThan(0);
+  });
+
+  it('GLSL fragment 에 마스크 uniform 3종 + sampler 선언 존재 (미러와 동기)', () => {
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform sampler2D uSurfaceMask');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float uMaskEnabled');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float maskWarpAmp');
+  });
+});
+
+describe('Amendment 4 (#1119) — GLSL 마스크 배선 계약 (§A4.3 결정 3·4·5·7)', () => {
+  it('equirectangular UV 공식이 §결정 3 박제 그대로 (본초자오선 = local +X / 북극 = v 0)', () => {
+    expect(PLANET_FRAGMENT_SHADER).toContain('atan(p.z, p.x) * INV_TWO_PI + 0.5');
+    expect(PLANET_FRAGMENT_SHADER).toContain('acos(clamp(p.y, -1.0, 1.0)) * INV_PI');
+  });
+
+  it('v 는 극점 clamp / u 는 clamp 없음 (주소 모드가 축마다 다르다 — cross-validate 권고 3)', () => {
+    // 워프가 v 를 0.0/1.0 너머로 밀면 극에서 역투영 특이점 — CLAMP_ADDRESSMODE 는 이를 못 막는다.
+    expect(PLANET_FRAGMENT_SHADER).toMatch(/maskV\s*=\s*clamp\([^;]*0\.001,\s*0\.999\)/);
+    // u 는 WRAP 이라 순환이 정상 — clamp 하면 ±180° 에서 좌표가 눌려 seam 이 생긴다.
+    expect(PLANET_FRAGMENT_SHADER).not.toMatch(/maskU\s*=\s*clamp\(/);
+  });
+
+  it('텍스처 샘플이 분기 밖 무조건 1회 (§결정 7 — WGSL uniformity + Phase 0 측정 구성)', () => {
+    const sampleIndex = PLANET_FRAGMENT_SHADER.indexOf('texture2D(uSurfaceMask');
+    expect(sampleIndex).toBeGreaterThan(0);
+    // 샘플은 정확히 1회.
+    expect((PLANET_FRAGMENT_SHADER.match(/texture2D\(/g) ?? []).length).toBe(1);
+    // 샘플 지점이 표면 타입 dispatch 체인(`else if`) 보다 **앞**에 있어야 한다.
+    const dispatchIndex = PLANET_FRAGMENT_SHADER.indexOf('} else if (uSurfaceType == 1)');
+    expect(dispatchIndex).toBeGreaterThan(0);
+    expect(sampleIndex).toBeLessThan(dispatchIndex);
+    // 샘플이 uMaskEnabled 분기 안에 들어가면 안 된다 (소스 전체에 그런 if 자체가 없어야 함).
+    expect(PLANET_FRAGMENT_SHADER).not.toMatch(/if\s*\(\s*uMaskEnabled/);
+  });
+
+  it('landMask = mix(절차, 마스크, uMaskEnabled) — 0 이면 Amendment 3 식으로 정확히 복귀', () => {
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'float proceduralMask = smoothstep(landThresholdLo, landThresholdHi, continents)',
+    );
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'float landMask = mix(proceduralMask, maskLand, uMaskEnabled)',
+    );
+  });
+
+  it('fbm 총 호출 수 불변 — 소스 전체에서 5회 (rocky 1 + desert 1 + gas 1 + cratered 1 + 정의부 1)', () => {
+    // §결정 5 "noise 샘플 ±0" 불변식. 마스크 도입이 fbm 을 새로 부르면 이 수가 늘어난다.
+    expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(5);
+  });
+
+  it('continents 는 rocky 전용 분기 안에서만 계산 (mars/jupiter/moon fragment 비용 불변)', () => {
+    expect(PLANET_FRAGMENT_SHADER).toMatch(
+      /float continents = 0\.0;\s*\n\s*if \(uSurfaceType == 0\) \{\s*\n\s*continents = fbm\(p \* 2\.4\);\s*\n\s*\}/,
+    );
+  });
+});
+
+describe('Amendment 4 (#1119) — JS 미러 마스크 경로 (§A4.4 핵심 예측 "uMaskEnabled=0 픽셀 동일")', () => {
+  const base: readonly [number, number, number] = [0.23, 0.45, 0.6];
+
+  it('mask 미전달 == enabled 0 == Amendment 3 결과 (부동소수 완전 일치)', () => {
+    for (const p of spherePoints(64)) {
+      const legacy = surfaceColorMirror(base, SurfaceType.Rocky, p);
+      const explicitOff = surfaceColorMirror(base, SurfaceType.Rocky, p, {
+        enabled: 0,
+        sample: 1,
+      });
+      expect(explicitOff).toEqual(legacy);
+    }
+  });
+
+  it('enabled=1 이면 마스크 샘플이 landMask 를 지배 (sample 0 = 바다 / 1 = 육지)', () => {
+    // 극관 밴드를 피하려고 저위도 점만 쓴다 (iceMask 가 색을 덮으면 비교가 무의미).
+    const equator = spherePoints(64).filter((p) => Math.abs(p[1]) < 0.2);
+    expect(equator.length).toBeGreaterThan(4);
+    let oceanLike = 0;
+    let landLike = 0;
+    for (const p of equator) {
+      const ocean = surfaceColorMirror(base, SurfaceType.Rocky, p, { enabled: 1, sample: 0 });
+      const land = surfaceColorMirror(base, SurfaceType.Rocky, p, { enabled: 1, sample: 1 });
+      // sample=0 → ocean = baseColor 그대로 (극관 밖에서는 read-only 규약 유지).
+      if (Math.abs(ocean[0] - base[0]) < 1e-9 && Math.abs(ocean[2] - base[2]) < 1e-9) oceanLike++;
+      // sample=1 → 육지색이므로 B < G (바다 청록의 반대).
+      if (land[2] < land[1]) landLike++;
+    }
+    expect(oceanLike).toBe(equator.length);
+    expect(landLike).toBe(equator.length);
+  });
+
+  it('마스크 경로도 보라/마젠타 0 (R>G && B>G 동시 우세 부재 — §A3.5 DoD 3 유지)', () => {
+    let violations = 0;
+    for (const p of spherePoints(200)) {
+      for (const sample of [0, 0.25, 0.5, 0.75, 1]) {
+        const [r, g, b] = surfaceColorMirror(base, SurfaceType.Rocky, p, { enabled: 1, sample });
+        if (r > g && b > g) violations++;
+      }
+    }
+    expect(violations).toBe(0);
+  });
+
+  it('비-rocky 타입은 mask 인자를 무시한다 (분기 격리 — mars/jupiter/moon 픽셀 불변)', () => {
+    for (const type of [SurfaceType.Desert, SurfaceType.GasBands, SurfaceType.Cratered]) {
+      for (const p of spherePoints(32)) {
+        expect(surfaceColorMirror(base, type, p, { enabled: 1, sample: 1 })).toEqual(
+          surfaceColorMirror(base, type, p),
+        );
+      }
+    }
   });
 });
