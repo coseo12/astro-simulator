@@ -100,8 +100,12 @@
  *   0 — 위반 0 (또는 `--population` / `--self-test` 성공)
  *   1 — 위반 발견, 또는 base 미해석 등 **판정 불가** (조용한 통과 없음)
  *   2 — 실행 에러 (잉여/누락 인자, prettier 바이너리 부재, **미해결(unmerged) 인덱스** 등
- *       환경·상태 오류). `--population` 의 미해결 인덱스가 여기 속하는 이유는 `1` 이 본
- *       스크립트에서 «위반 발견» 을 뜻해 진단이 섞이기 때문이다 (#1075)
+ *       환경·상태 오류). `--population` 의 미해결 인덱스가 `1` 이 아니라 여기 속하는 이유는
+ *       **판정 이전의 선행 조건**이기 때문이다 — 계수 산출 자체가 불가능한 상태이므로
+ *       «위반이 있는가» 라는 질문에 아직 도달하지 못한다. 형제 선행 조건인
+ *       `requirePrettierBin()` · `usage()` 도 같은 계급으로 `2` 를 쓴다 (#1075).
+ *       ⚠️ `1` 이 «판정 불가» 도 포괄하는 것과 혼동하지 말 것: 위 `1` 의 판정 불가는
+ *       **판정을 시도한 뒤** base 미해석 등으로 결론을 못 낸 경우다 (PR #1092 reviewer)
  *
  * ── 호출 ────────────────────────────────────────────────────────────────────
  *   node scripts/verify-md-tilde.mjs --staged        # .husky/pre-commit (index ↔ HEAD)
@@ -346,7 +350,7 @@ function requireResolvedIndex() {
   const conflicted = unmergedPaths();
   if (conflicted.length === 0) return;
   console.error(
-    `${TAG} 미해결(unmerged) 인덱스 엔트리 ${conflicted.length}건 — 모집단 관측 불가로 FAIL 한다.\n` +
+    `${TAG} 미해결(unmerged) 경로 ${conflicted.length}건 — 모집단 관측 불가로 FAIL 한다.\n` +
       `${TAG} git ls-files 는 충돌 경로를 stage 1/2/3 으로 각각 한 줄씩 반환해 같은 파일이 최대\n` +
       `${TAG} 3회 계수된다. 이 상태의 산출값은 계수가 아니라 잡음이므로 통과시키지 않는다.\n` +
       `${TAG} 충돌을 해소(또는 \`git merge --abort\`)한 뒤 다시 실행하라.`,
@@ -693,6 +697,9 @@ function selfTestIntegration() {
       `(11) 정상 인덱스 --population → exit 0 기대, 실제 ${r.status}\n${r.out}`,
     );
     assert.match(r.out, /prettier ignored: false : \d+/, `(11) 계수 출력 누락\n${r.out}`);
+    // (13) 에서 원복을 값으로 대조하기 위해 baseline 계수를 캡처해 둔다 (PR #1092 reviewer 🟡-4).
+    // `\d+` 매칭만으로는 본 결함의 본질인 **계수 부풀림**(49 → 51)이 통과한다.
+    const popBaseline = r.out.match(/prettier ignored: false : (\d+)/)?.[1];
 
     // (12) negative — 미해결(unmerged) 인덱스는 「계수」가 아니라 「관측 불가」다 (#1075).
     //  git ls-files 가 충돌 경로를 stage 1/2/3 으로 각각 반환해 같은 파일이 최대 3회 계수되는
@@ -723,7 +730,7 @@ function selfTestIntegration() {
       2,
       `(12) 미해결 인덱스 --population → exit 2 기대(관측 불가), 실제 ${r.status}\n${r.out}`,
     );
-    assert.match(r.out, /미해결\(unmerged\) 인덱스 엔트리 1건/, `(12) 미해결 진단 누락\n${r.out}`);
+    assert.match(r.out, /미해결\(unmerged\) 경로 1건/, `(12) 미해결 진단 누락\n${r.out}`);
     assert.match(r.out, /- CHANGELOG\.md/, `(12) 충돌 경로 지목 누락 (중복 제거 후 1건)\n${r.out}`);
     assert.ok(
       !/prettier ignored: false/.test(r.out),
@@ -735,7 +742,14 @@ function selfTestIntegration() {
     assert.equal(abort.status, 0, `(13) merge --abort 실패\n${abort.stderr}`);
     r = runSelfInRepo(repoDir, ['--population']);
     assert.equal(r.status, 0, `(13) 충돌 해소 후 exit 0 복원 기대, 실제 ${r.status}\n${r.out}`);
-    assert.match(r.out, /prettier ignored: false : \d+/, `(13) 복원 후 계수 출력 누락\n${r.out}`);
+    // 계수가 baseline 과 **같은 값**으로 돌아왔는지 대조한다 — `\d+` 로는 부풀린 51 도 통과한다.
+    // 출력 자체가 없으면 캡처가 undefined 가 되어 여기서 함께 잡힌다 (별도 match 단언 불요).
+    const popRestored = r.out.match(/prettier ignored: false : (\d+)/)?.[1];
+    assert.equal(
+      popRestored,
+      popBaseline,
+      `(13) 복원 후 계수가 baseline 과 다르다 (baseline=${popBaseline} 복원=${popRestored})\n${r.out}`,
+    );
 
     console.log(`${TAG} self-test (B) 3중 시뮬레이션 PASS — 13 단계 (격리 저장소: 임시 디렉토리)`);
   } finally {
