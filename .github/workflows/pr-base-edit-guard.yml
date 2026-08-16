@@ -1,0 +1,92 @@
+name: PR Base Edit Guard
+
+# PR 을 **연 뒤 base 를 바꾸는** 경로에서 base 선택 규칙을 재판정한다 (#1027).
+#
+# 배경: `branch-name-guard.yml` 의 트리거는 `types: [opened, synchronize]` 이고, base 변경은
+# `pull_request` 의 **`edited`** 액션이며 head SHA 를 바꾸지 않아 `synchronize` 도 아니다.
+# 그래서 *"`base=develop` 으로 열어 초록 확인 → `gh pr edit --base main`"* 경로가 **stale green**
+# 으로 남았다 (일회용 PR #1026 실측, 2026-08-12).
+# 계약 SSoT: docs/decisions/20260814-1027-pr-base-edit-guard.md
+#
+# ── CRITICAL: 본 체크는 required 가 아니다 (ADR §6) ─────────────────────────────
+# `pr-base-edit` 은 **required 가 아니다.** base 편집으로 규칙을 위반하면 붉은 X 가 뜨지만
+# **머지는 기계적으로 막히지 않는다.**
+# 즉 본 가드가 만드는 상태는 "탐지 100% · 차단 0%" 이며, 차단(required 편입)은 ADR §9-2
+# 재검토 조건 1·2 (= 20260807-971 §10-5 항 14) 가 발화할 때 재론한다. 축소해 적지 않는다.
+#
+# ⚠️ **현재 형태로 required 화는 원리적으로 불가능하다** (ADR §9-1 한계 3). `types: [edited]`
+#    단독이라 편집 없는 PR 에서는 체크런이 **아예 생성되지 않고**, required 로 올리면 영구
+#    `Pending` → 머지 영구 차단이 된다. 승격하려면 `opened` 를 함께 넣어야 하며 그 순간
+#    `branch-name` 에 `edited` 를 넣는 안(후보 1)과 **기술적 위험이 같아진다**.
+#
+# ── 왜 별도 workflow 인가 (ADR §4 결정 1) ──────────────────────────────────────
+# 자명한 수정은 `branch-name-guard.yml` 의 `types` 에 `edited` 한 줄을 넣는 것이다. 그러나
+# `branch-name` 은 `main` 의 **required status check** 이라, `edited` 를 넣는 순간 같은 SHA 에
+# 결론이 갈리는 체크런을 쌓는 **event *type* 축**을 얻는다 — 이는 ADR 20260807-971 결정 9-1 이
+# `pr-template-checklist` 를 required 에서 **제외한 바로 그 성질**이고, 동 ADR Phase 1 면제
+# 근거(*"required 3개 중 SHA 를 바꾸지 않는 반복 이벤트로 통과 3종 밖 결론을 만들 수 있는 것은
+# 하나도 없다"*)를 문자 그대로 깬다. 새 이름으로 받으면 required 3개의 `types:` 는 **무변경**이다.
+#
+# ── 트리거 설계 (ADR §4 결정 2) ────────────────────────────────────────────────
+# `types: [edited]` **단독**. `opened` / `synchronize` 미포함 — 그 둘은 `branch-name` 의 base
+# 스텝이 이미 required 로 덮는다 (`opened` = 최초 판정 / `synchronize` = base 편집 후 push).
+# 넣으면 같은 판정이 두 이름으로 중복 발화해 alert fatigue (20260701-779 계보) 를 만든다.
+# `branches:` 필터 **미사용** (= 모든 base) — `branch-name-guard.yml` 과 동일 근거. 봇 PR 17건이
+# `base=<type>/*` 로 열리므로 필터를 걸면 정확히 그 브랜치가 사각지대가 된다 (20260806-962 §5-2).
+#
+# ── CRITICAL: `if:` 조건을 두지 않는다 (ADR §4 결정 3) ──────────────────────────
+# `github.event.changes.base` 로 발화를 좁히지 **않는다**. `changes.base` 가 Actions 표현식으로
+# 실제 전달되는지는 실측되지 않았고(ADR §2-2), 전달되지 않으면 `if` 가 상시 false 가 되어 가드가
+# **조용히 아무것도 안 하는** 최악의 실패 모드가 열린다. 조건을 두지 않으면 그 모드가 구조적으로
+# 불가능하다 — 틀릴 수 있는 전제 자체가 없다. CLAUDE.md §가드 설계 원칙 "fallback 분기 금지".
+#
+# 부수 대가(명시): 제목·본문만 편집해도 판정이 돌므로, head 이름이 규약 밖인 PR 은 여기서도
+# `unresolved`(exit 1, **귀속: branch-name**) 를 받아 붉은 X 가 두 개가 된다. 진단 메시지는
+# 정확하고 새로 막히는 PR 은 **0** 이므로 수용한다. 발화당 CI 약 12초.
+#
+# ── CRITICAL: `pull_request_target` 금지 / script injection 회피 ───────────────
+# `branch-name-guard.yml` 헤더와 동일 근거. base·head ref 는 반드시 `env:` 로 받아 `"$VAR"` 로
+# 인용 전달한다 (`${{ }}` 를 `run:` 본문에 직접 보간하면 ref 가 셸로 해석된다).
+#
+# ── concurrency 미추가 (ADR §4 결정 4) ─────────────────────────────────────────
+# 20260807-971 결정 9-2 계승. `edited` 는 사람 페이스 이벤트라 연속 쌍의 대다수가 겹치지 않고
+# (저장소 전체 27쌍 중 겹침 5), 겹칠 때 `cancel-in-progress` 는 코스메틱 CANCELLED run 을
+# 제조한다 (docs/ops/operational-friction.md §4). `branch-name-guard.yml` 이 concurrency 를
+# 보유하는 근거는 `synchronize` 연타 dedup 인데, 본 workflow 에는 `synchronize` 가 없다.
+#
+# ── 판정 로직 복제 금지 ────────────────────────────────────────────────────────
+# 정본은 `scripts/verify-pr-base-rule.mjs` 의 `BASE_RULES` 매트릭스이며, 본 workflow 는
+# `branch-name-guard.yml` 의 base 스텝과 **완전히 같은 명령**을 호출한다 (판정 리터럴 사본 0).
+# ADR §9-3 Concrete Prediction: `BASE_RULES` 에 새 셀을 추가할 때 `.github/workflows/**` 변경
+# **0 줄**. 이 예측이 깨지면 workflow 에 판정 지식이 샌 것이므로 먼저 리팩토링 후 재개한다.
+#
+# ── hashFiles silent-skip 정책 (#945/#950) ────────────────────────────────────
+# SSoT 는 ci.yml §hashFiles silent-skip 정책 블록. 전 스텝 `if: hashFiles(...)` **미사용**.
+# `scripts/verify-pr-base-rule.mjs` 부재는 배포 시나리오가 아니라 **가드가 삭제된 회귀**이므로
+# node ENOENT 로 즉시 FAIL 하는 것이 유일한 정상 동작이다.
+
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: read # 어노테이션(::error::)만 사용 — write 불요
+
+jobs:
+  pr-base-edit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # #666 전수 명시 핀 정책 — 러너 기본 Node 버전에 암묵 의존하지 않는다.
+      # `.node-version` SSoT. 가드가 node 표준 라이브러리만 쓰므로 pnpm install 은 불필요.
+      - name: Node.js setup (.node-version 핀)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: PR base 선택 규칙 재판정 (#1027)
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: node scripts/verify-pr-base-rule.mjs --pr base="$BASE_REF" head="$HEAD_REF"

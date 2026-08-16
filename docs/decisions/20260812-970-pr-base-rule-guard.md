@@ -354,6 +354,13 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
    **그때까지의 완화**: (i) 본 가드의 실효는 *"실수로 잘못 연 PR"* 차단이며 **의도적 우회는 막지 못한다** — 규율이 이미 정착한 저장소(472 PR 연속 위반 0)에서 이 구분은 실질적이다. (ii) 릴리스·핫픽스 PR 은 사람이 base 를 의식적으로 고르는 소수 경로다. (iii) 후속에서 `edited` 대신 **머지 시점 검사**(`pull_request` `edited` 를 별도 non-required job 으로 두거나, ruleset 기반 base 제약)를 함께 비교한다.
 
+   > ⚠️ **개정 ([#1027](https://github.com/coseo12/astro-simulator/issues/1027) 집행, 2026-08-16).** 위 본문은 **이력이므로 덮어쓰지 않는다** (§6-3 과 같은 형식). 갱신되는 것은 **제목의 «미해결» 한 낱말**이다 — 상태는 «미해결» 이 아니라 **«탐지 100% · 차단 0%»** 다.
+   >
+   > - **여전히 참**: `branch-name-guard.yml` 의 `types: [opened, synchronize]` 는 base 변경을 **포착하지 못한다** (그 workflow 는 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §5 대로 **무접촉**). 위 실측 표 4행 전부 그대로 유효하다.
+   > - **더 이상 참이 아님**: *"경로가 열려 있다"* 가 **보이지 않는 우회**를 뜻하던 부분. 신규 workflow [`pr-base-edit-guard.yml`](../../.github/workflows/pr-base-edit-guard.yml) 의 **`pr-base-edit`** 체크가 `edited` 를 받아 **같은 `verify-pr-base-rule.mjs` 로 재판정**한다 (판정 로직 사본 0 — 본 ADR §5 의 스크립트는 무접촉).
+   > - **차단은 여전히 0**: `pr-base-edit` 은 **required 가 아니다.** 붉은 X 는 뜨지만 **머지는 기계적으로 막히지 않는다.** required 편입은 기각이 아니라 **유예**이며 승격 조건은 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §9-2 (= [20260807-971](20260807-971-required-status-checks.md) §10-5 **항 14**) 다.
+   > - **완화 (iii) 의 결말**: 예고한 비교가 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §3 에서 수행됐다 — 후보 4 + 변형 2 중 **«별도 non-required job»** 채택, **ruleset 기반 base 제약은 기술적으로 불가능**으로 기각 (동 ADR §3-4).
+
 1. **`develop` 대상 PR 에서는 여전히 권고**다. `develop` 은 보호 자체가 없고 ([20260807-971](20260807-971-required-status-checks.md) 결정 2 로 **영구 미채택**), 실효 강제 범위는 release/hotfix PR 뿐이다. 다만 본 규칙이 막으려는 것이 정확히 `base=main` 오지정이므로 **위험 표면과 강제 범위가 일치**한다.
 2. **`unresolved` 는 실환경 발화 증거가 얇다.** 픽스처 3건이 주 증거다.
 
