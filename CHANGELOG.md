@@ -139,6 +139,35 @@ Semantic Versioning을 따른다.
 
 ### Changed
 
+- **[#884] `verify:all` → `verify:smoke` 개명 + `verify:379-lod` 동명 중복 제거 (MINOR)** ([#884](https://github.com/coseo12/astro-simulator/issues/884)) — **이름이 계약을 어기고 있었다.** `verify:all` 은 등록된 `verify:*` 전건이 아니라 그중 9개만 돌렸고, `all` 을 전수 커버로 읽은 실행자에게 «잘못된 안심» 을 줬다 (CLAUDE.md §가드 설계 원칙 의 silent 가드 약화 클래스). **범위 1 (`ci.yml` 죽은 생태계 경로) 은 착수 전 NO-OP 로 종결**됐으므로 ([#915](https://github.com/coseo12/astro-simulator/issues/915) / PR [#917](https://github.com/coseo12/astro-simulator/pull/917) / 커밋 `5bbb1bd` 가 25 스텝을 선행 제거 — 제거 대상 `0`줄) 본 PR 은 **범위 2 단독**이다.
+
+  **재측정 — 이슈 본문(2026-07-26) 수치는 stale 이다.** 손 계수 대신 git-tracked `package.json` **5개**를 JSON 파싱해 계수했다 (술어: `scripts` 키 중 `verify:` 접두). 측정 트리는 `780cb92` (= 본 PR base) 이고 BEFORE/AFTER 는 **같은 술어의 같은 실행**이다.
+
+  | 항목                                 | 이슈 (2026-07-26) |        BEFORE (`780cb92`) |      AFTER (+ 본 PR diff) |
+  | ------------------------------------ | ----------------: | ------------------------: | ------------------------: |
+  | 등록 `verify:*`                      |              `50` | **`53`** (루트 30/web 23) | **`52`** (루트 30/web 22) |
+  | 체인 원소                            |               `9` |                       `9` |                       `9` |
+  | 커버리지 (분모 = 전건 − 집계자 자신) |          약 `18%` |      `9/52` = **`17.3%`** |      `9/51` = **`17.6%`** |
+  | 동명 중복                            |               `1` |                       `1` |                   **`0`** |
+
+  ⚠️ **AFTER 의 커버리지 상승은 개선이 아니다** — 분모에서 중복 등록 1건이 빠진 산술 효과일 뿐 체인은 불변이다. 본 PR 은 **커버리지를 고치지 않고 이름을 고친다**.
+
+  **판정 — 개명 채택, 나머지 기각** (침묵 기각 방지를 위해 근거를 전건 명시). (a) **전수 실행 (기각)** — 등록 `verify:*` **`41/52`** 가 브라우저/dev 서버 의존이라 (술어는 `operational-friction.md` §8-1 과 동일: 대상 스크립트 본문이 `browser-verify-utils` 또는 `localhost:` 를 참조) 순차 전수는 로컬 게이트로 성립하지 않고, 다수가 특정 이슈 시점에 가치가 고정된 회귀 가드다. (b) **주석 계약 단독 (기각)** — `package.json` 에 네이티브 주석이 없고 오용이 발생하는 지점은 `pnpm run` 목록과 손가락 기억이라 다른 파일의 주석은 그 지점에 닿지 않는다. 다만 **개명과 병행해서는 채택**했다 (`README.md` §`verify:smoke` 계약). (c) **`verify:all` 별칭 유지 (기각)** — 거짓 이름이 목록에 남으면 개명 목적이 소멸한다. 이 저장소는 드리프트 가드의 fallback 분기를 금지한다 (fail-fast).
+
+  ⚠️ **이슈의 기각 근거 2번(«회귀 가드는 이미 CI 에 개별 배선되어 로컬 전수 실행은 중복»)은 전칭으로 거짓이고, 체인에 대해서는 거의 정반대다.** `.github` 18 파일 전문에 대상 스크립트 basename 또는 스크립트명이 **토큰으로** 등장하는지로 판정했다 (AFTER 모집단 `51`): 배선 `32` / 미배선 `19`. 비-체인 `42` 중에서는 `31` 배선 / `11` 미배선이라 근거 2번은 **약 74% 참**이다. 그런데 **체인 `9` 개 중 워크플로가 부르는 것은 `verify:test-coverage` 하나뿐**이고 나머지 `8` 개는 `.github` 어디에도 없다 — `verify:smoke` 는 «CI 와 중복되는 편의 스크립트» 가 아니라 **CI 가 돌리지 않는 브라우저 매트릭스의 유일한 실행 경로**이며, 이 사실이 개명의 실익을 오히려 키운다. ⚠️ 단 «a11y·FPS 가 CI 에서 전혀 안 돈다» 로 읽으면 안 된다 — `verify-a11y-baseline.mjs` · `verify-fps-baseline.mjs` 라는 **다른 스크립트**가 전용 워크플로로 돈다.
+
+  ⚠️ **배선 판정 술어의 초판이 틀렸고 정정 후 재측정했다** — 경계 없는 `includes` 는 `verify:mobile` 이 `ci.yml` 의 `verify:mobile-p7d` 에 걸려 **거짓 배선**을 냈다 (`npm` ⊂ `pnpm` 과 같은 클래스). 매치 직후 문자가 `[A-Za-z0-9._-]` 이면 기각하도록 고치자 배선 `33 → 32` 로 바뀌었다. 술어 자기검증(naive `true` / 경계형 `false`)과 양성·음성 대조군을 같은 실행에 넣었다.
+
+  **`verify:379-lod` — 루트 유지, `apps/web` 제거.** 두 등록은 **같은 커밋 `f6bc67e` (PR [#390](https://github.com/coseo12/astro-simulator/pull/390)) 에서 동시에** 들어왔다. 관습이 진화한 결과가 아니라 **태생적 이중 등록**이다. 대상 스크립트는 cwd 비의존이라 (`__dirname` 기반 baseline 해석) 두 등록의 **동작이 동일**했고 본 변경은 순수 등록 정리다. 루트를 남긴 근거 셋 — 스크립트 자신의 헤더 용례가 `node apps/web/scripts/browser-verify-379-lod.mjs` 이고, `ci.yml` 이 `apps/web` 스크립트를 부르는 지배적 관용구가 루트 cwd 의 직접 `node` 호출이며, 형제 LOD 가드(`verify:lod` · `verify:391-billboard`)가 루트에 있다. `.github` 참조는 **양쪽 다 `0`** 이라 CI 영향이 없다.
+
+  **«루트/`apps/web` 이원화 정책» 수립 자체는 기각한다.** 루트는 `apps/web` 소재 스크립트를 `6` 개 등록하고 있고 이들은 `ci.yml` 에 직접 경로로 배선돼 있어, 일괄 이관은 CI 를 건드리면서 얻는 것이 없다. 본 PR 이 세우는 불변식은 **하나뿐**이다 — _동일 스크립트를 루트와 워크스페이스에 중복 등록하지 않는다_. 지키지 않을 배치 정책을 문서에 선언하면 그 선언 자체가 계약↔구현 드리프트가 된다.
+
+  **남은 중복 1건은 의도로 판정해 유지** — `verify:713-click-select` 와 `verify:719-overlap-cycle` 이 같은 `browser-verify-click-select.mjs` 를 가리킨다. 이름이 다르고 각각 다른 이슈의 회귀를 지시하는 **별칭**이라 동명 중복과 다른 클래스다.
+
+  **참조 갱신 3곳 / 미갱신 3곳.** 갱신 — `package.json`(정의) · `README.md`(`위 5개 순차 실행` 이라는 **개수 오기**를 함께 정정. 실제 체인은 `9`) · `.claude/skills/run-tests/SKILL.md`. 미갱신 — ADR [`20260416`](docs/decisions/20260416-engine-factory-no-op.md) 과 [P1 회고](docs/retrospectives/P1-retrospective.md) 는 **역사 기록이라 소급 편집 부적절**하고, `CHANGELOG.md` 는 **base `780cb92` 기준** `verify:all` hit 이 **`0`** 이라 확정 구간 소급 편집 문제가 애초에 없었다 (양성 대조군: 같은 파일 `verify:` `96` hit). ⚠️ **AFTER 에는 hit 이 생긴다 — 본 항목 자신이 그 이름을 서술하기 때문이며, 전부 `[Unreleased]` 안이라 확정 구간과 무관하다** (계수를 문서에 적는 순간 그 문서가 모집단에 들어가는 자기 참조 노화라, 위 `0` 은 **base rev 에 결속된 값**이지 현행값이 아니다). `docs/ops/operational-friction.md` §8-1 은 **rev `38b6c8a` 에 결속된 측정 기록**이라 이름을 덮어쓰면 그 rev 에 없던 이름을 인용하게 되므로, 측정값을 보존한 채 **현행 이름 포인터만 부기**했다.
+
+  **개명 실측** — 구 `pnpm verify:all` → `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "verify:all" not found` exit `254` (pnpm 이 `pnpm verify:scale` 을 오탈자 후보로 제시) / 구 `pnpm --filter @astro-simulator/web verify:379-lod` → `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT` exit `1` / `pnpm run` 목록에 `verify:smoke` **등장** · `verify:all` **소멸** · 루트 `verify:379-lod` **잔존**.
+
 - **[#1086] 좀비 카나리아 — 가드 사본 대조 사각 봉인 + 패턴 경계 자기적용 (MINOR)** ([#1086](https://github.com/coseo12/astro-simulator/issues/1086)) — [#1066](https://github.com/coseo12/astro-simulator/issues/1066)(PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080))이 _"산문 선언 → 기계 검증"_ 취지로 넣은 **항목 9** 가 같은 문서 안의 다른 사본을 못 봤다. 항목 9 는 `grep -E '<PATTERN>'` **형태 하나만** 찾았고 `docs/ops/zombie-process-guards.md` §10 의 **bare 코드펜스**는 대조 밖이었다 — reviewer 실증: 그 펜스만 구 패턴으로 되돌려도 `9/9 PASS`. 본 PR 에서 **#1086 이전 가드를 그대로 꺼내 같은 변조에 물려 재현**했다 (시나리오 `S1-prev` → `PASS`, 즉 사각 확인).
 
   **교정 — 형태를 넓히는 대신 «축자 사본 개수» 를 못박는다** (`EXPECTED_PATTERN_COPIES`: `qa.md` `1` / `zombie-process-guards.md` `2` = §9 검출 명령 + §10 교정 원리 펜스). 「어느 펜스가 정본인가」를 판정할 필요가 없어 **설명용 펜스·반례 인용은 구조적으로 오탐 `0`** 이다 — 그것들은 정의상 `PATTERN` 과 **다른 문자열**이라 축자 계수에 애초에 안 걸린다. **후보 (가) 펜스 추출 정규식 확대는 기각** — 이 문서는 §1 동결 인용 펜스가 `next dev` 를 싣고 §10 산문이 구 패턴을 반례로 인용해 **내용 기반 추출은 정상 문서에서 즉시 오탐**을 낸다. **후보 (나) §10 펜스 → §9 링크 대체도 기각** — §10 은 패턴을 **도출하는** 절이라 결론 리터럴을 빼면 도출이 안 읽히고, §9 는 이미 근거를 §10 으로 넘기고 있어 상호 참조만 남는다. 개수 pin 은 (가) 의 목표(§10 펜스를 대조 안으로)를 오탐 위험 없이 달성하면서 **형태 무관**이라 산문 사본까지 덮는다. ⚠️ **잔여 한계 명시** — 「처음부터 hook 과 다른 값으로 **새 사본을 추가**」하면 개수가 그대로라 통과한다. 이 축의 커버는 PR diff 리뷰다.
@@ -193,6 +222,10 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **`pnpm verify:all` 이 더 이상 존재하지 않는다 (#884).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 9개 체인이 실행됐고, 이제 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "verify:all" not found` 로 exit `254` 다. 대체 명령은 **`pnpm verify:smoke`** 이며 체인 원소·순서·동작은 **전부 불변**이다 (바뀐 것은 이름 하나뿐). **별칭은 두지 않았다** — 남기면 거짓 이름이 `pnpm run` 목록에 그대로 남아 개명의 목적이 소멸한다. pnpm 이 오탈자 후보(`pnpm verify:scale`)를 제시하므로 실패는 조용하지 않다.
+- **`pnpm --filter @astro-simulator/web verify:379-lod` 이 더 이상 존재하지 않는다 (#884).** 종전에는 실행됐고 이제 `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT` exit `1` 이다. **루트 `pnpm verify:379-lod` 는 불변**이며 두 등록이 부르던 대상 스크립트가 애초에 동일했으므로(cwd 비의존) **검증 능력 손실은 `0`** 이다. CI 영향도 `0` 이다 — `.github` 에서 이 스크립트를 부르는 곳이 변경 전에도 **없었다**.
+- **run-tests 스킬이 권고하는 체인 이름이 바뀐다 (#884).** `verify:test-coverage` 를 연결할 대상이 `verify:all` → `verify:smoke` 로 바뀌고, 그 체인이 **전수가 아니라 스모크 집합**이라는 계약이 문구에 명시된다. 에이전트가 같은 입력(모노레포 테스트 설정 누락 사고 방지 절차)에서 다른 명령을 쓰게 되므로 행동 변화다.
+- **`verify:smoke` 의 커버 범위가 문서화된 계약을 갖는다 (#884).** `README.md` 에 포함·제외 기준과 **«CI 초록 ≠ `verify:smoke` 실행됨»** 이 박제됐다. 종전에는 이름만 있고 계약이 없어 실행자가 전수 커버로 오인할 수 있었다. ⚠️ 계약은 **규약형 단독**이며 가드를 신설하지 않았다 — 체인 정본을 `package.json` 한 곳으로 두고 문서에서 개수 사본을 **제거**하는 쪽(중복 출처 제거)을 택했기 때문에 대조할 사본 자체가 없다.
 - **수치 박제 시 «측정한 트리»의 커밋을 적는다 (#1078, ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) (ii) `> 확장 (#1078)` — `Accepted (cross-validate 2026-08-16)`).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 rev 를 **동반**하기만 하면 규약을 충족했고, 이제 술어가 워킹트리의 다른 입력 파일(`.prettierignore` · 린터/컴파일러 설정 등)을 읽는 경우 **그 rev 만 체크아웃한 트리에서 값이 나오는지**까지 확인한다. 측정을 유발한 변경이 그 입력 자체를 바꾸는 PR 이면 헤더에 조합을 적고 **머지 후 재현 rev 를 사후 부기**한다. 입력이 전부 git 객체인 술어(`git ls-files` / `git grep <pat> <rev>`)는 **종전과 동일** — 추가 절차가 없다.
 - **`packages/{shared,core}` 테스트 파일의 타입 오류가 CI 를 통과하지 못한다 (#1060).** 같은 입력(두 패키지의 `*.test.ts` 또는 `__test-utils__/**` 에 타입 오류가 든 PR)에서 CI 가 **다르게 동작한다** — 이전에는 `verify-and-rust` 가 초록이었고(빌드는 해당 파일을 `exclude`, vitest 는 타입 미검사), 이제 `packages 타입 검사 (테스트 파일 포함, #1060)` 스텝이 exit `2` 로 job 을 실패시킨다. 소스 파일의 타입 검사 범위는 **불변**이다.
 - **강제력 등급은 "체크런 붉은 X + 메인의 CI 확인" 이다** (ADR 결정 4). 본 스텝은 required status check 가 아니며 `develop` 은 branch protection 미채택이라, `pnpm -r test` 를 포함해 이 저장소 CI 가드 대부분과 **같은 등급**이다. required 승격은 ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 결정 1 (Phase 2·3) 관할이며 본 변경은 그 일정에 개입하지 않는다.

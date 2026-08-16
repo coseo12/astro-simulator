@@ -545,7 +545,7 @@ CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하�
 | **의존 집합** | `4` | `dev` · `build` · `typecheck` · `test:unit` — **전건 실행** |
 | **비의존 집합** | `14` | `lint` · `lint:core` · `lint:shared` · `format:check` · `check-encoding` · `verify:{test-coverage,iau-data,no-scientific-grep,zombie-check,dead-wait-check,docs-links,adr-index,r1-tier-untouched,md-tilde}` — **전건 실행**, 전부 exit `0` |
 | **브라우저/서버 계열** | `24` | 스크립트 본문이 `browser-verify-utils` 또는 `localhost:` 를 참조 (술어: 아래 코드블록). `bench:scene` · `bench:scene:mobile` · `bench:scene:sweep` · `bench:tier-guard-cost` · `bench:webgpu` **5 종이 여기 속한다**. 대표 `3` 개 실행 → 전부 exit `1` / `ERR_CONNECTION_REFUSED` |
-| **기타** | `5` | `clean` · `prepare` · `format` (파괴적·부수효과라 미실행) · `verify:all` (위 계열들의 합성) · `bench:scene:set-baseline` |
+| **기타** | `5` | `clean` · `prepare` · `format` (파괴적·부수효과라 미실행) · `verify:all` (위 계열들의 합성 — **측정 rev 당시 이름**. 현 `verify:smoke`, #884) · `bench:scene:set-baseline` |
 
 ```bash
 # 브라우저/서버 계열 귀속 술어 — scripts 값에서 .mjs 경로를 뽑아 본문을 검사

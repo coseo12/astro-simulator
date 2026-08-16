@@ -42,7 +42,7 @@
     "verify:391-billboard": "node apps/web/scripts/browser-verify-391-billboard.mjs",
     "verify:r1-guard": "node apps/web/scripts/r1-ui-regression-guard.mjs",
     "verify:r1-tier-untouched": "bash apps/web/scripts/verify-r1-tier-untouched.sh",
-    "verify:all": "pnpm verify:test-coverage && pnpm verify:browser && pnpm verify:mobile && pnpm verify:mobile-p4c && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y && pnpm verify:webgpu && pnpm verify:belt-nbody",
+    "verify:smoke": "pnpm verify:test-coverage && pnpm verify:browser && pnpm verify:mobile && pnpm verify:mobile-p4c && pnpm verify:scale && pnpm verify:perf && pnpm verify:a11y && pnpm verify:webgpu && pnpm verify:belt-nbody",
     "verify:perf": "node scripts/browser-verify-perf.mjs",
     "verify:a11y": "node scripts/browser-verify-a11y.mjs",
     "verify:a11y-baseline": "node scripts/verify-a11y-baseline.mjs",
