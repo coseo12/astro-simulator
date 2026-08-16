@@ -354,6 +354,13 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
    **그때까지의 완화**: (i) 본 가드의 실효는 *"실수로 잘못 연 PR"* 차단이며 **의도적 우회는 막지 못한다** — 규율이 이미 정착한 저장소(472 PR 연속 위반 0)에서 이 구분은 실질적이다. (ii) 릴리스·핫픽스 PR 은 사람이 base 를 의식적으로 고르는 소수 경로다. (iii) 후속에서 `edited` 대신 **머지 시점 검사**(`pull_request` `edited` 를 별도 non-required job 으로 두거나, ruleset 기반 base 제약)를 함께 비교한다.
 
+   > ⚠️ **개정 ([#1027](https://github.com/coseo12/astro-simulator/issues/1027) 집행, 2026-08-16).** 위 본문은 **이력이므로 덮어쓰지 않는다** (§6-3 과 같은 형식) — **이 항목의 제목 줄도 포함**이다. 즉 위 제목의 «미해결» 은 **더 이상 유효하지 않으나 그대로 둔다**. 현재 상태는 «미해결» 이 아니라 **«탐지 100% · 차단 0%»** 이며, 그 정정은 본 주석이 싣는다. (제목 자체를 바꾼 것은 [`branch-strategy-workflow.md`](../guides/branch-strategy-workflow.md) §알려진 우회 쪽이다 — 그 문서는 **현행 규약**이라 이력 보존 대상이 아니기 때문이며, 두 문서의 취급이 갈리는 것은 의도된 것이다.)
+   >
+   > - **여전히 참**: `branch-name-guard.yml` 의 `types: [opened, synchronize]` 는 base 변경을 **포착하지 못한다** (그 workflow 는 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §5 대로 **무접촉**). 위 실측 표 4행 전부 그대로 유효하다.
+   > - **더 이상 참이 아님**: *"경로가 열려 있다"* 가 **보이지 않는 우회**를 뜻하던 부분. 신규 workflow [`pr-base-edit-guard.yml`](../../.github/workflows/pr-base-edit-guard.yml) 의 **`pr-base-edit`** 체크가 `edited` 를 받아 **같은 `verify-pr-base-rule.mjs` 로 재판정**한다 (판정 로직 사본 0 — 본 ADR §5 의 스크립트는 무접촉).
+   > - **차단은 여전히 0**: `pr-base-edit` 은 **required 가 아니다.** 붉은 X 는 뜨지만 **머지는 기계적으로 막히지 않는다.** required 편입은 기각이 아니라 **유예**이며 승격 조건은 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §9-2 (= [20260807-971](20260807-971-required-status-checks.md) §10-5 **항 14**) 다.
+   > - **완화 (iii) 의 결말**: 예고한 비교가 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §3 에서 수행됐다 — 후보 4 + 변형 2 중 **«별도 non-required job»** 채택, **ruleset 기반 base 제약은 기술적으로 불가능**으로 기각 (동 ADR §3-4).
+
 1. **`develop` 대상 PR 에서는 여전히 권고**다. `develop` 은 보호 자체가 없고 ([20260807-971](20260807-971-required-status-checks.md) 결정 2 로 **영구 미채택**), 실효 강제 범위는 release/hotfix PR 뿐이다. 다만 본 규칙이 막으려는 것이 정확히 `base=main` 오지정이므로 **위험 표면과 강제 범위가 일치**한다.
 2. **`unresolved` 는 실환경 발화 증거가 얇다.** 픽스처 3건이 주 증거다.
 
@@ -411,7 +418,7 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
 | # | 항목 | 근거 |
 |---|---|---|
-| **1** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) | ⚠️ **base 편집 우회 봉인** — `types` 에 `edited` 추가 vs 별도 non-required job vs ruleset 비교. **ADR 20260807-971 결정 9-1 / Phase 1 면제 근거와 동시에 판단해야 한다** (required check 에 event *type* 축을 들이는 결정) | §8-1 한계 0 (실측 [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
+| **1** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027), **완료**) | ⚠️ **base 편집 우회 봉인** — `types` 에 `edited` 추가 vs 별도 non-required job vs ruleset 비교. **ADR 20260807-971 결정 9-1 / Phase 1 면제 근거와 동시에 판단해야 한다** (required check 에 event *type* 축을 들이는 결정) | §8-1 한계 0 (실측 [#1026](https://github.com/coseo12/astro-simulator/pull/1026)) |
 | **2** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030), **완료**) | [`operational-friction.md`](../ops/operational-friction.md) §1-1 의 *"stacked PR"* 서술 정밀화 — 17건이 **100% 봇**이라는 구성 사실이 빠져 있어 *"사람의 stacked 관행"* 으로 오독된다 (본 PR 착수 시 실제로 오독이 발생했다) | §2-1 |
 | **3** ([#1030](https://github.com/coseo12/astro-simulator/issues/1030), **완료**) | 봇 PR 의 auto-close 경로 — base 가 작업 브랜치라 `auto-close-issues.yml` 도 네이티브도 미발동. 봇 PR 은 이슈를 닫지 않으므로 실해는 없으나 §1-1 표의 유일한 실사례가 봇이라는 점은 명시 가치가 있다 | §2-1 |
 
@@ -422,6 +429,12 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 > 트리거 축 표의 해당 행에 §1-2 포인터만 두었다.
 > ⚠️ 본 표의 항목 1 이 이슈 번호를 갖고 2·3 은 표에만 있던 상태가 **이 ADR 이 스스로 인용한 유실
 > 패턴**(#962 축 B → #970 재발견)과 같은 형태였다. #1030 이 그것을 이슈로 승격해 닫은 사례다.
+
+> **항목 1 종결 (2026-08-16)** — [#1027](https://github.com/coseo12/astro-simulator/issues/1027) 이
+> 세 안을 비교해 **«별도 non-required job»** 을 채택했다 (ADR [20260814-1027](20260814-1027-pr-base-edit-guard.md)).
+> `types` 추가안은 **기각이 아니라 유예**, ruleset 안은 **기술적으로 표현 불가능**으로 기각이다.
+> 산출물은 신규 workflow [`pr-base-edit-guard.yml`](../../.github/workflows/pr-base-edit-guard.yml)
+> (체크 이름 `pr-base-edit`) 이며, 위 §8-1 한계 0 의 개정 주석이 상태 갱신을 담는다.
 
 > cross-validate 는 본 ADR 박제 직후 **메인**이 1회 수행했다 (`developer` 페르소나 금지 — #479). 결과는 **§10** 에 4축으로 통합했고 상태는 `Accepted` 로 전이했다.
 
