@@ -171,6 +171,16 @@ Semantic Versioning을 따른다.
 
   **가드 — 검토 후 기각** (정본은 ADR §Amendment 4 §가드). 넓은 변형(표 행 코드 스팬 안 파이프 이스케이프 전건)은 정밀도 **`9/35` = 25.7%** 이고, 오탐 26 의 대부분이 확정 ADR(부기 원칙)·확정 CHANGELOG(소급 편집 금지)라 **영구히 꺼지지 않아** allowlist 가 단조 증가한다 ([`20260701-779`](docs/decisions/20260701-779-ci-alert-fatigue-concurrency.md) 의 alert fatigue 재생산). 좁힌 변형(코드 스팬 첫 토큰이 실행 파일명)은 정밀도 `3/8` 로 못 올리면서 **발의 사례 3셀을 전건 놓친다** (재현율 **`3/9`**) — 그 술어들이 정규식 조각이라 실행 파일명으로 시작하지 않는다. 정밀도를 의미로 올리려면 _"이 코드 스팬이 복사-실행 대상인가"_ 를 판정해야 하는데 이는 오기록 6 의 _"판정 = 의미론이라 기계 불가"_ 와 동형이다. ⚠️ **따라서 본 확장은 규약형 단독이며, 위반은 조용히 통과한다.**
 
+- **[#883] `setup-stage-labels.sh` 셸 옵션 강화 — 전제 재검증 결과 축 1건만 잔존 (PATCH)** ([#883](https://github.com/coseo12/astro-simulator/issues/883)) — 이슈가 지목한 **2축 중 1축이 소멸**했고, 남은 1축의 **처방 경로도 바뀌었다**. 착수 전 실측이 둘 다 드러냈다.
+
+  **소멸한 축** — `.github/workflows/harness-guards.yml` 은 [#907](https://github.com/coseo12/astro-simulator/issues/907) Phase B/C (`b474902`, PR [#911](https://github.com/coseo12/astro-simulator/pull/911)) 가 **삭제**했다. 파일이 없으므로 `.node-version` 핀 부재도 없다.
+
+  **처방이 바뀐 축** — `scripts/setup-stage-labels.sh` 의 `set -e` 는 실재한다 (다른 `scripts/*.sh` 10개 중 9개가 `set -euo pipefail`, `cleanup-browser.sh` 만 `set -uo pipefail` 로 의도적 예외 (술어 `for f in scripts/*.sh; do grep -m1 '^set ' $f; done`, 측정 트리 rev `a610b2b` — 계 `11`. ⚠️ 이슈 본문의 `11` 은 **다른 모집단**이다: 작성 시점 `3927c6b` 엔 `.sh` 가 `12`개였고 `cleanup-browser.sh` 가 없었다. 즉 이슈 서술은 **그 시점엔 참**이었고 낡은 것이지 틀린 것이 아니다)). 그러나 이슈가 요구한 **«upstream PR 직행 (Z 패턴 Phase 2)»** 은 성립하지 않는다 — **Z 패턴은 2026-07-31 폐기**됐고 (`CLAUDE.md:212` / ADR [`20260731-907`](docs/decisions/20260731-907-harness-decouple.md)) `.harness/` 의 tracked 파일은 `policy.json` **1건뿐**이다. 즉 **다운스트림 로컬 수정이 drift 를 만들지 않으므로** 그 자리에서 고치는 것이 정석이 됐다.
+
+  **안전성 3축 검증** — (1) `bash -n` 문법 OK (2) `-u`: 미설정 변수 참조 **0** (전 변수가 대입 후 사용, `REPO` 는 `${1:-…}` 기본값) (3) `-o pipefail`: 파이프라인 **0**. `-e` 는 `gh label create` 실패를 `if` 가 흡수하므로 멱등성 불변이다.
+
+  **negative 실증** — 격리 픽스처에서 `set -euo pipefail` + 미설정 변수 → `unbound variable` 로 중단, 같은 픽스처를 `set -e` 로만 돌리면 **빈 문자열로 통과**(양성 대조군). 즉 이 변경은 검출력을 실제로 더한다.
+
 ### Behavior Changes
 
 - **수치 박제 시 «측정한 트리»의 커밋을 적는다 (#1078, ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) (ii) `> 확장 (#1078)` — `Accepted (cross-validate 2026-08-16)`).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 rev 를 **동반**하기만 하면 규약을 충족했고, 이제 술어가 워킹트리의 다른 입력 파일(`.prettierignore` · 린터/컴파일러 설정 등)을 읽는 경우 **그 rev 만 체크아웃한 트리에서 값이 나오는지**까지 확인한다. 측정을 유발한 변경이 그 입력 자체를 바꾸는 PR 이면 헤더에 조합을 적고 **머지 후 재현 rev 를 사후 부기**한다. 입력이 전부 git 객체인 술어(`git ls-files` / `git grep <pat> <rev>`)는 **종전과 동일** — 추가 절차가 없다.
