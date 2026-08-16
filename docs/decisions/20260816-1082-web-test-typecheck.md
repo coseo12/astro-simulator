@@ -1,7 +1,8 @@
 # ADR: `apps/web` 45 + `packages/physics-wasm` 1 테스트 파일 타입 검사 강제 지점 — `ci.yml` `detect-and-test` 배선 + physics-wasm `tsconfig` 신설 (#1082)
 
 - 일자: 2026-08-16
-- **상태**: **Provisional** (cross-validate 미수행 — 메인 오케스트레이터가 수행 후 §교차검증 반영 사항 4축 통합 + `Accepted` 전이 + 인덱스 상태 열 동시 갱신). ⚠️ 본 라인은 [`20260812-1005`](20260812-1005-adr-index-status-guard.md) §재검토 조건의 **어순 제약** 대상이다 — 현재 상태 토큰이 최선두여야 한다
+- **상태**: **Accepted** (cross-validate 2026-08-16 — §교차검증 반영 사항 4축 통합 완료). 원 박제: `Provisional`
+  - **전이 주체·시점**: 메인 오케스트레이터가 PR [#1093](https://github.com/coseo12/astro-simulator/pull/1093) 머지 직전 수행 ([#479](https://github.com/coseo12/astro-simulator/issues/479) — sub-agent 직접 호출 금지). ⚠️ **cross-validate 를 2회 돌렸다** — 라운드 1 직후 1회, reviewer 차단 2건 반영으로 §실측 C 와 §비용 논거가 실질 변경돼 **라운드 2 에서 재수행**했다. 아래 4축은 **라운드 2 결과**다. `outcome` = `applied` / `plan_bypass` = `false`. 인덱스 표 상태 열은 같은 커밋에서 갱신한다
 - 관련: 이슈 [#1082](https://github.com/coseo12/astro-simulator/issues/1082) / 분리 출처 [#1060](https://github.com/coseo12/astro-simulator/issues/1060) §실측 B / 선행 ADR [`20260814-1060`](20260814-1060-packages-test-typecheck.md) (명령 형태 규약 결정 3 · 배선 지점 선례) · [`20260814-960`](20260814-960-worktree-typecheck-recipe.md) (`apps/web` typecheck 선행 조건 2축) · [`20260807-971`](20260807-971-required-status-checks.md) 결정 1 (required check 관할) · [`20260808-983`](20260808-983-measurement-recording-convention.md) (수치 박제 규약)
 - 측정 rev: `d0b5b5e` (`origin/develop` tip, 2026-08-16). 본 문서의 **로컬** 수치는 이 rev 단일 시점에 **격리 worktree** 1개에서 `pnpm install --frozen-lockfile` + `pnpm build` 후 일괄 도출했다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §부분 재측정 금지). 실행 환경은 macOS / pnpm `10.32.1` (= 루트 `packageManager` 핀) / TypeScript `6.0.3` / Next `16.2.12` / Node `v24.14.0`. ⚠️ **Node 는 `.node-version` 핀 (`22.16.0`) 과 다르다** — 아래 결론 중 Node 버전에 의존하는 것은 없으나(전부 `tsc` · `next` · `pnpm` 종료 코드) 표기해 둔다. **CI** 수치는 `gh api` (GET 전용) job-level 조회이며 run id 를 함께 적는다
 - 브랜치 base: 본 PR 은 리뷰 라운드 중 `a986973` (= `d0b5b5e` + PR [#1090](https://github.com/coseo12/astro-simulator/pull/1090), #1060 배선) 위로 rebase 됐다. **재측정하지 않은 근거**: 그 delta 의 변경 파일은 `.github/workflows/ci-physics-wasm.yml` · `CHANGELOG.md` **`2` 개뿐**이고 본 문서가 측정한 경로와 **교집합 `0`** 이다 (술어: `git diff --name-only d0b5b5e a986973 | grep -cE '^(apps/web/|packages/physics-wasm/|packages/shared/|packages/core/|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.github/workflows/ci.yml|.github/actions/)'` → `0`, 같은 실행 양성 대조군 = 전체 변경 파일 `2`)
@@ -468,7 +469,38 @@ npx prettier --write packages/physics-wasm/tsconfig.json
 
 ## 교차검증 반영 사항
 
-⚠️ **미수행 — 본 ADR 은 `Provisional` 이다.** cross-validate 는 메인 오케스트레이터가 수행하며 (#479 — sub-agent 직접 호출 금지), 통합 후 `Accepted` 전이 + `docs/decisions/README.md` 상태 열 동시 갱신 ([`20260812-1005`](20260812-1005-adr-index-status-guard.md) 가 강제).
+✅ **수행 완료 — 2회.** 라운드 1 (`2026-08-16`, ADR 초판) / **라운드 2** (`cross_validate.sh code 1093`, reviewer 차단 2건 반영 후 — outcome `applied`, exit `0`). 아래는 **라운드 2** 결과의 4축 분류다. 라운드 1 은 초판 서술을 승인했는데 그 서술 중 **두 문장이 이후 reviewer 에게 반증**됐으므로, 라운드 1 단독으로 전이하지 않은 것이 옳았다.
+
+### ① 합의
+
+- **결손 재현 방식** — `git ls-files` 와 `tsc --listFiles` **독립 술어 교차 검증** + 비-테스트 대조군을 **같은 실행에** 주입해 «도달성 축이 아니라 파일명 축» 을 확정한 것.
+- **`@ts-expect-error` 사문화 이력 추적** — `11c7b4f` 도입 시점 정상 동작 → `251d480`(#875) 다중 행 import 확장으로 사문화(미감지 `25`일)를 `R-HIST-A/B` 로 확정한 것.
+- **명령 규약 승계** — `20260814-1060` 결정 3 의 분리 호출 + `--fail-if-no-match`.
+- **임계 경로 교정** — 두 workflow 가 `concurrency.group` 에 workflow 이름을 포함해 **병렬**임을 근거로 비율 논거를 철회하고, «성공 경로 `+~7s` vs 실패 경로 `t≈97s` 에서 잔여 `~870s` 차단» 의 **비대칭성**으로 재작성한 것.
+- **거버넌스** — `Provisional` 상태 관리, lockfile 갱신에 따른 qa 게이트 «예외 불가» 명시.
+
+### ② 이견 수용
+
+없음 — 차단·반대 의견 `0`.
+
+### ③ 고유 발견
+
+**없다.** 라운드 2 의 지적은 전부 reviewer 라운드 1 이 이미 잡아 반영된 항목의 **재확인**이었다.
+
+> ⚠️ **이것이 이번 사이클의 반복 관측과 정합한다.** 라운드 1 cross-validate 는 초판을 승인했고, 그 초판에는 **전칭 단정 1건 + 실행 불가 처방 1건** 이 들어 있었다 — **둘 다 reviewer 의 격리 worktree 독립 재현만이 적발**했다. 같은 패턴이 PR [#1070](https://github.com/coseo12/astro-simulator/pull/1070)·[#1074](https://github.com/coseo12/astro-simulator/pull/1074)·[#1080](https://github.com/coseo12/astro-simulator/pull/1080)·[#1092](https://github.com/coseo12/astro-simulator/pull/1092) 에서도 관측됐다. ⇒ **cross-validate 는 «자기 논리 안에서 정합한가» 를 보며, 참인 명제가 잘못된 기전에 붙은 것은 뜯지 못한다.** 근거 검증은 reviewer 재현이 담당하고 cross-validate 는 각도 확장에 쓴다.
+
+### ④ Claude 편향 셀프 체크 (사후)
+
+호출 전 자기 판정 4축 중 **3축이 경계선/미통과**였고, 그중 둘은 **실제로 결함으로 실현**됐다.
+
+| 축 | 호출 전 | 사후 판정 |
+| --- | --- | --- |
+| 낙관적 일정 | 통과 | **유지** — 단 CI 소요 `[가정]` 라벨의 실측 의무는 구현 PR DoD 에 존치 |
+| 결합 간과 | ⚠️ 초안이 걸림 | **실현됐다** — physics-wasm 을 «tsconfig 만 만들면 되는 1 파일» 로 본 초안이 `@ts-expect-error` 사문화 + `typescript` 미선언 + lockfile 갱신을 놓쳤고, **프로브를 실행하고서야** 드러났다. 정적 추론으로는 끝까지 안 보였다 |
+| 폐기 프레이밍 | ⚠️ 경계선 | **실현됐다** — (b) 기각 근거 중 «한계 비용 비율» 이 병렬 workflow 를 직렬로 가정해 **부호가 반대**였다. (b) 의 진짜 장점을 §후보 비교 첫 문단에 먼저 적었음에도 근거 자체가 틀렸다 |
+| 순수주의 | ⚠️ 경계선 | **삽입 질문 «(A) 대신 (B) 명시적 범위 밖 선언이 더 비례하는가?» 에 대한 라운드 2 응답은 (A) 지지**다 — `echo` no-op 이 «거짓 문장 + exit `0`» 이라는 #840 클래스 근거를 인정했다. 다만 이 응답은 본 ADR 이 이미 제시한 근거의 재확인이라 **독립 증거가 아니다** |
+
+**앵커링 점검** — 삽입 질문은 ADR 이 자기 경계선 축에서 도출했고 메인은 호출 전 결론을 제시하지 않았다. 그러나 위 ③ 이 적은 대로 **«고유 발견 0» 은 질문이 좁았을 가능성과 구분되지 않는다.**
 
 **호출 전 Claude 편향 셀프 체크** ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5 4종) — architect 자기 점검 결과:
 
