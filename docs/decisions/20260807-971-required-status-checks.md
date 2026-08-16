@@ -1501,8 +1501,8 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 
     | 항목 | 내용 |
     | --- | --- |
-    | **실행 주체** | **기계** — `.github/workflows/release-escape-watch.yml` (비-required). 위 **(0)** 을 그대로 실행한다. **판단은 사람** (T1 대장 원인 분류 / T1 (b) 사후 정정 / T2 재개봉) |
-    | **주기** | 릴리스 클래스 머지 **이벤트마다** (`pull_request: types: [closed]` + `merged` ∧ 모집단 조건). 실측 빈도 **`26` 회/30일** (`base=main` 기준) · **`52` 회/30일** (릴리스 클래스 전건) — 사람 스텝으로 올리지 않는 근거 |
+    | **실행 주체** | **기계** — `.github/workflows/release-escape-watch.yml` (비-required). 위 **(0)** 을 그대로 실행한다. **판단은 사람** (T1 대장 원인 분류 / T1 (b) 사후 정정 / T2 재개봉). ⚠️ **그 workflow 는 아직 없다 — 구현은 [#1096](https://github.com/coseo12/astro-simulator/issues/1096)** (PR [#1098](https://github.com/coseo12/astro-simulator/pull/1098) reviewer 실측 `0` hit). 배선 전까지는 릴리스 직후 **메인이 (0) 을 1회 수동 실행**하며, 이 잠정 조치는 #1096 머지와 동시에 소멸한다 |
+    | **주기** | 릴리스 클래스 머지 **이벤트마다** (`pull_request: types: [closed]` + `merged` ∧ 모집단 조건). 실측 빈도 **`26` 회/30일** (`base=main` 기준) · **`52` 회/30일** (릴리스 클래스 전건) — 사람 스텝으로 올리지 않는 근거. ⚠️ 두 값은 **`2026-08-16` 측정 시점 스냅샷**이며 시간에 따라 이동한다 (`20260808-983` §수치 박제 규약 4항). 재산출 술어와 도출 근거는 ADR [`20260816-1073`](20260816-1073-clause13-observation-wiring.md) §결정 2 가 정본이고 여기서 값을 복제하지 않는다 — 본 표의 두 값은 «사람 스텝 미채택» 판단의 근거 인용이지 감시값이 아니다 (PR [#1098](https://github.com/coseo12/astro-simulator/pull/1098) reviewer 🟡-3) |
     | **실패 — `ESCAPE` 출력** | T1: **(a) 먼저** 아래 §escape 대장 박제 → **(b) 그 다음** 사후 정정. `escape >= 2` 도달 시 T2 = **결정 9-1 재개봉** (편입 승인 아님) |
     | **실패 — job 실패** | run 재실행. `2` 사이클 연속 실패 시 사람이 (0) 을 수동 1회 실행 + [20260816-1073](20260816-1073-clause13-observation-wiring.md) §재검토 조건 3 발동 |
     | **실패 — run 부재** (미발화) | **창 이탈 전** 사람이 (1)+(2) 전수 재산출 **1회**. `check-runs` 는 영구 보존이라 90일 창 안에서 **정보 손실 `0`** — 매 사이클 관측은 데이터 보존 요구가 아니라 **latency 요구**다. 이것이 fallback 이며 사람 규약은 폐지가 아니라 **강등**됐다 |
