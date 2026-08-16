@@ -304,18 +304,19 @@ on:
 
 ## §8 Developer 인계
 
-**본 ADR 자신은 구현을 포함하지 않는다.** 잔여는 후속 이슈로 분리하며, **표에만 남기지 않는다** — 그것이 §1 표의 세대 1·2 를 만든 실패 형태다.
+**본 ADR 자신은 구현을 포함하지 않는다.** 잔여는 후속 이슈로 분리하며, **표에만 남기지 않는다** — 그것이 §1 표의 세대 1·2 를 만든 실패 형태다. 두 후속 모두 **본 ADR 커밋과 같은 사이클에 이슈로 실물 생성**했고 번호를 아래에 박제한다.
 
-### 후속 1 — `release-escape-watch.yml` 구현 (본 ADR 의 직접 산출물)
+### 후속 1 — [#1096](https://github.com/coseo12/astro-simulator/issues/1096) `release-escape-watch.yml` 구현 (본 ADR 의 직접 산출물)
 
 - **시작 지점**: `.github/workflows/auto-close-issues.yml` 을 구조 원본으로 삼는다 (`pull_request: types: [closed]` + 최소 `permissions`).
 - **술어 원문**: 971 §10-5 항 13 의 **(0) 코드 블록**을 복제한다. `N` 만 `${{ github.event.pull_request.number }}` 로 바인딩한다.
 - **DoD 4축** ([guard-pr-dod.md](../lessons/guard-pr-dod.md)) — 신규 가드 도입 PR 이므로 **4축 전건 적용 의무**. 특히 축 (2) 3중 시뮬레이션: `clean` PR → `ESCAPE` PR (`#636` 등 소급 4건을 `N` 으로 주입) → 복구.
 - **명시적 비-범위**: 971 required 집합 · 저장소 설정 · 항 14.
 
-### 후속 2 — 항 14 관측 배선 (§결정 7 분리분)
+### 후속 2 — [#1097](https://github.com/coseo12/astro-simulator/issues/1097) 항 14 관측 배선 (§결정 7 분리분)
 
 - 술어 정본은 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §9-2 조건 1. 비용 `O(전수)` 이므로 트리거 설계부터 다시 판정해야 한다 (본 ADR 의 이벤트 구동 형태를 그대로 쓸 수 없다).
+- **기각도 결론**으로 열어 뒀다 — base rate 가 `0 / 110일` 이라 _"항 14 는 조건만 존재하고 관측은 발생하지 않는다"_ 가 정당한 결론일 수 있으며, 그 경우 **명시 박제**가 완료 조건이다 (§4-4 와 같은 규약).
 
 ---
 
