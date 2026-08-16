@@ -208,9 +208,15 @@ jobs:
       #   tsconfig.json = include ["src/**/*"]) 뿐인데 이를 부르는 CI 스텝이 0개였다.
       #   vitest 는 트랜스파일만 하고 타입을 안 보므로 아래 단위 테스트 스텝도 못 잡는다
       #   → 58 파일이 타입 검사 사각 ("CI 통과 ≠ 테스트 실행" #840 클래스, 강제 지점 부재형).
-      # 배선 지점이 여기인 이유: 위 빌드 스텝의 선행 조건 논거(core 소스가 physics-wasm pkg/
-      #   를 직접 import / shared·core exports 가 dist/ 기반, 둘 다 gitignored)가 typecheck
-      #   에 축자 그대로 적용된다. 같은 파일 집합의 두 검증(실행·타입)을 한 job 이 소유한다.
+      # 배선 지점이 여기인 이유: 위 빌드 스텝의 선행 조건 논거(core 소스가 physics-wasm 산출물을
+      #   직접 import / shared·core exports 가 dist/ 기반, 둘 다 gitignored)가 typecheck 에도
+      #   적용된다. 같은 파일 집합의 두 검증(실행·타입)을 한 job 이 소유한다.
+      #   ⚠ 단 physics-wasm 갈래는 **요구 산출물이 다르다** (PR #1090 reviewer 실측). core 의
+      #   moduleResolution 이 `bundler` 라 exports 의 `node` 조건을 타지 않아, typecheck 이
+      #   해석하는 것은 `pkg-bundler/` 이고 `pkg/` 는 vitest 런타임 대상이다 — `pkg/` 만 지우면
+      #   core typecheck 은 exit 0 (같은 상태 vitest 는 exit 1), `pkg-bundler/` 를 지워야
+      #   TS2307 이 난다. 배선 순서 결론은 불변이다: 위 빌드 스텝이 build:node && build:bundler
+      #   로 둘 다 만들고, shared/dist 갈래(제거 시 exit 2)만으로도 이 위치는 필연이기 때문이다.
       # ⚠ 명령 형태는 **패키지별 분리 호출 + --fail-if-no-match** 여야 한다 (둘 중 하나만으로는
       #   안 된다). 커버리지를 조용히 잃는 회귀가 2축이고, 두 수단이 순차 의존이기 때문이다
       #   — 아래는 이 브랜치에서 pnpm 10.32.1 (packageManager 핀과 일치 확인) 로 8셀 전건 실측:
