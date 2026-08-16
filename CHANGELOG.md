@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.75.0] — 2026-08-16
+
 ### Added
 
 - **[#1073] ADR [`20260816-1073`](docs/decisions/20260816-1073-clause13-observation-wiring.md) 신설 (`Accepted` — cross-validate 2026-08-16) — 971 §10-5 항 13 관측 의무 배선: 관측은 기계, 판단은 사람 (PATCH)** ([#1073](https://github.com/coseo12/astro-simulator/issues/1073)) — PR [#1069](https://github.com/coseo12/astro-simulator/pull/1069) 가 항 13 을 신설하며 술어·창·임계를 기계 판정 가능하게 박제했으나 **«누가 매 사이클 그것을 돌리는가»** 를 열어 뒀다. 조건을 평가하는 주체가 없으면 결과는 조건이 없는 것과 같고, 이 저장소는 같은 사슬이 **두 번** 끊겼다 (#962 → #970 / #1014 → #1035). 본 PR 은 **문서만** — `.github/workflows/` 무접촉이며 구현은 후속.
