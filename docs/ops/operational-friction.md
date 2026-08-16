@@ -691,6 +691,24 @@ pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 1
 - **에이전트 행동 규칙 사본**: `.claude/agents/developer.md` §규칙 (§7 규약 바로 다음 줄). 본 절이 절차 SSoT 다.
   ⚠️ 트리거 조건은 **두 곳이 같은 낱말이어야 한다** — 초판이 양쪽 다 *"`typecheck` 를 돌리려면"* 으로
   좁게 적었고 #1062 가 양쪽을 동시에 넓혔다. 한쪽만 고치면 사본이 SSoT 를 좁히는 형태가 된다.
+
+  **강제 지점 (#1076)** — `scripts/verify-ssot-trigger-wording.mjs` (CI `project-guards`). 위 규칙은
+  신설 당일 자기 위반을 냈고(SSoT `해석하는` / 사본 `의존하는` — PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072)
+  reviewer 라운드 1), 규약형 단독 방어가 그것을 통과시켰다. 가드는 이 절 첫 문단의 **트리거 강조
+  span 을 런타임 추출**해 사본과 정규화 축자 대조하고, 규범면(`.claude` · `docs/ops` · `CLAUDE.md`)에서
+  그 문언을 보유한 파일 집합이 {본 절, 사본} 과 정확히 일치하는지 pin 한다.
+
+  - ⚠️ **가드는 문언을 갖지 않는다** — 하드코딩하면 그 순간 스크립트가 **세 번째 검증되지 않은
+    사본**이 되어 막으려던 클래스를 재생산한다 (ADR [`20260806-962`](../decisions/20260806-962-branch-name-guard.md) §후보 (a) 기각 근거).
+    등록부가 갖는 것은 앵커(절 헤딩 정규식 + 표지 리터럴 `@astro-simulator/*`)뿐이고, 둘 다 낱말이
+    바뀌어도 불변이라 실제 drift 에서 정상 발화한다.
+  - ⚠️ **이 규칙은 `git grep` 으로 대체되지 않는다.** 위 트리거 강조 span 은 **줄바꿈을 품고** 있고
+    사본은 한 줄이라, 트리거를 축자로 건 `git grep -lF` 는 **본 절 자신을 찾지 못한다** (2026-08-16
+    실측: hit 은 사본과 `CHANGELOG.md` 뿐, 본 파일 `0`). 라인 단위 도구로는 원리적으로 대조가
+    성립하지 않는다 — 규약형이 아니라 스크립트여야 하는 이유다.
+  - **모집단 경계** — `CHANGELOG.md` · `docs/decisions` 는 **이력 기록** 계급이라 의도적으로 제외한다
+    ([`reviewer.md`](../../.claude/agents/reviewer.md) §절차 4 5분류 2항). 이력은 그 시점 사실이라
+    문언이 갈려 있는 것이 정상이고, 모집단에 넣으면 릴리스 노트를 쓸 때마다 발화한다.
 - 근거: [#960](https://github.com/coseo12/astro-simulator/issues/960) — 증상 2회 독립 보고
   (PR [#941](https://github.com/coseo12/astro-simulator/pull/941) · [#959](https://github.com/coseo12/astro-simulator/pull/959)).
   판정은 ADR [`20260814-960-worktree-typecheck-recipe.md`](../decisions/20260814-960-worktree-typecheck-recipe.md)
