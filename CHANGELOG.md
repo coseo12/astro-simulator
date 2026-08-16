@@ -110,6 +110,7 @@ Semantic Versioning을 따른다.
 - **강제력 등급은 "체크런 붉은 X + 메인의 CI 확인" 이다** (ADR 결정 4). 본 스텝은 required status check 가 아니며 `develop` 은 branch protection 미채택이라, `pnpm -r test` 를 포함해 이 저장소 CI 가드 대부분과 **같은 등급**이다. required 승격은 ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 결정 1 (Phase 2·3) 관할이며 본 변경은 그 일정에 개입하지 않는다.
 - **pnpm 기반 CI 가드 배선의 일반 규약이 생겼다** (ADR 결정 3). 다중 `--filter` 단일 호출은 **가드 배선에 쓰지 않는다** — 본 스텝에 한정되지 않으며, 앞으로 pnpm 스크립트를 CI 가드로 거는 모든 작업에 적용된다. 근거와 실측은 위 표 · 워크플로 인라인 주석 · ADR §후보 비교 2 세 곳에 있고 판정 정본은 ADR 이다.
 - **기존 `workspace 빌드` 스텝의 같은 축은 의도적으로 손대지 않았다** (ADR §의도적 비-범위). 그 스텝도 이중 `--filter` 를 쓰지만 `build` 는 소실 시 산출물이 안 생겨 후속 `pnpm -r test` 가 큰 소리로 죽으므로 **결과가 다르다** — 별도 판단이 필요하다.
+- **allowlist 밖 모듈을 재수출(`export … from`)로 끌어오면 `project-guards` 가 막는다 (#1084).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 `scripts/verify-adr-index.mjs` 에 그 한 줄을 넣어도 `--self-test` 가 `50 passed, 0 failed` exit `0` 이었고 `prettier`·`eslint` 백스톱도 `0` 이었다. 이제 `F19n` 이 exit `1` 로 떨어진다. **들여쓴 `import` 는 의도적으로 종전 그대로**다 (`prettier --check` 백스톱 exit `1` 실측 — 스크립트 헤더 §범위 경계 (iv) 가 기각 근거와 재검토 조건을 명시).
 - **`base` 를 편집하면 새 체크 `pr-base-edit` 이 뜬다 (#1027).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 열린 PR 의 `base` 를 바꿔도 **새 run 이 0건**이라 아무 판정도 남지 않았고(#1026 실측), 이제 `pull_request` `edited` 마다 `verify-pr-base-rule.mjs` 가 재판정한다. **막히는 PR 은 0** 이다 (비-required). 부수 대가로 **제목·본문만 편집해도 발화**하므로, head 이름이 규약 밖인 PR 은 `pr-base-edit` 에서도 `unresolved`(**귀속: branch-name**) 를 받아 붉은 X 가 둘이 된다 — 진단 메시지가 _"base 는 정상이니 head 이름만 고쳐라"_ 로 정확하므로 수용한 설계다 (ADR 결정 3).
 
 - **좀비 카나리아가 잡는 대상이 또 한 번 바뀐다 (#1086).** 같은 입력에서 SessionStart hook(가드 C)과 qa 에이전트 카나리아가 **다르게 동작한다**. **새로 보고하지 않는 것**: `cargo build --release && pnpm test` 처럼 명령 분리자(`&&` `;` `|`)를 넘어 뒤쪽 `test` 에 닿던 형태(= cargo 축 **오귀속**), `next development` · `next dev-preview` 처럼 `next dev` 우경계가 없어 걸리던 형태. **새로 보고하는 것**: `sh -c 'pnpm  dev'` 처럼 한 argv 원소 안에 공백이 2개 이상 보존된 형태. **검출 의무 형태는 전건 유지**(`pnpm dev` · `pnpm run dev` · `pnpm --filter <pkg> dev` · `next dev` · `next-server` · `cargo test` 계열 · `cargo nextest run` · `cargo +nightly test`).
@@ -118,6 +119,35 @@ Semantic Versioning을 따른다.
   \=======
 
 ### Fixed
+
+- **[#1084] `verify-adr-index --self-test` 의 import allowlist 우회 — 재수출(`export … from`) 채택 · 들여쓰기 기각** ([#1084](https://github.com/coseo12/astro-simulator/issues/1084)) — PR [#1077](https://github.com/coseo12/astro-simulator/pull/1077) reviewer 가 실측한 우회 2건은 **둘 다 base 패리티라 선재 결함**이다. 판정 정본은 ADR [`20260812-1005`](docs/decisions/20260812-1005-adr-index-status-guard.md) **§Amendment 4**.
+
+  **갈린 축은 «닫을 수 있는가» 가 아니라 «이미 다른 백스톱이 잡는가» 다.** 두 픽스처를 **같은 실행**에 넘겨 _"prettier 가 원래 아무거나 잡는다"_ 를 배제했다 (lockfile 판본 `prettier@3.9.6`): 컬럼 0 well-formed 재수출 → `prettier --check` **exit `0`** / `eslint` **exit `0`** = 백스톱 **`0`** → **채택**. 들여쓴 최상위 `import` → `prettier --check` **exit `1`**(`[warn]`) = 백스톱 **1** → **기각**. 기각은 침묵하지 않고 스크립트 헤더 §범위 경계 **(iv)** 에 근거·재검토 조건과 함께 박제했다 (CI 배선은 `ci.yml` §#952 포맷 백스톱이고 `scripts/` 는 `.prettierignore` 대상이 아니다 — 이 전제가 무너지면 앵커를 재판정).
+
+  **재수출이 «로드» 라는 것은 산문이 아니라 실측이다** (2축). ① 재수출 한 줄짜리 모듈을 부르면 대상 모듈의 최상위 `console.log` 가 찍힌다 ② 내장 모듈 축에서 `process.moduleLoadList` 의 해당 항목이 **`false` → `true`** 로 뒤집힌다. ⇒ 상수명을 `ALLOWED_IMPORTS` → **`ALLOWED_MODULE_LOADS`** 로 바꿔 allowlist 의 의미를 _"로드하는 모듈"_ 로 확정했다 (**허용 6항목 자체는 불변** — 바뀐 것은 이름과 수집 범위다). PR [#1018](https://github.com/coseo12/astro-simulator/pull/1018) cross-validate 보안 축이 근거로 삼은 _"자식 프로세스 모듈 import 0"_ 불변식은 **재수출 경로에 열려 있었고**, 이제 «로드» 기준으로 참이다.
+
+  **수집과 계수를 함께 넓혔다** (이슈 §범위 1항 경고 — 한쪽만 넓히면 두 조건이 상시 불일치해 무조건 FAIL 한다). 사전 구간에서 **따옴표를 배제**해 `export const X = 'from';` 오탐을 구조적으로 닫고, `from` 뒤에 명세자 따옴표가 곧바로 올 것을 함께 요구해 `export const from = 1;` 형태도 배제했다. 두 축의 계수는 **정규식을 분리해 각각 센 뒤 더한다** — 교대 정규식으로 합치면 재수출 매치가 소비한 구간에 다음 축의 줄 시작이 묻혀 계수가 서로를 **상쇄**할 수 있다 (사전 구간이 줄바꿈을 넘기 때문).
+
+  **negative 실증 — 3중 시뮬레이션.** 격리 사본에 주입했다 (`SCRIPT_DIR` 자기 참조 단언 때문에 `scripts/` **전체**를 복사해야 성립한다 — 단일 파일 복사는 원본을 읽어 무의미하다). 본검사는 `ADR_INDEX_ROOT` 로 실 저장소 루트를 주입해 격리 부작용(README 부재 exit `2`)과 주입 효과가 갈리지 않게 했다.
+
+  | 주입 (컬럼 0)                                      | 수정 **전** (head)             | 수정 **후**                                         |
+  | -------------------------------------------------- | ------------------------------ | --------------------------------------------------- |
+  | 재수출 1줄 (allowlist 밖)                          | `50 passed, 0 failed` exit `0` | **exit `1`** — 계수 `7`/기대 `6` + 수집에 해당 모듈 |
+  | 재수출 다중행 (prettier 분할형)                    | `50 passed, 0 failed` exit `0` | **exit `1`** (동일 진단)                            |
+  | 재수출 세미콜론 누락                               | `50 passed, 0 failed` exit `0` | **exit `1`** — 계수만 어긋남 (조건 ② 단독 검출)     |
+  | **오탐 대조군** — 모듈 로드 아닌 컬럼 0 export 4종 | `50 passed, 0 failed` exit `0` | `53 passed, 0 failed` exit `0` (**불변**)           |
+  | 들여쓴 import (기각 대상)                          | `50 passed, 0 failed` exit `0` | `53 passed, 0 failed` exit `0` (**의도된 미검출**)  |
+  | (원복)                                             | `50 passed, 0 failed`          | `53 passed, 0 failed` — **recovery**                |
+
+  **오탐 `0` 은 양성 대조군과 같은 실행에서 쟀다** — 음성만 재면 수집이 통째로 고장 나도 통과해 vacuous 하다. **실물 파일 층**: 음성 4종 + 양성 1건을 **한 번에** 주입하면 계수가 정확히 `7`(= `6` + `1`) 이고 늘어난 수집 항목은 **하나뿐**이다 (`52 passed, 1 failed`). 음성이 하나라도 샜다면 값이 더 커진다. **픽스처 층**: `F19r` 이 같은 소스에 둘을 넣고 결과가 정확히 `['node:vm']` · 계수 `1` 임을 **한 단언**으로 요구한다. ⚠️ 커밋물의 allowlist 밖 sentinel 은 `node:vm` 으로 통일했다 — 자식 프로세스 계열 모듈명을 적으면 `grep -c <모듈명>` 이라는 사람의 감사 술어가 오염돼 ADR §Amendment 1 의 Y-1 판정(denylist 기각)이 스스로 무너진다 (해당 모듈명의 이 파일 내 등장 수는 변경 전후 모두 **`0`**).
+
+  **신규 픽스처 3건** — `F19r`(오탐 0 + 양성 대조) / `F19s`(다중행 재수출 = `F19p` 의 재수출 축) / `F19t`(세미콜론 누락·한 줄 혼재 = `F19q` 의 재수출 축). `F19n`·`F19p`·`F19q` 는 이제 **같은 두 함수**(`collectLoads` / `countLoadStarts`)를 부른다 — 픽스처와 실물 단언이 사본으로 갈릴 수 없다 (volt [#120](https://github.com/coseo12/volt/issues/120)).
+
+  **단언 수 sweep — 최종값 1회 일괄** ([`20260813-1020`](docs/decisions/20260813-1020-adr-index-membership-marker-rejected.md) §결정 3). `grep -c 'assert(' scripts/verify-adr-index.mjs` == `--self-test` 출력 `N passed` == **53** (`50` → `53`, 차분 `+3`. 절대값·차분을 한 번의 출력에서 함께 도출했다). ⚠️ **범위 라벨 `F1~F20` 은 불변이라 갱신 대상은 다시 1곳**(self-test 섹션 헤더)이다 — 신규 3건이 전부 `F19` 아래로 들어가므로 Amendment 2 와 같은 상황이고, Amendment 3 의 _"3곳 전건"_ 은 `F20` 신설이라는 **그때의 조건**에 종속된 판정이었다. 갱신 **후** sweep 2종(`git grep -nE 'F1~F[0-9]+'` · `git grep -nE '[0-9]+ 단언'`)으로 재확인했다. 발견된 옛 값은 전건 **이력**이라 무치환이다 — 본 `[Unreleased]` 위 #1075 항목의 `== **50**` 은 PR [#1092](https://github.com/coseo12/astro-simulator/pull/1092) 시점 기록이고, ADR 본문 Amendment 1~3 의 `47`·`49`·`50` 과 확정 릴리스 섹션의 `23 단언`·`47 단언` 도 같다.
+
+  **부수 정정 1건** — self-test 섹션 헤더의 세부 라벨 범위가 `F19a~F19o` 에 멈춰 있어 PR #1077 이 추가한 `F19p`·`F19q` 를 빠뜨리고 있었다 (선재 drift). `F19a~F19t` 로 정정한다. ADR 본문 §Amendment 1 의 같은 표기는 **그 시점 기록**이라 무치환이다. ⚠️ 범위 표기를 **하나의 코드 스팬**으로 감싼 것은 서식 취향이 아니라 ADR [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) 준수다 — `prettier` 가 bare `~` 를 GFM 취소선 delimiter 로 정규화할 수 있기 때문이다. ⚠️ **정확한 변환 조건은 «코드 스팬 사이» 가 아니라 «같은 문단에 짝이 될 bare `~` 가 하나 더 있을 것»** 이다 (PR [#1100](https://github.com/coseo12/astro-simulator/pull/1100) reviewer 🟡-2 실측 — `prettier@3.9.6`: 문단에 bare `~` 가 **1개면 무변경**, **2개면 둘 다** `~~` 로 변환, 단일 코드 스팬은 무변경). 즉 위 서술을 전칭으로 읽으면 반례가 있다. ADR `20260812-1005` 본문은 이 조건을 이미 정확히 적었고 본 항목만 한정자가 빠져 있었다.
+
+  **인덱스 대조 로직 무접촉** — `runCheck` 이하 판정 경로는 한 글자도 바뀌지 않았고 본검사는 계속 PASS (`상태 불일치 0`). 본검사 stdout 의 _"범위 밖"_ 한 줄도 불변이다 — 신규 경계 (iv) 는 인덱스 대조가 아니라 **자기 배선 검사**의 경계라 축이 다르고, 헤더가 그 사실을 명시한다.
 
 - **[#1075] `verify-md-tilde.mjs --population` 의 미해결 인덱스 오계수 — fail-fast 로 전환** ([#1075](https://github.com/coseo12/astro-simulator/issues/1075)) — `--population` 이 `git ls-files -z '*.md'` 를 unmerged 검사 없이 쓰고 있었다. `git ls-files` 는 충돌 중인 경로를 **stage 1/2/3 으로 각각 한 줄씩** 반환하므로 같은 파일이 최대 3회 계수된다. **관측 실측** (PR [#1074](https://github.com/coseo12/astro-simulator/pull/1074) 작업 중): `CHANGELOG.md` 미해결 상태에서 계수 `49` → **`51`**(`+2`), 그때도 exit `0` · 경고 `0`.
 
