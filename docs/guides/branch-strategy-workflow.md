@@ -160,18 +160,19 @@ node scripts/verify-pr-base-rule.mjs --pr base=develop head="$(git branch --show
 
 | 검사 | workflow | job | 선결 조건 |
 |---|---|---|---|
-| 런타임 base × head (`--pr`) | `branch-name-guard.yml` | `branch-name` (**main 의 required check**) | 이벤트 페이로드의 `base.ref` · `head.ref` |
+| 런타임 base × head (`--pr`) — `opened` / `synchronize` | `branch-name-guard.yml` | `branch-name` (**main 의 required check**) | 이벤트 페이로드의 `base.ref` · `head.ref` |
+| 런타임 base × head (`--pr`) — `edited` | `pr-base-edit-guard.yml` | `pr-base-edit` (**required 아님** — 아래 §알려진 우회) | 동일 (같은 스크립트·같은 명령) |
 | SSoT drift (`--verify-ssot`) + `--self-test` | `project-guards.yml` | `project-guards` | 체크아웃된 파일 (이벤트 무관) |
 
 런타임 검사는 브랜치명 스텝 **뒤에** 둔다. `unresolved` 는 head 이름 위반에서 파생되므로 브랜치명이 먼저 판정돼야 진단이 정확하기 때문이다. 다만 **앞 스텝이 실패해도 base 검사는 돈다** — `if: ${{ !cancelled() }}` 를 붙여 놨다. 그렇지 않으면 head 이름과 base 가 **둘 다** 틀린 PR 에서 base 진단이 가려져 수정 왕복이 2회가 된다. 이 조건은 스텝 실행을 **추가**만 하므로 job 결론을 어느 방향으로도 뒤집지 않고, 취소된 run 에서는 돌지 않는다(`always()` 미채택). 따라서 `unresolved` 도 **CI 에서 도달 가능**하며, 스크립트는 그것을 fail-closed 로 처리한다.
 
 ⚠️ **폭발 반경**: 같은 job 에 넣는다는 것은 본 가드가 `main` 의 required check 강제력을 **상속**한다는 뜻이다. 오차단이 나면 릴리스가 하드 블록되고 `enforce_admins: true` 라 우회로가 없다. 그래서 릴리스·핫픽스 4셀(`develop→main` / `main→develop` / `hotfix/*→main` / `release/*-prep→develop`)은 `--self-test` 픽스처 **맨 앞에 불변식으로 고정**돼 있다. 막혔을 때의 탈출구는 아래 §required status check 롤백 R1.
 
-### ⚠️ 알려진 우회 — base 를 **나중에** 바꾸면 잡지 못한다 (미해결)
+### ⚠️ 알려진 우회 — base 를 **나중에** 바꾸면: **탐지는 봉인, 차단은 미봉인** (#1027)
 
-`types: [opened, synchronize]` 는 **base 변경을 포착하지 못한다.** base 변경은 `pull_request` 의 **`edited`** 액션이고 head SHA 를 바꾸지 않아 `synchronize` 도 아니다. 브랜치명 가드가 `reopened` 를 제외한 근거(*"head_ref 는 PR 생성 후 변경 불가"*)는 **base 에 전이되지 않는다** — base 는 언제든 바꿀 수 있다.
+`branch-name-guard.yml` 의 `types: [opened, synchronize]` 는 **base 변경을 포착하지 못한다.** base 변경은 `pull_request` 의 **`edited`** 액션이고 head SHA 를 바꾸지 않아 `synchronize` 도 아니다. 브랜치명 가드가 `reopened` 를 제외한 근거(*"head_ref 는 PR 생성 후 변경 불가"*)는 **base 에 전이되지 않는다** — base 는 언제든 바꿀 수 있다.
 
-**실측** (일회용 PR [#1026](https://github.com/coseo12/astro-simulator/pull/1026), 2026-08-12, 검증 후 close + 브랜치 삭제):
+**실측** (일회용 PR [#1026](https://github.com/coseo12/astro-simulator/pull/1026), 2026-08-12, 검증 후 close + 브랜치 삭제) — `pr-base-edit` 도입 **이전** 상태:
 
 | 단계 | 관측 |
 | --- | --- |
@@ -180,9 +181,15 @@ node scripts/verify-pr-base-rule.mjs --pr base=develop head="$(git branch --show
 | 변경 후 head SHA 체크런 | `branch-name: success` 하나뿐 = **stale green** |
 | 같은 조합 로컬 판정 | `exit 1` **violation** |
 
-즉 **"`base=develop` 으로 열어 초록 확인 → base 를 `main` 으로 편집"** 경로가 열려 있다. **본 가드는 "실수로 잘못 연 PR" 을 막지, 의도적 우회를 막지 못한다.**
+즉 **"`base=develop` 으로 열어 초록 확인 → base 를 `main` 으로 편집"** 경로에서 판정이 **아무 데도 남지 않았다**.
 
-봉인은 후속 과제다 — `types` 에 `edited` 를 넣는 자명한 수정은 `branch-name` 에 **event *type* 축**을 들이는 것이라, [ADR 20260807-971](../decisions/20260807-971-required-status-checks.md) **결정 9-1**(`pr-template-checklist` 를 required 에서 제외한 근거)과 **Phase 1 면제 근거**를 동시에 재검토해야 한다. 후속 이슈: [#1027](https://github.com/coseo12/astro-simulator/issues/1027). 상세: [ADR 20260812-970](../decisions/20260812-970-pr-base-rule-guard.md) §8-1 한계 0 / §9-1.
+**현재 상태 (#1027 적용 후).** `edited` 를 **별도 workflow** [`pr-base-edit-guard.yml`](../../.github/workflows/pr-base-edit-guard.yml) 의 `pr-base-edit` 체크로 받는다. 위 경로에서 base 를 편집하면 같은 스크립트(`verify-pr-base-rule.mjs`)가 재판정해 붉은 X 가 남는다. 다만 강제력은 다음 한 문장이 전부다:
+
+> `pr-base-edit` 은 **required 가 아니다.** base 편집으로 규칙을 위반하면 붉은 X 가 뜨지만 **머지는 기계적으로 막히지 않는다.**
+
+**즉 상태는 "미해결" 이 아니라 "탐지 100% · 차단 0%" 다.** *"의도적 우회를 막지 못한다"* 는 여전히 참이지만, *"보이지 않는다"* 는 더 이상 참이 아니다 — 놓친 경우에도 사후 전수 재구성이 가능하다 ([ADR 20260814-1027](../decisions/20260814-1027-pr-base-edit-guard.md) §9-2 조건 1 의 기계 술어).
+
+차단(required 편입)은 **기각이 아니라 유예**다. `branch-name` 의 `types` 에 `edited` 를 넣는 자명한 수정은 required check 에 **event *type* 축**을 들이는 것이라 [ADR 20260807-971](../decisions/20260807-971-required-status-checks.md) **결정 9-1** 과 **Phase 1 면제 근거**의 재개봉을 요구한다. 승격 조건은 [ADR 20260814-1027](../decisions/20260814-1027-pr-base-edit-guard.md) §9-2 (= 971 §10-5 **항 14**) 이며 자동이 아니다. 상세: [ADR 20260812-970](../decisions/20260812-970-pr-base-rule-guard.md) §8-1 한계 0 / [ADR 20260814-1027](../decisions/20260814-1027-pr-base-edit-guard.md) §6 · §9-1.
 
 ## required status check 롤백 (릴리스가 막혔을 때 — #971)
 
