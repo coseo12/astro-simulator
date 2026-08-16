@@ -3,6 +3,15 @@
 > CLAUDE.md `### 셸 경유 마크다운·코드 전달 — metachar 함정` 가지치기 위임 (이슈 #266 / PR #290). CLAUDE.md 본문은 1줄 포인터만 유지. **근거**: volt [#114](https://github.com/coseo12/volt/issues/114).
 >
 > ⚠️ **제목 확장 ([#1045](https://github.com/coseo12/astro-simulator/issues/1045))** — 원 제목은 `gh CLI 마크다운 본문 발송 — execSync shell metachar 함정` 이었다. #996 이 사거리를 `git commit -m` 까지 넓혔는데 제목·CLAUDE.md 진입점이 `gh CLI` / `execSync` 로 좁아 **에이전트가 규약 사거리를 명령 이름으로 오독**했다. 파일명(`gh-cli-execsync-pitfall.md`)은 유입 링크 보존을 위해 유지한다. 릴리스 확정 CHANGELOG (`[0.71.0]` 의 #990 entry) 가 인용한 구 제목은 **그 시점 사실**이므로 소급 편집하지 않는다.
+>
+> ⚠️ **파일명 ↔ 내용 불일치는 의도된 것이다 — 리네임 기각 ([#1071](https://github.com/coseo12/astro-simulator/issues/1071)).** 위 확장 이후 파일명만 구 경계(`gh` / `execsync`)를 가리키므로 `shell-metachar-pitfall.md` 로의 리네임을 검토했고, 아래 4축 실측으로 **기각**했다 (rev `a610b2b`).
+>
+> 1. **확정 CHANGELOG 가 이 경로를 링크로 인용한다.** 유입 hit **24건** (링크 타깃 `7` + 산문 언급 `17`) 중 **9건이 릴리스 확정 구간** (`[0.74.0]` 8 + `[0.71.0]` 1) 이고, 그중 **1건은 인라인 링크** (`[0.74.0]` 안) 다. 확정 구간은 소급 편집 대상이 아니므로 `git mv` 하면 이 링크가 깨진다 — 실측으로 [`verify-docs-links.mjs`](../../scripts/verify-docs-links.mjs) 가 **위반 `7`건 / exit `1`** 이고 CI `project-guards` 가 막는다.
+> 2. **구 경로 stub 은 가드를 침묵시킨다 (기각의 결정타).** stub 을 두면 위 FAIL 은 사라지지만 **유입 링크를 하나도 안 고쳐도 exit `0`** 이었다 (실측) — 가드가 **파일 존재만** 보기 때문이다. 즉 stub 은 확정 링크 1건을 살리는 대가로 구 경로를 **영구 silent-pass 표면**으로 바꾼다. 이후 누구든 확정 구간의 산문 8건에서 구 경로를 복사해 새 링크를 만들어도 가드는 초록이다. CLAUDE.md §가드 설계 원칙 의 _"drift 가드는 fail-fast 만 — fallback 분기 절대 금지"_ 와 정면으로 어긋난다.
+> 3. **리네임해도 불일치 클래스는 안 없어진다.** 이 저장소의 레슨 파일명은 **영문 slug 주소**이고 제목은 **한국어 산문**이라 `docs/lessons/*.md` **19개 중 18개**가 이미 slug 낱말이 H1 에 없다 (실측 — 전낱말 정합은 `monorepo-dist-stale.md` 하나뿐). 후보 `shell-metachar-pitfall.md` 역시 `shell` · `pitfall` 두 낱말이 H1 에 없어 **같은 클래스에 남는다** — 바뀌는 것은 어느 영문 낱말이 낡았는가뿐이다.
+> 4. **회수 표면은 이미 전부 교정돼 있다.** 에이전트가 이 문서에 닿는 경로는 CLAUDE.md 블록 제목 / 본 H1 / [`README.md`](README.md) 요지 열 셋이고 #1045 가 **셋 다** 새 사거리로 고쳤다. 파일명은 그 뒤에 오는 **주소**이지 회수 키가 아니다 — 회수 키는 제목·요지의 낱말이다.
+>
+> 따라서 이 파일명은 **낡은 채로 유지하는 것이 결정**이고, 1행 H1 의 `(원 제목: gh CLI execSync)` 가 그 표식이다. 사거리 판정은 파일명이 아니라 §사거리 를 읽는다.
 
 Node.js 에서 `execSync('gh pr comment N --body "..."')` 로 마크다운 본문 (백틱 / `$` / `!` / `;` 등 특수 문자 포함) 발송 시 **shell metachar 가 명령 치환·변수 확장으로 해석**되어 syntax error 발생. 자동 코멘트 / actionable 보고 발송이 silent fail.
 
