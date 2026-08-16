@@ -548,6 +548,25 @@ _"의도분과 손상분을 가를 구문적 판별자가 없다"_ 는 본 ADR �
 > **발동 사건**: [#1063](https://github.com/coseo12/astro-simulator/issues/1063) — `.prettierignore` 4경로 중 `docs/retrospectives/` 만 파일명 게이트(`**/*-retrospective.md`)였던 비대칭을 `**/*.md` 로 통일
 > **측정 rev**: `38b6c8a` (`origin/develop` tip) / prettier `3.9.6` (`pnpm exec` = lockfile 정본) / macOS
 
+> ⚠️ **[2026-08-16 — [#1078](https://github.com/coseo12/astro-simulator/issues/1078) 부기] 위 `측정 rev` 만으로는 아래 값이 재현되지 않는다.**
+> `38b6c8a` 를 그대로 체크아웃해 정본 호출을 돌리면 **`45`** 가 나온다. 아래 `49` 는 «트리
+> `38b6c8a`» 단독이 아니라 «그 트리 **+ 본 Amendment 를 담은 PR
+> [#1072](https://github.com/coseo12/astro-simulator/pull/1072) 자신의 `.prettierignore` 변경**»
+> 의 값이고, 측정 시점에 그 변경은 **어느 커밋에도 없는 브랜치 워킹트리 상태**였다. 즉 위 줄이
+> 적은 것은 측정한 트리가 아니라 **base rev** 다. 원문은 발동 시점의 기록이므로 **소급 치환하지
+> 않고 부기**한다 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §결과 3).
+>
+> **재현 가능한 rev 는 `fe922bb`** — PR #1072 의 develop 머지 커밋이며 트리와 게이트가 **한
+> 커밋에 함께** 들어 있다. 실행 가능한 술어와 rev 별 실측은 본 Amendment 말미 **§재현 — 박제
+> 술어를 그대로 추출해 실행 (#1078)** 에 있다.
+>
+> **일반화 판정**은 [`20260808-983`](20260808-983-measurement-recording-convention.md) §(ii)
+> `> 확장 (#1078)` — 오기록 **9 (rev 결속 무효)** 로 박제했다. 본 사건의 **병치** 축(`45` 와
+> `49` 의 모집단 관계)은 이미
+> [`20260814-1031-1064`](20260814-1031-1064-committed-claim-guard-rejected.md) 의 ⚠️ 부기
+> (_"명령 문자열은 같지만 술어는 같지 않다"_)가 (iv) 술어 비교환으로 닫았다 — 본 부기가 닫는
+> 것은 그 나머지, **헤더의 rev 결속**이다.
+
 ### 갱신된 감시값
 
 정본 호출 `node scripts/verify-md-tilde.mjs --population` 재측정:
@@ -610,3 +629,54 @@ ADR [`20260814-958`](20260814-958-prettier-live-docs-scope.md) §의도적 비-�
 > FAIL/WARN 계급을 세울 축이 없다** (정밀도 `0/1`). **위 서술은 그 시점 기록이라 보존한다** —
 > 감소를 보면 원인을 규명하라는 **사람 대상 지침으로는 유효**하고, 반증된 것은 그것을 **기계 차단
 > 기준으로 쓸 수 있다**는 함의뿐이다.
+
+### 재현 — 박제 술어를 그대로 추출해 실행 (2026-08-16, #1078)
+
+`--population` 은 **워킹트리를 읽는다** — `git ls-files '*.md'` (인덱스) 와 `prettier --file-info`
+(디스크의 `.prettierignore`) 의 곱이다. 그래서 rev 를 **인자로 줄 수 없고** 체크아웃해야 한다
+([`20260808-983`](20260808-983-measurement-recording-convention.md) §(ii) `> 확장 (#1064)` 이
+처방한 `git grep <pat> <rev>` 형식이 이 술어에는 **적용되지 않는 이유**다).
+
+```bash
+# 저장소 루트에서. PRETTIER_BIN 은 스크립트 위치 기준이라 체크아웃 트리에 node_modules 가 필요하다.
+# 아래 4개 rev 는 pnpm-lock.yaml 의 prettier 가 전부 3.9.6 이라 심볼릭 링크로 대신할 수 있다
+# (술어: `git show <rev>:pnpm-lock.yaml | grep -m1 'prettier@'` → 4/4 `prettier@3.9.6:`).
+for REV in 38b6c8a fe922bb 79ed14c 804dce6; do
+  git worktree add --detach ".tmp-md-tilde-$REV" "$REV" >/dev/null 2>&1
+  ln -s "$PWD/node_modules" ".tmp-md-tilde-$REV/node_modules"
+  printf '%s ' "$REV"
+  (cd ".tmp-md-tilde-$REV" && node scripts/verify-md-tilde.mjs --population |
+    grep -E 'tracked \*\.md|ignored: false' | tr -s ' ' | tr '\n' ' ')
+  echo
+  git worktree remove --force ".tmp-md-tilde-$REV"
+done
+```
+
+| 체크아웃 rev                                            | `.prettierignore` 게이트 (= 모집단 술어)  | `tracked *.md` | `--population` |
+| ------------------------------------------------------- | ----------------------------------------- | -------------: | -------------: |
+| `38b6c8a` (본 Amendment 헤더가 적은 rev)                | 구 — `!docs/retrospectives/**/*-retrospective.md` |          `236` |     **`45`** |
+| **`fe922bb`** (#1072 머지 커밋 — **재현 anchor**)       | 신 — `!docs/retrospectives/**/*.md`       |          `236` |     **`49`** |
+| `79ed14c` (#1069 머지 — `fe922bb` 의 후손)              | 신                                        |          `236` |     **`49`** |
+| `804dce6` (본 부기 PR 의 **base 커밋**, 2026-08-16)     | 신                                        |          `240` |     **`49`** |
+
+**앞 두 행의 `tracked *.md` 가 둘 다 `236` 이라는 것이 결정적이다** — 모집단 입력(추적 `*.md`
+집합)이 **같은데** 계수만 `45` ↔ `49` 로 갈린다. 즉 차이는 트리가 아니라 **게이트**에서 온다.
+`804dce6` 의 `240` 은 그 뒤 md 4개가 추가된 결과이며 계수 `49` 는 불변이라, **그 rev 까지는**
+§후속 감시 의 감시값 `49` 가 이탈하지 않았다.
+
+⚠️ **네 행 모두 고정 SHA 로만 적었다 — `origin/develop` 같은 이동하는 ref 이름은 쓰지 않았다.**
+본 부기를 쓰는 동안에도 develop 은 이동했다 — ref 이름으로 적으면 그 순간 표가 재현 불가능해지고,
+그것이 바로 본 부기가 다루는 결함이다. 같은 이유로 위 문장은 _"현행 tip 에서 `49`"_ 를 주장하지
+않는다. tip 은 rev 가 아니라 **시점 종속 별칭**이므로 [`20260808-983`](20260808-983-measurement-recording-convention.md)
+§(ii) 의 «무시점 절대 수치» 와 같은 형태로 썩는다.
+
+**대조군 — 같은 PR 의 형제 Amendment 는 같은 헤더로도 재현된다.**
+[`20260814-958`](20260814-958-prettier-live-docs-scope.md) §Amendment 2 도 헤더에
+`측정 rev: 38b6c8a` 만 적었으나 그쪽 술어는 `git ls-files 'docs/retrospectives/*.md'` 라
+**rev 로 닫힌다** —
+`38b6c8a` 체크아웃에서 `19` / `-retrospective.md` `15` 로 **그대로 재현**된다. 헤더 형식이 아니라
+**술어가 워킹트리의 다른 파일을 읽는가**가 가르는 축이라는 실증이다.
+
+**같은 PR 이 `.prettierignore` 주석에는 조건을 붙였다** — 그쪽은 _"실측 (rev `38b6c8a`): 편입
+`4` 건 / 모집단 `45` → `49`"_ 로 **두 끝점을 함께** 적어 게이트 축이 노출돼 있고, 위 표의 1·2행이
+그 서술을 그대로 재현한다. 잃어버린 것은 값이 아니라 **한쪽 끝점만 적은 헤더 형식**이다.
