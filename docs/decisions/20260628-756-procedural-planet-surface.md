@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Provisional (cross-validate agy 2026-08-17 수행 완료 · 4축 통합 + Accepted 전이 대기 — 메인 소관)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -822,7 +822,8 @@ col = mix(col, iceColor, iceMask);
 
 ## Amendment 4 (2026-08-17) — 지구 대륙 윤곽 실제화: 「에셋 0」의 조건부 예외 (#1119)
 
-- **상태**: **Provisional** (cross-validate 대기 — §A4.8 통합 후 Accepted 전이)
+- **상태**: **Accepted** (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료). 원 박제: `Provisional`
+  - **전이 주체·시점**: 메인 오케스트레이터가 PR [#1120](https://github.com/coseo12/astro-simulator/pull/1120) 머지 직전 수행 ([#479](https://github.com/coseo12/astro-simulator/issues/479) — sub-agent 직접 호출 금지). outcome `applied`. ⚠️ **cross-validate 1회 + reviewer 2 라운드를 거친 뒤 전이**한다 — cross-validate 만으로 전이했다면 **차단 2건이 그대로 착지**했을 것이다 (§A4.8 ④).
 - **이슈**: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (type:feat, priority:high, group:C-solar-system)
 - **형식**: **Amendment** (신규 ADR 기각). §A3.3 결정 1 과 **동일 기준** — 신규 모듈 0, 기존 rocky 분기 확장이면 Amendment. 다만 본 건은 §배경 의 **핵심 제약 「에셋 0」 자체를 조건부로 개정**하므로 본문 결정의 갱신이고, 그래서 더욱 별도 파일이 아니라 같은 문서에 부기해야 한다 (rocky 분기 이력 §결정 5 → A1 결정 4 → A3 → A4 가 한 파일에 수렴). **원문 소급 치환 0 — 부기만.**
 - **범위**: 본 PR 은 **설계·ADR 만**. 구현·에셋 취득은 후속 dev.
@@ -1178,7 +1179,26 @@ v = clamp(v + warp.y, 0.001, 0.999);
 5. **바다 깊이색 / 대기 rim / 구름** — §A3.7 재검토 조건 1·2·3 그대로. 본 Amendment 는 **편승하지 않는다** (#1119 비목표).
 6. **Natural Earth 버전 갱신** — `4.1.0` 고정. 상위 버전 도입 시 결정 8 의 단위 테스트 (면적가중 28.75% ± 0.5pp) 가 먼저 반응하므로, 값 갱신을 **의식적 SSoT 갱신**으로 처리한다 (조용한 임계 완화 금지).
 
-### A4.8 교차검증 반영 사항 (agy 2026-08-17 수행 — architect 반영분 통합, 4축 통합·전이는 메인 소관)
+### A4.8 교차검증 반영 사항 (agy 2026-08-17 — **4축 통합 완료, Accepted 전이**)
+
+> ✅ **메인 통합 (2026-08-17).** cross-validate 판정 **조건부 승인**(차단 0) → 권고 3건 architect 반영 → **reviewer 차단 2건** → architect 재반영. 아래 ①~④ 가 4축 분류이며, 그 뒤는 architect 가 남긴 반영 이력이다.
+>
+> **① 합의** — 구면 역투영 수학 정합 / 라이선스 근거·해시 고정·런타임 외부 통신 `0` / SSoT 보존(`solar-system.json` 무변경, 렌더링 상수는 코드) / **가드↔렌더 축 분리**(*"완벽히 정합"* — 제품은 graceful degrade, CI 는 `uMaskEnabled=0` 고착을 FAIL) / 네트워크 `0` 의존 재현 스크립트.
+>
+> **② 이견 수용** — 없음 (cross-validate 차단 `0`).
+>
+> **③ 고유 발견 3건 — 전건 실질이었고 전건 반영됐다.** (a) **Phase 0 게이트가 「컴파일」만 쟀다** — `1×1` 바인딩 + 에러 `0` 은 「좌표계가 두 백엔드에서 같은가」를 못 잰다 ⇒ `2×2` 4분면 샘플링 assertion 으로 Step 2 신설 (b) **원거리 축소 모아레** — `noMipmap` 전제에서 `R < 16px` shimmer ⇒ LOD 규칙. ⚠️ 이는 새 제약이 아니라 **해상도 논거의 반대편 끝**이다 (정합 폭 `2πR` 구간의 하한) (c) **fbm 워프 극점 clamp**.
+>
+> **④ Claude 편향 셀프 체크 — 사후.** architect 가 호출 **전에** 2축을 미통과로 자인했고 **둘 다 실현됐다.** 「낙관적 일정」은 *"게이트가 부분 성공을 놓칠 수 있다"* 를 **스스로 적고도 그 간극을 닫는 술어를 설계하지 않은** 형태로, 「결합 간과」는 우려한 순환 정당화가 **아니라** *"같은 근거의 한쪽 방향만 전개"* 로 실현됐다.
+>
+> ⚠️ **가장 중요한 관측 — cross-validate 만으로 전이했다면 차단 2건이 그대로 착지했다.** cross-validate 는 **설계 판단**을 잡았고(위 ③), reviewer 는 **「내가 쓴 근거를 내 계약대로 재현할 수 있는가」** 를 잡았다: 헤드라인 `30,135 B` 가 **ADR 자신이 기각한 `sharp` 로만 재현**됐고(계약 툴체인 `pngjs` 30조합 sweep 도달 `0`건), known-point 계약이 자기모순(`14` vs `16` / FAIL `1` vs `2` / 좌표 미박제 / `13/14` 가 **nearest 에서만** 성립)이었다. **후자는 외부 모델이 못 잡고 재현 시도만이 잡는다.** 일반화 — **계약이 도구 A 를 기각했으면 헤드라인 수치도 도구 A 로 내면 안 된다** (계약을 지키는 순간 근거가 사라진다).
+>
+> **부수** — 정정이 결과를 **개선**했다. 계약 툴체인 최적 조합 `27,295 B` 는 기각된 `sharp` 의 `30,135` 보다 **작다**. `BILINEAR` 정렬로 known-point 는 `13/14` → **`14/14`**.
+
+---
+
+#### (이하 architect 반영 이력)
+
 
 **호출 전 Claude 편향 셀프 체크** (4종, [cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5):
 
