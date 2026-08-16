@@ -148,3 +148,13 @@ jobs:
       # 신규 레슨 파일이 README "파일 목록" 표에 등록되지 않으면 exit 1 로 PR 머지 차단.
       - name: docs/lessons README 동기화 가드
         run: bash scripts/verify-lessons-readme.sh
+
+      # SSoT ↔ 사본 트리거 문언 동일 가드 (#1076)
+      # operational-friction.md §8 의 트리거 강조 span 을 런타임 추출해 `.claude/agents/developer.md`
+      # 사본과 정규화 축자 대조 + 규범면 보유 파일 집합 pin. #1062 가 낸 낱말 drift(`해석하는` ↔
+      # `의존하는`)를 그대로 재현하면 exit 1 이다. 문언 리터럴은 스크립트에 없다 (세 번째 사본 방지).
+      # self-test 동시 배선 (#897 교훈 — CI 미배선 self-test 는 0회 실행).
+      - name: SSoT 트리거 문언 가드 self-test
+        run: node scripts/verify-ssot-trigger-wording.mjs --self-test
+      - name: SSoT 트리거 문언 가드
+        run: node scripts/verify-ssot-trigger-wording.mjs
