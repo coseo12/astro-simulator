@@ -24,7 +24,8 @@
 - 소행성대 ThinInstances `?belt=N` 1~10000 (Kepler 해석해)
 - 시간 제어 (재생/역행, ×1d/×1y 프리셋, julian date 정밀 jump) + 질량 슬라이더 + "만약에" 시나리오 + URL 북마크
 - **우주 환경 + 온보딩** — 절차적 별 배경 + 은하수 (`infiniteDistance` 천구 + 단일 draw call shader, 신규 에셋 0, `?stars=off` 토글) / 첫 진입 온보딩 + 조작 가이드 모달 (소프트웨어 렌더 환경은 별 배경 자동 비활성 — fill-rate graceful degradation)
-- **절차적 표면 & 광원 (전부 에셋 0 셰이더)** — 행성 표면 4종 (지구 대륙·극관·biome 위도색 / 화성 dust / 목성 밴드 / 달 크레이터) + 태양 emissive granulation·limb darkening·색온도 + 행성 자전 (NASA sidereal period + IAU 자전축, 금성·천왕성 역행) + 실제 태양 광원 밤면/terminator 명암 + 천체 표시 크기 비율 단조 보존 (sqrt 압축, `?surface=off`/`?rotate=off` 토글)
+- **절차적 표면 & 광원 (지구 대륙 마스크 1장 외 에셋 0)** — 행성 표면 4종 (지구 **실제 대륙 윤곽**·극관·biome 위도색 / 화성 dust / 목성 밴드 / 달 크레이터) + 태양 emissive granulation·limb darkening·색온도 + 행성 자전 (NASA sidereal period + IAU 자전축, 금성·천왕성 역행) + 실제 태양 광원 밤면/terminator 명암 + 천체 표시 크기 비율 단조 보존 (sqrt 압축, `?surface=off`/`?rotate=off` 토글)
+  - 지구 대륙은 Natural Earth 50m 파생 `1024×512` 육지 마스크 (`27,295` B, public domain — [출처·라이선스](apps/web/public/textures/README.md)) 가 **저주파 형상**을, 기존 fbm 이 **고주파 디테일**을 담당한다. 저장소의 **유일한 런타임 텍스처 에셋**이며 **마스크 바이트의 JS 번들 유입은 `0` B** — `.png` 를 `import` 하는 소스가 저장소 전체에 없고 파일명 문자열로만 참조되므로 번들러가 인라인할 경로 자체가 없다 (셰이더 코드 자체의 JS 증가는 별개다)
 
 ## 스크린샷
 

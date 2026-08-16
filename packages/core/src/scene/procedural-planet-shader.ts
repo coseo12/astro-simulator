@@ -48,6 +48,25 @@
  *   - 자전 불변 (§A3.2-2): spin 은 local Y 축 회전이라 `abs(p.y)` 위도 밴드/극관은 자전해도 불변
  *     (painted-on 정합 — 극관이 흔들릴 구조 자체가 없음).
  *
+ * **Amendment 4 (#1119) — 지구 대륙 윤곽 실제화 (저해상도 육지 마스크)** (ADR §Amendment 4):
+ *   - §A4.3 결정 2·3 — Natural Earth 50m 파생 `1024×512` GRAYSCALE equirectangular 마스크 1장을
+ *     `uniform sampler2D uSurfaceMask` 로 샘플한다. UV 는 기존 `p = normalize(vLocalPos)` 에서
+ *     파생 (`u = atan(p.z,p.x)/2π + 0.5`, `v = acos(p.y)/π`) — **`attributes` 배열 무변경**
+ *     (mesh UV attribute 미바인딩 유지). 자전(#782)·`axialTiltDeg` 는 `vNormal`/world matrix 축이라
+ *     마스크가 **추가 배선 0 으로 자동 상속**한다 (painted-on 계약).
+ *   - §A4.3 결정 5 — `continents` fbm 은 **폐기하지 않고 역할 전환**: 마스크 = 저주파 **형상**,
+ *     fbm = 고주파 **디테일**(도메인 워프) + biome 경계 jitter. **fbm 호출 수 불변** (신규 noise 0).
+ *   - §A4.3 결정 6 — 대상 body 는 코드 상수 `SURFACE_MASK_BY_BODY` (데이터 SSoT 불변 — 마스크는
+ *     물리 관측값이 아니라 rendering 에셋 참조다). 미등록 body 는 `uMaskEnabled = 0` 으로 현행
+ *     절차 경로 **픽셀 동일**.
+ *   - §A4.3 결정 7 — graceful degradation: `uniform float uMaskEnabled` (0/1) 로 절차 경로와
+ *     마스크 경로를 `mix`. **`uMaskEnabled` 로 분기하지 않는다** — 텍스처는 분기 밖에서 **무조건
+ *     1회** 샘플하고 결과만 섞는다 (`gravitational-lensing.ts` 의 "textureSample 은 분기 밖 1회"
+ *     규약 정합 + Phase 0 게이트가 실측한 구성 그대로).
+ *   - §A4.3 결정 4 — 원거리 축소 LOD: 투영 disk 반경 < `SURFACE_MASK_MIN_DISK_PX` 면 `uMaskEnabled`
+ *     를 `0` 으로 되돌린다 (over-resolution × noMipmap = shimmer). **결정 7 의 분기를 재사용**하므로
+ *     신규 코드 표면 0.
+ *
  * ⚠️ **옵션 e 배선 계약 (drift 가드, Amendment 2)**: 본 광원 모델은 "vNormal = world normal (world
  *   matrix 변환) + uniform scaling" 에 의존한다. `world` uniform 이 uniforms 배열에서 빠지거나 VERTEX
  *   가 vNormal 을 local 로 되돌리면, 자전 시 명암이 표면과 함께 돌아버린다. onBind 의 dev-only 어서션이
@@ -75,10 +94,23 @@
  *   `gl_FragDepth` 를 Babylon logDepth 공식으로 기록해 정합.
  */
 
-import { Color3, Effect, ShaderMaterial, Vector3, type Mesh, type Scene } from '@babylonjs/core';
+import {
+  Color3,
+  Effect,
+  Matrix,
+  ShaderMaterial,
+  Vector3,
+  Viewport,
+  type Mesh,
+  type Scene,
+} from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { hexToColor3 } from './color-utils.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
+import {
+  getOrCreateSurfaceMaskPlaceholder,
+  getOrCreateSurfaceMaskTexture,
+} from './surface-mask-texture.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 표면 타입 enum ↔ uniform int 매핑 SSoT (#756 §결정 2).
@@ -252,6 +284,63 @@ export const ICE_LAT_HI = 0.92;
  */
 export const BIOME_LAT_JITTER = 0.12;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Amendment 4 (#1119) — 지구 대륙 마스크 상수 SSoT (§A4.3 결정 2·4·5·6).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * #1119 §A4.3 결정 6 — body id → 마스크 **파일명** 코드 상수 테이블 (데이터 SSoT 불변).
+ *
+ * `solar-system.json` 에 `surfaceMask` 필드를 추가하는 안은 **기각**됐다 — 마스크는 IAU/NASA
+ * 물리 관측값이 아니라 **rendering 에셋 참조**이므로 데이터 SSoT 에 누수시키지 않는다
+ * (`SURFACE_TYPE_BY_BODY` 동형). base URL 은 `createSolarSystemScene` 옵션으로 주입받는다 —
+ * core 가 web 라우팅을 알면 단방향 의존이 깨진다.
+ *
+ * 확장(화성 등) = **본 테이블 1줄 + 에셋 1장, 데이터 0** (§A4.7 재검토 조건 4). 단 화성 마스크는
+ * "육지/바다" 가 아니라 albedo 지형이라 의미가 달라 별건 설계 대상이다.
+ */
+export const SURFACE_MASK_BY_BODY: Readonly<Record<string, string>> = {
+  earth: 'earth-land-mask.png',
+};
+
+/**
+ * #1119 §A4.3 결정 5 — 마스크 샘플 좌표의 fbm 도메인 워프 진폭 (UV 단위, rendering-only 미학 상수).
+ *
+ * 기존 `continents` fbm 을 **재사용**해 마스크 UV 를 밀어 해안선의 텍셀 직선성을 깬다 (신규 noise
+ * 샘플 0 — §A3.3 결정 3-c 의 "noise 샘플 +0" 불변식 보존). `0.006` 은 `v` 축 기준 `0.006 × 512 ≈ 3`
+ * 텍셀 폭(진폭 ±1.5 텍셀) 로, 기본 focus(R≈98px) 에서는 sub-pixel 이고 최대 줌인(R≈811px, texel
+ * ≈14.9px)에서 해안선 요동으로 드러난다.
+ *
+ * ⚠️ **한정** — `continents = fbm(p * 2.4)` 의 최고 옥타브는 입력이 `p × 11.28` 이고 `valueNoise`
+ * 격자 셀이 `1` 이므로, **`p` 가 단위벡터**라 셀 하나가 호 길이 `1/11.28 rad = 5.079°` 에 대응한다.
+ * 마스크 텍셀은 `360/1024 = 0.352°` → **특징 크기 ≈ 14.4 텍셀**. 즉 본 워프는 **텍셀 십수 개
+ * 범위에서 서서히 변하는 변위**이지 텍셀 이하 고주파가 **아니다**.
+ *
+ * ⚠️⚠️ **초판 주석은 `31.9°` (≈ 91 텍셀) 이라 적었고 이는 `2π` 배 틀렸다** — 단위구의 대원 둘레는
+ * `360` 이 아니라 `2π` **격자 단위**인데 `360 / 11.28` 로 계산했다 (reviewer 지적 수용, 2026-08-17).
+ * 결론(워프가 텍셀 이하가 아님)은 유지되지만 **마진이 `91×` → `14.4×` 로 좁아졌다** — 해상도를
+ * 올리거나 워프 진폭을 키우면 두 스케일이 겹치는 대역에 훨씬 빨리 닿는다는 뜻이므로,
+ * §A4.7 재검토 조건 2·3 (`textureGrad` 승격 / 해상도 승격) 판단에서 이 값을 다시 봐야 한다.
+ * 어느 경우든 **여기서 fbm 을 새로 호출하지 않는다** (결정 5 위반).
+ */
+export const MASK_WARP_AMP = 0.006;
+
+/**
+ * #1119 §A4.3 결정 4 (cross-validate 권고 2) — 마스크 적용 하한 disk 반경 (화면 픽셀).
+ *
+ * `noMipmap` 전제에서 disk 가 아주 작아지면 (전체 태양계 조감) 1024 마스크가 과도하게 축소돼
+ * shimmer 가 난다. 이 대역에서는 `uMaskEnabled = 0` 으로 되돌려 **결정 7 의 절차 경로를 재사용**
+ * 한다 (신규 분기 0).
+ *
+ * **결정 2 논거의 반대편 끝이다** — 정합 폭 `2πR` 구간 `[618, 1854]` 의 상한(R 이 크면 마스크가
+ * 모자람)으로 1024 를 정당화했으면, 하한은 R 이 작으면 마스크가 **과함**을 뜻한다
+ * (`R = 16 px` → 정합 폭 ≈ 100 → 1024 는 `10.2×` over-resolution).
+ *
+ * 1차 출발값이며 measurement-first 조정 대상 (#774 결정 8 동형). low variant(billboard) 는 애초에
+ * 셰이더 미진입이라 실제로 걸리는 구간은 **mid variant 의 원거리 끝**이다.
+ */
+export const SURFACE_MASK_MIN_DISK_PX = 16;
+
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
 
@@ -375,6 +464,21 @@ uniform float iceLatLo;
 uniform float iceLatHi;
 uniform float biomeLatJitter;
 
+// Amendment 4 (#1119) — 지구 대륙 마스크 uniform (§A4.3 결정 2·4·6·7).
+//   uSurfaceMask: 1024×512 GRAYSCALE equirectangular 육지 마스크 (.r = 육지 계조 0~1).
+//                 ⚠️ 미도착/미등록 구간에도 1×1 placeholder 가 바인드돼 있다 — 샘플러가 비면
+//                 WebGPU 에서 파이프라인이 깨지므로 "항상 바인드" 가 계약이다.
+//   uMaskEnabled: 0 = 현행 절차 경로 (Amendment 3 픽셀 동일) / 1 = 마스크 경로. 로드 미도착·실패
+//                 (결정 7) 와 원거리 축소 LOD (결정 4) 가 같은 uniform 을 공유한다 (분기 재사용).
+//   maskWarpAmp:  마스크 UV 의 fbm 도메인 워프 진폭 (기존 continents 재사용 — 신규 noise 0).
+uniform sampler2D uSurfaceMask;
+uniform float uMaskEnabled;
+uniform float maskWarpAmp;
+
+// equirectangular UV 역수 상수 (매직 넘버 분리 — 1/(2π), 1/π).
+const float INV_TWO_PI = 0.1591549430918953;
+const float INV_PI = 0.3183098861837907;
+
 // 3D hash — sin-free fract-mix (starfield.ts hash33 답습 — swiftshader/tier-c fps 보호).
 vec3 hash33(vec3 p) {
   p = fract(p * vec3(0.1031, 0.1030, 0.0973));
@@ -433,12 +537,42 @@ void main(void) {
   vec3 shade = ambientShade + sunShade;
   vec3 col = baseColor;
 
+  // ── Amendment 4 (#1119) — 지구 대륙 마스크 샘플 (§A4.3 결정 3·5·7) ───────────────
+  // continents fbm 은 rocky 전용이라 분기 안에서만 계산한다 (desert/gas/cratered 의 fragment
+  // 비용 불변 — 하나라도 새는 순간 mars/jupiter/moon 이 fbm 1회를 더 낸다). 신규 fbm 호출
+  // **없음**: Amendment 3 까지 rocky 분기에 있던 그 호출을 위로 끌어올렸을 뿐이다 (§결정 5).
+  float continents = 0.0;
+  if (uSurfaceType == 0) {
+    continents = fbm(p * 2.4);
+  }
+  // fbm 도메인 워프 — u/v 를 반대 부호로 밀어 해안선의 텍셀 직선성을 깬다. 변위 방향은 고정이나
+  // 진폭이 continents 로 공간 변조돼 경계가 불규칙해진다 (신규 noise 샘플 0 — §결정 5).
+  float maskWarp = (continents - 0.5) * maskWarpAmp;
+  // equirectangular — local +X = 경도 0°(본초자오선) / local +Y = 북극(위도 +90°) → v = 0.
+  // u 는 WRAP_ADDRESSMODE 라 ±180° 를 넘어가도 정상 순환하므로 clamp 하지 않는다. v 는 acos 라
+  // 0.0/1.0 이 정확히 극점이고, 워프가 그 값을 넘기면 역투영 특이점이 생긴다 — CLAMP_ADDRESSMODE
+  // 는 좌표를 자를 뿐 **극에서 경도가 정의되지 않는 문제**를 막지 못한다. 두 축의 처리가 다르다.
+  //
+  // ⚠️ **극점에서 atan(0, 0) 은 GLSL 명세상 undefined 다** (reviewer 지적 수용, 2026-08-17).
+  // Phase 0 과 §결정 5 는 v 축(acos pinch) 만 다뤘고 u 축의 이 빈틈은 커버리지 밖이었다.
+  // **실해는 없다** — (i) 정확히 p.x == p.z == 0 인 fragment 는 measure-zero 이고 (ii) 그 위도는
+  // iceMask 가 포화해 landMask 기여가 0 이며 (iii) 비-rocky 타입은 maskLand 를 소비하지 않는다.
+  // 4 타입 전부 실측 통과했으므로 방어 코드를 넣지 않는다 — 넣으면 분기 밖 1회 샘플 계약과
+  // fragment 비용 불변 계약을 동시에 건드린다. **사실만 남기고 조치하지 않는 것이 결정이다.**
+  float maskU = atan(p.z, p.x) * INV_TWO_PI + 0.5 + maskWarp * 0.5;
+  float maskV = clamp(acos(clamp(p.y, -1.0, 1.0)) * INV_PI - maskWarp, 0.001, 0.999);
+  // ⚠️ **분기 밖 무조건 1회 샘플** (§결정 7). uMaskEnabled 로 감싸지 말 것 — WGSL 은 textureSample
+  // 을 비균일 제어 흐름에서 금지하며, Phase 0 게이트가 PASS 한 구성이 바로 이 배치다.
+  float maskLand = texture2D(uSurfaceMask, vec2(maskU, maskV)).r;
+
   // #756 §결정 2 — 표면 타입별 절차 변조 (if-else 분기만). 같은 draw = 같은 타입 (divergence 0).
   if (uSurfaceType == 0) {
-    // ── rocky (지구) — 대륙↔해양 mix (#775) + biome 위도 색 + 극관 (Amendment 3 #783) ──
-    // continents fbm → landMask. ocean = baseColor (실측 청록, read-only 규약).
-    float continents = fbm(p * 2.4);
-    float landMask = smoothstep(landThresholdLo, landThresholdHi, continents);
+    // ── rocky (지구) — 대륙 마스크 (#1119) + biome 위도 색 + 극관 (Amendment 3 #783) ──
+    // Amendment 4: landMask 소스가 fbm smoothstep → **실제 대륙 마스크** 로 전환된다. ocean =
+    // baseColor (실측 청록, read-only 규약) 와 해안선 전이 구조는 그대로 (#775 계약 보존).
+    // uMaskEnabled = 0 이면 Amendment 3 시점 식으로 **정확히** 복귀한다 (회귀 격리 기계 판정점).
+    float proceduralMask = smoothstep(landThresholdLo, landThresholdHi, continents);
+    float landMask = mix(proceduralMask, maskLand, uMaskEnabled);
     // Amendment 3 (#783) §A3.3 결정 3 — 위도 파라미터 (sin-space: p.y = sin(위도), §A3.2-1).
     float latRaw = abs(p.y);                                        // |sin(위도)| — 남북 대칭
     float latJ = latRaw + (continents - 0.5) * biomeLatJitter;      // 경계 자연화 — 기존 fbm 재사용 (추가 noise 0)
@@ -559,6 +693,16 @@ export interface CreateProceduralPlanetMaterialOptions {
    * 불일치하므로 호출부 (scene) 가 반드시 전달. 테스트 등 미전달 시 안전 기본값 (단색 행성 값) 적용.
    */
   lighting?: PlanetLightingConstants;
+
+  /**
+   * Amendment 4 (#1119) §A4.3 결정 6 — 마스크 에셋 base URL (예: `'/textures/'`).
+   *
+   * **미전달(`undefined`) = 마스크 경로 완전 비활성** — `uMaskEnabled` 가 `0` 으로 고정돼 Amendment 3
+   * 시점 절차 경로와 픽셀 동일하고, 텍스처 fetch 자체가 발생하지 않는다 (NullEngine 단위 테스트
+   * 무회귀). core 라이브러리 보수 기본값이며 **기본 ON 은 web 레이어 결정**이다 (`surfaceDetail` /
+   * `starfield` 와 동형 레이어 분리) — core 가 web 라우팅(`/textures/`)을 알면 단방향 의존이 깨진다.
+   */
+  surfaceMaskBaseUrl?: string | undefined;
 }
 
 /** Amendment 1 — lighting 미전달 시 기본값 (단색 행성 PointLight/HemisphericLight 값과 동일 — 일관). */
@@ -570,6 +714,68 @@ const DEFAULT_PLANET_LIGHTING: PlanetLightingConstants = {
   ambientSky: [1, 1, 1],
   ambientUp: [0, 1, 0],
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Amendment 4 (#1119) — 투영 disk 반경 산출 (원거리 LOD 판정, §A4.3 결정 4).
+//
+// 매 draw 호출되므로 alloc 0 — 아래 버퍼를 모듈 스코프에서 재사용한다 (Amendment 2 의
+// tmpSpinQuat 계약 동형, cross-validate 고유 발견 1).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 카메라 local right (= `Axis.X`). `Axis` 를 import 하지 않는 것은 번들 그래프 최소화 목적. */
+const CAMERA_LOCAL_RIGHT = new Vector3(1, 0, 0);
+const tmpEdgeWorld = new Vector3();
+const tmpProjectedCenter = new Vector3();
+const tmpProjectedEdge = new Vector3();
+const tmpGlobalViewport = new Viewport(0, 0, 0, 0);
+const IDENTITY_MATRIX = Matrix.Identity();
+
+/**
+ * `boundingSphere.radiusWorld` 는 bounding **cube** 의 half-diagonal (구 반경 × √3) 이다.
+ * `browser-verify-783-earth-detail.mjs` 가 쓰는 것과 **같은 보정 상수** — 값이 갈리면 스크립트
+ * 판정과 런타임 LOD 가 다른 반경을 보게 된다.
+ */
+const BOUNDING_SPHERE_TO_RADIUS = Math.sqrt(3);
+
+/**
+ * mesh 의 화면 투영 disk 반경 (픽셀).
+ *
+ * 산식은 `browser-verify-783-earth-detail.mjs` 의 것을 **그대로 재사용**한다 (§A4.4 예측표):
+ * 실 world 반경을 복원한 뒤 **카메라 right 방향 edge 점**을 화면 투영해 중심과의 거리를 잰다.
+ * (bbox 코너 투영은 cube 모서리라 ~1.2× 과대, 픽셀 카운트 기반은 밤면 limb 탈락으로 ~7% 과소 —
+ * 둘 다 실측으로 기각된 이력이 있다.)
+ *
+ * 카메라 부재 (NullEngine 단위 테스트 등) 면 `Infinity` — LOD 규칙이 마스크를 **끄지 않는다**
+ * (판정 불가를 "작다" 로 오해하면 마스크가 조용히 사라진다).
+ */
+function projectedDiskRadiusPx(scene: Scene, mesh: Mesh): number {
+  const camera = scene.activeCamera;
+  if (!camera) return Number.POSITIVE_INFINITY;
+  const engine = scene.getEngine();
+  camera.viewport.toGlobalToRef(
+    engine.getRenderWidth(),
+    engine.getRenderHeight(),
+    tmpGlobalViewport,
+  );
+  const transform = scene.getTransformMatrix();
+  const center = mesh.getAbsolutePosition();
+  const radiusWorld = mesh.getBoundingInfo().boundingSphere.radiusWorld / BOUNDING_SPHERE_TO_RADIUS;
+  camera.getDirectionToRef(CAMERA_LOCAL_RIGHT, tmpEdgeWorld);
+  tmpEdgeWorld.scaleInPlace(radiusWorld);
+  tmpEdgeWorld.addInPlace(center);
+  Vector3.ProjectToRef(center, IDENTITY_MATRIX, transform, tmpGlobalViewport, tmpProjectedCenter);
+  Vector3.ProjectToRef(
+    tmpEdgeWorld,
+    IDENTITY_MATRIX,
+    transform,
+    tmpGlobalViewport,
+    tmpProjectedEdge,
+  );
+  return Math.hypot(
+    tmpProjectedEdge.x - tmpProjectedCenter.x,
+    tmpProjectedEdge.y - tmpProjectedCenter.y,
+  );
+}
 
 /**
  * #756 — body 의 절차적 표면 ShaderMaterial 생성 (high/mid 공유).
@@ -642,7 +848,13 @@ export function createProceduralPlanetMaterial(
         'iceLatLo',
         'iceLatHi',
         'biomeLatJitter',
+        // Amendment 4 (#1119) — 대륙 마스크 uniform (sampler 는 아래 samplers 배열).
+        'uMaskEnabled',
+        'maskWarpAmp',
       ],
+      // Amendment 4 (#1119) — sampler 명시. Phase 0 게이트는 **명시한 상태에서만** 측정됐고
+      // 생략 시 거동은 미측정이다 (이슈 #1119 게이트 코멘트 §잔여 미측정 1) — 추측하지 말고 명시한다.
+      samplers: ['uSurfaceMask'],
     },
   );
 
@@ -707,8 +919,36 @@ export function createProceduralPlanetMaterial(
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.
   material.setVector3('uSunDirection', new Vector3(1, 0, 0));
 
+  // Amendment 4 (#1119) §A4.3 결정 6·7 — 대륙 마스크 배선.
+  //   ① placeholder 를 **먼저** 바인드한다 — 셰이더가 분기 밖에서 무조건 1회 샘플하므로 미도착·
+  //      미등록 구간에도 바인딩이 존재해야 한다 (샘플러 공백 = WebGPU 파이프라인 붕괴).
+  //   ② uMaskEnabled 는 `0` 에서 출발 → onLoad 성공 + 원거리 LOD 통과 시에만 `1`.
+  //      즉 "조용히 예전 지구" 상태는 uniform 값으로 관측 가능하고, verify 스크립트가 FAIL 한다.
+  material.setTexture('uSurfaceMask', getOrCreateSurfaceMaskPlaceholder(scene));
+  material.setFloat('uMaskEnabled', 0);
+  material.setFloat('maskWarpAmp', MASK_WARP_AMP);
+
+  const maskFileName = SURFACE_MASK_BY_BODY[body.id];
+  const maskBaseUrl = options.surfaceMaskBaseUrl;
+  // 마스크 로드 성공 여부 — onBind 의 LOD 판정이 이 플래그 아래에서만 uMaskEnabled 를 올린다.
+  let maskReady = false;
+  let materialDisposed = false;
+  if (maskFileName !== undefined && maskBaseUrl !== undefined) {
+    material.onDisposeObservable.add(() => {
+      materialDisposed = true;
+    });
+    const handle = getOrCreateSurfaceMaskTexture(scene, `${maskBaseUrl}${maskFileName}`);
+    handle.onReady((texture) => {
+      // 로드가 머티리얼 dispose 이후에 완료될 수 있다 (씬 재생성 레이스) — 그때 setTexture 하면
+      // 죽은 effect 에 쓰게 되므로 무시한다.
+      if (materialDisposed) return;
+      material.setTexture('uSurfaceMask', texture);
+      maskReady = true;
+    });
+  }
+
   const sunPositionProvider = options.sunPositionProvider;
-  if (sunPositionProvider) {
+  if (sunPositionProvider || maskFileName !== undefined) {
     // onBindObservable — 각 draw 직전 mesh 핸들과 함께 호출 (scene 이 material 핸들 별도 추적 불요,
     // 옵션 d Map 대비 우월 — ADR §A1.3 결정 1 c). tmpVector 재사용으로 alloc 0 (cross-validate 이견 2).
     const tmpSunDir = new Vector3();
@@ -716,13 +956,23 @@ export function createProceduralPlanetMaterial(
     // 누적 spam 차단). production 무영향 (NODE_ENV DCE — 아래 분기 전체 tree-shake).
     let warned = false;
     material.onBindObservable.add((mesh) => {
-      const sunPos = sunPositionProvider();
-      // sunDir = normalize(sunPos − meshAbsPos) (world). Amendment 2 옵션 e: vNormal 도 world normal.
-      // satellite (달) 도 parent 상속 위치를 getAbsolutePosition 이 정확히 반영 (ADR §A1.3 결정 1).
-      const meshPos = (mesh as Mesh).getAbsolutePosition();
-      sunPos.subtractToRef(meshPos, tmpSunDir);
-      tmpSunDir.normalize();
-      material.setVector3('uSunDirection', tmpSunDir);
+      if (sunPositionProvider) {
+        const sunPos = sunPositionProvider();
+        // sunDir = normalize(sunPos − meshAbsPos) (world). Amendment 2 옵션 e: vNormal 도 world normal.
+        // satellite (달) 도 parent 상속 위치를 getAbsolutePosition 이 정확히 반영 (ADR §A1.3 결정 1).
+        const meshPos = (mesh as Mesh).getAbsolutePosition();
+        sunPos.subtractToRef(meshPos, tmpSunDir);
+        tmpSunDir.normalize();
+        material.setVector3('uSunDirection', tmpSunDir);
+      }
+
+      // Amendment 4 (#1119) §A4.3 결정 4 — 원거리 축소 LOD. 마스크가 도착한 뒤에만 켜지고,
+      // 투영 disk 반경이 임계 미만이면 다시 절차 경로로 되돌린다 (over-resolution shimmer 차단).
+      // 결정 7 의 미도착 분기와 **같은 uniform** 을 공유하므로 신규 분기 0.
+      if (maskReady) {
+        const diskPx = projectedDiskRadiusPx(scene, mesh as Mesh);
+        material.setFloat('uMaskEnabled', diskPx >= SURFACE_MASK_MIN_DISK_PX ? 1 : 0);
+      }
 
       // Amendment 2 (#782) §A2.3 결정 6 — dev-only 옵션 e 배선 어서션 (의미 전환: "회전 감지" →
       // "world 배선 누락 / vNormal 오용 감지"). 옵션 e 는 vNormal 을 world matrix 로 변환하는 데
@@ -802,6 +1052,19 @@ function valueNoiseMirror(px: number, py: number, pz: number): number {
   );
 }
 
+/**
+ * Amendment 4 (#1119) — `surfaceColorMirror` 의 마스크 경로 입력.
+ *
+ * GLSL 은 텍스처 샘플을 미러할 수 없으므로 **샘플 결과를 값으로 주입**한다 (단위 테스트가
+ * `uMaskEnabled` 0/1 두 경로의 색 합성을 결정적으로 검증한다). 미전달 = `uMaskEnabled` 0.
+ */
+export interface SurfaceMaskMirrorInput {
+  /** `uMaskEnabled` — 0 = 절차 경로 (Amendment 3 동일) / 1 = 마스크 경로. */
+  enabled: number;
+  /** 마스크 texel `.r` ∈ [0,1] (BILINEAR 샘플 결과 — §A4.3 결정 4 채택 샘플링). */
+  sample: number;
+}
+
 /** GLSL fbm 의 JS 미러 (3-옥타브). */
 export function fbmMirror(px: number, py: number, pz: number): number {
   return (
@@ -824,12 +1087,14 @@ export function fbmMirror(px: number, py: number, pz: number): number {
  * @param baseColor 실측 base 색 RGB ∈ [0,1]³
  * @param surfaceType 표면 타입
  * @param p 정규화 구면 좌표 [x,y,z] (단위 벡터 가정)
+ * @param mask Amendment 4 (#1119) 마스크 경로 미러 (미전달 = `uMaskEnabled` 0 = Amendment 3 식 그대로)
  * @returns 변조 후 RGB ∈ [0,1]³ (clamp 적용)
  */
 export function surfaceColorMirror(
   baseColor: readonly [number, number, number],
   surfaceType: SurfaceType,
   p: readonly [number, number, number],
+  mask?: SurfaceMaskMirrorInput,
 ): readonly [number, number, number] {
   const [bx, by, bz] = baseColor;
   let r = bx,
@@ -846,7 +1111,11 @@ export function surfaceColorMirror(
     };
     const mix = (a: number, b2: number, t: number): number => a + (b2 - a) * t;
     const continents = fbmMirror(px * 2.4, py * 2.4, pz * 2.4);
-    const landMask = sm(LAND_THRESHOLD_LO, LAND_THRESHOLD_HI, continents);
+    // Amendment 4 (#1119) — landMask = mix(절차 mask, 마스크 texel, uMaskEnabled). mask 미전달 시
+    // uMaskEnabled = 0 이라 Amendment 3 식과 **부동소수 수준으로 동일**하다 (mix(a,b,0) === a).
+    const proceduralMask = sm(LAND_THRESHOLD_LO, LAND_THRESHOLD_HI, continents);
+    const maskEnabled = mask?.enabled ?? 0;
+    const landMask = mix(proceduralMask, mask?.sample ?? 0, maskEnabled);
     // 위도 파라미터 (sin-space) — 경계 자연화는 기존 continents fbm 재사용 (추가 noise 0).
     const latRaw = Math.abs(py);
     const latJ = latRaw + (continents - 0.5) * BIOME_LAT_JITTER;

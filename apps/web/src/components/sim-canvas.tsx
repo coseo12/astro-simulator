@@ -566,6 +566,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #756 — 절차적 행성 표면. 기본 ON 은 parseSurfaceVisible 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR 20260628-756 §결정 4 레이어 분리).
           surfaceDetail: surfaceVisible,
+          // #1119 — 지구 대륙 마스크 에셋 base URL. core 기본값은 undefined (마스크 비활성) 유지 —
+          // 정적 서빙 경로를 아는 것은 web 레이어의 책임이다 (ADR 20260628-756 §A4.3 결정 6).
+          surfaceMaskBaseUrl: '/textures/',
           // #782 — 행성 self-rotation. 기본 ON 은 parseRotateEnabled 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR §A2.3 결정 7 레이어 분리, surfaceDetail 동형).
           selfRotation: rotateEnabled,
