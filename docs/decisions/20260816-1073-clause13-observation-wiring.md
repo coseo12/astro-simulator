@@ -1,6 +1,7 @@
 # ADR: ADR 971 §10-5 항 13 관측 의무 배선 — 관측은 기계(이벤트 구동 workflow), 판단은 사람 (#1073)
 
-- **상태**: **Provisional** (cross-validate 미수행 — 메인이 수행 후 §9 에 4축 통합 + `Accepted` 전이 + `README.md` 인덱스 상태 열 동시 갱신)
+- **상태**: **Accepted** (cross-validate 2026-08-16 — §9 4축 통합 완료). 원 박제: `Provisional` (발동 앵커 — ADR 신규 + 선행 ADR §10-5 개정)
+  - **전이 주체·시점**: 메인 오케스트레이터가 PR [#1098](https://github.com/coseo12/astro-simulator/pull/1098) 머지 직전 수행 ([#479](https://github.com/coseo12/astro-simulator/issues/479) — sub-agent 직접 호출 금지). `outcome` = `applied` / `plan_bypass` = `false`. 인덱스 표 상태 열은 같은 커밋에서 갱신한다 (`verify-adr-index.mjs` 강제)
 - **날짜**: 2026-08-16
 - **결정자**: architect (실측 기반 설계). workflow 구현·머지 권한은 사용자
 - **관련**:
@@ -322,7 +323,35 @@ on:
 
 ## §9 교차검증 반영 사항
 
-⚠️ **미수행 — 본 ADR 은 `Provisional` 이다.** cross-validate 는 메인이 수행한다 ([#479](https://github.com/coseo12/astro-simulator/issues/479) — sub-agent 직접 호출 금지). 수행 후 본 절에 **합의 / 이견 수용 / Claude 재분석으로 기각 / 고유 발견** 4축을 통합하고 `Accepted` 전이 + `README.md` 인덱스 상태 열을 **같은 커밋**에서 갱신한다 ([#1005](https://github.com/coseo12/astro-simulator/issues/1005) 가 강제).
+✅ **수행 완료 (2026-08-16, `cross_validate.sh code 1098` — outcome `applied`, exit `0`).** 종합 판정은 **승인 권고**이며 차단 `0` 이다. 아래는 4축 분류다.
+
+### ① 합의
+
+- **차단 조건 해소의 실증** — 앵커(`started_at <= mergedAt`)와 포화 assertion 을 대조군/처리군 주입 실험 + negative 테스트로 닫은 것.
+- **모집단 갭 선제 교정** — 초판 관측 대상(*"release PR 1건"*)이 prep PR 을 누락하던 진부분집합 결함을 **배선 단계에서** 잡은 것 (§3-2).
+- **SSoT·결합 분리** — `20260814-1031-1064` §결정 6 정합, `operational-friction.md` 중복 값 제거(포인터 1줄화), 비용 계급이 다른 항 14 를 [#1097](https://github.com/coseo12/astro-simulator/issues/1097) 로 분리한 것.
+- **실물 후속 이슈 연계** — [#1096](https://github.com/coseo12/astro-simulator/issues/1096)·#1097 을 실물로 만들어 «표에만 남고 잊히는» 세대 1·2 의 실패 패턴을 차단한 것.
+
+### ② 이견 수용
+
+없음 — 차단·반대 의견이 제기되지 않았다.
+
+### ③ 고유 발견
+
+**없다.** 위 §호출 프롬프트 삽입 질문 3개에 대한 응답은 아래와 같으며, 세 답 모두 본 ADR 이 이미 박제한 근거를 **재확인**하는 방향이었고 새 축을 열지 않았다.
+
+| 질문 | 응답 요지 | 본 ADR 반영 |
+| --- | --- | --- |
+| Q1 `if:` 표현식 엣지 케이스 (fork / 봇 / base 편집) | **정상 동작** — fork PR 의 `closed` 는 base 저장소 컨텍스트에서 실행되고, 봇 PR 은 `base.ref == 'main'` 을 만족하며, **base 편집 후 머지도 머지 시점 페이로드의 `base.ref` 가 `'main'` 이라 누락되지 않는다** | §8 후속 1(#1096) DoD 의 실측 축으로 이미 고정돼 있다. ⚠️ 다만 이 응답은 **문서 기반 추론이지 실측이 아니다** — #1096 이 실측으로 확정한다 |
+| Q2 «아무도 안 본다» 새 실패 모드 | **§재검토 조건 2 로 충분** — 사람 규약의 치명적 결함은 *"미실행"* 과 *"clean"* 이 **둘 다 산출물 `0`** 이라는 점인데, 기계는 성공 시에도 run 로그를 남겨 «릴리스 머지 PR 수 ↔ run 수» 대조가 성립한다 | §결정 3 «run 이력이 남는 것이 본 설계의 핵심 산출» 과 동일 논거 |
+| Q3 사람 규약 fallback 강등의 타당성 | **전적으로 타당** — 월 `26~52` 회는 일평균 1~2회라 체크리스트 주의력이 감쇠하며(PR #1061 의 4연속 수치 오류 전례), `check-runs` 영구 보존이므로 매 사이클 관측은 **«데이터 소실 방지» 가 아니라 «latency 단축» 요구**다 | §결정 2 와 축자 일치 — 본 ADR 이 독립적으로 도달한 결론이다 |
+
+### ④ Claude 편향 셀프 체크 (사후)
+
+- **낙관적 일정 ❌ 미통과 (호출 전 자기 판정)** — cross-validate 는 Q1 을 «정상 동작» 으로 답했으나 그 근거가 **문서 기반 추론**이라 미통과 판정을 **뒤집지 않는다**. `if:` 평가와 `gh` 인증 컨텍스트의 실측 의무는 #1096 DoD 에 그대로 남긴다. ⚠️ 여기에 PR [#1098](https://github.com/coseo12/astro-simulator/pull/1098) reviewer 가 축 하나를 더했다 — `permissions` 에 `pull-requests: read` 가 없는데 (0) 경로가 `gh pr view` 를 부르며, 승계 원본 `auto-close-issues.yml` 은 페이로드를 읽어 **선례가 이 축을 덮지 않는다**. #1096 «구현 전 실측 선행» 3번째 축으로 편입했다.
+- **폐기 프레이밍 ⚠️ 부분** — 유지. Q3 응답이 fallback 강등을 지지하나, 그 지지 근거(주의력 감쇠)는 본 ADR 이 §3-1 빈도 실측으로 이미 고정한 것이라 **독립 증거가 아니다**.
+- **결합 간과 ✅ / 순수주의 ✅** — 변동 없음.
+- **앵커링 점검** — 메인은 cross-validate 호출 전 결론을 제시하지 않았고, 삽입 질문 3개는 ADR 이 **자기 미통과 축에서 도출**한 것이라 유도 방향이 아니다. 다만 «고유 발견 0» 은 **질문이 좁았을 가능성**과 구분되지 않는다 — 이번 사이클에서 cross-validate 가 근거 층 결함을 놓친 사례가 반복 관측됐으므로(PR #1092 에서 vacuous 단언을 reviewer 만 적발), **본 ADR 의 실질 검증은 reviewer 독립 재현 쪽이 담당했다**고 기록한다.
 
 ### 호출 전 Claude 편향 셀프 체크 ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5)
 
