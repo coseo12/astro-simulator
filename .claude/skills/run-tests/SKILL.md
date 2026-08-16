@@ -36,12 +36,18 @@ description: |
 | `poetry.lock` | poetry | `poetry install && poetry run pytest` |
 | `Pipfile.lock` | pipenv | `pipenv sync --dev && pipenv run pytest` |
 | `requirements.txt` | pip | `pip install -r requirements.txt && pytest` |
-| `pyproject.toml` (lock 없음) | pip + PEP 621 | `pip install -e .[dev] \|\| pip install -e . && pytest` |
+| `pyproject.toml` (lock 없음) | pip + PEP 621 | extras fallback — 아래 ² |
 | `setup.py` (legacy) | pip | `pip install -e . && pytest` |
 
 > ¹ **Bun / Deno — 감지 테이블 정의만, CI 자동 실행 미구현**: 현재 `.github/workflows/ci.yml` 에는 Bun/Deno 경로 step 없음. 다운스트림이 직접 step 추가 필요 (volt #49 주석-구현 drift 경계). 향후 harness 에 추가 검토 — volt 후속 이슈 대상.
 >
 > **pytest exit code 5** (수집된 테스트 0건) 은 CI 에서 경고로 처리 권장: `pytest || [ $? = 5 ]`
+>
+> ² **PEP 621 extras fallback** — 명령에 `||` 가 있어 **표 셀에 두지 않는다** ([#1079](https://github.com/coseo12/astro-simulator/issues/1079)). 셀 안에서는 `\|\|` 로 이스케이프해야 하는데, 그 원문을 그대로 실행하면 `||` 가 **셸 연산자가 아니라 인자**가 되어 fallback 분기가 조용히 사라진다 (실측 대리 재현: `false \|\| echo x` → 아무것도 출력 안 함 / `false || echo x` → `x`).
+>
+> ```bash
+> pip install -e .[dev] || pip install -e . && pytest
+> ```
 
 ### 기타 언어
 
@@ -115,7 +121,8 @@ for ws in apps/* packages/*; do
 done
 ```
 
-루트에 `verify:test-coverage` 스크립트로 박제해 CI 파이프라인 + `verify:all` 체인에 연결할 것을 권장.
+루트에 `verify:test-coverage` 스크립트로 박제해 CI 파이프라인 + `verify:smoke` 체인에 연결할 것을 권장
+(종전 이름 `verify:all` — #884 개명. 그 체인은 등록된 `verify:*` 전수가 아니라 **스모크 집합**이며 계약은 **저장소 루트** `README.md` 의 §`verify:smoke` 계약 참조).
 
 ### 워크스페이스 필터 적용
 - 변경된 파일이 특정 워크스페이스에 한정되면 `pnpm --filter <ws> test` / `npm -w <ws> test` 로 범위를 좁힌다.

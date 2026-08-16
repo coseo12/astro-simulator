@@ -274,6 +274,9 @@ gh pr checks <PR> --json name,state --jq \
   - ⚠️ **문구만으로는 WARN 이 남는다 (#1010)**: 3계급 판정에서 phrase 는 blocking 축이고 **구조**(`kw1~5` 체크박스 / `kw6~7` `###` 헤더)는 WARN 축이다. 체크박스 항목을 `### 보안` 같은 헤더 절로 옮기면 FAIL 은 면해도 WARN 이 뜬다 — 실측으로 최근 머지 PR 60건 중 **release PR 8건이 이 경로**였다 (술어: 60 PR × 7 kw = 420 셀 중 WARN 21 셀, WARN PR 10건 중 8건이 release). 체크박스는 `[ ] → [x]` 갱신만 하고 라인 형태를 유지한다.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
 - **README 「현재 상태」 갱신 의무 (#842)**: release prep PR 에서 version bump + CHANGELOG 확정과 **동일 커밋**에 README `## 현재 상태` 의 버전/날짜/기능 서술을 현행화한다. 실측: v0.47.0~v0.50.0 3릴리스 연속 누락으로 README 가 v0.46.0 표기로 방치 (전수 감사 2026-07-18 발견).
+- **escape 관측은 사람 스텝이 아니다 (#1073)**: 릴리스 클래스 머지 PR 의 `pr-template-checklist` escape 관측은 `release-escape-watch.yml` 이 머지 이벤트마다 자동 수행한다 (비-required — 머지를 막지 않는다). **릴리스 절차에 수동 스텝을 추가하지 말 것.** 사람이 하는 일은 두 가지뿐 — ① `ESCAPE` 발화 시 **대장 박제 후** 본문 사후 정정 ② workflow run 이 아예 없을 때 창 이탈 전 전수 재산출 1회. 술어·창·임계·조치의 **정본은 ADR [`20260807-971`](../decisions/20260807-971-required-status-checks.md) §10-5 항 13** 이며 여기서 값을 복제하지 않는다. 배선 판정 근거: ADR [`20260816-1073`](../decisions/20260816-1073-clause13-observation-wiring.md).
+
+  > ⚠️ **`release-escape-watch.yml` 은 아직 없다 — 구현은 [#1096](https://github.com/coseo12/astro-simulator/issues/1096) 이다** (PR [#1098](https://github.com/coseo12/astro-simulator/pull/1098) reviewer, `git grep -lF 'release-escape-watch' -- .github/` → `0`). 위 서술은 **배선 확정 후의 정상 상태**를 적은 것이고, #1096 머지 전까지는 *"릴리스 절차에 수동 스텝을 추가하지 말 것"* 이 **관측 주체 부재 구간**을 만든다. 그 구간 한정으로 **릴리스 직후 메인이 (0) 술어를 1회 수동 실행**한다 — ADR §10-5 항 13 의 창이 90일이라 누락분은 #1096 배선 후 전수 재산출로 회수된다. 이 예외는 **#1096 머지와 동시에 소멸**한다.
 
 ## workspace 버전 정책 — 루트 단일 버전 (결정 노트, #842)
 
@@ -542,7 +545,7 @@ CI 의 `setup-and-build` composite (워크플로 8개가 소비) 이 수행하�
 | **의존 집합** | `4` | `dev` · `build` · `typecheck` · `test:unit` — **전건 실행** |
 | **비의존 집합** | `14` | `lint` · `lint:core` · `lint:shared` · `format:check` · `check-encoding` · `verify:{test-coverage,iau-data,no-scientific-grep,zombie-check,dead-wait-check,docs-links,adr-index,r1-tier-untouched,md-tilde}` — **전건 실행**, 전부 exit `0` |
 | **브라우저/서버 계열** | `24` | 스크립트 본문이 `browser-verify-utils` 또는 `localhost:` 를 참조 (술어: 아래 코드블록). `bench:scene` · `bench:scene:mobile` · `bench:scene:sweep` · `bench:tier-guard-cost` · `bench:webgpu` **5 종이 여기 속한다**. 대표 `3` 개 실행 → 전부 exit `1` / `ERR_CONNECTION_REFUSED` |
-| **기타** | `5` | `clean` · `prepare` · `format` (파괴적·부수효과라 미실행) · `verify:all` (위 계열들의 합성) · `bench:scene:set-baseline` |
+| **기타** | `5` | `clean` · `prepare` · `format` (파괴적·부수효과라 미실행) · `verify:all` (위 계열들의 합성 — **측정 rev 당시 이름**. 현 `verify:smoke`, #884) · `bench:scene:set-baseline` |
 
 ```bash
 # 브라우저/서버 계열 귀속 술어 — scripts 값에서 .mjs 경로를 뽑아 본문을 검사
@@ -688,6 +691,24 @@ pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 1
 - **에이전트 행동 규칙 사본**: `.claude/agents/developer.md` §규칙 (§7 규약 바로 다음 줄). 본 절이 절차 SSoT 다.
   ⚠️ 트리거 조건은 **두 곳이 같은 낱말이어야 한다** — 초판이 양쪽 다 *"`typecheck` 를 돌리려면"* 으로
   좁게 적었고 #1062 가 양쪽을 동시에 넓혔다. 한쪽만 고치면 사본이 SSoT 를 좁히는 형태가 된다.
+
+  **강제 지점 (#1076)** — `scripts/verify-ssot-trigger-wording.mjs` (CI `project-guards`). 위 규칙은
+  신설 당일 자기 위반을 냈고(SSoT `해석하는` / 사본 `의존하는` — PR [#1072](https://github.com/coseo12/astro-simulator/pull/1072)
+  reviewer 라운드 1), 규약형 단독 방어가 그것을 통과시켰다. 가드는 이 절 첫 문단의 **트리거 강조
+  span 을 런타임 추출**해 사본과 정규화 축자 대조하고, 규범면(`.claude` · `docs/ops` · `CLAUDE.md`)에서
+  그 문언을 보유한 파일 집합이 {본 절, 사본} 과 정확히 일치하는지 pin 한다.
+
+  - ⚠️ **가드는 문언을 갖지 않는다** — 하드코딩하면 그 순간 스크립트가 **세 번째 검증되지 않은
+    사본**이 되어 막으려던 클래스를 재생산한다 (ADR [`20260806-962`](../decisions/20260806-962-branch-name-guard.md) §후보 (a) 기각 근거).
+    등록부가 갖는 것은 앵커(절 헤딩 정규식 + 표지 리터럴 `@astro-simulator/*`)뿐이고, 둘 다 낱말이
+    바뀌어도 불변이라 실제 drift 에서 정상 발화한다.
+  - ⚠️ **이 규칙은 `git grep` 으로 대체되지 않는다.** 위 트리거 강조 span 은 **줄바꿈을 품고** 있고
+    사본은 한 줄이라, 트리거를 축자로 건 `git grep -lF` 는 **본 절 자신을 찾지 못한다** (2026-08-16
+    실측: hit 은 사본과 `CHANGELOG.md` 뿐, 본 파일 `0`). 라인 단위 도구로는 원리적으로 대조가
+    성립하지 않는다 — 규약형이 아니라 스크립트여야 하는 이유다.
+  - **모집단 경계** — `CHANGELOG.md` · `docs/decisions` 는 **이력 기록** 계급이라 의도적으로 제외한다
+    ([`reviewer.md`](../../.claude/agents/reviewer.md) §절차 4 5분류 2항). 이력은 그 시점 사실이라
+    문언이 갈려 있는 것이 정상이고, 모집단에 넣으면 릴리스 노트를 쓸 때마다 발화한다.
 - 근거: [#960](https://github.com/coseo12/astro-simulator/issues/960) — 증상 2회 독립 보고
   (PR [#941](https://github.com/coseo12/astro-simulator/pull/941) · [#959](https://github.com/coseo12/astro-simulator/pull/959)).
   판정은 ADR [`20260814-960-worktree-typecheck-recipe.md`](../decisions/20260814-960-worktree-typecheck-recipe.md)

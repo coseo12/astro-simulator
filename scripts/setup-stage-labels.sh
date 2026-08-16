@@ -2,7 +2,7 @@
 # 페르소나 핸드오프용 stage 라벨을 GitHub 저장소에 생성한다.
 # 멱등: 이미 존재하면 스킵.
 
-set -e
+set -euo pipefail
 
 REPO=${1:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}
 
