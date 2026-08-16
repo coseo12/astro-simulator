@@ -1,8 +1,8 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)**
-- **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04)
-- **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium)
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Provisional (cross-validate 대기)**
+- **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
+- **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
 - **용어**: [Tier](../glossary.md#tier-t1--t2--t3), [R-Phase](../glossary.md#r-phase-roadmap-v3-phase), [LOD](../glossary.md) (high/mid/low variant)
 
@@ -816,3 +816,287 @@ col = mix(col, iceColor, iceMask);
 7. **body 별 파라미터화 탈출구** — §A3.7 재검토 조건 5 에 이미 박제됨 (합의 재확인).
 
 **Claude 편향 셀프 체크 결과**: 결합 간과 (미통과 의심 축이었던 continents 이중 재사용) — agy 도 리스크 High 로 동의하나 채택 자체는 타당 판정. jitter 진폭이 작고 (위도 ±0.06) 백업 플랜이 구체화되어 실측 판정 (DoD) 으로 이관. 나머지 3종 통과 유지.
+
+---
+
+## Amendment 4 (2026-08-17) — 지구 대륙 윤곽 실제화: 「에셋 0」의 조건부 예외 (#1119)
+
+- **상태**: **Provisional** (cross-validate 대기 — §A4.8 통합 후 Accepted 전이)
+- **이슈**: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (type:feat, priority:high, group:C-solar-system)
+- **형식**: **Amendment** (신규 ADR 기각). §A3.3 결정 1 과 **동일 기준** — 신규 모듈 0, 기존 rocky 분기 확장이면 Amendment. 다만 본 건은 §배경 의 **핵심 제약 「에셋 0」 자체를 조건부로 개정**하므로 본문 결정의 갱신이고, 그래서 더욱 별도 파일이 아니라 같은 문서에 부기해야 한다 (rocky 분기 이력 §결정 5 → A1 결정 4 → A3 → A4 가 한 파일에 수렴). **원문 소급 치환 0 — 부기만.**
+- **범위**: 본 PR 은 **설계·ADR 만**. 구현·에셋 취득은 후속 dev.
+
+### A4.1 배경 — #783 이 닫지 못한 축
+
+#775 (ocean↔land 2색) → #783 (극관 + biome 3밴드) 는 **모두 색·밴드 축**이었고, 대륙 **모양**은 여전히 `fbm(p * 2.4)` 다. #783 이 이미 "지구가 지구 같지 않다" 는 같은 사용자 관찰에서 나왔으므로 (§A3.1), **같은 축의 3회차 정밀화는 해답이 아니다** — 아프리카도 아메리카도 없는 한 색을 아무리 맞춰도 실제 지구가 되지 않는다.
+
+「에셋 0」 (§배경) 의 실질 근거는 세 개다: **(i) 에셋 파이프라인 신설 (ii) 번들 증가 (iii) WebGPU 호환 리스크**. 본 Amendment 는 그 셋을 각각 **실측·판정**하고, 셋을 최소화하는 **저해상도 육지 마스크 1장** 에 한해 예외를 연다. 「에셋 0」 원칙 자체는 폐기되지 않는다 — 색/고도/구름/야간불빛 텍스처는 여전히 비목표다 (§A4.7).
+
+### A4.2 코드베이스 실측 (설계 결정의 근거 — 재조사 불필요)
+
+1. **에셋 파이프라인 부재 실측** — `public/` 디렉토리 **0개** (저장소 전체), 커밋된 텍스처 바이너리 **0건** (`git ls-files '*.png' '*.jpg' '*.webp' '*.ktx2' '*.basis' '*.dds'` 결과 91 PNG 는 **전부** `__baselines__` / `docs/screenshots` / `docs/reports` 이고 런타임 미참조), `new Texture(url)` / `SceneLoader` / `AssetsManager` / `assetsInlineLimit` **각 0건**. 유일한 런타임 이미지는 `apps/web/app/icon.svg` (335 B, favicon). → **"파이프라인 신설" 은 과장이 아니라 사실이다.** 다만 신설 실체는 `apps/web/public/` 디렉토리 1개 + URL 문자열이다 (Next.js 정적 서빙).
+2. **유일한 텍스처 선례** = `packages/core/src/scene/billboard-alpha-mask.ts` 의 `getOrCreateBillboardAlphaMask(scene)` — 64×64 `DynamicTexture` 를 **per-scene 캐시**로 1회 생성. URL 로드가 아니라 절차 생성이지만, **텍스처 수명·공유 패턴의 선례**는 존재한다 (§A4.3 결정 6 이 답습).
+3. **셰이더 sampler uniform 0개** — `attributes: ['position', 'normal']`, `samplers` 옵션 **미지정**, `shaderLanguage` **미지정**(GLSL 기본) → WebGPU 는 Babylon 의 GLSL→WGSL 자동 변환에 전적으로 의존한다. GLSL 소스에 `sampler2D` / `texture2D` **0건**.
+4. ⚠️ **저장소에서 sampler 를 쓰는 유일 셰이더가 WGSL 을 손으로 따로 쓴다** — `gravitational-lensing.ts` 는 `ShaderStore.ShadersStoreWGSL` ↔ `Effect.ShadersStore` 를 `isWebGPU` 로 **런타임 분기**한다 (`:165-178`). 단 이는 **PostProcess** 경로이고, 그 이유는 Babylon 이 자동 제공하는 샘플러 이름이 백엔드마다 다르기 때문 (`textureSampler` / `textureSamplerSampler`) 이다. **`ShaderMaterial` + 개발자가 명시 선언한 `sampler2D` 경로와 동일 클래스라고 단정할 수 없다.** → 단정 대신 §A4.3 **결정 0 게이트**.
+5. **UV attribute 미바인딩** — fragment 가 `vec3 p = normalize(vLocalPos)` 로 구면좌표를 직접 만든다 (`:415`). 위도는 `p.y` (sin-space), 경도는 **아예 계산하지 않는다**. → 마스크 UV 도 `p` 에서 파생하면 `attributes` 배열 무변경.
+6. **자전·tilt 는 `mesh.rotationQuaternion` → `world` matrix → `vNormal` 만** 영향한다 (§A2.3 결정 2). `vLocalPos` 는 local 유지 (painted-on 계약). → **마스크는 추가 배선 0 으로 자전(#782)·`axialTiltDeg` 23.44° 를 자동 상속**한다. 이것이 판정 3 (좌표계 정합) 의 구조적 답이다.
+7. **회귀 가드 지형** — 지구 canvas 픽셀을 담는 **PNG baseline 은 `apps/web/scripts/__baselines__/lod-body-{high,mid,low}.png` 3장뿐** (`browser-verify-lod.mjs` 의 `TIER_FOCUS_BODY.body = 'earth'`, 판정 max pixel diff < 15%). `lod-inner-*` 는 화성 / `lod-solar-*` 는 태양 focus. r1-guard 12장은 UI 영역만 clip 하므로 canvas 미포함. 셰이더 회귀는 baseline 이 아니라 `verify:783-earth-detail` 의 ON/OFF **상대 성질** 판정이 담당한다 (절대 임계 금지 — `shader-pixel-guard.yml`).
+
+### A4.3 결정
+
+#### 결정 0 — Phase 0 측정 게이트 (다른 모든 구현 이전, 차단 조건)
+
+**`sampler2D` 가 이 공유 GLSL `ShaderMaterial` 에서 WebGPU / WebGL2 양쪽에 동작하는가**를 최우선 실측한다. 최소 스파이크: rocky 분기에 1×1 흰색 `RawTexture` 를 바인딩하고 `texture2D(uSurfaceMask, vec2(0.5)).r` 을 곱한 뒤,
+
+- (a) **실 Chrome (WebGPU)** — earth disk 렌더 + console error 0
+- (b) **headless chromium `--use-angle=swiftshader` (WebGL2, CI 재현)** — 동일
+
+두 셀 모두 PASS → 나머지 결정대로 진행. **어느 하나라도 FAIL → 구현 중단 + architect 재개봉** (§A4.7 재검토 조건 1). 4타입 공유 셰이더를 WGSL 이중 소스화하는 것은 비용 계급이 달라 C안의 채택 근거 자체가 무너진다.
+
+> 근거: #820 의 **measurement-first Phase 0 게이트** 선례 (로컬 무재현 전제를 구현 전에 판별). §A4.2-4 는 리스크의 **존재**를 보이지만 **동일 클래스임을 증명하지 않는다** — 그래서 "위험하다" 도 "안전하다" 도 선언하지 않고 게이트로 넘긴다.
+
+#### 결정 1 — 출처·라이선스 (실측 박제, 취득은 dev)
+
+| 항목            | 값                                                                              |
+| --------------- | ------------------------------------------------------------------------------- |
+| 데이터셋        | **Natural Earth 1:50m Physical Vectors — Land** (`ne_50m_land`), VERSION `4.1.0` |
+| 공식 취득 URL   | `https://naciscdn.org/naturalearth/50m/physical/ne_50m_land.zip`                |
+| 취득일          | **2026-08-17**                                                                  |
+| zip SHA256      | `0b8e670cf80dce9cbebe2a193bc44ba5602758c22e1fa603980553646d7ff162`              |
+| 좌표계 (`.prj`) | `GEOGCS["GCS_WGS_1984"] … PRIMEM["Greenwich", 0]` — WGS84 경위도, 본초자오선 Greenwich |
+
+**미러 동일성 실측**: `https://naturalearth.s3.amazonaws.com/50m_physical/ne_50m_land.zip` 이 위 공식 CDN 파일과 **SHA256 동일** (2026-08-17 양쪽 다운로드 후 대조). 미러를 써도 출처가 흐려지지 않는다.
+
+**라이선스** — `https://www.naturalearthdata.com/about/terms-of-use/` (2026-08-17 취득. 직접 GET 은 mod_security `406` 이라 `web.archive.org` 미러로 원문 확인):
+
+> "All versions of Natural Earth raster + vector map data found on this website are in the public domain."
+> "No permission is needed to use Natural Earth."
+> "Crediting the authors is unnecessary."
+
+권장 인용문 (의무 아님): `Made with Natural Earth.`
+
+⚠️ **모순 표기를 알고도 채택했음을 박제한다** — 다운로드 페이지 푸터는 `© 2009 - 2026. Natural Earth. All rights reserved.` 다. 이는 **사이트 전반 boilerplate** 이고 terms-of-use 는 범위를 **"map data"** 로 명시해 public domain 을 선언한다. 본 결정은 후자를 근거로 한다. 미래 관찰자가 "확인하지 않았다" 로 오인하지 않도록 불일치를 남긴다.
+
+**NASA Blue Marble watermask 는 후보에서 탈락** — 2026-08-17 시점 시도한 `eoimages.gsfc.nasa.gov/images/imagerecords/76000/76487/world.watermask.21600x10800.png` 이 `404` 였고 대체 URL 을 확정하지 못했다. Natural Earth 는 (i) 라이선스 문구가 public domain 을 **명시**하고 (ii) **벡터**라 임의 해상도 재래스터화가 가능해 재현성이 높다 (§A4.3 결정 8).
+
+#### 결정 2 — 마스크 해상도·형식 (번들 실측 근거)
+
+**(2-a) 먼저 화면 각도해상도를 실측한다** — 해상도 요구는 "크면 좋다" 가 아니라 화면 픽셀 밀도가 정한다. dev server + Playwright, `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off` + jd 고정, disk 반경은 기존 `browser-verify-783` 과 **동일 산식** (`boundingSphere.radiusWorld / √3` 의 카메라 right 방향 edge 투영):
+
+| 조건                    | 기본 focus R (px) | 정합 마스크 폭 `2πR` | 최대 줌인 R (px) | 최대 줌 각도해상도 |
+| ----------------------- | ----------------: | -------------------: | ---------------: | -----------------: |
+| 1280×720 dsf1           |          **98.3** |                  618 |            810.9 |       0.0707 °/px |
+| 1920×1080 dsf1          |         **147.5** |                  927 |           1216.4 |       0.0471 °/px |
+| 1920×1080 dsf2 (retina) |         **295.0** |                 1854 |           2432.8 |       0.0236 °/px |
+
+→ **기본 focus 정합 폭 구간 = [618, 1854].**
+
+**(2-b) 인코딩 바이트 실측** — Natural Earth 50m → 8192×4096 이진 래스터 1회 → 각 후보로 면적평균 다운샘플. `aa` = 면적 사전필터(8bit 계조), `binary` = 임계 128 이진화:
+
+| 해상도    | variant | PNG gray8  | PNG palette | WebP lossless |
+| --------- | ------- | ---------: | ----------: | ------------: |
+| 512×256   | aa      |     15,848 |      15,848 |        13,774 |
+| 512×256   | binary  |      3,404 |       2,984 |         2,428 |
+| 1024×512  | aa      | **30,135** |      30,135 |        26,112 |
+| 1024×512  | binary  |      8,034 |       7,431 |         6,046 |
+| 2048×1024 | aa      |     54,071 |      54,071 |        44,532 |
+| 2048×1024 | binary  |     21,589 |      18,738 |        15,344 |
+
+**(2-c) 형상 충실도 IoU** — 기준 = 50m 8192 래스터를 4096×2048 로 면적평균 후 0.5 임계. 후보는 기준 격자에서 **bilinear 재구성 후 0.5 임계** (GPU 샘플링 규약과 동일):
+
+| 해상도    | variant | IoU%      |
+| --------- | ------- | --------: |
+| 256×128   | aa      |     95.45 |
+| 512×256   | aa      |     97.31 |
+| 1024×512  | binary  |     97.70 |
+| 1024×512  | aa      | **98.48** |
+| 2048×1024 | binary  |     98.66 |
+| 2048×1024 | aa      |     99.14 |
+
+판별력 대조군: 위도 부호를 반전시킨 **오규약**으로 같은 측정을 돌리면 IoU **11.82%** — 이 지표가 실제로 형상을 재고 있음을 같은 실행에서 확인.
+
+→ **채택: 1024×512 · 8-bit grayscale PNG · 면적 사전필터(AA) = 30,135 B.**
+
+근거:
+
+- **해상도** — 1024 는 정합 폭 구간 [618, 1854] 를 **[0.55×, 1.66×]** 로 덮는다. 2048 은 전 구간 **[1.10×, 3.32×] over-resolution** 이라 결정 4 의 `noMipmap` 전제에서 축소 shimmer 를 **상시** 유발한다. 512 는 retina 기본 focus 에서 3.6× under (뭉개짐).
+- **AA 채택 근거는 IoU 가 아니라 사전필터다** — `noMipmap` 하에서 mip 을 대신한다 (결정 4). 다만 1024 에서는 IoU 도 AA 우세 (98.48 vs 97.70) 라 두 축이 충돌하지 않는다.
+- ⚠️ **지표 한계 명시** — **해상도를 가로지르는** 비교에서는 binary 가 bytes/IoU 로 우월하다 (2048 binary 98.66% @ 15,344 B 가 1024 aa 98.48% @ 26,112 B 를 이긴다). 그러나 **IoU 는 정의상 sub-texel 가장자리 정보를 임계로 버리므로 AA 의 가치(사전필터)를 측정하지 못한다.** 해상도가 결정 4 의 제약으로 먼저 고정되므로 이 우월은 본 결정의 반례가 아니다. (이 문단은 "AA 가 언제나 낫다" 는 **전칭 단정을 스스로 반증**해 두는 것이다.)
+- **PNG 채택** (WebP 26,112 B 대비 **+4,023 B**) — (i) `pngjs` 가 **이미 루트 devDependency** 라 생성 스크립트를 **신규 의존 0** 으로 커밋할 수 있다 (`sharp` 는 직접 의존이 아니라 `next` 경유 전이 의존이므로 근거로 쓸 수 없다). (ii) 커밋 바이너리는 PNG 91장 / WebP 0장 — 신규 포맷 클래스를 만들지 않는다. (iii) 델타는 static 산출물의 **0.037%**.
+- **데이터셋 50m 채택** (110m 대비 +7,292 B) — 110m 은 1024 로 해상도를 올려도 IoU 가 **96.95% 에서 포화**해 **50m@512 의 97.45% 보다 낮다.** 래스터 해상도로 원천 일반화를 복구할 수 없다. ⚠️ 자기참조 주의: 기준 격자가 50m 유래이므로 이 수치는 **"110m 이 50m 대비 얼마나 일반화됐는가"** 를 재는 것이고 절대 정확도가 아니다.
+
+**(2-d) 번들 증가 실측** (`pnpm install --frozen-lockfile` + `pnpm build`, develop tip `37c0a49`):
+
+| 축                                                      |         값 |
+| ------------------------------------------------------- | ---------: |
+| `apps/web/.next/static` 총 바이트 (95 파일)             | 10,933,577 |
+| 그중 JS (82 파일)                                       |  8,652,828 |
+| 그중 단일 폰트 `PretendardVariable….woff2`              |  2,057,688 |
+| **마스크 1장**                                          | **30,135** |
+| static 산출물 증가율                                    | **+0.276%** |
+| **JS 번들 증가**                                        |  **0 B** — `import` 가 아니라 URL 문자열 |
+| 초기 페이지 전송 증가                                   |  **0 B** — 씬 생성 시점 fetch, `?surface=off` 면 fetch 자체 없음 |
+
+즉 마스크는 **이미 커밋된 폰트 파일 하나의 1.46%** 다. 「번들 증가」 라는 「에셋 0」 의 근거 (ii) 는 이 규모에서 성립하지 않는다.
+
+#### 결정 3 — 좌표계 정합 (실측 확정, 추측 0)
+
+셰이더는 mesh UV attribute 를 바인딩하지 않는다 (§A4.2-5). 마스크 UV 도 **동일한 `p = normalize(vLocalPos)`** 에서 파생한다 — `attributes` 배열 무변경.
+
+```glsl
+// equirectangular UV — p 는 이미 rocky 분기 진입부에 존재 (추가 varying 0)
+float u = atan(p.z, p.x) * INV_TWO_PI + 0.5;      // local +X = 경도 0° (본초자오선)
+float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +90°) → v = 0
+```
+
+마스크 파일 규약: `x=0 ↔ 경도 −180°`, `x=W/2 ↔ 경도 0°`, `y=0 ↔ 위도 +90°`, 픽셀 중심 샘플링.
+
+**실측 근거** (전부 같은 실행 안에 양성·음성 대조군 포함):
+
+- **(a) 마스크 규약 검증** — known-point 14개 (**양성 8** 육지 / **음성 6** 바다) 중 **13 PASS**. 유일 FAIL 은 Sydney (값 `60/255`) 로 **해안 도시의 sub-texel 혼합**이며 규약 오류가 아니다 — 2048×1024 에서 PASS 로 전환됨을 같은 실행에서 확인 (해안 8도시 판별: 1024 aa `6/8` → 2048 aa `7/8`, 내륙 `4/4` · 대양 `4/4` 는 전 해상도 불변). 판별력 대조군: **경도 180° 시프트** 오규약 → `9/14`, **위도 부호 반전** 오규약 → IoU `11.82%` (정상 `98.48%`).
+- **(b) 지리 sanity** — 면적(`cos φ`) 가중 육지 비율 **28.75%** (실제 지구 29.2%, 남극 포함). equirect 단순 픽셀 비율은 33.05% 로 고위도 과대표현 때문에 다르다. 판별력 대조군: **동일 픽셀 비율(33.2%) 의 무작위 마스크**는 면적가중 **33.82%** → 이 지표가 실제로 지리를 담고 있음이 확인된다 (마스크가 뒤집히거나 손상되면 값이 무너진다 → 결정 8 회귀 가드의 근거).
+- **(c) local frame ↔ 화면 실측** (`rotate=off`, `beta=π/2`, 1280×720, identity rotation): local **+X → 화면 오른쪽** (`Δx = +98.3`), local **+Y → 화면 위** (`Δy = −98.3`, canvas y 하향), local **+Z → 카메라 반대쪽**. 즉 근측 중심 = **−Z**.
+- **(d) 자전 방향 실측** (rotate ON, 1/8 항성일 간격 4표본): local +X 지점의 화면 x 가 `−100.7 → −73.8 → −5.6 → +75.7`, 즉 **좌 → 우**. 북극이 위인 실제 지구 관측 (근측 표면이 동쪽 = 오른쪽으로 이동) 과 일치 — #782 의 자전 방향 결정과 정합한다.
+
+(c)(d) 로부터 근측 중심(`−Z`) 에서 동쪽은 `+X` 방향이므로, 적도 `p(φ) = (sin φ, 0, −cos φ)` 에서 `u` 가 `φ` 와 함께 증가한다 (`φ=0 → u=0.25 → 경도 −90°`, `φ=90° → u=0.5 → 경도 0°`). → **거울상 아님** 이 계산이 아니라 실측 프레임으로 확정된다.
+
+⚠️ **명시 한계 — 새 불일치를 도입하지 않는다**: 위 규약은 본초자오선을 local `+X` 에 놓는데, `ROT_TILT_AXIS` 도 world `X` 다 (`self-rotation.ts:82`). 따라서 `jd = epoch` 에서 본초자오선이 obliquity 절선과 겹친다. 이는 **Amendment 2 §결정 3 이 이미 채택한 "축 방위각 world X 고정 근사 (pole RA/Dec 미사용)" 의 직접 귀결**이며 본 Amendment 가 새로 만드는 오차가 아니다. **특정 jd 의 sub-solar 경도는 천문 정확하지 않다** — Info/focus 패널은 그것을 주장하지 않으므로 D-T2 표기 불변 (§A4.6).
+
+#### 결정 4 — mip / seam 처리
+
+`noMipmap: true` + U `WRAP_ADDRESSMODE` / V `CLAMP_ADDRESSMODE` + `BILINEAR_SAMPLINGMODE`.
+
+| 축                | (A) mipmap ON                                                                                   | (B) `noMipmap` (채택)                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| ±180° 자오선 seam | ✗ `atan` 불연속 → 인접 fragment `du/dx` 폭증 → mip level 폭주 → **seam 선**                     | ✓ wrap 주소 모드가 경계를 정상 보간 — **구조적으로 seam 없음** |
+| 축소 앨리어싱     | ✓ mip 이 흡수                                                                                   | △ 사전필터(AA, 결정 2) + 해상도 정합으로 흡수                  |
+| 신규 GLSL 기능    | `textureGrad` / `dFdx` 필요 (Babylon GLSL→WGSL 변환 가능 여부 **미실측**)                        | 불요                                                            |
+
+→ **(B)**. 결정 2 의 "최대가 아니라 정합 해상도" 선택이 여기서 나온다 — 두 결정은 **커플링돼 있다** (over-resolution × noMipmap = shimmer).
+
+- **극 특이점** (`acos` pinch): `|sin φ| ≥ 0.84` 는 `iceMask` 가 덮으므로 (§A3.3 결정 4) 마스크 pinch 가 시각 노출되지 않는다.
+- **재검토**: qa 가 기본 focus 회전 중 해안선 shimmer 를 **인지**하면 `textureGrad` + seam 미분 wrap 보정으로 승격 (§A4.7 재검토 조건 2). 단 `textureGrad`/`dFdx` 의 WGSL 변환 가능 여부를 **먼저 실측** — 결정 0 스파이크에 합류 가능.
+
+#### 결정 5 — `continents` fbm 의 처분: **유지 + 역할 전환** (폐기 기각)
+
+| 축                             | (A) fbm 폐기 (마스크 단독)                                                | (B) 유지 + 역할 전환 (채택)                     |
+| ------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------- |
+| landMask 소스                  | 마스크                                                                    | 마스크 (동일)                                   |
+| 해안선 고주파                  | ✗ 텍셀 계단 노출 — 최대 줌 0.0236 °/px 에서 texel 당 **14.9 px** (1024)   | ✓ fbm 도메인 워프로 텍셀 이하 불규칙            |
+| biome 경계 jitter (A3 결정3-c) | ✗ **소실** → 위도 밴드가 딱딱한 가로선으로 회귀                           | ✓ `latJ` 그대로 유지                            |
+| noise 샘플 수                  | −1                                                                        | **±0** (기존 1회 재사용)                        |
+| 회귀 표면                      | biome·극관 식 재설계                                                      | rocky 분기 `landMask` 줄만                      |
+
+→ **(B) 채택**. `continents` 를 (i) **마스크 샘플 좌표의 도메인 워프**, (ii) **`latJ` biome jitter** 두 곳에 재사용. **fbm 호출 수 불변** — §A3.3 결정 3-c 의 "noise 샘플 +0" 불변식이 보존된다. 워프 진폭 상수 `MASK_WARP_AMP` 만 신규 (rendering-only 미학 상수 SSoT).
+
+> **(B) 는 성능 절약이 아니라 품질 요건이다.** 최대 줌인 각도해상도 0.0236 °/px 는 **어떤 실용 마스크 해상도로도 못 덮는다** (2048 에서도 texel 당 7.5 px). 고주파는 마스크가 아니라 fbm 이 담당해야 한다. 마스크는 **저주파 형상**, fbm 은 **고주파 디테일** — 역할 분리가 본 설계의 핵심이다.
+
+#### 결정 6 — 다른 body 무영향 + 확장 경로
+
+`solar-system.json` 에 `surfaceMask` 필드 추가 **기각**. §결정 2 (C) 의 직접 연장 — 마스크는 물리 데이터가 아니라 **rendering 에셋 참조**다 (IAU/NASA 관측값 SSoT 에 누수 금지).
+
+→ **코드 상수 테이블** `SURFACE_MASK_BY_BODY: Readonly<Record<string, string>> = { earth: 'earth-land-mask.png' }` — `SURFACE_TYPE_BY_BODY` 동형. **파일명만** 보유하고 base URL 은 `createSolarSystemScene` 옵션으로 주입 (core 가 web 라우팅을 몰라야 함 — 기존 단방향 의존 유지).
+
+- 미등록 body → `uMaskEnabled = 0` → 현행 절차 경로 **바이트 동일**. 23개 단색 body 는 애초에 셰이더 미진입 (테이블 부재 = 명시적 opt-in, §결정 2 C).
+- **마스크 소비는 rocky 분기 내부에서만.** desert / gas-bands / cratered 식 무변경 → mars·jupiter·moon 픽셀 불변 (§A3.4 핵심 예측 재현 대상).
+- 확장(화성 등) = **테이블 1줄 + 에셋 1장, 데이터 0**.
+- **텍스처 인스턴스는 per-scene 캐시** — `getOrCreateBillboardAlphaMask(scene)` 패턴 답습 (§A4.2-2). high/mid 두 머티리얼이 같은 `Texture` 를 공유해 VRAM 2배를 막는다. **신규 함수 ≠ 신규 구현** (CLAUDE.md).
+
+#### 결정 7 — 로드 실패·미도착 처리: graceful degradation **채택** (「fallback 분기 금지」 비적용 판정)
+
+`uniform float uMaskEnabled` (0/1) 로 현행 절차 경로와 마스크 경로를 `mix`. 텍스처 미도착·실패 시 `0` → **`?surface=off` 가 아니라 「오늘의 지구」** 로 렌더 (Amendment 3 시점 동작 100%).
+
+- **왜 §가드 설계 원칙 「drift 가드는 fail-fast 만 — fallback 분기 절대 금지」 에 저촉되지 않는가**: 그 규약의 대상은 **가드** — 불변식을 *주장하는* 검증 코드다. 가드가 fallback 을 가지면 "PASS" 가 "검사됨" 을 뜻하지 않게 되어 **자기모순**이 된다. 본 분기는 가드가 아니라 **렌더 경로의 점진적 향상**이며 **아무것도 주장하지 않는다** — 실패해도 거짓 PASS 가 생기지 않는다. 두 축은 직교하므로 규약을 기계적으로 확대 적용하지 않는다.
+- **단, 침묵은 금지한다** — 제품은 degrade 하되 **검증은 fail-fast**:
+  - 로드 실패 시 dev 빌드에서 **once-guard `console.warn`** (reviewer #776 패턴, 프레임당 spam 차단, `NODE_ENV !== 'production'` DCE).
+  - `?surface=on` (기본) 상태에서 마스크가 적용되지 않으면 신규 verify 스크립트가 **FAIL** (§A4.5 DoD 1). 즉 "조용히 예전 지구로 돌아가 있는" 상태가 CI 를 통과할 수 없다.
+- **WGSL 제약 대응**: `uMaskEnabled` 로 **분기하지 않는다.** 텍스처는 항상 **무조건 1회** 샘플하고 결과를 `mix` 로 섞는다 (`gravitational-lensing.ts` 의 "textureSample 은 분기 밖에서 1회만" 주석과 정합). 미도착 구간에도 바인딩이 존재하도록 **1×1 placeholder `RawTexture` 를 먼저 바인드**하고 `onLoad` 에서 교체한다.
+
+#### 결정 8 — 생성 재현성 + 회귀 가드
+
+- 커밋 대상: 에셋 1장 (`apps/web/public/textures/earth-land-mask.png`) + **생성 스크립트** `scripts/generate-earth-land-mask.mjs` (`pngjs` + `node:zlib` 만 — **신규 의존 0**). 네트워크 접근은 **개발자 실행 시점만** 이고 빌드·CI 경로가 아니다.
+- 스크립트 헤더에 결정 1 의 URL · VERSION · SHA256 · 취득일을 박제. `apps/web/public/textures/README.md` 에 출처·라이선스 **원문 인용** + 모순 표기 각주.
+- **단위 테스트 (네트워크 무관 — 커밋된 PNG 만 대상)**:
+  1. known-point 육지/바다 판별 — **양성 8 / 음성 6** (결정 3-a 목록), 해안 도시는 제외 (sub-texel 이라 판별력 없음)
+  2. 면적가중 육지 비율 `28.75% ± 0.5pp`
+  3. 크기 `1024×512`, 채널 grayscale
+
+  → 마스크의 **상하·좌우 반전 / 손상 / 오교체**를 잡는다. (1) 은 규약 오류를, (2) 는 내용 손상을 잡아 축이 직교한다.
+
+### A4.4 Concrete Prediction (구현 후 `git diff --stat` 실측 재현)
+
+| 영역               | 파일                                                             | 예측 라인          | 근거                                                                                               |
+| ------------------ | ---------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| 셰이더 rocky 확장  | `procedural-planet-shader.ts`                                    | ~70–120 변경/신규 | GLSL rocky 분기 +6–10 / sampler 선언 +1 / uniform +2 (`uMaskEnabled`, `maskWarpAmp`) / 상수 +2 / 팩토리 텍스처 배선 +25–40 / JS 미러 +15–25 / 헤더 주석 |
+| 텍스처 헬퍼        | `earth-land-mask-texture.ts` (신규) 또는 셰이더 모듈 내          | ~40–70 신규       | `billboard-alpha-mask.ts` (per-scene 캐시 + placeholder + onLoad/onError) 동형                     |
+| scene 배선         | `solar-system-scene.ts` / `body-mesh-factory.ts`                 | ~8–20 변경        | `surfaceMaskBaseUrl` 옵션 수신 → 팩토리 전달만                                                     |
+| web 배선           | `sim-canvas.tsx`                                                 | **0–3**           | 기본값이 `/textures/` 면 0. 옵션 명시 전달 시 3                                                    |
+| 에셋               | `apps/web/public/textures/earth-land-mask.png` (신규)            | 30,135 B          | 결정 2                                                                                             |
+| 생성 스크립트      | `scripts/generate-earth-land-mask.mjs` (신규)                    | ~150–220 신규     | SHP 파서 + 스캔라인 래스터화 + 면적 다운샘플 + pngjs write                                          |
+| 단위 테스트        | `procedural-planet-shader.test.ts` / `earth-land-mask.test.ts`   | ~90–150 신규/변경 | 결정 8 3축 + `uMaskEnabled=0` 시 기존 미러 결과 **불변** 어서션                                     |
+| browser verify     | `apps/web/scripts/browser-verify-1119-earth-mask.mjs` (신규)     | ~130–200 신규     | 대륙 형상 상관 측정 (§A4.5 DoD 1)                                                                  |
+| **데이터**         | `packages/shared/data/solar-system.json`                         | **0**             | 결정 6 — rendering 에셋 참조는 코드 상수                                                           |
+| **타 셰이더**      | `sun-shader.ts` / `ring-shader.ts` / `starfield.ts`              | **0**             | 무관 모듈                                                                                          |
+
+**핵심 예측** (reviewer/qa 실측 대상):
+
+- **JS 번들 증가 0 B** — 마스크가 청크에 들어가면 `import` 로 잘못 배선한 것 (결정 2-d 위반 신호).
+- **`uMaskEnabled = 0` 경로가 Amendment 3 과 픽셀 동일** — 회귀 격리의 기계 판정 지점.
+- **mars / jupiter / moon 픽셀 불변** — `browser-verify-783 MODE=others` + `MODE=diff` 재사용으로 그대로 측정 가능 (신규 측정 축 0).
+- **fbm 호출 수 불변** — 신규 `fbm(` 호출이 생기면 결정 5 위반.
+- **picking / camera / orbit / tier / LOD 변경 0** — fragment albedo + 텍스처 1장뿐.
+
+### A4.5 DoD (측정 가능 — 실 Chrome GUI 필수, CRITICAL #3)
+
+| #   | 기준                                                                                                                                                                                       | 측정 방법                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| 0   | **Phase 0 게이트 PASS** — WebGPU(실 Chrome) + WebGL2(swiftshader) 양쪽에서 `sampler2D` 렌더 + console error 0                                                                              | 결정 0 스파이크. **FAIL 이면 이하 전부 중단**                                                                       |
+| 1   | **대륙 형상이 실제와 일치** — 화면 disk 를 위경도로 역투영해 육지/바다 분류한 결과가 **커밋된 마스크와 IoU ≥ 0.80**. OFF (`&surface=off`) 및 마스크 미적용 경로 대비 **유의 증가**           | 신규 `browser-verify-1119-earth-mask.mjs`, `?focus=earth&rotate=off&speed=0&beta=π/2` 결정적 프레임 + pngjs        |
+| 2   | **마스크 미적용이 CI 를 통과하지 못함** — `uMaskEnabled` 가 0 으로 고착된 상태를 고의 주입하면 DoD 1 이 **FAIL** (negative test)                                                            | 동일 스크립트 negative 실행 (가드 도입 4축 §2 3중 시뮬레이션)                                                       |
+| 3   | **자전·tilt 정합** — `rotate=on` 에서 대륙이 표면과 함께 좌→우 이동, 극관·biome 위도 불변. `axialTiltDeg` 23.44° 로 극축 기울기 유지                                                        | 기존 `verify:782-rotation` PASS + 신규 스크립트의 2프레임 상관                                                      |
+| 4   | **#783 무회귀** — 극관 남북 whiteDayPct ≥ 50, 적도 G-share > 중위도 G-share, 마젠타 0                                                                                                       | 기존 `verify:783-earth-detail` (현행 실측 baseline: N 72% / S 61.5%, eq 0.5057 > mid 0.4045, magenta 0)             |
+| 5   | **#773 광원 무회귀** — 낮/밤 대비비 유지, 밤면 대륙도 어두움                                                                                                                                | 기존 `verify:773-light` + `verify:783` DoD 4 (현행 baseline: dayPolar 220.2 / nightPolar 52.4)                      |
+| 6   | **분기 격리** — mars / jupiter / moon 스크린샷 diff ≈ 0 (diffPx 비율 < 0.001)                                                                                                               | 기존 `browser-verify-783 MODE=others` → `MODE=diff`                                                                |
+| 7   | **LOD baseline** — `lod-body-{high,mid,low}.png` **재캡처는 의도된 변경으로 허용**. `lod-inner-*`(화성) / `lod-solar-*`(태양) 은 재캡처 전 diff 를 먼저 측정하고, **변화 픽셀이 지구 화면 bbox 밖이면 즉시 중단** | `browser-verify-lod.mjs` 판정(max pixel diff < 15%) + 변화 픽셀 bbox 대조. ⚠️ "지구 외 baseline 이 전혀 안 바뀐다" 는 전칭 단정 금지 — 광각 뷰에 지구가 들어오면 그 픽셀은 정당하게 바뀐다 |
+| 8   | **fps 회귀 0** — tier-a/b/c `fps-baseline-guard` PASS (texture fetch 1회 + sample 1회 추가)                                                                                                 | CI workflow                                                                                                        |
+| 9   | **번들** — `apps/web/.next/static` 증가가 **마스크 파일 크기와 일치** (JS 증가 0)                                                                                                            | build 전후 `find … -exec stat` 합계 대조 (baseline 10,933,577 B @ `37c0a49`)                                        |
+| 10  | **에셋 무결성 단위 테스트** — 결정 8 의 3축 PASS                                                                                                                                            | vitest                                                                                                             |
+| 11  | **데이터 0** — `git diff --stat` 에 `solar-system.json` 부재                                                                                                                                | reviewer 실측                                                                                                      |
+| 12  | **core typecheck 0** + 기존 procedural-planet 테스트 전체 PASS                                                                                                                              | `pnpm --filter core typecheck` + vitest                                                                            |
+| 13  | **실 Chrome GUI 수동 검증 1회** — headless false positive 차단 (CLAUDE.md §headless ≠ 실 브라우저)                                                                                          | qa                                                                                                                 |
+
+### A4.6 §Visual Fidelity 의무 체크리스트 4항목 (principles.md §1)
+
+- [x] **데이터 SSoT 보존** — 마스크 파일명 매핑 · 워프 진폭은 전부 rendering-only 코드 상수. `solar-system.json` 직접 수정 **0** (DoD 11). ocean = `colorHint.hex` read-only 유지. 마스크는 **지리 형상**이지 IAU/NASA 물리 관측값이 아니므로 데이터 SSoT 와 경쟁하지 않는다.
+- [x] **rendering 시점 분리** — fragment albedo 식 + 텍스처 1장. physics 엔진 (Rust+wasm) 무의존, P11-A 좌표 계약 위반 0.
+- [x] **사용자 D-T2 가이드** — 대륙 윤곽은 **실제 지리의 저해상도 근사**이고, 특정 jd 의 sub-solar 경도는 **천문 정확하지 않다** (결정 3 한계). Info/focus 패널은 그것을 주장하지 않으므로 표기 불변.
+- [x] **점유율 / 사실 비율 baseline** — mesh 기하·위치·rotation 불변 (albedo 만) → px diameter / 점유율 / 분리 마진 / #762 단조성 영향 **0**. LOD baseline 은 DoD 7 이 관할.
+
+### A4.7 결과 · 재검토 조건
+
+**기대 결과**: `?focus=earth` 에서 아프리카·아메리카·유라시아가 **알아볼 수 있는 형상**으로 보이고, 그 위에 Amendment 3 의 biome 3밴드 + 극관이 그대로 얹힌다. 해안선은 fbm 워프로 텍셀 계단 없이 자연스럽다. 자전 시 대륙이 표면과 함께 돈다. mars/jupiter/moon + 단색 22 + sun 무회귀. `?surface=off` 100% 복귀.
+
+**재검토 조건**:
+
+1. **Phase 0 게이트 FAIL** (결정 0) — `sampler2D` 가 WebGPU 또는 WebGL2 에서 동작하지 않으면 **본 Amendment 는 미실행 상태로 되돌리고 architect 재개봉**. 대안 축: (a) 4타입 공유 셰이더의 WGSL 이중 소스화 (비용 계급 상승 — C안 근거 붕괴) (b) `DynamicTexture` 로 CPU 에서 마스크를 그려 넣는 우회 (에셋은 여전히 필요) (c) C안 자체 철회 후 사용자 재협의.
+2. **해안선 shimmer 인지** (결정 4) — `textureGrad` + seam 미분 wrap 보정으로 승격. 선행 조건: `textureGrad`/`dFdx` 의 Babylon GLSL→WGSL 변환 가능 여부 실측.
+3. **해상도 부족 인지** — 사용자가 기본 focus 에서 형상을 "뭉개졌다" 로 인지하면 2048×1024 승격을 검토하되, **결정 4 의 noMipmap 과 커플링돼 있으므로 mip/seam 결정을 먼저 갱신해야 한다** (해상도만 올리면 shimmer 로 교환될 뿐).
+4. **다른 body 마스크 요구** — 결정 6 의 테이블 1줄 + 에셋 1장. 단 화성 마스크는 "육지/바다" 가 아니라 albedo 지형이라 **의미가 달라** 별도 uniform 해석이 필요하다 (본 Amendment 의 자연 연장이 아님 — 별건 설계).
+5. **바다 깊이색 / 대기 rim / 구름** — §A3.7 재검토 조건 1·2·3 그대로. 본 Amendment 는 **편승하지 않는다** (#1119 비목표).
+6. **Natural Earth 버전 갱신** — `4.1.0` 고정. 상위 버전 도입 시 결정 8 의 단위 테스트 (면적가중 28.75% ± 0.5pp) 가 먼저 반응하므로, 값 갱신을 **의식적 SSoT 갱신**으로 처리한다 (조용한 임계 완화 금지).
+
+### A4.8 교차검증 반영 사항 (cross-validate 대기 — Provisional)
+
+**호출 전 Claude 편향 셀프 체크** (4종, [cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5):
+
+- **낙관적 일정** — **미통과 의심.** 결정 0 게이트가 PASS 라고 암묵 가정한 채 A4.4 Concrete Prediction 을 작성했다. WGSL 변환이 부분 성공(컴파일은 되나 샘플 결과가 다름)하는 회색지대를 게이트 판정식이 덮지 못할 수 있다 → **명시 질문 1**.
+- **결합 간과** — **미통과 의심.** 결정 2(해상도) ↔ 결정 4(noMipmap) ↔ 결정 5(fbm 워프) 3자가 서로를 근거로 삼는다 (해상도는 noMipmap 때문에 낮추고, 낮춘 해상도는 fbm 워프로 보완). 순환 정당화일 위험 → **명시 질문 2**.
+- **폐기 프레이밍** — 통과 판단. 「에셋 0」 을 폐기가 아니라 **조건부 예외**로 좁혔고 색/고도/구름 텍스처는 명시 비목표로 유지 (§A4.7-5).
+- **순수주의** — 통과 판단. 결정 7 에서 「fallback 금지」 규약을 기계적으로 확대 적용하지 않고 가드/렌더 경로를 분리 판정했다.
+
+**cross-validate 명시 질문** (메인 수행 시 프롬프트 삽입):
+
+1. (낙관적 일정) 결정 0 게이트의 판정식 — "렌더 + console error 0" 이 Babylon GLSL→WGSL 의 `sampler2D` 변환 **부분 실패**(컴파일 성공 · 샘플 좌표/필터링 상이)를 놓치지 않는가. 놓친다면 어떤 추가 술어가 필요한가.
+2. (결합 간과) 결정 2·4·5 의 상호 정당화가 순환인가 — "2048 + mipmap + seam 보정" 조합을 1차에 채택하지 않은 판단이 타당한가, 아니면 `noMipmap` 전제 자체가 회피 가능한 제약인가.
+3. equirectangular 마스크에서 **극 pinch** 를 `iceMask` 가 가린다는 결정 4 의 논거가 `|sin φ| ≥ 0.84` 임계에서 실제로 성립하는가 (극관 전이 하단 0.84 와 마스크 왜곡 가시 시작 위도의 관계).
+4. 결정 7 의 "가드 ↔ 렌더 경로" 분리 판정이 §가드 설계 원칙의 의도와 정합하는가 — degrade 를 허용하되 검증을 fail-fast 로 두는 이중 구조에 사각이 있는가.
