@@ -104,6 +104,22 @@ Semantic Versioning을 따른다.
 
   부수로 §6 의 _"6 항목을 정적 검사한다"_ stale 서술을 정정했다 (#1066 이 7~9 를 추가하며 갱신을 빠뜨렸다 — 실제는 **9 항목, 뒤 3개는 정적 아님**).
 
+- **[#1079] 마크다운 표 셀의 술어가 원문·렌더링 두 형태로 갈린다 — 전수 sweep + ADR `20260808-983` §Amendment 4 (MINOR)** ([#1079](https://github.com/coseo12/astro-simulator/issues/1079)) — GFM 표 셀에서 파이프는 백슬래시 이스케이프가 **강제**되는데 GitHub 은 렌더링 시 그 백슬래시를 **벗긴다**. 그래서 **한 셀이 원문형·렌더링형 두 개**가 되고, 둘은 같은 도구에 태워도 다른 값을 낸다. 판정 정본은 ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) **§Amendment 4** (`Provisional` — cross-validate 는 메인 오케스트레이터 수행) 이며 **오기록 9 (술어 매체 종속)** 로 분류했다. 발화 계보: PR [#1070](https://github.com/coseo12/astro-simulator/pull/1070) dev 자기 발견 + reviewer 라운드 2 실측.
+
+  **전수 sweep** (rev `fa497b6`, 모집단 = `git ls-files -- '*.md'` **240 파일**, 비-ASCII 경로 `0` 확인. 술어 원형은 ADR §Amendment 4 §전수 sweep 의 펜스) — 표 행 안 파이프 이스케이프 **36** 줄 / 그중 **코드 스팬 안 35** / 그중 **재현으로 확인된 진양성 9**. 무해 26 의 사유는 넷으로 갈린다: 비-술어 표기 **21**(TypeScript 유니온 타입 · URL 파라미터 표기 · 프로그램 출력 인용) · 자리표시자라 실행 불가 **3** · 시끄러운 실패 **1**(`git ls-files` 가 파이프를 스위치로 읽고 rc `129`) · 양 형태 값 동일 **1**.
+
+  **판정은 전부 양 형태를 실제로 실행한 값 대비다** (정적 추론 아님). `claudemd-governance.md` 의 정본 술어는 `CLAUDE.md` 에서 원문형 **`0`** / 렌더링형 **`23`**, `zombie-process-guards.md` 3셀은 원문형 `0` 대 렌더링형 `1`·`2`·`2`. ⚠️ **rc 는 판별에 못 쓴다** — `awk` 형과 파이프라인 형(`| wc -l`)은 양쪽 다 rc `0` 이고 맨손 `grep -c` 만 rc `1` 이다. 이슈 본문의 _"rc `0`"_ 은 지배적 호출 형태에서 참이지 전칭이 아니며, **불변인 것은 rc 가 아니라 «값이 조용히 다르다» 쪽**이다.
+
+  ⚠️ **양방향이라 처방은 «백슬래시를 지워라» 가 아니다.** `exhaustive-grep-protocol.md` §2 의 `-F` 술어는 찾는 문자열 자신이 백슬래시를 포함해(ADR 인덱스 행 계수 명령의 정규식 원문) **원문형이 박제값 `1` 을 재현하고 렌더링형이 `0`** 을 냈다 (rev `b9c273a`, 4셀 실측). 채택 처방은 **매체 이전** — 셀에는 라벨만 두고 술어 원형은 코드 펜스로 뺀다. 펜스 안에서는 이스케이프가 보존돼 **원문 == 렌더링**이다 (`gh api -H "Accept: application/vnd.github.html" /repos/{owner}/{repo}/contents/{path}` GET 실측).
+
+  **그물 전수성도 실측이다** — 표 셀에서 벗겨지는 백슬래시는 **파이프 앞의 것뿐**이고 같은 코드 스팬의 다른 백슬래시는 보존된다 (`gh-cli-execsync-pitfall.md` 의 한 셀이 `\\.` 를 유지한 채 파이프만 벗겨진 것이 실증). 따라서 파이프 이스케이프를 그물로 삼으면 이 클래스가 **전수로 잡힌다**.
+
+  **반영 3파일 6셀** — `docs/guides/claudemd-governance.md`(정본 술어 2 + 실측 표 술어 셀 1 → 라벨 참조) · `docs/guides/exhaustive-grep-protocol.md`(실측 전례 2 + §2 _"가정 벗기기"_ 에 **6. 매체** 항 신설) · `.claude/skills/run-tests/SKILL.md`(PEP 621 extras fallback 1 → 각주 펜스).
+
+  **미반영 4셀은 «건드리면 안 되는» 쪽이다** — `docs/ops/zombie-process-guards.md` 3셀(진양성)은 병행 작업이 파일을 점유 중이라 후속으로 넘기고, `CHANGELOG.md` 확정 `[0.12.0]` 구간의 1셀은 **소급 편집 금지** 대상이다 (`rg` 술어 원문형 `0` / 렌더링형 `3` — 당시 박제된 결론 _"0 건"_ 은 소스 범위에서 양 형태 모두 `0` 이라 **결론 자체는 불변**).
+
+  **가드 — 검토 후 기각** (정본은 ADR §Amendment 4 §가드). 넓은 변형(표 행 코드 스팬 안 파이프 이스케이프 전건)은 정밀도 **`9/35` = 25.7%** 이고, 오탐 26 의 대부분이 확정 ADR(부기 원칙)·확정 CHANGELOG(소급 편집 금지)라 **영구히 꺼지지 않아** allowlist 가 단조 증가한다 ([`20260701-779`](docs/decisions/20260701-779-ci-alert-fatigue-concurrency.md) 의 alert fatigue 재생산). 좁힌 변형(코드 스팬 첫 토큰이 실행 파일명)은 정밀도 `3/8` 로 못 올리면서 **발의 사례 3셀을 전건 놓친다** (재현율 **`3/9`**) — 그 술어들이 정규식 조각이라 실행 파일명으로 시작하지 않는다. 정밀도를 의미로 올리려면 _"이 코드 스팬이 복사-실행 대상인가"_ 를 판정해야 하는데 이는 오기록 6 의 _"판정 = 의미론이라 기계 불가"_ 와 동형이다. ⚠️ **따라서 본 확장은 규약형 단독이며, 위반은 조용히 통과한다.**
+
 ### Behavior Changes
 
 - **`packages/{shared,core}` 테스트 파일의 타입 오류가 CI 를 통과하지 못한다 (#1060).** 같은 입력(두 패키지의 `*.test.ts` 또는 `__test-utils__/**` 에 타입 오류가 든 PR)에서 CI 가 **다르게 동작한다** — 이전에는 `verify-and-rust` 가 초록이었고(빌드는 해당 파일을 `exclude`, vitest 는 타입 미검사), 이제 `packages 타입 검사 (테스트 파일 포함, #1060)` 스텝이 exit `2` 로 job 을 실패시킨다. 소스 파일의 타입 검사 범위는 **불변**이다.
@@ -112,6 +128,8 @@ Semantic Versioning을 따른다.
 - **기존 `workspace 빌드` 스텝의 같은 축은 의도적으로 손대지 않았다** (ADR §의도적 비-범위). 그 스텝도 이중 `--filter` 를 쓰지만 `build` 는 소실 시 산출물이 안 생겨 후속 `pnpm -r test` 가 큰 소리로 죽으므로 **결과가 다르다** — 별도 판단이 필요하다.
 - **allowlist 밖 모듈을 재수출(`export … from`)로 끌어오면 `project-guards` 가 막는다 (#1084).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 `scripts/verify-adr-index.mjs` 에 그 한 줄을 넣어도 `--self-test` 가 `50 passed, 0 failed` exit `0` 이었고 `prettier`·`eslint` 백스톱도 `0` 이었다. 이제 `F19n` 이 exit `1` 로 떨어진다. **들여쓴 `import` 는 의도적으로 종전 그대로**다 (`prettier --check` 백스톱 exit `1` 실측 — 스크립트 헤더 §범위 경계 (iv) 가 기각 근거와 재검토 조건을 명시).
 - **`base` 를 편집하면 새 체크 `pr-base-edit` 이 뜬다 (#1027).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 열린 PR 의 `base` 를 바꿔도 **새 run 이 0건**이라 아무 판정도 남지 않았고(#1026 실측), 이제 `pull_request` `edited` 마다 `verify-pr-base-rule.mjs` 가 재판정한다. **막히는 PR 은 0** 이다 (비-required). 부수 대가로 **제목·본문만 편집해도 발화**하므로, head 이름이 규약 밖인 PR 은 `pr-base-edit` 에서도 `unresolved`(**귀속: branch-name**) 를 받아 붉은 X 가 둘이 된다 — 진단 메시지가 _"base 는 정상이니 head 이름만 고쳐라"_ 로 정확하므로 수용한 설계다 (ADR 결정 3).
+- **파이프를 포함하는 술어를 표 셀에 두지 않는다 (#1079).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 수치를 표로 박제하는 에이전트가 종전에는 ADR [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md) (iv) 셋째 불릿(_"표로 낼 때는 술어 열을 별도로"_)만 따라 술어 원형을 셀에 넣었고, 이제 셀에는 **라벨만** 두고 원형은 코드 펜스로 뺀다. **술어 열 자체는 유지**되며 파이프가 없는 술어는 종전 그대로다. 같은 확장이 `exhaustive-grep-protocol.md` §2 _"가정 벗기기"_ 에 **6. 매체** 항으로도 들어가, 0 hit 을 얻은 에이전트가 벗겨 볼 가정이 5개에서 6개로 늘어난다.
+- **run-tests 스킬이 복사-실행하는 PEP 621 fallback 문자열이 바뀐다 (#1079).** 종전 셀 원문형은 `||` 가 **셸 연산자가 아니라 인자**가 되어 fallback 분기가 조용히 사라졌다 (대리 재현: `false \|\| echo x` → 출력 없음 / `false || echo x` → `x`). 이제 각주 코드 펜스의 정상 형태를 읽는다.
 
 - **좀비 카나리아가 잡는 대상이 또 한 번 바뀐다 (#1086).** 같은 입력에서 SessionStart hook(가드 C)과 qa 에이전트 카나리아가 **다르게 동작한다**. **새로 보고하지 않는 것**: `cargo build --release && pnpm test` 처럼 명령 분리자(`&&` `;` `|`)를 넘어 뒤쪽 `test` 에 닿던 형태(= cargo 축 **오귀속**), `next development` · `next dev-preview` 처럼 `next dev` 우경계가 없어 걸리던 형태. **새로 보고하는 것**: `sh -c 'pnpm  dev'` 처럼 한 argv 원소 안에 공백이 2개 이상 보존된 형태. **검출 의무 형태는 전건 유지**(`pnpm dev` · `pnpm run dev` · `pnpm --filter <pkg> dev` · `next dev` · `next-server` · `cargo test` 계열 · `cargo nextest run` · `cargo +nightly test`).
 - ⚠️ **확정 `[0.74.0]` §Behavior Changes 의 «검출 능력 손실 `0`» 은 전칭 단정이었고 #1086 이 코퍼스 한정으로 낮췄다** (2026-08-16 부기 — 확정 섹션은 _그 시점 사실_ 이므로 소급 편집하지 않는다). 반례는 `pnpm  dev`(공백 2개)로 구 `1` → #1066 `0`. 정확한 서술은 _"손실이 `0`"_ 이 아니라 _"코퍼스 밖 손실은 무해한 중복(하네스 래퍼 셸 자신)"_ 이며, 정정본은 [`docs/ops/zombie-process-guards.md`](docs/ops/zombie-process-guards.md) §10-1 에 있다.
