@@ -122,7 +122,7 @@ done
 ```
 
 루트에 `verify:test-coverage` 스크립트로 박제해 CI 파이프라인 + `verify:smoke` 체인에 연결할 것을 권장
-(종전 이름 `verify:all` — #884 개명. 그 체인은 등록된 `verify:*` 전수가 아니라 **스모크 집합**이며 계약은 `README.md` 참조).
+(종전 이름 `verify:all` — #884 개명. 그 체인은 등록된 `verify:*` 전수가 아니라 **스모크 집합**이며 계약은 **저장소 루트** `README.md` 의 §`verify:smoke` 계약 참조).
 
 ### 워크스페이스 필터 적용
 - 변경된 파일이 특정 워크스페이스에 한정되면 `pnpm --filter <ws> test` / `npm -w <ws> test` 로 범위를 좁힌다.
