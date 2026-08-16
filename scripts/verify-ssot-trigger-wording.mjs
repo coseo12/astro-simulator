@@ -1,0 +1,495 @@
+#!/usr/bin/env node
+// SSoT ↔ 사본 트리거 문언 동일 가드 (#1076).
+//
+// PR #1072(#1062) 가 `docs/ops/operational-friction.md` §8 을 절차 SSoT, `.claude/agents/developer.md`
+// §규칙을 사본으로 선언하면서 규칙 하나를 신설했다 — **트리거 조건은 두 곳이 같은 낱말이어야 한다.**
+// 그 규칙이 같은 커밋에서 위반됐고(SSoT `해석하는` / 사본 `의존하는`), 정정은 됐으나 기계 가드가
+// 없었다. 규약형 단독 방어가 **신설 당일 자기 위반**을 통과시킨 것이 본 가드의 존재 이유다.
+//
+// 검사 항목 (등록된 쌍마다):
+//   T1. SSoT 절에서 트리거 강조 span 추출 — 실패 시 exit 1 (fallback 분기 없음)
+//   T2. 등록된 사본 전건이 정규화 후 트리거 문언을 **축자 보유**
+//   T3. 보유 파일 집합 pin — 규범면 모집단에서 트리거를 보유한 파일이 {SSoT} ∪ {사본} 과 정확히 일치
+//
+// **문언 리터럴을 이 스크립트에 두지 않는다.** 트리거는 SSoT 산문에서 런타임 추출한다 — 하드코딩하면
+// 그 순간 이 파일이 **세 번째 검증되지 않은 사본**이 되어, 막으려던 클래스를 스스로 재생산한다
+// (ADR 20260806-962 §후보 (a) 기각 근거 / volt #120). 쌍 등록부(PAIRS)가 갖는 것은 **문언이 아니라
+// 앵커**다: 절 헤딩 정규식과 표지 리터럴(`markerLiteral`)뿐이며, 둘 다 문언이 바뀌어도 불변이다.
+// 그래서 `해석하는` → `의존하는` 같은 실제 drift 에서 앵커는 그대로 살아 가드가 정상 발화한다.
+//
+// **왜 정규화가 필요한가 (grep 으로 대체 불가).** SSoT 의 트리거 강조 span 은 **줄바꿈을 품고**
+// 있고 사본은 한 줄이다. 그래서 트리거를 축자로 건 `git grep -lF` 는 **SSoT 자신을 찾지 못한다** —
+// 2026-08-16 실측: 그 술어의 hit 은 사본(`.claude/agents/developer.md`)과 `CHANGELOG.md` 뿐이고
+// SSoT 파일은 `0` 이다. 라인 단위 도구로는 원리적으로 대조가 성립하지 않는다.
+//
+// **왜 내용 기반 전수가 아니라 집합 pin 인가.** 정규식을 넓혀 저장소 전체에서 "사본처럼 보이는 것"을
+// 추출하면 정상 문서의 인용·반례에서 즉시 오탐한다. 집합 pin 은 오탐 위험을 0 으로 유지하면서
+// **미등록 사본 유입**을 잡는다 (PR #1095 / #1086 항목 8·9 가 채택한 것과 같은 형태의 근거).
+//
+// 모집단 경계 — `.claude/**` + `docs/ops/**` + `CLAUDE.md` 의 `.md` (tracked + untracked).
+// `CHANGELOG.md` · `docs/decisions/**` 는 **이력 기록** 계급이라 의도적으로 제외한다 (reviewer.md
+// §절차 4 5분류 2항). 이력은 그 시점 사실이므로 문언이 갈려 있는 것이 정상이고, 모집단에 넣으면
+// 릴리스 노트를 쓸 때마다 가드가 발화한다.
+//
+// 호출:
+//   node scripts/verify-ssot-trigger-wording.mjs              → 본검사
+//   node scripts/verify-ssot-trigger-wording.mjs --self-test  → 격리 픽스처 3중 시뮬 + 오탐 대조군
+//
+// 관련 이슈/PR: #1076 (본 가드) / #1062 · PR #1072 (자기 위반) / #1086 · PR #1095 (동형 선례)
+// 관련 ADR: 20260806-962 (가드가 유일한 정본, 산문은 검증된 파생) / volt #120 (중복 출처 제거)
+
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+const ROOT = process.cwd();
+
+// ────────────────────────────────────────────────────────────────────────────
+// 쌍 등록부 — 문언은 없다. 앵커(절 헤딩 + 표지 리터럴)와 경로만 둔다.
+// ────────────────────────────────────────────────────────────────────────────
+const PAIRS = [
+  {
+    id: '#1062 §8 격리 worktree 빌드 선행',
+    ssotPath: 'docs/ops/operational-friction.md',
+    // 절 범위 — 이 헤딩부터 같거나 상위 레벨의 다음 헤딩 전까지 (`### 8-1.` 은 포함된다)
+    sectionHeading: /^## 8\. /,
+    // 트리거 명사구를 고르는 표지. **문언이 아니라 패키지 스코프 리터럴**이라 낱말 drift 에 불변.
+    markerLiteral: '@astro-simulator/*',
+    copyPaths: ['.claude/agents/developer.md'],
+    // 집합 pin 모집단 — 규범면 한정 (위 헤더 §모집단 경계)
+    populationGlobs: ['.claude', 'docs/ops', 'CLAUDE.md'],
+  },
+];
+
+// ────────────────────────────────────────────────────────────────────────────
+// 순수 함수 — 파일/깃 무의존. self-test 픽스처가 직접 호출한다.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 코드 펜스 본문 제거. 펜스 안의 `**` 가 유령 강조 span 을 만드는 것을 막는다.
+ * 펜스 = 들여쓰기 최대 3칸 + 백틱/물결 3개 이상 (CommonMark).
+ */
+export function stripFencedBlocks(md) {
+  const out = [];
+  let fence = null;
+  for (const line of md.split('\n')) {
+    const m = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (fence === null && m) {
+      fence = m[1][0];
+      out.push(''); // 줄 수를 보존해 진단 라인 번호가 밀리지 않게 한다
+      continue;
+    }
+    if (fence !== null) {
+      out.push('');
+      if (m && m[1][0] === fence) fence = null;
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/**
+ * 인라인 코드 스팬 **본문만** 같은 길이의 마스크 문자로 치환한다 (인덱스 보존).
+ *
+ * ⚠️ 강조 구분자 짝 맞추기 전용이다. 문서에는 `` `.claude/**` `` 같은 **glob 이 인라인 코드 안에**
+ * 흔히 등장하고, 그 `**` 가 강조 구분자로 오인되면 짝이 한 칸씩 밀려 **엉뚱한 span 이 트리거 후보로
+ * 잡힌다** (#1076 구현 중 실측 — 이 절에 glob 을 쓴 순간 후보가 2 개로 늘어 가드가 자기 문서를 물었다).
+ * 마스크는 **판정용**이고 추출값은 원본에서 슬라이스하므로, 트리거가 품은 인라인 코드는 보존된다.
+ *
+ * 경계: 백틱 런은 **같은 줄 안에서** 짝짓는다. 여러 줄에 걸친 코드 스팬이나 본문에 백틱을 품은
+ * 다중 백틱 런(`` `x` ``)은 마스크되지 않고 **그대로 남는다** — 폭주 마스킹보다 미마스킹이 안전하다
+ * (미마스킹은 F9 모호 실패로 드러나고, 폭주는 조용히 span 을 삼킨다).
+ */
+export function maskInlineCode(text) {
+  return text.replace(
+    /(`+)([^`\n]*?)\1/g,
+    (_m, ticks, body) => ticks + ' '.repeat(body.length) + ticks,
+  );
+}
+
+/**
+ * 마크다운 강조 마커 제거 + 공백류(줄바꿈 포함) 단일 스페이스 축약.
+ * `**` 만 벗긴다 — 더 벗길수록 매칭이 관대해져 **실제 drift 를 통과시키는** 방향이라 최소로 둔다.
+ */
+export function normalize(text) {
+  return text.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** ATX 헤딩 라인의 레벨. 헤딩이 아니면 0. */
+function headingLevel(line) {
+  const m = line.match(/^(#{1,6}) /);
+  return m ? m[1].length : 0;
+}
+
+/**
+ * 절 범위 추출 — headingPattern 매치 라인부터 같거나 상위 레벨의 다음 헤딩 직전까지.
+ *
+ * ⚠️ **펜스를 먼저 벗긴다.** 벗기지 않으면 ```bash 블록 안의 `# 주석` 이 H1 헤딩으로 읽혀
+ * 절이 거기서 **조용히 잘린다**. 실제 §8-1 이 그 형태를 갖고 있어 초판이 잘린 절을 스캔했고,
+ * 그 결과 §9 픽스처의 하위 절이 범위 밖으로 밀리는 것을 self-test 가 잡았다 (#1076 구현 중 실측).
+ * `stripFencedBlocks` 는 줄 수를 보존하므로 startLine 은 원본 기준으로 유효하다.
+ *
+ * @returns {{ok: boolean, text?: string, startLine?: number, reason?: string}}
+ */
+export function extractSection(md, headingPattern) {
+  const lines = stripFencedBlocks(md).split('\n');
+  const start = lines.findIndex((l) => headingPattern.test(l));
+  if (start === -1) return { ok: false, reason: `절 헤딩 미발견 — 패턴 ${headingPattern}` };
+  const level = headingLevel(lines[start]);
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    const lv = headingLevel(lines[i]);
+    if (lv > 0 && lv <= level) {
+      end = i;
+      break;
+    }
+  }
+  return { ok: true, text: lines.slice(start, end).join('\n'), startLine: start + 1 };
+}
+
+/**
+ * 절 안에서 markerLiteral 을 품은 강조 span 을 뽑는다.
+ * CommonMark 상 강조는 빈 줄(문단 경계)을 넘지 못하므로 그런 span 은 후보에서 뺀다.
+ * 후보가 0 이거나 2 이상이면 **실패**다 — "첫 번째를 쓴다" 는 조용한 의미 이동을 허용한다.
+ * @returns {{ok: boolean, trigger?: string, reason?: string, candidates?: string[]}}
+ */
+export function extractTriggerSpan(sectionText, markerLiteral) {
+  const body = stripFencedBlocks(sectionText);
+  // 구분자 짝 맞추기는 마스크본에서, 값 추출은 원본에서 (위 maskInlineCode 주석 참조).
+  const spans = [];
+  for (const m of maskInlineCode(body).matchAll(/\*\*((?:(?!\*\*)[\s\S])+?)\*\*/g)) {
+    const start = m.index + 2;
+    const raw = body.slice(start, start + m[1].length);
+    // CommonMark 상 강조는 빈 줄(문단 경계)을 넘지 못한다
+    if (/\n[ \t]*\n/.test(raw)) continue;
+    spans.push(raw);
+  }
+  const hits = spans.filter((s) => s.includes(markerLiteral));
+  if (hits.length === 0) {
+    return {
+      ok: false,
+      reason: `표지 '${markerLiteral}' 를 품은 강조 span 0 개 (스캔한 span ${spans.length} 개)`,
+      candidates: [],
+    };
+  }
+  if (hits.length > 1) {
+    return {
+      ok: false,
+      reason: `표지 '${markerLiteral}' 를 품은 강조 span 이 ${hits.length} 개 — 트리거가 모호하다`,
+      candidates: hits.map(normalize),
+    };
+  }
+  return { ok: true, trigger: normalize(hits[0]) };
+}
+
+/** 정규화한 내용이 트리거를 축자 포함하는가. */
+export function carries(content, trigger) {
+  return normalize(content).includes(trigger);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 파일/깃 의존 — 본검사 전용
+// ────────────────────────────────────────────────────────────────────────────
+
+/** 모집단 파일 열거. `-z` 로 비-ASCII 경로 C-인용을 회피한다. */
+function listPopulation(globs) {
+  const r = spawnSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...globs],
+    { encoding: 'utf8', cwd: ROOT },
+  );
+  if (r.status !== 0) throw new Error(`git ls-files 실패: ${(r.stderr || '').trim()}`);
+  return r.stdout
+    .split('\0')
+    .filter(Boolean)
+    .filter((f) => f.endsWith('.md'));
+}
+
+function checkPair(pair) {
+  const failures = [];
+  const ssotAbs = resolve(ROOT, pair.ssotPath);
+  if (!existsSync(ssotAbs)) {
+    return { failures: [`SSoT 파일 없음 — ${pair.ssotPath}`], trigger: null };
+  }
+
+  // T1 — SSoT 추출 (fail-fast: 못 뽑으면 통과시키지 않는다)
+  const section = extractSection(readFileSync(ssotAbs, 'utf8'), pair.sectionHeading);
+  if (!section.ok) {
+    return { failures: [`[T1] ${pair.ssotPath} — ${section.reason}`], trigger: null };
+  }
+  const span = extractTriggerSpan(section.text, pair.markerLiteral);
+  if (!span.ok) {
+    const extra = span.candidates?.length ? `\n       후보: ${span.candidates.join(' | ')}` : '';
+    return {
+      failures: [`[T1] ${pair.ssotPath} §${section.startLine}행 — ${span.reason}${extra}`],
+      trigger: null,
+    };
+  }
+  const trigger = span.trigger;
+
+  // T2 — 등록된 사본이 축자 보유하는가
+  for (const copyPath of pair.copyPaths) {
+    const abs = resolve(ROOT, copyPath);
+    if (!existsSync(abs)) {
+      failures.push(`[T2] 사본 파일 없음 — ${copyPath}`);
+      continue;
+    }
+    if (!carries(readFileSync(abs, 'utf8'), trigger)) {
+      failures.push(
+        `[T2] ${copyPath} 가 SSoT 트리거 문언을 보유하지 않는다.\n` +
+          `       SSoT (${pair.ssotPath}): "${trigger}"\n` +
+          `       → 사본의 트리거 낱말을 SSoT 와 동일하게 맞춘다 (한쪽만 고치면 사본이 SSoT 를 좁힌다).`,
+      );
+    }
+  }
+
+  // T3 — 보유 파일 집합 pin
+  const expected = new Set([pair.ssotPath, ...pair.copyPaths]);
+  const actual = new Set(
+    listPopulation(pair.populationGlobs).filter((f) =>
+      carries(readFileSync(resolve(ROOT, f), 'utf8'), trigger),
+    ),
+  );
+  const unregistered = [...actual].filter((f) => !expected.has(f));
+  const missing = [...expected].filter((f) => !actual.has(f));
+  if (unregistered.length) {
+    failures.push(
+      `[T3] 미등록 사본 ${unregistered.length} 건 — ${unregistered.join(', ')}\n` +
+        `       → 의도한 사본이면 PAIRS[].copyPaths 에 등록하고, 아니면 제거한다.`,
+    );
+  }
+  // T2 가 이미 보고한 사본은 중복 보고하지 않는다 (SSoT 자신의 누락만 여기서 잡는다)
+  const missingSsot = missing.filter((f) => !pair.copyPaths.includes(f));
+  if (missingSsot.length) {
+    failures.push(`[T3] SSoT 파일이 자기 트리거를 보유하지 않는다 — ${missingSsot.join(', ')}`);
+  }
+
+  return { failures, trigger, carriers: [...actual].sort() };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// self-test — 격리 픽스처. **실제 트리거 문언을 쓰지 않는다** (쓰면 모집단이 오염된다).
+// 픽스처가 합성 낱말로 통과한다는 것 자체가 가드의 placeholder-agnostic 성질의 증거다.
+// ────────────────────────────────────────────────────────────────────────────
+
+const FX_MARKER = '@fixture-scope/*';
+
+/** SSoT 픽스처 — 트리거 강조 span 이 **줄바꿈을 품는다** (실제 §8 과 같은 형태). */
+const FX_SSOT = [
+  '## 9. 픽스처 절 제목',
+  '',
+  // 인라인 코드 안의 glob — 마스크하지 않으면 이 `**` 가 구분자로 오인돼 이후 짝이 밀린다.
+  '모집단은 `.claude/**` 이다.',
+  '',
+  '**1순위 — 앞선 강조.** 격리 픽스처에서 **가상 패키지(`@fixture-scope/*`)를 참조하는',
+  '절차**를 돌려야 하면, 아래를 밟는다.',
+  '',
+  '```bash',
+  '# 펜스 안의 **가상 패키지(`@fixture-scope/*`)를 참조하는 절차** 는 무시돼야 한다',
+  'echo fixture',
+  '```',
+  '',
+  '### 9-1. 하위 절은 범위에 포함된다',
+  '',
+  '본문.',
+  '',
+  '## 10. 다음 절 — 범위 밖',
+  '',
+  '**여기의 `@fixture-scope/*` 강조 span** 은 §9 범위 밖이라 모호성을 만들지 않는다.',
+].join('\n');
+
+/** 사본 픽스처 (정합) — 문장 틀(`돌려야 하면` vs `돌리려면`)·줄바꿈·강조가 SSoT 와 다르다. */
+const FX_COPY_OK =
+  '- **격리 픽스처에서 가상 패키지(`@fixture-scope/*`)를 참조하는 절차를 돌리려면 선행** (#0000) — 본문.';
+
+/** 사본 픽스처 (drift) — #1062 가 실제로 낸 형태: 트리거 동사만 갈린다. */
+const FX_COPY_DRIFT = FX_COPY_OK.replace('참조하는', '의존하는');
+
+/** 사본 픽스처 (줄바꿈 감김) — 오탐 대조군. 문언은 같고 줄만 접혔다. */
+const FX_COPY_WRAPPED =
+  '- **격리 픽스처에서 가상 패키지(`@fixture-scope/*`)를\n  참조하는 절차를 돌리려면 선행** (#0000) — 본문.';
+
+let passed = 0;
+let failed = 0;
+function check(label, actual, expected) {
+  const ok = actual === expected;
+  if (ok) passed++;
+  else failed++;
+  console.log(
+    `  [${ok ? 'PASS' : 'FAIL'}] ${label}${ok ? '' : ` — 기대 ${expected}, 실제 ${actual}`}`,
+  );
+}
+
+function fixtureTrigger() {
+  const section = extractSection(FX_SSOT, /^## 9\. /);
+  if (!section.ok) throw new Error(`픽스처 절 추출 실패 — ${section.reason}`);
+  const span = extractTriggerSpan(section.text, FX_MARKER);
+  if (!span.ok) throw new Error(`픽스처 트리거 추출 실패 — ${span.reason}`);
+  return span.trigger;
+}
+
+function selfTest() {
+  console.log('── F1~F3. 3중 시뮬레이션 (positive → negative → recovery)');
+  const trigger = fixtureTrigger();
+  check('F1 positive — 정합 사본이 트리거 보유', carries(FX_COPY_OK, trigger), true);
+  check(
+    'F2 negative — 낱말 1개 drift 사본은 미보유 (= FAIL 유발)',
+    carries(FX_COPY_DRIFT, trigger),
+    false,
+  );
+  check(
+    'F3 recovery — 원복 사본이 다시 보유',
+    carries(FX_COPY_DRIFT.replace('의존하는', '참조하는'), trigger),
+    true,
+  );
+
+  console.log('── F4~F6. 오탐 0 대조군 (같은 실행의 양성 대조)');
+  check(
+    'F4 문장 틀이 달라도 통과 (SSoT `돌려야 하면` ↔ 사본 `돌리려면`)',
+    carries(FX_COPY_OK, trigger),
+    true,
+  );
+  check('F5 사본이 줄바꿈으로 접혀도 통과', carries(FX_COPY_WRAPPED, trigger), true);
+  check(
+    'F6 강조 마커 유무가 판정을 바꾸지 않는다',
+    carries(FX_COPY_OK.replace(/\*\*/g, ''), trigger),
+    true,
+  );
+
+  console.log('── F7~F9. SSoT 추출 fail-fast (조용한 통과 없음)');
+  check('F7 절 헤딩 부재 → 추출 실패', extractSection(FX_SSOT, /^## 99\. /).ok, false);
+  check(
+    'F8 표지 없는 절 → 트리거 0 개로 실패',
+    extractTriggerSpan(extractSection(FX_SSOT, /^## 10\. /).text, '@no-such-scope/*').ok,
+    false,
+  );
+  check(
+    'F9 표지를 품은 강조 span 2 개 → 모호로 실패 (첫 개 채택 금지)',
+    extractTriggerSpan(
+      FX_SSOT.replace('### 9-1.', `**추가 \`${FX_MARKER}\` span**\n\n### 9-1.`),
+      FX_MARKER,
+    ).ok,
+    false,
+  );
+
+  console.log('── F10~F13. 범위 경계 (펜스 처리가 판정을 가른다는 실증)');
+  // 픽스처는 표지를 3회 싣는다 — 산문 1 + 펜스 안 1 + `## 10.` 1. 펜스를 벗기면 2 가 남는다.
+  check('F10 원본 픽스처의 표지 3회', FX_SSOT.split(FX_MARKER).length - 1, 3);
+  check(
+    'F10b 펜스 본문이 비워져 표지 2회로 줄어든다',
+    stripFencedBlocks(FX_SSOT).split(FX_MARKER).length - 1,
+    2,
+  );
+  // 펜스 안 `# 주석` 이 H1 로 읽히면 절이 거기서 잘려 `### 9-1.` 이 범위 밖으로 밀린다.
+  check(
+    'F11 펜스 안 `# 주석` 이 절 경계를 자르지 않는다 (하위 절 `### 9-1.` 이 범위 안)',
+    extractSection(FX_SSOT, /^## 9\. /).text.includes('### 9-1.'),
+    true,
+  );
+  // 펜스 구분자를 지우고 bash 주석 접두 `# ` 도 벗겨 **같은 내용을 산문으로** 만든다.
+  // (구분자만 지우면 그 줄이 H1 로 읽혀 절이 잘리므로, 그 경로는 F11 이 이미 다룬다.)
+  const FX_AS_PROSE = FX_SSOT.split('\n')
+    .filter((l) => !/^`{3,}/.test(l))
+    .map((l) => l.replace(/^# /, ''))
+    .join('\n');
+  check(
+    'F12 같은 내용이 산문이면 후보 2 개로 모호 실패 (= 펜스 제외가 load-bearing)',
+    extractTriggerSpan(extractSection(FX_AS_PROSE, /^## 9\. /).text, FX_MARKER).ok,
+    false,
+  );
+  check(
+    'F13 다음 절(`## 10.`)의 span 은 §9 범위 밖',
+    extractSection(FX_SSOT, /^## 9\. /).text.includes('## 10.'),
+    false,
+  );
+
+  console.log('── F13b~F13d. 인라인 코드 glob 마스킹 (구분자 짝 밀림 차단)');
+  check(
+    'F13b 인라인 코드 안의 `**` 가 마스크된다',
+    maskInlineCode('본문 `.claude/**` 뒤').includes('.claude/**'),
+    false,
+  );
+  check(
+    'F13c 마스크가 길이를 보존한다 (원본 슬라이스 인덱스 불변)',
+    maskInlineCode(FX_SSOT).length,
+    FX_SSOT.length,
+  );
+  // 같은 glob 의 백틱만 벗기면 마스크가 불가능해져 짝이 밀린다 — 마스킹이 load-bearing 이라는 증거.
+  const FX_GLOB_BARE = FX_SSOT.replace('`.claude/**`', '.claude/**');
+  check(
+    'F13d 백틱을 벗기면(= 마스크 불가) 트리거 추출이 깨진다',
+    extractTriggerSpan(extractSection(FX_GLOB_BARE, /^## 9\. /).text, FX_MARKER).trigger ===
+      trigger,
+    false,
+  );
+
+  console.log('── F14~F15. 집합 pin 판정 (순수 함수 층)');
+  const carriersOk = [FX_COPY_OK, '무관한 문서'].map((c) => carries(c, trigger));
+  check('F14 미등록 사본 유입은 보유 파일 수를 늘린다', carriersOk.filter(Boolean).length, 1);
+  check(
+    'F15 트리거 미보유 문서는 모집단에 있어도 보유로 세지 않는다',
+    carries('완전히 무관한 규범 문서 본문', trigger),
+    false,
+  );
+
+  // 자기 적용 (DoD 축 4). 비교 대상을 **런타임 추출값**으로 잡는다 — 문언을 여기 적으면
+  // 그 단언 자신이 리터럴이 되어 영원히 참이 되는 자기참조 사각이 생긴다 (초판이 그랬고, 이 케이스가 잡았다).
+  console.log('── F16. 문언 리터럴 부재 (이 가드가 세 번째 사본이 아님)');
+  const selfSrc = readFileSync(new URL(import.meta.url), 'utf8');
+  for (const pair of PAIRS) {
+    const sec = extractSection(
+      readFileSync(resolve(ROOT, pair.ssotPath), 'utf8'),
+      pair.sectionHeading,
+    );
+    const sp = extractTriggerSpan(sec.text, pair.markerLiteral);
+    if (!sp.ok) throw new Error(`F16 전제 실패 — ${pair.id} 트리거 추출 불가: ${sp.reason}`);
+    check(
+      `F16 가드 소스가 트리거 문언을 담지 않는다 (${pair.id})`,
+      carries(selfSrc, sp.trigger),
+      false,
+    );
+  }
+
+  // 마스크 문자를 NUL 로 두면 git 이 이 파일을 **binary 로 판정해 PR diff 가 렌더링되지 않는다**
+  // — 가드가 리뷰 불가가 되는 회귀다 (#1076 구현 중 실측: `Bin 0 -> 24138 bytes`).
+  check(
+    'F17 가드 소스에 NUL·제어 문자 0 (git binary 판정 방지)',
+    /[\x00-\x08\x0e-\x1f]/.test(selfSrc),
+    false,
+  );
+
+  console.log(`\n${failed === 0 ? '✅' : '❌'} self-test ${passed} passed, ${failed} failed`);
+  if (failed > 0) process.exit(1);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 진입점 — import 되지 않는 스크립트라 진입점 가드를 두지 않는다
+// (ADR 20260806-962 §실측: realpath 불일치 시 진입점 가드가 스크립트 전체를 no-op 으로 만든다).
+// ────────────────────────────────────────────────────────────────────────────
+
+if (process.argv.includes('--self-test')) {
+  selfTest();
+} else {
+  let total = 0;
+  for (const pair of PAIRS) {
+    const { failures, trigger, carriers } = checkPair(pair);
+    if (failures.length === 0) {
+      console.log(`[PASS] ${pair.id}`);
+      console.log(`       트리거: "${trigger}"`);
+      console.log(`       보유 파일 ${carriers.length}: ${carriers.join(', ')}`);
+    } else {
+      for (const f of failures) console.error(`[FAIL] ${pair.id} — ${f}`);
+    }
+    total += failures.length;
+  }
+
+  if (total > 0) {
+    console.error(
+      `\n❌ SSoT ↔ 사본 트리거 문언 drift ${total} 건.\n` +
+        '근거: docs/ops/operational-friction.md §8 "트리거 조건은 두 곳이 같은 낱말이어야 한다" (#1062, #1076)',
+    );
+    process.exit(1);
+  }
+  console.log(`\n✅ SSoT ↔ 사본 트리거 문언 정합 (${PAIRS.length} 쌍)`);
+}
