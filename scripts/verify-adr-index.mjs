@@ -69,6 +69,17 @@
  *   (ii) **산문 역참조 — 범위 밖** (이슈 #1005 완료 기준 4항 / 비목표). 본문 안의 상태 서술
  *       (예: 다른 문서가 `20260701-779` 를 _"Provisional"_ 로 적는 문장) 은 표 셀이 아니라
  *       자연어라 별개 난이도다. 계약 (2) 도 이 클래스를 덮지 않는다.
+ *   (iii) **행 본문의 수치·술어 내용 — 범위 밖** (ADR
+ *       `20260814-1031-1064-committed-claim-guard-rejected.md` §결정 4 가 명시한 **세 번째
+ *       경계**). 본 가드가 대조하는 것은 **상태 열의 상태 토큰 하나**뿐이다. 주제 셀·상하
+ *       관계 셀에 적힌 **수치**(_"측정 대상 N건"_ · 정밀도)나 **술어**(재도달용 `git grep`
+ *       한 줄)가 ADR 실물과 어긋나도, 실행 불가능한 술어여도 검출하지 않는다.
+ *       확장은 같은 §결정 4 가 **기각**했다 — 행 본문 자기모순은
+ *       [`20260808-983`](docs/decisions/20260808-983-measurement-recording-convention.md)
+ *       §Amendment 2 가 정밀도 `0/76` 으로 기각한 **술어 비교환** 클래스와 동형이라,
+ *       기계가 _"두 수치가 같은 것을 세는가"_ 를 판정할 수 없다. 즉 이 미검출은 결함이
+ *       아니라 **결정**이며, self-test **F20** 이 그 경계를 픽스처로 고정해 미래 관찰자가
+ *       _"누락"_ 으로 오인하지 않게 한다 (F10 과 같은 취지).
  *
  * 종료 코드:
  *   0 — 위반 0
@@ -77,7 +88,7 @@
  *
  * 호출:
  *   node scripts/verify-adr-index.mjs               # 검사 (CI 기본)
- *   node scripts/verify-adr-index.mjs --self-test   # 격리 픽스처 F1~F19 (positive/negative/recovery)
+ *   node scripts/verify-adr-index.mjs --self-test   # 격리 픽스처 F1~F20 (positive/negative/recovery)
  *   ADR_INDEX_ROOT=<dir> node scripts/verify-adr-index.mjs   # 스캔 루트 override (self-test 용)
  *
  * 관련: 이슈 #1005 / PR #1004 (계약 명문화) / #998 축 B / ADR
@@ -399,7 +410,7 @@ function main(args = process.argv.slice(2), env = process.env) {
     );
   }
   console.log(
-    '[adr-index] 범위 밖 (의도적 미검출): 인덱스 미등재 검출 / 산문 역참조 상태 서술 — 헤더 §범위 경계 + self-test F10',
+    '[adr-index] 범위 밖 (의도적 미검출): 인덱스 미등재 검출 / 산문 역참조 상태 서술 / 행 본문의 수치·술어 내용 — 헤더 §범위 경계 + self-test F10·F20',
   );
   if (violations.length > 0) {
     console.error(`\n[adr-index] FAIL — 위반 ${violations.length}건:`);
@@ -412,7 +423,7 @@ function main(args = process.argv.slice(2), env = process.env) {
   return 0;
 }
 
-// ── --self-test: 격리 픽스처 F1~F19 / 49 단언 (가드 도입 PR DoD 축 1~3) ──────
+// ── --self-test: 격리 픽스처 F1~F20 / 50 단언 (가드 도입 PR DoD 축 1~3) ──────
 //  F19 는 CLI 표면(모드 디스패치 + main() 종료 코드 + 배선)이라 세부 케이스가 많아
 //  `F19a`~`F19o` 로 나뉜다. 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
 //  ADR `20260813-1020-adr-index-membership-marker-rejected.md` §결정 3 이 정본이다.
@@ -917,6 +928,34 @@ function selfTest() {
           '— 수집을 넓힌 뒤에도 조건 ②가 독립 방어선으로 남는다는 증거',
       );
     }
+
+    // F20 경계 고정 — **행 본문의 수치·술어 내용**은 검사 대상이 아니다 (헤더 §범위 경계 (iii)).
+    //  ADR `20260814-1031-1064-committed-claim-guard-rejected.md` §결정 4 가 확장을 **기각**하면서
+    //  명시한 **세 번째 경계**다. 기존 두 경계(F10 = 미등재 / 산문 역참조)와 같은 형식으로 고정한다.
+    //
+    //  픽스처는 한 행 안에 두 종류의 거짓을 동시에 심는다 — 주제 셀의 **수치**(표 `999건` /
+    //  정밀도 `1.0` vs 실물 `3건` / `0/76`)와 상하 관계 셀의 **실행 불가능한 술어**(존재하지 않는
+    //  패턴을 세는 재도달 명령). 상태 토큰은 양쪽 다 `Accepted` 이므로 본 가드는 **위반 0** 을
+    //  보고해야 한다. 이 PASS 는 가드가 눈감은 것이 아니라 **범위 밖**이라는 뜻이다:
+    //  행 본문 자기모순은 `20260808-983` §Amendment 2 가 정밀도 `0/76` 으로 기각한 술어 비교환
+    //  클래스와 동형이라, 기계는 _"두 수치가 같은 것을 세는가"_ 를 판정할 수 없다.
+    //  ⚠️ 이 픽스처가 **검출**로 뒤집히면 그것은 개선이 아니라 §결정 4 의 번복이다 — 그때는
+    //  ADR 개정이 선행돼야 한다 (F10 이 #1015 미등재에 대해 갖는 관계와 같다).
+    writeAdr(
+      '20260806-local-adr.md',
+      '- 상태: **Accepted** (2026-08-06). 측정 대상 3건 · 정밀도 0/76',
+    );
+    writeIndex([
+      upstreamRow,
+      '| 2026-08-06 | [local](20260806-local-adr.md) — 측정 대상 **999건** · 정밀도 `1.0` ' +
+        '| Accepted | 재도달: `git grep -c 존재하지-않는-패턴` == 42 |',
+    ]);
+    r = runCheck(tmp);
+    assert(
+      r.violations.length === 0 && r.compared.length === 1,
+      'F20 경계: 행 본문의 수치·술어 내용은 검사하지 않는다 — 표 999건 vs 실물 3건 + 실행 불가 ' +
+        '술어를 심어도 상태 토큰만 대조해 위반 0 (범위 밖 — 누락 아님. 확장은 ADR §결정 4 가 기각)',
+    );
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
