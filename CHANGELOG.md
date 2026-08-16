@@ -5,6 +5,28 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1027] `pr-base-edit` 가드 신설 — PR `base` 편집 우회의 _탐지_ 봉인 (MINOR)** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) — ADR [`20260814-1027`](docs/decisions/20260814-1027-pr-base-edit-guard.md) (**Accepted**, cross-validate 2026-08-15 전이) **결정 1~5 의 배선**이다. 설계 재론 없음. [#970](https://github.com/coseo12/astro-simulator/issues/970) 이 §8-1 한계 0 으로 박제한 stale green (_"`base=develop` 으로 열어 초록 확인 → `base` 를 `main` 으로 편집"_) 이 본 PR 로 **보이게** 된다.
+
+  **신규 `.github/workflows/pr-base-edit-guard.yml`** — job id 겸 체크 이름 `pr-base-edit`. `types: [edited]` **단독** (`opened`/`synchronize` 는 `branch-name` 의 base 스텝이 이미 required 로 덮으므로 넣으면 중복 발화) · `branches:` 필터 **미사용** (봇 PR 17건이 `base=<type>/*` 라 필터가 정확히 그 브랜치를 사각지대로 만든다) · **`if:` 조건 미부여** (`github.event.changes.base` 가 Actions 표현식으로 전달되는지 **미실측**이라, 그 값에 의존하지 않으면 _"조용히 아무것도 안 하는"_ 실패 모드가 **구조적으로 불가능**해진다 — 대가는 제목·본문 편집당 CI 약 12초) · `concurrency` 미추가 (971 결정 9-2 계승 — `synchronize` 가 없어 연타 dedup 대상이 없다) · `permissions: contents: read`. 판정은 `scripts/verify-pr-base-rule.mjs` **재사용**이라 workflow 안의 판정 리터럴 사본 **0** 이며, `branch-name-guard.yml` · 판정 스크립트 · `.claude/**` · 저장소 보호 설정은 **전부 무접촉**이다 (ADR §5 관할 경계).
+
+  **왜 `branch-name` 에 `edited` 한 줄을 넣지 않았는가** — 그 순간 `main` 의 required check 이 **event *type* 축**을 얻어, ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 의 Phase 1 면제 근거(_"required 3개 중 SHA 를 바꾸지 않는 반복 이벤트로 통과 3종 밖 결론을 만들 수 있는 것은 하나도 없다"_)를 **문자 그대로 깬다**. 새 이름으로 받으면 required 3개의 `types:` 는 무변경이다. 후보 1 은 **기각이 아니라 유예**이며 승격 조건은 ADR §9-2 (= 971 §10-5 **항 14**) 다.
+
+  **3중 시뮬레이션 — 일회용 PR [#1089](https://github.com/coseo12/astro-simulator/pull/1089) 라이브 재현** (head SHA `9e1a1cd`, 검증 후 **close + 브랜치 삭제 완료** — `state=CLOSED` / `mergedAt=null` / `git ls-remote --heads origin | grep -c baseedit-probe` → **0**). **(P)** `base=develop` 로 open → `pr-base-edit` **체크런 없음** + `branch-name` `success`. **(N)** `gh pr edit 1089 --base main` (`06:33:55~57Z`) → run [`31931724254`](https://github.com/coseo12/astro-simulator/actions/runs/31931724254) 가 **`06:33:58Z` = 1~3초 만에 생성되고 `failure`** — #1026 실측(_"새 run 0건 · stale green"_)의 **역재현**이다. **(R)** `--base develop` 로 되돌림 → run [`31931756566`](https://github.com/coseo12/astro-simulator/actions/runs/31931756566) **`success`**.
+
+  **required 축 불변의 라이브 증거** (ADR §11 ④ 고유 발견이 구현 PR 에 인계한 **음성 축**) — 같은 SHA 최종 집계에서 `branch-name` **`n=1`** · `project-guards` `n=1` · `label-pr` `n=1` (= required 3개 전부, base 를 **두 번** 편집했는데도 1) / `pr-base-edit` `n=2` / 대조군 `pr-template-checklist` **`n=3`**. `pr-base-edit` 이 2 이고 대조군이 3 인 차이가 곧 결정 2 (`opened` 미포함) 의 관측이다. **`pr-base-edit` 이 required 목록에 없음**을 `GET /repos/.../branches/main/protection` 으로 확인했다 — `["project-guards","branch-name","label-pr"]` (쓰기 `-X PUT/PATCH/DELETE` 미사용).
+
+  **부수 실측 — default branch 반영은 선행 조건이 아니다.** N 시점에 `pr-base-edit-guard.yml` 은 `main`·`develop` 어디에도 없고 **PR head 브랜치에만** 있었는데 정상 발화했다. `pull_request` 이벤트는 merge ref (head ⊕ base) 의 workflow 파일로 돌기 때문이며, [`workflow-dispatch-pitfalls.md`](docs/lessons/workflow-dispatch-pitfalls.md) 의 2단계 함정과는 **다른 축**임을 실측으로 분리했다.
+
+  **동시 갱신** (ADR §8 산출물) — (a) [`branch-strategy-workflow.md`](docs/guides/branch-strategy-workflow.md) §알려진 우회 제목의 _"미해결"_ → **"탐지는 봉인, 차단은 미봉인"** + CI 배선 표에 `edited` 행 추가 (b) ADR [`20260812-970`](docs/decisions/20260812-970-pr-base-rule-guard.md) §8-1 한계 0 에 **개정 주석** (본문은 이력이라 덮어쓰지 않고 회수 표시 — 동 ADR §6-3 형식. 완화 (iii) 가 예고한 비교의 결말도 함께 착지) (c) **본 항목** — `[Unreleased]` 에만 박제하고 `[0.74.0]` 이하 확정 구간은 무접촉 (d) workflow 헤더에 §6 문장. **971 §10-5 항 14 는 무접촉** — ADR PR [#1085](https://github.com/coseo12/astro-simulator/pull/1085) 가 이미 신설했다.
+
+  ⚠️ **차단력은 `0` 이다 (축소해 적지 않는다).** `pr-base-edit` 은 **required 가 아니므로** 붉은 X 는 뜨지만 머지는 기계적으로 막히지 않는다. N 단계가 이것을 그대로 보인다 — `base=main` 인 채로 required 3개가 **전부 `success`** 였다 (머지는 시도하지 않았다). 게다가 **현재 형태로는 required 화가 원리적으로 불가능**하다: `types: [edited]` 단독이라 편집 없는 PR 에서는 체크런이 **아예 생성되지 않아** required 로 올리면 영구 `Pending` → 머지 영구 차단이 된다 (ADR §9-1 한계 3).
+
+### Behavior Changes
+
+- **`base` 를 편집하면 새 체크 `pr-base-edit` 이 뜬다 (#1027).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 열린 PR 의 `base` 를 바꿔도 **새 run 이 0건**이라 아무 판정도 남지 않았고(#1026 실측), 이제 `pull_request` `edited` 마다 `verify-pr-base-rule.mjs` 가 재판정한다. **막히는 PR 은 0** 이다 (비-required). 부수 대가로 **제목·본문만 편집해도 발화**하므로, head 이름이 규약 밖인 PR 은 `pr-base-edit` 에서도 `unresolved`(**귀속: branch-name**) 를 받아 붉은 X 가 둘이 된다 — 진단 메시지가 _"base 는 정상이니 head 이름만 고쳐라"_ 로 정확하므로 수용한 설계다 (ADR 결정 3).
+
 ## [0.74.0] — 2026-08-16
 
 ### Added
