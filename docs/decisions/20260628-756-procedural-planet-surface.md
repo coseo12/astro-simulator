@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Provisional (cross-validate 대기)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Provisional (cross-validate agy 2026-08-17 수행 완료 · 4축 통합 + Accepted 전이 대기 — 메인 소관)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -846,14 +846,23 @@ col = mix(col, iceColor, iceMask);
 
 #### 결정 0 — Phase 0 측정 게이트 (다른 모든 구현 이전, 차단 조건)
 
-**`sampler2D` 가 이 공유 GLSL `ShaderMaterial` 에서 WebGPU / WebGL2 양쪽에 동작하는가**를 최우선 실측한다. 최소 스파이크: rocky 분기에 1×1 흰색 `RawTexture` 를 바인딩하고 `texture2D(uSurfaceMask, vec2(0.5)).r` 을 곱한 뒤,
+**`sampler2D` 가 이 공유 GLSL `ShaderMaterial` 에서 WebGPU / WebGL2 양쪽에 동작하는가**를 최우선 실측한다. 게이트는 **2 Step 이며 두 Step 모두 두 백엔드에서 PASS 해야 한다.**
+
+**Step 1 — 컴파일·바인딩**: rocky 분기에 1×1 흰색 `RawTexture` 를 바인딩하고 `texture2D(uSurfaceMask, vec2(0.5)).r` 을 곱한 뒤,
 
 - (a) **실 Chrome (WebGPU)** — earth disk 렌더 + console error 0
 - (b) **headless chromium `--use-angle=swiftshader` (WebGL2, CI 재현)** — 동일
 
-두 셀 모두 PASS → 나머지 결정대로 진행. **어느 하나라도 FAIL → 구현 중단 + architect 재개봉** (§A4.7 재검토 조건 1). 4타입 공유 셰이더를 WGSL 이중 소스화하는 것은 비용 계급이 달라 C안의 채택 근거 자체가 무너진다.
+**Step 2 — 샘플링·좌표계 동일성** *(cross-validate 권고 1 수용, 2026-08-17 — §A4.8)*: **4분면 색이 서로 다른 `2×2` `RawTexture`** 를 바인딩하고 `u ∈ {0.25, 0.75}` × `v ∈ {0.25, 0.75}` 4점을 샘플해, **두 백엔드가 같은 (u,v) 에서 같은 색상값**을 내는지 **기계적 assertion** 한다 (사람 눈 판정 금지 — 픽셀값 비교).
 
-> 근거: #820 의 **measurement-first Phase 0 게이트** 선례 (로컬 무재현 전제를 구현 전에 판별). §A4.2-4 는 리스크의 **존재**를 보이지만 **동일 클래스임을 증명하지 않는다** — 그래서 "위험하다" 도 "안전하다" 도 선언하지 않고 게이트로 넘긴다.
+- 판정식: 4점 × 2 백엔드 = **8 셀**, WebGPU 값과 WebGL2 값이 채널별 **완전 일치** (압축 없는 `RawTexture` + `NEAREST` 샘플링이라 허용 오차 0).
+- 양성 대조군: 4분면 색이 **서로 달라야** 한다 (전부 같은 색이면 UV 뒤집힘을 통과시킨다 — 이 대조군이 없으면 Step 2 자체가 무의미).
+
+**Step 1 만으로는 부족하다** — Step 1 은 *"바인딩이 되는가"* 만 재고 *"좌표계가 두 백엔드에서 같은가"* 는 재지 않는다. **컴파일은 되는데 `v` 축이 뒤집힌** 경우가 Step 1 을 통과한다. 그것이 이 저장소가 반복해 온 **「가드가 초록인데 결함이 남는」** 클래스이며, 초판 게이트가 정확히 그 함정을 갖고 있었다 (§A4.8 사후 결과 1).
+
+**어느 Step 이든 FAIL → 구현 중단 + architect 재개봉** (§A4.7 재검토 조건 1). 4타입 공유 셰이더를 WGSL 이중 소스화하는 것은 비용 계급이 달라 C안의 채택 근거 자체가 무너진다.
+
+> 근거: #820 의 **measurement-first Phase 0 게이트** 선례 (로컬 무재현 전제를 구현 전에 판별). §A4.2-4 는 리스크의 **존재**를 보이지만 **동일 클래스임을 증명하지 않는다** — 그래서 "위험하다" 도 "안전하다" 도 선언하지 않고 게이트로 넘긴다. 단 **게이트가 그 미지를 실제로 좁히지 못하면 "모른다" 를 유예로 바꾼 것에 불과하다** — Step 2 가 그 간극을 닫는다.
 
 #### 결정 1 — 출처·라이선스 (실측 박제, 취득은 dev)
 
@@ -975,6 +984,10 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 → **(B)**. 결정 2 의 "최대가 아니라 정합 해상도" 선택이 여기서 나온다 — 두 결정은 **커플링돼 있다** (over-resolution × noMipmap = shimmer).
 
 - **극 특이점** (`acos` pinch): `|sin φ| ≥ 0.84` 는 `iceMask` 가 덮으므로 (§A3.3 결정 4) 마스크 pinch 가 시각 노출되지 않는다.
+  - ⚠️ **한정 (cross-validate 정밀화 수용, 2026-08-17 — §A4.8 부수 1)**: `|sin φ| ≥ 0.84` 는 위도 **`±57.14°`** 다. 남반구는 남극·남빙양이라 위 논거가 그대로 성립하지만, **북반구 `57°` 이상에는 스칸디나비아 · 알래스카 · 시베리아 · 그린란드가 실재한다** — 즉 "고위도는 전부 얼음이라 마스크가 안 보인다" 는 **전칭으로 읽으면 거짓**이다. 결론(1차에서 pinch 를 별도 처리하지 않음)은 유지하는데, 근거가 "육지가 없다" 가 아니라 **"pinch 왜곡이 급격해지는 대역은 `±80°` 이상이라 `57°` 수준에서 실해가 작다"** 이기 때문이다. `±80°` 이상은 그린란드 최북단·남극 내륙뿐이고 그 대역은 `iceMask` 가 실제로 포화한다.
+- **원거리 축소 LOD 규칙 (cross-validate 권고 2 수용, 2026-08-17)**: `noMipmap` 전제에서 disk 가 아주 작아지는 뷰 (전체 태양계 조감, **R < 16 px** 수준) 는 마스크가 과도하게 축소돼 shimmer 가 난다. 이 대역에서는 **`uMaskEnabled` 를 `0` 으로 전환** (= 현행 절차 경로. 결정 7 의 미도착 경로와 **같은 분기를 재사용**하므로 신규 코드 표면 0).
+  - **이것은 새 제약이 아니라 결정 2 논거의 반대편 끝이다.** 결정 2 는 정합 폭 `2πR` 구간 **[618, 1854]** 의 **상한**(R 이 크면 마스크가 모자란다)으로 1024 를 정당화했다. 같은 식의 **하한**이 곧 **R 이 작으면 마스크가 과하다**는 뜻이다 — `R = 16 px` 의 정합 폭은 `2π × 16 ≈ 100` 이라 1024 마스크가 **10.2× over-resolution** 이다. 두 결정(2·4)이 **하나의 근거를 공유**한다.
+  - 임계 `R < 16 px` 자체는 **1차 출발값이며 dev measurement-first 조정 대상** (#774 결정 8 동형). low variant(billboard) 는 애초에 셰이더 미진입이라 (§결정 3) 이 규칙이 실제로 걸리는 구간은 **mid variant 의 원거리 끝**이다.
 - **재검토**: qa 가 기본 focus 회전 중 해안선 shimmer 를 **인지**하면 `textureGrad` + seam 미분 wrap 보정으로 승격 (§A4.7 재검토 조건 2). 단 `textureGrad`/`dFdx` 의 WGSL 변환 가능 여부를 **먼저 실측** — 결정 0 스파이크에 합류 가능.
 
 #### 결정 5 — `continents` fbm 의 처분: **유지 + 역할 전환** (폐기 기각)
@@ -990,6 +1003,14 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 → **(B) 채택**. `continents` 를 (i) **마스크 샘플 좌표의 도메인 워프**, (ii) **`latJ` biome jitter** 두 곳에 재사용. **fbm 호출 수 불변** — §A3.3 결정 3-c 의 "noise 샘플 +0" 불변식이 보존된다. 워프 진폭 상수 `MASK_WARP_AMP` 만 신규 (rendering-only 미학 상수 SSoT).
 
 > **(B) 는 성능 절약이 아니라 품질 요건이다.** 최대 줌인 각도해상도 0.0236 °/px 는 **어떤 실용 마스크 해상도로도 못 덮는다** (2048 에서도 texel 당 7.5 px). 고주파는 마스크가 아니라 fbm 이 담당해야 한다. 마스크는 **저주파 형상**, fbm 은 **고주파 디테일** — 역할 분리가 본 설계의 핵심이다.
+
+**구현 가이드 — 워프는 `v` 극점에서 clamp 한다** *(cross-validate 권고 3 수용, 2026-08-17)*:
+
+```glsl
+v = clamp(v + warp.y, 0.001, 0.999);
+```
+
+`v` 는 `acos(p.y)/π` 라 `0.0` / `1.0` 이 정확히 **극점**이다. 워프가 그 값을 넘기면 극에서 역투영 특이점이 생기고, `CLAMP_ADDRESSMODE` 는 좌표를 잘라줄 뿐 **극에서 경도가 정의되지 않는 문제**를 막지 못한다. `u` 는 `WRAP_ADDRESSMODE` 라 clamp 불요 (넘어가면 정상 순환) — **두 축의 처리가 다르다는 점이 요지**다.
 
 #### 결정 6 — 다른 body 무영향 + 확장 경로
 
@@ -1029,7 +1050,8 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 | ------------------ | ---------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
 | 셰이더 rocky 확장  | `procedural-planet-shader.ts`                                    | ~70–120 변경/신규 | GLSL rocky 분기 +6–10 / sampler 선언 +1 / uniform +2 (`uMaskEnabled`, `maskWarpAmp`) / 상수 +2 / 팩토리 텍스처 배선 +25–40 / JS 미러 +15–25 / 헤더 주석 |
 | 텍스처 헬퍼        | `earth-land-mask-texture.ts` (신규) 또는 셰이더 모듈 내          | ~40–70 신규       | `billboard-alpha-mask.ts` (per-scene 캐시 + placeholder + onLoad/onError) 동형                     |
-| scene 배선         | `solar-system-scene.ts` / `body-mesh-factory.ts`                 | ~8–20 변경        | `surfaceMaskBaseUrl` 옵션 수신 → 팩토리 전달만                                                     |
+| scene 배선         | `solar-system-scene.ts` / `body-mesh-factory.ts`                 | ~12–28 변경       | `surfaceMaskBaseUrl` 옵션 수신 → 팩토리 전달 + **원거리 LOD 규칙** (onBind 에서 투영 반경 `R < 16 px` 판정 → `uMaskEnabled = 0`, 결정 4 · cross-validate 권고 2). 반경 산식은 `browser-verify-783` 과 동일 (`boundingSphere.radiusWorld / √3` 투영) 재사용 |
+| Phase 0 스파이크   | 임시 (`scripts/_debug-1119-*-tmp.mjs`, 측정 후 즉시 `rm`)        | **커밋 0**        | 결정 0 Step 1·2. volt #67 패턴 — 산출물은 측정값이고 코드는 남기지 않는다                          |
 | web 배선           | `sim-canvas.tsx`                                                 | **0–3**           | 기본값이 `/textures/` 면 0. 옵션 명시 전달 시 3                                                    |
 | 에셋               | `apps/web/public/textures/earth-land-mask.png` (신규)            | 30,135 B          | 결정 2                                                                                             |
 | 생성 스크립트      | `scripts/generate-earth-land-mask.mjs` (신규)                    | ~150–220 신규     | SHP 파서 + 스캔라인 래스터화 + 면적 다운샘플 + pngjs write                                          |
@@ -1050,7 +1072,8 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 
 | #   | 기준                                                                                                                                                                                       | 측정 방법                                                                                                          |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| 0   | **Phase 0 게이트 PASS** — WebGPU(실 Chrome) + WebGL2(swiftshader) 양쪽에서 `sampler2D` 렌더 + console error 0                                                                              | 결정 0 스파이크. **FAIL 이면 이하 전부 중단**                                                                       |
+| 0-1 | **Phase 0 Step 1 (컴파일·바인딩)** — WebGPU(실 Chrome) + WebGL2(swiftshader) 양쪽에서 `sampler2D` 렌더 + console error 0                                                                   | 결정 0 Step 1. **FAIL 이면 이하 전부 중단**                                                                        |
+| 0-2 | **Phase 0 Step 2 (샘플링·좌표계 동일성)** — 4분면 색이 다른 `2×2` `RawTexture` 를 `u ∈ {0.25,0.75}` × `v ∈ {0.25,0.75}` 4점 샘플. **8 셀(4점 × 2 백엔드) 채널값 완전 일치** + 4분면 색 상이 양성 대조군 확인 | 결정 0 Step 2 (cross-validate 권고 1). 사람 눈 판정 금지 — 픽셀값 기계 assertion. **FAIL 이면 이하 전부 중단**     |
 | 1   | **대륙 형상이 실제와 일치** — 화면 disk 를 위경도로 역투영해 육지/바다 분류한 결과가 **커밋된 마스크와 IoU ≥ 0.80**. OFF (`&surface=off`) 및 마스크 미적용 경로 대비 **유의 증가**           | 신규 `browser-verify-1119-earth-mask.mjs`, `?focus=earth&rotate=off&speed=0&beta=π/2` 결정적 프레임 + pngjs        |
 | 2   | **마스크 미적용이 CI 를 통과하지 못함** — `uMaskEnabled` 가 0 으로 고착된 상태를 고의 주입하면 DoD 1 이 **FAIL** (negative test)                                                            | 동일 스크립트 negative 실행 (가드 도입 4축 §2 3중 시뮬레이션)                                                       |
 | 3   | **자전·tilt 정합** — `rotate=on` 에서 대륙이 표면과 함께 좌→우 이동, 극관·biome 위도 불변. `axialTiltDeg` 23.44° 로 극축 기울기 유지                                                        | 기존 `verify:782-rotation` PASS + 신규 스크립트의 2프레임 상관                                                      |
@@ -1064,6 +1087,7 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 | 11  | **데이터 0** — `git diff --stat` 에 `solar-system.json` 부재                                                                                                                                | reviewer 실측                                                                                                      |
 | 12  | **core typecheck 0** + 기존 procedural-planet 테스트 전체 PASS                                                                                                                              | `pnpm --filter core typecheck` + vitest                                                                            |
 | 13  | **실 Chrome GUI 수동 검증 1회** — headless false positive 차단 (CLAUDE.md §headless ≠ 실 브라우저)                                                                                          | qa                                                                                                                 |
+| 14  | **원거리 축소 shimmer 0** — 전체 태양계 조감 (지구 disk `R < 16 px` 대역) 에서 `uMaskEnabled = 0` 전환 확인 + 카메라 후퇴 중 지구 픽셀 프레임간 변동이 마스크 OFF 상태와 동등              | 결정 4 LOD 규칙 (cross-validate 권고 2). `?rotate=off&speed=0` 결정적 프레임 2장 비교. 임계 16 px 는 dev 조정 대상 |
 
 ### A4.6 §Visual Fidelity 의무 체크리스트 4항목 (principles.md §1)
 
@@ -1085,7 +1109,7 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 5. **바다 깊이색 / 대기 rim / 구름** — §A3.7 재검토 조건 1·2·3 그대로. 본 Amendment 는 **편승하지 않는다** (#1119 비목표).
 6. **Natural Earth 버전 갱신** — `4.1.0` 고정. 상위 버전 도입 시 결정 8 의 단위 테스트 (면적가중 28.75% ± 0.5pp) 가 먼저 반응하므로, 값 갱신을 **의식적 SSoT 갱신**으로 처리한다 (조용한 임계 완화 금지).
 
-### A4.8 교차검증 반영 사항 (cross-validate 대기 — Provisional)
+### A4.8 교차검증 반영 사항 (agy 2026-08-17 수행 — architect 반영분 통합, 4축 통합·전이는 메인 소관)
 
 **호출 전 Claude 편향 셀프 체크** (4종, [cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5):
 
@@ -1100,3 +1124,25 @@ float v = acos(clamp(p.y, -1.0, 1.0)) * INV_PI;   // local +Y = 북극(위도 +9
 2. (결합 간과) 결정 2·4·5 의 상호 정당화가 순환인가 — "2048 + mipmap + seam 보정" 조합을 1차에 채택하지 않은 판단이 타당한가, 아니면 `noMipmap` 전제 자체가 회피 가능한 제약인가.
 3. equirectangular 마스크에서 **극 pinch** 를 `iceMask` 가 가린다는 결정 4 의 논거가 `|sin φ| ≥ 0.84` 임계에서 실제로 성립하는가 (극관 전이 하단 0.84 와 마스크 왜곡 가시 시작 위도의 관계).
 4. 결정 7 의 "가드 ↔ 렌더 경로" 분리 판정이 §가드 설계 원칙의 의도와 정합하는가 — degrade 를 허용하되 검증을 fail-fast 로 두는 이중 구조에 사각이 있는가.
+
+#### 수행 결과 (agy, 2026-08-17, outcome `applied` — architect 반영분)
+
+**판정: 조건부 승인 (차단 0).** 수학·라이선스·SSoT·가드↔렌더 분리는 전건 「양호」. 특히 **명시 질문 4 (결정 7)** 는 _"완벽히 정합"_ 으로 확인돼 원안 유지.
+
+> ⚠️ **본 절은 architect 가 반영한 부분만 기록한다.** 4축 분류 (합의 / 이견 수용 / 기각 / 고유 발견) 전체 통합과 `Provisional → Accepted` 전이는 **메인 오케스트레이터 소관**이다 (#479 — architect 는 cross-validate 를 직접 호출하지 않는다).
+
+**수용 3건 — 전부 「자인한 편향 2축이 실현된 지점」에서 나왔다**:
+
+| 권고 | 대상 | 반영 위치 | 실현된 편향 축 |
+| --- | --- | --- | --- |
+| 1 | Phase 0 게이트가 **「컴파일」만 재고 「좌표계 동일성」은 안 잰다** | §결정 0 을 **Step 1 / Step 2 로 분리**, Step 2 에 4분면 `2×2` `RawTexture` 8 셀 기계 assertion + 양성 대조군 신설. §A4.5 DoD `0` → `0-1` / `0-2` 분할 | **낙관적 일정** |
+| 2 | `noMipmap` 하 **원거리 축소 모아레** (disk `R < 16 px`) | §결정 4 에 LOD 규칙 1줄 (`uMaskEnabled = 0` 전환, 결정 7 분기 재사용 → 신규 코드 표면 0) + §A4.5 DoD 14 신설 | **결합 간과** |
+| 3 | fbm 도메인 워프의 **`v` 극점 clamp** | §결정 5 에 `v = clamp(v + warp.y, 0.001, 0.999)` 구현 가이드 + `u`(WRAP) 와 `v`(CLAMP) 의 **처리가 다르다**는 요지 명시 | **결합 간과** |
+
+**부수 1 — 정밀화 (틀림이 아니라 한정 부족)**: `|sin φ| ≥ 0.84` = 위도 **`±57.14°`** 이고 **북반구 그 이상에 스칸디나비아·알래스카·시베리아·그린란드가 실재**한다. cross-validate 판정은 _"대체로 성립"_ (pinch 급격화는 `±80°` 이상). **결론은 유지하되 근거를 교체**했다 — "고위도는 전부 얼음" (전칭, 거짓) → "`57°` 대역은 pinch 실해가 작고 `±80°` 이상은 `iceMask` 가 포화" (한정, 참). §결정 4 극 특이점 항에 부기.
+
+**사후 편향 셀프 체크 결과 (자인 2축의 실현 여부)**:
+
+- **낙관적 일정 — 실현됨 (자인 적중).** "게이트가 부분 성공을 놓칠 수 있다" 까지는 스스로 적었으나, **그 간극을 닫는 술어를 설계하지 않고 명시 질문으로 넘겼다.** 미지를 인지한 것과 미지를 좁히는 것은 다르며, **게이트가 좁히지 못하면 "모른다" 를 "유예" 로 바꾼 것에 불과하다** — 이번 사이클의 가장 이전 가능한 교훈이다. 다음 설계에서는 **셀프 체크에서 미통과로 표시한 축은 cross-validate 로 넘기기 전에 술어화를 1회 시도**한다.
+- **결합 간과 — 실현됨 (자인 적중, 단 방향이 달랐다).** 우려는 "결정 2·4·5 가 순환 정당화" 였고 cross-validate 는 **순환이 아니라고** 판정했다. 대신 걸린 것은 **같은 근거의 반대편 끝을 안 본 것** — 정합 폭 `2πR` 구간의 **상한**(R 이 크면 부족)으로 1024 를 정당화하면서 **하한**(R 이 작으면 과잉)을 결론으로 끌어내지 않았다. 즉 결합을 **과소평가**한 게 아니라 **한쪽 방향만 전개**했다. 권고 3(극점 clamp) 도 같은 형태다 — `u`/`v` 를 대칭으로 다루다 주소 모드가 다르다는 비대칭을 놓쳤다. **일반화: 구간·경계·축쌍을 근거로 쓸 때 양끝·양축을 각각 전개했는지 자문한다.**
+- **폐기 프레이밍 / 순수주의 — 통과 유지.** 특히 순수주의 축(§결정 7 의 「fallback 금지」 비적용 판정)은 cross-validate 가 _"완벽히 정합"_ 으로 독립 확인했다.
