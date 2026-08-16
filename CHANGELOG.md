@@ -98,6 +98,16 @@ Semantic Versioning을 따른다.
 
   **가드 신설 `0`** — _"박제 rev 를 체크아웃해 재실행하는 가드"_ 는 [`20260814-1031-1064`](docs/decisions/20260814-1031-1064-committed-claim-guard-rejected.md) 가 실측으로 이미 기각했다. 본 변경은 그 판정을 재론하지 않고 재실행의 **위치 조건** 하나만 더한다.
 
+- **[#883] `setup-stage-labels.sh` 셸 옵션 강화 — 전제 재검증 결과 축 1건만 잔존 (PATCH)** ([#883](https://github.com/coseo12/astro-simulator/issues/883)) — 이슈가 지목한 **2축 중 1축이 소멸**했고, 남은 1축의 **처방 경로도 바뀌었다**. 착수 전 실측이 둘 다 드러냈다.
+
+  **소멸한 축** — `.github/workflows/harness-guards.yml` 은 [#907](https://github.com/coseo12/astro-simulator/issues/907) Phase B/C (`b474902`, PR [#911](https://github.com/coseo12/astro-simulator/pull/911)) 가 **삭제**했다. 파일이 없으므로 `.node-version` 핀 부재도 없다.
+
+  **처방이 바뀐 축** — `scripts/setup-stage-labels.sh` 의 `set -e` 는 실재한다 (다른 `scripts/*.sh` 10개 중 9개가 `set -euo pipefail`, `cleanup-browser.sh` 만 `set -uo pipefail` 로 의도적 예외). 그러나 이슈가 요구한 **«upstream PR 직행 (Z 패턴 Phase 2)»** 은 성립하지 않는다 — **Z 패턴은 2026-07-31 폐기**됐고 (`CLAUDE.md:212` / ADR [`20260731-907`](docs/decisions/20260731-907-harness-decouple.md)) `.harness/` 는 비어 있다. 즉 **다운스트림 로컬 수정이 drift 를 만들지 않으므로** 그 자리에서 고치는 것이 정석이 됐다.
+
+  **안전성 3축 검증** — (1) `bash -n` 문법 OK (2) `-u`: 미설정 변수 참조 **0** (전 변수가 대입 후 사용, `REPO` 는 `${1:-…}` 기본값) (3) `-o pipefail`: 파이프라인 **0**. `-e` 는 `gh label create` 실패를 `if` 가 흡수하므로 멱등성 불변이다.
+
+  **negative 실증** — 격리 픽스처에서 `set -euo pipefail` + 미설정 변수 → `unbound variable` 로 중단, 같은 픽스처를 `set -e` 로만 돌리면 **빈 문자열로 통과**(양성 대조군). 즉 이 변경은 검출력을 실제로 더한다.
+
 ### Changed
 
 - **[#1086] 좀비 카나리아 — 가드 사본 대조 사각 봉인 + 패턴 경계 자기적용 (MINOR)** ([#1086](https://github.com/coseo12/astro-simulator/issues/1086)) — [#1066](https://github.com/coseo12/astro-simulator/issues/1066)(PR [#1080](https://github.com/coseo12/astro-simulator/pull/1080))이 _"산문 선언 → 기계 검증"_ 취지로 넣은 **항목 9** 가 같은 문서 안의 다른 사본을 못 봤다. 항목 9 는 `grep -E '<PATTERN>'` **형태 하나만** 찾았고 `docs/ops/zombie-process-guards.md` §10 의 **bare 코드펜스**는 대조 밖이었다 — reviewer 실증: 그 펜스만 구 패턴으로 되돌려도 `9/9 PASS`. 본 PR 에서 **#1086 이전 가드를 그대로 꺼내 같은 변조에 물려 재현**했다 (시나리오 `S1-prev` → `PASS`, 즉 사각 확인).
