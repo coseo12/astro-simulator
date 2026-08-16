@@ -466,7 +466,9 @@ base 패리티라 **선재 결함**이다. 본 Amendment 는 두 건을 **갈라
 
 | 우회 형태 | 백스톱 실측 (2026-08-16, `prettier@3.9.6` = lockfile 판본) | 판정 |
 | --- | --- | --- |
-| `export … from '<allowlist 밖>';` (컬럼 0, well-formed) | `prettier --check` **exit 0** / `eslint` **exit 0** → 백스톱 **`0`** | **채택** |
+| `export … from '<allowlist 밖>';` (컬럼 0, well-formed) | `prettier --check` **exit 0** / `eslint` **구조적 비대상** → 백스톱 **`0`** | **채택** |
+
+> ⚠️ **eslint 항목은 «검사했으나 무발화» 가 아니라 «애초에 검사 대상이 아님» 이다** (PR [#1100](https://github.com/coseo12/astro-simulator/pull/1100) reviewer 🟡-3). `eslint.config.mjs` 의 전 블록이 `files: ['**/*.{ts,tsx}']` 이고 루트 `lint` 는 `pnpm -r lint` 라, 루트 `scripts/**.mjs` 는 **어느 경로로도 eslint 를 통과하지 않는다**. «백스톱 `0`» 근거는 이 정정으로 **약해지는 게 아니라 강해진다** — 우연히 안 걸린 것이 아니라 구조적으로 걸릴 수 없기 때문이다.
 | 들여쓴 `  import …` | `prettier --check` **exit 1** (`[warn]`) → 백스톱 **1** | **기각** (§결정 3) |
 
 두 측정은 **같은 실행**에서 나왔다 (`pnpm exec prettier --check` 에 두 픽스처를 함께 넘김) — 한쪽만
@@ -519,9 +521,23 @@ allowlist 의 의미를 _"import 하는 모듈"_ 에서 **_"로드하는 모듈"
 **재검토 조건**: `format:check` 가 CI 에서 빠지거나 `scripts/` 가 `.prettierignore` 에 들어가면 (1) 의
 전제가 무너지므로 그때 앵커를 다시 판정한다.
 
+> ⚠️ **재검토 조건 보강 — 백스톱 «개수» 가 아니라 «강제력 등급» 이 갈린다** (PR [#1100](https://github.com/coseo12/astro-simulator/pull/1100) reviewer 🟡-1, 라이브 GET 실측 `2026-08-16`).
+>
+> 위 기각은 «백스톱 `0` vs `1`» 이라는 **개수 비교**에 서 있는데, 두 백스톱의 **등급이 같지 않다**:
+>
+> | 축 | 가드 | 소속 job | `main` required |
+> | --- | --- | --- | :---: |
+> | **채택** (컬럼 0 재수출) | `verify-adr-index.mjs` | `project-guards` | **예** |
+> | **기각** (들여쓴 import·재수출) | `format:check` | `ci.yml` `detect-and-test` | **아니오** |
+>
+> 실측: `GET /branches/main/protection` → `["project-guards","branch-name","label-pr"]` / `GET /branches/develop/protection` → **`404 Branch not protected`**.
+> 즉 기각 축은 «다른 가드가 잡는다» 가 참이더라도 **머지를 막지는 못한다** (붉은 X 만). 기각 결론 자체는 유지한다 — 실해가 포맷 일탈이고 탐지가 `100%` 이기 때문이다.
+>
+> **추가 재검토 조건 3항**: ADR [`20260807-971`](20260807-971-required-status-checks.md) 결정 1 의 **Phase 2·3 이 required 집합을 움직여** `project-guards` 와 `detect-and-test` 의 등급이 갈리거나 뒤집히면, 위 표를 다시 재고 앵커를 재판정한다.
+
 ### negative 실증 — 3중 시뮬레이션 (가드 도입 PR DoD 축 2)
 
-**격리 사본**(`scripts/` 전체 복사 — `SCRIPT_DIR` 자기 참조 단언이 사본을 읽어야 하므로 단일 파일
+**격리 사본**(`scripts/` 전체 복사). ⚠️ **binding 이유는 `SCRIPT_DIR` 자기 참조가 아니라 정적 `import` 다** (PR [#1100](https://github.com/coseo12/astro-simulator/pull/1100) reviewer 🟡-4 실측) — 단일 파일만 복사하면 `ERR_MODULE_NOT_FOUND: ./upstream-only-allowlist.mjs` 로 **self-test 에 도달하기 전 링크 단계에서 죽는다**. `SCRIPT_DIR` 자기 참조 단언은 그다음에 걸리는 **두 번째 관문**이다.
 복사로는 성립하지 않는다)에 주입하고, 본검사는 `ADR_INDEX_ROOT` 로 실 저장소 루트를 주입해 격리
 부작용(README 부재 exit 2)과 주입 효과가 갈리지 않게 했다.
 
@@ -543,7 +559,7 @@ vacuous 하다. 두 층에서 동봉했다:
 - **픽스처 층** — `F19r` 이 같은 소스에 음성 4종 + 양성 1건을 넣고 결과가 정확히 `['node:vm']` ·
   계수 `1` 임을 **한 단언**으로 요구한다.
 
-### 신규 픽스처 4건
+### 신규 픽스처 3건
 
 | 라벨 | 겨냥 | 대응 |
 | --- | --- | --- |
