@@ -80,6 +80,25 @@
  *       기계가 _"두 수치가 같은 것을 세는가"_ 를 판정할 수 없다. 즉 이 미검출은 결함이
  *       아니라 **결정**이며, self-test **F20** 이 그 경계를 픽스처로 고정해 미래 관찰자가
  *       _"누락"_ 으로 오인하지 않게 한다 (F10 과 같은 취지).
+ *   (iv) **들여쓴 모듈 로드 선언 — 범위 밖** (#1084 판정 3 · 기각). ⚠️ 앞 셋과 **축이 다르다**
+ *       — (i)~(iii) 은 «인덱스 대조 판정» 의 경계이고, (iv) 는 self-test 가 **자기 소스**를
+ *       훑는 배선 단언 `F19n` 의 경계다. `F19n` 은 **컬럼 0** 에서 시작하는 선언만 세므로
+ *       `  import { x } from '<allowlist 밖>';` 처럼 **공백을 앞세운** 최상위 선언은 잡히지
+ *       않는다 (문법상 유효하고 모듈도 실제로 로드된다).
+ *       **기각 근거** — 백스톱이 `0` 이 아니다. 앵커를 공백 허용으로 넓히면 이 파일이 이미 갖고
+ *       있는 _"코드 무변경 FAIL"_ 클래스(블록 주석의 컬럼 0 `import` 줄이 세어지는 경로,
+ *       `F19n`·`F19o` 주석 참조)가 **들여쓴 산문 전체**로 확대된다 — 본 파일의 주석은 import
+ *       규칙을 한국어로 길게 논하므로 표면이 넓다. 반면 들여쓴 선언은 `prettier --check` 가
+ *       잡는다: 2026-08-16 실측, lockfile 판본 `prettier@3.9.6` 로 들여쓴 최상위 import 1줄
+ *       픽스처 → `[warn]` + **exit 1** (같은 실행의 well-formed 컬럼 0 재수출 픽스처는 exit 0
+ *       — 즉 이 백스톱은 «들여쓰기» 에만 반응한다). CI 배선은 `.github/workflows/ci.yml`
+ *       §#952 포맷 백스톱(`pnpm run format:check`)이고 `scripts/` 는 `.prettierignore` 대상이
+ *       아니다. ⇒ 넓혀서 얻는 것(백스톱 1 → 2)보다 잃는 것(상시 오탐 표면 확대)이 크다.
+ *       **재검토 조건**: `format:check` 가 CI 에서 빠지거나 `scripts/` 가 `.prettierignore` 에
+ *       들어가면 이 기각의 전제가 무너지므로 그때 앵커를 다시 판정한다.
+ *       ⚠️ 반면 **재수출**(`export … from`)은 백스톱이 실제로 `0` 이었고(같은 실측에서 prettier
+ *       exit 0 / eslint exit 0) 정규식으로 닫을 수 있어 **채택**했다 — `F19n` 이 두 갈래를 모두
+ *       센다. 두 판정이 갈린 이유는 «가능성» 이 아니라 **백스톱 유무**다.
  *
  * 종료 코드:
  *   0 — 위반 0
@@ -423,9 +442,11 @@ function main(args = process.argv.slice(2), env = process.env) {
   return 0;
 }
 
-// ── --self-test: 격리 픽스처 F1~F20 / 50 단언 (가드 도입 PR DoD 축 1~3) ──────
+// ── --self-test: 격리 픽스처 F1~F20 / 53 단언 (가드 도입 PR DoD 축 1~3) ──────
 //  F19 는 CLI 표면(모드 디스패치 + main() 종료 코드 + 배선)이라 세부 케이스가 많아
-//  `F19a`~`F19o` 로 나뉜다. 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
+//  `F19a`~`F19t` 로 나뉜다 (#1084 에서 `F19r`~`F19t` 추가. 직전까지 이 범위 표기가 `F19o` 에
+//  멈춰 있어 `F19p`·`F19q` 를 빠뜨렸던 것을 같이 정정했다 — 범위 라벨 `F1~F20` 은 신규 픽스처가
+//  전부 `F19` 아래로 들어가므로 **불변**이다). 단언 수 sweep 술어(자기 검증용 grep 1줄)와 갱신 대상 목록은
 //  ADR `20260813-1020-adr-index-membership-marker-rejected.md` §결정 3 이 정본이다.
 //  ⚠️ 그 grep 문자열을 **본 파일 안에 인용하지 않는다** — 인용하는 순간 주석 자신이 hit 이 되어
 //  `grep 결과 == 'N passed'` 라는 자기 검증 등식이 영구히 1 어긋난다 (실측: 당시 47 vs 46).
@@ -838,7 +859,7 @@ function selfTest() {
       //  검출 범위도 넓다 — 특정 모듈이 아니라 **allowlist 밖 모든 유입**을 잡는다.
       //  ESM 이라 `require` 경로는 `node:module` 의 `createRequire` 를 거쳐야 하는데 그 import
       //  자체가 allowlist 밖이므로 **구조적으로 닫힌다** (별도 검사 불요).
-      const ALLOWED_IMPORTS = [
+      const ALLOWED_MODULE_LOADS = [
         './upstream-only-allowlist.mjs',
         'node:fs',
         'node:os',
@@ -846,9 +867,19 @@ function selfTest() {
         'node:process',
         'node:url',
       ];
-      // `declared` 는 **선언 1건 = 매치 1건**으로 수집한다 (#1037 N-1 근본 해소). 시작을 `^import`
-      //  로, 종료를 `';` **+ 줄 끝**으로 앵커하고 그 사이에 `[^;]` 만 허용해 세미콜론을 넘지 못하게
-      //  한다. 사이에 줄바꿈이 와도 되므로 prettier 가 `printWidth: 100` 초과로 **스스로 쪼갠**
+      //  ⚠️ **allowlist 의 의미는 «import 하는 모듈» 이 아니라 «로드하는 모듈» 이다** (#1084 판정 2).
+      //  정적 ESM 에서 모듈 본문을 실행시키는 구문은 두 갈래다 — `import … from '<m>';`(부수효과
+      //  전용 `import '<m>';` 포함) 와 **재수출**(`export … from '<m>';`). 후자는 로컬 바인딩을
+      //  만들지 않을 뿐 **모듈을 똑같이 로드**한다. #1084 실측 2축: 재수출 한 줄짜리 모듈을 부르면
+      //  대상 모듈의 최상위 `console.log` 가 찍히고, 내장 모듈 축에서도 `process.moduleLoadList`
+      //  가 `false → true` 로 뒤집힌다 (자식 프로세스 계열 모듈로 재현).
+      //  ⇒ 초판 이름 `ALLOWED_IMPORTS` 는 구문 한 갈래만 가리켜 재수출을 **정의상 배제**했고,
+      //     그래서 allowlist 밖 모듈을 재수출로 끌어오면 **백스톱 `0`** 으로 통과했다 (#1077
+      //     reviewer 실측 · base 패리티라 선재 결함). 이름과 수집 범위를 함께 «로드» 로 넓혀 닫는다.
+      //
+      //  `declared` 는 **선언 1건 = 매치 1건**으로 수집한다 (#1037 N-1 근본 해소). 시작을 컬럼 0 의
+      //  키워드로, 종료를 `';` **+ 줄 끝**으로 앵커하고 그 사이에 세미콜론을 넘지 못하게 한다.
+      //  사이에 줄바꿈이 와도 되므로 prettier 가 `printWidth: 100` 초과로 **스스로 쪼갠**
       //  다중행 선언이 그대로 수집된다.
       //
       //  ⚠️ **직전 판정본은 여기서 "코드 무변경 FAIL" 을 냈다.** 한 줄로 끝나는 선언만 수집해서,
@@ -858,18 +889,43 @@ function selfTest() {
       //  이라 그 상태에서 후속 PR 이 전부 하드 블록됐다. 진단 메시지로 안내하는 대신 **수집
       //  자체를 넓혀** 경로를 없앤다 — 형태를 제약하는 것은 가드의 목적(유입 차단)이 아니다.
       //
+      //  ⚠️ **재수출 축의 사전 구간은 따옴표를 넘지 못하게 한다** — 그러지 않으면 모듈 로드가
+      //  아닌 정당한 컬럼 0 export 가 오탐된다. `export const X = 'from';` 은 따옴표 **안**에
+      //  `from` 을 품으므로, 사전 구간이 따옴표를 통과하면 그 문자열이 명세자로 잡힌다.
+      //  따옴표를 배제하면 이 경로가 구조적으로 닫히고, `from` 을 **명세자 따옴표가 곧바로**
+      //  뒤따를 것을 함께 요구해 `export const from = 1;` 같은 형태도 걸리지 않는다.
+      //  이 오탐 0 은 아래 `F19r` 이 **양성 대조군을 같은 소스에** 넣어 vacuous 하지 않게 고정한다.
+      //
       //  ⚠️ **선언 수 조건 ②는 그대로 둔다 — 넓힌 뒤에도 두 조건은 독립이다.** 세미콜론 누락
       //  선언은 종료 앵커가 없어 여전히 수집되지 않고, 한 줄에 선언 2건을 이어 쓰면 앞 선언의
-      //  `;` 뒤가 줄 끝이 아니라 그 줄이 통째로 수집에서 빠진다. 두 형태 다 `^import` **줄 수**
-      //  로는 드러나므로 ②가 닫는다. 이 성질을 아래 `F19p`·`F19q` 가 합성 소스로 고정한다.
-      const declaredLineCount = (selfSrc.match(/^import\b/gm) ?? []).length;
+      //  `;` 뒤가 줄 끝이 아니라 그 줄이 통째로 수집에서 빠진다. 두 형태 다 **선언 시작 줄 수**
+      //  로는 드러나므로 ②가 닫는다. 계수 대상도 수집과 **같이** 넓혔다 — 한쪽만 넓히면 두 조건이
+      //  상시 불일치해 무조건 FAIL 한다 (#1084 §범위 1항 경고). 이 성질을 아래 `F19p`~`F19t` 가
+      //  합성 소스로 고정한다.
+      //
+      //  두 축의 계수는 **정규식을 분리해 각각 센 뒤 더한다.** 하나의 교대(alternation) 정규식으로
+      //  합치면 재수출 매치가 소비한 구간에 다음 축의 줄 시작이 묻혀 계수가 **서로를 상쇄**할 수
+      //  있다 (사전 구간이 줄바꿈을 넘기 때문). 분리하면 축 간 소비 간섭이 정의상 0 이다.
       const IMPORT_DECL_RE = /^import\b[^;]*?['"]([^'"]+)['"];[ \t]*$/gm;
-      const declared = [...selfSrc.matchAll(IMPORT_DECL_RE)].map((m) => m[1]).sort();
+      const IMPORT_START_RE = /^import\b/gm;
+      const EXPORT_FROM_DECL_RE = /^export\b[^;'"]*\bfrom\s*['"]([^'"]+)['"];[ \t]*$/gm;
+      const EXPORT_FROM_START_RE = /^export\b[^;'"]*\bfrom\s*['"]/gm;
+      /** 컬럼 0 정적 모듈 로드 선언에서 명세자를 수집 (import 축 + 재수출 축) */
+      const collectLoads = (src) => [
+        ...[...src.matchAll(IMPORT_DECL_RE)].map((m) => m[1]),
+        ...[...src.matchAll(EXPORT_FROM_DECL_RE)].map((m) => m[1]),
+      ];
+      /** 컬럼 0 모듈 로드 **선언 시작** 줄 수 (조건 ② — 수집 실패를 드러내는 독립 방어선) */
+      const countLoadStarts = (src) =>
+        (src.match(IMPORT_START_RE) ?? []).length + (src.match(EXPORT_FROM_START_RE) ?? []).length;
+      const declaredLineCount = countLoadStarts(selfSrc);
+      const declared = collectLoads(selfSrc).sort();
       assert(
-        declaredLineCount === ALLOWED_IMPORTS.length &&
-          JSON.stringify(declared) === JSON.stringify(ALLOWED_IMPORTS),
-        `F19n 배선: **컬럼 0 에서 시작하는** 정적 import 선언 집합 == allowlist ` +
-          `(선언 시작 줄 ${declaredLineCount} / 기대 ${ALLOWED_IMPORTS.length} / 수집 ${JSON.stringify(declared)}). ` +
+        declaredLineCount === ALLOWED_MODULE_LOADS.length &&
+          JSON.stringify(declared) === JSON.stringify(ALLOWED_MODULE_LOADS),
+        `F19n 배선: **컬럼 0 에서 시작하는** 정적 모듈 로드 선언 집합 == allowlist ` +
+          `(선언 시작 줄 ${declaredLineCount} / 기대 ${ALLOWED_MODULE_LOADS.length} / 수집 ${JSON.stringify(declared)}). ` +
+          `⚠️ **두 갈래를 모두 센다** — import 선언과 재수출(from 절을 가진 컬럼 0 export 선언). ` +
           `⚠️ 다중행 선언도 수집된다 — 줄 수와 수집 목록이 **함께** 어긋나면 allowlist 밖 유입을, ` +
           `줄 수만 어긋나면 세미콜론 누락 또는 한 줄 2선언을 의심하라. ` +
           `⚠️ **산문에도 걸린다** — 컬럼 0 에서 import 키워드로 시작하는 줄은 **블록 주석 안이어도** ` +
@@ -904,28 +960,76 @@ function selfTest() {
       //  사각을 함께 적는다는 것이 같은 커밋의 ADR 962 §9-3 부기 요지인데, 초판이 그 부기를
       //  쓰면서 **바로 옆에 새 전칭 단정을 박제**했다 — 자기모순이라 완화한다.
 
-      // F19p·F19q — #1037 N-1 의 경계를 **합성 소스**로 고정한다. 실물 파일이 아니라 문자열에
-      //  적용하므로 이 파일의 선언 형태가 앞으로 어떻게 바뀌든 판정이 결정적이다. (합성 소스는
-      //  JS 문자열 리터럴이라 `\n` 이 escape 다 — 물리적 줄 시작이 아니므로 위 `^import` 앵커
-      //  기반 단언들에 유입되지 않는다. 자기-매칭 4표면 중 ①의 재발 방지.)
-      const collectDecls = (src) => [...src.matchAll(IMPORT_DECL_RE)].map((m) => m[1]);
-      const countDeclStarts = (src) => (src.match(/^import\b/gm) ?? []).length;
+      // F19p~F19t — #1037 N-1 과 #1084 의 경계를 **합성 소스**로 고정한다. 실물 파일이 아니라
+      //  문자열에 적용하므로 이 파일의 선언 형태가 앞으로 어떻게 바뀌든 판정이 결정적이다.
+      //  (합성 소스는 JS 문자열 리터럴이라 `\n` 이 escape 다 — 물리적 줄 시작이 아니므로 위 컬럼 0
+      //  앵커 기반 단언들에 유입되지 않는다. 자기-매칭 4표면 중 ①의 재발 방지.)
+      //
+      //  ⚠️ 픽스처가 쓰는 **allowlist 밖 sentinel 은 `node:vm` 로 통일**한다 — 자식 프로세스 계열
+      //  모듈명을 여기 적으면 `grep -c <모듈명>` 이라는 사람의 감사 술어가 오염돼 위 Y-1 판정이
+      //  스스로 무너진다 (현재 이 파일의 해당 모듈명 등장 수는 `0`). #1084 의 우회 실증은 그
+      //  모듈로 했으나 **격리 사본에서만** 했고 커밋물에는 남기지 않는다.
+      //
+      //  ⚠️ 아래 5 픽스처는 **위 F19n 이 쓰는 것과 같은 함수**(`collectLoads` / `countLoadStarts`)를
+      //  부른다. 사본을 따로 두면 실물 단언과 픽스처가 갈릴 수 있다 (volt #120).
       const SPLIT_DECL = "import {\n  readFileSync,\n  statSync,\n} from 'node:fs';\n";
       assert(
-        countDeclStarts(SPLIT_DECL) === 1 &&
-          JSON.stringify(collectDecls(SPLIT_DECL)) === JSON.stringify(['node:fs']),
+        countLoadStarts(SPLIT_DECL) === 1 &&
+          JSON.stringify(collectLoads(SPLIT_DECL)) === JSON.stringify(['node:fs']),
         'F19p 수집: prettier 가 쪼갠 다중행 선언도 1건으로 수집된다 ' +
           '(#1037 — allowlist 불변인데 FAIL 하던 "코드 무변경 FAIL" 경로가 닫혔다는 증거)',
       );
       const NO_SEMICOLON = "import { x } from 'node:vm'\n";
       const TWO_PER_LINE = "import { a } from 'node:fs'; import { b } from 'node:vm';\n";
       assert(
-        collectDecls(NO_SEMICOLON).length === 0 &&
-          countDeclStarts(NO_SEMICOLON) === 1 &&
-          collectDecls(TWO_PER_LINE).length === 0 &&
-          countDeclStarts(TWO_PER_LINE) === 1,
+        collectLoads(NO_SEMICOLON).length === 0 &&
+          countLoadStarts(NO_SEMICOLON) === 1 &&
+          collectLoads(TWO_PER_LINE).length === 0 &&
+          countLoadStarts(TWO_PER_LINE) === 1,
         'F19q 수집: 세미콜론 누락·한 줄 2선언은 수집에서 빠지고 **선언 시작 줄 수**로만 드러난다 ' +
           '— 수집을 넓힌 뒤에도 조건 ②가 독립 방어선으로 남는다는 증거',
+      );
+
+      // F19r — **오탐 0 + 양성 대조군을 한 소스·한 단언에** (#1084 완료 기준 3항).
+      //  두 대조군을 따로 두면 "오탐 0" 이 vacuous 해진다 — 수집이 통째로 고장 나도 음성 단언은
+      //  통과하기 때문이다. 같은 소스에 **잡혀야 하는 것 1건**과 **잡히면 안 되는 것 4종**을 함께
+      //  넣고 결과가 정확히 `['node:vm']` · 계수 `1` 임을 요구하면, 어느 쪽이 무너져도 값이 어긋난다.
+      //  음성 4종은 전부 «모듈을 로드하지 않는 정당한 컬럼 0 export» 다: 문자열 안에 from 을 품은
+      //  상수 / 식별자가 from 으로 시작하는 함수 / default / 로컬 재수출(from 절 없음).
+      const MIXED_EXPORTS =
+        "export const FROM_LABEL = 'from';\n" +
+        'export function fromToken() {\n  return 1;\n}\n' +
+        'export default FROM_LABEL;\n' +
+        'export { fromToken as reexported };\n' +
+        "export { x } from 'node:vm';\n";
+      assert(
+        JSON.stringify(collectLoads(MIXED_EXPORTS)) === JSON.stringify(['node:vm']) &&
+          countLoadStarts(MIXED_EXPORTS) === 1,
+        'F19r 오탐 0: 모듈 로드가 아닌 컬럼 0 export 4종은 수집·계수 어디에도 들어가지 않고, ' +
+          '같은 소스의 allowlist 밖 재수출 1건만 잡힌다 (양성 대조군 동봉 — 음성만으론 vacuous)',
+      );
+
+      // F19s — 재수출도 다중행으로 쪼개진다 (F19p 의 재수출 축 대응). prettier 가 명명 목록을
+      //  쪼개면 `from` 절이 **다음 줄로 내려가므로**, 사전 구간이 줄바꿈을 넘지 못하면 여기서 샌다.
+      const SPLIT_EXPORT = "export {\n  a,\n  b,\n} from 'node:vm';\n";
+      assert(
+        countLoadStarts(SPLIT_EXPORT) === 1 &&
+          JSON.stringify(collectLoads(SPLIT_EXPORT)) === JSON.stringify(['node:vm']),
+        'F19s 수집: 다중행으로 쪼개진 재수출도 1건으로 수집된다 ' +
+          '(#1037 이 import 축에서 닫은 "코드 무변경 FAIL" 경로를 재수출 축에도 열어두지 않는다)',
+      );
+
+      // F19t — 재수출 축의 조건 ② 독립성 (F19q 의 재수출 축 대응). 세미콜론이 없거나 앞 선언과
+      //  같은 줄에 붙으면 수집은 실패하고 **계수만** 어긋난다 = 조용한 통과가 아니라 FAIL 이다.
+      const EXPORT_NO_SEMICOLON = "export { x } from 'node:vm'\n";
+      const IMPORT_THEN_EXPORT = "import { a } from 'node:fs'; export { b } from 'node:vm';\n";
+      assert(
+        collectLoads(EXPORT_NO_SEMICOLON).length === 0 &&
+          countLoadStarts(EXPORT_NO_SEMICOLON) === 1 &&
+          collectLoads(IMPORT_THEN_EXPORT).length === 0 &&
+          countLoadStarts(IMPORT_THEN_EXPORT) === 1,
+        'F19t 수집: 재수출의 세미콜론 누락·한 줄 혼재(import 뒤 재수출)도 계수로만 드러난다 ' +
+          '— 두 번째 선언이 컬럼 0 이 아니어서 계수가 1 에 머물고, 수집 0 과 어긋나 FAIL 한다',
       );
     }
 
