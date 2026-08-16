@@ -119,8 +119,28 @@ pnpm verify:mobile        # 모바일 480×900
 pnpm verify:scale         # 스케일 전환 (태양~해왕성)
 pnpm verify:perf          # FPS 측정 (5 시나리오)
 pnpm verify:a11y          # axe-core + 키보드 + 색약
-pnpm verify:all           # 위 5개 순차 실행
+pnpm verify:smoke         # 스모크 체인 순차 실행 (전수 아님 — 아래 계약)
 ```
+
+#### `verify:smoke` 계약
+
+**스모크 집합이지 전수가 아니다.** 체인의 정본은 루트 `package.json` 의 `verify:smoke` 값 **하나뿐**이며,
+개수·목록을 이 문서로 복제하지 않는다 — 사본을 두면 드리프트한다 (종전 이 줄의 `# 위 5개 순차 실행` 이
+실제 체인 9개와 어긋나 있었다).
+
+- **포함 (성격)** — 이슈 비종속 상시 검증. **예:** 뷰포트/플랫폼 매트릭스 · 스케일 전환 · FPS · a11y ·
+  WebGPU · N-body · 워크스페이스 테스트 설정. ⚠️ **이 열거는 전수가 아니다** — 위 원칙대로 목록의
+  정본은 `package.json` 이고, 여기 적힌 것은 성격을 보이는 예시다.
+- **제외 (성격)** — `verify:<이슈번호>-*` 꼴의 이슈별 회귀 가드. 필요하면 개별 실행한다.
+  ⚠️ _"CI 가 자체 배선한 정적 가드"_ 를 제외 기준으로 쓰지 않는다 — 체인 원소 `verify:test-coverage`
+  자신이 CI 배선분이라 그 술어는 절 안에서 자기모순이 된다 (PR [#1111](https://github.com/coseo12/astro-simulator/pull/1111) reviewer).
+  등록된 `verify:*` 전건의 정본은 루트와 `apps/web` 의 `package.json` 이다.
+- ⚠️ **CI 초록 ≠ `verify:smoke` 실행됨.** 체인 원소 중 어느 워크플로든 실제로 부르는 것은
+  `verify:test-coverage` **뿐이다** (측정 트리 rev `01401dd` — 본 PR base. 초판 `780cb92` 는 그 부모라 라벨 오기였고, 두 rev 각각 측정해 수치 영향 `0` 을 실증했다). 나머지는 로컬에서만 돈다.
+- ⚠️ **역도 성립하지 않는다** — `verify:smoke` 를 돌렸다고 회귀 가드 전수가 돈 것이 아니다.
+
+> 종전 이름은 `verify:all` 이었고 [#884](https://github.com/coseo12/astro-simulator/issues/884) 에서 개명했다.
+> `all` 은 전수 커버를 뜻하지 않았는데도 그렇게 읽혀 «잘못된 안심» 을 만들었다 — 이름 자체가 계약을 어기는 상태였다.
 
 ---
 
