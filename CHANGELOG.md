@@ -7,6 +7,29 @@ Semantic Versioning을 따른다.
 
 ### Added
 
+- **[#1060] `packages/{shared,core}` 테스트 파일 CI 타입 검사 배선 — `verify-and-rust` 스텝 1개 + 다중 `--filter` 단일 호출 금지 (MINOR)** ([#1060](https://github.com/coseo12/astro-simulator/issues/1060)) — 설계 정본은 ADR [`20260814-1060`](docs/decisions/20260814-1060-packages-test-typecheck.md) (`Accepted`, PR [#1083](https://github.com/coseo12/astro-simulator/pull/1083)) 이며 본 PR 은 **배선만** 한다 (결정 2 지점 · 결정 3 형태 · 결정 4 저장소 설정 무접촉).
+
+  **결손은 "깨져 있음" 이 아니라 "강제 지점 부재" 다.** 두 패키지의 `build` (`tsc -p tsconfig.build.json`) 는 `exclude` 로 테스트를 빼고, 이를 포함하는 것은 `typecheck` (`tsc --noEmit`) 뿐인데 이를 부르는 CI 스텝이 **`0` 개**였다. vitest 는 트랜스파일만 하고 타입을 안 보므로 기존 단위 테스트 스텝도 못 잡는다 — `58` 파일이 사각이었다 ([#840](https://github.com/coseo12/astro-simulator/issues/840) `--if-present` silent no-op 과 같은 클래스).
+
+  **커버리지를 구성 추론이 아니라 컴파일러 출력으로 실증**했다 — `tsc --noEmit --listFiles` 가 프로그램에 넣는 테스트 성격 파일이 core `57` + shared `1` = **`58`** 로 `git ls-files` 계수 `58` 과 일치한다 (경로 비-ASCII `0` 확인 — git 의 C-인용이 grep 앵커를 깨는 함정 배제). ⚠️ 이 `58` 은 술어(`*.test.ts` 접미 + `__test-utils__/` 경로)가 잡는 전부이지 _"테스트 성격 파일 전부"_ 가 아니다.
+
+  **명령 형태 — silent no-op 2축은 직교하며 각각 다른 수단으로만 닫힌다.** 핀 판본(`pnpm --version` = `10.32.1`, `packageManager` 와 일치 확인)으로 본 PR 브랜치에서 **8셀 전건 실측**했다. **축 1 = script 소실** (`packages/shared` 의 `scripts.typecheck` 를 일시 제거 후 복원) / **축 2 = 필터 부분 미매칭** (`@astro-simulator/shared` 를 존재하지 않는 이름으로 치환 — 패키지 리네임·삭제 회귀의 모사).
+
+  | 형태                                              |      script 소실 | 필터 부분 미매칭 |
+  | ------------------------------------------------- | ---------------: | ---------------: |
+  | 이중 `--filter` 단일 호출 (이슈 제안 1안)         | **`0`** (silent) | **`0`** (silent) |
+  | 이중 `--filter` + `--fail-if-no-match`            | **`0`** (silent) | **`0`** (silent) |
+  | 단일 `--filter` (분리 호출)                       |              `1` | **`0`** (silent) |
+  | **단일 `--filter` + `--fail-if-no-match`** (채택) |              `1` |              `1` |
+
+  **이중 `--filter` 형태에서는 플래그가 양축 모두 무력하다** — 이것이 설계 시 예상보다 나쁜 실측이다. `--fail-if-no-match` 는 **선택 집합 전체가 빌 때만** 발화하므로, 두 필터 중 한쪽이 사라져도 나머지가 매칭되는 한 침묵한다 (`No projects matched the filters "@astro-simulator/nonexistent"` 를 stdout 에 찍고 exit `0`). 즉 **한 패키지가 커버리지에서 빠지는 정확히 그 회귀**를 이중 형태로는 어떤 플래그로도 못 잡는다. 축 1 을 닫는 것은 **분리 호출**(`ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT`) 뿐이고, 분리하면 축 2 의 부분 미매칭이 **각 호출의 전체 미매칭으로 환원**되어 그때 비로소 플래그가 발화한다. 두 수단은 대체재가 아니라 **순차 의존**이다.
+
+  ⚠️ 분리 호출의 검출력은 **pnpm 메이저에 종속**된다 (ADR §후보 비교 2 — `9.15.4` 는 script 소실에도 `0`). 핀 값 SSoT 는 루트 `package.json` 의 `packageManager` 필드이며 본 항은 값을 복제하지 않는다.
+
+  **3중 시뮬레이션 — negative 가 작동 증거다.** `packages/core/src/scene/color-utils.test.ts` 에 타입 오류 1줄을 일시 주입해 스텝 본문을 그대로 실행: positive(주입 전) exit **`0`** → negative(주입 후) exit **`2`** (`error TS2322: Type 'string' is not assignable to type 'number'`) → recovery(되돌린 후) exit **`0`**. 같은 주입 상태에서 **기존 CI 경로는 그대로 초록**이다 — `core` build exit `0` / 해당 파일 vitest exit `0` (`2 tests passed`). 즉 새 스텝이 이 오류의 **유일한 포착 지점**이다.
+
+  **비목표 준수** — `apps/web` (`45` 파일) · `packages/physics-wasm` (`1`) 결손은 무접촉이며 후속 [#1082](https://github.com/coseo12/astro-simulator/issues/1082) 소관이다. 신규 workflow 파일 신설 `0` · 저장소 설정(required status check · branch protection) 무접촉.
+
 - **[#1027] `pr-base-edit` 가드 신설 — PR `base` 편집 우회의 _탐지_ 봉인 (MINOR)** ([#1027](https://github.com/coseo12/astro-simulator/issues/1027)) — ADR [`20260814-1027`](docs/decisions/20260814-1027-pr-base-edit-guard.md) (**Accepted**, cross-validate 2026-08-15 전이) **결정 1~5 의 배선**이다. 설계 재론 없음. [#970](https://github.com/coseo12/astro-simulator/issues/970) 이 §8-1 한계 0 으로 박제한 stale green (_"`base=develop` 으로 열어 초록 확인 → `base` 를 `main` 으로 편집"_) 이 본 PR 로 **보이게** 된다.
 
   **신규 `.github/workflows/pr-base-edit-guard.yml`** — job id 겸 체크 이름 `pr-base-edit`. `types: [edited]` **단독** (`opened`/`synchronize` 는 `branch-name` 의 base 스텝이 이미 required 로 덮으므로 넣으면 중복 발화) · `branches:` 필터 **미사용** (봇 PR 17건이 `base=<type>/*` 라 필터가 정확히 그 브랜치를 사각지대로 만든다) · **`if:` 조건 미부여** (`github.event.changes.base` 가 Actions 표현식으로 전달되는지 **미실측**이라, 그 값에 의존하지 않으면 _"조용히 아무것도 안 하는"_ 실패 모드가 **구조적으로 불가능**해진다 — 대가는 제목·본문 편집당 CI 약 12초) · `concurrency` 미추가 (971 결정 9-2 계승 — `synchronize` 가 없어 연타 dedup 대상이 없다) · `permissions: contents: read`. 판정은 `scripts/verify-pr-base-rule.mjs` **재사용**이라 workflow 안의 판정 리터럴 사본 **0** 이며, `branch-name-guard.yml` · 판정 스크립트 · `.claude/**` · 저장소 보호 설정은 **전부 무접촉**이다 (ADR §5 관할 경계).
@@ -25,6 +48,10 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **`packages/{shared,core}` 테스트 파일의 타입 오류가 CI 를 통과하지 못한다 (#1060).** 같은 입력(두 패키지의 `*.test.ts` 또는 `__test-utils__/**` 에 타입 오류가 든 PR)에서 CI 가 **다르게 동작한다** — 이전에는 `verify-and-rust` 가 초록이었고(빌드는 해당 파일을 `exclude`, vitest 는 타입 미검사), 이제 `packages 타입 검사 (테스트 파일 포함, #1060)` 스텝이 exit `2` 로 job 을 실패시킨다. 소스 파일의 타입 검사 범위는 **불변**이다.
+- **강제력 등급은 "체크런 붉은 X + 메인의 CI 확인" 이다** (ADR 결정 4). 본 스텝은 required status check 가 아니며 `develop` 은 branch protection 미채택이라, `pnpm -r test` 를 포함해 이 저장소 CI 가드 대부분과 **같은 등급**이다. required 승격은 ADR [`20260807-971`](docs/decisions/20260807-971-required-status-checks.md) 결정 1 (Phase 2·3) 관할이며 본 변경은 그 일정에 개입하지 않는다.
+- **pnpm 기반 CI 가드 배선의 일반 규약이 생겼다** (ADR 결정 3). 다중 `--filter` 단일 호출은 **가드 배선에 쓰지 않는다** — 본 스텝에 한정되지 않으며, 앞으로 pnpm 스크립트를 CI 가드로 거는 모든 작업에 적용된다. 근거와 실측은 위 표 · 워크플로 인라인 주석 · ADR §후보 비교 2 세 곳에 있고 판정 정본은 ADR 이다.
+- **기존 `workspace 빌드` 스텝의 같은 축은 의도적으로 손대지 않았다** (ADR §의도적 비-범위). 그 스텝도 이중 `--filter` 를 쓰지만 `build` 는 소실 시 산출물이 안 생겨 후속 `pnpm -r test` 가 큰 소리로 죽으므로 **결과가 다르다** — 별도 판단이 필요하다.
 - **`base` 를 편집하면 새 체크 `pr-base-edit` 이 뜬다 (#1027).** 판정 질문(_"같은 입력에 다르게 동작하는가"_)에 **예**다 — 종전에는 열린 PR 의 `base` 를 바꿔도 **새 run 이 0건**이라 아무 판정도 남지 않았고(#1026 실측), 이제 `pull_request` `edited` 마다 `verify-pr-base-rule.mjs` 가 재판정한다. **막히는 PR 은 0** 이다 (비-required). 부수 대가로 **제목·본문만 편집해도 발화**하므로, head 이름이 규약 밖인 PR 은 `pr-base-edit` 에서도 `unresolved`(**귀속: branch-name**) 를 받아 붉은 X 가 둘이 된다 — 진단 메시지가 _"base 는 정상이니 head 이름만 고쳐라"_ 로 정확하므로 수용한 설계다 (ADR 결정 3).
 
 ## [0.74.0] — 2026-08-16
