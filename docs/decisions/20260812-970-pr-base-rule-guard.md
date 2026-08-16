@@ -354,7 +354,7 @@ self-test 는 잡았지만 **런타임 판정 자체가 틀렸다**. 정정: git
 
    **그때까지의 완화**: (i) 본 가드의 실효는 *"실수로 잘못 연 PR"* 차단이며 **의도적 우회는 막지 못한다** — 규율이 이미 정착한 저장소(472 PR 연속 위반 0)에서 이 구분은 실질적이다. (ii) 릴리스·핫픽스 PR 은 사람이 base 를 의식적으로 고르는 소수 경로다. (iii) 후속에서 `edited` 대신 **머지 시점 검사**(`pull_request` `edited` 를 별도 non-required job 으로 두거나, ruleset 기반 base 제약)를 함께 비교한다.
 
-   > ⚠️ **개정 ([#1027](https://github.com/coseo12/astro-simulator/issues/1027) 집행, 2026-08-16).** 위 본문은 **이력이므로 덮어쓰지 않는다** (§6-3 과 같은 형식). 갱신되는 것은 **제목의 «미해결» 한 낱말**이다 — 상태는 «미해결» 이 아니라 **«탐지 100% · 차단 0%»** 다.
+   > ⚠️ **개정 ([#1027](https://github.com/coseo12/astro-simulator/issues/1027) 집행, 2026-08-16).** 위 본문은 **이력이므로 덮어쓰지 않는다** (§6-3 과 같은 형식) — **이 항목의 제목 줄도 포함**이다. 즉 위 제목의 «미해결» 은 **더 이상 유효하지 않으나 그대로 둔다**. 현재 상태는 «미해결» 이 아니라 **«탐지 100% · 차단 0%»** 이며, 그 정정은 본 주석이 싣는다. (제목 자체를 바꾼 것은 [`branch-strategy-workflow.md`](../guides/branch-strategy-workflow.md) §알려진 우회 쪽이다 — 그 문서는 **현행 규약**이라 이력 보존 대상이 아니기 때문이며, 두 문서의 취급이 갈리는 것은 의도된 것이다.)
    >
    > - **여전히 참**: `branch-name-guard.yml` 의 `types: [opened, synchronize]` 는 base 변경을 **포착하지 못한다** (그 workflow 는 [20260814-1027](20260814-1027-pr-base-edit-guard.md) §5 대로 **무접촉**). 위 실측 표 4행 전부 그대로 유효하다.
    > - **더 이상 참이 아님**: *"경로가 열려 있다"* 가 **보이지 않는 우회**를 뜻하던 부분. 신규 workflow [`pr-base-edit-guard.yml`](../../.github/workflows/pr-base-edit-guard.yml) 의 **`pr-base-edit`** 체크가 `edited` 를 받아 **같은 `verify-pr-base-rule.mjs` 로 재판정**한다 (판정 로직 사본 0 — 본 ADR §5 의 스크립트는 무접촉).
