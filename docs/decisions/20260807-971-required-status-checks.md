@@ -19,6 +19,8 @@
   > — **승계 부기 (2026-08-14, [#1035](https://github.com/coseo12/astro-simulator/issues/1035))**: 위 *"재검토 조건 12개"* 는 **Accepted 전이 시점(2026-08-08) 값**이다. 이후 §10-5 에 **재검토 조건 13** (`pr-template-checklist` escape 재발 → 결정 9-1 재검토) 이 신설돼 **현재 13개**다. 원문은 이력이므로 치환하지 않는다.
   >
   > — **승계 부기 2 (2026-08-14, [#1027](https://github.com/coseo12/astro-simulator/issues/1027))**: **재검토 조건 14** (`branch-name` base 편집 우회 escape 재발 → `types` 에 `edited` 추가안 재검토) 가 신설돼 **현재 14개**다. 위 두 수치 (`12` / `13`) 는 각 시점 값이므로 치환하지 않는다. ⚠️ 본 신설은 **§10-5 additive** 이며 **§결정 1 · §결정 9-1 · Phase 1 면제 근거 · 조건 13 은 전부 무접촉**이다 (본 ADR 상태도 `Accepted` 유지).
+  >
+  > — **승계 부기 3 (2026-08-16, [#1073](https://github.com/coseo12/astro-simulator/issues/1073))**: 조건 **개수는 14 로 불변**이고 **조건 13 내부**가 개정됐다 — ① «관측 주체 · 주기 · 실패 시 조치» 서브블록 신설 (실행 주체 = 비-required workflow, 판단은 사람) ② **관측 시점 정정** (초판 _"release PR 1건"_ → 그 사이클의 **릴리스 클래스 머지 PR 전건** — 초판이 모집단 (1) 의 진부분집합이라 prep PR 이 빠졌다). 판정 근거는 ADR [20260816-1073](20260816-1073-clause13-observation-wiring.md). ⚠️ **§결정 1 · §결정 9-1 · §결정 9-2 · Phase 1 면제 근거 · 조건 14 는 전부 무접촉**이고 저장소 보호 설정 변경 `0` 이다 (본 ADR 상태도 `Accepted` 유지).
 
   > **조건 3 의 핵심 관측**: release PR #992 head `614f1d9` 에서 `project-guards` 가 **`n=2` 인 채 둘 다 `success`** 였고 GitHub 이 머지를 허용했다. §2-11 이 예측한 *"Phase 0 는 동명을 없애는 게 아니라 **완주 쌍을 늘린다**. 그럼에도 전부 통과 결론이면 어떤 해석 규칙에서도 통과한다"* 가 **required check 하에서 실증**된 것이며, §2-2 가 *"미문서화"* 로 분류한 동명 해석 규칙이 **적어도 전부 `success` 인 경우에는 통과**임이 관측으로 확인된다. ⚠️ **다만 규칙 자체는 미판별이다** — `{success, success}` 는 세 해석 규칙(latest / all-must-pass / first)이 **같은 답**을 내므로 어느 규칙인지 구별되지 않는다. **불일치 시 동작은 여전히 미관측**이고(표본 n=1), §2-2 의 미기술 행과 §10-4 단계 2-bis(**미실행**)는 유효하다. Phase 2/3 은 별도 판단 (§6 결정 1).
 
@@ -1475,7 +1477,9 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
 
     **관측 창** — **90일 rolling, 하한은 본 항 신설일 `2026-08-14`**. 실효 창 = `[max(2026-08-14T00:00:00Z, now-90d), now]`. 하한을 두는 이유는 소급 4건이 전부 `2026-06-08~10` 에 몰려 있어 하한이 없으면 **신설 당일 자동 발화**하기 때문이다 — 그 4건은 발화 입력이 아니라 **기준선**이다 (1014 §1-B 가 창 하한을 _"결정 4 머지 이후"_ 로 둔 것과 동형).
 
-    **관측 시점** — 릴리스 사이클 종료 직후 (release PR 머지 직후) 그 PR **1건**만 판정한다 (`O(1)`). 그 경로가 아래 **(0)** 이며 (1) 이 만드는 파일에 의존하지 않는다 (**복붙 실행 가능**). 창 전수 재산출이 필요할 때만 (1) + (2) 를 돌린다.
+    **관측 시점** — 릴리스 사이클 종료 직후, 그 사이클의 **릴리스 클래스 머지 PR 전건**을 각각 `O(1)` 로 판정한다. 그 경로가 아래 **(0)** 이며 (1) 이 만드는 파일에 의존하지 않는다 (**복붙 실행 가능**). 창 전수 재산출이 필요할 때만 (1) + (2) 를 돌린다.
+
+    > **정정 (2026-08-16, [#1073](https://github.com/coseo12/astro-simulator/issues/1073) / ADR [20260816-1073](20260816-1073-clause13-observation-wiring.md) §3-2).** 초판은 _"release PR 머지 직후 그 PR **1건**만"_ 이었는데, 이는 위 **모집단 (1)** 필터 (`base == "main"` **∨** `head` 가 `release/` 로 시작) 의 **진부분집합**이다. 릴리스 1사이클은 PR **2건**이며 (실측: `#1087` `base=develop` `head=release/0.74.0-prep` → `#1088` `base=main` `head=develop`), 초판 서술로는 **prep PR 이 관측에서 통째로 빠진다** (전 기간 `65`건). 소급 기준선 escape `4/4` 는 전부 `base=main` 이라 **현재 갈림은 `0`** 이나, `pr-template-checklist` 첫 run `failure` 3건 (`#912` `#964` `#1032`) 이 **전부 prep PR** 이므로 ([`operational-friction.md`](../ops/operational-friction.md) §릴리스 부수 마찰) 방향이 거짓 음성이다 — 위 두 assertion 이 닫은 것과 **같은 클래스**라 함께 닫는다. 사이클당 실행 횟수만 `1 → 2` 로 늘고 PR 당 비용은 `O(1)` 불변이다.
 
     ```bash
     # (0) 단일 PR 판정 — 관측 시점 경로. N 만 바꾼다
@@ -1490,6 +1494,20 @@ grep -A3 "^on:" .github/workflows/harness-pr-review.yml .github/workflows/pr-tem
             f:([.[]|select(.conclusion=="failure")]|length)}
          | if .s==0 and .f>=1 then "ESCAPE" else "clean" end'
     ```
+
+    #### 관측 주체 · 주기 · 실패 시 조치 (신설 2026-08-16, [#1073](https://github.com/coseo12/astro-simulator/issues/1073))
+
+    초판은 _"무엇을 어떻게 재는가"_ 만 닫고 _"**누가** 매 사이클 그것을 돌리는가"_ 를 열어 뒀다. 조건을 평가하는 주체가 없으면 **결과는 조건이 없는 것과 같다** — 이 저장소가 [#962](https://github.com/coseo12/astro-simulator/issues/962) → [#970](https://github.com/coseo12/astro-simulator/issues/970) / [#1014](https://github.com/coseo12/astro-simulator/issues/1014) → [#1035](https://github.com/coseo12/astro-simulator/issues/1035) 로 두 번 겪은 형태다. 판정 근거 전문은 ADR [20260816-1073](20260816-1073-clause13-observation-wiring.md).
+
+    | 항목 | 내용 |
+    | --- | --- |
+    | **실행 주체** | **기계** — `.github/workflows/release-escape-watch.yml` (비-required). 위 **(0)** 을 그대로 실행한다. **판단은 사람** (T1 대장 원인 분류 / T1 (b) 사후 정정 / T2 재개봉) |
+    | **주기** | 릴리스 클래스 머지 **이벤트마다** (`pull_request: types: [closed]` + `merged` ∧ 모집단 조건). 실측 빈도 **`26` 회/30일** (`base=main` 기준) · **`52` 회/30일** (릴리스 클래스 전건) — 사람 스텝으로 올리지 않는 근거 |
+    | **실패 — `ESCAPE` 출력** | T1: **(a) 먼저** 아래 §escape 대장 박제 → **(b) 그 다음** 사후 정정. `escape >= 2` 도달 시 T2 = **결정 9-1 재개봉** (편입 승인 아님) |
+    | **실패 — job 실패** | run 재실행. `2` 사이클 연속 실패 시 사람이 (0) 을 수동 1회 실행 + [20260816-1073](20260816-1073-clause13-observation-wiring.md) §재검토 조건 3 발동 |
+    | **실패 — run 부재** (미발화) | **창 이탈 전** 사람이 (1)+(2) 전수 재산출 **1회**. `check-runs` 는 영구 보존이라 90일 창 안에서 **정보 손실 `0`** — 매 사이클 관측은 데이터 보존 요구가 아니라 **latency 요구**다. 이것이 fallback 이며 사람 규약은 폐지가 아니라 **강등**됐다 |
+
+    ⚠️ **workflow 를 쓰는 결정적 근거는 부담이 아니라 «실행 증거» 다.** 아래 두 assertion 이 지키는 것은 _"`0 hit` 의 의미"_ 인데, **관측 자체가 스킵되면 그 방어가 술어 밖에서 무효화**된다 — 사람 규약은 미실행과 `clean` 을 구별할 산출물을 남기지 않는다. workflow 는 `clean` 이어도 run 이력을 남겨 둘을 분리한다. 이 배선이 [20260814-1031-1064](20260814-1031-1064-committed-claim-guard-rejected.md) §결정 6 (_"대조 주체는 사람"_) 과 충돌하지 않는 이유는 **기계가 관측값 출력까지만** 담당하기 때문이며, 근거 대조표는 [20260816-1073](20260816-1073-clause13-observation-wiring.md) §결정 2 에 있다.
 
     ```bash
     REPO=coseo12/astro-simulator
