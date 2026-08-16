@@ -268,11 +268,21 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 - **소스 접촉 판정** (표 셀 밖 — 이스케이프 금지, #1079):
 
   ```bash
-  gh pr diff <N> --name-only | grep -cE '^(apps|packages)/.*\.(ts|tsx|rs|wgsl|css)$'
+  gh pr diff <N> --name-only \
+    | grep -E '^(apps|packages)/' \
+    | grep -vE '^apps/[^/]+/scripts/' \
+    | grep -cE '\.(ts|tsx|jsx|js|mjs|cjs|rs|wgsl|css)$|/package\.json$|/Cargo\.toml$'
   ```
+
+  3단으로 나눈 이유 — ① `-P` 부정 전방탐색은 **이식성이 낮다**(BSD/GNU 차) ② `apps/*/scripts/**` 제외는 §915 가 이미 *"검증 스크립트는 인프라 범주"* 로 규정한 것을 술어에 반영한 것이다(실측 `29`건) ③ 매니페스트(`package.json`·`Cargo.toml`)를 포함하는 것은 **의존성 변경이 런타임**이기 때문이다.
+  ⚠️ **매니페스트는 과발화한다** — `scripts` 키만 바꾼 PR 도 잡힌다(예: PR #1111). **fail-safe 방향이라 그대로 둔다.** 강도를 낮추려면 근거 코멘트에 *"`dependencies`·`devDependencies` 무변경"* 을 diff 로 실증하고 메인이 판정한다.
+  ⚠️ `grep -c` 는 **0 매칭 시 exit `1`** 이다. `set -e`/`pipefail` 스크립트에 넣을 땐 `|| true` 를 붙인다 (단독 실행용 명령이라 위 형태는 그대로 쓴다).
+
+- **루트 설정**(`/package.json` · `/tsconfig.json` · `pnpm-lock.yaml` · `.github/**`)은 위 술어에서 `0` 이며 **2행(가드·CI)** 으로 간다. 단 **`pnpm-lock.yaml` 변경은 §915 «예외 불가»** 라 qa 는 정식이다.
 
 - **범위 밖 발견의 기본 처분은 «PR 코멘트 기록»** 이다. 이슈는 **실피해가 관측됐을 때** 만든다 — 「이론적으로 뚫린다」는 발견은 `deferred:no-incident` 라벨로 격리한다. **가드를 하나 만들 때마다 그 가드를 검사할 표면이 하나 늘어나므로, 발견을 전부 이슈화하면 루프가 수렴하지 않는다.**
 - **예외** — 실사고가 이미 발생한 건은 성격 무관 풀 파이프라인.
+- **`deferred:no-incident` 수명주기** — 무기한 방치를 막는다. **해당 컴포넌트를 다음에 건드릴 때** 그 이슈를 함께 재판정하고, 그 시점에도 실피해가 없으면 **`wontfix` 로 close** 한다. 즉 해제 트리거는 시간이 아니라 **접촉**이다 (시간 기준은 또 하나의 추정 임계가 된다 — ADR `20260816-850` 결정 1 과 같은 논거).
 
 ---
 
