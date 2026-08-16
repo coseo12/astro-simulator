@@ -274,6 +274,9 @@ gh pr checks <PR> --json name,state --jq \
   - ⚠️ **문구만으로는 WARN 이 남는다 (#1010)**: 3계급 판정에서 phrase 는 blocking 축이고 **구조**(`kw1~5` 체크박스 / `kw6~7` `###` 헤더)는 WARN 축이다. 체크박스 항목을 `### 보안` 같은 헤더 절로 옮기면 FAIL 은 면해도 WARN 이 뜬다 — 실측으로 최근 머지 PR 60건 중 **release PR 8건이 이 경로**였다 (술어: 60 PR × 7 kw = 420 셀 중 WARN 21 셀, WARN PR 10건 중 8건이 release). 체크박스는 `[ ] → [x]` 갱신만 하고 라인 형태를 유지한다.
 - **`gh release create --target <sha>` 는 태그 기존재 시 HTTP 422**: 태그를 먼저 push 했으면 `--target` 제거(기존 태그 커밋 사용).
 - **README 「현재 상태」 갱신 의무 (#842)**: release prep PR 에서 version bump + CHANGELOG 확정과 **동일 커밋**에 README `## 현재 상태` 의 버전/날짜/기능 서술을 현행화한다. 실측: v0.47.0~v0.50.0 3릴리스 연속 누락으로 README 가 v0.46.0 표기로 방치 (전수 감사 2026-07-18 발견).
+- **escape 관측은 사람 스텝이 아니다 (#1073)**: 릴리스 클래스 머지 PR 의 `pr-template-checklist` escape 관측은 `release-escape-watch.yml` 이 머지 이벤트마다 자동 수행한다 (비-required — 머지를 막지 않는다). **릴리스 절차에 수동 스텝을 추가하지 말 것.** 사람이 하는 일은 두 가지뿐 — ① `ESCAPE` 발화 시 **대장 박제 후** 본문 사후 정정 ② workflow run 이 아예 없을 때 창 이탈 전 전수 재산출 1회. 술어·창·임계·조치의 **정본은 ADR [`20260807-971`](../decisions/20260807-971-required-status-checks.md) §10-5 항 13** 이며 여기서 값을 복제하지 않는다. 배선 판정 근거: ADR [`20260816-1073`](../decisions/20260816-1073-clause13-observation-wiring.md).
+
+  > ⚠️ **`release-escape-watch.yml` 은 아직 없다 — 구현은 [#1096](https://github.com/coseo12/astro-simulator/issues/1096) 이다** (PR [#1098](https://github.com/coseo12/astro-simulator/pull/1098) reviewer, `git grep -lF 'release-escape-watch' -- .github/` → `0`). 위 서술은 **배선 확정 후의 정상 상태**를 적은 것이고, #1096 머지 전까지는 *"릴리스 절차에 수동 스텝을 추가하지 말 것"* 이 **관측 주체 부재 구간**을 만든다. 그 구간 한정으로 **릴리스 직후 메인이 (0) 술어를 1회 수동 실행**한다 — ADR §10-5 항 13 의 창이 90일이라 누락분은 #1096 배선 후 전수 재산출로 회수된다. 이 예외는 **#1096 머지와 동시에 소멸**한다.
 
 ## workspace 버전 정책 — 루트 단일 버전 (결정 노트, #842)
 
