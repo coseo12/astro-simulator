@@ -187,6 +187,8 @@ Semantic Versioning을 따른다.
 - ⚠️ **확정 `[0.74.0]` §Behavior Changes 의 «검출 능력 손실 `0`» 은 전칭 단정이었고 #1086 이 코퍼스 한정으로 낮췄다** (2026-08-16 부기 — 확정 섹션은 _그 시점 사실_ 이므로 소급 편집하지 않는다). 반례는 `pnpm  dev`(공백 2개)로 구 `1` → #1066 `0`. 정확한 서술은 _"손실이 `0`"_ 이 아니라 _"코퍼스 밖 손실은 무해한 중복(하네스 래퍼 셸 자신)"_ 이며, 정정본은 [`docs/ops/zombie-process-guards.md`](docs/ops/zombie-process-guards.md) §10-1 에 있다.
 - **`.claude/agents/qa.md` 카나리아 명령 리터럴 갱신** — 패턴이 바뀌었으므로 qa 가 복사해 실행하는 명령도 바뀐다. hook ↔ `qa.md` ↔ `zombie-process-guards.md` §9·§10 **4곳 동시 갱신**이며 `scripts/verify-zombie-check.mjs` 항목 8·9 가 기계 검증한다 (`축자 사본 1/1` · `2/2`, exit `0`).
 
+- **SSoT ↔ 사본의 트리거 문언 불일치가 CI 를 통과하지 못한다 (#1076).** 같은 입력(정본과 사본의 트리거 문구가 갈린 PR)에서 CI 가 **다르게 동작한다** — 종전에는 규약형 단독 방어라 위반이 **조용히 통과**했고, 이제 `verify-ssot-trigger-wording.mjs` 가 `project-guards` 에서 exit `1` 로 차단한다. ⚠️ 본 bullet 은 PR [#1104](https://github.com/coseo12/astro-simulator/pull/1104) 가 **누락한 것을 사후 보정**한 것이다 — 그 PR 은 MINOR 를 자기 선언하면서 CHANGELOG 변경을 전건 `### Added` 에만 넣어 CLAUDE.md §릴리스 의 «MINOR 는 `### Behavior Changes` 필수」 를 위반했고, reviewer 가 **머지 직후** 적발했다 (같은 절의 선례 #1084·#1027·#1060·#1086 은 전부 도입 PR 자신이 넣었다). 가드 자체의 미탐 2건은 [#1109](https://github.com/coseo12/astro-simulator/issues/1109) 로 분리한다.
+
 ### Fixed
 
 - **[#1084] `verify-adr-index --self-test` 의 import allowlist 우회 — 재수출(`export … from`) 채택 · 들여쓰기 기각** ([#1084](https://github.com/coseo12/astro-simulator/issues/1084)) — PR [#1077](https://github.com/coseo12/astro-simulator/pull/1077) reviewer 가 실측한 우회 2건은 **둘 다 base 패리티라 선재 결함**이다. 판정 정본은 ADR [`20260812-1005`](docs/decisions/20260812-1005-adr-index-status-guard.md) **§Amendment 4**.
