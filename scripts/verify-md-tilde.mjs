@@ -75,8 +75,18 @@
  *   - ADR 이 규정한 트리거 동작은 _"즉시 재측정한다"_ 라는 **사람의 행위**이지 차단이 아니다.
  *   - 기대 계수 상수는 ADR §후보 비교 (g) 가 기각한 매직 넘버 baseline 과 같은 클래스다
  *     (통과시키려고 올리면 그만이고, 어디가 늘었는지 국소화하지 못한다).
- * 즉 판정은 **관측은 기계 · 판단은 사람**이다. `--population` 은 항상 exit 0 이며 계수와
- * 소유 파일 목록을 stdout 에 출력한다.
+ * 즉 판정은 **관측은 기계 · 판단은 사람**이다. `--population` 은 **관측이 가능한 한** exit 0 이며
+ * 계수와 소유 파일 목록을 stdout 에 출력한다.
+ *
+ * ⚠️ **「차단하지 않는다」 는 「관측 불가를 통과시킨다」 가 아니다** (#1075). 인덱스에 미해결
+ * (unmerged) 엔트리가 있으면 `git ls-files` 가 그 경로를 **stage 1/2/3 으로 각각 한 줄씩**
+ * 반환해 같은 파일이 stage 수만큼 중복 계수된다 — PR #1074 작업 중 `CHANGELOG.md` 하나가
+ * 미해결인 상태에서 계수가 **`+2` 부풀려진 채** exit `0` · 경고 `0` 으로 통과했다 (절대값은
+ * 감시값이라 여기 적지 않는다 — 그 관측의 dated 기록은 #1075 의 CHANGELOG entry 에 있다).
+ * 이 산출값은 **계수가 아니라 잡음**이므로 `--population` 은 그 상태를 **exit 2 로 fail-fast**
+ * 한다 (`--deduplicate` 로 숫자만 맞추는 우회는 fallback 분기라 채택하지 않았다 — 게다가
+ * 미해결 상태에서는 `.prettierignore` 자신이 충돌 마커를 품을 수 있어 모집단 판정의 전제가
+ * 오염된다).
  *
  * ⚠️ **"차단하지 않는다" 가 "관측하지 않는다" 는 아니다.** `--population` 은 수동 호출뿐이라
  * 그것만 두면 §재검토 조건 1 의 트리거가 **무관측**으로 남는다 — 이 PR 이 닫으려는 결함
@@ -89,7 +99,13 @@
  * ── 종료 코드 ───────────────────────────────────────────────────────────────
  *   0 — 위반 0 (또는 `--population` / `--self-test` 성공)
  *   1 — 위반 발견, 또는 base 미해석 등 **판정 불가** (조용한 통과 없음)
- *   2 — 실행 에러 (잉여/누락 인자, prettier 바이너리 부재 등 환경 오류)
+ *   2 — 실행 에러 (잉여/누락 인자, prettier 바이너리 부재, **미해결(unmerged) 인덱스** 등
+ *       환경·상태 오류). `--population` 의 미해결 인덱스가 `1` 이 아니라 여기 속하는 이유는
+ *       **판정 이전의 선행 조건**이기 때문이다 — 계수 산출 자체가 불가능한 상태이므로
+ *       «위반이 있는가» 라는 질문에 아직 도달하지 못한다. 형제 선행 조건인
+ *       `requirePrettierBin()` · `usage()` 도 같은 계급으로 `2` 를 쓴다 (#1075).
+ *       ⚠️ `1` 이 «판정 불가» 도 포괄하는 것과 혼동하지 말 것: 위 `1` 의 판정 불가는
+ *       **판정을 시도한 뒤** base 미해석 등으로 결론을 못 낸 경우다 (PR #1092 reviewer)
  *
  * ── 호출 ────────────────────────────────────────────────────────────────────
  *   node scripts/verify-md-tilde.mjs --staged        # .husky/pre-commit (index ↔ HEAD)
@@ -298,6 +314,52 @@ function parseNulList(text) {
 }
 
 /**
+ * 미해결(unmerged) 인덱스 엔트리의 경로 목록 (중복 제거 · 정렬).
+ * `git ls-files -u -z` 의 레코드는 `<mode> <object> <stage>\t<path>` 형식이라 탭 뒤가 경로다.
+ */
+function unmergedPaths() {
+  const records = parseNulList(git(['ls-files', '-u', '-z']));
+  const paths = records.map((r) => {
+    const tab = r.indexOf('\t');
+    // 탭이 없으면 형식 가정이 깨진 것이다. 조용히 버리지 않고 레코드 원문을 그대로 올린다.
+    return tab < 0 ? r : r.slice(tab + 1);
+  });
+  return [...new Set(paths)].sort();
+}
+
+/**
+ * 모집단 관측의 **선행 조건** — 인덱스에 미해결 엔트리가 없어야 한다.
+ *
+ * `git ls-files` 는 충돌 중인 경로를 **stage 1/2/3 으로 각각 한 줄씩** 반환하므로 같은 파일이
+ * stage 수만큼 중복 계수된다 (#1075 — PR #1074 작업 중 `CHANGELOG.md` 하나가 미해결인 상태에서
+ * 계수가 **`+2`** 부풀려진 채 exit `0` · 경고 `0` 으로 통과했다. **절대값은 감시값이라 여기
+ * 복제하지 않는다** — §모집단 감시 의 사본 금지 규약과 같은 이유다).
+ * 이 상태의 산출값은 **「계수가 늘었다」가 아니라 「관측할 수 없다」**
+ * 이므로 통과로 흘리지 않는다 — `--population` 의 유일한 소비자는 ADR §재검토 조건 1 의 대조이고,
+ * 오계수를 흘리면 사람이 **없는 이탈**을 재측정 트리거로 오독한다.
+ *
+ * `--deduplicate` 로 계수만 맞추는 우회는 채택하지 않았다. 그건 fallback 분기(판정 불가를
+ * 그럴듯한 값으로 덮기)이고, 게다가 미해결 상태에서는 워킹트리 파일이 충돌 마커를 포함해
+ * `.prettierignore` 조차 신뢰할 수 없어 **모집단 판정 자체**가 오염된다
+ * (CLAUDE.md §가드 설계 원칙 — drift 가드는 fail-fast 만, fallback 분기 절대 금지).
+ *
+ * 종료 코드는 **2** 다 — 형제 선행 조건인 `requirePrettierBin()` 과 같은 «환경/상태 오류» 계급이고,
+ * `1` 은 이 스크립트에서 «위반 발견» 을 뜻하므로 재사용하면 진단이 섞인다.
+ */
+function requireResolvedIndex() {
+  const conflicted = unmergedPaths();
+  if (conflicted.length === 0) return;
+  console.error(
+    `${TAG} 미해결(unmerged) 경로 ${conflicted.length}건 — 모집단 관측 불가로 FAIL 한다.\n` +
+      `${TAG} git ls-files 는 충돌 경로를 stage 1/2/3 으로 각각 한 줄씩 반환해 같은 파일이 최대\n` +
+      `${TAG} 3회 계수된다. 이 상태의 산출값은 계수가 아니라 잡음이므로 통과시키지 않는다.\n` +
+      `${TAG} 충돌을 해소(또는 \`git merge --abort\`)한 뒤 다시 실행하라.`,
+  );
+  for (const file of conflicted) console.error(`${TAG}   - ${file}`);
+  process.exit(2);
+}
+
+/**
  * 변경 파일 × 추가 라인 ∩ post-image 위반 라인.
  * @param {'staged'|'base'} mode
  * @param {string|null} baseSha
@@ -381,9 +443,11 @@ function runBase(baseSha) {
   return report(collectViolations('base', resolved.stdout.trim()));
 }
 
-/** 모집단 관측 — 항상 exit 0. 판단은 사람이 한다 (§모집단 감시). */
+/** 모집단 관측 — 관측 가능하면 항상 exit 0. 판단은 사람이 한다 (§모집단 감시). */
 function runPopulation() {
   const prettierBin = requirePrettierBin();
+  // 선행 조건 — 미해결 인덱스는 「관측 불가」다 (exit 2). 계수로 흘리지 않는다 (#1075).
+  requireResolvedIndex();
   const all = git(['ls-files', '-z', '*.md']);
   const files = parseNulList(all);
   const owned = files.filter((f) => isPrettierOwnedMarkdown(f, prettierBin));
@@ -623,7 +687,71 @@ function selfTestIntegration() {
     assert.equal(r.status, 0, `(10) 무시 파일 신규 추가 → PASS 기대, 실제 ${r.status}\n${r.out}`);
     assert.ok(!r.out.includes('NEW-IGNORED.md'), `(10) 무시 파일이 통지에 등장\n${r.out}`);
 
-    console.log(`${TAG} self-test (B) 3중 시뮬레이션 PASS — 10 단계 (격리 저장소: 임시 디렉토리)`);
+    // (11) --population positive — 미해결 엔트리 0 이면 관측 가능 → exit 0 + 계수 출력
+    g(['add', '-A']);
+    g(['commit', '-q', '--allow-empty', '-m', 'population baseline']);
+    r = runSelfInRepo(repoDir, ['--population']);
+    assert.equal(
+      r.status,
+      0,
+      `(11) 정상 인덱스 --population → exit 0 기대, 실제 ${r.status}\n${r.out}`,
+    );
+    assert.match(r.out, /prettier ignored: false : \d+/, `(11) 계수 출력 누락\n${r.out}`);
+    // (13) 에서 원복을 값으로 대조하기 위해 baseline 계수를 캡처해 둔다 (PR #1092 reviewer 🟡-4).
+    // `\d+` 매칭만으로는 본 결함의 본질인 **계수 부풀림**(49 → 51)이 통과한다.
+    const popBaseline = r.out.match(/prettier ignored: false : (\d+)/)?.[1];
+
+    // (12) negative — 미해결(unmerged) 인덱스는 「계수」가 아니라 「관측 불가」다 (#1075).
+    //  git ls-files 가 충돌 경로를 stage 1/2/3 으로 각각 반환해 같은 파일이 최대 3회 계수되는
+    //  경로를 실제 충돌로 재현한다. `--deduplicate` 로 숫자만 맞추는 우회는 fallback 분기라
+    //  채택하지 않았으므로, 여기서 요구하는 것은 «정확한 계수» 가 아니라 «exit 2 + 경로 지목» 이다.
+    const conflictBranch = spawnSync('git', ['checkout', '-q', '-b', 'conflict-side'], {
+      cwd: repoDir,
+      encoding: 'utf8',
+    });
+    assert.equal(conflictBranch.status, 0, `(12) 충돌 브랜치 생성 실패\n${conflictBranch.stderr}`);
+    fs.appendFileSync(changelog, '- side 변경\n');
+    g(['commit', '-q', '-am', 'side']);
+    g(['checkout', '-q', 'main']);
+    fs.appendFileSync(changelog, '- main 변경\n');
+    g(['commit', '-q', '-am', 'main']);
+    const merge = spawnSync('git', ['merge', '--no-edit', 'conflict-side'], {
+      cwd: repoDir,
+      encoding: 'utf8',
+    });
+    assert.notEqual(
+      merge.status,
+      0,
+      `(12) 충돌이 발생하지 않았다 — 픽스처 전제 붕괴\n${merge.stdout}`,
+    );
+    r = runSelfInRepo(repoDir, ['--population']);
+    assert.equal(
+      r.status,
+      2,
+      `(12) 미해결 인덱스 --population → exit 2 기대(관측 불가), 실제 ${r.status}\n${r.out}`,
+    );
+    assert.match(r.out, /미해결\(unmerged\) 경로 1건/, `(12) 미해결 진단 누락\n${r.out}`);
+    assert.match(r.out, /- CHANGELOG\.md/, `(12) 충돌 경로 지목 누락 (중복 제거 후 1건)\n${r.out}`);
+    assert.ok(
+      !/prettier ignored: false/.test(r.out),
+      `(12) 관측 불가인데 계수를 출력했다 — 통과로 흘리는 경로\n${r.out}`,
+    );
+
+    // (13) recovery — 충돌을 되돌리면 관측이 다시 가능해진다 (exit 0 복원)
+    const abort = spawnSync('git', ['merge', '--abort'], { cwd: repoDir, encoding: 'utf8' });
+    assert.equal(abort.status, 0, `(13) merge --abort 실패\n${abort.stderr}`);
+    r = runSelfInRepo(repoDir, ['--population']);
+    assert.equal(r.status, 0, `(13) 충돌 해소 후 exit 0 복원 기대, 실제 ${r.status}\n${r.out}`);
+    // 계수가 baseline 과 **같은 값**으로 돌아왔는지 대조한다 — `\d+` 로는 부풀린 51 도 통과한다.
+    // 출력 자체가 없으면 캡처가 undefined 가 되어 여기서 함께 잡힌다 (별도 match 단언 불요).
+    const popRestored = r.out.match(/prettier ignored: false : (\d+)/)?.[1];
+    assert.equal(
+      popRestored,
+      popBaseline,
+      `(13) 복원 후 계수가 baseline 과 다르다 (baseline=${popBaseline} 복원=${popRestored})\n${r.out}`,
+    );
+
+    console.log(`${TAG} self-test (B) 3중 시뮬레이션 PASS — 13 단계 (격리 저장소: 임시 디렉토리)`);
   } finally {
     fs.rmSync(repoDir, { recursive: true, force: true });
   }
