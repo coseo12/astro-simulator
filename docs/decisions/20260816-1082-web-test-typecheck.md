@@ -364,7 +364,7 @@ step 분해 (run `31929876027`, `detect-and-test`): composite `69s` / 그 뒤 �
       #   루트 `pnpm build` 뿐이다 — 저장소에서 `next build` 가 도는 job 은 여기 하나다.
       #   같은 `pnpm build` 가 packages/physics-wasm/pkg 도 만들므로 physics-wasm typecheck 의
       #   선행 조건(wasm-pack 산출 .d.ts)도 여기서 함께 충족된다.
-      # 왜 이 위치인가: composite 직후 = 아래 브라우저 회귀 가드 (~900s) 진입 전 fail-fast.
+      # 왜 이 위치인가: composite 직후 (t≈97s) = 잔여 ~870s (브라우저 회귀 가드 등) 진입 전 fail-fast.
       # `if:` 는 위 composite 과 **반드시 같아야 한다** — docs-only PR 은 composite 가 스킵되어
       #   `next-env.d.ts` 가 없고, 그때 이 스텝만 돌면 TS2882 로 오탐 FAIL 한다 (실측: run
       #   31896358263 에서 composite conclusion=skipped).
