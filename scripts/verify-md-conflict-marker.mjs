@@ -14,22 +14,38 @@
  * 포맷터가 쓴다."_ 그리고 `prettier --check` 로도 탐지되지 않는다: `--write` 가 만든 형태는
  * prettier 기준으로 **정답**이라 이후 `--check` 도 초록이다.
  *
- * ── 실측 매트릭스 (rev `0ee0de1` / prettier `3.9.6` / 격리 픽스처) ──────────
- * 변형은 **마커 종류 × 앞줄 상태**의 2축이다. 「`sep` 은 escape 된다」 처럼 한 축만 보면
- * 나머지를 놓친다. (마커는 `open`/`base`/`sep`/`close` 대역 이름으로만 적는다 — §5)
+ * ── 실측 매트릭스 (rev `b64c66c` / prettier `3.9.6` / 격리 픽스처) ──────────
+ * 변형은 **3축**이다 — 마커 종류 × **앞줄 상태**(축 2) × **컨테이너 컨텍스트**(축 3).
+ * (마커는 `open`/`base`/`sep`/`close` 대역 이름으로만 적는다 — §5)
  *
- *   마커            | 앞줄이 빈 줄        | 앞줄에 텍스트 인접 (리스트 lazy continuation)
+ * **축 2 — 앞줄 상태.** 마커가 리스트 항목 바로 밑에 오면 lazy continuation 이 붙는다:
+ *
+ *   마커            | 앞줄이 빈 줄        | 앞줄에 텍스트 인접
  *   ----------------|---------------------|---------------------------------------------
  *   open   (7 lt)   | 그대로              | 그대로
  *   base   (7 pipe) | 그대로              | **선행 2칸 들여쓰기**
  *   sep    (7 eq)   | 그대로              | **선행 2칸 + 백슬래시 escape**
  *   close  (7 gt)   | **blockquote 정규화** | **blockquote 정규화**
  *
- * ⚠️ 두 가지가 여기서 나온다:
- *   (1) **선행 공백은 `sep` 만의 문제가 아니다** — `base` 도 들여쓰기가 붙는다. 그래서 원형
- *       술어 전체에 `^\s*` 를 넣는다. 행 선두 앵커만 쓰면 리스트 안 충돌을 통째로 놓친다.
- *   (2) `close` 는 **앞줄 상태와 무관하게** 항상 변형된다 (`> ` 반복). 반대로 `sep` 의 escape
- *       는 **조건부**라, 실사고 형태(빈 줄 분리)에서는 원형 그대로 남아 있었다.
+ *   ⚠️ (a) **선행 공백은 `sep` 만의 문제가 아니다** — `base` 도 들여쓰기가 붙는다. 그래서
+ *          원형 술어 전체에 `^\s*` 를 넣는다.
+ *   ⚠️ (b) `close` 는 **앞줄과 무관하게** 항상 변형된다. 반대로 `sep` 의 escape 는 **조건부**라,
+ *          실사고 형태(빈 줄 분리)에서는 원형 그대로 남아 있었다.
+ *
+ * **축 3 — 컨테이너 컨텍스트.** 마커가 blockquote 나 표 **안**에 놓이면 접두가 붙는다:
+ *
+ *   원본 문맥                    | prettier 통과 후
+ *   -----------------------------|--------------------------------
+ *   앞 줄이 blockquote           | `"> "` + 마커  (인용 안으로 흡수)
+ *   표 행 안                     | `"| "` + 마커 + `" |"`
+ *
+ *   ⚠️ **이 축은 `^\s*` 로 못 덮는다** — `>` 와 `|` 는 공백이 아니다. `containerVariants()`
+ *      가 접두를 한 겹씩 벗기며 매 단계를 검사한다.
+ *   ⚠️ **인위적 주입이 아니다.** git 은 마커를 항상 컬럼 `0` 에 쓰지만, `CHANGELOG.md` 처럼
+ *      blockquote·표를 상시 쓰는 파일에서는 `prettier --write` **1회**로 도달한다 — 실사고
+ *      `fa497b6` 과 **같은 파일 클래스**다. 초판은 이 축을 몰라 「2축」이라 단정했고,
+ *      PR #1123 reviewer 가 실제 prettier 산출물로 반증했다 (B1). 그 상태에서는 보고된
+ *      줄만 지우면 **가드가 초록인 채 마커가 커밋**되는 경로가 열려 있었다.
  *
  * ── 검사 계약 ───────────────────────────────────────────────────────────────
  *   1. **모집단** — `git ls-files` 의 tracked 파일 전수. 바이너리는 `git grep -I` 와 같은
@@ -44,7 +60,10 @@
  *      확정 릴리스 구간의 존량 21줄을 #1040 판정 전까지 손댈 수 없어 전수가 alert fatigue
  *      가 되기 때문인데 (#766 계보), **충돌 마커에는 "고칠 수 없는 존량" 이라는 범주가
  *      없다**. 마커는 언제 어디서 발견되든 결함이다. 도입 시점 저장소 존량도 `0` 이다
- *      (rev `0ee0de1`, 6형태 전건 · 같은 실행 양성 대조군 `^## ` 248 파일).
+ *      (rev `b64c66c` — 6형태 전건 `0` · 같은 실행 양성 대조군 `git grep -IlE '^## '` 249 파일).
+ *      ⚠️ **모집단 계약: 작업 트리 기준**이다 (`fs.readFileSync`). `.husky/pre-commit` 의 자매
+ *      가드가 쓰는 `--staged`(인덱스 ↔ HEAD) 와 **모집단이 다르다** — 인덱스에만 마커가 있고
+ *      작업 트리가 깨끗하면 이 가드는 통과한다. 그 경로는 CI 의 전수 실행이 백스톱이다.
  *   4. **fail-fast** — `|| true` · soft-exit · allowlist · 예외 경로를 두지 않는다
  *      (CLAUDE.md §가드 설계 원칙).
  *   5. **자기 참조 회피** — 이 파일과 문서는 마커를 **리터럴로 적지 않는다**. 술어는
@@ -61,12 +80,15 @@
  *   (iii) **conflictStyle `zdiff3` 의 축약 마커는 별도로 두지 않는다** — 마커 문자 자체는
  *         `diff3` 와 같은 4종이라 술어가 그대로 덮는다.
  *
- * ── 오탐 축 실측 (rev `0ee0de1`, tracked 744 파일 전수) ──────────────────────
- * 술어별로 "정상 마크다운에 실재할 수 있는가" 를 따로 쟀다. 전건 `0`:
+ * ── 오탐 축 실측 (rev `b64c66c`) ────────────────────────────────────────────
+ * 술어별로 "정상 마크다운에 실재할 수 있는가" 를 따로 쟀다. 술어는 `git grep -lE '<패턴>' -- .`
+ * (tracked `746` 파일 / 검사 `658` — 차 `88` 은 바이너리이고 tracked PNG 전량 `88` 과 일치).
+ * 전건 `0`:
  *   - setext H1 (`eq` 연속) — `={7}` `0` / `={4,}` `0` / **`={2,}` 조차 `0`**
- *   - 표 문법 (`pipe` 7연속) `0` · 부등호 7연속 `0` · blockquote 6중첩 이상 `0`
+ *   - 표 문법 (`pipe` 7연속) `0` · 부등호 7연속 `0` · **`(> ){6}>`(close 정규화형) `0`**
  * 즉 이 저장소에서 6형태는 **마커 이외의 출처가 없다**. 시점 의존 값이므로 rev 를 병기한다
- * (ADR `20260808-983` §수치 박제 규약 4항).
+ * (ADR `20260808-983` §수치 박제 규약 4항 — 값과 rev 라벨이 어긋나면 그 자체가 오박제다.
+ * 초판이 `0ee0de1` 라벨에 다른 rev 의 값을 적었고 PR #1123 reviewer S3 가 적발했다).
  *
  * ── 종료 코드 ───────────────────────────────────────────────────────────────
  *   0 — 위반 0 (또는 `--self-test` 성공)
@@ -83,6 +105,7 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 /** 처방 문구 — 우회로(`--no-verify` 등)는 출력에 넣지 않는다. */
 const PRESCRIPTION = '충돌 해소를 끝내고 마커를 제거한 뒤 다시 커밋한다';
@@ -90,6 +113,17 @@ const ISSUE = '#1103';
 const TAG = '[md-conflict-marker]';
 
 const EXEC_OPTS = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
+
+/**
+ * 이 스크립트의 절대 경로.
+ *
+ * ⚠️ `new URL(import.meta.url).pathname` 을 쓰면 **경로에 공백이 있을 때 깨진다** — 그 값은
+ * 퍼센트 인코딩된 채라 (`/has%20space/...`) `realpathSync` 가 `ENOENT` 로 던진다. 모듈 로드
+ * 시점 예외라 `main()` 의 try/catch 밖이고, 종료 코드가 `1` 이라 **「위반 발견」과 구별되지
+ * 않는다** — 헤더 §종료 코드 계약(`2` = 환경 오류)을 조용히 어기는 형태다.
+ * `fileURLToPath` 는 디코드까지 해 준다 (자매 가드 `verify-md-tilde.mjs` 와 같은 관용구).
+ */
+const SELF_PATH = fileURLToPath(import.meta.url);
 
 // ────────────────────────────────────────────────────────────────────────────
 // 술어 — 마커를 리터럴로 적지 않는다 (§5 자기 참조 회피)
@@ -107,7 +141,18 @@ const GT = '>'.repeat(RUN);
  * 6형태.
  *
  * `scope` 가 `md` 인 것은 prettier 가 markdown 파서를 거칠 때만 만드는 형태다 (§2).
- * `^\s*` 는 리스트 lazy continuation 이 붙이는 선행 들여쓰기를 덮는다 (§실측 매트릭스 (1)).
+ * `^\s*` 는 리스트 lazy continuation 이 붙이는 선행 들여쓰기를 덮는다 (§실측 매트릭스 축 2).
+ *
+ * ⚠️ **`^\s*` 만으로는 축 3 (컨테이너) 을 덮지 못한다** — blockquote 의 `>` 와 표 셀의 `|` 는
+ * 공백이 아니다. 그 축은 술어가 아니라 `containerVariants()` 가 담당한다 (§축 3 참조).
+ *
+ * `close-blockquote` 의 `(?:> ){RUN-1}>` 는 **`>` 를 정확히 `RUN` 개 요구**하는 형태다.
+ * prettier 는 blockquote 를 `"> "` 쌍으로 정규화하므로 마커는 두 모습으로만 나온다:
+ *   - 마커 뒤에 텍스트가 있으면 `"> " × 7` + 텍스트  → 앞 6쌍 소비 후 7번째 `>` 가 매칭
+ *   - 마커 뒤가 비면 마지막 `>` 에 짝이 없어 `"> " × 6 + ">"` → 같은 술어가 그대로 덮는다
+ * ⚠️ **`{RUN-1,}` (`{6,}`) 으로 열어 두면 정상 6중첩 인용이 오탐**된다 — 초판이 그랬고
+ * self-test negative `"> " × 6 + 텍스트` 가 그 경계를 고정한다. 위쪽 `close` 와 겹치지 않는
+ * 이유는 그쪽이 `>` **연속** 7개(공백 없음)를 요구하기 때문이다.
  */
 const RULES = [
   { id: 'open', scope: 'all', re: new RegExp(`^\\s*${LT}(?:\\s|$)`) },
@@ -116,8 +161,41 @@ const RULES = [
   { id: 'close', scope: 'all', re: new RegExp(`^\\s*${GT}(?:\\s|$)`) },
   // prettier 변형 — sep 은 백슬래시 escape, close 는 blockquote 정규화.
   { id: 'sep-escaped', scope: 'md', re: new RegExp(`^\\s*\\\\${EQ}\\s*$`) },
-  { id: 'close-blockquote', scope: 'md', re: new RegExp(`^(?:> ){${RUN - 1},}`) },
+  { id: 'close-blockquote', scope: 'md', re: new RegExp(`^\\s*(?:> ){${RUN - 1}}>`) },
 ];
+
+/** 컨테이너 접두를 한 겹씩 벗기는 패턴 — blockquote `>` 와 표 셀 `|`. */
+const CONTAINER_PREFIX = /^[ \t]*[>|][ \t]?/;
+
+/** 벗기기 상한. 실측 최대 깊이는 `close` 의 7 이며, 여유를 둔 무한 루프 방지값이다. */
+const MAX_CONTAINER_DEPTH = 16;
+
+/**
+ * 한 라인의 **컨테이너 접두를 한 겹씩 벗긴 변형들**을 원본과 함께 돌려준다 (축 3).
+ *
+ * git 은 마커를 항상 컬럼 `0` 에 쓰지만, `prettier --write` **1회**로 그 마커가 앞 blockquote
+ * 안으로 흡수되거나 (`"> " + open`) 표 셀 안에 놓인다 (`"| " + open + " |"`). 그 형태는
+ * 행 선두 앵커 술어를 통째로 관통한다 — 인위적 주입이 아니라 **CHANGELOG 가 상시 쓰는 형태**
+ * 에서 자연히 나온다 (실사고 `fa497b6` 과 같은 파일 클래스).
+ *
+ * **한 겹씩** 벗기며 매 단계를 검사 대상에 넣는 이유는 표 셀 때문이다. `|` 를 통째로 잘라
+ * 셀 배열로 만들면 `base` 마커(파이프 `RUN` 개) 자체가 쪼개져 **사라진다**. 한 겹만 벗기면
+ * `"| " + base` 가 `base` 로 남아 검출된다.
+ *
+ * @param {string} line
+ * @returns {string[]} 원본 + 벗긴 변형들
+ */
+function containerVariants(line) {
+  const variants = [line];
+  let s = line;
+  for (let depth = 0; depth < MAX_CONTAINER_DEPTH; depth += 1) {
+    const m = CONTAINER_PREFIX.exec(s);
+    if (!m || m[0].length === 0) break;
+    s = s.slice(m[0].length);
+    variants.push(s);
+  }
+  return variants;
+}
 
 /**
  * 한 파일의 내용을 검사한다 (순수 함수 — 파일/깃 무의존, self-test 가 직접 호출).
@@ -131,9 +209,14 @@ export function scanContent(content, isMarkdown) {
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const text = lines[i];
+    // 컨테이너 벗기기는 markdown 에서만 한다 — 다른 확장자에서 `>`/`|` 는 컨테이너가 아니다
+    // (셸 리다이렉트 · 파이프 · 비교 연산자). 거기까지 벗기면 순수 오탐 표면이 된다.
+    const variants = isMarkdown ? containerVariants(text) : [text];
     for (const rule of RULES) {
       if (rule.scope === 'md' && !isMarkdown) continue;
-      if (rule.re.test(text)) {
+      // close-blockquote 는 변형 자체가 컨테이너 형태라 원본에만 적용한다 (벗기면 사라진다).
+      const targets = rule.id === 'close-blockquote' ? [text] : variants;
+      if (targets.some((t) => rule.re.test(t))) {
         findings.push({ line: i + 1, id: rule.id, text });
         break; // 한 줄은 한 형태로만 보고한다 (술어는 서로 배타적)
       }
@@ -155,9 +238,19 @@ function isBinary(buf) {
   return buf.includes(0);
 }
 
+/**
+ * tracked 파일 목록.
+ *
+ * ⚠️ **중복 제거가 필수다.** 인덱스에 미해결(unmerged) 엔트리가 있으면 `git ls-files` 는 그
+ * 경로를 **stage 1/2/3 으로 각각 한 줄씩** 반환한다 — 즉 충돌 해소 중에는 같은 파일이 최대
+ * 3번 스캔되어 **위반 건수가 3배로 부풀고 계수도 틀린다**. 하필 이 가드가 가장 자주 도는
+ * 상황이 바로 그 상태다 (자매 가드 `verify-md-tilde.mjs` 는 같은 문제를 exit `2` 로 처리한다 —
+ * 그쪽은 «계수» 가 산출물이라 오염이 곧 무의미이지만, 여기서는 **중복만 걷으면 판정이 성립**
+ * 하므로 차단하지 않는다. 마커를 찾는 것이 목적인데 충돌 중이라고 검사를 거부하면 본말전도다).
+ */
 function trackedFiles(cwd) {
   const out = git(['ls-files', '-z'], { cwd });
-  return out.split('\0').filter((p) => p.length > 0);
+  return [...new Set(out.split('\0').filter((p) => p.length > 0))];
 }
 
 function collectViolations(cwd) {
@@ -168,8 +261,12 @@ function collectViolations(cwd) {
     let buf;
     try {
       buf = fs.readFileSync(abs);
-    } catch {
-      continue; // 인덱스에는 있으나 작업 트리에 없는 경로 (삭제 스테이징 등)
+    } catch (err) {
+      // 인덱스에는 있으나 작업 트리에 없는 경로 (삭제 스테이징 · 깨진 심볼릭 링크) 만 흡수한다.
+      // ⚠️ EACCES·EISDIR 까지 삼키면 **검사되지 않은 파일이 조용히 늘어난다** — 가드가 초록인
+      // 채로 커버리지만 줄어드는 형태라, fail-fast 원칙상 그쪽은 환경 오류(exit 2)로 올린다.
+      if (err.code === 'ENOENT') continue;
+      throw err;
     }
     if (isBinary(buf)) continue;
     scanned += 1;
@@ -234,6 +331,36 @@ function selfTestClassifier() {
     assert.equal(hits[0].id, id, `indented positive 오분류: ${id}`);
   }
 
+  // (2-b) **컨테이너 접두** — 축 3. git 컬럼 0 마커가 `prettier --write` 1회로 앞 blockquote 에
+  //       흡수되거나 표 셀에 놓이면 행 선두 앵커가 통째로 관통된다 (PR #1123 reviewer B1).
+  //       ⚠️ 이 블록이 비면 회귀가 조용히 재개방된다 — 초판이 정확히 그 상태였다.
+  for (const [id, line] of [
+    ['open', `> ${M.open}`], // blockquote 흡수 — 실사고와 같은 파일 클래스에서 자연 발생
+    ['open', `> > ${M.open}`], // 중첩 blockquote
+    ['open', `  > ${M.open}`], // 들여쓴 blockquote (축 2 × 축 3)
+    ['sep', `> ${M.sep}`],
+    ['close', `> ${M.close}`], // blockquote 안 bare close (정규화 전)
+    ['open', `| ${M.open} |`], // 표 셀
+    ['base', `| ${M.base} |`], // 표 셀 안 파이프 마커 — 셀 분리로 자르면 사라진다
+    ['open', `> | ${M.open} |`], // 컨테이너 2겹
+    ['close-blockquote', `${'> '.repeat(RUN - 1)}>`], // bare close — 뒤가 비면 마지막 `>` 에 짝이 없다
+  ]) {
+    const hits = scanContent(`# f\n\n${line}\n`, true);
+    assert.equal(hits.length, 1, `container positive 미검출: ${id} ← ${JSON.stringify(line)}`);
+    assert.equal(
+      hits[0].id,
+      id,
+      `container positive 오분류: ${JSON.stringify(line)} → ${hits[0].id}`,
+    );
+  }
+
+  // (2-c) 컨테이너 벗기기는 **markdown 한정**이다 — 비-md 의 `>`/`|` 는 셸 리다이렉트·파이프다
+  assert.equal(
+    scanContent(`x\n> ${M.open}\n`, false).length,
+    0,
+    '비-md 에서 컨테이너 벗기기가 발화 (셸 리다이렉트 오탐 표면)',
+  );
+
   // (3) md 한정 술어가 비-md 에서는 발화하지 않는다 (§2)
   for (const line of [M.sepEscaped, M.closeBlockquote]) {
     assert.equal(scanContent(`x\n${line}\n`, false).length, 0, 'md 한정 술어가 비-md 에서 발화');
@@ -256,6 +383,15 @@ function selfTestClassifier() {
     `${'='.repeat(RUN)} 뒤에 텍스트`, // sep 은 단독 행만
     '### 헤딩',
     'a < b 이고 c > d 이다',
+    // 컨테이너 벗기기가 새로 만드는 오탐 표면의 대조군 (축 3 도입 후 추가)
+    '| a | b | c | d | e | f | g | h |', // 파이프 8개이나 연속이 아니다
+    '> > > > > > 6중첩이나 뒤가 텍스트', // close-blockquote 는 `> ` 쌍 반복만
+    '> | 표를 인용 안에 | 넣은 것 |',
+    '  > > 들여쓴 중첩 인용',
+    `> ${'='.repeat(RUN - 1)}`, // 인용 안 짧은 등호
+    `| ${'<'.repeat(RUN - 1)} HEAD |`, // 표 셀 안 짧은 마커
+    '>', // 빈 blockquote
+    '|', // 빈 표 구분
   ];
   for (const line of negatives) {
     const hits = scanContent(`# f\n\n${line}\n`, true);
@@ -288,7 +424,7 @@ function selfTestIntegration() {
 
     const run = () => {
       const script = path.resolve(
-        path.dirname(fs.realpathSync(new URL(import.meta.url).pathname)),
+        path.dirname(fs.realpathSync(SELF_PATH)),
         'verify-md-conflict-marker.mjs',
       );
       const r = execFileSync(process.execPath, [script], {
@@ -366,10 +502,7 @@ function main() {
 }
 
 // 직접 실행일 때만 종료 코드를 낸다 (self-test 가 모듈로 import 할 수 있게).
-if (
-  process.argv[1] &&
-  fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname)
-) {
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(SELF_PATH)) {
   try {
     process.exit(main());
   } catch (err) {
