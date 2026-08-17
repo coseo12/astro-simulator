@@ -82,6 +82,52 @@ sub-agent 가 `run_in_background=true` 로 띄운 로컬 프로세스(dev 서버
 
 상세: [headless-browser-verification.md](headless-browser-verification.md)
 
+## 공유 인증 함정 — `--edit-last` / `--delete-last` (#1099)
+
+위 절들이 **박제 누락**(안 쓴 것)을 다룬다면, 이 절은 **박제 파괴**(남이 쓴 것을 지운 것)를 다룬다. 방향이 반대이고 탐지 난이도가 더 높다.
+
+`gh issue comment` · `gh pr comment` 의 `--edit-last` / `--delete-last` 는 「그 이슈/PR 의 마지막 코멘트」가 아니라 **「인증 사용자가 마지막으로 단 코멘트」**를 대상으로 한다. 이 저장소는 메인과 모든 sub-agent 가 **같은 `gh` 인증(`coseo12`)을 공유**하므로 API 에서 서로 구별되지 않는다.
+
+⇒ **단일 에이전트 환경에서는 안전한 명령이 병행 에이전트 환경에서는 조용한 데이터 손실이 된다.**
+
+### 실사고 (2026-08-16, [#1082](https://github.com/coseo12/astro-simulator/issues/1082))
+
+| 시각 (UTC) | 코멘트 id | 원래 | 사고 후 |
+| --- | --- | --- | --- |
+| `06:51:39` | `5306197592` | architect 최초 설계안 | 그대로 |
+| `07:13:39` | **`5306272590`** | **메인의 「인계 — PR #1090 reviewer 실측 축」** | **architect 설계안으로 교체** |
+
+architect 가 자기 설계안을 갱신하려고 `--edit-last` 를 불렀고, 그 사이 메인이 같은 이슈에 코멘트를 달아 **그것이 대상이 됐다.**
+
+세 가지가 이 사고를 어렵게 만든다:
+
+1. **exit `0` · 경고 `0`** — 실패 신호가 없다. 이 저장소가 반복해 온 silent 클래스다 ([#840](https://github.com/coseo12/astro-simulator/issues/840) `--if-present` / [#1060](https://github.com/coseo12/astro-simulator/issues/1060) pnpm 다중 `--filter` / [#1066](https://github.com/coseo12/astro-simulator/issues/1066) 카나리아 `.*`).
+2. **탐지 지점이 사람뿐** — architect 의 관측(_"내가 만들지 않은 중복본이 있다"_)은 **정확했고 원인 진단만 틀렸다** (중복 생성이 아니라 덮어쓰기). 관측이 맞아도 진단이 틀리면 역추적은 사람이 한다.
+3. **복구 불가에 가깝다** — GitHub 은 편집 이력을 UI 에만 노출하고 `gh` 로는 회수 경로가 마땅치 않다. 이번엔 메인이 원문을 세션 컨텍스트에 갖고 있어 재게시했을 뿐이다.
+
+### 규약
+
+- **기본 — 항상 새 코멘트를 만든다.** `gh issue comment <N> --body-file -`
+- **갱신이 꼭 필요하면 id 를 지정한다.** 생성 시 반환되는 URL 끝 `issuecomment-<id>` 의 숫자가 코멘트 id 다.
+  `gh api -X PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@-`
+- 5개 에이전트 `.md` 전건에 같은 문구로 박제돼 있다 (`## ⚠️ 코멘트 박제`).
+
+### 사거리 (`gh` `2.88.1` 실측)
+
+| 서브커맨드 | `--edit-last` | `--delete-last` |
+| --- | :---: | :---: |
+| `gh issue comment` | ✅ | ✅ |
+| `gh pr comment` | ✅ | ✅ |
+| `gh pr review` · `gh release edit` · `gh release create` · `gist edit` | ✗ | ✗ |
+
+⚠️ **`--delete-last` 는 원 이슈가 놓친 축이다.** 같은 「인증 사용자의 마지막」 대상이며 덮어쓰기보다 파괴적이다 (`--yes` 로 확인 프롬프트까지 건너뛸 수 있다). 그리고 `gh issue comment` 에는 **id 지정 편집 옵션 자체가 없다** — 편집 계열이 `--edit-last` 뿐이라 「마지막」 의존을 피하려면 `gh api` 로 내려가야 한다.
+
+### 정적 가드는 기각했다 (침묵 기각 금지)
+
+저장소 전체에서 `--edit-last` 리터럴은 **`0`건**이다 (`git grep -F`, rev `0ee0de1` / 같은 실행 양성 대조군 `gh pr` 44 파일 · `gh issue` 31 파일). 즉 **에이전트는 리포 문서에서 이 명령을 배운 게 아니라 `gh` 자체 지식으로 썼다.** 리포에 없는 리터럴을 금지하는 정적 가드는 막을 대상이 없다 — 실효 경로는 **프롬프트 규약**뿐이다.
+
+규약 문구의 **존재**를 검사하는 가드도 기각했다: 사고는 규약 *부재*였지 규약 *소실*이 아니고, 문구를 수정할 때마다 가드도 고쳐야 하는 drift 원이 새로 생긴다. 「가드를 하나 만들 때마다 그 가드를 검사할 표면이 하나 늘어난다」 (CLAUDE.md §검증 강도 게이트). 규약 소실이 실제로 관측되면 그때 재판정한다.
+
 ## 누락 감지 시 대응
 
 누락 감지 시 메인이 직접 보완 박제 (커밋/PR/코멘트). **sub-agent 를 재호출해 같은 누락을 반복시키지 않는다** — 같은 sub-agent 가 같은 누락을 반복할 확률이 높음.

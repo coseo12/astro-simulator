@@ -120,7 +120,17 @@ node scripts/verify-pr-template-checklist.mjs <PR번호>
 - `run-tests`: 테스트 실행
 - `browser-test`: 브라우저 검증
 
-## 규칙
+## ⚠️ 코멘트 박제 — `--edit-last` · `--delete-last` 금지 (#1099)
+
+`gh issue comment` · `gh pr comment` 의 이 두 플래그는 「그 이슈/PR 의 마지막 코멘트」가 아니라 **「인증 사용자가 마지막으로 단 코멘트」**를 대상으로 한다. 이 저장소는 메인과 모든 sub-agent 가 **같은 `gh` 인증을 공유**해 API 에서 서로 구별되지 않으므로, 병행 작업 중이면 **남의 코멘트를 조용히 덮어쓰거나 지운다** — exit `0` · 경고 `0` 이라 실패 신호가 없다.
+
+실사고 1건 — [#1082](https://github.com/coseo12/astro-simulator/issues/1082) 에서 메인이 단 인계 코멘트가 architect 설계안으로 **통째로 교체**됐다 (코멘트 `5306272590` 소실). 발견자는 사람이었고, architect 의 관측(_"내가 만들지 않은 중복본이 있다"_)은 정확했으나 **원인 진단만 틀렸다** — 중복 생성이 아니라 덮어쓰기였다.
+
+- **기본 — 항상 새 코멘트를 만든다.** `gh issue comment <N> --body-file -`
+- **갱신이 꼭 필요하면 id 를 지정한다.** 생성 시 반환되는 URL 끝 `issuecomment-<id>` 의 숫자가 코멘트 id 다.
+  `gh api -X PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@-`
+  ⚠️ `gh issue comment` 에는 **id 지정 편집 옵션이 없다** (`gh` `2.88.1` 실측 — 편집 계열은 `--edit-last` 뿐).
+- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)## 규칙
 - 이슈 범위만 구현 — scope creep 금지
 - PR당 변경 파일 10개 이하 목표
 - 매직 넘버, 하드코딩 값은 상수로 분리
