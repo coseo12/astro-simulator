@@ -7,7 +7,7 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-- **[#1099] 에이전트가 `--edit-last` · `--delete-last` 를 쓰지 않는다 (MINOR)** — 5개 에이전트 `.md` 전건에 금지 규약이 박제됐다. 코멘트 갱신이 필요하면 **새 코멘트**를 만들거나 `gh api -X PATCH …/issues/comments/<id>` 로 **id 를 지정**한다. 「마지막 코멘트」에 의존하는 경로가 사라진다.
+- **[#1099] 에이전트가 `--edit-last` · `--delete-last` 를 쓰지 않는다 (MINOR)** — 5개 에이전트 `.md` **+ `CLAUDE.md`(메인 오케스트레이터)** 에 금지 규약이 박제됐다. **메인도 가해자가 될 수 있다** — 메인은 `.claude/agents/*.md` 를 읽지 않으므로 에이전트 쪽 박제만으로는 축이 하나 빈다. 코멘트 갱신이 필요하면 **새 코멘트**를 만들거나 `gh api -X PATCH …/issues/comments/<id>` 로 **id 를 지정**한다. 「마지막 코멘트」에 의존하는 경로가 사라진다.
 
 - **[#1119] 지구가 실제 대륙 윤곽으로 렌더된다 (MINOR)** — `?focus=earth` 에서 아프리카·아메리카·유라시아가 **알아볼 수 있는 형상**으로 보인다. 그 위에 Amendment 3 의 biome 3밴드 + 극관 + #773 광원 + #782 자전이 **전부 그대로** 얹힌다. `?surface=off` 는 100% 복귀하고, 마스크 로드 실패·원거리 축소 시에는 Amendment 3 시점 절차 경로로 **조용히 degrade** 한다 (제품은 degrade / 검증은 fail-fast). 저장소에 **런타임 텍스처 에셋이 1장 생긴다** — `apps/web/public/textures/earth-land-mask.png` (`27,295` B, public domain). mars / jupiter / moon / 단색 22 / sun 은 **무변경**이다.
 
