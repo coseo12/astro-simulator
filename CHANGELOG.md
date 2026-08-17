@@ -9,7 +9,21 @@ Semantic Versioning을 따른다.
 
 - **[#1103] 머지 충돌 마커가 남은 커밋이 차단된다 (MINOR)** — `.husky/pre-commit` 과 CI 가 tracked 파일 **전수**에서 마커 6형태를 찾아 발견 시 exit `1` 로 막는다. 원형 4형태는 전 파일, `prettier --write` 가 만드는 변형 2형태는 `.md` 한정이다. 우회로(allowlist·soft-exit)는 없다. 도입 시점 저장소 존량이 `0` 이라 **기존 파일이 새로 걸리는 일은 없고**, 검사 비용은 `658` 파일 `0.16`초다.
 
+- **[#1099] 에이전트가 `--edit-last` · `--delete-last` 를 쓰지 않는다 (MINOR)** — 5개 에이전트 `.md` **+ `CLAUDE.md`(메인 오케스트레이터)** 에 금지 규약이 박제됐다. **메인도 가해자가 될 수 있다** — 메인은 `.claude/agents/*.md` 를 읽지 않으므로 에이전트 쪽 박제만으로는 축이 하나 빈다. 코멘트 갱신이 필요하면 **새 코멘트**를 만들거나 `gh api -X PATCH …/issues/comments/<id>` 로 **id 를 지정**한다. 「마지막 코멘트」에 의존하는 경로가 사라진다.
+
 - **[#1119] 지구가 실제 대륙 윤곽으로 렌더된다 (MINOR)** — `?focus=earth` 에서 아프리카·아메리카·유라시아가 **알아볼 수 있는 형상**으로 보인다. 그 위에 Amendment 3 의 biome 3밴드 + 극관 + #773 광원 + #782 자전이 **전부 그대로** 얹힌다. `?surface=off` 는 100% 복귀하고, 마스크 로드 실패·원거리 축소 시에는 Amendment 3 시점 절차 경로로 **조용히 degrade** 한다 (제품은 degrade / 검증은 fail-fast). 저장소에 **런타임 텍스처 에셋이 1장 생긴다** — `apps/web/public/textures/earth-land-mask.png` (`27,295` B, public domain). mars / jupiter / moon / 단색 22 / sun 은 **무변경**이다.
+
+### Fixed
+
+- **[#1099] 병행 에이전트의 코멘트를 조용히 덮어쓰는 경로 차단 (MINOR)** ([#1099](https://github.com/coseo12/astro-simulator/issues/1099)) — `gh issue comment` · `gh pr comment` 의 `--edit-last` / `--delete-last` 는 「그 이슈/PR 의 마지막 코멘트」가 아니라 **「인증 사용자가 마지막으로 단 코멘트」**를 대상으로 한다. 이 저장소는 메인과 모든 sub-agent 가 **같은 `gh` 인증을 공유**해 API 에서 구별되지 않으므로, 단일 에이전트 환경에서 안전한 명령이 **병행 환경에서는 조용한 데이터 손실**이 된다 (exit `0` · 경고 `0`).
+
+  **실사고 1건** — [#1082](https://github.com/coseo12/astro-simulator/issues/1082) 에서 메인이 단 인계 코멘트(`5306272590`)가 architect 설계안으로 **통째로 교체**됐다. architect 의 관측(_"내가 만들지 않은 중복본이 있다"_)은 **정확했고 원인 진단만 틀렸다** — 중복 생성이 아니라 덮어쓰기였다.
+
+  ⚠️ **`--delete-last` 는 원 이슈가 놓친 축이다** — 같은 「인증 사용자의 마지막」 대상이며 덮어쓰기보다 파괴적이다 (`--yes` 로 확인 프롬프트까지 건너뛴다). 사거리 실측 (`gh` `2.88.1`): `gh issue comment` · `gh pr comment` **둘 다** 두 플래그를 갖고, `gh pr review` · `gh release edit` · `gh release create` · `gist edit` 은 `0`.
+
+  **정적 가드는 기각했다** (침묵 기각 금지) — 저장소 전체 `--edit-last` 리터럴이 **`0`건**이다 (rev `0ee0de1` / 같은 실행 양성 대조군 `gh pr` 44 파일 · `gh issue` 31 파일). 에이전트는 리포 문서가 아니라 `gh` 자체 지식으로 이 명령을 썼으므로 **리포에 없는 리터럴을 금지하는 가드는 막을 대상이 없다.** 규약 문구의 존재를 검사하는 가드도 기각했다 — 사고는 규약 *부재*였지 *소실*이 아니고, 문구 수정마다 가드를 고쳐야 하는 drift 원이 새로 생긴다.
+
+  상세: [`docs/lessons/sub-agent-ssot-handoff.md`](docs/lessons/sub-agent-ssot-handoff.md) §공유 인증 함정
 
 ### Added
 

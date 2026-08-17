@@ -121,6 +121,18 @@ SendMessage 로 이전 라운드에 이어 호출된 경우, 컨텍스트 격리
 
 7. architect로 넘길 준비가 됐으면 라벨 `stage:planning` → `stage:design` 전이 + `/architect <이슈>` 안내
 
+## ⚠️ 코멘트 박제 — `--edit-last` · `--delete-last` 금지 (#1099)
+
+`gh issue comment` · `gh pr comment` 의 이 두 플래그는 「그 이슈/PR 의 마지막 코멘트」가 아니라 **「인증 사용자가 마지막으로 단 코멘트」**를 대상으로 한다. 이 저장소는 메인과 모든 sub-agent 가 **같은 `gh` 인증을 공유**해 API 에서 서로 구별되지 않으므로, 병행 작업 중이면 **남의 코멘트를 조용히 덮어쓰거나 지운다** — exit `0` · 경고 `0` 이라 실패 신호가 없다.
+
+실사고 1건 — [#1082](https://github.com/coseo12/astro-simulator/issues/1082) 에서 메인이 단 인계 코멘트가 architect 설계안으로 **통째로 교체**됐다 (코멘트 `5306272590` 소실). 발견자는 사람이었고, architect 의 관측(_"내가 만들지 않은 중복본이 있다"_)은 정확했으나 **원인 진단만 틀렸다** — 중복 생성이 아니라 덮어쓰기였다.
+
+- **기본 — 항상 새 코멘트를 만든다.** `gh issue comment <N> --body-file -`
+- **갱신이 꼭 필요하면 id 를 지정한다.** 생성 시 반환되는 URL 끝 `issuecomment-<id>` 의 숫자가 코멘트 id 다.
+  `gh api -X PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@-`
+  ⚠️ `gh issue comment` 에는 **id 지정 편집 옵션이 없다** (`gh` `2.88.1` 실측 — 편집 계열은 `--edit-last` 뿐).
+- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)
+
 ## 마무리 체크리스트 JSON 반환 (필수)
 
 sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **pm extends**. 누락 field 는 `null` / `{}` / `[]` 로 명시 (생략 금지).
