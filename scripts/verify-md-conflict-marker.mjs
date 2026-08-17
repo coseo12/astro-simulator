@@ -104,6 +104,12 @@
  * ── 호출 ────────────────────────────────────────────────────────────────────
  *   node scripts/verify-md-conflict-marker.mjs              # 전수 (pre-commit / CI)
  *   node scripts/verify-md-conflict-marker.mjs --self-test  # 격리 픽스처 3중 시뮬레이션
+ *
+ * ⚠️ **`--self-test` 는 hermetic 하지 않다** — prettier e2e 단계가
+ * `<script>/../node_modules/.bin/prettier` 를 요구하므로 **`pnpm install` 이 선행**돼야 한다
+ * (부재 시 exit `2`). 본검사는 prettier 를 쓰지 않으므로 이 제약이 없다. CI 는 install →
+ * self-test 순서라 안전하고 pre-commit 은 `--self-test` 를 호출하지 않는다. 격리 worktree 에
+ * 스크립트만 복사해 돌리면 이 조건에 걸린다 (실제로 한 번 밟았다 — U3).
  */
 
 import fs from 'node:fs';
@@ -185,8 +191,14 @@ const CONTAINER_PREFIX = /^[ \t]*[>|][ \t]?/;
  * `\s*$` 로 **행 끝**을 요구하므로, 표 셀 안의 마커(`"| " + sep + " |"`)는 여는 `|` 를 벗겨도
  * 뒤에 남은 `|` 때문에 매칭되지 않는다. prettier 가 셀 폭을 맞추며 넣는 패딩까지 더해
  * `sep` 이 **조용히 사라진다** — PR #1123 reviewer 라운드 2 (B2) 가 실제 산출물로 재현했다.
+ *
+ * ⚠️ **한 겹만 뗀다.** `"| a | (sep) | b |"` 처럼 셀이 여럿인 행은 이 패턴으로 못 잡지만,
+ * **git 은 마커를 컬럼 `0` 에 단독으로 쓰므로** 그 줄에는 파이프가 없고 prettier 를 거치면
+ * 항상 **단일 셀 행**이 된다 (reviewer 라운드 3 U4 — 30조건 sweep + multipass fixpoint 로
+ * 도달 불가 확인). 여러 겹을 떼면 정상 표 행이 오탐 표면으로 들어온다.
+ * ⚠️ `\r` 을 포함하는 이유는 CRLF 파일에서 닫는 파이프 뒤에 `\r` 이 남기 때문이다 (U5).
  */
-const CONTAINER_SUFFIX = /[ \t]*\|[ \t]*$/;
+const CONTAINER_SUFFIX = /[ \t\r]*\|[ \t\r]*$/;
 
 /** 벗기기 상한. 실측 최대 깊이는 `close` 의 7 이며, 여유를 둔 무한 루프 방지값이다. */
 const MAX_CONTAINER_DEPTH = 16;
@@ -460,13 +472,18 @@ function selfTestClassifier() {
 /**
  * prettier e2e — **손으로 쓴 문자열이 아니라 실제 `prettier --write` 산출물**을 검사한다.
  *
- * ⚠️ 이 단계가 없어서 축 3 의 하위 케이스(B2)가 두 라운드 연속 빠져나갔다. 위 분류기
- * 테스트의 컨테이너 픽스처는 **내가 손으로 적은 변형형**이라, 술어가 그 문자열을 잡는다는
- * 것만 보이고 **prettier 가 실제로 무엇을 만드는지**는 보이지 않는다 — ADR 자신이 「자기
- * 충족」이라 경고한 형태를 self-test 가 그대로 하고 있었다.
+ * 손으로 적은 변형형은 «술어가 그 문자열을 잡는다» 는 것만 보이고 **prettier 가 실제로
+ * 무엇을 만드는지**는 보이지 않는다 — ADR 자신이 「자기 충족」이라 경고한 형태다. 그래서
+ * 여기서는 **git 이 쓰는 컬럼 `0` 마커만** 주입하고 변형은 전적으로 prettier 에 맡긴다.
  *
- * 그래서 여기서는 **git 이 쓰는 컬럼 `0` 마커만** 주입하고, 변형은 전적으로 prettier 에게
- * 맡긴다. 판정은 **주입한 마커 줄 수 = 검출 수**다.
+ * ⚠️ **B2 회귀를 실제로 막는 것은 이 함수가 아니라 위 분류기의 컨테이너 픽스처다.**
+ * 초판 e2e 는 표 컨텍스트의 충돌 «내용» 을 리스트 항목으로 썼는데, 그러면 GFM 표가 `sep`
+ * 전에 끝나 마커가 표 밖으로 나온다 — **B2 결함 보유판(`b2c83fc`)에서도 14/14 통과**했다
+ * (PR #1123 reviewer 라운드 3 U1 이 변이 테스트로 측정). 즉 그 시점의 e2e 는 판별력이 `0`
+ * 이었고, «e2e 가 없어서 B2 가 통과했다» 는 서술은 **틀렸다**.
+ * 지금은 표 컨텍스트의 내용도 **표 행**으로 맞춰 판별력을 실측 확인했다 (결함판에서 `sep`
+ * 소실 → 검출). **두 층을 모두 유지한다** — 분류기 픽스처를 「e2e 와 중복」이라며 지우면
+ * B1·B2 보호가 조용히 사라진다.
  *
  * 임시 디렉토리에서 돌리므로 저장소의 `.prettierignore` 영향을 받지 않는다 (리포 안에서
  * 돌리면 `.context/`·`docs/**` 가 `ignored: true` 라 **아무것도 검사하지 않은 채 통과**한다 —
@@ -479,15 +496,47 @@ function selfTestPrettierE2E() {
   const sep = '='.repeat(RUN);
   const close = `${'>'.repeat(RUN)} origin/develop`;
 
-  /** 마커를 감싸는 문맥. `%M` 자리에 마커 블록이 컬럼 0 으로 들어간다. */
+  /**
+   * 마커를 감싸는 문맥. `%M` 자리에 마커 블록이 컬럼 `0` 으로 들어간다.
+   *
+   * ⚠️ **`body` 가 컨텍스트와 정합해야 판별력이 생긴다.** 표 안 충돌인데 사이 «내용» 을
+   * 리스트 항목으로 쓰면 GFM 표가 그 지점에서 끝나 뒤 마커가 표 밖으로 나온다 — 표 케이스를
+   * 돌리는 시늉만 하고 실제로는 평문을 재는 셈이다 (U1 이 이걸 변이 테스트로 잡았다).
+   *
+   * `table` 플래그는 §U6 용이다: **살아있는 표 안에서 diff3 `base` 는 원리적으로 검출 불가**다.
+   * prettier 가 파이프 `RUN` 연속을 빈 셀들로 **분해**해 문자열 자체가 소멸하기 때문이고,
+   * 이건 미검출이 아니라 **부재**다 (나머지 3종이 발화해 exit `1` 은 유지된다).
+   */
   const CONTEXTS = [
-    ['평문-빈줄', '# f\n\n- 항목 A\n\n%M\n\n- 항목 B\n'],
-    ['평문-인접', '# f\n\n- 항목 A\n%M\n- 항목 B\n'],
-    ['blockquote-앞줄', '# f\n\n> 인용 문장이 앞에 있다.\n%M\n\n- 뒤\n'],
-    ['blockquote-중첩', '# f\n\n> 1단계\n>\n> > 2단계 중첩\n%M\n\n- 뒤\n'],
-    ['표-안', '| 항목 | 값 |\n| --- | --- |\n| a | 1 |\n%M\n| b | 2 |\n'],
-    ['표-헤더직후', '| 항목 | 값 |\n| --- | --- |\n%M\n| a | 1 |\n'],
-    ['리스트-중첩', '# f\n\n- 상위\n  - 하위 항목\n%M\n\n- 뒤\n'],
+    { name: '평문-빈줄', tmpl: '# f\n\n- 항목 A\n\n%M\n\n- 항목 B\n', body: (i) => `- 변경 ${i}` },
+    { name: '평문-인접', tmpl: '# f\n\n- 항목 A\n%M\n- 항목 B\n', body: (i) => `- 변경 ${i}` },
+    {
+      name: 'blockquote-앞줄',
+      tmpl: '# f\n\n> 인용 문장이 앞에 있다.\n%M\n\n- 뒤\n',
+      body: (i) => `> 변경 ${i}`,
+    },
+    {
+      name: 'blockquote-중첩',
+      tmpl: '# f\n\n> 1단계\n>\n> > 2단계 중첩\n%M\n\n- 뒤\n',
+      body: (i) => `> 변경 ${i}`,
+    },
+    {
+      name: '표-안',
+      tmpl: '| 항목 | 값 |\n| --- | --- |\n| a | 1 |\n%M\n| b | 2 |\n',
+      body: (i) => `| x | 변경 ${i} |`,
+      table: true,
+    },
+    {
+      name: '표-헤더직후',
+      tmpl: '| 항목 | 값 |\n| --- | --- |\n%M\n| a | 1 |\n',
+      body: (i) => `| x | 변경 ${i} |`,
+      table: true,
+    },
+    {
+      name: '리스트-중첩',
+      tmpl: '# f\n\n- 상위\n  - 하위 항목\n%M\n\n- 뒤\n',
+      body: (i) => `  - 변경 ${i}`,
+    },
   ];
   const MARKER_SETS = [
     [
@@ -527,25 +576,29 @@ function selfTestPrettierE2E() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-conflict-marker-e2e-'));
   try {
     let cases = 0;
-    for (const [ctxName, tmpl] of CONTEXTS) {
+    for (const ctx of CONTEXTS) {
       for (const [setName, markers] of MARKER_SETS) {
-        // 마커 사이에 «양쪽 변경분» 을 끼워 실제 충돌 모양을 만든다.
+        // 마커 사이에 «양쪽 변경분» 을 끼워 실제 충돌 모양을 만든다 — 내용도 컨텍스트에 맞춘다.
         const block = markers
-          .map(([, m], i) => (i < markers.length - 1 ? `${m}\n- 변경 ${i}` : m))
+          .map(([, m], i) => (i < markers.length - 1 ? `${m}\n${ctx.body(i)}` : m))
           .join('\n');
-        const src = tmpl.replace('%M', block);
-        const file = path.join(dir, `${ctxName}-${setName}.md`);
+        const src = ctx.tmpl.replace('%M', block);
+        const file = path.join(dir, `${ctx.name}-${setName}.md`);
         fs.writeFileSync(file, src);
         execFileSync(bin, ['--write', file], { stdio: 'ignore' });
         const after = fs.readFileSync(file, 'utf8');
         const found = new Set(scanContent(after, true).map((h) => h.id));
         for (const [kind] of markers) {
+          // §U6 — 살아있는 표 안에서 diff3 base 는 prettier 가 빈 셀로 분해해 «부재» 가 된다.
+          if (kind === 'base' && ctx.table) continue;
           assert.ok(
             ACCEPTS[kind].some((id) => found.has(id)),
-            `prettier e2e — 마커 종류 '${kind}' 소실 [${ctxName}/${setName}]\n` +
+            `prettier e2e — 마커 종류 '${kind}' 소실 [${ctx.name}/${setName}]\n` +
               `--- prettier 산출물 ---\n${after}\n--- 검출 id ---\n${[...found].join(', ') || '(없음)'}`,
           );
         }
+        // 어떤 컨텍스트에서도 «전부 소실» 은 허용하지 않는다 (exit 1 이 유지되는지).
+        assert.ok(found.size > 0, `prettier e2e — 검출 0 [${ctx.name}/${setName}]\n${after}`);
         cases += 1;
       }
     }
@@ -577,11 +630,11 @@ function selfTestIntegration() {
     git(['add', '-A'], { cwd: dir });
 
     const run = () => {
-      const script = path.resolve(
-        path.dirname(fs.realpathSync(SELF_PATH)),
-        'verify-md-conflict-marker.mjs',
-      );
-      const r = execFileSync(process.execPath, [script], {
+      // ⚠️ **자기 자신**을 실행한다. 고정 파일명(`verify-md-conflict-marker.mjs`)을 쓰면
+      // 사본·변이본으로 돌려도 자식은 항상 원본을 실행해 **통합 단계가 무엇도 검증하지
+      // 못한다** — 변이 테스트가 조용히 초록이 된다 (PR #1123 라운드 3 에서 U2 케이스를
+      // 추가하고 변이로 확인하다 실제로 이 사각을 밟았다).
+      const r = execFileSync(process.execPath, [fs.realpathSync(SELF_PATH)], {
         cwd: dir,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -622,8 +675,33 @@ function selfTestIntegration() {
     r = runAllowFail();
     assert.equal(r.code, 0, `recovery 단계가 exit ${r.code}`);
 
+    // ④ tracked gitlink(서브모듈) 가 있어도 exit 0 — T1 회귀 보호.
+    //    `git ls-files` 는 gitlink 을 «경로» 로 내지만 작업 트리에서는 디렉토리라
+    //    `readFileSync` 가 EISDIR 을 던진다. 흡수 집합에서 EISDIR 을 빼면 여기서 exit 2 가 된다
+    //    (라운드 2 T1 이 실제로 그 상태였고, 라운드 3 U2 가 «되돌려도 아무 테스트도 안 잡는다» 를
+    //    지적했다 — 이 케이스가 그 사각을 닫는다).
+    const subDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-conflict-marker-sub-'));
+    try {
+      git(['init', '-q'], { cwd: subDir });
+      git(['config', 'user.email', 'self-test@example.invalid'], { cwd: subDir });
+      git(['config', 'user.name', 'self-test'], { cwd: subDir });
+      git(['commit', '-q', '--allow-empty', '-m', 'init'], { cwd: subDir });
+      git(['-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', subDir, 'sub'], {
+        cwd: dir,
+      });
+      git(['add', '-A'], { cwd: dir });
+      const gl = runAllowFail();
+      assert.equal(
+        gl.code,
+        0,
+        `gitlink 보유 저장소가 exit ${gl.code} (EISDIR 흡수 회귀)\n${gl.out}`,
+      );
+    } finally {
+      fs.rmSync(subDir, { recursive: true, force: true });
+    }
+
     console.log(
-      `${TAG} self-test(통합) — 3중 시뮬레이션 PASS (positive 1 / negative ${injections.length} / recovery 1)`,
+      `${TAG} self-test(통합) — 3중 시뮬레이션 PASS (positive 1 / negative ${injections.length} / recovery 1 / gitlink 1)`,
     );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
