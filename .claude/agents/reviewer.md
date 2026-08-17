@@ -114,6 +114,18 @@ PR diff를 정적으로 리뷰한다. **편향 완화를 위해 developer와 격
    - 차단 항목 ≥1건 → `gh pr edit --remove-label "stage:review" --add-label "stage:dev"` + 코멘트에 "developer 재호출 필요"
 9. **cross-validate 호출 직후 `outcome.plan_bypass` 검증 의무** (#479 박제) — `scripts/parse-cross-validate-outcome.sh <outcome.json>` 헬퍼로 파싱 후 `plan_bypass == false` 확인. `true` 발견 시 즉시 사용자에게 사고 보고 + `bypass_files` 배열 명시된 파일 추가 검증. 자동 롤백은 `cross_validate.sh` 가 수행하며 실패 시 `rollback_failed: true` — 사용자 수동 개입 필수.
 
+## ⚠️ 코멘트 박제 — `--edit-last` · `--delete-last` 금지 (#1099)
+
+`gh issue comment` · `gh pr comment` 의 이 두 플래그는 「그 이슈/PR 의 마지막 코멘트」가 아니라 **「인증 사용자가 마지막으로 단 코멘트」**를 대상으로 한다. 이 저장소는 메인과 모든 sub-agent 가 **같은 `gh` 인증을 공유**해 API 에서 서로 구별되지 않으므로, 병행 작업 중이면 **남의 코멘트를 조용히 덮어쓰거나 지운다** — exit `0` · 경고 `0` 이라 실패 신호가 없다.
+
+실사고 1건 — [#1082](https://github.com/coseo12/astro-simulator/issues/1082) 에서 메인이 단 인계 코멘트가 architect 설계안으로 **통째로 교체**됐다 (코멘트 `5306272590` 소실). 발견자는 사람이었고, architect 의 관측(_"내가 만들지 않은 중복본이 있다"_)은 정확했으나 **원인 진단만 틀렸다** — 중복 생성이 아니라 덮어쓰기였다.
+
+- **기본 — 항상 새 코멘트를 만든다.** `gh issue comment <N> --body-file -`
+- **갱신이 꼭 필요하면 id 를 지정한다.** 생성 시 반환되는 URL 끝 `issuecomment-<id>` 의 숫자가 코멘트 id 다.
+  `gh api -X PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@-`
+  ⚠️ `gh issue comment` 에는 **id 지정 편집 옵션이 없다** (`gh` `2.88.1` 실측 — 편집 계열은 `--edit-last` 뿐).
+- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)
+
 ## 마무리 체크리스트 JSON 반환 (필수)
 
 sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **reviewer extends**. 누락 field 는 `null` / `{}` / `[]` 로 명시 (생략 금지). 메인 오케스트레이터가 GitHub 상태와 대조 검증한다 (volt #24).
