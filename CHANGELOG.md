@@ -25,6 +25,16 @@ Semantic Versioning을 따른다.
 
 ### Added
 
+- **[#1122] LOD 가드의 검사 범위를 명시 + disk 기준 보조 지표 (PATCH)** ([#1122](https://github.com/coseo12/astro-simulator/issues/1122)) — `apps/web/scripts/browser-verify-lod.mjs` 의 **판정은 그대로 두고**(프레임 대비 `15%`), 이 가드가 **무엇을 지키지 않는지**를 헤더에 박제하고 `diskDiffPct` 를 출력에 추가했다.
+
+  **가드가 표면 회귀를 구조적으로 못 잡는다.** focus body 의 disk 가 프레임에서 차지하는 면적이 임계보다 작아, **disk 픽셀이 `100%` 바뀌어도 임계에 도달할 수 없다.** 실측 (2026-08-17 / 로컬 GPU / rev `8d578c2`): 구조적 상한이 `solar` `3.66%` / `inner` `2.16~3.16%` / `body` `1.52~2.96%` 로 **9/9 전 조합**이 `15%` 에 못 미친다 — 사각은 이슈가 지적한 body tier 에 국한되지 않고 **매트릭스 전체**다.
+
+  ⚠️ **baseline 9장은 `ff4e88d`(2026-04-24, #289) 이후 한 번도 갱신되지 않았다.** 그 사이 절차 표면 셰이더(#756) · 광원(#773) · 자전(#782) · 극관/biome(#783) · 별 배경(#738) · 지구 육지 마스크(#1119) 가 전부 들어갔고 **전건 PASS** 로 통과했다. 그 누적이 `disk 대비 diff` `30~76%` 로 관측된다. 재캡처는 #1122 비목표라 **관측만 남긴다**.
+
+  **판정 축을 disk 로 교체하지 않은 이유** (이슈 §대안 B 와 같은 논거): body 마다 disk 면적이 달라 단일 임계가 안 잡히고(solar 태양 vs body 지구는 화면 점유가 수십 배 차이), `low` variant 는 billboard 라 disk 개념이 mesh 와 다르며, 축을 바꾸면 **커밋된 baseline 9장의 의미가 바뀐다**. 그래서 표면 회귀는 지대별 verify(`1119-earth-mask` / `783-earth-detail`)가 담당한다는 **현행 운영 형태를 명문화**하는 쪽(이슈 §대안 C)을 택했다.
+
+  ⚠️ **이슈 본문 수치 2건을 정정했다** — 프레임 면적을 `1280×720 = 921,600` 으로 계산했으나 이 가드의 viewport 는 **`1280×800 = 1,024,000`** 이고(baseline PNG IHDR 직독), disk 반경 `98.32px` 는 **`browser-verify-1119-earth-mask.mjs`(`1280×720`, 자체 카메라)** 의 값이라 조건이 다르다. **결론(상한 < 임계)은 양쪽 모두에서 성립한다.**
+
 - **[#1119] 지구 대륙 윤곽 실제화 구현 — Natural Earth 육지 마스크 1장 (MINOR)** ([#1119](https://github.com/coseo12/astro-simulator/issues/1119)) — ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 4** (`Accepted`) 의 §결정 1~8 이행. 설계는 재개봉하지 않았다.
 
   **에셋 생성기가 ADR 헤드라인 바이트를 독립 재현했다.** `scripts/generate-earth-land-mask.mjs` 는 `pngjs` + `node:zlib` 만 쓰고 (**신규 의존 `0`** — `sharp` 는 §결정 2 가 기각한 전이 의존이다) ZIP 리더 · SHP Polygon 파서 · scanline even-odd 래스터라이저 · 8×8 면적평균을 자체 구현한다. ADR 이 박제한 수치를 **다시 유도한 결과가 전건 일치**했다 — 원천 zip SHA256 `0b8e670c…162` / 8192×4096 이진 래스터 육지 서브픽셀 비율 **`33.054%`** / 마스크 면적(cos φ)가중 육지 **`28.75%`** / 고유 계조 **정확히 `65`개** / 산출 **`27,295` B**. `colorType:0` · `bitDepth:8` · `filterType:0` · `deflateStrategy:3` · `deflateLevel:9` 5개를 상수로 박제했고 스크립트가 산출 직후 **IHDR 바이트 + round-trip 재디코드**(불일치 `0`)로 자기 검증한다. ⚠️ 재현 중 **round-trip 검증이 실제로 결함을 잡았다** — `pngjs` 는 `inputHasAlpha: false` 일 때 RGBA 입력 stride 를 `4 → 3` 으로 줄여 읽어 픽셀 `417,229`개가 어긋났고, 자기 검증이 없었으면 **그 파일이 그대로 커밋**됐을 것이다.
