@@ -130,7 +130,9 @@ node scripts/verify-pr-template-checklist.mjs <PR번호>
 - **갱신이 꼭 필요하면 id 를 지정한다.** 생성 시 반환되는 URL 끝 `issuecomment-<id>` 의 숫자가 코멘트 id 다.
   `gh api -X PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@-`
   ⚠️ `gh issue comment` 에는 **id 지정 편집 옵션이 없다** (`gh` `2.88.1` 실측 — 편집 계열은 `--edit-last` 뿐).
-- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)## 규칙
+- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)
+
+## 규칙
 - 이슈 범위만 구현 — scope creep 금지
 - PR당 변경 파일 10개 이하 목표
 - 매직 넘버, 하드코딩 값은 상수로 분리

@@ -135,7 +135,9 @@ ADR 파일명: `docs/decisions/<YYYYMMDD>-<kebab-topic>.md`. 생성 후 이슈 �
 - **갱신이 꼭 필요하면 id 를 지정한다.** 생성 시 반환되는 URL 끝 `issuecomment-<id>` 의 숫자가 코멘트 id 다.
   `gh api -X PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@-`
   ⚠️ `gh issue comment` 에는 **id 지정 편집 옵션이 없다** (`gh` `2.88.1` 실측 — 편집 계열은 `--edit-last` 뿐).
-- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)## 마무리 체크리스트 JSON 반환 (필수)
+- 상세: [`docs/lessons/sub-agent-ssot-handoff.md`](../../docs/lessons/sub-agent-ssot-handoff.md)
+
+## 마무리 체크리스트 JSON 반환 (필수)
 
 sub-agent 종료 전 반드시 아래 JSON을 반환한다. **공통 코어 필드** (CLAUDE.md `### sub-agent 검증 완료 ≠ GitHub 박제 완료` SSoT) + **architect extends**. 누락 field 는 `null` / `{}` / `[]` 로 명시 (생략 금지).
 
