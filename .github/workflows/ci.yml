@@ -228,6 +228,18 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node scripts/verify-md-tilde.mjs --base "$BASE_SHA"
 
+      # #1103 — 머지 충돌 마커 전수 가드. 위 `~~` 가드와 뿌리가 같다 (포맷터가 만드는 손상)
+      #   지만 **모집단·스코프가 다르다**: 마커는 prettier 미소유 파일에도 원형으로 남을 수
+      #   있어 소유 여부가 경계가 되지 못하고, "고칠 수 없는 존량" 범주가 없어 diff 로 좁힐
+      #   이유도 없다. 그래서 별도 스크립트이며 **전수**다 (745 파일 0.4초).
+      #   ADR: docs/decisions/20260817-1103-conflict-marker-guard.md
+      # 이벤트 무관 상시 — 전수라 base 해석이 필요 없다 (`pull_request` 한정 조건 없음).
+      - name: '#1103 충돌 마커 가드 self-test (사용 직전 자기 검증)'
+        run: node scripts/verify-md-conflict-marker.mjs --self-test
+
+      - name: '#1103 머지 충돌 마커 가드 (전수)'
+        run: node scripts/verify-md-conflict-marker.mjs
+
       # #915 — CI 인프라 스크립트 self-test 상시 배선 (#897 교훈: CI 미배선 self-test = 0회 실행).
       # diff-scope 분류기는 diff-scope job 이 사용 직전 자기 검증 — 여기서는 auto-close 파서만.
       # (auto-close-issues.yml 은 머지 이벤트에만 돌므로 PR 단계 상시 검증은 본 스텝이 담당.)
