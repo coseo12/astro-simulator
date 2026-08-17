@@ -13,7 +13,7 @@ Semantic Versioning을 따른다.
 
 ### Added
 
-- **[#1103] 머지 충돌 마커 전수 가드 — 포맷터가 만드는 형태까지 (MINOR)** ([#1103](https://github.com/coseo12/astro-simulator/issues/1103)) — ADR [`20260817-1103`](docs/decisions/20260817-1103-conflict-marker-guard.md) (`Provisional`). `scripts/verify-md-conflict-marker.mjs` 신설 + `.husky/pre-commit`(lint-staged 다음 줄) · `ci.yml`(self-test + 본검사 상시) 배선.
+- **[#1103] 머지 충돌 마커 전수 가드 — 포맷터가 만드는 형태까지 (MINOR)** ([#1103](https://github.com/coseo12/astro-simulator/issues/1103)) — ADR [`20260817-1103`](docs/decisions/20260817-1103-conflict-marker-guard.md) (**`Accepted`** — cross-validate agy 2026-08-17, `Provisional` 에서 전이). `scripts/verify-md-conflict-marker.mjs` 신설 + `.husky/pre-commit`(lint-staged 다음 줄) · `ci.yml`(self-test + 본검사 상시) 배선.
 
   **실사고 1건이 근거다** — `origin/develop` 의 `fa497b6` (PR #1095 머지분) `CHANGELOG.md` 에 마커가 커밋됐고, 메인과 dev(#1079) 가 **독립적으로** 같은 결함에 도달했다. 매 머지마다 행 선두 앵커로 `0` 을 확인했는데도 통과한 이유는 **`lint-staged` 의 `prettier --write` 가 커밋 직전에 마커를 md 문법으로 정규화**하기 때문이다. `prettier --check` 로도 안 잡힌다 — `--write` 가 만든 형태는 prettier 기준 **정답**이라 이후 `--check` 도 초록이다 (ADR [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) 와 같은 뿌리: _"손상은 작성자가 타이핑하지 않는다. 포맷터가 쓴다."_).
 
