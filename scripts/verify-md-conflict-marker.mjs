@@ -41,6 +41,12 @@
  *
  *   ⚠️ **이 축은 `^\s*` 로 못 덮는다** — `>` 와 `|` 는 공백이 아니다. `containerVariants()`
  *      가 접두를 한 겹씩 벗기며 매 단계를 검사한다.
+ *   ⚠️ **접두만으로는 부족하다 — 표에는 「닫는」 구분자가 있다.** `sep`/`sep-escaped` 는
+ *      6형태 중 유일하게 `\s*$` 로 행 끝을 요구하므로, 여는 `|` 를 벗겨도 뒤의 `|` 때문에
+ *      매칭되지 않는다. 그래서 각 단계마다 **닫는 구분자를 뗀 변형도** 후보에 넣는다
+ *      (PR #1123 reviewer 라운드 2 B2 — 라운드 1 픽스처가 못 드러낸 하위 케이스였다).
+ *      모집단이 작지 않다: prettier 소유 md `50` 중 `45` 가 최상위 표를 갖고, 실사고 파일
+ *      `CHANGELOG.md` 자신의 표 행이 `56` 이다.
  *   ⚠️ **인위적 주입이 아니다.** git 은 마커를 항상 컬럼 `0` 에 쓰지만, `CHANGELOG.md` 처럼
  *      blockquote·표를 상시 쓰는 파일에서는 `prettier --write` **1회**로 도달한다 — 실사고
  *      `fa497b6` 과 **같은 파일 클래스**다. 초판은 이 축을 몰라 「2축」이라 단정했고,
@@ -153,6 +159,11 @@ const GT = '>'.repeat(RUN);
  * ⚠️ **`{RUN-1,}` (`{6,}`) 으로 열어 두면 정상 6중첩 인용이 오탐**된다 — 초판이 그랬고
  * self-test negative `"> " × 6 + 텍스트` 가 그 경계를 고정한다. 위쪽 `close` 와 겹치지 않는
  * 이유는 그쪽이 `>` **연속** 7개(공백 없음)를 요구하기 때문이다.
+ * ⚠️ **오탐이 완전히 사라진 것은 아니다 — 정상 `RUN` 중첩 인용은 여전히 hit 이다.** 마커의
+ * 정규화 결과와 **구조적으로 구별 불가**해서 원리적으로 불가피하다 (저장소 실측 `0`건).
+ * 트레이드오프가 «6중첩 오탐» 에서 «7중첩 오탐» 으로 **이동**했을 뿐임을 적어 둔다.
+ * ⚠️ 탭 구분 blockquote(`>` + 탭 반복)는 이 술어가 잡지 않는다. prettier 가 `"> "`(공백)로
+ * 정규화하므로 **현재 도달 경로가 없다** — 기록용이다.
  */
 const RULES = [
   { id: 'open', scope: 'all', re: new RegExp(`^\\s*${LT}(?:\\s|$)`) },
@@ -166,6 +177,16 @@ const RULES = [
 
 /** 컨테이너 접두를 한 겹씩 벗기는 패턴 — blockquote `>` 와 표 셀 `|`. */
 const CONTAINER_PREFIX = /^[ \t]*[>|][ \t]?/;
+
+/**
+ * 표 행의 **닫는** 구분자.
+ *
+ * ⚠️ **접두만 벗기면 끝 앵커 술어가 통과된다.** `sep`/`sep-escaped` 는 6형태 중 유일하게
+ * `\s*$` 로 **행 끝**을 요구하므로, 표 셀 안의 마커(`"| " + sep + " |"`)는 여는 `|` 를 벗겨도
+ * 뒤에 남은 `|` 때문에 매칭되지 않는다. prettier 가 셀 폭을 맞추며 넣는 패딩까지 더해
+ * `sep` 이 **조용히 사라진다** — PR #1123 reviewer 라운드 2 (B2) 가 실제 산출물로 재현했다.
+ */
+const CONTAINER_SUFFIX = /[ \t]*\|[ \t]*$/;
 
 /** 벗기기 상한. 실측 최대 깊이는 `close` 의 7 이며, 여유를 둔 무한 루프 방지값이다. */
 const MAX_CONTAINER_DEPTH = 16;
@@ -186,13 +207,20 @@ const MAX_CONTAINER_DEPTH = 16;
  * @returns {string[]} 원본 + 벗긴 변형들
  */
 function containerVariants(line) {
-  const variants = [line];
+  const variants = [];
+  /** 각 단계마다 «그대로» 와 «닫는 구분자를 뗀 것» 을 모두 후보로 넣는다. */
+  const push = (s) => {
+    variants.push(s);
+    const trimmed = s.replace(CONTAINER_SUFFIX, '');
+    if (trimmed !== s) variants.push(trimmed);
+  };
+  push(line);
   let s = line;
   for (let depth = 0; depth < MAX_CONTAINER_DEPTH; depth += 1) {
     const m = CONTAINER_PREFIX.exec(s);
     if (!m || m[0].length === 0) break;
     s = s.slice(m[0].length);
-    variants.push(s);
+    push(s);
   }
   return variants;
 }
@@ -233,6 +261,22 @@ function git(args, opts = {}) {
   return execFileSync('git', args, { ...EXEC_OPTS, ...opts });
 }
 
+/**
+ * prettier 바이너리 — **`--self-test` 전용**이다 (본검사는 prettier 를 쓰지 않는다).
+ *
+ * 스크립트 위치 기준으로 찾는다 — self-test 가 임시 디렉토리에서 돌기 때문에 `cwd` 로는
+ * 못 찾는다 (자매 가드 `verify-md-tilde.mjs` 와 같은 관용구). 부재는 «위반» 이 아니라
+ * 환경 오류이므로 exit `2` 다.
+ */
+function requirePrettierBin() {
+  const bin = path.resolve(path.dirname(SELF_PATH), '..', 'node_modules', '.bin', 'prettier');
+  if (!fs.existsSync(bin)) {
+    console.error(`${TAG} prettier 바이너리 부재: ${bin} — \`pnpm install\` 후 다시 실행한다`);
+    process.exit(2);
+  }
+  return bin;
+}
+
 /** NUL 바이트가 있으면 바이너리로 본다 (`git grep -I` 와 같은 기준). */
 function isBinary(buf) {
   return buf.includes(0);
@@ -262,10 +306,15 @@ function collectViolations(cwd) {
     try {
       buf = fs.readFileSync(abs);
     } catch (err) {
-      // 인덱스에는 있으나 작업 트리에 없는 경로 (삭제 스테이징 · 깨진 심볼릭 링크) 만 흡수한다.
-      // ⚠️ EACCES·EISDIR 까지 삼키면 **검사되지 않은 파일이 조용히 늘어난다** — 가드가 초록인
-      // 채로 커버리지만 줄어드는 형태라, fail-fast 원칙상 그쪽은 환경 오류(exit 2)로 올린다.
-      if (err.code === 'ENOENT') continue;
+      // 흡수하는 것은 **「파일이 아니어서 읽을 수 없다」** 는 두 경우뿐이다:
+      //   ENOENT — 인덱스에는 있으나 작업 트리에 없다 (삭제 스테이징 · 깨진 심볼릭 링크)
+      //   EISDIR — tracked gitlink(서브모듈). `git ls-files` 는 이걸 경로로 내지만 작업
+      //            트리에서는 디렉토리다. ⚠️ 초판은 ENOENT 만 흡수해 **서브모듈이 추가되는
+      //            날 CI 가 exit 2 로 hard fail** 했다 (PR #1123 reviewer 라운드 2 T1 —
+      //            현재 gitlink `0` 이라 잠복이었고, 격리 저장소에서 재현했다).
+      // ⚠️ EACCES 등 나머지는 삼키지 않는다 — **검사되지 않은 파일이 조용히 늘어나는** 형태라
+      // 가드가 초록인 채 커버리지만 줄어든다. fail-fast 원칙상 환경 오류(exit 2)로 올린다.
+      if (err.code === 'ENOENT' || err.code === 'EISDIR') continue;
       throw err;
     }
     if (isBinary(buf)) continue;
@@ -320,12 +369,13 @@ function selfTestClassifier() {
   }
 
   // (2) 선행 들여쓰기가 붙은 형태 — 행 선두 앵커만 쓰면 여기서 뚫린다 (§실측 (1))
-  for (const [id, line] of [
+  const indented = [
     ['base', `  ${M.base}`],
     ['sep', `  ${M.sep}`],
     ['open', `  ${M.open}`],
     ['close', `  ${M.close}`],
-  ]) {
+  ];
+  for (const [id, line] of indented) {
     const hits = scanContent(`# f\n\n${line}\n`, true);
     assert.equal(hits.length, 1, `indented positive 미검출: ${id}`);
     assert.equal(hits[0].id, id, `indented positive 오분류: ${id}`);
@@ -334,7 +384,7 @@ function selfTestClassifier() {
   // (2-b) **컨테이너 접두** — 축 3. git 컬럼 0 마커가 `prettier --write` 1회로 앞 blockquote 에
   //       흡수되거나 표 셀에 놓이면 행 선두 앵커가 통째로 관통된다 (PR #1123 reviewer B1).
   //       ⚠️ 이 블록이 비면 회귀가 조용히 재개방된다 — 초판이 정확히 그 상태였다.
-  for (const [id, line] of [
+  const containers = [
     ['open', `> ${M.open}`], // blockquote 흡수 — 실사고와 같은 파일 클래스에서 자연 발생
     ['open', `> > ${M.open}`], // 중첩 blockquote
     ['open', `  > ${M.open}`], // 들여쓴 blockquote (축 2 × 축 3)
@@ -344,7 +394,10 @@ function selfTestClassifier() {
     ['base', `| ${M.base} |`], // 표 셀 안 파이프 마커 — 셀 분리로 자르면 사라진다
     ['open', `> | ${M.open} |`], // 컨테이너 2겹
     ['close-blockquote', `${'> '.repeat(RUN - 1)}>`], // bare close — 뒤가 비면 마지막 `>` 에 짝이 없다
-  ]) {
+    ['sep', `| ${M.sep} |`], // 표 셀 — 끝 앵커 술어가 닫는 구분자를 넘어야 한다 (B2)
+    ['sep-escaped', `| ${M.sepEscaped.trim()} |`],
+  ];
+  for (const [id, line] of containers) {
     const hits = scanContent(`# f\n\n${line}\n`, true);
     assert.equal(hits.length, 1, `container positive 미검출: ${id} ← ${JSON.stringify(line)}`);
     assert.equal(
@@ -399,8 +452,109 @@ function selfTestClassifier() {
   }
 
   console.log(
-    `${TAG} self-test(분류기) — positive 10 / md-scope 3 / negative ${negatives.length} PASS`,
+    `${TAG} self-test(분류기) — positive ${positives.length + indented.length + containers.length}` +
+      ` / md-scope 3 / negative ${negatives.length} PASS`,
   );
+}
+
+/**
+ * prettier e2e — **손으로 쓴 문자열이 아니라 실제 `prettier --write` 산출물**을 검사한다.
+ *
+ * ⚠️ 이 단계가 없어서 축 3 의 하위 케이스(B2)가 두 라운드 연속 빠져나갔다. 위 분류기
+ * 테스트의 컨테이너 픽스처는 **내가 손으로 적은 변형형**이라, 술어가 그 문자열을 잡는다는
+ * 것만 보이고 **prettier 가 실제로 무엇을 만드는지**는 보이지 않는다 — ADR 자신이 「자기
+ * 충족」이라 경고한 형태를 self-test 가 그대로 하고 있었다.
+ *
+ * 그래서 여기서는 **git 이 쓰는 컬럼 `0` 마커만** 주입하고, 변형은 전적으로 prettier 에게
+ * 맡긴다. 판정은 **주입한 마커 줄 수 = 검출 수**다.
+ *
+ * 임시 디렉토리에서 돌리므로 저장소의 `.prettierignore` 영향을 받지 않는다 (리포 안에서
+ * 돌리면 `.context/`·`docs/**` 가 `ignored: true` 라 **아무것도 검사하지 않은 채 통과**한다 —
+ * 이 함정도 실제로 한 번 밟았다).
+ */
+function selfTestPrettierE2E() {
+  const bin = requirePrettierBin();
+  const open = `${'<'.repeat(RUN)} HEAD`;
+  const base = `${'|'.repeat(RUN)} base`;
+  const sep = '='.repeat(RUN);
+  const close = `${'>'.repeat(RUN)} origin/develop`;
+
+  /** 마커를 감싸는 문맥. `%M` 자리에 마커 블록이 컬럼 0 으로 들어간다. */
+  const CONTEXTS = [
+    ['평문-빈줄', '# f\n\n- 항목 A\n\n%M\n\n- 항목 B\n'],
+    ['평문-인접', '# f\n\n- 항목 A\n%M\n- 항목 B\n'],
+    ['blockquote-앞줄', '# f\n\n> 인용 문장이 앞에 있다.\n%M\n\n- 뒤\n'],
+    ['blockquote-중첩', '# f\n\n> 1단계\n>\n> > 2단계 중첩\n%M\n\n- 뒤\n'],
+    ['표-안', '| 항목 | 값 |\n| --- | --- |\n| a | 1 |\n%M\n| b | 2 |\n'],
+    ['표-헤더직후', '| 항목 | 값 |\n| --- | --- |\n%M\n| a | 1 |\n'],
+    ['리스트-중첩', '# f\n\n- 상위\n  - 하위 항목\n%M\n\n- 뒤\n'],
+  ];
+  const MARKER_SETS = [
+    [
+      'merge',
+      [
+        ['open', open],
+        ['sep', sep],
+        ['close', close],
+      ],
+    ],
+    [
+      'diff3',
+      [
+        ['open', open],
+        ['base', base],
+        ['sep', sep],
+        ['close', close],
+      ],
+    ],
+  ];
+
+  /**
+   * 주입한 마커 **종류**가 어떤 검출 id 로 나타날 수 있는지.
+   *
+   * ⚠️ 판정을 「주입 줄 수 == 검출 줄 수」로 하면 **틀린다.** prettier 가 마커 뒤의 내용까지
+   * 같은 blockquote 로 흡수하면 마커 하나가 **여러 줄로 번지고**, 가드는 그 줄들을 전부
+   * 보고한다 — 그것은 과보고(fail-loud)이지 결함이 아니다 (사용자는 어차피 다 지워야 한다).
+   * 이 self-test 가 물어야 하는 것은 **「주입한 마커 종류가 하나라도 사라졌는가」** 다.
+   */
+  const ACCEPTS = {
+    open: ['open'],
+    base: ['base'],
+    sep: ['sep', 'sep-escaped'],
+    close: ['close', 'close-blockquote'],
+  };
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-conflict-marker-e2e-'));
+  try {
+    let cases = 0;
+    for (const [ctxName, tmpl] of CONTEXTS) {
+      for (const [setName, markers] of MARKER_SETS) {
+        // 마커 사이에 «양쪽 변경분» 을 끼워 실제 충돌 모양을 만든다.
+        const block = markers
+          .map(([, m], i) => (i < markers.length - 1 ? `${m}\n- 변경 ${i}` : m))
+          .join('\n');
+        const src = tmpl.replace('%M', block);
+        const file = path.join(dir, `${ctxName}-${setName}.md`);
+        fs.writeFileSync(file, src);
+        execFileSync(bin, ['--write', file], { stdio: 'ignore' });
+        const after = fs.readFileSync(file, 'utf8');
+        const found = new Set(scanContent(after, true).map((h) => h.id));
+        for (const [kind] of markers) {
+          assert.ok(
+            ACCEPTS[kind].some((id) => found.has(id)),
+            `prettier e2e — 마커 종류 '${kind}' 소실 [${ctxName}/${setName}]\n` +
+              `--- prettier 산출물 ---\n${after}\n--- 검출 id ---\n${[...found].join(', ') || '(없음)'}`,
+          );
+        }
+        cases += 1;
+      }
+    }
+    console.log(
+      `${TAG} self-test(prettier e2e) — ${cases} 조건 전건 「주입 마커 종류 소실 0」 PASS`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -478,6 +632,7 @@ function selfTestIntegration() {
 
 function selfTest() {
   selfTestClassifier();
+  selfTestPrettierE2E();
   selfTestIntegration();
   console.log(`${TAG} self-test 전건 PASS`);
   return 0;
