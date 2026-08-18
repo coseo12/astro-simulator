@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.76.0] - 2026-08-18
+
 ### Behavior Changes
 
 - **[#1103] 머지 충돌 마커가 남은 커밋이 차단된다 (MINOR)** — `.husky/pre-commit` 과 CI 가 tracked 파일 **전수**에서 마커 6형태를 찾아 발견 시 exit `1` 로 막는다. 원형 4형태는 전 파일, `prettier --write` 가 만드는 변형 2형태는 `.md` 한정이다. 우회로(allowlist·soft-exit)는 없다. 도입 시점 저장소 존량이 `0` 이라 **기존 파일이 새로 걸리는 일은 없고**, 검사 비용은 `658` 파일 `0.16`초다.
