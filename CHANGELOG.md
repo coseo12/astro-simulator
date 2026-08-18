@@ -7,6 +7,8 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **[#1103] 머지 충돌 마커가 남은 커밋이 차단된다 (MINOR)** — `.husky/pre-commit` 과 CI 가 tracked 파일 **전수**에서 마커 6형태를 찾아 발견 시 exit `1` 로 막는다. 원형 4형태는 전 파일, `prettier --write` 가 만드는 변형 2형태는 `.md` 한정이다. 우회로(allowlist·soft-exit)는 없다. 도입 시점 저장소 존량이 `0` 이라 **기존 파일이 새로 걸리는 일은 없고**, 검사 비용은 `658` 파일 `0.16`초다.
+
 - **[#1099] 에이전트가 `--edit-last` · `--delete-last` 를 쓰지 않는다 (MINOR)** — 5개 에이전트 `.md` **+ `CLAUDE.md`(메인 오케스트레이터)** 에 금지 규약이 박제됐다. **메인도 가해자가 될 수 있다** — 메인은 `.claude/agents/*.md` 를 읽지 않으므로 에이전트 쪽 박제만으로는 축이 하나 빈다. 코멘트 갱신이 필요하면 **새 코멘트**를 만들거나 `gh api -X PATCH …/issues/comments/<id>` 로 **id 를 지정**한다. 「마지막 코멘트」에 의존하는 경로가 사라진다.
 
 - **[#1119] 지구가 실제 대륙 윤곽으로 렌더된다 (MINOR)** — `?focus=earth` 에서 아프리카·아메리카·유라시아가 **알아볼 수 있는 형상**으로 보인다. 그 위에 Amendment 3 의 biome 3밴드 + 극관 + #773 광원 + #782 자전이 **전부 그대로** 얹힌다. `?surface=off` 는 100% 복귀하고, 마스크 로드 실패·원거리 축소 시에는 Amendment 3 시점 절차 경로로 **조용히 degrade** 한다 (제품은 degrade / 검증은 fail-fast). 저장소에 **런타임 텍스처 에셋이 1장 생긴다** — `apps/web/public/textures/earth-land-mask.png` (`27,295` B, public domain). mars / jupiter / moon / 단색 22 / sun 은 **무변경**이다.
@@ -40,6 +42,20 @@ Semantic Versioning을 따른다.
   **판정 축을 disk 로 교체하지 않은 이유** (이슈 §대안 B 와 같은 논거): body 마다 disk 면적이 달라 단일 임계가 안 잡히고(solar 태양 vs body 지구는 화면 점유가 수십 배 차이), `low` variant 는 billboard 라 disk 개념이 mesh 와 다르며, 축을 바꾸면 **커밋된 baseline 9장의 의미가 바뀐다**. 그래서 표면 회귀는 지대별 verify(`1119-earth-mask` / `783-earth-detail`)가 담당한다는 **현행 운영 형태를 명문화**하는 쪽(이슈 §대안 C)을 택했다.
 
   ⚠️ **이슈 본문 수치 2건을 정정했다** — 프레임 면적을 `1280×720 = 921,600` 으로 계산했으나 이 가드의 viewport 는 **`1280×800 = 1,024,000`** 이고(baseline PNG IHDR 직독), disk 반경 `98.32px` 는 **`browser-verify-1119-earth-mask.mjs`(`1280×720`, 자체 카메라)** 의 값이라 조건이 다르다. **결론(상한 < 임계)은 양쪽 모두에서 성립한다.** ⚠️ **다만 정정의 파급이 있다** — 이슈의 원 추론은 _"`body-high` 실측 `3.20%` 가 상한 `3.295%` 와 거의 같으니 disk 가 사실상 전부 바뀐 것"_ 이었는데, 올바른 반경·프레임으로는 그 근사 등식이 성립하지 않는다. **「disk 가 전부 바뀌었다」는 별도로 `diskDiffPct` 로 재야 하고**, 그것이 이 PR 이 그 지표를 추가한 이유다.
+
+- **[#1103] 머지 충돌 마커 전수 가드 — 포맷터가 만드는 형태까지 (MINOR)** ([#1103](https://github.com/coseo12/astro-simulator/issues/1103)) — ADR [`20260817-1103`](docs/decisions/20260817-1103-conflict-marker-guard.md) (**`Accepted`** — cross-validate agy 2026-08-17, `Provisional` 에서 전이). `scripts/verify-md-conflict-marker.mjs` 신설 + `.husky/pre-commit`(lint-staged 다음 줄) · `ci.yml`(self-test + 본검사 상시) 배선.
+
+  **실사고 1건이 근거다** — `origin/develop` 의 `fa497b6` (PR #1095 머지분) `CHANGELOG.md` 에 마커가 커밋됐고, 메인과 dev(#1079) 가 **독립적으로** 같은 결함에 도달했다. 매 머지마다 행 선두 앵커로 `0` 을 확인했는데도 통과한 이유는 **`lint-staged` 의 `prettier --write` 가 커밋 직전에 마커를 md 문법으로 정규화**하기 때문이다. `prettier --check` 로도 안 잡힌다 — `--write` 가 만든 형태는 prettier 기준 **정답**이라 이후 `--check` 도 초록이다 (ADR [`20260814-982`](docs/decisions/20260814-982-changelog-tilde-guard.md) 와 같은 뿌리: _"손상은 작성자가 타이핑하지 않는다. 포맷터가 쓴다."_).
+
+  **변형은 3축이다** — 마커 종류 × **앞줄 상태** × **컨테이너 컨텍스트** (rev `b64c66c` / prettier `3.9.6` 실측). `close` 는 앞줄과 무관하게 항상 blockquote 로 정규화되고, `sep` 의 백슬래시 escape 는 **앞줄에 텍스트가 인접할 때만** 걸린다 — 즉 실사고 형태(빈 줄 분리)에서 `sep` 은 원형 그대로였다. ⚠️ **선행 공백은 `sep` 만의 문제가 아니다** — diff3 의 `base` 에도 리스트 lazy continuation 이 2칸을 붙인다. 이슈 본문이 제안한 행 선두 앵커 술어는 이 형태를 통째로 놓친다.
+
+  ⚠️ **축 3 (컨테이너) 은 초판이 통째로 놓쳤고 PR #1123 reviewer 가 반증했다.** 마커가 blockquote 안으로 흡수되거나(`"> "` + 마커) 표 셀에 놓이면(`"| "` + 마커) `^\s*` 로는 못 덮는다 — `>` 와 `|` 는 공백이 아니다. 인위적 주입이 아니라 `CHANGELOG.md` 처럼 blockquote·표를 상시 쓰는 파일에서 `prettier --write` **1회**로 도달하며(실사고 `fa497b6` 과 같은 파일 클래스), 그 상태의 가드는 **보고된 줄만 지우면 초록인 채 마커를 통과**시킨다. `containerVariants()` 가 접두를 **한 겹씩** 벗기며 매 단계를 검사해 닫았다 (통째로 셀 분리하면 `base` 마커 자체가 쪼개져 사라진다).
+
+  **`verify-md-tilde.mjs` 확장이 아니라 신설이다.** 모집단이 다르다 — 저쪽은 prettier **소유** md 한정인데, 마커는 prettier **미소유** 파일(`.claude/**` · `CLAUDE.md` · `docs/**` 의 대부분)에도 원형으로 남아 소유 여부가 경계가 되지 못한다 (실측 tracked md `245` → 소유 `50` / 미소유 `195`). 스코프도 다르다 — 저쪽이 diff 로 좁힌 이유는 확정 구간 존량 21줄을 고칠 수 없어서인데, **충돌 마커에는 「고칠 수 없는 존량」 범주 자체가 없다**. 그래서 전수이고, 도입 시점 존량은 `0` 이다 (6형태 전건 `0` / 같은 실행 양성 대조군 `git grep -IlE '^## ' -- .` **249** 파일 @ rev `b64c66c`).
+
+  **DoD 6항 전건 PASS** — ① 분류기 positive `21` + md-scope 3 ② **negative 실증** 격리 저장소 7건 주입 각각 exit `1` · 원복 exit `0` (3중 시뮬레이션) ③ 오탐 `0` (`658` 파일 전수, negative 대조군 `21`) ④ **실제 `prettier --write` 산출물 e2e `14` 조건** — 컨텍스트 7 × 마커셋 2, 판정은 «주입 마커 종류 소실 `0`». ⚠️ 컨텍스트별 충돌 «내용» 을 정합시켜야 판별력이 생긴다 — 표 케이스에 리스트 항목을 쓰면 GFM 표가 끝나 **결함 보유판에서도 전건 통과**한다(reviewer 변이 테스트로 반증) ④-b **변이 테스트** — 방어를 되돌리면 잡는가: `CONTAINER_SUFFIX` 무력화 / `EISDIR` 흡수 제거 양쪽 exit `2` ⑤ 자기 참조 회피 — 스크립트 소스의 마커 리터럴 `0` (기계 검사) ⑥ `--self-test` CI 배선.
+
+  ⚠️ **DoD ④·⑤ 가 실제로 결함을 잡았다.** ⑤ 는 초판 주석 인라인 코드의 리터럴 1건을 잡았고(손으로는 못 봤다), ④ 는 **초판에서 통과했는데도 축 3 을 놓쳤다** — 테스트한 4조건 안에서만 「주입 수 = 검출 수」가 참이었기 때문이다. **조건 집합 안에서 참인 명제를 전칭으로 적으면 그 자체가 오박제**라는 것이 이번 사이클의 교훈이다.
 
 - **[#1119] 지구 대륙 윤곽 실제화 구현 — Natural Earth 육지 마스크 1장 (MINOR)** ([#1119](https://github.com/coseo12/astro-simulator/issues/1119)) — ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 4** (`Accepted`) 의 §결정 1~8 이행. 설계는 재개봉하지 않았다.
 

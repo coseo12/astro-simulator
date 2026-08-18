@@ -56,6 +56,7 @@
     "verify:docs-links": "node scripts/verify-docs-links.mjs",
     "verify:adr-index": "node scripts/verify-adr-index.mjs",
     "verify:md-tilde": "node scripts/verify-md-tilde.mjs",
+    "verify:md-conflict-marker": "node scripts/verify-md-conflict-marker.mjs",
     "verify:ssot-trigger-wording": "node scripts/verify-ssot-trigger-wording.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
