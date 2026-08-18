@@ -106,7 +106,9 @@ export function createRingPlaceholder(
     // 적도면 경사가 있어야 하지만, 본 ADR §결정 #2 각주대로 Laplace plane 기준은
     // PR-2.5 본 shader 에서 처리. PR-1 은 평면 disk 로 족함.
     // R8 #647 §축 2a — XZ 공전면 (π/2) + 자전축 기울기 (미지정 0 — 기존 동작 하위 호환).
-    disc.rotation.x = Math.PI / 2 + (options.axialTiltRad ?? 0);
+    // #1130 — ORBITAL_NORMAL_OFFSET(π/2) 를 body 자전축과 **함께** 받는다. 한쪽만 옮기면
+    //   보정 전에도 성립하던 `pole ↔ ring 법선 = 0°` 정합이 깨진다 (self-rotation.ts 참조).
+    disc.rotation.x = Math.PI + (options.axialTiltRad ?? 0);
 
     // 호스트 부모-자식 관계로 위치 자동 추종.
     disc.parent = host;

@@ -723,7 +723,7 @@ export function createSolarSystemScene(
     // ring disc 가 host 자식이면 함께 spin → ring tilt 가 자전축 주위로 wobble (R8 세로 고리 붕괴).
     // ring-anchor (비회전 TransformNode) 로 ring disc 를 host 자전에서 격리한다: ring meshes 를 anchor
     // 자식으로 재parent (host 직속 해제) → host 자전 미상속. anchor 는 자체 rotation 0 이고 ring disc 는
-    // 여전히 `rotation.x = π/2 + tiltRad` (tilt 보존). anchor 의 position/scaling 은 updateAt 이 host 값으로
+    // 여전히 `rotation.x = π + tiltRad` (tilt 보존 + #1130 기준면 보정). anchor 의 position/scaling 은 updateAt 이 host 값으로
     // 동기 (tier scale + origin shift 추종). host 자전(rotation) 만 상속 안 함 → wobble 구조적 0.
     // (cross-validate 이견 수용 1 의 scene graph 격리 — 역회전 보정 없이 구조로 해결.)
     if (selfRotation && rotationStates.has(body.id)) {
@@ -1374,7 +1374,7 @@ export function createSolarSystemScene(
         );
       }
       // ring-anchor 동기 — ring disc 를 host 자전에서 격리 (wobble 0). host 의 position/scaling 만
-      // 복사 (rotation 제외) → ring 은 host 자전 미상속, tilt 만 (ring disc `rotation.x = π/2 + tiltRad`).
+      // 복사 (rotation 제외) → ring 은 host 자전 미상속, tilt 만 (ring disc `rotation.x = π + tiltRad`).
       // ring host 4개 한정 (ringAnchors 는 자전하는 ring body 만 보유). tier scale = host.scaling 추종.
       for (const [id, anchor] of ringAnchors) {
         const host = meshes.get(id);

@@ -167,7 +167,7 @@ const CelestialBodyRawSchema = z.object({
   ringAlphaHint: z.number().min(0).max(1).optional(),
   /**
    * R8 #647 §축 2a — 자전축 기울기 (NASA "obliquity to orbit", 도 단위, optional).
-   * ring disc 생성 3경로 (shader/fallback/placeholder) 의 `rotation.x = π/2 + tiltRad` 에 사용
+   * ring disc 생성 3경로 (shader/fallback/placeholder) 의 `rotation.x = π + tiltRad` 에 사용 (#1130 — π/2 는 기준면 보정)
    * (ring-only tilt — 본체 자전/텍스처 미구현이라 host 통합 불필요, 후보 A).
    * 0~180 범위 가드 (97.77° 같은 역행 자전 포함, NaN 전파 차단 — agy 합의 ③).
    * 미지정 시 scene 이 0 폴백 → 기존 동작 (XZ 공전면) 하위 호환 (jupiter 무회귀).

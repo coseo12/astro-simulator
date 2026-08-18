@@ -5,6 +5,26 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1130] 전 행성의 자전축이 궤도 법선 기준으로 선다 (MINOR)** — 지구·화성 등이 **더 이상 옆으로 누워 있지 않다**. obliquity 측정값이 IAU 값과 **9/9 소수 3자리 일치**한다 (지구 `23.440°` / 천왕성 `97.770°` / 금성 `177.360°`). 고리(jupiter · uranus · neptune)는 body 와 **함께** 같은 보정을 받아 `pole ↔ ring 법선 = 0°` 정합을 유지한다. 자전 속도·방향·`?t=` 결정성은 **무변경**이고, 셰이더의 `maskV = acos(p.y)`(local +Y = 북극) 계약도 **불변**이라 지구 대륙(#1119)·극관(#783)·낮밤(#773)은 그대로 얹힌다. **공전 궤도는 이번 변경 대상이 아니며 8/8 정합으로 이상 없음을 확인했다.**
+
+### Fixed
+
+- **[#1130] 자전축 90° 오정렬 — obliquity 기준면이 궤도면 «안»이었다 (MINOR)** ([#1130](https://github.com/coseo12/astro-simulator/issues/1130)) — #782 가 도입한 self-rotation 이 **기준면을 잘못 잡았다.** 이 씬의 궤도면은 XY(전 행성 `|z|/r ≤ 0.07` 실측)라 궤도 법선은 **world Z** 인데, spin 축이 local Y 여서 보정이 없으면 `tiltRad = 0` 인 body 의 자전축이 궤도면 **안**에 눕는다. 결과적으로 **전 행성이 90° 누웠다** — 지구 `66.56°`(기대 `23.44°`) / 화성 `64.81°`(기대 `25.19°`).
+
+  **천왕성이 진단을 확증했다** — 「옆으로 누운 행성」이 `7.77°` 로 **오히려 똑바로 서 있었고** 정상 행성들이 누워 있었다. 오차가 아니라 **기준면이 뒤바뀐** 형태다. 수정은 `ORBITAL_NORMAL_OFFSET = π/2` 를 tilt 각에 더하는 것이고, ring 의 `rotation.x` 도 `π/2 + tiltRad` → **`π + tiltRad`** 로 **함께** 옮긴다 (보정 전에도 body↔ring 은 서로 정합했으므로 한쪽만 고치면 지금 맞는 정합이 깨진다).
+
+  ⚠️ **가드가 6주간 틀린 명제를 정확히 PASS 시켰다.** `verify:782-rotation` 의 DoD 2 는 `acos(pole.y)`, DoD 3 은 `pole.y` 부호를 봤는데 **그 기준이 곧 버그의 정의**였다. 단위 테스트 4건도 quaternion **성분**(`q.y ≈ √½` 등)을 단언해 구현 세부에 결합돼 있었고 「자전축이 어디를 향하는가」는 한 번도 묻지 않았다. 이번에 가드는 `pole.z` 기준으로, 테스트는 `angle(pole, 궤도법선) == obliquity` **9 body 전건** 의미론적 단언으로 교체했다.
+
+  ⚠️ **가시화 계기는 #1119 다.** 그 전에는 표면이 절차적 fbm 이라 **자세가 틀려도 육안으로 드러나지 않았고**, 실제 대륙이 생기자 사용자가 즉시 발견했다 — 시각 검증의 판별력은 표면의 구체성에 의존한다.
+
+  **비-범위**: 축 방위각(azimuth)은 여전히 world X 고정 근사다(기준「면」만 고쳤다). `verify:lod` baseline 9장 재캡처는 그 가드가 CI 미배선이라 [#1127](https://github.com/coseo12/astro-simulator/issues/1127) 소관이다.
+
+  부수 발견 — `self-rotation.ts` 가 참조하던 `docs/decisions/20260701-782-self-rotation.md` 는 **존재한 적이 없는 경로**였다(dead reference). `.ts` 는 `verify-docs-links` 스캔 모집단(`docs/**` + 루트 md) 밖이라 잡히지 않았다. 실제 경로로 정정했다.
+
+  상세: [`docs/decisions/20260628-756-procedural-planet-surface.md`](docs/decisions/20260628-756-procedural-planet-surface.md) §Amendment 5
+
 ## [0.76.0] - 2026-08-18
 
 ### Behavior Changes

@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -1286,3 +1286,72 @@ reviewer 가 **독립 SHP 파서 + 래스터라이저로 재현**했고 **실측
 **미측정으로 남은 축 (그대로 둔다)**: 화면 disk 반경 `98.3 / 147.5 / 295.0 px` 브라우저 실측은 reviewer 가 재현하지 못해 **「미측정」**으로 명시됐다. 단 _"1024 가 기본 focus 를 덮는다"_ ↔ _"최대 줌인은 못 덮는다"_ 는 **서로 다른 R 레짐(8.25배)** 이라 모순이 아님이 확인됐다.
 
 **본 라운드의 교훈 (다음 설계 자산)**: cross-validate 라운드에서 걸린 것은 **설계 판단**이었고, reviewer 라운드에서 걸린 것은 **「내가 쓴 근거를 내 계약대로 재현할 수 있는가」** 였다. 후자는 외부 모델이 못 잡는다 — **재현 시도만이 잡는다.** 수치를 박제할 때 *"이 값을 계약된 도구·경로로 다시 낼 수 있는가"* 를 자문하는 것이 셀프 체크 5번째 축이 되어야 한다.
+
+---
+
+## Amendment 5 (2026-08-18) — 자전 **기준면** 정정: obliquity 는 궤도 법선에서 잰다 (#1130)
+
+- **상태**: Accepted (2026-08-18)
+- **이슈**: [#1130](https://github.com/coseo12/astro-simulator/issues/1130) (type:feat, high, group:C-solar-system)
+- **선행**: §Amendment 2 (#782) 가 도입한 self-rotation 의 **기준 자세**를 정정한다. 자전각·ω·quaternion 합성 순서 등 나머지 결정은 **불변**이다.
+
+### A5.1 무엇이 틀렸나
+
+§A2.5 DoD 2 는 *"지구 자전축이 **world Y 에서** 23.44° 기울어짐"* 을 검사 기준으로 박제했다. **그 기준이 틀렸다.**
+
+이 씬의 궤도면은 **XY 평면**이고 (전 행성 `|z| / r ≤ 0.07` 실측) 따라서 **궤도 법선은 world Z** 다. obliquity 는 정의상 궤도 법선에서 재는 각인데, 초판은 궤도면 **안**의 축(world Y)을 기준으로 삼았다.
+
+⇒ **전 행성이 90° 누웠다.** v0.76.0 실측:
+
+| body | obliquity | 초판 측정 | 정정 후 |
+| --- | ---: | ---: | ---: |
+| earth | `23.44°` | `66.56°` | **`23.440°`** |
+| mars | `25.19°` | `64.81°` | **`25.190°`** |
+| uranus | `97.77°` | `7.77°` | **`97.770°`** |
+| venus | `177.36°` | `87.36°` | **`177.360°`** |
+
+천왕성이 이 진단을 확증한다 — 「옆으로 누운 행성」이 **오히려 똑바로 서 있었고** 정상 행성들이 누워 있었다. 오차가 아니라 **기준면이 뒤바뀐** 형태다.
+
+### A5.2 왜 6주간 안 보였나 — 가드가 틀린 명제를 정확히 검사했다
+
+`browser-verify-782-rotation.mjs` 의 DoD 2 는 `acos(pole.y)` 를, DoD 3 은 `pole.y` 부호를 봤다. **그 기준이 곧 버그의 정의였으므로 가드는 6주 내내 PASS 를 보고했고 그 PASS 는 정확했다** — 다만 물어야 할 명제가 아니었다.
+
+단위 테스트도 같은 형태였다. 구 테스트 4건은 quaternion **성분**(`q.y ≈ √½` 등)을 직접 단언해 **구현 세부에 결합**돼 있었고, 「자전축이 어디를 향하는가」는 한 번도 묻지 않았다.
+
+가시화 계기는 §Amendment 4 (#1119, v0.76.0) 다. 그 전에는 행성 표면이 절차적 fbm 이라 **자세가 틀려도 육안으로 드러나지 않았고**, 실제 대륙이 생기자 사용자가 즉시 발견했다.
+
+⇒ **「표면이 추상적이면 자세 오류가 숨는다」.** 시각 검증의 판별력은 표면의 구체성에 의존한다 — 이것이 §Amendment 4 가 뜻밖에 만든 부수 효과다.
+
+### A5.3 결정
+
+1. **`ORBITAL_NORMAL_OFFSET = π/2`** 를 `computeSpinQuaternion` 의 tilt 각에 더한다. spin 축(local Y)·tilt 축(world X)은 그대로 두고 **기준 자세만** 옮긴다 — 셰이더의 `maskV = acos(p.y)`(local +Y = 북극) 계약 **불변**.
+2. **ring 도 같은 `π/2` 를 함께 받는다** — `rotation.x = π/2 + tiltRad` → **`π + tiltRad`** (`ring-shader.ts` 2곳 · `ring-placeholder.ts` 1곳).
+   ⚠️ **한쪽만 옮기면 안 된다.** 보정 전에도 `pole ↔ ring 법선 = 0°` 로 **서로는 정합**했다 (§A2 주석의 주장이 맞았다). body 만 고치면 그 정합이 깨진다.
+3. **가드 기준을 함께 교체한다** — DoD 2 `acos(pole.y)` → `acos(pole.z)`, DoD 3 `pole.y` 부호 → `pole.z` 부호. 구현만 고치면 가드가 FAIL 로 뒤집힌다.
+4. **단위 테스트를 성분 단언 → 의미론적 단언으로 전환한다.** `angle(pole, 궤도법선) == obliquity` 를 **9 body 전건**으로 검사한다.
+
+### A5.4 의도적 비-범위
+
+- **축 방위각(azimuth)** — 여전히 `world X` 고정 근사다. 실제 자전축은 춘분점 기준 특정 방향을 향하지만 본 Amendment 는 **기준「면」만** 다룬다.
+- **`verify:lod` baseline 9장 재캡처** — 그 가드는 **CI 미배선**이고 baseline 이 이미 4개월 낡았다 ([#1127](https://github.com/coseo12/astro-simulator/issues/1127) 소관).
+
+### A5.5 검증 (실측)
+
+| 축 | 결과 |
+| --- | --- |
+| obliquity 정합 (9 body) | **9/9** — IAU 값과 소수 3자리 일치 |
+| `pole ↔ ring 법선` | **`0°` 유지** (jupiter · uranus · neptune) |
+| `verify:782-rotation` | **PASS** (기준 교체 후. 교체 전에는 DoD 2·3 **동시** FAIL) |
+| `verify:1119-earth-mask` | **PASS** — IoU `0.9365` + negative 실증. 마스크는 local 좌표 기반이라 **자세와 독립** |
+| `783-earth-detail` / `773-light` / `756-surface` | **PASS** — CI 배선 시각 가드는 전부 **의미론적 판정**(극관 비율 · 낮밤 대비 · hfEntropy)이라 자세 변경에 영향받지 않는다 |
+| 단위 테스트 / typecheck | **845 PASS** / PASS |
+| **공전 궤도** (별건 확인) | **8/8 정합** — 궤도면 경사가 IAU 값과 소수 3자리 일치. 회귀는 **자전 축에 국한**된다 |
+
+⚠️ **`r1-ui-regression-guard` 는 로컬 판정 불가**다 — baseline 이 Linux CI 캡처본이라 macOS 로컬에서는 폰트 렌더 차이로 항상 치수 mismatch 가 난다. 그리고 `shader-pixel-guard.yml` 이 규정하듯 그 가드는 **UI 영역만 보고 canvas 픽셀은 baseline 대상이 아니므로** 자전축과 구조적으로 무관하다. 판정은 CI 소관.
+
+### A5.6 결과 · 재검토 조건
+
+1. **씬 좌표계(궤도면)가 바뀌면** `ORBITAL_NORMAL_OFFSET` 과 ring 의 `π` 를 **함께** 재유도한다. 두 상수는 같은 가정 위에 있다.
+2. **축 방위각을 정밀화하면** 본 Amendment 의 X 축 고정 가정이 재검토 대상이 된다.
+3. 부수 발견 — `self-rotation.ts` 가 참조하던 `docs/decisions/20260701-782-self-rotation.md` 는 **존재한 적이 없는 경로**였다 (dead reference). `.ts` 는 `verify-docs-links` 의 스캔 모집단(`docs/**` + 루트 md) 밖이라 잡히지 않았다. 본 Amendment 에서 실제 경로로 정정했다.
+

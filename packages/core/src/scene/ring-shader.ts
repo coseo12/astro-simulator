@@ -510,7 +510,8 @@ function createSingleRingShaderMesh(
     scene,
   );
   // R8 #647 §축 2a — XZ 공전면 (π/2) + 자전축 기울기 (uranus 97.77° 세로 고리 / saturn 26.73°).
-  disc.rotation.x = Math.PI / 2 + axialTiltRad;
+  // #1130 — body 자전축과 같은 ORBITAL_NORMAL_OFFSET(π/2) 적용 (self-rotation.ts 참조).
+  disc.rotation.x = Math.PI + axialTiltRad;
   disc.position.y = zOffset; // z-fighting 방지 (층간 미세 offset)
 
   const material = createRingShaderMaterial(scene, params);
@@ -556,7 +557,8 @@ export function createRingInstancedMesh(
   mat.backFaceCulling = false;
   source.material = mat;
   // R8 #647 §축 2a — shader 경로와 동일 tilt (3경로 일관 — 회귀 검증 모드 정합).
-  source.rotation.x = Math.PI / 2 + axialTiltRad;
+  // #1130 — 위 disc 와 동일 보정.
+  source.rotation.x = Math.PI + axialTiltRad;
   source.position.y = layerIdx * 1e-4;
   source.parent = host;
 
