@@ -180,6 +180,7 @@ sub-agent(dev/qa 페르소나 등) 는 **검증** 까지는 신뢰하되 **박�
 
 - 상세: [docs/lessons/sub-agent-ssot-handoff.md](docs/lessons/sub-agent-ssot-handoff.md) — **공통 SSoT 9 필드 + 메인 게이트 + bg 인계 + base=develop 함정** 통합
 - **SSoT 동기화 자동 가드** (#145, v2.23.0~): 9 필드는 5 에이전트 `.md` 의 체크리스트 JSON 에 그대로 등장해야 하며 `scripts/verify-agent-ssot.sh` 가 CI `detect-and-test` 에서 drift 차단. SSoT 블록 수정 PR 은 5 에이전트 파일 동시 갱신 + 로컬 verify 사전 확인 필수.
+- **`--edit-last`·`--delete-last` 금지** (#1099 — 실사고 #1082): `gh issue comment`·`gh pr comment` 의 두 플래그는 「그 이슈/PR 의 마지막」이 아니라 **「인증 사용자가 마지막으로 단」** 코멘트를 잡는다. 메인과 전 sub-agent 가 같은 `gh` 인증을 공유해 API 가 둘을 **구별하지 못하므로**, 병행 중이면 **남의 코멘트를 exit `0` 인 채 덮어쓰거나 지운다**. **메인도 가해자다** — 이 규칙이 여기 있는 이유이고, 에이전트 쪽 박제(5 파일)만으로는 축이 하나 빈다. 갱신은 **새 코멘트** 또는 `gh api -X PATCH …/issues/comments/<id> -F body=@-` (`-f` 는 리터럴 `@-` 가 박히는 silent 버그).
 - **메인 오케스트레이터 단계 게이트** (volt [#77](https://github.com/coseo12/volt/issues/77)): `developer → reviewer → qa → 사용자/머지` 순서 강제. 상세: [docs/lessons/headless-browser-verification.md](docs/lessons/headless-browser-verification.md)
 - **qa 게이트 예외 규약** (#915 — 전례 PR #910/#911/#916/#917 추출): 메인은 아래 4조건 **전건 충족** 시에만 qa 디스패치를 생략할 수 있다. (a) **앱 runtime 표면 0** — docs·리포 자산 / CI·workflow 설정 / 인프라 스크립트 전용, `apps/**`·`packages/**` 소스 무접촉을 diff 로 실증 (소스 = 빌드·번들 유입 경로. `apps/*/scripts/**` 검증 스크립트는 인프라 범주) (b) **동적 검증 대체 실증** — 본 PR CI run 가드 실발화 / 실 스크립트 1회 실행 / reviewer 독립 재현 등, **변경 대상의 동작을 직접 발화시킨 구체 증거** 명시 의무 ("docs 라서 생략"·"CI green 이니 충분" 단독 사유 금지 — CI green 은 실행 사실이지 대체 실증이 아님) (c) **근거 코멘트 박제** — `## qa 게이트 예외 판단` 제목으로 (a)(b) 근거를 PR 코멘트에 박제 (d) **메인 직접 전이** — `stage:qa → stage:done` 은 메인이 직접 수행. **예외 불가 (정식 qa 의무)**: runtime 의존/라우팅/렌더 경로 변경 (next 업그레이드 #906 / i18n 라우팅 #914 전례), runtime 의존성·lockfile 갱신, 시각 효과 (실 Chrome GUI 수동 검증 별도 의무 — 아래 headless 교훈). **회색지대**: 검증 스크립트 (`scripts/**` 로직) 수정은 해당 스크립트 실제 1회 실행 로그 박제 시에만 예외 허용 (#911/#917 전례, 실행 증거 요구는 #916), 에이전트 행동 규칙 (`.claude/**`) 은 SSoT·정적 가드 실발화가 대체 실증. **Fail-safe**: 4조건·회색지대 판정이 조금이라도 애매하면 정식 qa 디스패치 (비용 절감 < 회귀 차단 — cross-validate 2026-08-01 반영)
 
@@ -252,6 +253,37 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
 3. **pgrep self-match 오탐** — `pgrep -f "패턴"` 이 자기 셸 명령행 매칭 → **bracket `[-]`** (`agent-browser-chrome[-]`). pkill 은 자기 셸 kill 위험이라 **안전 개선**. hook 은 `grep -v` 로 이미 안전. ⚠️ 자기 오탐은 **직교 2축** (#1054): **조상 셸**(macOS `pgrep -a` 가 유입 — **`-a` 금지**) + **형제 subshell**(비-exec fork 의 argv 상속 — `-a` 제거로 안 없어짐). bracket 은 두 축 다 **argv 순도 조건부**라 좀비 카나리아 정본은 **순도와 무관하게** 둘 다 막는 `ps … | grep -E … | grep -v grep` (§3).
 4. **concurrency CANCELLED = 코스메틱** — `cancel-in-progress`(#779) 로 superseded run 이 `CANCELLED`/UNSTABLE 표기. 각 체크 최신 run 이 SUCCESS 면 안전(§릴리스 판별법).
+
+---
+
+## 검증 강도 게이트 (2026-08-16)
+
+**PR 의 검증 강도를 변경 성격에 맞춘다.** 전 PR 에 풀 파이프라인을 걸면 인프라 작업이 제품 작업을 밀어낸다 — 실측: `type:feat` 이슈 **27(6월) → 5(7월) → 0(8월)**, 8월 머지 PR **60건 중 앱 소스 접촉 1건**.
+
+| 변경 성격 | reviewer | cross-validate | qa |
+| --- | :---: | :---: | :---: |
+| `apps/**`·`packages/**` **소스** 접촉 | 필수 | 필수 | **정식 qa** |
+| 가드·CI·`scripts/**` 로직 | 필수 | 트리거 시 | §915 예외 (실행 로그) |
+| 문서·ADR·CHANGELOG 전용 | **메인 자체 검증** | 트리거 시 | §915 예외 |
+
+- **소스 접촉 판정** (표 셀 밖 — 이스케이프 금지, #1079):
+
+  ```bash
+  gh pr diff <N> --name-only \
+    | grep -E '^(apps|packages)/' \
+    | grep -vE '^apps/[^/]+/scripts/' \
+    | grep -cE '\.(ts|tsx|jsx|js|mjs|cjs|rs|wgsl|css)$|/package\.json$|/Cargo\.toml$'
+  ```
+
+  3단으로 나눈 이유 — ① `-P` 부정 전방탐색은 **이식성이 낮다**(BSD/GNU 차) ② `apps/*/scripts/**` 제외는 §915 가 이미 *"검증 스크립트는 인프라 범주"* 로 규정한 것을 술어에 반영한 것이다(실측 `29`건) ③ 매니페스트(`package.json`·`Cargo.toml`)를 포함하는 것은 **의존성 변경이 런타임**이기 때문이다.
+  ⚠️ **매니페스트는 과발화한다** — `scripts` 키만 바꾼 PR 도 잡힌다(예: PR #1111). **fail-safe 방향이라 그대로 둔다.** 강도를 낮추려면 근거 코멘트에 *"`dependencies`·`devDependencies` 무변경"* 을 diff 로 실증하고 메인이 판정한다.
+  ⚠️ `grep -c` 는 **0 매칭 시 exit `1`** 이다. `set -e`/`pipefail` 스크립트에 넣을 땐 `|| true` 를 붙인다 (단독 실행용 명령이라 위 형태는 그대로 쓴다).
+
+- **루트 설정**(`/package.json` · `/tsconfig.json` · `pnpm-lock.yaml` · `.github/**`)은 위 술어에서 `0` 이며 **2행(가드·CI)** 으로 간다. 단 **`pnpm-lock.yaml` 변경은 §915 «예외 불가»** 라 qa 는 정식이다.
+
+- **범위 밖 발견의 기본 처분은 «PR 코멘트 기록»** 이다. 이슈는 **실피해가 관측됐을 때** 만든다 — 「이론적으로 뚫린다」는 발견은 `deferred:no-incident` 라벨로 격리한다. **가드를 하나 만들 때마다 그 가드를 검사할 표면이 하나 늘어나므로, 발견을 전부 이슈화하면 루프가 수렴하지 않는다.**
+- **예외** — 실사고가 이미 발생한 건은 성격 무관 풀 파이프라인.
+- **`deferred:no-incident` 수명주기** — 무기한 방치를 막는다. **해당 컴포넌트를 다음에 건드릴 때** 그 이슈를 함께 재판정하고, 그 시점에도 실피해가 없으면 **`wontfix` 로 close** 한다. 즉 해제 트리거는 시간이 아니라 **접촉**이다 (시간 기준은 또 하나의 추정 임계가 된다 — ADR `20260816-850` 결정 1 과 같은 논거).
 
 ---
 

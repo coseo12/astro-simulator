@@ -42,6 +42,7 @@ import {
   getOrCreateBillboardAlphaMask,
   disposeBillboardAlphaMask,
 } from './billboard-alpha-mask.js';
+import { disposeSurfaceMaskTextures } from './surface-mask-texture.js';
 import {
   computeRotationState,
   computeSpinQuaternion,
@@ -469,6 +470,19 @@ export interface SolarSystemSceneOptions {
   surfaceDetail?: boolean;
 
   /**
+   * #1119 Amendment 4 — 지구 대륙 마스크 에셋 base URL (예: `'/textures/'`).
+   *
+   * 기본값 **undefined** (core 라이브러리 보수 기본 — `surfaceDetail` / `starfield` 동형 레이어
+   * 분리). 미전달이면 셰이더의 `uMaskEnabled` 가 `0` 으로 고정돼 Amendment 3 시점 절차 경로와
+   * **픽셀 동일**하고, 텍스처 fetch 자체가 발생하지 않는다 (NullEngine 단위 테스트 무회귀).
+   *
+   * **core 가 web 라우팅을 몰라야 하므로** 파일명만 코드 상수 테이블 (`SURFACE_MASK_BY_BODY`) 이
+   * 보유하고 base URL 은 본 옵션으로 주입한다 (ADR §A4.3 결정 6 — 단방향 의존 유지).
+   * `surfaceDetail=false` (`?surface=off`) 면 셰이더 자체가 생성되지 않아 본 옵션도 무효다.
+   */
+  surfaceMaskBaseUrl?: string;
+
+  /**
    * #782 §A2 — 행성 self-rotation (자전).
    *
    * 기본값 **false** (core 라이브러리 보수 기본 — 기존 NullEngine 단위 테스트 무회귀, surfaceDetail
@@ -510,6 +524,7 @@ export function createSolarSystemScene(
     glowMarkerSatelliteRatio = GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
     starfield = false,
     surfaceDetail = false,
+    surfaceMaskBaseUrl,
     selfRotation = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
@@ -576,6 +591,8 @@ export function createSolarSystemScene(
   const surfaceLightingArgs: SurfaceLightingArgs = {
     lighting: planetLighting,
     sunPositionProvider,
+    // #1119 Amendment 4 — 마스크 base URL 단방향 주입 (미전달이면 절차 경로 고정).
+    surfaceMaskBaseUrl,
   };
 
   // 각 바디 메쉬 생성 — Phase A: 생성 시점 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
@@ -2019,6 +2036,9 @@ export function createSolarSystemScene(
       // ADR `docs/decisions/20260502-391-phase2-billboard.md` §결정 §"공유 텍스처 dispose 책임".
       // billboard material 들이 모두 dispose 된 후 호출 (참조 정리 후 텍스처 해제 순서 보장).
       disposeBillboardAlphaMask(scene);
+      // #1119 Amendment 4 — scene 공유 대륙 마스크 텍스처 + placeholder 정리 (같은 순서 규약:
+      // 셰이더 머티리얼이 전부 dispose 된 뒤 텍스처 해제).
+      disposeSurfaceMaskTextures(scene);
     },
   };
 }

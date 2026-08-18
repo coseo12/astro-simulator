@@ -32,12 +32,20 @@ import { GLOW_MARKER_RESTORE_EMISSIVE_SCALE_NON_STAR } from './glow-marker.js';
 import { getOrCreateBillboardAlphaMask } from './billboard-alpha-mask.js';
 
 /**
- * #773 Amendment 1 — 절차 표면 셰이더 광원 배선 인자 (createBodyMesh/createBodyMeshMid 공유).
+ * #773 Amendment 1 — 절차 표면 셰이더 배선 인자 (createBodyMesh/createBodyMeshMid 공유).
  * scene 가 소유한 광원 상수 + sun position provider 를 셰이더 팩토리로 단방향 전달.
+ *
+ * ⚠️ 이름은 `#850 Phase 1 순수 이동` 이력과의 대조 가능성을 위해 유지한다 (모듈 헤더 참조).
+ * #1119 이후 실제 내용은 "광원" 을 넘어 **셰이더 배선 묶음 전체**다.
  */
 export interface SurfaceLightingArgs {
   lighting: PlanetLightingConstants;
   sunPositionProvider: () => Vector3;
+  /**
+   * #1119 Amendment 4 §A4.3 결정 6 — 대륙 마스크 에셋 base URL (예: `'/textures/'`).
+   * `undefined` = 마스크 경로 비활성 (core 보수 기본 — `uMaskEnabled` 0 고정).
+   */
+  surfaceMaskBaseUrl?: string | undefined;
 }
 
 export function createBodyMesh(

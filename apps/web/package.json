@@ -32,7 +32,8 @@
     "verify:783-earth-detail": "node scripts/browser-verify-783-earth-detail.mjs",
     "verify:790-focus-zoom": "node scripts/browser-verify-790-focus-zoom.mjs",
     "verify:818-focus-zoom": "node scripts/browser-verify-818-focus-zoom.mjs",
-    "verify:848-modal-focus": "node scripts/browser-verify-848-modal-focus.mjs"
+    "verify:848-modal-focus": "node scripts/browser-verify-848-modal-focus.mjs",
+    "verify:1119-earth-mask": "node scripts/browser-verify-1119-earth-mask.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",
