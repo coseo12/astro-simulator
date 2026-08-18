@@ -156,8 +156,9 @@ async function measureRotation(page, body, jd0, jd1) {
         return { x: t.x, y: t.y, z: t.z };
       };
       const pole = rotateVecByQ({ x: 0, y: 1, z: 0 }, q0c);
-      // #1130 — obliquity 는 **궤도 법선**에서 재는 각이다. 이 씬의 궤도면은 XY (전 행성
-      //   |z|/r ≤ 0.07 실측) 라 법선은 **world Z** → acos(pole·(0,0,1)) = acos(pole.z).
+      // #1130 — obliquity 는 **궤도 법선**에서 재는 각이다. 이 씬의 기준 궤도면은 XY (근거는
+      //   `physics/state-vector.ts` 의 `z = sinI·y₁` 이 i=0 에서 z≡0 을 보장하는 **구조**) 라
+      //   법선은 **world Z** → acos(pole·(0,0,1)) = acos(pole.z). ⚠️ 엄밀히는 황도 법선 기준.
       // ⚠️ 구판은 `acos(pole.y)` 였다. 그 기준이 곧 버그의 정의였고, 가드는 6주간 **정확하게**
       //   PASS 를 보고했다 — 틀린 명제를. 기준을 바꾸지 않으면 수정된 구현이 FAIL 로 뒤집힌다.
       const tiltMeasuredDeg = (Math.acos(Math.min(1, Math.max(-1, pole.z))) * 180) / Math.PI;
@@ -179,6 +180,8 @@ async function measureRotation(page, body, jd0, jd1) {
         q1: q1c,
         relAngleRad: relAngle,
         tiltMeasuredDeg: Number(tiltMeasuredDeg.toFixed(3)),
+        // #1130 — 판정축은 z 다. y 는 구 기준(참고용)이라 **판정에 쓰지 않는다**.
+        poleWorldZ: Number(pole.z.toFixed(4)),
         poleWorldY: Number(pole.y.toFixed(4)),
         eclipticSpinSign,
         relAxisDotPole: Number(relAxisDotPole.toFixed(3)),

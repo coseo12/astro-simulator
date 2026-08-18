@@ -22,6 +22,7 @@
 
 import { Color3, MeshBuilder, StandardMaterial, type Mesh, type Scene } from '@babylonjs/core';
 import type { LoadedRingLayer } from '../ephemeris/solar-system-loader.js';
+import { RING_DISC_BASE_TILT_X } from './ring-shader.js';
 import { renderScaleForTier, type Tier } from './tier.js';
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. 생성 시점의 tier 로 반경을 계산한다.
@@ -57,8 +58,9 @@ export interface RingPlaceholderOptions {
    */
   tier?: Tier;
   /**
-   * R8 #647 §축 2a — ring 자전축 기울기 (rad). `rotation.x = π/2 + axialTiltRad`
+   * R8 #647 §축 2a — ring 자전축 기울기 (rad). `rotation.x = RING_DISC_BASE_TILT_X + axialTiltRad`
    * (shader/fallback 경로 동일 — 3경로 일관, 회귀 검증 모드 정합). 기본 0 (하위 호환).
+   * ⚠️ base 는 #1130 에서 `π/2` → `π` 로 이동했다 (body 의 `ORBITAL_NORMAL_OFFSET` 과 **짝**).
    */
   axialTiltRad?: number;
 }
@@ -105,10 +107,11 @@ export function createRingPlaceholder(
     // Disc 는 기본적으로 XY 평면에 생성됨. 목성 공전면(황도면) 에 맞추려면
     // 적도면 경사가 있어야 하지만, 본 ADR §결정 #2 각주대로 Laplace plane 기준은
     // PR-2.5 본 shader 에서 처리. PR-1 은 평면 disk 로 족함.
-    // R8 #647 §축 2a — XZ 공전면 (π/2) + 자전축 기울기 (미지정 0 — 기존 동작 하위 호환).
+    // R8 #647 §축 2a — 기준 궤도면(XY) 정렬 + 자전축 기울기 (미지정 0 — 기존 동작 하위 호환).
+    // #1130 — base 는 `RING_DISC_BASE_TILT_X`(= π) SSoT. body 의 `ORBITAL_NORMAL_OFFSET` 과 짝.
     // #1130 — ORBITAL_NORMAL_OFFSET(π/2) 를 body 자전축과 **함께** 받는다. 한쪽만 옮기면
     //   보정 전에도 성립하던 `pole ↔ ring 법선 = 0°` 정합이 깨진다 (self-rotation.ts 참조).
-    disc.rotation.x = Math.PI + (options.axialTiltRad ?? 0);
+    disc.rotation.x = RING_DISC_BASE_TILT_X + (options.axialTiltRad ?? 0);
 
     // 호스트 부모-자식 관계로 위치 자동 추종.
     disc.parent = host;

@@ -23,8 +23,12 @@ import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 // pole 이 뒤집혀 양수 spin 이 역행으로 보인다. period 부호를 음수로 주면 방향이 이중 적용되어 뒤집힌다.
 //
 // 축 방위각 (azimuth) 은 world X 고정 근사 — tilt 는 X 축 주위 회전. ring disc 의
-// `rotation.x = π + tiltRad` 와 **같은 축 · 같은 기준면 보정**(#1130)이라 `pole == ring 법선` 이다
-// (실측 `0°`). ⚠️ 방위각 근사는 #1130 의 범위 밖 — 그쪽은 기준「면」만 고쳤다.
+// `rotation.x = RING_DISC_BASE_TILT_X + tiltRad` 와 **같은 축**이라 ring 평면이 적도면과 일치한다
+// (`|cos(pole, ringNormal)| == 1` — `self-rotation.test.ts` §ring 정합 이 9 body 전건 단언).
+// ⚠️ 두 상수는 값이 다르다 (π vs π/2) — 차 π/2 는 disc local 법선(+Z) 과 pole(local +Y) 의 축
+// 차이다. 그리고 이 정렬에서 ring 법선은 pole 의 **반대 방향**(180°)이나, disc 는 양면이라
+// 부호는 물리적 의미가 없고 평면 일치만이 계약이다.
+// ⚠️ 방위각 근사는 #1130 의 범위 밖 — 그쪽은 기준「면」만 고쳤다.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** #782 — body 별 자전 파라미터 (데이터에서 1회 산출, 매 프레임 재계산 회피). */
@@ -77,9 +81,10 @@ export function computeSpinQuaternion(
   // spin: local Y (자전축) 주위. tilt: world X 주위.
   Quaternion.RotationAxisToRef(ROT_SPIN_AXIS, spinAngle, tmpSpin);
   // ⚠️ **`+ π/2` 가 기준면 보정이다** (#1130). obliquity 는 **궤도 법선**에서 재는 각인데, 이
-  // 씬의 궤도면은 XY (전 행성 |z|/r ≤ 0.07 실측) 라 궤도 법선은 **world Z** 다. 그런데 spin 축
-  // 이 local Y 라 보정이 없으면 `tiltRad = 0` 일 때 자전축이 world **Y** — 즉 궤도면 **안**에
-  // 눕는다. `ORBITAL_NORMAL_OFFSET` 이 그 90° 를 메운다.
+  // 씬의 기준 궤도면은 XY 라 궤도 법선은 **world Z** 다 (근거는 측정이 아니라 구조 —
+  // `physics/state-vector.ts` 의 `z = sinI · y₁` 이 inclination 0 에서 `z ≡ 0` 을 보장하고,
+  // 씬은 이 좌표를 기저 변환 없이 직결한다). 그런데 spin 축이 local Y 라 보정이 없으면
+  // `tiltRad = 0` 일 때 자전축이 world **Y** — 즉 궤도면 **안**에 눕는다. 그 90° 를 메운다.
   Quaternion.RotationAxisToRef(ROT_TILT_AXIS, ORBITAL_NORMAL_OFFSET + state.tiltRad, tmpTilt);
   // q = tilt ∘ spin (spin 먼저 적용 후 tilt — Babylon A.multiply(B) = B 먼저).
   tmpTilt.multiplyToRef(tmpSpin, out);
@@ -93,11 +98,16 @@ const ROT_TILT_AXIS = new Vector3(1, 0, 0);
  * #1130 — **기준면 보정** `π/2`. obliquity 를 궤도 법선(world Z) 기준으로 만든다.
  *
  * 없으면 `tiltRad = 0` 인 body 의 자전축이 world Y(궤도면 안)가 되어 **전 행성이 90° 누운다**.
+ *
+ * ⚠️ 엄밀히는 **황도** 법선 기준이다 — body 자기 궤도면과는 inclination 만큼 다르다 (mercury
+ * `7.005°` / moon `5.145°`). 데이터의 `axialTiltDeg` 도 NASA "obliquity to orbit" 이라 같은 계열의
+ * 근사이며, 자기 궤도면 기준 정밀화는 #1130 범위 밖이다.
  * 실측(v0.76.0, 보정 전): 지구 `66.56°`(기대 `23.44°`) / 천왕성 `7.77°`(기대 `97.77°`) — 「옆으로
  * 누운 행성」이 오히려 똑바로 서 보이는 형태였다.
  *
- * ⚠️ **ring 도 같은 `π/2` 를 함께 받는다** (`ring-shader.ts` / `ring-placeholder.ts` 의
- * `rotation.x`). 둘은 보정 전에도 서로 정합(`pole ↔ ring 법선 = 0°`)했으므로 **한쪽만 옮기면
- * 지금 맞는 정합이 깨진다.** 두 상수는 같이 움직여야 한다.
+ * ⚠️ **ring 의 `RING_DISC_BASE_TILT_X` 와 짝이다** (`ring-shader.ts`). 보정 전에도 두 축은 서로
+ * 정합했고 이번에 **같은 크기·같은 방향**으로 함께 옮겼으므로 상대 관계는 불변이다 — 그래서
+ * **한쪽만 옮기면 지금 맞는 정합이 깨진다.** 불변식은 `self-rotation.test.ts` §ring 정합 이
+ * 단언한다 (변이 실측: 한쪽만 되돌리면 각각 2건 · 4건 FAIL).
  */
 export const ORBITAL_NORMAL_OFFSET = Math.PI / 2;

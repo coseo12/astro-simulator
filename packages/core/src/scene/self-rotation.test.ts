@@ -11,7 +11,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
-import { computeRotationState, computeSpinQuaternion } from './self-rotation.js';
+import {
+  computeRotationState,
+  computeSpinQuaternion,
+  ORBITAL_NORMAL_OFFSET,
+} from './self-rotation.js';
+import { RING_DISC_BASE_TILT_X } from './ring-shader.js';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 /** 자전 파라미터만 의미 있는 최소 body stub (본 모듈은 id/radius/orbit 을 읽지 않는다). */
@@ -77,10 +82,34 @@ function poleOf(q: Quaternion): Vector3 {
 function angleDeg(a: Vector3, b: Vector3): number {
   return (Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(a, b)))) * 180) / Math.PI;
 }
-/** 이 씬의 궤도 법선 — 궤도면이 XY 라 world Z (#1130 실측: 전 행성 |z|/r ≤ 0.07). */
+/**
+ * 이 씬의 **기준 궤도 법선** — world Z (#1130).
+ *
+ * 근거는 측정이 아니라 **구조**다: `physics/state-vector.ts` 가 `z = sinI · y₁` 로 궤도면을 만들어,
+ * inclination `0` 이면 `z ≡ 0` 이다. 즉 기준 궤도면(황도)은 **XY** 이고 씬은 이 좌표를 기저 변환
+ * 없이 직결한다.
+ *
+ * ⚠️ 엄밀히는 **황도** 법선이라 body 자기 궤도면과는 inclination 만큼 다르다 (mercury `7.005°` /
+ * moon `5.145°`). obliquity 를 「자기 궤도면 기준」으로 재려면 body 별 법선이 필요하다 — 그건
+ * #1130 범위 밖이고, 현재 데이터의 `axialTiltDeg` 도 NASA "obliquity to orbit" 값이라 이 근사와
+ * 같은 계열이다.
+ */
 const ORBITAL_NORMAL = new Vector3(0, 0, 1);
 
 describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자전각)', () => {
+  /** IAU obliquity (deg) — 자전하는 9 body 전건. 두 불변식(obliquity · ring 정합)이 공유한다. */
+  const OBLIQUITY: ReadonlyArray<readonly [string, number]> = [
+    ['mercury', 0.034],
+    ['venus', 177.36],
+    ['earth', 23.44],
+    ['mars', 25.19],
+    ['jupiter', 3.13],
+    ['saturn', 26.73],
+    ['uranus', 97.77],
+    ['neptune', 28.32],
+    ['moon', 6.68],
+  ];
+
   const state = { omega: TWO_PI, tiltRad: 0 }; // 1 day = 1 회전, tilt 없음
   const epoch = 2451545.0; // J2000
 
@@ -130,20 +159,31 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
     expect(Math.abs(dot)).toBeCloseTo(1, 6);
   });
 
+  it('#1130 — ring 평면이 적도면과 일치한다 (body ↔ ring 짝 불변식, 9 body 전건)', () => {
+    // ⚠️ 이 테스트가 없으면 ring 쪽 상수만 되돌려도 **845 전건이 초록**이다 (reviewer 변이 M3 실측).
+    // body 의 `ORBITAL_NORMAL_OFFSET` 과 ring 의 `RING_DISC_BASE_TILT_X` 는 **짝**이고, 둘의 차 π/2 는
+    // disc local 법선(+Z) 과 body pole(local +Y) 의 축 차이를 메운다. 한쪽만 옮기면 여기서 깨진다.
+    //
+    // 판정은 **평면 일치** `|cos| == 1` 이다. disc 는 양면이라 법선의 **부호는 물리적 의미가 없고**,
+    // 이 정렬에서 실제로는 pole 의 반대 방향(180°)이 나온다.
+    for (const [, degrees] of OBLIQUITY) {
+      const tiltRad = (degrees * Math.PI) / 180;
+      const pole = poleOf(spin(epoch, { omega: TWO_PI, tiltRad }));
+      // ring disc: local 법선 +Z 를 X 축으로 (RING_DISC_BASE_TILT_X + tiltRad) 회전.
+      const theta = RING_DISC_BASE_TILT_X + tiltRad;
+      const ringNormal = new Vector3(0, -Math.sin(theta), Math.cos(theta));
+      expect(Math.abs(Vector3.Dot(pole, ringNormal))).toBeCloseTo(1, 9);
+    }
+  });
+
+  it('#1130 — 두 기준 상수의 차는 정확히 π/2 (축 차이 — disc +Z vs pole +Y)', () => {
+    // 위 불변식이 성립하는 **이유**를 직접 고정한다. 값 자체가 아니라 **관계**가 계약이다.
+    expect(RING_DISC_BASE_TILT_X - ORBITAL_NORMAL_OFFSET).toBeCloseTo(Math.PI / 2, 12);
+  });
+
   it('#1130 — obliquity 는 **궤도 법선에서 재는 각**이다 (9 body 전건)', () => {
     // 「누운 행성」(uranus/venus)이 실제로 눕는지가 판별력의 핵심 — 보정 전 uranus 는 7.77° 로
     // **똑바로 서 보였다**(기대 97.77°). 정상 행성과 역행 행성이 서로 뒤바뀐 형태였다.
-    const OBLIQUITY: ReadonlyArray<readonly [string, number]> = [
-      ['mercury', 0.034],
-      ['venus', 177.36],
-      ['earth', 23.44],
-      ['mars', 25.19],
-      ['jupiter', 3.13],
-      ['saturn', 26.73],
-      ['uranus', 97.77],
-      ['neptune', 28.32],
-      ['moon', 6.68],
-    ];
     for (const [id, degrees] of OBLIQUITY) {
       const q = spin(epoch, { omega: TWO_PI, tiltRad: (degrees * Math.PI) / 180 });
       // 허용 오차 5e-5° — `acos` 의 수치 오차(실측 최대 1.2e-6°)보다 크고 계약값 ±0.05° 보다

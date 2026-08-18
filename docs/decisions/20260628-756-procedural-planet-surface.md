@@ -1291,15 +1291,28 @@ reviewer 가 **독립 SHP 파서 + 래스터라이저로 재현**했고 **실측
 
 ## Amendment 5 (2026-08-18) — 자전 **기준면** 정정: obliquity 는 궤도 법선에서 잰다 (#1130)
 
+- **날짜**: 2026-08-18
 - **상태**: Accepted (2026-08-18)
-- **이슈**: [#1130](https://github.com/coseo12/astro-simulator/issues/1130) (type:feat, high, group:C-solar-system)
+- **이슈**: [#1130](https://github.com/coseo12/astro-simulator/issues/1130) (type:feat, high, group:C-solar-system) / PR [#1131](https://github.com/coseo12/astro-simulator/pull/1131)
 - **선행**: §Amendment 2 (#782) 가 도입한 self-rotation 의 **기준 자세**를 정정한다. 자전각·ω·quaternion 합성 순서 등 나머지 결정은 **불변**이다.
 
 ### A5.1 무엇이 틀렸나
 
-§A2.5 DoD 2 는 *"지구 자전축이 **world Y 에서** 23.44° 기울어짐"* 을 검사 기준으로 박제했다. **그 기준이 틀렸다.**
+#782 시점의 검사 기준은 *"지구 자전축이 **world Y 에서** 23.44° 기울어짐"* 이었다. **그 기준이 틀렸다.**
 
-이 씬의 궤도면은 **XY 평면**이고 (전 행성 `|z| / r ≤ 0.07` 실측) 따라서 **궤도 법선은 world Z** 다. obliquity 는 정의상 궤도 법선에서 재는 각인데, 초판은 궤도면 **안**의 축(world Y)을 기준으로 삼았다.
+> ⚠️ **인용 출처 정정** — 이 문구의 실제 출처는 §A2.5 본문이 아니라 가드 스크립트
+> `apps/web/scripts/browser-verify-782-rotation.mjs` 의 헤더 DoD 2 다. 초판 Amendment 5 는 이를 §A2.5 에
+> 귀속시켰으나 §A2.5 에는 해당 서술이 없다 (reviewer 지적 N5).
+
+이 씬의 기준 궤도면은 **XY** 이고 따라서 **궤도 법선은 world Z** 다. 근거는 측정이 아니라 **구조**다 — `physics/state-vector.ts` 의 `z = sinI · y₁` 이 inclination `0` 에서 `z ≡ 0` 을 보장하고, 씬은 이 좌표를 기저 변환 없이 직결한다 (`solar-system-scene.ts`). obliquity 는 정의상 궤도 법선에서 재는 각인데, #782 는 궤도면 **안**의 축(world Y)을 기준으로 삼았다.
+
+> ⚠️ **초판 Amendment 5 의 근거 수치는 반증됐다** — *"전 행성 `|z|/r ≤ 0.07`"* 이라고 적었으나 실측은
+> mercury `0.1220` · moon `0.0897` 로 **자전 9 body 중 2개가 초과**한다. 결론(궤도면 ≈ XY)은 위 구조
+> 근거로 여전히 참이지만, **측정으로 뒷받침한 척한 것이 틀렸다.**
+
+> ⚠️ **엄밀히는 「황도」 법선 기준의 근사다** — body 자기 궤도면과는 inclination 만큼 다르다 (mercury
+> `7.005°` / moon `5.145°`). 데이터의 `axialTiltDeg` 도 NASA "obliquity to orbit" 이라 같은 계열의 근사이며,
+> 자기 궤도면 기준 정밀화는 본 Amendment 범위 밖이다.
 
 ⇒ **전 행성이 90° 누웠다.** v0.76.0 실측:
 
@@ -1325,10 +1338,14 @@ reviewer 가 **독립 SHP 파서 + 래스터라이저로 재현**했고 **실측
 ### A5.3 결정
 
 1. **`ORBITAL_NORMAL_OFFSET = π/2`** 를 `computeSpinQuaternion` 의 tilt 각에 더한다. spin 축(local Y)·tilt 축(world X)은 그대로 두고 **기준 자세만** 옮긴다 — 셰이더의 `maskV = acos(p.y)`(local +Y = 북극) 계약 **불변**.
-2. **ring 도 같은 `π/2` 를 함께 받는다** — `rotation.x = π/2 + tiltRad` → **`π + tiltRad`** (`ring-shader.ts` 2곳 · `ring-placeholder.ts` 1곳).
-   ⚠️ **한쪽만 옮기면 안 된다.** 보정 전에도 `pole ↔ ring 법선 = 0°` 로 **서로는 정합**했다 (§A2 주석의 주장이 맞았다). body 만 고치면 그 정합이 깨진다.
+2. **ring 기준 회전을 상수화하고 같은 크기만큼 함께 옮긴다** — `RING_DISC_BASE_TILT_X`(`ring-shader.ts`) 를 신설해 `π/2` → **`π`** 로 이동, 3경로(shader/fallback/placeholder)가 이 SSoT 를 참조한다.
+   두 상수는 **값이 다르다** (`π` vs `π/2`) — 차 `π/2` 는 **disc local 법선(+Z)** 과 **body pole(local +Y)** 의 축 차이다.
+   ⚠️ **한쪽만 옮기면 안 된다.** 보정 전에도 두 축은 서로 정합했고 이번에 **같은 크기·같은 방향**으로 함께 옮겼으므로 상대 관계가 불변이다.
+   > ⚠️ **초판의 `pole ↔ ring 법선 = 0°` 는 오측정이다.** 이 정렬에서 ring 법선은 pole 의 **반대 방향(`180°`)** 이다. disc 는 양면이라 법선 부호는 물리적 의미가 없고 **평면 일치**(`|cos| = 1`)만이 계약이다 — 보정 전에도 `180°` 였으므로 **결론(정합 유지)은 바뀌지 않는다.**
 3. **가드 기준을 함께 교체한다** — DoD 2 `acos(pole.y)` → `acos(pole.z)`, DoD 3 `pole.y` 부호 → `pole.z` 부호. 구현만 고치면 가드가 FAIL 로 뒤집힌다.
 4. **단위 테스트를 성분 단언 → 의미론적 단언으로 전환한다.** `angle(pole, 궤도법선) == obliquity` 를 **9 body 전건**으로 검사한다.
+5. **ring 짝 불변식을 신설한다** — `|cos(pole, ringNormal)| == 1` (9 body) + `RING_DISC_BASE_TILT_X − ORBITAL_NORMAL_OFFSET == π/2`.
+   ⚠️ **이게 없으면 ring 쪽만 되돌려도 전건이 초록이다** (reviewer 변이 M3 실측 `845/845 PASS`). 브라우저 가드 DoD 6 도 같은 disc 를 두 시점 자기비교라 구조적으로 못 잡는다.
 
 ### A5.4 의도적 비-범위
 
@@ -1340,12 +1357,13 @@ reviewer 가 **독립 SHP 파서 + 래스터라이저로 재현**했고 **실측
 | 축 | 결과 |
 | --- | --- |
 | obliquity 정합 (9 body) | **9/9** — IAU 값과 소수 3자리 일치 |
-| `pole ↔ ring 법선` | **`0°` 유지** (jupiter · uranus · neptune) |
+| ring 평면 ↔ 적도면 | **`\|cos\| = 1` 유지** (9 body 단위 불변식 + jupiter · uranus · neptune 브라우저 실측). 법선 부호는 반대(`180°`) — disc 양면이라 무의미 |
+| **변이 테스트** (판별력 실증) | ring 상수만 되돌림 → **2 FAIL** / body 상수만 되돌림 → **4 FAIL** / 부호 변이(`−π/2`) → **2 FAIL**. 원복 후 **847 PASS** |
 | `verify:782-rotation` | **PASS** (기준 교체 후. 교체 전에는 DoD 2·3 **동시** FAIL) |
 | `verify:1119-earth-mask` | **PASS** — IoU `0.9365` + negative 실증. 마스크는 local 좌표 기반이라 **자세와 독립** |
 | `783-earth-detail` / `773-light` / `756-surface` | **PASS** — CI 배선 시각 가드는 전부 **의미론적 판정**(극관 비율 · 낮밤 대비 · hfEntropy)이라 자세 변경에 영향받지 않는다 |
-| 단위 테스트 / typecheck | **845 PASS** / PASS |
-| **공전 궤도** (별건 확인) | **8/8 정합** — 궤도면 경사가 IAU 값과 소수 3자리 일치. 회귀는 **자전 축에 국한**된다 |
+| 단위 테스트 / typecheck | **847 PASS** / PASS |
+| **공전 궤도** (별건 확인) | **8/8 정합** — 궤도면 경사가 IAU 값과 소수 3자리 일치. 회귀는 **자전 축에 국한**된다. ⚠️ 세션 내 임시 스크립트 1회 실측이고 **재현 스크립트를 리포에 박제하지 않았다** — 재검증하려면 재작성이 필요하다 (reviewer 지적 B3ⓒ) |
 
 ⚠️ **`r1-ui-regression-guard` 는 로컬 판정 불가**다 — baseline 이 Linux CI 캡처본이라 macOS 로컬에서는 폰트 렌더 차이로 항상 치수 mismatch 가 난다. 그리고 `shader-pixel-guard.yml` 이 규정하듯 그 가드는 **UI 영역만 보고 canvas 픽셀은 baseline 대상이 아니므로** 자전축과 구조적으로 무관하다. 판정은 CI 소관.
 
@@ -1353,5 +1371,6 @@ reviewer 가 **독립 SHP 파서 + 래스터라이저로 재현**했고 **실측
 
 1. **씬 좌표계(궤도면)가 바뀌면** `ORBITAL_NORMAL_OFFSET` 과 ring 의 `π` 를 **함께** 재유도한다. 두 상수는 같은 가정 위에 있다.
 2. **축 방위각을 정밀화하면** 본 Amendment 의 X 축 고정 가정이 재검토 대상이 된다.
-3. 부수 발견 — `self-rotation.ts` 가 참조하던 `docs/decisions/20260701-782-self-rotation.md` 는 **존재한 적이 없는 경로**였다 (dead reference). `.ts` 는 `verify-docs-links` 의 스캔 모집단(`docs/**` + 루트 md) 밖이라 잡히지 않았다. 본 Amendment 에서 실제 경로로 정정했다.
+3. **본 Amendment 는 reviewer 지적 8건을 반영해 개정됐다** (PR #1131) — blocking 3건(CI 템플릿 / 주석 계약 잔존 6곳 / 수치 주장 3건 반증) + non-blocking 5건. 특히 **초판이 박제한 수치 2건(`|z|/r ≤ 0.07` · `0°`)이 반증**됐고, 결론은 유지되나 근거를 구조 논증으로 교체했다.
+4. 부수 발견 — `self-rotation.ts` 가 참조하던 `docs/decisions/20260701-782-self-rotation.md` 는 **존재한 적이 없는 경로**였다 (dead reference). `.ts` 는 `verify-docs-links` 의 스캔 모집단(`docs/**` + 루트 md) 밖이라 잡히지 않았다. 본 Amendment 에서 실제 경로로 정정했다.
 
