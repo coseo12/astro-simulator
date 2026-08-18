@@ -33,39 +33,43 @@
  * (300/500) 는 tier-transition.ts 수식 주석 박제. 향후 scene 에 `state.transitioning` 을 정식
  * export 하면 polling 기반 대기로 개선 가능 (후속 이슈 후보).
  *
- * ## ⚠️ 본 가드가 지키지 **않는** 것 (#1122)
+ * ## ⚠️ 본 가드의 실효 범위 (#1122) — **현재 임계로는 아무것도 검출하지 못한다**
  *
- * **대상은 LOD 분기(`mesh.scaling` / `mesh.position`) 회귀뿐이다.** LOD 가 깨지면 mesh 크기가
- * 프레임 규모로 달라지므로 프레임 대비 15% 임계가 그 용도에는 유효하다.
+ * 아래 셋은 전부 커밋된 산출물로 재현 가능한 사실이다. 「무엇을 지키는가」보다 **무엇을 지키지
+ * 못하는가**를 먼저 적는다 — 그것을 모르면 이 가드의 초록을 근거로 쓰게 된다.
  *
- * **body 표면(텍스처·셰이더) 회귀는 대상이 아니며, 구조적으로 검출할 수 없다.** focus body 의
- * disk 가 프레임에서 차지하는 면적이 작아 **disk 픽셀이 100% 바뀌어도** 프레임 대비 diff 는
- * 그 면적 비율(아래 `diskFrameShare`)을 넘지 못하고, 임계에 **도달 자체가 불가능**하다.
+ * ### (1) 표면 회귀 — 구조적으로 도달 불가
  *
- * 실측 (2026-08-17 / 로컬 Apple GPU / `1280×800` / rev `8d578c2` 기준):
+ * focus body 의 disk 가 프레임에서 차지하는 면적이 작아 **disk 픽셀이 100% 바뀌어도** 프레임
+ * 대비 diff 는 그 면적 비율(`diskFrameShare`)을 넘지 못한다. 실측에서 **9/9 전 조합**의 상한이
+ * `1.5%~3.7%` 로 임계 `15%` 에 못 미쳤다 — 사각은 body tier 에 국한되지 않고 **매트릭스 전체**다.
  *
- *   조합          disk 반경   프레임 대비   disk 대비   **구조적 상한**
- *   solar-high    109.2px      4.02%       50.65%       3.66%
- *   solar-mid     109.2px      5.25%       76.51%       3.66%
- *   inner-high     83.9px      2.82%       49.82%       2.16%
- *   body-high      70.3px      2.86%       32.03%       1.52%
- *   body-mid       87.5px      3.81%       30.23%       2.35%
+ * ### (2) LOD 회귀 — **이것도 도달 불가** (초판이 반대로 적었다)
  *
- * **9/9 전 조합**의 구조적 상한이 `1.52%~3.66%` 로 임계 `15%` 에 한참 못 미친다 — 즉 사각은
- * body tier 에 국한되지 않고 **매트릭스 전체**다. `low` variant 의 disk 대비 diff 가 작은 것은
- * billboard 라 disk 개념이 mesh 와 다르기 때문이다.
+ * ⚠️ 초판은 *"LOD 가 깨지면 mesh 크기가 프레임 규모로 달라지므로 15% 임계가 그 용도에는
+ * 유효하다"* 고 적었다. **측정 없이 쓴 주장이었고 커밋된 baseline 자신이 반증한다** — 서로 다른
+ * LOD 레벨의 baseline 끼리 같은 파라미터로 재면:
  *
- * ⚠️ **`disk 대비` 가 30~76% 인 것은 baseline 이 낡았다는 뜻이기도 하다.** baseline 9장은
- * `ff4e88d` (2026-04-24, #289) 이후 **한 번도 갱신되지 않았고**, 그 사이 절차 표면 셰이더(#756) ·
- * 광원(#773) · 자전(#782) · 극관/biome(#783) · 별 배경(#738) · 지구 육지 마스크(#1119) 가 전부
- * 들어갔다. 본 가드는 그 4개월치를 **전건 PASS** 로 통과시켰다. 재캡처 여부는 #1122 의
- * 비목표라 본 변경에서 다루지 않는다 — 관측만 남긴다.
+ *   solar high↔mid `3.54%` / body high↔mid `2.04%` / inner high↔mid `1.41%`
+ *   **mid↔low 는 3 tier 전부 `0.01%`**  ← 9장 중 3장은 독립 정보가 없다
  *
- * ⚠️ 측정 환경에 따라 값이 달라진다 — 이슈 #1122 본문의 표(`body-high 3.20%` 등)는 PR #1121 의
- * **CI(swiftshader)** 실측이다. 위 표는 로컬 GPU 값이며 **결론(상한 < 임계)은 양쪽 동일**하다.
+ * 즉 **LOD 가 통째로 다른 레벨이어도 최대 `3.54%`** 이고 임계에 닿지 않는다. 이 가드는 자기
+ * 선언 목적(LOD 회귀)조차 현재 임계로는 검출하지 못한다.
+ *
+ * ### (3) 자동 발화 `0` — CI 에 배선된 적이 없다
+ *
+ * `.github/**` 안의 `verify:lod` hit 은 **주석 1건**(`shader-pixel-guard.yml` 이 *"보완 가드로
+ * 기대되던 이 스크립트가 눈이 멀어 있다"* 고 적은 것) 뿐이고, `git log -S 'verify:lod' -- .github`
+ * 는 **0 커밋**이며 `verify:smoke` 같은 aggregator 에도 없다. **수동 실행 전용**이다.
+ *
+ * ⚠️ 따라서 *"이 가드가 4개월치 시각 변경을 전건 PASS 로 통과시켰다"* 는 **성립하지 않는다** —
+ * 통과시킨 게 아니라 **실행되지 않았다.** (baseline 9장이 `ff4e88d`(2026-04-24, #289) 이후 갱신
+ * 되지 않은 것은 사실이고, 그 사이 #756 · #773 · #782 · #783 · #738 · #1119 가 들어간 것도
+ * 사실이다. 틀린 것은 인과다.) 재캡처·CI 배선은 #1122 비목표라 여기서 다루지 않는다.
  *
  * ⇒ **표면 회귀는 지대별 verify 가 담당한다** (`browser-verify-1119-earth-mask.mjs` /
- * `browser-verify-783-earth-detail.mjs`). 본 가드는 그것을 지키는 척하지 않는다.
+ * `browser-verify-783-earth-detail.mjs`) — 그쪽은 CI 에 배선돼 있다. 본 가드는 그것을 지키는
+ * 척하지 않는다.
  *
  * ## pixel diff 방식
  *
@@ -86,8 +90,22 @@
  *  - 축을 바꾸면 커밋된 baseline 9장의 **의미가 바뀐다** — 재캡처 없이는 해석이 성립하지 않는다.
  *
  * disk bbox 산식은 `browser-verify-1119-earth-mask.mjs` / `browser-verify-783-earth-detail.mjs`
- * 와 **같다** (`boundingSphere.radiusWorld / √3` 의 카메라 right 방향 edge 투영) — 셰이더 LOD
- * 판정과도 같은 산식이다.
+ * 와 **같다** (`boundingSphere.radiusWorld / √3` 의 카메라 right 방향 edge 투영).
+ * ⚠️ 초판은 여기에 *"셰이더 LOD 판정과도 같은 산식"* 이라고 덧붙였는데 **근거가 없다** — scene 의
+ * LOD 는 `screenCoverageRadius`(`body.radius × bodyScale`) 로 판정하며 `boundingSphere` 를 거치지
+ * 않는다 (PR #1126 reviewer S9). 두 verify 스크립트와 동형이라는 앞 문장만 유효하다.
+ *
+ * ⚠️ **`diskR` 은 결정적이지 않다.** 같은 머신 반복 실행에서 `inner`/`body` 는 최대 `±25%` 흔들린다
+ * (`solar` 만 floating origin 앵커라 안정). 따라서 이 지표는 **한 실행 안의 상대 비교**로만 읽고,
+ * 절대값을 문서에 박제할 때는 rev·환경·실행 횟수를 함께 적는다 (ADR `20260808-983` §4항).
+ *
+ * ⚠️ **bbox 는 정사각인데 disk 는 원이다.** 모서리 배경이 분모·분자에 섞여 `diskDiffPct` 는 원반
+ * 대비를 **`×1.19~1.29` 과소평가**한다 (모서리 = bbox 의 `21.5~22.7%`, 해석값 `1 − π/4` 와 정합).
+ * 편차 방향이 **과소**라 「사각이 있다」는 결론을 약화시키는 쪽이므로 그대로 둔다.
+ *
+ * ⚠️ `diskFrameShare` 는 `π r²` 를 **clamp 없이** 쓰는 반면 `computeDiskDiffPct` 의 bbox 는 프레임
+ * 경계로 clamp 한다. disk 가 화면 밖으로 잘리면 상한이 실제보다 커지는데, 방향이 **보수적**
+ * (상한 과대 → 「도달 불가」 주장이 약해짐)이라 유지한다.
  *
  * ## headless swiftshader freeze 완화 (volt #33)
  *
@@ -205,6 +223,9 @@ if (outcome === 'scene-not-ready') process.exit(1);
  *   판정에 영향을 주지 않으므로 조용히 생략한다)
  */
 async function measureDiskBBox(page, bodyId) {
+  // ⚠️ `meshes.get(id)` 는 **sphere variant** 다. `low` LOD 의 billboard 는 별도 Map 에 있어
+  //    `low` 3행의 `diskR` 은 「화면에 실제로 그려진 것」이 아니라 sphere 기준값이다
+  //    (PR #1126 reviewer S6). 이 지표는 **6/9 측정 + 3/9 개념 불일치**로 읽어야 한다.
   return page.evaluate((id) => {
     const scene = window.__simCore?.scene;
     const mesh = window.__solarScene?.meshes?.get(id);
@@ -296,6 +317,9 @@ async function runCombo(page, combo) {
     return {
       combo: key,
       diffPct: 100,
+      diskDiffPct: null,
+      diskR: null,
+      diskFrameShare: null,
       pass: false,
       reason: `focus 실패 (${focusBodyId}): ${focusResult.reason}`,
     };
@@ -318,6 +342,9 @@ async function runCombo(page, combo) {
     return {
       combo: key,
       diffPct: 100,
+      diskDiffPct: null,
+      diskR: null,
+      diskFrameShare: null,
       pass: false,
       reason: `tier solar 전환 실패 (실제: ${actualTier})`,
     };
@@ -341,6 +368,9 @@ async function runCombo(page, combo) {
     return {
       combo: key,
       diffPct: 0,
+      diskDiffPct: null,
+      diskR: null,
+      diskFrameShare: null,
       pass: true,
       reason: updateBaseline ? 'baseline 갱신' : 'baseline 신규 생성',
     };
@@ -354,6 +384,9 @@ async function runCombo(page, combo) {
     return {
       combo: key,
       diffPct: 100,
+      diskDiffPct: null,
+      diskR: null,
+      diskFrameShare: null,
       pass: false,
       reason: `viewport 크기 불일치: baseline ${baselinePng.width}x${baselinePng.height} vs current ${currentPng.width}x${currentPng.height}`,
     };
@@ -380,7 +413,7 @@ async function runCombo(page, combo) {
     diffPct,
     diskDiffPct: diskInfo?.pct ?? null,
     diskR: disk?.r ?? null,
-    // disk 가 프레임에서 차지하는 면적 비율 = 이 조합에서 **프레임 대비 diff 의 구조적 상한**.
+    // disk 가 프레임에서 차지하는 면적 비율 = **표면만 바뀌었을 때** 프레임 대비 diff 의 상한.
     diskFrameShare: disk ? ((Math.PI * disk.r * disk.r) / totalPixels) * 100 : null,
     pass: diffPct < MAX_DIFF_PCT_THRESHOLD,
     reason:
@@ -405,10 +438,19 @@ console.log(`  threshold: ${MAX_DIFF_PCT_THRESHOLD}%`);
 
 // ── 보조 지표 (#1122) — 판정에 쓰지 않는다. §diskDiffPct 참조.
 //    `상한` 이 임계보다 작은 조합은 **표면이 100% 바뀌어도 이 가드로는 FAIL 할 수 없다**.
-const diskRows = results.filter((r) => r.diskDiffPct !== null);
+// ⚠️ `!== null` 로 거르면 **`undefined` 가 통과한다.** 조기 반환 경로(focus 실패 / tier 실패 /
+//    viewport 불일치 / baseline 신규 생성)는 이 키 자체를 만들지 않으므로, 타입으로 판정해야
+//    `r.diskR.toFixed()` 가 TypeError 로 죽지 않는다 (PR #1126 reviewer B1 — baseline 신규
+//    생성이 9/9 성공인데 exit 1 이 되는 회귀를 실증했다).
+const diskRows = results.filter(
+  (r) => typeof r.diskDiffPct === 'number' && typeof r.diskR === 'number',
+);
 if (diskRows.length > 0) {
   console.log('\n[보조] focus body disk 기준 (판정 무관 — #1122)');
-  console.log('  combo         diskR    frame대비 diff   disk대비 diff   구조적 상한');
+  // ⚠️ 마지막 칸은 «disk 가 프레임에서 차지하는 비율» 이다. 「프레임 대비 diff 의 상한」이라고
+  //    읽으면 옆 칸에 바로 반증된다 — 프레임 diff 에는 배경·별·HUD 변화가 함께 들어오므로
+  //    disk 지분보다 큰 값이 정상이다. 이 칸이 뜻하는 것은 **표면만 바뀌었을 때의 상한**이다.
+  console.log('  combo         diskR    frame대비 diff   disk대비 diff   disk 지분(표면 상한)');
   for (const r of diskRows) {
     const blind = r.diskFrameShare < MAX_DIFF_PCT_THRESHOLD ? '  ← 임계 도달 불가' : '';
     console.log(
