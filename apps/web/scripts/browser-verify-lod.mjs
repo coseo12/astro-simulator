@@ -248,6 +248,9 @@ async function measureDiskBBox(page, bodyId) {
     const e = Vector3.Project(center.add(right.scale(radiusWorld)), idMat, transform, vp);
     const r = Math.hypot(e.x - c.x, e.y - c.y);
     if (!Number.isFinite(r) || r <= 0) return null;
+    // ⚠️ 렌더 해상도(rw/rh)를 함께 돌려준다 — 호출부가 `diskFrameShare` 를 스크린샷 픽셀 수로
+    //    나누므로, devicePixelRatio ≠ 1 이면 두 좌표계가 어긋나 **조용히 틀린 비율**이 나온다
+    //    (PR #1126 reviewer S7). 호출부에서 대조한다.
     return { cx: c.x, cy: c.y, r, rw, rh };
   }, bodyId);
 }
@@ -258,6 +261,10 @@ async function measureDiskBBox(page, bodyId) {
  * bbox 를 프레임 경계로 clamp 한 뒤 그 영역만 잘라 `pixelmatch` 를 재실행한다. 전체 diff 를
  * 재사용하지 않는 이유는 pixelmatch 가 반환하는 것이 **총계뿐**이라 영역별 분해가 안 되기
  * 때문이다.
+ *
+ * ⚠️ **잘라서 다시 재면 경계 픽셀의 anti-alias 판정이 달라진다** — crop 경계에서는 이웃 픽셀이
+ * 없어 `pixelmatch` 의 AA 휴리스틱이 다르게 동작한다. 실측 편차는 최대 `119`px (상대 `0.49%`)로
+ * 보조 지표의 해석을 바꾸지 않는 규모다 (PR #1126 reviewer S4).
  */
 function computeDiskDiffPct(baselinePng, currentPng, disk) {
   const { width, height } = currentPng;
@@ -406,15 +413,24 @@ async function runCombo(page, combo) {
   writeFileSync(diffPath, PNG.sync.write(diffPng));
 
   // 보조 지표 — disk 안에서만 다시 잰 diff. **판정에 쓰지 않는다** (§diskDiffPct).
-  const diskInfo = disk ? computeDiskDiffPct(baselinePng, currentPng, disk) : null;
+  // ⚠️ 렌더 해상도 ↔ 스크린샷 해상도가 어긋나면 좌표계가 달라 지표가 조용히 틀린다 (S7).
+  //    보조 지표라 차단하지 않고 **생략 + 경고**한다 — 판정에는 영향이 없다.
+  if (disk && (disk.rw !== width || disk.rh !== height)) {
+    console.warn(
+      `  [보조지표 생략] ${key}: 렌더 ${disk.rw}x${disk.rh} ≠ 스크린샷 ${width}x${height}` +
+        ' (devicePixelRatio ≠ 1 로 추정 — diskDiffPct 좌표계 불일치)',
+    );
+  }
+  const coordOk = disk && disk.rw === width && disk.rh === height;
+  const diskInfo = coordOk ? computeDiskDiffPct(baselinePng, currentPng, disk) : null;
 
   return {
     combo: key,
     diffPct,
     diskDiffPct: diskInfo?.pct ?? null,
-    diskR: disk?.r ?? null,
+    diskR: coordOk ? disk.r : null,
     // disk 가 프레임에서 차지하는 면적 비율 = **표면만 바뀌었을 때** 프레임 대비 diff 의 상한.
-    diskFrameShare: disk ? ((Math.PI * disk.r * disk.r) / totalPixels) * 100 : null,
+    diskFrameShare: coordOk ? ((Math.PI * disk.r * disk.r) / totalPixels) * 100 : null,
     pass: diffPct < MAX_DIFF_PCT_THRESHOLD,
     reason:
       diffPct < MAX_DIFF_PCT_THRESHOLD

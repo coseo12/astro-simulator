@@ -37,7 +37,7 @@ Semantic Versioning을 따른다.
 
   **판정 축을 disk 로 교체하지 않은 이유** (이슈 §대안 B 와 같은 논거): body 마다 disk 면적이 달라 단일 임계가 안 잡히고(solar 태양 vs body 지구는 화면 점유가 수십 배 차이), `low` variant 는 billboard 라 disk 개념이 mesh 와 다르며, 축을 바꾸면 **커밋된 baseline 9장의 의미가 바뀐다**. 그래서 표면 회귀는 지대별 verify(`1119-earth-mask` / `783-earth-detail`)가 담당한다는 **현행 운영 형태를 명문화**하는 쪽(이슈 §대안 C)을 택했다.
 
-  ⚠️ **이슈 본문 수치 2건을 정정했다** — 프레임 면적을 `1280×720 = 921,600` 으로 계산했으나 이 가드의 viewport 는 **`1280×800 = 1,024,000`** 이고(baseline PNG IHDR 직독), disk 반경 `98.32px` 는 **`browser-verify-1119-earth-mask.mjs`(`1280×720`, 자체 카메라)** 의 값이라 조건이 다르다. **결론(상한 < 임계)은 양쪽 모두에서 성립한다.**
+  ⚠️ **이슈 본문 수치 2건을 정정했다** — 프레임 면적을 `1280×720 = 921,600` 으로 계산했으나 이 가드의 viewport 는 **`1280×800 = 1,024,000`** 이고(baseline PNG IHDR 직독), disk 반경 `98.32px` 는 **`browser-verify-1119-earth-mask.mjs`(`1280×720`, 자체 카메라)** 의 값이라 조건이 다르다. **결론(상한 < 임계)은 양쪽 모두에서 성립한다.** ⚠️ **다만 정정의 파급이 있다** — 이슈의 원 추론은 _"`body-high` 실측 `3.20%` 가 상한 `3.295%` 와 거의 같으니 disk 가 사실상 전부 바뀐 것"_ 이었는데, 올바른 반경·프레임으로는 그 근사 등식이 성립하지 않는다. **「disk 가 전부 바뀌었다」는 별도로 `diskDiffPct` 로 재야 하고**, 그것이 이 PR 이 그 지표를 추가한 이유다.
 
 - **[#1119] 지구 대륙 윤곽 실제화 구현 — Natural Earth 육지 마스크 1장 (MINOR)** ([#1119](https://github.com/coseo12/astro-simulator/issues/1119)) — ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 4** (`Accepted`) 의 §결정 1~8 이행. 설계는 재개봉하지 않았다.
 
