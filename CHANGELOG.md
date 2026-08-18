@@ -27,6 +27,14 @@ Semantic Versioning을 따른다.
 
   상세: [`docs/decisions/20260628-756-procedural-planet-surface.md`](docs/decisions/20260628-756-procedural-planet-surface.md) §Amendment 5
 
+### Notes
+
+- **[#1130] cross-validate (agy) 결과** — `APPROVED` / blocking `0`. 고유 발견 3건 중 **2건 수용**(ring 정합 테스트를 손유도식 → Babylon `Matrix.RotationX` 실제 변환으로 교체 / `solar-system-scene.ts` 주석 상수 심볼화), **1건 후속 분리**([#1132](https://github.com/coseo12/astro-simulator/issues/1132) — 공전 궤도면 경사각 회귀 가드 자산화, #1130 비목표라 스코프 팽창 회피).
+
+  ⚠️ **수용 전 실측 sanity check 를 선행했다** — 권고 2는 「테스트가 틀린 것을 검증 중일 수 있다」는 의심을 포함했으므로, 손유도식과 Babylon 실제 변환의 편차를 먼저 쟀다. 최대 `2.07e-8`(Babylon `Matrix` 가 float32)로 **내 유도는 정확**했고, 그럼에도 채택한 이유는 **Babylon 이 회전 규약을 바꾸면 손유도식은 눈이 멀기 때문**이다. tolerance 를 `9` → `7` 자리로 완화했으나 판별력은 재실측으로 확인했다 — `π → π/2` 변이 **2 FAIL**, `π + 1e-3` 미세 변이도 **2 FAIL**.
+
+  ⚠️ reviewer 와 cross-validate 가 **독립적으로 같은 지적**을 한 항목이 1건 있다 (공전 궤도 재현 경로 부재 — reviewer B3ⓒ / agy 권고 3). 두 검증이 겹친 지점이라 후속 이슈의 우선 근거로 기록한다.
+
 ## [0.76.0] - 2026-08-18
 
 ### Behavior Changes

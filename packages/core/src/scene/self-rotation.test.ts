@@ -169,10 +169,16 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
     for (const [, degrees] of OBLIQUITY) {
       const tiltRad = (degrees * Math.PI) / 180;
       const pole = poleOf(spin(epoch, { omega: TWO_PI, tiltRad }));
-      // ring disc: local 법선 +Z 를 X 축으로 (RING_DISC_BASE_TILT_X + tiltRad) 회전.
+      // ring disc: local 법선 +Z 를 `disc.rotation.x` 가 만드는 **실제 Babylon 변환**으로 옮긴다.
+      // ⚠️ 손유도식(`(0, −sinθ, cosθ)`)을 쓰지 않는 이유 — 그 식은 Babylon 의 회전 규약이 바뀌어도
+      // 눈이 먼다. 실제 행렬을 쓰면 파이프라인 변경이 여기서 드러난다 (cross-validate 권고 2).
+      // 실측상 두 경로의 차는 ≤ 2.1e-8 (Babylon `Matrix` 가 float32) 이라 판정에는 영향이 없다.
       const theta = RING_DISC_BASE_TILT_X + tiltRad;
-      const ringNormal = new Vector3(0, -Math.sin(theta), Math.cos(theta));
-      expect(Math.abs(Vector3.Dot(pole, ringNormal))).toBeCloseTo(1, 9);
+      const ringNormal = Vector3.TransformNormal(
+        new Vector3(0, 0, 1),
+        Matrix.RotationX(theta),
+      ).normalize();
+      expect(Math.abs(Vector3.Dot(pole, ringNormal))).toBeCloseTo(1, 7);
     }
   });
 
