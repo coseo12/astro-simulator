@@ -33,16 +33,35 @@
  * (300/500) 는 tier-transition.ts 수식 주석 박제. 향후 scene 에 `state.transitioning` 을 정식
  * export 하면 polling 기반 대기로 개선 가능 (후속 이슈 후보).
  *
- * ## ⚠️ 본 가드의 실효 범위 (#1122) — **현재 임계로는 아무것도 검출하지 못한다**
+ * ## ⚠️ 본 가드의 실효 범위 (#1122) — **측정한 회귀 클래스 4종을 전부 놓친다**
  *
- * 아래 셋은 전부 커밋된 산출물로 재현 가능한 사실이다. 「무엇을 지키는가」보다 **무엇을 지키지
+ * 아래는 전부 커밋된 산출물로 재현 가능한 사실이다. 「무엇을 지키는가」보다 **무엇을 지키지
  * 못하는가**를 먼저 적는다 — 그것을 모르면 이 가드의 초록을 근거로 쓰게 된다.
+ *
+ * ⚠️ **「아무것도 검출 못 한다」로 적지 않는다** — 그건 전칭 부정이고 반례가 있다. 배경색 전환급
+ * 전면 변경은 `98.78~99.42%` 로 잡히고, 임계를 **경유하지 않는** FAIL 경로 4개(focus 실패 /
+ * tier 실패 / viewport 불일치 / 씬 미노출)도 살아 있다 (PR #1126 reviewer 라운드 2 S3).
+ * 정확히 말하면 **프레임 대비 diff 임계가 무력한 회귀 클래스가 아래 4종**이라는 것이다.
+ *
+ *   | 회귀 클래스 | 실측 diff | 임계 `15%` |
+ *   | 표면(텍스처·셰이더) 전면 교체 | disk 지분이 상한 (아래 (1)) | 미달 |
+ *   | LOD 레벨 전면 교체 | 최대 `3.54%` (아래 (2)) | 미달 |
+ *   | 카메라/tier 가 통째로 엉뚱한 곳 | `0.48~4.44%` | 미달 |
+ *   | **화면 전체 검정 (파국적 렌더 실패)** | `0.52~4.25%` | **미달** |
+ *
+ * 마지막 줄이 이 가드의 성격을 가장 잘 보여준다 — 우주 배경이 대부분 검정이라 **렌더가 통째로
+ * 죽어도 프레임 대비 diff 는 임계에 닿지 않는다.**
  *
  * ### (1) 표면 회귀 — 구조적으로 도달 불가
  *
  * focus body 의 disk 가 프레임에서 차지하는 면적이 작아 **disk 픽셀이 100% 바뀌어도** 프레임
- * 대비 diff 는 그 면적 비율(`diskFrameShare`)을 넘지 못한다. 실측에서 **9/9 전 조합**의 상한이
- * `1.5%~3.7%` 로 임계 `15%` 에 못 미쳤다 — 사각은 body tier 에 국한되지 않고 **매트릭스 전체**다.
+ * 대비 diff 는 그 면적 비율(`diskFrameShare`)을 넘지 못한다. 사각은 body tier 에 국한되지 않고
+ * **매트릭스 전체**다.
+ *
+ * ⚠️ **범위 수치를 박제하지 않는다.** `diskR` 이 비결정적이라(아래 §diskDiffPct) 실행마다 상한
+ * 범위가 달라진다 — 관측된 스프레드만 해도 `1.4%~5.4%`(로컬 GPU, 메인 2회 + reviewer 4회)다.
+ * **불변인 것은 「9/9 전 조합이 임계 `15%` 에 못 미친다」** 이고, 그것이 이 절의 주장이다.
+ * 절대값이 필요하면 그 자리에서 재고 rev·환경·실행 횟수를 함께 적는다.
  *
  * ### (2) LOD 회귀 — **이것도 도달 불가** (초판이 반대로 적었다)
  *
@@ -248,9 +267,15 @@ async function measureDiskBBox(page, bodyId) {
     const e = Vector3.Project(center.add(right.scale(radiusWorld)), idMat, transform, vp);
     const r = Math.hypot(e.x - c.x, e.y - c.y);
     if (!Number.isFinite(r) || r <= 0) return null;
-    // ⚠️ 렌더 해상도(rw/rh)를 함께 돌려준다 — 호출부가 `diskFrameShare` 를 스크린샷 픽셀 수로
-    //    나누므로, devicePixelRatio ≠ 1 이면 두 좌표계가 어긋나 **조용히 틀린 비율**이 나온다
-    //    (PR #1126 reviewer S7). 호출부에서 대조한다.
+    // 렌더 해상도(rw/rh)를 함께 돌려준다 — 호출부가 `diskFrameShare` 를 스크린샷 픽셀 수로
+    //    나누므로 두 좌표계가 어긋나면 **조용히 틀린 비율**이 나온다. 호출부에서 대조한다.
+    // ⚠️ **`devicePixelRatio ≠ 1` 은 이 불일치를 만들지 않는다** — `engine-factory.ts` 가
+    //    `adaptToDeviceRatio: true` 라 DPR 이 오르면 렌더 버퍼도 함께 커지고 (#623 실측:
+    //    *"DPR 1 vs 2 에서 getRenderHeight 720→1440"*, `render/lod.ts` §단위), 스크린샷도 같이
+    //    커져 **양쪽이 일치한다**. `deviceScaleFactor: 2` 주입 실측에서 게이트는 미발화했다
+    //    (PR #1126 reviewer 라운드 2 S2 — 라운드 1 의 내 원인 진단이 틀렸다).
+    //    이 저장소에서 도달 가능한 트리거는 확인되지 않았다 (`setHardwareScalingLevel` 호출 0).
+    //    그럼에도 대조를 남기는 이유는 **불일치 시 틀린 값을 내는 것보다 생략이 낫기** 때문이다.
     return { cx: c.x, cy: c.y, r, rw, rh };
   }, bodyId);
 }
@@ -413,12 +438,13 @@ async function runCombo(page, combo) {
   writeFileSync(diffPath, PNG.sync.write(diffPng));
 
   // 보조 지표 — disk 안에서만 다시 잰 diff. **판정에 쓰지 않는다** (§diskDiffPct).
-  // ⚠️ 렌더 해상도 ↔ 스크린샷 해상도가 어긋나면 좌표계가 달라 지표가 조용히 틀린다 (S7).
+  // 렌더 해상도 ↔ 스크린샷 해상도가 어긋나면 좌표계가 달라 지표가 조용히 틀린다.
   //    보조 지표라 차단하지 않고 **생략 + 경고**한다 — 판정에는 영향이 없다.
+  //    ⚠️ 현재 저장소에서 이 분기의 도달 경로는 확인되지 않았다 (`measureDiskBBox` 주석 참조).
   if (disk && (disk.rw !== width || disk.rh !== height)) {
     console.warn(
       `  [보조지표 생략] ${key}: 렌더 ${disk.rw}x${disk.rh} ≠ 스크린샷 ${width}x${height}` +
-        ' (devicePixelRatio ≠ 1 로 추정 — diskDiffPct 좌표계 불일치)',
+        ' — 좌표계 불일치로 diskDiffPct 생략',
     );
   }
   const coordOk = disk && disk.rw === width && disk.rh === height;
@@ -459,7 +485,10 @@ console.log(`  threshold: ${MAX_DIFF_PCT_THRESHOLD}%`);
 //    `r.diskR.toFixed()` 가 TypeError 로 죽지 않는다 (PR #1126 reviewer B1 — baseline 신규
 //    생성이 9/9 성공인데 exit 1 이 되는 회귀를 실증했다).
 const diskRows = results.filter(
-  (r) => typeof r.diskDiffPct === 'number' && typeof r.diskR === 'number',
+  (r) =>
+    typeof r.diskDiffPct === 'number' &&
+    typeof r.diskR === 'number' &&
+    typeof r.diskFrameShare === 'number',
 );
 if (diskRows.length > 0) {
   console.log('\n[보조] focus body disk 기준 (판정 무관 — #1122)');
