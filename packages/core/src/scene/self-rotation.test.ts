@@ -10,8 +10,13 @@
  *   (ii) 자전각은 **jd 순수 함수** — 매 프레임 누적이 아니므로 동일 jd 는 항상 동일 quaternion.
  */
 import { describe, expect, it } from 'vitest';
-import { Quaternion } from '@babylonjs/core';
-import { computeRotationState, computeSpinQuaternion } from './self-rotation.js';
+import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
+import {
+  computeRotationState,
+  computeSpinQuaternion,
+  ORBITAL_NORMAL_OFFSET,
+} from './self-rotation.js';
+import { RING_DISC_BASE_TILT_X } from './ring-shader.js';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 /** 자전 파라미터만 의미 있는 최소 body stub (본 모듈은 id/radius/orbit 을 읽지 않는다). */
@@ -63,7 +68,48 @@ describe('#782 — computeRotationState (자전 파라미터 산출)', () => {
   });
 });
 
+/**
+ * #1130 — quaternion 을 **성분으로** 단언하지 않는다. 성분 단언은 구현 세부(기준면 보정 등)에
+ * 결합돼, 정작 물어야 할 「자전축이 궤도 법선 대비 obliquity 인가」를 검사하지 않는다.
+ * 실제로 구 테스트 4건은 성분만 보느라 **전 행성 90° 오정렬을 6주간 통과**시켰다.
+ */
+function poleOf(q: Quaternion): Vector3 {
+  const m = new Matrix();
+  Matrix.FromQuaternionToRef(q, m);
+  return Vector3.TransformNormal(new Vector3(0, 1, 0), m).normalize();
+}
+/** 두 단위벡터 사이 각 [deg]. */
+function angleDeg(a: Vector3, b: Vector3): number {
+  return (Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(a, b)))) * 180) / Math.PI;
+}
+/**
+ * 이 씬의 **기준 궤도 법선** — world Z (#1130).
+ *
+ * 근거는 측정이 아니라 **구조**다: `physics/state-vector.ts` 가 `z = sinI · y₁` 로 궤도면을 만들어,
+ * inclination `0` 이면 `z ≡ 0` 이다. 즉 기준 궤도면(황도)은 **XY** 이고 씬은 이 좌표를 기저 변환
+ * 없이 직결한다.
+ *
+ * ⚠️ 엄밀히는 **황도** 법선이라 body 자기 궤도면과는 inclination 만큼 다르다 (mercury `7.005°` /
+ * moon `5.145°`). obliquity 를 「자기 궤도면 기준」으로 재려면 body 별 법선이 필요하다 — 그건
+ * #1130 범위 밖이고, 현재 데이터의 `axialTiltDeg` 도 NASA "obliquity to orbit" 값이라 이 근사와
+ * 같은 계열이다.
+ */
+const ORBITAL_NORMAL = new Vector3(0, 0, 1);
+
 describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자전각)', () => {
+  /** IAU obliquity (deg) — 자전하는 9 body 전건. 두 불변식(obliquity · ring 정합)이 공유한다. */
+  const OBLIQUITY: ReadonlyArray<readonly [string, number]> = [
+    ['mercury', 0.034],
+    ['venus', 177.36],
+    ['earth', 23.44],
+    ['mars', 25.19],
+    ['jupiter', 3.13],
+    ['saturn', 26.73],
+    ['uranus', 97.77],
+    ['neptune', 28.32],
+    ['moon', 6.68],
+  ];
+
   const state = { omega: TWO_PI, tiltRad: 0 }; // 1 day = 1 회전, tilt 없음
   const epoch = 2451545.0; // J2000
 
@@ -73,12 +119,10 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
     return out;
   }
 
-  it('jd === epoch → identity quaternion (spinAngle 0, tilt 0)', () => {
+  it('#1130 — tilt 0 이면 자전축이 **궤도 법선**과 일치 (구 기준은 world Y 였다)', () => {
     const q = spin(epoch);
-    expect(q.x).toBeCloseTo(0, 12);
-    expect(q.y).toBeCloseTo(0, 12);
-    expect(q.z).toBeCloseTo(0, 12);
-    expect(Math.abs(q.w)).toBeCloseTo(1, 12);
+    // 성분이 아니라 **자전축**을 본다. 보정 전에는 pole 이 world Y(궤도면 안)라 90° 누웠다.
+    expect(angleDeg(poleOf(q), ORBITAL_NORMAL)).toBeCloseTo(0, 9);
   });
 
   it('결정성 — 동일 jd 재호출은 매 프레임 누적 없이 항상 동일 값 (float drift 0)', () => {
@@ -97,31 +141,61 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
     expect(Math.abs(dot)).toBeCloseTo(1, 9);
   });
 
-  it('1/4 주기 (jd + 0.25일) 는 local Y 축 90° 회전 (spin 축 = pole)', () => {
-    const q = spin(epoch + 0.25);
-    // sin(π/4) = cos(π/4) ≈ 0.70710678 — Y 성분만 비0 (X/Z 성분 0 = 다른 축 오염 없음).
-    expect(q.y).toBeCloseTo(Math.SQRT1_2, 9);
-    expect(q.w).toBeCloseTo(Math.SQRT1_2, 9);
-    expect(q.x).toBeCloseTo(0, 12);
-    expect(q.z).toBeCloseTo(0, 12);
+  it('자전은 **자전축을 움직이지 않는다** (spin 축 == pole) — 1/4·1/2 주기', () => {
+    // spin 은 pole 주위 회전이므로 pole 자체는 불변이어야 한다. 성분 대신 이 불변식을 본다.
+    const p0 = poleOf(spin(epoch));
+    for (const dj of [0.25, 0.5, 0.75]) {
+      expect(angleDeg(p0, poleOf(spin(epoch + dj)))).toBeCloseTo(0, 9);
+    }
   });
 
   it('큰 jd 에서도 정밀도 보존 — (jd − epoch) 선뺄셈으로 각 오차 ≤ 1e-6 rad', () => {
     // 100년 후 (36,525일). float64 로 jd 를 먼저 빼지 않으면 유효숫자 손실이 발생하는 구간.
     const days = 36525;
-    const q = spin(epoch + days);
-    // ω = 2π (정수 회전수) → 100년 후에도 identity 로 복귀해야 한다.
-    expect(Math.abs(q.w)).toBeCloseTo(1, 6);
-    expect(q.y).toBeCloseTo(0, 6);
+    const start = spin(epoch);
+    const later = spin(epoch + days);
+    // ω = 2π (정수 회전수) → 100년 후에도 **시작 자세**로 복귀해야 한다 (회전 동치 |dot| ≈ 1).
+    const dot = start.x * later.x + start.y * later.y + start.z * later.z + start.w * later.w;
+    expect(Math.abs(dot)).toBeCloseTo(1, 6);
   });
 
-  it('tilt 합성 — q = tilt(world X) ∘ spin(local Y), spinAngle 0 이면 tilt 단독', () => {
-    const tilted = spin(epoch, { omega: TWO_PI, tiltRad: Math.PI / 2 });
-    // X 축 90° 회전 = (sin45, 0, 0, cos45).
-    expect(tilted.x).toBeCloseTo(Math.SQRT1_2, 9);
-    expect(tilted.w).toBeCloseTo(Math.SQRT1_2, 9);
-    expect(tilted.y).toBeCloseTo(0, 12);
-    expect(tilted.z).toBeCloseTo(0, 12);
+  it('#1130 — ring 평면이 적도면과 일치한다 (body ↔ ring 짝 불변식, 9 body 전건)', () => {
+    // ⚠️ 이 테스트가 없으면 ring 쪽 상수만 되돌려도 **845 전건이 초록**이다 (reviewer 변이 M3 실측).
+    // body 의 `ORBITAL_NORMAL_OFFSET` 과 ring 의 `RING_DISC_BASE_TILT_X` 는 **짝**이고, 둘의 차 π/2 는
+    // disc local 법선(+Z) 과 body pole(local +Y) 의 축 차이를 메운다. 한쪽만 옮기면 여기서 깨진다.
+    //
+    // 판정은 **평면 일치** `|cos| == 1` 이다. disc 는 양면이라 법선의 **부호는 물리적 의미가 없고**,
+    // 이 정렬에서 실제로는 pole 의 반대 방향(180°)이 나온다.
+    for (const [, degrees] of OBLIQUITY) {
+      const tiltRad = (degrees * Math.PI) / 180;
+      const pole = poleOf(spin(epoch, { omega: TWO_PI, tiltRad }));
+      // ring disc: local 법선 +Z 를 `disc.rotation.x` 가 만드는 **실제 Babylon 변환**으로 옮긴다.
+      // ⚠️ 손유도식(`(0, −sinθ, cosθ)`)을 쓰지 않는 이유 — 그 식은 Babylon 의 회전 규약이 바뀌어도
+      // 눈이 먼다. 실제 행렬을 쓰면 파이프라인 변경이 여기서 드러난다 (cross-validate 권고 2).
+      // 실측상 두 경로의 차는 ≤ 2.1e-8 (Babylon `Matrix` 가 float32) 이라 판정에는 영향이 없다.
+      const theta = RING_DISC_BASE_TILT_X + tiltRad;
+      const ringNormal = Vector3.TransformNormal(
+        new Vector3(0, 0, 1),
+        Matrix.RotationX(theta),
+      ).normalize();
+      expect(Math.abs(Vector3.Dot(pole, ringNormal))).toBeCloseTo(1, 7);
+    }
+  });
+
+  it('#1130 — 두 기준 상수의 차는 정확히 π/2 (축 차이 — disc +Z vs pole +Y)', () => {
+    // 위 불변식이 성립하는 **이유**를 직접 고정한다. 값 자체가 아니라 **관계**가 계약이다.
+    expect(RING_DISC_BASE_TILT_X - ORBITAL_NORMAL_OFFSET).toBeCloseTo(Math.PI / 2, 12);
+  });
+
+  it('#1130 — obliquity 는 **궤도 법선에서 재는 각**이다 (9 body 전건)', () => {
+    // 「누운 행성」(uranus/venus)이 실제로 눕는지가 판별력의 핵심 — 보정 전 uranus 는 7.77° 로
+    // **똑바로 서 보였다**(기대 97.77°). 정상 행성과 역행 행성이 서로 뒤바뀐 형태였다.
+    for (const [id, degrees] of OBLIQUITY) {
+      const q = spin(epoch, { omega: TWO_PI, tiltRad: (degrees * Math.PI) / 180 });
+      // 허용 오차 5e-5° — `acos` 의 수치 오차(실측 최대 1.2e-6°)보다 크고 계약값 ±0.05° 보다
+      //   3 자릿수 엄격하다. 6 자리로 조이면 saturn 이 acos 오차만으로 FAIL 한다.
+      expect(angleDeg(poleOf(q), ORBITAL_NORMAL), id).toBeCloseTo(degrees, 4);
+    }
   });
 
   it('out 파라미터에 결과를 쓰고 tmp 버퍼를 재사용 (매 프레임 alloc 0 계약)', () => {

@@ -5,6 +5,36 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1130] 전 행성의 자전축이 궤도 법선 기준으로 선다 (MINOR)** — 지구·화성 등이 **더 이상 옆으로 누워 있지 않다**. obliquity 측정값이 IAU 값과 **9/9 소수 3자리 일치**한다 (지구 `23.440°` / 천왕성 `97.770°` / 금성 `177.360°`). 고리(jupiter · uranus · neptune)는 body 와 **함께** 같은 크기의 보정을 받아 **ring 평면 ↔ 적도면 일치**(`|cos| = 1`)를 유지한다. 자전 속도·방향·`?t=` 결정성은 **무변경**이고, 셰이더의 `maskV = acos(p.y)`(local +Y = 북극) 계약도 **불변**이라 지구 대륙(#1119)·극관(#783)·낮밤(#773)은 그대로 얹힌다. **공전 궤도는 이번 변경 대상이 아니며 8/8 정합으로 이상 없음을 확인했다** (세션 내 임시 스크립트 1회 실측 — 재현 스크립트는 리포에 박제하지 않았다).
+
+### Fixed
+
+- **[#1130] 자전축 90° 오정렬 — obliquity 기준면이 궤도면 «안»이었다 (MINOR)** ([#1130](https://github.com/coseo12/astro-simulator/issues/1130)) — #782 가 도입한 self-rotation 이 **기준면을 잘못 잡았다.** 이 씬의 기준 궤도면은 XY 라 궤도 법선은 **world Z** 인데(근거는 측정이 아니라 **구조** — `physics/state-vector.ts` 의 `z = sinI · y₁` 이 inclination `0` 에서 `z ≡ 0` 을 보장한다), spin 축이 local Y 여서 보정이 없으면 `tiltRad = 0` 인 body 의 자전축이 궤도면 **안**에 눕는다. 결과적으로 **전 행성이 90° 누웠다** — 지구 `66.56°`(기대 `23.44°`) / 화성 `64.81°`(기대 `25.19°`).
+
+  **천왕성이 진단을 확증했다** — 「옆으로 누운 행성」이 `7.77°` 로 **오히려 똑바로 서 있었고** 정상 행성들이 누워 있었다. 오차가 아니라 **기준면이 뒤바뀐** 형태다. 수정은 `ORBITAL_NORMAL_OFFSET = π/2` 를 tilt 각에 더하고, ring 기준 회전을 `RING_DISC_BASE_TILT_X` 로 상수화해 `π/2` → **`π`** 로 **같은 크기만큼 함께** 옮기는 것이다 (보정 전에도 두 축은 서로 정합했으므로 한쪽만 고치면 지금 맞는 정합이 깨진다). 두 상수의 차 `π/2` 는 **disc local 법선(+Z)** 과 **body pole(local +Y)** 의 축 차이다.
+
+  ⚠️ **가드가 6주간 틀린 명제를 정확히 PASS 시켰다.** `verify:782-rotation` 의 DoD 2 는 `acos(pole.y)`, DoD 3 은 `pole.y` 부호를 봤는데 **그 기준이 곧 버그의 정의**였다. 단위 테스트 4건도 quaternion **성분**(`q.y ≈ √½` 등)을 단언해 구현 세부에 결합돼 있었고 「자전축이 어디를 향하는가」는 한 번도 묻지 않았다. 이번에 가드는 `pole.z` 기준으로, 테스트는 `angle(pole, 궤도법선) == obliquity` **9 body 전건** 의미론적 단언으로 교체하고 **ring 짝 불변식**(`|cos(pole, ringNormal)| == 1` + 두 상수 차 `π/2`)을 신설했다.
+
+  **판별력은 변이 테스트로 실증했다** — ring 상수만 되돌리면 **2 FAIL**, body 상수만 되돌리면 **4 FAIL**, 부호를 뒤집으면(`−π/2`) **2 FAIL**, 원복 시 **847 PASS**. ⚠️ ring 불변식 신설 전에는 ring 만 되돌려도 **845 전건이 초록**이었다(판별력 0) — 브라우저 가드 DoD 6 도 같은 disc 를 두 시점 자기비교라 구조적으로 못 잡는다.
+
+  ⚠️ **가시화 계기는 #1119 다.** 그 전에는 표면이 절차적 fbm 이라 **자세가 틀려도 육안으로 드러나지 않았고**, 실제 대륙이 생기자 사용자가 즉시 발견했다 — 시각 검증의 판별력은 표면의 구체성에 의존한다.
+
+  **비-범위**: 축 방위각(azimuth)은 여전히 world X 고정 근사다(기준「면」만 고쳤다). obliquity 는 엄밀히 **황도** 법선 기준이라 body 자기 궤도면과 inclination 만큼 다르다(mercury `7.005°` / moon `5.145°`) — 데이터의 `axialTiltDeg` 도 NASA "obliquity to orbit" 이라 같은 계열의 근사다. `verify:lod` baseline 9장 재캡처는 그 가드가 CI 미배선이라 [#1127](https://github.com/coseo12/astro-simulator/issues/1127) 소관이다.
+
+  부수 발견 — `self-rotation.ts` 가 참조하던 `docs/decisions/20260701-782-self-rotation.md` 는 **존재한 적이 없는 경로**였다(dead reference). `.ts` 는 `verify-docs-links` 스캔 모집단(`docs/**` + 루트 md) 밖이라 잡히지 않았다. 실제 경로로 정정했다.
+
+  상세: [`docs/decisions/20260628-756-procedural-planet-surface.md`](docs/decisions/20260628-756-procedural-planet-surface.md) §Amendment 5
+
+### Notes
+
+- **[#1130] cross-validate (agy) 결과** — `APPROVED` / blocking `0`. 고유 발견 3건 중 **2건 수용**(ring 정합 테스트를 손유도식 → Babylon `Matrix.RotationX` 실제 변환으로 교체 / `solar-system-scene.ts` 주석 상수 심볼화), **1건 후속 분리**([#1132](https://github.com/coseo12/astro-simulator/issues/1132) — 공전 궤도면 경사각 회귀 가드 자산화, #1130 비목표라 스코프 팽창 회피).
+
+  ⚠️ **수용 전 실측 sanity check 를 선행했다** — 권고 2는 「테스트가 틀린 것을 검증 중일 수 있다」는 의심을 포함했으므로, 손유도식과 Babylon 실제 변환의 편차를 먼저 쟀다. 최대 `2.07e-8`(Babylon `Matrix` 가 float32)로 **내 유도는 정확**했고, 그럼에도 채택한 이유는 **Babylon 이 회전 규약을 바꾸면 손유도식은 눈이 멀기 때문**이다. tolerance 를 `9` → `7` 자리로 완화했으나 판별력은 재실측으로 확인했다 — `π → π/2` 변이 **2 FAIL**, `π + 1e-3` 미세 변이도 **2 FAIL**.
+
+  ⚠️ reviewer 와 cross-validate 가 **독립적으로 같은 지적**을 한 항목이 1건 있다 (공전 궤도 재현 경로 부재 — reviewer B3ⓒ / agy 권고 3). 두 검증이 겹친 지점이라 후속 이슈의 우선 근거로 기록한다.
+
 ## [0.76.0] - 2026-08-18
 
 ### Behavior Changes
