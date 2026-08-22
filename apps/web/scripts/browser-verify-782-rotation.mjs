@@ -11,7 +11,9 @@
  *
  * 측정 축 (ADR §A2.5 DoD):
  *  - DoD 1: 자전각 = jd 순수 함수 — 두 시점 quaternion 상대 회전각 Δ = 이론 ω·Δjd (±5%).
- *  - DoD 2: axialTilt body 적용 — 지구 자전축(local Y in world) 이 world Y 에서 23.44° 기울어짐.
+ *  - DoD 2: axialTilt body 적용 — 지구 자전축이 **궤도 법선(world Z)** 에서 23.44° 기울어짐.
+ *    ⚠️ 구판은 이 기준이 `world Y` 였다 (#1130). 그 기준 자체가 버그의 정의였고 가드는 6주간
+ *    PASS 를 보고했다 — **틀린 명제를 정확히** 검사한 셈이다.
  *  - DoD 3: 역행 부호 — 금성(177.36° obliquity)/천왕성(97.77°) 이 순행 body 와 반대 화면 spin 방향
  *           (규약 i: period 양수 magnitude, 방향은 obliquity>90 에서 창발 — CW).
  *  - DoD 6: ring wobble 0 — ring disc world normal 이 두 시점 불변 (body spin Δ>0 인데도).
@@ -100,7 +102,8 @@ async function measureRotation(page, body, jd0, jd1) {
         child.computeWorldMatrix?.(true);
         const wm = child.getWorldMatrix?.();
         if (!wm || !Vector3) return null;
-        // disc 는 rotation.x = π/2 + tilt 로 XZ 평면에 눕는다 → local +Z 가 disc 법선.
+        // disc 는 rotation.x = π + tilt (#1130 기준면 보정 포함) → local **−Z** 가 disc 법선.
+        //   (실측 역산: rotX(n, π/2+t) == pole 을 만족하는 n 은 −Z 였다. 구 주석의 '+Z' 는 부호 오기)
         const nLocal = new Vector3(0, 0, 1);
         const nWorld = Vector3.TransformNormal(nLocal, wm);
         nWorld.normalize();
@@ -153,26 +156,32 @@ async function measureRotation(page, body, jd0, jd1) {
         return { x: t.x, y: t.y, z: t.z };
       };
       const pole = rotateVecByQ({ x: 0, y: 1, z: 0 }, q0c);
-      // world Y 에서의 각도 = obliquity (tilt). acos(pole·(0,1,0)) = acos(pole.y).
-      const tiltMeasuredDeg = (Math.acos(Math.min(1, Math.max(-1, pole.y))) * 180) / Math.PI;
+      // #1130 — obliquity 는 **궤도 법선**에서 재는 각이다. 이 씬의 기준 궤도면은 XY (근거는
+      //   `physics/state-vector.ts` 의 `z = sinI·y₁` 이 i=0 에서 z≡0 을 보장하는 **구조**) 라
+      //   법선은 **world Z** → acos(pole·(0,0,1)) = acos(pole.z). ⚠️ 엄밀히는 황도 법선 기준.
+      // ⚠️ 구판은 `acos(pole.y)` 였다. 그 기준이 곧 버그의 정의였고, 가드는 6주간 **정확하게**
+      //   PASS 를 보고했다 — 틀린 명제를. 기준을 바꾸지 않으면 수정된 구현이 FAIL 로 뒤집힌다.
+      const tiltMeasuredDeg = (Math.acos(Math.min(1, Math.max(-1, pole.z))) * 180) / Math.PI;
 
       // 화면 spin 방향 (DoD 3) — qRel 회전축이 자전축과 같은 부호인지 (순행) 반대인지 (역행).
       // qRel 축 = (qRel.x, qRel.y, qRel.z) 정규화. 자전축 pole 과 dot > 0 → 축 정렬 (Δjd>0 이면 +ω).
-      // obliquity < 90 이면 pole.y > 0 (북극이 위) → 위에서 볼 때 CCW = prograde.
-      // obliquity > 90 이면 pole.y < 0 (북극이 아래) → 위에서 볼 때 CW = retrograde.
+      // obliquity < 90 이면 pole.z > 0 (북극이 궤도 북쪽) → 궤도 북에서 볼 때 CCW = prograde.
+      // obliquity > 90 이면 pole.z < 0 (북극이 궤도 남쪽) → CW = retrograde (#1130 기준면 정정).
       const spinAxisWorld = rotateVecByQ({ x: 0, y: 1, z: 0 }, q0c); // = pole
       const relAxisLen = Math.hypot(qRel.x, qRel.y, qRel.z) || 1e-9;
       const relAxisDotPole =
         (qRel.x * spinAxisWorld.x + qRel.y * spinAxisWorld.y + qRel.z * spinAxisWorld.z) /
         relAxisLen;
-      // 화면(ecliptic north = +Y) 기준 유효 spin 부호 = sign(ω) × sign(pole.y). ω>0 (Δjd>0), 부호는 pole.y.
-      const eclipticSpinSign = pole.y >= 0 ? 'CCW(prograde)' : 'CW(retrograde)';
+      // ecliptic north = **+Z** (#1130) 기준 유효 spin 부호 = sign(ω) × sign(pole.z). ω>0 (Δjd>0).
+      const eclipticSpinSign = pole.z >= 0 ? 'CCW(prograde)' : 'CW(retrograde)';
 
       return {
         q0: q0c,
         q1: q1c,
         relAngleRad: relAngle,
         tiltMeasuredDeg: Number(tiltMeasuredDeg.toFixed(3)),
+        // #1130 — 판정축은 z 다. y 는 구 기준(참고용)이라 **판정에 쓰지 않는다**.
+        poleWorldZ: Number(pole.z.toFixed(4)),
         poleWorldY: Number(pole.y.toFixed(4)),
         eclipticSpinSign,
         relAxisDotPole: Number(relAxisDotPole.toFixed(3)),
@@ -256,7 +265,8 @@ async function launch() {
 
         // DoD 2 — axialTilt 적용 (측정 tilt ≈ obliquity, obliquity>90 은 pole 이 뒤집혀 180-tilt 로 측정될
         // 수 있어 min(tilt, 180-tilt) vs min(obliquity, 180-obliquity) 로 비교하지 않고 직접 obliquity 비교).
-        // pole = rotate((0,1,0), tilt(X)) → pole.y = cos(tiltRad). tiltMeasuredDeg = acos(pole.y) = obliquity.
+        // #1130 — pole = rotate((0,1,0), (π/2 + tiltRad)(X)) → pole.z = cos(tiltRad).
+        //   tiltMeasuredDeg = acos(pole.z) = obliquity (궤도 법선 기준).
         const tiltErr = Math.abs(m.tiltMeasuredDeg - body.tiltDeg);
         const dod2 = tiltErr <= 1.5; // 0.034° 같은 미세값 floor 여유
 

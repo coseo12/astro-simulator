@@ -167,10 +167,12 @@ const CelestialBodyRawSchema = z.object({
   ringAlphaHint: z.number().min(0).max(1).optional(),
   /**
    * R8 #647 §축 2a — 자전축 기울기 (NASA "obliquity to orbit", 도 단위, optional).
-   * ring disc 생성 3경로 (shader/fallback/placeholder) 의 `rotation.x = π/2 + tiltRad` 에 사용
+   * ring disc 생성 3경로 (shader/fallback/placeholder) 의 `rotation.x = RING_DISC_BASE_TILT_X + tiltRad` 에 사용
+   * (#1130 — base 가 `π/2` → `π`. body 의 `ORBITAL_NORMAL_OFFSET` 과 짝이라 한쪽만 옮기면 깨진다)
    * (ring-only tilt — 본체 자전/텍스처 미구현이라 host 통합 불필요, 후보 A).
    * 0~180 범위 가드 (97.77° 같은 역행 자전 포함, NaN 전파 차단 — agy 합의 ③).
-   * 미지정 시 scene 이 0 폴백 → 기존 동작 (XZ 공전면) 하위 호환 (jupiter 무회귀).
+   * 미지정 시 scene 이 0 폴백 → 기존 동작 (기준 궤도면 = **XY**) 하위 호환 (jupiter 무회귀).
+   * ⚠️ 「XZ 공전면」은 구 서술 오류다 (#1130 — 실제 궤도면은 XY, `physics/state-vector.ts` 의 `z = sinI·y₁`).
    * ADR `20260610-r8-uranus-titania-rings-visualization.md` §축 2a.
    */
   axialTiltDeg: z.number().min(0).max(180).optional(),

@@ -238,6 +238,21 @@ const DEG_TO_RAD = Math.PI / 180;
  */
 export const ARC_EDGE_FADE_RAD = 0.035;
 
+/**
+ * #1130 — ring disc 의 **기준 회전** (X 축, rad). `rotation.x = RING_DISC_BASE_TILT_X + axialTiltRad`.
+ *
+ * body 의 `ORBITAL_NORMAL_OFFSET`(= π/2, `self-rotation.ts`) 과 **짝을 이루는 상수**다. 둘의 차 π/2 는
+ * **disc local 법선(+Z)** 과 **body pole(local +Y)** 의 축 차이를 메운다 — 그래서 값이 같지 않다.
+ *
+ * ⚠️ **한쪽만 바꾸면 ring 이 적도면에서 떨어진다.** 불변식은 `self-rotation.test.ts` §ring 정합 이
+ * 9 body 전건으로 단언한다 (`|cos(pole, ringNormal)| == 1`). #1130 이전에는 `π/2` 였고, body 가
+ * `0 → π/2` 로 옮겨진 것과 **같은 크기·같은 방향**이라 상대 관계는 그때도 지금도 동일하다.
+ *
+ * 참고 — 이 정렬에서 ring 법선은 pole 의 **반대 방향**(`180°`)이다. disc 는 양면이라 부호는 물리적
+ * 의미가 없고 **평면 일치**(`|cos| = 1`)만이 계약이다.
+ */
+export const RING_DISC_BASE_TILT_X = Math.PI;
+
 /** GLSL smoothstep 동형 (Hermite). 단위 테스트에서 GLSL 경계 거동 재현용. */
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.min(Math.max((x - edge0) / Math.max(edge1 - edge0, 1e-6), 0), 1);
@@ -388,12 +403,13 @@ export interface CreateRingShaderOptions {
    */
   tier?: Tier;
   /**
-   * R8 #647 §축 2a — ring 자전축 기울기 (rad). disc `rotation.x = π/2 + axialTiltRad`
+   * R8 #647 §축 2a — ring 자전축 기울기 (rad). disc `rotation.x = RING_DISC_BASE_TILT_X + axialTiltRad`
    * (shader/fallback 양 경로 동일 — placeholder 는 `ring-placeholder.ts` 동명 옵션).
+   * ⚠️ base 는 #1130 에서 `π/2` → `π` 로 이동했다 (body 의 `ORBITAL_NORMAL_OFFSET` 과 **짝**).
    * 회전축 방위각은 world X 고정 근사 (pole RA/Dec 미사용 — ADR §위험 #6 주석 계약).
    * 층간 z-offset (`position.y = idx × 1e-4`) 의 tilt 후 ring 법선 방향 cos 편차는
    * 1e-4 scene unit 스케일이라 무시 (주석 계약, 테스트 불요 — ROI 5문).
-   * 기본 0 — 기존 동작 (XZ 공전면) 하위 호환 (jupiter 무회귀).
+   * 기본 0 — 기존 동작 (기준 궤도면 = **XY**) 하위 호환 (jupiter 무회귀). ⚠️ 「XZ 공전면」은 구 서술 오류 (#1130).
    */
   axialTiltRad?: number;
   /**
@@ -509,8 +525,12 @@ function createSingleRingShaderMesh(
     { radius: radiusScene, tessellation: DISC_TESSELLATION },
     scene,
   );
-  // R8 #647 §축 2a — XZ 공전면 (π/2) + 자전축 기울기 (uranus 97.77° 세로 고리 / saturn 26.73°).
-  disc.rotation.x = Math.PI / 2 + axialTiltRad;
+  // R8 #647 §축 2a — 기준 궤도면(XY) 정렬 + 자전축 기울기 (uranus 97.77° 세로 고리 / saturn 26.73°).
+  // #1130 — base 가 `RING_DISC_BASE_TILT_X`(= π). body 의 `ORBITAL_NORMAL_OFFSET`(= π/2) 과 **짝**이며,
+  // 둘의 차 π/2 는 disc local 법선(+Z) 과 body pole(local +Y) 의 축 차이를 메운다. 한쪽만 옮기면 깨진다
+  // (불변식 테스트 `self-rotation.test.ts` §ring 정합 이 이 관계를 단언한다).
+  // #1130 — body 자전축과 같은 ORBITAL_NORMAL_OFFSET(π/2) 적용 (self-rotation.ts 참조).
+  disc.rotation.x = RING_DISC_BASE_TILT_X + axialTiltRad;
   disc.position.y = zOffset; // z-fighting 방지 (층간 미세 offset)
 
   const material = createRingShaderMaterial(scene, params);
@@ -556,7 +576,8 @@ export function createRingInstancedMesh(
   mat.backFaceCulling = false;
   source.material = mat;
   // R8 #647 §축 2a — shader 경로와 동일 tilt (3경로 일관 — 회귀 검증 모드 정합).
-  source.rotation.x = Math.PI / 2 + axialTiltRad;
+  // #1130 — 위 disc 와 동일 보정.
+  source.rotation.x = RING_DISC_BASE_TILT_X + axialTiltRad;
   source.position.y = layerIdx * 1e-4;
   source.parent = host;
 
@@ -624,7 +645,7 @@ export function createRingShaderMesh(
   const ringAlpha = options.ringAlpha ?? 0.6;
   const layerColors = options.layerColors ?? [];
   const sceneUnitPerMeter = renderScaleForTier(options.tier ?? 'solar');
-  // R8 #647 §축 2a — 미지정 시 0 (XZ 공전면 하위 호환, jupiter 무회귀).
+  // R8 #647 §축 2a — 미지정 시 0 (기준 궤도면 XY 정렬, jupiter 무회귀). 「XZ」는 구 서술 오류 (#1130).
   const axialTiltRad = options.axialTiltRad ?? 0;
 
   // forceFallback — 즉시 InstancedMesh 경로로 분기
