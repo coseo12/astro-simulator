@@ -64,10 +64,13 @@ jobs:
           cat "$RUNNER_TEMP/step1.raw"
           echo "::endgroup::"
 
-          bind() {
-            sed -e "s/\${{ github.event.pull_request.number }}/$1/g" \
-                -e "s|\${{ github.event.pull_request.base.ref }}|main|g" \
-                -e "s|\${{ github.event.pull_request.head.ref }}|develop|g"
+          # ⚠️ 이 run 블록 안에 Actions 표현식 토큰을 **문자 그대로 쓰면 안 된다** — Actions 가
+          # run 본문을 먼저 치환하므로 sed 패턴이 probe PR 자신의 값으로 바뀐다 (실측: 초판 실패).
+          # 여는 토큰을 문자 클래스로 우회한다. N 행은 통째로 교체하고, 나머지 표현식은
+          # summary/이슈 본문의 장식 필드라 판정에 영향이 없으므로 PROBE 로 치환한다.
+          bind() {  # $1 = 주입할 N
+            sed -E -e "s@^N=.*@N=$1; REPO=coseo12/astro-simulator@" \
+                   -e 's@[$][{][{][^}]*[}][}]@PROBE@g'
           }
 
           FAILED=0
