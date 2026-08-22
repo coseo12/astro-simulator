@@ -1,160 +1,146 @@
 #!/usr/bin/env node
 /**
- * P11-B.2 #289 D3b — LOD Screenshot diff E2E.
- *
- * 목적: 3 tier × 3 LOD = 9 조합의 baseline 스크린샷을 캡처하고, 이후 변경 PR 이
- * baseline 대비 max pixel diff < 15% 를 유지하는지 회귀 가드한다.
+ * LOD 9조합 **렌더 스모크 테스트** — 3 tier × 3 LOD 가 전부 실제로 서는지 확인한다.
  *
  * 사용:
- *   node apps/web/scripts/browser-verify-lod.mjs [baseUrl] [--update-baseline]
- *   기본 URL: http://localhost:3001
+ *   BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-lod.mjs
+ *   pnpm verify:lod            # BASE_URL 미지정 시 http://localhost:3000
  *
- *   --update-baseline  : baseline 재생성 (최초 1회 또는 의도적 시각 변경 시 PR 본문에 근거 박제)
+ * ## 이 가드가 지키는 것 — 구조적 FAIL 경로 5개 (#1127)
  *
- * ## 구조
+ * | # | 경로            | FAIL 조건                                                |
+ * |---|-----------------|----------------------------------------------------------|
+ * | 1 | 씬 미노출       | `__solarScene` / `__simCore` / `__simStore` 전역 부재      |
+ * | 2 | focus 실패      | `focusOn` 후 `selectedBodyId` 가 요청 body 와 불일치        |
+ * | 3 | tier 실패       | `getTier()` 가 조합이 요구하는 tier 와 불일치              |
+ * | 4 | LOD 미적용      | `setLodOverride` 후 `getLodStats().override` 가 요청과 불일치 |
+ * | 5 | viewport 불일치 | 스크린샷 픽셀 크기 ≠ 선언된 `VIEWPORT`                      |
  *
- *  - 3 tier: solar / inner / body
- *      - solar: 태양 focus (__solarScene.getTier() === 'solar' 보장)
- *      - inner: 화성 focus (inner 또는 body 경로 허용 — planet focus 거리 임계)
- *      - body:  지구 focus + 추가 zoom-in (body tier 강제)
- *  - 3 LOD: high / mid / low (__solarScene.setLodOverride(level))
- *  - 9 조합 = 3 tier × 3 LOD
+ * 5개 전부 **주입 시 exit 1 / 정상 시 exit 0** 을 실증한 뒤 CI 에 배선했다 (#1127 PR 본문 §판별력
+ * 실증). 「테스트가 있다 ≠ 그 테스트가 작동한다」(#1123) 를 배선 조건으로 삼는다.
  *
- * ## state.transitioning 대안 (R4 — flag 부재)
+ * ⚠️ **DoD 재조정 박제 (CLAUDE.md §스프린트 계약 7)** — #1127 계약의 완료 기준 2 는 원래
+ * **「구조 FAIL 경로 4개만 assert」** 였고 경로 4(LOD)가 없었다. PR #1143 reviewer 가 *"가드가 자기
+ * 이름으로 내건 축(LOD)에 판정이 없다 — 9 조합이 내는 서로 다른 판정은 `3`개"* 로 적발했고,
+ * **사용자 재합의로 5경로로 확장**했다. 되돌림이 가상이 아니라는 근거: 부트스트랩 기본 쿼리가
+ * `/?gpu=a&lod=auto` 라 늦게 도착한 `setLodOverride('auto')` 가 앞선 강제값을 덮은 실측이
+ * `sim-canvas.tsx` §#680 에 박제돼 있다 (`low@1059ms → auto@1272ms`). 지금은
+ * `BOOTSTRAP_SETTLE_MS` 가 그 창을 덮지만 **못 덮는 날 조용히 PASS** 한다.
  *
- * B.1 머지 결과에서 scene 전역에 `state.transitioning` flag 는 **노출되지 않았다**.
- * `tier-transition.ts` 의 `runTierTransition` 은 camera.radius 300ms dolly + 500ms 입력 잠금 +
- * 200ms 마진 으로 총 800~1000ms 안정화. LOD 분기는 mesh.scaling / mesh.position 이 **즉시**
- * 반영되므로 camera.radius interp 만 LOD 결과에 영향 (screenCoverage ∝ 1/radius). 따라서
- * tier 변경 명령 후 **1200ms 대기** (300+500+400 margin) 로 transitioning 경과. LOD override
- * 변경 후에도 400ms 안정화 대기.
+ * ⚠️ **2번은 `command()` 가 throw 하지 않아도 FAIL 한다.** `SimulationCore` 의 `focusOn` 은
+ * R-Phase allowlist 밖 body 를 `console.warn` + `break` 로 **조용히 기각**하므로 (`simulation-core.ts`
+ * §focusOn), try/catch 만으로는 눈이 먼다. 그래서 store 왕복(`selectedBodyId`)을 판정에 쓴다.
  *
- * 이 대안은 R4 "부재 시 architect 경량 자문" 을 대체 — `runTierTransition` 내부 타이밍 상수
- * (300/500) 는 tier-transition.ts 수식 주석 박제. 향후 scene 에 `state.transitioning` 을 정식
- * export 하면 polling 기반 대기로 개선 가능 (후속 이슈 후보).
+ * ⚠️ **4번도 같은 이유로 「호출했다」가 아니라 「반영됐다」를 읽는다.** `simulation-core.ts` 의
+ * `case 'setLodOverride'` 는 핸들러를 `?.` 로 부르므로 **미등록이면 조용히 no-op** 이다.
  *
- * ## ⚠️ 본 가드의 실효 범위 (#1122) — **측정한 회귀 클래스 4종을 전부 놓친다**
+ * ### 축 일관성 — 2·4번 모두 **앱 경로**(`__simCore.command`)로 명령한다 (PR #1143 권고 1 판정)
  *
- * 아래는 전부 커밋된 산출물로 재현 가능한 사실이다. 「무엇을 지키는가」보다 **무엇을 지키지
- * 못하는가**를 먼저 적는다 — 그것을 모르면 이 가드의 초록을 근거로 쓰게 된다.
+ * 초판은 focus 만 앱 경로였고 LOD 는 `__solarScene.setLodOverride` 를 **직접** 불러
+ * `sim-canvas.tsx` 의 `resolveLodWithTierForce` 배선을 통째로 우회했다. 즉 command 라우팅 /
+ * 핸들러 등록 회귀를 못 봤다. 앱 경로로 통일해 그 대역을 회수한다.
  *
- * ⚠️ **「아무것도 검출 못 한다」로 적지 않는다** — 그건 전칭 부정이고 반례가 있다. 배경색 전환급
- * 전면 변경은 `98.78~99.42%` 로 잡히고, 임계를 **경유하지 않는** FAIL 경로 4개(focus 실패 /
- * tier 실패 / viewport 불일치 / 씬 미노출)도 살아 있다 (PR #1126 reviewer 라운드 2 S3).
- * 정확히 말하면 **프레임 대비 diff 임계가 무력한 회귀 클래스가 아래 4종**이라는 것이다.
+ * 앱 경로를 거쳐도 **판정은 결정론적**이다 — `resolveLodWithTierForce` 의 치환 조건은
+ * `level === 'auto'` 이고 본 매트릭스는 `high|mid|low` 만 쓰므로 치환이 발동하지 않는다
+ * (`?lod=` 미지정 + tier-c 강제 여부와 무관하게 요청 레벨이 그대로 통과).
  *
- *   | 회귀 클래스 | 실측 diff | 임계 `15%` |
- *   | 표면(텍스처·셰이더) 전면 교체 | disk 지분이 상한 (아래 (1)) | 미달 |
- *   | LOD 레벨 전면 교체 | 최대 `3.54%` (아래 (2)) | 미달 |
- *   | 카메라/tier 가 통째로 엉뚱한 곳 | `0.48~4.44%` | 미달 |
- *   | **화면 전체 검정 (파국적 렌더 실패)** | `0.52~4.25%` | **미달** |
+ * ## 이 가드가 지키지 **않는** 것 — 픽셀 회귀 전부 (#1122 → #1127)
  *
- * 마지막 줄이 이 가드의 성격을 가장 잘 보여준다 — 우주 배경이 대부분 검정이라 **렌더가 통째로
- * 죽어도 프레임 대비 diff 는 임계에 닿지 않는다.**
+ * 구판은 baseline PNG 9장 대비 `max pixel diff < 15%` 를 판정에 썼다. 그 임계는 **측정으로
+ * 반증됐다** — 아래는 전부 커밋된 산출물로 재현 가능한 사실이다 (#1122, PR #1126).
  *
- * ### (1) 표면 회귀 — 구조적으로 도달 불가
+ *   | 회귀 클래스                         | 실측 frame 대비 diff | 임계 `15%` |
+ *   | 표면(텍스처·셰이더) 전면 교체       | disk 면적 지분이 상한 | 미달       |
+ *   | LOD 레벨 전면 교체                  | 최대 `3.54%`          | 미달       |
+ *   | 카메라/tier 가 통째로 엉뚱한 곳     | `0.48~4.44%`          | 미달       |
+ *   | **화면 전체 검정 (파국적 렌더 실패)** | `0.52~4.25%`          | **미달**   |
  *
- * focus body 의 disk 가 프레임에서 차지하는 면적이 작아 **disk 픽셀이 100% 바뀌어도** 프레임
- * 대비 diff 는 그 면적 비율(`diskFrameShare`)을 넘지 못한다. 사각은 body tier 에 국한되지 않고
- * **매트릭스 전체**다.
+ * 마지막 줄이 성격을 가장 잘 보여준다 — 우주 배경이 대부분 검정이라 **렌더가 통째로 죽어도 프레임
+ * 대비 diff 는 임계에 닿지 않는다.** 임계를 낮추는 것으로는 닫히지 않는다: `diskR` 이 비결정적이라
+ * 관측 스프레드만 `1.4~5.4%` 이고 (로컬 GPU, 메인 2회 + reviewer 4회) 그 대역이 위 표와 겹친다.
+ * **프레임 대비 diff 라는 지표 자체**가 구조적으로 둔감한 것이지 상수 하나가 틀린 게 아니다.
+ * 지표 교체(disk 기준 / SSIM 등)는 baseline 재캡처 + 설계가 선행이라 비용 계급이 다르고, 본
+ * 스크립트의 범위 밖이다.
  *
- * ⚠️ **범위 수치를 박제하지 않는다.** `diskR` 이 비결정적이라(아래 §diskDiffPct) 실행마다 상한
- * 범위가 달라진다 — 관측된 스프레드만 해도 `1.4%~5.4%`(로컬 GPU, 메인 2회 + reviewer 4회)다.
- * **불변인 것은 「9/9 전 조합이 임계 `15%` 에 못 미친다」** 이고, 그것이 이 절의 주장이다.
- * 절대값이 필요하면 그 자리에서 재고 rev·환경·실행 횟수를 함께 적는다.
- *
- * ### (2) LOD 회귀 — **이것도 도달 불가** (초판이 반대로 적었다)
- *
- * ⚠️ 초판은 *"LOD 가 깨지면 mesh 크기가 프레임 규모로 달라지므로 15% 임계가 그 용도에는
- * 유효하다"* 고 적었다. **측정 없이 쓴 주장이었고 커밋된 baseline 자신이 반증한다** — 서로 다른
- * LOD 레벨의 baseline 끼리 같은 파라미터로 재면:
- *
- *   solar high↔mid `3.54%` / body high↔mid `2.04%` / inner high↔mid `1.41%`
- *   **mid↔low 는 3 tier 전부 `0.01%`**  ← 9장 중 3장은 독립 정보가 없다
- *
- * 즉 **LOD 가 통째로 다른 레벨이어도 최대 `3.54%`** 이고 임계에 닿지 않는다. 이 가드는 자기
- * 선언 목적(LOD 회귀)조차 현재 임계로는 검출하지 못한다.
- *
- * ### (3) 자동 발화 `0` — CI 에 배선된 적이 없다
- *
- * `.github/**` 안의 `verify:lod` hit 은 **주석 1건**(`shader-pixel-guard.yml` 이 *"보완 가드로
- * 기대되던 이 스크립트가 눈이 멀어 있다"* 고 적은 것) 뿐이고, `git log -S 'verify:lod' -- .github`
- * 는 **0 커밋**이며 `verify:smoke` 같은 aggregator 에도 없다. **수동 실행 전용**이다.
- *
- * ⚠️ 따라서 *"이 가드가 4개월치 시각 변경을 전건 PASS 로 통과시켰다"* 는 **성립하지 않는다** —
- * 통과시킨 게 아니라 **실행되지 않았다.** (baseline 9장이 `ff4e88d`(2026-04-24, #289) 이후 갱신
- * 되지 않은 것은 사실이고, 그 사이 #756 · #773 · #782 · #783 · #738 · #1119 가 들어간 것도
- * 사실이다. 틀린 것은 인과다.) 재캡처·CI 배선은 #1122 비목표라 여기서 다루지 않는다.
- *
- * ⇒ **표면 회귀는 지대별 verify 가 담당한다** (`browser-verify-1119-earth-mask.mjs` /
- * `browser-verify-783-earth-detail.mjs`) — 그쪽은 CI 에 배선돼 있다. 본 가드는 그것을 지키는
+ * ⇒ **픽셀 회귀는 다른 가드가 담당한다.** 표면은 지대별 verify
+ * (`browser-verify-1119-earth-mask.mjs` / `browser-verify-783-earth-detail.mjs`), 셰이더 산출은
+ * `shader-pixel-guard.yml`, 상단 UI 는 `r1-ui-regression-guard.mjs`. 본 가드는 그것을 지키는
  * 척하지 않는다.
  *
- * ## pixel diff 방식
+ * ⚠️ **위 표의 4행이 축소 후에도 그대로 사각이라는 뜻은 아니다** — 「카메라/tier 오위치」는 경로
+ * 3 이, 「LOD 레벨 전면 교체」는 경로 4 가, 「씬이 아예 안 선다」는 경로 1 이 잡는다.
  *
- * pixelmatch + pngjs 로 baseline PNG 와 현재 screenshot PNG 의 pixel-level diff 를 계산.
- *  - threshold 0.1 (매칭 민감도) — 미세 anti-alias 변동 흡수
- *  - max diff pct = (diffPixels / totalPixels) × 100
- *  - DoD: 각 조합 max diff < 15% (계약 Q2-A)
+ * **남는 사각 (전건 열거)**:
  *
- * ### `diskDiffPct` — 보조 지표 (판정에 쓰지 않는다)
+ *  1. **구조는 전부 정상인데 픽셀만 틀린 경우** — 전역도 focus 도 tier 도 override 도 viewport 도
+ *     맞는데 화면이 검거나 표면이 뒤바뀐 상태. 스크린샷을 캡처하지만 **내용을 판정하지 않는다.**
+ *  2. **콘솔 에러** — 수집해서 개수와 내용을 찍지만 **판정하지 않는다.** `hasSimErrors(…, {
+ *     allowExternal: true })` 로 승격하면 위 1번의 상당 부분을 비-픽셀 축으로 덮을 수 있다
+ *     (PR #1143 권고 3). 실측상 채택해도 안전하다 — 로컬·CI(run `32582032287`) 양쪽에서 수집된
+ *     콘솔 에러가 `0` 이다. **그럼에도 채택하지 않은 이유는 계약이다**: 사용자 재합의는 경로 4
+ *     (LOD) 에 한정됐고, 판정 축을 하나 더 늘리는 것은 또 한 번의 계약 확장이다. 후속 분리.
+ *  3. **body 별 LOD 레벨** — 경로 4 는 `getLodStats().override` (씬 전역 요청값) 를 읽는다.
+ *     `getLodInfo()` 의 per-body `level` 까지 보면 더 강하지만 `#546` 위성 가드 후처리 예외가
+ *     있어 술어가 예외를 안고 간다. 예외 없는 술어를 택했다.
  *
- * focus body 의 화면 disk bbox **안에서만** 다시 잰 diff 비율. 위 사각을 **관측 가능하게**
- * 만들기 위한 것이고 **PASS/FAIL 을 바꾸지 않는다.**
+ * ## baseline PNG 9장 처분 — **전량 삭제** (#1127 §쟁점)
  *
- * 판정 축으로 승격하지 않은 이유 (#1122 §대안 B 와 같은 논거):
- *  - body 마다 disk 면적이 달라 **단일 임계가 잡히지 않는다** (solar tier 의 태양 vs body tier
- *    의 지구는 화면 점유가 수십 배 차이).
- *  - `low` variant 는 billboard 라 disk 개념 자체가 mesh 와 다르다.
- *  - 축을 바꾸면 커밋된 baseline 9장의 **의미가 바뀐다** — 재캡처 없이는 해석이 성립하지 않는다.
+ * 임계 판정을 없애면 `apps/web/scripts/__baselines__/lod-*.png` 를 **소비하는 판정자가 없다.**
+ * 「보조 지표로 출력」 안을 택하지 않은 근거 셋:
  *
- * disk bbox 산식은 `browser-verify-1119-earth-mask.mjs` / `browser-verify-783-earth-detail.mjs`
- * 와 **같다** (`boundingSphere.radiusWorld / √3` 의 카메라 right 방향 edge 투영).
- * ⚠️ 초판은 여기에 *"셰이더 LOD 판정과도 같은 산식"* 이라고 덧붙였는데 **근거가 없다** — scene 의
- * LOD 는 `screenCoverageRadius`(`body.radius × bodyScale`) 로 판정하며 `boundingSphere` 를 거치지
- * 않는다 (PR #1126 reviewer S9). 두 verify 스크립트와 동형이라는 앞 문장만 유효하다.
+ *  1. **판정 무관 숫자를 출력에 남기면 근거로 오독된다** — 구판 `diskDiffPct` 가 "판정에 쓰지
+ *     않는다" 를 주석에 적고도 그 선례를 만들었다.
+ *  2. **baseline 자신이 매트릭스를 담고 있지 않다** — mid↔low 는 3 tier 전부 `0.01%` 로, 9장 중
+ *     3장은 독립 정보가 없다 (#1122 실측).
+ *  3. **`ff4e88d` (2026-04-24) 이후 4개월 stale** 이라 그 사이 들어간 시각 변경(#756 · #773 ·
+ *     #782 · #783 · #738 · #1119) 이 전부 "차이" 로 계상된다.
  *
- * ⚠️ **`diskR` 은 결정적이지 않다.** 같은 머신 반복 실행에서 `inner`/`body` 는 최대 `±25%` 흔들린다
- * (`solar` 만 floating origin 앵커라 안정). 따라서 이 지표는 **한 실행 안의 상대 비교**로만 읽고,
- * 절대값을 문서에 박제할 때는 rev·환경·실행 횟수를 함께 적는다 (ADR `20260808-983` §4항).
+ * 시각 기록이 사라지지는 않는다 — (a) 삭제본은 `ff4e88d` 에서 그대로 복원 가능하고, (b) 본
+ * 스크립트가 매 실행 9장을 `.verify-screenshots/lod-smoke/` 에 남긴다 (gitignored 산출물).
+ * 없어지는 것은 **커밋된 2026-04-24 스냅샷** 뿐이고 그것이 정확히 stale 한 대상이다.
+ * (#909 가 이 9장을 "스크립트가 소비하므로 유지" 로 판정했던 근거는 본 PR 로 소멸한다.)
  *
- * ⚠️ **bbox 는 정사각인데 disk 는 원이다.** 모서리 배경이 분모·분자에 섞여 `diskDiffPct` 는 원반
- * 대비를 **`×1.19~1.29` 과소평가**한다 (모서리 = bbox 의 `21.5~22.7%`, 해석값 `1 − π/4` 와 정합).
- * 편차 방향이 **과소**라 「사각이 있다」는 결론을 약화시키는 쪽이므로 그대로 둔다.
+ * ## 안정화 대기 — `state.transitioning` flag 부재 대안
  *
- * ⚠️ `diskFrameShare` 는 `π r²` 를 **clamp 없이** 쓰는 반면 `computeDiskDiffPct` 의 bbox 는 프레임
- * 경계로 clamp 한다. disk 가 화면 밖으로 잘리면 상한이 실제보다 커지는데, 방향이 **보수적**
- * (상한 과대 → 「도달 불가」 주장이 약해짐)이라 유지한다.
+ * scene 전역에 `state.transitioning` 은 노출돼 있지 않다. `tier-transition.ts` 의
+ * `runTierTransition` 이 camera.radius 300ms dolly + 500ms 입력 잠금이므로 tier 변경 후
+ * **1200ms** (300 + 500 + 400 margin) 대기한다. LOD override 는 mesh 교체가 즉시 반영되나 200ms
+ * cross-fade 가 있어 **400ms** 대기. 향후 `state.transitioning` 을 정식 export 하면 polling 대기로
+ * 개선 가능하다.
  *
- * ## headless swiftshader freeze 완화 (volt #33)
+ * ## headless 한계
  *
- * 3D/shader 경로 + headless 환경에서 partial freeze 가능성. 본 스크립트는 수치 검증
- * (diff pct) 만 수행하며, 시각 실 Chrome 검증은 `README` 수동 체크리스트로 보완.
+ * headless swiftshader 는 3D/shader 경로에서 partial freeze 가능성이 있다 (volt #33). 본
+ * 스크립트는 **구조 판정만** 하므로 렌더 품질은 보증 대상이 아니며, 시각 검증은 실 Chrome 수동
+ * 체크리스트가 담당한다.
  */
-import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import {
+  bootstrapScene,
+  buildLaunchOptions,
+  collectConsoleErrors,
+  resolveBaseUrl,
+  saveCapture,
+  withBrowser,
+} from '../../../scripts/browser-verify-utils.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { PNG } from 'pngjs';
-import pixelmatch from 'pixelmatch';
 
-const baseUrl = process.argv[2]?.startsWith('--')
-  ? 'http://localhost:3001'
-  : (process.argv[2] ?? 'http://localhost:3001');
-const updateBaseline = process.argv.includes('--update-baseline');
+const BASE_URL = resolveBaseUrl();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const baselineDir = join(__dirname, '__baselines__');
-const diffDir = join(__dirname, '..', '..', '..', '.verify-screenshots', 'lod-diff');
-mkdirSync(baselineDir, { recursive: true });
-mkdirSync(diffDir, { recursive: true });
+const captureDir = join(__dirname, '..', '..', '..', '.verify-screenshots', 'lod-smoke');
 
+/** 캡처 해상도 계약. 스크린샷 픽셀 크기가 이 값과 다르면 FAIL 한다 (경로 5). */
 const VIEWPORT = { width: 1280, height: 800 };
 
-// DoD 임계값 (계약 Q2-A).
-const MAX_DIFF_PCT_THRESHOLD = 15.0;
+/** tier 전환 안정화 (300ms dolly + 500ms lock + 400ms margin). */
+const TIER_SETTLE_MS = 1200;
+/** LOD override 안정화 (200ms cross-fade + margin). */
+const LOD_SETTLE_MS = 400;
+/** 씬 부트스트랩 후 추가 안정화. */
+const BOOTSTRAP_SETTLE_MS = 2000;
 
-// 9 조합 매트릭스.
+/** 9 조합 매트릭스. */
 const COMBOS = [
   { tier: 'solar', lod: 'high' },
   { tier: 'solar', lod: 'mid' },
@@ -168,360 +154,193 @@ const COMBOS = [
 ];
 
 /**
- * tier 별 focus body id. FocusQuickButtons 는 sun/earth/jupiter/neptune 4개만 노출하므로
- * mars (inner tier 대표) 는 __simCore.command 로 직접 호출.
- *  - solar: 태양 focus → tier='solar'
- *  - inner: 화성 focus → tier='inner' (planet focus 거리 임계)
- *  - body:  지구 focus + setTier('body') 강제
+ * tier 별 focus body id — **전부 `tierFromFocus` 가 그 tier 를 반환하는 kind** 로 고른다.
+ * FocusQuickButtons 는 sun/earth/jupiter/neptune 4개만 노출하므로 `__simCore.command` 로 직접
+ * 호출한다.
+ *
+ *  - solar ← `sun` (kind=star → 무조건 `solar`)
+ *  - inner ← `mars` (kind=planet, focus-entry 정착 거리 `0.16 AU` > 경계 `0.1 AU` → `inner`)
+ *  - body  ← `moon` (kind=moon → 무조건 `body`)
+ *
+ * ⚠️ **구판은 `earth` focus + `setTier('body')` 강제였고, 그것은 성립하지 않았다.** planet
+ * focus-entry 는 `× 5` 프레이밍으로 `0.21 AU` 에 정착해 **inner 가 의도된 계약**이고 (#834 /
+ * `tier.ts` §PLANET_FOCUS_BODY_BOUNDARY), 매 프레임 `updateTierByCamera` 가 강제 tier 를 즉시
+ * `inner` 로 되돌린다. 구판은 `solar` 행만 tier 를 assert 했으므로 이 되돌림을 **한 번도 보지
+ * 못했다** — 즉 커밋돼 있던 `lod-body-*.png` 3장은 실제로는 `inner` tier 캡처다 (본 PR 실측:
+ * `getTier()=inner, 요구=body` 3/3). kind 로 tier 를 얻으면 강제도 되돌림도 없다.
  */
 const TIER_FOCUS_BODY = {
   solar: 'sun',
   inner: 'mars',
-  body: 'earth',
+  body: 'moon',
 };
 
-const results = [];
+/** 조합이 요구하는 tier (경로 3 판정) — 위 focus kind 로 결정론적이라 전부 단일 값이다. */
+const TIER_EXPECT = {
+  solar: 'solar',
+  inner: 'inner',
+  body: 'body',
+};
 
+/** PNG IHDR 에서 폭/높이를 읽는다 (시그니처 8B + 길이 4B + 타입 4B → width@16, height@20). */
+function readPngSize(buffer) {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (buffer.length < 24 || !buffer.subarray(0, 8).equals(signature)) {
+    throw new Error('[verify:lod] 스크린샷이 PNG 가 아니다 — 캡처 경로 회귀');
+  }
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+const results = [];
 const consoleErrors = [];
 
-// #940 — 본 스크립트는 top-level await 로 `launch → … → close` 를 일직선 나열해, `page.goto`
-//   실패나 `evaluate` throw 가 나면 마지막 `browser.close()` 에 도달하지 못했다 (#927 이 정리한
-//   클래스와 동일. 본 파일은 `finally` 자체가 없던 세대다). 수명주기를 `withBrowser` 로 위임한다.
-//   launch 인자는 원본 그대로 **무인자** — 렌더러 축 무변경 (본 가드는 픽셀 diff 판정이다).
-//   조기 종료는 콜백 안에서 `process.exit` 하면 안 된다 (Node 즉시 종료 → close 미도달).
-//   sentinel 을 반환하고 실제 종료는 호출부에서 한다 (#939 `verify-fps-baseline` 전례).
-const outcome = await withBrowser({}, async (browser) => {
+// #940 — 브라우저 수명주기는 `withBrowser` 에 위임한다 (에러 경로 close 보장). 콜백 안에서
+//   `process.exit` 하면 finally 가 실행되지 않으므로, 조기 종료는 sentinel 반환 + 호출부 종료다.
+const outcome = await withBrowser(buildLaunchOptions(), async (browser) => {
   const context = await browser.newContext({ viewport: VIEWPORT });
   const page = await context.newPage();
+  collectConsoleErrors(page, { errors: consoleErrors });
 
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  page.on('pageerror', (err) => consoleErrors.push(err.message));
+  console.log('\n[verify:lod] LOD 9조합 렌더 스모크 테스트');
+  console.log(`baseUrl: ${BASE_URL}`);
+  console.log(`viewport: ${VIEWPORT.width}x${VIEWPORT.height}\n`);
 
-  console.log('\n[P11-B.2 D3b] LOD Screenshot diff E2E — 9 조합');
-  console.log(`baseUrl: ${baseUrl}`);
-  console.log(`updateBaseline: ${updateBaseline}`);
-  console.log(`threshold: max diff < ${MAX_DIFF_PCT_THRESHOLD}%\n`);
-
-  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(2000);
-
-  // __solarScene 노출 확인
-  const sceneReady = await page.evaluate(
-    () => typeof window.__solarScene === 'object' && window.__solarScene !== null,
-  );
-  if (!sceneReady) {
-    console.error('[FAIL] __solarScene 전역 미노출 — dev 빌드 아님 또는 초기화 실패');
+  // 경로 1 — 씬 미노출. `bootstrapScene` 의 전역 대기가 타임아웃하면 그것이 곧 이 경로다.
+  //   throw 를 그대로 올리지 않고 명시 FAIL 로 바꾸는 이유는 진단 문구를 남기기 위함이며,
+  //   판정은 바뀌지 않는다 (양쪽 다 exit 1).
+  try {
+    await bootstrapScene(page, {
+      baseUrl: BASE_URL,
+      handles: ['__solarScene', '__simCore', '__simStore'],
+      settleMs: BOOTSTRAP_SETTLE_MS,
+    });
+  } catch (error) {
+    console.error(
+      '[FAIL] 씬 전역 미노출 (__solarScene / __simCore / __simStore) — ' +
+        `dev 빌드 아님 또는 초기화 실패: ${error?.message ?? error}`,
+    );
     return 'scene-not-ready';
   }
 
-  // `runCombo` 는 아래에 선언돼 있으나 함수 선언 호이스팅으로 여기서 호출 가능 —
-  // 본문 위치를 옮기지 않아 diff 를 수명주기 변경분으로 한정한다.
   for (const combo of COMBOS) {
     const result = await runCombo(page, combo);
     results.push(result);
-    const mark = result.pass ? 'PASS' : 'FAIL';
-    console.log(`  [${mark}] ${result.combo}: ${result.reason}`);
+    console.log(`  [${result.pass ? 'PASS' : 'FAIL'}] ${result.combo}: ${result.reason}`);
   }
   return 'ran';
 });
 
-// 원 동작 보존 — 씬 미노출은 리포트 없이 exit 1 (브라우저는 위에서 이미 닫힘).
 if (outcome === 'scene-not-ready') process.exit(1);
 
 /**
- * focus body 의 화면 disk bbox (px) 를 잰다 — **보조 지표 전용** (§diskDiffPct).
+ * 한 조합을 세운 뒤 5개 구조 경로를 판정한다 (경로 1 은 부트스트랩에서 이미 통과).
  *
- * 산식은 `browser-verify-1119-earth-mask.mjs` / `browser-verify-783-earth-detail.mjs` 와 같다:
- * `boundingSphere.radiusWorld / √3` 를 카메라 **right** 방향으로 밀어 투영한 뒤 중심과의 거리.
- * (`/ √3` 는 Babylon 의 boundingSphere 가 AABB 외접구라 구체 mesh 의 실반경보다 √3 배 크기
- * 때문이다.)
- *
- * @returns {Promise<{ cx: number, cy: number, r: number } | null>} 실패 시 null (보조 지표라
- *   판정에 영향을 주지 않으므로 조용히 생략한다)
- */
-async function measureDiskBBox(page, bodyId) {
-  // ⚠️ `meshes.get(id)` 는 **sphere variant** 다. `low` LOD 의 billboard 는 별도 Map 에 있어
-  //    `low` 3행의 `diskR` 은 「화면에 실제로 그려진 것」이 아니라 sphere 기준값이다
-  //    (PR #1126 reviewer S6). 이 지표는 **6/9 측정 + 3/9 개념 불일치**로 읽어야 한다.
-  return page.evaluate((id) => {
-    const scene = window.__simCore?.scene;
-    const mesh = window.__solarScene?.meshes?.get(id);
-    if (!scene || !mesh) return null;
-    const camera = scene.activeCamera;
-    if (!camera) return null;
-    const engine = scene.getEngine();
-    const rw = engine.getRenderWidth();
-    const rh = engine.getRenderHeight();
-
-    const Vector3 = mesh.getAbsolutePosition().constructor;
-    const right = camera.getDirection(new Vector3(1, 0, 0));
-    const center = mesh.getAbsolutePosition();
-    const radiusWorld = mesh.getBoundingInfo().boundingSphere.radiusWorld / Math.sqrt(3);
-
-    const idMat = mesh.getWorldMatrix().constructor.Identity();
-    const transform = scene.getTransformMatrix();
-    const vp = camera.viewport.toGlobal(rw, rh);
-    const c = Vector3.Project(center, idMat, transform, vp);
-    const e = Vector3.Project(center.add(right.scale(radiusWorld)), idMat, transform, vp);
-    const r = Math.hypot(e.x - c.x, e.y - c.y);
-    if (!Number.isFinite(r) || r <= 0) return null;
-    // 렌더 해상도(rw/rh)를 함께 돌려준다 — 호출부가 `diskFrameShare` 를 스크린샷 픽셀 수로
-    //    나누므로 두 좌표계가 어긋나면 **조용히 틀린 비율**이 나온다. 호출부에서 대조한다.
-    // ⚠️ **`devicePixelRatio ≠ 1` 은 이 불일치를 만들지 않는다** — `engine-factory.ts` 가
-    //    `adaptToDeviceRatio: true` 라 DPR 이 오르면 렌더 버퍼도 함께 커지고 (#623 실측:
-    //    *"DPR 1 vs 2 에서 getRenderHeight 720→1440"*, `render/lod.ts` §단위), 스크린샷도 같이
-    //    커져 **양쪽이 일치한다**. `deviceScaleFactor: 2` 주입 실측에서 게이트는 미발화했다
-    //    (PR #1126 reviewer 라운드 2 S2 — 라운드 1 의 내 원인 진단이 틀렸다).
-    //    이 저장소에서 도달 가능한 트리거는 확인되지 않았다 (`setHardwareScalingLevel` 호출 0).
-    //    그럼에도 대조를 남기는 이유는 **불일치 시 틀린 값을 내는 것보다 생략이 낫기** 때문이다.
-    return { cx: c.x, cy: c.y, r, rw, rh };
-  }, bodyId);
-}
-
-/**
- * disk bbox **안에서만** diff 를 다시 잰다 (보조 지표).
- *
- * bbox 를 프레임 경계로 clamp 한 뒤 그 영역만 잘라 `pixelmatch` 를 재실행한다. 전체 diff 를
- * 재사용하지 않는 이유는 pixelmatch 가 반환하는 것이 **총계뿐**이라 영역별 분해가 안 되기
- * 때문이다.
- *
- * ⚠️ **잘라서 다시 재면 경계 픽셀의 anti-alias 판정이 달라진다** — crop 경계에서는 이웃 픽셀이
- * 없어 `pixelmatch` 의 AA 휴리스틱이 다르게 동작한다. 실측 편차는 최대 `119`px (상대 `0.49%`)로
- * 보조 지표의 해석을 바꾸지 않는 규모다 (PR #1126 reviewer S4).
- */
-function computeDiskDiffPct(baselinePng, currentPng, disk) {
-  const { width, height } = currentPng;
-  const x0 = Math.max(0, Math.floor(disk.cx - disk.r));
-  const y0 = Math.max(0, Math.floor(disk.cy - disk.r));
-  const x1 = Math.min(width, Math.ceil(disk.cx + disk.r));
-  const y1 = Math.min(height, Math.ceil(disk.cy + disk.r));
-  const w = x1 - x0;
-  const h = y1 - y0;
-  if (w <= 0 || h <= 0) return null;
-
-  const crop = (src) => {
-    const out = Buffer.alloc(w * h * 4);
-    for (let y = 0; y < h; y += 1) {
-      const srcStart = ((y0 + y) * width + x0) * 4;
-      src.copy(out, y * w * 4, srcStart, srcStart + w * 4);
-    }
-    return out;
-  };
-
-  const diffPixels = pixelmatch(crop(baselinePng.data), crop(currentPng.data), null, w, h, {
-    threshold: 0.1,
-    includeAA: false,
-  });
-  return { pct: (diffPixels / (w * h)) * 100, w, h, diffPixels };
-}
-
-/**
- * tier + LOD 조합 적용 후 안정화 대기 → screenshot 캡처 → baseline diff.
- *
- * @param {import('playwright').Page} page `withBrowser` 콜백이 생성한 페이지 (#940 — 모듈 스코프
- *   `page` 클로저를 인자로 승격. 브라우저 수명주기가 콜백 안으로 들어가면서 필요해졌다)
+ * @param {import('playwright').Page} page
  * @param {{ tier: string, lod: string }} combo
- * @returns {Promise<{ combo: string, diffPct: number, diskDiffPct: number | null,
- *   diskR: number | null, diskFrameShare: number | null, pass: boolean, reason: string }>}
+ * @returns {Promise<{ combo: string, pass: boolean, reason: string }>}
  */
 async function runCombo(page, combo) {
   const key = `${combo.tier}-${combo.lod}`;
-  const baselinePath = join(baselineDir, `lod-${key}.png`);
-
-  // 1. focus 전환 → __simCore.command 로 직접 호출 (FocusQuickButtons 는 4개만 노출).
-  //    tier-transition.ts 의 runTierTransition 은 300ms dolly + 500ms lock 보장.
-  //    추가 400ms margin 으로 animating 상태 완전 경과 (state.transitioning flag 부재 대안 — 파일 상단 주석 참조).
   const focusBodyId = TIER_FOCUS_BODY[combo.tier];
-  const focusResult = await page.evaluate((bodyId) => {
-    if (!window.__simCore || typeof window.__simCore.command !== 'function') {
-      return { ok: false, reason: '__simCore.command 미노출' };
-    }
-    try {
-      window.__simCore.command({ type: 'focusOn', bodyId });
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, reason: String(err) };
-    }
+
+  // 경로 2 — focus. `command` 는 allowlist 기각 시에도 throw 하지 않으므로 store 왕복으로 판정한다.
+  await page.evaluate((bodyId) => {
+    window.__simCore.command({ type: 'focusOn', bodyId });
   }, focusBodyId);
-  if (!focusResult.ok) {
+  await page.waitForTimeout(TIER_SETTLE_MS);
+
+  const selectedBodyId = await page.evaluate(
+    () => window.__simStore?.getState?.().selectedBodyId ?? null,
+  );
+  if (selectedBodyId !== focusBodyId) {
     return {
       combo: key,
-      diffPct: 100,
-      diskDiffPct: null,
-      diskR: null,
-      diskFrameShare: null,
       pass: false,
-      reason: `focus 실패 (${focusBodyId}): ${focusResult.reason}`,
-    };
-  }
-  await page.waitForTimeout(1200);
-
-  // 2. body tier 는 추가 zoom-in 필요 — focus-earth 만으로는 inner 로 남을 수 있음.
-  //    지구 반경 × 5 공식이 body tier 판정 거리 (0.1 AU 임계 이하로 진입).
-  if (combo.tier === 'body') {
-    // scene API 로 직접 tier 강제 (테스트 안정성 우선).
-    await page.evaluate(() => {
-      window.__solarScene?.setTier?.('body');
-    });
-    await page.waitForTimeout(1200);
-  }
-
-  // 실제 tier 확인 (solar 는 확정, inner/body 는 허용 범위 넓게)
-  const actualTier = await page.evaluate(() => window.__solarScene?.getTier?.());
-  if (combo.tier === 'solar' && actualTier !== 'solar') {
-    return {
-      combo: key,
-      diffPct: 100,
-      diskDiffPct: null,
-      diskR: null,
-      diskFrameShare: null,
-      pass: false,
-      reason: `tier solar 전환 실패 (실제: ${actualTier})`,
+      reason: `focus 실패 — selectedBodyId=${String(selectedBodyId)} ≠ ${focusBodyId}`,
     };
   }
 
-  // 3. LOD override 설정 + 안정화 대기.
-  await page.evaluate((lod) => {
-    window.__solarScene?.setLodOverride?.(lod);
+  // 경로 3 — tier. focus kind 가 tier 를 결정하므로 강제 전환 없이 결과만 확인한다.
+  const actualTier = await page.evaluate(() => window.__solarScene?.getTier?.() ?? null);
+  const expected = TIER_EXPECT[combo.tier];
+  if (actualTier !== expected) {
+    return {
+      combo: key,
+      pass: false,
+      reason: `tier 실패 — getTier()=${String(actualTier)}, 요구=${expected}`,
+    };
+  }
+
+  // 경로 4 — LOD. 명령은 **앱 경로**(`__simCore.command`)로 보낸다 — scene 직접 호출은
+  //   `sim-canvas.tsx` 의 `setLodOverrideHandler` 배선을 우회해 command 라우팅 회귀를 못 본다.
+  //   핸들러 미등록이면 `simulation-core.ts` 가 `?.` 로 조용히 no-op 하므로, 「호출했다」가 아니라
+  //   `getLodStats().override` 로 **반영됐다**를 읽어야 판별력이 생긴다 (PR #1143 🔴).
+  await page.evaluate((level) => {
+    window.__simCore.command({ type: 'setLodOverride', level });
   }, combo.lod);
-  // LOD 는 매 프레임 즉시 반영되지만 200ms cross-fade 가 있으므로 400ms 대기.
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(LOD_SETTLE_MS);
 
-  // 4. screenshot 캡처 + focus body disk bbox 측정 (보조 지표 — 판정 불변).
-  //    캡처 «직전» 에 재는 이유는 두 값이 같은 카메라 상태를 가리켜야 하기 때문이다.
-  const disk = await measureDiskBBox(page, focusBodyId);
-  const screenshotBuffer = await page.screenshot({ type: 'png', fullPage: false });
-
-  // 5. baseline 처리: 없으면 생성, 있으면 diff.
-  if (!existsSync(baselinePath) || updateBaseline) {
-    writeFileSync(baselinePath, screenshotBuffer);
+  const actualOverride = await page.evaluate(
+    () => window.__solarScene?.getLodStats?.().override ?? null,
+  );
+  if (actualOverride !== combo.lod) {
     return {
       combo: key,
-      diffPct: 0,
-      diskDiffPct: null,
-      diskR: null,
-      diskFrameShare: null,
-      pass: true,
-      reason: updateBaseline ? 'baseline 갱신' : 'baseline 신규 생성',
-    };
-  }
-
-  // 6. pixelmatch diff.
-  const currentPng = PNG.sync.read(screenshotBuffer);
-  const baselinePng = PNG.sync.read(readFileSync(baselinePath));
-
-  if (currentPng.width !== baselinePng.width || currentPng.height !== baselinePng.height) {
-    return {
-      combo: key,
-      diffPct: 100,
-      diskDiffPct: null,
-      diskR: null,
-      diskFrameShare: null,
       pass: false,
-      reason: `viewport 크기 불일치: baseline ${baselinePng.width}x${baselinePng.height} vs current ${currentPng.width}x${currentPng.height}`,
+      reason: `LOD 미적용 — getLodStats().override=${String(actualOverride)}, 요구=${combo.lod}`,
     };
   }
 
-  const { width, height } = currentPng;
-  const diffPng = new PNG({ width, height });
-  const diffPixels = pixelmatch(baselinePng.data, currentPng.data, diffPng.data, width, height, {
-    threshold: 0.1,
-    includeAA: false,
-  });
-  const totalPixels = width * height;
-  const diffPct = (diffPixels / totalPixels) * 100;
-
-  // diff 시각화 PNG 는 .verify-screenshots/lod-diff/ 에 저장 (커밋 대상 아님, 디버그 용도)
-  const diffPath = join(diffDir, `lod-${key}-diff.png`);
-  writeFileSync(diffPath, PNG.sync.write(diffPng));
-
-  // 보조 지표 — disk 안에서만 다시 잰 diff. **판정에 쓰지 않는다** (§diskDiffPct).
-  // 렌더 해상도 ↔ 스크린샷 해상도가 어긋나면 좌표계가 달라 지표가 조용히 틀린다.
-  //    보조 지표라 차단하지 않고 **생략 + 경고**한다 — 판정에는 영향이 없다.
-  //    ⚠️ 현재 저장소에서 이 분기의 도달 경로는 확인되지 않았다 (`measureDiskBBox` 주석 참조).
-  if (disk && (disk.rw !== width || disk.rh !== height)) {
-    console.warn(
-      `  [보조지표 생략] ${key}: 렌더 ${disk.rw}x${disk.rh} ≠ 스크린샷 ${width}x${height}` +
-        ' — 좌표계 불일치로 diskDiffPct 생략',
-    );
+  // 경로 5 — viewport. 캡처 해상도 계약이 깨지면 (DPR / hardware scaling / context 옵션 회귀)
+  //   이후 어떤 픽셀 측정도 좌표계가 어긋나므로 여기서 끊는다.
+  const screenshot = await page.screenshot({ type: 'png', fullPage: false });
+  await saveCapture(screenshot, join(captureDir, `lod-${key}.png`));
+  const size = readPngSize(screenshot);
+  if (size.width !== VIEWPORT.width || size.height !== VIEWPORT.height) {
+    return {
+      combo: key,
+      pass: false,
+      reason: `viewport 불일치 — 스크린샷 ${size.width}x${size.height} ≠ 선언 ${VIEWPORT.width}x${VIEWPORT.height}`,
+    };
   }
-  const coordOk = disk && disk.rw === width && disk.rh === height;
-  const diskInfo = coordOk ? computeDiskDiffPct(baselinePng, currentPng, disk) : null;
 
   return {
     combo: key,
-    diffPct,
-    diskDiffPct: diskInfo?.pct ?? null,
-    diskR: coordOk ? disk.r : null,
-    // disk 가 프레임에서 차지하는 면적 비율 = **표면만 바뀌었을 때** 프레임 대비 diff 의 상한.
-    diskFrameShare: coordOk ? ((Math.PI * disk.r * disk.r) / totalPixels) * 100 : null,
-    pass: diffPct < MAX_DIFF_PCT_THRESHOLD,
-    reason:
-      diffPct < MAX_DIFF_PCT_THRESHOLD
-        ? `diff ${diffPct.toFixed(2)}% < ${MAX_DIFF_PCT_THRESHOLD}%`
-        : `diff ${diffPct.toFixed(2)}% ≥ ${MAX_DIFF_PCT_THRESHOLD}% (회귀)`,
+    pass: true,
+    reason: `tier=${actualTier} override=${actualOverride} 렌더 성립`,
   };
 }
 
 // 최종 리포트.
 console.log('\n========================================');
-console.log('[D3b] LOD Screenshot diff 결과');
+console.log('[verify:lod] LOD 9조합 렌더 스모크 결과');
 console.log('----------------------------------------');
 const passCount = results.filter((r) => r.pass).length;
 const failCount = results.length - passCount;
-const maxDiffPct = Math.max(...results.map((r) => r.diffPct));
-
 console.log(`  pass: ${passCount}/${results.length}`);
 console.log(`  fail: ${failCount}`);
-console.log(`  max diff: ${maxDiffPct.toFixed(2)}%`);
-console.log(`  threshold: ${MAX_DIFF_PCT_THRESHOLD}%`);
+console.log(`  스크린샷: ${captureDir} (gitignored — 판정에 쓰지 않는 진단 산출물)`);
+console.log(`  콘솔 에러: ${consoleErrors.length}건 (비판정 — §지키지 않는 것 2번)`);
 
-// ── 보조 지표 (#1122) — 판정에 쓰지 않는다. §diskDiffPct 참조.
-//    `상한` 이 임계보다 작은 조합은 **표면이 100% 바뀌어도 이 가드로는 FAIL 할 수 없다**.
-// ⚠️ `!== null` 로 거르면 **`undefined` 가 통과한다.** 조기 반환 경로(focus 실패 / tier 실패 /
-//    viewport 불일치 / baseline 신규 생성)는 이 키 자체를 만들지 않으므로, 타입으로 판정해야
-//    `r.diskR.toFixed()` 가 TypeError 로 죽지 않는다 (PR #1126 reviewer B1 — baseline 신규
-//    생성이 9/9 성공인데 exit 1 이 되는 회귀를 실증했다).
-const diskRows = results.filter(
-  (r) =>
-    typeof r.diskDiffPct === 'number' &&
-    typeof r.diskR === 'number' &&
-    typeof r.diskFrameShare === 'number',
-);
-if (diskRows.length > 0) {
-  console.log('\n[보조] focus body disk 기준 (판정 무관 — #1122)');
-  // ⚠️ 마지막 칸은 «disk 가 프레임에서 차지하는 비율» 이다. 「프레임 대비 diff 의 상한」이라고
-  //    읽으면 옆 칸에 바로 반증된다 — 프레임 diff 에는 배경·별·HUD 변화가 함께 들어오므로
-  //    disk 지분보다 큰 값이 정상이다. 이 칸이 뜻하는 것은 **표면만 바뀌었을 때의 상한**이다.
-  console.log('  combo         diskR    frame대비 diff   disk대비 diff   disk 지분(표면 상한)');
-  for (const r of diskRows) {
-    const blind = r.diskFrameShare < MAX_DIFF_PCT_THRESHOLD ? '  ← 임계 도달 불가' : '';
-    console.log(
-      `  ${r.combo.padEnd(12)}  ${r.diskR.toFixed(1).padStart(6)}px` +
-        `  ${r.diffPct.toFixed(2).padStart(10)}%` +
-        `  ${r.diskDiffPct.toFixed(2).padStart(11)}%` +
-        `  ${r.diskFrameShare.toFixed(2).padStart(9)}%${blind}`,
-    );
-  }
-  const blindCount = diskRows.filter((r) => r.diskFrameShare < MAX_DIFF_PCT_THRESHOLD).length;
-  if (blindCount > 0) {
-    console.log(
-      `\n  ⚠️ ${blindCount}/${diskRows.length} 조합은 focus body 표면이 100% 바뀌어도` +
-        ` 프레임 대비 임계 ${MAX_DIFF_PCT_THRESHOLD}% 에 도달할 수 없다.`,
-    );
-    console.log('     표면 회귀는 지대별 verify 담당 (1119-earth-mask / 783-earth-detail).');
-  }
-}
-
+// 콘솔 에러는 **판정하지 않는다** — 판정 축은 위 5개뿐이다. 실패 진단용으로만 찍는다.
 if (consoleErrors.length > 0) {
-  console.log('\n[console errors]');
+  console.log('\n[console errors — 비판정 진단]');
   for (const err of consoleErrors) console.log(`  - ${err}`);
 }
 
-if (failCount > 0) {
-  console.error('\n[FAIL] 1개 이상 조합이 임계 초과 또는 오류');
+// 공허 통과 차단 (PR #1143 권고 2) — 루프가 조기 이탈하거나 매트릭스가 비면 `failCount` 가 `0` 이
+//   되어 **아무것도 검사하지 않고 PASS** 한다. 출력의 조합 수와 실제 결과 수가 서로를 검증하도록
+//   개수를 대조한다 (#1123 / #1134 와 같은 계급 — 「전건 통과」가 공허 참이던 사례).
+if (results.length !== COMBOS.length) {
+  console.error(
+    `\n[FAIL] 결과 수 불일치 — results ${results.length} ≠ COMBOS ${COMBOS.length}` +
+      ' (루프 조기 이탈 또는 매트릭스 소실)',
+  );
   process.exit(1);
 }
-console.log('\n[PASS] 9 조합 전체 통과\n');
+
+if (failCount > 0) {
+  console.error('\n[FAIL] 1개 이상 조합이 구조 경로에서 실패');
+  process.exit(1);
+}
+console.log(`\n[PASS] ${COMBOS.length} 조합 전체 렌더 성립\n`);

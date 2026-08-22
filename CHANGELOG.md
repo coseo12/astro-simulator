@@ -7,6 +7,38 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **[#1127] `verify:lod` 를 「9조합 렌더 스모크」로 축소하고 CI 에 배선 — 픽셀 임계 판정 제거 + baseline 9장 삭제 (MINOR)** ([#1127](https://github.com/coseo12/astro-simulator/issues/1127)) — `apps/web/scripts/browser-verify-lod.mjs` 는 `#289` 이래 **CI 에서 한 번도 실행된 적이 없고** (`git log -S 'verify:lod' -- .github` = `0` 커밋), 그 판정축(baseline 대비 `max pixel diff < 15%`)은 #1122 가 **측정으로 반증**했다 — 화면 전체가 검게 죽어도 프레임 대비 diff 는 `0.52~4.25%` 라 임계에 닿지 않는다. 이 PR 은 임계 판정을 걷어내고 **임계를 경유하지 않는 구조 FAIL 경로 5개** (씬 미노출 / focus 실패 / tier 실패 / LOD 미적용 / viewport 불일치) 만 남긴 뒤 `ci.yml` 공용 dev 서버(`:3002`) 뒤에 배선한다. 호출 관례도 형제 가드와 맞춰 `BASE_URL` 환경변수로 통일했다 — 구 `process.argv[2]` positional + `--update-baseline` 플래그 **제거**, 그리고 **기본 baseUrl 이 `3001` → `3000` 으로 바뀐다** (`resolveBaseUrl()` 기본값. CI 는 `BASE_URL` 을 명시 주입하므로 무영향이고, 로컬에서 인자 없이 돌리던 습관만 바뀐다). ⚠️ 초판이 적은 _"형제 가드 11종"_ 은 술어가 없어 재현되지 않았다 — 실측 술어와 값: `grep -oE "browser-verify-[a-z0-9-]+\.mjs" .github/workflows/ci.yml | sort -u` 중 `BASE_URL` 로 호출되는 것이 **`14`** (자신 포함) / **`13`** (자신 제외)이고, `resolveBaseUrl()` 까지 채택한 형제는 **`3`** (`627-satellite-orbit` / `848-modal-focus` / `mobile-p7d`) 이다 (ADR `20260808-983` §4항).
+
+  **SemVer 근거** — 앱 코드는 `0` 줄 바뀌었으나 (a) 전에 없던 CI 게이트가 새로 발화하고 (신규 workflow 배선을 MINOR 로 판정한 [#1096](https://github.com/coseo12/astro-simulator/issues/1096) 선례와 동형), (b) 스크립트의 판정 계약과 CLI 표면이 바뀌었다. CLI 플래그 제거만 보면 MAJOR 축도 읽히나, 대상이 **자동 소비처 `0` 인 dev 전용 verify 스크립트**라 CLAUDE.md §릴리스 _"판정 애매 시 낮은 쪽"_ 을 적용해 MINOR 로 둔다.
+
+  **판별력 실증** — 「테스트가 있다 ≠ 그 테스트가 작동한다」([#1123](https://github.com/coseo12/astro-simulator/issues/1123) 클래스: 신설 e2e 가 결함 보유판에서도 전건 통과해 판별력이 `0` 이었다) 재발을 막기 위해, 4경로 각각을 **실제 실행 경로의 실제 파일**에 주입해 exit code 를 **같은 실행에서** 실측했다 (로컬 macOS, dev `:3002`, 무주입 → 주입 → 복원 순서).
+
+  | 주입         | 주입 대상     | 지점                                                            | 결과                               | exit |
+  | ------------ | ------------- | --------------------------------------------------------------- | ---------------------------------- | ---- |
+  | 무주입       | —             | —                                                               | `9/9 PASS`                         | `0`  |
+  | A focus      | **앱**        | `core-adapter.ts` `onBodySelected` 무력화                       | `9/9 FAIL` (`selectedBodyId=null`) | `1`  |
+  | B tier       | **앱**        | `sim-canvas.tsx` `applyFocusTier` + `updateTierByCamera` 무력화 | `6/9 FAIL` (`getTier()=solar`)     | `1`  |
+  | C viewport   | **가드 자신** | 가드의 `newContext` 에 `deviceScaleFactor: 2`                   | `9/9 FAIL` (`2560x1600`)           | `1`  |
+  | D 씬 미노출  | **앱**        | `sim-canvas.tsx` 의 `__solarScene` 전역 이름 변경               | 부트스트랩 단계 FAIL               | `1`  |
+  | E LOD 미적용 | **앱**        | `sim-canvas.tsx` 의 `setLodOverrideHandler` 무력화              | 2라운드 실측 (PR 본문 표)          | `1`  |
+  | 복원 후      | —             | —                                                               | `9/9 PASS`                         | `0`  |
+
+  ⚠️ **C 만 「가드 자신」 주입이다** — DPR/viewport 를 정하는 주체가 가드 자신이라 경로 5 는 **앱 회귀로는 발화할 수 없다**. assert 로서는 정당하나(캡처 해상도 계약 고정) A·B·D·E 와 증거 등급이 다르므로 열로 구분한다 (PR #1143 권고 8).
+
+  ⚠️ **B 는 1차 시도가 결함을 만들지 못했다** — `applyFocusTier` 만 무력화했을 때 가드는 `9/9 PASS`(exit `0`) 였고, 그것은 가드의 눈이 먼 것이 아니라 **매 프레임 `updateTierByCamera` 가 tier 를 제대로 복구**하고 있었기 때문이다 (앱의 이중화). 두 경로를 함께 끊어야 비로소 tier 가 `solar` 에 머문다. 「주입했는데 PASS」를 가드 결함으로 오독하지 않기 위해 실패한 1차 시도까지 남긴다.
+
+  **부수 발견 — 커밋돼 있던 `lod-body-*.png` 3장은 `body` tier 캡처가 아니었다.** 구판은 `earth` focus 후 `setTier('body')` 로 강제했는데, planet focus-entry 는 `× 5` 프레이밍으로 `0.21 AU` 에 정착해 **`inner` 가 의도된 계약**이고 ([#834](https://github.com/coseo12/astro-simulator/issues/834) / `tier.ts` §`PLANET_FOCUS_BODY_BOUNDARY`), 매 프레임 `updateTierByCamera` 가 강제 tier 를 즉시 되돌린다. 구판은 `solar` 행만 tier 를 assert 해서 이 되돌림을 한 번도 보지 못했다 — 신판 술어로 재면 `getTier()=inner, 요구=body` 가 `3/3` 이다. 신판은 tier 를 강제하지 않고 **focus kind 로 결정**한다 (`solar` ← `sun`(star) / `inner` ← `mars`(planet, 정착 `0.16 AU`) / `body` ← `moon`(moon → 무조건 body)).
+
+  **baseline PNG 9장 — 전량 삭제.** 임계 판정이 사라지면 `apps/web/scripts/__baselines__/lod-*.png` 를 소비하는 판정자가 없다. 「보조 지표로 출력」안을 택하지 않은 근거 셋: (1) 판정 무관 숫자를 출력에 남기면 근거로 오독된다 — 구판 `diskDiffPct` 가 _"판정에 쓰지 않는다"_ 를 주석에 적고도 그 선례를 만들었다, (2) mid↔low 가 3 tier 전부 `0.01%` 라 9장 중 3장은 독립 정보가 없다 (#1122 실측), (3) `ff4e88d` (2026-04-24) 이후 4개월 stale 이다. 시각 기록은 남는다 — 삭제본은 `ff4e88d` 에서 복원 가능하고, 스크립트가 매 실행 9장을 `.verify-screenshots/lod-smoke/` (gitignored) 에 남긴다. [#909](https://github.com/coseo12/astro-simulator/issues/909) 가 이 9장을 _"스크립트가 소비하므로 유지"_ 로 판정했던 근거는 본 PR 로 소멸한다.
+
+  **⚠️ DoD 재조정 박제 (CLAUDE.md §스프린트 계약 7)** — 계약의 완료 기준 2 는 원래 **「구조 FAIL 경로 4개만 assert」** 였고 LOD 항이 없었다. PR [#1143](https://github.com/coseo12/astro-simulator/pull/1143) reviewer 가 _"가드가 자기 이름으로 내건 축(LOD)에 판정이 없다 — 9 조합이 내는 서로 다른 판정은 `3`개"_ 로 적발했고, **사용자 재합의**를 거쳐 **5경로**로 확장했다. 되돌림은 가상이 아니다: 부트스트랩 기본 쿼리가 `/?gpu=a&lod=auto` 라, 늦게 도착한 `setLodOverride('auto')` 가 앞선 강제값을 덮은 실측이 `sim-canvas.tsx` §#680 에 이미 박제돼 있다 (`low@1059ms → auto@1272ms`). 재조정 사실은 **코드 주석(스크립트 헤더) · PR 본문 · 본 CHANGELOG** 세 곳에 박제했다. 겸사 **축 일관성**도 정정했다 — LOD 명령을 `__solarScene.setLodOverride` 직접 호출에서 **앱 경로** `__simCore.command({ type: 'setLodOverride', level })` 로 바꿔 `resolveLodWithTierForce` 배선까지 지나가게 했다 (본 매트릭스는 `high|mid|low` 만 쓰므로 치환 조건 `level === 'auto'` 이 발동하지 않아 판정은 결정론적).
+
+  **부수 정정 2건** — (1) `.github/workflows/shader-pixel-guard.yml` 의 _"보완 가드로 기대되던 `browser-verify-lod.mjs` 는 … 임계 `15%` 를 구조적으로 넘길 수 없어 눈이 멀어 있다"_ 는 **근거절이 stale** 이 됐다 (임계 자체가 사라졌다). **결론은 뒤집히지 않고 강화**되므로 삭제가 아니라 dated 한 줄 부기로 정정했다. (2) `ci.yml` step 주석의 _"부트스트랩 쿼리 `?gpu=a` 만 쓴다"_ 를 실제값 `/?gpu=a&lod=auto` 로 고쳤다 — 하필 이 가드에서 `lod=auto` 가 위 되돌림 창과 직결된다.
+
+  **실행 시간** — 로컬 3회 `19.14` / `19.06` / `19.11` 초 (macOS, Playwright 번들 chromium 기본 백엔드, dev 서버 `:3002`, 작업 트리 rev `94cfa8b` 기준). 9 조합 × (tier 안정화 `1200ms` + LOD 안정화 `400ms`) 가 지배항이다. 조합 축소는 하지 않았다 — 이 수치가 형제 브라우저 가드와 같은 계급이라 축소의 근거가 되지 못한다. CI(ubuntu) 실측치는 PR 본문에 별도 박제한다.
+
+  **관측만 남기는 사실 (본 PR 비-범위)** — `verify:379-lod` 역시 `package.json` 에만 있고 CI 배선이 **없다**. 같은 「미배선 verify」 클래스지만 별개 스크립트라 여기서 함께 배선하지 않는다.
+
 - **[#1096] 릴리스 클래스 머지마다 escape 관측 run 이 남는다 (MINOR)** — `base=main` 이거나 `head` 가 `release/` 로 시작하는 PR 이 **머지**되면 `release-escape-watch` 가 발화해 그 PR 1건을 판정한다. `clean` 이면 job summary 에 판정 1줄을 남기고 성공하고, `ESCAPE` 면 `[ADR Trigger]` 이슈를 만들고 **job 을 실패**시킨다. **`clean` 이어도 run 이력이 남는 것이 요점이다** — 사람 규약은 「관측을 안 한 것」과 「관측했더니 깨끗한 것」을 구별할 산출물을 남기지 않는다. 저장소 보호 설정·required 체크 집합은 **무접촉**이며, `closed` 이벤트라 머지 게이트에 원리적으로 개입하지 않는다 (비-required). 릴리스 절차에 사람 스텝이 **추가되지 않는다** — 배선 전까지의 잠정 조치였던 「메인이 릴리스 직후 술어를 수동 1회 실행」이 소멸한다.
 
 ### Fixed
