@@ -6,21 +6,43 @@
  *   BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-lod.mjs
  *   pnpm verify:lod            # BASE_URL 미지정 시 http://localhost:3000
  *
- * ## 이 가드가 지키는 것 — 구조적 FAIL 경로 4개 (#1127)
+ * ## 이 가드가 지키는 것 — 구조적 FAIL 경로 5개 (#1127)
  *
- * | # | 경로            | FAIL 조건                                              |
- * |---|-----------------|--------------------------------------------------------|
- * | 1 | 씬 미노출       | `__solarScene` / `__simCore` / `__simStore` 전역 부재    |
- * | 2 | focus 실패      | `focusOn` 후 `selectedBodyId` 가 요청 body 와 불일치      |
- * | 3 | tier 실패       | `getTier()` 가 조합이 요구하는 tier 와 불일치            |
- * | 4 | viewport 불일치 | 스크린샷 픽셀 크기 ≠ 선언된 `VIEWPORT`                    |
+ * | # | 경로            | FAIL 조건                                                |
+ * |---|-----------------|----------------------------------------------------------|
+ * | 1 | 씬 미노출       | `__solarScene` / `__simCore` / `__simStore` 전역 부재      |
+ * | 2 | focus 실패      | `focusOn` 후 `selectedBodyId` 가 요청 body 와 불일치        |
+ * | 3 | tier 실패       | `getTier()` 가 조합이 요구하는 tier 와 불일치              |
+ * | 4 | LOD 미적용      | `setLodOverride` 후 `getLodStats().override` 가 요청과 불일치 |
+ * | 5 | viewport 불일치 | 스크린샷 픽셀 크기 ≠ 선언된 `VIEWPORT`                      |
  *
- * 4개 전부 **주입 시 exit 1 / 정상 시 exit 0** 을 실증한 뒤 CI 에 배선했다 (#1127 PR 본문 §판별력
+ * 5개 전부 **주입 시 exit 1 / 정상 시 exit 0** 을 실증한 뒤 CI 에 배선했다 (#1127 PR 본문 §판별력
  * 실증). 「테스트가 있다 ≠ 그 테스트가 작동한다」(#1123) 를 배선 조건으로 삼는다.
+ *
+ * ⚠️ **DoD 재조정 박제 (CLAUDE.md §스프린트 계약 7)** — #1127 계약의 완료 기준 2 는 원래
+ * **「구조 FAIL 경로 4개만 assert」** 였고 경로 4(LOD)가 없었다. PR #1143 reviewer 가 *"가드가 자기
+ * 이름으로 내건 축(LOD)에 판정이 없다 — 9 조합이 내는 서로 다른 판정은 `3`개"* 로 적발했고,
+ * **사용자 재합의로 5경로로 확장**했다. 되돌림이 가상이 아니라는 근거: 부트스트랩 기본 쿼리가
+ * `/?gpu=a&lod=auto` 라 늦게 도착한 `setLodOverride('auto')` 가 앞선 강제값을 덮은 실측이
+ * `sim-canvas.tsx` §#680 에 박제돼 있다 (`low@1059ms → auto@1272ms`). 지금은
+ * `BOOTSTRAP_SETTLE_MS` 가 그 창을 덮지만 **못 덮는 날 조용히 PASS** 한다.
  *
  * ⚠️ **2번은 `command()` 가 throw 하지 않아도 FAIL 한다.** `SimulationCore` 의 `focusOn` 은
  * R-Phase allowlist 밖 body 를 `console.warn` + `break` 로 **조용히 기각**하므로 (`simulation-core.ts`
  * §focusOn), try/catch 만으로는 눈이 먼다. 그래서 store 왕복(`selectedBodyId`)을 판정에 쓴다.
+ *
+ * ⚠️ **4번도 같은 이유로 「호출했다」가 아니라 「반영됐다」를 읽는다.** `simulation-core.ts` 의
+ * `case 'setLodOverride'` 는 핸들러를 `?.` 로 부르므로 **미등록이면 조용히 no-op** 이다.
+ *
+ * ### 축 일관성 — 2·4번 모두 **앱 경로**(`__simCore.command`)로 명령한다 (PR #1143 권고 1 판정)
+ *
+ * 초판은 focus 만 앱 경로였고 LOD 는 `__solarScene.setLodOverride` 를 **직접** 불러
+ * `sim-canvas.tsx` 의 `resolveLodWithTierForce` 배선을 통째로 우회했다. 즉 command 라우팅 /
+ * 핸들러 등록 회귀를 못 봤다. 앱 경로로 통일해 그 대역을 회수한다.
+ *
+ * 앱 경로를 거쳐도 **판정은 결정론적**이다 — `resolveLodWithTierForce` 의 치환 조건은
+ * `level === 'auto'` 이고 본 매트릭스는 `high|mid|low` 만 쓰므로 치환이 발동하지 않는다
+ * (`?lod=` 미지정 + tier-c 강제 여부와 무관하게 요청 레벨이 그대로 통과).
  *
  * ## 이 가드가 지키지 **않는** 것 — 픽셀 회귀 전부 (#1122 → #1127)
  *
@@ -46,9 +68,20 @@
  * 척하지 않는다.
  *
  * ⚠️ **위 표의 4행이 축소 후에도 그대로 사각이라는 뜻은 아니다** — 「카메라/tier 오위치」는 경로
- * 3 이, 「씬이 아예 안 선다」는 경로 1 이 잡는다. **남는 사각은 「구조는 전부 정상인데 픽셀만
- * 틀린」 경우**다: 전역도 focus 도 tier 도 viewport 도 맞는데 화면이 검거나 표면이 뒤바뀐 상태를
- * 본 가드는 PASS 로 통과시킨다. 스크린샷을 캡처하지만 **내용을 판정하지 않기** 때문이다.
+ * 3 이, 「LOD 레벨 전면 교체」는 경로 4 가, 「씬이 아예 안 선다」는 경로 1 이 잡는다.
+ *
+ * **남는 사각 (전건 열거)**:
+ *
+ *  1. **구조는 전부 정상인데 픽셀만 틀린 경우** — 전역도 focus 도 tier 도 override 도 viewport 도
+ *     맞는데 화면이 검거나 표면이 뒤바뀐 상태. 스크린샷을 캡처하지만 **내용을 판정하지 않는다.**
+ *  2. **콘솔 에러** — 수집해서 개수와 내용을 찍지만 **판정하지 않는다.** `hasSimErrors(…, {
+ *     allowExternal: true })` 로 승격하면 위 1번의 상당 부분을 비-픽셀 축으로 덮을 수 있다
+ *     (PR #1143 권고 3). 실측상 채택해도 안전하다 — 로컬·CI(run `32582032287`) 양쪽에서 수집된
+ *     콘솔 에러가 `0` 이다. **그럼에도 채택하지 않은 이유는 계약이다**: 사용자 재합의는 경로 4
+ *     (LOD) 에 한정됐고, 판정 축을 하나 더 늘리는 것은 또 한 번의 계약 확장이다. 후속 분리.
+ *  3. **body 별 LOD 레벨** — 경로 4 는 `getLodStats().override` (씬 전역 요청값) 를 읽는다.
+ *     `getLodInfo()` 의 per-body `level` 까지 보면 더 강하지만 `#546` 위성 가드 후처리 예외가
+ *     있어 술어가 예외를 안고 간다. 예외 없는 술어를 택했다.
  *
  * ## baseline PNG 9장 처분 — **전량 삭제** (#1127 §쟁점)
  *
@@ -97,7 +130,7 @@ const BASE_URL = resolveBaseUrl();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const captureDir = join(__dirname, '..', '..', '..', '.verify-screenshots', 'lod-smoke');
 
-/** 캡처 해상도 계약. 스크린샷 픽셀 크기가 이 값과 다르면 FAIL 한다 (경로 4). */
+/** 캡처 해상도 계약. 스크린샷 픽셀 크기가 이 값과 다르면 FAIL 한다 (경로 5). */
 const VIEWPORT = { width: 1280, height: 800 };
 
 /** tier 전환 안정화 (300ms dolly + 500ms lock + 400ms margin). */
@@ -200,7 +233,7 @@ const outcome = await withBrowser(buildLaunchOptions(), async (browser) => {
 if (outcome === 'scene-not-ready') process.exit(1);
 
 /**
- * 한 조합을 세운 뒤 4개 구조 경로를 판정한다.
+ * 한 조합을 세운 뒤 5개 구조 경로를 판정한다 (경로 1 은 부트스트랩에서 이미 통과).
  *
  * @param {import('playwright').Page} page
  * @param {{ tier: string, lod: string }} combo
@@ -238,13 +271,27 @@ async function runCombo(page, combo) {
     };
   }
 
-  // LOD override 적용 + 안정화.
-  await page.evaluate((lod) => {
-    window.__solarScene.setLodOverride(lod);
+  // 경로 4 — LOD. 명령은 **앱 경로**(`__simCore.command`)로 보낸다 — scene 직접 호출은
+  //   `sim-canvas.tsx` 의 `setLodOverrideHandler` 배선을 우회해 command 라우팅 회귀를 못 본다.
+  //   핸들러 미등록이면 `simulation-core.ts` 가 `?.` 로 조용히 no-op 하므로, 「호출했다」가 아니라
+  //   `getLodStats().override` 로 **반영됐다**를 읽어야 판별력이 생긴다 (PR #1143 🔴).
+  await page.evaluate((level) => {
+    window.__simCore.command({ type: 'setLodOverride', level });
   }, combo.lod);
   await page.waitForTimeout(LOD_SETTLE_MS);
 
-  // 경로 4 — viewport. 캡처 해상도 계약이 깨지면 (DPR / hardware scaling / context 옵션 회귀)
+  const actualOverride = await page.evaluate(
+    () => window.__solarScene?.getLodStats?.().override ?? null,
+  );
+  if (actualOverride !== combo.lod) {
+    return {
+      combo: key,
+      pass: false,
+      reason: `LOD 미적용 — getLodStats().override=${String(actualOverride)}, 요구=${combo.lod}`,
+    };
+  }
+
+  // 경로 5 — viewport. 캡처 해상도 계약이 깨지면 (DPR / hardware scaling / context 옵션 회귀)
   //   이후 어떤 픽셀 측정도 좌표계가 어긋나므로 여기서 끊는다.
   const screenshot = await page.screenshot({ type: 'png', fullPage: false });
   await saveCapture(screenshot, join(captureDir, `lod-${key}.png`));
@@ -257,7 +304,11 @@ async function runCombo(page, combo) {
     };
   }
 
-  return { combo: key, pass: true, reason: `tier=${actualTier} lod=${combo.lod} 렌더 성립` };
+  return {
+    combo: key,
+    pass: true,
+    reason: `tier=${actualTier} override=${actualOverride} 렌더 성립`,
+  };
 }
 
 // 최종 리포트.
@@ -269,15 +320,27 @@ const failCount = results.length - passCount;
 console.log(`  pass: ${passCount}/${results.length}`);
 console.log(`  fail: ${failCount}`);
 console.log(`  스크린샷: ${captureDir} (gitignored — 판정에 쓰지 않는 진단 산출물)`);
+console.log(`  콘솔 에러: ${consoleErrors.length}건 (비판정 — §지키지 않는 것 2번)`);
 
-// 콘솔 에러는 **판정하지 않는다** — 본 가드의 판정 축은 위 4개뿐이다. 실패 진단용으로만 찍는다.
+// 콘솔 에러는 **판정하지 않는다** — 판정 축은 위 5개뿐이다. 실패 진단용으로만 찍는다.
 if (consoleErrors.length > 0) {
   console.log('\n[console errors — 비판정 진단]');
   for (const err of consoleErrors) console.log(`  - ${err}`);
+}
+
+// 공허 통과 차단 (PR #1143 권고 2) — 루프가 조기 이탈하거나 매트릭스가 비면 `failCount` 가 `0` 이
+//   되어 **아무것도 검사하지 않고 PASS** 한다. 출력의 조합 수와 실제 결과 수가 서로를 검증하도록
+//   개수를 대조한다 (#1123 / #1134 와 같은 계급 — 「전건 통과」가 공허 참이던 사례).
+if (results.length !== COMBOS.length) {
+  console.error(
+    `\n[FAIL] 결과 수 불일치 — results ${results.length} ≠ COMBOS ${COMBOS.length}` +
+      ' (루프 조기 이탈 또는 매트릭스 소실)',
+  );
+  process.exit(1);
 }
 
 if (failCount > 0) {
   console.error('\n[FAIL] 1개 이상 조합이 구조 경로에서 실패');
   process.exit(1);
 }
-console.log('\n[PASS] 9 조합 전체 렌더 성립\n');
+console.log(`\n[PASS] ${COMBOS.length} 조합 전체 렌더 성립\n`);
