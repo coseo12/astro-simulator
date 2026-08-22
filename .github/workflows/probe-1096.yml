@@ -1,0 +1,147 @@
+name: probe-1096
+
+# ⚠️ 일회용 — #1096 DoD 검증 전용. **머지 금지.**
+# release-escape-watch.yml 의 **실 step 본문을 파일에서 추출해** Actions 런타임에서 실행한다
+# (사본 재작성 금지 — 사본을 테스트하면 파일 자체는 검증되지 않는다).
+# `gh issue create` 만 PATH 스텁으로 가로채 실 이슈 생성을 막는다.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  checks: read
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 실 workflow step 본문 추출 → Actions 런타임 실행 (양성/음성 + negative)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          WF=.github/workflows/release-escape-watch.yml
+          GH_REAL="$(command -v gh)"; export GH_REAL
+          echo "실 gh 경로: $GH_REAL"
+
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/gh" <<'STUB'
+          #!/bin/bash
+          if [ "${1:-}" = "issue" ] && [ "${2:-}" = "create" ]; then
+            printf '%s\n' "$@" > "$RUNNER_TEMP/gh-issue-argv.txt"
+            echo "[STUB] gh issue create 가로챔 — 실 이슈 생성 안 함"
+            exit 0
+          fi
+          exec "$GH_REAL" "$@"
+          STUB
+          chmod +x "$RUNNER_TEMP/bin/gh"
+          export PATH="$RUNNER_TEMP/bin:$PATH"
+
+          extract() {
+            local s e
+            s=$(grep -nF -- "$1" "$WF" | head -1 | cut -d: -f1)
+            e=$(grep -nF -- "$2" "$WF" | head -1 | cut -d: -f1)
+            [ -n "$s" ] && [ -n "$e" ] || { echo "FAIL: 추출 실패 [$1]→[$2]"; exit 1; }
+            sed -n "${s},${e}p" "$WF" | sed 's/^          //'
+          }
+          extract '          {' '          } | tee'                      > "$RUNNER_TEMP/step1.raw"
+          extract '          VERDICT="$(cat' '>> "$GITHUB_STEP_SUMMARY"' > "$RUNNER_TEMP/step2.raw"
+          extract '            echo "## 배경"' '          exit 1'        > "$RUNNER_TEMP/step3.body"
+          { echo '{'; cat "$RUNNER_TEMP/step3.body"; } > "$RUNNER_TEMP/step3.raw"
+
+          for f in step1 step2 step3; do
+            n=$(wc -l < "$RUNNER_TEMP/$f.raw")
+            echo "추출 $f = $n 행"
+            [ "$n" -gt 3 ] || { echo "FAIL: $f 추출 라인수 이상 — 시뮬레이션 무효"; exit 1; }
+          done
+
+          echo "::group::추출된 step1 (술어 원문 복제 구간)"
+          cat "$RUNNER_TEMP/step1.raw"
+          echo "::endgroup::"
+
+          bind() {
+            sed -e "s/\${{ github.event.pull_request.number }}/$1/g" \
+                -e "s|\${{ github.event.pull_request.base.ref }}|main|g" \
+                -e "s|\${{ github.event.pull_request.head.ref }}|develop|g"
+          }
+
+          FAILED=0
+          run_case() {   # $1=N $2=기대판정
+            local N="$1" expect="$2" rc1 rc2 rc3="-" verdict issue="no"
+            export GITHUB_OUTPUT="$RUNNER_TEMP/out-$N.txt"; : > "$GITHUB_OUTPUT"
+            export GITHUB_STEP_SUMMARY="$RUNNER_TEMP/sum-$N.md"; : > "$GITHUB_STEP_SUMMARY"
+            rm -f "$RUNNER_TEMP/gh-issue-argv.txt" "$RUNNER_TEMP/verdict.txt"
+
+            bind "$N" < "$RUNNER_TEMP/step1.raw" > "$RUNNER_TEMP/s1.sh"
+            bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s1.sh" >/dev/null 2>&1; rc1=$?
+            bind "$N" < "$RUNNER_TEMP/step2.raw" > "$RUNNER_TEMP/s2.sh"
+            bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s2.sh" >/dev/null 2>&1; rc2=$?
+            verdict=$(sed -n 's/^verdict=//p' "$GITHUB_OUTPUT")
+
+            if [ "$verdict" = "ESCAPE" ]; then
+              export REPO=coseo12/astro-simulator PR_NUMBER="$N" \
+                     PR_URL="https://github.com/coseo12/astro-simulator/pull/$N" \
+                     BASE_REF=main HEAD_REF=develop RUN_URL="probe"
+              bind "$N" < "$RUNNER_TEMP/step3.raw" > "$RUNNER_TEMP/s3.sh"
+              bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s3.sh" >/dev/null 2>&1; rc3=$?
+            fi
+            [ -f "$RUNNER_TEMP/gh-issue-argv.txt" ] && issue="yes"
+
+            local ok="OK"
+            [ "$verdict" = "$expect" ] || ok="MISMATCH"
+            [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] || ok="STEP_FAIL"
+            if [ "$expect" = "ESCAPE" ]; then
+              { [ "$rc3" = "1" ] && [ "$issue" = "yes" ]; } || ok="ESCAPE_BRANCH_FAIL"
+            else
+              [ "$issue" = "no" ] || ok="UNEXPECTED_ISSUE"
+            fi
+            printf '#%-6s 기대=%-6s 판정=%-7s s1=%s s2=%s s3=%-2s 이슈=%-3s → %s\n' \
+              "$N" "$expect" "${verdict:-<빈값>}" "$rc1" "$rc2" "$rc3" "$issue" "$ok"
+            [ "$ok" = "OK" ] || FAILED=1
+          }
+
+          echo "=== 3중 시뮬레이션: clean → ESCAPE → 복구 ==="
+          run_case 1088 clean
+          run_case 636  ESCAPE
+          run_case 1068 clean
+          echo "=== 양성 대조군 전건 ==="
+          for n in 636 646 652 658; do run_case "$n" ESCAPE; done
+          echo "=== 음성 대조군 전건 ==="
+          for n in 1067 1068 1088; do run_case "$n" clean; done
+
+          echo "=== negative: 미존재 PR → step1 exit != 0 ==="
+          bind 999999 < "$RUNNER_TEMP/step1.raw" > "$RUNNER_TEMP/sn.sh"
+          bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/sn.sh" >/dev/null 2>&1
+          rc=$?; echo "  exit=$rc (기대 != 0)"; [ "$rc" -ne 0 ] || FAILED=1
+
+          echo "=== negative: 빈 판정 → step2 exit 1 ==="
+          export GITHUB_OUTPUT="$RUNNER_TEMP/out-neg.txt"; : > "$GITHUB_OUTPUT"
+          export GITHUB_STEP_SUMMARY="$RUNNER_TEMP/sum-neg.md"; : > "$GITHUB_STEP_SUMMARY"
+          : > "$RUNNER_TEMP/verdict.txt"
+          bind 1088 < "$RUNNER_TEMP/step2.raw" > "$RUNNER_TEMP/s2n.sh"
+          bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s2n.sh" >/dev/null 2>&1
+          rc=$?; echo "  exit=$rc (기대 1)"; [ "$rc" -eq 1 ] || FAILED=1
+
+          echo "=== ESCAPE 이슈 argv (스텁 기록) ==="
+          bind 636 < "$RUNNER_TEMP/step1.raw" > "$RUNNER_TEMP/s1.sh"
+          bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s1.sh" >/dev/null 2>&1
+          export GITHUB_OUTPUT="$RUNNER_TEMP/out-x.txt"; : > "$GITHUB_OUTPUT"
+          export GITHUB_STEP_SUMMARY="$RUNNER_TEMP/sum-x.md"; : > "$GITHUB_STEP_SUMMARY"
+          bind 636 < "$RUNNER_TEMP/step2.raw" > "$RUNNER_TEMP/s2.sh"
+          bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s2.sh" >/dev/null 2>&1
+          export REPO=coseo12/astro-simulator PR_NUMBER=636 \
+                 PR_URL="https://github.com/coseo12/astro-simulator/pull/636" \
+                 BASE_REF=main HEAD_REF=develop RUN_URL="probe"
+          bind 636 < "$RUNNER_TEMP/step3.raw" > "$RUNNER_TEMP/s3.sh"
+          bash --noprofile --norc -e -o pipefail "$RUNNER_TEMP/s3.sh" >/dev/null 2>&1 || true
+          cat "$RUNNER_TEMP/gh-issue-argv.txt"
+          echo "=== clean job summary 실제 출력 ==="
+          cat "$RUNNER_TEMP/sum-1088.md"
+
+          [ "$FAILED" -eq 0 ] || { echo "FAIL: 위 표에 OK 아닌 셀이 있다"; exit 1; }
+          echo "ALL PASS"
