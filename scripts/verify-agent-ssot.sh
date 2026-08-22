@@ -39,26 +39,49 @@
 #            두 형태 모두 정당한 현행 계약이다 (실측: architect/pm/qa/reviewer 는 헤딩,
 #            developer 는 번호 리스트 항목). `^## ` 로 전면 교체하면 developer 오탐이다.
 #
-#   [검사 2] 헤딩 글루 라인 — 코드펜스(``` / ~~~) 와 인라인 코드 스팬 제거 후, **라인
-#            선두가 아닌 위치**에 `##`~`######` + 공백 이 나타나면 FAIL.
+#   [검사 2] 헤딩 글루 라인 — 코드펜스 밖에서 인라인 코드 스팬을 비공백 placeholder 로
+#            치환한 뒤, **라인 선두가 아닌 위치**에 `#`~`######` + 공백 이 나타나면 FAIL.
 #            #1124 손상은 두 형태였다: 4파일은 **앵커 헤딩**이 글루됐고 developer 는
 #            **`## 규칙`** 이 글루됐다(developer 의 앵커는 무손상). 즉 검사 1 은 5/5 를
 #            못 덮으며, developer 형태를 잡는 것은 검사 2 뿐이다.
 #
-# 술어 작성 시 주의 (실측으로 한 번 틀린 지점):
-#   - 제외 문자류에 `#` 을 반드시 포함한다. 초판 `[^[:space:]]#{2,6}[[:space:]]` 는
-#     `###` 자신의 첫 `#` 이 「비공백 문자」에 매칭되어 정상 헤딩을 전부 오탐했다
-#     (`.claude/**` 64,414 hit). 올바른 형태는 `[^[:space:]#]##+[[:space:]]`.
-#   - 인터벌 `{n,m}` 에 의존하지 않는다 (macOS BWK awk 호환) — `##+` 를 쓴다.
+# 두 검사의 분담 — 검사 1 은 **존재 계약**("정상 형태의 앵커가 최소 1개 있는가"),
+# 검사 2 는 **무결성 계약**("어떤 라인도 헤더가 글루되지 않았는가")이다. 검사 1 을
+# 「첫 등장 라인」에 묶으면 양방향으로 샌다(상세는 check_anchor_form 주석). 대신 검사 1 이
+# 공허 통과하는 구성(앞쪽에 번호 리스트 언급 + 뒤쪽 앵커 글루)은 **검사 2 가 받아낸다** —
+# 실측: 그 픽스처에서 검사 1 무발화 / 검사 2 발화 1건 / exit 1.
 #
-# ⚠️ 명시된 범위 경계 (조용한 미검출이 아니라 계약된 한계):
-#   인라인 코드 제거가 **단일 백틱 스팬만** 처리하므로, 이중 백틱(`` ``…`` ``) 스팬
-#   안의 `## ` 는 검사 2 가 검출하지 못한다. 현행 5파일에서 실피해 0 임을 실측했고,
-#   필요해지면 별도 이슈로 확장한다.
+# 술어 작성 시 주의 (실측으로 틀렸던 지점 — 전부 재현 후 정정):
+#   - 제외 문자류에 `#` 을 반드시 포함한다. 초판 `[^[:space:]]#{2,6}[[:space:]]` 는
+#     `###` 자신의 첫 `#` 이 「비공백 문자」에 매칭되어 **h3 이상 헤딩을 자기 매칭**했다
+#     (`## h2` 는 매칭되지 않는다 — 격리 픽스처 4줄로 재현). 규모는 술어·도구·모집단에
+#     따라 두 자릿수 이상 갈린다: `grep -rE '[^[:space:]]#{2,6} ' .claude --include='*.md'`
+#     = 64,414 hit 이지만 그 모집단은 **on-disk 19,351 md** 로 gitignored
+#     `.claude/worktrees/` 사본이 지배적이고, tracked 기준
+#     `git grep -E '[^[:space:]]#{2,6} ' -- .claude` = **178 hit / tracked 23 md** 다.
+#     올바른 형태는 `[^[:space:]#]#+[[:space:]]`.
+#   - 인터벌 `{n,m}` 에 의존하지 않는다 (macOS BWK awk 호환) — `#+` 를 쓴다.
+#   - 코드 스팬 치환 문자는 **비공백**이어야 한다 (check_glue_lines 주석 (1) 참조).
+#
+# ⚠️ 명시된 범위 경계 (조용한 미검출이 아니라 계약된 한계 — 전부 실측):
+#   a) **표 셀 구분자 오탐** — `| ## 헤더` 가 아닌 `|## 헤더` 형태는 `|` 가 비공백이라
+#      글루로 잡힌다. tracked 245 md 전수에서 현행 발생 0건.
+#   b) **`C# ` / `F# ` 류 언어명 오탐** — `#+` 확장(h1 글루 검출)이 새로 들여온 형태다.
+#      tracked 245 md 전수 리터럴 `[CF]# ` **0건**이라 확장을 택했으나, 위험 자체는
+#      실재하므로 미래에 걸리면 이 줄을 근거로 `##+` 로 되돌리거나 예외를 논하라.
+#   c) 위 두 형태를 뺀 오탐은 tracked 245 md 전수에서 **1건**뿐이며
+#      (`docs/decisions/20260430-r3-followup-body-proportion.md:1153`, 큰따옴표 안 정당
+#      인용) 이 가드의 모집단(5파일) 밖이다.
+#   ⚠️ 초판 주석이 경계를 「이중 백틱 스팬 **안**」으로 적었던 것은 **거짓이었다** —
+#      실제로는 치환 문자가 공백이라 **코드 스팬 직후 글루 전부**가 백틱 개수와 무관하게
+#      미탐이었다. placeholder 수정으로 해소됐고, 3형태(링크 직후 / 단일 백틱 직후 /
+#      이중 백틱 직후) 전건 exit 1 을 실증했다.
 #
 # 모집단은 이 가드의 기존 5파일로 고정한다 (`.claude/**` · `docs/**` 확대는 #1125 비-범위).
 #
-# 관련 이슈: #1125 (앵커 헤딩성 + 글루 라인 검사 추가). 손상 원인 PR: #1124
+# 관련 이슈: #1125 (앵커 헤딩성 + 글루 라인 검사 추가). 손상 원인 PR: #1124.
+#            리뷰 라운드 1 (PR #1133) 에서 B1(치환 문자) · B2(SSoT 리터럴) · 펜스 추적 ·
+#            검사 1 누수 · 수치 술어 4건을 실측 반증받아 정정.
 
 set -euo pipefail
 
@@ -84,7 +107,15 @@ CORE_FIELDS=(
 
 # 앵커 문구 — 이 문구 1개가 섹션 추출(extract_json_block)과 헤딩성 검사(check_anchor_form)의
 # 공통 기준점이다. 두 곳이 갈리지 않도록 변수 1개로 고정한다.
+# ⚠️ 이 주장은 **양쪽이 실제로 이 변수를 소비할 때만** 참이다 — extract_json_block 이
+# 리터럴을 들고 있으면 여기만 바꿔도 갈린다 (#1125 리뷰 B2 에서 실제로 그 상태였다).
+# 소비처를 늘리거나 옮길 때 `grep -n 'ANCHOR_KEYWORD'` 로 전수 확인할 것.
 ANCHOR_KEYWORD="마무리 체크리스트 JSON 반환"
+
+# 파일당 구조 검사 횟수 — check_agent 가 호출하는 check_*_form/lines 함수 개수와 일치해야 한다.
+# 최종 요약에서 곱수로 쓰이며, 실제 누적값(checked_structure)과 대조 검증한다 (#1125 리뷰 권고 7 —
+# 하드코딩 곱수가 조용히 drift 하는 것을 막는다).
+STRUCTURE_CHECKS_PER_FILE=2
 
 errors=0
 checked_fields=0
@@ -102,9 +133,10 @@ checked_structure=0
 # 추출기 자체는 아래 그대로 두고, 뚫린 축만 구조 검사 2종으로 막는다 (상단 주석 참조).
 extract_json_block() {
   local file="$1"
-  awk '
-    # 1. "마무리 체크리스트 JSON 반환" 키워드가 나올 때까지 무시
-    !seen && /마무리 체크리스트 JSON 반환/ { seen = 1; next }
+  awk -v kw="${ANCHOR_KEYWORD}" '
+    # 1. 앵커 키워드가 나올 때까지 무시 — 리터럴이 아니라 ANCHOR_KEYWORD 를 소비한다
+    #    (#1125 리뷰 B2: 리터럴이면 변수와 갈려 "변수 1개로 고정" 주석이 거짓이 된다)
+    !seen && index($0, kw) { seen = 1; next }
     # 2. 키워드 발견 후, 첫 ```json 코드블록 시작점을 찾음 (들여쓰기 허용)
     seen && !in_json && /^[[:space:]]*```json[[:space:]]*$/ { in_json = 1; next }
     # 3. 코드블록 내부에서 닫는 ``` 를 만나면 즉시 처리 종료
@@ -114,58 +146,115 @@ extract_json_block() {
   ' "${file}"
 }
 
-# [검사 1] 앵커 헤딩성 — 앵커 라인이 `^## …` (헤딩) 또는 `^<숫자>. …` (번호 리스트 항목)
-# 이어야 한다. 그 밖의 위치(문장/불릿 꼬리에 글루)면 FAIL.
-# awk 로 첫 등장 라인만 뽑는다 — grep 은 미발견 시 exit 1 이라 `|| true` 가 필요해지고,
+# [검사 1] 앵커 헤딩성 — 앵커 키워드를 담은 라인 중 **최소 1개**가 `^## …` (헤딩) 또는
+# `^<숫자>. …` (번호 리스트 항목) 형태여야 한다. 하나도 없으면 FAIL.
+#
+# ⚠️ 「첫 등장 라인만 본다」로 쓰면 안 된다 (#1125 리뷰 권고 2 — 양방향 누수):
+#   - 오탐 축: 같은 파일 다른 절에 이 문구를 언급하는 **정당한 상호참조 불릿**을 앞에
+#     추가하는 것만으로 FAIL 이 난다. 문서를 정상적으로 늘리는 행위가 가드를 깨면
+#     가드가 회피 대상이 된다.
+#   - 공허 통과 축: 앞쪽에 번호 리스트 언급이 먼저 있으면 진짜 앵커가 글루돼도 통과한다.
+# 그래서 검사 1 은 **존재 계약**("정상 형태의 앵커가 있는가")만 지고, 개별 라인의
+# **무결성 계약**("어떤 라인도 헤더가 글루되지 않았는가")은 검사 2 가 전담한다.
+# 두 계약의 곱이 #1124 손상 2형태를 덮는다 — 실증은 PR 본문의 negative 픽스처 참조.
+#
+# awk 로 훑는다 — grep 은 미발견 시 exit 1 이라 `|| true` 가 필요해지고,
 # 그 우회로는 가드 설계 원칙(fail-fast, soft-exit 0건)에 어긋난다.
 check_anchor_form() {
   local agent="$1"
   local file="$2"
 
-  local anchor
-  anchor=$(awk -v kw="${ANCHOR_KEYWORD}" 'index($0, kw) { printf "%d:%s", FNR, $0; exit }' "${file}")
+  # occurrences = 키워드를 담은 전체 라인 수 / valid = 그중 정당 형태 라인 수 / first = 첫 등장(진단용)
+  local scan
+  scan=$(awk -v kw="${ANCHOR_KEYWORD}" '
+    index($0, kw) {
+      total++
+      if ($0 ~ /^##[[:space:]]/ || $0 ~ /^[0-9]+\.[[:space:]]/) valid++
+      if (total == 1) first = FNR ": " substr($0, 1, 120)
+    }
+    END { printf "%d\t%d\t%s", total + 0, valid + 0, first }
+  ' "${file}")
 
   checked_structure=$((checked_structure + 1))
 
-  if [ -z "${anchor}" ]; then
+  local total="${scan%%$'\t'*}"
+  local rest="${scan#*$'\t'}"
+  local valid="${rest%%$'\t'*}"
+  local first="${rest#*$'\t'}"
+
+  if [ "${total}" -eq 0 ]; then
     echo "❌ [${agent}] 앵커 문구 '${ANCHOR_KEYWORD}' 없음 — ${file}" >&2
     errors=$((errors + 1))
     return
   fi
 
-  local line_no="${anchor%%:*}"
-  local text="${anchor#*:}"
-
-  if [[ "${text}" =~ ^##[[:space:]] ]] || [[ "${text}" =~ ^[0-9]+\.[[:space:]] ]]; then
+  if [ "${valid}" -gt 0 ]; then
     return
   fi
 
-  echo "❌ [${agent}] 앵커가 헤딩/번호 리스트 항목이 아님 (line ${line_no}) — ${file}" >&2
+  echo "❌ [${agent}] 정상 형태의 앵커가 0개 (키워드 등장 ${total}회, 전부 헤딩/번호 리스트 항목 아님) — ${file}" >&2
   echo "     기대: '## ${ANCHOR_KEYWORD} …' 또는 '<숫자>. …${ANCHOR_KEYWORD}…'" >&2
-  echo "     실제: ${text:0:120}" >&2
+  echo "     첫 등장: ${first}" >&2
   errors=$((errors + 1))
 }
 
-# [검사 2] 헤딩 글루 라인 — 코드펜스/인라인 코드 스팬 제거 후, 라인 선두가 아닌 위치에
-# `##`~`######` + 공백 이 나타나면 FAIL. #1124 의 developer `## 규칙` 손상은 이 검사만 잡는다.
-# 범위 경계(이중 백틱 스팬 미처리) 는 상단 주석에 명시.
+# [검사 2] 헤딩 글루 라인 — 코드펜스 밖에서, 인라인 코드 스팬을 비공백 placeholder 로
+# 치환한 뒤, 라인 선두가 아닌 위치에 `##`~`######` + 공백 이 나타나면 FAIL.
+# #1124 의 developer `## 규칙` 손상은 이 검사만 잡는다 (그 파일의 앵커는 무손상이었다).
+#
+# 설계상 유의점 2가지 — 둘 다 리뷰에서 실측으로 반증된 초판의 결함이다 (#1125 리뷰):
+#
+#  (1) 코드 스팬 치환 문자는 **비공백**이어야 한다. 초판은 공백(" ")으로 치웠는데
+#      술어가 `[^[:space:]#]` 로 **비공백** 선행 문자를 요구하므로, 코드 스팬 **직후**의
+#      글루(`` `docs/x.md`## 규칙 ``)가 백틱 개수와 무관하게 전량 미탐이었다.
+#      placeholder `\001` 은 마크다운 본문에 나타나지 않는 제어문자다.
+#
+#  (2) 펜스는 **여는 마커의 문자 종류와 길이를 기억**해야 한다 (CommonMark). 초판은
+#      `fence = !fence` 단순 토글이라 4-백틱 펜스 안의 3-백틱 펜스에서 상태가 반전됐다
+#      (`architect.md:115~121` / `pm.md:114~120` 실재). 그 구간은 안쪽 토글이 짝수라
+#      우연히 복구됐지만, **홀수가 되면 그 뒤 파일 전체가 조용히 검사에서 빠진다** —
+#      가드가 눈머는 경로라 fail-fast 원칙상 허용 불가.
+#      여는 펜스는 백틱/틸드 3개 이상, 닫는 펜스는 **같은 문자 · 같은 길이 이상 · info
+#      string 없음** 일 때만 성립시킨다.
+#
+# 범위 경계(표 셀 `|##` / `C# ` 류 / 확장 근거 수치)는 파일 상단 주석에 일괄 박제.
 check_glue_lines() {
   local agent="$1"
   local file="$2"
 
   local flagged
   flagged=$(awk '
-    # 코드펜스 토글 — 펜스 내부는 마크다운 헤딩 문법이 적용되지 않으므로 검사 제외
-    /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
-    fence { next }
-    # 정상 헤딩 라인 (선두 `#`) 은 검사 대상이 아니다
-    /^[[:space:]]*#+[[:space:]]/ { next }
     {
+      s = $0
+      sub(/^[[:space:]]+/, "", s)
+      ch = substr(s, 1, 1)
+      if (ch == "`" || ch == "~") {
+        n = 0
+        while (substr(s, n + 1, 1) == ch) n++
+        if (n >= 3) {
+          if (!fence) {
+            # 여는 펜스 — 마커 문자와 길이를 기억한다
+            fence = 1; fchar = ch; flen = n
+            next
+          } else if (ch == fchar && n >= flen) {
+            # 닫는 펜스 후보 — 뒤에 info string 이 없어야 실제로 닫힌다
+            tail = substr(s, n + 1)
+            gsub(/[[:space:]]/, "", tail)
+            if (tail == "") { fence = 0; next }
+          }
+          # 그 밖(다른 마커 문자 / 더 짧은 길이)은 코드블록 "내용" 이다 — 닫지 않는다
+        }
+      }
+      if (fence) next
+      # 정상 헤딩 라인 (선두 `#`) 은 검사 대상이 아니다
+      if ($0 ~ /^[[:space:]]*#+[[:space:]]/) next
+
       line = $0
-      gsub(/`[^`]*`/, " ", line)     # 인라인 코드 스팬 제거 (단일 백틱 한정 — 범위 경계)
-      # `#` 을 제외 문자류에 포함해야 `###` 의 첫 `#` 이 「비공백 문자」로 오탐되지 않는다.
-      # 인터벌 {n,m} 미사용 — macOS BWK awk 호환.
-      if (match(line, /[^[:space:]#]##+[[:space:]]/)) printf "%d: %s\n", FNR, substr($0, 1, 120)
+      # 인라인 코드 스팬 → 비공백 placeholder (위 유의점 1)
+      gsub(/`[^`]*`/, "\001", line)
+      # `#` 을 제외 문자류에 포함해야 `###` 의 첫 `#` 이 「비공백 문자」로 자기 매칭되지 않는다.
+      # 인터벌 {n,m} 미사용 — macOS BWK awk 호환 (`#+` 를 쓴다).
+      if (match(line, /[^[:space:]#]#+[[:space:]]/)) printf "%d: %s\n", FNR, substr($0, 1, 120)
     }
   ' "${file}")
 
@@ -247,5 +336,13 @@ if [ "${errors}" -gt 0 ]; then
   exit 1
 fi
 
+# 요약 곱수 자기 검증 — 리터럴이 실제 누적값과 갈리면 fail-fast (fallback 분기 금지)
+expected_structure=$((${#AGENTS[@]} * STRUCTURE_CHECKS_PER_FILE))
+if [ "${checked_structure}" -ne "${expected_structure}" ]; then
+  echo "❌ 구조 검사 횟수 불일치 — 기대 ${expected_structure} (${#AGENTS[@]} files × ${STRUCTURE_CHECKS_PER_FILE}), 실제 ${checked_structure}." >&2
+  echo "   STRUCTURE_CHECKS_PER_FILE 이 check_agent 의 구조 검사 호출 수와 갈렸다. 상수를 갱신하라." >&2
+  exit 1
+fi
+
 echo "✅ agent SSoT drift 없음 (${#AGENTS[@]} files × ${#CORE_FIELDS[@]} fields = ${checked_fields} checks)"
-echo "✅ 구조 검사 통과 (${#AGENTS[@]} files × 2 checks = ${checked_structure} checks — 앵커 헤딩성 / 헤딩 글루 라인)"
+echo "✅ 구조 검사 통과 (${#AGENTS[@]} files × ${STRUCTURE_CHECKS_PER_FILE} checks = ${checked_structure} checks — 앵커 헤딩성 / 헤딩 글루 라인)"
