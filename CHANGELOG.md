@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-08-23
+
 ### Behavior Changes
 
 - **[#1127] `verify:lod` 를 「9조합 렌더 스모크」로 축소하고 CI 에 배선 — 픽셀 임계 판정 제거 + baseline 9장 삭제 (MINOR)** ([#1127](https://github.com/coseo12/astro-simulator/issues/1127)) — `apps/web/scripts/browser-verify-lod.mjs` 는 `#289` 이래 **CI 에서 한 번도 실행된 적이 없고** (`git log -S 'verify:lod' -- .github` = `0` 커밋), 그 판정축(baseline 대비 `max pixel diff < 15%`)은 #1122 가 **측정으로 반증**했다 — 화면 전체가 검게 죽어도 프레임 대비 diff 는 `0.52~4.25%` 라 임계에 닿지 않는다. 이 PR 은 임계 판정을 걷어내고 **임계를 경유하지 않는 구조 FAIL 경로 5개** (씬 미노출 / focus 실패 / tier 실패 / LOD 미적용 / viewport 불일치) 만 남긴 뒤 `ci.yml` 공용 dev 서버(`:3002`) 뒤에 배선한다. 호출 관례도 형제 가드와 맞춰 `BASE_URL` 환경변수로 통일했다 — 구 `process.argv[2]` positional + `--update-baseline` 플래그 **제거**, 그리고 **기본 baseUrl 이 `3001` → `3000` 으로 바뀐다** (`resolveBaseUrl()` 기본값. CI 는 `BASE_URL` 을 명시 주입하므로 무영향이고, 로컬에서 인자 없이 돌리던 습관만 바뀐다). ⚠️ 초판이 적은 _"형제 가드 11종"_ 은 술어가 없어 재현되지 않았다 — 실측 술어와 값: `grep -oE "browser-verify-[a-z0-9-]+\.mjs" .github/workflows/ci.yml | sort -u` 중 `BASE_URL` 로 호출되는 것이 **`14`** (자신 포함) / **`13`** (자신 제외)이고, `resolveBaseUrl()` 까지 채택한 형제는 **`3`** (`627-satellite-orbit` / `848-modal-focus` / `mobile-p7d`) 이다 (ADR `20260808-983` §4항).
