@@ -25,6 +25,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # ⚠️ 이 harness 는 «실패하도록 설계된» 명령의 exit code 를 읽는 것이 목적이라
+          # shell: bash 가 주는 -e 를 끈다. 측정 대상인 **추출된 step 본문은 그대로**
+          # `bash --noprofile --norc -e -o pipefail` 로 실행하므로 실 workflow 조건과 동일하다.
+          set +e
           WF=.github/workflows/release-escape-watch.yml
           GH_REAL="$(command -v gh)"; export GH_REAL
           echo "실 gh 경로: $GH_REAL"
