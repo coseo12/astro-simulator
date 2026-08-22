@@ -17,7 +17,12 @@
  *   3. 제외 (검사 안 함):
  *      - http(s):// / mailto: 외부 URL — 네트워크 비결정성으로 CI 검사 부적합
  *      - 페이지 내 앵커 단독 (#...) — 파일 존재 검사 무의미
- *      - fenced code block / inline code span 내 링크 — 예시/플레이스홀더 텍스트
+ *      - fenced code block (``` / ~~~) / inline code span 내 링크 — 예시/플레이스홀더 텍스트.
+ *        펜스의 **들여쓰기는 임의 깊이 허용**한다 (여는 쪽·닫는 쪽 독립) — 리스트
+ *        continuation 안의 펜스가 이 계약에서 빠지지 않도록 (#1134). 반대로 **비-펜스
+ *        indented code block (4칸 들여쓰기만으로 여는 형태) 은 마스킹하지 않는다** —
+ *        별개 술어이고 #1134 범위 밖이다 (계약이 술어보다 넓으면 그 자체가 결함이라
+ *        미포함을 명시한다).
  *      - footnote 정의 (`[^n]: ...`) — 링크 정의가 아닌 각주 본문
  *      - 템플릿 파일 (docs/templates/** + basename `_` 접두) — `[PR](URL)` 등
  *        placeholder 가 본질이라 링크 검사 무의미
@@ -112,10 +117,38 @@ function collectMdFiles(root) {
 /**
  * fenced code block + inline code span 을 공백으로 마스킹 (계약 3항).
  * 라인 수를 보존해 라인 번호 보고가 정확하도록 개행은 유지한다.
+ *
+ * #1134 — 왜 좁았던 술어가 뚫렸는가:
+ *   초판 술어는 `^(```|~~~)` 로 **행 선두 펜스만** 인식했다. 계약 3항은 「펜스 안이면
+ *   제외」인데 술어는 「행 선두 펜스 안이면 제외」였다 — 계약보다 좁은 술어다.
+ *   리스트 continuation 안의 펜스는 항상 들여쓰기를 갖기 때문에 그 안의 예시 링크가
+ *   **산문으로 읽혀** false FAIL 이 된다. PR #1133 이 CHANGELOG 의 2칸 들여쓴
+ *   ```text 픽스처 때문에 CI `project-guards` RED 가 나 실제로 발현했고, 그 PR 은
+ *   예시 대상을 실존 경로로 바꿔 우회할 수밖에 없었다 (= 픽스처 왜곡).
+ *
+ * 채택 술어와 기각 후보 (rev fb491d5 실측, 모집단 = 이 스크립트의 스캔 대상 211 md):
+ *   - 채택 `^[ \t]*` (임의 들여쓰기) — 마스킹 후 잔여(= 산문으로 읽히는) 펜스 라인 `0`.
+ *   - 기각 `^[ \t]{0,3}` (CommonMark 문면) — 잔여 `22`. CommonMark 의 `≤3` 은 컨테이닝
+ *     블록 **상대**값인데 이 스크립트는 리스트 컨텍스트를 추적하지 않아 절대 비교가
+ *     원리적으로 부정확하다. 그 `22` 는 전부 정당한 깊은 리스트 내포 펜스이며
+ *     **고치려는 결함과 같은 클래스**다.
+ *   - 기각 「현행 유지 + 계약 문구 축소」 — 잔여 `130`. 결함을 고치는 대신 결함을
+ *     문서화하는 선택이고, 이미 실피해(PR #1133)가 났다.
+ *   확대의 대가는 오늘 측정상 `0` 이다 — 링크 target 이 `3767` → `3766` 으로 **1건**만
+ *   줄고 그 1건이 `CHANGELOG.md:66` (#1133 이 넣은 우회 그 줄) 이다. `{0,3}` 과
+ *   임의 들여쓰기는 target 집합이 **완전히 동일**해 오늘 코퍼스에서 구분되지 않는다.
+ *
+ * ⚠️ 확대의 고유 위험과 그 방어:
+ *   들여쓴 「진짜 코드블록」 안의 백틱3 라인이 여는 펜스로 오인되면 그 뒤 **진짜 링크**
+ *   까지 마스킹돼 미탐이 된다 (#1125 「스트레이 펜스」와 동형). 방어는 두 겹이다 —
+ *   (1) 위 target 차분이 파일·라인 단위로 1건뿐임을 확인했고 (2) `--self-test` 에
+ *   「들여쓴 펜스 밖의 깨진 링크는 여전히 FAIL」 단언을 상주시켰다 (아래 unit 7·8).
+ *   닫는 펜스의 들여쓰기는 여는 쪽과 **독립**으로 허용한다 (`\1` 역참조는 펜스 문자만
+ *   묶고 들여쓰기는 밖에 둔다) — 실제 문서에서 양쪽 들여쓰기가 어긋난 사례가 있다.
  */
 function maskCode(content) {
-  // fenced block (``` 또는 ~~~) — 개행 보존 마스킹
-  let masked = content.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, (m) =>
+  // fenced block (``` 또는 ~~~) — 개행 보존 마스킹. 들여쓰기는 여는·닫는 쪽 각각 임의 깊이.
+  let masked = content.replace(/^[ \t]*(```|~~~)[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm, (m) =>
     m.replace(/[^\n]/g, ' '),
   );
   // inline code span — 단일 라인 내
@@ -390,6 +423,71 @@ function selfTest() {
     writeFileSync(path.join(docsDir, 'e.md'), '로그: `docs/local-artifact.log` (경로 표기)\n');
     r = runScan(tmp);
     assert(r.broken.length === 0, 'unit: gitignored 참조 제거 → recovery PASS');
+
+    // 7. 단위 — 들여쓴 fenced block 마스킹 (#1134, 오탐 방향):
+    //    리스트 continuation 안의 펜스(1~3칸)와 깊은 내포 펜스(4칸+) 양쪽에서
+    //    존재하지 않는 링크가 «예시» 로 통과해야 한다. 실사고는 2칸 형태였다 (PR #1133).
+    const indented = [
+      '# indented-fence',
+      '- 불릿',
+      '',
+      '  ```text',
+      '  - 상세: [x](y.md)## 자가 점검',
+      '  ```',
+      '',
+      '- 깊은 내포',
+      '  - 하위',
+      '',
+      '     ```bash',
+      '     cat [deep](./nope-deep.md)',
+      '     ```',
+      '',
+      '\t```text',
+      '\t[tab-indented](./nope-tab.md)',
+      '\t```',
+      '',
+    ].join('\n');
+    writeFileSync(path.join(docsDir, 'f.md'), indented);
+    r = runScan(tmp);
+    assert(
+      r.broken.length === 0,
+      `unit: 들여쓴 펜스(2칸/5칸/tab) 내 링크 마스킹 (실측 ${r.broken.length}건: ${r.broken
+        .map((b) => `${b.file}:${b.line} ${b.target}`)
+        .join(', ')})`,
+    );
+
+    // 8. 단위 — 마스킹 확대의 미탐 방어 (#1134, 미탐 방향):
+    //    같은 파일에 들여쓴 펜스와 «펜스 밖» 깨진 링크를 함께 두고 한 번에 실행한다.
+    //    펜스 밖 링크는 반드시 FAIL 이어야 한다 — 넓힌 마스킹이 진짜 결함을 삼키면
+    //    본말전도다. 닫는 펜스의 들여쓰기가 여는 쪽과 어긋난 형태도 함께 닫힌다.
+    const mixed = [
+      '# mixed',
+      '  ```text',
+      '  [in-fence](./nope-in.md)',
+      '```',
+      '',
+      '[out-of-fence](./nope-out.md)',
+      '',
+      '- 불릿',
+      '',
+      '    ```text',
+      '    [in-deep](./nope-in2.md)',
+      '    ```',
+      '',
+      '[out-after-fence](./nope-out2.md)',
+      '',
+    ].join('\n');
+    writeFileSync(path.join(docsDir, 'g.md'), mixed);
+    r = runScan(tmp);
+    const outs = r.broken.filter((b) => b.file.endsWith('g.md'));
+    assert(
+      outs.length === 2 &&
+        outs.some((b) => b.target === './nope-out.md' && b.line === 6) &&
+        outs.some((b) => b.target === './nope-out2.md' && b.line === 14),
+      `unit: 펜스 밖 깨진 링크는 여전히 FAIL (실측 ${outs.length}건: ${outs
+        .map((b) => `${b.file}:${b.line} ${b.target}`)
+        .join(', ')})`,
+    );
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
