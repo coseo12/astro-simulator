@@ -17,7 +17,16 @@
  *   3. 제외 (검사 안 함):
  *      - http(s):// / mailto: 외부 URL — 네트워크 비결정성으로 CI 검사 부적합
  *      - 페이지 내 앵커 단독 (#...) — 파일 존재 검사 무의미
- *      - fenced code block / inline code span 내 링크 — 예시/플레이스홀더 텍스트
+ *      - fenced code block (``` / ~~~) / inline code span 내 링크 — 예시/플레이스홀더 텍스트.
+ *        펜스의 **들여쓰기는 임의 깊이 허용**한다 (여는 쪽·닫는 쪽 독립) — 리스트
+ *        continuation 안의 펜스가 이 계약에서 빠지지 않도록 (#1134). 반대로 **비-펜스
+ *        indented code block (4칸 들여쓰기만으로 여는 형태) 은 마스킹하지 않는다** —
+ *        별개 술어이고 #1134 범위 밖이다 (계약이 술어보다 넓으면 그 자체가 결함이라
+ *        미포함을 명시한다).
+ *        ⚠️ 이 제외에는 **기지의 사각 2형태**가 더 있다 — 짝이 맞지 않는 들여쓴 백틱3
+ *        쌍이 그 사이 링크를 삼키는 미탐, 4백틱 바깥 + 들여쓴 3백틱 안쪽 중첩 펜스가
+ *        누출되는 오탐. 상세와 근거는 `maskCode()` JSDoc §확대의 고유 위험, 현행 동작의
+ *        박제는 `--self-test` unit 9·10 이다 (#1137).
  *      - footnote 정의 (`[^n]: ...`) — 링크 정의가 아닌 각주 본문
  *      - 템플릿 파일 (docs/templates/** + basename `_` 접두) — `[PR](URL)` 등
  *        placeholder 가 본질이라 링크 검사 무의미
@@ -112,10 +121,50 @@ function collectMdFiles(root) {
 /**
  * fenced code block + inline code span 을 공백으로 마스킹 (계약 3항).
  * 라인 수를 보존해 라인 번호 보고가 정확하도록 개행은 유지한다.
+ *
+ * #1134 — 왜 좁았던 술어가 뚫렸는가:
+ *   초판 술어는 `^(```|~~~)` 로 **행 선두 펜스만** 인식했다. 계약 3항은 「펜스 안이면
+ *   제외」인데 술어는 「행 선두 펜스 안이면 제외」였다 — 계약보다 좁은 술어다.
+ *   리스트 continuation 안의 펜스는 항상 들여쓰기를 갖기 때문에 그 안의 예시 링크가
+ *   **산문으로 읽혀** false FAIL 이 된다. PR #1133 이 CHANGELOG 의 2칸 들여쓴
+ *   ```text 픽스처 때문에 CI `project-guards` RED 가 나 실제로 발현했고, 그 PR 은
+ *   예시 대상을 실존 경로로 바꿔 우회할 수밖에 없었다 (= 픽스처 왜곡).
+ *
+ * 채택 술어와 기각 후보 (rev fb491d5 실측, 모집단 = 이 스크립트의 스캔 대상 211 md):
+ *   - 채택 `^[ \t]*` (임의 들여쓰기) — 마스킹 후 잔여(= 산문으로 읽히는) 펜스 라인 `0`.
+ *   - 기각 `^[ \t]{0,3}` (CommonMark 문면) — 잔여 `22`. CommonMark 의 `≤3` 은 컨테이닝
+ *     블록 **상대**값인데 이 스크립트는 리스트 컨텍스트를 추적하지 않아 절대 비교가
+ *     원리적으로 부정확하다. 그 `22` 는 전부 정당한 깊은 리스트 내포 펜스이며
+ *     **고치려는 결함과 같은 클래스**다.
+ *   - 기각 「현행 유지 + 계약 문구 축소」 — 잔여 `130`. 결함을 고치는 대신 결함을
+ *     문서화하는 선택이고, 이미 실피해(PR #1133)가 났다.
+ *   확대의 대가는 오늘 측정상 `0` 이다 — 링크 target 이 `3767` → `3766` 으로 **1건**만
+ *   줄고 그 1건이 PR #1133 이 우회로 넣은 그 줄 (`- 상세: [x](…)## 자가 점검` 형태)
+ *   이다. `{0,3}` 과 임의 들여쓰기는 target 집합이 **완전히 동일**해 오늘 코퍼스에서
+ *   구분되지 않는다 — 둘을 가른 것은 위의 잔여 펜스 라인 측정이다.
+ *
+ * ⚠️ 확대의 고유 위험과 그 방어 (사거리를 실제 실행 결과에 맞춰 적는다):
+ *   닫는 펜스의 들여쓰기를 여는 쪽과 **독립**으로 허용하므로 (`\1` 역참조가 펜스 문자만
+ *   묶고 들여쓰기는 밖에 둔다), 「가장 가까운 아무 백틱3 라인」이 닫는 펜스가 된다.
+ *   여기서 **방어되는 것**과 **방어되지 않는 것**이 갈린다.
+ *
+ *   방어됨 — 들여쓴 펜스가 정상적으로 짝지어진 경우 그 **밖**의 깨진 링크는 여전히
+ *     FAIL 한다. `--self-test` unit 8 이 같은 실행에서 이를 단언한다.
+ *   ⚠️ 방어되지 **않음** (PR #1137 reviewer 가 실행으로 재현한 2형태. 아래 unit 9·10 이
+ *     「지금은 이렇게 동작한다」를 경계로 박제한다 — 겨눈다는 뜻이 아니라 **못 겨눈다는
+ *     사실을 못 박는다**):
+ *     (a) 미탐 — 짝이 맞지 않는 들여쓴 백틱3 **두 개**가 서로 짝지어 그 사이의 진짜
+ *         깨진 링크를 삼킨다 (구 술어는 검출 / 채택 술어는 미검출).
+ *     (b) 오탐 — 4백틱 바깥 + 들여쓴 3백틱 안쪽의 **중첩 펜스** 문서에서, 안쪽 예시
+ *         링크가 산문으로 누출된다 (구 술어는 정상 마스킹).
+ *     둘 다 정규식 짝짓기에 내재한 클래스라 진짜 해소는 **상태 있는 라인 스캐너**로의
+ *     교체이고 #1134 범위 밖이다. 현 코퍼스 발생은 양쪽 `0` 이고 총 노출은 `130` → `0`
+ *     으로 단조 감소하므로 확대 자체는 유지한다. 후속 스캐너 교체 시 unit 9·10 의
+ *     기대값을 뒤집으면 그대로 회귀 타깃이 된다.
  */
 function maskCode(content) {
-  // fenced block (``` 또는 ~~~) — 개행 보존 마스킹
-  let masked = content.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, (m) =>
+  // fenced block (``` 또는 ~~~) — 개행 보존 마스킹. 들여쓰기는 여는·닫는 쪽 각각 임의 깊이.
+  let masked = content.replace(/^[ \t]*(```|~~~)[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm, (m) =>
     m.replace(/[^\n]/g, ' '),
   );
   // inline code span — 단일 라인 내
@@ -390,6 +439,137 @@ function selfTest() {
     writeFileSync(path.join(docsDir, 'e.md'), '로그: `docs/local-artifact.log` (경로 표기)\n');
     r = runScan(tmp);
     assert(r.broken.length === 0, 'unit: gitignored 참조 제거 → recovery PASS');
+
+    // 7. 단위 — 들여쓴 fenced block 마스킹 (#1134, 오탐 방향):
+    //    리스트 continuation 안의 펜스(1~3칸)와 깊은 내포 펜스(4칸+) 양쪽에서
+    //    존재하지 않는 링크가 «예시» 로 통과해야 한다. 실사고는 2칸 형태였다 (PR #1133).
+    const indented = [
+      '# indented-fence',
+      '- 불릿',
+      '',
+      '  ```text',
+      '  - 상세: [x](y.md)## 자가 점검',
+      '  ```',
+      '',
+      '- 깊은 내포',
+      '  - 하위',
+      '',
+      '     ```bash',
+      '     cat [deep](./nope-deep.md)',
+      '     ```',
+      '',
+      '\t```text',
+      '\t[tab-indented](./nope-tab.md)',
+      '\t```',
+      '',
+    ].join('\n');
+    writeFileSync(path.join(docsDir, 'f.md'), indented);
+    r = runScan(tmp);
+    assert(
+      r.broken.length === 0,
+      `unit: 들여쓴 펜스(2칸/5칸/tab) 내 링크 마스킹 (실측 ${r.broken.length}건: ${r.broken
+        .map((b) => `${b.file}:${b.line} ${b.target}`)
+        .join(', ')})`,
+    );
+
+    // 8. 단위 — 마스킹 확대의 미탐 방어 (#1134, 미탐 방향):
+    //    같은 파일에 들여쓴 펜스와 «펜스 밖» 깨진 링크를 함께 두고 한 번에 실행한다.
+    //    펜스 밖 링크는 반드시 FAIL 이어야 한다 — 넓힌 마스킹이 진짜 결함을 삼키면
+    //    본말전도다. 닫는 펜스의 들여쓰기가 여는 쪽과 어긋난 형태도 함께 닫힌다.
+    const mixed = [
+      '# mixed',
+      '  ```text',
+      '  [in-fence](./nope-in.md)',
+      '```',
+      '',
+      '[out-of-fence](./nope-out.md)',
+      '',
+      '- 불릿',
+      '',
+      '    ```text',
+      '    [in-deep](./nope-in2.md)',
+      '    ```',
+      '',
+      '[out-after-fence](./nope-out2.md)',
+      '',
+    ].join('\n');
+    writeFileSync(path.join(docsDir, 'g.md'), mixed);
+    r = runScan(tmp);
+    const outs = r.broken.filter((b) => b.file.endsWith('g.md'));
+    assert(
+      outs.length === 2 &&
+        outs.some((b) => b.target === './nope-out.md' && b.line === 6) &&
+        outs.some((b) => b.target === './nope-out2.md' && b.line === 14),
+      `unit: 펜스 밖 깨진 링크는 여전히 FAIL (실측 ${outs.length}건: ${outs
+        .map((b) => `${b.file}:${b.line} ${b.target}`)
+        .join(', ')})`,
+    );
+
+    // 9. 경계 박제 — 확대의 신규 사각 (a) **미탐** (#1137 reviewer 🟡1):
+    //    짝이 맞지 않는 들여쓴 백틱3 «두 개» 가 서로 짝지어, 그 사이의 «펜스 밖» 진짜
+    //    깨진 링크를 삼킨다. unit 8 은 이 형태를 통과시킨다 (겨누지 못한다).
+    //    ⚠️ 아래 기대값은 «올바른 동작» 이 아니라 **현행 경계**다 — 구 술어는 이 링크를
+    //    검출했고 채택 술어는 놓친다. 상태 있는 라인 스캐너로 교체하면 기대값을
+    //    「검출」로 뒤집어야 하며, 그때 이 단언이 회귀 타깃이 된다.
+    //    ⚠️ **통제 링크 필수** — "삼켜진다" 만 단언하면 «없음» 도 통과하는 공허 단언이
+    //    된다 (픽스처를 빈 문자열로 바꿔도 pass. PR #1137 라운드 2 실측 / #1123 클래스).
+    //    삼켜지는 구간 **밖**에 반드시 검출돼야 하는 링크를 함께 두어, 「픽스처가 실제로
+    //    읽혔다」를 같은 단언이 증명하게 한다.
+    const strayPair = [
+      '# stray-pair',
+      '첫 예시:',
+      '',
+      '    ```text',
+      '    example',
+      '',
+      '진짜 문단이다. [swallowed](./nope-stray.md) 가 여기 있다.',
+      '',
+      '둘째 예시:',
+      '',
+      '    ```text',
+      '    example2',
+      '',
+      '통제 링크 — 삼켜지는 구간 밖이라 반드시 검출된다: [control](./nope-stray-control.md)',
+      '',
+    ].join('\n');
+    writeFileSync(path.join(docsDir, 'h.md'), strayPair);
+    r = runScan(tmp);
+    const strays = r.broken.filter((b) => b.file.endsWith('h.md'));
+    assert(
+      strays.length === 1 &&
+        strays[0].target === './nope-stray-control.md' &&
+        strays[0].line === 14,
+      `unit(경계): 짝 안 맞는 들여쓴 백틱3 쌍이 그 사이 링크를 삼킨다 + 통제 링크는 검출 — 현행 미탐 박제 (실측 ${strays.length}건: ${strays
+        .map((b) => `${b.file}:${b.line} ${b.target}`)
+        .join(', ')})`,
+    );
+
+    // 10. 경계 박제 — 확대의 신규 사각 (b) **오탐** (#1137 reviewer 🟡1):
+    //     4백틱 바깥 + 들여쓴 3백틱 안쪽(중첩 펜스를 «서술하는» 문서)에서, 안쪽 예시
+    //     링크가 산문으로 누출돼 false FAIL 이 된다. 구 술어는 정상 마스킹했다.
+    //     ⚠️ 위와 같이 «현행 경계» 박제다 — 스캐너 교체 시 누출 `0` 으로 뒤집힌다.
+    const nested = [
+      '# nested-fence',
+      '````markdown',
+      '  ```text',
+      '  [leaked](./nope-nested-in.md)',
+      '  ```',
+      '````',
+      '',
+      '[outside](./nope-nested-out.md)',
+      '',
+    ].join('\n');
+    writeFileSync(path.join(docsDir, 'i.md'), nested);
+    r = runScan(tmp);
+    const nests = r.broken.filter((b) => b.file.endsWith('i.md'));
+    assert(
+      nests.length === 2 &&
+        nests.some((b) => b.target === './nope-nested-in.md' && b.line === 4) &&
+        nests.some((b) => b.target === './nope-nested-out.md' && b.line === 8),
+      `unit(경계): 4백틱 바깥 + 들여쓴 3백틱 안쪽의 예시 링크가 누출된다 — 현행 오탐 박제 (실측 ${nests.length}건: ${nests
+        .map((b) => `${b.file}:${b.line} ${b.target}`)
+        .join(', ')})`,
+    );
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
