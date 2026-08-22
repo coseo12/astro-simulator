@@ -23,6 +23,10 @@
  *        indented code block (4칸 들여쓰기만으로 여는 형태) 은 마스킹하지 않는다** —
  *        별개 술어이고 #1134 범위 밖이다 (계약이 술어보다 넓으면 그 자체가 결함이라
  *        미포함을 명시한다).
+ *        ⚠️ 이 제외에는 **기지의 사각 2형태**가 더 있다 — 짝이 맞지 않는 들여쓴 백틱3
+ *        쌍이 그 사이 링크를 삼키는 미탐, 4백틱 바깥 + 들여쓴 3백틱 안쪽 중첩 펜스가
+ *        누출되는 오탐. 상세와 근거는 `maskCode()` JSDoc §확대의 고유 위험, 현행 동작의
+ *        박제는 `--self-test` unit 9·10 이다 (#1137).
  *      - footnote 정의 (`[^n]: ...`) — 링크 정의가 아닌 각주 본문
  *      - 템플릿 파일 (docs/templates/** + basename `_` 접두) — `[PR](URL)` 등
  *        placeholder 가 본질이라 링크 검사 무의미
@@ -507,6 +511,10 @@ function selfTest() {
     //    ⚠️ 아래 기대값은 «올바른 동작» 이 아니라 **현행 경계**다 — 구 술어는 이 링크를
     //    검출했고 채택 술어는 놓친다. 상태 있는 라인 스캐너로 교체하면 기대값을
     //    「검출」로 뒤집어야 하며, 그때 이 단언이 회귀 타깃이 된다.
+    //    ⚠️ **통제 링크 필수** — "삼켜진다" 만 단언하면 «없음» 도 통과하는 공허 단언이
+    //    된다 (픽스처를 빈 문자열로 바꿔도 pass. PR #1137 라운드 2 실측 / #1123 클래스).
+    //    삼켜지는 구간 **밖**에 반드시 검출돼야 하는 링크를 함께 두어, 「픽스처가 실제로
+    //    읽혔다」를 같은 단언이 증명하게 한다.
     const strayPair = [
       '# stray-pair',
       '첫 예시:',
@@ -521,13 +529,17 @@ function selfTest() {
       '    ```text',
       '    example2',
       '',
+      '통제 링크 — 삼켜지는 구간 밖이라 반드시 검출된다: [control](./nope-stray-control.md)',
+      '',
     ].join('\n');
     writeFileSync(path.join(docsDir, 'h.md'), strayPair);
     r = runScan(tmp);
     const strays = r.broken.filter((b) => b.file.endsWith('h.md'));
     assert(
-      strays.length === 0,
-      `unit(경계): 짝 안 맞는 들여쓴 백틱3 쌍이 펜스 밖 링크를 삼킨다 — 현행 미탐 박제 (실측 ${strays.length}건: ${strays
+      strays.length === 1 &&
+        strays[0].target === './nope-stray-control.md' &&
+        strays[0].line === 14,
+      `unit(경계): 짝 안 맞는 들여쓴 백틱3 쌍이 그 사이 링크를 삼킨다 + 통제 링크는 검출 — 현행 미탐 박제 (실측 ${strays.length}건: ${strays
         .map((b) => `${b.file}:${b.line} ${b.target}`)
         .join(', ')})`,
     );
