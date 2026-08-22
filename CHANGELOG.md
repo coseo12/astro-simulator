@@ -131,7 +131,9 @@ Semantic Versioning을 따른다.
 
   ⇒ **(1a)** 술어·권한·`if:` 평가의 Actions 런타임 실증은 일회용 probe run [`32573178493`](https://github.com/coseo12/astro-simulator/actions/runs/32573178493) 로 **머지 전 달성** (`#636` → `ESCAPE` / `#1088` → `clean`, 리터럴 진리표 `8/8`). **(1b)** 최종 파일의 `if:` true 실발화는 **머지 후 첫 릴리스 클래스 머지 PR** 에서만 가능하므로 본 PR 시점 **미검증 축**이며 인계 항목이다. 조용히 「검증됨」으로 적으면 [#840](https://github.com/coseo12/astro-simulator/issues/840) 클래스라 명시 박제한다. (2)(3)(4) 는 원안대로 달성했다.
 
-  **(1b) 확인 항목** — prep (`release/*` → `develop`) 과 release (`develop` → `main`) **2건 모두** run 이 남는가 / job 이 skip 이 아닌가 / 판정이 `clean` 인가. 미발화는 ADR 1073 §재검토 조건 2 가 **`1`건이라도** 재검토 트리거로 잡는다.
+  **(1b) 확인 항목** — prep (`release/*` → `develop`) 과 release (`develop` → `main`) **2건 모두** run 이 남는가 / job 이 skip 이 아닌가 / 판정이 `clean` 인가. 미발화는 ADR 1073 §재검토 조건 2 가 **`1`건이라도** 재검토 트리거로 잡는다. ⚠️ (1a) 의 `if:` 진리표 `8/8` 은 **probe 파일의 손 사본**을 평가한 것이다 — `if:` 는 job 수준 필드라 step 본문처럼 파일에서 추출해 실행할 수 없고, probe 브랜치를 지웠으므로 그 사본의 축자 동일성은 재현 불가다. 원문은 [이슈 #1096 코멘트](https://github.com/coseo12/astro-simulator/issues/1096#issuecomment-5380451497)에 박제했다.
+
+- **[#1096] 항 13 「두 assertion 승계」의 비적용 판정** — 971 항 13 의 두 assertion 중 **조회 실패**는 (0) 블록 안에 그대로 있으나, **포화** (`--limit` 절단) 는 **(0) 경로에 구조적으로 부재**하다. 포화 assertion 은 (1) 모집단 열거 (`gh pr list --limit`) 전용이고 본 workflow 는 이벤트 구동이라 모집단을 열거하지 않기 때문이다 (PR 1건 = 이벤트 1건). 그 자리를 대신 지키는 것이 **판정값 화이트리스트**다 — 두 assertion 이 지키려던 것은 «`0 hit` 의 의미», 즉 **측정 실패가 `clean` 으로 읽히지 않는 것**이기 때문이다. 침묵 승계가 아니라 **명시적 비적용 판정**이며 workflow 주석 · PR 본문 · 본 항목 **3위치**에 박제한다.
 
 ## [0.77.0] - 2026-08-22
 
