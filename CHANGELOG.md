@@ -5,6 +5,10 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1096] 릴리스 클래스 머지마다 escape 관측 run 이 남는다 (MINOR)** — `base=main` 이거나 `head` 가 `release/` 로 시작하는 PR 이 **머지**되면 `release-escape-watch` 가 발화해 그 PR 1건을 판정한다. `clean` 이면 job summary 에 판정 1줄을 남기고 성공하고, `ESCAPE` 면 `[ADR Trigger]` 이슈를 만들고 **job 을 실패**시킨다. **`clean` 이어도 run 이력이 남는 것이 요점이다** — 사람 규약은 「관측을 안 한 것」과 「관측했더니 깨끗한 것」을 구별할 산출물을 남기지 않는다. 저장소 보호 설정·required 체크 집합은 **무접촉**이며, `closed` 이벤트라 머지 게이트에 원리적으로 개입하지 않는다 (비-required). 릴리스 절차에 사람 스텝이 **추가되지 않는다** — 배선 전까지의 잠정 조치였던 「메인이 릴리스 직후 술어를 수동 1회 실행」이 소멸한다.
+
 ### Fixed
 
 - **[#1134] `verify-docs-links` 의 코드펜스 마스킹이 들여쓴 펜스를 놓쳤다 — 계약보다 좁은 술어 (PATCH)** ([#1134](https://github.com/coseo12/astro-simulator/issues/1134)) — `scripts/verify-docs-links.mjs` 의 계약 3항은 _"fenced code block / inline code span 내 링크"_ 를 검사 제외로 선언하는데, 술어의 들여쓰기 접두가 `^` (= 없음) 이라 **행 선두 펜스만** 인식했다. **계약은 「펜스 안이면 제외」인데 술어는 「행 선두 펜스 안이면 제외」** 였고, 이 불일치가 결함의 본체다. 리스트 continuation 안의 펜스는 항상 들여쓰기를 갖기 때문에 그 안의 **예시 링크가 산문으로 읽혀 false FAIL** 이 된다. 접두를 `^[ \t]*` 로 넓혀 여는·닫는 쪽 **각각 독립**으로 임의 들여쓰기를 허용하고, **계약 3항 문구를 술어에 맞춰 정정**했다 — 마스킹 대상(임의 들여쓰기 펜스)과 **비대상**(비-펜스 indented code block)을 양방향으로 명시한다.
@@ -102,6 +106,34 @@ Semantic Versioning을 따른다.
   **fail-fast** — 새로 넣은 코드에 `|| true` · soft-exit · allowlist · 예외 경로는 **`0` 건**이다.
 
   **비-범위**: **비-펜스 indented code block**(4칸 들여쓰기만으로 여는 형태) 마스킹은 별개 술어라 다루지 않았고, 계약 3항에 **미포함을 명시**했다 (계약이 술어보다 넓으면 그 자체가 이 이슈의 결함이므로). `verify-agent-ssot.sh` 의 잔여 3종은 [#1125](https://github.com/coseo12/astro-simulator/issues/1125) 소관, 자매 가드 `verify-create-pr-ssot.sh` 는 별건이다.
+
+### Added
+
+- **[#1096] `release-escape-watch.yml` 신설 — ADR 971 §10-5 항 13 의 관측을 기계로 배선 (MINOR)** ([#1096](https://github.com/coseo12/astro-simulator/issues/1096)) — ADR [`20260816-1073`](docs/decisions/20260816-1073-clause13-observation-wiring.md) **§결정 3 (구현 계약)** 의 배선이며 설계 재론은 없다. 항 13 은 술어·창·임계를 기계 판정 가능한 형태로 박제했으나 **«누가 그것을 돌리는가»가 비어 있었다** — 조건을 평가하는 주체가 없으면 결과는 조건이 없는 것과 같고, 이 저장소는 같은 사슬이 두 번 끊긴 이력이 있다 ([#962](https://github.com/coseo12/astro-simulator/issues/962) → [#970](https://github.com/coseo12/astro-simulator/issues/970) / [#1014](https://github.com/coseo12/astro-simulator/issues/1014) → [#1035](https://github.com/coseo12/astro-simulator/issues/1035)).
+
+  **술어는 971 항 13 의 (0) 코드 블록 원문 복제**다. `N` 을 `${{ github.event.pull_request.number }}` 로 바인딩하는 **1행 외에 바이트가 다르지 않다** — `grep -nF` 양방향 + dedent diff 로 `11` 행 중 `10` 행 동일, 차이 `1` 행이 그 바인딩 행임을 확인했다. 임계값·창은 **여기에 복제하지 않는다** (971 이 정본, ADR 1073 §결정 5).
+
+  **모집단 판정은 job `if:`** — `merged == true` ∧ (`base.ref == 'main'` ∨ `startsWith(head.ref, 'release/')`). `branches:` 필터는 **쓸 수 없다** (base 축 단독으로 표현 불가능한 조건이다). 그래서 prep PR (`release/*-prep → develop`) 과 release PR (`develop → main`) **양쪽 모두** 잡힌다 — 초판 서술이 prep PR 을 통째로 빠뜨렸던 갭을 ADR 1073 §결정 4 가 교정했다. `concurrency` 는 **추가하지 않는다** (971 결정 9-2 — 동명 체크런 축 증식 회피).
+
+  **fail-fast — 「측정 실패」가 `clean` 으로 읽히지 않게 2중으로 닫았다.** 이 술어는 틀릴 때 거짓 음성 방향으로만 틀리므로 조용한 실패가 곧 _"escape 없음"_ 이 된다. ① 술어 step 을 `shell: bash` 로 선언한다 — 미지정 시 실제 셸이 `/usr/bin/bash -e {0}` 라 **pipefail 이 없고**, `gh api` 가 「비-0 exit + 빈 stdout」으로 실패하면 파이프 결과가 **exit `0` + 빈 판정**이 된다 (실측). ② 판정값이 `ESCAPE` / `clean` 이 아니면 `exit 1` — 빈 값과 `clean` 은 값으로 구분된다 (정상 조회 + 매칭 `0`건은 `clean` 을 출력한다). `|| true` · soft-exit · fallback 분기 **`0`건**.
+
+  **검증** (DoD 4축, [guard-pr-dod.md](docs/lessons/guard-pr-dod.md)) — 판정 `18` 케이스 `18/18` 기대 일치 (양성 `4/4` = `#636` `#646` `#652` `#658` / 음성 `3/3` = `#1067` `#1068` `#1088` / 반복 `8/8` 결정적 일치). negative `3` 종 전건 `exit 1` — 미존재 PR · 빈 판정 · 예상 외 문자열. `ESCAPE` 분기는 `gh issue create` 를 스텁으로 가로채 **실 이슈 생성 없이** 검증했다 (이슈 argv + job `exit 1` 확인). 시뮬레이션은 사본을 재작성하지 않고 **workflow 파일에서 step 본문을 추출해** 실행했다.
+
+  **`permissions` 는 `checks: read` + `contents: read` + `issues: write` 3개**다 (`auto-close-issues.yml` 관례 승계). ADR 1073 §결정 3 이 미실측으로 남긴 축 (🟡-5, _"(0) 술어가 `gh pr view` 를 부르는데 `pull-requests` 를 미열거하면 none 이 된다"_) 을 **구현 전 실측으로 해소**했다 — 이 3개만으로 `gh pr view --json headRefOid,mergedAt` 이 동작한다 (public 저장소). `gh` 는 **GET 전용**이며 `-X PUT/PATCH/DELETE` 를 부르지 않는다.
+
+  **무접촉 실증** — 971 §결정 1 required 집합 · §결정 9-1 · Phase 1 면제 근거 · 저장소 branch protection · §10-5 항 14 ([#1097](https://github.com/coseo12/astro-simulator/issues/1097) 소관). 변경은 `.github/workflows/release-escape-watch.yml` **신규 1개** + 본 CHANGELOG 뿐이다.
+
+  **SemVer 판정 근거** — 신규 자동화 **신설**이라 MINOR 로 잡았다. 저장소 선례가 축을 가른다: 가드/workflow **신설**은 MINOR ([#1027](https://github.com/coseo12/astro-simulator/issues/1027) `pr-base-edit` 신설 / [#1103](https://github.com/coseo12/astro-simulator/issues/1103) 충돌 마커 가드 신설), **기존 가드 술어 정정**은 PATCH ([#1125](https://github.com/coseo12/astro-simulator/issues/1125) / [#1134](https://github.com/coseo12/astro-simulator/issues/1134)). 본 PR 은 전자다. 앱 런타임 (`apps/` · `packages/`) 은 무변경이다.
+
+### Notes
+
+- **[#1096] 완료 기준 재조정 — DoD (1) 의 달성 시점** (CLAUDE.md §스프린트 계약 7, 3위치 박제 중 CHANGELOG) — 원 DoD (1) 은 «workflow 실발화 run URL 박제» 였다. 구현 전 Phase 0 실측에서 **`pull_request` 이벤트의 workflow 정의가 head ref 에서 로드**됨을 확인했으나 (`auto-close-issues.yml` 은 그것을 **신설한** PR [#917](https://github.com/coseo12/astro-simulator/pull/917) 자신의 머지에서 run `30695395893` 을 남겼고 그 `headSha` 는 merge commit 이 아닌 PR head 였다), job `if:` 가 `merged == true` ∧ 릴리스 클래스를 요구하므로 **도입 PR (`chore/…` → `develop`) 에서는 `if:` 가 원리적으로 true 가 될 수 없다** (트리거는 발화하고 job 은 skip 된다).
+
+  ⇒ **(1a)** 술어·권한·`if:` 평가의 Actions 런타임 실증은 일회용 probe run [`32573178493`](https://github.com/coseo12/astro-simulator/actions/runs/32573178493) 로 **머지 전 달성** (`#636` → `ESCAPE` / `#1088` → `clean`, 리터럴 진리표 `8/8`). **(1b)** 최종 파일의 `if:` true 실발화는 **머지 후 첫 릴리스 클래스 머지 PR** 에서만 가능하므로 본 PR 시점 **미검증 축**이며 인계 항목이다. 조용히 「검증됨」으로 적으면 [#840](https://github.com/coseo12/astro-simulator/issues/840) 클래스라 명시 박제한다. (2)(3)(4) 는 원안대로 달성했다.
+
+  **(1b) 확인 항목** — prep (`release/*` → `develop`) 과 release (`develop` → `main`) **2건 모두** run 이 남는가 / job 이 skip 이 아닌가 / 판정이 `clean` 인가. 미발화는 ADR 1073 §재검토 조건 2 가 **`1`건이라도** 재검토 트리거로 잡는다. ⚠️ (1a) 의 `if:` 진리표 `8/8` 은 **probe 파일의 손 사본**을 평가한 것이다 — `if:` 는 job 수준 필드라 step 본문처럼 파일에서 추출해 실행할 수 없고, probe 브랜치를 지웠으므로 그 사본의 축자 동일성은 재현 불가다. 원문은 [이슈 #1096 코멘트](https://github.com/coseo12/astro-simulator/issues/1096#issuecomment-5380451497)에 박제했다.
+
+- **[#1096] 항 13 「두 assertion 승계」의 비적용 판정** — 971 항 13 의 두 assertion 중 **조회 실패**는 (0) 블록 안에 그대로 있으나, **포화** (`--limit` 절단) 는 **(0) 경로에 구조적으로 부재**하다. 포화 assertion 은 (1) 모집단 열거 (`gh pr list --limit`) 전용이고 본 workflow 는 이벤트 구동이라 모집단을 열거하지 않기 때문이다 (PR 1건 = 이벤트 1건). 그 자리를 대신 지키는 것이 **판정값 화이트리스트**다 — 두 assertion 이 지키려던 것은 «`0 hit` 의 의미», 즉 **측정 실패가 `clean` 으로 읽히지 않는 것**이기 때문이다. 침묵 승계가 아니라 **명시적 비적용 판정**이며 workflow 주석 · PR 본문 · 본 항목 **3위치**에 박제한다.
 
 ## [0.77.0] - 2026-08-22
 

@@ -1,0 +1,187 @@
+name: release-escape-watch
+
+# #1096 — ADR 20260807-971 §10-5 **항 13** 의 escape 관측을 기계로 실행한다.
+# 설계 정본: ADR docs/decisions/20260816-1073-clause13-observation-wiring.md §결정 3 (구현 계약).
+#
+# 무엇을 재는가 — 릴리스 클래스 머지 PR 의 head SHA 위 `pr-template-checklist` 체크런 중
+# `started_at <= mergedAt` 인 것만 추려 `success = 0 ∧ failure >= 1` 이면 `ESCAPE`.
+# 즉 **머지 시점에 이미 발화한 판정**을 잰다. 술어·창·임계의 정본은 971 항 13 이며
+# 여기서 임계값·창을 복제하지 않는다 (ADR 1073 §결정 5 — 판정식 사본 0).
+#
+# 관측은 기계 / **판단은 사람** — 본 workflow 는 관측값 출력까지만 담당한다.
+# `ESCAPE` 후속 (T1 대장 박제 → 사후 정정, T2 결정 9-1 재개봉) 은 971 항 13 이 정의한 사람 경로다.
+#
+# ⚠ 왜 workflow 인가 — 부담이 아니라 «실행 증거» 다. 사람 규약은 미실행과 `clean` 을 구별할
+# 산출물을 남기지 않는다. 본 workflow 는 `clean` 이어도 run 이력을 남겨 둘을 분리한다 (971 항 13).
+#
+# ⚠ 완료 기준 재조정 박제 (#1096 Phase 0, CLAUDE.md §스프린트 계약 7 — 코드/PR/CHANGELOG 3위치 중 1).
+# 원 DoD (1) 은 «workflow 실발화 run URL 박제» 였으나, 아래 job `if:` 가 `merged == true` ∧
+# 릴리스 클래스를 요구하므로 **도입 PR 자신 (chore/… → develop) 에서는 원리적으로 true 가 될 수 없다.**
+# (workflow 정의는 head ref 에서 로드되므로 트리거 자체는 도입 PR 머지에서도 발화하나 job 은 skip 된다 —
+#  실측: auto-close-issues.yml 도입 PR #917 머지에서 run 30695395893 생성, headSha = PR head.)
+# ⇒ (1a) 술어·권한·`if:` 평가의 Actions 런타임 실증 = probe run 32573178493 (머지 전 달성)
+#    (1b) 최종 파일의 `if:` true 실발화 = **머지 후 첫 릴리스 클래스 머지 PR** — 본 PR 시점 **미검증 축**.
+# (1b) 확인 항목: prep(`release/*` → develop) 과 release(develop → main) **2건 모두** run 이 남는가 /
+# job 이 skip 이 아닌가 / 판정이 `clean` 인가. 미발화는 ADR 1073 §재검토 조건 2 가 1건이라도 트리거로 잡는다.
+#
+# 무접촉 (ADR 1073 §7 비목표) — 971 §결정 1 required 집합 · §결정 9-1 · Phase 1 면제 근거 ·
+# 저장소 branch protection · §10-5 항 14 (#1097 소관). `gh` 는 **GET 전용**이며
+# `-X PUT/PATCH/DELETE` 를 부르지 않는다. `closed` 이벤트라 머지 게이트에 원리적으로 개입 불가.
+
+on:
+  pull_request:
+    types: [closed]
+    # `branches:` 필터 **미사용** (ADR 1073 §결정 3). 모집단 조건이
+    # `base == main` ∨ `head` 가 `release/` 로 시작이라 base 축 단독 필터로 표현 불가능하다.
+    # 모집단 판정은 아래 job `if:` 가 한다.
+
+# GITHUB_TOKEN 최소 권한 (auto-close-issues.yml 관례 승계).
+# `pull-requests` 는 **의도적으로 미열거** — ADR 1073 §결정 3 이 «(0) 술어가 `gh pr view` 를
+# 부르는데 미열거 스코프는 none 이 된다» 를 미실측 축(🟡-5)으로 남겼고, #1096 Phase 0 에서
+# 이 3개만으로 `gh pr view --json headRefOid,mergedAt` 이 동작함을 실측했다
+# (public 저장소. run 32573178493 step C/D — #636 → ESCAPE / #1088 → clean).
+permissions:
+  checks: read
+  contents: read
+  issues: write
+
+# `concurrency` 를 추가하지 **않는다** — 971 결정 9-2 계승 (동명 체크런 축 증식 회피).
+
+jobs:
+  escape-watch:
+    # 971 항 13 모집단 (1) 필터와 **동형이며 사본이 아니라 같은 조건의 이벤트 표현** (ADR 1073 §결정 3).
+    # prep PR (`head=release/*-prep`) 과 release PR (`base=main`) **양쪽 모두** 잡는다 —
+    # 초판 서술이 prep PR 을 통째로 빠뜨렸던 갭을 ADR 1073 §결정 4 가 교정했다.
+    if: >-
+      github.event.pull_request.merged == true
+      && (github.event.pull_request.base.ref == 'main'
+          || startsWith(github.event.pull_request.head.ref, 'release/'))
+    runs-on: ubuntu-latest
+    steps:
+      # ⚠ 아래 run 본문은 971 §10-5 항 13 의 **(0) 코드 블록 원문 복제**다.
+      # `N=1068` → `N=${{ github.event.pull_request.number }}` 바인딩 **1곳 외에 한 글자도 다르지 않다**
+      # (PR #1140 에서 `grep -nF` 양방향 + dedent diff 로 1회 실증. 상시 drift 가드는 미배선 —
+      #  후속 분리 권고로 인계한다).
+      # 술어를 고칠 일이 생기면 **971 항 13 을 먼저 고치고** 여기를 재복제한다. 역방향 금지.
+      #
+      # ⚠ 아래 `N=${{ … .number }}` 만은 직접 보간이 **의도된 것**이다 — 계약이 지정한 유일한
+      # 바인딩 지점이고 (`N` 외 한 글자도 못 바꾼다), 값이 API 가 주는 **정수**라 셸 메타문자가
+      # 원리적으로 들어올 수 없다. 아래 step 2 의 `ref` 축(공격자 제어 **문자열**)과 다른 클래스다.
+      # 이것을 `env:` 로 바꾸면 DoD (4) 바이트 일치가 깨진다. **고치지 마라.**
+      #
+      # `shell: bash` 는 장식이 아니다 — 미지정 시 `/usr/bin/bash -e {0}` 로 **pipefail 이 없어서**
+      # `gh api` 가 «비-0 exit + 빈 stdout» 으로 실패하면 파이프 결과가 exit 0 + 빈 판정이 된다
+      # (#1096 Phase 0 실측). `shell: bash` 는 `-e -o pipefail` 을 준다.
+      - name: 항 13 (0) 술어 실행 — 판정 산출
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+          # (0) 단일 PR 판정 — 관측 시점 경로. N 만 바꾼다
+          N=${{ github.event.pull_request.number }}; REPO=coseo12/astro-simulator
+          read -r SHA MERGED_AT <<<"$(gh pr view "$N" --repo "$REPO" --json headRefOid,mergedAt -q '.headRefOid + " " + .mergedAt')"
+          [ -n "$SHA" ] && [ -n "$MERGED_AT" ] || { echo "FAIL: #$N 조회 실패 — 재실행"; exit 1; }
+          gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+          | jq -r --arg ma "$MERGED_AT" \
+              '[.check_runs[] | select(.name=="pr-template-checklist")
+                              | select(.started_at <= $ma)]
+               | {s:([.[]|select(.conclusion=="success")]|length),
+                  f:([.[]|select(.conclusion=="failure")]|length)}
+               | if .s==0 and .f>=1 then "ESCAPE" else "clean" end'
+          } | tee "$RUNNER_TEMP/verdict.txt"
+
+      # fail-fast — 971 항 13 의 두 assertion 승계 + 그 술어가 (0) 경로에서 갖는 형태로 정합.
+      #   ① 조회 실패 → (0) 블록 안의 `[ -n "$SHA" ] && [ -n "$MERGED_AT" ] || exit 1` 이 그대로 담당.
+      #      + `gh api` 실패는 위 pipefail 이 담당.
+      #   ② 포화 (`--limit` 절단) → **(0) 경로에는 구조적으로 부재**한다. 포화 assertion 은 (1) 모집단
+      #      열거 (`gh pr list --limit`) 전용이고, 본 workflow 는 이벤트 구동이라 모집단을 열거하지 않는다
+      #      (PR 1건 = 이벤트 1건). 그 자리를 대신 지키는 것이 아래 판정값 검사다 — 두 assertion 이
+      #      지키려던 것은 «`0 hit` 의 의미», 즉 **측정 실패가 `clean` 으로 읽히지 않는 것**이기 때문이다.
+      # 빈 판정과 `clean` 은 값으로 구분된다 (실측: 정상 조회 + 매칭 0건 → `clean` / 빈 stdout → 빈 값).
+      # fallback 분기 · `|| true` · soft-exit 0건.
+      #
+      # ⚠ CRITICAL — script injection 회피 (ADR 20260806-962 §5-3, `branch-name-guard.yml` 헤더 원문).
+      # `${{ github.event.pull_request.head.ref }}` 를 `run:` 본문에 **직접 보간하면 브랜치명이
+      # 셸로 해석된다** (명령 치환·변수 확장). 반드시 `env:` 로 받아 `"$HEAD_REF"` 로 인용 전달한다.
+      # 초판은 여기서만 직접 보간해 이 저장소의 다른 `pull_request` workflow 3/3 및 **같은 파일
+      # step 3** 과 어긋났다 (PR #1140 reviewer 차단). `$( )` · 백틱을 포함한 ref 는 실제로
+      # **git ref 로 적법**하고 (`git check-ref-format` 실측), 주입이 성립해도 exit 0 이라
+      # **job 은 성공으로 끝나고 이 workflow 의 유일한 산출물인 job summary 가 조용히 오염·절단**된다.
+      - name: 판정 확정 — 빈 결과·예상 외 출력을 clean 으로 흡수하지 않는다
+        id: verdict
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          VERDICT="$(cat "$RUNNER_TEMP/verdict.txt")"
+          case "$VERDICT" in
+            ESCAPE|clean) ;;
+            *) echo "FAIL: 판정값이 ESCAPE/clean 이 아니다 — [$VERDICT]. 측정 실패를 clean 으로 읽지 않는다"; exit 1 ;;
+          esac
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+          # run 이력에 판정을 남긴다 — `clean` 이어도 산출물이 남는 것이 본 설계의 핵심이다
+          printf '%s\n' \
+            "### release-escape-watch — 판정 \`$VERDICT\`" \
+            "" \
+            "- PR: #${PR_NUMBER} (\`base=${BASE_REF}\` / \`head=${HEAD_REF}\`)" \
+            "- 술어 정본: ADR \`20260807-971\` §10-5 항 13 (0)" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      # ESCAPE = 971 항 13 T1 발화. 이슈를 박제하고 **job 을 실패**시킨다 (붉은 X 가 관측 신호).
+      # 이슈 본문은 술어가 복원할 수 없는 것만 담고 **임계값·창을 복제하지 않는다** (971 이 정본).
+      # 라벨은 record-adr 스킬의 [ADR Trigger] 규약 승계 (`documentation` + `priority:high`,
+      # 2026-08-22 `gh label list` 로 실재 확인). 의도적 미채택 — 중복 생성 방지 분기:
+      #   ① **971 항 13 이 «T2 의 계수 출처는 위 (0)/(2) 술어다 (대장이 아니다)» 를 명시**하므로
+      #      중복 이슈는 **임계 계수에 원리적으로 무영향**이다 (ADR 수준 보장. PR #1140 reviewer 발견).
+      #   ② open 이슈 목록 조회는 절단·검색 의미론이라는 실패면을 **가장 드물고 중요한 경로**에 새로 만든다.
+      # 재실행 시 이슈가 2건 생기는 것은 보이고 무해하나, 조용한 미생성은 그렇지 않다.
+      - name: ESCAPE — '[ADR Trigger]' 이슈 박제 후 job 실패
+        if: steps.verdict.outputs.verdict == 'ESCAPE'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "## 배경"
+            echo
+            echo "- 발화 workflow: \`.github/workflows/release-escape-watch.yml\` (자동)"
+            echo "- 발화 run: $RUN_URL"
+            echo "- 대상 PR: $PR_URL (\`base=$BASE_REF\` / \`head=$HEAD_REF\`)"
+            echo
+            echo "## 임계값 발화 결과"
+            echo
+            echo "- ADR \`20260807-971\` §10-5 항 13 의 (0) 술어 판정 = \`ESCAPE\`"
+            echo "- 즉 이 PR 은 머지 시점에 \`pr-template-checklist\` 가 \`failure\` 이고 \`success\` 가 없었다 (무정정 머지)"
+            echo "- 임계·창의 정본은 971 항 13 이다 — 본 이슈는 값을 복제하지 않는다"
+            echo
+            echo "## 의무 (순서 구속)"
+            echo
+            echo "1. **(a) 먼저** 971 §escape 대장에 박제 — PR / head SHA / 첫 run \`started_at\` / 머지 시각 / 간격 / 머지 시점 run 수 / 원인 분류"
+            echo "2. **(b) 그 다음** 이 PR 본문을 사후 정정해 재발화시켜 빨간 X 해소"
+            echo "3. 창 안 누적이 T2 임계에 도달했는지 971 항 13 의 임계 표로 판정 — 도달 시 **결정 9-1 재개봉** (편입 승인 아님)"
+            echo
+            echo "> (a) → (b) 순서는 구속이다. (b) 를 먼저 하면 대장 필드를 재구성하기 어려워진다."
+            echo
+            echo "## Cross-link"
+            echo
+            echo "- ADR: \`docs/decisions/20260807-971-required-status-checks.md\` §10-5 항 13 (술어·임계 정본)"
+            echo "- ADR: \`docs/decisions/20260816-1073-clause13-observation-wiring.md\` §결정 6 (실패 시 조치 3분기)"
+            echo "- 배선 이슈: #1096"
+          } > "$RUNNER_TEMP/escape-issue.md"
+
+          gh issue create --repo "$REPO" \
+            --title "[ADR Trigger] ADR 971 §10-5 항 13 — pr-template-checklist escape 관측 (PR #${PR_NUMBER})" \
+            --label documentation --label priority:high \
+            --body-file "$RUNNER_TEMP/escape-issue.md"
+
+          echo "ESCAPE 판정 — 위 이슈를 박제했다. 관측 신호로 job 을 실패시킨다."
+          exit 1
