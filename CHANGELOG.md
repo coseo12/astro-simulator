@@ -5,6 +5,170 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-08-23
+
+### Behavior Changes
+
+- **[#1127] `verify:lod` 를 「9조합 렌더 스모크」로 축소하고 CI 에 배선 — 픽셀 임계 판정 제거 + baseline 9장 삭제 (MINOR)** ([#1127](https://github.com/coseo12/astro-simulator/issues/1127)) — `apps/web/scripts/browser-verify-lod.mjs` 는 `#289` 이래 **CI 에서 한 번도 실행된 적이 없고** (`git log -S 'verify:lod' -- .github` = `0` 커밋), 그 판정축(baseline 대비 `max pixel diff < 15%`)은 #1122 가 **측정으로 반증**했다 — 화면 전체가 검게 죽어도 프레임 대비 diff 는 `0.52~4.25%` 라 임계에 닿지 않는다. 이 PR 은 임계 판정을 걷어내고 **임계를 경유하지 않는 구조 FAIL 경로 5개** (씬 미노출 / focus 실패 / tier 실패 / LOD 미적용 / viewport 불일치) 만 남긴 뒤 `ci.yml` 공용 dev 서버(`:3002`) 뒤에 배선한다. 호출 관례도 형제 가드와 맞춰 `BASE_URL` 환경변수로 통일했다 — 구 `process.argv[2]` positional + `--update-baseline` 플래그 **제거**, 그리고 **기본 baseUrl 이 `3001` → `3000` 으로 바뀐다** (`resolveBaseUrl()` 기본값. CI 는 `BASE_URL` 을 명시 주입하므로 무영향이고, 로컬에서 인자 없이 돌리던 습관만 바뀐다). ⚠️ 초판이 적은 _"형제 가드 11종"_ 은 술어가 없어 재현되지 않았다 — 실측 술어와 값: `grep -oE "browser-verify-[a-z0-9-]+\.mjs" .github/workflows/ci.yml | sort -u` 중 `BASE_URL` 로 호출되는 것이 **`14`** (자신 포함) / **`13`** (자신 제외)이고, `resolveBaseUrl()` 까지 채택한 형제는 **`3`** (`627-satellite-orbit` / `848-modal-focus` / `mobile-p7d`) 이다 (ADR `20260808-983` §4항).
+
+  **SemVer 근거** — 앱 코드는 `0` 줄 바뀌었으나 (a) 전에 없던 CI 게이트가 새로 발화하고 (신규 workflow 배선을 MINOR 로 판정한 [#1096](https://github.com/coseo12/astro-simulator/issues/1096) 선례와 동형), (b) 스크립트의 판정 계약과 CLI 표면이 바뀌었다. CLI 플래그 제거만 보면 MAJOR 축도 읽히나, 대상이 **자동 소비처 `0` 인 dev 전용 verify 스크립트**라 CLAUDE.md §릴리스 _"판정 애매 시 낮은 쪽"_ 을 적용해 MINOR 로 둔다.
+
+  **판별력 실증** — 「테스트가 있다 ≠ 그 테스트가 작동한다」([#1123](https://github.com/coseo12/astro-simulator/issues/1123) 클래스: 신설 e2e 가 결함 보유판에서도 전건 통과해 판별력이 `0` 이었다) 재발을 막기 위해, 4경로 각각을 **실제 실행 경로의 실제 파일**에 주입해 exit code 를 **같은 실행에서** 실측했다 (로컬 macOS, dev `:3002`, 무주입 → 주입 → 복원 순서).
+
+  | 주입         | 주입 대상     | 지점                                                            | 결과                               | exit |
+  | ------------ | ------------- | --------------------------------------------------------------- | ---------------------------------- | ---- |
+  | 무주입       | —             | —                                                               | `9/9 PASS`                         | `0`  |
+  | A focus      | **앱**        | `core-adapter.ts` `onBodySelected` 무력화                       | `9/9 FAIL` (`selectedBodyId=null`) | `1`  |
+  | B tier       | **앱**        | `sim-canvas.tsx` `applyFocusTier` + `updateTierByCamera` 무력화 | `6/9 FAIL` (`getTier()=solar`)     | `1`  |
+  | C viewport   | **가드 자신** | 가드의 `newContext` 에 `deviceScaleFactor: 2`                   | `9/9 FAIL` (`2560x1600`)           | `1`  |
+  | D 씬 미노출  | **앱**        | `sim-canvas.tsx` 의 `__solarScene` 전역 이름 변경               | 부트스트랩 단계 FAIL               | `1`  |
+  | E LOD 미적용 | **앱**        | `sim-canvas.tsx` 의 `setLodOverrideHandler` 무력화              | 2라운드 실측 (PR 본문 표)          | `1`  |
+  | 복원 후      | —             | —                                                               | `9/9 PASS`                         | `0`  |
+
+  ⚠️ **C 만 「가드 자신」 주입이다** — DPR/viewport 를 정하는 주체가 가드 자신이라 경로 5 는 **앱 회귀로는 발화할 수 없다**. assert 로서는 정당하나(캡처 해상도 계약 고정) A·B·D·E 와 증거 등급이 다르므로 열로 구분한다 (PR #1143 권고 8).
+
+  ⚠️ **B 는 1차 시도가 결함을 만들지 못했다** — `applyFocusTier` 만 무력화했을 때 가드는 `9/9 PASS`(exit `0`) 였고, 그것은 가드의 눈이 먼 것이 아니라 **매 프레임 `updateTierByCamera` 가 tier 를 제대로 복구**하고 있었기 때문이다 (앱의 이중화). 두 경로를 함께 끊어야 비로소 tier 가 `solar` 에 머문다. 「주입했는데 PASS」를 가드 결함으로 오독하지 않기 위해 실패한 1차 시도까지 남긴다.
+
+  **부수 발견 — 커밋돼 있던 `lod-body-*.png` 3장은 `body` tier 캡처가 아니었다.** 구판은 `earth` focus 후 `setTier('body')` 로 강제했는데, planet focus-entry 는 `× 5` 프레이밍으로 `0.21 AU` 에 정착해 **`inner` 가 의도된 계약**이고 ([#834](https://github.com/coseo12/astro-simulator/issues/834) / `tier.ts` §`PLANET_FOCUS_BODY_BOUNDARY`), 매 프레임 `updateTierByCamera` 가 강제 tier 를 즉시 되돌린다. 구판은 `solar` 행만 tier 를 assert 해서 이 되돌림을 한 번도 보지 못했다 — 신판 술어로 재면 `getTier()=inner, 요구=body` 가 `3/3` 이다. 신판은 tier 를 강제하지 않고 **focus kind 로 결정**한다 (`solar` ← `sun`(star) / `inner` ← `mars`(planet, 정착 `0.16 AU`) / `body` ← `moon`(moon → 무조건 body)).
+
+  **baseline PNG 9장 — 전량 삭제.** 임계 판정이 사라지면 `apps/web/scripts/__baselines__/lod-*.png` 를 소비하는 판정자가 없다. 「보조 지표로 출력」안을 택하지 않은 근거 셋: (1) 판정 무관 숫자를 출력에 남기면 근거로 오독된다 — 구판 `diskDiffPct` 가 _"판정에 쓰지 않는다"_ 를 주석에 적고도 그 선례를 만들었다, (2) mid↔low 가 3 tier 전부 `0.01%` 라 9장 중 3장은 독립 정보가 없다 (#1122 실측), (3) `ff4e88d` (2026-04-24) 이후 4개월 stale 이다. 시각 기록은 남는다 — 삭제본은 `ff4e88d` 에서 복원 가능하고, 스크립트가 매 실행 9장을 `.verify-screenshots/lod-smoke/` (gitignored) 에 남긴다. [#909](https://github.com/coseo12/astro-simulator/issues/909) 가 이 9장을 _"스크립트가 소비하므로 유지"_ 로 판정했던 근거는 본 PR 로 소멸한다.
+
+  **⚠️ DoD 재조정 박제 (CLAUDE.md §스프린트 계약 7)** — 계약의 완료 기준 2 는 원래 **「구조 FAIL 경로 4개만 assert」** 였고 LOD 항이 없었다. PR [#1143](https://github.com/coseo12/astro-simulator/pull/1143) reviewer 가 _"가드가 자기 이름으로 내건 축(LOD)에 판정이 없다 — 9 조합이 내는 서로 다른 판정은 `3`개"_ 로 적발했고, **사용자 재합의**를 거쳐 **5경로**로 확장했다. 되돌림은 가상이 아니다: 부트스트랩 기본 쿼리가 `/?gpu=a&lod=auto` 라, 늦게 도착한 `setLodOverride('auto')` 가 앞선 강제값을 덮은 실측이 `sim-canvas.tsx` §#680 에 이미 박제돼 있다 (`low@1059ms → auto@1272ms`). 재조정 사실은 **코드 주석(스크립트 헤더) · PR 본문 · 본 CHANGELOG** 세 곳에 박제했다. 겸사 **축 일관성**도 정정했다 — LOD 명령을 `__solarScene.setLodOverride` 직접 호출에서 **앱 경로** `__simCore.command({ type: 'setLodOverride', level })` 로 바꿔 `resolveLodWithTierForce` 배선까지 지나가게 했다 (본 매트릭스는 `high|mid|low` 만 쓰므로 치환 조건 `level === 'auto'` 이 발동하지 않아 판정은 결정론적).
+
+  **부수 정정 2건** — (1) `.github/workflows/shader-pixel-guard.yml` 의 _"보완 가드로 기대되던 `browser-verify-lod.mjs` 는 … 임계 `15%` 를 구조적으로 넘길 수 없어 눈이 멀어 있다"_ 는 **근거절이 stale** 이 됐다 (임계 자체가 사라졌다). **결론은 뒤집히지 않고 강화**되므로 삭제가 아니라 dated 한 줄 부기로 정정했다. (2) `ci.yml` step 주석의 _"부트스트랩 쿼리 `?gpu=a` 만 쓴다"_ 를 실제값 `/?gpu=a&lod=auto` 로 고쳤다 — 하필 이 가드에서 `lod=auto` 가 위 되돌림 창과 직결된다.
+
+  **실행 시간** — 로컬 3회 `19.14` / `19.06` / `19.11` 초 (macOS, Playwright 번들 chromium 기본 백엔드, dev 서버 `:3002`, 작업 트리 rev `94cfa8b` 기준). 9 조합 × (tier 안정화 `1200ms` + LOD 안정화 `400ms`) 가 지배항이다. 조합 축소는 하지 않았다 — 이 수치가 형제 브라우저 가드와 같은 계급이라 축소의 근거가 되지 못한다. CI(ubuntu) 실측치는 PR 본문에 별도 박제한다.
+
+  **관측만 남기는 사실 (본 PR 비-범위)** — `verify:379-lod` 역시 `package.json` 에만 있고 CI 배선이 **없다**. 같은 「미배선 verify」 클래스지만 별개 스크립트라 여기서 함께 배선하지 않는다.
+
+- **[#1096] 릴리스 클래스 머지마다 escape 관측 run 이 남는다 (MINOR)** — `base=main` 이거나 `head` 가 `release/` 로 시작하는 PR 이 **머지**되면 `release-escape-watch` 가 발화해 그 PR 1건을 판정한다. `clean` 이면 job summary 에 판정 1줄을 남기고 성공하고, `ESCAPE` 면 `[ADR Trigger]` 이슈를 만들고 **job 을 실패**시킨다. **`clean` 이어도 run 이력이 남는 것이 요점이다** — 사람 규약은 「관측을 안 한 것」과 「관측했더니 깨끗한 것」을 구별할 산출물을 남기지 않는다. 저장소 보호 설정·required 체크 집합은 **무접촉**이며, `closed` 이벤트라 머지 게이트에 원리적으로 개입하지 않는다 (비-required). 릴리스 절차에 사람 스텝이 **추가되지 않는다** — 배선 전까지의 잠정 조치였던 「메인이 릴리스 직후 술어를 수동 1회 실행」이 소멸한다.
+
+### Fixed
+
+- **[#1134] `verify-docs-links` 의 코드펜스 마스킹이 들여쓴 펜스를 놓쳤다 — 계약보다 좁은 술어 (PATCH)** ([#1134](https://github.com/coseo12/astro-simulator/issues/1134)) — `scripts/verify-docs-links.mjs` 의 계약 3항은 _"fenced code block / inline code span 내 링크"_ 를 검사 제외로 선언하는데, 술어의 들여쓰기 접두가 `^` (= 없음) 이라 **행 선두 펜스만** 인식했다. **계약은 「펜스 안이면 제외」인데 술어는 「행 선두 펜스 안이면 제외」** 였고, 이 불일치가 결함의 본체다. 리스트 continuation 안의 펜스는 항상 들여쓰기를 갖기 때문에 그 안의 **예시 링크가 산문으로 읽혀 false FAIL** 이 된다. 접두를 `^[ \t]*` 로 넓혀 여는·닫는 쪽 **각각 독립**으로 임의 들여쓰기를 허용하고, **계약 3항 문구를 술어에 맞춰 정정**했다 — 마스킹 대상(임의 들여쓰기 펜스)과 **비대상**(비-펜스 indented code block)을 양방향으로 명시한다.
+
+  **실피해가 이미 났다** — PR [#1133](https://github.com/coseo12/astro-simulator/pull/1133) 의 CHANGELOG 픽스처가 불릿 continuation 안 **2칸 들여쓴** 펜스(info string `text`)에 있어 그 안의 예시 링크가 진짜 상대 링크로 읽혔고, CI `project-guards` 가 RED 였다. 그 PR 은 예시 대상을 실존 경로로 바꿔 우회했다.
+
+  **채택 판정과 기각 근거** (모집단 = 이 가드의 스캔 대상 **`211` md**, 본 PR 작업 트리). 판정축은 **마스킹 후에도 「산문」으로 남는 펜스 라인 수**다. 세 후보는 **펜스 문자 그룹이 동일**하고 오직 **들여쓰기 접두**만 다르므로 접두로 표기한다.
+
+  | 후보                       | 접두            | 잔여 펜스 라인 | 파일 | 판정 |
+  | -------------------------- | --------------- | -------------: | ---: | ---- |
+  | 현행 유지 + 계약 문구 축소 | `^` (접두 없음) |      **`132`** | `31` | 기각 |
+  | 후보 1 (CommonMark 문면)   | `^[ \t]{0,3}`   |       **`22`** |  `7` | 기각 |
+  | **채택**                   | `^[ \t]*`       |        **`0`** |  `0` | 채택 |
+
+  ⚠️ **위 표의 값은 본 가드의 stdout 이 아니다** — `node scripts/verify-docs-links.mjs` 는 파일 수·링크 수·위반만 출력하고 「잔여 펜스 라인」을 출력하지 않는다. 그래서 판정축 산출 명령을 함께 싣는다 (모집단은 tracked 기준이며 본 트리에서 가드의 `collectMdFiles()` 와 **`211` 로 일치**한다 — untracked md 오염 `0`).
+
+  ```bash
+  node --input-type=module -e '
+  import { readFileSync, existsSync } from "node:fs";
+  import { execSync } from "node:child_process";
+  const files = execSync("git ls-files -z -- docs", { maxBuffer: 1 << 28 }).toString().split("\0")
+    .filter((f) => f.endsWith(".md") && !f.startsWith("docs/deprecated/") && !f.startsWith("docs/templates/") && !f.split("/").pop().startsWith("_"))
+    .concat(["README.md", "CHANGELOG.md", "CLAUDE.md", "AGENTS.md"].filter((f) => existsSync(f)));
+  const FENCE = /^[ \t]*(`{3}|~{3})/;
+  const V = {
+    "현행 ^": /^(`{3}|~{3})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm,
+    "후보1 ^[ \\t]{0,3}": /^[ \t]{0,3}(`{3}|~{3})[^\n]*\n[\s\S]*?^[ \t]{0,3}\1[^\n]*$/gm,
+    "채택 ^[ \\t]*": /^[ \t]*(`{3}|~{3})[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm,
+  };
+  console.log("모집단", files.length, "파일");
+  for (const [name, re] of Object.entries(V)) {
+    let n = 0, nf = 0;
+    for (const f of files) {
+      const c = readFileSync(f, "utf8").replace(re, (m) => m.replace(/[^\n]/g, " "))
+        .split("\n").filter((l) => FENCE.test(l)).length;
+      if (c) nf += 1;
+      n += c;
+    }
+    console.log(name, "잔여 펜스 라인", n, "(" + nf + " 파일)");
+  }
+  '
+  ```
+
+  ⚠️ **이 수치는 이 entry 자신을 포함한 트리 값이다** — 위 재현 명령의 코드 펜스가 불릿 continuation 안에 있어 **2칸 들여쓰기**를 갖는 탓에, 구 술어 기준 잔여가 entry 추가 전 `130` 에서 `132` 로 늘었다 (`1~3`칸 분포도 `108` → `110`). 이 entry 가 서술하는 결함을 **entry 자신이 한 건 더 만들어 낸 셈**이고, 채택 술어에서는 그 `2` 도 함께 `0` 이 된다. 같은 모집단에서 원본 펜스 라인의 들여쓰기 분포는 `0`칸 **`1,178`** / `1~3`칸 **`110`** / `4`칸 이상 **`22`** 다.
+
+  - **후보 1 기각** — 그 **`22`** 을 남긴다. CommonMark 의 `≤3` 은 컨테이닝 블록 **상대**값인데 이 스크립트는 리스트 컨텍스트를 추적하지 않아 **절대 비교가 원리적으로 부정확**하다. 남는 잔여는 `7` 파일의 정당한 깊은 리스트 내포 펜스(여는 쪽 `bash`/`json`/`typescript` info string + 짝이 맞는 닫는 펜스)로 **고치려는 결함과 같은 클래스**다.
+  - **후보 3(현행 유지) 기각** — **`132`** 줄이 계속 노출된다. 결함을 고치는 대신 **결함을 문서화**하는 선택이고, 이미 실피해가 났다.
+
+  ⚠️ **이 술어는 「마스킹」(검사 제외) 이라 [#1125](https://github.com/coseo12/astro-simulator/issues/1125) 의 절대 `≤3` 판정과 방향이 반대다** — 그쪽은 검사 대상을 넓히면 오탐이 늘어 좁게 갔고, 이쪽은 마스킹을 좁히면 **오탐이 는다**.
+
+  **positive — 트리 축 × 술어 축 2×2 전건** (모두 스캔 `211` 파일. 술어: `node scripts/verify-docs-links.mjs` stdout).
+
+  | 트리 \ 술어        | 구 술어 (`^`)          | 채택 (`^[ \t]*`)       |
+  | ------------------ | ---------------------- | ---------------------- |
+  | rev `fb491d5` 원본 | 링크 `3767` / exit `0` | 링크 `3766` / exit `0` |
+  | 본 PR 작업 트리    | 링크 `3777` / exit `0` | 링크 `3776` / exit `0` |
+
+  ⚠️ **네 셀이 모두 exit `0` 이라는 사실 자체가 아래 「회귀 픽스처 기각」의 근거다** — 코퍼스는 이 결함에 대해 감도가 없다. 감도를 가진 것은 `--self-test` 다.
+
+  **링크 target 차분 — 술어를 고정해서 잰다** ([#983](https://github.com/coseo12/astro-simulator/issues/983) §4항. 좌우 술어를 섞으면 트리 차이와 술어 차이가 뒤섞인다).
+
+  - **술어 축** (트리 고정, `fb491d5`): 사라지는 target 정확히 **1 행** / 새로 생기는 target **`0`**. 사라지는 그 1 행이 PR #1133 이 우회로 넣은 줄, 즉 `[0.77.0]` 절의 `- 상세: [x](docs/glossary.md)## 자가 점검` 줄이다 — **이제 의도대로 예시로 마스킹된다**.
+  - **트리 축** (술어 고정, **양변 모두 채택 술어**): `CHANGELOG.md` 안 target 다중집합 `994` → `1004`. **사라짐 `0`** / 생김 `10` 은 전부 이 entry 가 새로 건 참조다 — 외부 이슈·PR URL `8` (외부 스킴이라 파일 존재 검사 대상 아님) + **상대 경로 ADR 링크 `2`** (`20260701-779…` · `20260814-1040…` — 둘 다 실존하므로 검사 대상이고 PASS 한다). `CHANGELOG.md` **이외 파일의 차분은 `0`** 이다.
+
+  **negative — 양방향, 같은 실행에서.** `--self-test` 에 **상주**시켰다 (CI `ci.yml` 에서 매 커밋 실행).
+
+  - **오탐 방향** — 들여쓴 펜스 안의 존재하지 않는 링크가 **통과**한다. `1~3`칸과 `4`칸+ **양쪽** 실증: `2`칸(실사고 형태) / `5`칸 / **tab**.
+  - **미탐 방향** — **같은 실행**에서 **펜스 밖** 깨진 링크 `2` 건이 여전히 FAIL 하고 **파일:라인까지 정확**하다.
+
+  ⚠️ **확대의 신규 사각 2형태 — 위 미탐 방향 단언은 이것을 겨누지 못한다.** PR [#1137](https://github.com/coseo12/astro-simulator/pull/1137) 리뷰가 실행으로 재현했다. **(a) 미탐** — 짝이 맞지 않는 들여쓴 백틱3 **두 개**가 서로 짝지어 그 사이의 진짜 깨진 링크를 삼킨다 (구 술어는 검출 / 채택 술어는 미검출). **(b) 오탐** — 4백틱 바깥 + 들여쓴 3백틱 안쪽의 **중첩 펜스** 문서에서 안쪽 예시 링크가 산문으로 누출된다 (구 술어는 정상 마스킹). 원인은 하나다 — 역참조가 펜스 문자만 묶고 들여쓰기를 밖에 두므로 「가장 가까운 아무 백틱3 라인」이 닫는 펜스가 된다. **확대를 유지한 근거**는 현 코퍼스 발생이 양쪽 `0` 이고 총 노출이 **`132` → `0`** 로 단조 감소하며, 진짜 해소는 **상태 있는 라인 스캐너**로의 교체라 이 이슈 범위 밖이라는 것이다. 대신 두 형태를 self-test 에 **경계 단언**으로 상주시켜 「지금은 이렇게 동작한다」를 못 박았다 (기대값을 뒤집으면 그대로 후속 회귀 타깃이 된다). self-test 는 `11` → **`15` 단언**이 됐다.
+
+  **판별력은 변이 테스트로 실증했다** (판별력 `0` 인 테스트를 넣지 않기 위해 — [#1123](https://github.com/coseo12/astro-simulator/issues/1123) 교훈). 변이 사본은 상대 import 해석 때문에 `scripts/` 안에서 돌렸다 (스크래치 배치는 `ERR_MODULE_NOT_FOUND` 로 **가짜 exit `1`** 을 낸다).
+
+  | 변이                           | 본 실행  | `--self-test`               |
+  | ------------------------------ | -------- | --------------------------- |
+  | 채택 (현행)                    | exit `0` | **`15` passed, 0 failed**   |
+  | 구 술어 `^` 로 되돌림          | exit `0` | `11` passed, **`4` failed** |
+  | 후보 1 `^[ \t]{0,3}` 로 되돌림 | exit `0` | `12` passed, **`3` failed** |
+  | 경계 (a) 픽스처를 빈 문자열로  | exit `0` | `14` passed, **`1` failed** |
+
+  실패 단언의 «어느 것» 까지 갈린다 — 구 술어는 오탐 방향·미탐 방향·경계 (a)·경계 (b) **4건 전부**, 후보 1 은 오탐 방향(`5`칸 케이스만)·미탐 방향·경계 (a) **3건**이다 (경계 (b) 는 안쪽 펜스가 `2`칸이라 후보 1 도 같이 누출시켜 갈리지 않는다).
+
+  ⚠️ **마지막 행은 「테스트가 있다 ≠ 그 테스트가 작동한다」 대응이다.** 경계 (a) 단언은 초판이 「삼켜진다(= 검출 `0`)」만 단언해 **픽스처를 지워도 통과하는 공허 단언**이었다 (빈 픽스처 변이에서 `15 passed, 0 failed`). 삼켜지는 구간 **밖**에 반드시 검출돼야 하는 **통제 링크**를 함께 두어 「픽스처가 실제로 읽혔다」를 같은 단언이 증명하게 했고, 그 결과 빈 픽스처 변이가 **`1 failed`** 로 갈린다. 경계 (b) 단언은 애초에 「검출 `2` 건」을 단언해 이 문제가 없었다.
+
+  ⚠️ **세 변이의 「본 실행」은 전부 exit `0` 으로 갈리지 않는다** — 코퍼스에는 판별력이 없고 self-test 에만 있다.
+
+  **회귀 픽스처 복원 — 판정: 기각.** 이슈 완료 조건은 _"PR #1133 의 우회를 되돌릴 수 **있는지 판정**"_ 이었고, **되돌리지 않기로 판정**했다. 근거 3축이며 전건 실행으로 확인했다.
+
+  1. **판별력이 실측 `0`** — `[0.77.0]` 을 `fb491d5` 로 되돌린 트리에서 self-test `15` 단언이 **전건 통과**하고 본 실행도 exit `0` 이다. 확정 구간 픽스처는 **아무 단언도 지탱하지 않는다**. 게다가 그 픽스처는 self-test 오탐 방향 단언의 첫 케이스(2칸 들여쓴 `text` 펜스)와 **형태가 같다** — 사실상 그 단언의 **사본**인데 하필 동결 구간에 놓인 것뿐이다. **영구 회귀 픽스처인 것은 `--self-test` 쪽**이다.
+  2. **이 저장소의 유일한 기계 판정 예외를 통과하지 못한다** — ADR [`20260814-1040`](docs/decisions/20260814-1040-changelog-tilde-recovery.md) §결정 2 의 확정 구간 회수 인증서를 그대로 돌리면 **exit `1`** 이다 (조항 (1) 변경 라인 전건이 손상 보유 라인 · (2) 의미 불변 이 둘 다 FAIL). 그 ADR 은 **(2) 를 예외의 경계**로 명시한다 — 의미 불변을 _"사람이 선언하는 것이 아니라 문자열 동일성이 판정한다"_. #1040 은 **손상 회수**(기계가 사실 불변을 증명)였고 본 건은 **우회 되돌리기**라 성격이 다르다.
+  3. **부기만으로 닫히고, 그 부기조차 형태를 지켜야 한다** — 원 문장의 현재형 서술이 본 변경 이후 거짓이 되는 문제는 실재하나 그 해소에 픽스처 복원은 **필요하지 않다**. 그리고 부기 형태 자체도 선례([`20260701-779`](docs/decisions/20260701-779-ci-alert-fatigue-concurrency.md) §Amendment 2)가 요구하는 **원문 보존**을 지켜야 하는데, 초판 시도는 원 문장을 **제자리에서 재작성**해 그 조건을 어겼다 (낱말 diff 로 반증됨).
+
+  ⇒ **`## [0.77.0]` 이하는 `fb491d5` 와 byte 동일**하다 (확정 구간 `3254` 라인, 문자열 동일성으로 확인). ⚠️ **`3254` 는 위 인증서의 계수 기준값이다** — 그 인증서가 `split("\n")` 으로 세므로 말미 개행이 한 원소로 잡혀 `wc -l`·`splitlines()` 기준 `3253` 과 `1` 이 갈린다. **인용한 기계와 같은 술어로 적는다** ([#983](https://github.com/coseo12/astro-simulator/issues/983) §4항 — 술어를 병기하지 않으면 재현자가 어느 쪽이 틀렸는지 판정할 수 없다). 확정 구간의 그 서술은 **그 시점 사실의 기록**으로 그대로 둔다.
+
+  **fail-fast** — 새로 넣은 코드에 `|| true` · soft-exit · allowlist · 예외 경로는 **`0` 건**이다.
+
+  **비-범위**: **비-펜스 indented code block**(4칸 들여쓰기만으로 여는 형태) 마스킹은 별개 술어라 다루지 않았고, 계약 3항에 **미포함을 명시**했다 (계약이 술어보다 넓으면 그 자체가 이 이슈의 결함이므로). `verify-agent-ssot.sh` 의 잔여 3종은 [#1125](https://github.com/coseo12/astro-simulator/issues/1125) 소관, 자매 가드 `verify-create-pr-ssot.sh` 는 별건이다.
+
+### Added
+
+- **[#1096] `release-escape-watch.yml` 신설 — ADR 971 §10-5 항 13 의 관측을 기계로 배선 (MINOR)** ([#1096](https://github.com/coseo12/astro-simulator/issues/1096)) — ADR [`20260816-1073`](docs/decisions/20260816-1073-clause13-observation-wiring.md) **§결정 3 (구현 계약)** 의 배선이며 설계 재론은 없다. 항 13 은 술어·창·임계를 기계 판정 가능한 형태로 박제했으나 **«누가 그것을 돌리는가»가 비어 있었다** — 조건을 평가하는 주체가 없으면 결과는 조건이 없는 것과 같고, 이 저장소는 같은 사슬이 두 번 끊긴 이력이 있다 ([#962](https://github.com/coseo12/astro-simulator/issues/962) → [#970](https://github.com/coseo12/astro-simulator/issues/970) / [#1014](https://github.com/coseo12/astro-simulator/issues/1014) → [#1035](https://github.com/coseo12/astro-simulator/issues/1035)).
+
+  **술어는 971 항 13 의 (0) 코드 블록 원문 복제**다. `N` 을 `${{ github.event.pull_request.number }}` 로 바인딩하는 **1행 외에 바이트가 다르지 않다** — `grep -nF` 양방향 + dedent diff 로 `11` 행 중 `10` 행 동일, 차이 `1` 행이 그 바인딩 행임을 확인했다. 임계값·창은 **여기에 복제하지 않는다** (971 이 정본, ADR 1073 §결정 5).
+
+  **모집단 판정은 job `if:`** — `merged == true` ∧ (`base.ref == 'main'` ∨ `startsWith(head.ref, 'release/')`). `branches:` 필터는 **쓸 수 없다** (base 축 단독으로 표현 불가능한 조건이다). 그래서 prep PR (`release/*-prep → develop`) 과 release PR (`develop → main`) **양쪽 모두** 잡힌다 — 초판 서술이 prep PR 을 통째로 빠뜨렸던 갭을 ADR 1073 §결정 4 가 교정했다. `concurrency` 는 **추가하지 않는다** (971 결정 9-2 — 동명 체크런 축 증식 회피).
+
+  **fail-fast — 「측정 실패」가 `clean` 으로 읽히지 않게 2중으로 닫았다.** 이 술어는 틀릴 때 거짓 음성 방향으로만 틀리므로 조용한 실패가 곧 _"escape 없음"_ 이 된다. ① 술어 step 을 `shell: bash` 로 선언한다 — 미지정 시 실제 셸이 `/usr/bin/bash -e {0}` 라 **pipefail 이 없고**, `gh api` 가 「비-0 exit + 빈 stdout」으로 실패하면 파이프 결과가 **exit `0` + 빈 판정**이 된다 (실측). ② 판정값이 `ESCAPE` / `clean` 이 아니면 `exit 1` — 빈 값과 `clean` 은 값으로 구분된다 (정상 조회 + 매칭 `0`건은 `clean` 을 출력한다). `|| true` · soft-exit · fallback 분기 **`0`건**.
+
+  **검증** (DoD 4축, [guard-pr-dod.md](docs/lessons/guard-pr-dod.md)) — 판정 `18` 케이스 `18/18` 기대 일치 (양성 `4/4` = `#636` `#646` `#652` `#658` / 음성 `3/3` = `#1067` `#1068` `#1088` / 반복 `8/8` 결정적 일치). negative `3` 종 전건 `exit 1` — 미존재 PR · 빈 판정 · 예상 외 문자열. `ESCAPE` 분기는 `gh issue create` 를 스텁으로 가로채 **실 이슈 생성 없이** 검증했다 (이슈 argv + job `exit 1` 확인). 시뮬레이션은 사본을 재작성하지 않고 **workflow 파일에서 step 본문을 추출해** 실행했다.
+
+  **`permissions` 는 `checks: read` + `contents: read` + `issues: write` 3개**다 (`auto-close-issues.yml` 관례 승계). ADR 1073 §결정 3 이 미실측으로 남긴 축 (🟡-5, _"(0) 술어가 `gh pr view` 를 부르는데 `pull-requests` 를 미열거하면 none 이 된다"_) 을 **구현 전 실측으로 해소**했다 — 이 3개만으로 `gh pr view --json headRefOid,mergedAt` 이 동작한다 (public 저장소). `gh` 는 **GET 전용**이며 `-X PUT/PATCH/DELETE` 를 부르지 않는다.
+
+  **무접촉 실증** — 971 §결정 1 required 집합 · §결정 9-1 · Phase 1 면제 근거 · 저장소 branch protection · §10-5 항 14 ([#1097](https://github.com/coseo12/astro-simulator/issues/1097) 소관). 변경은 `.github/workflows/release-escape-watch.yml` **신규 1개** + 본 CHANGELOG 뿐이다.
+
+  **SemVer 판정 근거** — 신규 자동화 **신설**이라 MINOR 로 잡았다. 저장소 선례가 축을 가른다: 가드/workflow **신설**은 MINOR ([#1027](https://github.com/coseo12/astro-simulator/issues/1027) `pr-base-edit` 신설 / [#1103](https://github.com/coseo12/astro-simulator/issues/1103) 충돌 마커 가드 신설), **기존 가드 술어 정정**은 PATCH ([#1125](https://github.com/coseo12/astro-simulator/issues/1125) / [#1134](https://github.com/coseo12/astro-simulator/issues/1134)). 본 PR 은 전자다. 앱 런타임 (`apps/` · `packages/`) 은 무변경이다.
+
+### Notes
+
+- **[#1096] 완료 기준 재조정 — DoD (1) 의 달성 시점** (CLAUDE.md §스프린트 계약 7, 3위치 박제 중 CHANGELOG) — 원 DoD (1) 은 «workflow 실발화 run URL 박제» 였다. 구현 전 Phase 0 실측에서 **`pull_request` 이벤트의 workflow 정의가 head ref 에서 로드**됨을 확인했으나 (`auto-close-issues.yml` 은 그것을 **신설한** PR [#917](https://github.com/coseo12/astro-simulator/pull/917) 자신의 머지에서 run `30695395893` 을 남겼고 그 `headSha` 는 merge commit 이 아닌 PR head 였다), job `if:` 가 `merged == true` ∧ 릴리스 클래스를 요구하므로 **도입 PR (`chore/…` → `develop`) 에서는 `if:` 가 원리적으로 true 가 될 수 없다** (트리거는 발화하고 job 은 skip 된다).
+
+  ⇒ **(1a)** 술어·권한·`if:` 평가의 Actions 런타임 실증은 일회용 probe run [`32573178493`](https://github.com/coseo12/astro-simulator/actions/runs/32573178493) 로 **머지 전 달성** (`#636` → `ESCAPE` / `#1088` → `clean`, 리터럴 진리표 `8/8`). **(1b)** 최종 파일의 `if:` true 실발화는 **머지 후 첫 릴리스 클래스 머지 PR** 에서만 가능하므로 본 PR 시점 **미검증 축**이며 인계 항목이다. 조용히 「검증됨」으로 적으면 [#840](https://github.com/coseo12/astro-simulator/issues/840) 클래스라 명시 박제한다. (2)(3)(4) 는 원안대로 달성했다.
+
+  **(1b) 확인 항목** — prep (`release/*` → `develop`) 과 release (`develop` → `main`) **2건 모두** run 이 남는가 / job 이 skip 이 아닌가 / 판정이 `clean` 인가. 미발화는 ADR 1073 §재검토 조건 2 가 **`1`건이라도** 재검토 트리거로 잡는다. ⚠️ (1a) 의 `if:` 진리표 `8/8` 은 **probe 파일의 손 사본**을 평가한 것이다 — `if:` 는 job 수준 필드라 step 본문처럼 파일에서 추출해 실행할 수 없고, probe 브랜치를 지웠으므로 그 사본의 축자 동일성은 재현 불가다. 원문은 [이슈 #1096 코멘트](https://github.com/coseo12/astro-simulator/issues/1096#issuecomment-5380451497)에 박제했다.
+
+- **[#1096] 항 13 「두 assertion 승계」의 비적용 판정** — 971 항 13 의 두 assertion 중 **조회 실패**는 (0) 블록 안에 그대로 있으나, **포화** (`--limit` 절단) 는 **(0) 경로에 구조적으로 부재**하다. 포화 assertion 은 (1) 모집단 열거 (`gh pr list --limit`) 전용이고 본 workflow 는 이벤트 구동이라 모집단을 열거하지 않기 때문이다 (PR 1건 = 이벤트 1건). 그 자리를 대신 지키는 것이 **판정값 화이트리스트**다 — 두 assertion 이 지키려던 것은 «`0 hit` 의 의미», 즉 **측정 실패가 `clean` 으로 읽히지 않는 것**이기 때문이다. 침묵 승계가 아니라 **명시적 비적용 판정**이며 workflow 주석 · PR 본문 · 본 항목 **3위치**에 박제한다.
+
 ## [0.77.0] - 2026-08-22
 
 ### Behavior Changes

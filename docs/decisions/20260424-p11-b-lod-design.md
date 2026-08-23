@@ -665,3 +665,14 @@ Gemini 가 제안했지만 Claude 가 범위/필요성 근거로 반려한 항�
 - **영향 범위 — Prediction 2 정합 재확인**: 본 Amendment 는 `packages/core/src/render/` 내부 확장이므로 Prediction 2 (Scale Tier 코드 변화 0) 위배 없음. `packages/core/src/scene/` 은 여전히 0 라인.
 - **상위 ADR 연결**: `docs/decisions/20260424-tier-preset-design.md` §결정 §4 "LOD 경계 주입" 경로를 본 Amendment 가 receive. 양 ADR 이 동일 계약 참조.
 - **근거**: CLAUDE.md "주석 계약 vs 구현 drift" 교훈 (volt #49). 하드코딩 상수를 남겨두되 주석 계약에서 "tier 프로파일로 주입 가능" 명시하지 않으면 미래 호출부 변경이 상수 참조를 갱신하지 않을 위험.
+
+### 2026-08-23 — DoD #3 검증 기제 교체: screenshot diff → 구조 assert 5경로 (#1127)
+
+> 원문 무접촉 — 위 §테스트 전략 표와 §구현 범위 표의 *"screenshot diff < 15%"* / *"#3 screenshot diff"* 는 **2026-04-24 시점의 기록**이며 소급 편집하지 않는다 (ADR `20260814-1040` §확정 문서 소급 편집 금지). 본 Amendment 가 그 이후 사실을 덧쓴다.
+
+- **배경**: 본 ADR 이 DoD #3 (3 tier × 3 LOD 매트릭스) 의 검증 기제로 지정한 `apps/web/scripts/browser-verify-lod.mjs` 의 **screenshot diff (`< 15%`) 판정이 [#1127](https://github.com/coseo12/astro-simulator/issues/1127) 에서 제거**됐다. 그 임계는 [#1122](https://github.com/coseo12/astro-simulator/issues/1122) 가 측정으로 반증했다 — 화면 전체가 검게 죽어도 프레임 대비 diff 는 `0.52~4.25%` 라 임계에 닿지 않고, LOD 레벨이 통째로 달라도 최대 `3.54%` 다. 우주 배경이 대부분 검정이라 **프레임 대비 diff 라는 지표 자체**가 구조적으로 둔감한 것이지 상수가 틀린 게 아니다.
+- **변경**: DoD #3 의 검증 기제를 **screenshot diff → 구조 assert 5경로** 로 교체한다. 씬 미노출 / focus 실패 / tier 실패 / **LOD 미적용** (`getLodStats().override` 대조) / viewport 불일치. 아울러 그 가드가 `#289` 이래 **CI 미배선(자동 발화 `0`)** 이던 것을 `ci.yml` 에 배선했다.
+- **DoD #3 에 대한 순효과**: **강화 + 축소의 혼합**이다. 「LOD 레벨이 실제로 요청대로 적용됐는가」는 이제 **결정론적으로 판정**되고 **CI 에서 매 PR 실행**된다 (종전에는 판정도 실행도 없었다). 반면 「LOD 별 렌더 산출이 시각적으로 다른가」(draw call 차 / 픽셀 차) 는 **더 이상 이 가드가 보지 않는다** — 그 대역은 `shader-pixel-guard.yml` 의 지대별 verify 와 `r1-ui-regression-guard.mjs` 가 담당한다.
+- **잔여 사각 (명시)**: 구조가 전부 정상인데 픽셀만 틀린 경우(화면 검정 / 표면 뒤바뀜)는 본 가드가 PASS 시킨다. `getLodInfo()` 의 per-body `level` 은 `#546` 위성 가드 후처리 예외가 있어 술어에서 제외했다.
+- **커밋된 baseline 처분**: `apps/web/scripts/__baselines__/lod-*.png` 9장은 판정자가 사라져 **삭제**했다 (`ff4e88d` 에서 복원 가능, 합계 `316,966` bytes). `lod-379.json` 과 `__baselines__/r1/**` 는 유지되므로 baseline 디렉토리 컨벤션은 그대로다.
+- **근거**: [#1127](https://github.com/coseo12/astro-simulator/issues/1127) / PR [#1143](https://github.com/coseo12/astro-simulator/pull/1143) (reviewer 권고 9 — *"지금은 ADR 만 읽으면 screenshot diff 게이트가 아직 LOD 를 지키는 것처럼 읽힌다"*).
