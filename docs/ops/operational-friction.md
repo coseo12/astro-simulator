@@ -716,3 +716,81 @@ pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 1
   트리거 조건 확장과 §8-1 전수 매트릭스는 [#1062](https://github.com/coseo12/astro-simulator/issues/1062)
   — #960 DoD 3 검증(PR [#1061](https://github.com/coseo12/astro-simulator/pull/1061) dev 보고) 에서
   축 (ii) 가 `test:unit` 을 깨뜨린다는 것이 처음 실증됐다.
+
+## 9. 백틱 포함 본문을 셸 문자열에 넣으면 셸이 코드 스팬을 **실행**한다 (#1147)
+
+**규약**: 마크다운 인라인 코드가 든 본문은 **셸 인자로 넘기지 않는다.** `Edit` 도구 또는 **quoted
+heredoc** (`<<'PY'` — 구분자에 따옴표 필수) 만 쓴다. 그리고 편집 후 **의도본 대비 diff** 로 대조한다.
+
+**증상**: `python3 -c "…"` 처럼 **쌍따옴표로 감싼 셸 인자**에 `` `2` `` 같은 인라인 코드가 들어가면
+셸이 그것을 **명령 치환으로 평가**한다. 토큰은 사라지고 그 자리는 빈 문자열이 된다.
+
+```bash
+# 재현 — 쌍따옴표 인자 (금지)
+python3 -c "
+import io
+io.open('out.md','w',encoding='utf-8').write('그 `2` 도 함께 `0` 이 된다')
+"
+# stderr: line 1: 2: command not found / line 1: 0: command not found
+# exit  : 0
+# out.md: 그  도 함께  이 된다          ← 토큰 소실
+
+# 대조군 — quoted heredoc (권장)
+python3 - <<'PY'
+import io
+io.open('out2.md','w',encoding='utf-8').write('그 `2` 도 함께 `0` 이 된다')
+PY
+# out2.md: 그 `2` 도 함께 `0` 이 된다   ← 보존
+```
+
+**왜 기존 검증이 못 잡는가** — 세 축이 전부 통과한다:
+
+| 축 | 값 | 판정 |
+| --- | --- | --- |
+| stderr | `command not found: 2` | 아무도 안 읽는다 |
+| 종료 코드 | **`0`** | 성공으로 읽힌다 |
+| U+FFFD | **`0`** | CRITICAL #4 통과 |
+
+⚠️ **`grep` 으로도 못 찾는 경우가 있다.** 실사례(PR [#1137](https://github.com/coseo12/astro-simulator/pull/1137))에서
+`CHANGELOG.md` 2곳이 손상됐는데(`그 도 함께 이 된다` / `전부 exit 으로 갈리지 않는다`), **1곳은
+패턴 grep 이 놓치고 「의도본 대비 diff」로만** 드러났다 — 남은 문장이 문법적으로 멀쩡해서 검색할
+고정 패턴이 없다. §7 마지막 불릿의 *"`grep` 한다"* 는 **필요조건이지 충분조건이 아니다.**
+
+**§7 과의 관계 — 같은 피해, 다른 층**: §7 은 **도구(prettier)가 코드 스팬을 재해석**하는 것이고 §9 는
+**셸이 코드 스팬을 실행**하는 것이다. 방어도 다르다 — §7 은 버전 고정, §9 는 인용 경계다. v0.78.0
+사이클 한 번에 백틱 취급 사고가 **4회** 났고 그 내역이 두 층에 걸쳐 있다 (prettier 이중 백틱 정규화
+×2 / 들여쓴 펜스 마스킹 ×1 — [#1134](https://github.com/coseo12/astro-simulator/issues/1134) / 셸 명령 치환 ×1).
+
+⚠️ **릴리스 확정 구간에 들어가면 되돌릴 수 없다** — `CHANGELOG.md` 확정 섹션은 소급 편집 금지
+(ADR [`20260814-1040`](../decisions/20260814-1040-changelog-tilde-recovery.md)). 손상이 릴리스를 넘기기 전에
+잡아야 한다.
+
+## 10. `--body-file` stale 업로드 — 「실패한 생성기 + 살아남은 파일 + `;` 체인」 3박자 (#1147)
+
+**규약**: 본문 파일을 만들어 넘길 때는 **`&&` 체인**으로 잇고, 업로드 후 **되읽어 대조**한다.
+
+```bash
+python3 gen.py && gh pr edit "$N" --body-file body.md     # 생성 실패 시 gh 미실행
+gh pr view "$N" --json body -q .body | head -3            # 반영 확인 (되읽기)
+```
+
+**증상 — `gh` 자체는 안전하다.** 파일이 **없으면** `gh` 는 실패한다:
+
+```
+open …/nope.md: no such file or directory
+```
+
+위험한 것은 **이전 실행이 남긴 파일이 살아 있을 때**다. 생성기가 실패했는데 `;` 로 이어 붙이면
+`gh` 가 **stale 본문을 올린다.**
+
+| 체인 형태 | 생성기 실패 시 |
+| --- | --- |
+| `gen.py ; gh pr edit …` | **stale 업로드** |
+| `gen.py && gh pr edit …` | 차단 |
+
+⚠️ **보고 술어를 정확히 쓸 것** — 이 건은 처음 *"`gh` 가 생성 실패해도 그대로 실행돼 조용히
+업로드한다"* 로 보고됐으나 **실측에서 반증**됐다(파일 부재 시 `gh` 는 실패한다). 원인을 도구에
+돌리면 처방이 `gh` 쪽으로 가고, 실제 처방인 **체인 형태 + 되읽기**를 놓친다.
+
+**같은 클래스** — §9 와 함께 *"exit `0` 인데 반영 안 됨"* 이다. 종료 코드가 성공을 뜻하지 않는
+지점이 도구 경계마다 있다.
