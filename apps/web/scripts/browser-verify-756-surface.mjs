@@ -30,11 +30,15 @@
  *       `32570050718`) 의 `verify:756-surface` JSON 에서 `area` 와 `screenBox` 를 둘 다 가진
  *       노드 전건 = **45** (surfaceOn 4 + surfaceOff 4 + plain 3 + lodMid 3 + tierC 1, × 3 run).
  *       술어 `w × h − area > 0` → **45 중 9 건** (mars 6 / neptune 3). 나머지 36 은 제외 0 이
- *       계산으로 확정된다. 제외량은 body 별 결정론적이다 (neptune 223/224/223, mars OFF
- *       85/85/86) — 노이즈가 아니라 어두운 body 의 고정 왜곡.
+ *       계산으로 확정된다 (전제: viewport 1280x720 + deviceScaleFactor 1 이고 45 표본의
+ *       imgSize 가 전건 1280x720 이라 렌더 px == 이미지 px).
+ *       ⚠️ 재현되는 것은 **부호**다 — 3 run 전건에서 mars/neptune 은 항상 > 0, 나머지는 항상 0.
+ *       **양은 아니다** (mars/surfaceOn 75/74/29 로 2.6x 갈림; neptune 223/224/223 과
+ *       mars/surfaceOff 85/85/86 은 안정하나 n=3).
  *       ⚠️ 초판은 `screenBox` 를 못 본다고 보고 인수분해 우회 술어를 썼다. 그 술어는
- *       (a) 뷰포트 상한이 빠지면 4 가 아니라 2 를 내고 (b) 위반만 확정하는 한 방향 검사라
- *       neptune 의 plain 3 건을 놓친다. `screenBox` 가 있으므로 우회는 불필요했다.
+ *       (a) 뷰포트 상한이 빠지면 4 가 아니라 2 를 내고 (b) 한 방향 검사라 9 중 5 를 놓친다
+ *       (검출 4 = mars 2 + neptune 2 / 미검출 5 = mars 4 + neptune 1).
+ *       `screenBox` 가 있으므로 우회는 불필요했다.
  *       ⇒ 「죽은 분기」가 아니라 **「반대로 동작하는 분기」**다. earth/jupiter/moon 은 밝아서
  *       우연히 무해했고, 어두운 두 body 는 **측정 대상 자체가 달랐다**
  *       (구: 밤면 일부 제외 / 신: 기하 원 안 전부 포함).
