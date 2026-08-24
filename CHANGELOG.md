@@ -7,7 +7,7 @@ Semantic Versioning을 따른다.
 
 ### Changed
 
-- **[#1149] `CLAUDE.md` 의 마찰 계수 삭제 + 고빈도 절 노출 — 하드코딩 수가 drift 생성원 (MINOR)** ([#1149](https://github.com/coseo12/astro-simulator/issues/1149)) — `CLAUDE.md` 가 _"저비용 마찰 **4건**"_ 이라 선언하고 §1~§4 만 열거했으나 `docs/ops/operational-friction.md` 의 번호 절은 **`10`개**다. 문구를 신설한 `997242e`(2026-07-15, [#795](https://github.com/coseo12/astro-simulator/issues/795)) 시점에는 **선언 `4` = 실제 `4` 로 정합**했고, 이후 5주간 §5~§10 이 추가되는 동안 아무도 갱신하지 않았다.
+- **[#1149] `CLAUDE.md` 의 마찰 계수 삭제 + 고빈도 절 노출 — 하드코딩 수가 drift 생성원 (MINOR)** ([#1149](https://github.com/coseo12/astro-simulator/issues/1149)) — `CLAUDE.md` 가 _"저비용 마찰 **4건**"_ 이라 선언하고 §1~§4 만 열거했으나 `docs/ops/operational-friction.md` 의 번호 절은 **`10`개**다. 문구를 신설한 `997242e`(2026-07-15, [#795](https://github.com/coseo12/astro-simulator/issues/795)) 시점에는 **선언 `4` = 실제 `4` 로 정합**했고, 이후 §5~§10 이 추가되는 동안 아무도 갱신하지 않았다 — §5 는 `11`일 뒤(`3927c6b`, 07-26)부터 시작해 §8 이 08-14(`15b7e67`)까지 붙었고, **§9·§10 은 이 릴리스의 [#1147](https://github.com/coseo12/astro-simulator/issues/1147) 이 오늘 추가했다** (즉 `6`절 중 `2`절은 이 사이클 산이다).
 
   **계수를 고치지 않고 없앴다.** `4` → `10` 갱신은 **같은 생성원을 남긴다**(§11 이 생기는 날 재drift). 목록을 _"접촉 빈도가 높은 것만 추린 발췌"_ / _"정본은 그 문서"_ / _"절이 늘어도 이 목록은 갱신 의무가 없다"_ 로 격하해 **갱신 의무를 없앴다**. 가드 신설(선언 수 ↔ 절 수 대조)은 **기각** — 실피해 `0` / 발생 `1`회 대비 **검사 표면 `+1`** 이라 §검증 강도 게이트 미달이다.
 
