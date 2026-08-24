@@ -247,12 +247,14 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 ### 반복 운영 마찰 원인 박제 (#795)
 
-매 세션·릴리스 반복되던 저비용 마찰 4건의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제:
+매 세션·릴리스 반복되던 저비용 마찰의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제한다. 아래는 **접촉 빈도가 높은 것만 추린 발췌**이고 **절 목록의 정본은 그 문서다** — 절이 늘어도 이 목록은 갱신 의무가 없다 (하드코딩 계수가 drift 생성원이었다, #1149). **아래 항목 번호는 그 문서의 절 번호와 같다**:
 
 1. **squash auto-close 미발동** — GitHub **네이티브** auto-close 는 default branch(main) 머지만. `base=develop` 은 구조적 미발동이나 `auto-close-issues.yml`(#915)이 대체 → 메인은 `gh issue view <N> --json state` 로 **결과만 확인**, OPEN 이면 폴백 수동 close (§1-1 미발동 조건).
 2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
 3. **pgrep self-match 오탐** — `pgrep -f "패턴"` 이 자기 셸 명령행 매칭 → **bracket `[-]`** (`agent-browser-chrome[-]`). pkill 은 자기 셸 kill 위험이라 **안전 개선**. hook 은 `grep -v` 로 이미 안전. ⚠️ 자기 오탐은 **직교 2축** (#1054): **조상 셸**(macOS `pgrep -a` 가 유입 — **`-a` 금지**) + **형제 subshell**(비-exec fork 의 argv 상속 — `-a` 제거로 안 없어짐). bracket 은 두 축 다 **argv 순도 조건부**라 좀비 카나리아 정본은 **순도와 무관하게** 둘 다 막는 `ps … | grep -E … | grep -v grep` (§3).
 4. **concurrency CANCELLED = 코스메틱** — `cancel-in-progress`(#779) 로 superseded run 이 `CANCELLED`/UNSTABLE 표기. 각 체크 최신 run 이 SUCCESS 면 안전(§릴리스 판별법).
+
+⚠️ **worktree·본문 편집 경로에서 매번 밟는 절차가 같은 문서에 더 있다** — §7 `npx prettier` 버전 skew(코드 스팬 손상) · §8 워크스페이스 의존 명령 결손(`pnpm build` 선행) · §9 백틱 본문의 **셸 명령 치환**(stderr·종료 코드·U+FFFD **세 축이 동시에 무효**이고 유효 명령이면 **실행·주입**된다) · §10 `--body-file` **stale 업로드 3박자**. §7·§8 은 [`developer.md`](.claude/agents/developer.md) 가 이미 「절차 SSoT」로 참조한다.
 
 ---
 
