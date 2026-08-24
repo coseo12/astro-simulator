@@ -5,7 +5,9 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-### Changed
+## [0.79.0] - 2026-08-24
+
+### Behavior Changes
 
 - **[#1149] `CLAUDE.md` 의 마찰 계수 삭제 + 고빈도 절 노출 — 하드코딩 수가 drift 생성원 (MINOR)** ([#1149](https://github.com/coseo12/astro-simulator/issues/1149)) — `CLAUDE.md` 가 _"저비용 마찰 **4건**"_ 이라 선언하고 §1~§4 만 열거했으나 `docs/ops/operational-friction.md` 의 번호 절은 **`10`개**다. 문구를 신설한 `997242e`(2026-07-15, [#795](https://github.com/coseo12/astro-simulator/issues/795)) 시점에는 **선언 `4` = 실제 `4` 로 정합**했고, 이후 §5~§10 이 추가되는 동안 아무도 갱신하지 않았다 — §5 는 `11`일 뒤(`3927c6b`, 07-26)부터 시작해 §8 이 08-14(`15b7e67`)까지 붙었고, **§9·§10 은 이 릴리스의 [#1147](https://github.com/coseo12/astro-simulator/issues/1147) 이 오늘 추가했다** (즉 `6`절 중 `2`절은 이 사이클 산이다).
 
@@ -13,9 +15,13 @@ Semantic Versioning을 따른다.
 
   ⚠️ **잔여를 인정한다** — 항목 `4`개와 §7~§10 제목은 여전히 사본이고, 면제 조항 _"절이 **늘어도**"_ 는 **증가만 덮고 재번호·삭제·개제는 안 덮는다**. 그래서 _"어긋나면 **그 문서가 정본**"_ 을 함께 박았다. 생성원이 **소멸**한 것이 아니라 **약해진** 것이다 (reviewer 지적).
 
-  **함께 §7~§10 을 노출했다** — `npx prettier` 버전 skew / 워크스페이스 의존 명령 결손 / 백틱 본문의 **셸 명령 치환** / `--body-file` **stale 업로드 3박자**. 선정 기준은 **worktree·본문 편집 경로에서 매번 밟는가**다. ⚠️ **§7·§8 은 [`developer.md`](.claude/agents/developer.md) `:144,149` 가 이미 「절차 SSoT」로 참조**하는데 `CLAUDE.md` 목록에는 없어 **참조 경로가 파일마다 갈려** 있었다. 부수로 존재하지 않는 표제 참조(`§릴리스 판별법` — 대상 문서 hit `0`)를 `§4` 로 정정하고, 항목 4 의 _"SUCCESS 면 안전"_ 에 **required check 하 전제 무효**(§4-1, #971) 경계를 달았다. 크기 `26,941` → `27,469` chars (예산 `33,000`).
+  **함께 §7~§10 을 노출했다** — `npx prettier` 버전 skew / 워크스페이스 의존 명령 결손 / 백틱 본문의 **셸 명령 치환** / `--body-file` **stale 업로드 3박자**. 선정 기준은 **worktree·본문 편집 경로에서 매번 밟는가**다. ⚠️ **§7·§8 은 [`developer.md`](.claude/agents/developer.md) `:144,149` 가 이미 「절차 SSoT」로 참조**하는데 `CLAUDE.md` 목록에는 없어 **참조 경로가 파일마다 갈려** 있었다. 그리고 §9·§10 은 **이 변경으로 표면 `0` → `1`** 이 된다 — 같은 블록 [#1147](https://github.com/coseo12/astro-simulator/issues/1147) entry 의 PATCH 근거가 가리키는 전이가 이것이다. 부수로 존재하지 않는 표제 참조(`§릴리스 판별법` — 대상 문서 hit `0`)를 `§4` 로 정정하고, 항목 4 의 _"SUCCESS 면 안전"_ 에 **required check 하 전제 무효**(§4-1, #971) 경계를 달았다. 크기 `26,941` → `27,469` chars (예산 `33,000`).
+
+  **행동 변화** — `CLAUDE.md` §반복 운영 마찰 블록이 §7~§10 을 **매 세션 컨텍스트에 처음 노출**한다. 이전에는 §1~§4 만 열거돼 있어, [`developer.md`](.claude/agents/developer.md) 를 로드하지 않는 경로의 에이전트는 `npx prettier` 버전 skew · `pnpm build` 선행 · 백틱 셸 명령 치환 · `--body-file` stale 업로드에 **도달하지 못했다**. 아울러 _"저비용 마찰 `4`건"_ 이라는 **갱신 의무가 삭제**된다 — 이후 그 목록은 절 추가 시 갱신 대상이 아니다.
 
   **cross-validate (agy)** — `outcome: applied` / exit `0` / plan-bypass 사후 diff empty, 판정 **LGTM**(5축 전건 「양호」). 고유 발견 1건(번호 매핑 부재)은 **처방을 바꿔 반영**했다 — 원안 `1.` → `§1.` 은 마크다운 ordered list 문법을 깨고, _"아래 **4개**는 §1~§4"_ 형태면 **이 변경이 없앤 계수가 되살아난다**. 상세: PR [#1150 코멘트](https://github.com/coseo12/astro-simulator/pull/1150#issuecomment-5390525419)
+
+### Changed
 
 - **[#1147] 백틱 본문의 셸 명령 치환 + `--body-file` stale 업로드 — 운영 마찰 §9·§10 신설 + §7 역포인터 (PATCH)** ([#1147](https://github.com/coseo12/astro-simulator/issues/1147)) — **2026-08-22 하루에 백틱 취급 사고가 `4`회** 났고(릴리스 귀속이 갈린다 — `## [0.77.0]` `2` + `## [0.78.0]` `2`. 본 entry 는 `## [Unreleased]` 에 있다), 그중 하나는 **기존 검증 3축이 전부 통과**하는 형태였다. `docs/ops/operational-friction.md` 에 두 절을 신설한다. ⚠️ **초판은 이것을 MINOR 로 분류했고 리뷰가 반증했다** — 이 문서를 가리키는 에이전트 표면은 전부 **절 단위**다 (`developer.md:144`→§7 / `:149`→§8·§8-1 / `create-pr/SKILL.md:187`→§1·§1-1 / `CLAUDE.md:250`→§1~§4). **신설한 §9·§10 에 닿는 표면은 `0`개**이고(⚠️ **`#1147` 시점 사실이다** — 같은 `[Unreleased]` 블록의 [#1149](https://github.com/coseo12/astro-simulator/issues/1149) 가 `CLAUDE.md` 에서 §9·§10 을 가리켜 **`0` → `1`** 이 됐다. 본 PATCH 판정은 **#1147 자신의 델타 기준**이라 유효하다), 함께 손댄 **§7 은 `developer.md:144` 가 가리키는 표면이 맞다** — 다만 추가분이 **§9 로 가는 역포인터 2행**뿐이라 그 절의 기존 계약(버전 명시 의무)을 바꾸지 않는다. 인용했던 선례도 반대로 읽힌다 — `#1062`·`#960` 의 MINOR 는 `.claude/agents/developer.md` 를 **같이 고쳤기** 때문이고, 이 문서 **단독**은 PATCH 다. 같은 문서 **절 신설** 선례 2건(`#1063` §7-2 / `#1030` §1-2)도 전부 PATCH.
 
