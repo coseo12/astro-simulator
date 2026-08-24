@@ -24,14 +24,17 @@
  *       배경을 거른 적은 없다. ⚠️ **초판(#1146)은 여기서 「죽은 분기」로 결론냈고 PR #1156
  *       리뷰가 반증했다.** 어두운 body 에서는 발화했고, 발화한 대상이 **천체 픽셀**이다 —
  *       mars/neptune 밤면 disk 휘도가 `6.7~6.9` 로 임계 `8` **아래**다 (2026-08-24 방사 프로파일).
- *       재현 술어: 구 코드 `area = count(lum ≥ 8)` 이고 창은 정수 `bw × bh` 이므로
- *       `area == bw × bh` ⟺ 제외 픽셀 0. 대우로 `area` 가 `2 ≤ w,h` 인 정수 인수쌍으로
- *       분해되지 않으면 제외 > 0 이 확정된다. 모집단 = 구 코드 CI run 3건
- *       (`32705066150` / `32557761937` / `32570050718`) 의 `verify:756-surface` 스텝 로그에
- *       찍힌 `area=` 전건 **45 표본** → **4 표본이 어떤 정수 창으로도 분해되지 않는다**
- *       (mars `49431` = 3×16477 / mars `52127` 소수 / neptune `47506` = 2×23753 /
- *       neptune `44497` 소수). ⚠️ 나머지 41 표본이 「제외 0」이라는 뜻은 **아니다** —
- *       인수쌍 존재는 일치를 증명하지 않는다. 위반만 확정하는 한 방향 검사다.
+ *       재현 술어: 구 코드 `measureDisk` 가 `screenBox` 를 반환값에 담아 `=== JSON ===`
+ *       덤프로 찍으므로 (콘솔 요약 라인에는 없다) **제외 픽셀 = `w × h − area`** 를 표본마다
+ *       직접 계산한다. 모집단 = 구 코드 CI run 3건 (`32705066150` / `32557761937` /
+ *       `32570050718`) 의 `verify:756-surface` JSON 에서 `area` 와 `screenBox` 를 둘 다 가진
+ *       노드 전건 = **45** (surfaceOn 4 + surfaceOff 4 + plain 3 + lodMid 3 + tierC 1, × 3 run).
+ *       술어 `w × h − area > 0` → **45 중 9 건** (mars 6 / neptune 3). 나머지 36 은 제외 0 이
+ *       계산으로 확정된다. 제외량은 body 별 결정론적이다 (neptune 223/224/223, mars OFF
+ *       85/85/86) — 노이즈가 아니라 어두운 body 의 고정 왜곡.
+ *       ⚠️ 초판은 `screenBox` 를 못 본다고 보고 인수분해 우회 술어를 썼다. 그 술어는
+ *       (a) 뷰포트 상한이 빠지면 4 가 아니라 2 를 내고 (b) 위반만 확정하는 한 방향 검사라
+ *       neptune 의 plain 3 건을 놓친다. `screenBox` 가 있으므로 우회는 불필요했다.
  *       ⇒ 「죽은 분기」가 아니라 **「반대로 동작하는 분기」**다. earth/jupiter/moon 은 밝아서
  *       우연히 무해했고, 어두운 두 body 는 **측정 대상 자체가 달랐다**
  *       (구: 밤면 일부 제외 / 신: 기하 원 안 전부 포함).
@@ -486,9 +489,10 @@ async function launch() {
         // tier-c 에서 실제 렌더되는 것은 low billboard quad 이고 그 variant 는 #675 에서
         // 자체 scaling 을 쓰는데(`solar-system-scene.ts` low variant), 본 함수의 반경은
         // high mesh 의 `extendSize × scaling` 에서 나온다 — 즉 창이 렌더된 quad 와 대응하는지
-        // 확인되지 않았다. 실측 `area=112` (구 창은 run `32705066150` `378` /
-        // `32705331154` `437`) 로 near-degenerate 하니
-        // 회귀 조사에서 이 수를 신호로 읽지 말 것 (#1146 리뷰 R8).
+        // 확인되지 않았다. 신 창 실측 `area≈111~112` (run `32731913488` `112` /
+        // `32736347310` `111` — 투영 반경 말단 차로 1 갈린다), 구 창은 run
+        // `32705066150` `378` / `32705331154` `437`. 어느 쪽이든 near-degenerate 하니
+        // 회귀 조사에서 이 수를 신호로 읽지 말 것 (#1146 리뷰 R8/P5).
         const { context, page } = await setupPage(browser, `?gpu=c${ROTATE_OFF_QUERY}`);
         const lod = await getLodStats(page);
         const m = await measureDisk(page, 'earth', 'tierc-earth');
