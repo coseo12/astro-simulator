@@ -247,7 +247,7 @@ Z 패턴: **폐기** (2026-07-31, #907 / ADR [20260731-907-harness-decouple.md](
 
 ### 반복 운영 마찰 원인 박제 (#795)
 
-매 세션·릴리스 반복되던 저비용 마찰의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제한다. 아래는 **접촉 빈도가 높은 것만 추린 발췌**이고 **절 목록의 정본은 그 문서다** — 절이 늘어도 이 목록은 갱신 의무가 없다 (하드코딩 계수가 drift 생성원이었다, #1149):
+매 세션·릴리스 반복되던 저비용 마찰의 **구조 원인 + 표준 절차**는 [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) 에 박제한다. 아래는 **접촉 빈도가 높은 것만 추린 발췌**이고 **절 목록의 정본은 그 문서다** — 절이 늘어도 이 목록은 갱신 의무가 없다 (하드코딩 계수가 drift 생성원이었다, #1149). **아래 항목 번호는 그 문서의 절 번호와 같다**:
 
 1. **squash auto-close 미발동** — GitHub **네이티브** auto-close 는 default branch(main) 머지만. `base=develop` 은 구조적 미발동이나 `auto-close-issues.yml`(#915)이 대체 → 메인은 `gh issue view <N> --json state` 로 **결과만 확인**, OPEN 이면 폴백 수동 close (§1-1 미발동 조건).
 2. **`gh pr merge --delete-branch` worktree 충돌** — Conductor 멀티 워크스페이스 브랜치 점유 → `--delete-branch` **생략** + `git push origin --delete <branch>` 분리.
