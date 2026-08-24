@@ -35,7 +35,7 @@
  *       ⚠️ 재현되는 것은 **부호**다 — 3 run 전건에서 mars/neptune 은 항상 > 0, 나머지는 항상 0.
  *       **양은 아니다** (mars/surfaceOn 75/74/29 로 2.6x 갈림; neptune 223/224/223 과
  *       mars/surfaceOff 85/85/86 은 안정하나 n=3).
- *       ⚠️ 초판(`e38b6fa`)은 `screenBox` 를 직접 인용했다 (그 entry 내 인수분해 표현 0 건).
+ *       ⚠️ 초판(`e38b6fa`)은 `screenBox` 를 직접 인용했다 (그 CHANGELOG entry 내 인수분해 표현 0 건).
  *       인수분해 우회 술어는 리뷰 라운드 1 [C1] 에서 들어와 라운드 2 커밋본에 실렸다. 그 술어는
  *       (a) 뷰포트 상한이 빠지면 4 가 아니라 2 를 내고 (b) 한 방향 검사라 9 중 5 를 놓친다
  *       (검출 4 = mars 2 + neptune 2 / 미검출 5 = mars 4 + neptune 1).
