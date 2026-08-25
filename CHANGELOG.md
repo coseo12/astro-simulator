@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.79.1] - 2026-08-26
+
 ### Changed
 
 - **[#1155] `verify:774-sun` 판별력 복구 + `verify:773-light` 측정 방법 교정 — 형제 가드 2종 (PATCH)** ([#1155](https://github.com/coseo12/astro-simulator/issues/1155)) — [#1146](https://github.com/coseo12/astro-simulator/issues/1146) 이 `verify:756-surface` 에서 확정한 두 결함(회전 의존 AABB 창 / 배경을 거르지 않는 `lum < 8` 마스크)이 형제 가드 2종에 그대로 남아 있었다. 착수 전 실측이 **둘의 성격이 다르다**는 것을 먼저 갈랐다 — 773 은 **재는 양이 왜곡**될 뿐 판정은 흔들리지 않았고, **774 는 판정 자체가 눈이 멀어 있었다**.
