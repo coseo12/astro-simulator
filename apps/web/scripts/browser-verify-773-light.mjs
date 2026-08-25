@@ -66,11 +66,11 @@
  * `rotate=off` 는 자전과 `axialTilt` 를 동시에 끄고, **부수적으로 focus framing 도 바꾼다**:
  * focus 거리 산출이 `boundingSphere.radiusWorld` 를 쓰는데 그 값이 *"box 외접구 √3 과대 +
  * #782 자전 위상 진동"* 이라고 `camera-controller.ts:88`(`resolveMeshVisualRadius`)·`:197`
- * 주석이 이미 명시한다. ⚠️ **operative 경로는 `apps/web/src/components/sim-canvas.tsx:868`**
- * (`mesh.getBoundingInfo().boundingSphere.radiusWorld` → `desiredRadius` → `controller.focusOn
- * ({ mesh, radius })`, 같은 파일 `:876` 이 명시 전달로 내부 식을 우회). 초판은 `camera-controller
- * .ts` 의 `focusOn` 을 인용했는데 그 파일 `:203` NOTE 가 스스로 그것을 fallback 이라고 못박으므로,
- * 인용을 따라간 독자가 논거를 기각할 수 있다 (reviewer 라운드 2 [N1] — 기전 결론 유지, 인용처 병기).
+ * 주석이 이미 명시한다. ⚠️ **operative 경로는 `apps/web/src/components/sim-canvas.tsx:868`** 이다:
+ * `mesh.getBoundingInfo().boundingSphere.radiusWorld` → `desiredRadius` → `focusOn({ mesh, radius })`
+ * 이고, 같은 파일 `:876` 이 명시 전달로 내부 식을 우회한다. 초판은 `camera-controller.ts` 의
+ * `focusOn` 을 인용했는데 그 파일 `:203` NOTE 가 스스로 그것을 fallback 이라고 못박으므로, 인용을
+ * 따라간 독자가 논거를 기각할 수 있다 (reviewer 라운드 2 [N1] — 기전 결론 유지, 인용처 병기).
  * 실제로 `diskRpx` 가 `earth 74.75 / mars 73.90 / jupiter 93.36 / moon 22.15`(on) →
  * `98.32 / 98.32 / 98.32 / 24.58`(off) 로 바뀐다 — off 쪽에서 planet 3종이 **같은 화각**으로
  * 정렬되므로 body 간 대조도 그쪽이 읽기 쉽다. 주장은 「`rotate=off` 가 진폭을 없앤다」까지다.
