@@ -13,8 +13,59 @@
  *  - DoD 5: 절차 무회귀 — 낮면 기준 고주파 엔트로피 ON > OFF.
  *  - DoD 6: 보라/마젠타 0 — disk 픽셀 중 (R>G && B>G) 기괴 색역 비율.
  *
- * disk 영역만 샘플: scene.activeCamera 로 mesh bounding box 8 corner 화면 투영 → 그 bbox 픽셀만 분석.
+ * disk 영역만 샘플: scene.activeCamera 로 mesh 의 **투영 disk** 를 산출 → 그 원 안 픽셀만 분석.
  * 낮/밤 분할: sunDir(scene-unit) 을 화면 평면에 투영 → disk 중심 기준 sun 쪽 절반 = 낮면, 반대 = 밤면.
+ *
+ * ── 측정 방법 (#1155 — CRITICAL #6.10 「수치 DoD 미달 시 (0) 측정 방법 검증 우선」) ──────────
+ * 초판(#773~#1154)은 **회전하는 mesh 의 world AABB** 8 코너를 투영해 창을 잡고 `lum < 8` 로
+ * 배경을 걸러「려」 했다. `#1146` 이 `browser-verify-756-surface.mjs` 에서 확정한 것과 같은 두
+ * 결함이 본 가드에도 있었다. 다만 **판정은 흔들리지 않았다** — 아래 실측이 그 점도 함께 박제한다.
+ *
+ *  D1 — 창이 매 실행 달라진다. local AABB 는 정육면체라 mesh 가 돌면 축정렬 외접 박스가
+ *       커졌다 작아진다. 구 코드 10회 반복 실측(2026-08-25, 로컬 swiftshader, 같은 커밋):
+ *       `screenBox` `w×h` distinct 가 `earth` OFF·`jupiter` OFF 에서 **`10/10`** (매 실행 다른
+ *       창), `w` 진폭이 `jupiter` OFF `216~296` = **`37.0%`**. 같은 조건에서 투영 disk 반경은
+ *       body 마다 단일값으로 고정된다.
+ *  D2 — `lum < 8` 이 배경을 거르지 않는다. 배경이 임계 위로 렌더되기 때문이다. 위 10회에서
+ *       그 마스크가 실제로 제외한 픽셀은 8 config 중 **6개가 정확히 `0`**, 나머지 둘도
+ *       `mars` ON `5~76px` / `mars` OFF `85~89px` (창 `166×170` 대비) 다. 그 결과 창의 상당
+ *       부분을 차지하는 배경이 낮면/밤면 평균에 함께 들어가 **판정량을 왜곡**했다 — 기하 원
+ *       마스크로 바꾸면 `contrastMean` 이 mars `+53%` / jupiter `+40%` / moon `+42%` 갈린다
+ *       (같은 실행 내 대조, 2026-08-25 Phase 0).
+ *       ⚠️ `#1146` 이 756 에서 관측한 「어두운 밤면을 깎아낸다」 축은 **본 가드의 4 body 에서는
+ *       재현되지 않는다** — 기하 원 안에서 `lum < 8` 로 제외되는 픽셀이 `0.00~0.03%` 다
+ *       (Phase 0). 위 「6개가 `0`」 과 같은 방향의 두 표본이다: 그 분기는 여기서 **거의 아무것도
+ *       거르지 않았다**. (`#1155` 본문 초안이 756 의 카빙 서술을 이식했고 실측이 정정했다.)
+ *  D3 — **판정 여유는 반복 sd 의 6~20배라 위 왜곡이 PASS/FAIL 을 뒤집은 적은 없다.** 그래서
+ *       마스크 교체의 동기는 flake 예방이 아니라 **재는 양의 정확성**이다 (측정량 ≠ 판정 안정성).
+ *
+ * 처방 P1 — 창을 AABB 코너 대신 **투영 disk** 로 잡고 배경을 휘도가 아니라 **기하** 로 배제
+ * (`#1146`/`#1119`/`#783` 선례 재사용, 신규 구현 금지 — CLAUDE.md §신규 함수 ≠ 신규 구현).
+ *
+ * 처방 P2 — 전 시나리오에 `?rotate=off` (`#1146` P1 과 같은 플래그).
+ * ⚠️ **착수 시 판단은 「불필요」였고 실측이 뒤집었다 — 값을 갈아치우지 않고 이력으로 남긴다**
+ * (`reviewer.md` §4 계급 2). 착수 시 논거는 *"신 창의 반경 산식이 회전 불변이라 D1 이 창에서
+ * 소멸하고, 판정 3축은 낮/밤 반구 평균이라 표면 패턴 위상에 둔감하다"* 였고, **앞 절반은 맞고
+ * 뒷 절반이 틀렸다**. 로컬 swiftshader 각 10회 반복 (2026-08-25, 같은 커밋):
+ *   신 창 + `rotate=on`  → 창 distinct **`1`** (전 8 config) 인데 `contrastMean` sd 가
+ *                          `mars` ON **`0.1489`** (`7.44~7.83`) / `jupiter` ON `0.0200`
+ *   신 창 + `rotate=off` → sd 전 8 config **`≤ 0.0050`**, 판정 10/10 PASS
+ * 착수 시 인용했던 「기하 마스크 반복 sd ≤ 0.004」 는 Phase 0 의 4 config 표본(`jupiter` OFF /
+ * `mars` OFF / `earth` ON / `moon` ON)에서 나온 값이고 **`mars` ON 이 그 표본에 없었다** —
+ * 모집단이 좁았던 것이다.
+ * ⚠️ **진폭을 만든 축이 「자전」이라고는 주장하지 않는다** — 본 PR 은 그것을 분리하지 않았다.
+ * `rotate=off` 는 자전과 `axialTilt` 를 동시에 끄고, **부수적으로 focus framing 도 바꾼다**:
+ * `camera-controller.ts` 의 `focusOn` 이 거리 산출에 `boundingSphere.radiusWorld` 를 쓰는데
+ * 그 값이 *"box 외접구 √3 과대 + #782 자전 위상 진동"* 이라고 그 파일 주석이 이미 명시한다.
+ * 실제로 `diskRpx` 가 `earth 74.75 / mars 73.90 / jupiter 93.36 / moon 22.15`(on) →
+ * `98.32 / 98.32 / 98.32 / 24.58`(off) 로 바뀐다 — off 쪽에서 planet 3종이 **같은 화각**으로
+ * 정렬되므로 body 간 대조도 그쪽이 읽기 쉽다. 주장은 「`rotate=off` 가 진폭을 없앤다」까지다.
+ * 회전 불변 반경 산식은 `rotate=off` 를 준 뒤에도 **유지**한다 (그 플래그가 미래에 빠져도 창이
+ * 조용히 틀어지지 않게 하는 방어의 깊이 — `#1146` 과 같은 논거).
+ * ⚠️ 부수 손실: `rotate=off` 는 `#782` 계약상 `axialTilt` 도 끄므로, 종전 이 가드가 `rotate=on`
+ * 이라 **우연히** 밟던 「기울기 × 광원」 조합이 본 변경 이후 노출 `0` 이 된다. 그 조합을 assert
+ * 하던 가드는 애초에 없어 손실된 assert 는 `0` 이나, 노출이 사라진 것은 사실이라 적어 둔다
+ * (`#1146` 이 756 에서 같은 손실을 기록한 것과 동형).
  *
  * 판정 (#759 — shader-pixel-guard CI 상시 가드, ADR 20260705-759 결정 3):
  *   4 body 각각 (1) dayMean > nightMean × 2 (2) contrastMean(ON) > contrastMean(OFF)
@@ -44,6 +95,21 @@ const SWIFTSHADER = process.env.SWIFTSHADER === '1';
 // #759 판정 상수 — 낮/밤 대비 하한 배수. 실측 최소 (swiftshader 포함 전 라운드) saturn 2.14×,
 // 표면 4 body 하드웨어 실측 3.07~5.37× (docs/reports/773-light/qa-773-comment.md) → 2× 하한 안전.
 const DAY_NIGHT_RATIO_MIN = 2;
+
+/**
+ * #1155 — 분석 창의 disk 반경 대비 샘플 비율. `browser-verify-756-surface.mjs` 의 동명 상수와
+ * 같은 값·같은 역할이다 (limb antialiasing 링을 마진째 배제). `#1119` 의 `0.85` 보다 덜 깎는
+ * 이유도 동일 — 본 가드는 terminator 를 낀 disk 전면을 재야 한다.
+ */
+const DISK_SAMPLE_RADIUS = 0.95;
+
+/**
+ * #1155 — 전 시나리오 공통 쿼리 접미 (자전 정지). `#1146` P1 과 같은 플래그·같은 이유이나,
+ * **본 가드에서는 창이 아니라 픽셀 내용 때문에 필요하다** — 근거는 헤더 §측정 방법 말미.
+ * 판정 경로(ON/OFF)만이 아니라 `plain` 경로에도 일관 적용한다 (회귀 조사 때 판정 경로와
+ * 대조해 읽어야 하므로 같은 조건이어야 한다 — #1146 근거 1 동형).
+ */
+const ROTATE_OFF_QUERY = '&rotate=off';
 
 const SURFACE_BODIES = [
   { id: 'earth', type: 'rocky' },
@@ -89,7 +155,7 @@ async function measureLight(page, bodyId, captureName) {
   }
   const b64 = buf.toString('base64');
   return page.evaluate(
-    async ({ b64, bodyId }) => {
+    async ({ b64, bodyId, DISK_SAMPLE_RADIUS }) => {
       const core = window.__simCore;
       const solar = window.__solarScene;
       const scene = core?.scene;
@@ -108,22 +174,39 @@ async function measureLight(page, bodyId, captureName) {
       const Matrix = (BABYLON && BABYLON.Matrix) || mesh.getWorldMatrix().constructor;
       const idMat = Matrix.Identity();
 
-      // mesh 중심 + bbox 화면 투영.
+      // ── 회전 불변 시각 반경 (#1155) ─────────────────────────────────────────────────
+      // 산식 SSoT = `packages/core/src/scene/camera-controller.ts` 의 `resolveMeshVisualRadius`
+      // (#790): `max(boundingBox.extendSize(local) 각 축 × |scaling| 각 축)`.
+      // 본 블록은 `browser-verify-756-surface.mjs` / `browser-verify-774-sun.mjs` 의 같은 블록과
+      // **의도적 복제**다 — 이 코드는 `page.evaluate` 안(브라우저 컨텍스트)에서 실행되므로
+      // Node 모듈로 뽑으면 소스 문자열 주입이라는 **새 기전**이 생긴다. 형제 verify 가드
+      // (`#783`/`#1119`/`#756`)가 각자 사본을 갖는 것이 이 저장소의 확립된 패턴이다.
+      // ⚠️ `boundingSphere.radiusWorld / √3` (#783 / #1119 선례) 를 쓰지 않는 이유 — 그 보정은
+      // **회전이 identity 일 때만** 맞다 (#1146 실측: 자전 ON 시 1.3936배 과대). 본 가드는
+      // `?rotate=off` 를 주므로 두 산식이 같은 값이 되지만, 회전 불변 쪽을 채택해 그 플래그가
+      // 미래에 빠져도 창이 조용히 틀어지지 않게 한다 (#1146 과 같은 방어의 깊이 논거).
       const meshPos = mesh.getAbsolutePosition();
-      const bb = mesh.getBoundingInfo().boundingBox;
-      const corners = bb.vectorsWorld;
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      for (const c of corners) {
-        const p = Vector3.Project(c, idMat, transform, vp);
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
-      }
+      const boundingInfo = mesh.getBoundingInfo();
+      const bb = boundingInfo.boundingBox;
+      const extendSize = bb.extendSize;
+      const scaling = mesh.scaling;
+      const radiusWorld = Math.max(
+        extendSize.x * Math.abs(scaling.x),
+        extendSize.y * Math.abs(scaling.y),
+        extendSize.z * Math.abs(scaling.z),
+      );
+      const camRight = cam.getDirection(new Vector3(1, 0, 0));
       const centerScreen = Vector3.Project(meshPos, idMat, transform, vp);
+      const edgeScreen = Vector3.Project(
+        meshPos.add(camRight.scale(radiusWorld)),
+        idMat,
+        transform,
+        vp,
+      );
+      const diskRpx = Math.hypot(edgeScreen.x - centerScreen.x, edgeScreen.y - centerScreen.y);
+      if (!(diskRpx > 0) || !Number.isFinite(diskRpx)) {
+        return { error: `disk 투영 반경 산출 실패 (${diskRpx})` };
+      }
 
       // sunDir (scene-unit world) — sunLight.position − meshPos. PointLight 검색.
       let sunPos = null;
@@ -147,11 +230,17 @@ async function measureLight(page, bodyId, captureName) {
       sdx /= sdLen;
       sdy /= sdLen;
 
+      // 창 = disk 외접 정사각형 (viewport clamp). 배경 배제는 창이 아니라 아래 원 마스크가 한다.
+      const boxMinX = Math.max(0, Math.floor(centerScreen.x - diskRpx));
+      const boxMinY = Math.max(0, Math.floor(centerScreen.y - diskRpx));
       const screenBox = {
-        x: Math.max(0, Math.floor(minX)),
-        y: Math.max(0, Math.floor(minY)),
-        w: Math.min(rw, Math.ceil(maxX)) - Math.max(0, Math.floor(minX)),
-        h: Math.min(rh, Math.ceil(maxY)) - Math.max(0, Math.floor(minY)),
+        x: boxMinX,
+        y: boxMinY,
+        w: Math.min(rw, Math.ceil(centerScreen.x + diskRpx)) - boxMinX,
+        h: Math.min(rh, Math.ceil(centerScreen.y + diskRpx)) - boxMinY,
+        cx: Number(centerScreen.x.toFixed(2)),
+        cy: Number(centerScreen.y.toFixed(2)),
+        r: Number(diskRpx.toFixed(2)),
       };
 
       const img = new Image();
@@ -175,9 +264,12 @@ async function measureLight(page, bodyId, captureName) {
       if (bw < 2 || bh < 2) return { error: `disk bbox 너무 작음 ${bw}x${bh}`, screenBox };
       const data = ctx.getImageData(bx, by, bw, bh).data;
 
-      // disk 중심 (img 좌표) = centerScreen 를 img 스케일 변환 후 bbox-상대.
+      // disk 중심 (img 좌표) = centerScreen 를 img 스케일 변환 후 창-상대.
       const cxImg = centerScreen.x * sx - bx;
       const cyImg = centerScreen.y * sy - by;
+      // 기하 disk 마스크 반경 (#1155) — 배경 배제를 휘도가 아니라 기하로 한다.
+      const maskRx = diskRpx * sx * DISK_SAMPLE_RADIUS;
+      const maskRy = diskRpx * sy * DISK_SAMPLE_RADIUS;
 
       const lumGrid = new Float32Array(bw * bh);
       const mask = new Uint8Array(bw * bh);
@@ -198,7 +290,13 @@ async function measureLight(page, bodyId, captureName) {
           const b = data[i * 4 + 2];
           const lum = 0.299 * r + 0.587 * g + 0.114 * b;
           lumGrid[i] = lum;
-          if (lum < 8) continue; // 우주 배경 배제
+          // 배경 배제 = **기하** (#1155). 초판의 `lum < 8` 휘도 임계는 제거했다 — 배경이 임계
+          // 위로 렌더돼 **배경을 거른 적이 없고**, 창의 상당 부분을 차지하던 그 배경이 낮면/밤면
+          // 평균을 함께 끌어내려 판정량을 왜곡했다 (헤더 §측정 방법 D2). 임계 상향은 배경색이
+          // 바뀌면 재발하고 어두운 body 의 밤면을 깎으므로 채택하지 않는다.
+          const ddx = (x + 0.5 - cxImg) / maskRx;
+          const ddy = (y + 0.5 - cyImg) / maskRy;
+          if (ddx * ddx + ddy * ddy > 1) continue; // disk 밖 (우주 배경 / 궤도선 / UI) 배제
           mask[i] = 1;
           diskCount++;
           // 낮/밤 분할.
@@ -229,10 +327,17 @@ async function measureLight(page, bodyId, captureName) {
       };
       const day = stat(dayLums);
       const night = stat(nightLums);
-      // 대비비 = 낮면 mean / 밤면 mean (밤면 0 방지 +1).
-      const contrastMean =
-        night.mean > 0 ? Number((day.mean / Math.max(night.mean, 0.5)).toFixed(2)) : Infinity;
+      // 대비비 = 낮면 mean / 밤면 mean. 0 나눗셈은 바깥 삼항이 이미 막는다.
+      // #1155 기준 8 — 구판의 `Math.max(night.mean, 0.5)` 하한 제거. 구 마스크(`lum ≥ 8`) 하에서는
+      // `night.mean ≥ 8` 이 구조적으로 보장돼 **도달 불가능한 죽은 코드**였다. 신 마스크에서는
+      // 밤면 최암부가 표본에 들어와 도달 가능해지지만, 그때 하는 일이 「진짜 어두운 밤면의 대비를
+      // 조용히 낮춰서 보고」하는 것이라 **판정을 무디게 만드는 방향**이다 → 되살리지 않고 제거한다.
+      const contrastMean = night.mean > 0 ? Number((day.mean / night.mean).toFixed(2)) : Infinity;
       // p90(낮면 밝은 부분) / p10(밤면 어두운 부분) — terminator 양극 대비.
+      // ⚠️ 이쪽 `Math.max(…, 0.5)` 하한은 **유지**한다. `contrastExtreme` 은 판정 입력이 아니라
+      // 로그 전용이고 (판정 3축은 dayMean/contrastMean/purplePct), 신 마스크에서 `night.p10` 은
+      // 실제로 `0` 에 닿을 수 있어 (밤면 최암부가 표본에 포함) 하한이 `Infinity` 오염을 막는
+      // **도달 가능한 방어**가 된다. 즉 위와 달리 죽은 코드가 아니다.
       const contrastExtreme = Number((day.p90 / Math.max(night.p10, 0.5)).toFixed(2));
 
       // 고주파 엔트로피 (낮면 기준 — 절차 무회귀, #756 패턴).
@@ -265,6 +370,10 @@ async function measureLight(page, bodyId, captureName) {
 
       return {
         diskArea: diskCount,
+        // #1155 기준 6 — 배경이 실제로 제외됐다는 관측 가능한 증거 (기하 마스크 생존 신호).
+        windowPx: bw * bh,
+        excludedPx: bw * bh - diskCount,
+        diskRpx: Number(diskRpx.toFixed(2)),
         day,
         night,
         contrastMean, // ★ DoD 1 — 낮면/밤면 mean 대비비
@@ -276,9 +385,10 @@ async function measureLight(page, bodyId, captureName) {
         oceanCount,
         screenSunDir: { x: Number(sdx.toFixed(3)), y: Number(sdy.toFixed(3)) },
         screenBox,
+        imgSize: { w: img.width, h: img.height },
       };
     },
-    { b64, bodyId },
+    { b64, bodyId, DISK_SAMPLE_RADIUS },
   );
 }
 
@@ -312,14 +422,14 @@ async function launch() {
       for (const { id, type } of SURFACE_BODIES) {
         const { context, page, consoleErrors, consoleWarns } = await setupPage(
           browser,
-          `?gpu=a&focus=${id}&lod=auto`,
+          `?gpu=a&focus=${id}&lod=auto${ROTATE_OFF_QUERY}`,
         );
         const m = await measureLight(page, id, `qa-773-on-${id}`);
         out.surfaceOn[id] = { type, ...m };
         out.consoleErrors[`on-${id}`] = consoleErrors.length;
         out.rotWarns[`on-${id}`] = consoleWarns.filter((w) => w.includes('회전 non-zero')).length;
         console.log(
-          `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct} land/ocean=${m.landCount}/${m.oceanCount} err=${consoleErrors.length}`,
+          `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct} land/ocean=${m.landCount}/${m.oceanCount} disk=${m.diskArea}/${m.windowPx} (제외 ${m.excludedPx}) diskRpx=${m.diskRpx} err=${consoleErrors.length}`,
         );
         if (consoleErrors.length)
           console.log(`     ↳ errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
@@ -330,12 +440,12 @@ async function launch() {
       for (const { id } of PLAIN_BODIES) {
         const { context, page, consoleErrors } = await setupPage(
           browser,
-          `?gpu=a&focus=${id}&lod=auto`,
+          `?gpu=a&focus=${id}&lod=auto${ROTATE_OFF_QUERY}`,
         );
         const m = await measureLight(page, id, `qa-773-plain-${id}`);
         out.plain[id] = m;
         console.log(
-          `  ${id.padEnd(8)} contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} purple%=${m.purplePct} err=${consoleErrors.length}`,
+          `  ${id.padEnd(8)} contrastMean=${m.contrastMean} contrastExtreme=${m.contrastExtreme} dayMean=${m.day?.mean} nightMean=${m.night?.mean} purple%=${m.purplePct} disk=${m.diskArea}/${m.windowPx} (제외 ${m.excludedPx}) diskRpx=${m.diskRpx} err=${consoleErrors.length}`,
         );
         await context.close();
       }
@@ -344,12 +454,12 @@ async function launch() {
       for (const { id, type } of SURFACE_BODIES) {
         const { context, page } = await setupPage(
           browser,
-          `?gpu=a&focus=${id}&lod=auto&surface=off`,
+          `?gpu=a&focus=${id}&lod=auto&surface=off${ROTATE_OFF_QUERY}`,
         );
         const m = await measureLight(page, id, `qa-773-off-${id}`);
         out.surfaceOff[id] = { type, ...m };
         console.log(
-          `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct}`,
+          `  ${id.padEnd(8)} [${type}] contrastMean=${m.contrastMean} dayMean=${m.day?.mean} nightMean=${m.night?.mean} hfEnt(day)=${m.hfEntropy} purple%=${m.purplePct} disk=${m.diskArea}/${m.windowPx} (제외 ${m.excludedPx}) diskRpx=${m.diskRpx}`,
         );
         await context.close();
       }
