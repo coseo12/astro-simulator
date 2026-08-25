@@ -36,8 +36,17 @@
  *       재현되지 않는다** — 기하 원 안에서 `lum < 8` 로 제외되는 픽셀이 `0.00~0.03%` 다
  *       (Phase 0). 위 「6개가 `0`」 과 같은 방향의 두 표본이다: 그 분기는 여기서 **거의 아무것도
  *       거르지 않았다**. (`#1155` 본문 초안이 756 의 카빙 서술을 이식했고 실측이 정정했다.)
- *  D3 — **판정 여유는 반복 sd 의 6~20배라 위 왜곡이 PASS/FAIL 을 뒤집은 적은 없다.** 그래서
- *       마스크 교체의 동기는 flake 예방이 아니라 **재는 양의 정확성**이다 (측정량 ≠ 판정 안정성).
+ *  D3 — **위 왜곡이 PASS/FAIL 을 뒤집은 적은 없다.** 모집단·술어를 함께 적는다 (reviewer
+ *       라운드 2 [N2]). 모집단 = PR `#1158` 본문 표 C 의 **구 코드 10회 반복 × 4 body × ON/OFF
+ *       (8 config 전건)**. 술어 = body 별 최악 여유 `min(ON 10회) − max(OFF 10회)` 가 양수인가.
+ *       결과: `earth 1.12` / `mars 0.63` / `jupiter 0.55` / `moon 1.16` 으로 **4 body 전건 양수**
+ *       이고, 그 여유는 같은 body 의 `max(sd_ON, sd_OFF)` 의 `2.4×`(mars — 최소) ~ `290×`
+ *       (moon — sd 가 `0.0040` 이라 축퇴한 값) 다.
+ *       ⚠️ 착수 시 적었던 *"여유가 반복 sd 의 6~20배"* 는 Phase 0 의 **4 config 표본**에서 나온
+ *       값이고 **그 분모·여유 정의를 기록해 두지 않았다**. 값을 갈아치우지 않고 모집단을 명시한
+ *       위 재도출을 병기한다 (`reviewer.md` §4 계급 2).
+ *       그래서 마스크 교체의 동기는 flake 예방이 아니라 **재는 양의 정확성**이다
+ *       (측정량 ≠ 판정 안정성).
  *
  * 처방 P1 — 창을 AABB 코너 대신 **투영 disk** 로 잡고 배경을 휘도가 아니라 **기하** 로 배제
  * (`#1146`/`#1119`/`#783` 선례 재사용, 신규 구현 금지 — CLAUDE.md §신규 함수 ≠ 신규 구현).
@@ -55,8 +64,13 @@
  * 모집단이 좁았던 것이다.
  * ⚠️ **진폭을 만든 축이 「자전」이라고는 주장하지 않는다** — 본 PR 은 그것을 분리하지 않았다.
  * `rotate=off` 는 자전과 `axialTilt` 를 동시에 끄고, **부수적으로 focus framing 도 바꾼다**:
- * `camera-controller.ts` 의 `focusOn` 이 거리 산출에 `boundingSphere.radiusWorld` 를 쓰는데
- * 그 값이 *"box 외접구 √3 과대 + #782 자전 위상 진동"* 이라고 그 파일 주석이 이미 명시한다.
+ * focus 거리 산출이 `boundingSphere.radiusWorld` 를 쓰는데 그 값이 *"box 외접구 √3 과대 +
+ * #782 자전 위상 진동"* 이라고 `camera-controller.ts:88`(`resolveMeshVisualRadius`)·`:197`
+ * 주석이 이미 명시한다. ⚠️ **operative 경로는 `apps/web/src/components/sim-canvas.tsx:868`**
+ * (`mesh.getBoundingInfo().boundingSphere.radiusWorld` → `desiredRadius` → `controller.focusOn
+ * ({ mesh, radius })`, 같은 파일 `:876` 이 명시 전달로 내부 식을 우회). 초판은 `camera-controller
+ * .ts` 의 `focusOn` 을 인용했는데 그 파일 `:203` NOTE 가 스스로 그것을 fallback 이라고 못박으므로,
+ * 인용을 따라간 독자가 논거를 기각할 수 있다 (reviewer 라운드 2 [N1] — 기전 결론 유지, 인용처 병기).
  * 실제로 `diskRpx` 가 `earth 74.75 / mars 73.90 / jupiter 93.36 / moon 22.15`(on) →
  * `98.32 / 98.32 / 98.32 / 24.58`(off) 로 바뀐다 — off 쪽에서 planet 3종이 **같은 화각**으로
  * 정렬되므로 body 간 대조도 그쪽이 읽기 쉽다. 주장은 「`rotate=off` 가 진폭을 없앤다」까지다.
@@ -220,6 +234,13 @@ async function measureLight(page, bodyId, captureName) {
       const sunWorldDir = sunPos.subtract(meshPos); // 태양 방향 (월드).
       // 태양 방향 끝점을 화면 투영해 화면 평면 sunDir 추출 (정규화 후 mesh 반경 비례 길이).
       const sunDirN = sunWorldDir.normalize();
+      // ⚠️ 이 `meshRadius` 는 위 창 산출의 회전 불변 반경과 **무관한 별개 용도**다 (reviewer
+      // 라운드 2 [N3]). 형태상 local AABB 대각선 반길이(정육면체면 `√3 × r`) 이고 `mesh.scaling`
+      // 도 반영하지 않아, 위 헤더가 폐기 선언한 `radiusWorld / √3` 계열과 같은 결함을 갖는다.
+      // 그럼에도 **무해**하다 — 쓰임이 `tip` 을 disk 밖으로 밀어내 화면 sunDir 을 얻는 것뿐이고,
+      // 결과 `sdx/sdy` 는 `sdLen` 으로 정규화된다. 3D 직선은 화면에 직선으로 투영되므로
+      // `centerScreen → tipScreen` **방향은 크기 불변**이다. 즉 여기서는 반경의 정확도가
+      // 판정에 들어가지 않는다 (§주석 계약 vs 구현 drift 예방 — 형태만 보고 고치지 말 것).
       const meshRadius = bb.maximum.subtract(bb.minimum).length() * 0.5 || 1;
       const tip = meshPos.add(sunDirN.scale(meshRadius * 4));
       const tipScreen = Vector3.Project(tip, idMat, transform, vp);
