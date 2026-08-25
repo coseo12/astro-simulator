@@ -236,8 +236,11 @@ async function measureLight(page, bodyId, captureName) {
       const sunDirN = sunWorldDir.normalize();
       // ⚠️ 이 `meshRadius` 는 위 창 산출의 회전 불변 반경과 **무관한 별개 용도**다 (reviewer
       // 라운드 2 [N3]). 형태상 local AABB 대각선 반길이(정육면체면 `√3 × r`) 이고 `mesh.scaling`
-      // 도 반영하지 않아, 위 헤더가 폐기 선언한 `radiusWorld / √3` 계열과 같은 결함을 갖는다.
-      // 그럼에도 **무해**하다 — 쓰임이 `tip` 을 disk 밖으로 밀어내 화면 sunDir 을 얻는 것뿐이고,
+      // 도 반영하지 않는다. ⚠️ 위 헤더가 폐기 선언한 `radiusWorld / √3` 과 **같은 결함은 아니다**
+      // (라운드 2 [R2-c]) — 그쪽 폐기 사유는 **회전 의존**인데 이것은 local AABB 라 회전 불변이고,
+      // 남는 것은 상수 `√3` 편향 + scaling 무시다.
+      // 그럼에도 **무해**하다 — 쓰임이 `tip` 을 disk 중심에서 충분히 떨어뜨려 화면 sunDir 을 얻는
+      // 것뿐이고 (⚠️ scaling 미반영이라 `tip` 이 disk 안에 들어올 수도 있으나 무관하다),
       // 결과 `sdx/sdy` 는 `sdLen` 으로 정규화된다. 3D 직선은 화면에 직선으로 투영되므로
       // `centerScreen → tipScreen` **방향은 크기 불변**이다. 즉 여기서는 반경의 정확도가
       // 판정에 들어가지 않는다 (§주석 계약 vs 구현 drift 예방 — 형태만 보고 고치지 말 것).
