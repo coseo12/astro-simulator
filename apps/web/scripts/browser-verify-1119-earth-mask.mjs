@@ -57,8 +57,9 @@ const IOU_THRESHOLD = 0.8;
  *
  * **왜 필요한가.** 초판 전제는 *"`on.iou > surfaceOff.iou` 가 잡는 것은 동률(차이 0)뿐"* 이었다.
  * 전제는 참이나 결론이 거꾸로다 — **동률에서만 발화한다는 것이 곧 결함**이다. 마진은 발화
- * 조건을 `갭 ≤ 0` 에서 `갭 ≤ M` 으로 **확장**한다. 유출 주입 실측(아래)에서 갭이 **`99.86%`
- * 소멸해도 마진 없는 부호 비교는 통과**했다 — `#1159` 가 773·774 에서 잡아낸 blindness 가
+ * 조건을 `갭 ≤ 0` 에서 `갭 ≤ M` 으로 **확장**한다. 유출 주입 실측에서 `uMaskEnabled` blend
+ * `0.6` 이 `surfaceOff.iou = 0.9347` 을 냈고 (갭 `0.0013` = **`99.86%` 소멸**) **마진 없는 부호
+ * 비교는 그것을 통과시켰다** (`0.9360 > 0.9347`). `#1159` 가 773·774 에서 잡아낸 blindness 가
  * 이 축에서도 재현된다.
  *
  * **왜 절대(차) 마진인가.** `#1159` 는 **상대(곱셈)** 마진을 썼고 그 근거는 *"판정량이 스케일
@@ -71,6 +72,9 @@ const IOU_THRESHOLD = 0.8;
  * **산출 (measurement-first — 임계부터 정하고 맞춘 값이 아니다).** 무주입 baseline
  * (2026-08-26, 로컬 `SWIFTSHADER=1` headless + `next dev :3001`, `4`회 전건 sd `0`):
  * `on.iou 0.9360` / `forcedOff.iou 0.3122` / `surfaceOff.iou 0.0000` / `maskLandPct 50.62`.
+ * CI (ubuntu swiftshader, `shader-pixel-guard` run `32960373263`) 교차 확인 — `on 0.936` /
+ * `surfaceOff 0` / **`maskLandPct 50.62` 일치** / `forcedOff 0.3123` (`1e-4` 차). 아래 상한의
+ * 입력인 `maskLandPct` 는 마스크 PNG + 고정 기하의 함수라 **GPU 비의존**이다.
  *
  *  - **하한 (판별력) `> 0.1243`** — 잡아야 할 부분 유출의 **잔존 갭**. 유출 주입 실측에서
  *    `uMaskEnabled` 를 `0.5` 로 blend 한 유출 프레임이 `surfaceOff.iou = 0.8117` 을 냈다
