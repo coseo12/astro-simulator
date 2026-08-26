@@ -16,9 +16,11 @@ Semantic Versioning을 따른다.
   | 축                 | 신호 정의                     |   무주입 최소 관측 |        하한 (판별력) | 상한 (`÷2`) |                            채택 |   실현 여유 |
   | ------------------ | ----------------------------- | -----------------: | -------------------: | ----------: | ------------------------------: | ----------: |
   | 774 DoD 3          | `1 − (B/R edge)/(B/R center)` |           `31.30%` | `> 0.38%` (M-B 잔존) |    `15.65%` |      `COLOR_TEMP_MARGIN = 0.10` | **`3.13×`** |
-  | 773 `contrastMean` | `1 − OFF/ON`                  | `36.77%` (jupiter) | `> 4.62%` (M-C 잔존) |    `18.38%` | `CONTRAST_ON_OFF_MARGIN = 0.10` | **`3.68×`** |
+  | 773 `contrastMean` | `1 − OFF/ON`                  | `36.64%` (jupiter) | `> 4.62%` (M-C 잔존) |    `18.32%` | `CONTRAST_ON_OFF_MARGIN = 0.10` | **`3.66×`** |
 
-  구속은 774 쪽(`31.30/3 = 10.43` < `36.77/3 = 12.26`)이다. 무주입 모집단은 **세 환경**이고 최소 신호가 갈리지 않았다 — 로컬 swiftshader headless `11`회(#1159 `5` + #1155 Phase 0 `6`, 774 는 전건 `31.30%` sd `0`) / CI `5`건(#1155 Phase 0, 774 `31.31%` 전건 동일) / **실 Chrome 하드웨어 GPU** `1`회(#1159 — 774 `31.30%`, 773 jupiter `36.77%`).
+  구속은 774 쪽(`31.30/3 = 10.43` < `36.64/3 = 12.21`)이다. 무주입 모집단은 **세 환경**이고 최소 신호가 갈리지 않았다 — 로컬 swiftshader headless `11`회(#1159 `5` + #1155 Phase 0 `6`, 774 는 전건 `31.30%` sd `0`, 773 jupiter `36.77%`) / **CI** `shader-pixel-guard`(#1155 Phase 0 `5`건 + 본 PR run `1`건, 774 `31.31%` 전건 동일, 773 jupiter `36.64%`) / **실 Chrome 하드웨어 GPU** `1`회(#1159 — 774 `31.30%`, 773 jupiter `36.77%`).
+
+  ⚠️ **773 상한은 CI 실측 후 `18.38% → 18.32%` 로 정정됐다** — 마진 확정 시점에 손에 있던 CI 표본은 #1155 Phase 0 의 `ON−OFF` **절대값** 5건뿐이라(body 별 `ON` 이 없어 낙차 %로 재도출 불가) 로컬 최소 `36.77%` 로 상한을 잡았고, 본 PR 의 CI run 이 3 모집단 최소를 `36.64%` 로 `0.13%p` 낮췄다. 채택값 `0.10` 은 그 변동에 걸리지 않으며 구속 축도 그대로 774 다. 값을 갈아치우지 않고 시점을 병기한다.
 
   **판별력 before/after — 774 (기준 3·6).** 같은 dev server·같은 커밋에서 `packages/core/src/scene/sun-shader.ts` 에 #1155 가 쓴 변이 2종을 그대로 재주입하고 `pnpm --filter core build` 후 실행했다(재발명 없음). 원복 후 `git status` 에 셰이더 파일 **없음**.
 
@@ -42,7 +44,7 @@ Semantic Versioning을 따른다.
 
   M-C `K = 0.045` 의 마진 전 실행에서 4 body 전건이 `dayMean > nightMean × 2` 와 `purplePct == 0` 을 통과했고 마진 후 실행의 실패 목록에도 그 두 축은 없다 — 즉 그 `exit 0` 은 형제 축이 받쳐준 결과가 아니라 **본 축이 눈먼** 결과다.
 
-  **무주입 무회귀 (기준 5)** — 마진 도입 후 두 가드 로컬 `exit 0`: swiftshader headless 각 `2`회 + 실 Chrome 하드웨어 GPU 각 `1`회. **기존 임계 무변경 (기준 7)** — `HF_ENTROPY_MARGIN`(756 파일 무접촉) · `DAY_NIGHT_RATIO_MIN = 2` · `DISK_SAMPLE_RADIUS = 0.95` · `EDGE_RADIUS = 0.9` 선언 **변경 `0` 행**. `edgeCenterRatio < 0.85` 는 담고 있는 판정식 라인이 색온도 항 교체로 재작성됐으나 **그 부분식 자체는 축자 동일**하다.
+  **무주입 무회귀 (기준 5)** — 마진 도입 후 두 가드 `exit 0`: 로컬 swiftshader headless 각 `2`회 + 실 Chrome 하드웨어 GPU 각 `1`회 + **CI `shader-pixel-guard` `SUCCESS`**(PR #1162 run `32928986266` — `verify:756-surface` → `773` → `774` 직렬 전건 PASS). **기존 임계 무변경 (기준 7)** — `HF_ENTROPY_MARGIN`(756 파일 무접촉) · `DAY_NIGHT_RATIO_MIN = 2` · `DISK_SAMPLE_RADIUS = 0.95` · `EDGE_RADIUS = 0.9` 선언 **변경 `0` 행**. `edgeCenterRatio < 0.85` 는 담고 있는 판정식 라인이 색온도 항 교체로 재작성됐으나 **그 부분식 자체는 축자 동일**하다.
 
   **곁들여 닫은 구멍** — 새 상대 낙차식은 `bOverREdge` 가 `null` 이면 `1 − 0/x = 1` 로 **통과**해 버려 부호 비교 시절에는 없던 구멍이 생긴다. `judgeRadial` 에 채널비 결손 fail-fast 를 추가했다(§가드 설계 원칙 _"drift 가드는 fail-fast 만 — fallback 분기 절대 금지"_, 기존 `incomplete` 검사와 같은 계급의 측정 결손 처리이지 판정 축 신설이 아니다).
 
