@@ -537,7 +537,28 @@ async function runDod(browser) {
   const forcedOff = results.forcedOff;
   const surfaceOff = results.surfaceOff;
 
-  // DoD 1 — IoU 하한 + 마스크 미적용 경로 대비 유의 증가.
+  // DoD 1 — IoU 하한 + 마스크 미적용 두 경로 대비 우위.
+  //
+  // ⚠️ 구 주석은 이것을 「유의 증가」라고 적었으나 **그 성질을 집행하는 코드가 없다** (#1163).
+  // 집행되는 것은 `IOU_THRESHOLD` 하한과 단순 부호 비교 2건이고, 아래 근거대로 그 두 비교는
+  // 판정을 바꾸지 않는다. 「유의」를 재려면 마진 상수가 필요한데 — **여기서는 불필요하다.**
+  //
+  // (1) `on.iou > forcedOff.iou` 는 **논리적으로 함의된다.** 이 블록이 `on.iou >= IOU_THRESHOLD`
+  //     를 요구하고 DoD 2 가 `forcedOff.iou < IOU_THRESHOLD` 를 요구하며, 최종 게이트가
+  //     `if (!(dod1 && dod2))` 다. 즉 PASS 시 `on.iou >= 0.8 > forcedOff.iou` 가 반드시 성립한다.
+  // (2) `on.iou > surfaceOff.iou` 는 임계가 걸려 있지 않으나 상대가 **구조적으로 0** 이다 —
+  //     `?surface=off` 는 셰이더를 아예 만들지 않는 단색 StandardMaterial 경로(아래 ③ 주석)라
+  //     대륙이 없다. 실측 `0.0000` (2026-08-26, 로컬 SWIFTSHADER 4회, sd 0). 이 비교가 구속하려면
+  //     `surfaceOff.iou >= on.iou` 여야 하는데 텍스처 없는 단색 구에서 불가능하다.
+  // (3) 회귀 시에도 임계가 먼저 잡는다 — 마스크가 죽으면 `on.iou` 가 forcedOff 대역으로 떨어지고
+  //     (같은 실측: ON `0.9360` / forcedOff `0.3122`), 부분 열화도 `0.8` 을 지나며 발화한다.
+  //
+  // ⇒ 마진 상수를 넣으면 **발화하지 않는 상수**가 되고 판별력 실증도 불가능하다(어떤 변이를
+  //   심어도 `IOU_THRESHOLD` 가 먼저 발화한다). §가드 설계 원칙 — 검사 표면을 늘리지 않는다.
+  //
+  // ⚠️ **`#1159` 를 여기에 기계 복제하지 말 것.** 그쪽(773 `contrastMean` / 774 DoD 3)은 판정량에
+  //   임계가 **없어서** 부호만 남았고 신호 `98.8%` 소멸이 통과하는 것이 실측됐다. 여기는 임계가
+  //   하중을 지고 있어 사정이 다르다 — 형태는 같고 결과가 다르다 (#1163 실측).
   const dod1 =
     !on.error &&
     on.iou >= IOU_THRESHOLD &&

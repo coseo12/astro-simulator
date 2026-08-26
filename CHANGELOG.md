@@ -7,6 +7,14 @@ Semantic Versioning을 따른다.
 
 ### Changed
 
+- **[#1163] `verify:1119-earth-mask` DoD 1 주석 계약 정정 — 「유의 증가」를 집행하는 코드가 없다 (PATCH)** ([#1163](https://github.com/coseo12/astro-simulator/issues/1163)) — [#1159](https://github.com/coseo12/astro-simulator/issues/1159) 리뷰가 범위 밖으로 남긴 잔여다. `:540` 주석이 _"IoU 하한 + 마스크 미적용 경로 대비 **유의 증가**"_ 라고 선언하는데 **「유의」를 재는 코드가 없다** — 집행되는 것은 `IOU_THRESHOLD` 하한과 단순 부호 비교 `2`건이다. §주석 계약 vs 구현 drift 그대로다.
+
+  ⚠️ **그러나 `#1159` 를 여기에 복제하지 않았다 — 형태는 같고 결과가 다르다.** 실측(2026-08-26, 로컬 `SWIFTSHADER` 4회, 전건 sd `0`): ON `0.9360` / `forcedOff` `0.3122` / `surfaceOff` **`0.0000`**, `IOU_THRESHOLD = 0.8`. 두 부호 비교의 하중을 **임계가 이미 지고 있다** — (1) `on.iou > forcedOff.iou` 는 **논리적으로 함의된다** (`dod1` 이 `on.iou >= 0.8` 을, `dod2` 가 `forcedOff.iou < 0.8` 을 요구하고 최종 게이트가 `dod1 && dod2` 라, PASS 시 반드시 성립). (2) `on.iou > surfaceOff.iou` 는 임계가 없으나 상대가 **구조적으로 `0`** 이다 (`?surface=off` = 셰이더 미생성 단색 `StandardMaterial` — 대륙 없음). 구속하려면 `surfaceOff.iou >= 0.9360` 이어야 하는데 텍스처 없는 단색 구에서 불가능하다. (3) 마스크가 죽으면 `on.iou` 가 `forcedOff` 대역으로 떨어져 **`0.8` 에서 먼저 잡힌다**.
+
+  ⇒ 마진 상수를 넣으면 **발화하지 않는 상수**가 되고 판별력 실증도 불가능하다 (어떤 변이를 심어도 `IOU_THRESHOLD` 가 먼저 발화한다). §가드 설계 원칙 — 검사 표면을 늘리지 않는다. `#1159` 가 다뤘던 `773`·`774` 는 그 판정량에 임계가 **없어서** 부호만 남았고 신호 `98.8%` 소멸이 통과하는 것이 실측됐다 — 그 blindness 가 여기서는 **재현되지 않는다**.
+
+  **처방은 주석뿐이다** — 실제 집행 내용 + 위 (1)(2)(3) 근거 + _"`#1159` 를 기계 복제하지 말 것"_ 을 판정 블록에 박았다. **판정 로직 diff `0`행**(주석 접두 없는 `+`/`-` 라인 `0`), 가드 무주입 재실행 `PASS`(DoD 1·2 both).
+
 - **[#1159] 마진 없는 판정 축 2개에 상대 낙차 마진 도입 — `verify:774-sun` DoD 3 + `verify:773-light` `contrastMean` (PATCH)** ([#1159](https://github.com/coseo12/astro-simulator/issues/1159)) — [#1155](https://github.com/coseo12/astro-simulator/issues/1155) 가 _"그 판정에 **마진 상수가 없어 부호만 비교**한다"_ 를 774 DoD 3 에서 지목하고 범위 밖으로 남긴 잔여다. 본 PR 이 처리하는 것은 **계약이 지명한 2 축** — 774 DoD 3 과 그 자매 축인 773 `contrastMean` 이고, 둘을 **함께** 처리했다. 하나만 고치면 「같은 저장소 안에서 판정 방식이 갈린다」가 재생산되고 그 상태가 곧 #1155 를 만든 것이기 때문이다.
 
   ⚠️ **초판이 적었던 「전 가드에서 마진 없는 축은 정확히 `2`개」는 철회한다** (reviewer 라운드 2 [B1] 반증). 같은 형태 — ON/OFF 신호 대조를 **부호만으로** 판정 — 가 최소한 `browser-verify-1119-earth-mask.mjs:541-546`(`on.iou > forcedOff.iou` / `on.iou > surfaceOff.iou`) 에도 있다. 그 축은 773 의 `on.contrastMean > off.contrastMean` 과 형태뿐 아니라 OFF 기전(`?surface=off`)까지 같고 같은 `shader-pixel-guard` workflow 소속인데, 초판이 쓴 술어가 그 파일의 `const dodN = … && …` 구조를 보지 못했다(그 파일에 대한 hit `0` — 재현 확인). **전수 개수는 다시 주장하지 않는다** — 더 넓은 술어(양변이 모두 `식별자.속성` 인 비교)로 다시 훑으면 거짓 양성(`773` 의 `on.day.mean > on.night.mean` 은 실제 우변이 `on.night.mean * DAY_NIGHT_RATIO_MIN` 이라 **마진이 있다** — 정규식이 잘랐다)과 클래스 혼입(`704`·`631`·`790`·`737` 의 hit 는 ON/OFF 신호 대조가 아니라 **구조적 한계 단언 또는 결정적 파라미터 전/후 비교**다 — `704:119` 의 `after.panningSensibility < before.panningSensibility` 가 후자다)이 섞인다. `1119` 는 #1159 계약 범위 밖이라 **무접촉**이고 발견은 PR #1162 코멘트에 기록했다 (§검증 강도 게이트 _"범위 밖 발견의 기본 처분은 «PR 코멘트 기록»"_ — 이슈화는 실피해 관측 시).
