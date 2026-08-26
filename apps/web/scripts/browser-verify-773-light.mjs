@@ -592,7 +592,9 @@ async function launch() {
     //   · `on = 0`   → `-Infinity` → 차단   · `on = NaN` / `off = undefined` → `NaN` → 차단
     //   · `on = Infinity` (off 유한) → `1 − 0 = 1` → **통과** (fail-fast 아님)
     //   · `off = null` → `null → 0` 강제로 `1` → **통과**
-    // ⚠️ 위 `Infinity` 는 열거 중 **유일하게 실제 도달 가능한** 축퇴값이다 — 위 `contrastMean =
+    // ⚠️ 위 `Infinity` 는 열거 중 **유일하게 판정을 통과시키는** 축퇴값이다 (도달 가능한 축퇴값
+    // 자체는 더 있다 — `stat([])` 이 `mean 0` 을 내므로 `dayLums` 가 비면 `contrastMean = 0` 도
+    // 나온다. 그쪽은 통과하지 않는다. reviewer 라운드 2 [R2-N2]) — 위 `contrastMean =
     // night.mean > 0 ? … : Infinity` 가 (a) 밤면이 완전 흑색이거나 (b) 밤면 표본이 비어
     // `stat([])` 이 `mean 0` 을 낼 때 만든다. (a) 는 회귀가 아니라 이상적 상태라 통과가 옳고,
     // (b) 는 측정 결손이나 **구판도 똑같이 통과시켰다** (회귀 아님).
