@@ -82,7 +82,8 @@
  * (`#1146` 이 756 에서 같은 손실을 기록한 것과 동형).
  *
  * 판정 (#759 — shader-pixel-guard CI 상시 가드, ADR 20260705-759 결정 3):
- *   4 body 각각 (1) dayMean > nightMean × 2 (2) contrastMean(ON) > contrastMean(OFF)
+ *   4 body 각각 (1) dayMean > nightMean × 2 (2) contrastMean 상대 낙차
+ *   `1 − OFF/ON ≥ CONTRAST_ON_OFF_MARGIN` (#1159 — 그 전에는 마진 없는 `ON > OFF`)
  *   (3) purplePct == 0. 미충족 시 exit 1 (fail-fast).
  *   ⚠️ hfEntropy ON>OFF 는 판정 축에서 제외 — moon day-side 실측 역전 (ON 1.402 < OFF 1.989,
  *   disk 소면적 framing + land/ocean 소표본 artifact — ADR §실측 3). 측정·로그는 유지하되
@@ -109,6 +110,45 @@ const SWIFTSHADER = process.env.SWIFTSHADER === '1';
 // #759 판정 상수 — 낮/밤 대비 하한 배수. 실측 최소 (swiftshader 포함 전 라운드) saturn 2.14×,
 // 표면 4 body 하드웨어 실측 3.07~5.37× (docs/reports/773-light/qa-773-comment.md) → 2× 하한 안전.
 const DAY_NIGHT_RATIO_MIN = 2;
+
+/**
+ * #1159 — `contrastMean` ON/OFF 판정의 **상대 낙차 하한**. 구판 판정은 `on.contrastMean >
+ * off.contrastMean` 이라는 순수 부등식이라 **부호만** 비교했다. 밤면이 *부분* 회귀해 낙차가
+ * 몇 `%` 만 남아도 부호는 옳으므로 통과한다 — 실측(아래 M-C)에서 mars 낙차 `36.8% → 5.00%`
+ * 인 셰이더를 구판이 `exit 0` 으로 통과시켰다 (「테스트가 있다 ≠ 그 테스트가 작동한다」 #1123).
+ *
+ * **형태 — 상대(곱셈) 마진** (`off.contrastMean ≤ on.contrastMean × (1 − MARGIN)`). 판정량
+ * `contrastMean` 자체가 `day.mean / night.mean` 인 무차원 비율이라 가산 마진은 body 마다
+ * (`earth 4.25` ~ `mars 7.61`) 뜻이 달라진다. 바로 위 형제 축 `DAY_NIGHT_RATIO_MIN` 도 곱셈이다.
+ * 정규화 분모는 **ON** 을 쓴다 — 낙차를 「셰이더가 만든 대비 중 몇 %가 사라졌는가」로 읽는
+ * 것이 회귀 서술과 일치하고, 스프린트 계약이 인용한 baseline(`(ON−OFF)/ON`)과도 같은 축이다.
+ *
+ * **산출 근거 (measurement-first — 임계부터 정하고 맞춘 값이 아니다).**
+ * 신호 = `1 − off.contrastMean / on.contrastMean`.
+ *  - **하한 (판별력)** — 아래 M-C(0.045) 의 mars 잔존 낙차보다 커야 한다 (별개 실행 2 표본:
+ *    구 가드 실행 `5.00%` / 신 가드 실행 `4.62%`).
+ *  - **상한 (무회귀)** — 무주입 관측 최소 신호의 `1/2` = `18.38%` (스프린트 계약 기준 2).
+ *    무주입 관측 — body 별 낙차, 최소는 어느 모집단에서도 **jupiter** 다:
+ *      · 로컬 swiftshader headless (#1159 n=5 = 마진 도입 전 3 + 도입 후 2 · #1155 Phase 0 n=6)
+ *        `earth 47.76%` / `moon 41.67~41.79%` / `mars 37.50~37.58%` / **`jupiter 36.77%`**
+ *      · **실 Chrome 하드웨어 GPU** (HEADFUL 기본, #1159 n=1)
+ *        `earth 47.78%` / `moon 41.67%` / `mars 37.68%` / **`jupiter 36.77%`**
+ *      · CI 표본은 #1155 Phase 0 의 `ON−OFF` **절대값** 5건이고 로컬과 진폭 `0.010` 이다
+ *        (낙차 백분율로는 재도출하지 않았다 — 그 표에 body 별 `ON` 값이 없다).
+ *  - **선택** — `browser-verify-774-sun.mjs` 의 `COLOR_TEMP_MARGIN` 과 **같은 값**을 쓴다.
+ *    같은 형태(비율 축 상대 낙차)의 두 판정이 저장소 안에서 갈리지 않게 하려는 것이고
+ *    (#1155 를 만든 상태가 그것이다), 그 상수 주석에 두 축 공통 산출식이 있다. 구속은
+ *    774(`31.30/3 = 10.43`) 쪽이며 본 축의 실현 여유는 `36.77 / 10 = 3.68×` 다.
+ *
+ * **M-C 변이 (판별력 실증, #1159)** — `procedural-planet-shader.ts` 의
+ * `sunFactor ← mix(smoothstep(0, W, ndl), 1.0, 0.045)`. 밤면에 태양 diffuse 의 `4.5%` 를 새게
+ * 해 #773 원 증상(밤면이 밝아짐)을 **부분** 재현한다. 구 가드 실행에서 4 body 전건
+ * `dayMean > nightMean × 2` 와 `purplePct == 0` 이 그대로 통과했고(그래서 `exit 0`), 신 가드
+ * 실행의 실패 목록에도 그 두 축은 없다 — 즉 형제 축이 받쳐준 것이 아니라 **본 축이 눈먼** 것이다.
+ * ⚠️ 계수 `0.045` 는 「구 가드 통과 ∧ 신 가드 차단」 창을 맞춘 값이다 (`0.035` 는 최소 낙차가
+ * mars `11.87%` 로 **양쪽 다 통과**). 그 창의 존재 자체가 본 마진이 잡는 회귀 대역이다.
+ */
+const CONTRAST_ON_OFF_MARGIN = 0.1;
 
 /**
  * #1155 — 분석 창의 disk 반경 대비 샘플 비율. `browser-verify-756-surface.mjs` 의 동명 상수와
@@ -494,8 +534,9 @@ async function launch() {
   console.log(JSON.stringify(out, null, 2));
 
   // ── 판정 (#759 — ADR 20260705-759 결정 3: per-body 상대 성질, fail-fast) ──────
-  // 축: (1) dayMean > nightMean×2 — 광원 붕괴 검출 (2) contrastMean ON > OFF — 밤면 회귀
-  // (#773 원 회귀) 검출 (3) purplePct == 0 — 기괴 색역 검출. hfEntropy 는 헤더 주석 사유로 제외.
+  // 축: (1) dayMean > nightMean×2 — 광원 붕괴 검출 (2) contrastMean ON/OFF 상대 낙차 ≥
+  // CONTRAST_ON_OFF_MARGIN — 밤면 회귀 (#773 원 회귀) 검출 (#1159 — 마진 도입 전에는 마진 없는
+  // `ON > OFF`) (3) purplePct == 0 — 기괴 색역 검출. hfEntropy 는 헤더 주석 사유로 제외.
   const failures = [];
   for (const { id } of SURFACE_BODIES) {
     const on = out.surfaceOn[id];
@@ -513,9 +554,12 @@ async function launch() {
         `${id}: dayMean(${on.day.mean}) ≤ nightMean(${on.night.mean}) × ${DAY_NIGHT_RATIO_MIN} (광원 대비 붕괴)`,
       );
     }
-    if (!(on.contrastMean > off.contrastMean)) {
+    // #1159 — 부호가 아니라 **낙차 크기**를 본다. `on.contrastMean` 이 `0`/`Infinity`/`NaN` 이면
+    // 아래 식이 `-Infinity`/`NaN` 이 되어 비교가 false → fail-fast (구판 부호 비교와 동일 판정).
+    const contrastRelDrop = 1 - off.contrastMean / on.contrastMean;
+    if (!(contrastRelDrop >= CONTRAST_ON_OFF_MARGIN)) {
       failures.push(
-        `${id}: contrastMean ON(${on.contrastMean}) ≤ OFF(${off.contrastMean}) (밤면 회귀 — #773 원 증상)`,
+        `${id}: contrastMean 상대 낙차 ${(contrastRelDrop * 100).toFixed(2)}% < ${CONTRAST_ON_OFF_MARGIN * 100}% (ON ${on.contrastMean} / OFF ${off.contrastMean}) (밤면 회귀 — #773 원 증상)`,
       );
     }
     if (on.purplePct !== 0) {
@@ -524,7 +568,7 @@ async function launch() {
   }
 
   console.log(
-    `\n=== 판정 (#759 — day>night×${DAY_NIGHT_RATIO_MIN} + contrastMean ON>OFF + purple 0, hfEntropy 축 제외) ===`,
+    `\n=== 판정 (#759 — day>night×${DAY_NIGHT_RATIO_MIN} + contrastMean 낙차 ≥${CONTRAST_ON_OFF_MARGIN * 100}% + purple 0, hfEntropy 축 제외) ===`,
   );
   if (failures.length) {
     for (const f of failures) console.log(`  ✗ ${f}`);
@@ -535,7 +579,7 @@ async function launch() {
       const on = out.surfaceOn[id];
       const off = out.surfaceOff[id];
       console.log(
-        `  ✓ ${id}: day ${on.day.mean}/night ${on.night.mean} (×${DAY_NIGHT_RATIO_MIN} 초과), contrastMean ON ${on.contrastMean} > OFF ${off.contrastMean}, purple ${on.purplePct}%`,
+        `  ✓ ${id}: day ${on.day.mean}/night ${on.night.mean} (×${DAY_NIGHT_RATIO_MIN} 초과), contrastMean ON ${on.contrastMean} / OFF ${off.contrastMean} (낙차 ${((1 - off.contrastMean / on.contrastMean) * 100).toFixed(2)}% ≥ ${CONTRAST_ON_OFF_MARGIN * 100}%), purple ${on.purplePct}%`,
       );
     }
     console.log('=== PASS ===');
