@@ -40,7 +40,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && pnpm run verify:emit",
     "dev": "tsc -p tsconfig.build.json --watch",
-    "clean": "rm -rf dist *.tsbuildinfo",
+    "clean": "rm -rf dist .tsbuildinfo *.tsbuildinfo",
     "verify:emit": "test -f dist/index.js || { echo '[verify:emit] @astro-simulator/core: dist/index.js 가 없다. tsc 가 exit 0 인 채 아무것도 emit 하지 않았다 (stale tsbuildinfo 의심). pnpm --filter @astro-simulator/core clean 후 재빌드하라.' >&2; exit 1; }",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

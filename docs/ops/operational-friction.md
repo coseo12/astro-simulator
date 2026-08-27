@@ -639,11 +639,16 @@ pnpm --filter web typecheck                                                    #
 
 ⚠️ **두 번째 줄의 exit `2` 는 예상된 것이다.** `packages/core` 가 `@astro-simulator/physics-wasm` 을
 못 찾아 `TS2307` `4` 건을 내지만, `tsc` 는 `noEmitOnError` 기본값에서 **전량 방출**하므로 `dist` 는
-완전하다 — 실측 `core` 의 `.d.ts` **`58` 개** (= `tsconfig.build.json` 이 `exclude` 하는
+완전하다 — 실측 `core` 의 `.d.ts` **`59` 개** (= `tsconfig.build.json` 이 `exclude` 하는
 `__test-utils__` 를 뺀 의도 대상 전량) / `shared` **`11` 개**. 공개 `.d.ts` 의 `physics-wasm` 참조는
 **`0` 건**이라 (wasm 핸들이 `private wasm;` 으로 캡슐화) 세 번째 줄이 exit `0` 이 된다.
 **exit `2` 를 보고 절차가 실패했다고 판단하지 말 것** — 다만 `&&` 로 체이닝하면 세 번째 줄이
 실행되지 않으므로 줄을 나눠 돌린다.
+
+⚠️ **이 조건을 흉내 내서 검증할 때 `pkg` 만 치우면 재현되지 않는다** (#1166 실측). `physics-wasm` 의
+`exports["."]` 는 `node` 조건이 `./pkg/…`, 그 외 조건이 `./pkg-bundler/…` 인 **2 갈래**라, `pkg` 만
+없애면 `tsc` 가 `pkg-bundler` 로 해석해 **exit `0` · `TS2307` `0` 건**이 된다. 위 값들은 **툴체인 부재
+= `pkg` 와 `pkg-bundler` 가 둘 다 없는** 상태의 실측이다 (그 상태에서 exit `2` / `TS2307` `4` 건 재현).
 
 **⚠️ `.tsbuildinfo` 함정 — `rm -rf dist` 만으로는 재빌드가 안 된다.** 레시피를 검증하거나 `dist` 를
 강제로 다시 만들 때 걸린다. `packages/*/tsconfig.build.json` 이 `composite: true` 라 남기는

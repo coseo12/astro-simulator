@@ -33,7 +33,12 @@ pnpm workspace 등 monorepo 환경에서 core 패키지 `src/` 수정 후 앱 de
 
 **처방** (#1166 에서 적용):
 
-1. `clean` 은 경로를 손으로 적지 않는다 — `rm -rf dist *.tsbuildinfo` (글로브가 설정 파일명 변경을 흡수).
+1. `clean` 은 빌드 정보 경로를 **하나만 손으로 적지 않는다** — `rm -rf dist .tsbuildinfo *.tsbuildinfo`.
+   글로브가 흡수하는 drift 는 **설정 파일명 변경**이다(`tsconfig.build.json` 을 다른 이름으로 바꿔도
+   파생 `<새이름>.tsbuildinfo` 가 걸린다). ⚠️ **글로브만으로 갈음하지 말 것** — sh 의 `*` 는 선행 dot 을
+   매칭하지 않아 종전 리터럴 `.tsbuildinfo` 를 놓친다(#1166 초판이 그렇게 써서 **커버리지 순수 축소**를
+   냈고 리뷰가 격리 픽스처로 적발했다). 커버 밖도 적어 둔다 — **하위 디렉토리** 경로
+   (`.cache/x.tsbuildinfo`, 실측 잔존) 와 `.tsbuildinfo` **이외의 dotfile**.
 2. `build` 뒤에 **선언된 진입점이 실제로 emit 됐는지** 단언한다 — `test -f dist/index.js`. 「빈 dist + exit `0`」
    이라는 침묵을 exit `1` + 메시지로 바꾼다. 원인이 무엇이든(수동 `rm -rf dist`, 부분 삭제) 발화한다.
 3. ⚠️ `tsc --build --clean` 은 **대안이 못 된다** — 실측(#1166) 결과 `tsbuildinfo` 는 지우지만 `dist` 안의
