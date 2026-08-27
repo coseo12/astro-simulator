@@ -1400,3 +1400,53 @@ qa 가 구 상수를 런타임 주입한 negative 대조에서, **두 행성의 
 3. **본 Amendment 는 reviewer 지적 8건을 반영해 개정됐다** (PR #1131) — blocking 3건(CI 템플릿 / 주석 계약 잔존 6곳 / 수치 주장 3건 반증) + non-blocking 5건. 특히 **초판이 박제한 수치 2건(`|z|/r ≤ 0.07` · `0°`)이 반증**됐고, 결론은 유지되나 근거를 구조 논증으로 교체했다.
 4. 부수 발견 — `self-rotation.ts` 가 참조하던 `docs/decisions/20260701-782-self-rotation.md` 는 **존재한 적이 없는 경로**였다 (dead reference). `.ts` 는 `verify-docs-links` 의 스캔 모집단(`docs/**` + 루트 md) 밖이라 잡히지 않았다. 본 Amendment 에서 실제 경로로 정정했다.
 
+## Amendment 6 (2026-08-27) — 마스크 LOD 판정 반경을 회전 불변 산식으로 교체 (#1157)
+
+**상태**: Accepted
+
+### 배경 — Amendment 4 가 배선한 산식이 자기 목적을 훼손했다
+
+Amendment 4 §결정 4 는 원거리 축소 shimmer 를 막으려고 *"투영 disk 반경 `R < 16 px` 면 `uMaskEnabled = 0`"* 을 배선했고, 배선 표(`:1123`)가 그 반경 산식을 **`browser-verify-783` 과 동일 (`boundingSphere.radiusWorld / √3` 투영) 재사용**으로 명시했다.
+
+⚠️ **그 재사용에는 빠진 전제가 있었다.** `#783`·`#1119` 는 전 쿼리 site 에 **`rotate=off`** 를 강제하므로 그쪽에서는 `radiusWorld / √3` 이 참 반경과 항등이다. **런타임에는 그 전제가 없다** — Babylon 의 `radiusWorld` 는 `max|TransformNormal((1,1,1), world)| × localRadius` (`@babylonjs/core` `boundingSphere.js:75-76`) 이므로 **자전 위상의 함수**다.
+
+### 실측 (#1157 Phase 0 — 수정 전 트리, 로컬 SWIFTSHADER 1280×720, `?focus=earth`)
+
+카메라를 고정해 **참 반경을 불변**으로 둔 채 `jumpToJulianDate` 로 지구 자전 1주기를 16 스텝 순회:
+
+| 축 | 값 |
+| --- | --- |
+| 참 반경 (`resolveMeshVisualRadius` 투영) | **`11.006 px` — 16 스텝 전건 불변** |
+| 종전 산식 (`radiusWorld / √3` 투영) | `12.886 ~ 18.651 px` — 임계 `16` 을 넘나듦 |
+| `uMaskEnabled` | **distinct `[0, 1]` — 자전 1주기 4회 전이** |
+
+**가시성 (격리 — 같은 JD + `pause` + uniform 만 토글)**: 차이 픽셀 `143`, `maxDelta` `172` (disk 면적 `≈ 381 px`).
+
+⇒ **Amendment 4 가 없애려던 shimmer 를 그 판정 입력이 스스로 만들고 있었다.**
+
+### 결정
+
+반경 산식을 **`resolveMeshVisualRadius`** (`packages/core/src/scene/camera-controller.ts`, #790 — 회전 불변)로 교체한다. 그 함수 주석이 이미 이 함정을 경고하고 있었다(*"√3 과대 + #782 자전 위상 진동"*).
+
+- **임계 `SURFACE_MASK_MIN_DISK_PX = 16` 은 무변경**이다. 입력이 진동하는 상태에서 임계를 옮기는 것은 순서가 틀렸다 (CLAUDE.md §스프린트 계약 10).
+- 부수로 **마스크가 켜지는 참 반경 하한이 이동한다** — 종전에는 부풀려진 값이 `16` 과 비교돼 하한이 `16 / ratio` (`ratio ∈ [1, √3]`) 로 `9.24 px` 까지 내려갈 수 있었고, 이후에는 참 반경 `16 px` 이 위상과 무관한 하한이다. **§결정 4 의 over-resolution 논거가 애초에 참 disk 반경 기준**이므로 그 문면 쪽으로 붙는 이동이다.
+
+### 배선 표 정정
+
+`:1123` 의 *"반경 산식은 `browser-verify-783` 과 동일 (`boundingSphere.radiusWorld / √3` 투영) 재사용"* 은 **본 Amendment 로 대체된다.** ⚠️ 원문은 **소급 편집하지 않는다** — 그 문장은 Amendment 4 시점의 결정 기록이고, 그것이 왜 부족했는지가 본 Amendment 의 배경이다 (`reviewer.md` §4 계급 2).
+
+### ⚠️ 이 결함이 검출되지 않은 구조적 이유
+
+§A4.5 **DoD 14**(`:1161`)가 검증 쿼리에 `?rotate=off&speed=0` 를 규정한다. 즉 **DoD 자체가 결함이 발현하지 않는 조건을 고정**하고 있었다. 가드가 초록인 것과 가드가 무언가를 지키는 것은 다르다.
+
+### 잔여 — guard ↔ runtime 반경 정합의 근거가 바뀌었다
+
+`browser-verify-783-earth-detail.mjs:191` 과 `browser-verify-1119-earth-mask.mjs:481` 은 **여전히 `radiusWorld / √3`** 로 같은 투영 disk 반경을 계산한다. 런타임만 회전 불변이 되었으므로, 종전 주석이 선언했던 *"값이 갈리면 스크립트 판정과 런타임 LOD 가 다른 반경을 본다"* 는 계약은 **설계상 깨졌고**, 남은 유일한 안전판은 **그 두 가드가 강제하는 `rotate=off`** 다 — 본 Amendment 가 취약하다고 판정한 바로 그 전제다.
+
+두 가드가 `rotate=off` 를 강제하는 한 실제 불일치는 발생하지 않고 실피해 관측이 없으므로 **기록만 한다** (§검증 강도 게이트). 그 강제가 미래에 빠지면 이 절이 재검토 트리거다.
+
+### 재검토 조건
+
+1. `SURFACE_MASK_MIN_DISK_PX` 를 조정할 때 — 입력이 이제 위상 불변이므로 **측정 baseline 을 다시 잡는다**.
+2. `#783`·`#1119` 가드에서 `rotate=off` 강제가 빠질 때 — 위 §잔여의 안전판이 소멸한다.
+3. oblate 천체(비균등 scaling) 지원 시 — `resolveMeshVisualRadius` 의 `max(축별)` 이 장/단축을 뭉갠다 (cross-validate 고유 발견, 현 스코프 무영향).

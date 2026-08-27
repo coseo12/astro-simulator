@@ -639,25 +639,36 @@ pnpm --filter web typecheck                                                    #
 
 ⚠️ **두 번째 줄의 exit `2` 는 예상된 것이다.** `packages/core` 가 `@astro-simulator/physics-wasm` 을
 못 찾아 `TS2307` `4` 건을 내지만, `tsc` 는 `noEmitOnError` 기본값에서 **전량 방출**하므로 `dist` 는
-완전하다 — 실측 `core` 의 `.d.ts` **`58` 개** (= `tsconfig.build.json` 이 `exclude` 하는
+완전하다 — 실측 `core` 의 `.d.ts` **`59` 개** (= `tsconfig.build.json` 이 `exclude` 하는
 `__test-utils__` 를 뺀 의도 대상 전량) / `shared` **`11` 개**. 공개 `.d.ts` 의 `physics-wasm` 참조는
 **`0` 건**이라 (wasm 핸들이 `private wasm;` 으로 캡슐화) 세 번째 줄이 exit `0` 이 된다.
 **exit `2` 를 보고 절차가 실패했다고 판단하지 말 것** — 다만 `&&` 로 체이닝하면 세 번째 줄이
 실행되지 않으므로 줄을 나눠 돌린다.
+
+⚠️ **이 조건을 흉내 내서 검증할 때 `pkg` 만 치우면 재현되지 않는다** (#1166 실측). `physics-wasm` 의
+`exports["."]` 는 `node` 조건이 `./pkg/…`, 그 외 조건이 `./pkg-bundler/…` 인 **2 갈래**라, `pkg` 만
+없애면 `tsc` 가 `pkg-bundler` 로 해석해 **exit `0` · `TS2307` `0` 건**이 된다. 위 값들은 **툴체인 부재
+= `pkg` 와 `pkg-bundler` 가 둘 다 없는** 상태의 실측이다 (그 상태에서 exit `2` / `TS2307` `4` 건 재현).
 
 **⚠️ `.tsbuildinfo` 함정 — `rm -rf dist` 만으로는 재빌드가 안 된다.** 레시피를 검증하거나 `dist` 를
 강제로 다시 만들 때 걸린다. `packages/*/tsconfig.build.json` 이 `composite: true` 라 남기는
 `tsconfig.build.tsbuildinfo` 를 `tsc` 가 보고 up-to-date 로 판정하기 때문이다.
 
 ```bash
-# 실측 — dist 만 지우면 tsc 가 exit 0 을 내고 아무것도 emit 하지 않는다
-rm -rf packages/shared/dist
-pnpm --filter @astro-simulator/shared build   # exit 0 인데 dist 미생성 ⚠️
+# ✅ 권장 — clean 이 dist 와 tsconfig.build.tsbuildinfo 를 함께 지운다 (#1166 이후)
+pnpm --filter @astro-simulator/shared clean
+pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.js 11개 / .d.ts 11개)
 
-# 완전 초기화 = .tsbuildinfo 까지 지운다
-rm -rf packages/shared/dist packages/shared/tsconfig.build.tsbuildinfo
-pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 11개)
+# ⚠️ 손으로 dist 만 지우면 함정은 그대로다 — 단 #1166 이후로는 조용하지 않다
+rm -rf packages/shared/dist
+pnpm --filter @astro-simulator/shared build   # exit 1 + [verify:emit] 메시지
+                                              # (#1166 이전에는 exit 0 + 빈 dist 였다)
 ```
+
+⚠️ **#1166 이전 판이 여기 적어 두었던 처방 `rm -rf packages/<pkg>/dist packages/<pkg>/tsconfig.build.tsbuildinfo`
+는 회수한다.** `clean` 이 그 일을 하므로 경로를 손으로 적을 이유가 없고, **경로를 손으로 적는 것이
+[#1166](https://github.com/coseo12/astro-simulator/issues/1166) 결함의 원천**이었다 — 그 결함도
+`clean` 스크립트에 `.tsbuildinfo` 라는 실재하지 않는 경로가 하드코딩돼 있던 것이다.
 
 - **본 건은 정확성 결손이 아니라 개발자 경험 마찰이다 — 단 예외가 하나 있다.** `setup-and-build` 가
   도는 `pnpm build` 안의 `next build` 가 TypeScript 검사를 수행하고 (`apps/web/next.config.*` 에

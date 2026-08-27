@@ -138,6 +138,27 @@ CI 최소 갭 0.359 = 마진의 2.4×, 전체 관측 최소 (로컬 분산 포�
 
 **3. P1 실측**: 신규 job 총 6m49s (setup ~2m + verify 6종 4m43s) — 예측 ≤25분 대비 27% 수준. CI 계수 실측 ≈ 1.15× (로컬 4.1분 → CI 4.7분. agy 의 5~8× 경고는 미발현 — timeout 40 완충은 유지).
 
+## Amendment 2 — 773 `contrastMean` 판정 규약에 상대 낙차 마진 도입 ([#1159](https://github.com/coseo12/astro-simulator/issues/1159), 2026-08-26 dev, PR [#1162](https://github.com/coseo12/astro-simulator/pull/1162))
+
+**결정 3 의 773 축 서술 `contrastMean(ON) > contrastMean(OFF)` 는 본 Amendment 로 대체된다** (원문 라인은 기록 보존을 위해 소급 편집하지 않는다 — 위 Amendment 1 과 같은 처리).
+
+**갱신 후 규약** — 4 body 각각 (1) `dayMean > nightMean × 2` **(2) `1 − contrastMean(OFF) / contrastMean(ON) ≥ CONTRAST_ON_OFF_MARGIN`(`= 0.10`)** (3) `purplePct == 0`. (1)·(3) 및 hfEntropy 축 제외는 무변경.
+
+**사유** — 구 규약은 **마진 상수 없는 순수 부등식**이라 부호만 비교했다. 밤면에 태양 diffuse 를 새게 하는 변이(`sunFactor ← mix(smoothstep(0, W, ndl), 1.0, K)`, `K = 0.045`)에서 4 body 전건이 `exit 0` 으로 통과했고 — 형제 축 (1)·(3) 도 함께 통과했으므로 **본 축이 눈먼 것**이다 — 마진 도입 후 `exit 1` 로 뒤집혔다 (mars 잔존 낙차 `4.62%`). 「테스트가 있다 ≠ 그 테스트가 작동한다」([#1123](https://github.com/coseo12/astro-simulator/issues/1123)) 클래스.
+
+**마진 산출** (measurement-first, 3중 박제 — `browser-verify-773-light.mjs` 상수 주석 / PR #1162 본문 / 본 각주. 결정 3 이 756 마진에 대해 규정한 관례를 그대로 따른다):
+
+| 축                     | 신호 정의       | 무주입 최소 (3 모집단) |        하한 (판별력) | 상한 (`÷2`, 계약 기준 2) |    채택 |   실현 여유 |
+| ---------------------- | --------------- | ---------------------: | -------------------: | -----------------------: | ------: | ----------: |
+| 773 `contrastMean`     | `1 − OFF / ON`  |     `36.64%` (jupiter) | `> 4.62%` (M-C 잔존) |                 `18.32%` | `0.10` | **`3.66×`** |
+| 774 DoD 3 (자매, 동시) | `1 − (B/R edge) / (B/R center)` | `31.30%` | `> 0.38%` (M-B 잔존) | `15.65%` | `0.10` | **`3.13×`** |
+
+두 축에 같은 값을 쓰므로 구간을 겹치면 상한 `15.65%`(774 구속) · 하한 `4.62%` 이고, **유효숫자 1자리 최대값 `0.10` 이 유일 해**다 (`0.2` = `20%` 는 상한 초과). 즉 채택값은 스프린트 계약의 `2×` 규칙만으로 결정되며 판별력 변이(M-B·M-C)는 **비구속 하한**에만 기여한다.
+
+**검출 하한 (blind band)** — 판정량이 잔존 신호라 「`10%` 열화를 잡는다」가 아니다. 발화에는 **신호의 `72.71%`(jupiter — 구속) ~ `79.07%`(earth) 이상 소멸**이 필요하다 (술어 `1 − 10 / baseline%`, body 별 baseline 은 `browser-verify-773-light.mjs` 상수 주석). 그 아래 대역은 형제 축이 담당한다.
+
+**재검토 트리거 추가** — 본 마진의 baseline 은 **측정 방법**에 종속된다 (`#1155` 의 기하 마스크 교체가 `contrastMean` 을 body 별 `+40~53%` 이동시킨 실측). ⇒ `DISK_SAMPLE_RADIUS` / 기하 마스크 / 낮밤 분할 기준 / 774 의 `EDGE_RADIUS`·`RADII` 를 **다음에 건드릴 때** 무주입 baseline 재측정 + 마진 여유 재확인 (접촉 기준 — CLAUDE.md §`deferred:no-incident` 수명주기 와 같은 관례이고, 시간 기준을 쓰지 않는 논거는 ADR [20260816-850](20260816-850-phase1-threshold-noop.md) 결정 1 의 *"임계 자체가 추정 오차의 산물이라 고수할 실체가 없다"* 다). 위 §재검토 트리거 의 *"silent 약화 금지"* 는 그대로 적용된다 — 마진 **완화**는 본 ADR Amendment 로만.
+
 ## 참고
 
 - 이슈: [#759](https://github.com/coseo12/astro-simulator/issues/759) (원 범위 + 2026-07-04 확장 코멘트), [#793](https://github.com/coseo12/astro-simulator/issues/793) (산출물 수명주기 — 합류/분리 명시)

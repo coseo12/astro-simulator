@@ -9,7 +9,8 @@
  * 측정 (ADR 20260703-774 §DoD):
  *   DoD 1 — granulation: 태양 disk 라플라시안 고주파 에너지/엔트로피 ON > OFF.
  *   DoD 2 — limb darkening: radial Rec.709 휘도 프로파일 단조 감소 + edge(r≈0.9R)/center < 0.85.
- *   DoD 3 — 색온도: 가장자리 B/R 채널비 < 중심 B/R.
+ *   DoD 3 — 색온도: 가장자리 B/R 채널비 < 중심 B/R × (1 − `COLOR_TEMP_MARGIN`) (#1159 — 마진 도입
+ *           전에는 마진 없는 순수 부등식이었다).
  *   DoD 4 — ?surface=off 단색 복귀 (hf ≈ 0) + planet 4종 ON 무회귀.
  *
  * ── 측정 방법 (#1155 — CRITICAL #6.10 「수치 DoD 미달 시 (0) 측정 방법 검증 우선」) ──────────
@@ -38,6 +39,12 @@
  *       `0.15%` 인데 이는 **granulation clamp 잔차**(`base` 비 `0.6588` 대비 center `+0.59%` /
  *       edge `+0.74%`) 의 차이지 색온도 검출이 아니다. ⇒ **본 가드의 판별력 근거는 DoD 2 축에
  *       있다** (DoD 3 은 두 변이 어느 쪽에서도 축이 살아 있음을 보이지 못한다).
+ *       ⚠️ **위 두 문장은 `#1155` 시점(마진 도입 전)의 술어다 — `#1159` 가 그 시점을 지났다.**
+ *       값을 갈아치우지 않고 시점을 명시한다 (`reviewer.md` §4 계급 2). `COLOR_TEMP_MARGIN`
+ *       (아래 상수) 도입 후 실측: M-B 는 신호 `0.38% < 10%` 로 **DoD 3 축 자체가 `FAIL`** 이고
+ *       (`#1155` 에서는 그 축이 통과했다), M-A 의 `FAIL` 은 잔차 부호가 아니라 **`|0.15%| < 10%`**
+ *       에서 나온다 — 즉 잔차 부호가 반대로 뒤집혀도 그대로 `FAIL` 이라 위 「부호를 보장하는
+ *       장치가 없다」는 지적이 해소된다. DoD 2 축의 판별력 근거는 그대로 유효하다 (무변경).
  *  D2 — `lum < 8` 휘도 마스크는 **배경을 거르지 않는다**. 배경이 임계 위(`9.08`)로 렌더되기
  *       때문이다 (`#1146` 이 756 에서 먼저 확정한 것과 같은 축). 태양은 밝아서 「천체를 깎는」
  *       반대 방향 피해는 없었으나, 배경을 통과시킨 결과가 곧 위 D1 의 halo 오염이다.
@@ -90,6 +97,61 @@ if (!RADII.includes(EDGE_RADIUS)) {
 if (Math.max(...RADII) > DISK_SAMPLE_RADIUS) {
   throw new Error(`RADII 최대값이 DISK_SAMPLE_RADIUS(${DISK_SAMPLE_RADIUS}) 초과 — 링이 창 밖`);
 }
+
+/**
+ * #1159 — DoD 3(색온도) 판정의 **상대 낙차 하한**. 구판 판정은 `bOverREdge < bOverRCenter` 라는
+ * 순수 부등식이라 **부호만** 비교했고, 색온도를 `98.8%` 소멸시킨 변이(M-B: `mu ← 1 − (1−mu)^8`)의
+ * 잔존 `0.38%` 도 부호가 옳아 통과했다 (#1155 / PR #1158 본문 「색온도 신호」 표 — 「테스트가
+ * 있다 ≠ 그 테스트가 작동한다」 #1123 클래스. 그 표에서 `exit 1` 을 낸 것은 DoD 2 였다).
+ *
+ * **형태 — 상대(곱셈) 마진** (`bOverREdge < bOverRCenter × (1 − MARGIN)`). 판정량 `B/R` 이
+ * 무차원 채널비라 가산 마진은 base 발광색(`#FFE9A8`)·노출이 바뀌면 뜻이 달라진다. 같은
+ * `judgeRadial` 안의 형제 축 DoD 2 가 이미 `edge/center < 0.85` 라는 같은 형태이고,
+ * `browser-verify-773-light.mjs` 의 `DAY_NIGHT_RATIO_MIN` 도 곱셈이다 (756 의
+ * `HF_ENTROPY_MARGIN` 만 가산인데 그쪽 판정량 엔트로피는 비율량이 아니다).
+ *
+ * **산출 근거 (measurement-first — 임계부터 정하고 맞춘 값이 아니다).**
+ * 신호 = `1 − bOverREdge / bOverRCenter` (DoD 3 이 비교하는 바로 그 두 값의 상대 낙차).
+ *  - **하한 (판별력)** — M-B 잔존 `0.38%` 보다 커야 한다.
+ *  - **상한 (무회귀)** — 무주입 관측 최소 신호의 `1/2` = `15.65%` (스프린트 계약 기준 2).
+ *    무주입 관측 모집단 (전건 `31.30%` 또는 `31.31%`, 환경 간 진폭 `0.01%p`):
+ *      · 로컬 swiftshader headless `31.30%` — #1159 n=5 (마진 도입 전 3 + 도입 후 2) · #1155
+ *        Phase 0 n=6 ⇒ 11회 전건 동일 (sd `0`)
+ *      · CI `31.31%` — #1155 Phase 0 `shader-pixel-guard` run 5건 전건 동일 + 본 마진 도입
+ *        PR #1162 의 run `32928986266` 1건 (`0.4552 / 0.6627`) ⇒ 6건 전건 동일
+ *      · **실 Chrome 하드웨어 GPU** (HEADFUL 기본) `31.30%` — #1159 n=1 (B/R `0.4553`/`0.6627`
+ *        가 swiftshader 와 자릿수까지 같다. `edge/center` 만 `0.6609` vs `0.6612` 로 갈린다)
+ *  - **선택 — 채택값은 스프린트 계약의 `2×` 규칙만으로 유일하게 결정된다.** 본 상수와 773
+ *    `CONTRAST_ON_OFF_MARGIN` 에 **같은 값**을 쓰므로(형태가 같은 두 비율 축이 저장소 안에서
+ *    갈리지 않게 — #1155 를 만든 상태가 그것이다) 두 축의 구간을 겹친다. 상한은
+ *    `min(15.65%, 18.32%) = 15.65%`(774 구속), 하한은 두 축 잔존 중 큰 쪽 `4.62%`(773 M-C).
+ *    그 구간에서 **유효숫자 1자리 최대값**은 `0.1` 이다 (`0.2` = `20%` 는 상한 초과).
+ *    ⚠️ 실현 여유 774 `3.13×` / 773 `3.66×` 는 **사후 확인이지 선택 근거가 아니다.** 초판
+ *    주석은 이를 「양쪽 여유 `≥ 3×`」라는 결정 규칙으로 적었으나 그 규칙은 **채택값을 구속하지
+ *    않는다** — `3×` 로 풀면 상한이 `min(10.43, 12.21) = 10.43%` 로 좁아질 뿐 유효숫자 1자리
+ *    최대값은 그대로 `0.1` 이다. 즉 「임계부터 정하고 맞췄나」에 대한 반증은 `3×` 가 아니라
+ *    **계약 자신의 `2×` 규칙에 대한 답의 불변성**이다 (reviewer 라운드 2 [N2]).
+ *    (773 의 `36.64%` 는 본 PR CI run 이 준 3 모집단 최소다 — 마진 확정 시점에는 로컬 최소
+ *    `36.77%` 였고 그 상한 `18.38%` 도 774 의 `15.65%` 보다 느슨해 구속이 바뀌지 않는다.)
+ *
+ * **검출 하한 (blind band) — 이 마진이 무엇부터 잡는가.** 판정량이 **잔존** 신호이므로
+ * 「`10%` 이상의 열화를 잡는다」가 아니다. 술어 `1 − 10 / baseline%` 로 무주입 baseline
+ * (로컬·실 GPU `31.30%` / CI `31.31%`) 을 환산하면 **신호의 `68.05~68.06%` 이상이 소멸해야**
+ * 발화한다. 그 아래 대역은 본 축이 보지 못한다 (형제 축 DoD 1·2 의 커버는 별개).
+ * 실측 대조점: M-B 잔존 `0.38%`
+ * = 소멸률 `98.79%` → **발화**. 미발화 쪽 대조점은 774 에 없다 — 하한을 아래에서 bracket 한
+ * 실측은 773 쪽 M-C(`K=0.035`) 이고 그 근거는 `browser-verify-773-light.mjs` 에 있다.
+ *
+ * **재도출 트리거 — 접촉 기준** (CLAUDE.md §`deferred:no-incident` 수명주기 와 같은 관례.
+ * 시간 기준을 쓰지 않는 것은 그것이 또 하나의 추정 임계가 되기 때문이다 — ADR 20260816-850
+ * 결정 1 이 *"임계 자체가 추정 오차의 산물이라 고수할 실체가 없다"* 로 든 논거). 위 baseline 은
+ * **측정 방법**에 종속된다. 실제 위험은 셰이더가 아니라 창·마스크 변경이다 — `#1155` 의
+ * 기하 마스크 교체가 773 의 `contrastMean` 을 body 별 `+40~53%` 움직인 실측이 그 크기를
+ * 박제한다(`browser-verify-773-light.mjs` 헤더 §측정 방법 D2). ⇒ `DISK_SAMPLE_RADIUS` /
+ * `EDGE_RADIUS` / 기하 마스크 / `RADII` 를 **다음에 건드릴 때** 무주입 baseline 을 재측정하고
+ * 본 상수의 상한·여유를 재확인한다.
+ */
+const COLOR_TEMP_MARGIN = 0.1;
 
 async function setupPage(browser, query) {
   const context = await browser.newContext({
@@ -361,12 +423,35 @@ function judgeRadial(radial) {
   const edgeCenterRatio = edge.lum / center;
   const bOverRCenter = radial[0].bOverR;
   const bOverREdge = edge.bOverR;
+  // #1159 — 채널비 결손은 fail-fast (§가드 설계 원칙 *"drift 가드는 fail-fast 만"*). 아래 상대
+  // 낙차는 `bOverREdge` 가 null 이면 `1 − 0/x = 1` 로 **통과**해 버린다.
+  // ⚠️ 이것은 **선재하던 구멍이지 새 식이 만든 것이 아니다** (초판 주석은 *"부호 비교 시절에는
+  // 없던 구멍"* 이라 적었고 reviewer 라운드 2 [B2] 가 측정으로 반증했다). 구판 `bOverREdge <
+  // bOverRCenter` 도 `null < 0.6627` 에서 `null → 0` 강제로 `true` 를 내 **똑같이 통과**시켰다.
+  // 축퇴 6 케이스(edge=null/undefined/NaN, center=null/0, 양쪽 null) 전건에서 구판과 신판의
+  // 판정이 일치한다 — 즉 `#774` 판정이 이 스크립트에 들어온 이래 있던 결손 구멍을
+  // **곁들여 닫는** 것이다. ⚠️ 파일 자체는 `2a86ce0`(`#759`)에서 처음 커밋됐다 — `#774`
+  // 트리에 없다. 「`#774` 이래」가 성립하는 근거는 ADR `20260705-759` 결정 2 가 그 커밋을
+  // 「4종 untracked 커밋 (756/762/773/774)」로 규정하고 「774 는 판정 이미 존재 — 무수정」
+  // 이라 적었다는 것이다 (reviewer 라운드 2 [R2-N1]). (발생원: 위
+  // `bOverR: cnt && sumR > 0 ? … : null` 이 `lum` 과 독립으로 null 을 낼 수 있는데, `incomplete`
+  // 검사는 `lum === null || samples !== RADIAL_ANGLES` 만 봐 `sumR === 0` 경로를 덮지 않는다.)
+  // 판정 축 신설이 아니라 위 `incomplete` 검사와 같은 계급의 측정 결손 처리다.
+  if (typeof bOverRCenter !== 'number' || typeof bOverREdge !== 'number' || !(bOverRCenter > 0)) {
+    return {
+      ok: false,
+      reason: `B/R 채널비 결손 (center=${bOverRCenter} edge=${bOverREdge}) — 색온도 측정 불가`,
+    };
+  }
+  // DoD 3 신호 — 중심 대비 가장자리 B/R 의 상대 낙차. 부호가 아니라 크기를 본다 (#1159).
+  const colorTempDrop = 1 - bOverREdge / bOverRCenter;
   return {
-    ok: monotonicViolations === 0 && edgeCenterRatio < 0.85 && bOverREdge < bOverRCenter,
+    ok: monotonicViolations === 0 && edgeCenterRatio < 0.85 && colorTempDrop >= COLOR_TEMP_MARGIN,
     monotonicViolations,
     edgeCenterRatio: Number(edgeCenterRatio.toFixed(4)),
     bOverRCenter,
     bOverREdge,
+    colorTempDrop: Number((colorTempDrop * 100).toFixed(2)),
     center,
     edge: edge.lum,
   };
@@ -400,7 +485,7 @@ function judgeRadial(radial) {
         console.log(`  radial lum : ${m.radial?.map((s) => s.lum).join(' ')}`);
         console.log(`  radial B/R : ${m.radial?.map((s) => s.bOverR).join(' ')}`);
         console.log(
-          `  limb judge : edge/center=${judge.edgeCenterRatio} (<0.85?) monoViol=${judge.monotonicViolations} B/R center=${judge.bOverRCenter} edge=${judge.bOverREdge} → ${judge.ok ? 'PASS' : 'FAIL'}${judge.reason ? ` (${judge.reason})` : ''}`,
+          `  limb judge : edge/center=${judge.edgeCenterRatio} (<0.85?) monoViol=${judge.monotonicViolations} B/R center=${judge.bOverRCenter} edge=${judge.bOverREdge} drop=${judge.colorTempDrop}% (≥${COLOR_TEMP_MARGIN * 100}%?) → ${judge.ok ? 'PASS' : 'FAIL'}${judge.reason ? ` (${judge.reason})` : ''}`,
         );
         if (consoleErrors.length)
           console.log(`  console errors: ${JSON.stringify(consoleErrors.slice(0, 3))}`);
