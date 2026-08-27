@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-08-27
+
 ### Behavior Changes
 
 - **[#1166] `packages/{core,shared}` 의 `clean` 이 실재하지 않는 tsbuildinfo 경로를 지우고 있었다 — `clean && build` 가 exit `0` 인 채 빈 `dist` 를 남기던 결함 (MINOR)** ([#1166](https://github.com/coseo12/astro-simulator/issues/1166)) — `clean` 이 `rm -rf dist .tsbuildinfo` 인데 두 패키지의 `tsconfig.build.json` 은 `composite: true`(`:10`)라 TypeScript 가 빌드 정보를 **`.tsbuildinfo` 가 아니라 `tsconfig.build.tsbuildinfo`** 에 쓴다. `clean` 은 **존재하지 않는 경로**를 지웠고, 살아남은 빌드 정보를 본 `tsc` 는 up-to-date 로 판정해 아무것도 emit 하지 않았다. **`dist` 는 방금 지워졌는데 exit `0`** 이다.
