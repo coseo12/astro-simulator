@@ -105,6 +105,9 @@ import {
   type Scene,
 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+// #1157 — 회전 불변 시각 반경 SSoT (#790). `camera-controller.ts` 는 `@babylonjs/core` 외의
+// 모듈을 import 하지 않으므로 순환 없음 (`tier-transition.ts` 가 같은 방향으로 이미 의존한다).
+import { resolveMeshVisualRadius } from './camera-controller.js';
 import { hexToColor3 } from './color-utils.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
 import {
@@ -731,24 +734,42 @@ const tmpGlobalViewport = new Viewport(0, 0, 0, 0);
 const IDENTITY_MATRIX = Matrix.Identity();
 
 /**
- * `boundingSphere.radiusWorld` 는 bounding **cube** 의 half-diagonal (구 반경 × √3) 이다.
- * `browser-verify-783-earth-detail.mjs` 가 쓰는 것과 **같은 보정 상수** — 값이 갈리면 스크립트
- * 판정과 런타임 LOD 가 다른 반경을 보게 된다.
- */
-const BOUNDING_SPHERE_TO_RADIUS = Math.sqrt(3);
-
-/**
  * mesh 의 화면 투영 disk 반경 (픽셀).
  *
- * 산식은 `browser-verify-783-earth-detail.mjs` 의 것을 **그대로 재사용**한다 (§A4.4 예측표):
- * 실 world 반경을 복원한 뒤 **카메라 right 방향 edge 점**을 화면 투영해 중심과의 거리를 잰다.
+ * **투영 방식**은 `browser-verify-783-earth-detail.mjs` 의 것을 재사용한다 (§A4.4 예측표):
+ * world 반경만큼 떨어진 **카메라 right 방향 edge 점**을 화면 투영해 중심과의 거리를 잰다.
  * (bbox 코너 투영은 cube 모서리라 ~1.2× 과대, 픽셀 카운트 기반은 밤면 limb 탈락으로 ~7% 과소 —
  * 둘 다 실측으로 기각된 이력이 있다.)
+ *
+ * ⚠️ **world 반경 산출은 #1157 에서 교체됐다 — 이력을 남긴다.** 초판은 투영 방식과 함께 `#783` 의
+ * `boundingSphere.radiusWorld / √3` 도 베끼고 *"같은 보정 상수"* 라고 적었는데, **그 등가는
+ * `#783`·`#1119` 가 전 쿼리 site 에 `rotate=off` 를 강제한다는 전제 위에서만 성립한다.** Babylon 의
+ * `radiusWorld` 는 world matrix 로 변환한 bounding box 기준이라 **자전 위상의 함수**이고, 런타임에는
+ * 그 전제가 없다 — 그것이 이 결함의 출발점이다.
+ *
+ * 결함 실측 (#1157 Phase 0 — **수정 전** 트리, 로컬 SWIFTSHADER 1280×720, `?focus=earth`,
+ * 카메라 고정 `radius = 329`, 자전 ON, `jumpToJulianDate` 로 1.0 day 를 16 스텝 순회한 **1 run**):
+ * 종전 산식의 투영 반경이 `12.886 ~ 18.651 px` 로 진동해 아래 임계 `16` 을 넘나들고 `uMaskEnabled`
+ * 가 그 16 스텝에서 **4회** 전이했다. 같은 16 스텝에서 회전 불변 산식은 `11.006 px` 로 전건
+ * 불변이었다. ⇒ Amendment 4 가 없애려던 shimmer 를 그 판정 입력이 스스로 만들고 있었다.
+ *
+ * 그래서 반경은 `resolveMeshVisualRadius` (#790, 회전 불변) 를 쓴다 — 그 함수 주석이 이미 이 함정을
+ * *"√3 과대 + #782 자전 위상 진동"* 으로 경고하고 있었고, `#1146` 이 가드 쪽에서 같은 판단으로
+ * 채택한 선례가 있다 (`browser-verify-756-surface.mjs:208-209` 주석 실측 — earth 에서
+ * `rotate=off` 면 두 산식 비 `1.0000`, 자전 ON 이면 `1.3936`).
+ *
+ * ⚠️ **부수 결과: 마스크가 켜지는 거리 경계가 이동한다.** 종전에는 부풀려진 값이 `16` 과 비교됐으므로
+ * 마스크가 켜지는 **참** 반경 하한이 `16 / ratio` 였다. `ratio` 는 구조적으로 `[1, √3]` 이고
+ * (world AABB 가 최대로 부풀어도 그 이상 갈 수 없다) 자전 위상의 함수라, 하한이 `9.24 px` 까지
+ * 내려갈 수 있었다. 이후에는 참 반경 `16 px` 이 하한이며 위상과 무관하다. 임계
+ * `SURFACE_MASK_MIN_DISK_PX` 자체는 무변경이고 (#1157 계약 명시 비목표), ADR §A4.3 결정 4 의
+ * over-resolution 논거가 애초에 **참 disk 반경 R** 기준이라 (`R = 16 px` → 정합 폭 ≈ 100) 이
+ * 교체는 그 문면 쪽으로 붙는다.
  *
  * 카메라 부재 (NullEngine 단위 테스트 등) 면 `Infinity` — LOD 규칙이 마스크를 **끄지 않는다**
  * (판정 불가를 "작다" 로 오해하면 마스크가 조용히 사라진다).
  */
-function projectedDiskRadiusPx(scene: Scene, mesh: Mesh): number {
+export function projectedDiskRadiusPx(scene: Scene, mesh: Mesh): number {
   const camera = scene.activeCamera;
   if (!camera) return Number.POSITIVE_INFINITY;
   const engine = scene.getEngine();
@@ -759,9 +780,9 @@ function projectedDiskRadiusPx(scene: Scene, mesh: Mesh): number {
   );
   const transform = scene.getTransformMatrix();
   const center = mesh.getAbsolutePosition();
-  const radiusWorld = mesh.getBoundingInfo().boundingSphere.radiusWorld / BOUNDING_SPHERE_TO_RADIUS;
+  const visualRadius = resolveMeshVisualRadius(mesh);
   camera.getDirectionToRef(CAMERA_LOCAL_RIGHT, tmpEdgeWorld);
-  tmpEdgeWorld.scaleInPlace(radiusWorld);
+  tmpEdgeWorld.scaleInPlace(visualRadius);
   tmpEdgeWorld.addInPlace(center);
   Vector3.ProjectToRef(center, IDENTITY_MATRIX, transform, tmpGlobalViewport, tmpProjectedCenter);
   Vector3.ProjectToRef(
