@@ -744,8 +744,10 @@ const IDENTITY_MATRIX = Matrix.Identity();
  * ⚠️ **world 반경 산출은 #1157 에서 교체됐다 — 이력을 남긴다.** 초판은 투영 방식과 함께 `#783` 의
  * `boundingSphere.radiusWorld / √3` 도 베끼고 *"같은 보정 상수"* 라고 적었는데, **그 등가는
  * `#783`·`#1119` 가 전 쿼리 site 에 `rotate=off` 를 강제한다는 전제 위에서만 성립한다.** Babylon 의
- * `radiusWorld` 는 world matrix 로 변환한 bounding box 기준이라 **자전 위상의 함수**이고, 런타임에는
- * 그 전제가 없다 — 그것이 이 결함의 출발점이다.
+ * `radiusWorld` 는 **`max|TransformNormal((1,1,1), world)| × localRadius`** 이므로 (`@babylonjs/core`
+ * `boundingSphere.js:75-76`) **자전 위상의 함수**이고, 런타임에는 그 전제가 없다 — 그것이 이 결함의
+ * 출발점이다. ⚠️ 이 기전을 「world AABB 기준」으로 적는 것은 부정확하다 (리뷰 권고 1) —
+ * 자매 가드 `browser-verify-756-surface.mjs:207-208` 이 이미 정확한 문구를 갖고 있다.
  *
  * 결함 실측 (#1157 Phase 0 — **수정 전** 트리, 로컬 SWIFTSHADER 1280×720, `?focus=earth`,
  * 카메라 고정 `radius = 329`, 자전 ON, `jumpToJulianDate` 로 1.0 day 를 16 스텝 순회한 **1 run**):
@@ -760,7 +762,8 @@ const IDENTITY_MATRIX = Matrix.Identity();
  *
  * ⚠️ **부수 결과: 마스크가 켜지는 거리 경계가 이동한다.** 종전에는 부풀려진 값이 `16` 과 비교됐으므로
  * 마스크가 켜지는 **참** 반경 하한이 `16 / ratio` 였다. `ratio` 는 구조적으로 `[1, √3]` 이고
- * (world AABB 가 최대로 부풀어도 그 이상 갈 수 없다) 자전 위상의 함수라, 하한이 `9.24 px` 까지
+ * (`|TransformNormal((1,1,1), world)|` 의 최대 성분이 `√3` 을 넘을 수 없다) 자전 위상의 함수라,
+ * 하한이 `9.24 px` 까지
  * 내려갈 수 있었다. 이후에는 참 반경 `16 px` 이 하한이며 위상과 무관하다. 임계
  * `SURFACE_MASK_MIN_DISK_PX` 자체는 무변경이고 (#1157 계약 명시 비목표), ADR §A4.3 결정 4 의
  * over-resolution 논거가 애초에 **참 disk 반경 R** 기준이라 (`R = 16 px` → 정합 폭 ≈ 100) 이
@@ -768,6 +771,9 @@ const IDENTITY_MATRIX = Matrix.Identity();
  *
  * 카메라 부재 (NullEngine 단위 테스트 등) 면 `Infinity` — LOD 규칙이 마스크를 **끄지 않는다**
  * (판정 불가를 "작다" 로 오해하면 마스크가 조용히 사라진다).
+ *
+ * `export` 는 **단위 테스트 노출용**이다 (`procedural-planet-mask-lod.test.ts`). 패키지 public API 는
+ * 불변이다 — `scene/index.ts` 가 이 심볼을 재export 하지 않는다 (리뷰 권고 4).
  */
 export function projectedDiskRadiusPx(scene: Scene, mesh: Mesh): number {
   const camera = scene.activeCamera;
