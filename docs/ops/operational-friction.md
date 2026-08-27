@@ -650,14 +650,20 @@ pnpm --filter web typecheck                                                    #
 `tsconfig.build.tsbuildinfo` 를 `tsc` 가 보고 up-to-date 로 판정하기 때문이다.
 
 ```bash
-# 실측 — dist 만 지우면 tsc 가 exit 0 을 내고 아무것도 emit 하지 않는다
-rm -rf packages/shared/dist
-pnpm --filter @astro-simulator/shared build   # exit 0 인데 dist 미생성 ⚠️
+# ✅ 권장 — clean 이 dist 와 tsconfig.build.tsbuildinfo 를 함께 지운다 (#1166 이후)
+pnpm --filter @astro-simulator/shared clean
+pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.js 11개 / .d.ts 11개)
 
-# 완전 초기화 = .tsbuildinfo 까지 지운다
-rm -rf packages/shared/dist packages/shared/tsconfig.build.tsbuildinfo
-pnpm --filter @astro-simulator/shared build   # exit 0 / dist 재생성 (.d.ts 11개)
+# ⚠️ 손으로 dist 만 지우면 함정은 그대로다 — 단 #1166 이후로는 조용하지 않다
+rm -rf packages/shared/dist
+pnpm --filter @astro-simulator/shared build   # exit 1 + [verify:emit] 메시지
+                                              # (#1166 이전에는 exit 0 + 빈 dist 였다)
 ```
+
+⚠️ **#1166 이전 판이 여기 적어 두었던 처방 `rm -rf packages/<pkg>/dist packages/<pkg>/tsconfig.build.tsbuildinfo`
+는 회수한다.** `clean` 이 그 일을 하므로 경로를 손으로 적을 이유가 없고, **경로를 손으로 적는 것이
+[#1166](https://github.com/coseo12/astro-simulator/issues/1166) 결함의 원천**이었다 — 그 결함도
+`clean` 스크립트에 `.tsbuildinfo` 라는 실재하지 않는 경로가 하드코딩돼 있던 것이다.
 
 - **본 건은 정확성 결손이 아니라 개발자 경험 마찰이다 — 단 예외가 하나 있다.** `setup-and-build` 가
   도는 `pnpm build` 안의 `next build` 가 TypeScript 검사를 수행하고 (`apps/web/next.config.*` 에

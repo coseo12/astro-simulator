@@ -7,6 +7,35 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **[#1166] `packages/{core,shared}` 의 `clean` 이 실재하지 않는 tsbuildinfo 경로를 지우고 있었다 — `clean && build` 가 exit `0` 인 채 빈 `dist` 를 남기던 결함 (MINOR)** ([#1166](https://github.com/coseo12/astro-simulator/issues/1166)) — `clean` 이 `rm -rf dist .tsbuildinfo` 인데 두 패키지의 `tsconfig.build.json` 은 `composite: true`(`:10`)라 TypeScript 가 빌드 정보를 **`.tsbuildinfo` 가 아니라 `tsconfig.build.tsbuildinfo`** 에 쓴다. `clean` 은 **존재하지 않는 경로**를 지웠고, 살아남은 빌드 정보를 본 `tsc` 는 up-to-date 로 판정해 아무것도 emit 하지 않았다. **`dist` 는 방금 지워졌는데 exit `0`** 이다.
+
+  **실피해가 이미 관측됐다** — PR [#1165](https://github.com/coseo12/astro-simulator/pull/1165)([#1157](https://github.com/coseo12/astro-simulator/issues/1157)) 정식 qa 가 세션 중 dev 서버 `500` 을 직접 밟았다. `deferred:no-incident` 대상이 아니다. **위험한 갈래는 서버를 재기동하지 않는 쪽**이다 — 재기동하면 `500` 으로 즉시 드러나지만, 하지 않으면 stale 코드를 계속 서빙하면서 **하필 stale 을 치료하려고 밟은 절차 때문에 더 안심하게 된다**. CLAUDE.md §빌드 성공 ≠ 동작하는 앱 의 변형 [`monorepo-dist-stale`](docs/lessons/monorepo-dist-stale.md)(volt #70)인데, 그 문서의 "3 신호" 중 1번(dev 재시작 여부)이 이 갈래에서는 **무력하다** — 재시작을 했어도 재빌드가 없었기 때문이다.
+
+  **양방향 대조 실측** (로컬 `develop@4aa84f6` 기반 브랜치, TypeScript `6.0.3`, pnpm `10.32.1`). 결함판은 `git stash` 로 되돌린 **같은 트리**에서, `core` 는 `packages/shared/dist` 를 정상(`11`)으로 유지한 **격리 조건**에서 잰다 — 초기 측정에서 `shared/dist` 가 빈 상태가 `core` 의 증분 상태를 교란해 `dist js = 9`(`TS2307` exit `2`)라는 잡음값이 나왔고, 그 교란을 제거한 값이 아래다.
+
+  | 워크스페이스      | 판          | `clean` exit | clean 후 tsbuildinfo | `build` exit | `dist/**/*.js` |
+  | ----------------- | ----------- | :----------: | :------------------: | :----------: | :------------: |
+  | `packages/core`   | 결함(stash) |     `0`      |    **`1`건 잔존**    |     `0`      |    **`0`**     |
+  | `packages/core`   | 수정        |     `0`      |      **`0`건**       |     `0`      |    **`59`**    |
+  | `packages/shared` | 결함(stash) |     `0`      |    **`1`건 잔존**    |     `0`      |    **`0`**     |
+  | `packages/shared` | 수정        |     `0`      |      **`0`건**       |     `0`      |    **`11`**    |
+
+  즉 **수정판이 통과한다는 사실만으로는 아무것도 증명되지 않으며**, 같은 절차가 결함판에서 여전히 `0` 을 낸다는 쪽이 판별력의 근거다. 전수 왕복도 확인했다 — `pnpm -r clean` → `pnpm build` 가 4 워크스페이스 전부에서 exit `0`, `core 59` / `shared 11` / `physics-wasm pkg`·`pkg-bundler` / `.next` 재생성.
+
+  **⚠️ 관측 가능한 행동 변화 3건.**
+
+  1. **`pnpm -r clean` 이 `apps/web` 에 도달한다.** 종전에는 `apps/web` 에 `clean` 스크립트가 **아예 없어** pnpm 이 조용히 스킵했고(`Scope: 3`), 루트 `clean` 을 돌린 사람은 전부 지워졌다고 믿었지만 `.next` 와 `apps/web/tsconfig.tsbuildinfo` 는 **남아 있었다** — 같은 「믿음과 실제의 어긋남」 클래스다. 이제 `Scope: 4 of 5` 이며 `.next` 가 실제로 삭제된다. **루트 `clean` 후 첫 `next dev` 기동이 느려지는 것은 이 변화의 정상 결과다.** `next-env.d.ts` 는 무접촉(실측 보존 확인) — ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md) §B-1 이 그 파일의 수기 취급을 기각했다.
+  2. **`pnpm build` 가 실패할 수 있는 지점이 하나 늘었다.** `packages/{core,shared}` 의 `build` 가 `tsc … && pnpm run verify:emit` 이 되어, 선언된 진입점(`main`·`module`·`exports["."].import` 가 전부 가리키는 `dist/index.js`)이 emit 되지 않았으면 exit `1` + 메시지를 낸다. **이 가드는 본 사이클에서 실제로 발화했다** — 결함판이 남긴 stale tsbuildinfo 상태에서 `pnpm --filter shared build` 가 exit `1` 과 `[verify:emit] … tsc 가 exit 0 인 채 아무것도 emit 하지 않았다 (stale tsbuildinfo 의심)` 를 냈다. 즉 「가드가 있다 ≠ 그 가드가 작동한다」를 **의도한 시나리오에서의 실발화**로 닫았다.
+  3. **`clean` 이 글로브를 쓴다** — `rm -rf dist *.tsbuildinfo`. 매칭이 없을 때 `/bin/sh` 가 글로브를 리터럴로 넘겨 `rm -rf` 가 no-op exit `0` 이 되는 것을 실측 확인했다(pnpm `shell-emulator` 는 미설정 = 시스템 `sh`).
+
+  **`tsc --build --clean` 을 쓰지 않은 근거 (실측).** 이 명령이 `tsconfig.build.tsbuildinfo` 를 삭제 대상에 포함하는 것은 사실이나(`--clean --dry` 의 삭제 대상 `237`건 중 `1`건이 그것), 그것은 **tsc 가 아는 emit 산출물 목록**을 지우는 것이지 `dist` 를 통째로 지우는 게 아니다. `packages/core/dist` 에 비-emit 파일(`__stray-1166.js`, `__stray-dir/orphan.js`)을 심고 `--clean --dry` 를 돌리면 그 둘은 삭제 대상 목록에 **`0`건** 잡힌다 — 즉 남는다. 즉 src 에서 삭제된 파일의 산출물이 `dist` 에 영구 잔존해 **본 이슈와 같은 stale 클래스를 재생산**한다. 속도는 결정 요인이 아니었다(TS 6 네이티브 포트라 `--clean --dry` `0.29s` vs `rm -rf` `0.02s`). 경로 하드코딩의 drift 위험은 글로브가 흡수한다 — 재발하려면 `tsBuildInfoFile` 이 패키지 루트 **밖**을 가리켜야 한다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** 앱 런타임 소스는 무접촉이라 [#1163](https://github.com/coseo12/astro-simulator/issues/1163) 등의 PATCH 근거(_"변경 파일이 앱 런타임 표면 `0`"_)를 원용할 여지가 있으나, 본 건은 **신규 스크립트 `2`종**(`verify:emit` ×2, `apps/web clean`)이 추가돼 `pnpm -r clean` 과 `pnpm build` 가 **동일 입력에서 종전과 다른 결과**를 낸다. _"판정 애매 시 낮은 쪽"_ 은 애매할 때의 규칙인데 이 건은 애매하지 않다 — 위 3건이 관측 가능하다. 하위 호환 파괴는 없다(제거·리네임된 스크립트 `0`).
+
+  **범위 밖 (기록만 — §검증 강도 게이트).** ① `tsc -p` → `tsc --build` 로 바꾸면 `tsc -b` 의 up-to-date 검사가 **산출물 부재를 스스로 감지**해 이 결함이 구조적으로 소멸하나, 계약 명시 비목표(빌드 파이프라인 구조 변경)라 무접촉이다. ② `verify:emit` 은 **전량 emit 실패**를 잡고 부분 emit 결손은 잡지 않는다(진입점 `1`개만 단언). ③ `packages/physics-wasm` 의 `clean` 은 composite TS 프로젝트가 아니라 무관(계약 명시 비목표). ④ `apps/web` 에는 `verify:emit` 을 두지 않았다 — `next build` 는 실패 시 nonzero 를 내고, `.next` 를 워크스페이스 의존으로 import 하는 소비자가 없다.
+
+  **처방 수명 관리** ([#999](https://github.com/coseo12/astro-simulator/issues/999) 클래스) — [`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) §8 이 이 함정의 **수동 우회 레시피**(`rm -rf packages/<pkg>/dist packages/<pkg>/tsconfig.build.tsbuildinfo`)를 처방하고 있었다. `clean` 이 그 일을 하게 됐으므로 회수하고, 문서가 기재하던 실측값(`exit 0 인데 dist 미생성`)도 갱신했다 — 손으로 `dist` 만 지우는 경로는 이제 **exit `1` + `[verify:emit]`** 이다. **자동화를 도입하면서 그것이 대체한 수동 규약을 남겨 두면 후속 세션이 낡은 처방을 실행한다.**
+
 - **[#1157] 마스크 LOD 판정 반경을 회전 불변 산식으로 교체 — 카메라가 고정인데 자전만으로 `uMaskEnabled` 가 토글하던 결함 (MINOR)** ([#1157](https://github.com/coseo12/astro-simulator/issues/1157)) — Amendment 4 ([#1119](https://github.com/coseo12/astro-simulator/issues/1119)) 의 원거리 LOD 가 `boundingSphere.radiusWorld / √3` 로 disk 반경을 잡았는데 **그 값이 자전 위상의 함수**라, 참 반경이 임계(`SURFACE_MASK_MIN_DISK_PX = 16`) 근방일 때 카메라를 고정해도 마스크 경로와 절차 경로 사이를 오갔다. **Amendment 4 가 없애려던 shimmer 를 그 판정 입력이 스스로 만들고 있었다.**
 
   **기전은 주석이 이미 알고 있었다.** `camera-controller.ts:87-88` 의 `resolveMeshVisualRadius`([#790](https://github.com/coseo12/astro-simulator/issues/790)) 가 _"√3 과대 + #782 자전 위상 진동"_ 을 경고하고 있었고, [#1146](https://github.com/coseo12/astro-simulator/issues/1146) 이 가드 쪽에서 같은 판단으로 그 함수를 채택한 선례도 있다. 런타임만 그 앎의 바깥에 있었다. 초판이 `#783` 의 식을 베끼며 _"같은 보정 상수"_ 라 적은 것은 **틀린 인용이 아니라 전제가 빠진 인용**이다 — `#783`·`#1119` 는 navigation 쿼리 리터럴 전수(`783` 2건 `:343`·`:360` / `1119` 2건 `FOCUS_QUERY :525`·`:719`)에 `rotate=off` 를 강제하므로 그쪽에서는 두 산식이 항등이고, **런타임에는 그 전제가 없다**.
