@@ -19,6 +19,10 @@ Semantic Versioning을 따른다.
 
   **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** 종전에 초록이던 입력 (테스트 파일 타입 오류 / typecheck 배선 없는 신규 워크스페이스) 에서 CI 가 FAIL 한다. 앱 런타임 소스 접촉은 `binding.test.ts` 주석 `1`행 삭제뿐이며 런타임 동작 무변경 — 행동 변화는 전부 CI·가드 축이다.
 
+### Changed
+
+- **[#1082 후속] ADR `20260816-1082` Amendment 1 — 결정 5 의 typescript 판본 하락 예측 반증 박제 (PATCH)** — 구현 PR [#1171](https://github.com/coseo12/astro-simulator/pull/1171) reviewer 가 지목한 서술 drift 의 후속. ADR 은 physics-wasm 에 `^6.0.0` 을 선언하면 `tsc` 가 `6.0.3` → `6.0.2` 로 내려간다고 예측했으나, 머지 실물 lockfile 은 **`6.0.3` 유지**다 (shared·core 는 `6.0.2` 그대로, 판본 공존 2개 유지 — specifier→해상도 함수성의 암묵 가정이 반증됨, 기전은 [가정] 라벨). §실측 C-2 교차 판본 실행이 양방향 진단 집합 불변을 이미 덮으므로 **결정·구현 불변, 서술만 정정** — 원문은 보존하고 인라인 포인터 2곳 + §Amendment 1 로 박제. **Behavior Changes: None — 문서만** (ADR·CHANGELOG 전용, 에이전트가 같은 입력에 다르게 동작하지 않는다).
+
 ## [0.80.0] - 2026-08-27
 
 ### Behavior Changes
