@@ -204,7 +204,7 @@ node -p "JSON.stringify(require('./packages/physics-wasm/package.json').devDepen
 
 `shared` · `core` 는 `typescript` 를 **선언**하고 자기 `node_modules/.bin` 에서 해석한다. `physics-wasm` 은 선언이 없어 루트 hoist 로 우연히 동작한다. 지금 동작한다는 사실이 _"선언하지 않아도 된다"_ 의 근거는 아니다 — 이 저장소가 반복 청산해 온 **암묵 의존** 클래스다.
 
-⚠️ **선언은 `tsc` 판본을 바꾼다** (PR [#1093](https://github.com/coseo12/astro-simulator/pull/1093) reviewer 🟡-1 반영). lockfile 에 `typescript` 가 **2 판본 공존**한다 (술어: `grep -n '^  typescript@' pnpm-lock.yaml` → `2941` `typescript@6.0.2` · `2946` `typescript@6.0.3`). 루트가 `^6.0.3` → `6.0.3`, `shared`·`core` 가 `^6.0.0` → `6.0.2` 이므로, 결정 5 대로 `^6.0.0` 을 선언하면 physics-wasm 은 **`6.0.3` → `6.0.2`** 로 내려간다 — §실측 C 가 돌던 판본과 달라진다.
+⚠️ **선언은 `tsc` 판본을 바꾼다** (PR [#1093](https://github.com/coseo12/astro-simulator/pull/1093) reviewer 🟡-1 반영). lockfile 에 `typescript` 가 **2 판본 공존**한다 (술어: `grep -n '^  typescript@' pnpm-lock.yaml` → `2941` `typescript@6.0.2` · `2946` `typescript@6.0.3`). 루트가 `^6.0.3` → `6.0.3`, `shared`·`core` 가 `^6.0.0` → `6.0.2` 이므로, 결정 5 대로 `^6.0.0` 을 선언하면 physics-wasm 은 **`6.0.3` → `6.0.2`** 로 내려간다 — §실측 C 가 돌던 판본과 달라진다. ⚠️ **이 하락 예측은 구현 머지 후 반증됐다 — §Amendment 1** (실물 해상도는 `6.0.3` 유지).
 
 **두 판본을 교차 실행해 확인한 뒤 `^6.0.0` 을 택했다** (동형성 우선). 같은 프로브·같은 트리에서 두 바이너리를 직접 호출했다.
 
@@ -343,7 +343,7 @@ step 분해 (run `31929876027`, `detect-and-test`): composite `69s` / 그 뒤 �
 5. **`packages/physics-wasm` 은 검사 대상에 편입한다** (§후보 비교 2 (A)). 손으로 하는 변경은 **`4` 건** (파일 `3` 개) 이며, 여기에 파생 산출물 `pnpm-lock.yaml` 이 따라붙어 **커밋 파일은 `4` 개**가 된다.
    - `packages/physics-wasm/tsconfig.json` **신설** — `packages/core/tsconfig.json` 의 `compilerOptions` 에서 **`"types": ["node"]` 를 제거한** 사본 `+` `include: ["tests/**/*.ts", "vitest.config.ts"]` `+` `exclude: ["node_modules", "pkg", "pkg-bundler", "target"]`. ⚠️ **`types` 를 남기면 `error TS2688` 로 죽고 `TS2578`·`TS2307` 이 한 줄도 보고되지 않는다** (§실측 C-0). `@types/node` 는 `core` 만 선언하고 physics-wasm·루트 어디에도 없다. 전문은 §dev 인계용 원문
    - `packages/physics-wasm/package.json` — `"typecheck": "tsc --noEmit"` (기존 `echo` no-op 교체. 그 문장은 사실이 아니었다)
-   - `packages/physics-wasm/package.json` — `devDependencies` 에 `"typescript": "^6.0.0"` 선언 (`shared`·`core` 와 **동형**. 루트 hoist 암묵 의존 제거 — §실측 C-2). ⚠️ 이 선언은 physics-wasm 의 `tsc` 를 `6.0.3` → **`6.0.2`** 로 내리며, **두 판본 교차 실행으로 진단 집합 불변을 확인했다** (§C-2 표 — P1 출력 `diff` `0` / P3 양쪽 exit `0`). **`pnpm-lock.yaml` 갱신 동반**
+   - `packages/physics-wasm/package.json` — `devDependencies` 에 `"typescript": "^6.0.0"` 선언 (`shared`·`core` 와 **동형**. 루트 hoist 암묵 의존 제거 — §실측 C-2). ⚠️ 이 선언은 physics-wasm 의 `tsc` 를 `6.0.3` → **`6.0.2`** 로 내리며, **두 판본 교차 실행으로 진단 집합 불변을 확인했다** (§C-2 표 — P1 출력 `diff` `0` / P3 양쪽 exit `0`). **`pnpm-lock.yaml` 갱신 동반**. ⚠️ 하락 서술은 머지 실물로 반증 — **§Amendment 1** (해상도 `6.0.3` 유지. §C-2 실측이 양방향을 덮으므로 결정 불변)
    - `packages/physics-wasm/tests/binding.test.ts` — **`12` 행 `@ts-expect-error` 삭제** (이동 아님 — §후보 비교 2 (D)). 그 지시자는 `251d480` (#875) 이후로 억제에 실패한다 (§실측 C-1)
    - ⚠️ **구현 PR 은 qa 게이트 «예외 불가» 구간이다.** 위 세 번째 항목이 `pnpm-lock.yaml` 을 갱신하므로, CLAUDE.md §qa 게이트 예외 규약이 _"runtime 의존성·lockfile 갱신"_ 을 예외 불가로 못박은 조항에 **lockfile 축만으로 확정 해당**한다. (a) 앱 runtime 표면 `0` 조건을 따질 필요 없이 **정식 qa 디스패치**다 — dev 가 _"문서·CI 설정이니 qa 예외"_ 로 판단할 여지를 여기서 닫는다
 6. **저장소 설정은 변경하지 않는다.** required status check 목록 · branch protection 무접촉 — ADR [`20260807-971`](20260807-971-required-status-checks.md) 결정 1 관할. 본 가드의 강제력 등급은 **체크런 붉은 X + 메인의 CI 확인**이며 이 저장소 CI 가드 대부분과 같은 등급이다.
@@ -527,3 +527,41 @@ reviewer 가 격리 worktree 에서 §실측 A·B·C 를 **전건 독립 재실�
 **정정이 새 drift 를 만들지 않았는지 자기 점검** — 초판이 `tsconfig` 전문을 **손으로 옮겨 적어** 측정본(`lib: ["ES2022","DOM","DOM.Iterable"]`)과 어긋나 있었다. 본 라운드에서 발견해 **생성 술어를 박제하고 그 술어가 만든 파일로 P1~P5 를 전건 재측정**했다 (§dev 인계용 원문). 또한 reviewer 서술의 _"`9` 개월간 미감지"_ 는 `git log` 날짜 차로 재현되지 않아 **채택하지 않고 `25` 일로 기계 산출**했다 (§C-1).
 
 **셀프 체크에 대한 함의** — 위 `2` 건의 차단은 **결합 간과 축이 통과 판정을 받은 뒤에 나왔다.** 프로브를 실행한 것만으로 _"교정 후 통과"_ 라고 적은 것이 이르렀다. cross-validate 호출 시 **세 번째 명시 질문**을 추가한다: _"본 ADR 이 실측으로 뒷받침한다고 주장하는 문장 중, 그 실측이 실제로는 덮지 못하는 범위까지 일반화한 것이 있는가?"_
+
+## Amendment 1 — 결정 5 의 판본 하락 예측 반증 (2026-08-29, 구현 머지 후 실측)
+
+- **출처**: 구현 PR [#1171](https://github.com/coseo12/astro-simulator/pull/1171) reviewer 비차단 발견 2 (코멘트 [5460877800](https://github.com/coseo12/astro-simulator/pull/1171#issuecomment-5460877800)) → 메인 오케스트레이터 직접 재실측. 측정 rev: `471f1f7` (`origin/develop` tip = #1171 squash 머지 커밋), pnpm `10.32.1`.
+- **반증된 서술**: §실측 C-2 경고 블록과 결정 5 세 번째 항목의 _"이 선언은 physics-wasm 의 `tsc` 를 `6.0.3` → `6.0.2` 로 내리며"_. 원 추론은 _"`shared`·`core` 와 같은 specifier(`^6.0.0`) 이므로 같은 판본(`6.0.2`)으로 해상된다"_ 로, **specifier → 해상도의 함수성을 암묵 가정**했다.
+
+### 실측
+
+```bash
+# [실측] importer 별 해상도 (rev 471f1f7)
+awk '/^  packages\/physics-wasm:/,/^  packages\/shared:/' pnpm-lock.yaml | grep -A2 'typescript:'
+#       specifier: ^6.0.0
+#       version: 6.0.3        ← 예측(6.0.2)과 다르다. 하락은 일어나지 않았다
+awk '/^  packages\/shared:/,0' pnpm-lock.yaml | grep -m1 -A2 'typescript:'
+#       specifier: ^6.0.0
+#       version: 6.0.2        ← shared·core 는 기존 해상도 유지
+
+# [실측] 판본 공존은 여전히 2개 — "세 번째 버전 출처" 우려 미실현
+grep -n '^  typescript@' pnpm-lock.yaml
+# 2944:  typescript@6.0.2:    (행 번호는 #1171 머지로 원 술어의 2941/2946 에서 이동)
+# 2949:  typescript@6.0.3:
+```
+
+PR #1171 의 lockfile diff 는 **3행 추가뿐** (physics-wasm importer 블록 신설, 타 패키지 해상도 무변경 — qa 코멘트 [5461548406](https://github.com/coseo12/astro-simulator/pull/1171#issuecomment-5461548406) 독립 확인 동일).
+
+### 기전 — [가정] 라벨
+
+같은 specifier `^6.0.0` 이 importer 별로 다르게 해상됐다는 것까지가 [실측] 이고, _"pnpm 은 신규 importer 에 lockfile 기존 해상도 중 specifier 를 만족하는 최고 판본을 재사용한다"_ 는 **[가정]** 이다 (pnpm `10.32.1` 관측 계약 — §측정 rev 의 Next 버전 의존 가정과 같은 지위). 기전 소스 추적은 하지 않았다.
+
+### 영향 — 결정 불변
+
+- **결정 5 는 그대로 유효하다.** §실측 C-2 의 교차 판본 실행 (P1 출력 `diff` `0` / P3 양쪽 exit `0`) 은 `6.0.2` 와 `6.0.3` **양쪽에서** 진단 집합 불변을 이미 실측했으므로, 하락 여부와 무관하게 본 ADR 의 결론을 덮는다 — 예측이 틀렸는데도 결정이 무사한 것은 우연이 아니라 §C-2 를 요구한 리뷰 라운드 1 🟡-1 덕이다.
+- **기각 논거도 유지된다.** `^6.0.3` 고정 대안을 기각한 근거(세 번째 버전 출처 생성)는, 실물이 기존 `6.0.3` 을 재사용해 출처 수가 2 로 유지됐으므로 오히려 실측으로 보강됐다.
+- 본문 두 곳에는 본 절 포인터를 인라인 박제했다. 원문은 리뷰 라운드 1 정정 이력과 같은 방식으로 보존한다 (정정이 새 drift 를 만들지 않도록 — 원 서술 삭제 금지).
+
+### 재검토 조건 영향
+
+기존 §재검토 조건 무변경. 추가 1건 — `shared`·`core` 의 typescript 해상도가 `6.0.3` 으로 수렴(lockfile 재생성 등)하면 본 Amendment 의 "2 판본 공존" 서술은 시점 기록으로 강등된다 (결정 영향 없음).
