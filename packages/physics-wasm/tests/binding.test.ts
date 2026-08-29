@@ -9,7 +9,6 @@
  * 결정성: 초기 조건은 전부 고정 상수 (Math.random 금지) — 실패 시 항상 재현 가능.
  */
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — pkg/는 빌드 산출물(gitignored). test 스크립트가 선빌드한다.
 import {
   BarnesHutEngine,
   NBodyEngine,

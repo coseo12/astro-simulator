@@ -5,7 +5,19 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-## [0.80.0] - 2026-08-27
+### Behavior Changes
+
+- **[#1082] `apps/web` `45` + `packages/physics-wasm` `1` 테스트 파일을 CI 타입 검사에 배선 — `next build` 는 `*.test.*` 를 검사하지 않는다 (MINOR)** ([#1082](https://github.com/coseo12/astro-simulator/issues/1082)) — [#1060](https://github.com/coseo12/astro-simulator/issues/1060) 이 `packages/{shared,core}` `58` 파일을 닫은 것과 같은 클래스의 잔여분. `next build` 는 타입 검사를 하지만 `*.test.*` 파일은 **파일명 축**으로 제외하므로 (ADR [`20260814-1060`](docs/decisions/20260814-1060-packages-test-typecheck.md) §실측 B — 도달성 축 아님), composite 의 `pnpm build` 가 초록이어도 테스트 파일의 타입 오류는 통과했다. `packages/physics-wasm` 은 `tsconfig.json` 부재 + `typecheck` 가 `echo` no-op 인 **세 번째 종류의 결손**이었다.
+
+  **배선** — `ci.yml` `detect-and-test` 의 `setup-and-build` composite **직후** 스텝 `1` 개 (ADR [`20260816-1082`](docs/decisions/20260816-1082-web-test-typecheck.md) §후보 비교 1). `apps/web` typecheck 의 선행 조건 2축 (`next-env.d.ts` + `packages/{shared,core}/dist` — ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md)) 을 한 번에 만드는 루트 `pnpm build` 가 도는 CI job 이 저장소에서 여기 하나이기 때문이다. 명령 형태는 규약 (ADR `20260814-1060` 결정 3) — **패키지별 분리 호출 + `--fail-if-no-match`**. `if:` 는 composite 과 동일 (docs-only PR 오탐 FAIL 방지).
+
+  **관측 가능한 행동 변화 3건.**
+
+  1. **코드 변경 PR 의 CI 가 `apps/web`·`packages/physics-wasm` 테스트 파일 타입 오류에서 FAIL 한다** (종전 전 경로 초록). positive PASS 는 작동 증거가 아니므로 일회용 negative PR 로 FAIL 을 실증했다 (증거는 PR 본문·코멘트).
+  2. **`pnpm --filter @astro-simulator/physics-wasm typecheck` 가 실제 검사를 한다** — 종전 `echo` no-op 이 `tsc --noEmit` (신규 `tsconfig.json` + `devDependencies.typescript`) 이 됐다. 동반: `tests/binding.test.ts` `12`행의 사문 `@ts-expect-error` 삭제 — `251d480`([#875](https://github.com/coseo12/astro-simulator/issues/875)) 의 import 다행화 리팩터 이후 아무 오류도 억제하지 않으면서 `TS2578` 만 내던 지시자다 (검사 지점 부재로 `25`일간 미감지 — 주석 계약 ↔ 구현 drift 클래스).
+  3. **`scripts/verify-test-coverage.mjs` 가 typecheck 배선 존재까지 강제한다** (PR #1090 reviewer 실측 축 판정 — [#1082 코멘트](https://github.com/coseo12/astro-simulator/issues/1082#issuecomment-5306272590) 후속 재게시분). typecheck 열거가 `ci.yml` (web·physics-wasm) 과 `ci-physics-wasm.yml` (shared·core) **두 파일에 흩어지므로**, 신규 워크스페이스 추가 시 (1) `scripts.typecheck` 가 실제 `tsc` 호출일 것 (2) 워크플로 어딘가에 규약 형태 배선이 존재할 것 — 2축을 기계 검사한다. 열거 갱신을 사람 눈에 맡기면 미커버 워크스페이스가 조용히 사각이 되고 가드는 초록이기 때문이다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** 종전에 초록이던 입력 (테스트 파일 타입 오류 / typecheck 배선 없는 신규 워크스페이스) 에서 CI 가 FAIL 한다. 앱 런타임 소스 접촉은 `binding.test.ts` 주석 `1`행 삭제뿐이며 런타임 동작 무변경 — 행동 변화는 전부 CI·가드 축이다.
 
 ### Behavior Changes
 
