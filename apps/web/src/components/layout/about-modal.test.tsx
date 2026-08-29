@@ -56,5 +56,3 @@ describe('AboutModal (P10-C-3 #278 / P12-C #298 — 단일 모드)', () => {
     expect(screen.getByTestId('about-modal')).toHaveTextContent('±0.01%');
   });
 });
-
-const __probe1082Web: number = 'not-a-number';
