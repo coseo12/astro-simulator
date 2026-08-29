@@ -19,6 +19,8 @@ Semantic Versioning을 따른다.
 
   **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** 종전에 초록이던 입력 (테스트 파일 타입 오류 / typecheck 배선 없는 신규 워크스페이스) 에서 CI 가 FAIL 한다. 앱 런타임 소스 접촉은 `binding.test.ts` 주석 `1`행 삭제뿐이며 런타임 동작 무변경 — 행동 변화는 전부 CI·가드 축이다.
 
+## [0.80.0] - 2026-08-27
+
 ### Behavior Changes
 
 - **[#1166] `packages/{core,shared}` 의 `clean` 이 실재하지 않는 tsbuildinfo 경로를 지우고 있었다 — `clean && build` 가 exit `0` 인 채 빈 `dist` 를 남기던 결함 (MINOR)** ([#1166](https://github.com/coseo12/astro-simulator/issues/1166)) — `clean` 이 `rm -rf dist .tsbuildinfo` 인데 두 패키지의 `tsconfig.build.json` 은 `composite: true`(`:10`)라 TypeScript 가 빌드 정보를 **`.tsbuildinfo` 가 아니라 `tsconfig.build.tsbuildinfo`** 에 쓴다. `clean` 은 **존재하지 않는 경로**를 지웠고, 살아남은 빌드 정보를 본 `tsc` 는 up-to-date 로 판정해 아무것도 emit 하지 않았다. **`dist` 는 방금 지워졌는데 exit `0`** 이다.
