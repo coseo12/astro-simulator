@@ -25,9 +25,10 @@
     "test": "pnpm prebuild-test && vitest run",
     "test:watch": "vitest",
     "lint": "cargo clippy --all-targets -- -D warnings",
-    "typecheck": "echo 'typecheck: TS 없음, cargo check 사용'"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "typescript": "^6.0.0",
     "vitest": "^4.1.10"
   }
 }
