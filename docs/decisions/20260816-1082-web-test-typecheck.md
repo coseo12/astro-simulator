@@ -565,3 +565,7 @@ PR #1171 의 lockfile diff 는 **3행 추가뿐** (physics-wasm importer 블록 
 ### 재검토 조건 영향
 
 기존 §재검토 조건 무변경. 추가 1건 — `shared`·`core` 의 typescript 해상도가 `6.0.3` 으로 수렴(lockfile 재생성 등)하면 본 Amendment 의 "2 판본 공존" 서술은 시점 기록으로 강등된다 (결정 영향 없음).
+
+### 교차검증 (agy, 2026-08-29)
+
+박제 직후 1회 루틴 수행 — **Approved**. Amendment 1 자체에 대한 지적 `0`건. 원 ADR·구현 대상 제안 `4`건 (fail-fast 의도 명시 / DOM lib 잔존 / `@types/node` 대비 / 루트 typecheck 정렬) 은 전건 이론 지적·실피해 미관측이라 본 개정 PR 본문에 기록만 한다 (§검증 강도 게이트). 그중 루트 typecheck 정렬은 본 편입으로 `pnpm -r typecheck` 의 삼킴 조건(스크립트 없는 워크스페이스)이 `0` 이 되어 사실상 충족됐다.
