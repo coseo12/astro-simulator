@@ -194,3 +194,5 @@ describe('#849 extract_osculating_elements — 바인딩 스모크', () => {
     expect([...out].every((x) => Number.isFinite(x))).toBe(true); // Ω/ω/M 포함 전 원소 유한
   });
 });
+
+const __probe1082Wasm: number = 'not-a-number';
