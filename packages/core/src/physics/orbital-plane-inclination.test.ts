@@ -19,19 +19,24 @@
  * 카메라)는 평면 **방향**을 바꿀 수 없다.
  *
  * ⚠️ **4번째 사본 탐지 술어** — 본 가드는 위 3개만 안다. 사본이 늘면 자동으로 알지 못한다.
- * 저장소 전체에서 **프로덕션** 사본을 세는 술어 (2026-08-30 실측 `3` hit, 위 3개와 일치):
+ * 저장소에서 **프로덕션** 사본을 세는 술어 (2026-08-30 실측 `3` hit, 위 3개와 일치):
  *
- *   grep -rn "cosI \* y1" --include="*.ts" packages apps \
- *     | grep -v "/dist/" | grep -v node_modules | grep -v "\.test\.ts:"
+ *   git grep -nF "cosI * y1" | grep -v "\.test\.ts:"
  *
- * ⚠️ **마지막 필터(`.test.ts:` 제외)를 빼지 말 것 — 술어가 자기 자신을 센다.** D3 의 로컬
- * M0 복제 2행이 같은 계수를 쓰기 때문이다. 필터를 빼면 히트가 본 파일 쪽으로 늘어나며
- * (초판 시점 실측 `5 = 프로덕션 3 + 본 파일 2`), 그 수는 본 헤더가 패턴을 산문에 다시
- * 적기만 해도 또 바뀐다 — 그래서 **박제하는 baseline 은 필터를 건 `3` 뿐**이다. 파일별
- * 분해가 필요하면 같은 패턴을 `git grep -c -F` 로 세면 된다.
- * 초판 헤더가 필터 없이 `3` 을 박제했다가 PR #1174 reviewer B1 으로 차단됐다 — 가드
- * 자기-매칭 클래스(#995)이자, 측정 무결성을 산출물로 남기는 PR 이 그 자리에 새로운
- * 반증 가능 수치를 넣은 사례다.
+ * 경로를 한정하지 않는다 (reviewer.md §4-2 정합) — 추적 파일 전체가 대상이다.
+ *
+ * ⚠️ **마지막 필터(`.test.ts:` 제외)를 빼지 말 것 — 술어가 자기 자신을 센다.** 본 파일에는
+ * D3 의 로컬 M0 복제 2행에 더해 **바로 위 술어 문장 자신**이 같은 리터럴을 담고 있다
+ * (`-F` 라 이스케이프가 없다). 그래서 **미필터 계수는 박제하지 않는다** — 헤더를 한 줄
+ * 고칠 때마다 바뀌는 수라서, 박제하는 순간 반증 가능한 서술이 된다. **baseline 은 필터를
+ * 건 `3` 하나뿐**이고 그 값만 프로덕션 사본 수를 뜻한다.
+ *   (재발 이력 — 라운드 1: 필터가 없어 박제한 `3` 이 실제와 어긋났다 (PR #1174 B1 차단).
+ *    라운드 2: 필터를 넣어 `3` 을 복원하고 미필터 `5` 를 함께 적었다 — 그 시점엔 맞았다
+ *    (편집 도중 산문에 리터럴을 다시 적어 `6` 이 됐다가 되돌린 일이 있었다).
+ *    라운드 3: W7 로 `-F` 술어를 쓰자 술어 문장 자신이 hit 가 되어 미필터가 다시 어긋났고,
+ *    커밋 전 검산에서 잡아 **미필터 계수 박제를 아예 없앴다**. 같은 자리에서 세 번 재발했다.)
+ * 클래스로는 #995 **가드 자기-매칭**이고, 측정 무결성을 산출물로 남기는 PR 이 반증된
+ * 수치를 청산한 자리에 새 반증 가능 수치를 넣은 사례이기도 하다 (D5 위반).
  *
  * ## 측정 방법 (판정 전제 — 계약의 일부, 임의 교체 금지)
  *
@@ -44,10 +49,16 @@
  *    winding 이 뒤집혀 `180 − i` 를 낸다 — 코드 결함이 아니라 **측정 도구 결함**이다.
  *    실측 (2026-08-30, 술어 명시): deimos (`i = 1.791°`, `T = 1.262895 d`) 를 `positionAt` 으로
  *    `jd = J2000, +Δt, +2Δt` (`Δt = 1 d`) 3점 샘플링하고 같은 연속 외적 합 · 같은 `atan2` tilt 를
- *    쓰면 **`178.209000°`** 가 나온다 (참값 `1.791000°`). 발현 조건은 `(Δt / T) mod 1 ∈ (0.5, 1)`
- *    — 같은 술어로 `Δt = 0.25 / 0.5 / 1.5 / 3 d` 는 `1.791000°` 로 정상이고 `Δt = 1 / 1.25 / 2 / 5 / 7 d`
- *    가 `178.209000°` 다. (초판이 술어 없이 인용한 `176.4°` 는 위 5종 어디서도 재현되지 않아
- *    폐기한다. 기전만 유효 — PR #1174 reviewer W2.)
+ *    쓰면 **`178.209000°`** 가 나온다 (참값 `1.791000°`). 발현 조건은 `f := (Δt / T) mod 1` 이
+ *    **비퇴화**일 때 `f ∈ (0.5, 1)` — 같은 술어로 `Δt = 0.25 / 0.5 / 1.5 / 3 d` 는 `1.791000°` 로
+ *    정상이고 `Δt = 1 / 1.25 / 2 / 5 / 7 d` 가 `178.209000°` 다 (측정한 `Δt` 9종).
+ *    **퇴화 대역은 조건식 밖이다** (reviewer W6): `f = 0` 이면 세 점이 겹쳐 법선이 `|n| = 0` 으로
+ *    붕괴하고 `atan2(0, 0) = 0` 이라 `0.000000°` 가 나온다 (`f = 1e-12` 도 동일). `Δt` 가 `T` 의
+ *    정수배면 부동소수 잔차가 부호를 정해 `1T → 178.209000°` / `2T → 1.791000°` /
+ *    `3T → 178.208999°` 로 갈린다 — 규칙이 아니라 잡음이다. 비퇴화 쪽 경계는 실측에서
+ *    `f = 0.4989 → 1.791000°` / `f = 0.5004 → 178.209000°` 로 `0.5` 를 끼고 반전한다.
+ *    (초판이 술어 없이 인용한 `176.4°` 는 위 스윕 어디서도 재현되지 않아 폐기한다.
+ *    기전만 유효 — PR #1174 reviewer W2.)
  *
  * ## 실측값 (2026-08-30, 본 파일 술어로 측정 — 반증된 「8/8」「소수 3자리」주장 대체)
  *
@@ -70,12 +81,24 @@
  *  - **`Ω` (승교점 황경) 배치** — 두 불변식 모두 무구속. 실측 (2026-08-30): `kepler.ts` 의
  *    `sinO` 부호를 반전 (`Ω → -Ω`) 시켜도 **D1 `0/31` · D2 `0/31`** 로 아무것도 검출되지
  *    않는다 (깨지는 것은 D3 의 M0 복제 바이트 일치 `1` 건뿐 — 불변식이 아니라 결합 장치다).
+ *  - **궤도 크기·형상·렌더 배율** (`a` · `e` · `renderScale`) — 두 불변식 모두 무구속.
+ *    실측 (2026-08-30, 프로덕션 실변이 3종 전부 `195 passed` 미검출): `renderScaleForTier`
+ *    반환값 `× 2` / 로더 `semiMajorAxis` `× 2` / 로더 `eccentricity → 0`. 기전은 축마다 다르다 —
+ *    `renderScale`·`a` 는 D1 이 법선 **방향**만, D2 가 `z / r` 만 보아 두 판정량이 위치 크기에
+ *    불변이기 때문이고, `e` 는 하네스가 같은 요소에서 ν 를 다시 구해 닫힌형이 자기정합을
+ *    유지하기 때문이다.
  *  - **자전축** — #1130 에서 완결.
  *
  * ⚠️ 「본 불변식은 경사만 구속한다」는 **틀린 서술이다** (초판 헤더 · PR #1174 reviewer W1).
  * D1 은 경사만 구속하지만 **D2 는 `ω` 배치까지 구속한다** — 실측: `kepler.ts` 의 `sinW` 부호를
  * 반전 (`ω → -ω`) 시키면 **D2 가 `31/31` 검출**한다 (D1 은 `0/31`). D3 의 M5 (`Rz(ω)`/`Rx(i)`
  * 순서 교환) 가 D1 을 통과하고 D2 에 걸리는 것도 같은 축이다.
+ *
+ * ⚠️ 위 §범위 밖 목록을 **전수로 읽지 말 것.** 세 오일러각 중 두 축 모두 무구속인 것은 `Ω`
+ * 지만, 각도 밖으로 나가면 동경(radial) 축도 무구속이다 (바로 위 항목). 라운드 2 에서
+ * 「두 축 모두 무구속인 것은 `Ω` 뿐」이라 적었다가 `a` · `e` · `renderScale` 실변이 3종으로
+ * 반증됐다 (PR #1174 reviewer B2). 여기 적힌 것은 **실측한 것**이지 무구속 축의 전부가
+ * 아니다 — 새 축을 「무구속이 아니다」로 단정하기 전에 실변이를 한 번 돌려 볼 것.
  *
  * ## 파일 구성 근거
  *
@@ -199,12 +222,22 @@ interface RotationCopy {
   label: string;
   sample: (body: LoadedCelestialBody) => readonly [SampledPoint, SampledPoint, SampledPoint];
   /**
-   * D1 법선. `orbitalStateAt` 만 `h = r × v` 라 3점 샘플이 필요 없으므로 `sample` 을 호출하지
-   * 않는다 — 그래서 `body` 만 받고 각 사본이 필요한 만큼만 스스로 계산한다 (PR #1174
-   * reviewer W4: 종전 시그니처는 D1 이 전 사본에 대해 `sample` 을 강제 호출해 사본 1 에서
-   * `31 × 3` 회의 JD 역산을 전량 폐기했다).
+   * D1 법선을 **3점 샘플 없이** 직접 낼 수 있는 사본만 정의한다. 미정의면 D1 루프가
+   * `normalFromCopySamples(copy, body)` 로 폴백하며, 이때 넘기는 `copy` 는 **루프 변수
+   * 자신**이라 다른 사본을 가리킬 표현이 존재하지 않는다.
+   *
+   * 이력 — PR #1174 reviewer W4 로 `(body, points) => Vec3` 에서 `(body) => Vec3` 로 줄여
+   * 사본 1 의 낭비(`31 × 3` 회 JD 역산 전량 폐기)를 없앴는데, 그 과정에서 사본 2·3 이
+   * `normalFromCopySamples(COPIES[<리터럴 인덱스>]!, body)` 로 **자기 자신을 인덱스로**
+   * 참조하게 됐다. reviewer W5 실측: 사본 3 의 인덱스를 `2 → 1` 로 바꿔도 단독으로는
+   * `195 passed` (완전 미검출) 이고, `orbit-sampling.ts` 실변이와 결합하면 `62 → 31 failed`
+   * 로 D1 `31` 셀 판정력이 소실된다. 선택 필드로 되돌려 그 인덱스 표현 자체를 없앴다.
+   * ⚠️ 이 변경은 오배선을 **검출**하지 않는다 (재도입 실측: 단독 `195 passed`). D1 이 법선의
+   * **방향**만 보고 사본 3 개가 같은 평면을 내는 것이 정상이라, 교차 배선은 D1 관점에서
+   * 관측 동등이다 — 법선 **크기**는 사본마다 다르지만 판정에 들어가지 않는다. 방어는
+   * 구조적(인덱스를 쓸 자리가 없음)이다.
    */
-  planeNormal: (body: LoadedCelestialBody) => Vec3;
+  planeNormal?: (body: LoadedCelestialBody) => Vec3;
 }
 
 function sampleWith(
@@ -246,7 +279,7 @@ const COPIES: readonly RotationCopy[] = [
   {
     label: 'positionAt (physics/kepler.ts)',
     sample: (body) => sampleWith(body, (el, mu, jd) => positionAt(el, jd, mu)),
-    planeNormal: (body) => normalFromCopySamples(COPIES[1]!, body),
+    // planeNormal 미정의 → D1 이 자기 sample 3점으로 폴백 (위 인터페이스 주석).
   },
   {
     label: 'sampleOrbitPoints (scene/orbit-sampling.ts)',
@@ -263,7 +296,7 @@ const COPIES: readonly RotationCopy[] = [
       });
       return sampled as unknown as readonly [SampledPoint, SampledPoint, SampledPoint];
     },
-    planeNormal: (body) => normalFromCopySamples(COPIES[2]!, body),
+    // planeNormal 미정의 → D1 이 자기 sample 3점으로 폴백 (위 인터페이스 주석).
   },
 ];
 
@@ -276,7 +309,11 @@ for (const copy of COPIES) {
     for (const { id, inclinationDeg } of ORBITING_BODIES) {
       it(`${id} (i = ${inclinationDeg}°)`, () => {
         const body = bodyById.get(id)!;
-        const measured = normalTiltDeg(copy.planeNormal(body));
+        // planeNormal 이 없는 사본은 자기 자신(`copy`)의 3점 샘플로 폴백한다.
+        const normal = copy.planeNormal
+          ? copy.planeNormal(body)
+          : normalFromCopySamples(copy, body);
+        const measured = normalTiltDeg(normal);
         expect(Math.abs(measured - Math.abs(inclinationDeg))).toBeLessThan(D1_TOLERANCE_DEG);
       });
     }
