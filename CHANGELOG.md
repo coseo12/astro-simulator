@@ -5,6 +5,36 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.81.0] - 2026-08-30
+
+### Behavior Changes
+
+- **[#1082] `apps/web` `45` + `packages/physics-wasm` `1` 테스트 파일을 CI 타입 검사에 배선 — `next build` 는 `*.test.*` 를 검사하지 않는다 (MINOR)** ([#1082](https://github.com/coseo12/astro-simulator/issues/1082)) — [#1060](https://github.com/coseo12/astro-simulator/issues/1060) 이 `packages/{shared,core}` `58` 파일을 닫은 것과 같은 클래스의 잔여분. `next build` 는 타입 검사를 하지만 `*.test.*` 파일은 **파일명 축**으로 제외하므로 (ADR [`20260814-1060`](docs/decisions/20260814-1060-packages-test-typecheck.md) §실측 B — 도달성 축 아님), composite 의 `pnpm build` 가 초록이어도 테스트 파일의 타입 오류는 통과했다. `packages/physics-wasm` 은 `tsconfig.json` 부재 + `typecheck` 가 `echo` no-op 인 **세 번째 종류의 결손**이었다.
+
+  **배선** — `ci.yml` `detect-and-test` 의 `setup-and-build` composite **직후** 스텝 `1` 개 (ADR [`20260816-1082`](docs/decisions/20260816-1082-web-test-typecheck.md) §후보 비교 1). `apps/web` typecheck 의 선행 조건 2축 (`next-env.d.ts` + `packages/{shared,core}/dist` — ADR [`20260814-960`](docs/decisions/20260814-960-worktree-typecheck-recipe.md)) 을 한 번에 만드는 루트 `pnpm build` 가 도는 CI job 이 저장소에서 여기 하나이기 때문이다. 명령 형태는 규약 (ADR `20260814-1060` 결정 3) — **패키지별 분리 호출 + `--fail-if-no-match`**. `if:` 는 composite 과 동일 (docs-only PR 오탐 FAIL 방지).
+
+  **관측 가능한 행동 변화 3건.**
+
+  1. **코드 변경 PR 의 CI 가 `apps/web`·`packages/physics-wasm` 테스트 파일 타입 오류에서 FAIL 한다** (종전 전 경로 초록). positive PASS 는 작동 증거가 아니므로 일회용 negative PR 로 FAIL 을 실증했다 (증거는 PR 본문·코멘트).
+  2. **`pnpm --filter @astro-simulator/physics-wasm typecheck` 가 실제 검사를 한다** — 종전 `echo` no-op 이 `tsc --noEmit` (신규 `tsconfig.json` + `devDependencies.typescript`) 이 됐다. 동반: `tests/binding.test.ts` `12`행의 사문 `@ts-expect-error` 삭제 — `251d480`([#875](https://github.com/coseo12/astro-simulator/issues/875)) 의 import 다행화 리팩터 이후 아무 오류도 억제하지 않으면서 `TS2578` 만 내던 지시자다 (검사 지점 부재로 `25`일간 미감지 — 주석 계약 ↔ 구현 drift 클래스).
+  3. **`scripts/verify-test-coverage.mjs` 가 typecheck 배선 존재까지 강제한다** (PR #1090 reviewer 실측 축 판정 — [#1082 코멘트](https://github.com/coseo12/astro-simulator/issues/1082#issuecomment-5306272590) 후속 재게시분). typecheck 열거가 `ci.yml` (web·physics-wasm) 과 `ci-physics-wasm.yml` (shared·core) **두 파일에 흩어지므로**, 신규 워크스페이스 추가 시 (1) `scripts.typecheck` 가 실제 `tsc` 호출일 것 (2) 워크플로 어딘가에 규약 형태 배선이 존재할 것 — 2축을 기계 검사한다. 열거 갱신을 사람 눈에 맡기면 미커버 워크스페이스가 조용히 사각이 되고 가드는 초록이기 때문이다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** 종전에 초록이던 입력 (테스트 파일 타입 오류 / typecheck 배선 없는 신규 워크스페이스) 에서 CI 가 FAIL 한다. 앱 런타임 소스 접촉은 `binding.test.ts` 주석 `1`행 삭제뿐이며 런타임 동작 무변경 — 행동 변화는 전부 CI·가드 축이다.
+
+- **[#1132] 궤도면 경사 불변식 가드 신설 — `Rz(Ω)·Rx(i)·Rz(ω)` 회전 사본 `3`개 × 궤도 보유 `31` body (MINOR)** ([#1132](https://github.com/coseo12/astro-simulator/issues/1132)) — [#1130](https://github.com/coseo12/astro-simulator/issues/1130) 이 자전축 기준면을 정정하며 공전 궤도도 별건 확인했으나 **그 측정 경로가 리포에 없었다** (PR [#1131](https://github.com/coseo12/astro-simulator/pull/1131) reviewer B3ⓒ). 신규 `packages/core/src/physics/orbital-plane-inclination.test.ts` (`195` 케이스) 가 그 재현 경로를 상시 실행 자산으로 남긴다.
+
+  **커버 대상은 physics 2 + scene 1 사본이다** — `orbitalStateAt` (`physics/state-vector.ts:61`) · `positionAt` (`physics/kepler.ts:119`) · `sampleOrbitPoints` (`scene/orbit-sampling.ts:61`). 세 번째가 씬이 실제로 궤도선을 그리는 경로이고 그 출력은 `CreateLineSystem` 에 기저 변환 없이 직행하므로, 본 단위 테스트가 곧 「씬 해석」 검증이다.
+
+  **판정 2축.** D1 — 궤도면 법선 경사 `== Math.abs(inclinationDeg)`, 절대 공차 `1e-9°` (`31 × 3 = 93` 셀). D2 — `z/r == sin(i)·sin(ω+ν)`, 궤도 반경 정규화 상대 공차 `1e-9` (`31 × 3 × 3 = 279` 셀). **D2 는 장식이 아니다** — `z` 부호 반전과 `Rz(ω)`/`Rx(i)` 순서 교환은 둘 다 법선 경사를 보존해 D1 이 `0/31` 로 미검출한다 (프로덕션 코드 실변이로 실증). 구속 범위도 D1 보다 넓다: `sinW` 부호 반전 (`ω → -ω`) 을 D2 가 `31/31` 검출한다 (D1 `0/31`). **세 오일러각 중** 두 축 모두 무구속인 것은 `Ω` 다 (`sinO` 부호 반전 → D1 `0/31` · D2 `0/31`). 각도 밖으로는 동경 축도 무구속이다 — `renderScaleForTier` 반환 `× 2` / 로더 `semiMajorAxis` `× 2` / 로더 `eccentricity → 0` 실변이 3종이 전부 `195 passed` (미검출). 이 열거는 **실측한 축**이지 무구속 축의 전수가 아니며, 기전 설명은 반증돼 뺐다 (reviewer B3) — 무구속 여부는 실변이를 돌려 확인할 것.
+
+  **측정 방법이 계약의 일부다** (CLAUDE.md §스프린트 계약 10항). `atan2(hypot(n.x,n.y), n.z)` — `acos(n·ẑ)` 는 earth (`inclinationDeg = -1.531e-05`) 에서 `1.042e-8°` 로 열화해 공차를 넘는다. 법선 winding 은 `h = r × v` 또는 진근점각 **단조 증가** 3점으로 고정 — **시간** 등간격 샘플링은 겉보기 winding 이 뒤집혀 `180 − i` 를 낸다 (실측 술어: deimos `i = 1.791°` · `T = 1.262895 d` 를 `positionAt` 으로 `jd = J2000, +Δt, +2Δt` `Δt = 1 d` 3점 · 연속 외적 합 · `atan2` tilt → **`178.209000°`**, 발현 조건은 `f := (Δt / T) mod 1` 이 `(0.5, 1)`. `f = 0` 은 조건식 밖이고 두 대역으로 갈린다 — `Δt = 0` 은 세 점이 같은 점이라 `|n| = 0` · `0.000000°` 인 퇴화이고, `Δt = k · T` (`k ≥ 1`) 는 **퇴화가 아니라 잡음 대역**이라 `1T → 178.209000°` / `2T → 1.791000°` / `3T → 178.208999°` 로 갈린다. **`Δt = T` 를 고르면 경고 대상인 `178.209°` 를 그대로 맞는다**). 실측 max 오차는 D1 `1.421e-14°` / D2 `2.914e-16` (술어: 위 함수·샘플링). 종전 「`8/8` 정합 / 소수 `3`자리 일치」 주장은 모집단·정밀도 양쪽 다 반증돼 폐기했다 (모집단 정본은 `orbit` 보유 `31`).
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"같은 입력에 다르게 동작하는가"_): **예.** 앱 런타임 소스 접촉은 `0`행이나, 회전식이 깨진 저장소 상태에서 CI 의 판정이 뒤집힌다. 실증 — `develop` 에서 초록인 변이 `2`종을 프로덕션 파일에 실주입했을 때 본 브랜치는 `sinI`/`cosI` 교환에 `62`~`63` 케이스, `z` 부호 반전에 `31` 케이스 FAIL 한다.
+
+### Changed
+
+- **[#1082 후속] ADR `20260816-1082` Amendment 1 — 결정 5 의 typescript 판본 하락 예측 반증 박제 (PATCH)** — 구현 PR [#1171](https://github.com/coseo12/astro-simulator/pull/1171) reviewer 가 지목한 서술 drift 의 후속. ADR 은 physics-wasm 에 `^6.0.0` 을 선언하면 `tsc` 가 `6.0.3` → `6.0.2` 로 내려간다고 예측했으나, 머지 실물 lockfile 은 **`6.0.3` 유지**다 (shared·core 는 `6.0.2` 그대로, 판본 공존 2개 유지 — specifier→해상도 함수성의 암묵 가정이 반증됨, 기전은 [가정] 라벨). §실측 C-2 교차 판본 실행이 양방향 진단 집합 불변을 이미 덮으므로 **결정·구현 불변, 서술만 정정** — 원문은 보존하고 인라인 포인터 2곳 + §Amendment 1 로 박제. **Behavior Changes: None — 문서만** (ADR·CHANGELOG 전용, 에이전트가 같은 입력에 다르게 동작하지 않는다).
+
 ## [0.80.0] - 2026-08-27
 
 ### Behavior Changes
