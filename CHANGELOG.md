@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.81.0] - 2026-08-30
+
 ### Behavior Changes
 
 - **[#1082] `apps/web` `45` + `packages/physics-wasm` `1` 테스트 파일을 CI 타입 검사에 배선 — `next build` 는 `*.test.*` 를 검사하지 않는다 (MINOR)** ([#1082](https://github.com/coseo12/astro-simulator/issues/1082)) — [#1060](https://github.com/coseo12/astro-simulator/issues/1060) 이 `packages/{shared,core}` `58` 파일을 닫은 것과 같은 클래스의 잔여분. `next build` 는 타입 검사를 하지만 `*.test.*` 파일은 **파일명 축**으로 제외하므로 (ADR [`20260814-1060`](docs/decisions/20260814-1060-packages-test-typecheck.md) §실측 B — 도달성 축 아님), composite 의 `pnpm build` 가 초록이어도 테스트 파일의 타입 오류는 통과했다. `packages/physics-wasm` 은 `tsconfig.json` 부재 + `typecheck` 가 `echo` no-op 인 **세 번째 종류의 결손**이었다.
