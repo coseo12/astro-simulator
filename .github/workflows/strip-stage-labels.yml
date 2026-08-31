@@ -38,7 +38,12 @@ on:
     # base=main(릴리스/핫픽스) 미커버의 원인이었고, 앞으로 base 가 늘어도 미커버가 재발하지
     # 않도록 열거 대신 필터 부재를 택한다.
 
-# GITHUB_TOKEN 최소 권한 — PR 라벨 조작만 (PR 도 Issues API 네임스페이스라 `issues:` 불필요)
+# GITHUB_TOKEN 최소 권한 — PR 라벨 조작만.
+# `issues:` 를 병기하지 않는 근거: GitHub 의 "Permissions required for GitHub Apps" 표가
+# `GET` / `DELETE /repos/{owner}/{repo}/issues/{n}/labels[/{name}]` 를 "Pull requests" 와
+# "Issues" **양쪽** 섹션에 중복 등재하며, 둘 중 하나만 있어도 접근 가능하다. 대상이 PR 이므로
+# `pull-requests: write` 로 충족된다.
+# https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps
 permissions:
   pull-requests: write
 
@@ -62,19 +67,24 @@ jobs:
           set -euo pipefail
 
           # 제거 대상은 `stage:` 접두 한정 — type:* / priority:* / group:* / deferred:* 는 보존.
-          # grep 무매칭 exit 1 은 정상 경로(제거 대상 없음)라 `|| true` 로 흡수한다.
           # `mapfile` 은 bash 4+ 전용이라 쓰지 않는다 — 이 스크립트를 로컬 bash 3.2 에서
           # 그대로 dry-run 검증할 수 있게 하려는 것이다 (러너 bash 버전에 대한 암묵 의존 제거).
-          stage_labels=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name' | grep '^stage:' || true)
+          #
+          # 읽기와 필터를 **분리**한다. 한 파이프라인으로 묶으면 `pipefail` 이 파이프라인 상태를
+          # 마지막 비-0 종료 상태로 삼으므로, `grep` 무매칭용으로 단 `|| true` 가 `gh api` 실패
+          # (403 / rate limit / 네트워크 / jq 오류)까지 함께 흡수한다. 그러면 API 실패가
+          # "stage:* 라벨 없음" 과 구분 불가능해지고 step 이 exit 0 으로 끝나 — 아래 DELETE 의
+          # fail-visible 원칙이 읽기 단계에서만 무너진다.
+          # 분리형에서 `gh api` 실패는 파이프라인이 아니므로 `set -e` 로 그대로 step 실패가 된다.
+          all_labels=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
+          # `|| true` 는 여기에만 — grep 무매칭 exit 1(제거 대상 없음)은 정상 경로다.
+          stage_labels=$(printf '%s\n' "$all_labels" | grep '^stage:' || true)
 
           if [ -z "$stage_labels" ]; then
             echo "stage:* 라벨 없음 — no-op"
             exit 0
           fi
 
-          # 프로세스 치환 — 파이프라인 subshell 을 피해 `set -e` 가 루프 밖까지 전파되게 한다.
-          # heredoc 은 `$stage_labels` 전개를 위해 따옴표를 못 쳐 라벨명 metachar 가 재전개되므로
-          # 쓰지 않는다 (CLAUDE.md §셸 경유 metachar 함정).
           while IFS= read -r l; do
             [ -n "$l" ] || continue
             # 라벨명에 `:` 가 들어가므로 경로 세그먼트 인코딩. jq @uri 로 처리해
@@ -86,5 +96,9 @@ jobs:
           done < <(printf '%s\n' "$stage_labels")
 
           # 보존 실증 — 잔존 라벨을 run 로그에 남긴다 (stage:* 이외가 남아 있어야 정상).
-          remaining=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" --jq '[.[].name] | join(", ")')
+          # `--paginate` 하에서 jq 필터는 페이지마다 적용되므로 `join` 을 jq 안에 두지 않는다
+          # (실측 `gh 2.88.1`: `--paginate ... --jq '[.[].name]|join(", ")'` 은 페이지 수만큼
+          # 줄이 갈린다. `--slurp` 는 `--jq` 와 병용 불가). 이름만 뽑아 `paste` 로 합친다 —
+          # 저장소에 `good first issue` 처럼 공백을 포함한 라벨명이 있어 구분자는 쉼표여야 한다.
+          remaining=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name' | paste -sd ',' -)
           echo "잔존 라벨: ${remaining:-(없음)}"
