@@ -39,11 +39,11 @@ on:
     # 않도록 열거 대신 필터 부재를 택한다.
 
 # GITHUB_TOKEN 최소 권한 — PR 라벨 조작만.
-# `issues:` 를 병기하지 않는 근거: GitHub 의 "Permissions required for GitHub Apps" 표가
-# `GET` / `DELETE /repos/{owner}/{repo}/issues/{n}/labels[/{name}]` 를 "Pull requests" 와
-# "Issues" **양쪽** 섹션에 중복 등재하며, 둘 중 하나만 있어도 접근 가능하다. 대상이 PR 이므로
-# `pull-requests: write` 로 충족된다.
-# https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps
+# `issues:` 를 병기하지 않는 근거: 본 workflow 는 기존 라벨의 GET 과 DELETE 만 하고
+# **라벨을 생성하거나 부착하지 않는다**. `issues: write` 가 추가로 필요해지는 것은 라벨을
+# 부착·생성할 때다 — 저장소 전례로 `harness-pr-review.yml` 은 `issues.addLabels` 를 쓰므로
+# `pull-requests: write` 와 `issues: write` 를 병기한다.
+# ⚠️ 이 파일에 라벨 부착·생성 코드를 추가하면 위 근거가 무효가 되므로 권한을 재검토할 것.
 permissions:
   pull-requests: write
 
@@ -75,7 +75,6 @@ jobs:
           # (403 / rate limit / 네트워크 / jq 오류)까지 함께 흡수한다. 그러면 API 실패가
           # "stage:* 라벨 없음" 과 구분 불가능해지고 step 이 exit 0 으로 끝나 — 아래 DELETE 의
           # fail-visible 원칙이 읽기 단계에서만 무너진다.
-          # 분리형에서 `gh api` 실패는 파이프라인이 아니므로 `set -e` 로 그대로 step 실패가 된다.
           all_labels=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
           # `|| true` 는 여기에만 — grep 무매칭 exit 1(제거 대상 없음)은 정상 경로다.
           stage_labels=$(printf '%s\n' "$all_labels" | grep '^stage:' || true)
@@ -99,6 +98,6 @@ jobs:
           # `--paginate` 하에서 jq 필터는 페이지마다 적용되므로 `join` 을 jq 안에 두지 않는다
           # (실측 `gh 2.88.1`: `--paginate ... --jq '[.[].name]|join(", ")'` 은 페이지 수만큼
           # 줄이 갈린다. `--slurp` 는 `--jq` 와 병용 불가). 이름만 뽑아 `paste` 로 합친다 —
-          # 저장소에 `good first issue` 처럼 공백을 포함한 라벨명이 있어 구분자는 쉼표여야 한다.
+          # 저장소에 `good first issue` 처럼 공백을 포함한 라벨명이 있어 공백은 구분자로 쓸 수 없다.
           remaining=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name' | paste -sd ',' -)
           echo "잔존 라벨: ${remaining:-(없음)}"
