@@ -16,7 +16,11 @@ Semantic Versioning을 따른다.
   **관측 가능한 행동 변화 2건.**
 
   1. **머지된 PR 은 `stage:*` 를 갖지 않는다** — base 무관(`develop`·`main` 전부). `stage:` 접두만 제거하고 `type:*`·`priority:*`·`group:*`·`deferred:*` 는 보존한다. 미머지 close 는 `if: merged == true` 로 제외 — 파이프라인 밖으로 나간 것이 아니라 중단된 것이라 "어디서 멈췄나"가 여전히 정보이기 때문이다.
-  2. **`/next` §5 이상 상태 감지 규칙이 뒤집힌다** — 종전 _"머지되어 있는데 `stage:done` 아님 → 라벨 전이 제안"_ 이 _"머지된 PR 에 `stage:*` 잔존 → 제거 제안"_ 이 된다. 그 줄이 위 `67` 건 판정을 낸 출처이므로, 미처리로 남긴 `62` 건은 **정정 대상이 아니라 이미 올바른 상태**가 된다 (소급 제거는 본 건 범위 밖 — 자동 전이는 미래 머지에만 발동한다).
+  2. **`/next` §5 이상 상태 감지 규칙이 뒤집히고 탐색 윈도우를 갖는다** ([#1182](https://github.com/coseo12/astro-simulator/issues/1182)) — 종전 _"머지되어 있는데 `stage:done` 아님 → 라벨 전이 제안"_ 이 _"**배선 도입 이후** 머지된 PR 에 `stage:*` 잔존 → 조사 대상"_ 이 된다. 그 줄이 위 `67` 건 판정을 낸 출처이므로, 미처리로 남긴 `62` 건은 **정정 대상이 아니라 이미 올바른 상태**다 (소급 제거는 범위 밖 — 자동 제거는 미래 머지에만 발동한다).
+
+     **윈도우가 없으면 새 술어는 노이즈를 늘린다.** 릴리스 PR [#1181](https://github.com/coseo12/astro-simulator/pull/1181) 의 cross-validate 가 이를 고유 발견으로 지적했고 실측으로 확인됐다 — 머지 PR `100` 건 기준 구 술어 매칭 `63` 건 대 신 술어 매칭 **`98` 건**. 자동 제거가 미래 머지에만 발동하는 이상 과거 `98` 건은 영구 잔존하므로, 윈도우 없는 술어는 매 `/next` 실행마다 같은 목록을 반복 제시한다. ⇒ 경계를 **자동화의 사거리**(PR [#1179](https://github.com/coseo12/astro-simulator/pull/1179) 머지 `2026-09-01T02:41:56Z` 이후 머지분)로 잡았다. 「최근 N일」 같은 시간 임계를 쓰지 않은 것은 그것이 또 하나의 추정값이 되기 때문이다 (CLAUDE.md §`deferred:no-incident` 수명주기와 같은 논거). **윈도우 적용 후 매칭 `98` → `0`** 이며, 윈도우 안의 머지 PR `2` 건(#1179 · #1180)은 배선이 실제로 제거해 `labels=[]` 다.
+
+     윈도우 **안**의 잔존은 레거시와 의미가 다르다 — 배선이 커버하는 구간이므로 **workflow 미발동**을 뜻하며 `gh run list --workflow=strip-stage-labels.yml` 로 조사한다. 윈도우 **밖**은 지적하지 않는다.
 
   **기존 `auto-close-issues.yml` 확장이 아니라 신규 파일인 근거는 착수 전 실측이다.** 이슈 §기술 참고는 "스텝 1개 추가로 끝날 가능성이 높다"고 봤으나, 그 workflow 는 `on.pull_request.branches: [develop]` 라 **base=main 머지에서 구조적으로 발화하지 않는다** — 전체 run `134` 건 중 `headBranch == develop` 인 run **`0` 건**(base=main 머지 PR 은 전부 head=`develop` 인 릴리스 PR 이라 발화했다면 반드시 나타난다) + base=main 머지 PR 최근 `5` 건 각각의 머지 시각 `+600`초 창에 run **`0` 건**. 이슈 §실측 2 의 `base=main` 전이율 `11%` 는 이 필터에서 온 구조적 미커버가 맞다. 그런데 `on.<event>.branches` 는 **workflow 단위**라 job 별로 다르게 줄 수 없어, 재사용하려면 #915 auto-close 의 발화 범위까지 함께 넓혀야 한다 — 본 건이 요청하지 않은 다른 가드의 행동 변경이다. 부수 이득으로 `pull-requests: write` 가 신규 job 에만 부여되고 auto-close 토큰은 `issues: write, contents: read` 를 유지한다.
 
