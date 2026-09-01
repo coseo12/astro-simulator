@@ -22,7 +22,7 @@ Semantic Versioning을 따른다.
 
   **부수 변경**: 상수 `postReviewStages` → `SKIP_REATTACH_STAGES` (역할은 「리뷰 후 단계 열거」가 아니라 「`stage:review` 재부착을 건너뛸 상태」다 — 이름을 그대로 믿으면 `stage:dev` 누락이 버그가 아니라 정의상 당연해 보이고, 이것이 결함이 3라운드 동안 안 보인 원인의 일부로 지목됐다). 파일 분리에 따라 workflow 에 `actions/checkout` 과 `permissions: contents: read` 가 추가됐다.
 
-  **알려진 한계 (현행 동작 보존 — 본 건에서 바꾸지 않음)**: 연결 이슈 파서는 `Closes|Fixes|Resolves` 3종 + **첫 매치 1개**라 `Closes #1, #2` 는 `#1` 만 전이된다 (`auto-close-issue-parser.mjs` 의 9종 + 전 매치와 의도적으로 다르다 — 재사용하면 어느 이슈가 전이되는지가 조용히 바뀐다). 1 이슈 : N PR 이면 어느 PR 의 push 든 같은 이슈를 끈다.
+  **알려진 한계 (현행 동작 보존 — 본 건에서 바꾸지 않음)**: 연결 이슈 파서는 `Closes|Fixes|Resolves` 3종 + **첫 매치 1개**라 `Closes #A, #B` 는 앞의 하나만 전이된다 (`auto-close-issue-parser.mjs` 의 9종 + 전 매치와 의도적으로 다르다 — 재사용하면 어느 이슈가 전이되는지가 조용히 바뀐다). 1 이슈 : N PR 이면 어느 PR 의 push 든 같은 이슈를 끈다. ⚠️ **파생 함정**: 파서는 마크다운을 해석하지 않으므로 PR 본문에 close 키워드를 **숫자와 함께 예시로** 적으면 코드 스팬 안이어도 매칭되고, 첫 매치라 본문 하단의 진짜 `Closes #<이슈>` 보다 먼저 잡힌다 — 도입 PR [#1187](https://github.com/coseo12/astro-simulator/pull/1187) 초판이 이 함정을 밟아 예시 번호의 이슈에 `stage:review` 가 부착됐다(수동 원복). 종전 파서도 같은 정규식이었으므로 신규 회귀가 아니라 **드러난 선재 함정**이다.
 
   **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"에이전트가 같은 입력에 다르게 동작하는가"_): **예.** 「`stage:dev` PR 에 push」라는 같은 입력에 대해 종전에는 `{stage:dev, stage:review}` 가 되고 이제는 `{stage:review}` 가 된다. `apps/`·`packages/` 무접촉 — 변경은 `.github/workflows/` `2` 파일 + `scripts/` 신규 `2` 파일 + 본 CHANGELOG 다.
 
