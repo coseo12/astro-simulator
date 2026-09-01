@@ -42,8 +42,8 @@ allowed-tools: [Bash, Read, Agent]
    - 다중 `stage:*` 라벨 동시 존재 → 경고 (라벨 무결성 깨짐)
    - 알 수 없는 라벨 → 경고 + 스킵
    - **`strip-stage-labels.yml` 도입 이후 머지된 PR** 에 `stage:*` 잔존 → **조사 대상** (#1178 / #1182). 원인이 **두 갈래**이므로 `gh run list --workflow=strip-stage-labels.yml` 로 먼저 가른다:
-     - **run 없음 / `failure`** → workflow 미발동. run 로그를 조사한다
-     - **run `success`** → 머지 **이후** 부착된 라벨이다. 그 workflow 는 `types: [closed]` 만 청취하고 `labeled` 를 청취하지 않으므로 사후 부착분은 정상 발화에도 잔존한다. 이 경우 조사할 결함이 없으니 **라벨을 제거**하면 된다 (`gh api --method DELETE .../issues/<N>/labels/<enc>`). 판정은 timeline 의 `labeled` 이벤트 시각이 `mergedAt` 보다 뒤인지로 한다
+     - **run 이 `success` 가 아님** (없음 · `failure` · `skipped` · 아직 진행 중) → workflow 미발동. run 로그를 조사한다
+     - **run `success`** → 머지 **이후** 부착된 라벨이다. 그 workflow 는 `types: [closed]` 만 청취하고 `labeled` 를 청취하지 않으므로 사후 부착분은 정상 발화에도 잔존한다. 이 경우 조사할 결함이 없으니 **라벨을 제거**하면 된다 — `gh api --method DELETE "repos/coseo12/astro-simulator/issues/<N>/labels/stage:done"`. 판정은 **잔존한 그 라벨**의 `labeled` 이벤트 시각이 `mergedAt` 보다 뒤인지로 한다 (같은 PR 이 머지 전후로 라벨 이벤트를 둘 다 가질 수 있으므로 라벨명을 특정해서 본다)
      - **탐색 윈도우**: `mergedAt >= 2026-09-01T02:41:56Z` (PR #1179 머지 시각) 인 PR 만 대상 — **경계 포함**이다. 배제(`>`)로 잡으면 배선의 첫 실발화를 증명하는 #1179 자신이 윈도우 밖으로 빠진다. 경계를 「최근 N일」이 아니라 **자동화의 사거리**로 잡는 이유는 시간 임계가 또 하나의 추정값이 되기 때문이다 (CLAUDE.md §`deferred:no-incident` 수명주기와 같은 논거)
      - **윈도우 밖(레거시) 잔존은 지적하지 않는다** — 자동 제거는 미래 머지에만 발동하므로 도입 이전 머지분의 `stage:*` 는 영구 잔존이 정상이다. 지적하면 매 실행마다 같은 목록이 반복된다 (#1182 실측: 윈도우 없이 `98` 건)
      - `stage:done` 여부는 판정 기준이 **아니다** — `stage:done` = "완료 — 사용자 머지 대기" 는 머지 **전** 상태다
