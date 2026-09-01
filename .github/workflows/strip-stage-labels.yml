@@ -1,0 +1,103 @@
+name: strip-stage-labels
+
+# #1178 — PR 머지 시 해당 PR 의 `stage:*` 라벨을 전량 제거한다.
+#
+# 결정 (이슈 #1178 코멘트, 2026-09-01 사용자): 후보 (a) `stage:done` 종단 재정의 /
+# (b) `stage:merged` 신설 / (d) 기각 은 모두 기각되고 **(c) 전량 제거**가 채택됐다.
+# `stage:done` 의 뜻("완료 — 사용자 머지 대기" = 머지 **전** 상태)은 **바뀌지 않는다**.
+# 머지된 PR 은 파이프라인(pm→architect→developer→reviewer→qa→done) **밖**이므로
+# 단계 라벨을 갖지 않는다 — 라벨 정의와 충돌하지 않는 것이 (c) 의 채택 근거다.
+#
+# ── 왜 `auto-close-issues.yml` 에 스텝을 추가하지 않고 신규 파일인가 (#1178 완료 조건 2) ──
+# 이슈 §기술 참고는 "스텝 1개 추가로 끝날 가능성이 높다"고 봤으나, 착수 전 실증이 그 전제를
+# 뒤집었다. `auto-close-issues.yml` 은 `on.pull_request.branches: [develop]` 이라
+# **base=main 머지에서 구조적으로 발화하지 않는다** (실측 2026-09-01):
+#   - 해당 workflow 의 전체 run 134 건 중 headBranch == `develop` 인 run **0 건**.
+#     base=main 머지 PR 은 전부 head=`develop` 인 릴리스 PR 이므로, 발화했다면 반드시 나타난다.
+#   - base=main 머지 PR 최근 5 건(#1176 #1169 #1161 #1154 #1145) 각각의 머지 시각 +600초
+#     창에 run **0 건**.
+# 즉 이슈 본문 §실측 2 의 `base=main` 전이율 11% 는 `branches: [develop]` 필터에서 온
+# 구조적 미커버가 맞다.
+#
+# 그런데 `on.<event>.branches` 는 **workflow 단위**라 job 별로 다르게 줄 수 없다. 기존 파일을
+# 재사용해 base=main 을 커버하려면 그 필터를 넓혀야 하고, 그러면 #915 auto-close job 의
+# 발화 범위까지 함께 바뀐다 — 본 이슈가 요청하지 않은 다른 가드의 행동 변경이다.
+# 따라서 트리거 범위가 서로 다른 두 관심사를 분리해 신규 workflow 로 둔다. 부수 이득으로
+# `pull-requests: write` 가 라벨 제거 job 에만 부여되고 auto-close job 의 토큰 권한은
+# `issues: write, contents: read` 그대로 유지된다 (최소 권한).
+#
+# ── `workflow_dispatch` 2단계 함정과 동형이 아니다 (#999 정정 계보) ──
+# `pull_request` `closed(merged==true)` 는 머지 커밋이 base 에 올라간 **뒤** 발화하므로
+# 본 workflow 를 신설하는 PR 자신의 머지에서 실발동한다. `auto-close-issues.yml` 헤더의
+# 실측 2건(run 30695395893 / 31007305890)이 같은 이벤트로 이를 이미 반증 자료로 갖는다.
+
+on:
+  pull_request:
+    types: [closed]
+    # base 무관 전량 커버 — `branches` 필터를 두지 않는다. 위 실증대로 `[develop]` 한정이
+    # base=main(릴리스/핫픽스) 미커버의 원인이었고, 앞으로 base 가 늘어도 미커버가 재발하지
+    # 않도록 열거 대신 필터 부재를 택한다.
+
+# GITHUB_TOKEN 최소 권한 — PR 라벨 조작만.
+# `issues:` 를 병기하지 않는 근거: 본 workflow 는 기존 라벨의 GET 과 DELETE 만 하고
+# **라벨을 생성하거나 부착하지 않는다**. `issues: write` 가 추가로 필요해지는 것은 라벨을
+# 부착·생성할 때다 — 저장소 전례로 `harness-pr-review.yml` 은 `issues.addLabels` 를 쓰므로
+# `pull-requests: write` 와 `issues: write` 를 병기한다.
+# ⚠️ 이 파일에 라벨 부착·생성 코드를 추가하면 위 근거가 무효가 되므로 권한을 재검토할 것.
+permissions:
+  pull-requests: write
+
+jobs:
+  strip-stage-labels:
+    # merged==true 만 — 미머지 close(포기/중복 PR)는 라벨을 그대로 둔다.
+    # 파이프라인 밖으로 나간 것이 아니라 중단된 것이므로 "어디서 멈췄나"가 여전히 정보다.
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: 머지된 PR 의 stage:* 라벨 전량 제거
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # ${{ }} 를 run 스크립트에 직접 보간하지 않고 env 로 우회 — script injection 차단
+          # 표준 패턴 (auto-close-issues.yml 과 동일). 본 workflow 는 PR 본문·제목을 아예
+          # 읽지 않고 번호만 쓰므로 노출면이 더 작다.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # 제거 대상은 `stage:` 접두 한정 — type:* / priority:* / group:* / deferred:* 는 보존.
+          # `mapfile` 은 bash 4+ 전용이라 쓰지 않는다 — 이 스크립트를 로컬 bash 3.2 에서
+          # 그대로 dry-run 검증할 수 있게 하려는 것이다 (러너 bash 버전에 대한 암묵 의존 제거).
+          #
+          # 읽기와 필터를 **분리**한다. 한 파이프라인으로 묶으면 `pipefail` 이 파이프라인 상태를
+          # 마지막 비-0 종료 상태로 삼으므로, `grep` 무매칭용으로 단 `|| true` 가 `gh api` 실패
+          # (403 / rate limit / 네트워크 / jq 오류)까지 함께 흡수한다. 그러면 API 실패가
+          # "stage:* 라벨 없음" 과 구분 불가능해지고 step 이 exit 0 으로 끝나 — 아래 DELETE 의
+          # fail-visible 원칙이 읽기 단계에서만 무너진다.
+          all_labels=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
+          # `|| true` 는 여기에만 — grep 무매칭 exit 1(제거 대상 없음)은 정상 경로다.
+          stage_labels=$(printf '%s\n' "$all_labels" | grep '^stage:' || true)
+
+          if [ -z "$stage_labels" ]; then
+            echo "stage:* 라벨 없음 — no-op"
+            exit 0
+          fi
+
+          while IFS= read -r l; do
+            [ -n "$l" ] || continue
+            # 라벨명에 `:` 가 들어가므로 경로 세그먼트 인코딩. jq @uri 로 처리해
+            # 셸 인용에 의존하지 않는다.
+            enc=$(jq -rn --arg s "$l" '$s|@uri')
+            # 실패(권한 등)는 step 실패로 표면화 — 조용한 미발동 금지 (fail-visible).
+            gh api --method DELETE "repos/$REPO/issues/$PR_NUMBER/labels/$enc" > /dev/null
+            echo "removed: $l"
+          done < <(printf '%s\n' "$stage_labels")
+
+          # 보존 실증 — 잔존 라벨을 run 로그에 남긴다 (stage:* 이외가 남아 있어야 정상).
+          # `--paginate` 하에서 jq 필터는 페이지마다 적용되므로 `join` 을 jq 안에 두지 않는다
+          # (실측 `gh 2.88.1`: `--paginate ... --jq '[.[].name]|join(", ")'` 은 페이지 수만큼
+          # 줄이 갈린다. `--slurp` 는 `--jq` 와 병용 불가). 이름만 뽑아 `paste` 로 합친다 —
+          # 저장소에 `good first issue` 처럼 공백을 포함한 라벨명이 있어 공백은 구분자로 쓸 수 없다.
+          remaining=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name' | paste -sd ',' -)
+          echo "잔존 라벨: ${remaining:-(없음)}"
