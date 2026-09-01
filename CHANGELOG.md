@@ -5,6 +5,27 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1184] PR push 시 `stage:*` 라벨 단일화 + 이슈 단계 되돌림 차단 (MINOR)** ([#1184](https://github.com/coseo12/astro-simulator/issues/1184)) — `harness-pr-review.yml` 은 push (`synchronize`) 마다 `stage:review` 를 **부착만** 하고 기존 `stage:*` 를 떼지 않았다. 이슈 축은 더 좁아서 `stage:dev` **하나만** 제거했으므로, 이슈가 `stage:qa` 여도 `stage:review` 가 덧붙어 **다중 부착 + 단계 되돌림**이 동시에 발생했다. PR [#1183](https://github.com/coseo12/astro-simulator/pull/1183) 에서 `3` 회 관측됐고 매회 수동 정리했다.
+
+  **사용자 결정은 (B) 「부착 시 단일화 / 자동 복귀 유지」다** (2026-09-02). 후보 (A) 「스킵 목록에 `stage:dev` 추가」는 기각됐다 — 그 안은 다중 부착을 없애는 대신 reviewer 차단 후 재리뷰 진입을 전부 수동 전이로 바꾸는데, 자동 복귀는 가정된 편의가 아니라 **관측된 사용 경로**이기 때문이다 (PR #1183 의 라운드 2~5 진입이 정확히 그 전이였다). 즉 (A) 는 마찰을 없애는 게 아니라 옮긴다.
+
+  **관측 가능한 행동 변화 2건.**
+
+  1. **PR 의 `stage:` 접두 라벨이 push 후 정확히 1개가 된다** — 스킵 대상이 아니면 `stage:review` 를 제외한 다른 `stage:*` 를 제거한 뒤 부착한다. `stage:` 접두만 건드리고 `type:*`·`priority:*` 등은 보존한다. `stage:qa`·`stage:done` 인 PR 은 **종전과 같이 무접촉**이다 (#915 가 그 스킵을 넣은 이유 — 리뷰 후 단계를 push 로 되돌리지 않는다 — 를 보존).
+  2. **연결 이슈가 `stage:qa`·`stage:done` 이면 이슈 라벨을 건드리지 않는다** — 종전에는 `stage:review` 가 덧붙어 단계가 뒤로 갔다. 이슈 축에도 PR 축과 같은 스킵 규칙을 적용해 방향별로 가른다: `planning`/`design`/`dev` → `review` 는 전진이므로 수행, `qa`/`done` → `review` 는 후퇴이므로 차단. PR 은 전이되는데 이슈는 무접촉인 **비대칭은 허용**되며 fail-safe 방향이다 — 단계를 뒤로 끌지 않는다. 보드만 보는 사람에게는 이 비대칭이 보이지 않으므로 run 로그에 `[stage-label-sync][asymmetry]` 1행을 남긴다.
+
+  **순서 불변식이 규율이 아니라 구조로 고정된다.** 「스킵 판정 → 제거 → 부착」 순서여야 하는 이유는 스킵 판정이 읽는 PR 라벨이 `context.payload.pull_request.labels`, 즉 **이벤트 시점 스냅샷**이기 때문이다 — 제거를 앞에 두면 선행 제거가 그 값을 바꾸지 못해 스킵이 여전히 걸리고, 그 시점엔 이미 제거가 끝나 있어 **`stage:*` 가 하나도 남지 않는다**. 결정 로직을 `scripts/stage-label-decision.mjs` 의 순수 함수 `decide()` 로 분리하고 실행기가 결정을 **값으로 확정한 뒤에만** 변이하도록 두어, 「제거를 스킵 판정 앞에 두는」 구현을 표현 불가능하게 만들었다. 스킵도 실행기의 분기가 아니라 **빈 배열**로 표현되므로 「스킵 = API 호출 0회」가 구조로 보장된다.
+
+  **회귀 가드는 변이 테스트로 판별력을 실증했다** — 「테스트가 있다 ≠ 그 테스트가 작동한다」(#1123 전례). 변이 `4` 종(스킵 목록에서 `stage:qa` 삭제 / 제거 루프를 `decide()` 앞으로 이동 / `pr.remove` 를 `[]` 로 고정 / 이슈 축 스킵 판정 삭제) 전건이 FAIL 했고, 그중 **순서 뒤집기는 `decide()` 단위 테스트로 잡히지 않는다** — 순서는 실행기의 성질이지 결정 함수의 성질이 아니므로, 주입형 페이크 `api` 의 호출 기록을 순서까지 비교하는 테스트 1건만이 그것을 갈라낸다. 실행기를 주입형으로 분리한 것은 취향이 아니라 그 판별력을 만드는 수단이다.
+
+  **부수 변경**: 상수 `postReviewStages` → `SKIP_REATTACH_STAGES` (역할은 「리뷰 후 단계 열거」가 아니라 「`stage:review` 재부착을 건너뛸 상태」다 — 이름을 그대로 믿으면 `stage:dev` 누락이 버그가 아니라 정의상 당연해 보이고, 이것이 결함이 3라운드 동안 안 보인 원인의 일부로 지목됐다). 파일 분리에 따라 workflow 에 `actions/checkout` 과 `permissions: contents: read` 가 추가됐다.
+
+  **알려진 한계 (현행 동작 보존 — 본 건에서 바꾸지 않음)**: 연결 이슈 파서는 `Closes|Fixes|Resolves` 3종 + **첫 매치 1개**라 `Closes #1, #2` 는 `#1` 만 전이된다 (`auto-close-issue-parser.mjs` 의 9종 + 전 매치와 의도적으로 다르다 — 재사용하면 어느 이슈가 전이되는지가 조용히 바뀐다). 1 이슈 : N PR 이면 어느 PR 의 push 든 같은 이슈를 끈다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer 판정 질문 — _"에이전트가 같은 입력에 다르게 동작하는가"_): **예.** 「`stage:dev` PR 에 push」라는 같은 입력에 대해 종전에는 `{stage:dev, stage:review}` 가 되고 이제는 `{stage:review}` 가 된다. `apps/`·`packages/` 무접촉 — 변경은 `.github/workflows/` `2` 파일 + `scripts/` 신규 `2` 파일 + 본 CHANGELOG 다.
+
 ## [0.82.0] - 2026-09-01
 
 ### Behavior Changes
