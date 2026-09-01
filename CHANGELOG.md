@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.82.0] - 2026-09-01
+
 ### Behavior Changes
 
 - **[#1178] 머지 시 PR 의 `stage:*` 라벨 전량 제거 배선 — `strip-stage-labels.yml` 신설 (MINOR)** ([#1178](https://github.com/coseo12/astro-simulator/issues/1178)) — 2026-09-01 `/next` 라벨 정합 스윕에서 **머지된 PR `100` 건 중 `67` 건이 종단 라벨 없이 정지**해 있었고, 시기·유형 어느 쪽으로도 규칙성이 없어 (같은 날 `#1165`·`#1167` 은 `done`, `#1168`·`#1169` 는 `review`) 규약 문서 보강으로는 수렴하지 않는 **건별 산발 누락**이었다. 사용자 결정은 후보 (a) `stage:done` 종단 재정의 / (b) `stage:merged` 신설 / (d) 기각 을 모두 기각하고 **(c) 전량 제거**다.
