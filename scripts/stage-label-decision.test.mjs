@@ -43,6 +43,9 @@
  *   M10a `parseCloseTargets` **에만** 미적용 → 본 suite 전건 PASS / **auto-close 단독** FAIL
  *   M10b `parseLinkedIssue` **에만** 미적용  → 본 suite 5건 FAIL / **auto-close PASS**
  *   M11 공유 모듈에 이스케이프 인식 처방 주입 → **U13 단독** FAIL / auto-close PASS
+ *   M12 공유 모듈의 치환 문자 `' '` → `''`      → 본 suite 단독 FAIL / auto-close PASS
+ *       ⤷ 단, `M12` 만 주입하면 U13 의 **단언 1** 이 먼저 걸려 신규 단언(번호 합성)은
+ *         실행되지 않는다. 그 단언의 판별력은 단언 1 을 임시 제거한 판에서만 관측된다.
  *
  * ⚠️ M8·M9 가 U13 까지 깨는 것은 의도된 결과다 (설계 단계 예측표에는 U12 만 적혀 있었다) —
  * U13 은 **전처리가 존재한다는 전제 위에서** 그 한계를 고정하므로 전처리를 걷어내면 함께
