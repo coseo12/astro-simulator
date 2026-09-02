@@ -36,11 +36,17 @@
  * 출력으로 결정된다」는 성질이고, 대가는 **둘**이다 (초판 JSDoc 은 (1) 만 적었다 — PR #1187 R1):
  *   (1) PR 스킵 경로의 GET 1회 낭비.
  *   (2) ⚠️ **연결 이슈 조회가 실패하면 PR 축 라벨링까지 죽는다.** 조회가 모든 변이보다 앞에 있으므로
- *       본문의 이슈 번호가 존재하지 않으면(오탈자 / 예시 번호) `listLabelsOnIssue` 가 던지고 PR 은
- *       라벨을 받지 못한 채 run 이 빨갛게 실패한다. 종전 workflow 는 PR 부착이 먼저였으므로 이것은
- *       **행동 변화**이며 CHANGELOG `[Unreleased]` 행동 변화 3번 항에 박제했다. 삼키지 않는 쪽을
- *       유지한 근거: 실패가 **보이고**(fail-visible — B1 과 같은 방향), 원인이 PR 본문 오류라
- *       사람이 고칠 수 있으며, 삼키면 미검증 분기가 하나 늘어난다.
+ *       `listLabelsOnIssue` 가 던지면 PR 은 라벨을 받지 못한 채 run 이 빨갛게 실패한다. 종전
+ *       workflow 는 PR 부착이 먼저였으므로 이것은 **행동 변화**이며 CHANGELOG `[Unreleased]`
+ *       행동 변화 3번 항에 박제했다.
+ *       ⚠️ **발화 조건은 그 호출이 실패하는 모든 경우다.** 본문의 이슈 번호가 존재하지 않는
+ *       경우(오탈자 / 예시 번호)는 그중 하나일 뿐이고, 이슈가 **실재해도** `500`·`502`·
+ *       `403`(레이트리밋)·`401` 이 같은 경로로 PR 축 변이를 `0` 건으로 만든다 (PR #1187
+ *       reviewer 가 4경로 주입으로 재현). 이 workflow 의 `actions/github-script@v7` 은
+ *       `retries:` 를 지정하지 않으므로(`origin/develop` 시점과 같은 선재 상태 — 본 건에서
+ *       바꾸지 않았다) 일시 실패를 코드가 회수하지도 않는다.
+ *       그럼에도 삼키지 않는 쪽을 유지한 근거: 실패가 **보이고**(fail-visible — B1 과 같은 방향),
+ *       삼키면 미검증 분기가 하나 늘어난다.
  *
  * ## 연결 이슈 파서를 `auto-close-issue-parser.mjs` 와 공유하지 않는 이유 (의도적 비재사용)
  *
@@ -82,8 +88,16 @@ export const REVIEW_STAGE = 'stage:review';
  * 그 증가분은 전부 이 재조정 기록 자신이다.
  *
  * 그래서 검산 대상은 개수가 아니라 **안정 불변식 2개**다:
- *   (a) **활성 코드 참조 `0`** — `git grep -n 'postReviewStages' -- ':(exclude)*.md' | grep -vE ':[0-9]+: \*| //'`
- *       가 빈 결과. 계약 작성 시점의 참조처(`harness-pr-review.yml`)는 소멸했다.
+ *   (a) **활성 코드 참조 `0`** — 아래 술어가 빈 결과. 계약 작성 시점의 참조처
+ *       (`harness-pr-review.yml`)는 소멸했다.
+ *         git grep -n --untracked 'postReviewStages' -- ':(exclude)*.md' \
+ *           | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(\*|//|#)'
+ *       ⚠️ 이 술어는 **선별(screen)** 이지 주석 파서가 아니다. 제외하는 것은 `path:line:` 접두
+ *       **직후가 주석 마커(`*` `//` `#`)로 시작하는 라인**뿐이므로 트레일링 주석이 붙은 활성 코드는
+ *       남고, `#` 로 시작하는 산문은 빠진다. 초판 술어(`-vE ':[0-9]+: \*| //'`)는 이 두 방향이
+ *       모두 반대였다 — 활성 코드를 지우고(거짓 음성) 산문을 통과시켰다 (PR #1187 reviewer R-a,
+ *       합성 입력으로 재현). 문자열·템플릿 리터럴 안의 마커까지 가르지는 못하므로 **hit 가 나오면
+ *       그 라인을 눈으로 대조한다.**
  *   (b) **잔존 hit 전건이 산문** — 주석 라인 또는 `.md`. 실행되는 식별자가 아니다.
  * (reviewer 독립 실측: 표기 변형 5종 × `--untracked` × 경로 무제한에서 **추가 hit `0`**.)
  *
@@ -108,19 +122,24 @@ export function parseLinkedIssue(body) {
 }
 
 /**
- * 같은 정규식의 **전 매치 수** — 결정에는 쓰지 않고 모호성 로깅에만 쓴다 (R2).
+ * 같은 정규식이 잡는 **서로 다른 이슈 번호의 개수** — 결정에는 쓰지 않고 모호성 로깅에만 쓴다 (R2).
  *
  * `parseLinkedIssue` 의 의미론(3 키워드 + 첫 매치 1개)은 그대로 두는 것이 설계 §9-1 의 결정이므로
  * **어느 이슈가 전이되는지는 한 글자도 바뀌지 않는다.** 다만 초판이 밟은 함정(본문 예시 번호가
- * 진짜 링크보다 먼저 잡힘)의 재발을 막는 것이 「JSDoc 을 읽었는지」뿐이었으므로, 매치가 `2` 건
+ * 진짜 링크보다 먼저 잡힘)의 재발을 막는 것이 「JSDoc 을 읽었는지」뿐이었으므로, 후보가 `2` 개
  * 이상일 때 사후 추적용 로그 1행만 남긴다.
+ *
+ * 매치 수가 아니라 **고유 번호 수**를 세는 이유: 같은 이슈를 두 번 인용한 본문은 어느 이슈가
+ * 전이되는지가 모호하지 않은데 매치 수로 세면 경고가 남는다 (PR #1187 reviewer R-d).
+ * 번호는 `Number` 로 정규화하므로 `#7` 과 `#007` 은 같은 후보다.
  *
  * @param {string|null|undefined} body
  * @returns {number}
  */
-export function countLinkedIssueMatches(body) {
+export function countDistinctLinkedIssues(body) {
   if (!body) return 0;
-  return (body.match(/(?:Closes|Fixes|Resolves)\s+#\d+/gi) ?? []).length;
+  const matches = body.matchAll(/(?:Closes|Fixes|Resolves)\s+#(\d+)/gi);
+  return new Set([...matches].map((m) => Number(m[1]))).size;
 }
 
 /** 한 축(PR 또는 이슈)의 라벨 연산을 계산한다. 스킵은 빈 배열로 표현된다. */
@@ -187,7 +206,11 @@ export function decide({ prLabels = [], issueNumber = null, issueLabels = null }
   return { pr, issue: { number: issueNumber, ...issue } };
 }
 
-/** 한 축의 연산을 적용한다. 분기 없는 순회 — 스킵은 호출 0회로 자동 보장된다. */
+/**
+ * 한 축의 연산을 적용한다. 분기 없는 순회 — **주어진 `ops` 의 두 배열이 비면 이 함수의 API 호출은
+ * 0회**이므로 스킵을 위한 `if` 가 여기 필요 없다. 국소 명제이며, 호출부가 `applyOps` **밖**에서
+ * 변이를 추가하는 것까지 막지는 않는다 (그 이탈은 변이 M2 ↔ 테스트 U5 가 갈라낸다).
+ */
 async function applyOps({ api, owner, repo, issueNumber, ops, log }) {
   for (const name of ops.remove) {
     try {
@@ -237,10 +260,10 @@ export async function runLabelSync({
 
   // R2 — 의미론은 불변(첫 매치 1개)이고 **모호성만 사후 추적**한다. 어느 이슈가 전이되는지는
   // 이 로그가 있든 없든 같다. 실피해가 1회 관측됐으므로(본 모듈 도입 PR 초판) 남긴다.
-  const linkedMatches = countLinkedIssueMatches(prBody);
-  if (linkedMatches >= 2) {
+  const linkedCandidates = countDistinctLinkedIssues(prBody);
+  if (linkedCandidates >= 2) {
     log(
-      `[stage-label-sync][ambiguous] close 키워드 매치 ${linkedMatches}건 — ` +
+      `[stage-label-sync][ambiguous] close 키워드가 가리키는 이슈 ${linkedCandidates}개 — ` +
         `첫 매치 #${issueNumber} 를 사용 (본문에 예시로 적은 번호가 아닌지 확인할 것)`,
     );
   }

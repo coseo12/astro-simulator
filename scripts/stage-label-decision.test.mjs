@@ -15,16 +15,24 @@
  * `U5` 단독이었고, 라운드 2 가 쓴 「`decide()` 앞에 제거 루프 **추가**」 변형은 중복 제거 때문에
  * `U5, U6, U7` 이 갈렸다. 두 경우 모두 U1~U4 는 PASS 다.
  *
- * 변이 ↔ 테스트 대응 (D10, 이슈 #1184 architect 설계 §6):
- *   M1 스킵 목록에서 `stage:qa` 삭제        → U1, U5
- *   M2 제거 루프를 `decide()` 앞으로 이동    → U5 단독
- *   M3 `pr.remove` 를 `[]` 로 고정            → U2, U6
- *   M4 이슈 축 스킵 판정 삭제                 → U4, U7
+ * 변이 ↔ 테스트 대응 — D10 **계약 원문은 M1~M4 `4` 종**이다 (이슈 #1184 architect 설계 §6):
+ *   M1 스킵 목록에서 `stage:qa` 삭제         → U1, U5
+ *   M2 제거 루프를 `decide()` 앞으로 이동     → U5 단독 (주입 지점 의존 — 위 ⚠️ 참조)
+ *   M3 `pr.remove` 를 `[]` 로 고정             → U2, U6
+ *   M4 이슈 축 스킵 판정 삭제                  → U4, U7
  *
- * 리뷰 라운드 2 추가분 (PR #1187):
+ * 리뷰 라운드 2 가 추가한 변이 `3` 종 (PR #1187 — 신규 테스트·단언의 판별력 실증. 전건 단독 사살):
+ *   M5 `applyOps` 의 `if (e?.status !== 404) throw e;` 1행 삭제
+ *      (= 초판의 무제한 `catch` 복원)          → U10 단독
+ *   M6 모호성 임계 `>= 2` 를 `>= 999`(도달 불가)로 → U11 단독
+ *   M7 `countDistinctLinkedIssues` 의 dedup 제거
+ *      (`new Set(...).size` → 매치 수)          → U11 단독 (R-d 단언)
+ *
+ * 그 변이가 겨냥하는 신규 테스트:
  *   U10 `removeLabel` 의 404 **이외** 실패가 전파되는지 (B1 — 무제한 `catch` 는 D1 위반을
  *       신호 0으로 재생산했다. reviewer 가 `403` 주입으로 재현)
- *   U11 close 키워드 다중 매치 시 모호성 로그 (R2 — 파서 의미론은 불변)
+ *   U11 close 키워드가 **서로 다른 이슈**를 가리킬 때 모호성 로그 (R2 — 파서 의미론은 불변 /
+ *       R-d — 같은 이슈 중복 인용은 모호하지 않으므로 세지 않는다)
  *
  * 실행: node scripts/stage-label-decision.test.mjs
  */
@@ -33,7 +41,7 @@ import assert from 'node:assert/strict';
 import {
   REVIEW_STAGE,
   SKIP_REATTACH_STAGES,
-  countLinkedIssueMatches,
+  countDistinctLinkedIssues,
   decide,
   parseLinkedIssue,
   runLabelSync,
@@ -266,26 +274,35 @@ await run('U10 — removeLabel 이 404 아닌 실패(403)면 전파된다 (조�
   assert.deepEqual(api.calls, [], '전파 시 후속 변이는 일어나지 않는다');
 });
 
-await run('U11 — close 키워드 매치 2건 이상이면 ambiguous 로그 (결정은 첫 매치 불변)', async () => {
+await run('U11 — 서로 다른 이슈 2개 이상이면 ambiguous 로그 (결정은 첫 매치 불변)', async () => {
   const lines = [];
   const body = 'Closes #A, #B 는 자리표시자다\n\nCloses #4242\nFixes #7';
-  assert.equal(countLinkedIssueMatches(body), 2, '자리표시자는 숫자가 아니라 매치되지 않는다');
+  assert.equal(countDistinctLinkedIssues(body), 2, '자리표시자는 숫자가 아니라 매치되지 않는다');
 
   const decision = await runLabelSync(
     syncArgs({ prLabels: ['stage:dev'], prBody: body, api: fakeApi(), log: (m) => lines.push(m) }),
   );
   const hits = lines.filter((l) => l.includes('[ambiguous]'));
   assert.equal(hits.length, 1, '모호성 1건이 로그로 남아야 한다');
-  assert.ok(hits[0].includes('2건'));
+  assert.ok(hits[0].includes('2개'));
   // ⚠️ 파서 의미론 불변 — 로그는 결정을 바꾸지 않는다 (설계 §9-1 비-범위).
   assert.equal(decision.issue.number, 4242);
 
-  // 매치 1건이면 남지 않는다 (정상 PR 본문에서 상시 경고하지 않는다).
+  // 후보 1개면 남지 않는다 (정상 PR 본문에서 상시 경고하지 않는다).
   const single = [];
   await runLabelSync(
     syncArgs({ prBody: 'Closes #1184', api: fakeApi(), log: (m) => single.push(m) }),
   );
   assert.equal(single.filter((l) => l.includes('[ambiguous]')).length, 0);
+
+  // R-d — 같은 이슈를 두 번 인용한 본문은 어느 이슈가 전이되는지 모호하지 않다. 매치 수로 세면
+  // `2` 라 경고가 남았다 (PR #1187 reviewer 실측). 고유 번호 수로 세므로 `1` 이고 로그도 없다.
+  const dup = [];
+  assert.equal(countDistinctLinkedIssues('Closes #1184\n\nCloses #1184'), 1);
+  await runLabelSync(
+    syncArgs({ prBody: 'Closes #1184\n\nCloses #1184', api: fakeApi(), log: (m) => dup.push(m) }),
+  );
+  assert.equal(dup.filter((l) => l.includes('[ambiguous]')).length, 0);
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);
