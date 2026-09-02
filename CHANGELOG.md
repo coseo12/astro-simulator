@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-09-02
+
 ### Behavior Changes
 
 - **[#1184] PR push 시 `stage:*` 라벨 단일화 + 이슈 단계 되돌림 차단 (MINOR)** ([#1184](https://github.com/coseo12/astro-simulator/issues/1184)) — `harness-pr-review.yml` 은 push (`synchronize`) 마다 `stage:review` 를 **부착만** 하고 기존 `stage:*` 를 떼지 않았다. 이슈 축은 더 좁아서 `stage:dev` **하나만** 제거했으므로, 이슈가 `stage:qa` 여도 `stage:review` 가 덧붙어 **다중 부착 + 단계 되돌림**이 동시에 발생했다. PR [#1183](https://github.com/coseo12/astro-simulator/pull/1183) 에서 `3` 회 관측됐고 매회 수동 정리했다.
