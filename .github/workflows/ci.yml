@@ -295,6 +295,15 @@ jobs:
       - name: '#846 browser-verify 헬퍼 회귀 가드 (browser-verify-utils.test)'
         run: node scripts/browser-verify-utils.test.mjs
 
+      # #1184 stage:* 라벨 결정 로직 (harness-pr-review.yml 의 SSoT) 회귀 가드.
+      # 순수 함수 decide() + 주입형 실행기 runLabelSync() 를 페이크 api 로 검증한다 —
+      # 변이 M2(제거 루프를 decide() 앞으로 이동)는 실행기 호출 **순서**로만 갈리므로
+      # decide() 단위 테스트만으로는 판별력이 0 이다.
+      # harness-pr-review.yml 이 사용 직전에도 같은 테스트를 돌린다 (이중 배선).
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#1184 stage:* 라벨 결정 로직 회귀 가드 (stage-label-decision.test)'
+        run: node scripts/stage-label-decision.test.mjs
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================
