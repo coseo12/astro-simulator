@@ -8,15 +8,23 @@
  * (#897 교훈 — CI 미배선 self-test 는 0회 실행 / #840 `--if-present` silent no-op 금지).
  *
  * 실행기 테스트는 **호출을 기록하는 페이크 `api`** 를 주입하고 기록 배열을 `deepEqual` 로
- * **순서까지** 비교한다. 변이 M2(제거 루프를 `decide()` 앞으로 이동)는 `decide()` 단위
- * 테스트로 절대 잡히지 않는다 — 순서는 실행기의 성질이지 결정 함수의 성질이 아니므로
- * **U5 만이** 그것을 갈라낸다.
+ * **순서까지** 비교한다. 변이 M2(제거 루프를 `decide()` 앞으로 이동)를 주입하면 `decide()` 만
+ * 검사하는 **U1~U4 는 전건 PASS** 한다 (라운드 1·2 실측) — 순서는 실행기의 성질이지 결정 함수의
+ * 성질이 아니기 때문이다. 즉 M2 를 갈라내는 것은 **실행기 테스트뿐**이고 그 최소 표본이 U5 다.
+ * ⚠️ 갈리는 테스트의 **정확한 집합은 주입 지점에 따라 달라진다** — 라운드 1 의 「루프 이동」은
+ * `U5` 단독이었고, 라운드 2 가 쓴 「`decide()` 앞에 제거 루프 **추가**」 변형은 중복 제거 때문에
+ * `U5, U6, U7` 이 갈렸다. 두 경우 모두 U1~U4 는 PASS 다.
  *
  * 변이 ↔ 테스트 대응 (D10, 이슈 #1184 architect 설계 §6):
  *   M1 스킵 목록에서 `stage:qa` 삭제        → U1, U5
  *   M2 제거 루프를 `decide()` 앞으로 이동    → U5 단독
  *   M3 `pr.remove` 를 `[]` 로 고정            → U2, U6
  *   M4 이슈 축 스킵 판정 삭제                 → U4, U7
+ *
+ * 리뷰 라운드 2 추가분 (PR #1187):
+ *   U10 `removeLabel` 의 404 **이외** 실패가 전파되는지 (B1 — 무제한 `catch` 는 D1 위반을
+ *       신호 0으로 재생산했다. reviewer 가 `403` 주입으로 재현)
+ *   U11 close 키워드 다중 매치 시 모호성 로그 (R2 — 파서 의미론은 불변)
  *
  * 실행: node scripts/stage-label-decision.test.mjs
  */
@@ -25,6 +33,7 @@ import assert from 'node:assert/strict';
 import {
   REVIEW_STAGE,
   SKIP_REATTACH_STAGES,
+  countLinkedIssueMatches,
   decide,
   parseLinkedIssue,
   runLabelSync,
@@ -47,7 +56,7 @@ const run = async (name, fn) => {
  * **변이(add/remove) 만** `calls` 에 기록한다 — 읽기는 순서 불변식 대상이 아니므로
  * 별도 `reads` 에 둔다 (기록 배열이 변이 순서만을 나타내게 유지).
  */
-function fakeApi({ issueLabels = [], missingLabels = [] } = {}) {
+function fakeApi({ issueLabels = [], missingLabels = [], errorLabels = {} } = {}) {
   const calls = [];
   const reads = [];
   return {
@@ -61,6 +70,12 @@ function fakeApi({ issueLabels = [], missingLabels = [] } = {}) {
       if (missingLabels.includes(name)) {
         const err = new Error('Label does not exist');
         err.status = 404;
+        throw err;
+      }
+      // 404 **이외**의 실패 주입 — `{ 'stage:dev': 403 }` 형태 (U10).
+      if (errorLabels[name]) {
+        const err = new Error(`HTTP ${errorLabels[name]}`);
+        err.status = errorLabels[name];
         throw err;
       }
       calls.push(`removeLabel:#${n}:${name}`);
@@ -235,6 +250,42 @@ await run('U9 — 비대칭 로그가 남는다 (보드만 보는 사람에게 �
     syncArgs({ prLabels: ['stage:dev'], prBody: null, api: fakeApi(), log: (m) => lines3.push(m) }),
   );
   assert.equal(lines3.filter((l) => l.includes('[asymmetry]')).length, 0);
+});
+
+await run('U10 — removeLabel 이 404 아닌 실패(403)면 전파된다 (조용한 D1 위반 금지)', async () => {
+  const api = fakeApi({ issueLabels: [], errorLabels: { 'stage:dev': 403 } });
+  await assert.rejects(
+    () =>
+      runLabelSync(
+        syncArgs({ prNumber: 900, prLabels: ['stage:dev'], prBody: 'Closes #1184', api }),
+      ),
+    (e) => e.status === 403,
+    '404 이외의 실패는 삼키지 않는다',
+  );
+  // 부착까지 진행하면 「제거 실패 + 부착 성공」 = `stage:*` 다중 잔존이 신호 0으로 재생산된다.
+  assert.deepEqual(api.calls, [], '전파 시 후속 변이는 일어나지 않는다');
+});
+
+await run('U11 — close 키워드 매치 2건 이상이면 ambiguous 로그 (결정은 첫 매치 불변)', async () => {
+  const lines = [];
+  const body = 'Closes #A, #B 는 자리표시자다\n\nCloses #4242\nFixes #7';
+  assert.equal(countLinkedIssueMatches(body), 2, '자리표시자는 숫자가 아니라 매치되지 않는다');
+
+  const decision = await runLabelSync(
+    syncArgs({ prLabels: ['stage:dev'], prBody: body, api: fakeApi(), log: (m) => lines.push(m) }),
+  );
+  const hits = lines.filter((l) => l.includes('[ambiguous]'));
+  assert.equal(hits.length, 1, '모호성 1건이 로그로 남아야 한다');
+  assert.ok(hits[0].includes('2건'));
+  // ⚠️ 파서 의미론 불변 — 로그는 결정을 바꾸지 않는다 (설계 §9-1 비-범위).
+  assert.equal(decision.issue.number, 4242);
+
+  // 매치 1건이면 남지 않는다 (정상 PR 본문에서 상시 경고하지 않는다).
+  const single = [];
+  await runLabelSync(
+    syncArgs({ prBody: 'Closes #1184', api: fakeApi(), log: (m) => single.push(m) }),
+  );
+  assert.equal(single.filter((l) => l.includes('[ambiguous]')).length, 0);
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

@@ -17,15 +17,30 @@
  * 바꾸지 못한다. 그래서 스킵이 여전히 걸리고(`stage:qa` 를 보고 중단), 그 시점엔 이미 제거가
  * 끝나 있어 **`stage:*` 가 하나도 남지 않는다.**
  *
- * 이 모듈은 그 불변식을 **규율이 아니라 구조로** 보장한다: `runLabelSync` 는 `decide()` 로
- * 결정 객체를 먼저 확정한 뒤에만 변이 API 를 호출하고, 스킵은 실행기의 `if` 가 아니라
- * **빈 배열**(`remove: [], add: []`)로 표현된다. 「제거를 스킵 판정 앞에 두는」 구현은 표현
- * 자체가 불가능하다. ⚠️ 이 성질을 깨는 리팩토링(실행기에 스킵 분기 재도입 / `decide()` 호출을
- * 변이 뒤로 이동)은 금지다 — 변이 테스트 M2 가 이것만을 검사한다.
+ * 이 모듈의 형태는 그 불변식을 **지키기 쉽게** 만든다: `runLabelSync` 는 `decide()` 로 결정
+ * 객체를 먼저 확정한 뒤에만 변이 API 를 호출하고, 스킵은 실행기의 `if` 가 아니라
+ * **빈 배열**(`remove: [], add: []`)로 표현되므로 실행기에 스킵 분기를 따로 둘 필요가 없다.
+ *
+ * ⚠️ **다만 「구조상 표현 불가능」은 아니다.** 제거 루프를 `decide()` 앞으로 옮기는 구현(변이 M2)은
+ * 문법·타입 오류 `0` 으로 작성·로드·실행되며, `stage:*` 가 하나도 남지 않는 바로 그 피해를 낸다
+ * (PR #1187 reviewer 가 직접 주입해 재현). 초판 주석의 「표현 자체가 불가능」은 **거짓이었다**.
+ * 그 거짓은 아래 M2/U5 를 불필요한 중복으로 보이게 해 **가드 삭제를
+ * 유도하는 방향**이라 위험하다. 실제 보장은 둘의 합이다:
+ *   (1) **규율** — 위 형태를 깨는 리팩토링(실행기에 스킵 분기 재도입 / `decide()` 호출을 변이
+ *       뒤로 이동)은 금지다.
+ *   (2) **결정적 탐지** — 그 이탈을 변이 테스트 M2 ↔ **U5** 가 갈라낸다. 순서는 실행기의 성질이라
+ *       `decide()` 단위 테스트(U1~U4)로는 M2 가 잡히지 않는다 (전건 PASS 실측).
  *
  * 읽기(`listLabelsOnIssue`)는 불변식 대상이 아니다. 변이가 아니라서 스냅샷을 오염시키지 못하므로
- * 이슈 라벨은 `decide()` 호출 **전에 무조건** 조회한다. 대가는 PR 스킵 경로의 GET 1회 낭비이고,
- * 얻는 것은 「모든 변이가 단일 순수 함수의 출력으로 결정된다」는 성질이다.
+ * 이슈 라벨은 `decide()` 호출 **전에 무조건** 조회한다. 얻는 것은 「모든 변이가 단일 순수 함수의
+ * 출력으로 결정된다」는 성질이고, 대가는 **둘**이다 (초판 JSDoc 은 (1) 만 적었다 — PR #1187 R1):
+ *   (1) PR 스킵 경로의 GET 1회 낭비.
+ *   (2) ⚠️ **연결 이슈 조회가 실패하면 PR 축 라벨링까지 죽는다.** 조회가 모든 변이보다 앞에 있으므로
+ *       본문의 이슈 번호가 존재하지 않으면(오탈자 / 예시 번호) `listLabelsOnIssue` 가 던지고 PR 은
+ *       라벨을 받지 못한 채 run 이 빨갛게 실패한다. 종전 workflow 는 PR 부착이 먼저였으므로 이것은
+ *       **행동 변화**이며 CHANGELOG `[Unreleased]` 행동 변화 3번 항에 박제했다. 삼키지 않는 쪽을
+ *       유지한 근거: 실패가 **보이고**(fail-visible — B1 과 같은 방향), 원인이 PR 본문 오류라
+ *       사람이 고칠 수 있으며, 삼키면 미검증 분기가 하나 늘어난다.
  *
  * ## 연결 이슈 파서를 `auto-close-issue-parser.mjs` 와 공유하지 않는 이유 (의도적 비재사용)
  *
@@ -58,6 +73,15 @@ export const REVIEW_STAGE = 'stage:review';
  *
  * #915 가 이 스킵을 넣은 이유: `synchronize` 마다 `stage:review` 를 무조건 재부착하면
  * 이미 qa/done 단계에 간 PR 을 push 가 뒤로 끈다.
+ *
+ * ⚠️ **D7 계약 재조정 — 술어는 「활성 코드 참조 `0`」이다** (사용자 결정 2026-09-02,
+ * CLAUDE.md §스프린트 계약 5·7항). 원 계약 술어 `git grep -c 'postReviewStages'` 는 리터럴
+ * `2` 를 반환하는데, 그 `2` 는 **전부 산문**이다 — 본 JSDoc 1행 + `CHANGELOG.md` 의 rename
+ * 서술 1행 (reviewer 실측: 5종 표기 변형 × `--untracked` × 경로 무제한에서 추가 hit `0`).
+ * 산문의 옛 이름은 **의도적으로 남긴다**: 옛 이름으로 검색하는 사람이 새 이름에 도달하지 못하면
+ * rename 자체가 추적 불가능해지므로 이 문자열이 **grep 회수 키**다. 같은 클래스의 저장소 선례 —
+ * `scripts/verify-no-scientific-grep.mjs` 헤더가 _"주석(역사 맥락) 과 `docs/` 는 의도적으로 허용"_.
+ * 재조정 근거는 PR 본문에, 미래 관찰자용 기록은 CHANGELOG Notes 에 동시 박제했다.
  */
 export const SKIP_REATTACH_STAGES = ['stage:qa', 'stage:done'];
 
@@ -72,6 +96,22 @@ export function parseLinkedIssue(body) {
   if (!body) return null;
   const match = body.match(/(?:Closes|Fixes|Resolves)\s+#(\d+)/i);
   return match ? Number(match[1]) : null;
+}
+
+/**
+ * 같은 정규식의 **전 매치 수** — 결정에는 쓰지 않고 모호성 로깅에만 쓴다 (R2).
+ *
+ * `parseLinkedIssue` 의 의미론(3 키워드 + 첫 매치 1개)은 그대로 두는 것이 설계 §9-1 의 결정이므로
+ * **어느 이슈가 전이되는지는 한 글자도 바뀌지 않는다.** 다만 초판이 밟은 함정(본문 예시 번호가
+ * 진짜 링크보다 먼저 잡힘)의 재발을 막는 것이 「JSDoc 을 읽었는지」뿐이었으므로, 매치가 `2` 건
+ * 이상일 때 사후 추적용 로그 1행만 남긴다.
+ *
+ * @param {string|null|undefined} body
+ * @returns {number}
+ */
+export function countLinkedIssueMatches(body) {
+  if (!body) return 0;
+  return (body.match(/(?:Closes|Fixes|Resolves)\s+#\d+/gi) ?? []).length;
 }
 
 /** 한 축(PR 또는 이슈)의 라벨 연산을 계산한다. 스킵은 빈 배열로 표현된다. */
@@ -144,9 +184,15 @@ async function applyOps({ api, owner, repo, issueNumber, ops, log }) {
     try {
       await api.removeLabel({ owner, repo, issue_number: issueNumber, name });
       log(`[stage-label-sync] #${issueNumber} 제거: ${name}`);
-    } catch {
-      // 404 = 이미 없음. 제거는 멱등이므로 삼킨다.
-      log(`[stage-label-sync] #${issueNumber} 제거 스킵 (부재): ${name}`);
+    } catch (e) {
+      // 404 = 이미 없음. 제거는 멱등이므로 **404 만** 삼킨다.
+      // ⚠️ 404 이외(403·5xx 등)는 전파한다 — 삼키면 제거가 실패한 채 부착만 성공해
+      // `stage:*` 다중 잔존(D1 위반)이 **신호 0으로** 재생산되고, 로그가 검증하지 않은
+      // 원인(「부재」)을 단정해 사후 조사자를 오도하며, 결정 JSON 의 `"remove"` 가
+      // **결정**일 뿐인데 **결과**로 읽히는 실행 증거 오염까지 겹친다. 아래 부착 경로의
+      // fail-visible 원칙과 같은 방향이다 (PR #1187 reviewer B1 — `403` 주입 재현).
+      if (e?.status !== 404) throw e;
+      log(`[stage-label-sync] #${issueNumber} 제거 스킵 (404 부재): ${name}`);
     }
   }
   if (ops.add.length) {
@@ -179,6 +225,16 @@ export async function runLabelSync({
   log = console.log,
 }) {
   const issueNumber = parseLinkedIssue(prBody);
+
+  // R2 — 의미론은 불변(첫 매치 1개)이고 **모호성만 사후 추적**한다. 어느 이슈가 전이되는지는
+  // 이 로그가 있든 없든 같다. 실피해가 1회 관측됐으므로(본 모듈 도입 PR 초판) 남긴다.
+  const linkedMatches = countLinkedIssueMatches(prBody);
+  if (linkedMatches >= 2) {
+    log(
+      `[stage-label-sync][ambiguous] close 키워드 매치 ${linkedMatches}건 — ` +
+        `첫 매치 #${issueNumber} 를 사용 (본문에 예시로 적은 번호가 아닌지 확인할 것)`,
+    );
+  }
 
   // 읽기는 순서 불변식 대상이 아니다 (변이가 아니라 스냅샷을 오염시키지 못함) —
   // 결정을 1회로 유지하기 위해 decide() 전에 무조건 조회한다.
