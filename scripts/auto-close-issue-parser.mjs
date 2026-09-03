@@ -13,6 +13,21 @@
  *   - 키워드 직후 `#N` 만 매칭 — `Closes #1, #2` 의 `#2` 는 GitHub 과 동일하게 비매칭
  *   - `Part of #N` / `Builds on #N` 등 비-close 참조는 비매칭
  *   - cross-repo (`owner/repo#N`) 는 범위 외 (본 저장소 이슈만)
+ *   - **코드 스팬/코드 블록 안의 close 지시는 매칭하지 않는다** (#1190) — 아래 참조
+ *
+ * ## 코드 영역 전처리 (#1190)
+ *
+ * 본 파서는 마크다운을 해석하지 않아, 본문에 **예시로** 적은 close 지시를 코드 스팬
+ * 안이어도 진짜 지시로 읽었다 — 그 결과가 **무관한 이슈 close** 다. 머지 PR 전수 690 건
+ * 실측에서 이 오독이 결과를 바꾼 PR 이 3 건(#660 · #431 · #422)이고, **3 건 전부에서
+ * 저자 의도는 「이 PR 은 close 하지 않는다」였다** (셋 다 자기 PR 연결에는 `Refs` 를 썼고
+ * 둘은 본문에 그렇게 명시했다). 즉 파서가 저자 신호를 정확히 거꾸로 읽고 있었다.
+ * ⇒ `stripCodeRegions` 로 전처리한다. 나머지 687 건은 결과 완전 일치다.
+ *
+ * 전처리 함수는 `stage-label-decision.mjs` 와 **공유**하되(사본 0 — 한쪽만 고치면
+ * 「라벨은 미전이인데 이슈는 닫히는」 신규 비대칭이 생긴다), **공유 범위는 전처리까지다**:
+ * 위 키워드 9종 · 전 매치 · dedup 의미론은 그 모듈과 여전히 다르고 한 글자도 바뀌지 않았다.
+ * 전처리의 알려진 한계 5종과 그 실측 노출 수치는 `pr-body-code-regions.mjs` 가 정본이다.
  *
  * 사용법:
  *   node scripts/auto-close-issue-parser.mjs --body-file <path>   # 이슈 번호를 줄당 1개 출력
@@ -23,15 +38,19 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 
+import { stripCodeRegions } from './pr-body-code-regions.mjs';
+
 // GitHub 공식 키워드 9종. 구분자는 공백 또는 `:` (GitHub 은 `Closes: #1` 도 인정).
 const CLOSE_KEYWORD_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\s*:\s*|\s+)#(\d+)/gi;
 
 /** PR 본문 → close 대상 이슈 번호 배열 (등장 순서, dedup). */
 export function parseCloseTargets(body) {
   if (!body) return [];
+  // #1190 — 코드 스팬/블록 안의 예시는 close 지시가 아니다 (위 §코드 영역 전처리).
+  const scannable = stripCodeRegions(body);
   const seen = new Set();
   const result = [];
-  for (const match of body.matchAll(CLOSE_KEYWORD_RE)) {
+  for (const match of scannable.matchAll(CLOSE_KEYWORD_RE)) {
     const n = Number(match[1]);
     if (!seen.has(n)) {
       seen.add(n);
@@ -60,6 +79,21 @@ function selfTest() {
     ['null 본문', null, []],
     ['키워드-번호 개행 분리 허용 (공백 클래스)', 'Closes\n#42', [42]],
     ['단어 경계 — disclose 비매칭', 'disclose #99', []],
+    // #1190 A2 — 코드 영역 안의 예시는 close 지시가 아니다. `stage-label-decision.test.mjs`
+    // 의 U12-1~U12-4 와 **같은 4형태**를 대칭 배치한다 (한쪽 파서에만 전처리를 붙이는
+    // 변이 M10a/M10b 를 서로 반대쪽 suite 가 단독으로 갈라내는 것이 이 대칭의 목적이다).
+    ['A2-1 코드 스팬 안 예시 단독 (인라인)', '예시: `Closes #8801` 처럼 쓰지 말 것', []],
+    ['A2-2 fenced block 안 예시 단독', '설명 문단\n\n```text\nCloses #8802\n```\n\n마감 문단', []],
+    [
+      'A2-3 스팬 안 예시 + 코드 밖 진짜 지시 병존 → 코드 밖만',
+      '예시는 `Closes #8803` 형태다\n\n### 관련 이슈\n\nCloses #8804',
+      [8804],
+    ],
+    [
+      'A2-4 fenced + 인라인 혼합이 유일 매치',
+      '```md\nCloses #8805\n```\n\n인라인도 `Fixes #8806` 뿐이다',
+      [],
+    ],
   ];
   for (const [desc, body, expected] of cases) {
     const actual = parseCloseTargets(body);
