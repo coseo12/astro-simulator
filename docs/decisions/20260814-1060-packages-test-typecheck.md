@@ -1,7 +1,7 @@
 # ADR: `packages/{shared,core}` 테스트 파일 타입 검사 강제 지점 — `verify-and-rust` 배선 + 다중 `--filter` 단일 호출 금지 (#1060)
 
 - 일자: 2026-08-14
-- **상태**: **Accepted** (cross-validate agy 2026-08-15 — `Provisional` 에서 전이)
+- **상태**: **Accepted** (cross-validate agy 2026-08-15 — `Provisional` 에서 전이) · §후보 비교 2 **dated 부기 2026-09-04** ([#1094](https://github.com/coseo12/astro-simulator/issues/1094) — 축 2 정밀화. 결정 불변이므로 재-`Provisional` 강등 아님)
 - 관련: 이슈 [#1060](https://github.com/coseo12/astro-simulator/issues/1060) / 분리 출처 [#960](https://github.com/coseo12/astro-simulator/issues/960) §교차검증 반영 사항 고유 발견 / 선행 ADR [`20260814-960`](20260814-960-worktree-typecheck-recipe.md) (typecheck 선행 조건 2축) · [`20260807-971`](20260807-971-required-status-checks.md) 결정 1·9-1 (required check 관할) · [`20260808-983`](20260808-983-measurement-recording-convention.md) (수치 박제 규약)
 - 측정 rev: `fe922bb` (`origin/develop` tip, 2026-08-14). 본 문서의 모든 수치는 이 rev 단일 시점에 **격리 worktree** 1개에서 `pnpm install --frozen-lockfile` + `pnpm build` 후 일괄 도출 ([`20260808-983`](20260808-983-measurement-recording-convention.md) §부분 재측정 금지). 실행 환경은 macOS / pnpm `10.32.1` / TypeScript `6.0.3` / Next `16.2.12`
 
@@ -210,6 +210,38 @@ pnpm --fail-if-no-match --filter @astro-simulator/nonexistent typecheck ; echo $
 `pnpm -C` 형태도 두 축을 닫는다 (실측: 디렉토리 부재 시 `ENOENT` exit `1`). 채택하지 않은 이유는 **주소 체계 일관성**이다 — 같은 job 의 기존 빌드 스텝이 패키지 **이름**(`@astro-simulator/*`)으로 주소한다. 경로 주소를 섞으면 워크스페이스 이동 시 두 곳이 따로 논다. `--fail-if-no-match` 는 pnpm 이 정확히 이 목적으로 제공하는 플래그다.
 
 ⚠️ **별도 `verify-*.mjs` 단언 스크립트를 만들지 않는다.** 같은 job 의 vitest 스텝은 실행 수 단언을 손으로 짰지만(#840), 여기서는 **pnpm 자체 종료 코드가 이미 fail-fast** 다. 가드를 위한 가드를 신설하면 그것이 다시 검증 대상이 된다.
+
+### 부기 (2026-09-04, [#1094](https://github.com/coseo12/astro-simulator/issues/1094)) — 축 2 «필터 `0` 매칭» 정밀화
+
+> 위 원문은 **소급 치환하지 않는다.** 본 절은 축 2 라벨이 한데 묶고 있던 하위 축을 **추가로** 드러낼 뿐이며, §결정 3 의 결론(분리 호출 + `--fail-if-no-match`)은 **불변**이다.
+
+(iii) _"필터 `0` 매칭"_ 은 실측상 **두 하위 축**을 한 라벨에 묶는다. `--fail-if-no-match` 의 검출 여부가 그 둘 사이에서 **갈린다**:
+
+- **(iii-a) 전체 `0` 매칭** — 선택 집합이 통째로 빈다. 플래그가 exit `1` 로 **잡는다** (위 (iv) 가 이 경우다).
+- **(iii-b) 부분 미매칭** — 다중 `--filter` 중 **일부만** 매칭된다. 플래그를 붙여도 exit **`0`** 이고 **못 잡는다**. 플래그는 선택 집합이 **통째로 빌 때만** 발화하기 때문이다.
+
+실측 (rev `9a9f79f` / 격리 worktree / `pnpm --version` = `10.32.1`, 루트 `packageManager` 핀과 일치 확인 / 실 워크스페이스 이름 사용, `@astro-simulator/nope` 는 부재):
+
+```bash
+# (iii-b) 부분 미매칭 — 플래그를 붙여도 조용하다
+pnpm -r --fail-if-no-match --filter @astro-simulator/shared --filter @astro-simulator/nope build ; echo $?
+# No projects matched the filters "@astro-simulator/nope" in "<repo>"
+# 0   ← 미매칭을 출력으로 알리고도 exit 0
+
+# (iii-a) 전체 0 매칭 — 플래그가 잡는다
+pnpm --fail-if-no-match --filter @astro-simulator/nope build ; echo $?
+# 1
+
+# 참고 — 이중 형태여도 양쪽이 모두 부재면 그것은 (iii-a) 이고, 플래그가 잡는다
+pnpm -r --fail-if-no-match --filter @astro-simulator/nope1 --filter @astro-simulator/nope2 build ; echo $?
+# 1
+```
+
+**규범적 귀결 — 「분리」는 스타일이 아니라 검출력의 필요조건이다.** (한정: §결정 3 의 전제 아래, 즉 **pnpm 자체 종료 코드만으로 검출**하고 별도 단언 스크립트를 두지 않는다는 조건에서다.) 위 판정 표의 _"패키지별 분리 호출 + `--fail-if-no-match` → exit 1"_ 셀이 성립하는 이유는 **플래그 때문만이 아니다.** 분리가 각 호출의 필터를 `1` 개로 만들어 **(iii-b) 를 (iii-a) 로 환원**시키고, 그래야 비로소 플래그가 발화한다. 이중 형태에 플래그만 덧붙이는 처방은 **(iii-b) 에서** 무력하다 — 축 2 **전체**에서가 아니다 (위 세 번째 실측: 이중 형태여도 양쪽이 모두 부재면 (iii-a) 라 플래그가 exit `1` 을 낸다). 그 한정 아래에서 두 수단은 대등한 선택지가 아니라 **순차 의존**이다.
+
+**§재검토 조건 5 의 재측정 대상 집합이 `4` → `5` 로 는다.** 그 항의 _"4개 종료 코드"_ 는 (i)·(ii)·(iii)·(iv) 를 가리켰다. (iii) 이 (iii-a)·(iii-b) 로 갈라지되 **플래그 없는 종료 코드는 둘 다 `0`** 이므로, 실제로 추가되는 측정 항은 **「(iii-b) 부분 미매칭 + `--fail-if-no-match` → exit `0`」 하나**다.
+
+측정 출처: ADR 원문 4행 (측정 rev `fe922bb`) · 이슈 [#1094](https://github.com/coseo12/astro-simulator/issues/1094) §실측 · 같은 이슈의 스프린트 계약 코멘트 · 본 부기 코드블록 (rev `9a9f79f` 재현).
 
 ## 비용
 

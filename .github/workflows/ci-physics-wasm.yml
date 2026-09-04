@@ -185,6 +185,10 @@ jobs:
       # composite setup-and-build 미사용 (리뷰 발견): composite 는 Playwright 설치 +
       # 루트 `pnpm build` (web next build 포함) 를 무조건 수행 — vitest 에 불필요한 비용.
       # 인라인 3스텝 + 표적 빌드로 대체. Node 핀은 .node-version (#666 전수 명시 핀 정합).
+      # shared/core 호출 형태는 **패키지별 분리 호출 + --fail-if-no-match** 다 (#1094) —
+      #   ADR 20260814-1060 결정 3 은 본 스텝에 한정되지 않는 일반 규약인데 이 스텝만 예외로
+      #   남아 있었다 (그 ADR §의도적 비-범위 = 예외 선언이 아니라 «별도 판단» 유예). 기전과
+      #   2축 실측은 아래 타입 검사 스텝 주석 참조 — 같은 silent no-op 클래스다.
       - name: pnpm setup (unit tests)
         uses: pnpm/action-setup@v4
 
@@ -200,7 +204,8 @@ jobs:
       - name: workspace 빌드 (wasm → shared → core)
         run: |
           pnpm --filter @astro-simulator/physics-wasm build
-          pnpm --filter @astro-simulator/shared --filter @astro-simulator/core -r build
+          pnpm --fail-if-no-match --filter @astro-simulator/shared build
+          pnpm --fail-if-no-match --filter @astro-simulator/core build
 
       # #1060 — packages/{shared,core} 테스트 파일 타입 검사 강제 지점.
       # 두 패키지의 build (`tsc -p tsconfig.build.json`) 는 exclude 로 `**/*.test.ts` ·
