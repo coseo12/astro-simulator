@@ -34,6 +34,35 @@
  *   U11 close 키워드가 **서로 다른 이슈**를 가리킬 때 모호성 로그 (R2 — 파서 의미론은 불변 /
  *       R-d — 같은 이슈 중복 인용은 모호하지 않으므로 세지 않는다)
  *
+ * #1190 이 추가한 변이 `6` 종 (코드 영역 전처리 — 전건 단독 사살. dev 가 실제 주입해 측정한
+ * 값이며 재현 로그는 PR 본문. 「auto-close」 열은 `auto-close-issue-parser.mjs --self-test`):
+ *   M8  양쪽 파서에서 `stripCodeRegions(body)` → `body`
+ *       (= 현행 결함판 복원)          → U12-1·U12-2·U12-3·U12-4·U13 FAIL / auto-close FAIL
+ *   M9  공유 모듈에서 인라인 스팬 `.replace(...)`
+ *       **한 항만** 삭제 (fenced 만 제거) → U12-1·U12-3·U12-4·U13 FAIL / **U12-2 PASS** / auto-close FAIL
+ *   M10a `parseCloseTargets` **에만** 미적용 → 본 suite 전건 PASS / **auto-close 단독** FAIL
+ *   M10b `parseLinkedIssue` **에만** 미적용  → 본 suite 5건 FAIL / **auto-close PASS**
+ *   M11 공유 모듈에 이스케이프 인식 처방 주입 → **U13 단독** FAIL / auto-close PASS
+ *   M12 공유 모듈의 치환 문자 `' '` → `''`      → 본 suite 단독 FAIL / auto-close PASS
+ *       ⤷ 단, `M12` 만 주입하면 U13 의 **한계 4 첫 단언**(`한계 4: 공백 치환이 …`)이 먼저
+ *         `null !== 8811` 로 걸려 신규 단언(번호 합성)은 실행되지 않는다. 신규 단언이 내는
+ *         `8811 !== 88` 은 **그 첫 단언을 임시 제거한 판**에서만 나오고, 그 판이 판별력을
+ *         실증한다. (한계 1 단언을 제거하는 것으로는 갈리지 않는다 — 실측.)
+ *
+ * ⚠️ M8·M9 가 U13 까지 깨는 것은 의도된 결과다 (설계 단계 예측표에는 U12 만 적혀 있었다) —
+ * U13 은 **전처리가 존재한다는 전제 위에서** 그 한계를 고정하므로 전처리를 걷어내면 함께
+ * 무너진다. M8↔M9 판별은 U13 이 아니라 **U12-2 의 PASS** 가 한다.
+ *
+ * ⚠️ **U12 를 통짜 1 케이스로 묶지 말 것.** `assert` 는 첫 실패에서 중단하므로 묶으면 M8 과 M9 가
+ * **구분 불가능해진다** — 두 변이는 auto-close 쪽에서 같은 케이스에 걸리므로, 판별 신호는
+ * 「fenced 축은 살아 있고 인라인 축만 죽었다」는 **`U12-2` 의 PASS 하나뿐**이다.
+ *
+ * ⚠️ **M10a/M10b 의 탐지는 두 suite 가 「각각」 실행됨에 의존한다** (한쪽 열이 전건 PASS 인 것이
+ * 곧 다른 쪽이 유일한 탐지자라는 뜻이다). 그래서 교차 파서 합의 테스트를 신설하지 **않았다** —
+ * 그것만이 잡는 변이가 `0` 이라 판별력이 `0` 이기 때문이다. 대신 두 suite 의 CI 배선 `4` 곳
+ * (`ci.yml` 2 step + `auto-close-issues.yml` · `harness-pr-review.yml` 사용 직전 각 1 step)이
+ * 유지돼야 한다 — 하나라도 빠지면 그 열의 변이가 미검출로 돌아간다.
+ *
  * 실행: node scripts/stage-label-decision.test.mjs
  */
 import assert from 'node:assert/strict';
@@ -303,6 +332,93 @@ await run('U11 — 서로 다른 이슈 2개 이상이면 ambiguous 로그 (결�
     syncArgs({ prBody: 'Closes #1184\n\nCloses #1184', api: fakeApi(), log: (m) => dup.push(m) }),
   );
   assert.equal(dup.filter((l) => l.includes('[ambiguous]')).length, 0);
+});
+
+// --- #1190 코드 영역 전처리 (A2 4형태 — 개별 케이스 필수, 헤더 ⚠️ 참조) --------
+
+await run('U12-1 — 코드 스팬 안 예시 단독은 연결 지시가 아니다 (인라인 축)', () => {
+  const body = '예시: `Closes #8801` 처럼 쓰지 말 것';
+  assert.equal(parseLinkedIssue(body), null, '인라인 스팬 안은 매치되지 않는다');
+  assert.equal(countDistinctLinkedIssues(body), 0, '모호성 계수도 같은 전처리를 거친다');
+});
+
+await run('U12-2 — fenced block 안 예시 단독은 연결 지시가 아니다 (fenced 축)', () => {
+  // ⚠️ 이 케이스의 **PASS 여부**가 M8(전처리 전삭제) ↔ M9(인라인 항만 삭제) 의 유일한 판별
+  // 신호다. M9 는 fenced 축을 살려 두므로 여기만 PASS 한다 (헤더 변이 대응표).
+  const body = '설명 문단\n\n```text\nCloses #8802\n```\n\n마감 문단';
+  assert.equal(parseLinkedIssue(body), null, 'fenced block 안은 매치되지 않는다');
+  assert.equal(countDistinctLinkedIssues(body), 0);
+});
+
+await run('U12-3 — 스팬 안 예시 + 코드 밖 진짜 링크 병존 → 코드 밖이 선택된다', () => {
+  // 실피해 재현 방향: 전처리가 없으면 **첫 매치**라 예시(8803)가 진짜 링크(8804)를 이긴다.
+  const body = '예시는 `Closes #8803` 형태다\n\n### 관련 이슈\n\nCloses #8804';
+  assert.equal(parseLinkedIssue(body), 8804, '코드 밖 진짜 링크가 선택돼야 한다');
+  // 코드 스팬 후보를 세면 `2` 가 되어 모호성 경고가 남는다 — 결정은 그 후보를 보지도 않는다.
+  assert.equal(countDistinctLinkedIssues(body), 1, '코드 스팬 후보는 세지 않는다');
+});
+
+await run('U12-4 — fenced + 인라인 혼합이 유일 매치면 결과는 null', () => {
+  const body = '```md\nCloses #8805\n```\n\n인라인도 `Fixes #8806` 뿐이다';
+  assert.equal(parseLinkedIssue(body), null);
+  assert.equal(countDistinctLinkedIssues(body), 0);
+});
+
+await run('U13 — 전처리의 알려진 한계를 현행 동작으로 고정 (주석 계약 ↔ 구현 drift 차단)', () => {
+  // 이 테스트는 **결함을 겨누지 않는다.** `pr-body-code-regions.mjs` §알려진 한계가
+  // 서술한 동작을 못 박아, 누가 한계를 「고치면」 빨개져서 **주석의 수치도 함께 갱신**하도록
+  // 강제하는 것이 목적이다 (CLAUDE.md §주석 계약 vs 구현 drift).
+
+  // 한계 1 — 백슬래시 이스케이프. 렌더링상 리터럴 백틱이지만 본 함수는 코드 스팬으로 오인한다.
+  // ⚠️ 이 기대값을 뒤집는 처방(이스케이프 인식)은 머지 PR 690 건 실측에서 **엄격히 나쁘다**
+  //    — #422 의 정정을 잃고 #1070 의 진짜 링크 3행을 파괴한다. 기대값을 바꾸려면 그 측정을
+  //    다시 뜨고 주석 수치를 함께 갱신할 것.
+  assert.equal(
+    parseLinkedIssue('baseline 갱신 PR 본문 \\`Closes #8807\\` 를 적는다'),
+    null,
+    '한계 1: 이스케이프된 백틱도 코드 스팬으로 취급된다 (현행 동작)',
+  );
+
+  // 한계 2 — 문단 경계 미준수. 홀수 백틱이 문단을 건너 짝지어 사이의 진짜 링크를 삼킨다.
+  const oddTicks = '백틱이 하나 열린 `채 문단이 끝난다\n\nCloses #8808\n\n다시 백틱 `이 온다';
+  assert.equal(
+    parseLinkedIssue(oddTicks),
+    null,
+    '한계 2: 문단을 건너 짝지어 사이의 진짜 링크를 삼킨다 (현행 동작)',
+  );
+
+  // 한계 3 — fence 짝짓기는 비탐욕 쌍 단위. 마커가 홀수면 마지막 하나는 짝을 못 찾는다.
+  // (노출 0/690 이라 실제 표본이 없어 합성 입력으로 고정한다.)
+  assert.equal(
+    parseLinkedIssue('```\nCloses #8809\n```\n\nCloses #8810\n\n```\n꼬리 fence'),
+    8810,
+    '한계 3: 짝지어진 첫 쌍만 제거되고 그 뒤 진짜 링크는 살아남는다',
+  );
+
+  // 한계 4 — 치환이 공백 1개라 「키워드 + 공백 + #N」이 합성될 수 있다. 빈 문자열 치환이
+  // 만드는 **번호 변조**(다른 이슈를 가리키게 됨)를 피하려고 택한 거래다.
+  assert.equal(
+    parseLinkedIssue('Closes`주석`#8811'),
+    8811,
+    '한계 4: 공백 치환이 없던 매치를 만든다 (택한 오탐 1종)',
+  );
+  // ⚠️ 입력에 close 키워드가 **있어야** 판별력이 생긴다. 초판은 키워드 없는 `참조 #88…` 이라
+  //    develop 판 · 공백 치환 · 빈 문자열 치환 세 판이 전부 null 이어서 주석이 주장하는
+  //    「번호 합성 방지」를 하나도 고정하지 못했다 (PR #1191 reviewer B3).
+  //    아래 형태는 빈 문자열 치환에서만 8811 로 **번호가 변조**되므로 결정 3(원안 '' 이탈)이
+  //    근거로 든 바로 그 현상을 고정한다. 실측: develop=88 / ' '=88 / ''=8811.
+  assert.equal(
+    parseLinkedIssue('Closes #88`무관`11'),
+    88,
+    '한계 4의 대가로 얻은 것: 번호 조각이 이어붙어 다른 번호(8811)로 합성되지 않는다',
+  );
+
+  // 한계 5 — tilde fence 미지원. 확장 시 이득 0/690 · GFM 취소선과 충돌하므로 확장하지 않는다.
+  assert.equal(
+    parseLinkedIssue('~~~\nCloses #8812\n~~~'),
+    8812,
+    '한계 5: ~~~ 는 코드 블록으로 인식되지 않는다 (현행 동작)',
+  );
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

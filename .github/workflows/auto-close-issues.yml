@@ -8,6 +8,10 @@ name: auto-close-issues
 # PR 본문의 close 키워드를 파싱해 이슈 close + PR 링크 코멘트를 박제한다 (수동 close 규약 대체).
 #
 # 파싱 SSoT: scripts/auto-close-issue-parser.mjs (GitHub 공식 키워드 9종 미러링).
+# 그 파서는 본문을 스캔하기 전 scripts/pr-body-code-regions.mjs 의 stripCodeRegions 로
+# 코드 스팬/코드 블록을 제거한다 (#1190) — 본문에 **예시로** 적은 close 지시가 무관한 이슈를
+# 닫던 결함의 처방이며, 전처리 모듈은 harness-pr-review.yml 의 라벨 파서와 공유한다
+# (공유 범위는 전처리까지 — 키워드 집합·매치 수 의미론은 두 파서가 각자 유지).
 # self-test 는 (1) 본 workflow 사용 직전 + (2) ci.yml detect-and-test 상시 배선 이중화
 # (#897 교훈 — CI 미배선 self-test 는 0회 실행).
 #

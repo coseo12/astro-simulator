@@ -55,15 +55,34 @@
  * 이슈가 전이되는지가 조용히 바뀌므로 **현행 workflow 의미론을 그대로 보존**한다.
  * ⤷ 파생 한계: `Closes #A, #B` 처럼 PR 이 이슈 여러 개를 닫을 때 **첫 이슈만 전이**되고 나머지는
  *   이전 단계에 방치된다. 현행 동작 그대로이며 본 건에서 바꾸지 않는다.
- * ⤷ ⚠️ 위 예시를 PR 본문에 **숫자 그대로** 쓰지 말 것. 파서는 마크다운을 해석하지 않으므로
- *   코드 스팬 안이어도 매칭되고, **첫 매치**라 본문 하단의 진짜 `Closes #<이슈>` 보다 먼저 잡힌다.
- *   본 모듈을 도입한 PR #1187 의 초판이 이 함정을 그대로 밟아, 예시로 적은 번호의 이슈에
- *   `stage:review` 가 부착됐다 (수동 원복). 예시는 숫자가 아닌 자리표시자로 쓴다.
- * ⤷ 별도 한계: 1 이슈 : N PR 인 경우 어느 PR 의 push 든 같은 이슈를 `stage:review` 로 끈다.
- *   되돌려도 유지해도 모순이라 「뒷단계를 앞으로 끌지 않는다」를 차악으로 택했다 (아래 이슈 축 규칙).
+ * ⤷ 별도 한계 (위 파생 한계의 쌍대 — 1 PR : N 이슈 가 아니라 1 이슈 : N PR): 어느 PR 의
+ *   push 든 같은 이슈를 `stage:review` 로 끈다. 되돌려도 유지해도 모순이라 「뒷단계를 앞으로
+ *   끌지 않는다」를 차악으로 택했다 (아래 이슈 축 규칙).
+ * ⤷ ⚠️ 위 예시를 PR 본문에 **숫자 그대로** 쓰지 말 것. **첫 매치**라 본문 하단의 진짜
+ *   `Closes #<이슈>` 보다 먼저 잡히기 때문이다. 본 모듈을 도입한 PR #1187 의 초판이 이 함정을
+ *   그대로 밟아, 예시로 적은 번호의 이슈에 `stage:review` 가 부착됐다 (수동 원복).
+ *   예시는 숫자가 아닌 자리표시자로 쓴다.
+ *   ⤷ #1190 이후 이 규약은 **유지하되 단독 방어선이 아니다** — 코드 스팬/블록 안의 close
+ *     지시는 아래 전처리가 파서 단계에서 걸러낸다. 규약이 남는 이유는 전처리가 마크다운
+ *     파서가 아니어서 한계 5종이 있고(그 목록과 실측 수치는 `pr-body-code-regions.mjs`
+ *     가 정본), 코드 영역 **밖**의 예시는 전처리가 손대지 않기 때문이다.
+ *
+ * ## 코드 영역 전처리는 공유한다 (#1190 — 위 「공유하지 않는다」의 사거리 정정)
+ *
+ * ⚠️ 위 절의 「공유하지 않는다」는 **파서 본체**에 대한 서술이다. #1190 이후
+ * **전처리 함수 1개는 공유한다** (`./pr-body-code-regions.mjs` 의 `stripCodeRegions`).
+ * 공유 범위는 거기까지다 — 키워드 집합(3종 vs 9종) · 매치 수(첫 매치 vs 전 매치) ·
+ * dedup 유무는 여전히 각자이고, 그것이 위 비재사용 판정이 계속 유효한 이유다.
+ *
+ * 전처리를 **양쪽에** 붙이는 것이 본 건 범위인 근거: 머지 PR 전수 690 건 실측에서 두 파서의
+ * 델타가 **동일한 3 건**(#660 · #431 · #422)이라 같은 결함을 공유함이 확인됐고, 한쪽만 고치면
+ * *「라벨은 미전이인데 이슈는 닫히는」* 신규 비대칭이 생긴다 — 그 비대칭은 본 수정이 만드는
+ * 표면이므로 별건으로 미룰 수 없다.
  *
  * 실행: node scripts/stage-label-decision.test.mjs  (단위 테스트 = self-test)
  */
+
+import { stripCodeRegions } from './pr-body-code-regions.mjs';
 
 /** `stage:` 접두 — 단계 라벨 판별의 유일한 기준. */
 export const STAGE_PREFIX = 'stage:';
@@ -119,7 +138,8 @@ export const SKIP_REATTACH_STAGES = ['stage:qa', 'stage:done'];
  */
 export function parseLinkedIssue(body) {
   if (!body) return null;
-  const match = body.match(/(?:Closes|Fixes|Resolves)\s+#(\d+)/i);
+  // #1190 — 코드 스팬/블록 안의 예시는 연결 지시가 아니다 (위 §코드 영역 전처리는 공유한다).
+  const match = stripCodeRegions(body).match(/(?:Closes|Fixes|Resolves)\s+#(\d+)/i);
   return match ? Number(match[1]) : null;
 }
 
@@ -140,7 +160,10 @@ export function parseLinkedIssue(body) {
  */
 export function countDistinctLinkedIssues(body) {
   if (!body) return 0;
-  const matches = body.matchAll(/(?:Closes|Fixes|Resolves)\s+#(\d+)/gi);
+  // #1190 — `parseLinkedIssue` 와 **같은 전처리**를 거쳐야 한다. 한쪽만 전처리하면 모호성
+  // 로그가 결정과 다른 모집단을 세게 되고, 그 불일치는 로그를 사후 조사자에게 오도한다
+  // (코드 스팬 안 예시를 후보로 세면 「모호」 경고가 뜨는데 결정은 애초에 그 후보를 안 본다).
+  const matches = stripCodeRegions(body).matchAll(/(?:Closes|Fixes|Resolves)\s+#(\d+)/gi);
   return new Set([...matches].map((m) => Number(m[1]))).size;
 }
 
