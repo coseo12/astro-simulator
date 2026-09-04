@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-09-03
+
 ### Behavior Changes
 
 - **[#1190] 코드 스팬·코드 블록 안의 close 지시는 더 이상 연결 이슈로 잡히지 않는다 — 두 파서 공통 (MINOR)** ([#1190](https://github.com/coseo12/astro-simulator/issues/1190)) — `scripts/stage-label-decision.mjs` 의 `parseLinkedIssue` 와 `scripts/auto-close-issue-parser.mjs` 의 `parseCloseTargets` 는 둘 다 마크다운을 해석하지 않아, PR 본문에 **예시로** 적은 close 지시를 코드 스팬 안이어도 진짜 지시로 읽었다. 전자는 엉뚱한 이슈에 `stage:review` 를 부착하고 (도입 PR [#1187](https://github.com/coseo12/astro-simulator/pull/1187) 초판이 실제로 밟아 수동 원복), 후자는 **무관한 이슈를 close** 한다. 신설 공유 모듈 `scripts/pr-body-code-regions.mjs` 의 `stripCodeRegions` 가 fenced block 과 인라인 스팬을 제거한 뒤 스캔하도록 **양쪽 모두** 배선했다.
