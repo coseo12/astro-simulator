@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.85.0] - 2026-09-05
+
 ### Behavior Changes
 
 - **[#1094] `ci-physics-wasm` 의 workspace 빌드 스텝 — 이중 `--filter` 단일 호출 → 분리 호출 + `--fail-if-no-match` (MINOR)** ([#1094](https://github.com/coseo12/astro-simulator/issues/1094)) — `verify-and-rust` job 의 `workspace 빌드 (wasm → shared → core)` 스텝 `1` 행이 `pnpm --filter @astro-simulator/shared --filter @astro-simulator/core -r build` 였다. ADR [`20260814-1060`](docs/decisions/20260814-1060-packages-test-typecheck.md) 결정 3 이 _"다중 `--filter` 단일 호출은 silent no-op 이므로 가드 배선에 쓰지 않는다"_ 를 **본 스텝에 한정되지 않는 일반 규약**으로 박제했는데, 정작 그 규약을 만든 저장소의 이 스텝이 예외로 남아 있었다. 같은 ADR §의도적 비-범위 의 해당 항목은 **예외 선언이 아니라 「별도 판단이 필요해 손대지 않는다」는 유예**였고, 본 건이 그 판단이다.
