@@ -33,7 +33,7 @@
  *   node browser-verify-783-earth-detail.mjs                     # DoD 측정 (earth ON vs OFF)
  *   MODE=others CAPTURE_DIR=/abs node ...                        # mars/jupiter/moon 결정적 캡처 (분기 격리 diff 용)
  *   MODE=diff node ... <dirA> <dirB>                             # 캡처 dir 픽셀 diff (Concrete Prediction: ≈0)
- *   MODE=ocean node ...                                          # #1197 바다 깊이 그라데이션 (D5/D6, negative 주입 내장)
+ *   MODE=ocean node ...                                          # #1197 바다 깊이 그라데이션 (D5/D5-b/D6, negative 주입 내장)
  *
  * ── Amendment 7 (#1197) MODE=ocean — 바다 깊이 색 (ADR §A7.5 D5/D6) ──────────────
  * **무엇을 재는가**: 지구 disk 픽셀을 구면 역투영해 sub-solar 근방 낮면 바다 픽셀만 고르고,
@@ -50,9 +50,25 @@
  * 보유판(변이 M-a)과 **동일한 변이**다 — 두 요구가 한 변이로 닫힌다. `patchedMaterials > 0` 을
  * 함께 assert 해 「초록 no-op」이 통과 증거로 오채택되는 것을 막는다.
  *
- * **게이트는 2조건 동시** — `ON >= τ` **와** `ON − negative >= M`. 부호 비교만으로는 낙차가 `0` 에
- * 임의로 가까워도 통과한다 (#1163 라운드 2 [B4] 반증). 임계는 절대값이 아니라 **상대 성질**이며
- * ADR `20260705-759` 결정 3 규약을 따른다.
+ * **게이트는 3조건 동시** — D5 `ON >= τ` · D5-b 최심부 색 순서 `b > g > r` · D6 `ON − negative >= M`.
+ * 부호 비교만으로는 낙차가 `0` 에 임의로 가까워도 통과한다 (#1163 라운드 2 [B4] 반증). 임계는
+ * 절대값이 아니라 **상대 성질**이며 ADR `20260705-759` 결정 3 규약을 따른다. 표본 하한은 ON 과
+ * negative **양쪽**에 건다 — negative 의 낮은 갭이 「감쇠가 죽어서」가 아니라 「표본이 말라서」인
+ * 경우 D6 는 낙차가 커서 오히려 초록으로 보인다.
+ *
+ * ── 픽셀 층 변이 실증 (원본 PASS · 변이 결과) ────────────────────────────────
+ * PR 본문의 변이 표는 **단위 테스트 층** (`procedural-planet-shader.test.ts`) 전수 재현이다.
+ * 아래는 **픽셀 층** (본 게이트) 에서 별도로 실측한 변이다.
+ *
+ * | 변이 | 단위 층 | 본 게이트 |
+ * | --- | --- | --- |
+ * | (없음 — 원본) | `88 passed (88)` | `exit 0` · D5 갭 `0.2317` · D5-b 평균 RGB `(73.74, 170.01, 251.81)` · D6 낙차 `0.2289` |
+ * | **M-h** — `material.setColor3('deepOceanFactor', …)` 바인딩 블록 삭제 | `88 passed (88)` | ⚠️ **`exit 0` (미검출)** · D5 갭 `0.5704` · D5-b 평균 RGB `(29.66, 58.39, 73.93)` · D6 낙차 `0.5677` |
+ *
+ * [실측] 2026-09-06, 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`. **M-h 는 어느 층에서도
+ * 잡히지 않는다.** uniform 이 `(0,0,0)` 으로 남아 `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 가 되고,
+ * 이는 채널 공통 스칼라 감쇠라 (a) 색 순서를 보존하고 (b) 갭을 **키우는** 방향이라 D5 의 단측
+ * 술어를 통과한다. 잔여 구멍이며 D5-b 로는 원리적으로 도달할 수 없다 (게이트 근처 주석 참조).
  */
 
 import { chromium } from 'playwright';
@@ -520,7 +536,9 @@ async function measureOceanDepth(page, buf) {
       const rShot = diskR * Math.max(sx, sy);
       const span = Math.ceil(rShot) + 2;
 
-      const lums = [];
+      // 휘도만이 아니라 채널값까지 보관한다 — D5 는 휘도 백분위만 쓰지만 D5-b (§A7.5, R7) 는
+      // 최심부 대역의 **색 순서**를 봐야 하므로 r/g/b 가 필요하다.
+      const oceanPx = [];
       let excludedPolar = 0;
       let excludedNight = 0;
       let excludedLand = 0;
@@ -592,7 +610,7 @@ async function measureOceanDepth(page, buf) {
             continue;
           }
           const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-          lums.push(lum);
+          oceanPx.push({ lum, r, g, b });
 
           // 해안 밴드 진단 (비-게이트) — 셰이더와 동일한 equirectangular UV.
           const u = Math.atan2(nz, nx) / (2 * Math.PI) + 0.5;
@@ -608,7 +626,7 @@ async function measureOceanDepth(page, buf) {
         }
       }
 
-      if (lums.length === 0) {
+      if (oceanPx.length === 0) {
         return {
           error: 'ocean 표본 0',
           diskR: Number(diskR.toFixed(2)),
@@ -619,19 +637,36 @@ async function measureOceanDepth(page, buf) {
           excludedLand,
         };
       }
-      lums.sort((a, b2) => a - b2);
-      const pct = (q) => lums[Math.min(lums.length - 1, Math.floor(q * (lums.length - 1)))];
+      oceanPx.sort((a, b2) => a.lum - b2.lum);
+      const pct = (q) =>
+        oceanPx[Math.min(oceanPx.length - 1, Math.floor(q * (oceanPx.length - 1)))].lum;
       const p10 = pct(0.1);
       const p90 = pct(0.9);
+
+      // D5-b (§A7.5, R7) — 최심부 대역 대표 색. 휘도 하위 10% (P10 이하) 를 「최심부」로 본다.
+      // 대표값은 **평균**이고, 중앙값은 진단으로만 함께 낸다 (판정에 쓰지 않는다).
+      const deepEnd = Math.max(1, Math.floor(0.1 * (oceanPx.length - 1)) + 1);
+      const deepBand = oceanPx.slice(0, deepEnd);
+      const mean = (k) => deepBand.reduce((s, q) => s + q[k], 0) / deepBand.length;
+      const medianOf = (k) => {
+        const v = deepBand.map((q) => q[k]).sort((x, y) => x - y);
+        return v[Math.floor((v.length - 1) / 2)];
+      };
       return {
         diskR: Number(diskR.toFixed(2)),
-        nOcean: lums.length,
+        nOcean: oceanPx.length,
         maxNdl: Number(maxNdl.toFixed(4)),
         p10Lum: Number(p10.toFixed(2)),
         p50Lum: Number(pct(0.5).toFixed(2)),
         p90Lum: Number(p90.toFixed(2)),
         // 판정량 (b-2) — 상대 갭. raw 로 반환하고 판정은 raw 로 (인쇄만 반올림).
         gap: p90 > 0 ? (p90 - p10) / p90 : 0,
+        // D5-b 판정량 — raw 로 반환하고 판정도 raw 로 (인쇄만 반올림).
+        deepN: deepBand.length,
+        deepMeanR: mean('r'),
+        deepMeanG: mean('g'),
+        deepMeanB: mean('b'),
+        deepMedianRGB: [medianOf('r'), medianOf('g'), medianOf('b')],
         excludedPolar,
         excludedNight,
         excludedLand,
@@ -720,10 +755,13 @@ async function runOcean(browser) {
   const neg = results.negative;
 
   // 표본 고갈 fail-fast — cap 이 대륙 위에 얹히면 τ 가 잡음이 된다. 조용히 통과시키지 않는다.
-  const sampleOk = !on.error && on.nOcean >= OCEAN_MIN_SAMPLES;
+  // R6 — negative 프레임도 같은 하한을 요구한다. negative 의 갭이 낮은 이유가 「깊이 감쇠가 죽어서」가
+  // 아니라 「표본이 말라서」일 수 있고, 그 상태의 D6 는 낙차가 커서 오히려 초록으로 보인다.
+  const negSampleOk = !neg.error && (neg.nOcean ?? 0) >= OCEAN_MIN_SAMPLES;
+  const sampleOk = !on.error && on.nOcean >= OCEAN_MIN_SAMPLES && negSampleOk;
   console.log('\n=== 판정 (§A7.5) ===');
   console.log(
-    `표본: ON ocean 픽셀 ${on.nOcean ?? 0} (하한 ${OCEAN_MIN_SAMPLES}) · disk R ${on.diskR} · 제외 극관 ${on.excludedPolar} / 밤면·저ndl ${on.excludedNight} / 육지 ${on.excludedLand} → ${sampleOk ? 'PASS' : 'FAIL (측정 불가 — 밴드를 넓히지 말 것)'}`,
+    `표본: ON ocean 픽셀 ${on.nOcean ?? 0} / negative ${neg.nOcean ?? 0} (하한 ${OCEAN_MIN_SAMPLES}) · disk R ${on.diskR} · 제외 극관 ${on.excludedPolar} / 밤면·저ndl ${on.excludedNight} / 육지 ${on.excludedLand} → ${sampleOk ? 'PASS' : 'FAIL (측정 불가 — 밴드를 넓히지 말 것)'}`,
   );
   if (!sampleOk) {
     process.exitCode = 1;
@@ -732,9 +770,30 @@ async function runOcean(browser) {
 
   const gapDrop = on.gap - neg.gap;
   const d5 = on.gap >= OCEAN_GAP_TAU && on.consoleErrors === 0;
+  // ── D5-b — 최심부 색 순서 계약 ────────────────────────────────────────────
+  // 무엇을 거는가: 최심부(휘도 하위 10%) 대표 색의 **채널 순서** `b > g > r` (strict).
+  // 셰이더 상수 `DEEP_OCEAN_FACTOR` 의 제약 `b >= g >= r` 에서 파생된 부등식뿐이라 **새 임계
+  // 숫자가 없다** (실값 `b 0.62 > g 0.45 > r 0.35` 이라 strict 가 성립한다). 깊이 감쇠가 색조
+  // 이동 없는 회색화·색조 역전으로 무너지면 여기서 걸린다.
+  //
+  // ⚠️ **이 술어는 변이 M-h 를 잡지 못한다** — 그것이 R7 이 지목한 구멍인데, 닫히지 않았다.
+  // `material.setColor3('deepOceanFactor', …)` 바인딩 블록만 삭제하면 uniform 이 `(0,0,0)` 으로
+  // 남고, 그러면 `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 라 **채널 공통 스칼라 감쇠**가 된다.
+  // 즉 최심부는 어두워지되 **색 순서는 그대로 보존**된다. [실측] (2026-09-06, `SWIFTSHADER=1
+  // HEADFUL=0`) 원본 최심부 평균 RGB `(73.74, 170.01, 251.81)` vs M-h `(29.66, 58.39, 73.93)` —
+  // 둘 다 `b > g > r` 이라 D5-b 는 PASS, D5 는 갭이 `0.2317 → 0.5704` 로 **커져서** PASS,
+  // D6 도 낙차가 커져 PASS, `exit 0`. M-h 는 여전히 열려 있다.
+  //
+  // 왜 D5 만으로는 부족한가 (기록): `gap >= τ` 는 **단측 술어**라 갭이 커지는 실패 방향에 눈이
+  // 멀다. D5-b 는 그 축을 부분적으로만 보강한다 — 스칼라 감쇠 변이는 색 순서를 건드리지 않으므로
+  // 색 순서 축으로는 원리적으로 도달할 수 없다.
+  const d5b = on.deepMeanB > on.deepMeanG && on.deepMeanG > on.deepMeanR;
   const d6 = !neg.error && neg.patchedMaterials > 0 && gapDrop >= OCEAN_GAP_MARGIN;
   console.log(
     `D5 깊이 그라데이션: ON 상대 갭 ${on.gap.toFixed(4)} (≥ τ ${OCEAN_GAP_TAU}) · P10 ${on.p10Lum} / P50 ${on.p50Lum} / P90 ${on.p90Lum} · console err ${on.consoleErrors} → ${d5 ? 'PASS' : 'FAIL'}`,
+  );
+  console.log(
+    `D5-b 최심부 색 순서 (b > g > r strict, 하위 10% n=${on.deepN}): 평균 RGB (${on.deepMeanR.toFixed(2)}, ${on.deepMeanG.toFixed(2)}, ${on.deepMeanB.toFixed(2)}) · 중앙값 (${on.deepMedianRGB.join(', ')}) → ${d5b ? 'PASS' : 'FAIL'}`,
   );
   console.log(
     `D6 판별력 (deepOceanFactor (1,1,1) 고착 주입): 머티리얼 ${neg.patchedMaterials}개 패치 · negative 갭 ${neg.gap?.toFixed(4)} · 낙차 ${gapDrop.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) → ${d6 ? 'PASS' : 'FAIL'}`,
@@ -747,7 +806,15 @@ async function runOcean(browser) {
   console.log(
     `  ↳ [진단·비게이트] 해안 밴드 (0.1<maskLand<0.9) n=${on.coastN} 평균 휘도 ${on.coastMeanLum} vs 원양 (maskLand==0) n=${on.openOceanN} 평균 ${on.openOceanMeanLum}`,
   );
-  if (!(d5 && d6)) process.exitCode = 1;
+  // negative 프레임에 D5-b 를 적용한 진단 — **비게이트**. [실측] `(1,1,1)` 주입에서는 최심부가
+  // 감쇠 없이 baseColor 로 올라가 G·B 가 상단 포화(255)에 붙어 `b > g` 가 거짓이 된다. 즉 D5-b 는
+  // M-h 뿐 아니라 M-a 도 걸지만, **그것을 계약으로 선언하지는 않는다** — 포화 여부는 광원·톤매핑에
+  // 딸린 성질이고 M-a 는 이미 D6 가 낙차로 닫는다. 여기서는 관측만 한다.
+  const negD5b = neg.deepMeanB > neg.deepMeanG && neg.deepMeanG > neg.deepMeanR;
+  console.log(
+    `  ↳ [진단·비게이트] negative 프레임 최심부 평균 RGB (${neg.deepMeanR?.toFixed(2)}, ${neg.deepMeanG?.toFixed(2)}, ${neg.deepMeanB?.toFixed(2)}) · D5-b 술어 적용 → ${negD5b ? 'PASS' : 'FAIL'}`,
+  );
+  if (!(d5 && d5b && d6)) process.exitCode = 1;
 }
 
 const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
