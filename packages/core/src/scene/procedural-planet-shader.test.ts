@@ -41,7 +41,12 @@ import {
   SURFACE_MASK_BY_BODY,
   MASK_WARP_AMP,
   SURFACE_MASK_MIN_DISK_PX,
+  DEEP_OCEAN_FACTOR,
+  OCEAN_DEPTH_EDGE_HI,
+  OCEAN_DEPTH_RANGE,
+  OCEAN_DEPTH_MIN_GAP,
   fbmMirror,
+  oceanDepthMirror,
   surfaceColorMirror,
   lightingShadeMirror,
   luminance709,
@@ -395,25 +400,36 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
   // earth base = 청록 (ocean), land = 올리브-브라운. landMask 로 색조(hue) mix → "바다만" 회귀 해소.
   const EARTH_OCEAN: [number, number, number] = [0.23, 0.45, 0.6];
 
-  it('rocky 대륙 mix — ocean(landMask=0) + land(landMask=1) 색 둘 다 존재 (#783 밴드 조건 반영)', () => {
+  it('rocky 대륙 mix — ocean(landMask=0) 깊이 감쇠 + land(landMask=1) 밴드색 둘 다 존재 (#1197 갱신)', () => {
     // Amendment 3 (#783) 후 land 색은 위도 의존 (biome 3밴드) + 고위도는 극관이 덮는다.
     // 따라서 박제값 대조는 밴드가 확정되는 latJ 구간으로 조건화한다:
-    //  - ocean: continents ≤ LO && latJ ≤ ICE_LAT_LO → baseColor 그대로 (#775 read-only 규약 유지)
+    //  - ocean: 최심부 대역에서 baseColor 대비 상대 휘도 갭 ≥ OCEAN_DEPTH_MIN_GAP (#1197 D12 갱신)
     //  - land(tropical): continents ≥ HI && latJ ≤ TEMPERATE_LO → BIOME_TROPICAL_RGB
     //  - land(temperate): continents ≥ HI && TEMPERATE_HI ≤ latJ ≤ TUNDRA_LO → LAND_COLOR_RGB
-    let foundOcean = false;
+    //
+    // ⚠️ **D12 갱신 (#1197) — 삭제가 아니라 이관·교체다.** 종전 ocean 분기는 「continents ≤ LO 전
+    // 구간에서 ocean === baseColor **정확 일치**」를 요구했고 Amendment 7 이 그 계약을 의도적으로
+    // 깬다 (그 구간에 depth > 0 이 생긴다). 「해안 접점에서 정확히 baseColor」라는 원 계약의 **핵심**
+    // 은 사라지지 않고 아래 `oceanDepthMirror` 직접 호출 테스트 (U3/U4) 로 **이관**됐다 — 그쪽이
+    // 미러를 거치지 않아 `toBe(0)` 정확 비교가 가능하므로 오히려 강해졌다. 이 자리에는 원 계약이
+    // 못 재던 것 (깊이가 실제로 색을 바꾸는가) 을 넣는다.
+    let foundOceanDeep = false;
     let foundTropical = false;
     let foundTemperate = false;
+    const oceanBaseLum = luminance709(EARTH_OCEAN);
     for (const p of spherePoints(4000)) {
       const continents = fbmMirror(p[0] * 2.4, p[1] * 2.4, p[2] * 2.4);
       const latJ = Math.abs(p[1]) + (continents - 0.5) * BIOME_LAT_JITTER;
       const [r, g, b] = surfaceColorMirror(EARTH_OCEAN, SurfaceType.Rocky, p);
-      if (continents <= LAND_THRESHOLD_LO && latJ <= ICE_LAT_LO) {
-        // ocean 색 (baseColor) 그대로 — 중·저위도 해안선/바다 불변 (#775 무회귀, §A3.5 DoD 5).
-        expect(r).toBeCloseTo(EARTH_OCEAN[0], 4);
-        expect(g).toBeCloseTo(EARTH_OCEAN[1], 4);
-        expect(b).toBeCloseTo(EARTH_OCEAN[2], 4);
-        foundOcean = true;
+      if (continents <= LAND_THRESHOLD_LO - OCEAN_DEPTH_RANGE && latJ <= ICE_LAT_LO) {
+        // 최심부 (절차 경로 depth = 1) — baseColor 대비 상대 휘도 갭이 하한 이상.
+        expect(1 - luminance709([r, g, b]) / oceanBaseLum).toBeGreaterThanOrEqual(
+          OCEAN_DEPTH_MIN_GAP,
+        );
+        // deep 이 여전히 파랗다 — verify:1119 화면 분류 `b < g` 가 deep 을 육지로 오분류하지 않는다.
+        expect(b).toBeGreaterThan(g);
+        expect(g).toBeGreaterThan(r);
+        foundOceanDeep = true;
       }
       if (continents >= LAND_THRESHOLD_HI) {
         if (latJ <= BIOME_TEMPERATE_LO) {
@@ -429,8 +445,8 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
         }
       }
     }
-    // 지구 표면에 바다 + 열대 대륙 + 온대 대륙이 모두 존재해야 (mix/밴드가 의미 있음).
-    expect(foundOcean).toBe(true);
+    // 지구 표면에 깊은 바다 + 열대 대륙 + 온대 대륙이 모두 존재해야 (mix/밴드가 의미 있음).
+    expect(foundOceanDeep).toBe(true);
     expect(foundTropical).toBe(true);
     expect(foundTemperate).toBe(true);
   });
@@ -446,9 +462,11 @@ describe('#775 지구 대륙 mix — ocean ↔ land 색 분리 (ADR §A1.5 DoD 4
     expect(LAND_COLOR_RGB.g).toBeGreaterThanOrEqual(Math.min(LAND_COLOR_RGB.r, LAND_COLOR_RGB.b));
   });
 
-  it('GLSL rocky 분기가 mix(baseColor, landCol, landMask) 사용 (밝기 변조 → 색 mix — #783 landCol 밴드)', () => {
-    // Amendment 3 (#783): 단일 landColor → 위도 밴드 합성 landCol 로 확장 (ocean=baseColor 불변).
-    expect(PLANET_FRAGMENT_SHADER).toContain('mix(baseColor, landCol, landMask)');
+  it('GLSL rocky 분기가 mix(oceanCol, landCol, landMask) 사용 (밝기 변조 → 색 mix — #1197 oceanCol)', () => {
+    // Amendment 3 (#783): 단일 landColor → 위도 밴드 합성 landCol 로 확장.
+    // Amendment 7 (#1197): 첫 인자가 baseColor → oceanCol (baseColor 파생 깊이 감쇠색) 로 갱신.
+    // 제목도 함께 갱신한다 (주석 계약 ↔ 구현 drift 회피).
+    expect(PLANET_FRAGMENT_SHADER).toContain('mix(oceanCol, landCol, landMask)');
     expect(PLANET_FRAGMENT_SHADER).toContain('smoothstep(landThresholdLo, landThresholdHi');
     expect(PLANET_FRAGMENT_SHADER).toContain('uniform vec3 landColor');
   });
@@ -805,13 +823,20 @@ describe('Amendment 4 (#1119) — JS 미러 마스크 경로 (§A4.4 핵심 예�
     // 극관 밴드를 피하려고 저위도 점만 쓴다 (iceMask 가 색을 덮으면 비교가 무의미).
     const equator = spherePoints(64).filter((p) => Math.abs(p[1]) < 0.2);
     expect(equator.length).toBeGreaterThan(4);
+    // ⚠️ **D12 클래스 갱신 (#1197)** — 계약이 이 테스트도 깬다 (계약 D12 열거 2건 밖의 3번째다).
+    // 종전 ocean 분기는 `sample=0` 에서 「baseColor **정확 일치**」를 요구했는데 Amendment 7 이
+    // 그 지점에 depth > 0 을 넣는다. 삭제하지 않고, 이 테스트가 **원래 재던 축** (마스크 샘플이
+    // landMask 를 지배하는가) 을 그대로 유지하도록 술어만 「baseColor 파생 청록」으로 갱신한다.
     let oceanLike = 0;
     let landLike = 0;
     for (const p of equator) {
       const ocean = surfaceColorMirror(base, SurfaceType.Rocky, p, { enabled: 1, sample: 0 });
       const land = surfaceColorMirror(base, SurfaceType.Rocky, p, { enabled: 1, sample: 1 });
-      // sample=0 → ocean = baseColor 그대로 (극관 밖에서는 read-only 규약 유지).
-      if (Math.abs(ocean[0] - base[0]) < 1e-9 && Math.abs(ocean[2] - base[2]) < 1e-9) oceanLike++;
+      // sample=0 → ocean 은 baseColor **파생** (성분별 감쇠 계수 ∈ (0,1] 곱) — 색은 여전히 청록
+      // (B > G) 이고 각 성분이 baseColor 를 넘지 않는다.
+      const derived =
+        ocean[2] > ocean[1] && ocean[0] <= base[0] + 1e-9 && ocean[2] <= base[2] + 1e-9;
+      if (derived) oceanLike++;
       // sample=1 → 육지색이므로 B < G (바다 청록의 반대).
       if (land[2] < land[1]) landLike++;
     }
@@ -838,5 +863,174 @@ describe('Amendment 4 (#1119) — JS 미러 마스크 경로 (§A4.4 핵심 예�
         );
       }
     }
+  });
+});
+
+describe('Amendment 7 (#1197) — 바다 깊이 색 상수 SSoT (#69 drift 가드 — U1/U2)', () => {
+  it('U1 — 박제값 (drift 시 시각 회귀)', () => {
+    expect(DEEP_OCEAN_FACTOR).toEqual({ r: 0.35, g: 0.45, b: 0.62 });
+    expect(OCEAN_DEPTH_EDGE_HI).toBe(0.68);
+    expect(OCEAN_DEPTH_RANGE).toBe(0.32);
+    expect(OCEAN_DEPTH_MIN_GAP).toBe(0.4);
+  });
+
+  it('U2 — DEEP_OCEAN_FACTOR 제약 4종 (§A7.3 결정 3)', () => {
+    const { r, g, b } = DEEP_OCEAN_FACTOR;
+    // ① 각 성분 ∈ (0, 1] — 감쇠 계수이지 증폭이 아니다 (pm 계약).
+    for (const v of [r, g, b]) {
+      expect(v).toBeGreaterThan(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+    // ② b >= g >= r — 깊을수록 어둡고 **더 파랗게**. verify:1119 화면 분류 `b < g` 의 B ≥ G 전제
+    //    보존 + 보라/마젠타 anti-pattern 회피를 동시에 자동 충족 (pm 계약).
+    expect(b).toBeGreaterThanOrEqual(g);
+    expect(g).toBeGreaterThanOrEqual(r);
+    // ③ r < 1 — 감쇠가 실재한다 ((1,1,1) 변이 차단, architect 추가).
+    expect(r).toBeLessThan(1);
+    // ④ b > r — 색조 이동이 실재한다 (#775 「순수 스칼라 어둡게」 회귀 차단, architect 추가).
+    expect(b).toBeGreaterThan(r);
+  });
+
+  it('OCEAN_DEPTH_RANGE < LAND_THRESHOLD_LO (절차 경로 edge 반전 부재 + 양끝 갭 확보)', () => {
+    // 절차 경로 edges = (LO − RANGE, LO) = (0.16, 0.48). RANGE < LO 라 continents = 0 에서
+    // depth 가 1 에 도달한다 (D4 양끝 갭). 동시에 edge0 < edge1 이라 smoothstep 이 well-defined.
+    expect(OCEAN_DEPTH_RANGE).toBeLessThan(LAND_THRESHOLD_LO);
+    expect(OCEAN_DEPTH_RANGE).toBeGreaterThan(0);
+    // 마스크 경로 edges = (EDGE_HI − RANGE, EDGE_HI) 도 같은 조건.
+    expect(OCEAN_DEPTH_EDGE_HI - OCEAN_DEPTH_RANGE).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('Amendment 7 (#1197) — oceanDepthMirror 계약 (D3/D4 — 미러 직접 호출)', () => {
+  it('U3 — 절차 경로 해안 접점 depth 정확히 0 (D3)', () => {
+    // uMaskEnabled = 0 → 앵커 = LAND_THRESHOLD_LO. continents == LO 는 램프 상단이라 depth = 0.
+    expect(oceanDepthMirror(LAND_THRESHOLD_LO, 0, 0)).toBe(0);
+    // 램프 위쪽 (육지 방향) 도 0 (clamp).
+    expect(oceanDepthMirror(LAND_THRESHOLD_HI, 0, 0)).toBe(0);
+  });
+
+  it('U4 — 마스크 경로 해안 접점 (landMask = 1) depth 정확히 0 — 임의 continents 8종 (D3)', () => {
+    // 결정 2 의 해안 감쇠 `*= (1 - landMask)` 가 마스크 경로에서 D3 을 기하학적으로 참으로 만든다.
+    for (const c of [0, 0.1, 0.2, 0.3, 0.36, 0.5, 0.68, 1]) {
+      expect(oceanDepthMirror(c, 1, 1)).toBe(0);
+    }
+  });
+
+  it('U5 — 해안 감쇠 실재: landMask 가 클수록 depth 가 작다 (결정 2)', () => {
+    expect(oceanDepthMirror(0.3, 0.5, 1)).toBeLessThan(oceanDepthMirror(0.3, 0, 1));
+  });
+
+  it('경로별 앵커 분리 — 같은 continents 에서 마스크 경로 depth 가 절차 경로보다 크다 (결정 1)', () => {
+    // 마스크 경로 앵커 (0.68) 가 절차 경로 앵커 (0.48) 보다 높아 램프가 오른쪽으로 밀린다.
+    // 이 분리가 없으면 M2 (실제 바다의 59.78% 가 depth 0) 로 신호가 붕괴한다.
+    for (const c of [0.36, 0.45, 0.5, 0.6]) {
+      expect(oceanDepthMirror(c, 0, 1)).toBeGreaterThan(oceanDepthMirror(c, 0, 0));
+    }
+  });
+
+  it('U6 — continents LO → 0 9단계 단조 비증가 + 양끝 상대 휘도 갭 ≥ OCEAN_DEPTH_MIN_GAP (D4)', () => {
+    const base: readonly [number, number, number] = [0.2314, 0.4784, 0.7098]; // earth #3B7AB5
+    const lums: number[] = [];
+    const STEPS = 9;
+    for (let i = 0; i < STEPS; i++) {
+      const c = LAND_THRESHOLD_LO * (1 - i / (STEPS - 1)); // LO → 0
+      const depth = oceanDepthMirror(c, 0, 0);
+      const rgb: [number, number, number] = [
+        base[0] * (1 + (DEEP_OCEAN_FACTOR.r - 1) * depth),
+        base[1] * (1 + (DEEP_OCEAN_FACTOR.g - 1) * depth),
+        base[2] * (1 + (DEEP_OCEAN_FACTOR.b - 1) * depth),
+      ];
+      lums.push(luminance709(rgb));
+    }
+    expect(lums).toHaveLength(STEPS);
+    for (let i = 1; i < STEPS; i++) {
+      const prev = lums[i - 1] as number;
+      const cur = lums[i] as number;
+      expect(cur).toBeLessThanOrEqual(prev);
+    }
+    const first = lums[0] as number;
+    const last = lums[STEPS - 1] as number;
+    expect(1 - last / first).toBeGreaterThanOrEqual(OCEAN_DEPTH_MIN_GAP);
+  });
+
+  it('depth 는 항상 [0,1] (clamp — 곱 감쇠가 색역을 벗어나지 않는 전제)', () => {
+    for (const enabled of [0, 1]) {
+      for (const c of [-1, 0, 0.16, 0.36, 0.5, 0.68, 1, 2]) {
+        for (const lm of [0, 0.5, 1]) {
+          const d = oceanDepthMirror(c, lm, enabled);
+          expect(d).toBeGreaterThanOrEqual(0);
+          expect(d).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+});
+
+/**
+ * GLSL 소스에서 `//` 행 주석을 제거한 **실행 코드만** 남긴 사본.
+ *
+ * ⚠️ 부정 assert (`not.toContain`) 를 raw 소스에 걸면 **주석이 스스로를 매칭** 한다 (#995 클래스).
+ * Amendment 7 은 스케치의 undefined 형태를 주석에 인용하므로, 그 축은 반드시 이 사본으로 잰다.
+ */
+const FRAGMENT_CODE_ONLY = PLANET_FRAGMENT_SHADER.split('\n')
+  .map((line) => line.replace(/\/\/.*$/, ''))
+  .join('\n');
+
+describe('Amendment 7 (#1197) — GLSL 배선 계약 (U7/U8/U9 구조 변이 차단)', () => {
+  it('U7 — 깊이 식 3줄 + uniform 선언이 박제 그대로', () => {
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'float depthEdgeHi = mix(landThresholdLo, oceanDepthEdgeHi, uMaskEnabled)',
+    );
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'float oceanDepth = 1.0 - smoothstep(depthEdgeHi - oceanDepthRange, depthEdgeHi, continents)',
+    );
+    expect(PLANET_FRAGMENT_SHADER).toContain('oceanDepth *= 1.0 - landMask');
+    expect(PLANET_FRAGMENT_SHADER).toContain(
+      'vec3 oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth)',
+    );
+    expect(PLANET_FRAGMENT_SHADER).toContain('mix(oceanCol, landCol, landMask)');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform vec3 deepOceanFactor');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float oceanDepthEdgeHi');
+    expect(PLANET_FRAGMENT_SHADER).toContain('uniform float oceanDepthRange');
+    // M4 — 스케치의 감소 edge 형 (edge0 >= edge1, GLSL 명세상 undefined) 은 쓰지 않는다.
+    // 주석이 그 형태를 **인용** 하므로 실행 코드 사본으로 잰다 (raw 소스면 주석이 자기 자신을 매칭).
+    expect(FRAGMENT_CODE_ONLY).not.toContain('smoothstep(landThresholdLo, 0.0');
+    // 양성 대조 — 사본이 실제로 코드를 담고 있다 (빈 문자열 상대의 공허한 통과 차단).
+    expect(FRAGMENT_CODE_ONLY).toContain(
+      'smoothstep(landThresholdLo, landThresholdHi, continents)',
+    );
+  });
+
+  it('U8 — iceMask mix 가 rocky 분기의 **마지막** mix (신규 mix 가 뒤로 끼어들지 않음 — D8)', () => {
+    const iceIdx = FRAGMENT_CODE_ONLY.indexOf('col = mix(col, iceColor, iceMask)');
+    expect(iceIdx).toBeGreaterThan(0);
+    // 깊이 mix 3종은 전부 iceMask mix **앞**에 있어야 한다.
+    for (const marker of [
+      'float depthEdgeHi = mix(',
+      'vec3 oceanCol = baseColor * mix(',
+      'col = mix(oceanCol, landCol, landMask)',
+    ]) {
+      expect(FRAGMENT_CODE_ONLY.indexOf(marker)).toBeLessThan(iceIdx);
+    }
+    // rocky 분기 종료 (desert dispatch) 까지 남은 구간에 col 재대입이 없어야 한다.
+    const dispatchIdx = FRAGMENT_CODE_ONLY.indexOf('} else if (uSurfaceType == 1)');
+    expect(dispatchIdx).toBeGreaterThan(iceIdx);
+    const tail = FRAGMENT_CODE_ONLY.slice(
+      iceIdx + 'col = mix(col, iceColor, iceMask)'.length,
+      dispatchIdx,
+    );
+    expect(tail).not.toContain('col =');
+  });
+
+  it('U9 — 신규 noise/텍스처 샘플 0: fbm 인자 문자열까지 각 1회 + texture2D 1회 (D11)', () => {
+    // 계수가 아니라 **호출 인자 문자열까지** 박제한다 (계수만 세면 인자 교체를 못 잡는다).
+    for (const call of ['fbm(p * 2.4)', 'fbm(p * 3.6)', 'fbm(p * 4.0)', 'fbm(p * 5.0)']) {
+      const hits = PLANET_FRAGMENT_SHADER.split(call).length - 1;
+      expect(hits).toBe(1);
+    }
+    // 정의부 1 + 호출 4 = 5 (Amendment 4 불변식 유지).
+    expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(5);
+    expect((PLANET_FRAGMENT_SHADER.match(/texture2D\(/g) ?? []).length).toBe(1);
+    expect(PLANET_FRAGMENT_SHADER).toContain('texture2D(uSurfaceMask, vec2(maskU, maskV))');
   });
 });

@@ -67,6 +67,22 @@
  *     를 `0` 으로 되돌린다 (over-resolution × noMipmap = shimmer). **결정 7 의 분기를 재사용**하므로
  *     신규 코드 표면 0.
  *
+ * **Amendment 7 (#1197) — 지구 바다 깊이 색** (ADR §Amendment 7):
+ *   - §A7.3 결정 1 — ocean 색을 `baseColor` 단일값 → **깊이 파생 감쇠색** 으로 확장. depth 소스는
+ *     기존 `continents` fbm 재사용 (**신규 noise/텍스처 샘플 0**). 앵커는 **경로별로 분리** 한다:
+ *     절차 경로는 `landThresholdLo` (continents 가 곧 해안선), 마스크 경로는 ocean 한정 continents
+ *     P90 (`oceanDepthEdgeHi`). §A4.3 결정 7 의 `mix(…, uMaskEnabled)` 관용구 재사용 — 신규 분기 0.
+ *   - §A7.3 결정 2 — 해안 감쇠 `oceanDepth *= 1.0 - landMask` (이미 계산된 landMask 재사용) 로
+ *     해안 접점 ocean 성분이 정확히 `baseColor` 로 수렴.
+ *   - §A7.3 결정 3 — (B′) `oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth)`.
+ *     **ocean 색의 유일한 소스는 여전히 `colorHint.hex`** 이고 `deepOceanFactor` 는 rendering-only
+ *     감쇠 계수다 (데이터 SSoT read-only 규약은 데이터 무변조를 뜻하지 출력 동일성이 아니다 —
+ *     desert/gas/sun 이 이미 `baseColor` 를 곱으로 변조하는 것과 같은 계층).
+ *   - §A7.3 결정 4 — 삽입 위치는 첫 mix 의 `baseColor` 자리. `iceMask` mix 는 **그대로 마지막**
+ *     (테스트 가드 대상) 이고 `col *= shade` 최종 곱도 불변 (#773 규약).
+ *   - ⚠️ **결합**: `continents` 는 이제 4중 용도 (육지 임계 / maskWarp / biome·ice `latJ` jitter /
+ *     depth) 라 극지 해빙 경계와 바다 깊이가 상관된다. §A3.7 재검토 조건 4 가 관리하는 클래스.
+ *
  * ⚠️ **옵션 e 배선 계약 (drift 가드, Amendment 2)**: 본 광원 모델은 "vNormal = world normal (world
  *   matrix 변환) + uniform scaling" 에 의존한다. `world` uniform 이 uniforms 배열에서 빠지거나 VERTEX
  *   가 vNormal 을 local 로 되돌리면, 자전 시 명암이 표면과 함께 돌아버린다. onBind 의 dev-only 어서션이
@@ -210,6 +226,9 @@ export const SOFT_TERMINATOR_WIDTH = 0.12;
  * #775 — rocky 육지색 RGB (rendering-only 미학 상수, 데이터 SSoT 무관 — ADR §A1.3 결정 4 A).
  *
  * ocean 색 = base color (colorHint.hex, 데이터 SSoT read-only). land 색 = 본 상수. 황토-브라운
+ * ⚠️ **부기 (Amendment 7 #1197)**: ocean 색은 baseColor **에서 파생** 한다 — 깊이 감쇠 계수
+ * (`DEEP_OCEAN_FACTOR`) 는 rendering-only 이고 **색의 유일한 소스는 여전히 `colorHint.hex`** 다
+ * (규약 개정이 아니라 부기 — 데이터 무변조는 그대로다).
  * 자연 톤 (R/G 우세, B 결핍 — 보라/마젠타 anti-pattern 구조적 회피, #756 가드 정합). landMask 로
  * ocean↔land 색조(hue) mix → "바다만" 회귀 (밝기 변조만) 해소.
  *
@@ -343,6 +362,44 @@ export const MASK_WARP_AMP = 0.006;
  * 셰이더 미진입이라 실제로 걸리는 구간은 **mid variant 의 원거리 끝**이다.
  */
 export const SURFACE_MASK_MIN_DISK_PX = 16;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Amendment 7 (#1197) — 지구 바다 깊이 색 rendering-only 미학 상수 SSoT (§A7.3 결정 1·2·3).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * #1197 Amendment 7 — 최심부 감쇠 계수 (rendering-only 미학 상수, 데이터 SSoT 무관).
+ *
+ * ocean 색 = baseColor **에서 파생** 한다 — 색의 유일한 소스는 여전히 `colorHint.hex` 이고
+ * 본 상수는 rendering 시점 감쇠 계수다 (§A7.3 결정 3, (B′)). 제약 4종은 테스트 가드 대상:
+ *   각 성분 ∈ (0,1] / b >= g >= r / r < 1 (감쇠 실재) / b > r (색조 이동 실재 — #775 「순수
+ *   스칼라 어둡게」 회귀 차단). b >= g >= r 이 `verify:1119` 화면 분류 `b < g` 의 B ≥ G 전제와
+ *   보라·마젠타 anti-pattern 회피를 **동시에 자동 충족** 한다.
+ * [산식] deep albedo(depth=1) = (0.0810, 0.2153, 0.4401), 낮면 화면 휘도 상대갭 0.4477.
+ */
+export const DEEP_OCEAN_FACTOR = { r: 0.35, g: 0.45, b: 0.62 } as const;
+
+/**
+ * #1197 — 마스크 경로의 깊이 램프 상단 앵커 (continents 값).
+ *
+ * ocean 텍셀(maskLand < 0.5, n = 350,906) 한정 `continents` 분포의 **P90 = 0.6766** 을 반올림한
+ * 값이다 — 매직 넘버가 아니라 실측 분위수다. 절차 경로는 `LAND_THRESHOLD_LO` 를 앵커로 쓰므로
+ * (해안선 정의가 다르다) 셰이더가 `uMaskEnabled` 로 둘을 mix 한다.
+ */
+export const OCEAN_DEPTH_EDGE_HI = 0.68;
+
+/**
+ * #1197 — 깊이 램프 폭 (두 경로 공용). ocean 한정 `continents` 의 P90 − P10
+ * (0.6766 − 0.3598 = 0.3168) 을 반올림했다. `< LAND_THRESHOLD_LO` 라 절차 경로에서
+ * `continents = 0` 이 depth 1 에 도달한다 (D4 양끝 갭 확보).
+ */
+export const OCEAN_DEPTH_RANGE = 0.32;
+
+/**
+ * #1197 — D4 양끝 상대 휘도 갭 하한 (미러 단위 테스트). [산식] 실측 0.5414 ⇒ 마진 0.14.
+ * GPU 무관 결정적 미러 값이라 architect 가 확정한다 (D5/D6 의 τ·M 과 혼동 금지 — 그쪽은 GPU 실측).
+ */
+export const OCEAN_DEPTH_MIN_GAP = 0.4;
 
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
@@ -478,6 +535,14 @@ uniform sampler2D uSurfaceMask;
 uniform float uMaskEnabled;
 uniform float maskWarpAmp;
 
+// Amendment 7 (#1197) — 지구 바다 깊이 색 uniform (rocky 전용, rendering-only 미학 상수).
+//   deepOceanFactor: 최심부 감쇠 계수 (baseColor 곱 — 색 소스는 여전히 colorHint.hex).
+//   oceanDepthEdgeHi: 마스크 경로 깊이 램프 상단 앵커 (ocean 한정 continents P90).
+//   oceanDepthRange:  깊이 램프 폭 (두 경로 공용 — ocean 한정 continents P90 − P10).
+uniform vec3 deepOceanFactor;
+uniform float oceanDepthEdgeHi;
+uniform float oceanDepthRange;
+
 // equirectangular UV 역수 상수 (매직 넘버 분리 — 1/(2π), 1/π).
 const float INV_TWO_PI = 0.1591549430918953;
 const float INV_PI = 0.3183098861837907;
@@ -571,8 +636,9 @@ void main(void) {
   // #756 §결정 2 — 표면 타입별 절차 변조 (if-else 분기만). 같은 draw = 같은 타입 (divergence 0).
   if (uSurfaceType == 0) {
     // ── rocky (지구) — 대륙 마스크 (#1119) + biome 위도 색 + 극관 (Amendment 3 #783) ──
-    // Amendment 4: landMask 소스가 fbm smoothstep → **실제 대륙 마스크** 로 전환된다. ocean =
-    // baseColor (실측 청록, read-only 규약) 와 해안선 전이 구조는 그대로 (#775 계약 보존).
+    // Amendment 4: landMask 소스가 fbm smoothstep → **실제 대륙 마스크** 로 전환된다. 해안선 전이
+    // 구조는 그대로 (#775 계약 보존). ⚠️ 부기 (Amendment 7 #1197): ocean 은 이제 baseColor 고정이
+    // 아니라 baseColor **에서 파생** 된 깊이 감쇠색이다 (아래 oceanCol — 색 소스는 여전히 colorHint).
     // uMaskEnabled = 0 이면 Amendment 3 시점 식으로 **정확히** 복귀한다 (회귀 격리 기계 판정점).
     float proceduralMask = smoothstep(landThresholdLo, landThresholdHi, continents);
     float landMask = mix(proceduralMask, maskLand, uMaskEnabled);
@@ -582,7 +648,24 @@ void main(void) {
     // 대륙색: 적도 녹색 → 중위도 황토·갈색 (landColor=temperate) → 고위도 툰드라 회백 (2 smoothstep 연쇄 mix)
     vec3 landCol = mix(biomeTropicalColor, landColor, smoothstep(biomeTemperateLo, biomeTemperateHi, latJ));
     landCol = mix(landCol, biomeTundraColor, smoothstep(biomeTundraLo, biomeTundraHi, latJ));
-    col = mix(baseColor, landCol, landMask);                        // #775 해안선 전이 유지 (ocean = baseColor 불변)
+    // ── Amendment 7 (#1197) — 바다 깊이 색 (§A7.3 결정 1·2) ─────────────────
+    // depth 앵커는 **경로별로 다르다**. 절차 경로(uMaskEnabled=0)에서는 continents 가 곧 해안선이라
+    // landThresholdLo 가 깊이 0 지점이다(#775 계약). 마스크 경로에서는 해안선이 마스크로 이관돼
+    // (Amendment 4 §A4.3 결정 5) ocean 텍셀의 continents 가 전 구간에 퍼진다 — 같은 앵커를 쓰면
+    // 실제 바다의 59.78% 가 depth 0 으로 눌린다(실측 §A7.2). 앵커를 §A4.3 결정 7 의
+    // mix(…, uMaskEnabled) 관용구로 갈아탄다 — **신규 분기 0**.
+    float depthEdgeHi = mix(landThresholdLo, oceanDepthEdgeHi, uMaskEnabled);
+    // ⚠️ 증가 edge 형만 쓴다. ADR §A3.7 재검토 조건 1 의 스케치 smoothstep(landThresholdLo, 0.0, x)
+    // 는 edge0 >= edge1 이라 **GLSL 명세상 undefined** 다 (비용은 동일하므로 논쟁 대상이 아니다).
+    float oceanDepth = 1.0 - smoothstep(depthEdgeHi - oceanDepthRange, depthEdgeHi, continents);
+    // 해안 감쇠 — 마스크 계조 대역(ocean 텍셀의 2.96%, 약 2텍셀 폭)에서 깊이를 끌어내려 해안 접점의
+    // ocean 성분이 정확히 baseColor 로 수렴한다. **신규 샘플 0** — 이미 계산된 landMask 재사용.
+    // 절차 경로에서는 landMask > 0 구간이 이미 depth 0 구간과 겹쳐 사실상 no-op 이다.
+    oceanDepth *= 1.0 - landMask;
+    // (B′) baseColor 파생 — 색의 유일한 소스는 여전히 colorHint.hex 이고 deepOceanFactor 는
+    // rendering-only 감쇠 계수다. b >= g >= r 제약이 「어두워지며 파래짐」과 B ≥ G 보존을 동시 충족.
+    vec3 oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth);
+    col = mix(oceanCol, landCol, landMask);                        // #775 해안선 전이 유지 (ocean 은 baseColor 파생)
     // 극관 — continents 무관 (§A3.3 결정 4 B: 북극 해빙 + 남극 빙상 둘 다 흰색), ocean/land 공통
     // 최종 mix. albedo 단계에서만 결정 — 아래 col *= shade 최종 곱 불변 (#773 규약, 밤면 극관은 어둡다).
     float iceMask = smoothstep(iceLatLo, iceLatHi, latJ);
@@ -878,6 +961,10 @@ export function createProceduralPlanetMaterial(
         // Amendment 4 (#1119) — 대륙 마스크 uniform (sampler 는 아래 samplers 배열).
         'uMaskEnabled',
         'maskWarpAmp',
+        // Amendment 7 (#1197) — 바다 깊이 색 uniform (rocky 전용, +3 — vec3 1 + float 2).
+        'deepOceanFactor',
+        'oceanDepthEdgeHi',
+        'oceanDepthRange',
       ],
       // Amendment 4 (#1119) — sampler 명시. Phase 0 게이트는 **명시한 상태에서만** 측정됐고
       // 생략 시 거동은 미측정이다 (이슈 #1119 게이트 코멘트 §잔여 미측정 1) — 추측하지 말고 명시한다.
@@ -941,6 +1028,16 @@ export function createProceduralPlanetMaterial(
   material.setFloat('iceLatLo', ICE_LAT_LO);
   material.setFloat('iceLatHi', ICE_LAT_HI);
   material.setFloat('biomeLatJitter', BIOME_LAT_JITTER);
+
+  // Amendment 7 (#1197) — 바다 깊이 색 미학 상수 uniform (rocky 전용, rendering-only).
+  // 4중 SSoT: 상수 → uniforms 배열 → 본 바인딩 → GLSL 선언 (+ JS 미러 `oceanDepthMirror` 동기).
+  // landColor 등 rocky 전용 uniform 이 이미 전 body 에 무조건 set 되는 선례를 따라 body 분기 없음.
+  material.setColor3(
+    'deepOceanFactor',
+    new Color3(DEEP_OCEAN_FACTOR.r, DEEP_OCEAN_FACTOR.g, DEEP_OCEAN_FACTOR.b),
+  );
+  material.setFloat('oceanDepthEdgeHi', OCEAN_DEPTH_EDGE_HI);
+  material.setFloat('oceanDepthRange', OCEAN_DEPTH_RANGE);
 
   // Amendment 1 (#773) §A1.3 결정 1 — 태양 방향 uniform.
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.
@@ -1102,12 +1199,42 @@ export function fbmMirror(px: number, py: number, pz: number): number {
 }
 
 /**
+ * Amendment 7 (#1197) — GLSL 바다 깊이(`oceanDepth`) 식의 **순수 JS 미러** (§A7.3 결정 1·2).
+ *
+ * `surfaceColorMirror` 가 이 함수를 호출한다 (식 중복 금지 — 한 곳만 고치면 양쪽이 따라온다).
+ * 단위 테스트는 색 미러를 거치지 않고 **직접** 호출해 `toBe(0)` 같은 정확 비교를 한다.
+ *
+ * ⚠️ FRAGMENT_SHADER 의 GLSL 3줄과 동일 식이어야 한다 (SSoT — 한쪽 수정 시 양쪽 동기화).
+ *
+ * @param continents rocky 분기의 `fbm(p * 2.4)` 값
+ * @param landMask 최종 landMask (절차/마스크 mix 결과) ∈ [0,1]
+ * @param maskEnabled `uMaskEnabled` — 0 = 절차 경로 / 1 = 마스크 경로 (앵커 선택)
+ * @returns 깊이 ∈ [0,1] — 0 = 해안 접점 (baseColor 그대로), 1 = 최심부
+ */
+export function oceanDepthMirror(
+  continents: number,
+  landMask: number,
+  maskEnabled: number,
+): number {
+  const smoothstep = (e0: number, e1: number, x: number): number => {
+    const t = Math.min(Math.max((x - e0) / Math.max(e1 - e0, 1e-6), 0), 1);
+    return t * t * (3 - 2 * t);
+  };
+  // 앵커 경로별 분리 — 절차 경로는 LAND_THRESHOLD_LO, 마스크 경로는 ocean 한정 continents P90.
+  const depthEdgeHi = LAND_THRESHOLD_LO + (OCEAN_DEPTH_EDGE_HI - LAND_THRESHOLD_LO) * maskEnabled;
+  const depth = 1 - smoothstep(depthEdgeHi - OCEAN_DEPTH_RANGE, depthEdgeHi, continents);
+  // 해안 감쇠 — 마스크 계조 대역에서 해안 접점 ocean 성분이 정확히 baseColor 로 수렴.
+  return depth * (1 - landMask);
+}
+
+/**
  * #756 — FRAGMENT_SHADER 의 표면 변조 GLSL 의 **순수 JS 미러** (anti-pattern 계약 검증용).
  *
  * 주어진 구면 좌표 + 표면 타입에 대해 변조된 출력 RGB 를 반환한다 (광원 명암 shade 제외 —
  * 색역 검증은 변조 식만으로 충분, 광원 단조성은 `lightingShadeMirror` 가 별도 검증). GLSL 과
  * 동일 식 — 보라/마젠타 부재 (R+B 동시 우세 & G 결핍 금지) / 출력 [0,1] 범위 / 변조 강도 상수
- * SSoT 를 결정적으로 검증한다. rocky 는 Amendment 1 (#775) 대륙 mix (ocean=base ↔ land=landColor).
+ * SSoT 를 결정적으로 검증한다. rocky 는 Amendment 1 (#775) 대륙 mix (ocean ↔ land=landColor) —
+ * Amendment 7 (#1197) 이후 ocean 은 baseColor **파생** 깊이 감쇠색이다 (`oceanDepthMirror`).
  *
  * ⚠️ FRAGMENT_SHADER 의 GLSL 분기와 동일 식이어야 한다 (SSoT — 한쪽 수정 시 양쪽 동기화).
  *
@@ -1155,9 +1282,15 @@ export function surfaceColorMirror(
     lr = mix(lr, BIOME_TUNDRA_RGB.r, tundraMix);
     lg = mix(lg, BIOME_TUNDRA_RGB.g, tundraMix);
     lb = mix(lb, BIOME_TUNDRA_RGB.b, tundraMix);
-    r = mix(bx, lr, landMask);
-    g = mix(by, lg, landMask);
-    b = mix(bz, lb, landMask);
+    // Amendment 7 (#1197) — ocean 은 baseColor **파생** 감쇠색 (색 소스는 여전히 colorHint.hex).
+    // 깊이 식은 `oceanDepthMirror` 단일 출처 (GLSL 3줄과 동기 — 식 중복 금지).
+    const oceanDepth = oceanDepthMirror(continents, landMask, maskEnabled);
+    const ox = bx * mix(1, DEEP_OCEAN_FACTOR.r, oceanDepth);
+    const oy = by * mix(1, DEEP_OCEAN_FACTOR.g, oceanDepth);
+    const oz = bz * mix(1, DEEP_OCEAN_FACTOR.b, oceanDepth);
+    r = mix(ox, lr, landMask);
+    g = mix(oy, lg, landMask);
+    b = mix(oz, lb, landMask);
     // 극관 — continents 무관, ocean/land 공통 최종 mix (§A3.3 결정 4 B).
     const iceMask = sm(ICE_LAT_LO, ICE_LAT_HI, latJ);
     r = mix(r, ICE_COLOR_RGB.r, iceMask);

@@ -1,14 +1,15 @@
 name: shader-pixel-guard
 
 # 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
-# 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 6종 CI 상시 가드.
+# 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 8종 CI 상시 가드 (아래 §목적 지대 계수와 동기).
 #
-# 목적: 셰이더 feature 7개 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
-#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크) 의 픽셀 회귀 (uniform 배선 절단·
-#   분기 오염·광원 붕괴·자전 정지·극관/biome 소실·대륙 마스크 미적용) 를 PR 단계에서 차단.
+# 목적: 셰이더 feature 8개 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
+#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크 / #1197 바다 깊이 색) 의 픽셀 회귀 (uniform 배선 절단·
+#   분기 오염·광원 붕괴·자전 정지·극관/biome 소실·대륙 마스크 미적용·바다 깊이 소실) 를 PR 단계에서 차단.
 #   r1-guard 는 UI 영역 diff 만 담당하고 canvas 픽셀은 baseline 대상이 아니므로
 #   (#756 ADR §A2 결정 7) 본 가드가 canvas 성질을 지킨다.
-#   ⚠️ 지대 계수는 종전 "5개" 였으나 열거는 6개였다 (선재 off-by-one). #1119 추가와 함께 7 로 정정.
+#   ⚠️ 지대 계수는 종전 "5개" 였으나 열거는 6개였다 (선재 off-by-one). #1119 추가와 함께 7 로 정정,
+#      #1197 추가와 함께 8 로 갱신 (계수와 열거를 함께 센다).
 #
 # 판정 규약 (ADR 결정 3): per-body 상대 성질 (ON vs OFF) 만 — 절대 임계 금지
 #   (swiftshader ↔ 하드웨어 값 편차). 756 마진은 D1 CI 실측으로 확정 (스크립트 주석 참조).
@@ -80,7 +81,7 @@ jobs:
         with:
           start-dev-server: 'true'
 
-      # ── verify 7종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
+      # ── verify 8종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
       # 호출 규약: HEADFUL=0 (756/773/774/782/783/1119) / --headless (762) — CI 에 chrome channel 이
       #   없으므로 폴백이 아닌 명시적 headless 로 결정적 실행. BASE_URL 주입 (dev server 3001).
       # trap: 스크립트 비정상 종료 (playwright timeout/crash) 시 잔존 chromium 정리 —
@@ -125,6 +126,19 @@ jobs:
           trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
           HEADFUL=0 BASE_URL=http://localhost:3001 \
             CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/783-earth" \
+            pnpm --filter @astro-simulator/web run verify:783-earth-detail
+
+      # #1197 — 바다 깊이 색 (Amendment 7). 783 스크립트의 MODE 스위치에 `ocean` 을 더한 것이라
+      # **신규 스크립트 0** 이다. 기존 술어 5종 (783 DoD 1~4 / 1119 IoU / 756 hfEntropy) 은 이 축의
+      # 판별력이 전부 `0` 이므로 (극관·land 한정 / deep·shallow 둘 다 B≥G 라 같은 집합 / 총량 성질)
+      # 본 step 이 바다 깊이 회귀를 잡는 **유일한 지점**이다.
+      # negative 주입 (`deepOceanFactor` 를 (1,1,1) 로 고착) 이 **같은 실행 안에** 내장돼 있어
+      # 「가드가 있다 ≠ 작동한다」(#1123) 를 그 자리에서 반증한다 — `patchedMaterials > 0` 동반 assert.
+      - name: verify:783-earth-detail MODE=ocean (바다 깊이 그라데이션 + negative 주입)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          MODE=ocean HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1197-earth-ocean" \
             pnpm --filter @astro-simulator/web run verify:783-earth-detail
 
       # #1119 — 대륙 마스크. ADR `20260628-756` §A4.3 결정 7 이 계약한 *"조용히 예전 지구로
