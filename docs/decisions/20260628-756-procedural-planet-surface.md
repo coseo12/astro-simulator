@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Provisional (2026-09-06 — 지구 바다 깊이 색. cross-validate 결과 통합 후 Accepted 전이)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -1569,6 +1569,8 @@ FRAGMENT 의 `fbm(` 호출 **4개** (`p*2.4` / `p*3.6` / `p*4.0` / `p*5.0`) · `
 | D4 | 단조성 | `continents` `LO → 0` 9단계 `luminance709` 단조 비증가 + 양끝 상대 갭 `>= OCEAN_DEPTH_MIN_GAP (0.40)` |
 | D5 | 픽셀 실측 | `ndl >= 0.9` ∧ `|sin lat| < 0.84` ∧ `b >= g` 인 ocean 픽셀의 상대 갭 `>= τ` **∧** 표본 `>= 900` |
 | D6 | 판별력 | `deepOceanFactor` 를 `(1,1,1)` 로 고착 주입한 프레임에서 D5 가 **FAIL** + `patchedMaterials > 0` + `ON − negative >= M` |
+| D5-b | 최심부 색 순서 | 하위 10% 깊이 대역 평균 RGB 가 `b > g > r` **strict** (부등식만 — 신규 임계 `0`) |
+| D6-b | 바인딩 기여도 | `deepOceanFactor` 를 **`(0,0,0)`** 로 고착 주입한 프레임의 갭 `zeroGap` 에 대해 `zeroGap − onGap >= M` + `patchedMaterials > 0` |
 
 **임계는 절대값이 아니라 GPU 실측 확정치다** (ADR `20260705-759` 결정 3). [실측] 2026-09-06 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3001`, **3회 전건 동일 (sd `0`)**: ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / 표본 `n = 3,612`. ⇒ `τ = 0.11` · `M = 0.11` · 표본 하한 `900` (각각 실측의 절반 / 절반 / 1/4).
 
@@ -1620,3 +1622,42 @@ disk 이미지 공간 확대 (같은 프레임 — 카메라 이동 없음):
 2. **`DEEP_OCEAN_FACTOR` 는 현재 earth 전용 rendering 상수다** — 다른 rocky body 확장 시 body 별 파라미터화가 필요하다 (§A3.7 재검토 조건 5 의 연장, cross-validate 합의 보강).
 3. **마스크 에셋 포맷이 바뀔 때** — M1 이 (나) 를 기각한 근거가 현행 에셋 계약이다. 계조/채널이 늘면 (나) 가 다시 선택지가 된다.
 4. **`τ`/`M` 재도출 트리거 (시간이 아니라 접촉)** — `OCEAN_NDL_MIN` / `OCEAN_DISK_SAMPLE_RADIUS` / 화면 분류 술어(`b >= g`) / earth `colorHint` / 프레임 방위 중 하나를 다음에 건드릴 때 위 실측을 다시 잡는다.
+
+### A7.8 교차검증 반영 사항 (agy 2026-09-05 — **4축 통합 완료, Accepted 전이**)
+
+> ✅ **메인 통합 (2026-09-06).** cross-validate 판정 **조건부 승인**(차단 `0`) → 이견 수용 3건 반영 → **reviewer 차단 `0` · 권고 5건** → qa 통과 → 사용자 합의로 M-h 보강. 아래 ①~④ 가 4축 분류다.
+>
+> **① 합의** — (나) 거리장 기각의 절대성(마스크 ocean 텍셀 `97.038%` 가 완전 `0`) / GLSL `edge0 >= edge1` undefined 교정 / 색 제약 `b >= g >= r` 이 §A4.5 화면 분류 `b < g` 를 구조적으로 보존 / 4중 SSoT 폐쇄 / 앵커 경로 분리(`mix`) 유지 필수 / `continents` 재사용(신규 noise `0`) 현행 유지 / M-e 한계 박제의 정직성.
+>
+> **② 이견 수용 3건** — (a) `N_ocean` **fail-fast** (표본 부족을 「측정 불가」로 즉시 실패). 하한은 agy 제안 `1,000` 이 아니라 실측 기반 **`OCEAN_MIN_SAMPLES = 900`** (b) **해안 밴드 관측**을 「가드 없음」에서 「로그에 관측 가능」으로 한 단계 — **비-게이트 진단 출력**으로만 (게이트화는 flaky, §A7.6) (c) `DEEP_OCEAN_FACTOR` **earth 전용 rendering 상수** 명시 → 재검토 조건 2 신설.
+>
+> **③ 기각·무효 8건 — 전건에 실측 근거를 붙였다.**
+>
+> | # | agy 지적 | 처분 | 근거 [실측] |
+> | --- | --- | --- | --- |
+> | 1 | 정반사광(Specular / Sun Glint) 과 깊이 감쇠의 상호작용 (§6 + 인수인계 3) | **무효** | 셰이더에 `specular` 매칭 **`0`건**. 존재하지 않는 항이다 |
+> | 2 | mipmap LOD bias 로 거리장 근사 (Q2 대안) | **무효** (결론 동일, **근거 교체**) | agy 근거는 「해안선이 함께 뭉개짐」이나, 마스크는 `surface-mask-texture.ts:136` 에서 **`noMipmap: true`** 로 생성돼 **mip chain 자체가 없다** |
+> | 3 | Q3 산술 — 단일 앵커 시 접점 깊이 **`0.625`** | **오류** (결론 **불변·강화**) | Hermite 누락. `t = 0.375` → `s = t²(3−2t) = 0.3164` → 깊이 **`0.6836`**. agy 는 `1 − t` 라는 **선형 램프**를 계산했다. 실제 아티팩트는 agy 서술보다 **더 크다** |
+> | 4 | foreshortening 대비 **대체 JD 후보군** 명시 | **기각** | 이견 수용 (a) 의 fail-fast 가 같은 위험을 덮는다. 후보군을 미리 나열하면 **게이트가 통과할 때까지 JD 를 바꾸는 경로**가 생긴다 — 술어가 아니라 표본을 고르게 된다 |
+> | 5 | `oceanDepthMirror` 시그니처에 `edgeHi?` / `range?` 확장 | **기각** | 현행 3-파라미터(`continents, landMask, maskEnabled`). 오버라이드 소비처가 `0` 이고, 파라미터화는 **미러 drift 축을 하나 더 만든다** (4중 SSoT 의 폐쇄를 여는 방향) |
+> | 6 | 단위 테스트에서 `material.isReady()` 함께 검증 | **기각** | `isReady` 매칭 `0`건 유지. 바인딩 존재는 **uniforms 배열 · GLSL 선언 · setter 3면 대조**(U7 문자열 가드)가 이미 건다 |
+> | 7 | 팩토리 단계 **기본값 주입 경로** 명시 | **이미 충족** | `setColor3`/`setFloat` 3건이 **material 생성 시점**에 호출된다 (`procedural-planet-shader.ts` 의 Amendment 7 바인딩 블록). 최초 렌더 전 uninitialized 구간이 없다 |
+> | 8 | `fbm(p.zyx)` 도입 시 **「20~30% 비용 증가」** / 해빙 물리와 정성 일치 | **미실측 서술로 분류** | 두 주장 모두 근거 측정이 제시되지 않았다. 결론(현행 유지)은 채택하되 **수치·물리 논거는 인용하지 않는다** |
+>
+> **④ Claude 편향 셀프 체크 — 사후.** architect 가 호출 **전에** 자인한 축(결합 간과 — `continents` 4중 용도)은 cross-validate 가 **순환 아님**으로 판정했고 §A7.6 의 M-e 박제로 관리됐다. 그러나 **자인하지 않은 축에서 결함이 나왔다**: reviewer 가 D5 술어의 **단측성**을 적발했다 (아래).
+>
+> ⚠️ **가장 중요한 관측 — cross-validate 는 「설계」를 봤고 「가드의 판별력」은 못 봤다.** agy 는 M-e 미검출 박제를 *"훌륭한 엔지니어링 결정"* 으로 평가하며 **가드가 무엇을 못 잡는지를 함께 검토**했는데도, **`setColor3('deepOceanFactor', …)` 바인딩 한 블록만 지우면 바다가 검게 렌더되는데 전 가드가 초록**이라는 사실(R7 / 변이 M-h)은 잡지 못했다. 원인은 D5 판정식 `gap >= τ` 의 **단측성** — 갭이 **커지는** 방향의 실패에 눈이 멀고, 바다가 검어지면 갭은 오히려 벌어진다. 이를 잡은 것은 **reviewer 가 실제로 변이를 주입해 전 게이트를 돌려본 것**이다.
+>
+> **일반화 — 「가드의 한계를 문서화했다」는 「가드의 판별력을 측정했다」가 아니다.** §A7.6 은 M-e 한 변이의 한계를 정직하게 적었고 외부 모델도 그것을 칭찬했지만, 두 층 모두 **적지 않은 변이**를 검사하지 않았다. 한계 목록은 **자기가 떠올린 실패 모드**로만 채워지므로, 그 목록을 읽는 검토도 같은 사각을 물려받는다. 판별력의 정본은 서술이 아니라 **변이 주입 후 게이트 재실행**이다 (선례 #1123).
+>
+> ⚠️ **같은 클래스가 한 사이클 안에서 두 번 났다 — 두 번째 가해자는 메인이다.** M-h 를 닫으라는 사용자 결정 뒤, 메인이 처방한 술어 **`b > g > r` strict (D5-b) 는 M-h 를 잡지 못한다**. `deepOceanFactor = (0,0,0)` 은 `mix(vec3(1.0), vec3(0.0), d) = vec3(1.0 - d)` 라 **채널 공통 스칼라 감쇠**이고, `baseColor` 에 균일하게 곱해져 **색 순서가 보존**되기 때문이다 — 바다는 「검게」가 아니라 **어둡게** 렌더된다 ([실측] M-h 하 최심부 평균 `(29.66, 58.39, 73.93)`, `b > g > r` 성립). 메인은 reviewer 의 「검게 렌더」라는 **표현을 `(0,0,0)` 포화로 읽고** 그 도약을 검산하지 않은 채 처방을 발행했고, dev 의 3단 실측이 반증했다.
+>
+> **처방도 서술이다.** 이 절이 *"판별력의 정본은 변이 주입 후 게이트 재실행"* 이라고 적히던 바로 그 사이클에, 메인은 **실행 없이** 가드 술어를 발행했다. ⇒ **가드 술어를 제안할 때 그 술어를 변이에 대고 1회 돌려본 뒤 발행한다.**
+>
+> **닫은 방법 — 정적 속성이 아니라 동적 기여를 잰다.** 색 순서는 **정적 속성**이라 스칼라 감쇠에 눈이 멀다. 최종 술어는 D6 의 주입 기법을 재사용해 `deepOceanFactor = (0,0,0)` 프레임의 갭 `zeroGap` 을 재고 **`zeroGap − onGap >= OCEAN_GAP_MARGIN`** (기존 상수 재사용, 새 임계 `0`개) 을 요구한다 — **바인딩이 렌더 결과에 실제로 기여하는 양**을 재므로, M-h 하에서는 주입 프레임과 ON 프레임의 uniform 이 같아져 낙차가 `0` 으로 붕괴한다. D5-b·R6 은 다른 실패 모드를 잡으므로 함께 유지한다.
+>
+> [실측] 2026-09-06 로컬 `SWIFTSHADER=1 HEADFUL=0`, M-h 를 `packages/core` 소스에 주입하고 dist 재빌드 후 측정 — 원본 상승 `0.3388` PASS / M-h 하 **`0.0000` FAIL** (`exit 1`) / 원복 후 원본과 전 항목 동일. ⚠️ **그 변이에서 FAIL 하는 것은 D6-b 하나뿐**이다 — D5 갭은 `0.2317 → 0.5704` 로 **커지고**, D5-b·D6 도 초록이다. 배선 확인: 임계를 임시로 올린 판(변이 없음)에서도 D6-b 단독으로 `exit 1` 이 났다.
+>
+> **한 줄 일반화**: **판별식이 「값의 형태」를 보면 형태를 보존하는 실패에 눈이 멀고, 「값의 기여」를 보면 그 축이 닫힌다.**
+>
+> **전이 주체·시점**: 메인 오케스트레이터가 PR [#1198](https://github.com/coseo12/astro-simulator/pull/1198) 머지 직전 수행 ([#479](https://github.com/coseo12/astro-simulator/issues/479) — sub-agent 직접 호출 금지, reviewer·qa 도 sub-agent 다). cross-validate outcome `applied` (2026-09-05). 원 박제: `Provisional`.
