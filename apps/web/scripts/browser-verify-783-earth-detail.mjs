@@ -33,7 +33,7 @@
  *   node browser-verify-783-earth-detail.mjs                     # DoD 측정 (earth ON vs OFF)
  *   MODE=others CAPTURE_DIR=/abs node ...                        # mars/jupiter/moon 결정적 캡처 (분기 격리 diff 용)
  *   MODE=diff node ... <dirA> <dirB>                             # 캡처 dir 픽셀 diff (Concrete Prediction: ≈0)
- *   MODE=ocean node ...                                          # #1197 바다 깊이 그라데이션 (D5/D5-b/D6, negative 주입 내장)
+ *   MODE=ocean node ...                                          # #1197 바다 깊이 그라데이션 (D5/D5-b/D6/D6-b, uniform 주입 내장)
  *
  * ── Amendment 7 (#1197) MODE=ocean — 바다 깊이 색 (ADR §A7.5 D5/D6) ──────────────
  * **무엇을 재는가**: 지구 disk 픽셀을 구면 역투영해 sub-solar 근방 낮면 바다 픽셀만 고르고,
@@ -45,16 +45,20 @@
  * `ndl >= SOFT_TERMINATOR_WIDTH(0.12)` 에서 이미 포화하므로 이 대역의 실효는 광원 균일화가 아니라
  * **`hemiFactor`(위도) 변동 억제**다.
  *
- * **판별력 내장 (#1123 「테스트가 있다 ≠ 작동한다」)**: 같은 실행 안에서 `deepOceanFactor` 를
- * `(1,1,1)` 로 매 프레임 덮어쓰는 negative 프레임을 함께 측정한다. 이는 D12 가 지정한 결함
- * 보유판(변이 M-a)과 **동일한 변이**다 — 두 요구가 한 변이로 닫힌다. `patchedMaterials > 0` 을
- * 함께 assert 해 「초록 no-op」이 통과 증거로 오채택되는 것을 막는다.
+ * **판별력 내장 (#1123 「테스트가 있다 ≠ 작동한다」)**: 같은 실행 안에서 `deepOceanFactor` uniform 을
+ * 매 프레임 덮어쓴 프레임을 **두 개** 함께 측정한다.
+ *  - `(1,1,1)` = negative. D12 가 지정한 결함 보유판(변이 M-a)과 **동일한 변이**다 — 두 요구가
+ *    한 변이로 닫힌다.
+ *  - `(0,0,0)` = zero probe. 바인딩이 소실됐을 때(변이 M-h) uniform 이 남는 값이라 **M-h 상태의
+ *    대조군**이다.
+ * 두 프레임 모두 `patchedMaterials > 0` 을 함께 assert 해 「초록 no-op」이 통과 증거로 오채택되는
+ * 것을 막는다.
  *
- * **게이트는 3조건 동시** — D5 `ON >= τ` · D5-b 최심부 색 순서 `b > g > r` · D6 `ON − negative >= M`.
- * 부호 비교만으로는 낙차가 `0` 에 임의로 가까워도 통과한다 (#1163 라운드 2 [B4] 반증). 임계는
- * 절대값이 아니라 **상대 성질**이며 ADR `20260705-759` 결정 3 규약을 따른다. 표본 하한은 ON 과
- * negative **양쪽**에 건다 — negative 의 낮은 갭이 「감쇠가 죽어서」가 아니라 「표본이 말라서」인
- * 경우 D6 는 낙차가 커서 오히려 초록으로 보인다.
+ * **게이트는 4조건 동시** — D5 `ON >= τ` · D5-b 최심부 색 순서 `b > g > r` · D6 `ON − negative >= M`
+ * · D6-b `zero − ON >= M`. 부호 비교만으로는 낙차가 `0` 에 임의로 가까워도 통과한다 (#1163
+ * 라운드 2 [B4] 반증). 임계는 절대값이 아니라 **상대 성질**이며 ADR `20260705-759` 결정 3 규약을
+ * 따른다. 표본 하한은 세 프레임 **전부**에 건다 — 갭이 기대 방향으로 낮거나 높은 이유가 「감쇠가
+ * 죽어서」가 아니라 「표본이 말라서」일 수 있고, 그 상태의 낙차 술어는 오히려 초록으로 보인다.
  *
  * ── 픽셀 층 변이 실증 (원본 PASS · 변이 결과) ────────────────────────────────
  * PR 본문의 변이 표는 **단위 테스트 층** (`procedural-planet-shader.test.ts`) 전수 재현이다.
@@ -62,13 +66,16 @@
  *
  * | 변이 | 단위 층 | 본 게이트 |
  * | --- | --- | --- |
- * | (없음 — 원본) | `88 passed (88)` | `exit 0` · D5 갭 `0.2317` · D5-b 평균 RGB `(73.74, 170.01, 251.81)` · D6 낙차 `0.2289` |
- * | **M-h** — `material.setColor3('deepOceanFactor', …)` 바인딩 블록 삭제 | `88 passed (88)` | ⚠️ **`exit 0` (미검출)** · D5 갭 `0.5704` · D5-b 평균 RGB `(29.66, 58.39, 73.93)` · D6 낙차 `0.5677` |
+ * | (없음 — 원본) | `88 passed (88)` | `exit 0` · D5 갭 `0.2317` · D5-b 평균 RGB `(73.74, 170.01, 251.81)` · D6 낙차 `0.2289` · D6-b 상승 `0.3388` |
+ * | **M-h** — `material.setColor3('deepOceanFactor', …)` 바인딩 블록 삭제 | `88 passed (88)` | **`exit 1`** (D6-b 만 FAIL) · D5 갭 `0.5704` (PASS) · D5-b 평균 RGB `(29.66, 58.39, 73.93)` (PASS) · D6 낙차 `0.5677` (PASS) · **D6-b 상승 `0.0000` (FAIL)** |
  *
- * [실측] 2026-09-06, 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`. **M-h 는 어느 층에서도
- * 잡히지 않는다.** uniform 이 `(0,0,0)` 으로 남아 `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 가 되고,
- * 이는 채널 공통 스칼라 감쇠라 (a) 색 순서를 보존하고 (b) 갭을 **키우는** 방향이라 D5 의 단측
- * 술어를 통과한다. 잔여 구멍이며 D5-b 로는 원리적으로 도달할 수 없다 (게이트 근처 주석 참조).
+ * [실측] 2026-09-06, 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000` (mutation → revert 후
+ * 원본 재실행에서 위 원본 값 전건 재현). **M-h 를 잡는 것은 D6-b 하나뿐이다** — 나머지 셋은
+ * 이 변이에서 전부 PASS 로 남는다. uniform 이 `(0,0,0)` 으로 남아
+ * `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 가 되고, 이는 채널 공통 스칼라 감쇠라 (a) 색 순서를
+ * 보존하고 (b) 갭을 **키우는** 방향이라 D5 의 단측 술어를 통과하기 때문이다. D6-b 가 재는 것은
+ * 그 정적 속성이 아니라 **바인딩이 렌더 결과에 기여하는 양**이며, M-h 하에서는 zero 프레임과
+ * ON 프레임의 uniform 이 같은 값이 되어 상승이 `0` 으로 붕괴한다 (게이트 근처 주석 참조).
  */
 
 import { chromium } from 'playwright';
@@ -142,6 +149,10 @@ const OCEAN_GAP_TAU = 0.11;
  * 통과한다** (#1163 라운드 2 [B4] 가 반증한 것) — 그래서 `τ` 와 **동시** 요구한다.
  *
  * [실측] 낙차 `0.2289` (= ON `0.2317` − negative `0.0027`), 3회 전건 동일. `M` 은 그 **절반**.
+ *
+ * §A7.5 D6-b 의 `zero − ON` 상승 하한도 **같은 상수를 재사용**한다 (새 임계 숫자를 만들지 않는다).
+ * [실측] 그 상승은 `0.3388` (= zero `0.5704` − ON `0.2317`) 로 `M` 위쪽에 있고, 변이 M-h 에서는
+ * `0.0000` 으로 붕괴한다 — 두 대역 사이에 `M` 이 놓인다.
  */
 const OCEAN_GAP_MARGIN = 0.11;
 
@@ -399,18 +410,24 @@ async function diffDirs(dirA, dirB, names) {
 }
 
 /**
- * Amendment 7 (#1197) §A7.5 D6 — negative 주입: `deepOceanFactor` 를 `(1,1,1)` 로 **매 프레임
+ * Amendment 7 (#1197) §A7.5 D6/D6-b — `deepOceanFactor` uniform 을 지정 값으로 **매 프레임
  * 덮어쓴다** (`verify:1119` `injectMaskDisabled` 선례 그대로 per-frame observer).
  *
  * Babylon 은 `bind()` 에서 uniform 을 먼저 올린 뒤 `onBindObservable` 을 알리므로, 우리 observer 가
- * 뒤에 등록되면 다음 프레임 업로드 값이 항상 `(1,1,1)` 이 된다 — **프로덕션 코드 0 줄로** 「깊이
- * 감쇠가 죽은 상태」를 재현한다. 이는 D12 가 지정한 결함 보유판(변이 M-a)과 **동일한 변이**다.
+ * 뒤에 등록되면 다음 프레임 업로드 값이 항상 주입값이 된다 — **프로덕션 코드 0 줄로** 특정
+ * uniform 상태를 재현한다.
+ *
+ * 두 호출처:
+ *  - `(1,1,1)` = D6 negative. 「깊이 감쇠가 죽은 상태」이며 D12 가 지정한 결함 보유판(변이 M-a)과
+ *    **동일한 변이**다.
+ *  - `(0,0,0)` = D6-b probe. 바인딩이 소실됐을 때 uniform 이 남는 값(변이 M-h)이며, 건강한
+ *    빌드에서는 ON 프레임과 **다른** 상태여야 한다 (게이트 근처 주석 참조).
  *
  * ⚠️ `deepOceanFactor` 는 `vec3` 라 `setFloat` 로는 쓸 수 없다 — `setColor3` 가 정확한 주입이다.
  * `Color3` 생성자는 번들이라 전역에 없으므로 씬의 기존 Color3 인스턴스에서 얻는다.
  */
-async function injectDeepOceanNeutral(page) {
-  return page.evaluate(() => {
+async function injectDeepOceanFactor(page, rgb) {
+  return page.evaluate(([r, g, b]) => {
     const scene = window.__simCore?.scene;
     const earth = window.__solarScene?.meshes?.get('earth');
     if (!scene || !earth) return { patched: 0, error: 'earth mesh/scene 부재' };
@@ -422,12 +439,12 @@ async function injectDeepOceanNeutral(page) {
     for (const mesh of meshes) {
       const mat = mesh.material;
       if (mat && typeof mat.setColor3 === 'function' && mat.onBindObservable) {
-        mat.onBindObservable.add(() => mat.setColor3('deepOceanFactor', new Color3(1, 1, 1)));
+        mat.onBindObservable.add(() => mat.setColor3('deepOceanFactor', new Color3(r, g, b)));
         patched += 1;
       }
     }
     return { patched };
-  });
+  }, rgb);
 }
 
 /**
@@ -722,7 +739,7 @@ async function setupOceanFrame(browser) {
   return ctx;
 }
 
-/** MODE=ocean — Amendment 7 (#1197) §A7.5 D5/D6. */
+/** MODE=ocean — Amendment 7 (#1197) §A7.5 D5/D5-b/D6/D6-b. */
 async function runOcean(browser) {
   const results = {};
 
@@ -738,7 +755,7 @@ async function runOcean(browser) {
   // ── ② negative — deepOceanFactor (1,1,1) 고착 주입 (D6 = D12 결함 보유판 M-a) ──
   {
     const { context, page, consoleErrors } = await setupOceanFrame(browser);
-    const injected = await injectDeepOceanNeutral(page);
+    const injected = await injectDeepOceanFactor(page, [1, 1, 1]);
     await page.waitForTimeout(800); // observer 는 다음 bind 부터 유효 — 프레임 몇 개 대기
     const buf = await captureBody(page, 'earth', 'qa-1197-ocean-negative');
     results.negative = await measureOceanDepth(page, buf);
@@ -748,20 +765,37 @@ async function runOcean(browser) {
     await context.close();
   }
 
+  // ── ③ zero probe — deepOceanFactor (0,0,0) 고착 주입 (D6-b = 변이 M-h 대조군) ──
+  {
+    const { context, page, consoleErrors } = await setupOceanFrame(browser);
+    const injected = await injectDeepOceanFactor(page, [0, 0, 0]);
+    await page.waitForTimeout(800);
+    const buf = await captureBody(page, 'earth', 'qa-1197-ocean-zero');
+    results.zero = await measureOceanDepth(page, buf);
+    results.zero.consoleErrors = consoleErrors.length;
+    results.zero.patchedMaterials = injected.patched;
+    results.zero.injectError = injected.error ?? null;
+    await context.close();
+  }
+
   console.log('\n=== 측정 (#1197 바다 깊이 — 낮면 ocean 휘도 백분위 갭) ===');
   console.log(JSON.stringify(results, null, 2));
 
   const on = results.on;
   const neg = results.negative;
+  const zero = results.zero;
 
   // 표본 고갈 fail-fast — cap 이 대륙 위에 얹히면 τ 가 잡음이 된다. 조용히 통과시키지 않는다.
   // R6 — negative 프레임도 같은 하한을 요구한다. negative 의 갭이 낮은 이유가 「깊이 감쇠가 죽어서」가
   // 아니라 「표본이 말라서」일 수 있고, 그 상태의 D6 는 낙차가 커서 오히려 초록으로 보인다.
+  // zero probe 도 같은 이유로 같은 하한을 받는다 — D6-b 는 zero 갭이 **커야** 통과하는 술어라
+  // 표본이 마른 프레임의 잡음 갭이 그 방향으로 튀면 역시 초록으로 보인다.
   const negSampleOk = !neg.error && (neg.nOcean ?? 0) >= OCEAN_MIN_SAMPLES;
-  const sampleOk = !on.error && on.nOcean >= OCEAN_MIN_SAMPLES && negSampleOk;
+  const zeroSampleOk = !zero.error && (zero.nOcean ?? 0) >= OCEAN_MIN_SAMPLES;
+  const sampleOk = !on.error && on.nOcean >= OCEAN_MIN_SAMPLES && negSampleOk && zeroSampleOk;
   console.log('\n=== 판정 (§A7.5) ===');
   console.log(
-    `표본: ON ocean 픽셀 ${on.nOcean ?? 0} / negative ${neg.nOcean ?? 0} (하한 ${OCEAN_MIN_SAMPLES}) · disk R ${on.diskR} · 제외 극관 ${on.excludedPolar} / 밤면·저ndl ${on.excludedNight} / 육지 ${on.excludedLand} → ${sampleOk ? 'PASS' : 'FAIL (측정 불가 — 밴드를 넓히지 말 것)'}`,
+    `표본: ON ocean 픽셀 ${on.nOcean ?? 0} / negative ${neg.nOcean ?? 0} / zero ${zero.nOcean ?? 0} (하한 ${OCEAN_MIN_SAMPLES}) · disk R ${on.diskR} · 제외 극관 ${on.excludedPolar} / 밤면·저ndl ${on.excludedNight} / 육지 ${on.excludedLand} → ${sampleOk ? 'PASS' : 'FAIL (측정 불가 — 밴드를 넓히지 말 것)'}`,
   );
   if (!sampleOk) {
     process.exitCode = 1;
@@ -776,19 +810,37 @@ async function runOcean(browser) {
   // 숫자가 없다** (실값 `b 0.62 > g 0.45 > r 0.35` 이라 strict 가 성립한다). 깊이 감쇠가 색조
   // 이동 없는 회색화·색조 역전으로 무너지면 여기서 걸린다.
   //
-  // ⚠️ **이 술어는 변이 M-h 를 잡지 못한다** — 그것이 R7 이 지목한 구멍인데, 닫히지 않았다.
-  // `material.setColor3('deepOceanFactor', …)` 바인딩 블록만 삭제하면 uniform 이 `(0,0,0)` 으로
-  // 남고, 그러면 `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 라 **채널 공통 스칼라 감쇠**가 된다.
-  // 즉 최심부는 어두워지되 **색 순서는 그대로 보존**된다. [실측] (2026-09-06, `SWIFTSHADER=1
-  // HEADFUL=0`) 원본 최심부 평균 RGB `(73.74, 170.01, 251.81)` vs M-h `(29.66, 58.39, 73.93)` —
-  // 둘 다 `b > g > r` 이라 D5-b 는 PASS, D5 는 갭이 `0.2317 → 0.5704` 로 **커져서** PASS,
-  // D6 도 낙차가 커져 PASS, `exit 0`. M-h 는 여전히 열려 있다.
+  // ⚠️ **이 술어는 변이 M-h 를 잡지 못한다** — 색 순서는 **정적 속성**이라 채널 공통 스칼라
+  // 감쇠에 눈이 먼다. `material.setColor3('deepOceanFactor', …)` 바인딩 블록만 삭제하면 uniform 이
+  // `(0,0,0)` 으로 남고, 그러면 `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 라 최심부가 어두워지되
+  // **색 순서는 그대로 보존**된다. [실측] (2026-09-06, `SWIFTSHADER=1 HEADFUL=0`) 원본 최심부
+  // 평균 RGB `(73.74, 170.01, 251.81)` vs M-h `(29.66, 58.39, 73.93)` — 둘 다 `b > g > r`.
+  // M-h 는 D6-b 가 닫는다 (아래).
   //
   // 왜 D5 만으로는 부족한가 (기록): `gap >= τ` 는 **단측 술어**라 갭이 커지는 실패 방향에 눈이
   // 멀다. D5-b 는 그 축을 부분적으로만 보강한다 — 스칼라 감쇠 변이는 색 순서를 건드리지 않으므로
   // 색 순서 축으로는 원리적으로 도달할 수 없다.
   const d5b = on.deepMeanB > on.deepMeanG && on.deepMeanG > on.deepMeanR;
   const d6 = !neg.error && neg.patchedMaterials > 0 && gapDrop >= OCEAN_GAP_MARGIN;
+  // ── D6-b — 바인딩 기여도 계약 (변이 M-h) ──────────────────────────────────
+  // 무엇을 거는가: `deepOceanFactor` 를 `(0,0,0)` 으로 주입한 프레임의 갭 `zeroGap` 이 ON 프레임의
+  // 갭보다 **`M` 이상 크다**. 임계는 D6 와 **같은 상수** `OCEAN_GAP_MARGIN` 재사용 — 새 임계
+  // 숫자가 없다.
+  //
+  // **왜 이 술어는 M-h 에 도달하는가**: D5-b 의 색 순서는 정적 속성이라 스칼라 감쇠에 눈이 멀지만,
+  // 이 술어는 **바인딩이 렌더 결과에 실제로 기여하는 양**을 잰다. 건강한 빌드에서는 ON 프레임의
+  // uniform 이 `DEEP_OCEAN_FACTOR` 이고 zero 프레임은 `(0,0,0)` 이라 두 프레임이 서로 다른 상태고,
+  // 갭이 낙차만큼 벌어진다. M-h 하에서는 ON 프레임의 uniform 도 `(0,0,0)` 이 되어 두 프레임이
+  // **같은 값**이 되고 낙차가 `0` 으로 붕괴한다.
+  //
+  // 부호(`zeroGap > onGap`) 가 아니라 마진을 요구하는 이유는 D6 와 같다 — 부호만으로는 낙차가
+  // `0` 에 임의로 가까워도 통과한다 (#1163 라운드 2 [B4]).
+  //
+  // `patchedMaterials > 0` 을 함께 assert 하는 이유도 D6 와 같다: 주입이 no-op 이면 zero 프레임이
+  // ON 프레임과 같아져 낙차가 `0` 이 되므로 **초록이 아니라 붉게** 죽지만, 그 붉음의 원인이
+  // 「M-h 검출」인지 「주입 실패」인지 구분되어야 한다.
+  const zeroGapRise = (zero.gap ?? 0) - on.gap;
+  const d6b = !zero.error && zero.patchedMaterials > 0 && zeroGapRise >= OCEAN_GAP_MARGIN;
   console.log(
     `D5 깊이 그라데이션: ON 상대 갭 ${on.gap.toFixed(4)} (≥ τ ${OCEAN_GAP_TAU}) · P10 ${on.p10Lum} / P50 ${on.p50Lum} / P90 ${on.p90Lum} · console err ${on.consoleErrors} → ${d5 ? 'PASS' : 'FAIL'}`,
   );
@@ -797,6 +849,9 @@ async function runOcean(browser) {
   );
   console.log(
     `D6 판별력 (deepOceanFactor (1,1,1) 고착 주입): 머티리얼 ${neg.patchedMaterials}개 패치 · negative 갭 ${neg.gap?.toFixed(4)} · 낙차 ${gapDrop.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) → ${d6 ? 'PASS' : 'FAIL'}`,
+  );
+  console.log(
+    `D6-b 바인딩 기여도 (deepOceanFactor (0,0,0) 고착 주입 = 변이 M-h 대조군): 머티리얼 ${zero.patchedMaterials}개 패치 · zero 갭 ${zero.gap?.toFixed(4)} · ON 대비 상승 ${zeroGapRise.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) → ${d6b ? 'PASS' : 'FAIL'}`,
   );
   console.log(
     `  ↳ negative 프레임에 D5 술어 적용: 갭 ${neg.gap?.toFixed(4)} ≥ τ ${OCEAN_GAP_TAU} → ${neg.gap >= OCEAN_GAP_TAU ? 'PASS (판별력 없음 — 가드 실패)' : 'FAIL (기대대로 — 가드 작동)'}`,
@@ -814,7 +869,7 @@ async function runOcean(browser) {
   console.log(
     `  ↳ [진단·비게이트] negative 프레임 최심부 평균 RGB (${neg.deepMeanR?.toFixed(2)}, ${neg.deepMeanG?.toFixed(2)}, ${neg.deepMeanB?.toFixed(2)}) · D5-b 술어 적용 → ${negD5b ? 'PASS' : 'FAIL'}`,
   );
-  if (!(d5 && d5b && d6)) process.exitCode = 1;
+  if (!(d5 && d5b && d6 && d6b)) process.exitCode = 1;
 }
 
 const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
@@ -843,7 +898,9 @@ const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
     {},
     async (browser) => {
       if (MODE === 'ocean') {
-        console.log('=== #1197 바다 깊이 그라데이션 (D5/D6 — negative 주입 내장) ===');
+        console.log(
+          '=== #1197 바다 깊이 그라데이션 (D5/D5-b/D6/D6-b — uniform 주입 프레임 2종 내장) ===',
+        );
         await runOcean(browser);
         return;
       }
