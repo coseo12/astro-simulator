@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Provisional (2026-09-06 — 지구 바다 깊이 색. cross-validate 결과 통합 후 Accepted 전이)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -673,6 +673,9 @@ Amendment 1 §A1.3 결정 4 의 rocky 분기 (`col = mix(baseColor, landColor, l
 | Tier 1-1 극관 (polar ice caps)       | ✓           | 이슈 핵심. `smoothstep` mask 1개 + 색 상수 1개 — 저비용                                                                                                                                                                                                                                                                                                                                    |
 | Tier 1-2 biome 위도 색 (3밴드)       | ✓           | 이슈 핵심. 기존 continents fbm 재사용으로 noise 샘플 +0 (결정 3)                                                                                                                                                                                                                                                                                                                           |
 | Tier 2-3 바다 깊이 색 (deep/shallow) | ✗ 후속      | 저비용임은 인정 (§A3.7 재검토 조건 1 에 설계 스케치 박제 — continents 값 재활용). 단 (i) DoD 측정 축 +1 (deep/shallow 픽셀 판별 방법 별도 설계 필요), (ii) ocean = baseColor (데이터 SSoT read-only) 규약에 shallow 신규 상수가 얹히는 색 체계 논의 확장, (iii) Tier 1 만으로 "지구가 지구처럼 보인다" 완결 Behavior Change 집합 성립. scope 절제 우선 (CRITICAL #6)                       |
+
+
+> ⚠️ 부기 (#1197, 2026-09-05): 본 행의 「✗ 후속」은 **Amendment 7 에서 해소**됐다. 위 (i)(ii) 우려는 각각 신규 DoD 축(MODE=ocean 픽셀 가드)과 (B′) baseColor 파생으로 닫혔다. 원문은 당시 결정의 기록으로 보존한다.
 | Tier 2-4 대기 fresnel rim            | ✗ 후속      | #774 가 `cameraPosition` auto-bind 를 실증해 viewDir 비용은 하락 (이슈 판단 요청 2 의 재평가 반영). 그러나 (i) 4 타입 공유 셰이더에 rocky 전용 varying (vWorldPos) 혼입 — #774 결정 1 이 "무의미한 uniform 동거" 를 분리 근거로 쓴 논리의 역방향 침범, (ii) 대기 표현은 구름 (Tier 3) 과 묶어 별도 레이어로 설계하는 것이 자연 (§A1.8 재검토 조건 5 대기/구름 mesh 박제와 합류). 후속 유지 |
 | Tier 3 구름 / 야간 불빛              | ✗ 별도 트랙 | 별도 mesh/레이어 — §A1.8 재검토 조건 5 그대로                                                                                                                                                                                                                                                                                                                                              |
 
@@ -777,6 +780,8 @@ col = mix(col, iceColor, iceMask);
 **재검토 조건**:
 
 1. **바다 깊이 색 (Tier 2-3) 요구** — 설계 스케치: `float depth = smoothstep(landThresholdLo, 0.0, continents)` (continents 재활용 — landMask 하위 구간을 깊이로 역해석, noise +0) + `DEEP_OCEAN_RGB` 상수 1개, `oceanCol = mix(baseColor, deepOcean, depth)` 를 첫 mix 의 baseColor 자리에 대입. ocean = colorHint read-only 규약과의 관계 (deep 색이 baseColor 변조인지 독립 상수인지) 재론 필요.
+
+> ⚠️ 부기 (#1197, 2026-09-05): 본 스케치는 **Amendment 3 시점 문면**이며 두 가지가 stale 하다 — (i) Amendment 4 (#1119) 가 대륙 형상을 마스크로 이관해 `landThresholdLo` 앵커가 실제 바다의 60%를 depth 0 으로 누른다 (실측: ocean 한정 continents 의 59.78% 가 LO 이상, 평균 depth 0.0441), (ii) `smoothstep(landThresholdLo, 0.0, …)` 는 edge0 >= edge1 이라 GLSL 명세상 undefined 다. 현행 정본은 Amendment 7 §결정 1·2 이며 원문은 소급 수정하지 않는다.
 2. **대기 fresnel rim (Tier 2-4) 요구** — #774 cameraPosition auto-bind 실증으로 uniform 비용 하락. 단 공유 셰이더 varying 혼입 vs 별도 대기 레이어 (§A1.8 재검토 조건 5) 비교 선행 — 구름 도입 시점과 합류 권장.
 3. **구름 / 야간 도시 불빛 (Tier 3)** — 별도 mesh/레이어 트랙 (§A1.8 재검토 조건 5 그대로). 구름은 #782 자전과 차등 offset 필요.
 4. **biome 경계 상관 아티팩트** — continents 재사용 jitter (결정 3-c) 가 해안선-biome 경계 쏠림 (contour-following) 등 부자연 발견 시 **좌표 스위즐링 fbm (`fbm(p.zyx * 2.4)`)** 으로 승격 (cross-validate 고유 발견 — landMask 와의 상관을 완전 해제하면서 신규 noise 함수 불요. 단 agy 의 "비용 0" 주장은 오류 — 이미 계산된 값 재사용이 아니라 fbm 신규 호출 = hash 24회 추가로 독립 샘플 (B) 와 동일 비용. 가치는 탈상관이지 무비용이 아님).
@@ -1450,3 +1455,168 @@ Amendment 4 §결정 4 는 원거리 축소 shimmer 를 막으려고 *"투영 di
 1. `SURFACE_MASK_MIN_DISK_PX` 를 조정할 때 — 입력이 이제 위상 불변이므로 **측정 baseline 을 다시 잡는다**.
 2. `#783`·`#1119` 가드에서 `rotate=off` 강제가 빠질 때 — 위 §잔여의 안전판이 소멸한다.
 3. oblate 천체(비균등 scaling) 지원 시 — `resolveMeshVisualRadius` 의 `max(축별)` 이 장/단축을 뭉갠다 (cross-validate 고유 발견, 현 스코프 무영향).
+
+---
+
+## Amendment 7 (2026-09-06) — 지구 바다 깊이 색: `baseColor` 파생 감쇠 (#1197)
+
+**상태**: Provisional (cross-validate 결과 통합 후 Accepted 전이 — CLAUDE.md §ADR Status 워크플로. 본 Amendment 는 「ADR 신규·개정」 앵커에 해당한다)
+
+**이슈**: [#1197](https://github.com/coseo12/astro-simulator/issues/1197) — §A3.7 **재검토 조건 1 (Tier 2-3 바다 깊이 색)** 의 발동 결과다.
+
+⚠️ **번호가 `5` 가 아니라 `7` 인 이유**: pm 계약 문면은 "Amendment 5" 라 적었으나 저장소 실물에는 Amendment 5 (#1130) · 6 (#1157) 이 이미 있다. 계약의 "Amendment 5" 는 **"다음 Amendment 번호"** 로 읽는다. 같은 이유로 상태 라인의 **Amendment 6 누락(선재 drift)** 도 본 Amendment 에서 함께 backfill 했다 — 상태 라인은 Amendment 마다 갱신되는 라인이므로 §A7.7 의 「원문 소급 치환 금지」(대상: §A3.3 Tier 표 행 · §A3.7 재검토 조건 1) 위반이 아니다. **의도된 부수 변경**이다.
+
+### A7.1 배경 — 재검토 조건 1 의 스케치가 Amendment 4 이후 stale 하다
+
+§A3.7 재검토 조건 1 은 `depth = smoothstep(landThresholdLo, 0.0, continents)` 를 스케치로 박제했다. 그 문면은 **Amendment 3 시점**의 것이고 두 축이 무효화됐다:
+
+1. **앵커가 stale** — Amendment 4 (#1119) §A4.3 결정 5 가 `continents` 의 역할을 *"저주파 형상 → 고주파 디테일 + biome jitter"* 로 전환했고 대륙 형상은 마스크가 정한다. `landThresholdLo` 는 더 이상 해안선이 아니다.
+2. **형태가 명세상 undefined** — GLSL(ES) `smoothstep(edge0, edge1, x)` 는 *"Results are undefined if edge0 >= edge1"* 인데 스케치는 `edge0 = 0.48 > edge1 = 0.0` 이다.
+
+### A7.2 실측 (설계 결정의 근거)
+
+커밋된 마스크를 `pngjs` 로 디코드하고 셰이더의 `fbm`/`smoothstep`/광원식을 그대로 옮긴 순수 JS 로 계산했다 (volt #67 debug-script 패턴 — 측정 후 `rm`). **GPU 실측 아님** — 아래 화면 휘도는 전부 「산식」이고, 게이트 임계의 정본은 §A7.5 의 GPU 실측이다.
+
+**M1 — 마스크는 사실상 이진이다** (`earth-land-mask.png` `1024×512`, 전 텍셀 `524,288`):
+
+| 값 | 텍셀 | 비율 |
+| --- | ---: | ---: |
+| 정확히 `0` (원양) | 340,511 | **64.947%** |
+| 정확히 `255` (육지) | 163,774 | 31.237% |
+| 중간 계조 (해안 AA) | 20,003 | 3.815% |
+
+ocean 텍셀 (`maskLand < 0.5`, `n = 350,906`) 만 보면 **`97.038%` 가 `maskLand == 0`** 이다 — 단일 샘플이 원양에서 돌려주는 값은 전 지점 동일해 **정보량이 `0`** 이다.
+
+**M2 — 스케치 depth 는 마스크 경로에서 수치적으로 죽는다.** well-defined 등가형 `1 - smoothstep(0, LO, continents)` 로 ocean 텍셀에 적용: 평균 depth `0.0441` / `depth == 0` **`59.78%`** / `[0, 0.1)` `85.7%`. 원인은 앵커다 — ocean 한정 `continents` 는 P10 `0.3598` / P50 `0.5064` / P90 `0.6766` 로 **전 구간에 퍼져** `LO = 0.48` 이상이 `59.78%` 다.
+
+**M3 — 스케치 depth 는 해안과 거의 무상관.** 마스크 거리장(4-이웃 BFS, x 순환) 과 Pearson `r = 0.14404` (`n = 350,906`). 해안거리 밴드별 평균 depth 는 `0.0226 → 0.0641` 로 단조 증가하나 **절대 크기가 전부 `0.07` 미만**이라 시각 의미가 없다.
+
+**M4 [명세 인용, 미실측]** — 위 A7.1-2. 증가 edge 형이 **비용 동일**이므로 논쟁 대상이 아니다.
+
+**M5 — 낮면 ocean 은 이미 클리핑돼 있다.** `SOFT_TERMINATOR_WIDTH = 0.12` 라 `sunFactor` 는 `ndl >= 0.12` 전 구간에서 `1.0` 이다. `hemiFactor = 0.5` 대표값에서 `baseColor × shade = (0.6183, 1.2188, 1.5452)` → G·B 가 clamp 된다. 결과: (a) 얕은 대역은 blown-out 이라 **depth 장이 넓게 퍼져야** 하고, (b) 깊은 대역은 R 이 클리핑되지 않아 (`0.618 < 1`) 전 구간 연속 변화를 제공한다.
+
+### A7.3 결정
+
+#### 결정 1 — depth 소스는 `continents` fbm 재사용. 단 **앵커를 경로별로 분리**한다
+
+(나) 「마스크 파생 depth」는 **M1 로 구현 불가**다 (선택지가 아니었다) — 거리장을 얻으려면 에셋 계약(`colorType=0` · `27,295 B` · 고유 계조 65 · §A4.3 결정 8)을 갈아엎거나 다중 오프셋 샘플이 필요한데 후자는 「텍스처 샘플 1 유지」를 정면으로 깬다. (가) 도 스케치 문면대로는 M2 로 죽으므로, 앵커를 **§A4.3 결정 7 의 `mix(…, uMaskEnabled)` 관용구**로 갈아탄다 (신규 분기 `0`).
+
+```glsl
+float depthEdgeHi = mix(landThresholdLo, oceanDepthEdgeHi, uMaskEnabled);
+float oceanDepth  = 1.0 - smoothstep(depthEdgeHi - oceanDepthRange, depthEdgeHi, continents);
+```
+
+`OCEAN_DEPTH_EDGE_HI = 0.68` · `OCEAN_DEPTH_RANGE = 0.32` 는 **매직 넘버가 아니라 M2 의 실측 분위수**다 — ocean 한정 `continents` 의 P90 `0.6766` 과 P90−P10 `0.3168` 의 반올림이다. 절차 경로 edges `(0.16, 0.48)` 은 `RANGE < LO` 라 `continents = 0` 에서 depth 가 `1` 에 도달한다.
+
+[산식] 마스크 경로 depth 분포: 평균 `0.0441 → 0.5183` / P50 `0.000 → 0.559` / `depth == 0` `59.78% → 9.56%`.
+
+#### 결정 2 — 해안 감쇠 `oceanDepth *= 1.0 - landMask` (비용 `0`)
+
+`landMask` 는 이미 계산돼 있다. 곱 1회로 마스크 계조 대역에서 depth 를 끌어내려 **해안 접점의 ocean 성분이 정확히 `baseColor` 로 수렴**한다 (결정 1 의 앵커 mix 가 절차 경로에서, 이 곱이 마스크 경로에서 D3 을 보장).
+
+⚠️ **과대평가 금지 — 측정된 폭**: 이 항이 `0` 이 아닌 ocean 텍셀은 `10,395` 개 = ocean 의 **`2.96%`** (약 2텍셀 폭). 기본 focus 에서는 sub-pixel 이고 최대 줌인에서만 대륙붕처럼 보인다. 절차 경로에서는 사실상 no-op 이다. ⇒ **픽셀 게이트는 이 항에 의존하지 않는다**; 계약은 미러 단위 테스트가 걸고, 픽셀 층은 §A7.5 의 **비-게이트 진단 출력**으로 관측만 한다.
+
+#### 결정 3 — (B′) `baseColor` 파생. `DEEP_OCEAN_FACTOR = { r: 0.35, g: 0.45, b: 0.62 }`
+
+```glsl
+vec3 oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth);
+```
+
+**ocean 색의 유일한 소스는 여전히 `colorHint.hex`** 이고 본 계수는 rendering-only 감쇠다. 「read-only」의 저장소 내 실제 의미는 **데이터 무변조**이지 출력 동일성이 아니다 — desert/gas-bands/sun 이 이미 `baseColor` 를 곱으로 변조한다. 따라서 규약 문면은 **개정이 아니라 부기**다.
+
+제약 4종 (전건 단위 테스트):
+
+| 제약 | 출처 | 실측 |
+| --- | --- | --- |
+| 각 성분 `∈ (0,1]` | pm 계약 | ✓ |
+| `b >= g >= r` | pm 계약 (`B ≥ G` 보존 · 보라/마젠타 회피) | `0.62 ≥ 0.45 ≥ 0.35` ✓ |
+| `r < 1` (감쇠 실재) | `(1,1,1)` 변이 차단 | ✓ |
+| `b > r` (색조 이동 실재) | #775 「순수 스칼라 어둡게」 차단 | `0.62 > 0.35` ✓ |
+
+`b >= g >= r` 이 §A4.5 IoU 가드의 화면 분류 `b < g` 를 **구조적으로 보존**한다 (deep albedo [산식] `(0.0810, 0.2153, 0.4401)` — `b > g`). 값은 **산식 근거의 출발값**이며 (#783 `ICE_LAT_LO 0.88 → 0.84` 선례 동형) D13 실 Chrome GUI 관찰에서 **무조정**으로 확정했다 (§A7.5).
+
+#### 결정 4 — 삽입 위치: 첫 mix 의 `baseColor` 자리. `iceMask` 는 마지막 유지
+
+`col = mix(oceanCol, landCol, landMask)` → … → `col = mix(col, iceColor, iceMask)` (불변, GLSL 문자열 가드 대상). `ndl`/`shade` 무접촉 — `col *= shade` 최종 곱 불변 (#773 규약).
+
+#### 결정 5 — uniform 신규 3개, 4중 SSoT 전건
+
+`deepOceanFactor` (`vec3`, `setColor3`) / `oceanDepthEdgeHi` / `oceanDepthRange` (`float`, `setFloat`). ① `uniforms:` 배열 ② setter ③ GLSL 선언 ④ 미러 — 4곳 전부. 미러는 **헬퍼를 새로 export** 한다 (식 중복 금지): `oceanDepthMirror(continents, landMask, maskEnabled)` 를 `surfaceColorMirror` 가 호출하고, D3/D4 단위 테스트는 그 헬퍼를 **직접** 불러 `toBe(0)` 정확 비교를 한다.
+
+#### 결정 6 — 신규 noise/텍스처 샘플 `0`
+
+FRAGMENT 의 `fbm(` 호출 **4개** (`p*2.4` / `p*3.6` / `p*4.0` / `p*5.0`) · `texture2D` **1개** 불변. 추가되는 것은 `mix`·`smoothstep`·곱셈뿐이다.
+
+⚠️ **대가는 결합이다.** `continents` 는 이제 **4중 용도** (육지 임계 / `maskWarp` / biome·ice `latJ` jitter / **depth**) 다. 특히 `iceMask` 의 `latJ` 가 `continents` 기반이라 **극지 해빙 경계와 바다 깊이가 상관**된다 (낮은 `continents` → 깊은 바다 **그리고** ice 감소). 이는 §A3.7 **재검토 조건 4** 가 이미 관리하는 클래스이며 본 이슈 비목표다. ⚠️ 이 커플링을 「실제 해양 물리와 일치한다」로 정당화하지 않는다 — 우리 코드의 상관은 물리 채널이 아니라 **같은 노이즈 장을 공유한 결과**이고 `latJ` 는 육지 biome 에도 걸린다 (완결 서사 편향 회피). **관리 대상으로만 박제한다.**
+
+### A7.4 Concrete Prediction
+
+- 데이터 SSoT 무접촉 — `solar-system.json` `0` 행. 마스크 에셋 (`colorType=0` · `1024×512` · `27,295 B`) **무변경**.
+- 비-rocky 3 분기 · sun-shader · `?surface=off` 경로의 **fragment 코드 무변경** → 그 body 들의 렌더 픽셀 diff `0`.
+- 신규 스크립트 `0` (`browser-verify-783-earth-detail.mjs` 에 MODE 1개 추가) · workflow step `+1`.
+
+### A7.5 DoD (측정 가능 — 실 Chrome GUI 필수, WebGPU readback 금지 #728)
+
+픽셀 가드는 `browser-verify-783-earth-detail.mjs` **`MODE=ocean`** 이다. 프레임은 기존 결정적 레시피(`?focus=earth&rotate=off&orbits=off` → 정착 → `jumpToJulianDate(2451626.0)` → `pause` → `beta = π/2`)에 **`alpha += π/2`** 를 더한다.
+
+⚠️ **그 방위 보정이 없으면 이 축은 표본 `0` 으로 구조적 측정 불능이다.** [실측] 기본 방위에서 sub-camera 점의 `ndl` 이 **정확히 `0`** (카메라가 terminator 정면) 이라 disk 전체의 `ndl` 최댓값이 `0.7869` 에 그치고 `ndl >= 0.9` 대역에 한 픽셀도 들어오지 않는다 (역투영 성공 `21,953` 픽셀 전건 제외). 방위 스윕 [실측]: `+0° → 0.0000` / `+30° → 0.4996` / `+60° → 0.8654` / **`+90° → 0.9993`** / `+180° → 0.0000`. **JD 와 `ndl` 대역은 건드리지 않았다** — 바꾼 것은 카메라 방위 하나이고, 방위는 낮면 반구를 **바꾸지 않는다** (그것은 JD 가 정한다). §A4.5 MODE=seam 이 이미 `alpha += offset` 를 도는 선례다.
+
+**판정량**은 (b-2) **백분위 갭** `(P90 − P10) / P90` of Rec.709 휘도다. (b-1) 상관 대비 채택 근거는 §A7.5 게이트 실측 (아래) 이고, (b-1) 은 스크립트가 `fbm` + 마스크 샘플 + 앵커 mix 를 **재구현**해야 해 「셰이더가 아니라 재구현본을 검사」하는 위험과 미러 drift 축이 하나 더 생긴다.
+
+| # | 축 | 판정 |
+| --- | --- | --- |
+| D3 | 해안 접점 연속성 | `oceanDepthMirror` 직접 호출: 절차 경로 `(LO, 0, 0) === 0` · 마스크 경로 `(c, 1, 1) === 0` (임의 `c` 8종) |
+| D4 | 단조성 | `continents` `LO → 0` 9단계 `luminance709` 단조 비증가 + 양끝 상대 갭 `>= OCEAN_DEPTH_MIN_GAP (0.40)` |
+| D5 | 픽셀 실측 | `ndl >= 0.9` ∧ `|sin lat| < 0.84` ∧ `b >= g` 인 ocean 픽셀의 상대 갭 `>= τ` **∧** 표본 `>= 900` |
+| D6 | 판별력 | `deepOceanFactor` 를 `(1,1,1)` 로 고착 주입한 프레임에서 D5 가 **FAIL** + `patchedMaterials > 0` + `ON − negative >= M` |
+
+**임계는 절대값이 아니라 GPU 실측 확정치다** (ADR `20260705-759` 결정 3). [실측] 2026-09-06 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3001`, **3회 전건 동일 (sd `0`)**: ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / 표본 `n = 3,612`. ⇒ `τ = 0.11` · `M = 0.11` · 표본 하한 `900` (각각 실측의 절반 / 절반 / 1/4).
+
+⚠️ **설계의 [산식] 예측 `0.4477` 을 옮겨 적지 않았다** — GPU 실측은 `0.2317` 로 그 절반 수준이다 (투영 foreshortening · AA · swiftshader · `ndl >= 0.9` cap 이 disk 중앙만 본다). 설계가 「그대로 옮겨 적지 말 것」이라 명시한 이유가 실측으로 확인됐다.
+
+**게이트는 `ON >= τ` 와 `ON − negative >= M` 을 동시에 요구한다** — 부호 비교만으로는 낙차가 `0` 에 임의로 가까워도 통과한다 (#1163 라운드 2 [B4] 반증).
+
+**표본 고갈은 fail-fast** 다 (cross-validate 이견 수용 1). 표본이 마르면 백분위가 잡음이 되는데 그 상태는 초록으로 보인다 — 관측 수를 항상 출력하고 하한 미달이면 즉사시킨다. ⚠️ **밴드를 넓히는 우회는 금지**이며 대체 JD 후보군도 **기각**이다 (`2451626.0` 은 §A3.5/§A4.5 와 공유하는 결정성 앵커이고, 후보군은 실행마다 다른 프레임을 재는 문을 연다).
+
+**회귀 축** [실측]: `verify:1119 MODE=dod` IoU `0.9360 → 0.9374` (하락 없음) · `screenLandPct 50.93 → 51.28` (절대차 `0.35pp`) / `verify:783 MODE=dod` DoD 1~4 전건 PASS / `?surface=off` 프레임 base sha 대비 픽셀 diff **`0`** (전 프레임 `921,600` px, `maxDelta 0`) / mars·jupiter·moon 렌더 영역 diff `0`~`7` px `maxDelta <= 2` — **같은 코드 재실행 대조군과 같은 대역** (§A7.6).
+
+### A7.5-1 D13 실 Chrome GUI 관찰 (headless:false · channel:chrome · WebGPU · console error `0`)
+
+![1197 실 Chrome GUI 낮면 1280x720](../reports/1197-ocean-depth/1197-gui-dayside-1280x720.png)
+
+disk 이미지 공간 확대 (같은 프레임 — 카메라 이동 없음):
+
+![1197 실 Chrome GUI disk 확대](../reports/1197-ocean-depth/1197-gui-disk-zoom.png)
+
+![1197 실 Chrome GUI 극지 1280x720](../reports/1197-ocean-depth/1197-gui-polar-1280x720.png)
+
+**관찰 (i) 「무작위 얼룩으로 읽히지 않는가」 — 읽히지 않는다.** 깊이 특징의 크기가 **대륙 규모**이고 경계가 매끄러워 대양 분지처럼 읽힌다 (고주파 얼룩 아님). ⚠️ 다만 **M3 그대로 실제 해안선과는 무상관**이다 — 육지 바로 옆이 최심부이거나 원양 한가운데가 얕은 구간이 실제로 보인다. 이는 (나) 가 M1 로 불가능한 데서 오는 **의도된 추상화 한계**이고, 「얼룩」과는 다른 축이다.
+
+**관찰 (ii) 해안선·극관 정상.** 대륙 윤곽이 선명하고 (#1119 무회귀), 극관 흰 모자가 남북 모두 유지된다. 결정 6 의 `continents` 4중 결합이 극지에서 **눈에 띄는 아티팩트를 만들지 않았다** — 해빙 경계는 여전히 위도 밴드로 읽힌다.
+
+**관찰 (iii) 자전 시 painted-on 유지.** `jumpToJulianDate` 로 자전 2위상(`T_JD + 0.25` / `+ 0.5`)을 캡처했을 때 깊이 장이 **대륙과 함께 회전**한다 (공간 고정이 아님) — `vLocalPos` 기반 계약 유지.
+
+⇒ **`DEEP_OCEAN_FACTOR` 무조정.** 결정 3 의 산식 출발값 `{0.35, 0.45, 0.62}` 을 그대로 확정한다 (measurement-first 절차상 「무조정」도 명시 의무).
+
+⚠️ **카메라 줌인 관찰은 성립하지 않았다** — `camera.radius` 를 줄이면 focus framing 이 방위를 되돌려 밤면이 잡힌다 (본 변경과 무관한 선재 거동). 결정 2 의 해안 2텍셀 대역은 그래서 **육안 확인되지 않았고**, 그 한계는 §A7.6 이 이미 박제한 것과 같은 축이다 (픽셀 층에서는 비-게이트 진단 출력으로만 관측). 위 확대는 카메라가 아니라 **이미지 공간 crop** 이다.
+
+### A7.6 자동 가드가 잡지 못하는 것 (정직성 박제)
+
+**변이 M-e (해안 감쇠 항 `oceanDepth *= 1.0 - landMask` 삭제) 는 어떤 픽셀 게이트도 FAIL 시키지 못한다.** 해당 대역이 ocean 의 `2.96%` (약 2텍셀) 라 기본 focus 에서 sub-pixel 이기 때문이다. 게이트를 거기 걸면 플레이키가 된다 — 이것은 결정 2 에서 명시적으로 지불한 대가다. 미러 단위 테스트(U5)와 GLSL 문자열 가드(U7)가 **코드 층에서만** 막고, 픽셀 층은 **비-게이트 진단 출력** (해안 밴드 `0.1 < maskLand < 0.9` 평균 휘도 vs 원양 `maskLand == 0` 평균) 으로 관측만 한다 (cross-validate 이견 수용 2 — 「가드 없음」에서 「로그에 관측 가능」으로 한 단계).
+
+[실측] 그 진단: 해안 밴드 `n = 31` 평균 휘도 `231.13` vs 원양 `n = 3,532` 평균 `218.84` — 해안이 더 밝다(=얕다)는 기대 방향이 관측된다.
+
+⚠️ **캡처 프레임에는 HUD DOM 이 합성된다** (Playwright element screenshot 은 겹치는 DOM 을 포함한다). HUD 글리프 안티에일리어싱은 **실행 간 비결정적**이며 [실측] `534 px / maxDelta 120` 규모다 — **같은 코드로 두 번 캡처했을 때도 같은 서명이 재현**됐다 (base↔base 대조군에서 jupiter). 렌더 영역(`y < 660`)만 보면 그 대조군이 `0~7 px / maxDelta <= 2` 이므로, 회귀 판정은 **렌더 영역 한정**으로 읽어야 한다.
+
+### A7.7 결과 · 재검토 조건
+
+**기대 결과**: `?focus=earth` 에서 대양이 해안 근처는 밝은 청록, 원양 중심부는 어둡고 짙은 파랑으로 그라데이션. 해안선·극관·biome 밴드 무회귀. 자전 시 painted-on 유지. mars/jupiter/moon + 단색 22 + sun 무회귀. `?surface=off` 100% 복귀.
+
+⚠️ **원문 소급 치환 금지** — §A3.3 Tier 표의 Tier 2-3 행과 §A3.7 재검토 조건 1 의 스케치는 **당시 결정의 기록**이므로 손대지 않고 각 앵커 아래 dated 부기만 달았다.
+
+**재검토 조건**:
+
+1. **깊이 패턴이 「무작위 얼룩」으로 읽힐 때** — M3 대로 depth 는 실제 해안선과 무상관(`r = 0.144`)이다. 이는 (나) 가 M1 로 불가능한 데서 오는 **의도된 추상화 한계**다. 얼룩으로 읽히면 값 튜닝이 아니라 **재검토 조건 4 승격(좌표 스위즐링 `fbm(p.zyx)`)** 으로 간다.
+2. **`DEEP_OCEAN_FACTOR` 는 현재 earth 전용 rendering 상수다** — 다른 rocky body 확장 시 body 별 파라미터화가 필요하다 (§A3.7 재검토 조건 5 의 연장, cross-validate 합의 보강).
+3. **마스크 에셋 포맷이 바뀔 때** — M1 이 (나) 를 기각한 근거가 현행 에셋 계약이다. 계조/채널이 늘면 (나) 가 다시 선택지가 된다.
+4. **`τ`/`M` 재도출 트리거 (시간이 아니라 접촉)** — `OCEAN_NDL_MIN` / `OCEAN_DISK_SAMPLE_RADIUS` / 화면 분류 술어(`b >= g`) / earth `colorHint` / 프레임 방위 중 하나를 다음에 건드릴 때 위 실측을 다시 잡는다.
