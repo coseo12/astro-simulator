@@ -5,9 +5,11 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.86.0] - 2026-09-07
+
 ### Behavior Changes
 
-- **[#1197] 지구 바다에 깊이 색 그라데이션이 생긴다 — 해안은 밝은 청록, 원양 중심부는 짙은 파랑 (MINOR)** ([#1197](https://github.com/coseo12/astro-simulator/issues/1197)) — rocky 분기의 ocean 색이 `baseColor` **단일값**에서 **깊이 파생 감쇠색**으로 확장된다. ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 7** (Provisional — cross-validate 통합 후 Accepted). `?focus=earth` 에서 육안으로 달라지는 유일한 body 는 **지구**이고, mars/jupiter/moon · 단색 22 · sun · `?surface=off` 는 픽셀 무변경이다.
+- **[#1197] 지구 바다에 깊이 색 그라데이션이 생긴다 — 해안은 밝은 청록, 원양 중심부는 짙은 파랑 (MINOR)** ([#1197](https://github.com/coseo12/astro-simulator/issues/1197)) — rocky 분기의 ocean 색이 `baseColor` **단일값**에서 **깊이 파생 감쇠색**으로 확장된다. ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 7** (`Accepted` — cross-validate agy 2026-09-05, §A7.8 4축 통합 후 전이). `?focus=earth` 에서 육안으로 달라지는 유일한 body 는 **지구**이고, mars/jupiter/moon · 단색 22 · sun · `?surface=off` 는 픽셀 무변경이다.
 
   **색의 소스는 바뀌지 않았다 — (B′) `baseColor` 파생이다.** `oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth)` 이며 `DEEP_OCEAN_FACTOR = {0.35, 0.45, 0.62}` 는 rendering-only 감쇠 계수다. ocean 색의 유일한 소스는 여전히 `colorHint.hex` 이므로 데이터 SSoT read-only 규약은 **개정이 아니라 부기**로 족하다 — 저장소에서 「read-only」의 실제 의미는 데이터 무변조이지 출력 동일성이 아니고, desert/gas-bands/sun 이 이미 `baseColor` 를 곱으로 변조한다. 독립 상수안 (A) 를 기각한 결정적 근거는 `verify:1119` 의 화면 분류 술어가 `b < g` 라는 점이다 — 배수 변조는 `B ≥ G` 를 **구조적으로 보존**해 deep 픽셀이 육지로 오분류될 수 없지만, 독립 상수는 값에 따라 그 전제를 깨고 IoU 축을 잠식한다.
 
