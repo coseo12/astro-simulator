@@ -5,6 +5,28 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1197] 지구 바다에 깊이 색 그라데이션이 생긴다 — 해안은 밝은 청록, 원양 중심부는 짙은 파랑 (MINOR)** ([#1197](https://github.com/coseo12/astro-simulator/issues/1197)) — rocky 분기의 ocean 색이 `baseColor` **단일값**에서 **깊이 파생 감쇠색**으로 확장된다. ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 7** (Provisional — cross-validate 통합 후 Accepted). `?focus=earth` 에서 육안으로 달라지는 유일한 body 는 **지구**이고, mars/jupiter/moon · 단색 22 · sun · `?surface=off` 는 픽셀 무변경이다.
+
+  **색의 소스는 바뀌지 않았다 — (B′) `baseColor` 파생이다.** `oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth)` 이며 `DEEP_OCEAN_FACTOR = {0.35, 0.45, 0.62}` 는 rendering-only 감쇠 계수다. ocean 색의 유일한 소스는 여전히 `colorHint.hex` 이므로 데이터 SSoT read-only 규약은 **개정이 아니라 부기**로 족하다 — 저장소에서 「read-only」의 실제 의미는 데이터 무변조이지 출력 동일성이 아니고, desert/gas-bands/sun 이 이미 `baseColor` 를 곱으로 변조한다. 독립 상수안 (A) 를 기각한 결정적 근거는 `verify:1119` 의 화면 분류 술어가 `b < g` 라는 점이다 — 배수 변조는 `B ≥ G` 를 **구조적으로 보존**해 deep 픽셀이 육지로 오분류될 수 없지만, 독립 상수는 값에 따라 그 전제를 깨고 IoU 축을 잠식한다.
+
+  **⚠️ ADR 이 6주간 박제해 둔 설계 스케치가 실측으로 두 군데 틀렸다.** §A3.7 재검토 조건 1 의 `smoothstep(landThresholdLo, 0.0, continents)` 는 (i) **앵커가 stale** 하고 (ii) **GLSL 명세상 undefined** 다 (`edge0 >= edge1`). (i) 이 치명적이다 — Amendment 4 (#1119) 가 대륙 형상을 마스크로 이관한 뒤 ocean 텍셀의 `continents` 는 전 구간에 퍼져 (P10 `0.3598` / P50 `0.5064` / P90 `0.6766`), 스케치대로 쓰면 **실제 바다의 `59.78%` 가 depth `0` 으로 눌리고** 평균 depth 가 `0.0441` 이 된다. 그래서 앵커를 `mix(landThresholdLo, oceanDepthEdgeHi, uMaskEnabled)` 로 **경로별 분리**했고 (§A4.3 결정 7 의 관용구 재사용 = 신규 분기 `0`), 그 결과 평균 depth `0.5183` / `depth == 0` `9.56%` 가 됐다. `OCEAN_DEPTH_EDGE_HI = 0.68` · `OCEAN_DEPTH_RANGE = 0.32` 는 매직 넘버가 아니라 **ocean 한정 `continents` 의 P90 과 P90−P10** 이다. 원문 스케치는 당시 결정의 기록이므로 **소급 수정하지 않고** dated 부기만 달았다.
+
+  **비용은 `0` 이다** — 신규 noise 샘플 `0` · 신규 텍스처 샘플 `0` · 신규 스크립트 `0`. `fbm(` 호출 `4` 개와 `texture2D` `1` 개가 인자 문자열까지 불변임을 단위 테스트가 assert 한다. ⚠️ **대가는 결합이다**: `continents` 는 이제 4중 용도(육지 임계 / `maskWarp` / biome·ice `latJ` jitter / depth)라 **극지 해빙 경계와 바다 깊이가 상관**된다. 이를 「실제 해양 물리와 일치한다」로 정당화하지 않는다 — 물리 채널이 아니라 같은 노이즈 장을 공유한 결과일 뿐이고, §A3.7 재검토 조건 4 가 이미 관리하는 클래스로 **박제만** 한다.
+
+  **신규 픽셀 가드 1축** — `browser-verify-783-earth-detail.mjs` 에 `MODE=ocean` 추가 + `shader-pixel-guard.yml` step `+1`. 기존 술어 5종은 이 축의 판별력이 전부 `0` 이다(극관·land 한정 / deep·shallow 둘 다 `B ≥ G` 라 같은 집합 / 총량 성질). 판정량은 낮면 ocean 픽셀 휘도의 `(P90 − P10) / P90` 이고, 게이트는 `ON >= τ` (D5) · `ON − negative >= M` (D6) · `zero − ON >= M` (D6-b, 아래 재조정) **동시**다 (부호 비교만으로는 낙차가 `0` 에 임의로 가까워도 통과 — #1163 라운드 2 [B4] 반증). 임계는 GPU 실측 확정: 로컬 SWIFTSHADER **3회 전건 동일(sd `0`)** 로 ON `0.2317` / negative `0.0027` / 표본 `3,612` ⇒ `τ = 0.11` · `M = 0.11` · 표본 하한 `900`. ⚠️ **설계의 산식 예측 `0.4477` 을 옮겨 적지 않았다** — 실측이 그 절반이었고, 설계가 「옮겨 적지 말 것」이라 명시한 이유가 확인됐다.
+
+  **가드가 잡지 못하는 것을 함께 박제했다.** 변이 M-e(해안 감쇠 항 삭제)는 **어떤 픽셀 게이트도 FAIL 시키지 못한다** — 해당 대역이 ocean 의 `2.96%`(약 2텍셀)라 기본 focus 에서 sub-pixel 이고, 게이트를 걸면 플레이키가 된다. 미러 단위 테스트와 GLSL 문자열 가드가 코드 층에서만 막고, 픽셀 층은 **비-게이트 진단 출력**으로 관측만 한다 (실측: 해안 밴드 평균 휘도 `231.13` vs 원양 `218.84` — 해안이 더 얕다는 기대 방향).
+
+  **[계약 재조정 — CLAUDE.md §스프린트 계약 7항]** reviewer 가 남긴 판별력 구멍 **R7** 을 「닫는다」로 재조정하고 (근거는 [#1197 코멘트](https://github.com/coseo12/astro-simulator/issues/1197#issuecomment-5558172218)) `MODE=ocean` 에 두 축을 더했다 — **표본 하한의 주입 프레임 확대** (기존 `OCEAN_MIN_SAMPLES` 재사용 — 주입 프레임의 갭이 기대 방향으로 치우친 이유가 「감쇠가 죽어서」가 아니라 「표본이 말라서」인 경우 낙차 술어가 초록이 된다) · **D6-b** (아래).
+
+  **R7 이 지목한 변이 M-h 는 D6-b 가 닫았다 — 그리고 착수 처방이던 D5-b(최심부 색 순서 `b > g > r` strict)는 삭제했다.** 처방은 그 색 순서로 M-h 를 잡는다는 것이었는데 **실측이 두 번 반증했다. (i) M-h 미검출** — 바인딩 블록만 삭제하면 uniform 이 `(0,0,0)` 으로 남아 `mix(vec3(1.0), vec3(0.0), d) = 1 - d` 가 되고, 이는 **채널 공통 스칼라 감쇠**라 색 순서를 보존한다 (`b > g > r` 은 `1 - d` 배 아래 불변). 즉 색 순서라는 **정적 속성**으로는 원리적으로 도달할 수 없다. **(ii) 스스로 선언한 실패 모드인 색조 역전(변이 M-i)도 미검출** — reviewer 가 `deepOceanFactor` 채널을 뒤집어(`(0.35, 0.45, 0.62)` → `(0.62, 0.45, 0.35)`) ON 프레임에 주입하자 최심부 대표 색이 `(73.74, 170.01, 251.81)` → `(110.68, 178.54, 196.53)` 로 실제 뒤집혔는데 **당시 네 게이트 전부 초록, `exit 0`** 이었다 ([reviewer 코멘트](https://github.com/coseo12/astro-simulator/pull/1198#issuecomment-5558473466)). 기전은 검증 스크립트의 ocean 표본 필터 `if (b < g) { excludedLand++; continue; }` 다 — 색조가 뒤집힌 픽셀을 land 로 분류해 술어에 닿기 전에 배제한다 ([실측] 원본 → M-i 에서 `nOcean` `3612 → 3557` · `excludedLand` `3566 → 3621`). 유일하게 실증된 검출이던 `(1,1,1)` 주입은 **D6 가 이미 낙차로 닫는다**. 그래서 문면 정정이 아니라 **삭제**했다 — CLAUDE.md §검증 강도 게이트 「가드를 하나 만들 때마다 그 가드를 검사할 표면이 하나 늘어난다」. ⚠️ **M-i 는 지금도 열린 사각이고 이번에 닫지 않았다** — 변이 표와 위 기전은 스크립트 헤더 주석에 박제했다. 최심부 대표 색은 계속 인쇄하되 판정에는 쓰지 않는다. 채택한 D6-b 는 대신 **바인딩이 렌더 결과에 실제로 기여하는 양**을 잰다 — 같은 실행 안에서 `deepOceanFactor` 를 `(0,0,0)` 으로 주입한 세 번째 프레임을 측정하고 (D6 의 `(1,1,1)` 주입과 **같은 `onBindObservable` 기법**, `patchedMaterials > 0` 동반 assert), `zero 갭 − ON 갭 >= M` 을 요구한다. **`M` 은 D6 의 상수를 그대로 재사용해 새 임계 숫자가 `0` 개다.** M-h 하에서는 ON 프레임의 uniform 도 `(0,0,0)` 이 되어 두 프레임이 같은 상태가 되고 상승이 `0` 으로 붕괴한다.
+
+  [실측] (2026-09-06, 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`, mutation → revert 3단) 원본 `exit 0` · D6-b 상승 `0.3388` (= zero `0.5704` − ON `0.2317`) / M-h **`exit 1`** · D6-b 상승 `0.0000`. **M-h 에서 FAIL 하는 것은 D6-b 하나뿐이다** — 같은 실행에서 D5 갭 `0.5704` (PASS, 갭이 **커지는** 실패 방향이라 단측 술어가 눈이 먼다) · D6 낙차 `0.5677` (PASS) 로 나머지 둘은 초록이다. revert 후 재실행에서 원본 값이 전건 재현됐다. **D5-b 삭제 후 재측정에서도 M-h 는 여전히 `exit 1` (D6-b 만 FAIL)** — 삭제가 M-h 검출을 깨지 않았다.
+
+  **MINOR 판정 근거** (CLAUDE.md §SemVer): 시각 행동 변화이며 `packages/core` 셰이더 소스를 접촉한다. 기존 단위 테스트 **3건이 계약상 깨지므로 갱신**했다 (삭제 아님 — 「해안 접점에서 정확히 `baseColor`」 계약은 미러 헬퍼 직접 호출 테스트로 **이관**됐고, 그쪽은 `toBeCloseTo` 가 아니라 `toBe(0)` 정확 비교라 오히려 강해졌다).
+
 ## [0.85.0] - 2026-09-05
 
 ### Behavior Changes
