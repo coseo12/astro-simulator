@@ -903,14 +903,30 @@ export function createSolarSystemScene(
    *
    * 지속 시간은 시간 재생 여부에 종속된다 — 실측(로컬, `?gpu=a&focus=earth`, 휠 -100):
    * 재생 중이면 다음 프레임 `updateAt` 이 정정해 **1 프레임**, `?speed=0` 이면 `TimeController.tick`
-   * 이 `scale === 0` 에서 false 를 반환해 `timeChanged` 자체가 끊기므로 **지속**된다 (176 프레임
-   * 관측 시점까지 계속 영벡터).
+   * 이 `scale === 0` 에서 false 를 반환해 `timeChanged` 자체가 끊기므로 관측 종료 시점까지 **지속**된다.
    *
-   * ⚠️ **화면 암전까지 실측으로 잇지는 못했다.** 위 재현 경로에서는 `earth` 절차 표면 mesh 가
-   * 내내 `isVisible=false` 이고 `earth-lod-low` 가 그려져, 절차 머티리얼의 `onBindObservable`
-   * 발동이 **0 회**였다 (즉 영벡터가 draw 에 도달하지 않았다). 그 LOD 착지는 #1205 의 범위다.
-   * 본 수정이 보장하는 것은 **광원이 mesh 와 같은 기준계에 있다**는 것까지이고, 그것이 곧
-   * 「지구가 밝다」는 아니다.
+   * ## draw 도달 여부는 시나리오마다 반대다 (PR #1206 리뷰 B1 정정)
+   *
+   * 초판 주석은 「`earth` 절차 mesh 가 내내 `isVisible=false` 라 영벡터가 draw 에 도달하지 않는다」를
+   * 위 재현 경로 **전체**의 사실로 적었다. 그것은 `pause` 에서만 참이다. 셰이더와 **같은 두 입력**
+   * (`sunPositionProvider()` / `mesh.getAbsolutePosition()`) 을 절차 머티리얼 `onBindObservable` 에서
+   * 계측했고, reviewer 1 회 + 본 브랜치 재현 1 회의 **독립 두 세션이 같은 결론**을 냈다:
+   *
+   *  - `play`  — `earth` 가 관측 전 프레임 `isVisible=true` 이고 머티리얼이 매 프레임 bind 된다.
+   *              결함 주입판에서 **영벡터가 bind 시점에 도달**했다 (두 세션 각각 1 회, `tier="body"`,
+   *              `mesh="earth"`). 즉 `play` 에서는 영벡터가 draw 에 닿는다.
+   *  - `pause` — `earth` 는 관측 전 프레임 `isVisible=false` 이고 `earth-lod-low` 가 그려져 절차
+   *              머티리얼 bind 가 **0 회**다. 영벡터가 draw 에 도달하지 않는다.
+   *
+   * 두 시나리오가 갈리는 이유는 구조다 — LOD 가시성 선택도 `updateAt` 안에 있으므로 (아래 P11-B
+   * #289 hook), `scale === 0` 이면 광원뿐 아니라 **LOD 도 함께 동결**된다.
+   *
+   * ⚠️ **직관과 반대다**: 지속되는 쪽(`pause`)이 픽셀 무영향이고, 1 프레임인 쪽(`play`)이 화면에
+   * 닿는다. `pause` 진입 후 캔버스 중앙 200×200 평균 휘도는 결함 주입판과 수정판이 같았다
+   * (reviewer 실측 `meanLum 9.077` / `maxLum 21.0934`).
+   *
+   * 그래도 본 수정이 보장하는 범위는 **광원이 mesh 와 같은 기준계에 있다**까지다 — 밝기 자체는 재지
+   * 않았고, `pause` 에서 절차 표면이 그려지지 않는 LOD 착지는 #1205 의 범위다.
    *
    * 호출부가 둘로 갈린 것이 재발 조건이었으므로 수식을 여기 한 곳에만 둔다. 새 tier 경로가
    * 생기면 이 함수를 부르면 된다.
@@ -918,8 +934,11 @@ export function createSolarSystemScene(
    * origin 을 튜플이 아니라 **스칼라 3개**로 받는다. (a) 위 재사용 버퍼 주석(#76)의 「프레임당
    * 재할당 회피」를 지키고, (b) `updateAt` 이 넘기는 값은 진입 시 **스냅샷한** `ox/oy/oz` 라
    * 호출 시점의 `floatingOrigin.originOffset` 과 **다르다** — 그 사이 primary follow 의
-   * `setOriginToBody` 가 originOffset 을 mutate 하기 때문이다 (#380 가드 C 순서). 배열을 넘기게
-   * 두면 무심코 `originOffset` 을 직접 넘겨 mesh 와 다른 기준계를 쓰기 쉬우므로 신호를 남긴다.
+   * `setOriginToBody` 가 `#originOffset` 을 **새 배열로 재할당**하기 때문이다
+   * (`coords/floating-origin.ts`). in-place mutate 가 아니므로 배열을 미리 캡처해 두면 그 자체는
+   * 스냅샷으로 남는다 — 위험한 것은 호출 지점에서 `originOffset` 을 **다시 읽는** 경로다
+   * (#380 가드 C 순서). 배열을 넘기게 두면 무심코 그 재-read 값을 직접 넘겨 mesh 와 다른 기준계를
+   * 쓰기 쉬우므로 신호를 남긴다.
    */
   const syncSunLightPosition = (ox: number, oy: number, oz: number, scale: number): void => {
     const sunWorld = worldPositions.get('sun') ?? ZERO;
@@ -1122,7 +1141,8 @@ export function createSolarSystemScene(
     // 새 기준계로 옮기면 그 차가 무의미해진다. T2 → T3 전환에서는 두 값이 동시에 원점이 되어
     // 방향이 영벡터로 붕괴했다 (실측: 재생 중 1 프레임 / `speed=0` 이면 지속).
     // `updateAt` 은 `timeChanged` 바인딩이라 이 프레임을 메우지 못한다 (아래 ring-anchor 와 같은
-    // 논거 — #782 Amendment 2-i 가 같은 결함을 ring 에서 먼저 고쳤다).
+    // 논거 — 동형 결함을 ring 에서 먼저 고친 것은 아래 주석이 적은 대로 **PR #785 reviewer 권고 1**
+    // 의 fix 다. #782 Amendment 2-i 는 위상 도입 쪽이라 이 즉시 동기 자체의 출처가 아니다).
     // 수식·재현·측정 한계는 `syncSunLightPosition` 정의부 주석이 SSoT.
     syncSunLightPosition(
       tierTransitionOrigin[0],

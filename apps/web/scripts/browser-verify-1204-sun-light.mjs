@@ -17,10 +17,19 @@
  * `uSunDirection = normalize(sunPos − meshAbsPos)` 의 피연산자 둘이 **동시에 원점**이 되어
  * 방향이 **영벡터**가 된다. 셰이더가 이 값을 받으면 `ndl = dot(N, 0) ≡ 0` 이다.
  *
- * ⚠️ **본 가드는 「화면이 어둡다」를 재지 않는다.** 도입 시점 실측에서 이 재현 경로는 `earth`
- * 절차 표면 mesh 가 내내 `isVisible=false` 이고 `earth-lod-low` 가 그려져, 절차 머티리얼의
- * `onBindObservable` 이 **0 회** 발동했다 — 영벡터가 draw 에 도달하지 않았다는 뜻이다. 그 LOD
- * 착지는 #1205 의 범위다. 여기서 지키는 불변식은 **광원이 mesh 와 같은 기준계에 있다**까지다.
+ * ⚠️ **본 가드는 「화면이 어둡다」를 재지 않는다.** 여기서 지키는 불변식은 **광원이 mesh 와 같은
+ * 기준계에 있다**까지다.
+ *
+ * ⚠️ **draw 도달 여부는 아래 두 시나리오에서 반대다** (PR #1206 리뷰 B1 정정 — 초판 헤더는
+ * `pause` 관측을 재현 경로 전체의 사실로 적었다). 절차 머티리얼 `onBindObservable` 에 셰이더와
+ * 같은 두 입력을 걸어 계측한 독립 두 세션(reviewer / dev)이 일치했다:
+ *  - `play`  : `earth` 가 관측 전 프레임 `isVisible=true`, 매 프레임 bind. 결함 주입판에서
+ *              **영벡터가 bind 시점에 도달**했다 (두 세션 각각 1 회, `tier="body"`/`mesh="earth"`).
+ *  - `pause` : `earth` 가 전 프레임 `isVisible=false`, `earth-lod-low` 만 그려져 bind **0 회**.
+ *              영벡터가 draw 에 도달하지 않고, 캔버스 중앙 휘도도 결함판·수정판이 같았다.
+ * 갈리는 이유는 구조다 — LOD 가시성 선택도 `updateAt` 안(P11-B #289 hook)이라 `speed=0` 이면
+ * 광원뿐 아니라 **LOD 도 함께 동결**된다. `pause` 에서 절차 표면이 안 그려지는 것 자체는 #1205
+ * 범위이고 본 가드는 그것을 판정하지 않는다.
  *
  * ## 무엇을 재는가 (술어)
  *
@@ -35,7 +44,13 @@
  * ⚠️ **`uSunDirection` 유니폼을 GPU 에서 읽어오지는 않는다** — 위 등가성으로 대신한다. 등가성이
  * 깨지는 경우(예: 광원 위치 산출 경로가 추가로 갈라짐)는 본 가드의 사각이다.
  *
- * 판정: 관측된 모든 프레임에서 `|sunPos − meshAbsPos| > 0`. 한 프레임이라도 0 이면 exit 1.
+ * 판정 축 2개 (둘 다 만족해야 exit 0):
+ *  1. 관측된 모든 프레임에서 `|sunPos − meshAbsPos| > 0`. 한 프레임이라도 0 이면 exit 1.
+ *  2. 두 시나리오 통틀어 **콘솔 에러 0 건** (`hasSimErrors` 1차 엄격 정책 — #848 선례와 동일
+ *     SSoT 헬퍼). 초판은 에러를 모으기만 하고 출력만 했다(PR #1206 리뷰 R4). tier 전환은 카메라·
+ *     LOD·origin 이 한 프레임에 동시에 움직이는 지점이라 「영벡터는 아니지만 던지고 있다」가
+ *     통과하면 안 된다. 판별력은 앱에 `console.error` 를 1 건 주입해 `exit 1` 로 실증했다.
+ *
  * ⚠️ **「고리가 사라졌다」/「지구가 밝다」는 판정 축이 아니다** — 그것은 셰이더 분기로도 만들 수
  * 있고 (#1204 본문이 금지한 처방) 원인을 남긴 채 증상만 지운다.
  *
@@ -51,6 +66,7 @@
 import {
   bootstrapScene,
   collectConsoleErrors,
+  hasSimErrors,
   resolveBaseUrl,
   withBrowser,
   buildLaunchOptions,
@@ -188,7 +204,16 @@ async function main() {
     }
   });
 
-  if (errors.length > 0) console.log('\nconsole errors:', errors.slice(0, 5));
+  // 판정 축 2 — 콘솔 에러. `hasSimErrors` 기본(1차 엄격)은 「1건이라도 있으면 실패」다.
+  if (errors.length > 0) {
+    console.log(`\n콘솔 에러 ${errors.length}건:`);
+    for (const e of errors.slice(0, 10)) console.log(`  ${e}`);
+  }
+  if (hasSimErrors(errors)) {
+    console.error(`\n  [FAIL] 콘솔 에러 ${errors.length}건 — 판정 축 2 위반.`);
+    failed = true;
+  }
+
   if (failed) {
     process.exitCode = 1;
     return;
