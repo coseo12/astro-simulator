@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.87.0] - 2026-09-08
+
 ### Behavior Changes
 
 - **[#1205] 일시정지(`speed=0`) 중에도 LOD 가 카메라를 따라온다 — `updateAt` 을 시간 위상 / 프레임 위상으로 분리 (MINOR)** ([#1205](https://github.com/coseo12/astro-simulator/issues/1205)) — `runLodPass` 의 유일 호출부가 `updateAt` 안이었고 `updateAt` 은 `timeChanged` 바인딩이었다. `TimeController.tick` 이 `!running || scale === 0` 에서 `false` 를 반환하므로 **일시정지에서는 LOD 판정이 한 번도 돌지 않았다** — 카메라 종속 판정이 시간 위상에 얹혀 있었던 것이다. 사용자에게는 「일시정지 상태로 지구에 들어가면 절차 표면 없는 단색 빌보드로 남고, 줌인해도 복귀하지 않는다」로 보였다. #756 이래 누적된 시각 자산(대륙 마스크·biome·극관·바다 깊이색·대기 rim)이 전부 high/mid variant 전용이라 **그 누적분을 통째로 못 봤다.** ADR [`20260907-1205`](docs/decisions/20260907-1205-frame-phase-vs-time-phase.md) (**`Accepted`** — cross-validate 2026-09-07, §교차검증 반영 사항 4축 통합 후 전이). `20260628-756` **Amendment 9**(`?speed=0` 캡처 정착 조건)도 같은 전이에 포함된다.
