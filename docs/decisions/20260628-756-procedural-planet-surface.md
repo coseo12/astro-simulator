@@ -2001,14 +2001,14 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 
 - 산출 지점은 `runLodPass` 말미의 `lodStats.fading = lodFadeState.size` 다. 루프 안의 `applyLodVariantState` 가 종료된 fade 를 맵에서 지우므로, 루프 뒤의 크기가 곧 「아직 진행 중」 개수다 — **파생 상태를 새로 만들지 않는다.**
 - ⚠️ **순간값 술어(`waitForFunction(() => …fading === 0)`)는 쓰지 않는다.** 본 Amendment 초판이 그 형태를 제시했고 **PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) R5 에서 반증됐다** — 두 구멍이 있다. (i) 카메라 조작 직후 첫 표본은 **아직 전이 전**이라 `fading === 0` 이고, 그 술어는 전이가 시작되기도 전에 통과한다 (상수 sleep 보다 나쁘다). (ii) `runLodPass` 는 `prevLevel === undefined` (그 body 최초 레벨 결정) 일 때 `lodFadeState` 에 등록하지 않으므로, **분포가 움직이는 중인데 `fading` 이 계속 `0`** 인 구간이 실재한다. `waitForLodSettle` 은 **「분포 동일 ∧ `fading === 0`」이 연속 N 회** (기본 `3 × 200ms` > fade `200ms`) 를 요구해 (ii) 를 닫는다. (i) 은 술어가 아니라 타이밍이 지탱한다 — 회귀 가드는 `scripts/browser-verify-utils.test.mjs` (변이 2종 검출).
-- ⚠️ **적용 대상 — 「LOD 레벨을 바꾸는 조작 직후 캡처하는」 가드.** ⚠️ **여기에는 「본 변경으로 그 조작이 *새로* LOD 를 건드리게 된 기존 가드」가 포함된다** (초판은 범위를 「신규」로 적었고 **PR #1208 R5 가 반증했다**). `browser-verify-1119-earth-mask` / `-1202-atmosphere-rim` 은 `pause` 직후 `camera.beta = π/2` 를 대입하는데, #1205 이전에는 그 대입이 LOD 를 **건드릴 수 없었다**:
+- ⚠️ **적용 대상 — 「LOD 레벨을 바꾸는 조작 직후 캡처하는」 가드.** ⚠️ **여기에는 「본 변경으로 그 조작이 *새로* LOD 를 건드리게 된 기존 가드」가 포함된다** (초판은 범위를 「신규」로 적었고 **PR #1208 R5 가 반증했다**). `browser-verify-1119-earth-mask` / `-1202-atmosphere-rim` / `-783-earth-detail`(`MODE=dod`) 은 `pause` 직후 `camera.beta = π/2` 를 대입하는데, #1205 이전에는 그 대입이 LOD 를 **건드릴 수 없었다**:
 
   | 같은 시퀀스 | LOD 분포 | 전이 body 수 | `fading` 창 |
   | --- | --- | --- | --- |
   | #1205 이전 (결함 rev 재빌드) | `3/3/26` **불변** (표본 127/127 동일) | `0` | 없음 (`fading` 필드 부재) |
   | #1205 이후 | `3/2/27` → **`9/6/17`** | **`11`** | `12 ms` ~ `211 ms` |
 
-  두 가드가 무수정으로 통과한 이유는 뒤따르는 **상수** `waitForTimeout(600)` 이 그 창을 덮었기 때문이고 (여유 `389 ms`), 이는 처방이 아니라 우연이다. ⇒ 두 가드를 `waitForLodSettle` 로 전환했다 (PR #1208). 전환 후 재측정: `1119` `dod` IoU `0.936` (baseline 동일) / `lod` / `seam` · `1202` 게이트 6종 · `783` DoD 1~4 · `1204` · `1205` **전건 exit 0**.
+  세 가드가 무수정으로 통과한 이유는 뒤따르는 **상수** `waitForTimeout(600)` 이 그 창을 덮었기 때문이고 (여유 `389 ms`), 이는 처방이 아니라 우연이다. ⇒ 셋 모두 `waitForLodSettle` 로 전환했다 (PR #1208). ⚠️ **`-783` 은 reviewer 가 명시한 목록 밖이었고 dev 스윕(`type: 'pause'` 를 보내는 verify 스크립트 전수 → 그중 카메라 속성 직접 대입)에서 발견됐다** — 「명시된 것만 고치고 닫음」을 피하려면 이 축의 술어는 스크립트 이름이 아니라 **`pause` + 카메라 조작 패턴**이어야 한다. 전환 후 재측정: `1119` `dod` IoU `0.936` (baseline 동일) / `lod` / `seam` · `1202` 게이트 6종 · `783` DoD 1~4 (전환 전과 **동일 수치** — N `70.3%` / S `55.7%` / eqG `0.5186` / midG `0.4029` / 마젠타 `0` px) · `1204` · `1205` **전건 exit 0**.
 
 ### A9.3 기각한 대안 2건
 
