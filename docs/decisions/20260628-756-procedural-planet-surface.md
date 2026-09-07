@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Provisional (2026-09-07 — `?speed=0` 캡처 정착 조건. 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) 의 cross-validate 4축 통합 시 함께 전이)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -1968,3 +1968,48 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 본 Amendment 에서 **차단된 것은 구현이 아니라 근거**다. 설계 라운드 2 의 `ndl = sin(α)·cos(φ)` 는 **미러 실측·기하** 라벨을 달고 있었고 상수 주석 초안까지 그 문장으로 쓰였는데, 실행해 보니 근접 관측에서 반증됐다. 라벨이 「실측」이어도 **모델이 근사인지**는 별도 축이다.
 
 일반화: **`sin(α)` 처럼 한 항으로 떨어지는 깨끗한 산식은 대개 극한(무한원·소각)에서 유도된 것이고, 그 극한이 실제 파라미터 영역에 성립하는지는 산식이 스스로 말해 주지 않는다.** 여기서 무너진 항은 `asin(r/d) = 6.631°` 하나였고, 그 하나가 「rim 이 사라진다 / 안 사라진다」를 갈랐다. §A8.13 의 검산은 해석식과 **수치해를 5 자세에서 대조**해서 이뤄졌다 — 산식 대 산식이 아니라 **산식 대 수치**여야 근사 오차가 드러난다.
+
+---
+
+## Amendment 9 (2026-09-07) — `?speed=0` 결정적 캡처의 **정착 조건**: LOD cross-fade (#1205)
+
+- **이슈**: [#1205](https://github.com/coseo12/astro-simulator/issues/1205)
+- **선행 ADR**: [20260907-1205 — per-frame 갱신의 위상 분리](20260907-1205-frame-phase-vs-time-phase.md) §결과 / §재검토 조건 2
+- **대상 절**: §A2.3 결정 7 (snapshot 가드 대응) 의 *"결정적 재현 수단 존재 — `?t=<jd>&speed=0` … 임의 snapshot 을 프레임 독립으로 캡처 가능"*
+- ⚠️ **원문 소급 편집 0.** 결정 7 은 자전각에 대해 **여전히 참**이고, 본 Amendment 는 그 문장이 **다루지 않았던 축**(LOD cross-fade)에 조건을 하나 **추가**한다.
+
+### A9.1 무엇이 바뀌었나
+
+결정 7 이 쓰일 당시 `?speed=0` 은 **LOD 를 통째로 얼렸다**. `runLodPass` 의 유일 호출부가 `updateAt` 안이었고 `updateAt` 은 `timeChanged` 바인딩이었기 때문이다 — 즉 「프레임 독립」이 성립한 이유의 일부가 **결함**이었다. #1205 가 LOD 를 프레임 위상으로 분리하면서 그 동결이 풀렸고, 그 결과 **200 ms cross-fade 가 일시정지에서도 `performance.now()` 기준으로 진행**한다 (`LOD_FADE_DURATION_MS`).
+
+⇒ `?speed=0` 에서도 **LOD 레벨 전이 직후 200 ms 안에 찍은 스냅샷은 알파가 캡처 시각에 종속**된다.
+
+[dev 실측 #1205 M7] `?gpu=a&focus=earth&speed=0&rotate=off` 에서 `setLodOverride('low')` → `'auto'` 왕복:
+
+| 전이 후 경과 | 알파가 열린구간 `(0,1)` 인 mesh 수 | 표본 |
+| --- | --- | --- |
+| `+19.3 ms` | **10** | `sun 0.899` / `sun-lod-low 0.101` / `mercury-lod-mid 0.899` / `mercury-lod-low 0.101` … |
+| `+209.2 ms` | `0` | — |
+
+수정 전 같은 조건에서는 pause 중 LOD 레벨 전이가 **`0` 건**이었다 (얼어 있었으므로 이 창 자체가 없었다).
+
+### A9.2 처방 — 캡처 측 정착 조건 (채택)
+
+`getLodStats()` 에 **`fading`** (cross-fade 진행 중 body 수) 을 노출한다. `?speed=0` 결정적 캡처는 **`fading === 0` 을 확인한 뒤** 찍는다.
+
+```js
+await page.waitForFunction(() => window.__solarScene?.getLodStats?.().fading === 0);
+```
+
+- 산출 지점은 `runLodPass` 말미의 `lodStats.fading = lodFadeState.size` 다. 루프 안의 `applyLodVariantState` 가 종료된 fade 를 맵에서 지우므로, 루프 뒤의 크기가 곧 「아직 진행 중」 개수다 — **파생 상태를 새로 만들지 않는다.**
+- ⚠️ **적용 대상은 「LOD 레벨을 바꾸는 조작 직후 캡처하는」 가드뿐이다.** 부팅 후 충분히 정착시킨 뒤 찍는 기존 가드들은 이미 이 조건을 시간으로 만족한다 — [dev 실측] `browser-verify-783-earth-detail` / `-1119-earth-mask` / `-1202-atmosphere-rim` / `-1204-sun-light` **전건 exit 0** (무수정).
+
+### A9.3 기각한 대안 2건
+
+- ❌ **정지 중에는 fade 를 동결한다** — 정지 전용 분기는 「재생 경로 / 정지 경로」 이원화이며, 그것이 정확히 증상 1·2(#782/#785, #1204)를 낳은 구조다. 선행 ADR §후보 비교 의 후보 (D) 와 같은 패턴.
+- ⏸ **fade 를 `performance.now()` 대신 jd 기반으로** — 보류. 정지에서 jd 가 안 흐르므로 fade 가 **영구 미완료로 얼어붙는다** — #1205 결함의 재생산이다. 「정지에서도 진행하되 결정적」이 되려면 fade 시계를 프레임 카운트로 바꿔야 하고, 그건 fps 종속을 들여온다.
+
+### A9.4 재검토 조건
+
+- **`fading` 을 확인하지 않는 신규 픽셀 가드가 `?speed=0` 에서 flaky 해질 때** — 본 Amendment 의 처방을 그 가드에 적용한다. flaky 가 아니라 **일관되게 틀린** 값이 나오면 fade 가 아니라 다른 축이므로 여기로 오지 말 것.
+- **프레임 위상 멤버가 늘어나 `performance.now()` 종속 상태가 하나 더 생길 때** — 선행 ADR §결정 2 의 멤버십 조건 3(멱등) 예외가 2건째가 되므로, `fading` 처럼 개별 필드를 늘리는 대신 **「정착 완료」 단일 술어**로 통합할지 재평가한다.
