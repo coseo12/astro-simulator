@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Provisional (cross-validate 결과 통합 후 Accepted 전이)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -1877,15 +1877,61 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 
 6. **LOD Low 전환 거동이 바뀜** — 현재 rim 의 Low 소멸은 신규 거동이 아니라 §결정 3(low = 자동 단색 billboard, `solar-system-scene.ts:467`)의 **상속**이다. Low 에 절차 표면이 도입되면 rim 의 전환 처리를 별도 판정해야 한다.
 
-### A8.12 교차검증 반영 사항
+### A8.12 교차검증 반영 사항 (agy 2026-09-07 — **4축 통합 완료, Accepted 전이**)
 
-⟨메인이 cross-validate 수행 후 4축(합의 / 이견 수용 / 기각 / 고유 발견) 으로 채우고 상태를 Accepted 로 전이⟩
+> ✅ **메인 통합 (2026-09-07).** 설계안 박제 직후 1회 수행 — 판정 **조건부 승인 (차단 `0`)**, `outcome: applied` · `exit_code: 0` · `plan_bypass: false` · `bypass_files: []` (#479 step 9 는 호출 주체인 메인이 확인). 이후 **architect 라운드 2 반영 → reviewer 차단 `0` · 권고 9건 → dev 라운드 2** 를 거쳐 전이한다.
+>
+> **① 합의** — D0 비교의 논리적 완성도 / `vWorldPos` 공간 계약의 엄격성 / (A-1) vs (A-2) 시선 벡터 기하 판정(*"완벽합니다"*) / GLSL 정의 → 단위 계약 가드 → 픽셀 가드 → CI → ADR 의 E2E 라이프사이클 완결성 / `?surface=off` 보존·신규 URL 파라미터 `0`·런타임 주입으로 씬 파서 변경 표면 `0`.
+>
+> **② 이견 수용 4건**
+>
+> | # | 지적 | 반영 |
+> | --- | --- | --- |
+> | 3 | **(B) 기각이 비목표에만 의존하면 순환논증** | **결론 (A) 유지, 근거 교체** — 비용 3항(정렬 오버헤드 · log-depth 정합 · 광원 모델 복제)으로 닻을 다시 내렸다. ⚠️ 이 적발이 **계약 D0 두 번째 술어의 철회**로 이어졌다 (사용자 합의 2026-09-07) — 그 술어가 요구한 「비목표와의 연결」이 곧 순환이었다 |
+> | 4 ⑤ | **washout** — rim 과다로 대기가 아니라 플라스틱 하이라이트로 읽힘. G1·G2·G3 를 **전부 통과** | **G4(채도 비붕괴) 신설 + 변이 M-6.** 가산에서 ⑤ 는 가설이 아니라 구조적 귀결(낮면 점근값이 흰색)이라 열거로 끝낼 수 없었다 |
+> | 5 | G3 를 통과하는 **위치 오류**(림이 특정 사분면에 몰림) | **사각 인정, 분할 방식은 수정.** 「4 사분면 균일성」은 이 셰이더에서 **정상 구현을 FAIL 시킨다**(rim 이 설계상 비대칭) → 낮면 호만 `>= 3` 분할. ⚠️ 그 게이트(G5)는 **reviewer 권고 3 으로 이후 삭제**됐다 (아래 ④) |
+> | 9 | 브라우저 12회 재기동 대신 1회 기동 내 프레임별 주입 | **이미 이 저장소 방식**이라 그대로 수용하지 않고, 변이를 **주입 가능성으로 분류**했다 — M-1 은 uniform 등가 에뮬레이션, M-4·M-6·M-7·M-9 는 순수 주입, **M-2·M-3 만 소스 변이 + dist 재빌드** |
+>
+> **③ 기각 6건 — 전건에 근거를 붙였다**
+>
+> | # | 지적 | 처분 | 근거 |
+> | --- | --- | --- | --- |
+> | 1 | `col += ` 대신 **`col = mix(col, RIM_COLOR, rim)`** 로 clamp 헤드룸 문제를 소멸시켜라 | **기각 (폐기 아님 — §A8.11 재검토 조건 5 대기)** | 미러 산술 5 표면 × 3 연산자 × 2 `RIM_COLOR`: `mix` 는 낮면 P1 을 **5개 중 3개 표면에서 음수**로 만든다 (`land 온대 −0.1819`). 부호를 살리려면 `lum(RIM_COLOR)` 가 포화 낮면 휘도 근처여야 하는데 **그게 agy 자신의 발견 4 ⑤ washout 그 자체**다. `C3 (0.75,0.87,1.00)` 처럼 이미 창백한 색에서도 land 온대는 `−0.0249` |
+> | 2 | **위상각·전방 산란 항 누락** — 역광에서 림이 수십 배 밝아진다 | **기각 (비-범위 3), 단 방향이 반대** | 전방 산란 항 신설은 물리 정확도 추구라 비-범위. **그런데 architect 는 「위상각은 물리 정확도가 아니라 rim 의 존재 조건」이라며 `RIM_NDL_LO` 부호를 열었고, 그 기하 논증이 dev 에게 반증됐다** (§A8.13) |
+> | 6-a | 후처리 파이프라인(ToneMapping·Bloom·sRGB)과의 색공간 정합 미명시 | **전제가 비사실** | [실측] `DefaultRenderingPipeline` · `ImageProcessing` · `toneMapping` · `GlowLayer` **4종 전부 `0`건** (`packages/core/src` + `apps/web/src`). `PostProcess` 는 `?bh=1` 옵트인 1건뿐 |
+> | 6-b | LOD 전환 시 rim popping 정책 미명시 | **신규 거동 아님** | `solar-system-scene.ts:467` — *"low (billboard) + tier-c 는 자동 단색 (별도 코드 0)"*. Low 에서는 **절차 표면 전체**가 사라지고 rim 은 그것을 상속만 한다 |
+> | 7 | `normalize` 영벡터 가드 / `pow` 도메인 가드 | **둘 다 기각** | `rimGeom` 이 `clamp` 로 `[0,1]` 보장 + `sun-shader.ts:129`·`starfield.ts:230` 무가드 출하 선례. ⚠️ **다만 진짜 구멍 하나를 노출했다** — `rimFalloff` uniform 에 `0` 이 바인딩되면 `pow(0,0)` 미정의. 처분은 셰이더 분기가 아니라 **단위 테스트 assert** (§가드 설계 원칙 — 가드에 fallback 분기 금지) |
+> | 8 | `rimStrength = 0.0` 이면 **무비용 스킵**되는 구조로 일반화 | **기각** | 「무비용 스킵」이 아니다 — fragment 동적 분기이고 rocky = earth 하나뿐이라 **한 번도 스킵되지 않는다**. 원하는 능력(`rimStrength=0` → 정확한 no-op)은 분기 없이 이미 있고, 그게 가드의 OFF 프레임 경로다 |
+>
+> **④ Claude 편향 셀프 체크 — 사후.** architect 가 호출 **전에** 축 1(낙관적 일정)·축 4(순수주의)를 미통과로 자인하고 명시 질문에 삽입했다. **둘 다 실현됐다** — 축 4 는 clamp 헤드룸 실측이 「원칙적으로 옳은 rim」과 「관측 가능성」의 충돌 구간을 드러낸 형태로, 축 1 은 변이 실행 부담을 12회 재기동으로 과대 추정한 형태로.
+>
+> ⚠️ **가장 중요한 관측 — cross-validate 는 「설계 판단」을 잡고 「기하 논증의 극한 가정」은 못 잡았다.** 발견 2 의 처방을 받아 architect 가 세운 근거는 *"실루엣에서 `ndl = sin(α)·cos(φ)`"* 였는데, 그것은 **직교(무한원) 근사**였고 `?focus=earth` 의 `r/d = 0.11547` 에서는 틀린다 — `α = 177.814°` 에서는 **부호까지 틀린다**. agy 도 architect 도 통과시켰고, **dev 의 수치 검산만이 반증**했다 (§A8.13·§A8.14).
+>
+> 이는 §A7.8(#1197)의 관측과 **같은 축이되 방향이 다르다**. 저번에는 외부 모델이 「가드가 못 잡는 것」을 검토하고도 **가드의 판별력**을 못 봤고, 이번에는 「더 물리적으로」를 권하면서 **그 물리 논증이 선 극한 가정**을 못 봤다. 공통점은 **문서 안에서 완결된 논증은 문서 안에서 검토해 봐야 그 논증의 전제까지는 열리지 않는다**는 것이다.
+>
+> ⚠️ **그리고 그 상수를 지키는 게이트가 없었다** — reviewer 가 `RIM_NDL_LO ∈ {−0.25 … +0.05}` 전 구간에서 **5 게이트가 완전 불변**임을 실측했다. 구조적 원인은 가드의 `DAY_NDL_MIN = 0.15` 가 셰이더 `RIM_NDL_HI = 0.15` 와 **정확히 같아 `smoothstep` 전이 구간 전체가 두 대역 사이에 비는** 것이었다. **Phase 0 이 통째로 이 상수의 부호를 정하는 데 쓰였고 근거가 라운드 중에 한 번 교체까지 됐는데, 정작 그 근거를 재검사하는 축이 `0` 이었다** (#1127 「가드 이름이 LOD 인데 LOD 판정이 없음」과 같은 클래스). **G6(박명 호) 신설 + 변이 M-7** 로 닫았다.
+>
+> **전이 주체·시점**: 메인 오케스트레이터가 PR [#1203](https://github.com/coseo12/astro-simulator/pull/1203) 머지 직전 수행 ([#479](https://github.com/coseo12/astro-simulator/issues/479) — sub-agent 직접 호출 금지, reviewer·qa 도 sub-agent 다). 원 박제: `Provisional`.
+
+### A8.12-1 상수 근거의 강도 — 정직성 박제 (reviewer 권고 6)
+
+**본 Amendment 의 상수가 모두 같은 강도의 근거를 갖지는 않는다.** 계약이 *"임계는 GPU 실측으로 확정 + 근거 박제"* 를 요구했으므로 강도를 구분해 적는다.
+
+| 강도 | 상수 |
+| --- | --- |
+| **실측 파생** (스윕·분포에서 유도) | `RIM_NDL_LO` (§A8.13 박명 호 스윕) · `G1~G3 = 0.025` · `G4 = 0.24` (세기 ×3 `0.22854` 통과 / ×4 `0.29996` 발화 사이) · `G6 = 0.02` (baseline `0.06086` 의 1/3) · `MIN_SAMPLES` · `MIN_TWILIGHT_SAMPLES` · `MIN_DAY_HEADROOM` · `MIN_DAY_LIT_LUM` |
+| **기존 상수 파생** (새 숫자 아님) | G6 대역 하단 = `NIGHT_NDL_MAX` · 상단 = terminator 정의값 `0` |
+| **관례·관찰** ⚠️ | `RIM_STRENGTH = 0.5` (*"×2 는 육안으로 하이라이트로 읽혔다"* — **주관 관찰**) · `RIM_COLOR_RGB` · `RIM_FALLOFF` · `RIM_NDL_HI` · `RIM_BAND_NDV` · `DAY_NDL_MIN` · `NIGHT_NDL_MAX` · `INNER_NDV_MIN` · `ARC_BINS` |
+
+⚠️ **아래 칸이 상위 칸으로 승격될 근거는 아직 없다.** 특히 `RIM_STRENGTH` 는 재현 경로가 「육안」뿐이라, 다음에 이 값을 건드릴 때 재도출이 필요하다 (§A8.11 재검토 조건에 접촉 트리거로 둔다). ⚠️ `MIN_PHASE_ALPHA_DEG = 10` 은 §A8.13 이 도달 최저 위상각을 `2.186°` 로 실측한 것과 **방향이 어긋난다** — 유효성 전제로서 과도할 수 있고, 이 역시 접촉 시 재판정 대상이다.
 
 ### A8.13 위상각 기하 — `RIM_NDL_LO` 의 근거는 **설계와 다르다** (설계 근거는 실측 반증)
 
 설계 라운드 2 는 실루엣(`N ⊥ V`)에서 `ndl = sin(α) · cos(φ)` 이므로 낮면 림의 `ndl` 최댓값이 `sin(α)` 로 상한되고, 따라서 저위상각(「보름 지구」)에서 `RIM_NDL_LO >= 0` 이면 **rim 이 통째로 사라져 계약 2 가 미충족**된다고 판정했다. 그 판정이 `RIM_NDL_LO` 를 음수로 여는 근거였다.
 
-**그 산식은 직교(무한원) 근사이고 `?focus=earth` 근접 관측에는 맞지 않는다.** 원근에서는 실루엣이 `N·U = r/d` 에 생기므로 상한은 `sin(α + asin(r/d))` 다. [실측 — 실루엣 원 3600 분할 수치해 vs 해석식, 카메라 5 자세 전건 소수 4자리 일치]:
+**그 산식은 직교(무한원) 근사이고 `?focus=earth` 근접 관측에는 맞지 않는다.** 원근에서는 실루엣이 `N·U = r/d` 에 생기므로 상한은 `sin(α + asin(r/d))` 다. [해석 — 아래 항등식의 수치 검산. 실루엣 원 3600 분할 수치해 vs 해석식이 카메라 5 자세에서 전건 소수 4자리 일치했다]:
+
+> ⚠️ **이 대조는 「측정」이 아니다** (reviewer 권고 7). `c·cosα + √(1−c²)·sinα ≡ sin(α + asin c)` 는 **항등식**이라 수치해와 해석식의 일치는 반증 가능한 명제가 아니고, 구현 오류가 없음만 확인한다. **반증 가능한 측정은 아래 박명 호 값과 제품 프레임 값**이며, 설계 근거를 실제로 뒤집은 것도 그쪽이다.
 
 | 위상각 α  | 실루엣 `ndl` 최댓값 (수치해) | `sin(α)` (직교 근사) | `sin(α + asin(r/d))` (원근) |
 | --------: | ---------------------------: | -------------------: | --------------------------: |
