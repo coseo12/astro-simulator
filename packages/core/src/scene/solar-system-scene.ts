@@ -1594,6 +1594,15 @@ export function createSolarSystemScene(
     // 종속이라 시간이 멈춰도 갱신돼야 한다. 여기 남겨두면 재생 중 2×/프레임이 되므로 호출을
     // 남기지 않는다. hook 책임 서술은 `runFramePass` 정의부로 함께 옮겼다.
     // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
+    //
+    // ⚠️ **바로 위 「2×/프레임」 계약은 이 주석만이 지킨다 — 의식적 기각이다** (PR #1208 R3).
+    // 여기에 `runLodPass(cam)` 를 되돌려도 [실측] `verify:1205-pause-lod` 는 출력까지 완전히
+    // 동일한 채 exit `0` 이다. 살아 있었다는 증거는 `getTransformMatrix`/frame `4.000 → 5.000`
+    // 뿐인데, 그것은 Babylon 내부 카운터라 무관한 변경에도 움직여 가드로 삼으면 false-positive
+    // 생성기가 된다. 기각 근거 5축과 **무효 조건**(프레임 위상 멤버가 2개째로 늘면 재판정)은
+    // 위 ADR §비-범위 「2×/프레임 금지 계약의 가드 — 검토 후 기각」.
+    // 계약의 나머지 절반(프레임 위상 자신이 프레임당 1회)은 단위 층이 닫는다 —
+    // `packages/core/src/engine/simulation-core-frame-pass.test.ts`.
 
     // 소행성대 업데이트.
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.

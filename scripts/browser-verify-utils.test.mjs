@@ -26,6 +26,7 @@ import {
   collectConsoleErrors,
   resolveBaseUrl,
   saveCapture,
+  waitForLodSettle,
   withBrowser,
 } from './browser-verify-utils.mjs';
 
@@ -372,6 +373,103 @@ await run('saveCapture — 상위 디렉토리 자동 생성 후 저장', async 
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// --- waitForLodSettle (#1205) ---------------------------------------------
+/**
+ * `getLodStats()` 표본 시퀀스를 대본대로 돌려주는 Page 스텁.
+ * 대본이 소진되면 마지막 표본을 계속 반환한다 (정착 상태 유지).
+ */
+function stubLodPage(script) {
+  let i = 0;
+  return {
+    polls: [],
+    async waitForTimeout(ms) {
+      this.polls.push(ms);
+      await new Promise((r) => setTimeout(r, ms));
+    },
+    async evaluate() {
+      const cur = script[Math.min(i, script.length - 1)];
+      i += 1;
+      return cur;
+    },
+  };
+}
+
+await run('waitForLodSettle — 분포 동일 + fading 0 이 연속 N 회면 정착', async () => {
+  const page = stubLodPage([
+    { dist: '9/6/17', fading: 0 },
+    { dist: '9/6/17', fading: 0 },
+    { dist: '9/6/17', fading: 0 },
+    { dist: '9/6/17', fading: 0 },
+  ]);
+  const r = await waitForLodSettle(page, { pollMs: 1, stableSamples: 3, timeoutMs: 5000 });
+  assert.equal(r.timedOut, false);
+  assert.equal(r.dist, '9/6/17');
+  assert.equal(r.fading, 0);
+});
+
+await run(
+  'waitForLodSettle — fading=0 인 채 분포만 움직이는 구간을 정착으로 읽지 않는다',
+  async () => {
+    // ⚠️ 이 다리가 이 헬퍼가 `waitForFunction(fading === 0)` 보다 나은 **유일한 술어상 이유**다.
+    // `runLodPass` 는 `prevLevel === undefined` (그 body 최초 레벨 결정) 일 때 `lodFadeState` 에
+    // 등록하지 않으므로, **분포는 바뀌는데 `fading` 은 계속 0** 인 구간이 실재한다.
+    // `fading` 만 보는 술어는 아래 3번째 표본에서 이미 정착으로 판정한다 (polls = 3).
+    const page = stubLodPage([
+      { dist: '3/2/27', fading: 0 },
+      { dist: '5/4/23', fading: 0 },
+      { dist: '9/6/17', fading: 0 },
+      { dist: '9/6/17', fading: 0 },
+      { dist: '9/6/17', fading: 0 },
+      { dist: '9/6/17', fading: 0 },
+    ]);
+    const r = await waitForLodSettle(page, { pollMs: 1, stableSamples: 3, timeoutMs: 5000 });
+    assert.equal(r.timedOut, false);
+    assert.equal(r.dist, '9/6/17');
+    // 분포 축을 빼면 3 표본에서 반환한다 — 표본 수가 판별량이다 (반환 dist 는 양쪽 같다).
+    assert.equal(page.polls.length, 6, `polls=${page.polls.length}`);
+  },
+);
+
+await run('waitForLodSettle — fade 진행 표본이 끼면 연속 계수가 리셋된다', async () => {
+  const page = stubLodPage([
+    { dist: '9/6/17', fading: 11 },
+    { dist: '9/6/17', fading: 4 },
+    { dist: '9/6/17', fading: 0 },
+    { dist: '9/6/17', fading: 0 },
+    { dist: '9/6/17', fading: 0 },
+    { dist: '9/6/17', fading: 0 },
+  ]);
+  const r = await waitForLodSettle(page, { pollMs: 1, stableSamples: 3, timeoutMs: 5000 });
+  assert.equal(r.timedOut, false);
+  assert.equal(r.fading, 0);
+  // fade 중 표본(f=4)을 정착으로 세면 4 표본에서 반환한다 — 표본 수가 판별량이다.
+  assert.equal(page.polls.length, 5, `polls=${page.polls.length}`);
+});
+
+await run('waitForLodSettle — fade 가 계속 진행 중이면 정착으로 판정하지 않는다', async () => {
+  const page = stubLodPage([{ dist: '9/6/17', fading: 2 }]);
+  const r = await waitForLodSettle(page, { pollMs: 2, stableSamples: 3, timeoutMs: 60 });
+  assert.equal(r.timedOut, true);
+  assert.equal(r.fading, 2);
+});
+
+await run('waitForLodSettle — 상한 초과 시 throw 하지 않고 timedOut 으로 반환', async () => {
+  // 분포가 매 표본 바뀌는 病적 케이스 — 호출부가 캡처 진행 여부를 판단할 수 있어야 한다.
+  let n = 0;
+  const page = {
+    async waitForTimeout(ms) {
+      await new Promise((r) => setTimeout(r, ms));
+    },
+    async evaluate() {
+      n += 1;
+      return { dist: `${n}/0/0`, fading: 0 };
+    },
+  };
+  const r = await waitForLodSettle(page, { pollMs: 2, stableSamples: 3, timeoutMs: 60 });
+  assert.equal(r.timedOut, true);
+  assert.ok(r.waitedMs >= 60, `waitedMs=${r.waitedMs}`);
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

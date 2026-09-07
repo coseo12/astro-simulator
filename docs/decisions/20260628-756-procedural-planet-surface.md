@@ -1997,12 +1997,18 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 
 `getLodStats()` 에 **`fading`** (cross-fade 진행 중 body 수) 을 노출한다. `?speed=0` 결정적 캡처는 **`fading === 0` 을 확인한 뒤** 찍는다.
 
-```js
-await page.waitForFunction(() => window.__solarScene?.getLodStats?.().fading === 0);
-```
+구현은 `scripts/browser-verify-utils.mjs` 의 **`waitForLodSettle(page)`** 다. 호출부는 정지 중 카메라를 움직인 **직후** 부른다.
 
 - 산출 지점은 `runLodPass` 말미의 `lodStats.fading = lodFadeState.size` 다. 루프 안의 `applyLodVariantState` 가 종료된 fade 를 맵에서 지우므로, 루프 뒤의 크기가 곧 「아직 진행 중」 개수다 — **파생 상태를 새로 만들지 않는다.**
-- ⚠️ **적용 대상은 「LOD 레벨을 바꾸는 조작 직후 캡처하는」 가드뿐이다.** 부팅 후 충분히 정착시킨 뒤 찍는 기존 가드들은 이미 이 조건을 시간으로 만족한다 — [dev 실측] `browser-verify-783-earth-detail` / `-1119-earth-mask` / `-1202-atmosphere-rim` / `-1204-sun-light` **전건 exit 0** (무수정).
+- ⚠️ **순간값 술어(`waitForFunction(() => …fading === 0)`)는 쓰지 않는다.** 본 Amendment 초판이 그 형태를 제시했고 **PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) R5 에서 반증됐다** — 두 구멍이 있다. (i) 카메라 조작 직후 첫 표본은 **아직 전이 전**이라 `fading === 0` 이고, 그 술어는 전이가 시작되기도 전에 통과한다 (상수 sleep 보다 나쁘다). (ii) `runLodPass` 는 `prevLevel === undefined` (그 body 최초 레벨 결정) 일 때 `lodFadeState` 에 등록하지 않으므로, **분포가 움직이는 중인데 `fading` 이 계속 `0`** 인 구간이 실재한다. `waitForLodSettle` 은 **「분포 동일 ∧ `fading === 0`」이 연속 N 회** (기본 `3 × 200ms` > fade `200ms`) 를 요구해 (ii) 를 닫는다. (i) 은 술어가 아니라 타이밍이 지탱한다 — 회귀 가드는 `scripts/browser-verify-utils.test.mjs` (변이 2종 검출).
+- ⚠️ **적용 대상 — 「LOD 레벨을 바꾸는 조작 직후 캡처하는」 가드.** ⚠️ **여기에는 「본 변경으로 그 조작이 *새로* LOD 를 건드리게 된 기존 가드」가 포함된다** (초판은 범위를 「신규」로 적었고 **PR #1208 R5 가 반증했다**). `browser-verify-1119-earth-mask` / `-1202-atmosphere-rim` 은 `pause` 직후 `camera.beta = π/2` 를 대입하는데, #1205 이전에는 그 대입이 LOD 를 **건드릴 수 없었다**:
+
+  | 같은 시퀀스 | LOD 분포 | 전이 body 수 | `fading` 창 |
+  | --- | --- | --- | --- |
+  | #1205 이전 (결함 rev 재빌드) | `3/3/26` **불변** (표본 127/127 동일) | `0` | 없음 (`fading` 필드 부재) |
+  | #1205 이후 | `3/2/27` → **`9/6/17`** | **`11`** | `12 ms` ~ `211 ms` |
+
+  두 가드가 무수정으로 통과한 이유는 뒤따르는 **상수** `waitForTimeout(600)` 이 그 창을 덮었기 때문이고 (여유 `389 ms`), 이는 처방이 아니라 우연이다. ⇒ 두 가드를 `waitForLodSettle` 로 전환했다 (PR #1208). 전환 후 재측정: `1119` `dod` IoU `0.936` (baseline 동일) / `lod` / `seam` · `1202` 게이트 6종 · `783` DoD 1~4 · `1204` · `1205` **전건 exit 0**.
 
 ### A9.3 기각한 대안 2건
 
@@ -2011,5 +2017,7 @@ await page.waitForFunction(() => window.__solarScene?.getLodStats?.().fading ===
 
 ### A9.4 재검토 조건
 
-- **`fading` 을 확인하지 않는 신규 픽셀 가드가 `?speed=0` 에서 flaky 해질 때** — 본 Amendment 의 처방을 그 가드에 적용한다. flaky 가 아니라 **일관되게 틀린** 값이 나오면 fade 가 아니라 다른 축이므로 여기로 오지 말 것.
+- **`fading` 을 확인하지 않는 픽셀 가드가 `?speed=0` 에서 flaky 해질 때** — 신규·기존을 가리지 않는다 (초판은 「신규」로 한정했고 R5 가 반증했다 — §A9.2). 본 Amendment 의 처방(`waitForLodSettle`)을 그 가드에 적용한다. flaky 가 아니라 **일관되게 틀린** 값이 나오면 fade 가 아니라 다른 축이므로 여기로 오지 말 것.
+- **정지 중 카메라를 움직이는 가드를 새로 쓰거나, 기존 가드에 그런 조작을 더할 때** — `waitForTimeout(N)` 상수로 덮지 말고 `waitForLodSettle` 을 쓴다. 상수의 안전성은 「`N` > 그때 측정된 fade 창」이라는 **우연**이고, `LOD_FADE_DURATION_MS` 나 전이 시작 시각(셰이더 컴파일 stall) 이 움직이면 조용히 깨진다 — 그때 나오는 것은 **부분 fade 된 알파로 판정한 픽셀 가드 실패**라 셰이더 회귀로 오진하기 쉽다.
+- **`waitForLodSettle` 의 「전이 미시작」 잔여 창이 실측으로 관측될 때** — 현재 그 다리는 술어가 아니라 타이밍(전이 `12 ms` vs 첫 표본 `200 ms`)이 지탱한다. 여유가 얇아지면 호출부가 「전이 관측」을 별도 조건으로 걸어야 한다 (helper JSDoc 에 동일 서술).
 - **프레임 위상 멤버가 늘어나 `performance.now()` 종속 상태가 하나 더 생길 때** — 선행 ADR §결정 2 의 멤버십 조건 3(멱등) 예외가 2건째가 되므로, `fading` 처럼 개별 필드를 늘리는 대신 **「정착 완료」 단일 술어**로 통합할지 재평가한다.

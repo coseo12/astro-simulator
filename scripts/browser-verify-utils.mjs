@@ -299,6 +299,77 @@ export async function bootstrapScene(page, options = {}) {
 }
 
 /**
+ * #1205 — LOD cross-fade 정착 대기. **일시정지 중 카메라를 움직인 직후** 호출한다.
+ *
+ * ## 왜 필요한가
+ *
+ * #1205 이전에는 일시정지에서 `runLodPass` 가 아예 돌지 않아 LOD 가 얼어 있었다 — 정지 중
+ * 카메라를 어떻게 흔들어도 레벨 전이도 cross-fade 도 발생하지 않았다. 프레임 위상 분리 이후
+ * 정지에서도 LOD 가 갱신되고, 200ms cross-fade 가 **wall-clock 으로** 진행한다
+ * (ADR `docs/decisions/20260628-756-procedural-planet-surface.md` Amendment 9).
+ *
+ * 그래서 정지 중 카메라 조작 뒤에 상수 `waitForTimeout(N)` 으로 캡처하면 알파가 캡처 시각에
+ * 종속된다 — N 이 fade 창보다 크다는 것이 우연히 참인 동안만 안전하다.
+ *
+ * ## 정착 술어
+ *
+ * `getLodStats()` 의 **분포가 직전 표본과 동일**하고 **`fading === 0`** 인 표본이
+ * `stableSamples` 회 **연속** 관측되면 정착
+ * (`apps/web/scripts/browser-verify-1205-pause-lod.mjs` 의 `settle()` 과 같은 형태 — 그쪽은
+ * `tier`/`radius` 축을 더 본다). 두 다리가 각각 닫는 것이 다르다.
+ *
+ *  - `fading === 0` — cross-fade **진행 중** 캡처를 막는다.
+ *  - **분포 동일** — fade 를 남기지 않는 전이를 막는다. `runLodPass` 는 `prevLevel === undefined`
+ *    일 때 (그 body 의 최초 레벨 결정) `lodFadeState` 에 등록하지 않으므로, **분포가 움직이는
+ *    중인데 `fading` 이 계속 `0`** 인 구간이 실재한다. `fading` 만 보는 술어는 그 구간을 정착으로
+ *    읽는다.
+ *
+ * ⚠️ **닫지 못하는 것 — 「전이가 아직 시작되지 않은」 구간.** 처음 `stableSamples + 1` 표본
+ * (기본 `4 × 200ms = 800ms`) 안에 레벨 전이가 시작되지 않으면 **옛 분포가 정착으로 읽힌다.**
+ * 이 다리는 술어가 아니라 **타이밍**이 지탱한다: `runFramePass` 가 매 프레임 돌므로 전이는
+ * 카메라 조작 다음 프레임에 적용된다 — [실측] `beta = π/2` 대입 후 분포 변화 관측 `12ms`,
+ * fade 종료 `211ms` (1280×720 headless, `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off`).
+ * 기본 `pollMs = 200` 은 그 `12ms` 의 16배다. 이 여유가 얇아지면 (예: 전이가 셰이더 컴파일
+ * stall 뒤로 밀리면) 호출부가 「전이 관측」을 별도 조건으로 걸어야 한다.
+ *
+ * @param {import('playwright').Page} page
+ * @param {number} [options.pollMs] 표본 간격 (기본 200)
+ * @param {number} [options.stableSamples] 연속 동일 표본 수 (기본 3 — 총 600ms > fade 200ms)
+ * @param {number} [options.timeoutMs] 상한 (기본 8000). 초과 시 `timedOut: true` 로 반환하며
+ *   throw 하지 않는다 — 호출부가 캡처를 진행할지 판단한다.
+ * @returns {Promise<{dist: string, fading: number, waitedMs: number, timedOut: boolean}>}
+ */
+export async function waitForLodSettle(page, options = {}) {
+  const pollMs = options.pollMs ?? 200;
+  const stableSamples = options.stableSamples ?? 3;
+  const timeoutMs = options.timeoutMs ?? 8000;
+  const start = Date.now();
+  let last = null;
+  let stable = 0;
+
+  while (Date.now() - start < timeoutMs) {
+    await page.waitForTimeout(pollMs);
+    const cur = await page.evaluate(() => {
+      const s = window.__solarScene.getLodStats();
+      return { dist: `${s.high}/${s.mid}/${s.low}`, fading: s.fading };
+    });
+    const same = last !== null && last.dist === cur.dist && cur.fading === 0;
+    stable = same ? stable + 1 : 0;
+    last = cur;
+    if (stable >= stableSamples) {
+      return { ...cur, waitedMs: Date.now() - start, timedOut: false };
+    }
+  }
+
+  return {
+    dist: last?.dist ?? 'unknown',
+    fading: last?.fading ?? -1,
+    waitedMs: Date.now() - start,
+    timedOut: true,
+  };
+}
+
+/**
  * 캡처 버퍼를 디렉토리 생성과 함께 저장.
  *
  * @param {Buffer | Uint8Array} buffer `page.screenshot()` / `canvas.screenshot()` 결과

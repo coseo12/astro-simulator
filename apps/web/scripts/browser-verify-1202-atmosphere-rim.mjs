@@ -53,6 +53,7 @@
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { waitForLodSettle } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? null;
@@ -235,7 +236,16 @@ async function setupPage(browser) {
   await page.evaluate(() => {
     window.__simCore.scene.activeCamera.beta = Math.PI / 2;
   });
-  await page.waitForTimeout(600);
+  // #1205 — 정지 중 카메라 조작이 이제 LOD 를 건드린다. [실측] 이 `beta` 대입 하나로 분포가
+  // `3/2/27 → 9/6/17` (11 body 전이) 로 바뀌고 cross-fade 가 `12ms ~ 211ms` 동안 진행한다
+  // (#1205 이전 같은 시퀀스: 분포 `3/3/26` 불변, 전이 0 건 — 양쪽 실측).
+  // 상수 sleep 대신 `fading === 0` 정착을 확인한다 (ADR `20260628-756` Amendment 9).
+  const lodSettle = await waitForLodSettle(page);
+  if (lodSettle.timedOut) {
+    console.warn(
+      `[1202] LOD 정착 상한 초과 (${lodSettle.waitedMs}ms, dist=${lodSettle.dist} fading=${lodSettle.fading}) — 마지막 상태로 진행`,
+    );
+  }
   return { context, page, consoleErrors };
 }
 

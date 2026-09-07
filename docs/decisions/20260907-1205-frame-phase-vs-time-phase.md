@@ -48,6 +48,8 @@ Babylon 9.19.0 `Scene.render()` 실측 순서 (`node_modules/.pnpm/@babylonjs+co
 
 ⚠️ **`animate()` 가 `onBeforeRenderObservable` 보다 먼저다.** 이 앱은 실제로 Babylon `Animation` 을 쓴다 (`camera-controller.ts` 의 focusOn `cam-target`/`cam-radius`, `tier-transition.ts` 의 tier 전환 radius). 따라서 후보 (A) 는 **tween 후** 카메라를 본다 — §후보 비교 가 (A) 를 낮게 둔 논거의 실측 근거다. cross-validate 라운드가 이 순서를 반대로 기술했으나 실물 대조로 기각됐다.
 
+> **줄 번호 표기에 대하여** (PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) R6). ADR [`20260808-983`](20260808-983-measurement-recording-convention.md) §결정 (ii) 확장(#1051)은 *"소급 편집이 금지된 기록물(… `Accepted` ADR 본문)에서 코드·문서의 한 지점을 가리킬 때는 줄 번호를 쓰지 않는다"* 이고, 본 ADR 은 `Accepted` 이며 위 문단은 `L4445`~`L4568` 로 **9회** 가리킨다. 그럼에도 유지하는 근거는 하나다 — **좌표계가 버전에 고정돼 있다.** 참조 경로 `node_modules/.pnpm/@babylonjs+core@9.19.0/…` 는 pnpm content-addressed 경로라 `9.19.0` 인 한 그 파일의 내용이 바뀌지 않으므로, 983 이 말하는 부패 기전(*"참조 대상이 움직인다"*)이 성립하지 않는다. 9건 전부 실물 대조로 확인됐다 (dev 최초 + reviewer 독립 재현). ⚠️ **이 면제는 버전 고정에 붙은 것이지 본 ADR 에 붙은 것이 아니다** — Babylon 메이저/마이너 업그레이드 시 §재검토 조건 7 이 발동한다.
+
 ---
 
 ## 후보 비교 (축별)
@@ -182,10 +184,12 @@ P-R = (가) ∧ (나)     # 두 다리 모두 필요조건
 
 | 대상 | `D_A` | `D_pause(A→B)` | `D_init(B)` | (가) | (나) | exit |
 |---|---|---|---|---|---|---|
-| 결함 보유 build (stash 재빌드) | `0/0/32` | `0/0/32` | `0/0/32` | **FAIL** | **PASS** | `1` |
+| 결함 보유 build (stash 재빌드) [^premise] | `0/0/32` | `0/0/32` | `0/0/32` | **FAIL** | **PASS** | `1` |
 | 변이 (a) 훅 호출 1줄 제거 | `0/0/0` | `0/0/0` | `0/0/0` | **FAIL** | **PASS** | `1` |
 | 변이 (b) 훅을 `tick()` 조건 안으로 (원 결함 형태) | `0/0/0` | `0/0/0` | `0/0/0` | **FAIL** | **PASS** | `1` |
 | 원본 / 복구 | `2/1/29` | `2/4/26` | `2/4/26` | PASS | PASS | `0` |
+
+[^premise]: **1행의 `exit 1` 은 (가) 가 내는 것이 아니다** (PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) reviewer 재현). `fading` 은 본 PR 이 신설한 필드라 결함 rev 에서 `undefined` 이고, `settle()` 의 정착 조건 `cur.fading === 0` 이 영영 거짓이 되어 **세 세션 모두 상한 `12000ms` 를 초과**한다. 그래서 실제 출력은 `전제 위배 — A 이 fade 미정착 (fading=undefined). 판별력 0.` 이 (가) 보다 **먼저** 뜬다. ⇒ **순수 (가) 판별력의 증거는 변이 (a)(b) 뿐이다** — 그쪽만 `fading === 0` 으로 전제를 통과한 뒤 (가) 단독으로 FAIL 한다. 아래 결론(= (가) 는 필요조건)은 그 두 행만으로 이미 성립하므로 **흔들리지 않는다.** 1행이 증명하는 것은 「결함 rev 에서 가드가 초록이 아니다」까지다.
 
 ⇒ **(나) 만 넣었으면 가드가 결함 보유판에서 초록이었다.** §B-2 분석은 반증되지 않았고 오히려 3중으로 재현됐다.
 
@@ -199,12 +203,13 @@ P-R = (가) ∧ (나)     # 두 다리 모두 필요조건
 
 1. **M2 가 `idle` fps 회귀를 보일 때** — ADR `20260424-p11-b-lod-design.md` §재검토 조건 3 이 예고한 *"10 프레임 throttle 또는 `screenCoverageRadius` batch API"* 가 트리거된다. ⚠️ throttle 은 §결정 2 의 조건 3(멱등)을 더 깨므로 도입 시 본 ADR Amendment 필수. **현재 판정: 검출 실패(측정 분해능 부족)이지 「회귀 없음」이 아니다** — 프로덕션 빌드 + 저소음 환경에서 재측정할 여지가 남아 있다.
 2. **M7 이 fade 창 종속을 관측할 때** — ✅ **발동함.** `20260628-756` §결정 7 에 캡처 전 정착 조건 Amendment 9 를 추가했다.
-3. **프레임 위상 멤버가 2개째로 늘어날 때** — §결정 2 의 3조건을 그 멤버에 적용한 판정을 박제. 3조건을 통과하지 못하는 것을 넣으려면 본 ADR Amendment.
+3. **프레임 위상 멤버가 2개째로 늘어날 때** — §결정 2 의 3조건을 그 멤버에 적용한 판정을 박제. 3조건을 통과하지 못하는 것을 넣으려면 본 ADR Amendment. ⚠️ **동시에 §비-범위 「2×/프레임 금지 계약의 가드 — 검토 후 기각」도 재판정한다** — 그 기각은 「멤버 1개 + sub-ms 규모 비-멱등」을 전제로만 성립한다.
 4. **`setTier` 즉시-동기가 4건째로 늘어날 때** — §결정 5 의 「유지」 판정이 무효화된다. 그 시점에 위상 흡수를 재평가한다.
 5. **M6 가 floating-origin assert 발화를 관측할 때** — ADR `20260422-floating-origin.md` §3 계약 위배이므로 본 결정을 **재설계**한다 (배치 지점 변경 또는 후보 (A) 후퇴).
 6. **M3-가시 가 tier 전환 프레임의 LOD/scale 불일치를 «가시» 수준으로 관측할 때** — 위상차 유예가 무효화된다. escalation 은 **(E3) 후보 (A) + `tierObserver` 뒤 등록**이다: `animate()` → `onBeforeRenderObservable`[tier] → [LOD] 순서가 되어 **tier 지연과 카메라 tween 지연이 동시에** 사라진다. `sim-canvas.tsx` 의 tier 옵저버 무접촉.
    ⚠️ 대가는 재생 경로 입력의 한 스텝 이동 — #380/#818/#790 회귀 세트 전량 재실행이 조건.
    ❌ 「`updateTierByCamera` 를 프레임 위상으로 이관」은 **채택하지 않는다** — free-fly gate / `upperRadiusLimit` SSoT / #704 NaN 가드 전체가 딸려 오고, tier 지연만 없앨 뿐 tween 지연은 남는다.
+7. **`@babylonjs/core` 를 `9.19.0` 밖으로 올릴 때** — §배경 의 `scene.pure.js` 실행 순서 문단(줄 번호 9건 + `animate()` < `onBeforeRenderObservable` 순서)을 **재대조**한다. 그 순서는 §후보 비교 가 후보 (A) 를 (F) 보다 낮게 둔 **결정 근거**이고, §결정 3 의 배치 계약과 §재검토 조건 6 의 escalation (E3) 설계가 모두 여기에 얹혀 있다. 순서가 바뀌면 (A) 의 상대 순위부터 다시 판정해야 하므로 본 ADR Amendment 대상이다. 줄 번호는 버전 고정 경로에 매인 좌표라 **업그레이드와 동시에 무효**가 된다 (§배경 각주 — ADR `20260808-983` §결정 (ii) 확장과의 관계).
 
 ---
 
@@ -228,6 +233,31 @@ P-R = (가) ∧ (나)     # 두 다리 모두 필요조건
 - LOD 임계·거리 규칙 튜닝 / low variant 에 절차 셰이더 적용 / `applySatelliteVisibilityGuard` 정책 재설계.
 - **진입 경로별 착지 거리 통일** — dev D0 §4 가 원인을 **자전 위상**(`boundingSphere.radiusWorld` 의 회전한 AABB 대각 오염)으로 특정했다. 후속 이슈를 뜬다면 제목이 「진입 경로별」이 아니라 「`boundingSphere.radiusWorld` 자전 위상 종속」이어야 한다.
 - 미등록 `browser-verify-*.mjs` 일괄 배선.
+
+### 「2×/프레임 금지」 계약의 가드 — **검토 후 기각** (PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) R3)
+
+`solar-system-scene.ts` 의 옛 LOD hook 자리 주석이 *"여기 남겨두면 재생 중 2×/프레임이 되므로 호출을 남기지 않는다"* 를 **계약으로 선언**한다. 그 계약을 어겨도 **어떤 가드도 발화하지 않는다** — reviewer 가 변이로 관측했고 dev 가 재현했다.
+
+**변이 C 실측** — `updateAt` 원 자리에 `runLodPass(cam)` 를 되돌리고 프레임 위상도 유지 (`core` 재빌드 + `next dev :3002` + headless chromium 1280×720):
+
+| | `getTransformMatrix`/frame (재생) | `verify:1205-pause-lod` 출력 | exit |
+|---|---|---|---|
+| 원본 | **`4.000`** (`3148 / 787`) | `2/1/29 → 2/4/26 / 2/4/26` | `0` |
+| 변이 C (2×/프레임) | **`5.000`** (`3600 / 720`) | **완전 동일** | `0` |
+
+변이가 살아 있었다는 증거는 **델타 `+1.000`** 이다 (LOD 패스 1회가 `scene.getTransformMatrix()` 를 1회 부른다). reviewer 세션은 `6.000 → 7.000` 이었다 — **절대값은 세션·쿼리 종속이라 판정에 쓰지 않고 델타만 쓴다.**
+
+**기각 근거 5축.**
+
+1. **관측 가능한 출력이 동일하다.** 가드 출력·exit·LOD 분포가 전부 같고, 달라진 유일한 양이 Babylon 내부 카운터다.
+2. **그 동일성의 크기가 곧 §결정 2 조건 3 예외의 크기다.** 같은 프레임·같은 카메라의 2회 호출은 같은 레벨을 산출하므로 `bodyCurrentLod` 전이가 1회분만 일어나고 새 fade 도 등록되지 않는다 (`prevLevel !== nextLevel` 이 2회차에 거짓). 남는 차이는 두 호출 사이 `performance.now()` 차(sub-ms)가 `LOD_FADE_DURATION_MS = 200` 창에 얹히는 것뿐이고, 방향은 「더 최신 시각」이라 열화가 아니다. ⚠️ **「멱등이라 무해」가 아니다** — §결정 2 는 `runLodPass` 의 비-멱등을 이미 명시 예외로 기록했다. 무해한 이유는 **그 비-멱등의 스케일이 sub-ms / 200ms** 라는 것이다.
+3. **비용이 측정 분해능 아래다.** M2 는 프레임 위상 1회를 median `0.1 ms` / max `0.2 ms` (`n = 399`/`302`) 로 쟀는데 브라우저 `performance.now()` 양자화가 `0.1 ms` 라 **그것이 바닥이다.** 2× 의 증분은 `[0, 0.2) ms` 로만 말할 수 있다 — **가드가 걸 임계값이 없다.**
+4. **유일하게 검출된 술어가 Babylon 내부 카운터다.** `getTransformMatrix`/frame 은 카메라 코드·궤도선·셰이더·Babylon 버전이 바뀌면 함께 움직인다 (같은 변이에서 세션마다 `4` / `6` 으로 갈린 것이 그 증거다). 여기에 임계를 박으면 **본 계약과 무관한 PR 에서 발화하는 false-positive 생성기**가 된다 — CLAUDE.md §가드 설계 원칙 measurement-first 위배.
+5. **값싼 대안(정적 술어)이 계약보다 좁다.** 「`runLodPass(` 호출부가 1곳」 정적 검사는 (i) `updateAt` 이 `runFramePass()` 를 부르는 형태 (ii) `setFramePassHandler` 2회 등록 (iii) 다른 파일에서의 호출 을 못 잡는다. **이 클래스를 닫는다며 이 클래스를 재생산한다** ([#1147](https://github.com/coseo12/astro-simulator/issues/1147) 「가드 술어 < 계약」).
+
+**절반은 닫았다.** 계약은 두 다리다 — **(α)** 프레임 위상 자신이 프레임당 정확히 1회 / **(β)** 시간 위상이 LOD 패스를 부르지 않음. **(α) 는 `packages/core/src/engine/simulation-core-frame-pass.test.ts` 가 단위 층에서 닫는다** (변이 4종 전건 검출, 브라우저 불요 ⇒ 새 가드 표면 `0`). 기각 대상은 **(β) 뿐**이다.
+
+⚠️ **기각의 무효 조건.** 위 2·3 은 「프레임 위상 멤버가 `runLodPass` **하나**이고 그 비-멱등이 sub-ms 규모」에 전적으로 의존한다. §재검토 조건 3 (멤버 2개째) 이 발동하면 **이 기각도 함께 재판정한다** — 상태를 누적하는 멤버가 들어오면 2× 는 성능이 아니라 **정확성** 문제가 되고 위 5축이 전부 무효다.
 
 ---
 
