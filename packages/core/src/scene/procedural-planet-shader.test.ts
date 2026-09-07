@@ -1160,13 +1160,19 @@ describe('Amendment 8 (#1202) — rim 미학 상수 SSoT + 정의역 불변식 (
     // 직교 근사라 근접 관측에서 반증됐다 (상수 선언부 주석의 실측 참조).
     // 실측 근거: 림 밴드의 ndl −0.2 / −0.1 / 0.0 구간에서 LO = −0.25 는 rim 기여
     // 0.00813 / 0.04764 / 0.10006 을 내지만 LO = +0.05 는 셋 다 0 이다 (박명 호 소멸).
+    //
+    // ⚠️ **이 단위 테스트만으로는 위 근거가 지켜지지 않는다.** 「음수」는 필요조건일 뿐이고
+    // `LO = -0.05` 도 통과하는데 박명 호는 실측 `0.00254` 로 baseline `0.06086` 의 4.2% 만 남는다.
+    // 그 축을 닫는 것은 `verify:1202-atmosphere-rim` 의 **G6 (박명 호 rim 기여 ≥ 0.02)** 이고,
+    // 본 assert 는 정의역 불변식(부호)만 고정한다.
     expect(RIM_NDL_LO).toBeLessThan(0);
   });
 
   it('U19 — rim 색은 레일리 우세 (B > G > R) — 채도 게이트 G4 가 이 낙차에 의존', () => {
     expect(RIM_COLOR_RGB.b).toBeGreaterThan(RIM_COLOR_RGB.g);
     expect(RIM_COLOR_RGB.g).toBeGreaterThan(RIM_COLOR_RGB.r);
-    // 보라/마젠타 anti-pattern 회피 (저장소 공통 제약 — G >= min(R,B)).
-    expect(RIM_COLOR_RGB.g).toBeGreaterThanOrEqual(Math.min(RIM_COLOR_RGB.r, RIM_COLOR_RGB.b));
+    // ⚠️ 「보라/마젠타 anti-pattern 회피 (G >= min(R,B))」 assert 는 **삭제했다** — 위 두 줄이
+    // `b > g > r` 을 못박으므로 `min(r, b) = r` 이고 `g > r` 이 그 부등식을 함의한다. 즉 어떤
+    // 입력에서도 실패할 수 없는 줄이었다 (초록인데 아무것도 안 지키는 assert).
   });
 });

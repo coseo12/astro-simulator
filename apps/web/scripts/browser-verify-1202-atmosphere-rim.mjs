@@ -11,12 +11,15 @@
  * 그 술어가 #1197 변이 M-i 의 사각 출처였다 (뒤집힌 픽셀이 판정에 도달하기 전에 배제됐다).
  * 본 가드의 표본 정의는 **전적으로 기하**(`dot(N, viewDir)` · `dot(N, sunDir)`)다.
  *
- * ## 게이트 5종
+ * ## 게이트 6종 (G5 결번)
  *   G1  낮면 림 rim 기여 − 밤면 림 rim 기여 ≥ M    — D1 핵심 (변이 M-1: 광원각 항 삭제)
  *   G2  낮면 림 rim 기여 ≥ τ                        — 변이 M-2 / M-3 / M-4
  *   G3  낮면 림 기여 − 낮면 **내부** 기여 ≥ M2      — 실패 모드 ③ (밝기는 맞고 위치가 틀림)
  *   G4  낮면 림 채도 감소량 ≤ 상한                  — 실패 모드 ⑤ washout (변이 M-6)
- *   G5  낮면 림 호를 3 하위 호로 분할, 각 호 > 0    — 사분면 편중
+ *   G5  **결번** — 낮면 호 3분할 `> 0`. 단독 발화 구간이 없어 삭제 (M-8 실측, 상수 블록 참조)
+ *   G6  박명 호 (`-0.15 < ndl < 0`) rim 기여 ≥ τ2  — `RIM_NDL_LO` 부호 (변이 M-7). **G1~G4 는
+ *       이 상수에 전부 눈이 멀다** — 낮면 림 기여가 `LO` 전 구간에서 불변이다
+ *   G7  런타임 콘솔 에러 수 == 0                    — 측정이 성립한 런타임인가 (변이 M-9)
  *
  * ## 「측정 불가」 ≠ FAIL (§A8.8)
  * 아래 넷 중 하나라도 걸리면 PASS/FAIL 이 아니라 **「측정 불가」로 즉시 종료**한다. 조용한 PASS 도,
@@ -30,10 +33,14 @@
  *       (tier-c 폴백 — `FOCUS_QUERY` 주석). dev 가 실행으로 발견해 추가한 네 번째 전제다.
  *
  * ## 모드
- *   node browser-verify-1202-atmosphere-rim.mjs               # 게이트 5종
+ *   node browser-verify-1202-atmosphere-rim.mjs               # 게이트 6종
  *   INJECT=m1 node browser-verify-1202-atmosphere-rim.mjs     # 변이 M-1 (광원각 항 런타임 등가 삭제)
  *   INJECT=m4 node browser-verify-1202-atmosphere-rim.mjs     # 변이 M-4 (세기 0 고착)
  *   INJECT=m6 node browser-verify-1202-atmosphere-rim.mjs     # 변이 M-6 (세기 x5 — washout)
+ *   INJECT=m7 node browser-verify-1202-atmosphere-rim.mjs     # 변이 M-7 (rimNdlLo 부호 뒤집기)
+ *   INJECT=m9 node browser-verify-1202-atmosphere-rim.mjs     # 변이 M-9 (콘솔 에러 1건 주입)
+ *   INJECT=lo LO=-0.05 ...                                    # rimNdlLo 스윕 (G6 임계 확정용)
+ *   INJECT=m8 M8_LO=0.85 M8_HI=0.90 ...                       # 방위 편중 (G5 판별력 실측용)
  *   MODE=profile ...                                          # 게이트 없이 진단만 (임계 확정용)
  *
  * 환경:
@@ -82,9 +89,14 @@ const RIM_BAND_NDV = 0.25;
 const DAY_NDL_MIN = 0.15;
 /** 밤면 판정 상한 (`ndl`). terminator 를 양쪽에서 비워 대역이 섞이지 않게 한다. */
 const NIGHT_NDL_MAX = -0.15;
+/**
+ * terminator 정의값 — `ndl == 0` 이 낮/밤 경계다. **새 임계가 아니라 정의**다 (튜닝 대상 아님).
+ * G6 박명 호 대역의 상단 경계이며, 하단은 기존 `NIGHT_NDL_MAX` 를 그대로 쓴다.
+ */
+const TERMINATOR_NDL = 0;
 /** G3 의 「내부」 = `dot(N, viewDir) >= INNER_NDV_MIN` 인 낮면 픽셀 (disk 중앙부). */
 const INNER_NDV_MIN = 0.6;
-/** G5 낮면 호 분할 수. */
+/** 낮면 호 분할 수 (진단 전용 — G5 결번). */
 const ARC_BINS = 3;
 
 // ── 「측정 불가」 하한 ───────────────────────────────────────────────────────
@@ -102,6 +114,13 @@ const MIN_PHASE_ALPHA_DEG = 10;
  * 그 축을 닫는 네 번째 유효성 전제이며, 게이트가 아니라 **전제**다 (rim 의 유무를 묻지 않는다).
  */
 const MIN_DAY_LIT_LUM = 0.15;
+/**
+ * 박명 대역 표본 수 하한 (G6 전용). 이 대역은 `ndl` 폭이 `0.15` 로 좁아 구조적으로 표본이 적다
+ * — 실측 `97` 로 낮/밤 대역 `867` 의 1/9 다. 낮/밤 대역이 쓴 여유율(실측의 약 1/6)을 그대로
+ * 적용하면 `16` 이지만, 좁은 대역일수록 표본 붕괴가 빨리 오므로 더 보수적인 `30` (실측의 약 1/3)
+ * 을 쓴다. **엄격한 쪽이 안전한 방향**이다 — 미달은 「측정 불가」(exit 2) 이지 조용한 PASS 가 아니다.
+ */
+const MIN_TWILIGHT_SAMPLES = 30;
 
 // ── 게이트 임계 (GPU 실측 확정 — 측정 조건·산포는 PR 본문 · ADR §A8.8) ──────
 /**
@@ -136,14 +155,39 @@ const G3_MIN_LIMB_INNER_GAP = 0.025;
  * 로 커진다. 즉 세기 상향은 얻는 것보다 잃는 것이 빨리 커진다.
  */
 const G4_MAX_SATURATION_DROP = 0.24;
+// G5 (낮면 하위 호별 rim `> 0`) — **결번**. 초판의 게이트였고 리뷰 라운드에서 **삭제**했다.
+// 근거 [실측, 변이 M-8 = `ndl` 창을 위로 밀어 방위 편중을 만드는 런타임 등가]:
+//   창 하단 0.30 / 0.50 / 0.70 / 0.85 에서 호 기여
+//     `0.07635·0.05360·0.09388` / `0.06006·0.05360·0.07230` / `0.02505·0.05360·0.03499` /
+//     `0.00017·0.04576·0.00052`  ⇒ **네 경우 모두 G5 PASS** (`> 0` 은 근사-0 을 걸러내지 못한다)
+//   같은 실행의 낮면 림 기여 `0.07466` / `0.06201` / `0.03786` / **`0.01543`**
+//     ⇒ 편중이 극단(호 하나에 몰림)에 이르는 0.85 에서 **G2 가 먼저 FAIL** 한다.
+//   호가 정확히 `0` 이 되는 0.90 (`0`·`0.02512`·`0`) 에서는 낮면 림이 `0.00835` 라 G2 도 FAIL.
+// ⇒ **G5 가 단독으로 발화하는 구간이 없다.** 겨냥한 것(방위 편중)은 못 잡고 잡는 것은 G2 중복이다
+//   (#1197 D5-b 동형 — 「내가 만든 게이트」는 보존 근거가 아니다). 호 분할은 **진단 인쇄로 남긴다**
+//   (§A8.7 ⑥ 밴드 두께와 같은 처분 — 게이트 불가 축은 진단 + GUI 육안이 짝이다).
 /**
- * G5 — 낮면 하위 호별 rim 기여 하한. **`> 0` 초과만 요구하고 floor 는 두지 않는다.**
+ * G6 — **박명 호** (terminator 를 넘어간 림, `NIGHT_NDL_MAX < ndl < 0`) rim 기여 하한.
  *
- * 하위 호 사이에도 `ndl` 이 변하므로 (실측 `0.07635` / `0.05360` / `0.09488` — 최대·최소가
- * 1.77배) 편차 밴드를 걸면 정상 구현이 FAIL 한다. 본 rim 은 설계상 비대칭이며, 이 게이트가
- * 겨냥하는 것은 「rim 이 한 사분면에만 몰림」이고 그 경우 나머지 호가 정확히 `0` 이 된다.
+ * 이 게이트만이 `RIM_NDL_LO` 의 **부호**를 잡는다. 기존 G1~G4 는 그 상수에 전부 눈이 멀다
+ * [실측, `rimNdlLo` 런타임 스윕] — 낮면 림 기여가 `LO ∈ {-0.25, -0.20, -0.15, -0.10, -0.05,
+ * 0.00, +0.05}` 전 구간에서 `0.07499` 로 **완전 불변**이다 (G1 은 밤면이 `0` 이 되어 오히려 좋아진다).
+ * 구조적 원인: 낮면 대역 하한 `DAY_NDL_MIN = 0.15` 가 셰이더 `RIM_NDL_HI` 와 **같아** smoothstep
+ * 전이 구간 전체가 낮/밤 두 대역 **사이에** 빈다.
+ *
+ * 같은 스윕의 박명 대역 실측 (`N = 97`, 단조):
+ *   `-0.25` **`0.06086`** / `-0.20` `0.04490` / `-0.15` `0.02754` / `-0.10` `0.01241` /
+ *   `-0.05` `0.00254` / `0.00` `0` / `+0.05` `0`
+ *
+ * 임계 `0.02` 는 baseline `0.06086` 의 약 1/3 — G1~G3 과 **같은 관례**다. 판정 결과:
+ *  - `+0.05` (변이 M-7) `0` ⇒ FAIL. `0.00` 도 `0` ⇒ FAIL.
+ *  - **`-0.05` `0.00254` ⇒ FAIL 이고, 그것이 옳다.** 「음수면 통과」는 U18 단위 테스트가 이미 가진
+ *    구멍이다 — `-0.05` 는 박명 호의 **4.2%** 만 남긴다 (24배 감소). §A8.13 이 이 상수의 근거로
+ *    든 것은 「음수」가 아니라 「terminator 박명 호」이고, `-0.05` 는 그 근거를 비운다.
+ *  - `-0.15` `0.02754` (1.38배) PASS / `-0.10` `0.01241` FAIL. 즉 본 게이트가 실제로 고정하는
+ *    계약은 「`LO` 가 `NIGHT_NDL_MAX` 근방 이하로 충분히 음수」다.
  */
-const G5_MIN_ARC_RIM = 0;
+const G6_MIN_TWILIGHT_RIM = 0.02;
 
 async function launch() {
   if (SWIFTSHADER) {
@@ -327,8 +371,15 @@ async function measure(page, onB64, offB64, params) {
       const dayLimb = mk();
       const nightLimb = mk();
       const dayInner = mk();
+      // G6 — 박명 호: terminator 를 **넘어간** 림 픽셀 (`NIGHT_NDL_MAX < ndl < 0`). 기존 세 대역이
+      // 구조적으로 비워 둔 구간이며 (`DAY_NDL_MIN` 이 셰이더 `RIM_NDL_HI` 와 같아 smoothstep 전이
+      // 구간 전체가 낮/밤 대역 사이에 빈다), `RIM_NDL_LO` 의 부호가 유일하게 드러나는 곳이다.
+      const twilightLimb = mk();
       const arcPx = []; // { theta, p } — G5 하위 호 분할용
       const radialProfile = new Map(); // 반경(px, 정수) → { n, sumP } (밴드 두께 진단)
+      // 림 픽셀의 `ndl` 구간별 rim 기여 (폭 0.05) — 진단 전용. §A8.13 의 박명 호 실측을 가드 안에서
+      // 재현 가능하게 만든다 (전용 스크래치 스크립트 없이 `MODE=profile` 로 재측정).
+      const ndlProfile = new Map();
 
       for (let y = 0; y < rh; y += 1) {
         for (let x = 0; x < rw; x += 1) {
@@ -383,6 +434,7 @@ async function measure(page, onB64, offB64, params) {
           const isInner = ndv >= P.INNER_NDV_MIN;
           const isDay = ndl >= P.DAY_NDL_MIN;
           const isNight = ndl <= P.NIGHT_NDL_MAX;
+          const isTwilight = ndl > P.NIGHT_NDL_MAX && ndl < P.TERMINATOR_NDL;
 
           const push = (acc) => {
             acc.n += 1;
@@ -401,7 +453,17 @@ async function measure(page, onB64, offB64, params) {
             });
           }
           if (isLimb && isNight) push(nightLimb);
+          if (isLimb && isTwilight) push(twilightLimb);
           if (isInner && isDay) push(dayInner);
+
+          if (isLimb) {
+            const bin = Math.floor(ndl / 0.05) * 0.05;
+            const key = Number(bin.toFixed(2));
+            const slot = ndlProfile.get(key) ?? { n: 0, sumP: 0 };
+            slot.n += 1;
+            slot.sumP += p;
+            ndlProfile.set(key, slot);
+          }
 
           if (isDay) {
             const rad = Math.round(Math.hypot(x - cS.x, y - cS.y));
@@ -480,8 +542,13 @@ async function measure(page, onB64, offB64, params) {
         peakRadialRim: Number(peak.toFixed(5)),
         dayLimb: pack(dayLimb),
         nightLimb: pack(nightLimb),
+        twilightLimb: pack(twilightLimb),
         dayInner: pack(dayInner),
         arcs,
+        ndlProfile: [...ndlProfile.entries()]
+          .filter(([, s]) => s.n >= 8)
+          .sort((a, b) => a[0] - b[0])
+          .map(([k, s]) => [k, s.n, Number((s.sumP / s.n).toFixed(5))]),
         radialProfile: prof
           .filter((e) => e.rad % 4 === 0)
           .map((e) => [e.rad, Number(e.rim.toFixed(5))]),
@@ -512,6 +579,37 @@ async function main() {
     } else if (INJECT === 'm6') {
       console.log('[inject] M-6 — rimStrength=2.5 (기본 0.5 x5 — washout 겨냥)');
       await injectFloats(page, [['rimStrength', 2.5]]);
+    } else if (INJECT === 'm7') {
+      // M-7 — `RIM_NDL_LO` 부호 뒤집기. G6 가 겨냥하는 변이 (§A8.13 근거를 지키는 게이트).
+      console.log('[inject] M-7 — rimNdlLo=+0.05 (부호 뒤집기 — 박명 호 소멸 겨냥)');
+      await injectFloats(page, [['rimNdlLo', 0.05]]);
+    } else if (INJECT === 'lo') {
+      // `RIM_NDL_LO` 스윕 — 임계 확정·판별력 실측용 (MODE=profile 과 함께 쓴다).
+      const lo = Number(process.env.LO);
+      if (!Number.isFinite(lo)) {
+        console.error('[inject] INJECT=lo 는 LO=<숫자> 환경변수가 필요하다');
+        await context.close();
+        return 1;
+      }
+      console.log(`[inject] LO 스윕 — rimNdlLo=${lo}`);
+      await injectFloats(page, [['rimNdlLo', lo]]);
+    } else if (INJECT === 'm8') {
+      // M-8 — 방위 편중 (G5 겨냥). ndl 게이트 창을 낮면 림의 `ndl` 분포 **위쪽**으로 밀어
+      // 태양에 가장 가까운 호에만 rim 이 남게 한다. 소스 변이가 아니라 런타임 등가다.
+      const lo = Number(process.env.M8_LO ?? 0.5);
+      const hi = Number(process.env.M8_HI ?? 0.55);
+      console.log(`[inject] M-8 — rimNdlLo=${lo} / rimNdlHi=${hi} (방위 편중 — G5 겨냥)`);
+      await injectFloats(page, [
+        ['rimNdlLo', lo],
+        ['rimNdlHi', hi],
+      ]);
+    } else if (INJECT === 'm9') {
+      // M-9 — 콘솔 에러 게이트의 판별력 실증용 인위적 결함 주입. 셰이더와 무관하며, 재는 것은
+      // 「런타임 에러가 하나라도 나면 가드가 FAIL 하는가」 하나다.
+      console.log('[inject] M-9 — 페이지 콘솔 에러 1건 주입 (콘솔 에러 게이트 판별력 실증)');
+      await page.evaluate(() => {
+        console.error('[m9] injected runtime error canary');
+      });
     } else if (INJECT !== 'none') {
       console.error(`[inject] 미지원 INJECT=${INJECT}`);
       await context.close();
@@ -529,6 +627,7 @@ async function main() {
       RIM_BAND_NDV,
       DAY_NDL_MIN,
       NIGHT_NDL_MAX,
+      TERMINATOR_NDL,
       INNER_NDV_MIN,
       ARC_BINS,
     });
@@ -547,11 +646,18 @@ async function main() {
     console.table({
       '낮면 림': r.dayLimb,
       '밤면 림': r.nightLimb,
+      '박명 림': r.twilightLimb,
       '낮면 내부': r.dayInner,
     });
-    console.log('낮면 호 분할 (G5):', JSON.stringify(r.arcs));
+    // 호 분할은 **진단 전용**이다 (G5 결번 — 위 상수 블록의 M-8 실측 참조). 방위 편중은 게이트로
+    // 닫지 못하고 (`> 0` 은 근사-0 을 못 거르며, 극단 편중은 G2 가 먼저 잡는다) 이 인쇄와 실 Chrome
+    // GUI 육안이 짝이다 — §A8.7 ⑥ 밴드 두께와 같은 처분.
+    console.log('낮면 호 분할 (진단, 게이트 아님):', JSON.stringify(r.arcs));
     console.log('낮면 반경 프로파일 [px, rim]:', JSON.stringify(r.radialProfile));
-    if (consoleErrors.length) console.log('consoleErrors:', consoleErrors.slice(0, 5));
+    console.log('림 ndl 프로파일 [ndl_lo, n, rim]:', JSON.stringify(r.ndlProfile));
+    console.log(
+      `consoleErrors: ${consoleErrors.length}${consoleErrors.length ? ` — ${JSON.stringify(consoleErrors.slice(0, 5))}` : ''}`,
+    );
 
     // ── 「측정 불가」 판정 (게이트보다 **먼저**) ──
     const unmeasurable = [];
@@ -563,6 +669,10 @@ async function main() {
       if (acc.n < MIN_SAMPLES)
         unmeasurable.push(`(1) 표본 부족 — ${label} N=${acc.n} < ${MIN_SAMPLES}`);
     }
+    if (r.twilightLimb.n < MIN_TWILIGHT_SAMPLES)
+      unmeasurable.push(
+        `(1) 표본 부족 — 박명 림 N=${r.twilightLimb.n} < ${MIN_TWILIGHT_SAMPLES} (좁은 대역 전용 하한)`,
+      );
     if (r.dayLimb.headroom !== null && r.dayLimb.headroom < MIN_DAY_HEADROOM)
       unmeasurable.push(
         `(2) 낮면 림 평균 잔여 휘도 헤드룸 ${r.dayLimb.headroom} < ${MIN_DAY_HEADROOM}`,
@@ -586,12 +696,13 @@ async function main() {
       return 0;
     }
 
-    // ── 게이트 5종 ──
+    // ── 게이트 (G1~G4 · G6 · G7 — G5 결번) ──
     const gaps = {
       g1: r.dayLimb.rim - r.nightLimb.rim,
       g2: r.dayLimb.rim,
       g3: r.dayLimb.rim - r.dayInner.rim,
       g4: r.dayLimb.satOff - r.dayLimb.satOn,
+      g6: r.twilightLimb.rim,
     };
     const results = [
       [
@@ -613,13 +724,18 @@ async function main() {
         `<= ${G4_MAX_SATURATION_DROP}`,
         gaps.g4 <= G4_MAX_SATURATION_DROP,
       ],
+      // G5 는 결번이다 (위 상수 블록 참조). 번호를 당겨 쓰지 않는다 — M-5 결번과 같은 처분으로,
+      // 리뷰 이력의 「G5」가 다른 술어를 가리키게 되는 혼선을 막는다.
+      ['G6 박명 호 rim 기여', gaps.g6, `>= ${G6_MIN_TWILIGHT_RIM}`, gaps.g6 >= G6_MIN_TWILIGHT_RIM],
     ];
-    const arcFail = r.arcs.filter((a) => a.rim === null || a.rim <= G5_MIN_ARC_RIM);
+    // G7 — 런타임 콘솔 에러. 인쇄만 하고 판정하지 않으면 「측정은 했는데 아무도 안 본다」가 된다.
+    // 재는 것은 rim 이 아니라 **측정이 성립한 런타임인가**이며, 픽셀 게이트가 전건 초록인 채로
+    // WebGL 셰이더 컴파일 경고·예외가 나는 상태를 통과시키지 않는다.
     results.push([
-      `G5 낮면 하위 호 ${ARC_BINS}개 전건`,
-      r.arcs.map((a) => a.rim).join(' / '),
-      `각 호 > ${G5_MIN_ARC_RIM}`,
-      arcFail.length === 0,
+      'G7 런타임 콘솔 에러 수',
+      String(consoleErrors.length),
+      '== 0',
+      consoleErrors.length === 0,
     ]);
 
     console.log('\n=== 게이트 ===');
@@ -630,7 +746,9 @@ async function main() {
       if (!ok) anyFail = true;
     }
     exitCode = anyFail ? 1 : 0;
-    console.log(anyFail ? '\n[FAIL] 게이트 미충족' : '\n[PASS] 게이트 5종 전건 충족');
+    console.log(
+      anyFail ? '\n[FAIL] 게이트 미충족' : `\n[PASS] 게이트 ${results.length}종 전건 충족`,
+    );
   } finally {
     await browser.close();
   }
