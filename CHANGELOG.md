@@ -5,6 +5,18 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1202] 지구 가장자리에 대기 산란 rim 이 생긴다 — 낮면 쪽이 밝고 밤면 쪽은 어둡다 (MINOR)** ([#1202](https://github.com/coseo12/astro-simulator/issues/1202)) — rocky 분기에 **시선각 × 광원각** 함수의 rim 1항이 더해진다. 순수 fresnel(시선각만)이면 밤면 림이 낮면과 같은 밝기가 되어 **균일한 테두리 링**이 되는데, 그것을 광원각 게이트가 막는다. ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 8** (`Provisional` — cross-validate 결과 통합 후 Accepted 전이). §A3.7 재검토 조건 2 가 못박은 「공유 셰이더 혼입 vs 별도 대기 레이어 비교 선행」을 §A8.1 에서 판정으로 수행했고 **(A) 공유 셰이더 혼입**을 채택했다 — 신규 mesh `0` · 알파 블렌딩 없음 · varying `+1`.
+
+  **무회귀** [실측 base↔feature 렌더 영역 diff]: mars / jupiter / moon / 단색(venus) / sun **`0` px** · `?surface=off` **`0` px**. earth 만 `12661 px` 변한다 (양성 대조). moon 의 잔차 `11 px` 는 **같은 코드 대조군에서도 재현된다** (base↔base `7 px` / feature↔feature `15 px`) — 본 변경 원인이 아니다.
+
+  **비용**: 신규 `fbm(` **`0`** · 신규 `texture2D(` **`0`** (총계 `5` / `1` 불변, 단위 assert `U9` 가 인자 문자열까지 고정). uniform `39 → 45` (그중 `cameraPosition` 은 Babylon auto-bind 라 수동 바인딩 `+5`) · varying `3 → 4` (`vWorldPos`) · sampler 불변.
+
+  **신규 픽셀 가드** `verify:1202-atmosphere-rim` (CI `shader-pixel-guard` 배선) — 게이트 5종을 **전부 기하로만** 표본화한다 (`verify:1119` 의 색 기반 분류 술어는 #1197 M-i 사각의 출처라 재사용하지 않았다). 판별력은 변이 6종 **3단(원본 PASS · 변이 FAIL · 원복 PASS)** 으로 실증했다. ⚠️ **변이 M-2(바인딩 블록만 삭제, GLSL 무변경)에서 `packages/core` 단위 테스트 1075건이 전건 통과했고 오직 이 가드만 FAIL 했다** — 정적 assert 가 구조적으로 눈이 머는 축이며(#1197 M-h 동형), 이 가드의 존재 이유다.
+
+  **[설계 근거 반증 — 결론은 유지, 근거는 교체]** 설계 라운드 2 는 `RIM_NDL_LO` 를 음수로 여는 근거로 _"실루엣에서 `ndl = sin(위상각)·cos(φ)` 이므로 저위상각(「보름 지구」)에서 `LO >= 0` 이면 rim 이 통째로 사라진다"_ 를 들었다. **그 산식은 직교(무한원) 근사이고 `?focus=earth` 근접 관측(`r/d = 0.11547`)에는 맞지 않는다** — 원근 상한은 `sin(위상각 + asin(r/d))` 이고, 도달 가능한 최저 위상각 `2.186°` 에서도 실루엣 `ndl` 최댓값이 **`0.1533`** 로 `SOFT_TERMINATOR_WIDTH = 0.12` 를 넘는다 (직교 근사 예측은 `0.0381`, 그리고 위상각 `177.814°` 에서는 **부호까지 틀린다**). 실측으로도 그 프레임의 림 rim 기여는 `LO = -0.25` `0.04662` 대 `LO = +0.05` `0.04614` 로 **차이 1.0%** — rim 은 사라지지 않는다. `LO` 를 음수로 유지한 **실제 근거는 terminator 박명 호**다: `ndl` 구간 −0.2 / −0.1 / 0.0 에서 `LO = -0.25` 는 `0.00813` / `0.04764` / `0.10006` 을 내지만 `LO = +0.05` 는 셋 다 `0` 이다. 대가는 밤면 림 기여 `0.00061` (G1 마진 `0.07438` 의 0.8%). 상세는 ADR §A8.13 · §A8.14.
+
 ## [0.86.0] - 2026-09-07
 
 ### Behavior Changes

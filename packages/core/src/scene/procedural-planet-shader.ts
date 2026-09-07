@@ -401,6 +401,87 @@ export const OCEAN_DEPTH_RANGE = 0.32;
  */
 export const OCEAN_DEPTH_MIN_GAP = 0.4;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// #1202 Amendment 8 — 대기 산란 rim 미학 상수 (**earth 전용**, rendering-only).
+// 적용 범위: SURFACE_TYPE_BY_BODY 의 Rocky = earth 하나뿐이라 구조적으로 earth 전용이다.
+// ⚠️ 다른 body 를 Rocky 로 재분류하면 **대기 없는 body 가 rim 을 상속한다** (금성=농밀 /
+// 화성=희박 / 달=없음 — 셋의 요구가 다르다). 그때는 body 별 파라미터화가 필요하다
+// (ADR §A8 재검토 조건 3, §A3.7 재검토 조건 5 연장 — DEEP_OCEAN_FACTOR §A7.7 선례 동형).
+// 값은 전부 GPU 실측으로 확정했다 (§A8.8 — 설계 스케치의 placeholder 가 아니다).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * #1202 — 대기 산란 rim 색 (레일리 우세 하늘색: B > G > R).
+ *
+ * 물리 산란 계수 재현이 아니라 감상용 색이다 (비-범위 3). 채도 비붕괴 게이트(G4)가
+ * 이 색의 채널 낙차에 의존하므로 R↔B 간격을 좁히지 말 것 — 좁히면 rim 이 흰 하이라이트로
+ * 읽힌다 (§A8.7 실패 모드 ⑤ washout).
+ */
+export const RIM_COLOR_RGB = { r: 0.35, g: 0.55, b: 1.0 } as const;
+
+/**
+ * #1202 — rim 세기.
+ *
+ * ⚠️ **반직관 — 올릴수록 D1 마진이 나빠진다** (§A8.6). 낮면 기여는 표면색의 휘도 헤드룸에서
+ * 멈추지만 (land 온대는 `r = 0.5` 에서 이미 천장) 밤면 기여는 계속 자란다. "안 보이니 세게" 가
+ * 정확히 게이트를 깨는 방향이다. 값 변경 시 `verify:1202-atmosphere-rim` 재측정 의무.
+ */
+export const RIM_STRENGTH = 0.5;
+
+/**
+ * #1202 — rim 반경 프로파일 지수 (`pow(rimGeom, RIM_FALLOFF)`).
+ *
+ * 클수록 밴드가 얇아진다. **상·하한이 양쪽 다 있다**:
+ *  - 하한 `> 0` — `pow(0.0, 0.0)` 이 GLSL 명세상 미정의다. 셰이더 방어 분기 대신 단위 테스트가
+ *    assert 한다 (§A8.10 각주 — cross-validate 발견 7 잔여 수용).
+ *  - 상한 — 밴드가 1~2px 미만이면 자전 시 모아레가 생긴다 (§A8.7 ⑥). 가드가 밴드 두께(px)를
+ *    진단 인쇄하고 실 Chrome GUI 자전 육안 확인이 짝이다 (headless 는 이 축에 눈이 멀다).
+ */
+export const RIM_FALLOFF = 3.0;
+
+/**
+ * #1202 Amendment 8 §A8.13 — rim 광원각 게이트 하단. **음수이고, 그것이 결함이 아니다.**
+ *
+ * ⚠️ **이 상수의 근거는 설계 라운드 2 가 제시한 것과 다르다 — 그 근거는 실측으로 반증됐다.**
+ *
+ * 설계는 실루엣에서 `ndl = sin(위상각) * cos(phi)` 이므로 낮면 림의 `ndl` 최댓값이 `sin(위상각)`
+ * 으로 상한되고, 따라서 저위상각(「보름 지구」)에서 `LO >= 0` 이면 rim 이 통째로 사라진다고 봤다.
+ * **그 산식은 직교(무한원) 근사이고 `?focus=earth` 근접 관측에는 맞지 않는다.** 원근에서는
+ * 실루엣이 `N·U = r/d` 에 생기므로 상한은 `sin(위상각 + asin(r/d))` 다. 실측 [기하 수치해 3600
+ * 분할 vs 해석식, 5개 자세 전건 소수 4자리 일치]:
+ *
+ *   위상각 2.186° · `r/d = 0.11547` (asin = 6.631°)
+ *     → 실루엣 ndl 최댓값 **0.1533** (직교 근사 예측 `0.0381`)
+ *
+ * `SOFT_TERMINATOR_WIDTH = 0.12` 보다 크므로 **도달 가능한 최저 위상각에서도 `sunFactor == 1`
+ * 인 호가 존재한다.** 실제로 저위상각 프레임(2.186°)에서 `LO = -0.25` 와 `LO = +0.05` 의 림
+ * 평균 rim 기여는 `0.04662` 대 `0.04614` (차이 1.0%) 로, **rim 은 사라지지 않는다.**
+ *
+ * **그럼에도 음수로 두는 실측 근거는 따로 있다 — terminator 박명 호다.** 위상각 90° 프레임에서
+ * 림 밴드를 `ndl` 로 구간화하면 (`ndv <= 0.25`, 구간폭 0.1):
+ *
+ *   ndl −0.2 / −0.1 / 0.0 구간 (n = 65 / 66 / 62)
+ *     LO = −0.25 → `0.00813` / `0.04764` / `0.10006`
+ *     LO = +0.05 → `0` / `0` / `0`
+ *
+ * 즉 `LO >= 0` 은 **terminator 를 넘어가는 박명 호를 통째로 지운다**. 그 대가는 밤면 림 평균
+ * 기여 `0.00061` 이고, D1 게이트 G1 의 실측 마진 `0.07438` 의 0.8% 다.
+ *
+ * ⚠️ LO 를 더 내릴수록 밤면 기여가 커져 D1 마진이 깎인다 — **「박명 호 ↔ D1 마진」의 단일
+ * trade-off 노브이고, 값은 GPU 실측으로만 정한다.**
+ *
+ * ⚠️ `r/d` 의존성: 위 반증은 **focus 진입 카메라 거리** (`r/d = 0.11547`) 에서의 것이다. 크게
+ * 줌아웃하면 `asin(r/d) → 0` 이라 직교 근사에 수렴하지만, 그 거리에서는 disk 자체가 수 px 라
+ * rim 이 sub-pixel 이다.
+ */
+export const RIM_NDL_LO = -0.25;
+
+/**
+ * #1202 — rim 광원각 게이트 상단 (`smoothstep(RIM_NDL_LO, RIM_NDL_HI, ndl)`).
+ * `RIM_NDL_LO < RIM_NDL_HI` 가 불변식이다 (역전 시 GLSL smoothstep 미정의).
+ */
+export const RIM_NDL_HI = 0.15;
+
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
 
@@ -430,6 +511,11 @@ uniform mat4 world;
 
 varying vec3 vLocalPos;
 varying vec3 vNormal;
+// #1202 Amendment 8 — world position. viewDir = normalize(cameraPosition - vWorldPos) 전용
+// (per-fragment 정확 시선각 — sun-shader.ts:95 선례). ⚠️ **절차 패턴 입력 금지**: vWorldPos 를
+// 대륙/밴드/크레이터/biome/마스크 UV 의 입력으로 쓰면 패턴이 공간에 고정돼 mesh 가 미끄러진다
+// (ADR §A2.3 결정 2 가 vLocalPos 를 local 로 둔 이유 그 자체). 단위 테스트가 정적 가드.
+varying vec3 vWorldPos;
 // #756 §핵심 위험 1 — 로그 depth: scene 이 enableLogarithmicDepth 로 StandardMaterial(본체)을
 // 로그 depth 공간에 기록하는데, 커스텀 ShaderMaterial 이 표준 z 를 쓰면 depth 비교 공간이
 // 불일치 → 본체 표면이 항상 다른 body 위로 그려진다. ring-shader 와 동일하게 fragment 에서
@@ -442,6 +528,8 @@ void main(void) {
   // Amendment 2 옵션 e — world normal (self-rotation 후에도 광원 dot 이 태양 방향 고정). w=0 으로
   // 변환해 translation 무시 (방향 벡터), uniform scale 이므로 normalize 로 스케일 정규화.
   vNormal = normalize((world * vec4(normal, 0.0)).xyz);
+  // #1202 Amendment 8 — world position (rim 의 per-fragment viewDir 기준). sun-shader.ts:129 동형.
+  vWorldPos = (world * vec4(position, 1.0)).xyz;
   vec4 clip = worldViewProjection * vec4(position, 1.0);
   gl_Position = clip;
   vFragmentDepth = 1.0 + clip.w;
@@ -469,6 +557,7 @@ precision highp float;
 
 varying vec3 vLocalPos;
 varying vec3 vNormal;
+varying vec3 vWorldPos;
 varying float vFragmentDepth;
 
 uniform vec3 baseColor;
@@ -543,6 +632,21 @@ uniform vec3 deepOceanFactor;
 uniform float oceanDepthEdgeHi;
 uniform float oceanDepthRange;
 
+// Amendment 8 (#1202) — 대기 산란 rim uniform (rocky 전용, rendering-only 미학 상수).
+//   cameraPosition: Babylon ShaderMaterial **표준 auto-bind** (uniforms 배열에 이름만 선언하면
+//                   bind 단계에서 scene.activeCamera.globalPosition 이 들어간다 — sun-shader.ts:31-33
+//                   이 v8.56/v9.2 확인과 함께 박제). 수동 setVector3 **없음**.
+//   rimColor:     산란 rim 색 (레일리 우세 하늘색 B > G > R — 채도 게이트 G4 가 이 낙차에 의존).
+//   rimStrength:  세기. ⚠️ 올릴수록 D1 마진이 나빠진다 (§A8.6 헤드룸 천장 — 낮면은 멈추고 밤면만 자란다).
+//   rimFalloff:   반경 프로파일 지수. > 0 불변식 (pow(0,0) 미정의 — 단위 테스트 assert).
+//   rimNdlLo/Hi:  광원각 게이트 smoothstep 임계. **Lo 는 음수** — §A8.13 위상각 기하 참조.
+uniform vec3 cameraPosition;
+uniform vec3 rimColor;
+uniform float rimStrength;
+uniform float rimFalloff;
+uniform float rimNdlLo;
+uniform float rimNdlHi;
+
 // equirectangular UV 역수 상수 (매직 넘버 분리 — 1/(2π), 1/π).
 const float INV_TWO_PI = 0.1591549430918953;
 const float INV_PI = 0.3183098861837907;
@@ -604,6 +708,9 @@ void main(void) {
   // 합성 명암 (StandardMaterial PointLight+HemisphericLight diffuse 항 재현 — diffuseColor 곱 전).
   vec3 shade = ambientShade + sunShade;
   vec3 col = baseColor;
+  // Amendment 8 (#1202) — 대기 산란 rim 세기. rocky 분기 안에서만 계산되고 (§A8.4 — mars/jupiter/
+  // moon 의 fragment 추가 비용은 아래 합성 3 FMA 뿐), 비-rocky 는 0 이라 합성이 정확한 no-op 이다.
+  float rim = 0.0;
 
   // ── Amendment 4 (#1119) — 지구 대륙 마스크 샘플 (§A4.3 결정 3·5·7) ───────────────
   // continents fbm 은 rocky 전용이라 분기 안에서만 계산한다 (desert/gas/cratered 의 fragment
@@ -670,6 +777,19 @@ void main(void) {
     // 최종 mix. albedo 단계에서만 결정 — 아래 col *= shade 최종 곱 불변 (#773 규약, 밤면 극관은 어둡다).
     float iceMask = smoothstep(iceLatLo, iceLatHi, latJ);
     col = mix(col, iceColor, iceMask);
+    // ── Amendment 8 (#1202) — 대기 산란 rim (§A8.2 결정 1 · §A8.13) ──────────
+    // viewDir 은 **per-fragment** 다. 상수 viewDir(카메라→중심)을 쓰면 실루엣이 dot(N,U) = r/d
+    // 에 생겨 rim 대역 폭·세기가 카메라 거리의 함수가 된다 (줌하면 rim 이 변한다). per-fragment
+    // 는 실루엣에서 정확히 0 이라 거리 불변 — sun-shader.ts:95 가 같은 이유를 박제했다.
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float rimGeom = 1.0 - clamp(dot(N, viewDir), 0.0, 1.0);
+    // rimGeom 이 clamp 로 [0,1] 보장 + rimFalloff > 0 (단위 테스트 assert) 이라 pow 정의역 안이다.
+    float rimFall = pow(rimGeom, rimFalloff);
+    // ⚠️ **이 항이 D1 의 핵심 계약이다.** 삭제하면 순수 fresnel 이 되어 밤면 림이 낮면과 같은
+    // 세기를 받고, 밤면 휘도 헤드룸이 훨씬 넓어 낮면 < 밤면으로 역전한다 (변이 M-1).
+    // ndl 은 위 광원식에서 이미 계산됐다 — 재계산 금지, 재사용 (volt #21).
+    float rimLight = smoothstep(rimNdlLo, rimNdlHi, ndl);
+    rim = rimStrength * rimFall * rimLight;
   } else if (uSurfaceType == 1) {
     // ── desert (화성) — dust/협곡 결 (fbm) + 산화철 톤 ─────────────────────
     float detail = fbm(p * 3.6);
@@ -709,6 +829,11 @@ void main(void) {
   // Amendment 1 (#773) §결정 3 — 합성 순서 유지: 절차 변조(대륙/밴드/크레이터) 위에 광원 명암 곱.
   //   밤면에서도 절차 디테일(대륙/밴드 패턴)은 존재하되 어둡다 (#756 고주파 엔트로피는 낮면 기준 유지).
   col *= shade;
+  // Amendment 8 (#1202) §A8.5 — 대기 산란 rim 합성. 산란광이므로 **가산**이고, 명암 곱 뒤 ·
+  // 기존 clamp 앞이다. 비-rocky 는 rim = 0 이라 정확한 no-op (분기 없이 3 FMA).
+  // ⚠️ mix 로 바꾸지 말 것 — 낮면 P1 의 부호가 5개 표면색 중 3개에서 뒤집혀 D1 이 구조적으로
+  // FAIL 한다 (§A8.11 재검토 조건 5 에 대기 중인 안이며, 채택 시 판정량도 함께 바뀐다).
+  col += rimColor * rim;
   // 안전 clamp — 광원(낮면 휘도 > 1) + 절차 변조 후 색역 이탈 방지 (디자인 루브릭 — 보라/마젠타 등
   // 기괴 색역 차단은 baseColor/landColor 가 실측 자연색이라 R/G/B 단조 합성으로 구조적 보장. clamp 는
   // [0,1] 범위만 보정 — 낮면이 sunIntensity 2.5 로 1.0 초과해도 흰색으로 saturate, 단색 행성과 동일).
@@ -965,6 +1090,15 @@ export function createProceduralPlanetMaterial(
         'deepOceanFactor',
         'oceanDepthEdgeHi',
         'oceanDepthRange',
+        // Amendment 8 (#1202) — 대기 산란 rim uniform (rocky 전용, +5 — vec3 1 + float 4).
+        // ⚠️ 'cameraPosition' 은 **Babylon 표준 auto-bind** — 이 배열에 이름이 있어야만 동작하고,
+        // 수동 setVector3 는 없다 (sun-shader.ts:31-33 이 v8.56/v9.2 확인과 함께 박제).
+        'cameraPosition',
+        'rimColor',
+        'rimStrength',
+        'rimFalloff',
+        'rimNdlLo',
+        'rimNdlHi',
       ],
       // Amendment 4 (#1119) — sampler 명시. Phase 0 게이트는 **명시한 상태에서만** 측정됐고
       // 생략 시 거동은 미측정이다 (이슈 #1119 게이트 코멘트 §잔여 미측정 1) — 추측하지 말고 명시한다.
@@ -1038,6 +1172,17 @@ export function createProceduralPlanetMaterial(
   );
   material.setFloat('oceanDepthEdgeHi', OCEAN_DEPTH_EDGE_HI);
   material.setFloat('oceanDepthRange', OCEAN_DEPTH_RANGE);
+
+  // Amendment 8 (#1202) — 대기 산란 rim 미학 상수 uniform (rocky 전용, rendering-only).
+  // 4중 SSoT: 상수 → uniforms 배열 → 본 바인딩 → GLSL 선언. landColor 등 rocky 전용 uniform 이
+  // 이미 전 body 에 무조건 set 되는 선례를 따라 body 분기 없음.
+  // ⚠️ 이 블록이 통째로 사라져도 **GLSL 소스 정적 assert 는 전건 통과**한다 (변이 M-2 클래스,
+  // #1197 M-h 선례) — 그 축을 막는 것은 `verify:1202-atmosphere-rim` 의 픽셀 게이트 G2 다.
+  material.setColor3('rimColor', new Color3(RIM_COLOR_RGB.r, RIM_COLOR_RGB.g, RIM_COLOR_RGB.b));
+  material.setFloat('rimStrength', RIM_STRENGTH);
+  material.setFloat('rimFalloff', RIM_FALLOFF);
+  material.setFloat('rimNdlLo', RIM_NDL_LO);
+  material.setFloat('rimNdlHi', RIM_NDL_HI);
 
   // Amendment 1 (#773) §A1.3 결정 1 — 태양 방향 uniform.
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.

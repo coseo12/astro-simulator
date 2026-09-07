@@ -45,6 +45,11 @@ import {
   OCEAN_DEPTH_EDGE_HI,
   OCEAN_DEPTH_RANGE,
   OCEAN_DEPTH_MIN_GAP,
+  RIM_COLOR_RGB,
+  RIM_STRENGTH,
+  RIM_FALLOFF,
+  RIM_NDL_LO,
+  RIM_NDL_HI,
   fbmMirror,
   oceanDepthMirror,
   surfaceColorMirror,
@@ -1032,5 +1037,136 @@ describe('Amendment 7 (#1197) — GLSL 배선 계약 (U7/U8/U9 구조 변이 차
     expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(5);
     expect((PLANET_FRAGMENT_SHADER.match(/texture2D\(/g) ?? []).length).toBe(1);
     expect(PLANET_FRAGMENT_SHADER).toContain('texture2D(uSurfaceMask, vec2(maskU, maskV))');
+  });
+});
+
+describe('Amendment 8 (#1202) — vWorldPos 공간 계약 (D4, ADR §A8.3)', () => {
+  it('U10 — VERTEX 가 vWorldPos 를 world position 으로 산출', () => {
+    expect(PLANET_VERTEX_SHADER).toContain('varying vec3 vWorldPos');
+    expect(PLANET_VERTEX_SHADER).toContain('vWorldPos = (world * vec4(position, 1.0)).xyz');
+  });
+
+  it('U10-b — 기존 두 varying 의 공간이 하나도 바뀌지 않았다 (§A2.3 결정 2 불파괴)', () => {
+    // vNormal = world / vLocalPos = local. vWorldPos 는 **제3의 공간**이고 이 둘을 건드리지 않는다.
+    expect(PLANET_VERTEX_SHADER).toContain('vLocalPos = normalize(position)');
+    expect(PLANET_VERTEX_SHADER).toContain('vNormal = normalize((world * vec4(normal, 0.0)).xyz)');
+  });
+
+  it('U11 — vWorldPos 가 절차 패턴 입력에 도달하지 않는다 (공간 오용 정적 차단)', () => {
+    // FRAGMENT 에서 vWorldPos 의 유일한 소비처는 viewDir 산출이어야 한다. 절차 패턴 입력
+    // (p / maskU / maskV / continents / latJ) 로 새면 패턴이 공간에 고정돼 mesh 가 미끄러진다.
+    const uses = FRAGMENT_CODE_ONLY.split('vWorldPos').length - 1;
+    expect(uses).toBe(2); // varying 선언 1 + viewDir 산출 1
+    expect(FRAGMENT_CODE_ONLY).toContain('vec3 viewDir = normalize(cameraPosition - vWorldPos)');
+    // 절차 패턴의 입력은 여전히 vLocalPos 파생 p 뿐이다.
+    expect(FRAGMENT_CODE_ONLY).toContain('vec3 p = normalize(vLocalPos)');
+    for (const consumer of ['fbm(p *', 'atan(p.z, p.x)', 'acos(clamp(p.y, -1.0, 1.0))']) {
+      expect(FRAGMENT_CODE_ONLY).toContain(consumer);
+    }
+  });
+});
+
+describe('Amendment 8 (#1202) — rim GLSL 배선 계약 (D1/D5, ADR §A8.4·A8.5)', () => {
+  it('U12 — rim 3줄 + 합성 1줄이 박제 그대로', () => {
+    expect(FRAGMENT_CODE_ONLY).toContain('float rimGeom = 1.0 - clamp(dot(N, viewDir), 0.0, 1.0)');
+    expect(FRAGMENT_CODE_ONLY).toContain('float rimFall = pow(rimGeom, rimFalloff)');
+    // D1 핵심 — 광원각 항. 인자가 ndl 이라는 것까지 박제한다 (시선각만의 함수가 아니다).
+    expect(FRAGMENT_CODE_ONLY).toContain('float rimLight = smoothstep(rimNdlLo, rimNdlHi, ndl)');
+    expect(FRAGMENT_CODE_ONLY).toContain('rim = rimStrength * rimFall * rimLight');
+    expect(FRAGMENT_CODE_ONLY).toContain('col += rimColor * rim');
+  });
+
+  it('U12-b — rim 계산은 rocky 분기 **안**, 합성은 분기 **밖** (§A8.4 비-rocky 비용 격리)', () => {
+    // `if (uSurfaceType == 0) {` 는 정확히 2회 나온다 — ① 분기 밖 continents 사전 계산
+    // (Amendment 4 §결정 5) ② 표면 타입 분기(dispatch). rim 이 속해야 할 곳은 ② 다.
+    const rockyOccurrences = FRAGMENT_CODE_ONLY.split('if (uSurfaceType == 0) {').length - 1;
+    expect(rockyOccurrences).toBe(2);
+    const rockyIdx = FRAGMENT_CODE_ONLY.lastIndexOf('if (uSurfaceType == 0) {');
+    const dispatchIdx = FRAGMENT_CODE_ONLY.indexOf('} else if (uSurfaceType == 1)');
+    const rimCalcIdx = FRAGMENT_CODE_ONLY.indexOf('rim = rimStrength * rimFall * rimLight');
+    const compositeIdx = FRAGMENT_CODE_ONLY.indexOf('col += rimColor * rim');
+    expect(rockyIdx).toBeGreaterThan(0);
+    expect(rimCalcIdx).toBeGreaterThan(rockyIdx);
+    expect(rimCalcIdx).toBeLessThan(dispatchIdx); // rocky 분기 안
+    expect(compositeIdx).toBeGreaterThan(dispatchIdx); // 분기 밖
+    // 비-rocky 가 rim 을 0 으로 받는 유일한 근거 — 분기 앞 초기화.
+    const initIdx = FRAGMENT_CODE_ONLY.indexOf('float rim = 0.0');
+    expect(initIdx).toBeGreaterThan(0);
+    expect(initIdx).toBeLessThan(rockyIdx);
+  });
+
+  it('U12-c — 합성 위치: col *= shade **뒤**, 기존 clamp **앞** (§A8.5)', () => {
+    const shadeIdx = FRAGMENT_CODE_ONLY.indexOf('col *= shade');
+    const compositeIdx = FRAGMENT_CODE_ONLY.indexOf('col += rimColor * rim');
+    const clampIdx = FRAGMENT_CODE_ONLY.indexOf('col = clamp(col, 0.0, 1.0)');
+    expect(shadeIdx).toBeGreaterThan(0);
+    expect(compositeIdx).toBeGreaterThan(shadeIdx);
+    expect(clampIdx).toBeGreaterThan(compositeIdx);
+  });
+
+  it('U12-d — 합성은 **가산**이다 (mix 금지 — §A8.11 재검토 조건 5 에 대기 중인 안)', () => {
+    expect(FRAGMENT_CODE_ONLY).not.toContain('mix(col, rimColor');
+    expect(FRAGMENT_CODE_ONLY).not.toContain('mix(col.rgb, rimColor');
+  });
+
+  it('U13 — rim uniform 6종 GLSL 선언 (cameraPosition auto-bind 포함)', () => {
+    for (const decl of [
+      'uniform vec3 cameraPosition',
+      'uniform vec3 rimColor',
+      'uniform float rimStrength',
+      'uniform float rimFalloff',
+      'uniform float rimNdlLo',
+      'uniform float rimNdlHi',
+    ]) {
+      expect(PLANET_FRAGMENT_SHADER).toContain(decl);
+    }
+  });
+
+  it('U14 — rim 은 신규 noise/텍스처 샘플을 쓰지 않는다 (D5 — U9 총계 불변의 국소 근거)', () => {
+    const rockyStart = FRAGMENT_CODE_ONLY.indexOf('vec3 viewDir = normalize(cameraPosition');
+    const rimBlock = FRAGMENT_CODE_ONLY.slice(
+      rockyStart,
+      FRAGMENT_CODE_ONLY.indexOf('} else if (uSurfaceType == 1)'),
+    );
+    expect(rimBlock.length).toBeGreaterThan(0);
+    expect(rimBlock).not.toContain('fbm(');
+    expect(rimBlock).not.toContain('texture2D(');
+    // ndl 재계산 금지 — 광원식에서 이미 계산된 값을 재사용한다 (volt #21).
+    expect((FRAGMENT_CODE_ONLY.match(/float ndl = /g) ?? []).length).toBe(1);
+  });
+});
+
+describe('Amendment 8 (#1202) — rim 미학 상수 SSoT + 정의역 불변식 (#69 drift 가드)', () => {
+  it('U15 — 박제값 (drift 시 시각 회귀 — 값 변경 시 verify:1202 재측정 의무)', () => {
+    expect(RIM_COLOR_RGB).toEqual({ r: 0.35, g: 0.55, b: 1.0 });
+    expect(RIM_STRENGTH).toBe(0.5);
+    expect(RIM_FALLOFF).toBe(3.0);
+    expect(RIM_NDL_LO).toBe(-0.25);
+    expect(RIM_NDL_HI).toBe(0.15);
+  });
+
+  it('U16 — RIM_FALLOFF > 0 (pow(0.0, 0.0) 미정의 차단 — §A8.10 각주)', () => {
+    // GLSL 명세상 pow 는 x < 0, 또는 x == 0 && y <= 0 에서 미정의다. rimGeom 은 clamp 로
+    // [0,1] 이 보장되므로 남는 축은 지수뿐이고, 셰이더 방어 분기 대신 여기서 fail-fast 한다.
+    expect(RIM_FALLOFF).toBeGreaterThan(0);
+  });
+
+  it('U17 — RIM_NDL_LO < RIM_NDL_HI (smoothstep edge0 < edge1 불변식)', () => {
+    expect(RIM_NDL_LO).toBeLessThan(RIM_NDL_HI);
+  });
+
+  it('U18 — RIM_NDL_LO 는 음수 (§A8.13 — terminator 박명 호)', () => {
+    // ⚠️ 근거는 설계 라운드 2 의 「저위상각에서 rim 이 사라진다」가 **아니다** — 그 산식은
+    // 직교 근사라 근접 관측에서 반증됐다 (상수 선언부 주석의 실측 참조).
+    // 실측 근거: 림 밴드의 ndl −0.2 / −0.1 / 0.0 구간에서 LO = −0.25 는 rim 기여
+    // 0.00813 / 0.04764 / 0.10006 을 내지만 LO = +0.05 는 셋 다 0 이다 (박명 호 소멸).
+    expect(RIM_NDL_LO).toBeLessThan(0);
+  });
+
+  it('U19 — rim 색은 레일리 우세 (B > G > R) — 채도 게이트 G4 가 이 낙차에 의존', () => {
+    expect(RIM_COLOR_RGB.b).toBeGreaterThan(RIM_COLOR_RGB.g);
+    expect(RIM_COLOR_RGB.g).toBeGreaterThan(RIM_COLOR_RGB.r);
+    // 보라/마젠타 anti-pattern 회피 (저장소 공통 제약 — G >= min(R,B)).
+    expect(RIM_COLOR_RGB.g).toBeGreaterThanOrEqual(Math.min(RIM_COLOR_RGB.r, RIM_COLOR_RGB.b));
   });
 });
