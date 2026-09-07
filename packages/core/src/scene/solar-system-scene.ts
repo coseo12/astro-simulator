@@ -883,6 +883,53 @@ export function createSolarSystemScene(
   }
   const resolved = new Set<string>();
 
+  /**
+   * `sun-light` PointLight 를 현재 origin/scale 기준 scene 좌표로 동기 (#1204).
+   *
+   * mesh.position 과 **완전히 같은 3단 변환** (ADR `20260422-floating-origin.md` §3:
+   * world(m) → local(m, origin shift) → scene unit(× renderScale)) 을 쓴다. 광원은 셰이더
+   * `uSunDirection = normalize(sunPos − meshAbsPos)` 의 한쪽 피연산자이므로 (`sunPositionProvider`
+   * → `procedural-planet-shader.ts` onBind), mesh 와 **다른 기준계**에 있으면 그 차가 물리적으로
+   * 무의미해진다.
+   *
+   * ## 왜 함수로 뽑았나 (#1204 회귀의 원인)
+   *
+   * 종전에는 이 수식이 `updateAt` 안에만 있었다. `setTier` 는 origin/scale 을 바꾼 뒤 mesh 와
+   * ring-anchor 만 즉시 재계산하고 광원은 두고 갔고, `updateAt` 은 `timeChanged` 바인딩이라
+   * (`sim-canvas.tsx` 의 `instance.on('timeChanged', …)`) tier 전환 프레임을 메우지 못한다.
+   * 그 결과 T2(origin `[0,0,0]`, 태양이 Heliocentric 원점 근처라 광원 ≈ 원점) → T3(origin 이
+   * focus body 로 이동, mesh 가 원점) 전환 프레임에서 **두 피연산자가 동시에 원점** → 그 차가
+   * 영벡터가 된다. 셰이더가 이 값을 받으면 `ndl = dot(N, 0) ≡ 0` 이다.
+   *
+   * 지속 시간은 시간 재생 여부에 종속된다 — 실측(로컬, `?gpu=a&focus=earth`, 휠 -100):
+   * 재생 중이면 다음 프레임 `updateAt` 이 정정해 **1 프레임**, `?speed=0` 이면 `TimeController.tick`
+   * 이 `scale === 0` 에서 false 를 반환해 `timeChanged` 자체가 끊기므로 **지속**된다 (176 프레임
+   * 관측 시점까지 계속 영벡터).
+   *
+   * ⚠️ **화면 암전까지 실측으로 잇지는 못했다.** 위 재현 경로에서는 `earth` 절차 표면 mesh 가
+   * 내내 `isVisible=false` 이고 `earth-lod-low` 가 그려져, 절차 머티리얼의 `onBindObservable`
+   * 발동이 **0 회**였다 (즉 영벡터가 draw 에 도달하지 않았다). 그 LOD 착지는 #1205 의 범위다.
+   * 본 수정이 보장하는 것은 **광원이 mesh 와 같은 기준계에 있다**는 것까지이고, 그것이 곧
+   * 「지구가 밝다」는 아니다.
+   *
+   * 호출부가 둘로 갈린 것이 재발 조건이었으므로 수식을 여기 한 곳에만 둔다. 새 tier 경로가
+   * 생기면 이 함수를 부르면 된다.
+   *
+   * origin 을 튜플이 아니라 **스칼라 3개**로 받는다. (a) 위 재사용 버퍼 주석(#76)의 「프레임당
+   * 재할당 회피」를 지키고, (b) `updateAt` 이 넘기는 값은 진입 시 **스냅샷한** `ox/oy/oz` 라
+   * 호출 시점의 `floatingOrigin.originOffset` 과 **다르다** — 그 사이 primary follow 의
+   * `setOriginToBody` 가 originOffset 을 mutate 하기 때문이다 (#380 가드 C 순서). 배열을 넘기게
+   * 두면 무심코 `originOffset` 을 직접 넘겨 mesh 와 다른 기준계를 쓰기 쉬우므로 신호를 남긴다.
+   */
+  const syncSunLightPosition = (ox: number, oy: number, oz: number, scale: number): void => {
+    const sunWorld = worldPositions.get('sun') ?? ZERO;
+    sunLight.position.set(
+      (sunWorld[0] - ox) * scale,
+      (sunWorld[1] - oy) * scale,
+      (sunWorld[2] - oz) * scale,
+    );
+  };
+
   // 소행성대 (#99) — ThinInstances 단일 draw call.
   // Kepler 경로: 각 소행성 독립 해석해.
   // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
@@ -1069,6 +1116,20 @@ export function createSolarSystemScene(
       );
       mesh.computeWorldMatrix(true);
     }
+
+    // #1204 — 광원도 **같은 프레임에** 새 origin/scale 로 재계산. 위 mesh 루프와 한 쌍이다:
+    // 셰이더 `uSunDirection` 은 `sunLight.position − mesh.absolutePosition` 이라 둘 중 하나만
+    // 새 기준계로 옮기면 그 차가 무의미해진다. T2 → T3 전환에서는 두 값이 동시에 원점이 되어
+    // 방향이 영벡터로 붕괴했다 (실측: 재생 중 1 프레임 / `speed=0` 이면 지속).
+    // `updateAt` 은 `timeChanged` 바인딩이라 이 프레임을 메우지 못한다 (아래 ring-anchor 와 같은
+    // 논거 — #782 Amendment 2-i 가 같은 결함을 ring 에서 먼저 고쳤다).
+    // 수식·재현·측정 한계는 `syncSunLightPosition` 정의부 주석이 SSoT.
+    syncSunLightPosition(
+      tierTransitionOrigin[0],
+      tierTransitionOrigin[1],
+      tierTransitionOrigin[2],
+      newScale,
+    );
 
     // #782 Amendment 2-i fix (PR #785 reviewer 권고 1 / qa 실측) — ring-anchor 를 setTier 에서도 즉시 동기.
     // updateAt 의 ring-anchor 동기 블록 (#845 라인 앵커화) 은 `timeChanged` 바인딩이라 speed=0 (pause)
@@ -1409,12 +1470,8 @@ export function createSolarSystemScene(
     const cam = scene.activeCamera;
 
     // Sun light — worldPositions['sun'] 도 Heliocentric 절대 좌표 (m). Floating Origin shift + tier scale 반영.
-    const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
-    sunLight.position.set(
-      (sunWorld[0] - ox) * sceneUnitPerMeter,
-      (sunWorld[1] - oy) * sceneUnitPerMeter,
-      (sunWorld[2] - oz) * sceneUnitPerMeter,
-    );
+    // #1204 — 수식 SSoT 는 `syncSunLightPosition` (setTier 의 tier 전환 즉시 재계산과 공유).
+    syncSunLightPosition(ox, oy, oz, sceneUnitPerMeter);
 
     // P11-A #288 — safety net (ADR §1-A). focus 가 없는 free-fly 탐색 중 카메라가 1 AU 이상
     // 이동하면 origin 을 카메라 위치로 추가 shift. 다음 프레임의 `updateAt` 이 새 origin 으로

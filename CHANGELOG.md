@@ -5,6 +5,16 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1204] tier 전환 프레임에서 `sun-light` PointLight 가 floating origin 재앵커를 따라오지 않던 결함 (PATCH)** ([#1204](https://github.com/coseo12/astro-simulator/issues/1204)) — `setTier` 는 origin/scale 을 바꾼 뒤 mesh 와 ring-anchor 만 즉시 재계산하고 광원은 두고 갔다. `updateAt` 은 세 대상을 같은 origin 으로 쓰지만 `timeChanged` 바인딩이라 그 프레임을 메우지 못한다. T2(origin `[0,0,0]`, 태양이 Heliocentric 원점 근처라 광원 ≈ 원점) → T3(origin 이 focus body 로 이동해 mesh 가 원점) 전환에서 셰이더 `uSunDirection = normalize(sunPos − meshAbsPos)` 의 **피연산자 둘이 동시에 원점**이 되어 방향이 영벡터가 됐다. 광원 좌표 수식을 `syncSunLightPosition` 하나로 모으고 `setTier` 의 즉시 재계산 블록에서도 호출한다 — #782 Amendment 2-i 가 ring-anchor 에서 먼저 고친 것과 **같은 결함의 마지막 잔여 대상**이다.
+
+  [실측] (로컬 `?gpu=a&focus=earth`, 실제 휠 `-100` 반복, 프레임별 기록) 지속 시간이 시간 재생 여부에 종속된다 — 재생 중이면 다음 프레임 `updateAt` 이 정정해 **1 프레임**, `?speed=0` 이면 `TimeController.tick` 이 `scale === 0` 에서 `false` 를 반환해 `timeChanged` 자체가 끊기므로 **지속**된다 (관측 종료 시점까지 계속 영벡터).
+
+  **⚠️ 화면 암전까지 실측으로 잇지는 못했다.** 위 재현 경로에서 `earth` 절차 표면 mesh 는 내내 `isVisible=false` 이고 `earth-lod-low` 가 그려져, 절차 머티리얼의 `onBindObservable` 발동이 **0 회**였다 — 영벡터가 draw 에 도달하지 않았다는 뜻이다. 그 LOD 착지는 [#1205](https://github.com/coseo12/astro-simulator/issues/1205) 의 범위이고 본 PR 은 손대지 않았다. 따라서 보장 범위는 **광원이 mesh 와 같은 기준계에 있다**까지이며 「지구가 밝다」로 확대 해석하지 않는다.
+
+  **회귀 가드** `apps/web/scripts/browser-verify-1204-sun-light.mjs` — `play`/`pause` 두 시나리오에서 매 프레임 `|sunPos − meshAbsPos|` 를 기록하고 한 프레임이라도 `0` 이면 `exit 1`. body tier 진입 자체를 관측하지 못하면 판별력 `0` 으로 보고 **FAIL** 시킨다(초록 위장 차단). 판별력 3단 실증: 원본 `exit 0` → `setTier` 호출만 제거 시 `exit 1` (play 1 프레임 / pause 167 프레임) → 복구 `exit 0`.
+
 ## [0.86.0] - 2026-09-07
 
 ### Behavior Changes
