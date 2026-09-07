@@ -329,8 +329,11 @@ export async function bootstrapScene(page, options = {}) {
  * 이 다리는 술어가 아니라 **타이밍**이 지탱한다: `runFramePass` 가 매 프레임 돌므로 전이는
  * 카메라 조작 다음 프레임에 적용된다 — [실측] `beta = π/2` 대입 후 분포 변화 관측 `12ms`,
  * fade 종료 `211ms` (1280×720 headless, `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off`).
- * 기본 `pollMs = 200` 은 그 `12ms` 의 16배다. 이 여유가 얇아지면 (예: 전이가 셰이더 컴파일
- * stall 뒤로 밀리면) 호출부가 「전이 관측」을 별도 조건으로 걸어야 한다.
+ * ⚠️ **이 여유를 배수로 박제하지 않는다.** 관측값이 런마다 움직인다 — 같은 조작을 독립 세션에서
+ * 재면 `24.1ms` 가 나왔다 (dev `12ms` / qa `24.1ms`, PR #1208). 배수를 적으면 다음 실측이
+ * 그 문장을 반증한다. 지탱하는 것은 **기전**이다: 전이는 조작 **다음 프레임**에 적용되고
+ * `pollMs` 는 그보다 크다. 이 여유가 얇아지면 (예: 전이가 셰이더 컴파일 stall 뒤로 밀리면)
+ * 호출부가 「전이 관측」을 별도 조건으로 걸어야 한다.
  *
  * @param {import('playwright').Page} page
  * @param {number} [options.pollMs] 표본 간격 (기본 200)
