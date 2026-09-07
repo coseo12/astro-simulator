@@ -626,6 +626,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
         instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
 
+        // #1205 — 프레임 위상 등록. 위 `timeChanged` (시간 위상) 과 **같은 effect** 에 두는 것이
+        // 계약이다: 두 위상의 등록/해제 수명이 대칭이어야 한다 (해제는 이 effect 의 return 에서
+        // `setFramePassHandler(null)`).
+        //
+        // `updateAt` 은 일시정지 (`!running || scale === 0`) 에서 한 번도 돌지 않는데 그 안에
+        // 카메라 종속 갱신 (LOD 판정) 이 섞여 있었다 — 그래서 정지 중에는 줌/포커스를 바꿔도
+        // LOD 가 얼어붙었다. 프레임 위상은 렌더 루프가 매 프레임 1회 구동하므로 정지에서도 돈다.
+        // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
+        instance.setFramePassHandler(() => solar.runFramePass());
+
         // #713 — canvas 클릭/터치 → body 선택 (raycast picking).
         // ADR `docs/decisions/20260620-713-click-body-select.md` §3 핵심 데이터 흐름.
         //
@@ -1214,6 +1224,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       unsubSensitivity?.();
       tierObserverCleanupRef.current?.();
       tierObserverCleanupRef.current = null;
+      // #1205 — 프레임 위상 해제. 매 프레임 실행되는 클로저라 남겨두면 dispose 된 scene 을
+      // 붙든다 (`setFramePassHandler` 시그니처가 `| null` 인 이유 — simulation-core JSDoc).
+      // 아래 `instance.dispose()` 가 렌더 루프를 멈추므로 순서 의존은 없으나, 등록이 위 effect
+      // 본문에 있으니 해제도 같은 수명 경계에 명시한다.
+      instance.setFramePassHandler(null);
       // #699 — 캔버스 포커스 복원 리스너 해제 (HMR/unmount 누수 방지). WASD detach 는
       // camera.onDisposeObservable 에서 처리(instance.dispose() 가 camera dispose 트리거).
       canvas.removeEventListener('pointerenter', refocusCanvas);

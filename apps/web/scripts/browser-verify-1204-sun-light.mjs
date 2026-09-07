@@ -25,11 +25,12 @@
  * 같은 두 입력을 걸어 계측한 독립 두 세션(reviewer / dev)이 일치했다:
  *  - `play`  : `earth` 가 관측 전 프레임 `isVisible=true`, 매 프레임 bind. 결함 주입판에서
  *              **영벡터가 bind 시점에 도달**했다 (두 세션 각각 1 회, `tier="body"`/`mesh="earth"`).
- *  - `pause` : `earth` 가 전 프레임 `isVisible=false`, `earth-lod-low` 만 그려져 bind **0 회**.
- *              영벡터가 draw 에 도달하지 않고, 캔버스 중앙 휘도도 결함판·수정판이 같았다.
- * 갈리는 이유는 구조다 — LOD 가시성 선택도 `updateAt` 안(P11-B #289 hook)이라 `speed=0` 이면
- * 광원뿐 아니라 **LOD 도 함께 동결**된다. `pause` 에서 절차 표면이 안 그려지는 것 자체는 #1205
- * 범위이고 본 가드는 그것을 판정하지 않는다.
+ *  - `pause` : [#1205 이전] `earth` 가 전 프레임 `isVisible=false`, `earth-lod-low` 만 그려져
+ *              bind **0 회**였다. 영벡터가 draw 에 도달하지 않았고, 캔버스 중앙 휘도도
+ *              결함판·수정판이 같았다.
+ * 갈렸던 이유는 구조다 — LOD 가시성 선택도 `updateAt` 안(P11-B #289 hook)이라 `speed=0` 이면
+ * 광원뿐 아니라 **LOD 도 함께 동결**됐다. `pause` 에서 절차 표면이 안 그려지던 것은 **#1205 에서
+ * 닫혔고**, 본 가드는 그것을 판정하지 않는다 (판정 술어는 좌표 축 그대로).
  *
  * ## 무엇을 재는가 (술어)
  *
@@ -92,6 +93,15 @@ const FINAL_SETTLE_MS = 1500;
  *  - `pause` : `?speed=0`. `TimeController.tick` 이 `scale === 0` 에서 false 를 반환해
  *              `timeChanged` 가 발동하지 않는다 → `updateAt` 이 영영 안 돌고 영벡터가 **지속**된다.
  * 두 시나리오의 프레임 수 차이가 곧 그 종속성의 증거다.
+ *
+ * ⚠️ **#1205 이후 `pause` 시나리오의 성격이 바뀌었다 (판정 술어는 불변).** 위 서술 중
+ * *"`updateAt` 이 영영 안 돈다"* 는 **여전히 참**이고 광원 즉시-동기의 필요성도 그대로다 —
+ * `syncSunLightPosition` 은 시간 위상에 남아 있다. 바뀐 것은 **LOD** 다: #1205 가 LOD 판정을
+ * 프레임 위상으로 분리해 `pause` 에서도 focus body 가 high LOD 로 착지한다. 즉 아래 §무엇을
+ * 재는가 의 `pause` 관측(*"`earth` 가 전 프레임 `isVisible=false`, bind 0 회"*)은 **#1205
+ * 이전에만 참**이며, 이제는 영벡터가 실제로 draw 에 닿을 수 있으므로 본 가드가 지키는 대역이
+ * 넓어졌다. [실측] #1205 수정판에서 두 시나리오 모두 영벡터 프레임 `0`, exit 0.
+ * ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md` §결정 5.
  */
 const SCENARIOS = [
   { name: 'play', query: `/?gpu=a&focus=${FOCUS_BODY}` },

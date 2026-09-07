@@ -37,6 +37,9 @@ export class SimulationCore {
   #setLodOverrideHandler: ((level: 'high' | 'mid' | 'low' | 'auto') => void) | null = null;
   // #688 — 궤도선 가시성 핸들러. UI 토글 버튼 + URL `?orbits=off` 초기값에서 scene 에 전달.
   #setOrbitLinesVisibleHandler: ((visible: boolean) => void) | null = null;
+  // #1205 — 프레임 위상 핸들러. 매 프레임 1회, `timeChanged` 와 무관하게 호출된다.
+  // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
+  #framePassHandler: (() => void) | null = null;
   // P5-B #177 — fps emit 주기 제어. 매 프레임 emit하면 store 갱신 과다 → 0.5초 간격.
   #lastFpsEmitTime = 0;
   // P4-D #166 — GPU frame time (ms 단위) 직접 측정. 미지원 환경에서는 null.
@@ -194,6 +197,26 @@ export class SimulationCore {
     this.#setOrbitLinesVisibleHandler = handler;
   }
 
+  /**
+   * #1205 — **프레임 위상** 핸들러 연결. 렌더 루프가 매 프레임 1회 호출한다.
+   *
+   * `updateAt` 은 `timeChanged` 이벤트 바인딩이라 `TimeController.tick` 이 `false` 를 반환하는
+   * 일시정지 (`!running || scale === 0`) 에서는 **한 번도 돌지 않는다**. 그 안에 카메라 종속
+   * 갱신 (LOD 판정) 이 섞여 있어서, 시간이 멈추면 카메라만 움직여도 갱신되지 않았다.
+   * 프레임 위상은 그 카메라 종속 갱신의 새 소유자다 — 자세한 계약과 멤버십 3조건은
+   * ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md` §결정 2.
+   *
+   * ⚠️ **`| null` 은 위 두 선례 (`setLodOverrideHandler` / `setOrbitLinesVisibleHandler`) 와
+   * 다른 의도된 이탈이다. 이유는 호출 빈도가 아니라 수명이다.** 두 선례는 command 라우터가
+   * 1회성으로 부르는 핸들러라 dispose 뒤에 stale 등록이 남아도 무해하다 (다시 불릴 일이
+   * 없다). 프레임 위상 핸들러는 **매 프레임 실행되는 클로저**라 해제하지 않으면 dispose 된
+   * scene 을 계속 붙든다. 그래서 호출자는 언마운트 시 `setFramePassHandler(null)` 로 명시
+   * 해제해야 하고, 시그니처가 그것을 강제한다. 「일관성」을 이유로 non-nullable 로 되돌리지 말 것.
+   */
+  setFramePassHandler(handler: (() => void) | null): void {
+    this.#framePassHandler = handler;
+  }
+
   /** 이벤트 구독. */
   on<K extends keyof CoreEvents>(type: K, handler: Handler<CoreEvents[K]>): void {
     this.#emitter.on(type, handler);
@@ -317,6 +340,15 @@ export class SimulationCore {
       if (this.#time.tick(dt)) {
         this.#emitter.emit('timeChanged', { julianDate: this.#time.julianDate });
       }
+
+      // #1205 — 프레임 위상. 시간 위상 (`timeChanged` → `updateAt`) **직후**, `scene.render()`
+      // **직전**. 이 자리가 계약이다 (ADR `20260907-1205-frame-phase-vs-time-phase.md` §결정 3):
+      //  - `scene.render()` **뒤**로 옮기면 LOD 가 전면 1 프레임 지연된다.
+      //  - `scene.onBeforeRenderObservable` (render 안쪽) 로 옮기면 Babylon `animate()`
+      //    (`scene.pure.js` 의 `render()` 본문에서 `onBeforeRenderObservable` 보다 먼저) 이후가
+      //    되어 **재생 경로의 입력이 한 스텝 이동**한다. 이 자리를 지키는 것이 「재생 경로 델타 0」
+      //    이라는 본 변경의 유일한 자산이다.
+      this.#framePassHandler?.();
 
       scene.render();
 
