@@ -1,6 +1,6 @@
 # ADR 20260907-1205 — per-frame 갱신의 위상 분리: 시간 위상 / 프레임 위상
 
-- **상태**: Provisional
+- **상태**: **Accepted** (cross-validate 2026-09-07 — 아래 §교차검증 반영 사항 4축 통합 완료). 원 박제: `Provisional`
 - **날짜**: 2026-09-07
 - **이슈**: [#1205](https://github.com/coseo12/astro-simulator/issues/1205)
 - **관련**: [#782](https://github.com/coseo12/astro-simulator/issues/782)/[#785](https://github.com/coseo12/astro-simulator/issues/785) (ring-anchor 즉시 동기) · [#1204](https://github.com/coseo12/astro-simulator/issues/1204)/[#1206](https://github.com/coseo12/astro-simulator/pull/1206) (sun-light 즉시 동기) · [#783](https://github.com/coseo12/astro-simulator/issues/783) (회피 레시피) · [ADR 20260628-756](20260628-756-procedural-planet-surface.md) §결정 7 / Amendment 6 / **Amendment 9**
@@ -95,7 +95,7 @@ Babylon 9.19.0 `Scene.render()` 실측 순서 (`node_modules/.pnpm/@babylonjs+co
 
 [dev 실측 M4] 프레임 위상 시점의 `camera.globalPosition` + `scene.getTransformMatrix()` 가 **직전 프레임 최종값**과 일치하는 비율: 수정 전 `508/508`, 수정 후 `500/500`. **당 프레임 최종값과 일치한 표본은 양쪽 모두 `0`.** ⇒ 지연 특성 델타 `0`. (지연 자체는 `camera-controller.ts` 가 #611 에서 이미 실측해 둔 기지 사실이고, 여기서 잰 것은 **델타 0 여부**다.)
 
-⚠️ **위상차 해소는 본 결정의 범위가 아니다 (유예).** 실피해 관측 `0` 이고, 해소는 재생 경로 입력을 이동시켜 (F) 의 유일한 자산인 「재생 델타 0」을 버린다. 일시정지 축에서 본 결정은 `∞` 프레임 지연을 `1` 프레임으로 줄이는 **엄격한 개선**이며 악화 경로가 없다. escalation 트리거는 §재검토 조건 6.
+⚠️ **위상차 해소는 본 결정의 범위가 아니다 (유예).** 실피해 관측 `0` 이고 — ⚠️ 이는 **픽셀 축을 재지 않았다**는 뜻이지 「LOD 분포 이탈도 없다」가 아니다. 재생 경로의 분포 이탈은 [실측] 관측된다 (`{2,4,26}` → `{4,2,26}` → `{2,4,26}`). **수정 전 구현판에서 프레임 단위로 같은 값**이 나오므로 승계이며 본 변경이 만든 것이 아니다 — 해소는 재생 경로 입력을 이동시켜 (F) 의 유일한 자산인 「재생 델타 0」을 버린다. 일시정지 축에서 본 결정은 `∞` 프레임 지연을 `1` 프레임으로 줄이는 **엄격한 개선**이며 악화 경로가 없다. escalation 트리거는 §재검토 조건 6.
 
 ### 4. 옮기지 않는 것 — floating-origin safety net
 
@@ -233,7 +233,11 @@ P-R = (가) ∧ (나)     # 두 다리 모두 필요조건
 
 ## 교차검증 반영 사항 (cross-validate 2026-09-07 — 설계 라운드 2)
 
-> ⚠️ 본 절은 **설계 단계**의 cross-validate 결과를 옮겨 실은 것이다. **본 ADR 문서 자체에 대한 cross-validate 는 아직 수행되지 않았으므로 상태가 `Provisional`** 이다 (CLAUDE.md §ADR Status 워크플로). 메인이 4축 통합 후 `Accepted (cross-validate YYYY-MM-DD)` 로 전이한다.
+> ✅ **메인 통합 (2026-09-07).** cross-validate 는 **설계안 + 본 ADR 초안을 같은 입력에 넣어** 1회 수행했다 (`outcome: applied` · `exit_code: 0` · `plan_bypass: false` · `bypass_files: []` — #479 step 9 는 호출 주체인 메인이 확인). 즉 본 절은 「설계 단계 결과의 이월」이 아니라 **이 문서를 포함한 검토의 결과**다. 4축 분류는 아래와 같고, 이어 `Provisional → Accepted` 로 전이한다.
+>
+> ⚠️ **가장 중요한 관측 — 외부 검토가 낸 처방이 결함 보유판에서 통과했다.** cross-validate 는 원안 술어 P1 의 결함을 **정확히** 짚었고(궤도 운동으로 두 경로의 body 위치가 달라 결정적이지 않다) 대안 P1-Refined 를 제시했는데, **그 대안 자체가 결함 보유판에서 PASS 한다** — 두 조건이 둘 다 일시정지라 같은 퇴화 상수로 수렴하기 때문이다. 이를 잡은 것은 **Claude 재분석**이었고, dev 실측이 **3중으로 재현**했다 (§가드 참조: 실제 결함 rev · 훅 제거 · 훅을 `tick()` 안으로 — 셋 다 `(나)` PASS · `(가)` FAIL). **「외부 모델이 술어를 고쳐 줬다」에서 멈췄으면 초록인 채 머지됐다.**
+>
+> ⇒ 일반화: **깨진 술어를 지적하는 능력과 대체 술어를 세우는 능력은 다르다.** 전자는 외부 검토가 강하고, 후자는 **결함 보유판에 대고 돌려 보는 것**만이 판정한다 (#1123 클래스).
 
 ### 합의 — 원안 유지
 
