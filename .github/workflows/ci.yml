@@ -718,6 +718,26 @@ jobs:
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-lod.mjs
 
       # ============================================================
+      # #1204 — tier 전환 시 sun-light 재앵커 회귀 가드 (verify:1204-sun-light). 신규 배선
+      # ============================================================
+      # 결함: `setTier` 가 origin/scale 을 바꾼 뒤 mesh·ring-anchor 만 즉시 재계산하고 광원은 두고
+      #   갔다. T2 → T3 전환 프레임에서 셰이더 `uSunDirection = normalize(sunPos − meshAbsPos)` 의
+      #   피연산자 둘이 동시에 원점이 되어 방향이 영벡터로 붕괴한다.
+      # 판정 2축: (1) 관측 전 프레임에서 `|sunPos − meshAbsPos| > 0` (2) 콘솔 에러 0 건.
+      #   body tier 진입 자체를 관측 못 하면 **판별력 0 으로 보고 FAIL** 시킨다 (초록 위장 차단).
+      # 배선 근거는 위 #1127 주석과 같은 클래스다 — PR #1206 reviewer 가 「`browser-verify-*.mjs`
+      #   28 개 중 이것만 npm script·CI 어느 쪽에도 없다」를 적발했다. 3단 판별력 실증은 「돌리면
+      #   작동한다」를 보였을 뿐 「돌아간다」를 보이지 않는다 (#1096 / #1127 재발 클래스).
+      # `BROWSER_VERIFY_GPU` 미설정 — 판정축이 픽셀이 아니라 **좌표**라 렌더러 백엔드에 비의존이다
+      #   (#1127 verify:lod 와 같은 논거). 스크립트 자체 쿼리는 `?gpu=a&focus=earth`.
+      # 재현 경로는 **실제 휠 입력**이어야 한다 — `camera.radius` 직접 대입은 `updateTierByCamera`
+      #   의 히스테리시스/lock 경로를 건너뛰어 전환이 일어나지 않는다. 진입 틱은 고정하지 않고
+      #   `WHEEL_TICKS_MAX=40` 까지 보낸다 (로컬 실측 19~20 틱).
+      - name: '#1204 sun-light 재앵커 회귀 가드 (verify:1204-sun-light)'
+        if: needs.diff-scope.outputs.code_changed == 'true'
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-1204-sun-light.mjs
+
+      # ============================================================
       # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)
       # ============================================================
       # `if: always()` 가 정리의 단독 책임 지점이다. 개별 가드 step 안의 `kill` 은 Actions 기본

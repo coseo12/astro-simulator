@@ -19,6 +19,20 @@ Semantic Versioning을 따른다.
 
   **[설계 근거 반증 — 결론은 유지, 근거는 교체]** 설계 라운드 2 는 `RIM_NDL_LO` 를 음수로 여는 근거로 _"실루엣에서 `ndl = sin(위상각)·cos(φ)` 이므로 저위상각(「보름 지구」)에서 `LO >= 0` 이면 rim 이 통째로 사라진다"_ 를 들었다. **그 산식은 직교(무한원) 근사이고 `?focus=earth` 근접 관측(`r/d = 0.11547`)에는 맞지 않는다** — 원근 상한은 `sin(위상각 + asin(r/d))` 이고, 도달 가능한 최저 위상각 `2.186°` 에서도 실루엣 `ndl` 최댓값이 **`0.1533`** 로 `SOFT_TERMINATOR_WIDTH = 0.12` 를 넘는다 (직교 근사 예측은 `0.0381`, 그리고 위상각 `177.814°` 에서는 **부호까지 틀린다**). 실측으로도 그 프레임의 림 rim 기여는 `LO = -0.25` `0.04662` 대 `LO = +0.05` `0.04614` 로 **차이 1.0%** — rim 은 사라지지 않는다. `LO` 를 음수로 유지한 **실제 근거는 terminator 박명 호**다: `ndl` 구간 −0.2 / −0.1 / 0.0 에서 `LO = -0.25` 는 `0.00813` / `0.04764` / `0.10006` 을 내지만 `LO = +0.05` 는 셋 다 `0` 이다. 대가는 밤면 림 기여 `0.00061` (G1 마진 `0.07438` 의 0.8%). 상세는 ADR §A8.13 · §A8.14.
 
+### Fixed
+
+- **[#1204] tier 전환 프레임에서 `sun-light` PointLight 가 floating origin 재앵커를 따라오지 않던 결함 (PATCH)** ([#1204](https://github.com/coseo12/astro-simulator/issues/1204)) — `setTier` 는 origin/scale 을 바꾼 뒤 mesh 와 ring-anchor 만 즉시 재계산하고 광원은 두고 갔다. `updateAt` 은 세 대상을 같은 origin 으로 쓰지만 `timeChanged` 바인딩이라 그 프레임을 메우지 못한다. T2(origin `[0,0,0]`, 태양이 Heliocentric 원점 근처라 광원 ≈ 원점) → T3(origin 이 focus body 로 이동해 mesh 가 원점) 전환에서 셰이더 `uSunDirection = normalize(sunPos − meshAbsPos)` 의 **피연산자 둘이 동시에 원점**이 되어 방향이 영벡터가 됐다. 광원 좌표 수식을 `syncSunLightPosition` 하나로 모으고 `setTier` 의 즉시 재계산 블록에서도 호출한다 — ring-anchor 에서 먼저 고친 것과 **같은 클래스의 잔여 대상**이다. (⚠️ 그 ring-anchor 의 `setTier` 즉시 동기 자체는 [#782](https://github.com/coseo12/astro-simulator/issues/782) Amendment 2-i 가 아니라 **PR [#785](https://github.com/coseo12/astro-simulator/pull/785) reviewer 권고 1** 의 fix 다 — 초판이 잘못 귀속했다.)
+
+  [실측] (로컬 `?gpu=a&focus=earth`, 실제 휠 `-100` 반복, 프레임별 기록) 지속 시간이 시간 재생 여부에 종속된다 — 재생 중이면 다음 프레임 `updateAt` 이 정정해 **1 프레임**, `?speed=0` 이면 `TimeController.tick` 이 `scale === 0` 에서 `false` 를 반환해 `timeChanged` 자체가 끊기므로 **지속**된다 (관측 종료 시점까지 계속 영벡터).
+
+  **⚠️ draw 도달 여부는 시나리오마다 반대다.** 초판은 「`earth` 절차 mesh 가 내내 `isVisible=false` 라 영벡터가 draw 에 도달하지 않는다」를 재현 경로 **전체**의 사실로 적었으나, 그것은 `pause` 에서만 참이다. 셰이더와 같은 두 입력(`sunPositionProvider()` / `mesh.getAbsolutePosition()`)을 절차 머티리얼 `onBindObservable` 에서 계측한 **독립 두 세션**(PR [#1206](https://github.com/coseo12/astro-simulator/pull/1206) reviewer 1 회 + dev 재현 1 회)이 같은 결론을 냈다 — `play` 는 `earth` 가 관측 전 프레임 `isVisible=true` 이고 머티리얼이 매 프레임 bind 되며, 결함 주입판에서 **영벡터가 bind 시점에 도달**했다(두 세션 각각 1 회, `tier="body"` / `mesh="earth"`). `pause` 는 `earth` 가 전 프레임 `isVisible=false` 이고 `earth-lod-low` 만 그려져 bind 가 **0 회**다. 갈리는 이유는 구조다 — LOD 가시성 선택도 `updateAt` 안(P11-B [#289](https://github.com/coseo12/astro-simulator/issues/289) hook)이라 `scale === 0` 이면 광원뿐 아니라 **LOD 도 함께 동결**된다.
+
+  **⚠️ 직관과 반대다** — 지속되는 쪽(`pause`)이 픽셀 무영향이고, 1 프레임인 쪽(`play`)이 화면에 닿는다. `pause` 진입 후 캔버스 중앙 200×200 평균 휘도는 결함 주입판과 수정판이 같았다(reviewer 실측 `meanLum 9.077` / `maxLum 21.0934`). 그래도 보장 범위는 **광원이 mesh 와 같은 기준계에 있다**까지이며 「지구가 밝다」로 확대 해석하지 않는다 — 밝기 자체는 재지 않았고, `pause` 에서 절차 표면이 그려지지 않는 LOD 착지는 [#1205](https://github.com/coseo12/astro-simulator/issues/1205) 의 범위다.
+
+  **회귀 가드** `apps/web/scripts/browser-verify-1204-sun-light.mjs` (`pnpm --filter @astro-simulator/web run verify:1204-sun-light`) — `play`/`pause` 두 시나리오에서 매 프레임 `|sunPos − meshAbsPos|` 를 기록해 **(1)** 한 프레임이라도 `0` 이면 `exit 1`, **(2)** 콘솔 에러가 1 건이라도 있으면 `exit 1` (`hasSimErrors` 1차 엄격 — [#848](https://github.com/coseo12/astro-simulator/issues/848) 선례와 같은 SSoT 헬퍼). body tier 진입 자체를 관측하지 못하면 판별력 `0` 으로 보고 **FAIL** 시킨다(초록 위장 차단). 판별력 실증: 원본 `exit 0` → `setTier` 호출만 제거 시 `exit 1` (play 는 `1` 프레임, pause 는 관측 종료까지 지속) → 복구 `exit 0`, 그리고 앱에 `console.error` 1 건 주입 시 `exit 1`.
+
+  ⚠️ **npm script 등록 + CI 배선을 같은 PR 에서 함께 한다** — reviewer 가 「`browser-verify-*.mjs` 28 개 중 이것만 `package.json` 어느 쪽에도 없다」를 적발했다. 판별력 3단 실증은 「돌리면 작동한다」를 보였을 뿐 「돌아간다」를 보이지 않는다. 이 저장소는 같은 클래스로 이미 데었다 — `ci.yml` 이 `verify:lod` 에 대해 _"`#289` 이래 자동 발화 `0`"_ 을 적고 있고 그 배선이 [#1127](https://github.com/coseo12/astro-simulator/issues/1127) 이었다.
+
 ## [0.86.0] - 2026-09-07
 
 ### Behavior Changes
