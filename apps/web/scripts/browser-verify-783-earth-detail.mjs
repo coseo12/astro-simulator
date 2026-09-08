@@ -8,9 +8,18 @@
  *
  * 결정적 프레임 레시피 (실측 근거 — PR 본문 박제):
  *   1. `?focus=earth&rotate=off&orbits=off` 로 로드 — identity rotation → local Y = world Y
- *      = 화면 세로축 (tilt 오염 제거, ADR §A3.2-5). ⚠️ `?speed=0` 를 로드 쿼리에 넣으면
- *      focus 정착(LOD/광원 per-frame 갱신)이 완주하지 않아 disk 가 렌더되지 않는다 (실측)
- *      — 로드는 기본 speed 로 진행.
+ *      = 화면 세로축 (tilt 오염 제거, ADR §A3.2-5).
+ *
+ *      ⚠️ **회피 레시피 회수 (#1205)**. 이 자리에는 원래 *"`?speed=0` 를 로드 쿼리에 넣으면
+ *      focus 정착(LOD/광원 per-frame 갱신)이 완주하지 않아 disk 가 렌더되지 않는다 (실측)"* 가
+ *      적혀 있었다. 그 관측은 **당시 참이었고 원인은 결함이었다** — `runLodPass` 가 `updateAt`
+ *      안에 있었고 `updateAt` 은 `timeChanged` 바인딩이라 `speed=0` 이면 LOD 가 부팅 직후 값에
+ *      얼어붙었다. #1205 가 LOD 를 프레임 위상으로 분리해 **해소**됐다
+ *      (ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`).
+ *      결함이 회피 레시피로 문서화되면 결함으로 보이지 않는다 — 그래서 두 달 넘게 이슈가 안 떴다.
+ *      ⚠️ **그럼에도 로드는 기본 speed 로 진행한다.** 아래 2단계가 런타임에서 `jumpToJulianDate`
+ *      + `pause` 로 프레임을 고정하므로 로드 쿼리에 `speed=0` 을 넣을 이유가 없고, 레시피를
+ *      바꾸면 본 가드의 baseline 성격이 함께 바뀐다 (#1205 비-범위).
  *   2. 정착 후 런타임 `__simCore.command(jumpToJulianDate T_JD)` + `command(pause)` 동기 연속
  *      호출 — 프레임 고정 (재현 결정적).
  *   3. T_JD = 2451626.0 (2000-03-22, 춘분 근방) — 지구 공전 방위 ~182° 에서 태양 방향이
@@ -90,7 +99,7 @@
  */
 
 import { chromium } from 'playwright';
-import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
+import { waitForLodSettle, withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PNG } from 'pngjs';
@@ -927,7 +936,18 @@ const OTHER_BODIES = ['mars', 'jupiter', 'moon'];
         await page.evaluate(() => {
           window.__simCore.scene.activeCamera.beta = Math.PI / 2;
         });
-        await page.waitForTimeout(600);
+        // #1205 — 정지 중 카메라 조작이 이제 LOD 를 건드린다 (`setupPage` 가 `pause` 를 보낸다).
+        // [실측] 이 `beta` 대입 하나로 분포가 `3/2/27 → 9/6/17` (11 body 전이) 로 바뀌고
+        // cross-fade 가 `12ms ~ 211ms` 동안 진행한다 (#1205 이전 같은 시퀀스: 분포 `3/3/26`
+        // 불변, 전이 0 건 — 양쪽 실측). 상수 sleep 대신 `fading === 0` 정착을 확인한다
+        // (ADR `20260628-756` Amendment 9). ⚠️ 본 파일은 reviewer R5 가 명시한 두 가드
+        // (`-1119` / `-1202`) 목록 **밖**이었으나 dev 스윕에서 같은 패턴으로 발견됐다.
+        const lodSettle = await waitForLodSettle(page);
+        if (lodSettle.timedOut) {
+          console.warn(
+            `[783] LOD 정착 상한 초과 (${lodSettle.waitedMs}ms, dist=${lodSettle.dist} fading=${lodSettle.fading}) — 마지막 상태로 진행`,
+          );
+        }
         const buf = await captureBody(page, 'earth', `qa-783-earth-${label}`);
         const m = await measureEarth(page, buf);
         out[label] = { ...m, consoleErrors: consoleErrors.length };

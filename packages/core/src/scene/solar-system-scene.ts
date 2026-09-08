@@ -155,6 +155,12 @@ export interface SolarSystemSceneHandles {
   meshes: Map<string, Mesh>;
   /** 주어진 Julian Date 시점으로 모든 천체 위치 갱신 */
   updateAt: (julianDate: number) => void;
+  /**
+   * #1205 — 프레임 위상. 매 프레임 1회, **일시정지에서도** 호출돼야 한다.
+   * 카메라 종속 갱신 (현재 멤버: LOD 판정) 의 소유자.
+   * 호출자는 `SimulationCore.setFramePassHandler` 로 렌더 루프에 연결한다.
+   */
+  runFramePass: () => void;
   /** 궤도선 가시성 토글 */
   setOrbitLinesVisible: (visible: boolean) => void;
   /**
@@ -285,15 +291,29 @@ export interface SolarSystemSceneHandles {
   /**
    * P11-B #289 — LOD override 설정. URL `?lod=high|mid|low` 는 전 body 강제, `'auto'` 는 거리 자동 판정 (기본).
    *
-   * 런타임 1회 변경 전제 — 반복 호출도 허용되지만 매 updateAt 에서 즉시 반영.
+   * 런타임 1회 변경 전제 — 반복 호출도 허용되며 **다음 프레임 위상**에서 반영된다.
+   * #1205 이전에는 「매 updateAt 에서 즉시 반영」이라 `speed=0` 에서 반영되지 않았다.
    */
   setLodOverride: (level: LodOverride) => void;
   /**
-   * P11-B #289 — 마지막 `updateAt` 에서 집계된 LOD 분포. dev overlay (draw call) 표시용.
+   * P11-B #289 — 마지막 **프레임 위상**(`runFramePass`)에서 집계된 LOD 분포. dev overlay (draw call) 표시용.
+   *
+   * ⚠️ #1205 이전에는 `updateAt` 에서 집계됐고, `updateAt` 이 `timeChanged` 바인딩이라
+   * `speed=0` 에서 값이 얼어붙었다. 프레임 위상 분리 후 일시정지에서도 갱신된다.
    *
    * `{ high, mid, low }` 는 각 LOD 단계로 판정된 body 개수. 합은 전체 body 수 (고리/HUD 제외).
+   *
+   * `fading` — #1205. 200ms cross-fade 가 **아직 진행 중인** body 수. 일시정지에서도 fade 가
+   * wall-clock 으로 진행하므로, `?speed=0` 결정적 캡처는 이 값이 `0` 인 것을 확인한 뒤 찍어야
+   * 알파가 캡처 시각에 종속되지 않는다 (ADR `20260628-756` §결정 7 Amendment 9).
    */
-  getLodStats: () => { high: number; mid: number; low: number; override: LodOverride };
+  getLodStats: () => {
+    high: number;
+    mid: number;
+    low: number;
+    override: LodOverride;
+    fading: number;
+  };
   /**
    * #388 — 마지막 `runLodPass` 에서 결정된 body 별 LOD 상세. dev overlay 시각화 용도.
    *
@@ -649,7 +669,7 @@ export function createSolarSystemScene(
   const lowVariants = new Map<string, Mesh>();
   const bodyCurrentLod = new Map<string, LodLevel>();
   // LOD 집계 — getLodStats 반환 값 재사용 버퍼 (매 프레임 객체 할당 회피).
-  const lodStats = { high: 0, mid: 0, low: 0, override: 'auto' as LodOverride };
+  const lodStats = { high: 0, mid: 0, low: 0, override: 'auto' as LodOverride, fading: 0 };
   // #388 — body 별 LOD raw 데이터 버퍼. runLodPass 가 매 프레임 in-place 갱신.
   // 배열 자체는 매 frame 동일 참조 — body 추가/제거 시에만 길이 조정. 행 객체도 mutable in-place.
   const lodInfo: LodBodyInfo[] = [];
@@ -883,6 +903,80 @@ export function createSolarSystemScene(
   }
   const resolved = new Set<string>();
 
+  /**
+   * `sun-light` PointLight 를 현재 origin/scale 기준 scene 좌표로 동기 (#1204).
+   *
+   * mesh.position 과 **완전히 같은 3단 변환** (ADR `20260422-floating-origin.md` §3:
+   * world(m) → local(m, origin shift) → scene unit(× renderScale)) 을 쓴다. 광원은 셰이더
+   * `uSunDirection = normalize(sunPos − meshAbsPos)` 의 한쪽 피연산자이므로 (`sunPositionProvider`
+   * → `procedural-planet-shader.ts` onBind), mesh 와 **다른 기준계**에 있으면 그 차가 물리적으로
+   * 무의미해진다.
+   *
+   * ## 왜 함수로 뽑았나 (#1204 회귀의 원인)
+   *
+   * 종전에는 이 수식이 `updateAt` 안에만 있었다. `setTier` 는 origin/scale 을 바꾼 뒤 mesh 와
+   * ring-anchor 만 즉시 재계산하고 광원은 두고 갔고, `updateAt` 은 `timeChanged` 바인딩이라
+   * (`sim-canvas.tsx` 의 `instance.on('timeChanged', …)`) tier 전환 프레임을 메우지 못한다.
+   * 그 결과 T2(origin `[0,0,0]`, 태양이 Heliocentric 원점 근처라 광원 ≈ 원점) → T3(origin 이
+   * focus body 로 이동, mesh 가 원점) 전환 프레임에서 **두 피연산자가 동시에 원점** → 그 차가
+   * 영벡터가 된다. 셰이더가 이 값을 받으면 `ndl = dot(N, 0) ≡ 0` 이다.
+   *
+   * 지속 시간은 시간 재생 여부에 종속된다 — 실측(로컬, `?gpu=a&focus=earth`, 휠 -100):
+   * 재생 중이면 다음 프레임 `updateAt` 이 정정해 **1 프레임**, `?speed=0` 이면 `TimeController.tick`
+   * 이 `scale === 0` 에서 false 를 반환해 `timeChanged` 자체가 끊기므로 관측 종료 시점까지 **지속**된다.
+   *
+   * ## draw 도달 여부는 시나리오마다 반대다 (PR #1206 리뷰 B1 정정)
+   *
+   * 초판 주석은 「`earth` 절차 mesh 가 내내 `isVisible=false` 라 영벡터가 draw 에 도달하지 않는다」를
+   * 위 재현 경로 **전체**의 사실로 적었다. 그것은 `pause` 에서만 참이다. 셰이더와 **같은 두 입력**
+   * (`sunPositionProvider()` / `mesh.getAbsolutePosition()`) 을 절차 머티리얼 `onBindObservable` 에서
+   * 계측했고, reviewer 1 회 + 본 브랜치 재현 1 회의 **독립 두 세션이 같은 결론**을 냈다:
+   *
+   *  - `play`  — `earth` 가 관측 전 프레임 `isVisible=true` 이고 머티리얼이 매 프레임 bind 된다.
+   *              결함 주입판에서 **영벡터가 bind 시점에 도달**했다 (두 세션 각각 1 회, `tier="body"`,
+   *              `mesh="earth"`). 즉 `play` 에서는 영벡터가 draw 에 닿는다.
+   *  - `pause` — [#1205 이전 실측] `earth` 는 관측 전 프레임 `isVisible=false` 이고 `earth-lod-low`
+   *              가 그려져 절차 머티리얼 bind 가 **0 회**였다. 영벡터가 draw 에 도달하지 않았다.
+   *
+   * 두 시나리오가 갈렸던 이유는 구조다 — LOD 가시성 선택도 `updateAt` 안에 있었으므로
+   * `scale === 0` 이면 광원뿐 아니라 **LOD 도 함께 동결**됐다.
+   *
+   * ⚠️ **`pause` 쪽 전제는 #1205 로 해소됐다.** LOD 는 프레임 위상(`runFramePass`)으로 분리되어
+   * 일시정지에서도 갱신되므로, 이제 `pause` 에서도 focus body 가 high LOD 로 착지해 절차 머티리얼이
+   * bind 된다. 즉 위 「bind 0 회」는 **#1205 이전에만 참**이다. 반면 **광원은 여전히 시간 위상**에
+   * 남아 있으므로 (`syncSunLightPosition` 은 `updateAt` 안) 아래 `setTier` 즉시 동기가 없으면
+   * 영벡터가 `pause` 에서 지속된다 — 즉 본 함수의 존재 이유는 불변이고, 오히려 **`pause` 에서
+   * 영벡터가 draw 에 도달하게 됐으므로 그 필요성이 커졌다**.
+   *
+   * ⚠️ **직관과 반대다**: 지속되는 쪽(`pause`)이 픽셀 무영향이고, 1 프레임인 쪽(`play`)이 화면에
+   * 닿는다. `pause` 진입 후 캔버스 중앙 200×200 평균 휘도는 결함 주입판과 수정판이 같았다
+   * (reviewer 실측 `meanLum 9.077` / `maxLum 21.0934`).
+   *
+   * 그래도 본 수정이 보장하는 범위는 **광원이 mesh 와 같은 기준계에 있다**까지다 — 밝기 자체는 재지
+   * 않았다. `pause` 에서 절차 표면이 그려지지 않던 LOD 착지는 **#1205 에서 닫혔다**
+   * (ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`).
+   *
+   * 호출부가 둘로 갈린 것이 재발 조건이었으므로 수식을 여기 한 곳에만 둔다. 새 tier 경로가
+   * 생기면 이 함수를 부르면 된다.
+   *
+   * origin 을 튜플이 아니라 **스칼라 3개**로 받는다. (a) 위 재사용 버퍼 주석(#76)의 「프레임당
+   * 재할당 회피」를 지키고, (b) `updateAt` 이 넘기는 값은 진입 시 **스냅샷한** `ox/oy/oz` 라
+   * 호출 시점의 `floatingOrigin.originOffset` 과 **다르다** — 그 사이 primary follow 의
+   * `setOriginToBody` 가 `#originOffset` 을 **새 배열로 재할당**하기 때문이다
+   * (`coords/floating-origin.ts`). in-place mutate 가 아니므로 배열을 미리 캡처해 두면 그 자체는
+   * 스냅샷으로 남는다 — 위험한 것은 호출 지점에서 `originOffset` 을 **다시 읽는** 경로다
+   * (#380 가드 C 순서). 배열을 넘기게 두면 무심코 그 재-read 값을 직접 넘겨 mesh 와 다른 기준계를
+   * 쓰기 쉬우므로 신호를 남긴다.
+   */
+  const syncSunLightPosition = (ox: number, oy: number, oz: number, scale: number): void => {
+    const sunWorld = worldPositions.get('sun') ?? ZERO;
+    sunLight.position.set(
+      (sunWorld[0] - ox) * scale,
+      (sunWorld[1] - oy) * scale,
+      (sunWorld[2] - oz) * scale,
+    );
+  };
+
   // 소행성대 (#99) — ThinInstances 단일 draw call.
   // Kepler 경로: 각 소행성 독립 해석해.
   // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
@@ -1069,6 +1163,21 @@ export function createSolarSystemScene(
       );
       mesh.computeWorldMatrix(true);
     }
+
+    // #1204 — 광원도 **같은 프레임에** 새 origin/scale 로 재계산. 위 mesh 루프와 한 쌍이다:
+    // 셰이더 `uSunDirection` 은 `sunLight.position − mesh.absolutePosition` 이라 둘 중 하나만
+    // 새 기준계로 옮기면 그 차가 무의미해진다. T2 → T3 전환에서는 두 값이 동시에 원점이 되어
+    // 방향이 영벡터로 붕괴했다 (실측: 재생 중 1 프레임 / `speed=0` 이면 지속).
+    // `updateAt` 은 `timeChanged` 바인딩이라 이 프레임을 메우지 못한다 (아래 ring-anchor 와 같은
+    // 논거 — 동형 결함을 ring 에서 먼저 고친 것은 아래 주석이 적은 대로 **PR #785 reviewer 권고 1**
+    // 의 fix 다. #782 Amendment 2-i 는 위상 도입 쪽이라 이 즉시 동기 자체의 출처가 아니다).
+    // 수식·재현·측정 한계는 `syncSunLightPosition` 정의부 주석이 SSoT.
+    syncSunLightPosition(
+      tierTransitionOrigin[0],
+      tierTransitionOrigin[1],
+      tierTransitionOrigin[2],
+      newScale,
+    );
 
     // #782 Amendment 2-i fix (PR #785 reviewer 권고 1 / qa 실측) — ring-anchor 를 setTier 에서도 즉시 동기.
     // updateAt 의 ring-anchor 동기 블록 (#845 라인 앵커화) 은 `timeChanged` 바인딩이라 speed=0 (pause)
@@ -1409,12 +1518,8 @@ export function createSolarSystemScene(
     const cam = scene.activeCamera;
 
     // Sun light — worldPositions['sun'] 도 Heliocentric 절대 좌표 (m). Floating Origin shift + tier scale 반영.
-    const sunWorld = worldPositions.get('sun') ?? [0, 0, 0];
-    sunLight.position.set(
-      (sunWorld[0] - ox) * sceneUnitPerMeter,
-      (sunWorld[1] - oy) * sceneUnitPerMeter,
-      (sunWorld[2] - oz) * sceneUnitPerMeter,
-    );
+    // #1204 — 수식 SSoT 는 `syncSunLightPosition` (setTier 의 tier 전환 즉시 재계산과 공유).
+    syncSunLightPosition(ox, oy, oz, sceneUnitPerMeter);
 
     // P11-A #288 — safety net (ADR §1-A). focus 가 없는 free-fly 탐색 중 카메라가 1 AU 이상
     // 이동하면 origin 을 카메라 위치로 추가 shift. 다음 프레임의 `updateAt` 이 새 origin 으로
@@ -1484,20 +1589,20 @@ export function createSolarSystemScene(
       }
     }
 
-    // P11-B #289 — LOD 3단 분기 hook (ADR 20260424-p11-b-lod-design §결정).
+    // #1205 — LOD 분기 hook 은 여기 있었다. **프레임 위상 (`runFramePass`) 으로 이동**했다.
+    // `updateAt` 은 `timeChanged` 바인딩이라 일시정지에서 한 번도 돌지 않는데, LOD 는 카메라
+    // 종속이라 시간이 멈춰도 갱신돼야 한다. 여기 남겨두면 재생 중 2×/프레임이 되므로 호출을
+    // 남기지 않는다. hook 책임 서술은 `runFramePass` 정의부로 함께 옮겼다.
+    // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
     //
-    // 선행 ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment — 본 파일에 LOD 분기 hook 추가는
-    // 예외 허용. 금지 조건 (mesh.position 수식 / renderScaleForTier 적용 지점 / Tier 상수 / activeTier
-    // 의미 / FloatingOrigin 상호작용 / setTier origin 로직) 은 본 hook 에서 건드리지 않음.
-    //
-    // hook 책임:
-    //  1. 각 body 의 `screenCoverageRadius` 계산 → `lodFromScreenCoverage` 로 LOD 결정
-    //  2. LOD 변경된 body 는 `lodFadeState` 에 200ms cross-fade 등록
-    //  3. variant visibility / alpha 갱신
-    //  4. 집계 `lodStats` 갱신 (dev overlay 용)
-    if (cam) {
-      runLodPass(cam);
-    }
+    // ⚠️ **바로 위 「2×/프레임」 계약은 이 주석만이 지킨다 — 의식적 기각이다** (PR #1208 R3).
+    // 여기에 `runLodPass(cam)` 를 되돌려도 [실측] `verify:1205-pause-lod` 는 출력까지 완전히
+    // 동일한 채 exit `0` 이다. 살아 있었다는 증거는 `getTransformMatrix`/frame `4.000 → 5.000`
+    // 뿐인데, 그것은 Babylon 내부 카운터라 무관한 변경에도 움직여 가드로 삼으면 false-positive
+    // 생성기가 된다. 기각 근거 5축과 **무효 조건**(프레임 위상 멤버가 2개째로 늘면 재판정)은
+    // 위 ADR §비-범위 「2×/프레임 금지 계약의 가드 — 검토 후 기각」.
+    // 계약의 나머지 절반(프레임 위상 자신이 프레임당 1회)은 단위 층이 닫는다 —
+    // `packages/core/src/engine/simulation-core-frame-pass.test.ts`.
 
     // 소행성대 업데이트.
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
@@ -1768,6 +1873,16 @@ export function createSolarSystemScene(
     }
     // body 가 줄었을 가능성 — trailing slot 잘라내기 (현재 시스템에선 정적이지만 미래 안전).
     if (lodInfo.length > lodInfoIndex) lodInfo.length = lodInfoIndex;
+
+    // #1205 — cross-fade 진행 중 body 수. 위 루프의 `applyLodVariantState` 가 종료된 fade 를
+    // `lodFadeState` 에서 지우므로, 루프 뒤의 size 가 곧 "아직 진행 중" 개수다.
+    //
+    // 왜 노출하는가: 프레임 위상 분리로 **일시정지에서도 fade 가 wall-clock 으로 진행**하게 됐다
+    // (`LOD_FADE_DURATION_MS` 는 `performance.now()` 기준). 즉 `?speed=0` 스냅샷을 레벨 전이
+    // 직후 200ms 안에 찍으면 알파가 캡처 시각에 종속된다 — #1205 이전에는 정지에서 fade 가 통째로
+    // 얼어 있어 이 창이 없었다. 캡처 측이 `getLodStats().fading === 0` 을 정착 조건으로 확인하도록
+    // 노출한다 (ADR `20260628-756` §결정 7 Amendment 9 / `20260907-1205` §결과).
+    lodStats.fading = lodFadeState.size;
   };
 
   /**
@@ -1879,6 +1994,34 @@ export function createSolarSystemScene(
     // fade 중에는 둘 다 보여야 하므로 isVisible 유지. 정착 시 hideVariantEntirely 로 반대편 숨김.
   };
 
+  /**
+   * #1205 — **프레임 위상**. 렌더 루프가 매 프레임 1회 구동한다 (`SimulationCore.setFramePassHandler`).
+   *
+   * `updateAt` (시간 위상) 과 달리 `timeChanged` 에 바인딩되지 않으므로 **일시정지에서도 돈다.**
+   * 카메라만 움직이는 프레임의 갱신 소유자이며, ADR
+   * `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md` §결정 2 의 멤버십 3조건
+   * (카메라/뷰포트 종속 · 시간이 멈춰도 의미 있음 · 멱등) 을 전건 충족하는 것만 들어온다.
+   * **현재 멤버는 `runLodPass` 하나뿐이다.** 늘리기 전에 그 3조건 판정을 ADR 에 박제할 것.
+   *
+   * 아래 hook 책임 서술은 #1205 이전 `updateAt` 안 P11-B #289 hook 자리에 있던 것을 옮겨온 것이다.
+   *
+   * 선행 ADR `20260424-tier-naming-policy.md` §Prediction 1 Amendment — 본 파일에 LOD 분기 hook 추가는
+   * 예외 허용. 금지 조건 (mesh.position 수식 / renderScaleForTier 적용 지점 / Tier 상수 / activeTier
+   * 의미 / FloatingOrigin 상호작용 / setTier origin 로직) 은 본 hook 에서 건드리지 않음.
+   *
+   * hook 책임:
+   *  1. 각 body 의 `screenCoverageRadius` 계산 → `lodFromScreenCoverage` 로 LOD 결정
+   *  2. LOD 변경된 body 는 `lodFadeState` 에 200ms cross-fade 등록
+   *  3. variant visibility / alpha 갱신
+   *  4. 집계 `lodStats` 갱신 (dev overlay 용)
+   */
+  const runFramePass = () => {
+    const cam = scene.activeCamera;
+    if (cam) {
+      runLodPass(cam);
+    }
+  };
+
   // P11-B #289 — LOD API 외부 노출.
   const setLodOverride = (level: LodOverride) => {
     lodOverride = level;
@@ -1988,6 +2131,7 @@ export function createSolarSystemScene(
   return {
     meshes,
     updateAt,
+    runFramePass,
     setOrbitLinesVisible,
     getTier,
     setTier,

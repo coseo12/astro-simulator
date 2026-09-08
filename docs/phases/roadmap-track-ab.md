@@ -25,7 +25,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ---
 
-## 완료 (2026-06-24 ~ 2026-07-04)
+## 완료 (2026-06-24 ~ 2026-09-07)
 
 | 이슈                                                                                                                        | 트랙   | 1줄 요약                                                                                                                                                        | 릴리스            |
 | --------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
@@ -38,14 +38,18 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | [#782](https://github.com/coseo12/astro-simulator/issues/782)                                                               | A      | 행성 self-rotation (자전) — 9 body + 달, 광원 world normal 옵션 e 전환                                                                                          | v0.42.0           |
 | [#774](https://github.com/coseo12/astro-simulator/issues/774)                                                               | A      | 태양 emissive 절차 셰이더 — granulation + limb darkening + 색온도                                                                                               | v0.43.0           |
 | [#783](https://github.com/coseo12/astro-simulator/issues/783)                                                               | A      | 지구 극관 + biome 위도 색 변화 (#775 후속 Tier 1)                                                                                                               | v0.44.0           |
+| [#1197](https://github.com/coseo12/astro-simulator/issues/1197)                                                             | A      | 지구 바다 깊이 색 — `baseColor` 파생 감쇠 (ADR `20260628-756` Amendment 7)                                                                                      | v0.86.0           |
+| [#1202](https://github.com/coseo12/astro-simulator/issues/1202)                                                             | A      | 지구 대기 산란 rim — 공유 셰이더 혼입 (ADR `20260628-756` Amendment 8)                                                                                          | 릴리스 확정 전    |
 
 > 사이 릴리스 v0.39.0 (#766) / v0.41.0·v0.45.0 (#779) / v0.46.0 (#759) 은 infra (Z-패턴 allowlist / CI alert fatigue / shader-pixel-guard) — 트랙 밖.
+
+> `#1202` 의 「릴리스」 칸은 **본 표에서 유일하게 미확정**이다 — 본 이슈 PR 이 `develop` 에 머지된 시점에는 릴리스 번호가 정해지지 않는다. **릴리스 준비 PR 이 이 칸을 확정한다.**
 
 ---
 
 ## 진행 중
 
-- **없음** (2026-07-06 기준). 관찰 잔여 [#759](https://github.com/coseo12/astro-simulator/issues/759)/[#779](https://github.com/coseo12/astro-simulator/issues/779) 는 infra 가드 (트랙 밖).
+- **없음** (2026-09-07 기준). 직전 착수분 [#1197](https://github.com/coseo12/astro-simulator/issues/1197)·[#1202](https://github.com/coseo12/astro-simulator/issues/1202) 는 위 §완료 로 이동했다. 관찰 잔여 [#759](https://github.com/coseo12/astro-simulator/issues/759)/[#779](https://github.com/coseo12/astro-simulator/issues/779) 는 infra 가드 (트랙 밖).
 
 ---
 
@@ -53,15 +57,15 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 전부 트랙 A. 우선순위 미확정 — 착수 시 사용자와 합의 후 이슈 박제.
 
-| 후보                       | ADR 앵커 (재검토 조건)                                                                                                                                            |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 바다 깊이색 (deep/shallow) | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §A3.7 재검토 조건 1 — continents 값 재활용 설계 스케치 박제됨                          |
-| 대기 fresnel rim           | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §A3.7 (Tier 2-4) — #774 cameraPosition auto-bind 로 비용 하락, 구름 레이어와 합류 권장 |
-| 구름 레이어                | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §A1.8 재검토 조건 5 — 별도 mesh/레이어 트랙, #782 자전과 차등 offset 필요              |
-| 야간 도시 불빛             | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §A3.7 (Tier 3) — 구름과 동일 별도 레이어 트랙                                          |
-| 코로나 / 플레어            | [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) §결과·재검토 조건 5 — disk 밖 효과, 별도 빌보드/glow 레이어 후속 이슈 분리 대상              |
-| sunspot (흑점)             | [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) §결과·재검토 조건 2 — granulation 과 시각 혼동 → DoD 측정 기준 오염 리스크 선해소 필요       |
-| 사운드 (ambient)           | **ADR 없음** — 방향성 기획 (2026-06-22) 트랙 A 원 항목 (별배경/표면/사운드 중 유일 미착수). 착수 시 신규 ADR 의무                                                 |
+| 후보             | ADR 앵커 (재검토 조건)                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 구름 레이어      | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §A1.8 재검토 조건 5 — 별도 mesh/레이어 트랙, #782 자전과 차등 offset 필요        |
+| 야간 도시 불빛   | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §A3.7 (Tier 3) — 구름과 동일 별도 레이어 트랙                                    |
+| 코로나 / 플레어  | [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) §결과·재검토 조건 5 — disk 밖 효과, 별도 빌보드/glow 레이어 후속 이슈 분리 대상        |
+| sunspot (흑점)   | [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) §결과·재검토 조건 2 — granulation 과 시각 혼동 → DoD 측정 기준 오염 리스크 선해소 필요 |
+| 사운드 (ambient) | **ADR 없음** — 방향성 기획 (2026-06-22) 트랙 A 원 항목 (별배경/표면/사운드 중 유일 미착수). 착수 시 신규 ADR 의무                                           |
+
+> 제거된 행 2건 (2026-09-07): **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) 로 착수·완료 (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) 로 착수·완료. 둘 다 위 §완료 표로 이동했다 — 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
 
 트랙 B 후속 후보는 현재 백로그 0 — 사용자 피드백 발생 시 본 표에 추가.
 

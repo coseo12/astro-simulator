@@ -1,15 +1,19 @@
 name: shader-pixel-guard
 
 # 프로젝트 로컬 워크플로 — harness 업데이트 대상 아님.
-# 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 8종 CI 상시 가드 (아래 §목적 지대 계수와 동기).
+# 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 스크립트 CI 상시 가드.
 #
-# 목적: 셰이더 feature 8개 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
-#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크 / #1197 바다 깊이 색) 의 픽셀 회귀 (uniform 배선 절단·
-#   분기 오염·광원 붕괴·자전 정지·극관/biome 소실·대륙 마스크 미적용·바다 깊이 소실) 를 PR 단계에서 차단.
+# 목적: 아래 셰이더 feature 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
+#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크 / #1197 바다 깊이 색 / #1202 대기 산란 rim) 의
+#   픽셀 회귀 (uniform 배선 절단·분기 오염·광원 붕괴·자전 정지·극관/biome 소실·대륙 마스크 미적용·
+#   바다 깊이 소실·rim 소실 또는 광원각 의존 상실) 를 PR 단계에서 차단.
 #   r1-guard 는 UI 영역 diff 만 담당하고 canvas 픽셀은 baseline 대상이 아니므로
 #   (#756 ADR §A2 결정 7) 본 가드가 canvas 성질을 지킨다.
-#   ⚠️ 지대 계수는 종전 "5개" 였으나 열거는 6개였다 (선재 off-by-one). #1119 추가와 함께 7 로 정정,
-#      #1197 추가와 함께 8 로 갱신 (계수와 열거를 함께 센다).
+#   ⚠️ **지대·스크립트의 계수(「N종」·「N개」)는 주석에 두지 않는다.** 종전에는 두 곳에 서로 다른
+#      계수가 박혀 있었고 (헤더 "8종" ↔ 목적 "9개 지대" — 본 워크플로 자신이 #1202 에서 만든 drift),
+#      그 전에도 계수 "5개" ↔ 열거 6개의 선재 off-by-one 이 있었다. 정본은 **아래 열거와 job step
+#      목록**이고, 계수는 세는 술어(지대? 스크립트? step?)에 따라 값이 갈려 어느 쪽도 참인 채로
+#      어긋난다. 지대 추가 시 갱신 대상은 위 열거 한 곳뿐이다.
 #
 # 판정 규약 (ADR 결정 3): per-body 상대 성질 (ON vs OFF) 만 — 절대 임계 금지
 #   (swiftshader ↔ 하드웨어 값 편차). 756 마진은 D1 CI 실측으로 확정 (스크립트 주석 참조).
@@ -17,6 +21,10 @@ name: shader-pixel-guard
 # CI 렌더 전제 (ADR §실측 1): ubuntu runner 는 GPU 부재 → headless chromium 이 SwiftShader
 #   (소프트웨어 렌더) 로 WebGL2 렌더. detect-gpu-tier 는 tier-c 로 판정하므로 6 스크립트 전부
 #   `?gpu=a` tier 강제 플래그 (P11-C #290) 로 표면 셰이더에 진입한다.
+#   ⚠️ 부기 (#1202, 2026-09-07): 위 "6 스크립트" 는 **선재 drift** 다. 본 워크플로가 부르는
+#     verify 스크립트에서 `?gpu=a` 를 쓰는 것은 #1202 이전에 이미 756 / 762 / 773 / 774 / 782 /
+#     783 / 1119 이었고, 여기에 #1202 가 더해진다. 원문은 당시 기록으로 보존하되 **정정판에는
+#     계수를 다시 박지 않는다** (위 계수 금지 규약 — 정본은 열거와 job step 목록이다).
 #   로컬 재현: SWIFTSHADER=1 HEADFUL=0 BASE_URL=http://localhost:3001 \
 #     pnpm --filter @astro-simulator/web run verify:756-surface   (756/773/783 지원)
 #
@@ -175,6 +183,19 @@ jobs:
           MODE=seam HEADFUL=0 BASE_URL=http://localhost:3001 \
             CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1119-earth-mask-seam" \
             pnpm --filter @astro-simulator/web run verify:1119-earth-mask
+
+      # #1202 — 대기 산란 rim. ADR `20260628-756` Amendment 8 §A8.8 의 게이트를 강제한다.
+      # 이 step 이 없으면 **단위 테스트만으로는 잡히지 않는 회귀 클래스가 통째로 열린다** — 변이
+      # M-2 (바인딩 블록만 삭제, GLSL 무변경) 를 주입한 상태에서 `packages/core` 단위 테스트
+      # **1075건이 전건 통과**했고 (실측, #1202 PR 본문) 오직 본 가드의 G2 만 FAIL 했다.
+      # 「1 step = 1 명령」 규약은 783/1119 선례 그대로. 변이 주입 모드(INJECT=…)는 CI 에 배선하지
+      # 않는다 — 판별력 실증은 PR 시점의 1회 의무이고 상시 실행은 비용만 는다.
+      - name: verify:1202-atmosphere-rim (림 낮면>밤면 + 반경 프로파일 + 채도 비붕괴 + 박명 호)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1202-atmosphere-rim" \
+            pnpm --filter @astro-simulator/web run verify:1202-atmosphere-rim
 
       - name: dev server 정리
         if: always()

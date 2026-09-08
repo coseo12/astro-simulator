@@ -718,6 +718,58 @@ jobs:
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-lod.mjs
 
       # ============================================================
+      # #1204 — tier 전환 시 sun-light 재앵커 회귀 가드 (verify:1204-sun-light). 신규 배선
+      # ============================================================
+      # 결함: `setTier` 가 origin/scale 을 바꾼 뒤 mesh·ring-anchor 만 즉시 재계산하고 광원은 두고
+      #   갔다. T2 → T3 전환 프레임에서 셰이더 `uSunDirection = normalize(sunPos − meshAbsPos)` 의
+      #   피연산자 둘이 동시에 원점이 되어 방향이 영벡터로 붕괴한다.
+      # 판정 2축: (1) 관측 전 프레임에서 `|sunPos − meshAbsPos| > 0` (2) 콘솔 에러 0 건.
+      #   body tier 진입 자체를 관측 못 하면 **판별력 0 으로 보고 FAIL** 시킨다 (초록 위장 차단).
+      # 배선 근거는 위 #1127 주석과 같은 클래스다 — PR #1206 reviewer 가 「`browser-verify-*.mjs`
+      #   28 개 중 이것만 npm script·CI 어느 쪽에도 없다」를 적발했다. 3단 판별력 실증은 「돌리면
+      #   작동한다」를 보였을 뿐 「돌아간다」를 보이지 않는다 (#1096 / #1127 재발 클래스).
+      # `BROWSER_VERIFY_GPU` 미설정 — 판정축이 픽셀이 아니라 **좌표**라 렌더러 백엔드에 비의존이다
+      #   (#1127 verify:lod 와 같은 논거). 스크립트 자체 쿼리는 `?gpu=a&focus=earth`.
+      # 재현 경로는 **실제 휠 입력**이어야 한다 — `camera.radius` 직접 대입은 `updateTierByCamera`
+      #   의 히스테리시스/lock 경로를 건너뛰어 전환이 일어나지 않는다. 진입 틱은 고정하지 않고
+      #   `WHEEL_TICKS_MAX=40` 까지 보낸다 (로컬 실측 19~20 틱).
+      - name: '#1204 sun-light 재앵커 회귀 가드 (verify:1204-sun-light)'
+        if: needs.diff-scope.outputs.code_changed == 'true'
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-1204-sun-light.mjs
+
+      # ============================================================
+      # #1205 — 일시정지(speed=0) 중 LOD 동결 회귀 가드 (verify:1205-pause-lod). 신규 배선
+      # ============================================================
+      # 결함: `runLodPass` 의 유일 호출부가 `updateAt` 안이었고 `updateAt` 은 `timeChanged` 바인딩
+      #   이라, `TimeController.tick` 이 false 를 반환하는 일시정지에서는 LOD 판정이 **한 번도
+      #   돌지 않았다**. 카메라 종속 판정이 시간 위상에 얹혀 있던 것 — 사용자에게는 「지구에
+      #   들어갔는데 절차 표면 없는 단색 빌보드」로 보인다. #756 이래 누적된 시각 자산이 전부
+      #   high/mid variant 전용이라 그 누적분을 통째로 못 본다.
+      #   ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
+      # 판정 술어 P-R = (가) ∧ (나) — **두 다리 모두 필요조건**이다.
+      #   (가) 비퇴화  : 일시정지 중 focus A→B 이동 시 `getLodStats()` 분포가 변한다
+      #   (나) 경로무관: `D_pause(A→B) === D_init(B)`
+      #   ⚠️ **(나) 단독은 결함 보유판에서 통과한다.** 두 조건이 둘 다 일시정지라 결함판에서는
+      #   양쪽이 같은 퇴화 상수로 수렴한다 — focus tween 은 Babylon `Animation`(= `scene.animate()`)
+      #   구동이라 sim time 과 무관하게 완주하므로 **카메라는 B 에 가고 LOD 만 안 따라온다**.
+      #   실측: 결함 보유 rev `1a21d85` 에서 `D_A = D_pause(B) = D_init(B) = 0/0/32` → (나) PASS.
+      #   #1123 「신설 e2e 가 결함 보유판에서도 전건 통과」 재생산이라 (가) 를 판별력 담당으로 둔다.
+      # 배선 조건은 **변이 실증**이었다 (#1123 클래스 차단). 같은 스크립트로 4상태를 돌려
+      #   원본 exit 0 / 훅 호출 1줄 제거 exit 1 / 훅을 `tick()` 조건 안으로 exit 1 / 복구 exit 0,
+      #   그리고 **stash 로 되돌린 실제 결함 보유 build 에서도 exit 1** 을 실증했다 (PR 본문 표).
+      # `BROWSER_VERIFY_GPU` 미설정 — 판정축이 픽셀이 아니라 **LOD 분포 카운트**라 렌더러 백엔드에
+      #   비의존이다 (#1127 verify:lod / #1204 와 같은 논거). 스크립트 자체 쿼리는
+      #   `?gpu=a&focus=<body>&speed=0&rotate=off`.
+      # ⚠️ `rotate=off` 는 무해한 디테일이 아니다 — `focusOn` 착지 radius 가
+      #   `boundingSphere.radiusWorld` 에서 나오는데 이 값이 자전에 따라 변한다 (실측 earth
+      #   `8.8978~12.3299`, 회전한 AABB 대각 오염). 켜 두면 (나) 의 두 세션이 서로 다른 거리에서
+      #   비교돼 술어가 무의미해진다. 스크립트가 판정 전에 두 세션의 tier/radius 일치를 확인하고
+      #   어긋나면 **판별력 0 으로 FAIL** 시킨다 (초록 위장 차단).
+      - name: '#1205 일시정지 LOD 동결 회귀 가드 (verify:1205-pause-lod)'
+        if: needs.diff-scope.outputs.code_changed == 'true'
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-1205-pause-lod.mjs
+
+      # ============================================================
       # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)
       # ============================================================
       # `if: always()` 가 정리의 단독 책임 지점이다. 개별 가드 step 안의 `kill` 은 Actions 기본
