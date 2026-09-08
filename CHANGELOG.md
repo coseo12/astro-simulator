@@ -5,6 +5,26 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1201] `verify:783-earth-detail MODE=ocean` 의 D6·D6-b 가 주입 프레임의 콘솔 에러에 눈이 멀어 있었다** ([#1201](https://github.com/coseo12/astro-simulator/issues/1201)) — `results.negative.consoleErrors` / `results.zero.consoleErrors` 는 **수집돼 JSON 덤프에 인쇄까지 되는데 어느 술어에도 들어가지 않았다**. 콘솔 축을 든 것은 D5(ON 프레임) 하나뿐이라, 주입 프레임에서 셰이더 컴파일 경고나 WebGL 런타임 예외가 나도 `patchedMaterials > 0` 과 갭 조건만 서면 두 게이트가 초록이었다. 세 술어를 `hasSimErrors`(1차 엄격, `browser-verify-utils.mjs` SSoT — #848/#1202 G7/#1204 판정 축 2 와 같은 함수)로 통일했다. 그 파일은 이미 같은 모듈을 import 하고 있어 **신규 의존 `0`** 이다.
+
+  ⚠️ **추가만으로는 판별력이 실증되지 않는다** ([#1123](https://github.com/coseo12/astro-simulator/issues/1123) 클래스). 변이 실증 [실측] — 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`, 각 프레임에 `console.error` 1건을 주입:
+
+  | 판                   | 변이            | 결과                                                                                   |
+  | -------------------- | --------------- | -------------------------------------------------------------------------------------- |
+  | 결함 보유(`c3634f9`) | negative 프레임 | **`exit 0` — 전 게이트 PASS (미검출)** · JSON 에 `"consoleErrors": 1` 이 찍힌 채로     |
+  | 본 판                | negative 프레임 | **`exit 1`** · **D6 단독 FAIL** (D5 · D6-b PASS)                                       |
+  | 본 판                | zero 프레임     | **`exit 1`** · **D6-b 단독 FAIL** (D5 · D6 PASS)                                       |
+  | 본 판                | ON 프레임       | **`exit 1`** · **D5 단독 FAIL** (D6 · D6-b PASS) — 통일이 기존 축을 깨지 않았다는 대조 |
+  | 본 판                | (없음 — 원복)   | `exit 0` · 전 게이트 PASS                                                              |
+
+  **축 분리와 프레임 분리가 둘 다 보인다.** 네 변이 전건에서 갭 축 수치가 원본과 **완전히 동일**했고(ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388`, 표본 `3612 / 3616 / 3605`) 붉어진 것은 콘솔 축 하나다. 그리고 한 프레임에 주입하면 **그 프레임의 술어만** FAIL 한다 — 세 프레임이 각기 별도 browser context/page 라 서로 다른 표본이기 때문이며, 이것이 확인되지 않으면 항이 셋이어도 실질은 하나다.
+
+  **`hasSimErrors` 통일 판단 근거**: D5 는 원래 `on.consoleErrors === 0` 이었고 `hasSimErrors` 기본(1차 엄격) 정책이 `consoleErrors.length > 0` 이라 **D5 의 판정 결과는 정의상 불변**이다(표현만 바뀐다 — 위 표 4행이 그 대조). 부분 적용(`d6`·`d6b` 만 `=== 0`)을 택하지 않은 이유는 같은 함수 안에 「콘솔 에러란 무엇인가」의 정의가 두 벌 생기고, 나중에 한쪽에만 `allowExternal` 이 붙는 순간 조용히 갈라지기 때문이다. 값을 개수에서 **메시지 배열**로 바꿔 붉게 죽었을 때 원인 문자열이 로그에 남는다.
+
+  **무회귀** [실측]: `MODE=ocean` D5 · D6 · D6-b · 표본 하한 전건 PASS, 값이 ADR §A7.5 확정 실측(`0.2317` / `0.0027` / `0.2289`)과 **동일** · `MODE=dod` DoD 1~4 전건 PASS(N `70.3%` / S `55.7%` / 적도 G-share `0.5186` > 중위도 `0.4029` / 마젠타 `0` px / 밤면 `52.7` < `70.8`). ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) §A7.5 표 아래에 dated 부기로 박제했다(원문 행 무접촉).
+
 ## [0.87.0] - 2026-09-08
 
 ### Behavior Changes

@@ -1575,6 +1575,10 @@ FRAGMENT 의 `fbm(` 호출 **4개** (`p*2.4` / `p*3.6` / `p*4.0` / `p*5.0`) · `
 | D6 | 판별력 | `deepOceanFactor` 를 `(1,1,1)` 로 고착 주입한 프레임에서 D5 가 **FAIL** + `patchedMaterials > 0` + `ON − negative >= M` |
 | D6-b | 바인딩 기여도 | `deepOceanFactor` 를 **`(0,0,0)`** 로 고착 주입한 프레임의 갭 `zeroGap` 에 대해 `zeroGap − onGap >= M` + `patchedMaterials > 0` |
 
+⚠️ **부기 (#1201, 2026-09-08) — 위 세 행에 콘솔 에러 축이 더해졌다.** 원문 행은 당시 결정의 기록이므로 손대지 않는다. 실제 구현은 세 프레임 **전부**에 `hasSimErrors(consoleErrors) === false` 를 추가로 요구한다 (1차 엄격 = 1건이라도 있으면 실패, `scripts/browser-verify-utils.mjs` SSoT). D5 는 도입 시점부터 코드에 이 축이 있었으나 **표 행이 그것을 적지 않아** 문서와 구현이 갈려 있었고, D6·D6-b 는 `consoleErrors` 를 **수집·인쇄만 하고 판정하지 않았다**. 재는 것은 갭이 아니라 **측정이 성립한 런타임인가**이며, 같은 이유로 §A8 G7 (#1202) 과 #1204 판정 축 2 가 이미 서 있다.
+
+[실측] 2026-09-08 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`, 각 프레임에 `console.error` 1건 주입 — 결함 보유판(`c3634f9`) negative 주입 **`exit 0` (전 게이트 PASS · 미검출)** / 본 판 negative 주입 `exit 1` **D6 단독 FAIL** / zero 주입 `exit 1` **D6-b 단독 FAIL** / ON 주입 `exit 1` **D5 단독 FAIL** / 무변이 `exit 0`. 네 변이 전건에서 갭 축 수치는 원본과 동일했다 (ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388`) — **콘솔 축 단독 발화**이고, 세 프레임이 각기 별도 context/page 라 **주입한 프레임의 술어만** 붉어진다.
+
 **임계는 절대값이 아니라 GPU 실측 확정치다** (ADR `20260705-759` 결정 3). [실측] 2026-09-06 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3001`, **3회 전건 동일 (sd `0`)**: ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / 표본 `n = 3,612`. ⇒ `τ = 0.11` · `M = 0.11` · 표본 하한 `900` (각각 실측의 절반 / 절반 / 1/4).
 
 ⚠️ **설계의 [산식] 예측 `0.4477` 을 옮겨 적지 않았다** — GPU 실측은 `0.2317` 로 그 절반 수준이다 (투영 foreshortening · AA · swiftshader · `ndl >= 0.9` cap 이 disk 중앙만 본다). 설계가 「그대로 옮겨 적지 말 것」이라 명시한 이유가 실측으로 확인됐다.

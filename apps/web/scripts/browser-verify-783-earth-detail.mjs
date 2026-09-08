@@ -69,6 +69,13 @@
  * 따른다. 표본 하한은 세 프레임 **전부**에 건다 — 갭이 기대 방향으로 낮거나 높은 이유가 「감쇠가
  * 죽어서」가 아니라 「표본이 말라서」일 수 있고, 그 상태의 낙차 술어는 오히려 초록으로 보인다.
  *
+ * **콘솔 에러 축은 세 프레임 전부에 건다** (#1201, `hasSimErrors` 1차 엄격 — #848/#1202 G7/#1204
+ * 판정 축 2 와 같은 SSoT). 한때 이 축은 ON 프레임에만 걸려 있었고, 그래서 주입 프레임에서 셰이더
+ * 컴파일 경고나 WebGL 예외가 나도 갭 조건만 서면 D6·D6-b 가 초록이었다 ([실측] negative 프레임에
+ * `console.error` 1건 주입 → 결함 보유판 `exit 0` / 본 판 `exit 1` 이며 갭 축은 셋 다 PASS 인 채
+ * D6 **단독** FAIL). 세 프레임은 각기 별도 context/page 라 **서로 다른 표본**이다 — zero 프레임에만
+ * 주입하면 D6-b 만 붉어진다 ([실측] 같은 사이클).
+ *
  * ── 픽셀 층 변이 실증 (원본 PASS · 변이 결과) ────────────────────────────────
  * PR 본문의 변이 표는 **단위 테스트 층** (`procedural-planet-shader.test.ts`) 전수 재현이다.
  * 아래는 **픽셀 층** (본 게이트) 에서 별도로 실측한 변이다.
@@ -99,7 +106,11 @@
  */
 
 import { chromium } from 'playwright';
-import { waitForLodSettle, withBrowser } from '../../../scripts/browser-verify-utils.mjs';
+import {
+  hasSimErrors,
+  waitForLodSettle,
+  withBrowser,
+} from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PNG } from 'pngjs';
@@ -768,7 +779,9 @@ async function runOcean(browser) {
     const { context, page, consoleErrors } = await setupOceanFrame(browser);
     const buf = await captureBody(page, 'earth', 'qa-1197-ocean-on');
     results.on = await measureOceanDepth(page, buf);
-    results.on.consoleErrors = consoleErrors.length;
+    // 개수가 아니라 **메시지 배열**을 넘긴다 — 판정은 `hasSimErrors` 가 하고 (아래 D5/D6/D6-b),
+    // 붉게 죽었을 때 원인 문자열이 JSON 덤프에 그대로 남아야 「무엇이 났는지」를 로그만으로 안다.
+    results.on.consoleErrors = consoleErrors;
     await context.close();
   }
 
@@ -779,7 +792,7 @@ async function runOcean(browser) {
     await page.waitForTimeout(800); // observer 는 다음 bind 부터 유효 — 프레임 몇 개 대기
     const buf = await captureBody(page, 'earth', 'qa-1197-ocean-negative');
     results.negative = await measureOceanDepth(page, buf);
-    results.negative.consoleErrors = consoleErrors.length;
+    results.negative.consoleErrors = consoleErrors;
     results.negative.patchedMaterials = injected.patched;
     results.negative.injectError = injected.error ?? null;
     await context.close();
@@ -792,7 +805,7 @@ async function runOcean(browser) {
     await page.waitForTimeout(800);
     const buf = await captureBody(page, 'earth', 'qa-1197-ocean-zero');
     results.zero = await measureOceanDepth(page, buf);
-    results.zero.consoleErrors = consoleErrors.length;
+    results.zero.consoleErrors = consoleErrors;
     results.zero.patchedMaterials = injected.patched;
     results.zero.injectError = injected.error ?? null;
     await context.close();
@@ -822,9 +835,25 @@ async function runOcean(browser) {
     return;
   }
 
+  // ── 콘솔 축 (#1201) ──────────────────────────────────────────────────────
+  // 세 프레임 모두 에러 메시지를 **수집**하고 있었으나 술어에 들어간 것은 ON 프레임 하나뿐이었다.
+  // 그 결과 주입 프레임에서 셰이더 컴파일 경고나 WebGL 런타임 예외가 나도, `patchedMaterials > 0`
+  // 과 갭 조건만 서면 D6·D6-b 가 초록이었다 ([실측] negative 프레임에 `console.error` 1건을
+  // 주입해도 결함 보유판은 `exit 0`). 재는 것은 갭이 아니라 **측정이 성립한 런타임인가**이고,
+  // 이는 #1202 G7 · #1204 판정 축 2 가 이미 같은 이유로 세운 축이다.
+  //
+  // **`hasSimErrors` 로 셋을 통일한 판단**: D5 는 원래 `=== 0` 이었다. 기본(1차 엄격) 정책은
+  // `consoleErrors.length > 0` 이라 D5 의 판정 결과는 **정의상 불변**이고 (표현만 바뀐다),
+  // 대신 같은 함수 안에 「콘솔 에러란 무엇인가」의 정의가 두 벌 생기는 것을 막는다 — 나중에
+  // 한쪽에 `allowExternal` 이 붙으면 조용히 갈라지는, 이 저장소가 반복해 온 drift 클래스다.
+  // `browser-verify-utils.mjs` 는 이 파일이 이미 import 하고 있어 **신규 의존 0** 이다 (#848 SSoT).
+  const onConsoleOk = !hasSimErrors(on.consoleErrors);
+  const negConsoleOk = !hasSimErrors(neg.consoleErrors);
+  const zeroConsoleOk = !hasSimErrors(zero.consoleErrors);
+
   const gapDrop = on.gap - neg.gap;
-  const d5 = on.gap >= OCEAN_GAP_TAU && on.consoleErrors === 0;
-  const d6 = !neg.error && neg.patchedMaterials > 0 && gapDrop >= OCEAN_GAP_MARGIN;
+  const d5 = on.gap >= OCEAN_GAP_TAU && onConsoleOk;
+  const d6 = !neg.error && neg.patchedMaterials > 0 && gapDrop >= OCEAN_GAP_MARGIN && negConsoleOk;
   // ── D6-b — 바인딩 기여도 계약 (변이 M-h) ──────────────────────────────────
   // 무엇을 거는가: `deepOceanFactor` 를 `(0,0,0)` 으로 주입한 프레임의 갭 `zeroGap` 이 ON 프레임의
   // 갭보다 **`M` 이상 크다**. 임계는 D6 와 **같은 상수** `OCEAN_GAP_MARGIN` 재사용 — 새 임계
@@ -845,16 +874,28 @@ async function runOcean(browser) {
   // ON 프레임과 같아져 낙차가 `0` 이 되므로 **초록이 아니라 붉게** 죽지만, 그 붉음의 원인이
   // 「M-h 검출」인지 「주입 실패」인지 구분되어야 한다.
   const zeroGapRise = (zero.gap ?? 0) - on.gap;
-  const d6b = !zero.error && zero.patchedMaterials > 0 && zeroGapRise >= OCEAN_GAP_MARGIN;
+  const d6b =
+    !zero.error && zero.patchedMaterials > 0 && zeroGapRise >= OCEAN_GAP_MARGIN && zeroConsoleOk;
   console.log(
-    `D5 깊이 그라데이션: ON 상대 갭 ${on.gap.toFixed(4)} (≥ τ ${OCEAN_GAP_TAU}) · P10 ${on.p10Lum} / P50 ${on.p50Lum} / P90 ${on.p90Lum} · console err ${on.consoleErrors} → ${d5 ? 'PASS' : 'FAIL'}`,
+    `D5 깊이 그라데이션: ON 상대 갭 ${on.gap.toFixed(4)} (≥ τ ${OCEAN_GAP_TAU}) · P10 ${on.p10Lum} / P50 ${on.p50Lum} / P90 ${on.p90Lum} · console err ${on.consoleErrors.length} (== 0) → ${d5 ? 'PASS' : 'FAIL'}`,
   );
   console.log(
-    `D6 판별력 (deepOceanFactor (1,1,1) 고착 주입): 머티리얼 ${neg.patchedMaterials}개 패치 · negative 갭 ${neg.gap?.toFixed(4)} · 낙차 ${gapDrop.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) → ${d6 ? 'PASS' : 'FAIL'}`,
+    `D6 판별력 (deepOceanFactor (1,1,1) 고착 주입): 머티리얼 ${neg.patchedMaterials}개 패치 · negative 갭 ${neg.gap?.toFixed(4)} · 낙차 ${gapDrop.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) · console err ${neg.consoleErrors.length} (== 0) → ${d6 ? 'PASS' : 'FAIL'}`,
   );
   console.log(
-    `D6-b 바인딩 기여도 (deepOceanFactor (0,0,0) 고착 주입 = 변이 M-h 대조군): 머티리얼 ${zero.patchedMaterials}개 패치 · zero 갭 ${zero.gap?.toFixed(4)} · ON 대비 상승 ${zeroGapRise.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) → ${d6b ? 'PASS' : 'FAIL'}`,
+    `D6-b 바인딩 기여도 (deepOceanFactor (0,0,0) 고착 주입 = 변이 M-h 대조군): 머티리얼 ${zero.patchedMaterials}개 패치 · zero 갭 ${zero.gap?.toFixed(4)} · ON 대비 상승 ${zeroGapRise.toFixed(4)} (≥ M ${OCEAN_GAP_MARGIN}) · console err ${zero.consoleErrors.length} (== 0) → ${d6b ? 'PASS' : 'FAIL'}`,
   );
+  // 어느 프레임에서 났는지가 판정과 함께 보여야 한다 — 셋이 서로 다른 표본이라 (각기 별도
+  // context/page) 「콘솔 에러 N 건」 하나로 뭉뚱그리면 어느 축이 붉은지 로그에서 못 읽는다.
+  for (const [label, frame] of [
+    ['ON', on],
+    ['negative', neg],
+    ['zero', zero],
+  ]) {
+    if (frame.consoleErrors.length === 0) continue;
+    console.log(`  ↳ [console] ${label} 프레임 ${frame.consoleErrors.length}건:`);
+    for (const e of frame.consoleErrors.slice(0, 10)) console.log(`      ${e}`);
+  }
   console.log(
     `  ↳ negative 프레임에 D5 술어 적용: 갭 ${neg.gap?.toFixed(4)} ≥ τ ${OCEAN_GAP_TAU} → ${neg.gap >= OCEAN_GAP_TAU ? 'PASS (판별력 없음 — 가드 실패)' : 'FAIL (기대대로 — 가드 작동)'}`,
   );
