@@ -770,6 +770,10 @@ col = mix(col, iceColor, iceMask);
 | 8   | **데이터 0**: `git diff --stat` 에 `solar-system.json` 부재                                                                                                                            | reviewer 실측                                                                                                                                    |
 | 9   | **core typecheck 0** (#719 — dev/메인/reviewer 3중) + 기존 procedural-planet 테스트 전체 PASS                                                                                          | `pnpm --filter core typecheck` + vitest                                                                                                          |
 
+⚠️ **부기 (#1201, 2026-09-08) — 위 1~4 행에 콘솔 에러 축이 더해졌다.** 원문 행은 당시 결정의 기록이므로 손대지 않는다. 실제 구현(`browser-verify-783-earth-detail.mjs MODE=dod`)은 각 DoD 에 `hasSimErrors(consoleErrors) === false` 를 추가 conjunct 로 요구한다 — ON 프레임은 DoD 1~4 전부, OFF(`&surface=off`) 프레임은 **DoD 1** 에 (그 프레임을 소비하는 유일한 술어이므로). 이 축은 §A7.5 D5/D6/D6-b 와 **같은 함수**(`scripts/browser-verify-utils.mjs` `hasSimErrors`, 1차 엄격)를 쓴다. 그전까지 두 프레임은 `consoleErrors` 를 **수집·인쇄만 하고 판정하지 않았다**. OFF 프레임을 DoD 1 에 거는 것이 특히 필요한 이유는 `capPass` 의 비교항이 `off[side].whiteDayPct === null ||` 로 시작해 **OFF 측정이 무너지면 비교가 스스로 참이 되어 사라지기** 때문이다 — 측정 실패가 완화로 둔갑하는 경로다.
+
+[실측] 2026-09-08 로컬 `HEADFUL=0`(headless chromium, swiftshader 미지정) + `next dev :3001`, 프레임 하나에 `console.error` 1건 주입 — 결함 보유판(`6ea56c5`) **ON 주입 `exit 0` / OFF 주입 `exit 0`** (양쪽 다 DoD 1~4 전건 PASS · `↳ console errors: 1` 이 찍힌 채로) / 본 판 **ON 주입 `exit 1` DoD 1~4 전건 FAIL** / **OFF 주입 `exit 1` DoD 1 단독 FAIL** (DoD 2·3·4 PASS) / 무변이 `exit 0`. 다섯 실행 전건에서 픽셀 수치가 **완전히 동일**했다 (N `70.3%` / S `55.7%` / 적도 G-share `0.5186` n=1550 > 중위도 `0.4029` n=883 / 마젠타 `0` px / 밤면 `52.7` < 낮면 `212.3`) — **콘솔 축 단독 발화**이며, 두 프레임이 각기 별도 context/page 라 **주입한 프레임의 술어만** 붉어진다.
+
 ### A3.6 §Visual Fidelity 의무 체크리스트 4항목 (principles.md §1)
 
 - [x] **데이터 SSoT 보존** — biome/극관 색·위도 임계는 전부 `procedural-planet-shader.ts` rendering-only 미학 상수. `solar-system.json` 직접 수정 0 (DoD 8). ocean = `colorHint.hex` read-only 유지.
@@ -1169,6 +1173,10 @@ v = clamp(v + warp.y, 0.001, 0.999);
 | 13  | **실 Chrome GUI 수동 검증 1회** — headless false positive 차단 (CLAUDE.md §headless ≠ 실 브라우저)                                                                                          | qa                                                                                                                 |
 | 14  | **원거리 축소 shimmer 0** — 전체 태양계 조감 (지구 disk `R < 16 px` 대역) 에서 `uMaskEnabled = 0` 전환 확인 + 카메라 후퇴 중 지구 픽셀 프레임간 변동이 마스크 OFF 상태와 동등              | 결정 4 LOD 규칙 (cross-validate 권고 2). `?rotate=off&speed=0` 결정적 프레임 2장 비교. 임계 16 px 는 dev 조정 대상 |
 | 15  | **a11y 비대상 — 근거 박제** (reviewer 권고 수용): `verify:a11y` / `verify:hud-contrast` 는 **비-범위**이나 그 판단의 근거를 남긴다. ① 마스크는 **canvas 내부 albedo 만** 바꾸고 DOM·HUD·포커스 순서·ARIA 를 건드리지 않는다 ② 저장소 대비 측정은 **HUD chip 이 `bg-void@α0.85` backing 을 가져 canvas 휘도와 무관**하도록 이미 고쳐져 있다 (#749) ③ 대비 계산의 worst-case 는 **sun-white** 이고 마스크는 그보다 밝은 색을 만들지 않는다 (`ICE_COLOR_RGB` 상한) | 근거만 박제하고 **실행은 회귀 스위트(`verify:smoke`)에 이미 포함된 경로로 갈음**. r1-guard 를 canvas 미측정 근거로 비대상 처리한 §A2.3 결정 7 과 **같은 형식** — "docs 라서 생략" 류의 단독 사유가 아니라 **측정 대상 구조**를 근거로 한다 |
+
+⚠️ **부기 (#1201 스윕, 2026-09-08) — 위 1·2·14 행에 콘솔 에러 축이 더해졌다.** 원문 행은 손대지 않는다. `browser-verify-1119-earth-mask.mjs` 는 세 모드 전부에서 `consoleErrors` 를 수집하면서 술어에 든 것은 `MODE=dod` DoD 1 의 ON 프레임 **하나뿐**이었고, `MODE=lod` 는 호출부가 배열을 **구조분해조차 하지 않아** 버리고 있었다. 배선 규칙은 §A3.5 부기와 같다 — 프레임을 **소비하는** 술어에 건다: DoD 1 에 ON + `?surface=off` 프레임 (`surfaceOffGap` 항), DoD 2 에 마스크고착 프레임, DoD 14 의 양성 대조군에 `near`, 두 원거리 술어에 `far`, `MODE=seam` 은 판정에 쓰이는 `best` 행. 술어는 §A7.5·§A3.5 와 같은 `hasSimErrors` 다. `MODE=lod` 가 특히 필요한 이유는 `farUnchanged` 가 「픽셀이 안 바뀐다」를 재는 술어라 **렌더가 예외로 죽어 아무것도 안 그려져도 초록**이 되기 때문이다.
+
+[실측] 2026-09-08 로컬 `HEADFUL=0`(headless chromium) + `next dev :3001` — 무변이 `MODE=dod` / `MODE=lod` / `MODE=seam` **전건 `exit 0`** (IoU ON `0.936` / 마스크고착 `0.308` / `surface=off` `0` · lod `R 98.32 → 5.619` diff `40952px → 0%` · seam `0.9602` / `0.877`, 전부 기존 baseline 동일). 프레임 주입 시 — `forcedOff` → `exit 1` **DoD 2 단독 FAIL** / `surfaceOff` → `exit 1` **DoD 1 단독 FAIL** / `near` → `exit 1` **양성 대조군 단독 FAIL** / `far` → `exit 1` **원거리 2 술어 FAIL**(양성 대조군 PASS). 네 주입 전건에서 IoU·diff 수치가 무변이와 **완전히 동일**했다 — 콘솔 축 단독 발화 + 프레임별 분리.
 
 #### A4.5-9 DoD 9 재유도 이력 (reviewer 차단 판정 수용, 2026-08-17 — 구현 PR [#1121](https://github.com/coseo12/astro-simulator/pull/1121))
 
@@ -1574,6 +1582,12 @@ FRAGMENT 의 `fbm(` 호출 **4개** (`p*2.4` / `p*3.6` / `p*4.0` / `p*5.0`) · `
 | D5 | 픽셀 실측 | `ndl >= 0.9` ∧ `|sin lat| < 0.84` ∧ `b >= g` 인 ocean 픽셀의 상대 갭 `>= τ` **∧** 표본 `>= 900` |
 | D6 | 판별력 | `deepOceanFactor` 를 `(1,1,1)` 로 고착 주입한 프레임에서 D5 가 **FAIL** + `patchedMaterials > 0` + `ON − negative >= M` |
 | D6-b | 바인딩 기여도 | `deepOceanFactor` 를 **`(0,0,0)`** 로 고착 주입한 프레임의 갭 `zeroGap` 에 대해 `zeroGap − onGap >= M` + `patchedMaterials > 0` |
+
+⚠️ **부기 (#1201, 2026-09-08) — 위 세 행에 콘솔 에러 축이 더해졌다.** 원문 행은 당시 결정의 기록이므로 손대지 않는다. 실제 구현은 세 프레임 **전부**에 `hasSimErrors(consoleErrors) === false` 를 추가로 요구한다 (1차 엄격 = 1건이라도 있으면 실패, `scripts/browser-verify-utils.mjs` SSoT). D5 는 도입 시점부터 코드에 이 축이 있었으나 **표 행이 그것을 적지 않아** 문서와 구현이 갈려 있었고, D6·D6-b 는 `consoleErrors` 를 **수집·인쇄만 하고 판정하지 않았다**. 재는 것은 갭이 아니라 **측정이 성립한 런타임인가**이며, 같은 이유로 §A8 G7 (#1202) 과 #1204 판정 축 2 가 이미 서 있다.
+
+[실측] 2026-09-08 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`, 각 프레임에 `console.error` 1건 주입 — 결함 보유판(`c3634f9`) negative 주입 **`exit 0` (전 게이트 PASS · 미검출)** / 본 판 negative 주입 `exit 1` **D6 단독 FAIL** / zero 주입 `exit 1` **D6-b 단독 FAIL** / ON 주입 `exit 1` **D5 단독 FAIL** / 무변이 `exit 0`. 네 변이 전건에서 갭 축 수치는 원본과 동일했다 (ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388`) — **콘솔 축 단독 발화**이고, 세 프레임이 각기 별도 context/page 라 **주입한 프레임의 술어만** 붉어진다.
+
+⚠️ **부기 확장 (#1201 R5, 2026-09-08) — 같은 클래스가 이 파일의 다른 MODE 에도 있었다.** reviewer 가 `MODE=dod` 를 지목했고, 스크립트 이름이 아니라 **「`consoleErrors` 를 수집하는데 판정식에 항이 없다」 패턴**으로 스윕해 전건을 닫았다. 결과: `MODE=dod` → §A3.5 부기 / `MODE=others` → 종료 코드 축 신설 (캡처 PNG 는 그대로 기록하고 exit 만 붉힌다 — 그 PNG 가 `MODE=diff` 의 입력이라 **에러 난 런타임의 캡처가 조용히 diff 로 흘러가는** 경로였다. [실측] jupiter 프레임 주입 → `exit 1` · 해당 body 만 `FAIL` · PNG `3`장 정상 기록 / 무변이 `exit 0`) / `MODE=diff` → 브라우저 미사용이라 **대상 아님**. 파일 밖으로도 같은 술어를 돌려 `browser-verify-1119-earth-mask.mjs` 3 모드를 닫았고(§A4.5 부기), `browser-verify-1202-atmosphere-rim.mjs` 는 G7 이 이미 서 있으며 `MODE=profile` 은 게이트 이전에 반환하는 **선언된 비-게이트 모드**라 해당 없음을 확인했다.
 
 **임계는 절대값이 아니라 GPU 실측 확정치다** (ADR `20260705-759` 결정 3). [실측] 2026-09-06 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3001`, **3회 전건 동일 (sd `0`)**: ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / 표본 `n = 3,612`. ⇒ `τ = 0.11` · `M = 0.11` · 표본 하한 `900` (각각 실측의 절반 / 절반 / 1/4).
 

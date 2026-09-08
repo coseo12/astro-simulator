@@ -5,6 +5,56 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1201] `verify:783-earth-detail MODE=ocean` 의 D6·D6-b 가 주입 프레임의 콘솔 에러에 눈이 멀어 있었다** ([#1201](https://github.com/coseo12/astro-simulator/issues/1201)) — `results.negative.consoleErrors` / `results.zero.consoleErrors` 는 **수집돼 JSON 덤프에 인쇄까지 되는데 어느 술어에도 들어가지 않았다**. 콘솔 축을 든 것은 D5(ON 프레임) 하나뿐이라, 주입 프레임에서 셰이더 컴파일 경고나 WebGL 런타임 예외가 나도 `patchedMaterials > 0` 과 갭 조건만 서면 두 게이트가 초록이었다. 세 술어를 `hasSimErrors`(1차 엄격, `browser-verify-utils.mjs` SSoT — #848/#1202 G7/#1204 판정 축 2 와 같은 함수)로 통일했다. 그 파일은 이미 같은 모듈을 import 하고 있어 **신규 의존 `0`** 이다.
+
+  ⚠️ **추가만으로는 판별력이 실증되지 않는다** ([#1123](https://github.com/coseo12/astro-simulator/issues/1123) 클래스). 변이 실증 [실측] — 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`, 각 프레임에 `console.error` 1건을 주입:
+
+  | 판                   | 변이            | 결과                                                                                   |
+  | -------------------- | --------------- | -------------------------------------------------------------------------------------- |
+  | 결함 보유(`c3634f9`) | negative 프레임 | **`exit 0` — 전 게이트 PASS (미검출)** · JSON 에 `"consoleErrors": 1` 이 찍힌 채로     |
+  | 본 판                | negative 프레임 | **`exit 1`** · **D6 단독 FAIL** (D5 · D6-b PASS)                                       |
+  | 본 판                | zero 프레임     | **`exit 1`** · **D6-b 단독 FAIL** (D5 · D6 PASS)                                       |
+  | 본 판                | ON 프레임       | **`exit 1`** · **D5 단독 FAIL** (D6 · D6-b PASS) — 통일이 기존 축을 깨지 않았다는 대조 |
+  | 본 판                | (없음 — 원복)   | `exit 0` · 전 게이트 PASS                                                              |
+
+  **축 분리와 프레임 분리가 둘 다 보인다.** 네 변이 전건에서 갭 축 수치가 원본과 **완전히 동일**했고(ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388`, 표본 `3612 / 3616 / 3605`) 붉어진 것은 콘솔 축 하나다. 그리고 한 프레임에 주입하면 **그 프레임의 술어만** FAIL 한다 — 세 프레임이 각기 별도 browser context/page 라 서로 다른 표본이기 때문이며, 이것이 확인되지 않으면 항이 셋이어도 실질은 하나다.
+
+  **`hasSimErrors` 통일 판단 근거**: D5 는 원래 `on.consoleErrors === 0` 이었고 `hasSimErrors` 기본(1차 엄격) 정책이 `consoleErrors.length > 0` 이라 **D5 의 판정 결과는 정의상 불변**이다(표현만 바뀐다 — 위 표 4행이 그 대조). 부분 적용(`d6`·`d6b` 만 `=== 0`)을 택하지 않은 이유는 같은 함수 안에 「콘솔 에러란 무엇인가」의 정의가 두 벌 생기고, 나중에 한쪽에만 `allowExternal` 이 붙는 순간 조용히 갈라지기 때문이다. 값을 개수에서 **메시지 배열**로 바꿔 붉게 죽었을 때 원인 문자열이 로그에 남는다.
+
+  **무회귀** [실측]: `MODE=ocean` D5 · D6 · D6-b · 표본 하한 전건 PASS, 값이 ADR §A7.5 확정 실측(`0.2317` / `0.0027` / `0.2289`)과 **동일** · `MODE=dod` DoD `1~4` 전건 PASS(N `70.3%` / S `55.7%` / 적도 G-share `0.5186` > 중위도 `0.4029` / 마젠타 `0` px / 밤면 `52.7` < `70.8`). ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) §A7.5 표 아래에 dated 부기로 박제했다(원문 행 무접촉).
+
+  **⚠️ 같은 클래스가 같은 파일의 다른 MODE 에도, 다른 가드 파일에도 있었다 (R5 — 범위 확대).** reviewer 가 `MODE=dod` 를 지목했고, **스크립트 이름이 아니라 「`consoleErrors` 를 수집하는데 판정식에 항이 없다」 패턴**으로 스윕해 전건을 닫았다. 남기면 세 번째 이슈가 난다.
+
+  - **`browser-verify-783-earth-detail.mjs MODE=dod`** — DoD `1~4` 에 콘솔 conjunct 신설. 배선은 「프레임을 **소비하는** 술어에 건다」(ocean 의 D5=ON / D6=negative / D6-b=zero 와 같은 규칙): ON 프레임은 DoD `1~4` 전부, OFF(`&surface=off`) 프레임은 **DoD 1** 에. OFF 를 거는 것이 특히 필요한 이유는 `capPass` 의 비교항이 `off[side].whiteDayPct === null ||` 로 시작해 **OFF 측정이 무너지면 비교가 스스로 참이 되어 사라지기** 때문이다 — 측정 실패가 완화로 둔갑하는 경로다.
+  - **`MODE=others`** — 판정식이 없는 캡처 모드라 DoD 에 항을 더할 자리가 없다. 대신 **종료 코드 축**을 신설했다: 여기서 나온 PNG 가 그대로 `MODE=diff` 의 입력이라, **에러 난 런타임의 캡처가 조용히 diff 로 흘러가는** 경로가 열려 있었다. 캡처 파일은 그대로 쓰고(진단 가치) exit 만 붉힌다.
+  - **`MODE=diff`** — 브라우저를 열지 않으므로 **대상 아님**.
+  - **`browser-verify-1119-earth-mask.mjs` 3 모드** (파일 밖 스윕, CI `shader-pixel-guard` 3 step 전부) — `MODE=dod` 는 ON 프레임 하나만 술어에 있었고, **`MODE=lod` 는 호출부가 `consoleErrors` 를 구조분해조차 하지 않아 배열을 버리고 있었다**(수집조차 회수 안 함 — 783 보다 한 단계 앞의 상태). DoD 1 에 ON + `surface=off`, DoD 2 에 마스크고착, DoD 14 양성 대조군에 `near`, 원거리 2 술어에 `far`, `MODE=seam` 은 판정에 쓰이는 `best` 행. `MODE=lod` 가 특히 필요한 이유는 `farUnchanged` 가 「픽셀이 안 바뀐다」를 재는 술어라 **렌더가 예외로 죽어 아무것도 안 그려져도 초록**이 되기 때문이다. 함께 `=== 0` → `hasSimErrors` 로, 개수 → **메시지 배열**로 통일했다.
+  - **`browser-verify-1202-atmosphere-rim.mjs`** — G7 이 이미 서 있고 `MODE=profile` 은 게이트 이전에 반환하는 **선언된 비-게이트 모드**라 해당 없음. 조치 없음.
+
+  변이 실증 [실측] — 로컬 `HEADFUL=0`(headless chromium, swiftshader 미지정) + `next dev :3001`, 프레임 하나에 `console.error` 1건 주입:
+
+  | 대상              | 판                   | 변이                 | 결과                                                                            |
+  | ----------------- | -------------------- | -------------------- | ------------------------------------------------------------------------------- |
+  | `783 MODE=dod`    | 결함 보유(`6ea56c5`) | ON 프레임            | **`exit 0` — DoD `1~4` 전건 PASS (미검출)** · `↳ console errors: 1` 인쇄된 채로 |
+  | `783 MODE=dod`    | 결함 보유(`6ea56c5`) | OFF 프레임           | **`exit 0` — DoD `1~4` 전건 PASS (미검출)** · 동상                              |
+  | `783 MODE=dod`    | 본 판                | ON 프레임            | **`exit 1`** · **DoD `1~4` 전건 FAIL**                                          |
+  | `783 MODE=dod`    | 본 판                | OFF 프레임           | **`exit 1`** · **DoD 1 단독 FAIL** (DoD 2·3·4 PASS)                             |
+  | `783 MODE=dod`    | 본 판                | (없음 — 원복)        | `exit 0` · 전건 PASS                                                            |
+  | `783 MODE=others` | 본 판                | jupiter 프레임       | **`exit 1`** · **jupiter 만 FAIL** (mars·moon PASS) · PNG `3`장 정상 기록       |
+  | `783 MODE=others` | 본 판                | (없음)               | `exit 0`                                                                        |
+  | `1119 MODE=dod`   | 본 판                | 마스크고착 프레임    | **`exit 1`** · **DoD 2 단독 FAIL**                                              |
+  | `1119 MODE=dod`   | 본 판                | `surface=off` 프레임 | **`exit 1`** · **DoD 1 단독 FAIL**                                              |
+  | `1119 MODE=lod`   | 본 판                | `near` 프레임        | **`exit 1`** · **양성 대조군 단독 FAIL**                                        |
+  | `1119 MODE=lod`   | 본 판                | `far` 프레임         | **`exit 1`** · **원거리 2 술어 FAIL** (양성 대조군 PASS)                        |
+
+  **축 분리와 프레임 분리가 여기서도 둘 다 보인다.** 주입 전건에서 픽셀 수치가 무변이와 **완전히 동일**했다 — `783 MODE=dod` (N `70.3%` / S `55.7%` / 적도 `0.5186` n=1550 > 중위도 `0.4029` n=883 / 마젠타 `0` / 밤면 `52.7` < 낮면 `212.3`) · `1119 MODE=dod` (IoU ON `0.936` / 마스크고착 `0.308` / `surface=off` `0`) · `1119 MODE=lod` (`R 98.32 → 5.619`, diff `40952px → 0%`). 붉어진 것은 콘솔 축 하나이고, 주입한 프레임의 술어만 붉어진다.
+
+  **무회귀 재확인** [실측, 같은 조건]: `783 MODE=ocean` `exit 0` (ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388` / 표본 `3612`·`3616`·`3605` — **swiftshader 로 잰 ADR §A7.5 확정치와 동일**) · `783 MODE=dod` `exit 0` · `783 MODE=others` `exit 0` · `1119 MODE=dod`·`lod`·`seam` `exit 0` (seam IoU `0.9602` / `0.877`).
+
+  **주석 3건** (reviewer R1·R2·R3): **R1** — `allowExternal` 서술이 단방향이었다. 통일했기 때문에 **한 호출부에만 `{ allowExternal: true }` 를 넘겨도** 술어가 `length > 0` 에서 정규식 매칭으로 바뀌어 「전부 같은 정책」 전제가 조용히 깨진다는 **역방향 축**을 박제했다(계수는 적지 않는다 — 하드코딩 계수 drift). **R2** — 같은 필드명 `consoleErrors` 가 모드별로 `string[]` / `number` 로 갈려 있던 비대칭은 **전건 배열로 통일**해 해소(1119 포함). **R3** — 저장하는 값이 `.length` 스냅샷이 아니라 리스너가 push 하는 **라이브 배열 참조**라는 사실을 조치 없이 기록했다(fail-safe 방향 — 늦게 도착한 에러도 잡는다. 이 축에서만 산발 실패가 나면 1순위 의심). ADR §A3.5 / §A4.5 표 아래에도 dated 부기를 더했다 — 원문 행 · §A7.6~§A7.8 무접촉.
+
 ## [0.87.0] - 2026-09-08
 
 ### Behavior Changes
