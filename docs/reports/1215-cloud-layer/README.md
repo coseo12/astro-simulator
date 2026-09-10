@@ -1,0 +1,63 @@
+# #1215 Phase 0 — 알파 축 재판정 측정 기록
+
+[이슈 #1215](https://github.com/coseo12/astro-simulator/issues/1215) Phase 0 의 산출물이다.
+**판정 본문은 이슈 코멘트**에 있고, 이 디렉토리는 그 판정이 인용하는 **원자료**다.
+
+⚠️ 프로토타입 셰이더/주입 스크립트는 **커밋하지 않았다.** 계약이 _"Phase 0 의 산출은 코드가 아니라
+판정"_ / _"프로토타입 코드는 판정을 위한 수단이며 머지 대상이 아니어도 된다"_ 로 규정했고,
+프로토타입은 프로덕션 소스 **0 줄 변경**으로 런타임 주입했다 (`verify:1119` `injectMaskDisabled` ·
+`verify:1202` `injectFloats` 와 같은 계열). 측정 후 스크래치는 삭제했다 (volt #67).
+
+## 측정 조건
+
+| 축         | 값                                                                        |
+| ---------- | ------------------------------------------------------------------------- |
+| URL        | `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off`                       |
+| JD         | `2451626.0` (`verify:1202` 와 동일) + `pause`                             |
+| 카메라     | `beta = π/2` (오클루전 시나리오만 `alpha = 0` — 아래 참조)                |
+| 정착       | `waitForLodSettle` — 전 조건 `dist 9/6/17`, `fading 0`, `timedOut false`  |
+| 뷰포트     | `1280×720`, `deviceScaleFactor 1`                                         |
+| 프로토타입 | earth mesh clone, `scale 1.02`, fbm 5-옥타브, `cover 0.52` / `sharp 0.10` |
+
+렌더러는 **두 축 모두** 돌렸다.
+
+- `phase0-measurements.json` — **실 Chrome GUI** (`channel: chrome`, `--use-angle=metal`, headful).
+  §915 예외 불가 조항 + CLAUDE.md §headless 브라우저 검증 대응. `*.png` / `zoom-*.png` 가 이 판본이다.
+- `phase0-measurements-swiftshader.json` — headless `--use-angle=swiftshader` (CI 재현 축).
+  ⚠️ **프레임 시간은 이쪽만 유효하다** — 실 GPU 는 vsync 락으로 전 조건 `16.6~16.7ms` 에 붙는다.
+- `phase0-occlusion.json` — (c) 달 transit/occultation + M5(강등) 축. swiftshader.
+
+## 파일
+
+| 파일                                                     | 내용                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `off.png` / `off-control.png`                            | 구름 없음 ×2 — **결정성 대조군**. 실 GPU 에서 전 화면 diff `0`            |
+| `alphatest.png`                                          | ALPHATEST (`alphaCutOff 0.5` discard)                                     |
+| `alphablend.png`                                         | ALPHABLEND (`needAlphaBlending: true`, `alphaMode = 2`)                   |
+| `dither.png`                                             | 제3 후보 — ALPHATEST + 4×4 Bayer dither                                   |
+| `alphablend-nologdepth.png` / `alphatest-nologdepth.png` | P0-4 대조군 — log-depth 기록 **미삽입**                                   |
+| `alphablend-nodepthwrite.png`                            | P0-4 — `disableDepthWrite = true`                                         |
+| `zoom-*.png`                                             | 위 4종의 `(600,340)` 중심 `180×180` 영역 4× 확대. **알파 축 육안 비교용** |
+| `occl-transit-*.png`                                     | (c) transit 시나리오 (`jd 2451638.75`) 프레임                             |
+
+## 오클루전 시나리오의 카메라가 다른 이유
+
+`verify:1202` 의 `alpha = -π/2, beta = π/2` 는 **달 궤도면을 정면(face-on)으로 보는 시점**이다.
+[실측] 그 시점에서 `jd 2451626.0` 부터 30일을 `0.05` 일 간격으로 601 표본 스캔했을 때 달–지구
+시선 이각(`sepDeg`)이 `24.798 ~ 26.655` 로만 움직였고, 지구 disk(각반경 `6.631°`)와 겹치는 표본이
+**`0`** 이었다. 즉 그 시점에서는 (c) 가 **구조적으로 발생하지 않는다**.
+
+`alpha = 0` (황도면 안)으로 옮기면 `sepDeg` 가 `1.373 ~ 30.237` 을 쓸고 겹침 표본이 **79** 개
+(앞 18 / 뒤 61) 생긴다. 그중 결정적으로 고른 두 시점:
+
+- **transit** `jd 2451638.75` — `sep 3.838° < 6.631°`, `camToMoon 19.308 < camToEarth 36.827`
+- **occultation** `jd 2451651.55` — `sep 1.373° < 6.631°`, `camToMoon 54.632 > 36.827`
+
+## 폐기한 술어 2건 (같은 실수 반복 방지)
+
+1. **「배경이 아닌 픽셀 = earth disk」** — 배경이 `(8,9,13)` 이라 이 술어가 화면의 `99.7%`
+   (`919277 / 921600`) 를 disk 로 셌다. `verify:1202` 의 ray-sphere 역투영으로 교체했다
+   (실제 disk `30768 px`).
+2. **「달 기하 원판 + `pad 2px`」** — 마스크 `691 px` 중 달 실면적이 약 `515 px` 라, 구름이 달을
+   덮지 않아도 `changedPx > 0` 이 나왔다. **달을 껐을 때 실제로 변한 픽셀 집합**(실루엣, `538 px`)
+   과 침식 원판(`304 px`)으로 교체했다.

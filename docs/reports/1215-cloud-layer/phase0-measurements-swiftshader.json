@@ -1,0 +1,799 @@
+{
+  "meta": {
+    "gpu": "swiftshader",
+    "headful": false,
+    "query": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off",
+    "jd": 2451626,
+    "viewport": "1280x720",
+    "frameSamples": 240,
+    "generatedAt": "2026-09-10T05:35:51.894Z"
+  },
+  "conditions": [
+    {
+      "label": "off",
+      "install": null,
+      "installResult": null,
+      "compile": null,
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 809,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 2,
+            "alphaTest": 0,
+            "transparent": 0,
+            "transparentNames": [],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid"
+            ]
+          }
+        ],
+        "transparentTotal": 0,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 2,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid"
+        ],
+        "sceneMeshCount": 88
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 20,
+        "p25Ms": 19.6,
+        "p75Ms": 20.7,
+        "iqrMs": 1.1,
+        "p10Ms": 19.3,
+        "p90Ms": 21.9,
+        "minMs": 18.4,
+        "maxMs": 24.4
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": null
+    },
+    {
+      "label": "off-control",
+      "install": null,
+      "installResult": null,
+      "compile": null,
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 2,
+            "alphaTest": 0,
+            "transparent": 0,
+            "transparentNames": [],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid"
+            ]
+          }
+        ],
+        "transparentTotal": 0,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 2,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid"
+        ],
+        "sceneMeshCount": 88
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 19.8,
+        "p25Ms": 19.4,
+        "p75Ms": 20.9,
+        "iqrMs": 1.5,
+        "p10Ms": 19,
+        "p90Ms": 22.2,
+        "minMs": 0.4,
+        "maxMs": 77
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 0,
+        "diskChangedRatio": 0,
+        "diskMeanAbsDiff": 0,
+        "diskMaxAbsDiff": 0,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 0,
+        "dayFaceChangedRatio": 0,
+        "outsideDiskChangedPx": 520,
+        "outsideDiskMaxAbsDiff": 254
+      }
+    },
+    {
+      "label": "alphatest",
+      "install": {
+        "mode": "alphatest"
+      },
+      "installResult": {
+        "ok": true,
+        "shellName": "cloud-shell-proto",
+        "needAlphaBlending": false,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "compile": {
+        "installed": true,
+        "hasEffect": true,
+        "isReady": true,
+        "compilationError": ""
+      },
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 3,
+            "alphaTest": 0,
+            "transparent": 0,
+            "transparentNames": [],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid",
+              "cloud-shell-proto"
+            ]
+          }
+        ],
+        "transparentTotal": 0,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 3,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid",
+          "cloud-shell-proto"
+        ],
+        "sceneMeshCount": 89
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 21.6,
+        "p25Ms": 21.2,
+        "p75Ms": 22.2,
+        "iqrMs": 1,
+        "p10Ms": 20.8,
+        "p90Ms": 23,
+        "minMs": 0.3,
+        "maxMs": 83
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 8183,
+        "diskChangedRatio": 0.26596,
+        "diskMeanAbsDiff": 47.3382,
+        "diskMaxAbsDiff": 674,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 4990,
+        "dayFaceChangedRatio": 0.41002,
+        "outsideDiskChangedPx": 993,
+        "outsideDiskMaxAbsDiff": 717
+      }
+    },
+    {
+      "label": "alphablend",
+      "install": {
+        "mode": "alphablend"
+      },
+      "installResult": {
+        "ok": true,
+        "shellName": "cloud-shell-proto",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "compile": {
+        "installed": true,
+        "hasEffect": true,
+        "isReady": true,
+        "compilationError": ""
+      },
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 813,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 2,
+            "alphaTest": 0,
+            "transparent": 1,
+            "transparentNames": [
+              "cloud-shell-proto"
+            ],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid"
+            ]
+          }
+        ],
+        "transparentTotal": 1,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 2,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)",
+          "cloud-shell-proto(visible=true)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid",
+          "cloud-shell-proto"
+        ],
+        "sceneMeshCount": 89
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 21.9,
+        "p25Ms": 21.3,
+        "p75Ms": 22.4,
+        "iqrMs": 1.1,
+        "p10Ms": 21,
+        "p90Ms": 23,
+        "minMs": 1.2,
+        "maxMs": 82.3
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 11736,
+        "diskChangedRatio": 0.38144,
+        "diskMeanAbsDiff": 47.2952,
+        "diskMaxAbsDiff": 674,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 6908,
+        "dayFaceChangedRatio": 0.56763,
+        "outsideDiskChangedPx": 1150,
+        "outsideDiskMaxAbsDiff": 717
+      }
+    },
+    {
+      "label": "dither",
+      "install": {
+        "mode": "dither"
+      },
+      "installResult": {
+        "ok": true,
+        "shellName": "cloud-shell-proto",
+        "needAlphaBlending": false,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "compile": {
+        "installed": true,
+        "hasEffect": true,
+        "isReady": true,
+        "compilationError": ""
+      },
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 812,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 3,
+            "alphaTest": 0,
+            "transparent": 0,
+            "transparentNames": [],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid",
+              "cloud-shell-proto"
+            ]
+          }
+        ],
+        "transparentTotal": 0,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 3,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid",
+          "cloud-shell-proto"
+        ],
+        "sceneMeshCount": 89
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 21.8,
+        "p25Ms": 21.3,
+        "p75Ms": 22.4,
+        "iqrMs": 1.1,
+        "p10Ms": 20.9,
+        "p90Ms": 23.4,
+        "minMs": 0.4,
+        "maxMs": 82.9
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 8229,
+        "diskChangedRatio": 0.26745,
+        "diskMeanAbsDiff": 47.2936,
+        "diskMaxAbsDiff": 674,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 4949,
+        "dayFaceChangedRatio": 0.40666,
+        "outsideDiskChangedPx": 992,
+        "outsideDiskMaxAbsDiff": 717
+      }
+    },
+    {
+      "label": "alphablend-nologdepth",
+      "install": {
+        "mode": "alphablend",
+        "logDepth": false
+      },
+      "installResult": {
+        "ok": true,
+        "shellName": "cloud-shell-proto",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": false
+      },
+      "compile": {
+        "installed": true,
+        "hasEffect": true,
+        "isReady": true,
+        "compilationError": ""
+      },
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 814,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 2,
+            "alphaTest": 0,
+            "transparent": 1,
+            "transparentNames": [
+              "cloud-shell-proto"
+            ],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid"
+            ]
+          }
+        ],
+        "transparentTotal": 1,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 2,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)",
+          "cloud-shell-proto(visible=true)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid",
+          "cloud-shell-proto"
+        ],
+        "sceneMeshCount": 89
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 21.7,
+        "p25Ms": 21.3,
+        "p75Ms": 22.3,
+        "iqrMs": 1,
+        "p10Ms": 21,
+        "p90Ms": 23.1,
+        "minMs": 0.5,
+        "maxMs": 84.7
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 159,
+        "diskChangedRatio": 0.00517,
+        "diskMeanAbsDiff": 0.4344,
+        "diskMaxAbsDiff": 350,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 76,
+        "dayFaceChangedRatio": 0.00624,
+        "outsideDiskChangedPx": 1151,
+        "outsideDiskMaxAbsDiff": 717
+      }
+    },
+    {
+      "label": "alphablend-nodepthwrite",
+      "install": {
+        "mode": "alphablend",
+        "depthWrite": false
+      },
+      "installResult": {
+        "ok": true,
+        "shellName": "cloud-shell-proto",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": true,
+        "fragHasLogDepth": true
+      },
+      "compile": {
+        "installed": true,
+        "hasEffect": true,
+        "isReady": true,
+        "compilationError": ""
+      },
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 816,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 2,
+            "alphaTest": 0,
+            "transparent": 1,
+            "transparentNames": [
+              "cloud-shell-proto"
+            ],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid"
+            ]
+          }
+        ],
+        "transparentTotal": 1,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 2,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)",
+          "cloud-shell-proto(visible=true)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid",
+          "cloud-shell-proto"
+        ],
+        "sceneMeshCount": 89
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 21.8,
+        "p25Ms": 21.4,
+        "p75Ms": 22.3,
+        "iqrMs": 0.9,
+        "p10Ms": 20.9,
+        "p90Ms": 23.4,
+        "minMs": 0.5,
+        "maxMs": 87.5
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 11736,
+        "diskChangedRatio": 0.38144,
+        "diskMeanAbsDiff": 47.2952,
+        "diskMaxAbsDiff": 674,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 6908,
+        "dayFaceChangedRatio": 0.56763,
+        "outsideDiskChangedPx": 1150,
+        "outsideDiskMaxAbsDiff": 717
+      }
+    },
+    {
+      "label": "alphatest-nologdepth",
+      "install": {
+        "mode": "alphatest",
+        "logDepth": false
+      },
+      "installResult": {
+        "ok": true,
+        "shellName": "cloud-shell-proto",
+        "needAlphaBlending": false,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": false
+      },
+      "compile": {
+        "installed": true,
+        "hasEffect": true,
+        "isReady": true,
+        "compilationError": ""
+      },
+      "lodSettle": {
+        "dist": "9/6/17",
+        "fading": 0,
+        "waitedMs": 812,
+        "timedOut": false
+      },
+      "queues": {
+        "renderingGroupCount": 1,
+        "groups": [
+          {
+            "idx": 0,
+            "opaque": 3,
+            "alphaTest": 0,
+            "transparent": 0,
+            "transparentNames": [],
+            "alphaTestNames": [],
+            "opaqueNames": [
+              "earth",
+              "moon-lod-mid",
+              "cloud-shell-proto"
+            ]
+          }
+        ],
+        "transparentTotal": 0,
+        "alphaTestTotal": 0,
+        "opaqueTotal": 3,
+        "alphaBlendCapableNames": [
+          "jupiter-ring-halo(visible=true)",
+          "jupiter-ring-main(visible=true)",
+          "jupiter-ring-gossamer(visible=true)",
+          "saturn-ring-d(visible=true)",
+          "saturn-ring-c(visible=true)",
+          "saturn-ring-b(visible=true)",
+          "saturn-ring-a(visible=true)",
+          "saturn-ring-f(visible=true)",
+          "uranus-ring-main(visible=true)",
+          "neptune-ring-main(visible=true)",
+          "mercury-lod-mid(visible=false)",
+          "venus-lod-mid(visible=false)"
+        ],
+        "activeMeshNames": [
+          "earth",
+          "moon-lod-mid",
+          "cloud-shell-proto"
+        ],
+        "sceneMeshCount": 89
+      },
+      "frames": {
+        "n": 240,
+        "medianMs": 21.5,
+        "p25Ms": 21.1,
+        "p75Ms": 22.1,
+        "iqrMs": 1,
+        "p10Ms": 20.7,
+        "p90Ms": 23.1,
+        "minMs": 0.3,
+        "maxMs": 84
+      },
+      "consoleErrorCount": 0,
+      "consoleErrors": [],
+      "diskDiffVsOff": {
+        "diskPx": 30768,
+        "diskChangedPx": 130,
+        "diskChangedRatio": 0.00423,
+        "diskMeanAbsDiff": 0.4167,
+        "diskMaxAbsDiff": 350,
+        "dayFacePx": 12170,
+        "dayFaceChangedPx": 58,
+        "dayFaceChangedRatio": 0.00477,
+        "outsideDiskChangedPx": 993,
+        "outsideDiskMaxAbsDiff": 717
+      }
+    }
+  ],
+  "diskMask": {
+    "diskPx": 30768,
+    "rw": 1280,
+    "rh": 720
+  },
+  "geometry": {
+    "rw": 1280,
+    "rh": 720,
+    "fov": 0.8,
+    "forward": {
+      "x": 0,
+      "y": -4.82353764423598e-17,
+      "z": 1
+    },
+    "right": {
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    "up": {
+      "x": 0,
+      "y": 1,
+      "z": 4.82353764423598e-17
+    },
+    "camPos": {
+      "x": -229.43414306640625,
+      "y": -8.756192207336426,
+      "z": -36.82684326171875
+    },
+    "center": {
+      "x": -229.43414306640625,
+      "y": -8.756192207336426,
+      "z": 0.000002339741286050412
+    },
+    "radiusWorld": 4.2523980541839705,
+    "sunDir": {
+      "x": 0.9992725378845029,
+      "y": 0.03813653143463078,
+      "z": -1.019045893369077e-8
+    }
+  },
+  "gateIndicatorA": {
+    "off-control": {
+      "offTransparent": 0,
+      "onTransparent": 0,
+      "delta": 0
+    },
+    "alphatest": {
+      "offTransparent": 0,
+      "onTransparent": 0,
+      "delta": 0
+    },
+    "alphablend": {
+      "offTransparent": 0,
+      "onTransparent": 1,
+      "delta": 1
+    },
+    "dither": {
+      "offTransparent": 0,
+      "onTransparent": 0,
+      "delta": 0
+    },
+    "alphablend-nologdepth": {
+      "offTransparent": 0,
+      "onTransparent": 1,
+      "delta": 1
+    },
+    "alphablend-nodepthwrite": {
+      "offTransparent": 0,
+      "onTransparent": 1,
+      "delta": 1
+    },
+    "alphatest-nologdepth": {
+      "offTransparent": 0,
+      "onTransparent": 0,
+      "delta": 0
+    }
+  }
+}
