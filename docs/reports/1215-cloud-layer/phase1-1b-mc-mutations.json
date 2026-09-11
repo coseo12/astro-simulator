@@ -1664,7 +1664,7 @@
   "notes": [
    "원본 실행 판정량이 5f72be7 과 동일 (C1 0.034201 · C2 0.55598 · C5a/C5b 0.019252 · C7b = ω) — 전제 확장은 판정량을 바꾸지 않았다.",
    "MC-9 (구름 needAlphaBlending 거짓) 는 이전 라운드 FAIL (C3 · C2 · C5a) 에서 이번 라운드 exit 2 (전제 8) 로 분류가 바뀌었다. 구름이 불투명 큐로 가 fade 큐가 [earth, earth-lod-mid] 가 되고, 전제가 게이트보다 먼저 평가돼 C3 의 제품 결함 FAIL 을 가린다. CI 는 exit 2 도 실패로 막는다 — 분류 품질 문제이며 메인 결정 대상 (전제 8 을 하네스가 통제하는 earth-lod-mid 로만 좁히는 안). → reviewRound2 에서 정정: 전제 8 을 mid 만 묻도록 좁혀 MC-9 는 FAIL (C2 · C3 · C5a · C5b) 로 돌아왔다.",
-   "R2 (지구 scaling 0) 의 exit 2 는 전제 2 가 아니라 전제 6 (c7Load 쌍 기하 불일치) 에서 먼저 발화했다 — 쌍 기하 대조가 측정보다 앞서기 때문. 반경 ≤ 0 · N = 0 도 각각 exit 2 를 낸다.",
+   "R2 (지구 scaling 0) 는 exit 2 (전제 6 — 기하 무효 또는 쌍 기하 불일치). 어느 하위 검사가 먼저 발화하는지는 실행 의존이다 — 이 실행에서는 두 로드 카메라가 달라 쌍 기하 대조가, reviewer 실행에서는 반경 검사가 발화했다. 쌍 기하 대조 → 반경 검사 → 전제 2 · 3 세 겹이 각각 독립으로 막는다 (reviewer 실행 — 앞 두 겹 제거판도 exit 2).",
    "MC-8 (구름 log-depth 문장 삭제): mid 정착 쌍 C1 0 인데 fade 정지 쌍 C1 0.019252 — fade 창에서는 host · mid 가 둘 다 투명이라 depth 를 쓰지 않아 구름이 가려지지 않는 것으로 보인다 (관측, 기전 분리 미실시).",
    "A4 [실행]: reviewer 형태의 MC-12 (CLOUD_SORT_RANK → HOST_FAMILY_RANK) 는 core build exit 2 (TS6133 CLOUD_SORT_RANK 미사용) 이나 dist 는 변이를 담아 emit 된다. 러너는 CLOUD_SORT_RANK * 0 로 import 를 살려 build exit 0.",
    "러너 결함 1건: skipUnit 변이 (R3) 의 로그 줄이 unit.tests 를 읽어 크래시 — R3 는 원복 후 기록 · 저장됐고 X2 · S4 · X4 를 별도 실행 (mc-r2b) 했다."
