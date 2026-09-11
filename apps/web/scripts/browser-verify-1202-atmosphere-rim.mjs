@@ -751,6 +751,13 @@ async function main() {
       (n) => window.__simCore.scene.getMeshByName(n) !== null,
       CLOUD_MESH_NAME,
     );
+    // #1215 cross-validate X4 — 대칭 전제: ON 페이지에 구름 mesh 가 **있다**. §A10.10 은 「G1~G4 는 구름 ON
+    // 프레임에서 잰다」 고 선언했다 — 팩토리 결함 등으로 구름이 안 생기면 선언과 다른 프레임을 재고도 조용히
+    // 통과한다 (verify:1215 C3 가 같은 CI 에서 잡더라도 이 가드는 자기 전제를 스스로 확인한다).
+    const onPageHasCloud = await pageOn.page.evaluate(
+      (n) => window.__simCore.scene.getMeshByName(n) !== null,
+      CLOUD_MESH_NAME,
+    );
 
     const r = await capturePair(pageOn.page, '');
     const rOff = await capturePair(pageOff.page, 'cloudsoff-');
@@ -780,6 +787,10 @@ async function main() {
       unmeasurable.push(
         `(5) ?clouds=off 페이지에 ${CLOUD_MESH_NAME} mesh 가 있다 — G6 가 구름 OFF 프레임을 재지 않는다`,
       );
+    if (!onPageHasCloud)
+      unmeasurable.push(
+        `(5) 구름 ON 페이지에 ${CLOUD_MESH_NAME} mesh 가 없다 — G1~G4 가 구름 ON 프레임을 재지 않는다`,
+      );
 
     if (unmeasurable.length) {
       console.error('\n[측정 불가] 유효성 전제 미충족 — PASS 도 FAIL 도 내지 않는다 (§A8.8):');
@@ -787,7 +798,7 @@ async function main() {
       return EXIT_UNMEASURABLE;
     }
     console.log(
-      '[측정 불가 판정] 발화 0 — 유효성 전제 전건 충족 (두 쌍 각 4항 + OFF 페이지 구름 부재)',
+      '[측정 불가 판정] 발화 0 — 유효성 전제 전건 충족 (두 쌍 각 4항 + ON 페이지 구름 존재 · OFF 페이지 구름 부재)',
     );
 
     if (MODE === 'profile') {

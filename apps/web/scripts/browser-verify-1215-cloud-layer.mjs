@@ -26,10 +26,13 @@
  *   3 OFF 대역 평균 휘도 < MIN_DAY_LIT_LUM       4 위상각 < MIN_PHASE_ALPHA_DEG
  *   5 ?clouds=off 페이지에 구름 mesh 존재         6 measure() 가 error 를 반환 — **모든 게이트보다 먼저 본다**
  *   7 C2 표본 (포화 제외 후) N < MIN_EXPECTED
+ *   8 fade 정지 재현의 투명 큐에 earth-cloud 와 earth-lod-mid 가 둘 다 있지 않다 (C5b 전제)
+ *   ⚠️ 2 · 3 은 주 쌍만이 아니라 **판정에 쓰이는 모든 쌍**에 건다 (low 는 2 만) — judge() 의 표 주석.
+ *   6 에는 비유한 · 퇴화 기하 (반경 ≤ 0) 와 쌍별 페이지 기하 불일치도 포함된다.
  *
  * ## `== 0` 술어는 지구 disk 내부로 한정한다 (#1215 Phase 1a 실측)
- * 같은 조건 두 실행에서 **disk 밖** 픽셀 `22746` 개가 한 실행에서만 달랐다 (disk 내부는 두 실행 동일 —
- * architect §A10.12 의 `22745 px` 와 수가 거의 같다, 원인 미규명). full frame 으로 재면 그 비결정에 걸린다.
+ * 같은 조건 독립 로드에서 **disk 밖** 픽셀이 실행에 따라 달라지는 비결정이 관측됐다 (disk 내부는 동일 —
+ * 원인 미규명, 실행마다 개수가 달라 수치는 적지 않는다). full frame 으로 재면 그 비결정에 걸린다.
  *
  * ## 주입 대상 한정 (#1215 Phase 1a 실측)
  * 기존 injector (`verify:783` · `verify:1119` · `verify:1202` `injectFloats`) 는 `earth.getChildMeshes()`
@@ -101,7 +104,9 @@ const MIN_PHASE_ALPHA_DEG = 10;
 // ── 임계 — §A10.11 도출 규칙 (baseline ÷ 3 — §A8.8 G1~G3 · G6 과 같은 관례) ──────────────
 // baseline [실측]: D1 승인 파라미터 (후보 B — 반경비 1.01 · cover 0.5 · opacity 0.9) · headless chromium
 // `--use-angle=swiftshader` (`SWIFTSHADER=1 HEADFUL=0`) · 1280×720 · JD 2451626.0 · `MODE=profile` **5회 —
-// 다섯 실행이 판정량 전 항목에서 동일 (산포 `0`)**. (6번째 시도 1건은 동시 실행 중이던 Rust 빌드와의
+// 다섯 실행이 판정량 전 항목에서 동일 (산포 `0`)** — **로컬** swiftshader 에 한한다. CI 렌더러 (run
+// 34591856729, `5f72be7`) 와는 소수 4~5 자리 차이가 있다 (예: C1 `0.034201` vs `0.034194` · 맑은 하늘 비율
+// `0.55598` vs `0.55624` · C2 표본 `4225` vs `4223`) — 임계 (÷ 3) 와는 멀어 판정에 영향이 없고 임계는 바꾸지 않았다. (6번째 시도 1건은 동시 실행 중이던 Rust 빌드와의
 // 경합으로 `bootstrapScene` 핸들 대기 20 s 가 초과돼 **예외 exit 1** 로 끝났다 — 측정값이 없어 표본에서
 // 제외했고 재실행분을 쓴다. 판정 경로에 들어가기 전의 크래시라 fail-closed 방향이다.)
 // ⚠️ 이 숫자는 설계 스케치의 예측이 아니라 전부 이 스크립트의 실행 출력이다.
@@ -263,6 +268,34 @@ async function measurePair(ctx, onB64, offB64) {
         }
       }
       if (!sunPos) return { error: 'sunLight 부재' };
+      // 기하 유효성 — 비유한 값 (NaN quaternion 등) 이나 반경 ≤ 0 에서는 ray-sphere 판정이 무의미해진다.
+      // NaN 이면 `disc < 0` 이 거짓이라 **프레임 전체가 disk 로** 잡히고 (reviewer R1 실측 — disk n 921600),
+      // 반경 0 이면 disk 가 빈 집합이라 `changed == 0` 술어가 공허하게 참이 된다 (reviewer R2). 둘 다
+      // 판정에 들어가기 전에 측정 오류로 끝낸다 (#1214 시그니처 5 — error 를 모든 게이트보다 먼저).
+      const geomNums = [
+        forward.x,
+        forward.y,
+        forward.z,
+        right.x,
+        right.y,
+        right.z,
+        up.x,
+        up.y,
+        up.z,
+        camPos.x,
+        camPos.y,
+        camPos.z,
+        center.x,
+        center.y,
+        center.z,
+        radiusWorld,
+        camera.fov,
+        sunPos.x,
+        sunPos.y,
+        sunPos.z,
+      ];
+      if (!geomNums.every(Number.isFinite) || !(radiusWorld > 0))
+        return { error: `기하 무효 — 비유한 값 또는 반경 ≤ 0 (radius ${radiusWorld})` };
       const sunDir = sunPos.subtract(center).normalize();
       const camUnit = camPos.subtract(center).normalize();
       const cosA = Math.max(
@@ -411,6 +444,18 @@ const readGeomKey = (ctx) =>
     return [p.x, p.y, p.z, c.x, c.y, c.z].join(',');
   });
 
+/**
+ * 두 페이지의 프레임 쌍을 재기 전에 **두 페이지 기하가 정확히 같은지** 대조한다 (cross-validate X3).
+ * 쌍의 기하가 다르면 `changed == 0` 술어에는 FAIL 방향이지만 `≥` 술어 (C5a · C5b) 에는 차이를 부풀려
+ * **통과 방향**이다 — 불일치는 측정 오류로 끝낸다. 판정 기하는 `ctxA` 의 카메라다.
+ */
+async function measureCheckedPair(ctxA, aB64, ctxB, bB64, label) {
+  const gA = await readGeomKey(ctxA);
+  const gB = await readGeomKey(ctxB);
+  if (gA !== gB) return { error: `${label} 페이지 기하 불일치 (${gA} vs ${gB})` };
+  return measurePair(ctxA, aB64, bB64);
+}
+
 /** quaternion → local Y 회전각 [rad] (구름 상대 자전은 Y 축 회전뿐 — x·z 성분 0 도 함께 확인). */
 const yAngle = (q) => 2 * Math.atan2(q[1], q[3]);
 const wrapPi = (a) => {
@@ -483,13 +528,25 @@ async function run(browser) {
   // ── C5 — mid 정착 쌍 → fade 창 정지 쌍 ──
   await settleLod(on, 'mid', 'mid');
   await settleLod(off, 'mid', 'mid');
-  out.mid = await measurePair(on, await capture(on, 'mid-on'), await capture(off, 'mid-off'));
+  out.mid = await measureCheckedPair(
+    on,
+    await capture(on, 'mid-on'),
+    off,
+    await capture(off, 'mid-off'),
+    'mid',
+  );
   const fzOn = await installFadeFreeze(on);
   const fzOff = await installFadeFreeze(off);
   if (fzOn.error || fzOff.error)
     out.fade = { error: `fade 정지 설치 실패 (${fzOn.error ?? fzOff.error})` };
   else
-    out.fade = await measurePair(on, await capture(on, 'fade-on'), await capture(off, 'fade-off'));
+    out.fade = await measureCheckedPair(
+      on,
+      await capture(on, 'fade-on'),
+      off,
+      await capture(off, 'fade-off'),
+      'fade',
+    );
   out.fadeQueueOn = await readTransparentQueue(on);
   await removeFadeFreeze(on);
   await removeFadeFreeze(off);
@@ -497,7 +554,13 @@ async function run(browser) {
   // ── C6 — low 정착 ──
   await settleLod(on, 'low', 'low');
   await settleLod(off, 'low', 'low');
-  out.low = await measurePair(on, await capture(on, 'low-on'), await capture(off, 'low-off'));
+  out.low = await measureCheckedPair(
+    on,
+    await capture(on, 'low-on'),
+    off,
+    await capture(off, 'low-off'),
+    'low',
+  );
   out.lowCloudVisible = await on.page.evaluate(
     (n) => window.__simCore.scene.getMeshByName(n)?.isVisible ?? null,
     CLOUD_MESH,
@@ -505,14 +568,27 @@ async function run(browser) {
 
   // ── C8 — rotate=off 독립 두 번째 로드 + JD 두 번째 점 ──
   const on2 = await setupPage(browser, QUERY_ON, 'on2');
-  out.c8Load = await measurePair(on2, await capture(on2, 'on2'), onPreInjectB64);
+  // 기준 프레임은 `on` 페이지의 주입 전 프레임이라 기하 대조 상대는 `on` 이다 (LOD override 는 카메라를 옮기지 않는다).
+  out.c8Load = await measureCheckedPair(
+    on2,
+    await capture(on2, 'on2'),
+    on,
+    onPreInjectB64,
+    'c8Load',
+  );
   await jumpTo(on2, T_JD + DELTA_JD);
   out.c8QuatJd1 = await readCloudQuat(on2);
 
   // ── C7 — rotate ON 독립 두 로드 + JD+Δjd 구조 읽기 ──
   const rotA = await setupPage(browser, QUERY_ROTATE, 'rotA');
   const rotB = await setupPage(browser, QUERY_ROTATE, 'rotB');
-  out.c7Load = await measurePair(rotA, await capture(rotA, 'rotA'), await capture(rotB, 'rotB'));
+  out.c7Load = await measureCheckedPair(
+    rotA,
+    await capture(rotA, 'rotA'),
+    rotB,
+    await capture(rotB, 'rotB'),
+    'c7Load',
+  );
   out.c7QuatJd0 = await readCloudQuat(rotA);
   await jumpTo(rotA, T_JD + DELTA_JD);
   out.c7QuatJd1 = await readCloudQuat(rotA);
@@ -556,6 +632,43 @@ function judge(r) {
     unmeasurable.push(`(3) OFF 대역 평균 휘도 ${band.lumOff} < ${MIN_DAY_LIT_LUM}`);
   if (r.main.phaseAlphaDeg < MIN_PHASE_ALPHA_DEG)
     unmeasurable.push(`(4) 위상각 ${r.main.phaseAlphaDeg}deg < ${MIN_PHASE_ALPHA_DEG}deg`);
+
+  // ── 전제 2 · 3 을 **판정에 쓰이는 모든 쌍**에 건다 (reviewer B1 · cross-validate X1) ──
+  // 불변 술어 (C6 · C7a · C8b 의 `changed == 0`) 는 대상이 비면 공허하게 참이고, `≥` 술어 (C5a · C5b) 는
+  // 대상이 없는 쌍에서 의미가 없다. 새 상수 없이 주 쌍의 전제를 그대로 재사용한다:
+  //   | 쌍      | 쓰는 게이트  | 전제 2 (낮면 내부 N) | 전제 3 (OFF 낮면 휘도) | 전제 7 (C2 표본) |
+  //   | main    | C1 C2 C6     | ✅                    | ✅                      | ✅ — C2 를 재는 쌍 |
+  //   | mid     | C5a C5b      | ✅                    | ✅                      | ❌ C2 를 안 잰다   |
+  //   | fade    | C5b          | ✅                    | ✅                      | ❌                  |
+  //   | c7Load  | C7a          | ✅                    | ✅                      | ❌                  |
+  //   | c8Load  | C8b          | ✅                    | ✅                      | ❌                  |
+  //   | low     | C6           | ✅                    | ❌ billboard 라 설계상 어둡다 | ❌            |
+  // 전제 7 을 추가 쌍에 걸지 않는 이유 [실측]: 포화 제외 후 C2 표본이 mid 정착 쌍 `1109` · C7 rotate ON 쌍
+  // `350` 으로 하한 `2408` 아래라 (CI 도 `1108` · `349`), 걸면 정상 실행이 상시 「측정 불가」 가 된다.
+  // low 에 전제 3 을 걸지 않는 이유 [실측]: low 쌍 OFF 낮면 내부 평균 휘도가 `0.03559` 로 하한 `0.15` 아래다
+  // (단색 billboard — 절차 표면이 아니다). low 의 「대상이 화면에 있다」 는 C6 의 `∧ C1 PASS` 결합이 받친다.
+  const pairPremises = [
+    ['mid', r.mid, true],
+    ['fade', r.fade, true],
+    ['c7Load', r.c7Load, true],
+    ['c8Load', r.c8Load, true],
+    ['low', r.low, false],
+  ];
+  for (const [label, pair, withLum] of pairPremises) {
+    const b = pair.dayInner;
+    if (MIN_EXPECTED !== null && b.n < MIN_EXPECTED)
+      unmeasurable.push(`(2) [${label}] 대역 표본 N=${b.n} < MIN_EXPECTED ${MIN_EXPECTED}`);
+    if (withLum && (b.lumOff === null || b.lumOff < MIN_DAY_LIT_LUM))
+      unmeasurable.push(`(3) [${label}] OFF 대역 평균 휘도 ${b.lumOff} < ${MIN_DAY_LIT_LUM}`);
+  }
+  // ── 전제 8 — fade 정지 재현이 **결함 조건**을 실제로 만들었는가 (cross-validate X2) ──
+  // C5b 는 「mid variant 가 구름과 함께 투명 큐에 있다」 는 조건 위에서만 정렬 함수를 시험한다. 재현이 그
+  // 조건을 못 만들면 fade 프레임 = mid 정착 프레임이 되어 C5b 가 정렬 함수를 시험하지 않고 통과한다.
+  const fadeNames = r.fadeQueueOn.names;
+  if (!fadeNames.includes(CLOUD_MESH) || !fadeNames.includes('earth-lod-mid'))
+    unmeasurable.push(
+      `(8) fade 정지 재현의 투명 큐 ${JSON.stringify(fadeNames)} 에 ${CLOUD_MESH} 와 earth-lod-mid 가 둘 다 있지 않다 — C5b 가 결함 조건을 시험하지 않는다`,
+    );
   if (unmeasurable.length) return { unmeasurable };
   if (MODE === 'profile') return { profile: true };
 
@@ -589,8 +702,9 @@ function judge(r) {
     [
       'C5b fade 정지 쌍 C1 량',
       r.fade.dayInner.c1,
-      `>= mid ÷ 3 = ${(r.mid.dayInner.c1 / 3).toFixed(6)}`,
-      r.fade.dayInner.c1 >= r.mid.dayInner.c1 / 3,
+      `>= mid ÷ 3 = ${(r.mid.dayInner.c1 / 3).toFixed(6)} ∧ C5a PASS`,
+      // 기준이 0 이면 `0 >= 0` 이 통과로 찍힌다 (reviewer A1 — MC-1 재현) — C6 처럼 C5a PASS 를 결합한다.
+      r.fade.dayInner.c1 >= r.mid.dayInner.c1 / 3 && r.mid.dayInner.c1 >= T_DELTA,
     ],
     [
       'C6 low: cloud.isVisible · disk 변화 px',
