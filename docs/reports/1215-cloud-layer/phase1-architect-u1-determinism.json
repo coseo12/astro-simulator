@@ -1,0 +1,60 @@
+{
+ "det": {
+  "H vs H2": {
+   "inDisk": 0,
+   "ring": 0,
+   "outside": 0,
+   "bbox": [
+    1000000000,
+    1000000000,
+    -1,
+    -1
+   ],
+   "diskCenter": [
+    640,
+    360
+   ],
+   "R": 98.3
+  },
+  "FCUR vs FCUR2": {
+   "inDisk": 0,
+   "ring": 0,
+   "outside": 0,
+   "bbox": [
+    1000000000,
+    1000000000,
+    -1,
+    -1
+   ],
+   "diskCenter": [
+    640,
+    360
+   ],
+   "R": 98.3
+  },
+  "FOPQ vs FOPQ2": {
+   "inDisk": 0,
+   "ring": 0,
+   "outside": 0,
+   "bbox": [
+    1000000000,
+    1000000000,
+    -1,
+    -1
+   ],
+   "diskCenter": [
+    640,
+    360
+   ],
+   "R": 98.3
+  }
+ },
+ "consoleErrors": {
+  "H": 0,
+  "H2": 0,
+  "FCUR": 0,
+  "FCUR2": 0,
+  "FOPQ": 0,
+  "FOPQ2": 0
+ }
+}
