@@ -197,6 +197,17 @@ jobs:
             CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1202-atmosphere-rim" \
             pnpm --filter @astro-simulator/web run verify:1202-atmosphere-rim
 
+      # #1215 — 지구 구름 레이어 (ADR 20260628-756 Amendment 10 §A10.11 — C1~C8 + 「측정 불가」 7전제).
+      # 구름 ON / OFF(`?clouds=off`) 두 페이지를 같은 결정적 프레임으로 비교한다. exit 2 는 「측정 불가」
+      # (PASS 도 FAIL 도 아니다 — step 실패로 드러나야 한다, fallback 금지). 변이 주입(INJECT=mc6/mc7/mc9)은
+      # 1202 와 같은 이유로 CI 에 배선하지 않는다 — 판별력 실증은 PR 시점 1회 의무.
+      - name: verify:1215-cloud-layer (구름 가시 + 과다 상한 + 투명 큐 + LOD fade/low + 자전 결정성)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1215-cloud-layer" \
+            pnpm --filter @astro-simulator/web run verify:1215-cloud-layer
+
       - name: dev server 정리
         if: always()
         run: |

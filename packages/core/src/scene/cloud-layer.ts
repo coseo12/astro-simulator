@@ -47,7 +47,8 @@ export const CLOUD_LAYER_BODY_ID = 'earth';
  * <https://a.atmos.uw.edu/academics/classes/2010Q2/545/545_Ch_2_notes.pdf> — 중위도 경압파
  * (구름·기상계를 싣고 가는 요란) 의 위상속도를 _"10-15 m s⁻¹, which is comparable to the wind
  * speed at the 700 hPa level (Wallace et al., 1988)"_ 로 적는다. 본 상수는 그 범위의 **하한**이다
- * (범위 안 임의 내삽값을 만들지 않으려고 인용된 경계값을 골랐다 — 차등의 가시성 판정은 D1 사용자).
+ * (범위 안 임의 내삽값을 만들지 않으려고 인용된 경계값을 골랐다). **D1 사용자 승인 2026-09-11** —
+ * `10 m/s` 유지, Visual Fidelity 배수 없음 (#1215 코멘트 5632521560).
  *
  * ⚠️ 이것은 **중위도** 대표값이다. 실제 지구 대기는 열대 편동풍 · 중위도 편서풍으로 위도마다 부호가
  * 갈리지만, 본 구현은 shell 전체를 하나의 강체 차등 회전으로 근사한다 (위도별 차등 비-범위).
@@ -60,10 +61,12 @@ const SECONDS_PER_DAY = 86_400;
 /**
  * 구름 shell 반경 / host 반경 (rendering-only 상수).
  *
- * ⚠️ **임시값 — D1 사용자 육안이 확정한다** (§A10.3 — _"반경비는 제품 상수다 … D1 사용자 육안이
- * 정하고, 가드가 정하지 않는다"_). 물리 비율 (구름 상층 `~10 km` / `6378 km` ≈ `1.0016`) 이면 결정적
- * 프레임에서 림 돌출이 서브픽셀이라 보이지 않는다 (§A10.3 [도출] `≈ 0.16 px`) — 이 값 자체가
- * Visual Fidelity 왜곡이며 §의무 체크리스트 4항목이 ADR 에 박제돼 있다.
+ * **D1 사용자 승인 2026-09-11** (후보 B — #1215 코멘트
+ * <https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5632521560>). 가드가 정한 값이
+ * 아니다 (§A10.3 — _"반경비는 제품 상수다 … D1 사용자 육안이 정하고, 가드가 정하지 않는다"_).
+ * 물리 비율 (구름 상층 `~10 km` / `6378 km` ≈ `1.0016`) 이면 결정적 프레임에서 림 돌출이 서브픽셀이라
+ * 보이지 않는다 (§A10.3 [도출] `≈ 0.16 px`) — 이 값 자체가 Visual Fidelity 왜곡이며 §의무 체크리스트
+ * 4항목이 ADR 에 박제돼 있다 (결정적 프레임 림 돌출 `98.32 px × 0.01 ≈ 0.98 px`).
  */
 export const CLOUD_SHELL_RADIUS_RATIO = 1.01;
 
@@ -71,7 +74,10 @@ export const CLOUD_SHELL_RADIUS_RATIO = 1.01;
 const CLOUD_SHELL_SEGMENTS = 32;
 
 /**
- * 외형 상수 (rendering-only 미학 상수 — ⚠️ 전부 **임시값, D1 사용자 판정 대상**).
+ * 외형 상수 (rendering-only 미학 상수). **D1 사용자 승인 2026-09-11** — 후보 B (`cover 0.5` ·
+ * `opacity 0.9`) 와 밤면 구름 밝기 유지 (새 상수 `0`) 가 결정됐다 (#1215 코멘트
+ * <https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5632521560>). 나머지 네 값
+ * (sharpness · frequency · detail 2종) 은 승인 캡처가 쓴 값 그대로다.
  *
  *  - `CLOUD_COVER` — fbm 밀도 임계 (smoothstep 하단). 높을수록 구름이 적다.
  *    ⚠️ 가드 (`verify:1202` G6 등) 를 통과시키려고 고르지 않는다 (계약 재조정 2 — C1 클래스 금지).
