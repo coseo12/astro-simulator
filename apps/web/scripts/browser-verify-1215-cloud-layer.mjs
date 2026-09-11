@@ -452,6 +452,11 @@ async function run(browser) {
   const out = { mode: MODE, inject: INJECT };
   const on = await setupPage(browser, QUERY_ON, 'on');
   const off = await setupPage(browser, QUERY_OFF, 'off');
+  // C8b 기준 프레임은 **주입 전**에 찍는다. C8b 의 계약은 「제품 코드의 독립 2회 로드가 같다」 인데,
+  // 주 프레임 (`onB64`) 은 런타임 변이 (INJECT) 가 얹힌 뒤라 그것을 기준으로 쓰면 주입이 곧 비결정으로
+  // 오계수된다 — 변이 실증 1차 실행에서 MC-6 · MC-9 가 C8b 까지 FAIL 시켰다 (disk `30180` · `30205 px`).
+  // 주입이 없으면 이 프레임은 주 프레임과 바이트 동일하다 (같은 페이지 · 같은 결정적 상태).
+  const onPreInjectB64 = await capture(on, 'on-pre-inject');
   out.injectNote = await applyInject(on);
   await frames(on.page, 4);
 
@@ -500,7 +505,7 @@ async function run(browser) {
 
   // ── C8 — rotate=off 독립 두 번째 로드 + JD 두 번째 점 ──
   const on2 = await setupPage(browser, QUERY_ON, 'on2');
-  out.c8Load = await measurePair(on2, await capture(on2, 'on2'), onB64);
+  out.c8Load = await measurePair(on2, await capture(on2, 'on2'), onPreInjectB64);
   await jumpTo(on2, T_JD + DELTA_JD);
   out.c8QuatJd1 = await readCloudQuat(on2);
 
