@@ -40,6 +40,55 @@
 | `zoom-*.png`                                             | 위 4종의 `(600,340)` 중심 `180×180` 영역 4× 확대. **알파 축 육안 비교용** |
 | `occl-transit-*.png`                                     | (c) transit 시나리오 (`jd 2451638.75`) 프레임                             |
 
+## Phase 1 architect 실측 (2026-09-11)
+
+ADR `20260628-756` Amendment 10 §A10.12 의 원자료다. 결정 3 (`disableDepthWrite`) · 결정 4 (LOD fade 창
+정렬 동률) · 결정 5 (LOD low 거동) 를 판정했다. 런타임 주입만 했고 (프로덕션 코드 0 줄), 임시 스크립트는
+실행 후 삭제했다 (volt #67). headless `--use-angle=swiftshader`, 측정 조건은 위 표와 같다 (오클루전 제외).
+
+| 파일                                      | 내용                                                                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `phase1-architect-depthwrite-lodlow.json` | depth write 기본/비활성 × 구름 순서 (자연 / `alphaIndex 0`) × 지구 투명 큐 강제 + LOD low                                        |
+| `phase1-architect-fade-order.json`        | 실경로 — lazy 생성된 `earth-lod-mid` 의 fade 정지 재현 (구름 idx 88 < mid idx 90)                                                |
+| `phase1-architect-u1-opaque-fade.json`    | cross-validate U1 대안 — host 계열 불투명 강제 (`transparencyMode 0`) vs 현행 fade. earth · mars, disk 픽셀 H/M 분류 + 구름 결합 |
+| `phase1-architect-u1-determinism.json`    | U1 결정성 대조 — H · 현행 fade · 불투명 강제 fade 각 독립 2회 로드 diff (disk / 림 링 / 바깥)                                    |
+
+## Phase 1a dev 실측 (2026-09-11)
+
+구현 커밋 (`feat(core): [#1215] ... Phase 1a`) 위에서 잰 **판정용 사전 측정**이다. 가드 임계를 정하지
+않는다 — 임계는 D1 승인 파라미터로 baseline 을 다시 재는 Phase 1b 몫이다 (§A10.11). 측정 스크립트는
+실행 후 삭제했다 (volt #67).
+
+| 파일                                 | 내용                                                                                                                                                                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phase1-1a-c5-first-run.json`        | C5 첫 실행 — 정렬 키 치환 설치 / 제거 / 재설치 × LOD fade 창 정지 재현 (swiftshader, 독립 2회 로드)                                                                                                                          |
+| `phase1-1a-guards-cloud-on-off.json` | 기존 지구 가드 11 실행을 구름 ON (web 기본값) / OFF 에서 1회씩 — 판정과 핵심 값 (가드·임계 무수정)                                                                                                                           |
+| `phase1-d1-static-{off,A,B,C}.png`   | D1 후보 — 실 Chrome GUI 정지 프레임 (`?gpu=a&focus=earth&lod=auto`, JD `2451626.0`, pause). `-zoom` = 2× 확대                                                                                                                |
+| `phase1-d1-drift-jd{0,1,2}-zoom.png` | 차등 자전 재료 — 후보 B, JD 를 항성일 간격으로 3점 (표면 방위는 거의 같고 구름만 상대각만큼 이동)                                                                                                                            |
+| `phase1-d1-measurements.json`        | D1 정지·차등 캡처의 기하 · 엔진 (WebGPU 여부) · 후보별 disk 변화 px · 구름 quaternion. ⚠️ 이 파일의 `lodZoom` 은 **focus 상태**라 지구가 전 프레임 `high` 였다 (focus body 는 LOD 가 항상 high) — LOD 판정 재료로 쓰지 말 것 |
+| `phase1-d1-lod-roundtrip/*.png`      | LOD 경계 줌 왕복 (**`detachFocus()` 후**) — 지구 variant 상태가 바뀌거나 지구 fade 창인 프레임 (지구 중심 crop)                                                                                                              |
+| `phase1-d1-lod-measurements.json`    | 위 왕복의 프레임별 지구 LOD · variant 가시성/alpha · 구름 가시성 · 계열 draw 순서                                                                                                                                            |
+
+D1 후보 (런타임 주입 — 코드 기본값은 B):
+
+| 후보 | 반경비  | cover  | opacity | 결정적 프레임 림 돌출 (`98.32 px × (반경비 − 1)`) |
+| ---- | ------- | ------ | ------- | ------------------------------------------------- |
+| A    | `1.005` | `0.55` | `0.8`   | `0.49 px`                                         |
+| B    | `1.01`  | `0.5`  | `0.9`   | `0.98 px`                                         |
+| C    | `1.02`  | `0.45` | `0.95`  | `1.97 px`                                         |
+
+## Phase 1b dev 실측 (2026-09-11)
+
+D1 사용자 판정 (후보 B — #1215 코멘트 `5632521560`) 뒤에 잰 가드 도출·판별력·무회귀 원자료다. 측정·변이
+러너 스크립트는 스크래치로만 두고 커밋하지 않았다 (volt #67).
+
+| 파일                                | 내용                                                                                                                                                                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phase1-1b-baseline.json`           | `verify:1215-cloud-layer` `MODE=profile` 5회 — 판정량별 산포 · 도출 임계 (`T_DELTA` · `T_CLEAR` · `MIN_EXPECTED`) · 대역 판단 재료                                                                                                                                    |
+| `phase1-1b-d6-base-vs-feature.json` | D6 — develop `5489476` ↔ feature 8 쿼리 + 로드 간 잡음 대조 (base 3 × feature 3 로드, 15쌍)                                                                                                                                                                           |
+| `phase1-1b-mc-mutations.json`       | 변이 MC-1~MC-12 3단 (원본 PASS · 변이 FAIL · 원복 PASS) — 가드 exit · FAIL 줄 · 변이 상태 core 단위 테스트 수. `reviewRound` = PR 반려 라운드 수정 후 전건 재실행 + 반려 대응 변이 6건 (빈 표본 · NaN 기하 · 카메라 이탈 · fade 조건 · settle timeout · 1202 ON 전제) |
+| `phase1-1b-d5-guards.json`          | D5 — 기존 지구 가드 전건 재실행 (D1 파라미터 · `verify:1202` G6 재정의 구조)                                                                                                                                                                                          |
+
 ## 오클루전 시나리오의 카메라가 다른 이유
 
 `verify:1202` 의 `alpha = -π/2, beta = π/2` 는 **달 궤도면을 정면(face-on)으로 보는 시점**이다.

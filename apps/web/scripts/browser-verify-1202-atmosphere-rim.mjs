@@ -80,6 +80,14 @@ const T_JD = 2451626.0;
  */
 const FOCUS_QUERY = '?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off';
 
+/**
+ * #1215 — G6 를 재는 **두 번째 페이지** (구름 OFF). `?clouds=off` 는 구름 mesh 미생성 + 정렬 함수
+ * 미설치로 구름 도입 전과 같은 코드 경로다 (ADR `20260628-756` §A10.9 · §A10.10).
+ */
+const FOCUS_QUERY_CLOUDS_OFF = `${FOCUS_QUERY}&clouds=off`;
+/** #1215 — 구름 shell mesh 이름 (`cloud-layer.ts` `createCloudLayer` — `${body.id}-cloud`). */
+const CLOUD_MESH_NAME = 'earth-cloud';
+
 /** 「측정 불가」 종료 코드 — PASS(0) 도 FAIL(1) 도 아니다 (§A8.8). */
 const EXIT_UNMEASURABLE = 2;
 
@@ -187,6 +195,14 @@ const G4_MAX_SATURATION_DROP = 0.24;
  *    든 것은 「음수」가 아니라 「terminator 박명 호」이고, `-0.05` 는 그 근거를 비운다.
  *  - `-0.15` `0.02754` (1.38배) PASS / `-0.10` `0.01241` FAIL. 즉 본 게이트가 실제로 고정하는
  *    계약은 「`LO` 가 `NIGHT_NDL_MAX` 근방 이하로 충분히 음수」다.
+ *
+ * **#1215 재정의 (계약 재조정 2)** — G6 는 구름 OFF 프레임(?clouds=off 페이지)에서 잰다. 구름 ON 에서는
+ * 구름이 박명 호를 물리적으로 가려 0.06086 -> 0.00382 (cover 0.52, ALPHATEST 도 0.00341) 로 떨어진다 —
+ * 알파 축이 아니라 커버리지 축이고, 가드가 낡은 것이지 구현 결함이 아니다. 임계 0.02 · 대역 · 표본
+ * 하한은 무변경이며 재는 프레임만 바꿨다. cover 를 가드가 통과하는 값으로 고르는 것은 금지 (C1 클래스 —
+ * 가드 발화는 시각 회귀의 증거다). 사용자 합의: #1215 계약 재조정 2 (코멘트 5615851703).
+ *   - ⚠️ D1 승인 파라미터 (`cover 0.5`) 의 구름 ON 박명 값은 이 게이트를 **통과한다** — 그래도 재정의는
+ *     설계대로 한다. 통과 여부로 재는 프레임을 고르면 그것이 곧 C1 클래스다 (구름 ON 값은 진단 인쇄).
  */
 const G6_MIN_TWILIGHT_RIM = 0.02;
 
@@ -210,7 +226,7 @@ async function launch() {
  * 결정적 프레임 부트스트랩 — `verify:783` / `verify:1119` 레시피 그대로.
  *   `?focus=earth&rotate=off&orbits=off` → JD 고정 + pause → `beta = π/2` 적도면 시점.
  */
-async function setupPage(browser) {
+async function setupPage(browser, query = FOCUS_QUERY) {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
@@ -219,7 +235,7 @@ async function setupPage(browser) {
   const consoleErrors = [];
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
   page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));
-  await page.goto(`${BASE_URL}${FOCUS_QUERY}`, {
+  await page.goto(`${BASE_URL}${query}`, {
     waitUntil: 'networkidle',
     timeout: 45_000,
   });
@@ -260,7 +276,14 @@ async function injectFloats(page, entries) {
   return page.evaluate((pairs) => {
     const earth = window.__solarScene?.meshes?.get('earth');
     if (!earth) return { patched: 0, error: 'earth mesh 부재' };
-    const meshes = [earth, ...earth.getChildMeshes()];
+    // #1215 — 대상은 **표면 셰이더를 싣는 host 와 LOD variant** 로 명시 한정한다. `getChildMeshes()` 는
+    // 구름 shell (`earth-cloud`) 도 돌려주는데, 이 함수는 rim uniform 을 매 프레임 덮어쓰는 용도라
+    // 구름 머티리얼은 대상이 아니다 (구름 셰이더에 rim uniform 이 없어 무해하나 「패치 개수」가 구름
+    // 유무로 달라져 진단이 섞인다 — Phase 1a 실측: 구름 ON 에서 `verify:783` / `verify:1119` 가
+    // 「머티리얼 2개 패치」, OFF 에서 `1`).
+    const meshes = [earth, ...earth.getChildMeshes()].filter(
+      (m) => m === earth || m.name.startsWith('earth-lod-'),
+    );
     let patched = 0;
     for (const mesh of meshes) {
       const mat = mesh.material;
@@ -568,130 +591,205 @@ async function measure(page, onB64, offB64, params) {
   );
 }
 
+/**
+ * INJECT 변이를 **한 페이지**에 얹는다 (프로덕션 코드 0 줄).
+ *
+ * ⚠️ #1215 — G6 재정의 후에는 **두 페이지 모두**에 주입한다. 한쪽 (구름 ON) 에만 주입하면 M-7 이 G6
+ * (구름 OFF 페이지에서 잰다) 에 도달하지 못해, 재정의가 판별력을 조용히 지우는 경로가 된다 (ADR
+ * `20260628-756` §A10.10 구현 계약).
+ *
+ * @returns {Promise<string|null>} 오류 문구 (미지원 INJECT · LO 누락) 또는 null
+ */
+async function applyInject(page, label) {
+  if (INJECT === 'm1') {
+    // M-1 등가 에뮬레이션: 도달 가능한 모든 ndl ∈ [-1,1] 에서 smoothstep = 1 ⇒ rimLight ≡ 1.
+    // 즉 광원각 항이 없는 순수 fresnel 과 **거동이 같다** (소스 삭제와 문자 동일하지는 않다).
+    console.log(`[inject:${label}] M-1 — rimNdlLo=-2.0 / rimNdlHi=-1.9 (순수 fresnel 등가)`);
+    await injectFloats(page, [
+      ['rimNdlLo', -2.0],
+      ['rimNdlHi', -1.9],
+    ]);
+  } else if (INJECT === 'm4') {
+    console.log(`[inject:${label}] M-4 — rimStrength=0 (세기 0 고착)`);
+    await injectFloats(page, [['rimStrength', 0]]);
+  } else if (INJECT === 'm6') {
+    console.log(`[inject:${label}] M-6 — rimStrength=2.5 (기본 0.5 x5 — washout 겨냥)`);
+    await injectFloats(page, [['rimStrength', 2.5]]);
+  } else if (INJECT === 'm7') {
+    // M-7 — `RIM_NDL_LO` 부호 뒤집기. G6 가 겨냥하는 변이 (§A8.13 근거를 지키는 게이트).
+    console.log(`[inject:${label}] M-7 — rimNdlLo=+0.05 (부호 뒤집기 — 박명 호 소멸 겨냥)`);
+    await injectFloats(page, [['rimNdlLo', 0.05]]);
+  } else if (INJECT === 'lo') {
+    // `RIM_NDL_LO` 스윕 — 임계 확정·판별력 실측용 (MODE=profile 과 함께 쓴다).
+    const lo = Number(process.env.LO);
+    if (!Number.isFinite(lo)) return 'INJECT=lo 는 LO=<숫자> 환경변수가 필요하다';
+    console.log(`[inject:${label}] LO 스윕 — rimNdlLo=${lo}`);
+    await injectFloats(page, [['rimNdlLo', lo]]);
+  } else if (INJECT === 'm8') {
+    // M-8 — 방위 편중 (G5 겨냥). ndl 게이트 창을 낮면 림의 `ndl` 분포 **위쪽**으로 밀어
+    // 태양에 가장 가까운 호에만 rim 이 남게 한다. 소스 변이가 아니라 런타임 등가다.
+    const lo = Number(process.env.M8_LO ?? 0.5);
+    const hi = Number(process.env.M8_HI ?? 0.55);
+    console.log(`[inject:${label}] M-8 — rimNdlLo=${lo} / rimNdlHi=${hi} (방위 편중 — G5 겨냥)`);
+    await injectFloats(page, [
+      ['rimNdlLo', lo],
+      ['rimNdlHi', hi],
+    ]);
+  } else if (INJECT === 'm9') {
+    // M-9 — 콘솔 에러 게이트의 판별력 실증용 인위적 결함 주입. 셰이더와 무관하며, 재는 것은
+    // 「런타임 에러가 하나라도 나면 가드가 FAIL 하는가」 하나다.
+    console.log(`[inject:${label}] M-9 — 페이지 콘솔 에러 1건 주입 (콘솔 에러 게이트 판별력 실증)`);
+    await page.evaluate(() => {
+      console.error('[m9] injected runtime error canary');
+    });
+  } else if (INJECT !== 'none') {
+    return `미지원 INJECT=${INJECT}`;
+  }
+  return null;
+}
+
+/** ON 프레임 (INJECT 적용 상태) → OFF 프레임 (`rimStrength = 0` 정확한 no-op) → 기하 대역 측정. */
+async function capturePair(page, prefix) {
+  await page.waitForTimeout(400);
+  const onB64 = await capture(page, `1202-${prefix}on-${INJECT}`);
+  // 나중에 등록된 observer 가 이긴다.
+  await injectFloats(page, [['rimStrength', 0]]);
+  await page.waitForTimeout(400);
+  const offB64 = await capture(page, `1202-${prefix}off-${INJECT}`);
+  return measure(page, onB64, offB64, {
+    RIM_BAND_NDV,
+    DAY_NDL_MIN,
+    NIGHT_NDL_MAX,
+    TERMINATOR_NDL,
+    INNER_NDV_MIN,
+    ARC_BINS,
+  });
+}
+
+/**
+ * 「측정 불가」 4 전제 — #1215 이후 **두 쌍 각각**에서 평가한다 (G6 의 유효성은 자기 프레임의
+ * 표본 · 위상각 · 휘도에 달렸다 — §A10.10). 박명 표본 하한 (좁은 대역 전용) 은 G6 를 재는 쌍에만 건다 —
+ * 구름 ON 쌍의 박명 값은 게이트가 아니라 진단이다.
+ */
+function premises(r, label, withTwilight) {
+  const out = [];
+  for (const [name, acc] of [
+    ['낮면 림', r.dayLimb],
+    ['밤면 림', r.nightLimb],
+    ['낮면 내부', r.dayInner],
+  ]) {
+    if (acc.n < MIN_SAMPLES)
+      out.push(`(1) [${label}] 표본 부족 — ${name} N=${acc.n} < ${MIN_SAMPLES}`);
+  }
+  if (withTwilight && r.twilightLimb.n < MIN_TWILIGHT_SAMPLES)
+    out.push(
+      `(1) [${label}] 표본 부족 — 박명 림 N=${r.twilightLimb.n} < ${MIN_TWILIGHT_SAMPLES} (좁은 대역 전용 하한)`,
+    );
+  if (r.dayLimb.headroom !== null && r.dayLimb.headroom < MIN_DAY_HEADROOM)
+    out.push(
+      `(2) [${label}] 낮면 림 평균 잔여 휘도 헤드룸 ${r.dayLimb.headroom} < ${MIN_DAY_HEADROOM}`,
+    );
+  if (r.phaseAlphaDeg < MIN_PHASE_ALPHA_DEG)
+    out.push(`(3) [${label}] 위상각 ${r.phaseAlphaDeg}deg < ${MIN_PHASE_ALPHA_DEG}deg`);
+  if (r.dayInner.lumOff !== null && r.dayInner.lumOff < MIN_DAY_LIT_LUM)
+    out.push(
+      `(4) [${label}] 낮면 내부 평균 휘도(OFF) ${r.dayInner.lumOff} < ${MIN_DAY_LIT_LUM} — 측정 대상(절차 표면)이 화면에 없다`,
+    );
+  return out;
+}
+
+function printDiagnostics(label, r) {
+  console.log(`\n--- ${label} ---`);
+  console.log(
+    `위상각 alpha        : ${r.phaseAlphaDeg}deg   disk 반경: ${r.diskRadiusPx}px   rim 밴드 반치폭: ${r.bandHalfWidthPx}px (peak ${r.peakRadialRim})`,
+  );
+  console.table({
+    '낮면 림': r.dayLimb,
+    '밤면 림': r.nightLimb,
+    '박명 림': r.twilightLimb,
+    '낮면 내부': r.dayInner,
+  });
+  // 호 분할은 **진단 전용**이다 (G5 결번 — 위 상수 블록의 M-8 실측 참조). 방위 편중은 게이트로
+  // 닫지 못하고 (`> 0` 은 근사-0 을 못 거르며, 극단 편중은 G2 가 먼저 잡는다) 이 인쇄와 실 Chrome
+  // GUI 육안이 짝이다 — §A8.7 ⑥ 밴드 두께와 같은 처분.
+  console.log('낮면 호 분할 (진단, 게이트 아님):', JSON.stringify(r.arcs));
+  console.log('낮면 반경 프로파일 [px, rim]:', JSON.stringify(r.radialProfile));
+  console.log('림 ndl 프로파일 [ndl_lo, n, rim]:', JSON.stringify(r.ndlProfile));
+}
+
 async function main() {
   const browser = await launch();
   let exitCode = 0;
   try {
-    const { context, page, consoleErrors } = await setupPage(browser);
+    // 페이지 A — 구름 ON (web 기본값). G1~G4 는 여기서 잰다 — 사용자 합의 범위는 G6 하나다 (§A10.10).
+    const pageOn = await setupPage(browser, FOCUS_QUERY);
+    // 페이지 B — 구름 OFF (`?clouds=off`). **G6 만** 여기서 잰다.
+    //   #1215 — G6 는 구름 OFF 프레임(?clouds=off 페이지)에서 잰다. 구름 ON 에서는 구름이 박명 호를
+    //   물리적으로 가려 0.06086 -> 0.00382 (cover 0.52, ALPHATEST 도 0.00341) 로 떨어진다 — 알파 축이
+    //   아니라 커버리지 축이고, 가드가 낡은 것이지 구현 결함이 아니다. 임계 0.02 · 대역 · 표본 하한은
+    //   무변경이며 재는 프레임만 바꿨다. cover 를 가드가 통과하는 값으로 고르는 것은 금지 (C1 클래스 —
+    //   가드 발화는 시각 회귀의 증거다). 사용자 합의: #1215 계약 재조정 2 (코멘트 5615851703).
+    // 토글이 런타임 `setEnabled(false)` 가 아니라 URL flag 인 이유: `?clouds=off` 는 구름 mesh 미생성 +
+    // 정렬 함수 미설치로 구름 도입 전과 **같은 코드 경로**라 G6 baseline `0.06086` · 임계 · M-7 이 그대로
+    // 옮겨 온다 (§A10.9 · §A10.10). 런타임 비활성은 mesh 와 정렬 함수가 남아 동일성을 따로 증명해야 한다.
+    const pageOff = await setupPage(browser, FOCUS_QUERY_CLOUDS_OFF);
+    const pages = [
+      [pageOn, '구름 ON'],
+      [pageOff, '구름 OFF'],
+    ];
 
-    // ON 프레임 — INJECT 가 지정되면 그 변이를 얹는다 (프로덕션 코드 0 줄).
-    if (INJECT === 'm1') {
-      // M-1 등가 에뮬레이션: 도달 가능한 모든 ndl ∈ [-1,1] 에서 smoothstep = 1 ⇒ rimLight ≡ 1.
-      // 즉 광원각 항이 없는 순수 fresnel 과 **거동이 같다** (소스 삭제와 문자 동일하지는 않다).
-      console.log('[inject] M-1 — rimNdlLo=-2.0 / rimNdlHi=-1.9 (순수 fresnel 등가)');
-      await injectFloats(page, [
-        ['rimNdlLo', -2.0],
-        ['rimNdlHi', -1.9],
-      ]);
-    } else if (INJECT === 'm4') {
-      console.log('[inject] M-4 — rimStrength=0 (세기 0 고착)');
-      await injectFloats(page, [['rimStrength', 0]]);
-    } else if (INJECT === 'm6') {
-      console.log('[inject] M-6 — rimStrength=2.5 (기본 0.5 x5 — washout 겨냥)');
-      await injectFloats(page, [['rimStrength', 2.5]]);
-    } else if (INJECT === 'm7') {
-      // M-7 — `RIM_NDL_LO` 부호 뒤집기. G6 가 겨냥하는 변이 (§A8.13 근거를 지키는 게이트).
-      console.log('[inject] M-7 — rimNdlLo=+0.05 (부호 뒤집기 — 박명 호 소멸 겨냥)');
-      await injectFloats(page, [['rimNdlLo', 0.05]]);
-    } else if (INJECT === 'lo') {
-      // `RIM_NDL_LO` 스윕 — 임계 확정·판별력 실측용 (MODE=profile 과 함께 쓴다).
-      const lo = Number(process.env.LO);
-      if (!Number.isFinite(lo)) {
-        console.error('[inject] INJECT=lo 는 LO=<숫자> 환경변수가 필요하다');
-        await context.close();
+    for (const [p, label] of pages) {
+      const err = await applyInject(p.page, label);
+      if (err) {
+        console.error(`[inject] ${err}`);
+        for (const [q] of pages) await q.context.close();
         return 1;
       }
-      console.log(`[inject] LO 스윕 — rimNdlLo=${lo}`);
-      await injectFloats(page, [['rimNdlLo', lo]]);
-    } else if (INJECT === 'm8') {
-      // M-8 — 방위 편중 (G5 겨냥). ndl 게이트 창을 낮면 림의 `ndl` 분포 **위쪽**으로 밀어
-      // 태양에 가장 가까운 호에만 rim 이 남게 한다. 소스 변이가 아니라 런타임 등가다.
-      const lo = Number(process.env.M8_LO ?? 0.5);
-      const hi = Number(process.env.M8_HI ?? 0.55);
-      console.log(`[inject] M-8 — rimNdlLo=${lo} / rimNdlHi=${hi} (방위 편중 — G5 겨냥)`);
-      await injectFloats(page, [
-        ['rimNdlLo', lo],
-        ['rimNdlHi', hi],
-      ]);
-    } else if (INJECT === 'm9') {
-      // M-9 — 콘솔 에러 게이트의 판별력 실증용 인위적 결함 주입. 셰이더와 무관하며, 재는 것은
-      // 「런타임 에러가 하나라도 나면 가드가 FAIL 하는가」 하나다.
-      console.log('[inject] M-9 — 페이지 콘솔 에러 1건 주입 (콘솔 에러 게이트 판별력 실증)');
-      await page.evaluate(() => {
-        console.error('[m9] injected runtime error canary');
-      });
-    } else if (INJECT !== 'none') {
-      console.error(`[inject] 미지원 INJECT=${INJECT}`);
-      await context.close();
-      return 1;
     }
-    await page.waitForTimeout(400);
-    const onB64 = await capture(page, `1202-on-${INJECT}`);
+    // 「측정 불가」 추가 전제 — OFF 페이지에 구름 mesh 가 **없다** (있으면 G6 가 구름 OFF 프레임을 재지 않는다).
+    const offPageHasCloud = await pageOff.page.evaluate(
+      (n) => window.__simCore.scene.getMeshByName(n) !== null,
+      CLOUD_MESH_NAME,
+    );
+    // #1215 cross-validate X4 — 대칭 전제: ON 페이지에 구름 mesh 가 **있다**. §A10.10 은 「G1~G4 는 구름 ON
+    // 프레임에서 잰다」 고 선언했다 — 팩토리 결함 등으로 구름이 안 생기면 선언과 다른 프레임을 재고도 조용히
+    // 통과한다 (verify:1215 C3 가 같은 CI 에서 잡더라도 이 가드는 자기 전제를 스스로 확인한다).
+    const onPageHasCloud = await pageOn.page.evaluate(
+      (n) => window.__simCore.scene.getMeshByName(n) !== null,
+      CLOUD_MESH_NAME,
+    );
 
-    // OFF 프레임 — rimStrength = 0 (정확한 no-op). 나중에 등록된 observer 가 이긴다.
-    await injectFloats(page, [['rimStrength', 0]]);
-    await page.waitForTimeout(400);
-    const offB64 = await capture(page, `1202-off-${INJECT}`);
+    const r = await capturePair(pageOn.page, '');
+    const rOff = await capturePair(pageOff.page, 'cloudsoff-');
+    for (const [p] of pages) await p.context.close();
 
-    const r = await measure(page, onB64, offB64, {
-      RIM_BAND_NDV,
-      DAY_NDL_MIN,
-      NIGHT_NDL_MAX,
-      TERMINATOR_NDL,
-      INNER_NDV_MIN,
-      ARC_BINS,
-    });
-    await context.close();
-
-    if (r.error) {
-      console.error(`[fail] 측정 실패 — ${r.error}`);
+    if (r.error || rOff.error) {
+      console.error(`[fail] 측정 실패 — ${r.error ?? rOff.error}`);
       return 1;
     }
 
     console.log('\n=== #1202 대기 산란 rim — 진단 ===');
     console.log(`INJECT=${INJECT}  MODE=${MODE}`);
+    printDiagnostics('페이지 A — 구름 ON (G1~G4)', r);
+    printDiagnostics('페이지 B — 구름 OFF ?clouds=off (G6)', rOff);
+    // 구름 ON 박명 호는 **진단으로 인쇄**한다 — 커버리지 축 관측을 지우지 않는다 (§A10.10).
     console.log(
-      `위상각 alpha        : ${r.phaseAlphaDeg}deg   disk 반경: ${r.diskRadiusPx}px   rim 밴드 반치폭: ${r.bandHalfWidthPx}px (peak ${r.peakRadialRim})`,
+      `\nG6 진단 (게이트 아님) — 구름 ON 박명 호 rim 기여 ${r.twilightLimb.rim} (N=${r.twilightLimb.n}) · 구름 OFF ${rOff.twilightLimb.rim} (N=${rOff.twilightLimb.n})`,
     );
-    console.table({
-      '낮면 림': r.dayLimb,
-      '밤면 림': r.nightLimb,
-      '박명 림': r.twilightLimb,
-      '낮면 내부': r.dayInner,
-    });
-    // 호 분할은 **진단 전용**이다 (G5 결번 — 위 상수 블록의 M-8 실측 참조). 방위 편중은 게이트로
-    // 닫지 못하고 (`> 0` 은 근사-0 을 못 거르며, 극단 편중은 G2 가 먼저 잡는다) 이 인쇄와 실 Chrome
-    // GUI 육안이 짝이다 — §A8.7 ⑥ 밴드 두께와 같은 처분.
-    console.log('낮면 호 분할 (진단, 게이트 아님):', JSON.stringify(r.arcs));
-    console.log('낮면 반경 프로파일 [px, rim]:', JSON.stringify(r.radialProfile));
-    console.log('림 ndl 프로파일 [ndl_lo, n, rim]:', JSON.stringify(r.ndlProfile));
+    const consoleErrors = [...pageOn.consoleErrors, ...pageOff.consoleErrors];
     console.log(
-      `consoleErrors: ${consoleErrors.length}${consoleErrors.length ? ` — ${JSON.stringify(consoleErrors.slice(0, 5))}` : ''}`,
+      `consoleErrors: ${consoleErrors.length} (구름 ON ${pageOn.consoleErrors.length} · 구름 OFF ${pageOff.consoleErrors.length})${consoleErrors.length ? ` — ${JSON.stringify(consoleErrors.slice(0, 5))}` : ''}`,
     );
 
-    // ── 「측정 불가」 판정 (게이트보다 **먼저**) ──
-    const unmeasurable = [];
-    for (const [label, acc] of [
-      ['낮면 림', r.dayLimb],
-      ['밤면 림', r.nightLimb],
-      ['낮면 내부', r.dayInner],
-    ]) {
-      if (acc.n < MIN_SAMPLES)
-        unmeasurable.push(`(1) 표본 부족 — ${label} N=${acc.n} < ${MIN_SAMPLES}`);
-    }
-    if (r.twilightLimb.n < MIN_TWILIGHT_SAMPLES)
+    // ── 「측정 불가」 판정 (게이트보다 **먼저**) — 두 쌍 각각 + OFF 페이지 구름 부재 ──
+    const unmeasurable = [...premises(r, '구름 ON', false), ...premises(rOff, '구름 OFF', true)];
+    if (offPageHasCloud)
       unmeasurable.push(
-        `(1) 표본 부족 — 박명 림 N=${r.twilightLimb.n} < ${MIN_TWILIGHT_SAMPLES} (좁은 대역 전용 하한)`,
+        `(5) ?clouds=off 페이지에 ${CLOUD_MESH_NAME} mesh 가 있다 — G6 가 구름 OFF 프레임을 재지 않는다`,
       );
-    if (r.dayLimb.headroom !== null && r.dayLimb.headroom < MIN_DAY_HEADROOM)
+    if (!onPageHasCloud)
       unmeasurable.push(
-        `(2) 낮면 림 평균 잔여 휘도 헤드룸 ${r.dayLimb.headroom} < ${MIN_DAY_HEADROOM}`,
-      );
-    if (r.phaseAlphaDeg < MIN_PHASE_ALPHA_DEG)
-      unmeasurable.push(`(3) 위상각 ${r.phaseAlphaDeg}deg < ${MIN_PHASE_ALPHA_DEG}deg`);
-    if (r.dayInner.lumOff !== null && r.dayInner.lumOff < MIN_DAY_LIT_LUM)
-      unmeasurable.push(
-        `(4) 낮면 내부 평균 휘도(OFF) ${r.dayInner.lumOff} < ${MIN_DAY_LIT_LUM} — 측정 대상(절차 표면)이 화면에 없다`,
+        `(5) 구름 ON 페이지에 ${CLOUD_MESH_NAME} mesh 가 없다 — G1~G4 가 구름 ON 프레임을 재지 않는다`,
       );
 
     if (unmeasurable.length) {
@@ -699,20 +797,22 @@ async function main() {
       for (const u of unmeasurable) console.error(`  - ${u}`);
       return EXIT_UNMEASURABLE;
     }
-    console.log('[측정 불가 판정] 발화 0 — 유효성 전제 4항 전건 충족');
+    console.log(
+      '[측정 불가 판정] 발화 0 — 유효성 전제 전건 충족 (두 쌍 각 4항 + ON 페이지 구름 존재 · OFF 페이지 구름 부재)',
+    );
 
     if (MODE === 'profile') {
       console.log('\n[profile] 진단 전용 모드 — 게이트 미판정.');
       return 0;
     }
 
-    // ── 게이트 (G1~G4 · G6 · G7 — G5 결번) ──
+    // ── 게이트 (G1~G4 = 구름 ON 쌍 · G6 = 구름 OFF 쌍 · G7 = 두 페이지 합 — G5 결번) ──
     const gaps = {
       g1: r.dayLimb.rim - r.nightLimb.rim,
       g2: r.dayLimb.rim,
       g3: r.dayLimb.rim - r.dayInner.rim,
       g4: r.dayLimb.satOff - r.dayLimb.satOn,
-      g6: r.twilightLimb.rim,
+      g6: rOff.twilightLimb.rim,
     };
     const results = [
       [
@@ -736,13 +836,18 @@ async function main() {
       ],
       // G5 는 결번이다 (위 상수 블록 참조). 번호를 당겨 쓰지 않는다 — M-5 결번과 같은 처분으로,
       // 리뷰 이력의 「G5」가 다른 술어를 가리키게 되는 혼선을 막는다.
-      ['G6 박명 호 rim 기여', gaps.g6, `>= ${G6_MIN_TWILIGHT_RIM}`, gaps.g6 >= G6_MIN_TWILIGHT_RIM],
+      [
+        'G6 박명 호 rim 기여 (구름 OFF 페이지)',
+        gaps.g6,
+        `>= ${G6_MIN_TWILIGHT_RIM}`,
+        gaps.g6 >= G6_MIN_TWILIGHT_RIM,
+      ],
     ];
-    // G7 — 런타임 콘솔 에러. 인쇄만 하고 판정하지 않으면 「측정은 했는데 아무도 안 본다」가 된다.
-    // 재는 것은 rim 이 아니라 **측정이 성립한 런타임인가**이며, 픽셀 게이트가 전건 초록인 채로
-    // WebGL 셰이더 컴파일 경고·예외가 나는 상태를 통과시키지 않는다.
+    // G7 — 런타임 콘솔 에러 (**두 페이지 합** — #1215 §A10.10). 인쇄만 하고 판정하지 않으면 「측정은
+    // 했는데 아무도 안 본다」가 된다. 재는 것은 rim 이 아니라 **측정이 성립한 런타임인가**이며, 픽셀
+    // 게이트가 전건 초록인 채로 WebGL 셰이더 컴파일 경고·예외가 나는 상태를 통과시키지 않는다.
     results.push([
-      'G7 런타임 콘솔 에러 수',
+      'G7 런타임 콘솔 에러 수 (두 페이지 합)',
       String(consoleErrors.length),
       '== 0',
       consoleErrors.length === 0,

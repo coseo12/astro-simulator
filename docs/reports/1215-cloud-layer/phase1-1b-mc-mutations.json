@@ -1,0 +1,1883 @@
+{
+ "issue": 1215,
+ "phase": "1b",
+ "what": "verify:1215-cloud-layer · verify:1202 (G6 재정의) 변이 3단 실증 — 원본 PASS · 변이 FAIL · 원복 PASS",
+ "conditions": {
+  "renderer": "SWIFTSHADER=1 HEADFUL=0",
+  "sourceMutation": "소스 치환 → core 재빌드 (core 변이) → dev 서버 재시작 → core 단위 테스트 → 가드 → 원복 → 재빌드 → 재시작 → 가드",
+  "runtimeMutation": "INJECT 로 가드 1회 → INJECT 없이 1회"
+ },
+ "results": [
+  {
+   "id": "original-1215",
+   "exit": 0,
+   "fails": [],
+   "unmeasurable": [],
+   "gates": [
+    "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+    "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+    "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+    "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+    "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+    "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+    "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+    "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+    "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+    "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+    "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+   ]
+  },
+  {
+   "id": "original-1202",
+   "exit": 0,
+   "fails": [],
+   "unmeasurable": [],
+   "gates": [
+    "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+    "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+    "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+    "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+    "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+    "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+   ]
+  },
+  {
+   "id": "MC-6",
+   "kind": "runtime",
+   "file": null,
+   "expect": "C2 단독 FAIL · C1 PASS",
+   "unitTestsInMutatedState": null,
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.230811  (>= 0.0114)",
+     "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.117229  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.117229  (>= mid ÷ 3 = 0.039076)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": null
+  },
+  {
+   "id": "MC-7",
+   "kind": "runtime",
+   "file": null,
+   "expect": "C4 FAIL",
+   "unitTestsInMutatedState": null,
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C4 콘솔 에러 (전 페이지) = 1  (!hasSimErrors)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "FAIL  C4 콘솔 에러 (전 페이지) = 1  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": null
+  },
+  {
+   "id": "MC-9",
+   "kind": "runtime",
+   "file": null,
+   "expect": "C3 FAIL",
+   "unitTestsInMutatedState": null,
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+     "FAIL  C3 투명 큐 ON − OFF = 0 []  (== 1 ∧ earth-cloud ∈ ON)",
+     "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.230811  (>= 0.0114)",
+     "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+     "FAIL  C3 투명 큐 ON − OFF = 0 []  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": null
+  },
+  {
+   "id": "MC-11/m7",
+   "kind": "runtime",
+   "file": null,
+   "expect": "G6 FAIL · G1~G4 PASS",
+   "unitTestsInMutatedState": null,
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  G1 낮면 림 − 밤면 림 = 0.07135  (>= 0.025)",
+     "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+     "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+     "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+     "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)",
+     "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+     "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+     "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+     "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+     "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+     "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+    ]
+   },
+   "revertByteIdentical": null
+  },
+  {
+   "id": "MC-11/m4",
+   "kind": "runtime",
+   "file": null,
+   "expect": "G6 FAIL (G2 등 동반)",
+   "unitTestsInMutatedState": null,
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  G1 낮면 림 − 밤면 림 = 0.00000  (>= 0.025)",
+     "FAIL  G2 낮면 림 rim 기여 = 0.00000  (>= 0.025)",
+     "FAIL  G3 낮면 림 − 낮면 내부 = 0.00000  (>= 0.025)",
+     "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "FAIL  G1 낮면 림 − 밤면 림 = 0.00000  (>= 0.025)",
+     "FAIL  G2 낮면 림 rim 기여 = 0.00000  (>= 0.025)",
+     "FAIL  G3 낮면 림 − 낮면 내부 = 0.00000  (>= 0.025)",
+     "PASS  G4 낮면 림 채도 감소량 = 0.00000  (<= 0.24)",
+     "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)",
+     "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+     "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+     "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+     "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+     "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+     "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+    ]
+   },
+   "revertByteIdentical": null
+  },
+  {
+   "id": "MC-1",
+   "kind": "source",
+   "file": "packages/core/src/scene/cloud-layer.ts",
+   "expect": "C1 FAIL (단위 테스트 통과 예상 — 바인딩 삭제 사각)",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+     "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+     "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 1.000000  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000)",
+     "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-2",
+   "kind": "source",
+   "file": "packages/core/src/scene/solar-system-scene.ts",
+   "expect": "C7 구조 읽기 FAIL",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C7b 구름 상대각 차 (Δjd=1) = 0.000000  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "FAIL  C7b 구름 상대각 차 (Δjd=1) = 0.000000  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-3",
+   "kind": "source",
+   "file": "packages/core/src/scene/solar-system-scene.ts",
+   "expect": "C8 FAIL",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-4",
+   "kind": "source",
+   "file": "packages/core/src/scene/solar-system-scene.ts",
+   "expect": "C5 뒤 항 FAIL",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-12",
+   "kind": "source",
+   "file": "packages/core/src/scene/solar-system-scene.ts",
+   "expect": "C5 뒤 항 FAIL (rank 가 판별력 담지자)",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-5",
+   "kind": "source",
+   "file": "packages/core/src/scene/solar-system-scene.ts",
+   "expect": "C6 FAIL",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C6 low: cloud.isVisible · disk 변화 px = true · 14211  (false ∧ == 0 ∧ C1 PASS)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "FAIL  C6 low: cloud.isVisible · disk 변화 px = true · 14211  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-8",
+   "kind": "source",
+   "file": "packages/core/src/scene/cloud-layer.ts",
+   "expect": "log-depth-glsl.test.ts FAIL + C1 FAIL",
+   "unitTestsInMutatedState": "2 failed | 1102 passed (1104)",
+   "mutant": {
+    "exit": 1,
+    "fails": [
+     "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+     "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+     "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)"
+    ],
+    "unmeasurable": [],
+    "gates": [
+     "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 1.000000  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.000000)",
+     "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  },
+  {
+   "id": "MC-10",
+   "kind": "source",
+   "file": "apps/web/src/core/parse-cloud-mode.ts",
+   "expect": "측정 불가 5 (exit 2)",
+   "unitTestsInMutatedState": "1104 passed (1104)",
+   "mutant": {
+    "exit": 2,
+    "fails": [],
+    "unmeasurable": [
+     "- (5) ?clouds=off 페이지에 earth-cloud mesh 가 있다 — OFF 가 구름 도입 전 경로가 아니다"
+    ],
+    "gates": []
+   },
+   "restore": {
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   "revertByteIdentical": true
+  }
+ ],
+ "supplementary": {
+  "note": "MC-3 (내부 rotationStates.has 게이트 삭제) 은 미검출 — 등가 변이다. 구름 상대 자전 호출이 외곽 `if (rotationStates.size > 0)` 블록 안에 있어 rotate=off (빈 Map) 에서 블록 통째로 건너뛰므로 내부 게이트만 지우면 거동이 같다. MC-3′ 는 외곽 · 내부 게이트를 함께 열어 「rotate=off 에서도 상대 자전」 을 실제로 만든 보충 변이다.",
+  "results": [
+   {
+    "id": "MC-3b",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C8 FAIL (rotate=off 에서도 상대 자전)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C8a rotate=off JD 2점 identity = [0,0.7152234632788377,0,-0.6988958417213721] · [0,0.6662825401274255,0,-0.7456993876364293]  (identity ×2)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.063787  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.467690  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.027349  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.027349  (>= mid ÷ 3 = 0.009116)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "FAIL  C8a rotate=off JD 2점 identity = [0,0.7152234632788377,0,-0.6988958417213721] · [0,0.6662825401274255,0,-0.7456993876364293]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   }
+  ]
+ },
+ "firstRun": {
+  "note": "1차 실행: 런타임 MC-6 · MC-9 가 C8b 까지 FAIL (disk 30180 · 30205 px) — C8b 기준 프레임이 주입 뒤 주 프레임이던 가드 결함. 기준을 주입 전 프레임으로 고친 뒤 (커밋 fix(verify) C8b) 전건 재실행한 것이 results. 1차 실행은 러너 로그 경로 버그 (MC-11/m7 의 /) 로 MC-11 이후 중단 — 소스 변이 적용 전.",
+  "results": [
+   {
+    "id": "MC-6",
+    "kind": "runtime",
+    "file": null,
+    "expect": "C2 단독 FAIL · C1 PASS",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "FAIL  C8b rotate=off 독립 2회 로드 disk 변화 px = 30180.000000  (== 0)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.230811  (>= 0.0114)",
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.117229  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.117229  (>= mid ÷ 3 = 0.039076)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "FAIL  C8b rotate=off 독립 2회 로드 disk 변화 px = 30180.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-7",
+    "kind": "runtime",
+    "file": null,
+    "expect": "C4 FAIL",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C4 콘솔 에러 (전 페이지) = 1  (!hasSimErrors)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "FAIL  C4 콘솔 에러 (전 페이지) = 1  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-9",
+    "kind": "runtime",
+    "file": null,
+    "expect": "C3 FAIL",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "FAIL  C3 투명 큐 ON − OFF = 0 []  (== 1 ∧ earth-cloud ∈ ON)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C8b rotate=off 독립 2회 로드 disk 변화 px = 30205.000000  (== 0)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.230811  (>= 0.0114)",
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "FAIL  C3 투명 큐 ON − OFF = 0 []  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "FAIL  C8b rotate=off 독립 2회 로드 disk 변화 px = 30205.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   }
+  ]
+ },
+ "reviewRound": {
+  "what": "PR #1217 반려 라운드 (reviewer B1 · A1 / cross-validate X1~X4) 수정 후 전건 재실행 — judge 전제 확장 (2 · 3 을 판정에 쓰이는 모든 쌍에, low 는 2 만) · 전제 8 (fade 큐) · 전제 6 확장 (비유한 · 퇴화 기하 · 쌍별 기하 불일치) · C5b ∧ C5a · verify:1202 ON 페이지 구름 존재 전제",
+  "results": [
+   {
+    "id": "original-1215",
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   {
+    "id": "original-1202",
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+     "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+     "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+     "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+     "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+     "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+    ]
+   },
+   {
+    "id": "MC-6",
+    "kind": "runtime",
+    "file": null,
+    "expect": "C2 단독 FAIL · C1 PASS",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.230811  (>= 0.0114)",
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.117229  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.117229  (>= mid ÷ 3 = 0.039076 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-7",
+    "kind": "runtime",
+    "file": null,
+    "expect": "C4 FAIL",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C4 콘솔 에러 (전 페이지) = 1  (!hasSimErrors)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "FAIL  C4 콘솔 에러 (전 페이지) = 1  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-9",
+    "kind": "runtime",
+    "file": null,
+    "expect": "C3 FAIL",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (8) fade 정지 재현의 투명 큐 [\"earth\",\"earth-lod-mid\"] 에 earth-cloud 와 earth-lod-mid 가 둘 다 있지 않다 — C5b 가 결함 조건을 시험하지 않는다"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-11/m7",
+    "kind": "runtime",
+    "file": null,
+    "expect": "G6 FAIL · G1~G4 PASS",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  G1 낮면 림 − 밤면 림 = 0.07135  (>= 0.025)",
+      "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+      "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+      "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+      "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)",
+      "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+      "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+      "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+      "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+      "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+      "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-11/m4",
+    "kind": "runtime",
+    "file": null,
+    "expect": "G6 FAIL (G2 등 동반)",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  G1 낮면 림 − 밤면 림 = 0.00000  (>= 0.025)",
+      "FAIL  G2 낮면 림 rim 기여 = 0.00000  (>= 0.025)",
+      "FAIL  G3 낮면 림 − 낮면 내부 = 0.00000  (>= 0.025)",
+      "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "FAIL  G1 낮면 림 − 밤면 림 = 0.00000  (>= 0.025)",
+      "FAIL  G2 낮면 림 rim 기여 = 0.00000  (>= 0.025)",
+      "FAIL  G3 낮면 림 − 낮면 내부 = 0.00000  (>= 0.025)",
+      "PASS  G4 낮면 림 채도 감소량 = 0.00000  (<= 0.24)",
+      "FAIL  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.00000  (>= 0.02)",
+      "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+      "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+      "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+      "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+      "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+      "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-1",
+    "kind": "source",
+    "file": "packages/core/src/scene/cloud-layer.ts",
+    "expect": "C1 FAIL (단위 테스트 통과 예상 — 바인딩 삭제 사각)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000 ∧ C5a PASS)",
+      "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 1.000000  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000 ∧ C5a PASS)",
+      "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-2",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C7 구조 읽기 FAIL",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C7b 구름 상대각 차 (Δjd=1) = 0.000000  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "FAIL  C7b 구름 상대각 차 (Δjd=1) = 0.000000  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-3",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C8 FAIL",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-3b",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C8 FAIL (rotate=off 에서도 상대 자전)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C8a rotate=off JD 2점 identity = [0,0.7152234632788377,0,-0.6988958417213721] · [0,0.6662825401274255,0,-0.7456993876364293]  (identity ×2)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.063787  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.467690  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.027349  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.027349  (>= mid ÷ 3 = 0.009116 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "FAIL  C8a rotate=off JD 2점 identity = [0,0.7152234632788377,0,-0.6988958417213721] · [0,0.6662825401274255,0,-0.7456993876364293]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-4",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C5 뒤 항 FAIL",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-12",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C5 뒤 항 FAIL (rank 가 판별력 담지자)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-5",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "C6 FAIL",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C6 low: cloud.isVisible · disk 변화 px = true · 14211  (false ∧ == 0 ∧ C1 PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "FAIL  C6 low: cloud.isVisible · disk 변화 px = true · 14211  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-8",
+    "kind": "source",
+    "file": "packages/core/src/scene/cloud-layer.ts",
+    "expect": "log-depth-glsl.test.ts FAIL + C1 FAIL",
+    "unitTestsInMutatedState": "2 failed | 1102 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.000000 ∧ C5a PASS)",
+      "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "FAIL  C1 낮면 내부 평균 |ΔL| = 0.000000  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 1.000000  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.000000 ∧ C5a PASS)",
+      "FAIL  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-10",
+    "kind": "source",
+    "file": "apps/web/src/core/parse-cloud-mode.ts",
+    "expect": "측정 불가 5 (exit 2)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (5) ?clouds=off 페이지에 earth-cloud mesh 가 있다 — OFF 가 구름 도입 전 경로가 아니다"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "R2",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "exit 2 (rotate ON 에서 지구 scaling 0 — 빈 표본/퇴화 기하)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (6) 측정 오류 — c7Load: c7Load 페이지 기하 불일치 (-229.43414306640625,-8.756192207336426,-45.550228118896484,-229.43414306640625,-8.756192207336426,0.000002339741286050412 vs -229.43414306640625,-8.756192207336426,-48.43708419799805,-229.43414306640625,-8.756192207336426,0.000002339741286050412)"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "R1",
+    "kind": "source",
+    "file": "packages/core/src/scene/solar-system-scene.ts",
+    "expect": "exit 2 (rotate ON 에서 지구 NaN quaternion — 비유한 기하)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (6) 측정 오류 — c7Load: 기하 무효 — 비유한 값 또는 반경 ≤ 0 (radius NaN)"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "R3",
+    "kind": "source",
+    "file": "apps/web/scripts/browser-verify-1215-cloud-layer.mjs",
+    "expect": "exit 2 (rotate ON 페이지 카메라가 지구를 겨누지 않음)",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (2) [c7Load] 대역 표본 N=0 < MIN_EXPECTED 2408",
+      "- (3) [c7Load] OFF 대역 평균 휘도 null < 0.15"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "X2",
+    "kind": "source",
+    "file": "apps/web/scripts/browser-verify-1215-cloud-layer.mjs",
+    "expect": "exit 2 (fade 정지가 mid 를 투명 큐에 못 넣음 — 전제 8)",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (8) fade 정지 재현의 투명 큐 [\"earth\",\"earth-cloud\"] 에 earth-cloud 와 earth-lod-mid 가 둘 다 있지 않다 — C5b 가 결함 조건을 시험하지 않는다"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "S4",
+    "kind": "source",
+    "file": "apps/web/scripts/browser-verify-1215-cloud-layer.mjs",
+    "expect": "exit 2 (settle timedOut — 전제 1, #1214 시그니처 4)",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (1) LOD 정착 상한 초과 — on/boot (205ms, dist=9/6/17 fading=11)",
+      "- (1) LOD 정착 상한 초과 — off/boot (203ms, dist=9/6/17 fading=11)",
+      "- (1) LOD 정착 상한 초과 — on2/boot (204ms, dist=9/6/17 fading=11)",
+      "- (1) LOD 정착 상한 초과 — rotA/boot (204ms, dist=6/8/18 fading=10)",
+      "- (1) LOD 정착 상한 초과 — rotB/boot (202ms, dist=6/8/18 fading=10)"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "X4",
+    "kind": "source",
+    "file": "apps/web/src/core/parse-cloud-mode.ts",
+    "expect": "verify:1202 exit 2 (ON 페이지 구름 부재)",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (5) 구름 ON 페이지에 earth-cloud mesh 가 없다 — G1~G4 가 구름 ON 프레임을 재지 않는다"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+      "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+      "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+      "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+      "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+      "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   }
+  ],
+  "notes": [
+   "원본 실행 판정량이 5f72be7 과 동일 (C1 0.034201 · C2 0.55598 · C5a/C5b 0.019252 · C7b = ω) — 전제 확장은 판정량을 바꾸지 않았다.",
+   "MC-9 (구름 needAlphaBlending 거짓) 는 이전 라운드 FAIL (C3 · C2 · C5a) 에서 이번 라운드 exit 2 (전제 8) 로 분류가 바뀌었다. 구름이 불투명 큐로 가 fade 큐가 [earth, earth-lod-mid] 가 되고, 전제가 게이트보다 먼저 평가돼 C3 의 제품 결함 FAIL 을 가린다. CI 는 exit 2 도 실패로 막는다 — 분류 품질 문제이며 메인 결정 대상 (전제 8 을 하네스가 통제하는 earth-lod-mid 로만 좁히는 안). → reviewRound2 에서 정정: 전제 8 을 mid 만 묻도록 좁혀 MC-9 는 FAIL (C2 · C3 · C5a · C5b) 로 돌아왔다.",
+   "R2 (지구 scaling 0) 는 exit 2 (전제 6 — 기하 무효 또는 쌍 기하 불일치). 어느 하위 검사가 먼저 발화하는지는 실행 의존이다 — 이 실행에서는 두 로드 카메라가 달라 쌍 기하 대조가, reviewer 실행에서는 반경 검사가 발화했다. 쌍 기하 대조 → 반경 검사 → 전제 2 · 3 세 겹이 각각 독립으로 막는다 (reviewer 실행 — 앞 두 겹 제거판도 exit 2).",
+   "MC-8 (구름 log-depth 문장 삭제): mid 정착 쌍 C1 0 인데 fade 정지 쌍 C1 0.019252 — fade 창에서는 host · mid 가 둘 다 투명이라 depth 를 쓰지 않아 구름이 가려지지 않는 것으로 보인다 (관측, 기전 분리 미실시).",
+   "A4 [실행]: reviewer 형태의 MC-12 (CLOUD_SORT_RANK → HOST_FAMILY_RANK) 는 core build exit 2 (TS6133 CLOUD_SORT_RANK 미사용) 이나 dist 는 변이를 담아 emit 된다. 러너는 CLOUD_SORT_RANK * 0 로 import 를 살려 build exit 0.",
+   "러너 결함 1건: skipUnit 변이 (R3) 의 로그 줄이 unit.tests 를 읽어 크래시 — R3 는 원복 후 기록 · 저장됐고 X2 · S4 · X4 를 별도 실행 (mc-r2b) 했다."
+  ]
+ },
+ "reviewRound2": {
+  "what": "메인 결정 — 전제 8 을 「fade 투명 큐에 earth-lod-mid 가 있다」 하나로 좁힘 (전제 = 하네스 설정, 게이트 = 제품 속성). 재실행 대상: 원본 · MC-9 · X2 · MC-4 · MC-12",
+  "scopeRationale": "전제에서 조건을 빼면 발화가 줄기만 한다. 직전 라운드 변이 로그 20건 중 전제 (8) 이 발화한 것은 MC-9 · X2 둘뿐이라 나머지의 분류는 바뀔 수 없다. MC-4 · MC-12 는 fade 쌍 (C5b) 을 쓰므로 확인차 재실행.",
+  "results": [
+   {
+    "id": "original-1215",
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+     "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+     "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+     "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+     "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+     "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+     "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+     "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+     "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+     "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+     "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+    ]
+   },
+   {
+    "id": "original-1202",
+    "exit": 0,
+    "fails": [],
+    "unmeasurable": [],
+    "gates": [
+     "PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+     "PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+     "PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+     "PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+     "PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+     "PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)"
+    ]
+   },
+   {
+    "id": "MC-9",
+    "kind": "runtime",
+    "expect": "C3 FAIL",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "FAIL  C3 투명 큐 ON − OFF = 0 []  (== 1 ∧ earth-cloud ∈ ON)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000 ∧ C5a PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.230811  (>= 0.0114)",
+      "FAIL  C2 맑은 하늘 비율 (포화 제외) = 0.000000  (>= 0.1853)",
+      "FAIL  C3 투명 큐 ON − OFF = 0 []  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "FAIL  C5a mid 정착 쌍 C1 량 = 0.000000  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.000000 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": null
+   },
+   {
+    "id": "MC-4",
+    "kind": "source",
+    "expect": "C5 뒤 항 FAIL",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "MC-12",
+    "kind": "source",
+    "expect": "C5 뒤 항 FAIL (rank 가 판별력 담지자)",
+    "unitTestsInMutatedState": "1104 passed (1104)",
+    "mutant": {
+     "exit": 1,
+     "fails": [
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)"
+     ],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "FAIL  C5b fade 정지 쌍 C1 량 = 0.000000  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   },
+   {
+    "id": "X2",
+    "kind": "source",
+    "expect": "exit 2 (fade 정지가 mid 를 투명 큐에 못 넣음 — 전제 8)",
+    "unitTestsInMutatedState": null,
+    "mutant": {
+     "exit": 2,
+     "fails": [],
+     "unmeasurable": [
+      "- (8) fade 정지 재현의 투명 큐 [\"earth\",\"earth-cloud\"] 에 earth-lod-mid 가 없다 — 하네스가 fade 조건을 만들지 못했다 (C5b 가 시험되지 않는다)"
+     ],
+     "gates": []
+    },
+    "restore": {
+     "exit": 0,
+     "fails": [],
+     "unmeasurable": [],
+     "gates": [
+      "PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+      "PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+      "PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+      "PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+      "PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+      "PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417 ∧ C5a PASS)",
+      "PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+      "PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+      "PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+      "PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+      "PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)"
+     ]
+    },
+    "revertByteIdentical": true
+   }
+  ]
+ }
+}

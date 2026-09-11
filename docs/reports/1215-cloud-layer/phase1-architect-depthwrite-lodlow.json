@@ -1,0 +1,457 @@
+{
+ "results": {
+  "base": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 812,
+    "timedOut": false
+   },
+   "installed": null,
+   "info": {
+    "transparent": [],
+    "hostVisible": true,
+    "kids": [],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "A_dwOn": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 824,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": false,
+    "alphaIndex": 1.7976931348623157e+308
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     }
+    ],
+    "hostVisible": true,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "B_dwOff": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 813,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": true,
+    "alphaIndex": 1.7976931348623157e+308
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     }
+    ],
+    "hostVisible": true,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "C0_forceNoCloud": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 1017,
+    "timedOut": false
+   },
+   "installed": null,
+   "info": {
+    "transparent": [
+     {
+      "name": "earth",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     }
+    ],
+    "hostVisible": true,
+    "kids": [],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "C1_force_dwOn_natural": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 814,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": false,
+    "alphaIndex": 1.7976931348623157e+308
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "earth",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     },
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     }
+    ],
+    "hostVisible": true,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "C2_force_dwOn_cloudFirst": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 1017,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": false,
+    "alphaIndex": 0
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "earth",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     },
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 0
+     }
+    ],
+    "hostVisible": true,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "C3_force_dwOff_cloudFirst": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 1014,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": true,
+    "alphaIndex": 0
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "earth",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     },
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 0
+     }
+    ],
+    "hostVisible": true,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "C4_force_dwOff_natural": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 813,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": true,
+    "alphaIndex": 1.7976931348623157e+308
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "earth",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     },
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     }
+    ],
+    "hostVisible": true,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 9,
+     "mid": 6,
+     "low": 17,
+     "override": "auto",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "L0_low_noCloud": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 1015,
+    "timedOut": false
+   },
+   "installed": null,
+   "info": {
+    "transparent": [],
+    "hostVisible": false,
+    "kids": [
+     {
+      "n": "earth-lod-low",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 0,
+     "mid": 1,
+     "low": 31,
+     "override": "low",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  },
+  "L1_low_cloud": {
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 1218,
+    "timedOut": false
+   },
+   "installed": {
+    "parent": "earth",
+    "dwd": true,
+    "alphaIndex": 1.7976931348623157e+308
+   },
+   "info": {
+    "transparent": [
+     {
+      "name": "cloud-probe",
+      "d": 36.826845601460036,
+      "ai": 1.7976931348623157e+308
+     }
+    ],
+    "hostVisible": false,
+    "kids": [
+     {
+      "n": "cloud-probe",
+      "en": true,
+      "vis": true
+     },
+     {
+      "n": "earth-lod-low",
+      "en": true,
+      "vis": true
+     }
+    ],
+    "lod": {
+     "high": 0,
+     "mid": 1,
+     "low": 31,
+     "override": "low",
+     "fading": 0
+    }
+   },
+   "consoleErrors": 0,
+   "errSample": []
+  }
+ },
+ "diffs": {
+  "base vs C0_forceNoCloud": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 0,
+   "maxD": 0,
+   "lumA": 0.39783,
+   "lumB": 0.39783
+  },
+  "base vs A_dwOn": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 28734,
+   "maxD": 127,
+   "lumA": 0.39783,
+   "lumB": 0.69921
+  },
+  "A_dwOn vs B_dwOff": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 0,
+   "maxD": 0,
+   "lumA": 0.69921,
+   "lumB": 0.69921
+  },
+  "A_dwOn vs C1_force_dwOn_natural": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 0,
+   "maxD": 0,
+   "lumA": 0.69921,
+   "lumB": 0.69921
+  },
+  "A_dwOn vs C2_force_dwOn_cloudFirst": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 28734,
+   "maxD": 127,
+   "lumA": 0.69921,
+   "lumB": 0.39783
+  },
+  "B_dwOff vs C3_force_dwOff_cloudFirst": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 28734,
+   "maxD": 127,
+   "lumA": 0.69921,
+   "lumB": 0.39783
+  },
+  "B_dwOff vs C4_force_dwOff_natural": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 0,
+   "maxD": 0,
+   "lumA": 0.69921,
+   "lumB": 0.69921
+  },
+  "base vs C2_force_dwOn_cloudFirst": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 0,
+   "maxD": 0,
+   "lumA": 0.39783,
+   "lumB": 0.39783
+  },
+  "L0_low_noCloud vs L1_low_cloud": {
+   "diskR": 98.3,
+   "n": 29144,
+   "changed": 29144,
+   "maxD": 124,
+   "lumA": 0.03589,
+   "lumB": 0.51836
+  }
+ }
+}

@@ -28,6 +28,17 @@ import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield } from './starfield.js';
+// #1215 — 지구 구름 레이어 (ADR 20260628-756 Amendment 10).
+import {
+  applyCloudDrift,
+  CLOUD_LAYER_BODY_ID,
+  CLOUD_SORT_RANK,
+  createCloudLayer,
+  createHostFamilyTransparentSortCompare,
+  HOST_FAMILY_RANK,
+  HostFamilyRegistry,
+  type CloudLayerHandles,
+} from './cloud-layer.js';
 import { SCENE_CLEAR_COLOR_RGBA, hexToColor3 } from './color-utils.js';
 import type { PlanetLightingConstants } from './procedural-planet-shader.js';
 // #850 Phase 1 — 아래 4 모듈은 본 파일 테일 (구 2041-2502) 에서 순수 이동한 헬퍼다 (동작 변경 0).
@@ -516,6 +527,19 @@ export interface SolarSystemSceneOptions {
    * ring-anchor (비회전 tilt-only 노드) 로 ring disc 를 격리해 wobble 0 (ADR §A2.3 결정 1).
    */
   selfRotation?: boolean;
+
+  /**
+   * #1215 — 지구 구름 레이어 (`cloud-layer.ts`, ADR `20260628-756` Amendment 10).
+   *
+   * 기본값 **false** (core 라이브러리 보수 기본 — `surfaceDetail` / `starfield` / `selfRotation` 동형
+   * 레이어 분리). **기본 ON 은 web 레이어 결정** — `parseCloudsVisible` (apps/web) 기본값이 true 이며
+   * `?clouds=off` 가 옵트아웃 (§A10.9 결정 8).
+   *
+   * **유효 조건 = `clouds && surfaceDetail`** — `?surface=off` 픽셀 diff `0` 계약 (D6) 이 구름도 함께
+   * 꺼질 것을 요구한다. 비활성이면 구름 mesh **미생성** + 투명 정렬 함수 **미설치** — 구름 도입 전과
+   * **같은 코드 경로**다 (`verify:1202` G6 재정의 §A10.10 의 전제).
+   */
+  clouds?: boolean;
 }
 
 /**
@@ -546,6 +570,7 @@ export function createSolarSystemScene(
     surfaceDetail = false,
     surfaceMaskBaseUrl,
     selfRotation = false,
+    clouds = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -653,6 +678,50 @@ export function createSolarSystemScene(
         const host = meshes.get(body.id);
         if (host) host.rotationQuaternion = Quaternion.Identity();
       }
+    }
+  }
+
+  // #1215 §A10.3 · §A10.6 · §A10.9 — 지구 구름 레이어. 유효 조건 `clouds && surfaceDetail` (결정 8).
+  // 비활성이면 mesh 미생성 + 정렬 함수 미설치 → 구름 도입 전과 같은 코드 경로 (구조적 no-op).
+  //  - 구조: earth host 의 **자식** shell (결정 1 — position·scaling·host 자전을 구조적으로 상속).
+  //  - 정렬: 렌더링 그룹 0 투명 정렬을 **정렬 키 치환**으로 교체 (결정 4). host 계열 (host · mid · low ·
+  //    구름) 은 host 의 `(alphaIndex, distance)` 로 치환되고 구름만 `rank 1` 이라 계열 블록 끝에 그려진다.
+  //    lazy 생성 mid·low 는 `getVariantMesh` 생성 지점에서 계열에 등록한다.
+  //    `null` 두 개는 RenderingGroup 생성자 기본값과 같다 (opaque · alphaTest → PainterSortCompare).
+  const hostFamilies = new HostFamilyRegistry();
+  let cloudLayer: CloudLayerHandles | null = null;
+  if (clouds && surfaceDetail) {
+    const cloudBody = bodiesById.get(CLOUD_LAYER_BODY_ID);
+    const cloudHost = meshes.get(CLOUD_LAYER_BODY_ID);
+    if (cloudBody && cloudHost) {
+      const layer = createCloudLayer(
+        scene,
+        cloudBody,
+        cloudHost,
+        bodyInitialRenderScale,
+        bodyScale,
+        surfaceLightingArgs,
+      );
+      cloudLayer = layer;
+      hostFamilies.registerHost(cloudHost);
+      hostFamilies.registerMember(layer.mesh, cloudHost, CLOUD_SORT_RANK);
+      // `_RenderSorted` 와 같은 카메라 (activeCamera.globalPosition, 부재 시 원점).
+      const cameraFallback = Vector3.Zero();
+      scene.setRenderingOrder(
+        0,
+        null,
+        null,
+        createHostFamilyTransparentSortCompare(
+          hostFamilies,
+          () => scene.activeCamera?.globalPosition ?? cameraFallback,
+        ),
+      );
+      disposables.push({
+        dispose: () => {
+          scene.setRenderingOrder(0, null, null, null);
+          layer.dispose();
+        },
+      });
     }
   }
 
@@ -1482,6 +1551,12 @@ export function createSolarSystemScene(
           mesh.rotationQuaternion,
         );
       }
+      // #1215 §A10.8 결정 6·7 — 구름 상대 자전. host 자전과 **같은 루프 · 같은 epoch · 같은 게이트**
+      // (`rotationStates.has`). `?rotate=off` 면 이 블록 전체가 skip 되어 구름은 identity 로 남는다
+      // (구조적 상속 — 결정적 가드 783 / 1119 / 1202 의 `rotate=off` 전제 보존).
+      if (cloudLayer && rotationStates.has(CLOUD_LAYER_BODY_ID)) {
+        applyCloudDrift(cloudLayer, jd, rotationEpoch);
+      }
       // ring-anchor 동기 — ring disc 를 host 자전에서 격리 (wobble 0). host 의 position/scaling 만
       // 복사 (rotation 제외) → ring 은 host 자전 미상속, tilt 만 (ring disc `rotation.x = RING_DISC_BASE_TILT_X + tiltRad`).
       // ring host 4개 한정 (ringAnchors 는 자전하는 ring body 만 보유). tier scale = host.scaling 추종.
@@ -1750,6 +1825,14 @@ export function createSolarSystemScene(
 
       // variant visibility / alpha 갱신. fade 중이면 alpha interp, 정착이면 단일 variant.
       applyLodVariantState(body, highMesh, nextLevel, now);
+      // #1215 §A10.7 결정 5 — 구름 가시성 = rim 을 싣는 variant (high / mid) 가 보이는 동안만.
+      // `isVisible` 은 자식에게 상속되지 않고 host 는 `setEnabled(true)` 를 유지하므로, 처리 없으면 low
+      // 에서도 그려진다 (실측 `29144 / 29144 px`). ⚠️ **프레임 위상** (여기) 에 둔다 — `updateAt` (시간
+      // 위상) 에 두면 일시정지 중 LOD 가 바뀌어도 구름이 얼어붙는다 (#1205 클래스).
+      if (cloudLayer && cloudLayer.host === highMesh) {
+        cloudLayer.mesh.isVisible =
+          highMesh.isVisible || midVariants.get(body.id)?.isVisible === true;
+      }
 
       // 집계.
       if (nextLevel === 'high') lodStats.high += 1;
@@ -1943,6 +2026,8 @@ export function createSolarSystemScene(
           surfaceLightingArgs,
         );
         midVariants.set(body.id, m);
+        // #1215 §A10.6 — lazy 생성 variant 를 host 계열 식별자 집합에 등록 (계열 host 가 아니면 no-op).
+        hostFamilies.registerMember(m, highMesh, HOST_FAMILY_RANK);
       }
       return m;
     }
@@ -1951,6 +2036,8 @@ export function createSolarSystemScene(
     if (!m) {
       m = createBodyBillboard(body, scene, bodyInitialRenderScale, highMesh, bodyScale);
       lowVariants.set(body.id, m);
+      // #1215 §A10.6 (b) — low billboard 도 계열이다 (fade 중 투명 큐 진입 · host 자식 원점 · 중심 동일).
+      hostFamilies.registerMember(m, highMesh, HOST_FAMILY_RANK);
     }
     return m;
   };

@@ -54,6 +54,25 @@ export function computeRotationState(body: LoadedCelestialBody): RotationState |
 }
 
 /**
+ * #1215 §A10.8 — jd 순수 함수 회전각 `((jd − epoch) × ω) mod 2π` [rad] (식 SSoT).
+ *
+ * `computeSpinQuaternion` (host 자전) 과 구름 상대 자전 (`cloud-layer.ts`) 이 **함께 호출**한다 —
+ * 같은 식의 사본 2벌은 숨은 상수 drift 클래스다 (volt #69). #1215 에서 `computeSpinQuaternion`
+ * 본문의 식을 **값 불변으로** 이동했다 (증거: 기존 `self-rotation.test.ts` 무수정 통과).
+ *
+ * (jd − epoch) 뺄셈을 float64 로 먼저 한다 (큰 수 − 큰 수 = 작은 수 → 정밀도 보존). 매 프레임 누적
+ * 금지 (ADR §A2.3 결정 5). 음수 `(jd − epoch)` 는 음수 각을 내며, 그것은 유효한 회전이고 `0` 을
+ * 지날 때 연속이다 (ADR §A10.16 기각 근거).
+ *
+ * @param jd 현재 Julian Date
+ * @param epoch 기준 epoch (JD) — 각 0 기준
+ * @param omega 각속도 [rad/day]
+ */
+export function computeSpinAngle(jd: number, epoch: number, omega: number): number {
+  return ((jd - epoch) * omega) % (2 * Math.PI);
+}
+
+/**
  * #782 §A2.3 결정 5 — jd 순수 함수 자전각 → `tilt(axialTilt) ∘ spin(spinAngle)` quaternion.
  *
  * `spinAngle = ((jd − epoch) × ω) mod 2π` (float64 CPU — jd 큰 수 뺄셈을 먼저 수행해 정밀도 보존,
@@ -77,7 +96,7 @@ export function computeSpinQuaternion(
   out: Quaternion,
 ): void {
   // (jd − epoch) 뺄셈을 float64 로 먼저 (큰 수 − 큰 수 = 작은 수) → mod 2π 로 각 누적 없이 결정적.
-  const spinAngle = (((jd - epoch) * state.omega) % (2 * Math.PI)) as number;
+  const spinAngle = computeSpinAngle(jd, epoch, state.omega);
   // spin: local Y (자전축) 주위. tilt: world X 주위.
   Quaternion.RotationAxisToRef(ROT_SPIN_AXIS, spinAngle, tmpSpin);
   // ⚠️ **`+ π/2` 가 기준면 보정이다** (#1130). obliquity 는 **궤도 법선**에서 재는 각인데, 이

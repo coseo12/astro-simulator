@@ -1,0 +1,950 @@
+{
+ "issue": 1215,
+ "phase": "1b",
+ "what": "D6 — base (develop 5489476, :3001) ↔ feature (feature/1215-cloud-layer-phase1, :3000). 비-earth 무회귀 · ?surface=off · ?clouds=off · earth 양성 대조 + 로드 간 잡음 대조 (base 3 × feature 3 로드, 15쌍)",
+ "conditions": {
+  "renderer": "headless chromium --use-angle=swiftshader",
+  "recipe": "?gpu=a&focus=<body>&lod=auto&rotate=off&orbits=off · JD 2451626.0 · pause · beta π/2 · LOD 정착 (fading 0 × 3 연속)",
+  "viewport": "1280x720 dpr1",
+  "diskRegion": "body host 반경 투영 원판"
+ },
+ "d6": [
+  {
+   "name": "mars",
+   "query": "?gpu=a&focus=mars&lod=auto&rotate=off&orbits=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 4,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": true
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "jupiter",
+   "query": "?gpu=a&focus=jupiter&lod=auto&rotate=off&orbits=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 4,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": true
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "moon",
+   "query": "?gpu=a&focus=moon&lod=auto&rotate=off&orbits=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 4,
+    "disk": 4,
+    "diskN": 1900
+   },
+   "featLoadControl": {
+    "full": 551,
+    "disk": 17,
+    "diskN": 1900
+   },
+   "geomEqual": false,
+   "cloudMesh": {
+    "base": false,
+    "feat": true
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "venus",
+   "query": "?gpu=a&focus=venus&lod=auto&rotate=off&orbits=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": true
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "sun",
+   "query": "?gpu=a&focus=sun&lod=auto&rotate=off&orbits=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 534,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": true
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "earth-surface-off",
+   "query": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off&surface=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 0,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": false
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "earth-clouds-off",
+   "query": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off&clouds=off",
+   "expect": 0,
+   "baseVsFeat": {
+    "full": 4,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 534,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": false
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  },
+  {
+   "name": "earth-default (양성 대조)",
+   "query": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off",
+   "expect": "nonzero",
+   "baseVsFeat": {
+    "full": 14360,
+    "disk": 13730,
+    "diskN": 30352
+   },
+   "featLoadControl": {
+    "full": 534,
+    "disk": 0,
+    "diskN": 30352
+   },
+   "geomEqual": true,
+   "cloudMesh": {
+    "base": false,
+    "feat": true
+   },
+   "settled": [
+    true,
+    true,
+    true
+   ],
+   "errors": {
+    "base": [],
+    "feat": [],
+    "feat2": []
+   }
+  }
+ ],
+ "noise": {
+  "earth-clouds-off": {
+   "geoms": [
+    {
+     "tag": "B0",
+     "settled": true,
+     "cx": 640.0001525274397,
+     "cy": 360.0000001341925,
+     "R": 98.32045593288251,
+     "cam": [
+      -229.43414306640625,
+      -8.756192207336426,
+      -36.82684326171875
+     ]
+    },
+    {
+     "tag": "B1",
+     "settled": true,
+     "cx": 640.0001525274397,
+     "cy": 360.0000001341925,
+     "R": 98.32045593288251,
+     "cam": [
+      -229.43414306640625,
+      -8.756192207336426,
+      -36.82684326171875
+     ]
+    },
+    {
+     "tag": "B2",
+     "settled": true,
+     "cx": 640.0001525274397,
+     "cy": 360.0000001341925,
+     "R": 98.32045593288251,
+     "cam": [
+      -229.43414306640625,
+      -8.756192207336426,
+      -36.82684326171875
+     ]
+    },
+    {
+     "tag": "F0",
+     "settled": true,
+     "cx": 640.0001525274397,
+     "cy": 360.0000001341925,
+     "R": 98.32045593288251,
+     "cam": [
+      -229.43414306640625,
+      -8.756192207336426,
+      -36.82684326171875
+     ]
+    },
+    {
+     "tag": "F1",
+     "settled": true,
+     "cx": 640.0001525274397,
+     "cy": 360.0000001341925,
+     "R": 98.32045593288251,
+     "cam": [
+      -229.43414306640625,
+      -8.756192207336426,
+      -36.82684326171875
+     ]
+    },
+    {
+     "tag": "F2",
+     "settled": true,
+     "cx": 640.0001525274397,
+     "cy": 360.0000001341925,
+     "R": 98.32045593288251,
+     "cam": [
+      -229.43414306640625,
+      -8.756192207336426,
+      -36.82684326171875
+     ]
+    }
+   ],
+   "pairs": [
+    {
+     "pair": "B0-B1",
+     "kind": "base-base",
+     "full": 534,
+     "disk": 0,
+     "bbox": [
+      516,
+      676,
+      711,
+      699
+     ]
+    },
+    {
+     "pair": "B0-B2",
+     "kind": "base-base",
+     "full": 536,
+     "disk": 0,
+     "bbox": [
+      516,
+      676,
+      711,
+      699
+     ]
+    },
+    {
+     "pair": "B0-F0",
+     "kind": "base-feat",
+     "full": 534,
+     "disk": 0,
+     "bbox": [
+      516,
+      676,
+      711,
+      699
+     ]
+    },
+    {
+     "pair": "B0-F1",
+     "kind": "base-feat",
+     "full": 534,
+     "disk": 0,
+     "bbox": [
+      516,
+      676,
+      711,
+      699
+     ]
+    },
+    {
+     "pair": "B0-F2",
+     "kind": "base-feat",
+     "full": 534,
+     "disk": 0,
+     "bbox": [
+      516,
+      676,
+      711,
+      699
+     ]
+    },
+    {
+     "pair": "B1-B2",
+     "kind": "base-base",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B1-F0",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B1-F1",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B1-F2",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B2-F0",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B2-F1",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B2-F2",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "F0-F1",
+     "kind": "feat-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "F0-F2",
+     "kind": "feat-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "F1-F2",
+     "kind": "feat-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    }
+   ]
+  },
+  "jupiter": {
+   "geoms": [
+    {
+     "tag": "B0",
+     "settled": true,
+     "cx": 640.0000321106426,
+     "cy": 360.0001384644561,
+     "R": 98.32045535296942,
+     "cam": [
+      828.801025390625,
+      793.01806640625,
+      -145.13510131835938
+     ]
+    },
+    {
+     "tag": "B1",
+     "settled": true,
+     "cx": 640.0000321106426,
+     "cy": 360.0001384644561,
+     "R": 98.32045535296942,
+     "cam": [
+      828.801025390625,
+      793.01806640625,
+      -145.13510131835938
+     ]
+    },
+    {
+     "tag": "B2",
+     "settled": true,
+     "cx": 640.0000321106426,
+     "cy": 360.0001384644561,
+     "R": 98.32045535296942,
+     "cam": [
+      828.801025390625,
+      793.01806640625,
+      -145.13510131835938
+     ]
+    },
+    {
+     "tag": "F0",
+     "settled": true,
+     "cx": 640.0000321106426,
+     "cy": 360.0001384644561,
+     "R": 98.32045535296942,
+     "cam": [
+      828.801025390625,
+      793.01806640625,
+      -145.13510131835938
+     ]
+    },
+    {
+     "tag": "F1",
+     "settled": true,
+     "cx": 640.0000321106426,
+     "cy": 360.0001384644561,
+     "R": 98.32045535296942,
+     "cam": [
+      828.801025390625,
+      793.01806640625,
+      -145.13510131835938
+     ]
+    },
+    {
+     "tag": "F2",
+     "settled": true,
+     "cx": 640.0000321106426,
+     "cy": 360.0001384644561,
+     "R": 98.32045535296942,
+     "cam": [
+      828.801025390625,
+      793.01806640625,
+      -145.13510131835938
+     ]
+    }
+   ],
+   "pairs": [
+    {
+     "pair": "B0-B1",
+     "kind": "base-base",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B0-B2",
+     "kind": "base-base",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B0-F0",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B0-F1",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B0-F2",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B1-B2",
+     "kind": "base-base",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B1-F0",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B1-F1",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B1-F2",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B2-F0",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B2-F1",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "B2-F2",
+     "kind": "base-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "F0-F1",
+     "kind": "feat-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "F0-F2",
+     "kind": "feat-feat",
+     "full": 4,
+     "disk": 0,
+     "bbox": [
+      577,
+      676,
+      608,
+      699
+     ]
+    },
+    {
+     "pair": "F1-F2",
+     "kind": "feat-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    }
+   ]
+  },
+  "moon": {
+   "geoms": [
+    {
+     "tag": "B0",
+     "settled": true,
+     "cx": 639.9999659785728,
+     "cy": 360.0010147281129,
+     "R": 24.58011259066012,
+     "cam": [
+      -3088311.75,
+      -3550214.25,
+      -156095.40625
+     ]
+    },
+    {
+     "tag": "B1",
+     "settled": true,
+     "cx": 640.0003831715021,
+     "cy": 360.0005905629726,
+     "R": 24.580111856603935,
+     "cam": [
+      -3088291,
+      -3549949.5,
+      -156051.6875
+     ]
+    },
+    {
+     "tag": "B2",
+     "settled": true,
+     "cx": 639.9999319748779,
+     "cy": 360.00097599283293,
+     "R": 24.580112443848805,
+     "cam": [
+      -3088308.75,
+      -3550174.5,
+      -156088.875
+     ]
+    },
+    {
+     "tag": "F0",
+     "settled": true,
+     "cx": 639.9997786344182,
+     "cy": 359.99915930228815,
+     "R": 24.580111930009537,
+     "cam": [
+      -3088324,
+      -3550370.75,
+      -156121.109375
+     ]
+    },
+    {
+     "tag": "F1",
+     "settled": true,
+     "cx": 639.9997106270309,
+     "cy": 360.0010921986251,
+     "R": 24.58011178319839,
+     "cam": [
+      -3088318,
+      -3550293.75,
+      -156108.46875
+     ]
+    },
+    {
+     "tag": "F2",
+     "settled": true,
+     "cx": 640.0003063393548,
+     "cy": 360.00076599338985,
+     "R": 24.58011193000965,
+     "cam": [
+      -3088313,
+      -3550229,
+      -156097.859375
+     ]
+    }
+   ],
+   "pairs": [
+    {
+     "pair": "B0-B1",
+     "kind": "base-base",
+     "full": 6,
+     "disk": 5,
+     "bbox": [
+      630,
+      350,
+      642,
+      384
+     ]
+    },
+    {
+     "pair": "B0-B2",
+     "kind": "base-base",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B0-F0",
+     "kind": "base-feat",
+     "full": 23,
+     "disk": 22,
+     "bbox": [
+      618,
+      335,
+      658,
+      381
+     ]
+    },
+    {
+     "pair": "B0-F1",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B0-F2",
+     "kind": "base-feat",
+     "full": 5,
+     "disk": 5,
+     "bbox": [
+      630,
+      350,
+      642,
+      381
+     ]
+    },
+    {
+     "pair": "B1-B2",
+     "kind": "base-base",
+     "full": 6,
+     "disk": 5,
+     "bbox": [
+      630,
+      350,
+      642,
+      384
+     ]
+    },
+    {
+     "pair": "B1-F0",
+     "kind": "base-feat",
+     "full": 25,
+     "disk": 23,
+     "bbox": [
+      618,
+      335,
+      658,
+      384
+     ]
+    },
+    {
+     "pair": "B1-F1",
+     "kind": "base-feat",
+     "full": 6,
+     "disk": 5,
+     "bbox": [
+      630,
+      350,
+      642,
+      384
+     ]
+    },
+    {
+     "pair": "B1-F2",
+     "kind": "base-feat",
+     "full": 1,
+     "disk": 0,
+     "bbox": [
+      642,
+      384,
+      642,
+      384
+     ]
+    },
+    {
+     "pair": "B2-F0",
+     "kind": "base-feat",
+     "full": 23,
+     "disk": 22,
+     "bbox": [
+      618,
+      335,
+      658,
+      381
+     ]
+    },
+    {
+     "pair": "B2-F1",
+     "kind": "base-feat",
+     "full": 0,
+     "disk": 0,
+     "bbox": null
+    },
+    {
+     "pair": "B2-F2",
+     "kind": "base-feat",
+     "full": 5,
+     "disk": 5,
+     "bbox": [
+      630,
+      350,
+      642,
+      381
+     ]
+    },
+    {
+     "pair": "F0-F1",
+     "kind": "feat-feat",
+     "full": 23,
+     "disk": 22,
+     "bbox": [
+      618,
+      335,
+      658,
+      381
+     ]
+    },
+    {
+     "pair": "F0-F2",
+     "kind": "feat-feat",
+     "full": 24,
+     "disk": 23,
+     "bbox": [
+      618,
+      335,
+      658,
+      381
+     ]
+    },
+    {
+     "pair": "F1-F2",
+     "kind": "feat-feat",
+     "full": 5,
+     "disk": 5,
+     "bbox": [
+      630,
+      350,
+      642,
+      381
+     ]
+    }
+   ]
+  }
+ },
+ "note": "base↔feature 의 0 이 아닌 차이는 전부 같은 서버 재로드의 잡음 범위 안이다 — 각 쿼리에서 base↔feature 픽셀 동일 쌍이 존재 (earth ?clouds=off B1-F0/F1/F2, jupiter B0-F1, moon B0-F1). moon 은 develop 에서도 로드 간 비결정 (base↔base disk 최대 5 px) — 원인 미조사."
+}
