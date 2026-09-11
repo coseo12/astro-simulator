@@ -26,7 +26,7 @@
  *   3 OFF 대역 평균 휘도 < MIN_DAY_LIT_LUM       4 위상각 < MIN_PHASE_ALPHA_DEG
  *   5 ?clouds=off 페이지에 구름 mesh 존재         6 measure() 가 error 를 반환 — **모든 게이트보다 먼저 본다**
  *   7 C2 표본 (포화 제외 후) N < MIN_EXPECTED
- *   8 fade 정지 재현의 투명 큐에 earth-cloud 와 earth-lod-mid 가 둘 다 있지 않다 (C5b 전제)
+ *   8 fade 정지 재현의 투명 큐에 earth-lod-mid 가 없다 (C5b 전제 — 하네스 설정만. 구름 부재는 C3 가 잰다)
  *   ⚠️ 2 · 3 은 주 쌍만이 아니라 **판정에 쓰이는 모든 쌍**에 건다 (low 는 2 만) — judge() 의 표 주석.
  *   6 에는 비유한 · 퇴화 기하 (반경 ≤ 0) 와 쌍별 페이지 기하 불일치도 포함된다.
  *
@@ -661,13 +661,14 @@ function judge(r) {
     if (withLum && (b.lumOff === null || b.lumOff < MIN_DAY_LIT_LUM))
       unmeasurable.push(`(3) [${label}] OFF 대역 평균 휘도 ${b.lumOff} < ${MIN_DAY_LIT_LUM}`);
   }
-  // ── 전제 8 — fade 정지 재현이 **결함 조건**을 실제로 만들었는가 (cross-validate X2) ──
-  // C5b 는 「mid variant 가 구름과 함께 투명 큐에 있다」 는 조건 위에서만 정렬 함수를 시험한다. 재현이 그
-  // 조건을 못 만들면 fade 프레임 = mid 정착 프레임이 되어 C5b 가 정렬 함수를 시험하지 않고 통과한다.
+  // ── 전제 8 — fade 정지 재현이 **하네스 설정**을 실제로 만들었는가 (cross-validate X2 · 메인 결정) ──
+  // 측정 불가 전제는 하네스가 통제하는 설정의 성립만 묻고, 판정 대상인 제품 속성은 게이트가 잰다. fade 정지
+  // 재현이 통제하는 것은 「mid variant 를 투명 큐에 넣는다」 뿐이고, 구름이 투명 큐에 있는가는 제품 속성이라
+  // C3 (와 C5b) 가 FAIL 로 잡는다 — 둘을 섞으면 제품 결함이 exit 2 로 가려진다 (MC-9 실측).
   const fadeNames = r.fadeQueueOn.names;
-  if (!fadeNames.includes(CLOUD_MESH) || !fadeNames.includes('earth-lod-mid'))
+  if (!fadeNames.includes('earth-lod-mid'))
     unmeasurable.push(
-      `(8) fade 정지 재현의 투명 큐 ${JSON.stringify(fadeNames)} 에 ${CLOUD_MESH} 와 earth-lod-mid 가 둘 다 있지 않다 — C5b 가 결함 조건을 시험하지 않는다`,
+      `(8) fade 정지 재현의 투명 큐 ${JSON.stringify(fadeNames)} 에 earth-lod-mid 가 없다 — 하네스가 fade 조건을 만들지 못했다 (C5b 가 시험되지 않는다)`,
     );
   if (unmeasurable.length) return { unmeasurable };
   if (MODE === 'profile') return { profile: true };
