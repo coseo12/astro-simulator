@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Provisional (cross-validate agy 2026-09-11 반영 개정 — §A10.16. Accepted 전이는 메인 판단)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -392,7 +392,7 @@ cross-validate (Antigravity `agy`) 1회 수행 (2026-06-30, outcome=applied, exi
 3. **terminator aliasing 잔존** — soft terminator (smoothstep, cross-validate 이견 1) 로 1차 완화했으나 segments=12 (mid) 에서 여전히 각지면 `SOFT_TERMINATOR_WIDTH` 확대 또는 per-pixel normal 보간 검토 (Amendment 2).
 4. **다른 rocky body 추가** — 화성도 미래에 land mix 요구 시 rocky 분기 land 색을 body별 상수로 확장 (현재 earth 만 Rocky).
 5. **대기/구름 레이어 도입** (cross-validate 고유 발견 1) — 지구 표면 위 투명 대기/구름 셰이더 mesh 도입 시 알파 블렌딩 + depth 우선순위 (표면 셰이더 log-depth § 핵심 위험 1 과의 정합) 검토 필요. **현재 대기/구름 mesh 미구현이라 본 Amendment 범위 밖** — 도입 시점에 별도 이슈로 분리 (맥락 박제용 기록).
-   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: **발동·처리.** 알파 = ALPHABLEND, log-depth 기록 필수, `disableDepthWrite` 는 블렌드 draw 에서 무효라 `true` 명시, LOD fade 창의 정렬 동률 결함은 정렬 키 치환으로 해소 — §A10.13. 위 원문은 소급 수정하지 않는다.
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Accepted)**: **발동·처리.** 알파 = ALPHABLEND, log-depth 기록 필수, `disableDepthWrite` 는 블렌드 draw 에서 무효라 `true` 명시, LOD fade 창의 정렬 동률 결함은 정렬 키 치환으로 해소 — §A10.13. 위 원문은 소급 수정하지 않는다.
 
 ---
 
@@ -793,7 +793,7 @@ col = mix(col, iceColor, iceMask);
 > ⚠️ 부기 (#1197, 2026-09-05): 본 스케치는 **Amendment 3 시점 문면**이며 두 가지가 stale 하다 — (i) Amendment 4 (#1119) 가 대륙 형상을 마스크로 이관해 `landThresholdLo` 앵커가 실제 바다의 60%를 depth 0 으로 누른다 (실측: ocean 한정 continents 의 59.78% 가 LO 이상, 평균 depth 0.0441), (ii) `smoothstep(landThresholdLo, 0.0, …)` 는 edge0 >= edge1 이라 GLSL 명세상 undefined 다. 현행 정본은 Amendment 7 §결정 1·2 이며 원문은 소급 수정하지 않는다.
 2. **대기 fresnel rim (Tier 2-4) 요구** — #774 cameraPosition auto-bind 실증으로 uniform 비용 하락. 단 공유 셰이더 varying 혼입 vs 별도 대기 레이어 (§A1.8 재검토 조건 5) 비교 선행 — 구름 도입 시점과 합류 권장.
 3. **구름 / 야간 도시 불빛 (Tier 3)** — 별도 mesh/레이어 트랙 (§A1.8 재검토 조건 5 그대로). 구름은 #782 자전과 차등 offset 필요.
-   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: **구름 = 발동·처리** — host 자식 shell 의 local 상대 자전, jd 순수 함수, `?rotate=off` 구조적 상속 (§A10.8). **야간 도시 불빛 = 미발동** (#1215 비-범위) — §A10.13.
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Accepted)**: **구름 = 발동·처리** — host 자식 shell 의 local 상대 자전, jd 순수 함수, `?rotate=off` 구조적 상속 (§A10.8). **야간 도시 불빛 = 미발동** (#1215 비-범위) — §A10.13.
 4. **biome 경계 상관 아티팩트** — continents 재사용 jitter (결정 3-c) 가 해안선-biome 경계 쏠림 (contour-following) 등 부자연 발견 시 **좌표 스위즐링 fbm (`fbm(p.zyx * 2.4)`)** 으로 승격 (cross-validate 고유 발견 — landMask 와의 상관을 완전 해제하면서 신규 noise 함수 불요. 단 agy 의 "비용 0" 주장은 오류 — 이미 계산된 값 재사용이 아니라 fbm 신규 호출 = hash 24회 추가로 독립 샘플 (B) 와 동일 비용. 가치는 탈상관이지 무비용이 아님).
 5. **다른 rocky body 확장** — mars 등 을 Rocky 로 재분류하거나 위성 rocky 추가 시 biome 파라미터가 earth 전용 상수라 body 별 파라미터화 필요 (§A1.8 재검토 조건 4 연장).
 6. **극관 land/ocean 차등 디테일** (cross-validate 고유 발견) — 현재 iceMask 는 latJ (continents jitter 포함) 기반이라 경계가 지형 장을 따라 요동하지만, land 빙상 vs ocean 해빙의 분포 차이 (열용량) 는 미표현. qa 실측에서 "위도로만 잘린 흰 모자" 로 부자연하면 iceMask 에 landMask 미세 가중 검토.
@@ -1884,7 +1884,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 **재검토 조건**:
 
 1. **구름 레이어 또는 야간 도시 불빛이 범위에 진입** — §A8.1 축 5 의 값이 `0` 에서 살아난다. (B) 재평가 + 본 rim 을 shell 로 이관할지 판정 (§A1.8 재검토 조건 5 / §A3.7 재검토 조건 3).
-   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: 구름은 **(B) 형 별도 shell** 로 도입. **rim 이관은 「검토 후 유지」** (무처분이 아니다) — 이관 이득을 비용과 같은 단위로 서술할 수 없고, 조건부 재개 트리거(낮면 림 헤드룸의 하한 접근)는 미발화 (prototype 실측 `0.28218 → 0.34620`) — §A10.2 / §A10.13.
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Accepted)**: 구름은 **(B) 형 별도 shell** 로 도입. **rim 이관은 「검토 후 유지」** (무처분이 아니다) — 이관 이득을 비용과 같은 단위로 서술할 수 없고, 조건부 재개 트리거(낮면 림 헤드룸의 하한 접근)는 미발화 (prototype 실측 `0.28218 → 0.34620`) — §A10.2 / §A10.13.
 2. **disk 밖 halo 요구 발생** — 축 4 의 값이 살아난다. (A) 로는 구조적 불가이므로 (B) 승격.
 3. **다른 body 가 `SurfaceType.Rocky` 로 재분류** — rim 이 대기 없는 body 에 상속된다. body 별 파라미터화 필요 (§A3.7 재검토 조건 5 연장).
 4. **G3 도 통과하는 위치 오류 발견** — §A8.7 ③ 의 닫힘이 불완전했다는 뜻. 게이트 재설계.
@@ -1893,7 +1893,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
    ⚠️ **`mix` 는 폐기가 아니라 이 조건에 대기 중이다.** [미러 실측, rim `r = 0.5`] `mix`(pre-clamp)의 낮면 부호 있는 휘도 차분은 ocean 얕은 `-0.1112` / land 온대 `-0.1819` / land 열대 `-0.1456` (`RIM_COLOR = (0.35,0.55,1.00)`) 로 **부호가 뒤집힌다**. `RIM_COLOR` 를 `(0.75,0.87,1.00)` 까지 희석해도 land 온대는 `-0.0249` 로 여전히 음수다. 부호를 살리려면 `RIM_COLOR` 휘도가 포화된 낮면 표면 휘도(ocean 얕은 post-clamp `lum 0.9188`) 근처, 즉 **거의 흰색**이어야 하는데 그것이 §A8.7 ⑤ washout 그 자체다. **`mix` 채택 시 판정량은 반드시 함께 바뀐다.**
 
 6. **LOD Low 전환 거동이 바뀜** — 현재 rim 의 Low 소멸은 신규 거동이 아니라 §결정 3(low = 자동 단색 billboard, `solar-system-scene.ts:467`)의 **상속**이다. Low 에 절차 표면이 도입되면 rim 의 전환 처리를 별도 판정해야 한다.
-   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: **발동·신규 결정.** 구름 mesh 는 이 상속을 받지 않는다 — host 자식으로 두면 low 에서도 그려짐을 실측 (disk `29144 / 29144 px` 변화) → 구름 가시성을 high/mid variant 가시성에서 파생해 **rim 과 같은 시점**에 소멸시킨다 — §A10.7.
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Accepted)**: **발동·신규 결정.** 구름 mesh 는 이 상속을 받지 않는다 — host 자식으로 두면 low 에서도 그려짐을 실측 (disk `29144 / 29144 px` 변화) → 구름 가시성을 high/mid variant 가시성에서 파생해 **rim 과 같은 시점**에 소멸시킨다 — §A10.7.
 
 ### A8.12 교차검증 반영 사항 (agy 2026-09-07 — **4축 통합 완료, Accepted 전이**)
 
@@ -2045,7 +2045,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 ## Amendment 10 (2026-09-11) — 지구 구름 레이어: host 자식 shell · ALPHABLEND · 재검토 조건 4건 결과 기록 (#1215)
 
 - **이슈**: [#1215](https://github.com/coseo12/astro-simulator/issues/1215)
-- **상태**: Provisional (cross-validate 결과 통합 후 Accepted 전이 — CLAUDE.md §ADR Status 워크플로. 본 Amendment 는 「ADR 신규·개정」 앵커에 해당한다)
+- **상태**: Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료. 본 Amendment 는 「ADR 신규·개정」 앵커에 해당해 Provisional 로 박제됐고, 메인 재분석 반영 개정 `924f798` 후 전이했다)
 - **선행 판정** (전부 #1215 코멘트): 계약 `5613443708` · architect Phase 0 `5613553836` · cross-validate `5613589876` · 계약 재조정 1 `5613600171` · 정정 `5613952227` · dev Phase 0 `5613929741` · 계약 재조정 2 `5615851703`
 - **원자료**: [`docs/reports/1215-cloud-layer/`](../reports/1215-cloud-layer/) — Phase 0 (dev) + `phase1-architect-*.json` (본 Amendment 결정 3·4·5 의 근거)
 - **결과 기록 대상**: §A1.8 재검토 조건 5 · §A3.7 재검토 조건 3 · §A8.11 재검토 조건 1 · §A8.11 재검토 조건 6. 원문은 소급 수정하지 않고 각 조건 아래 ⏩ 포인터만 추가했다.
@@ -2313,9 +2313,11 @@ Phase 0 는 이 축을 「열리지 않았다」로 유보했다. 본 설계에�
 - 불투명 강제 대안의 카메라 이동 중 거동, 그리고 그 1차 실행의 `22745 px` 차이의 원인
 - earth 낮면 내부의 채널 `255` 포화 픽셀 수 (C2 제외량 — `verify:1202` 의 포화율 `14.76%` 는 **낮면 림** 대역 값이라 여기에 쓰지 않는다)
 
-### A10.16 교차검증 반영 사항 (agy 2026-09-11 — 개정 반영, **Provisional 유지**)
+### A10.16 교차검증 반영 사항 (agy 2026-09-11 — 개정 반영, **Accepted 전이**)
 
-수행: 메인 (#479) · `agy` · outcome `applied` · `plan_bypass=false` · 로그 `.claude/logs/cross-validate-architecture-20260911-155553.log` · 메인 재분석 #1215 코멘트 `5630728164`. agy 결론은 「Accepted 반대」 였고, 메인이 Babylon 실코드 · 저장소 실물과 대조해 재분석한 결과로 본 개정을 재위임했다. **Accepted 전이는 메인이 판단한다.**
+수행: 메인 (#479) · `agy` · outcome `applied` · `plan_bypass=false` · 로그 `.claude/logs/cross-validate-architecture-20260911-155553.log` · 메인 재분석 #1215 코멘트 `5630728164`. agy 결론은 「Accepted 반대」 였고, 메인이 Babylon 실코드 · 저장소 실물과 대조해 재분석한 결과로 본 개정을 재위임했다.
+
+**전이 판단 (메인, 2026-09-11)** — agy 가 반대 사유로 든 세 요구 (결정 4 대안 전환 · C2 완화 · LOD 팝핑 대책) 는 아래 표대로 **실측 비교 후 원안 형태 수정** (U1·C1) / **새 상수 없는 형태로 수용** (U2) / **기존 거동이라 기각** 으로 전부 처분됐다. 남은 §A10.15 미확인 항목은 **구현 시점에만 잴 수 있는 량** (C5 첫 실행 · 최종 파라미터의 기존 가드 결과 등) 이고, 교차검증이 답할 수 있는 설계 판단이 아니다 — 그 결과가 결정을 바꾸면 **후속 Amendment** 로 기록한다. ⇒ Accepted 로 전이한다.
 
 #### 합의 (설계 유지)
 
