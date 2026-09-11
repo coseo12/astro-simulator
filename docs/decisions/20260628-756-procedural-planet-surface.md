@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Provisional (cross-validate 대기 — §A10.16)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -392,6 +392,7 @@ cross-validate (Antigravity `agy`) 1회 수행 (2026-06-30, outcome=applied, exi
 3. **terminator aliasing 잔존** — soft terminator (smoothstep, cross-validate 이견 1) 로 1차 완화했으나 segments=12 (mid) 에서 여전히 각지면 `SOFT_TERMINATOR_WIDTH` 확대 또는 per-pixel normal 보간 검토 (Amendment 2).
 4. **다른 rocky body 추가** — 화성도 미래에 land mix 요구 시 rocky 분기 land 색을 body별 상수로 확장 (현재 earth 만 Rocky).
 5. **대기/구름 레이어 도입** (cross-validate 고유 발견 1) — 지구 표면 위 투명 대기/구름 셰이더 mesh 도입 시 알파 블렌딩 + depth 우선순위 (표면 셰이더 log-depth § 핵심 위험 1 과의 정합) 검토 필요. **현재 대기/구름 mesh 미구현이라 본 Amendment 범위 밖** — 도입 시점에 별도 이슈로 분리 (맥락 박제용 기록).
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: **발동·처리.** 알파 = ALPHABLEND, log-depth 기록 필수, `disableDepthWrite` 는 블렌드 draw 에서 무효라 `true` 명시, LOD fade 창의 정렬 동률 결함은 쌍 규칙으로 해소 — §A10.13. 위 원문은 소급 수정하지 않는다.
 
 ---
 
@@ -792,6 +793,7 @@ col = mix(col, iceColor, iceMask);
 > ⚠️ 부기 (#1197, 2026-09-05): 본 스케치는 **Amendment 3 시점 문면**이며 두 가지가 stale 하다 — (i) Amendment 4 (#1119) 가 대륙 형상을 마스크로 이관해 `landThresholdLo` 앵커가 실제 바다의 60%를 depth 0 으로 누른다 (실측: ocean 한정 continents 의 59.78% 가 LO 이상, 평균 depth 0.0441), (ii) `smoothstep(landThresholdLo, 0.0, …)` 는 edge0 >= edge1 이라 GLSL 명세상 undefined 다. 현행 정본은 Amendment 7 §결정 1·2 이며 원문은 소급 수정하지 않는다.
 2. **대기 fresnel rim (Tier 2-4) 요구** — #774 cameraPosition auto-bind 실증으로 uniform 비용 하락. 단 공유 셰이더 varying 혼입 vs 별도 대기 레이어 (§A1.8 재검토 조건 5) 비교 선행 — 구름 도입 시점과 합류 권장.
 3. **구름 / 야간 도시 불빛 (Tier 3)** — 별도 mesh/레이어 트랙 (§A1.8 재검토 조건 5 그대로). 구름은 #782 자전과 차등 offset 필요.
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: **구름 = 발동·처리** — host 자식 shell 의 local 상대 자전, jd 순수 함수, `?rotate=off` 구조적 상속 (§A10.8). **야간 도시 불빛 = 미발동** (#1215 비-범위) — §A10.13.
 4. **biome 경계 상관 아티팩트** — continents 재사용 jitter (결정 3-c) 가 해안선-biome 경계 쏠림 (contour-following) 등 부자연 발견 시 **좌표 스위즐링 fbm (`fbm(p.zyx * 2.4)`)** 으로 승격 (cross-validate 고유 발견 — landMask 와의 상관을 완전 해제하면서 신규 noise 함수 불요. 단 agy 의 "비용 0" 주장은 오류 — 이미 계산된 값 재사용이 아니라 fbm 신규 호출 = hash 24회 추가로 독립 샘플 (B) 와 동일 비용. 가치는 탈상관이지 무비용이 아님).
 5. **다른 rocky body 확장** — mars 등 을 Rocky 로 재분류하거나 위성 rocky 추가 시 biome 파라미터가 earth 전용 상수라 body 별 파라미터화 필요 (§A1.8 재검토 조건 4 연장).
 6. **극관 land/ocean 차등 디테일** (cross-validate 고유 발견) — 현재 iceMask 는 latJ (continents jitter 포함) 기반이라 경계가 지형 장을 따라 요동하지만, land 빙상 vs ocean 해빙의 분포 차이 (열용량) 는 미표현. qa 실측에서 "위도로만 잘린 흰 모자" 로 부자연하면 iceMask 에 landMask 미세 가중 검토.
@@ -1882,6 +1884,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 **재검토 조건**:
 
 1. **구름 레이어 또는 야간 도시 불빛이 범위에 진입** — §A8.1 축 5 의 값이 `0` 에서 살아난다. (B) 재평가 + 본 rim 을 shell 로 이관할지 판정 (§A1.8 재검토 조건 5 / §A3.7 재검토 조건 3).
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: 구름은 **(B) 형 별도 shell** 로 도입. **rim 이관은 「검토 후 유지」** (무처분이 아니다) — 이관 이득을 비용과 같은 단위로 서술할 수 없고, 조건부 재개 트리거(낮면 림 헤드룸의 하한 접근)는 미발화 (prototype 실측 `0.28218 → 0.34620`) — §A10.2 / §A10.13.
 2. **disk 밖 halo 요구 발생** — 축 4 의 값이 살아난다. (A) 로는 구조적 불가이므로 (B) 승격.
 3. **다른 body 가 `SurfaceType.Rocky` 로 재분류** — rim 이 대기 없는 body 에 상속된다. body 별 파라미터화 필요 (§A3.7 재검토 조건 5 연장).
 4. **G3 도 통과하는 위치 오류 발견** — §A8.7 ③ 의 닫힘이 불완전했다는 뜻. 게이트 재설계.
@@ -1890,6 +1893,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
    ⚠️ **`mix` 는 폐기가 아니라 이 조건에 대기 중이다.** [미러 실측, rim `r = 0.5`] `mix`(pre-clamp)의 낮면 부호 있는 휘도 차분은 ocean 얕은 `-0.1112` / land 온대 `-0.1819` / land 열대 `-0.1456` (`RIM_COLOR = (0.35,0.55,1.00)`) 로 **부호가 뒤집힌다**. `RIM_COLOR` 를 `(0.75,0.87,1.00)` 까지 희석해도 land 온대는 `-0.0249` 로 여전히 음수다. 부호를 살리려면 `RIM_COLOR` 휘도가 포화된 낮면 표면 휘도(ocean 얕은 post-clamp `lum 0.9188`) 근처, 즉 **거의 흰색**이어야 하는데 그것이 §A8.7 ⑤ washout 그 자체다. **`mix` 채택 시 판정량은 반드시 함께 바뀐다.**
 
 6. **LOD Low 전환 거동이 바뀜** — 현재 rim 의 Low 소멸은 신규 거동이 아니라 §결정 3(low = 자동 단색 billboard, `solar-system-scene.ts:467`)의 **상속**이다. Low 에 절차 표면이 도입되면 rim 의 전환 처리를 별도 판정해야 한다.
+   > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Provisional)**: **발동·신규 결정.** 구름 mesh 는 이 상속을 받지 않는다 — host 자식으로 두면 low 에서도 그려짐을 실측 (disk `29144 / 29144 px` 변화) → 구름 가시성을 high/mid variant 가시성에서 파생해 **rim 과 같은 시점**에 소멸시킨다 — §A10.7.
 
 ### A8.12 교차검증 반영 사항 (agy 2026-09-07 — **4축 통합 완료, Accepted 전이**)
 
@@ -2035,3 +2039,234 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 - **정지 중 카메라를 움직이는 가드를 새로 쓰거나, 기존 가드에 그런 조작을 더할 때** — `waitForTimeout(N)` 상수로 덮지 말고 `waitForLodSettle` 을 쓴다. 상수의 안전성은 「`N` > 그때 측정된 fade 창」이라는 **우연**이고, `LOD_FADE_DURATION_MS` 나 전이 시작 시각(셰이더 컴파일 stall) 이 움직이면 조용히 깨진다 — 그때 나오는 것은 **부분 fade 된 알파로 판정한 픽셀 가드 실패**라 셰이더 회귀로 오진하기 쉽다.
 - **`waitForLodSettle` 의 「전이 미시작」 잔여 창이 실측으로 관측될 때** — 현재 그 다리는 술어가 아니라 타이밍(전이 `12 ms` vs 첫 표본 `200 ms`)이 지탱한다. 여유가 얇아지면 호출부가 「전이 관측」을 별도 조건으로 걸어야 한다 (helper JSDoc 에 동일 서술).
 - **프레임 위상 멤버가 늘어나 `performance.now()` 종속 상태가 하나 더 생길 때** — 선행 ADR §결정 2 의 멤버십 조건 3(멱등) 예외가 2건째가 되므로, `fading` 처럼 개별 필드를 늘리는 대신 **「정착 완료」 단일 술어**로 통합할지 재평가한다.
+
+---
+
+## Amendment 10 (2026-09-11) — 지구 구름 레이어: host 자식 shell · ALPHABLEND · 재검토 조건 4건 결과 기록 (#1215)
+
+- **이슈**: [#1215](https://github.com/coseo12/astro-simulator/issues/1215)
+- **상태**: Provisional (cross-validate 결과 통합 후 Accepted 전이 — CLAUDE.md §ADR Status 워크플로. 본 Amendment 는 「ADR 신규·개정」 앵커에 해당한다)
+- **선행 판정** (전부 #1215 코멘트): 계약 `5613443708` · architect Phase 0 `5613553836` · cross-validate `5613589876` · 계약 재조정 1 `5613600171` · 정정 `5613952227` · dev Phase 0 `5613929741` · 계약 재조정 2 `5615851703`
+- **원자료**: [`docs/reports/1215-cloud-layer/`](../reports/1215-cloud-layer/) — Phase 0 (dev) + `phase1-architect-*.json` (본 Amendment 결정 3·4·5 의 근거)
+- **결과 기록 대상**: §A1.8 재검토 조건 5 · §A3.7 재검토 조건 3 · §A8.11 재검토 조건 1 · §A8.11 재검토 조건 6. 원문은 소급 수정하지 않고 각 조건 아래 ⏩ 포인터만 추가했다.
+- ⚠️ **본 Amendment 는 설계 박제다.** 가드 임계 수치는 여기서 정하지 않는다 — dev 가 measurement-first 로 baseline 을 얻어 §A10.11 의 **도출 규칙**으로 채운다 (§A8.8 _"설계 스케치의 예측값을 옮겨 적지 않았다"_). 「실측」 라벨은 실행 출력에만 붙였고, 실행되지 않은 것은 §A10.15 에 모았다.
+
+### A10.1 게이트 판정 — `(가)`, 채택안 ALPHABLEND
+
+| 게이트 조건 (계약 재조정 1) | 판정 | 근거 (실측, dev Phase 0) |
+| --- | --- | --- |
+| 조건 1 — ALPHATEST 성립 | ❌ | 실 Chrome GUI 육안 — 하드 엣지 블롭, 계조 `0` |
+| 조건 2 (a) 투명 큐 증분 `+1` | ✅ | `_transparentSubMeshes` `0 → 1` (`["cloud-shell-proto"]`) — metal · swiftshader · 독립 2세션 |
+| 조건 2 (b) 렌더 상태 비-오염 | 재정의 | `consoleErrors` 전 셀 `0`. `verify:1202` 는 `G6` FAIL 이나 **커버리지 축** (ALPHATEST 도 FAIL, `cover 0.70` 에서 둘 다 PASS) → 계약 재조정 2 로 `G6` 재정의 (§A10.10) |
+| 조건 2 (c) 달 오클루전 | ✅ | transit `jd 2451638.75` 침식 원판 내 구름 기여 `0` · occultation `jd 2451651.55` 지구 disk 내 달 누출 `0` |
+
+- **dither (제3 후보) 기각** — 순서 독립·결정성은 통과했으나 스티플이 육안 식별되고 ALPHATEST 대비 품질 이득이 없다 (disk 변화 `8205` vs `8148` px).
+- **`body-mesh-factory.ts:220` 「ALPHABLEND 정렬 부하」 = `설계 추정`** — 원출처 [`20260502-391`](20260502-391-phase2-billboard.md) §암묵 전제 의 「발생 가능」, forensic SSoT 에 `frame`/`fps`/`sort` 토큰 `0`, 구현 PR #394 에 A/B 대조군 없음. 그리고 `?focus=earth` 정착 프레임의 런타임 투명 큐는 **`0`** 이다 (ring 10 mesh 전부 frustum 밖) — 구름은 `n → n+1` 이 아니라 `0 → 1`.
+- **`renderingGroupId` 「선례」 무효** — `starfield.ts:315` 의 `= 0` 은 Babylon 기본값 (`abstractMesh.pure.js:200`) 재기술이고 저장소 비-0 사용 `0` 건. 그룹 분리는 정렬을 **제거하지 않고 분할**한다.
+- 프레임 시간 (swiftshader, 240 표본 × 독립 2세션): 구름 유무 차 `≈1.7~1.9 ms`, ALPHABLEND − ALPHATEST 중앙값 차 `0.3` / `0.1 ms` 가 각 조건 IQR `0.8~1.1 ms` 보다 작다 — **알파 모드의 영향은 분리되지 않는다**.
+
+### A10.2 §A8.1 저울 재평가 — 축 2 약화 · 축 5 생존 · rim 유지
+
+- **축 2** ((A) 우위 — _"본 저장소는 body 표면 알파 블렌드를 이미 비용 사유로 기각했다"_) — 인용 원천이 `설계 추정`으로 판정됐으므로 **크기 주장은 무너졌다**. 구조 주장 (ALPHATEST 는 정렬 리스트 밖) 은 유효하다.
+- **축 5** (구름 인프라 공유) — 구름 shell 이 실제로 생기므로 값은 `0` 이 아니다. ⚠️ 「`(가)` 로 닫혔으니 축 5 는 여전히 `0`」 은 **순환**이며 쓰지 않는다 (계약 위험 7).
+- **결론** — 구름은 **(B) 형 레이어 (별도 shell mesh)** 로 도입한다. **rim 은 (A) 공유 셰이더에 유지한다** (이관하지 않는다). 이관 이득을 비용 (게이트 6종 재baseline · 「측정 불가」 전제 4종 · 변이 8 → 9종 · `RIM_NDL_LO`) 과 **같은 단위로 서술할 수 없다** (architect Phase 0). 조건부 재개 트리거 (낮면 림 헤드룸이 하한 `0.05` 에 접근) 는 **발화하지 않았다** — 실측 `0.28218 → 0.34620` (하한에서 멀어짐 — 구름이 grazing 각에서 림을 어둡게 한다).
+- §A8.8 `M-5` ((B) 렌더 순서) 는 rim 을 옮기지 않으므로 **여전히 「해당 없음」** 이다. 구름 자신의 렌더 순서는 §A10.6 이 따로 결정하고 변이 `MC-4` 로 실증한다.
+
+### A10.3 결정 1 — 구조: 구름 = earth **host mesh 의 자식** shell (별도 anchor 기각)
+
+- 구름 mesh 는 earth high mesh (host) 의 **자식**이다. local 위치 `0`, local scaling = 반경비 상수, local 회전 = 상대 자전 (§A10.8) 만.
+- **별도 cloud-anchor (ring-anchor 의 거울상) 는 기각한다** — architect Phase 0 골격 4 의 정정. ring-anchor 는 host 의 position·scaling 을 `updateAt` 과 `setTier` **두 곳**에서 복사해야 했고, 한 곳 누락이 실결함이었다 (`solar-system-scene.ts` `setTier` 안 ring-anchor 동기 주석 — #782/#785, 실측 drift 최대 `1733%`). 자식은 position·scaling·host 회전을 **구조적으로 상속**하므로 동기 코드가 `0` 이다. ring 이 anchor 를 쓴 이유는 host 자전을 **격리**하기 위해서였고, 구름은 반대로 host 자전을 **상속한 위에 차등을 더한다** — 목적이 반대이므로 구조도 반대가 맞다.
+- 실측: architect probe (§A10.12) 가 이 구조 (host 의 자식, `scale 1.02`) 로 렌더됐고 투명 큐에 1개로 들어갔다.
+- **geometry** — host 와 같은 diameter 산식의 별도 sphere (`MeshBuilder.CreateSphere`, segments 는 high variant 와 같은 `32`). 반경비는 **제품 상수**다 (Phase 0 의 `1.02` 는 프로토타입 임의값) — D1 사용자 육안이 정하고, 가드가 정하지 않는다.
+
+### A10.4 결정 2 — 재질: ALPHABLEND `ShaderMaterial` · `backFaceCulling = true` · log-depth · 조명 재사용
+
+- `needAlphaBlending: true` + `alphaMode = 2` (ring 레시피 — `ring-shader.ts` `createRingShaderMaterial`).
+- **`backFaceCulling = true`** — ring (`false`) 과 반대. 닫힌 구에서 `false` 면 반대편 구름이 비친다 (Phase 0 확인).
+- **log-depth 필수** — `LOG_DEPTH_FRAGMENT_WRITE_GLSL` 재사용 + `logDepthConstant = 2 / log2(maxZ + 1)` 바인딩. [실측] 없으면 disk 변화 `11736 → 159 px` (ALPHABLEND). `log-depth-glsl.test.ts` 의 `SHADERS` 는 **3 → 4**.
+- **noise** — 구름 fbm 을 새로 쓰지 않는다. `hash13` / `fbm` 본문은 planet · sun · starfield 셰이더에 **텍스트 동일**하게 이미 3벌 있다 (본 설계 시 `diff` 로 동일 확인). 4번째 사본은 `sun-shader.test.ts` 의 `NOISE_CONTRACT_LINES` 대상에 구름 fragment 를 **추가**해 같은 계약으로 묶는다. 공용 상수 추출은 3 셰이더의 최종 GLSL 을 건드려 픽셀 재실측을 부르므로 **비-범위**.
+- **조명** — 구름도 태양 방향에 따라 낮/밤이 갈려야 한다. 광원 입력은 `SurfaceLightingArgs` (`lighting` 상수 + `sunPositionProvider`) 를 **그대로** 받아 onBind 에서 매번 읽는다. 태양 벡터를 캐시한 사본 금지 (#1204 영벡터 클래스), 조명 상수 신설 금지 (`PlanetLightingConstants` 재사용).
+
+### A10.5 결정 3 — `disableDepthWrite = true` (명시). **이 플래그는 블렌드 draw 에서 무효임이 실측됐다**
+
+Phase 0 는 이 축을 「열리지 않았다」로 유보했다. 본 설계에서 **왜 안 열리는지**를 실행으로 닫았다.
+
+- [실측, §A10.12] 구름을 **먼저** 그리게 강제한 프레임 (`alphaIndex 0`) 에서 `disableDepthWrite` `false` / `true` 두 판본이 **바이트 동일**했고, 둘 다 뒤에 그려진 지구가 구름을 **disk 거의 전면 (`28734 / 29144 px`) 에서 덮어썼다**. `false` 에서도 구름이 depth 를 쓰지 않았다는 뜻이다.
+- [코드] Babylon 9.19.0 의 `setAlphaMode` 는 `noDepthWriteChange` 가 아니면 `depthMask = (mode === ALPHA_DISABLE)` 로 둔다 — WebGL `Engines/Extensions/engine.alpha.pure.js` · WebGPU `Engines/WebGPU/Extensions/engine.alpha.pure.js` 둘 다. 즉 블렌드 draw 는 **플래그와 무관하게 depth 를 쓰지 않는다** (`forceDepthWrite` 가 유일한 예외).
+- ⇒ **`disableDepthWrite = true` 를 명시한다.** 거동은 같지만 코드가 엔진의 실제 거동을 말하게 한다 (주석 계약 vs 구현 drift 클래스 차단). **`forceDepthWrite` 사용 금지** — 켜면 결정 4 의 순서 문제가 depth 차폐로 바뀌어 지구가 구름 아래에서 사라진다.
+- ⚠️ WebGPU 경로는 **코드 판독만** 했다 (§A10.15).
+
+### A10.6 결정 4 — 그리기 순서: **구름은 자기 host 계열 mesh 보다 항상 뒤에 그린다** (신규 실측 결함)
+
+**결함 [실측, §A10.12]** — LOD cross-fade 창에서 구름이 **disk 전면에서 사라진다.**
+
+1. fade 중 variant 는 `material.alpha < 1` 이 되고 (`setVariantAlpha`), Babylon `ShaderMaterial.needAlphaBlending()` 은 `alpha < 1.0 || options.needAlphaBlending` 이라 절차 셰이더 variant 가 **투명 큐로 들어간다** (절차 셰이더는 `gl_FragColor.a = 1.0` 이라 색은 불투명 그대로 — 실측으로 확인).
+2. 투명 큐는 bounding sphere **중심**까지의 거리로 정렬하는데, 구름과 host 계열은 **중심이 같다** — 실측 거리가 전부 `36.826845601460036` 으로 **완전 동률**이다. `backToFrontSortCompare` 는 동률에 `0` 을 돌려주므로 순서는 **삽입 순서**가 정한다.
+3. mid variant 는 **lazy 생성**이라 구름보다 나중에 `scene.meshes` 에 들어간다 (실측 index 구름 `88` < mid `90`). fade (to = mid) 상태에서 큐 순서가 `[cloud, earth-lod-mid]` 이고, 뒤에 그려진 mid 가 구름을 덮어 **프레임이 구름 없음과 바이트 동일**했다 (`changed 0 / 29144`).
+
+**결정** — 렌더링 그룹 0 의 투명 정렬 함수를 **Babylon `defaultTransparentSortCompare` + 쌍 규칙 1개**로 교체한다: _두 submesh 가 「구름」과 「그 구름의 host 계열 (host + LOD variant)」 쌍이면 구름이 뒤. 그 밖의 모든 쌍은 기본 비교를 그대로 쓴다._
+
+- 설치: `scene.setRenderingOrder(0, null, null, compareFn)`. [코드] `null` 은 `RenderingGroup` 생성자 기본값과 같다 (opaque · alphaTest → `PainterSortCompare`) — 불투명·alphaTest 경로 불변. 구름이 비활성이면 **설치하지 않는다** (구조적 no-op).
+- 쌍 규칙은 **거리를 보지 않는다.** 동률이든 부동소수 잡음으로 한쪽이 미세하게 앞서든, 구름 (반경비 `> 1`) 은 host 표면 바깥이므로 뒤가 항상 옳다. 거리 비교에 맡기면 bounding 중심의 잡음이 순서를 정한다.
+- 다른 쌍의 순서는 불변이다 — 기본 비교를 그대로 호출하고, `Array.prototype.sort` 는 안정 정렬이다.
+
+**기각**:
+
+- ❌ `renderingGroupId = 1` — 구름을 그룹 0 의 **모든** 투명 mesh 뒤로 보낸다. 지구 앞을 지나는 달의 LOD variant 가 fade 중 (투명 큐) 이면 구름이 그 위에 그려진다 → 게이트 (c) 의 기전 위반 **(기전 추론, 미실측)**. 저장소 첫 그룹 분리이기도 하다.
+- ❌ `alphaIndex` — 기본값이 `Number.MAX_VALUE` (실측 `1.7976931348623157e+308`) 라 구름 쪽을 **올려서** 뒤로 보낼 수 없다. host 계열을 내리면 전역 순서가 바뀐다.
+- ❌ 구름을 mid 생성 뒤에 만들기 — 삽입 순서 의존 그 자체이며, 결정 4 가 없애려는 것이다.
+- ❌ fade 중 구름 숨김 — 결함과 같은 깜빡임을 결정적으로 만들 뿐이다.
+
+### A10.7 결정 5 — LOD: 구름 가시성은 host 계열 **high / mid variant 의 가시성에서 파생**한다 (§A8.11 조건 6)
+
+- [실측, §A10.12] 구름을 host 자식으로 두고 아무 처리도 하지 않으면 **low 에서도 그대로 그려진다** — `setLodOverride('low')` 에서 투명 큐에 구름이 남고 disk 전 픽셀 (`29144 / 29144`) 이 바뀌었다 (평균 휘도 `0.03589 → 0.51836`, 작은 billboard 둘레의 흰 구). 원인: variant 숨김은 `isVisible` 로 하고 (`isVisible` 은 자식에게 상속되지 않는다), host 는 자식에게 transform 을 공급하려고 `setEnabled(true)` 를 **유지해야** 한다 (`hideVariantEntirely` 주석 — 리뷰 #321 Blocking 1).
+- **결정**: 매 LOD pass 에서 `cloud.isVisible = (host.isVisible || midVariant?.isVisible === true)`. 즉 **구름은 rim 을 싣고 있는 variant 가 보이는 동안만 보인다** — rim 의 low 소멸 (§결정 3 상속) 과 **같은 시점**에 사라진다.
+  - high ↔ mid fade: 양끝 모두 구름이 있으므로 계속 보인다 (순서는 결정 4 가 지킨다).
+  - mid ↔ low fade: mid variant 가 `isVisible` 인 동안 (fade 전 구간) 보이고, fade 종료의 `hideVariantEntirely` 와 **같은 프레임**에 사라진다. 절차 셰이더는 `material.alpha` 를 출력에 쓰지 않으므로 rim 도 이 시점에 사라진다 — 구름에 별도 알파 fade 를 붙이지 않는다 (새 타이밍 상수 `0`).
+  - tier-c (`forceOverride: 'low'`): 자동 소멸.
+- ⚠️ **위상** — 이 대입은 `runLodPass` 안 (프레임 위상) 에 둔다. `updateAt` (시간 위상) 에 두면 일시정지 중 LOD 가 바뀌어도 구름 가시성이 얼어붙는다 — [선행 ADR 20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) 가 닫은 클래스의 재생산이다. 새 멤버 추가가 아니라 `runLodPass` 의 기존 책임 (variant 가시성) 에 속한다.
+
+### A10.8 결정 6 · 7 — 차등 자전 (jd 순수 함수) + `?rotate=off` 상속 (§A3.7 조건 3)
+
+- **형태** — 구름 local 회전 = local Y (자전축) 주위 `Δθ(jd) = ((jd − rotationEpoch) × CLOUD_DRIFT_OMEGA) mod 2π`. host 가 `tilt ∘ spin(θs)` 이므로 world 는 `tilt ∘ spin(θs + Δθ)` — 구름의 유효 각속도는 `ω_earth + CLOUD_DRIFT_OMEGA`. `self-rotation.ts:80` 과 **같은 식**이며 `(jd − epoch)` 뺄셈을 float64 로 먼저 한다.
+- **매 프레임 누적 금지** (§A2.3 결정 5 — frame-rate 의존 / float drift / timeScale 불연속).
+- **식 SSoT** — `((jd − epoch) × ω) % 2π` 를 `self-rotation.ts` 의 순수 함수 하나로 추출해 `computeSpinQuaternion` 과 구름이 **함께 호출**한다. 같은 식의 사본 2벌은 숨은 상수 drift 클래스 (volt #69) 다. 추출은 값 불변 이동이며, 기존 `self-rotation.test.ts` 가 무수정 통과하는 것이 증거다.
+- **위치·위상** — host 자전과 **같은 루프** (`updateAt` 의 `rotationStates` 루프, 시간 위상), 같은 `rotationEpoch`.
+- **`?rotate=off` (결정 7)** — 상대 자전 계산을 **`rotationStates.has(host.id)` 와 같은 조건**으로 건다. `rotate=off` 면 `rotationStates` 가 비어 host 회전도 구름 상대 회전도 설정되지 않는다 → 구름 **identity** (구조적 상속). 기존 결정적 가드 3종 (`783` / `1119` / `1202`) 의 `?rotate=off` 전제가 보존된다.
+- **`CLOUD_DRIFT_OMEGA` 상수 근거** — `= CLOUD_ZONAL_WIND_MS × 86400 / body.radius` [rad/day]. `body.radius` 는 데이터 SSoT (`solar-system.json`), 부호는 **양 (순행)**. `CLOUD_ZONAL_WIND_MS` 는 **출처 인용 값**이며 코드 주석에 출처를 박는다 — architect 는 값을 대조하지 않았다 (§A10.15). 가드 통과를 위해 고르지 않는다.
+  - 기본 속도는 `86400` (1 일/초 — `apps/web/src/core/url-sync.tsx` 의 기본값 판정) 이라 실시간 1초당 상대각 = `CLOUD_DRIFT_OMEGA` rad 이다. 그 속도에서 차등이 **인지 불가**라고 D1 사용자가 판정하면, principles.md §1 Visual Fidelity 의 rendering-only 배수로 과장할 수 있다 — **§의무 체크리스트 4항목을 본 ADR 에 박제한 뒤에만.**
+  - 단위 테스트 필수: `CLOUD_DRIFT_OMEGA > 0` (`0` 이면 「다른 속도」 계약이 공허하게 참이 된다).
+
+### A10.9 결정 8 — 활성 조건: `?clouds=off` 옵트아웃 + `surfaceDetail` 종속
+
+- `apps/web/src/core/parse-cloud-mode.ts` (`parseCloudsVisible`) — `parse-surface-mode.ts` 동형 (기본 ON · `off` 옵트아웃 · 대소문자 무시 · 미지 값 → ON + `console.warn`) + 단위 테스트. URL 초기값만 (런타임 토글 UI 비-범위).
+- core 옵션 `clouds?: boolean` — core 기본 **false** (`surfaceDetail` · `starfield` · `selfRotation` 동형 레이어 분리). **유효 조건 = `clouds && surfaceDetail`** — 계약 D6 이 `?surface=off` 픽셀 diff `0` 을 요구하므로 구름도 함께 꺼져야 한다.
+- 비활성이면 구름 mesh **미생성** + 정렬 함수 **미설치** — develop tip 과 **같은 코드 경로**. 이 동일성이 §A10.10 의 전제이며, D6 이 직접 잰다.
+
+### A10.10 결정 9 — `G6` 재정의: **(1) 구름 OFF 프레임에서 잰다** (계약 재조정 2)
+
+**선택 = (1).** `verify:1202` 가 `?clouds=off` 로 **두 번째 페이지**를 열어 rim ON/OFF 쌍을 한 벌 더 찍고, **`G6` 만** 그 쌍에서 잰다. `G1`~`G4` · `G7` 은 기존 페이지 (구름 기본 ON) 에서 그대로 잰다 — 사용자 합의 범위는 `G6` 하나다.
+
+**(1) 을 고른 근거 (실행으로 확인된 사실만)**:
+
+- `G6` 의 baseline `0.06086` (`N = 97`) · 임계 `0.02` (= baseline 의 1/3) · 판별 변이 `M-7` 은 **전부 구름 없는 프레임에서** 확립됐다 (§A8.8). `?clouds=off` 가 develop tip 과 같은 코드 경로 (결정 8) 이면 그 프레임이 **그대로** 재현되고 baseline · 임계 · `M-7` 이 옮겨 온다 — 새 임계 `0`.
+- **(2) 대역 축소는 prototype `cover` 에서 표본 하한을 넘지 못한다** — [실측 2값에서의 도출, 가정 2개] 구름 존재 시 박명 대역은 `N = 97` 그대로인데 평균 기여가 `0.06086 → 0.00382` (`6.3%`) 로 떨어졌다. rim 은 표면 셰이더 안의 **가산**이고 구름은 그 위에 블렌드되므로, 픽셀 기여 `lum(on) − lum(off)` 는 `(1 − α) × (rim 증분) ≥ 0` 이다 (가정 1 — clamp 가 단조라는 전제 포함). 구름 없는 픽셀이 baseline 수준의 기여를 유지한다면 (가정 2) 그런 픽셀은 `97` 의 약 `6%` — 한 자릿수로, `MIN_TWILIGHT_SAMPLES = 30` 에 한참 못 미친다 → 상시 「측정 불가」. ⚠️ 구름 없는 박명 픽셀을 **직접 센 값은 없다** (§A10.15).
+- (2) 는 또 **측정 집합이 제품 파라미터 (`cover`) 로 정의된다** — `cover` 를 바꾸면 재는 픽셀이 바뀐다. #1197 `M-i` (술어 도달 전 집합 필터가 결함을 흡수) 클래스이고, 「구름 없음」 판정 임계가 새로 필요하다 (#1214 판정 순서 4항 — 교정이 새 표면).
+
+**토글 수단 = URL flag `?clouds=off` (런타임 `setEnabled(false)` 기각)** — URL flag 경로는 mesh 미생성 + 정렬 함수 미설치로 develop tip 과의 동일성이 **구조적**이고, D6 이 따로 잰다. 런타임 비활성은 mesh 와 정렬 함수가 남아 동일성을 **별도로 증명**해야 한다. 비용은 페이지 부트스트랩 1회 추가.
+
+**구현 계약**:
+
+- `INJECT` 변이는 **두 페이지 모두**에 주입한다 — 한쪽만 주입하면 `M-7` 이 `G6` 에 도달하지 못한다 (재정의가 판별력을 조용히 지우는 경로).
+- 「측정 불가」 4전제는 **두 쌍 각각**에서 평가한다 (`G6` 의 유효성은 자기 프레임의 표본 · 위상각 · 휘도에 달렸다). 추가 전제: `?clouds=off` 페이지에 구름 mesh 가 **없다** (`getMeshByName` → `null`). 위배 시 `exit 2`.
+- `G7` 은 두 페이지 콘솔 에러의 합이다.
+- 구름 ON 페이지의 박명 호 값은 **진단으로 인쇄**한다 (커버리지 축 관측을 지우지 않는다).
+- **임계 `0.02` · 대역 (`-0.15 < ndl < 0`) · `MIN_TWILIGHT_SAMPLES` 무변경.** 재는 **프레임**을 바꿀 뿐 임계를 낮추지 않는다. `cover` 를 가드 통과 값으로 고르는 것은 금지 (C1 클래스).
+- **3위치 박제** (§스프린트 계약 7항): ① 코드 주석 — `G6_MIN_TWILIGHT_RIM` 정의부와 두 번째 페이지 부트스트랩에 「왜 구름 OFF 프레임인가 + `cover` 를 고르지 않은 이유」 ② PR 본문 — 계약 재조정 2 코멘트 링크 ③ CHANGELOG Notes — `G6` 변경을 「가드 약화」로 오인하지 않도록.
+
+### A10.11 결정 10 — 신규 가드 `verify:1215-cloud-layer` (도출 규칙만 — 수치는 dev)
+
+[#1214](https://github.com/coseo12/astro-simulator/issues/1214) fail-open 시그니처 5종을 전부 적용한다. 헬퍼는 새로 만들지 않는다 — `launchBrowser` / `bootstrapScene` / `collectConsoleErrors` / `waitForLodSettle` / `hasSimErrors` / `withBrowser` (`scripts/browser-verify-utils.mjs`).
+
+**프레임** — `verify:1202` 와 같은 결정적 조건 (`?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off` · JD `2451626.0` · pause · `beta = π/2` · `waitForLodSettle`). ON = 기본, OFF = `&clouds=off`. 픽셀 영역은 `verify:1202` 의 ray-sphere 역투영, 대역은 **낮면 내부** (`ndv ≥ INNER_NDV_MIN (0.6)` ∧ `ndl ≥ DAY_NDL_MIN (0.15)` — 1202 정의 재사용, 새 대역 상수 `0`). 밤면은 구름도 어두워 「변화 없음」과 섞이므로 제외한다.
+
+| # | 술어 | 겨냥 | 위배 시 |
+| --- | --- | --- | --- |
+| **C1** | 낮면 내부 평균 `abs(lum(ON) − lum(OFF))` ≥ `T_DELTA` | 결함 문장 「구름이 안 보인다」의 **문자 그대로의 부정** (판별력 하한) | FAIL |
+| **C2** | 낮면 내부 **맑은 하늘 비율** (채널 최대차 `== 0` 인 픽셀 비율) ≥ `T_CLEAR` | **과다 상한** — 표면 전부 덮음 / 얇은 베일 전면. C1 은 이 방향에 눈이 멀다 (§A8.8 `M-6` 동형) | FAIL |
+| **C3** | 투명 큐: ON 개수 − OFF 개수 `== 1` ∧ ON 이름 목록에 구름 포함 | 게이트 (a) 의 제도화 — **큐를 잰다** (frustum culling 무관) | FAIL |
+| **C4** | `!hasSimErrors(consoleErrors)` (두 페이지, `pageerror` 포함) | §A8.8 `G7` 동형 | FAIL |
+| **C5** | `setLodOverride('mid')` 정착 쌍의 C1 량 ≥ `T_DELTA` **그리고** 같은 상태에서 mid variant `material.alpha = 0.999` 를 매 프레임 덮어쓴 쌍 (fade 창 정지 재현) 의 C1 량 ≥ mid 정착 쌍 C1 량의 1/3 | 결정 4 (fade 창 소멸). 뒤 항은 **같은 실행의 양성 대조에 대한 비**라 절대 상수가 없다 | FAIL |
+| **C6** | `setLodOverride('low')` 에서 `cloud.isVisible === false` ∧ low 쌍의 disk 변화 px `== 0` | 결정 5. 「불변」 술어라 **C1 PASS 를 선행 결합**한다 (구름이 그려지는 실행에서만 의미가 있다) | FAIL |
+| **C7** | `rotate` ON 쿼리에서 같은 JD 독립 2회 로드의 disk 변화 px `== 0` ∧ JD `+Δjd` 에서 구름 local 회전각 = `(Δjd × CLOUD_DRIFT_OMEGA) mod 2π` (구조 읽기) | D3 결정성 + 차등의 **실재**. 표면 자전이 픽셀을 바꾸므로 픽셀로는 구름 차등을 분리하지 못한다 — **구조 읽기**가 양성 대조 | FAIL |
+| **C8** | `rotate=off` 에서 JD 2점 모두 구름 local 회전 identity ∧ 독립 2회 로드 disk 변화 px `== 0` | D4 | FAIL |
+
+**「측정 불가」 (`exit 2`)** — PASS/FAIL 이 아니다. **fallback 분기 금지**:
+
+1. 어느 페이지든 `waitForLodSettle` 의 `timedOut === true` — ⚠️ `verify:1202` 는 현재 경고 후 진행한다. 신규 가드는 따르지 않고, 1202 쪽은 #1214 재판정 코멘트에 기록한다
+2. OFF 낮면 내부 표본 `N < MIN_EXPECTED`
+3. OFF 낮면 내부 평균 휘도 `< MIN_DAY_LIT_LUM (0.15)` — §A8.8 전제 4 와 정의·값 동일 (1202 가 SSoT, 주석으로 참조)
+4. 위상각 `< MIN_PHASE_ALPHA_DEG (10°)` — 동일
+5. `?clouds=off` 페이지에 구름 mesh 존재
+6. `measure()` 가 `error` 를 반환 — **판정식은 `error` 를 모든 게이트보다 먼저 본다** (#1214 시그니처 5). 부분 결과로 게이트를 계산하지 않는다
+
+**임계 도출 규칙** (수치 발명 금지):
+
+- `T_DELTA` = baseline C1 량 ÷ 3 · `T_CLEAR` = baseline 맑은 하늘 비율 ÷ 3 · `MIN_EXPECTED` = ⌊baseline 낮면 내부 `N` ÷ 3⌋ — §A8.8 의 1/3 관례 (`G1`~`G3` · `G6`, 박명 표본 하한 `30 ≈ 97 / 3`).
+- baseline 은 **D1 에서 사용자가 승인한 최종 구름 파라미터**로, CI 렌더러 (swiftshader) 에서, 반복 실행하며 산포를 함께 기록한다 (§A8.8 은 5회 동일 = 산포 `0`). 산포가 있으면 평균으로 덮지 말고 보고한다.
+- baseline 맑은 하늘 비율이 `0` 이면 C2 를 도출할 수 없다 — 보고한다 (전면 헤이즈 형태는 C2 재설계 대상).
+- 각 임계의 코드 주석에 **baseline 값 + 규칙**을 박는다 — 근거 없는 임계는 교정이 새 취약점이다 (#1214 판정 순서 4항).
+- `== 0` 술어 (C2 의 맑은 하늘 · C6 · C7 · C8) 는 새 임계가 아니다. 근거: 페이지 로드 간 결정성이 실측됐다 (Phase 0 결정성 대조군 — 실 GPU 전 화면 `0`, swiftshader disk 내부 `0`).
+
+**변이 3단 실증** (원본 PASS · 변이 FAIL · 원복 PASS. 소스 변이는 `packages/core` dist 재빌드 후, 변이 상태의 `packages/core` 단위 테스트 통과 수를 함께 기록):
+
+| # | 변이 | 주입 | 기대 FAIL |
+| --- | --- | --- | --- |
+| MC-1 | **바인딩 삭제** — 구름 외형 uniform (커버 / 불투명도 등) 의 바인딩 블록만 삭제, GLSL 무변경 | 소스 + dist 재빌드 | C1 (단위 테스트는 통과 예상 — §A8.8 `M-2` 동형 사각) |
+| MC-2 | 상대 자전 계산을 회전 루프에서 삭제 (순수 함수는 유지) | 소스 + dist 재빌드 | C7 구조 읽기 |
+| MC-3 | 상대 자전 게이트 (`rotationStates.has`) 삭제 | 소스 + dist 재빌드 | C8 |
+| MC-4 | 정렬 함수 설치 삭제 | 소스 + dist 재빌드 | C5 뒤 항 (architect 실측 동형: `changed 0`) |
+| MC-5 | low 가시성 파생 삭제 | 소스 + dist 재빌드 | C6 (architect 실측 동형: `29144 px`) |
+| MC-6 | 과다 커버 (전면 덮음) | 런타임 uniform | **C2 만** FAIL, C1 PASS — 단측 사각 실증 |
+| MC-7 | 콘솔 에러 1건 | 런타임 | C4 |
+| MC-8 | 구름 fragment 의 log-depth 문장 삭제 | 소스 + dist 재빌드 | `log-depth-glsl.test.ts` + C1 |
+| MC-9 | `needAlphaBlending` 거짓 | 런타임 | C3 |
+| MC-10 | `?clouds=off` 무시 (parse 가 항상 ON) | 소스 (web) | 측정 불가 5 (`exit 2`) + D6 `?clouds=off` diff ≠ 0 |
+| MC-11 | `verify:1202` `INJECT=m7` / `m4` 를 재정의 구조에서 | 런타임 | `G6` (m7 은 `G1`~`G4` PASS 유지) |
+
+### A10.12 architect 실측 — 결정 3 · 4 · 5 의 근거
+
+런타임 주입만 했다 (프로덕션 코드 `0` 줄, 임시 스크립트는 실행 후 삭제 — volt #67). headless chromium `--use-angle=swiftshader` · `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off` · JD `2451626.0` · pause · `beta = π/2` · `waitForLodSettle` (전 시나리오 `9/6/17` · `fading 0` · `timedOut false`) · 1280×720. probe = earth host 의 자식 clone, `scale 1.02`, 균일 알파 `0.5` 흰색, log-depth 기록, `backFaceCulling = true`, `alphaMode = 2`. 지구 disk 표본 `n = 29144`. 콘솔 에러는 전 시나리오 `0`. 원자료 `phase1-architect-depthwrite-lodlow.json` · `phase1-architect-fade-order.json`.
+
+| 비교 | disk 변화 px | 평균 휘도 | 의미 |
+| --- | ---: | --- | --- |
+| 구름 없음 ↔ 지구만 투명 큐 강제 | `0` | `0.39783` 동일 | 절차 셰이더의 alpha 강제는 **색을 바꾸지 않는다** (큐 배치만) |
+| 구름 없음 ↔ 구름 (depth write 기본) | `28734` | `0.39783 → 0.69921` | 양성 대조 |
+| 구름 (기본) ↔ 구름 (`disableDepthWrite`) | `0` | — | Phase 0 재현 |
+| 구름 ↔ 지구 투명 강제 + 자연 순서 | `0` | — | 삽입 순서 `[earth, cloud]` 면 무결 |
+| 구름 ↔ 지구 투명 강제 + **구름 먼저** (`alphaIndex 0`), depth write 기본 | `28734` | `0.69921 → 0.39783` | 구름 **소멸** |
+| 위와 같음, `disableDepthWrite = true` | `28734` | `0.69921 → 0.39783` | 플래그 무관 — **결정 3** |
+| 구름 없음 ↔ 구름 먼저 (depth write 기본) | `0` | — | 소멸 프레임 = 구름 없음과 **바이트 동일** |
+| mid 정착 구름 없음 ↔ mid 정착 구름 | `28707` | `0.44719 → 0.72377` | mid 에서 구름 존재 (양성 대조) |
+| mid 정착 구름 없음 ↔ **mid fade 정지 재현 + 구름** (실경로: 구름 idx `88`, mid idx `90`) | **`0`** | — | **실경로 소멸 — 결정 4** |
+| low 구름 없음 ↔ low 구름 (처리 없음) | `29144` | `0.03589 → 0.51836` | low 에서도 그려짐 — **결정 5** |
+
+투명 큐 거리는 전 시나리오에서 구름 · `earth` · `earth-lod-mid` 모두 `36.826845601460036` (완전 동률), `alphaIndex` 기본값은 `1.7976931348623157e+308`.
+
+### A10.13 재검토 조건 결과 기록 (계약 D8)
+
+| 조건 | 결과 |
+| --- | --- |
+| **§A1.8 조건 5** (대기/구름 — 알파 + depth 우선순위, log-depth 핵심 위험 1) | **발동·처리.** 알파 = ALPHABLEND (§A10.1). depth: log-depth 기록 필수 (없으면 `11736 → 159 px`), `disableDepthWrite` 는 블렌드 draw 에서 무효 → `true` 명시 (§A10.5). 우선순위: 신규 결함 (fade 창 동률 정렬) 을 쌍 규칙으로 해소 (§A10.6) |
+| **§A3.7 조건 3** (구름 / 야간 도시 불빛 — 차등 offset) | **구름: 발동·처리** — host 자식의 local 상대 자전, jd 순수 함수, `?rotate=off` 구조적 상속 (§A10.8). **야간 도시 불빛: 미발동** — 계약 비-범위. 인프라 (자식 shell · 쌍 규칙 · 가시성 파생) 재사용 여부는 그 이슈에서 판정 |
+| **§A8.11 조건 1** ((B) 재평가 + rim 이관) | **(B) 재평가: 구름은 (B) 형 별도 shell 로 도입.** rim 이관: **검토 후 유지** — 이득을 비용과 같은 단위로 서술할 수 없고 재개 트리거 (헤드룸 하한 접근) 미발화 (`0.28218 → 0.34620`) (§A10.2). ⚠️ 무처분이 아니다 |
+| **§A8.11 조건 6** (LOD Low 전환 거동) | **발동·신규 결정.** 구름은 별도 mesh 라 상속되지 않고 low 에서도 그려짐을 실측 → 가시성을 high/mid variant 가시성에서 파생, rim 과 같은 시점에 소멸 (§A10.7) |
+| §A8.11 조건 5 (clamp 포화) — 참고 | **미발동.** 계약 위험 5 의 「구름이 rim 헤드룸을 먹는다」 는 prototype 에서 반대 방향 (`0.28218 → 0.34620`). 최종 파라미터에서 D5 가 다시 인쇄한다 |
+
+### A10.14 재검토 조건 (신규)
+
+1. **최종 구름 파라미터에서 `G1`~`G4` 중 하나가 FAIL** — `G1`~`G4` 는 구름 ON 프레임에서 잰다. FAIL 이면 가드를 고치지 말고 보고한다 — `G6` 과 같은 재정의 여부는 **사용자 명시 합의 대상**이다 (§스프린트 계약 5항).
+2. **`verify:783` / `verify:1119` (및 지구 픽셀을 읽는 다른 CI 가드) 가 구름 ON 에서 FAIL** — 둘은 표면 계약 (극관 · biome · 대륙 IoU) 을 재며, 구름의 영향은 **미실측**이다. 처분은 같다: 보고 후 사용자 합의 (`?clouds=off` 프레임 이관이 후보이나 architect 가 정하지 않는다).
+3. **WebGPU 실행에서 결정 3 · 4 의 전제가 다름** — 코드 판독만 했다. 실 Chrome GUI (WebGPU) 에서 LOD 경계를 넘나드는 줌 중 구름 깜빡임이 보이면 결정 4 를 재검토한다.
+4. **다른 body 가 구름/대기 shell 을 갖게 됨** — 쌍 규칙은 「구름 ↔ 자기 host 계열」 이라 body 가 늘어도 규칙은 불변이나, 정렬 함수가 그룹 0 전역에 걸리므로 설치 조건을 재확인한다.
+5. **야간 도시 불빛 착수** — 자식 shell · 쌍 규칙 · 가시성 파생의 재사용 여부 판정 (§A3.7 조건 3 잔여).
+6. **`hash13` / `fbm` 사본이 5벌째가 됨** — 공용 GLSL 상수 추출 (log-depth #845 선례) 을 재판단한다.
+
+### A10.15 미확인 (실행되지 않은 것 — 근거로 인용 금지)
+
+- WebGPU 경로의 depth mask · 정렬 거동 (코드 판독만)
+- `rotate` ON 에서의 페이지 로드 간 결정성 (Phase 0 은 `rotate=off` 만 쟀다)
+- `verify:783` · `verify:1119` · `verify:756` · `verify:762` · `verify:773` · `verify:1204` · `verify:1205` 의 구름 ON 결과 (Phase 0 은 `verify:1202` 만 돌렸다)
+- 구름 없는 박명 픽셀 수의 직접 계수 (§A10.10 의 (2) 기각은 실측 2값에서의 도출)
+- `CLOUD_ZONAL_WIND_MS` 의 출처 값
+- 정렬 함수 설치 후 fade 창에서 구름이 **복원되는지** (결함은 실측했고 처방은 아직 실행되지 않았다 — C5 가 첫 실행)
+- 정렬 함수 교체의 프레임 시간 영향
+
+### A10.16 교차검증 반영 사항 (cross-validate 대기 — Provisional)
+
+메인이 수행한다 (#479). 호출 전 architect 셀프 체크 ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5):
+
+- **낙관적 일정** △ — dev 1회 디스패치로 D1~D9 가 닫힌다고 보지 않는다. D1 은 사용자 육안 왕복이 필요하고, §A10.14 조건 1 · 2 가 발화하면 사용자 합의로 멈춘다.
+- **결합 간과** △ — 구름이 `783` / `1119` 등 지구 픽셀 가드와 결합하는 축을 **실측하지 못했다** (§A10.15). 명시 질문으로 넘긴다.
+- **폐기 프레이밍** OK — Phase 0 의 anchor 골격을 폐기했으나, 근거는 코드 주석이 기록한 실결함 (#785 drift) 이다.
+- **순수주의** △ — 쌍 규칙 (정렬 함수 교체) 은 전역 표면을 하나 만든다. 더 간단한 대안이 있는지 명시 질문으로 넘긴다.

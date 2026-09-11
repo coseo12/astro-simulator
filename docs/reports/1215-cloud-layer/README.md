@@ -40,6 +40,17 @@
 | `zoom-*.png`                                             | 위 4종의 `(600,340)` 중심 `180×180` 영역 4× 확대. **알파 축 육안 비교용** |
 | `occl-transit-*.png`                                     | (c) transit 시나리오 (`jd 2451638.75`) 프레임                             |
 
+## Phase 1 architect 실측 (2026-09-11)
+
+ADR `20260628-756` Amendment 10 §A10.12 의 원자료다. 결정 3 (`disableDepthWrite`) · 결정 4 (LOD fade 창
+정렬 동률) · 결정 5 (LOD low 거동) 를 판정했다. 런타임 주입만 했고 (프로덕션 코드 0 줄), 임시 스크립트는
+실행 후 삭제했다 (volt #67). headless `--use-angle=swiftshader`, 측정 조건은 위 표와 같다 (오클루전 제외).
+
+| 파일                                      | 내용                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `phase1-architect-depthwrite-lodlow.json` | depth write 기본/비활성 × 구름 순서 (자연 / `alphaIndex 0`) × 지구 투명 큐 강제 + LOD low |
+| `phase1-architect-fade-order.json`        | 실경로 — lazy 생성된 `earth-lod-mid` 의 fade 정지 재현 (구름 idx 88 < mid idx 90)         |
+
 ## 오클루전 시나리오의 카메라가 다른 이유
 
 `verify:1202` 의 `alpha = -π/2, beta = π/2` 는 **달 궤도면을 정면(face-on)으로 보는 시점**이다.
