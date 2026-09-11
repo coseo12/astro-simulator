@@ -1,0 +1,6016 @@
+{
+ "query": "?gpu=a&focus=earth&lod=auto",
+ "jd": 2451626,
+ "candidates": {
+  "A": {
+   "ratio": 1.005,
+   "cover": 0.55,
+   "opacity": 0.8
+  },
+  "B": {
+   "ratio": 1.01,
+   "cover": 0.5,
+   "opacity": 0.9
+  },
+  "C": {
+   "ratio": 1.02,
+   "cover": 0.45,
+   "opacity": 0.95
+  }
+ },
+ "settle": {
+  "dist": "2/3/27",
+  "fading": 0,
+  "waitedMs": 815,
+  "timedOut": false
+ },
+ "geom": {
+  "cx": 640.0001159670229,
+  "cy": 359.9999961160367,
+  "R": 86.8092350090123,
+  "engine": "WebGPU",
+  "isWebGPU": true,
+  "renderer": false
+ },
+ "lod": {
+  "id": "earth",
+  "level": "high",
+  "screenCoverage": 74.7533020614786,
+  "pxDiameter": 149.5066041229572,
+  "cameraDistanceMeters": 31452652125.20258,
+  "billboardAlphaMask": null
+ },
+ "lodZoom": {
+  "cam0": {
+   "radius": 48.437084654676276,
+   "lower": 4.4650178020505225,
+   "upper": 100000000000000
+  },
+  "factor": 1.06,
+  "extraIn": 80,
+  "steps": [
+   {
+    "radius": 48.437084654676276,
+    "tier": "inner",
+    "level": "high",
+    "px": 149.5066041229572,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 0,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "00-high-cloudOn.png"
+   },
+   {
+    "radius": 51.34330973395686,
+    "tier": "inner",
+    "level": "high",
+    "px": 141.0439604890791,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 1,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 54.42390831799427,
+    "tier": "inner",
+    "level": "high",
+    "px": 133.06034436902107,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 2,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 57.68934281707392,
+    "tier": "inner",
+    "level": "high",
+    "px": 125.52862725662524,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 3,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 61.15070338609837,
+    "tier": "inner",
+    "level": "high",
+    "px": 118.42323251809479,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 4,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 64.81974558926427,
+    "tier": "inner",
+    "level": "high",
+    "px": 111.72003330370372,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 5,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 68.70893032462013,
+    "tier": "inner",
+    "level": "high",
+    "px": 105.39626028807248,
+    "host": true,
+    "mid": null,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": null,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 6,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 72.83146614409735,
+    "tier": "inner",
+    "level": "mid",
+    "px": 99.4304341269647,
+    "host": true,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": 0,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 7,
+    "earthFade": true,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "01-mid-fade-cloudOn.png"
+   },
+   {
+    "radius": 77.20135411274319,
+    "tier": "inner",
+    "level": "mid",
+    "px": 93.80229569470623,
+    "host": true,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 0.998,
+    "aLow": null,
+    "draw": [
+     "earth",
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 8,
+    "earthFade": true,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "02-mid-fade-cloudOn.png"
+   },
+   {
+    "radius": 81.83343535950779,
+    "tier": "inner",
+    "level": "mid",
+    "px": 88.49272460744129,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 9,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "03-mid-cloudOn.png"
+   },
+   {
+    "radius": 86.74344148107826,
+    "tier": "inner",
+    "level": "mid",
+    "px": 83.483705027741,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 10,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 91.94804796994296,
+    "tier": "inner",
+    "level": "mid",
+    "px": 78.75821353014065,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 11,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 97.46493084813953,
+    "tier": "inner",
+    "level": "mid",
+    "px": 74.30020068581216,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 12,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 103.31282669902791,
+    "tier": "inner",
+    "level": "mid",
+    "px": 70.09453106971952,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 13,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 109.5115963009696,
+    "tier": "inner",
+    "level": "mid",
+    "px": 66.12691660898093,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 14,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 116.08229207902777,
+    "tier": "inner",
+    "level": "mid",
+    "px": 62.38388035313905,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 15,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 123.04722960376945,
+    "tier": "inner",
+    "level": "mid",
+    "px": 58.852718444481525,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 16,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 130.4300633799956,
+    "tier": "inner",
+    "level": "mid",
+    "px": 55.521431811874535,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 17,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 138.25586718279538,
+    "tier": "inner",
+    "level": "mid",
+    "px": 52.378711481303505,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 18,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 146.5512192137631,
+    "tier": "inner",
+    "level": "mid",
+    "px": 49.413879655591394,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 19,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 155.3442923665889,
+    "tier": "inner",
+    "level": "mid",
+    "px": 46.616866751865615,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 20,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 164.66494990858425,
+    "tier": "inner",
+    "level": "mid",
+    "px": 43.978174529953016,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 21,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 174.5448469030993,
+    "tier": "inner",
+    "level": "mid",
+    "px": 41.48884365992242,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 22,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 185.01753771728528,
+    "tier": "inner",
+    "level": "mid",
+    "px": 39.140419434344125,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 23,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 196.1185899803224,
+    "tier": "inner",
+    "level": "mid",
+    "px": 36.924922715821495,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 24,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 207.88570537914174,
+    "tier": "inner",
+    "level": "mid",
+    "px": 34.83483452744484,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 25,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 220.35884770189026,
+    "tier": "inner",
+    "level": "mid",
+    "px": 32.86305106519264,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 26,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 233.58037856400367,
+    "tier": "inner",
+    "level": "mid",
+    "px": 31.00287883904805,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 27,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 247.5952012778439,
+    "tier": "inner",
+    "level": "mid",
+    "px": 29.247997814001337,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 28,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 262.45091335451457,
+    "tier": "inner",
+    "level": "mid",
+    "px": 27.59245229972611,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 29,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 278.1979681557854,
+    "tier": "inner",
+    "level": "mid",
+    "px": 26.030613856352694,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 30,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 294.8898462451326,
+    "tier": "inner",
+    "level": "mid",
+    "px": 24.557184071267145,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 31,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 312.58323701984057,
+    "tier": "inner",
+    "level": "mid",
+    "px": 23.167154801019997,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 32,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 331.338231241031,
+    "tier": "inner",
+    "level": "mid",
+    "px": 21.855805666070857,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 33,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 351.21852511549287,
+    "tier": "inner",
+    "level": "mid",
+    "px": 20.618683636497217,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 34,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 372.2916366224225,
+    "tier": "inner",
+    "level": "mid",
+    "px": 19.451589528088267,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 35,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 394.62913481976784,
+    "tier": "inner",
+    "level": "mid",
+    "px": 18.350556339408836,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 36,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 418.3068829089539,
+    "tier": "inner",
+    "level": "mid",
+    "px": 17.31184488006843,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 37,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 443.40529588349125,
+    "tier": "inner",
+    "level": "mid",
+    "px": 16.331928915681416,
+    "host": false,
+    "mid": true,
+    "low": null,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": null,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 38,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 470.00961363650066,
+    "tier": "inner",
+    "level": "low",
+    "px": 15.407480416687461,
+    "host": false,
+    "mid": true,
+    "low": true,
+    "cloud": true,
+    "aHost": 0.002,
+    "aMid": 1,
+    "aLow": 0,
+    "draw": [
+     "earth-lod-mid",
+     "earth-cloud"
+    ],
+    "i": 39,
+    "earthFade": true,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "04-low-fade-cloudOn.png"
+   },
+   {
+    "radius": 498.21019045469075,
+    "tier": "inner",
+    "level": "low",
+    "px": 14.53535933546045,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 40,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null,
+    "savedAs": "05-low-cloudOff.png"
+   },
+   {
+    "radius": 528.1028018819723,
+    "tier": "inner",
+    "level": "low",
+    "px": 13.71260320009335,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 41,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 559.7889699948906,
+    "tier": "inner",
+    "level": "low",
+    "px": 12.936418344213997,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 42,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 593.3763081945841,
+    "tier": "inner",
+    "level": "low",
+    "px": 12.204168153495727,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 43,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 628.9788866862591,
+    "tier": "inner",
+    "level": "low",
+    "px": 11.513365762142751,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 44,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 666.7176198874348,
+    "tier": "inner",
+    "level": "low",
+    "px": 10.861666214771981,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 45,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 706.7206770806808,
+    "tier": "inner",
+    "level": "low",
+    "px": 10.246854091023064,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 46,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 749.1239177055216,
+    "tier": "inner",
+    "level": "low",
+    "px": 9.666844052102306,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 47,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 794.071352767853,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.49743621812911987,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 48,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 701.5563187399734,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.5285464011003916,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 49,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 545.4617393326373,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.6391837709624776,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 50,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 421.7670618592255,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.821983397281473,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 51,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 323.02884498482535,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.0689745908386026,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 52,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 242.88918275017545,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.405989620757239,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 53,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 153.76464032138233,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.1870230583061883,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 54,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 108.13831609792908,
+    "tier": "solar",
+    "level": "low",
+    "px": 3.047576848093712,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 55,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 71.25579972268349,
+    "tier": "solar",
+    "level": "low",
+    "px": 4.387961451308888,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 56,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 43.469763273044464,
+    "tier": "solar",
+    "level": "low",
+    "px": 6.922057448109087,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 57,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 43.31298287824652,
+    "tier": "solar",
+    "level": "low",
+    "px": 9.119663873828971,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 58,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1507.384504174677,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.2620431915700924,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 59,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1597.8275744251578,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.24721057023595625,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 60,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1693.6972288906672,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.23321750536406263,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 61,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1795.3190626241073,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.2200165157416517,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 62,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1903.038206381554,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.20756275393997897,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 63,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2017.2204987644473,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.19581392288011382,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 64,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2138.253728690314,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.18473010752340407,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 65,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2266.548952411733,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.1742736910674617,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 66,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2402.541889556437,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.16440914371413898,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 67,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2546.6944029298234,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.15510296118373365,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 68,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2699.4960671056133,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.14632355664591115,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 69,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2861.46583113195,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.1380410809486731,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 70,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3033.153780999867,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.1302274439943456,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 71,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3215.143007859859,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.12285607785633271,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 72,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3408.051588331451,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.11590195635351354,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 73,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3612.5346836313383,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.10934146657092118,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 74,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3829.2867646492186,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.10315233058192215,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 75,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4059.043970528172,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.09731351655873983,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 76,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4302.586608759863,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.09180520779970404,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 77,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4560.741805285455,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.08660868508135625,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 78,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4834.386313602582,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0817063063161244,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 79,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 5124.4494924187375,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0770814239602893,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 80,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 5431.916461963862,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.07271832014942464,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 81,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 5757.831449681694,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.06860218833061728,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 82,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 6103.3013366625955,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.06471904743737483,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 83,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 6469.499416862352,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.061055703635840626,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 84,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 6857.669381874093,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.057599720886271,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 85,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 7269.12954478654,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.05433936091753361,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 86,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 7705.277317473731,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.05126354685242613,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 87,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 8167.593956522156,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.04836183808681683,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 88,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 8657.649593913486,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.045624375388515805,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 89,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 9177.108569548294,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.04304186351875063,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 90,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 9727.735083721194,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.04060552977862512,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 91,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 10311.399188744466,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.038307103811157664,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 92,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 10930.083140069135,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.036138778432884815,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 93,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 11585.888128473283,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.03409318808570316,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 94,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 12281.04141618168,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.032163384853318946,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 95,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 13017.903901152582,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.030342816281584927,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 96,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 13798.978135221738,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.028625298354385223,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 97,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 14626.916823335043,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.027004996983370746,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 98,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 15504.531832735147,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.025476413512799712,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 99,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 16434.803742699256,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.024034351525000674,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 100,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 17420.891967261214,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.022673916975238906,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 101,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 18466.145485296885,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.021390487246341176,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 102,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 19574.114214414698,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.020179704937218382,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 103,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 20748.561067279585,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.019037457118708724,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 104,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 21993.474731316357,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0179598665045326,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 105,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 23313.083215195344,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.016943269597374813,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 106,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 24711.868208107066,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.015984216492601438,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 107,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 26194.58030059349,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.015079449064789351,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 108,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 27766.2551186291,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.014225895878461327,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 109,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 29432.230425746846,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.013420656804350525,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 110,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 31198.164251291662,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.012660996267085224,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 111,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 33070.05410636916,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.011944336548242142,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 112,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 35054.25735275131,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.011268242060522052,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 113,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 37157.512793916394,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.010630417470695114,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 114,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 39386.963561551376,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.010028695097464492,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 115,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 41750.181375244465,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.009461032904547207,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 116,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 44255.19225775913,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.008925503375896409,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 117,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 46910.503793224685,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.008420286012245608,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 118,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 49725.13402081817,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.007943665629304333,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 119,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 52708.642062067265,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.007494024226896529,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 120,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 55871.160585791295,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.007069834555428029,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 121,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 59223.430220938775,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0066696552440406445,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 122,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 62776.83603419511,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.00629212753663727,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 123,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 66543.44619624682,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.005935969439340328,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 124,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 70536.05296802164,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.005599970954267342,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 125,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 74768.21614610293,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.005282991407494673,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 126,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 79254.30911486912,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.004983954115512136,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 127,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 84009.56766176126,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.004701843554823683,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 128,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 89050.14172146695,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0044357016588568235,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 129,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 94393.15022475497,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0041846242319215025,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 130,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 100056.73923824028,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.003947758516242184,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 131,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 106060.1435925347,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.003724300699217018,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 132,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 112423.7522080868,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0035134911947880655,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 133,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 119169.17734057199,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0033146142029113405,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 134,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 126319.32798100632,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.003126994587808251,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 135,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 133898.4876598667,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0029499947966501044,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 136,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 141932.3969194587,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0027830140224454855,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 137,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 150448.34073462622,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.002625485037743781,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 138,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 159475.2411787038,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.002476872581682457,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 139,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 169043.75564942608,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0023366722310484635,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 140,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 159475.2411787038,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.002476872581682457,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 141,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 150448.34073462622,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.002625485037743781,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 142,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 141932.3969194587,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0027830140224454855,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 143,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 133898.4876598667,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0029499947966501044,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 144,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 126319.32798100632,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.003126994587808251,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 145,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 119169.17734057199,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0033146142029113405,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 146,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 112423.7522080868,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0035134911947880655,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 147,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 106060.1435925347,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.003724300699217018,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 148,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 100056.73923824028,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.003947758516242184,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 149,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 94393.15022475497,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0041846242319215025,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 150,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 89050.14172146695,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0044357016588568235,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 151,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 84009.56766176126,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.004701843554823683,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 152,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 79254.30911486912,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.004983954115512136,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 153,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 74768.21614610293,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.005282991407494673,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 154,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 70536.05296802164,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.005599970954267342,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 155,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 66543.44619624682,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.005935969439340328,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 156,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 62776.83603419511,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.00629212753663727,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 157,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 59223.430220938775,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0066696552440406445,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 158,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 55871.160585791295,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.007069834555428029,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 159,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 52708.642062067265,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.007494024226896529,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 160,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 49725.13402081817,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.007943665629304333,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 161,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 46910.503793224685,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.008420286012245608,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 162,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 44255.19225775913,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.008925503375896409,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 163,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 41750.181375244465,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.009461032904547207,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 164,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 39386.963561551376,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.010028695097464492,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 165,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 37157.512793916394,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.010630417470695114,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 166,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 35054.25735275131,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.011268242060522052,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 167,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 33070.05410636916,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.011944336548242142,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 168,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 31198.164251291662,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.012660996267085224,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 169,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 29432.230425746846,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.013420656804350525,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 170,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 27766.2551186291,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.014225895878461327,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 171,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 26194.58030059349,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.015079449064789351,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 172,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 24711.868208107066,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.015984216492601438,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 173,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 23313.083215195344,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.016943269597374813,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 174,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 21993.474731316357,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0179598665045326,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 175,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 20748.561067279585,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.019037457118708724,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 176,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 19574.114214414698,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.020179704937218382,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 177,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 18466.145485296885,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.021390487246341176,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 178,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 17420.891967261214,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.022673916975238906,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 179,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 16434.803742699256,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.024034351525000674,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 180,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 15504.531832735147,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.025476413512799712,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 181,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 14626.916823335043,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.027004996983370746,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 182,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 13798.978135221738,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.028625298354385223,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 183,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 13017.903901152582,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.030342816281584927,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 184,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 12281.04141618168,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.032163384853318946,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 185,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 11585.888128473283,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.03409318808570316,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 186,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 10930.083140069135,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.036138778432884815,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 187,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 10311.399188744466,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.038307103811157664,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 188,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 9727.735083721194,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.04060552977862512,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 189,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 9177.108569548294,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.04304186351875063,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 190,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 8657.649593913486,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.045624375388515805,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 191,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 8167.593956522156,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.04836183808681683,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 192,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 7705.277317473731,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.05126354685242613,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 193,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 7269.12954478654,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.05433936091753361,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 194,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 6857.669381874093,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.057599720886271,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 195,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 6469.499416862352,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.061055703635840626,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 196,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 6103.3013366625955,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.06471904743737483,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 197,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 5757.831449681694,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.06860218833061728,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 198,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 5431.916461963862,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.07271832014942464,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 199,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 5124.4494924187375,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0770814239602893,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 200,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4834.386313602582,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.0817063063161244,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 201,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4560.741805285455,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.08660868508135625,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 202,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4302.586608759863,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.09180520779970404,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 203,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 4059.043970528172,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.09731351655873983,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 204,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3829.2867646492186,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.10315233058192215,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 205,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3612.5346836313383,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.10934146657092118,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 206,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3408.051588331451,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.11590195635351354,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 207,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3215.143007859859,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.12285607785633271,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 208,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 3033.153780999867,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.1302274439943456,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 209,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2861.46583113195,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.1380410809486731,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 210,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2699.4960671056133,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.14632355664591115,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 211,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2546.6944029298234,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.15510296118373365,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 212,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2402.541889556437,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.16440914371413898,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 213,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2266.548952411733,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.1742736910674617,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 214,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2138.253728690314,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.18473010752340407,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 215,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 2017.2204987644473,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.19581392288011382,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 216,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1903.038206381554,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.20756275393997897,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 217,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1795.3190626241073,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.2200165157416517,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 218,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1693.6972288906672,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.23321750536406263,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 219,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1597.8275744251578,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.24721057023595625,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 220,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1507.384504174677,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.2620431915700924,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 221,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1422.0608529949782,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.27776579828425485,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 222,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1341.5668424480925,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.2944317218328538,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 223,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1265.6290966491438,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.3120976239110877,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 224,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1193.989713819947,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.3308234863433776,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 225,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1126.4053903961762,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.35067290329042305,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 226,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1062.6465947133738,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.37171327493494233,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 227,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 1002.4967874654469,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.39401608440434455,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 228,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 945.7516862881574,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.417657029971525,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 229,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 892.2185719699598,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.4427164647197707,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 230,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 841.7156339339243,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.4692794478919602,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 231,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 794.071352767853,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.49743621812911987,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 232,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 749.1239177055216,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.5272824006702881,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 233,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 706.7206770806808,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.5589193598861866,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 234,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 666.7176198874348,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.5924545180640789,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 235,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 628.9788866862591,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.6280017657636149,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 236,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 593.3763081945841,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.6656818958202958,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 237,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 559.7889699948906,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.7056228148862043,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 238,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 528.1028018819723,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.7479601701807485,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 239,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 498.21019045469075,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.7928377770243014,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 240,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 470.00961363650066,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.840408017211638,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 241,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 443.40529588349125,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.8908324801112537,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 242,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 418.3068829089539,
+    "tier": "solar",
+    "level": "low",
+    "px": 0.9442824410389384,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 243,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 394.62913481976784,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.0009394288693845,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 244,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 372.2916366224225,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.0609957836482862,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 245,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 351.21852511549287,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.1246555589239322,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 246,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 331.338231241031,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.1921348434121322,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 247,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 312.58323701984057,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.2636629766736598,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 248,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 294.8898462451326,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.3394827535091274,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 249,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 278.1979681557854,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.4198516491452358,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 250,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 262.45091335451457,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.5050428350193057,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 251,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 247.5952012778439,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.5953453154292816,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 252,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 233.58037856400367,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.6910660961564918,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 253,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 220.35884770189026,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.792530033003522,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 254,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 207.88570537914174,
+    "tier": "solar",
+    "level": "low",
+    "px": 1.9000818551151772,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 255,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 196.1185899803224,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.014086818608533,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 256,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 185.01753771728528,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.1349319335442,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 257,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 174.5448469030993,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.2630277959935383,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 258,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 164.66494990858425,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.3988094748691133,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 259,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 155.3442923665889,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.542738135963501,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 260,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 146.5512192137631,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.695302469924687,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 261,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 138.25586718279538,
+    "tier": "solar",
+    "level": "low",
+    "px": 2.857020562495437,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 262,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 130.4300633799956,
+    "tier": "solar",
+    "level": "low",
+    "px": 3.0284418407013547,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 263,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 123.04722960376945,
+    "tier": "solar",
+    "level": "low",
+    "px": 3.2101481982975537,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 264,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 116.08229207902777,
+    "tier": "solar",
+    "level": "low",
+    "px": 3.402757243372887,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 265,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 109.5115963009696,
+    "tier": "solar",
+    "level": "low",
+    "px": 3.606922622506493,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 266,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 103.31282669902791,
+    "tier": "solar",
+    "level": "low",
+    "px": 3.8233379441683994,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 267,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 97.46493084813953,
+    "tier": "solar",
+    "level": "low",
+    "px": 4.052738090933548,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 268,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 91.94804796994296,
+    "tier": "solar",
+    "level": "low",
+    "px": 4.295902412039954,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 269,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 86.74344148107826,
+    "tier": "solar",
+    "level": "low",
+    "px": 4.553656876420686,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 270,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 81.83343535950779,
+    "tier": "solar",
+    "level": "low",
+    "px": 4.8268761557065325,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 271,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 77.20135411274319,
+    "tier": "solar",
+    "level": "low",
+    "px": 5.116488651596002,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 272,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 72.83146614409735,
+    "tier": "solar",
+    "level": "low",
+    "px": 5.423477995354691,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 273,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 68.70893032462013,
+    "tier": "solar",
+    "level": "low",
+    "px": 5.748886666654074,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 274,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 64.81974558926427,
+    "tier": "solar",
+    "level": "low",
+    "px": 6.09381970832665,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 275,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 61.15070338609837,
+    "tier": "solar",
+    "level": "low",
+    "px": 6.459449123486001,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 276,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 57.68934281707392,
+    "tier": "solar",
+    "level": "low",
+    "px": 6.847016118746722,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 277,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 54.42390831799427,
+    "tier": "solar",
+    "level": "low",
+    "px": 7.257837062849834,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 278,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 51.34330973395686,
+    "tier": "solar",
+    "level": "low",
+    "px": 7.693307045056994,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 279,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 48.437084654676276,
+    "tier": "solar",
+    "level": "low",
+    "px": 8.154905802231209,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 280,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 45.695362881770066,
+    "tier": "solar",
+    "level": "low",
+    "px": 8.6442002266332,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 281,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 43.10883290733025,
+    "tier": "solar",
+    "level": "low",
+    "px": 9.162852004657715,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 282,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 40.6687102899342,
+    "tier": "solar",
+    "level": "low",
+    "px": 9.712622671163606,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 283,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 38.36670782069264,
+    "tier": "solar",
+    "level": "low",
+    "px": 10.295380892866937,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 284,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 36.19500737801192,
+    "tier": "solar",
+    "level": "low",
+    "px": 10.91310349907828,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 285,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 34.14623337548294,
+    "tier": "solar",
+    "level": "low",
+    "px": 11.567889967524934,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 286,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 32.213427712719756,
+    "tier": "solar",
+    "level": "low",
+    "px": 12.261962806713857,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 287,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 30.390026144075236,
+    "tier": "solar",
+    "level": "low",
+    "px": 12.997680932253,
+    "host": false,
+    "mid": false,
+    "low": true,
+    "cloud": false,
+    "aHost": 0.002,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low"
+    ],
+    "i": 288,
+    "earthFade": false,
+    "cloudDrawn": false,
+    "cloudAfterFamily": null
+   },
+   {
+    "radius": 28.669835984976636,
+    "tier": "inner",
+    "level": "high",
+    "px": 252.588259121119,
+    "host": true,
+    "mid": false,
+    "low": true,
+    "cloud": true,
+    "aHost": 0,
+    "aMid": 0.085,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low",
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 289,
+    "earthFade": true,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "06-high-fade-cloudOn.png"
+   },
+   {
+    "radius": 481.41006749401373,
+    "tier": "inner",
+    "level": "low",
+    "px": 15.508323500204044,
+    "host": true,
+    "mid": true,
+    "low": true,
+    "cloud": true,
+    "aHost": 0.103,
+    "aMid": 1,
+    "aLow": 0,
+    "draw": [
+     "earth-lod-mid",
+     "earth-lod-low",
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 290,
+    "earthFade": true,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "07-low-fade-cloudOn.png"
+   },
+   {
+    "radius": 25.516051962421358,
+    "tier": "inner",
+    "level": "high",
+    "px": 283.80816542408934,
+    "host": true,
+    "mid": false,
+    "low": true,
+    "cloud": true,
+    "aHost": 0,
+    "aMid": 0.083,
+    "aLow": 1,
+    "draw": [
+     "earth-lod-low",
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 291,
+    "earthFade": true,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "08-high-fade-cloudOn.png"
+   },
+   {
+    "radius": 24.071747134359768,
+    "tier": "inner",
+    "level": "high",
+    "px": 300.836662570755,
+    "host": true,
+    "mid": false,
+    "low": false,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": 0.083,
+    "aLow": 0.01,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 292,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true,
+    "savedAs": "09-high-cloudOn.png"
+   },
+   {
+    "radius": 22.709195409773365,
+    "tier": "inner",
+    "level": "high",
+    "px": 318.8868487088729,
+    "host": true,
+    "mid": false,
+    "low": false,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": 0.083,
+    "aLow": 0.01,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 293,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   },
+   {
+    "radius": 21.423769254503174,
+    "tier": "inner",
+    "level": "high",
+    "px": 338.0200738582932,
+    "host": true,
+    "mid": false,
+    "low": false,
+    "cloud": true,
+    "aHost": 1,
+    "aMid": 0.083,
+    "aLow": 0.01,
+    "draw": [
+     "earth",
+     "earth-cloud"
+    ],
+    "i": 294,
+    "earthFade": false,
+    "cloudDrawn": true,
+    "cloudAfterFamily": true
+   }
+  ]
+ },
+ "consoleErrors": []
+}

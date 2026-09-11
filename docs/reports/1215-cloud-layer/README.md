@@ -53,6 +53,30 @@ ADR `20260628-756` Amendment 10 §A10.12 의 원자료다. 결정 3 (`disableDep
 | `phase1-architect-u1-opaque-fade.json`    | cross-validate U1 대안 — host 계열 불투명 강제 (`transparencyMode 0`) vs 현행 fade. earth · mars, disk 픽셀 H/M 분류 + 구름 결합 |
 | `phase1-architect-u1-determinism.json`    | U1 결정성 대조 — H · 현행 fade · 불투명 강제 fade 각 독립 2회 로드 diff (disk / 림 링 / 바깥)                                    |
 
+## Phase 1a dev 실측 (2026-09-11)
+
+구현 커밋 (`feat(core): [#1215] ... Phase 1a`) 위에서 잰 **판정용 사전 측정**이다. 가드 임계를 정하지
+않는다 — 임계는 D1 승인 파라미터로 baseline 을 다시 재는 Phase 1b 몫이다 (§A10.11). 측정 스크립트는
+실행 후 삭제했다 (volt #67).
+
+| 파일                                 | 내용                                                                                                                                                                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phase1-1a-c5-first-run.json`        | C5 첫 실행 — 정렬 키 치환 설치 / 제거 / 재설치 × LOD fade 창 정지 재현 (swiftshader, 독립 2회 로드)                                                                                                                          |
+| `phase1-1a-guards-cloud-on-off.json` | 기존 지구 가드 11 실행을 구름 ON (web 기본값) / OFF 에서 1회씩 — 판정과 핵심 값 (가드·임계 무수정)                                                                                                                           |
+| `phase1-d1-static-{off,A,B,C}.png`   | D1 후보 — 실 Chrome GUI 정지 프레임 (`?gpu=a&focus=earth&lod=auto`, JD `2451626.0`, pause). `-zoom` = 2× 확대                                                                                                                |
+| `phase1-d1-drift-jd{0,1,2}-zoom.png` | 차등 자전 재료 — 후보 B, JD 를 항성일 간격으로 3점 (표면 방위는 거의 같고 구름만 상대각만큼 이동)                                                                                                                            |
+| `phase1-d1-measurements.json`        | D1 정지·차등 캡처의 기하 · 엔진 (WebGPU 여부) · 후보별 disk 변화 px · 구름 quaternion. ⚠️ 이 파일의 `lodZoom` 은 **focus 상태**라 지구가 전 프레임 `high` 였다 (focus body 는 LOD 가 항상 high) — LOD 판정 재료로 쓰지 말 것 |
+| `phase1-d1-lod-roundtrip/*.png`      | LOD 경계 줌 왕복 (**`detachFocus()` 후**) — 지구 variant 상태가 바뀌거나 지구 fade 창인 프레임 (지구 중심 crop)                                                                                                              |
+| `phase1-d1-lod-measurements.json`    | 위 왕복의 프레임별 지구 LOD · variant 가시성/alpha · 구름 가시성 · 계열 draw 순서                                                                                                                                            |
+
+D1 후보 (런타임 주입 — 코드 기본값은 B):
+
+| 후보 | 반경비  | cover  | opacity | 결정적 프레임 림 돌출 (`98.32 px × (반경비 − 1)`) |
+| ---- | ------- | ------ | ------- | ------------------------------------------------- |
+| A    | `1.005` | `0.55` | `0.8`   | `0.49 px`                                         |
+| B    | `1.01`  | `0.5`  | `0.9`   | `0.98 px`                                         |
+| C    | `1.02`  | `0.45` | `0.95`  | `1.97 px`                                         |
+
 ## 오클루전 시나리오의 카메라가 다른 이유
 
 `verify:1202` 의 `alpha = -π/2, beta = π/2` 는 **달 궤도면을 정면(face-on)으로 보는 시점**이다.

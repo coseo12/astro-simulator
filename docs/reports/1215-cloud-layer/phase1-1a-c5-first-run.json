@@ -1,0 +1,542 @@
+{
+ "issue": 1215,
+ "phase": "1a",
+ "what": "C5 첫 실행 — 정렬 키 치환 설치 전/후 LOD fade 창 정지 재현에서 구름 복원 여부 (판정용 사전 측정, 가드 아님 — 임계 없음)",
+ "conditions": {
+  "renderer": "headless chromium --use-angle=swiftshader",
+  "query": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off",
+  "jd": 2451626,
+  "pause": true,
+  "beta": "PI/2",
+  "viewport": "1280x720 dpr1",
+  "lodOverride": "mid → waitForLodSettle",
+  "fadeFreeze": "scene.onBeforeRenderObservable 에서 host·mid 매 프레임 isVisible=true + material.alpha=0.999 (architect §A10.12 동형)",
+  "cloudOff": "earth-cloud setEnabled(false) (런타임)",
+  "sortRemoved": "scene.setRenderingOrder(0,null,null,null) 후 저장한 비교 함수로 재설치",
+  "cloudParams": "코드 기본값 (반경비 1.01 · cover 0.5 · opacity 0.9 — 임시값)"
+ },
+ "maskNote": "스크립트 1차 판본은 disk 반경을 boundingSphere.radiusWorld (Babylon 구 = AABB 반대각선 = r√3, 170.30px) 로 잡아 과대했다. 아래 corrected 는 저장된 run0 PNG 를 host 반경 98.32px (=170.30/√3) 로 재계산한 값이다. inner = r ≤ R−2, ring = R−2 < r ≤ R+4, n=29144 는 architect §A10.12 disk 표본 수와 같다.",
+ "corrected_run0": {
+  "mid정착 구름없음↔구름 (양성 대조)": {
+   "inner": 29144,
+   "innerChanged": 13239,
+   "ringChanged": 1008,
+   "outsideChanged": 0,
+   "innerMeanAbsLum": 0.02694
+  },
+  "fade정지 구름없음↔구름 [정렬 설치]": {
+   "inner": 29144,
+   "innerChanged": 13239,
+   "ringChanged": 996,
+   "outsideChanged": 0,
+   "innerMeanAbsLum": 0.02694
+  },
+  "fade정지 구름없음↔구름 [정렬 제거 = 설치 전]": {
+   "inner": 29144,
+   "innerChanged": 0,
+   "ringChanged": 665,
+   "outsideChanged": 0,
+   "innerMeanAbsLum": 0
+  },
+  "fade정지 구름없음↔구름 [재설치]": {
+   "inner": 29144,
+   "innerChanged": 13239,
+   "ringChanged": 996,
+   "outsideChanged": 0,
+   "innerMeanAbsLum": 0.02694
+  },
+  "mid정착 ↔ fade정지 (둘 다 구름없음)": {
+   "inner": 29144,
+   "innerChanged": 0,
+   "ringChanged": 707,
+   "outsideChanged": 0,
+   "innerMeanAbsLum": 0
+  }
+ },
+ "ringNote": "정렬 제거 상태의 ring 665px 는 구름 없는 두 프레임 (mid 정착 vs fade 정지) 사이에도 ring 707px 차이가 있어 shell 돌출로 귀속하지 않는다 (원인 미규명).",
+ "run1FullFrameNote": "run1 의 양성 대조 쌍 full frame 변화가 36993px (run0 14247px) — disk 밖 22746px 가 한 실행에서만 달랐다. architect §A10.12 의 불투명 강제 1차 실행 22745px 와 수가 가깝다. 원인 미규명, 원인으로 승격하지 않는다 (disk 내부 값은 두 실행 동일).",
+ "raw_runs": [
+  {
+   "run": 0,
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 811,
+    "timedOut": false
+   },
+   "settleMid": {
+    "dist": "0/32/0",
+    "fading": 0,
+    "waitedMs": 809,
+    "timedOut": false
+   },
+   "geom": {
+    "W": 1280,
+    "H": 720,
+    "cx": 640.0001525274397,
+    "cy": 360.0000001341925,
+    "R": 170.2960250990894,
+    "camDist": 36.826845601460036
+   },
+   "stateM0": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [],
+    "dist": [],
+    "cloudVisible": true,
+    "cloudEnabled": false,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "stateM1": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth-cloud"
+    ],
+    "dist": [
+     [
+      "earth-cloud",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "drawM1": [
+    "earth-lod-mid",
+    "earth-cloud"
+   ],
+   "stateF0": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": false,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "stateF1": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-cloud",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "drawF1": [
+    "earth",
+    "earth-lod-mid",
+    "earth-cloud"
+   ],
+   "stateF1u": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-cloud",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": false
+   },
+   "drawF1u": [
+    "earth",
+    "earth-cloud",
+    "earth-lod-mid"
+   ],
+   "stateF1r": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-cloud",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "drawF1r": [
+    "earth",
+    "earth-lod-mid",
+    "earth-cloud"
+   ],
+   "pairs": {
+    "mid정착 구름없음↔구름 (양성 대조)": {
+     "disk": 91096,
+     "diskChanged": 14247,
+     "full": 14247,
+     "diskMeanAbsLum": 0.00962
+    },
+    "fade정지 구름없음↔구름 [정렬 설치]": {
+     "disk": 91096,
+     "diskChanged": 14235,
+     "full": 14235,
+     "diskMeanAbsLum": 0.00948
+    },
+    "fade정지 구름없음↔구름 [정렬 제거 = 설치 전]": {
+     "disk": 91096,
+     "diskChanged": 665,
+     "full": 665,
+     "diskMeanAbsLum": 0.00068
+    },
+    "fade정지 구름없음↔구름 [재설치]": {
+     "disk": 91096,
+     "diskChanged": 14235,
+     "full": 14235,
+     "diskMeanAbsLum": 0.00948
+    },
+    "mid정착 구름 ↔ fade정지 구름 [설치]": {
+     "disk": 91096,
+     "diskChanged": 689,
+     "full": 689,
+     "diskMeanAbsLum": 0.00149
+    }
+   },
+   "consoleErrors": []
+  },
+  {
+   "run": 1,
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 812,
+    "timedOut": false
+   },
+   "settleMid": {
+    "dist": "0/32/0",
+    "fading": 0,
+    "waitedMs": 810,
+    "timedOut": false
+   },
+   "geom": {
+    "W": 1280,
+    "H": 720,
+    "cx": 640.0001525274397,
+    "cy": 360.0000001341925,
+    "R": 170.2960250990894,
+    "camDist": 36.826845601460036
+   },
+   "stateM0": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [],
+    "dist": [],
+    "cloudVisible": true,
+    "cloudEnabled": false,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "stateM1": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth-cloud"
+    ],
+    "dist": [
+     [
+      "earth-cloud",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "drawM1": [
+    "earth-lod-mid",
+    "earth-cloud"
+   ],
+   "stateF0": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": false,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "stateF1": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-cloud",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "drawF1": [
+    "earth",
+    "earth-lod-mid",
+    "earth-cloud"
+   ],
+   "stateF1u": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-cloud",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": false
+   },
+   "drawF1u": [
+    "earth",
+    "earth-cloud",
+    "earth-lod-mid"
+   ],
+   "stateF1r": {
+    "lod": {
+     "high": 0,
+     "mid": 32,
+     "low": 0,
+     "override": "mid",
+     "fading": 0
+    },
+    "queue": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ],
+    "dist": [
+     [
+      "earth",
+      36.826845601460036
+     ],
+     [
+      "earth-cloud",
+      36.826845601460036
+     ],
+     [
+      "earth-lod-mid",
+      36.826845601460036
+     ]
+    ],
+    "cloudVisible": true,
+    "cloudEnabled": true,
+    "midIndex": 90,
+    "cloudIndex": 32,
+    "sortInstalled": true
+   },
+   "drawF1r": [
+    "earth",
+    "earth-lod-mid",
+    "earth-cloud"
+   ],
+   "pairs": {
+    "mid정착 구름없음↔구름 (양성 대조)": {
+     "disk": 91096,
+     "diskChanged": 14247,
+     "full": 36993,
+     "diskMeanAbsLum": 0.00962
+    },
+    "fade정지 구름없음↔구름 [정렬 설치]": {
+     "disk": 91096,
+     "diskChanged": 14235,
+     "full": 14235,
+     "diskMeanAbsLum": 0.00948
+    },
+    "fade정지 구름없음↔구름 [정렬 제거 = 설치 전]": {
+     "disk": 91096,
+     "diskChanged": 665,
+     "full": 665,
+     "diskMeanAbsLum": 0.00068
+    },
+    "fade정지 구름없음↔구름 [재설치]": {
+     "disk": 91096,
+     "diskChanged": 14235,
+     "full": 14235,
+     "diskMeanAbsLum": 0.00948
+    },
+    "mid정착 구름 ↔ fade정지 구름 [설치]": {
+     "disk": 91096,
+     "diskChanged": 689,
+     "full": 689,
+     "diskMeanAbsLum": 0.00149
+    }
+   },
+   "consoleErrors": []
+  }
+ ]
+}
