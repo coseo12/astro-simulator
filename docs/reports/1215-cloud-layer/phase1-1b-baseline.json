@@ -1,0 +1,1129 @@
+{
+ "issue": 1215,
+ "phase": "1b",
+ "what": "verify:1215-cloud-layer baseline — D1 승인 파라미터 (후보 B) · MODE=profile 5회",
+ "conditions": {
+  "renderer": "SWIFTSHADER=1 HEADFUL=0",
+  "jd": 2451626,
+  "viewport": "1280x720"
+ },
+ "spread": {
+  "C1 day inner": {
+   "min": 0.034201,
+   "max": 0.034201,
+   "spread": 0
+  },
+  "N day inner": {
+   "min": 7225,
+   "max": 7225,
+   "spread": 0
+  },
+  "C2 n2": {
+   "min": 4225,
+   "max": 4225,
+   "spread": 0
+  },
+  "C2 clearRatio": {
+   "min": 0.55598,
+   "max": 0.55598,
+   "spread": 0
+  },
+  "lumOff": {
+   "min": 0.76919,
+   "max": 0.76919,
+   "spread": 0
+  },
+  "night C1": {
+   "min": 0.02294,
+   "max": 0.02294,
+   "spread": 0
+  },
+  "mid C1": {
+   "min": 0.019252,
+   "max": 0.019252,
+   "spread": 0
+  },
+  "fade C1": {
+   "min": 0.019252,
+   "max": 0.019252,
+   "spread": 0
+  },
+  "low disk changed": {
+   "min": 0,
+   "max": 0,
+   "spread": 0
+  },
+  "c8 disk changed": {
+   "min": 0,
+   "max": 0,
+   "spread": 0
+  },
+  "c7 disk changed": {
+   "min": 0,
+   "max": 0,
+   "spread": 0
+  }
+ },
+ "thresholds": {
+  "T_DELTA": {
+   "value": 0.0114,
+   "rule": "0.034201 / 3"
+  },
+  "T_CLEAR": {
+   "value": 0.1853,
+   "rule": "0.55598 / 3"
+  },
+  "MIN_EXPECTED": {
+   "value": 2408,
+   "rule": "floor(7225 / 3)"
+  }
+ },
+ "crashNote": "6번째 시도 1건: 동시 실행 중이던 Rust 빌드와 경합, bootstrapScene 핸들 대기 20 s 초과 예외 → exit 1 (측정값 없음, 제외)",
+ "runs": [
+  {
+   "run": 1,
+   "main": {
+    "phaseAlphaDeg": 90,
+    "geomKey": "-229.43414306640625,-8.756192207336426,-36.82684326171875,-229.43414306640625,-8.756192207336426,0.000002339741286050412,4.2523980541839705,1280,720",
+    "dayInner": {
+     "n": 7225,
+     "c1": 0.034201,
+     "lumOff": 0.76919,
+     "changed": 3330,
+     "n2": 4225,
+     "satExcluded": 3000,
+     "clearRatio": 0.55598
+    },
+    "nightInner": {
+     "n": 7225,
+     "c1": 0.02294,
+     "lumOff": 0.04971,
+     "changed": 3497,
+     "n2": 7225,
+     "satExcluded": 0,
+     "clearRatio": 0.51599
+    },
+    "disk": {
+     "n": 30768,
+     "c1": 0.032601,
+     "lumOff": 0.40005,
+     "changed": 13891,
+     "n2": 21720,
+     "satExcluded": 9048,
+     "clearRatio": 0.5564
+    },
+    "outsideChanged": 21447
+   },
+   "mid": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "fade": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "low": {
+    "disk": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.03588,
+     "changed": 0,
+     "n2": 30756,
+     "satExcluded": 12,
+     "clearRatio": 1
+    },
+    "cloudVisible": false
+   },
+   "c8": {
+    "load": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.43251,
+     "changed": 0,
+     "n2": 21643,
+     "satExcluded": 9125,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "quatJd1": [
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "c7": {
+    "load": {
+     "n": 27256,
+     "c1": 0,
+     "lumOff": 0.33362,
+     "changed": 0,
+     "n2": 19596,
+     "satExcluded": 7660,
+     "clearRatio": 1
+    },
+    "outsideChanged": 0,
+    "quatJd0": [
+     0,
+     0.7152234632788377,
+     0,
+     -0.6988958417213721
+    ],
+    "quatJd1": [
+     0,
+     0.6662825401274255,
+     0,
+     -0.7456993876364293
+    ]
+   },
+   "queueOn": {
+    "names": [
+     "earth-cloud"
+    ]
+   },
+   "queueOff": {
+    "names": []
+   },
+   "fadeQueueOn": {
+    "names": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ]
+   },
+   "settles": [
+    {
+     "page": "on",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 815,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 812,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 812,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 814,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 808,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    {
+     "page": "on2",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "rotA",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    {
+     "page": "rotB",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 1014,
+     "timedOut": false
+    }
+   ],
+   "consoleErrors": {
+    "on": [],
+    "off": [],
+    "on2": [],
+    "rotA": [],
+    "rotB": []
+   }
+  },
+  {
+   "run": 2,
+   "main": {
+    "phaseAlphaDeg": 90,
+    "geomKey": "-229.43414306640625,-8.756192207336426,-36.82684326171875,-229.43414306640625,-8.756192207336426,0.000002339741286050412,4.2523980541839705,1280,720",
+    "dayInner": {
+     "n": 7225,
+     "c1": 0.034201,
+     "lumOff": 0.76919,
+     "changed": 3330,
+     "n2": 4225,
+     "satExcluded": 3000,
+     "clearRatio": 0.55598
+    },
+    "nightInner": {
+     "n": 7225,
+     "c1": 0.02294,
+     "lumOff": 0.04971,
+     "changed": 3497,
+     "n2": 7225,
+     "satExcluded": 0,
+     "clearRatio": 0.51599
+    },
+    "disk": {
+     "n": 30768,
+     "c1": 0.032601,
+     "lumOff": 0.40005,
+     "changed": 13891,
+     "n2": 21720,
+     "satExcluded": 9048,
+     "clearRatio": 0.5564
+    },
+    "outsideChanged": 469
+   },
+   "mid": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "fade": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "low": {
+    "disk": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.03588,
+     "changed": 0,
+     "n2": 30756,
+     "satExcluded": 12,
+     "clearRatio": 1
+    },
+    "cloudVisible": false
+   },
+   "c8": {
+    "load": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.43251,
+     "changed": 0,
+     "n2": 21643,
+     "satExcluded": 9125,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "quatJd1": [
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "c7": {
+    "load": {
+     "n": 27256,
+     "c1": 0,
+     "lumOff": 0.33362,
+     "changed": 0,
+     "n2": 19596,
+     "satExcluded": 7660,
+     "clearRatio": 1
+    },
+    "outsideChanged": 0,
+    "quatJd0": [
+     0,
+     0.7152234632788377,
+     0,
+     -0.6988958417213721
+    ],
+    "quatJd1": [
+     0,
+     0.6662825401274255,
+     0,
+     -0.7456993876364293
+    ]
+   },
+   "queueOn": {
+    "names": [
+     "earth-cloud"
+    ]
+   },
+   "queueOff": {
+    "names": []
+   },
+   "fadeQueueOn": {
+    "names": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ]
+   },
+   "settles": [
+    {
+     "page": "on",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 808,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "on2",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 1023,
+     "timedOut": false
+    },
+    {
+     "page": "rotA",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    {
+     "page": "rotB",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 1013,
+     "timedOut": false
+    }
+   ],
+   "consoleErrors": {
+    "on": [],
+    "off": [],
+    "on2": [],
+    "rotA": [],
+    "rotB": []
+   }
+  },
+  {
+   "run": 3,
+   "main": {
+    "phaseAlphaDeg": 90,
+    "geomKey": "-229.43414306640625,-8.756192207336426,-36.82684326171875,-229.43414306640625,-8.756192207336426,0.000002339741286050412,4.2523980541839705,1280,720",
+    "dayInner": {
+     "n": 7225,
+     "c1": 0.034201,
+     "lumOff": 0.76919,
+     "changed": 3330,
+     "n2": 4225,
+     "satExcluded": 3000,
+     "clearRatio": 0.55598
+    },
+    "nightInner": {
+     "n": 7225,
+     "c1": 0.02294,
+     "lumOff": 0.04971,
+     "changed": 3497,
+     "n2": 7225,
+     "satExcluded": 0,
+     "clearRatio": 0.51599
+    },
+    "disk": {
+     "n": 30768,
+     "c1": 0.032601,
+     "lumOff": 0.40005,
+     "changed": 13891,
+     "n2": 21720,
+     "satExcluded": 9048,
+     "clearRatio": 0.5564
+    },
+    "outsideChanged": 15324
+   },
+   "mid": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "fade": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "low": {
+    "disk": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.03588,
+     "changed": 0,
+     "n2": 30756,
+     "satExcluded": 12,
+     "clearRatio": 1
+    },
+    "cloudVisible": false
+   },
+   "c8": {
+    "load": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.43251,
+     "changed": 0,
+     "n2": 21643,
+     "satExcluded": 9125,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "quatJd1": [
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "c7": {
+    "load": {
+     "n": 27256,
+     "c1": 0,
+     "lumOff": 0.33362,
+     "changed": 0,
+     "n2": 19596,
+     "satExcluded": 7660,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0.7152234632788377,
+     0,
+     -0.6988958417213721
+    ],
+    "quatJd1": [
+     0,
+     0.6662825401274255,
+     0,
+     -0.7456993876364293
+    ]
+   },
+   "queueOn": {
+    "names": [
+     "earth-cloud"
+    ]
+   },
+   "queueOff": {
+    "names": []
+   },
+   "fadeQueueOn": {
+    "names": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ]
+   },
+   "settles": [
+    {
+     "page": "on",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 807,
+     "timedOut": false
+    },
+    {
+     "page": "on2",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "rotA",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    {
+     "page": "rotB",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    }
+   ],
+   "consoleErrors": {
+    "on": [],
+    "off": [],
+    "on2": [],
+    "rotA": [],
+    "rotB": []
+   }
+  },
+  {
+   "run": 4,
+   "main": {
+    "phaseAlphaDeg": 90,
+    "geomKey": "-229.43414306640625,-8.756192207336426,-36.82684326171875,-229.43414306640625,-8.756192207336426,0.000002339741286050412,4.2523980541839705,1280,720",
+    "dayInner": {
+     "n": 7225,
+     "c1": 0.034201,
+     "lumOff": 0.76919,
+     "changed": 3330,
+     "n2": 4225,
+     "satExcluded": 3000,
+     "clearRatio": 0.55598
+    },
+    "nightInner": {
+     "n": 7225,
+     "c1": 0.02294,
+     "lumOff": 0.04971,
+     "changed": 3497,
+     "n2": 7225,
+     "satExcluded": 0,
+     "clearRatio": 0.51599
+    },
+    "disk": {
+     "n": 30768,
+     "c1": 0.032601,
+     "lumOff": 0.40005,
+     "changed": 13891,
+     "n2": 21720,
+     "satExcluded": 9048,
+     "clearRatio": 0.5564
+    },
+    "outsideChanged": 21447
+   },
+   "mid": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "fade": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "low": {
+    "disk": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.03588,
+     "changed": 0,
+     "n2": 30756,
+     "satExcluded": 12,
+     "clearRatio": 1
+    },
+    "cloudVisible": false
+   },
+   "c8": {
+    "load": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.43251,
+     "changed": 0,
+     "n2": 21643,
+     "satExcluded": 9125,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "quatJd1": [
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "c7": {
+    "load": {
+     "n": 27256,
+     "c1": 0,
+     "lumOff": 0.33362,
+     "changed": 0,
+     "n2": 19596,
+     "satExcluded": 7660,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0.7152234632788377,
+     0,
+     -0.6988958417213721
+    ],
+    "quatJd1": [
+     0,
+     0.6662825401274255,
+     0,
+     -0.7456993876364293
+    ]
+   },
+   "queueOn": {
+    "names": [
+     "earth-cloud"
+    ]
+   },
+   "queueOff": {
+    "names": []
+   },
+   "fadeQueueOn": {
+    "names": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ]
+   },
+   "settles": [
+    {
+     "page": "on",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 812,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "on2",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    {
+     "page": "rotA",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 1223,
+     "timedOut": false
+    },
+    {
+     "page": "rotB",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 1011,
+     "timedOut": false
+    }
+   ],
+   "consoleErrors": {
+    "on": [],
+    "off": [],
+    "on2": [],
+    "rotA": [],
+    "rotB": []
+   }
+  },
+  {
+   "run": 5,
+   "main": {
+    "phaseAlphaDeg": 90,
+    "geomKey": "-229.43414306640625,-8.756192207336426,-36.82684326171875,-229.43414306640625,-8.756192207336426,0.000002339741286050412,4.2523980541839705,1280,720",
+    "dayInner": {
+     "n": 7225,
+     "c1": 0.034201,
+     "lumOff": 0.76919,
+     "changed": 3330,
+     "n2": 4225,
+     "satExcluded": 3000,
+     "clearRatio": 0.55598
+    },
+    "nightInner": {
+     "n": 7225,
+     "c1": 0.02294,
+     "lumOff": 0.04971,
+     "changed": 3497,
+     "n2": 7225,
+     "satExcluded": 0,
+     "clearRatio": 0.51599
+    },
+    "disk": {
+     "n": 30768,
+     "c1": 0.032601,
+     "lumOff": 0.40005,
+     "changed": 13891,
+     "n2": 21720,
+     "satExcluded": 9048,
+     "clearRatio": 0.5564
+    },
+    "outsideChanged": 23214
+   },
+   "mid": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "fade": {
+    "n": 7225,
+    "c1": 0.019252,
+    "lumOff": 0.88277,
+    "changed": 3298,
+    "n2": 1109,
+    "satExcluded": 6116,
+    "clearRatio": 0.5284
+   },
+   "low": {
+    "disk": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.03588,
+     "changed": 0,
+     "n2": 30756,
+     "satExcluded": 12,
+     "clearRatio": 1
+    },
+    "cloudVisible": false
+   },
+   "c8": {
+    "load": {
+     "n": 30768,
+     "c1": 0,
+     "lumOff": 0.43251,
+     "changed": 0,
+     "n2": 21643,
+     "satExcluded": 9125,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "quatJd1": [
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "c7": {
+    "load": {
+     "n": 27256,
+     "c1": 0,
+     "lumOff": 0.33362,
+     "changed": 0,
+     "n2": 19596,
+     "satExcluded": 7660,
+     "clearRatio": 1
+    },
+    "outsideChanged": 22745,
+    "quatJd0": [
+     0,
+     0.7152234632788377,
+     0,
+     -0.6988958417213721
+    ],
+    "quatJd1": [
+     0,
+     0.6662825401274255,
+     0,
+     -0.7456993876364293
+    ]
+   },
+   "queueOn": {
+    "names": [
+     "earth-cloud"
+    ]
+   },
+   "queueOff": {
+    "names": []
+   },
+   "fadeQueueOn": {
+    "names": [
+     "earth",
+     "earth-cloud",
+     "earth-lod-mid"
+    ]
+   },
+   "settles": [
+    {
+     "page": "on",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 817,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 808,
+     "timedOut": false
+    },
+    {
+     "page": "on",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "mid",
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 808,
+     "timedOut": false
+    },
+    {
+     "page": "off",
+     "step": "low",
+     "dist": "0/1/31",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "on2",
+     "step": "boot",
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    {
+     "page": "rotA",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    {
+     "page": "rotB",
+     "step": "boot",
+     "dist": "6/8/18",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    }
+   ],
+   "consoleErrors": {
+    "on": [],
+    "off": [],
+    "on2": [],
+    "rotA": [],
+    "rotB": []
+   }
+  }
+ ]
+}

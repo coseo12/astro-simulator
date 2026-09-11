@@ -2083,6 +2083,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
   2. **rendering 시점 분리** — physics 엔진 (Rust/wasm) 은 구름 mesh·상수를 참조하지 않는다 (scene 전용 mesh).
   3. **사용자 D-T2 가이드** — UI overlay (focus · Info 패널) 는 구름 고도를 표기하지 않는다. 표기를 도입한다면 실측 고도로 하고 반경비 파생값을 쓰지 않는다.
   4. **baseline 박제** — D1 승인 반경비에서 결정적 프레임의 림 돌출 px (`disk 반경 × (반경비 − 1)`) 를 본 ADR 에 박제한다 (dev · D1 시점). 참고 [도출]: 프로토 `1.02` 는 `98.3 × 0.02 ≈ 2.0 px`.
+     > ⏩ **박제 (2026-09-11, D1 사용자 승인 — #1215 코멘트 `5632521560`)**: 반경비 **`1.01`** (후보 B · `CLOUD_SHELL_RADIUS_RATIO`). 결정적 프레임 (`verify:1202` 레시피 — `?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off` · JD `2451626.0` · `beta = π/2` · 1280×720) 의 host disk 반경 `98.32 px` [실측 — `verify:1202` 인쇄] → disk 지름 `196.64 px`, 구름 shell 반경 `99.30 px`, **림 돌출 `0.98 px`** [도출 `98.32 × 0.01`]. 물리 비율 `≈ 1.0016` 이면 `0.16 px` 라 보이지 않는다 — 과장 배수 약 `6.2` 배 (`0.01 / 0.0016`). 차등 속도는 과장하지 않았다 (D1 — 풍속 `10 m/s` 유지, 배수 없음) 이므로 §A10.8 의 두 번째 체크리스트는 **발동하지 않았다**. 후보 비교 원자료: [`docs/reports/1215-cloud-layer/`](../reports/1215-cloud-layer/) `phase1-d1-*`.
 - ⚠️ 차등 속도 과장 (§A10.8) 도 같은 체크리스트 대상이다 — 두 왜곡은 **각각** 박제한다.
 
 ### A10.4 결정 2 — 재질: ALPHABLEND `ShaderMaterial` · `backFaceCulling = true` · log-depth · 조명 재사용
@@ -2193,6 +2194,8 @@ Phase 0 는 이 축을 「열리지 않았다」로 유보했다. 본 설계에�
 [#1214](https://github.com/coseo12/astro-simulator/issues/1214) fail-open 시그니처 5종을 전부 적용한다. 헬퍼는 새로 만들지 않는다 — `launchBrowser` / `bootstrapScene` / `collectConsoleErrors` / `waitForLodSettle` / `hasSimErrors` / `withBrowser` (`scripts/browser-verify-utils.mjs`).
 
 **프레임** — `verify:1202` 와 같은 결정적 조건 (`?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off` · JD `2451626.0` · pause · `beta = π/2` · `waitForLodSettle`). ON = 기본, OFF = `&clouds=off`. 픽셀 영역은 `verify:1202` 의 ray-sphere 역투영, 대역은 **낮면 내부** (`ndv ≥ INNER_NDV_MIN (0.6)` ∧ `ndl ≥ DAY_NDL_MIN (0.15)` — 1202 정의 재사용, 새 대역 상수 `0`). 밤면은 구름도 어두워 「변화 없음」과 섞이므로 제외한다.
+
+> ⏩ **결과 (2026-09-11, #1215 Phase 1b — dev 실측)**: 위 제외 근거 문장은 **반증됐다** — D1 캡처에서 밤면 구름이 ambient 조명으로 밝은 회색으로 보이고 사용자가 그 밝기를 유지로 결정했다 (#1215 코멘트 `5632521560`). 그래서 대역을 미리 정하지 않고 D1 승인 파라미터의 baseline 으로 다시 판단했고 **낮면 내부를 유지**한다 [실측, swiftshader 5회 산포 `0`]: 낮면 내부 `N 7225` · C1 량 `0.034201` · OFF 채널 `255` 포화 `3000` 제외 후 C2 표본 `4225` · 맑은 하늘 비율 `0.55598` / 밤면 내부 `N 7225` · C1 량 `0.02294` · 포화 `0` · 비율 `0.51599`. 포화 제외 후에도 C2 표본이 하한 위이고 C1 량은 낮면이 더 크다 — 대역을 옮겨 얻는 판별력이 없다. 도출 임계: `T_DELTA 0.0114` (`0.034201 ÷ 3`) · `T_CLEAR 0.1853` (`0.55598 ÷ 3`) · `MIN_EXPECTED 2408` (`⌊7225 ÷ 3⌋`). 원문은 소급 수정하지 않는다 (근거 문장만 교체 기록).
 
 | # | 술어 | 겨냥 | 위배 시 |
 | --- | --- | --- | --- |
