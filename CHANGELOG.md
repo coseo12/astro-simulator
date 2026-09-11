@@ -14,7 +14,7 @@ Semantic Versioning을 따른다.
   - **LOD** — 구름 가시성은 rim 을 싣는 high / mid variant 가시성에서 파생 — low 에서 rim 과 같은 프레임에 사라진다 (§A10.7, 프레임 위상 — #1205 클래스 회피).
   - **차등 자전** — 구름 상대각 `((jd − epoch) × CLOUD_DRIFT_OMEGA) mod 2π` (jd 순수 함수 — `self-rotation.ts` `computeSpinAngle` 을 host 와 공유, 값 불변 추출). `CLOUD_ZONAL_WIND_MS = 10 m/s` — 출처 Wallace, UW ATM S 545 Ch.2 (중위도 경압파 위상속도 `10-15 m s⁻¹` 의 하한). `?rotate=off` 에서 identity (구조적 상속).
   - **`?clouds=off`** 옵트아웃 (`parse-cloud-mode.ts`). 유효 조건 `clouds && surfaceDetail` — 비활성이면 mesh 미생성 + 정렬 함수 미설치로 구름 도입 전과 **같은 코드 경로**.
-- **신규 가드 `verify:1215-cloud-layer`** (`shader-pixel-guard.yml`, 1202 다음 step) — C1~C8 + 「측정 불가」 7전제 (`exit 2`, fallback 금지, measure `error` 를 모든 게이트보다 먼저). [#1214](https://github.com/coseo12/astro-simulator/issues/1214) fail-open 시그니처 5종 적용. 임계는 D1 승인 파라미터 · swiftshader · 5회 (판정량 전 항목 동일 — 산포 `0`) 에서 baseline ÷ 3 으로 도출 (각 임계 주석에 baseline 값 + 규칙).
+- **신규 가드 `verify:1215-cloud-layer`** (`shader-pixel-guard.yml`, 1202 다음 step) — `C1~C8` + 「측정 불가」 8전제 (`exit 2`, fallback 금지, measure `error` 를 모든 게이트보다 먼저). 전제 2 · 3 은 판정에 쓰이는 **모든 쌍**에 건다 (low 는 2 만 — billboard 라 설계상 어둡다). [#1214](https://github.com/coseo12/astro-simulator/issues/1214) fail-open 시그니처 대응은 **실행으로 실증된 범위만** 적는다 — 빈 표본 (rotate ON 지구 scaling `0` · 카메라 이탈) · 비유한 기하 (NaN quaternion) · settle timeout · fade 조건 미형성이 전부 `exit 2` 로 떨어진다 (PR 반려 라운드 — 첫 판본은 전제가 주 쌍에만 걸려 빈 표본에서 `exit 0` 이었다). 임계는 D1 승인 파라미터 · **로컬** swiftshader 5회 (판정량 전 항목 동일 — 산포 `0`) 에서 baseline ÷ 3 으로 도출 (각 임계 주석에 baseline 값 + 규칙). CI 렌더러와는 소수 `4~5` 자리 차이 (예: C1 `0.034201` vs `0.034194`) 로 임계와 멀다.
 
 ### Behavior Changes
 
@@ -80,7 +80,7 @@ Semantic Versioning을 따른다.
 - **Visual Fidelity** — 반경비 `1.01` 은 rendering 왜곡 (물리 `≈ 1.0016` 의 약 `6.2` 배, 결정적 프레임 림 돌출 `0.98 px`). 데이터 SSoT 변경 `0`, physics 비참조. ADR §A10.3 체크리스트에 박제.
 - **신규 가드 대역** — §A10.11 은 대역을 낮면 내부로 잡으며 「밤면은 구름도 어두워 변화 없음과 섞인다」를 근거로 댔으나 D1 캡처에서 **그 근거 문장은 반증**됐다 (밤면 구름이 밝은 회색으로 보인다). 대역은 baseline 실측으로 다시 판단했다: **낮면 내부 유지** [실측] — 포화 `3000` 제외 후 C2 표본 `4225` 가 하한 `2408` 위이고, C1 량이 밤면 내부 (`0.02294`) 보다 낮면 내부 (`0.034201`) 가 크다. 대역을 옮겨 얻는 판별력이 없어 옮기지 않았다 (ADR §A10.11 dated 기록).
 - 기존 injector 의 주입 대상 — `verify:1202` `injectFloats` 를 host · LOD variant 로 명시 한정했다 (`getChildMeshes()` 가 구름 shell 까지 돌려줘 구름 ON 에서 「패치 개수」가 달라졌다 — 무해하나 진단이 섞인다). `verify:783` · `verify:1119` 의 같은 순회는 판정에 영향이 없어 **이 PR 에서 건드리지 않았다** (구름 셰이더에 해당 uniform 이 없다).
-- 변이 3단 실증 (원본 PASS · 변이 FAIL · 원복 PASS) — 14 변이 중 13 FAIL · 원복 전건 PASS. **MC-3 (내부 `rotationStates.has` 게이트 삭제) 은 미검출 — 등가 변이**다 (호출이 외곽 `rotationStates.size > 0` 블록 안이라 rotate=off 에서 블록째 건너뛴다). 외곽까지 연 보충 MC-3′ 가 C8a 단독 FAIL. **MC-1 (바인딩 삭제) 상태에서 core 단위 1104 건 전건 통과** — 픽셀 게이트 C1 만 잡는다. 가드 개발 중 C8b 기준 프레임이 런타임 주입 뒤였던 결함을 1차 실행이 드러내 고쳤다 (MC-6 · MC-9 가 C8b 까지 FAIL). 원자료 `docs/reports/1215-cloud-layer/phase1-1b-mc-mutations.json`.
+- 변이 3단 실증 (원본 PASS · 변이 FAIL · 원복 PASS) — 반려 라운드 재실행 기준 — MC 계열 14건: **FAIL 11** · **측정 불가 (exit 2) 2** (MC-10 은 설계대로 전제 5 · MC-9 는 전제 8 이 C3 FAIL 보다 먼저 발화) · **미검출 1** (MC-3) · 원복 전건 PASS. 반려 대응 변이 6건 (빈 표본 · NaN 기하 · 카메라 이탈 · fade 조건 미형성 · settle timeout · `verify:1202` ON 페이지 구름 부재) 은 전건 **측정 불가 (exit 2)**. exit 2 는 PASS 도 FAIL 도 아니며 CI 를 막는다. **MC-3 (내부 `rotationStates.has` 게이트 삭제) 은 미검출 — 등가 변이**다 (호출이 외곽 `rotationStates.size > 0` 블록 안이라 rotate=off 에서 블록째 건너뛴다). 외곽까지 연 보충 MC-3′ 가 C8a 단독 FAIL. **MC-1 (바인딩 삭제) 상태에서 core 단위 1104 건 전건 통과** — 픽셀 게이트 C1 만 잡는다. 가드 개발 중 C8b 기준 프레임이 런타임 주입 뒤였던 결함을 1차 실행이 드러내 고쳤다 (MC-6 · MC-9 가 C8b 까지 FAIL). 원자료 `docs/reports/1215-cloud-layer/phase1-1b-mc-mutations.json`.
 
 ## [0.87.0] - 2026-09-08
 

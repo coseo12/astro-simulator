@@ -54,7 +54,7 @@
   }
  },
  "ringNote": "정렬 제거 상태의 ring 665px 는 구름 없는 두 프레임 (mid 정착 vs fade 정지) 사이에도 ring 707px 차이가 있어 shell 돌출로 귀속하지 않는다 (원인 미규명).",
- "run1FullFrameNote": "run1 의 양성 대조 쌍 full frame 변화가 36993px (run0 14247px) — disk 밖 22746px 가 한 실행에서만 달랐다. architect §A10.12 의 불투명 강제 1차 실행 22745px 와 수가 가깝다. 원인 미규명, 원인으로 승격하지 않는다 (disk 내부 값은 두 실행 동일).",
+ "run1FullFrameNote": "run1 의 양성 대조 쌍에서만 disk 밖 픽셀 일부가 달랐다 (disk 내부 값은 두 실행 동일) — 로드 간 비결정, 원인 미규명. 실행마다 개수가 달라 수치는 적지 않는다 (원 개수는 raw_runs[].pairs 에 있다).",
  "raw_runs": [
   {
    "run": 0,
