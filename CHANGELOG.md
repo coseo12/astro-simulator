@@ -5,6 +5,41 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1219] `verify:675-glow-marker` 가 천체가 아니라 HUD 글자를 세고 있었다** ([#1219](https://github.com/coseo12/astro-simulator/issues/1219)) — 같은 커밋이 40 AU 증가분 경계에서 두 번 갈렸다 (2026-08-23 PR [#1145](https://github.com/coseo12/astro-simulator/pull/1145) · 2026-09-12 PR [#1218](https://github.com/coseo12/astro-simulator/pull/1218), 둘 다 `+9` < `+10` → rerun 통과). 앱 diff `0` 행이라 회귀가 아니라 **판정량의 산포**였고, 측정 우선 순서 **(0) 측정 방법**에서 원인이 **둘** 나왔다.
+
+  - **(a) DOM HUD 오버레이 혼입** — `canvas.screenshot()` 은 element 의 **화면 영역**을 찍으므로 캔버스 위에 겹친 DOM (TimeBar 배속 버튼 · TopBar · HUD 코너) 의 **글자 글리프가 luminance cluster 로 세어진다**. [실측] `?marker=off` 40 AU 카운트가 `131~134` → **DOM 숨김만 추가하면 `2` 고정**. 세던 것의 거의 전부가 UI 텍스트였고, 글리프가 page load 마다 갈려 (`1M` 이 1 cluster 이기도 2 cluster 이기도) ±2 이봉을 만들었다. 같은 페이지 안 3회 재캡처는 항상 동일 — **프레임 축이 아니라 page load 축**이다.
+  - **(b) sim 시각 진행** — 기본 배율 `86_400` + pause 부재라 로드·대기 편차가 궤도 위상 편차로 번역된다. 항목 5 주석이 2026-06-13 에 관측해 둔 축이다.
+
+  대응은 항목 **1·5 의 측정 경로**에만 건다: 캔버스 외 DOM 숨김 (`visibility` — 레이아웃 무변경) + `T_JD = 2451626.0` 고정 + `pause` + `waitForLodSettle`(상수 대기가 아니라 정착 확인, `timedOut` 은 새 항목 0 에서 **FAIL** — fail-open 회피). **임계 `EXPECTED_DELTA` 는 `0` 행 변경**이고 판정 항목 2~6 의 술어도 무접촉이며, **항목 6 (#677 race 가드) 에는 결정적 조건을 걸지 않았다** (그 블록은 비결정 구간을 의도적으로 재현한다).
+
+  ⚠️ **`#1146` 이 `verify:756-surface` 에서 확정한 자전 위상 축은 여기서는 아니다.** [실측] `?rotate=off` **단독** N=10 은 산포를 못 줄였다 (착수 전 판본과 같은 `off` 40 AU distinct `4`). JD 고정 뒤에는 자전각도 jd 순수 함수라 이미 고정되므로 `?rotate=off`·`?orbits=off` 는 **넣지 않았다** — 추가판과 본 판의 6 계열이 바이트 동일이다.
+
+  [실측] N=10 (macOS 26.6.2 · Apple M1 Pro · Playwright headless chromium · `next dev` · 1280×720) — `default`·`glow`·`off` × 40/100 AU **6 계열 전부 `distinct == 1`**. 증가분 40 AU `+11` (기준 `+10`) / 100 AU `+14` (기준 `+11`). 착수 전 판본의 같은 표본은 `off` 40 AU `131~134` (distinct 4) · 증가분 `+12~+15` 였다.
+
+  ⚠️ **산포를 줄이는 것이 신호를 같이 줄이면 본말전도다** ([#1123](https://github.com/coseo12/astro-simulator/issues/1123) 클래스). 변이 3단 실증 [실측]:
+
+  | 판                    | 변이                                     | 결과                                                                                 |
+  | --------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
+  | 본 판                 | (없음 — 원본)                            | `exit 0` · 전 항목 PASS · 40 AU `+11` / 100 AU `+14`                                 |
+  | 본 판                 | **M1 전면** — `resolveGlowMarker` 무력화 | **`exit 1`** · 항목 1·4·5 FAIL · 40 AU `+0` / 100 AU `+0`                            |
+  | 본 판                 | **M2-a 부분** — 32 body 중 3 (바깥 행성) | **`exit 1`** · 항목 4 FAIL (항목 1 은 `+13` 로 PASS)                                 |
+  | 착수 전 판본 (대조군) | M2-a 동일                                | **`exit 1`** · **같은 항목 4 만 FAIL** (항목 1 `+14` PASS)                           |
+  | 본 판                 | **M2-b 부분** — 32 body 중 5 (왜소행성)  | **`exit 1`** · **항목 1 이 40·100 AU 양쪽 FAIL** (`+9`/`+9`)                         |
+  | 착수 전 판본 (대조군) | M2-b 동일 (**N=3**)                      | `exit 1` · 40 AU 판정이 **런마다 뒤집힌다** — `+9`(FAIL) / `+10`(PASS) / `+10`(PASS) |
+  | 본 판                 | (원복)                                   | `exit 0` · 전 항목 PASS                                                              |
+
+  대조군 두 행이 본 계약의 핵심이다 — **결정화는 판별력을 깎지 않았고 M2-b 에서는 오히려 늘렸다**. 착수 전 판본은 같은 회귀에서 **40 AU 판정이 런마다 뒤집힌다** (독립 재현 3회 중 2회 통과). 본 판은 `+9`/`+9` 로 **결정적으로 FAIL** 한다 — 즉 차이는 「잡느냐 못 잡느냐」가 아니라 **「잡는 것이 재현되느냐」**다. 반대로 **M2-a 를 항목 1 이 못 잡는 것은 결정화 탓이 아니다** (대조군도 동일) — luminance cluster 계수는 marker 수에 **단조가 아니다**. 4.5px marker 가 이웃을 하나로 잇고 있어서, 그 marker 를 지우면 묶여 있던 클러스터가 갈라져 카운트가 **오른다** (M2-a 에서 `14 → 16`). 이 비단조성은 본 PR 이 만든 것이 아니라 판정량의 성질이고, 그 구멍을 항목 4 (전수 발동) 가 메운다.
+
+  수치 정본은 이슈 [#1219](https://github.com/coseo12/astro-simulator/issues/1219) 코멘트다 — CI Actions 로그는 만료된다 (ADR [`20260814-1040`](docs/decisions/20260814-1040-changelog-tilde-recovery.md)).
+
+### Behavior Changes
+
+- **`verify:675-glow-marker` 의 식별 천체 카운트 절대값이 달라진다** — DOM HUD 를 빼고 세므로 `40 AU default` 가 `145~148` → `14` 수준이 된다. **판정식·임계는 무변경**이고 증가분(`default − off`)만이 판정량이라 게이트 의미는 그대로다.
+- **새 판정 항목 0 (LOD 정착)** 이 추가됐다 — `waitForLodSettle` 이 `timedOut` 인 표본이 하나라도 있으면 FAIL. 기존 항목은 늘지도 줄지도 않았다.
+- `CAPTURE_DIR` 로 저장되는 PNG 에 HUD 가 더 이상 찍히지 않는다.
+
 ## [0.88.0] - 2026-09-12
 
 ### Added
