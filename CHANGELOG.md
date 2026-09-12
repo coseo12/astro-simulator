@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.88.1] - 2026-09-13
+
 ### Fixed
 
 - **[#1219] `verify:675-glow-marker` 가 천체가 아니라 HUD 글자를 세고 있었다** ([#1219](https://github.com/coseo12/astro-simulator/issues/1219)) — 같은 커밋이 40 AU 증가분 경계에서 두 번 갈렸다 (2026-08-23 PR [#1145](https://github.com/coseo12/astro-simulator/pull/1145) · 2026-09-12 PR [#1218](https://github.com/coseo12/astro-simulator/pull/1218), 둘 다 `+9` < `+10` → rerun 통과). 앱 diff `0` 행이라 회귀가 아니라 **판정량의 산포**였고, 측정 우선 순서 **(0) 측정 방법**에서 원인이 **둘** 나왔다.
