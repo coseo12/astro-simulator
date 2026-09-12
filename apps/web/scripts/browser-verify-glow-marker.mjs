@@ -26,11 +26,46 @@
  *
  * dev 빌드 의존: `window.__solarScene` / `window.__simStore` / `window.__simCore` (sim-canvas.tsx).
  * `?gpu=a` 고정 — headless GPU adapter 부재 시 tier-c LOD low 아티팩트 함정 회피 (R7 선례).
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * #1219 — 항목 1·5 의 **측정 경로** 결정화 (임계 `EXPECTED_DELTA` 는 무변경).
+ *
+ * 2026-08-23 (PR #1145) 과 2026-09-12 (PR #1218) 에 같은 커밋이 40 AU 증가분 경계에서 갈렸다
+ * (`+9` < `+10` → rerun 통과). 앱 diff `0` 행이라 회귀가 아니라 **판정량의 산포**였다.
+ *
+ * [실측] 착수 시점 판본 (`cb96191`) 을 로컬에서 N=10 반복해 축을 단독 개입으로 갈랐다
+ * (macOS 26.6.2 · Apple M1 Pro · Playwright headless chromium · `next dev` · 1280×720).
+ * 원인은 **둘**이고, `#1146` 이 `verify:756-surface` 에서 확정한 자전 위상 축은 **여기서는 아니다**:
+ *
+ *   (a) **DOM HUD 오버레이가 판정량에 섞여 있었다** — `canvas.screenshot()` 은 element **영역**을
+ *       캡처하므로 캔버스 위에 겹친 DOM (TimeBar 배속 버튼 · TopBar · HUD 코너) 의 **글자 글리프가
+ *       luminance cluster 로 세어진다**. 단독 개입 실측: `?marker=off` 40 AU 카운트가 착수 전 판본
+ *       `131~134` → **DOM 숨김만 추가하면 `2` 고정**. 즉 세던 것의 거의 전부가 UI 텍스트였다.
+ *       글리프가 page load 마다 갈려 (`1M` 이 1 cluster 이기도 2 cluster 이기도) ±2 이봉을 만든다 —
+ *       같은 페이지 안에서 3회 재캡처하면 항상 동일하므로 프레임 축이 아니라 **page load 축**이다.
+ *   (b) **sim 시각이 계속 흐른다** — 기본 배율 `86_400` (초당 1일) + pause 부재라 로드·대기 편차가
+ *       궤도 위상 편차로 번역된다. 항목 5 주석이 2026-06-13 에 이미 관측해 둔 축이다.
+ *
+ * 대응: (a) 캡처 직전 캔버스 외 DOM 숨김 (`hideDomOverlays`) / (b) `T_JD` 고정 + `pause` +
+ * `waitForLodSettle` (상수 대기가 아니라 정착 확인). `?rotate=off` · `?orbits=off` 는 **넣지 않았다**
+ * — 단독 개입 N=10 에서 `rotate=off` 는 산포를 못 줄였고 (base 와 동일), JD 고정 뒤에는 자전각도
+ * jd 순수 함수라 이미 고정된다. 실측상 `rotate/orbits` 추가판과 본 판의 6 계열이 **바이트 동일**이다.
+ *
+ * [실측] N=10 × 6 계열 (`default`·`glow`·`off` × 40/100 AU) 전부 `distinct == 1`:
+ *   40 AU `default 14` / `glow 14` / `off 3` → 증가분 `+11` (기준 `+10`)
+ *   100 AU `default 15` / `glow 15` / `off 1` → 증가분 `+14` (기준 `+11`)
+ * 착수 전 판본의 같은 표본은 `off` 40 AU `131~134` (distinct 4) · 증가분 `+12~+15` 였다.
+ * 수치 정본은 이슈 [#1219](https://github.com/coseo12/astro-simulator/issues/1219) 코멘트
+ * (CI Actions 로그는 만료된다 — ADR `20260814-1040`).
+ *
+ * ⚠️ **항목 6 (#677 race 가드) 에는 이 결정적 조건을 걸지 않는다** — 그 블록은 `?gpu=a`·`?lod`
+ * 미부여와 `requestAdapter` 폴링 게이트로 **비결정 구간을 의도적으로 재현**한다 (아래 항목 6 주석).
+ * ──────────────────────────────────────────────────────────────────────────────
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
+import { withBrowser, waitForLodSettle } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? '';
@@ -38,6 +73,10 @@ const CAPTURE_DIR = process.env.CAPTURE_DIR ?? '';
 const VIEWPORT = { width: 1280, height: 720 };
 const POST_INIT_WAIT_MS = 1500;
 const POST_CAMERA_WAIT_MS = 1000;
+/** #1219 — JD 고정 + pause command 반영 대기 (`1202` setupPage 와 같은 값). */
+const POST_JD_WAIT_MS = 1000;
+/** #1219 — DOM 숨김 스타일 적용 후 다음 페인트 여유. */
+const POST_HIDE_WAIT_MS = 200;
 const AU_METERS = 1.495978707e11;
 
 /** 프리뷰 실측 기준 (2026-06-12) — 식별 천체 증가분 하한. ADR §축 6 박제값. */
@@ -48,6 +87,12 @@ const EXPECTED_DELTA = [
 
 /** luminance cluster 식별 임계 (0~255). glow marker 피크 휘도 173~252 (프리뷰 실측) ≫ 40. */
 const LUMINANCE_THRESHOLD = 40;
+
+/**
+ * #1219 — 결정성 앵커 JD. 저장소 공용 상수 (`783` / `1119` / `1202` / `1215` 와 동일 값).
+ * 통과하는 값으로 고른 것이 아니라 **이미 쓰이던 앵커를 그대로 채택**했다 (C1 클래스 회피).
+ */
+const T_JD = 2451626.0;
 
 function buildUrl(query) {
   const sep = BASE_URL.includes('?') ? '&' : '?';
@@ -66,7 +111,31 @@ async function openSim(browser, query) {
     { timeout: 30_000 },
   );
   await page.waitForTimeout(POST_INIT_WAIT_MS);
+  // #1219 (b) — sim 시각 고정. 기본 배율 86_400 + pause 부재면 로드·대기 편차가 그대로 궤도 위상
+  // 편차가 된다. `1202` / `1215` 의 결정적 부트스트랩 레시피와 같은 2 command.
+  await page.evaluate((jd) => {
+    window.__simCore.command({ type: 'jumpToJulianDate', julianDate: jd });
+    window.__simCore.command({ type: 'pause' });
+  }, T_JD);
+  await page.waitForTimeout(POST_JD_WAIT_MS);
+  // #1219 (a) — 캔버스 위 DOM 오버레이 숨김. 이걸 안 하면 판정량의 97% 가 UI 글리프다.
+  await hideDomOverlays(page);
   return { context, page };
+}
+
+/**
+ * #1219 (a) — 캔버스 외 DOM 을 `visibility: hidden` 으로 숨긴다.
+ *
+ * `canvas.screenshot()` (Playwright element 캡처) 는 **element 의 화면 영역**을 찍으므로 그 위에
+ * 겹친 DOM (TopBar · TimeBar · HUD 코너) 이 함께 찍힌다. 즉 luminance cluster 계수가 천체가 아니라
+ * UI 텍스트를 세고 있었다 (실측 `136` → `3`). `visibility` 는 레이아웃을 바꾸지 않아 캔버스 크기·
+ * 렌더링 경로에 영향이 없다 (`display:none` 이었다면 캔버스 리사이즈를 유발한다).
+ */
+async function hideDomOverlays(page) {
+  await page.addStyleTag({
+    content: 'body * { visibility: hidden !important; } canvas { visibility: visible !important; }',
+  });
+  await page.waitForTimeout(POST_HIDE_WAIT_MS);
 }
 
 /**
@@ -220,6 +289,7 @@ async function main() {
     };
     const counts = {}; // counts[mode][au]
     const lowStates = {}; // lowStates[mode][au]
+    const settleTimeouts = []; // #1219 — LOD 정착 결과. timedOut 표본이 있으면 아래 항목 0) 에서 FAIL
 
     for (const [mode, query] of Object.entries(modes)) {
       counts[mode] = {};
@@ -228,14 +298,34 @@ async function main() {
       await disableOrbitLines(page);
       for (const { au } of EXPECTED_DELTA) {
         const actualAu = await setCameraAu(page, au);
+        // #1219 — 상수 대기 대신 LOD 정착 확인 (cross-fade 진행 중 캡처 차단).
+        // timedOut 은 **PASS 로 흡수하지 않는다** — 정착 실패를 통과로 세면 fail-open 이다.
+        const settle = await waitForLodSettle(page);
+        settleTimeouts.push({ mode, au, settle });
         const captureName = `675-glow-${au}au-${mode}`;
         counts[mode][au] = await countIdentifiableBodies(page, captureName);
         lowStates[mode][au] = await collectLowVariantState(page);
         console.log(
-          `   [측정] mode=${mode.padEnd(7)} ${au} AU (실측 ${actualAu.toFixed(1)} AU) → 식별 천체 ${counts[mode][au]}`,
+          `   [측정] mode=${mode.padEnd(7)} ${au} AU (실측 ${actualAu.toFixed(1)} AU) → 식별 천체 ${counts[mode][au]} (LOD ${settle.dist}, ${settle.waitedMs}ms${settle.timedOut ? ' TIMEOUT' : ''})`,
         );
       }
       await context.close();
+    }
+
+    // 0) #1219 — 측정 전제. LOD 정착 실패 표본이 하나라도 있으면 아래 카운트 비교는 의미가 없다.
+    //    측정 실패를 통과로 읽지 않기 위해 판정 앞에 세운다 (#1201 fail-open 시그니처 회피).
+    console.log('\n0) 측정 전제 — 캡처 시점 LOD 정착 (cross-fade 종료 + 분포 안정)\n');
+    {
+      const timedOut = settleTimeouts.filter((s) => s.settle.timedOut);
+      check(
+        `LOD 정착 표본 ${settleTimeouts.length - timedOut.length}/${settleTimeouts.length}`,
+        timedOut.length === 0,
+        timedOut.length > 0
+          ? timedOut
+              .map((t) => `${t.mode}@${t.au}AU dist=${t.settle.dist} fading=${t.settle.fading}`)
+              .join(' / ')
+          : undefined,
+      );
     }
 
     // 1) 식별 천체 증가분 (default vs off) — 프리뷰 실측 기준 재현.
@@ -292,6 +382,11 @@ async function main() {
     //
     // ⚠️ default 와의 정확 카운트 일치 단언은 금지 — 페이지 로드 간 sim 시각 차이로 body 위치가
     // 미세 이동 → 인접 marker cluster 병합/분리 ±1~2 변동 (2026-06-13 실측: 100 AU 124 vs 125).
+    //
+    // #1219 — 위 변동의 축 두 개 (sim 시각 진행 · DOM HUD 글리프) 는 측정 경로에서 닫혔고,
+    // N=10 에서 `default` 와 `glow` 가 실제로 같은 값이었다 (40 AU `14`/`14`, 100 AU `15`/`15`).
+    // 그래도 **일치 단언으로 바꾸지 않는다** — 본 PR 은 임계·술어 무변경이 계약이고 (#1219 D6),
+    // 일치는 로컬 1 환경의 관측이지 CI 렌더러까지의 보증이 아니다.
     // 명시 glow 의 작동 자체는 off 대비 증가분 (≥ minDelta) 이 직접 검증한다 — wiring 회귀
     // (명시 glow 가 off 로 해석되는 류) 시 증가분이 0 으로 떨어져 즉시 FAIL.
     console.log('\n5) 하위 호환 — ?marker=glow 명시 = off 대비 증가분 동일 기준 충족\n');
