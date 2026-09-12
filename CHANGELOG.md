@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.88.0] - 2026-09-12
+
 ### Added
 
 - **[#1215] 지구 구름 레이어** ([#1215](https://github.com/coseo12/astro-simulator/issues/1215)) — `?focus=earth` 에서 표면 위에 **표면과 다른 속도로 도는 구름**이 보인다. ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 10 (Accepted — cross-validate agy 2026-09-11)** 구현.
@@ -74,6 +76,7 @@ Semantic Versioning을 따른다.
 
 ### Notes
 
+- **Phase 0 실측 원자료** ([#1216](https://github.com/coseo12/astro-simulator/pull/1216)) — 알파 축 재판정(ALPHATEST/ALPHABLEND/dither 3안 비교 · 투명 큐 · 달 오클루전 · 프레임 시간)의 캡처·JSON 이 `docs/reports/1215-cloud-layer/` 에 먼저 머지됐다. 게이트 판정 `(가)` 의 근거가 그 폴더다.
 - ⚠️ **`verify:1202` `G6` 변경은 「가드 약화」가 아니다** — [계약 재조정 2](https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5615851703) (사용자 합의). 구름은 박명 호를 **물리적으로 가린다** (Phase 0 프로토 `cover 0.52` 에서 `0.06086 → 0.00382`, ALPHATEST 도 `0.00341` — 알파 축이 아니라 커버리지 축). `G6` 은 rim 계약을 지키는 술어이므로 구름 없는 프레임이 정본이다. **임계 `0.02` · 대역 · 표본 하한은 무변경**이고 재는 **프레임**만 바꿨다. `cover` 를 가드 통과 값으로 고르는 것은 금지했다 (C1 클래스). D1 승인 파라미터 (`cover 0.5`) 에서는 구름 ON 박명 값 `0.04684` 도 임계를 넘지만 재정의는 설계대로 수행했다 — 통과 여부로 재는 프레임을 고르면 그것이 곧 C1 클래스다. `G1`~`G4` 는 구름 ON 페이지에서 그대로 잰다 (사용자 합의 범위는 `G6` 하나).
 - **[계약 재조정 1](https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5613600171)** — 게이트 (a) 는 픽셀이 아니라 **투명 큐**를 잰다 (`verify:1215` C3). frustum culling 과 무관하게 「구름이 정렬 대상에 정확히 1개 들어간다」를 직접 묻기 위해서다.
 - **D1 사용자 판정** ([#1215 코멘트](https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5632521560)) — 파라미터 후보 B (반경비 `1.01` · 커버 `0.5` · 불투명 `0.9`) · 밤면 구름 밝기 유지 (새 상수 `0`) · 풍속 `10 m/s` 유지 · 낮쪽 대비 부족은 기존 낮면 밝기 거동이라 범위 밖 (PR 코멘트 기록).
