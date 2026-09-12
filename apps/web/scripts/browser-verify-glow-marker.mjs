@@ -43,6 +43,12 @@
  *       `131~134` → **DOM 숨김만 추가하면 `2` 고정**. 즉 세던 것의 거의 전부가 UI 텍스트였다.
  *       글리프가 page load 마다 갈려 (`1M` 이 1 cluster 이기도 2 cluster 이기도) ±2 이봉을 만든다 —
  *       같은 페이지 안에서 3회 재캡처하면 항상 동일하므로 프레임 축이 아니라 **page load 축**이다.
+ *
+ *       ⚠️ **그런데 글리프는 증가분에서 상쇄된다** — 임계를 건드리지 않은 근거다. [실측 reviewer]
+ *       HUD 만 따로 캡처하면 두 모드가 **완전히 동일**하다 (`default` = `off` = `136` cluster ·
+ *       `5971` px). 같은 표본에서 구프레임 증가분 `149 − 138 = 11` 과 신프레임 `14 − 3 = 11` 이
+ *       일치한다. 즉 DOM 오염은 증가분의 **기댓값을 옮기지 않았고 산포만 실었다**. 임계
+ *       `+10`/`+11` 의 출처 실측이 오염 프레임에서 나왔더라도 그 값은 그대로 유효하다.
  *   (b) **sim 시각이 계속 흐른다** — 기본 배율 `86_400` (초당 1일) + pause 부재라 로드·대기 편차가
  *       궤도 위상 편차로 번역된다. 항목 5 주석이 2026-06-13 에 이미 관측해 둔 축이다.
  *
@@ -79,7 +85,13 @@ const POST_JD_WAIT_MS = 1000;
 const POST_HIDE_WAIT_MS = 200;
 const AU_METERS = 1.495978707e11;
 
-/** 프리뷰 실측 기준 (2026-06-12) — 식별 천체 증가분 하한. ADR §축 6 박제값. */
+/**
+ * 프리뷰 실측 기준 (2026-06-12) — 식별 천체 증가분 하한. ADR §축 6 박제값.
+ *
+ * #1219 — 재는 프레임이 바뀌어 **카운트 절대값은 더 이상 프리뷰 수치를 재현하지 않는다**
+ * (`145~148` → `14`). 재현되는 것은 **증가분**뿐이고 본 값은 그 기준이라 무변경이다.
+ * 근거: DOM 오염은 두 모드에 같은 항으로 실려 증가분에서 상쇄된다 (아래 헤더 §(a) 실측).
+ */
 const EXPECTED_DELTA = [
   { au: 40, minDelta: 10 },
   { au: 100, minDelta: 11 },
@@ -118,7 +130,8 @@ async function openSim(browser, query) {
     window.__simCore.command({ type: 'pause' });
   }, T_JD);
   await page.waitForTimeout(POST_JD_WAIT_MS);
-  // #1219 (a) — 캔버스 위 DOM 오버레이 숨김. 이걸 안 하면 판정량의 97% 가 UI 글리프다.
+  // #1219 (a) — 캔버스 위 DOM 오버레이 숨김. 이걸 안 하면 `?marker=off` 카운트의 거의 전부가
+  // UI 글리프다 (헤더 §(a)).
   await hideDomOverlays(page);
   return { context, page };
 }
@@ -128,14 +141,31 @@ async function openSim(browser, query) {
  *
  * `canvas.screenshot()` (Playwright element 캡처) 는 **element 의 화면 영역**을 찍으므로 그 위에
  * 겹친 DOM (TopBar · TimeBar · HUD 코너) 이 함께 찍힌다. 즉 luminance cluster 계수가 천체가 아니라
- * UI 텍스트를 세고 있었다 (실측 `136` → `3`). `visibility` 는 레이아웃을 바꾸지 않아 캔버스 크기·
- * 렌더링 경로에 영향이 없다 (`display:none` 이었다면 캔버스 리사이즈를 유발한다).
+ * UI 텍스트를 세고 있었다.
+ *
+ * `visibility: hidden` 을 쓴다 — **레이아웃 박스를 보존**하므로 캔버스 기하가 그대로다
+ * ([실측 reviewer] 숨김 전/후 `canvas.width×height` · `getBoundingClientRect` 둘 다 `1280×720`
+ * 불변, `getLodStats` `0/0/32 fading=0` 불변).
  */
 async function hideDomOverlays(page) {
   await page.addStyleTag({
     content: 'body * { visibility: hidden !important; } canvas { visibility: visible !important; }',
   });
   await page.waitForTimeout(POST_HIDE_WAIT_MS);
+  // #1219 권고 1 — 위 셀렉터는 스코프가 없어 페이지의 **모든** 캔버스를 되살린다. 지금은 캔버스가
+  // 하나뿐이라 무해하지만 [실측 reviewer: `querySelectorAll('canvas').length === 1`], HUD 에 캔버스
+  // (미니맵·성능 그래프 등) 가 하나 생기면 이번에 닫은 오염 축이 **조용히** 재개통된다 — 값만
+  // 커지고 FAIL 이 아니다.
+  //
+  // 셀렉터를 특정 id 로 좁히는 대신 **개수 단언**을 둔다: id 는 바뀌어도 스크립트가 조용히 다른
+  // 것을 재기 시작하지만, 개수 단언은 전제가 깨지는 순간 시끄럽게 깨진다 (fail-fast).
+  const canvasCount = await page.evaluate(() => document.querySelectorAll('canvas').length);
+  if (canvasCount !== 1) {
+    throw new Error(
+      `[#1219] 캔버스가 ${canvasCount}개다 (기대 1). hideDomOverlays 의 'canvas { visibility: visible }' 가 ` +
+        '캡처 대상 밖 캔버스까지 되살려 판정량을 오염시킨다 — 셀렉터를 캡처 대상으로 좁히고 본 단언을 갱신하라.',
+    );
+  }
 }
 
 /**
@@ -317,14 +347,21 @@ async function main() {
     console.log('\n0) 측정 전제 — 캡처 시점 LOD 정착 (cross-fade 종료 + 분포 안정)\n');
     {
       const timedOut = settleTimeouts.filter((s) => s.settle.timedOut);
+      // #1219 권고 6 — `timedOut.length === 0` 만 보면 **표본이 비었을 때 공허 참으로 PASS** 한다
+      // (#1201 / #1214 「측정 성공 ↔ 측정 부재」 시그니처). 표본 하한을 함께 건다. 기대 표본 수는
+      // 새 상수를 만들지 않고 **측정 루프의 정의**(모드 수 × 거리 수) 에서 도출한다 — 루프가 바뀌면
+      // 기대값도 같이 바뀌어야 하고, 별도 상수는 그 순간 drift 를 만든다.
+      const expectedSamples = Object.keys(modes).length * EXPECTED_DELTA.length;
       check(
-        `LOD 정착 표본 ${settleTimeouts.length - timedOut.length}/${settleTimeouts.length}`,
-        timedOut.length === 0,
+        `LOD 정착 표본 ${settleTimeouts.length - timedOut.length}/${settleTimeouts.length} (기대 ${expectedSamples})`,
+        settleTimeouts.length === expectedSamples && timedOut.length === 0,
         timedOut.length > 0
           ? timedOut
               .map((t) => `${t.mode}@${t.au}AU dist=${t.settle.dist} fading=${t.settle.fading}`)
               .join(' / ')
-          : undefined,
+          : settleTimeouts.length !== expectedSamples
+            ? `표본 수 불일치 — 측정 루프가 ${expectedSamples} 회를 돌지 않았다 (측정 부재를 통과로 세지 않는다)`
+            : undefined,
       );
     }
 
