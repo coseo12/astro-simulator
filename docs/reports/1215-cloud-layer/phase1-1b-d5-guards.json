@@ -1,0 +1,252 @@
+{
+ "issue": 1215,
+ "phase": "1b",
+ "what": "D5 — 기존 지구 가드 전건 + 신규 verify:1215 재실행. D1 승인 파라미터 (후보 B = 코드 기본값), verify:1202 는 G6 재정의 구조. 가드·임계 무수정. 줄은 가드 출력 원문 발췌.",
+ "conditions": {
+  "server": "next dev :3000 (feature/1215-cloud-layer-phase1 작업 트리)",
+  "axis": "SWIFTSHADER=1 HEADFUL=0 — 762 는 --headless, 1204/1205 는 스크립트 기본 (CI 호출과 같은 인자)"
+ },
+ "guards": {
+  "756": {
+   "exit": 0,
+   "durS": 56,
+   "lines": [
+    "=== DoD 1 — 4 body 표면 디테일 (surface ON, 기본) ===",
+    "=== DoD 5 — ?surface=off 단색 복귀 대조 ===",
+    "=== DoD 2 — 무회귀 (미등록 body 단색, surface ON) ===",
+    "=== DoD 3 — LOD mid 전환 표면 연속성 (reviewer 권고 1: cross-fade 팝핑) ===",
+    "=== DoD 4 — tier-c (?gpu=c) 단색 ===",
+    "  \"consoleErrors\": {",
+    "=== 판정 (#759 — hfEntropy ON−OFF ≥ 0.15 + tier-c forceOverride=low) ===",
+    "  ✓ earth: hfEntropy 갭 2.451 ≥ 0.15",
+    "  ✓ mars: hfEntropy 갭 1.033 ≥ 0.15",
+    "  ✓ jupiter: hfEntropy 갭 1.206 ≥ 0.15",
+    "  ✓ moon: hfEntropy 갭 0.963 ≥ 0.15",
+    "  ✓ tier-c: override=low, high=0, mid=0 (표면 셰이더 구조적 미진입)",
+    "=== PASS ==="
+   ]
+  },
+  "762": {
+   "exit": 0,
+   "durS": 19,
+   "lines": [
+    "    mars     px=  19.342 onScreen=true center=(1072,353)",
+    "    jupiter  px= 150.556 onScreen=false center=(2554,-981)",
+    "    saturn   px= 622.776 onScreen=false center=(14003,-12424)",
+    "    uranus   px=  19.483 onScreen=false center=(2447,2004)",
+    "    neptune  px=  17.285 onScreen=false center=(1987,2261)",
+    "    mercury  px=   4.587 onScreen=true center=(636,400)",
+    "    venus    px=    6.03 onScreen=true center=(577,368)",
+    "    earth    px=     9.8 onScreen=true center=(618,277)",
+    "    mars     px=   5.155 onScreen=true center=(765,357)",
+    "    jupiter  px=  22.581 onScreen=true center=(1037,81)",
+    "    saturn   px=      33 onScreen=false center=(1400,-367)",
+    "    uranus   px=   9.775 onScreen=false center=(1546,1184)",
+    "    neptune  px=     7.6 onScreen=false center=(1463,1522)",
+    "    jupiter > earth: PASS  ({\"rule\":\"jupiter > earth\",\"jupiter\":22.581,\"earth\":9.8,\"pass\":true})",
+    "    jupiter > mars: PASS  ({\"rule\":\"jupiter > mars\",\"jupiter\":22.581,\"mars\":5.155,\"pass\":true})",
+    "    jupiter > venus: PASS  ({\"rule\":\"jupiter > venus\",\"jupiter\":22.581,\"venus\":6.03,\"pass\":true})",
+    "    jupiter > mercury: PASS  ({\"rule\":\"jupiter > mercury\",\"jupiter\":22.581,\"mercury\":4.587,\"pass\":true})",
+    "    mercury  px=   1.236 onScreen=true center=(639,371)",
+    "    venus    px=   1.618 onScreen=true center=(623,362)",
+    "    earth    px=   2.597 onScreen=true center=(634,338)",
+    "    mars     px=   1.616 onScreen=true center=(673,359)",
+    "    jupiter  px=   7.088 onScreen=true center=(737,292)",
+    "    saturn   px=   5.854 onScreen=true center=(803,204)",
+    "    uranus   px=   3.448 onScreen=true center=(949,641)",
+    "    neptune  px=   3.558 onScreen=false center=(968,823)",
+    "    jupiter > earth: PASS  ({\"rule\":\"jupiter > earth\",\"jupiter\":7.088,\"earth\":2.597,\"pass\":true})",
+    "    jupiter > mars: PASS  ({\"rule\":\"jupiter > mars\",\"jupiter\":7.088,\"mars\":1.616,\"pass\":true})",
+    "    jupiter > venus: PASS  ({\"rule\":\"jupiter > venus\",\"jupiter\":7.088,\"venus\":1.618,\"pass\":true})",
+    "    jupiter > mercury: PASS  ({\"rule\":\"jupiter > mercury\",\"jupiter\":7.088,\"mercury\":1.236,\"pass\":true})",
+    "    saturn > earth: PASS  ({\"rule\":\"saturn > earth\",\"saturn\":5.854,\"earth\":2.597,\"pass\":true})",
+    "    saturn > mars: PASS  ({\"rule\":\"saturn > mars\",\"saturn\":5.854,\"mars\":1.616,\"pass\":true})",
+    "    mercury  px=  15.822 onScreen=false center=(-554,1326)",
+    "    venus    px=  20.767 onScreen=false center=(-772,1234)",
+    "    earth    px=  32.592 onScreen=false center=(-825,1016)",
+    "    mars     px=  20.606 onScreen=false center=(-174,1228)",
+    "    jupiter  px= 148.317 onScreen=true center=(640,360)",
+    "    saturn   px= 766.191 onScreen=false center=(6159,-7243)",
+    "    uranus   px=  22.709 onScreen=false center=(1956,2364)",
+    "    neptune  px=   12.39 onScreen=false center=(1672,2492)",
+    "  단조성 PASS: true"
+   ]
+  },
+  "773": {
+   "exit": 0,
+   "durS": 52,
+   "lines": [
+    "  venus    contrastMean=4.77 contrastExtreme=9.77 dayMean=202.6 nightMean=42.5 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0",
+    "  mercury  contrastMean=6.66 contrastExtreme=18.44 dayMean=175.8 nightMean=26.4 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0",
+    "  saturn   contrastMean=2.52 contrastExtreme=7.19 dayMean=118.4 nightMean=47 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0",
+    "  neptune  contrastMean=6.07 contrastExtreme=19.8 dayMean=154.7 nightMean=25.5 purple%=0 disk=27410/39204 (제외 11794) diskRpx=98.32 err=0",
+    "=== DoD 5 — ?surface=off 대조 (낮면 hfEntropy ON>OFF) ===",
+    "  earth    [rocky] contrastMean=2.22 dayMean=60.7 nightMean=27.3 hfEnt(day)=0.812 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32",
+    "  mars     [desert] contrastMean=4.75 dayMean=105 nightMean=22.1 hfEnt(day)=0.677 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32",
+    "  jupiter  [gas-bands] contrastMean=2.94 dayMean=115.4 nightMean=39.2 hfEnt(day)=0.897 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32",
+    "  moon     [cratered] contrastMean=2.66 dayMean=101.4 nightMean=38.1 hfEnt(day)=2.513 purple%=0 disk=1700/2500 (제외 800) diskRpx=24.58",
+    "      \"contrastMean\": 4.7,",
+    "      \"contrastExtreme\": 20.57,",
+    "      \"contrastMean\": 7.6,",
+    "      \"contrastExtreme\": 15.16,",
+    "      \"contrastMean\": 4.65,",
+    "      \"contrastExtreme\": 10.32,",
+    "      \"contrastMean\": 4.56,",
+    "      \"contrastExtreme\": 8.25,",
+    "      \"contrastMean\": 2.22,",
+    "      \"contrastExtreme\": 6.19,",
+    "      \"contrastMean\": 4.75,",
+    "      \"contrastExtreme\": 12.84,",
+    "      \"contrastMean\": 2.94,",
+    "      \"contrastExtreme\": 8.74,",
+    "      \"contrastMean\": 2.66,",
+    "      \"contrastExtreme\": 7.33,",
+    "      \"contrastMean\": 4.77,",
+    "      \"contrastExtreme\": 9.77,",
+    "      \"contrastMean\": 6.66,",
+    "      \"contrastExtreme\": 18.44,",
+    "      \"contrastMean\": 2.52,",
+    "      \"contrastExtreme\": 7.19,",
+    "      \"contrastMean\": 6.07,",
+    "      \"contrastExtreme\": 19.8,",
+    "  \"consoleErrors\": {",
+    "=== 판정 (#759 — day>night×2 + contrastMean 낙차 ≥10% + purple 0, hfEntropy 축 제외) ===",
+    "  ✓ earth: day 136.4/night 29 (×2 초과), contrastMean ON 4.7 / OFF 2.22 (낙차 52.77% ≥ 10%), purple 0%",
+    "  ✓ mars: day 189.3/night 24.9 (×2 초과), contrastMean ON 7.6 / OFF 4.75 (낙차 37.50% ≥ 10%), purple 0%",
+    "  ✓ jupiter: day 183.1/night 39.4 (×2 초과), contrastMean ON 4.65 / OFF 2.94 (낙차 36.77% ≥ 10%), purple 0%",
+    "  ✓ moon: day 172/night 37.7 (×2 초과), contrastMean ON 4.56 / OFF 2.66 (낙차 41.67% ≥ 10%), purple 0%",
+    "=== PASS ==="
+   ]
+  },
+  "1202": {
+   "exit": 0,
+   "durS": 20,
+   "lines": [
+    "│ (index)   │ n    │ rim     │ headroom │ satOn   │ satOff  │ lumOff  │ saturatedPct │",
+    "│ (index)   │ n    │ rim     │ headroom │ satOn   │ satOff  │ lumOff  │ saturatedPct │",
+    "G6 진단 (게이트 아님) — 구름 ON 박명 호 rim 기여 0.04684 (N=97) · 구름 OFF 0.06086 (N=97)",
+    "consoleErrors: 0 (구름 ON 0 · 구름 OFF 0)",
+    "[측정 불가 판정] 발화 0 — 유효성 전제 전건 충족 (두 쌍 각 4항 + OFF 페이지 구름 부재)",
+    "  PASS  G1 낮면 림 − 밤면 림 = 0.07110  (>= 0.025)",
+    "  PASS  G2 낮면 림 rim 기여 = 0.07135  (>= 0.025)",
+    "  PASS  G3 낮면 림 − 낮면 내부 = 0.06870  (>= 0.025)",
+    "  PASS  G4 낮면 림 채도 감소량 = 0.07132  (<= 0.24)",
+    "  PASS  G6 박명 호 rim 기여 (구름 OFF 페이지) = 0.06086  (>= 0.02)",
+    "  PASS  G7 런타임 콘솔 에러 수 (두 페이지 합) = 0  (== 0)",
+    "[PASS] 게이트 6종 전건 충족"
+   ]
+  },
+  "1204": {
+   "exit": 0,
+   "durS": 23,
+   "lines": [
+    "  [PASS] play: 전 프레임에서 광원 방향이 영벡터가 아니다.",
+    "  [PASS] pause: 전 프레임에서 광원 방향이 영벡터가 아니다.",
+    "[PASS] 전 시나리오 통과."
+   ]
+  },
+  "1205": {
+   "exit": 0,
+   "durS": 15,
+   "lines": [
+    "✅ PASS — (가) 비퇴화 ∧ (나) 경로무관 ∧ 콘솔 에러 0"
+   ]
+  },
+  "1215": {
+   "exit": 0,
+   "durS": 70,
+   "lines": [
+    "C8 rotate=off 2회 로드: {\"dayInner\":{\"n\":7225,\"c1\":0,\"lumOff\":0.80339,\"changed\":0,\"n2\":4206,\"satExcluded\":3019,\"clearRatio\":1},\"nightInner\":{\"n\":7225,\"c1\":0,\"lumOff\":0.07265,\"changed\":0,\"n2\":7225,\"satExcluded\":0,\"clearRatio\":1},\"disk\":{\"n\":30768,\"c1\":0,\"lumOff\":0.43251,\"changed\":0,\"n2\":21643,\"satExcluded\":9125,\"clearRatio\":1},\"outsideChanged\":23275}",
+    "C7 rotate ON 2회 로드: {\"dayInner\":{\"n\":6407,\"c1\":0,\"lumOff\":0.90962,\"changed\":0,\"n2\":350,\"satExcluded\":6057,\"clearRatio\":1},\"nightInner\":{\"n\":6407,\"c1\":0,\"lumOff\":0.10892,\"changed\":0,\"n2\":6407,\"satExcluded\":0,\"clearRatio\":1},\"disk\":{\"n\":27256,\"c1\":0,\"lumOff\":0.33362,\"changed\":0,\"n2\":19596,\"satExcluded\":7660,\"clearRatio\":1},\"outsideChanged\":22745}",
+    "quat C8 jd0 [0,0,0,1] jd1 [0,0,0,1] · C7 jd0 [0,0.7152234632788377,0,-0.6988958417213721] jd1 [0,0.6662825401274255,0,-0.7456993876364293]",
+    "consoleErrors {\"on\":[],\"off\":[],\"on2\":[],\"rotA\":[],\"rotB\":[]}",
+    "  PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)",
+    "  PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)",
+    "  PASS  C3 투명 큐 ON − OFF = 1 [\"earth-cloud\"]  (== 1 ∧ earth-cloud ∈ ON)",
+    "  PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)",
+    "  PASS  C5a mid 정착 쌍 C1 량 = 0.019252  (>= 0.0114)",
+    "  PASS  C5b fade 정지 쌍 C1 량 = 0.019252  (>= mid ÷ 3 = 0.006417)",
+    "  PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)",
+    "  PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+    "  PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)",
+    "  PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)",
+    "  PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)",
+    "[PASS] 게이트 11종 전건 충족"
+   ]
+  },
+  "783-dod": {
+   "exit": 0,
+   "durS": 14,
+   "lines": [
+    "=== 판정 (§A3.5) ===",
+    "DoD 1 극관(낮면 남북): N 76.8% / S 57.9% (≥50, OFF N 0% / S 0%) · console err ON 0 / OFF 0 (== 0) → PASS",
+    "DoD 2 biome: 적도 G-share 0.4838 (n=1180) > 중위도 0.3954 (n=738) · console err ON 0 (== 0) → PASS",
+    "DoD 3 마젠타: 0 px · console err ON 0 (== 0) → PASS",
+    "DoD 4 극 휘도: 밤면 52.8 < 낮면 213.1/3=71.0 · console err ON 0 (== 0) → PASS"
+   ]
+  },
+  "783-ocean": {
+   "exit": 0,
+   "durS": 22,
+   "lines": [
+    "=== 측정 (#1197 바다 깊이 — 낮면 ocean 휘도 백분위 갭) ===",
+    "    \"gap\": 0.2703398521316637,",
+    "    \"consoleErrors\": []",
+    "    \"gap\": 0.07097978365522194,",
+    "    \"consoleErrors\": [],",
+    "    \"gap\": 0.5735213788732236,",
+    "    \"consoleErrors\": [],",
+    "=== 판정 (§A7.5) ===",
+    "표본: ON ocean 픽셀 3612 / negative 3616 / zero 3606 (하한 900) · disk R 98.32 · 제외 극관 0 / 밤면·저ndl 14775 / 육지 3566 → PASS",
+    "D5 깊이 그라데이션: ON 상대 갭 0.2703 (≥ τ 0.11) · P10 183.43 / P50 230.13 / P90 251.39 · console err 0 (== 0) → PASS",
+    "D6 판별력 (deepOceanFactor (1,1,1) 고착 주입): 머티리얼 2개 패치 · negative 갭 0.0710 · 낙차 0.1994 (≥ M 0.11) · console err 0 (== 0) → PASS",
+    "D6-b 바인딩 기여도 (deepOceanFactor (0,0,0) 고착 주입 = 변이 M-h 대조군): 머티리얼 2개 패치 · zero 갭 0.5735 · ON 대비 상승 0.3032 (≥ M 0.11) · console err 0 (== 0) → PASS",
+    "  ↳ negative 프레임에 D5 술어 적용: 갭 0.0710 ≥ τ 0.11 → FAIL (기대대로 — 가드 작동)"
+   ]
+  },
+  "1119-dod": {
+   "exit": 0,
+   "durS": 21,
+   "lines": [
+    "    \"consoleErrors\": []",
+    "    \"consoleErrors\": [],",
+    "    \"consoleErrors\": []",
+    "=== 판정 (§A4.5) ===",
+    "DoD 1 대륙 형상 IoU: ON 0.936 (≥ 0.8) / 마스크고착 0.3072 / surface=off 0 · 낙차 0.9360 (요구 ≥ 0.2) · console err ON 0 / surface=off 0 (== 0) → PASS",
+    "DoD 2 negative (uMaskEnabled 0 고착 주입 → DoD 1 FAIL): 머티리얼 2개 패치, IoU 0.3072 < 0.8 · console err 0 (== 0) → PASS"
+   ]
+  },
+  "1119-lod": {
+   "exit": 0,
+   "durS": 16,
+   "lines": [
+    "=== 측정 (DoD 14 — 원거리 축소 LOD) ===",
+    "    \"consoleErrors\": []",
+    "    \"consoleErrors\": []",
+    "=== 판정 ===",
+    "양성 대조군 (focus, R=98.32px ≥ 16): 고착 주입 diff 38741px (>0 필요) · console err 0 (== 0) → PASS",
+    "원거리 대역 진입 (조감, R=5.619px < 16) · console err 0 (== 0) → PASS",
+    "원거리에서 uMaskEnabled 이미 0 (고착 주입 diff 0% < 0.001%) · console err 0 (== 0) → PASS"
+   ]
+  },
+  "1119-seam": {
+   "exit": 0,
+   "durS": 57,
+   "lines": [
+    "        \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "      \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "        \"consoleErrors\": []",
+    "      \"consoleErrors\": []",
+    "=== 판정 ===",
+    "본초자오선 낮면 (JD 2451626.0): sub-solar 경도 0° · 낮면 표본 21953 (≥ 2000) · IoU 0.9599 (≥ 0.8) · alpha+90° · console err 0 (== 0) → PASS",
+    "±180° 자오선 낮면 (JD 2451809.5): sub-solar 경도 -180° · 낮면 표본 21953 (≥ 2000) · IoU 0.877 (≥ 0.8) · alpha+270° · console err 0 (== 0) → PASS"
+   ]
+  }
+ }
+}

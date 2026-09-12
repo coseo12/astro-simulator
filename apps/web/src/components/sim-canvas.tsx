@@ -22,6 +22,7 @@ import { parseOrbitsVisible } from '@/core/parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from '@/core/parse-stars-mode';
 import { parseSurfaceVisible } from '@/core/parse-surface-mode';
 import { parseRotateEnabled } from '@/core/parse-rotate-mode';
+import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
@@ -520,6 +521,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // `?t=<jd>&speed=0` 로 결정적 재현 가능 (rotate=on 이어도 verify 는 프레임 독립 캡처).
         const rotateParam = new URLSearchParams(window.location.search).get('rotate');
         const rotateEnabled = parseRotateEnabled(rotateParam);
+        // #1215 — 지구 구름 레이어 기본 ON + `?clouds=off` 옵트아웃 (ADR 20260628-756 §A10.9 결정 8).
+        // core 유효 조건은 `clouds && surfaceDetail` — `?surface=off` 면 이 값과 무관하게 꺼진다.
+        const cloudsParam = new URLSearchParams(window.location.search).get('clouds');
+        const cloudsVisible = parseCloudsVisible(cloudsParam);
         // #762 — 천체 압축 곡선 지수 p (default 0.5 sqrt). `?bodyScaleP=0.55` 로 D-T2 실시간 튜닝.
         // URL 부재 시 default p 의 getBodyScale 콜백 그대로 (모듈 로드 시 1회 산출된 BODY_SCALE).
         // ADR 20260629-762 §5 결정 2.7.
@@ -572,6 +577,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #782 — 행성 self-rotation. 기본 ON 은 parseRotateEnabled 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR §A2.3 결정 7 레이어 분리, surfaceDetail 동형).
           selfRotation: rotateEnabled,
+          // #1215 — 지구 구름. 기본 ON 은 parseCloudsVisible 기본값 (true) 이 결정 — core 옵션 기본값은
+          // false 유지 (surfaceDetail / selfRotation 동형 레이어 분리).
+          clouds: cloudsVisible,
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.

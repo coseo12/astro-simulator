@@ -1,0 +1,839 @@
+{
+  "scenarios": [
+    {
+      "scenario": "transit",
+      "jd": 2451638.75,
+      "cloud": "off",
+      "install": null,
+      "lodSettle": {
+        "dist": "3/1/28",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 583,
+        "cy": 363.4,
+        "rPx": 12.8,
+        "px": 304,
+        "camDist": 19.308
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 538,
+        "maxAbsDiff": 635,
+        "meanAbsDiff": 1.9393
+      },
+      "moonSelfDiff": {
+        "selPx": 304,
+        "changedPx": 304,
+        "maxAbsDiff": 254,
+        "meanAbsDiff": 98.6283
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 538
+    },
+    {
+      "scenario": "transit",
+      "jd": 2451638.75,
+      "cloud": "alphablend",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "lodSettle": {
+        "dist": "3/1/28",
+        "fading": 0,
+        "waitedMs": 809,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 583,
+        "cy": 363.4,
+        "rPx": 12.8,
+        "px": 304,
+        "camDist": 19.308
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 538,
+        "maxAbsDiff": 635,
+        "meanAbsDiff": 2.1182
+      },
+      "moonSelfDiff": {
+        "selPx": 304,
+        "changedPx": 304,
+        "maxAbsDiff": 223,
+        "meanAbsDiff": 116.5428
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 538,
+      "cloudInMoonDiskEroded": {
+        "selPx": 304,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 538,
+        "changedPx": 35,
+        "maxAbsDiff": 97,
+        "meanAbsDiff": 2.7677
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31050,
+        "changedPx": 16047,
+        "maxAbsDiff": 597,
+        "meanAbsDiff": 75.9108
+      }
+    },
+    {
+      "scenario": "transit",
+      "jd": 2451638.75,
+      "cloud": "alphablend-nodepthwrite",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": true,
+        "fragHasLogDepth": true
+      },
+      "lodSettle": {
+        "dist": "3/1/28",
+        "fading": 0,
+        "waitedMs": 812,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 583,
+        "cy": 363.4,
+        "rPx": 12.8,
+        "px": 304,
+        "camDist": 19.308
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 538,
+        "maxAbsDiff": 635,
+        "meanAbsDiff": 2.1182
+      },
+      "moonSelfDiff": {
+        "selPx": 304,
+        "changedPx": 304,
+        "maxAbsDiff": 223,
+        "meanAbsDiff": 116.5428
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 538,
+      "cloudInMoonDiskEroded": {
+        "selPx": 304,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 538,
+        "changedPx": 35,
+        "maxAbsDiff": 97,
+        "meanAbsDiff": 2.7677
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31050,
+        "changedPx": 16047,
+        "maxAbsDiff": 597,
+        "meanAbsDiff": 75.9108
+      }
+    },
+    {
+      "scenario": "transit",
+      "jd": 2451638.75,
+      "cloud": "alphatest",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": false,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "lodSettle": {
+        "dist": "3/1/28",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 583,
+        "cy": 363.4,
+        "rPx": 12.8,
+        "px": 304,
+        "camDist": 19.308
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 538,
+        "maxAbsDiff": 635,
+        "meanAbsDiff": 2.1344
+      },
+      "moonSelfDiff": {
+        "selPx": 304,
+        "changedPx": 304,
+        "maxAbsDiff": 254,
+        "meanAbsDiff": 118.8125
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 538,
+      "cloudInMoonDiskEroded": {
+        "selPx": 304,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 538,
+        "changedPx": 24,
+        "maxAbsDiff": 99,
+        "meanAbsDiff": 2.8699
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31050,
+        "changedPx": 11818,
+        "maxAbsDiff": 606,
+        "meanAbsDiff": 75.8147
+      }
+    },
+    {
+      "scenario": "transit",
+      "jd": 2451638.75,
+      "cloud": "alphablend-2shell",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true,
+        "second": {
+          "ok": true,
+          "shellName": "cloud-shell-proto-1",
+          "needAlphaBlending": true,
+          "alphaMode": 2,
+          "backFaceCulling": true,
+          "disableDepthWrite": false,
+          "fragHasLogDepth": true
+        }
+      },
+      "lodSettle": {
+        "dist": "3/1/28",
+        "fading": 0,
+        "waitedMs": 809,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 583,
+        "cy": 363.4,
+        "rPx": 12.8,
+        "px": 304,
+        "camDist": 19.308
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 538,
+        "maxAbsDiff": 635,
+        "meanAbsDiff": 2.1166
+      },
+      "moonSelfDiff": {
+        "selPx": 304,
+        "changedPx": 304,
+        "maxAbsDiff": 223,
+        "meanAbsDiff": 116.5132
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 538,
+      "cloudInMoonDiskEroded": {
+        "selPx": 304,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 538,
+        "changedPx": 35,
+        "maxAbsDiff": 97,
+        "meanAbsDiff": 2.7639
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31050,
+        "changedPx": 25731,
+        "maxAbsDiff": 597,
+        "meanAbsDiff": 133.4958
+      }
+    },
+    {
+      "scenario": "transit",
+      "jd": 2451638.75,
+      "cloud": "alphablend-2shell-nodepthwrite",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": true,
+        "fragHasLogDepth": true,
+        "second": {
+          "ok": true,
+          "shellName": "cloud-shell-proto-1",
+          "needAlphaBlending": true,
+          "alphaMode": 2,
+          "backFaceCulling": true,
+          "disableDepthWrite": true,
+          "fragHasLogDepth": true
+        }
+      },
+      "lodSettle": {
+        "dist": "3/1/28",
+        "fading": 0,
+        "waitedMs": 812,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 583,
+        "cy": 363.4,
+        "rPx": 12.8,
+        "px": 304,
+        "camDist": 19.308
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 538,
+        "maxAbsDiff": 635,
+        "meanAbsDiff": 2.1166
+      },
+      "moonSelfDiff": {
+        "selPx": 304,
+        "changedPx": 304,
+        "maxAbsDiff": 223,
+        "meanAbsDiff": 116.5132
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 538,
+      "cloudInMoonDiskEroded": {
+        "selPx": 304,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 538,
+        "changedPx": 35,
+        "maxAbsDiff": 97,
+        "meanAbsDiff": 2.7639
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31050,
+        "changedPx": 25731,
+        "maxAbsDiff": 597,
+        "meanAbsDiff": 133.4958
+      }
+    },
+    {
+      "scenario": "occultation",
+      "jd": 2451651.55,
+      "cloud": "off",
+      "install": null,
+      "lodSettle": {
+        "dist": "2/2/28",
+        "fading": 0,
+        "waitedMs": 817,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 660.4,
+        "cy": 359.4,
+        "rPx": 4.51,
+        "px": 8,
+        "camDist": 54.631
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "moonSelfDiff": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 0
+    },
+    {
+      "scenario": "occultation",
+      "jd": 2451651.55,
+      "cloud": "alphablend",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "lodSettle": {
+        "dist": "2/2/28",
+        "fading": 0,
+        "waitedMs": 815,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 660.4,
+        "cy": 359.4,
+        "rPx": 4.51,
+        "px": 8,
+        "camDist": 54.631
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "moonSelfDiff": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 0,
+      "cloudInMoonDiskEroded": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 0,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": null
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31588,
+        "changedPx": 16485,
+        "maxAbsDiff": 535,
+        "meanAbsDiff": 76.4665
+      }
+    },
+    {
+      "scenario": "occultation",
+      "jd": 2451651.55,
+      "cloud": "alphablend-nodepthwrite",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": true,
+        "fragHasLogDepth": true
+      },
+      "lodSettle": {
+        "dist": "2/2/28",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 660.4,
+        "cy": 359.4,
+        "rPx": 4.51,
+        "px": 8,
+        "camDist": 54.631
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "moonSelfDiff": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 0,
+      "cloudInMoonDiskEroded": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 0,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": null
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31588,
+        "changedPx": 16485,
+        "maxAbsDiff": 535,
+        "meanAbsDiff": 76.4665
+      }
+    },
+    {
+      "scenario": "occultation",
+      "jd": 2451651.55,
+      "cloud": "alphatest",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": false,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true
+      },
+      "lodSettle": {
+        "dist": "2/2/28",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 660.4,
+        "cy": 359.4,
+        "rPx": 4.51,
+        "px": 8,
+        "camDist": 54.631
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "moonSelfDiff": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 0,
+      "cloudInMoonDiskEroded": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 0,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": null
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31588,
+        "changedPx": 12125,
+        "maxAbsDiff": 568,
+        "meanAbsDiff": 76.4937
+      }
+    },
+    {
+      "scenario": "occultation",
+      "jd": 2451651.55,
+      "cloud": "alphablend-2shell",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": false,
+        "fragHasLogDepth": true,
+        "second": {
+          "ok": true,
+          "shellName": "cloud-shell-proto-1",
+          "needAlphaBlending": true,
+          "alphaMode": 2,
+          "backFaceCulling": true,
+          "disableDepthWrite": false,
+          "fragHasLogDepth": true
+        }
+      },
+      "lodSettle": {
+        "dist": "2/2/28",
+        "fading": 0,
+        "waitedMs": 809,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 660.4,
+        "cy": 359.4,
+        "rPx": 4.51,
+        "px": 8,
+        "camDist": 54.631
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "moonSelfDiff": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 0,
+      "cloudInMoonDiskEroded": {
+        "selPx": 8,
+        "changedPx": 8,
+        "maxAbsDiff": 25,
+        "meanAbsDiff": 14.125
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 0,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": null
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31588,
+        "changedPx": 26165,
+        "maxAbsDiff": 573,
+        "meanAbsDiff": 130.8003
+      }
+    },
+    {
+      "scenario": "occultation",
+      "jd": 2451651.55,
+      "cloud": "alphablend-2shell-nodepthwrite",
+      "install": {
+        "ok": true,
+        "shellName": "cloud-shell-proto-0",
+        "needAlphaBlending": true,
+        "alphaMode": 2,
+        "backFaceCulling": true,
+        "disableDepthWrite": true,
+        "fragHasLogDepth": true,
+        "second": {
+          "ok": true,
+          "shellName": "cloud-shell-proto-1",
+          "needAlphaBlending": true,
+          "alphaMode": 2,
+          "backFaceCulling": true,
+          "disableDepthWrite": true,
+          "fragHasLogDepth": true
+        }
+      },
+      "lodSettle": {
+        "dist": "2/2/28",
+        "fading": 0,
+        "waitedMs": 813,
+        "timedOut": false
+      },
+      "moonDisk": {
+        "cx": 660.4,
+        "cy": 359.4,
+        "rPx": 4.51,
+        "px": 8,
+        "camDist": 54.631
+      },
+      "earthDisk": {
+        "cx": 640,
+        "cy": 360,
+        "rPx": 98.32,
+        "px": 31588,
+        "camDist": 36.827
+      },
+      "moonLeakInEarthDisk": {
+        "selPx": 31588,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "moonSelfDiff": {
+        "selPx": 8,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": 0
+      },
+      "consoleErrorCount": 0,
+      "moonSilhouettePx": 0,
+      "cloudInMoonDiskEroded": {
+        "selPx": 8,
+        "changedPx": 8,
+        "maxAbsDiff": 25,
+        "meanAbsDiff": 14.125
+      },
+      "cloudInMoonSilhouette": {
+        "selPx": 0,
+        "changedPx": 0,
+        "maxAbsDiff": 0,
+        "meanAbsDiff": null
+      },
+      "cloudOutsideMoonInEarth": {
+        "selPx": 31588,
+        "changedPx": 26165,
+        "maxAbsDiff": 573,
+        "meanAbsDiff": 130.8003
+      }
+    }
+  ],
+  "m5": {
+    "off": {
+      "transparent": 5,
+      "opaque": 5,
+      "transparentNames": [
+        "saturn-ring-d",
+        "saturn-ring-c",
+        "saturn-ring-b",
+        "saturn-ring-a",
+        "saturn-ring-f"
+      ],
+      "activeMeshNames": [
+        "saturn",
+        "saturn-ring-d",
+        "saturn-ring-c",
+        "saturn-ring-b",
+        "saturn-ring-a",
+        "saturn-ring-f",
+        "titan-lod-mid",
+        "enceladus-lod-mid",
+        "rhea-lod-mid",
+        "iapetus-lod-mid"
+      ]
+    },
+    "alphablend": {
+      "transparent": 5,
+      "opaque": 5,
+      "transparentNames": [
+        "saturn-ring-d",
+        "saturn-ring-c",
+        "saturn-ring-b",
+        "saturn-ring-a",
+        "saturn-ring-f"
+      ],
+      "activeMeshNames": [
+        "saturn",
+        "saturn-ring-d",
+        "saturn-ring-c",
+        "saturn-ring-b",
+        "saturn-ring-a",
+        "saturn-ring-f",
+        "titan-lod-mid",
+        "enceladus-lod-mid",
+        "rhea-lod-mid",
+        "iapetus-lod-mid"
+      ]
+    },
+    "transparentDelta": 0,
+    "fullFrameDiff": {
+      "selPx": 921600,
+      "changedPx": 15564,
+      "maxAbsDiff": 262,
+      "meanAbsDiff": 0.474
+    },
+    "consoleErrors": {
+      "off": 0,
+      "alphablend": 0
+    }
+  }
+}

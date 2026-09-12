@@ -36,6 +36,7 @@
     "verify:848-modal-focus": "node scripts/browser-verify-848-modal-focus.mjs",
     "verify:1119-earth-mask": "node scripts/browser-verify-1119-earth-mask.mjs",
     "verify:1202-atmosphere-rim": "node scripts/browser-verify-1202-atmosphere-rim.mjs",
+    "verify:1215-cloud-layer": "node scripts/browser-verify-1215-cloud-layer.mjs",
     "verify:1204-sun-light": "node scripts/browser-verify-1204-sun-light.mjs"
   },
   "dependencies": {

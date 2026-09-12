@@ -31,7 +31,11 @@
  */
 
 import { chromium } from 'playwright';
-import { waitForLodSettle, withBrowser } from '../../../scripts/browser-verify-utils.mjs';
+import {
+  hasSimErrors,
+  waitForLodSettle,
+  withBrowser,
+} from '../../../scripts/browser-verify-utils.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -575,7 +579,9 @@ async function runSeam(browser) {
       const deg = Math.round((offset * 180) / Math.PI);
       const shot = await capture(page, `qa-1119-seam-jd${Math.round(julianDate)}-alpha${deg}`);
       const m = await measureIoU(page, shot);
-      rows.push({ alphaOffsetDeg: deg, ...m, consoleErrors: consoleErrors.length });
+      // #1201 스윕 — 개수가 아니라 메시지 배열 (같은 파일의 dod/lod 와 같은 표현). 판정은
+      // 아래 `hasSimErrors` 가 하고, 붉게 죽었을 때 원인 문자열이 덤프에 남는다.
+      rows.push({ alphaOffsetDeg: deg, ...m, consoleErrors });
       await context.close();
     }
     const best = rows.reduce((a, b) => (a.domain >= b.domain ? a : b));
@@ -588,14 +594,16 @@ async function runSeam(browser) {
   console.log('\n=== 판정 ===');
   let pass = true;
   for (const g of groups) {
+    // 콘솔 축은 **판정에 쓰이는 행**(`best`) 에만 건다 — 나머지 3 방위는 어떤 술어에도
+    // 들어가지 않으므로 같은 「소비하는 술어에 건다」 규칙의 귀결이다 (#1201 스윕).
     const ok =
       !g.best.error &&
       g.best.domain >= SEAM_MIN_DOMAIN &&
       g.best.iou >= IOU_THRESHOLD &&
-      g.best.consoleErrors === 0;
+      !hasSimErrors(g.best.consoleErrors);
     if (!ok) pass = false;
     console.log(
-      `${g.label}: sub-solar 경도 ${g.best.subSolarLonDeg}° · 낮면 표본 ${g.best.domain} (≥ ${SEAM_MIN_DOMAIN}) · IoU ${g.best.iou} (≥ ${IOU_THRESHOLD}) · alpha+${g.best.alphaOffsetDeg}° → ${ok ? 'PASS' : 'FAIL'}`,
+      `${g.label}: sub-solar 경도 ${g.best.subSolarLonDeg}° · 낮면 표본 ${g.best.domain} (≥ ${SEAM_MIN_DOMAIN}) · IoU ${g.best.iou} (≥ ${IOU_THRESHOLD}) · alpha+${g.best.alphaOffsetDeg}° · console err ${g.best.consoleErrors.length} (== 0) → ${ok ? 'PASS' : 'FAIL'}`,
     );
   }
   if (!pass) process.exitCode = 1;
@@ -609,7 +617,7 @@ async function runDod(browser) {
     const { context, page, consoleErrors } = await setupPage(browser, FOCUS_QUERY);
     const shot = await capture(page, 'qa-1119-earth-mask-on');
     results.on = await measureIoU(page, shot);
-    results.on.consoleErrors = consoleErrors.length;
+    results.on.consoleErrors = consoleErrors;
     await context.close();
   }
 
@@ -620,7 +628,7 @@ async function runDod(browser) {
     await page.waitForTimeout(800); // observer 가 다음 bind 부터 유효 — 프레임 몇 개 대기
     const shot = await capture(page, 'qa-1119-earth-mask-forced-off');
     results.forcedOff = await measureIoU(page, shot);
-    results.forcedOff.consoleErrors = consoleErrors.length;
+    results.forcedOff.consoleErrors = consoleErrors;
     results.forcedOff.patchedMaterials = injected.patched;
     await context.close();
   }
@@ -630,7 +638,7 @@ async function runDod(browser) {
     const { context, page, consoleErrors } = await setupPage(browser, `${FOCUS_QUERY}&surface=off`);
     const shot = await capture(page, 'qa-1119-earth-surface-off');
     results.surfaceOff = await measureIoU(page, shot);
-    results.surfaceOff.consoleErrors = consoleErrors.length;
+    results.surfaceOff.consoleErrors = consoleErrors;
     await context.close();
   }
 
@@ -684,8 +692,28 @@ async function runDod(browser) {
   //   `:521-532`). ⚠️ 그러나 지표가 다르므로 **커버 대역이 같다는 것은 증명되지 않았다** —
   //   「저쪽이 덮으니 여기는 불필요」의 근거로 쓰지 말 것. 맥락이지 근거가 아니다.
   //
-  // dod1 conjunct 는 5개다: `!on.error` / `on.iou >= IOU_THRESHOLD` / 위 (1) / 위 (2) /
-  // `on.consoleErrors === 0`.
+  // dod1 conjunct: `!on.error` / `on.iou >= IOU_THRESHOLD` / 위 (1) / 위 (2) / ON·surface=off
+  // 두 프레임의 콘솔 축 (아래 참조). ⚠️ 개수를 세어 적지 않는다 — 항이 늘 때마다 이 문장이
+  // 조용히 stale 해지는 하드코딩 계수 drift 클래스다.
+  //
+  // ── 콘솔 축 (#1201 스윕 — 783 스크립트와 같은 클래스) ─────────────────────
+  // 세 프레임 모두 에러를 **수집**하고 있었으나 술어에 든 것은 ON 프레임 하나뿐이었다. 각
+  // 프레임은 그 프레임을 **소비하는** 술어에 건다 (783 `runDod`/`runOcean` 과 같은 규칙):
+  // `surfaceOff` 는 DoD 1 의 `surfaceOffGap` 항으로 들어가므로 DoD 1 에, `forcedOff` 는
+  // DoD 2 의 유일한 소비처이므로 DoD 2 에 건다. `forcedOff` 는 `on.iou > forcedOff.iou`
+  // 로 DoD 1 에도 들어가지만, 그 항은 DoD 2 가 같은 프레임을 더 강한 술어(`< IOU_THRESHOLD`)로
+  // 이미 잡고 있어 **어느 쪽이 붉은지 구분**을 위해 DoD 2 에만 건다.
+  //
+  // `=== 0` 대신 `hasSimErrors` 를 쓰는 이유는 783 과 같다 — 한 파일 안에 「콘솔 에러란
+  // 무엇인가」의 정의가 두 벌 생기는 것을 막는다. 기본(1차 엄격) 정책이 `length > 0` 이라
+  // ON 프레임의 판정 결과는 **정의상 불변**이다 (표현만 바뀐다).
+  // ⚠️ 한 호출부에만 `{ allowExternal: true }` 를 넘기면 술어가 정규식 매칭으로 바뀌어
+  // 「전부 같은 정책」 전제가 조용히 깨진다 — 이완은 호출부를 함께 바꿔서 하라.
+  // ⚠️ 든 값은 `.length` 스냅샷이 아니라 리스너가 push 하는 **배열 그 자체**다 (fail-safe
+  // 방향 — 늦게 도착한 에러도 잡는다). 이 축에서만 산발 실패가 나면 여기를 1순위로 의심하라.
+  const onConsoleOk = !hasSimErrors(on.consoleErrors);
+  const forcedOffConsoleOk = !hasSimErrors(forcedOff.consoleErrors);
+  const surfaceOffConsoleOk = !hasSimErrors(surfaceOff.consoleErrors);
   // 판정은 **raw 차** 로 한다 (인쇄만 반올림 — 756 `hfEntropy` 축과 동형). 반올림된 값을
   // 판정에 쓰면 `1e-4` 자리에서 판정과 인쇄가 갈리는 경계가 생긴다.
   const surfaceOffGap = on.iou - surfaceOff.iou;
@@ -694,17 +722,31 @@ async function runDod(browser) {
     on.iou >= IOU_THRESHOLD &&
     on.iou > forcedOff.iou &&
     surfaceOffGap >= SURFACE_OFF_IOU_MARGIN &&
-    on.consoleErrors === 0;
+    onConsoleOk &&
+    surfaceOffConsoleOk;
   // DoD 2 — 고착 주입 시 DoD 1 이 실제로 FAIL 해야 한다 (가드가 작동한다는 증거).
-  const dod2 = !forcedOff.error && forcedOff.patchedMaterials > 0 && forcedOff.iou < IOU_THRESHOLD;
+  const dod2 =
+    !forcedOff.error &&
+    forcedOff.patchedMaterials > 0 &&
+    forcedOff.iou < IOU_THRESHOLD &&
+    forcedOffConsoleOk;
 
   console.log('\n=== 판정 (§A4.5) ===');
   console.log(
-    `DoD 1 대륙 형상 IoU: ON ${on.iou} (≥ ${IOU_THRESHOLD}) / 마스크고착 ${forcedOff.iou} / surface=off ${surfaceOff.iou} · 낙차 ${surfaceOffGap.toFixed(4)} (요구 ≥ ${SURFACE_OFF_IOU_MARGIN}) · console err ${on.consoleErrors} → ${dod1 ? 'PASS' : 'FAIL'}`,
+    `DoD 1 대륙 형상 IoU: ON ${on.iou} (≥ ${IOU_THRESHOLD}) / 마스크고착 ${forcedOff.iou} / surface=off ${surfaceOff.iou} · 낙차 ${surfaceOffGap.toFixed(4)} (요구 ≥ ${SURFACE_OFF_IOU_MARGIN}) · console err ON ${on.consoleErrors.length} / surface=off ${surfaceOff.consoleErrors.length} (== 0) → ${dod1 ? 'PASS' : 'FAIL'}`,
   );
   console.log(
-    `DoD 2 negative (uMaskEnabled 0 고착 주입 → DoD 1 FAIL): 머티리얼 ${forcedOff.patchedMaterials}개 패치, IoU ${forcedOff.iou} < ${IOU_THRESHOLD} → ${dod2 ? 'PASS' : 'FAIL'}`,
+    `DoD 2 negative (uMaskEnabled 0 고착 주입 → DoD 1 FAIL): 머티리얼 ${forcedOff.patchedMaterials}개 패치, IoU ${forcedOff.iou} < ${IOU_THRESHOLD} · console err ${forcedOff.consoleErrors.length} (== 0) → ${dod2 ? 'PASS' : 'FAIL'}`,
   );
+  for (const [label, frame] of [
+    ['ON', on],
+    ['마스크고착', forcedOff],
+    ['surface=off', surfaceOff],
+  ]) {
+    if (frame.consoleErrors.length === 0) continue;
+    console.log(`  ↳ [console] ${label} 프레임 ${frame.consoleErrors.length}건:`);
+    for (const e of frame.consoleErrors.slice(0, 10)) console.log(`      ${e}`);
+  }
   if (!(dod1 && dod2)) process.exitCode = 1;
 }
 
@@ -712,28 +754,32 @@ async function runLod(browser) {
   // focus 상태 (마스크 ON 대역) — 양성 대조군.
   const near = {};
   {
-    const { context, page } = await setupPage(browser, FOCUS_QUERY);
+    const { context, page, consoleErrors } = await setupPage(browser, FOCUS_QUERY);
     near.diskR = await readDiskRadiusPx(page);
     const before = await capture(page, 'qa-1119-lod-near-before');
     await injectMaskDisabled(page);
     await page.waitForTimeout(800);
     const after = await capture(page, 'qa-1119-lod-near-after');
     near.diff = await diffRatio(page, before, after);
+    near.consoleErrors = consoleErrors;
     await context.close();
   }
 
   // 전체 태양계 조감 (disk R < 16 px 대역) — 마스크가 이미 꺼져 있어야 한다.
   const far = {};
   {
-    const { context, page } = await setupPage(browser, '?gpu=a&lod=auto&rotate=off&orbits=off', {
-      equatorialView: false,
-    });
+    const { context, page, consoleErrors } = await setupPage(
+      browser,
+      '?gpu=a&lod=auto&rotate=off&orbits=off',
+      { equatorialView: false },
+    );
     far.diskR = await readDiskRadiusPx(page);
     const before = await capture(page, 'qa-1119-lod-far-before');
     await injectMaskDisabled(page);
     await page.waitForTimeout(800);
     const after = await capture(page, 'qa-1119-lod-far-after');
     far.diff = await diffRatio(page, before, after);
+    far.consoleErrors = consoleErrors;
     await context.close();
   }
 
@@ -742,21 +788,40 @@ async function runLod(browser) {
 
   // 양성 대조군 — focus 대역에서는 고착 주입이 픽셀을 **실제로 바꿔야** 한다.
   // (안 바뀌면 주입이 무효라는 뜻이고, 그러면 far 의 "안 바뀜" 은 아무것도 증명하지 못한다.)
-  const positiveControl = near.diskR >= MASK_MIN_DISK_PX && near.diff.diffPx > 0;
-  const farBelowThreshold = far.diskR !== null && far.diskR < MASK_MIN_DISK_PX;
+  // ── 콘솔 축 (#1201 스윕) ──────────────────────────────────────────────────
+  // 이 모드는 세 축 중 **어느 것도** 콘솔을 보지 않았다 — `setupPage` 가 리스너를 달고 있는데도
+  // 호출부가 `consoleErrors` 를 아예 구조분해하지 않아 배열이 버려졌다. 783 `MODE=dod` 의
+  // 「수집하고 판정 안 함」보다 한 단계 더 앞의 상태(수집조차 회수 안 함)지만 귀결은 같다:
+  // 셰이더 컴파일 경고나 WebGL 예외가 나도 diff 수치만 서면 전건 초록이었다.
+  //
+  // 배선 규칙은 같다 — 프레임을 **소비하는** 술어에 건다. `near` 는 양성 대조군 술어에,
+  // `far` 는 두 원거리 술어에. `farUnchanged` 는 「픽셀이 안 바뀐다」를 재는 술어라 렌더가
+  // 예외로 죽어 아무것도 안 그려져도 초록이 된다 — 콘솔 축이 특히 필요한 자리다.
+  const nearConsoleOk = !hasSimErrors(near.consoleErrors);
+  const farConsoleOk = !hasSimErrors(far.consoleErrors);
+  const positiveControl = near.diskR >= MASK_MIN_DISK_PX && near.diff.diffPx > 0 && nearConsoleOk;
+  const farBelowThreshold = far.diskR !== null && far.diskR < MASK_MIN_DISK_PX && farConsoleOk;
   // 임계 아래 대역에서는 마스크가 이미 꺼져 있으므로 고착 주입이 픽셀을 바꾸지 못한다.
-  const farUnchanged = far.diff.pct < 0.001;
+  const farUnchanged = far.diff.pct < 0.001 && farConsoleOk;
 
   console.log('\n=== 판정 ===');
   console.log(
-    `양성 대조군 (focus, R=${near.diskR}px ≥ ${MASK_MIN_DISK_PX}): 고착 주입 diff ${near.diff.diffPx}px (>0 필요) → ${positiveControl ? 'PASS' : 'FAIL'}`,
+    `양성 대조군 (focus, R=${near.diskR}px ≥ ${MASK_MIN_DISK_PX}): 고착 주입 diff ${near.diff.diffPx}px (>0 필요) · console err ${near.consoleErrors.length} (== 0) → ${positiveControl ? 'PASS' : 'FAIL'}`,
   );
   console.log(
-    `원거리 대역 진입 (조감, R=${far.diskR}px < ${MASK_MIN_DISK_PX}) → ${farBelowThreshold ? 'PASS' : 'FAIL'}`,
+    `원거리 대역 진입 (조감, R=${far.diskR}px < ${MASK_MIN_DISK_PX}) · console err ${far.consoleErrors.length} (== 0) → ${farBelowThreshold ? 'PASS' : 'FAIL'}`,
   );
   console.log(
-    `원거리에서 uMaskEnabled 이미 0 (고착 주입 diff ${far.diff.pct}% < 0.001%) → ${farUnchanged ? 'PASS' : 'FAIL'}`,
+    `원거리에서 uMaskEnabled 이미 0 (고착 주입 diff ${far.diff.pct}% < 0.001%) · console err ${far.consoleErrors.length} (== 0) → ${farUnchanged ? 'PASS' : 'FAIL'}`,
   );
+  for (const [label, frame] of [
+    ['near', near],
+    ['far', far],
+  ]) {
+    if (frame.consoleErrors.length === 0) continue;
+    console.log(`  ↳ [console] ${label} 프레임 ${frame.consoleErrors.length}건:`);
+    for (const e of frame.consoleErrors.slice(0, 10)) console.log(`      ${e}`);
+  }
   if (!(positiveControl && farBelowThreshold && farUnchanged)) process.exitCode = 1;
 }
 

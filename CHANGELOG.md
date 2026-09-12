@@ -5,6 +5,86 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.88.0] - 2026-09-12
+
+### Added
+
+- **[#1215] 지구 구름 레이어** ([#1215](https://github.com/coseo12/astro-simulator/issues/1215)) — `?focus=earth` 에서 표면 위에 **표면과 다른 속도로 도는 구름**이 보인다. ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) **Amendment 10 (Accepted — cross-validate agy 2026-09-11)** 구현.
+  - **구조** — earth host mesh 의 **자식** shell (`cloud-layer.ts`). position · scaling · host 자전을 구조적으로 상속해 동기 코드가 `0` 이다 (ring-anchor 의 이중 동기 실결함 #782/#785 을 피한 구조 — §A10.3).
+  - **재질** — ALPHABLEND `ShaderMaterial` (`backFaceCulling true` · `disableDepthWrite true` 명시 · log-depth 기록 · 기존 `hash13`/`fbm` 텍스트 재사용 · 표면과 같은 광원식). `disableDepthWrite` 는 블렌드 draw 에서 엔진이 이미 무시한다는 것이 실측됐고, 코드가 그 거동을 말하게 하려는 명시다 (§A10.5).
+  - **그리기 순서** — 렌더링 그룹 0 투명 정렬을 **정렬 키 치환** `(alphaIndex, distance, rank)` 으로 교체한다. host 계열 (host · mid · low · 구름) 은 host 값으로 치환되고 구름만 `rank 1` 이라 계열 블록 끝에 그려진다. 치환 없이는 LOD cross-fade 창에서 구름이 **disk 전면 소멸**했다 [실측 `0 / 29144 px` — 설치 시 `13239 / 29144 px`, mid 정착 양성 대조와 동일] (§A10.6).
+  - **LOD** — 구름 가시성은 rim 을 싣는 high / mid variant 가시성에서 파생 — low 에서 rim 과 같은 프레임에 사라진다 (§A10.7, 프레임 위상 — #1205 클래스 회피).
+  - **차등 자전** — 구름 상대각 `((jd − epoch) × CLOUD_DRIFT_OMEGA) mod 2π` (jd 순수 함수 — `self-rotation.ts` `computeSpinAngle` 을 host 와 공유, 값 불변 추출). `CLOUD_ZONAL_WIND_MS = 10 m/s` — 출처 Wallace, UW ATM S 545 Ch.2 (중위도 경압파 위상속도 `10-15 m s⁻¹` 의 하한). `?rotate=off` 에서 identity (구조적 상속).
+  - **`?clouds=off`** 옵트아웃 (`parse-cloud-mode.ts`). 유효 조건 `clouds && surfaceDetail` — 비활성이면 mesh 미생성 + 정렬 함수 미설치로 구름 도입 전과 **같은 코드 경로**.
+- **신규 가드 `verify:1215-cloud-layer`** (`shader-pixel-guard.yml`, 1202 다음 step) — `C1~C8` + 「측정 불가」 8전제 (`exit 2`, fallback 금지, measure `error` 를 모든 게이트보다 먼저). 전제 2 · 3 은 판정에 쓰이는 **모든 쌍**에 건다 (low 는 2 만 — low 대역은 씬 배경색이라 휘도 전제가 성립하지 않는다. C6 의 판정 근거는 `isVisible === false` 구조 읽기이고, low 프레임에 지구가 그려졌는지는 보증하지 않는다). [#1214](https://github.com/coseo12/astro-simulator/issues/1214) fail-open 시그니처 대응은 **실행으로 실증된 범위만** 적는다 — 빈 표본 (rotate ON 지구 scaling `0` · 카메라 이탈) · 비유한 기하 (NaN quaternion) · settle timeout · fade 조건 미형성이 전부 `exit 2` 로 떨어진다 (PR 반려 라운드 — 첫 판본은 전제가 주 쌍에만 걸려 빈 표본에서 `exit 0` 이었다). 임계는 D1 승인 파라미터 · **로컬** swiftshader 5회 (판정량 전 항목 동일 — 산포 `0`) 에서 baseline ÷ 3 으로 도출 (각 임계 주석에 baseline 값 + 규칙). CI 렌더러와는 소수 `4~5` 자리 차이 (예: C1 `0.034201` vs `0.034194`) 로 임계와 멀다.
+
+### Behavior Changes
+
+- **`?focus=earth` 에 구름이 기본으로 보인다** (web 기본 ON). 끄려면 `?clouds=off`. `?surface=off` 면 함께 꺼진다.
+- **렌더링 그룹 0 의 투명 정렬 함수가 교체된다** (구름이 활성일 때만). 계열 밖 mesh 쌍은 Babylon `defaultTransparentSortCompare` 와 **같은 결과** (단위 테스트가 400 무작위 쌍으로 부호 동일을 단언).
+- **`verify:1202` `G6` 가 두 번째 페이지 (`?clouds=off`) 에서 잰다** — 아래 Notes.
+
+### Fixed
+
+- **[#1201] `verify:783-earth-detail MODE=ocean` 의 D6·D6-b 가 주입 프레임의 콘솔 에러에 눈이 멀어 있었다** ([#1201](https://github.com/coseo12/astro-simulator/issues/1201)) — `results.negative.consoleErrors` / `results.zero.consoleErrors` 는 **수집돼 JSON 덤프에 인쇄까지 되는데 어느 술어에도 들어가지 않았다**. 콘솔 축을 든 것은 D5(ON 프레임) 하나뿐이라, 주입 프레임에서 셰이더 컴파일 경고나 WebGL 런타임 예외가 나도 `patchedMaterials > 0` 과 갭 조건만 서면 두 게이트가 초록이었다. 세 술어를 `hasSimErrors`(1차 엄격, `browser-verify-utils.mjs` SSoT — #848/#1202 G7/#1204 판정 축 2 와 같은 함수)로 통일했다. 그 파일은 이미 같은 모듈을 import 하고 있어 **신규 의존 `0`** 이다.
+
+  ⚠️ **추가만으로는 판별력이 실증되지 않는다** ([#1123](https://github.com/coseo12/astro-simulator/issues/1123) 클래스). 변이 실증 [실측] — 로컬 `SWIFTSHADER=1 HEADFUL=0` + `next dev :3000`, 각 프레임에 `console.error` 1건을 주입:
+
+  | 판                   | 변이            | 결과                                                                                   |
+  | -------------------- | --------------- | -------------------------------------------------------------------------------------- |
+  | 결함 보유(`c3634f9`) | negative 프레임 | **`exit 0` — 전 게이트 PASS (미검출)** · JSON 에 `"consoleErrors": 1` 이 찍힌 채로     |
+  | 본 판                | negative 프레임 | **`exit 1`** · **D6 단독 FAIL** (D5 · D6-b PASS)                                       |
+  | 본 판                | zero 프레임     | **`exit 1`** · **D6-b 단독 FAIL** (D5 · D6 PASS)                                       |
+  | 본 판                | ON 프레임       | **`exit 1`** · **D5 단독 FAIL** (D6 · D6-b PASS) — 통일이 기존 축을 깨지 않았다는 대조 |
+  | 본 판                | (없음 — 원복)   | `exit 0` · 전 게이트 PASS                                                              |
+
+  **축 분리와 프레임 분리가 둘 다 보인다.** 네 변이 전건에서 갭 축 수치가 원본과 **완전히 동일**했고(ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388`, 표본 `3612 / 3616 / 3605`) 붉어진 것은 콘솔 축 하나다. 그리고 한 프레임에 주입하면 **그 프레임의 술어만** FAIL 한다 — 세 프레임이 각기 별도 browser context/page 라 서로 다른 표본이기 때문이며, 이것이 확인되지 않으면 항이 셋이어도 실질은 하나다.
+
+  **`hasSimErrors` 통일 판단 근거**: D5 는 원래 `on.consoleErrors === 0` 이었고 `hasSimErrors` 기본(1차 엄격) 정책이 `consoleErrors.length > 0` 이라 **D5 의 판정 결과는 정의상 불변**이다(표현만 바뀐다 — 위 표 4행이 그 대조). 부분 적용(`d6`·`d6b` 만 `=== 0`)을 택하지 않은 이유는 같은 함수 안에 「콘솔 에러란 무엇인가」의 정의가 두 벌 생기고, 나중에 한쪽에만 `allowExternal` 이 붙는 순간 조용히 갈라지기 때문이다. 값을 개수에서 **메시지 배열**로 바꿔 붉게 죽었을 때 원인 문자열이 로그에 남는다.
+
+  **무회귀** [실측]: `MODE=ocean` D5 · D6 · D6-b · 표본 하한 전건 PASS, 값이 ADR §A7.5 확정 실측(`0.2317` / `0.0027` / `0.2289`)과 **동일** · `MODE=dod` DoD `1~4` 전건 PASS(N `70.3%` / S `55.7%` / 적도 G-share `0.5186` > 중위도 `0.4029` / 마젠타 `0` px / 밤면 `52.7` < `70.8`). ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) §A7.5 표 아래에 dated 부기로 박제했다(원문 행 무접촉).
+
+  **⚠️ 같은 클래스가 같은 파일의 다른 MODE 에도, 다른 가드 파일에도 있었다 (R5 — 범위 확대).** reviewer 가 `MODE=dod` 를 지목했고, **스크립트 이름이 아니라 「`consoleErrors` 를 수집하는데 판정식에 항이 없다」 패턴**으로 스윕해 전건을 닫았다. 남기면 세 번째 이슈가 난다.
+
+  - **`browser-verify-783-earth-detail.mjs MODE=dod`** — DoD `1~4` 에 콘솔 conjunct 신설. 배선은 「프레임을 **소비하는** 술어에 건다」(ocean 의 D5=ON / D6=negative / D6-b=zero 와 같은 규칙): ON 프레임은 DoD `1~4` 전부, OFF(`&surface=off`) 프레임은 **DoD 1** 에. OFF 를 거는 것이 특히 필요한 이유는 `capPass` 의 비교항이 `off[side].whiteDayPct === null ||` 로 시작해 **OFF 측정이 무너지면 비교가 스스로 참이 되어 사라지기** 때문이다 — 측정 실패가 완화로 둔갑하는 경로다.
+  - **`MODE=others`** — 판정식이 없는 캡처 모드라 DoD 에 항을 더할 자리가 없다. 대신 **종료 코드 축**을 신설했다: 여기서 나온 PNG 가 그대로 `MODE=diff` 의 입력이라, **에러 난 런타임의 캡처가 조용히 diff 로 흘러가는** 경로가 열려 있었다. 캡처 파일은 그대로 쓰고(진단 가치) exit 만 붉힌다.
+  - **`MODE=diff`** — 브라우저를 열지 않으므로 **대상 아님**.
+  - **`browser-verify-1119-earth-mask.mjs` 3 모드** (파일 밖 스윕, CI `shader-pixel-guard` 3 step 전부) — `MODE=dod` 는 ON 프레임 하나만 술어에 있었고, **`MODE=lod` 는 호출부가 `consoleErrors` 를 구조분해조차 하지 않아 배열을 버리고 있었다**(수집조차 회수 안 함 — 783 보다 한 단계 앞의 상태). DoD 1 에 ON + `surface=off`, DoD 2 에 마스크고착, DoD 14 양성 대조군에 `near`, 원거리 2 술어에 `far`, `MODE=seam` 은 판정에 쓰이는 `best` 행. `MODE=lod` 가 특히 필요한 이유는 `farUnchanged` 가 「픽셀이 안 바뀐다」를 재는 술어라 **렌더가 예외로 죽어 아무것도 안 그려져도 초록**이 되기 때문이다. 함께 `=== 0` → `hasSimErrors` 로, 개수 → **메시지 배열**로 통일했다.
+  - **`browser-verify-1202-atmosphere-rim.mjs`** — G7 이 이미 서 있고 `MODE=profile` 은 게이트 이전에 반환하는 **선언된 비-게이트 모드**라 해당 없음. 조치 없음.
+
+  변이 실증 [실측] — 로컬 `HEADFUL=0`(headless chromium, swiftshader 미지정) + `next dev :3001`, 프레임 하나에 `console.error` 1건 주입:
+
+  | 대상              | 판                   | 변이                 | 결과                                                                            |
+  | ----------------- | -------------------- | -------------------- | ------------------------------------------------------------------------------- |
+  | `783 MODE=dod`    | 결함 보유(`6ea56c5`) | ON 프레임            | **`exit 0` — DoD `1~4` 전건 PASS (미검출)** · `↳ console errors: 1` 인쇄된 채로 |
+  | `783 MODE=dod`    | 결함 보유(`6ea56c5`) | OFF 프레임           | **`exit 0` — DoD `1~4` 전건 PASS (미검출)** · 동상                              |
+  | `783 MODE=dod`    | 본 판                | ON 프레임            | **`exit 1`** · **DoD `1~4` 전건 FAIL**                                          |
+  | `783 MODE=dod`    | 본 판                | OFF 프레임           | **`exit 1`** · **DoD 1 단독 FAIL** (DoD 2·3·4 PASS)                             |
+  | `783 MODE=dod`    | 본 판                | (없음 — 원복)        | `exit 0` · 전건 PASS                                                            |
+  | `783 MODE=others` | 본 판                | jupiter 프레임       | **`exit 1`** · **jupiter 만 FAIL** (mars·moon PASS) · PNG `3`장 정상 기록       |
+  | `783 MODE=others` | 본 판                | (없음)               | `exit 0`                                                                        |
+  | `1119 MODE=dod`   | 본 판                | 마스크고착 프레임    | **`exit 1`** · **DoD 2 단독 FAIL**                                              |
+  | `1119 MODE=dod`   | 본 판                | `surface=off` 프레임 | **`exit 1`** · **DoD 1 단독 FAIL**                                              |
+  | `1119 MODE=lod`   | 본 판                | `near` 프레임        | **`exit 1`** · **양성 대조군 단독 FAIL**                                        |
+  | `1119 MODE=lod`   | 본 판                | `far` 프레임         | **`exit 1`** · **원거리 2 술어 FAIL** (양성 대조군 PASS)                        |
+
+  **축 분리와 프레임 분리가 여기서도 둘 다 보인다.** 주입 전건에서 픽셀 수치가 무변이와 **완전히 동일**했다 — `783 MODE=dod` (N `70.3%` / S `55.7%` / 적도 `0.5186` n=1550 > 중위도 `0.4029` n=883 / 마젠타 `0` / 밤면 `52.7` < 낮면 `212.3`) · `1119 MODE=dod` (IoU ON `0.936` / 마스크고착 `0.308` / `surface=off` `0`) · `1119 MODE=lod` (`R 98.32 → 5.619`, diff `40952px → 0%`). 붉어진 것은 콘솔 축 하나이고, 주입한 프레임의 술어만 붉어진다.
+
+  **무회귀 재확인** [실측, 같은 조건]: `783 MODE=ocean` `exit 0` (ON `0.2317` / negative `0.0027` / 낙차 `0.2289` / zero `0.5704` / 상승 `0.3388` / 표본 `3612`·`3616`·`3605` — **swiftshader 로 잰 ADR §A7.5 확정치와 동일**) · `783 MODE=dod` `exit 0` · `783 MODE=others` `exit 0` · `1119 MODE=dod`·`lod`·`seam` `exit 0` (seam IoU `0.9602` / `0.877`).
+
+  **주석 3건** (reviewer R1·R2·R3): **R1** — `allowExternal` 서술이 단방향이었다. 통일했기 때문에 **한 호출부에만 `{ allowExternal: true }` 를 넘겨도** 술어가 `length > 0` 에서 정규식 매칭으로 바뀌어 「전부 같은 정책」 전제가 조용히 깨진다는 **역방향 축**을 박제했다(계수는 적지 않는다 — 하드코딩 계수 drift). **R2** — 같은 필드명 `consoleErrors` 가 모드별로 `string[]` / `number` 로 갈려 있던 비대칭은 **전건 배열로 통일**해 해소(1119 포함). **R3** — 저장하는 값이 `.length` 스냅샷이 아니라 리스너가 push 하는 **라이브 배열 참조**라는 사실을 조치 없이 기록했다(fail-safe 방향 — 늦게 도착한 에러도 잡는다. 이 축에서만 산발 실패가 나면 1순위 의심). ADR §A3.5 / §A4.5 표 아래에도 dated 부기를 더했다 — 원문 행 · §A7.6~§A7.8 무접촉.
+
+### Notes
+
+- **Phase 0 실측 원자료** ([#1216](https://github.com/coseo12/astro-simulator/pull/1216)) — 알파 축 재판정(ALPHATEST/ALPHABLEND/dither 3안 비교 · 투명 큐 · 달 오클루전 · 프레임 시간)의 캡처·JSON 이 `docs/reports/1215-cloud-layer/` 에 먼저 머지됐다. 게이트 판정 `(가)` 의 근거가 그 폴더다.
+- ⚠️ **`verify:1202` `G6` 변경은 「가드 약화」가 아니다** — [계약 재조정 2](https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5615851703) (사용자 합의). 구름은 박명 호를 **물리적으로 가린다** (Phase 0 프로토 `cover 0.52` 에서 `0.06086 → 0.00382`, ALPHATEST 도 `0.00341` — 알파 축이 아니라 커버리지 축). `G6` 은 rim 계약을 지키는 술어이므로 구름 없는 프레임이 정본이다. **임계 `0.02` · 대역 · 표본 하한은 무변경**이고 재는 **프레임**만 바꿨다. `cover` 를 가드 통과 값으로 고르는 것은 금지했다 (C1 클래스). D1 승인 파라미터 (`cover 0.5`) 에서는 구름 ON 박명 값 `0.04684` 도 임계를 넘지만 재정의는 설계대로 수행했다 — 통과 여부로 재는 프레임을 고르면 그것이 곧 C1 클래스다. `G1`~`G4` 는 구름 ON 페이지에서 그대로 잰다 (사용자 합의 범위는 `G6` 하나).
+- **[계약 재조정 1](https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5613600171)** — 게이트 (a) 는 픽셀이 아니라 **투명 큐**를 잰다 (`verify:1215` C3). frustum culling 과 무관하게 「구름이 정렬 대상에 정확히 1개 들어간다」를 직접 묻기 위해서다.
+- **D1 사용자 판정** ([#1215 코멘트](https://github.com/coseo12/astro-simulator/issues/1215#issuecomment-5632521560)) — 파라미터 후보 B (반경비 `1.01` · 커버 `0.5` · 불투명 `0.9`) · 밤면 구름 밝기 유지 (새 상수 `0`) · 풍속 `10 m/s` 유지 · 낮쪽 대비 부족은 기존 낮면 밝기 거동이라 범위 밖 (PR 코멘트 기록).
+- **Visual Fidelity** — 반경비 `1.01` 은 rendering 왜곡 (물리 `≈ 1.0016` 의 약 `6.2` 배, 결정적 프레임 림 돌출 `0.98 px`). 데이터 SSoT 변경 `0`, physics 비참조. ADR §A10.3 체크리스트에 박제.
+- **신규 가드 대역** — §A10.11 은 대역을 낮면 내부로 잡으며 「밤면은 구름도 어두워 변화 없음과 섞인다」를 근거로 댔으나 D1 캡처에서 **그 근거 문장은 반증**됐다 (밤면 구름이 밝은 회색으로 보인다). 대역은 baseline 실측으로 다시 판단했다: **낮면 내부 유지** [실측] — 포화 `3000` 제외 후 C2 표본 `4225` 가 하한 `2408` 위이고, C1 량이 밤면 내부 (`0.02294`) 보다 낮면 내부 (`0.034201`) 가 크다. 대역을 옮겨 얻는 판별력이 없어 옮기지 않았다 (ADR §A10.11 dated 기록).
+- 기존 injector 의 주입 대상 — `verify:1202` `injectFloats` 를 host · LOD variant 로 명시 한정했다 (`getChildMeshes()` 가 구름 shell 까지 돌려줘 구름 ON 에서 「패치 개수」가 달라졌다 — 무해하나 진단이 섞인다). `verify:783` · `verify:1119` 의 같은 순회는 판정에 영향이 없어 **이 PR 에서 건드리지 않았다** (구름 셰이더에 해당 uniform 이 없다).
+- 변이 3단 실증 (원본 PASS · 변이 FAIL · 원복 PASS) — 반려 라운드 재실행 기준 — MC 계열 14건: **FAIL 12** · **측정 불가 (exit 2) 1** (MC-10 — 설계대로 전제 5) · **미검출 1** (MC-3). 전제 8 은 하네스 설정 (fade 큐에 mid) 만 묻는다 — 첫 판본이 구름 존재까지 묻다가 MC-9 의 C3 FAIL 을 exit 2 로 가렸다 · 원복 전건 PASS. 반려 대응 변이 6건 (빈 표본 · NaN 기하 · 카메라 이탈 · fade 조건 미형성 · settle timeout · `verify:1202` ON 페이지 구름 부재) 은 전건 **측정 불가 (exit 2)**. exit 2 는 PASS 도 FAIL 도 아니며 CI 를 막는다. **MC-3 (내부 `rotationStates.has` 게이트 삭제) 은 미검출 — 등가 변이**다 (호출이 외곽 `rotationStates.size > 0` 블록 안이라 rotate=off 에서 블록째 건너뛴다). 외곽까지 연 보충 MC-3′ 가 C8a 단독 FAIL. **MC-1 (바인딩 삭제) 상태에서 core 단위 1104 건 전건 통과** — 픽셀 게이트 C1 만 잡는다. 가드 개발 중 C8b 기준 프레임이 런타임 주입 뒤였던 결함을 1차 실행이 드러내 고쳤다 (MC-6 · MC-9 가 C8b 까지 FAIL). 원자료 `docs/reports/1215-cloud-layer/phase1-1b-mc-mutations.json`.
+
 ## [0.87.0] - 2026-09-08
 
 ### Behavior Changes

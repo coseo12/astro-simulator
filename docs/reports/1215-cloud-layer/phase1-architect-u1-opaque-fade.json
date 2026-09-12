@@ -1,0 +1,483 @@
+{
+ "earth": {
+  "body": "earth",
+  "classify": {
+   "diskR": 98.3,
+   "nAll": 29144,
+   "hmDiff": 28085,
+   "out": {
+    "FCUR": {
+     "n": 29144,
+     "eqH": 1059,
+     "eqM": 29144,
+     "eqBoth": 1059,
+     "onlyH": 0,
+     "onlyM": 28085,
+     "neither": 0
+    },
+    "FOPQ": {
+     "n": 29144,
+     "eqH": 28782,
+     "eqM": 1282,
+     "eqBoth": 1059,
+     "onlyH": 27723,
+     "onlyM": 223,
+     "neither": 139
+    },
+    "FOPQ2": {
+     "n": 29144,
+     "eqH": 28782,
+     "eqM": 1282,
+     "eqBoth": 1059,
+     "onlyH": 27723,
+     "onlyM": 223,
+     "neither": 139
+    }
+   },
+   "switches": {
+    "FCUR": 0,
+    "FOPQ": 469,
+    "FOPQ2": 469
+   }
+  },
+  "pairs": {
+   "FOPQ vs FOPQ2": {
+    "fullFrameChanged": 22745
+   },
+   "M vs MC (구름 양성 대조)": {
+    "fullFrameChanged": 31622
+   },
+   "FCUR vs FCUR_C (현행 fade + 구름)": {
+    "fullFrameChanged": 2002
+   },
+   "FOPQ vs FOPQ_C (불투명 fade + 구름)": {
+    "fullFrameChanged": 31643
+   },
+   "MC vs FOPQ_C": {
+    "fullFrameChanged": 29075
+   }
+  },
+  "meta": {
+   "H": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    "settle2": null,
+    "fade": null,
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "earth",
+      "moon-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "M": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 1009,
+     "timedOut": false
+    },
+    "fade": null,
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "moon-lod-mid",
+      "earth-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FCUR": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 3,
+     "midIdx": 89
+    },
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "moon-lod-mid"
+     ],
+     "transparent": [
+      "earth",
+      "earth-lod-mid"
+     ]
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FOPQ": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 3,
+     "midIdx": 89
+    },
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "earth",
+      "moon-lod-mid",
+      "earth-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FOPQ2": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 814,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 812,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 3,
+     "midIdx": 89
+    },
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "earth",
+      "moon-lod-mid",
+      "earth-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "MC": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 809,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 1114,
+     "timedOut": false
+    },
+    "fade": null,
+    "cloudIdx": 88,
+    "queues": {
+     "opaque": [
+      "moon-lod-mid",
+      "earth-lod-mid"
+     ],
+     "transparent": [
+      "cloud-probe"
+     ]
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FCUR_C": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 1013,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 934,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 3,
+     "midIdx": 90
+    },
+    "cloudIdx": 88,
+    "queues": {
+     "opaque": [
+      "moon-lod-mid"
+     ],
+     "transparent": [
+      "earth",
+      "cloud-probe",
+      "earth-lod-mid"
+     ]
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FOPQ_C": {
+    "settle": {
+     "dist": "9/6/17",
+     "fading": 0,
+     "waitedMs": 1013,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/32/0",
+     "fading": 0,
+     "waitedMs": 1195,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 3,
+     "midIdx": 90
+    },
+    "cloudIdx": 88,
+    "queues": {
+     "opaque": [
+      "earth",
+      "moon-lod-mid",
+      "earth-lod-mid"
+     ],
+     "transparent": [
+      "cloud-probe"
+     ]
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   }
+  }
+ },
+ "mars": {
+  "body": "mars",
+  "classify": {
+   "diskR": 98.3,
+   "nAll": 29144,
+   "hmDiff": 13650,
+   "out": {
+    "FCUR": {
+     "n": 29144,
+     "eqH": 15494,
+     "eqM": 29144,
+     "eqBoth": 15494,
+     "onlyH": 0,
+     "onlyM": 13650,
+     "neither": 0
+    },
+    "FOPQ": {
+     "n": 29144,
+     "eqH": 29114,
+     "eqM": 15519,
+     "eqBoth": 15492,
+     "onlyH": 13622,
+     "onlyM": 27,
+     "neither": 3
+    },
+    "FOPQ2": {
+     "n": 29144,
+     "eqH": 29114,
+     "eqM": 15519,
+     "eqBoth": 15492,
+     "onlyH": 13622,
+     "onlyM": 27,
+     "neither": 3
+    }
+   },
+   "switches": {
+    "FCUR": 0,
+    "FOPQ": 45,
+    "FOPQ2": 45
+   }
+  },
+  "pairs": {
+   "FOPQ vs FOPQ2": {
+    "fullFrameChanged": 0
+   }
+  },
+  "meta": {
+   "H": {
+    "settle": {
+     "dist": "11/5/16",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    "settle2": null,
+    "fade": null,
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "mars",
+      "phobos-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "M": {
+    "settle": {
+     "dist": "11/5/16",
+     "fading": 0,
+     "waitedMs": 811,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/31/1",
+     "fading": 0,
+     "waitedMs": 808,
+     "timedOut": false
+    },
+    "fade": null,
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "phobos-lod-mid",
+      "mars-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FCUR": {
+    "settle": {
+     "dist": "11/5/16",
+     "fading": 0,
+     "waitedMs": 810,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/31/1",
+     "fading": 0,
+     "waitedMs": 1014,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 5,
+     "midIdx": 88
+    },
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "phobos-lod-mid"
+     ],
+     "transparent": [
+      "mars",
+      "mars-lod-mid"
+     ]
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FOPQ": {
+    "settle": {
+     "dist": "11/5/16",
+     "fading": 0,
+     "waitedMs": 812,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/31/1",
+     "fading": 0,
+     "waitedMs": 1010,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 5,
+     "midIdx": 88
+    },
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "mars",
+      "phobos-lod-mid",
+      "mars-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   },
+   "FOPQ2": {
+    "settle": {
+     "dist": "11/5/16",
+     "fading": 0,
+     "waitedMs": 813,
+     "timedOut": false
+    },
+    "settle2": {
+     "dist": "0/31/1",
+     "fading": 0,
+     "waitedMs": 808,
+     "timedOut": false
+    },
+    "fade": {
+     "hostMat": "ShaderMaterial",
+     "midMat": "ShaderMaterial",
+     "hostIdx": 5,
+     "midIdx": 88
+    },
+    "cloudIdx": null,
+    "queues": {
+     "opaque": [
+      "mars",
+      "phobos-lod-mid",
+      "mars-lod-mid"
+     ],
+     "transparent": []
+    },
+    "consoleErrors": 0,
+    "errSample": []
+   }
+  }
+ }
+}
