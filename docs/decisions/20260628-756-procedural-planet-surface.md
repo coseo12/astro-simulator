@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Provisional (cross-validate 대기 — 메인 수행, #479)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -684,7 +684,7 @@ Amendment 1 §A1.3 결정 4 의 rocky 분기 (`col = mix(baseColor, landColor, l
 
 | Tier 3 구름 / 야간 불빛              | ✗ 별도 트랙 | 별도 mesh/레이어 — §A1.8 재검토 조건 5 그대로                                                                                                                                                                                                                                                                                                                                              |
 
-> ⚠️ 부기 (#1226, 2026-09-13): 본 표의 **「Tier 3 구름 / 야간 불빛」 행** 의 「별도 mesh/레이어」 는 **구름에 대해서만** 그대로 실현됐다 (Amendment 10 — host 자식 shell). **야간 불빛은 Amendment 11 (Provisional) 에서 표면 셰이더 혼입으로 결정돼 원문과 다르다** — 구름 차폐 순서 · LOD low 소멸이 구조적으로 성립하고, 신규 mesh · 투명 큐 · noise 함수 사본 증가가 `0` 이다 (§A11.1). 원문은 당시 결정의 기록으로 보존한다.
+> ⚠️ 부기 (#1226, 2026-09-13): 본 표의 **「Tier 3 구름 / 야간 불빛」 행** 의 「별도 mesh/레이어」 는 **구름에 대해서만** 그대로 실현됐다 (Amendment 10 — host 자식 shell). **야간 불빛은 Amendment 11 (Accepted) 에서 표면 셰이더 혼입으로 결정돼 원문과 다르다** — 구름 차폐 순서 · LOD low 소멸이 구조적으로 성립하고, 신규 mesh · 투명 큐 · noise 함수 사본 증가가 `0` 이다 (§A11.1). 원문은 당시 결정의 기록으로 보존한다.
 
 #### 결정 3 — biome 색 구조: 3밴드 연쇄 mix + continents 재사용 jitter
 
@@ -796,7 +796,7 @@ col = mix(col, iceColor, iceMask);
 2. **대기 fresnel rim (Tier 2-4) 요구** — #774 cameraPosition auto-bind 실증으로 uniform 비용 하락. 단 공유 셰이더 varying 혼입 vs 별도 대기 레이어 (§A1.8 재검토 조건 5) 비교 선행 — 구름 도입 시점과 합류 권장.
 3. **구름 / 야간 도시 불빛 (Tier 3)** — 별도 mesh/레이어 트랙 (§A1.8 재검토 조건 5 그대로). 구름은 #782 자전과 차등 offset 필요.
    > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Accepted)**: **구름 = 발동·처리** — host 자식 shell 의 local 상대 자전, jd 순수 함수, `?rotate=off` 구조적 상속 (§A10.8). **야간 도시 불빛 = 미발동** (#1215 비-범위) — §A10.13.
-   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Provisional)**: **야간 도시 불빛 = 발동** — 별도 mesh/레이어가 아니라 **표면 셰이더 혼입**으로 결정했다 (원문과 다름 — §A3.3 Tier 표 685행 부기). 차등 offset 은 불요: 분포 입력을 표면 local 좌표 (`vLocalPos`) 파생으로 제한해 표면과 함께 돈다 — §A11.1 · §A11.3.
+   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Accepted)**: **야간 도시 불빛 = 발동** — 별도 mesh/레이어가 아니라 **표면 셰이더 혼입**으로 결정했다 (원문과 다름 — §A3.3 Tier 표 685행 부기). 차등 offset 은 불요: 분포 입력을 표면 local 좌표 (`vLocalPos`) 파생으로 제한해 표면과 함께 돈다 — §A11.1 · §A11.3.
 4. **biome 경계 상관 아티팩트** — continents 재사용 jitter (결정 3-c) 가 해안선-biome 경계 쏠림 (contour-following) 등 부자연 발견 시 **좌표 스위즐링 fbm (`fbm(p.zyx * 2.4)`)** 으로 승격 (cross-validate 고유 발견 — landMask 와의 상관을 완전 해제하면서 신규 noise 함수 불요. 단 agy 의 "비용 0" 주장은 오류 — 이미 계산된 값 재사용이 아니라 fbm 신규 호출 = hash 24회 추가로 독립 샘플 (B) 와 동일 비용. 가치는 탈상관이지 무비용이 아님).
 5. **다른 rocky body 확장** — mars 등 을 Rocky 로 재분류하거나 위성 rocky 추가 시 biome 파라미터가 earth 전용 상수라 body 별 파라미터화 필요 (§A1.8 재검토 조건 4 연장).
 6. **극관 land/ocean 차등 디테일** (cross-validate 고유 발견) — 현재 iceMask 는 latJ (continents jitter 포함) 기반이라 경계가 지형 장을 따라 요동하지만, land 빙상 vs ocean 해빙의 분포 차이 (열용량) 는 미표현. qa 실측에서 "위도로만 잘린 흰 모자" 로 부자연하면 iceMask 에 landMask 미세 가중 검토.
@@ -1888,7 +1888,7 @@ rim 이 rocky 분기 안에 있고 `SURFACE_TYPE_BY_BODY` 의 Rocky 는 earth �
 
 1. **구름 레이어 또는 야간 도시 불빛이 범위에 진입** — §A8.1 축 5 의 값이 `0` 에서 살아난다. (B) 재평가 + 본 rim 을 shell 로 이관할지 판정 (§A1.8 재검토 조건 5 / §A3.7 재검토 조건 3).
    > ⏩ **결과 (2026-09-11, #1215 — Amendment 10, Accepted)**: 구름은 **(B) 형 별도 shell** 로 도입. **rim 이관은 「검토 후 유지」** (무처분이 아니다) — 이관 이득을 비용과 같은 단위로 서술할 수 없고, 조건부 재개 트리거(낮면 림 헤드룸의 하한 접근)는 미발화 (prototype 실측 `0.28218 → 0.34620`) — §A10.2 / §A10.13.
-   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Provisional)**: **불빛 진입분** — (B) 재평가: 불빛은 **(A) 표면 셰이더 혼입** (구름 shell 인프라를 쓸 속성이 없는 표면 발광). rim 이관: **검토 후 유지** (무처분 아님) — 재개 트리거 (낮면 림 헤드룸 하한 접근) 는 불빛 항이 `ndl ≥ 0` 에서 정확히 `0` 이라 **구조적으로 미발화** — §A11.7.
+   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Accepted)**: **불빛 진입분** — (B) 재평가: 불빛은 **(A) 표면 셰이더 혼입** (구름 shell 인프라를 쓸 속성이 없는 표면 발광). rim 이관: **검토 후 유지** (무처분 아님) — 재개 트리거 (낮면 림 헤드룸 하한 접근) 는 불빛 항이 `ndl ≥ 0` 에서 정확히 `0` 이라 **구조적으로 미발화** — §A11.7.
 2. **disk 밖 halo 요구 발생** — 축 4 의 값이 살아난다. (A) 로는 구조적 불가이므로 (B) 승격.
 3. **다른 body 가 `SurfaceType.Rocky` 로 재분류** — rim 이 대기 없는 body 에 상속된다. body 별 파라미터화 필요 (§A3.7 재검토 조건 5 연장).
 4. **G3 도 통과하는 위치 오류 발견** — §A8.7 ③ 의 닫힘이 불완전했다는 뜻. 게이트 재설계.
@@ -2317,9 +2317,9 @@ Phase 0 는 이 축을 「열리지 않았다」로 유보했다. 본 설계에�
 3. **WebGPU 실행에서 결정 3 · 4 의 전제가 다름** — 코드 판독만 했다. 실 Chrome GUI (WebGPU) 에서 LOD 경계를 넘나드는 줌 중 구름 깜빡임이 보이면 결정 4 를 재검토한다.
 4. **다른 body 가 구름/대기 shell 을 갖게 됨** — 정렬 키 치환은 host 별 계열 집합이라 body 가 늘어도 형태는 불변이나, 정렬 함수가 그룹 0 전역에 걸리므로 설치 조건을 재확인한다.
 5. **야간 도시 불빛 착수** — 자식 shell · 정렬 키 치환 · 가시성 파생의 재사용 여부 판정 (§A3.7 조건 3 잔여).
-   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Provisional)**: **발동·판정** — 자식 shell · 정렬 키 치환 · 가시성 파생 **3건 모두 비재사용** (불빛 = 표면 셰이더 혼입). 단 구름의 불빛 차폐는 정렬 키 치환의 보장에 **의존**한다 — §A11.1 · §A11.2.
+   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Accepted)**: **발동·판정** — 자식 shell · 정렬 키 치환 · 가시성 파생 **3건 모두 비재사용** (불빛 = 표면 셰이더 혼입). 단 구름의 불빛 차폐는 정렬 키 치환의 보장에 **의존**한다 — §A11.1 · §A11.2.
 6. **`hash13` / `fbm` 사본이 5벌째가 됨** — 공용 GLSL 상수 추출 (log-depth #845 선례) 을 재판단한다.
-   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Provisional)**: **미발화** — 불빛은 표면 셰이더 혼입 (A) 이라 `hash13` / `fbm` **함수 사본 증가 `0`** (호출 증가는 사본과 별개 — §A11.5). 공용 추출 재판단은 열지 않는다 (§A11.8).
+   > ⏩ **결과 (2026-09-13, #1226 — Amendment 11, Accepted)**: **미발화** — 불빛은 표면 셰이더 혼입 (A) 이라 `hash13` / `fbm` **함수 사본 증가 `0`** (호출 증가는 사본과 별개 — §A11.5). 공용 추출 재판단은 열지 않는다 (§A11.8).
 7. **LOD fade 기전이 `material.alpha` 가 아닌 것으로 바뀜** — 결정 4 는 alpha 기반 fade 가 절차 셰이더 variant 를 투명 큐로 보내기 때문에 존재한다. 기전이 바뀌면 결정 4 · C5 를 함께 재검토한다 (불투명 강제 대안 §A10.6 도 그때 다시 비교).
 
 ### A10.15 미확인 (실행되지 않은 것 — 근거로 인용 금지)
@@ -2390,7 +2390,7 @@ Phase 0 는 이 축을 「열리지 않았다」로 유보했다. 본 설계에�
 ## Amendment 11 (2026-09-13) — 지구 야간 도시 불빛: 표면 셰이더 혼입 (A) · 재검토 조건 결과 기록 (#1226)
 
 - **이슈**: [#1226](https://github.com/coseo12/astro-simulator/issues/1226) — 계약 D0 (§A10.14 조건 5 · §A8.11 조건 1 · §A3.3 Tier 표 685행 · §A10.14 조건 6 · Visual Fidelity 판정)
-- **상태**: Provisional (cross-validate 대기 — 호출 주체는 메인, [#479](https://github.com/coseo12/astro-simulator/issues/479). 본 Amendment 는 「ADR 신규·개정」 앵커에 해당한다)
+- **상태**: Accepted (cross-validate 2026-09-13 — agy, 반영 내역 §A11.16. U1 · U2 사용자 결정 2026-09-13 반영 §A11.11)
 - **선행 결정**: 사용자 Q1~Q5 권고안 전건 채택 — #1226 코멘트 [`5652235616`](https://github.com/coseo12/astro-simulator/issues/1226#issuecomment-5652235616). Q2 는 「최종 판정은 architect D0」 조건부였고, 본 Amendment 가 그 판정이다.
 - **원자료**: [`docs/reports/1226-night-lights/`](../reports/1226-night-lights/) — `architect-probe-*.json`. 측정 스크립트는 임시였고 삭제했다 (volt #67). 주입 레시피는 그 폴더 README 에 적었다.
 - **결과 기록 대상**: §A3.7 조건 3 · §A8.11 조건 1 · §A10.14 조건 5 · §A10.14 조건 6. 원문은 소급 수정하지 않고 각 조건 아래 ⏩ 포인터만 추가했다. §A3.3 Tier 표 685행에는 dated 부기를 더했다.
@@ -2527,13 +2527,15 @@ col += nightLightColor * lights;
 | # | 계약 문면 | (A) 판본 | 기대 |
 | --- | --- | --- | --- |
 | MN-5 | 마스크 게이트 제거 | 소스 — `lightGate` 에서 `landMask` 인자 삭제 | D5 FAIL |
-| MN-5b (신규 관측) | 극관 억제 제거 | 소스 — `(1 − iceMask)` 인자 삭제 | **판별 불가 기록** (§A11.4 [실측] 사각) — 단위 테스트가 잡는지만 기록 |
-| MN-6 | 「합성을 구름 블렌드 뒤로 옮기는 동형 주입」 | **표현 불가** — (A) 에서 불빛은 표면 `col` 의 일부라 구름보다 나중에 합성될 경로가 없다. 차폐 실패가 나타날 수 있는 형태는 「구름이 불빛 위에 없음」 뿐이다 → 런타임: **P3 에만** `earth-cloud` 를 `setEnabled(false)` (§A10.7 결정 문면상 LOD pass 는 `isVisible` 만 대입하므로 덮어써지지 않는다 — dev 가 확인) | D6 FAIL (전제 7 은 P4 에서 재므로 유지) |
+| MN-5b (신규 관측) | 극관 억제 제거 | 소스 — `(1 − iceMask)` 인자 삭제 | **판별 불가 기록** (§A11.4 [실측] 사각) — 단위 테스트가 잡는지만 기록. ⚠️ 판별 가능 여부는 U1 JD `2451808.0` 의 `NI` ∩ 육지 ∩ `iceMask` 포화 픽셀 수로 dev 가 재판정한다 — 그 픽셀은 G 에서 `R == 0` 이라 `NI_sea` 에 들어가 **D5 가 잡는 자리**다 (§A11.16 기각 1) |
+| MN-6 | 「합성을 구름 블렌드 뒤로 옮기는 동형 주입」 | **표현 불가** — (A) 에서 불빛은 표면 `col` 의 일부라 구름보다 나중에 합성될 경로가 없다. 차폐 실패가 나타날 수 있는 형태는 「구름이 불빛 위에 없음」 뿐이다 → 런타임: **P3 에만** `earth-cloud` 를 `setEnabled(false)` (§A10.7 결정 문면상 LOD pass 는 `isVisible` 만 대입하므로 덮어써지지 않는다 — dev 가 확인) | D6 FAIL (전제 7 은 P4 에서 재므로 유지). ⚠️ **기대값 미확정** — P3 단독 주입은 분자에 구름 자체의 밤면 휘도항이 섞여, FAIL 여부가 그 부호에 달린다 (§A11.16 수용 1) |
 | MN-7 | low billboard 에 불빛 항 주입 | 런타임: P1 low 쌍에서만 `earth-lod-low` 머티리얼 `emissiveColor` 를 백색으로 | D7 (2) FAIL |
 
 ### A11.11 사용자 결정 필요 (dev 가드 구현 전)
 
 **U1 — 신규 가드의 측정 JD.** 계약 공통 프레임은 JD `2451626.0` 인데, 그 프레임에서는 D6 신호가 `0` 이다 (보강 2).
+
+> ⏩ **사용자 결정 (2026-09-13)**: **(b) 채택** — 신규 가드 `verify:1226-night-lights` 전체를 JD `2451808.0` 에서 잰다. 기존 가드 프레임은 무변경.
 
 [실측 — 4점 표본, 모두 위상각 `90°`]
 
@@ -2555,6 +2557,8 @@ col += nightLightColor * lights;
 
 **U2 — D4 · D5 표본을 게이트 맵으로 정의.** 계약 Q3 (i) 문면은 「측정 집합은 기하 (`ndl`/`ndv`) 로만 정의」 다. D5 는 계약 자신이 「마스크 계조 `0` 텍셀」 을 요구하므로 문면상 이미 기하 밖이지만, **D4 (보강 1) 는 계약의 「D2 대역」 에서 좁히는 변경**이다. 권고: 게이트 맵 정의 채택 (근거 보강 1 — 기하 집합으로는 MN-4 판별 불가).
 
+> ⏩ **사용자 결정 (2026-09-13)**: **채택** — D4 · D5 표본은 게이트 맵 G 로 정의한다. 계약 Q3 (i) 「측정 집합은 기하로만」 문면에 대한 명시적 예외다.
+
 ### A11.12 기존 가드 영향 — 계약 R1 · R3 의 전제 재실측
 
 **R1 (`verify:773` 헤드룸) — 「낮면 평균 불변」 전제는 거짓, 결론 자릿수는 유지**
@@ -2565,7 +2569,7 @@ col += nightLightColor * lights;
 
 `(142.67 + 0.04337·X) / (30.58 + 0.28642·X) ≥ 4.6655 × (1 − 0.5277) / 0.9 = 2.448`
 
-이고 `X ≤ 약 103` (밤면 평균 `≤ 약 60`) 이다. 낮면 누설을 무시하면 `X ≤ 약 97` (밤면 `≤ 약 58`). ⇒ 계약 R1 의 「밤면 평균 ≲ 55」 와 **같은 자릿수** — 낮면 누설은 예산을 오히려 조금 넓힌다. D1 후보 비교 시 `X` (게이트 가중 평균 불빛 휘도) 를 함께 인쇄하면 `773` 선발동 여부를 캡처 단계에서 예측할 수 있다.
+이고 `X ≤ 약 103` (밤면 평균 `≤ 약 60`) 이다. 낮면 누설을 무시하면 `X ≤ 약 97` (밤면 `≤ 약 58`). ⇒ 계약 R1 의 「밤면 평균 ≲ 55」 와 **같은 자릿수**. **예산은 보수 쪽인 누설 무시 한계 (`X ≤ 약 97`, 밤면 `≤ 약 58`) 를 쓴다** — 앞의 누설 포함 식은 낮면 절반 누설 픽셀에도 `nightFactor ≈ 1` 을 곱한 상한 근사라, 반평면 경계 부근 황혼 대역의 실제 불빛 기여를 과대 계상한다 (§A11.16 수용 2). D1 후보 비교 시 `X` (게이트 가중 평균 불빛 휘도) 를 함께 인쇄하면 `773` 선발동 여부를 캡처 단계에서 예측할 수 있다.
 
 ⚠️ `773` 프레임은 JD 를 고정하지 않으므로 위상각이 실행 대기 시간에 따라 조금씩 달라진다 — 위 수치는 1회 실행이다.
 
@@ -2597,18 +2601,20 @@ col += nightLightColor * lights;
 - CI 렌더러 (GitHub Actions swiftshader) 에서의 위 실측값 — 전부 로컬 swiftshader 1회 (결정성: 독립 2회 로드 disk 내부 변화 `0 / 33469 px` — 게이트 맵 · 구름 ON 제품 프레임 둘 다)
 - WebGPU 실 GPU 에서의 불빛 외형 (D13)
 - `773` 프레임의 위상각 산포 (1회 실행)
+- MN-6 주입 시 D6 판정량의 부호 — `NI_land` 에서 `mean(lum(P2) − lum(P4))` (구름이 밤면 육지를 어둡게 하는지 밝게 하는지) 는 제품 프레임에서 재지 않았다 (게이트 맵 · 구름 알파 맵은 `cloudColor (0,0,0)` 주입 판본) (§A11.16 수용 1)
+- JD `2451808.0` 의 `NI` ∩ 육지 ∩ `iceMask` 포화 픽셀 수 — JD `2451626.0` 원자료 `landIce` 는 전 대역 `0` 이었다 (§A11.16 기각 1)
 
 ### A11.15 재검토 조건 (신규)
 
 1. **D10 에서 기존 가드 FAIL** — 가드를 고치지 않고 보고한다. 프레임 이관 (계약 Q3 (ii)) 은 사용자 결정이다.
 2. **D1 승인 파라미터에서 `max(nightLightColor) × nightLightStrength > 1`** — 증폭 게이트 맵 논증 (§A11.10) 의 「sub-LSB」 전제가 약해진다. D5 표본 정의를 재검산한다.
-3. **D13 에서 반경 `16 px` 경계 on/off 또는 자전 shimmer 가 인지됨** — 결정 2 (γ) 또는 결정 3 의 주파수를 재검토한다.
+3. **D13 에서 반경 `16 px` 경계 on/off 또는 자전 shimmer 가 인지됨** — 결정 2 (γ) 또는 결정 3 의 주파수를 재검토한다. 경계 on/off 의 처방 후보 (agy 2026-09-13, 미검증): 마스크가 켜진 구간 안 (반경 `16 ~ 24 px` 등) 에서 `nightLightStrength` 를 연속 감쇠 — (γ) 의 「마스크 OFF 에서 불빛 `0`」 은 유지된다.
 4. **`SURFACE_MASK_MIN_DISK_PX` 변경** — 불빛 on/off 경계가 함께 움직인다 (결정 2 결합).
 5. **§A10.14 조건 7 발동 (LOD fade 기전 변경)** — 구름의 불빛 차폐도 함께 재검토한다 (§A11.2).
 6. **다른 body 가 `SurfaceType.Rocky` 로 재분류** — 불빛을 상속한다 (§A8.11 조건 3 동형).
 7. **극관 억제의 픽셀 판별이 필요해짐** — 밤면 내부에 극관 포화 픽셀이 생기는 프레임을 채택할 때 게이트 편입을 재판단한다 (§A11.4 사각).
 
-### A11.16 교차검증 반영 사항 — **대기** (메인 수행, #479)
+### A11.16 교차검증 반영 사항 — **반영 완료** (agy 2026-09-13, Accepted 전이)
 
 **호출 전 Claude 편향 셀프 체크** ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5):
 
@@ -2623,3 +2629,31 @@ col += nightLightColor * lights;
 2. MN-6 을 「표현 불가 → 차폐 소멸 등가」 로 재정의한 것이 D6 의 판별력 요구를 충족하는가
 3. D4 · D5 표본을 게이트 맵으로 정의한 것이 M-i 클래스를 재생산하지 않는다는 논증 (§A11.10 보강 1) 의 빈틈
 4. `773` 예산 도출 (§A11.12) 의 전제 — 반평면 분할 · `nightFactor ≈ 1` · E8 낙차 인용
+
+**실행**: `cross_validate.sh architecture` — 입력은 본 Amendment 전체 (구조 경계 발췌, 앞 Amendment 미포함) + 메인 맥락 헤더 (사용자 결정 Q1~Q5 · 반복 결함 클래스 4종). outcome `applied` · exit `0` · plan-bypass 가드 사후 diff empty. 로그 `.claude/logs/cross-validate-architecture-20260913-183055.log` (gitignored, 로컬).
+
+**합의 (수용)**
+
+1. **MN-6 주입 교란** (질문 2) — agy 는 P3 단독 구름 제거가 「비정상 차분」 을 만든다고 지적했고, 메인 재분석과 교란의 **존재**에서 일치한다. 기전: D6 판정량 분자 `lum(P3) − lum(P4)` 에서 P3 의 구름을 끄면 `lum(P3) = lum(P1)` 이 되어 분자 = `[lum(P1) − lum(P2)] + [lum(P2) − lum(P4)]` 다. 둘째 항은 불빛과 무관한 **구름 자체의 밤면 육지 휘도 효과**이고 부호가 재지 않은 값이다 (§A11.14) — 양이면 비가 `1` 을 넘어 FAIL, 음이면 통과할 수 있다. ⇒ dev 는 가드 구현 전 baseline 에서 둘째 항의 부호를 인쇄하고, MN-6 의 기대값을 그 부호에서 도출한다. 음이면 MN-6 설계를 다시 연다.
+   - **agy 처방 (구름 alpha `0` 강제) 은 기각** — (A) 에서 alpha `0` 구름은 시각적으로 구름 제거와 같은 조작이라 같은 교란을 갖는다. agy 가 든 「`ALPHA_COMBINE` 파괴 · depth 쓰기 충돌」 은 구름이 모든 표면을 덮는 방식이 깨지는 결함이라 `verify:1215` 의 판정 영역이다.
+   - 양쪽 페이지 (P3 · P4) 에서 모두 구름을 끄면 비는 정확히 `1` 이 되지만, 전제 7 (P4 ↔ P2) 이 신호를 잃어 `exit 2` 가 된다 — FAIL 이 아니므로 변이 판정으로 쓸 수 없다. 대안으로 채택하지 않았다.
+2. **§A11.12 누설 예산** (질문 4 의 2) — `nightFactor ≈ 1` 은 반평면 경계 부근 황혼 픽셀의 불빛을 과대 계상한다. 「낮면 누설이 예산을 넓힌다」 문장을 삭제하고 보수 한계 (`X ≤ 약 97`) 를 쓰도록 §A11.12 를 고쳤다.
+
+**부분 수용**
+
+- **(γ) 경계 on/off 의 인지 비용** (질문 1) — 자리는 인정한다 (focus 에서 지름 `2 px` 까지 `high` 가 유지되므로 불빛만 꺼지는 구간이 실재 — §A11.4 [실측]). 「인간 시각은 전역 점멸에 극도로 민감」 은 근거 없는 단정이라 인용하지 않는다. 결정 2 는 유지하고, 처방 후보 (마스크 ON 구간 안 연속 감쇠) 만 §A11.15 조건 3 에 적었다. 판정은 D13.
+- **§A11.12 의 1회 실행 · E8 비보정** (질문 4 의 1 · 3) — 둘 다 본문이 이미 ⚠️ 로 고지한 한계와 같다. 문면 변경 없음. 「CI 에서 `773` 이 간헐 FAIL 할 위험이 매우 높다」 는 실행 근거가 없어 기각 — D10 이 잰다.
+
+**기각 (근거)**
+
+1. **MN-5b 극관 억제 제거가 M-i 클래스로 흡수된다** (질문 3 의 2) — 기전이 반대다. `(1 − iceMask)` 를 뺀 결함에서 불빛이 새로 켜지는 픽셀은 육지 ∩ 극관 포화인데, 그 픽셀은 G 에서 `R = landMask · (1 − iceMask) = 0` 이라 **`NI_sea` 로 분류된다**. D5 는 `NI_sea` 무변화를 요구하므로 그 자리에서 잡힌다 — 배제가 아니라 검출 경로다. 판별 불가의 실제 원인은 표본 부재 (JD `2451626.0` 원자료 `nightInner.landIce 0`) 이고, U1 JD 에서의 표본 수를 §A11.14 에 추가했다.
+2. **`lightGate` 누락 시 G 가 정상이라 결함이 격리되지 않는다** (질문 3 의 1) — G 가 불빛 결함에 움직이지 않는 것이 설계 속성이다. 게이트가 빠지면 바다 픽셀 (`NI_sea`) 에 불빛이 켜져 D5 가 FAIL 한다 (MN-4 · MN-5).
+3. **해안 sub-LSB 누설이 `NI_land` 평균에 희석된다** (질문 3 의 3) — D4 는 평균이 아니라 「변화 없는 픽셀 비율」 이다. 판별력이 떨어지는 방향과 크기가 제시되지 않아 반영하지 않았다.
+4. **지구 외 rocky 천체로 불빛 누출** (§2.1) — [파일] `SurfaceType.Rocky` 는 `SURFACE_TYPE_BY_BODY` 에서 `earth` 한 곳뿐이고 (`procedural-planet-shader.ts:170`), `SURFACE_MASK_BY_BODY` 도 `earth` 한 줄이다 (`:324`). 미등록 body 는 `uMaskEnabled = 0` 이라 게이트 (γ) 가 구조적으로 `0` 이다. 재분류 시점은 §A11.15 조건 6 이 이미 다룬다.
+5. **자전축 경사 · 계절에 따른 극관 변화** (§2.6) — [파일] `iceMask = smoothstep(iceLatLo, iceLatHi, latJ)` 이고 `latJ` 는 `abs(p.y)` (로컬 좌표) 파생이다 (`:758` · `:783`). 시간 입력이 없는 painted-on 이라 시간축이 없다.
+6. **`exit 2` 가 fail-open** (§3) — [파일] `.github/workflows/**` 에 `exit 2` 를 특별 처리하는 경로가 없고, `shader-pixel-guard.yml` 의 가드 스텝에 `continue-on-error` 가 없다. 비영 종료는 CI 실패다. 이 저장소에서 `exit 2` 는 「측정 불가」 를 FAIL 과 구분해 보고하는 코드이지 통과가 아니다.
+7. **저사양 폴백 부재 · `onBindObservable` 주입의 엔진 결합** (§2.1 · §2.3) — 전자는 `?surface=off` 가 명시 옵트아웃이라 결함이 아니고, 후자는 `verify:1202` 선례의 기존 관행이다. 반영하지 않았다.
+
+**메인 원자료 대조 (반영 중 발견 1건 — 해소)**: `architect-probe-gate-lod-773-glow.json` 의 `detCloudsOffReload.identicalToFirstLoad` 가 `false` 인데 §A11.14 는 「disk 내부 변화 `0 / 33469 px`」 라고 적었다. README 가 앞의 것을 full-frame PNG 비교 1차 판본 (DOM HUD 혼입으로 판별력 없음, #1219 동형) 으로 명시하고, 인용값은 `architect-probe-clouds-jd.json` `determinism.gateMapReload` · `productReload` (`changed 0`) 와 일치한다. 모순 아님.
+
+**Claude 편향 셀프 체크 (반영 후)**: 외부 지적을 일괄 기각하는 방향으로 기울었는지 — 수용 2 · 부분 수용 2 · 기각 7 이고, 기각 7건은 전부 파일 · 원자료 근거를 달았다. 수용 1 은 메인이 발췌를 읽으며 먼저 적은 교란과 같은 지점이라 **독립 발견이 아니라 합의**로 분류했다.
