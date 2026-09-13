@@ -1,0 +1,594 @@
+{
+  "detCloudsOff": {
+    "settle": {
+      "dist": "9/6/17",
+      "fading": 0,
+      "waitedMs": 816,
+      "timedOut": false
+    },
+    "inj": {
+      "patched": 1,
+      "cloudPatched": 0,
+      "cloudExists": false
+    },
+    "phaseDeg": 90,
+    "diskR": 98.32,
+    "uMaskEnabledHigh": 1,
+    "bands": {
+      "nightInner": {
+        "n": 7225,
+        "gate0": 6462,
+        "gatePos": 763,
+        "gateFull": 632,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": 0.09601,
+        "meanBaseLum601": 12.47
+      },
+      "dayInner": {
+        "n": 7225,
+        "gate0": 2992,
+        "gatePos": 4233,
+        "gateFull": 3592,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": 0.53726,
+        "meanBaseLum601": 186.45
+      },
+      "twilight": {
+        "n": 3214,
+        "gate0": 2309,
+        "gatePos": 905,
+        "gateFull": 696,
+        "iceSat": 164,
+        "iceSatGate0": 160,
+        "icePos": 335,
+        "landIce": 0,
+        "meanGate": 0.24564,
+        "meanBaseLum601": 21.02
+      },
+      "nightAll": {
+        "n": 12170,
+        "gate0": 10767,
+        "gatePos": 1403,
+        "gateFull": 927,
+        "iceSat": 86,
+        "iceSatGate0": 77,
+        "icePos": 448,
+        "landIce": 0,
+        "meanGate": 0.09012,
+        "meanBaseLum601": 13.79
+      },
+      "dayAll": {
+        "n": 12170,
+        "gate0": 6994,
+        "gatePos": 5176,
+        "gateFull": 4010,
+        "iceSat": 92,
+        "iceSatGate0": 89,
+        "icePos": 458,
+        "landIce": 0,
+        "meanGate": 0.36783,
+        "meanBaseLum601": 189.22
+      },
+      "h773night": {
+        "n": 15480,
+        "gate0": 13155,
+        "gatePos": 2325,
+        "gateFull": 1635,
+        "iceSat": 256,
+        "iceSatGate0": 243,
+        "icePos": 794,
+        "landIce": 0,
+        "meanGate": 0.12267,
+        "meanBaseLum601": 15.35
+      },
+      "h773day": {
+        "n": 15288,
+        "gate0": 9285,
+        "gatePos": 6003,
+        "gateFull": 4589,
+        "iceSat": 261,
+        "iceSatGate0": 258,
+        "icePos": 793,
+        "landIce": 0,
+        "meanGate": 0.33742,
+        "meanBaseLum601": 181.97
+      },
+      "h773nightNdlNonNeg": {
+        "n": 96,
+        "gate0": 79,
+        "gatePos": 17,
+        "gateFull": 12,
+        "iceSat": 6,
+        "iceSatGate0": 6,
+        "icePos": 11,
+        "landIce": 0,
+        "meanGate": 0.13092,
+        "meanBaseLum601": 23.59
+      },
+      "h773dayNdlNeg": {
+        "n": 0,
+        "gate0": 0,
+        "gatePos": 0,
+        "gateFull": 0,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": null,
+        "meanBaseLum601": null
+      }
+    },
+    "errors": 0,
+    "sameReshotIdentical": true
+  },
+  "lodSweep": [
+    {
+      "k": 1,
+      "level": "high",
+      "pxDiameter": 196.64,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 1,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 2,
+      "level": "high",
+      "pxDiameter": 98.32,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 1,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 4,
+      "level": "high",
+      "pxDiameter": 49.16,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 1,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 6,
+      "level": "high",
+      "pxDiameter": 32.77,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 1,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 8,
+      "level": "high",
+      "pxDiameter": 24.58,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 10,
+      "level": "high",
+      "pxDiameter": 19.66,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 12,
+      "level": "high",
+      "pxDiameter": 16.39,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 14,
+      "level": "high",
+      "pxDiameter": 14.05,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 16,
+      "level": "high",
+      "pxDiameter": 12.29,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 20,
+      "level": "high",
+      "pxDiameter": 9.83,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 24,
+      "level": "high",
+      "pxDiameter": 8.19,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 32,
+      "level": "high",
+      "pxDiameter": 6.15,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 48,
+      "level": "high",
+      "pxDiameter": 4.1,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 64,
+      "level": "high",
+      "pxDiameter": 3.07,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    },
+    {
+      "k": 96,
+      "level": "high",
+      "pxDiameter": 2.05,
+      "highVisible": true,
+      "midVisible": null,
+      "lowVisible": null,
+      "uMaskHigh": 0,
+      "uMaskMid": null,
+      "lowMaterialClass": null,
+      "settled": true
+    }
+  ],
+  "detCloudsOn": {
+    "settle": {
+      "dist": "9/6/17",
+      "fading": 0,
+      "waitedMs": 814,
+      "timedOut": false
+    },
+    "inj": {
+      "patched": 1,
+      "cloudPatched": 1,
+      "cloudExists": true
+    },
+    "errors": 0,
+    "phaseDeg": 90,
+    "diskR": 98.32,
+    "uMaskEnabledHigh": 1,
+    "bands": {
+      "nightInner": {
+        "n": 7225,
+        "gate0": 6464,
+        "gatePos": 761,
+        "gateFull": 630,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": 0.09601,
+        "meanBaseLum601": 0
+      },
+      "dayInner": {
+        "n": 7225,
+        "gate0": 2999,
+        "gatePos": 4226,
+        "gateFull": 1632,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": 0.40025,
+        "meanBaseLum601": 0
+      },
+      "twilight": {
+        "n": 3214,
+        "gate0": 2315,
+        "gatePos": 899,
+        "gateFull": 566,
+        "iceSat": 62,
+        "iceSatGate0": 62,
+        "icePos": 335,
+        "landIce": 0,
+        "meanGate": 0.23019,
+        "meanBaseLum601": 0
+      },
+      "nightAll": {
+        "n": 12170,
+        "gate0": 10784,
+        "gatePos": 1386,
+        "gateFull": 925,
+        "iceSat": 4,
+        "iceSatGate0": 4,
+        "icePos": 430,
+        "landIce": 0,
+        "meanGate": 0.0891,
+        "meanBaseLum601": 0
+      },
+      "dayAll": {
+        "n": 12170,
+        "gate0": 7010,
+        "gatePos": 5160,
+        "gateFull": 1786,
+        "iceSat": 19,
+        "iceSatGate0": 19,
+        "icePos": 458,
+        "landIce": 0,
+        "meanGate": 0.26914,
+        "meanBaseLum601": 0
+      },
+      "h773night": {
+        "n": 15480,
+        "gate0": 13179,
+        "gatePos": 2301,
+        "gateFull": 1495,
+        "iceSat": 70,
+        "iceSatGate0": 70,
+        "icePos": 776,
+        "landIce": 0,
+        "meanGate": 0.11847,
+        "meanBaseLum601": 0
+      },
+      "h773day": {
+        "n": 15288,
+        "gate0": 9305,
+        "gatePos": 5983,
+        "gateFull": 2166,
+        "iceSat": 136,
+        "iceSatGate0": 136,
+        "icePos": 793,
+        "landIce": 0,
+        "meanGate": 0.25244,
+        "meanBaseLum601": 0
+      },
+      "h773nightNdlNonNeg": {
+        "n": 96,
+        "gate0": 80,
+        "gatePos": 16,
+        "gateFull": 4,
+        "iceSat": 4,
+        "iceSatGate0": 4,
+        "icePos": 11,
+        "landIce": 0,
+        "meanGate": 0.10192,
+        "meanBaseLum601": 0
+      },
+      "h773dayNdlNeg": {
+        "n": 0,
+        "gate0": 0,
+        "gatePos": 0,
+        "gateFull": 0,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": null,
+        "meanBaseLum601": null
+      }
+    }
+  },
+  "cloudAttenuation": {
+    "nightInnerGated": {
+      "n": 763,
+      "ratioOnOff": 0.99994,
+      "attenuation": 0.00006,
+      "clearFrac": 0.99214
+    },
+    "dayInnerGated": {
+      "n": 4233,
+      "ratioOnOff": 0.74498,
+      "attenuation": 0.25502,
+      "clearFrac": 0.47909
+    }
+  },
+  "detCloudsOffReload": {
+    "identicalToFirstLoad": false
+  },
+  "frame773": {
+    "phaseDeg": 107.2713,
+    "diskR": 98.32,
+    "uMaskEnabledHigh": 1,
+    "bands": {
+      "nightInner": {
+        "n": 11905,
+        "gate0": 4972,
+        "gatePos": 6933,
+        "gateFull": 2837,
+        "iceSat": 6,
+        "iceSatGate0": 5,
+        "icePos": 1197,
+        "landIce": 0,
+        "meanGate": 0.33909,
+        "meanBaseLum601": 23.13
+      },
+      "dayInner": {
+        "n": 3061,
+        "gate0": 793,
+        "gatePos": 2268,
+        "gateFull": 1164,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": 0.598,
+        "meanBaseLum601": 221.74
+      },
+      "twilight": {
+        "n": 3137,
+        "gate0": 626,
+        "gatePos": 2511,
+        "gateFull": 57,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 1260,
+        "landIce": 0,
+        "meanGate": 0.14869,
+        "meanBaseLum601": 27.89
+      },
+      "nightAll": {
+        "n": 17480,
+        "gate0": 7056,
+        "gatePos": 10424,
+        "gateFull": 2846,
+        "iceSat": 487,
+        "iceSatGate0": 447,
+        "icePos": 3618,
+        "landIce": 0,
+        "meanGate": 0.26527,
+        "meanBaseLum601": 29.23
+      },
+      "dayAll": {
+        "n": 7300,
+        "gate0": 2320,
+        "gatePos": 4980,
+        "gateFull": 2088,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 126,
+        "landIce": 0,
+        "meanGate": 0.50053,
+        "meanBaseLum601": 219.36
+      },
+      "h773night": {
+        "n": 15507,
+        "gate0": 6143,
+        "gatePos": 9364,
+        "gateFull": 2765,
+        "iceSat": 487,
+        "iceSatGate0": 447,
+        "icePos": 3374,
+        "landIce": 0,
+        "meanGate": 0.28642,
+        "meanBaseLum601": 30.58
+      },
+      "h773day": {
+        "n": 15261,
+        "gate0": 4487,
+        "gatePos": 10774,
+        "gateFull": 2743,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 1714,
+        "landIce": 0,
+        "meanGate": 0.37681,
+        "meanBaseLum601": 142.67
+      },
+      "h773nightNdlNonNeg": {
+        "n": 0,
+        "gate0": 0,
+        "gatePos": 0,
+        "gateFull": 0,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 0,
+        "landIce": 0,
+        "meanGate": null,
+        "meanBaseLum601": null
+      },
+      "h773dayNdlNeg": {
+        "n": 5110,
+        "gate0": 1539,
+        "gatePos": 3571,
+        "gateFull": 138,
+        "iceSat": 0,
+        "iceSatGate0": 0,
+        "icePos": 1504,
+        "landIce": 0,
+        "meanGate": 0.12953,
+        "meanBaseLum601": 24.32
+      }
+    },
+    "errors": 0
+  },
+  "glow": {
+    "40": {
+      "level": "low",
+      "pxDiameter": 0.7858365864025065,
+      "settle": {
+        "dist": "0/0/32",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      }
+    },
+    "100": {
+      "level": "low",
+      "pxDiameter": 0.31433462697514447,
+      "settle": {
+        "dist": "0/0/32",
+        "fading": 0,
+        "waitedMs": 821,
+        "timedOut": false
+      }
+    }
+  }
+}
