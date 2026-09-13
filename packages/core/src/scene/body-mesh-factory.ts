@@ -46,6 +46,13 @@ export interface SurfaceLightingArgs {
    * `undefined` = 마스크 경로 비활성 (core 보수 기본 — `uMaskEnabled` 0 고정).
    */
   surfaceMaskBaseUrl?: string | undefined;
+  /**
+   * #1226 Amendment 11 §A11.6 결정 4 — 야간 도시 불빛. `undefined`/`false` = `nightLightStrength` 0
+   * (core 보수 기본). 이 묶음이 `createProceduralPlanetMaterial` 옵션으로 그대로 전달된다.
+   */
+  nightLights?: boolean | undefined;
+  /** #1226 D1 (Phase 1 임시) — 불빛 파라미터 후보 id. `undefined` = 기본 후보. */
+  nightLightCandidate?: string | undefined;
 }
 
 export function createBodyMesh(

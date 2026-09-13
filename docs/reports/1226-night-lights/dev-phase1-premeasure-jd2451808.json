@@ -1,0 +1,266 @@
+{
+  "meta": {
+    "jd": 2451808,
+    "baseUrl": "http://localhost:3000",
+    "renderer": "headless chromium --use-angle=swiftshader 1280x720",
+    "pages": {
+      "P2": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 0,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 814,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P4": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 0,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 816,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P1_a": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 0.9,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 813,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P3_a": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 0.9,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 813,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P1_b": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 1,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 815,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P3_b": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 1,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 812,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P1_c": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 0.6,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 812,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P3_c": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "isWebGPU": false,
+          "nightLightStrength": 0.6,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 812,
+          "timedOut": false
+        },
+        "errors": 0
+      }
+    },
+    "injectG": {
+      "patched": 1
+    },
+    "injectGA": {
+      "patched": 1
+    },
+    "injectL": {
+      "patched": 1
+    }
+  },
+  "summary": {
+    "NI": 7225,
+    "NI_land": 4104,
+    "NI_sea": 3121,
+    "DI": 7225,
+    "item1_meanP2minusP4_NI_land_lum709": -0.02608,
+    "item1_meanP2minusP4_NI_land_lum601_8bit": -6.86998,
+    "item1_changedPx_NI_land": 2083,
+    "item2": {
+      "landIceSat": 0,
+      "landIceHalf": 0,
+      "landGateAmpZero": 0,
+      "gateVsAmpZeroMismatch": 9
+    },
+    "candidates": {
+      "a": {
+        "X_lum601_8bit_per_gate": 33.73764,
+        "predicted773NightMean_conservative": 40.24314,
+        "NI_meanLum601_P1": 30.01022,
+        "NI_meanLum601_P2": 12.42325,
+        "D2preview_NI_land_meanContrib709_cloudsOff": 0.11984,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "D4preview_NI_land_unchangedRatio": 0.60989,
+        "D6preview_ratio_cloudsOnOverOff": 0.74121,
+        "NI_land_maxContrib709": 0.58739,
+        "NI_land_channelSaturatedPx_P1": 0
+      },
+      "b": {
+        "X_lum601_8bit_per_gate": 39.85042,
+        "predicted773NightMean_conservative": 41.99396,
+        "NI_meanLum601_P1": 33.19673,
+        "NI_meanLum601_P2": 12.42325,
+        "D2preview_NI_land_meanContrib709_cloudsOff": 0.14354,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "D4preview_NI_land_unchangedRatio": 0.8192,
+        "D6preview_ratio_cloudsOnOverOff": 0.75376,
+        "NI_land_maxContrib709": 0.86853,
+        "NI_land_channelSaturatedPx_P1": 640
+      },
+      "c": {
+        "X_lum601_8bit_per_gate": 17.65535,
+        "predicted773NightMean_conservative": 35.63684,
+        "NI_meanLum601_P1": 21.62674,
+        "NI_meanLum601_P2": 12.42325,
+        "D2preview_NI_land_meanContrib709_cloudsOff": 0.06318,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "D4preview_NI_land_unchangedRatio": 0.52924,
+        "D6preview_ratio_cloudsOnOverOff": 0.73628,
+        "NI_land_maxContrib709": 0.38545,
+        "NI_land_channelSaturatedPx_P1": 0
+      }
+    }
+  }
+}

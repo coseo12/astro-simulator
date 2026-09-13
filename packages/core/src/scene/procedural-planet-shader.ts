@@ -487,6 +487,117 @@ export const RIM_NDL_LO = -0.25;
  */
 export const RIM_NDL_HI = 0.15;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// #1226 Amendment 11 — 야간 도시 불빛 미학 파라미터 (**earth 전용**, rendering-only).
+// 적용 범위: rim 과 같은 rocky 분기라 구조적으로 earth 전용이다 (§A11.15 조건 6 — 재분류 시 상속).
+//
+// ⚠️ **Phase 1 = D1 후보 단계다.** 밝기 · 색 · 밀도 · 황혼 전이의 최종값은 사용자 육안 승인 (계약 D1)
+// 이 정하고, 가드 임계는 그 승인 **뒤에** baseline ÷ 3 으로 도출한다 (§A11.10). 후보 표는 승인 후
+// 승인값 1벌로 접는다 — 그때까지 `?nightlightsCandidate=<id>` 로 전환한다 (web 레이어).
+// 모든 후보는 `max(color) × strength ≤ 1` 이다 — §A11.15 조건 2 (증폭 게이트 맵 sub-LSB 전제) 를
+// 후보 단계에서부터 넘지 않는다 (단위 테스트 assert).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 불빛 분포 형태 — `uniform int nightLightPattern` 정수와 1:1 (§A11.5 후보 (d1) / (d2)). */
+export enum NightLightPattern {
+  /** (d1) value noise 군집 — `smoothstep(lo, hi, valueNoise(p * K))`, rocky fragment hash `+8`. */
+  ValueNoiseCluster = 0,
+  /** (d2) 셀 점 분포 — `step(lo, hash13(floor(p * K)))`, rocky fragment hash `+1`. */
+  CellPoints = 1,
+}
+
+/** 불빛 항 파라미터 1벌 (GLSL uniform 7종과 1:1). */
+export interface NightLightParams {
+  /** 세기 — `0` 이면 합성이 정확한 no-op (OFF = 같은 프로그램, rim `rimStrength = 0` 선례). */
+  readonly strength: number;
+  /** 발광 색 RGB ∈ [0,1]³. */
+  readonly color: { readonly r: number; readonly g: number; readonly b: number };
+  /** 황혼 전이 폭 `W` — `nightFactor = 1 − smoothstep(−W, 0, ndl)`. `> 0` 불변식 (smoothstep 미정의 차단). */
+  readonly twilightWidth: number;
+  /** 분포 형태. */
+  readonly pattern: NightLightPattern;
+  /** 분포 격자 주파수 `K` (`p` 공간). §A11.5 상한 `K ≲ 98` [도출 — 결정적 프레임 disk 반경 98.32 px]. */
+  readonly frequency: number;
+  /** (d1) smoothstep 하단 / (d2) step 임계. */
+  readonly lo: number;
+  /** (d1) smoothstep 상단 — `lo < hi` 불변식. (d2) 에서는 미사용이나 불변식은 유지한다. */
+  readonly hi: number;
+  /** 기존 `continents` 로 대규모 밀도 변조하는 비율 ∈ [0,1] (§A11.5 「공통」 — noise 호출 `+0`). */
+  readonly clusterMix: number;
+}
+
+/**
+ * #1226 D1 후보 표 — 사용자 육안 비교용 (Phase 1). id 는 URL `?nightlightsCandidate=<id>` 값이다.
+ *
+ * 축별로 서로 다른 값을 둔다 (계약 D1 「밝기 · 색 · 밀도 · 황혼 전이 후보 ≥ 2」):
+ *   - a — (d1) 군집 · 나트륨 주황 · 좁은 황혼 · 대륙 변조 절반
+ *   - b — (d2) 점 분포 · 황백 · 넓은 황혼 · 대륙 변조 없음
+ *   - c — (d1) 군집 저밝기 · 연주황 · 넓은 황혼 · 대륙 변조 강
+ */
+export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> = {
+  a: {
+    strength: 0.9,
+    color: { r: 1.0, g: 0.72, b: 0.38 },
+    twilightWidth: 0.12,
+    pattern: NightLightPattern.ValueNoiseCluster,
+    frequency: 48,
+    lo: 0.55,
+    hi: 0.72,
+    clusterMix: 0.5,
+  },
+  b: {
+    strength: 1.0,
+    color: { r: 1.0, g: 0.86, b: 0.62 },
+    twilightWidth: 0.25,
+    pattern: NightLightPattern.CellPoints,
+    frequency: 90,
+    lo: 0.82,
+    hi: 1.0,
+    clusterMix: 0.0,
+  },
+  c: {
+    strength: 0.6,
+    color: { r: 1.0, g: 0.8, b: 0.5 },
+    twilightWidth: 0.25,
+    pattern: NightLightPattern.ValueNoiseCluster,
+    frequency: 72,
+    lo: 0.5,
+    hi: 0.8,
+    clusterMix: 0.8,
+  },
+};
+
+/** 후보 미지정 시 기본 후보 id (Phase 1 임시 — D1 승인값으로 교체된다). */
+export const NIGHT_LIGHT_DEFAULT_CANDIDATE = 'a';
+
+/**
+ * #1226 §A11.6 결정 4 — 불빛 uniform 값 1벌을 결정한다 (순수 함수 — 바인딩과 단위 테스트가 공유).
+ *
+ * - `nightLights === false` → 후보 파라미터는 그대로 두고 **`strength` 만 `0`** — 같은 프로그램에서
+ *   합성이 정확한 no-op 이 된다 (§A11.3 「OFF = `nightLightStrength = 0`」).
+ * - 유효 조건 `nightLights && surfaceDetail` 의 `surfaceDetail` 축은 여기서 묻지 않는다 —
+ *   `surfaceDetail = false` 면 절차 머티리얼 자체가 만들어지지 않는다 (구조적).
+ * - 알 수 없는 후보 id → 기본 후보 + `console.warn` (fail-safe 가 아니라 **표시용 폴백**이다 — 가드는
+ *   후보 id 를 쓰지 않는다).
+ */
+export function resolveNightLightParams(
+  nightLights: boolean,
+  candidateId?: string | undefined,
+): NightLightParams {
+  let base = NIGHT_LIGHT_CANDIDATES[NIGHT_LIGHT_DEFAULT_CANDIDATE]!;
+  if (candidateId !== undefined) {
+    const found = NIGHT_LIGHT_CANDIDATES[candidateId];
+    if (found) {
+      base = found;
+    } else {
+      console.warn(
+        `[procedural-planet-shader] 알 수 없는 야간 불빛 후보 "${candidateId}" — 기본 후보 "${NIGHT_LIGHT_DEFAULT_CANDIDATE}" 사용`,
+      );
+    }
+  }
+  return nightLights ? base : { ...base, strength: 0 };
+}
+
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
 
@@ -652,6 +763,23 @@ uniform float rimFalloff;
 uniform float rimNdlLo;
 uniform float rimNdlHi;
 
+// Amendment 11 (#1226) — 야간 도시 불빛 uniform (rocky 전용, rendering-only 미학 파라미터 — §A11.3~§A11.5).
+//   nightLightStrength:      세기. 0 = OFF (같은 프로그램, 합성이 정확한 no-op — rimStrength 선례).
+//   nightLightColor:         발광 색.
+//   nightLightTwilightWidth: 황혼 전이 폭 W — nightFactor = 1 − smoothstep(−W, 0, ndl). > 0 불변식.
+//   nightLightPattern:       분포 형태 정수 (0 = value noise 군집 / 1 = 셀 점 분포 — if-else 만).
+//   nightLightFrequency:     분포 격자 주파수 K (p 공간 — vLocalPos 파생이라 painted-on).
+//   nightLightLo/Hi:         (0) smoothstep 경계 / (1) step 임계 (Lo 만 사용).
+//   nightLightClusterMix:    기존 continents 로 대규모 밀도 변조하는 비율 (noise 호출 +0).
+uniform float nightLightStrength;
+uniform vec3 nightLightColor;
+uniform float nightLightTwilightWidth;
+uniform int nightLightPattern;
+uniform float nightLightFrequency;
+uniform float nightLightLo;
+uniform float nightLightHi;
+uniform float nightLightClusterMix;
+
 // equirectangular UV 역수 상수 (매직 넘버 분리 — 1/(2π), 1/π).
 const float INV_TWO_PI = 0.1591549430918953;
 const float INV_PI = 0.3183098861837907;
@@ -716,6 +844,9 @@ void main(void) {
   // Amendment 8 (#1202) — 대기 산란 rim 세기. rocky 분기 안에서만 계산되고 (§A8.4 — mars/jupiter/
   // moon 의 fragment 추가 비용은 아래 합성 3 FMA 뿐), 비-rocky 는 0 이라 합성이 정확한 no-op 이다.
   float rim = 0.0;
+  // Amendment 11 (#1226) — 야간 도시 불빛 세기. rim 과 같은 배치 — rocky 분기 안에서만 계산되고
+  // 비-rocky 는 0 이라 아래 합성이 정확한 no-op 이다 (§A11.3).
+  float lights = 0.0;
 
   // ── Amendment 4 (#1119) — 지구 대륙 마스크 샘플 (§A4.3 결정 3·5·7) ───────────────
   // continents fbm 은 rocky 전용이라 분기 안에서만 계산한다 (desert/gas/cratered 의 fragment
@@ -782,6 +913,25 @@ void main(void) {
     // 최종 mix. albedo 단계에서만 결정 — 아래 col *= shade 최종 곱 불변 (#773 규약, 밤면 극관은 어둡다).
     float iceMask = smoothstep(iceLatLo, iceLatHi, latJ);
     col = mix(col, iceColor, iceMask);
+    // ── Amendment 11 (#1226) — 야간 도시 불빛 (§A11.3 결정 1 · §A11.4 결정 2 · §A11.5 결정 3) ──
+    // 연산은 여기 (rocky 분기 안), 합성은 분기 밖 rim 옆. col 을 건드리지 않는다 (위 iceMask mix 가
+    // 분기의 마지막 col 대입이라는 U8 계약 유지). landMask · iceMask · ndl 은 이미 계산됐다 — 재계산 금지 (volt #21).
+    // nightFactor — ndl >= 0 에서 **정확히 0** (smoothstep 이 1.0 을 정확히 낸다) → 낮면 불변 (계약 D3 · Q5).
+    float nightFactor = 1.0 - smoothstep(-nightLightTwilightWidth, 0.0, ndl);
+    // 게이트 (γ) — 마스크 경로가 꺼지는 곳 (원거리 R < 16 px · 로드 실패) 에서 불빛도 꺼진다 (분포 전환 0).
+    // (1.0 - iceMask) 는 Q1-b 극관 억제 — 결정적 프레임에서 픽셀 판별 불가라 단위 테스트가 고정한다.
+    float lightGate = landMask * (1.0 - iceMask) * uMaskEnabled;
+    // 분포 — 입력은 vLocalPos 파생 p 뿐이다 (painted-on · ?rotate=off 상속 · vWorldPos 금지 §A8.3).
+    // ⚠️ Phase 1 D1 후보 전환용 정수 분기 (if-else 만 — #756 §결정 2). 승인 뒤 한쪽으로 접는다.
+    float lightDensity = 0.0;
+    if (nightLightPattern == 0) {
+      lightDensity = smoothstep(nightLightLo, nightLightHi, valueNoise(p * nightLightFrequency));
+    } else {
+      lightDensity = step(nightLightLo, hash13(floor(p * nightLightFrequency)));
+    }
+    // 대규모 밀도 변조 — 기존 continents 재사용 (noise 호출 +0, §A11.5 「공통」).
+    lightDensity *= mix(1.0, continents, nightLightClusterMix);
+    lights = nightLightStrength * nightFactor * lightGate * lightDensity;
     // ── Amendment 8 (#1202) — 대기 산란 rim (§A8.2 결정 1 · §A8.13) ──────────
     // viewDir 은 **per-fragment** 다. 상수 viewDir(카메라→중심)을 쓰면 실루엣이 dot(N,U) = r/d
     // 에 생겨 rim 대역 폭·세기가 카메라 거리의 함수가 된다 (줌하면 rim 이 변한다). per-fragment
@@ -839,6 +989,9 @@ void main(void) {
   // ⚠️ mix 로 바꾸지 말 것 — 낮면 P1 의 부호가 5개 표면색 중 3개에서 뒤집혀 D1 이 구조적으로
   // FAIL 한다 (§A8.11 재검토 조건 5 에 대기 중인 안이며, 채택 시 판정량도 함께 바뀐다).
   col += rimColor * rim;
+  // Amendment 11 (#1226) §A11.3 — 야간 도시 불빛 합성. 발광이라 **가산**이고 밤면 명암에 곱해지지 않는다
+  // (col *= shade 뒤). rim 옆 · clamp 앞. 비-rocky 와 OFF (nightLightStrength 0) 는 lights = 0 이라 정확한 no-op.
+  col += nightLightColor * lights;
   // 안전 clamp — 광원(낮면 휘도 > 1) + 절차 변조 후 색역 이탈 방지 (디자인 루브릭 — 보라/마젠타 등
   // 기괴 색역 차단은 baseColor/landColor 가 실측 자연색이라 R/G/B 단조 합성으로 구조적 보장. clamp 는
   // [0,1] 범위만 보정 — 낮면이 sunIntensity 2.5 로 1.0 초과해도 흰색으로 saturate, 단색 행성과 동일).
@@ -919,6 +1072,15 @@ export interface CreateProceduralPlanetMaterialOptions {
    * `starfield` 와 동형 레이어 분리) — core 가 web 라우팅(`/textures/`)을 알면 단방향 의존이 깨진다.
    */
   surfaceMaskBaseUrl?: string | undefined;
+
+  /**
+   * #1226 Amendment 11 §A11.6 결정 4 — 야간 도시 불빛. **미전달/`false` = `nightLightStrength` 0**
+   * (core 보수 기본 — 합성이 정확한 no-op). 기본 ON 은 web 레이어 결정 (`?nightlights=off` 옵트아웃).
+   */
+  nightLights?: boolean | undefined;
+
+  /** #1226 D1 (Phase 1 임시) — 불빛 파라미터 후보 id (`NIGHT_LIGHT_CANDIDATES`). 미전달 = 기본 후보. */
+  nightLightCandidate?: string | undefined;
 }
 
 /** Amendment 1 — lighting 미전달 시 기본값 (단색 행성 PointLight/HemisphericLight 값과 동일 — 일관). */
@@ -1104,6 +1266,15 @@ export function createProceduralPlanetMaterial(
         'rimFalloff',
         'rimNdlLo',
         'rimNdlHi',
+        // Amendment 11 (#1226) — 야간 도시 불빛 uniform (rocky 전용, +8 — vec3 1 + float 6 + int 1).
+        'nightLightStrength',
+        'nightLightColor',
+        'nightLightTwilightWidth',
+        'nightLightPattern',
+        'nightLightFrequency',
+        'nightLightLo',
+        'nightLightHi',
+        'nightLightClusterMix',
       ],
       // Amendment 4 (#1119) — sampler 명시. Phase 0 게이트는 **명시한 상태에서만** 측정됐고
       // 생략 시 거동은 미측정이다 (이슈 #1119 게이트 코멘트 §잔여 미측정 1) — 추측하지 말고 명시한다.
@@ -1188,6 +1359,27 @@ export function createProceduralPlanetMaterial(
   material.setFloat('rimFalloff', RIM_FALLOFF);
   material.setFloat('rimNdlLo', RIM_NDL_LO);
   material.setFloat('rimNdlHi', RIM_NDL_HI);
+
+  // Amendment 11 (#1226) §A11.6 결정 4 — 야간 도시 불빛 uniform (rocky 전용, rendering-only).
+  // 4중 SSoT: 파라미터 (후보 표) → uniforms 배열 → 본 바인딩 → GLSL 선언. rim 선례대로 body 분기 없음.
+  // OFF (`nightLights` 미전달/false) = strength 0 — 같은 프로그램에서 합성이 정확한 no-op 이다.
+  // ⚠️ 이 블록이 통째로 사라져도 GLSL 소스 정적 assert 는 전건 통과한다 (계약 변이 MN-2 — §A8.8 M-2
+  // 동형). 그 축은 신규 가드 `verify:1226-night-lights` D2 가 픽셀로 잰다 (Phase 2).
+  const nightLight = resolveNightLightParams(
+    options.nightLights === true,
+    options.nightLightCandidate,
+  );
+  material.setFloat('nightLightStrength', nightLight.strength);
+  material.setColor3(
+    'nightLightColor',
+    new Color3(nightLight.color.r, nightLight.color.g, nightLight.color.b),
+  );
+  material.setFloat('nightLightTwilightWidth', nightLight.twilightWidth);
+  material.setInt('nightLightPattern', nightLight.pattern);
+  material.setFloat('nightLightFrequency', nightLight.frequency);
+  material.setFloat('nightLightLo', nightLight.lo);
+  material.setFloat('nightLightHi', nightLight.hi);
+  material.setFloat('nightLightClusterMix', nightLight.clusterMix);
 
   // Amendment 1 (#773) §A1.3 결정 1 — 태양 방향 uniform.
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.
@@ -1532,6 +1724,39 @@ export function lightingShadeMirror(
     ambient[1] + lighting.sunIntensity * lighting.sunDiffuse[1] * sunFactor,
     ambient[2] + lighting.sunIntensity * lighting.sunDiffuse[2] * sunFactor,
   ];
+}
+
+/** #1226 — `nightLightTermMirror` 입력 (GLSL 에서 이미 계산된 값들 — 셰이더도 재계산하지 않는다). */
+export interface NightLightTermMirrorInput {
+  /** `dot(N, uSunDirection)`. */
+  ndl: number;
+  /** 최종 landMask (절차/마스크 mix 결과) ∈ [0,1]. */
+  landMask: number;
+  /** 극관 마스크 ∈ [0,1]. */
+  iceMask: number;
+  /** `uMaskEnabled` (0/1). */
+  maskEnabled: number;
+  /** 분포 `lightDensity` ∈ [0,1] (noise 는 미러하지 않고 값으로 주입 — `SurfaceMaskMirrorInput` 선례). */
+  density: number;
+}
+
+/**
+ * #1226 Amendment 11 — GLSL `lights` 식 (황혼 게이트 × 게이트 (γ) × 밀도 × 세기) 의 **순수 JS 미러**.
+ *
+ * 극관 억제 (Q1-b) 는 결정적 프레임 밤면 내부에 극관 포화 픽셀이 없어 픽셀 가드가 판별하지 못한다
+ * (§A11.4 [실측]) — 그 축을 이 미러의 단위 테스트가 고정한다.
+ *
+ * ⚠️ FRAGMENT_SHADER 의 `nightFactor` · `lightGate` · `lights` 3줄과 동일 식이어야 한다 (한쪽 수정 시 양쪽 동기화).
+ */
+export function nightLightTermMirror(
+  input: NightLightTermMirrorInput,
+  params: NightLightParams,
+): number {
+  const w = params.twilightWidth;
+  const t = Math.min(Math.max((input.ndl + w) / w, 0), 1);
+  const nightFactor = 1 - t * t * (3 - 2 * t);
+  const lightGate = input.landMask * (1 - input.iceMask) * input.maskEnabled;
+  return params.strength * nightFactor * lightGate * input.density;
 }
 
 /** Rec.709 휘도 (광원식 단조성 검증용 — 밤면 < 낮면 비교 스칼라화). */
