@@ -13,6 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   NIGHT_LIGHT_CANDIDATES,
+  NIGHT_LIGHT_CLUSTER_GATE_OFF,
   NIGHT_LIGHT_DEFAULT_CANDIDATE,
   NightLightPattern,
   PLANET_FRAGMENT_SHADER,
@@ -45,6 +46,32 @@ describe('#1226 N1 — 후보 파라미터 정의역 불변식', () => {
 
   it.each(candidateEntries)('후보 %s — lo < hi (smoothstep 정의역)', (_id, c) => {
     expect(c.lo).toBeLessThan(c.hi);
+  });
+
+  it.each(candidateEntries)(
+    '후보 %s — clusterLo < clusterHi (군집 게이트 smoothstep 정의역)',
+    (_id, c) => {
+      expect(c.clusterLo).toBeLessThan(c.clusterHi);
+    },
+  );
+
+  it('게이트 끔 상수 — Hi ≤ 0 이라 continents ∈ [0,1] 전 구간에서 smoothstep 이 정확히 1 (1·2차 후보 픽셀 불변)', () => {
+    expect(NIGHT_LIGHT_CLUSTER_GATE_OFF.clusterHi).toBeLessThanOrEqual(0);
+    for (const id of ['a', 'b', 'c', 'a1', 'a2', 'a3']) {
+      const c = NIGHT_LIGHT_CANDIDATES[id]!;
+      expect(c.clusterLo).toBe(NIGHT_LIGHT_CLUSTER_GATE_OFF.clusterLo);
+      expect(c.clusterHi).toBe(NIGHT_LIGHT_CLUSTER_GATE_OFF.clusterHi);
+    }
+  });
+
+  it('3차 군집 후보 g1~g3 — a 와 게이트 외 파라미터 동일 · 게이트는 continents 치역 (0,1) 안', () => {
+    const a = NIGHT_LIGHT_CANDIDATES.a!;
+    for (const id of ['g1', 'g2', 'g3']) {
+      const g = NIGHT_LIGHT_CANDIDATES[id]!;
+      expect({ ...g, clusterLo: a.clusterLo, clusterHi: a.clusterHi }).toEqual(a);
+      expect(g.clusterLo).toBeGreaterThan(0);
+      expect(g.clusterHi).toBeLessThan(1);
+    }
   });
 
   it.each(candidateEntries)('후보 %s — max(color) × strength ≤ 1 (§A11.15 조건 2)', (_id, c) => {
@@ -112,6 +139,9 @@ describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
     expect(CODE).toContain('float lightGate = landMask * (1.0 - iceMask) * uMaskEnabled');
     expect(CODE).toContain('lights = nightLightStrength * nightFactor * lightGate * lightDensity');
     expect(CODE).toContain('col += nightLightColor * lights');
+    expect(CODE).toContain(
+      'lightDensity *= smoothstep(nightLightClusterLo, nightLightClusterHi, continents)',
+    );
   });
 
   it('연산은 rocky 분기 안 (iceMask mix 뒤 · desert dispatch 앞), 초기화는 분기 앞', () => {
@@ -139,7 +169,7 @@ describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
     expect(CODE).not.toContain('mix(col, nightLightColor');
   });
 
-  it('uniform 8종 GLSL 선언', () => {
+  it('uniform 10종 GLSL 선언', () => {
     for (const decl of [
       'uniform float nightLightStrength',
       'uniform vec3 nightLightColor',
@@ -149,6 +179,8 @@ describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
       'uniform float nightLightLo',
       'uniform float nightLightHi',
       'uniform float nightLightClusterMix',
+      'uniform float nightLightClusterLo',
+      'uniform float nightLightClusterHi',
     ]) {
       expect(PLANET_FRAGMENT_SHADER).toContain(decl);
     }

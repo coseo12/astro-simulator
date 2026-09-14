@@ -51,3 +51,13 @@ ADR [`20260628-756` Amendment 11](../../decisions/20260628-756-procedural-planet
 | `dev-phase1-d1r2-area-jd2451808.json`                  | 후보 a · a1 · a2 · a3 의 켜진 게이트 면적 비율 (위 선행 실측 레시피의 P2 · P1 · G · GA 페이지 재사용). `litRatio` = `NI_land` 에서 불빛 ON/OFF 로 픽셀이 바뀐 비율, `brightRatio` = `lum709` 증가 `≥ 0.1` 비율 (진단용 기준 — 가드 임계 아님) |
 | `d10-early-warning/after-{a1,a2,a3}-{773,783-dod}.log` | 변형별 `verify:773-light` · `verify:783-earth-detail` (`MODE=dod`) 원 출력. 가드는 URL 후보 파라미터를 받지 않으므로 측정 동안만 `NIGHT_LIGHT_DEFAULT_CANDIDATE` 를 변형으로 바꿔 core 를 빌드했다 (커밋된 기본값은 `a`)                      |
 | `d1-candidates/a{1,2,3}-*.png`                         | 2차 캡처 (1차와 같은 레시피)                                                                                                                                                                                                                  |
+
+## dev D1 3차 (2026-09-14) — 군집화
+
+사용자 결정 ([#1226 코멘트 `5663066189`](https://github.com/coseo12/astro-simulator/issues/1226#issuecomment-5663066189)) — 2차 a1 · a2 · a3 미승인, 저주파 노이즈를 곱이 아니라 임계로 써서 불빛을 몰리게 한다.
+
+| 파일                                                   | 내용                                                                                                                                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `dev-phase1-d1r3-cluster-jd2451808.json`               | 후보 a · a1 · a2 · a3 · g1 · g2 · g3 의 켜진 면적 + 몰림 지표 (화면 `16 px` 블록 켜짐 비율의 CV · 불빛 없는 블록 비율). 레시피는 2차 면적 측정과 같고 블록 집계만 더했다 |
+| `d10-early-warning/after-{g1,g2,g3}-{773,783-dod}.log` | 변형별 `verify:773-light` · `verify:783-earth-detail` (`MODE=dod`). 2차와 같은 방식 — 측정 동안만 기본 후보를 바꿔 빌드, 커밋 기본값은 `a`                               |
+| `d1-candidates/g{1,2,3}-*.png`                         | 3차 캡처 (1·2차와 같은 레시피)                                                                                                                                           |

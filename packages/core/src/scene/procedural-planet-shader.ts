@@ -524,6 +524,13 @@ export interface NightLightParams {
   readonly hi: number;
   /** 기존 `continents` 로 대규모 밀도 변조하는 비율 ∈ [0,1] (§A11.5 「공통」 — noise 호출 `+0`). */
   readonly clusterMix: number;
+  /**
+   * 군집 게이트 하단 — `smoothstep(clusterLo, clusterHi, continents)` (D1 3차). `continents` 를 곱이 아니라
+   * **임계**로 써서 불빛을 일부 지역에 몰고 넓은 빈 땅을 만든다. `clusterLo < clusterHi` 불변식.
+   */
+  readonly clusterLo: number;
+  /** 군집 게이트 상단. */
+  readonly clusterHi: number;
 }
 
 /**
@@ -534,6 +541,24 @@ export interface NightLightParams {
  *   - b — (d2) 점 분포 · 황백 · 넓은 황혼 · 대륙 변조 없음
  *   - c — (d1) 군집 저밝기 · 연주황 · 넓은 황혼 · 대륙 변조 강
  */
+/**
+ * 군집 게이트 끔 — Lo/Hi 를 `continents` 치역 [0,1] 아래에 둬 `smoothstep` 이 정확히 `1.0` 을 낸다.
+ * 1차 · 2차 후보 (a · b · c · a1~a3) 가 게이트 도입 전과 같은 픽셀을 내게 하는 값이다 (`x * 1.0` 은 정확).
+ */
+export const NIGHT_LIGHT_CLUSTER_GATE_OFF = { clusterLo: -2, clusterHi: -1 } as const;
+
+/** D1 3차 군집 후보 공통 — 후보 a 의 분포 · 색 · 황혼 폭 · 세기 (군집 게이트 제외). */
+const NIGHT_LIGHT_BASE_A_SHAPE = {
+  strength: 0.9,
+  color: { r: 1.0, g: 0.72, b: 0.38 },
+  twilightWidth: 0.12,
+  pattern: NightLightPattern.ValueNoiseCluster,
+  frequency: 48,
+  lo: 0.55,
+  hi: 0.72,
+  clusterMix: 0.5,
+} as const;
+
 export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> = {
   a: {
     strength: 0.9,
@@ -544,6 +569,7 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     lo: 0.55,
     hi: 0.72,
     clusterMix: 0.5,
+    ...NIGHT_LIGHT_CLUSTER_GATE_OFF,
   },
   b: {
     strength: 1.0,
@@ -554,6 +580,7 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     lo: 0.82,
     hi: 1.0,
     clusterMix: 0.0,
+    ...NIGHT_LIGHT_CLUSTER_GATE_OFF,
   },
   c: {
     strength: 0.6,
@@ -564,6 +591,7 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     lo: 0.5,
     hi: 0.8,
     clusterMix: 0.8,
+    ...NIGHT_LIGHT_CLUSTER_GATE_OFF,
   },
   // ── D1 2차 (사용자 결정 2026-09-14, #1226 코멘트 5662682559) — a 기반 밀도 하향 ──────────
   // a/b/c 는 「육지 전면 발광」으로 미승인. a 의 분포 (d1) · 색 · 황혼 폭 W · 세기 · 대륙 변조는
@@ -580,6 +608,7 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     lo: 0.65,
     hi: 0.78,
     clusterMix: 0.5,
+    ...NIGHT_LIGHT_CLUSTER_GATE_OFF,
   },
   /** a2 — 군집을 작게 (K 64) + 임계 상향 (면적 약 40%, 흩어진 작은 도시). */
   a2: {
@@ -591,6 +620,7 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     lo: 0.7,
     hi: 0.82,
     clusterMix: 0.5,
+    ...NIGHT_LIGHT_CLUSTER_GATE_OFF,
   },
   /** a3 — 군집을 크게 (K 40) + 임계 강상향 (면적 약 1/4, 드문 큰 도시권). */
   a3: {
@@ -602,6 +632,34 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     lo: 0.75,
     hi: 0.86,
     clusterMix: 0.5,
+    ...NIGHT_LIGHT_CLUSTER_GATE_OFF,
+  },
+  // ── D1 3차 (사용자 결정 2026-09-14, #1226 코멘트 5663066189) — 군집화 ─────────────────────────
+  // a1~a3 는 면적은 줄었으나 사하라 · 유럽이 같은 밀도라 「도시처럼 몰림」이 없어 미승인. a 의 분포 · K ·
+  // lo/hi · 대륙 변조 · 색 · 황혼 폭 · 세기를 **그대로** 두고 군집 게이트 (기존 continents 임계) 만 켠다.
+  // 게이트 값은 2차 변형과 켜진 면적이 비슷하도록 골랐다 [도출 — GLSL 미러 구면 30만 표본 × 육지 마스크,
+  // 10° 셀 304개]: 켜진 면적 · 셀 켜짐 비율 CV · 불빛 없는 셀 (< 1%) 비율
+  //   a1 0.187 · 0.81 · 0.29 → g1 0.189 · 1.21 · 0.47
+  //   a2 0.133 · 0.83 · 0.29 → g2 0.123 · 1.56 · 0.58
+  //   a3 0.084 · 0.96 · 0.33 → g3 0.101 · 1.73 · 0.62
+  // (불빛 없는 셀 0.29 기저는 극관 억제 — 그린란드 · 남극.)
+  /** g1 — 군집 게이트 0.52/0.60 (켜진 면적 ≈ a1). */
+  g1: {
+    ...NIGHT_LIGHT_BASE_A_SHAPE,
+    clusterLo: 0.52,
+    clusterHi: 0.6,
+  },
+  /** g2 — 군집 게이트 0.58/0.64 (켜진 면적 ≈ a2). */
+  g2: {
+    ...NIGHT_LIGHT_BASE_A_SHAPE,
+    clusterLo: 0.58,
+    clusterHi: 0.64,
+  },
+  /** g3 — 군집 게이트 0.60/0.66 (켜진 면적 ≈ a3, 몰림 최강). */
+  g3: {
+    ...NIGHT_LIGHT_BASE_A_SHAPE,
+    clusterLo: 0.6,
+    clusterHi: 0.66,
   },
 };
 
@@ -809,6 +867,7 @@ uniform float rimNdlHi;
 //   nightLightFrequency:     분포 격자 주파수 K (p 공간 — vLocalPos 파생이라 painted-on).
 //   nightLightLo/Hi:         (0) smoothstep 경계 / (1) step 임계 (Lo 만 사용).
 //   nightLightClusterMix:    기존 continents 로 대규모 밀도 변조하는 비율 (noise 호출 +0).
+//   nightLightClusterLo/Hi:  군집 게이트 — 같은 continents 의 smoothstep 임계 (noise 호출 +0, D1 3차).
 uniform float nightLightStrength;
 uniform vec3 nightLightColor;
 uniform float nightLightTwilightWidth;
@@ -817,6 +876,8 @@ uniform float nightLightFrequency;
 uniform float nightLightLo;
 uniform float nightLightHi;
 uniform float nightLightClusterMix;
+uniform float nightLightClusterLo;
+uniform float nightLightClusterHi;
 
 // equirectangular UV 역수 상수 (매직 넘버 분리 — 1/(2π), 1/π).
 const float INV_TWO_PI = 0.1591549430918953;
@@ -969,6 +1030,10 @@ void main(void) {
     }
     // 대규모 밀도 변조 — 기존 continents 재사용 (noise 호출 +0, §A11.5 「공통」).
     lightDensity *= mix(1.0, continents, nightLightClusterMix);
+    // 군집 게이트 (D1 3차) — 같은 continents 를 **임계**로 써서 불빛을 일부 지역에 몰고 넓은 빈 땅을 만든다.
+    // §A11.5 「공통」 행 (기존 continents 재사용 · hash +0) 안의 형태다. Lo < Hi 불변식 (단위 테스트).
+    // 게이트를 쓰지 않는 후보는 Lo/Hi 를 continents 치역 [0,1] 아래에 둬 정확히 1.0 을 곱한다 (a~a3 픽셀 불변).
+    lightDensity *= smoothstep(nightLightClusterLo, nightLightClusterHi, continents);
     lights = nightLightStrength * nightFactor * lightGate * lightDensity;
     // ── Amendment 8 (#1202) — 대기 산란 rim (§A8.2 결정 1 · §A8.13) ──────────
     // viewDir 은 **per-fragment** 다. 상수 viewDir(카메라→중심)을 쓰면 실루엣이 dot(N,U) = r/d
@@ -1304,7 +1369,7 @@ export function createProceduralPlanetMaterial(
         'rimFalloff',
         'rimNdlLo',
         'rimNdlHi',
-        // Amendment 11 (#1226) — 야간 도시 불빛 uniform (rocky 전용, +8 — vec3 1 + float 6 + int 1).
+        // Amendment 11 (#1226) — 야간 도시 불빛 uniform (rocky 전용, +10 — vec3 1 + float 8 + int 1).
         'nightLightStrength',
         'nightLightColor',
         'nightLightTwilightWidth',
@@ -1313,6 +1378,8 @@ export function createProceduralPlanetMaterial(
         'nightLightLo',
         'nightLightHi',
         'nightLightClusterMix',
+        'nightLightClusterLo',
+        'nightLightClusterHi',
       ],
       // Amendment 4 (#1119) — sampler 명시. Phase 0 게이트는 **명시한 상태에서만** 측정됐고
       // 생략 시 거동은 미측정이다 (이슈 #1119 게이트 코멘트 §잔여 미측정 1) — 추측하지 말고 명시한다.
@@ -1418,6 +1485,8 @@ export function createProceduralPlanetMaterial(
   material.setFloat('nightLightLo', nightLight.lo);
   material.setFloat('nightLightHi', nightLight.hi);
   material.setFloat('nightLightClusterMix', nightLight.clusterMix);
+  material.setFloat('nightLightClusterLo', nightLight.clusterLo);
+  material.setFloat('nightLightClusterHi', nightLight.clusterHi);
 
   // Amendment 1 (#773) §A1.3 결정 1 — 태양 방향 uniform.
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.
