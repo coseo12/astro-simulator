@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "jd": 2451808,
+    "renderer": "headless chromium --use-angle=swiftshader 1280x720",
+    "brightLumDelta": 0.1,
+    "pages": {
+      "P1_a": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "nightLightStrength": 0.9,
+          "nightLightLo": 0.55,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 811,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P1_a1": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "nightLightStrength": 0.9,
+          "nightLightLo": 0.65,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 814,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P1_a2": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "nightLightStrength": 0.9,
+          "nightLightLo": 0.7,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 810,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P1_a3": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "nightLightStrength": 0.9,
+          "nightLightLo": 0.75,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 809,
+          "timedOut": false
+        },
+        "errors": 0
+      },
+      "P2": {
+        "geom": {
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "nightLightStrength": 0,
+          "nightLightLo": 0.55,
+          "maskEnabled": 1
+        },
+        "lodSettle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 811,
+          "timedOut": false
+        },
+        "errors": 0
+      }
+    }
+  },
+  "summary": {
+    "NI": 7225,
+    "NI_land": 4104,
+    "DI": 7225,
+    "candidates": {
+      "a": {
+        "litRatio_NI_land": 0.39011,
+        "brightRatio_NI_land": 0.2902,
+        "meanContrib709_NI_land": 0.11984,
+        "X_lum601_8bit_per_gate": 33.73764,
+        "predicted773NightMean_conservative": 40.24314,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "NI_land_channelSaturatedPx": 0,
+        "litRatio_vs_a": 1,
+        "brightRatio_vs_a": 1
+      },
+      "a1": {
+        "litRatio_NI_land": 0.2193,
+        "brightRatio_NI_land": 0.16228,
+        "meanContrib709_NI_land": 0.0668,
+        "X_lum601_8bit_per_gate": 18.80585,
+        "predicted773NightMean_conservative": 35.96637,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "NI_land_channelSaturatedPx": 0,
+        "litRatio_vs_a": 0.56215,
+        "brightRatio_vs_a": 0.5592
+      },
+      "a2": {
+        "litRatio_NI_land": 0.16009,
+        "brightRatio_NI_land": 0.11647,
+        "meanContrib709_NI_land": 0.04663,
+        "X_lum601_8bit_per_gate": 13.12878,
+        "predicted773NightMean_conservative": 34.34035,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "NI_land_channelSaturatedPx": 0,
+        "litRatio_vs_a": 0.41037,
+        "brightRatio_vs_a": 0.40134
+      },
+      "a3": {
+        "litRatio_NI_land": 0.08382,
+        "brightRatio_NI_land": 0.05629,
+        "meanContrib709_NI_land": 0.02114,
+        "X_lum601_8bit_per_gate": 5.95226,
+        "predicted773NightMean_conservative": 32.28485,
+        "D3preview_DI_changedPx": 0,
+        "D5preview_NI_sea_changedPx": 0,
+        "NI_land_channelSaturatedPx": 0,
+        "litRatio_vs_a": 0.21486,
+        "brightRatio_vs_a": 0.19397
+      }
+    }
+  }
+}

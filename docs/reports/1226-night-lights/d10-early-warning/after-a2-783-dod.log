@@ -1,0 +1,62 @@
+
+> @astro-simulator/web@ verify:783-earth-detail /Users/seo/project/space/apps/web
+> node scripts/browser-verify-783-earth-detail.mjs
+
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== earth surface=on ===
+{
+  "diskPx": 22445,
+  "R": 98.3,
+  "north": {
+    "nDay": 504,
+    "whiteDayPct": 76.8
+  },
+  "south": {
+    "nDay": 359,
+    "whiteDayPct": 57.9
+  },
+  "eqGShare": 0.4838,
+  "midGShare": 0.3954,
+  "eqN": 1180,
+  "midN": 738,
+  "magenta": 0,
+  "dayPolarLum": 213.1,
+  "nightPolarLum": 56.3,
+  "screenSunDir": {
+    "x": 0.999,
+    "y": -0.038
+  }
+}
+
+=== earth surface=off ===
+{
+  "diskPx": 21746,
+  "R": 98.3,
+  "north": {
+    "nDay": 485,
+    "whiteDayPct": 0
+  },
+  "south": {
+    "nDay": 260,
+    "whiteDayPct": 0
+  },
+  "eqGShare": null,
+  "midGShare": null,
+  "eqN": 0,
+  "midN": 0,
+  "magenta": 0,
+  "dayPolarLum": 66.7,
+  "nightPolarLum": 30.7,
+  "screenSunDir": {
+    "x": 0.999,
+    "y": -0.038
+  }
+}
+
+=== 판정 (§A3.5) ===
+DoD 1 극관(낮면 남북): N 76.8% / S 57.9% (≥50, OFF N 0% / S 0%) · console err ON 0 / OFF 0 (== 0) → PASS
+DoD 2 biome: 적도 G-share 0.4838 (n=1180) > 중위도 0.3954 (n=738) · console err ON 0 (== 0) → PASS
+DoD 3 마젠타: 0 px · console err ON 0 (== 0) → PASS
+DoD 4 극 휘도: 밤면 56.3 < 낮면 213.1/3=71.0 · console err ON 0 (== 0) → PASS
+exit=0

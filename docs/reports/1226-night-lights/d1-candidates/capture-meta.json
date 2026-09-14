@@ -230,6 +230,195 @@
         "timedOut": false
       },
       "consoleErrors": 0
+    },
+    "a1-terminator": {
+      "isWebGPU": true,
+      "alpha": -1.5707963267948966,
+      "beta": 1.5707963267948966,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.65,
+      "nightLightHi": 0.78,
+      "nightLightFrequency": 48,
+      "uMaskEnabled": 1,
+      "lod": "11/3/18",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.8268455734717,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "11/3/18",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a1-night": {
+      "isWebGPU": true,
+      "alpha": 1.0000621239758022e-8,
+      "beta": 0.9100732531053309,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.65,
+      "nightLightHi": 0.78,
+      "nightLightFrequency": 48,
+      "uMaskEnabled": 1,
+      "lod": "2/5/25",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.826845371579196,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "2/5/25",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a1-night-clouds-off": {
+      "isWebGPU": true,
+      "alpha": 1.0000621239758022e-8,
+      "beta": 0.9100732531053309,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.65,
+      "nightLightHi": 0.78,
+      "nightLightFrequency": 48,
+      "uMaskEnabled": 1,
+      "lod": "2/5/25",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.826845371579196,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "2/5/25",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a2-terminator": {
+      "isWebGPU": true,
+      "alpha": -1.5707963267948966,
+      "beta": 1.5707963267948966,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.7,
+      "nightLightHi": 0.82,
+      "nightLightFrequency": 64,
+      "uMaskEnabled": 1,
+      "lod": "11/3/18",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.8268455734717,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "11/3/18",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a2-night": {
+      "isWebGPU": true,
+      "alpha": 1.0000621239758022e-8,
+      "beta": 0.9100732531053309,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.7,
+      "nightLightHi": 0.82,
+      "nightLightFrequency": 64,
+      "uMaskEnabled": 1,
+      "lod": "2/5/25",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.826845371579196,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "2/5/25",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a2-night-clouds-off": {
+      "isWebGPU": true,
+      "alpha": 1.0000621239758022e-8,
+      "beta": 0.9100732531053309,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.7,
+      "nightLightHi": 0.82,
+      "nightLightFrequency": 64,
+      "uMaskEnabled": 1,
+      "lod": "2/5/25",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.826845371579196,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "2/5/25",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a3-terminator": {
+      "isWebGPU": true,
+      "alpha": -1.5707963267948966,
+      "beta": 1.5707963267948966,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.75,
+      "nightLightHi": 0.86,
+      "nightLightFrequency": 40,
+      "uMaskEnabled": 1,
+      "lod": "11/3/18",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.8268455734717,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "11/3/18",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a3-night": {
+      "isWebGPU": true,
+      "alpha": 1.0000621239758022e-8,
+      "beta": 0.9100732531053309,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.75,
+      "nightLightHi": 0.86,
+      "nightLightFrequency": 40,
+      "uMaskEnabled": 1,
+      "lod": "2/5/25",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.826845371579196,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "2/5/25",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "consoleErrors": 0
+    },
+    "a3-night-clouds-off": {
+      "isWebGPU": true,
+      "alpha": 1.0000621239758022e-8,
+      "beta": 0.9100732531053309,
+      "nightLightStrength": 0.9,
+      "nightLightLo": 0.75,
+      "nightLightHi": 0.86,
+      "nightLightFrequency": 40,
+      "uMaskEnabled": 1,
+      "lod": "2/5/25",
+      "settledRadius": 36.82684741926834,
+      "settledCamDist": 36.826845371579196,
+      "fov": 0.32000000000000006,
+      "settle": {
+        "dist": "2/5/25",
+        "fading": 0,
+        "waitedMs": 810,
+        "timedOut": false
+      },
+      "consoleErrors": 0
     }
   }
 }

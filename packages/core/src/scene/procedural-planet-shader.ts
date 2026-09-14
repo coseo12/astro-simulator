@@ -565,6 +565,44 @@ export const NIGHT_LIGHT_CANDIDATES: Readonly<Record<string, NightLightParams>> 
     hi: 0.8,
     clusterMix: 0.8,
   },
+  // ── D1 2차 (사용자 결정 2026-09-14, #1226 코멘트 5662682559) — a 기반 밀도 하향 ──────────
+  // a/b/c 는 「육지 전면 발광」으로 미승인. a 의 분포 (d1) · 색 · 황혼 폭 W · 세기 · 대륙 변조는
+  // 그대로 두고 **켜지는 면적만** 임계 (lo/hi) 와 군집 크기 (K) 로 줄인다. 세기는 조정하지 않았다.
+  // 면적 [도출 — GLSL 미러 구면 표본 200k, 육지 무관]: density > 0 비율 a 0.3960 →
+  //   a1 0.2206 (a 의 56%) · a2 0.1536 (39%) · a3 0.0951 (24%).
+  /** a1 — a 와 같은 군집 크기, 임계만 상향 (면적 약 절반). */
+  a1: {
+    strength: 0.9,
+    color: { r: 1.0, g: 0.72, b: 0.38 },
+    twilightWidth: 0.12,
+    pattern: NightLightPattern.ValueNoiseCluster,
+    frequency: 48,
+    lo: 0.65,
+    hi: 0.78,
+    clusterMix: 0.5,
+  },
+  /** a2 — 군집을 작게 (K 64) + 임계 상향 (면적 약 40%, 흩어진 작은 도시). */
+  a2: {
+    strength: 0.9,
+    color: { r: 1.0, g: 0.72, b: 0.38 },
+    twilightWidth: 0.12,
+    pattern: NightLightPattern.ValueNoiseCluster,
+    frequency: 64,
+    lo: 0.7,
+    hi: 0.82,
+    clusterMix: 0.5,
+  },
+  /** a3 — 군집을 크게 (K 40) + 임계 강상향 (면적 약 1/4, 드문 큰 도시권). */
+  a3: {
+    strength: 0.9,
+    color: { r: 1.0, g: 0.72, b: 0.38 },
+    twilightWidth: 0.12,
+    pattern: NightLightPattern.ValueNoiseCluster,
+    frequency: 40,
+    lo: 0.75,
+    hi: 0.86,
+    clusterMix: 0.5,
+  },
 };
 
 /** 후보 미지정 시 기본 후보 id (Phase 1 임시 — D1 승인값으로 교체된다). */
