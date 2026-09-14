@@ -1,0 +1,29 @@
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== 측정 (DoD 14 — 원거리 축소 LOD) ===
+{
+  "near": {
+    "diskR": 98.32,
+    "diff": {
+      "diffPx": 38741,
+      "total": 921600,
+      "pct": 4.2037
+    },
+    "consoleErrors": []
+  },
+  "far": {
+    "diskR": 5.619,
+    "diff": {
+      "diffPx": 0,
+      "total": 921600,
+      "pct": 0
+    },
+    "consoleErrors": []
+  }
+}
+
+=== 판정 ===
+양성 대조군 (focus, R=98.32px ≥ 16): 고착 주입 diff 38741px (>0 필요) · console err 0 (== 0) → PASS
+원거리 대역 진입 (조감, R=5.619px < 16) · console err 0 (== 0) → PASS
+원거리에서 uMaskEnabled 이미 0 (고착 주입 diff 0% < 0.001%) · console err 0 (== 0) → PASS
+exit=0

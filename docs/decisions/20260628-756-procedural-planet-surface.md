@@ -2472,6 +2472,25 @@ col += nightLightColor * lights;
 - **`fbm` 신규 호출은 기각** — `+24` hash (value noise 3회). §A3.3 결정 3-c 의 fill-rate 논거 (earth focus 대면적) 를 그대로 적용한다.
 - **주파수 상한 [도출 — 근사]**: 결정적 프레임 disk 반경 `98.32 px` [실측]. `p` 공간 격자 간격이 `1/K` 이고 disk 중심부에서 `p` 1 단위가 약 반경 px 에 대응하므로 셀 폭은 약 `98.32 / K` px 다. `K` 가 약 `98` 을 넘으면 셀이 1 px 미만이 되어 noMipmap 마스크의 over-resolution 과 같은 축 (§A4.3 결정 2·4 커플링) 에 들어간다. `K` 는 D1 이 정하되 자전 ON 실 Chrome GUI shimmer 관찰 (D13) 을 동반한다.
 
+> ⏩ **D1 사용자 육안 승인 (2026-09-14)** — #1226 코멘트 [`5663330554`](https://github.com/coseo12/astro-simulator/issues/1226#issuecomment-5663330554). **승인 = 후보 (d1) value noise 군집 + 「공통」 행의 `continents` 재사용 두 형태 (곱 · 임계)**. (d2) 셀 점 분포는 미채택 (1차 `b` — 3D 격자 셀 경계 가시 · 채널 포화 `640 px`) 이고 코드에서 삭제했다.
+>
+> | 항목 | 승인값 |
+> | --- | --- |
+> | 분포 | `smoothstep(0.55, 0.72, valueNoise(p * 48))` |
+> | 대륙 변조 (곱) | `mix(1.0, continents, 0.5)` |
+> | 군집 게이트 (임계) | `smoothstep(0.52, 0.60, continents)` — `continents = fbm(p * 2.4)` 재사용, 추가 hash `0` |
+> | 색 · 세기 · 황혼 폭 | `(1.00, 0.72, 0.38)` · `0.9` · `W 0.12` |
+>
+> **후보 이력** (원자료 [`docs/reports/1226-night-lights/d1-candidates/`](../reports/1226-night-lights/d1-candidates/) — 실 Chrome GUI · WebGPU 캡처, 각 차수의 사용자 결정 코멘트):
+>
+> 1. **1차 `a` · `b` · `c`** — 분포 (d1)/(d2) · 밝기 · 색 · 황혼 폭을 축별로 달리함 → **전건 미승인** ([`5662682559`](https://github.com/coseo12/astro-simulator/issues/1226#issuecomment-5662682559) — 사하라 · 아마존까지 거의 균일한 「육지 전면 발광」)
+> 2. **2차 `a1` · `a2` · `a3`** — `a` 의 형태를 두고 임계 `lo/hi` · `K` 로 켜진 면적만 `0.56` · `0.41` · `0.21` 배 → **미승인** ([`5663066189`](https://github.com/coseo12/astro-simulator/issues/1226#issuecomment-5663066189) — 면적은 줄었으나 「도시처럼 몰림」 없음)
+> 3. **3차 `g1` · `g2` · `g3`** — `continents` 를 곱이 아니라 임계로 쓰는 군집 게이트 (`0.52/0.60` · `0.58/0.64` · `0.60/0.66`) → **`g1` 승인**
+>
+> - 3차의 GLSL 형태 변경 (군집 게이트) 은 본 절 표의 「공통 — 기존 `continents` 재사용 · hash `0`」 행 안이라고 판정했다 (noise 함수 사본 · `fbm` 호출 · `texture2D` 증가 `0` — 단위 테스트 N4). 표의 위험 칸 「대륙 형상과 연동」 은 곱보다 **강하게** 작용한다 — 불빛이 몰리는 위치를 `continents` 의 높은 영역이 정하며 실제 인구 밀집지와 무관하다.
+> - 주파수 `K 48` 은 상한 `≲ 98` 안이다. 자전 ON shimmer 는 D13 (실 Chrome GUI 사용자 육안) 에서 확인한다.
+> - 군집 게이트는 분포 패턴 변경이라 §A11.17.5 재실측 조건 3 이 발화한다 — 결과는 §A11.17.5 ⏩.
+
 ### A11.6 결정 4 — 활성 조건 (Q4)
 
 - `apps/web/src/core/parse-night-lights-mode.ts` — `parse-cloud-mode.ts` 동형 (기본 ON · `off` 옵트아웃 · 대소문자 무시 · 미지 값 → ON + `console.warn`) + 단위 테스트. URL 초기값만.
@@ -2588,6 +2607,12 @@ col += nightLightColor * lights;
 | 데이터 · 에셋 | `solar-system.json` · `apps/web/public/textures/` | **`0`** |
 | 기존 테스트 목록 | `log-depth-glsl.test.ts` `SHADERS` · `sun-shader.test.ts` `NOISE_CONTRACT_LINES` | **무변경** — 신규 셰이더 `0` · 신규 noise 사본 `0` (계약 D14 의 「무변경 사유」) |
 | web | `parse-night-lights-mode.ts` (+ test) · `sim-canvas.tsx` 배선 · `browser-verify-1226-night-lights.mjs` · `package.json` script | 신규 / 배선 |
+
+> ⏩ **결과 — 편차 2건 (2026-09-14, dev Phase 2)**: 예측 표에 없던 core 파일이 둘 바뀌었다.
+>
+> - `solar-system-scene.ts` — core 옵션 `nightLights?: boolean` (기본 `false`) 선언 · 구조 분해 · 배선 묶음 전달. §A11.6 결정 4 가 core 옵션을 요구했으므로 **예측 표의 누락**이다 (결정과 모순은 아니다).
+> - `body-mesh-factory.ts` — `SurfaceLightingArgs` 에 `nightLights?` 필드 `+1`. 이 묶음이 `createProceduralPlanetMaterial` 옵션으로 **그대로** 전달되는 배선이라 필드 선언이 필요했다. 표의 「`body-mesh-factory.ts` `0` 줄」 은 LOD · 정렬 코드 불변을 뜻했고, **LOD · 정렬 · 구름 코드 변경은 `0` 줄**로 성립했다 (`cloud-layer.ts` · 정렬 함수 · `createBodyMeshLow` 무접촉).
+> - 나머지 행 (noise 정의 수 · FRAGMENT 불변식 · 데이터 · 에셋 · `SHADERS` · `NOISE_CONTRACT_LINES` 무변경) 은 예측대로다 — 신규 셰이더 `0` · noise 사본 `0`.
 
 ### A11.14 미확인 (실행되지 않은 것 — 근거로 인용 금지)
 
