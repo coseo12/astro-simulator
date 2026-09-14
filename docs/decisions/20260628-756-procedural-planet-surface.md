@@ -2635,7 +2635,7 @@ col += nightLightColor * lights;
 **합의 (수용)**
 
 1. **MN-6 주입 교란** (질문 2) — agy 는 P3 단독 구름 제거가 「비정상 차분」 을 만든다고 지적했고, 메인 재분석과 교란의 **존재**에서 일치한다. 기전: D6 판정량 분자 `lum(P3) − lum(P4)` 에서 P3 의 구름을 끄면 `lum(P3) = lum(P1)` 이 되어 분자 = `[lum(P1) − lum(P2)] + [lum(P2) − lum(P4)]` 다. 둘째 항은 불빛과 무관한 **구름 자체의 밤면 육지 휘도 효과**이고 부호가 재지 않은 값이다 (§A11.14) — 양이면 비가 `1` 을 넘어 FAIL, 음이면 통과할 수 있다. ⇒ dev 는 가드 구현 전 baseline 에서 둘째 항의 부호를 인쇄하고, MN-6 의 기대값을 그 부호에서 도출한다. 음이면 MN-6 설계를 다시 연다.
-   - ⏩ **결과 (2026-09-14)**: 부호 **음** (`−0.02608`, dev 선행 실측 1) → 재설계 발동. 실측 결과 구름 자체 휘도는 **건강판 D6 판정량에서는 상쇄**되고 (잔차 `≤ 2e-5`), 교란은 원안 주입 (P3 단독 구름 비활성) 에만 있어 원안이 3 밀도 변형 모두 **미검출**이었다. MN-6 을 「불빛 항만 구름 블렌드 뒤 (rendering group 1) 에 가산하는 overlay」 로 교체 — 3 변형 모두 `R ≈ 1.000` 으로 D6 FAIL. D6 판정량 정의는 무변경 (D2 선행 결합만 추가). → [§A11.17](#a1117-mn-6-재설계-선행-실측-1-음수-부호-대응) (**Provisional**)
+   - ⏩ **결과 (2026-09-14)**: 부호 **음** (`−0.02608`, dev 선행 실측 1) → 재설계 발동. 실측 결과 구름 자체 휘도는 **건강판 D6 판정량에서는 상쇄**되고 (잔차 `≤ 2e-5`), 교란은 원안 주입 (P3 단독 구름 비활성) 에만 있어 원안이 3 밀도 변형 모두 **미검출**이었다. MN-6 을 「불빛 항만 구름 블렌드 뒤 (rendering group 1) 에 가산하는 overlay」 로 교체 — 3 변형 모두 `R ≈ 1.000` 으로 D6 FAIL. D6 판정량 정의는 무변경 (D2 선행 결합만 추가). → [§A11.17](#a1117-mn-6-재설계-선행-실측-1-음수-부호-대응) (**Accepted**, cross-validate 2026-09-14)
    - **agy 처방 (구름 alpha `0` 강제) 은 기각** — (A) 에서 alpha `0` 구름은 시각적으로 구름 제거와 같은 조작이라 같은 교란을 갖는다. agy 가 든 「`ALPHA_COMBINE` 파괴 · depth 쓰기 충돌」 은 구름이 모든 표면을 덮는 방식이 깨지는 결함이라 `verify:1215` 의 판정 영역이다.
    - 양쪽 페이지 (P3 · P4) 에서 모두 구름을 끄면 비는 정확히 `1` 이 되지만, 전제 7 (P4 ↔ P2) 이 신호를 잃어 `exit 2` 가 된다 — FAIL 이 아니므로 변이 판정으로 쓸 수 없다. 대안으로 채택하지 않았다.
 2. **§A11.12 누설 예산** (질문 4 의 2) — `nightFactor ≈ 1` 은 반평면 경계 부근 황혼 픽셀의 불빛을 과대 계상한다. 「낮면 누설이 예산을 넓힌다」 문장을 삭제하고 보수 한계 (`X ≤ 약 97`) 를 쓰도록 §A11.12 를 고쳤다.
@@ -2661,7 +2661,7 @@ col += nightLightColor * lights;
 
 ### A11.17 MN-6 재설계 (선행 실측 1 음수 부호 대응)
 
-- **상태**: **Provisional** (2026-09-14) — cross-validate 전. 메인이 교차검증 결과를 본 절 끝 「교차검증 반영 사항」 에 통합한 뒤 Accepted 로 전이한다. 전이 전에는 dev 가 본 절의 주입 레시피로 가드 변이를 확정하지 않는다.
+- **상태**: **Accepted** (cross-validate agy 2026-09-14 — §A11.17.8 4축 통합 완료. 원 박제: `Provisional`). 전이 전 메인 재분석 반영 — 퇴화 수렴 서술 정정 · 레시피 보강 3건 · 재실측 조건 1 · 5 보강. 보강 레시피는 **실행 전**이라 dev 가 D12 구현 시 V1~V4 로 재실측하고, 위배되면 해당 보강을 철회한다.
 - **발동**: §A11.16 수용 1 의 조건 「음이면 MN-6 설계를 다시 연다」. dev Phase 1 선행 실측 1 — `NI_land` `mean(lum709(P2) − lum709(P4)) = −0.02608` ([`dev-phase1-premeasure-jd2451808.json`](../reports/1226-night-lights/dev-phase1-premeasure-jd2451808.json)). 사용자 결정 2026-09-14 — #1226 코멘트 [`5662682559`](https://github.com/coseo12/astro-simulator/issues/1226#issuecomment-5662682559).
 - **원자료**: [`docs/reports/1226-night-lights/mn6-redesign/`](../reports/1226-night-lights/mn6-redesign/) — 측정 스크립트는 임시였고 삭제했다 (volt #67). 레시피 · 프레임 정의 · 판독 주의는 그 폴더 README 에 있다.
 - **측정 조건 (아래 「실측」 공통)**: §A11 공통 조건 (headless chromium `--use-angle=swiftshader` · 1280×720 · `verify:1202` 결정적 프레임) · JD `2451808.0` (U1) · `packages/core` = `3dfe672` 빌드 · `next dev`. 페이지 P1~P4 는 §A11.10 정의 그대로다. 추가 조건 하나 — **DOM 전 요소 `visibility: hidden`, canvas 만 visible** (#1219 HUD 글리프 혼입 차단). 전 페이지 `lodSettle.timedOut false` · 콘솔 에러 `0` · canvas 개수 `1` · 카메라 · 중심 · 태양 · fov 페이지 간 동일. 변형마다 1회 실행 + 건강판 독립 재로드 1회 (R3 ↔ P3 full frame `0 px`, 3 변형 모두).
@@ -2706,11 +2706,12 @@ col += nightLightColor * lights;
 MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입. 프로덕션 코드 0 줄. 대상 페이지 = P3 (구름 ON · 불빛 ON)
 1. host 와 earth-lod-* 머티리얼 onBindObservable 에 nightLightStrength = 0 을 매 bind 덮어쓴다 (verify:1202 injectFloats 선례). 주입 전 host 값 S 를 먼저 읽어 둔다
 2. overlay = host.clone('<이름>', null, true); overlay.parent = host; position (0,0,0) · rotationQuaternion null · rotation (0,0,0) · scaling (1,1,1)
-3. overlayMat = host.material.clone('<이름>'); overlayMat._options = { ...host.material._options, needAlphaBlending: true }; overlayMat.alphaMode = 1 (ALPHA_ADD); overlay.material = overlayMat
+3. overlayMat = host.material.clone('<이름>'); overlayMat._options = { ...host.material._options, needAlphaBlending: true }; overlayMat.alphaMode = 1 (ALPHA_ADD); overlayMat.disableDepthWrite = true (블렌드 draw 에서 무효 — §A10.5 규약상 명시); overlay.material = overlayMat
 4. overlay.renderingGroupId = 1; scene.setRenderingAutoClearDepthStencil(1, false, false, false); overlay.alwaysSelectAsActiveMesh = true
 5. scene.onBeforeRenderObservable 에서 매 프레임 host 머티리얼의 _floats · _ints · _vectors3 · _colors3 · _textures 를 overlayMat 의 같은 맵으로 복사한 뒤
    sunIntensity = 0 · ambientIntensity = 0 · rimStrength = 0 · nightLightStrength = S 로 덮어쓴다
-6. 원복 = 5 의 observer 제거 · overlay / overlayMat dispose · host nightLightStrength 를 S 로 다시 덮어쓴다
+6. 원복 = 5 의 observer 제거 · overlay.dispose() · overlayMat.dispose(false, false) (텍스처 비해제 명시) · scene.setRenderingAutoClearDepthStencil(1, true, true, true) (Babylon 기본값 복원) · host nightLightStrength 를 S 로 다시 덮어쓴다
+   하네스는 1~5 를 try, 6 을 finally 에서 실행하고 판정 종료 코드는 finally 뒤에서 낸다 (try 안 process.exit 는 finally 를 건너뛴다 — #940)
 ```
 
 - `_options` 는 **복사**한다 — 공유된 채 `needAlphaBlending` 을 켜면 host 까지 투명 큐로 옮겨 간다. `clone()` 의 기본 동작이 `_options` 를 공유하는지는 재지 않았다 (§A11.17.7). 레시피대로 복사한 상태에서 host `needAlphaBlending() === false` · overlay `true` · 공유 `false` [실측].
@@ -2730,7 +2731,7 @@ MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입.
 
 **퇴화 수렴 점검**
 
-- 건강판 `R` = 불빛 픽셀 위 `(1 − α)` 의 기여 가중 평균이다 — [실측] 가중 평균 `0.74132` / `0.72693` / `0.71996` ≈ 건강판 `R`. 변이판 `R = 1` 은 `α` 와 무관하다. 둘이 같은 상수로 수렴하는 조건은 **불빛 ∩ 구름 픽셀의 기여 가중이 `0`** 인 경우 하나이고, 그때는 건강판이 `1` 로 올라가 **D6 가 건강판을 FAIL** 시킨다 — 통과 방향이 아니라 fail-closed 다.
+- 건강판 `R` = 불빛 픽셀 위 `(1 − α)` 의 기여 가중 평균이다 — [실측] 가중 평균 `0.74132` / `0.72693` / `0.71996` ≈ 건강판 `R`. 변이판 `R = 1` 은 `α` 와 무관하다. 둘이 같은 상수로 수렴하는 조건은 **불빛 ∩ 구름 픽셀의 기여 가중이 `0`** 인 경우 하나다. 그때 `K_OCC = (1 − R_baseline) / 3` 도 **같은 baseline 에서 함께 작아지므로** 건강판은 PASS 를 유지하고, 판별 여유가 `K_OCC` 대 C-4 반올림 이탈 `|1 − R|` 로 줄어든다 — **fail-open 방향 (여유 붕괴)** 이다. 이 방향은 새 임계가 아니라 **D12 MN-6 을 최종 상수로 실발화**해 잡고, baseline 실행에서 겹침 px · `K_OCC` · C-4 `R` 을 함께 인쇄한다 (§A11.17.5 조건 1). ⏩ **정정 (2026-09-14, cross-validate — §A11.17.8 고유 발견 1)**: 원 서술 「건강판이 `1` 로 올라가 D6 가 건강판을 FAIL — fail-closed」 는 §A11.17.2 머리말 (같은 실행 도출 시 건강판 PASS 는 산술상 자명) 과 모순이었다.
 - 실측 범위에서 불빛 ∩ 구름 (`P1 ≠ P2` ∧ `P4 ≠ P2`) 은 `810` / `471` / `294 px`, 건강판 `R` 은 `0.72 ~ 0.74` 로 수렴 징후가 없다.
 - 반대 방향 (변이판이 건강판 쪽으로 내려옴) 은 overlay 에 `(1 − α)` 가 곱해져야 하는데 레시피에 `α` 입력이 없다 (구조).
 - 원안 C-1 은 퇴화 수렴이 아니라 **역방향 이탈**이다 — `a-d2` 에서 건강판 (`0.71949`) 보다도 아래 (`0.22501`) 로 내려간다.
@@ -2747,11 +2748,11 @@ MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입.
 - **건강판 baseline (→ `K_OCC`) — 약하게 의존.** `R = 0.74121 / 0.72671 / 0.71949`. 기전은 「불빛 픽셀 위 `(1 − α)` 의 기여 가중 평균」 이다. 분포 noise 가 구름과 공간적으로 독립이면 게이트 영역의 구름 감쇠로 수렴한다 — 실측한 축은 `lo/hi` 뿐이다.
 - **원안 C-1 — 강하게, 역방향으로 의존** (§A11.17.1 (iii)). 재설계가 필요했던 두 번째 이유다.
 - **재실측이 필요한 조건** — 도출 규칙은 그대로 두고 수치만 다시 잰다:
-  1. **D1 최종 승인 파라미터** — `K_OCC` 는 원래 승인값 baseline 에서 도출한다 (계약 임계 규칙). 그 baseline 실행에서 채택안 MN-6 의 `R` 과 V1~V4 를 **함께** 인쇄한다.
+  1. **D1 최종 승인 파라미터** — `K_OCC` 는 원래 승인값 baseline 에서 도출한다 (계약 임계 규칙). 그 baseline 실행에서 채택안 MN-6 의 `R` 과 V1~V4 를 **함께** 인쇄한다. 같은 실행에서 불빛 ∩ 구름 px (`P1 ≠ P2` ∧ `P4 ≠ P2`) · 판별 여유 `K_OCC / |1 − R_C4|` · `NI_land` 채널 포화 px 도 인쇄한다 — 앞 둘은 퇴화 (여유 붕괴) 의 조기 판독이고, 포화 px `> 0` 이면 §A11.17.1 (i) 상쇄의 전제 (clamp 미포화) 를 재확인한다. 판정은 D12 실발화가 하며 이 인쇄값에는 임계를 두지 않는다 (§A11.17.8).
   2. 승인 파라미터의 `NI_land` 평균 기여가 **`0.03365` 미만** (실측 최저, `a-d2`) — 반올림 이탈이 측정 범위 밖으로 커진다.
   3. 분포가 구름 noise 와 **상관을 가질 수 있는 변경** (패턴 교체 · `clusterMix` · 구름과 같은 입력 공간이나 주파수 사용) — 가중 평균 기전의 전제 (공간 독립) 가 흔들린다.
   4. **구름 파라미터** (`cover` · `opacity` · `frequency`) · **측정 JD** · 구름 drift 변경 — `α` 분포가 바뀐다.
-  5. 레시피가 의존하는 **Babylon 내부 필드** (`_options` · `_floats` 계열 맵 · group 자동 depth clear) 가 엔진 업그레이드로 바뀜 — V1~V4 가 먼저 깨지는 자리다.
+  5. 레시피가 의존하는 **Babylon 내부 필드** (`_options` · `_floats` 계열 맵 · group 자동 depth clear) 가 엔진 업그레이드로 바뀜, 또는 **렌더 파이프라인 설정** (MSAA · 톤매핑 · 후처리 · 그룹 0 뒤에 그려지는 레이어 도입 · `renderingGroupId` 1 을 쓰는 제품 코드 등장) 변경 — V1~V4 가 먼저 깨지는 자리다.
 
 #### A11.17.6 앞 절과의 관계 (원문 소급 수정 `0`)
 
@@ -2774,7 +2775,7 @@ MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입.
 - 백색 표면 점검에서 disk 중 `R ≠ 255` 인 `271 px` 의 위치 (`NI_land` 잔차 `≤ 2e-5` 라 판정 집합 영향은 없다고 본다 — 도출)
 - overlay 설치가 **다른 기존 가드**와 결합하는지 — 변이 하네스 전용이라 기존 가드 실행 경로에는 들어가지 않는다 (구조)
 
-#### A11.17.8 교차검증 반영 사항 — **대기** (메인 cross-validate 후 기입)
+#### A11.17.8 교차검증 반영 사항 — **반영 완료** (agy 2026-09-14, Accepted 전이)
 
 **호출 전 Claude 편향 셀프 체크** ([cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5):
 
@@ -2788,3 +2789,44 @@ MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입.
 1. C-4 가 결함 문장 「불빛이 구름 위에 그려짐」 의 합성식과 동형이라는 논증 (§A11.17.3) 의 빈틈 — 특히 clamp · 8-bit 반올림 순서가 달라지는 지점
 2. 건강판 판정량에서 구름 자체 휘도가 상쇄된다는 실측 (§A11.17.1 (i)) 이 **clamp 포화 픽셀**이 생기는 파라미터에서도 유지되는가
 3. 재실측 조건 5종 (§A11.17.5) 의 누락 — 특히 퇴화 수렴 (불빛 ∩ 구름 가중 → `0`) 을 D1 승인 단계에서 조기 감지할 방법
+
+---
+
+- **호출**: `cross_validate.sh architecture` (outcome `applied`, plan-bypass 가드 diff empty). 입력 = §A11.17 절 전체 + 원자료 README + 계약 D6 · MN-6 원문 (구조 경계 발췌, 필수 토큰 grep 확인). 병행 dev 체크아웃 보호를 위해 유휴 worktree 에서 실행했다.
+- **Claude 사전 분석**을 agy 결과 열람 **전에** 따로 기록했다 (편향 대조용 — 아래 「고유 발견 (Claude)」).
+
+**합의 (반영)**
+
+1. C-1 · C-2 · C-3 · C-5 기각과 C-4 채택의 합성식 논증 (§A11.17.3) — 양측 동의.
+2. clamp · 8-bit 순서 (명시 질문 1) — C-4 는 `clamp(clamp((1−α)S + αK) + L)` 이라 결함식 `clamp((1−α)S + αK + L)` 와 중간 clamp 한 번이 다르다. `NI_land` 는 밤면이라 중간 항이 포화에서 멀고, 실측 `R − 1 ≤ 0.00044` 가 1 LSB 양자화 누적의 크기와 맞는다 — 판별에 영향 없음.
+3. 구름 자체 휘도 상쇄는 **clamp 포화 픽셀에서 깨진다** (명시 질문 2) — `P3` 가 포화하면 `P3 − P4 < (1−α)L` 이 되고 `αK` 가 잔차로 남는다. §A10/§A11.10 보강 2 의 「clamp 미포화 전제」 가 이미 조건으로 달려 있다.
+4. 주입 원복 계약 보강 (agy 구조 [MAJOR]) — 레시피 1~5 중 예외가 나면 6 이 돌지 않는다 → 하네스는 1~5 를 `try`, 6 을 `finally` 에서 실행한다. ⚠️ `try` 안의 `process.exit` 는 `finally` 를 건너뛴다 (#940) — 판정 종료 코드는 `finally` 뒤에서 낸다.
+
+**이견 (근거와 함께 처분)**
+
+1. agy **[CRITICAL] 텍스처 공유 파괴** (`overlayMat.dispose()` 가 host 텍스처를 해제) — **기각.** Babylon `9.19.0` `ShaderMaterial.dispose(forceDisposeEffect, forceDisposeTextures, notBoundToMesh)` 는 `forceDisposeTextures` 가 참일 때만 `_textures` 를 `dispose()` 하고, 기본 (`undefined`) 에서는 자기 맵 참조만 비운다 [소스 확인 — `Materials/shaderMaterial.pure.js`]. 원복 후 full frame `0 px` (V4) 도 host 텍스처가 살아 있음을 보인다 [실측]. 다만 인자를 명시하는 것은 비용이 없어 **레시피에 `dispose(false, false)` 로 적는다** (거동 불변, 코드가 의도를 말하게 함).
+2. agy **[CRITICAL] 렌더 그룹 설정 원복 누락** (`setRenderingAutoClearDepthStencil(1, …)` 을 6 에서 되돌리지 않음) — **지적은 수용, 등급은 기각.** 제품 코드에서 `renderingGroupId` 를 0 이 아닌 값으로 쓰는 곳이 `0` 건이다 [grep — `packages/core/src` · `apps/web/src`, 명시 대입은 starfield `0` 뿐]. 그래서 그룹 1 자동 depth/stencil clear 설정은 overlay dispose 뒤 어떤 draw 에도 닿지 않고, V4 `0 px` 와 정합한다. 후속 측정 오염 가능성은 **그룹 1 을 쓰는 코드가 생길 때**만 생긴다 → 레시피 6 에 Babylon 기본값 복원 `setRenderingAutoClearDepthStencil(1, true, true, true)` 을 추가한다.
+3. agy 「`NI` 의 밤면 조건 (`ndl ≤ −0.15`) 이 포화 부재를 보장한다」 — **기각.** 포화원은 표면·구름이 아니라 **불빛 자신**이다. 1차 D1 후보 `b` 에서 밤면 육지 채널 포화 `640 px` 가 실측됐다 (dev Phase 1). 따라서 포화 부재는 밤면이라서 자동으로 참이 아니라 **D1 파라미터에 달린 제품 속성**이다 → 「측정 불가」 전제로 올리지 않고 (#1215 X2), baseline 도출 실행의 **인쇄 항목**으로 둔다 (아래 재실측 조건 1 보강).
+4. agy 퇴화 수렴 조기 감지 — 겹침 지표 `Ω` 에 「최소 유효 픽셀 `≤ 50 px`」 임계 + `WARN` — **지표 인쇄는 수용, 임계는 기각.** `50` 은 도출 근거가 없는 새 임계다 (계약 「수치 발명 금지」). 겹침 px 와 판별 여유를 baseline 실행에서 **인쇄**하고, 판별 가능 여부는 D12 MN-6 실발화가 정한다 (아래 고유 발견 1).
+5. agy 재실측 누락 조건 — **KTX2/Basis 텍스처 압축은 기각** (본 기능은 텍스처 `0` — 절차 셰이더, ADR 「에셋 0」 원칙). **MSAA · 톤매핑 · 후처리 · 그룹 0 뒤에 그려지는 대기/후처리 레이어 도입은 수용** — 조건 5 를 「Babylon 내부 필드」 에서 「엔진 내부 필드 **또는 렌더 파이프라인 설정**」 으로 넓힌다.
+6. agy `overlayMat.disableDepthWrite = true` 명시 — **수용 (거동 근거는 정정).** §A10.5 실측상 이 플래그는 블렌드 draw 에서 **무효**다 (구름에서 `false`/`true` 바이트 동일). agy 가 댄 「그룹 1 depth 덮어쓰기 방지」 효과는 없다. 같은 절의 규약 — 거동이 같아도 코드가 엔진의 실제 거동을 말하게 명시한다 — 에 따라 레시피 3 에 적는다.
+
+**외부 모델 고유 발견**
+
+1. 그룹 설정 원복 · 예외 안전성 — 위 합의 4 · 이견 2 로 처분.
+2. overlay 가 host 만 복제 (LOD 메시 미포함) — §A11.17.7 미확인 「mid LOD · fade 창」 과 같은 축이다. 변경 없음.
+
+**고유 발견 (Claude — agy 미검출)**
+
+1. **「퇴화 수렴 = fail-closed」 논증이 §A11.17.2 머리말과 모순된다 (본 절에서 정정).** 머리말은 `K` 를 같은 실행의 건강판에서 도출하면 「건강판 PASS 는 산술상 자명」 이라 적었다. 그런데 퇴화 점검은 불빛 ∩ 구름 가중 → `0` 이면 「건강판 R → 1 → D6 가 건강판을 FAIL」 이라 적었다. 실제 가드에서 `K_OCC` 는 D1 승인 baseline 에서 도출되는 상수라, baseline 자체가 퇴화하면 `K_OCC = (1 − R_baseline)/3` 도 **같이 작아진다** — 건강판은 여전히 PASS 하고, 판별 여유는 `K_OCC` 대 C-4 의 반올림 이탈 `|1 − R|` 로 줄어든다. 즉 퇴화의 실제 모습은 **판별 여유 붕괴 (C-4 가 `R ≤ 1 − K_OCC` 로 통과 — fail-open 방향)** 이다. 이를 잡는 것은 새 임계가 아니라 **D12 MN-6 을 최종 상수로 실발화**하는 것이고 (계약에 이미 있다), 조기 판독을 위해 baseline 실행에서 겹침 px · `K_OCC` · C-4 `R` 을 함께 인쇄한다. agy 는 명시 질문 3 에서 문서의 「건강판 FAIL」 프레이밍을 그대로 이어받았다 — 명시 질문이 문서 프레이밍을 운반한 **앵커링**으로 본다.
+2. **재실측 조건 2 는 D1 3차 (군집화) 에서 발화 가능성이 높다** [추론]. 2차 `a3` 의 켜진 면적이 `a` 대비 `0.21` 이었고 군집화는 면적을 더 줄이는 방향이다. 조건 2 발화 시 조건 1 인쇄 항목으로 판별 여유를 먼저 본다.
+3. C-4 는 제품 코드로 도달할 수 없는 합성 결함이다 (§A11.17.2 ⚠️ 인정). 계약 D12 문면을 충족하므로 문제는 아니나, Q2=(A) 에서 D6 가 **실제로 막는 제품 회귀**와의 대응 — 구름 알파 소실은 E10 양성 대조 `exit 2`, 구름 shell 정렬 변경은 D6 비 변화 — 는 여기 기록만 한다 [추론, 미실측].
+4. 조건 5 (엔진 업그레이드) 의 조기 감지 수단은 V1~V4 뿐이고, 이는 변이 하네스 실행 때만 돈다. 엔진 업그레이드 PR 에서 MN-6 재실증을 강제하는 배선은 없다 — 기록만 (범위 밖, 실피해 관측 전 이슈화하지 않음).
+
+**Claude 편향 셀프 체크**
+
+- **낙관** — 레시피 보강 3건 (`disableDepthWrite` · 그룹 설정 복원 · `dispose` 인자) 은 **실행하지 않았다.** 거동 불변을 소스·§A10.5 실측에서 도출했을 뿐이다 → dev 가 D12 구현 시 V1~V4 를 보강 레시피로 재실측하고, 하나라도 위배되면 해당 보강을 철회한다.
+- **결합 간과** — 이견 2 의 「그룹 1 사용 `0` 건」 은 현재 코드 grep 이다. 그룹 1 을 쓰는 코드가 생기면 조건 5 로 재실측한다.
+- **순수주의** — 내부 필드 의존은 유지한다 (V1~V4 로 무효 판정이 먼저 난다). 공개 API 대체는 재지 않았다.
+
+**전이**: 위 반영 (정정 1 · 레시피 보강 3 · 재실측 조건 1·5 보강) 후 **Provisional → Accepted (cross-validate 2026-09-14)**.
