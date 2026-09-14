@@ -30,18 +30,3 @@ export function parseNightLightsVisible(urlParam: string | null | undefined): bo
   );
   return true;
 }
-
-/**
- * #1226 D1 (Phase 1 임시) — `?nightlightsCandidate=<id>` → 불빛 파라미터 후보 id.
- *
- * 사용자 육안 비교 (계약 D1) 전용이다. 승인 뒤 후보 표가 승인값 1벌로 접히면 이 파라미터도 함께
- * 정리한다. id 의 유효성은 core (`NIGHT_LIGHT_CANDIDATES`) 가 판정한다 — web 이 core 상수를 import
- * 하면 babylon 이 SSR import 그래프에 들어오므로 여기서는 정규화만 한다.
- *
- * @returns 소문자로 정규화한 id, 미지정·빈 문자열이면 `undefined` (core 기본 후보)
- */
-export function parseNightLightCandidate(urlParam: string | null | undefined): string | undefined {
-  if (urlParam === null || urlParam === undefined) return undefined;
-  const normalized = urlParam.trim().toLowerCase();
-  return normalized === '' ? undefined : normalized;
-}

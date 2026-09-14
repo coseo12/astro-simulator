@@ -51,8 +51,6 @@ export interface SurfaceLightingArgs {
    * (core 보수 기본). 이 묶음이 `createProceduralPlanetMaterial` 옵션으로 그대로 전달된다.
    */
   nightLights?: boolean | undefined;
-  /** #1226 D1 (Phase 1 임시) — 불빛 파라미터 후보 id. `undefined` = 기본 후보. */
-  nightLightCandidate?: string | undefined;
 }
 
 export function createBodyMesh(

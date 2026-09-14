@@ -1,24 +1,31 @@
 /**
  * #1226 — 야간 도시 불빛 (ADR `20260628-756` Amendment 11) 단위 테스트.
  *
- * Phase 1 범위 — 픽셀 가드 (`verify:1226-night-lights`) 의 임계는 D1 승인 뒤에 도출하므로 여기서는
- * **GPU 무관한 구조 계약**만 고정한다:
- *   N1. 후보 파라미터 정의역 불변식 (smoothstep 미정의 차단 · §A11.15 조건 2 · 주파수 상한)
- *   N2. OFF = strength 0 (같은 프로그램 no-op) · 미지 후보 폴백
+ * 픽셀 가드 (`verify:1226-night-lights`) 가 GPU 에서 재는 축과 겹치지 않는 **구조 계약**을 고정한다:
+ *   N1. D1 승인 상수 (g1) 박제 + 정의역 불변식 (smoothstep 미정의 차단 · §A11.15 조건 2 · 주파수 상한)
+ *   N2. OFF = strength 0 (같은 프로그램 no-op)
  *   N3. GLSL 배치 — 연산은 rocky 분기 안, 합성은 rim 옆 · clamp 앞 · 가산
  *   N4. 입력 공간 — vLocalPos 파생 p 만 (painted-on, 계약 D8) · noise 함수 사본 증가 0 (§A11.8)
  *   N5. 극관 억제 · 황혼 게이트 · 마스크 게이트 — 결정적 프레임에서 픽셀 판별 불가라 미러로 고정 (§A11.4)
+ *
+ * ⚠️ 이 파일이 전건 통과해도 **바인딩 블록이 사라진 결함**은 잡지 못한다 (계약 변이 MN-2 — §A8.8 M-2
+ * 동형). 그 축은 픽셀 가드 D2 가 잰다.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  NIGHT_LIGHT_CANDIDATES,
-  NIGHT_LIGHT_CLUSTER_GATE_OFF,
-  NIGHT_LIGHT_DEFAULT_CANDIDATE,
-  NightLightPattern,
+  NIGHT_LIGHT_CLUSTER_HI,
+  NIGHT_LIGHT_CLUSTER_LO,
+  NIGHT_LIGHT_CLUSTER_MIX,
+  NIGHT_LIGHT_COLOR_RGB,
+  NIGHT_LIGHT_DENSITY_HI,
+  NIGHT_LIGHT_DENSITY_LO,
+  NIGHT_LIGHT_FREQUENCY,
+  NIGHT_LIGHT_STRENGTH,
+  NIGHT_LIGHT_TWILIGHT_WIDTH,
   PLANET_FRAGMENT_SHADER,
   nightLightTermMirror,
-  resolveNightLightParams,
+  resolveNightLightStrength,
 } from './procedural-planet-shader.js';
 
 /** 주석을 뺀 GLSL 실행 코드 사본 — 주석이 토큰을 인용해 자기 자신을 매칭하는 것을 막는다. */
@@ -29,119 +36,80 @@ const CODE = PLANET_FRAGMENT_SHADER.split('\n')
 /** §A11.5 주파수 상한 [도출] — 결정적 프레임 disk 반경 98.32 px 에서 셀 폭이 1 px 가 되는 K. */
 const MAX_FREQUENCY = 98;
 
-const candidateEntries = Object.entries(NIGHT_LIGHT_CANDIDATES);
-
-describe('#1226 N1 — 후보 파라미터 정의역 불변식', () => {
-  it('후보가 2개 이상이고 기본 후보가 표에 있다 (계약 D1 「후보 ≥ 2」)', () => {
-    expect(candidateEntries.length).toBeGreaterThanOrEqual(2);
-    expect(NIGHT_LIGHT_CANDIDATES[NIGHT_LIGHT_DEFAULT_CANDIDATE]).toBeDefined();
+describe('#1226 N1 — D1 승인 상수 (g1) · 정의역 불변식', () => {
+  it('승인값 박제 — #1226 코멘트 5663330554 (값 변경 시 verify:1226 임계 재도출 의무)', () => {
+    expect(NIGHT_LIGHT_STRENGTH).toBe(0.9);
+    expect(NIGHT_LIGHT_COLOR_RGB).toEqual({ r: 1.0, g: 0.72, b: 0.38 });
+    expect(NIGHT_LIGHT_TWILIGHT_WIDTH).toBe(0.12);
+    expect(NIGHT_LIGHT_FREQUENCY).toBe(48);
+    expect(NIGHT_LIGHT_DENSITY_LO).toBe(0.55);
+    expect(NIGHT_LIGHT_DENSITY_HI).toBe(0.72);
+    expect(NIGHT_LIGHT_CLUSTER_MIX).toBe(0.5);
+    expect(NIGHT_LIGHT_CLUSTER_LO).toBe(0.52);
+    expect(NIGHT_LIGHT_CLUSTER_HI).toBe(0.6);
   });
 
-  it.each(candidateEntries)(
-    '후보 %s — twilightWidth > 0 (smoothstep(−W, 0, ndl) 의 edge0 < edge1)',
-    (_id, c) => {
-      expect(c.twilightWidth).toBeGreaterThan(0);
-    },
-  );
-
-  it.each(candidateEntries)('후보 %s — lo < hi (smoothstep 정의역)', (_id, c) => {
-    expect(c.lo).toBeLessThan(c.hi);
+  it('twilightWidth > 0 (smoothstep(−W, 0, ndl) 의 edge0 < edge1)', () => {
+    expect(NIGHT_LIGHT_TWILIGHT_WIDTH).toBeGreaterThan(0);
   });
 
-  it.each(candidateEntries)(
-    '후보 %s — clusterLo < clusterHi (군집 게이트 smoothstep 정의역)',
-    (_id, c) => {
-      expect(c.clusterLo).toBeLessThan(c.clusterHi);
-    },
-  );
-
-  it('게이트 끔 상수 — Hi ≤ 0 이라 continents ∈ [0,1] 전 구간에서 smoothstep 이 정확히 1 (1·2차 후보 픽셀 불변)', () => {
-    expect(NIGHT_LIGHT_CLUSTER_GATE_OFF.clusterHi).toBeLessThanOrEqual(0);
-    for (const id of ['a', 'b', 'c', 'a1', 'a2', 'a3']) {
-      const c = NIGHT_LIGHT_CANDIDATES[id]!;
-      expect(c.clusterLo).toBe(NIGHT_LIGHT_CLUSTER_GATE_OFF.clusterLo);
-      expect(c.clusterHi).toBe(NIGHT_LIGHT_CLUSTER_GATE_OFF.clusterHi);
-    }
+  it('분포 · 군집 게이트 smoothstep 정의역 — LO < HI', () => {
+    expect(NIGHT_LIGHT_DENSITY_LO).toBeLessThan(NIGHT_LIGHT_DENSITY_HI);
+    expect(NIGHT_LIGHT_CLUSTER_LO).toBeLessThan(NIGHT_LIGHT_CLUSTER_HI);
   });
 
-  it('3차 군집 후보 g1~g3 — a 와 게이트 외 파라미터 동일 · 게이트는 continents 치역 (0,1) 안', () => {
-    const a = NIGHT_LIGHT_CANDIDATES.a!;
-    for (const id of ['g1', 'g2', 'g3']) {
-      const g = NIGHT_LIGHT_CANDIDATES[id]!;
-      expect({ ...g, clusterLo: a.clusterLo, clusterHi: a.clusterHi }).toEqual(a);
-      expect(g.clusterLo).toBeGreaterThan(0);
-      expect(g.clusterHi).toBeLessThan(1);
-    }
+  it('군집 게이트는 continents 치역 (0, 1) 안 — 밖이면 게이트가 상수가 된다', () => {
+    expect(NIGHT_LIGHT_CLUSTER_LO).toBeGreaterThan(0);
+    expect(NIGHT_LIGHT_CLUSTER_HI).toBeLessThan(1);
   });
 
-  it.each(candidateEntries)('후보 %s — max(color) × strength ≤ 1 (§A11.15 조건 2)', (_id, c) => {
-    const maxChannel = Math.max(c.color.r, c.color.g, c.color.b);
-    expect(maxChannel * c.strength).toBeLessThanOrEqual(1);
-    for (const v of [c.color.r, c.color.g, c.color.b]) {
+  it('max(color) × strength ≤ 1 (§A11.15 조건 2) · 색 채널 ∈ [0,1]', () => {
+    const { r, g, b } = NIGHT_LIGHT_COLOR_RGB;
+    expect(Math.max(r, g, b) * NIGHT_LIGHT_STRENGTH).toBeLessThanOrEqual(1);
+    for (const v of [r, g, b]) {
       expect(v).toBeGreaterThanOrEqual(0);
       expect(v).toBeLessThanOrEqual(1);
     }
   });
 
-  it.each(candidateEntries)(
-    '후보 %s — 0 < frequency ≤ 98 · clusterMix ∈ [0,1] · strength > 0',
-    (_id, c) => {
-      expect(c.frequency).toBeGreaterThan(0);
-      expect(c.frequency).toBeLessThanOrEqual(MAX_FREQUENCY);
-      expect(c.clusterMix).toBeGreaterThanOrEqual(0);
-      expect(c.clusterMix).toBeLessThanOrEqual(1);
-      expect(c.strength).toBeGreaterThan(0);
-      expect(Object.values(NightLightPattern)).toContain(c.pattern);
-    },
-  );
+  it('0 < frequency ≤ 98 · clusterMix ∈ [0,1] · strength > 0', () => {
+    expect(NIGHT_LIGHT_FREQUENCY).toBeGreaterThan(0);
+    expect(NIGHT_LIGHT_FREQUENCY).toBeLessThanOrEqual(MAX_FREQUENCY);
+    expect(NIGHT_LIGHT_CLUSTER_MIX).toBeGreaterThanOrEqual(0);
+    expect(NIGHT_LIGHT_CLUSTER_MIX).toBeLessThanOrEqual(1);
+    expect(NIGHT_LIGHT_STRENGTH).toBeGreaterThan(0);
+  });
 });
 
-describe('#1226 N2 — resolveNightLightParams (OFF = strength 0)', () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+describe('#1226 N2 — resolveNightLightStrength (OFF = strength 0)', () => {
+  it('nightLights=false → 0', () => {
+    expect(resolveNightLightStrength(false)).toBe(0);
   });
-  afterEach(() => {
-    warnSpy.mockRestore();
-  });
-
-  it('nightLights=false → strength 만 0, 나머지는 후보 그대로', () => {
-    const base = NIGHT_LIGHT_CANDIDATES[NIGHT_LIGHT_DEFAULT_CANDIDATE]!;
-    const off = resolveNightLightParams(false);
-    expect(off.strength).toBe(0);
-    expect({ ...off, strength: base.strength }).toEqual(base);
-  });
-
-  it('nightLights=true · 후보 미지정 → 기본 후보', () => {
-    expect(resolveNightLightParams(true)).toEqual(
-      NIGHT_LIGHT_CANDIDATES[NIGHT_LIGHT_DEFAULT_CANDIDATE],
-    );
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
-
-  it.each(candidateEntries)('후보 %s 지정 → 그 후보', (id, c) => {
-    expect(resolveNightLightParams(true, id)).toEqual(c);
-  });
-
-  it('미지 후보 → 기본 후보 + console.warn 1회', () => {
-    expect(resolveNightLightParams(true, 'zz')).toEqual(
-      NIGHT_LIGHT_CANDIDATES[NIGHT_LIGHT_DEFAULT_CANDIDATE],
-    );
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+  it('nightLights=true → 승인 세기', () => {
+    expect(resolveNightLightStrength(true)).toBe(NIGHT_LIGHT_STRENGTH);
   });
 });
 
 describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
-  it('박제 형태 — nightFactor · 게이트 (γ) · lights · 합성', () => {
+  it('박제 형태 — nightFactor · 게이트 (γ) · 분포 · 군집 게이트 · lights · 합성', () => {
     expect(CODE).toContain(
       'float nightFactor = 1.0 - smoothstep(-nightLightTwilightWidth, 0.0, ndl)',
     );
     expect(CODE).toContain('float lightGate = landMask * (1.0 - iceMask) * uMaskEnabled');
-    expect(CODE).toContain('lights = nightLightStrength * nightFactor * lightGate * lightDensity');
-    expect(CODE).toContain('col += nightLightColor * lights');
+    expect(CODE).toContain(
+      'float lightDensity = smoothstep(nightLightLo, nightLightHi, valueNoise(p * nightLightFrequency))',
+    );
+    expect(CODE).toContain('lightDensity *= mix(1.0, continents, nightLightClusterMix)');
     expect(CODE).toContain(
       'lightDensity *= smoothstep(nightLightClusterLo, nightLightClusterHi, continents)',
     );
+    expect(CODE).toContain('lights = nightLightStrength * nightFactor * lightGate * lightDensity');
+    expect(CODE).toContain('col += nightLightColor * lights');
+  });
+
+  it('D1 전환 장치가 남지 않았다 — 패턴 정수 분기 · 셀 해시 경로 부재', () => {
+    expect(PLANET_FRAGMENT_SHADER).not.toContain('nightLightPattern');
+    expect(CODE).not.toContain('hash13(floor(p * nightLightFrequency))');
   });
 
   it('연산은 rocky 분기 안 (iceMask mix 뒤 · desert dispatch 앞), 초기화는 분기 앞', () => {
@@ -169,12 +137,11 @@ describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
     expect(CODE).not.toContain('mix(col, nightLightColor');
   });
 
-  it('uniform 10종 GLSL 선언', () => {
+  it('uniform 9종 GLSL 선언', () => {
     for (const decl of [
       'uniform float nightLightStrength',
       'uniform vec3 nightLightColor',
       'uniform float nightLightTwilightWidth',
-      'uniform int nightLightPattern',
       'uniform float nightLightFrequency',
       'uniform float nightLightLo',
       'uniform float nightLightHi',
@@ -188,9 +155,10 @@ describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
 });
 
 describe('#1226 N4 — 입력 공간 · noise 사본 (계약 D8 · §A11.8)', () => {
-  it('분포 입력은 p (vLocalPos 파생) 뿐이다', () => {
+  it('분포 입력은 p (vLocalPos 파생) 와 continents (p 파생 fbm) 뿐이다 — painted-on', () => {
+    expect(CODE).toContain('vec3 p = normalize(vLocalPos)');
     expect(CODE).toContain('valueNoise(p * nightLightFrequency)');
-    expect(CODE).toContain('hash13(floor(p * nightLightFrequency))');
+    expect(CODE).toContain('continents = fbm(p * 2.4)');
     // vWorldPos 는 여전히 varying 선언 1 + viewDir 1 (U11 과 같은 계수 — 불빛이 새지 않았다).
     expect(CODE.split('vWorldPos').length - 1).toBe(2);
   });
@@ -201,41 +169,41 @@ describe('#1226 N4 — 입력 공간 · noise 사본 (계약 D8 · §A11.8)', ()
     expect((CODE.match(/float fbm\(/g) ?? []).length).toBe(1);
   });
 
-  it('fbm 신규 호출 0 (§A11.5 기각) — 불빛 블록에 fbm( · texture2D( 없음', () => {
+  it('fbm 신규 호출 0 (§A11.5 기각) — 불빛 블록에 fbm( · texture2D( · vWorldPos 없음', () => {
     const start = CODE.indexOf('float nightFactor');
     const end = CODE.indexOf('lights = nightLightStrength');
     const block = CODE.slice(start, end);
     expect(block.length).toBeGreaterThan(0);
     expect(block).not.toContain('fbm(');
     expect(block).not.toContain('texture2D(');
+    expect(block).not.toContain('vWorldPos');
   });
 });
 
 describe('#1226 N5 — 게이트 미러 (극관 억제 · 황혼 · 마스크, §A11.4)', () => {
-  const params = NIGHT_LIGHT_CANDIDATES[NIGHT_LIGHT_DEFAULT_CANDIDATE]!;
   const deepNight = -1;
   const full = { ndl: deepNight, landMask: 1, iceMask: 0, maskEnabled: 1, density: 1 };
 
   it('완전 밤 · 육지 · 극관 없음 · 마스크 경로 · 밀도 1 → strength', () => {
-    expect(nightLightTermMirror(full, params)).toBeCloseTo(params.strength, 12);
+    expect(nightLightTermMirror(full)).toBeCloseTo(NIGHT_LIGHT_STRENGTH, 12);
   });
 
   it('Q1-b 극관 억제 — iceMask 1 → 정확히 0', () => {
-    expect(nightLightTermMirror({ ...full, iceMask: 1 }, params)).toBe(0);
+    expect(nightLightTermMirror({ ...full, iceMask: 1 })).toBe(0);
   });
 
   it('Q5 황혼 게이트 — ndl ≥ 0 에서 정확히 0 (낮면 불변 D3 의 구조적 근거)', () => {
     for (const ndl of [0, 1e-6, 0.15, 1]) {
-      expect(nightLightTermMirror({ ...full, ndl }, params)).toBe(0);
+      expect(nightLightTermMirror({ ...full, ndl })).toBe(0);
     }
   });
 
   it('게이트 (γ) — uMaskEnabled 0 → 0 · landMask 0 (바다) → 0', () => {
-    expect(nightLightTermMirror({ ...full, maskEnabled: 0 }, params)).toBe(0);
-    expect(nightLightTermMirror({ ...full, landMask: 0 }, params)).toBe(0);
+    expect(nightLightTermMirror({ ...full, maskEnabled: 0 })).toBe(0);
+    expect(nightLightTermMirror({ ...full, landMask: 0 })).toBe(0);
   });
 
   it('OFF (strength 0) → 0', () => {
-    expect(nightLightTermMirror(full, resolveNightLightParams(false))).toBe(0);
+    expect(nightLightTermMirror(full, resolveNightLightStrength(false))).toBe(0);
   });
 });

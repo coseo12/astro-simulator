@@ -552,12 +552,6 @@ export interface SolarSystemSceneOptions {
    * 프로그램에서 `nightLightStrength = 0` 이라 합성이 정확한 no-op 이다.
    */
   nightLights?: boolean;
-
-  /**
-   * #1226 D1 (Phase 1 임시) — 불빛 파라미터 후보 id (`NIGHT_LIGHT_CANDIDATES`). 사용자 육안 승인 뒤
-   * 승인값 1벌로 접히면 제거한다. 미지정 = 기본 후보.
-   */
-  nightLightCandidate?: string | undefined;
 }
 
 /**
@@ -590,7 +584,6 @@ export function createSolarSystemScene(
     selfRotation = false,
     clouds = false,
     nightLights = false,
-    nightLightCandidate,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -661,7 +654,6 @@ export function createSolarSystemScene(
     // #1226 Amendment 11 — 야간 도시 불빛 (유효 조건 `nightLights && surfaceDetail` — 이 묶음은
     // surfaceDetail=true 일 때만 소비된다). clouds 와 독립.
     nightLights,
-    nightLightCandidate,
   };
 
   // 각 바디 메쉬 생성 — Phase A: 생성 시점 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
