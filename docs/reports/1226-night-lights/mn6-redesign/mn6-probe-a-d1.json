@@ -1,0 +1,455 @@
+{
+  "meta": {
+    "variant": "a-d1",
+    "density": {
+      "lo": 0.65,
+      "hi": 0.8
+    },
+    "jd": 2451808,
+    "base": "http://localhost:3100",
+    "renderer": "headless chromium --use-angle=swiftshader 1280x720",
+    "pages": {
+      "P3": {
+        "settle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 811,
+          "timedOut": false
+        },
+        "canvasCount": 1,
+        "errors": 0,
+        "errorSamples": [],
+        "geom": {
+          "rw": 1280,
+          "rh": 720,
+          "fov": 0.8,
+          "forward": [
+            0,
+            -4.82353764423598e-17,
+            1
+          ],
+          "right": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            1,
+            4.82353764423598e-17
+          ],
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "radius": 4.2523980541839705,
+          "sun": [
+            0,
+            0,
+            0
+          ],
+          "isWebGPU": false,
+          "hostStrength": 0.9,
+          "hostLo": 0.65,
+          "hostVisible": true,
+          "cloudPresent": true
+        }
+      },
+      "P1": {
+        "settle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 809,
+          "timedOut": false
+        },
+        "canvasCount": 1,
+        "errors": 0,
+        "errorSamples": [],
+        "geom": {
+          "rw": 1280,
+          "rh": 720,
+          "fov": 0.8,
+          "forward": [
+            0,
+            -4.82353764423598e-17,
+            1
+          ],
+          "right": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            1,
+            4.82353764423598e-17
+          ],
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "radius": 4.2523980541839705,
+          "sun": [
+            0,
+            0,
+            0
+          ],
+          "isWebGPU": false,
+          "hostStrength": 0.9,
+          "hostLo": 0.65,
+          "hostVisible": true,
+          "cloudPresent": false
+        }
+      },
+      "P2": {
+        "settle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 811,
+          "timedOut": false
+        },
+        "canvasCount": 1,
+        "errors": 0,
+        "errorSamples": [],
+        "geom": {
+          "rw": 1280,
+          "rh": 720,
+          "fov": 0.8,
+          "forward": [
+            0,
+            -4.82353764423598e-17,
+            1
+          ],
+          "right": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            1,
+            4.82353764423598e-17
+          ],
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "radius": 4.2523980541839705,
+          "sun": [
+            0,
+            0,
+            0
+          ],
+          "isWebGPU": false,
+          "hostStrength": 0,
+          "hostLo": 0.65,
+          "hostVisible": true,
+          "cloudPresent": false
+        },
+        "overlay": {
+          "hostNeedsBlend": false,
+          "overlayNeedsBlend": true,
+          "sharedOptions": false
+        }
+      },
+      "P4": {
+        "settle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 812,
+          "timedOut": false
+        },
+        "canvasCount": 1,
+        "errors": 0,
+        "errorSamples": [],
+        "geom": {
+          "rw": 1280,
+          "rh": 720,
+          "fov": 0.8,
+          "forward": [
+            0,
+            -4.82353764423598e-17,
+            1
+          ],
+          "right": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            1,
+            4.82353764423598e-17
+          ],
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "radius": 4.2523980541839705,
+          "sun": [
+            0,
+            0,
+            0
+          ],
+          "isWebGPU": false,
+          "hostStrength": 0,
+          "hostLo": 0.65,
+          "hostVisible": true,
+          "cloudPresent": true
+        },
+        "overlay": {
+          "hostNeedsBlend": false,
+          "overlayNeedsBlend": true,
+          "sharedOptions": false
+        }
+      },
+      "R3": {
+        "settle": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 811,
+          "timedOut": false
+        },
+        "canvasCount": 1,
+        "errors": 0,
+        "errorSamples": [],
+        "geom": {
+          "rw": 1280,
+          "rh": 720,
+          "fov": 0.8,
+          "forward": [
+            0,
+            -4.82353764423598e-17,
+            1
+          ],
+          "right": [
+            1,
+            0,
+            0
+          ],
+          "up": [
+            0,
+            1,
+            4.82353764423598e-17
+          ],
+          "cam": [
+            231.1609344482422,
+            -8.651449203491211,
+            -36.82684326171875
+          ],
+          "center": [
+            231.1609344482422,
+            -8.651449203491211,
+            0.0000023117529508454027
+          ],
+          "radius": 4.2523980541839705,
+          "sun": [
+            0,
+            0,
+            0
+          ],
+          "isWebGPU": false,
+          "hostStrength": 0.9,
+          "hostLo": 0.65,
+          "hostVisible": true,
+          "cloudPresent": true
+        }
+      }
+    },
+    "geomIdentical": true,
+    "fullFrame": {
+      "C0_ne_P4": 0,
+      "R3_ne_P3": 0,
+      "M6a_ne_P1": 0
+    }
+  },
+  "analysis": {
+    "disk": 30768,
+    "diskC0_ne_P4": 0,
+    "diskR3_ne_P3": 0,
+    "diskWhiteNot255": 271,
+    "niLandGateVsAlphaMismatch": 115,
+    "sets": {
+      "NI": {
+        "n": 7225,
+        "litPx": 894,
+        "mean_contribOff_P1mP2": 0.03506,
+        "mean_contribOn_healthy_P3mP4": 0.02548,
+        "mean_cloudSelf_P2mP4": -0.02154,
+        "mean_predicted_1mAlpha_times_off": 0.02549,
+        "mean_resid_healthy_minus_pred": -0.00001,
+        "mean_absResid_healthy_minus_pred": 0.00007,
+        "ratio_healthy": 0.72671,
+        "ratio_healthy_reload_R3": 0.72671,
+        "ratio_M6a_P3cloudDisabled": 0.3856,
+        "ratio_M6b_overlayAfterClouds": 1.00007,
+        "alphaWeighted_1mAlpha_by_off": 0.72693,
+        "K_example_baselineAttenuationDiv3": 0.0911,
+        "judge_healthy": "PASS",
+        "judge_healthy_reload_R3": "PASS",
+        "judge_M6a": "PASS",
+        "judge_M6b": "FAIL",
+        "m6aIdentity_M6a_ne_P1_px": 0,
+        "control_C1_overlayOnCloudsOff_meanContrib": 0.03506,
+        "control_C1_ne_P1_px": 540,
+        "control_C1_maxAbsLum_vs_P1": 0.00392,
+        "control_C0_ne_P4_px": 0,
+        "determinism_R3_ne_P3_px": 0
+      },
+      "NI_land": {
+        "n": 4104,
+        "litPx": 894,
+        "mean_contribOff_P1mP2": 0.06172,
+        "mean_contribOn_healthy_P3mP4": 0.04486,
+        "mean_cloudSelf_P2mP4": -0.02608,
+        "mean_predicted_1mAlpha_times_off": 0.04487,
+        "mean_resid_healthy_minus_pred": -0.00001,
+        "mean_absResid_healthy_minus_pred": 0.00013,
+        "ratio_healthy": 0.72671,
+        "ratio_healthy_reload_R3": 0.72671,
+        "ratio_M6a_P3cloudDisabled": 0.57749,
+        "ratio_M6b_overlayAfterClouds": 1.00007,
+        "alphaWeighted_1mAlpha_by_off": 0.72693,
+        "K_example_baselineAttenuationDiv3": 0.0911,
+        "judge_healthy": "PASS",
+        "judge_healthy_reload_R3": "PASS",
+        "judge_M6a": "PASS",
+        "judge_M6b": "FAIL",
+        "m6aIdentity_M6a_ne_P1_px": 0,
+        "control_C1_overlayOnCloudsOff_meanContrib": 0.06173,
+        "control_C1_ne_P1_px": 540,
+        "control_C1_maxAbsLum_vs_P1": 0.00392,
+        "control_C0_ne_P4_px": 0,
+        "determinism_R3_ne_P3_px": 0
+      },
+      "NI_sea": {
+        "n": 3121,
+        "litPx": 0,
+        "mean_contribOff_P1mP2": 0,
+        "mean_contribOn_healthy_P3mP4": 0,
+        "mean_cloudSelf_P2mP4": -0.01557,
+        "mean_predicted_1mAlpha_times_off": 0,
+        "mean_resid_healthy_minus_pred": 0,
+        "mean_absResid_healthy_minus_pred": 0,
+        "ratio_healthy": null,
+        "ratio_healthy_reload_R3": null,
+        "ratio_M6a_P3cloudDisabled": null,
+        "ratio_M6b_overlayAfterClouds": null,
+        "alphaWeighted_1mAlpha_by_off": null,
+        "K_example_baselineAttenuationDiv3": null,
+        "judge_healthy": null,
+        "judge_healthy_reload_R3": null,
+        "judge_M6a": null,
+        "judge_M6b": null,
+        "m6aIdentity_M6a_ne_P1_px": 0,
+        "control_C1_overlayOnCloudsOff_meanContrib": 0,
+        "control_C1_ne_P1_px": 0,
+        "control_C1_maxAbsLum_vs_P1": 0,
+        "control_C0_ne_P4_px": 0,
+        "determinism_R3_ne_P3_px": 0
+      },
+      "NI_land_cloudedP4P2": {
+        "n": 2083,
+        "litPx": 471,
+        "mean_contribOff_P1mP2": 0.06768,
+        "mean_contribOn_healthy_P3mP4": 0.03446,
+        "mean_cloudSelf_P2mP4": -0.05138,
+        "mean_predicted_1mAlpha_times_off": 0.0345,
+        "mean_resid_healthy_minus_pred": -0.00004,
+        "mean_absResid_healthy_minus_pred": 0.00024,
+        "ratio_healthy": 0.50916,
+        "ratio_healthy_reload_R3": 0.50916,
+        "ratio_M6a_P3cloudDisabled": 0.24083,
+        "ratio_M6b_overlayAfterClouds": 0.99993,
+        "alphaWeighted_1mAlpha_by_off": 0.50977,
+        "K_example_baselineAttenuationDiv3": 0.16361,
+        "judge_healthy": "PASS",
+        "judge_healthy_reload_R3": "PASS",
+        "judge_M6a": "PASS",
+        "judge_M6b": "FAIL",
+        "m6aIdentity_M6a_ne_P1_px": 0,
+        "control_C1_overlayOnCloudsOff_meanContrib": 0.06767,
+        "control_C1_ne_P1_px": 272,
+        "control_C1_maxAbsLum_vs_P1": 0.00364,
+        "control_C0_ne_P4_px": 0,
+        "determinism_R3_ne_P3_px": 0
+      },
+      "NI_land_alpha": {
+        "n": 2198,
+        "litPx": 506,
+        "mean_contribOff_P1mP2": 0.06736,
+        "mean_contribOn_healthy_P3mP4": 0.03586,
+        "mean_cloudSelf_P2mP4": -0.04869,
+        "mean_predicted_1mAlpha_times_off": 0.03589,
+        "mean_resid_healthy_minus_pred": -0.00003,
+        "mean_absResid_healthy_minus_pred": 0.00024,
+        "ratio_healthy": 0.53241,
+        "ratio_healthy_reload_R3": 0.53241,
+        "ratio_M6a_P3cloudDisabled": 0.27709,
+        "ratio_M6b_overlayAfterClouds": 0.99994,
+        "alphaWeighted_1mAlpha_by_off": 0.53279,
+        "K_example_baselineAttenuationDiv3": 0.15586,
+        "judge_healthy": "PASS",
+        "judge_healthy_reload_R3": "PASS",
+        "judge_M6a": "PASS",
+        "judge_M6b": "FAIL",
+        "m6aIdentity_M6a_ne_P1_px": 0,
+        "control_C1_overlayOnCloudsOff_meanContrib": 0.06735,
+        "control_C1_ne_P1_px": 293,
+        "control_C1_maxAbsLum_vs_P1": 0.00364,
+        "control_C0_ne_P4_px": 0,
+        "determinism_R3_ne_P3_px": 0
+      },
+      "NI_land_lit_clouded": {
+        "n": 471,
+        "litPx": 471,
+        "mean_contribOff_P1mP2": 0.29932,
+        "mean_contribOn_healthy_P3mP4": 0.1524,
+        "mean_cloudSelf_P2mP4": -0.04819,
+        "mean_predicted_1mAlpha_times_off": 0.15258,
+        "mean_resid_healthy_minus_pred": -0.00018,
+        "mean_absResid_healthy_minus_pred": 0.00107,
+        "ratio_healthy": 0.50916,
+        "ratio_healthy_reload_R3": 0.50916,
+        "ratio_M6a_P3cloudDisabled": 0.83899,
+        "ratio_M6b_overlayAfterClouds": 0.99992,
+        "alphaWeighted_1mAlpha_by_off": 0.50977,
+        "K_example_baselineAttenuationDiv3": 0.16361,
+        "judge_healthy": "PASS",
+        "judge_healthy_reload_R3": "PASS",
+        "judge_M6a": "FAIL",
+        "judge_M6b": "FAIL",
+        "m6aIdentity_M6a_ne_P1_px": 0,
+        "control_C1_overlayOnCloudsOff_meanContrib": 0.29928,
+        "control_C1_ne_P1_px": 270,
+        "control_C1_maxAbsLum_vs_P1": 0.00364,
+        "control_C0_ne_P4_px": 0,
+        "determinism_R3_ne_P3_px": 0
+      }
+    }
+  }
+}
