@@ -1,0 +1,110 @@
+[
+  {
+    "hideDom": false,
+    "rep": 1,
+    "patched": [
+      "earth-cloud-mat"
+    ],
+    "diffPx": 0,
+    "bbox": null,
+    "toastBefore": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    },
+    "toastAfter": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    }
+  },
+  {
+    "hideDom": false,
+    "rep": 2,
+    "patched": [
+      "earth-cloud-mat"
+    ],
+    "diffPx": 0,
+    "bbox": null,
+    "toastBefore": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    },
+    "toastAfter": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    }
+  },
+  {
+    "hideDom": true,
+    "rep": 1,
+    "patched": [
+      "earth-cloud-mat"
+    ],
+    "diffPx": 0,
+    "bbox": null,
+    "toastBefore": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    },
+    "toastAfter": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    }
+  },
+  {
+    "hideDom": true,
+    "rep": 2,
+    "patched": [
+      "earth-cloud-mat"
+    ],
+    "diffPx": 0,
+    "bbox": null,
+    "toastBefore": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    },
+    "toastAfter": {
+      "rect": [
+        528,
+        584,
+        752,
+        624
+      ],
+      "opacity": "1"
+    }
+  }
+]

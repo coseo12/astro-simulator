@@ -62,6 +62,10 @@ import {
 - [ ] `page.on('console', …)` 인라인 대신 `collectConsoleErrors()` — `pageerror` 누락 방지
 - [ ] `mkdir` + `writeFile` 수기 조합 대신 `saveCapture()`
 - [ ] `process.env.BASE_URL ?? 'http://localhost:3000'` 대신 `resolveBaseUrl()`
+- [ ] `locator('canvas').screenshot()` 으로 픽셀을 재면 캡처 전에 `hideDomOverlays(page)` — element
+      캡처는 캔버스 **위에 겹친 DOM** (HUD · 토스트) 을 함께 찍는다. #1219 (glow-marker 가 UI 글리프를
+      세던 사고) · #1228 (토스트 소멸이 주입 전후 diff 에 섞여 결함 판 `exit 0`) 두 번 실사고가 났다
+      (`visibility` 사용 — `display:none` 은 캡처 박스가 `0×0` 이 된다)
 - [ ] ci.yml 에 배선한다면 **dev 서버를 새로 띄우지 않는다** — 공용 `:3002` 를 `BASE_URL` 로 받는다
       (§아래 "ci.yml 배선 규약")
 

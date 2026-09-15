@@ -29,6 +29,7 @@ import {
   NullEngine,
   Quaternion,
   Scene,
+  TransformNode,
   Vector3,
   Viewport,
   type Mesh,
@@ -310,6 +311,10 @@ const CHILD_SPIN_AXIS = new Vector3(1, 1, 0).normalize();
 /** 부모 자전과 자식 회전의 위상 속도 비 — 두 회전이 같은 위상에 묶이지 않게 한다. */
 const PARENT_PHASE_MULTIPLIER = 3;
 
+/** #1228 N1 — 깊이 2 체인의 조상 `TransformNode` scaling · 기울기 (tier 값과 겹치지 않는 임의 값). */
+const GRANDPARENT_SCALING = 2.5;
+const GRANDPARENT_TILT_DEG = 30;
+
 interface ChildFixture extends Fixture {
   /** LOD mid variant 형태 — host 의 자식, `scaling = 1`. */
   child: Mesh;
@@ -386,13 +391,41 @@ describe('#1228 부모 scaling 을 가진 자식 mesh (LOD mid variant 형태)',
       expect(world[0]).toBeCloseTo(EARTH_LOCAL_RADIUS * TIER_SCALING, 6);
       // host 와 같은 값. 부모 없는 host 에서는 local 식과도 같다 (#790 floor 경로 등가).
       for (let i = 0; i < PHASE_STEPS; i++) expect(world[i]).toBeCloseTo(hostWorld[i]!, 9);
-      expect(resolveMeshWorldVisualRadius(fx.mesh)).toBeCloseTo(
-        resolveMeshVisualRadius(fx.mesh),
-        9,
-      );
+      // #1228 N2 — 주석이 「비트 동일」이라 주장하므로 근사가 아니라 `toBe` 로 고정한다
+      // (부모가 없으면 루프가 돌지 않아 같은 수가 같은 식에 들어간다).
+      expect(resolveMeshWorldVisualRadius(fx.mesh)).toBe(resolveMeshVisualRadius(fx.mesh));
       // 증인 — local scaling 식은 자식에서 tier scaling 만큼 작다 (#1228 기전).
       expect(local[0]).toBeCloseTo(EARTH_LOCAL_RADIUS, 9);
       expect(world[0]! / local[0]!).toBeCloseTo(TIER_SCALING, 6);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('부모 체인 깊이 2 — 조상 TransformNode 의 scaling 까지 곱하고 위상 순회에서 불변이다', () => {
+    // #1228 N1 — 현행 mid 는 깊이 1 이라 「부모 1단만 보는」 변이가 다른 테스트를 전건 통과했다
+    // (reviewer 실측 11/11). 루프가 존재 이유를 스스로 증명하도록 조상을 하나 더 둔다.
+    const fx = makeChildFixture();
+    try {
+      const root = new TransformNode('tier-root', fx.scene);
+      root.scaling.setAll(GRANDPARENT_SCALING);
+      root.rotationQuaternion = Quaternion.RotationAxis(
+        new Vector3(0, 0, 1),
+        (GRANDPARENT_TILT_DEG * Math.PI) / 180,
+      );
+      root.computeWorldMatrix(true);
+      fx.mesh.parent = root;
+
+      const values: number[] = [];
+      for (let i = 0; i < PHASE_STEPS; i++) {
+        applyParentPhase(fx, i / PHASE_STEPS);
+        values.push(resolveMeshWorldVisualRadius(fx.child));
+      }
+      const expected = childTrueRadius(fx) * GRANDPARENT_SCALING;
+      expect(Math.max(...values) - Math.min(...values)).toBeLessThan(1e-9);
+      expect(values[0]).toBeCloseTo(expected, 9);
+      // 독립 오라클 — world matrix 분해값도 같은 배수여야 한다 (Float32 라 자릿수만 낮춘다).
+      expect(fx.child.absoluteScaling.x).toBeCloseTo(TIER_SCALING * GRANDPARENT_SCALING, 4);
     } finally {
       fx.dispose();
     }

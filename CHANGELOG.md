@@ -11,7 +11,8 @@ Semantic Versioning을 따른다.
 
   - 수정 — `resolveMeshWorldVisualRadius` 신설 (부모 체인 `scaling` 곱, float64) 을 `projectedDiskRadiusPx` 에서만 쓴다. #790 카메라 floor 호출부 (`focusOn` · `runTierTransition`) 는 부모 없는 host 만 넘겨 두 식이 비트 동일이라 **무접촉**이다.
   - ⚠️ `mesh.absoluteScaling` 은 채택하지 않았다 — Babylon `Matrix` 가 `Float32Array` 라 분해값이 자전 위상마다 흔들려 (NullEngine 16 위상 폭 반경 `2.2e-7`) #1157 불변 단언 `< 1e-9` 가 부모 없는 host 에서도 깨졌다.
-  - 가드 — `verify:1119-earth-mask` `MODE=lod` 에 mid 정착 양성 판정 추가. 초판은 결함 판에서 `exit 0` 을 냈다 (`setLodOverride` 직후 무주입 캡처가 1회 갈려 diff 가 섞였다) — sham 대조군 (무주입 연속 캡처 동일) · mid 머티리얼 단독 주입 · mid 로 그려짐 전제를 판정 앞에 결합했다.
+  - 가드 — `verify:1119-earth-mask` `MODE=lod` 에 mid 정착 양성 판정 추가. 판정 앞에 전제 셋을 결합했다 — mid 로 그려짐 · mid 머티리얼 단독 주입 · **바뀐 픽셀이 지구 disk 안**.
+  - ⚠️ **fail-open 이 두 번 났다.** 초판 판정은 결함 판에서 `exit 0` 이었고, 원인은 캔버스 위 DOM 토스트 「확대하여 달의 위치를 확인하세요」 (`apps/web/src/components/ui/satellite-zoom-tooltip.tsx` — `1500 ms` 뒤 등장 · `5200 ms` 뒤 소멸) 가 `canvas.screenshot()` 에 찍힌 것이다 (#1219 클래스). 처음에는 이를 「화면 하단 띠」로 오판하고 주입 직전 무주입 두 캡처가 같을 때까지 기다리는 sham 대조군으로 막았다고 적었다. reviewer 가 `setupPage` 대기를 `1800 ms` 로 당겨 결함 판 `exit 0` 을 재현해 반증했다 — 토스트가 sham 통과 **뒤** 주입 창에서 사라지면 막지 못한다. 최종 처방은 캡처 전 캔버스 외 DOM 숨김 (`hideDomOverlays` — `verify:675` 에서 `scripts/browser-verify-utils.mjs` 로 공용화) + near·mid 양성 diff 를 disk ROI 로 한정이다 (새 임계 없음). 기존 near 양성 대조군도 같은 토스트를 먹고 있었다.
 
 ### Behavior Changes
 

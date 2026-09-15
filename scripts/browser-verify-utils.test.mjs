@@ -20,8 +20,11 @@ import { join } from 'node:path';
 import {
   DEFAULT_BASE_URL,
   DEFAULT_BOOTSTRAP_QUERY,
+  DOM_OVERLAY_HIDE_CSS,
+  DOM_OVERLAY_POST_HIDE_WAIT_MS,
   GPU_LAUNCH_ARGS,
   bootstrapScene,
+  hideDomOverlays,
   buildLaunchOptions,
   collectConsoleErrors,
   resolveBaseUrl,
@@ -470,6 +473,48 @@ await run('waitForLodSettle — 상한 초과 시 throw 하지 않고 timedOut �
   const r = await waitForLodSettle(page, { pollMs: 2, stableSamples: 3, timeoutMs: 60 });
   assert.equal(r.timedOut, true);
   assert.ok(r.waitedMs >= 60, `waitedMs=${r.waitedMs}`);
+});
+
+// --- hideDomOverlays (#1219 / #1228) --------------------------------------
+
+/** addStyleTag · waitForTimeout · evaluate(캔버스 개수) 만 흉내내는 스텁. */
+function makeOverlayPage(canvasCount) {
+  const calls = { styles: [], waits: [] };
+  return {
+    calls,
+    async addStyleTag(opts) {
+      calls.styles.push(opts.content);
+    },
+    async waitForTimeout(ms) {
+      calls.waits.push(ms);
+    },
+    async evaluate() {
+      return canvasCount;
+    },
+  };
+}
+
+await run('hideDomOverlays — 캔버스 1개면 숨김 스타일 1회 적용 + 기본 대기 후 통과', async () => {
+  const page = makeOverlayPage(1);
+  const r = await hideDomOverlays(page);
+  assert.deepEqual(r, { canvasCount: 1 });
+  assert.deepEqual(page.calls.styles, [DOM_OVERLAY_HIDE_CSS]);
+  assert.deepEqual(page.calls.waits, [DOM_OVERLAY_POST_HIDE_WAIT_MS]);
+  // display:none 이면 캡처 박스가 0×0 이 된다 (#1219) — visibility 여야 한다.
+  assert.match(DOM_OVERLAY_HIDE_CSS, /visibility: hidden/);
+  assert.doesNotMatch(DOM_OVERLAY_HIDE_CSS, /display/);
+});
+
+await run('hideDomOverlays — postHideWaitMs 지정 시 그 값으로 대기', async () => {
+  const page = makeOverlayPage(1);
+  await hideDomOverlays(page, { postHideWaitMs: 7 });
+  assert.deepEqual(page.calls.waits, [7]);
+});
+
+await run('hideDomOverlays — 캔버스가 1개가 아니면 throw (0개 · 2개)', async () => {
+  for (const n of [0, 2]) {
+    await assert.rejects(() => hideDomOverlays(makeOverlayPage(n)), /캔버스가 \d+개다/);
+  }
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

@@ -71,7 +71,11 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { withBrowser, waitForLodSettle } from '../../../scripts/browser-verify-utils.mjs';
+import {
+  hideDomOverlays,
+  withBrowser,
+  waitForLodSettle,
+} from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? '';
@@ -81,8 +85,6 @@ const POST_INIT_WAIT_MS = 1500;
 const POST_CAMERA_WAIT_MS = 1000;
 /** #1219 — JD 고정 + pause command 반영 대기 (`1202` setupPage 와 같은 값). */
 const POST_JD_WAIT_MS = 1000;
-/** #1219 — DOM 숨김 스타일 적용 후 다음 페인트 여유. */
-const POST_HIDE_WAIT_MS = 200;
 const AU_METERS = 1.495978707e11;
 
 /**
@@ -131,41 +133,10 @@ async function openSim(browser, query) {
   }, T_JD);
   await page.waitForTimeout(POST_JD_WAIT_MS);
   // #1219 (a) — 캔버스 위 DOM 오버레이 숨김. 이걸 안 하면 `?marker=off` 카운트의 거의 전부가
-  // UI 글리프다 (헤더 §(a)).
+  // UI 글리프다 (헤더 §(a)). 헬퍼 본체 (`visibility` 선택 근거 · 캔버스 개수 fail-fast 단언) 는
+  // #1228 에서 `verify:1119` 와 공유하려고 `scripts/browser-verify-utils.mjs` 로 옮겼다 — 동작 불변.
   await hideDomOverlays(page);
   return { context, page };
-}
-
-/**
- * #1219 (a) — 캔버스 외 DOM 을 `visibility: hidden` 으로 숨긴다.
- *
- * `canvas.screenshot()` (Playwright element 캡처) 는 **element 의 화면 영역**을 찍으므로 그 위에
- * 겹친 DOM (TopBar · TimeBar · HUD 코너) 이 함께 찍힌다. 즉 luminance cluster 계수가 천체가 아니라
- * UI 텍스트를 세고 있었다.
- *
- * `visibility: hidden` 을 쓴다 — **레이아웃 박스를 보존**하므로 캔버스 기하가 그대로다
- * ([실측 reviewer] 숨김 전/후 `canvas.width×height` · `getBoundingClientRect` 둘 다 `1280×720`
- * 불변, `getLodStats` `0/0/32 fading=0` 불변).
- */
-async function hideDomOverlays(page) {
-  await page.addStyleTag({
-    content: 'body * { visibility: hidden !important; } canvas { visibility: visible !important; }',
-  });
-  await page.waitForTimeout(POST_HIDE_WAIT_MS);
-  // #1219 권고 1 — 위 셀렉터는 스코프가 없어 페이지의 **모든** 캔버스를 되살린다. 지금은 캔버스가
-  // 하나뿐이라 무해하지만 [실측 reviewer: `querySelectorAll('canvas').length === 1`], HUD 에 캔버스
-  // (미니맵·성능 그래프 등) 가 하나 생기면 이번에 닫은 오염 축이 **조용히** 재개통된다 — 값만
-  // 커지고 FAIL 이 아니다.
-  //
-  // 셀렉터를 특정 id 로 좁히는 대신 **개수 단언**을 둔다: id 는 바뀌어도 스크립트가 조용히 다른
-  // 것을 재기 시작하지만, 개수 단언은 전제가 깨지는 순간 시끄럽게 깨진다 (fail-fast).
-  const canvasCount = await page.evaluate(() => document.querySelectorAll('canvas').length);
-  if (canvasCount !== 1) {
-    throw new Error(
-      `[#1219] 캔버스가 ${canvasCount}개다 (기대 1). hideDomOverlays 의 'canvas { visibility: visible }' 가 ` +
-        '캡처 대상 밖 캔버스까지 되살려 판정량을 오염시킨다 — 셀렉터를 캡처 대상으로 좁히고 본 단언을 갱신하라.',
-    );
-  }
 }
 
 /**

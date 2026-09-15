@@ -372,6 +372,52 @@ export async function waitForLodSettle(page, options = {}) {
   };
 }
 
+/** #1219 — DOM 숨김 스타일 적용 후 다음 페인트 여유 (ms). `verify:675-glow-marker` 가 쓰던 값. */
+export const DOM_OVERLAY_POST_HIDE_WAIT_MS = 200;
+
+/** #1219 — 캔버스만 남기고 DOM 을 숨기는 스타일. `visibility` 라 레이아웃 박스가 보존된다. */
+export const DOM_OVERLAY_HIDE_CSS =
+  'body * { visibility: hidden !important; } canvas { visibility: visible !important; }';
+
+/**
+ * #1219 (a) · #1228 B1 — 캔버스 외 DOM 을 `visibility: hidden` 으로 숨긴다.
+ *
+ * `canvas.screenshot()` (Playwright element 캡처) 는 **element 의 화면 영역**을 찍으므로 그 위에
+ * 겹친 DOM (TopBar · TimeBar · HUD 코너 · 토스트) 이 함께 찍힌다.
+ *  - #1219: luminance cluster 계수가 천체가 아니라 UI 텍스트를 세고 있었다 (`verify:675`).
+ *  - #1228 B1: `verify:1119` `MODE=lod` 의 「주입 전후 diff」 에 `apps/web/src/components/ui/satellite-zoom-tooltip.tsx`
+ *    토스트 (focus `1500ms` 뒤 등장 · `5000 + 200ms` 뒤 소멸) 가 섞여, 마스크가 꺼진 결함 판에서도
+ *    diff 가 `> 0` 이 되는 fail-open 이 났다.
+ *
+ * `visibility: hidden` 을 쓴다 — **레이아웃 박스를 보존**하므로 캔버스 기하가 그대로다
+ * ([실측 #1219 reviewer] 숨김 전/후 `canvas.width×height` · `getBoundingClientRect` 둘 다
+ * `1280×720` 불변, `getLodStats` `0/0/32 fading=0` 불변). `display: none` 은 박스가 `0×0` 이 되어
+ * element 캡처가 타임아웃한다 (#1219 실측).
+ *
+ * 위 셀렉터는 스코프가 없어 페이지의 **모든** 캔버스를 되살린다. HUD 에 캔버스 (미니맵·성능 그래프
+ * 등) 가 하나 생기면 닫은 오염 축이 **조용히** 재개통된다 — 값만 커지고 FAIL 이 아니다. 셀렉터를
+ * 특정 id 로 좁히는 대신 **개수 단언**을 둔다: 개수 단언은 전제가 깨지는 순간 시끄럽게 깨진다
+ * (#1219 권고 1, fail-fast).
+ *
+ * @param {import('playwright').Page} page
+ * @param {number} [options.postHideWaitMs] 스타일 적용 후 대기 (기본 `DOM_OVERLAY_POST_HIDE_WAIT_MS`)
+ * @returns {Promise<{canvasCount: number}>}
+ * @throws 캔버스가 정확히 1개가 아니면
+ */
+export async function hideDomOverlays(page, options = {}) {
+  const postHideWaitMs = options.postHideWaitMs ?? DOM_OVERLAY_POST_HIDE_WAIT_MS;
+  await page.addStyleTag({ content: DOM_OVERLAY_HIDE_CSS });
+  await page.waitForTimeout(postHideWaitMs);
+  const canvasCount = await page.evaluate(() => document.querySelectorAll('canvas').length);
+  if (canvasCount !== 1) {
+    throw new Error(
+      `[hideDomOverlays] 캔버스가 ${canvasCount}개다 (기대 1). 'canvas { visibility: visible }' 가 ` +
+        '캡처 대상 밖 캔버스까지 되살려 판정량을 오염시킨다 — 셀렉터를 캡처 대상으로 좁히고 본 단언을 갱신하라.',
+    );
+  }
+  return { canvasCount };
+}
+
 /**
  * 캡처 버퍼를 디렉토리 생성과 함께 저장.
  *
