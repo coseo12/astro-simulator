@@ -15,6 +15,10 @@
  *  3. **판별력** (기준 3) — 진동만 없앤 게 아니라 원래 성질이 산다: 참 반경이 임계 아래면 판정이
  *     `false`, 위면 `true` 이고 **위상과 무관하게** 그렇다.
  *  4. 카메라 부재 시 `Infinity` (판정 불가를 "작다" 로 오해하지 않는다) — 선재 계약 무회귀.
+ *  5. **#1228 — 부모 scaling 을 가진 자식 mesh** (LOD mid variant 형태): 판정 반경이 부모 변환을
+ *     포함하고, 부모 자전 위상 순회에서 불변이며, host 와 같은 판정을 낸다. 수정 전 산식
+ *     (`resolveMeshVisualRadius` = local scaling) 은 같은 픽스처에서 `1 / tier scaling` 로 작아져
+ *     임계 위 거리에서도 OFF 였다 — 그 증인도 함께 붙잡는다.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -30,7 +34,7 @@ import {
   type Mesh,
 } from '@babylonjs/core';
 
-import { resolveMeshVisualRadius } from './camera-controller.js';
+import { resolveMeshVisualRadius, resolveMeshWorldVisualRadius } from './camera-controller.js';
 import { projectedDiskRadiusPx, SURFACE_MASK_MIN_DISK_PX } from './procedural-planet-shader.js';
 
 /** 렌더 타깃 크기 — 앱의 기본 뷰포트(1280×720)와 같은 종횡비. NullEngine 기본값(512×256) 대신 고정. */
@@ -290,6 +294,172 @@ describe('#1157 선재 계약 무회귀', () => {
       const px = projectedDiskRadiusPx(fx.scene, fx.mesh);
       expect(Number.isFinite(px)).toBe(true);
       expect(px).toBeGreaterThan(0);
+    } finally {
+      fx.dispose();
+    }
+  });
+});
+
+/** #1228 — inner tier scaling (`18.3333`) · earth local 반경 (`0.231949`) — F1 실측 형태. */
+const TIER_SCALING = 18.3333;
+const EARTH_LOCAL_RADIUS = 0.231949;
+
+/** 자식 자신의 회전 테스트용 축 — 부모 자전축(Y)과 겹치지 않는 임의 축. */
+const CHILD_SPIN_AXIS = new Vector3(1, 1, 0).normalize();
+
+/** 부모 자전과 자식 회전의 위상 속도 비 — 두 회전이 같은 위상에 묶이지 않게 한다. */
+const PARENT_PHASE_MULTIPLIER = 3;
+
+interface ChildFixture extends Fixture {
+  /** LOD mid variant 형태 — host 의 자식, `scaling = 1`. */
+  child: Mesh;
+}
+
+/**
+ * host (tier scaling + 자전 quaternion) 아래에 `createBodyMeshMid` 와 같은 형태의 자식을 붙인다.
+ * 자식은 같은 직경 · `parent = host` · `position 0` · `scaling 1` 이다.
+ */
+function makeChildFixture(): ChildFixture {
+  const fx = makeFixture(EARTH_LOCAL_RADIUS, TIER_SCALING);
+  const child = MeshBuilder.CreateSphere(
+    'earth-lod-mid',
+    { diameter: EARTH_LOCAL_RADIUS * 2, segments: 12 },
+    fx.scene,
+  );
+  child.parent = fx.mesh;
+  child.position.set(0, 0, 0);
+  return { ...fx, child };
+}
+
+/** host 에 자전 위상을 주고, 부모 → 자식 순으로 world matrix 를 강제 갱신한다. */
+function applyParentPhase(fx: ChildFixture, phase: number): void {
+  applyPhase(fx, phase);
+  fx.child.computeWorldMatrix(true);
+  fx.child.refreshBoundingInfo();
+}
+
+/**
+ * 오라클 — 자식의 **참** world 반경 = local bounding 반경 × 부모 tier scaling. SUT 미호출.
+ * ⚠️ 상수 `EARTH_LOCAL_RADIUS` 를 쓰지 않는다 — bounding box 는 Float32 정점에서 산출돼
+ * `0.231949` 와 `1e-9` 자리에서 갈린다 (초판이 그 차이로 `toBeCloseTo(…, 9)` 에서 실패했다).
+ */
+function childTrueRadius(fx: ChildFixture): number {
+  const e = fx.child.getBoundingInfo().boundingBox.extendSize;
+  return Math.max(e.x, e.y, e.z) * TIER_SCALING;
+}
+
+const childTruePx = (fx: ChildFixture): number =>
+  projectRadiusToPx(fx.scene, fx.child, childTrueRadius(fx));
+
+/** 오라클 산 캘리브레이션 — 자식 참 반경의 투영이 `targetPx` 가 되게 카메라 거리를 맞춘다. */
+function calibrateChildToPx(fx: ChildFixture, targetPx: number): number {
+  for (let i = 0; i < 3; i++) {
+    applyParentPhase(fx, 0);
+    fx.camera.radius *= childTruePx(fx) / targetPx;
+  }
+  applyParentPhase(fx, 0);
+  return childTruePx(fx);
+}
+
+describe('#1228 부모 scaling 을 가진 자식 mesh (LOD mid variant 형태)', () => {
+  it('판정 반경이 부모 scaling 을 반영하고 부모 자전 위상 순회에서 불변이다', () => {
+    const fx = makeChildFixture();
+    try {
+      const world: number[] = [];
+      const local: number[] = [];
+      const hostWorld: number[] = [];
+      const legacy: number[] = [];
+      for (let i = 0; i < PHASE_STEPS; i++) {
+        applyParentPhase(fx, i / PHASE_STEPS);
+        world.push(resolveMeshWorldVisualRadius(fx.child));
+        local.push(resolveMeshVisualRadius(fx.child));
+        hostWorld.push(resolveMeshWorldVisualRadius(fx.mesh));
+        legacy.push(legacyRadiusOf(fx.child));
+      }
+      // 회전이 실제로 world 변환에 걸렸는지 먼저 확인 — 무회전이면 아래 불변 단언이 공허하게 참이다.
+      expect(Math.max(...legacy) - Math.min(...legacy)).toBeGreaterThan(0.05);
+
+      // 불변 — 16 위상 전건 (분해 sqrt 의 부동소수 오차만 허용).
+      expect(Math.max(...world) - Math.min(...world)).toBeLessThan(1e-9);
+      // 부모 scaling 반영 — 참 반경 = local bounding 반경 × tier scaling.
+      expect(world[0]).toBeCloseTo(childTrueRadius(fx), 9);
+      expect(world[0]).toBeCloseTo(EARTH_LOCAL_RADIUS * TIER_SCALING, 6);
+      // host 와 같은 값. 부모 없는 host 에서는 local 식과도 같다 (#790 floor 경로 등가).
+      for (let i = 0; i < PHASE_STEPS; i++) expect(world[i]).toBeCloseTo(hostWorld[i]!, 9);
+      expect(resolveMeshWorldVisualRadius(fx.mesh)).toBeCloseTo(
+        resolveMeshVisualRadius(fx.mesh),
+        9,
+      );
+      // 증인 — local scaling 식은 자식에서 tier scaling 만큼 작다 (#1228 기전).
+      expect(local[0]).toBeCloseTo(EARTH_LOCAL_RADIUS, 9);
+      expect(world[0]! / local[0]!).toBeCloseTo(TIER_SCALING, 6);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('자식 자신이 회전해도 (부모 균등 scaling) 판정 반경이 불변이다', () => {
+    const fx = makeChildFixture();
+    try {
+      const values: number[] = [];
+      for (let i = 0; i < PHASE_STEPS; i++) {
+        fx.child.rotationQuaternion = Quaternion.RotationAxis(
+          CHILD_SPIN_AXIS,
+          (i / PHASE_STEPS) * 2 * Math.PI,
+        );
+        applyParentPhase(fx, (i * PARENT_PHASE_MULTIPLIER) / PHASE_STEPS);
+        values.push(resolveMeshWorldVisualRadius(fx.child));
+      }
+      expect(Math.max(...values) - Math.min(...values)).toBeLessThan(1e-9);
+      expect(values[0]).toBeCloseTo(EARTH_LOCAL_RADIUS * TIER_SCALING, 6);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('`projectedDiskRadiusPx` — 자식 판정 px 가 host 와 같고 위상 전건 동일하다', () => {
+    const fx = makeChildFixture();
+    try {
+      calibrateChildToPx(fx, SURFACE_MASK_MIN_DISK_PX * 1.5);
+      const childPx: number[] = [];
+      for (let i = 0; i < PHASE_STEPS; i++) {
+        applyParentPhase(fx, i / PHASE_STEPS);
+        const px = projectedDiskRadiusPx(fx.scene, fx.child);
+        childPx.push(px);
+        expect(px).toBeCloseTo(projectedDiskRadiusPx(fx.scene, fx.mesh), 9);
+        expect(px).toBeCloseTo(childTruePx(fx), 9);
+      }
+      expect(Math.max(...childPx) - Math.min(...childPx)).toBeLessThan(1e-9);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('판별력 — 참 반경이 임계 위면 자식도 전 위상 ON, 아래면 전 위상 OFF', () => {
+    const fx = makeChildFixture();
+    try {
+      const above = calibrateChildToPx(fx, SURFACE_MASK_MIN_DISK_PX * 1.5);
+      expect(above).toBeGreaterThan(SURFACE_MASK_MIN_DISK_PX);
+      for (let i = 0; i < PHASE_STEPS; i++) {
+        applyParentPhase(fx, i / PHASE_STEPS);
+        expect(projectedDiskRadiusPx(fx.scene, fx.child)).toBeGreaterThanOrEqual(
+          SURFACE_MASK_MIN_DISK_PX,
+        );
+        // 증인 — 수정 전 산식 (local scaling) 은 같은 거리에서 임계 아래였다.
+        const legacyLocalPx = projectRadiusToPx(
+          fx.scene,
+          fx.child,
+          resolveMeshVisualRadius(fx.child),
+        );
+        expect(legacyLocalPx).toBeLessThan(SURFACE_MASK_MIN_DISK_PX);
+      }
+
+      const below = calibrateChildToPx(fx, SURFACE_MASK_MIN_DISK_PX * 0.75);
+      expect(below).toBeLessThan(SURFACE_MASK_MIN_DISK_PX);
+      for (let i = 0; i < PHASE_STEPS; i++) {
+        applyParentPhase(fx, i / PHASE_STEPS);
+        expect(projectedDiskRadiusPx(fx.scene, fx.child)).toBeLessThan(SURFACE_MASK_MIN_DISK_PX);
+      }
     } finally {
       fx.dispose();
     }

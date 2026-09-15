@@ -5,6 +5,18 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1228] mid LOD variant 에서 지구 대륙 마스크가 항상 꺼져 있었다** ([#1228](https://github.com/coseo12/astro-simulator/issues/1228)) — #1157 (PR [#1165](https://github.com/coseo12/astro-simulator/pull/1165)) 이 마스크 LOD 판정 반경을 회전 불변 `resolveMeshVisualRadius` 로 바꿨는데, 그 함수는 **local** `scaling` 만 곱한다. `earth-lod-mid` 는 host 의 자식이라 자신의 `scaling` 이 `1` 이고 tier scaling 은 부모에만 있어, mid 의 판정 반경이 `1 / tier scaling` 로 작아졌다. [실측] 수정 전 · 로컬 SWIFTSHADER 1280×720 · `?focus=earth&rotate=off` · `setLodOverride('mid')` 정착: host `98.32 px` / mid `5.363 px` (임계 `16`), mid 머티리얼 onBind 75회 전건 `uMaskEnabled = 0`. 실 Chrome (WebGPU) free-fly 줌아웃에서도 disk `49.84 px` 부터 `18.69 px` 까지 mid 로 그려지는 4 표본 전건이 `uMaskEnabled = 0` 이었다.
+
+  - 수정 — `resolveMeshWorldVisualRadius` 신설 (부모 체인 `scaling` 곱, float64) 을 `projectedDiskRadiusPx` 에서만 쓴다. #790 카메라 floor 호출부 (`focusOn` · `runTierTransition`) 는 부모 없는 host 만 넘겨 두 식이 비트 동일이라 **무접촉**이다.
+  - ⚠️ `mesh.absoluteScaling` 은 채택하지 않았다 — Babylon `Matrix` 가 `Float32Array` 라 분해값이 자전 위상마다 흔들려 (NullEngine 16 위상 폭 반경 `2.2e-7`) #1157 불변 단언 `< 1e-9` 가 부모 없는 host 에서도 깨졌다.
+  - 가드 — `verify:1119-earth-mask` `MODE=lod` 에 mid 정착 양성 판정 추가. 초판은 결함 판에서 `exit 0` 을 냈다 (`setLodOverride` 직후 무주입 캡처가 1회 갈려 diff 가 섞였다) — sham 대조군 (무주입 연속 캡처 동일) · mid 머티리얼 단독 주입 · mid 로 그려짐 전제를 판정 앞에 결합했다.
+
+### Behavior Changes
+
+- 지구가 **mid LOD variant 로 그려지고 참 disk 반경이 `16 px` 이상**인 구간 (focus 해제 상태의 중거리, `?lod=mid`) 에서 대륙이 절차 경로 대신 마스크 경로로 그려진다. high variant · 원거리 (`< 16 px`) 판정은 불변이다.
+
 ## [0.88.1] - 2026-09-13
 
 ### Fixed

@@ -1,0 +1,69 @@
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== 측정 (DoD 14 — 원거리 축소 LOD + #1228 mid 정착) ===
+{
+  "near": {
+    "diskR": 98.32,
+    "diff": {
+      "diffPx": 38741,
+      "total": 921600,
+      "pct": 4.2037
+    },
+    "consoleErrors": []
+  },
+  "mid": {
+    "settle": {
+      "dist": "0/32/0",
+      "fading": 0,
+      "waitedMs": 807,
+      "timedOut": false
+    },
+    "state": {
+      "override": "mid",
+      "fading": 0,
+      "hostVisible": false,
+      "midEnabled": true,
+      "midVisible": true,
+      "midParentIsHost": true,
+      "midMaterial": "earth-lod-mid-surface-mat",
+      "midUMaskEnabledDiag": 0,
+      "drawnAsMid": true
+    },
+    "diskR": 98.32,
+    "sham": {
+      "stable": true,
+      "attempts": 2,
+      "diffPx": [
+        13432,
+        0
+      ]
+    },
+    "injected": {
+      "patched": 1,
+      "materials": [
+        "earth-lod-mid-surface-mat"
+      ]
+    },
+    "diff": {
+      "diffPx": 0,
+      "total": 921600,
+      "pct": 0
+    },
+    "consoleErrors": []
+  },
+  "far": {
+    "diskR": 5.619,
+    "diff": {
+      "diffPx": 0,
+      "total": 921600,
+      "pct": 0
+    },
+    "consoleErrors": []
+  }
+}
+
+=== 판정 ===
+양성 대조군 (focus, R=98.32px ≥ 16): 고착 주입 diff 38741px (>0 필요) · console err 0 (== 0) → PASS
+#1228 mid 정착 양성 (R=98.32px ≥ 16): 전제 mid 로 그려짐 true (settle timedOut false, {"override":"mid","fading":0,"hostVisible":false,"midEnabled":true,"midVisible":true,"midParentIsHost":true,"midMaterial":"earth-lod-mid-surface-mat","midUMaskEnabledDiag":0,"drawnAsMid":true}) · mid 머티리얼 단독 패치 true · sham 무주입 정착 true ([13432,0]) · 고착 주입 diff 0px (>0 필요) · console err 0 (== 0) → FAIL
+원거리 대역 진입 (조감, R=5.619px < 16) · console err 0 (== 0) → PASS
+원거리에서 uMaskEnabled 이미 0 (고착 주입 diff 0% < 0.001%) · console err 0 (== 0) → PASS

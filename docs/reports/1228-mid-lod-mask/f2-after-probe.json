@@ -1,0 +1,246 @@
+[
+  {
+    "label": "rotate=off (verify:1119 FOCUS_QUERY)",
+    "query": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off",
+    "settleAuto": {
+      "dist": "9/6/17",
+      "fading": 0,
+      "waitedMs": 812,
+      "timedOut": false
+    },
+    "auto": {
+      "tier": "inner",
+      "lod": {
+        "override": "auto",
+        "dist": "9/6/17",
+        "fading": 0
+      },
+      "cameraRadius": 36.827,
+      "hostParentChain": [],
+      "midExists": false,
+      "rows": [
+        {
+          "mesh": "earth",
+          "enabled": true,
+          "isVisible": true,
+          "parent": null,
+          "material": "earth-surface-mat",
+          "scaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "absoluteScaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "extendSize": 0.231949,
+          "radiusLocalScaling": 4.252398,
+          "radiusWorldScaling": 4.252398,
+          "pxLocalScaling": 98.32,
+          "pxWorldScaling": 98.32,
+          "uMaskEnabledNow": 1,
+          "bindCount": 64,
+          "bindValues": [
+            1
+          ]
+        }
+      ]
+    },
+    "settleMid": {
+      "dist": "0/32/0",
+      "fading": 0,
+      "waitedMs": 812,
+      "timedOut": false
+    },
+    "mid": {
+      "tier": "inner",
+      "lod": {
+        "override": "mid",
+        "dist": "0/32/0",
+        "fading": 0
+      },
+      "cameraRadius": 36.827,
+      "hostParentChain": [],
+      "midExists": true,
+      "rows": [
+        {
+          "mesh": "earth",
+          "enabled": true,
+          "isVisible": false,
+          "parent": null,
+          "material": "earth-surface-mat",
+          "scaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "absoluteScaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "extendSize": 0.231949,
+          "radiusLocalScaling": 4.252398,
+          "radiusWorldScaling": 4.252398,
+          "pxLocalScaling": 98.32,
+          "pxWorldScaling": 98.32,
+          "uMaskEnabledNow": 1,
+          "bindCount": 0,
+          "bindValues": []
+        },
+        {
+          "mesh": "earth-lod-mid",
+          "enabled": true,
+          "isVisible": true,
+          "parent": "earth",
+          "material": "earth-lod-mid-surface-mat",
+          "scaling": [
+            1,
+            1,
+            1
+          ],
+          "absoluteScaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "extendSize": 0.231949,
+          "radiusLocalScaling": 0.231949,
+          "radiusWorldScaling": 4.252398,
+          "pxLocalScaling": 5.363,
+          "pxWorldScaling": 98.32,
+          "uMaskEnabledNow": 1,
+          "bindCount": 73,
+          "bindValues": [
+            1
+          ]
+        }
+      ]
+    },
+    "consoleErrors": []
+  },
+  {
+    "label": "rotate ON",
+    "query": "?gpu=a&focus=earth&lod=auto&orbits=off",
+    "settleAuto": {
+      "dist": "6/8/18",
+      "fading": 0,
+      "waitedMs": 813,
+      "timedOut": false
+    },
+    "auto": {
+      "tier": "inner",
+      "lod": {
+        "override": "auto",
+        "dist": "6/8/18",
+        "fading": 0
+      },
+      "cameraRadius": 48.437,
+      "hostParentChain": [],
+      "midExists": false,
+      "rows": [
+        {
+          "mesh": "earth",
+          "enabled": true,
+          "isVisible": true,
+          "parent": null,
+          "material": "earth-surface-mat",
+          "scaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "absoluteScaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "extendSize": 0.231949,
+          "radiusLocalScaling": 4.252398,
+          "radiusWorldScaling": 4.252398,
+          "pxLocalScaling": 74.753,
+          "pxWorldScaling": 74.753,
+          "uMaskEnabledNow": 1,
+          "bindCount": 63,
+          "bindValues": [
+            1
+          ]
+        }
+      ]
+    },
+    "settleMid": {
+      "dist": "0/32/0",
+      "fading": 0,
+      "waitedMs": 814,
+      "timedOut": false
+    },
+    "mid": {
+      "tier": "inner",
+      "lod": {
+        "override": "mid",
+        "dist": "0/32/0",
+        "fading": 0
+      },
+      "cameraRadius": 48.437,
+      "hostParentChain": [],
+      "midExists": true,
+      "rows": [
+        {
+          "mesh": "earth",
+          "enabled": true,
+          "isVisible": false,
+          "parent": null,
+          "material": "earth-surface-mat",
+          "scaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "absoluteScaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "extendSize": 0.231949,
+          "radiusLocalScaling": 4.252398,
+          "radiusWorldScaling": 4.252398,
+          "pxLocalScaling": 74.753,
+          "pxWorldScaling": 74.753,
+          "uMaskEnabledNow": 1,
+          "bindCount": 0,
+          "bindValues": []
+        },
+        {
+          "mesh": "earth-lod-mid",
+          "enabled": true,
+          "isVisible": true,
+          "parent": "earth",
+          "material": "earth-lod-mid-surface-mat",
+          "scaling": [
+            1,
+            1,
+            1
+          ],
+          "absoluteScaling": [
+            18.3333,
+            18.3333,
+            18.3333
+          ],
+          "extendSize": 0.231949,
+          "radiusLocalScaling": 0.231949,
+          "radiusWorldScaling": 4.252398,
+          "pxLocalScaling": 4.077,
+          "pxWorldScaling": 74.753,
+          "uMaskEnabledNow": 1,
+          "bindCount": 73,
+          "bindValues": [
+            1
+          ]
+        }
+      ]
+    },
+    "consoleErrors": []
+  }
+]

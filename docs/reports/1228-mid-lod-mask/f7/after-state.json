@@ -1,0 +1,139 @@
+{
+  "label": "after",
+  "baseUrl": "http://localhost:3000",
+  "engineInfo": {
+    "isWebGPU": true
+  },
+  "rows": [
+    {
+      "scenario": "A-forced-high",
+      "file": "after-A-forced-high.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 48.437,
+      "diskPx": 74.75,
+      "override": "high",
+      "dist": "32/0/0",
+      "fading": 0,
+      "earthDrawnAs": "high",
+      "hostUMask": 1,
+      "midUMask": null
+    },
+    {
+      "scenario": "A-forced-mid",
+      "file": "after-A-forced-mid.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 48.437,
+      "diskPx": 74.75,
+      "override": "mid",
+      "dist": "0/32/0",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 1
+    },
+    {
+      "scenario": "B-freefly-zoom1x",
+      "file": "after-B-freefly-zoom1x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 48.437,
+      "diskPx": 74.75,
+      "override": "auto",
+      "dist": "2/2/28",
+      "fading": 0,
+      "earthDrawnAs": "high",
+      "hostUMask": 1,
+      "midUMask": null
+    },
+    {
+      "scenario": "B-freefly-zoom1.5x",
+      "file": "after-B-freefly-zoom1.5x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 72.656,
+      "diskPx": 49.84,
+      "override": "auto",
+      "dist": "1/3/28",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 1
+    },
+    {
+      "scenario": "B-freefly-zoom2x",
+      "file": "after-B-freefly-zoom2x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 96.874,
+      "diskPx": 37.38,
+      "override": "auto",
+      "dist": "2/3/27",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 1
+    },
+    {
+      "scenario": "B-freefly-zoom3x",
+      "file": "after-B-freefly-zoom3x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 145.311,
+      "diskPx": 24.92,
+      "override": "auto",
+      "dist": "2/4/26",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 1
+    },
+    {
+      "scenario": "B-freefly-zoom4x",
+      "file": "after-B-freefly-zoom4x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 193.748,
+      "diskPx": 18.69,
+      "override": "auto",
+      "dist": "1/5/26",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 1
+    },
+    {
+      "scenario": "B-freefly-zoom5x",
+      "file": "after-B-freefly-zoom5x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 242.185,
+      "diskPx": 14.95,
+      "override": "auto",
+      "dist": "1/5/26",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 0
+    },
+    {
+      "scenario": "B-freefly-zoom6x",
+      "file": "after-B-freefly-zoom6x.png",
+      "settleTimedOut": false,
+      "tier": "inner",
+      "camRadius": 242.185,
+      "diskPx": 14.95,
+      "override": "auto",
+      "dist": "1/5/26",
+      "fading": 0,
+      "earthDrawnAs": "mid",
+      "hostUMask": 1,
+      "midUMask": 0
+    }
+  ],
+  "consoleErrors": {
+    "A": 0,
+    "B": 0
+  }
+}

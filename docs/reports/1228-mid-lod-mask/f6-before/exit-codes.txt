@@ -1,0 +1,11 @@
+1119-dod exit=0 sec=22
+1119-lod exit=0 sec=17
+1119-seam exit=0 sec=58
+783-dod exit=0 sec=14
+783-ocean exit=0 sec=23
+756-surface exit=0 sec=57
+1215-cloud-layer exit=0 sec=70
+1202-atmosphere-rim exit=0 sec=20
+675-glow-marker exit=0 sec=33
+790-focus-zoom exit=0 sec=49
+DONE

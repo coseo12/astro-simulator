@@ -20,7 +20,7 @@
  *
  * 모드:
  *   node browser-verify-1119-earth-mask.mjs            # DoD 1 (IoU) + DoD 2 (negative)
- *   MODE=lod node browser-verify-1119-earth-mask.mjs   # DoD 14 (원거리 축소 uMaskEnabled 0 전환)
+ *   MODE=lod node browser-verify-1119-earth-mask.mjs   # DoD 14 (원거리 축소 uMaskEnabled 0 전환 + #1228 mid 정착 양성)
  *   MODE=seam node browser-verify-1119-earth-mask.mjs  # 자오선 u=0/1 경계 (Phase 0 잔여 미측정 2)
  *
  * 환경:
@@ -173,6 +173,23 @@ const DAY_SIDE_MIN_NDL = 0.15;
 /** §A4.5 DoD 14 — 원거리 축소 판정 임계 (셰이더 `SURFACE_MASK_MIN_DISK_PX` 와 동일 값). */
 const MASK_MIN_DISK_PX = 16;
 
+/** #1228 — LOD mid variant mesh / 표면 머티리얼 이름 (`body-mesh-factory.ts` `createBodyMeshMid`). */
+const MID_MESH = 'earth-lod-mid';
+const MID_SURFACE_MATERIAL = 'earth-lod-mid-surface-mat';
+
+/**
+ * #1228 — mid 프레임 sham 대조군: 무주입 연속 캡처 간격 / 최대 시도 수.
+ *
+ * [실측] develop dist 에서 `setLodOverride` 직후 `waitForLodSettle` 이 통과한 뒤에도 **무주입** 연속
+ * 캡처가 1회 갈렸다 (`9554`·`13432 px`, bbox `[524,583,755,642]` — 지구 disk 가 아니라 화면 하단
+ * 띠) 그리고 그 뒤 9 간격은 전건 `0` 이었다 (`docs/reports/1228-mid-lod-mask/f5/`). 그 1회 변화가
+ * 「주입 전후」 창에 걸리면 마스크가 꺼진 결함 판에서도 diff 가 `> 0` 이 돼 판정이 **fail-open** 이었다
+ * (신규 판정 초판이 develop dist 에서 `exit 0` 을 냈다). 그래서 주입 **직전** 무주입 두 캡처가 같아질
+ * 때까지 기다리고, 상한 안에 못 맞추면 측정 실패로 FAIL 한다.
+ */
+const STABLE_CAPTURE_INTERVAL_MS = 800;
+const STABLE_CAPTURE_MAX_ATTEMPTS = 10;
+
 async function launch() {
   if (SWIFTSHADER) {
     console.log('[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)');
@@ -235,21 +252,26 @@ async function setupPage(browser, query, { equatorialView = true, julianDate = T
  * 머티리얼 자신의 observer **뒤에** 등록되면 다음 프레임 업로드 값이 항상 `0` 이 된다 —
  * **프로덕션 코드 0 줄로** "마스크가 0 으로 고착된 상태" 를 재현한다.
  */
-async function injectMaskDisabled(page) {
-  return page.evaluate(() => {
+async function injectMaskDisabled(page, onlyMaterial = null) {
+  return page.evaluate((only) => {
     const earth = window.__solarScene?.meshes?.get('earth');
     if (!earth) return { patched: 0, error: 'earth mesh 부재' };
     const meshes = [earth, ...earth.getChildMeshes()];
     let patched = 0;
+    // #1228 — 어느 머티리얼이 패치됐는지 이름으로 남긴다 (mid 정착 판정이 mid 패치를 전제로 요구).
+    // `only` 미지정 = 종전과 같이 지구 머티리얼 전부 (dod · near · far 무변경).
+    const materials = [];
     for (const mesh of meshes) {
       const mat = mesh.material;
+      if (only !== null && mat?.name !== only) continue;
       if (mat && typeof mat.setFloat === 'function' && mat.onBindObservable) {
         mat.onBindObservable.add(() => mat.setFloat('uMaskEnabled', 0));
         patched += 1;
+        materials.push(mat.name);
       }
     }
-    return { patched };
-  });
+    return { patched, materials };
+  }, onlyMaterial);
 }
 
 /**
@@ -497,6 +519,64 @@ async function readDiskRadiusPx(page) {
     const e = Vector3.Project(center.add(right.scale(radiusWorld)), idMat, transform, vp);
     return Number(Math.hypot(e.x - c.x, e.y - c.y).toFixed(3));
   });
+}
+
+/**
+ * #1228 — 지구가 **mid variant 로** 그려지고 있는지 (mid 정착 판정의 전제).
+ *
+ * `drawnAsMid` = override `mid` · cross-fade 0 · host(high) 숨김 · mid 활성 · mid 가시 · mid 머티리얼이
+ * 표면 셰이더. 하나라도 거짓이면 그 프레임의 diff 는 mid 마스크의 증거가 아니다.
+ * `uMaskEnabled` 는 **진단 인쇄 전용**이다 — Babylon 내부 필드(`_floats`)라 판정에 걸지 않는다.
+ */
+async function readMidVariantState(page) {
+  return page.evaluate(
+    ({ midMesh, midMaterial }) => {
+      const scene = window.__simCore?.scene;
+      const host = window.__solarScene?.meshes?.get('earth');
+      if (!scene || !host) return { error: 'earth mesh/scene 부재' };
+      const mid = scene.getMeshByName(midMesh);
+      if (!mid) return { error: `${midMesh} 부재` };
+      const stats = window.__solarScene.getLodStats();
+      const state = {
+        override: stats.override,
+        fading: stats.fading,
+        hostVisible: host.isVisible,
+        midEnabled: mid.isEnabled(),
+        midVisible: mid.isVisible,
+        midParentIsHost: mid.parent === host,
+        midMaterial: mid.material?.name ?? null,
+        midUMaskEnabledDiag: mid.material?._floats?.uMaskEnabled ?? null,
+      };
+      state.drawnAsMid =
+        state.override === 'mid' &&
+        state.fading === 0 &&
+        state.hostVisible === false &&
+        state.midEnabled === true &&
+        state.midVisible === true &&
+        state.midMaterial === midMaterial;
+      return state;
+    },
+    { midMesh: MID_MESH, midMaterial: MID_SURFACE_MATERIAL },
+  );
+}
+
+/**
+ * #1228 — 무주입 연속 두 캡처가 같아질 때까지 기다린다 (sham 대조군). 반환 `shot` 이 주입 전 기준이다.
+ * `stable === false` (상한 초과 · diff 실패) 는 측정 실패다 — 호출부가 FAIL 로 읽는다.
+ */
+async function captureStable(page, name) {
+  let prev = await capture(page, `${name}-sham0`);
+  const shamDiffs = [];
+  for (let attempt = 1; attempt <= STABLE_CAPTURE_MAX_ATTEMPTS; attempt++) {
+    await page.waitForTimeout(STABLE_CAPTURE_INTERVAL_MS);
+    const cur = await capture(page, name);
+    const d = await diffRatio(page, prev, cur);
+    shamDiffs.push(d.error ? d.error : d.diffPx);
+    if (!d.error && d.diffPx === 0)
+      return { stable: true, attempts: attempt, shamDiffs, shot: cur };
+    prev = cur;
+  }
+  return { stable: false, attempts: STABLE_CAPTURE_MAX_ATTEMPTS, shamDiffs, shot: prev };
 }
 
 /** 두 base64 PNG 의 픽셀 diff 비율 (±2/255 노이즈 허용 — 783 diffDirs 규약 동일). */
@@ -765,6 +845,37 @@ async function runLod(browser) {
     await context.close();
   }
 
+  // #1228 — mid LOD 정착 (focus 거리 그대로, variant 만 mid) — 마스크가 **켜져 있어야** 한다.
+  //
+  // 수정 전에는 mid 머티리얼의 판정 반경이 부모(host) tier scaling 을 빠뜨려 `1 / 18.33` 로 작게
+  // 나왔고, 참 disk 반경이 임계를 한참 넘는 이 프레임에서도 `uMaskEnabled` 가 `0` 이었다 (#1228 F1
+  // 실측 — host `98.32 px` / mid `5.363 px`). near·far 두 프레임은 high 와 조감만 재서 이 사각을
+  // 보지 못했다.
+  //
+  // ⚠️ fail-open 차단 3겹 — 「고착 주입이 픽셀을 바꾼다」가 mid 마스크의 증거가 되려면:
+  //  (1) **mid 가 실제로 그려진다** — host(high)가 fade 로 남거나 override 가 안 먹었으면 high 의
+  //      마스크가 diff 를 만든다 → `mid.drawnAsMid` 전제 (override=mid · fade 0 · host 숨김 · mid 가시).
+  //  (2) **주입 대상이 mid 머티리얼 하나다** — 다른 머티리얼 패치의 부수 효과를 판정에서 뺀다.
+  //  (3) **주입 없이는 안 바뀐다** — sham 대조군 `captureStable` (상수 선언부의 실측 참조). 초판은 이것
+  //      없이 develop dist (결함 판) 에서 `exit 0` 을 냈다.
+  // 셋 다 판정 **앞에** 결합한다. 전제 미충족은 측정 실패이고 FAIL 이다.
+  const mid = {};
+  {
+    const { context, page, consoleErrors } = await setupPage(browser, FOCUS_QUERY);
+    await page.evaluate(() => window.__simCore.command({ type: 'setLodOverride', level: 'mid' }));
+    mid.settle = await waitForLodSettle(page);
+    mid.state = await readMidVariantState(page);
+    mid.diskR = await readDiskRadiusPx(page);
+    const stable = await captureStable(page, 'qa-1119-lod-mid-before');
+    mid.sham = { stable: stable.stable, attempts: stable.attempts, diffPx: stable.shamDiffs };
+    mid.injected = await injectMaskDisabled(page, MID_SURFACE_MATERIAL);
+    await page.waitForTimeout(800);
+    const after = await capture(page, 'qa-1119-lod-mid-after');
+    mid.diff = await diffRatio(page, stable.shot, after);
+    mid.consoleErrors = consoleErrors;
+    await context.close();
+  }
+
   // 전체 태양계 조감 (disk R < 16 px 대역) — 마스크가 이미 꺼져 있어야 한다.
   const far = {};
   {
@@ -783,8 +894,8 @@ async function runLod(browser) {
     await context.close();
   }
 
-  console.log('\n=== 측정 (DoD 14 — 원거리 축소 LOD) ===');
-  console.log(JSON.stringify({ near, far }, null, 2));
+  console.log('\n=== 측정 (DoD 14 — 원거리 축소 LOD + #1228 mid 정착) ===');
+  console.log(JSON.stringify({ near, mid, far }, null, 2));
 
   // 양성 대조군 — focus 대역에서는 고착 주입이 픽셀을 **실제로 바꿔야** 한다.
   // (안 바뀌면 주입이 무효라는 뜻이고, 그러면 far 의 "안 바뀜" 은 아무것도 증명하지 못한다.)
@@ -798,8 +909,25 @@ async function runLod(browser) {
   // `far` 는 두 원거리 술어에. `farUnchanged` 는 「픽셀이 안 바뀐다」를 재는 술어라 렌더가
   // 예외로 죽어 아무것도 안 그려져도 초록이 된다 — 콘솔 축이 특히 필요한 자리다.
   const nearConsoleOk = !hasSimErrors(near.consoleErrors);
+  const midConsoleOk = !hasSimErrors(mid.consoleErrors);
   const farConsoleOk = !hasSimErrors(far.consoleErrors);
   const positiveControl = near.diskR >= MASK_MIN_DISK_PX && near.diff.diffPx > 0 && nearConsoleOk;
+  // #1228 — 전제 (mid 로 그려짐 + 참 반경이 임계 위 + mid 머티리얼 패치) 를 양성 술어 앞에 결합한다.
+  const midDrawnAsMid =
+    !mid.settle.timedOut && mid.state !== null && !mid.state.error && mid.state.drawnAsMid;
+  const midPatched =
+    Array.isArray(mid.injected.materials) &&
+    mid.injected.materials.length === 1 &&
+    mid.injected.materials[0] === MID_SURFACE_MATERIAL;
+  const midShamStable = mid.sham.stable === true;
+  const midPositive =
+    midConsoleOk &&
+    midDrawnAsMid &&
+    midPatched &&
+    midShamStable &&
+    mid.diskR !== null &&
+    mid.diskR >= MASK_MIN_DISK_PX &&
+    mid.diff.diffPx > 0;
   const farBelowThreshold = far.diskR !== null && far.diskR < MASK_MIN_DISK_PX && farConsoleOk;
   // 임계 아래 대역에서는 마스크가 이미 꺼져 있으므로 고착 주입이 픽셀을 바꾸지 못한다.
   const farUnchanged = far.diff.pct < 0.001 && farConsoleOk;
@@ -809,6 +937,9 @@ async function runLod(browser) {
     `양성 대조군 (focus, R=${near.diskR}px ≥ ${MASK_MIN_DISK_PX}): 고착 주입 diff ${near.diff.diffPx}px (>0 필요) · console err ${near.consoleErrors.length} (== 0) → ${positiveControl ? 'PASS' : 'FAIL'}`,
   );
   console.log(
+    `#1228 mid 정착 양성 (R=${mid.diskR}px ≥ ${MASK_MIN_DISK_PX}): 전제 mid 로 그려짐 ${midDrawnAsMid} (settle timedOut ${mid.settle.timedOut}, ${JSON.stringify(mid.state)}) · mid 머티리얼 단독 패치 ${midPatched} · sham 무주입 정착 ${midShamStable} (${JSON.stringify(mid.sham.diffPx)}) · 고착 주입 diff ${mid.diff.diffPx}px (>0 필요) · console err ${mid.consoleErrors.length} (== 0) → ${midPositive ? 'PASS' : 'FAIL'}`,
+  );
+  console.log(
     `원거리 대역 진입 (조감, R=${far.diskR}px < ${MASK_MIN_DISK_PX}) · console err ${far.consoleErrors.length} (== 0) → ${farBelowThreshold ? 'PASS' : 'FAIL'}`,
   );
   console.log(
@@ -816,13 +947,14 @@ async function runLod(browser) {
   );
   for (const [label, frame] of [
     ['near', near],
+    ['mid', mid],
     ['far', far],
   ]) {
     if (frame.consoleErrors.length === 0) continue;
     console.log(`  ↳ [console] ${label} 프레임 ${frame.consoleErrors.length}건:`);
     for (const e of frame.consoleErrors.slice(0, 10)) console.log(`      ${e}`);
   }
-  if (!(positiveControl && farBelowThreshold && farUnchanged)) process.exitCode = 1;
+  if (!(positiveControl && midPositive && farBelowThreshold && farUnchanged)) process.exitCode = 1;
 }
 
 await withBrowser(
