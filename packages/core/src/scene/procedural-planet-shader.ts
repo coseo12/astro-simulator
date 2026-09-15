@@ -123,7 +123,7 @@ import {
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 // #1157 — 회전 불변 시각 반경 SSoT (#790). `camera-controller.ts` 는 `@babylonjs/core` 외의
 // 모듈을 import 하지 않으므로 순환 없음 (`tier-transition.ts` 가 같은 방향으로 이미 의존한다).
-import { resolveMeshVisualRadius } from './camera-controller.js';
+import { resolveMeshWorldVisualRadius } from './camera-controller.js';
 import { hexToColor3 } from './color-utils.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
 import {
@@ -982,6 +982,15 @@ const IDENTITY_MATRIX = Matrix.Identity();
  * over-resolution 논거가 애초에 **참 disk 반경 R** 기준이라 (`R = 16 px` → 정합 폭 ≈ 100) 이
  * 교체는 그 문면 쪽으로 붙는다.
  *
+ * ⚠️ **#1228 — 위 교체가 mid LOD variant 에서 마스크를 항상 껐다.** `resolveMeshVisualRadius` 는
+ * **local** `scaling` 만 곱하는데, `earth-lod-mid` 는 host 의 자식이라 자신의 `scaling` 이 `1` 이고
+ * tier scaling 은 부모에만 있다. 수정 전 실측 (#1228 F1 — 로컬 SWIFTSHADER 1280×720,
+ * `?focus=earth&rotate=off`, `setLodOverride('mid')` 정착): host `98.32 px` / mid `5.363 px`
+ * (비 `18.333` = inner tier scaling), mid 머티리얼 onBind 75회 전건 `uMaskEnabled = 0`. 그래서
+ * 반경은 **부모 scaling 을 포함한** `resolveMeshWorldVisualRadius` (부모 체인 scaling 곱) 를 쓴다 —
+ * 회전 불변성은 그대로다 (근거는 그 함수 주석, 고정은 `procedural-planet-mask-lod.test.ts`).
+ * 부모가 없는 host 에서는 두 함수가 비트 동일이라 high 경로 판정은 불변이다.
+ *
  * 카메라 부재 (NullEngine 단위 테스트 등) 면 `Infinity` — LOD 규칙이 마스크를 **끄지 않는다**
  * (판정 불가를 "작다" 로 오해하면 마스크가 조용히 사라진다).
  *
@@ -999,7 +1008,7 @@ export function projectedDiskRadiusPx(scene: Scene, mesh: Mesh): number {
   );
   const transform = scene.getTransformMatrix();
   const center = mesh.getAbsolutePosition();
-  const visualRadius = resolveMeshVisualRadius(mesh);
+  const visualRadius = resolveMeshWorldVisualRadius(mesh);
   camera.getDirectionToRef(CAMERA_LOCAL_RIGHT, tmpEdgeWorld);
   tmpEdgeWorld.scaleInPlace(visualRadius);
   tmpEdgeWorld.addInPlace(center);

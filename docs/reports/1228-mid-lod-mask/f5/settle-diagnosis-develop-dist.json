@@ -1,0 +1,827 @@
+{
+  "high": {
+    "settle": {
+      "dist": "32/0/0",
+      "fading": 0,
+      "waitedMs": 808,
+      "timedOut": false
+    },
+    "series": [
+      {
+        "step": 0,
+        "state": {
+          "t": 9131,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 1,
+        "diffVsPrev": {
+          "n": 9554,
+          "bbox": [
+            526,
+            583,
+            753,
+            624
+          ]
+        },
+        "state": {
+          "t": 10286,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 2,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 11390,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 3,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 12477,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 4,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 13605,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 5,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 14697,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 6,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 15793,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 7,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 16889,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 8,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 17975,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 9,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 19078,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 10,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 20187,
+          "simPaused": null,
+          "jd": null,
+          "lod": "high 32/0/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "mid": null,
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      }
+    ]
+  },
+  "mid": {
+    "settle": {
+      "dist": "0/32/0",
+      "fading": 0,
+      "waitedMs": 809,
+      "timedOut": false
+    },
+    "series": [
+      {
+        "step": 0,
+        "state": {
+          "t": 6584,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 1,
+        "diffVsPrev": {
+          "n": 13432,
+          "bbox": [
+            524,
+            583,
+            755,
+            642
+          ]
+        },
+        "state": {
+          "t": 7649,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 2,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 8729,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 3,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 9793,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 4,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 10854,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 5,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 11903,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 6,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 12962,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 7,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 14035,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 8,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 15092,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 9,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 16160,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      },
+      {
+        "step": 10,
+        "diffVsPrev": {
+          "n": 0,
+          "bbox": null
+        },
+        "state": {
+          "t": 17217,
+          "simPaused": null,
+          "jd": null,
+          "lod": "mid 0/32/0 fading=0",
+          "cloudMeshes": [
+            "earth-cloud"
+          ],
+          "earth": {
+            "en": true,
+            "vis": false,
+            "visibility": 1,
+            "alpha": 0.4544999998807907
+          },
+          "mid": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cloud": {
+            "en": true,
+            "vis": true,
+            "visibility": 1,
+            "alpha": 1
+          },
+          "cam": [
+            -1.570796,
+            1.570796,
+            36.826847
+          ]
+        }
+      }
+    ]
+  }
+}

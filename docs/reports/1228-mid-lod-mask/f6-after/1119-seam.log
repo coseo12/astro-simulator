@@ -1,0 +1,141 @@
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== 측정 (자오선 u=0/1 경계 — JD 2종 × 카메라 4방위) ===
+[
+  {
+    "label": "본초자오선 낮면 (JD 2451626.0)",
+    "julianDate": 2451626,
+    "rows": [
+      {
+        "alphaOffsetDeg": 0,
+        "diskR": 98.32,
+        "subSolarLonDeg": 0,
+        "domain": 8255,
+        "screenLandPct": 51.21,
+        "maskLandPct": 50.62,
+        "excludedPolar": 0,
+        "excludedNight": 13698,
+        "iou": 0.936,
+        "consoleErrors": []
+      },
+      {
+        "alphaOffsetDeg": 90,
+        "diskR": 98.32,
+        "subSolarLonDeg": 0,
+        "domain": 21953,
+        "screenLandPct": 40.81,
+        "maskLandPct": 40.67,
+        "excludedPolar": 0,
+        "excludedNight": 0,
+        "iou": 0.9599,
+        "consoleErrors": []
+      },
+      {
+        "alphaOffsetDeg": 180,
+        "diskR": 98.32,
+        "subSolarLonDeg": 0,
+        "domain": 8255,
+        "screenLandPct": 29.57,
+        "maskLandPct": 29.72,
+        "excludedPolar": 0,
+        "excludedNight": 13698,
+        "iou": 0.9498,
+        "consoleErrors": []
+      },
+      {
+        "alphaOffsetDeg": 270,
+        "diskR": 98.32,
+        "subSolarLonDeg": 0,
+        "domain": 0,
+        "screenLandPct": null,
+        "maskLandPct": null,
+        "excludedPolar": 0,
+        "excludedNight": 21953,
+        "iou": 0,
+        "consoleErrors": []
+      }
+    ],
+    "best": {
+      "alphaOffsetDeg": 90,
+      "diskR": 98.32,
+      "subSolarLonDeg": 0,
+      "domain": 21953,
+      "screenLandPct": 40.81,
+      "maskLandPct": 40.67,
+      "excludedPolar": 0,
+      "excludedNight": 0,
+      "iou": 0.9599,
+      "consoleErrors": []
+    }
+  },
+  {
+    "label": "±180° 자오선 낮면 (JD 2451809.5)",
+    "julianDate": 2451809.5,
+    "rows": [
+      {
+        "alphaOffsetDeg": 0,
+        "diskR": 98.32,
+        "subSolarLonDeg": -180,
+        "domain": 8272,
+        "screenLandPct": 11.86,
+        "maskLandPct": 11.85,
+        "excludedPolar": 0,
+        "excludedNight": 13681,
+        "iou": 0.9768,
+        "consoleErrors": []
+      },
+      {
+        "alphaOffsetDeg": 90,
+        "diskR": 98.32,
+        "subSolarLonDeg": -180,
+        "domain": 0,
+        "screenLandPct": null,
+        "maskLandPct": null,
+        "excludedPolar": 0,
+        "excludedNight": 21953,
+        "iou": 0,
+        "consoleErrors": []
+      },
+      {
+        "alphaOffsetDeg": 180,
+        "diskR": 98.32,
+        "subSolarLonDeg": -180,
+        "domain": 8272,
+        "screenLandPct": 35.7,
+        "maskLandPct": 34.95,
+        "excludedPolar": 0,
+        "excludedNight": 13681,
+        "iou": 0.8827,
+        "consoleErrors": []
+      },
+      {
+        "alphaOffsetDeg": 270,
+        "diskR": 98.32,
+        "subSolarLonDeg": -180,
+        "domain": 21953,
+        "screenLandPct": 4.75,
+        "maskLandPct": 4.77,
+        "excludedPolar": 0,
+        "excludedNight": 0,
+        "iou": 0.877,
+        "consoleErrors": []
+      }
+    ],
+    "best": {
+      "alphaOffsetDeg": 270,
+      "diskR": 98.32,
+      "subSolarLonDeg": -180,
+      "domain": 21953,
+      "screenLandPct": 4.75,
+      "maskLandPct": 4.77,
+      "excludedPolar": 0,
+      "excludedNight": 0,
+      "iou": 0.877,
+      "consoleErrors": []
+    }
+  }
+]
+
+=== 판정 ===
+본초자오선 낮면 (JD 2451626.0): sub-solar 경도 0° · 낮면 표본 21953 (≥ 2000) · IoU 0.9599 (≥ 0.8) · alpha+90° · console err 0 (== 0) → PASS
+±180° 자오선 낮면 (JD 2451809.5): sub-solar 경도 -180° · 낮면 표본 21953 (≥ 2000) · IoU 0.877 (≥ 0.8) · alpha+270° · console err 0 (== 0) → PASS

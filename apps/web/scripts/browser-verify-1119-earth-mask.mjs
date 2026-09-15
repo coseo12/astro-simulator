@@ -20,7 +20,7 @@
  *
  * 모드:
  *   node browser-verify-1119-earth-mask.mjs            # DoD 1 (IoU) + DoD 2 (negative)
- *   MODE=lod node browser-verify-1119-earth-mask.mjs   # DoD 14 (원거리 축소 uMaskEnabled 0 전환)
+ *   MODE=lod node browser-verify-1119-earth-mask.mjs   # DoD 14 (원거리 축소 uMaskEnabled 0 전환 + #1228 mid 정착 양성)
  *   MODE=seam node browser-verify-1119-earth-mask.mjs  # 자오선 u=0/1 경계 (Phase 0 잔여 미측정 2)
  *
  * 환경:
@@ -33,6 +33,7 @@
 import { chromium } from 'playwright';
 import {
   hasSimErrors,
+  hideDomOverlays,
   waitForLodSettle,
   withBrowser,
 } from '../../../scripts/browser-verify-utils.mjs';
@@ -173,6 +174,39 @@ const DAY_SIDE_MIN_NDL = 0.15;
 /** §A4.5 DoD 14 — 원거리 축소 판정 임계 (셰이더 `SURFACE_MASK_MIN_DISK_PX` 와 동일 값). */
 const MASK_MIN_DISK_PX = 16;
 
+/** #1228 — LOD mid variant mesh / 표면 머티리얼 이름 (`body-mesh-factory.ts` `createBodyMeshMid`). */
+const MID_MESH = 'earth-lod-mid';
+const MID_SURFACE_MATERIAL = 'earth-lod-mid-surface-mat';
+
+/**
+ * #1228 — MODE=lod 양성 판정의 교란원과 그 차단 (reviewer B1 로 한 번 뒤집혔다 — 이력을 남긴다).
+ *
+ * **교란원** — DOM 토스트 「확대하여 달의 위치를 확인하세요」
+ * (`apps/web/src/components/ui/satellite-zoom-tooltip.tsx` — focus `1500ms` 뒤 등장, `5000 + 200ms`
+ * 뒤 소멸). `capture` 는 `locator('canvas').screenshot()` 이라 캔버스 **위에 겹친 DOM 이 찍힌다**
+ * (#1219 클래스). [실측] 무주입 연속 캡처 간 `13432 px` · bbox `[524,583,755,642]` 이 이 토스트의
+ * 소멸이며 지구 disk 안 픽셀은 `0` 이다. ⚠️ 초판 주석은 이것을 「화면 하단 띠」로 적었다 — 틀렸다.
+ *
+ * **왜 초판의 sham 대조군이 못 닫았나** — sham 은 「주입 직전 연속 두 캡처가 한 번 같았다」만
+ * 증명한다. 벽시계 타이머로 움직이는 토스트가 **sham 통과 뒤 주입 창 안에서** 사라지면 마스크가 꺼진
+ * 결함 판에서도 diff 가 `13432 > 0` 이 된다. [실측 reviewer] 결함 판 + `setupPage` 대기 `2800 → 1800ms`
+ * 한 줄 변경에서 N=2 `exit 0`. 결과가 로드 속도와 토스트 타이머의 경주에 달려 있었다.
+ *
+ * **차단 (둘 다 적용)** — 새 임계는 없다.
+ *  (a) `setupPage` 가 캡처 전에 캔버스 외 DOM 을 숨긴다 (`hideDomOverlays` — #1219 선례 공용화).
+ *      교란원 **클래스**(DOM 오버레이)를 모든 모드에서 제거한다.
+ *  (b) near·mid 양성 판정의 diff 를 **지구 disk ROI** 로 한정한다 (중심 = 투영 중심, 반경 = 셰이더 LOD
+ *      판정과 같은 산식의 투영 반경 그대로 — 여유폭 없음). 「마스크가 픽셀을 바꾼다」가 재는 대상을
+ *      술어의 문면과 일치시킨다 — 캔버스에 그려지는 disk 밖 변화도 판정에서 빠진다.
+ *      far 의 「안 바뀐다」 술어는 ROI 로 좁히면 **약해지는** 방향이라 전체 프레임을 유지한다.
+ *
+ * **sham 재판정 — 보조로 남긴다.** (a)(b) 뒤에는 sham 이 fail-open 을 닫는 장치가 아니다 (위 경주를
+ * 원리적으로 못 막는다). 남기는 이유는 주입 **전** disk ROI 가 정지해 있다는 사전 조건 확인이다 —
+ * 불통과 (상한 초과) 는 측정 실패로 FAIL 한다. 판정의 무게를 여기에 두지 말 것.
+ */
+const STABLE_CAPTURE_INTERVAL_MS = 800;
+const STABLE_CAPTURE_MAX_ATTEMPTS = 10;
+
 async function launch() {
   if (SWIFTSHADER) {
     console.log('[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)');
@@ -203,6 +237,10 @@ async function setupPage(browser, query, { equatorialView = true, julianDate = T
     () => typeof window.__simCore !== 'undefined' && typeof window.__solarScene !== 'undefined',
     { timeout: 20_000 },
   );
+  // #1228 B1 (a) — 캔버스 위 DOM (토스트 · HUD) 이 캡처에 섞이지 않게 먼저 숨긴다. 스타일은 페이지
+  // 수명 동안 유지되므로 이후 등장하는 토스트도 찍히지 않는다. IoU (dod · seam) 는 disk 안 픽셀만
+  // 쓰므로 판정량이 바뀌지 않아야 한다 — 전·후 실행으로 확인 (`docs/reports/1228-mid-lod-mask/`).
+  await hideDomOverlays(page);
   await page.waitForTimeout(2800); // mesh 생성 + focus tween + LOD 정착
   await page.evaluate((jd) => {
     window.__simCore.command({ type: 'jumpToJulianDate', julianDate: jd });
@@ -235,21 +273,26 @@ async function setupPage(browser, query, { equatorialView = true, julianDate = T
  * 머티리얼 자신의 observer **뒤에** 등록되면 다음 프레임 업로드 값이 항상 `0` 이 된다 —
  * **프로덕션 코드 0 줄로** "마스크가 0 으로 고착된 상태" 를 재현한다.
  */
-async function injectMaskDisabled(page) {
-  return page.evaluate(() => {
+async function injectMaskDisabled(page, onlyMaterial = null) {
+  return page.evaluate((only) => {
     const earth = window.__solarScene?.meshes?.get('earth');
     if (!earth) return { patched: 0, error: 'earth mesh 부재' };
     const meshes = [earth, ...earth.getChildMeshes()];
     let patched = 0;
+    // #1228 — 어느 머티리얼이 패치됐는지 이름으로 남긴다 (mid 정착 판정이 mid 패치를 전제로 요구).
+    // `only` 미지정 = 종전과 같이 지구 머티리얼 전부 (dod · near · far 무변경).
+    const materials = [];
     for (const mesh of meshes) {
       const mat = mesh.material;
+      if (only !== null && mat?.name !== only) continue;
       if (mat && typeof mat.setFloat === 'function' && mat.onBindObservable) {
         mat.onBindObservable.add(() => mat.setFloat('uMaskEnabled', 0));
         patched += 1;
+        materials.push(mat.name);
       }
     }
-    return { patched };
-  });
+    return { patched, materials };
+  }, onlyMaterial);
 }
 
 /**
@@ -478,8 +521,11 @@ async function capture(page, name) {
   return buf.toString('base64');
 }
 
-/** 현재 카메라에서의 지구 disk 투영 반경 (px) — 셰이더 LOD 판정과 동일 산식. */
-async function readDiskRadiusPx(page) {
+/**
+ * 현재 카메라에서의 지구 disk 투영 — 중심 (렌더 px) + 반경 (px). 반경은 셰이더 LOD 판정과 동일 산식.
+ * #1228 B1 (b) — disk ROI diff 가 중심을 필요로 해 `readDiskRadiusPx` 에서 분리했다.
+ */
+async function readDiskProjection(page) {
   return page.evaluate(() => {
     const scene = window.__simCore?.scene;
     const mesh = window.__solarScene?.meshes?.get('earth');
@@ -489,20 +535,103 @@ async function readDiskRadiusPx(page) {
     const Vector3 = mesh.getAbsolutePosition().constructor;
     const idMat = mesh.getWorldMatrix().constructor.Identity();
     const transform = scene.getTransformMatrix();
-    const vp = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+    const renderWidth = engine.getRenderWidth();
+    const renderHeight = engine.getRenderHeight();
+    const vp = camera.viewport.toGlobal(renderWidth, renderHeight);
     const center = mesh.getAbsolutePosition();
     const radiusWorld = mesh.getBoundingInfo().boundingSphere.radiusWorld / Math.sqrt(3);
     const right = camera.getDirection(new Vector3(1, 0, 0));
     const c = Vector3.Project(center, idMat, transform, vp);
     const e = Vector3.Project(center.add(right.scale(radiusWorld)), idMat, transform, vp);
-    return Number(Math.hypot(e.x - c.x, e.y - c.y).toFixed(3));
+    return {
+      r: Number(Math.hypot(e.x - c.x, e.y - c.y).toFixed(3)),
+      cx: Number(c.x.toFixed(3)),
+      cy: Number(c.y.toFixed(3)),
+      renderWidth,
+    };
   });
 }
 
-/** 두 base64 PNG 의 픽셀 diff 비율 (±2/255 노이즈 허용 — 783 diffDirs 규약 동일). */
-async function diffRatio(page, b64A, b64B) {
+/** 현재 카메라에서의 지구 disk 투영 반경 (px) — 셰이더 LOD 판정과 동일 산식. */
+async function readDiskRadiusPx(page) {
+  return (await readDiskProjection(page))?.r ?? null;
+}
+
+/**
+ * #1228 — 지구가 **mid variant 로** 그려지고 있는지 (mid 정착 판정의 전제).
+ *
+ * `drawnAsMid` = override `mid` · cross-fade 0 · host(high) 숨김 · mid 활성 · mid 가시 · mid 머티리얼이
+ * 표면 셰이더. 하나라도 거짓이면 그 프레임의 diff 는 mid 마스크의 증거가 아니다.
+ * `midUMaskEnabledDiag` 는 **진단 인쇄 전용**이다 — Babylon 내부 필드(`_floats`)라 판정에 걸지 않는다.
+ * `midParentIsHost` 도 **진단 인쇄 전용**이다 — 판정이 묻는 것은 「mid 로 그려질 때 마스크가 켜지는가」
+ * 이지 부모 관계가 아니다. 팩토리가 scale 을 mid 자신에게 옮기는 리팩토링은 결함이 아니므로 그때
+ * 이 전제가 FAIL 하면 오탐이 된다. 인쇄는 결함 기전 (#1228 — 부모 scaling) 을 로그에서 읽기 위함이다.
+ */
+async function readMidVariantState(page) {
   return page.evaluate(
-    async ({ a, b }) => {
+    ({ midMesh, midMaterial }) => {
+      const scene = window.__simCore?.scene;
+      const host = window.__solarScene?.meshes?.get('earth');
+      if (!scene || !host) return { error: 'earth mesh/scene 부재' };
+      const mid = scene.getMeshByName(midMesh);
+      if (!mid) return { error: `${midMesh} 부재` };
+      const stats = window.__solarScene.getLodStats();
+      const state = {
+        override: stats.override,
+        fading: stats.fading,
+        hostVisible: host.isVisible,
+        midEnabled: mid.isEnabled(),
+        midVisible: mid.isVisible,
+        midParentIsHost: mid.parent === host,
+        midMaterial: mid.material?.name ?? null,
+        midUMaskEnabledDiag: mid.material?._floats?.uMaskEnabled ?? null,
+      };
+      state.drawnAsMid =
+        state.override === 'mid' &&
+        state.fading === 0 &&
+        state.hostVisible === false &&
+        state.midEnabled === true &&
+        state.midVisible === true &&
+        state.midMaterial === midMaterial;
+      return state;
+    },
+    { midMesh: MID_MESH, midMaterial: MID_SURFACE_MATERIAL },
+  );
+}
+
+/**
+ * #1228 — 무주입 연속 두 캡처가 disk ROI 안에서 같아질 때까지 기다린다 (sham — **보조** 사전 조건,
+ * 근거는 `STABLE_CAPTURE_INTERVAL_MS` 선언부). 반환 `shot` 이 주입 전 기준이다.
+ * `stable === false` (상한 초과 · diff 실패) 는 측정 실패다 — 호출부가 FAIL 로 읽는다.
+ */
+async function captureStable(page, name, roi) {
+  let prev = await capture(page, `${name}-sham0`);
+  const shamDiffs = [];
+  for (let attempt = 1; attempt <= STABLE_CAPTURE_MAX_ATTEMPTS; attempt++) {
+    await page.waitForTimeout(STABLE_CAPTURE_INTERVAL_MS);
+    const cur = await capture(page, name);
+    const d = await diffRatio(page, prev, cur, roi);
+    shamDiffs.push(d.error ? d.error : d.diffPx);
+    if (!d.error && d.diffPx === 0)
+      return { stable: true, attempts: attempt, shamDiffs, shot: cur };
+    prev = cur;
+  }
+  return { stable: false, attempts: STABLE_CAPTURE_MAX_ATTEMPTS, shamDiffs, shot: prev };
+}
+
+/**
+ * 두 base64 PNG 의 픽셀 diff 비율 (±2/255 노이즈 허용 — 783 diffDirs 규약 동일).
+ *
+ * #1228 B1 (b) — `roi` (`readDiskProjection` 반환형) 를 주면 **disk 안 픽셀만** 센다. `total`·`pct`
+ * 도 ROI 기준이다. `roi` 가 `null`·비유한이면 `error` 를 돌려준다 — 호출부 술어가 FAIL 로 읽는다
+ * (측정 실패를 전체 프레임 판정으로 조용히 되돌리지 않는다).
+ */
+async function diffRatio(page, b64A, b64B, roi = undefined) {
+  if (roi !== undefined && !(roi && Number.isFinite(roi.r) && roi.r > 0 && roi.renderWidth > 0)) {
+    return { error: `disk ROI 무효 (${JSON.stringify(roi)})` };
+  }
+  return page.evaluate(
+    async ({ a, b, roi }) => {
       const load = async (src) => {
         const img = new Image();
         await new Promise((res, rej) => {
@@ -514,13 +643,32 @@ async function diffRatio(page, b64A, b64B) {
         c.width = img.width;
         c.height = img.height;
         c.getContext('2d').drawImage(img, 0, 0);
-        return c.getContext('2d').getImageData(0, 0, img.width, img.height).data;
+        return {
+          data: c.getContext('2d').getImageData(0, 0, img.width, img.height).data,
+          width: img.width,
+        };
       };
-      const da = await load(a);
-      const db = await load(b);
-      if (da.length !== db.length) return { error: '크기 불일치' };
+      const la = await load(a);
+      const lb = await load(b);
+      const da = la.data;
+      const db = lb.data;
+      if (da.length !== db.length || la.width !== lb.width) return { error: '크기 불일치' };
+      // ROI 는 렌더 px 라 캡처 PNG 폭 배율로 옮긴다 (deviceScaleFactor 1 이면 1).
+      const width = la.width;
+      const scale = roi ? width / roi.renderWidth : 1;
+      const cx = roi ? roi.cx * scale : 0;
+      const cy = roi ? roi.cy * scale : 0;
+      const r2 = roi ? (roi.r * scale) ** 2 : 0;
       let diff = 0;
+      let total = 0;
       for (let i = 0; i < da.length; i += 4) {
+        if (roi) {
+          const p = i / 4;
+          const x = p % width;
+          const y = (p - x) / width;
+          if ((x - cx) ** 2 + (y - cy) ** 2 > r2) continue;
+        }
+        total++;
         const d = Math.max(
           Math.abs(da[i] - db[i]),
           Math.abs(da[i + 1] - db[i + 1]),
@@ -528,10 +676,10 @@ async function diffRatio(page, b64A, b64B) {
         );
         if (d > 2) diff++;
       }
-      const total = da.length / 4;
+      if (total === 0) return { error: 'ROI 안 픽셀 0' };
       return { diffPx: diff, total, pct: Number(((diff / total) * 100).toFixed(4)) };
     },
-    { a: b64A, b: b64B },
+    { a: b64A, b: b64B, roi: roi ?? null },
   );
 }
 
@@ -755,13 +903,52 @@ async function runLod(browser) {
   const near = {};
   {
     const { context, page, consoleErrors } = await setupPage(browser, FOCUS_QUERY);
-    near.diskR = await readDiskRadiusPx(page);
+    near.disk = await readDiskProjection(page);
+    near.diskR = near.disk?.r ?? null;
     const before = await capture(page, 'qa-1119-lod-near-before');
     await injectMaskDisabled(page);
     await page.waitForTimeout(800);
     const after = await capture(page, 'qa-1119-lod-near-after');
+    // #1228 N3 — 판정은 disk ROI (`diffDisk`). 전체 프레임 `diff` 는 진단 인쇄 전용이다. 초판까지
+    // near 도 토스트를 먹고 있었다 — [실측 reviewer] `38741` = disk 안 `25309` + 토스트 `13432`.
     near.diff = await diffRatio(page, before, after);
+    near.diffDisk = await diffRatio(page, before, after, near.disk);
     near.consoleErrors = consoleErrors;
+    await context.close();
+  }
+
+  // #1228 — mid LOD 정착 (focus 거리 그대로, variant 만 mid) — 마스크가 **켜져 있어야** 한다.
+  //
+  // 수정 전에는 mid 머티리얼의 판정 반경이 부모(host) tier scaling 을 빠뜨려 `1 / 18.33` 로 작게
+  // 나왔고, 참 disk 반경이 임계를 한참 넘는 이 프레임에서도 `uMaskEnabled` 가 `0` 이었다 (#1228 F1
+  // 실측 — host `98.32 px` / mid `5.363 px`). near·far 두 프레임은 high 와 조감만 재서 이 사각을
+  // 보지 못했다.
+  //
+  // ⚠️ fail-open 차단 — 「고착 주입이 픽셀을 바꾼다」가 mid 마스크의 증거가 되려면:
+  //  (1) **mid 가 실제로 그려진다** — host(high)가 fade 로 남거나 override 가 안 먹었으면 high 의
+  //      마스크가 diff 를 만든다 → `mid.drawnAsMid` 전제 (override=mid · fade 0 · host 숨김 · mid 가시).
+  //  (2) **주입 대상이 mid 머티리얼 하나다** — 다른 머티리얼 패치의 부수 효과를 판정에서 뺀다.
+  //  (3) **바뀐 픽셀이 지구 disk 안이다** — 캔버스 위 DOM 숨김 (`setupPage`) + disk ROI diff. 초판은
+  //      sham 대조군으로 이것을 닫았다고 적었으나 reviewer 가 반증했다 (B1 — 대기 1초 당김에서 결함 판
+  //      `exit 0`). 근거와 sham 의 현재 역할은 `STABLE_CAPTURE_INTERVAL_MS` 선언부.
+  // 셋 다 판정 **앞에** 결합한다. 전제 미충족은 측정 실패이고 FAIL 이다.
+  const mid = {};
+  {
+    const { context, page, consoleErrors } = await setupPage(browser, FOCUS_QUERY);
+    await page.evaluate(() => window.__simCore.command({ type: 'setLodOverride', level: 'mid' }));
+    mid.settle = await waitForLodSettle(page);
+    mid.state = await readMidVariantState(page);
+    mid.disk = await readDiskProjection(page);
+    mid.diskR = mid.disk?.r ?? null;
+    const stable = await captureStable(page, 'qa-1119-lod-mid-before', mid.disk);
+    mid.sham = { stable: stable.stable, attempts: stable.attempts, diffPx: stable.shamDiffs };
+    mid.injected = await injectMaskDisabled(page, MID_SURFACE_MATERIAL);
+    await page.waitForTimeout(800);
+    const after = await capture(page, 'qa-1119-lod-mid-after');
+    // 판정은 disk ROI (`diffDisk`). 전체 프레임 `diff` 는 진단 인쇄 전용이다.
+    mid.diff = await diffRatio(page, stable.shot, after);
+    mid.diffDisk = await diffRatio(page, stable.shot, after, mid.disk);
+    mid.consoleErrors = consoleErrors;
     await context.close();
   }
 
@@ -783,8 +970,8 @@ async function runLod(browser) {
     await context.close();
   }
 
-  console.log('\n=== 측정 (DoD 14 — 원거리 축소 LOD) ===');
-  console.log(JSON.stringify({ near, far }, null, 2));
+  console.log('\n=== 측정 (DoD 14 — 원거리 축소 LOD + #1228 mid 정착) ===');
+  console.log(JSON.stringify({ near, mid, far }, null, 2));
 
   // 양성 대조군 — focus 대역에서는 고착 주입이 픽셀을 **실제로 바꿔야** 한다.
   // (안 바뀌면 주입이 무효라는 뜻이고, 그러면 far 의 "안 바뀜" 은 아무것도 증명하지 못한다.)
@@ -798,15 +985,42 @@ async function runLod(browser) {
   // `far` 는 두 원거리 술어에. `farUnchanged` 는 「픽셀이 안 바뀐다」를 재는 술어라 렌더가
   // 예외로 죽어 아무것도 안 그려져도 초록이 된다 — 콘솔 축이 특히 필요한 자리다.
   const nearConsoleOk = !hasSimErrors(near.consoleErrors);
+  const midConsoleOk = !hasSimErrors(mid.consoleErrors);
   const farConsoleOk = !hasSimErrors(far.consoleErrors);
-  const positiveControl = near.diskR >= MASK_MIN_DISK_PX && near.diff.diffPx > 0 && nearConsoleOk;
+  // #1228 N3 — near 도 disk ROI diff 로 판정한다 (B1 (b)). far 는 아래 주석대로 전체 프레임 유지.
+  const positiveControl =
+    near.diskR !== null &&
+    near.diskR >= MASK_MIN_DISK_PX &&
+    near.diffDisk.diffPx > 0 &&
+    nearConsoleOk;
+  // #1228 — 전제 (mid 로 그려짐 + 참 반경이 임계 위 + mid 머티리얼 패치) 를 양성 술어 앞에 결합한다.
+  const midDrawnAsMid =
+    !mid.settle.timedOut && mid.state !== null && !mid.state.error && mid.state.drawnAsMid;
+  const midPatched =
+    Array.isArray(mid.injected.materials) &&
+    mid.injected.materials.length === 1 &&
+    mid.injected.materials[0] === MID_SURFACE_MATERIAL;
+  const midShamStable = mid.sham.stable === true;
+  const midPositive =
+    midConsoleOk &&
+    midDrawnAsMid &&
+    midPatched &&
+    midShamStable &&
+    mid.diskR !== null &&
+    mid.diskR >= MASK_MIN_DISK_PX &&
+    mid.diffDisk.diffPx > 0;
   const farBelowThreshold = far.diskR !== null && far.diskR < MASK_MIN_DISK_PX && farConsoleOk;
   // 임계 아래 대역에서는 마스크가 이미 꺼져 있으므로 고착 주입이 픽셀을 바꾸지 못한다.
+  // #1228 — 「안 바뀐다」 술어는 ROI 로 좁히면 **약해진다** (disk R `5.6 px` 면 표본이 ~100 px) — 전체
+  // 프레임을 유지한다. DOM 숨김 (`setupPage`) 은 여기에도 걸려 토스트가 이 술어를 오발시키지 않는다.
   const farUnchanged = far.diff.pct < 0.001 && farConsoleOk;
 
   console.log('\n=== 판정 ===');
   console.log(
-    `양성 대조군 (focus, R=${near.diskR}px ≥ ${MASK_MIN_DISK_PX}): 고착 주입 diff ${near.diff.diffPx}px (>0 필요) · console err ${near.consoleErrors.length} (== 0) → ${positiveControl ? 'PASS' : 'FAIL'}`,
+    `양성 대조군 (focus, R=${near.diskR}px ≥ ${MASK_MIN_DISK_PX}): 고착 주입 disk 안 diff ${near.diffDisk.diffPx ?? near.diffDisk.error}px (>0 필요, 전체 프레임 진단 ${near.diff.diffPx}px) · console err ${near.consoleErrors.length} (== 0) → ${positiveControl ? 'PASS' : 'FAIL'}`,
+  );
+  console.log(
+    `#1228 mid 정착 양성 (R=${mid.diskR}px ≥ ${MASK_MIN_DISK_PX}): 전제 mid 로 그려짐 ${midDrawnAsMid} (settle timedOut ${mid.settle.timedOut}, ${JSON.stringify(mid.state)}) · mid 머티리얼 단독 패치 ${midPatched} · sham 무주입 정착 (disk 안) ${midShamStable} (${JSON.stringify(mid.sham.diffPx)}) · 고착 주입 disk 안 diff ${mid.diffDisk.diffPx ?? mid.diffDisk.error}px (>0 필요, 전체 프레임 진단 ${mid.diff.diffPx}px) · console err ${mid.consoleErrors.length} (== 0) → ${midPositive ? 'PASS' : 'FAIL'}`,
   );
   console.log(
     `원거리 대역 진입 (조감, R=${far.diskR}px < ${MASK_MIN_DISK_PX}) · console err ${far.consoleErrors.length} (== 0) → ${farBelowThreshold ? 'PASS' : 'FAIL'}`,
@@ -816,13 +1030,14 @@ async function runLod(browser) {
   );
   for (const [label, frame] of [
     ['near', near],
+    ['mid', mid],
     ['far', far],
   ]) {
     if (frame.consoleErrors.length === 0) continue;
     console.log(`  ↳ [console] ${label} 프레임 ${frame.consoleErrors.length}건:`);
     for (const e of frame.consoleErrors.slice(0, 10)) console.log(`      ${e}`);
   }
-  if (!(positiveControl && farBelowThreshold && farUnchanged)) process.exitCode = 1;
+  if (!(positiveControl && midPositive && farBelowThreshold && farUnchanged)) process.exitCode = 1;
 }
 
 await withBrowser(
