@@ -1,0 +1,161 @@
+[
+  {
+    "frame": "mid",
+    "filter": "none",
+    "diffPx": 9554,
+    "midUMaskDiag": 0,
+    "materials": [
+      {
+        "mesh": "earth",
+        "material": "earth-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": false,
+        "patched": false
+      },
+      {
+        "mesh": "earth-cloud",
+        "material": "earth-cloud-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      },
+      {
+        "mesh": "earth-lod-mid",
+        "material": "earth-lod-mid-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      }
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "frame": "mid",
+    "filter": "only:earth-lod-mid-surface-mat",
+    "diffPx": 13432,
+    "midUMaskDiag": 0,
+    "materials": [
+      {
+        "mesh": "earth",
+        "material": "earth-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": false,
+        "patched": false
+      },
+      {
+        "mesh": "earth-cloud",
+        "material": "earth-cloud-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      },
+      {
+        "mesh": "earth-lod-mid",
+        "material": "earth-lod-mid-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": true
+      }
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "frame": "mid",
+    "filter": "except:earth-lod-mid-surface-mat",
+    "diffPx": 13432,
+    "midUMaskDiag": 0,
+    "materials": [
+      {
+        "mesh": "earth",
+        "material": "earth-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": false,
+        "patched": true
+      },
+      {
+        "mesh": "earth-cloud",
+        "material": "earth-cloud-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": true
+      },
+      {
+        "mesh": "earth-lod-mid",
+        "material": "earth-lod-mid-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      }
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "frame": "high",
+    "filter": "none",
+    "diffPx": 0,
+    "midUMaskDiag": null,
+    "materials": [
+      {
+        "mesh": "earth",
+        "material": "earth-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      },
+      {
+        "mesh": "earth-cloud",
+        "material": "earth-cloud-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      }
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "frame": "high",
+    "filter": "only:earth-surface-mat",
+    "diffPx": 38741,
+    "midUMaskDiag": null,
+    "materials": [
+      {
+        "mesh": "earth",
+        "material": "earth-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": true
+      },
+      {
+        "mesh": "earth-cloud",
+        "material": "earth-cloud-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      }
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "frame": "high",
+    "filter": "except:earth-surface-mat",
+    "diffPx": 13432,
+    "midUMaskDiag": null,
+    "materials": [
+      {
+        "mesh": "earth",
+        "material": "earth-surface-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": false
+      },
+      {
+        "mesh": "earth-cloud",
+        "material": "earth-cloud-mat",
+        "cls": "ShaderMaterial",
+        "visible": true,
+        "patched": true
+      }
+    ],
+    "consoleErrors": 0
+  }
+]
