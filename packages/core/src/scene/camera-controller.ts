@@ -89,12 +89,64 @@ export function computeFocusLowerRadiusFloor(
  * 비균등 scaling (oblate 등) 에서도 최대 반경 기준 보수 판정을 유지한다.
  */
 export function resolveMeshVisualRadius(mesh: Mesh): number {
+  return visualRadiusFromScale(mesh, mesh.scaling);
+}
+
+/**
+ * #1228 — **부모 변환을 포함한** 회전 불변 시각 반경 (scene unit).
+ *
+ * `max(boundingBox.extendSize(local) 각 축 × |부모 체인 scaling 곱| 각 축)`. `resolveMeshVisualRadius`
+ * 와 식은 같고 scale 원천만 다르다 — `mesh.scaling` 에 조상 노드들의 `scaling` 을 축별로 곱한다.
+ *
+ * **왜 별도 함수인가.** LOD mid variant (`createBodyMeshMid`) 는 host 의 **자식**이고 자신의
+ * `scaling` 은 `1` 로 유지된다 — tier scaling 은 부모(host)에만 있다. local scaling 기준 반경은
+ * mid 에서 `1 / tier scaling` 로 작아져, 마스크 LOD 판정(`projectedDiskRadiusPx`)이 mid 를 항상
+ * 임계 아래로 판정했다 (#1228 F1 실측: inner tier `18.3333` 에서 host `98.32 px` / mid `5.363 px`).
+ * `resolveMeshVisualRadius` 자체를 바꾸지 않은 이유 (#1228 F4): #790 floor 호출부 2곳
+ * (`focusOn` · `runTierTransition`) 은 `meshes` Map 의 host 를 넘기는데 host 는 부모가 없어 두 식이
+ * 같은 값을 낸다 — 바꿔도 floor 에 얻는 것이 없고, 대신 #790 단위 테스트 mock (`scaling` 만 가짐)
+ * 과 가드 스크립트의 local scaling 산식 사본 (`browser-verify-756/773/774/790`) 이 함께 움직여야
+ * 한다. 호출부 한 곳만 바꾸면 floor 경로 diff 가 `0` 행이다.
+ *
+ * **회전 불변 — 구조적으로.** 회전(자전 quaternion)을 입력으로 받지 않으므로 위상의 함수가 될
+ * 수 없다. 이것이 참 world 반경과 같은 이유는 Babylon 행벡터 규약에서 world = `S · R · T` (부모
+ * 체인이면 그 곱) 이고 `S · R` 의 i 행 길이가 `|sᵢ|` 로 R 과 무관하기 때문이다 — 부모 쪽 회전도
+ * 자식 scale 뒤에 곱해져 같다. ⚠️ 예외는 **회전 뒤에 비균등 scale 이 오는** 체인 (자식이 회전하고
+ * 부모가 비균등 scale) 뿐이며, 그 경우 이 곱은 참 world 반경의 근사다 — host 는 `setTier` 의
+ * `scaling.setAll` 로, mid 는 `scaling` 미변경(`1`) 이라 이 체인은 균등 scale 이다.
+ *
+ * ⚠️ **`mesh.absoluteScaling` 을 쓰지 않는 이유 (실측).** 초판은 world matrix 분해값
+ * `absoluteScaling` 을 썼는데 Babylon `Matrix` 가 `Float32Array` 라 분해 결과가 자전 위상마다
+ * 흔들렸다 — NullEngine 16 위상 순회에서 반경 폭 `2.2e-7` · `projectedDiskRadiusPx` 폭 `2.4e-7 px`
+ * 로, #1157 불변 단언 (`< 1e-9`) 이 **부모 없는 host 에서도** 깨졌다. 판정 경계에서 토글할 크기는
+ * 아니나 「위상 전건 동일」 계약을 약화시키는 대신 float64 곱을 택했다. 부수 효과로 부모 없는
+ * mesh 에서는 `resolveMeshVisualRadius` 와 **비트 동일**하고, world matrix 신선도 전제도 없다.
+ */
+export function resolveMeshWorldVisualRadius(mesh: Mesh): number {
+  let sx = mesh.scaling.x;
+  let sy = mesh.scaling.y;
+  let sz = mesh.scaling.z;
+  for (let node = mesh.parent; node !== null; node = node.parent) {
+    // `Node` 자체는 scaling 이 없다 (TransformNode 이상만 보유) — 없으면 배수 1.
+    const parentScaling = (node as Partial<Pick<Mesh, 'scaling'>>).scaling;
+    if (parentScaling === undefined) continue;
+    sx *= parentScaling.x;
+    sy *= parentScaling.y;
+    sz *= parentScaling.z;
+  }
+  return visualRadiusFromScale(mesh, { x: sx, y: sy, z: sz });
+}
+
+/** 두 시각 반경 함수의 공통 식 — 축별 `extendSize × |scale|` 의 max. */
+function visualRadiusFromScale(
+  mesh: Mesh,
+  scale: { readonly x: number; readonly y: number; readonly z: number },
+): number {
   const { extendSize } = mesh.getBoundingInfo().boundingBox;
-  const { scaling } = mesh;
   return Math.max(
-    extendSize.x * Math.abs(scaling.x),
-    extendSize.y * Math.abs(scaling.y),
-    extendSize.z * Math.abs(scaling.z),
+    extendSize.x * Math.abs(scale.x),
+    extendSize.y * Math.abs(scale.y),
+    extendSize.z * Math.abs(scale.z),
   );
 }
 

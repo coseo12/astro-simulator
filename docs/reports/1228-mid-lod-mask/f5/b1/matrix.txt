@@ -1,0 +1,12 @@
+fixed newguard wait2800 run1 exit=0 mid→ PASS near→ PASS
+fixed newguard wait2800 run2 exit=0 mid→ PASS near→ PASS
+fixed newguard wait1800 run1 exit=0 mid→ PASS near→ PASS
+fixed newguard wait1800 run2 exit=0 mid→ PASS near→ PASS
+mutant oldguard wait1800 run1 exit=0 mid→ PASS near→ PASS
+mutant oldguard wait1800 run2 exit=0 mid→ PASS near→ PASS
+mutant newguard wait2800 run1 exit=1 mid→ FAIL near→ PASS
+mutant newguard wait2800 run2 exit=1 mid→ FAIL near→ PASS
+mutant newguard wait1800 run1 exit=1 mid→ FAIL near→ PASS
+mutant newguard wait1800 run2 exit=1 mid→ FAIL near→ PASS
+restored newguard wait2800 run1 exit=0 mid→ PASS near→ PASS
+restored newguard wait1800 run1 exit=0 mid→ PASS near→ PASS
