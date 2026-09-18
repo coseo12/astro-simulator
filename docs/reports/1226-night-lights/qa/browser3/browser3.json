@@ -1,0 +1,684 @@
+{
+  "level1": {
+    "desktop": {
+      "canvasCount": 1,
+      "renderWidth": 1280,
+      "renderHeight": 720,
+      "isWebGPU": true,
+      "meshCount": 91,
+      "earthPresent": true,
+      "path": "/Users/seo/project/space/docs/reports/1226-night-lights/qa/browser3/1-static-desktop.png",
+      "bytes": 95757,
+      "settle": {
+        "dist": "7/6/19",
+        "fading": 0,
+        "waitedMs": 814,
+        "timedOut": false
+      },
+      "consoleErrors": []
+    },
+    "mobile": {
+      "canvasCount": 1,
+      "renderWidth": 780,
+      "renderHeight": 1688,
+      "docScrollW": 390,
+      "docClientW": 390,
+      "canvasRect": 390,
+      "isWebGPU": true,
+      "path": "/Users/seo/project/space/docs/reports/1226-night-lights/qa/browser3/1-static-mobile.png",
+      "bytes": 194076,
+      "settle": {
+        "dist": "11/3/18",
+        "fading": 0,
+        "waitedMs": 817,
+        "timedOut": false
+      },
+      "consoleErrors": []
+    }
+  },
+  "level2": {
+    "toggle": {
+      "onStrengths": [
+        {
+          "mat": "sun-surface-mat",
+          "nightLightStrength": null,
+          "uMaskEnabled": null
+        },
+        {
+          "mat": "earth-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 1
+        },
+        {
+          "mat": "moon-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "jupiter-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "moon-lod-mid-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-lod-mid-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        }
+      ],
+      "offStrengths": [
+        {
+          "mat": "sun-surface-mat",
+          "nightLightStrength": null,
+          "uMaskEnabled": null
+        },
+        {
+          "mat": "earth-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 1
+        },
+        {
+          "mat": "moon-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "jupiter-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "moon-lod-mid-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-lod-mid-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        }
+      ],
+      "pixelDiff": {
+        "changed": 1002,
+        "maxCh": 198,
+        "totalPx": 921600
+      },
+      "onShot": {
+        "path": "/Users/seo/project/space/docs/reports/1226-night-lights/qa/browser3/2-interaction-nightlights-on.png",
+        "bytes": 82404
+      },
+      "offShot": {
+        "path": "/Users/seo/project/space/docs/reports/1226-night-lights/qa/browser3/2-interaction-nightlights-off.png",
+        "bytes": 77740
+      },
+      "settle": {
+        "on": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 812,
+          "timedOut": false
+        },
+        "off": {
+          "dist": "7/6/19",
+          "fading": 0,
+          "waitedMs": 810,
+          "timedOut": false
+        }
+      },
+      "consoleErrors": {
+        "on": [],
+        "off": []
+      }
+    },
+    "controls": {
+      "before": {
+        "radius": 35,
+        "target": [
+          0,
+          0,
+          0
+        ]
+      },
+      "afterZoom": {
+        "radius": 374.1313891876575
+      },
+      "zoomedIn": false,
+      "alphaBefore": -1.5707963267948966,
+      "alphaAfter": -2.51727696853673,
+      "dragRotated": true,
+      "path": "/Users/seo/project/space/docs/reports/1226-night-lights/qa/browser3/2-interaction-zoom-drag.png",
+      "bytes": 171039,
+      "consoleErrors": []
+    }
+  },
+  "level3": {
+    "combos": [
+      {
+        "key": "default",
+        "url": "?gpu=a&focus=earth&lod=auto&orbits=off",
+        "expect": {
+          "lights": 0.9,
+          "cloud": true,
+          "quat": true
+        },
+        "strengths": [
+          {
+            "mat": "sun-surface-mat",
+            "nightLightStrength": null,
+            "uMaskEnabled": null
+          },
+          {
+            "mat": "earth-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 1
+          },
+          {
+            "mat": "moon-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "jupiter-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "moon-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          }
+        ],
+        "clouds": [
+          {
+            "name": "earth-cloud",
+            "isVisible": true
+          }
+        ],
+        "rotation": {
+          "hasQuat": true,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": []
+      },
+      {
+        "key": "nightlights-off",
+        "url": "?gpu=a&focus=earth&lod=auto&orbits=off&nightlights=off",
+        "expect": {
+          "lights": 0,
+          "cloud": true,
+          "quat": true
+        },
+        "strengths": [
+          {
+            "mat": "sun-surface-mat",
+            "nightLightStrength": null,
+            "uMaskEnabled": null
+          },
+          {
+            "mat": "earth-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 1
+          },
+          {
+            "mat": "moon-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "jupiter-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "moon-lod-mid-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-lod-mid-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          }
+        ],
+        "clouds": [
+          {
+            "name": "earth-cloud",
+            "isVisible": true
+          }
+        ],
+        "rotation": {
+          "hasQuat": true,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": []
+      },
+      {
+        "key": "clouds-off",
+        "url": "?gpu=a&focus=earth&lod=auto&orbits=off&clouds=off",
+        "expect": {
+          "lights": 0.9,
+          "cloud": false,
+          "quat": true
+        },
+        "strengths": [
+          {
+            "mat": "sun-surface-mat",
+            "nightLightStrength": null,
+            "uMaskEnabled": null
+          },
+          {
+            "mat": "earth-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 1
+          },
+          {
+            "mat": "moon-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "jupiter-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "moon-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          }
+        ],
+        "clouds": [],
+        "rotation": {
+          "hasQuat": true,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": []
+      },
+      {
+        "key": "rotate-off",
+        "url": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off",
+        "expect": {
+          "lights": 0.9,
+          "cloud": true,
+          "quat": false
+        },
+        "strengths": [
+          {
+            "mat": "sun-surface-mat",
+            "nightLightStrength": null,
+            "uMaskEnabled": null
+          },
+          {
+            "mat": "earth-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 1
+          },
+          {
+            "mat": "moon-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "jupiter-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "moon-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          }
+        ],
+        "clouds": [
+          {
+            "name": "earth-cloud",
+            "isVisible": true
+          }
+        ],
+        "rotation": {
+          "hasQuat": false,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": []
+      },
+      {
+        "key": "all-off",
+        "url": "?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off&clouds=off&nightlights=off",
+        "expect": {
+          "lights": 0,
+          "cloud": false,
+          "quat": false
+        },
+        "strengths": [
+          {
+            "mat": "sun-surface-mat",
+            "nightLightStrength": null,
+            "uMaskEnabled": null
+          },
+          {
+            "mat": "earth-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 1
+          },
+          {
+            "mat": "moon-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "jupiter-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "moon-lod-mid-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-lod-mid-surface-mat",
+            "nightLightStrength": 0,
+            "uMaskEnabled": 0
+          }
+        ],
+        "clouds": [],
+        "rotation": {
+          "hasQuat": false,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": []
+      },
+      {
+        "key": "surface-off",
+        "url": "?gpu=a&focus=earth&lod=auto&orbits=off&surface=off",
+        "expect": {
+          "lights": null,
+          "cloud": true,
+          "quat": true
+        },
+        "strengths": [],
+        "clouds": [],
+        "rotation": {
+          "hasQuat": true,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": []
+      },
+      {
+        "key": "bogus-value",
+        "url": "?gpu=a&focus=earth&lod=auto&orbits=off&nightlights=banana",
+        "expect": {
+          "lights": 0.9,
+          "cloud": true,
+          "quat": true
+        },
+        "strengths": [
+          {
+            "mat": "sun-surface-mat",
+            "nightLightStrength": null,
+            "uMaskEnabled": null
+          },
+          {
+            "mat": "earth-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 1
+          },
+          {
+            "mat": "moon-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "jupiter-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "moon-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          },
+          {
+            "mat": "mars-lod-mid-surface-mat",
+            "nightLightStrength": 0.9,
+            "uMaskEnabled": 0
+          }
+        ],
+        "clouds": [
+          {
+            "name": "earth-cloud",
+            "isVisible": true
+          }
+        ],
+        "rotation": {
+          "hasQuat": true,
+          "rotY": 0
+        },
+        "consoleErrors": [],
+        "warnings": [
+          "[parse-night-lights-mode] 알 수 없는 ?nightlights=banana — ON (기본) 으로 폴백"
+        ]
+      }
+    ],
+    "navigation": {
+      "initial": [
+        {
+          "mat": "sun-surface-mat",
+          "nightLightStrength": null,
+          "uMaskEnabled": null
+        },
+        {
+          "mat": "earth-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 1
+        },
+        {
+          "mat": "moon-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "jupiter-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "moon-lod-mid-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-lod-mid-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        }
+      ],
+      "afterGotoOff": [
+        {
+          "mat": "sun-surface-mat",
+          "nightLightStrength": null,
+          "uMaskEnabled": null
+        },
+        {
+          "mat": "earth-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 1
+        },
+        {
+          "mat": "moon-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "jupiter-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "moon-lod-mid-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-lod-mid-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        }
+      ],
+      "afterBack": [
+        {
+          "mat": "sun-surface-mat",
+          "nightLightStrength": null,
+          "uMaskEnabled": null
+        },
+        {
+          "mat": "earth-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 1
+        },
+        {
+          "mat": "moon-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "jupiter-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "moon-lod-mid-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-lod-mid-surface-mat",
+          "nightLightStrength": 0.9,
+          "uMaskEnabled": 0
+        }
+      ],
+      "backUrl": "http://localhost:3000/?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off",
+      "afterForward": [
+        {
+          "mat": "sun-surface-mat",
+          "nightLightStrength": null,
+          "uMaskEnabled": null
+        },
+        {
+          "mat": "earth-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 1
+        },
+        {
+          "mat": "moon-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "jupiter-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "moon-lod-mid-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        },
+        {
+          "mat": "mars-lod-mid-surface-mat",
+          "nightLightStrength": 0,
+          "uMaskEnabled": 0
+        }
+      ],
+      "forwardUrl": "http://localhost:3000/?gpu=a&focus=earth&lod=auto&rotate=off&orbits=off&nightlights=off",
+      "path": "/Users/seo/project/space/docs/reports/1226-night-lights/qa/browser3/3-flow-navigation.png",
+      "bytes": 147108,
+      "consoleErrors": []
+    }
+  }
+}
