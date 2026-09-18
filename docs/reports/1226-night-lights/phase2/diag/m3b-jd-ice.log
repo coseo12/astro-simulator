@@ -1,0 +1,6 @@
+[가드 JD (대조)] JD 2451808 · NI n 7225 · NI∩land 4095 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 위상각 90° · 극축↔카메라 90° · DI 휘도 0.715749 · settle {"dist":"7/6/19","fading":0,"waitedMs":812,"timedOut":false}
+[춘분 2000-03-20 07:35 UTC] JD 2451623.816 · NI n 7216 · NI∩land 864 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 위상각 90° · 극축↔카메라 90° · DI 휘도 0.766676 · settle {"dist":"9/6/17","fading":0,"waitedMs":811,"timedOut":false}
+[하지 2000-06-21 01:48 UTC] JD 2451716.575 · NI n 7216 · NI∩land 1968 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 위상각 90° · 극축↔카메라 90° · DI 휘도 0.728759 · settle {"dist":"10/5/17","fading":0,"waitedMs":813,"timedOut":false}
+[추분 2000-09-22 17:28 UTC] JD 2451810.2278 · NI n 7216 · NI∩land 4158 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 위상각 90° · 극축↔카메라 90° · DI 휘도 0.71486 · settle {"dist":"7/5/20","fading":0,"waitedMs":812,"timedOut":false}
+[동지 2000-12-21 13:37 UTC] JD 2451900.0674 · NI n 7216 · NI∩land 2604 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 위상각 90° · 극축↔카메라 90° · DI 휘도 0.842469 · settle {"dist":"7/6/19","fading":0,"waitedMs":811,"timedOut":false}
+[errors] []

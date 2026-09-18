@@ -1,0 +1,115 @@
+{
+ "jds": {
+  "가드 JD (대조)": {
+   "jd": 2451808,
+   "settle": {
+    "dist": "7/6/19",
+    "fading": 0,
+    "waitedMs": 812,
+    "timedOut": false
+   },
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7225,
+   "diN": 7225,
+   "diLum": 0.715749,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 4095,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "춘분 2000-03-20 07:35 UTC": {
+   "jd": 2451623.816,
+   "settle": {
+    "dist": "9/6/17",
+    "fading": 0,
+    "waitedMs": 811,
+    "timedOut": false
+   },
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7216,
+   "diN": 7216,
+   "diLum": 0.766676,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 864,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "하지 2000-06-21 01:48 UTC": {
+   "jd": 2451716.575,
+   "settle": {
+    "dist": "10/5/17",
+    "fading": 0,
+    "waitedMs": 813,
+    "timedOut": false
+   },
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7216,
+   "diN": 7216,
+   "diLum": 0.728759,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 1968,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "추분 2000-09-22 17:28 UTC": {
+   "jd": 2451810.2278,
+   "settle": {
+    "dist": "7/5/20",
+    "fading": 0,
+    "waitedMs": 812,
+    "timedOut": false
+   },
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7216,
+   "diN": 7216,
+   "diLum": 0.71486,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 4158,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "동지 2000-12-21 13:37 UTC": {
+   "jd": 2451900.0674,
+   "settle": {
+    "dist": "7/6/19",
+    "fading": 0,
+    "waitedMs": 811,
+    "timedOut": false
+   },
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7216,
+   "diN": 7216,
+   "diLum": 0.842469,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 2604,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  }
+ },
+ "errors": []
+}

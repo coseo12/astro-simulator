@@ -1,0 +1,154 @@
+{
+ "jds": {
+  "가드 JD (대조)": {
+   "jd": 2451808,
+   "settle": {
+    "dist": "2/3/27",
+    "fading": 0,
+    "waitedMs": 814,
+    "timedOut": false
+   },
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 0,
+   "diN": 19616,
+   "diLum": 0.817703,
+   "phaseAlphaDeg": 2.143,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 0,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  }
+ },
+ "cameraDiag": {
+  "alphaDeg": -90,
+  "betaDeg": 72,
+  "upVector": [
+   0,
+   1,
+   0
+  ],
+  "earthAxisWorld": [
+   0,
+   18.33333396911621,
+   0
+  ],
+  "camDirUnit": [
+   0,
+   0.30901672443674316,
+   -0.9510566040033506
+  ],
+  "className": "ArcRotateCamera"
+ },
+ "alphaSweep": {
+  "+0deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7225,
+   "diN": 7225,
+   "diLum": 0.715749,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 4095,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "+30deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 15181,
+   "diN": 829,
+   "diLum": 0.805402,
+   "phaseAlphaDeg": 119.977,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 5473,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "+60deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 19616,
+   "diN": 0,
+   "diLum": null,
+   "phaseAlphaDeg": 177.857,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 8727,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "+90deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 7225,
+   "diN": 7225,
+   "diLum": 0.857489,
+   "phaseAlphaDeg": 90,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 1877,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "+120deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 0,
+   "diN": 19616,
+   "diLum": 0.780319,
+   "phaseAlphaDeg": 30.069,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 0,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "+150deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 19616,
+   "diN": 0,
+   "diLum": null,
+   "phaseAlphaDeg": 177.857,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 8727,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  },
+  "+180deg": {
+   "rw": 1280,
+   "rh": 720,
+   "diskN": 30768,
+   "niN": 0,
+   "diN": 19616,
+   "diLum": 0.817703,
+   "phaseAlphaDeg": 2.143,
+   "poleTiltFromCameraDeg": 90,
+   "niLand": 0,
+   "niLandIce": 0,
+   "niLandIceStrict": 0,
+   "maxNdvIce": null,
+   "samples": []
+  }
+ },
+ "errors": []
+}
