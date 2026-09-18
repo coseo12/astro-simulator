@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.89.0] - 2026-09-18
+
 ### Added
 
 - **[#1226] 지구 야간 도시 불빛** ([#1226](https://github.com/coseo12/astro-simulator/issues/1226)) — 표면 셰이더에 불빛 항을 혼입한다 (ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) Amendment 11). 별도 mesh·레이어를 만들지 않고 같은 프로그램 안에서 합성하므로 `?nightlights=off` 는 **정확한 no-op** 이다 (§A11.3).
