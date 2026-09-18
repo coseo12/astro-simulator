@@ -1,10 +1,10 @@
 [browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
 
 === DoD 1+2+4+6 — 표면 셰이더 행성 (surface ON, 기본) ===
-  earth    [rocky] contrastMean=4.73 contrastExtreme=20.74 dayMean=136.8 nightMean=28.9 hfEnt(day)=3.449 purple%=0 land/ocean=525/5642 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
-  mars     [desert] contrastMean=7.6 contrastExtreme=15.16 dayMean=189.3 nightMean=24.9 hfEnt(day)=2.119 purple%=0 land/ocean=12799/0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
-  jupiter  [gas-bands] contrastMean=4.65 contrastExtreme=10.32 dayMean=183.1 nightMean=39.4 hfEnt(day)=2.091 purple%=0 land/ocean=12855/0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
-  moon     [cratered] contrastMean=4.56 contrastExtreme=8.25 dayMean=172 nightMean=37.7 hfEnt(day)=2.209 purple%=0 land/ocean=70/0 disk=1700/2500 (제외 800) diskRpx=24.58 err=0
+  earth    [rocky] contrastMean=4.12 contrastExtreme=20.58 dayMean=137.3 nightMean=33.3 hfEnt(day)=3.6 purple%=0 land/ocean=1407/5604 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  mars     [desert] contrastMean=7.59 contrastExtreme=15.16 dayMean=189.1 nightMean=24.9 hfEnt(day)=2.122 purple%=0 land/ocean=12786/0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  jupiter  [gas-bands] contrastMean=4.65 contrastExtreme=10.32 dayMean=183.1 nightMean=39.4 hfEnt(day)=2.092 purple%=0 land/ocean=12855/0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  moon     [cratered] contrastMean=4.56 contrastExtreme=8.25 dayMean=172 nightMean=37.7 hfEnt(day)=2.209 purple%=0 land/ocean=69/0 disk=1700/2500 (제외 800) diskRpx=24.58 err=0
 
 === 단색 행성 (baseline — terminator/대비비 기준) ===
   venus    contrastMean=4.77 contrastExtreme=9.77 dayMean=202.7 nightMean=42.5 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
@@ -13,10 +13,10 @@
   neptune  contrastMean=6.07 contrastExtreme=19.8 dayMean=154.7 nightMean=25.5 purple%=0 disk=27412/39204 (제외 11792) diskRpx=98.32 err=0
 
 === DoD 5 — ?surface=off 대조 (낮면 hfEntropy ON>OFF) ===
-  earth    [rocky] contrastMean=2.22 dayMean=60.7 nightMean=27.3 hfEnt(day)=0.81 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
-  mars     [desert] contrastMean=4.75 dayMean=105 nightMean=22.1 hfEnt(day)=0.673 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
-  jupiter  [gas-bands] contrastMean=2.94 dayMean=115.4 nightMean=39.2 hfEnt(day)=0.896 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
-  moon     [cratered] contrastMean=2.66 dayMean=101.3 nightMean=38.1 hfEnt(day)=2.497 purple%=0 disk=1700/2500 (제외 800) diskRpx=24.58
+  earth    [rocky] contrastMean=2.22 dayMean=60.7 nightMean=27.3 hfEnt(day)=0.814 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
+  mars     [desert] contrastMean=4.75 dayMean=105 nightMean=22.1 hfEnt(day)=0.676 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
+  jupiter  [gas-bands] contrastMean=2.94 dayMean=115.4 nightMean=39.2 hfEnt(day)=0.895 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
+  moon     [cratered] contrastMean=2.66 dayMean=101.4 nightMean=38.1 hfEnt(day)=2.513 purple%=0 disk=1700/2500 (제외 800) diskRpx=24.58
 
 === JSON ===
 {
@@ -29,26 +29,26 @@
       "diskRpx": 98.32,
       "day": {
         "n": 13590,
-        "mean": 136.8,
-        "p90": 248.9,
+        "mean": 137.3,
+        "p90": 249,
         "p10": 12.3
       },
       "night": {
         "n": 13818,
-        "mean": 28.9,
-        "p90": 60.9,
-        "p10": 12
+        "mean": 33.3,
+        "p90": 70.7,
+        "p10": 12.1
       },
-      "contrastMean": 4.73,
-      "contrastExtreme": 20.74,
-      "hfEnergy": 10.4805,
-      "hfEntropy": 3.449,
+      "contrastMean": 4.12,
+      "contrastExtreme": 20.58,
+      "hfEnergy": 19.6776,
+      "hfEntropy": 3.6,
       "purplePct": 0,
-      "landCount": 525,
-      "oceanCount": 5642,
+      "landCount": 1407,
+      "oceanCount": 5604,
       "screenSunDir": {
-        "x": 0.263,
-        "y": 0.965
+        "x": 0.245,
+        "y": 0.97
       },
       "screenBox": {
         "x": 541,
@@ -72,9 +72,9 @@
       "diskRpx": 98.32,
       "day": {
         "n": 13795,
-        "mean": 189.3,
+        "mean": 189.1,
         "p90": 221.3,
-        "p10": 86.2
+        "p10": 85
       },
       "night": {
         "n": 13613,
@@ -82,16 +82,16 @@
         "p90": 33.9,
         "p10": 14.6
       },
-      "contrastMean": 7.6,
+      "contrastMean": 7.59,
       "contrastExtreme": 15.16,
-      "hfEnergy": 2.7381,
-      "hfEntropy": 2.119,
+      "hfEnergy": 2.717,
+      "hfEntropy": 2.122,
       "purplePct": 0,
-      "landCount": 12799,
+      "landCount": 12786,
       "oceanCount": 0,
       "screenSunDir": {
         "x": -1,
-        "y": 0.023
+        "y": 0.026
       },
       "screenBox": {
         "x": 541,
@@ -114,21 +114,21 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "day": {
-        "n": 13726,
+        "n": 13727,
         "mean": 183.1,
         "p90": 255,
         "p10": 29.9
       },
       "night": {
-        "n": 13682,
+        "n": 13681,
         "mean": 39.4,
         "p90": 56.5,
         "p10": 24.7
       },
       "contrastMean": 4.65,
       "contrastExtreme": 10.32,
-      "hfEnergy": 5.1234,
-      "hfEntropy": 2.091,
+      "hfEnergy": 5.1241,
+      "hfEntropy": 2.092,
       "purplePct": 0,
       "landCount": 12855,
       "oceanCount": 0,
@@ -170,10 +170,10 @@
       },
       "contrastMean": 4.56,
       "contrastExtreme": 8.25,
-      "hfEnergy": 51.7887,
+      "hfEnergy": 51.8266,
       "hfEntropy": 2.209,
       "purplePct": 0,
-      "landCount": 70,
+      "landCount": 69,
       "oceanCount": 0,
       "screenSunDir": {
         "x": 0.283,
@@ -202,24 +202,24 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "day": {
-        "n": 13591,
+        "n": 13590,
         "mean": 60.7,
         "p90": 139.9,
         "p10": 19.7
       },
       "night": {
-        "n": 13817,
+        "n": 13818,
         "mean": 27.3,
         "p90": 31.7,
         "p10": 22.6
       },
       "contrastMean": 2.22,
       "contrastExtreme": 6.19,
-      "hfEnergy": 0.79,
-      "hfEntropy": 0.81,
+      "hfEnergy": 0.791,
+      "hfEntropy": 0.814,
       "purplePct": 0,
       "landCount": 0,
-      "oceanCount": 6636,
+      "oceanCount": 6638,
       "screenSunDir": {
         "x": 0.25,
         "y": 0.968
@@ -245,23 +245,23 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "day": {
-        "n": 13795,
+        "n": 13796,
         "mean": 105,
-        "p90": 179.7,
-        "p10": 31.3
+        "p90": 179.6,
+        "p10": 31.4
       },
       "night": {
-        "n": 13613,
+        "n": 13612,
         "mean": 22.1,
         "p90": 30.2,
         "p10": 14
       },
       "contrastMean": 4.75,
-      "contrastExtreme": 12.84,
-      "hfEnergy": 0.6668,
-      "hfEntropy": 0.673,
+      "contrastExtreme": 12.83,
+      "hfEnergy": 0.6706,
+      "hfEntropy": 0.676,
       "purplePct": 0,
-      "landCount": 11640,
+      "landCount": 11642,
       "oceanCount": 0,
       "screenSunDir": {
         "x": -1,
@@ -301,10 +301,10 @@
       },
       "contrastMean": 2.94,
       "contrastExtreme": 8.74,
-      "hfEnergy": 0.9027,
-      "hfEntropy": 0.896,
+      "hfEnergy": 0.9016,
+      "hfEntropy": 0.895,
       "purplePct": 0,
-      "landCount": 17709,
+      "landCount": 17711,
       "oceanCount": 0,
       "screenSunDir": {
         "x": -0.819,
@@ -331,21 +331,21 @@
       "excludedPx": 800,
       "diskRpx": 24.58,
       "day": {
-        "n": 822,
-        "mean": 101.3,
+        "n": 821,
+        "mean": 101.4,
         "p90": 229.3,
         "p10": 28
       },
       "night": {
-        "n": 878,
+        "n": 879,
         "mean": 38.1,
         "p90": 44.9,
         "p10": 31.3
       },
       "contrastMean": 2.66,
       "contrastExtreme": 7.33,
-      "hfEnergy": 4.3824,
-      "hfEntropy": 2.497,
+      "hfEnergy": 4.3903,
+      "hfEntropy": 2.513,
       "purplePct": 0,
       "landCount": 458,
       "oceanCount": 0,
@@ -378,7 +378,7 @@
         "n": 13622,
         "mean": 202.7,
         "p90": 254.1,
-        "p10": 107
+        "p10": 106.8
       },
       "night": {
         "n": 13786,
@@ -388,14 +388,14 @@
       },
       "contrastMean": 4.77,
       "contrastExtreme": 9.77,
-      "hfEnergy": 0.7585,
-      "hfEntropy": 0.785,
+      "hfEnergy": 0.7569,
+      "hfEntropy": 0.782,
       "purplePct": 0,
-      "landCount": 20202,
+      "landCount": 20210,
       "oceanCount": 0,
       "screenSunDir": {
         "x": 0.993,
-        "y": -0.121
+        "y": -0.122
       },
       "screenBox": {
         "x": 541,
@@ -430,13 +430,13 @@
       },
       "contrastMean": 6.66,
       "contrastExtreme": 18.44,
-      "hfEnergy": 0.8549,
-      "hfEntropy": 0.909,
+      "hfEnergy": 0.8558,
+      "hfEntropy": 0.914,
       "purplePct": 0,
       "landCount": 16205,
       "oceanCount": 0,
       "screenSunDir": {
-        "x": 0.119,
+        "x": 0.118,
         "y": -0.993
       },
       "screenBox": {
@@ -459,21 +459,21 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "day": {
-        "n": 13707,
+        "n": 13706,
         "mean": 118.4,
         "p90": 245.9,
         "p10": 34.2
       },
       "night": {
-        "n": 13701,
+        "n": 13702,
         "mean": 47,
         "p90": 57.4,
         "p10": 34.2
       },
       "contrastMean": 2.52,
       "contrastExtreme": 7.19,
-      "hfEnergy": 0.9786,
-      "hfEntropy": 0.929,
+      "hfEnergy": 0.9783,
+      "hfEntropy": 0.93,
       "purplePct": 0,
       "landCount": 22003,
       "oceanCount": 0,
@@ -501,24 +501,24 @@
       "excludedPx": 11792,
       "diskRpx": 98.32,
       "day": {
-        "n": 13838,
+        "n": 13837,
         "mean": 154.7,
         "p90": 225.7,
-        "p10": 88.4
+        "p10": 88.3
       },
       "night": {
-        "n": 13574,
+        "n": 13575,
         "mean": 25.5,
         "p90": 56.6,
         "p10": 11.4
       },
       "contrastMean": 6.07,
       "contrastExtreme": 19.8,
-      "hfEnergy": 0.818,
+      "hfEnergy": 0.8184,
       "hfEntropy": 0.854,
       "purplePct": 0,
       "landCount": 0,
-      "oceanCount": 16486,
+      "oceanCount": 16483,
       "screenSunDir": {
         "x": -0.578,
         "y": -0.816
@@ -553,8 +553,8 @@
 }
 
 === 판정 (#759 — day>night×2 + contrastMean 낙차 ≥10% + purple 0, hfEntropy 축 제외) ===
-  ✓ earth: day 136.8/night 28.9 (×2 초과), contrastMean ON 4.73 / OFF 2.22 (낙차 53.07% ≥ 10%), purple 0%
-  ✓ mars: day 189.3/night 24.9 (×2 초과), contrastMean ON 7.6 / OFF 4.75 (낙차 37.50% ≥ 10%), purple 0%
+  ✓ earth: day 137.3/night 33.3 (×2 초과), contrastMean ON 4.12 / OFF 2.22 (낙차 46.12% ≥ 10%), purple 0%
+  ✓ mars: day 189.1/night 24.9 (×2 초과), contrastMean ON 7.59 / OFF 4.75 (낙차 37.42% ≥ 10%), purple 0%
   ✓ jupiter: day 183.1/night 39.4 (×2 초과), contrastMean ON 4.65 / OFF 2.94 (낙차 36.77% ≥ 10%), purple 0%
   ✓ moon: day 172/night 37.7 (×2 초과), contrastMean ON 4.56 / OFF 2.66 (낙차 41.67% ≥ 10%), purple 0%
 === PASS ===

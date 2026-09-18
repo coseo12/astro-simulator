@@ -1,0 +1,8 @@
+page.waitForTimeout: Target page, context or browser has been closed
+    at bootstrapScene (/Users/seo/project/space/scripts/browser-verify-utils.mjs:296:32)
+    at async setupPage (/Users/seo/project/space/apps/web/scripts/browser-verify-1226-night-lights.mjs:164:3)
+    at async runMain (/Users/seo/project/space/apps/web/scripts/browser-verify-1226-night-lights.mjs:725:14)
+    at async withBrowser (/Users/seo/project/space/scripts/browser-verify-utils.mjs:215:12)
+    at async main (/Users/seo/project/space/apps/web/scripts/browser-verify-1226-night-lights.mjs:1130:13) {
+  log: []
+}

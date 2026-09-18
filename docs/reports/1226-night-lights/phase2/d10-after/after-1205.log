@@ -1,0 +1,8 @@
+
+=== #1205 pause LOD 가드 ===
+  A(sun)      dist=2/1/29 tier=solar r=25.3047 fading=0
+  pause A→B          dist=2/4/26 tier=inner r=36.8268 fading=0
+  init  B            dist=2/4/26 tier=inner r=36.8268 fading=0
+
+✅ PASS — (가) 비퇴화 ∧ (나) 경로무관 ∧ 콘솔 에러 0
+exit=0

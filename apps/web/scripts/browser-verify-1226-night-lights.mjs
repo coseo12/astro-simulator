@@ -52,6 +52,7 @@ import {
   bootstrapScene,
   collectConsoleErrors,
   hasSimErrors,
+  hideDomOverlays,
   launchBrowser,
   resolveBaseUrl,
   waitForLodSettle,
@@ -64,6 +65,11 @@ const CAPTURE_DIR = process.env.CAPTURE_DIR ?? null;
 const SWIFTSHADER = process.env.SWIFTSHADER === '1';
 const MODE = process.env.MODE ?? 'dod';
 const INJECT = process.env.INJECT ?? 'none';
+/**
+ * §A11.17.3 보강 1 (`disableDepthWrite = true` 명시) 철회 스위치 — 보강이 V1~V4 위배의 원인인지 가르는 용도.
+ * ADR 은 이 플래그가 블렌드 draw 에서 **무효**라고 적었으므로 (§A10.5 실측) 값 변화가 없어야 한다.
+ */
+const MN6_SKIP_DEPTH_WRITE = process.env.MN6_SKIP_DEPTH_WRITE === '1';
 
 /** U1 (사용자 결정 2026-09-13) — 신규 가드 전체를 이 JD 에서 잰다. 계약 공통 JD `2451626.0` 에서는 D6 신호가 `0` (§A11.11). */
 const T_JD = 2451808.0;
@@ -94,15 +100,31 @@ const MIN_DAY_LIT_LUM = 0.15;
 const MIN_PHASE_ALPHA_DEG = 10;
 
 // ── 임계 — 계약 도출 규칙: D1 승인 파라미터 (g1) baseline ÷ 3 (§A8.8 · §A10.11 1/3 관례) ─────────
-// `null` = 미도출. MODE=profile 외에서 null 이 남아 있으면 fail-closed (throw → exit 1).
-const T_NIGHT = null;
-const T_DARK = null;
-const K_OCC = null;
-const MIN_EXPECTED_NIGHT = null;
-const MIN_EXPECTED_DAY = null;
-const MIN_EXPECTED_NIGHT_LAND = null;
-const MIN_EXPECTED_NIGHT_SEA = null;
-const MIN_EXPECTED_CLOUDED_LAND = null;
+// baseline [실측]: D1 승인 파라미터 g1 (#1226 코멘트 5663330554) · headless chromium `--use-angle=swiftshader`
+// (`SWIFTSHADER=1`) · 1280×720 · `next dev` · `packages/core` = `e39b6d9` (#1228 fix 포함) 빌드 · JD 2451808.0 ·
+// DOM 숨김 · `MODE=profile` **5회 — 다섯 실행이 아래 판정량 전 항목에서 동일 (산포 `0`)**. **로컬** swiftshader 에
+// 한한다 — CI 렌더러 (GitHub Actions ubuntu headless) 와의 동일성은 미확인이다 (`verify:1215` 는 소수 4~5 자리
+// 차이를 실측했다). 원자료: `docs/reports/1226-night-lights/phase2/baseline/`.
+// `null` 로 되돌리면 MODE=profile 외에서 fail-closed (throw → exit 1).
+/** D2 · D7 (1) 하한 = baseline NI 평균 기여 `0.02187` ÷ 3. 비교: mid 정착 쌍 `0.021659` (D7 (1) 여유 2.97배). */
+const T_NIGHT = 0.00729;
+/** D4 하한 = baseline NI_land 불빛 ON/OFF 변화 없는 비율 `0.8404` ÷ 3 = `0.280133`. */
+const T_DARK = 0.28013;
+/**
+ * D6 = baseline 감쇠율 `(1 − R_baseline)` ÷ 3. `R_baseline = 0.026925 / 0.038502 = 0.699314` → `0.300686 / 3
+ * = 0.100229`. 판정 `R ≤ 1 − K_OCC = 0.89977`.
+ */
+const K_OCC = 0.10023;
+/** 측정 불가 2 — ⌊baseline NI N `7225` ÷ 3⌋. rotate ON 쌍 NI `5740` 도 이 하한 위다. */
+const MIN_EXPECTED_NIGHT = 2408;
+/** 측정 불가 2 — ⌊baseline DI N `7225` ÷ 3⌋. */
+const MIN_EXPECTED_DAY = 2408;
+/** 측정 불가 2 (D2 · D4 · D6) — ⌊baseline NI_land N `4104` ÷ 3⌋. */
+const MIN_EXPECTED_NIGHT_LAND = 1368;
+/** 측정 불가 2 (D5) — ⌊baseline NI_sea N `3121` ÷ 3⌋. */
+const MIN_EXPECTED_NIGHT_SEA = 1040;
+/** 측정 불가 7 (D6 양성 대조 — §A11.10 보강 2) — ⌊baseline NI_land P4≠P2 `2083` ÷ 3⌋. */
+const MIN_EXPECTED_CLOUDED_LAND = 694;
 
 // ── 게이트 맵 주입 (§A11 공통 레시피 — `docs/reports/1226-night-lights/README.md`) ──────────────
 const GATE_AMBIENT = 1;
@@ -124,9 +146,13 @@ const GATE_COLORS = [
   ['iceColor', [0, 0, 1]],
 ];
 
-/** #1219 — 캔버스 위 DOM HUD 글리프가 캡처에 섞이지 않도록 canvas 만 보이게 한다 (레이아웃 무변경). */
-const HIDE_DOM_CSS =
-  'body * { visibility: hidden !important; } canvas { visibility: visible !important; }';
+/**
+ * #1228 B1 교훈 — 결함 빌드 판정이 로드 타이밍 경주에 기대지 않는지 확인하는 대기 당김 (ms).
+ * 부트스트랩 안정화 대기 `BOOT_SETTLE_MS` 에서 뺀다. 기본 `0` — D12 변이 실증에서만 `1000` 으로 돌린다.
+ */
+const WAIT_ADVANCE_MS = Number(process.env.WAIT_ADVANCE_MS ?? 0);
+/** 부트스트랩 안정화 대기 — `verify:1202` · `verify:1215` 와 같은 값. */
+const BOOT_SETTLE_MS = 2800;
 
 async function setupPage(browser, baseUrl, query, label, settleOptions = {}) {
   const context = await browser.newContext({
@@ -139,9 +165,11 @@ async function setupPage(browser, baseUrl, query, label, settleOptions = {}) {
     baseUrl,
     query,
     handles: ['__simCore', '__solarScene'],
-    settleMs: 2800,
+    settleMs: BOOT_SETTLE_MS - WAIT_ADVANCE_MS,
   });
-  await page.addStyleTag({ content: HIDE_DOM_CSS });
+  // #1219 · #1228 B1 — 캔버스 위 DOM (HUD · 토스트) 이 캡처에 섞이지 않게 숨긴다 (캔버스 개수 fail-fast 포함).
+  // 페이지 스타일 규칙이라 이후 등장하는 토스트 (focus 1500ms 뒤) 에도 적용된다.
+  await hideDomOverlays(page);
   await page.evaluate((jd) => {
     window.__simCore.command({ type: 'jumpToJulianDate', julianDate: jd });
     window.__simCore.command({ type: 'pause' });
@@ -251,7 +279,7 @@ const clearInjection = (ctx) =>
 // 하네스는 1~5 를 try, 6 을 finally 에서 부른다 (try 안 process.exit 는 finally 를 건너뛴다 — #940).
 const installOverlay = (ctx, { blockHost, overlay, strength }) =>
   ctx.page.evaluate(
-    ({ blockHost, overlay, strength }) => {
+    ({ blockHost, overlay, strength, skipDepthWrite }) => {
       const scene = window.__simCore.scene;
       const host = window.__solarScene.meshes.get('earth');
       const st = { hostBlock: [], S: host.material._floats.nightLightStrength };
@@ -279,7 +307,7 @@ const installOverlay = (ctx, { blockHost, overlay, strength }) =>
       const om = hm.clone('mn6-overlay-mat');
       om._options = { ...hm._options, needAlphaBlending: true };
       om.alphaMode = 1;
-      om.disableDepthWrite = true;
+      if (!skipDepthWrite) om.disableDepthWrite = true;
       o.material = om;
       o.renderingGroupId = 1;
       scene.setRenderingAutoClearDepthStencil(1, false, false, false);
@@ -300,10 +328,11 @@ const installOverlay = (ctx, { blockHost, overlay, strength }) =>
         hostBlocked: st.hostBlock.length,
         hostNeedsAlpha: hm.needAlphaBlending(),
         overlayNeedsAlpha: om.needAlphaBlending(),
+        disableDepthWrite: om.disableDepthWrite,
         optionsShared: om._options === hm._options,
       };
     },
-    { blockHost, overlay, strength },
+    { blockHost, overlay, strength, skipDepthWrite: MN6_SKIP_DEPTH_WRITE },
   );
 
 const uninstallOverlay = (ctx) =>
@@ -662,6 +691,12 @@ async function runMain(browser) {
     await capture(P2, 'mid-P2'),
     'mid',
   );
+  // #1228 선결 확인 — mid variant 머티리얼이 마스크 경로 (uMaskEnabled 1) 에 있어야 게이트 (γ) 가 불빛을 통과시킨다.
+  out.midMaskP1 = await P1.page.evaluate(
+    () =>
+      window.__simCore.scene.getMeshByName('earth-lod-mid')?.material?._floats?.uMaskEnabled ??
+      null,
+  );
   out.midStrengthP2 = await readLightStrengths(P2);
 
   // ── D7 (2) low 정착 쌍 ──
@@ -786,7 +821,15 @@ const PREMISE_TABLE = [
   ['main', 'D2 D3 D4 D5', 'NI · DI · NI_land · NI_sea', 'P2', 'P2', '—', ''],
   ['cloud', 'D6', 'NI_land', 'P4', 'P4', 'NI_land P4≠P2', ''],
   ['mid', 'D7(1)', 'NI', 'P2 (mid)', 'P2 (mid)', '—', ''],
-  ['low', 'D7(2)', 'NI', 'P2 (low)', '— (billboard 에 uniform 없음)', '—', ''],
+  [
+    'low',
+    'D7(2)',
+    'NI',
+    '— (재조정 — 대역이 씬 배경)',
+    '— (billboard 에 uniform 없음)',
+    '—',
+    '지구가 그려졌는지 보증 안 함',
+  ],
   ['d8Off', 'D8', 'NI', 'P1b', '— (두 페이지 모두 불빛 ON)', '—', ''],
   ['d8On', 'D8', 'NI', 'R1', '— (두 페이지 모두 불빛 ON)', '—', ''],
   ['p2Restore', '(주입 원복 확인)', '—', '—', '—', '—', 'full frame 0 px 아니면 측정 오류'],
@@ -840,14 +883,22 @@ function judgeMain(r) {
       unmeasurable.push(
         `(1) LOD 정착 상한 초과 — ${s.page}/${s.step} (${s.waitedMs}ms, dist=${s.dist} fading=${s.fading})`,
       );
+  if (r.midMaskP1 !== 1)
+    unmeasurable.push(
+      `(6) mid variant uMaskEnabled ${r.midMaskP1} ≠ 1 — mid 정착이 마스크 경로가 아니다 (#1228 회귀 — D7(1) 이 게이트 (γ) 로 구조적 0)`,
+    );
+  // 전제 5 — **하네스 설정**만 묻는다: OFF 페이지에서 읽힌 불빛 세기 값 중 비-0 이 있으면 설정 실패다.
+  // uniform 이 아예 읽히지 않으면 (`[]`) 「불빛 활성」 이 아니므로 전제 위배가 아니다 — 바인딩이 사라진 결함
+  // (MN-2) 은 GL 기본값 `0` 으로 불빛이 꺼지는 **제품 속성**이라 D2 가 FAIL 로 잡아야 한다 (#1215 X2 —
+  // 전제에 제품 속성을 섞으면 결함이 exit 2 뒤로 숨는다).
   for (const [label, v] of [
     ['P2', r.strengths.P2],
     ['P4', r.strengths.P4],
     ['P2 (mid)', r.midStrengthP2],
   ])
-    if (!v.length || v.some((x) => x !== 0))
+    if (v.some((x) => x !== 0))
       unmeasurable.push(
-        `(5) 불빛 OFF 페이지 ${label} 의 nightLightStrength ${JSON.stringify(v)} — 0 이 아니거나 읽지 못했다`,
+        `(5) 불빛 OFF 페이지 ${label} 의 nightLightStrength ${JSON.stringify(v)} — 비-0 (플래그가 불빛을 끄지 못했다)`,
       );
 
   const prof = MODE === 'profile';
@@ -866,8 +917,13 @@ function judgeMain(r) {
       unmeasurable.push(`(4) [${label}] 위상각 ${p.phaseAlphaDeg}deg < ${MIN_PHASE_ALPHA_DEG}deg`);
     if (label !== 'cloud' && lt(p.NI.n, MIN_EXPECTED_NIGHT))
       unmeasurable.push(`(2) [${label}] NI N=${p.NI.n} < MIN_EXPECTED_NIGHT ${MIN_EXPECTED_NIGHT}`);
-    // 전제 3 — 불빛 OFF (또는 두 번째) 페이지 DI 평균 휘도. 모든 쌍에 적용 (low 포함 — 계약 원문).
-    if (p.DI.lumB === null || p.DI.lumB < MIN_DAY_LIT_LUM)
+    // 전제 3 — 불빛 OFF (또는 두 번째) 페이지 DI 평균 휘도. low 쌍을 **제외한** 전 쌍에 적용한다.
+    // ⚠️ 계약 재조정 (사용자 결정 — #1226 코멘트 5682445336, `verify:1215` judge 선례 채택):
+    // low 정착 쌍의 DI 평균 휘도는 [실측] `0.035593` 으로 씬 배경색 (clear color 8-bit `(8, 9, 13)`) 의
+    // Rec.709 휘도와 같다 — low 대역은 배경이라 전제 3 을 걸면 가드가 매 실행 `exit 2` 다. low 에는 전제 2
+    // (표본 수) 만 건다. ⚠️ 한계: **low 프레임에 지구가 실제로 그려졌는지는 보증하지 않는다** — 전제 2 는
+    // 기하 계수이고 D2 는 high 프레임 값이다. D7 (2) 의 픽셀 항은 「배경 위에 불빛이 그려짐」 (MN-7) 만 잡는다.
+    if (label !== 'low' && (p.DI.lumB === null || p.DI.lumB < MIN_DAY_LIT_LUM))
       unmeasurable.push(`(3) [${label}] DI 평균 휘도 ${p.DI.lumB} < ${MIN_DAY_LIT_LUM}`);
   }
   if (lt(m.DI.n, MIN_EXPECTED_DAY))
@@ -983,7 +1039,7 @@ function judgeD9(r) {
   }
   for (const k of ['a', 'c']) {
     const v = r.pairs[k].strengthsFeature;
-    if (!v.length || v.some((x) => x !== 0))
+    if (v.some((x) => x !== 0))
       unmeasurable.push(`(5) [d9-${k}] feature OFF 페이지 nightLightStrength ${JSON.stringify(v)}`);
   }
   if (r.pairs.positive.fullChanged === 0)
@@ -1050,7 +1106,7 @@ function printMain(r) {
     `p2Restore fullChanged ${r.p2Restore?.fullChanged} · gate G↔GA NI changed ${r.gateVsAmp?.NI?.changed}`,
   );
   console.log(
-    `strengths ${JSON.stringify(r.strengths)} · mid P2 ${JSON.stringify(r.midStrengthP2)}`,
+    `strengths ${JSON.stringify(r.strengths)} · mid P2 ${JSON.stringify(r.midStrengthP2)} · mid P1 uMaskEnabled ${r.midMaskP1} · WAIT_ADVANCE_MS ${WAIT_ADVANCE_MS}`,
   );
   if (!r.main.error && !r.cloud.error) {
     const den = r.main.NI_land.meanContrib;

@@ -1,29 +1,29 @@
 [browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
 
 === DoD 1 — 4 body 표면 디테일 (surface ON, 기본) ===
-  earth    [rocky] hfEnergy=8.366 hfEntropy=3.06 stddev=88.655 uniqColors=361 area=27408/39204 (제외 11796) box=198x198 err=0
-  mars     [desert] hfEnergy=1.9964 hfEntropy=1.53 stddev=91.274 uniqColors=41 area=27408/39204 (제외 11796) box=198x198 err=0
-  jupiter  [gas-bands] hfEnergy=3.7682 hfEntropy=1.897 stddev=100.347 uniqColors=51 area=27408/39204 (제외 11796) box=198x198 err=0
-  moon     [cratered] hfEnergy=36.153 hfEntropy=2.711 stddev=99.749 uniqColors=34 area=1700/2500 (제외 800) box=50x50 err=0
+  earth    [rocky] hfEnergy=34.6971 hfEntropy=3.284 stddev=88.655 uniqColors=405 area=27408/39204 (제외 11796) box=198x198 err=0
+  mars     [desert] hfEnergy=2.0065 hfEntropy=1.535 stddev=91.258 uniqColors=43 area=27408/39204 (제외 11796) box=198x198 err=0
+  jupiter  [gas-bands] hfEnergy=3.7683 hfEntropy=1.898 stddev=100.346 uniqColors=53 area=27408/39204 (제외 11796) box=198x198 err=0
+  moon     [cratered] hfEnergy=36.1454 hfEntropy=2.711 stddev=99.749 uniqColors=34 area=1700/2500 (제외 800) box=50x50 err=0
 
 === DoD 5 — ?surface=off 단색 복귀 대조 ===
-  earth    [rocky] hfEnergy=0.6332 hfEntropy=0.603 stddev=38.286 uniqColors=46 area=27408/39204 (제외 11796) box=198x198 err=0
-  mars     [desert] hfEnergy=0.5656 hfEntropy=0.503 stddev=56.881 uniqColors=40 area=27408/39204 (제외 11796) box=198x198 err=0
-  jupiter  [gas-bands] hfEnergy=0.7425 hfEntropy=0.691 stddev=67.07 uniqColors=50 area=27408/39204 (제외 11796) box=198x198 err=0
-  moon     [cratered] hfEnergy=3.0912 hfEntropy=1.755 stddev=61.281 uniqColors=43 area=1700/2500 (제외 800) box=50x50 err=0
+  earth    [rocky] hfEnergy=0.6334 hfEntropy=0.607 stddev=38.281 uniqColors=46 area=27408/39204 (제외 11796) box=198x198 err=0
+  mars     [desert] hfEnergy=0.5657 hfEntropy=0.503 stddev=56.881 uniqColors=40 area=27408/39204 (제외 11796) box=198x198 err=0
+  jupiter  [gas-bands] hfEnergy=0.7423 hfEntropy=0.69 stddev=67.071 uniqColors=50 area=27408/39204 (제외 11796) box=198x198 err=0
+  moon     [cratered] hfEnergy=3.0931 hfEntropy=1.746 stddev=61.284 uniqColors=43 area=1700/2500 (제외 800) box=50x50 err=0
 
 === DoD 2 — 무회귀 (미등록 body 단색, surface ON) ===
-  venus    hfEnergy=0.777 hfEntropy=0.762 stddev=90.29 uniqColors=51 area=27408/39204 (제외 11796) box=198x198 err=0
-  saturn   hfEnergy=0.7972 hfEntropy=0.718 stddev=67.556 uniqColors=47 area=27408/39204 (제외 11796) box=198x198 err=0
-  neptune  hfEnergy=0.7332 hfEntropy=0.746 stddev=74.506 uniqColors=44 area=27412/39204 (제외 11792) box=198x198 err=0
+  venus    hfEnergy=0.7775 hfEntropy=0.764 stddev=90.286 uniqColors=49 area=27408/39204 (제외 11796) box=198x198 err=0
+  saturn   hfEnergy=0.7975 hfEntropy=0.719 stddev=67.556 uniqColors=47 area=27408/39204 (제외 11796) box=198x198 err=0
+  neptune  hfEnergy=0.7331 hfEntropy=0.747 stddev=74.508 uniqColors=44 area=27412/39204 (제외 11792) box=198x198 err=0
 
 === DoD 3 — LOD mid 전환 표면 연속성 (reviewer 권고 1: cross-fade 팝핑) ===
-  earth high   : hfEnergy=8.385 hfEntropy=3.06 area=27408
-  earth midFade: hfEnergy=8.3098 hfEntropy=3.07 area=27408
-  earth midSet : hfEnergy=8.3236 hfEntropy=3.071 area=27408
+  earth high   : hfEnergy=34.7103 hfEntropy=3.283 area=27408
+  earth midFade: hfEnergy=34.4833 hfEntropy=3.291 area=27408
+  earth midSet : hfEnergy=34.4868 hfEntropy=3.292 area=27408
 
 === DoD 4 — tier-c (?gpu=c) 단색 ===
-  earth tier-c : hfEnergy=138.5629 hfEntropy=1.246 area=113 lodStats={"high":0,"mid":0,"low":32,"override":"low","fading":0}
+  earth tier-c : hfEnergy=139.4262 hfEntropy=1.25 area=111 lodStats={"high":0,"mid":0,"low":32,"override":"low","fading":0}
 
 === JSON ===
 {
@@ -35,10 +35,10 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "stddev": 88.655,
-      "hfEnergy": 8.366,
-      "hfEntropy": 3.06,
-      "uniqueColors": 361,
-      "meanLum": 82.2,
+      "hfEnergy": 34.6971,
+      "hfEntropy": 3.284,
+      "uniqueColors": 405,
+      "meanLum": 84.5,
       "screenBox": {
         "x": 541,
         "y": 261,
@@ -59,10 +59,10 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 91.274,
-      "hfEnergy": 1.9964,
-      "hfEntropy": 1.53,
-      "uniqueColors": 41,
+      "stddev": 91.258,
+      "hfEnergy": 2.0065,
+      "hfEntropy": 1.535,
+      "uniqueColors": 43,
       "meanLum": 107.7,
       "screenBox": {
         "x": 541,
@@ -84,10 +84,10 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 100.347,
-      "hfEnergy": 3.7682,
-      "hfEntropy": 1.897,
-      "uniqueColors": 51,
+      "stddev": 100.346,
+      "hfEnergy": 3.7683,
+      "hfEntropy": 1.898,
+      "uniqueColors": 53,
       "meanLum": 111.4,
       "screenBox": {
         "x": 541,
@@ -110,7 +110,7 @@
       "excludedPx": 800,
       "diskRpx": 24.58,
       "stddev": 99.749,
-      "hfEnergy": 36.153,
+      "hfEnergy": 36.1454,
       "hfEntropy": 2.711,
       "uniqueColors": 34,
       "meanLum": 102.7,
@@ -136,9 +136,9 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 38.286,
-      "hfEnergy": 0.6332,
-      "hfEntropy": 0.603,
+      "stddev": 38.281,
+      "hfEnergy": 0.6334,
+      "hfEntropy": 0.607,
       "uniqueColors": 46,
       "meanLum": 43.8,
       "screenBox": {
@@ -162,7 +162,7 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "stddev": 56.881,
-      "hfEnergy": 0.5656,
+      "hfEnergy": 0.5657,
       "hfEntropy": 0.503,
       "uniqueColors": 40,
       "meanLum": 63.8,
@@ -186,9 +186,9 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 67.07,
-      "hfEnergy": 0.7425,
-      "hfEntropy": 0.691,
+      "stddev": 67.071,
+      "hfEnergy": 0.7423,
+      "hfEntropy": 0.69,
       "uniqueColors": 50,
       "meanLum": 77.3,
       "screenBox": {
@@ -211,9 +211,9 @@
       "windowPx": 2500,
       "excludedPx": 800,
       "diskRpx": 24.58,
-      "stddev": 61.281,
-      "hfEnergy": 3.0912,
-      "hfEntropy": 1.755,
+      "stddev": 61.284,
+      "hfEnergy": 3.0931,
+      "hfEntropy": 1.746,
       "uniqueColors": 43,
       "meanLum": 68.7,
       "screenBox": {
@@ -237,10 +237,10 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 90.29,
-      "hfEnergy": 0.777,
-      "hfEntropy": 0.762,
-      "uniqueColors": 51,
+      "stddev": 90.286,
+      "hfEnergy": 0.7775,
+      "hfEntropy": 0.764,
+      "uniqueColors": 49,
       "meanLum": 121.9,
       "screenBox": {
         "x": 541,
@@ -262,8 +262,8 @@
       "excludedPx": 11796,
       "diskRpx": 98.32,
       "stddev": 67.556,
-      "hfEnergy": 0.7972,
-      "hfEntropy": 0.718,
+      "hfEnergy": 0.7975,
+      "hfEntropy": 0.719,
       "uniqueColors": 47,
       "meanLum": 82.7,
       "screenBox": {
@@ -285,9 +285,9 @@
       "windowPx": 39204,
       "excludedPx": 11792,
       "diskRpx": 98.32,
-      "stddev": 74.506,
-      "hfEnergy": 0.7332,
-      "hfEntropy": 0.746,
+      "stddev": 74.508,
+      "hfEnergy": 0.7331,
+      "hfEntropy": 0.747,
       "uniqueColors": 44,
       "meanLum": 90.7,
       "screenBox": {
@@ -311,11 +311,11 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 88.715,
-      "hfEnergy": 8.385,
-      "hfEntropy": 3.06,
-      "uniqueColors": 351,
-      "meanLum": 82.3,
+      "stddev": 88.797,
+      "hfEnergy": 34.7103,
+      "hfEntropy": 3.283,
+      "uniqueColors": 400,
+      "meanLum": 84.8,
       "screenBox": {
         "x": 541,
         "y": 261,
@@ -335,11 +335,11 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 88.873,
-      "hfEnergy": 8.3098,
-      "hfEntropy": 3.07,
-      "uniqueColors": 365,
-      "meanLum": 82.7,
+      "stddev": 88.944,
+      "hfEnergy": 34.4833,
+      "hfEntropy": 3.291,
+      "uniqueColors": 416,
+      "meanLum": 85.2,
       "screenBox": {
         "x": 541,
         "y": 261,
@@ -359,11 +359,11 @@
       "windowPx": 39204,
       "excludedPx": 11796,
       "diskRpx": 98.32,
-      "stddev": 88.962,
-      "hfEnergy": 8.3236,
-      "hfEntropy": 3.071,
-      "uniqueColors": 359,
-      "meanLum": 82.8,
+      "stddev": 89.024,
+      "hfEnergy": 34.4868,
+      "hfEntropy": 3.292,
+      "uniqueColors": 408,
+      "meanLum": 85.3,
       "screenBox": {
         "x": 541,
         "y": 261,
@@ -380,22 +380,22 @@
     }
   },
   "tierC": {
-    "area": 113,
+    "area": 111,
     "windowPx": 182,
-    "excludedPx": 69,
+    "excludedPx": 71,
     "diskRpx": 6.31,
-    "stddev": 54.921,
-    "hfEnergy": 138.5629,
-    "hfEntropy": 1.246,
+    "stddev": 55.321,
+    "hfEnergy": 139.4262,
+    "hfEntropy": 1.25,
     "uniqueColors": 7,
-    "meanLum": 32.8,
+    "meanLum": 33.2,
     "screenBox": {
       "x": 553,
       "y": 43,
       "w": 14,
       "h": 13,
-      "cx": 560.05,
-      "cy": 49.4,
+      "cx": 559.92,
+      "cy": 49.43,
       "r": 6.31
     },
     "imgSize": {
@@ -426,10 +426,10 @@
 }
 
 === 판정 (#759 — hfEntropy ON−OFF ≥ 0.15 + tier-c forceOverride=low) ===
-  ✓ earth: hfEntropy 갭 2.457 ≥ 0.15
-  ✓ mars: hfEntropy 갭 1.027 ≥ 0.15
-  ✓ jupiter: hfEntropy 갭 1.206 ≥ 0.15
-  ✓ moon: hfEntropy 갭 0.956 ≥ 0.15
+  ✓ earth: hfEntropy 갭 2.677 ≥ 0.15
+  ✓ mars: hfEntropy 갭 1.032 ≥ 0.15
+  ✓ jupiter: hfEntropy 갭 1.208 ≥ 0.15
+  ✓ moon: hfEntropy 갭 0.965 ≥ 0.15
   ✓ tier-c: override=low, high=0, mid=0 (표면 셰이더 구조적 미진입)
 === PASS ===
 exit=0

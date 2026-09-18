@@ -1,13 +1,13 @@
 
 === #675 glow pixel marker 회귀 가드 ===
-BASE_URL=http://localhost:3100
+BASE_URL=http://localhost:3000
 
-   [측정] mode=default 40 AU (실측 40.0 AU) → 식별 천체 14 (LOD 0/0/32, 834ms)
-   [측정] mode=default 100 AU (실측 100.0 AU) → 식별 천체 15 (LOD 0/0/32, 839ms)
-   [측정] mode=glow    40 AU (실측 40.0 AU) → 식별 천체 14 (LOD 0/0/32, 824ms)
-   [측정] mode=glow    100 AU (실측 100.0 AU) → 식별 천체 15 (LOD 0/0/32, 839ms)
-   [측정] mode=off     40 AU (실측 40.0 AU) → 식별 천체 3 (LOD 0/0/32, 826ms)
-   [측정] mode=off     100 AU (실측 100.0 AU) → 식별 천체 1 (LOD 0/0/32, 825ms)
+   [측정] mode=default 40 AU (실측 40.0 AU) → 식별 천체 14 (LOD 0/0/32, 836ms)
+   [측정] mode=default 100 AU (실측 100.0 AU) → 식별 천체 15 (LOD 0/0/32, 837ms)
+   [측정] mode=glow    40 AU (실측 40.0 AU) → 식별 천체 14 (LOD 0/0/32, 835ms)
+   [측정] mode=glow    100 AU (실측 100.0 AU) → 식별 천체 15 (LOD 0/0/32, 832ms)
+   [측정] mode=off     40 AU (실측 40.0 AU) → 식별 천체 3 (LOD 0/0/32, 835ms)
+   [측정] mode=off     100 AU (실측 100.0 AU) → 식별 천체 1 (LOD 0/0/32, 833ms)
 
 0) 측정 전제 — 캡처 시점 LOD 정착 (cross-fade 종료 + 분포 안정)
 
