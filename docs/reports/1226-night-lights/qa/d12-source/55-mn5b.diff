@@ -1,0 +1,7 @@
+diff --git a/packages/core/src/scene/procedural-planet-shader.ts b/packages/core/src/scene/procedural-planet-shader.ts
+index bab1536..af1d32d 100644
+--- a/packages/core/src/scene/procedural-planet-shader.ts
++++ b/packages/core/src/scene/procedural-planet-shader.ts
+@@ -873 +873 @@ void main(void) {
+-    float lightGate = landMask * (1.0 - iceMask) * uMaskEnabled;
++    float lightGate = landMask * uMaskEnabled; // MN-5b: (1.0 - iceMask) 인자 삭제
