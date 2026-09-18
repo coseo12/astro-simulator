@@ -38,7 +38,7 @@
 2. **MN-7 — 해소.** 원 `mn7.log` 은 부트스트랩 크래시 (6번째 브라우저 컨텍스트 생성 시점) 로 판정에 도달하지 못한 로그였다. 동일 명령·환경 **3/3 재현 실패**이고 원인은 [추론] 메모리 압력이다 (성공 실행 peak RSS `1.11~1.15 GB` — ADR §A11.18.2). 정상 실행은 **`D7(2)` FAIL** (low 정착 쌍 disk 변화 `12 px`) · 나머지 9 게이트 PASS · `exit 1`. `mutations/mn7.log` 를 정상 실행 로그로 교체했다 (원 크래시 사실은 파일 머리 2줄).
 3. **MN-5b — 처분 확정: 「단위 테스트가 잡는 자리」** (ADR §A11.18.1). §A11.16 기각 1 의 예측 (_"`R == 0` 이라 `NI_sea` 에 들어가 `D5` 가 잡는다"_) 은 **두 겹으로 반증**됐다. [실측] 결함 렌더 (`diag/m3-mn5b-defect.log` — `disk changed 995 → 1045` · `fullChanged 1006 → 1061` 재현) 에서 「새로 변한」 픽셀은 **정확히 `50 px`** 이고 `ndv ∈ [0.0482, 0.3752]` (전량 `INNER_NDV_MIN 0.6` 미만) · `r/R ∈ [0.927, 0.9988]` (disk 주변부) · `|lat| ∈ [61.63°, 79.41°]` · 게이트 `R == 0` 이 `41` / `R > 0` 이 **`9`** 다. 즉 (i) `NI` 표본에 하나도 들어오지 않고 (ii) `9 px` 은 예측 전제 (`R == 0`) 자체가 성립하지 않는다.
    - 축은 **카메라 고도 `beta = π/2` 고정**이다 — JD 4대 거점 + 대조 `5` 개와 카메라 방위각 `α` `7` 개에서 `NI ∩ 육지 ∩ ice = 0` (극축↔카메라 전부 정확히 `90°`) 이나, `beta ≤ 70°` 에서는 `25 ~ 833 px` 로 들어온다. 가드 프레임 (`?rotate=off`) 은 `rotationQuaternion = null` 이라 자전축 기울기가 `0°` 다 (`rotate` ON 은 `66.56°`).
-   - 단위 테스트가 1건 잡는다 (`mutations/unit-tests.txt` · `procedural-planet-night-lights.test.ts` 의 `lightGate` 문자열 + `iceMask 1 → 정확히 0`).
+   - 단위 테스트가 1건 잡는다 (`mutations/unit-tests.txt` — `1 failed / 1129`). ⚠️ **하중을 지는 것은 `procedural-planet-night-lights.test.ts` 의 `lightGate` 문자열 assert 하나**다 (qa D12 독립 재현, ADR §A11.20). 같은 파일의 미러 테스트 (`iceMask 1 → 정확히 0`) 는 **GLSL 변이에서 통과한다** — JS 미러를 재는 직교 축이라 셰이더 소스 변경을 보지 못한다. 두 단언이 함께 잡는 것처럼 읽히지 않게 구분해 적는다.
 
 ⚠️ `mutations/mn6*.log` 4종은 **초판 술어 시점의 `exit 2` 기록**이다 (이력 보존). 현행 판정은 위 `diag/m4a-*` · `diag/m4b-*` 다.
 
