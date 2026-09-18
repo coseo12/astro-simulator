@@ -38,6 +38,7 @@
  *   MODE=profile ...                                       # 게이트 없이 baseline 인쇄 (임계 도출용)
  *   MODE=d9 BASE_URL_TIP=http://localhost:3100 ...         # D9 — develop tip 과 동일성 (PR 시점 1회)
  *   INJECT=mn6 ...   # §A11.17.3 레시피 — 불빛 항만 구름 블렌드 뒤에 가산 (D6 FAIL 기대) + V1~V4 주입 유효성
+ *                    #   V1 · V3 · V4 = §A11.17.3 원문 / V2 = §A11.17.9 확정안 (disk 전체 · 술어 2 — `measureV2`)
  *   INJECT=mn7 ...   # low billboard 발광 — D7 (2)
  *   INJECT=mn9 ...   # 콘솔 에러 1건 — D11
  *   INJECT=mn10-scale|mn10-camera|mn10-settle ...  # 측정 실패 주입 — exit 2
@@ -354,11 +355,11 @@ const uninstallOverlay = (ctx) =>
 
 /**
  * 프레임 비교 1쌍 (a ↔ b) — 기하는 이 페이지 (ctx) 의 카메라. `land` 이미지 (증폭 게이트 맵) 를 주면
- * NI_land / NI_sea 로 나눈 통계, `ref` 이미지를 주면 NI_land 에서 a ↔ ref 픽셀 차 (MN-6 V2) 를 함께 낸다.
+ * NI_land / NI_sea 로 나눈 통계를 함께 낸다.
  */
 async function measurePair(ctx, aB64, bB64, extra = {}) {
   return ctx.page.evaluate(
-    async ({ a, b, land, ref, cloudOff, cloudOn, P }) => {
+    async ({ a, b, land, cloudOff, cloudOn, P }) => {
       const scene = window.__simCore?.scene;
       const mesh = window.__solarScene?.meshes?.get('earth');
       if (!scene || !mesh) return { error: 'earth mesh/scene 부재' };
@@ -433,10 +434,9 @@ async function measurePair(ctx, aB64, bB64, extra = {}) {
       const A = await load(a);
       const B = await load(b);
       const L = land ? await load(land) : null;
-      const X = ref ? await load(ref) : null;
       const COFF = cloudOff ? await load(cloudOff) : null;
       const CON = cloudOn ? await load(cloudOn) : null;
-      for (const img of [B, L, X, COFF, CON])
+      for (const img of [B, L, COFF, CON])
         if (img && img.d.length !== A.d.length) return { error: '캔버스 크기 불일치' };
       const sx = A.w / rw;
       const sy = A.h / rh;
@@ -457,9 +457,6 @@ async function measurePair(ctx, aB64, bB64, extra = {}) {
         cloudChanged: 0,
         overlap: 0,
         sumCloudContrib: 0,
-        refMaxAbs: 0,
-        refOver1Lsb: 0,
-        sumRefContrib: 0,
       };
       const NIS = mk();
       const inDisk = new Uint8Array(A.w * A.h);
@@ -520,17 +517,6 @@ async function measurePair(ctx, aB64, bB64, extra = {}) {
               if (cloudCh) NIL.cloudChanged += 1;
               if (cloudCh && !same(A.d, B.d, i)) NIL.overlap += 1;
             }
-            if (X) {
-              const diff = Math.abs(lum(X.d, i) - lum(A.d, i));
-              if (diff > NIL.refMaxAbs) NIL.refMaxAbs = diff;
-              const chMax = Math.max(
-                Math.abs(X.d[i] - A.d[i]),
-                Math.abs(X.d[i + 1] - A.d[i + 1]),
-                Math.abs(X.d[i + 2] - A.d[i + 2]),
-              );
-              if (chMax > 1) NIL.refOver1Lsb += 1;
-              NIL.sumRefContrib += lum(X.d, i) - lum(B.d, i);
-            }
           } else {
             push(NIS, i);
           }
@@ -567,9 +553,6 @@ async function measurePair(ctx, aB64, bB64, extra = {}) {
               saturatedPxA: NIL.satA,
               cloudChanged: NIL.cloudChanged,
               overlap: NIL.overlap,
-              refMaxAbsLum: X ? r6(NIL.refMaxAbs) : null,
-              refOver1LsbPx: X ? NIL.refOver1Lsb : null,
-              refMeanContrib: X && NIL.n ? r6(NIL.sumRefContrib / NIL.n) : null,
             }
           : null,
         NI_sea: L ? pack(NIS) : null,
@@ -581,11 +564,218 @@ async function measurePair(ctx, aB64, bB64, extra = {}) {
       a: aB64,
       b: bB64,
       land: extra.land ?? null,
-      ref: extra.ref ?? null,
       cloudOff: extra.cloudOff ?? null,
       cloudOn: extra.cloudOn ?? null,
       P: { INNER_NDV_MIN, DAY_NDL_MIN, NIGHT_NDL_MAX },
     },
+  );
+}
+
+/**
+ * MN-6 주입 유효성 V2 (ADR `20260628-756` **§A11.17.9 확정안**) — overlay 프레임 `a` ↔ `P1` 을
+ * **disk 전체**에서 비교한다. 술어 **둘**이고 **새 임계는 없다**:
+ *
+ *   V2-①  `chMax ≥ 3` 인 px `== 0`
+ *         `3` 은 임계가 아니라 **MSAA 4x resolve 오차의 실측 상한 (`chMax ≤ 2`)** 바로 위다.
+ *   V2-②  `> 1 LSB` 픽셀의 4-이웃 연결 성분 중 **크기 `≥ 2` 인 것 `== 0`**
+ *         `2` 는 임계가 아니라 **비고립의 최소 크기**다 — 그 오차는 고립 1픽셀로만 나타난다.
+ *
+ * ## 초판 술어 (`NI_land` 범위 · 픽셀당 `≤ 1 LSB`) 를 폐기한 이유 (§A11.17.9 §초판 처방의 반증)
+ *  (i) **건강판이 위배한다** — 삼각형 경계 픽셀에서 MSAA 4x resolve 가 표본별로 양자화된 값을
+ *      평균해, 단일 fragment + round-to-nearest 의 산술 상한 `1 LSB` 를 깬다 (`2 LSB` 1 px).
+ *      `antialias:false` 개입에서 그 픽셀이 소멸하는 것으로 기전을 확정했다.
+ *  (ii) **`NI_land` 한정이 누출을 놓친다** — overlay 가 밤면 육지 **밖** (해양 · 터미네이터 대역 ·
+ *      주간 반구) 으로 불빛을 누출하는 결함은 `NI_land` 판정량을 건강판과 같게 남긴다
+ *      (주간 반구 누출 실측: `NI_land` `0 px` 대 `disk` `442 px`).
+ *
+ * `NA` (불빛만 렌더한 프레임) 는 **도입하지 않는다** — `O ↔ P1` 이 같으면 `(O − P2) = (P1 − P2)` 이고
+ * 우변이 host 불빛 기여이므로 「overlay 기여 = host 기여」 가 따라온다 (§A11.17.9 결정 3).
+ *
+ * 판정은 `judge()` 가 한다. 여기서는 두 술어의 판정량과 진단 인쇄값만 낸다.
+ */
+async function measureV2(ctx, { a, ref, base, land }) {
+  return ctx.page.evaluate(
+    async ({ a, ref, base, land, P }) => {
+      const scene = window.__simCore?.scene;
+      const mesh = window.__solarScene?.meshes?.get('earth');
+      if (!scene || !mesh) return { error: 'earth mesh/scene 부재' };
+      const canvasCount = document.querySelectorAll('canvas').length;
+      if (canvasCount !== 1) return { error: `캔버스 개수 ${canvasCount} ≠ 1 (#1219)` };
+      const engine = scene.getEngine();
+      const rw = engine.getRenderWidth();
+      const rh = engine.getRenderHeight();
+      const camera = scene.activeCamera;
+      const V = mesh.getAbsolutePosition().constructor;
+      const fw = camera.getDirection(new V(0, 0, 1));
+      const rt = camera.getDirection(new V(1, 0, 0));
+      const up = camera.getDirection(new V(0, 1, 0));
+      const cp = camera.globalPosition ?? camera.position;
+      const ct = mesh.getAbsolutePosition();
+      const R = mesh.getBoundingInfo().boundingSphere.radiusWorld / Math.sqrt(3);
+      let sunPos = null;
+      for (const l of scene.lights) {
+        if (l.position && (l.name === 'sun-light' || l.getClassName?.() === 'PointLight')) {
+          sunPos = l.position;
+          break;
+        }
+      }
+      if (!sunPos) return { error: 'sunLight 부재' };
+      const nums = [fw.x, fw.y, fw.z, rt.x, rt.y, rt.z, up.x, up.y, up.z, cp.x, cp.y, cp.z, ct.x, ct.y, ct.z, R, camera.fov, sunPos.x, sunPos.y, sunPos.z]; // prettier-ignore
+      if (!nums.every(Number.isFinite) || !(R > 0))
+        return { error: `기하 무효 — 비유한 값 또는 반경 ≤ 0 (radius ${R})` };
+      const sd = sunPos.subtract(ct).normalize();
+      const load = async (src) => {
+        const img = new Image();
+        await new Promise((res, rej) => {
+          img.onload = res;
+          img.onerror = rej;
+          img.src = `data:image/png;base64,${src}`;
+        });
+        const c = document.createElement('canvas');
+        c.width = img.width;
+        c.height = img.height;
+        c.getContext('2d').drawImage(img, 0, 0);
+        return {
+          d: c.getContext('2d').getImageData(0, 0, img.width, img.height).data,
+          w: img.width,
+          h: img.height,
+        };
+      };
+      const A = await load(a);
+      const X = await load(ref);
+      const B = await load(base);
+      const L = land ? await load(land) : null;
+      for (const img of [X, B, L])
+        if (img && img.d.length !== A.d.length) return { error: '캔버스 크기 불일치' };
+      const lum = (d, i) => (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+      const th = Math.tan(camera.fov / 2);
+      const asp = rw / rh;
+      const N = A.w * A.h;
+      const over1 = new Uint8Array(N);
+      const hist = {};
+      let n = 0;
+      let over1Px = 0;
+      let ge3Px = 0;
+      let maxAbs = 0;
+      let sumA = 0;
+      let sumX = 0;
+      let nLand = 0;
+      let sumALand = 0;
+      let sumXLand = 0;
+      for (let y = 0; y < rh; y += 1) {
+        for (let x = 0; x < rw; x += 1) {
+          const nx0 = ((x + 0.5) / rw) * 2 - 1;
+          const ny0 = 1 - ((y + 0.5) / rh) * 2;
+          const rx = fw.x + rt.x * nx0 * th * asp + up.x * ny0 * th;
+          const ry = fw.y + rt.y * nx0 * th * asp + up.y * ny0 * th;
+          const rz = fw.z + rt.z * nx0 * th * asp + up.z * ny0 * th;
+          const rl = Math.hypot(rx, ry, rz);
+          const dx = rx / rl;
+          const dy = ry / rl;
+          const dz = rz / rl;
+          const ox = cp.x - ct.x;
+          const oy = cp.y - ct.y;
+          const oz = cp.z - ct.z;
+          const bq = ox * dx + oy * dy + oz * dz;
+          const disc = bq * bq - (ox * ox + oy * oy + oz * oz - R * R);
+          if (disc < 0) continue;
+          const t = -bq - Math.sqrt(disc);
+          if (t < 0) continue;
+          const nx = (ox + t * dx) / R;
+          const ny = (oy + t * dy) / R;
+          const nz = (oz + t * dz) / R;
+          const vx = cp.x - (ct.x + nx * R);
+          const vy = cp.y - (ct.y + ny * R);
+          const vz = cp.z - (ct.z + nz * R);
+          const ndv = (nx * vx + ny * vy + nz * vz) / Math.hypot(vx, vy, vz);
+          const ndl = nx * sd.x + ny * sd.y + nz * sd.z;
+          const px = Math.round((x * A.w) / rw);
+          const py = Math.round((y * A.h) / rh);
+          if (px < 0 || py < 0 || px >= A.w || py >= A.h) continue;
+          const p = py * A.w + px;
+          const i = p * 4;
+          n += 1;
+          const chMax = Math.max(
+            Math.abs(A.d[i] - X.d[i]),
+            Math.abs(A.d[i + 1] - X.d[i + 1]),
+            Math.abs(A.d[i + 2] - X.d[i + 2]),
+          );
+          hist[chMax] = (hist[chMax] ?? 0) + 1;
+          if (chMax > 1) {
+            over1Px += 1;
+            over1[p] = 1;
+          }
+          if (chMax >= 3) ge3Px += 1;
+          const dl = Math.abs(lum(X.d, i) - lum(A.d, i));
+          if (dl > maxAbs) maxAbs = dl;
+          sumA += lum(A.d, i) - lum(B.d, i);
+          sumX += lum(X.d, i) - lum(B.d, i);
+          // 진단 — ADR 이 인용하는 `NI_land` 범위 상대오차도 함께 낸다 (술어 아님)
+          if (L && ndv >= P.INNER_NDV_MIN && ndl <= P.NIGHT_NDL_MAX && L.d[i] > 0) {
+            nLand += 1;
+            sumALand += lum(A.d, i) - lum(B.d, i);
+            sumXLand += lum(X.d, i) - lum(B.d, i);
+          }
+        }
+      }
+      // V2-② — `> 1 LSB` 집합의 4-이웃 연결 성분 (판정 집합 안에서만 이어붙인다)
+      const seen = new Uint8Array(N);
+      const sizeHist = {};
+      let maxSize = 0;
+      let nComponents = 0;
+      let nComponentsGe2 = 0;
+      const stack = [];
+      for (let p0 = 0; p0 < N; p0 += 1) {
+        if (!over1[p0] || seen[p0]) continue;
+        let size = 0;
+        stack.length = 0;
+        stack.push(p0);
+        seen[p0] = 1;
+        while (stack.length) {
+          const p = stack.pop();
+          size += 1;
+          const x = p % A.w;
+          const y = (p - x) / A.w;
+          const push = (q) => {
+            if (over1[q] && !seen[q]) {
+              seen[q] = 1;
+              stack.push(q);
+            }
+          };
+          if (x > 0) push(p - 1);
+          if (x < A.w - 1) push(p + 1);
+          if (y > 0) push(p - A.w);
+          if (y < A.h - 1) push(p + A.w);
+        }
+        sizeHist[size] = (sizeHist[size] ?? 0) + 1;
+        if (size > maxSize) maxSize = size;
+        if (size >= 2) nComponentsGe2 += 1;
+        nComponents += 1;
+      }
+      const r6 = (v) => Number(v.toFixed(6));
+      const pct = (o, r) => (r !== 0 ? Number((((o - r) / r) * 100).toFixed(4)) : null);
+      return {
+        n,
+        // 술어 판정량
+        ge3Px,
+        componentsGe2: nComponentsGe2,
+        // 진단 인쇄 (술어 아님)
+        over1Px,
+        chMaxHist: hist,
+        maxAbsLum: r6(maxAbs),
+        componentSizeHist: sizeHist,
+        componentMaxSize: maxSize,
+        componentCount: nComponents,
+        meanContribOverlay: n ? r6(sumA / n) : null,
+        meanContribRef: n ? r6(sumX / n) : null,
+        relErrPct: n ? pct(sumA, sumX) : null,
+        landN: nLand,
+        landMeanContribOverlay: nLand ? r6(sumALand / nLand) : null,
+        landMeanContribRef: nLand ? r6(sumXLand / nLand) : null,
+        landRelErrPct: nLand ? pct(sumALand, sumXLand) : null,
+      };
+    },
+    { a, ref, base, land: land ?? null, P: { INNER_NDV_MIN, NIGHT_NDL_MAX } },
   );
 }
 
@@ -678,7 +868,7 @@ async function runMain(browser) {
   if (!out.cloud.error && g4 !== g1)
     out.cloud = { error: `cloud ↔ main 기하 불일치 (${g4} vs ${g1})` };
 
-  // ── MN-6 (INJECT=mn6) — §A11.17.3 레시피 + 주입 유효성 V1~V4 ──
+  // ── MN-6 (INJECT=mn6) — §A11.17.3 레시피 + 주입 유효성 V1~V4 (V2 는 §A11.17.9 확정안) ──
   if (INJECT === 'mn6') out.mn6 = await runMn6(pages, img);
 
   // ── D7 (1) mid 정착 쌍 ──
@@ -751,13 +941,15 @@ async function runMn6(pages, img) {
   } finally {
     r.v1Uninstall = await uninstallOverlay(P4);
   }
-  // V2 — P2 (구름 OFF · 불빛 OFF) 에 세기 S overlay ↔ P1 (NI_land 기여 동일 · 픽셀당 ≤ 1 LSB)
+  // V2 — P2 (구름 OFF · 불빛 OFF) 에 세기 S overlay ↔ P1 (§A11.17.9 확정안 — disk 전체 · 술어 2)
   const S = (await readLightStrengths(P3))[0];
   try {
     r.v2Install = await installOverlay(P2, { blockHost: false, overlay: true, strength: S });
-    r.v2 = await measurePair(P2, await capture(P2, 'mn6-v2'), img.P2, {
-      land: img.GA,
+    r.v2 = await measureV2(P2, {
+      a: await capture(P2, 'mn6-v2'),
       ref: img.P1,
+      base: img.P2,
+      land: img.GA,
     });
   } finally {
     r.v2Uninstall = await uninstallOverlay(P2);
@@ -945,14 +1137,19 @@ function judgeMain(r) {
       `(7) D6 양성 대조 — NI_land P4≠P2 ${m.NI_land.cloudChanged} px < MIN_EXPECTED_CLOUDED_LAND ${MIN_EXPECTED_CLOUDED_LAND}`,
     );
 
-  // MN-6 주입 유효성 (V1~V4) — 위배 시 변이 실행은 PASS/FAIL 이 아니라 무효 (§A11.17.3)
+  // MN-6 주입 유효성 (V1~V4) — 위배 시 변이 실행은 PASS/FAIL 이 아니라 무효
+  // (V1 · V3 · V4 는 §A11.17.3 원문 / V2 는 §A11.17.9 확정안 — disk 전체 · 술어 2 · 새 임계 0)
   if (r.mn6) {
     const x = r.mn6;
     const invalid = [];
     if (x.v1.fullChanged !== 0)
       invalid.push(`V1 세기 0 overlay ↔ P4 full frame ${x.v1.fullChanged} px`);
-    if (x.v2.NI_land.refOver1LsbPx !== 0)
-      invalid.push(`V2 overlay-on-P2 ↔ P1 NI_land 채널차 > 1 LSB ${x.v2.NI_land.refOver1LsbPx} px`);
+    if (x.v2.ge3Px !== 0)
+      invalid.push(`V2-① overlay-on-P2 ↔ P1 disk 채널차 ≥ 3 LSB ${x.v2.ge3Px} px`);
+    if (x.v2.componentsGe2 !== 0)
+      invalid.push(
+        `V2-② overlay-on-P2 ↔ P1 disk > 1 LSB 연결 성분 (크기 ≥ 2) ${x.v2.componentsGe2} 개 (최대 크기 ${x.v2.componentMaxSize})`,
+      );
     if (x.v3.fullChanged !== 0)
       invalid.push(`V3 host 차단 P3 ↔ P4 full frame ${x.v3.fullChanged} px`);
     if (x.v4.fullChanged !== 0)
@@ -1121,7 +1318,10 @@ function printMain(r) {
         `[MN-6] R_C4 ${rC4} · |1 − R_C4| ${Math.abs(1 - rC4)} · K_OCC ${kOcc} (${K_OCC === null ? '이 실행 baseline ÷ 3 예시' : '가드 상수'}) · 판별 여유 K_OCC/|1−R_C4| ${kOcc !== null ? kOcc / Math.abs(1 - rC4) : null}`,
       );
       console.log(
-        `[MN-6 V] V1 full ${r.mn6.v1.fullChanged} · V2 NI_land 기여 overlay ${r.mn6.v2.NI_land.meanContrib} vs P1 ${r.mn6.v2.NI_land.refMeanContrib} · 최대 |Δlum| ${r.mn6.v2.NI_land.refMaxAbsLum} · >1LSB ${r.mn6.v2.NI_land.refOver1LsbPx} px · V3 full ${r.mn6.v3.fullChanged} · V4 full ${r.mn6.v4.fullChanged} · 변이 full ${r.mn6.mutated.fullChanged}`,
+        `[MN-6 V] V1 full ${r.mn6.v1.fullChanged} px · V2-① disk chMax ≥ 3 ${r.mn6.v2.ge3Px} px · V2-② disk > 1 LSB 크기 ≥ 2 성분 ${r.mn6.v2.componentsGe2} 개 · V3 full ${r.mn6.v3.fullChanged} px · V4 full ${r.mn6.v4.fullChanged} px · 변이 full ${r.mn6.mutated.fullChanged} px`,
+      );
+      console.log(
+        `[MN-6 V2 진단] disk n ${r.mn6.v2.n} · > 1 LSB ${r.mn6.v2.over1Px} px · 최대 |Δlum| ${r.mn6.v2.maxAbsLum} · 기여 overlay ${r.mn6.v2.meanContribOverlay} vs P1 ${r.mn6.v2.meanContribRef} (상대오차 ${r.mn6.v2.relErrPct}%) · NI_land 상대오차 ${r.mn6.v2.landRelErrPct}% (기여 ${r.mn6.v2.landMeanContribOverlay} vs ${r.mn6.v2.landMeanContribRef}, n ${r.mn6.v2.landN}) · chMaxHist ${JSON.stringify(r.mn6.v2.chMaxHist)} · 성분 크기 ${JSON.stringify(r.mn6.v2.componentSizeHist)} (총 ${r.mn6.v2.componentCount} 개 · 최대 ${r.mn6.v2.componentMaxSize})`,
       );
       console.log(
         `[MN-6 install] ${JSON.stringify({ v1: r.mn6.v1Install, v2: r.mn6.v2Install, v3: r.mn6.v3Install, mn: r.mn6.mnInstall })}`,
