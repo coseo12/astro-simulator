@@ -1,0 +1,44 @@
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== 측정 ===
+{
+  "on": {
+    "diskR": 98.32,
+    "subSolarLonDeg": 0,
+    "domain": 8255,
+    "screenLandPct": 51.21,
+    "maskLandPct": 50.62,
+    "excludedPolar": 0,
+    "excludedNight": 13698,
+    "iou": 0.936,
+    "consoleErrors": []
+  },
+  "forcedOff": {
+    "diskR": 98.32,
+    "subSolarLonDeg": 0,
+    "domain": 8255,
+    "screenLandPct": 30.2,
+    "maskLandPct": 50.62,
+    "excludedPolar": 0,
+    "excludedNight": 13698,
+    "iou": 0.3072,
+    "consoleErrors": [],
+    "patchedMaterials": 2
+  },
+  "surfaceOff": {
+    "diskR": 98.32,
+    "subSolarLonDeg": 0,
+    "domain": 8255,
+    "screenLandPct": 0,
+    "maskLandPct": 50.62,
+    "excludedPolar": 0,
+    "excludedNight": 13698,
+    "iou": 0,
+    "consoleErrors": []
+  }
+}
+
+=== 판정 (§A4.5) ===
+DoD 1 대륙 형상 IoU: ON 0.936 (≥ 0.8) / 마스크고착 0.3072 / surface=off 0 · 낙차 0.9360 (요구 ≥ 0.2) · console err ON 0 / surface=off 0 (== 0) → PASS
+DoD 2 negative (uMaskEnabled 0 고착 주입 → DoD 1 FAIL): 머티리얼 2개 패치, IoU 0.3072 < 0.8 · console err 0 (== 0) → PASS
+exit=0

@@ -1,0 +1,32 @@
+{
+  "variant": "a",
+  "pages": {
+    "P4": {
+      "settle": {
+        "dist": "7/6/19",
+        "fading": 0,
+        "waitedMs": 812,
+        "timedOut": false
+      },
+      "errors": 0,
+      "canvas": 1
+    },
+    "P3b": {
+      "settle": {
+        "dist": "7/6/19",
+        "fading": 0,
+        "waitedMs": 811,
+        "timedOut": false
+      },
+      "errors": 0,
+      "canvas": 1,
+      "hostS": 0.9
+    }
+  },
+  "fullFrame": {
+    "hostOff_ne_P4": 0,
+    "M6c_ne_M6b": 0,
+    "M6c_ne_orig": 1662,
+    "restored_ne_orig": 0
+  }
+}

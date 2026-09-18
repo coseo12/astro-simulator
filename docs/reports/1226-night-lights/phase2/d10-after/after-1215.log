@@ -1,0 +1,29 @@
+=== #1215 구름 레이어 — 진단 (MODE=dod INJECT=none) ===
+위상각 90deg · OFF 페이지 구름 mesh false
+main (ON↔OFF): {"dayInner":{"n":7225,"c1":0.034201,"lumOff":0.76919,"changed":3330,"n2":4225,"satExcluded":3000,"clearRatio":0.55598},"nightInner":{"n":7225,"c1":0.02294,"lumOff":0.05156,"changed":3497,"n2":7225,"satExcluded":0,"clearRatio":0.51599},"disk":{"n":30768,"c1":0.032589,"lumOff":0.40234,"changed":13893,"n2":21720,"satExcluded":9048,"clearRatio":0.55631},"outsideChanged":469}
+mid 정착: {"dayInner":{"n":7225,"c1":0.034293,"lumOff":0.76944,"changed":3329,"n2":4202,"satExcluded":3023,"clearRatio":0.55426},"nightInner":{"n":7225,"c1":0.022936,"lumOff":0.05173,"changed":3497,"n2":7225,"satExcluded":0,"clearRatio":0.51599},"disk":{"n":30768,"c1":0.032814,"lumOff":0.39958,"changed":13889,"n2":21813,"satExcluded":8955,"clearRatio":0.55834},"outsideChanged":468}
+fade 정지: {"dayInner":{"n":7225,"c1":0.034293,"lumOff":0.76944,"changed":3329,"n2":4202,"satExcluded":3023,"clearRatio":0.55426},"nightInner":{"n":7225,"c1":0.022936,"lumOff":0.05173,"changed":3497,"n2":7225,"satExcluded":0,"clearRatio":0.51599},"disk":{"n":30768,"c1":0.032569,"lumOff":0.40356,"changed":13873,"n2":21659,"satExcluded":9109,"clearRatio":0.55658},"outsideChanged":469}
+low 정착: {"dayInner":{"n":7225,"c1":0,"lumOff":0.03559,"changed":0,"n2":7225,"satExcluded":0,"clearRatio":1},"nightInner":{"n":7225,"c1":0,"lumOff":0.03559,"changed":0,"n2":7225,"satExcluded":0,"clearRatio":1},"disk":{"n":30768,"c1":0,"lumOff":0.03588,"changed":0,"n2":30756,"satExcluded":12,"clearRatio":1},"outsideChanged":0}
+C8 rotate=off 2회 로드: {"dayInner":{"n":7225,"c1":0,"lumOff":0.80339,"changed":0,"n2":4206,"satExcluded":3019,"clearRatio":1},"nightInner":{"n":7225,"c1":0,"lumOff":0.0745,"changed":0,"n2":7225,"satExcluded":0,"clearRatio":1},"disk":{"n":30768,"c1":0,"lumOff":0.43477,"changed":0,"n2":21643,"satExcluded":9125,"clearRatio":1},"outsideChanged":22745}
+C7 rotate ON 2회 로드: {"dayInner":{"n":6407,"c1":0,"lumOff":0.90962,"changed":0,"n2":350,"satExcluded":6057,"clearRatio":1},"nightInner":{"n":6407,"c1":0,"lumOff":0.10903,"changed":0,"n2":6407,"satExcluded":0,"clearRatio":1},"disk":{"n":27256,"c1":0,"lumOff":0.33372,"changed":0,"n2":19596,"satExcluded":7660,"clearRatio":1},"outsideChanged":22745}
+queue ON {"names":["earth-cloud"]} · OFF {"names":[]} · fade ON {"names":["earth","earth-cloud","earth-lod-mid"]}
+quat C8 jd0 [0,0,0,1] jd1 [0,0,0,1] · C7 jd0 [0,0.7152234632788377,0,-0.6988958417213721] jd1 [0,0.6662825401274255,0,-0.7456993876364293]
+low cloud.isVisible false
+settles ["on/boot:9/6/17/0/ok","on/mid:0/32/0/0/ok","on/low:0/1/31/0/ok","off/boot:9/6/17/0/ok","off/mid:0/32/0/0/ok","off/low:0/1/31/0/ok","on2/boot:9/6/17/0/ok","rotA/boot:6/8/18/0/ok","rotB/boot:6/8/18/0/ok"]
+consoleErrors {"on":[],"off":[],"on2":[],"rotA":[],"rotB":[]}
+
+=== 게이트 ===
+  PASS  C1 낮면 내부 평균 |ΔL| = 0.034201  (>= 0.0114)
+  PASS  C2 맑은 하늘 비율 (포화 제외) = 0.555980  (>= 0.1853)
+  PASS  C3 투명 큐 ON − OFF = 1 ["earth-cloud"]  (== 1 ∧ earth-cloud ∈ ON)
+  PASS  C4 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)
+  PASS  C5a mid 정착 쌍 C1 량 = 0.034293  (>= 0.0114)
+  PASS  C5b fade 정지 쌍 C1 량 = 0.034293  (>= mid ÷ 3 = 0.011431 ∧ C5a PASS)
+  PASS  C6 low: cloud.isVisible · disk 변화 px = false · 0  (false ∧ == 0 ∧ C1 PASS)
+  PASS  C7a rotate ON 독립 2회 로드 disk 변화 px = 0.000000  (== 0)
+  PASS  C7b 구름 상대각 차 (Δjd=1) = 0.135463  (== 0.13546275346547118 (±1e-9) ∧ 축 Y)
+  PASS  C8a rotate=off JD 2점 identity = [0,0,0,1] · [0,0,0,1]  (identity ×2)
+  PASS  C8b rotate=off 독립 2회 로드 disk 변화 px = 0.000000  (== 0)
+
+[PASS] 게이트 11종 전건 충족
+exit=0

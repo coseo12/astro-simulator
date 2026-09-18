@@ -1,0 +1,374 @@
+
+> @astro-simulator/core@ test /Users/seo/project/space/packages/core
+> vitest run
+
+
+ RUN  v4.1.10 /Users/seo/project/space/packages/core
+
+ ❯ src/scene/procedural-planet-night-lights.test.ts (21 tests | 1 failed) 13ms
+     × 박제 형태 — nightFactor · 게이트 (γ) · 분포 · 군집 게이트 · lights · 합성 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/scene/procedural-planet-night-lights.test.ts > #1226 N3 — GLSL 배치 (§A11.3) > 박제 형태 — nightFactor · 게이트 (γ) · 분포 · 군집 게이트 · lights · 합성
+AssertionError: expected '\nprecision highp float;\n\nvarying v…' to contain 'float lightGate = landMask * (1.0 - i…'
+
+- Expected
++ Received
+
+- float lightGate = landMask * (1.0 - iceMask) * uMaskEnabled
++
++ precision highp float;
++
++ varying vec3 vLocalPos;
++ varying vec3 vNormal;
++ varying vec3 vWorldPos;
++ varying float vFragmentDepth;
++
++ uniform vec3 baseColor;
++ uniform int uSurfaceType;
++ uniform float rockyContrast;
++ uniform float desertDetail;
++ uniform float desertRustTint;
++ uniform float gasBandAmplitude;
++ uniform float gasBandCount;
++ uniform float gasTurbulence;
++ uniform float craterDepth;
++ uniform float craterDensity;
++ uniform float logDepthConstant;
++
++
++
++
++
++
++
++
++ uniform vec3 uSunDirection;
++ uniform float sunIntensity;
++ uniform vec3 sunDiffuse;
++ uniform float ambientIntensity;
++ uniform vec3 ambientGround;
++ uniform vec3 ambientSky;
++ uniform vec3 ambientUp;
++ uniform float softTerminatorWidth;
++
++
++
++
++
++ uniform vec3 landColor;
++ uniform float landThresholdLo;
++ uniform float landThresholdHi;
++
++
++
++
++
++
++
++ uniform vec3 biomeTropicalColor;
++ uniform vec3 biomeTundraColor;
++ uniform vec3 iceColor;
++ uniform float biomeTemperateLo;
++ uniform float biomeTemperateHi;
++ uniform float biomeTundraLo;
++ uniform float biomeTundraHi;
++ uniform float iceLatLo;
++ uniform float iceLatHi;
++ uniform float biomeLatJitter;
++
++
++
++
++
++
++
++
++ uniform sampler2D uSurfaceMask;
++ uniform float uMaskEnabled;
++ uniform float maskWarpAmp;
++
++
++
++
++
++ uniform vec3 deepOceanFactor;
++ uniform float oceanDepthEdgeHi;
++ uniform float oceanDepthRange;
++
++
++
++
++
++
++
++
++
++ uniform vec3 cameraPosition;
++ uniform vec3 rimColor;
++ uniform float rimStrength;
++ uniform float rimFalloff;
++ uniform float rimNdlLo;
++ uniform float rimNdlHi;
++
++
++
++
++
++
++
++
++
++ uniform float nightLightStrength;
++ uniform vec3 nightLightColor;
++ uniform float nightLightTwilightWidth;
++ uniform float nightLightFrequency;
++ uniform float nightLightLo;
++ uniform float nightLightHi;
++ uniform float nightLightClusterMix;
++ uniform float nightLightClusterLo;
++ uniform float nightLightClusterHi;
++
++
++ const float INV_TWO_PI = 0.1591549430918953;
++ const float INV_PI = 0.3183098861837907;
++
++
++ vec3 hash33(vec3 p) {
++   p = fract(p * vec3(0.1031, 0.1030, 0.0973));
++   p += dot(p, p.yxz + 33.33);
++   return fract((p.xxy + p.yxx) * p.zyx);
++ }
++
++ float hash13(vec3 p) {
++   return hash33(p).x;
++ }
++
++
++ float valueNoise(vec3 p) {
++   vec3 i = floor(p);
++   vec3 f = fract(p);
++   vec3 u = f * f * (3.0 - 2.0 * f);
++   return mix(
++     mix(
++       mix(hash13(i + vec3(0.0, 0.0, 0.0)), hash13(i + vec3(1.0, 0.0, 0.0)), u.x),
++       mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), u.x),
++       u.y
++     ),
++     mix(
++       mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), u.x),
++       mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), u.x),
++       u.y
++     ),
++     u.z
++   );
++ }
++
++
++ float fbm(vec3 p) {
++   return 0.55 * valueNoise(p) + 0.30 * valueNoise(p * 2.3) + 0.15 * valueNoise(p * 4.7);
++ }
++
++ void main(void) {
++   vec3 p = normalize(vLocalPos);
++   
++   
++   
++   vec3 N = normalize(vNormal);
++
++   
++   
++   
++   float hemiFactor = dot(N, ambientUp) * 0.5 + 0.5;
++   vec3 ambientShade = ambientIntensity * mix(ambientGround, ambientSky, hemiFactor);
++   
++   
++   
++   float ndl = dot(N, uSunDirection);
++   float sunFactor = smoothstep(0.0, softTerminatorWidth, ndl);
++   vec3 sunShade = sunIntensity * sunDiffuse * sunFactor;
++   
++   vec3 shade = ambientShade + sunShade;
++   vec3 col = baseColor;
++   
++   
++   float rim = 0.0;
++   
++   
++   float lights = 0.0;
++
++   
++   
++   
++   
++   float continents = 0.0;
++   if (uSurfaceType == 0) {
++     continents = fbm(p * 2.4);
++   }
++   
++   
++   float maskWarp = (continents - 0.5) * maskWarpAmp;
++   
++   
++   
++   
++   
++   
++   
++   
++   
++   
++   
++   float maskU = atan(p.z, p.x) * INV_TWO_PI + 0.5 + maskWarp * 0.5;
++   float maskV = clamp(acos(clamp(p.y, -1.0, 1.0)) * INV_PI - maskWarp, 0.001, 0.999);
++   
++   
++   float maskLand = texture2D(uSurfaceMask, vec2(maskU, maskV)).r;
++
++   
++   if (uSurfaceType == 0) {
++     
++     
++     
++     
++     
++     float proceduralMask = smoothstep(landThresholdLo, landThresholdHi, continents);
++     float landMask = mix(proceduralMask, maskLand, uMaskEnabled);
++     
++     float latRaw = abs(p.y);                                        
++     float latJ = latRaw + (continents - 0.5) * biomeLatJitter;      
++     
++     vec3 landCol = mix(biomeTropicalColor, landColor, smoothstep(biomeTemperateLo, biomeTemperateHi, latJ));
++     landCol = mix(landCol, biomeTundraColor, smoothstep(biomeTundraLo, biomeTundraHi, latJ));
++     
++     
++     
++     
++     
++     
++     float depthEdgeHi = mix(landThresholdLo, oceanDepthEdgeHi, uMaskEnabled);
++     
++     
++     float oceanDepth = 1.0 - smoothstep(depthEdgeHi - oceanDepthRange, depthEdgeHi, continents);
++     
++     
++     
++     oceanDepth *= 1.0 - landMask;
++     
++     
++     vec3 oceanCol = baseColor * mix(vec3(1.0), deepOceanFactor, oceanDepth);
++     col = mix(oceanCol, landCol, landMask);                        
++     
++     
++     float iceMask = smoothstep(iceLatLo, iceLatHi, latJ);
++     col = mix(col, iceColor, iceMask);
++     
++     
++     
++     
++     float nightFactor = 1.0 - smoothstep(-nightLightTwilightWidth, 0.0, ndl);
++     
++     
++     float lightGate = landMask * uMaskEnabled; 
++     
++     
++     float lightDensity = smoothstep(nightLightLo, nightLightHi, valueNoise(p * nightLightFrequency));
++     
++     lightDensity *= mix(1.0, continents, nightLightClusterMix);
++     
++     
++     lightDensity *= smoothstep(nightLightClusterLo, nightLightClusterHi, continents);
++     lights = nightLightStrength * nightFactor * lightGate * lightDensity;
++     
++     
++     
++     
++     vec3 viewDir = normalize(cameraPosition - vWorldPos);
++     float rimGeom = 1.0 - clamp(dot(N, viewDir), 0.0, 1.0);
++     
++     float rimFall = pow(rimGeom, rimFalloff);
++     
++     
++     
++     float rimLight = smoothstep(rimNdlLo, rimNdlHi, ndl);
++     rim = rimStrength * rimFall * rimLight;
++   } else if (uSurfaceType == 1) {
++     
++     float detail = fbm(p * 3.6);
++     float mod_ = (detail - 0.5) * 2.0 * desertDetail;
++     col = baseColor * (1.0 + mod_);
++     
++     col.r = clamp(col.r + desertRustTint, 0.0, 1.0);
++     col.b = clamp(col.b - desertRustTint * 0.5, 0.0, 1.0);
++   } else if (uSurfaceType == 2) {
++     
++     
++     
++     float latitude = p.y;
++     
++     float turb = (fbm(p * 4.0) - 0.5) * 2.0 * gasTurbulence;
++     float bands = sin((latitude + turb) * gasBandCount * 3.14159265);
++     float mod_ = bands * gasBandAmplitude;
++     col = baseColor * (1.0 + mod_);
++   } else if (uSurfaceType == 3) {
++     
++     vec3 scaled = p * craterDensity;
++     vec3 cell = floor(scaled);
++     vec3 frac = fract(scaled);
++     vec3 rnd = hash33(cell);
++     
++     vec3 craterPos = rnd;
++     float dist = length(frac - craterPos);
++     
++     float craterSize = 0.18 + rnd.x * 0.22;
++     float crater = (1.0 - smoothstep(0.0, craterSize, dist)) * step(0.35, rnd.x);
++     
++     float terrain = (fbm(p * 5.0) - 0.5) * 2.0 * 0.15;
++     col = baseColor * (1.0 + terrain) * (1.0 - crater * craterDepth);
++   }
++   
++
++   
++   
++   col *= shade;
++   
++   
++   
++   
++   col += rimColor * rim;
++   
++   
++   col += nightLightColor * lights;
++   
++   
++   
++   col = clamp(col, 0.0, 1.0);
++
++   gl_FragColor = vec4(col, 1.0);
++
++   
++   gl_FragDepth = log2(max(vFragmentDepth, 1e-6)) * logDepthConstant * 0.5;
++ }
++
+
+ ❯ src/scene/procedural-planet-night-lights.test.ts:98:18
+     96|       'float nightFactor = 1.0 - smoothstep(-nightLightTwilightWidth, …
+     97|     );
+     98|     expect(CODE).toContain('float lightGate = landMask * (1.0 - iceMas…
+       |                  ^
+     99|     expect(CODE).toContain(
+    100|       'float lightDensity = smoothstep(nightLightLo, nightLightHi, val…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 60 passed (61)
+      Tests  1 failed | 1129 passed (1130)
+   Start at  16:00:50
+   Duration  5.90s (transform 2.20s, setup 0ms, import 36.14s, tests 5.58s, environment 4ms)
+
+/Users/seo/project/space/packages/core:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @astro-simulator/core@ test: `vitest run`
+Exit status 1
+exit=1

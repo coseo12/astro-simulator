@@ -1,0 +1,43 @@
+Scope: 4 of 5 workspace projects
+packages/physics-wasm test$ pnpm prebuild-test && vitest run
+packages/shared test$ vitest run
+packages/physics-wasm test: > @astro-simulator/physics-wasm@0.18.0 prebuild-test /Users/seo/project/space/packages/physics-wasm
+packages/physics-wasm test: > pnpm build:node
+packages/shared test:  RUN  v4.1.10 /Users/seo/project/space/packages/shared
+packages/physics-wasm test: > @astro-simulator/physics-wasm@0.18.0 build:node /Users/seo/project/space/packages/physics-wasm
+packages/physics-wasm test: > wasm-pack build --target nodejs --out-dir pkg
+packages/shared test:  Test Files  1 passed (1)
+packages/shared test:       Tests  4 passed (4)
+packages/shared test:    Start at  14:55:06
+packages/shared test:    Duration  134ms (transform 18ms, setup 0ms, import 27ms, tests 4ms, environment 0ms)
+packages/shared test: Done
+packages/physics-wasm test: [INFO]: 🎯  Checking for the Wasm target...
+packages/physics-wasm test: [INFO]: 🌀  Compiling to Wasm...
+packages/physics-wasm test:     Finished `release` profile [optimized] target(s) in 0.02s
+packages/physics-wasm test: [INFO]: ⬇️  Installing wasm-bindgen...
+packages/physics-wasm test: [INFO]: Optimizing wasm binaries with `wasm-opt`...
+packages/physics-wasm test: [INFO]: Optional field missing from Cargo.toml: 'repository'. This is not necessary, but recommended
+packages/physics-wasm test: [INFO]: License key is set in Cargo.toml but no LICENSE file(s) were found; Please add the LICENSE file(s) to your project directory
+packages/physics-wasm test: [INFO]: ✨   Done in 0.49s
+packages/physics-wasm test: [INFO]: 📦   Your wasm pkg is ready to publish at /Users/seo/project/space/packages/physics-wasm/pkg.
+packages/physics-wasm test:  RUN  v4.1.10 /Users/seo/project/space/packages/physics-wasm
+packages/physics-wasm test:  Test Files  1 passed (1)
+packages/physics-wasm test:       Tests  11 passed (11)
+packages/physics-wasm test:    Start at  14:55:07
+packages/physics-wasm test:    Duration  128ms (transform 26ms, setup 0ms, import 36ms, tests 5ms, environment 0ms)
+packages/physics-wasm test: Done
+packages/core test$ vitest run
+packages/core test:  RUN  v4.1.10 /Users/seo/project/space/packages/core
+packages/core test:  Test Files  61 passed (61)
+packages/core test:       Tests  1130 passed (1130)
+packages/core test:    Start at  14:55:08
+packages/core test:    Duration  7.39s (transform 2.61s, setup 0ms, import 45.54s, tests 7.66s, environment 8ms)
+packages/core test: Done
+apps/web test$ vitest run
+apps/web test:  RUN  v4.1.10 /Users/seo/project/space/apps/web
+apps/web test:  Test Files  48 passed (48)
+apps/web test:       Tests  567 passed (567)
+apps/web test:    Start at  14:55:15
+apps/web test:    Duration  8.41s (transform 4.73s, setup 8.34s, import 21.15s, tests 3.57s, environment 30.91s)
+apps/web test: Done
+exit=0

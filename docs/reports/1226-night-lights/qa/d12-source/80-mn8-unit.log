@@ -1,0 +1,11 @@
+--- core ---
+ Test Files  61 passed (61)
+      Tests  1130 passed (1130)
+--- web (parse-night-lights) ---
+     × "off" → false 4ms
+     × 대소문자 무시 — "OFF" → false 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/parse-night-lights-mode.test.ts > parseNightLightsVisible — 기본 ON + ?nightlights=off 옵트아웃 (ADR §A11.6) > "off" → false
+ FAIL  src/core/parse-night-lights-mode.test.ts > parseNightLightsVisible — 기본 ON + ?nightlights=off 옵트아웃 (ADR §A11.6) > 대소문자 무시 — "OFF" → false
+ Test Files  1 failed | 47 passed (48)
+      Tests  2 failed | 565 passed (567)

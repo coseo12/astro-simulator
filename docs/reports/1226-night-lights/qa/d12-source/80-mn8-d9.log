@@ -1,0 +1,20 @@
+=== #1226 야간 도시 불빛 — 진단 (MODE=d9 INJECT=none) ===
+쌍 × 전제 적용표 (전제 1 · 4 · 6 은 전 쌍):
+  main | D2 D3 D4 D5 | NI · DI · NI_land · NI_sea | P2 | P2 | — | 
+  cloud | D6 | NI_land | P4 | P4 | NI_land P4≠P2 | 
+  mid | D7(1) | NI | P2 (mid) | P2 (mid) | — | 
+  low | D7(2) | NI | — (재조정 — 대역이 씬 배경) | — (billboard 에 uniform 없음) | — | 지구가 그려졌는지 보증 안 함
+  d8Off | D8 | NI | P1b | — (두 페이지 모두 불빛 ON) | — | 
+  d8On | D8 | NI | R1 | — (두 페이지 모두 불빛 ON) | — | 
+  p2Restore | (주입 원복 확인) | — | — | — | — | full frame 0 px 아니면 측정 오류
+  d9 a/b/c | D9 | — | feature 페이지 (b 는 surface off 라 적용) | a · c feature 페이지 | positive 쌍 변화 > 0 | MODE=d9
+d9-a: {"fullChanged":987,"outsideChanged":10,"disk":{"n":30768,"meanContrib":0.004584,"changed":977,"lumA":0.433037,"lumB":0.428453},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.76961,"lumB":0.76961},"strengthsFeature":[0.9]}
+d9-b: {"fullChanged":0,"outsideChanged":0,"disk":{"n":30768,"meanContrib":0,"changed":0,"lumA":0.272577,"lumB":0.272577},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.477764,"lumB":0.477764},"strengthsFeature":[]}
+d9-c: {"fullChanged":1006,"outsideChanged":11,"disk":{"n":30768,"meanContrib":0.006752,"changed":995,"lumA":0.399697,"lumB":0.392945},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.715749,"lumB":0.715749},"strengthsFeature":[0.9]}
+d9-positive: {"fullChanged":987,"outsideChanged":10,"disk":{"n":30768,"meanContrib":0.004584,"changed":977,"lumA":0.433037,"lumB":0.428453},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.76961,"lumB":0.76961},"strengthsFeature":[0.9]}
+consoleErrors {"d9-a-feature":[],"d9-a-tip":[],"d9-b-feature":[],"d9-b-tip":[],"d9-c-feature":[],"d9-c-tip":[],"d9-positive-feature":[],"d9-positive-tip":[]}
+
+[측정 불가] 유효성 전제 미충족 — PASS 도 FAIL 도 내지 않는다:
+  - (5) [d9-a] feature OFF 페이지 nightLightStrength [0.9]
+  - (5) [d9-c] feature OFF 페이지 nightLightStrength [0.9]
+exit=2

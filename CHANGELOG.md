@@ -5,6 +5,14 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1226] 지구 야간 도시 불빛** ([#1226](https://github.com/coseo12/astro-simulator/issues/1226)) — 표면 셰이더에 불빛 항을 혼입한다 (ADR [`20260628-756`](docs/decisions/20260628-756-procedural-planet-surface.md) Amendment 11). 별도 mesh·레이어를 만들지 않고 같은 프로그램 안에서 합성하므로 `?nightlights=off` 는 **정확한 no-op** 이다 (§A11.3).
+
+  - 파라미터 (D1 사용자 승인 `g1`, 3라운드 육안 확인 후 확정) — value noise 군집 `K 48` · `lo/hi 0.55 / 0.72` · 대륙 변조 `0.5` · **군집 게이트 `smoothstep(0.52, 0.60, continents)`** · 색 `(1.0, 0.72, 0.38)` · 세기 `0.9` · 황혼 폭 `0.12`. 군집 게이트는 기존 `continents = fbm(p × 2.4)` 를 **임계로** 재사용해 추가 hash `0` 이다 — 불빛이 대륙 규모로 몰려 도시처럼 보인다. ⚠️ 몰리는 위치는 절차 노이즈가 정하며 **실제 인구 밀집지와 무관**하다.
+  - 게이트 `landMask × (1 − iceMask) × uMaskEnabled` (§A11.4) — 바다·극관·원거리(마스크 비활성)에서 불빛이 `0` 이다.
+  - 신규 가드 `verify:1226-night-lights` — 같은 결정적 프레임을 네 페이지(구름 ON/OFF × 불빛 ON/OFF)에서 찍어 **차분으로** D2~D8 · D11 을 판정한다 (기본 모드 게이트 10종). CI `shader-pixel-guard` 에 기본 모드로 배선했다. D9 (develop tip 과의 full frame 동일성) 는 두 번째 서버가 필요해 `MODE=d9` 로 분리했고 **PR 시점 1회 의무**다. 임계는 전부 D1 승인값 baseline ÷ 3 이고 `MODE=profile` **5회가 판정량 전 항목에서 동일**했다 (산포 `0`).
+
 ### Fixed
 
 - **[#1228] mid LOD variant 에서 지구 대륙 마스크가 항상 꺼져 있었다** ([#1228](https://github.com/coseo12/astro-simulator/issues/1228)) — #1157 (PR [#1165](https://github.com/coseo12/astro-simulator/pull/1165)) 이 마스크 LOD 판정 반경을 회전 불변 `resolveMeshVisualRadius` 로 바꿨는데, 그 함수는 **local** `scaling` 만 곱한다. `earth-lod-mid` 는 host 의 자식이라 자신의 `scaling` 이 `1` 이고 tier scaling 은 부모에만 있어, mid 의 판정 반경이 `1 / tier scaling` 로 작아졌다. [실측] 수정 전 · 로컬 SWIFTSHADER 1280×720 · `?focus=earth&rotate=off` · `setLodOverride('mid')` 정착: host `98.32 px` / mid `5.363 px` (임계 `16`), mid 머티리얼 onBind 75회 전건 `uMaskEnabled = 0`. 실 Chrome (WebGPU) free-fly 줌아웃에서도 disk `49.84 px` 부터 `18.69 px` 까지 mid 로 그려지는 4 표본 전건이 `uMaskEnabled = 0` 이었다.
@@ -16,7 +24,15 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **지구 밤면 육지에 도시 불빛이 보인다** (#1226). 바다·극관·낮면은 불변이고, 낮/밤 경계에서는 황혼 폭 `0.12` 안에서 서서히 들어온다 (`ndl ≥ 0` 에서는 정확히 `0`). 구름이 불빛을 가린다. `?nightlights=off` 로 끄면 불빛 도입 전과 **픽셀 동일**하다 (D9 — full frame 변화 `0 px` 실측, 양성 대조 `987 px`).
 - 지구가 **mid LOD variant 로 그려지고 참 disk 반경이 `16 px` 이상**인 구간 (focus 해제 상태의 중거리, `?lod=mid`) 에서 대륙이 절차 경로 대신 마스크 경로로 그려진다. high variant · 원거리 (`< 16 px`) 판정은 불변이다.
+
+### Notes
+
+- **[#1226] 계약 재조정 1건 — `verify:1226-night-lights` 의 low 정착 쌍에서 「측정 불가」 전제 3 (DI 평균 휘도 `≥ MIN_DAY_LIT_LUM`) 을 제외했다.** [실측] 그 대역의 DI 평균 휘도는 `0.035593` 으로 **씬 배경색** (clear color 8-bit `(8, 9, 13)`) 의 Rec.709 휘도와 같다 — low 대역은 배경이라 전제를 걸면 가드가 **매 실행 `exit 2`** 다. `verify:1215` judge 가 같은 값을 이미 실측하고 같은 처방을 쓴 선례를 채택했다. ⚠️ **한계: low 프레임에 지구가 실제로 그려졌는지는 보증하지 않는다** — 전제 2 (표본 수) 는 기하 계수이고 D2 는 high 프레임 값이다. D7(2) 의 픽셀 항은 「배경 위에 불빛이 그려짐」 만 잡는다. 3위치 박제 — 코드 주석 (`browser-verify-1226-night-lights.mjs` judge) · PR 본문 · 이 항목.
+- **[#1226] MN-5b (극관 억제 제거) 는 픽셀 가드가 아니라 단위 테스트가 잡는 자리로 남긴다** (ADR §A11.18.1). 결함이 바꾸는 `50 px` 전량이 `NI` 판정 대역 밖이고 (`ndv < 0.6` · `r/R ≥ 0.927` · `|lat| ≥ 61.63°`), 축은 가드가 고정한 **카메라 고도 `beta = π/2`** 다 — JD 4대 거점 + 방위각 7종에서 전부 `0`, `beta ≤ 70°` 에서 `25~833 px` 로 열린다. 대안 3종 (`ndv` 하한 인하 · 극관 전용 대역 신설 · 카메라 기울이기) 은 기각 근거를 ADR 에 적었다. 미래 관찰자가 이를 「누락」으로 오인하지 않도록 기록한다.
+- **[#1226] 계약 D12 변이 11종이 전부 실행됐다** — 소스 변이 7종 (MN-1·2·3·4·5·5b·8) 은 qa 가 **독립 재현**했고 게이트 단위 기대와 전건 일치한다 (ADR §A11.20). **MN-2 가 신규 가드의 고유 검출력을 실증한다** — 불빛 강도 uniform 바인딩만 삭제하면 (GLSL 무변경) 단위 테스트는 **`1130/1130` 통과**하는데 가드는 **8 게이트 FAIL** 한다. ⚠️ 부수로 **기존 `verify:773` 이 불빛 과다를 잡는다는 계약 Q3 (i) 가 절반만 성립**함이 드러났다 — 밤면 전면 발광 (MN-3·MN-4) 은 `nightMean 76.1` 로 FAIL 시키지만 **낮면 누출 (MN-1) 은 PASS** 다 (`773` 이 화면 반평면으로 낮/밤을 나누므로 낮면 누출이 밤면 평균을 올리지 않는다). 그 축은 신규 가드 `D3` 의 고유 검출력이고 기존 가드로 대체되지 않는다.
+- **[#1226] `V2` 주입 유효성 전제 술어가 개정 1 에서 교체됐다** (ADR §A11.17.9). 초판 (`NI_land` 범위 · 픽셀당 `≤ 1 LSB`) 은 **MSAA 4x resolve** 때문에 건강판을 `1 px` 로 위배했고 (`antialias:false` 개입으로 기전 확정), `NI_land` 한정이라 밤면 육지 밖 누출을 놓쳤다 (누출 고장 실측 `NI_land 0 px` 대 `disk 442 px`). 확정안은 `O ↔ P1` 을 `disk` 범위에서 두 술어로 보고 **새 임계 `0` 개**다. 이 교체로 **`D6` (구름이 불빛을 가린다) 의 변이 검출력이 처음으로 확인됐다** — MN-6 실발화에서 `R_C4 = 1.000208` FAIL (판별 여유 `482배`).
 
 ## [0.88.1] - 2026-09-13
 

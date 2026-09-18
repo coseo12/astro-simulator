@@ -1,0 +1,10 @@
+[카메라 진단] {"alphaDeg":-90,"betaDeg":72,"upVector":[0,1,0],"earthAxisWorld":[0,18.33333396911621,0],"camDirUnit":[0,0.30901672443674316,-0.9510566040033506],"className":"ArcRotateCamera"}
+[α +0°] NI n 7225 · NI∩land 4095 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 90° · DI 휘도 0.715749
+[α +30°] NI n 15181 · NI∩land 5473 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 119.977° · DI 휘도 0.805402
+[α +60°] NI n 19616 · NI∩land 8727 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 177.857° · DI 휘도 null
+[α +90°] NI n 7225 · NI∩land 1877 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 90° · DI 휘도 0.857489
+[α +120°] NI n 0 · NI∩land 0 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 30.069° · DI 휘도 0.780319
+[α +150°] NI n 19616 · NI∩land 8727 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 177.857° · DI 휘도 null
+[α +180°] NI n 0 · NI∩land 0 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 극축↔카메라 90° · 위상각 2.143° · DI 휘도 0.817703
+[가드 JD (대조)] JD 2451808 · NI n 0 · NI∩land 0 · **NI∩land∩ice 0** (엄격 0) · maxNdv(ice) null · 위상각 2.143° · 극축↔카메라 90° · DI 휘도 0.817703 · settle {"dist":"2/3/27","fading":0,"waitedMs":814,"timedOut":false}
+[errors] []

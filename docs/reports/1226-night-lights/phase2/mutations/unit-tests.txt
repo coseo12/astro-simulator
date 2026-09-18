@@ -1,0 +1,8 @@
+mn1 unit core:       Tests  1 failed | 1129 passed (1130) | web parse:       Tests  8 passed (8)
+mn2 unit core:       Tests  1130 passed (1130) | web parse:       Tests  8 passed (8)
+mn3 unit core:       Tests  1 failed | 1129 passed (1130) | web parse:       Tests  8 passed (8)
+mn4 unit core:       Tests  1 failed | 1129 passed (1130) | web parse:       Tests  8 passed (8)
+mn5 unit core:       Tests  1 failed | 1129 passed (1130) | web parse:       Tests  8 passed (8)
+mn5b unit core:       Tests  1 failed | 1129 passed (1130) | web parse:       Tests  8 passed (8)
+mn8 unit core:       Tests  1130 passed (1130) | web parse:       Tests  2 failed | 6 passed (8)
+restored unit core:       Tests  1130 passed (1130) | web parse:       Tests  8 passed (8)
