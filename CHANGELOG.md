@@ -11,7 +11,7 @@ Semantic Versioning을 따른다.
 
   - 파라미터 (D1 사용자 승인 `g1`, 3라운드 육안 확인 후 확정) — value noise 군집 `K 48` · `lo/hi 0.55 / 0.72` · 대륙 변조 `0.5` · **군집 게이트 `smoothstep(0.52, 0.60, continents)`** · 색 `(1.0, 0.72, 0.38)` · 세기 `0.9` · 황혼 폭 `0.12`. 군집 게이트는 기존 `continents = fbm(p × 2.4)` 를 **임계로** 재사용해 추가 hash `0` 이다 — 불빛이 대륙 규모로 몰려 도시처럼 보인다. ⚠️ 몰리는 위치는 절차 노이즈가 정하며 **실제 인구 밀집지와 무관**하다.
   - 게이트 `landMask × (1 − iceMask) × uMaskEnabled` (§A11.4) — 바다·극관·원거리(마스크 비활성)에서 불빛이 `0` 이다.
-  - 신규 가드 `verify:1226-night-lights` — 같은 결정적 프레임을 네 페이지(구름 ON/OFF × 불빛 ON/OFF)에서 찍어 **차분으로** D2~D9 · D11 을 판정한다. CI `shader-pixel-guard` 에 기본 모드로 배선했다. 임계는 전부 D1 승인값 baseline ÷ 3 이고 `MODE=profile` **5회가 판정량 전 항목에서 동일**했다 (산포 `0`).
+  - 신규 가드 `verify:1226-night-lights` — 같은 결정적 프레임을 네 페이지(구름 ON/OFF × 불빛 ON/OFF)에서 찍어 **차분으로** D2~D8 · D11 을 판정한다 (기본 모드 게이트 10종). CI `shader-pixel-guard` 에 기본 모드로 배선했다. D9 (develop tip 과의 full frame 동일성) 는 두 번째 서버가 필요해 `MODE=d9` 로 분리했고 **PR 시점 1회 의무**다. 임계는 전부 D1 승인값 baseline ÷ 3 이고 `MODE=profile` **5회가 판정량 전 항목에서 동일**했다 (산포 `0`).
 
 ### Fixed
 
