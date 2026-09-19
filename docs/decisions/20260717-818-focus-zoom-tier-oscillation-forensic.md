@@ -234,3 +234,4 @@ cross-validate (agy, `cross_validate.sh architecture`) 로 Q1(원인 진단+pres
 ## 변경 이력
 
 - 2026-07-17: 초안 작성 (developer, #818 구현·검증 동반). architect 스텝 로그 + browser-verify-818 fix 전/후 매트릭스 박제. 상태 Provisional (cross-validate 메인 수행 대기).
+- 2026-09-19: **cross-link 추가 (#1232)** — 본 ADR 이 도입한 `preserveFocusDistance=true` (줌 crossing) 경로의 radius tween 이 **구 tier 단위 시작값** 으로 전환 프레임을 렌더해 줌인 시 카메라가 1 프레임 지구 내부 (`5.2e-6 AU`) → floor clamp (`0.019381 AU`), 줌아웃 시 관성 누적기 미환산으로 정착 `×6.39` 이탈을 만든다는 실측. 결정 교체 (tween 제거 → 즉시 대입 + 관성 누적기 단위 환산) 는 [`20260509-380-zoom-camera-freeze-forensic.md`](20260509-380-zoom-camera-freeze-forensic.md) §Amendment 3 (Provisional) 이 SSoT. 본 ADR 의 §5 결정 (c) 실거리 보존 산식 · (e) 히스테리시스는 **불변**이며, `browser-verify-818-focus-zoom.mjs` 에 earth 왕복 (관성 생존) 시나리오가 추가된다

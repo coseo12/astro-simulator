@@ -1,6 +1,6 @@
 # ADR: #380 줌인 후 카메라 고정 — forensic 정적 조사 + Provisional fix 옵션 비교
 
-- **상태**: **Accepted** (2026-05-11 Amendment — §Amendment 2026-05-11 사용자 D-T2 양상 기반 G8 신규 + Option D+G8a 확정)
+- **상태**: **Accepted** (2026-05-11 Amendment — §Amendment 2026-05-11 사용자 D-T2 양상 기반 G8 신규 + Option D+G8a 확정) / **§Amendment 3 (2026-09-19, [#1232](https://github.com/coseo12/astro-simulator/issues/1232)) 은 Provisional** — cross-validate 결과 통합 전. Concrete Prediction 6 반증 + 줌 crossing 경로 결정 교체
 - **날짜**: 2026-05-09 (initial Provisional) / 2026-05-11 (Amendment Accepted)
 - **결정자**: architect
 - **이슈**: [#380](https://github.com/coseo12/astro-simulator/issues/380) (R3 D-T2 가드 발견 #4)
@@ -419,3 +419,105 @@ pass = signs.size <= 1; // 모든 변화율 같은 부호 (monotonic) — wheel 
 ### Status 유지
 
 **Accepted** (G8a 결정 변경 없음. 측정 방법 정정만)
+
+---
+
+## Amendment 3 — 2026-09-19 — Concrete Prediction 6 반증 + 줌 crossing 경로 결정 교체 (#1232)
+
+- **상태**: **Provisional** — cross-validate 결과 본문 통합 전 (CLAUDE.md §ADR Status 워크플로). 통합 후 `Accepted (cross-validate <YYYY-MM-DD>)` 로 전이
+- **발의**: [#1232](https://github.com/coseo12/astro-simulator/issues/1232) (사용자 D13 육안 보고 2026-09-18 — _「줌인 시 일정 부분에서 화면이 한번 흔들리고 … 다시 아웃하면 줌 거리가 확 멀어져」_). 스프린트 계약: [#1232 코멘트](https://github.com/coseo12/astro-simulator/issues/1232#issuecomment-5741088408) (사용자 승인 2026-09-19)
+- **트리거**: 실측 발견 (본 ADR §Amendment 2026-05-11 이 박제한 사용자 보고와 **같은 문장**이 재발)
+- **변경 분류**: 결정 폐기 (Prediction 6 의 원인 귀속) / 측정 지표 갱신 (Prediction 6 측정량) / 결정 추가 (줌 crossing 경로 radius 즉시 대입 + 관성 누적기 단위 환산)
+- **측정 환경**: `develop` tip `1977c92` · `next dev` + Playwright headless (`?gpu=a&lod=auto&focus=earth`, 1280×720) · 매 **렌더 프레임** 을 `scene.onAfterRenderObservable` 로 기록 (tier / `radius` / `lowerRadiusLimit` / `camera.movement._zoomVelocity` / `engine.getDeltaTime()`). 스크립트는 `scripts/_debug-1232-tmp.mjs` 로 작성·실행 후 삭제 (volt #67 패턴). 후보 판본은 `tier-transition.ts` 를 일시 변형 → `pnpm --filter @astro-simulator/core build` → 판본 마커(`globalThis.__tt1232`) 로 적재 확인 후 측정, 측정 뒤 원복
+
+### A3.1 Concrete Prediction 6 — 반증
+
+라운드 2 가 확정한 Prediction 6 (_「G8a 적용 후 tier 전환 시점 radius 변화율의 부호 일관성 보존 — wheel spike 0회」_) 은 **원인 귀속과 측정량이 둘 다 틀렸다.**
+
+**(1) 원인은 입력 race 가 아니다 [실측].** 경계 직전 `0.095 AU` 에 카메라를 두고 **300 ms 간격 단일 틱**(관성이 거의 소멸한 상태) 으로 경계를 넘겨도 결함이 **같은 모양으로** 나온다 — 6회 (`develop` 3 + tween 을 유지한 (나) 단독 판본 3) 전부 전환 프레임 실거리 `5.210e-6 ~ 5.215e-6 AU`, 다음 프레임 `0.019381 AU` (floor 값이라 6회 동일). 50 ms 연속 틱 조건 (3회) 도 `5.16e-6 ~ 5.19e-6 AU` 로 같은 급이다. G8a 가 막는 입력이 거의 없는 조건에서 재현되므로 G8 (tween ↔ 사용자 입력 race) 는 이 흔들림의 원인이 아니다.
+
+**(2) 실제 기전 — 두 프레임 [실측 + 판독].** 
+
+| 프레임 | 무엇이 일어나는가 | 실측 (earth 줌인, inner→body) |
+| --- | --- | --- |
+| `ci` (전환 프레임) | `setTier` 는 `sim-canvas` 의 `onBeforeRender` 에서 호출된다 — Babylon `Scene.render` 순서상 `animate()` → `camera.update()`(`_checkLimits` 포함) **다음**이다 [판독 — `scene.pure.js` 4470~4515]. 그래서 이 프레임은 mesh `scaling` · `target` 은 새 tier 인데 `radius` 는 **구 tier 값 그대로 렌더**된다 | `r = 19.5` (body 단위) = `5.2e-6 AU` — **카메라가 지구 내부** (지구 시각 반경 `69,308` unit) |
+| `ci+1` | tween 첫 적용값 `radiusOld`(구 tier 단위) → `_checkLimits` 가 가드 A 의 새 `lowerRadiusLimit` 로 끌어올림 | `r == lo == 72,774` = `0.019381 AU` (지구가 화면을 채움) |
+| `ci+2~` | tween 이 `targetRadius` 로 복귀 | `0.022 → 0.059 → 0.085 AU` |
+
+줌아웃 (body→inner) 에서도 **같은 `ci` 프레임** 이 반대 방향으로 발현한다 — body 단위 `r ≈ 4.3e5` 가 inner 스케일에서 렌더되어 실거리가 정착값의 **`2,522` 배** (결함 판본 `develop`) 로 튄다 [실측].
+
+⇒ 근본 원인은 **tween 의 시작값 `radiusOld` 가 구 tier 단위** 라는 것 (그리고 그 값이 한 프레임 그대로 렌더된다는 것) 이다. 줌 crossing 경로 (`preserveFocusDistance=true`) 에서는 `targetRadius = radiusOld × newScale/oldScale` 이 **이미 같은 실거리** 라 tween 이 보간할 대상이 애초에 없다 — `radiusOld` 와 `targetRadius` 는 같은 점의 서로 다른 단위 표기다.
+
+**(3) Prediction 6 의 측정량이 결함을 볼 수 없었다 [판독].** 라운드 2 의 S2 는 **raw `camera.radius`** 5 샘플의 부호 일관성을 쟀다. raw radius 는 전환 전후 **단위가 섞인** 양이라 실거리가 `0.085 → 5.2e-6 → 0.019 → 0.085 AU` 로 **역행**하는 동안에도 `19.5 → 72,774 → 2.2e5 → 3.2e5` 로 **단조 증가**한다. 게다가 S2 는 focus-entry (T1→T3, `preserveFocusDistance=false`) 경로를 재므로 줌 crossing 경로를 통과하지도 않는다. ⇒ **「PASS」 는 결함 부재가 아니라 측정량의 사각이었다.** tier 경계를 가로지르는 카메라 판정은 **실거리(`radius / renderScale(tier)`)** 로만 해야 한다 (`browser-verify-818-focus-zoom.mjs` 머리말이 이미 박제한 원칙과 같다).
+
+### A3.2 가드 A 의 부작용 — 정밀화
+
+이슈 본문은 _「흔들림을 가드 A 의 즉시 limits 동기가 만든다」_ 고 적었다. 실측은 이를 **부분적으로만** 지지한다:
+
+- 가드 A 가 만드는 것은 **`ci+1` 의 clamp 프레임** (`r == lo`) 이다. clamp 는 Babylon `_checkLimits` 가 `inertialRadiusOffset = 0` 을 호출해 **줌 관성까지 리셋**한다 (`movement.resetZoomVelocity()`) [판독 — `arcRotateCamera.pure.js` `_checkLimits`].
+- 그러나 **`ci` 의 지구 내부 프레임은 가드 A 와 무관**하다 (limits 검사는 이미 끝난 뒤라 적용 자체가 안 된다).
+- 반대로 가드 A 의 floor 는 **오차를 제한하는 쪽** 으로도 작동했다. 전환 창 동안 limits 를 넓히는 안 (아래 후보 3) 을 실측하면 `ci+1` 도 지구 내부 (`1.19e-6 AU`) 로 빠진다.
+
+⇒ 가드 A 의 결정 (tier 진입마다 `lowerRadiusLimit` 양방향 동기) 은 **유지**한다. 부작용은 가드 A 자체가 아니라 「구 단위 radius 가 새 limits 를 만나는」 순간이 존재한다는 데서 나오며, 그 순간을 없애는 것이 본 Amendment 의 결정이다.
+
+### A3.3 Babylon 9 관성 누적기 — `inertialRadiusOffset` 은 누적기가 아니다 [실측 + 판독]
+
+`@babylonjs/core@9.19.0` 에서 휠 줌은 `camera.movement.zoomAccumulatedPixels` 에 쌓이고 매 프레임 `movement._zoomVelocity` (`protected`, scene unit / ms) 로 적분된다. 공개 `inertialRadiusOffset` 은 **호환용 getter** 로, 레거시 필드가 0 이면 `movement.zoomDeltaCurrentFrame`(이번 프레임 변위) 을 돌려주고, setter 는 **0 을 쓸 때만** `resetZoomVelocity()` 를 부른다.
+
+⇒ 직관적 처방 `camera.inertialRadiusOffset *= newScale/oldScale` 은 **누적기를 건드리지 못한다** — 레거시 필드에 새 값을 하나 더 얹을 뿐 `_zoomVelocity` 는 구 단위로 계속 돈다. 실측: 이 처방 판본의 경계 초과 배율 **`×778`** (환산 없음 `×717` 과 같은 급). 조용히 실패하는 API 다.
+
+관성 누적기별 스케일 의존성 판정:
+
+| 누적기 | 단위 | 스케일 의존 | 본 결정 |
+| --- | --- | --- | --- |
+| `movement._zoomVelocity` · `movement.zoomAccumulatedPixels` · 레거시 `_inertialRadiusOffset` | scene unit (/ms) | **의존** | 환산 |
+| `movement._rotationVelocity` · `inertialAlphaOffset` · `inertialBetaOffset` | rad | 무관 | 무변경 |
+| `movement._panVelocity` · `inertialPanningX/Y` | scene unit | **의존** | **범위 밖** — focus 중에는 `panningSensibility = 0` 으로 패닝이 꺼져 있고, free-fly 에서는 `runTierTransition` 이 `camera.target` 자체를 새 단위로 옮기지 않아 (focusMesh 부재 경로) 패닝 관성만 환산해도 정합이 안 된다. 별도 축으로 기록만 한다 |
+
+### A3.4 후보 비교 — 실측
+
+같은 스크립트 · 같은 시나리오 · 판본만 교체. D1 창 = 전환 프레임 `ci` ~ `ci+2`. D2/D3 는 **대조군 비교** (A3.6) — 같은 틱 묶음을 경계 없는 inner 구간에서 쏜 배율 `F_c` 대비 경계를 관통한 배율 `F_x`.
+
+| 판본 | D1 창 실거리 (AU) | clamp | D2 `F_x/F_c` | D3 `ln F_x / ln F_c − 1` | 과도 최대 / 정착 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `develop` (결함) | `5.2e-6` · `0.019381` · `0.0215` | 1 | **`×6.39`** | `+383 %` | **`2,522`** |
+| (나) A 단독 (tween 유지) | `5.2e-6` · `0.019381` · `0.0216` | 1 | `×0.950` | `−10.7 %` | `16,291` |
+| **후보 3** + A (전환 창 limits 확장) | `5.2e-6` · **`1.19e-6`** · `0.0091` | 1 | `×0.946` | `−11.5 %` | `16,291` |
+| **후보 5** + A (tween 시작값 환산) | **`5.2e-6`** · `0.084787` · `0.084925` | 0 | `×0.955` | `−9.4 %` | `16,297` |
+| **후보 4** + A (즉시 대입) | `0.084996` · `0.084797` · `0.084762` | **0** | **`×1.0025`** | **`+0.5 %`** | **`1.000`** |
+
+(D2·D3·과도 열은 틱 8개 · 시작 `0.075 AU` 1회. 후보 4 의 D1 은 12회 측정 — 최소값 `0.084735 ~ 0.084762` AU, clamp 전건 0.)
+
+- **후보 3 기각 (결정적)**: 전환 프레임의 지구 내부 렌더를 못 막고 (`ci` 는 limits 와 무관), limits 를 넓힌 만큼 `ci+1` 도 지구 내부로 떨어진다 (`1.19e-6 AU`) — **#790 암전을 두 프레임으로 늘린다.** cleanup 3경로 복원 책임은 이 결함 앞에서 논점이 되지 않는다.
+- **후보 5 기각 (결정적)**: 애니메이션의 첫 적용은 **다음 프레임의 `animate()`** 라, 시작값을 바꿔도 `ci` 프레임은 여전히 구 단위 radius 로 렌더된다 (`5.2e-6 AU`). 또 시작값 = 끝값인 tween 이 300 ms 동안 radius 를 매 프레임 덮어써 줌 관성을 먹는다 (줌아웃 과도 `16,297` 은 같은 `ci` 프레임).
+- **후보 4 채택**: `setTier` 와 같은 `onBeforeRender` 안에서 `radius` 가 새 단위로 바뀌므로 `ci` 프레임부터 올바른 거리로 렌더되고, floor 아래를 지나가지 않아 clamp 가 없으며, tween 이 radius 를 덮어쓰지 않아 관성이 경계를 넘어 이어진다 (D3 `+0.5 %`).
+
+### A3.5 결정 (Provisional)
+
+1. **(가) 후보 4** — `runTierTransition` 의 `preserveFocusDistance === true` 경로는 tween 을 만들지 않고 `camera.radius = targetRadius` 를 **즉시 대입**한 뒤 cleanup 을 **동기 호출**한다 (`released` 플래그 계약 유지 → `onComplete` 정확히 1회 · `attachControl` · fallback timer 해제 · visibilitychange 해제). `preserveFocusDistance=false` (focus-entry `applyFocusTier` / `clearFocus`) 경로는 **무변경** — V5 재프레이밍 tween 과 G8a 잠금이 그대로다.
+   - G8a 의 위상: tween 경로에서는 유지. 즉시 대입 경로에서는 잠금 창이 **0 ms** 가 된다 — 비동기로 남는 작업이 없어 race 대상이 없다.
+2. **(나) A** — `runTierTransition` 진입 시 (경로 무관, scale 이 바뀌는 모든 전환) 줌 관성 누적기 3종 (`movement._zoomVelocity` / `movement.zoomAccumulatedPixels` / 레거시 `_inertialRadiusOffset`) 을 **`computeTargetRadius` 와 같은 식** 으로 새 tier 단위로 환산한다. 환산 계수의 SSoT 는 `computeTargetRadius` 하나다 — radius 와 관성이 같은 산술로 옮겨져야 실거리 보존이 성립한다.
+   - **두 경로 동시 적용** (계약 결정 1): 줌 crossing (`updateTierByCamera → setTier(_, true)`) 과 focus 진입 (`applyFocusTier → setTier → … → controller.focusOn`) 은 **둘 다 `setTier → runTierTransition` 을 지난다**. renderScale 을 바꾸는 경로는 이 하나뿐이고 `focusOn` 은 scale 을 바꾸지 않으므로 환산 계수가 정의되지 않는다 (= 1). #790 이 경계한 클래스 (한쪽이 다른 쪽의 쓰기를 **되돌림**) 는 `focusOn` 이 관성 누적기에 **쓰지 않는** 한 성립하지 않는다 — 이 부재를 단위 테스트로 고정한다. 실측: 관성이 살아있는 채 body→inner focus 전환 (`earth → mars`) 시 정착 radius / 프레이밍 radius 가 환산 없는 판본 **`×3.95 ~ ×11.2`** (6회 — `develop` 4 + 변이 2) → 환산 판본 `×0.857 ~ ×1.183` (19회. 분모 `boundingSphere.radiusWorld × 5` 가 자전 위상에 따라 흔들리는 것이 잡음원이라 **판정량으로는 쓰지 않는다**)
+3. **가드 A 유지**, Prediction 6 은 아래 A3.6 의 판정량으로 **대체**한다.
+
+### A3.6 Concrete Predictions (8~12)
+
+8. **D1 (줌인 흔들림 제거)**: earth focus 연속 휠 줌인 (50 ms 틱, 경계 통과 감지 시 중단) 에서 전환 프레임 `ci` · `ci+1` 의 실거리 최소 **`≥ 0.08 AU`**, `ci ~ ci+30` 의 `r == lowerRadiusLimit` 프레임 **0회**. 결함 판본 판정량: `5.2e-6 AU` · clamp 1.
+9. **D2 (줌아웃 이탈 제거)**: 「기대 r」 을 **대조군** 으로 정의한다 — body `0.097 AU` 에서 +120 틱 4개 (50 ms) 를 쏜 뒤 3 s 정착까지 실거리의 **최댓값** 을, 같은 틱 묶음을 경계 없는 inner `0.2 AU` 에서 쏜 배율로 예측한 값과 비교: `max_post / (x₀ × F_c) ≤ 1.05`. 결함 판본 판정량: 정착 `×6.39` · 과도 `×2,522`.
+   - ⚠️ 이슈 본문의 「기대 r = `r_pre × newScale/oldScale`」 은 **판정량으로 쓰지 않는다** [실측]: 경계 통과 후 관성이 **옳게** 이어지는 판본 (후보 4 + A) 이 `×1.066` 으로 FAIL 하고, 관성을 tween 이 먹어버리는 판본 (A 단독) 이 `×1.014` 로 PASS 한다 — **틀린 설계를 고르는 측정량**이다.
+10. **D3 (관성 비단절)**: 같은 두 묶음의 로그 배율 비 `|ln F_x / ln F_c − 1| ≤ 0.10`. 후보 4 + A 실측 `−0.02 %` · `+0.20 %`, 관성을 끊는 판본 (계약 결정 1 의 기각안 B — 전환 시 `inertialRadiusOffset = 0`) `−28.8 %` · `−26.3 %` (2회).
+    - ⚠️ 시간창 속도 (`ln 실거리 / s`, 경계 전후 ±0.1~0.7 s) 는 **판정량으로 쓰지 않는다** [실측]: 후보 4 + A 에서도 경계 후가 **`+9 ~ +22 %` 계통적으로 빠르다** (5회). body tier 의 렌더 부하가 커서 Playwright 틱 처리량이 tier 마다 달라지기 때문이다 — 측정하는 것이 줌이 아니라 프레임 부하다.
+11. **변이 판별력 (D5)**: 위 8~10 을 `browser-verify-818-focus-zoom.mjs` 에 earth 왕복으로 넣으면 — 수정판 PASS / `develop` FAIL / 「A 제거」 FAIL (`×717`) / 「공개 `inertialRadiusOffset` 로 환산」 FAIL (`×778`) / 「환산 대신 0 대입」 FAIL (D3 `−26 %`) / 「즉시 대입 제거 (tween 복원)」 FAIL (D1 `5.2e-6 AU`).
+12. **코드 변경 규모**: 제품 코드는 `tier-transition.ts` 1 파일 (환산 헬퍼 1 + 호출 1 + 즉시 대입 분기 1) 이고 `solar-system-scene.ts` · `camera-controller.ts` 의 **로직 diff 는 0 행** (주석만).
+
+### A3.7 재검토 조건
+
+- `@babylonjs/core` 업그레이드로 `movement._zoomVelocity` 가 사라지거나 이름이 바뀌면 — 핀 단위 테스트 (NullEngine 실 `ArcRotateCamera`) 가 fail-fast 한다. 그 시점에 공개 API 로 대체 가능한지 재평가
+- focus-entry 경로 (`preserveFocusDistance=false`) 에도 같은 `ci` 프레임 (구 단위 radius 렌더) 이 존재할 수 있다 [판독 — **미측정**]. 사용자 보고 또는 실측이 생기면 그때 같은 처방의 확장을 판정한다 (본 Amendment 비범위)
+- free-fly tier 전환은 `preserveFocusDistance=true` 로 들어오므로 즉시 대입이 적용된다 [판독]. `verify:629/631/699/704` 가 회귀를 보이면 free-fly 를 tween 경로로 되돌릴지 재판정
+
+### A3.8 교차검증 반영 사항
+
+_(메인 오케스트레이터가 cross-validate 수행 후 4축 — 합의 / 이견 수용 / 기각 / 고유 발견 — 과 호출 전 편향 셀프 체크를 여기에 통합하고 상태를 Accepted 로 전이한다.)_
+
+- **cross-link**: [#1232](https://github.com/coseo12/astro-simulator/issues/1232) · 선행 Amendment 2026-05-11 라운드 1·2 (본 파일) · [`20260717-818-focus-zoom-tier-oscillation-forensic.md`](20260717-818-focus-zoom-tier-oscillation-forensic.md) (`preserveFocusDistance` 도입 — 본 Amendment 가 그 경로의 tween 을 제거) · 코드 SSoT `packages/core/src/scene/tier-transition.ts` `runTierTransition` · `computeTargetRadius`
