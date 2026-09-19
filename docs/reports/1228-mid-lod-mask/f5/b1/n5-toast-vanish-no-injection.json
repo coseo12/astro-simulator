@@ -1,0 +1,80 @@
+[
+  {
+    "hideDom": false,
+    "rep": 1,
+    "appeared": true,
+    "vanished": true,
+    "textRect": [
+      545,
+      594,
+      712,
+      614
+    ],
+    "diffPx": 21941,
+    "diffInDiskProbe": 0,
+    "diffInToastBox": 13432,
+    "diffOutsideToastBox": 8509,
+    "bbox": [
+      12,
+      9,
+      1267,
+      642
+    ]
+  },
+  {
+    "hideDom": false,
+    "rep": 2,
+    "appeared": true,
+    "vanished": true,
+    "textRect": [
+      545,
+      594,
+      712,
+      614
+    ],
+    "diffPx": 43591,
+    "diffInDiskProbe": 0,
+    "diffInToastBox": 13432,
+    "diffOutsideToastBox": 30159,
+    "bbox": [
+      12,
+      9,
+      1267,
+      642
+    ]
+  },
+  {
+    "hideDom": true,
+    "rep": 1,
+    "appeared": true,
+    "vanished": true,
+    "textRect": [
+      545,
+      594,
+      712,
+      614
+    ],
+    "diffPx": 0,
+    "diffInDiskProbe": 0,
+    "diffInToastBox": 0,
+    "diffOutsideToastBox": 0,
+    "bbox": null
+  },
+  {
+    "hideDom": true,
+    "rep": 2,
+    "appeared": true,
+    "vanished": true,
+    "textRect": [
+      545,
+      594,
+      712,
+      614
+    ],
+    "diffPx": 0,
+    "diffInDiskProbe": 0,
+    "diffInToastBox": 0,
+    "diffOutsideToastBox": 0,
+    "bbox": null
+  }
+]

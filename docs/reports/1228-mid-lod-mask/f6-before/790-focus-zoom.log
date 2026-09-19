@@ -1,0 +1,21 @@
+
+=== #790 focus 최대 줌인 mesh 침범/암전 회귀 가드 ===
+  base URL: http://localhost:3000  임계: r/visualR ≥ 1 AND 중앙 lum ≥ 20
+
+[S1] sun focus → 최대 줌인 (침범/암전 판정)
+  focus(tier=solar r=25.30) → max-zoom(tier=solar r=3.07 lower=3.07 visualR=2.92 boundingRW=5.06)
+  기하 r/visualR=1.050 (≥1 요구) → PASS | 픽셀 중앙 lum=231.8 (≥20 요구) → PASS | 콘솔 에러=0
+
+[S2] jupiter focus → 최대 줌인 (침범/암전 판정)
+  focus(tier=inner r=176.66) → max-zoom(tier=body r=243645.28 lower=243645.28 visualR=232043.12 boundingRW=548252.84)
+  기하 r/visualR=1.050 (≥1 요구) → PASS | 픽셀 중앙 lum=35.4 (≥20 요구) → PASS | 콘솔 에러=0
+
+[S3] saturn focus → 최대 줌인 (침범/암전 판정)
+  focus(tier=inner r=158.16) → max-zoom(tier=body r=223703.44 lower=223703.44 visualR=213050.90 boundingRW=547008.92)
+  기하 r/visualR=1.050 (≥1 요구) → PASS | 픽셀 중앙 lum=42.3 (≥20 요구) → PASS | 콘솔 에러=0
+
+=== 최종 요약 ===
+  s1 (sun): PASS
+  s2 (jupiter): PASS
+  s3 (saturn): PASS
+  overall: PASS

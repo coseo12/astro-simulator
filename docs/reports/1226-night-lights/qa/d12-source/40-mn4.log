@@ -1,0 +1,36 @@
+=== #1226 야간 도시 불빛 — 진단 (MODE=dod INJECT=none) ===
+쌍 × 전제 적용표 (전제 1 · 4 · 6 은 전 쌍):
+  main | D2 D3 D4 D5 | NI · DI · NI_land · NI_sea | P2 | P2 | — | 
+  cloud | D6 | NI_land | P4 | P4 | NI_land P4≠P2 | 
+  mid | D7(1) | NI | P2 (mid) | P2 (mid) | — | 
+  low | D7(2) | NI | — (재조정 — 대역이 씬 배경) | — (billboard 에 uniform 없음) | — | 지구가 그려졌는지 보증 안 함
+  d8Off | D8 | NI | P1b | — (두 페이지 모두 불빛 ON) | — | 
+  d8On | D8 | NI | R1 | — (두 페이지 모두 불빛 ON) | — | 
+  p2Restore | (주입 원복 확인) | — | — | — | — | full frame 0 px 아니면 측정 오류
+  d9 a/b/c | D9 | — | feature 페이지 (b 는 surface off 라 적용) | a · c feature 페이지 | positive 쌍 변화 > 0 | MODE=d9
+main (P1↔P2): {"phase":90,"NI":{"n":7225,"meanContrib":0.354185,"changed":4097,"lumA":0.404927,"lumB":0.050742},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.715749,"lumB":0.715749},"NI_land":{"n":4104,"meanContrib":0.623534,"changed":4097,"lumA":0.674615,"lumB":0.051081,"unchangedRatio":0.001706,"saturatedPxA":39,"cloudChanged":2083,"overlap":2080},"NI_sea":{"n":3121,"meanContrib":0,"changed":0,"lumA":0.050296,"lumB":0.050296},"disk":{"n":30768,"meanContrib":0.103531,"changed":5679,"lumA":0.496476,"lumB":0.392945},"fullChanged":5712,"outsideChanged":33}
+cloud (P3↔P4): {"phase":90,"NI":{"n":7225,"meanContrib":0.261355,"changed":4092,"lumA":0.333638,"lumB":0.072283},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.76961,"lumB":0.76961},"NI_land":{"n":4104,"meanContrib":0.460109,"changed":4092,"lumA":0.537269,"lumB":0.07716,"unchangedRatio":0.002924,"saturatedPxA":39,"cloudChanged":0,"overlap":0},"NI_sea":{"n":3121,"meanContrib":0,"changed":0,"lumA":0.065871,"lumB":0.065871},"disk":{"n":30768,"meanContrib":0.076155,"changed":5660,"lumA":0.504608,"lumB":0.428453},"fullChanged":5693,"outsideChanged":33}
+mid: {"phase":90,"NI":{"n":7225,"meanContrib":0.353619,"changed":4102,"lumA":0.404367,"lumB":0.050749},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.715875,"lumB":0.715875},"NI_land":null,"NI_sea":null,"disk":{"n":30768,"meanContrib":0.102453,"changed":5629,"lumA":0.492547,"lumB":0.390094},"fullChanged":5631,"outsideChanged":2}
+low: {"phase":90,"NI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.035593,"lumB":0.035593},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.035593,"lumB":0.035593},"NI_land":null,"NI_sea":null,"disk":{"n":30768,"meanContrib":0,"changed":0,"lumA":0.035878,"lumB":0.035878},"fullChanged":0,"outsideChanged":0}
+d8Off: {"phase":90,"NI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.404927,"lumB":0.404927},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.715749,"lumB":0.715749},"NI_land":null,"NI_sea":null,"disk":{"n":30768,"meanContrib":0,"changed":0,"lumA":0.496476,"lumB":0.496476},"fullChanged":0,"outsideChanged":0}
+d8On: {"phase":90,"NI":{"n":5740,"meanContrib":0,"changed":0,"lumA":0.170696,"lumB":0.170696},"DI":{"n":5740,"meanContrib":0,"changed":0,"lumA":0.83932,"lumB":0.83932},"NI_land":null,"NI_sea":null,"disk":{"n":24344,"meanContrib":0,"changed":0,"lumA":0.36332,"lumB":0.36332},"fullChanged":0,"outsideChanged":0}
+p2Restore fullChanged 0 · gate G↔GA NI changed 605
+strengths {"P1":[0.9],"P2":[0],"P3":[0.9],"P4":[0]} · mid P2 [0,0] · mid P1 uMaskEnabled 1 · WAIT_ADVANCE_MS 0
+[D6 · §A11.17.5 조건 1] R_baseline 0.7379052305086811 · 불빛∩구름 px 2080 · NI_land P4≠P2 2083 · NI_land 채널 포화 px P1 39 · P3 39
+settles ["P1/boot:7/6/19/0/ok","P1/mid:0/32/0/0/ok","P1/low:0/1/31/0/ok","P2/boot:7/6/19/0/ok","P2/mid:0/32/0/0/ok","P2/low:0/1/31/0/ok","P3/boot:7/6/19/0/ok","P4/boot:7/6/19/0/ok","P1b/boot:7/6/19/0/ok","R1/boot:6/7/19/0/ok","R2/boot:6/7/19/0/ok"]
+consoleErrors {"P1":[],"P2":[],"P3":[],"P4":[],"P1b":[],"R1":[],"R2":[]}
+
+=== 게이트 ===
+  PASS  D2 NI 평균 기여 lum(P1) − lum(P2) = 0.354185  (>= 0.00729)
+  PASS  D3 DI 변화 px (P1 ↔ P2) = 0.000000  (== 0 ∧ D2 PASS)
+  FAIL  D4 NI_land 변화 없는 비율 = 0.001706  (>= 0.28013)
+  PASS  D5 NI_sea 변화 px (P1 ↔ P2) = 0.000000  (== 0 ∧ D2 PASS)
+  PASS  D6 R = NI_land (P3 − P4) / (P1 − P2) = 0.737905  (<= 1 − K_OCC = 0.899770 ∧ D2 PASS)
+  PASS  D7(1) mid 정착 쌍 NI 기여 = 0.353619  (>= 0.00729)
+  PASS  D7(2) low 정착 쌍 disk 변화 px = 0.000000  (== 0 ∧ D2 PASS)
+  PASS  D8 rotate=off 독립 2회 로드 NI 변화 px = 0.000000  (== 0 ∧ D2 PASS)
+  PASS  D8 rotate ON 독립 2회 로드 NI 변화 px = 0.000000  (== 0 ∧ D2 PASS)
+  PASS  D11 콘솔 에러 (전 페이지) = 0  (!hasSimErrors)
+
+[FAIL] 게이트 미충족
+exit=1

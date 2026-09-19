@@ -540,6 +540,18 @@ export interface SolarSystemSceneOptions {
    * **같은 코드 경로**다 (`verify:1202` G6 재정의 §A10.10 의 전제).
    */
   clouds?: boolean;
+
+  /**
+   * #1226 — 지구 야간 도시 불빛 (표면 셰이더 혼입, ADR `20260628-756` Amendment 11).
+   *
+   * 기본값 **false** (core 라이브러리 보수 기본 — `clouds` 동형 레이어 분리). **기본 ON 은 web 레이어
+   * 결정** — `parseNightLightsVisible` (apps/web) 기본값이 true 이며 `?nightlights=off` 가 옵트아웃.
+   *
+   * **유효 조건 = `nightLights && surfaceDetail`** (§A11.6) — `surfaceDetail=false` 면 절차 머티리얼이
+   * 없으므로 구조적으로 성립한다. `clouds` 와 **독립**이다 (서로를 읽지 않는다). 비활성이면 같은 셰이더
+   * 프로그램에서 `nightLightStrength = 0` 이라 합성이 정확한 no-op 이다.
+   */
+  nightLights?: boolean;
 }
 
 /**
@@ -571,6 +583,7 @@ export function createSolarSystemScene(
     surfaceMaskBaseUrl,
     selfRotation = false,
     clouds = false,
+    nightLights = false,
   } = options;
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
@@ -638,6 +651,9 @@ export function createSolarSystemScene(
     sunPositionProvider,
     // #1119 Amendment 4 — 마스크 base URL 단방향 주입 (미전달이면 절차 경로 고정).
     surfaceMaskBaseUrl,
+    // #1226 Amendment 11 — 야간 도시 불빛 (유효 조건 `nightLights && surfaceDetail` — 이 묶음은
+    // surfaceDetail=true 일 때만 소비된다). clouds 와 독립.
+    nightLights,
   };
 
   // 각 바디 메쉬 생성 — Phase A: 생성 시점 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).

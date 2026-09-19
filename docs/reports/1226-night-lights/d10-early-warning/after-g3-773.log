@@ -1,0 +1,565 @@
+
+> @astro-simulator/web@ verify:773-light /Users/seo/project/space/apps/web
+> node scripts/browser-verify-773-light.mjs
+
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== DoD 1+2+4+6 — 표면 셰이더 행성 (surface ON, 기본) ===
+  earth    [rocky] contrastMean=4.43 contrastExtreme=21.46 dayMean=138.2 nightMean=31.2 hfEnt(day)=3.48 purple%=0 land/ocean=951/5628 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  mars     [desert] contrastMean=7.59 contrastExtreme=15.16 dayMean=189.1 nightMean=24.9 hfEnt(day)=2.125 purple%=0 land/ocean=12786/0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  jupiter  [gas-bands] contrastMean=4.65 contrastExtreme=10.32 dayMean=183.1 nightMean=39.4 hfEnt(day)=2.091 purple%=0 land/ocean=12855/0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  moon     [cratered] contrastMean=4.57 contrastExtreme=8.25 dayMean=172.2 nightMean=37.7 hfEnt(day)=2.202 purple%=0 land/ocean=70/0 disk=1700/2500 (제외 800) diskRpx=24.58 err=0
+
+=== 단색 행성 (baseline — terminator/대비비 기준) ===
+  venus    contrastMean=4.77 contrastExtreme=9.77 dayMean=202.6 nightMean=42.5 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  mercury  contrastMean=6.66 contrastExtreme=18.44 dayMean=175.8 nightMean=26.4 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  saturn   contrastMean=2.52 contrastExtreme=7.19 dayMean=118.4 nightMean=47 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32 err=0
+  neptune  contrastMean=6.07 contrastExtreme=19.8 dayMean=154.7 nightMean=25.5 purple%=0 disk=27412/39204 (제외 11792) diskRpx=98.32 err=0
+
+=== DoD 5 — ?surface=off 대조 (낮면 hfEntropy ON>OFF) ===
+  earth    [rocky] contrastMean=2.22 dayMean=60.7 nightMean=27.3 hfEnt(day)=0.811 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
+  mars     [desert] contrastMean=4.75 dayMean=105 nightMean=22.1 hfEnt(day)=0.672 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
+  jupiter  [gas-bands] contrastMean=2.94 dayMean=115.4 nightMean=39.2 hfEnt(day)=0.896 purple%=0 disk=27408/39204 (제외 11796) diskRpx=98.32
+  moon     [cratered] contrastMean=2.66 dayMean=101.4 nightMean=38.1 hfEnt(day)=2.499 purple%=0 disk=1700/2500 (제외 800) diskRpx=24.58
+
+=== JSON ===
+{
+  "surfaceOn": {
+    "earth": {
+      "type": "rocky",
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13586,
+        "mean": 138.2,
+        "p90": 248.9,
+        "p10": 12.6
+      },
+      "night": {
+        "n": 13822,
+        "mean": 31.2,
+        "p90": 68,
+        "p10": 11.6
+      },
+      "contrastMean": 4.43,
+      "contrastExtreme": 21.46,
+      "hfEnergy": 17.1687,
+      "hfEntropy": 3.48,
+      "purplePct": 0,
+      "landCount": 951,
+      "oceanCount": 5628,
+      "screenSunDir": {
+        "x": 0.302,
+        "y": 0.953
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "mars": {
+      "type": "desert",
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13795,
+        "mean": 189.1,
+        "p90": 221.3,
+        "p10": 84.7
+      },
+      "night": {
+        "n": 13613,
+        "mean": 24.9,
+        "p90": 33.9,
+        "p10": 14.6
+      },
+      "contrastMean": 7.59,
+      "contrastExtreme": 15.16,
+      "hfEnergy": 2.7161,
+      "hfEntropy": 2.125,
+      "purplePct": 0,
+      "landCount": 12786,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": -1,
+        "y": 0.026
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "jupiter": {
+      "type": "gas-bands",
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13727,
+        "mean": 183.1,
+        "p90": 255,
+        "p10": 29.9
+      },
+      "night": {
+        "n": 13681,
+        "mean": 39.4,
+        "p90": 56.5,
+        "p10": 24.7
+      },
+      "contrastMean": 4.65,
+      "contrastExtreme": 10.32,
+      "hfEnergy": 5.1255,
+      "hfEntropy": 2.091,
+      "purplePct": 0,
+      "landCount": 12855,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": -0.818,
+        "y": 0.575
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "moon": {
+      "type": "cratered",
+      "diskArea": 1700,
+      "windowPx": 2500,
+      "excludedPx": 800,
+      "diskRpx": 24.58,
+      "day": {
+        "n": 821,
+        "mean": 172.2,
+        "p90": 255,
+        "p10": 27.3
+      },
+      "night": {
+        "n": 879,
+        "mean": 37.7,
+        "p90": 45.2,
+        "p10": 30.9
+      },
+      "contrastMean": 4.57,
+      "contrastExtreme": 8.25,
+      "hfEnergy": 51.8193,
+      "hfEntropy": 2.202,
+      "purplePct": 0,
+      "landCount": 70,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": 0.283,
+        "y": 0.959
+      },
+      "screenBox": {
+        "x": 615,
+        "y": 335,
+        "w": 50,
+        "h": 50,
+        "cx": 640,
+        "cy": 360,
+        "r": 24.58
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "surfaceOff": {
+    "earth": {
+      "type": "rocky",
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13591,
+        "mean": 60.7,
+        "p90": 139.9,
+        "p10": 19.7
+      },
+      "night": {
+        "n": 13817,
+        "mean": 27.3,
+        "p90": 31.7,
+        "p10": 22.6
+      },
+      "contrastMean": 2.22,
+      "contrastExtreme": 6.19,
+      "hfEnergy": 0.7909,
+      "hfEntropy": 0.811,
+      "purplePct": 0,
+      "landCount": 0,
+      "oceanCount": 6636,
+      "screenSunDir": {
+        "x": 0.25,
+        "y": 0.968
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "mars": {
+      "type": "desert",
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13795,
+        "mean": 105,
+        "p90": 179.7,
+        "p10": 31.3
+      },
+      "night": {
+        "n": 13613,
+        "mean": 22.1,
+        "p90": 30.2,
+        "p10": 14
+      },
+      "contrastMean": 4.75,
+      "contrastExtreme": 12.84,
+      "hfEnergy": 0.6666,
+      "hfEntropy": 0.672,
+      "purplePct": 0,
+      "landCount": 11640,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": -1,
+        "y": 0.018
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "jupiter": {
+      "type": "gas-bands",
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13727,
+        "mean": 115.4,
+        "p90": 241.3,
+        "p10": 30.2
+      },
+      "night": {
+        "n": 13681,
+        "mean": 39.2,
+        "p90": 49.4,
+        "p10": 27.6
+      },
+      "contrastMean": 2.94,
+      "contrastExtreme": 8.74,
+      "hfEnergy": 0.9029,
+      "hfEntropy": 0.896,
+      "purplePct": 0,
+      "landCount": 17709,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": -0.819,
+        "y": 0.574
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "moon": {
+      "type": "cratered",
+      "diskArea": 1700,
+      "windowPx": 2500,
+      "excludedPx": 800,
+      "diskRpx": 24.58,
+      "day": {
+        "n": 822,
+        "mean": 101.4,
+        "p90": 229.3,
+        "p10": 28
+      },
+      "night": {
+        "n": 878,
+        "mean": 38.1,
+        "p90": 44.9,
+        "p10": 31.3
+      },
+      "contrastMean": 2.66,
+      "contrastExtreme": 7.33,
+      "hfEnergy": 4.3832,
+      "hfEntropy": 2.499,
+      "purplePct": 0,
+      "landCount": 458,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": 0.282,
+        "y": 0.959
+      },
+      "screenBox": {
+        "x": 615,
+        "y": 335,
+        "w": 50,
+        "h": 50,
+        "cx": 640,
+        "cy": 360,
+        "r": 24.58
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "plain": {
+    "venus": {
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13623,
+        "mean": 202.6,
+        "p90": 254.1,
+        "p10": 106.8
+      },
+      "night": {
+        "n": 13785,
+        "mean": 42.5,
+        "p90": 57.9,
+        "p10": 26
+      },
+      "contrastMean": 4.77,
+      "contrastExtreme": 9.77,
+      "hfEnergy": 0.7606,
+      "hfEntropy": 0.784,
+      "purplePct": 0,
+      "landCount": 20213,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": 0.993,
+        "y": -0.12
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "mercury": {
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13786,
+        "mean": 175.8,
+        "p90": 245.3,
+        "p10": 96.8
+      },
+      "night": {
+        "n": 13622,
+        "mean": 26.4,
+        "p90": 56.9,
+        "p10": 13.3
+      },
+      "contrastMean": 6.66,
+      "contrastExtreme": 18.44,
+      "hfEnergy": 0.854,
+      "hfEntropy": 0.909,
+      "purplePct": 0,
+      "landCount": 16206,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": 0.119,
+        "y": -0.993
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "saturn": {
+      "diskArea": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13707,
+        "mean": 118.4,
+        "p90": 245.9,
+        "p10": 34.2
+      },
+      "night": {
+        "n": 13701,
+        "mean": 47,
+        "p90": 57.4,
+        "p10": 34.2
+      },
+      "contrastMean": 2.52,
+      "contrastExtreme": 7.19,
+      "hfEnergy": 0.9787,
+      "hfEntropy": 0.928,
+      "purplePct": 0,
+      "landCount": 22003,
+      "oceanCount": 0,
+      "screenSunDir": {
+        "x": -0.722,
+        "y": 0.691
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "neptune": {
+      "diskArea": 27412,
+      "windowPx": 39204,
+      "excludedPx": 11792,
+      "diskRpx": 98.32,
+      "day": {
+        "n": 13835,
+        "mean": 154.7,
+        "p90": 225.7,
+        "p10": 88.3
+      },
+      "night": {
+        "n": 13577,
+        "mean": 25.5,
+        "p90": 56.6,
+        "p10": 11.4
+      },
+      "contrastMean": 6.07,
+      "contrastExtreme": 19.8,
+      "hfEnergy": 0.8172,
+      "hfEntropy": 0.854,
+      "purplePct": 0,
+      "landCount": 0,
+      "oceanCount": 16480,
+      "screenSunDir": {
+        "x": -0.578,
+        "y": -0.816
+      },
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360.01,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "consoleErrors": {
+    "on-earth": 0,
+    "on-mars": 0,
+    "on-jupiter": 0,
+    "on-moon": 0
+  },
+  "rotWarns": {
+    "on-earth": 0,
+    "on-mars": 0,
+    "on-jupiter": 0,
+    "on-moon": 0
+  }
+}
+
+=== 판정 (#759 — day>night×2 + contrastMean 낙차 ≥10% + purple 0, hfEntropy 축 제외) ===
+  ✓ earth: day 138.2/night 31.2 (×2 초과), contrastMean ON 4.43 / OFF 2.22 (낙차 49.89% ≥ 10%), purple 0%
+  ✓ mars: day 189.1/night 24.9 (×2 초과), contrastMean ON 7.59 / OFF 4.75 (낙차 37.42% ≥ 10%), purple 0%
+  ✓ jupiter: day 183.1/night 39.4 (×2 초과), contrastMean ON 4.65 / OFF 2.94 (낙차 36.77% ≥ 10%), purple 0%
+  ✓ moon: day 172.2/night 37.7 (×2 초과), contrastMean ON 4.57 / OFF 2.66 (낙차 41.79% ≥ 10%), purple 0%
+=== PASS ===
+exit=0

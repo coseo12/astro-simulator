@@ -1,0 +1,659 @@
+{
+ "cases": {
+  "건강 (기준)": {
+   "n": 4104,
+   "litHealthy": 655,
+   "over1LsbPx": 1,
+   "chMaxHist": {
+    "0": 3709,
+    "1": 394,
+    "2": 1
+   },
+   "maxAbsLum": 0.005059,
+   "meanContribOverlay": 0.038509,
+   "meanContribRefP1": 0.038502,
+   "relErrPct": 0.0184,
+   "absRelErrPct": 0.0184,
+   "d2Hist": {
+    "0": 4087,
+    "1": 17
+   },
+   "over1D2Px": 0,
+   "d1Hist": {
+    "0": 3701,
+    "1": 402,
+    "2": 1
+   },
+   "over1D1Px": 1,
+   "affected": 0,
+   "affInRect": 0,
+   "affStat": {
+    "ndl": [
+     null,
+     null
+    ],
+    "ndv": [
+     null,
+     null
+    ],
+    "rOverR": [
+     null,
+     null
+    ]
+   },
+   "affSample": []
+  },
+  "국소 L1′ — 어두운 사각형 전량 kill": {
+   "n": 4104,
+   "litHealthy": 655,
+   "over1LsbPx": 12,
+   "chMaxHist": {
+    "0": 3703,
+    "1": 389,
+    "2": 2,
+    "3": 2,
+    "5": 1,
+    "7": 1,
+    "8": 1,
+    "10": 1,
+    "15": 1,
+    "19": 2,
+    "26": 1
+   },
+   "maxAbsLum": 0.077798,
+   "meanContribOverlay": 0.038423,
+   "meanContribRefP1": 0.038502,
+   "relErrPct": -0.2062,
+   "absRelErrPct": 0.2062,
+   "d2Hist": {
+    "0": 4073,
+    "1": 20,
+    "2": 1,
+    "3": 2,
+    "5": 1,
+    "6": 1,
+    "8": 1,
+    "9": 1,
+    "15": 1,
+    "19": 2,
+    "26": 1
+   },
+   "over1D2Px": 11,
+   "d1Hist": {
+    "0": 3701,
+    "1": 402,
+    "2": 1
+   },
+   "over1D1Px": 1,
+   "affected": 14,
+   "affInRect": 14,
+   "affStat": {
+    "ndl": [
+     -0.5851,
+     -0.5479
+    ],
+    "ndv": [
+     0.7391,
+     0.7724
+    ],
+    "rOverR": [
+     0.6351,
+     0.6736
+    ]
+   },
+   "affSample": [
+    {
+     "x": 699,
+     "y": 379,
+     "ndl": -0.5544,
+     "ndv": 0.7724,
+     "rOverR": 0.6351,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      9,
+      15,
+      6
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      1,
+      1,
+      0
+     ]
+    },
+    {
+     "x": 701,
+     "y": 379,
+     "ndl": -0.5738,
+     "ndv": 0.7562,
+     "rOverR": 0.6543,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      23,
+      25,
+      12
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      15,
+      11,
+      6
+     ]
+    },
+    {
+     "x": 702,
+     "y": 379,
+     "ndl": -0.5835,
+     "ndv": 0.7478,
+     "rOverR": 0.6639,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      9,
+      14,
+      6
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "x": 701,
+     "y": 380,
+     "ndl": -0.5743,
+     "ndv": 0.7535,
+     "rOverR": 0.6574,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      27,
+      28,
+      13
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      19,
+      14,
+      7
+     ]
+    },
+    {
+     "x": 702,
+     "y": 380,
+     "ndl": -0.5841,
+     "ndv": 0.745,
+     "rOverR": 0.667,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      9,
+      15,
+      6
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      1,
+      1,
+      0
+     ]
+    },
+    {
+     "x": 701,
+     "y": 381,
+     "ndl": -0.5748,
+     "ndv": 0.7507,
+     "rOverR": 0.6607,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      34,
+      33,
+      16
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      26,
+      19,
+      10
+     ]
+    },
+    {
+     "x": 702,
+     "y": 381,
+     "ndl": -0.5846,
+     "ndv": 0.7422,
+     "rOverR": 0.6702,
+     "inRect": 1,
+     "O": [
+      8,
+      14,
+      6
+     ],
+     "Oref": [
+      11,
+      16,
+      7
+     ],
+     "P2": [
+      8,
+      14,
+      6
+     ],
+     "NA": [
+      3,
+      2,
+      1
+     ]
+    },
+    {
+     "x": 701,
+     "y": 382,
+     "ndl": -0.5754,
+     "ndv": 0.7477,
+     "rOverR": 0.6641,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      15,
+      20,
+      9
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      8,
+      6,
+      3
+     ]
+    },
+    {
+     "x": 702,
+     "y": 382,
+     "ndl": -0.5851,
+     "ndv": 0.7391,
+     "rOverR": 0.6736,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      9,
+      16,
+      7
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      2,
+      2,
+      1
+     ]
+    },
+    {
+     "x": 700,
+     "y": 383,
+     "ndl": -0.5662,
+     "ndv": 0.7528,
+     "rOverR": 0.6582,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      10,
+      16,
+      7
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      3,
+      2,
+      1
+     ]
+    },
+    {
+     "x": 699,
+     "y": 384,
+     "ndl": -0.557,
+     "ndv": 0.7577,
+     "rOverR": 0.6526,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      13,
+      19,
+      8
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      6,
+      5,
+      2
+     ]
+    },
+    {
+     "x": 698,
+     "y": 385,
+     "ndl": -0.5479,
+     "ndv": 0.7623,
+     "rOverR": 0.6472,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      12,
+      18,
+      8
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      5,
+      4,
+      2
+     ]
+    },
+    {
+     "x": 699,
+     "y": 385,
+     "ndl": -0.5575,
+     "ndv": 0.7543,
+     "rOverR": 0.6565,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      26,
+      27,
+      13
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      19,
+      13,
+      7
+     ]
+    },
+    {
+     "x": 700,
+     "y": 385,
+     "ndl": -0.5673,
+     "ndv": 0.7461,
+     "rOverR": 0.6658,
+     "inRect": 1,
+     "O": [
+      7,
+      14,
+      6
+     ],
+     "Oref": [
+      16,
+      21,
+      10
+     ],
+     "P2": [
+      7,
+      14,
+      6
+     ],
+     "NA": [
+      9,
+      7,
+      4
+     ]
+    }
+   ]
+  }
+ },
+ "shader": {
+  "hasSource": true,
+  "lines": [
+   "lights = nightLightStrength * nightFactor * lightGate * lightDensity;",
+   "    // ── Amendment 8 (#1202) — 대기 산란 rim (§A8.2 결정 1 · §A8.13) ──────────"
+  ],
+  "craterDepthHost": 0.4,
+  "sunIntensityHost": 2.5,
+  "nightLightFrequency": 48,
+  "rimFalloffHost": 3
+ },
+ "hEqualsP1": {
+  "n": 4104,
+  "litHealthy": 655,
+  "over1LsbPx": 0,
+  "chMaxHist": {
+   "0": 4104
+  },
+  "maxAbsLum": 0,
+  "meanContribOverlay": 0.038502,
+  "meanContribRefP1": 0.038502,
+  "relErrPct": 0,
+  "absRelErrPct": 0,
+  "d2Hist": {
+   "0": 3701,
+   "1": 402,
+   "2": 1
+  },
+  "over1D2Px": 1,
+  "d1Hist": {
+   "0": 3701,
+   "1": 402,
+   "2": 1
+  },
+  "over1D1Px": 1,
+  "affected": 0,
+  "affInRect": 0,
+  "affStat": {
+   "ndl": [
+    null,
+    null
+   ],
+   "ndv": [
+    null,
+    null
+   ],
+   "rOverR": [
+    null,
+    null
+   ]
+  },
+  "affSample": []
+ },
+ "rectBright": {
+  "x0": 659,
+  "x1": 665,
+  "y0": 357,
+  "y1": 363,
+  "litInRect": 19,
+  "litContribSum": 2081491,
+  "center": [
+   662,
+   360
+  ],
+  "half": 3,
+  "gy0": 356,
+  "gy1": 363,
+  "gx0": 659,
+  "gx1": 666,
+  "setSize": 655
+ },
+ "rect": {
+  "x0": 698,
+  "x1": 704,
+  "y0": 379,
+  "y1": 385,
+  "litInRect": 15,
+  "litContribSum": 357649,
+  "center": [
+   701,
+   382
+  ],
+  "half": 3,
+  "gy0": 334,
+  "gy1": 341,
+  "gx0": 698,
+  "gx1": 705,
+  "setSize": 655
+ },
+ "l1Patch": {
+  "state": {
+   "patched": 1,
+   "scanned": 81
+  },
+  "shader": {
+   "hasSource": true,
+   "lines": [
+    "lights = nightLightStrength * nightFactor * lightGate * lightDensity;",
+    "if (craterDepth > 41.0 && gl_FragCoord.x >= 698.0 && gl_FragCoord.x <= 705.0 && gl_FragCoord.y >= 334.0 && gl_FragCoord.y <= 341.0) { lights = 0.0;"
+   ],
+   "craterDepthHost": 0.4,
+   "sunIntensityHost": 2.5,
+   "nightLightFrequency": 48,
+   "rimFalloffHost": 3
+  }
+ },
+ "l1HostUnchanged": {
+  "P2": 0,
+  "NA": 0,
+  "H": 0
+ },
+ "l1Control": {
+  "n": 4104,
+  "litHealthy": 655,
+  "over1LsbPx": 1,
+  "chMaxHist": {
+   "0": 3709,
+   "1": 394,
+   "2": 1
+  },
+  "maxAbsLum": 0.005059,
+  "meanContribOverlay": 0.038509,
+  "meanContribRefP1": 0.038502,
+  "relErrPct": 0.0184,
+  "absRelErrPct": 0.0184,
+  "d2Hist": {
+   "0": 4087,
+   "1": 17
+  },
+  "over1D2Px": 0,
+  "d1Hist": {
+   "0": 3701,
+   "1": 402,
+   "2": 1
+  },
+  "over1D1Px": 1,
+  "affected": 0,
+  "affInRect": 0,
+  "affStat": {
+   "ndl": [
+    null,
+    null
+   ],
+   "ndv": [
+    null,
+    null
+   ],
+   "rOverR": [
+    null,
+    null
+   ]
+  },
+  "affSample": []
+ },
+ "errorsPatched": [],
+ "errors": {
+  "P1": [],
+  "P2": []
+ }
+}

@@ -1,0 +1,14 @@
+
+> @astro-simulator/core@ test /Users/seo/project/space/packages/core
+> vitest run
+
+
+ RUN  v4.1.10 /Users/seo/project/space/packages/core
+
+
+ Test Files  61 passed (61)
+      Tests  1130 passed (1130)
+   Start at  15:51:53
+   Duration  6.11s (transform 2.18s, setup 0ms, import 37.59s, tests 5.98s, environment 4ms)
+
+exit=0

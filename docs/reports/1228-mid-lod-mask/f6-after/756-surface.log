@@ -1,0 +1,434 @@
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+
+=== DoD 1 — 4 body 표면 디테일 (surface ON, 기본) ===
+  earth    [rocky] hfEnergy=8.3665 hfEntropy=3.059 stddev=88.657 uniqColors=358 area=27408/39204 (제외 11796) box=198x198 err=0
+  mars     [desert] hfEnergy=1.9978 hfEntropy=1.531 stddev=91.274 uniqColors=41 area=27408/39204 (제외 11796) box=198x198 err=0
+  jupiter  [gas-bands] hfEnergy=3.7686 hfEntropy=1.897 stddev=100.347 uniqColors=52 area=27408/39204 (제외 11796) box=198x198 err=0
+  moon     [cratered] hfEnergy=36.153 hfEntropy=2.711 stddev=99.749 uniqColors=34 area=1700/2500 (제외 800) box=50x50 err=0
+
+=== DoD 5 — ?surface=off 단색 복귀 대조 ===
+  earth    [rocky] hfEnergy=0.6328 hfEntropy=0.602 stddev=38.289 uniqColors=46 area=27408/39204 (제외 11796) box=198x198 err=0
+  mars     [desert] hfEnergy=0.5648 hfEntropy=0.502 stddev=56.882 uniqColors=40 area=27408/39204 (제외 11796) box=198x198 err=0
+  jupiter  [gas-bands] hfEnergy=0.744 hfEntropy=0.694 stddev=67.069 uniqColors=50 area=27408/39204 (제외 11796) box=198x198 err=0
+  moon     [cratered] hfEnergy=3.0958 hfEntropy=1.751 stddev=61.285 uniqColors=43 area=1700/2500 (제외 800) box=50x50 err=0
+
+=== DoD 2 — 무회귀 (미등록 body 단색, surface ON) ===
+  venus    hfEnergy=0.7791 hfEntropy=0.767 stddev=90.284 uniqColors=50 area=27408/39204 (제외 11796) box=198x198 err=0
+  saturn   hfEnergy=0.7967 hfEntropy=0.719 stddev=67.55 uniqColors=46 area=27410/39204 (제외 11794) box=198x198 err=0
+  neptune  hfEnergy=0.732 hfEntropy=0.745 stddev=74.505 uniqColors=44 area=27412/39204 (제외 11792) box=198x198 err=0
+
+=== DoD 3 — LOD mid 전환 표면 연속성 (reviewer 권고 1: cross-fade 팝핑) ===
+  earth high   : hfEnergy=8.421 hfEntropy=3.06 area=27408
+  earth midFade: hfEnergy=8.3178 hfEntropy=3.071 area=27408
+  earth midSet : hfEnergy=8.346 hfEntropy=3.07 area=27408
+
+=== DoD 4 — tier-c (?gpu=c) 단색 ===
+  earth tier-c : hfEnergy=145.1302 hfEntropy=1.319 area=112 lodStats={"high":0,"mid":0,"low":32,"override":"low","fading":0}
+
+=== JSON ===
+{
+  "surfaceOn": {
+    "earth": {
+      "type": "rocky",
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 88.657,
+      "hfEnergy": 8.3665,
+      "hfEntropy": 3.059,
+      "uniqueColors": 358,
+      "meanLum": 82.2,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "mars": {
+      "type": "desert",
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 91.274,
+      "hfEnergy": 1.9978,
+      "hfEntropy": 1.531,
+      "uniqueColors": 41,
+      "meanLum": 107.7,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "jupiter": {
+      "type": "gas-bands",
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 100.347,
+      "hfEnergy": 3.7686,
+      "hfEntropy": 1.897,
+      "uniqueColors": 52,
+      "meanLum": 111.4,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "moon": {
+      "type": "cratered",
+      "area": 1700,
+      "windowPx": 2500,
+      "excludedPx": 800,
+      "diskRpx": 24.58,
+      "stddev": 99.749,
+      "hfEnergy": 36.153,
+      "hfEntropy": 2.711,
+      "uniqueColors": 34,
+      "meanLum": 102.7,
+      "screenBox": {
+        "x": 615,
+        "y": 335,
+        "w": 50,
+        "h": 50,
+        "cx": 640,
+        "cy": 360,
+        "r": 24.58
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "surfaceOff": {
+    "earth": {
+      "type": "rocky",
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 38.289,
+      "hfEnergy": 0.6328,
+      "hfEntropy": 0.602,
+      "uniqueColors": 46,
+      "meanLum": 43.8,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "mars": {
+      "type": "desert",
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 56.882,
+      "hfEnergy": 0.5648,
+      "hfEntropy": 0.502,
+      "uniqueColors": 40,
+      "meanLum": 63.8,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "jupiter": {
+      "type": "gas-bands",
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 67.069,
+      "hfEnergy": 0.744,
+      "hfEntropy": 0.694,
+      "uniqueColors": 50,
+      "meanLum": 77.3,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "moon": {
+      "type": "cratered",
+      "area": 1700,
+      "windowPx": 2500,
+      "excludedPx": 800,
+      "diskRpx": 24.58,
+      "stddev": 61.285,
+      "hfEnergy": 3.0958,
+      "hfEntropy": 1.751,
+      "uniqueColors": 43,
+      "meanLum": 68.7,
+      "screenBox": {
+        "x": 615,
+        "y": 335,
+        "w": 50,
+        "h": 50,
+        "cx": 640,
+        "cy": 360,
+        "r": 24.58
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "plain": {
+    "venus": {
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 90.284,
+      "hfEnergy": 0.7791,
+      "hfEntropy": 0.767,
+      "uniqueColors": 50,
+      "meanLum": 121.9,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "saturn": {
+      "area": 27410,
+      "windowPx": 39204,
+      "excludedPx": 11794,
+      "diskRpx": 98.32,
+      "stddev": 67.55,
+      "hfEnergy": 0.7967,
+      "hfEntropy": 0.719,
+      "uniqueColors": 46,
+      "meanLum": 82.7,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "neptune": {
+      "area": 27412,
+      "windowPx": 39204,
+      "excludedPx": 11792,
+      "diskRpx": 98.32,
+      "stddev": 74.505,
+      "hfEnergy": 0.732,
+      "hfEntropy": 0.745,
+      "uniqueColors": 44,
+      "meanLum": 90.7,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360.01,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "lodMid": {
+    "high": {
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 88.795,
+      "hfEnergy": 8.421,
+      "hfEntropy": 3.06,
+      "uniqueColors": 346,
+      "meanLum": 82.4,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "midFade": {
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 88.955,
+      "hfEnergy": 8.3178,
+      "hfEntropy": 3.071,
+      "uniqueColors": 360,
+      "meanLum": 82.8,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    },
+    "midSettled": {
+      "area": 27408,
+      "windowPx": 39204,
+      "excludedPx": 11796,
+      "diskRpx": 98.32,
+      "stddev": 89.041,
+      "hfEnergy": 8.346,
+      "hfEntropy": 3.07,
+      "uniqueColors": 349,
+      "meanLum": 82.9,
+      "screenBox": {
+        "x": 541,
+        "y": 261,
+        "w": 198,
+        "h": 198,
+        "cx": 640,
+        "cy": 360,
+        "r": 98.32
+      },
+      "imgSize": {
+        "w": 1280,
+        "h": 720
+      }
+    }
+  },
+  "tierC": {
+    "area": 112,
+    "windowPx": 182,
+    "excludedPx": 70,
+    "diskRpx": 6.31,
+    "stddev": 58.032,
+    "hfEnergy": 145.1302,
+    "hfEntropy": 1.319,
+    "uniqueColors": 6,
+    "meanLum": 34.3,
+    "screenBox": {
+      "x": 553,
+      "y": 43,
+      "w": 14,
+      "h": 13,
+      "cx": 560.18,
+      "cy": 49.36,
+      "r": 6.31
+    },
+    "imgSize": {
+      "w": 1280,
+      "h": 720
+    },
+    "lod": {
+      "stats": {
+        "high": 0,
+        "mid": 0,
+        "low": 32,
+        "override": "low",
+        "fading": 0
+      },
+      "infoCount": 32
+    }
+  },
+  "consoleErrors": {
+    "on-earth": 0,
+    "on-mars": 0,
+    "on-jupiter": 0,
+    "on-moon": 0,
+    "off-earth": 0,
+    "off-mars": 0,
+    "off-jupiter": 0,
+    "off-moon": 0
+  }
+}
+
+=== 판정 (#759 — hfEntropy ON−OFF ≥ 0.15 + tier-c forceOverride=low) ===
+  ✓ earth: hfEntropy 갭 2.457 ≥ 0.15
+  ✓ mars: hfEntropy 갭 1.029 ≥ 0.15
+  ✓ jupiter: hfEntropy 갭 1.203 ≥ 0.15
+  ✓ moon: hfEntropy 갭 0.960 ≥ 0.15
+  ✓ tier-c: override=low, high=0, mid=0 (표면 셰이더 구조적 미진입)
+=== PASS ===

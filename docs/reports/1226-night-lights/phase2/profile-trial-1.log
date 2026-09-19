@@ -1,0 +1,24 @@
+=== #1226 야간 도시 불빛 — 진단 (MODE=profile INJECT=none) ===
+쌍 × 전제 적용표 (전제 1 · 4 · 6 은 전 쌍):
+  main | D2 D3 D4 D5 | NI · DI · NI_land · NI_sea | P2 | P2 | — | 
+  cloud | D6 | NI_land | P4 | P4 | NI_land P4≠P2 | 
+  mid | D7(1) | NI | P2 (mid) | P2 (mid) | — | 
+  low | D7(2) | NI | P2 (low) | — (billboard 에 uniform 없음) | — | 
+  d8Off | D8 | NI | P1b | — (두 페이지 모두 불빛 ON) | — | 
+  d8On | D8 | NI | R1 | — (두 페이지 모두 불빛 ON) | — | 
+  p2Restore | (주입 원복 확인) | — | — | — | — | full frame 0 px 아니면 측정 오류
+  d9 a/b/c | D9 | — | feature 페이지 (b 는 surface off 라 적용) | a · c feature 페이지 | positive 쌍 변화 > 0 | MODE=d9
+main (P1↔P2): {"phase":90,"NI":{"n":7225,"meanContrib":0.02187,"changed":655,"lumA":0.072612,"lumB":0.050742},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.715749,"lumB":0.715749},"NI_land":{"n":4104,"meanContrib":0.038502,"changed":655,"lumA":0.089583,"lumB":0.051081,"unchangedRatio":0.8404,"saturatedPxA":0,"cloudChanged":2083,"overlap":360,"refMaxAbsLum":null,"refOver1LsbPx":null,"refMeanContrib":null},"NI_sea":{"n":3121,"meanContrib":0,"changed":0,"lumA":0.050296,"lumB":0.050296},"disk":{"n":30768,"meanContrib":0.006752,"changed":995,"lumA":0.399697,"lumB":0.392945},"fullChanged":1006,"outsideChanged":11}
+cloud (P3↔P4): {"phase":90,"NI":{"n":7225,"meanContrib":0.015294,"changed":639,"lumA":0.087577,"lumB":0.072283},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.76961,"lumB":0.76961},"NI_land":{"n":4104,"meanContrib":0.026925,"changed":639,"lumA":0.104084,"lumB":0.07716,"unchangedRatio":0.844298,"saturatedPxA":0,"cloudChanged":0,"overlap":0,"refMaxAbsLum":null,"refOver1LsbPx":null,"refMeanContrib":null},"NI_sea":{"n":3121,"meanContrib":0,"changed":0,"lumA":0.065871,"lumB":0.065871},"disk":{"n":30768,"meanContrib":0.004584,"changed":977,"lumA":0.433037,"lumB":0.428453},"fullChanged":987,"outsideChanged":10}
+mid: {"phase":90,"NI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.065065,"lumB":0.065065},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.842391,"lumB":0.842391},"NI_land":null,"NI_sea":null,"disk":{"n":30768,"meanContrib":0,"changed":0,"lumA":0.438032,"lumB":0.438032},"fullChanged":0,"outsideChanged":0}
+low: {"phase":90,"NI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.035593,"lumB":0.035593},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.035593,"lumB":0.035593},"NI_land":null,"NI_sea":null,"disk":{"n":30768,"meanContrib":0,"changed":0,"lumA":0.035878,"lumB":0.035878},"fullChanged":0,"outsideChanged":0}
+d8Off: {"phase":90,"NI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.072612,"lumB":0.072612},"DI":{"n":7225,"meanContrib":0,"changed":0,"lumA":0.715749,"lumB":0.715749},"NI_land":null,"NI_sea":null,"disk":{"n":30768,"meanContrib":0,"changed":0,"lumA":0.399697,"lumB":0.399697},"fullChanged":0,"outsideChanged":0}
+d8On: {"phase":90,"NI":{"n":5740,"meanContrib":0,"changed":0,"lumA":0.080975,"lumB":0.080975},"DI":{"n":5740,"meanContrib":0,"changed":0,"lumA":0.83932,"lumB":0.83932},"NI_land":null,"NI_sea":null,"disk":{"n":24344,"meanContrib":0,"changed":0,"lumA":0.336779,"lumB":0.336779},"fullChanged":0,"outsideChanged":0}
+p2Restore fullChanged 0 · gate G↔GA NI changed 605
+strengths {"P1":[0.9],"P2":[0],"P3":[0.9],"P4":[0]} · mid P2 [0,0]
+[D6 · §A11.17.5 조건 1] R_baseline 0.6993143213339567 · 불빛∩구름 px 360 · NI_land P4≠P2 2083 · NI_land 채널 포화 px P1 0 · P3 0
+settles ["P1/boot:7/6/19/0/ok","P1/mid:0/32/0/0/ok","P1/low:0/1/31/0/ok","P2/boot:7/6/19/0/ok","P2/mid:0/32/0/0/ok","P2/low:0/1/31/0/ok","P3/boot:7/6/19/0/ok","P4/boot:7/6/19/0/ok","P1b/boot:7/6/19/0/ok","R1/boot:6/7/19/0/ok","R2/boot:6/7/19/0/ok"]
+consoleErrors {"P1":[],"P2":[],"P3":[],"P4":[],"P1b":[],"R1":[],"R2":[]}
+
+[측정 불가] 유효성 전제 미충족 — PASS 도 FAIL 도 내지 않는다:
+  - (3) [low] DI 평균 휘도 0.035593 < 0.15

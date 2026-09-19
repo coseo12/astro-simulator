@@ -1,0 +1,98 @@
+[browser] headless chromium + --use-angle=swiftshader (CI 재현 — #759)
+=== #1197 바다 깊이 그라데이션 (D5/D6/D6-b — uniform 주입 프레임 2종 내장) ===
+
+=== 측정 (#1197 바다 깊이 — 낮면 ocean 휘도 백분위 갭) ===
+{
+  "on": {
+    "diskR": 98.32,
+    "nOcean": 3612,
+    "maxNdl": 1,
+    "p10Lum": 183.43,
+    "p50Lum": 230.13,
+    "p90Lum": 251.39,
+    "gap": 0.2703398521316637,
+    "deepN": 362,
+    "deepMeanR": 74.34530386740332,
+    "deepMeanG": 170.66022099447514,
+    "deepMeanB": 251.84530386740332,
+    "deepMedianRGB": [
+      78,
+      177,
+      255
+    ],
+    "excludedPolar": 0,
+    "excludedNight": 14775,
+    "excludedLand": 3566,
+    "coastN": 31,
+    "coastMeanLum": 242.55,
+    "openOceanN": 3532,
+    "openOceanMeanLum": 222.56,
+    "consoleErrors": []
+  },
+  "negative": {
+    "diskR": 98.32,
+    "nOcean": 3616,
+    "maxNdl": 1,
+    "p10Lum": 233.74,
+    "p50Lum": 234.17,
+    "p90Lum": 251.6,
+    "gap": 0.07097978365522194,
+    "deepN": 362,
+    "deepMeanR": 154.82596685082873,
+    "deepMeanG": 255,
+    "deepMeanB": 255,
+    "deepMedianRGB": [
+      155,
+      255,
+      255
+    ],
+    "excludedPolar": 0,
+    "excludedNight": 14775,
+    "excludedLand": 3562,
+    "coastN": 33,
+    "coastMeanLum": 244.03,
+    "openOceanN": 3533,
+    "openOceanMeanLum": 237.22,
+    "consoleErrors": [],
+    "patchedMaterials": 2,
+    "injectError": null
+  },
+  "zero": {
+    "diskR": 98.32,
+    "nOcean": 3606,
+    "maxNdl": 1,
+    "p10Lum": 107.12,
+    "p50Lum": 222.57,
+    "p90Lum": 251.17,
+    "gap": 0.5735213788732236,
+    "deepN": 361,
+    "deepMeanR": 30.598337950138504,
+    "deepMeanG": 59.83379501385041,
+    "deepMeanB": 75.63157894736842,
+    "deepMedianRGB": [
+      36,
+      70,
+      89
+    ],
+    "excludedPolar": 0,
+    "excludedNight": 14775,
+    "excludedLand": 3572,
+    "coastN": 30,
+    "coastMeanLum": 237.05,
+    "openOceanN": 3530,
+    "openOceanMeanLum": 197.1,
+    "consoleErrors": [],
+    "patchedMaterials": 2,
+    "injectError": null
+  }
+}
+
+=== 판정 (§A7.5) ===
+표본: ON ocean 픽셀 3612 / negative 3616 / zero 3606 (하한 900) · disk R 98.32 · 제외 극관 0 / 밤면·저ndl 14775 / 육지 3566 → PASS
+D5 깊이 그라데이션: ON 상대 갭 0.2703 (≥ τ 0.11) · P10 183.43 / P50 230.13 / P90 251.39 · console err 0 (== 0) → PASS
+D6 판별력 (deepOceanFactor (1,1,1) 고착 주입): 머티리얼 2개 패치 · negative 갭 0.0710 · 낙차 0.1994 (≥ M 0.11) · console err 0 (== 0) → PASS
+D6-b 바인딩 기여도 (deepOceanFactor (0,0,0) 고착 주입 = 변이 M-h 대조군): 머티리얼 2개 패치 · zero 갭 0.5735 · ON 대비 상승 0.3032 (≥ M 0.11) · console err 0 (== 0) → PASS
+  ↳ negative 프레임에 D5 술어 적용: 갭 0.0710 ≥ τ 0.11 → FAIL (기대대로 — 가드 작동)
+  ↳ [진단·비게이트] 해안 밴드 (0.1<maskLand<0.9) n=31 평균 휘도 242.55 vs 원양 (maskLand==0) n=3532 평균 222.56
+  ↳ [진단·비게이트] ON 최심부 (하위 10% n=362) 평균 RGB (74.35, 170.66, 251.85) · 중앙값 (78, 177, 255)
+exit=0

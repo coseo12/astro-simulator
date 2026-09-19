@@ -1,0 +1,112 @@
+{
+  "byJd": {
+    "2451626": {
+      "settleOff": false,
+      "settleOn": false,
+      "errors": 0,
+      "phase": 90,
+      "nightInner": {
+        "n": 7225,
+        "land": 763,
+        "cloud": 3693,
+        "landCloud": 6,
+        "meanAlphaAll": 0.23792,
+        "meanAlphaOverLand": 0.0025,
+        "gateWeightedAttenuation": 0.00006
+      },
+      "dayInner": {
+        "n": 7225,
+        "land": 4233,
+        "cloud": 3359,
+        "landCloud": 2223,
+        "meanAlphaAll": 0.1959,
+        "meanAlphaOverLand": 0.24831,
+        "gateWeightedAttenuation": 0.25501
+      }
+    },
+    "2451717": {
+      "settleOff": false,
+      "settleOn": false,
+      "errors": 0,
+      "phase": 90,
+      "nightInner": {
+        "n": 7205,
+        "land": 1989,
+        "cloud": 3567,
+        "landCloud": 1056,
+        "meanAlphaAll": 0.25815,
+        "meanAlphaOverLand": 0.23578,
+        "gateWeightedAttenuation": 0.23901
+      },
+      "dayInner": {
+        "n": 7205,
+        "land": 2592,
+        "cloud": 1759,
+        "landCloud": 531,
+        "meanAlphaAll": 0.06949,
+        "meanAlphaOverLand": 0.07072,
+        "gateWeightedAttenuation": 0.07049
+      }
+    },
+    "2451808": {
+      "settleOff": false,
+      "settleOn": false,
+      "errors": 0,
+      "phase": 90,
+      "nightInner": {
+        "n": 7225,
+        "land": 4095,
+        "cloud": 3385,
+        "landCloud": 2194,
+        "meanAlphaAll": 0.19868,
+        "meanAlphaOverLand": 0.25564,
+        "gateWeightedAttenuation": 0.2619
+      },
+      "dayInner": {
+        "n": 7225,
+        "land": 957,
+        "cloud": 3640,
+        "landCloud": 16,
+        "meanAlphaAll": 0.23126,
+        "meanAlphaOverLand": 0.00262,
+        "gateWeightedAttenuation": 0.00072
+      }
+    },
+    "2451899": {
+      "settleOff": false,
+      "settleOn": false,
+      "errors": 0,
+      "phase": 90,
+      "nightInner": {
+        "n": 7238,
+        "land": 2644,
+        "cloud": 1792,
+        "landCloud": 577,
+        "meanAlphaAll": 0.07323,
+        "meanAlphaOverLand": 0.07821,
+        "gateWeightedAttenuation": 0.07708
+      },
+      "dayInner": {
+        "n": 7238,
+        "land": 1929,
+        "cloud": 3615,
+        "landCloud": 1025,
+        "meanAlphaAll": 0.26039,
+        "meanAlphaOverLand": 0.23417,
+        "gateWeightedAttenuation": 0.23749
+      }
+    }
+  },
+  "determinism": {
+    "gateMapReload": {
+      "n": 33469,
+      "changed": 0,
+      "radiusPx": 103.24
+    },
+    "productReload": {
+      "n": 33469,
+      "changed": 0,
+      "radiusPx": 103.24
+    }
+  }
+}

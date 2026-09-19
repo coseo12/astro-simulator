@@ -1,0 +1,774 @@
+{
+ "axisRotateOff": {
+  "axisUnit": [
+   0,
+   1,
+   0
+  ],
+  "axisTiltFromWorldYDeg": 0,
+  "camDirUnit": [
+   0,
+   0,
+   -1
+  ],
+  "poleVsCamDeg": 90,
+  "alphaDeg": -90,
+  "betaDeg": 90,
+  "upVector": [
+   0,
+   1,
+   0
+  ],
+  "rotationQuaternion": null,
+  "rotation": [
+   0,
+   0,
+   0
+  ]
+ },
+ "axisRotateOn": {
+  "axisUnit": [
+   0,
+   -0.397789,
+   0.917477
+  ],
+  "axisTiltFromWorldYDeg": 66.56,
+  "camDirUnit": [
+   0,
+   0,
+   -1
+  ],
+  "poleVsCamDeg": 156.56,
+  "alphaDeg": -90,
+  "betaDeg": 90,
+  "upVector": [
+   0,
+   1,
+   0
+  ],
+  "rotationQuaternion": [
+   -0.53235,
+   0.423095,
+   0.644591,
+   -0.349422
+  ],
+  "rotation": [
+   0,
+   0,
+   0
+  ]
+ },
+ "betaSweep": {
+  "beta=90deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0,
+     -1
+    ],
+    "poleVsCamDeg": 90,
+    "alphaDeg": -90,
+    "betaDeg": 90,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 7225,
+   "niLand": 4095,
+   "niLandIce": 0,
+   "strict": 0,
+   "maxNdvIce": null,
+   "maxAbsLatInNi": 46.63,
+   "samples": []
+  },
+  "beta=80deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0.173648,
+     -0.984808
+    ],
+    "poleVsCamDeg": 80,
+    "alphaDeg": -90,
+    "betaDeg": 80,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 7130,
+   "niLand": 3456,
+   "niLandIce": 0,
+   "strict": 0,
+   "maxNdvIce": null,
+   "maxAbsLatInNi": 55.43,
+   "samples": []
+  },
+  "beta=70deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0.34202,
+     -0.939693
+    ],
+    "poleVsCamDeg": 70,
+    "alphaDeg": -90,
+    "betaDeg": 70,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 7031,
+   "niLand": 2879,
+   "niLandIce": 25,
+   "strict": 19,
+   "maxNdvIce": 0.7088,
+   "maxAbsLatInNi": 63.83,
+   "samples": [
+    {
+     "x": 660,
+     "y": 285,
+     "ndl": -0.1584,
+     "ndv": 0.6224,
+     "lat": 63.06,
+     "landMask": 0.478,
+     "iceMask": 0.776
+    },
+    {
+     "x": 661,
+     "y": 286,
+     "ndl": -0.1678,
+     "ndv": 0.631,
+     "lat": 62.2,
+     "landMask": 0.086,
+     "iceMask": 0.635
+    },
+    {
+     "x": 661,
+     "y": 287,
+     "ndl": -0.1678,
+     "ndv": 0.6427,
+     "lat": 61.45,
+     "landMask": 0.4,
+     "iceMask": 0.525
+    },
+    {
+     "x": 662,
+     "y": 288,
+     "ndl": -0.1772,
+     "ndv": 0.6506,
+     "lat": 60.62,
+     "landMask": 0.027,
+     "iceMask": 0.38
+    },
+    {
+     "x": 662,
+     "y": 289,
+     "ndl": -0.1772,
+     "ndv": 0.6616,
+     "lat": 59.89,
+     "landMask": 0.384,
+     "iceMask": 0.278
+    },
+    {
+     "x": 663,
+     "y": 289,
+     "ndl": -0.1866,
+     "ndv": 0.6581,
+     "lat": 59.8,
+     "landMask": 0.412,
+     "iceMask": 0.239
+    },
+    {
+     "x": 662,
+     "y": 290,
+     "ndl": -0.1772,
+     "ndv": 0.6723,
+     "lat": 59.18,
+     "landMask": 0.208,
+     "iceMask": 0.18
+    },
+    {
+     "x": 663,
+     "y": 290,
+     "ndl": -0.1866,
+     "ndv": 0.6688,
+     "lat": 59.09,
+     "landMask": 1,
+     "iceMask": 0.149
+    },
+    {
+     "x": 664,
+     "y": 290,
+     "ndl": -0.196,
+     "ndv": 0.6651,
+     "lat": 59,
+     "landMask": 0.788,
+     "iceMask": 0.122
+    },
+    {
+     "x": 660,
+     "y": 291,
+     "ndl": -0.1584,
+     "ndv": 0.6891,
+     "lat": 58.63,
+     "landMask": 0.58,
+     "iceMask": 0.141
+    }
+   ]
+  },
+  "beta=60deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0.5,
+     -0.866025
+    ],
+    "poleVsCamDeg": 60,
+    "alphaDeg": -90,
+    "betaDeg": 60,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 6938,
+   "niLand": 2398,
+   "niLandIce": 176,
+   "strict": 168,
+   "maxNdvIce": 0.8267,
+   "maxAbsLatInNi": 72.33,
+   "samples": [
+    {
+     "x": 660,
+     "y": 284,
+     "ndl": -0.1564,
+     "ndv": 0.61,
+     "lat": 72.33,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 284,
+     "ndl": -0.1659,
+     "ndv": 0.6065,
+     "lat": 72.09,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 662,
+     "y": 284,
+     "ndl": -0.1754,
+     "ndv": 0.6028,
+     "lat": 71.84,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 285,
+     "ndl": -0.1562,
+     "ndv": 0.6224,
+     "lat": 71.66,
+     "landMask": 0.831,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 285,
+     "ndl": -0.1657,
+     "ndv": 0.619,
+     "lat": 71.43,
+     "landMask": 0.992,
+     "iceMask": 1
+    },
+    {
+     "x": 662,
+     "y": 285,
+     "ndl": -0.1752,
+     "ndv": 0.6154,
+     "lat": 71.19,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 663,
+     "y": 285,
+     "ndl": -0.1847,
+     "ndv": 0.6115,
+     "lat": 70.95,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 664,
+     "y": 285,
+     "ndl": -0.1942,
+     "ndv": 0.6075,
+     "lat": 70.69,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 665,
+     "y": 285,
+     "ndl": -0.2038,
+     "ndv": 0.6033,
+     "lat": 70.43,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 286,
+     "ndl": -0.1561,
+     "ndv": 0.6344,
+     "lat": 70.99,
+     "landMask": 0.255,
+     "iceMask": 1
+    }
+   ]
+  },
+  "beta=50deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0.642788,
+     -0.766044
+    ],
+    "poleVsCamDeg": 50,
+    "alphaDeg": -90,
+    "betaDeg": 50,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 6863,
+   "niLand": 1963,
+   "niLandIce": 417,
+   "strict": 408,
+   "maxNdvIce": 0.9131,
+   "maxAbsLatInNi": 78.28,
+   "samples": [
+    {
+     "x": 660,
+     "y": 284,
+     "ndl": -0.1554,
+     "ndv": 0.6101,
+     "lat": 78.28,
+     "landMask": 0.18,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 284,
+     "ndl": -0.1649,
+     "ndv": 0.6065,
+     "lat": 77.8,
+     "landMask": 0.051,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 285,
+     "ndl": -0.1552,
+     "ndv": 0.6224,
+     "lat": 77.98,
+     "landMask": 0.824,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 285,
+     "ndl": -0.1647,
+     "ndv": 0.619,
+     "lat": 77.52,
+     "landMask": 0.678,
+     "iceMask": 1
+    },
+    {
+     "x": 662,
+     "y": 285,
+     "ndl": -0.1742,
+     "ndv": 0.6154,
+     "lat": 77.06,
+     "landMask": 0.522,
+     "iceMask": 1
+    },
+    {
+     "x": 663,
+     "y": 285,
+     "ndl": -0.1837,
+     "ndv": 0.6115,
+     "lat": 76.58,
+     "landMask": 0.067,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 286,
+     "ndl": -0.155,
+     "ndv": 0.6344,
+     "lat": 77.64,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 286,
+     "ndl": -0.1644,
+     "ndv": 0.631,
+     "lat": 77.2,
+     "landMask": 1,
+     "iceMask": 1
+    },
+    {
+     "x": 662,
+     "y": 286,
+     "ndl": -0.1739,
+     "ndv": 0.6275,
+     "lat": 76.76,
+     "landMask": 0.902,
+     "iceMask": 1
+    },
+    {
+     "x": 663,
+     "y": 286,
+     "ndl": -0.1834,
+     "ndv": 0.6237,
+     "lat": 76.3,
+     "landMask": 0.506,
+     "iceMask": 1
+    }
+   ]
+  },
+  "beta=40deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0.766044,
+     -0.642788
+    ],
+    "poleVsCamDeg": 40,
+    "alphaDeg": -90,
+    "betaDeg": 40,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 6808,
+   "niLand": 1532,
+   "niLandIce": 520,
+   "strict": 509,
+   "maxNdvIce": 0.9636,
+   "maxAbsLatInNi": 79.02,
+   "samples": [
+    {
+     "x": 660,
+     "y": 285,
+     "ndl": -0.1552,
+     "ndv": 0.6224,
+     "lat": 77.76,
+     "landMask": 0.102,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 285,
+     "ndl": -0.1647,
+     "ndv": 0.619,
+     "lat": 77.2,
+     "landMask": 0.102,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 286,
+     "ndl": -0.1549,
+     "ndv": 0.6344,
+     "lat": 78.11,
+     "landMask": 0.604,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 286,
+     "ndl": -0.1644,
+     "ndv": 0.631,
+     "lat": 77.55,
+     "landMask": 0.396,
+     "iceMask": 1
+    },
+    {
+     "x": 666,
+     "y": 286,
+     "ndl": -0.2121,
+     "ndv": 0.6114,
+     "lat": 74.69,
+     "landMask": 0.004,
+     "iceMask": 1
+    },
+    {
+     "x": 667,
+     "y": 286,
+     "ndl": -0.2217,
+     "ndv": 0.6069,
+     "lat": 74.1,
+     "landMask": 0.008,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 287,
+     "ndl": -0.1546,
+     "ndv": 0.646,
+     "lat": 78.4,
+     "landMask": 0.761,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 287,
+     "ndl": -0.1641,
+     "ndv": 0.6427,
+     "lat": 77.84,
+     "landMask": 0.549,
+     "iceMask": 1
+    },
+    {
+     "x": 662,
+     "y": 287,
+     "ndl": -0.1736,
+     "ndv": 0.6392,
+     "lat": 77.28,
+     "landMask": 0.451,
+     "iceMask": 1
+    },
+    {
+     "x": 663,
+     "y": 287,
+     "ndl": -0.1831,
+     "ndv": 0.6355,
+     "lat": 76.71,
+     "landMask": 0.278,
+     "iceMask": 1
+    }
+   ]
+  },
+  "beta=30deg": {
+   "diag": {
+    "axisUnit": [
+     0,
+     1,
+     0
+    ],
+    "axisTiltFromWorldYDeg": 0,
+    "camDirUnit": [
+     0,
+     0.866025,
+     -0.5
+    ],
+    "poleVsCamDeg": 30,
+    "alphaDeg": -90,
+    "betaDeg": 30,
+    "upVector": [
+     0,
+     1,
+     0
+    ],
+    "rotationQuaternion": null,
+    "rotation": [
+     0,
+     0,
+     0
+    ]
+   },
+   "niN": 6754,
+   "niLand": 1630,
+   "niLandIce": 833,
+   "strict": 814,
+   "maxNdvIce": 0.978,
+   "maxAbsLatInNi": 79.16,
+   "samples": [
+    {
+     "x": 660,
+     "y": 284,
+     "ndl": -0.1567,
+     "ndv": 0.6101,
+     "lat": 70.51,
+     "landMask": 0.286,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 285,
+     "ndl": -0.1563,
+     "ndv": 0.6224,
+     "lat": 71.22,
+     "landMask": 0.604,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 285,
+     "ndl": -0.1659,
+     "ndv": 0.619,
+     "lat": 70.79,
+     "landMask": 0.02,
+     "iceMask": 1
+    },
+    {
+     "x": 664,
+     "y": 285,
+     "ndl": -0.1945,
+     "ndv": 0.6075,
+     "lat": 69.43,
+     "landMask": 0.42,
+     "iceMask": 1
+    },
+    {
+     "x": 665,
+     "y": 285,
+     "ndl": -0.2041,
+     "ndv": 0.6033,
+     "lat": 68.95,
+     "landMask": 0.325,
+     "iceMask": 1
+    },
+    {
+     "x": 660,
+     "y": 286,
+     "ndl": -0.1559,
+     "ndv": 0.6344,
+     "lat": 71.9,
+     "landMask": 0.647,
+     "iceMask": 1
+    },
+    {
+     "x": 661,
+     "y": 286,
+     "ndl": -0.1654,
+     "ndv": 0.631,
+     "lat": 71.47,
+     "landMask": 0.024,
+     "iceMask": 1
+    },
+    {
+     "x": 667,
+     "y": 286,
+     "ndl": -0.2228,
+     "ndv": 0.6069,
+     "lat": 68.6,
+     "landMask": 0.329,
+     "iceMask": 1
+    },
+    {
+     "x": 668,
+     "y": 286,
+     "ndl": -0.2325,
+     "ndv": 0.6022,
+     "lat": 68.08,
+     "landMask": 0.659,
+     "iceMask": 1
+    },
+    {
+     "x": 670,
+     "y": 287,
+     "ndl": -0.2512,
+     "ndv": 0.6045,
+     "lat": 67.63,
+     "landMask": 0.165,
+     "iceMask": 1
+    }
+   ]
+  }
+ },
+ "errors": {
+  "off": [],
+  "on": []
+ }
+}

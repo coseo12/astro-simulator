@@ -1,0 +1,11 @@
+diff --git a/apps/web/src/core/parse-night-lights-mode.ts b/apps/web/src/core/parse-night-lights-mode.ts
+index 7bc8cb4..4e17f64 100644
+--- a/apps/web/src/core/parse-night-lights-mode.ts
++++ b/apps/web/src/core/parse-night-lights-mode.ts
+@@ -20,5 +20,3 @@ export function parseNightLightsVisible(urlParam: string | null | undefined): bo
+   const normalized = urlParam.toLowerCase();
+-  if (normalized === 'off') {
+-    return false;
+-  }
++  // MN-8: 플래그 무시 — off 분기 삭제 (parse 가 항상 ON)
+   if (normalized === 'on') {
