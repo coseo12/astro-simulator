@@ -26,6 +26,13 @@ Semantic Versioning을 따른다.
   - D3 「줌 속도」 는 시간창 속도가 아니라 **틱 묶음의 로그 배율 비** 다. 시간창 속도는 body tier 렌더 부하로 옳은 판본에서도 경계 후가 `+9 ~ +22 %` 계통적으로 빠르다.
   - 3위치 기록 — 코드 주석 (`browser-verify-818-focus-zoom.mjs` 머리말 S4 절) · PR 본문 · 이 항목.
 - **[#1232] D5 판별력 — 결함 판본 6종 (수정 전 `develop` + 변이 5종) 을 실제로 빌드·적재해 S4 를 실행했다.** 6종 전부 `exit 1`, 수정판만 `exit 0` 이다 (판본 마커로 적재 확인). **「줌인 방향만 관성 0」 변이는 S4d (줌인 통과군) 만 잡는다** — S4a · S4b 는 PASS 다 (S4d 는 cross-validate 수용으로 추가된 시나리오).
+- **[#1232] 계약 재조정 2 — D6 의 `verify:380-zoom` S2 를 폐기하지 않고 개정했다** (사용자 승인 2026-09-19, [#1232 코멘트](https://github.com/coseo12/astro-simulator/issues/1232#issuecomment-5741978238)).
+  - 사실: 구 S2 는 수정판과 `develop` **양쪽에서 FAIL** 했다. `verify:380` 이 CI 에 배선돼 있지 않아 드러나지 않았다.
+  - 원인 둘: (1) 판정량이 raw `camera.radius` 부호였다 — ADR §A3.1(3) 이 반증한 Prediction 6 의 측정량이라 올바른 경계 통과도 단위 전환 순간을 역행으로 읽는다. (2) 존재하지 않는 `__simCore.sendCommand` 를 불러 mercury focus 가 **조용히 no-op** 됐다. 실제로 재던 것은 기본 개요에서 휠이 solar→inner 를 넘는 **free-fly** 경로였다.
+  - 개정: 호출을 `command` 로 고치지 않고 **제거**하고, free-fly 줌 경계 통과를 명시 대상으로 삼았다. focus-entry 는 실거리가 의도적으로 불연속인 다른 계약이고, free-fly 분기는 `verify:818` S4 (`focus=earth` 전용) 가 지나지 않는다. 판정은 매 렌더 프레임 기록 (`apps/web/scripts/tier-frame-recorder.mjs` — `verify:818` S4 와 공용) 에서 **실거리 역행 프레임 수 `== 0`** · **tier 전이 횟수 `== 1`** 의 정수 술어다 (**새 임계 0개**). 전이 0회 · 빈 표본 · 비유한 실거리는 `exit 2` (판정 불가) 다.
+  - 판별력 [실측]: 수정판 PASS · `develop` FAIL (전환 프레임 `2.56 → 0.139 AU`, 역행 4) · 「free-fly 에서만 즉시 대입 제거」 변이 FAIL (역행 4) — 이 변이는 `verify:818` S4 가 **PASS** 한다 (각 3회).
+  - 3위치 기록 — 코드 주석 (`browser-verify-380-zoom.mjs` 머리말 S2 절) · PR 본문 · 이 항목.
+- **[#1232] `verify:818` S4 판정 분류 정정 (reviewer 권고)** — 기대 전이 뒤의 **추가 전이** (경계 진동) 를 전제 위반 (`exit 2`) 에서 **FAIL (`exit 1`)** 로 옮겼고, 확정 FAIL 이 하나라도 있으면 `exit 1` 이 우선한다 (전제 위반이 FAIL 을 가리지 않음). [실측] 진동 주입 변이에서 구 판정 `exit 2` → 개정 `exit 1`. D1 clamp 술어를 계약 문구 (`r == lowerRadiusLimit`, tier 무관) 에 맞췄고, 측정 오류는 TypeError 대신 원인 메시지와 함께 `exit 2` 다. D1 출력에 `dt[ci]` · `dt[ci+1]` 를 진단값으로 찍는다 (판정식 · 임계 불변).
 - **[#1232] 범위 밖 관찰 (이슈화하지 않음)** — focus 진입 경로 (`preserveFocusDistance=false`) 에도 같은 전환 프레임 (구 단위 radius 1 프레임 렌더) 이 있을 수 있다 [판독 — 미측정] / 패닝 관성 · free-fly `camera.target` 단위 / `verify:818` 은 CI 에 배선돼 있지 않다 (qa 수동 게이트).
 
 ## [0.89.0] - 2026-09-18
