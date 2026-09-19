@@ -31,6 +31,19 @@
  *     attachControl. handler idempotent. 구독은 시작 시, 해제는 정리 경로 (animation end).
  *  4. **minZ 재조정** — `radius_new` 가 이전 minZ 이하로 clamp 되면 apparent size 수식이 깨짐.
  *     전환 전 `cam.minZ = radius_new × 0.01` 로 선행 조정 (V5 clamp 충돌 방어).
+ *
+ * ## #1232 — 줌 crossing 경로는 tween 없이 즉시 대입 (ADR 380 §Amendment 3)
+ *
+ * 위 "camera.radius 만 300ms interp" 는 이제 **focus-entry 경로 (`preserveFocusDistance=false`)
+ * 한정**이다. 줌 crossing (`preserveFocusDistance=true`) 은 `radiusOld` 와 `targetRadius` 가 같은
+ * 실거리의 서로 다른 단위 표기라 보간할 대상이 없고, 구 단위 `radiusOld` 에서 출발하는 tween 은
+ * (a) 전환 프레임에 구 단위 radius 를 한 프레임 렌더 (earth 줌인 실측 `5.2e-6 AU` — 지구 내부),
+ * (b) 다음 프레임 `_checkLimits` 가 가드 A floor 로 clamp (`0.019381 AU`) 하는 흔들림을 만들었다.
+ * 그래서 이 경로는 `camera.radius = targetRadius` 를 즉시 대입하고 cleanup 을 동기 호출한다.
+ *
+ * 또 전환은 경로 무관하게 **줌 관성 누적기**를 새 tier 단위로 환산한다
+ * (`rescaleZoomInertiaForTier`). 누적기는 scene unit 이라 환산 없이 tier 를 넘으면 줌아웃 시
+ * 카메라가 날아간다 (실측 정착 `×6.39`).
  */
 
 import {
@@ -130,6 +143,59 @@ export function computeTargetRadius(radiusOld: number, oldScale: number, newScal
 }
 
 /**
+ * #1232 — 줌 관성 누적기를 새 tier 단위로 환산한다 (ADR 380 §Amendment 3 A3.3 / A3.5-2).
+ *
+ * `@babylonjs/core@9.19.0` 의 휠 줌 관성은 `camera.movement.zoomAccumulatedPixels` 에 쌓여
+ * 매 프레임 `movement._zoomVelocity` (`protected`, scene unit / ms) 로 적분된다. 둘 다 **scene
+ * unit** 이라 tier 전환으로 renderScale 이 16,299 배 바뀌면 같은 잔량이 전혀 다른 실거리가 된다
+ * (body→inner 줌아웃에서 잔량이 새 radius 의 수백 배 → 카메라가 날아감, 실측 정착 `×6.39`).
+ *
+ * 환산 계수의 SSoT 는 `computeTargetRadius` 다 — radius 와 관성이 **같은 산술**로 옮겨져야
+ * 실거리 보존이 성립한다.
+ *
+ * ⚠️ 공개 `camera.inertialRadiusOffset` setter 로 환산하면 **조용히 실패**한다. getter 는 레거시
+ * 필드가 0 이면 `zoomDeltaCurrentFrame` 을 돌려주는 호환 창구이고, setter 는 **0 을 쓸 때만**
+ * `resetZoomVelocity()` 를 부른다 — 곱한 값을 쓰면 레거시 필드에 값이 하나 더 얹힐 뿐
+ * `_zoomVelocity` 는 구 단위로 계속 돈다 (실측 `×778`, 환산 없음 `×717` 과 같은 급). 그래서 내부
+ * 필드를 직접 쓴다. 필드 존재는 단위 테스트 (NullEngine 실 `ArcRotateCamera`) 가 fail-fast 로 핀한다.
+ *
+ * 회전 누적기 (rad) 는 스케일 무관이라 건드리지 않는다. 패닝 누적기 (scene unit) 는 범위 밖이다
+ * (ADR A3.3 표 — focus 중 패닝 off, free-fly 는 `camera.target` 자체가 안 옮겨져 관성만 환산해도
+ * 정합이 안 된다).
+ */
+export function rescaleZoomInertiaForTier(
+  camera: ArcRotateCamera,
+  oldScale: number,
+  newScale: number,
+): void {
+  // 내부 필드 접근 — 타입 정의상 protected / 비공개라 구조 타입으로 좁혀 읽고 쓴다.
+  const internals = camera as unknown as {
+    movement?: { _zoomVelocity?: unknown; zoomAccumulatedPixels?: unknown };
+    _inertialRadiusOffset?: unknown;
+  };
+  const movement = internals.movement;
+  if (movement) {
+    if (typeof movement._zoomVelocity === 'number') {
+      movement._zoomVelocity = computeTargetRadius(movement._zoomVelocity, oldScale, newScale);
+    }
+    if (typeof movement.zoomAccumulatedPixels === 'number') {
+      movement.zoomAccumulatedPixels = computeTargetRadius(
+        movement.zoomAccumulatedPixels,
+        oldScale,
+        newScale,
+      );
+    }
+  }
+  if (typeof internals._inertialRadiusOffset === 'number') {
+    internals._inertialRadiusOffset = computeTargetRadius(
+      internals._inertialRadiusOffset,
+      oldScale,
+      newScale,
+    );
+  }
+}
+
+/**
  * minZ 재조정 권장값 — V5 clamp 충돌 방어.
  *
  * `cam.minZ = radius_new × 0.01` (ADR architect 설계안 위험 #3).
@@ -214,6 +280,13 @@ export interface TierTransitionOptions {
    *
    * 어느 경우든 `focusMeshVisualRadius` floor(#790) + target 동기화는 그대로 유지된다.
    * focusMesh 부재(free-fly) 경로에는 영향 없음(항상 `computeTargetRadius`).
+   *
+   * #1232 — `true` 는 **tween 없이 즉시 대입** 경로다 (focusMesh 유무 무관 — free-fly tier 전환도
+   * `updateTierByCamera → setTier(_, true)` 라 여기로 온다). `camera.radius = targetRadius` 후
+   * cleanup 을 동기 호출하므로, **`runTierTransition` 이 반환하기 전에 cleanup 이 끝난다** —
+   * `onComplete` (호출자의 `tierTransitionInProgress = false`) · `attachControl` · fallback timer
+   * 해제 · visibilitychange 해제가 모두 호출 안에서 일어난다. 즉 `tierTransitionInProgress` 는
+   * 호출 안에서 켜졌다 꺼진다. 반환되는 cleanup 은 이미 released 라 재호출은 no-op (idempotent).
    */
   preserveFocusDistance?: boolean;
   /** 전환 시간 (ms). 기본 300 */
@@ -242,9 +315,16 @@ export interface TierTransitionOptions {
 
 /**
  * Tier 전환 애니메이션 한 번 실행. 기존 `setTier` 에서 mesh scaling / orbit rebuild 는
- * 즉시 처리되었다는 전제. 본 함수는 **camera.radius dolly + 입력 잠금** 만 책임.
+ * 즉시 처리되었다는 전제. 본 함수는 **camera.radius dolly + 입력 잠금 + 줌 관성 단위 환산** 을 책임.
+ *
+ * 경로별 종료 시점 (#1232):
+ *  - `preserveFocusDistance=true` (줌 crossing / free-fly 전환): tween 없이 radius 즉시 대입 →
+ *    **반환 전에 cleanup 이 동기로 끝난다** (`onComplete` 정확히 1회 포함).
+ *  - `preserveFocusDistance=false` (focus-entry): 300ms tween → 정상 종료 / fallback timer /
+ *    visibilitychange 중 먼저 도달한 경로가 cleanup.
  *
  * @returns cleanup 함수 — 테스트 / 강제 해제 목적. 내부 타이머 + visibility listener 해제.
+ *   즉시 대입 경로에서는 이미 released 상태라 호출해도 no-op.
  */
 export function runTierTransition(opts: TierTransitionOptions): () => void {
   const {
@@ -274,6 +354,13 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
   // copyFrom / pending tween 취소 등 수 ms 작업 사이 wheel/pinch race 윈도우 존재. 본 가드는
   // 이 윈도우를 **0 ms 로 축소** — runTierTransition 진입 즉시 입력 차단.
   scene.detachControl();
+
+  // #1232 (ADR 380 §Amendment 3 A3.5-2) — 줌 관성 누적기를 새 tier 단위로 환산. **경로 무관**
+  // (focus-entry 포함 — scale 이 바뀌면 누적기의 단위도 바뀐다). renderScale 을 바꾸는 경로는
+  // `setTier → runTierTransition` 하나뿐이라 여기 한 곳이 두 호출처 (줌 crossing · focus 진입)
+  // 를 모두 덮는다. `camera-controller.focusOn` 은 scale 을 안 바꾸고 누적기에도 쓰지 않는다
+  // (그 부재가 단위 테스트로 고정돼 있다 — 쓰면 이 환산을 되돌리는 #790 클래스 회귀).
+  rescaleZoomInertiaForTier(camera, oldScale, newScale);
 
   // #444 — 입력 시도 카운트. transition 윈도우 (detachControl ~ cleanup) 에서 도달한 wheel/touchstart
   // 이벤트 개수. capture phase + passive (스크롤 차단 안 함). cleanup 시 removeEventListener.
@@ -438,6 +525,22 @@ export function runTierTransition(opts: TierTransitionOptions): () => void {
     doc?.removeEventListener('visibilitychange', onVisibilityChange);
     releaseControl();
   };
+
+  // #1232 (ADR 380 §Amendment 3 A3.5-1, 후보 4) — 줌 crossing 경로는 tween 없이 즉시 대입.
+  //   `radiusOld` 와 `targetRadius` 는 같은 실거리의 구/신 단위 표기라 보간할 대상이 없다. tween 은
+  //   첫 적용이 **다음 프레임 animate()** 라 이 프레임 (setTier 는 onBeforeRender — camera.update
+  //   다음) 에 구 단위 radius 가 그대로 렌더되고 (지구 내부 `5.2e-6 AU`), 다음 프레임 구 단위 시작값이
+  //   가드 A floor 에 clamp 된다 (`0.019381 AU`). 즉시 대입은 같은 onBeforeRender 안에서 radius 를
+  //   새 단위로 바꿔 두 프레임을 모두 없애고, radius 를 덮어쓰는 tween 이 없어 관성이 경계를 넘어
+  //   이어진다. 후보 3 (창 동안 limits 확장) · 후보 5 (시작값 환산) 는 전환 프레임을 못 막아 기각.
+  //   targetRadius ≥ lowerRadiusLimit 는 가드 A (`max(minZ, target×0.01)`) 와 #790 floor
+  //   (`min(visual×1.05, target)`) 가 둘 다 target 이하라 성립 → 대입 직후 clamp 없음.
+  //   cleanup 동기 호출 — released 계약 그대로 onComplete 1회 · attachControl · timer · listener 해제.
+  if (preserveFocusDistance) {
+    camera.radius = targetRadius;
+    cleanup();
+    return cleanup;
+  }
 
   Animation.CreateAndStartAnimation(
     'tier-transition-radius',
