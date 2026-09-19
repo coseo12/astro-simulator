@@ -424,7 +424,7 @@ pass = signs.size <= 1; // 모든 변화율 같은 부호 (monotonic) — wheel 
 
 ## Amendment 3 — 2026-09-19 — Concrete Prediction 6 반증 + 줌 crossing 경로 결정 교체 (#1232)
 
-- **상태**: **Provisional** — cross-validate 결과 본문 통합 전 (CLAUDE.md §ADR Status 워크플로). 통합 후 `Accepted (cross-validate <YYYY-MM-DD>)` 로 전이
+- **상태**: **Accepted (cross-validate 2026-09-19)** — §A3.8 통합 완료. A3.6 의 D2·D3 측정량 재정의 (수치 불변) 는 사용자가 2026-09-19 승인했다 (계약 재조정)
 - **발의**: [#1232](https://github.com/coseo12/astro-simulator/issues/1232) (사용자 D13 육안 보고 2026-09-18 — _「줌인 시 일정 부분에서 화면이 한번 흔들리고 … 다시 아웃하면 줌 거리가 확 멀어져」_). 스프린트 계약: [#1232 코멘트](https://github.com/coseo12/astro-simulator/issues/1232#issuecomment-5741088408) (사용자 승인 2026-09-19)
 - **트리거**: 실측 발견 (본 ADR §Amendment 2026-05-11 이 박제한 사용자 보고와 **같은 문장**이 재발)
 - **변경 분류**: 결정 폐기 (Prediction 6 의 원인 귀속) / 측정 지표 갱신 (Prediction 6 측정량) / 결정 추가 (줌 crossing 경로 radius 즉시 대입 + 관성 누적기 단위 환산)
@@ -492,7 +492,7 @@ pass = signs.size <= 1; // 모든 변화율 같은 부호 (monotonic) — wheel 
 - **후보 5 기각 (결정적)**: 애니메이션의 첫 적용은 **다음 프레임의 `animate()`** 라, 시작값을 바꿔도 `ci` 프레임은 여전히 구 단위 radius 로 렌더된다 (`5.2e-6 AU`). 또 시작값 = 끝값인 tween 이 300 ms 동안 radius 를 매 프레임 덮어써 줌 관성을 먹는다 (줌아웃 과도 `16,297` 은 같은 `ci` 프레임).
 - **후보 4 채택**: `setTier` 와 같은 `onBeforeRender` 안에서 `radius` 가 새 단위로 바뀌므로 `ci` 프레임부터 올바른 거리로 렌더되고, floor 아래를 지나가지 않아 clamp 가 없으며, tween 이 radius 를 덮어쓰지 않아 관성이 경계를 넘어 이어진다 (D3 `+0.5 %`).
 
-### A3.5 결정 (Provisional)
+### A3.5 결정
 
 1. **(가) 후보 4** — `runTierTransition` 의 `preserveFocusDistance === true` 경로는 tween 을 만들지 않고 `camera.radius = targetRadius` 를 **즉시 대입**한 뒤 cleanup 을 **동기 호출**한다 (`released` 플래그 계약 유지 → `onComplete` 정확히 1회 · `attachControl` · fallback timer 해제 · visibilitychange 해제). `preserveFocusDistance=false` (focus-entry `applyFocusTier` / `clearFocus`) 경로는 **무변경** — V5 재프레이밍 tween 과 G8a 잠금이 그대로다.
    - G8a 의 위상: tween 경로에서는 유지. 즉시 대입 경로에서는 잠금 창이 **0 ms** 가 된다 — 비동기로 남는 작업이 없어 race 대상이 없다.
