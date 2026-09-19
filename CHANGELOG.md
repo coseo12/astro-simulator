@@ -5,6 +5,36 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1232] tier 경계 줌 — 줌인 시 흔들림 · 줌아웃 시 과도 이탈** ([#1232](https://github.com/coseo12/astro-simulator/issues/1232), ADR [`20260509-380`](docs/decisions/20260509-380-zoom-camera-freeze-forensic.md) §Amendment 3). planet focus (예: `?focus=earth`) 에서 휠로 `0.1 AU` 경계를 넘을 때 생기던 두 증상을 고쳤다. 둘은 기전이 다르다.
+
+  - **(가) 줌인 흔들림 — 원인: 구 tier 단위 radius 에서 출발하는 tween.** `setTier` 는 `onBeforeRender` 에서 돌아 `camera.update()` 다음이다. 그래서 전환 프레임은 mesh 는 새 tier 인데 radius 는 구 tier 값 그대로 렌더됐고 (earth 실측 `5.2e-6 AU` — 지구 내부), 다음 프레임에는 tween 의 구 단위 시작값이 가드 A floor 에 clamp 됐다 (`0.019381 AU`). 줌 crossing 경로 (`preserveFocusDistance=true`) 는 `radiusOld` 와 `targetRadius` 가 같은 실거리라 보간할 대상이 없으므로, `runTierTransition` 이 radius 를 **즉시 대입**하고 cleanup 을 동기 호출하게 바꿨다. #380 Concrete Prediction 6 (_「G8a 로 입력 race 제거」_) 은 원인 귀속이 틀렸던 것으로 반증됐다.
+  - **(나) 줌아웃 이탈 — 원인: 줌 관성 누적기가 tier 단위 변환을 안 받음.** Babylon 9 의 휠 줌 관성 (`camera.movement._zoomVelocity` · `zoomAccumulatedPixels` · 레거시 `_inertialRadiusOffset`) 은 scene unit 인데 tier 전환이 단위를 `16,299` 배 바꾸면서 누적기는 그대로 뒀다. 전환 시 세 누적기를 `computeTargetRadius` 와 같은 식으로 환산한다 (`rescaleZoomInertiaForTier`, 경로 무관). ⚠️ 공개 `inertialRadiusOffset` setter 로는 환산이 **조용히 실패**한다 — setter 는 `0` 일 때만 누적기를 리셋한다.
+  - free-fly tier 전환도 같은 경로 (`setTier(_, true)`) 라 함께 고쳐진다. [실측] 기본 화면에서 휠 줌인으로 solar→inner 를 넘길 때 수정 전은 실거리가 `2.65 → 0.138 → 1.50 → 2.41 AU` 로 튀었고 (3회 동일), 수정 후는 `2.66 → 2.53 → 2.23 → 2.07 AU` 로 단조 감소한다.
+  - 가드 — `verify:818-focus-zoom` 에 **S4 (earth 경계 왕복 · 관성 생존)** 추가. 매 렌더 프레임을 기록해 D1 (전환 프레임 실거리 `≥ 0.08 AU` · clamp `0`) · D2 (줌아웃 통과 후 최대 실거리 / 대조군 예측 `≤ 1.05`) · D3 (줌아웃 · 줌인 로그 배율 비 `±10 %`) 를 판정한다. 전제 위반은 `exit 2`.
+
+### Behavior Changes
+
+- **focus 중 휠 줌으로 tier 경계를 넘을 때 카메라가 더 이상 흔들리거나 튀지 않는다** (#1232). 줌인 전환 순간 지구가 화면을 꽉 채웠다 물러나던 프레임이 사라졌고, 줌아웃 경계 통과 후 정착 거리가 같은 입력의 경계 없는 배율과 같아졌다 ([실측] `F_x / F_c` 수정 전 `7.63` → 수정 후 `1.00`). 진행 중이던 줌 관성은 경계를 넘어 그대로 이어진다.
+- 줌 crossing · free-fly tier 전환 (`preserveFocusDistance=true`) 은 이제 **300 ms radius tween 과 입력 잠금 창이 없다** — 전환이 한 프레임 안에서 끝난다. focus 진입 (클릭 · URL) 의 재프레이밍 tween 과 G8a 잠금은 **무변경**이다.
+
+### Notes
+
+- **[#1232] 계약 재조정 1건 — D2 · D3 은 수치를 그대로 두고 측정량만 바꿨다** (사용자 승인 2026-09-19, ADR §A3.6 9·10 항).
+  - D2 「기대 r」 은 이슈 본문의 `r_pre × newScale/oldScale` 가 아니라 **대조군 예측** (같은 4틱 묶음을 경계 없는 inner `0.2 AU` 에서 쏜 배율 `F_c`) 이다. 본문 식은 관성이 옳게 이어지는 판본을 FAIL (`×1.066`), 관성을 tween 이 먹는 판본을 PASS (`×1.014`) 시킨다 — 틀린 설계를 고르는 측정량이다.
+  - D3 「줌 속도」 는 시간창 속도가 아니라 **틱 묶음의 로그 배율 비** 다. 시간창 속도는 body tier 렌더 부하로 옳은 판본에서도 경계 후가 `+9 ~ +22 %` 계통적으로 빠르다.
+  - 3위치 기록 — 코드 주석 (`browser-verify-818-focus-zoom.mjs` 머리말 S4 절) · PR 본문 · 이 항목.
+- **[#1232] D5 판별력 — 결함 판본 6종 (수정 전 `develop` + 변이 5종) 을 실제로 빌드·적재해 S4 를 실행했다.** 6종 전부 `exit 1`, 수정판만 `exit 0` 이다 (판본 마커로 적재 확인). **「줌인 방향만 관성 0」 변이는 S4d (줌인 통과군) 만 잡는다** — S4a · S4b 는 PASS 다 (S4d 는 cross-validate 수용으로 추가된 시나리오).
+- **[#1232] 계약 재조정 2 — D6 의 `verify:380-zoom` S2 를 폐기하지 않고 개정했다** (사용자 승인 2026-09-19, [#1232 코멘트](https://github.com/coseo12/astro-simulator/issues/1232#issuecomment-5741978238)).
+  - 사실: 구 S2 는 수정판과 `develop` **양쪽에서 FAIL** 했다. `verify:380` 이 CI 에 배선돼 있지 않아 드러나지 않았다.
+  - 원인 둘: (1) 판정량이 raw `camera.radius` 부호였다 — ADR §A3.1(3) 이 반증한 Prediction 6 의 측정량이라 올바른 경계 통과도 단위 전환 순간을 역행으로 읽는다. (2) 존재하지 않는 `__simCore.sendCommand` 를 불러 mercury focus 가 **조용히 no-op** 됐다. 실제로 재던 것은 기본 개요에서 휠이 solar→inner 를 넘는 **free-fly** 경로였다.
+  - 개정: 호출을 `command` 로 고치지 않고 **제거**하고, free-fly 줌 경계 통과를 명시 대상으로 삼았다. focus-entry 는 실거리가 의도적으로 불연속인 다른 계약이고, free-fly 분기는 `verify:818` S4 (`focus=earth` 전용) 가 지나지 않는다. 판정은 매 렌더 프레임 기록 (`apps/web/scripts/tier-frame-recorder.mjs` — `verify:818` S4 와 공용) 에서 **실거리 역행 프레임 수 `== 0`** · **tier 전이 횟수 `== 1`** 의 정수 술어다 (**새 임계 0개**). 전이 0회 · 빈 표본 · 비유한 실거리는 `exit 2` (판정 불가) 다.
+  - 판별력 [실측]: 수정판 PASS · `develop` FAIL (전환 프레임 `2.56 → 0.139 AU`, 역행 4) · 「free-fly 에서만 즉시 대입 제거」 변이 FAIL (역행 4) — 이 변이는 `verify:818` S4 가 **PASS** 한다 (각 3회).
+  - 3위치 기록 — 코드 주석 (`browser-verify-380-zoom.mjs` 머리말 S2 절) · PR 본문 · 이 항목.
+- **[#1232] `verify:818` S4 판정 분류 정정 (reviewer 권고)** — 기대 전이 뒤의 **추가 전이** (경계 진동) 를 전제 위반 (`exit 2`) 에서 **FAIL (`exit 1`)** 로 옮겼고, 확정 FAIL 이 하나라도 있으면 `exit 1` 이 우선한다 (전제 위반이 FAIL 을 가리지 않음). [실측] 진동 주입 변이에서 구 판정 `exit 2` → 개정 `exit 1`. D1 clamp 술어를 계약 문구 (`r == lowerRadiusLimit`, tier 무관) 에 맞췄고, 측정 오류는 TypeError 대신 원인 메시지와 함께 `exit 2` 다. D1 출력에 `dt[ci]` · `dt[ci+1]` 를 진단값으로 찍는다 (판정식 · 임계 불변).
+- **[#1232] 범위 밖 관찰 (이슈화하지 않음)** — focus 진입 경로 (`preserveFocusDistance=false`) 에도 같은 전환 프레임 (구 단위 radius 1 프레임 렌더) 이 있을 수 있다 [판독 — 미측정] / 패닝 관성 · free-fly `camera.target` 단위 / `verify:818` 은 CI 에 배선돼 있지 않다 (qa 수동 게이트).
+
 ## [0.89.0] - 2026-09-18
 
 ### Added

@@ -1159,6 +1159,14 @@ export function createSolarSystemScene(
   // 실거리 보존으로 apparent size 불변 (tier-transition.ts 수식 유도 주석 참조). 입력 500ms 잠금 +
   // visibilitychange resume 으로 UX 안전장치 박제.
   //
+  // [#1232 — ADR 380 §Amendment 3] 위 300ms interp 는 이제 focus-entry (`preserveFocusDistance=false`)
+  // 경로 한정이다. 줌 crossing (`updateTierByCamera → setTier(_, true)`, free-fly 포함) 은
+  // `runTierTransition` 이 radius 를 **즉시 대입**하고 cleanup 을 **동기 호출**한다 — 아래
+  // `tierTransitionInProgress = true` 는 그 호출 안에서 onComplete 로 다시 false 가 되고,
+  // `pendingTierCleanup` 에는 이미 released 된 (idempotent) cleanup 이 담긴다. 순서상 문제 없음
+  // (lock 을 호출 **전에** 세우므로 onComplete 의 false 가 마지막 쓰기다). 줌 관성 누적기의 tier
+  // 단위 환산 (`rescaleZoomInertiaForTier`) 도 경로 무관하게 그 안에서 한 번 일어난다.
+  //
   // N2 권고 반영: 매 tier 전환마다 `scaling.scaleInPlace(ratio)` 누적은 부동소수점 drift 위험.
   // 대신 mesh 가 생성된 **초기 tier** 의 renderScale 기준으로 **절대** scaling 을 계산한다.
   //   mesh diameter(actual) = base × initialScale × mesh.scaling

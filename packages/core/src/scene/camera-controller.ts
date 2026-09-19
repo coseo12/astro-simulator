@@ -256,6 +256,11 @@ export class CameraController {
    * 로 계산해 `target.radius` 로 명시 전달하며 (아래 `??` fallback 우회), 행성은 그 값도 `× 5` 라
    * 수치 동일하다. 즉 focusOn 내부의 `meshRadius × FOCUS_USER_RADIUS_MULTIPLIER` 는 fallback 이고
    * operative 경로는 sim-canvas 쪽 — 행성 focus-entry 정착 결과는 양 경로에서 같다.
+   *
+   * #1232 — focusOn 은 줌 관성 누적기(camera.movement._zoomVelocity 등)에 쓰지 않는다.
+   * renderScale 변경은 applyFocusTier → setTier → runTierTransition 에서만 일어나고, 누적기의
+   * tier 단위 환산도 거기서 한 번 한다 (rescaleZoomInertiaForTier). 여기서 누적기를 쓰면 그 환산을
+   * 되돌리는 #790 클래스 회귀가 된다.
    */
   focusOn(target: FocusTarget): void {
     const { mesh } = target;
