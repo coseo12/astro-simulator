@@ -108,6 +108,30 @@ describe('#1232 Babylon 내부 필드 핀 (fail-fast — A3.7 재검토 조건)'
     expect(typeof c._inertialRadiusOffset).toBe('number');
   });
 
+  it('행동 핀: _zoomVelocity 시드 → camera.update() → radius 가 시드 방향으로, 시드에 비례해 변한다', () => {
+    // 존재 핀만으로는 부족하다 (#1232 reviewer 권고 4) — Babylon 업그레이드로 필드가 **남아 있으면서**
+    // 의미·단위가 바뀌면 (다른 필드를 적분하거나 정규화된 값이 되면) 존재 핀은 통과하고 환산은 조용히
+    // 무효가 된다. 환산이 기대는 성질 두 가지를 직접 고정한다:
+    //  ① 방향 — `radius -= zoomDeltaCurrentFrame` 이라 양의 velocity 는 radius 를 줄인다 (줌인)
+    //  ② 선형성 — `computeTargetRadius` 로 velocity 를 곱해 옮기는 것이 옳으려면 한 프레임 변위가
+    //     velocity 에 비례해야 한다 (`zoomDelta = velocity × speed × … × dt`)
+    const R0 = 1000;
+    const V = 0.5;
+    const K = 3;
+    const deltaFor = (velocity: number) => {
+      const camera = makeCamera(R0);
+      seedZoomInertia(camera, velocity, 0);
+      camera.update();
+      return camera.radius - R0;
+    };
+    const dPos = deltaFor(V);
+    const dNeg = deltaFor(-V);
+    const dScaled = deltaFor(V * K);
+    expect(dPos).toBeLessThan(0);
+    expect(dNeg).toBeGreaterThan(0);
+    expect(dScaled / dPos).toBeCloseTo(K, 9);
+  });
+
   it('반례 고정: 공개 inertialRadiusOffset setter 로 곱해도 _zoomVelocity 는 바뀌지 않는다', () => {
     // 헬퍼가 공개 API 대신 내부 필드를 쓰는 이유. setter 는 0 을 쓸 때만 resetZoomVelocity 를 부른다.
     // 관성 진행 중의 실제 상태: velocity ≠ 0 이고 이번 프레임 변위 zoomDeltaCurrentFrame ≠ 0.
