@@ -64,7 +64,7 @@
  * | 단계 | 설정 | 판정 |
  * |---|---|---|
  * | S4c 대조군 (줌아웃) | inner `0.2 AU` → `+120` × 4틱 (50 ms) → 3 s | `F_c` = 최종/시작 (경계 없음) |
- * | S4a D1 | `?focus=earth` inner → `−120` 50 ms 연속, body 전환 시 중단 → 800 ms | `min(실거리[ci], 실거리[ci+1]) ≥ 0.08 AU` ∧ `ci~ci+30` 의 `r == lowerRadiusLimit` 프레임 0 |
+ * | S4a D1 | `?focus=earth` inner → `−120` 50 ms 연속, body 전환 시 중단 → 800 ms | `min(실거리[ci], 실거리[ci+1]) ≥ 0.08 AU` ∧ `ci~ci+30` 의 `r == lowerRadiusLimit` 프레임 0 (tier 무관) ∧ 추가 전이 0 |
  * | S4b D2·D3 (줌아웃 통과군) | body `0.097 AU` → S4c 와 같은 4틱 → 3 s | D2 `maxPost / (x₀ × F_c) ≤ 1.05` · D3 `|ln F_x / ln F_c − 1| ≤ 0.10` |
  * | S4e 대조군 (줌인) | inner `0.2 AU` → `−120` × 4틱 → 3 s | `F_c↓` |
  * | S4d D3 (줌인 통과군) | inner `S4D_START_AU` → S4e 와 같은 4틱 → 3 s | `|ln F_x / ln F_c↓ − 1| ≤ 0.10` (D3 임계 재사용 — 새 임계 0개) |
@@ -82,8 +82,21 @@
  *    넘겨 전환 순간 관성이 크다. 경계를 관성 꼬리에서 넘기면 「관성 0 대입」 변이가 통과한다
  *    (`0.075 AU` · 8틱 → `−9.1 %`, 판별력 소실 — ADR A3.6 10 항 architect 실측).
  *
- * **전제 (fail-closed, exit 2)** — 통과군 경계 전이 정확히 1회 / 대조군 전이 0회 / 설정 직후 tier 가
- * 기대값 / 기록 프레임 > 0. 하나라도 어긋나면 FAIL 이 아니라 **전제 위반**으로 exit 2 (공허 통과 금지).
+ * **전제 (fail-closed, exit 2)** — 하네스가 통제하는 설정만 묻는다: 통과군 **기대 방향 전이 ≥ 1** /
+ * 대조군 전이 0회 / 설정 직후 tier 가 기대값 / 기록 프레임 > 0 / D1 창의 `lowerRadiusLimit` 기록.
+ * 하나라도 어긋나면 FAIL 이 아니라 **전제 위반**으로 exit 2 (공허 통과 금지). 측정 오류 (mesh 부재 등)
+ * 도 exit 2 다.
+ *
+ * **추가 전이는 FAIL (exit 1)** — 기대 전이 뒤에 다시 되돌아오는 전이 (경계 진동) 는 하네스가 아니라
+ * 제품 결함이다 (#1232 reviewer 권고 1(가)). 전제에 넣으면 결함이 전제 위반 뒤에 숨는다.
+ *
+ * **종료 코드 합성** — 확정 FAIL 이 어느 시나리오에든 있으면 exit 1 이 우선한다. S4 의 전제 위반이
+ * 독립 시나리오 S1~S3 의 FAIL 을 exit 2 로 가리지 않는다 (권고 1(나)).
+ *
+ * **진단값** — 기록기가 매 프레임 `engine.getDeltaTime()` 을 남기고 D1 출력에 `dt[ci]`·`dt[ci+1]` 를
+ * 찍는다. D1 의 `ci+1` 은 경계 `0.085 AU` 에서 관성 1프레임 분 내려간 값이라 프레임 간격에 걸려
+ * 있다 (여유 ≈3 %, ~32 fps 아래에서 수정판도 `< 0.08` 가능). 판정식·임계는 계약 그대로 두고, FAIL 시
+ * 프레임 간격 문제인지 결함 (`5.2e-6 AU`, 4자릿수 차) 인지 가르는 용도다 (권고 3).
  *
  * dev 빌드 의존: window.__solarScene (meshes Map / getTier) + window.__simStore (setSelectedBody)
  * 환경변수: BASE_URL (기본 http://localhost:3000) / CAPTURE_DIR (PNG 저장, 미지정 시 생략)
@@ -94,6 +107,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
+import {
+  AU,
+  RENDER_SCALE,
+  drainFrameRecorder,
+  installFrameRecorder,
+  tierTransitions,
+} from './tier-frame-recorder.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const CAPTURE_DIR = process.env.CAPTURE_DIR ?? '';
@@ -105,9 +125,7 @@ const flags = {
 
 const VIEWPORT = { width: 1280, height: 720 };
 const SETTLE_MS = 2500;
-const AU = 1.495978707e11;
-// tier.ts RENDER_SCALE SSoT (m → scene unit). tier-불변 실거리 환산에 사용.
-const RENDER_SCALE = { solar: 8.4e-11, inner: 1.54e-9, body: 2.51e-5 };
+// AU · RENDER_SCALE (tier.ts SSoT 사본) 은 `tier-frame-recorder.mjs` 로 이관 — 380 S2 와 공용 (#1232).
 
 // 줌인 시퀀스 파라미터.
 const MAX_ZOOM_ITERS = 60;
@@ -448,39 +466,6 @@ const S4_CONTROL_START_AU = 0.2; // inner — 경계 없는 대조군
 // S4d — 줌인 경계 0.085 AU 를 묶음 약 70 % 지점에서 통과 (S4b 와 대칭 설계, 실측 확정).
 const S4D_START_AU = 0.101;
 
-/** 매 렌더 프레임 기록기 설치 — `window.__rec1232` 에 {t, tier, radius, lo} push. */
-async function installRecorder(page, bodyId) {
-  return await page.evaluate((id) => {
-    const solar = window.__solarScene;
-    const mesh = solar?.meshes?.get?.(id);
-    if (!mesh) return { error: `no mesh: ${id}` };
-    const scene = mesh.getScene();
-    const cam = scene?.activeCamera;
-    if (!cam) return { error: 'no camera' };
-    if (window.__rec1232Observer) scene.onAfterRenderObservable.remove(window.__rec1232Observer);
-    window.__rec1232 = [];
-    window.__rec1232Observer = scene.onAfterRenderObservable.add(() => {
-      window.__rec1232.push({
-        t: performance.now(),
-        tier: solar.getTier ? solar.getTier() : 'unknown',
-        radius: cam.radius,
-        lo: cam.lowerRadiusLimit,
-      });
-    });
-    return { ok: true };
-  }, bodyId);
-}
-
-/** 기록 회수 + 실거리 부착. 기록은 비운다. */
-async function drainRecorder(page) {
-  const frames = await page.evaluate(() => {
-    const f = window.__rec1232 ?? [];
-    window.__rec1232 = [];
-    return f;
-  });
-  return frames.map((f) => ({ ...f, au: f.radius / (RENDER_SCALE[f.tier] ?? NaN) / AU }));
-}
-
 /** 관성 제거 후 실거리 `au` 로 radius 설정 (현 tier 단위) → 정착 → 측정. */
 async function setRealDistance(page, bodyId, au) {
   await page.evaluate(
@@ -497,24 +482,13 @@ async function setRealDistance(page, bodyId, au) {
   return withRealDistance(await measure(page, bodyId));
 }
 
-/** tier 전이 목록 (프레임 인덱스, from, to). */
-function tierTransitions(frames) {
-  const out = [];
-  for (let i = 1; i < frames.length; i += 1) {
-    if (frames[i].tier !== frames[i - 1].tier) {
-      out.push({ i, from: frames[i - 1].tier, to: frames[i].tier });
-    }
-  }
-  return out;
-}
-
 /**
  * 틱 묶음 1회 — 시작 실거리 설정 → 기록기 → 4틱 → 정착. 반환: {x0, xEnd, F, frames, setupTier}.
  * `x0` 는 설정 후 정착 측정값 (틱 직전), `xEnd` 는 정착 후 측정값.
  */
 async function runBundle(page, bodyId, { startAu, deltaY }) {
   const setup = await setRealDistance(page, bodyId, startAu);
-  const rec = await installRecorder(page, bodyId);
+  const rec = await installFrameRecorder(page, bodyId);
   if (rec.error) return { error: rec.error };
   for (let t = 0; t < S4_TICKS; t += 1) {
     await page.mouse.wheel(0, deltaY);
@@ -522,7 +496,7 @@ async function runBundle(page, bodyId, { startAu, deltaY }) {
   }
   await page.waitForTimeout(S4_BUNDLE_SETTLE_MS);
   const end = withRealDistance(await measure(page, bodyId));
-  const frames = await drainRecorder(page);
+  const frames = await drainFrameRecorder(page);
   return {
     setupTier: setup.tier,
     x0: setup.cameraFromFocusAU,
@@ -533,10 +507,30 @@ async function runBundle(page, bodyId, { startAu, deltaY }) {
 }
 
 /**
+ * D1 clamp 프레임 판정 — 계약 D1 문구 그대로 `r == lowerRadiusLimit` (tier·부호 한정 없음).
+ *
+ * #1232 reviewer 권고 2 — 이전 판본은 `tier === 'body' && lo > 0` 인 프레임만 세서 계약보다 좁았다
+ * (창 안에서 inner 로 되돌아간 프레임 · `lo` 가 `0` 인 프레임은 세지 않고 통과). 지금은:
+ *  - `lo === null` → Babylon 에서 「하한 없음」 이라 clamp 가 **정의상 불가** → 비계수 (의미론상 참)
+ *  - `lo === 0` → `r === 0` 이면 clamp (상대 오차 분모 0 회피)
+ *  - 그 밖 → 상대 오차 `< S4_CLAMP_EPS` (부동소수 동등성 — Babylon clamp 는 정확 대입)
+ * `lo` 가 기록되지 않았거나 비유한이면 판정 불가다 — 호출부가 **전제 위반**으로 올린다 (공허 통과 금지).
+ */
+function isClampFrame(f) {
+  if (f.lo === null) return false;
+  if (f.lo === 0) return f.radius === 0;
+  return Math.abs(f.radius - f.lo) / Math.abs(f.lo) < S4_CLAMP_EPS;
+}
+
+/**
  * S4a — D1. 진입 (inner) 에서 −120 을 50 ms 간격 연속, tier 가 body 가 되면 중단 → 800 ms 기록.
+ *
+ * 전제 (exit 2) 는 **하네스가 통제하는 것만** 묻는다 — 시작 tier · 기록 프레임 · 기대 전이 ≥ 1 ·
+ * `ci+1` 존재 · 창 안 `lo` 기록. 기대 전이 **뒤의 추가 전이** (body→inner 진동) 는 제품 결함이라
+ * FAIL 이다 (#1232 reviewer 권고 1(가) — 결함이 전제 뒤에 숨는 #1215 MC-9 모양 차단).
  */
 async function runS4a(page, bodyId) {
-  const rec = await installRecorder(page, bodyId);
+  const rec = await installFrameRecorder(page, bodyId);
   if (rec.error) return { error: rec.error };
   const startTier = (await measure(page, bodyId)).tier;
   let ticks = 0;
@@ -546,30 +540,44 @@ async function runS4a(page, bodyId) {
     if ((await measure(page, bodyId)).tier === 'body') break;
   }
   await page.waitForTimeout(S4A_POST_MS);
-  const frames = await drainRecorder(page);
+  const frames = await drainFrameRecorder(page);
   const trans = tierTransitions(frames);
   const ci = trans.find((x) => x.from === 'inner' && x.to === 'body')?.i ?? -1;
-  const precondition =
-    startTier === 'inner' && frames.length > 0 && ci > 0 && ci + 1 < frames.length
-      ? null
-      : `startTier=${startTier} frames=${frames.length} ci=${ci}`;
-  if (precondition) return { precondition, ticks };
-  const minAu = Math.min(frames[ci].au, frames[ci + 1].au);
-  let clampFrames = 0;
-  for (let i = ci; i <= Math.min(ci + S4_CLAMP_WINDOW, frames.length - 1); i += 1) {
-    const f = frames[i];
-    if (f.tier === 'body' && f.lo > 0 && Math.abs(f.radius - f.lo) / f.lo < S4_CLAMP_EPS) {
-      clampFrames += 1;
+  const pre = [];
+  if (startTier !== 'inner') pre.push(`startTier=${startTier}≠inner`);
+  if (frames.length === 0) pre.push('기록 프레임 0');
+  if (!(ci > 0 && ci + 1 < frames.length)) pre.push(`기대 전이 inner→body 부재/창 부족 ci=${ci}`);
+  const clampEnd = Math.min(ci + S4_CLAMP_WINDOW, frames.length - 1);
+  if (ci > 0) {
+    for (let i = ci; i <= clampEnd; i += 1) {
+      const lo = frames[i].lo;
+      if (lo !== null && !Number.isFinite(lo)) {
+        pre.push(`frame ${i} lowerRadiusLimit 미기록/비유한 (${lo})`);
+        break;
+      }
     }
   }
+  if (pre.length > 0) return { precondition: pre.join('; '), ticks };
+
+  const minAu = Math.min(frames[ci].au, frames[ci + 1].au);
+  let clampFrames = 0;
+  for (let i = ci; i <= clampEnd; i += 1) {
+    if (isClampFrame(frames[i])) clampFrames += 1;
+  }
+  // 기대 전이 1회 외의 전이 전부 — 진동 (body→inner 되돌아감) 은 제품 결함.
+  const extraTransitions = trans.length - 1;
   const window3 = frames.slice(ci, ci + 3).map((f) => f.au);
-  const pass = minAu >= S4_D1_MIN_AU && clampFrames === 0;
-  return { ticks, ci, minAu, clampFrames, window3, backTransitions: trans.length - 1, pass };
+  // 진단 전용 (판정량 아님, reviewer 권고 3) — 관성 변위는 dt 에 비례하므로 D1 FAIL 시 원인 분리용.
+  const dtCi = frames[ci].dt;
+  const dtCi1 = frames[ci + 1].dt;
+  const pass = minAu >= S4_D1_MIN_AU && clampFrames === 0 && extraTransitions === 0;
+  return { ticks, ci, minAu, clampFrames, extraTransitions, window3, dtCi, dtCi1, pass };
 }
 
 /**
- * 통과군 판정 — 경계 전이가 정확히 1회 (from→to) 여야 전제 충족.
- * D2 는 줌아웃 통과군만 (`withD2`) — `maxPost` = 전환 프레임 이후 실거리 최댓값.
+ * 통과군 판정. 전제 (exit 2) = 설정 tier · 기록 프레임 · 대조군 무전이 · `F_c` 비퇴화 · **기대 전이
+ * (from→to) ≥ 1**. 그 뒤의 **추가 전이** 는 제품 결함 (경계 진동) 이라 FAIL — #1232 reviewer 권고
+ * 1(가). D2 는 줌아웃 통과군만 (`withD2`) — `maxPost` = 전환 프레임 이후 실거리 최댓값.
  */
 function judgeCrossing(bundle, control, { from, to, withD2 }) {
   const trans = tierTransitions(bundle.frames);
@@ -578,33 +586,43 @@ function judgeCrossing(bundle, control, { from, to, withD2 }) {
   if (bundle.setupTier !== from) pre.push(`setupTier=${bundle.setupTier}≠${from}`);
   if (control.setupTier !== 'inner') pre.push(`control.setupTier=${control.setupTier}≠inner`);
   if (bundle.frames.length === 0 || control.frames.length === 0) pre.push('기록 프레임 0');
-  if (trans.length !== 1 || trans[0].from !== from || trans[0].to !== to) {
+  const expected = trans.find((x) => x.from === from && x.to === to);
+  if (!expected) {
     pre.push(
-      `통과군 전이 ${JSON.stringify(trans.map((x) => `${x.from}→${x.to}`))} ≠ [${from}→${to}]`,
+      `통과군 기대 전이 ${from}→${to} 0회 (관측 ${JSON.stringify(trans.map((x) => `${x.from}→${x.to}`))})`,
     );
   }
   if (ctrlTrans.length !== 0) pre.push(`대조군 전이 ${ctrlTrans.length}회 ≠ 0`);
   if (!(control.F > 0) || Math.abs(Math.log(control.F)) < 1e-6) pre.push(`F_c=${control.F} 퇴화`);
   if (pre.length > 0) return { precondition: pre.join('; ') };
 
-  const ci = trans[0].i;
+  const ci = expected.i;
+  const extraTransitions = trans.length - 1;
   const d3Dev = Math.log(bundle.F) / Math.log(control.F) - 1;
   const d3 = Math.abs(d3Dev) <= S4_D3_MAX_DEV;
-  const out = { ci, x0: bundle.x0, Fx: bundle.F, Fc: control.F, d3Dev, d3 };
+  const out = { ci, x0: bundle.x0, Fx: bundle.F, Fc: control.F, d3Dev, d3, extraTransitions };
+  let pass = d3 && extraTransitions === 0;
   if (withD2) {
     const maxPost = Math.max(...bundle.frames.slice(ci).map((f) => f.au));
     const d2Ratio = maxPost / (bundle.x0 * control.F);
     out.maxPost = maxPost;
     out.d2Ratio = d2Ratio;
     out.d2 = d2Ratio <= S4_D2_MAX_RATIO;
-    out.pass = out.d2 && d3;
-  } else {
-    out.pass = d3;
+    pass = pass && out.d2;
   }
+  out.pass = pass;
   return out;
 }
 
 const fmtPct = (x) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(2)}%`;
+
+/**
+ * 시나리오 상태 — 종료 코드 합성의 입력 (#1232 reviewer 권고 1(나)).
+ *  - `FAIL` — 평가된 술어가 하나라도 거짓 (확정 결함)
+ *  - `PRECONDITION` — 평가 전제 위반 / 측정 오류 (판정 불가)
+ *  - `PASS`
+ */
+const STATUS = Object.freeze({ PASS: 'PASS', FAIL: 'FAIL', PRECONDITION: 'PRECONDITION' });
 
 async function runS4(browser) {
   const bodyId = 'earth';
@@ -637,8 +655,20 @@ async function runS4(browser) {
     // S4d — 줌인 통과군 (inner S4D_START_AU).
     const d = await runBundle(page, bodyId, { startAu: S4D_START_AU, deltaY: -S4_WHEEL_DELTA });
 
-    for (const [k, v] of Object.entries({ ctrlOut, ctrlIn, b, d })) {
-      if (v.error) return { scenario: 'S4', bodyId, error: `${k}: ${v.error}`, pass: false };
+    // 측정 오류 (mesh/camera 부재) 는 판정 **전에** 걸러 원인 메시지를 보존한다 — reviewer 권고 6.
+    // 이전 판본은 `a` 를 이 루프에서 빠뜨려, `a.error` 일 때 아래 로그가 `a.window3.map` TypeError 로
+    // 죽고 하네스 오류가 FAIL(1) 로 분류됐다. 측정 불가는 판정 불가 (exit 2) 다 — fail-closed 유지.
+    for (const [k, v] of Object.entries({ ctrlOut, ctrlIn, a, b, d })) {
+      if (v.error) {
+        console.log(`  [측정 오류] ${k}: ${v.error}`);
+        return {
+          scenario: 'S4',
+          bodyId,
+          error: `${k}: ${v.error}`,
+          status: STATUS.PRECONDITION,
+          pass: false,
+        };
+      }
     }
     const jb = judgeCrossing(b, ctrlOut, { from: 'body', to: 'inner', withD2: true });
     const jd = judgeCrossing(d, ctrlIn, { from: 'inner', to: 'body', withD2: false });
@@ -656,27 +686,37 @@ async function runS4(browser) {
     if (!a.precondition) {
       console.log(
         `  [S4a] D1 ticks=${a.ticks} ci=${a.ci} 창[ci..ci+2]=${a.window3.map((x) => x.toExponential(4)).join(' · ')}AU | ` +
-          `min=${a.minAu.toExponential(4)} (≥${S4_D1_MIN_AU}?) clamp=${a.clampFrames} (=0?) → ${a.pass ? 'PASS' : 'FAIL'}`,
+          `min=${a.minAu.toExponential(4)} (≥${S4_D1_MIN_AU}?) clamp=${a.clampFrames} (=0?) ` +
+          `추가전이=${a.extraTransitions} (=0?) → ${a.pass ? 'PASS' : 'FAIL'} | ` +
+          `dt[ci]=${a.dtCi?.toFixed(1)}ms dt[ci+1]=${a.dtCi1?.toFixed(1)}ms (진단)`,
       );
     }
     if (!jb.precondition) {
       console.log(
         `  [S4b] 줌아웃 통과 x0=${jb.x0.toFixed(4)}AU F_x=${jb.Fx.toFixed(4)} maxPost=${jb.maxPost.toExponential(4)}AU | ` +
           `D2 maxPost/(x0·F_c)=${jb.d2Ratio.toFixed(4)} (≤${S4_D2_MAX_RATIO}? ${jb.d2 ? 'PASS' : 'FAIL'}) | ` +
-          `D3 ${fmtPct(jb.d3Dev)} (|·|≤${S4_D3_MAX_DEV * 100}%? ${jb.d3 ? 'PASS' : 'FAIL'})`,
+          `D3 ${fmtPct(jb.d3Dev)} (|·|≤${S4_D3_MAX_DEV * 100}%? ${jb.d3 ? 'PASS' : 'FAIL'}) | ` +
+          `추가전이=${jb.extraTransitions} (=0?)`,
       );
     }
     if (!jd.precondition) {
       console.log(
         `  [S4d] 줌인 통과 x0=${jd.x0.toFixed(4)}AU F_x=${jd.Fx.toFixed(4)} | ` +
-          `D3 ${fmtPct(jd.d3Dev)} (|·|≤${S4_D3_MAX_DEV * 100}%? ${jd.d3 ? 'PASS' : 'FAIL'})`,
+          `D3 ${fmtPct(jd.d3Dev)} (|·|≤${S4_D3_MAX_DEV * 100}%? ${jd.d3 ? 'PASS' : 'FAIL'}) | ` +
+          `추가전이=${jd.extraTransitions} (=0?)`,
       );
     }
     for (const p of preconditions) console.log(`  [전제 위반] ${p}`);
     console.log(`  콘솔에러=${consoleErrors.length}`);
 
-    const pass =
-      preconditions.length === 0 && a.pass && jb.pass && jd.pass && consoleErrors.length === 0;
+    // 평가된 술어가 하나라도 거짓이면 확정 FAIL — 다른 하위 단계의 전제 위반이 이를 가리지 않는다.
+    const evaluated = [a, jb, jd].filter((x) => !x.precondition);
+    const confirmedFail = evaluated.some((x) => !x.pass) || consoleErrors.length > 0;
+    const status = confirmedFail
+      ? STATUS.FAIL
+      : preconditions.length > 0
+        ? STATUS.PRECONDITION
+        : STATUS.PASS;
     return {
       scenario: 'S4',
       bodyId,
@@ -686,11 +726,23 @@ async function runS4(browser) {
       controls: { zoomOut: ctrlOut.F, zoomIn: ctrlIn.F },
       preconditions,
       consoleErrors: consoleErrors.length,
-      pass,
+      status,
+      pass: status === STATUS.PASS,
     };
   } finally {
     await context.close();
   }
+}
+
+/**
+ * 종료 코드 합성 (#1232 reviewer 권고 1(나)) — 확정 FAIL 이 하나라도 있으면 **exit 1 우선**.
+ * S1~S3 은 S4 와 독립이라, S4 의 전제 위반이 S1~S3 의 확정 FAIL 을 exit 2 로 가리면 안 된다.
+ * FAIL 없음 + 전제 위반/측정 오류 있음 → exit 2. 전부 PASS → exit 0.
+ */
+function exitCodeFor(statuses) {
+  if (statuses.includes(STATUS.FAIL)) return 1;
+  if (statuses.includes(STATUS.PRECONDITION)) return 2;
+  return 0;
 }
 
 async function main() {
@@ -700,7 +752,6 @@ async function main() {
   );
 
   const result = { timestamp: new Date().toISOString(), baseUrl: BASE_URL, scenarios: {} };
-  let allPass = true;
   // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
   // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
   await withBrowser({ headless: true }, async (browser) => {
@@ -718,27 +769,27 @@ async function main() {
       result.scenarios.s3 = await runScenario(browser, { name: 'S3', bodyId: 'earth' });
     }
     result.scenarios.s4 = await runS4(browser);
-    for (const s of Object.values(result.scenarios)) {
-      if (!s.pass) allPass = false;
-    }
   });
-  // #1232 — 전제 위반은 FAIL 과 구분해 exit 2 (공허 통과 금지 · 결함 판정과 섞지 않음).
-  const preconditionViolated = (result.scenarios.s4?.preconditions?.length ?? 0) > 0;
+  // S1~S3 은 기존 판정 그대로 PASS/FAIL 이분. S4 만 전제 위반 (exit 2) 을 가진다.
+  for (const s of Object.values(result.scenarios)) {
+    s.status ??= s.pass ? STATUS.PASS : STATUS.FAIL;
+  }
+  const exitCode = exitCodeFor(Object.values(result.scenarios).map((s) => s.status));
 
   console.log('\n=== 최종 요약 ===');
   for (const [k, s] of Object.entries(result.scenarios)) {
-    console.log(`  ${k} (${s.bodyId}): ${s.pass ? 'PASS' : 'FAIL'}`);
+    console.log(`  ${k} (${s.bodyId}): ${s.status}`);
   }
   if (flags.onlyS4) console.log('  (⚠️ --only=s4 — S1~S3 미실행. 전체 판정은 플래그 없이 실행)');
   console.log(
-    `  overall: ${preconditionViolated ? 'PRECONDITION VIOLATED (exit 2)' : allPass ? 'PASS' : 'FAIL'}`,
+    `  overall: ${exitCode === 0 ? 'PASS' : exitCode === 1 ? 'FAIL' : 'PRECONDITION VIOLATED (exit 2)'}`,
   );
 
   if (flags.json) {
     console.log('\n--- JSON ---');
     console.log(JSON.stringify(result, null, 2));
   }
-  process.exit(preconditionViolated ? 2 : allPass ? 0 : 1);
+  process.exit(exitCode);
 }
 
 main().catch((err) => {
