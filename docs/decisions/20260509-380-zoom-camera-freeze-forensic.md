@@ -1,6 +1,6 @@
 # ADR: #380 줌인 후 카메라 고정 — forensic 정적 조사 + Provisional fix 옵션 비교
 
-- **상태**: **Accepted** (2026-05-11 Amendment — §Amendment 2026-05-11 사용자 D-T2 양상 기반 G8 신규 + Option D+G8a 확정) / **§Amendment 3 (2026-09-19, [#1232](https://github.com/coseo12/astro-simulator/issues/1232)) 은 Provisional** — cross-validate 결과 통합 전. Concrete Prediction 6 반증 + 줌 crossing 경로 결정 교체
+- **상태**: **Accepted** (2026-05-11 Amendment — §Amendment 2026-05-11 사용자 D-T2 양상 기반 G8 신규 + Option D+G8a 확정) / **§Amendment 3 (2026-09-19, [#1232](https://github.com/coseo12/astro-simulator/issues/1232)) 은 Accepted (cross-validate 2026-09-19)** — Concrete Prediction 6 반증 + 줌 crossing 경로 결정 교체
 - **날짜**: 2026-05-09 (initial Provisional) / 2026-05-11 (Amendment Accepted)
 - **결정자**: architect
 - **이슈**: [#380](https://github.com/coseo12/astro-simulator/issues/380) (R3 D-T2 가드 발견 #4)
