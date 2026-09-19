@@ -518,6 +518,28 @@ pass = signs.size <= 1; // 모든 변화율 같은 부호 (monotonic) — wheel 
 
 ### A3.8 교차검증 반영 사항
 
-_(메인 오케스트레이터가 cross-validate 수행 후 4축 — 합의 / 이견 수용 / 기각 / 고유 발견 — 과 호출 전 편향 셀프 체크를 여기에 통합하고 상태를 Accepted 로 전이한다.)_
+agy 1회 (2026-09-19, `cross_validate.sh architecture`, outcome `applied` · 사후 snapshot diff empty). 입력은 본 Amendment 전문 + [설계 코멘트](https://github.com/coseo12/astro-simulator/issues/1232#issuecomment-5741396258) 전문 + 수정 전 `tier-transition.ts` 전문이다.
+
+**호출 전 편향 셀프 체크** — 설계자와 메인이 같은 모델이라, 이번 Amendment 의 실측이 전부 **같은 측정 스크립트 한 벌**에서 나왔다는 점을 공유 사각으로 두고 질의했다. 특히 D2·D3 측정량 재정의가 판별력을 깎는지 (결함 판본이 새 측정량에서 통과하는 경로) 를 명시 쟁점으로 넣었다.
+
+**합의**
+
+- 후보 4 채택, 후보 3·5 기각 사유 — 렌더 루프 순서 (`animate → camera.update(_checkLimits) → onBeforeRender → draw`) 로 `ci` 프레임을 설명하는 기전이 실측과 정합한다고 독립 판정했다.
+- D2·D3 측정량 재정의 — 대조군 비교가 이슈 본문의 식이 가진 역선택 (옳은 판본 FAIL · 틀린 판본 PASS) 을 없앤다는 데 동의했다.
+- free-fly 파급 — 즉시 대입이 free-fly 에도 적용된다는 위험 인식이 같다. 본 Amendment 는 A3.7 에서 `verify:629/631/699/704` 를 필수로 두고 회귀 시 적용 조건을 좁힌다. 선제 축소 (`preserveFocusDistance && focusMesh`) 는 **측정 없이 적용 범위를 바꾸는 것**이라 채택하지 않는다 — 측정 우선.
+
+**수용 (고유 발견)**
+
+- **D5 에 줌인 방향 관성 시나리오 (S4d) 추가** — S4a 는 전환 프레임 실거리와 clamp 만 보고, S4b·S4c 는 줌아웃만 쏜다. 따라서 **줌인 방향에서만 관성을 잃는 변이**는 어느 게이트에도 걸리지 않는다. 계약 D3 은 방향을 한정하지 않으므로 범위 안이다. S4b·S4c 와 같은 구조 (inner 에서 body 방향 −120 4틱, 경계 없는 대조군과의 로그 배율 비) 로 넣고, 임계는 D3 의 `0.10` 을 그대로 쓴다 (**새 임계 0개**). 구현 시 건강판 판정량과 「줌인 방향 0 대입」 변이 FAIL 을 실측으로 확인한다. ⚠️ 현 설계는 환산식이 하나 (`computeTargetRadius`) 라 방향별로 갈리는 결함은 자연 발생하기 어렵다 — 이 시나리오가 막는 것은 향후 분기 도입이다.
+- **`runTierTransition` 계약 문서화** — `preserveFocusDistance=true` 경로에서 반환 전에 cleanup 이 동기로 끝난다는 점 (`tierTransitionInProgress` 가 호출 안에서 켜졌다 꺼진다) 을 JSDoc 에 명시한다.
+
+**기각**
+
+- **focus-entry 경로에서 관성 누적기를 0 으로 리셋** — agy 는 `earth → mars` 환산 판본의 `×0.857 ~ ×1.183` 을 「잔여 관성이 프레이밍을 흔드는 것」 으로 읽었다. 본 Amendment 는 그 산포를 분모 (`boundingSphere` 반경) 의 자전 위상 변동으로 기록했고 판정량으로 쓰지 않았다. 어느 쪽이든 focus-entry 프레이밍은 계약 D1~D8 밖이고, 클릭 시 관성을 끊는 것은 **새 제품 행동**이다. 실피해 관측이 없어 범위 밖으로 기록만 한다 (CLAUDE.md §검증 강도 게이트 — 범위 밖 발견의 기본 처분).
+- **D2 하한 `≥ 0.95` 추가** — 관성이 줄어드는 결함은 D3 (`|ln F_x / ln F_c − 1| ≤ 0.10`) 이 같은 묶음으로 잡는다. agy 도 D3 이 잡는다고 적었다. 하한을 D2 에 겹쳐 넣으면 계약 D2 (`≤ ×1.05`, 이탈 결함) 의 뜻이 바뀌고 판별력은 늘지 않는다.
+- **런타임 `console.warn` · `camera.movement` 옵셔널 탐색 · NaN 가드** — `@babylonjs/core` 는 lockfile 로 고정돼 있어, 필드가 바뀌는 판본은 CI 를 거치지 않고는 들어올 수 없다. 그 CI 에서 핀 단위 테스트가 fail-fast 한다 (A3.7). 환산 계수의 두 scale 은 tier 상수라 0 · 비유한값이 나올 경로가 없다 [판독]. 구현자가 `typeof` 확인을 유지하는 것은 설계 그대로다.
+- **경계 통과 중 20~30 틱 연속 입력의 race** — agy 스스로 [추정] 으로 표시했다. 즉시 대입 경로에는 비동기로 남는 tween 이 없어 입력이 경쟁할 대상이 없다 (A3.5 1 의 G8a 위상). 기전이 제시되지 않아 기각한다.
+
+**오류 정정 (agy 측)** — inner→body 의 scale 비를 `약 3 × 10⁵` 로 적었으나 실측 비는 `16,299` 배다 (#1232 본문). 판정에는 영향이 없다.
 
 - **cross-link**: [#1232](https://github.com/coseo12/astro-simulator/issues/1232) · 선행 Amendment 2026-05-11 라운드 1·2 (본 파일) · [`20260717-818-focus-zoom-tier-oscillation-forensic.md`](20260717-818-focus-zoom-tier-oscillation-forensic.md) (`preserveFocusDistance` 도입 — 본 Amendment 가 그 경로의 tween 을 제거) · 코드 SSoT `packages/core/src/scene/tier-transition.ts` `runTierTransition` · `computeTargetRadius`
