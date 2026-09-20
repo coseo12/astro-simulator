@@ -26,6 +26,20 @@
  *  S5  주입 없이도 같은 페이지가 뜬다 — 대조군. 가드가 「주입했을 때만」이 아니라
  *      「평소에도」 통과함을 같은 실행에서 확인한다.
  *
+ * ## 이 가드가 재지 **못** 하는 것 [한계] — 직렬 2회 배치 (#1238 리뷰 R1)
+ *
+ * R1 이 지목한 최악 배치는 「**앞 호출이 느리게 settle + 뒤 호출이 미결**」이고, 그걸 여기서
+ * 주입하려면 `requestAdapter` 가 **non-null 어댑터**를 돌려줘야 한다 (null 이면 호출자가 뒤
+ * 호출을 건너뛴다). 그런데 그 순간 `createEngine` 이 WebGPU 경로로 들어가 `initAsync()` 를
+ * 부르고, Babylon 은 그 안에서 `navigator.gpu.requestAdapter()` 를 **자기가 다시** 부른다
+ * [실측 — `@babylonjs/core@9.19.0` `Engines/webgpuEngine.pure.js:401`]. 그 호출은 우리가
+ * 바꿔치기한 미결 함수이고 **상한 밖**이므로 (`engine-factory.ts` §initAsync 경고), 이 가드는
+ * 재려던 것 대신 **상한이 닿지 않는 다른 구멍에서 20 s 를 다 쓴다** — 측정이 무의미해진다.
+ *
+ * 그래서 직렬 배치는 **단위 테스트에서 결정적으로** 고정한다 (가짜 타이머 + 주입):
+ * `packages/core/src/gpu/capability.test.ts` §`#1238 R1` · `engine/engine-factory.test.ts` 의
+ * 같은 이름 케이스. 둘 다 호출당 상한 판본에서 **실제로 FAIL 한다** (판별력 확인).
+ *
  * ## 환경
  *
  *   SWIFTSHADER=1 HEADFUL=0 BASE_URL=http://localhost:3001 \
@@ -47,7 +61,15 @@ import {
 const BASE_URL = resolveBaseUrl();
 const SWIFTSHADER = process.env.SWIFTSHADER === '1';
 
-/** 장면 부팅 대기 한계 — `shader-pixel-guard` 가 실제로 쓰는 값과 같아야 의미가 있다. */
+/**
+ * 장면 부팅 대기 한계 — `shader-pixel-guard` 가 실제로 쓰는 값과 같아야 의미가 있다.
+ *
+ * ⚠️ **이 값의 정본은 `scripts/browser-verify-utils.mjs` 의 `handleTimeout` 기본값** (`:574`)
+ * 이고 여기 있는 것은 사본이다 (#1238 리뷰 R7). 링크 없는 사본이 여럿이라 — 인라인 verify
+ * 8종 · `packages/core/src/gpu/adapter-timeout.test.ts` 의 `GUARD_HANDLE_LIMIT_MS` —
+ * 정본이 내려가면 이 가드는 **실제 한계보다 느슨한 값으로 조용히 통과한다**. 정본을 바꿀 때
+ * 사본을 함께 내리는 것이 그 창을 닫는 유일한 수단이다.
+ */
 const HANDLE_TIMEOUT_MS = 20_000;
 
 /** 주입 페이지 쿼리. 1215/1226 과 같은 결정적 파라미터 (`speed=0` 은 쓰지 않는다 — 부팅만 본다). */

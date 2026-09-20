@@ -384,9 +384,19 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     //    #745 가 이미 못박은 **보수적 기본값**이지 새 동작이 아니다. 뒤늦게 도착한 2순위가 이
     //    판정을 뒤집었을 경우에만 위 `gpuCapPromise.then` 이 경고 + 마크를 남긴다.
     //
-    // #677 race 윈도우는 재발하지 않는다 — 차단 수단은 애초에 `Promise.all` 이 아니라 **단일
-    // Promise 공유**였고 (위 §#738 Amendment), 그 공유는 그대로다. `detectGpuCapability()` 는
-    // 여전히 마운트당 1회다.
+    // #677 race 윈도우는 재발하지 않는다. **근거는 `Promise.all` 도, 단일 Promise 공유도
+    // 아니다** (#1238 리뷰 R5 — 그렇게 적었던 것의 정정. 단일 공유가 막는 것은 「어댑터 2회
+    // 호출 / 결과 비결정」이라는 **다른 축**이고, 그건 그대로 유지된다 —
+    // `detectGpuCapability()` 는 여전히 마운트당 1회다).
+    //
+    // #677 이 막는 것은 **순서 race** 다 — capability `.then` 과 handler 등록 중 어느 쪽이
+    // 먼저 끝나는지가 비결정적이라는 것. 그걸 실제로 덮는 것은 #677 fix 의 **2중 경로**다
+    // (위 tier-c 분기: `__gpuTierForceLod` 플래그 + `coreRef.current?.command(...)`). 두 순서가
+    // 모두 덮인다 — capability 가 먼저면 command 가 no-op 이고 아래 `resolveLodWithTierForce`
+    // 가 **매 진입마다** 플래그를 재참조해 적용하며, handler 가 먼저면 command 가 먹는다
+    // (`coreRef.current = instance` 는 `:351` 의 **동기** 대입이라 그 시점 이후 항상 유효하다).
+    // ⚠️ 그래서 그 2중 경로는 **중복이 아니다**. 한쪽을 지우면 #677 이 재발한다.
+    // 회귀 가드: `browser-verify-glow-marker.mjs` 축 6.
     instance
       .start()
       .then(() => {
