@@ -25,6 +25,11 @@ import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
+// #1234 C3-B — renderer 문자열 합성 + late-arrival 판정 (CI 미도달 분기라 순수 함수 + 단위 테스트).
+import {
+  isLateSoftwareRendererArrival,
+  resolveRendererString,
+} from '@/core/resolve-renderer-string';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
@@ -239,7 +244,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       // 있다. 자동 되돌림은 하지 않는다 (별 배경 mesh 를 뒤늦게 dispose 하는 것이 fill-rate
       // 비용보다 위험하다 — #745 는 과잉 비활성 회귀가 원래 문제였다). 대신 **조용히 지나가지
       // 않게** 경고 + 마크를 남겨 진단 가능하게 둔다.
-      if (sceneRendererString === null && detectSoftwareRenderer(cap.adapterInfo?.description)) {
+      if (isLateSoftwareRendererArrival(sceneRendererString, cap.adapterInfo?.description)) {
         markPhase('web:gpu-capability-late-software');
         console.warn(
           '[gpu] 소프트웨어 렌더 보조 감지가 장면 구축 뒤에 도착 — 별 배경 비활성(#745)이 이번 ' +
@@ -584,9 +589,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 결정식 SSoT = resolveStarfieldVisible + detectSoftwareRenderer (단위 테스트 가드).
         // #1234 C3-B — 2순위는 `gpuCap`(대기 결과) 이 아니라 `gpuCapSnapshot`(그 시점 도착분)
         // 이다. 아직 안 왔으면 `null` 로 떨어지고, 그 결말은 #745 가 못박은 보수적 기본값
-        // (= 별 표시 유지) 이다. `sceneRendererString` 은 late-arrival 판정용 기록.
-        const rendererString =
-          extractWebglRendererString() ?? gpuCapSnapshot?.adapterInfo?.description ?? null;
+        // (= 별 표시 유지) 이다. 합성식이 순수 함수인 이유는 **이 분기가 CI 에서 도달하지
+        // 않기 때문**이다 (swiftshader 는 1순위가 항상 값을 준다) — `resolve-renderer-string.ts`
+        // §왜 순수 함수로 빼는가. `sceneRendererString` 은 late-arrival 판정용 기록.
+        const rendererString = resolveRendererString(extractWebglRendererString(), gpuCapSnapshot);
         sceneRendererString = rendererString;
         const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
         // #1234 C2-H3 — `extractWebglRendererString()` 은 UNMASKED_RENDERER 를 읽으려고 **별도
