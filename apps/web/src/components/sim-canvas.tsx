@@ -236,6 +236,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       // #1234 C2-H3 — `detectGpuCapability()` (내부에서 `navigator.gpu.requestAdapter()`) 종료.
       // 기존 체인 **안쪽**에 둔다 — 새 `.then` 을 달면 거부 시 unhandled rejection 이 새로 생긴다.
       markPhase('web:gpu-capability');
+      // #1234 cross-validate — 언마운트 뒤 도착분 차단. 상한이 걸리면 이 콜백이 최대 12 s 늦게
+      // 오는데, `useSimStore` 는 전역이라 **폐기된 마운트의 결과가 살아있는 마운트의 알림을
+      // 덮어쓴다** (dev StrictMode 이중 마운트의 첫 체인이 정확히 이 경우다). `instance.start()`
+      // 체인의 `if (cancelled …) return` (`:407`) 과 같은 계약을 이 체인에도 건다.
+      // 마크는 **위에서** 이미 남겼다 — 진단은 취소된 체인에서도 남아야 원인이 보인다.
+      if (cancelled) return;
       // #1234 C3-B — scene 체인의 조회 창구를 채운다. 마크보다 **뒤**에 두면 안 된다는 제약은
       // 없으나, 이 대입이 실패할 수 없는 한 줄이라 진단 마크 바로 뒤가 읽기 좋다.
       gpuCapSnapshot = cap;
