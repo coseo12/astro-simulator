@@ -146,6 +146,13 @@ describe('#1234 C3-A 상한 값 자체의 계약', () => {
     expect(GPU_ADAPTER_TIMEOUT_MS).toBeLessThanOrEqual(20_000 * 0.6);
   });
 
+  it('상한 + 어댑터 이후 부팅 작업이 가드 한계 안에 들어간다 (실측 max 2555ms)', () => {
+    // 위 단언(비율)과 다른 축이다 — 이쪽은 **절대 시간 예산**이다. 상한이 0.6 배를 지켜도
+    // 뒤 작업이 커지면 합이 한계를 넘을 수 있으므로 합으로 한 번 더 건다.
+    const POST_ADAPTER_BOOT_MAX_MS = 2555; // 96 표본의 `handlesMs − m2 어댑터 구간` 최댓값
+    expect(GPU_ADAPTER_TIMEOUT_MS + POST_ADAPTER_BOOT_MAX_MS).toBeLessThan(20_000);
+  });
+
   it('관측 최댓값(8082ms)보다 크다 — 정상 부팅에서 발화하면 진단 신호가 죽는다', () => {
     expect(GPU_ADAPTER_TIMEOUT_MS).toBeGreaterThan(8082);
   });
