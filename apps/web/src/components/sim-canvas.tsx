@@ -586,7 +586,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // + WebGL2 하드웨어 무구분) 로 잡아 하드웨어 가속 PC 에서도 별이 사라지는 과잉 비활성 회귀 →
         // 진짜 기준인 소프트웨어 렌더로 정정. renderer 추출: WebGL UNMASKED 1차/주 (CI swiftshader 확실
         // 감지 — fps 무회귀 핵심 제약) + WebGPU adapterInfo.description 보조 OR (빈 {} 라 신뢰 낮음).
-        // 결정식 SSoT = resolveStarfieldVisible + detectSoftwareRenderer (단위 테스트 가드).
+        // 결정식 SSoT = resolveRendererString + resolveStarfieldVisible + detectSoftwareRenderer
+        // (셋 다 순수 함수 + 단위 테스트 가드 — #1234 C3-B 에서 첫 항목이 추가됐다).
         // #1234 C3-B — 2순위는 `gpuCap`(대기 결과) 이 아니라 `gpuCapSnapshot`(그 시점 도착분)
         // 이다. 아직 안 왔으면 `null` 로 떨어지고, 그 결말은 #745 가 못박은 보수적 기본값
         // (= 별 표시 유지) 이다. 합성식이 순수 함수인 이유는 **이 분기가 CI 에서 도달하지
