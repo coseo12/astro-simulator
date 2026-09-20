@@ -21,12 +21,25 @@ export interface CreatedEngine {
  * 여기서 갈리는 축이 세 개다: 어댑터 조회 (`requestAdapter`) / WebGPU device 초기화 /
  * WebGL2 컨텍스트 생성. 세 번째는 **한 브라우저가 동시에 열 수 있는 GL 컨텍스트 수**에
  * 종속이라, 「페이지를 여러 개 열어둔 채 부팅」 가설 (H1) 이 사실이면 여기가 길어진다.
+ *
+ * #1234 C2 2단계 — **첫 마크가 `engine:webgpu-probe` 이면 늦다.** 그 마크는
+ * `isWebGpuUsable()` 이 **끝난 뒤**에 찍히는데, 그 안쪽이 `await gpu.requestAdapter()` 라
+ * (`detectGpuCapability` 와 같은 실패 모드) 거기서 멈추면 이 함수는 **마크를 하나도 남기지
+ * 못한다**. 그러면 「`start()` 가 호출되지 않았다」와 「어댑터 조회가 미결이다」가 같은
+ * 스냅샷 (엔진 마크 0) 으로 보인다. 아래 두 마크가 그 둘을 가른다.
+ *
+ * 그리고 이 축은 **실제로 필요했다** [실측]: 로컬 재현 표본 (`verify:1215-cloud-layer` page 3,
+ * 20 s 타임아웃) 에서 `gpu/capability.ts` 와 **여기**의 `requestAdapter()` 가 **동시에** 미결
+ * 이었다 (`gpu:adapter-call` · `engine:probe-adapter-call` 이 마지막 마크). 한쪽만 계측했다면
+ * 나머지 한쪽의 침묵이 「거기까지 못 왔다」로 읽혔을 것이다.
  */
 export async function createEngine(
   canvas: HTMLCanvasElement,
   onBootPhase?: BootPhaseHook,
 ): Promise<CreatedEngine> {
-  const webGpuUsable = await isWebGpuUsable();
+  // 「createEngine 에 도달은 했다」. 이 마크가 없으면 stall 은 이 함수 **앞**이다.
+  onBootPhase?.('engine:create-enter');
+  const webGpuUsable = await isWebGpuUsable(onBootPhase);
   onBootPhase?.('engine:webgpu-probe');
   if (webGpuUsable) {
     try {
@@ -70,12 +83,19 @@ export async function createEngine(
  *
  * 헤드리스 브라우저(Playwright Chromium 등)는 gpu 객체는 있으나 adapter가 null이므로
  * 여기서 즉시 false로 판별되어 WebGL2 경로로 이동.
+ *
+ * #1234 C2 2단계 — `engine:probe-adapter-call` 은 **await 직전**에 찍힌다. 이 마크가 있는데
+ * 호출부의 `engine:webgpu-probe` 가 없으면 **이 `requestAdapter()` 가 미결**이라는 뜻이다
+ * (저장소 안에서 타임아웃 없는 `requestAdapter` 호출 지점은 셋이고, 그중 둘이 마크 없이
+ * 부팅 앞단에 있었다 — 나머지 하나인 `getWebGpuFeatures` 는 이미 `engine:webgpu-probe` ↔
+ * `engine:webgpu-features` 사이에 갇혀 있어 따로 찍지 않는다).
  */
-async function isWebGpuUsable(): Promise<boolean> {
+async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
   if (typeof navigator === 'undefined') return false;
   const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
   if (!gpu) return false;
   try {
+    onBootPhase?.('engine:probe-adapter-call');
     const adapter = await gpu.requestAdapter();
     return adapter !== null;
   } catch {

@@ -143,3 +143,56 @@ describe('#849 createEngine — WebGPU 경로 + timestamp-query 조건부 featur
     warnSpy.mockRestore();
   });
 });
+
+/**
+ * #1234 C2 2단계 — 어댑터 **사전 판별** 구간 계측.
+ *
+ * `engine:webgpu-probe` 는 `isWebGpuUsable()` 이 **끝난 뒤** 찍힌다. 그 안쪽이
+ * `await gpu.requestAdapter()` 라 (`gpu/capability.ts` 와 같은 실패 모드) 거기서 멈추면
+ * createEngine 이 마크를 하나도 남기지 못했고, 그러면 「`start()` 미호출」과 「어댑터 조회
+ * 미결」이 **같은 스냅샷** (엔진 마크 0) 으로 보였다. 아래가 그 둘이 갈림을 단언한다.
+ */
+describe('#1234 C2 — createEngine 어댑터 사전 판별 마크', () => {
+  const flush = async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  };
+
+  it('훅 미지정이면 호출 0 (기존 분기 계약 불변)', async () => {
+    setNavigator({});
+    const created = await createEngine(canvas);
+    expect(created.kind).toBe('webgl2');
+  });
+
+  it('navigator.gpu 부재 — 진입 마크는 있고 어댑터 호출 마크는 없다', async () => {
+    const marks: string[] = [];
+    setNavigator({});
+    await createEngine(canvas, (n) => marks.push(n));
+
+    expect(marks).toEqual(['engine:create-enter', 'engine:webgpu-probe', 'engine:webgl2-ctor']);
+    expect(marks).not.toContain('engine:probe-adapter-call');
+  });
+
+  it('requestAdapter 미결 — `engine:probe-adapter-call` 에서 멈춘다', async () => {
+    const marks: string[] = [];
+    setNavigator({ gpu: { requestAdapter: () => new Promise(() => {}) } });
+    void createEngine(canvas, (n) => marks.push(n));
+    await flush();
+
+    expect(marks).toEqual(['engine:create-enter', 'engine:probe-adapter-call']);
+    // 이 마크가 없으면 아래 「미호출」 케이스와 구분이 불가능하다.
+    expect(marks).not.toContain('engine:webgpu-probe');
+  });
+
+  it('「createEngine 미호출」과 「어댑터 조회 미결」이 스냅샷으로 갈린다', async () => {
+    const notCalled: string[] = [];
+    // (가) 아예 호출하지 않음 — 마크 0.
+
+    const pending: string[] = [];
+    setNavigator({ gpu: { requestAdapter: () => new Promise(() => {}) } });
+    void createEngine(canvas, (n) => pending.push(n));
+    await flush();
+
+    expect(notCalled.at(-1)).toBeUndefined();
+    expect(pending.at(-1)).toBe('engine:probe-adapter-call');
+  });
+});

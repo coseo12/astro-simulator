@@ -34,8 +34,21 @@
  * core 는 **이름만 통지**한다 (`packages/core/src/engine/boot-phase.ts` §계약).
  */
 
-/** 기록 상한 — 계측이 메모리·로그를 키우지 않게 하는 방어선 (현행 마크 수의 약 3배). */
-const MAX_BOOT_PHASES = 64;
+/**
+ * 기록 상한 — 계측이 메모리·로그를 키우지 않게 하는 방어선.
+ *
+ * #1234 C2 2단계에서 `gpu:*` (최대 6) · `engine:create-enter` · `engine:probe-adapter-call`
+ * 이 늘었다. 두 수를 구분해서 적는다:
+ *  - **[실측]** 로컬 `verify:1215-cloud-layer` PASS 페이지 = `phases 44` · `dropped 0`
+ *    (WebGL2 폴백 경로 + StrictMode 첫 체인이 중도 취소된 형태). 옛 상한 64 로도 안 잘린다.
+ *  - **[계산]** 양 체인이 **둘 다 완주**하고 **WebGPU 경로**로 가면 체인당 34 (폴백까지 타면
+ *    36) → 한 페이지 68~72 로 64 를 넘는다. 이때 잘리는 것은 **뒤쪽**, 즉 `scene:*` ~
+ *    `web:first-frame-after-scene` 이라 하필 비교 기준이 되는 정상 부팅의 꼬리다.
+ *
+ * 즉 상한 상향은 관측된 절단의 수습이 아니라 **아직 안 밟은 경로에 대한 여유**다. 상한은
+ * 판정·임계가 아니라 계측 자신의 방어선이므로 #1234 계약 C5 의 「판정·임계 상수」와 무관하다.
+ */
+const MAX_BOOT_PHASES = 128;
 
 /**
  * dev 게이트. `process.env.NODE_ENV` 는 Next webpack 이 **리터럴로 치환**하므로 prod 빌드에서
@@ -101,7 +114,7 @@ export function nextBootChain(): string {
 /**
  * 구간 종료를 기록한다. 비활성 (prod) 이면 no-op.
  *
- * @param name 방금 끝난 구간 이름 (`web:` / `engine:` / `core:` / `scene:` 접두).
+ * @param name 방금 끝난 구간 이름 (`web:` / `gpu:` / `engine:` / `core:` / `scene:` 접두).
  * @param chain `nextBootChain()` 이 발급한 체인 id. 미지정은 체인 구분 없는 단일 흐름.
  */
 export function markBootPhase(name: string, chain = 'm0'): void {

@@ -197,7 +197,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     // 소프트웨어 렌더 보조 감지 — #745) 등에 gpuCap 을 쓴다. 두 경로가 별개로 detectGpuCapability()
     // 를 호출하면 adapter 요청이 2회 발생 + 결과 비결정 (race) → 동일 Promise 공유로 SSoT 1회
     // (#677 race 윈도우 차단).
-    const gpuCapPromise = gpuApi.detectGpuCapability();
+    //
+    // #1234 C2 2단계 — 계측 훅 주입. 실패 표본이 `web:effect-start` 다음에서 20 초를 넘겼고,
+    // 그 사이 코드가 이 호출 하나다. 훅이 없으면 「requestAdapter 호출 전」/「호출했고 미결」/
+    // 「settle 했는데 그 뒤가 느림」이 **같은 스냅샷** (마크 부재) 으로 보인다.
+    // `markPhase` 는 prod 에서 즉시 반환하는 no-op 이라 조건 분기 없이 상시 전달한다.
+    const gpuCapPromise = gpuApi.detectGpuCapability(markPhase);
 
     // #738 — GPU tier 판정 SSoT (URL ?gpu= override > detectGpuTier 자동 감지). LOD 강제/알림용.
     // (#745 부터 별 배경 비활성은 tier 가 아닌 소프트웨어 렌더 감지 기준 — resolveGpuTier 와 무관.)
