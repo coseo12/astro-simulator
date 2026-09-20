@@ -308,3 +308,73 @@ describe('#1234 C3 — detectGpuCapability 어댑터 미결의 결말', () => {
     expect(marks.filter((m) => m.includes('timeout'))).toEqual([]);
   });
 });
+
+/**
+ * #1238 리뷰 R1 — **직렬 2회 주입.** 이 함수의 어댑터 계열 await 는 둘이고
+ * (`requestAdapter` → `requestAdapterInfo`) 상한이 호출당이면 대기 합이 `2 × 12 s` 로 자란다.
+ *
+ * 아래는 그 최악 배치를 그대로 주입한다: 1회차가 **관측 최댓값 8082 ms 만큼 걸려** settle 하고
+ * 2회차가 **영영 미결**. 호출당 상한이었다면 이 함수는 `8082 + 12_000 = 20_082 ms` 에 반환해
+ * 가드 핸들 대기 한계 `20_000 ms` 를 넘는다 — **처방이 있어도 가드가 타임아웃한다**.
+ */
+describe('#1238 R1 — detectGpuCapability 체인의 어댑터 대기 합', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('1회차 8082ms settle + 2회차 미결 → 체인이 12_000ms 에 끝난다 (20_082 아님)', async () => {
+    vi.useFakeTimers();
+    const marks: string[] = [];
+    let resolveAdapter: ((v: unknown) => void) | undefined;
+    setNavigator({
+      gpu: {
+        requestAdapter: () =>
+          new Promise((resolve) => {
+            resolveAdapter = resolve;
+          }),
+      },
+    });
+
+    let settled = false;
+    const capPromise = detectGpuCapability((n) => marks.push(n)).then((c) => {
+      settled = true;
+      return c;
+    });
+
+    // 1회차: 관측 최댓값만큼 걸려 **성공적으로** settle (미결이 아니다).
+    await vi.advanceTimersByTimeAsync(8082);
+    resolveAdapter?.({ requestAdapterInfo: () => new Promise<never>(() => {}) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(marks).toContain('gpu:adapter-resolved');
+    expect(marks).not.toContain('gpu:adapter-timeout');
+
+    // 2회차(`requestAdapterInfo`)는 잔여 3918ms 만 받는다.
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS - 8082 - 1);
+    expect(settled).toBe(false); // 잔여가 남아 있는 동안은 조기 폴백이 아니다
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toBe(true);
+
+    const cap = await capPromise;
+    // 결말은 양성이다 — 2회차 상한은 「adapterInfo 없이 webgpu:true」로 흡수된다.
+    expect(cap.webgpu).toBe(true);
+    expect(cap.adapterInfo).toBeUndefined();
+    expect(marks).toContain('gpu:adapter-info-timeout');
+    expect(marks.at(-1)).toBe('gpu:detect-return');
+  });
+
+  it('두 호출이 **모두 미결**이면 발화는 1회 — 앞 상한이 뒤 호출을 건너뛴다', async () => {
+    vi.useFakeTimers();
+    const marks: string[] = [];
+    const requestAdapter = vi.fn(() => new Promise<never>(() => {}));
+    setNavigator({ gpu: { requestAdapter } });
+
+    const capPromise = detectGpuCapability((n) => marks.push(n));
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS);
+    const cap = await capPromise;
+
+    expect(cap.webgpu).toBe(false);
+    // 「상한 2회 발화」는 구조적으로 없다 — 이것이 R1 의 합을 만드는 기전이 아님을 고정한다.
+    expect(marks.filter((m) => m.endsWith('-timeout'))).toEqual(['gpu:adapter-timeout']);
+    expect(requestAdapter).toHaveBeenCalledTimes(1);
+  });
+});

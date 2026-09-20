@@ -1,6 +1,11 @@
 import { Engine, WebGPUEngine } from '@babylonjs/core';
 import type { BootPhaseHook } from './boot-phase.js';
-import { GPU_ADAPTER_TIMEOUT, withAdapterTimeoutMarked } from '../gpu/adapter-timeout.js';
+import {
+  GPU_ADAPTER_TIMEOUT,
+  createAdapterBudget,
+  withAdapterTimeoutMarked,
+  type AdapterBudget,
+} from '../gpu/adapter-timeout.js';
 
 export type EngineKind = 'webgpu' | 'webgl2';
 
@@ -39,9 +44,16 @@ export interface CreatedEngine {
  * 「어댑터 없음」과 같은 결론(WebGL2 폴백)으로 흡수되되 전용 마크로 갈린다. 상한 값과 그
  * 실측 근거는 `../gpu/adapter-timeout.ts` §`GPU_ADAPTER_TIMEOUT_MS` 가 SSoT 다.
  *
+ * #1238 리뷰 R1 — 그 두 호출은 **직렬**이라 (`isWebGpuUsable` 이 true 여야 `getWebGpuFeatures`
+ * 에 온다) 각자 상한을 가지면 대기 합이 가드 한계를 넘는다. 이 함수가 **체인 예산 하나**를
+ * 만들어 둘에게 넘기고 `finally` 에서 놓는다 — 어댑터 대기 합이 `GPU_ADAPTER_TIMEOUT_MS` 다.
+ *
  * ⚠️ **상한이 닿지 않는 곳이 하나 남는다** — `engine.initAsync()` 다 (아래 WebGPU 경로).
  * 관측된 미결 표본은 전부 어댑터 조회였고 `initAsync` 는 다른 API 라 이번 처방에 넣지 않았다.
  * 거기서 멈추면 `engine:webgpu-features` 는 찍혔는데 `engine:webgpu-init` 이 없는 형태다.
+ * 그 안쪽도 결국 `navigator.gpu.requestAdapter()` 를 **자기가 다시** 부른다 [실측 —
+ * `@babylonjs/core@9.19.0` `Engines/webgpuEngine.pure.js:401`] 는 점에서 같은 실패 모드이지만,
+ * 그 호출은 Babylon 소유라 이 예산이 닿지 않는다.
  */
 export async function createEngine(
   canvas: HTMLCanvasElement,
@@ -49,41 +61,48 @@ export async function createEngine(
 ): Promise<CreatedEngine> {
   // 「createEngine 에 도달은 했다」. 이 마크가 없으면 stall 은 이 함수 **앞**이다.
   onBootPhase?.('engine:create-enter');
-  const webGpuUsable = await isWebGpuUsable(onBootPhase);
-  onBootPhase?.('engine:webgpu-probe');
-  if (webGpuUsable) {
-    try {
-      // P4-D #166 — timestamp-query feature를 optional로 요청.
-      // 어댑터가 지원 시 EngineInstrumentation.captureGPUFrameTime이 동작한다.
-      // 미지원 어댑터는 feature가 비어있는 device로 생성되어 폴백 필요 없음.
-      const supported = await getWebGpuFeatures(onBootPhase);
-      onBootPhase?.('engine:webgpu-features');
-      const requiredFeatures = (
-        supported.has('timestamp-query') ? ['timestamp-query'] : []
-      ) as GPUFeatureName[];
-      const engine = new WebGPUEngine(canvas, {
-        antialias: true,
-        stencil: true,
-        adaptToDeviceRatio: true,
-        deviceDescriptor: { requiredFeatures },
-      });
-      await engine.initAsync();
-      onBootPhase?.('engine:webgpu-init');
-      return { engine, kind: 'webgpu' };
-    } catch (error) {
-      // adapter는 있었으나 초기화 중 실패 — WebGL2로 폴백
-      console.warn('[engine-factory] WebGPU 초기화 실패, WebGL2로 폴백합니다.', error);
-      onBootPhase?.('engine:webgpu-failed');
+  // #1238 R1 — 아래 두 어댑터 조회가 공유하는 체인 예산. 머리말 §R1 참조.
+  const budget = createAdapterBudget();
+  try {
+    const webGpuUsable = await isWebGpuUsable(onBootPhase, budget);
+    onBootPhase?.('engine:webgpu-probe');
+    if (webGpuUsable) {
+      try {
+        // P4-D #166 — timestamp-query feature를 optional로 요청.
+        // 어댑터가 지원 시 EngineInstrumentation.captureGPUFrameTime이 동작한다.
+        // 미지원 어댑터는 feature가 비어있는 device로 생성되어 폴백 필요 없음.
+        const supported = await getWebGpuFeatures(onBootPhase, budget);
+        onBootPhase?.('engine:webgpu-features');
+        const requiredFeatures = (
+          supported.has('timestamp-query') ? ['timestamp-query'] : []
+        ) as GPUFeatureName[];
+        const engine = new WebGPUEngine(canvas, {
+          antialias: true,
+          stencil: true,
+          adaptToDeviceRatio: true,
+          deviceDescriptor: { requiredFeatures },
+        });
+        await engine.initAsync();
+        onBootPhase?.('engine:webgpu-init');
+        return { engine, kind: 'webgpu' };
+      } catch (error) {
+        // adapter는 있었으나 초기화 중 실패 — WebGL2로 폴백
+        console.warn('[engine-factory] WebGPU 초기화 실패, WebGL2로 폴백합니다.', error);
+        onBootPhase?.('engine:webgpu-failed');
+      }
     }
-  }
 
-  const engine = new Engine(canvas, true, {
-    preserveDrawingBuffer: true,
-    stencil: true,
-    adaptToDeviceRatio: true,
-  });
-  onBootPhase?.('engine:webgl2-ctor');
-  return { engine, kind: 'webgl2' };
+    const engine = new Engine(canvas, true, {
+      preserveDrawingBuffer: true,
+      stencil: true,
+      adaptToDeviceRatio: true,
+    });
+    onBootPhase?.('engine:webgl2-ctor');
+    return { engine, kind: 'webgl2' };
+  } finally {
+    // 체인 종료 — 공유 타이머를 놓는다 (남기면 프로세스가 예산만큼 더 산다).
+    budget.release();
+  }
 }
 
 /**
@@ -96,12 +115,21 @@ export async function createEngine(
  *
  * #1234 C2 2단계 — `engine:probe-adapter-call` 은 **await 직전**에 찍힌다. 이 마크가 있는데
  * 호출부의 `engine:webgpu-probe` 가 없으면 **이 `requestAdapter()` 가 미결**이라는 뜻이다
- * (저장소 안 `requestAdapter` 호출 지점은 셋이고, C2 시점에 그중 둘이 마크 없이 부팅 앞단에
- * 있었다 — 나머지 하나인 `getWebGpuFeatures` 는 이미 `engine:webgpu-probe` ↔
- * `engine:webgpu-features` 사이에 갇혀 있어 **구간 마크**를 따로 찍지 않는다. C3-A 이후 셋 다
- * **상한 도달 마크**는 갖는다 — 구간 마크와 상한 마크는 다른 축이다).
+ * (**앱 런타임** (`apps/web/src` + `packages/core/src`) 의 `requestAdapter` 호출 지점은 셋이고,
+ * C2 시점에 그중 둘이 마크 없이 부팅 앞단에 있었다 — 나머지 하나인 `getWebGpuFeatures` 는 이미
+ * `engine:webgpu-probe` ↔ `engine:webgpu-features` 사이에 갇혀 있어 **구간 마크**를 따로 찍지
+ * 않는다. C3-A 이후 셋 다 **상한 도달 마크**는 갖는다 — 구간 마크와 상한 마크는 다른 축이다).
+ *
+ * ⚠️ 「셋」의 술어는 **앱 런타임**이다 (#1238 리뷰 R6 — 「저장소 안」이라고 적었던 것의 정정).
+ * 저장소 전체로는 가드 스크립트 `scripts/browser-verify-webgpu.mjs:61` 이 넷째 실호출이고,
+ * `apps/web/scripts/browser-verify-glow-marker.mjs:433` 은 호출이 아니라 **스텁 정의**다.
+ * 둘 다 부팅 경로가 아니므로 상한의 처방 대상이 아니다 — 가드는 자기 판정을 위해 어댑터를
+ * 직접 묻는 쪽이지 사용자 화면을 띄우는 쪽이 아니다.
  */
-async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
+async function isWebGpuUsable(
+  onBootPhase?: BootPhaseHook,
+  budget?: AdapterBudget,
+): Promise<boolean> {
   if (typeof navigator === 'undefined') return false;
   const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
   if (!gpu) return false;
@@ -114,6 +142,7 @@ async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
       gpu.requestAdapter(),
       'engine:probe-adapter-timeout',
       onBootPhase,
+      budget,
     );
     if (adapter === GPU_ADAPTER_TIMEOUT) return false;
     return adapter !== null;
@@ -132,8 +161,15 @@ async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
  * 도달하기 때문이다. 다만 「앞 호출이 settle 했으니 뒤 호출도 settle 한다」는 보장은 없고
  * (미결은 자원 상태 함수이지 단조 함수가 아니다), 여기서 멈추면 증상이 동일하다 —
  * `engine:webgpu-probe` 는 찍혔는데 `engine:webgpu-features` 가 없는 형태다. 같은 상한을 씌운다.
+ *
+ * #1238 R1 — 「같은 상한」이 아니라 **같은 예산**이다. 위 사전 판별이 늦게 settle 했다면 여기는
+ * **잔여만** 받는다. 잔여 소진은 양성 결말로 흡수된다 (빈 feature 집합 = P4-D bench 전용 —
+ * WebGPU 엔진 생성 자체는 그대로 진행한다).
  */
-async function getWebGpuFeatures(onBootPhase?: BootPhaseHook): Promise<ReadonlySet<string>> {
+async function getWebGpuFeatures(
+  onBootPhase?: BootPhaseHook,
+  budget?: AdapterBudget,
+): Promise<ReadonlySet<string>> {
   if (typeof navigator === 'undefined') return new Set();
   const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
   if (!gpu) return new Set();
@@ -142,6 +178,7 @@ async function getWebGpuFeatures(onBootPhase?: BootPhaseHook): Promise<ReadonlyS
       gpu.requestAdapter(),
       'engine:features-adapter-timeout',
       onBootPhase,
+      budget,
     );
     // 상한 도달은 「어댑터 없음」과 같은 결말 — feature 집합이 비면 timestamp-query 를 요청하지
     // 않을 뿐이고 (P4-D bench 전용) WebGPU 엔진 생성 자체는 그대로 진행한다.

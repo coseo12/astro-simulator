@@ -79,6 +79,7 @@ import {
   GPU_ADAPTER_TIMEOUT,
   GPU_ADAPTER_TIMEOUT_MS,
   adapterTimeoutReason,
+  createAdapterBudget,
   withAdapterTimeoutMarked,
 } from './adapter-timeout.js';
 
@@ -106,6 +107,11 @@ export async function detectGpuCapability(onBootPhase?: BootPhaseHook): Promise<
     onBootPhase?.('gpu:detect-unsupported');
     return { webgpu: false, reason: '브라우저가 WebGPU를 지원하지 않습니다.' };
   }
+  // #1238 리뷰 R1 — 이 함수의 어댑터 계열 await 둘 (`requestAdapter` → `requestAdapterInfo`) 은
+  // **직렬**이다. 각자 상한을 따로 가지면 최악의 대기 합이 `2 × 12 s` 가 돼 가드 핸들 대기 한계
+  // `20_000 ms` 를 넘어 **처방이 있어도 가드가 타임아웃한다**. 하나의 예산을 공유해 이 체인
+  // 전체를 `GPU_ADAPTER_TIMEOUT_MS` 로 묶는다 (`adapter-timeout.ts` §체인당).
+  const budget = createAdapterBudget();
   try {
     // 환경별 GPU/GPUAdapter 타입 충돌을 피하기 위해 unknown 캐스팅으로 좁게 사용.
     const gpu = (navigator as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
@@ -125,6 +131,7 @@ export async function detectGpuCapability(onBootPhase?: BootPhaseHook): Promise<
         gpu.requestAdapter(),
         'gpu:adapter-timeout',
         onBootPhase,
+        budget,
       );
     } catch (err) {
       // 거부도 settle 이다 — 「미결」과 갈라야 하므로 바깥 catch 에 맡기지 않고 여기서 찍는다.
@@ -160,10 +167,13 @@ export async function detectGpuCapability(onBootPhase?: BootPhaseHook): Promise<
       try {
         // #1234 C3-A — `requestAdapter` 와 **같은 클래스**다 (타임아웃 없는 어댑터 계열 await).
         // 여기서 미결이면 `webgpu:true` 인 채로 소비자 `.then` 이 영영 안 돌아 증상이 동일하다.
+        // 같은 예산이다 — 위 `requestAdapter` 가 늦게 settle 했다면 여기는 **잔여만** 받는다
+        // (#1238 R1). 잔여 소진은 양성 결말로 흡수된다 (`adapterInfo` 없이 `webgpu: true`).
         const info = await withAdapterTimeoutMarked(
           adapter.requestAdapterInfo(),
           'gpu:adapter-info-timeout',
           onBootPhase,
+          budget,
         );
         // info 는 이미 「실패해도 webgpu 는 사용 가능」 계약이라 (아래 catch) 상한 도달도 같은
         // 결말로 흡수한다 — `adapterInfo` 없이 `webgpu: true`. 종단 마크
@@ -192,5 +202,8 @@ export async function detectGpuCapability(onBootPhase?: BootPhaseHook): Promise<
       webgpu: false,
       reason: err instanceof Error ? err.message : 'WebGPU 감지 중 알 수 없는 오류.',
     };
+  } finally {
+    // 체인 종료 — 공유 타이머를 놓는다 (남기면 프로세스가 예산만큼 더 산다).
+    budget.release();
   }
 }
