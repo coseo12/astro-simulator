@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { detectGpuCapability } from './capability';
+import { GPU_ADAPTER_TIMEOUT_MS } from './adapter-timeout';
 
 const setNavigator = (value: unknown) => {
   Object.defineProperty(globalThis, 'navigator', {
@@ -217,5 +218,93 @@ describe('#1234 C2 — detectGpuCapability 부팅 계측 마크', () => {
     await detectGpuCapability((n) => marks.push(n));
     expect(marks).toContain('gpu:adapter-info-absent');
     expect(marks.at(-1)).toBe('gpu:detect-return');
+  });
+});
+
+/**
+ * #1234 C3-A — 미결의 **결말**.
+ *
+ * 위 C2 블록의 미결 케이스들은 반환 Promise 가 영영 안 풀려 `void` + 마이크로태스크 flush 로만
+ * 관측할 수 있었다. 그것이 곧 결함이었다. 여기서는 같은 입력에 **`await` 를 걸고 돌아온다**는
+ * 것 자체가 판정량이다 — 이 단언은 상한을 지우면 **테스트가 타임아웃으로 죽는다**.
+ */
+describe('#1234 C3 — detectGpuCapability 어댑터 미결의 결말', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('requestAdapter 미결 → 상한에서 webgpu:false + 타임아웃 사유로 **반환한다**', async () => {
+    vi.useFakeTimers();
+    const marks: string[] = [];
+    setNavigator({ gpu: { requestAdapter: () => new Promise(() => {}) } });
+
+    const capPromise = detectGpuCapability((n) => marks.push(n));
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS);
+    const cap = await capPromise;
+
+    expect(cap.webgpu).toBe(false);
+    // 「조용히 넘기지 않는다」 — 사유가 어댑터 null 과 갈려야 진단이 된다.
+    expect(cap.reason).toContain('12000ms');
+    expect(cap.reason).toContain('#1234');
+    expect(marks).toContain('gpu:adapter-timeout');
+    expect(marks.at(-1)).toBe('gpu:adapter-timeout');
+    // settle 한 적이 없으므로 settle 마크는 없어야 한다 (상한이 settle 을 흉내내지 않는다).
+    expect(marks).not.toContain('gpu:adapter-resolved');
+  });
+
+  it('「어댑터 null」과 「어댑터 미응답」의 사유가 서로 다르다', async () => {
+    setNavigator({ gpu: { requestAdapter: vi.fn().mockResolvedValue(null) } });
+    const nullCap = await detectGpuCapability();
+
+    vi.useFakeTimers();
+    setNavigator({ gpu: { requestAdapter: () => new Promise(() => {}) } });
+    const timeoutPromise = detectGpuCapability();
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS);
+    const timeoutCap = await timeoutPromise;
+
+    expect(nullCap.webgpu).toBe(false);
+    expect(timeoutCap.webgpu).toBe(false);
+    // 결론은 같고 사유는 다르다 — 폴백이 진단을 지우지 않는다는 것이 C3 의 요구였다.
+    expect(nullCap.reason).not.toBe(timeoutCap.reason);
+  });
+
+  it('requestAdapterInfo 미결 → 상한에서 adapterInfo 없이 webgpu:true 로 반환한다', async () => {
+    vi.useFakeTimers();
+    const marks: string[] = [];
+    setNavigator({
+      gpu: {
+        requestAdapter: vi.fn().mockResolvedValue({
+          requestAdapterInfo: () => new Promise<never>(() => {}),
+        }),
+      },
+    });
+
+    const capPromise = detectGpuCapability((n) => marks.push(n));
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS);
+    const cap = await capPromise;
+
+    // info 는 원래 「실패해도 webgpu 는 사용 가능」 계약이라 상한도 같은 결말로 흡수된다.
+    expect(cap.webgpu).toBe(true);
+    expect(cap.adapterInfo).toBeUndefined();
+    expect(marks).toContain('gpu:adapter-info-timeout');
+    // 종단 마크는 그대로 — 「함수가 끝났다」 축은 상한 도입으로 바뀌지 않는다.
+    expect(marks.at(-1)).toBe('gpu:detect-return');
+    expect(marks).not.toContain('gpu:adapter-info-resolved');
+  });
+
+  it('정상 경로는 상한 마크 0 — 건강한 부팅에 흔적을 남기지 않는다', async () => {
+    const marks: string[] = [];
+    setNavigator({
+      gpu: {
+        requestAdapter: vi.fn().mockResolvedValue({
+          requestAdapterInfo: vi.fn().mockResolvedValue({ vendor: 'apple', description: 'M3' }),
+        }),
+      },
+    });
+
+    const cap = await detectGpuCapability((n) => marks.push(n));
+    expect(cap.webgpu).toBe(true);
+    expect(cap.adapterInfo?.description).toBe('M3');
+    expect(marks.filter((m) => m.includes('timeout'))).toEqual([]);
   });
 });

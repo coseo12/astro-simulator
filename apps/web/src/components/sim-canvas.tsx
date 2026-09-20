@@ -194,15 +194,25 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     //
     // #738 Amendment — 단일 Promise 를 두 async chain (capability 감지 / scene 생성) 이 공유한다.
     // GPU tier 는 이 then 에서 LOD 강제/알림에 쓰이고, scene 콜백은 WebGPU adapterInfo (별 배경
-    // 소프트웨어 렌더 보조 감지 — #745) 등에 gpuCap 을 쓴다. 두 경로가 별개로 detectGpuCapability()
-    // 를 호출하면 adapter 요청이 2회 발생 + 결과 비결정 (race) → 동일 Promise 공유로 SSoT 1회
-    // (#677 race 윈도우 차단).
+    // 소프트웨어 렌더 보조 감지 — #745) 를 **2순위 폴백**으로 쓴다. 두 경로가 별개로
+    // detectGpuCapability() 를 호출하면 adapter 요청이 2회 발생 + 결과 비결정 (race) → 동일
+    // Promise 공유로 SSoT 1회 (#677 race 윈도우 차단).
+    //
+    // #1234 C3-B — **공유는 유지하되 「대기」를 끊는다.** 아래 scene 체인은 이 Promise 의 settle
+    // 을 더 이상 기다리지 않고 `gpuCapSnapshot` 을 **그 시점 값**으로 읽는다 (§C3-B 주석 참조).
     //
     // #1234 C2 2단계 — 계측 훅 주입. 실패 표본이 `web:effect-start` 다음에서 20 초를 넘겼고,
     // 그 사이 코드가 이 호출 하나다. 훅이 없으면 「requestAdapter 호출 전」/「호출했고 미결」/
     // 「settle 했는데 그 뒤가 느림」이 **같은 스냅샷** (마크 부재) 으로 보인다.
     // `markPhase` 는 prod 에서 즉시 반환하는 no-op 이라 조건 분기 없이 상시 전달한다.
     const gpuCapPromise = gpuApi.detectGpuCapability(markPhase);
+
+    // #1234 C3-B — 「지금까지 알려진 capability」. `null` = 아직 안 왔다.
+    // scene 체인이 **대기 대신 조회**하는 창구이며, 아래 `gpuCapPromise.then` 이 채운다.
+    let gpuCapSnapshot: Awaited<typeof gpuCapPromise> | null = null;
+    // scene 구축 시 확정한 renderer 문자열. `undefined` = 아직 구축 전 / `null` = 구축했는데
+    // 1순위(WebGL UNMASKED)도 2순위(adapterInfo)도 비어 있었다. late-arrival 판정에 쓴다.
+    let sceneRendererString: string | null | undefined;
 
     // #738 — GPU tier 판정 SSoT (URL ?gpu= override > detectGpuTier 자동 감지). LOD 강제/알림용.
     // (#745 부터 별 배경 비활성은 tier 가 아닌 소프트웨어 렌더 감지 기준 — resolveGpuTier 와 무관.)
@@ -221,6 +231,22 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       // #1234 C2-H3 — `detectGpuCapability()` (내부에서 `navigator.gpu.requestAdapter()`) 종료.
       // 기존 체인 **안쪽**에 둔다 — 새 `.then` 을 달면 거부 시 unhandled rejection 이 새로 생긴다.
       markPhase('web:gpu-capability');
+      // #1234 C3-B — scene 체인의 조회 창구를 채운다. 마크보다 **뒤**에 두면 안 된다는 제약은
+      // 없으나, 이 대입이 실패할 수 없는 한 줄이라 진단 마크 바로 뒤가 읽기 좋다.
+      gpuCapSnapshot = cap;
+      // late-arrival — scene 이 **이미** 구축됐고 그때 renderer 문자열을 **아무 소스에서도**
+      // 못 얻었다면 (`sceneRendererString === null`), 지금 도착한 2순위가 판정을 뒤집었을 수
+      // 있다. 자동 되돌림은 하지 않는다 (별 배경 mesh 를 뒤늦게 dispose 하는 것이 fill-rate
+      // 비용보다 위험하다 — #745 는 과잉 비활성 회귀가 원래 문제였다). 대신 **조용히 지나가지
+      // 않게** 경고 + 마크를 남겨 진단 가능하게 둔다.
+      if (sceneRendererString === null && detectSoftwareRenderer(cap.adapterInfo?.description)) {
+        markPhase('web:gpu-capability-late-software');
+        console.warn(
+          '[gpu] 소프트웨어 렌더 보조 감지가 장면 구축 뒤에 도착 — 별 배경 비활성(#745)이 이번 ' +
+            '세션에는 반영되지 않았습니다.',
+          cap.adapterInfo?.description,
+        );
+      }
       const requested = useSimStore.getState().physicsEngine;
       const wantsGpu = requested === 'webgpu' || requested === 'auto';
       if (!cap.webgpu) {
@@ -332,16 +358,36 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     let unsubEngine: (() => void) | null = null;
     // #704 — free-fly 감도 zoom/zoomoutFactor push 구독 해제 핸들 (cleanup 에서 호출).
     let unsubSensitivity: (() => void) | null = null;
-    // #738 — scene 생성을 GPU capability 와 함께 await (Promise.all). createSolarSystemScene 의
-    // starfield 옵션은 GPU 환경에 의존 (#745: 소프트웨어 렌더면 fill-rate graceful degradation
-    // 으로 스킵 — WebGPU adapterInfo 보조 감지에 gpuCap 필요)하므로 scene 콜백 진입 시점에 gpuCap
-    // 이 확정돼야 한다. instance.start() 만 await 하면 capability 가 아직 미해결일 수 있어 race
-    // (#677 윈도우). Promise.all 로 둘 다 동기 사용 가능.
-    Promise.all([instance.start(), gpuCapPromise])
-      .then(([, gpuCap]) => {
-        // #1234 C2-H3 — 두 비동기 (엔진 기동 + GPU capability) 가 **모두** 끝난 시점.
-        // 앞 구간들과 달리 이 구간은 둘 중 **늦은 쪽**을 재므로, 어느 쪽이 늦었는지는
-        // `core:render-loop` 와 `web:gpu-capability` 의 `atMs` 대소로 읽는다.
+    // #738 — createSolarSystemScene 의 starfield 옵션은 GPU 환경에 의존한다 (#745: 소프트웨어
+    // 렌더면 fill-rate graceful degradation 으로 스킵).
+    //
+    // #1234 C3-B — **주석 계약 갱신.** 도입 당시 이 자리는 `Promise.all([instance.start(),
+    // gpuCapPromise])` 였고 주석은 「scene 콜백 진입 시점에 gpuCap 이 확정돼야 한다」고 선언했다.
+    // 그 선언이 본 이슈의 증상을 만들었다: `detectGpuCapability()` 안의 `requestAdapter()` 가
+    // 미결이면 **장면 구축 전체가 그것을 기다려** `__solarScene` 이 영영 노출되지 않는다.
+    //
+    // 실제 의존은 그 선언보다 훨씬 약하다 [직접 재확인 — 아래 `rendererString` 산출부]:
+    // scene 체인이 `gpuCap` 에서 읽는 것은 **`adapterInfo?.description` 한 필드**이고, 그것도
+    // **2순위 폴백**이다 (1순위는 동기 `extractWebglRendererString()`). 그래서 계약을 이렇게
+    // 바꾼다 — **scene 체인은 gpuCap 의 settle 을 기다리지 않는다. 그 시점까지 도착한 값을
+    // `gpuCapSnapshot` 으로 읽고, 안 왔으면 1순위만으로 판정한다.**
+    //
+    // 늦게 도착할 때의 동작:
+    //  - 1순위가 값을 줬다 (CI swiftshader 포함 — 실측 96/96 에서 `adapterInfo` 는 애초에
+    //    `undefined` 였다) → 2순위는 **원래 안 읽힌다**. 동작 변화 0.
+    //  - 1순위가 `null` 이었다 → `detectSoftwareRenderer(null) === false` = 별 표시 유지. 이는
+    //    #745 가 이미 못박은 **보수적 기본값**이지 새 동작이 아니다. 뒤늦게 도착한 2순위가 이
+    //    판정을 뒤집었을 경우에만 위 `gpuCapPromise.then` 이 경고 + 마크를 남긴다.
+    //
+    // #677 race 윈도우는 재발하지 않는다 — 차단 수단은 애초에 `Promise.all` 이 아니라 **단일
+    // Promise 공유**였고 (위 §#738 Amendment), 그 공유는 그대로다. `detectGpuCapability()` 는
+    // 여전히 마운트당 1회다.
+    instance
+      .start()
+      .then(() => {
+        // #1234 C2-H3 — 엔진 기동이 끝난 시점. C3-B 이후로는 GPU capability 를 **더 이상 기다리지
+        // 않으므로** 이 구간은 엔진 기동 하나만 잰다 (도입 시점의 「둘 중 늦은 쪽」이 아니다).
+        // capability 가 언제 왔는지는 `web:gpu-capability` 의 `atMs` 로 따로 읽는다.
         markPhase('web:start-awaited');
         if (cancelled || !instance.scene) return;
         // #848 — 위 `setAttribute('tabindex','0')` 의 **주석 계약 drift 정정**.
@@ -536,8 +582,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 진짜 기준인 소프트웨어 렌더로 정정. renderer 추출: WebGL UNMASKED 1차/주 (CI swiftshader 확실
         // 감지 — fps 무회귀 핵심 제약) + WebGPU adapterInfo.description 보조 OR (빈 {} 라 신뢰 낮음).
         // 결정식 SSoT = resolveStarfieldVisible + detectSoftwareRenderer (단위 테스트 가드).
+        // #1234 C3-B — 2순위는 `gpuCap`(대기 결과) 이 아니라 `gpuCapSnapshot`(그 시점 도착분)
+        // 이다. 아직 안 왔으면 `null` 로 떨어지고, 그 결말은 #745 가 못박은 보수적 기본값
+        // (= 별 표시 유지) 이다. `sceneRendererString` 은 late-arrival 판정용 기록.
         const rendererString =
-          extractWebglRendererString() ?? gpuCap.adapterInfo?.description ?? null;
+          extractWebglRendererString() ?? gpuCapSnapshot?.adapterInfo?.description ?? null;
+        sceneRendererString = rendererString;
         const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
         // #1234 C2-H3 — `extractWebglRendererString()` 은 UNMASKED_RENDERER 를 읽으려고 **별도
         // WebGL 컨텍스트를 하나 더 만든다**. 엔진 컨텍스트 생성과 같은 자원을 쓰므로 이 구간을

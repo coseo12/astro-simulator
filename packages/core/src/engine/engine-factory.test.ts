@@ -35,6 +35,7 @@ vi.mock('@babylonjs/core', () => {
 });
 
 import { createEngine } from './engine-factory.js';
+import { GPU_ADAPTER_TIMEOUT_MS } from '../gpu/adapter-timeout.js';
 
 // gpu/capability.test.ts 동형 — Node 21+ 는 전역 navigator 가 실존하므로 defineProperty 로 교체.
 const setNavigator = (value: unknown) => {
@@ -194,5 +195,92 @@ describe('#1234 C2 — createEngine 어댑터 사전 판별 마크', () => {
 
     expect(notCalled.at(-1)).toBeUndefined();
     expect(pending.at(-1)).toBe('engine:probe-adapter-call');
+  });
+});
+
+/**
+ * #1234 C3-A — 미결 어댑터의 **결말**.
+ *
+ * C2 의 판정량이 「미결이 판별된다」였다면 C3 의 판정량은 **「미결이 끝난다」** 다. 그래서
+ * 단언은 마크가 아니라 **`createEngine` 의 반환 자체**에 건다 — 위 C2 블록의 미결 케이스는
+ * `void` 로 던져두고 마크만 봤지만 (반환을 `await` 하면 테스트가 행한다), 여기서는 같은 입력에
+ * `await` 를 걸고 **돌아온다**는 것이 판정량이다.
+ */
+describe('#1234 C3-A — 어댑터 미결의 결말 (상한 + WebGL2 폴백)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('사전 판별 미결 → 상한에서 webgl2 로 폴백하고 **반환한다**', async () => {
+    vi.useFakeTimers();
+    const marks: string[] = [];
+    setNavigator({ gpu: { requestAdapter: () => new Promise(() => {}) } });
+
+    const created = createEngine(canvas, (n) => marks.push(n));
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS);
+
+    await expect(created).resolves.toMatchObject({ kind: 'webgl2' });
+    expect(webgpuCtorSpy).not.toHaveBeenCalled();
+    // 「어댑터가 null 이었다」와 「어댑터가 응답하지 않았다」를 가르는 마크.
+    expect(marks).toContain('engine:probe-adapter-timeout');
+    expect(marks.at(-1)).toBe('engine:webgl2-ctor');
+  });
+
+  it('상한 **직전**까지는 여전히 미결 — 조기 폴백이 아니다', async () => {
+    vi.useFakeTimers();
+    let done = false;
+    setNavigator({ gpu: { requestAdapter: () => new Promise(() => {}) } });
+    void createEngine(canvas).then(() => {
+      done = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS - 1);
+    expect(done).toBe(false);
+    expect(engineCtorSpy).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
+  });
+
+  it('getWebGpuFeatures 의 2회차 어댑터 조회가 미결이어도 WebGPU 생성은 진행한다', async () => {
+    vi.useFakeTimers();
+    const marks: string[] = [];
+    let call = 0;
+    initAsyncMock.mockResolvedValue(undefined);
+    setNavigator({
+      gpu: {
+        requestAdapter: () => {
+          call += 1;
+          // 1회차 (사전 판별) 는 settle, 2회차 (feature 조회) 는 미결 — 「앞이 settle 했으니
+          // 뒤도 settle 한다」가 보장이 아님을 재현한다.
+          return call === 1
+            ? Promise.resolve({ features: new Set(['timestamp-query']) })
+            : new Promise(() => {});
+        },
+      },
+    });
+
+    const created = createEngine(canvas, (n) => marks.push(n));
+    await vi.advanceTimersByTimeAsync(GPU_ADAPTER_TIMEOUT_MS);
+
+    await expect(created).resolves.toMatchObject({ kind: 'webgpu' });
+    expect(marks).toContain('engine:features-adapter-timeout');
+    // feature 집합이 비었으므로 timestamp-query 는 요청되지 않는다 (P4-D bench 전용 — 폴백 결말).
+    expect(webgpuCtorSpy).toHaveBeenCalledWith(
+      canvas,
+      expect.objectContaining({ deviceDescriptor: { requiredFeatures: [] } }),
+    );
+  });
+
+  it('정상 어댑터 경로는 상한 마크 0 — 상한이 건강한 부팅에 흔적을 남기지 않는다', async () => {
+    const marks: string[] = [];
+    initAsyncMock.mockResolvedValue(undefined);
+    setNavigator({
+      gpu: { requestAdapter: vi.fn().mockResolvedValue({ features: new Set() }) },
+    });
+
+    const created = await createEngine(canvas, (n) => marks.push(n));
+    expect(created.kind).toBe('webgpu');
+    expect(marks.filter((m) => m.includes('timeout'))).toEqual([]);
   });
 });

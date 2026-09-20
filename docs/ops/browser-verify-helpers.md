@@ -85,6 +85,13 @@ import {
   `core:`(Scene 생성·렌더 루프) · `scene:`(장면 구축 내부).
 - probe 가 실패하면 `null` 이 아니라 `{ phasesError }` 다 — 「전역이 없다」와 「못 읽었다」를 가른다.
 - 성공 경로의 읽기 비용은 `phasesProbeMs` 로 분리돼 있다 (`totalMs` 에 포함된 몫).
+- **`-timeout` 으로 끝나는 마크는 C3-A 상한 발화다** (`gpu:adapter-timeout` ·
+  `gpu:adapter-info-timeout` · `engine:probe-adapter-timeout` · `engine:features-adapter-timeout`).
+  건강한 부팅에는 **하나도 없어야 정상**이다 — 하나라도 보이면 그 페이지에서 GPU 어댑터 조회가
+  `GPU_ADAPTER_TIMEOUT_MS`(12 s) 를 넘겼다는 뜻이고, 앱은 WebGL2 로 폴백해 계속 돈다
+  (`packages/core/src/gpu/adapter-timeout.ts` §상한 값 근거). 반대로 `gpu:adapter-call` 이
+  **마지막 마크인 채로** 12 s 를 넘겼다면 상한 자체가 안 걸린 것이므로 (타이머 큐가 막혔다)
+  어댑터가 아니라 호스트 쪽을 본다.
 
 ## 리뷰 체크리스트 (신규 verify 스크립트)
 

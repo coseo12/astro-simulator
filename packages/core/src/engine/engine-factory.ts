@@ -1,5 +1,6 @@
 import { Engine, WebGPUEngine } from '@babylonjs/core';
 import type { BootPhaseHook } from './boot-phase.js';
+import { GPU_ADAPTER_TIMEOUT, withAdapterTimeoutMarked } from '../gpu/adapter-timeout.js';
 
 export type EngineKind = 'webgpu' | 'webgl2';
 
@@ -32,6 +33,15 @@ export interface CreatedEngine {
  * 20 s 타임아웃) 에서 `gpu/capability.ts` 와 **여기**의 `requestAdapter()` 가 **동시에** 미결
  * 이었다 (`gpu:adapter-call` · `engine:probe-adapter-call` 이 마지막 마크). 한쪽만 계측했다면
  * 나머지 한쪽의 침묵이 「거기까지 못 왔다」로 읽혔을 것이다.
+ *
+ * #1234 C3-A — 그 확정된 원인에 상한을 씌웠다. 이 파일 안의 `requestAdapter()` 호출 **둘 다**
+ * (`isWebGpuUsable` · `getWebGpuFeatures`) `withAdapterTimeoutMarked` 를 거치며, 상한 도달은
+ * 「어댑터 없음」과 같은 결론(WebGL2 폴백)으로 흡수되되 전용 마크로 갈린다. 상한 값과 그
+ * 실측 근거는 `../gpu/adapter-timeout.ts` §`GPU_ADAPTER_TIMEOUT_MS` 가 SSoT 다.
+ *
+ * ⚠️ **상한이 닿지 않는 곳이 하나 남는다** — `engine.initAsync()` 다 (아래 WebGPU 경로).
+ * 관측된 미결 표본은 전부 어댑터 조회였고 `initAsync` 는 다른 API 라 이번 처방에 넣지 않았다.
+ * 거기서 멈추면 `engine:webgpu-features` 는 찍혔는데 `engine:webgpu-init` 이 없는 형태다.
  */
 export async function createEngine(
   canvas: HTMLCanvasElement,
@@ -46,7 +56,7 @@ export async function createEngine(
       // P4-D #166 — timestamp-query feature를 optional로 요청.
       // 어댑터가 지원 시 EngineInstrumentation.captureGPUFrameTime이 동작한다.
       // 미지원 어댑터는 feature가 비어있는 device로 생성되어 폴백 필요 없음.
-      const supported = await getWebGpuFeatures();
+      const supported = await getWebGpuFeatures(onBootPhase);
       onBootPhase?.('engine:webgpu-features');
       const requiredFeatures = (
         supported.has('timestamp-query') ? ['timestamp-query'] : []
@@ -86,9 +96,10 @@ export async function createEngine(
  *
  * #1234 C2 2단계 — `engine:probe-adapter-call` 은 **await 직전**에 찍힌다. 이 마크가 있는데
  * 호출부의 `engine:webgpu-probe` 가 없으면 **이 `requestAdapter()` 가 미결**이라는 뜻이다
- * (저장소 안에서 타임아웃 없는 `requestAdapter` 호출 지점은 셋이고, 그중 둘이 마크 없이
- * 부팅 앞단에 있었다 — 나머지 하나인 `getWebGpuFeatures` 는 이미 `engine:webgpu-probe` ↔
- * `engine:webgpu-features` 사이에 갇혀 있어 따로 찍지 않는다).
+ * (저장소 안 `requestAdapter` 호출 지점은 셋이고, C2 시점에 그중 둘이 마크 없이 부팅 앞단에
+ * 있었다 — 나머지 하나인 `getWebGpuFeatures` 는 이미 `engine:webgpu-probe` ↔
+ * `engine:webgpu-features` 사이에 갇혀 있어 **구간 마크**를 따로 찍지 않는다. C3-A 이후 셋 다
+ * **상한 도달 마크**는 갖는다 — 구간 마크와 상한 마크는 다른 축이다).
  */
 async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
   if (typeof navigator === 'undefined') return false;
@@ -96,7 +107,15 @@ async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
   if (!gpu) return false;
   try {
     onBootPhase?.('engine:probe-adapter-call');
-    const adapter = await gpu.requestAdapter();
+    // #1234 C3-A — 상한. 미결이면 `GPU_ADAPTER_TIMEOUT` 이 돌아오고, 「어댑터 없음」과 같은
+    // 결론(false)으로 흡수돼 아래 WebGL2 폴백으로 간다. 상한 도달은
+    // `engine:probe-adapter-timeout` 마크로 남으므로 「adapter 가 null 이었다」와 갈린다.
+    const adapter = await withAdapterTimeoutMarked(
+      gpu.requestAdapter(),
+      'engine:probe-adapter-timeout',
+      onBootPhase,
+    );
+    if (adapter === GPU_ADAPTER_TIMEOUT) return false;
     return adapter !== null;
   } catch {
     return false;
@@ -107,14 +126,26 @@ async function isWebGpuUsable(onBootPhase?: BootPhaseHook): Promise<boolean> {
  * 현재 어댑터가 지원하는 WebGPU feature 집합. P4-D #166 — timestamp-query 사용 가능 여부 판별.
  * 어댑터 획득 실패 시 빈 Set. 동일 어댑터에 대해 Babylon이 별도 생성하지만, 중복 호출 비용은
  * microsecond 단위로 무시 가능.
+ *
+ * #1234 C3-A — 여기도 **같은 클래스**다 (타임아웃 없는 `requestAdapter()` await, 부팅 경로 위).
+ * 실패 표본이 여기서 멈춘 적은 없다 — 이 함수는 위 사전 판별이 **settle 해서 true 였을 때만**
+ * 도달하기 때문이다. 다만 「앞 호출이 settle 했으니 뒤 호출도 settle 한다」는 보장은 없고
+ * (미결은 자원 상태 함수이지 단조 함수가 아니다), 여기서 멈추면 증상이 동일하다 —
+ * `engine:webgpu-probe` 는 찍혔는데 `engine:webgpu-features` 가 없는 형태다. 같은 상한을 씌운다.
  */
-async function getWebGpuFeatures(): Promise<ReadonlySet<string>> {
+async function getWebGpuFeatures(onBootPhase?: BootPhaseHook): Promise<ReadonlySet<string>> {
   if (typeof navigator === 'undefined') return new Set();
   const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
   if (!gpu) return new Set();
   try {
-    const adapter = await gpu.requestAdapter();
-    if (!adapter) return new Set();
+    const adapter = await withAdapterTimeoutMarked(
+      gpu.requestAdapter(),
+      'engine:features-adapter-timeout',
+      onBootPhase,
+    );
+    // 상한 도달은 「어댑터 없음」과 같은 결말 — feature 집합이 비면 timestamp-query 를 요청하지
+    // 않을 뿐이고 (P4-D bench 전용) WebGPU 엔진 생성 자체는 그대로 진행한다.
+    if (adapter === GPU_ADAPTER_TIMEOUT || !adapter) return new Set();
     return new Set(adapter.features);
   } catch {
     return new Set();
