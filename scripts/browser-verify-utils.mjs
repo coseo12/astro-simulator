@@ -355,6 +355,40 @@ async function probePageState(page) {
 }
 
 /**
+ * 부팅 **단계 계측** (#1234 C2-H3) 스냅샷을 읽는다.
+ *
+ * `window.__bootPhases` 는 apps/web `boot-phases.ts` 가 dev 빌드에서만 노출하는 getter 이며,
+ * 「구간 이름 + 네비게이션 기준 경과 + 직전 구간과의 차」를 누적한다. C1 이 남긴 실패 상태
+ * (`__simCore` 는 있고 `__solarScene` 만 없음) 는 「장면 구축 어딘가」까지만 좁혔고, 이 스냅샷이
+ * 그 안쪽을 가른다 — 엔진 생성 / 어댑터 / mesh 생성 / 궤도선 / 물리 엔진 중 어디서 멈췄는지.
+ *
+ * **prod 서버 (`next start`) 로 띄운 대조군에서는 전역 자체가 없다** → `null` 이 정상이다.
+ * probe 자체가 멈춘 페이지에 매달리지 않도록 `probePageState` 와 같은 상한으로 경주시킨다.
+ */
+async function readBootPhases(page) {
+  let timer;
+  try {
+    const probe = Promise.resolve(
+      page.evaluate(() => {
+        const snapshot = window.__bootPhases;
+        return snapshot === undefined ? null : snapshot;
+      }),
+    ).catch((error) => ({ phasesError: String(error?.message ?? error) }));
+    const bounded = new Promise((resolve) => {
+      timer = setTimeout(
+        () => resolve({ phasesError: `bootPhases probe ${BOOT_PROBE_TIMEOUT_MS}ms 초과` }),
+        BOOT_PROBE_TIMEOUT_MS,
+      );
+    });
+    return await Promise.race([probe, bounded]);
+  } catch (error) {
+    return { phasesError: String(error?.message ?? error) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * 실패 시점의 **dev server** 응답성을 브라우저 밖에서 잰다.
  *
  * 이 축이 없으면 「서버가 느린 것」과 「브라우저·페이지가 멈춘 것」이 같은 증상 (핸들 미노출) 으로
@@ -412,6 +446,28 @@ function attachBootErrorProbe(page) {
   };
 }
 
+/**
+ * 부팅 단계 (#1234 C2-H3) 를 사람이 읽는 한 조각으로 접는다.
+ *
+ * 전량은 JSON 줄에 있으므로 요약에는 **마지막 구간**(어디까지 갔나) 과 **가장 오래 걸린 3개**
+ * (어디서 샜나) 만 싣는다. 두 물음이 실패 로그를 훑을 때 먼저 던지는 것이다.
+ */
+function formatBootPhases(snapshot) {
+  if (snapshot === null || snapshot === undefined) return ' · phases -';
+  if (snapshot.phasesError) return ` · phases ERR(${snapshot.phasesError})`;
+  const phases = Array.isArray(snapshot.phases) ? snapshot.phases : [];
+  if (phases.length === 0) return ' · phases 0';
+  const last = phases[phases.length - 1];
+  const top = [...phases]
+    .sort((a, b) => b.deltaMs - a.deltaMs)
+    .slice(0, 3)
+    // dev StrictMode 는 초기화 체인을 두 개 돌린다 — 같은 이름이 두 번 나오므로 체인을 붙인다.
+    .map((p) => `${p.name}${p.chain ? `(${p.chain})` : ''} ${p.deltaMs}ms`)
+    .join(', ');
+  const droppedNote = snapshot.dropped ? ` +${snapshot.dropped}건 잘림` : '';
+  return ` · phases ${phases.length}${droppedNote} last ${last.name}@${last.atMs}ms · top ${top}`;
+}
+
 /** 계측 레코드를 요약 1줄 + JSON 1줄로 출력. */
 function logBootRecord(rec) {
   const ms = (v) => (v === null ? '-' : `${v}ms`);
@@ -428,7 +484,8 @@ function logBootRecord(rec) {
   console.log(
     `[boot] ${rec.guard} #${rec.seq}${rec.label ? ` ${rec.label}` : ''} — ${verdict} ` +
       `goto ${ms(rec.gotoMs)} · handles ${ms(rec.handlesMs)} · settle ${ms(rec.settleMs)} · ` +
-      `total ${ms(rec.totalMs)} · ${count} · t0 ${rec.processUptimeS}s${diag}`,
+      `total ${ms(rec.totalMs)} · ${count} · t0 ${rec.processUptimeS}s${diag}` +
+      formatBootPhases(rec.bootPhases),
   );
   console.log(`[boot] ${JSON.stringify(rec)}`);
 }
@@ -484,6 +541,10 @@ export async function bootstrapScene(page, options = {}) {
     error: null,
     state: null,
     server: null,
+    // #1234 C2-H3 — 부팅 단계 계측 스냅샷 (성공·실패 양쪽에서 채운다. prod 번들이면 null).
+    bootPhases: null,
+    /** 위 스냅샷을 읽는 데 든 시간 (성공 경로에서만. `totalMs` 에 포함된 몫). */
+    phasesProbeMs: null,
     consoleErrors: null,
     pagesAtFail: null,
     contextsAtFail: null,
@@ -520,6 +581,17 @@ export async function bootstrapScene(page, options = {}) {
     if (settleMs > 0) await page.waitForTimeout(settleMs);
     rec.settleMs = Date.now() - settleStartedAt;
 
+    // 성공 경로에서도 단계 분포를 남긴다 — **실패 표본만으로는 기준선이 없다** (C1 에서 goto 가
+    // 평평하다는 사실도 성공 표본 36회가 있어서 알았다). `readBootPhases` 는 자체 try/catch 로
+    // 절대 throw 하지 않으므로 아래 catch (= 판정) 에 닿지 않는다 (#1234 계약 C5).
+    //
+    // 이 evaluate 비용은 `totalMs` 에 들어간다 (finally 에서 재므로). 구간별 값
+    // (`gotoMs`/`handlesMs`/`settleMs`) 은 오염되지 않으며, 비용 자체는 `phasesProbeMs` 로
+    // 분리해 두어 C1 표본과의 `totalMs` 대조 시 빼고 볼 수 있게 한다.
+    const phasesProbeStartedAt = Date.now();
+    rec.bootPhases = await readBootPhases(page);
+    rec.phasesProbeMs = Date.now() - phasesProbeStartedAt;
+
     rec.ok = true;
     return url;
   } catch (error) {
@@ -527,6 +599,9 @@ export async function bootstrapScene(page, options = {}) {
     rec.failedPhaseMs = Date.now() - phaseStartedAt;
     rec.error = `${error?.name ?? 'Error'}: ${String(error?.message ?? error).split('\n')[0]}`;
     rec.state = await probePageState(page);
+    // #1234 C2-H3 — 「어디까지 갔나」. `state` 가 `__solarScene="undefined"` 로 잘라낸 구간의
+    // **안쪽**을 이 스냅샷이 가른다 (state 바로 옆에 싣는 것이 계약 — 두 값은 같이 읽힌다).
+    rec.bootPhases = await readBootPhases(page);
     rec.server = await probeServer(baseUrl);
     rec.consoleErrors = [...errorProbe.errors];
     const atFail = countOpenPages(page);

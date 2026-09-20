@@ -30,6 +30,9 @@ import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
+// #1234 C2-H3 — 부팅 단계 계측 (dev 전용 기록기. prod 에서는 호출이 즉시 반환하고
+// `window.__bootPhases` 는 정의되지 않는다 — boot-phases.ts §계약).
+import { markBootPhase, nextBootChain } from '@/core/boot-phases';
 import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -177,6 +180,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     if (!canvas) return;
     if (coreRef.current && !coreRef.current.disposed) return;
 
+    // #1234 C2-H3 — 이 effect 의 계측 체인. dev StrictMode 는 초기화를 **두 번** 돌리고 두
+    // 체인이 동시에 진행하므로 (로컬 실측 — 한 페이지에 엔진 2개), 체인을 나눠야 구간 소요가
+    // 남의 체인과의 차로 오염되지 않는다.
+    const bootChain = nextBootChain();
+    const markPhase = (name: string): void => markBootPhase(name, bootChain);
+    // 첫 눈금. `atMs` 가 곧 「문서 네비게이션 → 초기화 effect 진입」 경과라,
+    // 번들 로드/하이드레이션이 느린 것과 장면 구축이 느린 것이 이 값 하나로 갈린다.
+    markPhase('web:effect-start');
+
     // P3-0 #124 — WebGPU capability 감지 (마운트 시 1회). 사용자가 webgpu/auto
     // 엔진을 요청했는데 미지원이면 콘솔 경고 + HUD notice + newton 폴백 안내.
     //
@@ -201,6 +213,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     };
 
     gpuCapPromise.then((cap) => {
+      // #1234 C2-H3 — `detectGpuCapability()` (내부에서 `navigator.gpu.requestAdapter()`) 종료.
+      // 기존 체인 **안쪽**에 둔다 — 새 `.then` 을 달면 거부 시 unhandled rejection 이 새로 생긴다.
+      markPhase('web:gpu-capability');
       const requested = useSimStore.getState().physicsEngine;
       const wantsGpu = requested === 'webgpu' || requested === 'auto';
       if (!cap.webgpu) {
@@ -278,7 +293,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       }
     });
 
-    const instance = new SimulationCore(canvas);
+    // #1234 C2-H3 — 엔진/어댑터 구간 계측 훅 주입. `markBootPhase` 는 prod 에서 즉시 반환하는
+    // no-op 이라 (boot-phases.ts §계약) 조건 분기 없이 상시 전달한다.
+    const instance = new SimulationCore(canvas, { onBootPhase: markPhase });
     // Babylon이 기본 tabindex=1을 설정 — a11y(WCAG 2.4.3) 권고상 양수 금지.
     // 아래 `canvasTabIndex` 지정과 **이중 방어** — 여기 setAttribute 만으로는 engine 기동 전
     // 초기값만 잡는다 (실제 되돌림은 InputManager 가 한다. 상세는 아래 주석).
@@ -317,6 +334,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     // (#677 윈도우). Promise.all 로 둘 다 동기 사용 가능.
     Promise.all([instance.start(), gpuCapPromise])
       .then(([, gpuCap]) => {
+        // #1234 C2-H3 — 두 비동기 (엔진 기동 + GPU capability) 가 **모두** 끝난 시점.
+        // 앞 구간들과 달리 이 구간은 둘 중 **늦은 쪽**을 재므로, 어느 쪽이 늦었는지는
+        // `core:render-loop` 와 `web:gpu-capability` 의 `atMs` 대소로 읽는다.
+        markPhase('web:start-awaited');
         if (cancelled || !instance.scene) return;
         // #848 — 위 `setAttribute('tabindex','0')` 의 **주석 계약 drift 정정**.
         //
@@ -395,6 +416,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // camera dispose 시 WASD observer/blur 리스너 해제 (HMR/StrictMode 재마운트 누수 방지 —
         // #693 contextmenu handler onDisposeObservable 선례).
         camera.onDisposeObservable.add(() => wasdControl.detach());
+        // #1234 C2-H3 — 로그 깊이 활성 + 카메라/컨트롤러/WASD 배선까지.
+        markPhase('web:camera-setup');
         // #699 — free-fly 줌아웃 상한 (허공 대체 처리 — ADR §5-3). 진입 시 강제 줌아웃(#631) 대신
         // 사용자가 줌아웃할 때 빈 공간 도달 직전에서 멈춘다.
         //
@@ -511,6 +534,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const rendererString =
           extractWebglRendererString() ?? gpuCap.adapterInfo?.description ?? null;
         const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
+        // #1234 C2-H3 — `extractWebglRendererString()` 은 UNMASKED_RENDERER 를 읽으려고 **별도
+        // WebGL 컨텍스트를 하나 더 만든다**. 엔진 컨텍스트 생성과 같은 자원을 쓰므로 이 구간을
+        // 엔진 구간과 따로 재지 않으면 둘이 한 덩어리로 뭉친다.
+        markPhase('web:renderer-detect');
         const starfieldVisible = resolveStarfieldVisible(starsParamVisible, !isSoftwareRenderer);
         // #756 — 절차적 행성 표면 셰이더 기본 ON + `?surface=off` 옵트아웃 (ADR 20260628-756 §결정 4).
         // starfield 와 달리 전체화면 fill 이 아닌 body 표면만 → tier-c 는 forceOverride:'low' 가
@@ -550,7 +577,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           value: isSoftwareRenderer,
           writable: false,
         });
+        // #1234 C2-H3 — 카메라 셋업 + free-fly 배선 + URL 파라미터 파싱까지의 동기 구간.
+        markPhase('web:scene-preamble');
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
+          // #1234 C2-H3 — 장면 구축 내부 세분 (scene:* 마크). prod no-op.
+          onBootPhase: markPhase,
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
@@ -622,6 +653,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             configurable: true,
             value: solar,
             writable: false,
+          });
+          // #1234 C2-H3 — `bootstrapScene` 의 핸들 대기가 풀리는 바로 그 시점.
+          // 이 마크가 없으면 부팅이 여기까지 온 것이고, 있으면 20 s 는 다른 데서 샜다.
+          markPhase('web:solar-scene-exposed');
+          // 장면 생성 **이후** 첫 프레임. 셰이더 컴파일·텍스처 업로드가 여기서 처음 강제된다
+          // (`__solarScene` 노출 이후라 핸들 대기에는 포함되지 않는 구간 — 그래도 남겨 두면
+          // 「부팅은 빨랐는데 첫 그림이 늦다」를 같은 축에서 읽는다). 관측만 하는 addOnce 라
+          // 렌더 결과에는 관여하지 않는다.
+          instance.scene?.onAfterRenderObservable.addOnce(() => {
+            markPhase('web:first-frame-after-scene');
           });
         }
 

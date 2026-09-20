@@ -68,6 +68,24 @@ import {
 - 셀 수 없는 축(`contexts`/`pages`)은 `0` 이 아니라 `null` + `countError` 다 — 「0 개」와
   「못 셌다」가 같은 값이면 이 축으로 원인을 가르려는 쪽이 거짓 분포를 읽는다.
 
+### 단계 계측 `bootPhases` (C2-H3)
+
+`state` 가 「`__simCore` 는 있고 `__solarScene` 만 없다」 까지 좁힌 **그 안쪽**을 가르는 축이다.
+성공·실패 **양쪽**에서 채운다 (실패 표본만 있으면 기준선이 없다).
+
+```
+… · phases 17 last scene:orbit-lines@2481ms · top engine:webgl2-ctor 980ms, scene:body-meshes 412ms, web:effect-start 388ms
+```
+
+- 출처는 apps/web `src/core/boot-phases.ts` 가 **dev 빌드에서만** 노출하는 `window.__bootPhases`
+  (`__solarScene` 과 같은 게이트 계약). prod 서버(`next start`) 대조군에서는 `null` 이 **정상**이다.
+- 각 항목은 `{ name, atMs, deltaMs }` — `atMs` 는 네비게이션 기준 경과, `deltaMs` 는 **직전 구간과의
+  차**(= 그 구간 소요)다. 첫 항목의 `atMs` 가 곧 「초기화 effect 진입까지 걸린 시간」이다.
+- 이름 접두는 구간 소유자다: `web:`(sim-canvas 배선) · `engine:`(어댑터/컨텍스트) ·
+  `core:`(Scene 생성·렌더 루프) · `scene:`(장면 구축 내부).
+- probe 가 실패하면 `null` 이 아니라 `{ phasesError }` 다 — 「전역이 없다」와 「못 읽었다」를 가른다.
+- 성공 경로의 읽기 비용은 `phasesProbeMs` 로 분리돼 있다 (`totalMs` 에 포함된 몫).
+
 ## 리뷰 체크리스트 (신규 verify 스크립트)
 
 신규 `browser-verify-*.mjs` 가 PR 에 포함되면 아래를 확인한다.

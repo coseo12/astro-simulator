@@ -1,4 +1,5 @@
 import { Engine, WebGPUEngine } from '@babylonjs/core';
+import type { BootPhaseHook } from './boot-phase.js';
 
 export type EngineKind = 'webgpu' | 'webgl2';
 
@@ -15,14 +16,25 @@ export interface CreatedEngine {
  * 실제 사용 가능한 adapter가 있는 경우에만 진행한다.
  * 이렇게 하지 않으면 Babylon 내부에서 console.error로 실패 로그가 먼저 찍힌다
  * (try/catch로 잡히지 않음).
+ *
+ * #1234 C2-H3 — `onBootPhase` 는 **끝난 구간**을 통지한다 (미지정 시 호출 0).
+ * 여기서 갈리는 축이 세 개다: 어댑터 조회 (`requestAdapter`) / WebGPU device 초기화 /
+ * WebGL2 컨텍스트 생성. 세 번째는 **한 브라우저가 동시에 열 수 있는 GL 컨텍스트 수**에
+ * 종속이라, 「페이지를 여러 개 열어둔 채 부팅」 가설 (H1) 이 사실이면 여기가 길어진다.
  */
-export async function createEngine(canvas: HTMLCanvasElement): Promise<CreatedEngine> {
-  if (await isWebGpuUsable()) {
+export async function createEngine(
+  canvas: HTMLCanvasElement,
+  onBootPhase?: BootPhaseHook,
+): Promise<CreatedEngine> {
+  const webGpuUsable = await isWebGpuUsable();
+  onBootPhase?.('engine:webgpu-probe');
+  if (webGpuUsable) {
     try {
       // P4-D #166 — timestamp-query feature를 optional로 요청.
       // 어댑터가 지원 시 EngineInstrumentation.captureGPUFrameTime이 동작한다.
       // 미지원 어댑터는 feature가 비어있는 device로 생성되어 폴백 필요 없음.
       const supported = await getWebGpuFeatures();
+      onBootPhase?.('engine:webgpu-features');
       const requiredFeatures = (
         supported.has('timestamp-query') ? ['timestamp-query'] : []
       ) as GPUFeatureName[];
@@ -33,10 +45,12 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<CreatedEn
         deviceDescriptor: { requiredFeatures },
       });
       await engine.initAsync();
+      onBootPhase?.('engine:webgpu-init');
       return { engine, kind: 'webgpu' };
     } catch (error) {
       // adapter는 있었으나 초기화 중 실패 — WebGL2로 폴백
       console.warn('[engine-factory] WebGPU 초기화 실패, WebGL2로 폴백합니다.', error);
+      onBootPhase?.('engine:webgpu-failed');
     }
   }
 
@@ -45,6 +59,7 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<CreatedEn
     stencil: true,
     adaptToDeviceRatio: true,
   });
+  onBootPhase?.('engine:webgl2-ctor');
   return { engine, kind: 'webgl2' };
 }
 
