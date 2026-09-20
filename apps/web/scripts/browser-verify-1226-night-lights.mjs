@@ -167,6 +167,9 @@ async function setupPage(browser, baseUrl, query, label, settleOptions = {}) {
     query,
     handles: ['__simCore', '__solarScene'],
     settleMs: BOOT_SETTLE_MS - WAIT_ADVANCE_MS,
+    // #1234 C1 — `[boot]` 계측 로그에 실을 페이지 라벨 (판정 무관 진단). 이 가드는 한 프로세스에서
+    // 최대 7 페이지를 열고 실패 지점이 run 마다 달라, 순번만으로는 P1 ↔ P1b 를 가리기 어렵다.
+    label,
   });
   // #1219 · #1228 B1 — 캔버스 위 DOM (HUD · 토스트) 이 캡처에 섞이지 않게 숨긴다 (캔버스 개수 fail-fast 포함).
   // 페이지 스타일 규칙이라 이후 등장하는 토스트 (focus 1500ms 뒤) 에도 적용된다.

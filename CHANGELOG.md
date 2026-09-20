@@ -5,6 +5,14 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Changed
+
+- **[#1234] `bootstrapScene` 부팅 계측 — `[boot]` 진단 2줄 (판정·임계 0행 변경)** ([#1234](https://github.com/coseo12/astro-simulator/issues/1234) 계약 C1). `shader-pixel-guard` 의 장면 부팅 20 s 타임아웃이 2026-09-18 하루에 5회 (로컬 qa 1회 포함) 발화해 v0.89.0 릴리스 CI 를 두 번 막았는데, **실패 시 남는 것이 Playwright `TimeoutError` 스택뿐**이라 원인 후보를 가를 수치가 하나도 없었다. `bootstrapScene` 이 호출마다 구간 소요 (`goto` / 핸들 대기 / settle) · 가드 이름 · 페이지 라벨 · 호출 순번 · **그 시점 열려 있는 context/page 수** · 프로세스 경과를 남기고, 실패 시 `document.readyState` · `__simCore`·`__solarScene` 의 `typeof` · `performance.now()` · **node 측에서 잰 dev server 응답** · 콘솔/페이지 에러 수집본을 함께 찍는다. 사람이 읽는 요약 1줄 + `JSON.parse` 가능한 1줄로, 둘 다 `[boot] ` 로 시작한다 (`grep '^\[boot\] {'` 가 JSON 만 모은다).
+  - **본 PR 은 측정 (C1) 만이다** — 타임아웃 상수 · 대기 술어 · 시나리오 · 판정량은 변경하지 않았고 예외는 **원본 객체 그대로** 다시 던진다 (계약 C5). 처방 (C3) 은 원인 확정 후다.
+  - 완주 소요 (`gotoMs`/`handlesMs`/`settleMs`) 는 **완주한 구간만** 채운다. 실패 구간의 소비 시간을 같은 필드에 넣으면 「완주 소요」 분포에 타임아웃 상수가 섞이므로 `failedPhaseMs` 로 분리했다. 셀 수 없는 축은 `0` 이 아니라 `null` + `countError` 다 — 「0 개」와 「못 셌다」가 같은 값이면 이 축으로 원인을 가르려는 쪽이 거짓 분포를 읽는다.
+  - [실측] 로컬 `SWIFTSHADER=1` · `next dev :3001` 에서 CI 순서 (1215 → 1226) 3라운드 · 부팅 36회 (실패 0 · 가드 8/8 PASS): **`goto` 는 위치와 무관하게 평평하고** (전 36회 `796 ~ 924 ms`), 증가분은 전부 핸들 대기다 — 1215 `2377 → 9492 ms` (1 → 5 페이지) · 1226 `2402 → 7545 ms` (1 → 7 페이지), 라운드 간 재현 오차 약 5 %. ⚠️ 이 가드들에서 **동시 열린 페이지 수 · 호출 순번 · 프로세스 경과는 완전 공선**이라 이 표본만으로는 세 축이 갈리지 않는다 (C2 의 단독 개입 대상).
+  - 적용 범위 — `shader-pixel-guard` 의 12 step 중 `bootstrapScene` 을 쓰는 것은 **1215 · 1226 둘뿐**이다. 나머지 8 스크립트는 같은 상수 (`goto` 45 s · 핸들 20 s · `networkidle`) 를 각자 인라인으로 갖고 있어 **의미는 같지만 이 계측을 타지 않는다**. 앞쪽 가드 분포가 필요하면 그 8종을 `bootstrapScene` 으로 전환하는 후속이 있어야 한다.
+
 ### Fixed
 
 - **[#1232] tier 경계 줌 — 줌인 시 흔들림 · 줌아웃 시 과도 이탈** ([#1232](https://github.com/coseo12/astro-simulator/issues/1232), ADR [`20260509-380`](docs/decisions/20260509-380-zoom-camera-freeze-forensic.md) §Amendment 3). planet focus (예: `?focus=earth`) 에서 휠로 `0.1 AU` 경계를 넘을 때 생기던 두 증상을 고쳤다. 둘은 기전이 다르다.

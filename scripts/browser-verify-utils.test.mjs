@@ -98,6 +98,23 @@ function launchStub(browser) {
   };
 }
 
+/**
+ * `console.log` 을 가로채 배열로 수집 (#1234 — `bootstrapScene` 이 `[boot]` 계측 2줄을 찍는다).
+ *
+ * `captureWarnings` 와 같은 이유: 테스트 러너 출력 오염 방지 + 찍힌 내용 자체를 단언 대상으로 삼기.
+ */
+async function captureLogs(fn) {
+  const original = console.log;
+  const lines = [];
+  console.log = (msg) => lines.push(String(msg));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines;
+}
+
 /** `console.warn` 을 가로채 배열로 수집 (테스트 출력 오염 방지). */
 async function captureWarnings(fn) {
   const original = console.warn;
@@ -324,7 +341,10 @@ await run('collectConsoleErrors — errors 배열 주입 시 이어담기', () =
 // --- bootstrapScene -------------------------------------------------------
 await run('bootstrapScene — baseUrl + 기본 쿼리로 이동', async () => {
   const page = stubPage();
-  const url = await bootstrapScene(page, { baseUrl: 'http://localhost:3002' });
+  let url;
+  await captureLogs(async () => {
+    url = await bootstrapScene(page, { baseUrl: 'http://localhost:3002' });
+  });
   assert.equal(url, `http://localhost:3002${DEFAULT_BOOTSTRAP_QUERY}`);
   assert.equal(page.gotoCalls[0].url, url);
   assert.equal(page.gotoCalls[0].opts.waitUntil, 'networkidle');
@@ -332,10 +352,12 @@ await run('bootstrapScene — baseUrl + 기본 쿼리로 이동', async () => {
 
 await run('bootstrapScene — handles 전부 노출돼야 통과하는 술어', async () => {
   const page = stubPage();
-  await bootstrapScene(page, {
-    baseUrl: 'http://x',
-    handles: ['__solarScene', '__simStore'],
-  });
+  await captureLogs(() =>
+    bootstrapScene(page, {
+      baseUrl: 'http://x',
+      handles: ['__solarScene', '__simStore'],
+    }),
+  );
   const { fn, arg } = page.waitForFunctionCalls[0];
   assert.deepEqual(arg, ['__solarScene', '__simStore']);
   // 술어를 브라우저 대신 여기서 실제로 실행 — "하나라도 빠지면 false" 계약 검증.
@@ -355,14 +377,98 @@ await run('bootstrapScene — handles 전부 노출돼야 통과하는 술어', 
 
 await run('bootstrapScene — settleMs 0 이면 waitForTimeout 미호출', async () => {
   const page = stubPage();
-  await bootstrapScene(page, { baseUrl: 'http://x' });
+  await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x' }));
   assert.deepEqual(page.waitForTimeoutCalls, []);
 });
 
 await run('bootstrapScene — settleMs 지정 시 안정화 대기', async () => {
   const page = stubPage();
-  await bootstrapScene(page, { baseUrl: 'http://x', settleMs: 2500 });
+  await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x', settleMs: 2500 }));
   assert.deepEqual(page.waitForTimeoutCalls, [2500]);
+});
+
+// --- bootstrapScene 계측 (#1234 C1) ---------------------------------------
+// 계측은 **진단 전용**이다. 아래 3 케이스가 닫는 것: (1) 두 줄 규약과 JSON 파싱 가능성,
+// (2) 예외 경로에서 원 에러가 그대로 전파되는가 (판정 무변경), (3) 셀 수 없는 축을 `0` 으로
+// 지어내지 않는가. (3) 을 빼면 「ctx 0 / page 0」 이 관측값처럼 보여 다음 단계가 거짓 분포를 읽는다.
+
+/** `[boot] {…}` JSON 줄만 골라 파싱. */
+const bootJsonLines = (lines) =>
+  lines.filter((l) => l.startsWith('[boot] {')).map((l) => JSON.parse(l.slice('[boot] '.length)));
+
+await run('bootstrapScene 계측 — 요약 1줄 + 파싱 가능한 JSON 1줄', async () => {
+  const page = stubPage();
+  const lines = await captureLogs(() =>
+    bootstrapScene(page, { baseUrl: 'http://x', label: 'P1b', handles: ['__solarScene'] }),
+  );
+  const bootLines = lines.filter((l) => l.startsWith('[boot] '));
+  assert.equal(bootLines.length, 2, `[boot] 줄이 2개여야 한다 (실제 ${bootLines.length})`);
+  const [summary] = bootLines;
+  assert.ok(!summary.startsWith('[boot] {'), '첫 줄은 사람이 읽는 요약이어야 한다');
+  assert.match(summary, /P1b/, '요약에 라벨이 없다');
+
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.label, 'P1b');
+  assert.equal(rec.ok, true);
+  assert.equal(rec.failedPhase, null);
+  assert.equal(rec.url, `http://x${DEFAULT_BOOTSTRAP_QUERY}`);
+  assert.ok(typeof rec.seq === 'number' && rec.seq > 0, 'seq 미기록');
+  assert.ok(typeof rec.gotoMs === 'number', 'gotoMs 미기록');
+  assert.ok(typeof rec.handlesMs === 'number', 'handlesMs 미기록');
+  assert.ok(typeof rec.totalMs === 'number', 'totalMs 미기록');
+  assert.ok(typeof rec.processUptimeS === 'number', 'processUptimeS 미기록');
+});
+
+await run('bootstrapScene 계측 — 핸들 대기 실패 시 원 에러 전파 + 실패 단계 기록', async () => {
+  const page = stubPage();
+  const boom = new Error('Timeout 20000ms exceeded.');
+  boom.name = 'TimeoutError';
+  page.waitForFunction = async () => {
+    throw boom;
+  };
+  let caught = null;
+  const lines = await captureLogs(async () => {
+    try {
+      // 실패 경로는 dev server probe 를 돈다 — 즉시 connection refused 가 나는 주소를 쓴다
+      // (DNS 조회가 걸리는 호스트를 쓰면 테스트가 네트워크 상태에 종속된다).
+      await bootstrapScene(page, { baseUrl: 'http://127.0.0.1:1', label: 'P1' });
+    } catch (e) {
+      caught = e;
+    }
+  });
+  // 계측이 예외를 삼키거나 감싸면 호출부의 실패 경로가 바뀐다 — 동일 객체여야 한다.
+  assert.equal(caught, boom, '원 에러가 그대로 전파되지 않았다');
+
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.ok, false);
+  assert.equal(rec.failedPhase, 'handles');
+  assert.match(rec.error, /TimeoutError/);
+  // 완주 소요 필드는 완주한 구간만 채운다 — 실패 구간에 타임아웃 상수가 섞이면 분포가 오염된다.
+  assert.equal(rec.handlesMs, null, '완주하지 못한 구간이 완주 소요로 기록됐다');
+  assert.ok(typeof rec.failedPhaseMs === 'number', '실패 구간 소비 시간이 유실됐다');
+  assert.ok(typeof rec.gotoMs === 'number', '앞 구간(goto) 소요는 남아야 한다');
+  assert.deepEqual(
+    rec.consoleErrors,
+    [],
+    '실패 시 콘솔 에러 수집본이 있어야 한다 (0건이면 빈 배열)',
+  );
+  assert.ok(rec.state !== null, '실패 시 페이지 상태 probe 결과가 있어야 한다');
+  // 「서버가 느린가 / 페이지가 멈췄나」를 가르는 축 — 실패 경로에서 비어 있으면 안 된다.
+  assert.ok(typeof rec.server?.ms === 'number', '실패 시 dev server probe 결과가 없다');
+});
+
+await run('bootstrapScene 계측 — page 계수 불가 시 0 이 아니라 null', async () => {
+  // 스텁에는 `context()` 가 없다 = 「셀 수 없음」. 이 케이스가 `0` 으로 기록되면
+  // 「열린 페이지 0개」 라는 관측값과 구분되지 않는다.
+  const page = stubPage();
+  const lines = await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x' }));
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.pages, null);
+  assert.equal(rec.contexts, null);
+  assert.ok(
+    typeof rec.countError === 'string' && rec.countError.length > 0,
+    '계수 실패 사유 미기록',
+  );
 });
 
 // --- saveCapture ----------------------------------------------------------

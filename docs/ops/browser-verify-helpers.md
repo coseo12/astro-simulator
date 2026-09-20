@@ -46,6 +46,28 @@ import {
 다른 백엔드로 측정하고도 PASS 하는 사고를 막기 위한 fail-fast다
 (CLAUDE.md §가드 설계 원칙 — drift 가드는 fail-fast 만, fallback 분기 금지).
 
+## `bootstrapScene` 부팅 계측 `[boot]` ([#1234](https://github.com/coseo12/astro-simulator/issues/1234))
+
+`bootstrapScene` 은 호출마다 **진단 2줄**을 stdout 에 찍는다. 판정·임계·타임아웃과 무관하고,
+예외는 **원본 그대로** 다시 던진다 (계측이 실패를 삼키지 않는다).
+
+```
+[boot] browser-verify-1226-night-lights.mjs #5 P1b — ok goto 1043ms · handles 2455ms · settle 2801ms · total 6299ms · ctx 5/page 5 · t0 62.4s
+[boot] {"guard":"browser-verify-1226-night-lights.mjs","seq":5,"label":"P1b",...}
+```
+
+- 두 줄 다 `[boot] ` 로 시작한다 — `grep '^\[boot\]'` 가 전건, `grep '^\[boot\] {'` 가 **JSON 만** 모은다.
+- `seq` 는 그 프로세스의 N 번째 호출이다 (가드 1개 = node 프로세스 1개). 호출부가 `label` 을 주면
+  요약·JSON 에 함께 실린다 — 한 가드가 페이지를 여럿 여는 경우 `P1` ↔ `P1b` 를 가르는 축이다.
+- **실패 시**에만 채워지는 필드: `failedPhase`(`goto`/`handles`/`settle`) · `failedPhaseMs` ·
+  `state`(`readyState` / `__simCore`·`__solarScene` 의 `typeof` / `performance.now()`) ·
+  `server`(node 측 `fetch` 로 잰 dev server 응답 — 「서버가 느린가 ↔ 페이지가 멈췄나」를 가른다) ·
+  `consoleErrors` · `pagesAtFail`.
+- 완주 소요(`gotoMs`/`handlesMs`/`settleMs`)는 **완주한 구간만** 채운다. 실패 구간의 소비 시간을
+  같은 필드에 넣으면 「완주 소요」 분포에 타임아웃 상수가 섞이므로 `failedPhaseMs` 로 분리한다.
+- 셀 수 없는 축(`contexts`/`pages`)은 `0` 이 아니라 `null` + `countError` 다 — 「0 개」와
+  「못 셌다」가 같은 값이면 이 축으로 원인을 가르려는 쪽이 거짓 분포를 읽는다.
+
 ## 리뷰 체크리스트 (신규 verify 스크립트)
 
 신규 `browser-verify-*.mjs` 가 PR 에 포함되면 아래를 확인한다.
@@ -58,7 +80,8 @@ import {
 - [ ] `launch → … → close` 를 일직선으로 나열하지 말고 `withBrowser(launchOptions, fn)` — `page.goto`
       실패 등 **에러 경로에서도 `close()` 도달**을 보장한다 (#927). 콜백 안에서 `process.exit()` 를
       부르면 finally 가 실행되지 않으므로, 조기 종료는 값을 반환해 호출부에서 처리한다
-- [ ] `page.goto` + `waitForFunction(window.__solarScene …)` 수기 조합 대신 `bootstrapScene()`
+- [ ] `page.goto` + `waitForFunction(window.__solarScene …)` 수기 조합 대신 `bootstrapScene()` —
+      한 프로세스에서 페이지를 여럿 열면 `label` 을 넘긴다 (§`[boot]` 부팅 계측)
 - [ ] `page.on('console', …)` 인라인 대신 `collectConsoleErrors()` — `pageerror` 누락 방지
 - [ ] `mkdir` + `writeFile` 수기 조합 대신 `saveCapture()`
 - [ ] `process.env.BASE_URL ?? 'http://localhost:3000'` 대신 `resolveBaseUrl()`
