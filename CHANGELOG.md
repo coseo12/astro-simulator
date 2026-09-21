@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.89.1] - 2026-09-21
+
 ### Changed
 
 - **[#1234] `bootstrapScene` 부팅 계측 — `[boot]` 진단 2줄 (판정·임계 0행 변경)** ([#1234](https://github.com/coseo12/astro-simulator/issues/1234) 계약 C1). `shader-pixel-guard` 의 장면 부팅 20 s 타임아웃이 2026-09-18 하루에 5회 (로컬 qa 1회 포함) 발화해 v0.89.0 릴리스 CI 를 두 번 막았는데, **실패 시 남는 것이 Playwright `TimeoutError` 스택뿐**이라 원인 후보를 가를 수치가 하나도 없었다. `bootstrapScene` 이 호출마다 구간 소요 (`goto` / 핸들 대기 / settle) · 가드 이름 · 페이지 라벨 · 호출 순번 · **그 시점 열려 있는 context/page 수** · 프로세스 경과를 남기고, 실패 시 `document.readyState` · `__simCore`·`__solarScene` 의 `typeof` · `performance.now()` · **node 측에서 잰 dev server 응답** · 콘솔/페이지 에러 수집본을 함께 찍는다. 사람이 읽는 요약 1줄 + `JSON.parse` 가능한 1줄로, 둘 다 `[boot] ` 로 시작한다 (`grep '^\[boot\] {'` 가 JSON 만 모은다).
