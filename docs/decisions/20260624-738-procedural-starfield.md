@@ -347,7 +347,7 @@ Amendment 1 은 fps 회귀의 진짜 원인을 **소프트웨어 렌더(swiftsha
 
 ## §Amendment 3 — `Promise.all` 로 tier 를 동기 확정하던 race-safe 구현 폐기 (2026-09-20, #1234)
 
-**상태**: **Provisional** (ADR Status 워크플로 §부분 도입 #370 — ADR 개정은 cross-validate 발동 대상이므로 결과 통합 후 Accepted 전이). **트리거**: §Amendment 1 §결정 의 race-safe 구현 조항이 #1234 의 증상을 만드는 것이 계측으로 확정 (PR [#1238](https://github.com/coseo12/astro-simulator/pull/1238) 리뷰 R4 — 조항이 stale 임을 reviewer 가 지목).
+**상태**: **Accepted (cross-validate 2026-09-20)** — agy 1회 (PR [#1238](https://github.com/coseo12/astro-simulator/pull/1238) code 모드, outcome `applied`). 본 Amendment 의 결론(`Promise.all` 조항 폐기)에 대한 이견은 없었고, 지적 3건은 이 조항 밖이었다 — 1건 반영 (`gpuCapPromise.then` 언마운트 가드, `77923ae`) / 2건 기각 (`SWIFTSHADER=1` 누락 주장은 **전제가 거짓** — 이 워크플로의 어느 step 도 설정하지 않는다 / 늦은 거부 noop `catch` 는 관측 사례 `0`). 판정 근거는 [PR 코멘트](https://github.com/coseo12/astro-simulator/pull/1238#issuecomment-5750139848) 에 박제했다. **트리거**: §Amendment 1 §결정 의 race-safe 구현 조항이 #1234 의 증상을 만드는 것이 계측으로 확정 (PR [#1238](https://github.com/coseo12/astro-simulator/pull/1238) 리뷰 R4 — 조항이 stale 임을 reviewer 가 지목).
 
 ### 무효가 된 조항
 
