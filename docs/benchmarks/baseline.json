@@ -1,67 +1,107 @@
 {
-  "timestamp": "2026-04-23T16:28:51.189Z",
-  "phase": "p11-reshape-m3",
+  "timestamp": "2026-09-21T10:40:22.220Z",
+  "phase": "1209-roadmap-v3-rebaseline",
+  "commit": "7c9652ad265d37d92f0d83a59fcafe77e1865bcb",
   "durationMs": 3000,
   "environment": "gh-actions-ubuntu-chromium-headless",
   "viewport": "1280x800",
   "scenarios": [
     {
       "name": "idle",
-      "fps": 37.23,
-      "samples": 10
+      "fps": 106.5,
+      "samples": 10,
+      "min": 86.43,
+      "max": 129.15
     },
     {
       "name": "play-1d",
-      "fps": 28.87,
-      "samples": 10
+      "fps": 89.37,
+      "samples": 10,
+      "min": 72.02,
+      "max": 114.57
     },
     {
       "name": "play-1y",
-      "fps": 35.26,
-      "samples": 10
+      "fps": 91.88,
+      "samples": 10,
+      "min": 70.67,
+      "max": 130.54
     },
     {
       "name": "focus-earth",
-      "fps": 65.5,
-      "samples": 10
+      "fps": 102.85,
+      "samples": 10,
+      "min": 74.94,
+      "max": 134.19
     },
     {
       "name": "focus-neptune",
-      "fps": 150.48,
-      "samples": 10
+      "fps": 54.81,
+      "samples": 10,
+      "min": 47.39,
+      "max": 70.72
     }
   ],
   "nBody": [
     {
       "n": 10,
-      "fps": 37.02,
-      "samples": 10
+      "fps": 96.11,
+      "samples": 10,
+      "min": 73.54,
+      "max": 122.87
     },
     {
       "n": 100,
-      "fps": 31.45,
-      "samples": 10
+      "fps": 62.45,
+      "samples": 10,
+      "min": 49.74,
+      "max": 82.57
     },
     {
       "n": 200,
-      "fps": 26.95,
-      "samples": 10
+      "fps": 47.24,
+      "samples": 10,
+      "min": 36.65,
+      "max": 62.96
     },
     {
       "n": 1000,
-      "fps": 12.86,
-      "samples": 10
+      "fps": 16.73,
+      "samples": 10,
+      "min": 12.48,
+      "max": 23.55
     },
     {
       "n": 5000,
-      "fps": 3.79,
-      "samples": 10
+      "fps": 4.14,
+      "samples": 10,
+      "min": 3.12,
+      "max": 5.93
     },
     {
       "n": 10000,
-      "fps": 2.11,
-      "samples": 10
+      "fps": 2.28,
+      "samples": 10,
+      "min": 1.66,
+      "max": 3.15
     }
   ],
-  "source_count": 10
+  "source_count": 10,
+  "cells": {
+    "scenarios": [
+      "idle",
+      "play-1d",
+      "play-1y",
+      "focus-earth",
+      "focus-neptune"
+    ],
+    "nBody": [
+      10,
+      100,
+      200,
+      1000,
+      5000,
+      10000
+    ]
+  }
 }

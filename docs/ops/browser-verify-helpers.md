@@ -34,6 +34,25 @@ import {
 } from '../../../scripts/browser-verify-utils.mjs'; // apps/web/scripts 기준 상대 경로
 ```
 
+### 클릭 헬퍼 — 조용한 실패 금지 ([#1209](https://github.com/coseo12/astro-simulator/issues/1209))
+
+`page.click(sel).catch(() => {})` 는 **셀렉터가 사라져도 스크립트를 통과시킨다**. 그러면 이후 측정은
+「직전 화면」을 새 시나리오 이름으로 재게 되고, 그 값이 baseline 과 비교돼 정상 판정으로 흐른다.
+
+| 헬퍼                             | 규약                                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `clickTestId(page, id, opts)`    | pre-assert 후 클릭. 부재 시 throw. `skipIfAbsent: true` 는 **상태 의존 셀렉터 전용**             |
+| `pressTimePlay(page, opts)`      | `clickTestId(page, 'time-play', …)` 의 얇은 래퍼 (#210 계약·에러 문구 불변)                      |
+| `setTimePlayback(page, mode)`    | 셀렉터가 아니라 **상태**를 단언 (`'paused'` / `'playing'`). 토글 쌍이 **둘 다 부재면 throw**     |
+
+`time-controls.tsx` 는 한 버튼의 testid 를 상태로 갈아 끼우므로(`isPaused ? 'time-play' : 'time-pause'`)
+한쪽 부재가 「이미 그 상태」일 수 있다. `setTimePlayback` 은 그 허용을 **형제 셀렉터의 존재**로
+가둬서, 「없으면 건너뛴다」가 컨트롤 소실까지 통과시키는 것을 막는다.
+
+⚠️ `clickTestId` 기본 타임아웃은 `2_000ms`(`pressTimePlay` 승계)다. **메인 스레드가 포화되는
+측정 구간**(N-sweep 등)에서는 클릭 디스패치 자체가 늦어지므로 호출부가 `timeout` 을 명시한다
+(`bench-scene.mjs` 의 `PREP_CLICK_TIMEOUT_MS` 참조 — `N=10000` 에서 `9_377ms` 실측).
+
 렌더러 축은 `GPU_LAUNCH_ARGS` 가 SSoT다.
 
 | `gpu` 값      | chromium 인자             | 용도                           |
@@ -110,6 +129,9 @@ import {
 - [ ] `page.on('console', …)` 인라인 대신 `collectConsoleErrors()` — `pageerror` 누락 방지
 - [ ] `mkdir` + `writeFile` 수기 조합 대신 `saveCapture()`
 - [ ] `process.env.BASE_URL ?? 'http://localhost:3000'` 대신 `resolveBaseUrl()`
+- [ ] `page.click(sel).catch(() => {})` 금지 — `clickTestId()` / `setTimePlayback()` (§클릭 헬퍼).
+      「없으면 건너뛴다」를 남기려면 **무엇이 그 부재를 정상으로 만드는지**를 코드로 표현한다
+      (형제 셀렉터 존재 등). 그냥 삼키면 다른 화면을 잰 값이 판정까지 흘러간다 (#1209)
 - [ ] `locator('canvas').screenshot()` 으로 픽셀을 재면 캡처 전에 `hideDomOverlays(page)` — element
       캡처는 캔버스 **위에 겹친 DOM** (HUD · 토스트) 을 함께 찍는다. #1219 (glow-marker 가 UI 글리프를
       세던 사고) · #1228 (토스트 소멸이 주입 전후 diff 에 섞여 결함 판 `exit 0`) 두 번 실사고가 났다

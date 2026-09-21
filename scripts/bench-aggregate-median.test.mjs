@@ -5,7 +5,14 @@
  * stand-alone node 테스트 (check-duplicate-functions.test.mjs 선례 계승).
  */
 import assert from 'node:assert/strict';
-import { median, collectFps, buildBaseline, parseArgs } from './bench-aggregate-median.mjs';
+import { readFileSync } from 'node:fs';
+import {
+  median,
+  collectFps,
+  buildBaseline,
+  parseArgs,
+  deriveCommit,
+} from './bench-aggregate-median.mjs';
 
 let passed = 0;
 const run = (name, fn) => {
@@ -110,6 +117,48 @@ run('buildBaseline — 기존 baseline.json 스키마 호환', () => {
   assert.equal(out.nBody[1].n, 1000);
 });
 
+run('buildBaseline — `cells` 매니페스트 기록 (PR #1245 권고 2 — 셀 소실 감지 기준)', () => {
+  const collected = {
+    scenarios: new Map([
+      ['idle', [100, 99, 101]],
+      ['play-1y', [50, 51, 49]],
+    ]),
+    nBody: new Map([
+      [1000, [7, 8, 6]],
+      [10, [90, 91, 89]],
+    ]),
+    sampleCount: 3,
+  };
+  const out = buildBaseline(collected, { phase: 'p', firstReport: {} });
+  assert.deepEqual(out.cells.scenarios, ['idle', 'play-1y']);
+  assert.deepEqual(out.cells.nBody, [10, 1000], 'nBody 매니페스트는 항목과 같은 오름차순');
+  // 매니페스트가 빠지면 bench-judge 가 「신규 셀」과 「baseline 셀 소실」을 구분하지 못한다.
+  assert.deepEqual(
+    out.cells.scenarios,
+    out.scenarios.map((s) => s.name),
+  );
+  assert.deepEqual(
+    out.cells.nBody,
+    out.nBody.map((x) => x.n),
+  );
+});
+
+run('buildBaseline — 항목마다 산포(min/max) 기록 (#1209 B7 판정선 유도 근거)', () => {
+  const collected = {
+    scenarios: new Map([['focus-earth', [90, 88, 85, 92, 87]]]),
+    nBody: new Map([[100, [23, 24, 22, 25, 23]]]),
+    sampleCount: 5,
+  };
+  const out = buildBaseline(collected, { phase: 'p', firstReport: {} });
+  const earth = out.scenarios[0];
+  assert.equal(earth.min, 85);
+  assert.equal(earth.max, 92);
+  assert.equal(out.nBody[0].min, 22);
+  assert.equal(out.nBody[0].max, 25);
+  // 산포가 빠지면 판정선 보정(bench-judge checkCalibration)이 확인 불가로 떨어진다.
+  assert.ok(earth.min <= earth.fps && earth.fps <= earth.max);
+});
+
 run('parseArgs — 네 플래그 모두 파싱', () => {
   const a = parseArgs([
     '--input-dir',
@@ -130,6 +179,51 @@ run('parseArgs — 네 플래그 모두 파싱', () => {
 run('parseArgs — 기본 phase=remeasure', () => {
   const a = parseArgs(['--input-dir', '/tmp/x']);
   assert.equal(a.phase, 'remeasure');
+});
+
+// --- #1209 baseline 출처(commit) ---
+
+run('parseArgs — --commit 파싱 / 미지정 시 null', () => {
+  assert.equal(parseArgs(['--input-dir', '/tmp/x', '--commit', 'abc123']).commit, 'abc123');
+  assert.equal(parseArgs(['--input-dir', '/tmp/x']).commit, null);
+});
+
+run('deriveCommit — 전 회차 동일 sha 면 그 값', () => {
+  const reports = [
+    { data: { commit: 'aaa', scenarios: [] } },
+    { data: { commit: 'aaa', scenarios: [] } },
+    { data: { commit: 'aaa', scenarios: [] } },
+  ];
+  assert.equal(deriveCommit(reports), 'aaa');
+});
+
+run('deriveCommit — 기록이 하나도 없으면 null (구버전 리포트)', () => {
+  assert.equal(deriveCommit([{ data: { scenarios: [] } }, { data: { commit: '' } }]), null);
+});
+
+run('deriveCommit — 회차별 sha 가 갈리면 throw (median 전제 위반)', () => {
+  assert.throws(
+    () => deriveCommit([{ data: { commit: 'aaa' } }, { data: { commit: 'bbb' } }]),
+    /commit 불일치/,
+  );
+});
+
+run('buildBaseline — commit 필드가 출력에 포함 / 미지정 시 null 명시', () => {
+  const collected = { scenarios: new Map([['x', [1, 2, 3]]]), nBody: new Map(), sampleCount: 3 };
+  const withCommit = buildBaseline(collected, { phase: 'p', commit: 'deadbeef', firstReport: {} });
+  assert.equal(withCommit.commit, 'deadbeef');
+  const without = buildBaseline(collected, { phase: 'p', firstReport: {} });
+  // 필드 자체가 빠지면 "기록 안 함" 과 "기록 불가" 가 구분되지 않는다.
+  assert.ok('commit' in without);
+  assert.equal(without.commit, null);
+});
+
+run('baseline.json — 실물이 commit 출처 필드를 갖는다 (#1209)', () => {
+  const base = JSON.parse(
+    readFileSync(new URL('../docs/benchmarks/baseline.json', import.meta.url), 'utf8'),
+  );
+  assert.equal(typeof base.commit, 'string');
+  assert.match(base.commit, /^[0-9a-f]{40}$/);
 });
 
 console.log(`\n${passed} passed`);
