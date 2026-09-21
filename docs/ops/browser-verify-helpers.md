@@ -43,7 +43,7 @@ import {
 | -------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `clickTestId(page, id, opts)`    | pre-assert 후 클릭. 부재 시 throw. `skipIfAbsent: true` 는 **상태 의존 셀렉터 전용**             |
 | `pressTimePlay(page, opts)`      | `clickTestId(page, 'time-play', …)` 의 얇은 래퍼 (#210 계약·에러 문구 불변)                      |
-| `setTimePlayback(page, mode)`    | 셀렉터가 아니라 **상태**를 단언 (`'paused'` \| `'playing'`). 토글 쌍이 **둘 다 부재면 throw**    |
+| `setTimePlayback(page, mode)`    | 셀렉터가 아니라 **상태**를 단언 (`'paused'` / `'playing'`). 토글 쌍이 **둘 다 부재면 throw**     |
 
 `time-controls.tsx` 는 한 버튼의 testid 를 상태로 갈아 끼우므로(`isPaused ? 'time-play' : 'time-pause'`)
 한쪽 부재가 「이미 그 상태」일 수 있다. `setTimePlayback` 은 그 허용을 **형제 셀렉터의 존재**로
