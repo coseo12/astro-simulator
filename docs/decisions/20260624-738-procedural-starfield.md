@@ -1,11 +1,12 @@
 # ADR: 절차적 starfield + 은하수 우주 배경 — #738
 
-- **상태**: **Accepted** (cross-validate 2026-06-24 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료. ADR Status 워크플로 §부분 도입 #370). **§Amendment 2 (#745) 도 Accepted** — 2026-07-21 소급 전이 #842 (#745 CLOSED, developer 구현 + qa 실 GUI 완주 — v0.35.1 detectSoftwareRenderer 반영).
-- **날짜**: 2026-06-24 (§Amendment 2: 2026-06-25, #745)
-- **결정자**: architect (#738 설계 / #745 Amendment 2)
+- **상태**: **Accepted** (cross-validate 2026-06-24 agy 통합 — §교차검증 반영 사항 4+1축 박제 완료. ADR Status 워크플로 §부분 도입 #370). **§Amendment 2 (#745) 도 Accepted** — 2026-07-21 소급 전이 #842 (#745 CLOSED, developer 구현 + qa 실 GUI 완주 — v0.35.1 detectSoftwareRenderer 반영). ⚠️ **§Amendment 3 (#1234) 은 Provisional** — §Amendment 1 §결정 의 `Promise.all` 조항 폐기. cross-validate 통합 후 전이.
+- **날짜**: 2026-06-24 (§Amendment 2: 2026-06-25, #745 / §Amendment 3: 2026-09-20, #1234)
+- **결정자**: architect (#738 설계 / #745 Amendment 2) · developer (#1234 Amendment 3 — 구현 확정 사실의 소급 박제)
 - **관련**:
   - [#738](https://github.com/coseo12/astro-simulator/issues/738) (본 이슈 — 별 배경 + 은하수)
   - [#745](https://github.com/coseo12/astro-simulator/issues/745) (§Amendment 2 — tier-c 과잉 비활성 회귀 → 소프트웨어 렌더만 비활성 정정)
+  - [#1234](https://github.com/coseo12/astro-simulator/issues/1234) (§Amendment 3 — `Promise.all` race-safe 구현 폐기. 어댑터 미결이 장면 부팅을 영구 차단)
   - 방향성 기획서 2026-06-22 트랙 A1 (몰입·정체성 핵심) — `docs/architecture/principles.md §1 Visual Fidelity`
   - [`20260422-floating-origin.md`](20260422-floating-origin.md) (P11-A #288 — floating origin 좌표 계약, 별 무한원경 정합의 출처)
   - [`20260613-675-glow-pixel-marker.md`](20260613-675-glow-pixel-marker.md) (#675 — ShaderMaterial + URL 토글 + parse-\* 패턴 선례)
@@ -226,6 +227,7 @@ starfieldVisible = (parseStarsVisible(?stars=) === true) && resolveGpuTier(gpuCa
 - **레이어 분리 정합**: starfield 기본 ON 결정권은 web 레이어 (§결정 7). tier-c 스킵도 web 레이어 책임 — core `createSolarSystemScene` 의 `starfield` 옵션 기본값 false 는 불변.
 - **tier-c 자동 억제 철학 정합**: `detect-gpu-tier.ts §계약 6` ("tier-c 자동 억제: LOD low 강제 + 파티클 0 + shadow OFF + post-proc OFF + bloom OFF") 의 **starfield 확장**. 별 배경은 post-proc 성 전체화면 효과이므로 동일 graceful-degradation 범주.
 - **race-safe 구현**: GPU capability 감지 (`detectGpuCapability`) 와 scene 생성 (`instance.start`) 은 별개 async chain (#677 race 윈도우). 단일 `gpuCapPromise` 를 두 chain 이 공유 + `Promise.all([instance.start(), gpuCapPromise])` 로 scene 콜백 진입 시점에 tier 동기 확정. tier 판정식은 `resolveGpuTier` helper 로 추출 (capability then / scene 콜백 SSoT 단일 — drift 차단).
+  - ⚠️ **이 불릿의 `Promise.all` 부분은 아래 §Amendment 3 (2026-09-20, #1234) 으로 폐기됐다** — 어댑터가 미결일 때 장면 구축 전체가 멈춰 화면이 뜨지 않는 기전이었다. **단일 `gpuCapPromise` 공유와 `resolveGpuTier` SSoT 는 유지**된다.
 - **fallback 메커니즘 미박제 (결정 1-(A) 와 무관)**: 트리거 (1) `infiniteDistance` 가정은 dev 실측 PASS (Δ=0.000px) 라 결정 1-(A) fallback 은 여전히 불필요. 본 Amendment 는 트리거 (2) 전용.
 
 ### 효과
@@ -340,3 +342,50 @@ Amendment 1 은 fps 회귀의 진짜 원인을 **소프트웨어 렌더(swiftsha
 ### 고유 발견 (후속 분리)
 
 - 없음 — agy 발견은 모두 (a) 현재 PR 즉시 반영 (이견 수용 1~3) 또는 (b) 범위 밖 기각 (위 1~4) 으로 처리. 별도 후속 이슈 분리 대상 없음. (비-범위 실측 catalog / 패럴랙스 / 런타임 토글 UI 는 본 ADR §6 후속 분리 후보에 이미 박제 — agy 도 "현재 스프린트 필수 포함 항목 없음" 동의.)
+
+---
+
+## §Amendment 3 — `Promise.all` 로 tier 를 동기 확정하던 race-safe 구현 폐기 (2026-09-20, #1234)
+
+**상태**: **Provisional** (ADR Status 워크플로 §부분 도입 #370 — ADR 개정은 cross-validate 발동 대상이므로 결과 통합 후 Accepted 전이). **트리거**: §Amendment 1 §결정 의 race-safe 구현 조항이 #1234 의 증상을 만드는 것이 계측으로 확정 (PR [#1238](https://github.com/coseo12/astro-simulator/pull/1238) 리뷰 R4 — 조항이 stale 임을 reviewer 가 지목).
+
+### 무효가 된 조항
+
+§Amendment 1 §결정 의 **race-safe 구현** 불릿이 아래를 **현재형 결정**으로 선언한다:
+
+> 단일 `gpuCapPromise` 를 두 chain 이 공유 + `Promise.all([instance.start(), gpuCapPromise])` 로 scene 콜백 진입 시점에 tier 동기 확정.
+
+이 중 **`Promise.all` 부분이 폐기**된다. 단일 `gpuCapPromise` 공유와 `resolveGpuTier` helper SSoT 는 **그대로 유지**된다.
+
+### 발견 — 그 조항이 「빈 화면」의 기전이었다
+
+`shader-pixel-guard` 의 장면 부팅 20 s 타임아웃이 2026-09-18 하루 5회 발화해 v0.89.0 릴리스 CI 를 두 번 막았고, #1234 C2 계측이 원인을 확정했다: **`navigator.gpu.requestAdapter()` 가 settle 하지 않는다** (실패 표본의 마지막 마크가 `gpu:adapter-call` · `engine:probe-adapter-call` 이고 20.5 초 뒤에도 그대로).
+
+`Promise.all` 은 그 미결을 **장면 구축 전체의 전제**로 승격시킨다 — `gpuCapPromise` 가 영영 settle 하지 않으면 scene 콜백에 진입하지 못해 `window.__solarScene` 이 노출되지 않는다. ⚠️ **가드 전용 문제가 아니다**: 사용자 브라우저에서 같은 미결이 나면 **화면이 뜨지 않는다** (복구 경로 없음).
+
+즉 조항이 선언한 「scene 콜백 진입 시점에 tier 동기 확정」이라는 **강한 계약이 가용성을 대가로 샀고**, 실제 의존은 그 계약보다 훨씬 약했다 [직접 재확인]: scene 체인이 `gpuCap` 에서 읽는 것은 `adapterInfo?.description` **한 필드**이고 (`sim-canvas.tsx` 의 `rendererString` 산출부 — 다른 소비 지점 `0`, grep 확인), 그것도 §Amendment 2 가 **2순위 폴백**으로 강등시킨 값이다 (1순위는 동기 `extractWebglRendererString()`).
+
+### 결정
+
+**scene 체인은 `gpuCapPromise` 의 settle 을 기다리지 않는다.** 그 시점까지 도착한 값을 `gpuCapSnapshot` 으로 읽고, 안 왔으면 1순위만으로 판정한다.
+
+- **단일 Promise 공유는 유지** — 그것이 막는 것은 「어댑터 2회 호출 / 결과 비결정」이고 그 축은 그대로다. `detectGpuCapability()` 는 여전히 마운트당 1회다.
+- **`#677` 순서 race 는 `Promise.all` 이 막고 있던 것이 아니다.** 실제로 막는 것은 #677 fix 의 **2중 경로** (`__gpuTierForceLod` 플래그 + `coreRef.current?.command({ type: 'setLodOverride' })`) 이고, 그 2중 경로는 이번 변경과 무관하게 그대로다. **그 2중 경로는 중복이 아니며 한쪽을 지우면 #677 이 재발한다** (PR #1238 리뷰 R5 — 이 사실을 잘못 적었던 주석을 함께 정정했다).
+- **어댑터 계열 await 에 상한** (`GPU_ADAPTER_TIMEOUT_MS = 12_000`) — 미결을 「영원」이 아니라 「유한」으로 바꾼다. 상한은 **호출당이 아니라 체인당**이다 (리뷰 R1): 한 체인의 어댑터 await 들이 예산 하나를 공유해 대기 **합**이 `12_000 ms` 를 넘지 않는다. 호출당이면 `isWebGpuUsable` → `getWebGpuFeatures` 직렬 대기 합이 가드 한계 `20_000 ms` 를 넘어 **처방이 있어도 가드가 타임아웃한다**.
+
+### 효과 (§Amendment 2 계약에 대한 영향)
+
+- **1순위가 값을 주는 환경 — 동작 변화 `0`.** CI swiftshader 포함 (실측 96/96 에서 `adapterInfo` 는 애초에 `undefined` 였다). §Amendment 2 의 핵심 제약 (**CI software 확실 감지 → fps 무회귀**) 은 1순위 `UNMASKED_RENDERER_WEBGL` 이 담당하므로 **불변**이다.
+- **1순위가 `null` 인 브라우저** (`WEBGL_debug_renderer_info` 미노출) 에서만 창이 열린다. 그 경우 결말은 `detectSoftwareRenderer(null) === false` = **별 표시 유지**이고, 이는 §Amendment 2 가 이미 못박은 **보수적 기본값**이지 새 동작이 아니다 (§Amendment 2 §결정 — "불확실/빈 문자열이면 false").
+- 뒤늦게 도착한 2순위가 판정을 뒤집었을 때만 `console.warn` + `web:gpu-capability-late-software` 마크를 남긴다. **자동 되돌림은 하지 않는다** — 생성된 별 배경 mesh 를 뒤늦게 dispose 하는 것이 fill-rate 비용보다 위험하고, §Amendment 2 자체가 **과잉 비활성 회귀의 정정**이었다.
+
+### 회귀 가드
+
+- **신규 브라우저 가드 `verify:1234-adapter-stall`** — `page.addInitScript` 로 `requestAdapter` 를 영영 미결로 바꿔 결함 시나리오를 **결정적으로** 재현 (자연 발생 빈도 약 40 % 라 「통과」가 증거가 못 됐다). 판정 5종 중 **S1 이 양성 대조군**이다 — 타임아웃 마크가 없으면 주입이 안 먹은 것이므로 **FAIL**.
+- **변이 실증 6셀** — capability 상한 / engine 상한 / 본 Amendment(B) 세 축을 껐다 켜며 같은 가드를 돌렸다. **`M4`(B off) FAIL ↔ `M5`(B on) PASS 는 B 하나만 다르다** — 본 Amendment 의 고유 기여가 그 쌍으로 격리된다.
+- 단위 — `resolve-renderer-string.ts` (합성식 + late-arrival 판정 순수 함수, 12건). **CI 브라우저 가드가 이 분기에 도달하지 않기 때문이다**: headless swiftshader 는 1순위가 항상 값을 주므로 2순위·미도착 경로가 한 번도 평가되지 않는다. 가드 PASS 가 이 분기의 증거가 못 되므로 직접 고정한다.
+- 단위 — 체인 예산의 대기 합 상계 (`adapter-timeout.test.ts` §`#1238 R1` · `capability.test.ts` · `engine-factory.test.ts`). 호출당 상한 판본에서 **실제로 FAIL 한다** (판별력 확인).
+
+### §Amendment 1 과의 관계
+
+§Amendment 1 의 **결정 자체** (tier-c / 이후 §Amendment 2 로 software 렌더 기준에서 starfield 비활성) 는 **유지**된다. 폐기되는 것은 그 결정을 **구현하는 방식** 중 `Promise.all` 동기화 하나다. §Amendment 1 §결정 의 race-safe 불릿을 읽는 쪽은 본 Amendment 를 함께 읽어야 한다.

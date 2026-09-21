@@ -6,6 +6,7 @@ import mitt, { type Emitter, type Handler } from 'mitt';
 import { TimeController } from '../time/time-controller.js';
 import { isoToJulianDate } from '../time/julian-date.js';
 import { createEngine, type CreatedEngine, type EngineKind } from './engine-factory.js';
+import type { BootPhaseHook } from './boot-phase.js';
 // #402 — R-Phase Body Allowlist 가드 (defense-in-depth scene 측면).
 // ADR `20260504-r-phase-allowlist-guard.md` §결정 3.
 import { isRPhaseFocusable } from '../scene/r-phase-allowlist.js';
@@ -57,9 +58,18 @@ export class SimulationCore {
     tierTransitionInputDrops: 0,
   };
 
-  constructor(canvas: HTMLCanvasElement) {
+  // #1234 C2-H3 — 부팅 단계 계측 훅 (dev 전용 소비자가 주입). 미주입이면 호출 0.
+  #onBootPhase: BootPhaseHook | null = null;
+
+  /**
+   * @param canvas 렌더 타깃
+   * @param options.onBootPhase #1234 C2-H3 — 부팅 구간 통지 훅 (계측 전용, 미지정 시 비활성).
+   *   판정·렌더에 영향을 주지 않는다 (통지만 한다 — `boot-phase.ts` §계약).
+   */
+  constructor(canvas: HTMLCanvasElement, options: { onBootPhase?: BootPhaseHook } = {}) {
     this.#canvas = canvas;
     this.#time = new TimeController(J2000_JD, 86_400);
+    this.#onBootPhase = options.onBootPhase ?? null;
   }
 
   get engine(): CreatedEngine['engine'] | null {
@@ -315,7 +325,8 @@ export class SimulationCore {
     if (this.#created) return;
 
     try {
-      this.#created = await createEngine(this.#canvas);
+      // #1234 C2-H3 — 어댑터/컨텍스트 구간은 createEngine 이 자기 안에서 세분해 통지한다.
+      this.#created = await createEngine(this.#canvas, this.#onBootPhase ?? undefined);
     } catch (error) {
       this.#emitter.emit('error', {
         message: '엔진 초기화에 실패했습니다.',
@@ -328,6 +339,7 @@ export class SimulationCore {
     const scene = new Scene(engine);
     scene.clearColor = new Color4(...SCENE_CLEAR_COLOR_RGBA);
     this.#scene = scene;
+    this.#onBootPhase?.('core:scene-ctor');
 
     engine.runRenderLoop(() => {
       if (this.#disposed) return;
@@ -368,6 +380,7 @@ export class SimulationCore {
     this.#emitter.emit('engineReady', { renderer: kind });
     // 초기 시각도 알림
     this.#emitter.emit('timeChanged', { julianDate: this.#time.julianDate });
+    this.#onBootPhase?.('core:render-loop');
   }
 
   /** 완전 정리 — 캔버스 외부 자원 모두 해제. */

@@ -146,6 +146,8 @@ async function setupPage(browser, query, label) {
     query,
     handles: ['__simCore', '__solarScene'],
     settleMs: 2800,
+    // #1234 C1 — `[boot]` 계측 로그에 실을 페이지 라벨 (판정 무관 진단).
+    label,
   });
   await page.evaluate((jd) => {
     window.__simCore.command({ type: 'jumpToJulianDate', julianDate: jd });
