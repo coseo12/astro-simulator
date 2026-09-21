@@ -117,6 +117,32 @@ run('buildBaseline — 기존 baseline.json 스키마 호환', () => {
   assert.equal(out.nBody[1].n, 1000);
 });
 
+run('buildBaseline — `cells` 매니페스트 기록 (PR #1245 권고 2 — 셀 소실 감지 기준)', () => {
+  const collected = {
+    scenarios: new Map([
+      ['idle', [100, 99, 101]],
+      ['play-1y', [50, 51, 49]],
+    ]),
+    nBody: new Map([
+      [1000, [7, 8, 6]],
+      [10, [90, 91, 89]],
+    ]),
+    sampleCount: 3,
+  };
+  const out = buildBaseline(collected, { phase: 'p', firstReport: {} });
+  assert.deepEqual(out.cells.scenarios, ['idle', 'play-1y']);
+  assert.deepEqual(out.cells.nBody, [10, 1000], 'nBody 매니페스트는 항목과 같은 오름차순');
+  // 매니페스트가 빠지면 bench-judge 가 「신규 셀」과 「baseline 셀 소실」을 구분하지 못한다.
+  assert.deepEqual(
+    out.cells.scenarios,
+    out.scenarios.map((s) => s.name),
+  );
+  assert.deepEqual(
+    out.cells.nBody,
+    out.nBody.map((x) => x.n),
+  );
+});
+
 run('buildBaseline — 항목마다 산포(min/max) 기록 (#1209 B7 판정선 유도 근거)', () => {
   const collected = {
     scenarios: new Map([['focus-earth', [90, 88, 85, 92, 87]]]),

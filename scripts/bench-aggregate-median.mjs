@@ -17,7 +17,7 @@
  *   - 입력 JSON 은 `scripts/bench-scene.mjs` 출력 스키마와 일치 (scenarios[]·nBody[])
  *   - 최소 3 샘플 필요 (중앙값 신뢰성). 미달 시 exit 1
  *   - 결측 시나리오(일부 회차에서 누락) 는 존재하는 회차만으로 median — 회차 수 필드 `samples` 에 명시
- *   - 출력은 기존 baseline.json 과 동일 필드 + `samples` / `source_count` 메타 추가
+ *   - 출력은 기존 baseline.json 과 동일 필드 + `samples` / `source_count` / `cells` 메타 추가
  *   - #1209 B7 — 항목마다 **산포** `min` / `max` 도 기록. 판정선(`bench-judge.mjs`)이 이
  *     산포에서 유도됐으므로, 판정 때마다 유도식을 재실행해 상수 노후를 감지한다
  *   - #1209 — 출력에 `commit` (측정 대상 빌드 sha) 포함. 회차 리포트의 `commit` 에서
@@ -168,6 +168,14 @@ export function buildBaseline({ scenarios, nBody, sampleCount }, meta) {
         ...summarizeFps(fpsList),
       })),
     source_count: sampleCount,
+    // #1209 후속 (PR #1245 권고 2) — 이 baseline 이 **덮는다고 선언하는** 셀 재고.
+    //   항목 배열의 사본처럼 보이지만 역할이 다르다: 나중에 항목이 사라졌을 때
+    //   `bench-judge.classifyAbsent` 가 「진짜 신규 셀」과 「baseline 이 잃은 셀」을
+    //   가르는 기준이 이 선언이다 (§ABSENT). 항목에서 유도하면 항상 일치해 검출력이 0 이 된다.
+    cells: {
+      scenarios: Array.from(scenarios.keys()),
+      nBody: Array.from(nBody.keys()).sort((a, b) => a - b),
+    },
   };
 }
 

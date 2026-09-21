@@ -14,12 +14,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  ABSENT,
   CALIBRATION_SAFETY,
   MIN_BASELINE_SAMPLES,
   REGRESSION_RATIO,
   STATUS,
+  baselineCoverage,
   calibrationLines,
   checkCalibration,
+  classifyAbsent,
   judgeCell,
   judgeReport,
   regressionFloor,
@@ -84,8 +87,15 @@ run('judgeCell — 측정값이 유효하지 않으면 ✓ 가 아니라 ⛔', (
 });
 
 run('judgeCell — baseline 에 없는 셀은 신규 (⚠ 도 ✓ 도 아니다)', () => {
-  const r = judgeCell('new-scenario', 42, undefined);
+  const r = judgeCell('new-scenario', 42, undefined, ABSENT.NEW);
   assert.equal(r.status, STATUS.NEW);
+});
+
+run('judgeCell — 항목 부재의 분류를 주지 않으면 fail-closed (기본값이 ⛔)', () => {
+  // 기본값이 `NEW` 였다면 호출부가 분류를 빠뜨리는 순간 조용히 통과한다.
+  const r = judgeCell('x', 42, undefined);
+  assert.equal(r.status, STATUS.UNJUDGEABLE);
+  assert.match(r.line, /구분할 수 없다/);
 });
 
 run('judgeReport — baseline 파일 자체가 없으면 판정 불가 (초록으로 새지 않는다)', () => {
@@ -134,6 +144,114 @@ run('judgeReport — sweep 를 돌렸는데 baseline N 이 빠졌으면 ⛔', ()
   );
   assert.equal(v.counts.unjudgeable, 1);
   assert.match(v.lines.join('\n'), /N=100: 판정 불가 — 미측정/);
+});
+
+// ── 셀 추가 ↔ baseline 셀 소실 (PR #1245 권고 2) ─────────────────────────────
+//
+// 두 사건은 리포트와 baseline **항목**만 보면 똑같이 생겼다 (`measured ∖ baseline ≠ ∅`).
+// 가르는 기준은 baseline 이 따로 선언한 `cells` 매니페스트다. 아래 네 케이스가 그 표
+// (`bench-judge.mjs` §`ABSENT`) 를 **양방향으로** 못 박는다 — 한 방향만 고정하면 반대쪽이
+// 조용해진다.
+
+/** 5 시나리오 + N-sweep 중 일부를 담은 최소 baseline 골격. */
+const withCells = (entries, cells) => ({ ...entries, cells });
+
+run('신규 셀 추가 — 매니페스트에 없는 이름은 `+` 이고 exit 0 을 유지한다', () => {
+  const v = judgeReport(
+    {
+      scenarios: [
+        { name: 'idle', fps: 100 },
+        { name: 'brand-new', fps: 42 },
+      ],
+    },
+    withCells({ scenarios: [{ name: 'idle', fps: 100, min: 95 }] }, { scenarios: ['idle'] }),
+  );
+  assert.equal(v.counts.new, 1, '진짜 신규는 정상 경로다');
+  assert.equal(v.counts.unjudgeable, 0, 'exit 0 이어야 한다');
+  assert.equal(v.counts.ok, 1);
+});
+
+run('baseline 셀 소실 — 매니페스트에 실린 이름의 항목이 없으면 ⛔ (exit 2)', () => {
+  const v = judgeReport(
+    {
+      scenarios: [
+        { name: 'idle', fps: 100 },
+        { name: 'play-1y', fps: 50 },
+      ],
+    },
+    withCells(
+      { scenarios: [{ name: 'idle', fps: 100, min: 95 }] }, // play-1y 항목만 사라진 baseline
+      { scenarios: ['idle', 'play-1y'] },
+    ),
+  );
+  assert.equal(v.counts.new, 0, '소실이 `+ 신규` 로 분류되면 가드가 조용해진다');
+  assert.equal(v.counts.unjudgeable, 1);
+  assert.match(v.lines.join('\n'), /play-1y: 판정 불가 — baseline 이 이 셀을 잃었다/);
+});
+
+run('reviewer 변이 M3 — baseline.scenarios 전 셀 소실이 exit 0 으로 새지 않는다', () => {
+  // 구판: `{ok:6, new:5, unjudgeable:0}` → exit 0. 매니페스트가 방향을 되살린다.
+  const run0 = samples.runs[0];
+  const v = judgeReport(
+    { scenarios: run0.scenarios.map((s) => ({ name: s.name, fps: s.fps })), nBody: [] },
+    { ...baseline, scenarios: [] },
+  );
+  assert.equal(v.counts.new, 0);
+  assert.equal(v.counts.unjudgeable, run0.scenarios.length);
+});
+
+run('매니페스트 그룹이 비어 있으면 그 그룹은 ⛔ (baseline 이 안 덮는다)', () => {
+  // `bench:scene:set-baseline` 로 **비 sweep** 리포트를 복사한 baseline 에 sweep run 을 물린 꼴.
+  const v = judgeReport(
+    { scenarios: [], nBody: [{ n: 10, fps: 90 }] },
+    withCells({ scenarios: [], nBody: [] }, { scenarios: ['idle'], nBody: [] }),
+  );
+  assert.equal(v.counts.new, 0);
+  assert.equal(v.counts.unjudgeable, 1);
+  assert.match(v.lines.join('\n'), /N=10: 판정 불가 — baseline 이 이 그룹을 덮지 않는다/);
+});
+
+run('매니페스트 자체가 없으면 구분 불가 → ⛔ + ℹ (없으니까 통과 금지 · #1201)', () => {
+  const noManifest = { scenarios: [{ name: 'idle', fps: 100, min: 95 }] };
+  assert.equal(baselineCoverage(noManifest), null);
+  const v = judgeReport(
+    {
+      scenarios: [
+        { name: 'idle', fps: 100 },
+        { name: 'x', fps: 10 },
+      ],
+    },
+    noManifest,
+  );
+  assert.equal(v.counts.new, 0);
+  assert.equal(v.counts.unjudgeable, 1);
+  assert.match(v.lines.join('\n'), /ℹ \[매니페스트\]/);
+  // 항목이 **있는** 셀은 영향을 받지 않는다 — 정상 run 은 그대로 통과한다.
+  assert.equal(v.counts.ok, 1);
+});
+
+run('classifyAbsent — 네 분류가 매니페스트만으로 갈린다', () => {
+  const cov = baselineCoverage({ cells: { scenarios: ['idle'], nBody: [10] } });
+  assert.equal(classifyAbsent('idle', 'scenarios', cov), ABSENT.LOST);
+  assert.equal(classifyAbsent('other', 'scenarios', cov), ABSENT.NEW);
+  assert.equal(classifyAbsent(10, 'nBody', cov), ABSENT.LOST);
+  assert.equal(classifyAbsent('idle', 'scenarios', null), ABSENT.INDETERMINATE);
+  const empty = baselineCoverage({ cells: { scenarios: [], nBody: [] } });
+  assert.equal(classifyAbsent('idle', 'scenarios', empty), ABSENT.UNCOVERED);
+});
+
+run('실물 baseline — `cells` 매니페스트가 항목 집합과 정확히 일치한다', () => {
+  const cov = baselineCoverage(baseline);
+  assert.notEqual(
+    cov,
+    null,
+    'baseline 에 cells 매니페스트가 없다 (bench:baseline-remeasure 로 갱신)',
+  );
+  assert.deepEqual([...cov.scenarios].sort(), baseline.scenarios.map((s) => s.name).sort());
+  assert.deepEqual(
+    [...cov.nBody].sort((a, b) => a - b),
+    baseline.nBody.map((x) => x.n).sort((a, b) => a - b),
+  );
 });
 
 // ── 판정선 보정 (상수 노후 감지) ─────────────────────────────────────────────

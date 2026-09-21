@@ -94,11 +94,89 @@ export const STATUS = Object.freeze({
   NEW: 'new',
 });
 
+/**
+ * baseline 에 **항목이 없는** 셀의 분류 (PR #1245 권고 2).
+ *
+ * 「이번 run 이 쟀는데 baseline 에 항목이 없다」는 서로 전혀 다른 두 사건이 같은 모양으로
+ * 보이는 자리다:
+ *
+ *   - **진짜 신규** — 코드가 시나리오를 추가했고 baseline 은 그 이전에 측정됐다. 정상 경로다.
+ *   - **baseline 소실** — baseline 이 알던 셀을 잃었다 (부분 편집 · 잘못된 갱신 경로 · 절단된
+ *     아티팩트). 가드가 **조용해지는** 방향이므로 통과시키면 안 된다.
+ *
+ * 이번 run 의 리포트와 baseline 의 **항목 배열**만으로는 둘이 구분되지 않는다 — 양쪽 다
+ * `measured ∖ baseline ≠ ∅` 로 똑같이 보이고, 구판은 둘 다 `+ 신규` (exit 0) 로 흘려보냈다.
+ * 그래서 baseline 이 **자기가 덮는 셀 집합을 항목과 별도로 선언**한다 (`cells` 매니페스트 —
+ * `bench-aggregate-median.buildBaseline` 이 기록). 차집합을 항목이 아니라 **매니페스트**와
+ * 잡으면 방향이 갈린다:
+ *
+ *   | 항목 | 매니페스트 | 해석 | 결과 |
+ *   | --- | --- | --- | --- |
+ *   | 없음 | 그 이름이 실려 있다 | baseline 이 **잃었다** | `⛔ LOST` |
+ *   | 없음 | 그 그룹이 비어 있다 | baseline 이 그 그룹을 **안 덮는다** | `⛔ UNCOVERED` |
+ *   | 없음 | 있고, 그 이름은 없다 | **진짜 신규** | `+ NEW` |
+ *   | 없음 | 매니페스트 자체가 없다 | **구분 불가** | `⛔ INDETERMINATE` |
+ *
+ * ⚠️ 마지막 줄이 `+` 가 **아닌** 이유 — 「기록이 없으니 통과」는 이 저장소가 반복해 닫아 온
+ * fail-open 이다 (#1201 — 「없음/불변/비어있음」 술어의 공허 통과). 구분할 수 없으면 판정하지
+ * 않는다. 매니페스트 없는 baseline 은 `bench:baseline-remeasure` 로 갱신하면 채워지고,
+ * 그때까지 **정상 run 은 영향을 받지 않는다** (이 분기는 항목이 없는 셀에만 닿는다).
+ */
+export const ABSENT = Object.freeze({
+  NEW: 'new',
+  LOST: 'lost',
+  UNCOVERED: 'uncovered',
+  INDETERMINATE: 'indeterminate',
+});
+
 const isPositiveFinite = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
 /** baseline fps 에 대한 판정선 (이 값 **미만**이면 회귀). */
 export function regressionFloor(baselineFps) {
   return baselineFps * (1 - REGRESSION_RATIO);
+}
+
+/**
+ * baseline 이 **덮는다고 선언한** 셀 집합 (`cells` 매니페스트) 을 읽는다.
+ *
+ * 매니페스트는 항목 배열의 사본이 아니라 **재고 선언**이다 — 둘이 어긋나는 것 자체가 신호다
+ * (§`ABSENT`). 그래서 항목에서 유도하지 않고 파일이 따로 담은 값만 읽는다. 유도해 버리면
+ * 항상 일치해 검출력이 `0` 이 된다.
+ *
+ * @returns `{ scenarios: Set<string>, nBody: Set<number> }`, 또는 매니페스트가 없으면 `null`
+ */
+export function baselineCoverage(baseline) {
+  const cells = baseline?.cells;
+  if (cells == null || typeof cells !== 'object') return null;
+  return {
+    scenarios: new Set(Array.isArray(cells.scenarios) ? cells.scenarios : []),
+    nBody: new Set(Array.isArray(cells.nBody) ? cells.nBody.map(Number) : []),
+  };
+}
+
+/**
+ * baseline 에 항목이 없는 셀을 §`ABSENT` 표대로 분류한다.
+ *
+ * @param {string|number} key 매니페스트에 실리는 키 (시나리오는 이름, N-sweep 은 N 값)
+ * @param {'scenarios'|'nBody'} group
+ * @param {ReturnType<typeof baselineCoverage>} coverage
+ */
+export function classifyAbsent(key, group, coverage) {
+  if (coverage == null) return ABSENT.INDETERMINATE;
+  const known = coverage[group];
+  if (known.has(key)) return ABSENT.LOST;
+  if (known.size === 0) return ABSENT.UNCOVERED;
+  return ABSENT.NEW;
+}
+
+/** 매니페스트 부재를 침묵시키지 않는다 (`checkCalibration` 의 `checked=false` 와 같은 축). */
+export function coverageLines(coverage) {
+  if (coverage != null) return [];
+  return [
+    '  ℹ [매니페스트] baseline 에 `cells` 기록이 없다 — 「신규 셀 추가」와 「baseline 셀 소실」을 ' +
+      '구분할 수 없다. 항목이 없는 셀이 나오면 `+` 가 아니라 `⛔ 판정 불가`로 처리한다 ' +
+      '(`bench:baseline-remeasure` 로 갱신하면 채워진다).',
+  ];
 }
 
 /**
@@ -110,11 +188,34 @@ export function regressionFloor(baselineFps) {
  *
  * @param {string} name 셀 이름 (`idle` / `N=1000` 등)
  * @param {unknown} measuredFps 이번 run 측정값
- * @param {{ fps?: unknown } | undefined} baselineEntry baseline 항목 (없으면 신규 셀)
+ * @param {{ fps?: unknown } | undefined} baselineEntry baseline 항목 (없으면 §`ABSENT` 분류로 넘어간다)
+ * @param {string} absent 항목이 없을 때의 분류 (§`ABSENT`). 기본값은 **fail-closed** 쪽인
+ *        `INDETERMINATE` — 호출부가 분류를 주지 않았다면 그건 구분 근거가 없다는 뜻이다.
  */
-export function judgeCell(name, measuredFps, baselineEntry) {
+export function judgeCell(name, measuredFps, baselineEntry, absent = ABSENT.INDETERMINATE) {
   if (baselineEntry == null) {
-    return { name, status: STATUS.NEW, mark: '+', line: `  + ${name}: ${measuredFps} fps (신규)` };
+    if (absent === ABSENT.NEW) {
+      return {
+        name,
+        status: STATUS.NEW,
+        mark: '+',
+        line: `  + ${name}: ${measuredFps} fps (신규)`,
+      };
+    }
+    const why = {
+      [ABSENT.LOST]:
+        'baseline 이 이 셀을 잃었다 — `cells` 매니페스트에는 실려 있는데 항목이 없다 (부분 편집/절단된 갱신?)',
+      [ABSENT.UNCOVERED]:
+        'baseline 이 이 그룹을 덮지 않는다 — `cells` 매니페스트의 해당 그룹이 비어 있다',
+      [ABSENT.INDETERMINATE]:
+        'baseline 에 `cells` 매니페스트가 없어 「신규 셀」과 「baseline 셀 소실」을 구분할 수 없다',
+    }[absent];
+    return {
+      name,
+      status: STATUS.UNJUDGEABLE,
+      mark: '⛔',
+      line: `  ⛔ ${name}: 판정 불가 — ${why}`,
+    };
   }
   const base = baselineEntry.fps;
   if (!isPositiveFinite(base)) {
@@ -256,9 +357,16 @@ export function judgeReport(measured, baseline) {
   // 보정 **위반**은 그 아래 모든 마크의 신뢰성을 무효화하므로 판정 불가로 센다 (종료 코드 2).
   counts.unjudgeable += calibration.violations.length;
 
+  // 「baseline 이 셀을 잃었다」를 「신규 셀」과 구분한다 (§`ABSENT` — PR #1245 권고 2).
+  const coverage = baselineCoverage(baseline);
+  lines.push(...coverageLines(coverage));
+
   const byName = new Map((baseline.scenarios ?? []).map((s) => [s.name, s]));
   const measuredNames = new Set((measured.scenarios ?? []).map((s) => s.name));
-  for (const s of measured.scenarios ?? []) bump(judgeCell(s.name, s.fps, byName.get(s.name)));
+  for (const s of measured.scenarios ?? [])
+    bump(
+      judgeCell(s.name, s.fps, byName.get(s.name), classifyAbsent(s.name, 'scenarios', coverage)),
+    );
   // baseline 에만 있고 이번 run 에 없는 시나리오 — 측정 누락이 판정에서 사라지는 것을 막는다.
   for (const [name, entry] of byName) {
     if (measuredNames.has(name)) continue;
@@ -272,7 +380,8 @@ export function judgeReport(measured, baseline) {
   if (nBody.length > 0) {
     const baseN = new Map((baseline.nBody ?? []).map((x) => [x.n, x]));
     lines.push('  --- N-sweep ---');
-    for (const x of nBody) bump(judgeCell(`N=${x.n}`, x.fps, baseN.get(x.n)));
+    for (const x of nBody)
+      bump(judgeCell(`N=${x.n}`, x.fps, baseN.get(x.n), classifyAbsent(x.n, 'nBody', coverage)));
     for (const [n, entry] of baseN) {
       if (nBody.some((x) => x.n === n)) continue;
       counts.unjudgeable += 1;
