@@ -5,9 +5,14 @@ name: bench:scene
 
 # ── hashFiles silent-skip 정책 (#950) — SSoT 는 ci.yml §hashFiles silent-skip 정책 블록 (#945) ──
 # 본 파일의 유일한 hashFiles 조건 (`bench-summary.md`) 은 **(a) 정상 케이스**였다 — 가드 자산이
-#   아니라 `bench:scene:sweep` 이 run 중 생성하는 **런타임 산출물** (BENCH_SUMMARY_OUT,
-#   scripts/bench-scene.mjs:196~221. 저장소 미tracked) 이라 "부재" = bench 가 요약 기록 전에
-#   죽은 정상 시나리오이지 가드 소멸이 아니다.
+#   아니라 `bench:scene:sweep` 이 run 중 생성하는 **런타임 산출물** (BENCH_SUMMARY_OUT, 저장소
+#   미tracked) 이라 "부재" = bench 가 요약 기록 전에 죽은 정상 시나리오이지 가드 소멸이 아니다.
+#   writer 는 scripts/bench-scene.mjs 의 두 곳 — 실패 경로의 `reportMeasurementFailure()` 와
+#   말미의 `// CI 연동: Markdown 요약을 BENCH_SUMMARY_OUT 경로에 기록` 블록.
+#   ⚠️ 행 번호로 가리키지 않는다 — #1209 이 후자를 아래로 밀어 이 주석이 죽은 참조가 됐다
+#   (PR #1245 권고 4). 구조 경계(함수명·절 제목)는 같은 변경에서 썩지 않는다.
+#   ⚠️ #1209 이 실패 경로 writer 를 신설하면서 "부재" 의 의미가 **좁아졌다** — 측정이 실패해도
+#   이제는 요약을 쓰므로, 부재는 그 핸들러에 **도달하기 전** 죽은 경우만 남는다.
 # 그럼에도 조건으로 남기면 "가드 부재" 와 "산출물 부재" 가 같은 문법을 써서 정책이 다시 갈라진다.
 #   #945 가 ci.yml 에서 R1 diff 이미지 업로드를 `if-no-files-found: ignore` 로 옮겨 **예외 0** 을
 #   달성한 것과 동일하게, 본 스텝도 조건이 아니라 **액션 옵션** (`ignore_empty`) 으로 표현한다.
