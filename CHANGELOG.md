@@ -5,6 +5,27 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Changed
+
+- **[#1209] `bench:scene` 의 `focus-neptune ⚠` 8 PR 연속 발화 — baseline 재측정 + 조용한 측정 실패 제거** ([#1209](https://github.com/coseo12/astro-simulator/issues/1209) 계약 B3). PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) 에서 메인이 이 `⚠` 를 본 변경의 회귀로 의심해 조사 한 라운드를 태웠다. 본 변경 원인이 아니었고 **신호 자체가 죽어 있었다** — 그리고 그 밑에 「값이 어디서 왔는지」를 아무도 볼 수 없게 만든 구조가 둘 더 있었다.
+
+  - **기준선은 낡은 것이 아니라 다른 제품을 잰 것이다** (B2). `docs/benchmarks/baseline.json` 의 측정일 `2026-04-23` 은 **로드맵 v3 전면 재구성 (`2026-04-25`) 의 이틀 전**이고, 그 시점 빌드는 기본 진입 화면이 _"궤도 라인 + 해왕성 1개만 보이는 빈 상태"_ 인 P12 상태다 (CLAUDE.md §프로젝트 접근 의 폐기 배경 원문). 즉 `focus-neptune 150.48` 은 **빈 화면에서 유일하게 보이는 천체를 잡은 값**이었다. 지금은 고리 + 트리톤 + 천체 32개가 있는 장면이라 `54.81` 이다. 다른 시나리오의 `+57~210%` 도 같은 뿌리다 (폐기된 ADR `20260423-display-relative-scale-unification`). ⇒ **어느 시나리오도 현재와 비교 가능하지 않았다.** 본문 §착수 시 주의 가 경고한 「그 사이 누적된 회귀를 정상으로 박제할 위험」은 **비교 대상이 다른 제품이라 해당하지 않는다.**
+  - **baseline 재측정.** `bench-baseline-remeasure` workflow_dispatch (run [35589678686](https://github.com/coseo12/astro-simulator/actions/runs/35589678686), ubuntu-latest × N=10 중앙값) 값으로 갱신: idle `37.23 → 106.50` · play-1d `28.87 → 89.37` · play-1y `35.26 → 91.88` · focus-earth `65.50 → 102.85` · **focus-neptune `150.48 → 54.81`** · nBody `10/100/200/1000/5000/10000` = `96.11/62.45/47.24/16.73/4.14/2.28`. `phase` 는 갱신 근거를 담아 `1209-roadmap-v3-rebaseline`.
+  - **baseline 에 출처 `commit` 기록.** 측정 대상 빌드의 sha 를 필드로 남긴다. 워크플로 한쪽에만 심으면 다른 갱신 경로에서 다시 비므로 **리포트 자신**(`bench-scene.mjs`)이 `commit` 을 담게 했다 — `bench:scene:set-baseline`(단순 복사)·`bench-aggregate-median`(median 집계) 두 경로 모두에서 자동으로 이어진다. 재측정 워크플로는 `--commit "${GITHUB_SHA}"` 를 넘기고 aggregate 가 회차 리포트 기록과 **대조**한다 (회차별 sha 가 갈리면 exit 1 — median 은 「같은 빌드의 회차 반복」 전제 위에서만 의미가 있다).
+  - **판정 출력에 baseline 출처 노출.** 콘솔과 sticky 코멘트에 비교 대상의 `timestamp` · `phase` · `commit` 이 찍힌다. 이 한 줄이 있었다면 8 PR 을 가지 않았다 — baseline timestamp 가 로드맵 v3 재구성 이전이라는 게 첫 발화에서 보였을 것이다.
+  - **시나리오 prep 의 조용한 실패 제거.** `scripts/bench-scene.mjs` 의 각 prep 이 `page.click(...).catch(() => {})` 로 클릭 실패를 삼키고 있었다 (_"시나리오 의존 — bench 맥락상 관대 허용 유지"_). 셀렉터가 사라지면 **직전 시나리오의 화면**을 새 이름으로 계속 재고, 그 값이 baseline 과 비교돼 정상 판정으로 흐른다. `focus-*` testid 는 `focus-quick-buttons.tsx` 가 `focus-${b.id}` 로 **동적 생성**하므로 버튼 목록이 바뀌면 통째로 사라진다.
+    - 필수 셀렉터(`time-preset-1d` · `time-preset-1y` · `focus-earth` · `focus-neptune`)는 부팅 직후 **전건 존재를 단언**하고(fail-fast — 2분짜리 측정 도중이 아니라 시작 전에 터진다), 각 클릭도 pre-assert 한다 (`clickTestId`, #210 `pressTimePlay` 규약의 일반화).
+    - 「없으면 건너뛴다」가 남는 자리는 **`time-play` ↔ `time-pause` 토글 쌍 하나**다. `time-controls.tsx` 가 한 버튼의 testid 를 상태로 갈아 끼우므로(`isPaused ? 'time-play' : 'time-pause'`) 한쪽 부재는 「이미 그 상태」를 뜻한다. `setTimePlayback(page, 'paused' | 'playing')` 이 **셀렉터가 아니라 상태**를 단언하고, **양쪽 다 부재면 실패**한다 — 허용의 조건을 형제 셀렉터의 존재로 못 박아 컨트롤 소실이 skip 으로 통과하는 경로를 없앴다.
+  - **「느려졌다」와 「못 쟀다」를 종료 코드에서 가른다.** 측정 실패 = exit `1` + `⛔ 측정 실패 (판정 불가)` 블록 (fps 도 baseline diff 도 만들지 않는다) / 회귀 = exit `0` + `⚠` 마크 (기존 불변). ⚠️ 실패 경로도 **반드시 요약 파일을 쓴다** — `bench.yml` 은 `continue-on-error: true` + sticky `ignore_empty: true` 라 요약 없이 죽으면 **PR 에 아무것도 남지 않는다**. 그 침묵이 이 클래스를 8 PR 동안 숨긴 구조다.
+  - **판정선 교체(이슈 본문 처분 2)는 하지 않았다.** 위 셋으로 발화가 멎는지 먼저 본다 — 임계를 바꾸는 것은 새 공격면을 만드는 일이다.
+  - **B4 판별력 변이 2종 실증** (주입 → 실행 → 원복 → 재실행 PASS): (a) **인위 렌더 부하** (매 프레임 12 ms 메인스레드 burn) → 5 시나리오 **전건 `⚠`** (idle `104.62 → 47.21`, `Δ −59.29`) — 판정선은 무의미하지 않다. (b) **`focus-neptune` 버튼 제거** → 변경 전 스크립트는 `focus-neptune: 102.5 fps ✓` 로 **조용히 통과**했고(실제로는 earth focus 화면을 잰 값이라 `+87%` 로 *개선*처럼 보인다) 변경 후는 `exit 1` + 필수 셀렉터 부재 메시지다.
+  - **B5** — 새 baseline 으로 develop tip 에서 3회 (`bench:scene:sweep`, `BENCH_REGRESSION_FPS=-10`) 전건 `⚠` 0 · exit `0`. ⚠️ 이 3회는 **로컬 macOS** 라 CI ubuntu headless 와 환경이 다르다 (`focus-neptune` 로컬 `86.93~90.30` vs baseline `54.81`) — 새 baseline 의 CI 수렴은 본 PR 의 `bench.yml` run 이 실측한다.
+  - **새 상수 1개** — `PREP_CLICK_TIMEOUT_MS = 30_000` (`bench-scene.mjs`). **새 임계가 아니라 변경 전 값의 명시**다: 기존 `page.click(sel)` 이 Playwright 기본 타임아웃 `30_000 ms` 로 돌고 있었고, `clickTestId` 기본값 `2_000 ms` 를 그대로 쓰면 무거운 N-sweep 에서 **거짓 실패**가 난다 (실측 — `locator.click` 왕복이 belt 수에 비례: `N=10` `246 ms` · `1000` `1_065 ms` · `5000` `4_572 ms` · **`10000` `9_377 ms`**. 여유 `30_000 / 9_377 ≈ 3.2×`). 상한을 키우는 대신 변경 전 실효값을 유지해 **본 PR 이 측정 조건을 바꾸지 않았음**을 보장한다.
+
+### Behavior Changes
+
+None — 가드/벤치 측정 경로만. 앱 런타임 (`apps/web/src` · `packages/*/src`) 변경 0행이다.
+
 ## [0.89.1] - 2026-09-21
 
 ### Changed

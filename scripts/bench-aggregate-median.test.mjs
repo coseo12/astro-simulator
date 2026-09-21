@@ -5,7 +5,14 @@
  * stand-alone node 테스트 (check-duplicate-functions.test.mjs 선례 계승).
  */
 import assert from 'node:assert/strict';
-import { median, collectFps, buildBaseline, parseArgs } from './bench-aggregate-median.mjs';
+import { readFileSync } from 'node:fs';
+import {
+  median,
+  collectFps,
+  buildBaseline,
+  parseArgs,
+  deriveCommit,
+} from './bench-aggregate-median.mjs';
 
 let passed = 0;
 const run = (name, fn) => {
@@ -130,6 +137,51 @@ run('parseArgs — 네 플래그 모두 파싱', () => {
 run('parseArgs — 기본 phase=remeasure', () => {
   const a = parseArgs(['--input-dir', '/tmp/x']);
   assert.equal(a.phase, 'remeasure');
+});
+
+// --- #1209 baseline 출처(commit) ---
+
+run('parseArgs — --commit 파싱 / 미지정 시 null', () => {
+  assert.equal(parseArgs(['--input-dir', '/tmp/x', '--commit', 'abc123']).commit, 'abc123');
+  assert.equal(parseArgs(['--input-dir', '/tmp/x']).commit, null);
+});
+
+run('deriveCommit — 전 회차 동일 sha 면 그 값', () => {
+  const reports = [
+    { data: { commit: 'aaa', scenarios: [] } },
+    { data: { commit: 'aaa', scenarios: [] } },
+    { data: { commit: 'aaa', scenarios: [] } },
+  ];
+  assert.equal(deriveCommit(reports), 'aaa');
+});
+
+run('deriveCommit — 기록이 하나도 없으면 null (구버전 리포트)', () => {
+  assert.equal(deriveCommit([{ data: { scenarios: [] } }, { data: { commit: '' } }]), null);
+});
+
+run('deriveCommit — 회차별 sha 가 갈리면 throw (median 전제 위반)', () => {
+  assert.throws(
+    () => deriveCommit([{ data: { commit: 'aaa' } }, { data: { commit: 'bbb' } }]),
+    /commit 불일치/,
+  );
+});
+
+run('buildBaseline — commit 필드가 출력에 포함 / 미지정 시 null 명시', () => {
+  const collected = { scenarios: new Map([['x', [1, 2, 3]]]), nBody: new Map(), sampleCount: 3 };
+  const withCommit = buildBaseline(collected, { phase: 'p', commit: 'deadbeef', firstReport: {} });
+  assert.equal(withCommit.commit, 'deadbeef');
+  const without = buildBaseline(collected, { phase: 'p', firstReport: {} });
+  // 필드 자체가 빠지면 "기록 안 함" 과 "기록 불가" 가 구분되지 않는다.
+  assert.ok('commit' in without);
+  assert.equal(without.commit, null);
+});
+
+run('baseline.json — 실물이 commit 출처 필드를 갖는다 (#1209)', () => {
+  const base = JSON.parse(
+    readFileSync(new URL('../docs/benchmarks/baseline.json', import.meta.url), 'utf8'),
+  );
+  assert.equal(typeof base.commit, 'string');
+  assert.match(base.commit, /^[0-9a-f]{40}$/);
 });
 
 console.log(`\n${passed} passed`);

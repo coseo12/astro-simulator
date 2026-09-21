@@ -23,12 +23,16 @@ import {
   DOM_OVERLAY_HIDE_CSS,
   DOM_OVERLAY_POST_HIDE_WAIT_MS,
   GPU_LAUNCH_ARGS,
+  TIME_PLAYBACK_MODES,
   bootstrapScene,
+  clickTestId,
   hideDomOverlays,
   buildLaunchOptions,
   collectConsoleErrors,
+  pressTimePlay,
   resolveBaseUrl,
   saveCapture,
+  setTimePlayback,
   waitForLodSettle,
   withBrowser,
 } from './browser-verify-utils.mjs';
@@ -722,6 +726,108 @@ await run('hideDomOverlays — 캔버스가 1개가 아니면 throw (0개 · 2�
   for (const n of [0, 2]) {
     await assert.rejects(() => hideDomOverlays(makeOverlayPage(n)), /캔버스가 \d+개다/);
   }
+});
+
+// ===========================================================================
+// #1209 — 시나리오 prep 의 조용한 실패 제거 (clickTestId / setTimePlayback)
+// ===========================================================================
+
+/**
+ * `page.locator(sel).count()/click()` 계약만 흉내내는 스텁.
+ *
+ * @param present 존재하는 것으로 볼 `data-testid` 값 집합
+ */
+function makeLocatorPage(present) {
+  const set = new Set(present);
+  return {
+    clicks: [],
+    locator(selector) {
+      const m = /^\[data-testid="(.+)"\]$/.exec(selector);
+      if (!m) throw new Error(`예상 밖 셀렉터 형태: ${selector}`);
+      const id = m[1];
+      const self = this;
+      return {
+        async count() {
+          return set.has(id) ? 1 : 0;
+        },
+        async click(opts) {
+          if (!set.has(id)) throw new Error(`부재 요소 클릭: ${id}`);
+          self.clicks.push({ id, opts });
+        },
+      };
+    },
+  };
+}
+
+await run('clickTestId — 존재하면 클릭하고 true', async () => {
+  const page = makeLocatorPage(['focus-neptune']);
+  assert.equal(await clickTestId(page, 'focus-neptune'), true);
+  assert.deepEqual(
+    page.clicks.map((c) => c.id),
+    ['focus-neptune'],
+  );
+  assert.equal(page.clicks[0].opts.timeout, 2000);
+});
+
+await run('clickTestId — 부재면 throw (조용한 통과 금지 — #1209 핵심)', async () => {
+  const page = makeLocatorPage([]);
+  await assert.rejects(
+    () => clickTestId(page, 'focus-neptune'),
+    /data-testid="focus-neptune" 부재/,
+  );
+  assert.deepEqual(page.clicks, []);
+});
+
+await run('clickTestId — skipIfAbsent 면 클릭 없이 false', async () => {
+  const page = makeLocatorPage([]);
+  assert.equal(await clickTestId(page, 'x', { skipIfAbsent: true }), false);
+  assert.deepEqual(page.clicks, []);
+});
+
+await run('pressTimePlay — 기존 에러 문구 보존 (#210 계약 불변)', async () => {
+  await assert.rejects(
+    () => pressTimePlay(makeLocatorPage([])),
+    /data-testid="time-play" 부재 — 재생 버튼 셀렉터 회귀 가능성/,
+  );
+  const page = makeLocatorPage(['time-play']);
+  assert.equal(await pressTimePlay(page), true);
+});
+
+await run('setTimePlayback — 목표 상태 버튼이 있으면 클릭', async () => {
+  // 재생 중 (time-pause 노출) → paused 로 전이
+  const playing = makeLocatorPage(['time-pause']);
+  assert.equal(await setTimePlayback(playing, 'paused'), 'clicked');
+  assert.deepEqual(
+    playing.clicks.map((c) => c.id),
+    ['time-pause'],
+  );
+});
+
+await run('setTimePlayback — 이미 그 상태면 형제 셀렉터로 확인하고 already', async () => {
+  // 정지 중 (time-play 노출) → paused 요청은 이미 충족
+  const paused = makeLocatorPage(['time-play']);
+  assert.equal(await setTimePlayback(paused, 'paused'), 'already');
+  assert.deepEqual(paused.clicks, []);
+  // 반대 방향도 대칭
+  const playing = makeLocatorPage(['time-pause']);
+  assert.equal(await setTimePlayback(playing, 'playing'), 'already');
+});
+
+await run('setTimePlayback — 토글 쌍이 둘 다 부재면 throw (skip 과의 차이)', async () => {
+  for (const mode of TIME_PLAYBACK_MODES) {
+    await assert.rejects(
+      () => setTimePlayback(makeLocatorPage([]), mode),
+      /시간 토글 버튼 부재/,
+      `mode=${mode}`,
+    );
+  }
+});
+
+await run('setTimePlayback — 알 수 없는 mode 는 throw', async () => {
+  await assert.rejects(
+    () => setTimePlayback(makeLocatorPage(['time-play']), 'stopped'),
+    /알 수 없는 mode/,
+  );
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

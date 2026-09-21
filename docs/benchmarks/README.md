@@ -30,12 +30,31 @@ pnpm bench:scene:set-baseline
 - `{ISO-timestamp}.json` — 개별 측정 리포트 (타임스탬프 슬러그). **#905 부터 gitignored
   `.bench-out/` 에 기록** — 본 디렉토리에는 커밋하지 않는다 (실행마다 커밋 경로가 오염되던 재발 구조 제거)
 - `baseline.json` — 비교 기준선 (tracked). 의미 있는 성능 기준점(예: P1 종료, P2-0 완료) 갱신 시 업데이트
-- 각 리포트 JSON은 `{ timestamp, phase, scenarios: [{ name, fps }] }` 스키마
+- 각 리포트 JSON은 `{ timestamp, phase, commit, scenarios: [{ name, fps }] }` 스키마
+- `commit` — **측정 대상 빌드의 sha** ([#1209](https://github.com/coseo12/astro-simulator/issues/1209)).
+  리포트가 스스로 담으므로 `bench:scene:set-baseline`(단순 복사)·`bench-aggregate-median`(median 집계)
+  두 갱신 경로 모두에서 baseline 으로 이어진다. 재측정 워크플로는 `--commit "${GITHUB_SHA}"` 로
+  교차 검증한다 (회차별 sha 가 갈리면 exit 1).
 
 ## 회귀 판정
 
 bench 실행 시 baseline 대비 각 시나리오의 fps 변화율을 출력한다.
 `Δ < -2 fps` 인 시나리오는 `⚠` 마크. PR에 그 출력을 첨부하거나 값 악화 원인을 분석 후 PR 본문에 기록한다.
+판정 출력에는 **비교 대상 baseline 의 timestamp·phase·commit** 이 함께 찍힌다 (#1209) — 「언제 잰
+값과 비교 중인가」가 안 보이면 노후한 기준선의 상시 발화를 회귀로 오인한다.
+
+### 회귀(⚠) ↔ 측정 실패(판정 불가) 구분 (#1209)
+
+| 상황                                      | 출력                            | 종료 코드 |
+| ----------------------------------------- | ------------------------------- | --------- |
+| 측정 성공, baseline 대비 하락             | `⚠ <scenario>: … Δ …`           | `0`       |
+| 시나리오 prep 셀렉터 부재 / 브라우저 오류 | `⛔ 측정 실패 (판정 불가)` 블록 | `1`       |
+
+시나리오 prep 은 `.catch(() => {})` 로 클릭 실패를 삼키지 않는다. 필수 셀렉터
+(`time-preset-1d`·`time-preset-1y`·`focus-earth`·`focus-neptune`)는 부팅 직후 전건 존재를
+단언하고, 부재 시 fps 를 만들지 않는다 — 없으면 **직전 시나리오의 화면**을 그 이름으로 계속
+재게 되기 때문이다. `time-play`↔`time-pause` 토글 쌍만 한쪽 부재가 정상이며(같은 버튼의 상태별
+testid), **양쪽 다 부재면 실패**다.
 
 ## N-sweep 리포트 스키마
 
@@ -75,3 +94,5 @@ GitHub → Actions → bench:baseline-remeasure → Run workflow
 3. `aggregate` job 이 모든 아티팩트 다운로드 → `scripts/bench-aggregate-median.mjs` 로 median 계산 → `baseline.json` 덮어쓰기 → `chore/baseline-remeasure-<run_id>` 브랜치에 PR 자동 생성
 
 새 baseline 에는 `source_count` 와 각 항목의 `samples` 필드가 추가되어 재측정 근거를 추적 가능.
+`commit` 필드(#1209)에는 aggregate 가 `--commit "${GITHUB_SHA}"` 와 회차 리포트 기록을 대조한
+sha 가 들어간다 — **어느 빌드를 잰 기준선인가**가 baseline 파일 자체에 남는다.

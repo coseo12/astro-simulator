@@ -18,6 +18,9 @@
  *   - 최소 3 샘플 필요 (중앙값 신뢰성). 미달 시 exit 1
  *   - 결측 시나리오(일부 회차에서 누락) 는 존재하는 회차만으로 median — 회차 수 필드 `samples` 에 명시
  *   - 출력은 기존 baseline.json 과 동일 필드 + `samples` / `source_count` 메타 추가
+ *   - #1209 — 출력에 `commit` (측정 대상 빌드 sha) 포함. 회차 리포트의 `commit` 에서
+ *     파생하며, `--commit` 이 주어지면 **교차 검증**한다 (불일치 = exit 1). 서로 다른
+ *     커밋의 회차가 한 baseline 으로 섞이면 출처 필드 자체가 거짓이 되기 때문이다.
  *
  * 의존성 없음. stand-alone Node 실행.
  */
@@ -25,7 +28,13 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 export function parseArgs(argv) {
-  const args = { inputDir: null, phase: 'remeasure', environment: null, output: null };
+  const args = {
+    inputDir: null,
+    phase: 'remeasure',
+    environment: null,
+    output: null,
+    commit: null,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = argv[i + 1];
@@ -33,8 +42,31 @@ export function parseArgs(argv) {
     else if (arg === '--phase') args.phase = next;
     else if (arg === '--environment') args.environment = next;
     else if (arg === '--output') args.output = next;
+    else if (arg === '--commit') args.commit = next;
   }
   return args;
+}
+
+/**
+ * 회차 리포트들에서 측정 대상 커밋 sha 를 파생한다 (#1209).
+ *
+ * @returns 유일한 sha, 또는 어느 회차에도 기록이 없으면 `null`
+ * @throws 회차별 sha 가 갈리면 throw — median 은 **같은 빌드의 회차 반복**이라는 전제
+ *         위에서만 의미가 있고, 그 전제가 깨진 것을 출처 필드가 숨기면 안 된다.
+ */
+export function deriveCommit(reports) {
+  const seen = new Set();
+  for (const { data } of reports) {
+    if (typeof data.commit === 'string' && data.commit.length > 0) seen.add(data.commit);
+  }
+  if (seen.size === 0) return null;
+  if (seen.size > 1) {
+    throw new Error(
+      `[bench-aggregate-median] 회차별 commit 불일치 — ${[...seen].join(', ')}. ` +
+        '서로 다른 빌드의 회차가 섞였다 (median 전제 위반).',
+    );
+  }
+  return [...seen][0];
 }
 
 export function readJsonFiles(dir) {
@@ -96,6 +128,9 @@ export function buildBaseline({ scenarios, nBody, sampleCount }, meta) {
   return {
     timestamp: new Date().toISOString(),
     phase: meta.phase,
+    // #1209 — 출처. 없으면 `null` 로 **명시**한다 (필드 자체를 빼면 「기록 안 함」과
+    //   「기록할 수 없었음」이 구분되지 않는다).
+    commit: meta.commit ?? null,
     durationMs: firstReport.durationMs ?? null,
     environment: meta.environment ?? firstReport.environment ?? 'unknown',
     viewport: firstReport.viewport ?? null,
@@ -119,7 +154,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.inputDir) {
     console.error(
-      'usage: bench-aggregate-median.mjs --input-dir <dir> [--phase <str>] [--environment <str>] [--output <path>]',
+      'usage: bench-aggregate-median.mjs --input-dir <dir> [--phase <str>] [--environment <str>] [--output <path>] [--commit <sha>]',
     );
     process.exit(2);
   }
@@ -129,15 +164,33 @@ async function main() {
     process.exit(1);
   }
   const collected = collectFps(reports);
+  // #1209 — 출처 커밋. `--commit` (워크플로가 `GITHUB_SHA` 로 채운다) 과 리포트 파생값이
+  //   둘 다 있으면 일치해야 한다. 한쪽만 있으면 있는 쪽을 쓴다.
+  const derivedCommit = deriveCommit(reports);
+  if (args.commit && derivedCommit && args.commit !== derivedCommit) {
+    console.error(
+      `[bench-aggregate-median] commit 불일치 — --commit=${args.commit} vs 리포트 기록=${derivedCommit}`,
+    );
+    process.exit(1);
+  }
+  const commit = args.commit ?? derivedCommit;
+  if (!commit) {
+    console.warn(
+      '[bench-aggregate-median] ⚠ commit 미기록 — baseline 출처를 추적할 수 없다 (구버전 리포트?)',
+    );
+  }
   const baseline = buildBaseline(collected, {
     phase: args.phase,
     environment: args.environment,
+    commit,
     firstReport: reports[0].data,
   });
   const json = JSON.stringify(baseline, null, 2) + '\n';
   if (args.output) {
     writeFileSync(args.output, json);
-    console.log(`[bench-aggregate-median] ${args.output} (source_count=${reports.length})`);
+    console.log(
+      `[bench-aggregate-median] ${args.output} (source_count=${reports.length}, commit=${commit ?? '(미기록)'})`,
+    );
   } else {
     process.stdout.write(json);
   }
