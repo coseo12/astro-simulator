@@ -9,59 +9,81 @@
     {
       "name": "idle",
       "fps": 106.5,
-      "samples": 10
+      "samples": 10,
+      "min": 86.43,
+      "max": 129.15
     },
     {
       "name": "play-1d",
       "fps": 89.37,
-      "samples": 10
+      "samples": 10,
+      "min": 72.02,
+      "max": 114.57
     },
     {
       "name": "play-1y",
       "fps": 91.88,
-      "samples": 10
+      "samples": 10,
+      "min": 70.67,
+      "max": 130.54
     },
     {
       "name": "focus-earth",
       "fps": 102.85,
-      "samples": 10
+      "samples": 10,
+      "min": 74.94,
+      "max": 134.19
     },
     {
       "name": "focus-neptune",
       "fps": 54.81,
-      "samples": 10
+      "samples": 10,
+      "min": 47.39,
+      "max": 70.72
     }
   ],
   "nBody": [
     {
       "n": 10,
       "fps": 96.11,
-      "samples": 10
+      "samples": 10,
+      "min": 73.54,
+      "max": 122.87
     },
     {
       "n": 100,
       "fps": 62.45,
-      "samples": 10
+      "samples": 10,
+      "min": 49.74,
+      "max": 82.57
     },
     {
       "n": 200,
       "fps": 47.24,
-      "samples": 10
+      "samples": 10,
+      "min": 36.65,
+      "max": 62.96
     },
     {
       "n": 1000,
       "fps": 16.73,
-      "samples": 10
+      "samples": 10,
+      "min": 12.48,
+      "max": 23.55
     },
     {
       "n": 5000,
       "fps": 4.14,
-      "samples": 10
+      "samples": 10,
+      "min": 3.12,
+      "max": 5.93
     },
     {
       "n": 10000,
       "fps": 2.28,
-      "samples": 10
+      "samples": 10,
+      "min": 1.66,
+      "max": 3.15
     }
   ],
   "source_count": 10

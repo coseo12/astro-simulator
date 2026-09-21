@@ -36,6 +36,9 @@ on:
       - 'apps/web/**'
       - 'packages/**'
       - 'scripts/bench-scene.mjs'
+      # #1209 B7 — 판정선 모듈. 여기가 빠지면 **판정선을 바꾼 PR 에서 bench 가 안 돈다**
+      #   (가드 술어가 계약보다 좁아지는 클래스 — #1147).
+      - 'scripts/bench-judge.mjs'
       - 'docs/benchmarks/baseline.json'
       - '.github/workflows/bench.yml'
       # #814 — setup 구간이 composite (#802 SSoT) 의존이므로 composite 변경 PR 에서도 발화
@@ -69,11 +72,15 @@ jobs:
             sleep 2
           done
 
+      # #1209 B7 — `BENCH_REGRESSION_FPS: '-10'` (절대 fps 차) 제거. 판정선은
+      #   `scripts/bench-judge.mjs` 의 `REGRESSION_RATIO` (baseline 대비 상대 하락폭) 이며
+      #   **환경변수 우회 knob 을 두지 않는다** — 판정선을 워크플로에서 조용히 끌 수 있는
+      #   손잡이는 그 자체로 가드 무력화 경로다. 절대 임계는 러너 산포(회차 전역 인자
+      #   rsd 14.9%) 와 단위가 맞지 않아 같은 커밋 10 회차에서 4/10 회차 오발화했다.
       - name: bench:scene:sweep
         env:
           BENCH_PHASE: pr-${{ github.event.pull_request.number }}
           BENCH_SUMMARY_OUT: bench-summary.md
-          BENCH_REGRESSION_FPS: '-10'
         run: pnpm bench:scene:sweep
 
       # `if: always()` 는 앞 스텝 실패 시에도 게시하려는 **결과 조건** 이라 유지 (파일 존재 조건 아님).

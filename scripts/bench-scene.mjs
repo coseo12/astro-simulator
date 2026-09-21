@@ -22,19 +22,24 @@
  *
  * 종료 코드 (#1209)
  * ----------------
- * - `0` — 측정 성공. baseline 대비 회귀는 `⚠` 마크로 **출력에만** 표기한다
+ * - `0` — 측정·판정 성립. baseline 대비 회귀는 `⚠` 마크로 **출력에만** 표기한다
  *         (판정선 자체의 게이트 승격은 #1209 B3 에서 의도적으로 뒤로 미룬 축).
  * - `1` — **측정 실패 = 판정 불가.** 시나리오 prep 셀렉터 부재 / 브라우저 오류 등.
  *         이전에는 `page.click(...).catch(() => {})` 가 이 경우를 삼켜 **다른 화면을 측정한
  *         값**이 정상 판정으로 흘렀다. 이제 리포트를 쓰지 않고 실패 요약만 남긴다.
+ * - `2` — **측정은 됐으나 판정이 성립하지 않은 셀이 있다** (#1209 B7). baseline 파일/값
+ *         부재, 측정값이 유효한 양수가 아님, baseline 에 있는 시나리오 미측정, 판정선 보정
+ *         위반. `⛔` 로 표기하며 **`✓` 로 새지 않는다** — 「못 잰 것」이 「이상 없음」으로
+ *         읽히는 fail-open 을 종료 코드에서 가른다 (#1201 클래스).
  *
- * ⇒ 「느려졌다 (회귀)」와 「못 쟀다 (판정 불가)」가 종료 코드와 출력 양쪽에서 갈린다.
+ * ⇒ 「느려졌다 (회귀)」·「못 쟀다 (측정 실패)」·「판정이 성립 안 했다」가 셋 다 갈린다.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { clickTestId, setTimePlayback, withBrowser } from './browser-verify-utils.mjs';
+import { REGRESSION_RATIO, judgeReport } from './bench-judge.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SCENARIO_DURATION_MS = 3_000;
@@ -272,62 +277,24 @@ const slug = timestamp.replace(/[:.]/g, '-');
 const outPath = join(outDir, `${slug}.json`);
 writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
 
-// baseline diff — CI 환경 변동성 고려해 임계값은 환경변수로 조정 (기본 -2 fps)
-const regressionThreshold = Number.parseFloat(process.env.BENCH_REGRESSION_FPS ?? '-2');
+// baseline diff — 판정선은 `bench-judge.mjs` (#1209 B7). 절대 fps 차 임계
+// (`BENCH_REGRESSION_FPS`) 는 러너 산포와 단위가 맞지 않아 폐기했다: 상세 유도는 그 모듈의
+// `REGRESSION_RATIO` 선언부. 환경변수 우회 knob 을 두지 않는 것도 의도다 — 판정선을 조용히
+// 끌 수 있는 손잡이는 그 자체로 가드 무력화 경로다.
 const baselinePath = join(baselineDir, 'baseline.json');
-let diffLines = [];
 // #1209 과업 4 — 「언제·어느 커밋에서 잰 값과 비교 중인가」를 판정 출력에 노출한다.
 //   이 한 줄이 있었다면 8 PR 동안 `focus-neptune ⚠` 를 회귀로 오인하지 않았다:
 //   baseline timestamp 가 로드맵 v3 재구성 이전이라는 게 바로 보였을 것이다.
-let baselineProvenance = null;
-if (existsSync(baselinePath)) {
-  const base = JSON.parse(readFileSync(baselinePath, 'utf8'));
-  baselineProvenance = {
-    timestamp: base.timestamp ?? '(미기록)',
-    phase: base.phase ?? '(미기록)',
-    commit: base.commit ?? '(미기록)',
-  };
-  const byName = new Map(base.scenarios.map((s) => [s.name, s.fps]));
-  const measuredNames = new Set(scenarios.map((s) => s.name));
-  for (const s of scenarios) {
-    const b = byName.get(s.name);
-    if (b == null) {
-      diffLines.push(`  ${s.name}: ${s.fps} fps (신규)`);
-    } else {
-      const delta = s.fps - b;
-      const pct = ((delta / b) * 100).toFixed(1);
-      const mark = delta >= regressionThreshold ? '✓' : '⚠';
-      diffLines.push(
-        `  ${mark} ${s.name}: ${s.fps} fps (baseline ${b} → Δ ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}, ${pct}%)`,
-      );
+const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : null;
+const baselineProvenance = baseline
+  ? {
+      timestamp: baseline.timestamp ?? '(미기록)',
+      phase: baseline.phase ?? '(미기록)',
+      commit: baseline.commit ?? '(미기록)',
     }
-  }
-  // baseline 에만 있고 이번 run 에 없는 시나리오 — 측정 누락이 판정에서 사라지는 것을 막는다.
-  for (const name of byName.keys()) {
-    if (!measuredNames.has(name)) {
-      diffLines.push(`  ⚠ ${name}: 미측정 (baseline ${byName.get(name)} fps — 시나리오 소실?)`);
-    }
-  }
-  if (nBody.length > 0) {
-    const baseN = new Map((base.nBody ?? []).map((x) => [x.n, x.fps]));
-    diffLines.push('  --- N-sweep ---');
-    for (const x of nBody) {
-      const b = baseN.get(x.n);
-      if (b == null) diffLines.push(`  N=${x.n}: ${x.fps} fps (신규)`);
-      else {
-        const delta = x.fps - b;
-        const mark = delta >= regressionThreshold ? '✓' : '⚠';
-        diffLines.push(
-          `  ${mark} N=${x.n}: ${x.fps} fps (baseline ${b} → Δ ${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`,
-        );
-      }
-    }
-  }
-} else {
-  diffLines.push(
-    '  (baseline.json 없음 — 이 리포트를 baseline으로 복사하려면: `pnpm bench:scene:set-baseline`)',
-  );
-}
+  : null;
+const verdict = judgeReport({ scenarios, nBody }, baseline);
+const diffLines = verdict.lines;
 
 console.log('\n========================================');
 console.log(`bench:scene — ${timestamp}`);
@@ -341,8 +308,14 @@ if (baselineProvenance) {
     `baseline 출처: ${baselineProvenance.timestamp} · phase=${baselineProvenance.phase} · commit=${baselineProvenance.commit}`,
   );
 }
+console.log(
+  `판정선: baseline × (1 − ${(REGRESSION_RATIO * 100).toFixed(0)}%) 미만 = ⚠ (#1209 B7 — 유도 근거는 scripts/bench-judge.mjs)`,
+);
 console.log('baseline diff:');
 diffLines.forEach((l) => console.log(l));
+console.log(
+  `판정 요약: ✓ ${verdict.counts.ok} · ⚠ ${verdict.counts.regression} · ⛔ ${verdict.counts.unjudgeable} · 신규 ${verdict.counts.new}`,
+);
 
 // CI 연동: Markdown 요약을 BENCH_SUMMARY_OUT 경로에 기록 (PR 코멘트용)
 if (process.env.BENCH_SUMMARY_OUT) {
@@ -371,10 +344,21 @@ if (process.env.BENCH_SUMMARY_OUT) {
         ]
       : []),
     '',
-    '#### baseline diff',
+    `#### baseline diff — 판정선 \`baseline × (1 − ${(REGRESSION_RATIO * 100).toFixed(0)}%)\``,
     '```',
     ...diffLines,
+    `판정 요약: ✓ ${verdict.counts.ok} · ⚠ ${verdict.counts.regression} · ⛔ ${verdict.counts.unjudgeable} · 신규 ${verdict.counts.new}`,
     '```',
   ].join('\n');
   writeFileSync(process.env.BENCH_SUMMARY_OUT, md + '\n');
+}
+
+// #1209 B7 — 판정이 성립하지 않은 셀은 `✓` 로 새지 않고 종료 코드로 드러난다.
+//   요약 파일을 **쓴 뒤** 종료한다 — `bench.yml` 은 `continue-on-error: true` 라
+//   종료 코드만으로는 PR 에 아무것도 남지 않는다 (그 침묵이 이 클래스를 숨긴 구조다).
+if (verdict.counts.unjudgeable > 0) {
+  console.error(
+    `\n⛔ 판정 불가 ${verdict.counts.unjudgeable} 건 — 위 \`⛔\` 줄 참조. 이 run 의 판정은 완결되지 않았다.`,
+  );
+  process.exit(2);
 }

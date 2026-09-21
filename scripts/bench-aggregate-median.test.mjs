@@ -117,6 +117,22 @@ run('buildBaseline — 기존 baseline.json 스키마 호환', () => {
   assert.equal(out.nBody[1].n, 1000);
 });
 
+run('buildBaseline — 항목마다 산포(min/max) 기록 (#1209 B7 판정선 유도 근거)', () => {
+  const collected = {
+    scenarios: new Map([['focus-earth', [90, 88, 85, 92, 87]]]),
+    nBody: new Map([[100, [23, 24, 22, 25, 23]]]),
+    sampleCount: 5,
+  };
+  const out = buildBaseline(collected, { phase: 'p', firstReport: {} });
+  const earth = out.scenarios[0];
+  assert.equal(earth.min, 85);
+  assert.equal(earth.max, 92);
+  assert.equal(out.nBody[0].min, 22);
+  assert.equal(out.nBody[0].max, 25);
+  // 산포가 빠지면 판정선 보정(bench-judge checkCalibration)이 확인 불가로 떨어진다.
+  assert.ok(earth.min <= earth.fps && earth.fps <= earth.max);
+});
+
 run('parseArgs — 네 플래그 모두 파싱', () => {
   const a = parseArgs([
     '--input-dir',

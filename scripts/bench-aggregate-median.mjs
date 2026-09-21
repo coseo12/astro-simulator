@@ -18,6 +18,8 @@
  *   - 최소 3 샘플 필요 (중앙값 신뢰성). 미달 시 exit 1
  *   - 결측 시나리오(일부 회차에서 누락) 는 존재하는 회차만으로 median — 회차 수 필드 `samples` 에 명시
  *   - 출력은 기존 baseline.json 과 동일 필드 + `samples` / `source_count` 메타 추가
+ *   - #1209 B7 — 항목마다 **산포** `min` / `max` 도 기록. 판정선(`bench-judge.mjs`)이 이
+ *     산포에서 유도됐으므로, 판정 때마다 유도식을 재실행해 상수 노후를 감지한다
  *   - #1209 — 출력에 `commit` (측정 대상 빌드 sha) 포함. 회차 리포트의 `commit` 에서
  *     파생하며, `--commit` 이 주어지면 **교차 검증**한다 (불일치 = exit 1). 서로 다른
  *     커밋의 회차가 한 baseline 으로 섞이면 출처 필드 자체가 거짓이 되기 때문이다.
@@ -122,6 +124,27 @@ export function collectFps(reports) {
   return { scenarios, nBody, sampleCount: reports.length };
 }
 
+/**
+ * 회차 fps 배열을 baseline 항목으로 축약한다 (#1209 B7).
+ *
+ * `fps` (median) 외에 **산포** (`min` / `max`) 를 함께 기록한다. 판정선
+ * (`bench-judge.mjs` §`REGRESSION_RATIO`) 이 이 산포에서 유도됐으므로, 기록이 남아야
+ * 판정 때마다 **유도식을 재실행**해 상수가 노후했는지 확인할 수 있다 — 상수의 근거가
+ * 주석에만 있으면 baseline 이 갱신될 때 조용히 어긋난다 (#1209 가 그 노후였다).
+ *
+ * ⚠️ `min`/`max` 는 **판정의 허용치가 아니다**. 허용치는 고정 비율이고, 이 필드는 그
+ * 비율이 여전히 산포를 덮는지 검사하는 입력일 뿐이다 (넓어지면 경고가 커진다 — 허용치가
+ * 넓어지지 않는다). 허용치를 다른 측정량에 연동하면 그게 새 공격면이다 (#1226).
+ */
+function summarizeFps(fpsList) {
+  return {
+    fps: Number(median(fpsList).toFixed(2)),
+    samples: fpsList.length,
+    min: Number(Math.min(...fpsList).toFixed(2)),
+    max: Number(Math.max(...fpsList).toFixed(2)),
+  };
+}
+
 /** 회차별 fps 배열을 median 으로 축약 → baseline.json 스키마 생성. */
 export function buildBaseline({ scenarios, nBody, sampleCount }, meta) {
   const firstReport = meta.firstReport ?? {};
@@ -136,15 +159,13 @@ export function buildBaseline({ scenarios, nBody, sampleCount }, meta) {
     viewport: firstReport.viewport ?? null,
     scenarios: Array.from(scenarios.entries()).map(([name, fpsList]) => ({
       name,
-      fps: Number(median(fpsList).toFixed(2)),
-      samples: fpsList.length,
+      ...summarizeFps(fpsList),
     })),
     nBody: Array.from(nBody.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([n, fpsList]) => ({
         n,
-        fps: Number(median(fpsList).toFixed(2)),
-        samples: fpsList.length,
+        ...summarizeFps(fpsList),
       })),
     source_count: sampleCount,
   };

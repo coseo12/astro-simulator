@@ -295,6 +295,16 @@ jobs:
       - name: '#846 browser-verify 헬퍼 회귀 가드 (browser-verify-utils.test)'
         run: node scripts/browser-verify-utils.test.mjs
 
+      # #1209 B7 bench 회귀 판정선 (bench-judge) 회귀 가드. 판정선을 유도한 10 회차 원본
+      # (docs/benchmarks/1209-rebaseline-samples.json) 을 **프로덕션 판정 함수 그대로** 재판정해
+      #   (a) 같은 커밋 10 회차 ⚠ 0 (B8) (b) 38% 감속은 10 회차 전건 발화 (판별력)
+      #   (c) 실물 baseline 의 판정선 유도 전제 를 상시 확인한다.
+      # ⚠️ baseline 재측정 PR 은 (c) 에서 의도적으로 실패한다 — 재측정은 판정선 재유도 시점이다
+      #   (scripts/bench-judge.mjs §CALIBRATION_SAFETY).
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#1209 bench 판정선 회귀 가드 (bench-judge.test)'
+        run: node scripts/bench-judge.test.mjs
+
       # #1184 stage:* 라벨 결정 로직 (harness-pr-review.yml 의 SSoT) 회귀 가드.
       # 순수 함수 decide() + 주입형 실행기 runLabelSync() 를 페이크 api 로 검증한다 —
       # 변이 M2(제거 루프를 decide() 앞으로 이동)는 실행기 호출 **순서**로만 갈리므로
