@@ -198,8 +198,9 @@ const { scenarios, nBody } = await withBrowser(
 
     // P7-E #210 — time-play silent-fail 방지 (유틸 pressTimePlay 선적용).
     // #1209 — 나머지 셀렉터의 `.catch(() => {})` 도 제거. 「시나리오 의존이라 관대 허용」은
-    //   `time-play`/`time-pause` 토글 쌍에만 해당하는 성질이었고 (§OPTIONAL 계약 주석),
-    //   preset/focus 는 상시 렌더되는 상수 셀렉터라 부재 = 회귀다.
+    //   `time-play`/`time-pause` 토글 쌍에만 해당하는 성질이었고 (위 `REQUIRED_TESTIDS`
+    //   선언부의 §시나리오 prep 셀렉터 계약), preset/focus 는 상시 렌더되는 상수
+    //   셀렉터라 부재 = 회귀다.
     const click = (testId) => clickTestId(page, testId, { timeout: PREP_CLICK_TIMEOUT_MS });
     const playback = (mode) => setTimePlayback(page, mode, { timeout: PREP_CLICK_TIMEOUT_MS });
     const steps = [
