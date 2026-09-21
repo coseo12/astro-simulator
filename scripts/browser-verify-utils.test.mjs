@@ -823,11 +823,16 @@ await run('setTimePlayback — 토글 쌍이 둘 다 부재면 throw (skip 과�
   }
 });
 
-await run('setTimePlayback — 알 수 없는 mode 는 throw', async () => {
-  await assert.rejects(
-    () => setTimePlayback(makeLocatorPage(['time-play']), 'stopped'),
-    /알 수 없는 mode/,
-  );
+await run('setTimePlayback — 알 수 없는 mode 는 throw (상속 키 포함)', async () => {
+  // 'constructor' 등 Object.prototype 상속 키가 mode 검증을 통과하면 이후 쿼리가
+  // `[data-testid="undefined"]` 가 되어 「토글 버튼 부재」라는 엉뚱한 진단으로 실패한다.
+  for (const bad of ['stopped', 'constructor', 'toString', '__proto__']) {
+    await assert.rejects(
+      () => setTimePlayback(makeLocatorPage(['time-play']), bad),
+      /알 수 없는 mode/,
+      `mode=${bad}`,
+    );
+  }
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

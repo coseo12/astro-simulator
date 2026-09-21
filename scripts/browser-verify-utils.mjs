@@ -123,7 +123,10 @@ export const TIME_PLAYBACK_MODES = Object.freeze(Object.keys(TIME_TOGGLE_MODES))
  * @returns `'clicked'` (전이함) | `'already'` (이미 그 상태)
  */
 export async function setTimePlayback(page, mode, options = {}) {
-  const spec = TIME_TOGGLE_MODES[mode];
+  // `Object.hasOwn` — 리터럴 객체는 `Object.prototype` 을 상속하므로 `'constructor'` 같은
+  //   키가 truthy 로 잡혀 mode 검증을 통과하고, 이후 `[data-testid="undefined"]` 를 쿼리해
+  //   「토글 버튼 부재」라는 **엉뚱한 진단**으로 실패한다.
+  const spec = Object.hasOwn(TIME_TOGGLE_MODES, mode) ? TIME_TOGGLE_MODES[mode] : undefined;
   if (!spec) {
     throw new Error(
       `[browser-verify-utils] setTimePlayback: 알 수 없는 mode "${mode}" — ${TIME_PLAYBACK_MODES.join(' | ')} 중 하나여야 한다`,
