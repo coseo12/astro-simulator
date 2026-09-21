@@ -262,8 +262,239 @@ export function collectConsoleErrors(page, options = {}) {
   return errors;
 }
 
+// ---------------------------------------------------------------------------
+// #1234 C1 — 부팅 계측 (진단 전용 · 판정 무변경)
+// ---------------------------------------------------------------------------
+//
+// `bootstrapScene` 의 핸들 대기 20 s 타임아웃이 2026-09-18 하루에 5회, 로컬 qa 에서도 1회
+// 발화해 v0.89.0 릴리스 CI 를 두 번 막았다 (#1234). 그런데 **실패 시 남는 것이 Playwright
+// TimeoutError 스택뿐**이라 원인 후보 (동시 열린 페이지 수 / job 내 실행 순서 / dev server 상태) 를
+// 가를 수치가 하나도 없었다. 본 블록은 그 수치를 남기기만 한다 —
+// **타임아웃 상수 · 대기 술어 · 예외 전파는 한 글자도 바뀌지 않는다** (#1234 계약 C5).
+//
+// 출력은 두 줄이다.
+//   1. 사람이 읽는 한 줄 요약  `[boot] <guard> #<seq> <label> — ...`
+//   2. 기계가 읽는 JSON 한 줄  `[boot] {"guard":...}`
+// 둘 다 `[boot] ` 로 시작하므로 `grep '^\[boot\]'` 가 전건을, `grep '^\[boot\] {'` 가 JSON 만
+// 모은다. CI 로그 수집 절차는 PR 본문 §C1 수집 방법.
+
+/**
+ * 프로세스 안에서 `bootstrapScene` 이 몇 번째로 불렸는지 (1부터).
+ *
+ * 가드 1개 = node 프로세스 1개이므로 이 순번이 곧 「그 가드의 N 번째 페이지」다. 호출부가
+ * `label` 을 주지 않아도 P1 ↔ P1b 를 로그에서 가를 수 있게 하는 축 (#1234 — 실패 지점이
+ * 첫 페이지였던 run 과 5번째 페이지였던 run 이 섞여 있었다).
+ */
+let bootCallSeq = 0;
+
+/** 실패 진단 probe 상한 (ms). 멈춘 페이지에서 probe 자체가 매달리면 진단이 가드를 늘린다. */
+const BOOT_PROBE_TIMEOUT_MS = 5_000;
+
+/** 진단에 싣는 콘솔/페이지 에러 최대 건수 (로그 폭주 방지). */
+const BOOT_ERROR_SAMPLE_MAX = 20;
+
+/** 가드 이름 = 실행 엔트리 파일명. 호출부 수정 없이 「어느 가드인지」를 얻는 축. */
+function bootGuardName() {
+  const entry = process.argv[1];
+  if (typeof entry !== 'string' || entry === '') return 'unknown';
+  return entry.split(/[\\/]/).pop();
+}
+
+/**
+ * 지금 열려 있는 context / page 수.
+ *
+ * 셀 수 없으면 `null` 을 넣는다 — **진단이 `0` 을 지어내면 안 된다**. `0` 과 「못 셌다」가
+ * 같은 값으로 보이면 이 축으로 원인을 가르려는 다음 단계가 거짓 분포를 읽는다.
+ */
+function countOpenPages(page) {
+  try {
+    const browser = page.context?.()?.browser?.();
+    if (!browser) return { contexts: null, pages: null, countError: 'browser 핸들 미노출' };
+    const contexts = browser.contexts();
+    return {
+      contexts: contexts.length,
+      pages: contexts.reduce((n, ctx) => n + ctx.pages().length, 0),
+      countError: null,
+    };
+  } catch (error) {
+    return { contexts: null, pages: null, countError: String(error?.message ?? error) };
+  }
+}
+
+/**
+ * 실패 시점의 페이지 상태를 읽는다 (`document.readyState` / dev 전역 / `performance.now()`).
+ *
+ * `page.evaluate` 는 타임아웃 옵션이 없어 멈춘 페이지에서 그대로 매달릴 수 있으므로
+ * `BOOT_PROBE_TIMEOUT_MS` 로 경주시킨다. 진 쪽 promise 는 `catch` 를 달아 unhandled rejection 을
+ * 만들지 않는다.
+ */
+async function probePageState(page) {
+  let timer;
+  try {
+    const probe = Promise.resolve(
+      page.evaluate(() => ({
+        readyState: document.readyState,
+        href: location.href,
+        simCore: typeof window.__simCore,
+        solarScene: typeof window.__solarScene,
+        performanceNowMs: Math.round(performance.now()),
+      })),
+    ).catch((error) => ({ probeError: String(error?.message ?? error) }));
+    const bounded = new Promise((resolve) => {
+      timer = setTimeout(
+        () => resolve({ probeError: `probe ${BOOT_PROBE_TIMEOUT_MS}ms 초과` }),
+        BOOT_PROBE_TIMEOUT_MS,
+      );
+    });
+    return await Promise.race([probe, bounded]);
+  } catch (error) {
+    return { probeError: String(error?.message ?? error) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 부팅 **단계 계측** (#1234 C2-H3) 스냅샷을 읽는다.
+ *
+ * `window.__bootPhases` 는 apps/web `boot-phases.ts` 가 dev 빌드에서만 노출하는 getter 이며,
+ * 「구간 이름 + 네비게이션 기준 경과 + 직전 구간과의 차」를 누적한다. C1 이 남긴 실패 상태
+ * (`__simCore` 는 있고 `__solarScene` 만 없음) 는 「장면 구축 어딘가」까지만 좁혔고, 이 스냅샷이
+ * 그 안쪽을 가른다 — 엔진 생성 / 어댑터 / mesh 생성 / 궤도선 / 물리 엔진 중 어디서 멈췄는지.
+ *
+ * **prod 서버 (`next start`) 로 띄운 대조군에서는 전역 자체가 없다** → `null` 이 정상이다.
+ * probe 자체가 멈춘 페이지에 매달리지 않도록 `probePageState` 와 같은 상한으로 경주시킨다.
+ */
+async function readBootPhases(page) {
+  let timer;
+  try {
+    const probe = Promise.resolve(
+      page.evaluate(() => {
+        const snapshot = window.__bootPhases;
+        return snapshot === undefined ? null : snapshot;
+      }),
+    ).catch((error) => ({ phasesError: String(error?.message ?? error) }));
+    const bounded = new Promise((resolve) => {
+      timer = setTimeout(
+        () => resolve({ phasesError: `bootPhases probe ${BOOT_PROBE_TIMEOUT_MS}ms 초과` }),
+        BOOT_PROBE_TIMEOUT_MS,
+      );
+    });
+    return await Promise.race([probe, bounded]);
+  } catch (error) {
+    return { phasesError: String(error?.message ?? error) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 실패 시점의 **dev server** 응답성을 브라우저 밖에서 잰다.
+ *
+ * 이 축이 없으면 「서버가 느린 것」과 「브라우저·페이지가 멈춘 것」이 같은 증상 (핸들 미노출) 으로
+ * 보인다 — #1234 의 원인 후보 중 두 개 (`next dev` 상태 ↔ 동시 열린 페이지 수) 가 구분되지 않는다.
+ * Playwright 를 거치지 않는 node 측 `fetch` 라, 브라우저가 멈춰 있어도 서버는 따로 측정된다.
+ */
+async function probeServer(baseUrl) {
+  const startedAt = Date.now();
+  try {
+    const res = await fetch(baseUrl, { signal: AbortSignal.timeout(BOOT_PROBE_TIMEOUT_MS) });
+    // body 를 버리지 않으면 소켓이 남는다 (keep-alive).
+    await res.arrayBuffer().catch(() => {});
+    return { status: res.status, ms: Date.now() - startedAt };
+  } catch (error) {
+    return { status: null, ms: Date.now() - startedAt, error: String(error?.message ?? error) };
+  }
+}
+
+/**
+ * 부팅 구간 한정 콘솔/페이지 에러 수집기.
+ *
+ * 호출부의 `collectConsoleErrors` 배열에 기대지 않는다 — 그 배열을 넘겨받으려면 모든 호출부를
+ * 고쳐야 하고, 넘겨주지 않는 가드는 조용히 진단이 비게 된다. 리스너는 `detach()` 로 떼므로
+ * 부팅 이후 구간에는 남지 않는다.
+ */
+function attachBootErrorProbe(page) {
+  const errors = [];
+  const push = (text) => {
+    if (errors.length < BOOT_ERROR_SAMPLE_MAX) errors.push(text);
+  };
+  const onConsole = (msg) => {
+    try {
+      if (msg.type() === 'error') push(msg.text());
+    } catch {
+      /* 진단 수집 실패가 가드를 죽이면 안 된다 */
+    }
+  };
+  const onPageError = (err) => push(`pageerror: ${err?.message ?? err}`);
+  try {
+    page.on?.('console', onConsole);
+    page.on?.('pageerror', onPageError);
+  } catch {
+    /* 이벤트 계약이 없는 page (테스트 스텁 등) 는 수집 없이 진행 */
+  }
+  return {
+    errors,
+    detach() {
+      try {
+        page.off?.('console', onConsole);
+        page.off?.('pageerror', onPageError);
+      } catch {
+        /* 떼지 못해도 판정과 무관 */
+      }
+    },
+  };
+}
+
+/**
+ * 부팅 단계 (#1234 C2-H3) 를 사람이 읽는 한 조각으로 접는다.
+ *
+ * 전량은 JSON 줄에 있으므로 요약에는 **마지막 구간**(어디까지 갔나) 과 **가장 오래 걸린 3개**
+ * (어디서 샜나) 만 싣는다. 두 물음이 실패 로그를 훑을 때 먼저 던지는 것이다.
+ */
+function formatBootPhases(snapshot) {
+  if (snapshot === null || snapshot === undefined) return ' · phases -';
+  if (snapshot.phasesError) return ` · phases ERR(${snapshot.phasesError})`;
+  const phases = Array.isArray(snapshot.phases) ? snapshot.phases : [];
+  if (phases.length === 0) return ' · phases 0';
+  const last = phases[phases.length - 1];
+  const top = [...phases]
+    .sort((a, b) => b.deltaMs - a.deltaMs)
+    .slice(0, 3)
+    // dev StrictMode 는 초기화 체인을 두 개 돌린다 — 같은 이름이 두 번 나오므로 체인을 붙인다.
+    .map((p) => `${p.name}${p.chain ? `(${p.chain})` : ''} ${p.deltaMs}ms`)
+    .join(', ');
+  const droppedNote = snapshot.dropped ? ` +${snapshot.dropped}건 잘림` : '';
+  return ` · phases ${phases.length}${droppedNote} last ${last.name}@${last.atMs}ms · top ${top}`;
+}
+
+/** 계측 레코드를 요약 1줄 + JSON 1줄로 출력. */
+function logBootRecord(rec) {
+  const ms = (v) => (v === null ? '-' : `${v}ms`);
+  const count = rec.countError === null ? `ctx ${rec.contexts}/page ${rec.pages}` : 'ctx ?/page ?';
+  const verdict = rec.ok ? 'ok' : `FAIL(${rec.failedPhase} ${ms(rec.failedPhaseMs)})`;
+  // 실패 줄에는 「서버가 느린가 / 페이지가 멈췄나」를 가르는 두 값을 요약에도 싣는다 —
+  // JSON 을 파싱하지 않고 로그를 훑는 사람이 가장 먼저 봐야 하는 축이다.
+  const diag = rec.ok
+    ? ''
+    : ` · server ${rec.server?.status ?? 'x'}/${ms(rec.server?.ms ?? null)}` +
+      ` · readyState ${rec.state?.readyState ?? '?'}` +
+      ` · __simCore ${rec.state?.simCore ?? '?'} · __solarScene ${rec.state?.solarScene ?? '?'}` +
+      ` · consoleErrors ${rec.consoleErrors?.length ?? '?'}`;
+  console.log(
+    `[boot] ${rec.guard} #${rec.seq}${rec.label ? ` ${rec.label}` : ''} — ${verdict} ` +
+      `goto ${ms(rec.gotoMs)} · handles ${ms(rec.handlesMs)} · settle ${ms(rec.settleMs)} · ` +
+      `total ${ms(rec.totalMs)} · ${count} · t0 ${rec.processUptimeS}s${diag}` +
+      formatBootPhases(rec.bootPhases),
+  );
+  console.log(`[boot] ${JSON.stringify(rec)}`);
+}
+
 /**
  * 씬 페이지로 이동 후 dev 전용 전역 핸들이 노출될 때까지 대기.
+ *
+ * 각 구간 소요 시간과 실패 직전 상태를 `[boot]` 두 줄로 남긴다 (#1234 C1) — 판정·타임아웃은
+ * 불변이고 예외는 **원본 그대로** 다시 던진다.
  *
  * @param {import('playwright').Page} page
  * @param {object} [options]
@@ -274,6 +505,7 @@ export function collectConsoleErrors(page, options = {}) {
  * @param {number} [options.handleTimeout] 전역 노출 대기 ms (기본 20_000)
  * @param {number} [options.settleMs] 대기 후 추가 안정화 ms (기본 0)
  * @param {'load'|'domcontentloaded'|'networkidle'|'commit'} [options.waitUntil] 기본 `networkidle`
+ * @param {string} [options.label] 계측 로그에 실을 페이지 라벨 (예: `'P1'` / `'P1b'`). 미지정 시 순번만
  * @returns {Promise<string>} 실제 이동한 URL
  */
 export async function bootstrapScene(page, options = {}) {
@@ -281,21 +513,107 @@ export async function bootstrapScene(page, options = {}) {
   const query = options.query ?? DEFAULT_BOOTSTRAP_QUERY;
   const handles = options.handles ?? ['__solarScene'];
   const url = `${baseUrl}${query}`;
-
-  await page.goto(url, {
-    waitUntil: options.waitUntil ?? 'networkidle',
-    timeout: options.gotoTimeout ?? 45_000,
-  });
-  await page.waitForFunction(
-    (names) => names.every((name) => typeof window[name] !== 'undefined'),
-    handles,
-    { timeout: options.handleTimeout ?? 20_000 },
-  );
-
   const settleMs = options.settleMs ?? 0;
-  if (settleMs > 0) await page.waitForTimeout(settleMs);
 
-  return url;
+  const startedAt = Date.now();
+  /** @type {Record<string, unknown>} */
+  const rec = {
+    guard: bootGuardName(),
+    seq: ++bootCallSeq,
+    label: options.label ?? null,
+    url,
+    handles,
+    waitUntil: options.waitUntil ?? 'networkidle',
+    settleRequestedMs: settleMs,
+    // 가드 프로세스 기동 이후 경과 (s) — 「job 끝단일수록 느린가」 가설의 관측 축.
+    processUptimeS: Number(process.uptime().toFixed(1)),
+    ...countOpenPages(page),
+    gotoMs: null,
+    gotoStatus: null,
+    handlesMs: null,
+    settleMs: null,
+    totalMs: null,
+    ok: false,
+    failedPhase: null,
+    // 실패한 구간에서 소비한 시간. `gotoMs`/`handlesMs`/`settleMs` 는 **완주한 구간만** 채우므로
+    // (실패 구간에 값을 넣으면 「완주 소요」 분포에 타임아웃 상수가 섞인다) 실패 쪽은 여기로 뺀다.
+    failedPhaseMs: null,
+    error: null,
+    state: null,
+    server: null,
+    // #1234 C2-H3 — 부팅 단계 계측 스냅샷 (성공·실패 양쪽에서 채운다. prod 번들이면 null).
+    bootPhases: null,
+    /** 위 스냅샷을 읽는 데 든 시간 (성공 경로에서만. `totalMs` 에 포함된 몫). */
+    phasesProbeMs: null,
+    consoleErrors: null,
+    pagesAtFail: null,
+    contextsAtFail: null,
+  };
+  const errorProbe = attachBootErrorProbe(page);
+  let phase = 'goto';
+  let phaseStartedAt = startedAt;
+
+  try {
+    const response = await page.goto(url, {
+      waitUntil: options.waitUntil ?? 'networkidle',
+      timeout: options.gotoTimeout ?? 45_000,
+    });
+    rec.gotoMs = Date.now() - startedAt;
+    try {
+      rec.gotoStatus = response?.status?.() ?? null;
+    } catch {
+      rec.gotoStatus = null;
+    }
+
+    phase = 'handles';
+    const handlesStartedAt = Date.now();
+    phaseStartedAt = handlesStartedAt;
+    await page.waitForFunction(
+      (names) => names.every((name) => typeof window[name] !== 'undefined'),
+      handles,
+      { timeout: options.handleTimeout ?? 20_000 },
+    );
+    rec.handlesMs = Date.now() - handlesStartedAt;
+
+    phase = 'settle';
+    const settleStartedAt = Date.now();
+    phaseStartedAt = settleStartedAt;
+    if (settleMs > 0) await page.waitForTimeout(settleMs);
+    rec.settleMs = Date.now() - settleStartedAt;
+
+    // 성공 경로에서도 단계 분포를 남긴다 — **실패 표본만으로는 기준선이 없다** (C1 에서 goto 가
+    // 평평하다는 사실도 성공 표본 36회가 있어서 알았다). `readBootPhases` 는 자체 try/catch 로
+    // 절대 throw 하지 않으므로 아래 catch (= 판정) 에 닿지 않는다 (#1234 계약 C5).
+    //
+    // 이 evaluate 비용은 `totalMs` 에 들어간다 (finally 에서 재므로). 구간별 값
+    // (`gotoMs`/`handlesMs`/`settleMs`) 은 오염되지 않으며, 비용 자체는 `phasesProbeMs` 로
+    // 분리해 두어 C1 표본과의 `totalMs` 대조 시 빼고 볼 수 있게 한다.
+    const phasesProbeStartedAt = Date.now();
+    rec.bootPhases = await readBootPhases(page);
+    rec.phasesProbeMs = Date.now() - phasesProbeStartedAt;
+
+    rec.ok = true;
+    return url;
+  } catch (error) {
+    rec.failedPhase = phase;
+    rec.failedPhaseMs = Date.now() - phaseStartedAt;
+    rec.error = `${error?.name ?? 'Error'}: ${String(error?.message ?? error).split('\n')[0]}`;
+    rec.state = await probePageState(page);
+    // #1234 C2-H3 — 「어디까지 갔나」. `state` 가 `__solarScene="undefined"` 로 잘라낸 구간의
+    // **안쪽**을 이 스냅샷이 가른다 (state 바로 옆에 싣는 것이 계약 — 두 값은 같이 읽힌다).
+    rec.bootPhases = await readBootPhases(page);
+    rec.server = await probeServer(baseUrl);
+    rec.consoleErrors = [...errorProbe.errors];
+    const atFail = countOpenPages(page);
+    rec.pagesAtFail = atFail.pages;
+    rec.contextsAtFail = atFail.contexts;
+    // 판정 무변경 — 원 에러를 그대로 다시 던진다 (#1234 C5).
+    throw error;
+  } finally {
+    rec.totalMs = Date.now() - startedAt;
+    errorProbe.detach();
+    logBootRecord(rec);
+  }
 }
 
 /**

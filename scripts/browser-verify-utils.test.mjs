@@ -45,8 +45,15 @@ const run = async (name, fn) => {
   }
 };
 
-/** Playwright Page 의 이벤트 계약만 흉내내는 스텁. */
-function stubPage() {
+/**
+ * Playwright Page 의 이벤트 계약만 흉내내는 스텁.
+ *
+ * @param options.bootPhases `window.__bootPhases` 로 보일 값 (#1234 C2-H3). 미지정 시 전역 부재
+ *   = prod 번들 / 계측 이전 페이지와 같은 상황.
+ * @param options.evaluateError 지정 시 `page.evaluate` 가 항상 이 에러로 실패 — 진단 probe 가
+ *   깨져도 **판정이 불변**임을 재기 위한 축 (#1234 계약 C5).
+ */
+function stubPage({ bootPhases, evaluateError } = {}) {
   const handlers = new Map();
   return {
     gotoCalls: [],
@@ -69,6 +76,32 @@ function stubPage() {
     },
     async waitForTimeout(ms) {
       this.waitForTimeoutCalls.push(ms);
+    },
+    /**
+     * 콜백을 **브라우저 전역 스텁 위에서** 실행한다 (#1234 C2-H3).
+     *
+     * 진단 probe 가 실제로 읽는 것 (`document.readyState` / `location.href` /
+     * `window.__bootPhases` / `performance.now`) 만 세운다. 이 스텁이 없으면 probe 가 전부
+     * `…Error` 로 떨어져 **「진단이 동작한 것」과 「진단이 비어 있는 것」이 구분되지 않는다.**
+     */
+    async evaluate(fn) {
+      if (evaluateError) throw evaluateError;
+      const keys = ['window', 'document', 'location'];
+      const had = Object.fromEntries(
+        keys.map((k) => [k, Object.prototype.hasOwnProperty.call(globalThis, k)]),
+      );
+      const prev = Object.fromEntries(keys.map((k) => [k, globalThis[k]]));
+      globalThis.window = bootPhases === undefined ? {} : { __bootPhases: bootPhases };
+      globalThis.document = { readyState: 'complete' };
+      globalThis.location = { href: 'http://x/' };
+      try {
+        return await fn();
+      } finally {
+        for (const k of keys) {
+          if (had[k]) globalThis[k] = prev[k];
+          else delete globalThis[k];
+        }
+      }
     },
   };
 }
@@ -96,6 +129,23 @@ function launchStub(browser) {
       return browser;
     },
   };
+}
+
+/**
+ * `console.log` 을 가로채 배열로 수집 (#1234 — `bootstrapScene` 이 `[boot]` 계측 2줄을 찍는다).
+ *
+ * `captureWarnings` 와 같은 이유: 테스트 러너 출력 오염 방지 + 찍힌 내용 자체를 단언 대상으로 삼기.
+ */
+async function captureLogs(fn) {
+  const original = console.log;
+  const lines = [];
+  console.log = (msg) => lines.push(String(msg));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines;
 }
 
 /** `console.warn` 을 가로채 배열로 수집 (테스트 출력 오염 방지). */
@@ -324,7 +374,10 @@ await run('collectConsoleErrors — errors 배열 주입 시 이어담기', () =
 // --- bootstrapScene -------------------------------------------------------
 await run('bootstrapScene — baseUrl + 기본 쿼리로 이동', async () => {
   const page = stubPage();
-  const url = await bootstrapScene(page, { baseUrl: 'http://localhost:3002' });
+  let url;
+  await captureLogs(async () => {
+    url = await bootstrapScene(page, { baseUrl: 'http://localhost:3002' });
+  });
   assert.equal(url, `http://localhost:3002${DEFAULT_BOOTSTRAP_QUERY}`);
   assert.equal(page.gotoCalls[0].url, url);
   assert.equal(page.gotoCalls[0].opts.waitUntil, 'networkidle');
@@ -332,10 +385,12 @@ await run('bootstrapScene — baseUrl + 기본 쿼리로 이동', async () => {
 
 await run('bootstrapScene — handles 전부 노출돼야 통과하는 술어', async () => {
   const page = stubPage();
-  await bootstrapScene(page, {
-    baseUrl: 'http://x',
-    handles: ['__solarScene', '__simStore'],
-  });
+  await captureLogs(() =>
+    bootstrapScene(page, {
+      baseUrl: 'http://x',
+      handles: ['__solarScene', '__simStore'],
+    }),
+  );
   const { fn, arg } = page.waitForFunctionCalls[0];
   assert.deepEqual(arg, ['__solarScene', '__simStore']);
   // 술어를 브라우저 대신 여기서 실제로 실행 — "하나라도 빠지면 false" 계약 검증.
@@ -355,14 +410,166 @@ await run('bootstrapScene — handles 전부 노출돼야 통과하는 술어', 
 
 await run('bootstrapScene — settleMs 0 이면 waitForTimeout 미호출', async () => {
   const page = stubPage();
-  await bootstrapScene(page, { baseUrl: 'http://x' });
+  await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x' }));
   assert.deepEqual(page.waitForTimeoutCalls, []);
 });
 
 await run('bootstrapScene — settleMs 지정 시 안정화 대기', async () => {
   const page = stubPage();
-  await bootstrapScene(page, { baseUrl: 'http://x', settleMs: 2500 });
+  await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x', settleMs: 2500 }));
   assert.deepEqual(page.waitForTimeoutCalls, [2500]);
+});
+
+// --- bootstrapScene 계측 (#1234 C1) ---------------------------------------
+// 계측은 **진단 전용**이다. 아래 3 케이스가 닫는 것: (1) 두 줄 규약과 JSON 파싱 가능성,
+// (2) 예외 경로에서 원 에러가 그대로 전파되는가 (판정 무변경), (3) 셀 수 없는 축을 `0` 으로
+// 지어내지 않는가. (3) 을 빼면 「ctx 0 / page 0」 이 관측값처럼 보여 다음 단계가 거짓 분포를 읽는다.
+
+/** `[boot] {…}` JSON 줄만 골라 파싱. */
+const bootJsonLines = (lines) =>
+  lines.filter((l) => l.startsWith('[boot] {')).map((l) => JSON.parse(l.slice('[boot] '.length)));
+
+await run('bootstrapScene 계측 — 요약 1줄 + 파싱 가능한 JSON 1줄', async () => {
+  const page = stubPage();
+  const lines = await captureLogs(() =>
+    bootstrapScene(page, { baseUrl: 'http://x', label: 'P1b', handles: ['__solarScene'] }),
+  );
+  const bootLines = lines.filter((l) => l.startsWith('[boot] '));
+  assert.equal(bootLines.length, 2, `[boot] 줄이 2개여야 한다 (실제 ${bootLines.length})`);
+  const [summary] = bootLines;
+  assert.ok(!summary.startsWith('[boot] {'), '첫 줄은 사람이 읽는 요약이어야 한다');
+  assert.match(summary, /P1b/, '요약에 라벨이 없다');
+
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.label, 'P1b');
+  assert.equal(rec.ok, true);
+  assert.equal(rec.failedPhase, null);
+  assert.equal(rec.url, `http://x${DEFAULT_BOOTSTRAP_QUERY}`);
+  assert.ok(typeof rec.seq === 'number' && rec.seq > 0, 'seq 미기록');
+  assert.ok(typeof rec.gotoMs === 'number', 'gotoMs 미기록');
+  assert.ok(typeof rec.handlesMs === 'number', 'handlesMs 미기록');
+  assert.ok(typeof rec.totalMs === 'number', 'totalMs 미기록');
+  assert.ok(typeof rec.processUptimeS === 'number', 'processUptimeS 미기록');
+});
+
+await run('bootstrapScene 계측 — 핸들 대기 실패 시 원 에러 전파 + 실패 단계 기록', async () => {
+  const page = stubPage();
+  const boom = new Error('Timeout 20000ms exceeded.');
+  boom.name = 'TimeoutError';
+  page.waitForFunction = async () => {
+    throw boom;
+  };
+  let caught = null;
+  const lines = await captureLogs(async () => {
+    try {
+      // 실패 경로는 dev server probe 를 돈다 — 즉시 connection refused 가 나는 주소를 쓴다
+      // (DNS 조회가 걸리는 호스트를 쓰면 테스트가 네트워크 상태에 종속된다).
+      await bootstrapScene(page, { baseUrl: 'http://127.0.0.1:1', label: 'P1' });
+    } catch (e) {
+      caught = e;
+    }
+  });
+  // 계측이 예외를 삼키거나 감싸면 호출부의 실패 경로가 바뀐다 — 동일 객체여야 한다.
+  assert.equal(caught, boom, '원 에러가 그대로 전파되지 않았다');
+
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.ok, false);
+  assert.equal(rec.failedPhase, 'handles');
+  assert.match(rec.error, /TimeoutError/);
+  // 완주 소요 필드는 완주한 구간만 채운다 — 실패 구간에 타임아웃 상수가 섞이면 분포가 오염된다.
+  assert.equal(rec.handlesMs, null, '완주하지 못한 구간이 완주 소요로 기록됐다');
+  assert.ok(typeof rec.failedPhaseMs === 'number', '실패 구간 소비 시간이 유실됐다');
+  assert.ok(typeof rec.gotoMs === 'number', '앞 구간(goto) 소요는 남아야 한다');
+  assert.deepEqual(
+    rec.consoleErrors,
+    [],
+    '실패 시 콘솔 에러 수집본이 있어야 한다 (0건이면 빈 배열)',
+  );
+  assert.ok(rec.state !== null, '실패 시 페이지 상태 probe 결과가 있어야 한다');
+  // 「서버가 느린가 / 페이지가 멈췄나」를 가르는 축 — 실패 경로에서 비어 있으면 안 된다.
+  assert.ok(typeof rec.server?.ms === 'number', '실패 시 dev server probe 결과가 없다');
+});
+
+await run('bootstrapScene 계측 — page 계수 불가 시 0 이 아니라 null', async () => {
+  // 스텁에는 `context()` 가 없다 = 「셀 수 없음」. 이 케이스가 `0` 으로 기록되면
+  // 「열린 페이지 0개」 라는 관측값과 구분되지 않는다.
+  const page = stubPage();
+  const lines = await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x' }));
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.pages, null);
+  assert.equal(rec.contexts, null);
+  assert.ok(
+    typeof rec.countError === 'string' && rec.countError.length > 0,
+    '계수 실패 사유 미기록',
+  );
+});
+
+// --- bootstrapScene 단계 계측 (#1234 C2-H3) --------------------------------
+// C1 이 좁힌 곳은 「`__simCore` 는 있고 `__solarScene` 만 없다」 까지였다. 그 안쪽을 가르는 것이
+// `window.__bootPhases` 이고, 아래 3 케이스가 닫는 것: (1) 성공 표본에도 실린다 (실패만 있으면
+// 기준선이 없다), (2) 실패 표본에서 **멈춘 지점**이 남는다, (3) probe 가 깨져도 **판정은 불변**.
+
+/** 계측 전역 스냅샷 모양 (apps/web `boot-phases.ts` readBootPhases 반환과 동형). */
+const stubBootPhases = {
+  phases: [
+    { name: 'web:effect-start', chain: 'm1', atMs: 400, deltaMs: 400 },
+    { name: 'engine:webgl2-ctor', chain: 'm1', atMs: 1900, deltaMs: 1500 },
+    { name: 'scene:body-meshes', chain: 'm1', atMs: 2100, deltaMs: 200 },
+  ],
+  dropped: 0,
+  nowMs: 2200,
+};
+
+await run('bootstrapScene 계측 — 성공 표본에도 단계 분포가 실린다', async () => {
+  const page = stubPage({ bootPhases: stubBootPhases });
+  const lines = await captureLogs(() => bootstrapScene(page, { baseUrl: 'http://x' }));
+  const [rec] = bootJsonLines(lines);
+  assert.deepEqual(
+    rec.bootPhases?.phases?.map((p) => p.name),
+    ['web:effect-start', 'engine:webgl2-ctor', 'scene:body-meshes'],
+  );
+  // 이 비용은 totalMs 에 포함되므로 C1 표본과 대조하려면 뺄 수 있어야 한다.
+  assert.ok(typeof rec.phasesProbeMs === 'number', 'phasesProbeMs 미기록');
+  // 요약 줄은 「가장 오래 걸린 구간」을 먼저 보여야 한다 — 로그를 훑는 사람의 첫 물음이다.
+  const [summary] = lines.filter((l) => l.startsWith('[boot] '));
+  assert.match(summary, /engine:webgl2-ctor\(m1\) 1500ms/, '요약에 최장 구간이 없다');
+});
+
+await run('bootstrapScene 계측 — 실패 표본에 멈춘 지점이 남는다', async () => {
+  const page = stubPage({ bootPhases: stubBootPhases });
+  const boom = new Error('Timeout 20000ms exceeded.');
+  boom.name = 'TimeoutError';
+  page.waitForFunction = async () => {
+    throw boom;
+  };
+  const lines = await captureLogs(async () => {
+    await bootstrapScene(page, { baseUrl: 'http://127.0.0.1:1' }).catch(() => {});
+  });
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.ok, false);
+  assert.equal(
+    rec.bootPhases?.phases?.at(-1)?.name,
+    'scene:body-meshes',
+    '실패 시 마지막 구간이 없으면 「어디까지 갔나」를 못 읽는다',
+  );
+  // state 와 같이 읽히는 축 — 한쪽만 남으면 「구축 내부」까지만 좁히고 멈춘 C1 상태로 되돌아간다.
+  assert.equal(rec.state?.solarScene, 'undefined');
+});
+
+await run('bootstrapScene 계측 — 단계 probe 가 깨져도 판정 불변', async () => {
+  // 진단이 판정을 바꾸는 것이 최악이다 (계측 PR 이 가드를 흔들면 측정 자체가 무효).
+  const page = stubPage({ evaluateError: new Error('Execution context was destroyed') });
+  let url;
+  const lines = await captureLogs(async () => {
+    url = await bootstrapScene(page, { baseUrl: 'http://x' });
+  });
+  assert.equal(url, `http://x${DEFAULT_BOOTSTRAP_QUERY}`, 'probe 실패가 성공 경로를 바꿨다');
+  const [rec] = bootJsonLines(lines);
+  assert.equal(rec.ok, true);
+  assert.ok(
+    typeof rec.bootPhases?.phasesError === 'string',
+    'probe 실패 사유가 조용히 사라졌다 (null 과 구분 불가)',
+  );
 });
 
 // --- saveCapture ----------------------------------------------------------

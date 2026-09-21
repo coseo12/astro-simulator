@@ -243,7 +243,14 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
   const BODY = renderScaleForTier('body'); // 2.51e-5
   const PLANET_BODY_BOUNDARY_AU = 0.1; // tierFromFocus planet body↔inner 경계 (AU)
 
-  /** Animation spy 에서 'tier-transition-radius' 애니메이션의 목표 radius(arg[6]) 추출. */
+  /**
+   * Animation spy 에서 'tier-transition-radius' 애니메이션의 목표 radius(arg[6]) 추출.
+   *
+   * #1232 — `preserveFocusDistance: false` (focus-entry tween) 경로 전용. `true` 경로는 tween 을
+   * 만들지 않고 `camera.radius = targetRadius` 를 즉시 대입하므로 (ADR 380 §Amendment 3 A3.5-1)
+   * 그쪽 3건은 `camera.radius` 를 단언한다 — 단언하는 불변식 (실거리 보존 / < 0.1 AU / floor ≤ target)
+   * 은 그대로다.
+   */
   function capturedTargetRadius(): number {
     const spy = vi.mocked(Animation.CreateAndStartAnimation);
     const call = spy.mock.calls.find((c) => c[0] === 'tier-transition-radius');
@@ -271,11 +278,11 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
     cleanup();
 
     const expectedTarget = computeTargetRadius(22, INNER, BODY); // ≈ 358,571 unit
-    expect(capturedTargetRadius()).toBeCloseTo(expectedTarget, 0);
+    expect(camera.radius).toBeCloseTo(expectedTarget, 0);
     // boundingR × 5.9 (catapult) 이 아님 — 실거리 보존이 수백만 unit catapult 를 회피 (수십배 작다).
     const catapult = JUPITER_BODY_VISUAL_R * Math.sqrt(3) * 5.9; // ≈ 2.54M unit
-    expect(capturedTargetRadius()).toBeLessThan(catapult);
-    expect(catapult / capturedTargetRadius()).toBeGreaterThan(5); // catapult 이 ≥5배 더 멀다
+    expect(camera.radius).toBeLessThan(catapult);
+    expect(catapult / camera.radius).toBeGreaterThan(5); // catapult 이 ≥5배 더 멀다
   });
 
   it('산술 재현: crossing 후 cameraFromFocus < 0.1 AU → body 안정 (역판정 진동 차단)', () => {
@@ -292,7 +299,7 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
     });
     cleanup();
 
-    const target = capturedTargetRadius();
+    const target = camera.radius;
     // crossing 후 카메라-focus 실거리 (m) = target / renderScale_body.
     const cameraFromFocusAU = target / BODY / AU;
     expect(cameraFromFocusAU).toBeLessThan(PLANET_BODY_BOUNDARY_AU); // body 안정 (0.0955 AU)
@@ -352,7 +359,7 @@ describe('#818 runTierTransition — 줌 crossing apparent-size 보존 (preserve
     });
     cleanup();
 
-    const target = capturedTargetRadius();
+    const target = camera.radius;
     expect(camera.lowerRadiusLimit!).toBeGreaterThanOrEqual(JUPITER_BODY_VISUAL_R); // 표면 밖 보장
     expect(camera.lowerRadiusLimit!).toBeLessThanOrEqual(target); // 프레이밍 도달성
   });

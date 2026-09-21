@@ -13,6 +13,7 @@ import {
 } from '@babylonjs/core';
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD, SOLAR_MASS } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import type { BootPhaseHook } from '../engine/boot-phase.js';
 import { positionAt } from '../physics/kepler.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
 import {
@@ -552,6 +553,18 @@ export interface SolarSystemSceneOptions {
    * 프로그램에서 `nightLightStrength = 0` 이라 합성이 정확한 no-op 이다.
    */
   nightLights?: boolean;
+
+  /**
+   * #1234 C2-H3 — 장면 구축 **단계 계측 훅** (계약 SSoT: `../engine/boot-phase.ts`).
+   *
+   * 구간이 **끝날 때마다** 그 구간 이름으로 호출된다. 소요 시간은 소비자가 직전 호출과의
+   * 차로 계산한다 — core 는 시각을 재지 않는다. 미지정이면 호출 0 (도입 전과 같은 경로).
+   *
+   * 본 훅은 `bootstrapScene` 이 기다리는 `window.__solarScene` **노출 이전 구간**을 가르기
+   * 위한 것이다. 장면 구축은 전부 동기라, 여기서 사라지는 시간은 자바스크립트 실행 시간
+   * (mesh·머티리얼 생성 / 궤도 샘플링 / 물리 엔진 빌드) 이다.
+   */
+  onBootPhase?: BootPhaseHook;
 }
 
 /**
@@ -584,7 +597,10 @@ export function createSolarSystemScene(
     selfRotation = false,
     clouds = false,
     nightLights = false,
+    onBootPhase,
   } = options;
+  // #1234 C2-H3 — 구간 종료 통지 (미주입 시 호출 0). 이름은 「방금 끝난 구간」이다.
+  const phase = (name: string): void => onBootPhase?.(name);
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
   const SECONDS_PER_DAY = 86_400;
@@ -593,6 +609,8 @@ export function createSolarSystemScene(
   const bodiesById = new Map(system.bodies.map((b) => [b.id, b]));
   const meshes = new Map<string, Mesh>();
   const disposables: { dispose: () => void }[] = [];
+  // 천체 데이터 로드 (첫 호출이면 JSON 파싱 + 파생값 계산, 이후는 모듈 캐시).
+  phase('scene:system-data');
 
   // P12-A #298 — 활성 tier (ADR §1). 초기값 'solar' (전체 태양계 뷰).
   let activeTier: Tier = defaultInitialTier();
@@ -608,6 +626,8 @@ export function createSolarSystemScene(
     const sf = createStarfield(scene);
     disposables.push({ dispose: () => sf.dispose() });
   }
+  // 별 배경 (전체화면 절차 셰이더 머티리얼 1개). starfield=false 면 빈 구간.
+  phase('scene:starfield');
 
   // 회귀 #372 fix — 행성 그림자측 인지 가능 ambient (AMBIENT_* 상수 SSoT, 단위 테스트 가드).
   // #773 — 절차 표면 셰이더가 이 HemisphericLight 식을 재현하므로 값은 PLANET_LIGHTING 으로도 전달.
@@ -655,6 +675,8 @@ export function createSolarSystemScene(
     // surfaceDetail=true 일 때만 소비된다). clouds 와 독립.
     nightLights,
   };
+  // 광원 (HemisphericLight + PointLight) + 셰이더 광원 상수 묶음.
+  phase('scene:lights');
 
   // 각 바디 메쉬 생성 — Phase A: 생성 시점 tier 의 renderScale 로 실측 직경 계산 (ADR §주석 계약 §2).
   //
@@ -672,6 +694,10 @@ export function createSolarSystemScene(
     );
     meshes.set(body.id, mesh);
   }
+  // body high variant mesh 27개 + 머티리얼 생성. surfaceDetail=true 면 절차 표면
+  // `ShaderMaterial` 과 `/textures/` 마스크 **요청**이 여기서 난다 (로드 완료는 비동기라
+  // 이 구간에 포함되지 않는다 — 텍스처는 `__solarScene` 노출을 막지 않는다).
+  phase('scene:body-meshes');
 
   // #782 §A2 — self-rotation 상태 (rotationPeriodHours 보유 body 만). selfRotation=false 면 빈 Map →
   // updateAt 자전 루프가 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀). ADR §A2.3 결정 5/7.
@@ -696,6 +722,8 @@ export function createSolarSystemScene(
       }
     }
   }
+  // 자전 상태 계산 (rotationPeriodHours 보유 body 한정).
+  phase('scene:self-rotation');
 
   // #1215 §A10.3 · §A10.6 · §A10.9 — 지구 구름 레이어. 유효 조건 `clouds && surfaceDetail` (결정 8).
   // 비활성이면 mesh 미생성 + 정렬 함수 미설치 → 구름 도입 전과 같은 코드 경로 (구조적 no-op).
@@ -740,6 +768,8 @@ export function createSolarSystemScene(
       });
     }
   }
+  // 지구 구름 shell (`clouds && surfaceDetail` 일 때만 mesh + 정렬 키 치환).
+  phase('scene:clouds');
 
   // P11-B #289 — LOD mid/low variant lazy-create 저장소 (ADR 20260424-p11-b §축 4).
   //
@@ -841,6 +871,8 @@ export function createSolarSystemScene(
       disposables.push({ dispose: () => ringAnchor.dispose() });
     }
   }
+  // 고리 (saturn/jupiter/uranus/neptune) — ring shader 머티리얼 + anchor 노드.
+  phase('scene:rings');
 
   // 궤도선 — P12-A: tier 전환 시 재샘플링. 개별 Mesh 대신 LineSystem 하나로 통합해 draw call 감소 (#77).
   //
@@ -967,6 +999,8 @@ export function createSolarSystemScene(
       focusedBodyId === 'earth' ? MOON_ORBIT_COLOR_EARTH_FOCUS : MOON_ORBIT_COLOR_DEFAULT;
   };
   rebuildOrbitLines();
+  // 궤도선 — body 별 샘플링 (혜성 e≥0.6 은 256 seg) + LineSystem 빌드. 정점 수가 가장 많은 구간.
+  phase('scene:orbit-lines');
   disposables.push({
     dispose: () => {
       orbitLines?.dispose();
@@ -1066,6 +1100,8 @@ export function createSolarSystemScene(
   // Kepler 경로: 각 소행성 독립 해석해.
   // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
   let asteroidBelt: AsteroidBeltHandles | null = null;
+  // 위치 버퍼 초기화 (`localPositions`/`worldPositions`) + 태양광 동기 헬퍼 정의.
+  phase('scene:position-buffers');
   if (asteroidBeltN > 0) {
     asteroidBelt = createAsteroidBelt(scene, {
       n: asteroidBeltN,
@@ -1077,6 +1113,8 @@ export function createSolarSystemScene(
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
   }
+  // 소행성대 ThinInstances (`?belt=N` 미지정이면 빈 구간).
+  phase('scene:asteroid-belt');
 
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
@@ -1148,6 +1186,8 @@ export function createSolarSystemScene(
   if (physicsEngine === 'newton' || physicsEngine === 'barnes-hut' || physicsEngine === 'webgpu') {
     buildNewton(initialJulianDate, physicsEngine);
   }
+  // N-body 엔진 빌드 (kepler 경로면 빈 구간. webgpu 경로는 compute 파이프라인 생성 포함).
+  phase('scene:physics-engine');
   disposables.push({ dispose: disposeNewton });
 
   // P12-C #298 — viewMode 필드 + setViewMode API 제거 (단일 모드 전환, #288 연계 close).
@@ -1158,6 +1198,14 @@ export function createSolarSystemScene(
   // scale (mesh scaling / orbit line) 은 여전히 **즉시** 적용 — `radius_old / oldScale == radius_new / newScale`
   // 실거리 보존으로 apparent size 불변 (tier-transition.ts 수식 유도 주석 참조). 입력 500ms 잠금 +
   // visibilitychange resume 으로 UX 안전장치 박제.
+  //
+  // [#1232 — ADR 380 §Amendment 3] 위 300ms interp 는 이제 focus-entry (`preserveFocusDistance=false`)
+  // 경로 한정이다. 줌 crossing (`updateTierByCamera → setTier(_, true)`, free-fly 포함) 은
+  // `runTierTransition` 이 radius 를 **즉시 대입**하고 cleanup 을 **동기 호출**한다 — 아래
+  // `tierTransitionInProgress = true` 는 그 호출 안에서 onComplete 로 다시 false 가 되고,
+  // `pendingTierCleanup` 에는 이미 released 된 (idempotent) cleanup 이 담긴다. 순서상 문제 없음
+  // (lock 을 호출 **전에** 세우므로 onComplete 의 false 가 마지막 쓰기다). 줌 관성 누적기의 tier
+  // 단위 환산 (`rescaleZoomInertiaForTier`) 도 경로 무관하게 그 안에서 한 번 일어난다.
   //
   // N2 권고 반영: 매 tier 전환마다 `scaling.scaleInPlace(ratio)` 누적은 부동소수점 drift 위험.
   // 대신 mesh 가 생성된 **초기 tier** 의 renderScale 기준으로 **절대** scaling 을 계산한다.
@@ -2222,8 +2270,14 @@ export function createSolarSystemScene(
       buildNewton(currentJd, activeEngine);
   };
 
+  // tier/focus/LOD/updateAt 등 클로저 정의 구간 — 정의만 하므로 상시 ~0 이어야 한다.
+  // 0 이 아니게 되면 그 사이에 실행 코드가 들어왔다는 신호다.
+  phase('scene:api-closures');
+
   // 초기 시점 적용
   updateAt(initialJulianDate);
+  // 첫 `updateAt` — 전 body 위치 해석 + mesh/궤도선 좌표 반영 (프레임 경로와 같은 함수).
+  phase('scene:initial-update');
 
   // R4 #539 Amendment 3 — body id → parentId lookup (focus multiplier 분기 입력).
   // sim-canvas syncFocusToScene 의 식 후보 2 적용 SSoT. id 미존재 시 undefined 반환.

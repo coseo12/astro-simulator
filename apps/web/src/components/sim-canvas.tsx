@@ -25,11 +25,19 @@ import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
+// #1234 C3-B — renderer 문자열 합성 + late-arrival 판정 (CI 미도달 분기라 순수 함수 + 단위 테스트).
+import {
+  isLateSoftwareRendererArrival,
+  resolveRendererString,
+} from '@/core/resolve-renderer-string';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
+// #1234 C2-H3 — 부팅 단계 계측 (dev 전용 기록기. prod 에서는 호출이 즉시 반환하고
+// `window.__bootPhases` 는 정의되지 않는다 — boot-phases.ts §계약).
+import { markBootPhase, nextBootChain } from '@/core/boot-phases';
 import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -177,15 +185,39 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     if (!canvas) return;
     if (coreRef.current && !coreRef.current.disposed) return;
 
+    // #1234 C2-H3 — 이 effect 의 계측 체인. dev StrictMode 는 초기화를 **두 번** 돌리고 두
+    // 체인이 동시에 진행하므로 (로컬 실측 — 한 페이지에 엔진 2개), 체인을 나눠야 구간 소요가
+    // 남의 체인과의 차로 오염되지 않는다.
+    const bootChain = nextBootChain();
+    const markPhase = (name: string): void => markBootPhase(name, bootChain);
+    // 첫 눈금. `atMs` 가 곧 「문서 네비게이션 → 초기화 effect 진입」 경과라,
+    // 번들 로드/하이드레이션이 느린 것과 장면 구축이 느린 것이 이 값 하나로 갈린다.
+    markPhase('web:effect-start');
+
     // P3-0 #124 — WebGPU capability 감지 (마운트 시 1회). 사용자가 webgpu/auto
     // 엔진을 요청했는데 미지원이면 콘솔 경고 + HUD notice + newton 폴백 안내.
     //
     // #738 Amendment — 단일 Promise 를 두 async chain (capability 감지 / scene 생성) 이 공유한다.
     // GPU tier 는 이 then 에서 LOD 강제/알림에 쓰이고, scene 콜백은 WebGPU adapterInfo (별 배경
-    // 소프트웨어 렌더 보조 감지 — #745) 등에 gpuCap 을 쓴다. 두 경로가 별개로 detectGpuCapability()
-    // 를 호출하면 adapter 요청이 2회 발생 + 결과 비결정 (race) → 동일 Promise 공유로 SSoT 1회
-    // (#677 race 윈도우 차단).
-    const gpuCapPromise = gpuApi.detectGpuCapability();
+    // 소프트웨어 렌더 보조 감지 — #745) 를 **2순위 폴백**으로 쓴다. 두 경로가 별개로
+    // detectGpuCapability() 를 호출하면 adapter 요청이 2회 발생 + 결과 비결정 (race) → 동일
+    // Promise 공유로 SSoT 1회 (#677 race 윈도우 차단).
+    //
+    // #1234 C3-B — **공유는 유지하되 「대기」를 끊는다.** 아래 scene 체인은 이 Promise 의 settle
+    // 을 더 이상 기다리지 않고 `gpuCapSnapshot` 을 **그 시점 값**으로 읽는다 (§C3-B 주석 참조).
+    //
+    // #1234 C2 2단계 — 계측 훅 주입. 실패 표본이 `web:effect-start` 다음에서 20 초를 넘겼고,
+    // 그 사이 코드가 이 호출 하나다. 훅이 없으면 「requestAdapter 호출 전」/「호출했고 미결」/
+    // 「settle 했는데 그 뒤가 느림」이 **같은 스냅샷** (마크 부재) 으로 보인다.
+    // `markPhase` 는 prod 에서 즉시 반환하는 no-op 이라 조건 분기 없이 상시 전달한다.
+    const gpuCapPromise = gpuApi.detectGpuCapability(markPhase);
+
+    // #1234 C3-B — 「지금까지 알려진 capability」. `null` = 아직 안 왔다.
+    // scene 체인이 **대기 대신 조회**하는 창구이며, 아래 `gpuCapPromise.then` 이 채운다.
+    let gpuCapSnapshot: Awaited<typeof gpuCapPromise> | null = null;
+    // scene 구축 시 확정한 renderer 문자열. `undefined` = 아직 구축 전 / `null` = 구축했는데
+    // 1순위(WebGL UNMASKED)도 2순위(adapterInfo)도 비어 있었다. late-arrival 판정에 쓴다.
+    let sceneRendererString: string | null | undefined;
 
     // #738 — GPU tier 판정 SSoT (URL ?gpu= override > detectGpuTier 자동 감지). LOD 강제/알림용.
     // (#745 부터 별 배경 비활성은 tier 가 아닌 소프트웨어 렌더 감지 기준 — resolveGpuTier 와 무관.)
@@ -201,6 +233,31 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     };
 
     gpuCapPromise.then((cap) => {
+      // #1234 C2-H3 — `detectGpuCapability()` (내부에서 `navigator.gpu.requestAdapter()`) 종료.
+      // 기존 체인 **안쪽**에 둔다 — 새 `.then` 을 달면 거부 시 unhandled rejection 이 새로 생긴다.
+      markPhase('web:gpu-capability');
+      // #1234 cross-validate — 언마운트 뒤 도착분 차단. 상한이 걸리면 이 콜백이 최대 12 s 늦게
+      // 오는데, `useSimStore` 는 전역이라 **폐기된 마운트의 결과가 살아있는 마운트의 알림을
+      // 덮어쓴다** (dev StrictMode 이중 마운트의 첫 체인이 정확히 이 경우다). `instance.start()`
+      // 체인의 `if (cancelled …) return` (`:407`) 과 같은 계약을 이 체인에도 건다.
+      // 마크는 **위에서** 이미 남겼다 — 진단은 취소된 체인에서도 남아야 원인이 보인다.
+      if (cancelled) return;
+      // #1234 C3-B — scene 체인의 조회 창구를 채운다. 마크보다 **뒤**에 두면 안 된다는 제약은
+      // 없으나, 이 대입이 실패할 수 없는 한 줄이라 진단 마크 바로 뒤가 읽기 좋다.
+      gpuCapSnapshot = cap;
+      // late-arrival — scene 이 **이미** 구축됐고 그때 renderer 문자열을 **아무 소스에서도**
+      // 못 얻었다면 (`sceneRendererString === null`), 지금 도착한 2순위가 판정을 뒤집었을 수
+      // 있다. 자동 되돌림은 하지 않는다 (별 배경 mesh 를 뒤늦게 dispose 하는 것이 fill-rate
+      // 비용보다 위험하다 — #745 는 과잉 비활성 회귀가 원래 문제였다). 대신 **조용히 지나가지
+      // 않게** 경고 + 마크를 남겨 진단 가능하게 둔다.
+      if (isLateSoftwareRendererArrival(sceneRendererString, cap.adapterInfo?.description)) {
+        markPhase('web:gpu-capability-late-software');
+        console.warn(
+          '[gpu] 소프트웨어 렌더 보조 감지가 장면 구축 뒤에 도착 — 별 배경 비활성(#745)이 이번 ' +
+            '세션에는 반영되지 않았습니다.',
+          cap.adapterInfo?.description,
+        );
+      }
       const requested = useSimStore.getState().physicsEngine;
       const wantsGpu = requested === 'webgpu' || requested === 'auto';
       if (!cap.webgpu) {
@@ -278,7 +335,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       }
     });
 
-    const instance = new SimulationCore(canvas);
+    // #1234 C2-H3 — 엔진/어댑터 구간 계측 훅 주입. `markBootPhase` 는 prod 에서 즉시 반환하는
+    // no-op 이라 (boot-phases.ts §계약) 조건 분기 없이 상시 전달한다.
+    const instance = new SimulationCore(canvas, { onBootPhase: markPhase });
     // Babylon이 기본 tabindex=1을 설정 — a11y(WCAG 2.4.3) 권고상 양수 금지.
     // 아래 `canvasTabIndex` 지정과 **이중 방어** — 여기 setAttribute 만으로는 engine 기동 전
     // 초기값만 잡는다 (실제 되돌림은 InputManager 가 한다. 상세는 아래 주석).
@@ -310,13 +369,47 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     let unsubEngine: (() => void) | null = null;
     // #704 — free-fly 감도 zoom/zoomoutFactor push 구독 해제 핸들 (cleanup 에서 호출).
     let unsubSensitivity: (() => void) | null = null;
-    // #738 — scene 생성을 GPU capability 와 함께 await (Promise.all). createSolarSystemScene 의
-    // starfield 옵션은 GPU 환경에 의존 (#745: 소프트웨어 렌더면 fill-rate graceful degradation
-    // 으로 스킵 — WebGPU adapterInfo 보조 감지에 gpuCap 필요)하므로 scene 콜백 진입 시점에 gpuCap
-    // 이 확정돼야 한다. instance.start() 만 await 하면 capability 가 아직 미해결일 수 있어 race
-    // (#677 윈도우). Promise.all 로 둘 다 동기 사용 가능.
-    Promise.all([instance.start(), gpuCapPromise])
-      .then(([, gpuCap]) => {
+    // #738 — createSolarSystemScene 의 starfield 옵션은 GPU 환경에 의존한다 (#745: 소프트웨어
+    // 렌더면 fill-rate graceful degradation 으로 스킵).
+    //
+    // #1234 C3-B — **주석 계약 갱신.** 도입 당시 이 자리는 `Promise.all([instance.start(),
+    // gpuCapPromise])` 였고 주석은 「scene 콜백 진입 시점에 gpuCap 이 확정돼야 한다」고 선언했다.
+    // 그 선언이 본 이슈의 증상을 만들었다: `detectGpuCapability()` 안의 `requestAdapter()` 가
+    // 미결이면 **장면 구축 전체가 그것을 기다려** `__solarScene` 이 영영 노출되지 않는다.
+    //
+    // 실제 의존은 그 선언보다 훨씬 약하다 [직접 재확인 — 아래 `rendererString` 산출부]:
+    // scene 체인이 `gpuCap` 에서 읽는 것은 **`adapterInfo?.description` 한 필드**이고, 그것도
+    // **2순위 폴백**이다 (1순위는 동기 `extractWebglRendererString()`). 그래서 계약을 이렇게
+    // 바꾼다 — **scene 체인은 gpuCap 의 settle 을 기다리지 않는다. 그 시점까지 도착한 값을
+    // `gpuCapSnapshot` 으로 읽고, 안 왔으면 1순위만으로 판정한다.**
+    //
+    // 늦게 도착할 때의 동작:
+    //  - 1순위가 값을 줬다 (CI swiftshader 포함 — 실측 96/96 에서 `adapterInfo` 는 애초에
+    //    `undefined` 였다) → 2순위는 **원래 안 읽힌다**. 동작 변화 0.
+    //  - 1순위가 `null` 이었다 → `detectSoftwareRenderer(null) === false` = 별 표시 유지. 이는
+    //    #745 가 이미 못박은 **보수적 기본값**이지 새 동작이 아니다. 뒤늦게 도착한 2순위가 이
+    //    판정을 뒤집었을 경우에만 위 `gpuCapPromise.then` 이 경고 + 마크를 남긴다.
+    //
+    // #677 race 윈도우는 재발하지 않는다. **근거는 `Promise.all` 도, 단일 Promise 공유도
+    // 아니다** (#1238 리뷰 R5 — 그렇게 적었던 것의 정정. 단일 공유가 막는 것은 「어댑터 2회
+    // 호출 / 결과 비결정」이라는 **다른 축**이고, 그건 그대로 유지된다 —
+    // `detectGpuCapability()` 는 여전히 마운트당 1회다).
+    //
+    // #677 이 막는 것은 **순서 race** 다 — capability `.then` 과 handler 등록 중 어느 쪽이
+    // 먼저 끝나는지가 비결정적이라는 것. 그걸 실제로 덮는 것은 #677 fix 의 **2중 경로**다
+    // (위 tier-c 분기: `__gpuTierForceLod` 플래그 + `coreRef.current?.command(...)`). 두 순서가
+    // 모두 덮인다 — capability 가 먼저면 command 가 no-op 이고 아래 `resolveLodWithTierForce`
+    // 가 **매 진입마다** 플래그를 재참조해 적용하며, handler 가 먼저면 command 가 먹는다
+    // (`coreRef.current = instance` 는 `:351` 의 **동기** 대입이라 그 시점 이후 항상 유효하다).
+    // ⚠️ 그래서 그 2중 경로는 **중복이 아니다**. 한쪽을 지우면 #677 이 재발한다.
+    // 회귀 가드: `browser-verify-glow-marker.mjs` 축 6.
+    instance
+      .start()
+      .then(() => {
+        // #1234 C2-H3 — 엔진 기동이 끝난 시점. C3-B 이후로는 GPU capability 를 **더 이상 기다리지
+        // 않으므로** 이 구간은 엔진 기동 하나만 잰다 (도입 시점의 「둘 중 늦은 쪽」이 아니다).
+        // capability 가 언제 왔는지는 `web:gpu-capability` 의 `atMs` 로 따로 읽는다.
+        markPhase('web:start-awaited');
         if (cancelled || !instance.scene) return;
         // #848 — 위 `setAttribute('tabindex','0')` 의 **주석 계약 drift 정정**.
         //
@@ -395,6 +488,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // camera dispose 시 WASD observer/blur 리스너 해제 (HMR/StrictMode 재마운트 누수 방지 —
         // #693 contextmenu handler onDisposeObservable 선례).
         camera.onDisposeObservable.add(() => wasdControl.detach());
+        // #1234 C2-H3 — 로그 깊이 활성 + 카메라/컨트롤러/WASD 배선까지.
+        markPhase('web:camera-setup');
         // #699 — free-fly 줌아웃 상한 (허공 대체 처리 — ADR §5-3). 진입 시 강제 줌아웃(#631) 대신
         // 사용자가 줌아웃할 때 빈 공간 도달 직전에서 멈춘다.
         //
@@ -507,10 +602,20 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // + WebGL2 하드웨어 무구분) 로 잡아 하드웨어 가속 PC 에서도 별이 사라지는 과잉 비활성 회귀 →
         // 진짜 기준인 소프트웨어 렌더로 정정. renderer 추출: WebGL UNMASKED 1차/주 (CI swiftshader 확실
         // 감지 — fps 무회귀 핵심 제약) + WebGPU adapterInfo.description 보조 OR (빈 {} 라 신뢰 낮음).
-        // 결정식 SSoT = resolveStarfieldVisible + detectSoftwareRenderer (단위 테스트 가드).
-        const rendererString =
-          extractWebglRendererString() ?? gpuCap.adapterInfo?.description ?? null;
+        // 결정식 SSoT = resolveRendererString + resolveStarfieldVisible + detectSoftwareRenderer
+        // (셋 다 순수 함수 + 단위 테스트 가드 — #1234 C3-B 에서 첫 항목이 추가됐다).
+        // #1234 C3-B — 2순위는 `gpuCap`(대기 결과) 이 아니라 `gpuCapSnapshot`(그 시점 도착분)
+        // 이다. 아직 안 왔으면 `null` 로 떨어지고, 그 결말은 #745 가 못박은 보수적 기본값
+        // (= 별 표시 유지) 이다. 합성식이 순수 함수인 이유는 **이 분기가 CI 에서 도달하지
+        // 않기 때문**이다 (swiftshader 는 1순위가 항상 값을 준다) — `resolve-renderer-string.ts`
+        // §왜 순수 함수로 빼는가. `sceneRendererString` 은 late-arrival 판정용 기록.
+        const rendererString = resolveRendererString(extractWebglRendererString(), gpuCapSnapshot);
+        sceneRendererString = rendererString;
         const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
+        // #1234 C2-H3 — `extractWebglRendererString()` 은 UNMASKED_RENDERER 를 읽으려고 **별도
+        // WebGL 컨텍스트를 하나 더 만든다**. 엔진 컨텍스트 생성과 같은 자원을 쓰므로 이 구간을
+        // 엔진 구간과 따로 재지 않으면 둘이 한 덩어리로 뭉친다.
+        markPhase('web:renderer-detect');
         const starfieldVisible = resolveStarfieldVisible(starsParamVisible, !isSoftwareRenderer);
         // #756 — 절차적 행성 표면 셰이더 기본 ON + `?surface=off` 옵트아웃 (ADR 20260628-756 §결정 4).
         // starfield 와 달리 전체화면 fill 이 아닌 body 표면만 → tier-c 는 forceOverride:'low' 가
@@ -550,7 +655,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           value: isSoftwareRenderer,
           writable: false,
         });
+        // #1234 C2-H3 — 카메라 셋업 + free-fly 배선 + URL 파라미터 파싱까지의 동기 구간.
+        markPhase('web:scene-preamble');
         const solar = sceneApi.createSolarSystemScene(instance.scene, {
+          // #1234 C2-H3 — 장면 구축 내부 세분 (scene:* 마크). prod no-op.
+          onBootPhase: markPhase,
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
@@ -622,6 +731,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             configurable: true,
             value: solar,
             writable: false,
+          });
+          // #1234 C2-H3 — `bootstrapScene` 의 핸들 대기가 풀리는 바로 그 시점.
+          // 이 마크가 없으면 부팅이 여기까지 온 것이고, 있으면 20 s 는 다른 데서 샜다.
+          markPhase('web:solar-scene-exposed');
+          // 장면 생성 **이후** 첫 프레임. 셰이더 컴파일·텍스처 업로드가 여기서 처음 강제된다
+          // (`__solarScene` 노출 이후라 핸들 대기에는 포함되지 않는 구간 — 그래도 남겨 두면
+          // 「부팅은 빨랐는데 첫 그림이 늦다」를 같은 축에서 읽는다). 관측만 하는 addOnce 라
+          // 렌더 결과에는 관여하지 않는다.
+          instance.scene?.onAfterRenderObservable.addOnce(() => {
+            markPhase('web:first-frame-after-scene');
           });
         }
 
