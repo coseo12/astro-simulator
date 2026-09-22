@@ -10,9 +10,9 @@
  *   node apps/web/scripts/browser-verify-379-lod.mjs --json           # JSON 결과만 (CI artifact)
  *   node apps/web/scripts/browser-verify-379-lod.mjs --update          # baseline 업데이트
  *
- * 검증 매트릭스:
- *  - 시나리오 A: T1 default (모바일 3 viewport × DPR 1/2 + 데스크톱 2 viewport × DPR 1/2 = 10 cell)
- *      → DoD: sun=high 100%, billboard fallback 비율 ≤ 95% (sub-pixel asteroid 제외)
+ * 검증 매트릭스 (viewport 정본은 아래 `SCENARIO_A_VIEWPORTS` 배열 — 주석에 계수를 두지 않는다):
+ *  - 시나리오 A: T1 default 모바일/데스크톱 viewport × DPR 1/2 매트릭스
+ *      → DoD: sun=high 100%, billboard fallback 비율 ≤ `SCENARIO_A_DOD.maxLowRatio`
  *  - 시나리오 B: T3 body focus (지구 / 화성 focus 진입) → focus body=high 보장
  *  - 시나리오 C: asteroid belt sub-pixel scenario (T1 solar 뷰에서 asteroid low billboard 유지)
  *
@@ -21,6 +21,34 @@
  *
  * 환경변수:
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * ## CI 배선 ([#1207](https://github.com/coseo12/astro-simulator/issues/1207))
+ *
+ * `ci.yml` `detect-and-test` 의 브라우저 회귀 가드 구간에 상시 배선돼 있다 (`verify:379-lod`).
+ * 도입(#379 / PR #390) 이래 **CI 호출 0 건**이었고, 도입 PR 본문의 *"CI 통합은 별도 follow-up"*
+ * 이 집행되지 않은 채 남아 있었다. 어느 워크플로에 거는가의 판단 기준은
+ * [`docs/ops/browser-verify-helpers.md`](../../../docs/ops/browser-verify-helpers.md) §CI 배선 이
+ * 정본이다 — 본 가드의 판정량은 픽셀이 아니라 **LOD 레벨 분포 + 화면 반지름(px)** 이다.
+ *
+ * ## 판별력 실측 (#1207, 2026-09-22 · rev `1c1254e` · 로컬 dev 서버 headless)
+ *
+ * 「가드가 있다 ≠ 그 가드가 작동한다」([#1123](https://github.com/coseo12/astro-simulator/issues/1123))
+ * 차단을 위해 **앱(`packages/core`)에 변이를 주입**해 시나리오별로 독립 FAIL 을 실증했다.
+ * 무주입 대조군은 주입 전·후 모두 `exit 0` (3중 시뮬: positive → negative → recovery).
+ *
+ * | 변이 (주입 대상 = 앱) | 발화 지점 | 결과 |
+ * | --- | --- | --- |
+ * | `screenCoverageRadius` edge offset 축을 #379 fix 이전(cameraRight)으로 되돌림 | A `sunHighRatio` 7/8 | `exit 1` |
+ * | `lodFromScreenCoverage` 의 focus 강제 high 를 `'low'` 로 반전 | B 2/2 FAIL | `exit 1` |
+ * | 픽셀 경계 최하단 반환을 `'high'` 로 | C `high=28 > 5` | `exit 1` |
+ * | 픽셀 에스컬레이션 제거 (전부 `'low'`) | A `maxLowRatio` 100% > 96% | `exit 1` |
+ * | **focus 강제 high 분기를 *삭제*** | — | **`exit 0` — 미검출** |
+ *
+ * ⚠️ **마지막 행이 본 가드의 알려진 사각이다.** focus 진입 거리에서 지구/화성의 coverage 는
+ * 이미 `LOD_PIXEL_THRESHOLDS.high` 를 넘으므로(실측 `74.7px` / `73.9px`) 픽셀 경로가 같은 답을
+ * 낸다 — 시나리오 B 는 focus 강제 분기의 *반전*은 잡고 *제거*는 못 잡는다. 그 대역은
+ * `lod.test.ts` 의 단위 테스트가 순수 함수 수준에서 담당한다.
  */
 
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
@@ -57,9 +85,29 @@ const SCENARIO_A_VIEWPORTS = [
 const SCENARIO_A_DOD = Object.freeze({
   // sun=high 비율 (모든 cell 에서 sun 이 high LOD 인지)
   sunHighRatio: 1.0, // = 100% (변경 시 ADR §재검토 트리거)
-  // billboard fallback 비율 임계 — 24 body 중 low 가 25 미만 (sub-pixel asteroid 제외 ≈ 23 → ≤ 95%)
-  // 본 가드는 "sun 만 high 였던 fix 전" 회귀를 막는 것이 1차 목적.
+  // billboard fallback 비율 천장. 본 가드는 "sun 만 high 였던 fix 전" 회귀를 막는 것이 1차 목적.
   // mercury/venus mid 진입은 #385 라운드 3 영역 (architect ADR §재검토 #4).
+  //
+  // ── 여유 실측 (#1207, 2026-09-22 · rev `1c1254e` · 로컬 dev 서버 headless · N = 6) ──
+  // 무주입 `maxLowRatio` = **`0.875` 6/6 회 동일** (8 cell 전건도 run 간 바이트 동일 — 분산 0).
+  //   여유 `0.96 − 0.875 = 0.085` (32 body 기준 `2.7` body 분).
+  // ⚠️ 착수 시 인계된 *"여유가 `0.002` 뿐"* 은 **`__baselines__/lod-379.json` (2026-05-02, 24 body)
+  //   의 기록값 `0.9583`** 이지 현행 측정치가 아니었다. 그 사이 R-Phase 누적으로 body 가
+  //   `24 → 32` 로 늘고 고DPR cell 의 mid 진입이 늘어 분모·분자가 함께 이동했다.
+  //   ⇒ #1209 규약의 **재도출 조건 미발동**이라 임계를 **바꾸지 않는다** (새 임계 `0`).
+  //
+  // ── 임계 배치 (관측 3 점) ──
+  //   건강 `0.875`  <  **임계 `0.96`**  <  픽셀 에스컬레이션 제거 변이 `1.000`
+  //   가장 가까운 결함은 「sun 만 high」(`high=1 / low=31` → `0.96875`) 로 여유가 `0.00875` 뿐이다.
+  //   그 상태는 형제 다리 `sunHighRatio` 가 **먼저** 잡으므로 본 다리는 그 경우의 이중 방어다.
+  //   본 다리 단독 발화는 위 변이가 실증한다 (스크립트 헤더 §판별력 실측).
+  //
+  // ── 재검토 트리거 (접촉 기준 — CLAUDE.md §`deferred:no-incident` 수명주기 와 같은 관례) ──
+  //   판정량이 **비율**이라 body 총수에 종속된다. high+mid 가 지금처럼 `4` 로 고정된 채 low 만
+  //   늘면 `low / total` 은 `1` 로 단조 수렴하므로, total 이 `100` 을 넘는 시점부터 건강 상태가
+  //   천장을 넘어 **거짓 발화**한다 (지금 `32`). ⇒ **body 를 추가하는 R-Phase 에서 본 가드를
+  //   건드릴 때** 무주입 분포를 재측정하고 이 각주를 갱신한다. 완화는 silent 금지
+  //   ([guard-design-principles](../../../docs/lessons/guard-design-principles.md) §2).
   maxLowRatio: 0.96,
 });
 

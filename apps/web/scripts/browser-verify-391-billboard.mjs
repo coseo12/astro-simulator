@@ -21,6 +21,38 @@
  *
  * 환경변수:
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * ## CI 배선 ([#1207](https://github.com/coseo12/astro-simulator/issues/1207))
+ *
+ * `ci.yml` `detect-and-test` 의 브라우저 회귀 가드 구간에 상시 배선돼 있다 (`verify:391-billboard`).
+ * 도입(#391 / PR #394) 이래 CI 호출 `0` 건이었고, **배선 의도가 표명된 적도 없다** (도입 PR 본문에
+ * CI 토큰 hit `0`, 「수동 도구로 명시」된 문장도 없음). 그래서 배선 근거는 의도가 아니라
+ * **비어 있는 대역**이다 — 단위 테스트 `lod-billboard-alpha-mask.test.ts` 는 순수 함수(4px 경계)만
+ * 재고, 시나리오 E (공유 DynamicTexture 단일성 = per-body 복제 회귀) 와 시나리오 D (`runLodPass`
+ * 의 토글이 실제 material 까지 반영되는가) 는 CI 어디에도 없었다.
+ * 어느 워크플로에 거는가의 판단 기준은
+ * [`docs/ops/browser-verify-helpers.md`](../../../docs/ops/browser-verify-helpers.md) §CI 배선 이
+ * 정본이다 — 본 가드의 판정량은 픽셀이 아니라 **material 상태 + pxDiameter** 다.
+ *
+ * ## 판별력 실측 (#1207, 2026-09-22 · rev `1c1254e` · 로컬 dev 서버 headless)
+ *
+ * 앱(`packages/core`)에 변이를 주입해 시나리오별 독립 FAIL 을 실증했다. 무주입 대조군은 주입
+ * 전·후 모두 `exit 0` (3중 시뮬: positive → negative → recovery).
+ *
+ * | 변이 (주입 대상 = 앱) | 발화 지점 | 결과 |
+ * | --- | --- | --- |
+ * | `getOrCreateBillboardAlphaMask` 의 공유 캐시 조회 제거 (per-body 생성) | E `opacityTexture` 고유 인스턴스 `1 → 30` | `exit 1` |
+ * | `shouldApplyBillboardAlphaMask` 를 상시 `false` 로 | D cell `8/8 → 4/8` | `exit 1` |
+ *
+ * ⚠️ **D 의 판별력은 `level === 'mid'` cell 에서만 나온다.** `level === 'low'` cell 은 #675 glow
+ * marker 가 `wantsMask = glow.active || shouldApply…` 로 mask 를 **강제 유지**하므로 위 변이에도
+ * 통과한다 (실측 — 변이판에서 low cell 4 개는 `mask=true` 로 PASS). 8 cell 매트릭스를 줄이면
+ * 이 축이 죽으므로 축소하지 말 것.
+ *
+ * ⚠️ 알려진 사각 — 매트릭스 전 cell 에서 `pxDiameter ≥ 4px` 라 **`fallback 진입 cell = 0`** 이다
+ * (실측). 즉 시나리오 D 는 4px 미만의 사각형 fallback 쪽 분기를 한 번도 밟지 않는다. 그 경계는
+ * `lod-billboard-alpha-mask.test.ts` 의 `3.9 / 4.1px` 단위 테스트가 담당한다.
  */
 
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
