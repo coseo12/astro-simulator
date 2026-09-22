@@ -23,6 +23,11 @@ name: branch-cleanup
 # 즉 본 파일이 develop 에 머지되어도 실행되지 않고, **다음 릴리스 PR 이 main 에 닿은 뒤**부터
 # 스케줄이 돈다. `pull_request` 계열(auto-close-issues.yml 등)과 달리 도입 PR 자신의 머지로는
 # 실발동을 검증할 수 없다 — 도입 PR 단계의 증거는 로직 단위 테스트 + 로컬 dry-run 이다.
+#
+# ⚠ **첫 실발동이 곧 첫 실삭제다** (PR #1248 reviewer R5). 위 함정 때문에 도입 PR 에서는 발동
+# 관측이 0 이고, main 에 닿은 뒤 첫 `schedule` 이 곧바로 APPLY 다. 그래서 **main 반영 직후
+# `workflow_dispatch` 를 `apply=false`(기본 dry-run) 로 1회 돌려 목록을 눈으로 확인**한 뒤
+# 주간 스케줄에 맡긴다. 리허설 1회의 비용이 되돌리기 어려운 삭제보다 싸다.
 
 on:
   schedule:

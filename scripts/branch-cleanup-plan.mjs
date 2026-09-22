@@ -16,11 +16,32 @@
  * ## 삭제 술어 (한 줄)
  *
  *   삭제 = (같은 저장소의 **머지된** PR 이 그 브랜치를 head 로 가짐)
+ *          ∧ (**브랜치의 현재 sha 가 그 PR 이 머지한 head sha 와 같음**)
  *          ∧ (열린 PR 없음) ∧ (상태 미상 PR 없음)
  *          ∧ (`develop`·`main` 아님) ∧ (보호 브랜치 아님) ∧ (40자 sha 확보)
  *
  * 「PR 없음」·「닫힌(미머지) PR 만 있음」은 **삭제 대상이 아니다** — 판단이 필요한 대역이라
  * 자동화 범위 밖이다 (#1247 비목표).
+ *
+ * ## 머지 시점 sha 대조 (`advanced-past-merge`) — 왜 필요한가
+ *
+ * 초판에는 이 대조가 **없었다**. 「그 브랜치를 head 로 가진 머지된 PR 이 있다」만 보고 지웠으므로,
+ * **머지 뒤 같은 브랜치에 쌓인 새 커밋이 조용히 삭제**됐다 (PR #1248 reviewer B1 — 주입 재현에서
+ * `삭제 1 · 치명 0 · ok:true · exit 0`, 즉 이 함수의 모든 신호 채널이 정상을 가리켰다).
+ *
+ * 이 저장소는 **squash 머지**라 머지해도 head 브랜치는 그대로 남는다 — 손대지 않은 브랜치는
+ * `branch.commit.sha == pr.head.sha` 가 **상시 참**이다. 그 전제인 *"닫힌 PR 의 `head.sha` 는
+ * 머지 시점에 동결된다"* 는 실측으로 확인했다 (2026-09-22): `head.ref=="develop"` 인 머지된 PR
+ * **89 건**의 `head.sha` 가 **전부 서로 다르고**(distinct 89) 현재 `develop` tip 과는 **0 건**
+ * 일치한다 — 살아 있는 값이라면 89 건 전부 같은 현재 sha 를 보고했을 것이다.
+ *
+ * 그래서 두 sha 가 갈리는 것은 곧 「머지 이후 누군가 그 브랜치에 커밋했다」이고,
+ * 그 브랜치는 **미머지 내용을 보유**한다 —
+ * 「PR 없음」·「닫힌 PR 만 있음」과 정확히 같은 *판단이 필요한 대역* 이라 보존한다.
+ *
+ * 대조가 **불가능**한 경우(머지된 PR 의 head sha 를 읽지 못함)는 판정이 아니라 **측정 실패**이므로
+ * `keep` 이 아니라 `unresolved` 로 보낸다 ([#1201](https://github.com/coseo12/astro-simulator/issues/1201)
+ * 클래스 — 「재지 못했다」를 「지울 게 없다」로 읽지 않는다). 브랜치 쪽 `sha-unknown` 과 대칭이다.
  *
  * ## fail-closed 경로 (F4) — 「상태를 모르니 지운다」 금지
  *
@@ -32,6 +53,7 @@
  *              / 이름 없는 브랜치 레코드
  *   unresolved PR 상태 미상 (`open`·`merged`·`closed` 중 어느 것도 아님)
  *              / 보호 여부가 boolean 이 아님 / 40자 sha 를 확보하지 못함
+ *              / 머지된 PR 의 head sha 를 확보하지 못함 (머지 시점 대조 불가)
  *
  * 「PR 표본이 비었다」를 치명으로 두는 것이 [#1201](https://github.com/coseo12/astro-simulator/issues/1201)
  * 클래스 차단이다 — 표본이 비면 모든 브랜치가 「머지된 PR 없음」으로 **조용히 보존**되어 통과하는데,
@@ -56,7 +78,24 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 
-/** 항상 보존 — gitflow 장수 브랜치. 기본 브랜치 보호 설정과 독립으로 둔다 (설정은 바뀔 수 있다). */
+/**
+ * 항상 보존 — gitflow 장수 브랜치. 기본 브랜치 보호 설정과 독립으로 둔다 (설정은 바뀔 수 있다).
+ *
+ * ⚠️ `main` 과 `develop` 은 방어 층수가 **비대칭**이다 (PR #1248 reviewer R1). `main` 은
+ * `protected:true` + default branch 라 이 목록이 없어도 `protected` 분기가 잡지만, `develop` 은
+ * `protected:false` 이고 릴리스 PR(head=develop)이 **진짜 머지되므로** 이 문자열 하나가 빠지면
+ * 삭제 1순위다.
+ *
+ * 위 **머지 시점 sha 대조가 `develop` 의 두 번째 층**이 된다. 릴리스가 `--merge`(squash 아님) 후
+ * `git push origin main:develop` 으로 ff 동기화하는 구조라, 머지 후 `develop` 은 **항상 머지 커밋
+ * 쪽으로 앞서** 릴리스 PR 의 `head.sha` 와 갈린다 — 우연이 아니라 워크플로 구조다
+ * ([branch-strategy-workflow](../docs/guides/branch-strategy-workflow.md) §워크플로 3단계 2항).
+ * 실측 (2026-09-22, dev 독립 재현): PR 전수 **750 건** 중 `head.ref=="develop"` 이 **89 건**,
+ * 그 어느 `head.sha` 도 현재 `develop`(`61bc264…`)과 **불일치 (hit 0)**.
+ *
+ * 그래도 이 목록을 유지한다 — 2층은 *구조적으로 참인 관측* 이지 *불변식* 이 아니고, 삭제는
+ * 되돌리기 어렵다.
+ */
 export const ALWAYS_KEEP = Object.freeze(['develop', 'main']);
 
 export const PR_OPEN = 'open';
@@ -69,12 +108,44 @@ const KNOWN_STATUSES = [PR_OPEN, PR_MERGED, PR_CLOSED];
 const SHA_RE = /^[0-9a-f]{40}$/;
 
 /**
+ * 40자 커밋 sha 로 읽히면 소문자로, 아니면 `null`.
+ *
+ * 「없음」·「빈 문자열」·「길이가 다름」·「16진수가 아님」을 **하나의 sentinel 로 접는** 것이 요점이다.
+ * 접지 않으면 `''` 같은 값이 `=== sha` 비교에서 조용히 불일치가 되어, *측정 실패* 가 *판정* 으로
+ * 둔갑한다 (#1201 클래스).
+ */
+const asSha = (v) => {
+  if (typeof v !== 'string') return null;
+  const s = v.toLowerCase();
+  return SHA_RE.test(s) ? s : null;
+};
+
+/**
+ * GraphQL `totalCount` 응답(문자열) → 기대 PR 총계. 읽지 못하면 `null`.
+ *
+ * ⚠️ 구판은 `Number(raw)` 만 `Number.isInteger` 로 검사했다. 그런데 `Number('') === 0` 이고
+ * `Number.isInteger(0) === true` 라 **빈 출력이 검사를 통과**했고, 그 뒤 `prList.length < 0` 은
+ * 항상 false 라 **페이지네이션 검사 자체가 사라졌다** (PR #1248 reviewer R2, #1201 클래스).
+ *
+ * `>= 1` 은 **새 임계가 아니다** — PR 0 건인 저장소는 이미 「PR 표본이 비었다」 치명으로 잡히므로,
+ * 기대 총계가 0 이하라는 것은 「PR 이 없다」가 아니라 「총계를 읽지 못했다」의 재진술이다.
+ */
+export function parseExpectedPrCount(raw) {
+  const n = Number(String(raw ?? '').trim());
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+/**
  * REST `GET /repos/{repo}/pulls?state=all` 레코드 1건 → 판정 입력으로 정규화.
  *
  * 상태 매핑: `state=open` → open / `state=closed` ∧ `merged_at != null` → merged /
  * `state=closed` ∧ `merged_at == null` → closed / 그 외 → unknown.
  * `merged_at` 이 `undefined` (필드 자체가 없음) 인 경우도 unknown 이다 — `null`(미머지)과
  * 구분해야 「응답 스키마가 바뀌었다」를 「머지 안 됐다」로 읽지 않는다.
+ *
+ * `head.sha` 를 **버리지 않는다** — 이것이 「그 PR 이 머지한 내용」과 「브랜치의 현재 내용」을
+ * 잇는 유일한 고리다. 구판은 여기서 이 필드를 떨어뜨렸고, 그래서 머지 시점 대조 술어가
+ * 판정부에 **존재할 수 없었다** (PR #1248 reviewer B1).
  */
 export function normalizePullRequest(raw, { repo = null } = {}) {
   const pr = raw && typeof raw === 'object' ? raw : {};
@@ -93,7 +164,7 @@ export function normalizePullRequest(raw, { repo = null } = {}) {
     else if (pr.merged_at === null) status = PR_CLOSED;
   }
 
-  return { number, headRefName, status, sameRepo };
+  return { number, headRefName, status, sameRepo, headSha: asSha(head.sha) };
 }
 
 /** REST `GET /repos/{repo}/branches` 레코드 1건 → 판정 입력으로 정규화. */
@@ -115,7 +186,7 @@ const fmtNums = (nums) => nums.map((n) => (n === null ? '#?' : `#${n}`)).join(',
  *
  * @param {object} input
  * @param {Array<{name:string, sha:string, protected:boolean}>} input.branches 정규화된 브랜치 목록
- * @param {Array<{number:number|null, headRefName:string|null, status:string, sameRepo:boolean}>} input.prs
+ * @param {Array<{number:number|null, headRefName:string|null, status:string, sameRepo:boolean, headSha:string|null}>} input.prs
  * @param {number|null} input.expectedPrCount 기대 PR 총계 (GraphQL `totalCount`). 수집 건수가 이보다
  *        적으면 페이지네이션 누락으로 치명 처리한다. `null` 이면 검사하지 않는다.
  * @param {string[]} input.alwaysKeep 무조건 보존할 브랜치명
@@ -170,7 +241,10 @@ export function planBranchCleanup({
     if (status === PR_UNKNOWN) e.unknown.push(pr.number ?? null);
     else if (status === PR_OPEN)
       e.open.push(pr.number ?? null); // fork 여부 무관 — 보존 방향
-    else if (status === PR_MERGED && pr.sameRepo === true) e.merged.push(pr.number ?? null);
+    // 머지 신호만 sha 를 동반한다 — 머지 시점 대조는 삭제 근거에만 필요하고, 보존 근거(open)는
+    // sha 와 무관하게 발화해야 한다 (sha 를 못 읽어도 보존은 보존이다).
+    else if (status === PR_MERGED && pr.sameRepo === true)
+      e.merged.push({ number: pr.number ?? null, headSha: asSha(pr.headSha) });
     // 그 외(닫힌 미머지 PR / 외부 저장소의 머지된 PR)는 삭제 근거도 보존 근거도 아니다.
     byBranch.set(name, e);
   }
@@ -222,7 +296,29 @@ export function planBranchCleanup({
       });
       continue;
     }
-    del.push({ name, sha, prNumbers: e.merged.slice() });
+    // 머지 시점 대조 — squash 머지라 손대지 않은 브랜치는 `branch.sha == pr.head.sha` 가 상시 참.
+    // 갈렸다면 머지 이후 새 커밋이 쌓인 것이고, 그 브랜치는 미머지 내용을 보유한다.
+    const atMerge = e.merged.filter((m) => m.headSha !== null && m.headSha === sha);
+    if (atMerge.length === 0) {
+      // 일치가 하나라도 있으면 그것으로 충분하다 (다른 PR 의 sha 를 못 읽어도 「머지 시점 그대로」는
+      // 이미 증명됐다). 일치가 없을 때만 「대조 불가」와 「앞서 나갔다」를 구분한다.
+      const unmeasured = e.merged.filter((m) => m.headSha === null);
+      if (unmeasured.length > 0) {
+        unresolved.push({
+          name,
+          reason: 'merge-sha-unknown',
+          detail: `머지된 PR ${fmtNums(unmeasured.map((m) => m.number))} 의 head sha 를 읽지 못했다 — 머지 시점 대조 불가`,
+        });
+        continue;
+      }
+      keep.push({
+        name,
+        reason: 'advanced-past-merge',
+        detail: `머지 이후 새 커밋 — 머지된 PR ${fmtNums(e.merged.map((m) => m.number))} 의 head sha 와 불일치. 자동화 범위 밖`,
+      });
+      continue;
+    }
+    del.push({ name, sha, prNumbers: atMerge.map((m) => m.number) });
   }
 
   const fatal = errors.length > 0;
@@ -271,7 +367,9 @@ export function renderPlan(plan, { mode, repo }) {
   for (const k of plan.keep) byReason.set(k.reason, (byReason.get(k.reason) ?? 0) + 1);
   lines.push(`## 보존 (${plan.keep.length})`);
   for (const [reason, n] of byReason) lines.push(`- ${reason}: ${n}`);
-  const notable = plan.keep.filter((k) => k.reason === 'open-pr' || k.reason === 'protected');
+  // 이름까지 박는 보존 사유 — 「지워질 뻔했는데 안 지워진」 것들. `no-merged-pr` 은 상시 다수라 계수만.
+  const NOTABLE_KEEP = ['open-pr', 'protected', 'advanced-past-merge'];
+  const notable = plan.keep.filter((k) => NOTABLE_KEEP.includes(k.reason));
   for (const k of notable) lines.push(`  - ${k.name}  [${k.reason}] ${k.detail}`);
 
   return lines.join('\n');
@@ -304,17 +402,20 @@ function fetchState(repo) {
   const [owner, name] = repo.split('/');
   // 기대 총계를 **먼저** 잡는다. 뒤에 잡으면 수집 도중 생긴 PR 이 총계를 늘려 정상 수집도
   // 누락으로 보인다. 먼저 잡으면 그 반대(수집 > 기대)만 생기고 그건 통과 방향이다.
-  const expectedPrCount = Number(
-    gh([
-      'api',
-      'graphql',
-      '-f',
-      `query=query{repository(owner:"${owner}",name:"${name}"){pullRequests{totalCount}}}`,
-      '--jq',
-      '.data.repository.pullRequests.totalCount',
-    ]).trim(),
-  );
-  if (!Number.isInteger(expectedPrCount)) throw new Error('PR 기대 총계를 읽지 못했다');
+  const rawCount = gh([
+    'api',
+    'graphql',
+    '-f',
+    `query=query{repository(owner:"${owner}",name:"${name}"){pullRequests{totalCount}}}`,
+    '--jq',
+    '.data.repository.pullRequests.totalCount',
+  ]);
+  const expectedPrCount = parseExpectedPrCount(rawCount);
+  if (expectedPrCount === null) {
+    throw new Error(
+      `PR 기대 총계를 읽지 못했다 (원문: ${JSON.stringify(String(rawCount).trim())})`,
+    );
+  }
 
   const branches = ghPaginate(`repos/${repo}/branches?per_page=100`).map(normalizeBranch);
   const prs = ghPaginate(`repos/${repo}/pulls?state=all&per_page=100`).map((p) =>
@@ -371,7 +472,18 @@ function main(argv) {
         console.error(`[failed] ${t.name} — ${e.message}`);
       }
     }
-    console.log(`\n삭제 완료 ${deleted.length} / 실패 ${failed.length}`);
+    // ⚠️ `plan.ok` 가 false 여도 나머지 브랜치는 삭제된다 — F4 조문(*"그 브랜치를 삭제 대상에서
+    // 빼고 실패로 보고"*)대로이나, 결과물이 「빨간 run + 부분 삭제」라 로그를 안 읽으면
+    // 「실패했으니 안 지워졌겠지」로 오독된다 (PR #1248 reviewer R3). 마지막 줄에 병기해 닫는다.
+    console.log(
+      `\n삭제 완료 ${deleted.length} / 실패 ${failed.length} / 판정 불가 ${plan.unresolved.length} (건드리지 않음)` +
+        (plan.fatal
+          ? ` / 치명 ${plan.errors.length} → 삭제 후보 ${plan.suppressed} 건 전량 폐기`
+          : ''),
+    );
+    if (!plan.ok) {
+      console.log('⚠ run 은 실패로 끝나지만 위 삭제 완료 건은 이미 반영됐다 — 부분 삭제다.');
+    }
   }
 
   if (process.env.GITHUB_STEP_SUMMARY) {
@@ -383,7 +495,14 @@ function main(argv) {
       '```',
     ];
     if (apply) {
-      md.push('', `### 삭제 결과 — 성공 ${deleted.length} / 실패 ${failed.length}`, '');
+      md.push(
+        '',
+        `### 삭제 결과 — 성공 ${deleted.length} / 실패 ${failed.length} / 판정 불가 ${plan.unresolved.length} (건드리지 않음)`,
+        '',
+      );
+      if (!plan.ok) {
+        md.push('> ⚠ run 은 실패로 끝나지만 아래 삭제 건은 이미 반영됐다 — **부분 삭제**다.', '');
+      }
       for (const t of deleted) md.push(`- \`${t.name}\` sha \`${t.sha}\` (복구 단서)`);
       for (const t of failed) md.push(`- ❌ \`${t.name}\` sha \`${t.sha}\` — ${t.error}`);
     }

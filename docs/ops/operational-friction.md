@@ -164,7 +164,8 @@ done
 - 기본은 **dry-run** 이다. 실삭제는 주간 `schedule` 과 `workflow_dispatch` 의 `apply=true` 두 경로뿐이고, 어느 모드로 돌았는지가 로그와 run summary 첫 줄에 박힌다.
 - 삭제 **직전**에 브랜치명과 sha 를 출력하고 summary 에 남긴다 — 되살리려면 `git push origin <sha>:refs/heads/<name>`.
 - 조회 실패·PR 표본 공백·페이지네이션 누락·PR 상태 미상은 **삭제하지 않고 run 을 실패시킨다**. 「상태를 모르니 지운다」 경로는 없다.
-- ⚠️ `schedule`·`workflow_dispatch` 는 **default branch(main) 에 반영된 정의만** 발견된다 ([workflow-dispatch-pitfalls](../lessons/workflow-dispatch-pitfalls.md)). 즉 develop 머지만으로는 돌지 않고 **다음 릴리스 이후** 첫 스케줄이 뜬다.
+- 머지된 PR 이 있어도 **그 뒤 새 커밋이 쌓인 브랜치는 지우지 않는다** — 브랜치의 현재 sha 가 그 PR 의 `head.sha` 와 갈리면 미머지 내용을 보유한 것이므로 `advanced-past-merge` 로 보존한다 (squash 머지라 손대지 않은 브랜치는 두 sha 가 상시 같다).
+- ⚠️ `schedule`·`workflow_dispatch` 는 **default branch(main) 에 반영된 정의만** 발견된다 ([workflow-dispatch-pitfalls](../lessons/workflow-dispatch-pitfalls.md)). 즉 develop 머지만으로는 돌지 않고 **다음 릴리스 이후** 첫 스케줄이 뜬다. **첫 실발동이 곧 첫 실삭제**이므로, main 반영 직후 `workflow_dispatch` 를 `apply=false` 로 1회 돌려 목록을 눈으로 확인한 뒤 주간에 맡긴다.
 
 ---
 
