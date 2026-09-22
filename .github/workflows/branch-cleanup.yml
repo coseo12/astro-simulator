@@ -1,0 +1,109 @@
+name: branch-cleanup
+
+# #1247 — 머지된 PR 의 head 브랜치를 주기적으로 정리한다.
+#
+# 배경 (docs/ops/operational-friction.md §2): 2026-07-15 #824 의 워크트리 충돌 이후 표준 절차가
+# 브랜치 삭제를 `git push origin --delete <branch>` 라는 **별도 수동 단계**로 분리했다. 그 충돌
+# 서술은 여전히 참이지만, 분리된 단계에는 **집행 주체가 없었다** — 2026-09-22 실측에서 원격 브랜치
+# 110 개 중 머지된 PR 의 head 가 **90 개** 잔존했고 101 개를 손으로 지웠다. 본 workflow 가 그
+# 집행 주체다 (#1201 「집행 주체 없는 트리거 조건은 무한 유예」의 운영 절차판).
+#
+# ⚠ 저장소 설정 `delete_branch_on_merge` 를 켜는 쪽은 **의도적으로 택하지 않았다** — 릴리스 PR 은
+# head=develop 이라 GitHub 가 `develop` 을 지울 수 있고, 이 저장소의 `develop` 은 기본 브랜치도
+# 아니고 브랜치 보호도 없다 (실측 404). 그 축은 #971 소관이다. 본 workflow 는 `develop`·`main`
+# 을 이름으로 제외하므로 같은 함정에 빠지지 않는다.
+#
+# 판정 SSoT 는 `scripts/branch-cleanup-plan.mjs` 이고 술어·fail-closed 목록은 그 헤더에 있다.
+# 여기서 판정식을 복제하지 않는다. 핵심만: **ancestor 판정을 쓰지 않는다** — squash 머지라 머지된
+# 브랜치의 커밋은 `develop` 의 조상이 아니며, `git branch --merged` 로 재면 위 90 개가 전부
+# 「미머지」로 나온다. 기준은 PR 상태다.
+#
+# ── 트리거 2단계 함정 (docs/lessons/workflow-dispatch-pitfalls.md) ──
+# `schedule` 과 `workflow_dispatch` 는 **default branch(main) 에 반영된 정의만** 발견된다.
+# 즉 본 파일이 develop 에 머지되어도 실행되지 않고, **다음 릴리스 PR 이 main 에 닿은 뒤**부터
+# 스케줄이 돈다. `pull_request` 계열(auto-close-issues.yml 등)과 달리 도입 PR 자신의 머지로는
+# 실발동을 검증할 수 없다 — 도입 PR 단계의 증거는 로직 단위 테스트 + 로컬 dry-run 이다.
+#
+# ⚠ **첫 실발동이 곧 첫 실삭제다** (PR #1248 reviewer R5). 위 함정 때문에 도입 PR 에서는 발동
+# 관측이 0 이고, main 에 닿은 뒤 첫 `schedule` 이 곧바로 APPLY 다. 그래서 **main 반영 직후
+# `workflow_dispatch` 를 `apply=false`(기본 dry-run) 로 1회 돌려 목록을 눈으로 확인**한 뒤
+# 주간 스케줄에 맡긴다. 리허설 1회의 비용이 되돌리기 어려운 삭제보다 싸다.
+
+on:
+  schedule:
+    # 매주 월요일 03:17 UTC (= 12:17 KST). 정각을 피한 것은 GH Actions 가 정각에 몰리는
+    # 스케줄을 지연·유실시키기 때문이다 (GitHub 공식 권고).
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: '실삭제 여부. 기본 false = DRY-RUN (삭제 대상 목록만 출력)'
+        type: boolean
+        default: false
+
+# 최소 권한.
+#   contents: write      — 브랜치 ref DELETE. 삭제에 필요한 유일한 쓰기 권한이다.
+#   pull-requests: read  — 삭제 술어의 유일한 입력인 PR 상태 조회.
+# ⚠ 이 workflow 에 이슈 코멘트·라벨·PR 생성 코드를 추가하면 권한을 재검토할 것
+#   (strip-stage-labels.yml 헤더의 같은 경고와 동형).
+permissions:
+  contents: write
+  pull-requests: read
+
+# 삭제는 되돌리기 어렵다 — 진행 중 run 을 취소하면 목록의 일부만 지워진 채 끊긴다.
+# 중복 실행만 막고 취소는 하지 않는다.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      # 사용 직전 자기 검증 — 판정 로직이 회귀하면 삭제 대신 멈춘다 (fail-fast).
+      # ci.yml detect-and-test 에도 상시 배선 (#897 교훈: CI 미배선 self-test 는 0회 실행).
+      - name: 판정 로직 self-test
+        run: node scripts/branch-cleanup-plan.test.mjs
+
+      - name: 모드 판정
+        id: mode
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          # boolean 입력은 expression 밖으로 나오면 'true'/'false' 문자열이 된다.
+          # schedule 트리거에는 inputs 가 없으므로 빈 문자열이다.
+          APPLY_INPUT: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          # 실삭제 경로는 둘뿐 — 주간 schedule(집행 주체) 과 명시 입력 apply=true.
+          # 그 외 전부 dry-run 이다 (기본값 = 삭제하지 않음).
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$APPLY_INPUT" = "true" ]; then
+            echo "apply=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::모드 = APPLY (실삭제). 트리거 = $EVENT_NAME"
+          else
+            echo "apply=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::모드 = DRY-RUN (목록만 출력, 삭제하지 않음). 트리거 = $EVENT_NAME"
+          fi
+
+      - name: 정리 계획 산출 (+ APPLY 모드면 삭제 실행)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY_MODE: ${{ steps.mode.outputs.apply }}
+        run: |
+          set -euo pipefail
+          # 스크립트가 삭제 **전** 에 브랜치명과 sha 를 stdout·step summary 양쪽에 남긴다.
+          # 복구 단서이며 `git push origin <sha>:refs/heads/<name>` 으로 되살릴 수 있다.
+          # 조회 실패·페이지네이션 누락·상태 미상은 스크립트가 fail-closed 로 처리하고
+          # 비-0 으로 끝나므로 여기서 별도 가드를 두지 않는다 (판정식 사본 0).
+          if [ "$APPLY_MODE" = "true" ]; then
+            node scripts/branch-cleanup-plan.mjs --apply
+          else
+            node scripts/branch-cleanup-plan.mjs
+          fi

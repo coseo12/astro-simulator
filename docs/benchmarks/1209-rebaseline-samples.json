@@ -1,0 +1,572 @@
+{
+  "_provenance": {
+    "source": "GitHub Actions run 35589678686 (workflow: bench:baseline-remeasure, ubuntu-latest × 10 matrix job)",
+    "url": "https://github.com/coseo12/astro-simulator/actions/runs/35589678686",
+    "measured_commit": "7c9652ad265d37d92f0d83a59fcafe77e1865bcb",
+    "retrieved": "2026-09-22 (gh run download 35589678686 -n bench-run-<i>, retention 7d 내)",
+    "why": "#1209 B7 판정선을 유도한 측정 분포 원본. B8(같은 커밋 10회차 재판정 ⚠ 0건)을 CI 에서 상시 재현하기 위해 커밋한다 — 아티팩트는 7일 뒤 만료되므로 원본이 저장소에 없으면 유도 근거를 재실행할 수 없다.",
+    "note": "회차 리포트에 `commit` 필드가 없는 것은 정상 — 그 필드를 심은 변경(#1209)이 이 측정 시점에 아직 develop 에 없었다. 측정 대상 sha 는 위 measured_commit (워크플로 run 의 headSha)."
+  },
+  "runs": [
+    {
+      "artifact": "bench-run-1",
+      "timestamp": "2026-09-21T10:39:59.553Z",
+      "phase": "remeasure-run-1",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 110.75
+        },
+        {
+          "name": "play-1d",
+          "fps": 93.95
+        },
+        {
+          "name": "play-1y",
+          "fps": 83.34
+        },
+        {
+          "name": "focus-earth",
+          "fps": 84.54
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 58.57
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 91.78
+        },
+        {
+          "n": 100,
+          "fps": 61.28
+        },
+        {
+          "n": 200,
+          "fps": 45.5
+        },
+        {
+          "n": 1000,
+          "fps": 16.16
+        },
+        {
+          "n": 5000,
+          "fps": 4.14
+        },
+        {
+          "n": 10000,
+          "fps": 2.24
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-2",
+      "timestamp": "2026-09-21T10:39:50.556Z",
+      "phase": "remeasure-run-2",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 129.15
+        },
+        {
+          "name": "play-1d",
+          "fps": 99.5
+        },
+        {
+          "name": "play-1y",
+          "fps": 92.74
+        },
+        {
+          "name": "focus-earth",
+          "fps": 117.49
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 69.95
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 108.35
+        },
+        {
+          "n": 100,
+          "fps": 76.31
+        },
+        {
+          "n": 200,
+          "fps": 59.78
+        },
+        {
+          "n": 1000,
+          "fps": 23.03
+        },
+        {
+          "n": 5000,
+          "fps": 5.84
+        },
+        {
+          "n": 10000,
+          "fps": 3.11
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-3",
+      "timestamp": "2026-09-21T10:39:44.566Z",
+      "phase": "remeasure-run-3",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 119.19
+        },
+        {
+          "name": "play-1d",
+          "fps": 114.57
+        },
+        {
+          "name": "play-1y",
+          "fps": 130.54
+        },
+        {
+          "name": "focus-earth",
+          "fps": 134.19
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 70.72
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 122.87
+        },
+        {
+          "n": 100,
+          "fps": 82.57
+        },
+        {
+          "n": 200,
+          "fps": 62.96
+        },
+        {
+          "n": 1000,
+          "fps": 23.55
+        },
+        {
+          "n": 5000,
+          "fps": 5.93
+        },
+        {
+          "n": 10000,
+          "fps": 3.15
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-4",
+      "timestamp": "2026-09-21T10:40:01.506Z",
+      "phase": "remeasure-run-4",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 86.43
+        },
+        {
+          "name": "play-1d",
+          "fps": 72.02
+        },
+        {
+          "name": "play-1y",
+          "fps": 70.67
+        },
+        {
+          "name": "focus-earth",
+          "fps": 74.94
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 47.39
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 73.54
+        },
+        {
+          "n": 100,
+          "fps": 49.74
+        },
+        {
+          "n": 200,
+          "fps": 36.65
+        },
+        {
+          "n": 1000,
+          "fps": 12.48
+        },
+        {
+          "n": 5000,
+          "fps": 3.12
+        },
+        {
+          "n": 10000,
+          "fps": 1.66
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-5",
+      "timestamp": "2026-09-21T10:39:56.464Z",
+      "phase": "remeasure-run-5",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 114.6
+        },
+        {
+          "name": "play-1d",
+          "fps": 86.8
+        },
+        {
+          "name": "play-1y",
+          "fps": 90.92
+        },
+        {
+          "name": "focus-earth",
+          "fps": 104.85
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 54.13
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 98.44
+        },
+        {
+          "n": 100,
+          "fps": 64.89
+        },
+        {
+          "n": 200,
+          "fps": 49.91
+        },
+        {
+          "n": 1000,
+          "fps": 18.43
+        },
+        {
+          "n": 5000,
+          "fps": 4.71
+        },
+        {
+          "n": 10000,
+          "fps": 2.58
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-6",
+      "timestamp": "2026-09-21T10:39:55.960Z",
+      "phase": "remeasure-run-6",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 91.17
+        },
+        {
+          "name": "play-1d",
+          "fps": 78.29
+        },
+        {
+          "name": "play-1y",
+          "fps": 84.8
+        },
+        {
+          "name": "focus-earth",
+          "fps": 91.69
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 53.64
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 85.3
+        },
+        {
+          "n": 100,
+          "fps": 57.32
+        },
+        {
+          "n": 200,
+          "fps": 43.93
+        },
+        {
+          "n": 1000,
+          "fps": 15.85
+        },
+        {
+          "n": 5000,
+          "fps": 4.08
+        },
+        {
+          "n": 10000,
+          "fps": 2.23
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-7",
+      "timestamp": "2026-09-21T10:40:00.547Z",
+      "phase": "remeasure-run-7",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 99.72
+        },
+        {
+          "name": "play-1d",
+          "fps": 89.14
+        },
+        {
+          "name": "play-1y",
+          "fps": 106.46
+        },
+        {
+          "name": "focus-earth",
+          "fps": 110.25
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 56.55
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 99.39
+        },
+        {
+          "n": 100,
+          "fps": 63.62
+        },
+        {
+          "n": 200,
+          "fps": 47.57
+        },
+        {
+          "n": 1000,
+          "fps": 16.77
+        },
+        {
+          "n": 5000,
+          "fps": 4.14
+        },
+        {
+          "n": 10000,
+          "fps": 2.28
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-8",
+      "timestamp": "2026-09-21T10:39:52.876Z",
+      "phase": "remeasure-run-8",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 102.24
+        },
+        {
+          "name": "play-1d",
+          "fps": 93.26
+        },
+        {
+          "name": "play-1y",
+          "fps": 109.1
+        },
+        {
+          "name": "focus-earth",
+          "fps": 108.88
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 54.46
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 98.24
+        },
+        {
+          "n": 100,
+          "fps": 63.91
+        },
+        {
+          "n": 200,
+          "fps": 47.33
+        },
+        {
+          "n": 1000,
+          "fps": 16.77
+        },
+        {
+          "n": 5000,
+          "fps": 4.18
+        },
+        {
+          "n": 10000,
+          "fps": 2.28
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-9",
+      "timestamp": "2026-09-21T10:39:59.060Z",
+      "phase": "remeasure-run-9",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 118.73
+        },
+        {
+          "name": "play-1d",
+          "fps": 89.59
+        },
+        {
+          "name": "play-1y",
+          "fps": 91.02
+        },
+        {
+          "name": "focus-earth",
+          "fps": 94.66
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 55.16
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 91.77
+        },
+        {
+          "n": 100,
+          "fps": 60.9
+        },
+        {
+          "n": 200,
+          "fps": 47.15
+        },
+        {
+          "n": 1000,
+          "fps": 16.27
+        },
+        {
+          "n": 5000,
+          "fps": 4.01
+        },
+        {
+          "n": 10000,
+          "fps": 2.24
+        }
+      ]
+    },
+    {
+      "artifact": "bench-run-10",
+      "timestamp": "2026-09-21T10:39:46.855Z",
+      "phase": "remeasure-run-10",
+      "durationMs": 3000,
+      "environment": "playwright-chromium-headless",
+      "viewport": "1280x800",
+      "scenarios": [
+        {
+          "name": "idle",
+          "fps": 95.31
+        },
+        {
+          "name": "play-1d",
+          "fps": 85.23
+        },
+        {
+          "name": "play-1y",
+          "fps": 102.79
+        },
+        {
+          "name": "focus-earth",
+          "fps": 100.86
+        },
+        {
+          "name": "focus-neptune",
+          "fps": 54.26
+        }
+      ],
+      "nBody": [
+        {
+          "n": 10,
+          "fps": 93.99
+        },
+        {
+          "n": 100,
+          "fps": 60.94
+        },
+        {
+          "n": 200,
+          "fps": 46.09
+        },
+        {
+          "n": 1000,
+          "fps": 16.7
+        },
+        {
+          "n": 5000,
+          "fps": 4.15
+        },
+        {
+          "n": 10000,
+          "fps": 2.28
+        }
+      ]
+    }
+  ]
+}

@@ -41,10 +41,42 @@
  */
 
 /**
+ * 임의의 `[data-testid="<testId>"]` 요소를 pre-assert 후 클릭 (#1209).
+ *
+ * `pressTimePlay` (#210) 이 `time-play` 한 셀렉터에만 적용하던 pre-assert 규약을
+ * 일반화한 것이다. 배경: `scripts/bench-scene.mjs` 의 시나리오 prep 이
+ * `page.click(...).catch(() => {})` 로 클릭 실패를 삼켜, 셀렉터가 사라지면
+ * **조용히 다른 화면을 측정**하고 그 값을 baseline 과 비교했다 (#1209 B2).
+ *
+ * @param page Playwright Page
+ * @param testId `data-testid` 값 (셀렉터 문자열이 아니라 값만 넘긴다)
+ * @param options.timeout click 타임아웃 (기본 2000ms)
+ * @param options.skipIfAbsent 부재 시 throw 대신 false 반환 — **상태 의존 셀렉터 전용**
+ * @param options.reason 에러 메시지 꼬리말 (무엇이 회귀했는지)
+ * @returns click 성공 여부 (false = skipIfAbsent 로 건너뜀)
+ */
+export async function clickTestId(page, testId, options = {}) {
+  const timeout = options.timeout ?? 2000;
+  const skipIfAbsent = options.skipIfAbsent ?? false;
+  const reason = options.reason ?? '셀렉터 회귀 가능성';
+  const locator = page.locator(`[data-testid="${testId}"]`);
+  const count = await locator.count();
+  if (count === 0) {
+    if (skipIfAbsent) return false;
+    throw new Error(`[browser-verify-utils] data-testid="${testId}" 부재 — ${reason}`);
+  }
+  await locator.click({ timeout });
+  return true;
+}
+
+/**
  * `[data-testid="time-play"]` 버튼을 pre-assert 후 클릭.
  *
  * 셀렉터 부재 시 `Error` throw — 기존 `.catch(() => {})` 로 silent 삼키던 패턴을
  * 대체. `skipIfAbsent: true` 옵션을 주면 부재 시 false 반환 (재생 불필요 케이스).
+ *
+ * ⚠️ 재생/정지 **상태**를 맞추는 것이 목적이라면 `setTimePlayback` 을 쓴다 — 이 함수의
+ *    `skipIfAbsent` 는 「이미 재생 중」과 「버튼이 통째로 사라짐」을 구분하지 못한다 (#1209).
  *
  * @param page Playwright Page
  * @param options.timeout click 타임아웃 (기본 2000ms)
@@ -52,18 +84,65 @@
  * @returns click 성공 여부
  */
 export async function pressTimePlay(page, options = {}) {
-  const timeout = options.timeout ?? 2000;
-  const skipIfAbsent = options.skipIfAbsent ?? false;
-  const locator = page.locator('[data-testid="time-play"]');
-  const count = await locator.count();
-  if (count === 0) {
-    if (skipIfAbsent) return false;
+  return clickTestId(page, 'time-play', {
+    timeout: options.timeout,
+    skipIfAbsent: options.skipIfAbsent ?? false,
+    reason: '재생 버튼 셀렉터 회귀 가능성',
+  });
+}
+
+/**
+ * 시간 재생/정지 토글의 **목표 상태**별 testid 쌍 (#1209).
+ *
+ * `time-controls.tsx:70` 은 한 버튼의 testid 를 상태로 갈아 끼운다
+ * (`data-testid={isPaused ? 'time-play' : 'time-pause'}`). 따라서 `time-pause` 부재는
+ * 두 가지를 뜻할 수 있다 — (가) 이미 정지 상태라 버튼이 `time-play` 로 바뀜 (정상),
+ * (나) 시간 컨트롤 자체가 사라짐 (회귀). 한쪽만 보면 둘이 같은 「부재」다.
+ *
+ * - `click`  = 그 상태로 **전이**하려면 눌러야 하는 버튼
+ * - `already` = 이미 그 상태일 때 대신 보이는 버튼
+ */
+const TIME_TOGGLE_MODES = Object.freeze({
+  paused: Object.freeze({ click: 'time-pause', already: 'time-play' }),
+  playing: Object.freeze({ click: 'time-play', already: 'time-pause' }),
+});
+
+/** `setTimePlayback` 가 받는 mode 문자열 목록 (테스트/호출부 참조용). */
+export const TIME_PLAYBACK_MODES = Object.freeze(Object.keys(TIME_TOGGLE_MODES));
+
+/**
+ * 시간 재생 상태를 `mode` 로 맞춘다 — **셀렉터가 아니라 상태를 단언**한다 (#1209).
+ *
+ * 토글 쌍 중 한쪽의 부재는 정상이지만 **양쪽 다 부재면 실패**다. 이것이 `skipIfAbsent`
+ * 와의 차이다: 「없으면 건너뛴다」는 회귀를 통과시키지만, 여기서는 건너뛸 수 있는
+ * 조건 자체를 **형제 셀렉터의 존재**로 못 박는다.
+ *
+ * @param page Playwright Page
+ * @param mode `'paused'` | `'playing'`
+ * @param options.timeout click 타임아웃 (기본 2000ms)
+ * @returns `'clicked'` (전이함) | `'already'` (이미 그 상태)
+ */
+export async function setTimePlayback(page, mode, options = {}) {
+  // `Object.hasOwn` — 리터럴 객체는 `Object.prototype` 을 상속하므로 `'constructor'` 같은
+  //   키가 truthy 로 잡혀 mode 검증을 통과하고, 이후 `[data-testid="undefined"]` 를 쿼리해
+  //   「토글 버튼 부재」라는 **엉뚱한 진단**으로 실패한다.
+  const spec = Object.hasOwn(TIME_TOGGLE_MODES, mode) ? TIME_TOGGLE_MODES[mode] : undefined;
+  if (!spec) {
     throw new Error(
-      '[browser-verify-utils] data-testid="time-play" 부재 — 재생 버튼 셀렉터 회귀 가능성',
+      `[browser-verify-utils] setTimePlayback: 알 수 없는 mode "${mode}" — ${TIME_PLAYBACK_MODES.join(' | ')} 중 하나여야 한다`,
     );
   }
-  await locator.click({ timeout });
-  return true;
+  const timeout = options.timeout ?? 2000;
+  const target = page.locator(`[data-testid="${spec.click}"]`);
+  if ((await target.count()) > 0) {
+    await target.click({ timeout });
+    return 'clicked';
+  }
+  const sibling = page.locator(`[data-testid="${spec.already}"]`);
+  if ((await sibling.count()) > 0) return 'already';
+  throw new Error(
+    `[browser-verify-utils] 시간 토글 버튼 부재 — data-testid="${spec.click}" / "${spec.already}" 둘 다 없음 (시간 컨트롤 회귀)`,
+  );
 }
 
 /**

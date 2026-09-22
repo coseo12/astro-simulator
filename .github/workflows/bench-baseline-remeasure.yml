@@ -128,6 +128,11 @@ jobs:
           pattern: bench-run-*
           merge-multiple: true
 
+      # #1209 — `--commit` 으로 baseline 출처(측정 대상 빌드 sha)를 **자동** 기록한다.
+      #   각 회차 리포트도 스스로 `commit` 을 담으므로(bench-scene.mjs) aggregate 가
+      #   양쪽을 대조한다 — 불일치 시 exit 1 (서로 다른 빌드의 회차가 섞인 것).
+      #   수동 갱신 경로(`bench:scene:set-baseline` = 리포트 단순 복사)도 리포트의
+      #   `commit` 을 그대로 물려받으므로 두 경로 모두에서 필드가 채워진다.
       - name: aggregate 실행 → baseline.json 갱신
         env:
           PHASE_LABEL: ${{ inputs.phase_label }}
@@ -137,6 +142,7 @@ jobs:
             --input-dir /tmp/bench-artifacts \
             --phase "${PHASE_LABEL}" \
             --environment "gh-actions-ubuntu-chromium-headless" \
+            --commit "${GITHUB_SHA}" \
             --output docs/benchmarks/baseline.json
 
       - name: aggregate 단위 테스트 (회귀 가드)
@@ -165,6 +171,7 @@ jobs:
             - phase: `${{ inputs.phase_label }}`
             - sample_count: ${{ inputs.sample_count }}
             - environment: `gh-actions-ubuntu-chromium-headless`
+            - commit (측정 대상 빌드): `${{ github.sha }}`
 
             ## Test plan
 
