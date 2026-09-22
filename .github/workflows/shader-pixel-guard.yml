@@ -15,6 +15,12 @@ name: shader-pixel-guard
 #      목록**이고, 계수는 세는 술어(지대? 스크립트? step?)에 따라 값이 갈려 어느 쪽도 참인 채로
 #      어긋난다. 지대 추가 시 갱신 대상은 위 열거 한 곳뿐이다.
 #
+# 분담 기준 (#1207): 어떤 verify 스크립트를 본 워크플로에 걸고 어떤 것을 ci.yml 에 거는지의
+#   **정본은 `docs/ops/browser-verify-helpers.md` §CI 배선** 이다. 갈림축은 판정량 (픽셀 ↔
+#   씬 상태·좌표·DOM) 이고, **서버 방식이 아니다** — 두 워크플로 모두 `ci-dev-server.sh` 로
+#   `next dev` 를 띄운다 (:3001 / :3002). 규범과 다른 배치는 step 주석에 근거를 남긴다
+#   (본 워크플로의 `verify:1234-adapter-stall` 이 그 선례다).
+#
 # 판정 규약 (ADR 결정 3): per-body 상대 성질 (ON vs OFF) 만 — 절대 임계 금지
 #   (swiftshader ↔ 하드웨어 값 편차). 756 마진은 D1 CI 실측으로 확정 (스크립트 주석 참조).
 #
