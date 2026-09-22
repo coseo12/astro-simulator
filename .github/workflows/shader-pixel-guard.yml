@@ -95,13 +95,13 @@ jobs:
         with:
           start-dev-server: 'true'
 
-      # ── verify 8종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
+      # ── verify 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
       # 호출 규약: HEADFUL=0 (756/773/774/782/783/1119) / --headless (762) — CI 에 chrome channel 이
       #   없으므로 폴백이 아닌 명시적 headless 로 결정적 실행. BASE_URL 주입 (dev server 3001).
       # trap: 스크립트 비정상 종료 (playwright timeout/crash) 시 잔존 chromium 정리 —
       #   스크립트 간 실패 격리 (ADR cross-validate 부분 수용 4). 정상 종료 시 no-op.
 
-      # #1234 — 어댑터 미결 회귀 가드. **맨 앞에 둔다**: 부팅이 깨지면 아래 12 step 이 전부
+      # #1234 — 어댑터 미결 회귀 가드. **맨 앞에 둔다**: 부팅이 깨지면 아래 step 이 전부
       # 같은 증상으로 죽으므로, 약 35 초 만에 원인을 이름으로 알려주는 편이 8 분 뒤 아무 step
       # 에서나 `TimeoutError` 를 받는 것보다 낫다 (본 이슈가 정확히 그 상황이었다).
       # 자연 발생 빈도가 약 40 % 였던 결함을 `page.addInitScript` 로 **결정적으로** 재현하므로
