@@ -15,16 +15,19 @@
  *
  * ## 변이 ↔ 테스트 대응 (전건 사살. dev 가 실제 주입해 **측정한 값**이고 재현 로그는 PR 본문)
  *
- *   M1  열린 PR 검사 삭제 (`e.open.length > 0` 분기 제거)              → U2, U12, U17
+ *   M1  열린 PR 검사 삭제 (`e.open.length > 0` 분기 제거)              → U2, U12, U17, U19
  *   M2  `alwaysKeep` 검사 삭제                                         → U3
  *   M3  「PR 표본이 비었다」 치명 검사 삭제                              → U8, U15
  *   M4  상태 미상(`unknown`)을 닫힌 PR 처럼 무시                         → U7
  *   M5  `expectedPrCount` 페이지네이션 검사 삭제                         → U9
  *   M6  보호 브랜치 검사 삭제                                           → U4
  *   M7  fork `merged` 를 삭제 근거로 인정 (`sameRepo` 조건 제거)         → U12, U17
- *   M8  치명 시 `del` 을 비우지 않음 (`fatal ? [] : del` → `del`)       → U9, U13
+ *   M8  치명 시 `del` 을 비우지 않음 (`fatal ? [] : del` → `del`)       → U9, U13, U20
  *   M9  머지 시점 sha 대조 제거 (일치 조건 → `true`)                    → U16, U17
  *   M10 기대 총계의 `n >= 1` 완화 (`Number.isInteger` 만)               → U18
+ *   M11 head 결손의 상태 구분 제거 — 전건 **비**치명화 (`status === PR_CLOSED` → `true`)
+ *                                                                      → U13, U20
+ *   M12 면제 자체를 제거 — 전건 **치명**화 (구판 복귀)                   → U19
  *
  * ⚠️ 초판은 이 표를 「전건 **단독** 사살」로 적었고 **주입해 보니 절반이 틀렸다**. 실제 값이 위
  * 표이며, 특히 **M8 을 U8 이 잡지 못한다** — U8 의 표본은 PR 이 0 건이라 삭제 후보 자체가 생기지
@@ -34,6 +37,11 @@
  * ⚠️ **M9·M10 추가 시 M1~M8 을 재측정했고 M1·M7 의 값이 바뀌었다** (각각 `U2,U12` → `U2,U12,U17`
  * / `U12` → `U12,U17`). U17 이 fork·열린 PR 하위 케이스를 함께 재기 때문이다. **변이표는 테스트가
  * 늘면 stale 해진다** — 표를 손으로 고치지 말고 전건 재주입해 나온 값을 적을 것.
+ *
+ * ⚠️ **M11·M12 추가 시 M1~M10 을 다시 전건 재주입했고 M1·M8 의 값이 또 바뀌었다** (각각
+ * `U2,U12,U17` → `+U19` / `U9,U13` → `+U20`). 위 경고가 **두 번째로 실현된 것**이고, 이번에도
+ * 손으로 고쳤다면 표가 실제보다 좁게 남았을 것이다. M11·M12 는 **서로 반대 방향**이라 둘 다
+ * 필요하다 — M11(전건 비치명화)은 `unknown` 이 면제로 새는 회귀, M12(전건 치명화)는 구판 복귀다.
  */
 
 import assert from 'node:assert/strict';
@@ -422,6 +430,55 @@ run('U18 기대 PR 총계 — 빈 출력이 0 으로 퇴화해 통과하지 않�
   for (const bad of ['', '   ', '\n', null, undefined, '0', '-1', 'null', 'abc', '1.5', 'NaN']) {
     assert.equal(parseExpectedPrCount(bad), null, `${JSON.stringify(bad)} 는 총계가 아니다`);
   }
+});
+
+// ── cross-validate (PR #1248) head 브랜치명 결손의 치명 범위 ─────────────────
+run('U19 닫힘(미머지) PR 의 head 브랜치명 결손은 치명이 아니다 — 계수만 + 나머지 진행', () => {
+  const plan = planBranchCleanup({
+    branches: [br('feature/1-old', { sha: SHA_B }), br('fix/2-live')],
+    prs: [
+      pr(1, 'feature/1-old', PR_MERGED, { headSha: SHA_B }),
+      pr(2, 'fix/2-live', PR_OPEN),
+      // 과거 닫힌 PR — fork 삭제 등으로 head 가 비어 돌아온 레코드. 판정에 기여하지 않는다.
+      pr(30, null, PR_CLOSED),
+      pr(31, null, PR_CLOSED, { headSha: null }),
+    ],
+  });
+  assert.deepEqual(plan.errors, [], '닫힘(미머지)은 run 을 마비시키지 않는다');
+  assert.equal(plan.fatal, false);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.ignoredClosedNoHeadRef, 2, '조용히 버리지 않는다 — 건수를 센다');
+  // 다른 브랜치 판정은 정상 진행 — 삭제도 보존도 평소대로 발화한다.
+  assert.deepEqual(plan.del, [{ name: 'feature/1-old', sha: SHA_B, prNumbers: [1] }]);
+  assert.equal(plan.keep.find((k) => k.name === 'fix/2-live').reason, 'open-pr');
+  // 계수는 사람이 읽는 출력에도 박힌다 (0 건일 때도 줄 자체는 존재한다).
+  assert.match(renderPlan(plan, { mode: 'dry-run', repo: 'o/r' }), /head 브랜치명 결손 2 건/);
+  const none = planBranchCleanup({ branches: [br('feature/1-old')], prs: basePrs });
+  assert.equal(none.ignoredClosedNoHeadRef, 0);
+  assert.match(renderPlan(none, { mode: 'dry-run', repo: 'o/r' }), /head 브랜치명 결손 0 건/);
+});
+
+run('U20 닫힘 외 상태의 head 브랜치명 결손은 치명 유지 (unknown 포함)', () => {
+  // ⚠️ `unknown` 이 핵심이다 — 상태를 모르면 「닫힘인지」도 모르므로 면제 대상이 아니다.
+  for (const status of [PR_OPEN, PR_MERGED, PR_UNKNOWN]) {
+    const plan = planBranchCleanup({
+      branches: [br('feature/1-old')],
+      prs: [...basePrs, pr(12, null, status)],
+    });
+    assert.equal(plan.fatal, true, `status=${status} 의 head 결손은 치명이다`);
+    assert.equal(plan.ok, false);
+    assert.deepEqual(plan.del, [], '치명이면 삭제 후보를 전량 폐기한다');
+    assert.equal(plan.ignoredClosedNoHeadRef, 0, '면제로 새지 않는다');
+    assert.match(plan.errors[0], /귀속 불가/);
+    assert.match(plan.errors[0], new RegExp(`상태 ${status}`), '어느 상태에서 걸렸는지 남긴다');
+  }
+  // 상태 문자열이 아예 낯선 값이어도 `unknown` 으로 접혀 치명이다 (KNOWN_STATUSES 밖).
+  const weird = planBranchCleanup({
+    branches: [br('feature/1-old')],
+    prs: [...basePrs, { number: 13, headRefName: null, status: 'draft', sameRepo: true }],
+  });
+  assert.equal(weird.fatal, true);
+  assert.equal(weird.ignoredClosedNoHeadRef, 0);
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

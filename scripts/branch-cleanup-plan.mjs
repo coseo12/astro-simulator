@@ -49,11 +49,27 @@
  * **브랜치 단위(unresolved)** 는 그 브랜치만 빼고 나머지는 진행한다. 둘 다 `ok:false` 다.
  *
  *   fatal      브랜치 표본이 비었다 / PR 표본이 배열이 아니다 / PR 표본이 비었다
- *              / 페이지네이션 누락 (기대 총계 > 수집 건수) / head 브랜치명을 읽지 못한 PR
+ *              / 페이지네이션 누락 (기대 총계 > 수집 건수)
+ *              / head 브랜치명을 읽지 못한 PR **중 닫힘(미머지)이 아닌 것** (아래 참조)
  *              / 이름 없는 브랜치 레코드
  *   unresolved PR 상태 미상 (`open`·`merged`·`closed` 중 어느 것도 아님)
  *              / 보호 여부가 boolean 이 아님 / 40자 sha 를 확보하지 못함
  *              / 머지된 PR 의 head sha 를 확보하지 못함 (머지 시점 대조 불가)
+ *
+ * ## head 브랜치명 결손의 치명 범위 — 닫힘(미머지)만 제외 (PR #1248 cross-validate)
+ *
+ * 초판은 **상태와 무관하게** 전부 치명으로 올렸다. 그러면 과거 닫힌 PR 중 `head.ref` 가 `null` 로
+ * 오는 레코드가 **하나라도** 있으면 run 이 영구히 exit 1 이 되어 자동 정리가 **마비**된다
+ * (GitHub 은 fork 삭제 등으로 오래된 레코드의 head 를 비운 채 돌려줄 수 있다).
+ *
+ * 브랜치명이 필요한 이유는 둘뿐이다 — **열린** PR 의 head 를 **보존**하기 위해, **머지된** PR 의
+ * head 를 **삭제 후보로** 올리기 위해. 닫힘(미머지)은 어느 쪽도 아니라서(`byBranch` 집계에서도
+ * 삭제 근거·보존 근거 어디에도 안 들어간다) 그 레코드는 **판정에 기여하지 않는다** — 치명일 이유가
+ * 없다. 반면 `open`·`merged`·`unknown` 은 치명을 유지한다: `open` 은 보존해야 할 브랜치를 놓치고,
+ * `merged` 는 삭제 근거가 불완전해지며, **`unknown` 은 「닫힘인지」 자체를 모른다**.
+ *
+ * 제외된 건수는 **계수해서 출력**한다 — 조용히 버리면 「없었다」와 「무시했다」가 구분되지 않는다
+ * ([#1201](https://github.com/coseo12/astro-simulator/issues/1201) 클래스).
  *
  * 「PR 표본이 비었다」를 치명으로 두는 것이 [#1201](https://github.com/coseo12/astro-simulator/issues/1201)
  * 클래스 차단이다 — 표본이 비면 모든 브랜치가 「머지된 PR 없음」으로 **조용히 보존**되어 통과하는데,
@@ -201,6 +217,8 @@ export function planBranchCleanup({
   const errors = [];
   /** 브랜치 단위 판정 불가 — 그 브랜치만 제외한다. */
   const unresolved = [];
+  /** 판정에 기여하지 않아 건너뛴 PR 레코드 수 — 조용히 버리지 않으려고 센다. */
+  let ignoredClosedNoHeadRef = 0;
   const del = [];
   const keep = [];
 
@@ -223,8 +241,9 @@ export function planBranchCleanup({
     );
   }
 
-  // 브랜치명 → 신호 집계. 귀속 불가(head 브랜치명 없음)는 치명이다 — 그 PR 이 어느 브랜치의
-  // 열린 PR 인지 알 수 없으므로, 보존해야 할 브랜치를 삭제 대상으로 놓칠 수 있다.
+  // 브랜치명 → 신호 집계. 귀속 불가(head 브랜치명 없음)는 원칙적으로 치명이다 — 그 PR 이 어느
+  // 브랜치의 열린 PR 인지 알 수 없으므로, 보존해야 할 브랜치를 삭제 대상으로 놓칠 수 있다.
+  // 예외는 닫힘(미머지) 하나뿐이다 (헤더 §head 브랜치명 결손의 치명 범위).
   const byBranch = new Map();
   for (const raw of prList) {
     const pr = raw && typeof raw === 'object' ? raw : {};
@@ -232,8 +251,15 @@ export function planBranchCleanup({
     const name =
       typeof pr.headRefName === 'string' && pr.headRefName.length > 0 ? pr.headRefName : null;
     if (name === null) {
+      // 닫힘(미머지)은 삭제 근거도 보존 근거도 아니라 브랜치명이 없어도 판정이 달라지지 않는다.
+      // ⚠️ 이 분기가 `status` 로 갈리는 것이 핵심이다 — `unknown` 은 「닫힘인지」를 모르는
+      // 상태이므로 여기에 들어오면 안 된다 (치명 유지).
+      if (status === PR_CLOSED) {
+        ignoredClosedNoHeadRef += 1;
+        continue;
+      }
       errors.push(
-        `PR ${pr.number === undefined || pr.number === null ? '#?' : `#${pr.number}`} 의 head 브랜치명을 읽지 못했다 — 귀속 불가 (fail-closed)`,
+        `PR ${pr.number === undefined || pr.number === null ? '#?' : `#${pr.number}`} 의 head 브랜치명을 읽지 못했다 — 귀속 불가, 상태 ${status} (fail-closed)`,
       );
       continue;
     }
@@ -332,6 +358,11 @@ export function planBranchCleanup({
     keep,
     unresolved,
     errors,
+    /**
+     * 판정에 기여하지 않아 건너뛴 PR 레코드 수 (닫힘·미머지 ∧ head 브랜치명 결손).
+     * `ok` 에 영향을 주지 않는다 — 판정 불가가 아니라 **판정 무관**이다.
+     */
+    ignoredClosedNoHeadRef,
   };
 }
 
@@ -342,6 +373,11 @@ export function renderPlan(plan, { mode, repo }) {
   lines.push(`모드: ${mode === 'apply' ? 'APPLY (실삭제)' : 'DRY-RUN (목록만, 삭제하지 않음)'}`);
   lines.push(
     `판정: 삭제 ${plan.del.length} / 보존 ${plan.keep.length} / 판정 불가 ${plan.unresolved.length} / 치명 ${plan.errors.length}`,
+  );
+  // 0 건이어도 **항상** 박는다 — 줄이 없으면 「무시한 게 없다」와 「세는 채널이 없다」가
+  // 구분되지 않는다 (#1201 클래스).
+  lines.push(
+    `무시: 닫힘(미머지) PR 중 head 브랜치명 결손 ${plan.ignoredClosedNoHeadRef ?? 0} 건 — 삭제·보존 어느 근거도 아니라 판정 무관`,
   );
   lines.push('');
 
