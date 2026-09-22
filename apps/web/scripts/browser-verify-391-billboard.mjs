@@ -15,7 +15,8 @@
  *      → DoD: pxDiameter < 4px cell 에서 lowVariant.material.opacityTexture = null (사각형 fallback)
  *  - 시나리오 E — DynamicTexture 공유 인스턴스 검증
  *      → DoD: scene.metadata.__lodBillboardAlphaMask 1개 (per-body 생성 금지)
- *      → DoD: low variant material 24개 모두 동일 opacityTexture reference 공유
+ *      → DoD: low variant material 전건이 동일 opacityTexture reference 공유
+ *        (#1207 정정 — 종전 주석은 "24개" 였으나 body 누적으로 값이 변한다. 계수를 박지 않는다)
  *
  * dev 빌드 의존: `window.__solarScene.getLodInfo()` + `window.__simCore.scene` (private API).
  *
@@ -35,7 +36,7 @@
  * [`docs/ops/browser-verify-helpers.md`](../../../docs/ops/browser-verify-helpers.md) §CI 배선 이
  * 정본이다 — 본 가드의 판정량은 픽셀이 아니라 **material 상태 + pxDiameter** 다.
  *
- * ## 판별력 실측 (#1207, 2026-09-22 · rev `1c1254e` · 로컬 dev 서버 headless)
+ * ## 판별력 실측 (#1207, 2026-09-22~23 · rev `1c1254e` · 로컬 dev 서버 headless)
  *
  * 앱(`packages/core`)에 변이를 주입해 시나리오별 독립 FAIL 을 실증했다. 무주입 대조군은 주입
  * 전·후 모두 `exit 0` (3중 시뮬: positive → negative → recovery).

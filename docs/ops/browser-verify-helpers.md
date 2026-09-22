@@ -168,7 +168,7 @@ ADR [`20260705-759`](../decisions/20260705-759-shader-verify-ci-guard.md) 의 �
 - `.github/workflows/ci.yml` — `detect-and-test` job 의 브라우저 회귀 가드 구간 (dev 서버 `:3002` 공용)
 - `.github/workflows/shader-pixel-guard.yml` — 단독 job (dev 서버 `:3001`)
 
-> **갈림축이 *아닌* 것 [실측 2026-09-22]**: **서버 방식이 아니다.** 둘 다
+> **갈림축이 *아닌* 것 [실측 2026-09-22~23]**: **서버 방식이 아니다.** 둘 다
 > [`scripts/ci-dev-server.sh`](../../scripts/ci-dev-server.sh) 로 **`next dev`** 를 띄운다 (`:3002` /
 > `:3001` — 포트만 다르다. shader-pixel-guard 쪽은 `setup-and-build` composite 의
 > `start-dev-server: 'true'` 경로). 호출 관용구(`node apps/web/scripts/*.mjs` ↔
@@ -189,7 +189,7 @@ ADR [`20260705-759`](../decisions/20260705-759-shader-verify-ci-guard.md) 의 �
 부르지만 판정에는 쓰지 않는다 (`verify:762-monotonic` / `verify:lod`). 기준은 **PASS/FAIL 을
 가르는 값이 무엇인가** 하나다.
 
-### 현행 전수 분류 (2026-09-22 — 반례 검사 결과)
+### 현행 전수 분류 (2026-09-22~23 — 반례 검사 결과)
 
 `ci.yml` 배선 (본 PR 의 `379-lod` · `391-billboard` 포함):
 

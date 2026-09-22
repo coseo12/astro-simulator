@@ -31,7 +31,7 @@
  * [`docs/ops/browser-verify-helpers.md`](../../../docs/ops/browser-verify-helpers.md) §CI 배선 이
  * 정본이다 — 본 가드의 판정량은 픽셀이 아니라 **LOD 레벨 분포 + 화면 반지름(px)** 이다.
  *
- * ## 판별력 실측 (#1207, 2026-09-22 · rev `1c1254e` · 로컬 dev 서버 headless)
+ * ## 판별력 실측 (#1207, 2026-09-22~23 · rev `1c1254e` · 로컬 dev 서버 headless)
  *
  * 「가드가 있다 ≠ 그 가드가 작동한다」([#1123](https://github.com/coseo12/astro-simulator/issues/1123))
  * 차단을 위해 **앱(`packages/core`)에 변이를 주입**해 시나리오별로 독립 FAIL 을 실증했다.
@@ -69,7 +69,8 @@ const flags = {
 /**
  * 시나리오 A — T1 default 매트릭스 viewport 정의.
  * forensic 매트릭스 SSoT (`docs/reports/379-forensic/output.json`) 와 동일 viewport 풀에서
- * spot-check 10 cell 추출 (전체 40 cell 재측정 비용 절감).
+ * spot-check 추출 (전체 매트릭스 재측정 비용 절감 — cell 정본은 아래 배열이다).
+ * ⚠️ 종전 주석은 "10 cell" 이었으나 배열 원소는 8 개다 (#1207 정정). 계수를 다시 박지 않는다.
  */
 const SCENARIO_A_VIEWPORTS = [
   { id: '320x568_dpr1', width: 320, height: 568, dpr: 1, kind: 'mobile-narrow' },
@@ -88,7 +89,7 @@ const SCENARIO_A_DOD = Object.freeze({
   // billboard fallback 비율 천장. 본 가드는 "sun 만 high 였던 fix 전" 회귀를 막는 것이 1차 목적.
   // mercury/venus mid 진입은 #385 라운드 3 영역 (architect ADR §재검토 #4).
   //
-  // ── 여유 실측 (#1207, 2026-09-22 · rev `1c1254e` · 로컬 dev 서버 headless · N = 6) ──
+  // ── 여유 실측 (#1207, 2026-09-22~23 · rev `1c1254e` · 로컬 dev 서버 headless · N = 6) ──
   // 무주입 `maxLowRatio` = **`0.875` 6/6 회 동일** (8 cell 전건도 run 간 바이트 동일 — 분산 0).
   //   여유 `0.96 − 0.875 = 0.085` (32 body 기준 `2.7` body 분).
   // ⚠️ 착수 시 인계된 *"여유가 `0.002` 뿐"* 은 **`__baselines__/lod-379.json` (2026-05-02, 24 body)
