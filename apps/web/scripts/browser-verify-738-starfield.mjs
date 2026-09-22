@@ -27,6 +27,50 @@
  *   별 가시(S1)는 `page.screenshot()` composited 버퍼 + pngjs 로만 정확. drawImage 미사용.
  *
  * 실 Chrome GUI 시각 품질 (은하수 미학 / 색온도) 은 qa + 사용자 D-T2 (headless 미재현).
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * ## 왜 이 스크립트는 CI 에 걸지 않는가 ([#1207](https://github.com/coseo12/astro-simulator/issues/1207))
+ *
+ * **의도적으로 수동 전용이다.** 형제 가드 `verify:379-lod` · `verify:391-billboard` 는 #1207 에서
+ * `ci.yml` 에 배선됐지만 본 스크립트는 배선하지 않았다. 다음 사람이 *"셋 중 이것만 왜 빠졌지"*
+ * 로 같은 조사를 반복하지 않도록 근거를 여기 박제한다.
+ *
+ * **근거 — 배선해도 잴 값이 없다.** 위 §환경 자동 분기 가 계약한 대로, CI 러너는 GPU 가 없어
+ * 소프트웨어 렌더(SwiftShader)로 떨어지고 그러면 S6 계약대로 **별이 비활성 + mesh 미생성**이
+ * 정상이다. mesh 가 없으므로 mesh 의존 시나리오 S1~S5 는 전부 자동 SKIP 되고, 본 스크립트의
+ * **고유 대역인 S2 (floating-origin 별 좌표 불변)** 가 바로 그 SKIP 집합 안에 있다.
+ *
+ * 실측 (#1207, 2026-09-22 · rev `1c1254e` · **CI 와 동일한 무플래그 headless** — 본 파일이 쓰는
+ * `withBrowser({})` 그대로):
+ *
+ * ```
+ * isSoftwareRenderer=true, starfieldVisible=false
+ * ⊘ S1 별 가시 (SKIP) / ⊘ S2~S5 (SKIP) — software 환경 — starfield mesh 미생성
+ * 결과: 4/4 PASS   ← 4 건 전부 S6 + 콘솔 에러 축
+ * ```
+ *
+ * 즉 CI 에 걸면 **S6 만 재실행**하는 셈인데, S6·S5·S3 의 대역은 이미 CI 가 덮고 있다 —
+ * 단위 테스트 [`apps/web/src/core/detect-software-renderer.test.ts`] + [`packages/core/src/scene/starfield.test.ts`]
+ * (둘 다 `ci.yml` 의 `pnpm -r test` 경로) 와, ADR `20260624-738-procedural-starfield.md` §Amendment 2
+ * 가 명시 위임한 `fps-baseline-guard` + `r1-guard` 다. 그 위임은 실제로 작동한 이력이 있다
+ * (PR [#742](https://github.com/coseo12/astro-simulator/pull/742) → 이슈 [#745](https://github.com/coseo12/astro-simulator/issues/745)).
+ * ⇒ 배선은 CLAUDE.md §검증 강도 게이트 의 *"가드를 하나 만들 때마다 그 가드를 검사할 표면이
+ * 하나 늘어난다"* 에 그대로 걸리는 **「있으니 돌리자」**다.
+ *
+ * **재판정 조건 (접촉 기준 — 시간이 아니다).** 아래 중 하나가 성립하면 본 판단을 다시 편다.
+ *
+ *  1. **CI 러너가 하드웨어 GPU 를 갖게 됨** — 그 순간 S1~S5 가 실행되므로 S2 의 고유 대역이
+ *     CI 에서 처음으로 측정 가능해진다. 판별 술어는 러너 이름이 아니라 본 스크립트가 찍는
+ *     `isSoftwareRenderer` 다 (`false` 면 조건 성립).
+ *  2. **S2 가 지키는 축(floating-origin 별 좌표 불변)에서 실피해 관측** — 그때는 「배선」이
+ *     아니라 **software 환경에서도 측정 가능한 술어로 S2 를 재설계**하는 것이 먼저다.
+ *     `?stars=force` 류의 소프트웨어 강제 플래그가 생기면 그 경로로 배선한다.
+ *  3. **S6 의 위임처(fps-baseline-guard / r1-guard)가 제거되거나 대역이 좁아짐** — 위임이
+ *     끊기면 본 스크립트의 S6 가 유일 지점이 되므로 배선 근거가 생긴다.
+ *
+ * 어느 워크플로에 거는가의 판단 기준은
+ * [`docs/ops/browser-verify-helpers.md`](../../../docs/ops/browser-verify-helpers.md) §CI 배선 이
+ * 정본이고, 본 절은 그 §의 *"거는가 마는가"* 쪽 선례다.
  */
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 import { PNG } from 'pngjs';
