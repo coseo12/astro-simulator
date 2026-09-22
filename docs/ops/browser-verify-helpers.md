@@ -238,6 +238,22 @@ ADR [`20260705-759`](../decisions/20260705-759-shader-verify-ci-guard.md) 의 �
 그리고 「배선했다」와 「돈다」도 다른 명제라 **도입 PR 의 실 run 로그에서 step 발화를 확인**한다
 ([#1096](https://github.com/coseo12/astro-simulator/issues/1096)).
 
+> **「CI 호출 `0` 건」은 #1207 이 다룬 3 종이 전부가 아니다** [직접 계수 2026-09-23 · rev `8b5f2c3`].
+> 술어: 루트·`apps/web` `package.json` 에 등록된 `browser-verify-*.mjs` 전건에 대해 `.github/**` 에서
+> **파일명** 또는 **`run <스크립트명>`** 호출을 찾는다.
+>
+> - `apps/web/scripts/` 소속은 본 PR 의 배선 **전** 기준 **7 종**이었다 — `379-lod` · `391-billboard` ·
+>   `738-starfield` · `380-zoom` · `732-overview` · `790-focus-zoom` · `818-focus-zoom`. 앞 둘을 배선한
+>   뒤 남는 것은 **5 종**이고, 그중 근거가 박제된 것은 `738-starfield` 하나다 (나머지 4 종은 미조사).
+> - 루트 `scripts/` 소속까지 넓히면 **9 파일**이 더 있다 (`browser-verify.mjs` · `scale` · `mobile` ·
+>   `mobile-p4c` · `perf` · `a11y` · `webgpu` · `belt-nbody` · `click-select` — 마지막 하나는
+>   `verify:713-click-select` · `verify:719-overlap-cycle` 두 키가 공유한다). 이 중 8 개는 수동 번들
+>   `verify:smoke` 소속이라 「호출 0」이 곧 방치는 아니다.
+>
+> ⇒ 계수는 universe 에 따라 갈리므로(같은 시점에 **7** ↔ **16**) 「N 종」을 쓸 때는 **술어를 함께**
+> 적는다. 위 4 종(`380-zoom` · `732-overview` · `790-focus-zoom` · `818-focus-zoom`)은 **접촉 시
+> 재판정** 대상으로 남긴다 — 실피해 `0` 이라 지금 일괄 배선하지 않는다 (CLAUDE.md §검증 강도 게이트).
+
 ## ci.yml 배선 규약 (#846)
 
 브라우저 회귀 가드는 **dev 서버를 각자 띄우지 않는다.** `ci.yml` 이

@@ -106,6 +106,11 @@ jobs:
       # 에서나 `TimeoutError` 를 받는 것보다 낫다 (본 이슈가 정확히 그 상황이었다).
       # 자연 발생 빈도가 약 40 % 였던 결함을 `page.addInitScript` 로 **결정적으로** 재현하므로
       # 「통과 = 결함 없음」이 성립한다. 주입이 안 먹으면 S1 이 FAIL 이라 공허 통과가 막힌다.
+      # 배치 근거 (R3 예외 — `docs/ops/browser-verify-helpers.md` §CI 배선): 판정량이 픽셀이
+      # 아니라 부팅 구조(`bootPhases` / `rendererKind` / 콘솔)라 R1·R2 로는 `ci.yml` 이지만,
+      # 본 가드가 지키는 대상은 **이 job 의 나머지 step 이 측정 가능한 상태로 부팅되는가** 다.
+      # 즉 근거가 판정량이 아니라 **보호 대상과의 co-location** 이라, 다른 워크플로로 옮기면
+      # 위의 "맨 앞에 둔다" 가 성립하지 않는다 (순서 근거와 배치 근거는 별개 명제).
       - name: verify:1234-adapter-stall (requestAdapter 미결 주입 → 상한 폴백)
         run: |
           trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT

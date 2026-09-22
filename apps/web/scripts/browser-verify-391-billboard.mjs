@@ -51,9 +51,30 @@
  * 통과한다 (실측 — 변이판에서 low cell 4 개는 `mask=true` 로 PASS). 8 cell 매트릭스를 줄이면
  * 이 축이 죽으므로 축소하지 말 것.
  *
- * ⚠️ 알려진 사각 — 매트릭스 전 cell 에서 `pxDiameter ≥ 4px` 라 **`fallback 진입 cell = 0`** 이다
- * (실측). 즉 시나리오 D 는 4px 미만의 사각형 fallback 쪽 분기를 한 번도 밟지 않는다. 그 경계는
- * `lod-billboard-alpha-mask.test.ts` 의 `3.9 / 4.1px` 단위 테스트가 담당한다.
+ * ## 알려진 사각 3 종
+ *
+ * ⚠️ **(1) 4px fallback 분기 미도달** — 매트릭스 전 cell 에서 `pxDiameter ≥ 4px` 라
+ * **`fallback 진입 cell = 0`** 이다 (실측). 즉 시나리오 D 는 4px 미만의 사각형 fallback 쪽
+ * 분기를 한 번도 밟지 않는다. 그 경계는 `lod-billboard-alpha-mask.test.ts` 의 `3.9 / 4.1px`
+ * 단위 테스트가 담당한다.
+ *
+ * ⚠️ **(2) 시나리오 E 의 fail-open — 덮는 것은 시나리오 D 「단층」이다.**
+ * `runScenarioE` 의 판정은 `sharedExists && uniqueCount <= 1` 이라 mask 가 **하나도 적용되지
+ * 않은** 상태(`uniqueCount === 0`)에서도 참이다. 형제 조건 `sharedMaskExists` 는 그 대역을
+ * **덮지 못한다** — 그 상태에서 `true` 이기 때문이다 (#1207 정정. 종전 서술은 형제 조건과 D 가
+ * 함께 덮는다고 적었다). 코드로 확인한 도달 경로: `body-mesh-factory.ts` 가 low material 생성
+ * 시점에 `getOrCreateBillboardAlphaMask(scene)` 를 불러 **`scene.metadata` 캐시를 남기고**,
+ * 이후 `solar-system-scene.ts` 의 `runLodPass` 가 `lowMat.opacityTexture = null` 로 되돌릴 수
+ * 있다 ⇒ 「캐시 존재 + 고유 인스턴스 0」 은 도달 가능하다. 실제로 mask 판정을 상시 `false` 로
+ * 만든 변이(위 표 2 행)가 그 경로였고, 그때 FAIL 을 낸 것은 **D 뿐**이다 (`8/8 → 4/8`).
+ *
+ * ⚠️ **(3) 그 시나리오 D 자신의 공허 통과** ([#1201](https://github.com/coseo12/astro-simulator/issues/1201) 클래스).
+ * `runScenarioD` 는 `measurement.bodyResults[id]` 가 없으면 `bodyChecks[id] = { error: … }` 를
+ * 적고 `continue` 할 뿐 **`cellPass` 를 내리지 않는다.** `bodyResults` 는 `<id>-lod-low` mesh +
+ * material 이 있을 때만 채워지므로, `mercury` / `venus` 의 low variant(또는 그 material)가
+ * 사라지면 그 cell 은 **단언 0 개로 PASS** 하고 `pass = cellsPass === cellsTotal` 이라 D 전체가
+ * PASS 한다. (2) 와 겹치면 D·E 가 둘 다 통과한다. **술어 개정은 #1207 계약의 비목표**라
+ * 여기서는 기록만 한다 — 사용자 판정 대기.
  */
 
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
