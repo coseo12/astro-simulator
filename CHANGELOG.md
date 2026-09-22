@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.89.2] - 2026-09-23
+
 ### Added
 
 - **[#1207] 저장소에 파일로만 있던 browser-verify 2종 CI 배선 + 워크플로 분담 기준 정본 선언** ([#1207](https://github.com/coseo12/astro-simulator/issues/1207)). `browser-verify-379-lod.mjs` · `browser-verify-391-billboard.mjs` · `browser-verify-738-starfield.mjs` 셋은 **CI 호출 `0` 건**이었다. 셋을 같게 처분하지 않았다 — **앞 둘은 배선, 738 은 수동 유지**다.
