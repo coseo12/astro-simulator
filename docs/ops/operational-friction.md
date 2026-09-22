@@ -130,12 +130,41 @@ done
 
 **구조 원인**: Conductor 멀티 워크스페이스 환경은 여러 워크스페이스가 서로 다른 브랜치(특히 `develop`)를 동시 체크아웃한다. `--delete-branch` 는 머지 후 로컬에서 base 브랜치로 전환하려다 다른 워크스페이스가 점유한 브랜치와 충돌한다.
 
-**표준 절차**:
+**표준 절차** (2026-09-22 갱신 — 바뀐 것은 **「누가 원격 브랜치를 지우는가」 하나뿐**이다):
 
-- 처음부터 `--delete-branch` **생략**하고 머지만: `gh pr merge <PR> --squash`.
-- 원격 브랜치 정리는 별도: `git push origin --delete <branch>`.
+- 처음부터 `--delete-branch` **생략**하고 머지만: `gh pr merge <PR> --squash`. **이 항은 불변이다** — 위 worktree 충돌은 여전히 참이므로 `--delete-branch` 는 계속 쓰지 않는다.
+- 원격 브랜치 정리는 **주간 [`branch-cleanup` workflow](../../.github/workflows/branch-cleanup.yml) 가 집행한다** (#1247). 머지 후 사람이 할 일은 없다.
+- 즉시 지우고 싶으면 `git push origin --delete <branch>` 를 써도 된다. **다만 폴백이지 의무가 아니다** — 의무로 둔 3개월간 실제 집행률이 어땠는지는 아래 §2-1 이다.
 - 머지 성공 여부는 종료 코드가 아닌 실제 상태로 확인: `gh pr view <PR> --json state,mergeCommit`.
 - 실측: 2026-07-15 세션 #824 에서 `--delete-branch` worktree 충돌, 머지는 성공(exit 0) → 이후 PR 은 처음부터 생략.
+
+### 2-1. 그 「별도 단계」는 건너뛰어졌다 — 잔존 101 개 (#1247)
+
+위 표준 절차의 2번 항(구판 *"원격 브랜치 정리는 별도"*)은 **집행 주체가 없는 단계**였다. 결과를 2026-09-22 에 실측했다.
+
+| 분류                                     | 개수    |
+| ---------------------------------------- | ------: |
+| 원격 브랜치 (정리 전)                    | **110** |
+| └ PR 이 **머지됨** (squash)              |  **90** |
+| └ PR 이 닫힘 (머지 안 됨)                |       6 |
+| └ PR 없음                                |       2 |
+| 삭제한 것 (`develop`·`main` 만 남김)     | **101** |
+
+⇒ **집행 주체가 없는 단계는 대부분 건너뛰어진다.** [#1201](https://github.com/coseo12/astro-simulator/issues/1201) 이 박제한 *"접촉 트리거는 조회 습관 없이 발화하지 않는다 — 집행 주체 없는 트리거 조건은 무한 유예"* 와 같은 구조이고, 이번엔 그 대상이 가드가 아니라 **운영 절차**였다.
+
+원인은 두 개가 겹쳤다. 위 절차가 하나이고, 다른 하나는 저장소 설정 `delete_branch_on_merge: false` 다 (실측 — `gh api repos/... --jq .delete_branch_on_merge`).
+
+⚠️ **그 설정을 그냥 켜는 것은 처방이 아니다.** 릴리스 PR 은 `head=develop` 이라 머지 시 GitHub 가 **`develop` 을 지울 수 있고**, 이 저장소의 `develop` 은 기본 브랜치가 아니며 브랜치 보호도 없다 (실측 — `gh api .../branches/develop/protection` → `404 Branch not protected`). gitflow 의 알려진 함정이라 브랜치 보호가 선행돼야 하고, 그 정책은 [#971](https://github.com/coseo12/astro-simulator/issues/971) 소관이다. 대신 workflow 가 `develop`·`main` 을 **이름으로** 제외한다.
+
+**⚠️ ancestor 판정으로 「머지 여부」를 재지 말 것.** 이 저장소는 squash 머지라 머지된 브랜치의 커밋 sha 가 `develop` 의 조상이 **아니다**. `git branch --merged` / `git merge-base --is-ancestor` 로 재면 위 **90 개가 전부 「미머지」로 나온다**. 판정 기준은 **PR 상태**다.
+
+**자동화의 범위** — 술어·fail-closed 목록의 정본은 [`scripts/branch-cleanup-plan.mjs`](../../scripts/branch-cleanup-plan.mjs) 헤더이고 여기서 복제하지 않는다. 운영자가 알아야 할 것만:
+
+- 지우는 것은 **같은 저장소의 머지된 PR 의 head 브랜치**뿐이다. 「PR 없음」·「닫힌(미머지) PR 만 있음」은 **판단이 필요한 대역**이라 자동화하지 않았다 (위 표의 8 개가 그것이고, 이번엔 사용자 확인 후 손으로 지웠다).
+- 기본은 **dry-run** 이다. 실삭제는 주간 `schedule` 과 `workflow_dispatch` 의 `apply=true` 두 경로뿐이고, 어느 모드로 돌았는지가 로그와 run summary 첫 줄에 박힌다.
+- 삭제 **직전**에 브랜치명과 sha 를 출력하고 summary 에 남긴다 — 되살리려면 `git push origin <sha>:refs/heads/<name>`.
+- 조회 실패·PR 표본 공백·페이지네이션 누락·PR 상태 미상은 **삭제하지 않고 run 을 실패시킨다**. 「상태를 모르니 지운다」 경로는 없다.
+- ⚠️ `schedule`·`workflow_dispatch` 는 **default branch(main) 에 반영된 정의만** 발견된다 ([workflow-dispatch-pitfalls](../lessons/workflow-dispatch-pitfalls.md)). 즉 develop 머지만으로는 돌지 않고 **다음 릴리스 이후** 첫 스케줄이 뜬다.
 
 ---
 
