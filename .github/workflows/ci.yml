@@ -314,6 +314,17 @@ jobs:
       - name: '#1184 stage:* 라벨 결정 로직 회귀 가드 (stage-label-decision.test)'
         run: node scripts/stage-label-decision.test.mjs
 
+      # #1247 브랜치 정리 판정 로직 (branch-cleanup.yml 의 SSoT) 회귀 가드.
+      # 삭제는 되돌리기 어려우므로 판정 술어를 주입으로 고정한다 — (a) 머지된 브랜치를 잡는가
+      # (b) 열린 PR 의 head 를 제외하는가 (c) develop·main·보호 브랜치를 제외하는가
+      # (d) 조회 실패·상태 미상·빈 표본·페이지네이션 누락에서 fail-closed 인가.
+      # branch-cleanup.yml 이 사용 직전에도 같은 테스트를 돌린다 (이중 배선).
+      # ⚠️ 그 workflow 는 schedule/workflow_dispatch 라 **default branch 반영 후에만** 발견된다
+      #   — 이 상시 배선이 develop 단계에서 판정 로직을 잡는 유일한 경로다.
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#1247 브랜치 정리 판정 로직 회귀 가드 (branch-cleanup-plan.test)'
+        run: node scripts/branch-cleanup-plan.test.mjs
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================
