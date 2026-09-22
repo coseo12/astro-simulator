@@ -5,6 +5,22 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1247] 머지된 브랜치 자동 정리 — `branch-cleanup` workflow 신설** ([#1247](https://github.com/coseo12/astro-simulator/issues/1247)). 2026-09-22 실측에서 원격 브랜치 **110 개** 중 **머지된 PR 의 head 가 90 개** 잔존했고 101 개를 손으로 지웠다. 원인은 둘이 겹쳤다 — 저장소 설정 `delete_branch_on_merge: false`, 그리고 **우리 표준 절차가 삭제를 「집행 주체 없는 별도 단계」로 밀어낸 것**이다 ([`docs/ops/operational-friction.md`](docs/ops/operational-friction.md) §2, 2026-07-15 #824 의 worktree 충돌 처방). [#1201](https://github.com/coseo12/astro-simulator/issues/1201) 의 _"집행 주체 없는 트리거 조건은 무한 유예"_ 와 같은 구조이고, 이번엔 대상이 가드가 아니라 **운영 절차**였다.
+
+  - **주간 `schedule` + `workflow_dispatch`** (`.github/workflows/branch-cleanup.yml`). 삭제 술어는 **같은 저장소의 머지된 PR 의 head 브랜치**이고 **그 브랜치의 현재 sha 가 그 PR 이 머지한 `head.sha` 와 같을 때**뿐이다. `develop` · `main` · 열린 PR 의 head · 보호 브랜치는 제외한다. 「PR 없음」 · 「닫힌(미머지) PR 만 있음」은 **판단이 필요한 대역**이라 자동화 범위 밖이다.
+  - **머지 뒤 새 커밋이 쌓인 브랜치는 지우지 않는다** (`advanced-past-merge`). 초판에는 이 대조가 **없었고**, 그래서 머지 이후의 신규 커밋이 **조용히** 삭제됐다 — 주입 재현에서 `삭제 1 · 치명 0 · ok:true · exit 0` 으로 **이 판정 함수의 모든 신호 채널이 정상을 가리켰다** (PR [#1248](https://github.com/coseo12/astro-simulator/pull/1248) reviewer B1). 근원은 정규화가 REST 응답의 `head.sha` 를 버린 것이라 **대조 술어가 판정부에 존재할 수 없었다**. 이것은 「PR 없음」·「닫힌 PR 만 있음」과 정확히 같은 _판단이 필요한 대역_ 인데 **인지되지 않아 카브아웃에 들어가지 못한** 누락이다. 전제(_"닫힌 PR 의 `head.sha` 는 머지 시점에 동결된다"_)는 실측으로 확인했다 — `head.ref=="develop"` 인 머지된 PR **89 건**의 `head.sha` 가 **전부 서로 다르고**(distinct 89) 현재 `develop` tip 과는 **0 건** 일치한다 (살아 있는 값이라면 89 건 전부 같은 sha 를 보고했을 것이다). 이 대조는 덤으로 **`develop` 의 두 번째 방어 층**이 된다 — `main` 은 `protected:true` + default branch 로 2층인데 `develop` 은 `ALWAYS_KEEP` 문자열 한 겹뿐이었다 (reviewer R1). 다만 2층은 _구조적으로 참인 관측_ 이지 _불변식_ 이 아니라 목록은 유지한다.
+  - **대조 불가는 보존이 아니라 실패다.** 머지된 PR 의 `head.sha` 를 읽지 못하면 `keep` 이 아니라 `unresolved`(`merge-sha-unknown`) 로 보낸다 — 「재지 못했다」를 「범위 밖이다」로 읽지 않는다 ([#1201](https://github.com/coseo12/astro-simulator/issues/1201) 클래스). 브랜치 쪽 `sha-unknown` 과 대칭이며, `null`·`''`·길이 불일치·비-16진수를 **하나의 sentinel 로 접어** 조용한 불일치를 만들지 않는다. fork 의 머지된 PR 은 애초에 삭제 근거가 아니라 이 경로에 닿지 않고, 열린 PR 은 sha 와 무관하게 보존 신호로 남는다 (둘 다 보존 방향).
+  - **기본은 dry-run.** 실삭제 경로는 주간 `schedule` 과 `apply=true` 입력 둘뿐이며, 어느 모드로 돌았는지가 `::notice::` · stdout 첫 줄 · run summary 헤딩 **세 곳**에 박힌다. 삭제 **직전**에 브랜치명과 40자 sha 를 출력하고 summary 에 남긴다 — 되살리려면 `git push origin <sha>:refs/heads/<name>`.
+  - **⚠️ ancestor 판정을 쓰지 않는다.** squash 머지라 머지된 브랜치의 커밋은 `develop` 의 조상이 **아니다** — `git branch --merged` 로 재면 위 90 개가 **전부 「미머지」**로 나온다. 기준은 PR 상태다.
+  - **fail-closed (「상태를 모르니 지운다」 없음).** 치명(삭제 목록 **전량** 폐기) = 브랜치 표본 공백 / PR 표본 공백 / **페이지네이션 누락**(GraphQL `totalCount` 기대치 > REST 수집 건수) / head 브랜치명을 읽지 못한 PR / 이름 없는 브랜치. 브랜치 단위 제외 = PR 상태 미상 / `protected` 가 boolean 아님 / 40자 sha 미확보. 어느 쪽이든 run 은 비-0 으로 끝난다. 「PR 표본이 비었다」를 **치명**으로 둔 것이 [#1201](https://github.com/coseo12/astro-simulator/issues/1201) 클래스 차단이다 — 표본이 비면 전 브랜치가 「머지된 PR 없음」으로 **조용히 보존**되어 통과하는데, 그 통과는 「지울 게 없다」가 아니라 「재지 못했다」다.
+  - **페이지네이션 가드의 입력이 0 으로 퇴화하면 가드가 공허 통과했다** (reviewer R2). `Number('') === 0` 이고 `Number.isInteger(0) === true` 라 **빈 출력이 검사를 통과**했고, 그 뒤 `prList.length < 0` 은 항상 false 라 **페이지네이션 검사 자체가 사라졌다**. `parseExpectedPrCount` 로 분리해 `>= 1` 을 요구한다 — **새 임계가 아니다.** PR 0 건 저장소는 이미 「PR 표본이 비었다」 치명으로 잡히므로 기대 총계 0 은 「PR 이 없다」가 아니라 「총계를 읽지 못했다」의 재진술이다.
+  - **`--apply` 의 마지막 줄에 「판정 불가 N 건은 건드리지 않았다」를 병기한다** (reviewer R3). 판정 불가가 있어도 나머지는 삭제되고 run 은 비-0 으로 끝나는데(F4 조문대로다), 결과물이 「빨간 run + 부분 삭제」라 로그를 안 읽으면 **「실패했으니 안 지워졌겠지」로 오독**된다. stdout 과 step summary 양쪽에 박는다.
+  - **판정을 YAML 인라인 셸이 아니라 순수 함수로 뺐다** (`scripts/branch-cleanup-plan.mjs` + `.test.mjs`). 인라인 셸은 주입 지점이 없어 _"돌려봤더니 지울 게 없더라"_ 이상의 증거를 만들 수 없다. **변이를 실제 주입해 전건 사살 확인** — 변이↔사살 테스트 매핑의 **정본은 `scripts/branch-cleanup-plan.test.mjs` 헤더**다. 여기 사본을 두지 않는다: 테스트가 늘 때마다 매핑이 갱신되는데 (이 PR 에서만 **두 번** 갱신됐다 — M1·M8 이 두 라운드 연속 바뀌었다) 사본은 그 갱신을 못 따라가 혼자 낡는다 (volt #120 — 중복 출처 제거). ⚠️ 초판 주석은 이 표를 「전건 **단독** 사살」로 적었고 **주입해 보니 절반이 틀렸다** — 특히 **M8 을 U8 이 잡지 못한다** (U8 의 표본은 PR 0 건이라 삭제 후보 자체가 생기지 않아 `del` 이 변이 여부와 무관하게 `[]`). ⚠️ **변이를 추가할 때마다 기존 변이를 전건 재주입해야 한다** — 신규 테스트가 기존 변이도 함께 잡아 매핑이 바뀐다 (이 PR 에서 두 번 겪었다). 손으로 표를 고치면 그 자리가 곧 거짓이 된다.
+  - **`delete_branch_on_merge` 설정은 의도적으로 켜지 않았다.** 릴리스 PR 은 `head=develop` 이라 GitHub 가 **`develop` 을 지울 수 있고**, 이 저장소의 `develop` 은 기본 브랜치도 아니고 브랜치 보호도 없다 (실측 `404 Branch not protected`). 그 축은 [#971](https://github.com/coseo12/astro-simulator/issues/971) 소관이다. workflow 는 `develop`·`main` 을 **이름으로** 제외해 같은 함정을 피한다.
+  - ⚠️ **`schedule`·`workflow_dispatch` 는 default branch(main) 반영 후에만 발견된다** ([workflow-dispatch-pitfalls](docs/lessons/workflow-dispatch-pitfalls.md)). `pull_request` 계열과 달리 **도입 PR 자신의 머지로는 실발동을 검증할 수 없다** — develop 단계의 증거는 단위 테스트 + 로컬 dry-run 이고, 첫 스케줄은 다음 릴리스 이후다. `ci.yml detect-and-test` 상시 배선이 그동안 판정 로직을 잡는 유일한 경로다 (#897 교훈). ⚠️ 따라서 **첫 실발동이 곧 첫 실삭제다** (reviewer R5) — main 반영 직후 `workflow_dispatch` 를 `apply=false` 로 **1회 리허설**한 뒤 주간에 맡긴다 (workflow 헤더 + `operational-friction.md` §2-1 에 박제).
+
 ### Changed
 
 - **[#1209] `bench:scene` 의 `focus-neptune ⚠` 8 PR 연속 발화 — baseline 재측정 + 조용한 측정 실패 제거** ([#1209](https://github.com/coseo12/astro-simulator/issues/1209) 계약 B3). PR [#1208](https://github.com/coseo12/astro-simulator/pull/1208) 에서 메인이 이 `⚠` 를 본 변경의 회귀로 의심해 조사 한 라운드를 태웠다. 본 변경 원인이 아니었고 **신호 자체가 죽어 있었다** — 그리고 그 밑에 「값이 어디서 왔는지」를 아무도 볼 수 없게 만든 구조가 둘 더 있었다.
@@ -43,6 +59,8 @@ Semantic Versioning을 따른다.
 - **`BENCH_REGRESSION_FPS` 환경변수가 더 이상 판정에 관여하지 않는다** (제거).
 - **`baseline.json` 에 `cells` 필드가 추가된다** — `bench-aggregate-median` 이 생성하는 셀 재고 선언. 이 필드가 없는 기준선(구버전 · `bench:scene:set-baseline` 단일 리포트 복사)도 **판정 자체는 그대로 성립**하며 `ℹ [매니페스트]` 한 줄이 늘어난다. 다만 그런 기준선에서 baseline 에 항목이 없는 셀이 나오면 이전의 `+ 신규`(exit 0) 대신 `⛔ 판정 불가`(exit 2) 다.
 - 앱 런타임 (`apps/web/src` · `packages/*/src`) 변경은 여전히 **0행**이다 — 바뀐 것은 가드/벤치 측정 경로뿐이다.
+- **[#1247] 머지된 PR 의 head 브랜치가 주간으로 자동 삭제된다.** 제품 런타임은 무변경(**CI 운영 자동화만** — `apps/**`·`packages/**` 접촉 0행)이나 **저장소 상태와 에이전트 행동이 바뀌므로** `None` 이 아니다. ⚠️ 발효 시점은 이 PR 의 develop 머지가 아니라 **다음 릴리스가 main 에 닿은 뒤 첫 스케줄**이다 (`schedule` 은 default branch 정의만 발견한다).
+- **[#1247] 머지 후 원격 브랜치 수동 삭제가 「의무」에서 「폴백」으로 강등된다** (에이전트 행동 변화). `CLAUDE.md` §반복 운영 마찰 2 항과 `docs/ops/operational-friction.md` §2 표준 절차 2번 항이 _"원격 브랜치 정리는 별도: `git push origin --delete <branch>`"_ → _"주간 `branch-cleanup` workflow 가 집행한다"_ 로 바뀐다. **`--delete-branch` 생략은 불변이다** — worktree 충돌(#824)은 여전히 참이라 바뀐 것은 「누가 지우는가」 하나뿐이다.
 
 ## [0.89.1] - 2026-09-21
 
