@@ -212,7 +212,7 @@ ADR [`20260705-759`](../decisions/20260705-759-shader-verify-ci-guard.md) 의 �
    #728 SSoT)이라 R1 로는 `ci.yml` 이지만, 지키는 대상이 **표시 크기 비율 곡선**이라 **R2 가
    우선**한다. ADR 759 가 처음부터 이 스크립트를 셰이더 feature 트랙으로 열거했다.
 2. **`1234-adapter-stall`** — 픽셀을 전혀 안 본다. 배치 근거가 워크플로 step 주석에 이미 있다 —
-   *"맨 앞에 둔다: 부팅이 깨지면 아래 step 이 전부 같은 증상으로 죽으므로"*. **R3 예외의 선례**이고,
+   *"맨 앞에 둔다: 부팅이 깨지면 아래 12 step 이 전부 같은 증상으로 죽으므로"*. **R3 예외의 선례**이고,
    근거가 판정량이 아니라 **운영(fail-fast 선행)** 이라는 점이 핵심이다.
 3. **`glow-marker` (#675)** — luminance cluster 계수라 R1 로는 `shader-pixel-guard.yml` 이다.
    다만 `ci.yml` 배선일이 **2026-06-13** (`eedd595`) 로 `shader-pixel-guard.yml` 신설
