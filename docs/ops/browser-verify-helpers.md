@@ -158,6 +158,102 @@ import {
 > 관측되면 보너스로 박제하되, **불변 계약으로 승격하지 말 것** — 진단 라인 하나만 늘어도
 > 깨지는 과잉 제약이고, 깨졌을 때 판정 회귀로 오독된다.
 
+## CI 배선 — 어느 워크플로에 거는가 ([#1207](https://github.com/coseo12/astro-simulator/issues/1207))
+
+브라우저 verify 가드가 도는 워크플로는 둘이다. **본 절이 분담 기준의 정본**이다 — 종전에는
+ADR [`20260705-759`](../decisions/20260705-759-shader-verify-ci-guard.md) 의 대상 열거와
+`ci.yml` step 주석에만 암묵적으로 있었고, 그래서 `verify:1204-sun-light` 처럼 *"픽셀 가드가 두
+워크플로에 갈려 있는데 어디가 정본인지 모르겠다"* 가 반복됐다.
+
+- `.github/workflows/ci.yml` — `detect-and-test` job 의 브라우저 회귀 가드 구간 (dev 서버 `:3002` 공용)
+- `.github/workflows/shader-pixel-guard.yml` — 단독 job (dev 서버 `:3001`)
+
+> **갈림축이 *아닌* 것 [실측 2026-09-22~23]**: **서버 방식이 아니다.** 둘 다
+> [`scripts/ci-dev-server.sh`](../../scripts/ci-dev-server.sh) 로 **`next dev`** 를 띄운다 (`:3002` /
+> `:3001` — 포트만 다르다. shader-pixel-guard 쪽은 `setup-and-build` composite 의
+> `start-dev-server: 'true'` 경로). 호출 관용구(`node apps/web/scripts/*.mjs` ↔
+> `pnpm --filter @astro-simulator/web run verify:*`)도 갈림축이 아니라 각 워크플로의 지역 관례다.
+
+### 규범
+
+- **R1 (기본 — 판정량)**: 판정량이 **캔버스 픽셀의 색·밝기·분포**면 `shader-pixel-guard.yml`.
+  **씬 상태·좌표·material 참조·DOM·콘솔**이면 `ci.yml`.
+- **R2 (우선 — 지대)**: R1 과 무관하게, 가드가 지키는 대상이 **ADR 759 가 열거한 셰이더 feature
+  지대**(표면 / 표시 크기 곡선 / 광원 / 태양 / 자전 / 지구 디테일 / 대륙 마스크 / 바다 / 대기 rim /
+  구름 / 야간 불빛)면 `shader-pixel-guard.yml` 이다. 그 워크플로의 존재 이유가 *그 지대의 상시
+  가드*이므로 (ADR 759 §배경), 같은 지대는 같은 job 에서 같이 깨지는 편이 진단이 빠르다.
+- **R3 (예외 — 명시 의무)**: R1·R2 와 다른 배치를 하려면 **해당 step 주석에 배치 근거를 한 문장**
+  남긴다. 근거 없는 예외는 두지 않는다.
+
+**R1 이 곧 「픽셀을 찍는가」가 아니다.** 여러 가드가 산출물 박제용으로 `page.screenshot()` 을
+부르지만 판정에는 쓰지 않는다 (`verify:762-monotonic` / `verify:lod`). 기준은 **PASS/FAIL 을
+가르는 값이 무엇인가** 하나다.
+
+### 현행 전수 분류 (2026-09-22~23 — 반례 검사 결과)
+
+`ci.yml` 배선 (본 PR 의 `379-lod` · `391-billboard` 포함):
+
+| 판정량 | 스크립트 |
+| --- | --- |
+| 씬 상태 · 좌표 · material · DOM | `378-focus` · `focus-transition` · `r-phase-allowlist` · `627-satellite-orbit` · `629-freefly-zoom` · `631-freefly-tier` · `693-freefly-panning` · `699-freefly-unified` · `704-sensitivity` · `848-modal-focus` · `737-onboarding` · `mobile-p7d` · `lod` · `1204-sun-light` · `1205-pause-lod` · **`379-lod`** · **`391-billboard`** |
+| **픽셀** | **`glow-marker` (#675)** ← R1 반례 |
+
+`shader-pixel-guard.yml` 배선:
+
+| 판정량 | 스크립트 |
+| --- | --- |
+| 픽셀 | `756-surface` · `773-light` · `774-sun` · `782-rotation` · `783-earth-detail`(+`MODE=ocean`) · `1119-earth-mask`(`dod`/`lod`/`seam`) · `1202-atmosphere-rim` · `1215-cloud-layer` · `1226-night-lights` |
+| **NDC 기하 (px diameter)** | **`762-monotonic`** ← R2 로 설명됨 (표시 크기 곡선 지대) |
+| **부팅 구조 (`bootPhases` / `rendererKind` / 콘솔)** | **`1234-adapter-stall`** ← R3 예외 (근거 기박제) |
+
+**반례는 3 건이고 전부 설명된다.**
+
+1. **`762-monotonic`** — 판정량은 `boundingSphere.radiusWorld` 의 NDC 투영(픽셀 readback 금지,
+   #728 SSoT)이라 R1 로는 `ci.yml` 이지만, 지키는 대상이 **표시 크기 비율 곡선**이라 **R2 가
+   우선**한다. ADR 759 가 처음부터 이 스크립트를 셰이더 feature 트랙으로 열거했다.
+2. **`1234-adapter-stall`** — 픽셀을 전혀 안 본다. 배치 근거가 워크플로 step 주석에 이미 있다 —
+   *"맨 앞에 둔다: 부팅이 깨지면 아래 12 step 이 전부 같은 증상으로 죽으므로"*. **R3 예외의 선례**이고,
+   근거가 판정량이 아니라 **운영(fail-fast 선행)** 이라는 점이 핵심이다.
+3. **`glow-marker` (#675)** — luminance cluster 계수라 R1 로는 `shader-pixel-guard.yml` 이다.
+   다만 `ci.yml` 배선일이 **2026-06-13** (`eedd595`) 로 `shader-pixel-guard.yml` 신설
+   **2026-07-05** (`2a86ce0`) 보다 **앞선다** — 갈 곳이 없던 시절의 배치다. **옮기지 않는다**:
+   실피해 `0` 이고, 이동은 `ci.yml` 공용 dev 서버 구조에서 떼어내는 비용만 든다
+   (CLAUDE.md §검증 강도 게이트 의 *"범위 밖 발견의 기본 처분은 PR 코멘트 기록"*). 다음에
+   `glow-marker` 를 건드릴 때 함께 재판정한다 — **접촉 기준**이다.
+
+**본 규범은 현행 배선을 하나도 움직이지 않는다.** `verify:1204-sun-light` 의 위치 모호성(#1207
+본문 §함께 볼 것)도 이동이 아니라 분류로 닫힌다 — 그 술어는 `|sunPos − meshAbsPos| > 0` 즉
+**좌표**라 R1 상 `ci.yml` 이 맞다.
+
+### 거는가 마는가 — 「있으니 돌리자」 차단
+
+배선 자체가 항상 옳지는 않다. **CI 환경에서 그 가드의 고유 대역이 측정되지 않으면 배선은 표면만
+늘린다** (CLAUDE.md §검증 강도 게이트). 선례: `browser-verify-738-starfield.mjs` 는 CI 가 소프트웨어
+렌더러라 별이 계약대로 비활성이고, 그러면 고유 대역 S2 가 **SKIP** 된다 — 그래서 수동 전용으로
+남겼다. 근거와 **재판정 조건**은 그 스크립트 헤더 §왜 이 스크립트는 CI 에 걸지 않는가 에 박제돼
+있다. 배선을 보류할 때는 같은 형식으로 **헤더에 근거 + 재판정 조건**을 남긴다.
+
+배선할 때는 **판별력 실증이 선행 조건**이다 — 「가드가 있다 ≠ 그 가드가 작동한다」
+([#1123](https://github.com/coseo12/astro-simulator/issues/1123) / [#1127](https://github.com/coseo12/astro-simulator/issues/1127)).
+그리고 「배선했다」와 「돈다」도 다른 명제라 **도입 PR 의 실 run 로그에서 step 발화를 확인**한다
+([#1096](https://github.com/coseo12/astro-simulator/issues/1096)).
+
+> **「CI 호출 `0` 건」은 #1207 이 다룬 3 종이 전부가 아니다** [직접 계수 2026-09-23 · rev `8b5f2c3`].
+> 술어: 루트·`apps/web` `package.json` 에 등록된 `browser-verify-*.mjs` 전건에 대해 `.github/**` 에서
+> **파일명** 또는 **`run <스크립트명>`** 호출을 찾는다.
+>
+> - `apps/web/scripts/` 소속은 본 PR 의 배선 **전** 기준 **7 종**이었다 — `379-lod` · `391-billboard` ·
+>   `738-starfield` · `380-zoom` · `732-overview` · `790-focus-zoom` · `818-focus-zoom`. 앞 둘을 배선한
+>   뒤 남는 것은 **5 종**이고, 그중 근거가 박제된 것은 `738-starfield` 하나다 (나머지 4 종은 미조사).
+> - 루트 `scripts/` 소속까지 넓히면 **9 파일**이 더 있다 (`browser-verify.mjs` · `scale` · `mobile` ·
+>   `mobile-p4c` · `perf` · `a11y` · `webgpu` · `belt-nbody` · `click-select` — 마지막 하나는
+>   `verify:713-click-select` · `verify:719-overlap-cycle` 두 키가 공유한다). 이 중 8 개는 수동 번들
+>   `verify:smoke` 소속이라 「호출 0」이 곧 방치는 아니다.
+>
+> ⇒ 계수는 universe 에 따라 갈리므로(같은 시점에 **7** ↔ **16**) 「N 종」을 쓸 때는 **술어를 함께**
+> 적는다. 위 4 종(`380-zoom` · `732-overview` · `790-focus-zoom` · `818-focus-zoom`)은 **접촉 시
+> 재판정** 대상으로 남긴다 — 실피해 `0` 이라 지금 일괄 배선하지 않는다 (CLAUDE.md §검증 강도 게이트).
+
 ## ci.yml 배선 규약 (#846)
 
 브라우저 회귀 가드는 **dev 서버를 각자 띄우지 않는다.** `ci.yml` 이

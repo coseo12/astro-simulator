@@ -463,6 +463,9 @@ jobs:
       #   않는** 죽은 코드였고(`bash -e {0}`), 그때만 서버가 job 끝까지 잔존했다.
       # 개수 표기는 의도적으로 쓰지 않는다 (#935) — 가드 추가 PR 마다 손으로 갱신해야 하고
       #   누락해도 아무 신호가 없어 2회 연속 drift 했다. 배선 이력은 CHANGELOG 가 SSoT.
+      # 어떤 verify 를 여기 걸고 어떤 것을 shader-pixel-guard.yml 에 거는지의 **정본은
+      #   `docs/ops/browser-verify-helpers.md` §CI 배선** 이다 (#1207). 갈림축은 판정량
+      #   (씬 상태·좌표·DOM ↔ 캔버스 픽셀) 이고 서버 방식이 아니다 — 양쪽 다 next dev 다.
       # __solarScene 등 dev 빌드 한정 전역이 필요하므로 next start(:3001) 가 아닌 next dev.
       - name: '#846 dev 서버 기동 (브라우저 회귀 가드 공용, 1회)'
         # #885 — hashFiles 조건 제거. 위 "pnpm 모노레포 고정 경로" 주석이 선언한 계약
@@ -789,6 +792,52 @@ jobs:
       - name: '#1205 일시정지 LOD 동결 회귀 가드 (verify:1205-pause-lod)'
         if: needs.diff-scope.outputs.code_changed == 'true'
         run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-1205-pause-lod.mjs
+
+      # ============================================================
+      # #1207 — LOD auto 판정 매트릭스 회귀 가드 (verify:379-lod). 신규 배선
+      # ============================================================
+      # 이 스크립트는 도입(#379 / PR #390) 이래 **CI 호출 0 건**이었다. 도입 PR 본문이 "CI 통합은
+      #   별도 follow-up (스코프 보수)" 라고 적어 **의도는 명시됐고 집행만 빠진** 상태였다.
+      # 대역이 비어 있다 — 형제 가드 `verify:lod` (#1127) 는 헤더에서 "픽셀 회귀는 다른 가드가
+      #   담당… 본 가드는 그것을 지키는 척하지 않는다" 로 범위를 명시했고, **auto 판정이 어떤
+      #   레벨을 고르는가**를 실 scene 에서 단언하는 CI 가드가 없었다. `lod.test.ts` 주석도
+      #   "browser-verify-379-lod.mjs 가 실 scene 에서 통합 검증" 이라 그 대역을 비워 둔다.
+      # 배선 조건은 **판별력 실증**이었다 (#1123 / #1127 클래스 — 신설 가드가 결함 보유판에서도
+      #   전건 통과하는 선례). 앱에 변이를 주입해 3 시나리오 각각이 독립적으로 FAIL 함을 같은
+      #   실행에서 보였다 (PR 본문 §판별력 실증 표 — 주입 대상은 전부 `packages/core` 앱 코드):
+      #     · edge offset 축을 #379 fix 이전(cameraRight)으로 되돌림 → 시나리오 A `exit 1`
+      #     · focus 강제 high 분기를 'low' 로 반전            → 시나리오 B `exit 1`
+      #     · 픽셀 경계 최하단을 'high' 로                    → 시나리오 C `exit 1`
+      #     · 픽셀 에스컬레이션 제거(전부 low)                → 시나리오 A 천장 다리 `exit 1`
+      #   ⚠️ 같은 표가 **미검출 1 건**도 박제한다 — focus 강제 high 분기를 *삭제*하면 `exit 0` 이다
+      #   (focus 거리에서 coverage 가 이미 high 임계를 넘어 픽셀 경로로 같은 답이 나온다). 시나리오
+      #   B 는 *반전*은 잡고 *제거*는 못 잡는다. 스크립트 헤더 §판별력 실측 이 SSoT.
+      # `BROWSER_VERIFY_GPU` 미설정 — 판정축이 픽셀이 아니라 **LOD 레벨 분포와 화면 반지름(px)**
+      #   이라 렌더러 백엔드에 비의존이다 (#1127 verify:lod / #1204 / #1205 와 같은 논거).
+      #   워크플로 분담 기준의 정본은 `docs/ops/browser-verify-helpers.md` §CI 배선 — 어느
+      #   워크플로에 거는가. 스크립트 자체 쿼리는 `?gpu=a&lod=auto`.
+      - name: '#379 LOD auto 판정 매트릭스 회귀 가드 (verify:379-lod)'
+        if: needs.diff-scope.outputs.code_changed == 'true'
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-379-lod.mjs
+
+      # ============================================================
+      # #1207 — billboard alpha mask 회귀 가드 (verify:391-billboard). 신규 배선
+      # ============================================================
+      # 위 #379 와 달리 **CI 배선 의도가 표명된 적이 없다** (도입 PR #394 본문에 CI 토큰 hit 0).
+      #   「수동 도구로 명시」된 문장도 없으므로 *의도 부재* 가 정확한 기술이고, 배선 근거는
+      #   의도가 아니라 **비어 있는 대역**이다: 단위 테스트 `lod-billboard-alpha-mask.test.ts` 는
+      #   순수 함수(4px 경계)만 재고, (E) 공유 DynamicTexture 단일성 = per-body 복제 회귀와
+      #   (D) `runLodPass` 의 토글이 실제 material 까지 반영되는가는 **CI 어디에도 없다**.
+      # 판별력 실증 (앱 `packages/core` 변이 주입):
+      #     · 공유 캐시 조회 제거(per-body 생성) → 시나리오 E `exit 1` (고유 인스턴스 1 → 30)
+      #     · mask 적용 판정을 상시 false 로      → 시나리오 D `exit 1` (cell 8/8 → 4/8)
+      #   ⚠️ D 의 판별력은 **mid 레벨 cell 에서만** 나온다 — low 레벨 cell 은 `glow.active` 가
+      #   mask 를 강제 유지해(#675) 변이에도 통과한다. 8 cell 매트릭스를 줄이면 이 축이 죽는다.
+      # `BROWSER_VERIFY_GPU` 미설정 — 판정축이 픽셀이 아니라 **material 상태(opacityTexture 참조
+      #   동일성 / transparencyMode)와 pxDiameter** 라 렌더러 백엔드에 비의존이다.
+      - name: '#391 billboard alpha mask 회귀 가드 (verify:391-billboard)'
+        if: needs.diff-scope.outputs.code_changed == 'true'
+        run: BASE_URL=http://localhost:3002 node apps/web/scripts/browser-verify-391-billboard.mjs
 
       # ============================================================
       # #846 — 백그라운드 서버 정리 (dev :3002 + r1 next start :3001)

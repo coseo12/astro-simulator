@@ -10,9 +10,9 @@
  *   node apps/web/scripts/browser-verify-379-lod.mjs --json           # JSON 결과만 (CI artifact)
  *   node apps/web/scripts/browser-verify-379-lod.mjs --update          # baseline 업데이트
  *
- * 검증 매트릭스:
- *  - 시나리오 A: T1 default (모바일 3 viewport × DPR 1/2 + 데스크톱 2 viewport × DPR 1/2 = 10 cell)
- *      → DoD: sun=high 100%, billboard fallback 비율 ≤ 95% (sub-pixel asteroid 제외)
+ * 검증 매트릭스 (viewport 정본은 아래 `SCENARIO_A_VIEWPORTS` 배열 — 주석에 계수를 두지 않는다):
+ *  - 시나리오 A: T1 default 모바일/데스크톱 viewport × DPR 1/2 매트릭스
+ *      → DoD: sun=high 100%, billboard fallback 비율 ≤ `SCENARIO_A_DOD.maxLowRatio`
  *  - 시나리오 B: T3 body focus (지구 / 화성 focus 진입) → focus body=high 보장
  *  - 시나리오 C: asteroid belt sub-pixel scenario (T1 solar 뷰에서 asteroid low billboard 유지)
  *
@@ -21,6 +21,39 @@
  *
  * 환경변수:
  *   BASE_URL  — 웹 서버 URL (기본 http://localhost:3000)
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * ## CI 배선 ([#1207](https://github.com/coseo12/astro-simulator/issues/1207))
+ *
+ * `ci.yml` `detect-and-test` 의 브라우저 회귀 가드 구간에 상시 배선돼 있다 (`verify:379-lod`).
+ * 도입(#379 / PR #390) 이래 **CI 호출 0 건**이었고, 도입 PR 본문의 *"CI 통합은 별도 follow-up"*
+ * 이 집행되지 않은 채 남아 있었다. 어느 워크플로에 거는가의 판단 기준은
+ * [`docs/ops/browser-verify-helpers.md`](../../../docs/ops/browser-verify-helpers.md) §CI 배선 이
+ * 정본이다 — 본 가드의 판정량은 픽셀이 아니라 **LOD 레벨 분포 + 화면 반지름(px)** 이다.
+ *
+ * ## 판별력 실측 (#1207, 2026-09-22~23 · rev `1c1254e` · 로컬 dev 서버 headless)
+ *
+ * 「가드가 있다 ≠ 그 가드가 작동한다」([#1123](https://github.com/coseo12/astro-simulator/issues/1123))
+ * 차단을 위해 **앱(`packages/core`)에 변이를 주입**해 시나리오별로 독립 FAIL 을 실증했다.
+ * 무주입 대조군은 주입 전·후 모두 `exit 0` (3중 시뮬: positive → negative → recovery).
+ *
+ * | 변이 (주입 대상 = 앱) | 발화 지점 | 결과 |
+ * | --- | --- | --- |
+ * | `screenCoverageRadius` edge offset 축을 #379 fix 이전(cameraRight)으로 되돌림 | A `sunHighRatio` 7/8 | `exit 1` |
+ * | `lodFromScreenCoverage` 의 focus 강제 high 를 `'low'` 로 반전 | B 2/2 FAIL | `exit 1` |
+ * | 픽셀 경계 최하단 반환을 `'high'` 로 | C `high=28 > 5` | `exit 1` |
+ * | 픽셀 에스컬레이션 제거 (전부 `'low'`) | A `sunHighRatio 0/8` **+** `maxLowRatio 100%` — **두 다리 동시** | `exit 1` |
+ * | **sun 외 전부 `'low'`** (「sun 만 high」 재현 — 2026-09-23 · rev `8b5f2c3` 추가 주입) | A `maxLowRatio 96.9%` **단독** (`sunHighRatio 8/8` 은 PASS) | `exit 1` |
+ * | **focus 강제 high 분기를 *삭제*** | — | **`exit 0` — 미검출** |
+ *
+ * ⚠️ 위 4·5 행은 **서로 다른 것을 실증한다** — 4 행(픽셀 에스컬레이션 제거)은 두 다리가 함께
+ * 넘어가므로 어느 한 다리의 단독 발화력도 보이지 못하고, `maxLowRatio` 다리가 혼자 FAIL 을
+ * 내는 것은 5 행뿐이다. 임계 각주(`SCENARIO_A_DOD.maxLowRatio`)가 이 구분에 의존한다.
+ *
+ * ⚠️ **마지막 행이 본 가드의 알려진 사각이다.** focus 진입 거리에서 지구/화성의 coverage 는
+ * 이미 `LOD_PIXEL_THRESHOLDS.high` 를 넘으므로(실측 `74.7px` / `73.9px`) 픽셀 경로가 같은 답을
+ * 낸다 — 시나리오 B 는 focus 강제 분기의 *반전*은 잡고 *제거*는 못 잡는다. 그 대역은
+ * `lod.test.ts` 의 단위 테스트가 순수 함수 수준에서 담당한다.
  */
 
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
@@ -41,7 +74,8 @@ const flags = {
 /**
  * 시나리오 A — T1 default 매트릭스 viewport 정의.
  * forensic 매트릭스 SSoT (`docs/reports/379-forensic/output.json`) 와 동일 viewport 풀에서
- * spot-check 10 cell 추출 (전체 40 cell 재측정 비용 절감).
+ * spot-check 추출 (전체 매트릭스 재측정 비용 절감 — cell 정본은 아래 배열이다).
+ * ⚠️ 종전 주석은 "10 cell" 이었으나 배열 원소는 8 개다 (#1207 정정). 계수를 다시 박지 않는다.
  */
 const SCENARIO_A_VIEWPORTS = [
   { id: '320x568_dpr1', width: 320, height: 568, dpr: 1, kind: 'mobile-narrow' },
@@ -57,9 +91,57 @@ const SCENARIO_A_VIEWPORTS = [
 const SCENARIO_A_DOD = Object.freeze({
   // sun=high 비율 (모든 cell 에서 sun 이 high LOD 인지)
   sunHighRatio: 1.0, // = 100% (변경 시 ADR §재검토 트리거)
-  // billboard fallback 비율 임계 — 24 body 중 low 가 25 미만 (sub-pixel asteroid 제외 ≈ 23 → ≤ 95%)
-  // 본 가드는 "sun 만 high 였던 fix 전" 회귀를 막는 것이 1차 목적.
+  // billboard fallback 비율 천장. 본 가드는 "sun 만 high 였던 fix 전" 회귀를 막는 것이 1차 목적.
   // mercury/venus mid 진입은 #385 라운드 3 영역 (architect ADR §재검토 #4).
+  //
+  // ── 여유 실측 (#1207, 2026-09-22~23 · rev `1c1254e` · 로컬 dev 서버 headless · N = 6) ──
+  // 무주입 `maxLowRatio` = **`0.875` 6/6 회 동일** (8 cell 전건도 run 간 바이트 동일 — 분산 0).
+  //   여유 `0.96 − 0.875 = 0.085` (32 body 기준 `2.7` body 분).
+  // ⚠️ 착수 시 인계된 *"여유가 `0.002` 뿐"* 은 **`__baselines__/lod-379.json` (2026-05-02, 24 body)
+  //   의 기록값 `0.9583`** 이지 현행 측정치가 아니었다. 그 사이 R-Phase 누적으로 body 가
+  //   `24 → 32` 로 늘고 고DPR cell 의 mid 진입이 늘어 분모·분자가 함께 이동했다.
+  //   ⇒ #1209 규약의 **재도출 조건 미발동**이라 임계를 **바꾸지 않는다** (새 임계 `0`).
+  //
+  // ── 임계 배치 (관측 3 점) — 여유는 **양방향**으로 적는다 ──
+  //   건강 `0.875`  <  **임계 `0.96`**  <  픽셀 에스컬레이션 제거 변이 `1.000`
+  //   건강 쪽 여유 `0.085` / 결함 쪽 여유 `0.00875`. 가장 가까운 결함은 「sun 만 high」
+  //   (`high=1 / mid=0 / low=31` → `31/32 = 0.96875`) 이고, 이는 #379 회귀 그 자체의 모양이다.
+  //   ✔ 위 여유는 **CI 에서도 같다** — 배선 첫 run (ubuntu · swiftshader, run 35747391865) 의
+  //   8 cell 판정값이 로컬 macOS 와 **전건 일치**했다 (`87.5 / 81.3 / 71.9 / 65.6 / 81.3 / 81.3 /
+  //   65.6 / 75.0 %`). 즉 이 축은 렌더러 백엔드에 비의존이고, 로컬에서 잰 마진을 CI 가 승계한다.
+  //
+  // ⚠️ **그 대역을 잡는 것은 본 다리 하나뿐이다 (이중 방어 아님).** 형제 다리 `sunHighRatio` 는
+  //   「sun 이 high 인 **cell 의 비율**」이라 (`runScenarioA` 가 `sunLevel === 'high'` 일 때만
+  //   `sunHighCount` 를 올린다) sun 자신이 high 인 한 「sun 만 high」에서도 `8/8` PASS 한다.
+  //   확인 방법 3 가지 (2026-09-23 · rev `8b5f2c3`) —
+  //     (a) **변이 주입 실측**: `lodFromScreenCoverage` 에서 sun 외 전부 `'low'` 로 반환 →
+  //         8 cell 전건 `high=1/mid=0/low=31`, `sunHighRatio 8/8 PASS` · `maxLowRatio 96.9% FAIL`
+  //         · `exit 1`. 시나리오 B·C 는 PASS 라 **본 다리 단독 발화**다.
+  //     (b) **저장소 안 반례 조회**: `__baselines__/lod-379.json` (2026-05-02) 은 8 cell 전건
+  //         `high=1` (그중 3 cell 은 `mid=0`) 인데 `"sunHighRatio": 1` · `"pass": true` 로
+  //         기록돼 있다 — 그때 통과한 이유는 형제 다리가 아니라 body 가 24 라 `23/24 = 0.9583`
+  //         이 임계 아래였기 때문이다. 즉 형제 다리는 그 상태를 **한 번도 막은 적이 없다**.
+  //     (c) 판정 결합 확인: `runScenarioA` 의 반환은 `sunHighPass && lowRatioPass` 다.
+  // ⚠️ 반대로 **픽셀 에스컬레이션 제거 변이는 단독 발화의 증거가 아니다** — 같은 날 재현에서
+  //   `sunHighRatio 0/8 FAIL` **+** `maxLowRatio 100% FAIL` 로 두 다리가 동시에 넘어간다
+  //   (전부 `'low'` 면 sun 도 low 다). 그 변이가 보이는 것은 천장 다리가 살아 있다는 사실뿐이다.
+  //   ⇒ 본 임계를 완화·삭제하면 「sun 만 high」를 잡는 것이 **아무것도 남지 않는다**.
+  //
+  // ── 재검토 트리거 (접촉 기준 — CLAUDE.md §`deferred:no-incident` 수명주기 와 같은 관례) ──
+  //   판정량이 **비율**이라 body 총수에 종속된다. `high+mid` 가 고정이라면 `low / total` 은 `1` 로
+  //   단조 수렴하므로, `high+mid = 4` 고정 가정에서 `96/100 = 0.96` 은 경계 통과이고
+  //   `97/101 = 0.9604` 부터 건강 상태가 천장을 넘어 **거짓 발화**한다 (지금 `32`).
+  //   ⚠️ **다만 그 「고정」은 예측이고, 저장소의 관측 2 점은 반대 방향이다** (worst cell 기준) —
+  //     · 2026-05-02 `__baselines__/lod-379.json`: body `24` · `high+mid = 1` · `maxLowRatio 0.9583`
+  //     · 2026-09-23 무주입 실측 (rev `8b5f2c3`): body `32` · `high+mid = 4` · `maxLowRatio 0.875`
+  //   body 가 늘 때 `high+mid` 도 **함께** 늘었고 비율은 천장에서 오히려 **멀어졌다**. 2 점이
+  //   추세를 보장하지도 않으므로 예측을 사실로 읽지 말고 트리거만 유지한다.
+  //   ⚠️ **같은 트리거의 대상이 하나 더 있다 — `HIGH_REGRESSION_LIMIT`** (시나리오 C). 그쪽도
+  //   body 총수 결합이고 여유는 더 얇다 (무주입 `high=2` → 여유 `3`). 이미 한 칸 움직였다
+  //   (baseline 24 body 의 시나리오 C 는 `high=1`).
+  //   ⇒ **body 를 추가하는 R-Phase 에서 본 가드를 건드릴 때** 무주입 분포를 재측정하고 이
+  //   각주와 `HIGH_REGRESSION_LIMIT` 주석을 **함께** 갱신한다. 완화는 silent 금지
+  //   ([guard-design-principles](../../../docs/lessons/guard-design-principles.md) §2).
   maxLowRatio: 0.96,
 });
 
@@ -251,8 +333,13 @@ async function runScenarioC(browser) {
     return { pass: false, error: measurement.error };
   }
   const { lodStats } = measurement;
-  // sub-pixel body 가 low 유지 — 24 body 중 high 가 폭증하지 않음 (≤ 5).
+  // sub-pixel body 가 low 유지 — 활성 body 전체 중 high 가 폭증하지 않음 (≤ 5).
+  // (#1207 정정 — 종전 주석은 "24 body" 였으나 현행은 `32` 다. 계수를 다시 박지 않는다.)
   // fix 가 모든 body 를 high 로 강제하면 이 조건 fail (의도치 않은 회귀).
+  // ⚠️ 이 상수도 `SCENARIO_A_DOD.maxLowRatio` 와 **같은 body 총수 결합**이고 여유는 더 얇다 —
+  //    무주입 실측 `high=2` (2026-09-23 · rev `8b5f2c3`) 라 여유 `3`, baseline (2026-05-02,
+  //    body 24) 의 시나리오 C 는 `high=1` 이었으니 이미 한 칸 움직였다. 재검토 트리거는
+  //    `SCENARIO_A_DOD.maxLowRatio` 각주 §재검토 트리거 와 **공유**한다 (본 상수도 그 대상).
   const HIGH_REGRESSION_LIMIT = 5;
   const pass = lodStats.high <= HIGH_REGRESSION_LIMIT;
   console.log(

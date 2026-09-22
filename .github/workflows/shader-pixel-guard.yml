@@ -15,6 +15,12 @@ name: shader-pixel-guard
 #      목록**이고, 계수는 세는 술어(지대? 스크립트? step?)에 따라 값이 갈려 어느 쪽도 참인 채로
 #      어긋난다. 지대 추가 시 갱신 대상은 위 열거 한 곳뿐이다.
 #
+# 분담 기준 (#1207): 어떤 verify 스크립트를 본 워크플로에 걸고 어떤 것을 ci.yml 에 거는지의
+#   **정본은 `docs/ops/browser-verify-helpers.md` §CI 배선** 이다. 갈림축은 판정량 (픽셀 ↔
+#   씬 상태·좌표·DOM) 이고, **서버 방식이 아니다** — 두 워크플로 모두 `ci-dev-server.sh` 로
+#   `next dev` 를 띄운다 (:3001 / :3002). 규범과 다른 배치는 step 주석에 근거를 남긴다
+#   (본 워크플로의 `verify:1234-adapter-stall` 이 그 선례다).
+#
 # 판정 규약 (ADR 결정 3): per-body 상대 성질 (ON vs OFF) 만 — 절대 임계 금지
 #   (swiftshader ↔ 하드웨어 값 편차). 756 마진은 D1 CI 실측으로 확정 (스크립트 주석 참조).
 #
@@ -89,17 +95,22 @@ jobs:
         with:
           start-dev-server: 'true'
 
-      # ── verify 8종 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
+      # ── verify 직렬 실행 — 각 step 이 자기 exit code 로 job fail-fast (ADR 결정 1) ──
       # 호출 규약: HEADFUL=0 (756/773/774/782/783/1119) / --headless (762) — CI 에 chrome channel 이
       #   없으므로 폴백이 아닌 명시적 headless 로 결정적 실행. BASE_URL 주입 (dev server 3001).
       # trap: 스크립트 비정상 종료 (playwright timeout/crash) 시 잔존 chromium 정리 —
       #   스크립트 간 실패 격리 (ADR cross-validate 부분 수용 4). 정상 종료 시 no-op.
 
-      # #1234 — 어댑터 미결 회귀 가드. **맨 앞에 둔다**: 부팅이 깨지면 아래 12 step 이 전부
+      # #1234 — 어댑터 미결 회귀 가드. **맨 앞에 둔다**: 부팅이 깨지면 아래 step 이 전부
       # 같은 증상으로 죽으므로, 약 35 초 만에 원인을 이름으로 알려주는 편이 8 분 뒤 아무 step
       # 에서나 `TimeoutError` 를 받는 것보다 낫다 (본 이슈가 정확히 그 상황이었다).
       # 자연 발생 빈도가 약 40 % 였던 결함을 `page.addInitScript` 로 **결정적으로** 재현하므로
       # 「통과 = 결함 없음」이 성립한다. 주입이 안 먹으면 S1 이 FAIL 이라 공허 통과가 막힌다.
+      # 배치 근거 (R3 예외 — `docs/ops/browser-verify-helpers.md` §CI 배선): 판정량이 픽셀이
+      # 아니라 부팅 구조(`bootPhases` / `rendererKind` / 콘솔)라 R1·R2 로는 `ci.yml` 이지만,
+      # 본 가드가 지키는 대상은 **이 job 의 나머지 step 이 측정 가능한 상태로 부팅되는가** 다.
+      # 즉 근거가 판정량이 아니라 **보호 대상과의 co-location** 이라, 다른 워크플로로 옮기면
+      # 위의 "맨 앞에 둔다" 가 성립하지 않는다 (순서 근거와 배치 근거는 별개 명제).
       - name: verify:1234-adapter-stall (requestAdapter 미결 주입 → 상한 폴백)
         run: |
           trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
