@@ -327,7 +327,8 @@ async function setupPageWithFocus(browser, body, mode) {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__simCore !== 'undefined' && typeof window.__solarScene !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   // tier transition (300ms) + dolly 안정화 + LOD 안정화 + (research 모드의 경우) panel resize
   await page.waitForTimeout(POST_FOCUS_WAIT_MS);

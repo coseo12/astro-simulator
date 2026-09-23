@@ -93,7 +93,8 @@ async function setupPageWithInitialFocus(browser, fromBody) {
       typeof window.__simCore !== 'undefined' &&
       typeof window.__solarScene !== 'undefined' &&
       typeof window.__simStore !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   await page.waitForTimeout(POST_FOCUS_WAIT_MS);
   return { context, page };

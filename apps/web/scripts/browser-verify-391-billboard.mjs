@@ -155,7 +155,8 @@ async function setupPage(browser, viewport, queryString) {
   await page.goto(`${BASE_URL}${queryString}`, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__simCore !== 'undefined' && typeof window.__solarScene !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   // sun mesh 생성 + 첫 LOD pass + low variant lazy-create + 4px fallback 토글까지 안정.
   await page.waitForTimeout(2500);

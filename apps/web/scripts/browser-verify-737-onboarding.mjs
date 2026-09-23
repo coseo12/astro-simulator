@@ -85,7 +85,8 @@ async function boot(page) {
   await page.goto(`${BASE_URL}/?gpu=a&lod=auto`, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__solarScene !== 'undefined' && typeof window.__simStore !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   await page.waitForTimeout(SETTLE_MS);
 }
@@ -205,7 +206,9 @@ async function scenarioDismissPersist(browser) {
     const storedOk = stored !== null && JSON.parse(stored).value === true;
     // reload → 자동 미표시.
     await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
-    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', { timeout: 15_000 });
+    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', undefined, {
+      timeout: 20_000,
+    });
     await page.waitForTimeout(SETTLE_MS);
     const reShown = await page
       .locator('[data-testid="onboarding-modal"]')
@@ -232,7 +235,9 @@ async function scenarioReopenAndBackdrop(browser) {
     await boot(page);
     await setDismissed(page);
     await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
-    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', { timeout: 15_000 });
+    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', undefined, {
+      timeout: 20_000,
+    });
     await page.waitForTimeout(SETTLE_MS);
     // dismiss 상태라 자동 미표시.
     const autoHidden = !(await page
