@@ -104,6 +104,16 @@
  *     부팅이 끝난다 (12 s 지연). 그래도 엔진 probe 는 게이트하지 않는다 — 상한 발화에 의존하는
  *     재현은 가드 핸들 대기와 경쟁한다.
  *
+ * ⚠️ **ADR 의 당시 기록과 어긋나 보인다 — 지우지 않고 포인터로 잇는다.**
+ * `docs/decisions/20260613-675-glow-pixel-marker.md` §Amendment 2 (fix 항목) 는 이 축의 신설을
+ * 「pre-fix FAIL / post-fix PASS 3중 시뮬레이션 실측」으로 박제하고 있고, 거기서의 pre-fix 가
+ * 정확히 위 (C) 의 M2 다. 그 기록은 **이력이라 수정하지 않았다.** 여기서 반증한 범위는 **현행
+ * 트리와 #1234 직전 트리(`71d30eb`)** 뿐이고, 2026-06-13 당시 트리는 재현 대상이 아니었다 —
+ * 그러므로 **「그때는 왜 잡혔는가」는 단정하지 않는다.** (두 트리가 최소한 어떻게 다른지는
+ * 확인됐다: `Promise.all([instance.start(), gpuCapPromise])` 가 #738 로 2026-06-25 에 도입돼
+ * #1234 C3-B 에서 분리됐으므로, 2026-06-13 트리에는 그 대기가 **없었다.**) ADR 쪽에도 이 절을
+ * 가리키는 후속 실측 포인터를 달아 두 기록이 포인터 없이 만나지 않게 했다.
+ *
  * 처치: 게이트 대상을 **호출 순번 → 호출자**로 바꾼다. `detectGpuCapability` 계열 호출은 체인과
  * 무관하게 전부 붙들고, 엔진 probe 는 종전대로 즉시 null. 이것이 **지금** 가능한 이유는 #1234
  * C3-B 가 장면 체인의 `gpuCapPromise` **대기**를 끊었기 때문이다 (위 (D) 의 전/후 대조가 그
@@ -487,7 +497,13 @@ async function main() {
         // 호출자 판별은 스택의 함수명이다. dev 번들은 이름을 보존한다 [실측 2026-09-23 —
         // `at Module.detectGpuCapability (…/_next/static/chunks/…)`]. 이 판별이 깨지면 게이트가
         // 한 번도 안 걸리는데, 그건 **조용히 통과**가 아니라 아래 전제 검사가 `exit 2` 로 잡는다.
-        window.__axis6 = { detect: 0, probe: 0, gated: 0 };
+        // 카운터는 두 축뿐이다 — **호출자 판별**(`detect`/`probe`) 과 **게이트 해소**(`resolved`).
+        // `detect` 가 곧 게이트 발화 횟수다: 이 분기에 들어온 호출은 예외 없이 아래 폴링 게이트로
+        // 들어가므로 「detect 는 됐는데 게이트는 안 걸렸다」로 **갈릴 경로가 없다** (초판의 별도
+        // `gated` 카운터는 `detect` 와 항상 같은 값이었다 — PR #1255 reviewer 권고 3 으로 병합).
+        // 반면 `resolved` 는 갈린다 — 게이트가 `__solarScene` 을 기다리다 영영 안 풀리면
+        // `detect > resolved` 로 남고, 그게 아래 오귀인 힌트의 근거다.
+        window.__axis6 = { detect: 0, probe: 0, resolved: 0 };
         Object.defineProperty(navigator, 'gpu', {
           configurable: true,
           value: {
@@ -498,11 +514,14 @@ async function main() {
                 return Promise.resolve(null);
               }
               window.__axis6.detect += 1;
-              window.__axis6.gated += 1;
               return new Promise((resolve) => {
                 const poll = () => {
                   // +300ms 는 task 경계 여유.
-                  if (window.__solarScene) setTimeout(() => resolve(null), 300);
+                  if (window.__solarScene)
+                    setTimeout(() => {
+                      window.__axis6.resolved += 1;
+                      resolve(null);
+                    }, 300);
                   else setTimeout(poll, 100);
                 };
                 poll();
@@ -550,8 +569,11 @@ async function main() {
         };
       });
 
-      // 전제 1 — 게이트가 실제로 걸렸는가 (호출자 판별 붕괴 감지).
-      const gated = state.counters?.gated ?? 0;
+      // 전제 1 — 게이트가 실제로 걸렸는가 (호출자 판별 붕괴 감지). `detect` 가 곧 게이트 발화
+      // 횟수다 (위 init script 주석 — 둘로 갈릴 경로가 없어 카운터 하나로 합쳤다).
+      const gated = state.counters?.detect ?? 0;
+      // 갈리는 쪽. `detect > resolved` = 게이트가 아직 `__solarScene` 을 기다리는 중이다.
+      const gatesPending = gated - (state.counters?.resolved ?? 0);
       if (gated < 1) {
         blocked = true;
         console.log(
@@ -581,12 +603,26 @@ async function main() {
         );
       }
 
+      // 오귀인 차단 (PR #1255 reviewer 권고 2). 이 게이트는 **자기 자신이 순환을 만들 수 있다** —
+      // #1234 C3-B (장면 체인이 `gpuCapPromise` 의 settle 을 기다리지 않는다) 가 되돌려지면
+      // scene 이 capability 를, 게이트가 scene 을 서로 기다려 `__solarScene` 이 영영 안 나온다.
+      // 그때 나오는 결과는 #677 회귀와 **같은 모양의 FAIL** 이라, 힌트가 없으면 제품 회귀로 읽힌다.
+      // ⚠️ 판정은 바꾸지 않는다 (확정 FAIL 우선 — 여전히 `exit 1`). 동반 출력만 붙인다.
+      const misattributionHint =
+        gated < 1 || !reproduced
+          ? ` ⚠️ 단 이 FAIL 은 전제가 무너진 채 나왔다 (게이트 발화 ${gated}회 · 미해소 ` +
+            `${gatesPending}회 · chain=${state.chain} scene@${state.sceneAtMs} ` +
+            `capability@${state.capabilityAtMs}) — #677 회귀가 아니라 **게이트 자신이 만든 순환**일 ` +
+            '수 있다. #1234 C3-B (장면 체인의 gpuCapPromise 대기 분리) 가 살아 있는지 먼저 확인하라.'
+          : '';
+
       check(
         `지연 tier-c 감지 후 override='${state.override}' (tier='${state.tier}')`,
         settled,
         settled
           ? undefined
-          : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)",
+          : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)" +
+              misattributionHint,
       );
       await context.close();
     }
