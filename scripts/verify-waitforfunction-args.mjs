@@ -56,8 +56,10 @@
  * 확장자 `SCAN_EXTENSIONS` = { `.mjs`, `.js`, `.cjs`, `.ts`, `.tsx` } 파일을 재귀 수집한다.
  *
  * 제외 디렉토리(`SKIP_DIR_NAMES`) — 이름이 일치하면 하위 전체를 건너뛴다:
- *   `node_modules` `.git` `.next` `dist` `build` `coverage` `target` `pkg` `pkg-bundler`
+ *   `node_modules` `.git` `.next` `dist` `build` `coverage` `target` `pkg` `pkg-bundler` `pkg-node`
  *   → 전부 **생성물 또는 외부 코드**다. 커밋 대상이 아니므로 교정 주체가 없다.
+ *   (wasm-pack 출력 3 종의 배제 근거는 상수 옆 주석 참조 — `pkg-node` 는 루트 `.gitignore` 에
+ *    안 보여 초판에서 빠졌고, 그 결과 로컬 스캔이 CI 보다 많았다.)
  * 제외 경로(`SKIP_REL_PATHS`) — 루트 기준 상대 경로가 일치하면 건너뛴다:
  *   `.claude/worktrees`
  *   → Conductor 멀티 워크스페이스가 만드는 **형제 체크아웃**이고 `.git/info/exclude` 로
@@ -117,8 +119,15 @@ const SKIP_DIR_NAMES = new Set([
   'build',
   'coverage',
   'target',
+  // wasm-pack 출력 3 종. `pkg` · `pkg-bundler` 는 `packages/physics-wasm/.gitignore` 가,
+  // `pkg-node` 는 그 디렉토리가 스스로 들고 있는 `.gitignore`(`*`) 가 배제한다 — 후자는
+  // 저장소 루트 `.gitignore` 에 안 보여 초판에서 빠졌고, 그 결과 로컬 스캔이 CI 보다
+  // 4 파일 많았다 (2026-09-23 실측 `347` ↔ `343`. 차액은 이 3 파일 + 생성물 `next-env.d.ts`).
+  // 판정에는 영향이 없었으나(그 안에 대상 호출 0건) §검사 범위 계약의 "전부 생성물" 서술과
+  // 어긋나 있었다. 타깃이 더 생기면(`pkg-web` 등) 여기 같이 추가한다.
   'pkg',
   'pkg-bundler',
+  'pkg-node',
 ]);
 /** 루트 기준 상대 경로가 일치하면 제외 (§검사 범위 계약) */
 const SKIP_REL_PATHS = new Set([path.join('.claude', 'worktrees')]);
