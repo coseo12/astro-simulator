@@ -50,10 +50,172 @@
  * 넘어가므로 어느 한 다리의 단독 발화력도 보이지 못하고, `maxLowRatio` 다리가 혼자 FAIL 을
  * 내는 것은 5 행뿐이다. 임계 각주(`SCENARIO_A_DOD.maxLowRatio`)가 이 구분에 의존한다.
  *
- * ⚠️ **마지막 행이 본 가드의 알려진 사각이다.** focus 진입 거리에서 지구/화성의 coverage 는
- * 이미 `LOD_PIXEL_THRESHOLDS.high` 를 넘으므로(실측 `74.7px` / `73.9px`) 픽셀 경로가 같은 답을
- * 낸다 — 시나리오 B 는 focus 강제 분기의 *반전*은 잡고 *제거*는 못 잡는다. 그 대역은
- * `lod.test.ts` 의 단위 테스트가 순수 함수 수준에서 담당한다.
+ * ### #1250 추가 주입 (2026-09-23 · rev `23239d5` · 로컬 dev 서버 headless)
+ *
+ * 아래는 **앱이 아니라 계측 채널**을 무너뜨려 「가드 자신의 공허 통과」를 재현한 것이다. 주입 대상
+ * 은 dev API 접근자(`getLodInfo` / `getLodStats`) 와 `lodFromScreenCoverage` 이고, 같은 변이에
+ * 대해 개정 **전** 판본과 **후** 판본을 **같은 서버에 연속으로** 돌려 대조했다.
+ *
+ * | 변이 | 개정 전 | 개정 후 |
+ * | --- | --- | --- |
+ * | `width < 800` 에서만 `getLodInfo()` → `[]` (A 4/8 cell 측정 실패) | **`exit 0`** — 실패 cell 이 분자·분모에서 동시에 빠져 `sun=high 4/4 (100%)` | `exit 2` (측정 불가 cell = 4) |
+ * | `getLodInfo()` → `[]` (A **전건** 실패) | `exit 1` — `totalCells > 0 ? … : 0` 폴백이 `0 >= 1.0` 을 깨 FAIL. ⚠️ **전건 실패는 뚫리지 않았다** | `exit 2` (전제 붕괴를 제품 FAIL 로 보고하지 않는다) |
+ * | `width !== 1280` 에서 `getLodStats().low` → `NaN` (A 7/8 cell) | **`exit 0`** — `NaN > maxLowRatio` 가 거짓이라 초기값 `0` 이 그대로 통과 | `exit 2` (측정 불가 cell = 7) |
+ * | `width === 1280` **이고 `focus=` 없을 때만** `getLodInfo()` → `[]` (C 의 씬이 빔) | **`exit 0`** — C 는 `lodInfo` 를 받고도 읽지 않고 `lodStats.high` 만 쟀다 (**C = PASS**) | `exit 2` (**C = 측정 불가**) |
+ * | `lodFromScreenCoverage` 가 focus 분기 뒤 전부 `'mid'` (C 의 `low` 가 `0`) | C = **PASS** (`high=0/mid=32/low=0` → `0 <= 5`) | C = **FAIL** (`exit 1` — 단언의 주어 부재) |
+ * | `getLodInfo()` 에서 `mercury` · `venus` 제거 | **`exit 0`** | **`exit 0` — 미검출 (의도적. 아래 §알려진 사각)** |
+ * | `__baselines__/lod-379.json` 을 감춤 | **`exit 0`** — 로그에 `baseline` 토큰 **0 회** | `exit 2` (baseline 부재를 한 줄로 박제) |
+ * | baseline 의 `scenarios.A.sunHighRatio` 만 삭제 | **`exit 0`** — 역시 `baseline` 토큰 **0 회** | `exit 2` (비교 입력 결손) |
+ *
+ * ⚠️ **시나리오 C 는 종료 코드로 단독 대조할 수 없다** — C 의 요청(`/?gpu=a&lod=auto`, 1280×720)은
+ * A 의 `1280x720_dpr1` cell 과 **바이트 동일**이라 채널을 C 에만 끊을 수 없다. 그래서 위 4·5 행의
+ * 대조는 종료 코드가 아니라 **C 자신의 판정**(PASS → 측정 불가 / PASS → FAIL)으로 읽는다.
+ * ⚠️ **caveat 이 실제로 필요한 것은 5 행이다** — 종료 코드가 개정 전·후 **모두 `exit 1`** 이라
+ * 아예 움직이지 않는다 (PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) reviewer
+ * 독립 재현). 종료 코드만 보면 「미검출」로 오독된다. 4 행은 `exit 0 → 2` 로 움직이기는 하지만
+ * 그 이동은 A 가 같은 채널 차단을 함께 맞아 생긴 것이라 C 의 전이를 증거하지 못한다.
+ * ⚠️ 반면 **3 행(`lodStats.low → NaN`)은 이 caveat 의 대상이 아니다** — A 7/8 cell 을 끊는
+ * 변이라 C 를 건드리지 않고, 위 표가 적은 그대로 `exit 0 → 2` 로 **종료 코드로 대조된다**
+ * (#1253 차단 B1 정정 — 종전 이 문장은 `3·4 행` 이라 적혀 바로 위 표 자신과 모순됐고, 같은 PR
+ * 본문은 `4·5 행` 이라 적어 두 기록이 갈려 있었다).
+ *
+ * ⚠️ **시나리오 B 의 재분류가 값을 하는 곳은 위 2 행(전건 실패)이다.** 전건 실패에서 개정 전은 `focus body earth
+ * not found` 를 **제품 FAIL** 로 보고했지만, 실제 원인은 `lodInfo` 가 비었다는 **채널 붕괴**였다.
+ * B 에 빈 배열 검사를 넣지 않으면 focus body 부재 판정이 그 상태를 그대로 삼킨다.
+ *
+ * ## 종료 코드 계약 ([#1250](https://github.com/coseo12/astro-simulator/issues/1250))
+ *
+ * `0` = PASS / `1` = **제품 FAIL** (측정은 됐고 단언이 거짓) / `2` = **측정 불가** (계측 채널이
+ * 없거나 값이 판정에 쓸 수 없는 상태 — PASS 도 FAIL 도 아니다). `ci.yml` `detect-and-test` 의
+ * 호출부에 `|| true` 가 없으므로 `2` 도 빨강이다.
+ *
+ * **합성은 확정 FAIL 우선** — 어느 시나리오든 확정 FAIL 이 있으면 `1`, FAIL 이 없고 측정 불가만
+ * 있으면 `2`. `browser-verify-391-billboard.mjs` / `browser-verify-818-focus-zoom.mjs` §종료 코드
+ * 합성 과 같은 규칙이다. 반대로 두면 제품 결함이 「측정 불가」 뒤로 숨는다 (#1215 MC-9 가 치른 대가).
+ *
+ * 무엇이 어느 쪽인가의 기준은 **하네스가 통제하는가**다 (#1215 — 전제 ↔ 게이트를 섞지 않는다).
+ * ⚠️ 391 의 판정이 그대로 오지 않는다 — 391 은 `error` 가 전부 하네스 전제라 한 줄로 `2` 였지만,
+ * 여기서는 **같은 시나리오 안에서도** 갈린다.
+ *
+ *  - **`__solarScene.getLodInfo()` 미노출 / `lodInfo` 빈 배열** ⇒ `2`. dev 빌드 private API 라는
+ *    하네스 전제의 붕괴다. 이 상태에서는 제품이 건강한지 아픈지 **한 비트도 말할 수 없다**.
+ *  - **`getLodStats()` 부재 · 계수가 비유한수 · 합계 `0`** ⇒ `2`. 판정량이 **비율**이라 분모가
+ *    없으면 다리가 성립하지 않는다. 그냥 두면 `NaN` 비교가 조용히 거짓이 되어 초기값이 통과한다.
+ *  - **`sun` / focus body 가 `lodInfo` 에 없음** ⇒ `1`. `lodInfo` 항목은 제품(`runLodPass`)이
+ *    만드는 것이고 그 body 는 단언의 **주어 자신**이다. 계측 채널은 멀쩡히 작동해 「그 body 가
+ *    없다」고 **답을 준 것**이다. 전제에 넣으면 이 결함이 전제 위반 뒤로 숨는다.
+ *  - **시나리오 C 의 `low === 0`** ⇒ `1`. 같은 이유 — 「sub-pixel body 가 low 를 유지한다」의
+ *    주어가 `0` 개인 상태이고, 그것을 만드는 것은 제품이다.
+ *  - **baseline 파일 부재 / JSON 파손 / `scenarios.A.sunHighRatio` 부재** ⇒ `2`. baseline 은
+ *    하네스가 공급하는 산출물이고 `__baselines__/lod-379.json` 은 저장소에 **tracked** 돼 있어
+ *    체크아웃이면 항상 존재한다 ⇒ 부재는 정상 상태가 아니다. 반대로 비교가 **발화**하면
+ *    (sun=high 가 baseline 대비 5%p 하락) 그것은 제품 회귀 ⇒ `1`.
+ *
+ * ## 알려진 사각
+ *
+ * ⚠️ 표제에 계수를 박지 않는다. 「N 종」은 목록이 닫혔다는 인상을 주는데, 그 인상이 상위 집합을
+ * 이미 덮은 것처럼 보이게 한 전례가 있다 (#1207 reviewer R8).
+ *
+ * ### 열려 있는 것
+ *
+ * ⚠️ **focus 강제 high 분기의 *제거*는 못 잡는다** (위 첫 표 마지막 행). focus 진입 거리에서
+ * 지구/화성의 coverage 는 이미 `LOD_PIXEL_THRESHOLDS.high` 를 넘으므로(실측 `74.7px` / `73.9px`)
+ * 픽셀 경로가 같은 답을 낸다 — 시나리오 B 는 focus 강제 분기의 *반전*은 잡고 *제거*는 못 잡는다.
+ * 그 대역은 `lod.test.ts` 의 단위 테스트가 순수 함수 수준에서 담당한다.
+ *
+ * ⚠️ **`mercury` · `venus` 는 어느 술어의 주어도 아니다 — 데이터 박제이고, 의도적이다.**
+ * `measureLodMatrix` 가 둘의 `level` / `screenCoverage` / `pxDiameter` 를 받아 `cellResults` 에
+ * 적고 baseline JSON 으로 흘려보내지만 **읽어서 단언하는 곳이 없다**. 도입 시점의 근거가 저장소에
+ * 그대로 남아 있다 —
+ *   · 도입 PR [#390](https://github.com/coseo12/astro-simulator/pull/390) 본문 §비-범위:
+ *     *"mercury/venus 박제값 (900/650) 환경에서 mid 임계 8 미달 — 식 자체는 정확하나 박제값
+ *     영역"* (#385 라운드 3 / Phase 2 로 분리).
+ *   · ADR `20260502-379-fix-decision.md` §결과·재검토 조건 4 가 같은 것을 재검토 조건으로 박제.
+ *   · 그리고 **반례가 baseline 안에 있다** — `__baselines__/lod-379.json` (2026-05-02, 도입 run)
+ *     에서 `mercury` 는 8 cell 중 **6 cell 이 `low`**, `venus` 는 **3 cell 이 `low`** 다. 그때
+ *     「mid 이상」 술어를 넣었다면 **도입 PR 자신이 FAIL** 했다.
+ *   · 그 상태는 **지금도 그대로**다 (2026-09-23 무주입 실측 — `mercury` `low 6` / `mid 2`,
+ *     `venus` `low 4` / `mid 4`). 즉 술어를 지금 추가해도 곧장 FAIL 이고, 그것은 가드 교정이
+ *     아니라 박제값 결정(#385 계열)을 여는 일이다.
+ * ⇒ [#1250](https://github.com/coseo12/astro-simulator/issues/1250) G4 판정: **술어를 추가하지
+ *   않는다.** 추가는 술어 교정이 아니라 DoD 변경이고, 그 결정은 #385 계열(박제값)에 묶여 있다.
+ *   대신 이 대역이 비어 있다는 사실을 여기 박제한다.
+ * ⚠️ 반면 **`sun` 의 부재는 이미 fail-closed** 다 — `bodyResults.sun?.level ?? 'unknown'` 이
+ *   `'high'` 가 아니게 되어 `sunHighRatio` 가 떨어진다(⇒ `1`). 「단언 0 개」는 이 두 body 에만
+ *   해당하지 시나리오 A 전체의 성질이 아니다.
+ *
+ * ⚠️ **`--update` 로 이미 오염된 baseline 은 이 스크립트가 알아보지 못한다.** 기록 시점을 막았으므로
+ * (아래 §닫은 것) 이 스크립트가 쓰는 파일은 `exitCode === 0` 이지만, 손편집이나 다른 판본이 만든
+ * 오염은 그대로 읽는다. baseline 이 **tracked** 라 오염이 커밋으로만 들어오고 `sunHighRatio` 한
+ * 줄로 diff 에 보인다는 것이 현재의 유일한 방어다.
+ *
+ * ### 닫은 것 ([#1250](https://github.com/coseo12/astro-simulator/issues/1250))
+ *
+ * 전부 [#1201](https://github.com/coseo12/astro-simulator/issues/1201) 클래스(「없음/부재/불변」을
+ * 통과로 읽는 술어)다.
+ *
+ * ✅ **시나리오 A 의 분모 소거.** 종전에는 `measurement.error` 분기가 `totalCells += 1` **앞에서**
+ * `continue` 해서 실패 cell 이 분자·분모에서 **동시에** 빠졌다. ⚠️ 다만 **발현 모양이 391 R8 과
+ * 같지 않다** (실측 — 위 표 1·2 행). 391 은 `pass = cellsPass === cellsTotal` 이라 전건 실패가
+ * `0 === 0` 으로 통과했지만, 여기서는 `totalCells > 0 ? … : 0` 폴백이 전건 실패를
+ * `sunHighRatio = 0` 으로 떨어뜨려 `exit 1` 을 냈다. 실제로 뚫린 것은 **부분 실패**다
+ * (4 cell 실패 → 남은 `4/4 = 100%` → `exit 0`). ⇒ `cellsAttempted` 를 **측정 시도 직후** 올려
+ * 분모를 고정하고, 실패 cell 은 `cellsUnmeasured` 로 따로 세어 측정 불가(`2`)로 보낸다.
+ * 전건 실패도 「FAIL」이 아니라 「측정 불가」로 재분류된다 — 값은 같은 빨강이지만 원인이 다르다.
+ *
+ * ✅ **`maxLowRatio` 다리의 `NaN` 무음 통과.** `lowRatio` 가 `NaN` 이면 `NaN > maxLowRatio` 가
+ * 거짓이라 초기값 `0` 이 그대로 남아 `0 <= 0.96` 으로 통과했다. 그 다리는 「sun 만 high」의
+ * **유일 방어**(아래 `SCENARIO_A_DOD.maxLowRatio` 각주)이므로 조용한 무력화가 특히 위험하다.
+ * ⇒ `lodStatsDefect()` 로 분모의 존재를 **판정 전에** 확인하고, 없으면 그 cell 은 측정 불가다.
+ *
+ * ✅ **시나리오 C 의 기저 신호 부재.** `lodInfo` 를 받아 놓고 읽지 않은 채 `lodStats.high <= 5`
+ * 상한 하나만 쟀다 — 빈 씬(`lodInfo = []`, `lodStats` 전부 `0`)도 `0 <= 5` 로 통과한다.
+ * ⇒ (a) `lodInfo` 비어 있음 ⇒ `2`, (b) `lodStats` 분모 결손 ⇒ `2`, (c) `low === 0` ⇒ `1`
+ * (단언의 주어 부재 — 제품 속성). 상한 술어 자체와 `HIGH_REGRESSION_LIMIT` 는 그대로다.
+ *
+ * ✅ **baseline 비교의 3중 무음 단락.** `existsSync` → `null` / `?? null` / `!== null` 게이트가
+ * 셋 다 **조용히** 비교를 건너뛰어, 회귀 감지가 통째로 사라져도 로그 한 줄 안 남았다.
+ * ⇒ 세 경로 모두 **측정 불가로 승격**하고(위 §종료 코드 계약), 비교를 수행한 경우와 `--update`
+ * 로 건너뛴 경우도 **각각 한 줄씩 찍는다**. 「비교했는데 통과」와 「비교 자체가 없었다」가 로그에서
+ * 구분되지 않는 것이 이 클래스의 본체였다.
+ * ⚠️ 여기에 **분모 고정이 만든 결합**이 하나 딸려 온다 (구현 중 실측으로 드러났다). `sunHighRatio`
+ * 의 분모가 측정 시도로 고정되면서, 측정 불가 cell 이 있으면 그 비율은 제품이 아니라 **계측 상태**를
+ * 반영한다 — 그대로 비교하면 하락이 「제품 회귀(`1`)」로 보고돼 전제 붕괴가 게이트로 위장한다
+ * (실측: 4 cell 채널 차단 → `100% → 50%` → `exit 1`). ⇒ 비교는 **A 가 전 cell 측정에 성공했을
+ * 때만** 수행하고, 아니면 입력 결손으로 `2` 다.
+ *
+ * ✅ **`--update` 의 baseline 오염 — 기록 시점에서 막는다** (PR
+ * [#1253](https://github.com/coseo12/astro-simulator/pull/1253) 권고 1). 종전에는 이번 run 의
+ * 판정과 무관하게 덮어썼고, 그대로 두면 **이 변경이 피해를 키운다** — 개정 전에는 부분 측정 실패
+ * run 이 측정 성공 cell 기준 `1.0` (4/4) 을 기록해 값 자체는 멀쩡했지만, 분모를 **시도** 계수로
+ * 고정한 뒤에는 같은 상황이 `0.5` (4/8) 를 박는다. 그 baseline 으로 이후 비교하면
+ * `current < 0.5 − 0.05` 라 5%p 회귀 다리가 **사실상 발화 불가**가 된다. 「깨진 상태를 얼린다」가
+ * 아니라 「다리를 끈다」가 정확한 피해 모양이다. ⇒ `exitCode !== 0` 인 run 에서는 **쓰지 않는다**
+ * (거부도 한 줄 찍는다 — 침묵하면 닫으려던 클래스와 같은 모양이다).
+ * ⚠️ **왜 사용 시점(`loadBaseline()` 에서 `baseline.exitCode !== 0` ⇒ 측정 불가)이 아닌가.**
+ *   (a) **현행 tracked baseline 에는 `exitCode` 키 자체가 없다** — 2026-05-02 도입 run 을 개정 전
+ *       스크립트가 썼기 때문이다. `undefined !== 0` 은 참이라 그 술어는 **무주입 정상 run 을 곧장
+ *       `exit 2`** 로 만든다 (실측 — 그 한 줄만 넣은 사본으로 무주입 실행 → `exit 2` ·
+ *       `baseline 비교: blocked — baseline 이 exit undefined run 의 산출물`).
+ *   (b) 그래서 「키 부재는 허용」으로 완화하면 그것이 바로 이 파일이 닫는 클래스(「없음을 통과로
+ *       읽는 술어」)의 재생산이다. 완화하지 않으면 무회귀가 깨지고, 완화하면 클래스가 돌아온다.
+ *   (c) 기록 시점을 막고 나면 이 스크립트가 쓰는 파일은 **정의상 `exitCode === 0`** 이라 사용 시점
+ *       분기는 도달 불가가 된다 — 죽은 기본값을 하나 더 만드는 셈이다.
+ *   (d) 피해의 **인과 지점이 기록**이다. 분모 고정이 `0.5` 를 *쓰이게* 만든 것이지 읽는 쪽이
+ *       달라진 것이 아니다.
+ *   ⇒ 사용 시점에 남는 갭은 위 §열려 있는 것 에 적었다.
+ * 실측 (2026-09-23 · 로컬 dev 서버 headless · **모바일 4 cell 채널 차단 + `--update`** · 주입
+ * 발화는 cell 별 `lodInfo.length` 양성 대조로 먼저 확인) —
+ *   · #1250 개정 **전** 판본: `exit 0` · `sun=high 4/4 (100.0%)` ⇒ baseline 에 `sunHighRatio: 1`
+ *     이 기록된다. **값 자체는 멀쩡해서** 이 경로가 종전에는 무해해 보였다.
+ *   · #1250 개정 **후** · 본 게이트 **전**: `exit 2` · `4/8 (50.0%)` ⇒ baseline 에
+ *     `sunHighRatio: 0.5` · `exitCode: 2` 가 박힌다. **이 변경이 만든 피해가 여기 있다.**
+ *   · 본 게이트 **후**: `exit 2` · 기록 **거부** ⇒ baseline 파일 바이트 불변.
+ *   · PASS run 의 `--update` 는 그대로 동작한다 (무주입 `exit 0` ⇒ `sunHighRatio: 1` ·
+ *     `exitCode: 0` 기록). 게이트가 정상 갱신 경로를 막지 않는다.
+ *
+ * 남는 축 — **`cellsUnmeasured` 는 `0` 일 때도 출력한다.** 비정상일 때만 보이는 계수는 그 자체가
+ * 「재고 있는지 알 수 없는」 상태라, 닫으려던 것과 같은 모양이다 (#1207 E7 과 같은 이유).
  */
 
 import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
@@ -64,6 +226,9 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const BASELINE_PATH = path.join(__dirname, '__baselines__', 'lod-379.json');
+// baseline 대비 sun=high 하락 허용폭. 도입 때부터 쓰던 값을 상수로 꺼낸 것이고 값은 그대로다
+// (#1250 G6 — 새 임계 0 개).
+const BASELINE_SUN_HIGH_DROP = 0.05;
 
 const args = process.argv.slice(2);
 const flags = {
@@ -145,6 +310,32 @@ const SCENARIO_A_DOD = Object.freeze({
   maxLowRatio: 0.96,
 });
 
+/**
+ * `lodStats` 가 **비율의 분모로 쓸 수 있는 상태인가** 판정 (#1250).
+ *
+ * `lowRatio = low / (high + mid + low)` 는 계수 하나만 결손돼도 `NaN` 이 되고, `NaN` 비교는
+ * 조용히 거짓이라 `maxLowRatio` 가 초기값 `0` 에 머문 채 통과한다 — 판정이 사라진 것이 통과로
+ * 보인다. 그래서 **판정 전에** 분모의 존재를 확인하고, 없으면 그 cell 은 PASS 도 FAIL 도 아닌
+ * 측정 불가다 (헤더 §종료 코드 계약 — `getLodStats()` 는 dev overlay API = 하네스 전제).
+ *
+ * @returns {string | null} `null` = 분모 성립 / 문자열 = 측정 불가 사유
+ */
+function lodStatsDefect(lodStats) {
+  if (!lodStats || typeof lodStats !== 'object') {
+    return 'lodStats 미노출 (getLodStats 부재 또는 null)';
+  }
+  for (const key of ['high', 'mid', 'low']) {
+    if (!Number.isFinite(lodStats[key])) {
+      return `lodStats.${key} 가 유한수가 아님 (${String(lodStats[key])})`;
+    }
+  }
+  const total = lodStats.high + lodStats.mid + lodStats.low;
+  if (total <= 0) {
+    return `lodStats 합계가 ${total} — 비율의 분모가 없음 (high=${lodStats.high}/mid=${lodStats.mid}/low=${lodStats.low})`;
+  }
+  return null;
+}
+
 async function setupPage(browser, viewport, queryString = '') {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
@@ -201,22 +392,32 @@ async function runScenarioA(browser) {
   console.log('\n=== 시나리오 A — T1 default 매트릭스 검증 ===');
   const cellResults = [];
   let sunHighCount = 0;
-  let totalCells = 0;
+  // #1250 — 분모는 **측정 시도**로 고정한다 (종전 `totalCells` 는 측정 성공 cell 만 셌다).
+  let cellsAttempted = 0;
+  let cellsMeasured = 0;
+  let cellsUnmeasured = 0;
   let maxLowRatio = 0;
 
   for (const viewport of SCENARIO_A_VIEWPORTS) {
     const { context, page } = await setupPage(browser, viewport, '/?gpu=a&lod=auto');
     const measurement = await measureLodMatrix(page);
-    if (measurement.error) {
-      console.log(`  ! ${viewport.id}: ${measurement.error}`);
-      cellResults.push({ viewport: viewport.id, error: measurement.error });
+    // #1250 — 이 줄이 아래 `continue` 보다 **앞**이어야 한다. 종전에는 실패 cell 이 분자와
+    // 분모에서 동시에 빠져, 절반이 실패해도 남은 cell 만으로 `100%` 가 나왔다.
+    cellsAttempted += 1;
+    // 계측 채널 붕괴(`getLodInfo` 미노출 / `lodInfo` 빈 배열) — 제품 건강을 한 비트도 말할 수
+    // 없다 ⇒ 측정 불가 (헤더 §종료 코드 계약).
+    const defect = measurement.error ?? lodStatsDefect(measurement.lodStats);
+    if (defect) {
+      cellsUnmeasured += 1;
+      console.log(`  ! ${viewport.id}: 측정 불가 — ${defect}`);
+      cellResults.push({ viewport: viewport.id, measured: false, error: defect });
       await context.close();
       continue;
     }
+    cellsMeasured += 1;
     const { lodStats, bodyResults } = measurement;
     const sunLevel = bodyResults.sun?.level ?? 'unknown';
     if (sunLevel === 'high') sunHighCount += 1;
-    totalCells += 1;
 
     const total = lodStats.high + lodStats.mid + lodStats.low;
     const lowRatio = lodStats.low / total;
@@ -231,6 +432,9 @@ async function runScenarioA(browser) {
     cellResults.push({
       viewport: viewport.id,
       kind: viewport.kind,
+      measured: true,
+      // ⚠️ mercury / venus 는 **어느 술어의 주어도 아니다** — 데이터 박제다 (헤더 §알려진 사각
+      //    §열려 있는 것). 여기 적힌 값은 baseline JSON 으로만 흐른다.
       sun: bodyResults.sun,
       mercury: bodyResults.mercury,
       venus: bodyResults.venus,
@@ -239,24 +443,43 @@ async function runScenarioA(browser) {
     await context.close();
   }
 
-  const sunHighRatio = totalCells > 0 ? sunHighCount / totalCells : 0;
+  // 술어는 그대로다 (#1250 G6 — 새 임계 0 개). 바뀐 것은 분모가 **측정 시도** 계수라는 점과,
+  // 측정 실패가 PASS 쪽 잔여로 남지 않는다는 점이다.
+  const sunHighRatio = cellsAttempted > 0 ? sunHighCount / cellsAttempted : 0;
   const sunHighPass = sunHighRatio >= SCENARIO_A_DOD.sunHighRatio;
-  const lowRatioPass = maxLowRatio <= SCENARIO_A_DOD.maxLowRatio;
+  const lowRatioPass = cellsMeasured > 0 && maxLowRatio <= SCENARIO_A_DOD.maxLowRatio;
+  // 「측정된 cell 중 단언이 거짓인 것」만 제품 FAIL 로 센다. 측정 불가분이 두 다리를 끌어내려도
+  // 그것은 `1` 이 아니라 `2` 다 (헤더 §종료 코드 계약 — 확정 FAIL 우선의 전제).
+  const sunHighFailed = cellsMeasured > 0 && sunHighCount < cellsMeasured;
+  const lowRatioFailed = cellsMeasured > 0 && maxLowRatio > SCENARIO_A_DOD.maxLowRatio;
 
   console.log('\n  --- 시나리오 A 요약 ---');
   console.log(
-    `  sun=high 비율: ${sunHighCount}/${totalCells} (${(sunHighRatio * 100).toFixed(1)}%) — ` +
-      `${sunHighPass ? 'PASS' : 'FAIL'} (DoD ≥ ${SCENARIO_A_DOD.sunHighRatio * 100}%)`,
+    `  sun=high 비율: ${sunHighCount}/${cellsAttempted} (${(sunHighRatio * 100).toFixed(1)}%) — ` +
+      // 측정 불가 cell 때문에 비율이 내려간 것을 「FAIL」로 적지 않는다 — 측정된 cell 이 전부
+      // high 면 이 다리가 본 것은 제품 결함이 아니다 (헤더 §종료 코드 계약).
+      `${sunHighPass ? 'PASS' : sunHighFailed ? 'FAIL' : '측정 불가'} ` +
+      `(DoD ≥ ${SCENARIO_A_DOD.sunHighRatio * 100}%)`,
   );
   console.log(
     `  최대 low ratio: ${(maxLowRatio * 100).toFixed(1)}% — ` +
-      `${lowRatioPass ? 'PASS' : 'FAIL'} (DoD ≤ ${SCENARIO_A_DOD.maxLowRatio * 100}%)`,
+      `${lowRatioPass ? 'PASS' : cellsMeasured > 0 ? 'FAIL' : '측정 불가'} ` +
+      `(DoD ≤ ${SCENARIO_A_DOD.maxLowRatio * 100}%)`,
+  );
+  // 0 일 때도 찍는다 — 비정상일 때만 보이는 계수는 「재고 있는지 알 수 없는」 상태와 같다.
+  console.log(
+    `  측정: ${cellsMeasured}/${cellsAttempted} cell (측정 불가 cell=${cellsUnmeasured})`,
   );
 
   return {
-    pass: sunHighPass && lowRatioPass,
+    pass: cellsUnmeasured === 0 && sunHighPass && lowRatioPass,
+    failed: sunHighFailed || lowRatioFailed,
+    blocked: cellsUnmeasured > 0 || cellsMeasured === 0,
     sunHighRatio,
     maxLowRatio,
+    cellsAttempted,
+    cellsMeasured,
+    cellsUnmeasured,
     cellResults,
   };
 }
@@ -267,6 +490,10 @@ async function runScenarioB(browser) {
   const focusTargets = ['earth', 'mars'];
   const cellResults = [];
   let allPass = true;
+  // #1250 — 같은 파일 안에서 종료 코드 계약을 통일한다. B 의 `error` 는 **두 종류**이고 그
+  // 둘은 같은 코드로 보낼 것이 아니다 (헤더 §종료 코드 계약).
+  let anyFail = false;
+  let anyBlocked = false;
 
   for (const focusId of focusTargets) {
     // ?focus=<id> 로 진입 + ?gpu=a 로 tier-a 강제 (volt #77).
@@ -279,32 +506,58 @@ async function runScenarioB(browser) {
     await page.waitForTimeout(2000);
     const measurement = await page.evaluate((focusId) => {
       const solar = /** @type {any} */ (window).__solarScene;
-      if (!solar || !solar.getLodInfo) return { error: 'getLodInfo 미노출' };
+      // 하네스 전제(dev 빌드 private API) 붕괴 ⇒ 측정 불가.
+      if (!solar || !solar.getLodInfo) return { error: 'getLodInfo 미노출', blocked: true };
       const lodInfo = solar.getLodInfo();
+      if (!lodInfo?.length) return { error: 'lodInfo empty (runLodPass 미실행)', blocked: true };
       const focusEntry = lodInfo.find((e) => e.id === focusId);
-      return focusEntry ? { focus: focusEntry } : { error: `focus body ${focusId} not found` };
+      // focus body 의 부재는 다르다 — `lodInfo` 항목은 제품이 만드는 것이고 그 body 는 본
+      // 시나리오 단언의 **주어 자신**이다. 채널은 멀쩡히 「없다」고 답을 준 것이다 ⇒ 제품 FAIL.
+      return focusEntry
+        ? { focus: focusEntry }
+        : { error: `focus body ${focusId} not found in lodInfo`, blocked: false };
     }, focusId);
 
     if (measurement.error) {
-      console.log(`  ! focus=${focusId}: ${measurement.error}`);
+      const label = measurement.blocked ? '측정 불가' : 'FAIL';
+      console.log(`  ! focus=${focusId}: ${label} — ${measurement.error}`);
       allPass = false;
-      cellResults.push({ focus: focusId, error: measurement.error });
+      if (measurement.blocked) anyBlocked = true;
+      else anyFail = true;
+      cellResults.push({
+        focus: focusId,
+        measured: false,
+        blocked: measurement.blocked === true,
+        error: measurement.error,
+      });
       await context.close();
       continue;
     }
     const focusLevel = measurement.focus.level;
+    // ⚠️ **항목이 존재하면 채널은 정상으로 본다** — 「항목은 있는데 `level` 이 결손·쓰레기」인
+    // malformed 상태를 B 는 `2` 로 올리지 않는다 (#1253 권고 3 — 판정 근거만 남긴다).
+    //  (a) B 의 판정량은 **단일 값의 동등성**(`=== 'high'`)이라 A·C 의 `lodStatsDefect` 가 잡는
+    //      「비율의 분모 결손」에 해당하는 상태가 애초에 없다.
+    //  (b) 그 상태는 **fail-closed** 다 — `undefined === 'high'` 가 거짓이라 `anyFail` ⇒ `1`.
+    //      통과로 새지 않으므로 이 파일이 닫는 클래스가 아니다 (누수 0).
+    //  (c) `2` 로 올리려면 `high|mid|low` 라는 **유효 집합을 여기 복제**해야 하는데, 그 집합의
+    //      SSoT 는 제품(`lodFromScreenCoverage`)이다. 실피해 표본 0 을 위해 SSoT 를 둘로 만들지
+    //      않는다. ⇒ 재검토 트리거는 「malformed `level` 이 실제로 관측될 때」.
     const pass = focusLevel === 'high';
-    if (!pass) allPass = false;
+    if (!pass) {
+      allPass = false;
+      anyFail = true;
+    }
     console.log(
       `  focus=${focusId}: level=${focusLevel} ` +
         `(coverage=${measurement.focus.screenCoverage?.toFixed(1) ?? 'n/a'}px) — ` +
         `${pass ? 'PASS' : 'FAIL'} (focus body 는 항상 high)`,
     );
-    cellResults.push({ focus: focusId, ...measurement.focus, pass });
+    cellResults.push({ focus: focusId, measured: true, ...measurement.focus, pass });
     await context.close();
   }
 
-  return { pass: allPass, cellResults };
+  return { pass: allPass, failed: anyFail, blocked: anyBlocked, cellResults };
 }
 
 /** 시나리오 C — asteroid belt sub-pixel body 가 low billboard 유지 (회귀 가드). */
@@ -320,17 +573,22 @@ async function runScenarioC(browser) {
     const solar = /** @type {any} */ (window).__solarScene;
     if (!solar || !solar.getLodInfo) return { error: 'getLodInfo 미노출' };
     const lodInfo = solar.getLodInfo();
+    // #1250 — **기저 신호**. 종전에는 `lodInfo` 를 받아 놓고 읽지 않아, 빈 씬도 `lodStats.high`
+    // 상한만으로 통과했다 (`0 <= 5`). 판정의 전제가 성립하는지 먼저 묻는다.
+    if (!lodInfo?.length) return { error: 'lodInfo empty (runLodPass 미실행)' };
     // asteroid kind 또는 id prefix 'asteroid' / 'belt'로 식별. 시스템 정의에 따라 다양.
     // 본 검증은 lodInfo 전체에서 low 비율을 측정 (sub-pixel asteroid 가 low 유지하면 high 가
     // 폭증하지 않음). asteroid belt 가 ThinInstances 라 lodInfo 에 별도 항목 없을 수 있음 —
     // 본 시나리오는 "lodInfo 전체 low 가 일정 비율 유지" 로 회귀 가드 (한쪽으로 쏠리지 않음 검증).
     const lodStats = solar.getLodStats ? solar.getLodStats() : null;
-    return { lodInfo, lodStats };
+    return { lodInfoCount: lodInfo.length, lodStats };
   });
-  if (measurement.error) {
-    console.log(`  ! ${measurement.error}`);
+  // 계측 채널 붕괴 ⇒ 측정 불가 (종전에는 `pass: false` 로만 돌려 제품 FAIL 과 섞였다).
+  const channelDefect = measurement.error ?? lodStatsDefect(measurement.lodStats);
+  if (channelDefect) {
+    console.log(`  ! 측정 불가 — ${channelDefect}`);
     await context.close();
-    return { pass: false, error: measurement.error };
+    return { pass: false, failed: false, blocked: true, error: channelDefect };
   }
   const { lodStats } = measurement;
   // sub-pixel body 가 low 유지 — 활성 body 전체 중 high 가 폭증하지 않음 (≤ 5).
@@ -341,22 +599,107 @@ async function runScenarioC(browser) {
   //    body 24) 의 시나리오 C 는 `high=1` 이었으니 이미 한 칸 움직였다. 재검토 트리거는
   //    `SCENARIO_A_DOD.maxLowRatio` 각주 §재검토 트리거 와 **공유**한다 (본 상수도 그 대상).
   const HIGH_REGRESSION_LIMIT = 5;
-  const pass = lodStats.high <= HIGH_REGRESSION_LIMIT;
+  const highPass = lodStats.high <= HIGH_REGRESSION_LIMIT;
+  // #1250 — **단언의 주어가 존재하는가.** 「sub-pixel body 가 low 를 유지한다」인데 low 가 0 개면
+  // 그 상한은 아무것도 재지 않는다. `> 0` 은 임계가 아니라 공허 검사다 (고를 값이 없다). 그리고
+  // low 계수를 만드는 것은 제품(`runLodPass`)이므로 이 부재는 전제 위반이 아니라 제품 FAIL 이다.
+  const lowPresent = lodStats.low > 0;
+  const pass = highPass && lowPresent;
   console.log(
-    `  lodStats: high=${lodStats.high}/mid=${lodStats.mid}/low=${lodStats.low} — ` +
-      `${pass ? 'PASS' : 'FAIL'} (high ≤ ${HIGH_REGRESSION_LIMIT} 회귀 임계)`,
+    `  lodStats: high=${lodStats.high}/mid=${lodStats.mid}/low=${lodStats.low} ` +
+      `(lodInfo ${measurement.lodInfoCount} body) — ` +
+      `${pass ? 'PASS' : 'FAIL'} (high ≤ ${HIGH_REGRESSION_LIMIT} 회귀 임계` +
+      `${lowPresent ? '' : ' · low=0 — sub-pixel low 유지의 주어 부재'})`,
   );
   await context.close();
-  return { pass, lodStats };
+  return { pass, failed: !pass, blocked: false, lodStats, lodInfoCount: measurement.lodInfoCount };
 }
 
-async function loadBaseline() {
-  if (!fs.existsSync(BASELINE_PATH)) return null;
-  return JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+/**
+ * baseline 로드 (#1250).
+ *
+ * 부재·파손은 **하네스 전제의 붕괴**다 — `__baselines__/lod-379.json` 은 저장소에 tracked 돼
+ * 있어 체크아웃이면 항상 존재한다. 종전에는 `null` 을 돌려 호출부가 비교를 **조용히** 건너뛰었고,
+ * 그래서 회귀 감지가 통째로 사라져도 로그 한 줄 남지 않았다.
+ *
+ * @returns {{ baseline: object | null, error: string | null }}
+ */
+function loadBaseline() {
+  const rel = path.relative(process.cwd(), BASELINE_PATH);
+  if (!fs.existsSync(BASELINE_PATH)) {
+    return { baseline: null, error: `baseline 파일 부재: ${rel} (저장소 tracked 파일이다)` };
+  }
+  try {
+    return { baseline: JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')), error: null };
+  } catch (err) {
+    return { baseline: null, error: `baseline JSON 파손: ${rel} — ${err.message}` };
+  }
+}
+
+/**
+ * baseline 대비 sun=high 회귀 비교 (#1250).
+ *
+ * 술어와 임계(5%p)는 그대로다. 바뀐 것은 **비교를 못 한 경우가 침묵하지 않는다**는 점 —
+ * 「비교했는데 통과」와 「비교 자체가 없었다」는 로그에서 구분돼야 한다.
+ *
+ * @returns {{ status: 'compared' | 'regressed' | 'skipped' | 'blocked', detail: string, … }}
+ */
+function compareBaseline(fullResult) {
+  console.log('\n=== baseline 비교 ===');
+  if (flags.update) {
+    const detail = '스킵 — `--update` 모드 (현행 측정값으로 baseline 을 덮어쓴다)';
+    console.log(`  ${detail}`);
+    return { status: 'skipped', detail };
+  }
+  const { baseline, error } = loadBaseline();
+  if (error) {
+    console.log(`  ! 측정 불가 — ${error}`);
+    return { status: 'blocked', detail: error };
+  }
+  const baseSunHigh = baseline?.scenarios?.A?.sunHighRatio;
+  const currentSunHigh = fullResult.scenarios.A?.sunHighRatio;
+  // ⚠️ 비교의 **입력이 성립하는지** 먼저 본다 (#1250 — 구현 중 실측으로 드러난 결합).
+  // `sunHighRatio` 의 분모가 **측정 시도**로 고정되면서, 측정 불가 cell 이 있을 때 이 비율은
+  // 제품이 아니라 계측 상태를 반영한다. 그대로 비교하면 하락이 「제품 회귀(`1`)」로 보고돼
+  // 전제 붕괴가 게이트로 위장한다 (실측: 4 cell 채널 차단 → `50%` 하락 → `exit 1`).
+  // ⚠️ `?? 0` 은 형태만 보면 이 파일이 닫는 클래스(「없음을 전 cell 측정 성공으로 읽는 기본값」)와
+  // 같다. **현행 도달 불가**라 그대로 둔다 (#1253 권고 2) — 이유를 여기 박아 다음 사람이 같은
+  // 판정을 처음부터 반복하지 않게 한다: (a) `runScenarioA` 는 모든 반환 경로에서 `cellsUnmeasured`
+  // 를 채우고(중도 `return` 이 없다), (b) `scenarios.A` 자체가 없으려면 `withBrowser` 가 던져야
+  // 하는데 그 경로는 `main().catch` 가 `exit 2` 로 받는다 — `compareBaseline` 에 도달하지 않는다.
+  // ⇒ 도달 가능해지는 조건은 **(a) 또는 (b) 가 깨질 때**이고, 그때는 `!Number.isFinite(...)` 로
+  // 올려 측정 불가로 보낸다 (지금 올리면 트리거 없는 죽은 분기가 하나 늘 뿐이다).
+  const unmeasured = fullResult.scenarios.A?.cellsUnmeasured ?? 0;
+  if (unmeasured > 0) {
+    const detail = `시나리오 A 측정 불가 cell=${unmeasured} — current 측 비율이 제품 상태가 아니다`;
+    console.log(`  ! 측정 불가 — ${detail}`);
+    return { status: 'blocked', detail, baseSunHigh, currentSunHigh };
+  }
+  // 어느 한쪽이라도 없으면 비교 자체가 성립하지 않는다 ⇒ 측정 불가 (종전 `!== null` 게이트는
+  // 이 상태를 조용히 통과시켰다).
+  if (!Number.isFinite(baseSunHigh) || !Number.isFinite(currentSunHigh)) {
+    const detail =
+      `비교 입력 결손 — baseline.scenarios.A.sunHighRatio=${String(baseSunHigh)} / ` +
+      `current=${String(currentSunHigh)}`;
+    console.log(`  ! 측정 불가 — ${detail}`);
+    return { status: 'blocked', detail, baseSunHigh, currentSunHigh };
+  }
+  console.log(
+    `  sun=high baseline=${(baseSunHigh * 100).toFixed(1)}% / current=${(currentSunHigh * 100).toFixed(1)}%`,
+  );
+  if (currentSunHigh < baseSunHigh - BASELINE_SUN_HIGH_DROP) {
+    // 비교가 **발화**한 것은 제품 회귀다 ⇒ exit 1.
+    const detail = `sun=high 비율이 baseline 대비 ${BASELINE_SUN_HIGH_DROP * 100}%p 이상 하락 — 회귀 의심`;
+    console.log(`  ! ${detail}`);
+    return { status: 'regressed', detail, baseSunHigh, currentSunHigh };
+  }
+  return { status: 'compared', detail: '하락 없음', baseSunHigh, currentSunHigh };
 }
 
 async function main() {
   let allPass = true;
+  let anyFail = false; // 측정됐고 단언이 거짓 → exit 1
+  let anyBlocked = false; // 계측 채널 붕괴 / 판정 전제 결손 → exit 2
   const fullResult = {
     timestamp: new Date().toISOString(),
     baseUrl: BASE_URL,
@@ -366,58 +709,71 @@ async function main() {
   // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
   // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
   await withBrowser({ headless: true }, async (browser) => {
-    const a = await runScenarioA(browser);
-    fullResult.scenarios.A = a;
-    if (!a.pass) allPass = false;
-
-    const b = await runScenarioB(browser);
-    fullResult.scenarios.B = b;
-    if (!b.pass) allPass = false;
-
-    const c = await runScenarioC(browser);
-    fullResult.scenarios.C = c;
-    if (!c.pass) allPass = false;
+    for (const [key, run] of [
+      ['A', runScenarioA],
+      ['B', runScenarioB],
+      ['C', runScenarioC],
+    ]) {
+      const result = await run(browser);
+      fullResult.scenarios[key] = result;
+      if (!result.pass) allPass = false;
+      if (result.failed) anyFail = true;
+      if (result.blocked) anyBlocked = true;
+    }
   });
 
-  // baseline 비교 (있을 경우).
-  const baseline = await loadBaseline();
-  if (baseline && !flags.update) {
-    const baseSunHigh = baseline.scenarios?.A?.sunHighRatio ?? null;
-    const currentSunHigh = fullResult.scenarios.A?.sunHighRatio ?? null;
-    if (baseSunHigh !== null && currentSunHigh !== null) {
+  // baseline 비교 — 스킵·불가도 **반드시 한 줄 찍는다** (#1250).
+  const baselineComparison = compareBaseline(fullResult);
+  fullResult.baselineComparison = baselineComparison;
+  if (baselineComparison.status === 'regressed') {
+    allPass = false;
+    anyFail = true;
+  } else if (baselineComparison.status === 'blocked') {
+    allPass = false;
+    anyBlocked = true;
+  }
+
+  // 확정 FAIL 우선 (헤더 §종료 코드 계약) — 제품 결함이 「측정 불가」 뒤로 숨지 않게 한다.
+  // 마지막 `1` 은 fail-closed 잔여다 (세 플래그가 모순되면 통과가 아니라 실패로 떨어진다).
+  const exitCode = anyFail ? 1 : anyBlocked ? 2 : allPass ? 0 : 1;
+  fullResult.exitCode = exitCode;
+
+  // baseline 업데이트 — **PASS run 의 산출물만 baseline 이 된다** (#1253 권고 1).
+  // 종전에는 판정과 무관하게 덮어썼고, 분모를 측정 시도로 고정한 뒤로는 그 경로가 회귀 다리를
+  // 끄는 값(`0.5`)을 박을 수 있게 됐다. 기록 시점에서 막는 이유(사용 시점이 아닌 이유 포함)는
+  // 헤더 §닫은 것. 여기서 종료 코드를 바꾸지는 않는다 — 거부는 이미 non-zero 인 run 에서만
+  // 일어나므로 새 판정이 아니다 (G6 — 새 임계 0 개).
+  if (flags.update) {
+    if (exitCode !== 0) {
       console.log(
-        `\n=== baseline 비교 ===\n  sun=high baseline=${(baseSunHigh * 100).toFixed(1)}% / current=${(currentSunHigh * 100).toFixed(1)}%`,
+        `\n  ! baseline 업데이트 거부 — 이번 run 은 exit ${exitCode} ` +
+          `(${anyFail ? '제품 FAIL' : '측정 불가'}). PASS 가 아닌 run 의 산출물은 baseline 이 될 수 없다.`,
       );
-      if (currentSunHigh < baseSunHigh - 0.05) {
-        console.log('  ! sun=high 비율이 baseline 대비 5%p 이상 하락 — 회귀 의심');
-        allPass = false;
-      }
+    } else {
+      fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
+      fs.writeFileSync(BASELINE_PATH, JSON.stringify(fullResult, null, 2));
+      console.log(
+        `\n  baseline 업데이트: ${path.relative(process.cwd(), BASELINE_PATH)} (이번 run exit ${exitCode})`,
+      );
     }
   }
 
-  // baseline 업데이트.
-  if (flags.update) {
-    fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
-    fs.writeFileSync(BASELINE_PATH, JSON.stringify(fullResult, null, 2));
-    console.log(`\n  baseline 업데이트: ${path.relative(process.cwd(), BASELINE_PATH)}`);
-  }
+  /** 시나리오 한 건의 3상 판정 표기. */
+  const verdict = (s) => (s?.pass ? 'PASS' : s?.failed ? 'FAIL' : '측정 불가');
 
   console.log('\n=== 최종 요약 ===');
-  console.log(`overall: ${allPass ? 'PASS' : 'FAIL'}`);
-  console.log(
-    `  시나리오 A (T1 default 매트릭스): ${fullResult.scenarios.A?.pass ? 'PASS' : 'FAIL'}`,
-  );
-  console.log(`  시나리오 B (T3 focus high): ${fullResult.scenarios.B?.pass ? 'PASS' : 'FAIL'}`);
-  console.log(
-    `  시나리오 C (asteroid sub-pixel low): ${fullResult.scenarios.C?.pass ? 'PASS' : 'FAIL'}`,
-  );
+  console.log(`overall: ${allPass ? 'PASS' : anyFail ? 'FAIL' : '측정 불가'} (exit ${exitCode})`);
+  console.log(`  시나리오 A (T1 default 매트릭스): ${verdict(fullResult.scenarios.A)}`);
+  console.log(`  시나리오 B (T3 focus high): ${verdict(fullResult.scenarios.B)}`);
+  console.log(`  시나리오 C (asteroid sub-pixel low): ${verdict(fullResult.scenarios.C)}`);
+  console.log(`  baseline 비교: ${baselineComparison.status} — ${baselineComparison.detail}`);
 
   if (flags.json) {
     console.log('\n=== JSON 결과 ===');
     console.log(JSON.stringify(fullResult, null, 2));
   }
 
-  process.exit(allPass ? 0 : 1);
+  process.exit(exitCode);
 }
 
 main().catch((err) => {
