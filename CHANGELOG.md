@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.89.3] - 2026-09-24
+
 ### Fixed
 
 - **[#1256] `waitForFunction` 옵션 인자 오배치 34곳 전수 교정 + 재발 방지 정적 가드** ([#1256](https://github.com/coseo12/astro-simulator/issues/1256)). playwright 시그니처는 `waitForFunction(pageFunction, arg, options)` 인데 옵션 객체가 **두 번째** 자리에 있어 선언한 `timeout` 이 **한 번도 적용되지 않았다**. [#1239](https://github.com/coseo12/astro-simulator/issues/1239) 가 자기 축 1곳만 고치며 남긴 범위 경계의 후속이다.
@@ -50,6 +52,15 @@ Semantic Versioning을 따른다.
   - **`cellsUnmeasured` 는 `0` 일 때도 출력한다** — 비정상일 때만 보이는 계수는 그 자체가 「재고 있는지 알 수 없는」 상태라, 닫으려던 것과 같은 모양이 된다 (#1207 E7 과 같은 이유).
   - ⚠️ **헤더 §알려진 사각 표제에 계수를 박지 않는다** — 「N 종」이 상위 집합을 이미 덮은 것처럼 보이게 한 전례가 있다 (#1207 reviewer R8). 이번에 **열려 있는 것**으로 남긴 것: focus 강제 분기의 _삭제_ 미검출(선재), `mercury`·`venus` 단언 부재(위), **이미 오염된 baseline 을 이 스크립트가 알아보지 못한다는 것**(아래 `--update` 항목은 _기록_ 시점을 막을 뿐이라, 손편집·다른 판본이 만든 오염은 그대로 읽는다. baseline 이 tracked 라 오염이 커밋 diff 에 보인다는 것이 현재의 유일한 방어다).
   - **`--update` 는 PASS run 의 산출물만 baseline 으로 쓴다** (PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) reviewer 권고 1). 종전에는 이번 run 의 판정과 무관하게 덮어썼고, **위 분모 고정이 그 경로의 피해를 키웠다** — 개정 전에는 부분 측정 실패 run 이 측정 성공 cell 기준 `sunHighRatio: 1` (4/4) 을 기록해 값 자체가 멀쩡했지만, 분모를 **시도** 계수로 고정한 뒤에는 같은 상황이 `0.5` (4/8) 를 박아 `current < 0.5 − 0.05` 라는 5%p 회귀 다리를 사실상 끈다. 3 판본 대조 실측(모바일 4 cell 채널 차단 + `--update`, 주입 발화는 cell 별 `lodInfo.length` 양성 대조로 선확인) — #1250 개정 **전** `exit 0` ⇒ `1` 기록 / 개정 후·게이트 **전** `exit 2` ⇒ **`0.5` 기록** / 게이트 **후** `exit 2` ⇒ **기록 거부**(파일 바이트 불변). PASS run 의 갱신 경로는 그대로다(무주입 `exit 0` ⇒ `sunHighRatio: 1` · `exitCode: 0` 기록). ⚠️ **사용 시점(`loadBaseline()` 에서 `baseline.exitCode !== 0` ⇒ 측정 불가)이 아니라 기록 시점을 막았다** — 현행 tracked baseline 에는 `exitCode` 키 자체가 없어(2026-05-02 도입 run 이 개정 전 스크립트로 쓴 것) 그 술어는 **무주입 정상 run 을 곧장 `exit 2`** 로 만들고(실측), 「키 부재는 허용」으로 완화하면 그것이 바로 이 항목이 닫는 클래스의 재생산이다. 기록을 막고 나면 사용 시점 분기는 도달 불가이기도 하다.
+
+### Behavior Changes
+
+제품 런타임은 불변이다 (`apps/web/src/**`·`packages/**` 접촉 `0` 행). 아래는 **저장소·CI 행동** 변화이고 근거는 전부 위 §Fixed 안에 있다.
+
+- **신규 CI 가드가 PR 을 차단한다** — `project-guards` 에 `verify-waitforfunction-args` self-test + 본검사 2 스텝이 붙었다. `.waitForFunction(` 의 두 번째 top-level 인자가 옵션 키를 가진 객체 리터럴이면 머지 전에 막힌다 (#1256).
+- **browser-verify 의 대기 상한이 선언값대로 적용된다** — 종전에는 34 곳 전부 playwright 기본값이 실제 상한이었다. 느린 환경에서 만료가 **더 일찍** 일어날 수 있다 (#1256).
+- **하네스 전제 붕괴가 종료 코드로 갈린다** — `379-lod` · `glow-marker` 축 6 은 「재려던 상황이 성립하지 않음」을 `exit 2` 로 분리한다. 종전에는 그 경우가 통과(`0`) 또는 제품 회귀(`1`) 로 읽혔다 (#1250 · #1239).
+- **`379-lod --update` 는 PASS run 의 산출물만 baseline 으로 기록한다** — 종전에는 이번 run 의 판정과 무관하게 덮어썼다 (#1250).
 
 ## [0.89.2] - 2026-09-23
 
