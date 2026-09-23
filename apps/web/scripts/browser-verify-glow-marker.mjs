@@ -183,6 +183,7 @@ async function openSim(browser, query) {
       typeof window.__simStore !== 'undefined' &&
       typeof window.__solarScene !== 'undefined' &&
       typeof window.__simCore !== 'undefined',
+    undefined,
     { timeout: 30_000 },
   );
   await page.waitForTimeout(POST_INIT_WAIT_MS);

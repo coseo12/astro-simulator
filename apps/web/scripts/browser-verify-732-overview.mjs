@@ -84,7 +84,8 @@ async function boot(page) {
       typeof window.__solarScene !== 'undefined' &&
       typeof window.__simStore !== 'undefined' &&
       typeof window.__simCore !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   await page.waitForTimeout(SETTLE_MS);
 }

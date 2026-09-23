@@ -67,7 +67,8 @@ async function boot(page) {
   await page.goto(`${BASE_URL}/?gpu=a&lod=auto`, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__solarScene !== 'undefined' && typeof window.__simStore !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   await page.waitForTimeout(SETTLE_MS);
 }

@@ -167,6 +167,7 @@ async function setupPage(browser, query) {
   await page.goto(`${BASE_URL}${query}`, { waitUntil: 'networkidle', timeout: 45_000 });
   await page.waitForFunction(
     () => typeof window.__simCore !== 'undefined' && typeof window.__solarScene !== 'undefined',
+    undefined,
     { timeout: 20_000 },
   );
   await page.waitForTimeout(2600); // mesh 생성 + 첫 LOD pass + focus tween 정착

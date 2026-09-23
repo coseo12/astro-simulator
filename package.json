@@ -59,6 +59,7 @@
     "verify:md-tilde": "node scripts/verify-md-tilde.mjs",
     "verify:md-conflict-marker": "node scripts/verify-md-conflict-marker.mjs",
     "verify:ssot-trigger-wording": "node scripts/verify-ssot-trigger-wording.mjs",
+    "verify:waitforfunction-args": "node scripts/verify-waitforfunction-args.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
     "bench:tier-guard-cost": "node scripts/bench-tier-guard-cost.mjs",

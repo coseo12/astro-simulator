@@ -50,7 +50,8 @@ async function boot(page) {
   await page.goto(`${BASE_URL}/?gpu=a&lod=auto`, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__solarScene !== 'undefined' && typeof window.__simStore !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   await page.waitForTimeout(SETTLE_MS);
 }
@@ -174,7 +175,9 @@ async function scenarioPersistence(browser) {
     await setAxis(page, 'wasd', 0.04, true);
     await setAxis(page, 'zoomoutFactor', 14, true);
     await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
-    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', { timeout: 15_000 });
+    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', undefined, {
+      timeout: 20_000,
+    });
     await page.waitForTimeout(SETTLE_MS);
     const afterReload = await page.evaluate(() => ({
       ...window.__simStore.getState().freeFlySensitivity,
@@ -201,7 +204,9 @@ async function scenarioPersistence(browser) {
       { key: STORAGE_KEY, version: SCHEMA_VERSION },
     );
     await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
-    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', { timeout: 15_000 });
+    await page.waitForFunction(() => typeof window.__simStore !== 'undefined', undefined, {
+      timeout: 20_000,
+    });
     await page.waitForTimeout(SETTLE_MS);
     const afterCorrupt = await page.evaluate(() => ({
       ...window.__simStore.getState().freeFlySensitivity,

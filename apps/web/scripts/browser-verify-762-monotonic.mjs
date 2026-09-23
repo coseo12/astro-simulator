@@ -154,6 +154,7 @@ async function setup(browser, url) {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__solarScene !== 'undefined' && typeof window.__simCore !== 'undefined',
+    undefined,
     { timeout: 20_000 },
   );
   await page.waitForTimeout(POST_WAIT_MS);

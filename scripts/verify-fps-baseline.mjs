@@ -89,6 +89,10 @@ const REGRESSION_MARGIN = 0.3; // baseline 대비 30% 저하 허용 (rAF noise �
 //   LOD_SETTLE_TIMEOUT_MS: tier-c 일 때 측정 직전 override='low' 정착 대기 상한.
 //     race fix (#677) 가 정상 작동하면 즉시 충족. 미충족 (영구 'auto' 잔존) 이면 timeout 후
 //     auto LOD (sun high + mid sphere) 상태로 측정 → FAIL 표면화 (회귀 은폐 아님).
+//     ⚠️ #1256 이전에는 이 계약이 **거짓**이었다 — 옵션 객체를 `waitForFunction` 의 두 번째
+//     인자(= `arg`)로 넘겨 이 상수가 한 번도 적용되지 않았고 실제 상한은 playwright 기본값
+//     `30_000` 이었다. 위 "상한" 서술이 다시 실물과 어긋나지 않게 하는 것은
+//     `scripts/verify-waitforfunction-args.mjs` 가드다.
 //   MEASURE_MAX_ATTEMPTS: 1차 측정이 절대/회귀 임계 미달이면 best-of-N 재측정.
 //     transient (runner 이웃 부하 — 가설 2) 흡수용. 단 측정값을 모두 로깅하고
 //     판정은 best (max) 사용 → 진짜 회귀는 매번 fail 하므로 은폐 불가 (volt #32).
@@ -253,6 +257,7 @@ async function waitForLodSettle(page) {
   try {
     await page.waitForFunction(
       () => /** @type {any} */ (window).__solarScene?.getLodStats?.().override === 'low',
+      undefined,
       { timeout: LOD_SETTLE_TIMEOUT_MS },
     );
   } catch {

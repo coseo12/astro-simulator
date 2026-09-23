@@ -235,6 +235,7 @@ async function setupPage(browser, query, { equatorialView = true, julianDate = T
   await page.goto(`${BASE_URL}${query}`, { waitUntil: 'networkidle', timeout: 45_000 });
   await page.waitForFunction(
     () => typeof window.__simCore !== 'undefined' && typeof window.__solarScene !== 'undefined',
+    undefined,
     { timeout: 20_000 },
   );
   // #1228 B1 (a) — 캔버스 위 DOM (토스트 · HUD) 이 캡처에 섞이지 않게 먼저 숨긴다. 스타일은 페이지

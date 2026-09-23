@@ -51,6 +51,22 @@ const BASELINE_DIR = path.join(__dirname, '__baselines__', 'r1');
 const DIFF_DIR = path.join(__dirname, '__diff__', 'r1');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
+/**
+ * scene 전역 핸들(`__gpuTier` · `__simCore`) 등장 대기 상한 (#1256).
+ *
+ * 상수로 뽑은 이유는 값이 두 곳에서 쓰이기 때문이다 — `waitForFunction` 의 옵션과, 그 직전
+ * `diag()` 진단 문자열. 종전 판본은 옵션 객체를 **두 번째** 인자로 넘겨 선언 `10_000` 이
+ * 한 번도 적용되지 않았고(실제 상한은 playwright 기본값 `30_000`), diag 는 그와 별개로
+ * `10s` 를 **하드코딩**해 출력했다. 즉 로그를 읽는 사람이 본 값은 선언값도 실제값도 아니었다.
+ * 숫자를 문자열에 다시 적지 않는 것이 이 거짓 진단의 재발을 구조적으로 막는다.
+ *
+ * 값 `20_000` 은 새 임계가 아니라 `scripts/browser-verify-utils.mjs` `bootstrapScene` 의
+ * `handleTimeout` 기본값이다 (저장소 canonical). 정상 가드 CI 최대 표본 `8,271 ms` 대비
+ * 여유 2.42× — 종전 선언 `10_000` 의 여유 1.21× 는 #1209 가 치른 «판정선 여유 < 산포» 와
+ * 같은 축의 flake 를 만든다. 근거 실측은 이슈 #1256 §1.
+ */
+const SCENE_HANDLE_TIMEOUT_MS = 20_000;
+
 // #606 진단 — verify 경로 단계별 stderr 로깅 (R1_GUARD_DIAG=1 시 활성화).
 // stderr 는 unbuffered(동기) 라 freeze/timeout cancel 시에도 stuck 직전 단계가 보존된다.
 // stdout(console.log) 은 CI pipe 에서 block-buffered → step cancel 시 유실 (실측 #606).
@@ -413,10 +429,13 @@ async function setupPage(browser, viewport, queryString = '') {
   diag(`setupPage[${viewport.id}] goto ${url} (networkidle, 30s)`);
   await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
   // hydration + scene 초기화 대기.
-  diag(`setupPage[${viewport.id}] goto done → waitForFunction(__gpuTier,__simCore, 10s)`);
+  diag(
+    `setupPage[${viewport.id}] goto done → waitForFunction(__gpuTier,__simCore, ${SCENE_HANDLE_TIMEOUT_MS}ms)`,
+  );
   await page.waitForFunction(
     () => typeof window.__gpuTier !== 'undefined' && typeof window.__simCore !== 'undefined',
-    { timeout: 10_000 },
+    undefined,
+    { timeout: SCENE_HANDLE_TIMEOUT_MS },
   );
   // 추가 안정 대기 — sun mesh 생성 + 첫 프레임 렌더 완료.
   diag(`setupPage[${viewport.id}] waitForFunction done → waitForTimeout(800)`);

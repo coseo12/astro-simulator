@@ -133,6 +133,7 @@ async function setupPage(browser) {
       typeof window.__simStore !== 'undefined' &&
       typeof window.__solarScene !== 'undefined' &&
       typeof window.__simCore !== 'undefined',
+    undefined,
     { timeout: 30_000 },
   );
   await page.waitForTimeout(POST_INIT_WAIT_MS);
@@ -340,6 +341,7 @@ async function verifyUrlDirectEntry(browser) {
           typeof window.__simStore !== 'undefined' &&
           typeof window.__solarScene !== 'undefined' &&
           typeof window.__simCore !== 'undefined',
+        undefined,
         { timeout: 30_000 },
       );
       // url-sync useEffect 발화 + 가드 통과 시 store mutation propagation 대기.
