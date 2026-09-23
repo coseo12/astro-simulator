@@ -68,8 +68,16 @@
  * | baseline 의 `scenarios.A.sunHighRatio` 만 삭제 | **`exit 0`** — 역시 `baseline` 토큰 **0 회** | `exit 2` (비교 입력 결손) |
  *
  * ⚠️ **시나리오 C 는 종료 코드로 단독 대조할 수 없다** — C 의 요청(`/?gpu=a&lod=auto`, 1280×720)은
- * A 의 `1280x720_dpr1` cell 과 **바이트 동일**이라 채널을 C 에만 끊을 수 없다. 그래서 위 3·4 행의
+ * A 의 `1280x720_dpr1` cell 과 **바이트 동일**이라 채널을 C 에만 끊을 수 없다. 그래서 위 4·5 행의
  * 대조는 종료 코드가 아니라 **C 자신의 판정**(PASS → 측정 불가 / PASS → FAIL)으로 읽는다.
+ * ⚠️ **caveat 이 실제로 필요한 것은 5 행이다** — 종료 코드가 개정 전·후 **모두 `exit 1`** 이라
+ * 아예 움직이지 않는다 (PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) reviewer
+ * 독립 재현). 종료 코드만 보면 「미검출」로 오독된다. 4 행은 `exit 0 → 2` 로 움직이기는 하지만
+ * 그 이동은 A 가 같은 채널 차단을 함께 맞아 생긴 것이라 C 의 전이를 증거하지 못한다.
+ * ⚠️ 반면 **3 행(`lodStats.low → NaN`)은 이 caveat 의 대상이 아니다** — A 7/8 cell 을 끊는
+ * 변이라 C 를 건드리지 않고, 위 표가 적은 그대로 `exit 0 → 2` 로 **종료 코드로 대조된다**
+ * (#1253 차단 B1 정정 — 종전 이 문장은 `3·4 행` 이라 적혀 바로 위 표 자신과 모순됐고, 같은 PR
+ * 본문은 `4·5 행` 이라 적어 두 기록이 갈려 있었다).
  *
  * ⚠️ **시나리오 B 의 재분류가 값을 하는 곳은 위 2 행(전건 실패)이다.** 전건 실패에서 개정 전은 `focus body earth
  * not found` 를 **제품 FAIL** 로 보고했지만, 실제 원인은 `lodInfo` 가 비었다는 **채널 붕괴**였다.
@@ -136,9 +144,10 @@
  *   `'high'` 가 아니게 되어 `sunHighRatio` 가 떨어진다(⇒ `1`). 「단언 0 개」는 이 두 body 에만
  *   해당하지 시나리오 A 전체의 성질이 아니다.
  *
- * ⚠️ **`--update` 는 이번 run 의 판정과 무관하게 baseline 을 덮어쓴다.** FAIL·측정 불가 상태에서
- * 불러도 기록되므로 「깨진 상태를 baseline 으로 얼리는」 경로가 열려 있다. `--update` 는 사람이
- * 명시적으로 부르는 갱신 경로라 지금은 막지 않고 여기 적어 둔다 (#1250 비-범위).
+ * ⚠️ **`--update` 로 이미 오염된 baseline 은 이 스크립트가 알아보지 못한다.** 기록 시점을 막았으므로
+ * (아래 §닫은 것) 이 스크립트가 쓰는 파일은 `exitCode === 0` 이지만, 손편집이나 다른 판본이 만든
+ * 오염은 그대로 읽는다. baseline 이 **tracked** 라 오염이 커밋으로만 들어오고 `sunHighRatio` 한
+ * 줄로 diff 에 보인다는 것이 현재의 유일한 방어다.
  *
  * ### 닫은 것 ([#1250](https://github.com/coseo12/astro-simulator/issues/1250))
  *
@@ -174,6 +183,36 @@
  * 반영한다 — 그대로 비교하면 하락이 「제품 회귀(`1`)」로 보고돼 전제 붕괴가 게이트로 위장한다
  * (실측: 4 cell 채널 차단 → `100% → 50%` → `exit 1`). ⇒ 비교는 **A 가 전 cell 측정에 성공했을
  * 때만** 수행하고, 아니면 입력 결손으로 `2` 다.
+ *
+ * ✅ **`--update` 의 baseline 오염 — 기록 시점에서 막는다** (PR
+ * [#1253](https://github.com/coseo12/astro-simulator/pull/1253) 권고 1). 종전에는 이번 run 의
+ * 판정과 무관하게 덮어썼고, 그대로 두면 **이 변경이 피해를 키운다** — 개정 전에는 부분 측정 실패
+ * run 이 측정 성공 cell 기준 `1.0` (4/4) 을 기록해 값 자체는 멀쩡했지만, 분모를 **시도** 계수로
+ * 고정한 뒤에는 같은 상황이 `0.5` (4/8) 를 박는다. 그 baseline 으로 이후 비교하면
+ * `current < 0.5 − 0.05` 라 5%p 회귀 다리가 **사실상 발화 불가**가 된다. 「깨진 상태를 얼린다」가
+ * 아니라 「다리를 끈다」가 정확한 피해 모양이다. ⇒ `exitCode !== 0` 인 run 에서는 **쓰지 않는다**
+ * (거부도 한 줄 찍는다 — 침묵하면 닫으려던 클래스와 같은 모양이다).
+ * ⚠️ **왜 사용 시점(`loadBaseline()` 에서 `baseline.exitCode !== 0` ⇒ 측정 불가)이 아닌가.**
+ *   (a) **현행 tracked baseline 에는 `exitCode` 키 자체가 없다** — 2026-05-02 도입 run 을 개정 전
+ *       스크립트가 썼기 때문이다. `undefined !== 0` 은 참이라 그 술어는 **무주입 정상 run 을 곧장
+ *       `exit 2`** 로 만든다 (실측 — 그 한 줄만 넣은 사본으로 무주입 실행 → `exit 2` ·
+ *       `baseline 비교: blocked — baseline 이 exit undefined run 의 산출물`).
+ *   (b) 그래서 「키 부재는 허용」으로 완화하면 그것이 바로 이 파일이 닫는 클래스(「없음을 통과로
+ *       읽는 술어」)의 재생산이다. 완화하지 않으면 무회귀가 깨지고, 완화하면 클래스가 돌아온다.
+ *   (c) 기록 시점을 막고 나면 이 스크립트가 쓰는 파일은 **정의상 `exitCode === 0`** 이라 사용 시점
+ *       분기는 도달 불가가 된다 — 죽은 기본값을 하나 더 만드는 셈이다.
+ *   (d) 피해의 **인과 지점이 기록**이다. 분모 고정이 `0.5` 를 *쓰이게* 만든 것이지 읽는 쪽이
+ *       달라진 것이 아니다.
+ *   ⇒ 사용 시점에 남는 갭은 위 §열려 있는 것 에 적었다.
+ * 실측 (2026-09-23 · 로컬 dev 서버 headless · **모바일 4 cell 채널 차단 + `--update`** · 주입
+ * 발화는 cell 별 `lodInfo.length` 양성 대조로 먼저 확인) —
+ *   · #1250 개정 **전** 판본: `exit 0` · `sun=high 4/4 (100.0%)` ⇒ baseline 에 `sunHighRatio: 1`
+ *     이 기록된다. **값 자체는 멀쩡해서** 이 경로가 종전에는 무해해 보였다.
+ *   · #1250 개정 **후** · 본 게이트 **전**: `exit 2` · `4/8 (50.0%)` ⇒ baseline 에
+ *     `sunHighRatio: 0.5` · `exitCode: 2` 가 박힌다. **이 변경이 만든 피해가 여기 있다.**
+ *   · 본 게이트 **후**: `exit 2` · 기록 **거부** ⇒ baseline 파일 바이트 불변.
+ *   · PASS run 의 `--update` 는 그대로 동작한다 (무주입 `exit 0` ⇒ `sunHighRatio: 1` ·
+ *     `exitCode: 0` 기록). 게이트가 정상 갱신 경로를 막지 않는다.
  *
  * 남는 축 — **`cellsUnmeasured` 는 `0` 일 때도 출력한다.** 비정상일 때만 보이는 계수는 그 자체가
  * 「재고 있는지 알 수 없는」 상태라, 닫으려던 것과 같은 모양이다 (#1207 E7 과 같은 이유).
@@ -495,6 +534,15 @@ async function runScenarioB(browser) {
       continue;
     }
     const focusLevel = measurement.focus.level;
+    // ⚠️ **항목이 존재하면 채널은 정상으로 본다** — 「항목은 있는데 `level` 이 결손·쓰레기」인
+    // malformed 상태를 B 는 `2` 로 올리지 않는다 (#1253 권고 3 — 판정 근거만 남긴다).
+    //  (a) B 의 판정량은 **단일 값의 동등성**(`=== 'high'`)이라 A·C 의 `lodStatsDefect` 가 잡는
+    //      「비율의 분모 결손」에 해당하는 상태가 애초에 없다.
+    //  (b) 그 상태는 **fail-closed** 다 — `undefined === 'high'` 가 거짓이라 `anyFail` ⇒ `1`.
+    //      통과로 새지 않으므로 이 파일이 닫는 클래스가 아니다 (누수 0).
+    //  (c) `2` 로 올리려면 `high|mid|low` 라는 **유효 집합을 여기 복제**해야 하는데, 그 집합의
+    //      SSoT 는 제품(`lodFromScreenCoverage`)이다. 실피해 표본 0 을 위해 SSoT 를 둘로 만들지
+    //      않는다. ⇒ 재검토 트리거는 「malformed `level` 이 실제로 관측될 때」.
     const pass = focusLevel === 'high';
     if (!pass) {
       allPass = false;
@@ -614,6 +662,13 @@ function compareBaseline(fullResult) {
   // `sunHighRatio` 의 분모가 **측정 시도**로 고정되면서, 측정 불가 cell 이 있을 때 이 비율은
   // 제품이 아니라 계측 상태를 반영한다. 그대로 비교하면 하락이 「제품 회귀(`1`)」로 보고돼
   // 전제 붕괴가 게이트로 위장한다 (실측: 4 cell 채널 차단 → `50%` 하락 → `exit 1`).
+  // ⚠️ `?? 0` 은 형태만 보면 이 파일이 닫는 클래스(「없음을 전 cell 측정 성공으로 읽는 기본값」)와
+  // 같다. **현행 도달 불가**라 그대로 둔다 (#1253 권고 2) — 이유를 여기 박아 다음 사람이 같은
+  // 판정을 처음부터 반복하지 않게 한다: (a) `runScenarioA` 는 모든 반환 경로에서 `cellsUnmeasured`
+  // 를 채우고(중도 `return` 이 없다), (b) `scenarios.A` 자체가 없으려면 `withBrowser` 가 던져야
+  // 하는데 그 경로는 `main().catch` 가 `exit 2` 로 받는다 — `compareBaseline` 에 도달하지 않는다.
+  // ⇒ 도달 가능해지는 조건은 **(a) 또는 (b) 가 깨질 때**이고, 그때는 `!Number.isFinite(...)` 로
+  // 올려 측정 불가로 보낸다 (지금 올리면 트리거 없는 죽은 분기가 하나 늘 뿐이다).
   const unmeasured = fullResult.scenarios.A?.cellsUnmeasured ?? 0;
   if (unmeasured > 0) {
     const detail = `시나리오 A 측정 불가 cell=${unmeasured} — current 측 비율이 제품 상태가 아니다`;
@@ -683,14 +738,24 @@ async function main() {
   const exitCode = anyFail ? 1 : anyBlocked ? 2 : allPass ? 0 : 1;
   fullResult.exitCode = exitCode;
 
-  // baseline 업데이트. ⚠️ 판정과 무관하게 기록한다 (헤더 §알려진 사각 §열려 있는 것) —
-  // 적어도 **어떤 판정의 run 이었는지**는 파일에 함께 남도록 `exitCode` 산출 뒤로 옮겼다.
+  // baseline 업데이트 — **PASS run 의 산출물만 baseline 이 된다** (#1253 권고 1).
+  // 종전에는 판정과 무관하게 덮어썼고, 분모를 측정 시도로 고정한 뒤로는 그 경로가 회귀 다리를
+  // 끄는 값(`0.5`)을 박을 수 있게 됐다. 기록 시점에서 막는 이유(사용 시점이 아닌 이유 포함)는
+  // 헤더 §닫은 것. 여기서 종료 코드를 바꾸지는 않는다 — 거부는 이미 non-zero 인 run 에서만
+  // 일어나므로 새 판정이 아니다 (G6 — 새 임계 0 개).
   if (flags.update) {
-    fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
-    fs.writeFileSync(BASELINE_PATH, JSON.stringify(fullResult, null, 2));
-    console.log(
-      `\n  baseline 업데이트: ${path.relative(process.cwd(), BASELINE_PATH)} (이번 run exit ${exitCode})`,
-    );
+    if (exitCode !== 0) {
+      console.log(
+        `\n  ! baseline 업데이트 거부 — 이번 run 은 exit ${exitCode} ` +
+          `(${anyFail ? '제품 FAIL' : '측정 불가'}). PASS 가 아닌 run 의 산출물은 baseline 이 될 수 없다.`,
+      );
+    } else {
+      fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
+      fs.writeFileSync(BASELINE_PATH, JSON.stringify(fullResult, null, 2));
+      console.log(
+        `\n  baseline 업데이트: ${path.relative(process.cwd(), BASELINE_PATH)} (이번 run exit ${exitCode})`,
+      );
+    }
   }
 
   /** 시나리오 한 건의 3상 판정 표기. */
