@@ -67,6 +67,35 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
  */
 const SCENE_HANDLE_TIMEOUT_MS = 20_000;
 
+/**
+ * `page.goto(… waitUntil: 'networkidle')` 대기 상한 (#1256 라운드 2).
+ *
+ * 값은 종전 인라인 리터럴 `30_000` 그대로다 — **동작 무변경**. 상수로 뽑은 이유만 새롭다:
+ * 바로 위 diag 가 `30s` 를 하드코딩해 출력하고 있었고, 이것은 이 PR 이 없앤 결함과
+ * **같은 형태**다. 지금은 값이 우연히 일치해 거짓 출력이 아니지만, 어느 한쪽만 바꾸는
+ * 순간 조용히 거짓이 된다 — `SCENE_HANDLE_TIMEOUT_MS` 의 원본 결함이 정확히 그렇게
+ * 생겼다 (선언 `10_000` / 로그 `10s` / 실제 `30_000` 셋이 전부 달랐다).
+ *
+ * ⚠️ 이 자리는 **본 가드의 술어 밖**이다 — `goto` 는 옵션이 두 번째 인자인 정상 시그니처라
+ * `verify-waitforfunction-args.mjs` 가 보지 않는다. 즉 여기를 지키는 기계는 없고,
+ * 숫자를 문자열에 다시 적지 않는 이 형태 자체가 유일한 방어다.
+ */
+const GOTO_TIMEOUT_MS = 30_000;
+
+/**
+ * 핸들 등장 후 추가 안정 대기 (sun mesh 생성 + 첫 프레임 렌더 완료). 값은 종전 인라인
+ * 리터럴 `800` 그대로다 — **동작 무변경**. `GOTO_TIMEOUT_MS` 와 같은 이유로 상수화한다:
+ * 바로 위 diag 가 같은 숫자를 문자열에 다시 적고 있었다.
+ *
+ * 셋(`SCENE_HANDLE_TIMEOUT_MS` · `GOTO_TIMEOUT_MS` · 본 상수)을 묶고 나면 이 파일의
+ * `diag()` **호출 줄**에 남은 숫자 리터럴은 `0` 이다 (2026-09-23 실측. 술어 —
+ * `awk '/diag\(/ && /[0-9]/ {print NR": "$0}' <이 파일>`; 유일한 hit 2건은 이 JSDoc 과
+ * `SCENE_HANDLE_TIMEOUT_MS` JSDoc 의 **산문**이라 술어가 자기 자신을 잡는 것이다).
+ * ⚠️ 이것은 그 시점의 측정이지 불변식이 아니다 — 숫자를 담은 `diag()` 를 새로 추가하는
+ * 것을 막는 기계는 없다.
+ */
+const POST_HANDLE_SETTLE_MS = 800;
+
 // #606 진단 — verify 경로 단계별 stderr 로깅 (R1_GUARD_DIAG=1 시 활성화).
 // stderr 는 unbuffered(동기) 라 freeze/timeout cancel 시에도 stuck 직전 단계가 보존된다.
 // stdout(console.log) 은 CI pipe 에서 block-buffered → step cancel 시 유실 (실측 #606).
@@ -426,8 +455,8 @@ async function setupPage(browser, viewport, queryString = '') {
   });
   const page = await context.newPage();
   const url = `${BASE_URL}${queryString}`;
-  diag(`setupPage[${viewport.id}] goto ${url} (networkidle, 30s)`);
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+  diag(`setupPage[${viewport.id}] goto ${url} (networkidle, ${GOTO_TIMEOUT_MS}ms)`);
+  await page.goto(url, { waitUntil: 'networkidle', timeout: GOTO_TIMEOUT_MS });
   // hydration + scene 초기화 대기.
   diag(
     `setupPage[${viewport.id}] goto done → waitForFunction(__gpuTier,__simCore, ${SCENE_HANDLE_TIMEOUT_MS}ms)`,
@@ -438,8 +467,8 @@ async function setupPage(browser, viewport, queryString = '') {
     { timeout: SCENE_HANDLE_TIMEOUT_MS },
   );
   // 추가 안정 대기 — sun mesh 생성 + 첫 프레임 렌더 완료.
-  diag(`setupPage[${viewport.id}] waitForFunction done → waitForTimeout(800)`);
-  await page.waitForTimeout(800);
+  diag(`setupPage[${viewport.id}] waitForFunction done → waitForTimeout(${POST_HANDLE_SETTLE_MS})`);
+  await page.waitForTimeout(POST_HANDLE_SETTLE_MS);
   diag(`setupPage[${viewport.id}] ready`);
   return { context, page };
 }

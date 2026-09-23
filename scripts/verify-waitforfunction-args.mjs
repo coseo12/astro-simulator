@@ -31,25 +31,63 @@
  *   (2) 그 객체의 **top-level 키**에 옵션 키가 있다. 키 표기는 축약형(`{ timeout }`),
  *       `timeout:`, `'timeout':` / `"timeout":`, `['timeout']:` 를 인정한다.
  *
- * 옵션 키 집합은 `OPTION_KEYS` = { `timeout`, `polling` } 이다.
- *   ⚠️ 이슈 #1256 스프린트 계약 §3 항목 4 가 명명한 키는 `timeout` **하나**다. `polling` 을
- *   더한 것은 **의도적 1키 확장**이며 근거는 두 가지다. (a) `polling` 은 `waitForFunction` 의
- *   나머지 옵션 키 전부다 — 빼면 가드의 술어가 그 가드가 이름으로 내건 결함 클래스보다
- *   좁아진다(저장소가 반복해 밟은 «가드 술어 < 계약» 클래스). (b) 확장이 **판정을 바꾸지
- *   않는다**: 도입 시점 저장소 전수 스캔에서 `polling` 을 옵션 인자로 넘긴 호출은 0건이라
- *   두 술어의 위반 집합이 동일하다 (2026-09-23 실측 — 계약 §3 완료 기준 1·2 의 수치는 불변).
+ * 옵션 키 집합은 `OPTION_KEYS` = { `timeout`, `polling`, `signal` } 이다.
+ *   ⚠️ 이슈 #1256 스프린트 계약 §3 항목 4 가 명명한 키는 `timeout` **하나**이고, 나머지 둘은
+ *   **의도적 확장**이다. 근거 — 셋은 옵션이 `arg` 로 조용히 흘러가는 **정확히 같은 기전**을
+ *   공유하므로, 하나만 재면 가드의 술어가 그 가드가 이름으로 내건 결함 클래스보다 좁아진다
+ *   (저장소가 반복해 밟은 «가드 술어 < 계약» 클래스). 확장은 **판정을 바꾸지 않는다** —
+ *   도입 시점 저장소 전수 스캔에서 `polling`·`signal` 을 두 번째 인자로 넘긴 호출은 각각
+ *   0건이라 세 술어의 위반 집합이 동일하다 (2026-09-23 실측 — 계약 §3 완료 기준 1·2 의
+ *   수치는 불변).
+ *
+ *   ⚠️ **이 열거는 드리프트 표면이다.** 셋은 `playwright-core@1.62.1` 의
+ *   `PageWaitForFunctionOptions` 를 2026-09-23 에 읽어 옮긴 것이고 (`Page`·`Frame` 의
+ *   `waitForFunction` 이 같은 인터페이스를 쓴다), **그 시점 그 판본의 전부**다. playwright
+ *   업그레이드가 키를 추가하면 이 문장과 `OPTION_KEYS` 는 그 순간 다시 좁아진다 —
+ *   **그것을 감지하는 자동 장치는 없다.** 런타임 도출을 하지 않는 이유는 CI 의
+ *   `project-guards` job 이 `actions/checkout@v4` 뿐이라 `node_modules` 가 없기 때문이다.
+ *   거기서 타입을 읽으면 CI 에서 죽거나, 더 나쁘게는 「못 읽으면 통과」라는 fallback 분기를
+ *   만들게 된다 (CLAUDE.md §가드 설계 원칙 — fallback 분기 금지). 그래서 **재도출 절차를
+ *   수동 인계**로 남긴다 — playwright 메이저·마이너 업그레이드 PR 에서 아래 1줄을 돌려
+ *   결과가 `OPTION_KEYS` 와 같은지 확인할 것:
+ *     awk '/interface PageWaitForFunctionOptions/,/^}/' \
+ *       node_modules/.pnpm/playwright-core@*\/node_modules/playwright-core/types/types.d.ts \
+ *       | grep -oE '^  [a-zA-Z]+\?:' | tr -d ' ?:'
+ *   (초판은 「`polling` 이 나머지 전부다」라고 **단정**했고 `signal` 이 빠져 있었다. PR
+ *   [#1257](https://github.com/coseo12/astro-simulator/pull/1257) reviewer 가 격리 픽스처로
+ *   미검출을 실증해 적발했다. 완전성을 단정하지 않고 **출처·시점·드리프트 표면**을 적는
+ *   것이 그 재발을 막는 형태다.)
  *
  * ── 범위 경계 (의도적 미검출) ───────────────────────────────────────────────
- *   (i) **변수 경유 옵션** — `const OPTS = { timeout: 1 }; page.waitForFunction(fn, OPTS);`
- *       은 검출하지 않는다. 구문만으로는 `OPTS` 가 옵션인지 진짜 `arg` 인지 판정할 수 없고,
- *       식별자 이름 휴리스틱(`/opt/i` 등)은 precision 1.0 을 줄 수 없다. 자료형 추론은
- *       파서·타입 정보를 요구하는데 검사 대상이 `.mjs` 라 타입이 없다. self-test 픽스처
- *       **F16** 이 이 경계를 고정해 미래 관찰자가 «누락» 으로 오인하지 않게 한다.
- *   (ii) **옵션 키가 없는 오배치** — `page.waitForFunction(fn, {})` 처럼 빈 객체를 두 번째로
- *       넘기는 경우. 이것은 옵션 오배치의 징후가 아니라 그냥 빈 `arg` 이며, 실제로 유효한
- *       호출이다. 술어 (2) 가 이를 배제한다. 픽스처 **F6** 이 경계를 고정한다.
+ *   (i) **두 번째 인자가 객체 리터럴이 아닌 형태로 옵션을 넘기는 경우** — 변수 경유
+ *       (`const OPTS = { timeout: 1 }; page.waitForFunction(fn, OPTS);`) 와 spread
+ *       (`page.waitForFunction(fn, { ...opts });`) 가 여기 속한다. 둘 다 검출하지 않는다.
+ *       구문만으로는 `OPTS` / `...opts` 가 옵션인지 진짜 `arg` 인지 판정할 수 없고, 식별자
+ *       이름 휴리스틱(`/opt/i` 등)으로는 그 판정을 정확히 할 수 없다. 자료형 추론은 파서·타입
+ *       정보를 요구하는데 검사 대상이 `.mjs` 라 타입이 없다. self-test 픽스처 **F16** 이 이
+ *       경계를 고정해 미래 관찰자가 «누락» 으로 오인하지 않게 한다. 저장소 발생 `0`.
+ *   (ii) **옵션 키가 없는 객체 `arg`** — `page.waitForFunction(fn, {})` 나
+ *       `page.waitForFunction((a) => a.id, { id: 'earth' }, { timeout: 1 })` 처럼 두 번째
+ *       인자가 옵션 키를 하나도 갖지 않는 경우. 이것은 **유효한 호출**이고 술어 (2) 가
+ *       배제한다. 픽스처 **F6** 이 고정한다. (spread 는 여기가 아니라 (i) 다 — 형태만
+ *       객체이지 키를 읽을 수 없어 «옵션이 아님» 을 확인한 것이 아니다.)
  *   (iii) **인자 자리를 넘어선 정합성** — 세 번째 인자가 옵션으로서 well-formed 한지
  *       (예: `timeout` 이 음수인지) 는 보지 않는다. 그것은 값 정책이지 인자 위치가 아니다.
+ *   (iv) **메서드 호출 구문이 아닌 호출** — 구조분해
+ *       (`const { waitForFunction } = page; waitForFunction(fn, { timeout: 1 });`) 와 계산된
+ *       멤버 접근 (`page['waitForFunction'](fn, { timeout: 1 });`) 은 검출하지 않는다.
+ *       §검사 계약이 대상을 `<expr>.waitForFunction(` 로 한정하는 데서 따라 나오지만, (i)~(iii)
+ *       처럼 **명시**해 둔다. 전자는 앵커가 `.` 이 아니고, 후자는 토큰이 문자열 리터럴이라
+ *       어휘 스캐너가 `KIND_LITERAL` 로 분류한다 — 즉 F4(문자열 안 리터럴 오탐 배제)와 같은
+ *       기전의 대가다. 픽스처 **F21** 이 고정한다. 저장소 발생 `0` (전 hit 이 문자열·주석·
+ *       `browser-verify-utils.test.mjs` 의 mock **정의부**이고 정의부는 F13 이 고정한다).
+ *
+ *   ⚠️ **precision 은 1.0 이 아니다.** `page.waitForFunction(fn, { timeout: 5 }, { timeout: 1 })`
+ *   처럼 **3-인자이면서 두 번째가 진짜 `arg`** 인데 그 `arg` 가 옵션 키를 갖는 경우를 위반으로
+ *   보고한다 (계약 술어와는 정합 — 술어가 인자 개수를 보지 않는다). 저장소 발생 `0` 이고,
+ *   오탐 방향이 **fail-loud**(초록을 만드는 쪽이 아니라 빨강을 만드는 쪽)라 결함이 숨지
+ *   않는다. 위 (i) 을 배제한 근거는 「precision 1.0 을 줄 수 없다」가 아니라 **판정 자체가
+ *   불가능하다**는 것이다 — 그쪽은 오탐·미탐 중 어느 쪽인지도 말할 수 없다.
  *
  * ── 검사 범위 계약 (SSoT — 본 헤더) ─────────────────────────────────────────
  * 스캔 루트는 저장소 루트(`WAITFORFUNCTION_SCAN_ROOT` 로 override — self-test 전용)이고,
@@ -80,7 +118,7 @@
  *
  * 호출:
  *   node scripts/verify-waitforfunction-args.mjs               # 검사 (CI 기본)
- *   node scripts/verify-waitforfunction-args.mjs --self-test   # 격리 픽스처 F1~F20
+ *   node scripts/verify-waitforfunction-args.mjs --self-test   # 격리 픽스처 F1~F21
  *   WAITFORFUNCTION_SCAN_ROOT=<dir> node scripts/verify-waitforfunction-args.mjs
  *
  * 관련: 이슈 #1256 / PR #1255 (#1239 — 오배치가 처음 관측된 자리, 교정 선례
@@ -137,9 +175,14 @@ const DOT_DIR_ALLOWLIST = new Set(['.claude', '.github']);
 /** 검출 대상 메서드명 */
 const METHOD_NAME = 'waitForFunction';
 /**
- * 옵션 키 집합 (§검사 계약). `polling` 은 계약 §3-4 대비 의도적 1키 확장 — 헤더 참조.
+ * 옵션 키 집합 (§검사 계약).
+ *
+ * `playwright-core@1.62.1` 의 `PageWaitForFunctionOptions` 를 2026-09-23 에 읽어 옮긴 것이고,
+ * `polling`·`signal` 은 이슈 계약(`timeout` 만 명명) 대비 **의도적 확장**이다.
+ * ⚠️ 이 열거는 드리프트 표면이다 — playwright 업그레이드가 키를 추가해도 자동 감지가 없다.
+ * 재도출 절차(수동 인계)와 런타임 도출을 안 하는 이유는 헤더 §검사 계약 참조.
  */
-const OPTION_KEYS = ['timeout', 'polling'];
+const OPTION_KEYS = ['timeout', 'polling', 'signal'];
 
 /** 출력 마커 — self-test 가 stdout/stderr 대조에 사용하는 계약 문자열 */
 const MARK_PASS = '[PASS]';
@@ -602,7 +645,7 @@ function runCheck() {
 }
 
 // =============================================================================
-// --self-test — 격리 픽스처 F1~F20 (positive / negative / recovery + 경계 고정)
+// --self-test — 격리 픽스처 F1~F21 (positive / negative / recovery + 경계 고정)
 // =============================================================================
 
 function runSelfTest() {
@@ -775,12 +818,23 @@ function runSelfTest() {
     assert('F13 메서드 정의부 → exit 0', r.status === 0, r.out.trim());
   }
 
-  // ── F14 위반 — `polling` (계약 §3-4 대비 의도적 1키 확장)
+  // ── F14 위반 — `timeout` 외 옵션 키 2종 (계약 대비 의도적 확장)
+  //    `PageWaitForFunctionOptions` 의 세 키가 같은 기전을 공유하므로 셋을 같게 잡는다.
+  //    ⚠️ `signal` 은 초판에서 빠져 있었고 (헤더가 「polling 이 나머지 전부」라고 단정했다)
+  //    PR #1257 reviewer 가 격리 픽스처로 미검출을 실증해 적발했다. 이 두 단언은 상시 참이
+  //    아니다 — `OPTION_KEYS` 에서 해당 원소를 빼면 각각 즉시 FAIL 한다.
   {
     const r = runFixture('f14', {
       'a.mjs': `await page.waitForFunction(() => true, { polling: 'raf' });\n`,
     });
-    assert('F14 polling 키 → exit 1 (1키 확장)', r.status === 1, r.out.trim());
+    assert('F14a polling 키 → exit 1', r.status === 1, r.out.trim());
+    const r2 = runFixture('f14b', {
+      'a.mjs':
+        'const ac = new AbortController();\n' +
+        'await page.waitForFunction(() => true, { signal: ac.signal });\n',
+    });
+    assert('F14b signal 키 → exit 1', r2.status === 1, r2.out.trim());
+    assert('F14b 보고에 옵션 키 signal 명시', /옵션 키: signal/.test(r2.out), r2.out.trim());
   }
 
   // ── F15 다건 — 한 파일 2건 전건 보고
@@ -795,13 +849,18 @@ function runSelfTest() {
     assert('F15 두 줄 모두 보고', /a\.mjs:1/.test(r.out) && /a\.mjs:2/.test(r.out), r.out.trim());
   }
 
-  // ── F16 경계 (i) — 변수 경유 옵션은 의도적 미검출
+  // ── F16 경계 (i) — 두 번째 인자가 객체 리터럴이 아닌 형태의 옵션 전달은 의도적 미검출
   //    이 픽스처는 «가드가 못 잡는 것» 을 고정한다. exit 0 은 결함이 아니라 결정이다.
   {
     const r = runFixture('f16', {
       'a.mjs': 'const OPTS = { timeout: 15_000 };\nawait page.waitForFunction(() => true, OPTS);\n',
     });
-    assert('F16 변수 경유 옵션 → exit 0 (경계 i, 의도적 미검출)', r.status === 0, r.out.trim());
+    assert('F16a 변수 경유 옵션 → exit 0 (경계 i)', r.status === 0, r.out.trim());
+    const r2 = runFixture('f16b', {
+      'a.mjs':
+        'const opts = { timeout: 15_000 };\nawait page.waitForFunction(() => true, { ...opts });\n',
+    });
+    assert('F16b spread 경유 옵션 → exit 0 (경계 i)', r2.status === 0, r2.out.trim());
   }
 
   // ── F17 검사 범위 계약 — 제외 디렉토리는 스캔하지 않는다
@@ -877,6 +936,22 @@ function runSelfTest() {
       pkg.scripts?.['verify:waitforfunction-args'] === `node ${rel}`,
       `현재값=${pkg.scripts?.['verify:waitforfunction-args']}`,
     );
+  }
+
+  // ── F21 경계 (iv) — 메서드 호출 구문이 아닌 호출은 의도적 미검출
+  //    전자는 앵커가 `.` 이 아니고, 후자는 토큰이 문자열 리터럴이라 F4(문자열 안 리터럴 오탐
+  //    배제)와 **같은 기전**의 대가다. 둘 다 저장소 발생 0. exit 0 은 결함이 아니라 결정이다.
+  {
+    const r = runFixture('f21', {
+      'a.mjs':
+        'const { waitForFunction } = page;\n' +
+        'await waitForFunction(() => true, { timeout: 15_000 });\n',
+    });
+    assert('F21a 구조분해 호출 → exit 0 (경계 iv)', r.status === 0, r.out.trim());
+    const r2 = runFixture('f21b', {
+      'a.mjs': `await page['waitForFunction'](() => true, { timeout: 15_000 });\n`,
+    });
+    assert('F21b 계산된 멤버 호출 → exit 0 (경계 iv)', r2.status === 0, r2.out.trim());
   }
 
   rmSync(dir, { recursive: true, force: true });
