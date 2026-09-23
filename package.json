@@ -1,6 +1,6 @@
 {
   "name": "astro-simulator",
-  "version": "0.89.2",
+  "version": "0.89.3",
   "private": true,
   "description": "웹 기반 천체물리 시뮬레이터 — Babylon.js WebGPU 기반 멀티스케일 우주 탐험",
   "license": "MIT",
@@ -59,6 +59,7 @@
     "verify:md-tilde": "node scripts/verify-md-tilde.mjs",
     "verify:md-conflict-marker": "node scripts/verify-md-conflict-marker.mjs",
     "verify:ssot-trigger-wording": "node scripts/verify-ssot-trigger-wording.mjs",
+    "verify:waitforfunction-args": "node scripts/verify-waitforfunction-args.mjs",
     "bench:scene": "node scripts/bench-scene.mjs",
     "bench:scene:mobile": "node scripts/bench-scene-mobile.mjs",
     "bench:tier-guard-cost": "node scripts/bench-tier-guard-cost.mjs",

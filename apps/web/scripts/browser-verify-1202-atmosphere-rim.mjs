@@ -241,6 +241,7 @@ async function setupPage(browser, query = FOCUS_QUERY) {
   });
   await page.waitForFunction(
     () => typeof window.__simCore !== 'undefined' && typeof window.__solarScene !== 'undefined',
+    undefined,
     { timeout: 20_000 },
   );
   await page.waitForTimeout(2800);

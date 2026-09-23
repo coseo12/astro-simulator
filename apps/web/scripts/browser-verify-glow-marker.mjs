@@ -18,6 +18,7 @@
  *      race-lost 방향 (scene 초기화가 감지보다 먼저 완료) 을 결정론 재현해도 tier-c 강제 LOD 'low'
  *      가 정착하는지 검증. 회귀 시 override 'auto' 영구 잔존 → sun high + mid sphere 렌더 →
  *      CI fps-baseline-guard flaky FAIL (develop push 27412497611 desktop 28.1 FPS 선행 사례).
+ *      재현 여부는 가정하지 않고 **전제로 검사**한다 (§#1239 — 미재현은 `exit 2`).
  *
  * 사용법:
  *   node apps/web/scripts/browser-verify-glow-marker.mjs
@@ -66,6 +67,66 @@
  *
  * ⚠️ **항목 6 (#677 race 가드) 에는 이 결정적 조건을 걸지 않는다** — 그 블록은 `?gpu=a`·`?lod`
  * 미부여와 `requestAdapter` 폴링 게이트로 **비결정 구간을 의도적으로 재현**한다 (아래 항목 6 주석).
+ * ──────────────────────────────────────────────────────────────────────────────
+ * #1239 — 항목 6 의 **게이트 대상** 교체 (임계·단언은 무변경).
+ *
+ * 종전 게이트는 「`requestAdapter` **첫 호출**만 붙든다」였고, 주석은 그 첫 호출이 sim-canvas 의
+ * `detectGpuCapability` 이고 「2번째+ 는 Babylon 엔진 init」이라고 선언했다. **둘 다 틀렸다.**
+ *
+ * [실측 2026-09-23 · macOS 26.6.2 · Apple M1 Pro · playwright headless chromium · `next dev` ·
+ * 1280×720 · 게이트 3 run · 무게이트 대조 1 run] 한 페이지의 `requestAdapter` 호출은 **4 회**다 —
+ * dev StrictMode 가 초기화 effect 를 두 번 돌리기 때문이다 (`window.__bootPhases` 의 체인 `m1`·`m2`):
+ *
+ *   #1 `m1` detectGpuCapability  #2 `m1` isWebGpuUsable
+ *   #3 `m2` detectGpuCapability  #4 `m2` isWebGpuUsable
+ *
+ * (A) 게이트가 붙든 #1 은 **버려지는 첫 체인** `m1` 의 것이다 (React 가 즉시 cleanup → sim-canvas
+ *     의 `if (cancelled) return`). 살아남아 `__gpuTier` 를 박고 `__solarScene` 을 노출하는 `m2` 는
+ *     **게이트 밖의 #3** 을 받아 즉시 settle 한다.
+ * (B) 그래서 살아남은 체인에서는 재현하려던 순서가 **반대**로 성립했다 —
+ *     `m2 web:gpu-capability @345.3 / 353.0 / 352.3 ms` 가 `m2 web:solar-scene-exposed
+ *     @405.1 / 414.2 / 411.8 ms` 보다 **먼저**다. 무게이트 대조군의 같은 마크는 `@344.6 ms` 로
+ *     게이트판과 구분되지 않는다 ⇒ **게이트는 판정량에 아무 영향이 없었다.**
+ * (C) 판별력도 0 이었다. 변이 주입 3 종 (모두 `sim-canvas.tsx` 의 tier-c 분기, 게이트/무게이트 대조):
+ *       M1 양성 대조 — `__gpuTierForceLod` 플래그 + `command` 직접 발행 **둘 다** 제거 → 양쪽 FAIL
+ *       M2 **#677 회귀 재현** — `command` 직접 발행만 제거 (Amendment 2 이전 상태) → **양쪽 PASS**
+ *       M3 플래그만 제거 → 양쪽 FAIL
+ *     즉 이 축이 이름으로 걸고 있던 바로 그 회귀(M2)를 **못 잡았고**, 잡은 둘은 게이트 없이도
+ *     잡히는 것들이었다.
+ * (D) 「게이트 걸면 순환 대기 deadlock」(2026-06-13) — **그때는 참이었다.** #1234 직전 트리
+ *     (`71d30eb`) 를 빌드해 같은 축을 돌린 결과: `detectGpuCapability` 전부를 게이트하면
+ *     `__solarScene` 이 **영영 안 나온다** (`tier=null` · 2/2 run). 같은 트리에서 종전 게이트
+ *     (첫 호출만) 는 지금과 똑같이 PASS 한다 — 즉 **순환 대기는 한 번도 성립한 적이 없고**,
+ *     성립하지 않은 이유는 위 (A) 다 (이슈 #1239 본문의 두 가설 중 「다른 경로로 먼저 성립」이
+ *     참이고, 그 「다른 경로」의 정체가 StrictMode 둘째 체인이다).
+ *     현행 트리에서는 엔진 probe 를 게이트해도 deadlock 이 아니라 **#1234 상한이 발화**해 (1 run)
+ *     `engine:probe-adapter-timeout @12300.3 ms` 뒤 `web:solar-scene-exposed @12418.6 ms` 로
+ *     부팅이 끝난다 (12 s 지연). 그래도 엔진 probe 는 게이트하지 않는다 — 상한 발화에 의존하는
+ *     재현은 가드 핸들 대기와 경쟁한다.
+ *
+ * ⚠️ **ADR 의 당시 기록과 어긋나 보인다 — 지우지 않고 포인터로 잇는다.**
+ * `docs/decisions/20260613-675-glow-pixel-marker.md` §Amendment 2 (fix 항목) 는 이 축의 신설을
+ * 「pre-fix FAIL / post-fix PASS 3중 시뮬레이션 실측」으로 박제하고 있고, 거기서의 pre-fix 가
+ * 정확히 위 (C) 의 M2 다. 그 기록은 **이력이라 수정하지 않았다.** 여기서 반증한 범위는 **현행
+ * 트리와 #1234 직전 트리(`71d30eb`)** 뿐이고, 2026-06-13 당시 트리는 재현 대상이 아니었다 —
+ * 그러므로 **「그때는 왜 잡혔는가」는 단정하지 않는다.** (두 트리가 최소한 어떻게 다른지는
+ * 확인됐다: `Promise.all([instance.start(), gpuCapPromise])` 가 #738 로 2026-06-25 에 도입돼
+ * #1234 C3-B 에서 분리됐으므로, 2026-06-13 트리에는 그 대기가 **없었다.**) ADR 쪽에도 이 절을
+ * 가리키는 후속 실측 포인터를 달아 두 기록이 포인터 없이 만나지 않게 했다.
+ *
+ * 처치: 게이트 대상을 **호출 순번 → 호출자**로 바꾼다. `detectGpuCapability` 계열 호출은 체인과
+ * 무관하게 전부 붙들고, 엔진 probe 는 종전대로 즉시 null. 이것이 **지금** 가능한 이유는 #1234
+ * C3-B 가 장면 체인의 `gpuCapPromise` **대기**를 끊었기 때문이다 (위 (D) 의 전/후 대조가 그
+ * 직접 증거다). 교체 후 실측:
+ *   - 건강 판본 2/2 PASS — `m2 solar-scene-exposed @405.1 / 487.6` → `m2 gpu-capability
+ *     @1182.3 / 1258.2` 로 capability 가 **777 / 771 ms 늦게** 도착 (= race-lost 방향 재현).
+ *   - M2 변이 3/3 **FAIL** (`override='auto'`). 종전 게이트는 같은 변이에서 PASS ⇒ 판별력 복원.
+ * 새 임계 0 개 (폴 100ms · 여유 300ms 무변경).
+ *
+ * 재현 여부를 가정하지 않는다: 게이트 발화 횟수와 「capability 가 scene 노출보다 늦게 왔는가」를
+ * **전제로 검사**하고, 미성립이면 통과가 아니라 `exit 2` 다 (#1250 이 379-lod 에서 세운 종료 코드
+ * 계약과 같은 합성 — 확정 FAIL 우선). 전제 계측은 앱이 이미 남기는 `window.__bootPhases`
+ * (#1234 C2) 를 읽을 뿐이고 가드가 새 계측을 만들지 않는다.
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -122,6 +183,7 @@ async function openSim(browser, query) {
       typeof window.__simStore !== 'undefined' &&
       typeof window.__solarScene !== 'undefined' &&
       typeof window.__simCore !== 'undefined',
+    undefined,
     { timeout: 30_000 },
   );
   await page.waitForTimeout(POST_INIT_WAIT_MS);
@@ -271,6 +333,8 @@ async function collectLowVariantState(page) {
 
 async function main() {
   let allPass = true;
+  /** 판정의 **전제**가 무너졌다 (측정 불가) — 단언 거짓(`allPass=false`) 과 다른 축이다. */
+  let blocked = false;
   const check = (label, pass, detail) => {
     console.log(`   ${pass ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
     if (!pass) allPass = false;
@@ -418,25 +482,47 @@ async function main() {
     // 게이트를 걸어 race-lost 방향을 시간 무관하게 구조적으로 강제한다 (고정 지연은 cold context
     // 의 scene 초기화가 더 느리면 race 를 이겨버려 negative 재현 실패 — 2026-06-13 실측).
     // gpu/lod URL 파라미터 없이 자동 감지 경로 사용 (modes 의 ?gpu=a 함정 회피와 정반대 — 의도).
+    //
+    // #1239 — 게이트 대상이 **호출 순번**에서 **호출자**로 바뀌었다. 근거는 헤더 §#1239.
     console.log("\n6) #677 tier-c LOD override race — 지연 감지에서도 override='low' 정착\n");
     {
       const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
       await context.addInitScript(() => {
-        // 호출 1번째 = sim-canvas useEffect 의 detectGpuCapability (동기적으로 가장 먼저 호출됨)
-        // → __solarScene 노출 (= handler 등록 동일 sync 블록 완료) 까지 게이트.
-        // 호출 2번째+ = Babylon 엔진 init 의 WebGPU 탐지 → 즉시 null (게이트 걸면 scene 초기화
-        // 자체가 게이트를 기다리는 순환 대기 deadlock — 2026-06-13 실측).
-        let adapterCalls = 0;
+        // 게이트 대상 = `detectGpuCapability()` 의 어댑터 조회 **전부** (마운트 체인마다 1회).
+        // 엔진 probe (`isWebGpuUsable`) 는 즉시 null — 그쪽을 붙들면 `createEngine` 이 결과를
+        // 기다려 scene 자체가 안 서고, 게이트가 기다리는 `__solarScene` 도 안 나온다
+        // (2026-06-13 의 순환 대기). ⚠️ **현행 트리에서는 그 대기가 deadlock 이 아니다** —
+        // #1234 상한이 12 s 에 발화해 부팅이 끝난다. 그래도 붙들지 않는 이유는 그 재현이
+        // 상한 발화에 업혀 가드 핸들 대기와 경쟁하기 때문이다 (헤더 §#1239 (D)).
+        //
+        // 호출자 판별은 스택의 함수명이다. dev 번들은 이름을 보존한다 [실측 2026-09-23 —
+        // `at Module.detectGpuCapability (…/_next/static/chunks/…)`]. 이 판별이 깨지면 게이트가
+        // 한 번도 안 걸리는데, 그건 **조용히 통과**가 아니라 아래 전제 검사가 `exit 2` 로 잡는다.
+        // 카운터는 두 축뿐이다 — **호출자 판별**(`detect`/`probe`) 과 **게이트 해소**(`resolved`).
+        // `detect` 가 곧 게이트 발화 횟수다: 이 분기에 들어온 호출은 예외 없이 아래 폴링 게이트로
+        // 들어가므로 「detect 는 됐는데 게이트는 안 걸렸다」로 **갈릴 경로가 없다** (초판의 별도
+        // `gated` 카운터는 `detect` 와 항상 같은 값이었다 — PR #1255 reviewer 권고 3 으로 병합).
+        // 반면 `resolved` 는 갈린다 — 게이트가 `__solarScene` 을 기다리다 영영 안 풀리면
+        // `detect > resolved` 로 남고, 그게 아래 오귀인 힌트의 근거다.
+        window.__axis6 = { detect: 0, probe: 0, resolved: 0 };
         Object.defineProperty(navigator, 'gpu', {
           configurable: true,
           value: {
             requestAdapter: () => {
-              adapterCalls += 1;
-              if (adapterCalls > 1) return Promise.resolve(null);
+              const fromDetect = (new Error().stack ?? '').includes('detectGpuCapability');
+              if (!fromDetect) {
+                window.__axis6.probe += 1;
+                return Promise.resolve(null);
+              }
+              window.__axis6.detect += 1;
               return new Promise((resolve) => {
                 const poll = () => {
                   // +300ms 는 task 경계 여유.
-                  if (window.__solarScene) setTimeout(() => resolve(null), 300);
+                  if (window.__solarScene)
+                    setTimeout(() => {
+                      window.__axis6.resolved += 1;
+                      resolve(null);
+                    }, 300);
                   else setTimeout(poll, 100);
                 };
                 poll();
@@ -451,30 +537,106 @@ async function main() {
       try {
         await page.waitForFunction(
           () => window.__gpuTier === 'c' && window.__solarScene?.getLodStats?.().override === 'low',
-          { timeout: 15_000 },
+          // ⚠️ 두 번째 인자는 **`arg`** 이고 옵션은 세 번째다 — 종전 판본은 `{ timeout: 15_000 }`
+          // 을 `arg` 자리에 넘겨 선언값이 한 번도 적용되지 않았고 실제 상한은 playwright 기본
+          // 30 s 였다 [실측 2026-09-23 — FAIL 변이의 대기가 30004 ms]. 값을 `30_000` 으로 적어
+          // **선언 = 실제**로 맞춘다 (동작 무변경. 같은 파일 `openSim` 의 핸들 대기와 같은 값이고,
+          // 그쪽은 선언값이 기본값과 우연히 같아 드리프트가 드러나지 않았다).
+          undefined,
+          { timeout: 30_000 },
         );
         settled = true;
       } catch {
         // timeout → settled=false 로 FAIL 처리 (아래 check)
       }
-      const state = await page.evaluate(() => ({
-        tier: window.__gpuTier ?? null,
-        override: window.__solarScene?.getLodStats?.().override ?? null,
-      }));
+      const state = await page.evaluate(() => {
+        // 전제 계측은 앱이 이미 남기는 부트 마크를 읽는다 (#1234 C2) — 가드가 새로 재지 않는다.
+        const phases = window.__bootPhases?.phases ?? null;
+        // 살아남은 마운트 체인 = `__solarScene` 을 노출한 체인. dev StrictMode 는 체인을 둘
+        // 발급하고 첫 체인은 cleanup 으로 버려지므로, 체인을 고르지 않으면 버려진 쪽의 마크를
+        // 읽고 「지연됐다」고 오판한다 (그게 종전 축 6 이 순번으로 걸려 있던 자리다).
+        const exposed = phases?.find((p) => p.name === 'web:solar-scene-exposed') ?? null;
+        const capability = exposed
+          ? (phases.find((p) => p.chain === exposed.chain && p.name === 'web:gpu-capability') ??
+            null)
+          : null;
+        return {
+          tier: window.__gpuTier ?? null,
+          override: window.__solarScene?.getLodStats?.().override ?? null,
+          counters: window.__axis6 ?? null,
+          chain: exposed?.chain ?? null,
+          sceneAtMs: exposed?.atMs ?? null,
+          capabilityAtMs: capability?.atMs ?? null,
+        };
+      });
+
+      // 전제 1 — 게이트가 실제로 걸렸는가 (호출자 판별 붕괴 감지). `detect` 가 곧 게이트 발화
+      // 횟수다 (위 init script 주석 — 둘로 갈릴 경로가 없어 카운터 하나로 합쳤다).
+      const gated = state.counters?.detect ?? 0;
+      // 갈리는 쪽. `detect > resolved` = 게이트가 아직 `__solarScene` 을 기다리는 중이다.
+      const gatesPending = gated - (state.counters?.resolved ?? 0);
+      if (gated < 1) {
+        blocked = true;
+        console.log(
+          `  ? 전제 붕괴 — 게이트가 한 번도 안 걸렸다 (detect=${state.counters?.detect ?? 'n/a'} ` +
+            `probe=${state.counters?.probe ?? 'n/a'}). 호출자 판별(스택 함수명)이 깨졌을 수 있다.`,
+        );
+      }
+      // 전제 2 — race-lost 방향이 실제로 재현됐는가. 「capability 가 scene 노출보다 늦게 왔다」가
+      // 이 축이 재려는 상황 그 자체이고, 순서가 뒤집혀 있으면 아래 단언은 **쉬운 방향**을 잰 것이라
+      // PASS 가 무의미하다 (#1201 클래스 — 전제 미성립을 통과로 읽지 않는다).
+      const reproduced =
+        state.sceneAtMs !== null &&
+        state.capabilityAtMs !== null &&
+        state.capabilityAtMs > state.sceneAtMs;
+      if (!reproduced) {
+        blocked = true;
+        console.log(
+          `  ? 전제 붕괴 — race-lost 방향 미재현 (chain=${state.chain} ` +
+            `scene@${state.sceneAtMs} capability@${state.capabilityAtMs}). ` +
+            '부트 마크 부재이거나 capability 가 scene 보다 먼저 도착했다.',
+        );
+      } else {
+        console.log(
+          `  · 전제 성립 — chain=${state.chain} scene@${state.sceneAtMs}ms → ` +
+            `capability@${state.capabilityAtMs}ms (지연 ${Math.round(state.capabilityAtMs - state.sceneAtMs)}ms) · ` +
+            `게이트 ${gated}회`,
+        );
+      }
+
+      // 오귀인 차단 (PR #1255 reviewer 권고 2). 이 게이트는 **자기 자신이 순환을 만들 수 있다** —
+      // #1234 C3-B (장면 체인이 `gpuCapPromise` 의 settle 을 기다리지 않는다) 가 되돌려지면
+      // scene 이 capability 를, 게이트가 scene 을 서로 기다려 `__solarScene` 이 영영 안 나온다.
+      // 그때 나오는 결과는 #677 회귀와 **같은 모양의 FAIL** 이라, 힌트가 없으면 제품 회귀로 읽힌다.
+      // ⚠️ 판정은 바꾸지 않는다 (확정 FAIL 우선 — 여전히 `exit 1`). 동반 출력만 붙인다.
+      const misattributionHint =
+        gated < 1 || !reproduced
+          ? ` ⚠️ 단 이 FAIL 은 전제가 무너진 채 나왔다 (게이트 발화 ${gated}회 · 미해소 ` +
+            `${gatesPending}회 · chain=${state.chain} scene@${state.sceneAtMs} ` +
+            `capability@${state.capabilityAtMs}) — #677 회귀가 아니라 **게이트 자신이 만든 순환**일 ` +
+            '수 있다. #1234 C3-B (장면 체인의 gpuCapPromise 대기 분리) 가 살아 있는지 먼저 확인하라.'
+          : '';
+
       check(
         `지연 tier-c 감지 후 override='${state.override}' (tier='${state.tier}')`,
         settled,
         settled
           ? undefined
-          : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)",
+          : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)" +
+              misattributionHint,
       );
       await context.close();
     }
   });
 
+  // 확정 FAIL 우선 — 제품 결함이 「측정 불가」 뒤로 숨지 않게 한다 (#1250 이 379-lod 에서 세운
+  // 종료 코드 계약과 같은 합성). 마지막 `0` 은 전제도 서고 단언도 전부 참인 경우뿐이다.
+  const exitCode = !allPass ? 1 : blocked ? 2 : 0;
   console.log('\n=== 최종 요약 ===');
-  console.log(`  overall: ${allPass ? 'PASS' : 'FAIL'}`);
-  process.exit(allPass ? 0 : 1);
+  console.log(
+    `  overall: ${allPass ? (blocked ? '측정 불가' : 'PASS') : 'FAIL'} (exit ${exitCode})`,
+  );
+  process.exit(exitCode);
 }
 
 main().catch((err) => {

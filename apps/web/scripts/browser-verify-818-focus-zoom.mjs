@@ -146,7 +146,8 @@ async function bootstrap(page, urlSuffix = '') {
   });
   await page.waitForFunction(
     () => typeof window.__solarScene !== 'undefined' && typeof window.__simStore !== 'undefined',
-    { timeout: 15_000 },
+    undefined,
+    { timeout: 20_000 },
   );
   await page.waitForTimeout(SETTLE_MS);
 }
