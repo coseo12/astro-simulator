@@ -70,9 +70,9 @@ export const MISMATCH_RATIO_LIMIT = MISMATCH_RATIO_LIMIT_DESKTOP;
 /**
  * 실행 모드 식별자 (#1258). `resolveRunDisposition` 의 입력 도메인 SSoT.
  *
- * 우선순위는 `r1-ui-regression-guard.mjs` 의 기존 분기 순서를 그대로 옮긴 것이다 —
- * `--measure-px-ratio` 가 `main()` 의 첫 분기라 `--update` 와 동시 지정 시 px-ratio 가 이긴다.
- * 여기서 순서를 바꾸면 종전 동작이 조용히 달라진다.
+ * 이 배열은 **집합**으로만 쓰인다 — `resolveRunDisposition` 의 화이트리스트와 전수 표
+ * 테스트의 셀 열거. 순서는 어느 쪽에도 영향을 주지 않는다 (PR #1261 reviewer 변이 M-d
+ * 실증). guard 의 `runMode` 파생 순서는 별개이고 그쪽 주석이 SSoT 다.
  */
 export const R1_RUN_MODES = Object.freeze(['measure-px-ratio', 'update', 'measure-sun', 'verify']);
 
@@ -80,29 +80,48 @@ export const R1_RUN_MODES = Object.freeze(['measure-px-ratio', 'update', 'measur
  * 비-SSoT 환경(macOS) 실행 처분 판정 (#1258).
  *
  * r1-guard 의 회귀 판정 SSoT 는 **CI Linux** 다 — baseline 12 PNG 가 ubuntu 캡처본이기 때문이다
- * (ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26 §결정 1). 가드 영역 4개가 전부
- * 텍스트를 담은 DOM 이라 macOS 폰트 렌더 차이만으로 전 영역이 어긋나고, 그래서 darwin 의 verify
- * 결과는 **PASS 도 FAIL 도 정보가 아니다**.
+ * (ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26 §결정 1). 4 영역이 모두 텍스트를
+ * 담고 있어 macOS 폰트 렌더 차이만으로 전 영역이 어긋나고, 그래서 darwin verify 의 **PASS/FAIL
+ * 판정에는 정보가 없다**.
  *
- * 종전에는 그 상태가 `exit 1`(= 회귀 검출) 로 나왔고, `SKIP_LOCAL=1` 회피 경로는 **출력 0 바이트
- * `exit 0`**(= 진짜 PASS 와 구별 불가) 이었다. 양쪽 다 판정 결과를 사칭한다 — 전자는 회귀가 있다고,
- * 후자는 검증을 통과했다고. 그래서 세 처분을 분리한다.
+ * ⚠️ 판정에 정보가 없다는 것과 **출력 전체가 쓸모없다**는 것은 다르다. dimension mismatch 의
+ * `current=` 는 DOM 측정값이라 결정적이고, 두 판본을 같은 환경에서 상대 대조하는 용도로는
+ * 실제로 쓰인다 — #1258 의 근거표 자체가 그렇게 만들어졌다. 그래서 `R1_FORCE_LOCAL` 탈출구를
+ * 둔다 (§Amendment 3 §결정 4).
  *
- * 순수 함수로 뽑은 이유는 이 판정이 `platform × env × mode` 3축이라 조용히 drift 하기 때문이다.
- * 표 기반 단위 테스트(`r1-run-disposition.test.mjs`)가 16 셀을 전수로 고정한다.
+ * 종전에는 세 경로가 전부 판정 결과를 사칭했다 — `SKIP_LOCAL` 미설정은 `exit 1`(회귀가 있다),
+ * `SKIP_LOCAL=1` 은 **출력 0 바이트 `exit 0`**(검증을 통과했다), 그리고 강제 실행 경로는 아예
+ * 없었다. 네 처분으로 분리한다.
+ *
+ * 순수 함수로 뽑은 이유는 이 판정이 `platform × env 2종 × mode` 4축이라 조용히 drift 하기
+ * 때문이다. 표 기반 단위 테스트(`r1-run-disposition.test.mjs`)가 32 셀을 전수로 고정한다.
  *
  * @param {object} input
  * @param {NodeJS.Platform|string} input.platform - `process.platform`
  * @param {boolean} input.skipLocal - `process.env.SKIP_LOCAL === '1'`
- * @param {string} input.mode - `R1_RUN_MODES` 중 하나
- * @returns {'run'|'skip'|'not-ssot'}
- *   `run` = 종전대로 실행 / `skip` = 명시적 미수행 후 exit 0 / `not-ssot` = 판정 불가, exit 2
+ * @param {boolean} input.forceLocal - `process.env.R1_FORCE_LOCAL === '1'`
+ * @param {string} input.mode - `R1_RUN_MODES` 중 하나. 아니면 throw (fail-closed)
+ * @returns {'run'|'run-not-ssot'|'skip'|'not-ssot'}
+ *   `run` = 종전대로 실행 / `run-not-ssot` = 실행하되 판정 대신 exit 2 /
+ *   `skip` = 명시적 미수행 후 exit 0 / `not-ssot` = 판정 불가, 실행 없이 exit 2
  */
-export function resolveRunDisposition({ platform, skipLocal, mode }) {
+export function resolveRunDisposition({ platform, skipLocal, forceLocal, mode }) {
+  // fail-closed 화이트리스트. `mode` 는 외부 입력이 아니라 guard 의 `flags` 파생이라 오타가
+  // 도달하는 경로는 없다 — 막는 것은 **모드 추가 drift** 다. 새 모드를 guard 의 파생에만 더하고
+  // 여기 빠뜨리면 아래 마지막 `return 'run'` 이 darwin 에서 조용히 통과시키고, 전수 표 테스트는
+  // 이 배열을 순회하므로 그 셀을 **아예 만들지 않는다**.
+  if (!R1_RUN_MODES.includes(mode)) {
+    throw new TypeError(
+      `[r1-guard] 알 수 없는 mode: ${JSON.stringify(mode)} (허용: ${R1_RUN_MODES.join(' / ')})`,
+    );
+  }
   // Linux CI 가 판정 SSoT — 어떤 조합에서도 경로를 바꾸지 않는다.
   if (platform !== 'darwin') return 'run';
   // px ratio 는 baseline PNG 를 쓰지 않는다 (renderScale 결합 기반, viewport 무관) → 폰트 축 무관.
   if (mode === 'measure-px-ratio') return 'run';
+  // 호출부에서 명시적으로 켠 강제 실행이 ambient env(`SKIP_LOCAL`) 를 이긴다. verify 에만 의미가
+  // 있다 — 나머지 모드는 애초에 막힌 적이 없어 여기서 force 는 정의상 no-op 이다.
+  if (forceLocal && mode === 'verify') return 'run-not-ssot';
   if (skipLocal) return 'skip';
   // baseline 대비 픽셀 판정을 실제로 수행하는 모드만 차단한다. `--update` 는 baseline 을 쓰는 게
   // 아니라 만드는 쪽이고, `--measure-sun` 은 baseline 비교 전에 반환한다 — 둘 다 종전 경로 유지.

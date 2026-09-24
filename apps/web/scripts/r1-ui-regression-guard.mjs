@@ -17,11 +17,15 @@
  *   SKIP_LOCAL  — '1' + macOS darwin 한정 검증 미수행 후 exit 0 (Linux baseline 과 폰트 차이
  *                 false positive 회피). #1258 이후 «미수행» 을 1줄 명시 출력한다 — 종전 판본은
  *                 출력 0 바이트라 진짜 PASS 와 구별할 수 없었다.
+ *   R1_FORCE_LOCAL — '1' + macOS darwin + verify 한정 강제 실행. 판정 대신 exit 2 로 끝나고
+ *                 측정값만 낸다 (두 판본 상대 대조용 — ADR §Amendment 3 §결정 4).
+ *                 `SKIP_LOCAL` 과 동시 설정 시 이쪽이 이긴다.
  *
  * 종료 코드 (#1258):
  *   0 — PASS, 또는 darwin + SKIP_LOCAL=1 (검증 미수행)
  *   1 — 회귀 검출 (mismatch ratio 초과 / dimension mismatch)
- *   2 — 전제 미충족: --viewport 미매칭 / darwin verify (판정 SSoT 아님) / unhandled error
+ *   2 — 전제 미충족: --viewport 미매칭 / darwin verify (판정 SSoT 아님 — R1_FORCE_LOCAL 로
+ *       강제 실행했을 때도 측정만 하고 판정하지 않으므로 통과·실패 무관 2) / unhandled error
  *
  * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4 + §Amendment 2026-04-26.
  *
@@ -121,8 +125,13 @@ const flags = {
 };
 
 /**
- * flags → 단일 모드 식별자 (#1258). 우선순위는 `main()` 의 기존 분기 순서와 같아야 한다
- * (`--measure-px-ratio` 가 첫 분기). `R1_RUN_MODES` 가 도메인 SSoT.
+ * flags → 단일 모드 식별자 (#1258). 도메인은 `R1_RUN_MODES` 이고, 미등록 값은
+ * `resolveRunDisposition` 이 throw 한다 (fail-closed).
+ *
+ * 플래그를 동시에 준 경우의 순서는 **처분 판정과 진단 라벨용**이다. `--measure-px-ratio`
+ * 가 첫째인 것만 `main()` 의 실행 분기와 대응하고, `update`↔`measure-sun` 은 여기 순서와
+ * 실행 순서가 반대다 (`runForViewport` 가 measure-sun 을 baseline 비교 **전에** 반환한다).
+ * 처분에는 영향이 없다 — 두 모드는 32 셀 전건에서 같은 처분이다.
  */
 const runMode = flags.measurePxRatio
   ? 'measure-px-ratio'
@@ -788,6 +797,7 @@ async function main() {
   const disposition = resolveRunDisposition({
     platform: process.platform,
     skipLocal: process.env.SKIP_LOCAL === '1',
+    forceLocal: process.env.R1_FORCE_LOCAL === '1',
     mode: runMode,
   });
   if (disposition === 'skip') {
@@ -803,13 +813,23 @@ async function main() {
   if (disposition === 'not-ssot') {
     console.error('[r1-guard] 전제 미충족 — 이 환경(darwin)은 회귀 판정 SSoT 가 아니다. (#1258)');
     console.error(
-      '  원인: baseline 12 PNG 가 ubuntu CI 캡처본이고, 가드 영역 4개가 전부 텍스트를 담은 DOM 이라',
+      '  원인: baseline 12 PNG 가 ubuntu CI 캡처본이고, 가드 영역 4개가 모두 텍스트를 담고 있어',
     );
-    console.error('        macOS 폰트 렌더 차이만으로 전 영역이 어긋난다 — 로컬 검출력은 0 이다.');
+    console.error(
+      '        macOS 폰트 렌더 차이만으로 4/4 가 어긋난다 — PASS/FAIL 판정에 정보가 없다.',
+    );
     console.error('  SSoT: CI(ubuntu) 의 `r1-guard: verify 실행 (4/4)` step 결과를 본다.');
     console.error('  회피: SKIP_LOCAL=1 을 붙이면 검증을 건너뛰고 exit 0 으로 끝난다.');
+    console.error('  대조: R1_FORCE_LOCAL=1 은 강제로 실행해 측정값을 낸다 (두 판본 상대 대조용).');
+    console.error('        판정은 여전히 하지 않는다 — 통과·실패 무관 exit 2 다.');
     console.error('  종료 코드 2 = 판정 불가 (1 = 회귀 검출 과 구분한다).');
     process.exit(2);
+  }
+  if (disposition === 'run-not-ssot') {
+    // 강제 실행 — 측정값은 내되 판정은 하지 않는다. 판정을 되살리면 #1258 의 `exit 1` 사칭이
+    // 그대로 돌아온다. 배너를 **먼저** 찍어 뒤따르는 mismatch 수치가 판정으로 읽히지 않게 한다.
+    console.log('[r1-guard] R1_FORCE_LOCAL=1 + darwin — 강제 실행 (판정 SSoT 아님).');
+    console.log('[r1-guard] 아래 수치는 측정값이다. 통과·실패 무관 exit 2 로 끝난다.');
   }
   ensureDirSync(BASELINE_DIR);
   ensureDirSync(DIFF_DIR);
@@ -865,6 +885,11 @@ async function main() {
     }
   }
 
+  // 강제 실행은 판정하지 않는다 — overallPass 와 무관하게 「판정 불가」다.
+  if (disposition === 'run-not-ssot') {
+    console.log('[r1-guard] R1_FORCE_LOCAL 강제 실행 — 판정 없음 (exit 2).');
+    process.exit(2);
+  }
   process.exit(overallPass ? 0 : 1);
 }
 

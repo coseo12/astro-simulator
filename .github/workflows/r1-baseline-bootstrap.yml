@@ -100,7 +100,9 @@ jobs:
             ## Behavior Changes
 
             - R1 회귀 가드 baseline 이 macOS → Linux CI 캡처본으로 전환됨
-            - 로컬 macOS 검증 시 폰트 차이로 false positive 가능 — `SKIP_LOCAL=1` env var 또는 CI 결과 신뢰
+            - 로컬 macOS(darwin) verify 는 폰트 차이로 판정이 불가능하다 — #1258 이후 실행 전 `exit 2` 로
+              차단된다 (`SKIP_LOCAL=1` 은 명시적 미수행 `exit 0`, `R1_FORCE_LOCAL=1` 은 측정만 하고 `exit 2`).
+              회귀 판정 SSoT 는 CI(ubuntu) 결과다
 
             ## Test plan
 
