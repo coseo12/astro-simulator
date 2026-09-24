@@ -822,7 +822,7 @@ async function main() {
     // exit 0 이되 **PASS 가 아니다**. 종전 판본은 여기서 0 바이트로 끝나 진짜 PASS 와
     // 구별할 수 없었다. ⚠️ 이 경로의 **관측된 실사고는 없다** — 구조만으로 닫는다. macOS
     // 측정값을 SSoT 로 오인한 forensic ADR `20260504-411` 사건은 `SKIP_LOCAL` **미적용**
-    // 경로(종전 exit 1)에서 났고, 그것은 위 `not-ssot` 분기가 막는 쪽이다 (ADR §Amendment 3
+    // 경로(종전 exit 1)에서 났고, 그것은 아래 `not-ssot` 분기가 막는 쪽이다 (ADR §Amendment 3
     // §배경). 두 경로를 섞어 인용하면 exit 2 의 근거가 사라진다.
     console.log(
       `[r1-guard] SKIP_LOCAL=1 + darwin — mode=${runMode} 검증 미수행 (exit 0 은 PASS 가 아니다).`,
