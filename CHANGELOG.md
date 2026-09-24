@@ -5,6 +5,20 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Behavior Changes
+
+- **[#1258] r1-guard 의 비-SSoT 환경(macOS) 처분을 종료 코드로 분리** ([#1258](https://github.com/coseo12/astro-simulator/issues/1258)). `deferred:no-incident` 수명주기의 접촉 트리거 발화로 열린 재판정이고, **`wontfix` 가 아니라 최소 수정으로 닫는다** — 재판정에서 이슈 본문에 없던 사실 2건이 나와 본문 §"왜 지금 안 고치나" 의 선택지 집합이 바뀌었다.
+
+  - **회피 수단이 이미 존재했다.** `SKIP_LOCAL=1 + darwin → exit 0` 가 ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26 §결정 1 에 **정책으로 박제**돼 있었다. 이슈가 검토한 수정 방향은 「플랫폼별 baseline」·「임계 상향」 둘뿐이라 이 세 번째가 빠져 있었다 — 문제는 「고칠 방법이 없다」가 아니라 **「있는 방법이 발견 불가능하다」** 였다.
+  - **그리고 그 회피 수단이 침묵 `exit 0` 이었다 (실측 — stdout `0` 바이트).** 진짜 PASS 와 **구별 불가**하다. 전례가 있다 — forensic ADR `20260504-411-r1-guard-shortcut-bar-forensic.md` 가 macOS 측정값을 SSoT 로 오인한 qa 사이클을 박제하고 §후속 3 에 _"SKIP_LOCAL 가드 강화 — 별도 이슈"_ 를 제안했으나 **그 이슈는 만들어진 적이 없다.** 본 이슈가 그 재관측이다.
+  - **행동 변화 (darwin 한정 · verify 모드 한정).** ① `SKIP_LOCAL` 미설정 → 종전 `exit 1`(브라우저 기동 + 3 viewport 전수 실패 출력) → **`exit 2` + 진단, 브라우저 미기동** (실측 `0.07s` · 잔존 프로세스 `0`). `2` 는 이 스크립트에서 이미 「전제 미충족/오류」 버킷이고(`--viewport` 미매칭, unhandled error), PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) 의 _"전제↔게이트 판정에 따른 종료 코드 분배"_ 와 동형이다 — 요점은 **`1`(회귀 검출)과 구분**되는 것이다. ② `SKIP_LOCAL=1` → `exit 0` 은 유지하되 _"검증 미수행 (exit 0 은 PASS 가 아니다)"_ 2줄을 출력한다 (`0` → `173~178` 바이트).
+  - **검출력 손실 `0`.** 가드 영역 4개(`top-nav` · `shortcut-bar` · `hud-top-right` · `hud-bottom-right`)가 `r1-ui-regions.mjs` 정의상 **전부 텍스트를 담은 DOM** 이라, darwin 의 verify 결과는 종전에도 PASS·FAIL 어느 쪽도 정보가 아니었다. 이슈 실측표의 「3 viewport × 4 항목 전부 실패」가 이것과 정합한다.
+  - **CI(ubuntu) 무변경.** `platform !== 'darwin'` 은 전 셀 `run` 이고 baseline·임계·`ci.yml` 의 r1-guard 4 step 은 손대지 않았다.
+  - **판정 SSoT + 전수 표 가드.** `resolveRunDisposition({ platform, skipLocal, mode })` → `'run' | 'skip' | 'not-ssot'` 를 부작용 없는 `r1-ui-regions.mjs` 에 두고, `r1-run-disposition.test.mjs` 가 **16 셀**(platform 2 × skipLocal 2 × mode 4)을 전수 고정한다. 기대값을 상수로만 적지 않고 **종전 판본의 판정식을 그 자리에서 재현**해 바뀐 셀이 정확히 `darwin|false|verify` **하나** 임을 단언한다. ⚠️ CI 러너는 linux 라 verify step 이 darwin 분기를 **한 번도 밟지 않는다** — CI 에서 그 분기를 발화시키는 경로는 이 단위 테스트뿐이라 `ci.yml` 에 별도 배선했다 (`apps/web/vitest.config.ts` 의 include 는 `src/**` 라 vitest 가 줍지 않는다).
+  - **종전 동작 보존 (실측).** `--update` · `--measure-sun-coverage` · `--measure-px-ratio` 는 종료 코드·진입 경로 무변경 — 앞 둘은 `SKIP_LOCAL=1` 에서 `mode=update`/`mode=measure-sun` skip, `--measure-px-ratio` 는 `SKIP_LOCAL=1` 에서도 종전대로 `chromium launched` 까지 진입한다 (diag 실측).
+  - **범위 밖 기록** — darwin + `--update` 는 종전 경로 유지다. forensic ADR `20260504-411` §옵션 C 가 macOS 캡처 baseline 갱신을 이미 **금지**로 박제해 뒀으나 그 금지를 코드로 집행하는 것은 본 변경 밖이고, 새 가드를 하나 더 만들지 않았다.
+  - ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 3 (Provisional — cross-validate 통합 후 Accepted 전이).
+
 ## [0.89.3] - 2026-09-24
 
 ### Fixed

@@ -1374,3 +1374,77 @@ bootstrap (`--update`) capture 는 0 git diff (baseline 일치) ↔ detect-and-t
 - detect-and-test fail (가설 1 검증): [26048178289](https://github.com/coseo12/astro-simulator/actions/runs/26048178289) (1차+2차, 결정적 동일)
 - detect-and-test fail (가설 2 검증): [26049292683](https://github.com/coseo12/astro-simulator/actions/runs/26049292683) (step 분리 후, mismatch 정확 동일)
 - CLAUDE.md Amendment B 형식 컨벤션: `docs/decisions/README.md` + `docs/decisions/_amendment-template.md` (PR #504 박제)
+
+---
+
+## Amendment 3 — 2026-09-25 — 비-SSoT 환경(macOS) 처분을 종료 코드로 분리 (`exit 2` / 명시적 `skip`)
+
+- **상태**: Provisional (cross-validate 결과 통합 전)
+- **발의**: [#1258](https://github.com/coseo12/astro-simulator/issues/1258) — `deferred:no-incident` 수명주기의 접촉 트리거 발화 (본 가드 파일 최종 접촉 `ce7b665c` / PR [#1257](https://github.com/coseo12/astro-simulator/pull/1257))
+- **트리거**: 실측 발견 (재판정 중 이슈 본문에 없던 사실 2건)
+- **변경 분류**: 결정 expected behavior 정정 + 측정 지표 신설
+
+### 배경 — Amendment 2026-04-26 §결정 1 이 남긴 구멍
+
+§Amendment 2026-04-26 §결정 1 은 baseline SSoT 를 **CI Linux** 로 확정하고 `SKIP_LOCAL=1 + darwin → 즉시 PASS 종료` 를 선택적 회피로 뒀다. 그 결정 자체는 유지한다. 문제는 **회피하지 않았을 때와 회피했을 때의 종료 코드가 둘 다 판정 결과를 사칭한다**는 점이다.
+
+| 경로 | 종전 | 사칭하는 것 |
+| --- | --- | --- |
+| darwin + verify + `SKIP_LOCAL` 미설정 | `exit 1` + 3 viewport × 4 항목 실패 출력 | **회귀가 있다** — 실제로는 폰트 렌더 차이 |
+| darwin + verify + `SKIP_LOCAL=1` | `exit 0`, **출력 0 바이트** | **검증을 통과했다** — 실제로는 미수행 |
+
+전자의 비용은 실측됐다 — PR #1257 한 사이클에서 3주체가 각각 「내가 깬 건가」를 배제했다. 후자의 비용도 전례가 있다 — forensic ADR [`20260504-411-r1-guard-shortcut-bar-forensic.md`](20260504-411-r1-guard-shortcut-bar-forensic.md) 가 macOS 측정값을 SSoT 로 오인한 qa 사이클을 박제하고 §후속 3 에 *"SKIP_LOCAL 가드 강화 — 별도 이슈"* 를 제안했으나, 그 이슈는 만들어진 적이 없다.
+
+### 결정 1 — darwin verify 는 `exit 2` (판정 불가)
+
+`darwin` + verify 모드 + `SKIP_LOCAL` 미설정 → **브라우저 기동 전에** `exit 2` + 원인·SSoT·회피법 진단.
+
+`2` 는 본 스크립트에서 이미 「전제 미충족 / 오류」 버킷이다 (`--viewport` 미매칭, unhandled error). PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) (#1250) 의 *"전제↔게이트 판정에 따른 종료 코드 분배"* 와 동형이다. 요점은 **`1`(회귀 검출)과 구분되는 것** 이다.
+
+검출력 손실은 `0` 이다 — 가드 영역 4개(`top-nav` · `shortcut-bar` · `hud-top-right` · `hud-bottom-right`)가 [`r1-ui-regions.mjs`](../../apps/web/scripts/r1-ui-regions.mjs) 정의상 **전부 텍스트를 담은 DOM** 이라, darwin 의 verify 결과는 종전에도 PASS·FAIL 어느 쪽도 정보가 아니었다.
+
+### 결정 2 — `SKIP_LOCAL=1` 경로는 「미수행」을 명시 출력한다
+
+`exit 0` 은 유지하되 (§Amendment 2026-04-26 §결정 1 불변), *"검증 미수행 (exit 0 은 PASS 가 아니다)"* + *"판정 SSoT 는 CI(ubuntu)"* 2줄을 stdout 에 쓴다. **침묵 초록은 진짜 PASS 와 구별 불가하고, 그 구별 불가가 위 forensic 전례를 만들었다.**
+
+### 결정 3 — 판정은 순수 함수 SSoT + 전수 표 테스트
+
+`resolveRunDisposition({ platform, skipLocal, mode })` → `'run' | 'skip' | 'not-ssot'` 을 [`r1-ui-regions.mjs`](../../apps/web/scripts/r1-ui-regions.mjs) (부작용 없는 SSoT 모듈) 에 둔다. `platform × SKIP_LOCAL × mode` 3축이라 한 축만 보면 조용히 drift 한다 — **#1258 자체가 「회피 경로가 있는데 보이지 않는다」였다.**
+
+[`r1-run-disposition.test.mjs`](../../apps/web/scripts/r1-run-disposition.test.mjs) 가 **16 셀**(platform 2 × skipLocal 2 × mode 4)을 전수 고정하고, `ci.yml` 에 배선한다. ⚠️ CI 러너는 linux 라 verify step 은 darwin 분기를 **한 번도 밟지 않는다** — CI 에서 그 분기를 실제로 발화시키는 경로는 이 단위 테스트뿐이다.
+
+테스트는 종전 판본의 판정식을 그 자리에서 재현해 **바뀐 셀이 정확히 `darwin|false|verify` 하나** 임을 단언한다 (기대값을 상수로 적으면 그 상수가 또 하나의 drift 원이 된다).
+
+### 비-범위 (명시)
+
+- **CI(ubuntu) 동작** — `platform !== 'darwin'` 은 전 셀 `run`. 코드·임계·baseline 모두 무변경.
+- **baseline 플랫폼 분리 / 임계 상향** — #1258 본문 §비-범위 유지. 전자는 관리 대상을 2배로, 후자는 검출력을 깎는다.
+- **darwin + `--update`** — 종전 경로 유지. forensic ADR [`20260504-411`](20260504-411-r1-guard-shortcut-bar-forensic.md) §옵션 C 가 macOS 캡처 baseline 갱신을 이미 **금지**로 박제해 뒀으나, 그 금지를 코드로 집행하는 것은 본 Amendment 범위 밖이다 — PR 코멘트로 기록만 한다 (CLAUDE.md §검증 강도 게이트 «범위 밖 발견의 기본 처분은 PR 코멘트 기록»).
+
+### 측정 지표 (Amendment 3 PASS 기준)
+
+| # | 기준 | 실측 |
+| --- | --- | --- |
+| 1 | darwin verify → `exit 2`, 브라우저 미기동, `< 2s` | `exit=2` / `0.07s` / 잔존 프로세스 `0` |
+| 2 | 진단에 `baseline` · `CI` · `SKIP_LOCAL` 각 ≥ 1회 | `1` / `2` / `1` |
+| 3 | `SKIP_LOCAL=1` → `exit 0` + stdout ≥ 1줄 | `exit=0` / `173~178` bytes (종전 `0`) |
+| 4 | `--update` · `--measure-sun` · `--measure-px-ratio` 무변경 | 전 3종 실측 + 16 셀 표 |
+| 5 | linux 8 셀 전건 `run` | 단위 테스트 |
+
+### 재검토 조건
+
+1. verify 모드 이외에서도 macOS false positive 가 관측되면 → `resolveRunDisposition` 의 mode 축 재판정
+2. 판정 SSoT 가 ubuntu 외 환경으로 늘어나면 (예: OS 매트릭스 도입) → `platform !== 'darwin' → run` 전제 재검토. §Amendment 2026-04-26 의 후보 C (OS 매트릭스) 가 그 경로다
+3. `exit 2` 가 스크립트를 호출하는 상위 집합(`&&` 체인 / 집합 verify 스크립트)에서 의도치 않게 전파되면 → 호출부 배선 재검토 (현재 `verify:r1-guard` 는 어떤 집합 스크립트에도 포함되지 않음 — 실측)
+
+### Cross-validate 결과
+
+(박제 직후 1회 예정 — 통합 후 `상태: Accepted` 전이)
+
+### 관련 박제
+
+- 발의 이슈: [#1258](https://github.com/coseo12/astro-simulator/issues/1258) (재판정 코멘트에 사실 2건 + 스프린트 계약)
+- 선행 Amendment: §Amendment 2026-04-26 §결정 1 (SKIP_LOCAL 도입), §Amendment 2 2026-05-19 (viewport 별 임계)
+- 종료 코드 분배 선례: PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) (#1250 browser-verify-379-lod 공허 통과 5건)
+- 침묵 초록 전례: [`20260504-411-r1-guard-shortcut-bar-forensic.md`](20260504-411-r1-guard-shortcut-bar-forensic.md) §후속 3
+- 코드 SSoT: `apps/web/scripts/r1-ui-regions.mjs` (`resolveRunDisposition`), `apps/web/scripts/r1-ui-regression-guard.mjs` (`main()` 처분 게이트)

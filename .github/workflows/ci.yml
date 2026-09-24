@@ -325,6 +325,16 @@ jobs:
       - name: '#1247 브랜치 정리 판정 로직 회귀 가드 (branch-cleanup-plan.test)'
         run: node scripts/branch-cleanup-plan.test.mjs
 
+      # #1258 r1-guard 비-SSoT 환경(macOS) 처분 판정 회귀 가드.
+      # 판정이 `platform × SKIP_LOCAL × mode` 3축이라 한 축만 보면 조용히 drift 한다 —
+      # #1258 자체가 「회피 경로(SKIP_LOCAL)가 있는데 보이지 않는다」였다. 16 셀 전수 고정.
+      # ⚠️ 이 러너는 linux 라 아래 verify step 은 darwin 분기를 **한 번도 밟지 않는다**.
+      #   즉 CI 에서 그 분기를 실제로 발화시키는 경로는 이 단위 테스트뿐이다.
+      # 본 테스트는 `apps/web/vitest.config.ts` 의 include(`src/**`) 밖이라 vitest 가 줍지 않는다.
+      # `--if-present` 미사용 (#840 silent no-op 함정) — 스크립트 부재 시 결정적 FAIL.
+      - name: '#1258 r1-guard 로컬 처분 판정 회귀 가드 (r1-run-disposition.test)'
+        run: node apps/web/scripts/r1-run-disposition.test.mjs
+
       # ============================================================
       # R1 UI 회귀 가드 — wasm-pack + Playwright + pixel diff
       # ============================================================

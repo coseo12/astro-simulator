@@ -14,7 +14,14 @@
  *
  * 환경변수 계약:
  *   BASE_URL    — 웹 서버 URL (기본 http://localhost:3000, CI 에서 http://localhost:3001 등 오버라이드 가능)
- *   SKIP_LOCAL  — '1' + macOS darwin 한정 즉시 PASS 종료 (Linux baseline 과 폰트 차이 false positive 회피)
+ *   SKIP_LOCAL  — '1' + macOS darwin 한정 검증 미수행 후 exit 0 (Linux baseline 과 폰트 차이
+ *                 false positive 회피). #1258 이후 «미수행» 을 1줄 명시 출력한다 — 종전 판본은
+ *                 출력 0 바이트라 진짜 PASS 와 구별할 수 없었다.
+ *
+ * 종료 코드 (#1258):
+ *   0 — PASS, 또는 darwin + SKIP_LOCAL=1 (검증 미수행)
+ *   1 — 회귀 검출 (mismatch ratio 초과 / dimension mismatch)
+ *   2 — 전제 미충족: --viewport 미매칭 / darwin verify (판정 SSoT 아님) / unhandled error
  *
  * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4 + §Amendment 2026-04-26.
  *
@@ -42,6 +49,7 @@ import { fileURLToPath } from 'node:url';
 import {
   PIXELMATCH_THRESHOLD,
   getMismatchRatioLimit,
+  resolveRunDisposition,
   R1_UI_REGIONS,
   R1_VIEWPORTS,
 } from './r1-ui-regions.mjs';
@@ -111,6 +119,18 @@ const flags = {
   measurePxRatio: args.includes('--measure-px-ratio'),
   viewportFilter: args.find((a) => a.startsWith('--viewport='))?.split('=')[1] ?? null,
 };
+
+/**
+ * flags → 단일 모드 식별자 (#1258). 우선순위는 `main()` 의 기존 분기 순서와 같아야 한다
+ * (`--measure-px-ratio` 가 첫 분기). `R1_RUN_MODES` 가 도메인 SSoT.
+ */
+const runMode = flags.measurePxRatio
+  ? 'measure-px-ratio'
+  : flags.update
+    ? 'update'
+    : flags.measureSunCoverage
+      ? 'measure-sun'
+      : 'verify';
 
 /**
  * #373 ADR §결정 2 §5 Amendment 2026-05-03 라운드 3 D-1 + R4 #532 — body 별 임계값 SSoT.
@@ -760,10 +780,36 @@ async function runPxRatioMeasurement(browser) {
 }
 
 async function main() {
-  // SKIP_LOCAL=1 + darwin — Linux baseline 폰트 차이 false positive 회피 (ADR Amendment 2026-04-26 §결정 1).
-  // 단 --measure-px-ratio 모드는 px ratio 가 viewport 무관 (renderScale 결합 기반) 이므로 SKIP_LOCAL 무관.
-  if (process.env.SKIP_LOCAL === '1' && process.platform === 'darwin' && !flags.measurePxRatio) {
+  // 비-SSoT 환경(macOS) 처분 — 판정은 `resolveRunDisposition` (r1-ui-regions.mjs) 이 SSoT 다.
+  // ADR Amendment 2026-04-26 §결정 1 + Amendment 2026-09-25 §결정 1 (#1258).
+  //
+  // 두 경로 모두 브라우저를 띄우기 **전에** 끝난다. verify 차단이 느리면 그 자체가 마찰이고,
+  // 애초에 이 이슈가 «내가 깬 건가» 를 배제하는 데 드는 시간에 관한 것이었다.
+  const disposition = resolveRunDisposition({
+    platform: process.platform,
+    skipLocal: process.env.SKIP_LOCAL === '1',
+    mode: runMode,
+  });
+  if (disposition === 'skip') {
+    // exit 0 이되 **PASS 가 아니다**. 종전 판본은 여기서 0 바이트로 끝나 진짜 PASS 와
+    // 구별할 수 없었고, 그 구별 불가가 macOS 측정값을 SSoT 로 오인한 전례를 만들었다
+    // (forensic ADR `20260504-411-r1-guard-shortcut-bar-forensic.md` §후속 3).
+    console.log(
+      `[r1-guard] SKIP_LOCAL=1 + darwin — mode=${runMode} 검증 미수행 (exit 0 은 PASS 가 아니다).`,
+    );
+    console.log('[r1-guard] 회귀 판정 SSoT 는 CI(ubuntu) 의 r1-guard step 결과다.');
     process.exit(0);
+  }
+  if (disposition === 'not-ssot') {
+    console.error('[r1-guard] 전제 미충족 — 이 환경(darwin)은 회귀 판정 SSoT 가 아니다. (#1258)');
+    console.error(
+      '  원인: baseline 12 PNG 가 ubuntu CI 캡처본이고, 가드 영역 4개가 전부 텍스트를 담은 DOM 이라',
+    );
+    console.error('        macOS 폰트 렌더 차이만으로 전 영역이 어긋난다 — 로컬 검출력은 0 이다.');
+    console.error('  SSoT: CI(ubuntu) 의 `r1-guard: verify 실행 (4/4)` step 결과를 본다.');
+    console.error('  회피: SKIP_LOCAL=1 을 붙이면 검증을 건너뛰고 exit 0 으로 끝난다.');
+    console.error('  종료 코드 2 = 판정 불가 (1 = 회귀 검출 과 구분한다).');
+    process.exit(2);
   }
   ensureDirSync(BASELINE_DIR);
   ensureDirSync(DIFF_DIR);
