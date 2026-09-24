@@ -4,7 +4,8 @@
  *
  * stand-alone node 테스트 (`apps/web/vitest.config.ts` 의 include 는 `src/**` 라 이 파일은
  * vitest 글롭 밖이다). CI `ci.yml` 에 배선한다 — **테스트가 있다 ≠ 그 테스트가 돈다** (#1103).
- * 저장소의 다른 stand-alone `.test.mjs` 5종과 같은 관행이다 (`package.json` 미배선 / CI 전용).
+ * 저장소의 다른 stand-alone `.test.mjs` 와 같은 관행이다 — `git ls-files '*.test.mjs'` 의
+ * 본 파일 제외 **6/6 이 전부 `package.json` 미배선**(CI 전용)이다.
  *
  * 이 파일이 지키는 것 넷:
  *   1. **전수 고정** — `platform 2 × skipLocal 2 × forceLocal 2 × mode 4 = 32` 셀을 전부 명시한다.
@@ -17,7 +18,7 @@
  *      (PR #1261 cross-validate + reviewer 공통 지적).
  */
 import assert from 'node:assert/strict';
-import { R1_RUN_MODES, resolveRunDisposition } from './r1-ui-regions.mjs';
+import { R1_RUN_MODES, allowsBaselineWrite, resolveRunDisposition } from './r1-ui-regions.mjs';
 
 let passed = 0;
 const run = (name, fn) => {
@@ -167,6 +168,20 @@ run('판별력 — force 경로를 지우는 변이는 verify force 2 셀을 깨
     'darwin|skip=false|force=true|verify',
     'darwin|skip=true|force=true|verify',
   ]);
+});
+
+run('baseline 쓰기 계약 — 강제 실행 2 셀에서만 금지된다', () => {
+  // §결정 4 의 「측정만, 판정하지 않는다」에는 **쓰지도 않는다**가 포함된다. 부트스트랩 분기가
+  // baseline 부재 시 현재 캡처를 그대로 기록하는데, darwin 에서 그것은 macOS 폰트다
+  // (PR #1261 reviewer R2-B2 — 실측 재현됨). 조건식을 호출부에 인라인하면 이 표가 계약을
+  // 덮지 못하므로 순수 함수로 뽑아 32 셀에 걸어 둔다.
+  const denied = TABLE.filter((c) => !allowsBaselineWrite(resolveRunDisposition(c)));
+  assert.deepEqual(denied.map(key), [
+    'darwin|skip=false|force=true|verify',
+    'darwin|skip=true|force=true|verify',
+  ]);
+  // 나머지 30 셀은 종전대로 쓸 수 있다 — `--update` 와 최초 부트스트랩 경로가 여기 있다.
+  assert.equal(TABLE.length - denied.length, 30);
 });
 
 run('fail-closed — 미등록 mode 는 조용히 run 으로 빠지지 않는다', () => {

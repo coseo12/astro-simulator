@@ -128,3 +128,22 @@ export function resolveRunDisposition({ platform, skipLocal, forceLocal, mode })
   if (mode === 'verify') return 'not-ssot';
   return 'run';
 }
+
+/**
+ * 이 처분에서 baseline PNG 를 **써도 되는가** (#1258 / PR #1261 reviewer R2-B2).
+ *
+ * `run-not-ssot`(강제 실행) 은 안 된다. `runForViewport` 의 부트스트랩 분기는 baseline 이
+ * 없으면 **현재 캡처를 그대로 baseline 으로 기록**하는데, darwin 에서 그 캡처는 macOS 폰트다.
+ * tracked 파일로 들어가면 다음 CI(ubuntu) PR check 에서 즉시 회귀하고, 이것은 forensic ADR
+ * `20260504-411-r1-guard-shortcut-bar-forensic.md` §옵션 C 가 **금지**로 박제한 경로다.
+ *
+ * §결정 4 의 계약이 「측정만, 판정하지 않는다」이므로 **쓰기도 하지 않는다**. 계약을 코드
+ * 한 곳이 아니라 테스트되는 SSoT 에 두려고 함수로 뽑았다 — 조건식을 호출부에 인라인하면
+ * 32 셀 표가 그 계약을 덮지 못한다.
+ *
+ * @param {'run'|'run-not-ssot'|'skip'|'not-ssot'} disposition
+ * @returns {boolean}
+ */
+export function allowsBaselineWrite(disposition) {
+  return disposition !== 'run-not-ssot';
+}

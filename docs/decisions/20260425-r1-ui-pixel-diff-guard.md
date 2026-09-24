@@ -1426,7 +1426,11 @@ bootstrap (`--update`) capture 는 0 git diff (baseline 일치) ↔ detect-and-t
 
 `R1_FORCE_LOCAL=1` + darwin + verify → **실행하되 판정하지 않는다**. 배너를 먼저 찍어 뒤따르는 수치가 판정으로 읽히지 않게 하고, `overallPass` 와 **무관하게 `exit 2`** 로 끝낸다 — 판정을 되살리면 §결정 1 이 막은 `exit 1` 사칭이 그대로 돌아온다. `SKIP_LOCAL` 과 동시 설정 시 **force 가 이긴다** (호출부에서 명시적으로 타이핑한 override 가 ambient env 를 이긴다). verify 이외 모드에서는 정의상 no-op 이다 — 애초에 막힌 적이 없다.
 
-(PR #1261 reviewer B2(b). 초판은 이 축을 보지 못했다.)
+**강제 실행은 baseline 을 쓰지 않는다.** `runForViewport` 의 부트스트랩 분기는 baseline 이 없으면 현재 캡처를 그대로 기록하는데, darwin 에서 그것은 macOS 폰트다 — tracked 파일로 들어가면 다음 CI(ubuntu) check 에서 즉시 회귀하고, 이것은 forensic ADR [`20260504-411`](20260504-411-r1-guard-shortcut-bar-forensic.md) §옵션 C 가 **금지**로 박제한 경로다. 겹치는 문제로 그 분기는 `pass: true` 를 기록한다 — 측정도 판정도 아닌 것이 통과가 된다. 계약을 호출부 조건식이 아니라 테스트되는 SSoT 에 두려고 `allowsBaselineWrite(disposition)` 순수 함수로 뽑아 32 셀 표에 걸었다.
+
+> ⚠️ 이것은 **§결정 4 도입이 열어 버린 구멍**이지 선재 위험이 아니다 — §결정 1 의 `exit 2` 는 브라우저 기동 전 종료라 이 경로에 도달할 수 없었다. 발화 조건(「새 R-Phase 영역 추가 → baseline 부재 → force 로 대조」)이 §결정 4 가 상정한 사용 시나리오 그 자체라 더 나쁘다.
+
+(PR #1261 reviewer B2(b) / R2-B2. 초판은 force 축 자체를, 2판은 그 축이 연 쓰기 경로를 보지 못했다.)
 
 ### §결정 1 의 근거 — 「판정 검출력 손실 `0`」 의 정확한 범위
 
@@ -1449,14 +1453,16 @@ bootstrap (`--update`) capture 는 0 git diff (baseline 일치) ↔ detect-and-t
 | 3 | `SKIP_LOCAL=1` → `exit 0` + stdout ≥ 1줄 | `exit=0` / `173~178` bytes (종전 `0`) |
 | 4 | `--update` · `--measure-sun` · `--measure-px-ratio` 무변경 | 전 3종 실측 + 32 셀 표 |
 | 5 | linux 16 셀 전건 `run` | 단위 테스트 |
-| 6 | `R1_FORCE_LOCAL=1` → 측정값 산출 + `overall: FAIL` 인데 **`exit 2`** | end-to-end 실행 (dev :3000). 3 viewport × 4 영역 **4/4 어긋남** 재현 — `shortcut-bar 646×24→595×24` · `hud-top-right 137×27→130×27` · `hud-bottom-right 131×27→121×27` (모바일 `67×24→84×24`) 가 **#1258 본문 표와 완전 일치**하고, top-nav 픽셀 수(`4419`)만 본문(`4416`/`4421`)과 다르다 — 본문이 경고한 실행 간 변동 그대로다 |
+| 6 | `R1_FORCE_LOCAL=1` → 측정값 산출 + `overall: FAIL` 인데 **`exit 2`** | end-to-end 실행 (dev :3000). 3 viewport × 4 영역 **4/4 어긋남** 재현. dimension 4종이 **#1258 본문 표와 완전 일치** — `shortcut-bar 646×24→595×24` · `hud-top-right 137×27→130×27` · `hud-bottom-right 131×27→121×27` (모바일 `67×24→84×24`). ⚠️ top-nav **픽셀 수는 인용하지 않는다** — 실행마다 달라져 어떤 값을 적어도 재현되지 않는다 (#1258 본문이 경고한 축이고, 본 PR 사이클에서도 메인·reviewer 측정이 서로 어긋났다) |
+| 7 | 강제 실행이 baseline 을 **쓰지 않는다** | baseline 1장(`375x667/hud-bottom-right.png`)을 치우고 force 실행 → `! baseline 부재 — 강제 실행에서는 생성하지 않는다 (대조 불가).` / 파일 **미생성** / 복원 후 sha `f423958974c196c5` 동일, 작업 트리 clean |
 
 ### 재검토 조건
 
 1. verify 모드 이외에서도 macOS false positive 가 관측되면 → `resolveRunDisposition` 의 mode 축 재판정
 2. 판정 SSoT 가 ubuntu 외 환경으로 늘어나면 (예: OS 매트릭스 도입) → `platform !== 'darwin' → run` 전제 재검토. §Amendment 2026-04-26 의 후보 C (OS 매트릭스) 가 그 경로다
-3. `exit 2` 가 상위 호출부에서 의도치 않게 전파되면 → 배선 재검토. **현행 진입점 전수 (실측)**: 루트 `package.json` `verify:r1-guard`, `apps/web/package.json` `r1:guard` · `r1:guard:px-ratio`, `ci.yml:429` 직접 호출, `r1-baseline-bootstrap.yml:64` (`--update`). 어떤 **집합** 스크립트에도 포함되지 않는다
+3. `exit 2` 가 상위 호출부에서 의도치 않게 전파되면 → 배선 재검토. **현행 진입점 전수 (실측)**: 루트 `package.json` `verify:r1-guard`, `apps/web/package.json` `r1:guard` · `r1:guard:px-ratio`, `ci.yml:439` 직접 호출, `r1-baseline-bootstrap.yml:64` (`--update`). 어떤 **집합** 스크립트에도 포함되지 않는다
 4. `R1_FORCE_LOCAL` 사용이 「판정」으로 인용되는 사례가 관측되면 → 배너·종료 코드 재설계 (§결정 4 의 전제 붕괴)
+5. 새 실행 모드가 추가되면 → `R1_RUN_MODES` 등록 의무 (미등록은 `TypeError`) + `allowsBaselineWrite` 계약 재판정
 
 ### Cross-validate 결과
 
@@ -1465,7 +1471,7 @@ bootstrap (`--update`) capture 는 0 git diff (baseline 일치) ↔ detect-and-t
 - **합의** — 종료 코드 `2` 선택 (기존 「전제 미충족」 버킷 준수), 브라우저 기동 전 조기 반환, stdout/stderr 분리, `platform !== 'darwin' → run` 의 OS 매트릭스 여지 보존, 순수 함수 분리가 과잉이 아님.
 - **고유 발견 (수용 1)** — 미등록 `mode` 의 암묵적 `return 'run'` fail-open. **자리는 옳고 기전은 틀렸다** — 제시된 이유(오타 유입)는 도달 경로가 없고, 실제 위험은 모드 추가 drift 다 (reviewer P2 가 변이 M-g 로 독립 확인). 근거를 교체해 §결정 3 에 반영.
 - **고유 발견 (부분 수용 1)** — 「판별력」 테스트가 이름에 못 미친다는 지적. 다만 *"사실상 항진명제"* 라는 설명은 **거짓** 이다 (결함 판본에 적용하면 실제로 FAIL 함을 실증). 정확한 문제는 공허함이 아니라 **이름↔내용 불일치** 이고, 표 전체 대조로 교체해 해소.
-- **기각 3** — ① `R1_RUN_MODES` import: 제시 코드가 import 만 추가하고 **쓰지 않아** 목적 미달성. §결정 3 의 `includes()` 가 그 결합을 실제로 만든다. ② `package.json` 배선: 저장소의 stand-alone `.test.mjs` **5/5 가 전부 미배선**(CI 전용)이라 이 파일만 예외가 된다 (실측). ③ `SKIP_LOCAL=true` 허용: skip 스위치를 넓히는 방향이고, 실수로 건너뛰는 비용 > `exit 2` 를 한 번 더 보는 비용이다.
+- **기각 3** — ① `R1_RUN_MODES` import: 제시 코드가 import 만 추가하고 **쓰지 않아** 목적 미달성. §결정 3 의 `includes()` 가 그 결합을 실제로 만든다. ② `package.json` 배선: `git ls-files '*.test.mjs'` 의 본 PR 제외 **6/6 이 전부 미배선**(CI 전용)이라 이 파일만 예외가 된다 (기계 계수 — 초판의 `5/5` 는 손으로 고른 목록이었다). ③ `SKIP_LOCAL=true` 허용: skip 스위치를 넓히는 방향이고, 실수로 건너뛰는 비용 > `exit 2` 를 한 번 더 보는 비용이다.
 - **Claude 편향 셀프 체크** — 본 Amendment 초판의 차단 2건(411 귀속 / 검출력 범위)은 cross-validate 가 **둘 다 놓쳤고** reviewer 의 출처 대조만이 잡았다. 외부 모델은 diff 안에서 정합성을 보고, 인용된 출처를 열어보지 않는다. **인용은 diff 밖을 가리키므로 diff 검토로는 검증되지 않는다.**
 
 ### 관련 박제

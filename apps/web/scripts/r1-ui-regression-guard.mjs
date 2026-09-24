@@ -28,6 +28,8 @@
  *       강제 실행했을 때도 측정만 하고 판정하지 않으므로 통과·실패 무관 2) / unhandled error
  *
  * ADR `docs/decisions/20260425-r1-ui-pixel-diff-guard.md` §결정 4 + §Amendment 2026-04-26.
+ * ⚠️ 위 환경변수·종료 코드 계약의 **실효 SSoT 는 §Amendment 3 (2026-09-25)** 이다 — ADR 본문
+ * §601 의 「즉시 PASS」 서술은 그 Amendment 가 supersede 한다 (본문은 B 형식상 immutable).
  *
  * `--measure-px-ratio` 명세 (#373 ADR `20260430-r3-followup-body-proportion.md` §결정 2 §5
  *  Amendment 2026-05-03 라운드 3 D-1 박제값 임계 갱신, ±5% 마진 정책 보존):
@@ -52,6 +54,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   PIXELMATCH_THRESHOLD,
+  allowsBaselineWrite,
   getMismatchRatioLimit,
   resolveRunDisposition,
   R1_UI_REGIONS,
@@ -502,7 +505,7 @@ async function setupPage(browser, viewport, queryString = '') {
   return { context, page };
 }
 
-async function runForViewport(browser, viewport) {
+async function runForViewport(browser, viewport, { allowBaselineWrite = true } = {}) {
   console.log(`\n=== viewport ${viewport.id} (${viewport.width}×${viewport.height}) ===`);
   diag(`runForViewport[${viewport.id}] start`);
 
@@ -570,6 +573,21 @@ async function runForViewport(browser, viewport) {
     const bp = baselinePath(viewport.id, region.id);
 
     if (flags.update || !fs.existsSync(bp)) {
+      if (!allowBaselineWrite) {
+        // 강제 실행(`R1_FORCE_LOCAL`)은 baseline 을 만들지 않는다 — 여기 쓰면 macOS 폰트로 캡처한
+        // PNG 가 tracked 파일로 들어가고 다음 CI(ubuntu) check 에서 즉시 회귀한다. 종전 판본이
+        // 이 분기를 `pass: true` 로 처리한다는 점도 겹친다 — 측정도 판정도 아닌 것이 통과가 된다.
+        console.log(
+          `  ! ${region.id}: baseline 부재 — 강제 실행에서는 생성하지 않는다 (대조 불가).`,
+        );
+        overallPass = false;
+        results.push({
+          regionId: region.id,
+          pass: false,
+          error: 'baseline 부재 (R1_FORCE_LOCAL 에서 생성 금지)',
+        });
+        continue;
+      }
       // baseline 갱신 또는 부트스트래핑 (없으면 생성, 회귀 검증 모드여도 첫 실행이면 PASS 로 처리하고 생성).
       const buf = PNG.sync.write(currentPng);
       fs.writeFileSync(bp, buf);
@@ -802,8 +820,10 @@ async function main() {
   });
   if (disposition === 'skip') {
     // exit 0 이되 **PASS 가 아니다**. 종전 판본은 여기서 0 바이트로 끝나 진짜 PASS 와
-    // 구별할 수 없었고, 그 구별 불가가 macOS 측정값을 SSoT 로 오인한 전례를 만들었다
-    // (forensic ADR `20260504-411-r1-guard-shortcut-bar-forensic.md` §후속 3).
+    // 구별할 수 없었다. ⚠️ 이 경로의 **관측된 실사고는 없다** — 구조만으로 닫는다. macOS
+    // 측정값을 SSoT 로 오인한 forensic ADR `20260504-411` 사건은 `SKIP_LOCAL` **미적용**
+    // 경로(종전 exit 1)에서 났고, 그것은 위 `not-ssot` 분기가 막는 쪽이다 (ADR §Amendment 3
+    // §배경). 두 경로를 섞어 인용하면 exit 2 의 근거가 사라진다.
     console.log(
       `[r1-guard] SKIP_LOCAL=1 + darwin — mode=${runMode} 검증 미수행 (exit 0 은 PASS 가 아니다).`,
     );
@@ -861,7 +881,9 @@ async function main() {
           return 'no-viewport';
         }
         for (const viewport of targets) {
-          const { pass } = await runForViewport(browser, viewport);
+          const { pass } = await runForViewport(browser, viewport, {
+            allowBaselineWrite: allowsBaselineWrite(disposition),
+          });
           if (!pass) overallPass = false;
         }
       }
