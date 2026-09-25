@@ -1374,3 +1374,110 @@ bootstrap (`--update`) capture 는 0 git diff (baseline 일치) ↔ detect-and-t
 - detect-and-test fail (가설 1 검증): [26048178289](https://github.com/coseo12/astro-simulator/actions/runs/26048178289) (1차+2차, 결정적 동일)
 - detect-and-test fail (가설 2 검증): [26049292683](https://github.com/coseo12/astro-simulator/actions/runs/26049292683) (step 분리 후, mismatch 정확 동일)
 - CLAUDE.md Amendment B 형식 컨벤션: `docs/decisions/README.md` + `docs/decisions/_amendment-template.md` (PR #504 박제)
+
+---
+
+## Amendment 3 — 2026-09-25 — 비-SSoT 환경(macOS) 처분을 종료 코드로 분리 (`exit 2` / 명시적 `skip` / 강제 실행)
+
+- **상태**: Accepted (cross-validate 2026-09-25)
+- **발의**: [#1258](https://github.com/coseo12/astro-simulator/issues/1258) — `deferred:no-incident` 수명주기의 접촉 트리거 발화 (본 가드 파일 최종 접촉 `ce7b665c` / PR [#1257](https://github.com/coseo12/astro-simulator/pull/1257))
+- **트리거**: 실측 발견 (재판정 중 이슈 본문에 없던 사실 2건)
+- **변경 분류**: 결정 expected behavior 정정 + 측정 지표 신설
+- **본문 supersede**: 본 Amendment 는 ADR 본문 §601 의 환경변수 계약 서술(*"`SKIP_LOCAL=1` (선택사항, macOS darwin 한정 즉시 PASS)"*) 을 대체한다. 본문은 Amendment B 형식 관행상 immutable 이므로 수정하지 않는다 — 실효 계약은 본 §결정 1~4 다.
+
+### 배경 — Amendment 2026-04-26 §결정 1 이 남긴 구멍
+
+§Amendment 2026-04-26 §결정 1 은 baseline SSoT 를 **CI Linux** 로 확정하고 `SKIP_LOCAL=1 + darwin → 즉시 PASS 종료` 를 선택적 회피로 뒀다. 그 결정 자체는 유지한다. 문제는 **회피하지 않았을 때와 회피했을 때의 종료 코드가 둘 다 판정 결과를 사칭한다**는 점이다.
+
+| 경로 | 종전 | 사칭하는 것 | 실사고 |
+| --- | --- | --- | --- |
+| darwin + verify + `SKIP_LOCAL` 미설정 | `exit 1` + 3 viewport × 4 항목 실패 출력 | **회귀가 있다** | **있다** — 아래 |
+| darwin + verify + `SKIP_LOCAL=1` | `exit 0`, **출력 0 바이트** | **검증을 통과했다** | **없다** (구조적 fail-open) |
+
+**전례가 지지하는 것은 `exit 1` 쪽이다.** forensic ADR [`20260504-411-r1-guard-shortcut-bar-forensic.md`](20260504-411-r1-guard-shortcut-bar-forensic.md) 의 사건은 qa 가 `SKIP_LOCAL` **없이** 돌려 나온 `6.012% / 4.000% / 10.906%` 를 SSoT 로 오인한 것이고, 그 ADR 자신이 `:23` 에서 *"SKIP_LOCAL 가드가 우회된 경로로 측정된 것으로 추정"*, `docs/reports/411-forensic/output.json` 에서 *"SKIP_LOCAL=1 가 정상적으로 적용되면 macOS 는 즉시 PASS 했어야 함"* 이라고 적는다. 즉 **침묵 `exit 0` 은 그 사건에서 일어나지 않았다.**
+
+> ⚠️ 본 Amendment 초판은 이 전례를 §결정 2(침묵 초록)에 귀속시켰고, 그것은 인용 출처가 직접 반증한다 (PR #1261 reviewer B1). 귀속을 바로잡는다 — 411 은 §결정 1 의 근거이고, §결정 2 는 **실사고 없는 구조적 fail-open** 을 근거로 닫는다. 411 §후속 3 의 *"SKIP_LOCAL 가드 강화 (qa 워크플로 환경변수 의무화)"* 도 같은 `exit 1` 축이며, 그 후속 이슈는 만들어진 적이 없다.
+
+개발 마찰 쪽 비용은 별도로 실측됐다 — PR #1257 한 사이클에서 **3주체가 각각** 「내가 깬 건가」를 배제했다.
+
+### 결정 1 — darwin verify 는 `exit 2` (판정 불가)
+
+`darwin` + verify 모드 + `SKIP_LOCAL`·`R1_FORCE_LOCAL` 미설정 → **브라우저 기동 전에** `exit 2` + 원인·SSoT·회피법 진단.
+
+`2` 는 본 스크립트에서 이미 「전제 미충족 / 오류」 버킷이다 (`--viewport` 미매칭, unhandled error). PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) (#1250) 의 *"전제↔게이트 판정에 따른 종료 코드 분배"* 와 동형이다. 요점은 **`1`(회귀 검출)과 구분되는 것** 이다.
+
+### 결정 2 — `SKIP_LOCAL=1` 경로는 「미수행」을 명시 출력한다
+
+`exit 0` 은 유지하되 (§Amendment 2026-04-26 §결정 1 불변), *"검증 미수행 (exit 0 은 PASS 가 아니다)"* + *"판정 SSoT 는 CI(ubuntu)"* 2줄을 stdout 에 쓴다. 침묵 초록은 진짜 PASS 와 구별 불가하다. **관측된 실사고는 없다** — 구조만으로 닫는다.
+
+### 결정 3 — 판정은 순수 함수 SSoT + 전수 표 테스트 + fail-closed 도메인
+
+`resolveRunDisposition({ platform, skipLocal, forceLocal, mode })` → `'run' | 'run-not-ssot' | 'skip' | 'not-ssot'` 를 [`r1-ui-regions.mjs`](../../apps/web/scripts/r1-ui-regions.mjs) (부작용 없는 SSoT 모듈) 에 둔다. [`r1-run-disposition.test.mjs`](../../apps/web/scripts/r1-run-disposition.test.mjs) 가 **32 셀**(platform 2 × skipLocal 2 × forceLocal 2 × mode 4)을 전수 고정하고 `ci.yml` 에 배선한다.
+
+⚠️ CI 러너는 linux 라 verify step 은 darwin 분기를 **한 번도 밟지 않는다** — CI 에서 그 분기를 실제로 발화시키는 경로는 이 단위 테스트뿐이다.
+
+**미등록 `mode` 는 `TypeError` 로 fail-closed 한다.** `mode` 는 외부 입력이 아니라 guard 의 `flags` 파생이므로 오타가 도달하는 경로는 없다 — 막는 것은 **모드 추가 drift** 다. 새 모드를 guard 파생에만 더하고 `R1_RUN_MODES` 에 빠뜨리면 마지막 `return 'run'` 이 darwin 에서 조용히 통과시키고, 전수 표 테스트는 이 배열을 순회하므로 **그 셀을 아예 만들지 않는다**. (cross-validate 제안 1 + reviewer P2 독립 수렴. cross-validate 가 든 이유 「오타 유입」은 도달 경로가 없어 기각하고, 근거를 drift 축으로 교체했다.)
+
+테스트는 `forceLocal=false` 16 셀을 종전 판정식과 대조해 **바뀐 셀이 정확히 `darwin|skip=false|force=false|verify` 하나** 임을 단언하고, 완화 변이 2종을 **표 전체에 돌려** 깨지는 셀 집합을 단언한다.
+
+### 결정 4 — `R1_FORCE_LOCAL=1` 강제 실행 경로 (측정만, 판정 없음)
+
+**「판정에 정보가 없다」와 「출력 전체가 쓸모없다」는 다르다.** dimension mismatch 의 `current=` 는 DOM 측정값이라 결정적이고, 두 판본을 같은 환경에서 상대 대조하는 계측기로 **실제로 쓰인다** — #1258 의 근거표 자체가 그 방식으로 만들어졌다 (가드 파일 한 개만 `origin/develop` 판본으로 되돌려 대조). §결정 1 만 두면 그 용도가 사라지고 복구 경로가 없다 (`SKIP_LOCAL=1` 은 skip 이지 force 가 아니다).
+
+`R1_FORCE_LOCAL=1` + darwin + verify → **실행하되 판정하지 않는다**. 배너를 먼저 찍어 뒤따르는 수치가 판정으로 읽히지 않게 하고, `overallPass` 와 **무관하게 `exit 2`** 로 끝낸다 — 판정을 되살리면 §결정 1 이 막은 `exit 1` 사칭이 그대로 돌아온다. `SKIP_LOCAL` 과 동시 설정 시 **force 가 이긴다** (호출부에서 명시적으로 타이핑한 override 가 ambient env 를 이긴다). verify 이외 모드에서는 정의상 no-op 이다 — 애초에 막힌 적이 없다.
+
+**강제 실행은 baseline 을 쓰지 않는다.** `runForViewport` 의 부트스트랩 분기는 baseline 이 없으면 현재 캡처를 그대로 기록하는데, darwin 에서 그것은 macOS 폰트다 — tracked 파일로 들어가면 다음 CI(ubuntu) check 에서 즉시 회귀하고, 이것은 forensic ADR [`20260504-411`](20260504-411-r1-guard-shortcut-bar-forensic.md) §옵션 C 가 **금지**로 박제한 경로다. 겹치는 문제로 그 분기는 `pass: true` 를 기록한다 — 측정도 판정도 아닌 것이 통과가 된다. 계약을 호출부 조건식이 아니라 테스트되는 SSoT 에 두려고 `allowsBaselineWrite(disposition)` 순수 함수로 뽑아 32 셀 표에 걸었다.
+
+> ⚠️ 이것은 **§결정 4 도입이 열어 버린 구멍**이지 선재 위험이 아니다 — §결정 1 의 `exit 2` 는 브라우저 기동 전 종료라 이 경로에 도달할 수 없었다. 발화 조건(「새 R-Phase 영역 추가 → baseline 부재 → force 로 대조」)이 §결정 4 가 상정한 사용 시나리오 그 자체라 더 나쁘다.
+
+(PR #1261 reviewer B2(b) / R2-B2. 초판은 force 축 자체를, 2판은 그 축이 연 쓰기 경로를 보지 못했다.)
+
+### §결정 1 의 근거 — 「판정 검출력 손실 `0`」 의 정확한 범위
+
+가드 영역 4개(`top-nav` · `shortcut-bar` · `hud-top-right` · `hud-bottom-right`)가 모두 텍스트를 담고 있고 (소스: [`top-bar.tsx:20`](../../apps/web/src/components/layout/top-bar.tsx) · [`focus-quick-buttons.tsx:74`](../../apps/web/src/components/layout/focus-quick-buttons.tsx) · [`hud-corners.tsx:45`](../../apps/web/src/components/layout/hud-corners.tsx)·`:103`), macOS 폰트 렌더 차이만으로 **4/4 가 이미 어긋난다** (실측 — 아래 §측정 지표 6). 따라서 darwin verify 의 **PASS/FAIL 판정** 에는 종전에도 정보가 없었다.
+
+> ⚠️ 이것은 「영역이 텍스트 **전용**」이라는 뜻이 아니다 — `hud-bottom-right` 는 8×8 tier 색 스와치(`hud-corners.tsx:107-110`)를 포함한다. 주장의 범위는 **판정**이고, 측정값까지 무의미하다는 뜻이 아니다 (§결정 4). 초판은 범위를 넓게 적었고 근거로 본 PR 이 방금 써 넣은 줄을 인용해 자기참조였다 (reviewer B2(a)).
+
+### 비-범위 (명시)
+
+- **CI(ubuntu) 동작** — `platform !== 'darwin'` 은 16 셀 전건 `run`. 코드·임계·baseline 모두 무변경.
+- **baseline 플랫폼 분리 / 임계 상향** — #1258 본문 §비-범위 유지. 전자는 관리 대상을 2배로, 후자는 검출력을 깎는다.
+- **darwin + `--update` 금지의 코드 집행** — forensic ADR [`20260504-411`](20260504-411-r1-guard-shortcut-bar-forensic.md) §옵션 C 가 macOS 캡처 baseline 갱신을 **금지**로 박제해 뒀으나, 그 금지를 코드로 집행하는 것은 본 Amendment 밖이다 — PR 코멘트로 기록만 한다 (CLAUDE.md §검증 강도 게이트 «범위 밖 발견의 기본 처분은 PR 코멘트 기록»).
+
+### 측정 지표 (Amendment 3 PASS 기준)
+
+| # | 기준 | 실측 |
+| --- | --- | --- |
+| 1 | darwin verify → `exit 2`, 브라우저 미기동, `< 2s` | `exit=2` / `0.07s` / 잔존 프로세스 `0` |
+| 2 | 진단에 `baseline` · `CI` · `SKIP_LOCAL` 각 ≥ 1회 | `1` / `2` / `1` |
+| 3 | `SKIP_LOCAL=1` → `exit 0` + stdout ≥ 1줄 | `exit=0` / `173~178` bytes (종전 `0`) |
+| 4 | `--update` · `--measure-sun` · `--measure-px-ratio` 무변경 | 전 3종 실측 + 32 셀 표 |
+| 5 | linux 16 셀 전건 `run` | 단위 테스트 |
+| 6 | `R1_FORCE_LOCAL=1` → 측정값 산출 + `overall: FAIL` 인데 **`exit 2`** | end-to-end 실행 (dev :3000). 3 viewport × 4 영역 **4/4 어긋남** 재현. dimension 4종이 **#1258 본문 표와 완전 일치** — `shortcut-bar 646×24→595×24` · `hud-top-right 137×27→130×27` · `hud-bottom-right 131×27→121×27` (모바일 `67×24→84×24`). ⚠️ top-nav **픽셀 수는 인용하지 않는다** — 실행마다 달라져 어떤 값을 적어도 재현되지 않는다 (#1258 본문이 경고한 축이고, 본 PR 사이클에서도 메인·reviewer 측정이 서로 어긋났다) |
+| 7 | 강제 실행이 baseline 을 **쓰지 않는다** | baseline 1장(`375x667/hud-bottom-right.png`)을 치우고 force 실행 → `! baseline 부재 — 강제 실행에서는 생성하지 않는다 (대조 불가).` / 파일 **미생성** / 복원 후 sha `f423958974c196c5` 동일, 작업 트리 clean |
+
+### 재검토 조건
+
+1. verify 모드 이외에서도 macOS false positive 가 관측되면 → `resolveRunDisposition` 의 mode 축 재판정
+2. 판정 SSoT 가 ubuntu 외 환경으로 늘어나면 (예: OS 매트릭스 도입) → `platform !== 'darwin' → run` 전제 재검토. §Amendment 2026-04-26 의 후보 C (OS 매트릭스) 가 그 경로다
+3. `exit 2` 가 상위 호출부에서 의도치 않게 전파되면 → 배선 재검토. **현행 진입점 전수 (실측)**: 루트 `package.json` `verify:r1-guard`, `apps/web/package.json` `r1:guard` · `r1:guard:px-ratio`, `ci.yml:439` 직접 호출, `r1-baseline-bootstrap.yml:64` (`--update`). 어떤 **집합** 스크립트에도 포함되지 않는다
+4. `R1_FORCE_LOCAL` 사용이 「판정」으로 인용되는 사례가 관측되면 → 배너·종료 코드 재설계 (§결정 4 의 전제 붕괴)
+5. 새 실행 모드가 추가되면 → `R1_RUN_MODES` 등록 의무 (미등록은 `TypeError`) + `allowsBaselineWrite` 계약 재판정
+
+### Cross-validate 결과
+
+박제 직후 1회 수행 (`agy`, 2026-09-25, outcome `applied` — `.claude/logs/cross-validate-code-20260925-013121.log`). 판정 **승인 권고**. 4축 분류:
+
+- **합의** — 종료 코드 `2` 선택 (기존 「전제 미충족」 버킷 준수), 브라우저 기동 전 조기 반환, stdout/stderr 분리, `platform !== 'darwin' → run` 의 OS 매트릭스 여지 보존, 순수 함수 분리가 과잉이 아님.
+- **고유 발견 (수용 1)** — 미등록 `mode` 의 암묵적 `return 'run'` fail-open. **자리는 옳고 기전은 틀렸다** — 제시된 이유(오타 유입)는 도달 경로가 없고, 실제 위험은 모드 추가 drift 다 (reviewer P2 가 변이 M-g 로 독립 확인). 근거를 교체해 §결정 3 에 반영.
+- **고유 발견 (부분 수용 1)** — 「판별력」 테스트가 이름에 못 미친다는 지적. 다만 *"사실상 항진명제"* 라는 설명은 **거짓** 이다 (결함 판본에 적용하면 실제로 FAIL 함을 실증). 정확한 문제는 공허함이 아니라 **이름↔내용 불일치** 이고, 표 전체 대조로 교체해 해소.
+- **기각 3** — ① `R1_RUN_MODES` import: 제시 코드가 import 만 추가하고 **쓰지 않아** 목적 미달성. §결정 3 의 `includes()` 가 그 결합을 실제로 만든다. ② `package.json` 배선: `git ls-files '*.test.mjs'` 의 본 PR 제외 **6/6 이 전부 미배선**(CI 전용)이라 이 파일만 예외가 된다 (기계 계수 — 초판의 `5/5` 는 손으로 고른 목록이었다). ③ `SKIP_LOCAL=true` 허용: skip 스위치를 넓히는 방향이고, 실수로 건너뛰는 비용 > `exit 2` 를 한 번 더 보는 비용이다.
+- **Claude 편향 셀프 체크** — 본 Amendment 초판의 차단 2건(411 귀속 / 검출력 범위)은 cross-validate 가 **둘 다 놓쳤고** reviewer 의 출처 대조만이 잡았다. 외부 모델은 diff 안에서 정합성을 보고, 인용된 출처를 열어보지 않는다. **인용은 diff 밖을 가리키므로 diff 검토로는 검증되지 않는다.**
+
+### 관련 박제
+
+- 발의 이슈: [#1258](https://github.com/coseo12/astro-simulator/issues/1258) (재판정 코멘트에 사실 2건 + 스프린트 계약)
+- 선행 Amendment: §Amendment 2026-04-26 §결정 1 (SKIP_LOCAL 도입), §Amendment 2 2026-05-19 (viewport 별 임계)
+- 종료 코드 분배 선례: PR [#1253](https://github.com/coseo12/astro-simulator/pull/1253) (#1250 browser-verify-379-lod 공허 통과 5건)
+- `exit 1` 사칭 실사고: [`20260504-411-r1-guard-shortcut-bar-forensic.md`](20260504-411-r1-guard-shortcut-bar-forensic.md) `:23` + §후속 3
+- 코드 SSoT: `apps/web/scripts/r1-ui-regions.mjs` (`resolveRunDisposition` · `R1_RUN_MODES`), `apps/web/scripts/r1-ui-regression-guard.mjs` (`main()` 처분 게이트)
