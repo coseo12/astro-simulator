@@ -5,7 +5,9 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-### Behavior Changes
+## [0.89.4] - 2026-09-26
+
+### Fixed
 
 - **[#1258] r1-guard 의 비-SSoT 환경(macOS) 처분을 종료 코드로 분리** ([#1258](https://github.com/coseo12/astro-simulator/issues/1258)). `deferred:no-incident` 수명주기의 접촉 트리거 발화로 열린 재판정이고, **`wontfix` 가 아니라 최소 수정으로 닫는다** — 재판정에서 이슈 본문에 없던 사실 2건이 나와 본문 §"왜 지금 안 고치나" 의 선택지 집합이 바뀌었다.
 
@@ -20,6 +22,15 @@ Semantic Versioning을 따른다.
   - **종전 동작 보존 (실측).** `--update` · `--measure-sun-coverage` · `--measure-px-ratio` 는 종료 코드·진입 경로 무변경. `R1_FORCE_LOCAL` 은 verify 이외 모드에서 정의상 no-op 이다 — 애초에 막힌 적이 없다.
   - **범위 밖 기록** — darwin + `--update` 는 종전 경로 유지다. forensic ADR `20260504-411` §옵션 C 가 macOS 캡처 baseline 갱신을 이미 **금지**로 박제해 뒀으나 그 금지를 코드로 집행하는 것은 본 변경 밖이고, 새 가드를 하나 더 만들지 않았다.
   - ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 3 (`Accepted` — cross-validate 2026-09-25).
+
+### Behavior Changes
+
+제품 런타임은 불변이다 (`apps/web/src/**`·`packages/**` 접촉 `0` 행). 아래는 **로컬 검증 스크립트·CI 행동** 변화이고 근거는 전부 위 §Fixed 안에 있다.
+
+- **macOS(darwin) 에서 `verify:r1-guard` 를 플래그 없이 돌리면 `exit 1` 이 아니라 `exit 2` 로 끝난다** — 브라우저를 띄우기 전에 진단만 출력한다. 회귀 판정 SSoT 는 CI(ubuntu) 결과다 (#1258).
+- **`SKIP_LOCAL=1` 은 여전히 `exit 0` 이지만 「검증 미수행」을 출력한다** — 종전에는 출력 없는 `exit 0` 이라 진짜 PASS 와 구별되지 않았다 (#1258).
+- **`R1_FORCE_LOCAL=1` 신설** — darwin 에서 측정은 하되 판정하지 않고 `exit 2` 로 끝난다. baseline 부재 시에도 macOS 캡처를 baseline 으로 기록하지 않는다 (#1258).
+- **CI `detect-and-test` 에 `r1-run-disposition.test` 스텝이 붙었다** — 처분 판정 32 셀을 고정하고, 깨지면 PR 이 막힌다. CI(ubuntu) 의 r1-guard verify 자체는 무변경이다 (#1258).
 
 ### Notes
 
