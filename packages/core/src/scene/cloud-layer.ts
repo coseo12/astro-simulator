@@ -489,6 +489,20 @@ export class HostFamilyRegistry {
   resolve(mesh: AbstractMesh): HostFamilyEntry | undefined {
     return this.entries.get(mesh);
   }
+
+  /**
+   * #1265 — 계열 전부 해제 (`entries` · `hosts` 둘 다). 런타임 구름 OFF 가 부른다 (ADR
+   * `20260927-1265-runtime-display-toggles.md` §결정 2).
+   *
+   * 식별자 집합은 mesh 를 키로 쓰는 `Map` 이라 해제하지 않으면 ON/OFF 왕복마다 dispose 된 구름 mesh 가
+   * 키로 **누적**된다. 비우면 상태가 로드 OFF (빈 레지스트리) 와 같아져, OFF 중 lazy 생성된 mid·low 는
+   * 로드 OFF 와 똑같이 `registerMember` 가 `false` 로 빠진다 — 다시 켤 때 scene 이 기존 variant 를
+   * 재등록한다. 「정렬 함수가 없으면 레지스트리는 읽히지 않는다」 는 누적을 막지 못한다 (읽힘 ≠ 쌓임).
+   */
+  clear(): void {
+    this.entries.clear();
+    this.hosts.clear();
+  }
 }
 
 /**
