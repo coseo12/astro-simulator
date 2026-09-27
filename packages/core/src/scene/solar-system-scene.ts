@@ -2312,9 +2312,9 @@ export function createSolarSystemScene(
     // (a) 이미 lazy 생성된 earth mid·low 를 계열에 편입 — 구름이 없던 동안 생성된 variant 는 host 미등록으로
     //     `registerMember` 가 `false` 를 반환해 빠져 있다 (로드 ON 에서는 생성 지점이 등록한다).
     //     ⚠️ 현 기하에서는 등록 유무가 정렬 키를 바꾸지 않아 **픽셀 무영향**이다 (mid 는 host 와 중심이
-    //     같고 core 는 `alphaIndex` 를 쓰지 않는다). 이 등록을 지키는 것은 단위 테스트뿐이고 픽셀 가드
-    //     `verify:1265` D6f 는 못 잡는다 (PR #1267 변이 MV-4). 가드가 초록이라고 dead code 로 지우지 말 것 —
-    //     variant 에 `alphaIndex` 를 주거나 중심을 옮기는 변경이 들어오면 차이가 드러난다.
+    //     같고 core 는 mesh 의 `alphaIndex` 를 대입하지 않는다 — 정렬 함수가 읽는 값은 전부 기본값이다).
+    //     이 등록을 지키는 것은 단위 테스트뿐이고 픽셀 가드 `verify:1265` D6f 는 못 잡는다 (PR #1267 변이 MV-4).
+    //     가드가 초록이라고 dead code 로 지우지 말 것 — variant 에 `alphaIndex` 를 주거나 중심을 옮기는 변경이 들어오면 차이가 드러난다.
     for (const variant of [
       midVariants.get(CLOUD_LAYER_BODY_ID),
       lowVariants.get(CLOUD_LAYER_BODY_ID),

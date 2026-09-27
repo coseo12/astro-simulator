@@ -239,6 +239,10 @@ const readSortState = (ctx) =>
 /**
  * D8p — 렌더링 그룹 0 의 불투명 mesh 를 구조로 열거한다 (Babylon `RenderingGroup.dispatch` 의 분류와 같은 술어:
  * 블렌드도 알파 테스트도 아니면 불투명 큐). 뷰·프레임과 무관하다.
+ * ⚠️ 분기식만 같다 — Babylon 은 `subMesh.getMaterial()` (render-pass 머티리얼 · null 이면 defaultMaterial ·
+ * MultiMaterial 이면 sub-material) 로 머티리얼을 풀지만 여기서는 `mesh.material` 만 본다. 현재 저장소에
+ * MultiMaterial · render-pass 머티리얼이 없고 null-material mesh 는 default(depth write on) 라 양성을 놓치지
+ * 않는다. 둘 중 하나가 도입되면 이 술어를 다시 맞출 것.
  */
 const readOpaqueGroup0 = (ctx) =>
   ctx.page.evaluate(() => {
