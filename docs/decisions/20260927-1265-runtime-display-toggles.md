@@ -1,6 +1,6 @@
 # ADR 20260927-1265 — 런타임 표시 토글: core 명령 API · URL 쓰기 계약 · 표시 패널
 
-- **상태**: Provisional (cross-validate 대기 — 메인 오케스트레이터가 박제 직후 1회 수행 후 §교차검증 반영 사항 통합 → Accepted 전이)
+- **상태**: Accepted (cross-validate 2026-09-27)
 - **날짜**: 2026-09-27
 - **결정자**: architect (이슈 [#1265](https://github.com/coseo12/astro-simulator/issues/1265) 스프린트 계약 · 사용자 결정 Q1~Q4 2026-09-27)
 - **관련**:
@@ -105,7 +105,7 @@
    - (a) **이미 lazy 생성된** earth mid·low variant 를 계열에 등록한다 — 로드 OFF 에서 생성된 variant 는 `registerMember` 가 host 미등록으로 `false` 를 반환해 빠져 있다 (`cloud-layer.ts:479-483`). 등록은 `Map.set` 이라 재등록 멱등.
    - (b) **즉시 동기**: `rotationStates.has(CLOUD_LAYER_BODY_ID)` 면 `applyCloudDrift(cloudLayer, currentJd, rotationEpoch)` 를 바로 부른다. 없으면 일시정지 중 켠 구름이 identity 회전으로 남아 로드 ON 과 달라진다 (F4 — #1205 클래스). 가시성(`cloudLayer.mesh.isVisible`)은 프레임 위상(`runFramePass`)이 매 프레임 쓰고 렌더 직전에 돈다 (`simulation-core.ts:356-365`) — 별도 동기 불요.
 
-계열 레지스트리는 OFF 때 비우지 않는다 — 레지스트리를 읽는 것은 정렬 함수뿐이고 OFF 는 그 함수를 제거한다 (F2).
+**OFF 때 계열 레지스트리를 비운다** (`HostFamilyRegistry.clear()` 신설 — `entries`·`hosts` 둘 다). 레지스트리는 mesh 를 키로 쓰는 `Map` 이고 해제 메서드가 없어 (`cloud-layer.ts:469-470`), 비우지 않으면 ON/OFF 왕복마다 dispose 된 구름 mesh 가 키로 누적된다. 비우면 레지스트리 상태도 로드 OFF(빈 레지스트리)와 같아지고, OFF 중 lazy 생성된 mid·low 는 로드 OFF 와 똑같이 `registerMember` 가 `false` 로 빠진다 — 재-ON 시 위 4-(a) 가 다시 등록한다. (교차검증 반영 — 초판은 「정렬 함수만 제거하면 레지스트리는 읽히지 않는다」는 이유로 비우지 않았으나, 읽히지 않는 것과 누적되지 않는 것은 다른 축이었다.)
 
 ### 결정 3 — 별: 없을 때만 지연 생성, 이후 `setEnabled`
 
@@ -138,14 +138,23 @@
 - **컴포넌트**: `apps/web/src/components/layout/display-panel.tsx` — 트리거 버튼(`data-testid="display-panel-toggle"`, `aria-expanded`, `aria-controls`) + 패널. 우측 그룹에서 `SensitivitySettingsModal` 과 `BookmarkButton` 사이.
 - **패널 렌더**: `createPortal(…, document.body)` + `position: fixed` (트리거 `getBoundingClientRect()` 기준 우측 정렬, 뷰포트 안으로 clamp) + `z-[var(--z-dropdown)]`. 이유: (i) 우측 그룹은 모바일에서 `overflow-x-auto` 라 절대 위치 자식이 잘린다 (`top-bar.tsx:44`), (ii) 헤더 쌓임 맥락(`z-hud` 10) 안에서는 사이드 패널(`z-panel` 20) 아래로 깔린다, (iii) canvas 합성 레이어의 형제 DOM 가림 (#704 D-T2 · `modal.tsx` §계약 1). 닫히면 언마운트 (`open=false` → `null` — Modal 동형).
 - **비모달**: backdrop 없음, `aria-modal` 없음, 캔버스 조작 유지. 패널 밖 `pointerdown` 은 닫기(포커스 복원 없음).
-- **키보드**: 열릴 때 첫 토글로 포커스 이동 · 패널 안 Tab 순환은 기존 `resolveFocusTrapTarget` 재사용 (신규 함수 0) · Esc = 닫기 + 트리거로 포커스 복원. Esc 리스너는 결정 축 4 (c) — **window capture 단계** + `preventDefault()`, 패널 요소에 `data-display-panel-open="true"`. `focus-quick-buttons.tsx:54` 가드는 `if (e.defaultPrevented) return;` 과 셀렉터 `'[data-modal-open="true"], [data-display-panel-open="true"]'` 를 쓴다 (셀렉터는 상수 1개로).
-- **비활성 표현**: 신규 3종이 불가하면 `aria-disabled="true"` + 사유 `title` + 사유 텍스트 `aria-describedby` + 비활성 스타일. 클릭은 `toggle()` 의 가용성 검사로 no-op. **네이티브 `disabled` 를 쓰지 않는 이유** — 네이티브 `disabled` 는 포커스 순서에서 빠져 CI(swiftshader, 별 불가) 와 `?surface=off` 에서 D14 「Tab 으로 토글 4개 순회」가 구조적으로 불가능해지고, 사유가 스크린 리더에 닿지 않는다. (계약 D9·D10 「`disabled`」 표현의 해석 — 이슈 코멘트에 메인 판단 요청으로 박제)
+- **키보드**: 열릴 때 첫 토글로 포커스 이동 · **Tab 은 가두지 않는다** — 비모달 disclosure 패턴이라 Tab 은 패널 안 토글을 차례로 지나 패널 밖 다음 요소로 나간다 (WAI-ARIA APG: 비모달 팝오버에 focus trap 금지. 교차검증 반영 — 초판의 `resolveFocusTrapTarget` 재사용 순환안 폐기). 계약 D14 「Tab 으로 토글 4개 순회」는 선형 순회로 성립한다 · Esc = 닫기 + 트리거로 포커스 복원 · 창 `resize` 시 패널을 닫는다 (fixed 배치 좌표가 트리거와 어긋나는 것을 재계산 대신 제거). Esc 리스너는 결정 축 4 (c) — **window capture 단계** + `preventDefault()`, 패널 요소에 `data-display-panel-open="true"`. `focus-quick-buttons.tsx:54` 가드는 `if (e.defaultPrevented) return;` 과 셀렉터 `'[data-modal-open="true"], [data-display-panel-open="true"]'` 를 쓴다 (셀렉터는 상수 1개로).
+- **비활성 표현**: 신규 3종이 불가하면 `aria-disabled="true"` + 사유 `title` + 사유 텍스트 `aria-describedby` + 비활성 스타일. 클릭은 `toggle()` 의 가용성 검사로 no-op. **네이티브 `disabled` 를 쓰지 않는 이유** — 네이티브 `disabled` 는 포커스 순서에서 빠져 CI(swiftshader, 별 불가) 와 `?surface=off` 에서 D14 「Tab 으로 토글 4개 순회」가 구조적으로 불가능해지고, 사유가 스크린 리더에 닿지 않는다. (계약 D9·D10 「`disabled`」 표현을 `aria-disabled` 로 해석 — 2026-09-27 사용자 확정)
 - **자동 숨김 억제**: `top-bar.tsx` `hidden = mode === 'observe' && inactive && !displayPanelOpen`.
 - **문구·사유는 상수**: 토글 라벨(궤도선/별 배경/구름/야간 불빛)과 비활성 사유 3종(소프트웨어 렌더 / 표면 off / 장면 준비 중)은 `display-toggles.ts` 데이터 테이블에 둔다.
 
 ### 결정 7 — 데이터 테이블 1개가 4 토글의 SSoT
 
 `apps/web/src/core/display-toggles.ts` 에 `DISPLAY_TOGGLES` (id · urlKey · 라벨 · 기존 parse 함수 · command 빌더 · store 선택자 · 가용성 판정 · 비활성 사유) 를 두고 패널·훅·단위 테스트가 모두 이 표를 읽는다. 궤도선 행은 기존 `setOrbitLinesVisible` 명령을 가리킨다.
+
+### 결정 8 — PR 2 단계 분할 (2026-09-27 사용자 확정)
+
+| PR | 범위 | 완료 기준 |
+| --- | --- | --- |
+| **PR1 — core** | `CoreCommand` 3종 · `SimulationCore` 핸들러 3종 · scene setter 3종 (결정 2·3·4, `HostFamilyRegistry.clear()`, `isProceduralPlanetMaterial`) · 단위 테스트 · 본 ADR | D5 · D6 · D7 · D8 (구조 + OFF 픽셀) · D8p · D12 · D16 (core) · D15 (scene 직접 호출분). 픽셀 판정은 **`window.__solarScene` 의 신규 setter 를 직접 호출**해 해당 `?x=off` 로드와 비교한다 — UI 없이 core 기전만 격리 검증 |
+| **PR2 — web** | store · `useDisplayToggle` · 패널 · 상단 바 · Esc 가드 · a11y surface · r1 top-nav baseline (CI 캡처) | D1~D4 · D9~D11 · D13 · D14 · D15 (UI) · D16 (web) · D17 · D18 · D8b (실 Chrome 수동) + 3단계 브라우저 검증. D5~D8 은 UI 경로로 재판정 |
+
+PR1 은 호출자가 없어 **사용자 화면 변화 0** 이고 로드 경로 불변(D12)이라 단독 머지가 backward-compat 하다. 근거: 교차검증 「분할 강력 권장」 + architect 편향 셀프 체크 「낙관적 일정 미통과 의심」 합의.
 
 ---
 
@@ -160,7 +169,7 @@
 
 - `SimulationCore` 핸들러 슬롯 +3 (축 1 A).
 - 구름 ON 마다 머티리얼 재생성 — 셰이더 effect 는 Babylon 캐시로 재사용될 것으로 본다 [추정 — 미실측, D15 콘솔 0 · 체감 지연은 qa 가 관찰].
-- **R1 (별 지연 생성 순서)** — `?stars=off` 로드 후 처음 켠 별은 불투명 큐에서 body 뒤에 그려진다 (F3). body 들은 로그 depth 를 쓰고(`log-depth.ts:11-20` · `:37-38`) 별은 depth write off · 표준 depth 라, 별 fragment 는 body 가 이미 쓴 depth 에 막힐 것으로 본다 [추정 — 계산: `maxZ 1e14` 에서 `logDepthConstant ≈ 0.043`, 카메라 거리 100 scene unit body depth ≈ `0.14` < 반경 500 구의 표준 depth ≈ `1`. 미실측]. 이 논증의 **전제**는 「그룹 0 불투명 큐에서 별 외의 mesh 는 모두 depth write 를 한다」이고, 이 전제는 CI(software) 에서도 구조로 읽을 수 있다 → 가드 D8p 로 상시 검사. 픽셀 확인은 하드웨어 전용(D8b) — CI 도달 불가.
+- **R1 (별 지연 생성 순서)** — `?stars=off` 로드 후 처음 켠 별은 불투명 큐에서 body 뒤에 그려진다 (F3). body 들은 로그 depth 를 쓰고(`log-depth.ts:11-20` · `:37-38`) 별은 depth write off · 표준 depth 라, 별 fragment 는 body 가 이미 쓴 depth 에 막힐 것으로 본다 [추정 — 계산: `maxZ 1e14` 에서 `logDepthConstant ≈ 0.043`, 카메라 거리 100 scene unit body depth ≈ `0.14` < 반경 500 구의 표준 depth ≈ `1`. 미실측]. ⚠️ 이 계산은 near 평면을 고정으로 두었는데, 교차검증 반례 1 이 **near 가 변하면 별 depth 가 달라진다**는 축을 짚었다. 실측 — `camera.minZ` 초기값은 `0.01` (`camera.ts:307`) 이고 tier 전환은 `newMinZ < camera.minZ` 일 때만 대입해 **감소만** 한다 (`tier-transition.ts:407-410`). 따라서 별 표준 depth 는 항상 `≥ 1 − 0.01/500` 근방이고, body 로그 depth `log2(d+1)/log2(1e14+1)` 가 그 값을 넘으려면 body 가 scene unit `~1e14` 에 있어야 한다 — 현 스케일에서 도달하지 않는다. 논증의 **두 번째 전제**는 「그룹 0 불투명 큐에서 별 외의 mesh 는 모두 depth write 를 한다」이고 (현재 `disableDepthWrite = true` 는 `starfield.ts` · `cloud-layer.ts` 두 곳뿐이며 구름은 투명 큐 — 궤도선 `CreateLineSystem` 은 alpha 1 불투명 + depth write), 이 전제는 CI(software) 에서도 구조로 읽을 수 있다 → 가드 D8p 로 상시 검사. 픽셀 확인은 하드웨어 전용(D8b) — CI 도달 불가.
 - 가드의 지구 disk 역투영 식은 `verify:1215` `measurePair` 의 **사본**이다 (저장소에 같은 식의 사본이 이미 5곳 — 783/1119/1202/1215/1226). D12 가 `verify:1215` 무수정을 요구하므로 공용 모듈 추출은 이번 범위 밖이다.
 
 ### 재검토 트리거
@@ -175,7 +184,32 @@
 
 ## 교차검증 반영 사항
 
-**미수행 — 메인 오케스트레이터가 박제 직후 1회 수행 예정.** 결과를 합의 / 이견 수용 / 기각 / 고유 발견 4축으로 여기에 통합한 뒤 `상태: Accepted (cross-validate <YYYY-MM-DD>)` 로 전이한다.
+**수행 2026-09-27** (`agy`, `cross_validate.sh architecture`, outcome `applied`). 입력은 본 ADR + 이슈 설계 코멘트 + 코드 발췌 2개(free-fly Esc `useEffect` 전체 · 로드 구름 `if` 블록 전체) + 반례 탐색 질문 4개. 외부 모델은 도구 없이 텍스트만 봤다 — 코드 대조는 메인이 했다.
+
+**합의 (반영)**
+
+- **PR 분할** — 외부 「분할 강력 권장」 · architect 셀프 체크 「낙관적 일정 미통과 의심」 → 결정 8.
+- **축 4 (c) Esc capture 설계에 반례 없음** — capture 단계 리스너는 등록 순서와 무관하게 bubble 단계보다 먼저 돈다. 설계 그대로.
+- 축 1 A · 축 3 B · 데이터 테이블 SSoT — 외부도 타당 판정.
+
+**이견 수용 (반영)**
+
+- **구름 OFF 시 레지스트리 누적 (외부 질문 3 반례 1)** — 코드 대조로 확정 (`HostFamilyRegistry.entries` 는 mesh 키 `Map`, 해제 메서드 0). 결정 2 에 `clear()` 추가.
+- **비모달 패널 Tab 순환은 APG 위반** — 결정 6 에서 trap 폐기, 선형 Tab.
+- **패널 열린 채 창 크기 변경 시 위치 어긋남** — 결정 6 에 resize 시 닫기 추가.
+
+**기각 (근거)**
+
+- **R1 반례 1 (원거리 depth 역전)** — near 축을 짚은 것은 유효해 R1 논증을 보강했으나 반례 자체는 성립하지 않는다: `minZ ≤ 0.01` 단조 감소 실측으로 역전에는 body 가 scene unit `~1e14` 에 있어야 한다 (§받아들인 비용 R1).
+- **R1 반례 2 (불투명 큐의 depth write off mesh)** — 현재 해당 mesh 0 (`disableDepthWrite = true` 는 starfield · cloud-layer 둘뿐, 구름은 투명 큐, 궤도선은 불투명 + depth write). 미래 발생은 D8p 가 상시 감시 — 외부가 말한 「사후 감시」가 맞지만 그 감시가 이 ADR 의 재검토 트리거 2 다.
+- **R1 반례 3 (MSAA 에지)** [추정 기각] — 샘플 단위 depth test 라 body 가 덮은 샘플은 body, 덮지 않은 샘플은 별로 로드 ON 과 같은 결과가 된다. 픽셀 확인은 D8b (실 Chrome 수동, 사용자 확정).
+- **portal SSR 크래시** — 패널은 사용자 클릭 뒤 `open=true` 일 때만 렌더되고 서버 렌더 시점엔 `null` 이다 (결정 6 「닫히면 언마운트」). `document` 접근 경로 없음.
+- **고빈도 토글 경쟁** [추정 기각] — scene setter 는 동기(생성·dispose 모두 같은 틱)이고 멱등 검사(결정 2-2)가 있다. 계약 D15 (10회 왕복 콘솔 에러 0) 가 판정한다.
+- **별을 로드 시 항상 생성하고 `setEnabled` 만 쓰자 (`verify:738` 의 mesh 0 조건을 active mesh 로 재정의)** — 계약 D12 「`verify:738` S4 무수정 통과」·비목표 「로드 경로 변경 금지」와 상충 (CRITICAL #6 — 비목표 우선).
+
+**고유 발견 (외부)** — `e.defaultPrevented` 가드는 다른 위젯이 Esc 를 `preventDefault` 한 경우에도 free-fly 를 막는다. 「무언가 Esc 를 소비했으면 free-fly 를 발화하지 않는다」는 의도에 맞으므로 수용하되 속성 셀렉터 가드를 병행 유지한다 (결정 6 그대로).
+
+**Claude 편향 셀프 체크 (메인)** — 외부 반례 3건 중 2건을 수치·코드로 기각했으므로 「기각 편향」을 점검했다: 기각 2건은 전부 실측 근거(`camera.ts:307` · `tier-transition.ts:407-410` · `disableDepthWrite` 전수 grep)가 있고, 근거 없는 추론 기각(MSAA · 경쟁)은 [추정 기각] 으로 표기하고 판정을 계약(D8b · D15)에 넘겼다.
 
 - **호출 전 Claude 편향 셀프 체크** (architect 1차):
   - 낙관적 일정 — ⚠️ 미통과 의심. core 3 setter + store + 훅 + 패널 + 가드(D5~D11 + 변이 10종) + a11y surface + r1 baseline(CI 전용) 이 한 PR 이다. 프롬프트에 「PR 분할 필요성」 질문 삽입 권장.
