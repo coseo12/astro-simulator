@@ -758,7 +758,8 @@ export function createSolarSystemScene(
   //  - 구조: earth host 의 **자식** shell (결정 1 — position·scaling·host 자전을 구조적으로 상속).
   //  - 정렬: 렌더링 그룹 0 투명 정렬을 **정렬 키 치환**으로 교체 (결정 4). host 계열 (host · mid · low ·
   //    구름) 은 host 의 `(alphaIndex, distance)` 로 치환되고 구름만 `rank 1` 이라 계열 블록 끝에 그려진다.
-  //    lazy 생성 mid·low 는 `getVariantMesh` 생성 지점에서 계열에 등록한다.
+  //    lazy 생성 mid·low 는 `getVariantMesh` 생성 지점에서 계열에 등록한다 (런타임 ON 이전에 생성된 것은
+  //    `setCloudsVisible` (a) 가 등록한다 — #1265).
   //    `null` 두 개는 RenderingGroup 생성자 기본값과 같다 (opaque · alphaTest → PainterSortCompare).
   const hostFamilies = new HostFamilyRegistry();
   let cloudLayer: CloudLayerHandles | null = null;
@@ -2296,8 +2297,8 @@ export function createSolarSystemScene(
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
-    // 계약 D10 (`?surface=off` 에서 구름·불빛 토글은 `aria-disabled` + 클릭 no-op — 2026-09-27 재조정) 의
-    // core 쪽 방어 심층이다: web 가용성 검사가 뚫려 명령이 와도 mesh·uniform 변화 0.
+    // 계약 D10 (`?surface=off` 에서 구름 토글은 `aria-disabled` + 클릭 no-op — 2026-09-27 재조정) 의 core 쪽
+    // 방어 심층이다: web 가용성 검사가 뚫려 명령이 와도 구름 mesh 가 생기지 않는다.
     if (!surfaceDetail) return;
     // 멱등 — 같은 상태 요청에 생성·dispose 를 반복하지 않는다 (누수 0 계약 D6 의 전제).
     if (visible === (cloudLayer !== null)) return;
@@ -2310,6 +2311,10 @@ export function createSolarSystemScene(
     if (!layer) return;
     // (a) 이미 lazy 생성된 earth mid·low 를 계열에 편입 — 구름이 없던 동안 생성된 variant 는 host 미등록으로
     //     `registerMember` 가 `false` 를 반환해 빠져 있다 (로드 ON 에서는 생성 지점이 등록한다).
+    //     ⚠️ 현 기하에서는 등록 유무가 정렬 키를 바꾸지 않아 **픽셀 무영향**이다 (mid 는 host 와 중심이
+    //     같고 core 는 `alphaIndex` 를 쓰지 않는다). 이 등록을 지키는 것은 단위 테스트뿐이고 픽셀 가드
+    //     `verify:1265` D6f 는 못 잡는다 (PR #1267 변이 MV-4). 가드가 초록이라고 dead code 로 지우지 말 것 —
+    //     variant 에 `alphaIndex` 를 주거나 중심을 옮기는 변경이 들어오면 차이가 드러난다.
     for (const variant of [
       midVariants.get(CLOUD_LAYER_BODY_ID),
       lowVariants.get(CLOUD_LAYER_BODY_ID),
@@ -2326,7 +2331,8 @@ export function createSolarSystemScene(
   // 읽는다). 이미 있는 머티리얼은 절차 행성 머티리얼만 uniform 을 바꾼다 — 대상 판정은 생성 조건의 사본이
   // 아니라 생성 함수가 등록한 집합 (`isProceduralPlanetMaterial`). 구름 머티리얼은 불빛을 읽지 않는다.
   const setNightLightsVisible = (visible: boolean) => {
-    // D10 방어 심층 (위 `setCloudsVisible` 주석) — 표면 off 면 상태도 바꾸지 않는다.
+    // 유효 조건 `nightLights && surfaceDetail` 의 조문 동형. 관측 가능한 효과는 없다 — 표면 off 면 절차
+    // 머티리얼이 없고 `surfaceLightingArgs` 도 소비되지 않는다.
     if (!surfaceDetail) return;
     surfaceLightingArgs.nightLights = visible;
     const strength = resolveNightLightStrength(visible);

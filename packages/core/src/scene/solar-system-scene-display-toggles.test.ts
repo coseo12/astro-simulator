@@ -379,7 +379,9 @@ describe('#1265 setNightLightsVisible — 상태 + 기존 머티리얼 uniform',
       expect(lightStrength(m), m.name).toBe(NIGHT_LIGHT_STRENGTH);
   });
 
-  it('surfaceDetail=false 면 no-op (절차 머티리얼이 없다 · 이후 생성분에도 영향 0)', () => {
+  // setter 의 `!surfaceDetail` 조기 반환을 지워도 이 테스트는 통과한다 — 표면 off 면 절차 머티리얼이 없고
+  // 상태도 소비되지 않아 관측할 효과가 없다 (reviewer R4). 여기서는 throw 없음 · 머티리얼 0 만 잰다.
+  it('surfaceDetail=false 에서 호출해도 throw 없음 · 절차 머티리얼 0 (이후 생성분 포함)', () => {
     const f = makeScene({ surfaceDetail: false, nightLights: false });
     expect(proceduralMaterials(f)).toHaveLength(0);
     expect(() => f.handles.setNightLightsVisible(true)).not.toThrow();

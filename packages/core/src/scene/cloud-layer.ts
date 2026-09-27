@@ -463,7 +463,8 @@ interface HostFamilyEntry {
  * host 계열 **식별자 집합** (이름 문자열 비교 금지 — §A10.6). 조회 `O(1)`.
  *
  * 계열 = host · mid variant · low billboard · 구름. 구름·host 는 생성 시, lazy 생성되는 mid·low 는
- * scene 의 `getVariantMesh` 생성 지점에서 등록한다.
+ * scene 의 `getVariantMesh` 생성 지점에서 등록한다. 런타임 구름 ON (#1265) 은 그 전에 생성된 mid·low 를
+ * `setCloudsVisible` (a) 에서 등록한다.
  */
 export class HostFamilyRegistry {
   private readonly entries = new Map<AbstractMesh, HostFamilyEntry>();
@@ -498,6 +499,8 @@ export class HostFamilyRegistry {
    * 키로 **누적**된다. 비우면 상태가 로드 OFF (빈 레지스트리) 와 같아져, OFF 중 lazy 생성된 mid·low 는
    * 로드 OFF 와 똑같이 `registerMember` 가 `false` 로 빠진다 — 다시 켤 때 scene 이 기존 variant 를
    * 재등록한다. 「정렬 함수가 없으면 레지스트리는 읽히지 않는다」 는 누적을 막지 못한다 (읽힘 ≠ 쌓임).
+   *
+   * ⚠️ 호스트가 지구 1개라는 전제의 전량 해제다 — 다중 호스트를 도입하면 호스트 단위 정리로 바꿀 것.
    */
   clear(): void {
     this.entries.clear();

@@ -28,20 +28,30 @@
  *        ∧ 같은 상태로 돌아왔을 때 `scene.meshes` · `scene.materials` 개수가 왕복 전과 같다 ∧ 왕복 후 화면도 disk 변화 0.
  *   D6f  구름 ON 이전에 lazy 생성된 mid 가 있는 상태 — mid 선생성 → auto → ON → fade 정지 재현
  *        (`verify:1215` `installFadeFreeze` 동형) ↔ 로드 ON 페이지의 같은 절차 — disk 변화 0.
+ *        ⚠️ 켤 때의 mid·low **계열 등록** (`setCloudsVisible` (a)) 은 이 판정이 못 잡는다 — 현 기하에서는 등록
+ *        유무가 정렬 키를 바꾸지 않아 픽셀 무영향이다 (PR #1267 변이 MV-4 exit 0). 그 등록은 단위 테스트
+ *        (`solar-system-scene-display-toggles.test.ts`) 가 전담한다.
  *   D7   불빛 OFF: P1 에서 `setNightLightsVisible(false)` ↔ P2 로드 — disk 변화 0 ∧ `nightLightStrength` 를
  *        가진 머티리얼 **전부** 0. D7m: 이어서 두 페이지 mid 정착 쌍 disk 변화 0.
  *   D7e  개요 (focus 없음 — 지구 mid 미생성) 에서 끈 뒤 지구 focus + mid 정착 → 지구 high·mid 머티리얼 전부 0.
  *   D8   별: `&stars=off` 로드 → ON 후 starfield 정확히 1 · 10 왕복 뒤에도 1 · 같은 인스턴스 (전 환경 — 구조).
  *        픽셀 (하드웨어 전용, `__isSoftwareRenderer === false`): 로드 ON 에서 OFF ↔ `&stars=off` 로드 full frame 0.
- *   D8p  그룹 0 불투명 큐에서 starfield 외 mesh 는 전부 depth write 를 한다 (ADR R1 논증의 두 번째 전제 — 전 환경).
+ *   D8p  렌더링 그룹 0 의 불투명 mesh (블렌드·알파 테스트 아님) 중 starfield 외는 전부 depth write 를 한다
+ *        (ADR R1 논증의 두 번째 전제 — 전 환경). 활성 큐가 아니라 `scene.meshes` 를 **구조로 열거**한다 —
+ *        큐는 화면 안·활성 mesh 만 담아 뷰에 따라 표본이 달라진다. 표본 페이지: A (로드) · S (별 런타임 생성) ·
+ *        T (궤도선 켜진 기본 로드 + 4 토글 스트레스 뒤). 열거 시점에 존재하는 mesh 만 대상이다 (lazy 미생성
+ *        variant 는 밖).
+ *   ON 직후 존재  `setCloudsVisible(true)` · `setStarfieldVisible(true)` 는 동기로 mesh 를 만든다 — 호출 직후
+ *        mesh 가 없으면 **게이트 FAIL** (제품 결함). 머티리얼 준비 대기는 존재를 확인한 뒤에만 한다.
  *   D15  4 토글 (궤도선 포함) × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors` ∧ 전 페이지 콘솔 에러 0.
  *
  * ## 「측정 불가」 (exit 2 — PASS 도 FAIL 도 아니다. fallback 분기 금지). **모든 게이트보다 먼저** 본다
  *   1 LOD 정착 상한 초과   2 measure() error · 비유한/퇴화 기하 · 캔버스 개수 ≠ 1 · 쌍 기하 불일치
  *   3 양성 대조 실패 — 로드 ON ↔ 로드 OFF disk 변화 `== 0` (쌍이 효과를 담지 못하면 `== 0` 술어가 공허 참)
- *   4 런타임 생성 머티리얼 준비 대기 초과     5 D6f fade 재현 큐에 `earth-lod-mid` 부재
+ *   4 mesh 는 있으나 머티리얼 준비 대기 초과 · LOD mid 정착 후 `earth-lod-mid` 부재 (하네스 설정)
+ *   5 D6f fade 재현 큐에 `earth-lod-mid` 부재
  *   6 D7e 엣지 미실행 (토글 시점 mid 존재 또는 정착 후 부재)   7 `?stars=off` 로드에 starfield 존재
- *   8 D8p 불투명 큐 비었음 또는 starfield 부재   9 D8 (하드웨어) 독립 2 로드 full frame 비결정 또는 로드 ON ↔ OFF 동일
+ *   8 D8p 표본 페이지의 열거 결과가 비었음   9 D8 (하드웨어) 독립 2 로드 full frame 비결정 또는 로드 ON ↔ OFF 동일
  *
  * ## 모드 / 변이
  *   node browser-verify-1265-display-panel.mjs      # 게이트 (CI)
@@ -177,9 +187,14 @@ const callSetter = (ctx, setter, visible) =>
 
 /**
  * 런타임에 새로 만든 mesh 의 머티리얼이 컴파일될 때까지 대기 — 준비 전 프레임에서는 mesh 가 그려지지 않아
- * 「런타임 ON = 로드 ON」 비교가 결함 없이도 FAIL 한다. 초과는 측정 불가 (4).
+ * 「런타임 ON = 로드 ON」 비교가 결함 없이도 FAIL 한다.
+ *
+ * mesh **부재**와 **준비 초과**를 가른다 (reviewer B1). 부재는 `{ absent: true }` 로 돌려주고 호출부가 성격을
+ * 정한다 — 런타임 ON 직후 부재는 제품 결함 (게이트 FAIL), LOD override 뒤 mid 부재는 하네스 설정 실패
+ * (측정 불가). 존재하는데 준비가 안 끝나는 것만 여기서 측정 불가 (4) 로 만든다.
  */
 async function waitMaterialReady(ctx, meshName) {
+  if (!(await hasMesh(ctx, meshName))) return { absent: true, label: `${ctx.label}: ${meshName}` };
   try {
     await ctx.page.waitForFunction(
       (n) => {
@@ -219,6 +234,22 @@ const readSortState = (ctx) =>
       transparentDefault: g._transparentSortCompareFn === C.defaultTransparentSortCompare,
       opaqueDefault: g._opaqueSortCompareFn === C.PainterSortCompare,
     };
+  });
+
+/**
+ * D8p — 렌더링 그룹 0 의 불투명 mesh 를 구조로 열거한다 (Babylon `RenderingGroup.dispatch` 의 분류와 같은 술어:
+ * 블렌드도 알파 테스트도 아니면 불투명 큐). 뷰·프레임과 무관하다.
+ */
+const readOpaqueGroup0 = (ctx) =>
+  ctx.page.evaluate(() => {
+    const entries = [];
+    for (const m of window.__simCore.scene.meshes) {
+      const mat = m.material;
+      if (m.renderingGroupId !== 0 || !mat) continue;
+      if (mat.needAlphaBlendingForMesh(m) || mat.needAlphaTestingForMesh(m)) continue;
+      entries.push({ name: m.name, noDepthWrite: mat.disableDepthWrite === true });
+    }
+    return { entries };
   });
 
 const readQueue = async (ctx, field) => {
@@ -415,7 +446,7 @@ async function runClouds(browser, out, pages) {
   const A = await setupPage(browser, Q.cloudOn, 'A-cloudOn', T_JD_CLOUD);
   const B = await setupPage(browser, Q.cloudOff, 'B-cloudOff', T_JD_CLOUD);
   pages.push(A, B);
-  out.d8pLoad = await readQueue(A, '_opaqueSubMeshes');
+  out.d8pA = await readOpaqueGroup0(A);
   const aPre = await capture(A, 'A-pre');
   const bImg = await capture(B, 'B');
   out.d5Positive = await measureCheckedPair(A, aPre, B, bImg, 'd5Positive');
@@ -442,7 +473,7 @@ async function runClouds(browser, out, pages) {
   out.d6Positive = await measureCheckedPair(C, cPre, D, dImg, 'd6Positive');
   const countsOffLoad = await readCounts(C);
   await callSetter(C, 'setCloudsVisible', true);
-  out.ready.push(await waitMaterialReady(C, CLOUD_MESH));
+  out.onChecks.push(await waitMaterialReady(C, CLOUD_MESH));
   out.d6 = await measureCheckedPair(C, await capture(C, 'C-runtime-on'), D, dImg, 'd6');
   const countsOn = await readCounts(C);
   const trips = [];
@@ -451,7 +482,7 @@ async function runClouds(browser, out, pages) {
     await frames(C.page, 2);
     const off = await readCounts(C);
     await callSetter(C, 'setCloudsVisible', true);
-    out.ready.push(await waitMaterialReady(C, CLOUD_MESH));
+    out.onChecks.push(await waitMaterialReady(C, CLOUD_MESH));
     const on = await readCounts(C);
     trips.push({ off, on });
   }
@@ -464,7 +495,7 @@ async function runClouds(browser, out, pages) {
     'd6AfterTrips',
   );
 
-  // ── D6f — mid 선생성 뒤 ON (자전 OFF 프레임 — 계열 등록 축만 격리) ──
+  // ── D6f — mid 선생성 뒤 ON (자전 OFF 프레임). 계열 등록 누락은 여기서 픽셀로 드러나지 않는다 (헤더 D6f ⚠️) ──
   const E = await setupPage(browser, Q.cloudOff, 'E-cloudOff-mid', T_JD_CLOUD);
   const F = await setupPage(browser, Q.cloudOn, 'F-cloudOn-mid', T_JD_CLOUD);
   pages.push(E, F);
@@ -474,7 +505,7 @@ async function runClouds(browser, out, pages) {
   }
   out.d6fMidBeforeOn = await hasMesh(E, EARTH_MID);
   await callSetter(E, 'setCloudsVisible', true);
-  out.ready.push(await waitMaterialReady(E, CLOUD_MESH));
+  out.onChecks.push(await waitMaterialReady(E, CLOUD_MESH));
   const fzE = await installFadeFreeze(E);
   const fzF = await installFadeFreeze(F);
   if (fzE.error || fzF.error)
@@ -506,8 +537,8 @@ async function runNightLights(browser, out, pages) {
   // D7m — 끈 뒤 두 페이지 모두 mid 정착 (P1 의 mid 가 OFF 이후 생성이면 lazy 상태 경로를 탄다).
   await settleLod(P1, 'mid', 'mid');
   await settleLod(P2, 'mid', 'mid');
-  out.ready.push(await waitMaterialReady(P1, EARTH_MID));
-  out.ready.push(await waitMaterialReady(P2, EARTH_MID));
+  out.harnessReady.push(await waitMaterialReady(P1, EARTH_MID));
+  out.harnessReady.push(await waitMaterialReady(P2, EARTH_MID));
   out.d7m = await measureCheckedPair(
     P1,
     await capture(P1, 'P1-mid'),
@@ -543,13 +574,13 @@ async function runStars(browser, out, pages) {
   out.software = await S.page.evaluate(() => window.__isSoftwareRenderer === true);
   out.d8LoadCounts = await readCounts(S);
   await callSetter(S, 'setStarfieldVisible', true);
-  out.ready.push(await waitMaterialReady(S, STARFIELD_MESH));
+  out.onChecks.push(await waitMaterialReady(S, STARFIELD_MESH));
   const firstId = await S.page.evaluate(
     (n) => window.__simCore.scene.getMeshByName(n)?.uniqueId ?? null,
     STARFIELD_MESH,
   );
   out.d8AfterOn = await readCounts(S);
-  out.d8pRuntime = await readQueue(S, '_opaqueSubMeshes');
+  out.d8pS = await readOpaqueGroup0(S);
   for (let i = 0; i < STRESS_ROUND_TRIPS; i += 1) {
     await callSetter(S, 'setStarfieldVisible', false);
     await callSetter(S, 'setStarfieldVisible', true);
@@ -590,9 +621,10 @@ async function runStars(browser, out, pages) {
   // D8b (진단 전용 — 판정은 PR2 실 Chrome 수동): `?stars=off` 로드 후 켠 화면 ↔ 로드 ON.
   await callSetter(H2, 'setStarfieldVisible', true);
   const ready = await waitMaterialReady(H2, STARFIELD_MESH);
-  out.d8bDiag = ready.error
-    ? ready
-    : await measureCheckedPair(H2, await capture(H2, 'H2-runtime-on'), H1, h1Pre, 'd8b');
+  out.d8bDiag =
+    ready.error || ready.absent
+      ? ready
+      : await measureCheckedPair(H2, await capture(H2, 'H2-runtime-on'), H1, h1Pre, 'd8b');
 }
 
 /** D15 — 4 토글 × 10 왕복 × (재생 / 일시정지). */
@@ -623,6 +655,7 @@ async function runStress(browser, out, pages) {
   }
   await frames(T.page, 4);
   out.d15Counts = await readCounts(T);
+  out.d8pT = await readOpaqueGroup0(T);
   out.d15Errors = [...T.errors];
 }
 
@@ -640,7 +673,8 @@ async function retirePages(out, pages) {
 }
 
 async function run(browser) {
-  const out = { inject: INJECT, ready: [], settles: [], consoleErrors: {} };
+  // onChecks = 런타임 ON 직후 (부재 → 게이트) · harnessReady = 하네스가 만든 mesh (부재 → 측정 불가)
+  const out = { inject: INJECT, onChecks: [], harnessReady: [], settles: [], consoleErrors: {} };
   const pages = [];
   try {
     for (const section of [runClouds, runNightLights, runStars, runStress]) {
@@ -669,9 +703,14 @@ function judge(r) {
   ];
   if (!r.software) pairKeys.push('d8Determinism', 'd8Positive', 'd8Pixel');
   for (const k of pairKeys) if (r[k]?.error) unmeasurable.push(`(2) ${k}: ${r[k].error}`);
-  for (const k of ['d5SortA', 'd5SortB', 'd6fQueueE', 'd6fQueueF', 'd8pLoad', 'd8pRuntime'])
+  for (const k of ['d5SortA', 'd5SortB', 'd6fQueueE', 'd6fQueueF'])
     if (r[k]?.error) unmeasurable.push(`(2) ${k}: ${r[k].error}`);
-  for (const x of r.ready) if (x.error) unmeasurable.push(`(4) ${x.error}`);
+  // 4 — 준비 초과는 onChecks · harnessReady 둘 다. **부재**는 성격이 갈린다: 하네스가 만든 mesh 의 부재만 여기서
+  // 측정 불가이고, 런타임 ON 직후 부재 (`onChecks`) 는 제품 결함이라 아래 게이트가 FAIL 로 낸다 (reviewer B1).
+  for (const x of [...r.onChecks, ...r.harnessReady])
+    if (x.error) unmeasurable.push(`(4) ${x.error}`);
+  for (const x of r.harnessReady)
+    if (x.absent) unmeasurable.push(`(4) ${x.label} 부재 — LOD mid 정착이 mid 를 만들지 못했다`);
   if (unmeasurable.length) return { unmeasurable };
 
   for (const s of r.settles)
@@ -697,12 +736,11 @@ function judge(r) {
   // 7 — 로드 경로 전제 (이 가드가 아니라 verify:738 이 지키는 계약 — 여기서는 쌍 성립 조건).
   if (r.d8LoadCounts.stars !== 0)
     unmeasurable.push(`(7) ?stars=off 로드에 starfield ${r.d8LoadCounts.stars}개`);
-  // 8 — D8p 가 공허 참이 아니려면 큐가 비어 있지 않고 starfield 가 그 안에 있어야 한다.
-  const rq = r.d8pRuntime.entries;
-  if (rq.length === 0 || !rq.some((e) => e.name === STARFIELD_MESH))
-    unmeasurable.push(
-      `(8) D8p 불투명 큐 ${rq.length}개 · starfield 포함 ${rq.some((e) => e.name === STARFIELD_MESH)}`,
-    );
+  // 8 — D8p 가 공허 참이 아니려면 표본 페이지마다 열거 결과가 있어야 한다. starfield 가 그 안에 있는지는
+  // 묻지 않는다 — 별 존재는 제품 속성이라 D8 구조 게이트 · ON 직후 존재 게이트가 잰다 (reviewer B1).
+  const d8pSamples = { A: r.d8pA.entries, S: r.d8pS.entries, T: r.d8pT.entries };
+  for (const [page, entries] of Object.entries(d8pSamples))
+    if (entries.length === 0) unmeasurable.push(`(8) D8p 표본 ${page} 불투명 mesh 0개`);
   // 9 — D8 (하드웨어) 결정성 · 양성 대조.
   if (!r.software) {
     if (r.d8Determinism.fullChanged !== 0)
@@ -727,11 +765,18 @@ function judge(r) {
       t.on.materials === leak.countsOn.materials,
   );
   const maxClouds = Math.max(leak.countsOn.clouds, ...leak.trips.map((t) => t.on.clouds));
-  const nonStarNoDepth = [...r.d8pLoad.entries, ...rq].filter(
-    (e) => e.name !== STARFIELD_MESH && e.noDepthWrite,
-  );
+  const nonStarNoDepth = Object.values(d8pSamples)
+    .flat()
+    .filter((e) => e.name !== STARFIELD_MESH && e.noDepthWrite);
+  const onAbsent = r.onChecks.filter((x) => x.absent).map((x) => x.label);
   const allErrors = Object.values(r.consoleErrors).flat();
   const gates = [
+    [
+      `런타임 ON 직후 mesh 존재 (구름 ${2 + CLOUD_ROUND_TRIPS}회 · 별 1회)`,
+      onAbsent.length ? `부재 ${JSON.stringify(onAbsent)}` : `부재 0 / ${r.onChecks.length}`,
+      '부재 0',
+      onAbsent.length === 0,
+    ],
     [
       'D5 구름 런타임 OFF ↔ 로드 OFF disk 변화 px',
       r.d5.disk.changed,
@@ -812,7 +857,7 @@ function judge(r) {
           r.d8Pixel.fullChanged === 0,
         ],
     [
-      'D8p 그룹 0 불투명 큐 — starfield 외 depth write off mesh',
+      'D8p 그룹 0 불투명 mesh (A·S·T 구조 열거) — starfield 외 depth write off',
       JSON.stringify(nonStarNoDepth.map((e) => e.name)),
       '없음',
       nonStarNoDepth.length === 0,
@@ -880,7 +925,12 @@ async function main() {
   console.log(
     `d8 counts load ${JSON.stringify(r.d8LoadCounts)} · on ${JSON.stringify(r.d8AfterOn)} · trips ${JSON.stringify(r.d8AfterTrips)}`,
   );
-  console.log(`d8p load ${JSON.stringify(r.d8pLoad)} · runtime ${JSON.stringify(r.d8pRuntime)}`);
+  console.log(
+    `d8p A ${JSON.stringify(r.d8pA)} · S ${JSON.stringify(r.d8pS)} · T ${JSON.stringify(r.d8pT)}`,
+  );
+  console.log(
+    `onChecks ${JSON.stringify(r.onChecks)} · harnessReady ${JSON.stringify(r.harnessReady)}`,
+  );
   console.log(`d15 counts ${JSON.stringify(r.d15Counts)}`);
   console.log(
     `settles ${JSON.stringify(r.settles.map((s) => `${s.page}/${s.step}:${s.dist}/${s.fading}/${s.timedOut ? 'TIMEOUT' : 'ok'}`))}`,
