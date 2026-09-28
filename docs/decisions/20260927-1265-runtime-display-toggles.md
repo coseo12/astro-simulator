@@ -138,7 +138,7 @@
 - **컴포넌트**: `apps/web/src/components/layout/display-panel.tsx` — 트리거 버튼(`data-testid="display-panel-toggle"`, `aria-expanded`, `aria-controls`) + 패널. 우측 그룹에서 `SensitivitySettingsModal` 과 `BookmarkButton` 사이.
 - **패널 렌더**: `createPortal(…, document.body)` + `position: fixed` (트리거 `getBoundingClientRect()` 기준 우측 정렬, 뷰포트 안으로 clamp) + `z-[var(--z-dropdown)]`. 이유: (i) 우측 그룹은 모바일에서 `overflow-x-auto` 라 절대 위치 자식이 잘린다 (`top-bar.tsx:44`), (ii) 헤더 쌓임 맥락(`z-hud` 10) 안에서는 사이드 패널(`z-panel` 20) 아래로 깔린다, (iii) canvas 합성 레이어의 형제 DOM 가림 (#704 D-T2 · `modal.tsx` §계약 1). 닫히면 언마운트 (`open=false` → `null` — Modal 동형).
 - **비모달**: backdrop 없음, `aria-modal` 없음, 캔버스 조작 유지. 패널 밖 `pointerdown` 은 닫기(포커스 복원 없음).
-- **키보드**: 열릴 때 첫 토글로 포커스 이동 · **Tab 은 가두지 않는다** — 비모달 disclosure 패턴이라 Tab 은 패널 안 토글을 차례로 지나 패널 밖 다음 요소로 나간다 (WAI-ARIA APG: 비모달 팝오버에 focus trap 금지. 교차검증 반영 — 초판의 `resolveFocusTrapTarget` 재사용 순환안 폐기). 계약 D14 「Tab 으로 토글 4개 순회」는 선형 순회로 성립한다 · Esc = 닫기 + 트리거로 포커스 복원 · 창 `resize` 시 패널을 닫는다 (fixed 배치 좌표가 트리거와 어긋나는 것을 재계산 대신 제거). Esc 리스너는 결정 축 4 (c) — **window capture 단계** + `preventDefault()`, 패널 요소에 `data-display-panel-open="true"`. `focus-quick-buttons.tsx:54` 가드는 `if (e.defaultPrevented) return;` 과 셀렉터 `'[data-modal-open="true"], [data-display-panel-open="true"]'` 를 쓴다 (셀렉터는 상수 1개로).
+- **키보드**: 열릴 때 첫 토글로 포커스 이동 · **Tab 은 가두지 않는다** — 비모달 disclosure 패턴이라 Tab 은 패널 안 토글을 차례로 지나 패널 밖 다음 요소로 나간다 (WAI-ARIA APG: 비모달 팝오버에 focus trap 금지. 교차검증 반영 — 초판의 `resolveFocusTrapTarget` 재사용 순환안 폐기). 계약 D14 「Tab 으로 토글 4개 순회」는 선형 순회로 성립한다 · Esc = 닫기 + 트리거로 포커스 복원 · 창 `resize` 시 패널을 닫는다 (fixed 배치 좌표가 트리거와 어긋나는 것을 재계산 대신 제거). Esc 리스너는 결정 축 4 (c) — **window capture 단계** + `preventDefault()`, 패널 요소에 `data-display-panel-open="true"`. `focus-quick-buttons.tsx:54` 가드는 `if (e.defaultPrevented) return;` 과 셀렉터 `'[data-modal-open="true"], [data-display-panel-open="true"]'` 를 쓴다 (셀렉터는 상수 1개로). → 패널 속성 부착과 두 항 셀렉터는 [Amendment 1](#amendment-1--구현-실측으로-정정한-서술-3건-pr-1268-2026-09-28) 로 폐기.
 - **비활성 표현**: 신규 3종이 불가하면 `aria-disabled="true"` + 사유 `title` + 사유 텍스트 `aria-describedby` + 비활성 스타일. 클릭은 `toggle()` 의 가용성 검사로 no-op. **네이티브 `disabled` 를 쓰지 않는 이유** — 네이티브 `disabled` 는 포커스 순서에서 빠져 CI(swiftshader, 별 불가) 와 `?surface=off` 에서 D14 「Tab 으로 토글 4개 순회」가 구조적으로 불가능해지고, 사유가 스크린 리더에 닿지 않는다. (계약 D9·D10 「`disabled`」 표현을 `aria-disabled` 로 해석 — 2026-09-27 사용자 확정)
 - **자동 숨김 억제**: `top-bar.tsx` `hidden = mode === 'observe' && inactive && !displayPanelOpen`.
 - **문구·사유는 상수**: 토글 라벨(궤도선/별 배경/구름/야간 불빛)과 비활성 사유 3종(소프트웨어 렌더 / 표면 off / 장면 준비 중)은 `display-toggles.ts` 데이터 테이블에 둔다.
@@ -223,8 +223,20 @@ PR1 은 호출자가 없어 **사용자 화면 변화 0** 이고 로드 경로 �
 
 > 위 후보 비교 표 · 결정 본문은 당시 추론 기록이라 **소급 편집하지 않는다**. 결론(축 4 (c) 채택 · `aria-disabled` 해석 · portal)은 바뀌지 않는다. cross-validate 는 메인이 수행한다.
 
-1. **축 4 (c) · 결정 6 의 「속성 가드 병행 (방어 심층)」 은 성립하지 않는다.** 패널 속성은 패널이 열려 있을 때만 존재하고, capture 리스너는 그보다 넓은 「열림」 상태 전체에 붙는다 — 속성이 있는 상태 ⊂ capture 리스너가 붙은 상태다. 그래서 패널 자신의 Esc 에서는 capture 리스너가 먼저 닫기 + `preventDefault` 를 하고, 자유시점 리스너가 돌 때는 패널이 **선택 변경 여부와 무관하게 항상** 이미 사라져 있다. 속성 검사가 결정을 내리는 도달 가능 상태가 없다.
+1. **축 4 (c) · 결정 6 의 「속성 가드 병행 (방어 심층)」 은 성립하지 않는다.** 패널 속성은 패널이 열려 있을 때만 존재하고, capture 리스너는 그보다 넓은 「열림」 상태 전체에 붙는다 — 속성이 있는 상태 ⊂ capture 리스너가 붙은 상태다. 그래서 패널 자신의 Esc 에서는 capture 리스너가 먼저 닫기 + `preventDefault` 를 하고, 자유시점 리스너가 돌 때는 패널이 **선택 변경 여부와 무관하게 항상** 이미 사라져 있다 — **현 구현 (닫힘 애니메이션 없음 · 닫히면 언마운트) 기준**이다. 닫힘 전환을 두면 이 단정은 다시 검토한다 (차단은 어차피 `defaultPrevented` 라 결론과는 무관하다). 속성 검사가 결정을 내리는 도달 가능 상태가 없다.
    - 실측: PR #1268 변이 c — 자유시점 가드에서 `defaultPrevented` 검사만 지우면 선택 변경이 없는 D14 엣지와 D14b 둘 다 자유시점이 발화했다 (`exit 1`).
    - 처분: 자유시점 쪽 차단은 `defaultPrevented` 가 전담한다. 셀렉터의 패널 속성 항과 패널의 `data-display-panel-open` 부착은 dead 라 **제거**했다 (「실효 없음」 주석으로 남기는 안도 있었으나, 막지 않는 가드를 남기면 다음 독자가 방어가 두 겹이라고 읽는다). 모달 가드 `[data-modal-open]` (#737) 는 그대로다 — 모달 리스너는 bubble 이고 `preventDefault` 를 하지 않는다.
 2. **결정 5 「불가하면 return (방어 심층 — 버튼 상태와 독립)」 → 유일한 차단 지점.** D9 · D10 을 `aria-disabled` 로 해석한 뒤 (2026-09-27 재조정) 버튼은 클릭을 받으므로, `toggle()` 의 가용성 검사가 소프트웨어 렌더 별 · `?surface=off` 구름·불빛을 막는 **유일한** 지점이다 (core 는 렌더러를 모른다 — 결정 1). PR #1268 변이 a (이 검사 제거) 에서 소프트웨어 렌더인데 별이 생성됐다.
-3. **결정 6 「Tab 은 … 패널 밖 다음 요소로 나간다」 의 목적지.** portal 이라 DOM 상 패널은 문서 끝이고, 그대로 두면 마지막 토글의 Tab 이 트리거 다음 요소가 아니라 문서 끝으로 빠진다 (WCAG 2.4.3 — PR #1268 cross-validate 5-A). 구현은 패널이 트리거 바로 뒤에 있는 것처럼 잇는다: 열린 트리거 Tab → 첫 토글 · 첫 토글 Shift+Tab → 트리거 (패널 유지) · 마지막 토글 Tab → 패널을 닫고 트리거 다음 요소. 가두지 않는다는 결정 (APG) 은 그대로다.
+3. **결정 6 「Tab 은 … 패널 밖 다음 요소로 나간다」 의 목적지.** portal 이라 DOM 상 패널은 문서 끝이고, 그대로 두면 마지막 토글의 Tab 이 트리거 다음 요소가 아니라 문서 끝으로 빠진다 (WCAG 2.4.3 — PR #1268 cross-validate 5-A). 구현은 패널이 트리거 바로 뒤에 있는 것처럼 잇는다: 열린 트리거 Tab → 첫 토글 · 첫 토글 Shift+Tab → 트리거 (패널 유지) · 마지막 토글 Tab → 패널을 닫고 트리거 다음 요소. 가두지 않는다는 결정 (APG) 은 그대로다. 대칭으로, 포커스가 트리거와 패널을 **둘 다** 벗어나면 (예: 첫 토글 Shift+Tab → 트리거 → 다시 Shift+Tab) 패널을 닫는다 — 이어 갈 요소가 없으면 트리거로 돌린다 (PR #1268 라운드 3). 같은 라운드에서 창 스크롤도 resize 와 같은 이유로 닫기 조건에 넣었다 (`fixed` 좌표 어긋남 — 좁은 폭의 우측 그룹이 `overflow-x-auto`).
+
+### 재검토 트리거 (Amendment 1)
+
+- **패널이 열린 채 Esc 를 쓰는 다른 오버레이 (모달 등) 가 뜰 수 있게 되면** — 패널의 capture `preventDefault` 가 그 오버레이의 Esc 를 가로채 먼저 소비한다. 현재는 도달 불가다 (모달을 여는 경로는 상단 바 버튼 클릭뿐이고 그 `pointerdown` 이 패널을 먼저 닫는다. 단일 키 단축키는 비목표). 도달 가능해지면 오버레이 우선순위 (최상단만 Esc 처리) 를 재설계한다.
+
+### 교차검증 반영 사항 (Amendment 1)
+
+`agy` (2026-09-28, `applied`) — 입력: 결정 6 원문 + Amendment 1 전문 + `display-panel.tsx` 전체 + 자유시점 Esc `useEffect` 전체. 메인 판정 원문: PR #1268 코멘트 `issuecomment-5865190206`.
+
+- **수용 4** — 포커스 탈출 비대칭 (둘 다 벗어나면 닫기) · 트리거 다음 요소 없음 시 포커스 유실 (트리거로 폴백, reviewer R5 와 합의) · 스크롤 시 닫기 · 모달과의 Esc 경합 (현재 도달 불가 → 위 재검토 트리거로만 박제).
+- **한정 추가** — 「항상 이미 사라져 있다」 에 「현 구현 (닫힘 애니메이션 없음) 기준」 (React 배칭으로 속성이 남을 수 있다는 지적은 기각 — 변이 c 가 bubble 시점 속성 부재를 보였고, 차단은 속성이 아니라 `defaultPrevented` 라 결론과 무관).
+- **기각** — 패널 내부 컨트롤 자체 Esc 불가 · 모달/패널 가드 프로토콜 이원화 · `defaultPrevented` 시맨틱 (패널 안에 Esc 를 쓰는 컨트롤이 없고 이원화는 축 4 에서 비교·채택한 결과, reviewer 가 모달 보호 무약화 확인) / 매 Tab DOM 순회 성능 (포커서블 수십 개 수준) / Popover API 전환 · 통합 overlay 스택 (범위 밖).
