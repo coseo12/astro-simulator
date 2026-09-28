@@ -177,7 +177,7 @@ astro-simulator 의 정체성은 "감상/탐험형" (`principles.md §1 Visual F
 
 - 실측 star catalog (Hipparcos/Tycho) 기반 정확 별 배치 — 과학 정확성 트랙 (감상 미학과 직교)
 - 별자리 선/이름 라벨 — 교육 트랙
-- 런타임 starfield 토글 UI 버튼 (현재는 `?stars=off` 초기 옵트아웃만) — **설계: [ADR 20260927-1265](20260927-1265-runtime-display-toggles.md) (#1265, Accepted)**. 해소 표기는 구현 머지 시 (#1265 D18)
+- ~~런타임 starfield 토글 UI 버튼 (현재는 `?stars=off` 초기 옵트아웃만)~~ — **해소 (#1265)**: 상단 바 「표시」 패널의 별 배경 토글 (core [PR #1267](https://github.com/coseo12/astro-simulator/pull/1267) + web PR2). 설계: [ADR 20260927-1265](20260927-1265-runtime-display-toggles.md) (Accepted). 소프트웨어 렌더에서는 토글이 비활성(`aria-disabled` + 사유)이라 §Amendment 2 (#745) 의 별 미생성 계약은 불변이고, `?stars=off` 로드 경로 · `window.__starfieldVisible`(로드 시점 판정) 도 불변이다
 - 성운/은하 텍스처 (에셋 필요 → 사용자 승인)
 
 ---
