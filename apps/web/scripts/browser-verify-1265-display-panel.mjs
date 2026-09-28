@@ -88,6 +88,10 @@
  *   5 `fade:E|F` fade 재현 큐에 mid 부재   6 `edge:D7e` 토글 시점에 mid 가 이미 있음
  *   9 `det:D8` · `pos:D8` (하드웨어) 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일   15 `renderer` 렌더러 판독 불일치
  *   16 `ctl` 자유시점 양성 대조의 선택 재설정 실패   17 `scroll` 스크롤을 일으키지 못함
+ *   18 `d4:timing` 닫힌 채 4 초 안에 숨지 않았지만 더 기다리니 숨음 (타이머 지연)   19 `reload:boot` 새로고침 뒤 핸들 미노출
+ *   타임아웃성 게이트 (토글 뒤 정착 · ON 뒤 머티리얼 준비) 는 **같은 페이지의 토글 전 정착** (`settle:<page>`) 에 기댄다 —
+ *   토글 뒤만 초과하면 FAIL, 둘 다 초과하면 측정 불가. mesh **부재**는 타이밍이 아니라 항상 FAIL 이다.
+ *   어떤 게이트도 기대지 않는 전제는 `[정보]` 로만 출력한다.
  *   제품 결함이 원인이 될 수 있는 옛 전제는 게이트로 옮겼다 — 로드 경로 구조 (옛 3·7 의 로드 쪽 원인) · 토글 전후
  *   페이지 기하 불변 (옛 2 의 토글 쪽 원인) · 토글 뒤 정착 · mid (옛 1·4·5·6 의 토글 뒤 원인) · 런타임 ON 준비 (옛 4) ·
  *   D8p 표본 비어있음 (옛 8) · `?mode=` 진입 (옛 10) · D4 양성 대조 (옛 11) · D14b 선택·패널 (옛 12) · D14 시작 선택
@@ -100,7 +104,7 @@
  *   소스 변이 (MV-1 ~ MV-6 · clear 누락) 는 소스를 바꾸고 core dist 를 재빌드해 기본 모드로 돌린다 (PR 기록).
  *   변이 주입은 CI 에 배선하지 않는다 — 판별력 실증은 PR 시점 1회 의무 (1215 · 1226 선례).
  *   web 소스 변이 (PR2 — 가용성 검사 제거 · URL push · Esc `defaultPrevented` 검사 제거 · 자동 숨김 억제 제거 ·
- *   URL 쓰기를 UrlSync effect 로 · `setDisplayCapabilities` 호출 제거) 는 `next dev` 가 다시 컴파일하므로 재빌드
+ *   URL 쓰기를 UrlSync effect 로 · `setDisplayCapabilities` 호출 제거 · 패널 Esc 의 닫기 제거) 는 `next dev` 가 다시 컴파일하므로 재빌드
  *   없이 기본 모드로 돌린다 (PR 기록).
  *
  * 환경: SWIFTSHADER=1 (headless + --use-angle=swiftshader) · BROWSER_VERIFY_GPU=metal (D8 픽셀 — 하드웨어 경로) ·
@@ -269,7 +273,8 @@ const callSetter = (ctx, setter, visible) =>
  * 토글 뒤 lazy mid 는 게이트 (`onChecks` · `postToggleReady`), 토글 없는 페이지의 하네스 mid 만 전제 (`harnessReady`).
  */
 async function waitMaterialReady(ctx, meshName) {
-  if (!(await hasMesh(ctx, meshName))) return { absent: true, label: `${ctx.label}: ${meshName}` };
+  if (!(await hasMesh(ctx, meshName)))
+    return { absent: true, page: ctx.label, label: `${ctx.label}: ${meshName}` };
   try {
     await ctx.page.waitForFunction(
       (n) => {
@@ -279,9 +284,12 @@ async function waitMaterialReady(ctx, meshName) {
       meshName,
       { timeout: READY_TIMEOUT_MS },
     );
-    return { ok: true };
+    return { ok: true, page: ctx.label };
   } catch {
-    return { error: `${ctx.label}: ${meshName} 머티리얼 준비 대기 ${READY_TIMEOUT_MS}ms 초과` };
+    return {
+      error: `${ctx.label}: ${meshName} 머티리얼 준비 대기 ${READY_TIMEOUT_MS}ms 초과`,
+      page: ctx.label,
+    };
   }
 }
 
@@ -1061,9 +1069,30 @@ async function runUiInteraction(browser, out, pages) {
     page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="topbar"]')).opacity);
   await page.waitForTimeout(D4_IDLE_MS);
   const closedOpacity = await topbarOpacity();
+  // 계약 시간 안에 숨지 않았으면 더 기다려 본다 (`READY_TIMEOUT_MS`, 새 임계 0) — 늦게라도 숨으면 환경 저속
+  // (타이머 지연) 이라 D4 의 4 초 전제가 이 페이지에서 성립하지 않은 것이고 (측정 불가), 끝내 안 숨으면 제품 결함
+  // (자동 숨김 영구 억제) 이다 (reviewer R8).
+  let closedLate = null;
+  if (closedOpacity !== '0') {
+    try {
+      await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('[data-testid="topbar"]')).opacity === '0',
+        undefined,
+        { timeout: READY_TIMEOUT_MS },
+      );
+      closedLate = true;
+    } catch {
+      closedLate = false;
+    }
+  }
   await setPanelOpen(page, true);
   await page.waitForTimeout(D4_IDLE_MS);
-  out.uiD4 = { closedOpacity, openOpacity: await topbarOpacity(), panels: await panelCount(page) };
+  out.uiD4 = {
+    closedOpacity,
+    closedLate,
+    openOpacity: await topbarOpacity(),
+    panels: await panelCount(page),
+  };
   await setPanelOpen(page, false);
 
   // ── D3 — 패널 궤도선 ↔ 단축 바 궤도선 ↔ store ──
@@ -1088,6 +1117,8 @@ async function runUiInteraction(browser, out, pages) {
 
   // ── 스크롤 시 닫힘 (cross-validate Q4-1) — 패널을 연 채 좌측 단축 바를 실제로 스크롤한다 ──
   await setPanelOpen(page, true);
+  // 기저 신호 — 스크롤 직전 패널이 실제로 열려 있었는가 (열리자마자 닫히는 회귀에서 「닫힘」 이 공허 참이 되지 않게).
+  const panelsBeforeScroll = await panelCount(page);
   const scrolled = await page.evaluate(() => {
     // 단축 바 또는 그 조상 중 실제로 가로 스크롤되는 첫 요소 (상단 바 좌측 그룹도 overflow-x-auto 다).
     let bar = document.querySelector('[data-r1-region="shortcut-bar"]');
@@ -1098,7 +1129,7 @@ async function runUiInteraction(browser, out, pages) {
     return { before, after: bar.scrollLeft };
   });
   await frames(page, 2);
-  out.uiScroll = { scrolled, panels: await panelCount(page) };
+  out.uiScroll = { scrolled, panelsBefore: panelsBeforeScroll, panels: await panelCount(page) };
   await setPanelOpen(page, false);
 
   // ── D14 — 키보드만: Tab 도달 → Enter → 토글 4개 순회 (Space 반전) → Esc ──
@@ -1335,15 +1366,20 @@ async function runUiUrl(browser, out, pages) {
   const urlBeforeReload = await readUrlKeys(page);
   await page.reload();
   let reloadReady = true;
+  let reloadHandles = true;
   try {
     await waitCapsReady(page);
   } catch {
     reloadReady = false;
+    // 대기 초과의 성격 — 핸들조차 없으면 부팅이 안 끝난 것 (환경 저속 → 측정 불가), 핸들은 있는데 준비만 없으면
+    // 제품 결함이다 (sim-canvas 는 핸들러 등록과 같은 동기 블록에서 준비를 연다 — reviewer R8).
+    reloadHandles = await page.evaluate(() => !!window.__simCore && !!window.__solarScene);
   }
   const after = reloadReady ? await snap() : null;
   out.uiD11 = {
     software,
     bootCaps: rBootCaps,
+    reloadHandles,
     ids,
     h0,
     hAfterTrips,
@@ -1535,8 +1571,11 @@ function judge(r) {
     d6Positive: 'pos:cloudsRot',
     d7Positive: 'pos:night',
   };
+  // 양성 대조 쌍 자체가 측정 오류여도 이 전제는 무너진 것이다 — 그렇지 않으면 `pos:*` 에만 기대는 게이트가 양성
+  // 대조 없이 `== 0` 을 PASS 로 낸다 (reviewer R7).
   for (const [k, id] of Object.entries(positives))
-    if (!r[k]?.error && !(r[k].disk.changed > 0))
+    if (r[k]?.error) fail(id, `(3) ${k} — 양성 대조 쌍 측정 오류`);
+    else if (!(r[k].disk.changed > 0))
       fail(id, `(3) ${k} — 로드 ON ↔ 로드 OFF disk 변화 ${r[k].disk.changed}`);
   // (4) 하네스가 만든 mid (토글 없는 페이지) 의 부재 · 준비 초과.
   for (const x of r.harnessReady)
@@ -1552,30 +1591,47 @@ function judge(r) {
   // (6) D7e 엣지 — 토글 시점에 mid 가 이미 있으면 엣지가 아니다 (뷰 · 하네스). 정착 뒤 mid 부재는 D7e 게이트가 FAIL.
   if (r.d7eMidAtToggle !== false) fail('edge:D7e', `(6) D7e 토글 시점 mid ${r.d7eMidAtToggle}`);
   // (9) D8 (하드웨어) — 같은 URL 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일.
-  if (!r.software && !r.d8Determinism?.error && r.d8Determinism.fullChanged !== 0)
-    fail('det:D8', `(9) D8 독립 2 로드 full frame 변화 ${r.d8Determinism.fullChanged}`);
-  if (!r.software && !r.d8Positive?.error && !(r.d8Positive.fullChanged > 0))
-    fail('pos:D8', `(9) D8 로드 ON ↔ OFF full frame 변화 ${r.d8Positive.fullChanged}`);
+  if (hwSection(r) && (r.d8Determinism?.error || r.d8Determinism.fullChanged !== 0))
+    fail(
+      'det:D8',
+      `(9) D8 독립 2 로드 결정성 — ${r.d8Determinism?.error ?? r.d8Determinism.fullChanged}`,
+    );
+  if (hwSection(r) && (r.d8Positive?.error || !(r.d8Positive.fullChanged > 0)))
+    fail('pos:D8', `(9) D8 로드 ON ↔ OFF — ${r.d8Positive?.error ?? r.d8Positive.fullChanged}`);
   // (15) 렌더러 판독 불일치 — SKIP 결정의 전제 (#1234 감지 영역 · 환경 사실).
   const softwareReads = { core: r.software, ui: r.uiSoftware, url: r.uiD11.software };
   if (new Set(Object.values(softwareReads)).size !== 1)
     fail('renderer', `(15) __isSoftwareRenderer 판독 불일치 ${JSON.stringify(softwareReads)}`);
   // (16) 자유시점 양성 대조 — 선택 재설정 (하네스). 패널은 하네스가 트리거로 닫은 뒤다.
   if (!r.uiFreeFlyControl.selected) fail('ctl', '(16) 자유시점 양성 대조 — 선택 재설정 실패');
+  // (18) D4 타이밍 — 패널이 닫힌 채 계약 시간 (4 초) 안에 숨지 않았지만 더 기다리니 숨었다 → 이 페이지의 타이머가
+  // 계약 시간을 지키지 못했다 (환경 저속). D4 의 두 게이트가 이 시간 전제에 기댄다 (reviewer R8).
+  if (r.uiD4.closedOpacity !== '0' && r.uiD4.closedLate === true)
+    fail('d4:timing', `(18) D4 — ${D4_IDLE_MS}ms 뒤 opacity ${r.uiD4.closedOpacity}, 이후에 숨음`);
+  // (19) 새로고침 뒤 부팅 미완 — 핸들조차 노출되지 않았다 (환경 저속). 핸들이 있는데 준비만 없으면 게이트 FAIL.
+  if (!r.uiD11.reloadReady && r.uiD11.reloadHandles === false)
+    fail('reload:boot', '(19) D11 새로고침 뒤 핸들 노출 대기 초과');
   // (17) 스크롤 닫힘 — 스크롤을 실제로 일으켰는가 (레이아웃상 스크롤할 요소가 없으면 측정 불가).
   if (!r.uiScroll.scrolled || r.uiScroll.scrolled.before === r.uiScroll.scrolled.after)
     fail('scroll', `(17) 스크롤 미발생 ${JSON.stringify(r.uiScroll.scrolled)}`);
 
   const settleIds = (...pages) => pages.map((p) => `settle:${p}`);
-  const hw = !r.software;
+  const hw = hwSection(r);
   const specs = [...judgeCore(r, settleIds, hw), ...judgeUi(r, settleIds, hw)];
   const gates = specs.map(({ name, needs, evaluate }) => {
     const missing = needs.filter((id) => unmet[id]);
     if (missing.length) return [name, `전제 ${missing.join(', ')}`, '—', UNMEASURED];
     return [name, ...evaluate()];
   });
-  return { gates, unmet };
+  // 어떤 게이트도 기대지 않는 전제는 판정에 영향이 없다 — 「측정 불가」 와 섞어 출력하지 않고 정보로 분리한다 (N2).
+  const used = new Set(specs.flatMap((g) => g.needs));
+  const info = Object.fromEntries(Object.entries(unmet).filter(([id]) => !used.has(id)));
+  const blocking = Object.fromEntries(Object.entries(unmet).filter(([id]) => used.has(id)));
+  return { gates, unmet: blocking, info };
 }
+
+/** 하드웨어 전용 섹션 (D8 픽셀 쌍) 이 돌았는가 — core 섹션 렌더러 판독 기준. */
+const hwSection = (r) => !r.software;
 
 /** core 경로 (PR1 setter 직접 호출) + 로드 경로 구조 · 토글 전후 기하 · 토글 뒤 정착 게이트. */
 function judgeCore(r, settleIds, hw) {
@@ -1594,7 +1650,8 @@ function judgeCore(r, settleIds, hw) {
   const nonStarNoDepth = Object.values(d8pSamples)
     .flat()
     .filter((e) => e.name !== STARFIELD_MESH && e.noDepthWrite);
-  const onBad = r.onChecks.filter((x) => x.absent || x.error).map((x) => x.label ?? x.error);
+  const onAbsent = r.onChecks.filter((x) => x.absent).map((x) => x.label);
+  const onSlow = r.onChecks.filter((x) => x.error);
   const allErrors = Object.values(r.consoleErrors).flat();
   const ld = r.loadDisplay;
   // 로드 경로 구조 — 쌍의 기준 페이지가 쿼리대로 로드됐는가 (조작 전 판독). 기대: 구름 ON 로드 1 · OFF 로드 0 ·
@@ -1622,8 +1679,12 @@ function judgeCore(r, settleIds, hw) {
     .filter(([label, ok]) => !ld[label] || !ok(ld[label]))
     .map(([label]) => [label, ld[label] ?? null]);
   const geomBad = r.toggleGeom.filter((g) => g.before !== g.after || g.before.startsWith('error'));
-  const postSettleBad = r.settles.filter((s) => s.postToggle && s.timedOut);
-  const postReadyBad = r.postToggleReady.filter((x) => x.absent || x.error);
+  const postBad = (page) => ({
+    settles: r.settles.filter((s) => s.page === page && s.postToggle && s.timedOut),
+    ready: r.postToggleReady.filter((x) => x.page === page && (x.absent || x.error)),
+  });
+  const p1Post = postBad('P1-night');
+  const oPost = postBad('O-overview');
 
   return [
     gate('로드 경로 구조 — 쌍 기준 페이지가 쿼리대로 로드됨 (조작 전)', [], () => [
@@ -1636,15 +1697,35 @@ function judgeCore(r, settleIds, hw) {
       `변화 0 / ${r.toggleGeom.length} ∧ 표본 ≥ 1`,
       r.toggleGeom.length > 0 && geomBad.length === 0,
     ]),
-    gate('토글 뒤 LOD 정착 · mid 생성·준비 (P1 · O · E)', [], () => [
-      JSON.stringify({ postSettleBad, postReadyBad, d6fMidAfterOn: r.d6fMidAfterOn }),
-      '정착 초과 0 ∧ mid 부재·준비 초과 0 ∧ E mid 유지',
-      postSettleBad.length === 0 && postReadyBad.length === 0 && r.d6fMidAfterOn === true,
+    // 토글 뒤 정착 · 준비 — 같은 페이지의 토글 **전** 정착에 기댄다 (reviewer R8). 토글 전은 정착했는데 뒤만 초과하면
+    // FAIL (토글이 만든 결함), 둘 다 초과하면 환경 저속이라 측정 불가다.
+    gate('P1 불빛 끈 뒤 mid 정착 · 생성 · 준비', settleIds('P1-night'), () => [
+      JSON.stringify(p1Post),
+      '정착 초과 0 ∧ mid 부재·준비 초과 0',
+      p1Post.settles.length === 0 && p1Post.ready.length === 0,
     ]),
-    gate('런타임 ON 직후 mesh 존재 · 준비 (setter · 패널 경로 전부)', [], () => [
-      onBad.length ? `부재·준비 초과 ${JSON.stringify(onBad)}` : `0 / ${r.onChecks.length}`,
-      '0 ∧ 표본 ≥ 1',
-      r.onChecks.length > 0 && onBad.length === 0,
+    gate('O 개요에서 불빛 끈 뒤 focus · mid 정착', settleIds('O-overview'), () => [
+      JSON.stringify(oPost),
+      '정착 초과 0',
+      oPost.settles.length === 0,
+    ]),
+    // 부재는 타이밍이 아니다 — setter 는 동기로 동작하므로 환경과 무관하게 FAIL 이다.
+    gate('E 구름 ON 뒤 기존 mid 유지', [], () => [
+      `ON 전 ${r.d6fMidBeforeOn} · 후 ${r.d6fMidAfterOn}`,
+      'true',
+      r.d6fMidAfterOn === true,
+    ]),
+    gate('런타임 ON 직후 mesh 존재 (setter · 패널 경로 전부)', [], () => [
+      onAbsent.length ? `부재 ${JSON.stringify(onAbsent)}` : `부재 0 / ${r.onChecks.length}`,
+      '부재 0 ∧ 표본 ≥ 1',
+      r.onChecks.length > 0 && onAbsent.length === 0,
+    ]),
+    // 준비 초과는 그 페이지의 토글 전 정착에 기댄다 (PR #1267 의 「부재 = FAIL · 준비 초과 = 측정 불가」 구분을 되살리되,
+    // 토글 전은 정상인데 ON 뒤만 초과하면 FAIL). 정착 기록이 없는 페이지 (UI 경량 페이지) 는 환경 증거가 없어 FAIL 이다.
+    gate('런타임 ON 직후 머티리얼 준비', settleIds(...new Set(onSlow.map((x) => x.page))), () => [
+      onSlow.length ? `준비 초과 ${JSON.stringify(onSlow.map((x) => x.error))}` : '0',
+      '준비 초과 0',
+      onSlow.length === 0,
     ]),
     gate(
       'D5 구름 런타임 OFF ↔ 로드 OFF disk 변화 px',
@@ -1679,6 +1760,7 @@ function judgeCore(r, settleIds, hw) {
       'D6f mid 선생성 뒤 ON · fade 정지 ↔ 로드 ON disk 변화 px',
       [
         'err:d6f',
+        'pos:clouds',
         'err:d6fQueueE',
         'err:d6fQueueF',
         'fade:E',
@@ -1815,20 +1897,28 @@ function judgeUi(r, settleIds, hw) {
         uiD3.afterBar.store === uiD3.initial.store,
     ]),
     // D4 양성 대조는 게이트다 — 닫힌 뒤에도 숨지 않는 원인에 #1265 결함 (패널 열림 상태가 store 에 남음) 이 있다.
-    gate(`UI D4 양성 대조 — 패널 닫힘 · ${D4_IDLE_MS}ms 무입력 → 상단 바 숨김`, [], () => [
-      uiD4.closedOpacity,
-      '"0"',
-      uiD4.closedOpacity === '0',
-    ]),
-    gate(`UI D4 observe · 패널 열림 · ${D4_IDLE_MS}ms 무입력 — 상단 바 opacity`, [], () => [
-      `${uiD4.openOpacity} (패널 ${uiD4.panels})`,
-      '"1" ∧ 패널 1',
-      uiD4.openOpacity === '1' && uiD4.panels === 1,
-    ]),
+    gate(
+      `UI D4 양성 대조 — 패널 닫힘 · ${D4_IDLE_MS}ms 무입력 → 상단 바 숨김`,
+      ['d4:timing'],
+      () => [
+        `${uiD4.closedOpacity} (늦게라도 숨음 ${uiD4.closedLate})`,
+        '"0"',
+        uiD4.closedOpacity === '0',
+      ],
+    ),
+    gate(
+      `UI D4 observe · 패널 열림 · ${D4_IDLE_MS}ms 무입력 — 상단 바 opacity`,
+      ['d4:timing'],
+      () => [
+        `${uiD4.openOpacity} (패널 ${uiD4.panels})`,
+        '"1" ∧ 패널 1',
+        uiD4.openOpacity === '1' && uiD4.panels === 1,
+      ],
+    ),
     gate('UI 스크롤 시 패널 닫힘', ['scroll'], () => [
       JSON.stringify(r.uiScroll),
-      '패널 0',
-      r.uiScroll.panels === 0,
+      '스크롤 직전 패널 1 ∧ 뒤 0',
+      r.uiScroll.panelsBefore === 1 && r.uiScroll.panels === 0,
     ]),
     gate('UI 캡처 직전 패널 요소 수 (D5~D8 UI)', [], () => [
       JSON.stringify(r.uiPanelsAtCapture),
@@ -1952,13 +2042,17 @@ function judgeUi(r, settleIds, hw) {
       uiD11.trips.every((t) => t.bookmarkOff === 'off' && t.bookmarkOnHas === false),
     ]),
     // 새로고침 뒤 장면 준비 대기 초과도 게이트다 — 원인에 URL 상태별 준비 결함이 들어간다 (라운드 3 전제 감사).
-    gate('UI D11 새로고침 — 장면 준비 · 패널 aria-pressed · scene 상태 동일', [], () => [
-      `ready ${uiD11.reloadReady} · ${JSON.stringify(uiD11.before)} → ${JSON.stringify(uiD11.after)}`,
-      '준비 ∧ 새로고침 전 = 후 ∧ 전 상태가 실제로 전부 OFF',
-      uiD11.reloadReady === true &&
-        d11OffHeld &&
-        JSON.stringify(uiD11.before) === JSON.stringify(uiD11.after),
-    ]),
+    gate(
+      'UI D11 새로고침 — 장면 준비 · 패널 aria-pressed · scene 상태 동일',
+      ['reload:boot'],
+      () => [
+        `ready ${uiD11.reloadReady} · ${JSON.stringify(uiD11.before)} → ${JSON.stringify(uiD11.after)}`,
+        '준비 ∧ 새로고침 전 = 후 ∧ 전 상태가 실제로 전부 OFF',
+        uiD11.reloadReady === true &&
+          d11OffHeld &&
+          JSON.stringify(uiD11.before) === JSON.stringify(uiD11.after),
+      ],
+    ),
     uiD11.software
       ? gate('UI D11 별 URL (하드웨어 전용)', ['renderer'], () => [
           '소프트웨어 렌더 — 가용성 차단 (D9)',
@@ -2133,6 +2227,8 @@ async function main() {
   console.log(`consoleErrors ${JSON.stringify(r.consoleErrors)}`);
 
   const v = judge(r);
+  for (const [id, msgs] of Object.entries(v.info))
+    for (const m of msgs) console.log(`[정보] 기대는 게이트 없는 전제 [${id}] ${m}`);
   const unmetEntries = Object.entries(v.unmet);
   if (unmetEntries.length) {
     console.error(
