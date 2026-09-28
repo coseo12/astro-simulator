@@ -50,14 +50,15 @@
  *   D15  4 토글 (궤도선 포함) × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors` ∧ 전 페이지 콘솔 에러 0.
  *
  * ## 판정 — UI 경로 (PR2 배정분)
+ *   장면 준비  UI 페이지마다 부팅 직후 `displayCapabilities !== null` (sim-canvas 가 여는 제품 가용성 게이트 — 게이트다).
  *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 4 개 가시.
  *   D2   같은 페이지 — 우측 그룹 버튼 전부 `x + width ≤ 1280` · 좌측 단축 바 버튼 전부 스크롤로 도달 + 그 지점 hit.
  *   D3   패널 궤도선 ↔ 단축 바 `toggle-orbits` ↔ `store.orbitLinesVisible` — 어느 쪽을 눌러도 세 값 일치.
  *   D4   관찰 모드 · 패널 열림 · 4 초 무입력 → 상단 바 computed `opacity === "1"`.
  *   D5~D8 UI  위 core 판정과 같은 쌍 · 같은 술어 (D5 구조 포함). D8 픽셀 · D8 ON 구조는 하드웨어 전용.
- *   D9   소프트웨어 렌더 전용 — 별 토글 `aria-disabled="true"` + 사유 `title` · 누른 뒤에도 별 0 · `__starfieldVisible`
+ *   D9   소프트웨어 렌더 전용 — 별 토글 `aria-disabled="true"` + 소프트웨어 사유 `title` · 누른 뒤에도 별 0 · `__starfieldVisible`
  *        false · URL `stars` 부재. ⚠️ 이 차단은 `useDisplayToggle` 의 가용성 검사 한 곳뿐이다 (core 는 렌더러를 모른다).
- *   D10  `?surface=off` — 구름·불빛 `aria-disabled` + 사유 · 누른 뒤 mesh · 머티리얼 개수 · URL 무변화 · 구름 0.
+ *   D10  `?surface=off` — 구름·불빛 `aria-disabled` + 표면 off 사유 · 누른 뒤 mesh · 머티리얼 개수 · URL 무변화 · 구름 0.
  *        (`nightLightStrength` 보유 머티리얼이 0 개라 uniform 술어는 공허 참 — 판정 근거는 개수 술어다.)
  *   D11  토글별 OFF → `key=off` · ON → 키 부재 · `history.length` 불변 · 북마크 복사 URL 반영 · 전부 OFF 새로고침 뒤
  *        패널 `aria-pressed` · scene 4축 동일 · 4 키를 전부 끈 로드 직후 (조작 전) URL 불변 · `?orbits=off` → ON →
@@ -65,6 +66,10 @@
  *   D14  캔버스에서 Tab 으로 트리거 도달 → Enter → 토글 4 개 선형 순회 (trap 없음) → Space 반전 → Esc 닫힘 + 포커스
  *        트리거. 엣지: `focus=earth` 에서 Esc → `freeFlyMode === false`. D14b: 패널 연 채 `focusOn mars` 로 선택을
  *        바꿔 (자유시점 리스너가 패널 리스너 **뒤로** 재등록) Esc → 패널 닫힘 ∧ 자유시점 미진입.
+ *        포커스 순서: 마지막 토글 Tab → 패널 닫힘 + 트리거의 **기본 Tab 목적지** (패널 닫힌 상태에서 관측한 값) ·
+ *        첫 토글 Shift+Tab → 트리거 (패널 유지) · 열린 트리거 Tab → 첫 토글.
+ *        양성 대조: 패널이 닫힌 상태의 같은 Esc 는 자유시점으로 **간다** (그래야 위 `false` 술어가 판별력을 가진다 —
+ *        리스너가 죽은 회귀는 게이트 FAIL).
  *   D15 UI  패널 토글 4 개 × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors`.
  *
  * ## SKIP 은 PASS 로 세지 않는다
@@ -83,7 +88,9 @@
  *   10 `?mode=` 진입이 그 모드를 만들지 못함 (D1 을 한 모드에서 네 번 재는 공허 통과 차단)
  *   11 D4 양성 대조 — 패널 닫힘 · 같은 무입력 시간에 상단 바가 숨지 않음 (억제 술어가 공허 참)
  *   12 D14b 하네스 — 선택 변경 미반영 또는 Esc 직전 패널이 닫혀 있음   13 D14 시작 시 선택이 earth 아님
- *   14 D11 새로고침 뒤 장면 준비 (`displayCapabilities`) 대기 초과
+ *   14 D11 새로고침 뒤 장면 준비 (`displayCapabilities`) 대기 초과 — 부팅 때는 준비됐던 경우만 (부팅 때부터 미준비는
+ *      게이트 「UI 장면 준비」 FAIL)   15 `__isSoftwareRenderer` 섹션별 판독 불일치
+ *   16 자유시점 양성 대조 하네스 — 선택 재설정 실패 또는 Esc 직전 패널 열림
  *   ⚠️ 제품 속성은 전제에 넣지 않는다 — 패널이 닫히지 않음 · URL 을 안 씀 · Tab 이 트리거에 닿지 않음 · 런타임 ON 이
  *   mesh 를 안 만듦은 전부 게이트 FAIL (exit 1) 이다. 같은 이유로 **로드 직후 URL 불변 (D11) 은 3 보다 먼저** 게이트로
  *   본다 — 조작 전에 URL 이 바뀌면 `?x=off` 기준 페이지도 효과를 잃어 3 이 먼저 발화하는데, 원인은 제품이다.
@@ -95,7 +102,8 @@
  *   소스 변이 (MV-1 ~ MV-6 · clear 누락) 는 소스를 바꾸고 core dist 를 재빌드해 기본 모드로 돌린다 (PR 기록).
  *   변이 주입은 CI 에 배선하지 않는다 — 판별력 실증은 PR 시점 1회 의무 (1215 · 1226 선례).
  *   web 소스 변이 (PR2 — 가용성 검사 제거 · URL push · Esc `defaultPrevented` 검사 제거 · 자동 숨김 억제 제거 ·
- *   URL 쓰기를 UrlSync effect 로) 는 `next dev` 가 다시 컴파일하므로 재빌드 없이 기본 모드로 돌린다 (PR 기록).
+ *   URL 쓰기를 UrlSync effect 로 · `setDisplayCapabilities` 호출 제거) 는 `next dev` 가 다시 컴파일하므로 재빌드
+ *   없이 기본 모드로 돌린다 (PR 기록).
  *
  * 환경: SWIFTSHADER=1 (headless + --use-angle=swiftshader) · BROWSER_VERIFY_GPU=metal (D8 픽셀 — 하드웨어 경로) ·
  *       HEADFUL · BASE_URL · CAPTURE_DIR
@@ -174,6 +182,12 @@ const UI_VIEWPORT_WIDTH = 1280;
 const D4_IDLE_MS = 4000;
 /** D9 · D10 — 비활성 토글을 누르는 횟수. 첫 클릭은 OFF 명령이라 생성 경로 (ON) 를 열려면 2회가 필요하다. */
 const DISABLED_CLICKS = 2;
+/**
+ * D9 · D10 사유 판별 표지 — 비활성 사유가 「비어 있지 않음」이 아니라 **그 이유**인지 본다 (reviewer B1 두 번째 면:
+ * 장면 미준비 사유도 비어 있지 않은 `aria-disabled` 라 엉뚱한 이유로 PASS 했다). 가드는 앱 모듈을 import 하지
+ * 않으므로 `display-toggles.ts` `DISPLAY_DISABLED_REASONS` 의 부분 문자열을 쓴다 — 미준비 사유에는 둘 다 없다.
+ */
+const REASON_MARK = { software: '소프트웨어', surfaceOff: 'surface=off' };
 /** D10 대상 — 표면 종속 토글. */
 const SURFACE_TOGGLES = ['clouds', 'nightLights'];
 
@@ -651,6 +665,23 @@ const waitCapsReady = (page) =>
     { timeout: READY_TIMEOUT_MS },
   );
 
+/**
+ * UI 페이지 부팅 직후 장면 준비 (`displayCapabilities`) 를 기록한다. 이 값은 sim-canvas 가 여는 **제품** 가용성
+ * 게이트라 전제가 아니라 게이트로 판정한다 (reviewer B1 — 측정 불가로 흡수하면 결함을 잡는 게이트 6개가 가려진다).
+ * 대기 상한은 `READY_TIMEOUT_MS` (새 임계 0). 끝내 `null` 이면 `null` 로 남긴다.
+ */
+async function recordBootCaps(ctx, out) {
+  let caps = null;
+  try {
+    await waitCapsReady(ctx.page);
+    caps = (await readStoreSel(ctx.page)).caps;
+  } catch {
+    caps = null;
+  }
+  out.uiCapsAtBoot.push({ label: ctx.label, caps });
+  return caps;
+}
+
 /** 경량 페이지 — 결정적 프레임이 필요 없는 UI 판정 (D1 · D2 · D10 · D11). */
 async function setupUiPage(browser, query, label) {
   const context = await browser.newContext({
@@ -699,6 +730,7 @@ async function runClouds(browser, out, pages) {
     hideOverlays: false,
   });
   pages.push(Au);
+  await recordBootCaps(Au, out);
   await uiToggle(Au, 'clouds');
   out.d5ui = await measureCheckedPair(Au, await uiCapture(Au, 'Au-ui-off', out), B, bImg, 'd5ui');
   out.d5uiCounts = await readCounts(Au);
@@ -739,6 +771,7 @@ async function runClouds(browser, out, pages) {
     hideOverlays: false,
   });
   pages.push(Cu);
+  await recordBootCaps(Cu, out);
   await uiToggle(Cu, 'clouds');
   out.onChecks.push(await waitMaterialReady(Cu, CLOUD_MESH));
   out.d6ui = await measureCheckedPair(Cu, await uiCapture(Cu, 'Cu-ui-on', out), D, dImg, 'd6ui');
@@ -787,6 +820,7 @@ async function runNightLights(browser, out, pages) {
     hideOverlays: false,
   });
   pages.push(P1u);
+  await recordBootCaps(P1u, out);
   await uiToggle(P1u, 'nightLights');
   out.d7ui = await measureCheckedPair(
     P1u,
@@ -885,6 +919,7 @@ async function runStars(browser, out, pages) {
     hideOverlays: false,
   });
   pages.push(H1u);
+  await recordBootCaps(H1u, out);
   await uiToggle(H1u, 'stars');
   out.d8ui = await measureCheckedPair(
     H1u,
@@ -939,6 +974,7 @@ async function runUiModes(browser, out, pages) {
   for (const mode of UI_MODES) {
     const M = await setupUiPage(browser, `${UI_BASE}&mode=${mode}`, `M-${mode}`);
     pages.push(M);
+    await recordBootCaps(M, out);
     const store = await readStoreSel(M.page);
     const triggers = await M.page.locator(PANEL_TRIGGER).count();
     let expanded = null;
@@ -988,6 +1024,7 @@ async function runUiModes(browser, out, pages) {
 async function runUiInteraction(browser, out, pages) {
   const U = await setupUiPage(browser, UI_BASE, 'U-interaction');
   pages.push(U);
+  await recordBootCaps(U, out);
   const { page } = U;
   out.uiSoftware = await page.evaluate(() => window.__isSoftwareRenderer === true);
 
@@ -1057,6 +1094,12 @@ async function runUiInteraction(browser, out, pages) {
     selectedBefore: (await readStoreSel(page)).selectedBodyId,
   };
   if (reached) {
+    // 5-A 기준값 — 패널이 닫힌 상태에서 트리거의 Tab 이 브라우저 기본 순서로 닿는 요소. 패널 마지막 토글의 Tab 이
+    // 가야 할 곳이다 (가드가 제품과 같은 계산을 반복하지 않도록 기본 동작을 관측해 기준으로 쓴다).
+    await page.keyboard.press('Tab');
+    d14.nativeNext = await activeTestId(page);
+    await page.keyboard.press('Shift+Tab');
+    d14.backToTrigger = await activeTestId(page);
     await page.keyboard.press('Enter');
     await frames(page, 2);
     d14.expanded = await page.locator(PANEL_TRIGGER).getAttribute('aria-expanded');
@@ -1069,6 +1112,18 @@ async function runUiInteraction(browser, out, pages) {
       await page.keyboard.press('Tab');
       d14.visited.push(await activeTestId(page));
     }
+    // 5-A — 마지막 토글 Tab → 패널 닫힘 + 트리거 다음 요소 (portal 이라도 문서 끝으로 빠지지 않는다).
+    await page.keyboard.press('Tab');
+    await frames(page, 2);
+    d14.lastTab = { panels: await panelCount(page), focus: await activeTestId(page) };
+    // 5-A — 다시 열고 첫 토글 Shift+Tab → 트리거 (패널 유지) → Tab → 첫 토글.
+    await page.locator(PANEL_TRIGGER).focus();
+    await page.keyboard.press('Enter');
+    await frames(page, 2);
+    await page.keyboard.press('Shift+Tab');
+    d14.firstShiftTab = { panels: await panelCount(page), focus: await activeTestId(page) };
+    await page.keyboard.press('Tab');
+    d14.triggerTab = await activeTestId(page);
     await page.keyboard.press('Escape');
     await frames(page, 2);
     d14.panelsAfterEsc = await panelCount(page);
@@ -1104,6 +1159,29 @@ async function runUiInteraction(browser, out, pages) {
     panelsAfterEsc: await panelCount(page),
     freeFly: st14b.freeFlyMode,
     selected: st14b.selectedBodyId,
+  };
+
+  // ── 자유시점 Esc 양성 대조 (R2) — 패널이 닫힌 상태에서 같은 Esc 가 자유시점으로 **가야** D14 엣지 · D14b 의
+  // `freeFly === false` 가 판별력을 가진다. 리스너가 죽은 회귀는 제품 결함이라 게이트 FAIL 이다. 선택을 맞추는
+  // 것은 하네스 설정이다 — D14b 가 선택을 지웠을 수 있으므로 다시 고른다 (실패하면 측정 불가 16).
+  await page.evaluate(() => window.__simCore.command({ type: 'focusOn', bodyId: 'mars' }));
+  let controlSelected = true;
+  try {
+    await page.waitForFunction(
+      () => window.__simStore.getState().selectedBodyId === 'mars',
+      undefined,
+      { timeout: READY_TIMEOUT_MS },
+    );
+  } catch {
+    controlSelected = false;
+  }
+  const controlPanels = await panelCount(page);
+  await page.keyboard.press('Escape');
+  await frames(page, 2);
+  out.uiFreeFlyControl = {
+    selected: controlSelected,
+    panels: controlPanels,
+    freeFly: (await readStoreSel(page)).freeFlyMode,
   };
 
   // ── D9 — 소프트웨어 렌더: 별 토글 aria-disabled + 사유, 눌러도 별 0 ──
@@ -1159,6 +1237,7 @@ async function runUiInteraction(browser, out, pages) {
 async function runUiUrl(browser, out, pages) {
   const R = await setupUiPage(browser, UI_BASE, 'R-url');
   pages.push(R);
+  const rBootCaps = await recordBootCaps(R, out);
   const { page } = R;
   const software = await page.evaluate(() => window.__isSoftwareRenderer === true);
   // 소프트웨어 렌더의 별은 가용성이 막아 URL 을 쓰지 않는다 (D9) — URL 계약은 하드웨어에서만 잰다.
@@ -1205,6 +1284,7 @@ async function runUiUrl(browser, out, pages) {
   const after = reloadReady ? await snap() : null;
   out.uiD11 = {
     software,
+    bootCaps: rBootCaps,
     ids,
     h0,
     hAfterTrips,
@@ -1218,6 +1298,7 @@ async function runUiUrl(browser, out, pages) {
   // 로드 직후 (조작 전) 4 키 불변 + `?orbits=off` 로드 → 켜고 북마크 → `orbits` 부재 (기존 불일치 해소).
   const L = await setupUiPage(browser, UI_ALL_OFF, 'L-all-off');
   pages.push(L);
+  await recordBootCaps(L, out);
   const urlAtLoad = await readUrlKeys(L.page);
   await uiToggle(L, 'orbits');
   const orbitsOnOk = await waitUrlKey(L.page, 'orbits', null);
@@ -1244,6 +1325,7 @@ async function runUiUrl(browser, out, pages) {
 async function runUiSurfaceOff(browser, out, pages) {
   const SF = await setupUiPage(browser, `${UI_BASE}&surface=off`, 'SF-surfaceOff');
   pages.push(SF);
+  await recordBootCaps(SF, out);
   const { page } = SF;
   await setPanelOpen(page, true);
   const attrs = {};
@@ -1313,6 +1395,7 @@ async function run(browser) {
     consoleErrors: {},
     uiPanelsAtCapture: [],
     uiModes: [],
+    uiCapsAtBoot: [],
   };
   const pages = [];
   try {
@@ -1429,9 +1512,22 @@ function judge(r) {
     unmeasurable.push(
       `(13) D14 엣지 — Tab 순회 시작 시 선택 ${r.uiD14.selectedBefore} (earth 아님)`,
     );
-  // 14 — D11 새로고침 뒤 장면 준비 대기 초과.
-  if (!r.uiD11.reloadReady)
-    unmeasurable.push(`(14) D11 새로고침 후 장면 준비 대기 ${READY_TIMEOUT_MS}ms 초과`);
+  // 14 — D11 새로고침 뒤 장면 준비 대기 초과. **부팅 때는 준비가 열렸던 페이지에 한해서만** 측정 불가다 — 부팅
+  // 때부터 열리지 않았다면 제품 결함이고 게이트 「UI 장면 준비」 가 FAIL 로 낸다 (reviewer B1).
+  if (!r.uiD11.reloadReady && r.uiD11.bootCaps !== null)
+    unmeasurable.push(
+      `(14) D11 새로고침 후 장면 준비 대기 ${READY_TIMEOUT_MS}ms 초과 (부팅 때는 준비됨)`,
+    );
+  // 15 — 렌더러 축은 한 환경의 사실이다. 섹션마다 따로 읽은 값이 어긋나면 SKIP 결정 (D8 · D9 · D11 별) 이 섹션마다
+  // 달라져 소프트웨어 전용 D9 가 조용히 SKIP 될 수 있다 (reviewer R3).
+  const softwareReads = { core: r.software, ui: r.uiSoftware, url: r.uiD11.software };
+  if (new Set(Object.values(softwareReads)).size !== 1)
+    unmeasurable.push(`(15) __isSoftwareRenderer 판독 불일치 ${JSON.stringify(softwareReads)}`);
+  // 16 — 자유시점 양성 대조의 하네스 설정 (선택 · 패널 닫힘).
+  if (!r.uiFreeFlyControl.selected || r.uiFreeFlyControl.panels !== 0)
+    unmeasurable.push(
+      `(16) 자유시점 양성 대조 하네스 — 선택 ${r.uiFreeFlyControl.selected} · 패널 ${r.uiFreeFlyControl.panels}`,
+    );
   if (unmeasurable.length) return { unmeasurable };
 
   const leak = r.d6Leak;
@@ -1583,6 +1679,12 @@ function judgeUi(r) {
   const d11OffHeld = uiD11.ids.every((id) => uiD11.before.pressed[id] === offPressed[id]);
   const gates = [
     [
+      'UI 장면 준비 — 부팅 후 displayCapabilities 설정 (UI 페이지 전부)',
+      JSON.stringify(r.uiCapsAtBoot.filter((c) => c.caps === null).map((c) => c.label)),
+      '미설정 0 ∧ 페이지 ≥ 1',
+      r.uiCapsAtBoot.length > 0 && r.uiCapsAtBoot.every((c) => c.caps !== null),
+    ],
+    [
       'UI D1 모드 4종 — 트리거 1개 · 열림 aria-expanded · 토글 4개 aria-pressed 가시',
       JSON.stringify(uiModes.map((m) => [m.mode, m.triggers, m.expanded, m.toggles?.length])),
       '모드마다 1 · "true" · 4 ∧ 전부 가시',
@@ -1675,10 +1777,10 @@ function judgeUi(r) {
       ? [
           'UI D9 소프트웨어 렌더 — 별 토글 aria-disabled · 사유 · 클릭 후 별 0 · 전역 · URL',
           JSON.stringify(r.uiD9),
-          'aria-disabled "true" ∧ title ≠ "" ∧ 2회 클릭 내내 pressed "false" · 별 0 · 의도 불변 · URL stars 부재 ∧ __starfieldVisible false',
+          `aria-disabled "true" ∧ title ⊃ "${REASON_MARK.software}" ∧ 2회 클릭 내내 pressed "false" · 별 0 · 의도 불변 · URL stars 부재 ∧ __starfieldVisible false`,
           r.uiD9.ariaDisabled === 'true' &&
             typeof r.uiD9.title === 'string' &&
-            r.uiD9.title.length > 0 &&
+            r.uiD9.title.includes(REASON_MARK.software) &&
             r.uiD9.pressedBefore === 'false' &&
             r.uiD9.clicks.length === DISABLED_CLICKS &&
             r.uiD9.clicks.every(
@@ -1692,9 +1794,11 @@ function judgeUi(r) {
     [
       'UI D10 surface=off — 구름·불빛 aria-disabled · 사유 · 클릭 후 mesh/머티리얼/URL 무변화',
       JSON.stringify(uiD10),
-      'aria-disabled "true" ∧ title ≠ "" ∧ 개수 동일 ∧ 구름 0 ∧ URL 동일 ∧ 매 클릭 뒤 개수 · URL · 의도 불변',
+      `aria-disabled "true" ∧ title ⊃ "${REASON_MARK.surfaceOff}" ∧ 개수 동일 ∧ 구름 0 ∧ URL 동일 ∧ 매 클릭 뒤 개수 · URL · 의도 불변`,
       d10Attrs.length === SURFACE_TOGGLES.length &&
-        d10Attrs.every((a) => a.ariaDisabled === 'true' && !!a.title) &&
+        d10Attrs.every(
+          (a) => a.ariaDisabled === 'true' && (a.title ?? '').includes(REASON_MARK.surfaceOff),
+        ) &&
         uiD10.clicks.length === SURFACE_TOGGLES.length * DISABLED_CLICKS &&
         uiD10.clicks.every(
           (c) =>
@@ -1758,10 +1862,35 @@ function judgeUi(r) {
         uiD14.focusAfterEsc === 'display-panel-toggle',
     ],
     [
+      'UI D14 포커스 순서 — 마지막 토글 Tab → 닫힘 + 트리거 다음 요소 · 첫 토글 Shift+Tab → 트리거 (패널 유지) · 트리거 Tab → 첫 토글',
+      JSON.stringify({
+        nativeNext: uiD14.nativeNext,
+        backToTrigger: uiD14.backToTrigger,
+        lastTab: uiD14.lastTab,
+        firstShiftTab: uiD14.firstShiftTab,
+        triggerTab: uiD14.triggerTab,
+      }),
+      '마지막 Tab → 패널 0 · 트리거의 기본 Tab 목적지 ∧ Shift+Tab → 패널 1 · 트리거 ∧ Tab → 첫 토글',
+      !!uiD14.nativeNext &&
+        uiD14.nativeNext !== 'display-panel-toggle' &&
+        uiD14.backToTrigger === 'display-panel-toggle' &&
+        uiD14.lastTab?.panels === 0 &&
+        uiD14.lastTab?.focus === uiD14.nativeNext &&
+        uiD14.firstShiftTab?.panels === 1 &&
+        uiD14.firstShiftTab?.focus === 'display-panel-toggle' &&
+        uiD14.triggerTab === expectedVisited[0],
+    ],
+    [
       'UI D14 엣지 — focus=earth 에서 패널 Esc → 자유시점 미진입 · 선택 유지',
       `freeFly ${uiD14.freeFlyAfterEsc} · selected ${uiD14.selectedAfterEsc}`,
       'false · earth',
       uiD14.freeFlyAfterEsc === false && uiD14.selectedAfterEsc === 'earth',
+    ],
+    [
+      '자유시점 Esc 양성 대조 — 패널 닫힘 · 선택 있음 · Esc → 자유시점 진입 (#509 — D14 엣지 · D14b 판별력의 전제)',
+      JSON.stringify(r.uiFreeFlyControl),
+      'freeFly true',
+      r.uiFreeFlyControl.freeFly === true,
     ],
     [
       'UI D14b — 패널 연 채 선택 변경 후 Esc → 패널 닫힘 · 자유시점 미진입',
