@@ -119,15 +119,42 @@ describe('DisplayPanel — 열기/닫기', () => {
     expect(screen.queryByTestId('display-panel')).toBeNull();
   });
 
-  it('스크롤 → 닫힘 (요소 scroll 은 bubble 하지 않으므로 capture 로 받는다 — Q4-1)', () => {
-    renderPanel();
-    openPanel();
+  // 스크롤 닫기는 트리거 위치가 바뀐 경우만 (PR #1268 라운드 5). jsdom 은 레이아웃이 없어 트리거 rect 를 스텁한다.
+  const rectAt = (right: number, bottom: number) =>
+    ({
+      right,
+      bottom,
+      top: bottom - 24,
+      left: right - 40,
+      width: 40,
+      height: 24,
+      x: 0,
+      y: 0,
+    }) as DOMRect;
+  const scrollSomething = () => {
     const scroller = document.createElement('div');
     document.body.appendChild(scroller);
     act(() => {
+      // 요소 scroll 은 bubble 하지 않는다 — capture 로 받아야 잡힌다.
       scroller.dispatchEvent(new Event('scroll'));
     });
     document.body.removeChild(scroller);
+  };
+
+  it('트리거 위치가 그대로인 스크롤 (무관한 목록 · 단축 바) → 유지', () => {
+    renderPanel();
+    vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue(rectAt(900, 40));
+    openPanel();
+    scrollSomething();
+    expect(screen.getByTestId('display-panel')).toBeInTheDocument();
+  });
+
+  it('트리거 위치가 바뀐 스크롤 → 닫힘', () => {
+    renderPanel();
+    const spy = vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue(rectAt(900, 40));
+    openPanel();
+    spy.mockReturnValue(rectAt(860, 40));
+    scrollSomething();
     expect(screen.queryByTestId('display-panel')).toBeNull();
   });
 

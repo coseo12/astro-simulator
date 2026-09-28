@@ -26,7 +26,9 @@ import { useSimStore } from '@/store/sim-store';
  *     portal 이라 DOM 상 패널은 문서 끝이다 — 그대로 두면 마지막 토글의 Tab 이 문서 끝으로 빠진다. 그래서
  *     트리거 Tab → 첫 토글 · 첫 토글 Shift+Tab → 트리거 · 마지막 토글 Tab → 패널을 닫고 트리거 다음 요소로 잇는다.
  *     가두는 것이 아니라 나가는 목적지만 DOM 순서에 맞춘다.
- *   - 창 `resize` · 문서 안 모든 스크롤에서 닫는다 — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신 제거한다.
+ *   - 창 `resize` 와 **트리거 위치가 바뀐 스크롤**에서 닫는다 — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신
+ *     제거한다. 무관한 목록 · 단축 바 스크롤에는 유지한다 (모든 스크롤에서 닫으면 Tab 이 일으킨 단축 바 스크롤이 한
+ *     프레임 늦게 도착해 방금 연 패널을 닫았다 — PR #1268 qa 실측).
  *   - 포커스가 트리거와 패널을 둘 다 벗어나면 닫는다 (키보드로 빠져나가는 양방향이 같은 결과).
  *
  * ## 모달과 같은 점
@@ -114,22 +116,29 @@ export function DisplayPanel() {
       if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
       close(false);
     };
-    // resize · scroll — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신 닫아서 없앤다. scroll 은 **문서 안 모든
-    // 스크롤**에서 닫는다 (capture — 요소 scroll 은 bubble 하지 않는다). 좌표를 어긋나게 하는 스크롤 (우측 그룹 · 창) 만
-    // 가려내는 것보다 단순하고 흔한 팝오버 관례와 같다. 대신 사이드 패널 목록처럼 무관한 스크롤에도 닫힌다
-    // (PR #1268 — 메인 결정, cross-validate Q4-1).
-    const onReposition = () => close(false);
+    // resize · scroll — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신 닫아서 없앤다.
+    const onResize = () => close(false);
+    // scroll 은 **트리거 위치가 바뀐 경우에만** 닫는다 — 열 때의 배치와 지금 트리거로 계산한 배치를 정확 비교한다
+    // (배치 식이 같으므로 이것이 「fixed 좌표가 트리거와 어긋났다」 의 술어 그 자체다). capture 로 받는다 — 요소 scroll 은
+    // bubble 하지 않는다. 모든 스크롤에서 닫던 판본은 Tab 이 일으킨 좌측 단축 바 스크롤이 한 프레임 늦게 도착해 방금
+    // 연 패널을 닫았다 (PR #1268 qa 실측 — ADR Amendment 1 에 번복 기록).
+    const onScroll = () => {
+      const trigger = triggerRef.current;
+      if (!trigger || !position) return;
+      const now = resolvePanelPosition(trigger);
+      if (now.top !== position.top || now.right !== position.right) close(false);
+    };
     window.addEventListener('keydown', onKeyDown, { capture: true });
     window.addEventListener('pointerdown', onPointerDown, { capture: true });
-    window.addEventListener('resize', onReposition);
-    window.addEventListener('scroll', onReposition, { capture: true, passive: true });
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
     return () => {
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('pointerdown', onPointerDown, { capture: true });
-      window.removeEventListener('resize', onReposition);
-      window.removeEventListener('scroll', onReposition, { capture: true });
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll, { capture: true });
     };
-  }, [open, close]);
+  }, [open, close, position]);
 
   // 열리면 첫 토글로 포커스 (키보드 사용자가 Enter 직후 바로 Tab 순회를 시작하게).
   useEffect(() => {
