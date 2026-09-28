@@ -71,6 +71,9 @@
  *        양성 대조: 패널이 닫힌 상태의 같은 Esc 는 자유시점으로 **간다** (그래야 위 `false` 술어가 판별력을 가진다 —
  *        리스너가 죽은 회귀는 게이트 FAIL).
  *   D15 UI  패널 토글 4 개 × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors`.
+ *   스크롤  트리거 위치가 바뀐 스크롤에서만 닫는다 — 좌측 단축 바 스크롤 (무관) 뒤 패널 유지 · 좁은 폭 우측 그룹 스크롤
+ *        (트리거 이동) 뒤 패널 닫힘. 레이스: 키 간 지연 0 으로 캔버스 → 트리거 Tab → Enter 를 `RACE_TRIALS` 회 반복해
+ *        방금 연 패널이 늦게 도착한 좌측 스크롤로 닫히지 않는가 (PR #1268 qa 가 실측한 결함).
  *
  * ## SKIP 은 PASS 로 세지 않는다
  *   환경상 판정되지 않는 게이트 (하드웨어 전용 · 소프트웨어 전용) 는 `SKIP` 으로 찍고 요약에서 따로 센다 —
@@ -88,6 +91,8 @@
  *   5 `fade:E|F` fade 재현 큐에 mid 부재   6 `edge:D7e` 토글 시점에 mid 가 이미 있음
  *   9 `det:D8` · `pos:D8` (하드웨어) 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일   15 `renderer` 렌더러 판독 불일치
  *   16 `ctl` 자유시점 양성 대조의 선택 재설정 실패   17 `scroll` 스크롤을 일으키지 못함
+ *   20 `scroll:trigger` 좁은 폭 우측 그룹 스크롤이 트리거를 움직이지 못함   21 `race:scroll` 레이스 반복 중 요소 스크롤 0
+ *   `scroll:unrelated` 좌측 단축 바 스크롤이 트리거를 움직임 (그러면 「무관 스크롤」 이 아니다)
  *   18 `d4:timing` 닫힌 채 4 초 안에 숨지 않았지만 더 기다리니 숨음 (타이머 지연)   19 `reload:boot` 새로고침 뒤 핸들 미노출
  *   타임아웃성 게이트 (토글 뒤 정착 · ON 뒤 머티리얼 준비) 는 **같은 페이지의 토글 전 정착** (`settle:<page>`) 에 기댄다 —
  *   토글 뒤만 초과하면 FAIL, 둘 다 초과하면 측정 불가. mesh **부재**는 타이밍이 아니라 항상 FAIL 이다.
@@ -190,6 +195,13 @@ const DISABLED_CLICKS = 2;
  * 않으므로 `display-toggles.ts` `DISPLAY_DISABLED_REASONS` 의 부분 문자열을 쓴다 — 미준비 사유에는 둘 다 없다.
  */
 const REASON_MARK = { software: '소프트웨어', surfaceOff: 'surface=off' };
+/** 트리거 이동 스크롤 — 우측 그룹이 `overflow-x-auto` 가 되는 좁은 폭 (`max-sm`, 640px 미만). r1-guard 모바일 폭과 같다. */
+const NARROW_VIEWPORT = { width: 375, height: 667 };
+/**
+ * 레이스 반복 수. qa 재현율 SwiftShader `2/19` 를 기준으로 결함 판본을 한 번도 못 잡을 확률이 `(17/19)^40 ≈ 1.2%`
+ * 가 되는 값이다 (새 판정 임계가 아니라 표본 크기 — 판정은 「실패 0 회」).
+ */
+const RACE_TRIALS = 40;
 /** D10 대상 — 표면 종속 토글. */
 const SURFACE_TOGGLES = ['clouds', 'nightLights'];
 
@@ -568,6 +580,15 @@ async function setPanelOpen(page, open) {
 
 const panelCount = (page) => page.locator(PANEL).count();
 
+/** 트리거 화면 위치 (패널 배치 입력값 — `right` · `bottom`) 문자열. 스크롤 닫기 판정의 전제 (트리거가 움직였는가). */
+const readTriggerRect = (page) =>
+  page.evaluate(() => {
+    const r = document
+      .querySelector('[data-testid="display-panel-toggle"]')
+      .getBoundingClientRect();
+    return `${r.right},${r.bottom}`;
+  });
+
 /**
  * 토글 클릭. `aria-disabled` 토글은 Playwright 가 「비활성」으로 보고 actionability 대기에서 멈추므로
  * `force` 로 누른다 — 실제 마우스 클릭은 그대로 일어나고, 차단은 제품(`toggle()` 가용성 검사) 이 해야 한다.
@@ -716,9 +737,9 @@ async function recordBootCaps(ctx, out) {
 }
 
 /** 경량 페이지 — 결정적 프레임이 필요 없는 UI 판정 (D1 · D2 · D10 · D11). */
-async function setupUiPage(browser, query, label) {
+async function setupUiPage(browser, query, label, viewport = { width: 1280, height: 720 }) {
   const context = await browser.newContext({
-    viewport: { width: 1280, height: 720 },
+    viewport,
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
@@ -1115,10 +1136,12 @@ async function runUiInteraction(browser, out, pages) {
   const d3AfterBar = await readOrbitSync();
   out.uiD3 = { initial: d3Initial, afterPanel: d3AfterPanel, afterBar: d3AfterBar };
 
-  // ── 스크롤 시 닫힘 (cross-validate Q4-1) — 패널을 연 채 좌측 단축 바를 실제로 스크롤한다 ──
+  // ── 무관 스크롤 유지 — 패널을 연 채 좌측 단축 바를 실제로 스크롤한다. 트리거가 움직이지 않는 스크롤이라 패널은
+  // 남아야 한다 (라운드 5 — 스크롤 닫기는 트리거 위치가 바뀐 스크롤에서만. qa 가 「모든 스크롤 닫기」 의 레이스를 실측).
   await setPanelOpen(page, true);
-  // 기저 신호 — 스크롤 직전 패널이 실제로 열려 있었는가 (열리자마자 닫히는 회귀에서 「닫힘」 이 공허 참이 되지 않게).
+  // 기저 신호 — 스크롤 직전 패널이 실제로 열려 있었는가 (열리자마자 닫히는 회귀에서 결과가 공허해지지 않게).
   const panelsBeforeScroll = await panelCount(page);
+  const triggerBefore = await readTriggerRect(page);
   const scrolled = await page.evaluate(() => {
     // 단축 바 또는 그 조상 중 실제로 가로 스크롤되는 첫 요소 (상단 바 좌측 그룹도 overflow-x-auto 다).
     let bar = document.querySelector('[data-r1-region="shortcut-bar"]');
@@ -1129,7 +1152,12 @@ async function runUiInteraction(browser, out, pages) {
     return { before, after: bar.scrollLeft };
   });
   await frames(page, 2);
-  out.uiScroll = { scrolled, panelsBefore: panelsBeforeScroll, panels: await panelCount(page) };
+  out.uiScroll = {
+    scrolled,
+    triggerMoved: triggerBefore !== (await readTriggerRect(page)),
+    panelsBefore: panelsBeforeScroll,
+    panels: await panelCount(page),
+  };
   await setPanelOpen(page, false);
 
   // ── D14 — 키보드만: Tab 도달 → Enter → 토글 4개 순회 (Space 반전) → Esc ──
@@ -1416,6 +1444,90 @@ async function runUiUrl(browser, out, pages) {
   out.uiD11Load = d11Load;
 }
 
+/**
+ * 트리거 이동 스크롤 닫힘 — 우측 그룹이 넘치는 좁은 폭 (`max-sm:overflow-x-auto`) 에서 그 컨테이너를 스크롤해
+ * 트리거를 실제로 움직인다. 트리거가 움직이지 않았으면 (스크롤 불가 · 위치 불변) 측정 불가 전제 (20) 이다 —
+ * 「트리거가 움직였는가」 는 하네스 조건, 「닫혔는가」 는 제품 속성 (게이트).
+ */
+async function runUiTriggerScroll(browser, out, pages) {
+  const W = await setupUiPage(browser, UI_BASE, 'W-narrow', NARROW_VIEWPORT);
+  pages.push(W);
+  await recordBootCaps(W, out);
+  const { page } = W;
+  await setPanelOpen(page, true);
+  const panelsBefore = await panelCount(page);
+  const before = await readTriggerRect(page);
+  const scrolled = await page.evaluate(() => {
+    const group = document.querySelector('[data-testid="topbar-right"]');
+    if (!group || group.scrollWidth <= group.clientWidth) return null;
+    const from = group.scrollLeft;
+    group.scrollLeft = from === 0 ? group.scrollWidth : 0;
+    return { from, to: group.scrollLeft };
+  });
+  await frames(page, 2);
+  out.uiTriggerScroll = {
+    scrolled,
+    triggerMoved: before !== (await readTriggerRect(page)),
+    panelsBefore,
+    panels: await panelCount(page),
+  };
+}
+
+/**
+ * 레이스 회귀 — 키 간 지연 0 으로 캔버스 → 트리거까지 Tab → Enter 를 반복해 방금 연 패널이 남는지 본다.
+ * Tab 이 좌측 단축 바를 스크롤시키고 그 scroll 이 한 프레임 늦게 도착해, 「모든 스크롤 닫기」 판본은 막 연 패널을
+ * 닫았다 (PR #1268 qa — SwiftShader 2/19). 반복 수 `RACE_TRIALS` 근거는 상수 주석.
+ */
+async function runUiRace(browser, out, pages) {
+  const Q = await setupUiPage(browser, UI_BASE, 'Q-race');
+  pages.push(Q);
+  await recordBootCaps(Q, out);
+  const { page } = Q;
+  // 레이스의 재료 (요소 스크롤) 가 실제로 생겼는지 센다 — 0 이면 이 환경에서 레이스를 재현할 수 없다 (전제 21).
+  await page.evaluate(() => {
+    window.__raceScrolls = 0;
+    window.addEventListener(
+      'scroll',
+      (e) => {
+        if (e.target !== document) window.__raceScrolls += 1;
+      },
+      { capture: true, passive: true },
+    );
+  });
+  // 캔버스 → 트리거 Tab 수를 한 번 관측한다 (D14 와 같은 런어웨이 상한).
+  await page.locator('[data-testid="sim-canvas"]').focus();
+  const tabBound =
+    2 *
+    (await page.evaluate(
+      () =>
+        document.querySelectorAll('button, a[href], input, select, textarea, [tabindex]').length,
+    ));
+  let tabsToTrigger = 0;
+  while (tabsToTrigger < tabBound) {
+    await page.keyboard.press('Tab');
+    tabsToTrigger += 1;
+    if ((await activeTestId(page)) === 'display-panel-toggle') break;
+  }
+  const trials = [];
+  for (let i = 0; i < RACE_TRIALS; i += 1) {
+    await page.locator('[data-testid="sim-canvas"]').focus();
+    for (let t = 0; t < tabsToTrigger; t += 1) await page.keyboard.press('Tab');
+    const atTrigger = (await activeTestId(page)) === 'display-panel-toggle';
+    await page.keyboard.press('Enter');
+    await frames(page);
+    trials.push({ atTrigger, panels: await panelCount(page), focus: await activeTestId(page) });
+    await setPanelOpen(page, false);
+  }
+  out.uiRace = {
+    tabsToTrigger,
+    scrolls: await page.evaluate(() => window.__raceScrolls),
+    bad: trials.filter(
+      (t) => !t.atTrigger || t.panels !== 1 || t.focus !== 'display-toggle-orbits',
+    ),
+    trials: trials.length,
+  };
+}
+
 /** D10 — `?surface=off`: 구름·불빛 토글 aria-disabled + 사유, 눌러도 mesh · 머티리얼 · URL 무변화. */
 async function runUiSurfaceOff(browser, out, pages) {
   const SF = await setupUiPage(browser, `${UI_BASE}&surface=off`, 'SF-surfaceOff');
@@ -1507,6 +1619,8 @@ async function run(browser) {
       runUiInteraction,
       runUiUrl,
       runUiSurfaceOff,
+      runUiTriggerScroll,
+      runUiRace,
     ]) {
       await section(browser, out, pages);
       await retirePages(out, pages);
@@ -1611,6 +1725,17 @@ function judge(r) {
   // (19) 새로고침 뒤 부팅 미완 — 핸들조차 노출되지 않았다 (환경 저속). 핸들이 있는데 준비만 없으면 게이트 FAIL.
   if (!r.uiD11.reloadReady && r.uiD11.reloadHandles === false)
     fail('reload:boot', '(19) D11 새로고침 뒤 핸들 노출 대기 초과');
+  // (20) 트리거 이동 스크롤 — 좁은 폭에서 우측 그룹 스크롤이 트리거를 실제로 움직였는가 (하네스 조건).
+  if (!r.uiTriggerScroll.scrolled || !r.uiTriggerScroll.triggerMoved)
+    fail(
+      'scroll:trigger',
+      `(20) 트리거를 움직이는 스크롤 미발생 ${JSON.stringify(r.uiTriggerScroll)}`,
+    );
+  // (21) 레이스 재료 — 반복 동안 요소 스크롤이 실제로 있었는가.
+  if (!(r.uiRace.scrolls > 0)) fail('race:scroll', '(21) 레이스 반복 중 요소 스크롤 0');
+  // 무관 스크롤 판정의 전제 — 좌측 단축 바 스크롤이 트리거를 움직이지 않았어야 「무관」 이다.
+  if (r.uiScroll.triggerMoved)
+    fail('scroll:unrelated', '(17) 좌측 단축 바 스크롤이 트리거를 움직였다');
   // (17) 스크롤 닫힘 — 스크롤을 실제로 일으켰는가 (레이아웃상 스크롤할 요소가 없으면 측정 불가).
   if (!r.uiScroll.scrolled || r.uiScroll.scrolled.before === r.uiScroll.scrolled.after)
     fail('scroll', `(17) 스크롤 미발생 ${JSON.stringify(r.uiScroll.scrolled)}`);
@@ -1915,11 +2040,26 @@ function judgeUi(r, settleIds, hw) {
         uiD4.openOpacity === '1' && uiD4.panels === 1,
       ],
     ),
-    gate('UI 스크롤 시 패널 닫힘', ['scroll'], () => [
+    // 스크롤 닫기는 트리거 위치가 바뀐 스크롤에서만 (라운드 5 — (나) 「모든 스크롤」 → (가) 번복, qa 레이스 실측).
+    gate('UI 무관 스크롤 (좌측 단축 바) — 패널 유지', ['scroll', 'scroll:unrelated'], () => [
       JSON.stringify(r.uiScroll),
-      '스크롤 직전 패널 1 ∧ 뒤 0',
-      r.uiScroll.panelsBefore === 1 && r.uiScroll.panels === 0,
+      '스크롤 직전 패널 1 ∧ 뒤 1',
+      r.uiScroll.panelsBefore === 1 && r.uiScroll.panels === 1,
     ]),
+    gate('UI 트리거 이동 스크롤 (좁은 폭 우측 그룹) — 패널 닫힘', ['scroll:trigger'], () => [
+      JSON.stringify(r.uiTriggerScroll),
+      '스크롤 직전 패널 1 ∧ 뒤 0',
+      r.uiTriggerScroll.panelsBefore === 1 && r.uiTriggerScroll.panels === 0,
+    ]),
+    gate(
+      `UI 레이스 — 키 간 지연 0 Tab → Enter × ${RACE_TRIALS}: 방금 연 패널 유지 · 포커스 첫 토글`,
+      ['race:scroll'],
+      () => [
+        `실패 ${r.uiRace.bad.length} / ${r.uiRace.trials} · Tab ${r.uiRace.tabsToTrigger} · 스크롤 ${r.uiRace.scrolls} ${JSON.stringify(r.uiRace.bad.slice(0, 3))}`,
+        `실패 0 / ${RACE_TRIALS}`,
+        r.uiRace.trials === RACE_TRIALS && r.uiRace.bad.length === 0,
+      ],
+    ),
     gate('UI 캡처 직전 패널 요소 수 (D5~D8 UI)', [], () => [
       JSON.stringify(r.uiPanelsAtCapture),
       '전부 0 ∧ 캡처 ≥ 1',
