@@ -39,7 +39,8 @@
     "verify:1215-cloud-layer": "node scripts/browser-verify-1215-cloud-layer.mjs",
     "verify:1204-sun-light": "node scripts/browser-verify-1204-sun-light.mjs",
     "verify:1226-night-lights": "node scripts/browser-verify-1226-night-lights.mjs",
-    "verify:1234-adapter-stall": "node scripts/browser-verify-1234-adapter-stall.mjs"
+    "verify:1234-adapter-stall": "node scripts/browser-verify-1234-adapter-stall.mjs",
+    "verify:1265-display-panel": "node scripts/browser-verify-1265-display-panel.mjs"
   },
   "dependencies": {
     "@astro-simulator/core": "workspace:*",

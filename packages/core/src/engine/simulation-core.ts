@@ -38,6 +38,11 @@ export class SimulationCore {
   #setLodOverrideHandler: ((level: 'high' | 'mid' | 'low' | 'auto') => void) | null = null;
   // #688 — 궤도선 가시성 핸들러. UI 토글 버튼 + URL `?orbits=off` 초기값에서 scene 에 전달.
   #setOrbitLinesVisibleHandler: ((visible: boolean) => void) | null = null;
+  // #1265 — 별 배경 · 지구 구름 · 야간 불빛 런타임 토글 핸들러 (궤도선 #688 동형 — ADR
+  // `20260927-1265-runtime-display-toggles.md` §결정 1). 미등록이면 해당 command 는 no-op.
+  #setStarfieldVisibleHandler: ((visible: boolean) => void) | null = null;
+  #setCloudsVisibleHandler: ((visible: boolean) => void) | null = null;
+  #setNightLightsVisibleHandler: ((visible: boolean) => void) | null = null;
   // #1205 — 프레임 위상 핸들러. 매 프레임 1회, `timeChanged` 와 무관하게 호출된다.
   // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
   #framePassHandler: (() => void) | null = null;
@@ -208,6 +213,35 @@ export class SimulationCore {
   }
 
   /**
+   * #1265 — 별 배경 런타임 토글 핸들러 연결. `setOrbitLinesVisibleHandler` 와 같은 시그니처·수명
+   * (command 라우터가 1회성으로 부르는 핸들러라 `| null` 해제 슬롯이 불요 — `setFramePassHandler`
+   * 주석의 수명 논거가 해당 없다).
+   *
+   * 핸들러는 scene 의 `setStarfieldVisible(visible)` 를 부른다. **소프트웨어 렌더 차단은 여기서 하지
+   * 않는다** — core 는 렌더러 종류를 모르고, 로드 경로가 `resolveStarfieldVisible` 로 web 에서 거르는
+   * 것과 같은 레이어 분리다 (ADR `20260927-1265` §결정 1 · 5).
+   */
+  setStarfieldVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setStarfieldVisibleHandler = handler;
+  }
+
+  /**
+   * #1265 — 지구 구름 런타임 토글 핸들러 연결. 핸들러는 scene 의 `setCloudsVisible(visible)` 를 부른다
+   * (OFF = dispose + 정렬 함수 복원, ON = 로드와 같은 생성 함수 — ADR `20260927-1265` §결정 2).
+   */
+  setCloudsVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setCloudsVisibleHandler = handler;
+  }
+
+  /**
+   * #1265 — 야간 도시 불빛 런타임 토글 핸들러 연결. 핸들러는 scene 의 `setNightLightsVisible(visible)`
+   * 를 부른다 (uniform `nightLightStrength` 갱신 + lazy mid 가 읽는 상태 — ADR `20260927-1265` §결정 4).
+   */
+  setNightLightsVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setNightLightsVisibleHandler = handler;
+  }
+
+  /**
    * #1205 — **프레임 위상** 핸들러 연결. 렌더 루프가 매 프레임 1회 호출한다.
    *
    * `updateAt` 은 `timeChanged` 이벤트 바인딩이라 `TimeController.tick` 이 `false` 를 반환하는
@@ -309,6 +343,16 @@ export class SimulationCore {
       case 'setOrbitLinesVisible':
         // #688 — scene 에 위임. 미등록 시 no-op (scene 초기화 전 순서 무관 — setLodOverride 동일).
         this.#setOrbitLinesVisibleHandler?.(cmd.visible);
+        break;
+      case 'setStarfieldVisible':
+        // #1265 — scene 에 위임. 미등록 시 no-op (setOrbitLinesVisible 동일).
+        this.#setStarfieldVisibleHandler?.(cmd.visible);
+        break;
+      case 'setCloudsVisible':
+        this.#setCloudsVisibleHandler?.(cmd.visible);
+        break;
+      case 'setNightLightsVisible':
+        this.#setNightLightsVisibleHandler?.(cmd.visible);
         break;
       default: {
         const _exhaustive: never = cmd;

@@ -51,6 +51,12 @@ export type CoreEvents = {
  *
  * #688 — `setOrbitLinesVisible` 추가. 궤도선 런타임 토글 (UI 버튼 + URL `?orbits=off` 초기값).
  * `visible` true/false. scene `setOrbitLinesVisible` (satellite 일반화 #627) 로 위임.
+ *
+ * #1265 — `setStarfieldVisible` / `setCloudsVisible` / `setNightLightsVisible` 추가. 별 배경 · 지구
+ * 구름 · 야간 불빛의 런타임 토글 (`setOrbitLinesVisible` 동형 — 효과별 명령, ADR
+ * `docs/decisions/20260927-1265-runtime-display-toggles.md` §결정 1). 로드 시점 `?x=off` 경로와는
+ * 별개이며 그 경로를 바꾸지 않는다. core 는 렌더러 종류를 모른다 — 소프트웨어 렌더에서 별을 막는
+ * 것은 명령을 보내는 web 의 책임이다 (§결정 1 · 5).
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -64,4 +70,7 @@ export type CoreCommand =
   | { type: 'setCameraRadius'; radius: number }
   | { type: 'setMode'; mode: SimMode }
   | { type: 'setLodOverride'; level: 'high' | 'mid' | 'low' | 'auto' }
-  | { type: 'setOrbitLinesVisible'; visible: boolean };
+  | { type: 'setOrbitLinesVisible'; visible: boolean }
+  | { type: 'setStarfieldVisible'; visible: boolean }
+  | { type: 'setCloudsVisible'; visible: boolean }
+  | { type: 'setNightLightsVisible'; visible: boolean };

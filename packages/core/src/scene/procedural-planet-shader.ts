@@ -547,6 +547,23 @@ export function resolveNightLightStrength(nightLights: boolean): number {
   return nightLights ? NIGHT_LIGHT_STRENGTH : 0;
 }
 
+/**
+ * #1265 — `createProceduralPlanetMaterial` 이 만든 머티리얼의 식별자 집합 (ADR
+ * `20260927-1265-runtime-display-toggles.md` §결정 4).
+ *
+ * 런타임 불빛 토글은 「절차 행성 머티리얼만」 uniform 을 갱신해야 한다. 그 판정을 생성 조건의 사본
+ * (`surfaceDetail && kind !== 'star' && SURFACE_TYPE_BY_BODY[id]`) 으로 두면 생성부와 갱신부가 따로
+ * 바뀌며 어긋난다 (volt #69 숨은 상수 클래스). 그래서 **생성 함수가 스스로 등록**하고 갱신부는 이
+ * 집합만 묻는다 — 생성 조건이 바뀌어도 판정은 자동으로 따라간다. WeakSet 이라 dispose 된 머티리얼이
+ * 집합에 남아 GC 를 막지 않는다.
+ */
+const proceduralPlanetMaterials = new WeakSet<ShaderMaterial>();
+
+/** #1265 — 이 머티리얼이 `createProceduralPlanetMaterial` 이 만든 절차 행성 머티리얼인가. */
+export function isProceduralPlanetMaterial(material: unknown): material is ShaderMaterial {
+  return material instanceof ShaderMaterial && proceduralPlanetMaterials.has(material);
+}
+
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
 
@@ -1420,6 +1437,8 @@ export function createProceduralPlanetMaterial(
   const maxZ = scene.activeCamera?.maxZ ?? 1e14;
   material.setFloat('logDepthConstant', 2.0 / (Math.log(maxZ + 1.0) / Math.LN2));
 
+  // #1265 — 런타임 불빛 토글의 대상 판정 (`isProceduralPlanetMaterial`). 반환 직전 = 생성 성공한 것만.
+  proceduralPlanetMaterials.add(material);
   return material;
 }
 

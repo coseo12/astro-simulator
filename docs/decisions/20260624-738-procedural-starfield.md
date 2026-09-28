@@ -177,7 +177,7 @@ astro-simulator 의 정체성은 "감상/탐험형" (`principles.md §1 Visual F
 
 - 실측 star catalog (Hipparcos/Tycho) 기반 정확 별 배치 — 과학 정확성 트랙 (감상 미학과 직교)
 - 별자리 선/이름 라벨 — 교육 트랙
-- 런타임 starfield 토글 UI 버튼 (현재는 `?stars=off` 초기 옵트아웃만)
+- 런타임 starfield 토글 UI 버튼 (현재는 `?stars=off` 초기 옵트아웃만) — **설계: [ADR 20260927-1265](20260927-1265-runtime-display-toggles.md) (#1265, Accepted)**. 해소 표기는 구현 머지 시 (#1265 D18)
 - 성운/은하 텍스처 (에셋 필요 → 사용자 승인)
 
 ---
