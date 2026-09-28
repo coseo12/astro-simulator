@@ -10,7 +10,7 @@
  *  - 알 수 없는 값 → 기본값 `true` (ON) 폴백 + `console.warn`
  *
  * ⚠️ 유효 조건은 core 쪽에서 `nightLights && surfaceDetail` 이다 — `?surface=off` 면 이 값과 무관하게
- * 꺼진다. `?clouds=` 와는 **독립**이다 (서로를 읽지 않는다). URL 초기값만 결정하며 런타임 토글 UI 는 비-범위다.
+ * 꺼진다. `?clouds=` 와는 **독립**이다 (서로를 읽지 않는다). URL 초기값만 결정한다. 런타임 토글은 표시 패널이 `useDisplayToggle` 로 발행하며 (ADR `20260927-1265`), 그때 URL 은 이 함수의 역방향 `serializeDisplayToggle` 로 쓴다.
  */
 
 export function parseNightLightsVisible(urlParam: string | null | undefined): boolean {

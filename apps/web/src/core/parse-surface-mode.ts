@@ -12,7 +12,7 @@
  *    (parse-stars-mode 등 "unknown → 기본 동작" 패턴 정합)
  *
  * 반환은 `boolean` (visible) — scene `createSolarSystemScene({ surfaceDetail: visible })` 옵션과
- * 직접 정합. URL 초기값만 결정하며, 런타임 토글 UI 는 비-범위 (#675 marker / #738 stars 와 동일).
+ * 직접 정합. URL 초기값만 결정하며, 런타임 토글 UI 는 비-범위 (#675 marker 와 동일 — #1265 표시 패널 비목표, ADR `20260927-1265` 재검토 트리거 3).
  */
 
 export function parseSurfaceVisible(urlParam: string | null | undefined): boolean {

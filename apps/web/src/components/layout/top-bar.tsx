@@ -4,14 +4,19 @@ import { useSimStore } from '@/store/sim-store';
 import { useMouseInactivity } from '@/hooks/use-mouse-inactivity';
 import type { ReactNode } from 'react';
 
+/** 관찰 모드 자동 숨김까지의 마우스 비활성 시간 (ms). */
+const AUTO_HIDE_INACTIVITY_MS = 3000;
+
 /**
  * TopBar — 48px 높이 고정.
  * 관찰 모드 + 마우스 3초 비활성 시 페이드아웃 (UI 자기 숨김).
+ * #1265 — 표시 패널이 열려 있는 동안은 숨기지 않는다 (조작 중인 패널의 트리거가 사라지지 않게 — 계약 D4).
  */
 export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode }) {
   const mode = useSimStore((s) => s.mode);
-  const inactive = useMouseInactivity(3000);
-  const hidden = mode === 'observe' && inactive;
+  const displayPanelOpen = useSimStore((s) => s.displayPanelOpen);
+  const inactive = useMouseInactivity(AUTO_HIDE_INACTIVITY_MS);
+  const hidden = mode === 'observe' && inactive && !displayPanelOpen;
 
   return (
     <header
@@ -41,7 +46,10 @@ export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode })
         </span>
         {left}
       </div>
-      <div className="flex items-center gap-2 pointer-events-auto shrink-0 max-sm:shrink max-sm:min-w-0 max-sm:overflow-x-auto max-sm:[scrollbar-width:none]">
+      <div
+        data-testid="topbar-right"
+        className="flex items-center gap-2 pointer-events-auto shrink-0 max-sm:shrink max-sm:min-w-0 max-sm:overflow-x-auto max-sm:[scrollbar-width:none]"
+      >
         {right}
       </div>
     </header>

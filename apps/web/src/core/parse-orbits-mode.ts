@@ -11,7 +11,8 @@
  *    (parse-marker-mode 등 "unknown → 기본 동작" 패턴 정합)
  *
  * 반환은 `boolean` (visible) — scene `setOrbitLinesVisible(visible)` / command `visible` 필드와
- * 직접 정합. URL 초기값만 결정하며, 런타임 토글은 UI 버튼이 command 로 별도 발행한다.
+ * 직접 정합. URL 초기값만 결정한다. 런타임 토글은 단축 바 버튼과 표시 패널이 `useDisplayToggle` 로 발행하며
+ * (ADR `20260927-1265`), 그때 URL 은 이 함수의 역방향 `serializeDisplayToggle` 로 쓴다.
  */
 export function parseOrbitsVisible(urlParam: string | null | undefined): boolean {
   // 미지정 → true (기본 ON — 현행 동작 보존).

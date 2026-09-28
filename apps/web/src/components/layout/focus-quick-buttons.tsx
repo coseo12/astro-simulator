@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
+import { useDisplayToggle } from '@/core/use-display-toggle';
+import { DISPLAY_PANEL_OPEN_ATTR } from './display-panel';
 // #402 — R-Phase allowlist SSoT (named import — scene namespace 경유 금지).
 // ADR `20260504-r-phase-allowlist-guard.md` §Amendment 결정 D1.
 //
@@ -32,6 +34,12 @@ const FOCUS_BUTTONS = [
 const DISABLED_TOOLTIP = '아직 구현되지 않은 천체입니다 (R-Phase 진입 후 활성화)';
 
 /**
+ * Esc→자유시점 차단 대상 — 모달(#737) + 표시 패널(#1265). 셀렉터는 상수 1개로 둔다 (ADR `20260927-1265`
+ * 결정 6). 표시 패널 속성 이름은 패널이 부착하는 쪽 상수에서 파생한다 (두 곳에 문자열을 적지 않는다).
+ */
+const ESC_FREE_FLY_BLOCKERS = `[data-modal-open="true"], [${DISPLAY_PANEL_OPEN_ATTR}="true"]`;
+
+/**
  * TopBar 중앙 영역 — 임시 포커스 단축 버튼.
  * D7 CelestialTree (#26) 완성 후 제거 또는 핵심 4개만 유지.
  *
@@ -43,8 +51,9 @@ export function FocusQuickButtons() {
   const selected = useSimStore((s) => s.selectedBodyId);
   // #688 — 궤도선 토글 버튼 상태 SSoT. URL `?orbits=` 초기값을 sim-canvas 가 store 에 반영.
   const orbitLinesVisible = useSimStore((s) => s.orbitLinesVisible);
-  const setOrbitLinesVisible = useSimStore((s) => s.setOrbitLinesVisible);
   const sendCommand = useSimCommand();
+  // #1265 — 궤도선 토글은 표시 패널과 같은 훅을 쓴다 (Q4 — 같은 store · 같은 URL 쓰기 지점, 계약 D3 · D11).
+  const toggleDisplay = useDisplayToggle();
 
   // #509 — focus 중 Esc 키로 자유시점 진입. focus 없을 때는 no-op (reset 과 구분).
   // input/textarea/contenteditable 포커스 중에는 발화 차단 (사용자 입력 보호).
@@ -52,10 +61,16 @@ export function FocusQuickButtons() {
     if (selected === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // #1265 — 표시 패널(비모달)은 열린 채 선택이 바뀔 수 있어 이 리스너가 패널 리스너보다 뒤에 재등록될 수 있다.
+      // 그래서 속성 가드만으로는 순서에 기댄다 — 패널은 capture 단계에서 Esc 를 받아 preventDefault 하고, 여기서 defaultPrevented 를 먼저 본다.
+      if (e.defaultPrevented) return;
       // #737 — 모달 open 중 Esc 는 모달 닫기 전용. native window listener 라 React
       // stopPropagation 으로 차단 불가 → DOM 속성 가드로 free-fly 오발화 차단
-      // (about/sensitivity/onboarding 3 모달 일괄 정합).
-      if (document.querySelector('[data-modal-open="true"]')) return;
+      // (about/sensitivity/onboarding 3 모달 일괄 정합). #1265 표시 패널도 같은 셀렉터로 병행하지만, 패널 **자신의**
+      // Esc 에 대해서는 이 속성 검사가 실효가 없다 — 패널이 capture 단계에서 먼저 닫히고 그 갱신이 이 리스너 전에
+      // 반영돼 속성이 이미 사라져 있다 (PR2 변이 실측: 위 defaultPrevented 검사를 지우면 선택 변경이 없어도 자유시점이
+      // 발화). 그 경우의 차단은 defaultPrevented 한 줄이 전담한다.
+      if (document.querySelector(ESC_FREE_FLY_BLOCKERS)) return;
       const el = document.activeElement;
       const isEditable =
         el instanceof HTMLInputElement ||
@@ -122,17 +137,13 @@ export function FocusQuickButtons() {
         탐색
       </button>
       {/* #688 — 궤도선 on/off 토글. 27 body (행성+위성 일괄, scene API satellite 일반화 #627).
-          aria-pressed 로 켜짐/꺼짐 a11y 상태 노출. 클릭 → store + command 동시 (UI-owned state). */}
+          aria-pressed 로 켜짐/꺼짐 a11y 상태 노출. #1265 — 클릭은 공용 훅 → store + command + URL(replace). */}
       <button
         type="button"
         data-testid="toggle-orbits"
         aria-pressed={orbitLinesVisible}
         title={orbitLinesVisible ? '궤도선 끄기' : '궤도선 켜기'}
-        onClick={() => {
-          const next = !orbitLinesVisible;
-          setOrbitLinesVisible(next);
-          sendCommand({ type: 'setOrbitLinesVisible', visible: next });
-        }}
+        onClick={() => toggleDisplay('orbits')}
         className={`num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border transition-colors ${
           orbitLinesVisible
             ? 'bg-primary/20 text-fg-primary border-primary/40'
