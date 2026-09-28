@@ -47,13 +47,12 @@ describe('DisplayPanel — 열기/닫기', () => {
     expect(screen.queryByTestId('display-panel')).toBeNull();
   });
 
-  it('열림: aria-expanded=true · aria-controls=패널 id · 토글 4개 aria-pressed · 속성 가드 부착 (D1)', () => {
+  it('열림: aria-expanded=true · aria-controls=패널 id · 토글 4개 aria-pressed (D1)', () => {
     renderPanel();
     openPanel();
     const panel = screen.getByTestId('display-panel');
     expect(trigger()).toHaveAttribute('aria-expanded', 'true');
     expect(trigger()).toHaveAttribute('aria-controls', panel.id);
-    expect(panel).toHaveAttribute('data-display-panel-open', 'true');
     expect(panel).not.toHaveAttribute('aria-modal');
     for (const id of IDS) expect(toggleEl(id)).toHaveAttribute('aria-pressed', 'true');
     expect(useSimStore.getState().displayPanelOpen).toBe(true);
@@ -125,6 +124,91 @@ describe('DisplayPanel — 열기/닫기', () => {
     openPanel();
     unmount();
     expect(useSimStore.getState().displayPanelOpen).toBe(false);
+  });
+});
+
+describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 있는 것처럼 — cross-validate 5-A)', () => {
+  // 트리거 앞뒤에 버튼을 두고, 패널(portal)은 DOM 상 그 뒤 (문서 끝) 에 붙는다.
+  const renderWithSiblings = () =>
+    render(
+      <>
+        <button type="button" data-testid="before">
+          앞
+        </button>
+        <DisplayPanel />
+        <button type="button" data-testid="after">
+          뒤
+        </button>
+      </>,
+      { wrapper: withNuqsTestingAdapter() },
+    );
+
+  it('마지막 토글 Tab → 패널 닫힘 + 트리거 다음 요소로 (문서 끝으로 빠지지 않는다)', () => {
+    renderWithSiblings();
+    openPanel();
+    toggleEl('nightLights').focus();
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    act(() => {
+      toggleEl('nightLights').dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(true);
+    expect(screen.queryByTestId('display-panel')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByTestId('after'));
+  });
+
+  it('첫 토글 Shift+Tab → 트리거 (패널 유지)', () => {
+    renderWithSiblings();
+    openPanel();
+    fireEvent.keyDown(toggleEl('orbits'), { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(trigger());
+    expect(screen.getByTestId('display-panel')).toBeInTheDocument();
+  });
+
+  it('열린 상태의 트리거 Tab → 첫 토글 · 닫힌 상태는 기본 동작', () => {
+    renderWithSiblings();
+    openPanel();
+    trigger().focus();
+    fireEvent.keyDown(trigger(), { key: 'Tab' });
+    expect(document.activeElement).toBe(toggleEl('orbits'));
+    openPanel(); // 닫기
+    trigger().focus();
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    trigger().dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('중간 토글의 Tab 은 기본 동작 (가두지 않는다)', () => {
+    renderWithSiblings();
+    openPanel();
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    act(() => {
+      toggleEl('stars').dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+    expect(screen.getByTestId('display-panel')).toBeInTheDocument();
+  });
+});
+
+describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B — 사유 1회 낭독)', () => {
+  it('비활성 토글: 이름 = 라벨만 · 설명 = 사유', () => {
+    useSimStore.setState({ displayCapabilities: { starfield: false, surfaceDetail: false } });
+    renderPanel();
+    openPanel();
+    const stars = screen.getByRole('button', { name: '별 배경' });
+    expect(stars).toBe(toggleEl('stars'));
+    expect(stars).toHaveAccessibleDescription(DISPLAY_DISABLED_REASONS.softwareRenderer);
+    expect(screen.getByRole('button', { name: '구름' })).toHaveAccessibleDescription(
+      DISPLAY_DISABLED_REASONS.surfaceOff,
+    );
+  });
+
+  it('활성 토글: 이름 = 라벨만 · 설명 없음 (켜짐/꺼짐은 aria-pressed 로)', () => {
+    renderPanel();
+    openPanel();
+    const orbits = screen.getByRole('button', { name: '궤도선' });
+    expect(orbits).toBe(toggleEl('orbits'));
+    expect(orbits).toHaveAccessibleDescription('');
+    expect(orbits).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

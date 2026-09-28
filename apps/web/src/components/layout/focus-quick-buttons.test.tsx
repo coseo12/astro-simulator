@@ -434,21 +434,7 @@ describe('FocusQuickButtons — Esc 충돌 가드 (#737 data-modal-open)', () =>
     }
   });
 
-  it('#1265 — focus 중 표시 패널 열림([data-display-panel-open]) + Esc → enterFreeFly 미발화', () => {
-    useSimStore.setState({ selectedBodyId: 'earth' });
-    render(<FocusQuickButtons />);
-    const panel = document.createElement('div');
-    panel.setAttribute('data-display-panel-open', 'true');
-    document.body.appendChild(panel);
-    try {
-      fireEvent.keyDown(window, { key: 'Escape' });
-      expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
-    } finally {
-      document.body.removeChild(panel);
-    }
-  });
-
-  it('#1265 — 앞선 리스너가 preventDefault 한 Esc → enterFreeFly 미발화 (속성이 이미 사라진 경우에도)', () => {
+  it('#1265 — 앞선 리스너(표시 패널 capture)가 preventDefault 한 Esc → enterFreeFly 미발화', () => {
     useSimStore.setState({ selectedBodyId: 'earth' });
     render(<FocusQuickButtons />);
     // 표시 패널의 capture 리스너를 흉내 낸다 — 속성 없이 defaultPrevented 만 남긴다 (리스너 순서 역전 시나리오).

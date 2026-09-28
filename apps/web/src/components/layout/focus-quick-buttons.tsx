@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
 import { useDisplayToggle } from '@/core/use-display-toggle';
-import { DISPLAY_PANEL_OPEN_ATTR } from './display-panel';
 // #402 — R-Phase allowlist SSoT (named import — scene namespace 경유 금지).
 // ADR `20260504-r-phase-allowlist-guard.md` §Amendment 결정 D1.
 //
@@ -34,12 +33,6 @@ const FOCUS_BUTTONS = [
 const DISABLED_TOOLTIP = '아직 구현되지 않은 천체입니다 (R-Phase 진입 후 활성화)';
 
 /**
- * Esc→자유시점 차단 대상 — 모달(#737) + 표시 패널(#1265). 셀렉터는 상수 1개로 둔다 (ADR `20260927-1265`
- * 결정 6). 표시 패널 속성 이름은 패널이 부착하는 쪽 상수에서 파생한다 (두 곳에 문자열을 적지 않는다).
- */
-const ESC_FREE_FLY_BLOCKERS = `[data-modal-open="true"], [${DISPLAY_PANEL_OPEN_ATTR}="true"]`;
-
-/**
  * TopBar 중앙 영역 — 임시 포커스 단축 버튼.
  * D7 CelestialTree (#26) 완성 후 제거 또는 핵심 4개만 유지.
  *
@@ -61,16 +54,14 @@ export function FocusQuickButtons() {
     if (selected === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      // #1265 — 표시 패널(비모달)은 열린 채 선택이 바뀔 수 있어 이 리스너가 패널 리스너보다 뒤에 재등록될 수 있다.
-      // 그래서 속성 가드만으로는 순서에 기댄다 — 패널은 capture 단계에서 Esc 를 받아 preventDefault 하고, 여기서 defaultPrevented 를 먼저 본다.
+      // #1265 — 표시 패널은 capture 단계에서 Esc 를 받아 preventDefault 하고 닫힌다. 이 리스너(bubble)가 돌 때 패널은
+      // 선택 변경 여부와 무관하게 **이미 없으므로** DOM 속성으로는 막을 수 없다 (PR #1268 변이 c 실측) — 이 한 줄이
+      // 패널 Esc 의 유일한 차단이다 (ADR `20260927-1265` Amendment 1).
       if (e.defaultPrevented) return;
       // #737 — 모달 open 중 Esc 는 모달 닫기 전용. native window listener 라 React
       // stopPropagation 으로 차단 불가 → DOM 속성 가드로 free-fly 오발화 차단
-      // (about/sensitivity/onboarding 3 모달 일괄 정합). #1265 표시 패널도 같은 셀렉터로 병행하지만, 패널 **자신의**
-      // Esc 에 대해서는 이 속성 검사가 실효가 없다 — 패널이 capture 단계에서 먼저 닫히고 그 갱신이 이 리스너 전에
-      // 반영돼 속성이 이미 사라져 있다 (PR2 변이 실측: 위 defaultPrevented 검사를 지우면 선택 변경이 없어도 자유시점이
-      // 발화). 그 경우의 차단은 defaultPrevented 한 줄이 전담한다.
-      if (document.querySelector(ESC_FREE_FLY_BLOCKERS)) return;
+      // (about/sensitivity/onboarding 3 모달 일괄 정합).
+      if (document.querySelector('[data-modal-open="true"]')) return;
       const el = document.activeElement;
       const isEditable =
         el instanceof HTMLInputElement ||
