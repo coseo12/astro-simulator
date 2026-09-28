@@ -6,6 +6,7 @@ import {
   useId,
   useRef,
   useState,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -25,7 +26,8 @@ import { useSimStore } from '@/store/sim-store';
  *     portal 이라 DOM 상 패널은 문서 끝이다 — 그대로 두면 마지막 토글의 Tab 이 문서 끝으로 빠진다. 그래서
  *     트리거 Tab → 첫 토글 · 첫 토글 Shift+Tab → 트리거 · 마지막 토글 Tab → 패널을 닫고 트리거 다음 요소로 잇는다.
  *     가두는 것이 아니라 나가는 목적지만 DOM 순서에 맞춘다.
- *   - 창 `resize` 시 닫는다 — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신 제거한다.
+ *   - 창 `resize` · 스크롤 시 닫는다 — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신 제거한다.
+ *   - 포커스가 트리거와 패널을 둘 다 벗어나면 닫는다 (키보드로 빠져나가는 양방향이 같은 결과).
  *
  * ## 모달과 같은 점
  *   - `createPortal(document.body)` + `fixed` + `z-[var(--z-dropdown)]`. (i) 모바일 우측 그룹이
@@ -50,12 +52,17 @@ interface PanelPosition {
   right: number;
 }
 
-/** 패널을 빼고 본 문서 포커스 순서에서 트리거 바로 다음 요소 (없으면 `null`). */
+/**
+ * 패널을 빼고 본 문서 포커스 순서에서 트리거 바로 다음 요소. 트리거가 순서에 없거나 (조상 `inert` 등) 마지막이면
+ * `null` — 호출부가 트리거로 되돌린다 (`indexOf` 가 -1 일 때 `+1` 로 문서 첫 요소로 튀지 않게, reviewer R5).
+ */
 function nextFocusableAfter(trigger: HTMLElement, panel: HTMLElement | null): HTMLElement | null {
   const order = getFocusableElements(trigger.ownerDocument.body).filter(
     (el) => !panel?.contains(el),
   );
-  return order[order.indexOf(trigger) + 1] ?? null;
+  const i = order.indexOf(trigger);
+  if (i < 0) return null;
+  return order[i + 1] ?? null;
 }
 
 /** 트리거 우측 정렬 + 뷰포트 안쪽 clamp. */
@@ -93,7 +100,7 @@ export function DisplayPanel() {
     setOpen(true);
   };
 
-  // 열린 동안만 전역 리스너 — Esc (capture) · 패널 밖 pointerdown · resize.
+  // 열린 동안만 전역 리스너 — Esc (capture) · 패널 밖 pointerdown · resize · scroll.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -107,14 +114,18 @@ export function DisplayPanel() {
       if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
       close(false);
     };
-    const onResize = () => close(false);
+    // resize · scroll — `fixed` 좌표가 트리거와 어긋나는 것을 재계산 대신 닫아서 없앤다. scroll 은 capture 로 받는다
+    // (요소 scroll 은 bubble 하지 않는다 — 우측 그룹이 좁은 폭에서 overflow-x-auto 다, cross-validate Q4-1).
+    const onReposition = () => close(false);
     window.addEventListener('keydown', onKeyDown, { capture: true });
     window.addEventListener('pointerdown', onPointerDown, { capture: true });
-    window.addEventListener('resize', onResize);
+    window.addEventListener('resize', onReposition);
+    window.addEventListener('scroll', onReposition, { capture: true, passive: true });
     return () => {
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('pointerdown', onPointerDown, { capture: true });
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', onReposition);
+      window.removeEventListener('scroll', onReposition, { capture: true });
     };
   }, [open, close]);
 
@@ -151,8 +162,20 @@ export function DisplayPanel() {
       e.preventDefault();
       const next = nextFocusableAfter(trigger, panelRef.current);
       close(false);
-      next?.focus();
+      // 이어 갈 요소가 없으면 트리거로 — 언마운트되는 토글에 포커스가 남아 body 로 떨어지지 않게.
+      (next ?? trigger).focus();
     }
+  };
+
+  // 포커스가 트리거와 패널을 **둘 다** 벗어나면 닫는다 (cross-validate Q3-1 — 마지막 토글 Tab 경로와 대칭).
+  // 예: 첫 토글 Shift+Tab → 트리거 (패널 유지) → 다시 Shift+Tab. `relatedTarget` 이 없으면 (창 전환 · 비포커스
+  // 영역 클릭) 판단하지 않는다 — 클릭은 패널 밖 `pointerdown` 이 이미 닫는다.
+  const handleBlur = (e: ReactFocusEvent<HTMLElement>) => {
+    if (!open) return;
+    const to = e.relatedTarget;
+    if (!(to instanceof Node)) return;
+    if (panelRef.current?.contains(to) || triggerRef.current?.contains(to)) return;
+    close(false);
   };
 
   // 열린 채 언마운트되면 store 가 열림으로 남아 상단 바 자동 숨김이 영구 억제된다 — 수명 경계에서 닫는다.
@@ -170,6 +193,7 @@ export function DisplayPanel() {
         title="별 배경 · 구름 · 야간 불빛 · 궤도선 켜고 끄기"
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
+        onBlur={handleBlur}
         className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
@@ -184,6 +208,7 @@ export function DisplayPanel() {
               aria-labelledby={titleId}
               data-testid="display-panel"
               onKeyDown={handlePanelKeyDown}
+              onBlur={handleBlur}
               className="fixed z-[var(--z-dropdown)] w-60 bg-bg-surface border border-border-subtle rounded-sm p-3 shadow-lg"
               style={{ top: position.top, right: position.right }}
             >

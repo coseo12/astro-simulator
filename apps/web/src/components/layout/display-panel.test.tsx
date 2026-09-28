@@ -119,6 +119,18 @@ describe('DisplayPanel — 열기/닫기', () => {
     expect(screen.queryByTestId('display-panel')).toBeNull();
   });
 
+  it('스크롤 → 닫힘 (요소 scroll 은 bubble 하지 않으므로 capture 로 받는다 — Q4-1)', () => {
+    renderPanel();
+    openPanel();
+    const scroller = document.createElement('div');
+    document.body.appendChild(scroller);
+    act(() => {
+      scroller.dispatchEvent(new Event('scroll'));
+    });
+    document.body.removeChild(scroller);
+    expect(screen.queryByTestId('display-panel')).toBeNull();
+  });
+
   it('열린 채 언마운트 → store 열림 해제 (자동 숨김 영구 억제 방지)', () => {
     const { unmount } = renderPanel();
     openPanel();
@@ -175,6 +187,60 @@ describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 �
     const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     trigger().dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('트리거 다음 요소가 없으면 마지막 토글 Tab → 트리거로 (body 로 떨어지지 않는다 — reviewer R5)', () => {
+    renderPanel(); // 형제 없음 — 패널을 빼면 트리거가 문서의 마지막 포커서블이다
+    openPanel();
+    act(() => {
+      toggleEl('nightLights').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+      );
+    });
+    expect(screen.queryByTestId('display-panel')).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it('트리거가 포커스 순서에 없으면 (조상 inert) 문서 첫 요소로 튀지 않고 트리거로', () => {
+    render(
+      <>
+        <button type="button" data-testid="before">
+          앞
+        </button>
+        <div inert>
+          <DisplayPanel />
+        </div>
+        <button type="button" data-testid="after">
+          뒤
+        </button>
+      </>,
+      { wrapper: withNuqsTestingAdapter() },
+    );
+    openPanel();
+    act(() => {
+      toggleEl('nightLights').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+      );
+    });
+    expect(document.activeElement).not.toBe(screen.getByTestId('before'));
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it('포커스가 트리거와 패널을 둘 다 벗어나면 닫힘 (첫 토글 Shift+Tab → 트리거 → 다시 앞으로 — Q3-1)', () => {
+    renderWithSiblings();
+    openPanel();
+    fireEvent.keyDown(toggleEl('orbits'), { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(trigger());
+    expect(screen.getByTestId('display-panel')).toBeInTheDocument();
+    act(() => screen.getByTestId('before').focus());
+    expect(screen.queryByTestId('display-panel')).toBeNull();
+  });
+
+  it('포커스 이동 대상이 없는 blur (창 전환 등) 는 닫지 않는다', () => {
+    renderWithSiblings();
+    openPanel();
+    act(() => toggleEl('orbits').blur());
+    expect(screen.getByTestId('display-panel')).toBeInTheDocument();
   });
 
   it('중간 토글의 Tab 은 기본 동작 (가두지 않는다)', () => {
