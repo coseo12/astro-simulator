@@ -246,7 +246,9 @@ jobs:
       # 해당 `?x=off` 로드 화면과 같은 결정적 프레임으로 비교한다 — 판정식은 1215 · 1226 의 disk 역투영
       # (새 임계 0). 별 배경 픽셀 (D8) 은 하드웨어 전용이라 여기(SwiftShader)서는 SKIP 이 정상이고 구조
       # 판정과 D8p 전제만 돈다. exit 2 는 「측정 불가」. 소스 변이 실증은 PR 시점 1회 의무 (CI 미배선).
-      - name: verify:1265-display-panel (런타임 토글 = 로드 off 픽셀 동등 + 구조 + 누수 + 콘솔)
+      # PR2 — 같은 쌍을 표시 패널 클릭으로 다시 판정하고 패널 계약 (D1~D4 · D9~D11 · D14 · D15) 을 더했다.
+      # 하드웨어 전용 게이트는 SKIP 으로 따로 세서 요약에 드러난다 (PASS 계수에 넣지 않는다).
+      - name: verify:1265-display-panel (런타임 토글 = 로드 off 픽셀 동등 + 구조 + 누수 + 콘솔 + 표시 패널 UI)
         run: |
           trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
           HEADFUL=0 BASE_URL=http://localhost:3001 \
