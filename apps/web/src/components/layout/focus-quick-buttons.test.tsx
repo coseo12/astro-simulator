@@ -1,4 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import { withNuqsTestingAdapter, type UrlUpdateEvent } from 'nuqs/adapters/testing';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
@@ -11,8 +13,15 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
+// #1265 — 궤도선 버튼이 공용 훅(`useDisplayToggle` → nuqs `useQueryStates`)을 쓰므로 nuqs 어댑터가 필요하다.
+// URL 갱신은 `onUrlUpdate` 스파이로 관측한다.
+let onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
+const render = (ui: ReactElement) =>
+  rtlRender(ui, { wrapper: withNuqsTestingAdapter({ onUrlUpdate }) });
+
 beforeEach(() => {
   sentCommands = [];
+  onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
   useSimStore.setState({
     rendererKind: null,
     engineError: null,
@@ -380,6 +389,16 @@ describe('FocusQuickButtons — 궤도선 토글 (#688)', () => {
     expect(sentCommands).toContainEqual({ type: 'setOrbitLinesVisible', visible: true });
     expect(useSimStore.getState().orbitLinesVisible).toBe(true);
   });
+
+  it('#1265 — 클릭은 URL 에도 반영된다 (OFF → `orbits=off`, history replace — D11)', async () => {
+    useSimStore.setState({ orbitLinesVisible: true });
+    render(<FocusQuickButtons />);
+    fireEvent.click(screen.getByTestId('toggle-orbits'));
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.get('orbits')).toBe('off');
+    expect(last.options.history).toBe('replace');
+  });
 });
 
 /**
@@ -412,6 +431,20 @@ describe('FocusQuickButtons — Esc 충돌 가드 (#737 data-modal-open)', () =>
       expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
     } finally {
       document.body.removeChild(modal);
+    }
+  });
+
+  it('#1265 — 앞선 리스너(표시 패널 capture)가 preventDefault 한 Esc → enterFreeFly 미발화', () => {
+    useSimStore.setState({ selectedBodyId: 'earth' });
+    render(<FocusQuickButtons />);
+    // 표시 패널의 capture 리스너를 흉내 낸다 — 속성 없이 defaultPrevented 만 남긴다 (리스너 순서 역전 시나리오).
+    const capture = (e: KeyboardEvent) => e.preventDefault();
+    window.addEventListener('keydown', capture, { capture: true });
+    try {
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
+    } finally {
+      window.removeEventListener('keydown', capture, { capture: true });
     }
   });
 

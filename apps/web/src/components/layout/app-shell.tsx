@@ -15,6 +15,7 @@ import { PhysicsEngineToggle } from './physics-engine-toggle';
 import { SensitivitySettingsModal } from './sensitivity-settings-modal';
 import { OnboardingModal } from './onboarding-modal';
 import { BookmarkButton } from './bookmark-button';
+import { DisplayPanel } from './display-panel';
 import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 import { SatelliteZoomTooltip } from '../ui/satellite-zoom-tooltip';
@@ -43,6 +44,8 @@ export function AppShell() {
                   "P2 확장" 은 폐기된 v2 로드맵 잔재. 재도입 시 실 포매터와 함께 신규 이슈로. */}
               <PhysicsEngineToggle />
               <SensitivitySettingsModal />
+              {/* #1265 — 표시 효과 런타임 토글 (ADR 20260927-1265 결정 6 — 감도 설정과 북마크 사이). */}
+              <DisplayPanel />
               <BookmarkButton />
               {/* #737 — "조작 가이드"(조작법) 와 "?"(데이터 출처) 는 의미 직교 → 버튼 분리 공존. */}
               <OnboardingModal />

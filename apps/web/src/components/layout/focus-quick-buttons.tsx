@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
+import { useDisplayToggle } from '@/core/use-display-toggle';
 // #402 — R-Phase allowlist SSoT (named import — scene namespace 경유 금지).
 // ADR `20260504-r-phase-allowlist-guard.md` §Amendment 결정 D1.
 //
@@ -43,8 +44,9 @@ export function FocusQuickButtons() {
   const selected = useSimStore((s) => s.selectedBodyId);
   // #688 — 궤도선 토글 버튼 상태 SSoT. URL `?orbits=` 초기값을 sim-canvas 가 store 에 반영.
   const orbitLinesVisible = useSimStore((s) => s.orbitLinesVisible);
-  const setOrbitLinesVisible = useSimStore((s) => s.setOrbitLinesVisible);
   const sendCommand = useSimCommand();
+  // #1265 — 궤도선 토글은 표시 패널과 같은 훅을 쓴다 (Q4 — 같은 store · 같은 URL 쓰기 지점, 계약 D3 · D11).
+  const toggleDisplay = useDisplayToggle();
 
   // #509 — focus 중 Esc 키로 자유시점 진입. focus 없을 때는 no-op (reset 과 구분).
   // input/textarea/contenteditable 포커스 중에는 발화 차단 (사용자 입력 보호).
@@ -52,6 +54,10 @@ export function FocusQuickButtons() {
     if (selected === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // #1265 — 표시 패널은 capture 단계에서 Esc 를 받아 preventDefault 하고 닫힌다. 이 리스너(bubble)가 돌 때 패널은
+      // 선택 변경 여부와 무관하게 **이미 없으므로** DOM 속성으로는 막을 수 없다 (PR #1268 변이 c 실측) — 이 한 줄이
+      // 패널 Esc 의 유일한 차단이다 (ADR `20260927-1265` Amendment 1).
+      if (e.defaultPrevented) return;
       // #737 — 모달 open 중 Esc 는 모달 닫기 전용. native window listener 라 React
       // stopPropagation 으로 차단 불가 → DOM 속성 가드로 free-fly 오발화 차단
       // (about/sensitivity/onboarding 3 모달 일괄 정합).
@@ -122,17 +128,13 @@ export function FocusQuickButtons() {
         탐색
       </button>
       {/* #688 — 궤도선 on/off 토글. 27 body (행성+위성 일괄, scene API satellite 일반화 #627).
-          aria-pressed 로 켜짐/꺼짐 a11y 상태 노출. 클릭 → store + command 동시 (UI-owned state). */}
+          aria-pressed 로 켜짐/꺼짐 a11y 상태 노출. #1265 — 클릭은 공용 훅 → store + command + URL(replace). */}
       <button
         type="button"
         data-testid="toggle-orbits"
         aria-pressed={orbitLinesVisible}
         title={orbitLinesVisible ? '궤도선 끄기' : '궤도선 켜기'}
-        onClick={() => {
-          const next = !orbitLinesVisible;
-          setOrbitLinesVisible(next);
-          sendCommand({ type: 'setOrbitLinesVisible', visible: next });
-        }}
+        onClick={() => toggleDisplay('orbits')}
         className={`num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border transition-colors ${
           orbitLinesVisible
             ? 'bg-primary/20 text-fg-primary border-primary/40'

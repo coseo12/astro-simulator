@@ -14,6 +14,7 @@
  *      기본 상태만 측정해 패널/모달을 열지 않아 본 결함을 못 봤다 (게이트 사각).
  *      research 패널 + about/sensitivity 모달을 열어 axe `color-contrast` violation 을
  *      surface 별로 측정. baseline 초과 시 fail-fast.
+ *      #1265 — 표시 패널(비모달 드롭다운) 추가. baseline JSON 에 없는 surface 는 `0` 이 기준이다.
  *
  * 운영:
  *   - 일반 실행: `node scripts/verify-a11y-baseline.mjs` — baseline JSON 과 비교, 회귀 시 fail
@@ -155,7 +156,7 @@ function computeMoonOrbitContrast() {
 
 // 스캔 대상 surface 정의 (SSoT). 각 surface 는 testid 트리거로만 진입 (cross-validate (다)).
 // readyTestId = open 완료를 관측할 컨테이너 testid (마크업 변경 시 명시 실패 → 침묵 통과 차단).
-const OPEN_SURFACES = ['research-panels', 'about-modal', 'sensitivity-modal'];
+const OPEN_SURFACES = ['research-panels', 'about-modal', 'sensitivity-modal', 'display-panel'];
 
 // open 후 페이드인 transition 정착 대기 (cross-validate (가) flakiness 방지).
 // framer-motion (패널 0.25s) / backdrop-blur (모달) 가 정착하기 전 axe 스캔하면
@@ -270,6 +271,23 @@ async function measureOpenSurfaces(page) {
     '[data-testid="sensitivity-settings-modal"]',
   );
   await page.locator('[data-testid="sensitivity-close"]').click();
+  await page.waitForSelector('[data-testid="sensitivity-settings-modal"]', {
+    state: 'detached',
+    timeout: 5000,
+  });
+
+  // ----- 4. display-panel (#1265 D13 — 비모달 드롭다운. 트리거 재클릭으로 닫는다) -----
+  const displayBtn = page.locator('[data-testid="display-panel-toggle"]');
+  if ((await displayBtn.count()) === 0) {
+    throw new Error(
+      '[open-surface] display-panel-toggle 트리거 부재 — 마크업 변경? (testid 셀렉터 깨짐)',
+    );
+  }
+  await displayBtn.click();
+  await waitForSurfaceStable(page, '[data-testid="display-panel"]');
+  results['display-panel'] = await scanColorContrast(page, '[data-testid="display-panel"]');
+  await displayBtn.click();
+  await page.waitForSelector('[data-testid="display-panel"]', { state: 'detached', timeout: 5000 });
 
   return results;
 }
