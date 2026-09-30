@@ -97,6 +97,8 @@
 
 > **`?orbits` 가 command/handler 인 이유**: orbits 는 런타임 토글 버튼 (focus-quick-buttons) 이 있어 command 경유가 필수다. surface 는 토글 버튼이 비목표이므로 `?marker` 의 생성 옵션 패턴이 최소 정합 표면이다.
 
+> **후속 부기 (#1265, 2026-09-27)** — 원문 무변경. 구름 (§A10.9 결정 8) · 야간 불빛 (§A11.6 결정 4) 은 [ADR 20260927-1265](20260927-1265-runtime-display-toggles.md) 에서 위 **패턴 B** (command/handler + store + 런타임 토글) 를 추가 채택한다. 로드 경로 (`?clouds=off` · `?nightlights=off`) 는 그대로다. **표면 (`?surface=`) 은 패턴 A 유지** — 표면 런타임 토글은 #1265 비목표이며 본 결정 4 의 재개정이 선행 조건이다.
+
 ### 결정 5 — 데이터 SSoT: base color uniform 전달
 
 `colorHint.hex` (base 색상) 를 셰이더 `uniform vec3 baseColor` 로 전달하고, 절차적 변조 (명암 / 밴드 / 크레이터 / dust) 는 그 위에 합성한다. 물리 반경/색상 데이터는 불변. 변조 강도 상수는 `procedural-planet-shader.ts` 의 rendering-only 미학 상수 SSoT (starfield 패턴 — re-export + 단위 테스트 가드).

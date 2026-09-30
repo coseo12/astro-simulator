@@ -288,6 +288,21 @@ describe('#1215 (C) HostFamilyRegistry — 식별자 집합', () => {
     expect(registry.resolve(asMesh(lookalike as StubMesh))).toBeUndefined();
     expect(registry.resolve(asMesh(host))?.rank).toBe(HOST_FAMILY_RANK);
   });
+
+  it('#1265 clear() — entries · hosts 둘 다 비운다 (이후 member 등록은 로드 OFF 처럼 false)', () => {
+    const registry = new HostFamilyRegistry();
+    const host = stubMesh(new Vector3());
+    const cloud = stubMesh(new Vector3());
+    const mid = stubMesh(new Vector3());
+    registry.registerHost(asMesh(host));
+    registry.registerMember(asMesh(cloud), asMesh(host), CLOUD_SORT_RANK);
+    registry.clear();
+    expect(registry.resolve(asMesh(host))).toBeUndefined();
+    expect(registry.resolve(asMesh(cloud))).toBeUndefined();
+    expect(registry.isHost(asMesh(host))).toBe(false);
+    // hosts 까지 비지 않으면 OFF 중 생성된 variant 가 계열로 새어 들어간다.
+    expect(registry.registerMember(asMesh(mid), asMesh(host), HOST_FAMILY_RANK)).toBe(false);
+  });
 });
 
 // ─── (D) NullEngine ─────────────────────────────────────────────────────────

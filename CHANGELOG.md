@@ -5,6 +5,41 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.90.0] - 2026-09-30
+
+### Added
+
+- **[#1265] 런타임 표시 토글 — 상단 바 「표시」 패널** ([#1265](https://github.com/coseo12/astro-simulator/issues/1265), ADR [`20260927-1265`](docs/decisions/20260927-1265-runtime-display-toggles.md)). 로드 시점 `?x=off` 로만 끌 수 있던 별 배경 · 지구 구름 · 야간 불빛을 궤도선과 함께 화면에서 켜고 끈다. 2 PR 로 나눠 구현했다 (ADR 결정 8).
+  - **core** (PR [#1267](https://github.com/coseo12/astro-simulator/pull/1267)) — `CoreCommand` `setStarfieldVisible` · `setCloudsVisible` · `setNightLightsVisible` + scene setter 3종. 구름 OFF 는 dispose + 그룹 0 정렬 함수 복원 + 계열 레지스트리 비움, 별은 없을 때만 지연 생성 뒤 `setEnabled`, 불빛은 `surfaceLightingArgs.nightLights` 단일 상태 + 절차 머티리얼 uniform.
+  - **web** (PR [#1268](https://github.com/coseo12/astro-simulator/pull/1268)) — 데이터 테이블 `display-toggles.ts` (4 토글의 URL 키 · 라벨 · 역방향 파서 · 명령 · 가용성 · 비활성 사유 SSoT) · 공용 훅 `useDisplayToggle` (store → command → URL 을 한 호출에서) · `DisplayPanel` (portal · 비모달 · Tab trap 없음 — 포커스 순서는 트리거 바로 뒤처럼 잇는다 · Esc window capture · 패널 밖 pointerdown / resize 시 닫힘). 단축 바 궤도선 버튼도 같은 훅을 쓴다.
+  - **가드** `verify:1265-display-panel` 에 UI 섹션 — 같은 로드 기준 쌍으로 D5–D8 을 **패널 클릭**으로 다시 판정하고 (캡처 전 패널 닫힘 + 패널 요소 0 확인 — #1219), 패널 계약 D1–D4 · D9–D11 · D14 · D15 를 더했다. `verify:a11y-baseline` open-surface 에 `display-panel` 추가 (D13).
+
+### Behavior Changes
+
+- **상단 바 우측에 「표시」 버튼이 생겼다** — 감도 설정과 북마크 사이. 누르면 비모달 패널이 열리고 궤도선 · 별 배경 · 구름 · 야간 불빛을 켜고 끈다. 별 배경 · 구름 · 야간 불빛을 끈 화면은 해당 `?x=off` 로드 화면과 같다 (가드 — 구름 · 불빛은 지구 disk 변화 `0` px, 별 배경은 full frame 변화 `0` px · 하드웨어 전용). 궤도선은 단축 바 버튼과 같은 기존 명령(`setOrbitLinesVisible`, #688) 을 쓴다.
+- **토글이 URL 에 반영된다** (`history: replace` — 뒤로 가기 항목 없음). 끄면 `?<키>=off`, 켜면 키 삭제. 단축 바 **궤도선 버튼도 이제 URL 을 쓴다** — 그래서 북마크 버튼이 복사하는 URL 이 현재 표시 상태를 담는다 (`?orbits=off` 로드 후 켜고 북마크하면 `orbits=off` 가 남던 불일치 해소).
+- **소프트웨어 렌더에서는 별 배경 토글이, `?surface=off` 에서는 구름 · 불빛 토글이 비활성**이다 — `aria-disabled="true"` + 사유 (`title` · 화면 문구 · `aria-describedby`). 포커스와 클릭은 받지만 아무것도 바꾸지 않는다. 소프트웨어 렌더 별 미생성 계약 (#745) 은 그대로다.
+- **패널이 열려 있는 동안 관찰 모드 상단 바 자동 숨김(3초)이 멈춘다.**
+- **패널이 닫히는 경우** — Esc · 「표시」 재클릭 · 패널 밖 클릭 · 창 크기 변경 · 「표시」 버튼 위치가 바뀌는 스크롤 (무관한 목록 · 단축 바 스크롤에는 유지) · 키보드 포커스가 패널과 「표시」 버튼을 둘 다 벗어날 때. 키보드로는 패널이 「표시」 버튼 바로 뒤에 있는 것처럼 이어진다 (마지막 토글에서 Tab → 패널을 닫고 다음 버튼으로).
+- **Esc — 패널이 열려 있으면 패널만 닫고 포커스를 「표시」 버튼으로 돌린다.** 천체 포커스 중이어도 자유시점으로 넘어가지 않는다. 자유시점 Esc 리스너는 이제 `event.defaultPrevented` 를 보므로, 다른 위젯이 Esc 를 먼저 소비한 경우에도 자유시점을 발화하지 않는다.
+- **로드 경로는 불변이다** — `?stars=off` · `?clouds=off` · `?nightlights=off` · `?orbits=off` 로드 동작, `window.__starfieldVisible` (로드 시점 판정) 의미, 기존 가드 (`verify:738` · `verify:1215` · `verify:1226` · `verify:675` · `verify:627` · `verify:a11y` · `verify:mobile`) 무수정.
+- **가드 요약이 SKIP 을 따로 센다** — `verify:1265-display-panel` 은 `[PASS] 판정 N (PASS · FAIL) · SKIP M / 게이트 K` 로 끝난다. 하드웨어 전용 게이트는 CI (소프트웨어 렌더) 에서 `SKIP` 이고 PASS 계수에 들어가지 않는다 (PR #1267 qa 비차단 1).
+
+### Notes
+
+- **v0.90.0 cross-validate outcome** (`agy`, 2026-09-30, `applied`) — 입력: 이 절 전체 + README §현재 상태 문장. **수용 2** — ① Behavior Changes 첫 항목이 네 토글 모두의 「끈 화면 = `?x=off` 로드」 를 주장하는 것처럼 읽혔으나 가드가 판정하는 것은 별 배경 · 구름 · 불빛 셋이다 → 대상을 셋으로 좁히고 궤도선은 기존 명령임을 명시 ② README 의 「픽셀 단위로 같다」 가 판정 범위(구름 · 불빛은 지구 disk, 별 배경은 하드웨어 전용 full frame)를 빠뜨렸다 → 범위 명시. **기각** — 외부 제안문의 「열릴 때 포커스는 「표시」 버튼에 머문다」 는 사실과 반대(ADR 결정 6: 첫 토글로 이동)라 채택하면 새 거짓 서술이 된다 / Shift+Tab 누락 지적은 「포커스가 패널과 버튼을 둘 다 벗어날 때」 항목이 이미 덮는다 / README 「리뷰가 세 번 막았다」 를 인과 과장으로 본 것은 오독 — PR #1267 B1 · #1268 B1 · B2 셋 다 reviewer 차단이다 / i18n · WebGL 컨텍스트 복구 · 명령 실패 롤백은 범위 밖. SemVer MINOR 판정은 합의.
+- **#1265 스프린트 계약 재조정 3건** (사용자 확정 2026-09-27 — 이슈 코멘트 [`issuecomment-5852573137`](https://github.com/coseo12/astro-simulator/issues/1265#issuecomment-5852573137)). 계약 문구와 다르게 읽는 지점이라 여기 남긴다 (코드 주석 · PR 본문에도 같은 내용).
+  1. **D9 · D10 의 「`disabled`」 = `aria-disabled="true"`** — 네이티브 `disabled` 는 Tab 순서에서 빠져 CI(별 불가) · `?surface=off` 에서 D14 「Tab 으로 토글 4개 순회」를 구조적으로 막고, 사유가 스크린 리더에 닿지 않는다. 그래서 차단은 버튼이 아니라 `useDisplayToggle` 의 가용성 검사 한 곳이 한다 (`display-toggles.ts` 사유 상수 주석).
+  2. **D8b (`?stars=off` 로드 후 켠 화면 = 기본 로드) 는 실 Chrome 수동 확인으로 판정** — CI(swiftshader) 는 별을 만들지 않아 도달 불가. CI 는 D8p (전제) · D8 구조 (`?stars=off` → ON 후 starfield 1) 를 상시 판정하고, 픽셀은 하드웨어 전용이라 SKIP 이다.
+  3. **PR 2 개 분할** — core (PR #1267) / web (PR #1268). 기준 자체는 불변이고 배정만 나눴다. D5–D8 은 PR1 에서 scene setter 직접 호출로, PR2 에서 패널 클릭으로 두 번 판정했다.
+- **UI 섹션 판별력 (PR2 변이 주입 — web 소스를 바꾸고 `next dev` 재컴파일, SwiftShader, 9종 전부 `exit 1`)**: (a) `toggle()` 가용성 검사 제거 → D9 (소프트웨어 렌더에서 별 생성) · D10 / (b) URL `history: 'push'` → D11 (`history.length 2→8`) / (c) 자유시점 Esc 가드의 `defaultPrevented` 검사 제거 → D14 엣지 · D14b / (d) 상단 바 자동 숨김 억제 제거 → D4 / (e) URL 쓰기를 `UrlSync` store→URL effect 로 이동 → 로드 직후 `?x=off` 4 키 소실 / (f) sim-canvas 의 `setDisplayCapabilities` 호출 제거 → 「UI 장면 준비」 등 FAIL / (g) 패널 Esc 의 닫기 제거 → D14 · D14b FAIL / (h) 스크롤 리스너 제거 → 트리거 이동 스크롤 닫힘 FAIL / (i) 트리거 위치 비교 제거 (모든 스크롤에서 닫기) → 무관 스크롤 유지 · 레이스 FAIL. 상세 표는 PR 본문.
+  - ⚠️ (a) 의 1차 판본은 클릭 1회라 별이 생성되지 않았다 — 의도 기본값이 true 라 첫 클릭은 OFF 명령이다. 2회 클릭 + 매 클릭 뒤 store 의도 판독으로 강화했다.
+  - ⚠️ (e) 의 1차 판본은 `exit 2` (측정 불가) 였다 — 같은 결함이 `?x=off` 기준 로드도 무너뜨려 양성 대조가 먼저 발화했다. 제품 결함을 측정 불가로 흡수하지 않도록 「로드 직후 URL 불변」 을 양성 대조보다 먼저 게이트로 판정하게 바꿨다.
+  - ⚠️ (f) 는 리뷰가 찾은 같은 클래스다 — 1차 판본은 장면 준비 미설정을 새로고침 뒤 「측정 불가」로만 봐 결함을 잡는 게이트들이 평가되지 않았다. 부팅 직후 장면 준비를 게이트로 두고, D9 · D10 은 사유 문구가 「그 이유」인지 대조한다 (미준비 사유로 PASS 하던 경로 차단).
+  - ⚠️ 같은 클래스가 라운드 2 에서 한 번 더 나왔다 (자유시점 양성 대조의 패널 전제가 「Esc 로 패널이 안 닫힘」을 흡수 — (g)). 그래서 판정 구조를 바꿨다: 측정 불가 전제는 **그 전제에 기대는 게이트만** 평가하지 않고, 종료 코드는 FAIL > 측정 불가 > PASS 순이다. 제품 결함이 원인일 수 있는 전제는 게이트로 옮겼다 (로드 경로 구조 · 토글 전후 기하 · 토글 뒤 정착 등 — 전제별 판정표는 PR #1268 코멘트).
+  - ⚠️ 스크롤 닫기 범위를 한 번 번복했다 — 「문서 안 모든 스크롤」 판본은 키 간 지연 0 의 Tab → Enter 에서 Tab 이 일으킨 단축 바 스크롤이 한 프레임 늦게 도착해 방금 연 패널을 닫았다 (qa 실측). 「「표시」 버튼 위치가 바뀐 스크롤만」 으로 바꾸고 레이스 반복 게이트를 더했다 (ADR `20260927-1265` Amendment 1 에 번복 기록).
+  - (c) 에서 드러난 사실 — 자유시점 가드의 패널 속성 셀렉터 (`[data-display-panel-open]`) 는 **패널 자신의 Esc 를 막지 못했다**. 패널이 capture 단계에서 먼저 닫혀, 자유시점 리스너가 돌 때는 선택 변경 여부와 무관하게 패널이 이미 없다. 차단은 `defaultPrevented` 가 전담하고, 셀렉터의 패널 속성 항과 패널의 속성 부착은 제거했다 (ADR `20260927-1265` Amendment 1).
+
 ## [0.89.4] - 2026-09-26
 
 ### Fixed

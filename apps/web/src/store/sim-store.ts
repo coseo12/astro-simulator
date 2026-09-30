@@ -1,6 +1,7 @@
 import type { physics } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
+import type { DisplayCapabilities } from '@/core/display-toggles';
 import {
   FREE_FLY_SENSITIVITY_DEFAULT,
   savePersistedSensitivity,
@@ -95,8 +96,26 @@ export interface SimStoreState {
    *
    * 초기값은 URL `?orbits=` (parseOrbitsVisible) 가 sim-canvas mount 시 결정 (기본 true).
    * 버튼 클릭 → setOrbitLinesVisible 액션 (store) + setOrbitLinesVisible command (scene) 동시.
+   * #1265 — 클릭 경로는 공용 훅 `useDisplayToggle` (단축 바 버튼 · 표시 패널 공유) 이고 URL 도 함께 쓴다.
    */
   orbitLinesVisible: boolean;
+  /**
+   * #1265 — 별 배경 · 구름 · 야간 불빛의 **사용자 의도** (URL 의도 — `orbitLinesVisible` 동형, 기본 true).
+   *
+   * 화면에 실제로 보이는지는 의도 ∧ 환경(`displayCapabilities`) 이다 — 예: 소프트웨어 렌더에서
+   * `starsVisible === true` 여도 별은 없다. 그 결정식은 `display-toggles.ts` 의 `pressed` 가 SSoT.
+   * 초기값은 sim-canvas 가 이미 파싱한 URL 값으로 set 한다 (ADR `20260927-1265` 결정 5).
+   */
+  starsVisible: boolean;
+  cloudsVisible: boolean;
+  nightLightsVisible: boolean;
+  /**
+   * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
+   * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
+   */
+  displayCapabilities: DisplayCapabilities | null;
+  /** #1265 — 표시 패널 열림. 상단 바 자동 숨김 억제 (결정 6) 가 구독한다. */
+  displayPanelOpen: boolean;
   /**
    * #704 — free-fly 카메라 감도 4축 계수 (wasd / zoomoutFactor / panning / zoom).
    *
@@ -138,6 +157,12 @@ export interface SimStoreState {
   enterFreeFly: () => void;
   /** #688 — 궤도선 가시성 설정. 토글 버튼 + URL 초기값에서 호출 (버튼 표시 SSoT). */
   setOrbitLinesVisible: (visible: boolean) => void;
+  /** #1265 — 신규 3 토글 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
+  setStarsVisible: (visible: boolean) => void;
+  setCloudsVisible: (visible: boolean) => void;
+  setNightLightsVisible: (visible: boolean) => void;
+  setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
+  setDisplayPanelOpen: (open: boolean) => void;
   /**
    * #704 — 단일 감도 축 갱신 (ADR §결정 1/3).
    *
@@ -177,6 +202,12 @@ export const useSimStore = create<SimStoreState>((set) => ({
   freeFlyMode: false,
   // #688 — 기본 ON. URL `?orbits=off` 진입 시 sim-canvas 가 mount 직후 false 로 덮어쓴다.
   orbitLinesVisible: true,
+  // #1265 — 기본 ON (`orbitLinesVisible` 동형). `?x=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  starsVisible: true,
+  cloudsVisible: true,
+  nightLightsVisible: true,
+  displayCapabilities: null,
+  displayPanelOpen: false,
   // #704 — 감도 4축 초기값 = camera.ts const default (SSoT). 영속 로드는 클라 mount useEffect 가 담당
   // (Hydration Mismatch 차단 — 서버·클라 동일 default 로 첫 렌더 고정, ADR §결정 3).
   freeFlySensitivity: { ...FREE_FLY_SENSITIVITY_DEFAULT },
@@ -211,6 +242,11 @@ export const useSimStore = create<SimStoreState>((set) => ({
     set({ selectedBodyId: id, freeFlyMode: false }),
   enterFreeFly: () => set({ selectedBodyId: null, freeFlyMode: true }),
   setOrbitLinesVisible: (visible) => set({ orbitLinesVisible: visible }),
+  setStarsVisible: (visible) => set({ starsVisible: visible }),
+  setCloudsVisible: (visible) => set({ cloudsVisible: visible }),
+  setNightLightsVisible: (visible) => set({ nightLightsVisible: visible }),
+  setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
+  setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
   setFreeFlySensitivity: (axis, value, persist = false) =>
     set((state) => {
       // 동일 값이면 no-op (불필요 리렌더/영속 회피 — Hydration 로드가 default 와 같을 때 등).

@@ -948,6 +948,26 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           useSimStore.getState().setOrbitLinesVisible(orbitsVisible);
         }
 
+        // #1265 — 표시 패널 런타임 토글 3종 (별 · 구름 · 불빛). 궤도선 블록과 같은 wiring (ADR 20260927-1265 결정 5).
+        //   store 초기값은 위에서 **이미 파싱한 지역 변수**로 set 한다 — `new URLSearchParams` 신규 호출 0 (#850).
+        //   URL 은 여기서 쓰지 않는다 (사용자 토글 이벤트에서만 — `use-display-toggle.ts`).
+        //   소프트웨어 렌더 차단은 core 가 아니라 web 이 한다 (core 는 렌더러를 모른다) — 그래서 가용성
+        //   (`starfield: !isSoftwareRenderer`) 을 store 에 싣고, `toggle()` 이 그 값으로 명령 발행을 막는다.
+        instance.setStarfieldVisibleHandler((visible) => solar.setStarfieldVisible(visible));
+        instance.setCloudsVisibleHandler((visible) => solar.setCloudsVisible(visible));
+        instance.setNightLightsVisibleHandler((visible) => solar.setNightLightsVisible(visible));
+        {
+          const store = useSimStore.getState();
+          store.setStarsVisible(starsParamVisible);
+          store.setCloudsVisible(cloudsVisible);
+          store.setNightLightsVisible(nightLightsVisible);
+          // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
+          store.setDisplayCapabilities({
+            starfield: !isSoftwareRenderer,
+            surfaceDetail: surfaceVisible,
+          });
+        }
+
         // R1 #334+#335 — store-scene 동기화 단일 경로 helper.
         //
         // ADR `20260425-r1-store-scene-sync-unification.md` §결정 4.
@@ -1374,6 +1394,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       setCore(null);
       // #400 — camera 도 dispose 됨. ScaleControl 이 다음 mount 까지 subscribe 보류.
       setCameraTierApi(null);
+      // #1265 — 장면이 사라졌으니 신규 3 토글을 다시 불가로 (다음 mount 의 핸들러 등록까지).
+      useSimStore.getState().setDisplayCapabilities(null);
     };
   }, []);
 

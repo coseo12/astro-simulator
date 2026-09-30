@@ -4,7 +4,8 @@ name: shader-pixel-guard
 # 이슈 #759 / ADR 20260705-759 — 표면 셰이더 verify 스크립트 CI 상시 가드.
 #
 # 목적: 아래 셰이더 feature 지대 (#756 표면 / #762 비율 단조성 / #773 광원 / #774 태양 /
-#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크 / #1197 바다 깊이 색 / #1202 대기 산란 rim) 의
+#   #782 자전 / #783 지구 디테일 / #1119 지구 대륙 마스크 / #1197 바다 깊이 색 / #1202 대기 산란 rim /
+#   #1265 런타임 표시 토글) 의
 #   픽셀 회귀 (uniform 배선 절단·분기 오염·광원 붕괴·자전 정지·극관/biome 소실·대륙 마스크 미적용·
 #   바다 깊이 소실·rim 소실 또는 광원각 의존 상실) 를 PR 단계에서 차단.
 #   r1-guard 는 UI 영역 diff 만 담당하고 canvas 픽셀은 baseline 대상이 아니므로
@@ -240,6 +241,19 @@ jobs:
           HEADFUL=0 BASE_URL=http://localhost:3001 \
             CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1226-night-lights" \
             pnpm --filter @astro-simulator/web run verify:1226-night-lights
+
+      # #1265 — 런타임 표시 토글 (ADR 20260927-1265). `window.__solarScene` 의 신규 setter 로 끈/켠 화면을
+      # 해당 `?x=off` 로드 화면과 같은 결정적 프레임으로 비교한다 — 판정식은 1215 · 1226 의 disk 역투영
+      # (새 임계 0). 별 배경 픽셀 (D8) 은 하드웨어 전용이라 여기(SwiftShader)서는 SKIP 이 정상이고 구조
+      # 판정과 D8p 전제만 돈다. exit 2 는 「측정 불가」. 소스 변이 실증은 PR 시점 1회 의무 (CI 미배선).
+      # PR2 — 같은 쌍을 표시 패널 클릭으로 다시 판정하고 패널 계약 (D1~D4 · D9~D11 · D14 · D15) 을 더했다.
+      # 하드웨어 전용 게이트는 SKIP 으로 따로 세서 요약에 드러난다 (PASS 계수에 넣지 않는다).
+      - name: verify:1265-display-panel (런타임 토글 = 로드 off 픽셀 동등 + 구조 + 누수 + 콘솔 + 표시 패널 UI)
+        run: |
+          trap 'pkill -f "ms-playwright" 2>/dev/null || true' EXIT
+          HEADFUL=0 BASE_URL=http://localhost:3001 \
+            CAPTURE_DIR="$GITHUB_WORKSPACE/.verify-screenshots/shader-pixel-guard/1265-display-panel" \
+            pnpm --filter @astro-simulator/web run verify:1265-display-panel
 
       - name: dev server 정리
         if: always()

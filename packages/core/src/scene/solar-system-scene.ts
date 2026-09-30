@@ -28,7 +28,7 @@ import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
-import { createStarfield } from './starfield.js';
+import { createStarfield, type StarfieldHandles } from './starfield.js';
 // #1215 — 지구 구름 레이어 (ADR 20260628-756 Amendment 10).
 import {
   applyCloudDrift,
@@ -41,7 +41,11 @@ import {
   type CloudLayerHandles,
 } from './cloud-layer.js';
 import { SCENE_CLEAR_COLOR_RGBA, hexToColor3 } from './color-utils.js';
-import type { PlanetLightingConstants } from './procedural-planet-shader.js';
+import {
+  isProceduralPlanetMaterial,
+  resolveNightLightStrength,
+  type PlanetLightingConstants,
+} from './procedural-planet-shader.js';
 // #850 Phase 1 — 아래 4 모듈은 본 파일 테일 (구 2041-2502) 에서 순수 이동한 헬퍼다 (동작 변경 0).
 import {
   createBodyMesh,
@@ -175,6 +179,24 @@ export interface SolarSystemSceneHandles {
   runFramePass: () => void;
   /** 궤도선 가시성 토글 */
   setOrbitLinesVisible: (visible: boolean) => void;
+  /**
+   * #1265 — 별 배경 런타임 토글 (ADR `20260927-1265-runtime-display-toggles.md` §결정 3).
+   * 없으면 그때 한 번 생성하고, 이후는 `setEnabled` 만 바꾼다 (재생성 금지 — 머티리얼 `uniqueId` 가
+   * 커지면 그룹 0 불투명 큐 순서가 로드와 달라진다). 렌더러 종류는 묻지 않는다 — 소프트웨어 렌더
+   * 차단은 호출자 (web) 책임이다. `window.__starfieldVisible` (로드 시점 판정) 은 갱신하지 않는다.
+   */
+  setStarfieldVisible: (visible: boolean) => void;
+  /**
+   * #1265 — 지구 구름 런타임 토글 (§결정 2). OFF = dispose + 정렬 함수 복원 + 계열 해제 (로드 OFF 와
+   * 구조 동일), ON = 로드와 같은 생성 함수 + 기존 mid·low 계열 등록 + 구름 상대 자전 즉시 동기.
+   * `surfaceDetail = false` 면 no-op (유효 조건 `clouds && surfaceDetail`). 같은 상태 요청은 멱등.
+   */
+  setCloudsVisible: (visible: boolean) => void;
+  /**
+   * #1265 — 야간 도시 불빛 런타임 토글 (§결정 4). 이후 lazy 생성되는 mid 가 읽는 상태와 이미 있는
+   * 절차 행성 머티리얼의 `nightLightStrength` 를 함께 바꾼다. `surfaceDetail = false` 면 no-op.
+   */
+  setNightLightsVisible: (visible: boolean) => void;
   /**
    * P12-A #298 — 현재 활성 tier.
    *
@@ -622,10 +644,16 @@ export function createSolarSystemScene(
   // #738 — 절차적 별 배경 + 은하수 띠 (clearColor 위 background queue 레이어). 기본 false —
   // web 레이어가 `?stars=off` 옵트아웃으로 기본 ON 결정 (ADR §결정 7). infiniteDistance 가
   // floating-origin/tier/줌 불변을 엔진 레벨로 보장 → 별 추종 코드 0 (ADR §결정 1).
-  if (starfield) {
-    const sf = createStarfield(scene);
-    disposables.push({ dispose: () => sf.dispose() });
-  }
+  //
+  // #1265 §결정 3 — 핸들을 슬롯에 두어 런타임 토글이 같은 인스턴스를 켜고 끈다. 로드 분기 (`starfield`
+  // 일 때만 생성) 와 생성 위치는 그대로다 — 슬롯 disposer 는 비어 있으면 no-op.
+  let starfieldHandles: StarfieldHandles | null = starfield ? createStarfield(scene) : null;
+  disposables.push({
+    dispose: () => {
+      starfieldHandles?.dispose();
+      starfieldHandles = null;
+    },
+  });
   // 별 배경 (전체화면 절차 셰이더 머티리얼 1개). starfield=false 면 빈 구간.
   phase('scene:starfield');
 
@@ -730,44 +758,53 @@ export function createSolarSystemScene(
   //  - 구조: earth host 의 **자식** shell (결정 1 — position·scaling·host 자전을 구조적으로 상속).
   //  - 정렬: 렌더링 그룹 0 투명 정렬을 **정렬 키 치환**으로 교체 (결정 4). host 계열 (host · mid · low ·
   //    구름) 은 host 의 `(alphaIndex, distance)` 로 치환되고 구름만 `rank 1` 이라 계열 블록 끝에 그려진다.
-  //    lazy 생성 mid·low 는 `getVariantMesh` 생성 지점에서 계열에 등록한다.
+  //    lazy 생성 mid·low 는 `getVariantMesh` 생성 지점에서 계열에 등록한다 (런타임 ON 이전에 생성된 것은
+  //    `setCloudsVisible` (a) 가 등록한다 — #1265).
   //    `null` 두 개는 RenderingGroup 생성자 기본값과 같다 (opaque · alphaTest → PainterSortCompare).
   const hostFamilies = new HostFamilyRegistry();
   let cloudLayer: CloudLayerHandles | null = null;
-  if (clouds && surfaceDetail) {
+  // #1265 §결정 2 — 로드 경로의 본문을 **그대로** 두 클로저로 옮겼다. 로드는 같은 위치에서 1회 부르고,
+  // 런타임 토글 (`setCloudsVisible`) 이 같은 함수를 다시 부른다 — 「런타임 ON = 로드 ON」 과
+  // 「런타임 OFF = 로드 OFF」 가 구조로 성립하게 하는 것이 목적이다 (픽셀 계약 D5 · D6).
+  const enableClouds = (): void => {
     const cloudBody = bodiesById.get(CLOUD_LAYER_BODY_ID);
     const cloudHost = meshes.get(CLOUD_LAYER_BODY_ID);
-    if (cloudBody && cloudHost) {
-      const layer = createCloudLayer(
-        scene,
-        cloudBody,
-        cloudHost,
-        bodyInitialRenderScale,
-        bodyScale,
-        surfaceLightingArgs,
-      );
-      cloudLayer = layer;
-      hostFamilies.registerHost(cloudHost);
-      hostFamilies.registerMember(layer.mesh, cloudHost, CLOUD_SORT_RANK);
-      // `_RenderSorted` 와 같은 카메라 (activeCamera.globalPosition, 부재 시 원점).
-      const cameraFallback = Vector3.Zero();
-      scene.setRenderingOrder(
-        0,
-        null,
-        null,
-        createHostFamilyTransparentSortCompare(
-          hostFamilies,
-          () => scene.activeCamera?.globalPosition ?? cameraFallback,
-        ),
-      );
-      disposables.push({
-        dispose: () => {
-          scene.setRenderingOrder(0, null, null, null);
-          layer.dispose();
-        },
-      });
-    }
-  }
+    if (!cloudBody || !cloudHost) return;
+    const layer = createCloudLayer(
+      scene,
+      cloudBody,
+      cloudHost,
+      bodyInitialRenderScale,
+      bodyScale,
+      surfaceLightingArgs,
+    );
+    cloudLayer = layer;
+    hostFamilies.registerHost(cloudHost);
+    hostFamilies.registerMember(layer.mesh, cloudHost, CLOUD_SORT_RANK);
+    // `_RenderSorted` 와 같은 카메라 (activeCamera.globalPosition, 부재 시 원점).
+    const cameraFallback = Vector3.Zero();
+    scene.setRenderingOrder(
+      0,
+      null,
+      null,
+      createHostFamilyTransparentSortCompare(
+        hostFamilies,
+        () => scene.activeCamera?.globalPosition ?? cameraFallback,
+      ),
+    );
+  };
+  // 로드 OFF 에서 부르면 no-op (정렬 함수를 건드리지 않는다 — 로드 OFF 의 dispose 경로 불변).
+  // ⚠️ `setEnabled(false)` 로 대체하지 말 것 — 정렬 함수와 계열이 남아 로드 OFF 와 구조가 달라진다
+  // (ADR `20260927-1265` 축 2 · `verify:1215` 헤더). `hostFamilies.clear()` 는 누적 방지 (§결정 2 교차검증 반영).
+  const disableClouds = (): void => {
+    if (!cloudLayer) return;
+    scene.setRenderingOrder(0, null, null, null);
+    cloudLayer.dispose();
+    cloudLayer = null;
+    hostFamilies.clear();
+  };
+  if (clouds && surfaceDetail) enableClouds();
+  disposables.push({ dispose: disableClouds });
   // 지구 구름 shell (`clouds && surfaceDetail` 일 때만 mesh + 정렬 키 치환).
   phase('scene:clouds');
 
@@ -2240,6 +2277,73 @@ export function createSolarSystemScene(
     for (const ls of satelliteOrbitLines.values()) ls.isVisible = visible;
   };
 
+  // #1265 §결정 3 — 없을 때만 생성, 이후 `setEnabled`. 매번 재생성하면 머티리얼 `uniqueId` 가 커져 그룹 0
+  // 불투명 큐 (`PainterSortCompare` = `material.uniqueId` 순) 순서가 로드와 달라진다. 순서가 로드와 다른
+  // 경우는 「`starfield=false` 로드 후 첫 ON」 하나로 한정된다 (ADR §받아들인 비용 R1 — 가드 D8p 가 전제 감시).
+  //
+  // ⚠️ 이 setter 는 렌더러를 묻지 않는다 — 소프트웨어 렌더 (#745 fps 계약) 에서 별을 막는 **유일한 지점은
+  // web 의 가용성 검사**다. 계약 D9 「`disabled`」 는 `aria-disabled="true"` + 클릭 no-op 으로 해석한다
+  // (2026-09-27 사용자 확정 — 네이티브 `disabled` 는 Tab 순서에서 빠져 D14 키보드 순회를 CI 에서 채울 수
+  // 없다). 즉 버튼이 포커스·클릭을 받으므로, web 이 가용성 검사 없이 이 명령을 보내면 별이 생성된다.
+  const setStarfieldVisible = (visible: boolean) => {
+    if (visible) {
+      starfieldHandles ??= createStarfield(scene);
+      starfieldHandles.mesh.setEnabled(true);
+      return;
+    }
+    starfieldHandles?.mesh.setEnabled(false);
+  };
+
+  // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
+  const setCloudsVisible = (visible: boolean) => {
+    // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
+    // 계약 D10 (`?surface=off` 에서 구름 토글은 `aria-disabled` + 클릭 no-op — 2026-09-27 재조정) 의 core 쪽
+    // 방어 심층이다: web 가용성 검사가 뚫려 명령이 와도 구름 mesh 가 생기지 않는다.
+    if (!surfaceDetail) return;
+    // 멱등 — 같은 상태 요청에 생성·dispose 를 반복하지 않는다 (누수 0 계약 D6 의 전제).
+    if (visible === (cloudLayer !== null)) return;
+    if (!visible) {
+      disableClouds();
+      return;
+    }
+    enableClouds();
+    const layer = cloudLayer;
+    if (!layer) return;
+    // (a) 이미 lazy 생성된 earth mid·low 를 계열에 편입 — 구름이 없던 동안 생성된 variant 는 host 미등록으로
+    //     `registerMember` 가 `false` 를 반환해 빠져 있다 (로드 ON 에서는 생성 지점이 등록한다).
+    //     ⚠️ 현 기하에서는 등록 유무가 정렬 키를 바꾸지 않아 **픽셀 무영향**이다 (mid 는 host 와 중심이
+    //     같고 core 는 mesh 의 `alphaIndex` 를 대입하지 않는다 — 정렬 함수가 읽는 값은 전부 기본값이다).
+    //     이 등록을 지키는 것은 단위 테스트뿐이고 픽셀 가드 `verify:1265` D6f 는 못 잡는다 (PR #1267 변이 MV-4).
+    //     가드가 초록이라고 dead code 로 지우지 말 것 — variant 에 `alphaIndex` 를 주거나 중심을 옮기는 변경이 들어오면 차이가 드러난다.
+    for (const variant of [
+      midVariants.get(CLOUD_LAYER_BODY_ID),
+      lowVariants.get(CLOUD_LAYER_BODY_ID),
+    ]) {
+      if (variant) hostFamilies.registerMember(variant, layer.host, HOST_FAMILY_RANK);
+    }
+    // (b) 구름 상대 자전 즉시 동기 — 드리프트는 시간 위상 (`updateAt`) 에만 있어 일시정지 중 켜면 identity
+    //     로 남는다 (#1205 클래스 — ADR 1205 §결정 2). 게이트는 `updateAt` 과 같은 `rotationStates.has`.
+    //     가시성 (`isVisible`) 은 프레임 위상 (`runFramePass`) 이 렌더 직전 매 프레임 쓰므로 여기서 불요.
+    if (rotationStates.has(CLOUD_LAYER_BODY_ID)) applyCloudDrift(layer, currentJd, rotationEpoch);
+  };
+
+  // #1265 §결정 4 — 불빛 상태는 `surfaceLightingArgs.nightLights` 하나다 (lazy mid 가 이 객체를 참조로
+  // 읽는다). 이미 있는 머티리얼은 절차 행성 머티리얼만 uniform 을 바꾼다 — 대상 판정은 생성 조건의 사본이
+  // 아니라 생성 함수가 등록한 집합 (`isProceduralPlanetMaterial`). 구름 머티리얼은 불빛을 읽지 않는다.
+  const setNightLightsVisible = (visible: boolean) => {
+    // 유효 조건 `nightLights && surfaceDetail` 의 조문 동형. 관측 가능한 효과는 없다 — 표면 off 면 절차
+    // 머티리얼이 없고 `surfaceLightingArgs` 도 소비되지 않는다.
+    if (!surfaceDetail) return;
+    surfaceLightingArgs.nightLights = visible;
+    const strength = resolveNightLightStrength(visible);
+    for (const variants of [meshes, midVariants]) {
+      for (const mesh of variants.values()) {
+        const material = mesh.material;
+        if (isProceduralPlanetMaterial(material)) material.setFloat('nightLightStrength', strength);
+      }
+    }
+  };
+
   const setPhysicsEngine = (kind: PhysicsEngineKind) => {
     if (kind === activeEngine) return;
     // P3-B #146 — webgpu 직접 활성화. UI 어댑터(sim-canvas resolveEngine)가
@@ -2290,6 +2394,9 @@ export function createSolarSystemScene(
     updateAt,
     runFramePass,
     setOrbitLinesVisible,
+    setStarfieldVisible,
+    setCloudsVisible,
+    setNightLightsVisible,
     getTier,
     setTier,
     updateTierByCamera,

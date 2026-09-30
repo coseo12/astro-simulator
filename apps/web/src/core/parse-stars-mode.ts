@@ -11,7 +11,7 @@
  *    (parse-orbits-mode 등 "unknown → 기본 동작" 패턴 정합)
  *
  * 반환은 `boolean` (visible) — scene `createSolarSystemScene({ starfield: visible })` 옵션과
- * 직접 정합. URL 초기값만 결정하며, 런타임 토글 UI 는 비-범위 (#675 marker 와 동일 — 초기 옵트아웃만).
+ * 직접 정합. URL 초기값만 결정한다. 런타임 토글은 표시 패널이 `useDisplayToggle` 로 발행하며 (ADR `20260927-1265`), 그때 URL 은 이 함수의 역방향 `serializeDisplayToggle` 로 쓴다.
  */
 
 export function parseStarsVisible(urlParam: string | null | undefined): boolean {
