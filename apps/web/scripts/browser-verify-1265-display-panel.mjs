@@ -91,9 +91,22 @@
  *   5 `fade:E|F` fade 재현 큐에 mid 부재   6 `edge:D7e` 토글 시점에 mid 가 이미 있음
  *   9 `det:D8` · `pos:D8` (하드웨어) 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일   15 `renderer` 렌더러 판독 불일치
  *   16 `ctl` 자유시점 양성 대조의 선택 재설정 실패   17 `scroll` 스크롤을 일으키지 못함
- *   20 `scroll:trigger` 좁은 폭 우측 그룹 스크롤이 트리거를 움직이지 못함   21 `race:scroll` 레이스 반복 중 요소 스크롤 0
+ *   20 `scroll:trigger` 좁은 폭 우측 그룹 스크롤이 트리거를 움직이지 못함
+ *   21 `race:scroll` 레이스 반복 중 단축 바 **조상 체인** (단축 바 자신 포함) 의 스크롤 0. 레이스 게이트는 실패 관측
+ *      (`bad > 0`) 이 없을 때만 이 전제에 기댄다 — 「패널이 사라졌다」 는 스크롤 유무와 무관하게 관측된 결함이라 전제가
+ *      지울 수 없다 (#1271 R12). 계수는 캔버스 포커스 · 트리거 클릭 같은 다른 요소 스크롤을 세지 않는다
  *   `scroll:unrelated` 좌측 단축 바 스크롤이 트리거를 움직임 (그러면 「무관 스크롤」 이 아니다)
  *   18 `d4:timing` 닫힌 채 4 초 안에 숨지 않았지만 더 기다리니 숨음 (타이머 지연)   19 `reload:boot` 새로고침 뒤 핸들 미노출
+ *   22 `boot:<섹션>` 그 섹션의 페이지 부팅 (`bootstrapScene` — goto · 핸들 노출 대기) 이 예외로 끝나 섹션을 중단했다.
+ *      중단 직후 열린 페이지를 전부 닫고 **같은 쿼리를 단독으로** 다시 부팅해 원인을 가른다 (#1271):
+ *      재부팅 성공 → 경합 (열린 컨텍스트 수) 하의 부팅 지연 — 이 전제만 무너지고 **그 섹션의 게이트만** 측정 불가 /
+ *      재부팅도 실패 → 단독으로도 핸들이 노출되지 않는다 — 게이트 「부팅 — 단독 핸들 노출」 이 FAIL (이 전제도 무너진다 —
+ *      섹션 데이터가 없으므로). 재부팅 페이지는 판정에 쓰지 않고 판별 직후 닫는다. 부팅 **뒤** 단계 (DOM 숨김의 캔버스
+ *      개수 fail-fast · JD 점프 등) 예외는 이 분류 밖이다 — 그대로 전파해 exit 1.
+ *      ⚠️ 받아들인 비용: 경합 하에서만 나타나는 부팅 지연 회귀는 이 전제로 흡수된다 (측정 불가 — FAIL 이 아니다).
+ *   여러 섹션의 표본을 모으는 게이트 (로드 경로 구조 · 토글 전후 기하 · 런타임 ON 직후 · 콘솔 에러 · 장면 준비 · 캡처 직전
+ *   패널 · D8p) 는 중단 섹션이 있어도 **측정된 페이지 위에서** 판정한다 — 중단 섹션의 미측정 페이지만 기대 목록에서
+ *   빠지고, 기여 섹션이 전부 중단됐을 때만 측정 불가다 (`표본 ≥ 1` 술어가 공허 FAIL 을 내지 않게).
  *   타임아웃성 게이트 (토글 뒤 정착 · ON 뒤 머티리얼 준비) 는 **같은 페이지의 토글 전 정착** (`settle:<page>`) 에 기댄다 —
  *   토글 뒤만 초과하면 FAIL, 둘 다 초과하면 측정 불가. mesh **부재**는 타이밍이 아니라 항상 FAIL 이다.
  *   어떤 게이트도 기대지 않는 전제는 `[정보]` 로만 출력한다.
@@ -106,6 +119,12 @@
  *   node browser-verify-1265-display-panel.mjs      # 게이트 (CI)
  *   INJECT=console ...   # D15 페이지에 콘솔 에러 1건 — D15 FAIL 기대 (하네스 negative)
  *   INJECT=geom ...      # D5 쌍 캡처 뒤 카메라 이동 — 쌍 기하 불일치로 exit 2 기대 (측정 불가 negative)
+ *   INJECT=boot ...      # 한 페이지 (`INJECT_BOOT_LABEL`, 기본 `F-cloudOn-mid` — #1271 CI 실패 페이지) 의 **첫** 부팅에만
+ *                        # 핸들 대기 상한을 극소값으로 준다 — 단독 재부팅은 기본 상한이라 성공하므로 그 섹션 게이트만
+ *                        # 측정 불가 · 나머지 섹션은 판정 · exit 2 기대 (전제 22 negative). 라벨이 끝내 부팅되지 않으면
+ *                        # (오타 · 하드웨어 전용 라벨을 소프트웨어 렌더에서 지정) 주입 미발화로 exit 1 (공허 통과 차단).
+ *   소스 변이 `__solarScene` 노출 제거 (`sim-canvas.tsx`) — 단독 재부팅도 실패 → 「부팅 — 단독 핸들 노출」 FAIL · exit 1
+ *   (전제 22 가 제품 결함을 흡수하지 않는다는 실증, #1271 B4).
  *   소스 변이 (MV-1 ~ MV-6 · clear 누락) 는 소스를 바꾸고 core dist 를 재빌드해 기본 모드로 돌린다 (PR 기록).
  *   변이 주입은 CI 에 배선하지 않는다 — 판별력 실증은 PR 시점 1회 의무 (1215 · 1226 선례).
  *   web 소스 변이 (PR2 — 가용성 검사 제거 · URL push · Esc `defaultPrevented` 검사 제거 · 자동 숨김 억제 제거 ·
@@ -135,6 +154,14 @@ const SWIFTSHADER = process.env.SWIFTSHADER === '1';
 const INJECT = process.env.INJECT ?? 'none';
 
 const EXIT_UNMEASURABLE = 2;
+
+/** `INJECT=boot` 대상 페이지 라벨 — 기본은 #1271 CI 실패 페이지 (run `36651753956` · contexts 8 의 F). */
+const INJECT_BOOT_LABEL = process.env.INJECT_BOOT_LABEL ?? 'F-cloudOn-mid';
+/**
+ * `INJECT=boot` 의 핸들 대기 상한 — 판정 임계가 아니라 **주입값**이다 (첫 polling 전에 끝나게 하는 극소값).
+ * 단독 재부팅은 이 값을 쓰지 않고 `bootstrapScene` 기본 상한으로 돈다 (새 임계 0).
+ */
+const INJECT_BOOT_HANDLE_TIMEOUT_MS = 1;
 
 /** 구름 결정적 프레임 JD — `verify:1215` `T_JD` 와 동일. */
 const T_JD_CLOUD = 2451626.0;
@@ -205,24 +232,63 @@ const RACE_TRIALS = 40;
 /** D10 대상 — 표면 종속 토글. */
 const SURFACE_TOGGLES = ['clouds', 'nightLights'];
 
+/** 결정적 프레임 페이지 · UI 경량 페이지 공통 뷰포트 (계약 D1 · D2 의 1280×720). */
+const DEFAULT_VIEWPORT = { width: UI_VIEWPORT_WIDTH, height: 720 };
+
+/**
+ * 페이지 부팅 (`bootstrapScene`) 실패 — 섹션을 중단시키고 `run` 이 단독 재부팅으로 원인을 가른다 (전제 22).
+ * 부팅 **뒤** 단계의 예외는 이 클래스가 아니다 (그대로 전파 → exit 1).
+ */
+class BootFailure extends Error {
+  constructor({ label, query, viewport, errors, injected, cause }) {
+    super(
+      `${label} 부팅 실패 — ${cause?.name ?? 'Error'}: ${String(cause?.message ?? cause).split('\n')[0]}`,
+    );
+    this.name = 'BootFailure';
+    Object.assign(this, { label, query, viewport, errors, injected });
+  }
+}
+
+/** `INJECT=boot` 이 실제로 한 번 발화했는가 — 끝내 발화하지 않으면 `run` 이 공허 주입으로 끝낸다. */
+let bootInjected = false;
+
+/**
+ * 새 컨텍스트에 페이지 1 개를 열고 부팅한다. `bootstrapScene` 예외는 컨텍스트를 닫고 `BootFailure` 로 던진다 —
+ * 실패 페이지의 콘솔 에러는 실패에 실어 `run` 이 결과로 옮긴다 (콘솔 에러 게이트가 그 페이지도 본다).
+ */
+async function bootPage(browser, query, label, viewport) {
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  const errors = collectConsoleErrors(page);
+  const injected = INJECT === 'boot' && label === INJECT_BOOT_LABEL && !bootInjected;
+  if (injected) bootInjected = true;
+  try {
+    await bootstrapScene(page, {
+      baseUrl: BASE_URL,
+      query,
+      handles: ['__simCore', '__solarScene'],
+      settleMs: BOOT_SETTLE_MS,
+      label,
+      ...(injected ? { handleTimeout: INJECT_BOOT_HANDLE_TIMEOUT_MS } : {}),
+    });
+  } catch (cause) {
+    await context.close().catch(() => {});
+    throw new BootFailure({ label, query, viewport, errors: [...errors], injected, cause });
+  }
+  return { context, page, errors };
+}
+
 /**
  * 결정적 프레임 페이지. `hideOverlays: false` 는 UI 경로 페이지 전용 — 패널을 조작한 **뒤** `uiCapture` 가
  * 숨긴다 (숨긴 채로는 패널을 누를 수 없다). 숨김은 DOM `visibility` 만 바꿔 캔버스 기하·렌더와 무관하다.
  */
-async function setupPage(browser, query, label, jd, { hideOverlays = true } = {}) {
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 720 },
-    deviceScaleFactor: 1,
-  });
-  const page = await context.newPage();
-  const errors = collectConsoleErrors(page);
-  await bootstrapScene(page, {
-    baseUrl: BASE_URL,
-    query,
-    handles: ['__simCore', '__solarScene'],
-    settleMs: BOOT_SETTLE_MS,
-    label,
-  });
+async function setupPage(browser, pages, query, label, jd, { hideOverlays = true } = {}) {
+  const { context, page, errors } = await bootPage(browser, query, label, DEFAULT_VIEWPORT);
+  // 부팅 직후 열린 페이지 목록에 등록한다 — 같은 블록의 **다음** 페이지가 부팅에 실패해도 이 페이지가 해제 ·
+  // 데이터 이동 대상에 들어 있어야 단독 재부팅이 정말 단독이 된다 (#1271 — 블록 끝에서 몰아 등록하던 판본은 F 실패 시
+  // E 가 목록 밖에 남아 재부팅이 ctx 2 로 돌았다).
+  const ctx = { context, page, errors, settles: [], label };
+  pages.push(ctx);
   // #1219 — 캔버스 위 DOM 이 캡처에 섞이지 않게 숨긴다 (캔버스 개수 fail-fast 포함).
   if (hideOverlays) await hideDomOverlays(page);
   await page.evaluate((j) => {
@@ -234,7 +300,7 @@ async function setupPage(browser, query, label, jd, { hideOverlays = true } = {}
     window.__simCore.scene.activeCamera.beta = Math.PI / 2;
   });
   const settle = await waitForLodSettle(page);
-  const ctx = { context, page, errors, settles: [{ step: 'boot', ...settle }], label };
+  ctx.settles.push({ step: 'boot', ...settle });
   // 조작 전 로드 상태 — 「로드 경로 구조」 게이트가 쌍의 기준 페이지가 제 로드 상태인지 본다 (양성 대조 (3) 이
   // 「효과가 쌍에 없다」로 끝나기 전에, 그 원인이 로드 경로 결함인지를 게이트로 먼저 가른다).
   ctx.loadDisplay = await readSceneDisplay(ctx);
@@ -737,21 +803,11 @@ async function recordBootCaps(ctx, out) {
 }
 
 /** 경량 페이지 — 결정적 프레임이 필요 없는 UI 판정 (D1 · D2 · D10 · D11). */
-async function setupUiPage(browser, query, label, viewport = { width: 1280, height: 720 }) {
-  const context = await browser.newContext({
-    viewport,
-    deviceScaleFactor: 1,
-  });
-  const page = await context.newPage();
-  const errors = collectConsoleErrors(page);
-  await bootstrapScene(page, {
-    baseUrl: BASE_URL,
-    query,
-    handles: ['__simCore', '__solarScene'],
-    settleMs: BOOT_SETTLE_MS,
-    label,
-  });
-  return { context, page, errors, settles: [], label };
+async function setupUiPage(browser, pages, query, label, viewport = DEFAULT_VIEWPORT) {
+  const { context, page, errors } = await bootPage(browser, query, label, viewport);
+  const ctx = { context, page, errors, settles: [], label };
+  pages.push(ctx); // 부팅 직후 등록 — `setupPage` 와 같은 이유
+  return ctx;
 }
 
 // ── 섹션 ───────────────────────────────────────────────────────────────────
@@ -759,9 +815,8 @@ async function setupUiPage(browser, query, label, viewport = { width: 1280, heig
 /** D5 · D6 · D6f — 구름. */
 async function runClouds(browser, out, pages) {
   // ── D5 — 로드 ON 에서 런타임 OFF ↔ 로드 OFF (자전 OFF 프레임 — verify:1215 주 쌍) ──
-  const A = await setupPage(browser, Q.cloudOn, 'A-cloudOn', T_JD_CLOUD);
-  const B = await setupPage(browser, Q.cloudOff, 'B-cloudOff', T_JD_CLOUD);
-  pages.push(A, B);
+  const A = await setupPage(browser, pages, Q.cloudOn, 'A-cloudOn', T_JD_CLOUD);
+  const B = await setupPage(browser, pages, Q.cloudOff, 'B-cloudOff', T_JD_CLOUD);
   out.d8pA = await readOpaqueGroup0(A);
   const aPre = await capture(A, 'A-pre');
   const bImg = await capture(B, 'B');
@@ -780,20 +835,20 @@ async function runClouds(browser, out, pages) {
   out.d5SortA = await readSortState(A);
   out.d5SortB = await readSortState(B);
   // D5 (UI) — 같은 로드 ON 쿼리를 **패널**로 끈다 ↔ 같은 로드 OFF 캡처 (B). 구조 술어도 같이 본다.
-  const Au = await setupPage(browser, Q.cloudOn, 'Au-cloudOn-ui', T_JD_CLOUD, {
+  const Au = await setupPage(browser, pages, Q.cloudOn, 'Au-cloudOn-ui', T_JD_CLOUD, {
     hideOverlays: false,
   });
-  pages.push(Au);
   await recordBootCaps(Au, out);
   await withGeomCheck(Au, out, () => uiToggle(Au, 'clouds'));
   out.d5ui = await measureCheckedPair(Au, await uiCapture(Au, 'Au-ui-off', out), B, bImg, 'd5ui');
   out.d5uiCounts = await readCounts(Au);
   out.d5uiSort = await readSortState(Au);
+  // 블록 경계 해제 (#1271 A1) — 뒤 블록은 A · B · Au 를 다시 쓰지 않는다 (B 캡처 `bImg` 도 여기서 끝).
+  await retirePages(out, pages);
 
   // ── D6 — 로드 OFF (자전 ON) 에서 런타임 ON ↔ 로드 ON + 왕복 누수 ──
-  const C = await setupPage(browser, Q.cloudRotOff, 'C-cloudRotOff', T_JD_CLOUD);
-  const D = await setupPage(browser, Q.cloudRotOn, 'D-cloudRotOn', T_JD_CLOUD);
-  pages.push(C, D);
+  const C = await setupPage(browser, pages, Q.cloudRotOff, 'C-cloudRotOff', T_JD_CLOUD);
+  const D = await setupPage(browser, pages, Q.cloudRotOn, 'D-cloudRotOn', T_JD_CLOUD);
   const cPre = await capture(C, 'C-pre');
   const dImg = await capture(D, 'D');
   out.d6Positive = await measureCheckedPair(C, cPre, D, dImg, 'd6Positive');
@@ -821,19 +876,19 @@ async function runClouds(browser, out, pages) {
     'd6AfterTrips',
   );
   // D6 (UI) — `&clouds=off` (자전 ON) 로드를 **패널**로 켠다 ↔ 로드 ON 캡처 (D).
-  const Cu = await setupPage(browser, Q.cloudRotOff, 'Cu-cloudRotOff-ui', T_JD_CLOUD, {
+  const Cu = await setupPage(browser, pages, Q.cloudRotOff, 'Cu-cloudRotOff-ui', T_JD_CLOUD, {
     hideOverlays: false,
   });
-  pages.push(Cu);
   await recordBootCaps(Cu, out);
   await withGeomCheck(Cu, out, () => uiToggle(Cu, 'clouds'));
   out.onChecks.push(await waitMaterialReady(Cu, CLOUD_MESH));
   out.d6ui = await measureCheckedPair(Cu, await uiCapture(Cu, 'Cu-ui-on', out), D, dImg, 'd6ui');
+  // 블록 경계 해제 (#1271 A1) — D6f 는 새 쿼리 쌍 E · F 만 쓴다.
+  await retirePages(out, pages);
 
   // ── D6f — mid 선생성 뒤 ON (자전 OFF 프레임). 계열 등록 누락은 여기서 픽셀로 드러나지 않는다 (헤더 D6f ⚠️) ──
-  const E = await setupPage(browser, Q.cloudOff, 'E-cloudOff-mid', T_JD_CLOUD);
-  const F = await setupPage(browser, Q.cloudOn, 'F-cloudOn-mid', T_JD_CLOUD);
-  pages.push(E, F);
+  const E = await setupPage(browser, pages, Q.cloudOff, 'E-cloudOff-mid', T_JD_CLOUD);
+  const F = await setupPage(browser, pages, Q.cloudOn, 'F-cloudOn-mid', T_JD_CLOUD);
   for (const ctx of [E, F]) {
     await settleLod(ctx, 'mid', 'mid');
     await settleLod(ctx, 'auto', 'auto');
@@ -861,9 +916,8 @@ async function runClouds(browser, out, pages) {
 
 /** D7 · D7m · D7e — 야간 불빛. */
 async function runNightLights(browser, out, pages) {
-  const P1 = await setupPage(browser, Q.nightP1, 'P1-night', T_JD_NIGHT);
-  const P2 = await setupPage(browser, Q.nightP2, 'P2-nightOff', T_JD_NIGHT);
-  pages.push(P1, P2);
+  const P1 = await setupPage(browser, pages, Q.nightP1, 'P1-night', T_JD_NIGHT);
+  const P2 = await setupPage(browser, pages, Q.nightP2, 'P2-nightOff', T_JD_NIGHT);
   const p1Pre = await capture(P1, 'P1-pre');
   const p2Img = await capture(P2, 'P2');
   out.d7Positive = await measureCheckedPair(P1, p1Pre, P2, p2Img, 'd7Positive');
@@ -872,10 +926,9 @@ async function runNightLights(browser, out, pages) {
   out.d7 = await measureCheckedPair(P1, await capture(P1, 'P1-runtime-off'), P2, p2Img, 'd7');
   out.d7Strengths = await readAllLightStrengths(P1);
   // D7 (UI) — P1 쿼리를 **패널**로 끈다 ↔ P2 로드 캡처. (D7m 이 P2 의 LOD 를 바꾸기 전에 잰다.)
-  const P1u = await setupPage(browser, Q.nightP1, 'P1u-night-ui', T_JD_NIGHT, {
+  const P1u = await setupPage(browser, pages, Q.nightP1, 'P1u-night-ui', T_JD_NIGHT, {
     hideOverlays: false,
   });
-  pages.push(P1u);
   await recordBootCaps(P1u, out);
   await withGeomCheck(P1u, out, () => uiToggle(P1u, 'nightLights'));
   out.d7ui = await measureCheckedPair(
@@ -886,6 +939,8 @@ async function runNightLights(browser, out, pages) {
     'd7ui',
   );
   out.d7uiStrengths = await readAllLightStrengths(P1u);
+  // P1u 는 D7 UI 에서 끝난다 — D7m 은 P1 · P2 만 쓴다 (#1271 A1).
+  await retirePages(out, pages, [P1u]);
   // D7m — 끈 뒤 두 페이지 모두 mid 정착 (P1 의 mid 가 OFF 이후 생성이면 lazy 상태 경로를 탄다).
   await settleLod(P1, 'mid', 'mid', { postToggle: true });
   await settleLod(P2, 'mid', 'mid');
@@ -899,10 +954,11 @@ async function runNightLights(browser, out, pages) {
     await capture(P2, 'P2-mid'),
     'd7m',
   );
+  // 블록 경계 해제 (#1271 A1) — D7e 는 개요 페이지 O 만 쓴다.
+  await retirePages(out, pages);
 
   // ── D7e — 개요에서 끈 뒤 지구 focus → mid 정착 ──
-  const O = await setupPage(browser, Q.nightOverview, 'O-overview', T_JD_NIGHT);
-  pages.push(O);
+  const O = await setupPage(browser, pages, Q.nightOverview, 'O-overview', T_JD_NIGHT);
   out.d7eMidAtToggle = await hasMesh(O, EARTH_MID);
   await callSetter(O, 'setNightLightsVisible', false);
   await O.page.evaluate(() => window.__simCore.command({ type: 'focusOn', bodyId: 'earth' }));
@@ -922,8 +978,7 @@ async function runNightLights(browser, out, pages) {
 
 /** D8 · D8p — 별 배경. */
 async function runStars(browser, out, pages) {
-  const S = await setupPage(browser, Q.starsOff, 'S-starsOff', T_JD_CLOUD);
-  pages.push(S);
+  const S = await setupPage(browser, pages, Q.starsOff, 'S-starsOff', T_JD_CLOUD);
   out.software = await S.page.evaluate(() => window.__isSoftwareRenderer === true);
   out.d8LoadCounts = await readCounts(S);
   await callSetter(S, 'setStarfieldVisible', true);
@@ -951,6 +1006,8 @@ async function runStars(browser, out, pages) {
     (n) => window.__simCore.scene.getMeshByName(n)?.isEnabled() ?? null,
     STARFIELD_MESH,
   );
+  // 블록 경계 해제 (#1271 A1) — 픽셀 블록은 S 를 쓰지 않는다.
+  await retirePages(out, pages);
 
   // ── D8 픽셀 — 하드웨어 전용 (소프트웨어 렌더는 로드 ON 에서도 별을 만들지 않는다 — #745) ──
   if (out.software) {
@@ -960,22 +1017,22 @@ async function runStars(browser, out, pages) {
     };
     return;
   }
-  const H1 = await setupPage(browser, Q.starsOn, 'H1-starsOn', T_JD_CLOUD);
-  const H2 = await setupPage(browser, Q.starsOff, 'H2-starsOff', T_JD_CLOUD);
-  const H3 = await setupPage(browser, Q.starsOn, 'H3-starsOn', T_JD_CLOUD);
-  pages.push(H1, H2, H3);
+  const H1 = await setupPage(browser, pages, Q.starsOn, 'H1-starsOn', T_JD_CLOUD);
+  const H2 = await setupPage(browser, pages, Q.starsOff, 'H2-starsOff', T_JD_CLOUD);
+  const H3 = await setupPage(browser, pages, Q.starsOn, 'H3-starsOn', T_JD_CLOUD);
   const h1Pre = await capture(H1, 'H1-pre');
   const h2Img = await capture(H2, 'H2');
   const h3Img = await capture(H3, 'H3');
   out.d8Determinism = await measureCheckedPair(H1, h1Pre, H3, h3Img, 'd8Determinism');
+  // H3 은 결정성 쌍에서 끝난다 — H1u 를 열기 전에 닫아 열린 컨텍스트를 3 이하로 둔다 (#1271 A1).
+  await retirePages(out, pages, [H3]);
   out.d8Positive = await measureCheckedPair(H1, h1Pre, H2, h2Img, 'd8Positive');
   await withGeomCheck(H1, out, () => callSetter(H1, 'setStarfieldVisible', false));
   out.d8Pixel = await measureCheckedPair(H1, await capture(H1, 'H1-runtime-off'), H2, h2Img, 'd8');
   // D8 (UI) — 로드 ON 을 **패널**로 끈다 ↔ `&stars=off` 로드 full frame (하드웨어 전용).
-  const H1u = await setupPage(browser, Q.starsOn, 'H1u-starsOn-ui', T_JD_CLOUD, {
+  const H1u = await setupPage(browser, pages, Q.starsOn, 'H1u-starsOn-ui', T_JD_CLOUD, {
     hideOverlays: false,
   });
-  pages.push(H1u);
   await recordBootCaps(H1u, out);
   await withGeomCheck(H1u, out, () => uiToggle(H1u, 'stars'));
   out.d8ui = await measureCheckedPair(
@@ -996,8 +1053,7 @@ async function runStars(browser, out, pages) {
 
 /** D15 — 4 토글 × 10 왕복 × (재생 / 일시정지). */
 async function runStress(browser, out, pages) {
-  const T = await setupPage(browser, Q.stress, 'T-stress', T_JD_CLOUD);
-  pages.push(T);
+  const T = await setupPage(browser, pages, Q.stress, 'T-stress', T_JD_CLOUD);
   const setters = [
     'setOrbitLinesVisible',
     'setStarfieldVisible',
@@ -1029,8 +1085,7 @@ async function runStress(browser, out, pages) {
 /** D1 · D2 — 4 모드 × 1280×720. `education`·`sandbox` 는 모드 버튼이 비활성이라 `?mode=` 로 진입한다. */
 async function runUiModes(browser, out, pages) {
   for (const mode of UI_MODES) {
-    const M = await setupUiPage(browser, `${UI_BASE}&mode=${mode}`, `M-${mode}`);
-    pages.push(M);
+    const M = await setupUiPage(browser, pages, `${UI_BASE}&mode=${mode}`, `M-${mode}`);
     await recordBootCaps(M, out);
     const store = await readStoreSel(M.page);
     const triggers = await M.page.locator(PANEL_TRIGGER).count();
@@ -1074,13 +1129,14 @@ async function runUiModes(browser, out, pages) {
       return { right, bar: bar.length, unreachable };
     }, UI_VIEWPORT_WIDTH);
     out.uiModes.push({ mode, store: store.mode, triggers, expanded, toggles, layout });
+    // 모드 페이지는 서로 독립 — 반복마다 닫는다 (#1271 A1 — 섹션 끝까지 두면 4 컨텍스트).
+    await retirePages(out, pages);
   }
 }
 
 /** D4 · D3 · D14 · D14b · D9 · D15 (UI) — 기본 로드 (focus=earth, 관찰 모드). */
 async function runUiInteraction(browser, out, pages) {
-  const U = await setupUiPage(browser, UI_BASE, 'U-interaction');
-  pages.push(U);
+  const U = await setupUiPage(browser, pages, UI_BASE, 'U-interaction');
   await recordBootCaps(U, out);
   const { page } = U;
   out.uiSoftware = await page.evaluate(() => window.__isSoftwareRenderer === true);
@@ -1353,8 +1409,7 @@ async function runUiInteraction(browser, out, pages) {
 
 /** D11 — URL 쓰기 · history · 새로고침 복원 · 북마크 · 로드 직후 URL 불변. */
 async function runUiUrl(browser, out, pages) {
-  const R = await setupUiPage(browser, UI_BASE, 'R-url');
-  pages.push(R);
+  const R = await setupUiPage(browser, pages, UI_BASE, 'R-url');
   const rBootCaps = await recordBootCaps(R, out);
   const { page } = R;
   const software = await page.evaluate(() => window.__isSoftwareRenderer === true);
@@ -1419,8 +1474,7 @@ async function runUiUrl(browser, out, pages) {
   };
 
   // 로드 직후 (조작 전) 4 키 불변 + `?orbits=off` 로드 → 켜고 북마크 → `orbits` 부재 (기존 불일치 해소).
-  const L = await setupUiPage(browser, UI_ALL_OFF, 'L-all-off');
-  pages.push(L);
+  const L = await setupUiPage(browser, pages, UI_ALL_OFF, 'L-all-off');
   await recordBootCaps(L, out);
   const urlAtLoad = await readUrlKeys(L.page);
   await uiToggle(L, 'orbits');
@@ -1450,8 +1504,7 @@ async function runUiUrl(browser, out, pages) {
  * 「트리거가 움직였는가」 는 하네스 조건, 「닫혔는가」 는 제품 속성 (게이트).
  */
 async function runUiTriggerScroll(browser, out, pages) {
-  const W = await setupUiPage(browser, UI_BASE, 'W-narrow', NARROW_VIEWPORT);
-  pages.push(W);
+  const W = await setupUiPage(browser, pages, UI_BASE, 'W-narrow', NARROW_VIEWPORT);
   await recordBootCaps(W, out);
   const { page } = W;
   await setPanelOpen(page, true);
@@ -1479,17 +1532,22 @@ async function runUiTriggerScroll(browser, out, pages) {
  * 닫았다 (PR #1268 qa — SwiftShader 2/19). 반복 수 `RACE_TRIALS` 근거는 상수 주석.
  */
 async function runUiRace(browser, out, pages) {
-  const Q = await setupUiPage(browser, UI_BASE, 'Q-race');
-  pages.push(Q);
+  const Q = await setupUiPage(browser, pages, UI_BASE, 'Q-race');
   await recordBootCaps(Q, out);
   const { page } = Q;
-  // 레이스의 재료 (요소 스크롤) 가 실제로 생겼는지 센다 — 0 이면 이 환경에서 레이스를 재현할 수 없다 (전제 21).
+  // 레이스의 재료가 실제로 생겼는지 센다 — 0 이면 이 환경에서 레이스를 재현할 수 없다 (전제 21). 재료는 「Tab 이
+  // 단축 바를 스크롤시켰다」 이므로 단축 바 **조상 체인** (단축 바 자신 포함 — 실제로 넘치는 것은 상단 바 좌측 그룹일
+  // 수 있다) 의 스크롤만 센다. 캔버스 포커스 · 트리거 클릭 같은 다른 요소 스크롤은 진단용 `scrollsAll` 에만 (#1271 R12).
   await page.evaluate(() => {
     window.__raceScrolls = 0;
+    window.__raceScrollsAll = 0;
     window.addEventListener(
       'scroll',
       (e) => {
-        if (e.target !== document) window.__raceScrolls += 1;
+        if (e.target === document) return;
+        window.__raceScrollsAll += 1;
+        const bar = document.querySelector('[data-r1-region="shortcut-bar"]');
+        if (bar && e.target instanceof Element && e.target.contains(bar)) window.__raceScrolls += 1;
       },
       { capture: true, passive: true },
     );
@@ -1521,6 +1579,7 @@ async function runUiRace(browser, out, pages) {
   out.uiRace = {
     tabsToTrigger,
     scrolls: await page.evaluate(() => window.__raceScrolls),
+    scrollsAll: await page.evaluate(() => window.__raceScrollsAll),
     bad: trials.filter(
       (t) => !t.atTrigger || t.panels !== 1 || t.focus !== 'display-toggle-orbits',
     ),
@@ -1530,8 +1589,7 @@ async function runUiRace(browser, out, pages) {
 
 /** D10 — `?surface=off`: 구름·불빛 토글 aria-disabled + 사유, 눌러도 mesh · 머티리얼 · URL 무변화. */
 async function runUiSurfaceOff(browser, out, pages) {
-  const SF = await setupUiPage(browser, `${UI_BASE}&surface=off`, 'SF-surfaceOff');
-  pages.push(SF);
+  const SF = await setupUiPage(browser, pages, `${UI_BASE}&surface=off`, 'SF-surfaceOff');
   await recordBootCaps(SF, out);
   const { page } = SF;
   await setPanelOpen(page, true);
@@ -1580,18 +1638,57 @@ async function runUiSurfaceOff(browser, out, pages) {
 }
 
 /**
- * 섹션이 끝날 때마다 그 섹션의 페이지를 닫는다 — 열린 컨텍스트가 쌓이면 뒤 페이지의 부팅 (핸들 노출) 이
- * 누적으로 느려져 `bootstrapScene` 핸들 대기 20 s 에 접근한다 (1차 실행 실측: 11 페이지를 끝까지 열어 두면
- * 핸들 대기가 `2.3 s → 13.4 s` 로 단조 증가). 닫기 전에 정착 기록 · 콘솔 에러를 결과로 옮긴다.
+ * 페이지를 닫는다 (`which` 미지정 = 열린 페이지 전부). 열린 컨텍스트가 쌓이면 뒤 페이지의 부팅 (핸들 노출) 이
+ * 누적으로 느려져 `bootstrapScene` 핸들 대기 20 s 에 접근한다 — 섹션 경계만으로는 부족했다: 첫 섹션 `runClouds`
+ * 가 혼자 8 페이지를 열어 CI 핸들 대기가 contexts 1 → 8 에서 `206ms → 13.7s` (run `36548030595`), 실패 run
+ * `36651753956` 에서는 8 번째 F 가 `23.6s` 로 상한을 넘었다 (#1271). 그래서 3 페이지 이상 여는 섹션은 하위 블록
+ * 경계에서도 닫는다 (열린 컨텍스트 ≤ 3).
+ *
+ * 닫기 전에 정착 기록 · 콘솔 에러 · 로드 상태를 결과로 옮긴다 — 이동을 빠뜨리면 콘솔 에러 게이트 · 정착 전제가
+ * 그 페이지를 못 보고 공허 통과한다. 열려 있지 않은 페이지를 지정하면 하네스 결함이라 즉시 던진다 (fail-fast).
  */
-async function retirePages(out, pages) {
-  for (const p of pages.splice(0)) {
+async function retirePages(out, pages, which = [...pages]) {
+  for (const p of which) {
+    const i = pages.indexOf(p);
+    if (i === -1)
+      throw new Error(`retirePages: ${p.label} 은 열린 페이지 목록에 없다 (하네스 결함)`);
+    pages.splice(i, 1);
     out.settles.push(...p.settles.map((s) => ({ page: p.label, ...s })));
     out.consoleErrors[p.label] = [...p.errors];
     if (p.loadDisplay) out.loadDisplay[p.label] = p.loadDisplay;
     await p.context.close();
   }
 }
+
+/**
+ * 부팅 실패의 원인 판별 — 열린 페이지가 하나도 없는 상태에서 같은 쿼리 · 같은 뷰포트로 **단독** 부팅한다 (전제 22).
+ * 대기 상한은 `bootstrapScene` 기본값 (주입 없음). 이 페이지는 판정에 쓰지 않고 판별 직후 닫는다.
+ */
+async function rebootAlone(browser, failure) {
+  let ctx = null;
+  try {
+    ctx = await bootPage(browser, failure.query, `${failure.label}-reboot`, failure.viewport);
+    return { ok: true, consoleErrors: ctx.errors.length };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  } finally {
+    if (ctx) await ctx.context.close().catch(() => {});
+  }
+}
+
+/** 섹션 — 이름이 전제 `boot:<이름>` 의 id 가 된다. */
+const SECTIONS = [
+  ['clouds', runClouds],
+  ['night', runNightLights],
+  ['stars', runStars],
+  ['stress', runStress],
+  ['uiModes', runUiModes],
+  ['uiInteraction', runUiInteraction],
+  ['uiUrl', runUiUrl],
+  ['uiSurfaceOff', runUiSurfaceOff],
+  ['uiTriggerScroll', runUiTriggerScroll],
+  ['uiRace', runUiRace],
+];
 
 async function run(browser) {
   // onChecks = 런타임 ON 직후 (부재 → 게이트) · harnessReady = 하네스가 만든 mesh (부재 → 측정 불가)
@@ -1607,27 +1704,41 @@ async function run(browser) {
     toggleGeom: [],
     postToggleReady: [],
     loadDisplay: {},
+    // 전제 22 — 부팅 실패로 중단된 섹션 (섹션 · 라벨 · 첫 시도 에러 · 단독 재부팅 결과).
+    bootFailures: [],
   };
   const pages = [];
   try {
-    for (const section of [
-      runClouds,
-      runNightLights,
-      runStars,
-      runStress,
-      runUiModes,
-      runUiInteraction,
-      runUiUrl,
-      runUiSurfaceOff,
-      runUiTriggerScroll,
-      runUiRace,
-    ]) {
-      await section(browser, out, pages);
+    for (const [name, section] of SECTIONS) {
+      try {
+        await section(browser, out, pages);
+      } catch (e) {
+        // 부팅 예외만 섹션 중단으로 분류한다 — 그 밖의 예외는 그대로 exit 1 (분류 범위 밖).
+        if (!(e instanceof BootFailure)) throw e;
+        // 열린 페이지를 전부 닫아 (데이터 이동 포함) 재부팅을 단독으로 만든다.
+        await retirePages(out, pages);
+        // 「단독」 이 성립하지 않으면 판별 자체가 무효다 — 목록 밖에 남은 컨텍스트는 하네스 결함이라 즉시 던진다.
+        const leftover = browser.contexts().length;
+        if (leftover !== 0)
+          throw new Error(`단독 재부팅 전 열린 컨텍스트 ${leftover} ≠ 0 (하네스 결함 — 등록 누락)`);
+        out.consoleErrors[e.label] = e.errors;
+        out.bootFailures.push({
+          section: name,
+          label: e.label,
+          injected: e.injected,
+          error: e.message,
+          reboot: await rebootAlone(browser, e),
+        });
+      }
       await retirePages(out, pages);
     }
   } finally {
     await retirePages(out, pages);
   }
+  if (INJECT === 'boot' && !bootInjected)
+    throw new Error(
+      `INJECT=boot 미발화 — 라벨 ${INJECT_BOOT_LABEL} 이 부팅되지 않았다 (오타 · 환경상 열리지 않는 페이지)`,
+    );
   return out;
 }
 
@@ -1657,6 +1768,16 @@ function judge(r) {
   const unmet = {};
   const fail = (id, msg) => (unmet[id] ??= []).push(msg);
 
+  // (22) 부팅 실패로 중단된 섹션 — 그 섹션의 결과 필드는 비어 있을 수 있다. 아래 전제 계산 중 섹션 고유 필드를 읽는
+  // 것은 `ran(섹션)` 일 때만 계산한다 (그 전제에 기대는 게이트는 전부 `boot:<섹션>` 에도 기대므로 판정 영향 없음).
+  const aborted = new Set(r.bootFailures.map((f) => f.section));
+  const ran = (section) => !aborted.has(section);
+  for (const f of r.bootFailures)
+    fail(
+      `boot:${f.section}`,
+      `(22) ${f.label} 부팅 실패${f.injected ? ' (INJECT=boot)' : ''} — 섹션 중단 · 단독 재부팅 ${f.reboot.ok ? '성공 (경합 하 부팅 지연)' : `실패 (${f.reboot.error}) — 게이트 「부팅 — 단독 핸들 노출」 이 판정`} · ${f.error}`,
+    );
+
   // (2) 측정 오류 — 쌍 측정 · 정렬 · 큐 판독의 error.
   const pairKeys = [
     'd5Positive',
@@ -1672,7 +1793,9 @@ function judge(r) {
     'd6ui',
     'd7ui',
   ];
-  if (!r.software) pairKeys.push('d8Determinism', 'd8Positive', 'd8Pixel', 'd8ui');
+  const renderer = readRenderer(r);
+  const hw = renderer.hw;
+  if (hw) pairKeys.push('d8Determinism', 'd8Positive', 'd8Pixel', 'd8ui');
   for (const k of [...pairKeys, 'd5SortA', 'd5SortB', 'd5uiSort', 'd6fQueueE', 'd6fQueueF'])
     if (r[k]?.error) fail(`err:${k}`, `(2) ${k}: ${r[k].error}`);
   // (1) 하네스 정착 (부팅 · 토글 전 override) 상한 초과. 토글 **뒤** 정착은 게이트 쪽이다.
@@ -1680,15 +1803,16 @@ function judge(r) {
     if (s.timedOut && !s.postToggle)
       fail(`settle:${s.page}`, `(1) LOD 정착 상한 초과 — ${s.page}/${s.step} (${s.waitedMs}ms)`);
   // (3) 양성 대조 — 로드 ON ↔ 로드 OFF. 로드 상태 자체는 「로드 경로 구조」 게이트가 따로 본다.
-  const positives = {
-    d5Positive: 'pos:clouds',
-    d6Positive: 'pos:cloudsRot',
-    d7Positive: 'pos:night',
-  };
+  const positives = [
+    ['d5Positive', 'pos:clouds', 'clouds'],
+    ['d6Positive', 'pos:cloudsRot', 'clouds'],
+    ['d7Positive', 'pos:night', 'night'],
+  ];
   // 양성 대조 쌍 자체가 측정 오류여도 이 전제는 무너진 것이다 — 그렇지 않으면 `pos:*` 에만 기대는 게이트가 양성
   // 대조 없이 `== 0` 을 PASS 로 낸다 (reviewer R7).
-  for (const [k, id] of Object.entries(positives))
-    if (r[k]?.error) fail(id, `(3) ${k} — 양성 대조 쌍 측정 오류`);
+  for (const [k, id, section] of positives)
+    if (!ran(section)) continue;
+    else if (r[k]?.error) fail(id, `(3) ${k} — 양성 대조 쌍 측정 오류`);
     else if (!(r[k].disk.changed > 0))
       fail(id, `(3) ${k} — 로드 ON ↔ 로드 OFF disk 변화 ${r[k].disk.changed}`);
   // (4) 하네스가 만든 mid (토글 없는 페이지) 의 부재 · 준비 초과.
@@ -1696,53 +1820,79 @@ function judge(r) {
     if (x.absent || x.error)
       fail('ready:P2', `(4) ${x.label ?? x.error} — 하네스 mid 부재 또는 준비 초과`);
   // (5) fade 재현 큐 — 하네스 설정 (E 의 mid 존재 자체는 「토글 뒤 mid」 게이트가 본다).
-  for (const [k, id] of [
-    ['d6fQueueE', 'fade:E'],
-    ['d6fQueueF', 'fade:F'],
-  ])
-    if (!r[k]?.error && !r[k].entries.some((e) => e.name === EARTH_MID))
-      fail(id, `(5) ${k} — fade 재현 투명 큐에 ${EARTH_MID} 부재`);
+  if (ran('clouds'))
+    for (const [k, id] of [
+      ['d6fQueueE', 'fade:E'],
+      ['d6fQueueF', 'fade:F'],
+    ])
+      if (!r[k]?.error && !r[k].entries.some((e) => e.name === EARTH_MID))
+        fail(id, `(5) ${k} — fade 재현 투명 큐에 ${EARTH_MID} 부재`);
   // (6) D7e 엣지 — 토글 시점에 mid 가 이미 있으면 엣지가 아니다 (뷰 · 하네스). 정착 뒤 mid 부재는 D7e 게이트가 FAIL.
-  if (r.d7eMidAtToggle !== false) fail('edge:D7e', `(6) D7e 토글 시점 mid ${r.d7eMidAtToggle}`);
+  if (ran('night') && r.d7eMidAtToggle !== false)
+    fail('edge:D7e', `(6) D7e 토글 시점 mid ${r.d7eMidAtToggle}`);
   // (9) D8 (하드웨어) — 같은 URL 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일.
-  if (hwSection(r) && (r.d8Determinism?.error || r.d8Determinism.fullChanged !== 0))
+  if (hw && ran('stars') && (r.d8Determinism?.error || r.d8Determinism.fullChanged !== 0))
     fail(
       'det:D8',
       `(9) D8 독립 2 로드 결정성 — ${r.d8Determinism?.error ?? r.d8Determinism.fullChanged}`,
     );
-  if (hwSection(r) && (r.d8Positive?.error || !(r.d8Positive.fullChanged > 0)))
+  if (hw && ran('stars') && (r.d8Positive?.error || !(r.d8Positive.fullChanged > 0)))
     fail('pos:D8', `(9) D8 로드 ON ↔ OFF — ${r.d8Positive?.error ?? r.d8Positive.fullChanged}`);
-  // (15) 렌더러 판독 불일치 — SKIP 결정의 전제 (#1234 감지 영역 · 환경 사실).
-  const softwareReads = { core: r.software, ui: r.uiSoftware, url: r.uiD11.software };
-  if (new Set(Object.values(softwareReads)).size !== 1)
-    fail('renderer', `(15) __isSoftwareRenderer 판독 불일치 ${JSON.stringify(softwareReads)}`);
-  // (16) 자유시점 양성 대조 — 선택 재설정 (하네스). 패널은 하네스가 트리거로 닫은 뒤다.
-  if (!r.uiFreeFlyControl.selected) fail('ctl', '(16) 자유시점 양성 대조 — 선택 재설정 실패');
-  // (18) D4 타이밍 — 패널이 닫힌 채 계약 시간 (4 초) 안에 숨지 않았지만 더 기다리니 숨었다 → 이 페이지의 타이머가
-  // 계약 시간을 지키지 못했다 (환경 저속). D4 의 두 게이트가 이 시간 전제에 기댄다 (reviewer R8).
-  if (r.uiD4.closedOpacity !== '0' && r.uiD4.closedLate === true)
-    fail('d4:timing', `(18) D4 — ${D4_IDLE_MS}ms 뒤 opacity ${r.uiD4.closedOpacity}, 이후에 숨음`);
+  // (15) 렌더러 판독 불일치 — SKIP 결정의 전제 (#1234 감지 영역 · 환경 사실). 중단 섹션의 판독은 빠지고, 판독이
+  // 하나도 없으면 (판독 섹션 전부 중단) 렌더러를 모르는 것이라 역시 무너진다.
+  if (renderer.distinct !== 1)
+    fail(
+      'renderer',
+      `(15) __isSoftwareRenderer 판독 불일치 · 부재 ${JSON.stringify(renderer.reads)}`,
+    );
+  if (ran('uiInteraction')) {
+    // (16) 자유시점 양성 대조 — 선택 재설정 (하네스). 패널은 하네스가 트리거로 닫은 뒤다.
+    if (!r.uiFreeFlyControl.selected) fail('ctl', '(16) 자유시점 양성 대조 — 선택 재설정 실패');
+    // (18) D4 타이밍 — 패널이 닫힌 채 계약 시간 (4 초) 안에 숨지 않았지만 더 기다리니 숨었다 → 이 페이지의 타이머가
+    // 계약 시간을 지키지 못했다 (환경 저속). D4 의 두 게이트가 이 시간 전제에 기댄다 (reviewer R8).
+    if (r.uiD4.closedOpacity !== '0' && r.uiD4.closedLate === true)
+      fail(
+        'd4:timing',
+        `(18) D4 — ${D4_IDLE_MS}ms 뒤 opacity ${r.uiD4.closedOpacity}, 이후에 숨음`,
+      );
+    // 무관 스크롤 판정의 전제 — 좌측 단축 바 스크롤이 트리거를 움직이지 않았어야 「무관」 이다.
+    if (r.uiScroll.triggerMoved)
+      fail('scroll:unrelated', '좌측 단축 바 스크롤이 트리거를 움직였다 (무관 스크롤 아님)');
+    // (17) 스크롤 닫힘 — 스크롤을 실제로 일으켰는가 (레이아웃상 스크롤할 요소가 없으면 측정 불가).
+    if (!r.uiScroll.scrolled || r.uiScroll.scrolled.before === r.uiScroll.scrolled.after)
+      fail('scroll', `(17) 스크롤 미발생 ${JSON.stringify(r.uiScroll.scrolled)}`);
+  }
   // (19) 새로고침 뒤 부팅 미완 — 핸들조차 노출되지 않았다 (환경 저속). 핸들이 있는데 준비만 없으면 게이트 FAIL.
-  if (!r.uiD11.reloadReady && r.uiD11.reloadHandles === false)
+  if (ran('uiUrl') && !r.uiD11.reloadReady && r.uiD11.reloadHandles === false)
     fail('reload:boot', '(19) D11 새로고침 뒤 핸들 노출 대기 초과');
   // (20) 트리거 이동 스크롤 — 좁은 폭에서 우측 그룹 스크롤이 트리거를 실제로 움직였는가 (하네스 조건).
-  if (!r.uiTriggerScroll.scrolled || !r.uiTriggerScroll.triggerMoved)
+  if (ran('uiTriggerScroll') && (!r.uiTriggerScroll.scrolled || !r.uiTriggerScroll.triggerMoved))
     fail(
       'scroll:trigger',
       `(20) 트리거를 움직이는 스크롤 미발생 ${JSON.stringify(r.uiTriggerScroll)}`,
     );
-  // (21) 레이스 재료 — 반복 동안 요소 스크롤이 실제로 있었는가.
-  if (!(r.uiRace.scrolls > 0)) fail('race:scroll', '(21) 레이스 반복 중 요소 스크롤 0');
-  // 무관 스크롤 판정의 전제 — 좌측 단축 바 스크롤이 트리거를 움직이지 않았어야 「무관」 이다.
-  if (r.uiScroll.triggerMoved)
-    fail('scroll:unrelated', '(17) 좌측 단축 바 스크롤이 트리거를 움직였다');
-  // (17) 스크롤 닫힘 — 스크롤을 실제로 일으켰는가 (레이아웃상 스크롤할 요소가 없으면 측정 불가).
-  if (!r.uiScroll.scrolled || r.uiScroll.scrolled.before === r.uiScroll.scrolled.after)
-    fail('scroll', `(17) 스크롤 미발생 ${JSON.stringify(r.uiScroll.scrolled)}`);
+  // (21) 레이스 재료 — 반복 동안 단축 바 조상 체인 스크롤이 실제로 있었는가. 레이스 게이트는 실패 관측이 없을 때만
+  // 이 전제에 기댄다 (judgeUi — R12).
+  if (ran('uiRace') && !(r.uiRace.scrolls > 0))
+    fail(
+      'race:scroll',
+      `(21) 레이스 반복 중 단축 바 조상 체인 스크롤 0 (전체 요소 ${r.uiRace.scrollsAll})`,
+    );
 
-  const settleIds = (...pages) => pages.map((p) => `settle:${p}`);
-  const hw = hwSection(r);
-  const specs = [...judgeCore(r, settleIds, hw), ...judgeUi(r, settleIds, hw)];
+  const h = {
+    settleIds: (...pages) => pages.map((p) => `settle:${p}`),
+    hw,
+    ran,
+    /** 이 섹션의 게이트 — 섹션이 중단되면 측정 불가. */
+    boot: (section) => [`boot:${section}`],
+    /**
+     * 여러 섹션의 표본을 모으는 게이트 — 기여 섹션이 **전부** 중단됐을 때만 측정 불가 (그 밖에는 측정된 페이지
+     * 위에서 판정). `표본 ≥ 1` 술어가 표본 0 을 공허 FAIL 로 내지 않게 한다.
+     */
+    agg: (...sections) =>
+      sections.every((s) => aborted.has(s)) ? sections.map((s) => `boot:${s}`) : [],
+  };
+  const specs = [...judgeCore(r, h), ...judgeUi(r, h)];
   const gates = specs.map(({ name, needs, evaluate }) => {
     const missing = needs.filter((id) => unmet[id]);
     if (missing.length) return [name, `전제 ${missing.join(', ')}`, '—', UNMEASURED];
@@ -1755,23 +1905,32 @@ function judge(r) {
   return { gates, unmet: blocking, info };
 }
 
-/** 하드웨어 전용 섹션 (D8 픽셀 쌍) 이 돌았는가 — core 섹션 렌더러 판독 기준. */
-const hwSection = (r) => !r.software;
+/**
+ * 렌더러 판독 — core 섹션 (S) · UI 상호작용 (U) · URL (R) 세 페이지의 `__isSoftwareRenderer`. 중단 섹션의 판독은
+ * 빠진다. `hw` 는 core 판독을 우선한다 (하드웨어 전용 섹션 D8 픽셀 쌍이 core 섹션에서 돈다) — 없으면 남은 판독.
+ */
+function readRenderer(r) {
+  const reads = Object.fromEntries(
+    Object.entries({ core: r.software, ui: r.uiSoftware, url: r.uiD11?.software }).filter(
+      ([, v]) => v !== undefined,
+    ),
+  );
+  const values = Object.values(reads);
+  return { reads, distinct: new Set(values).size, hw: values.length > 0 && values[0] === false };
+}
 
 /** core 경로 (PR1 setter 직접 호출) + 로드 경로 구조 · 토글 전후 기하 · 토글 뒤 정착 게이트. */
-function judgeCore(r, settleIds, hw) {
-  const leak = r.d6Leak;
-  const tripsOk = leak.trips.every(
-    (t) =>
-      t.off.clouds === 0 &&
-      t.on.clouds === 1 &&
-      t.off.meshes === leak.countsOffLoad.meshes &&
-      t.off.materials === leak.countsOffLoad.materials &&
-      t.on.meshes === leak.countsOn.meshes &&
-      t.on.materials === leak.countsOn.materials,
+function judgeCore(r, { settleIds, hw, ran, boot, agg }) {
+  // D8p 표본 — 중단 섹션의 표본은 없을 수 있다 (있는 표본만 본다, 표본별 ≥ 1).
+  const d8pSamples = Object.fromEntries(
+    [
+      ['A', r.d8pA],
+      ['S', r.d8pS],
+      ['T', r.d8pT],
+    ]
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, v.entries]),
   );
-  const maxClouds = Math.max(leak.countsOn.clouds, ...leak.trips.map((t) => t.on.clouds));
-  const d8pSamples = { A: r.d8pA.entries, S: r.d8pS.entries, T: r.d8pT.entries };
   const nonStarNoDepth = Object.values(d8pSamples)
     .flat()
     .filter((e) => e.name !== STARFIELD_MESH && e.noDepthWrite);
@@ -1781,28 +1940,33 @@ function judgeCore(r, settleIds, hw) {
   const ld = r.loadDisplay;
   // 로드 경로 구조 — 쌍의 기준 페이지가 쿼리대로 로드됐는가 (조작 전 판독). 기대: 구름 ON 로드 1 · OFF 로드 0 ·
   // 불빛 ON 로드 > 0 · OFF 로드 0 · `?stars=off` 로드 별 0 · (하드웨어) 별 ON 로드 1.
+  // 페이지마다 섹션을 붙인다 — 중단 섹션의 **미측정** 페이지만 기대에서 빠진다 (측정된 페이지는 그대로 판정, 전제 22).
   const loadExpect = [
-    ['A-cloudOn', (d) => d.clouds === 1],
-    ['Au-cloudOn-ui', (d) => d.clouds === 1],
-    ['B-cloudOff', (d) => d.clouds === 0],
-    ['C-cloudRotOff', (d) => d.clouds === 0],
-    ['Cu-cloudRotOff-ui', (d) => d.clouds === 0],
-    ['D-cloudRotOn', (d) => d.clouds === 1],
-    ['P1-night', (d) => d.nightLight > 0],
-    ['P1u-night-ui', (d) => d.nightLight > 0],
-    ['P2-nightOff', (d) => d.nightLight === 0],
-    ['S-starsOff', (d) => d.stars === 0],
+    ['A-cloudOn', 'clouds', (d) => d.clouds === 1],
+    ['Au-cloudOn-ui', 'clouds', (d) => d.clouds === 1],
+    ['B-cloudOff', 'clouds', (d) => d.clouds === 0],
+    ['C-cloudRotOff', 'clouds', (d) => d.clouds === 0],
+    ['Cu-cloudRotOff-ui', 'clouds', (d) => d.clouds === 0],
+    ['D-cloudRotOn', 'clouds', (d) => d.clouds === 1],
+    ['P1-night', 'night', (d) => d.nightLight > 0],
+    ['P1u-night-ui', 'night', (d) => d.nightLight > 0],
+    ['P2-nightOff', 'night', (d) => d.nightLight === 0],
+    ['S-starsOff', 'stars', (d) => d.stars === 0],
   ];
   if (hw)
     loadExpect.push(
-      ['H1-starsOn', (d) => d.stars === 1],
-      ['H1u-starsOn-ui', (d) => d.stars === 1],
-      ['H2-starsOff', (d) => d.stars === 0],
-      ['H3-starsOn', (d) => d.stars === 1],
+      ['H1-starsOn', 'stars', (d) => d.stars === 1],
+      ['H1u-starsOn-ui', 'stars', (d) => d.stars === 1],
+      ['H2-starsOff', 'stars', (d) => d.stars === 0],
+      ['H3-starsOn', 'stars', (d) => d.stars === 1],
     );
   const loadBad = loadExpect
-    .filter(([label, ok]) => !ld[label] || !ok(ld[label]))
+    .filter(([label, section]) => ld[label] || ran(section))
+    .filter(([label, , ok]) => !ld[label] || !ok(ld[label]))
     .map(([label]) => [label, ld[label] ?? null]);
+  /** 표본을 내는 섹션 — 하드웨어 전용 페이지 (H1 · H1u · L) 는 하드웨어에서만 기여한다. */
+  const geomSections = hw ? ['clouds', 'night', 'stars'] : ['clouds', 'night'];
+  const onSections = hw ? ['clouds', 'stars', 'uiUrl'] : ['clouds', 'stars'];
   const geomBad = r.toggleGeom.filter((g) => g.before !== g.after || g.before.startsWith('error'));
   const postBad = (page) => ({
     settles: r.settles.filter((s) => s.page === page && s.postToggle && s.timedOut),
@@ -1812,78 +1976,134 @@ function judgeCore(r, settleIds, hw) {
   const oPost = postBad('O-overview');
 
   return [
-    gate('로드 경로 구조 — 쌍 기준 페이지가 쿼리대로 로드됨 (조작 전)', [], () => [
-      JSON.stringify(loadBad),
-      '어긋난 페이지 0',
-      loadBad.length === 0,
+    // 전제 22 의 판별 게이트 — 단독 재부팅도 실패하면 경합이 아니라 핸들 노출 자체가 깨진 것이다 (제품 결함 후보).
+    // 부팅 실패가 없으면 표본 0 이 정상이라 `≥ 1` 을 걸지 않는다 (판정 대상이 「실패한 부팅」 이다).
+    gate('부팅 — 단독 핸들 노출 (부팅 실패 섹션의 같은 쿼리 단독 재부팅)', [], () => [
+      r.bootFailures.length
+        ? JSON.stringify(r.bootFailures.map((f) => [f.section, f.label, f.reboot]))
+        : '부팅 실패 0',
+      '단독 재부팅 실패 0',
+      r.bootFailures.every((f) => f.reboot.ok),
     ]),
-    gate('토글 전후 페이지 기하 불변 (setter · 패널)', [], () => [
+    gate(
+      '로드 경로 구조 — 쌍 기준 페이지가 쿼리대로 로드됨 (조작 전)',
+      agg('clouds', 'night', 'stars'),
+      () => [JSON.stringify(loadBad), '어긋난 페이지 0', loadBad.length === 0],
+    ),
+    gate('토글 전후 페이지 기하 불변 (setter · 패널)', agg(...geomSections), () => [
       JSON.stringify(geomBad),
       `변화 0 / ${r.toggleGeom.length} ∧ 표본 ≥ 1`,
       r.toggleGeom.length > 0 && geomBad.length === 0,
     ]),
     // 토글 뒤 정착 · 준비 — 같은 페이지의 토글 **전** 정착에 기댄다 (reviewer R8). 토글 전은 정착했는데 뒤만 초과하면
     // FAIL (토글이 만든 결함), 둘 다 초과하면 환경 저속이라 측정 불가다.
-    gate('P1 불빛 끈 뒤 mid 정착 · 생성 · 준비', settleIds('P1-night'), () => [
-      JSON.stringify(p1Post),
-      '정착 초과 0 ∧ mid 부재·준비 초과 0',
-      p1Post.settles.length === 0 && p1Post.ready.length === 0,
-    ]),
-    gate('O 개요에서 불빛 끈 뒤 focus · mid 정착', settleIds('O-overview'), () => [
-      JSON.stringify(oPost),
-      '정착 초과 0',
-      oPost.settles.length === 0,
-    ]),
+    gate(
+      'P1 불빛 끈 뒤 mid 정착 · 생성 · 준비',
+      [...boot('night'), ...settleIds('P1-night')],
+      () => [
+        JSON.stringify(p1Post),
+        '정착 초과 0 ∧ mid 부재·준비 초과 0',
+        p1Post.settles.length === 0 && p1Post.ready.length === 0,
+      ],
+    ),
+    gate(
+      'O 개요에서 불빛 끈 뒤 focus · mid 정착',
+      [...boot('night'), ...settleIds('O-overview')],
+      () => [JSON.stringify(oPost), '정착 초과 0', oPost.settles.length === 0],
+    ),
     // 부재는 타이밍이 아니다 — setter 는 동기로 동작하므로 환경과 무관하게 FAIL 이다.
-    gate('E 구름 ON 뒤 기존 mid 유지', [], () => [
+    gate('E 구름 ON 뒤 기존 mid 유지', boot('clouds'), () => [
       `ON 전 ${r.d6fMidBeforeOn} · 후 ${r.d6fMidAfterOn}`,
       'true',
       r.d6fMidAfterOn === true,
     ]),
-    gate('런타임 ON 직후 mesh 존재 (setter · 패널 경로 전부)', [], () => [
+    gate('런타임 ON 직후 mesh 존재 (setter · 패널 경로 전부)', agg(...onSections), () => [
       onAbsent.length ? `부재 ${JSON.stringify(onAbsent)}` : `부재 0 / ${r.onChecks.length}`,
       '부재 0 ∧ 표본 ≥ 1',
       r.onChecks.length > 0 && onAbsent.length === 0,
     ]),
     // 준비 초과는 그 페이지의 토글 전 정착에 기댄다 (PR #1267 의 「부재 = FAIL · 준비 초과 = 측정 불가」 구분을 되살리되,
     // 토글 전은 정상인데 ON 뒤만 초과하면 FAIL). 정착 기록이 없는 페이지 (UI 경량 페이지) 는 환경 증거가 없어 FAIL 이다.
-    gate('런타임 ON 직후 머티리얼 준비', settleIds(...new Set(onSlow.map((x) => x.page))), () => [
-      onSlow.length ? `준비 초과 ${JSON.stringify(onSlow.map((x) => x.error))}` : '0',
-      '준비 초과 0',
-      onSlow.length === 0,
-    ]),
+    gate(
+      '런타임 ON 직후 머티리얼 준비',
+      [...agg(...onSections), ...settleIds(...new Set(onSlow.map((x) => x.page)))],
+      () => [
+        onSlow.length ? `준비 초과 ${JSON.stringify(onSlow.map((x) => x.error))}` : '0',
+        '준비 초과 0',
+        onSlow.length === 0,
+      ],
+    ),
     gate(
       'D5 구름 런타임 OFF ↔ 로드 OFF disk 변화 px',
-      ['err:d5', 'err:d5Positive', 'pos:clouds', ...settleIds('A-cloudOn', 'B-cloudOff')],
+      [
+        ...boot('clouds'),
+        'err:d5',
+        'err:d5Positive',
+        'pos:clouds',
+        ...settleIds('A-cloudOn', 'B-cloudOff'),
+      ],
       () => [r.d5.disk.changed, '== 0', r.d5.disk.changed === 0],
     ),
-    gate('D5 구조 — earth-cloud 수 · 그룹 0 정렬 (A/B)', ['err:d5SortA', 'err:d5SortB'], () => [
-      `${r.d5CountsA.clouds} · A ${JSON.stringify(r.d5SortA)} · B ${JSON.stringify(r.d5SortB)}`,
-      '0 ∧ A·B 둘 다 투명/불투명 기본값',
-      r.d5CountsA.clouds === 0 &&
-        r.d5SortA.transparentDefault &&
-        r.d5SortA.opaqueDefault &&
-        r.d5SortB.transparentDefault &&
-        r.d5SortB.opaqueDefault,
-    ]),
+    gate(
+      'D5 구조 — earth-cloud 수 · 그룹 0 정렬 (A/B)',
+      [...boot('clouds'), 'err:d5SortA', 'err:d5SortB'],
+      () => [
+        `${r.d5CountsA.clouds} · A ${JSON.stringify(r.d5SortA)} · B ${JSON.stringify(r.d5SortB)}`,
+        '0 ∧ A·B 둘 다 투명/불투명 기본값',
+        r.d5CountsA.clouds === 0 &&
+          r.d5SortA.transparentDefault &&
+          r.d5SortA.opaqueDefault &&
+          r.d5SortB.transparentDefault &&
+          r.d5SortB.opaqueDefault,
+      ],
+    ),
     gate(
       'D6 구름 런타임 ON (자전 ON) ↔ 로드 ON disk 변화 px',
-      ['err:d6', 'err:d6Positive', 'pos:cloudsRot', ...settleIds('C-cloudRotOff', 'D-cloudRotOn')],
+      [
+        ...boot('clouds'),
+        'err:d6',
+        'err:d6Positive',
+        'pos:cloudsRot',
+        ...settleIds('C-cloudRotOff', 'D-cloudRotOn'),
+      ],
       () => [r.d6.disk.changed, '== 0', r.d6.disk.changed === 0],
     ),
-    gate(`D6 ${CLOUD_ROUND_TRIPS}왕복 누수 — 최대 구름 수 · 상태별 meshes/materials`, [], () => [
-      `${maxClouds} · ${JSON.stringify(leak)}`,
-      '≤ 1 ∧ OFF = 로드 OFF 개수 ∧ ON = 첫 ON 개수',
-      maxClouds <= 1 && tripsOk,
-    ]),
+    gate(
+      `D6 ${CLOUD_ROUND_TRIPS}왕복 누수 — 최대 구름 수 · 상태별 meshes/materials`,
+      boot('clouds'),
+      () => {
+        const leak = r.d6Leak;
+        const tripsOk = leak.trips.every(
+          (t) =>
+            t.off.clouds === 0 &&
+            t.on.clouds === 1 &&
+            t.off.meshes === leak.countsOffLoad.meshes &&
+            t.off.materials === leak.countsOffLoad.materials &&
+            t.on.meshes === leak.countsOn.meshes &&
+            t.on.materials === leak.countsOn.materials,
+        );
+        const maxClouds = Math.max(leak.countsOn.clouds, ...leak.trips.map((t) => t.on.clouds));
+        return [
+          `${maxClouds} · ${JSON.stringify(leak)}`,
+          '≤ 1 ∧ OFF = 로드 OFF 개수 ∧ ON = 첫 ON 개수',
+          maxClouds <= 1 && tripsOk,
+        ];
+      },
+    ),
     gate(
       'D6 왕복 후 ↔ 로드 ON disk 변화 px',
-      ['err:d6AfterTrips', 'pos:cloudsRot', ...settleIds('C-cloudRotOff', 'D-cloudRotOn')],
+      [
+        ...boot('clouds'),
+        'err:d6AfterTrips',
+        'pos:cloudsRot',
+        ...settleIds('C-cloudRotOff', 'D-cloudRotOn'),
+      ],
       () => [r.d6AfterTrips.disk.changed, '== 0', r.d6AfterTrips.disk.changed === 0],
     ),
     gate(
       'D6f mid 선생성 뒤 ON · fade 정지 ↔ 로드 ON disk 변화 px',
       [
+        ...boot('clouds'),
         'err:d6f',
         'pos:clouds',
         'err:d6fQueueE',
@@ -1896,22 +2116,34 @@ function judgeCore(r, settleIds, hw) {
     ),
     gate(
       'D7 불빛 런타임 OFF ↔ 로드 OFF disk 변화 px',
-      ['err:d7', 'err:d7Positive', 'pos:night', ...settleIds('P1-night', 'P2-nightOff')],
+      [
+        ...boot('night'),
+        'err:d7',
+        'err:d7Positive',
+        'pos:night',
+        ...settleIds('P1-night', 'P2-nightOff'),
+      ],
       () => [r.d7.disk.changed, '== 0', r.d7.disk.changed === 0],
     ),
-    gate('D7 uniform — nightLightStrength 보유 머티리얼 전부', [], () => [
+    gate('D7 uniform — nightLightStrength 보유 머티리얼 전부', boot('night'), () => [
       JSON.stringify(r.d7Strengths.map((e) => e.v)),
       '전부 0 ∧ 1개 이상',
       r.d7Strengths.length > 0 && r.d7Strengths.every((e) => e.v === 0),
     ]),
     gate(
       'D7m 끈 뒤 mid 정착 쌍 disk 변화 px',
-      ['err:d7m', 'pos:night', 'ready:P2', ...settleIds('P1-night', 'P2-nightOff')],
+      [
+        ...boot('night'),
+        'err:d7m',
+        'pos:night',
+        'ready:P2',
+        ...settleIds('P1-night', 'P2-nightOff'),
+      ],
       () => [r.d7m.disk.changed, '== 0', r.d7m.disk.changed === 0],
     ),
     gate(
       'D7e 개요 OFF → focus → mid: 지구 high·mid · 전 머티리얼',
-      ['edge:D7e', ...settleIds('O-overview')],
+      [...boot('night'), 'edge:D7e', ...settleIds('O-overview')],
       () => [
         `earth ${JSON.stringify(r.d7eEarth)} · all ${r.d7eAll.length}`,
         '지구 high·mid 둘 다 존재 ∧ 전부 0',
@@ -1923,7 +2155,7 @@ function judgeCore(r, settleIds, hw) {
     ),
     gate(
       `D8 구조 — stars=off → ON 수 · ${STRESS_ROUND_TRIPS}왕복 후 수 · 같은 인스턴스 · OFF 후 enabled`,
-      [],
+      boot('stars'),
       () => [
         `${r.d8AfterOn.stars} · ${r.d8AfterTrips.stars} · ${r.d8SameInstance} · ${r.d8OffEnabled}`,
         '1 · 1 · true · false',
@@ -1937,6 +2169,7 @@ function judgeCore(r, settleIds, hw) {
       ? gate(
           'D8 별 런타임 OFF ↔ 로드 OFF full frame 변화 px',
           [
+            ...boot('stars'),
             'renderer',
             'err:d8Determinism',
             'err:d8Positive',
@@ -1947,15 +2180,23 @@ function judgeCore(r, settleIds, hw) {
           ],
           () => [r.d8Pixel.fullChanged, '== 0', r.d8Pixel.fullChanged === 0],
         )
-      : gate('D8 픽셀 (하드웨어 전용)', ['renderer'], () => ['소프트웨어 렌더', '—', SKIP]),
-    gate('D8p 그룹 0 불투명 mesh (A·S·T 구조 열거) — starfield 외 depth write off', [], () => [
-      `${JSON.stringify(nonStarNoDepth.map((e) => e.name))} · 표본 ${JSON.stringify(Object.fromEntries(Object.entries(d8pSamples).map(([k, v]) => [k, v.length])))}`,
-      '없음 ∧ 표본마다 ≥ 1',
-      nonStarNoDepth.length === 0 && Object.values(d8pSamples).every((v) => v.length > 0),
-    ]),
+      : gate('D8 픽셀 (하드웨어 전용)', [...boot('stars'), 'renderer'], () => [
+          '소프트웨어 렌더',
+          '—',
+          SKIP,
+        ]),
+    gate(
+      'D8p 그룹 0 불투명 mesh (A·S·T 구조 열거) — starfield 외 depth write off',
+      agg('clouds', 'stars', 'stress'),
+      () => [
+        `${JSON.stringify(nonStarNoDepth.map((e) => e.name))} · 표본 ${JSON.stringify(Object.fromEntries(Object.entries(d8pSamples).map(([k, v]) => [k, v.length])))}`,
+        '없음 ∧ 표본마다 ≥ 1',
+        nonStarNoDepth.length === 0 && Object.values(d8pSamples).every((v) => v.length > 0),
+      ],
+    ),
     gate(
       `D15 ${STRESS_ROUND_TRIPS}왕복 × 4 토글 × 재생/일시정지 — 콘솔 에러 (스트레스 페이지)`,
-      [],
+      boot('stress'),
       () => [String(r.d15Errors.length), '!hasSimErrors', !hasSimErrors(r.d15Errors)],
     ),
     gate('D15 전 페이지 콘솔 에러', [], () => [
@@ -1967,25 +2208,40 @@ function judgeCore(r, settleIds, hw) {
 }
 
 /** PR2 — UI 경로 게이트 (D1~D4 · D5~D8 UI 재판정 · D9~D11 · D14 · D15 UI). */
-function judgeUi(r, settleIds, hw) {
+function judgeUi(r, { settleIds, hw, boot, agg }) {
+  // 섹션 고유 필드는 게이트 평가 함수 안에서만 읽는다 — 섹션이 중단되면 (전제 22) 필드가 비어 있다.
   const { uiModes, uiD3, uiD4, uiD14, uiD14b, uiD11, uiD11Load, uiD10 } = r;
   const syncOk = (x) => x.panel === String(x.store) && x.bar === String(x.store);
   const expectedVisited = UI_IDS.map((id) => `display-toggle-${id}`);
-  const offPressed = Object.fromEntries(uiD11.ids.map((id) => [id, 'false']));
-  const d10Attrs = Object.values(uiD10.attrs);
-  const d11OffHeld =
-    !!uiD11.before && uiD11.ids.every((id) => uiD11.before.pressed[id] === offPressed[id]);
   const allOff = Object.fromEntries(Object.values(UI_URL_KEY).map((k) => [k, 'off']));
+  /** 장면 준비 표본을 내는 섹션 (UI 페이지 — H1u 는 하드웨어 전용). */
+  const capsSections = [
+    'clouds',
+    'night',
+    ...(hw ? ['stars'] : []),
+    'uiModes',
+    'uiInteraction',
+    'uiUrl',
+    'uiSurfaceOff',
+    'uiTriggerScroll',
+    'uiRace',
+  ];
+  // R12 — 레이스 실패가 관측됐으면 (`bad > 0`) 스크롤 재료 전제 (21) 와 무관하게 판정한다.
+  const raceObservedFail = (r.uiRace?.bad.length ?? 0) > 0;
   return [
-    gate('UI 장면 준비 — 부팅 후 displayCapabilities 설정 (UI 페이지 전부)', [], () => [
-      JSON.stringify(r.uiCapsAtBoot.filter((c) => c.caps === null).map((c) => c.label)),
-      '미설정 0 ∧ 페이지 ≥ 1',
-      r.uiCapsAtBoot.length > 0 && r.uiCapsAtBoot.every((c) => c.caps !== null),
-    ]),
+    gate(
+      'UI 장면 준비 — 부팅 후 displayCapabilities 설정 (UI 페이지 전부)',
+      agg(...capsSections),
+      () => [
+        JSON.stringify(r.uiCapsAtBoot.filter((c) => c.caps === null).map((c) => c.label)),
+        '미설정 0 ∧ 페이지 ≥ 1',
+        r.uiCapsAtBoot.length > 0 && r.uiCapsAtBoot.every((c) => c.caps !== null),
+      ],
+    ),
     // `?mode=` 진입 자체도 조건이다 — 패널 렌더가 앱을 무너뜨리면 모드 반영도 실패하므로 전제로 두지 않는다.
     gate(
       'UI D1 모드 4종 — ?mode= 진입 · 트리거 1개 · 열림 aria-expanded · 토글 4개 aria-pressed 가시',
-      [],
+      boot('uiModes'),
       () => [
         JSON.stringify(
           uiModes.map((m) => [m.mode, m.store, m.triggers, m.expanded, m.toggles?.length]),
@@ -2002,29 +2258,33 @@ function judgeUi(r, settleIds, hw) {
           ),
       ],
     ),
-    gate(`UI D2 우측 그룹 버튼 x+width ≤ ${UI_VIEWPORT_WIDTH} (모드 4종)`, [], () => [
+    gate(`UI D2 우측 그룹 버튼 x+width ≤ ${UI_VIEWPORT_WIDTH} (모드 4종)`, boot('uiModes'), () => [
       JSON.stringify(uiModes.map((m) => [m.mode, m.layout.right.filter((b) => !b.ok)])),
       '위반 0 ∧ 버튼 ≥ 1',
       uiModes.every((m) => m.layout.right.length > 0 && m.layout.right.every((b) => b.ok)),
     ]),
-    gate('UI D2 좌측 단축 바 전 버튼 스크롤 도달 · 클릭 가능 (모드 4종)', [], () => [
+    gate('UI D2 좌측 단축 바 전 버튼 스크롤 도달 · 클릭 가능 (모드 4종)', boot('uiModes'), () => [
       JSON.stringify(uiModes.map((m) => [m.mode, m.layout.bar, m.layout.unreachable])),
       '도달 불가 0 ∧ 버튼 ≥ 1',
       uiModes.every((m) => m.layout.bar > 0 && m.layout.unreachable.length === 0),
     ]),
-    gate('UI D3 궤도선 패널 ↔ 단축 바 ↔ store (패널 클릭 · 단축 바 클릭)', [], () => [
-      JSON.stringify(uiD3),
-      '세 값 일치 ∧ 패널 클릭 반전 ∧ 단축 바 클릭 복귀',
-      syncOk(uiD3.initial) &&
-        syncOk(uiD3.afterPanel) &&
-        syncOk(uiD3.afterBar) &&
-        uiD3.afterPanel.store !== uiD3.initial.store &&
-        uiD3.afterBar.store === uiD3.initial.store,
-    ]),
+    gate(
+      'UI D3 궤도선 패널 ↔ 단축 바 ↔ store (패널 클릭 · 단축 바 클릭)',
+      boot('uiInteraction'),
+      () => [
+        JSON.stringify(uiD3),
+        '세 값 일치 ∧ 패널 클릭 반전 ∧ 단축 바 클릭 복귀',
+        syncOk(uiD3.initial) &&
+          syncOk(uiD3.afterPanel) &&
+          syncOk(uiD3.afterBar) &&
+          uiD3.afterPanel.store !== uiD3.initial.store &&
+          uiD3.afterBar.store === uiD3.initial.store,
+      ],
+    ),
     // D4 양성 대조는 게이트다 — 닫힌 뒤에도 숨지 않는 원인에 #1265 결함 (패널 열림 상태가 store 에 남음) 이 있다.
     gate(
       `UI D4 양성 대조 — 패널 닫힘 · ${D4_IDLE_MS}ms 무입력 → 상단 바 숨김`,
-      ['d4:timing'],
+      [...boot('uiInteraction'), 'd4:timing'],
       () => [
         `${uiD4.closedOpacity} (늦게라도 숨음 ${uiD4.closedLate})`,
         '"0"',
@@ -2033,7 +2293,7 @@ function judgeUi(r, settleIds, hw) {
     ),
     gate(
       `UI D4 observe · 패널 열림 · ${D4_IDLE_MS}ms 무입력 — 상단 바 opacity`,
-      ['d4:timing'],
+      [...boot('uiInteraction'), 'd4:timing'],
       () => [
         `${uiD4.openOpacity} (패널 ${uiD4.panels})`,
         '"1" ∧ 패널 1',
@@ -2041,48 +2301,66 @@ function judgeUi(r, settleIds, hw) {
       ],
     ),
     // 스크롤 닫기는 트리거 위치가 바뀐 스크롤에서만 (라운드 5 — (나) 「모든 스크롤」 → (가) 번복, qa 레이스 실측).
-    gate('UI 무관 스크롤 (좌측 단축 바) — 패널 유지', ['scroll', 'scroll:unrelated'], () => [
-      JSON.stringify(r.uiScroll),
-      '스크롤 직전 패널 1 ∧ 뒤 1',
-      r.uiScroll.panelsBefore === 1 && r.uiScroll.panels === 1,
-    ]),
-    gate('UI 트리거 이동 스크롤 (좁은 폭 우측 그룹) — 패널 닫힘', ['scroll:trigger'], () => [
-      JSON.stringify(r.uiTriggerScroll),
-      '스크롤 직전 패널 1 ∧ 뒤 0',
-      r.uiTriggerScroll.panelsBefore === 1 && r.uiTriggerScroll.panels === 0,
-    ]),
+    gate(
+      'UI 무관 스크롤 (좌측 단축 바) — 패널 유지',
+      [...boot('uiInteraction'), 'scroll', 'scroll:unrelated'],
+      () => [
+        JSON.stringify(r.uiScroll),
+        '스크롤 직전 패널 1 ∧ 뒤 1',
+        r.uiScroll.panelsBefore === 1 && r.uiScroll.panels === 1,
+      ],
+    ),
+    gate(
+      'UI 트리거 이동 스크롤 (좁은 폭 우측 그룹) — 패널 닫힘',
+      [...boot('uiTriggerScroll'), 'scroll:trigger'],
+      () => [
+        JSON.stringify(r.uiTriggerScroll),
+        '스크롤 직전 패널 1 ∧ 뒤 0',
+        r.uiTriggerScroll.panelsBefore === 1 && r.uiTriggerScroll.panels === 0,
+      ],
+    ),
     gate(
       `UI 레이스 — 키 간 지연 0 Tab → Enter × ${RACE_TRIALS}: 방금 연 패널 유지 · 포커스 첫 토글`,
-      ['race:scroll'],
+      // 전제 (21) 는 「실패 0」 이 공허할 때만 막는다 — 실패가 관측되면 스크롤 유무와 무관하게 결함이다 (R12).
+      [...boot('uiRace'), ...(raceObservedFail ? [] : ['race:scroll'])],
       () => [
-        `실패 ${r.uiRace.bad.length} / ${r.uiRace.trials} · Tab ${r.uiRace.tabsToTrigger} · 스크롤 ${r.uiRace.scrolls} ${JSON.stringify(r.uiRace.bad.slice(0, 3))}`,
+        `실패 ${r.uiRace.bad.length} / ${r.uiRace.trials} · Tab ${r.uiRace.tabsToTrigger} · 단축 바 스크롤 ${r.uiRace.scrolls} (전체 요소 ${r.uiRace.scrollsAll}) ${JSON.stringify(r.uiRace.bad.slice(0, 3))}`,
         `실패 0 / ${RACE_TRIALS}`,
         r.uiRace.trials === RACE_TRIALS && r.uiRace.bad.length === 0,
       ],
     ),
-    gate('UI 캡처 직전 패널 요소 수 (D5~D8 UI)', [], () => [
-      JSON.stringify(r.uiPanelsAtCapture),
-      '전부 0 ∧ 캡처 ≥ 1',
-      r.uiPanelsAtCapture.length > 0 && r.uiPanelsAtCapture.every((c) => c.panels === 0),
-    ]),
+    gate(
+      'UI 캡처 직전 패널 요소 수 (D5~D8 UI)',
+      agg('clouds', 'night', ...(hw ? ['stars'] : [])),
+      () => [
+        JSON.stringify(r.uiPanelsAtCapture),
+        '전부 0 ∧ 캡처 ≥ 1',
+        r.uiPanelsAtCapture.length > 0 && r.uiPanelsAtCapture.every((c) => c.panels === 0),
+      ],
+    ),
     gate(
       'UI D5 패널 구름 OFF ↔ 로드 OFF disk 변화 px',
-      ['err:d5ui', 'pos:clouds', ...settleIds('Au-cloudOn-ui', 'B-cloudOff')],
+      [...boot('clouds'), 'err:d5ui', 'pos:clouds', ...settleIds('Au-cloudOn-ui', 'B-cloudOff')],
       () => [r.d5ui.disk.changed, '== 0', r.d5ui.disk.changed === 0],
     ),
-    gate('UI D5 구조 — earth-cloud 수 · 그룹 0 정렬', ['err:d5uiSort'], () => [
+    gate('UI D5 구조 — earth-cloud 수 · 그룹 0 정렬', [...boot('clouds'), 'err:d5uiSort'], () => [
       `${r.d5uiCounts.clouds} · ${JSON.stringify(r.d5uiSort)}`,
       '0 ∧ 투명/불투명 기본값',
       r.d5uiCounts.clouds === 0 && r.d5uiSort.transparentDefault && r.d5uiSort.opaqueDefault,
     ]),
     gate(
       'UI D6 패널 구름 ON (자전 ON) ↔ 로드 ON disk 변화 px',
-      ['err:d6ui', 'pos:cloudsRot', ...settleIds('Cu-cloudRotOff-ui', 'D-cloudRotOn')],
+      [
+        ...boot('clouds'),
+        'err:d6ui',
+        'pos:cloudsRot',
+        ...settleIds('Cu-cloudRotOff-ui', 'D-cloudRotOn'),
+      ],
       () => [r.d6ui.disk.changed, '== 0', r.d6ui.disk.changed === 0],
     ),
     gate(
       'UI D7 패널 불빛 OFF ↔ 로드 OFF disk 변화 px · uniform',
-      ['err:d7ui', 'pos:night', ...settleIds('P1u-night-ui', 'P2-nightOff')],
+      [...boot('night'), 'err:d7ui', 'pos:night', ...settleIds('P1u-night-ui', 'P2-nightOff')],
       () => [
         `${r.d7ui.disk.changed} · ${JSON.stringify(r.d7uiStrengths.map((e) => e.v))}`,
         '== 0 ∧ 전부 0 ∧ 1개 이상',
@@ -2095,6 +2373,7 @@ function judgeUi(r, settleIds, hw) {
       ? gate(
           'UI D8 패널 별 OFF ↔ 로드 OFF full frame 변화 px',
           [
+            ...boot('stars'),
             'renderer',
             'err:d8ui',
             'det:D8',
@@ -2103,26 +2382,26 @@ function judgeUi(r, settleIds, hw) {
           ],
           () => [r.d8ui.fullChanged, '== 0', r.d8ui.fullChanged === 0],
         )
-      : gate('UI D8 패널 별 OFF ↔ 로드 OFF full frame (하드웨어 전용)', ['renderer'], () => [
-          '소프트웨어 렌더',
-          '—',
-          SKIP,
-        ]),
+      : gate(
+          'UI D8 패널 별 OFF ↔ 로드 OFF full frame (하드웨어 전용)',
+          [...boot('stars'), 'renderer'],
+          () => ['소프트웨어 렌더', '—', SKIP],
+        ),
     hw
-      ? gate('UI D8 stars=off → 패널 ON starfield 수', ['renderer'], () => [
+      ? gate('UI D8 stars=off → 패널 ON starfield 수', [...boot('uiUrl'), 'renderer'], () => [
           uiD11Load.starsAfterUiOn,
           '1',
           uiD11Load.starsAfterUiOn === 1,
         ])
-      : gate('UI D8 stars=off → 패널 ON starfield 수 (하드웨어 전용)', ['renderer'], () => [
-          '소프트웨어 렌더',
-          '—',
-          SKIP,
-        ]),
+      : gate(
+          'UI D8 stars=off → 패널 ON starfield 수 (하드웨어 전용)',
+          [...boot('uiUrl'), 'renderer'],
+          () => ['소프트웨어 렌더', '—', SKIP],
+        ),
     r.uiSoftware
       ? gate(
           'UI D9 소프트웨어 렌더 — 별 토글 aria-disabled · 사유 · 클릭 후 별 0 · 전역 · URL',
-          ['renderer'],
+          [...boot('uiInteraction'), 'renderer'],
           () => [
             JSON.stringify(r.uiD9),
             `aria-disabled "true" ∧ title ⊃ "${REASON_MARK.software}" ∧ 2회 클릭 내내 pressed "false" · 별 0 · 의도 불변 · URL stars 부재 ∧ __starfieldVisible false`,
@@ -2140,43 +2419,46 @@ function judgeUi(r, settleIds, hw) {
               r.uiD9.urlStars === null,
           ],
         )
-      : gate('UI D9 소프트웨어 렌더 별 토글 (소프트웨어 전용)', ['renderer'], () => [
-          '하드웨어 렌더',
-          '—',
-          SKIP,
-        ]),
+      : gate(
+          'UI D9 소프트웨어 렌더 별 토글 (소프트웨어 전용)',
+          [...boot('uiInteraction'), 'renderer'],
+          () => ['하드웨어 렌더', '—', SKIP],
+        ),
     gate(
       'UI D10 surface=off — 구름·불빛 aria-disabled · 사유 · 클릭 후 mesh/머티리얼/URL 무변화',
-      [],
-      () => [
-        JSON.stringify(uiD10),
-        `aria-disabled "true" ∧ title ⊃ "${REASON_MARK.surfaceOff}" ∧ 개수 동일 ∧ 구름 0 ∧ URL 동일 ∧ 매 클릭 뒤 개수 · URL · 의도 불변`,
-        d10Attrs.length === SURFACE_TOGGLES.length &&
-          d10Attrs.every(
-            (a) => a.ariaDisabled === 'true' && (a.title ?? '').includes(REASON_MARK.surfaceOff),
-          ) &&
-          uiD10.clicks.length === SURFACE_TOGGLES.length * DISABLED_CLICKS &&
-          uiD10.clicks.every(
-            (c) =>
-              c.counts.meshes === uiD10.before.meshes &&
-              c.counts.materials === uiD10.before.materials &&
-              JSON.stringify(c.url) === JSON.stringify(uiD10.urlBefore) &&
-              JSON.stringify(c.intents) === JSON.stringify(uiD10.intentsBefore),
-          ) &&
-          uiD10.before.meshes === uiD10.after.meshes &&
-          uiD10.before.materials === uiD10.after.materials &&
-          uiD10.after.clouds === 0 &&
-          JSON.stringify(uiD10.urlBefore) === JSON.stringify(uiD10.urlAfter),
-      ],
+      boot('uiSurfaceOff'),
+      () => {
+        const d10Attrs = Object.values(uiD10.attrs);
+        return [
+          JSON.stringify(uiD10),
+          `aria-disabled "true" ∧ title ⊃ "${REASON_MARK.surfaceOff}" ∧ 개수 동일 ∧ 구름 0 ∧ URL 동일 ∧ 매 클릭 뒤 개수 · URL · 의도 불변`,
+          d10Attrs.length === SURFACE_TOGGLES.length &&
+            d10Attrs.every(
+              (a) => a.ariaDisabled === 'true' && (a.title ?? '').includes(REASON_MARK.surfaceOff),
+            ) &&
+            uiD10.clicks.length === SURFACE_TOGGLES.length * DISABLED_CLICKS &&
+            uiD10.clicks.every(
+              (c) =>
+                c.counts.meshes === uiD10.before.meshes &&
+                c.counts.materials === uiD10.before.materials &&
+                JSON.stringify(c.url) === JSON.stringify(uiD10.urlBefore) &&
+                JSON.stringify(c.intents) === JSON.stringify(uiD10.intentsBefore),
+            ) &&
+            uiD10.before.meshes === uiD10.after.meshes &&
+            uiD10.before.materials === uiD10.after.materials &&
+            uiD10.after.clouds === 0 &&
+            JSON.stringify(uiD10.urlBefore) === JSON.stringify(uiD10.urlAfter),
+        ];
+      },
     ),
-    gate('UI D11 URL — OFF 키=off · ON 키 부재 · history.length 불변', [], () => [
+    gate('UI D11 URL — OFF 키=off · ON 키 부재 · history.length 불변', boot('uiUrl'), () => [
       `${JSON.stringify(uiD11.trips.map((t) => [t.id, t.offOk, t.onOk]))} · history ${uiD11.h0}→${uiD11.hAfterTrips}`,
       '전부 true ∧ history 불변 ∧ 토글 수 = 대상 수',
       uiD11.trips.length === uiD11.ids.length &&
         uiD11.trips.every((t) => t.offOk && t.onOk) &&
         uiD11.hAfterTrips === uiD11.h0,
     ]),
-    gate('UI D11 북마크 복사 URL — OFF 시 키=off · ON 시 키 부재', [], () => [
+    gate('UI D11 북마크 복사 URL — OFF 시 키=off · ON 시 키 부재', boot('uiUrl'), () => [
       JSON.stringify(uiD11.trips.map((t) => [t.id, t.bookmarkOff, t.bookmarkOnHas])),
       '"off" · false',
       uiD11.trips.every((t) => t.bookmarkOff === 'off' && t.bookmarkOnHas === false),
@@ -2184,32 +2466,36 @@ function judgeUi(r, settleIds, hw) {
     // 새로고침 뒤 장면 준비 대기 초과도 게이트다 — 원인에 URL 상태별 준비 결함이 들어간다 (라운드 3 전제 감사).
     gate(
       'UI D11 새로고침 — 장면 준비 · 패널 aria-pressed · scene 상태 동일',
-      ['reload:boot'],
-      () => [
-        `ready ${uiD11.reloadReady} · ${JSON.stringify(uiD11.before)} → ${JSON.stringify(uiD11.after)}`,
-        '준비 ∧ 새로고침 전 = 후 ∧ 전 상태가 실제로 전부 OFF',
-        uiD11.reloadReady === true &&
-          d11OffHeld &&
-          JSON.stringify(uiD11.before) === JSON.stringify(uiD11.after),
-      ],
+      [...boot('uiUrl'), 'reload:boot'],
+      () => {
+        const d11OffHeld =
+          !!uiD11.before && uiD11.ids.every((id) => uiD11.before.pressed[id] === 'false');
+        return [
+          `ready ${uiD11.reloadReady} · ${JSON.stringify(uiD11.before)} → ${JSON.stringify(uiD11.after)}`,
+          '준비 ∧ 새로고침 전 = 후 ∧ 전 상태가 실제로 전부 OFF',
+          uiD11.reloadReady === true &&
+            d11OffHeld &&
+            JSON.stringify(uiD11.before) === JSON.stringify(uiD11.after),
+        ];
+      },
     ),
-    uiD11.software
-      ? gate('UI D11 별 URL (하드웨어 전용)', ['renderer'], () => [
+    (uiD11?.software ?? !hw)
+      ? gate('UI D11 별 URL (하드웨어 전용)', [...boot('uiUrl'), 'renderer'], () => [
           '소프트웨어 렌더 — 가용성 차단 (D9)',
           '—',
           SKIP,
         ])
-      : gate('UI D11 별 URL 포함 (하드웨어)', ['renderer'], () => [
+      : gate('UI D11 별 URL 포함 (하드웨어)', [...boot('uiUrl'), 'renderer'], () => [
           JSON.stringify(uiD11.ids),
           'stars 포함',
           uiD11.ids.includes('stars'),
         ]),
-    gate('UI D11 로드 직후 (조작 전) 4 키 불변', [], () => [
+    gate('UI D11 로드 직후 (조작 전) 4 키 불변', boot('uiUrl'), () => [
       JSON.stringify(uiD11Load.urlAtLoad),
       JSON.stringify(allOff),
       JSON.stringify(uiD11Load.urlAtLoad) === JSON.stringify(allOff),
     ]),
-    gate('UI D11 ?orbits=off → ON → 북마크 orbits 부재 (나머지 off 유지)', [], () => [
+    gate('UI D11 ?orbits=off → ON → 북마크 orbits 부재 (나머지 off 유지)', boot('uiUrl'), () => [
       JSON.stringify(uiD11Load),
       'ON 반영 ∧ 북마크 orbits 부재 ∧ 나머지 off 유지',
       uiD11Load.orbitsOnOk &&
@@ -2219,7 +2505,7 @@ function judgeUi(r, settleIds, hw) {
     ]),
     gate(
       'UI D14 키보드 — Tab 도달 · Enter 열림 · 토글 4개 순회 · Space 반전 · Esc 닫힘 + 포커스 복귀',
-      [],
+      boot('uiInteraction'),
       () => [
         JSON.stringify(uiD14),
         `도달 ∧ "true" ∧ ${JSON.stringify(expectedVisited)} ∧ 반전 ∧ 패널 0 ∧ 포커스 트리거`,
@@ -2233,7 +2519,7 @@ function judgeUi(r, settleIds, hw) {
     ),
     gate(
       'UI D14 포커스 순서 — 마지막 토글 Tab → 닫힘 + 트리거 다음 요소 · 첫 토글 Shift+Tab → 트리거 (패널 유지) · 트리거 Tab → 첫 토글 · 트리거 Shift+Tab → 닫힘 + 트리거 이전 요소',
-      [],
+      boot('uiInteraction'),
       () => [
         JSON.stringify({
           nativeNext: uiD14.nativeNext,
@@ -2262,16 +2548,20 @@ function judgeUi(r, settleIds, hw) {
       ],
     ),
     // 시작 선택이 earth 인지도 조건이다 — `?focus=earth` 반영 실패는 제품 결함일 수 있다.
-    gate('UI D14 엣지 — focus=earth 에서 패널 Esc → 자유시점 미진입 · 선택 유지', [], () => [
-      `시작 ${uiD14.selectedBefore} · freeFly ${uiD14.freeFlyAfterEsc} · selected ${uiD14.selectedAfterEsc}`,
-      '시작 earth · false · earth',
-      uiD14.selectedBefore === 'earth' &&
-        uiD14.freeFlyAfterEsc === false &&
-        uiD14.selectedAfterEsc === 'earth',
-    ]),
+    gate(
+      'UI D14 엣지 — focus=earth 에서 패널 Esc → 자유시점 미진입 · 선택 유지',
+      boot('uiInteraction'),
+      () => [
+        `시작 ${uiD14.selectedBefore} · freeFly ${uiD14.freeFlyAfterEsc} · selected ${uiD14.selectedAfterEsc}`,
+        '시작 earth · false · earth',
+        uiD14.selectedBefore === 'earth' &&
+          uiD14.freeFlyAfterEsc === false &&
+          uiD14.selectedAfterEsc === 'earth',
+      ],
+    ),
     gate(
       '자유시점 Esc 양성 대조 — 패널 닫힘 · 선택 있음 · Esc → 자유시점 진입 (#509 — D14 엣지 · D14b 판별력의 전제)',
-      ['ctl'],
+      [...boot('uiInteraction'), 'ctl'],
       () => [
         JSON.stringify(r.uiFreeFlyControl),
         'freeFly true',
@@ -2279,19 +2569,23 @@ function judgeUi(r, settleIds, hw) {
       ],
     ),
     // 선택 변경 반영 · Esc 직전 패널 열림도 조건이다 — 둘 다 #1265 결함 (패널이 선택 변경에 닫힘 등) 으로 깨질 수 있다.
-    gate('UI D14b — 패널 연 채 선택 변경 후 Esc → 패널 닫힘 · 자유시점 미진입', [], () => [
-      JSON.stringify(uiD14b),
-      '선택 변경 ∧ Esc 직전 패널 1 ∧ 패널 0 ∧ freeFly false',
-      uiD14b.selectedMars === true &&
-        uiD14b.panelsBeforeEsc === 1 &&
-        uiD14b.panelsAfterEsc === 0 &&
-        uiD14b.freeFly === false,
-    ]),
-    gate(`UI D15 패널 ${STRESS_ROUND_TRIPS}왕복 × 4 토글 × 재생/일시정지 — 콘솔 에러`, [], () => [
-      String(r.uiD15Errors.length),
-      '!hasSimErrors',
-      !hasSimErrors(r.uiD15Errors),
-    ]),
+    gate(
+      'UI D14b — 패널 연 채 선택 변경 후 Esc → 패널 닫힘 · 자유시점 미진입',
+      boot('uiInteraction'),
+      () => [
+        JSON.stringify(uiD14b),
+        '선택 변경 ∧ Esc 직전 패널 1 ∧ 패널 0 ∧ freeFly false',
+        uiD14b.selectedMars === true &&
+          uiD14b.panelsBeforeEsc === 1 &&
+          uiD14b.panelsAfterEsc === 0 &&
+          uiD14b.freeFly === false,
+      ],
+    ),
+    gate(
+      `UI D15 패널 ${STRESS_ROUND_TRIPS}왕복 × 4 토글 × 재생/일시정지 — 콘솔 에러`,
+      boot('uiInteraction'),
+      () => [String(r.uiD15Errors.length), '!hasSimErrors', !hasSimErrors(r.uiD15Errors)],
+    ),
   ];
 }
 
@@ -2365,6 +2659,7 @@ async function main() {
     `settles ${JSON.stringify(r.settles.map((s) => `${s.page}/${s.step}:${s.dist}/${s.fading}/${s.timedOut ? 'TIMEOUT' : 'ok'}`))}`,
   );
   console.log(`consoleErrors ${JSON.stringify(r.consoleErrors)}`);
+  console.log(`bootFailures ${JSON.stringify(r.bootFailures)}`);
 
   const v = judge(r);
   for (const [id, msgs] of Object.entries(v.info))
