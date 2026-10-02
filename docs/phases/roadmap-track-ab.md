@@ -79,6 +79,8 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 > 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → 위 §진행 중. 같은 낱말이 §완료·§진행 중 에 남아 있는 것은 정상이다.
 
+> ⚠️ **부기 (2026-10-02, [#1274](https://github.com/coseo12/astro-simulator/issues/1274))**: 첫 행 「지구 밖 천체 표면 확장」 의 리스크 칸 「대기 없는 body 가 rim·불빛을 상속한다」 는 상속 범위를 잘못 적었다. 어떤 body 를 `SurfaceType.Rocky` 로 재분류하면 **biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 대륙 · rim 은 무조건** 상속되고, **불빛은 조건부**다 — 게이트가 `uMaskEnabled` 를 곱하므로 `SURFACE_MASK_BY_BODY` 등록 + 마스크 로드 완료 + 투영 disk `≥ SURFACE_MASK_MIN_DISK_PX` (`16`) 일 때만 켜진다 (코드 경로 판독 — [ADR 20260628-756 §A12.3](../decisions/20260628-756-procedural-planet-surface.md)). 원문은 소급 수정하지 않는다. 착수 범위: #1274 는 ice giant (uranus · neptune) 만 — Rocky 재분류 · Cratered 확장은 이 행에 잔류한다.
+
 > **트랙 C·D 는 방향 결정 대기** — 위 표의 C·D 행은 후보 박제일 뿐 착수 합의가 아니다. 착수 시 트랙 표 상태와 본 문서 제목 범위(「트랙 A/B」)를 함께 재검토한다.
 
 > **착수 시 횡단 검토 (cross-validate agy 고유 발견, 2026-07-06)**: 현행 셰이더 효과는 전부 정적 (painted-on, 시간 변동 0) 이나, **시간 변동 emissive 효과** (코로나/플레어 등) 도입 시 광과민성 감쇠 옵션 (`prefers-reduced-motion` 연동 또는 효과 토글) 을 해당 이슈 DoD 에 동반 검토한다.
