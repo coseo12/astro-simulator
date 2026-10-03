@@ -5,6 +5,16 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Changed
+
+- **[#1274] 절차 표면 밴드 파라미터를 body 별 테이블로 이관 (PR1 — 화면 변화 없음)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.4). 천왕성·해왕성 `IceGiant` 표면 (PR2) 의 선행 작업이다.
+  - **`SURFACE_BAND_PARAMS_BY_BODY` · `BAND_SURFACE_TYPES` · `resolveSurfaceBandParams`** — 밴드 uniform 3종 (`gasBandAmplitude` · `gasBandCount` · `gasTurbulence`) 을 body 별 테이블에서 해석한다. 밴드 타입인데 행이 없거나, 비-밴드 타입인데 행이 있으면 throw 한다 (기본값 fallback 없음). jupiter 행은 기존 상수 `GAS_BAND_*` 를 참조한다.
+  - **비-밴드 body (earth · mars · moon) 의 밴드 uniform 바인딩이 목성 상수 → `0` 으로 바뀌었다.** 이 3종을 읽는 GLSL 이 밴드 분기뿐이라 화면 변화가 없어야 한다는 설계 예측을 아래 하네스로 실측했다 — base (develop `afee1b13`) ↔ feature, earth · mars · jupiter · moon × `?surface` on/off 8 시나리오 disk 표본 diff 전부 `0` (로컬 SwiftShader). 셰이더 문자열 (`PLANET_FRAGMENT_SHADER` · `PLANET_VERTEX_SHADER`) 은 바이트 동일하다.
+  - `surfaceColorMirror` 는 밴드 타입에서 파라미터를 5번째 인자로 받는다 (미전달 시 throw).
+  - **신규 실행 도구 `verify:1274-invariance`** — 두 빌드의 결정적 프레임을 `MODE=capture` 로 찍고 `MODE=compare` 로 disk 표본 픽셀 diff 를 판정한다 (exit `0` 충족 / `1` 기대 위반 / `2` 측정 불가). 두 빌드를 비교하므로 CI 상시 가드가 아니다. 양성 대조 — `GAS_BAND_AMPLITUDE` 만 바꾼 변이 빌드에서 `jupiter:on` diff `22296 / 27408` px, 나머지 7 시나리오 `0`.
+    - **같은 빌드끼리의 비교는 측정 불가 (`exit 2`)** — capture 가 페이지가 실제로 바인딩한 표면 머티리얼 uniform 과 셰이더 소스로 「서빙 지문」을 남기고, compare 는 A · B 의 dist 해시나 서빙 지문이 같으면 거부한다 (의도한 자기 비교만 `ALLOW_SAME_BUILD=1`). compare 는 시나리오별 서빙 `gasBand*` 값을 A → B 로 출력해, 위 D2 실행에서 earth · mars · moon `:on` 이 `0.28/9/0.12 → 0/0/0` 으로 바뀐 채 픽셀 diff 가 `0` 임을 같은 로그에 남긴다 (PR #1276 리뷰 B1).
+    - 전제 추가 — body 마다 같은 캡처의 `:on` ↔ `:off` disk diff `> 0` (`?surface` 토글이 프레임에 효과를 냈다) · 콘솔 에러 `0` 건. 위반 시 측정 불가 (리뷰 R2).
+
 ### Fixed
 
 - **[#1271] `verify:1265-display-panel` — 부팅 핸들 대기 초과가 처리되지 않은 예외로 `exit 1` 이 되던 경로를 판정 구조 안으로** ([#1271](https://github.com/coseo12/astro-simulator/issues/1271)). v0.90.0 prep PR [#1270](https://github.com/coseo12/astro-simulator/pull/1270) 의 CI 에서 같은 코드의 develop 실행은 통과했는데 `F-cloudOn-mid` 의 핸들 대기가 20 s 상한을 넘어 실패했다.

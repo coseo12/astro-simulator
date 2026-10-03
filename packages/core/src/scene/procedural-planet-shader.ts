@@ -208,6 +208,80 @@ export const CRATER_DEPTH = 0.4;
 export const CRATER_DENSITY = 14;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Amendment 12 (#1274) §A12.4 결정 1 — 밴드 파라미터 body 별 테이블.
+//
+// 밴드 uniform 3종 (`gasBandAmplitude` · `gasBandCount` · `gasTurbulence`) 은 종전에 body 분기 없이
+// **전 표면 body 에** 목성 상수로 바인딩됐다. 같은 타입의 두 body (uranus · neptune — PR2) 가 서로 다른
+// 값을 가질 수 없는 형태이고, 이슈 #1274 가 지목한 「earth 전용 상수 상속」 과 같은 구조라 별도
+// 테이블로 이관한다. 이관 축은 밴드 식이 읽는 uniform 3종뿐이다 — rocky · desert · cratered 상수와
+// earth 전용 블록은 소비자가 없어 이관하지 않는다 (§A8.9 결정 5 동형).
+//
+// 선례 = `SURFACE_MASK_BY_BODY` (소비하는 body 만 행을 가진 별도 per-body 테이블).
+// 불변식 (단위 테스트 가드): keys(SURFACE_BAND_PARAMS_BY_BODY) ==
+//   { id | SURFACE_TYPE_BY_BODY[id] ∈ BAND_SURFACE_TYPES } — 양방향.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 밴드 변조 파라미터 — GLSL 밴드 uniform 3종과 1:1 (이름은 uniform 이 `gasBand*` 로 유지된다 — §A12.5). */
+export interface SurfaceBandParams {
+  /** 위도 밴드 명암 진폭 → `gasBandAmplitude`. */
+  readonly amplitude: number;
+  /** 밴드 개수 → `gasBandCount`. */
+  readonly count: number;
+  /** 난류 결 진폭 → `gasTurbulence`. */
+  readonly turbulence: number;
+}
+
+/** 밴드 파라미터를 소비하는 표면 타입 집합 — GLSL 에서 밴드 uniform 을 읽는 분기의 타입과 같아야 한다. */
+export const BAND_SURFACE_TYPES: ReadonlySet<SurfaceType> = new Set([SurfaceType.GasBands]);
+
+/**
+ * body id → 밴드 파라미터. **밴드 타입 body 만** 행을 가진다 (위 불변식).
+ *
+ * jupiter 행은 기존 상수를 **참조**한다 — 값을 옮겨 적지 않는다 (숨은 상수 drift 차단, volt #69).
+ */
+export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandParams>> = {
+  jupiter: {
+    amplitude: GAS_BAND_AMPLITUDE,
+    count: GAS_BAND_COUNT,
+    turbulence: GAS_TURBULENCE,
+  },
+};
+
+/** 비-밴드 타입이 바인딩하는 값 — 밴드 uniform 을 읽는 GLSL 이 밴드 분기뿐이라 픽셀 영향이 없다 (§A12.4 계약 5). */
+const NO_BAND_PARAMS: SurfaceBandParams = Object.freeze({ amplitude: 0, count: 0, turbulence: 0 });
+
+/**
+ * #1274 §A12.4 계약 5 — body 의 밴드 파라미터를 해석한다 (불변식의 런타임 사본, 기본값 fallback 없음).
+ *
+ * - 밴드 타입인데 행이 없으면 **throw** — 조용히 0 이나 목성 값으로 그리지 않는다.
+ * - 비-밴드 타입인데 행이 있으면 **throw** — 아무도 읽지 않는 행 (§A8.9 결정 5).
+ * - 비-밴드 타입은 `{ 0, 0, 0 }` 을 돌려준다.
+ *
+ * @param table 주입용 (단위 테스트의 누락 · 초과 테이블) — 미전달 시 `SURFACE_BAND_PARAMS_BY_BODY`
+ */
+export function resolveSurfaceBandParams(
+  bodyId: string,
+  surfaceType: SurfaceType,
+  table: Readonly<Record<string, SurfaceBandParams>> = SURFACE_BAND_PARAMS_BY_BODY,
+): SurfaceBandParams {
+  const row = Object.prototype.hasOwnProperty.call(table, bodyId) ? table[bodyId] : undefined;
+  if (BAND_SURFACE_TYPES.has(surfaceType)) {
+    if (row === undefined) {
+      throw new Error(
+        `[procedural-planet-shader] '${bodyId}' 는 밴드 타입 (${surfaceType}) 인데 SURFACE_BAND_PARAMS_BY_BODY 행이 없다 (#1274 — 기본값 fallback 금지)`,
+      );
+    }
+    return row;
+  }
+  if (row !== undefined) {
+    throw new Error(
+      `[procedural-planet-shader] '${bodyId}' 는 비-밴드 타입 (${surfaceType}) 인데 SURFACE_BAND_PARAMS_BY_BODY 행이 있다 (#1274 — 소비자 없는 행)`,
+    );
+  }
+  return NO_BAND_PARAMS;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Amendment 1 (#773/#775) — 광원 모델 + 대륙 mix rendering-only 미학 상수 SSoT.
 // (광원 물리 상수 sun/ambient 는 scene 가 SSoT — 주입받음. 아래는 셰이더 고유 미학 상수.)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1264,9 +1338,13 @@ export function createProceduralPlanetMaterial(
   material.setFloat('rockyContrast', ROCKY_CONTRAST);
   material.setFloat('desertDetail', DESERT_DETAIL);
   material.setFloat('desertRustTint', DESERT_RUST_TINT);
-  material.setFloat('gasBandAmplitude', GAS_BAND_AMPLITUDE);
-  material.setFloat('gasBandCount', GAS_BAND_COUNT);
-  material.setFloat('gasTurbulence', GAS_TURBULENCE);
+  // Amendment 12 (#1274) §A12.4 — 밴드 uniform 3종은 body 별 테이블에서 해석한다 (누락 · 초과 시 throw).
+  // ⚠️ 비-밴드 body (earth · mars · moon) 는 종전 목성 상수 대신 `0` 을 받는다 — 이 3종을 읽는 GLSL 이
+  // 밴드 분기뿐이라 픽셀 영향이 없어야 하고, 그 명제를 `verify:1274-invariance` 가 base↔feature 로 잰다.
+  const bandParams = resolveSurfaceBandParams(body.id, surfaceType);
+  material.setFloat('gasBandAmplitude', bandParams.amplitude);
+  material.setFloat('gasBandCount', bandParams.count);
+  material.setFloat('gasTurbulence', bandParams.turbulence);
   material.setFloat('craterDepth', CRATER_DEPTH);
   material.setFloat('craterDensity', CRATER_DENSITY);
 
@@ -1540,6 +1618,19 @@ export function oceanDepthMirror(
   return depth * (1 - landMask);
 }
 
+/** #1274 §A12.4 계약 6 — 미러의 밴드 분기는 파라미터를 인자로만 받는다 (미전달 시 throw — 상수 fallback 없음). */
+function requireMirrorBandParams(
+  surfaceType: SurfaceType,
+  bands: SurfaceBandParams | undefined,
+): SurfaceBandParams {
+  if (bands === undefined) {
+    throw new Error(
+      `[surfaceColorMirror] 밴드 타입 (${surfaceType}) 에 bands 인자가 없다 — resolveSurfaceBandParams 결과를 넘겨라 (#1274)`,
+    );
+  }
+  return bands;
+}
+
 /**
  * #756 — FRAGMENT_SHADER 의 표면 변조 GLSL 의 **순수 JS 미러** (anti-pattern 계약 검증용).
  *
@@ -1555,6 +1646,9 @@ export function oceanDepthMirror(
  * @param surfaceType 표면 타입
  * @param p 정규화 구면 좌표 [x,y,z] (단위 벡터 가정)
  * @param mask Amendment 4 (#1119) 마스크 경로 미러 (미전달 = `uMaskEnabled` 0 = Amendment 3 식 그대로)
+ * @param bands Amendment 12 (#1274) 밴드 파라미터 — 밴드 타입 (`BAND_SURFACE_TYPES`) 에서 **필수**
+ *   (미전달 시 throw — 기본값 fallback 없음). 비-밴드 타입은 읽지 않는다. 런타임 바인딩과 같은 값을
+ *   쓰려면 `resolveSurfaceBandParams(bodyId, surfaceType)` 결과를 넘긴다.
  * @returns 변조 후 RGB ∈ [0,1]³ (clamp 적용)
  */
 export function surfaceColorMirror(
@@ -1562,6 +1656,7 @@ export function surfaceColorMirror(
   surfaceType: SurfaceType,
   p: readonly [number, number, number],
   mask?: SurfaceMaskMirrorInput,
+  bands?: SurfaceBandParams,
 ): readonly [number, number, number] {
   const [bx, by, bz] = baseColor;
   let r = bx,
@@ -1618,10 +1713,11 @@ export function surfaceColorMirror(
     r = Math.min(Math.max(r + DESERT_RUST_TINT, 0), 1);
     b = Math.min(Math.max(b - DESERT_RUST_TINT * 0.5, 0), 1);
   } else if (surfaceType === SurfaceType.GasBands) {
+    const band = requireMirrorBandParams(surfaceType, bands);
     const latitude = py;
-    const turb = (fbmMirror(px * 4, py * 4, pz * 4) - 0.5) * 2 * GAS_TURBULENCE;
-    const bands = Math.sin((latitude + turb) * GAS_BAND_COUNT * Math.PI);
-    const mod = bands * GAS_BAND_AMPLITUDE;
+    const turb = (fbmMirror(px * 4, py * 4, pz * 4) - 0.5) * 2 * band.turbulence;
+    const wave = Math.sin((latitude + turb) * band.count * Math.PI);
+    const mod = wave * band.amplitude;
     r = bx * (1 + mod);
     g = by * (1 + mod);
     b = bz * (1 + mod);

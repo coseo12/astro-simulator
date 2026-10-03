@@ -16,6 +16,8 @@ import { describe, expect, it } from 'vitest';
 import {
   SurfaceType,
   SURFACE_TYPE_BY_BODY,
+  SURFACE_BAND_PARAMS_BY_BODY,
+  resolveSurfaceBandParams,
   ROCKY_CONTRAST,
   DESERT_DETAIL,
   DESERT_RUST_TINT,
@@ -199,6 +201,8 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
   // 실측 자연색 baseColor 위 단조 변조이므로 구조적 보장 — 4 타입 × 다수 표면점으로 전수 확인.
 
   // 실측 자연색 base (지구 청록 / 화성 적갈 / 목성 담갈 / 달 회색 근사).
+  // #1274 — 밴드 타입은 미러에 파라미터를 넘겨야 한다. body 의 런타임 바인딩과 같은 값을 쓰도록
+  // `resolveSurfaceBandParams(bodyId, type)` 로 해석한다 (비-밴드 타입은 0 — 미러가 읽지 않는다).
   const BASES: Array<[string, SurfaceType, [number, number, number]]> = [
     ['earth/rocky', SurfaceType.Rocky, [0.23, 0.45, 0.6]],
     ['mars/desert', SurfaceType.Desert, [0.7, 0.4, 0.28]],
@@ -207,7 +211,10 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
   ];
 
   for (const [label, type, base] of BASES) {
+    // 수집 단계가 아니라 각 it 안에서 해석한다 — 테이블 결함이 파일 전체 수집 실패로 번지지 않게.
+    const bandsFor = () => resolveSurfaceBandParams(label.slice(0, label.indexOf('/')), type);
     it(`${label}: 다수 표면점에서 보라/마젠타 부재 (G ≥ min(R,B) 위배 없음)`, () => {
+      const bands = bandsFor();
       let violations = 0;
       for (let i = 0; i < 200; i++) {
         // 구면 표면점 샘플 (정규화).
@@ -217,7 +224,7 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
         const z = Math.sin(t * 0.5) * Math.sin(t);
         const len = Math.hypot(x, y, z) || 1;
         const p: [number, number, number] = [x / len, y / len, z / len];
-        const [r, g, b] = surfaceColorMirror(base, type, p);
+        const [r, g, b] = surfaceColorMirror(base, type, p, undefined, bands);
         // 보라/마젠타 = R 과 B 가 동시에 우세하면서 G 가 결핍 (G < min(R,B)).
         if (g < Math.min(r, b) - 1e-6) violations++;
       }
@@ -225,12 +232,13 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
     });
 
     it(`${label}: 변조 후 모든 채널 [0,1] 범위 내 (clamp 보장)`, () => {
+      const bands = bandsFor();
       for (let i = 0; i < 100; i++) {
         const t = i * 0.0628;
         const p: [number, number, number] = [Math.sin(t), Math.cos(t * 1.3), Math.sin(t * 0.7)];
         const len = Math.hypot(...p) || 1;
         const np: [number, number, number] = [p[0] / len, p[1] / len, p[2] / len];
-        for (const c of surfaceColorMirror(base, type, np)) {
+        for (const c of surfaceColorMirror(base, type, np, undefined, bands)) {
           expect(c).toBeGreaterThanOrEqual(0);
           expect(c).toBeLessThanOrEqual(1);
         }
@@ -294,7 +302,13 @@ describe('#756 procedural-planet — baseColor 데이터 SSoT (ADR §결정 5)',
     // fbm 이 0.5 근처면 변조 ≈ 0 → base 색 유지 (변조는 base 위 합성, 대체 아님).
     const base: [number, number, number] = [0.4, 0.5, 0.6];
     // gas-bands 는 sin 밴드라 base 근처 지점이 명확 (latitude=0 + turb 작은 지점).
-    const out = surfaceColorMirror(base, SurfaceType.GasBands, [1, 0, 0]);
+    const out = surfaceColorMirror(
+      base,
+      SurfaceType.GasBands,
+      [1, 0, 0],
+      undefined,
+      SURFACE_BAND_PARAMS_BY_BODY.jupiter,
+    );
     // latitude(y)=0 이면 sin(turb*count*π) ≈ 작음 → base 에 근접 (shade 미적용 미러).
     expect(Math.abs(out[0] - base[0])).toBeLessThan(0.35);
   });
@@ -862,9 +876,11 @@ describe('Amendment 4 (#1119) — JS 미러 마스크 경로 (§A4.4 핵심 예�
 
   it('비-rocky 타입은 mask 인자를 무시한다 (분기 격리 — mars/jupiter/moon 픽셀 불변)', () => {
     for (const type of [SurfaceType.Desert, SurfaceType.GasBands, SurfaceType.Cratered]) {
+      // #1274 — 밴드 타입은 파라미터 필수. 대표 body (gas-bands = jupiter) 의 행을 쓴다.
+      const bands = type === SurfaceType.GasBands ? SURFACE_BAND_PARAMS_BY_BODY.jupiter : undefined;
       for (const p of spherePoints(32)) {
-        expect(surfaceColorMirror(base, type, p, { enabled: 1, sample: 1 })).toEqual(
-          surfaceColorMirror(base, type, p),
+        expect(surfaceColorMirror(base, type, p, { enabled: 1, sample: 1 }, bands)).toEqual(
+          surfaceColorMirror(base, type, p, undefined, bands),
         );
       }
     }
