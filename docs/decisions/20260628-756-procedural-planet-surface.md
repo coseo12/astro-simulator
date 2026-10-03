@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료) · 개정 1 (§A11.17.9 `V2` 술어 재정의 · §A11.18 MN-5b 예측 반증): Accepted (cross-validate agy 2026-09-18 — §A11.19 4축 반영 완료)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료) · 개정 1 (§A11.17.9 `V2` 술어 재정의 · §A11.18 MN-5b 예측 반증): Accepted (cross-validate agy 2026-09-18 — §A11.19 4축 반영 완료)** — **Amendment 12 (#1274): Accepted (cross-validate 2026-10-02 — §A12.18 4축 반영 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -166,6 +166,7 @@
 1. **fps 회귀 발생** (tier-b 에서 표면 셰이더 fragment 비용 초과) — detailLevel uniform 약화 훅을 측정 기반 도입 (Amendment). 1차 예약만 한 인터페이스 활성화.
 2. **gas-bands 위도 밴드 부정확** — 자전축 기울기 (axialTiltDeg, ring-shader #647 인프라) 미반영으로 목성 밴드가 공전면 기준일 수 있음. 1차는 mesh local Y 기준 근사 (Visual Fidelity rendering-only) — 사실성 요구 시 후속.
 3. **표면 타입 확장 요구** (ice giant / 위성 추가) — `SURFACE_TYPE_BY_BODY` 테이블 + surfaceType enum 추가 (R-Phase). 데이터 변경 0 예측 재현.
+   > ⏩ **발동 (2026-10-02, #1274 — Amendment 12, Accepted)**: ice giant 만 (uranus · neptune → 신규 `IceGiant`). 위성 · Cratered 확장은 비-범위 (사용자 Q2). 「테이블 + enum 추가」 외에 **밴드 파라미터의 body 별 테이블** 이 선행된다 — 상수 1줄로는 uranus 와 neptune 의 값을 가를 수 없기 때문이다 (§A12.4). 위 원문은 소급 수정하지 않는다.
 4. **WebGPU↔WebGL parity 결함** — ring/starfield 가 실증했으나, 표면 셰이더 특정 함수 (cell noise / fbm) 의 백엔드 차이 발견 시 qa 실 Chrome (WebGPU) + CI swiftshader (WebGL) 양 경로 박제.
 
 ---
@@ -2643,6 +2644,7 @@ col += nightLightColor * lights;
 4. **`SURFACE_MASK_MIN_DISK_PX` 변경** — 불빛 on/off 경계가 함께 움직인다 (결정 2 결합).
 5. **§A10.14 조건 7 발동 (LOD fade 기전 변경)** — 구름의 불빛 차폐도 함께 재검토한다 (§A11.2).
 6. **다른 body 가 `SurfaceType.Rocky` 로 재분류** — 불빛을 상속한다 (§A8.11 조건 3 동형).
+   > ⚠️ 부기 (2026-10-02, #1274 — §A12.3): 「불빛을 상속한다」 는 **조건부**다 — 게이트가 `uMaskEnabled` 를 곱하고 (`procedural-planet-shader.ts:890`), `uMaskEnabled` 는 `SURFACE_MASK_BY_BODY` 등록 body 에서만 `1` 이 될 수 있다. 반대로 biome · 극관 · 바다 깊이 · fbm 대륙 · rim 은 **무조건** 상속된다. 위 원문은 소급 수정하지 않는다.
 7. **극관 억제의 픽셀 판별이 필요해짐** — 밤면 내부에 극관 포화 픽셀이 생기는 프레임을 채택할 때 게이트 편입을 재판단한다 (§A11.4 사각).
 
 ### A11.16 교차검증 반영 사항 — **반영 완료** (agy 2026-09-13, Accepted 전이)
@@ -3110,3 +3112,290 @@ MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입.
 
 - **소스 변이 로그에 `git diff` 동시 박제를 dev 절차로 승격**. `phase2/mutations/mn*.log` 7개가 전부 `INJECT=none` 헤더뿐이어서 **이전 라운드의 재현이 불가능했다** (레시피를 계약 문면에서 다시 세워야 했다).
 - `phase2/README.md` 의 MN-5b 처분 문장이 두 단언이 함께 잡는 것으로 읽히나, GLSL 변이에 하중을 지는 것은 **문자열 assert 하나**다 (미러 테스트는 통과 — 직교 축).
+
+---
+
+## Amendment 12 (2026-10-02) — 천왕성·해왕성 절차 표면: `IceGiant` 타입 + 밴드 파라미터 body 별 테이블 (#1274)
+
+- **이슈**: [#1274](https://github.com/coseo12/astro-simulator/issues/1274) — 스프린트 계약 D1~D17 · 위험 R1~R4. §결과·재검토 조건 3 (표면 타입 확장) **발동**.
+- **상태**: Accepted (cross-validate 2026-10-02 — agy, 반영 내역 §A12.18. U1 · 계약 조정 C1~C5 사용자 결정 2026-10-02 반영 §A12.12 · §A12.17)
+- **선행 결정 (사용자, 2026-10-02 — 재해석 금지)**: Q1 = uranus · neptune 만, 신규 `IceGiant` (저대비 위도 밴드), Rocky 재분류 없음 / Q2 = Cratered 확장 제외 (로드맵 잔류) / Q3 = 이슈 1 + PR 2 (PR1 파라미터화 · 시각 변화 0 → PR2 신규 타입·body) / Q4 = 프리뷰 → 육안 승인 (D13) → D4 수치 확정 / Q5 = 비-범위 전부 제외.
+- **결과 기록 대상**: §결과·재검토 조건 3 (⏩ 발동) · §A11.15 조건 6 (⚠️ 부기 — §A12.3). 원문은 소급 수정하지 않았다.
+- ⚠️ **본 Amendment 는 설계 박제다.** 밴드 파라미터 수치 · 가드 수치는 정하지 않는다 (D13 승인 후 dev). 라벨: 「실측」 = 실행 출력, 「도출」 = 실측값·데이터에서 산술, 「구조」 = 코드 경로 판독, 「추론」 = 실행되지 않은 예측. 실행되지 않은 것은 §A12.15 에 모았다. 줄 번호는 전부 HEAD `58c02060` 기준이다.
+
+### A12.1 배경 · 설계 입력 (실측)
+
+| # | 사실 | 라벨 · 근거 |
+| --- | --- | --- |
+| 1 | 밴드 변조 uniform 은 `gasBandAmplitude` · `gasBandCount` · `gasTurbulence` 3종이고, GLSL 에서 이 셋을 읽는 곳은 `uSurfaceType == 2` 분기뿐이다 | 구조 — `procedural-planet-shader.ts:921-930` |
+| 2 | 그 3종은 body 분기 없이 **전 표면 body 에** jupiter 상수로 바인딩된다 | 구조 — `:1267-1269` (`GAS_BAND_AMPLITUDE` 등, `:196-202`) |
+| 3 | uniforms 배열 항목 수 `54` (auto-bind `worldViewProjection` · `world` · `cameraPosition` 포함). 이슈 R4 의 「현재 `45`」 는 §A8.10 시점 값이고, Amendment 11 이 `+9` 를 더했다 | 실측 — uniforms 배열 블록의 `'…'` 항목 계수 |
+| 4 | GLSL `float fbm(` 함수 사본 = `cloud-layer.ts` · `procedural-planet-shader.ts` · `starfield.ts` · `sun-shader.ts` 각 `1` | 실측 — `git grep -c "float fbm(" -- packages apps` |
+| 5 | `?rotate=off` 면 `rotationQuaternion` 을 설정하는 블록 전체가 skip 된다 → 자전·기울기 모두 identity | 구조 — `solar-system-scene.ts:741` (#1230 실측과 일치) |
+| 6 | ring disc 의 기울기는 `rotate` 와 무관하게 적용된다 (`rotation.x = RING_DISC_BASE_TILT_X + axialTiltRad`) — `rotate=off` 프레임에서 uranus 는 **본체 기울기 `0°` · 고리 기울기 `97.77°`** 로 그려진다 | 구조 — `ring-placeholder.ts:114` |
+| 7 | `verify:756` · `verify:773` 의 `PLAIN_BODIES` 는 **로그만** 찍고 판정에 들어가지 않는다 (판정 루프는 `SURFACE_BODIES` 만 돈다) | 구조 — `browser-verify-756-surface.mjs:447-458` · `:522` / `browser-verify-773-light.mjs:537-543` (`out.plain` 대입 1곳) |
+| 8 | 두 가드 모두 배경 배제가 휘도 임계가 아니라 **기하** (투영 disk) 다 — 이슈 R2 가 인용한 `lum < 8` 은 #1146 / #1155 이전 코드다 | 구조 — `browser-verify-756-surface.mjs:126-135` · `browser-verify-773-light.mjs:390` |
+| 9 | 낮면 중심 라이팅 계수 `(2.67, 2.55, 2.18)` · 광원 감쇠 없음 | 실측 — §A1.2 표 / 구조 — `solar-system-scene.ts:675` (PointLight) · `procedural-planet-shader.ts:1049-1056` (`DEFAULT_PLANET_LIGHTING`) |
+
+### A12.2 결정 0 — 형식: **본 ADR 의 Amendment 12** (신규 ADR 기각)
+
+- **채택 근거 1 — 발동 대상이 이 ADR 자신의 재검토 조건이다.** §결과·재검토 조건 3 이 「ice giant 추가 — 테이블 + enum 추가」 를 이미 예고했다. 신규 ADR 로 쓰면 「조건 3 의 결과」 가 다른 문서에 놓여 ⏩ 포인터가 문서 경계를 넘는다.
+- **채택 근거 2 — 바꾸는 SSoT 가 전부 이 ADR 소관이다.** `SURFACE_TYPE_BY_BODY` (§결정 2) · 단일 셰이더 if-else 분기 (§결정 2) · §A8.9 결정 5 (body 별 파라미터화 판정). 신규 ADR 은 이 셋을 다시 인용해야 하고, 판정이 두 문서로 갈린다.
+- **채택 근거 3 — 계약 D16 이 Amendment 12 를 명시했다.** 이를 뒤집을 사유가 없다.
+- **비용 (기록)**: 이 파일은 Amendment 11 시점에 이미 `3112` 행이다 [실측 — `wc -l`, HEAD `58c02060`]. 「표면 타입 카탈로그」 를 별도 ADR 로 분리할지는 §A12.16 조건 5 에 둔다 — 지금 분리하면 계약 범위 밖 문서 이동이 생긴다.
+
+### A12.3 상속 서술 정정 (계약 D16) — dated 부기
+
+로드맵 `roadmap-track-ab.md` 68행과 §A11.15 조건 6 은 「(Rocky 로 재분류하면) 불빛을 상속한다」 고 적었다. 코드 경로상 [구조]:
+
+| 항목 | Rocky 재분류 시 | 근거 |
+| --- | --- | --- |
+| biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 절차 대륙 · 대기 rim | **무조건** 상속 | `:859` · `:881` · `:877` · `:848` · `:912`/`:956` |
+| 야간 불빛 | **조건부** — `lightGate = landMask * (1.0 - iceMask) * uMaskEnabled` (`:890`). `uMaskEnabled` 는 `0` 출발 (`:1363`) 이고 `SURFACE_MASK_BY_BODY` 등록 + 로드 완료 (`:1381`) + disk `≥ SURFACE_MASK_MIN_DISK_PX` (`:1409`) 일 때만 `1` | 같은 줄 |
+
+- 두 원문에는 ⚠️ dated 부기만 더했다 (§A11.15 조건 6 · 로드맵 표 아래). 원문 소급 수정 `0`.
+- **본 이슈에서는 발동하지 않는다** — Rocky 재분류가 없다 (Q1). `IceGiant` 는 비-Rocky 분기라 `rim = 0.0` · `lights = 0.0` 초기값 (`:813` · `:816`) 을 그대로 합성한다 [구조 — `:956` · `:959`].
+
+### A12.4 결정 1 — 밴드 파라미터: **별도 테이블 `SURFACE_BAND_PARAMS_BY_BODY`**, 이관 축 = 밴드 uniform 3종
+
+**형태 비교**
+
+| 축 | (가) `SURFACE_TYPE_BY_BODY` 값 확장 (`{ type, bands? }`) | **(나) 별도 테이블 + 소비 타입 집합 (채택)** | (다) 타입별 상수 (`ICE_GIANT_*`) |
+| --- | --- | --- | --- |
+| uranus ↔ neptune 값 분리 | ✓ | ✓ | ✗ (타입 단위라 두 body 가 같은 값) |
+| 기존 소비자 영향 | 값 형태 변경 → `SURFACE_TYPE_BY_BODY[id]` 를 읽는 전 소비자 수정 (`createProceduralPlanetMaterial` `:1174`, 테스트 `:121-136` · `:734`, `sun-shader.test.ts:284`) | **0** — 기존 테이블 무변경 | 0 |
+| §A8.9 결정 5 (소비자 없는 파라미터 금지) | earth · mars · moon 행이 「밴드 없음」 을 표현해야 함 | 밴드를 읽는 타입의 body 만 행을 가진다 | — |
+| 선례 | 없음 | **`SURFACE_MASK_BY_BODY`** — earth 만 행을 가진 별도 per-body 테이블 + 「마스크 키 ⊂ 표면 타입 키」 단위 테스트 (`procedural-planet-shader.test.ts:732-736`) | — |
+
+→ **(나) 채택.** (다) 는 Q1 의 2 body 가 같은 타입이라 구조적으로 불충분하다.
+
+**이관 축 = 3종 (`amplitude` · `count` · `turbulence`) 만.** 근거: 밴드 식이 읽는 uniform 이 정확히 이 3종이다 (§A12.1 #1). rocky · desert · cratered 상수와 earth 전용 블록 (biome · 극관 · 바다 · rim · 불빛) 은 **이관하지 않는다** — 소비자 (재분류된 body) 가 없다 (§A8.9 결정 5 동형). 이슈 계약 D1 의 「최소 밴드 진폭 · 밴드 수」 에 난류를 더한 이유는 저대비 ice giant 의 형태 차이가 난류 축에 있을 가능성이 높아서이고 (D13 후보 축 — §A12.10), 추가 uniform 은 `0` 이다 (기존 uniform 재사용).
+
+**계약 (dev 구현 대상)**
+
+1. `SurfaceBandParams = { amplitude: number; count: number; turbulence: number }`.
+2. `BAND_SURFACE_TYPES: ReadonlySet<SurfaceType>` — PR1 `{ GasBands }`, PR2 `{ GasBands, IceGiant }`.
+3. `SURFACE_BAND_PARAMS_BY_BODY` — PR1 은 `jupiter` 1행. **jupiter 행의 값은 기존 상수 `GAS_BAND_AMPLITUDE` · `GAS_BAND_COUNT` · `GAS_TURBULENCE` 를 참조**한다 (값 사본 금지 — #69. 기존 상수 단언 `procedural-planet-shader.test.ts:263-275` 가 그대로 유효하다).
+4. **불변식 (양방향)**: `keys(SURFACE_BAND_PARAMS_BY_BODY) == { id | SURFACE_TYPE_BY_BODY[id] ∈ BAND_SURFACE_TYPES }`. 단위 테스트로 집합 동일을 단언한다 (`toHaveLength` 단독 금지).
+5. **해석 함수 `resolveSurfaceBandParams(bodyId, surfaceType)`** — 밴드 타입인데 행이 없으면 **throw**, 비-밴드 타입인데 행이 있으면 **throw** (불변식의 런타임 사본 — 기본값 fallback 없음). 비-밴드 타입은 `{ 0, 0, 0 }` 을 반환해 바인딩한다.
+   - ⚠️ 비-밴드 body (earth · mars · moon) 의 바인딩 값이 `0.28 / 9 / 0.12` → `0` 으로 **바뀐다**. 픽셀 영향은 `0` 이어야 한다 — 그 3종을 읽는 GLSL 이 밴드 분기뿐이기 때문이다 [구조 — §A12.1 #1]. 이것이 D2 가 재는 명제다. 바꾸는 이유는 「jupiter 상수를 모든 body 가 상속하는 형태」 가 이슈가 지목한 earth 전용 상수 상속과 같은 구조이기 때문이다.
+6. `surfaceColorMirror` 는 밴드 타입에서 파라미터를 **인자로** 받는다 (미전달 시 throw). GLSL 식 자체는 PR1 에서 **무변경** — `PLANET_FRAGMENT_SHADER` 문자열 바이트 동일이 PR1 의 기대 상태다.
+
+### A12.5 결정 2 — `IceGiant` = **별도 enum 값 + 별도 GLSL 분기**, 밴드 uniform 은 **공유**
+
+| 축 | (가) GasBands 파라미터 변형 (enum 무추가) | (나) enum 추가 + 분기 공유 (`== 2 \|\| == 4`) | **(다) enum 추가 + 별도 분기 + uniform 공유 (채택)** | (라) 별도 분기 + 전용 uniform |
+| --- | --- | --- | --- | --- |
+| 사용자 Q1 · 계약 D3 (`SurfaceType` 에 `IceGiant`) | ✗ 위배 | ✓ | ✓ | ✓ |
+| jupiter 픽셀 격리 (D6 (i)) | 형태 변경 = jupiter 변경 | 형태 변경 시 **jupiter 도 바뀐다** | **구조적 격리** — ice giant 형태를 바꿔도 분기 2 무접촉 | 구조적 격리 |
+| D13 후보의 형태 자유도 | 파라미터만 | 파라미터만 (형태 변경은 jupiter 회귀) | 파라미터 + 형태 | 파라미터 + 형태 |
+| uniform 증분 | 0 | 0 | **0** (파라미터 축만이면) | `+3` (값은 결정 1 테이블과 중복) |
+| D5 M1 (분기 본문 제거) 의 대상 | 없음 | 조건식 `\|\| == 4` | 분기 본문 | 분기 본문 |
+
+→ **(다) 채택.** `SurfaceType.IceGiant = 4`, `else if (uSurfaceType == 4) { … }`. 분기 본문의 출발 형태는 GasBands 식과 같은 「`baseColor * (1 + sin((lat + turb) * count * π) * amplitude)`」 이고, D13 승인 후보가 형태를 바꾸면 이 분기 안에서만 바꾼다.
+
+- **GLSL 식 사본 (~5행) 은 수용한다.** 대가는 jupiter 와 ice giant 의 형태가 따로 진화할 수 있는 격리이고, 이는 D6 (i) 「jupiter diff `0`」 을 구조로 보장하는 유일한 안이다.
+- **uniform 이름 `gasBand*` 는 유지한다** (밴드 계열 공용임을 GLSL 선언부 주석으로 명시). 이름 변경은 4중 SSoT (상수 → uniforms 배열 → 바인딩 → GLSL 선언) 전부를 건드리는 비요청 리팩터라 비-범위다.
+- 승인 후보가 **3종 밖의 축** (예: 극 휘도 · 색조) 을 요구하면 그 축은 `IceGiant` 전용 uniform 으로 추가하고, §A12.6 비용 표를 그 PR 에서 갱신한다.
+
+### A12.6 결정 3 — 비용
+
+| 항목 | 현행 | PR1 | PR2 (파라미터 축만인 후보 승인 시) |
+| --- | --- | --- | --- |
+| uniform (배열 항목) | `54` | `54` | `54` (형태 축 1개당 `+1`) |
+| GLSL `float fbm(` 함수 사본 | `4` 파일 | `4` | `4` — `IceGiant` 는 같은 셰이더의 `fbm` 을 호출한다 (D10, §A10.14 조건 6 미발화) |
+| fragment 비용 | — | 불변 (GLSL 무변경) | uranus · neptune draw 만 밴드 식 1회 (`fbm` 호출 `1` = 분기 2 와 동일). 다른 body 의 draw 는 분기 진입 없음 [구조 — draw 단위 균일 분기, §결정 2] |
+| 데이터 `solar-system.json` | — | `0` 줄 | `0` 줄 (D9) |
+
+R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적이 없다 [실측 — 본 ADR 에 「한도」 · `maxUniform` 0건]. 그래서 판정 대신 **증분 기록**을 의무로 둔다 (위 표).
+
+### A12.7 결정 4 — PR 경계
+
+- **PR1 (파라미터화, 시각 변화 `0`)**: 결정 1 의 테이블 · 집합 · 해석 함수 · 바인딩 교체 · 미러 인자화 + 단위 테스트 (D1) + D2 하네스 (§A12.8) 신설 · 실행. GLSL · 데이터 · 가드 판정 무변경.
+- **PR2 (신규 타입 · body)**: enum · 테이블 2행 · 밴드 테이블 2행 · `IceGiant` 분기 · 미러 분기 · 프리뷰 (§A12.10, 머지 전 삭제) · 가드 확장 (§A12.9) · D15 처분 (§A12.11) · 본 Amendment 결과 기록.
+- PR2 착수 순서: **Phase 0 측정 (§A12.12) → 프리뷰 → D13 승인 → 수치 확정 · 후보 삭제 → 가드 · 변이 → qa**. Phase 0 결과가 U1 (§A12.12) 을 먼저 열 수 있다.
+
+### A12.8 결정 5 — D2 base↔feature 하네스 (PR1 신설 · PR2 재사용)
+
+**`apps/web/scripts/browser-verify-1274-surface-invariance.mjs`** (npm `verify:1274-invariance`). 두 빌드를 비교하므로 CI 상시 가드가 아니다 (비-범위) — dev · qa 실행 도구이고 실행 로그를 PR 코멘트에 박제한다.
+
+- **2 모드**: `MODE=capture OUT=<dir>` (현재 서버의 시나리오 캡처) / `MODE=compare A=<dir> B=<dir> EXPECT_ZERO=… EXPECT_NONZERO=…` (디렉터리 비교). 한 포트로 base 캡처 → feature 빌드 → feature 캡처 순서로 쓸 수 있다.
+- **시나리오**: `body × {on, off}` — PR1 `earth · mars · jupiter · moon`, PR2 에서 `uranus · neptune` 추가. 쿼리 `?gpu=a&focus=<id>&lod=auto&speed=0&rotate=off` (+ `&surface=off`). 1280×720 · `deviceScaleFactor 1`.
+- **캡처 절차**: `hideDomOverlays` (#1219 — HUD 글리프 오염) → `waitForLodSettle` (§A9.2) → canvas 스크린샷. 표본 = 투영 disk `0.95R` 안 (`verify:756` P2 와 같은 식. 사본이면 출처 주석).
+- **판정량**: 시나리오별 disk 표본에서 **채널 하나라도 다른 픽셀 수**. `EXPECT_ZERO` 는 정확히 `0`, `EXPECT_NONZERO` 는 `> 0`.
+- **exit**: `0` 기대 전건 충족 / `1` 기대 위반 / **`2` 측정 불가** — 아래 전제 중 하나라도 실패. 측정 실패를 diff `0` 으로 읽지 않는다.
+
+| 전제 (위반 = exit `2`) | 닫는 구멍 |
+| --- | --- |
+| 캔버스 개수 `=== 1` | 다른 캔버스를 찍는 경로 (glow-marker 선례) |
+| 대상 mesh 존재 · disk 표본 픽셀 `> 0` | mesh 부재 · 화면 밖 → 빈 표본의 diff `0` |
+| 전 시나리오 투영 disk 반경 `≥ SURFACE_MASK_MIN_DISK_PX` (기존 상수 재사용 — 새 임계 `0`. 하네스에 사본으로 두면 출처 주석) | 표본이 너무 작아 diff `0` 이 판별력 없이 나오는 경로. earth 의 `uMaskEnabled === 1` 전제는 같은 상수의 하한을 이미 함의한다 (`procedural-planet-shader.ts:1409`) — cross-validate F2 수정 수용 |
+| **자기 대조** — 같은 빌드 · 같은 시나리오를 **독립 page load 2회** 캡처해 diff `0` | 페이지 로드 축 비결정성을 「변경 없음」 으로 오독 (#1219) |
+| A · B 의 disk 기하 (중심 · 반경) 동일 · 렌더러 문자열 동일 | 서로 다른 영역 · 렌더러를 비교 |
+| earth 시나리오: high 머티리얼 `uMaskEnabled === 1` (마스크 로드 완료) | 마스크 도착 전/후 프레임 혼합 (§A4.3 결정 7 의 `0` 출발) |
+| `EXPECT_*` 비어 있지 않음 · 명시된 시나리오가 A · B 양쪽에 존재 | 기대 목록 공백의 공허 통과 |
+| **캡처된 시나리오 집합 == `EXPECT_ZERO` ∪ `EXPECT_NONZERO`** | 캡처는 했으나 기대에 넣지 않은 시나리오가 판정 밖으로 빠지는 경로 (cross-validate F3 수용) |
+
+- **양성 대조 (D2)**: feature 에 `GAS_BAND_AMPLITUDE` 만 바꾼 **미커밋 변이** 빌드를 C 로 캡처 → `compare A=base B=C EXPECT_NONZERO=jupiter:on EXPECT_ZERO=<나머지 전부>`. 변이의 `git diff` 를 로그와 함께 박제한다 (§A11.20 후속 권고 — 레시피 없는 변이 로그는 재현 불가).
+- **판정 범위의 한계 (기록)**: 표본이 `0.95R` 안쪽이므로 `0.95R ~ R` 가장자리 띠 (rim 대역 포함) 의 변화는 **판정 밖**이다. PR1 은 rim 경로 (`:912` · `:956`) 를 건드리지 않아 수용한다. 가장자리를 바꾸는 변경에 이 하네스를 쓸 때는 이 한계를 먼저 재판정한다.
+- **PR2 재사용**: D6 (i) (4 body `EXPECT_ZERO`) 과 D8 (uranus · neptune `:off` `EXPECT_ZERO` + `:on` `EXPECT_NONZERO`) 을 **한 번의 compare** 로 낸다 — `:on` 의 비-0 이 같은 실행의 양성 대조를 겸한다.
+
+### A12.9 결정 6 — 신규 body 가드 (PR2)
+
+**D3 · D1 단위 테스트**
+
+- 등록 집합 정확 단언: `SURFACE_TYPE_BY_BODY` 를 `{ earth: Rocky, mars: Desert, jupiter: GasBands, moon: Cratered, uranus: IceGiant, neptune: IceGiant }` 와 `toEqual`. 기존 `:128` `toHaveLength(4)` 와 `:120` 설명문은 이 단언으로 **교체** (사유: 계약 변경 — PR 본문 박제).
+- enum ↔ GLSL 정수: 기존 `:114` `toBe(4)` 를 「enum 값 집합 == GLSL `uSurfaceType == N` 정수 집합」 의 **집합 동일**로 교체.
+- **등록 키 ⊂ `solar-system.json` body id** (신규) — 테이블 키 오타는 그 body 를 조용히 미등록으로 만든다. D5 M3 의 테이블 측 짝이다.
+- `:864` 「비-rocky 타입은 mask 인자 무시」 의 타입 목록은 하드코딩 대신 enum 에서 Rocky 를 뺀 집합으로 (drift 0).
+
+**D7 — earth 전용 효과 `0`**: `FRAGMENT_SHADER` 의 **정적 블록 분석**. `//` 주석을 제거한 뒤 `uSurfaceType == N` 으로 가드된 모든 블록을 괄호 매칭으로 추출해 N 별로 합친다.
+
+- `rim =` · `lights =` 대입은 N = `0` 블록에만 존재하고 N = `4` 블록에는 없다. **양성 대조**: N = `0` 블록에 둘 다 존재해야 한다 (없으면 FAIL — 공허 통과 차단).
+- `gasBandAmplitude` · `gasBandCount` · `gasTurbulence` 참조가 있는 블록의 N 집합 == `BAND_SURFACE_TYPES` (결정 1 의 집합과 GLSL 의 양방향 일치 — 「데이터 파생 == 하드코딩」 volt #120).
+- 수치 양성 대조: `nightLightTermMirror` 가 earth 대표 입력에서 `> 0`.
+- ⚠️ 계약 D7 문면은 「GLSL 미러 단위 테스트」 다. 미러는 GLSL 과 별개로 작성되므로 **GLSL 에 rim 이 새는 결함을 미러가 잡지 못한다** → 정적 분석으로 보강한다 (§A12.17 제안 C2).
+
+**D4 · D6 (iii) — `verify:756` · `verify:773` 확장**
+
+- `verify:756` `SURFACE_BODIES` 에 `{ id: 'uranus', type: 'ice-giant' }` · `{ id: 'neptune', type: 'ice-giant' }`. 판정식 · `HF_ENTROPY_MARGIN 0.15` 무변경 (새 임계 `0`).
+- 두 스크립트 `PLAIN_BODIES` 에서 neptune 제거 → **대체 body 선정 기준**: (a) `SURFACE_TYPE_BY_BODY` 미등록 (b) 로드맵 Cratered 후보 (mercury · callisto · rhea · titania · oberon · ceres) **밖** — 다음 표면 확장에서 대조군이 다시 사라지지 않게 (c) 첫 실행 로그 `area > 0`. (a)~(c) 미충족 시 다음 후보. 결과 body 는 dev 가 정하고 로그로 박제한다 (`773` 의 기존 mercury 는 유지 — 선정 기준은 대체분에만 적용).
+- 두 스크립트에 **`PLAIN_BODIES.length >= 1` · `SURFACE_BODIES.length >= 1` fail-fast** (exit ≠ 0).
+- R2 (밤면 휘도 임계) 는 해당하지 않는다 — 두 가드의 배경 배제가 기하이고 `PLAIN_BODIES` 는 판정에 들어가지 않는다 (§A12.1 #7 · #8).
+
+**D6 (ii)**: `solar-system-scene-display-toggles.test.ts` 의 NullEngine fixture 에서 전 body high mesh 에 대해 `isProceduralPlanetMaterial(material) === (id ∈ SURFACE_TYPE_BY_BODY)`. 참 · 거짓 각각 `≥ 1` 건을 함께 단언 (한쪽 공집합의 공허 통과 차단).
+
+**D5 변이 — 술어 도달 판정 [추론 — 실행은 dev]**
+
+| 변이 | 기대 FAIL 지점 | 도달 경로 |
+| --- | --- | --- |
+| M1 `IceGiant` 분기 본문 제거 | `verify:756` 갭 `< 0.15` · D7 (밴드 uniform 참조 N 집합 ≠ `BAND_SURFACE_TYPES`) | 분기 출력 = `baseColor` → 셰이더 ≈ StandardMaterial. ⚠️ 셰이더 · StandardMaterial 의 광원 재현 오차가 갭 `≥ 0.15` 를 낼 가능성은 미측정 — M1 이 `exit 0` 이면 가드 결함으로 보고 |
+| M2 테이블 줄 삭제 (uranus) | 갭 ≈ `0` · D3 집합 단언 · D1 불변식 (밴드 행만 남음) | 미등록 → StandardMaterial — ON · OFF 경로가 같다 |
+| M3 대상 id 오타 | 가드 측: `measureDisk` 가 `{ error }` → `failures` (`browser-verify-756-surface.mjs:525-528`) / 테이블 측: 「등록 키 ⊂ body id」 단위 테스트 | mesh 부재를 측정 실패로 판정 — 빈 표본 통과 없음 |
+| M4 신규 body 파라미터 `0` 바인딩 | 갭 ≈ `0` | `amplitude 0` → 변조 `0` |
+
+각 변이의 `git diff` · 실행 로그 · exit code 를 PR 코멘트에 박제한다 (계약 D5).
+
+### A12.10 결정 7 — D13 프리뷰 (PR2, 머지 전 삭제)
+
+#1226 D1 선례 (`docs/reports/1226-night-lights/d1-candidates/README.md`) 의 형식을 따른다.
+
+- **URL 플래그 `?iceGiantCandidate=<id>`** — web 파서 (`parse-*-mode.ts` 동형: 미지 값 → 테이블 값 + `console.warn`) → core 옵션 `iceGiantCandidate?: string` → `createProceduralPlanetMaterial` 이 uranus · neptune 의 밴드 파라미터를 후보 표 `ICE_GIANT_CANDIDATES` 에서 읽는다. **후보 표 · 플래그 · 파서는 D13 승인 후 같은 PR 에서 삭제**하고 `git grep -c iceGiantCandidate` `0` 을 PR 본문에 박제한다.
+- **1차 후보 3개 (밴드 uniform 3축만 — uniform 증분 `0`)**. 값은 jupiter `(0.28, 9, 0.12)` 대비 축소에서 출발하는 미학 파라미터이며 임계가 아니다:
+
+  | id | 의도 | uranus `(amp, count, turb)` | neptune `(amp, count, turb)` |
+  | --- | --- | --- | --- |
+  | `a` | 저대비 기준 | `(0.06, 4, 0.04)` | `(0.10, 6, 0.06)` |
+  | `b` | 매끈한 넓은 띠 (난류 `0`) | `(0.06, 3, 0)` | `(0.10, 4, 0)` |
+  | `c` | 중대비 | `(0.12, 6, 0.06)` | `(0.18, 8, 0.10)` |
+
+  neptune 을 더 높게 둔 것은 실제 두 행성의 대비 차이 (neptune 의 띠가 더 뚜렷) 를 반영한 출발점이다 — 승인은 육안이 정한다.
+- **프레임 (후보 × body)**: (1) 제품 프레임 — 실 Chrome GUI · `channel:chrome` · WebGPU · `rotate` ON · JD 고정 (`jumpToJulianDate` + pause) / (2) `verify:756` 프레임 (`rotate=off`) / (3) `&surface=off` 대조. 저장 `docs/reports/1274-ice-giant/d13-candidates/` + `README.md` + `capture-meta.json`.
+- **후보별 수치 동봉 (판정 아님 — 정보)**: `verify:756` 갭 (ON−OFF) · disk 표본 중 **3채널 포화 (`≥ 254`) 비율**. 사용자가 「보이는 것」 과 「D4 통과 여부」 를 같은 표에서 본다. ⚠️ 갭으로 후보를 거르지 않는다 — 가드 통과 값으로 파라미터를 고르는 것은 계약이 막는 방향이다. 승인 후보의 갭이 `< 0.15` 면 R1 경로 (보고 → 재합의).
+- 2차 이후 (미승인 시) 의 축 변경 · 형태 축 추가는 사용자 코멘트의 방향을 따른다 (§A12.5 마지막 항).
+
+### A12.11 결정 8 — D15: `?rotate=off` 와의 관계 · #1230 처분 술어
+
+- **`verify:756` 판정량은 「존재」 를 잰다** [구조]: disk 표본의 라플라시안 크기 히스토그램 엔트로피 차 (ON − OFF) 이며 화면 좌표 항이 없다. 「밴드가 화면 어디에 있는가」 는 판정하지 않는다.
+- **그러나 「얼마나 보이는가」 는 기하에 종속된다** [추론]: §A12.12 의 포화 때문에 uranus 의 디테일은 비포화 영역 (terminator · 밤면 · limb) 에만 남고, 그 영역을 가로지르는 띠의 개수는 자전축과 태양 방향의 상대 각도에 달려 있다. `rotate=off` (기울기 `0°`, 띠 = 화면 수평) 와 제품 (기울기 `97.77°`) 은 그 각도가 다르다 → `rotate=off` 가 제품보다 디테일을 **과대 또는 과소** 측정할 수 있다. 이것이 #1230 이 묻는 축이다.
+- **처분 술어** (PR2 에서 1회 측정 — 가드 아님, 로그): `verify:756` 의 측정 함수로 uranus · neptune 의 갭을 `rotate` ON · JD 고정 · `speed=0` 프레임에서 한 번 더 잰다.
+
+  | `rotate=off` 갭 | `rotate` ON 갭 | 처분 |
+  | --- | --- | --- |
+  | `≥ 0.15` | `≥ 0.15` | 두 기하의 판정이 같다 → #1230 실피해 `0` → **`wontfix` close** (CLAUDE.md §`deferred:no-incident` 수명주기) |
+  | `≥ 0.15` | `< 0.15` | 가드가 제품에 없는 기하를 통과시킨다 → **#1230 승격** (deferred 해제, 실피해 사례 1) |
+  | `< 0.15` | — | D4 자체가 FAIL → R1 경로가 먼저다. D15 처분은 그 재합의 뒤 |
+
+- 결과는 #1230 과 #1274 양쪽에 코멘트로 박제한다 (계약 D15). 이 술어에 새 임계는 없다 (`0.15` 재사용).
+
+### A12.12 위험 R5 (신규) — **uranus 낮면 휘도 포화가 저대비 밴드를 지운다**
+
+- **기전 [도출]**: 광원 감쇠가 없어 낮면 중심 라이팅 계수가 `(2.67, 2.55, 2.18)` 이다 (§A12.1 #9). uranus `colorHint #B5E3EC` = `(0.710, 0.890, 0.925)` 에 곱하면 `(1.90, 2.27, 2.02)` — **세 채널 모두 `1` 을 넘어 clamp 된다** (`:963`). 변조 `(1 + m)` 이 R 채널을 `1` 아래로 내리려면 `m < −0.47` 이 필요하다 → **진폭 `< 0.47` 인 밴드는 낮면 중심에서 픽셀 변화 `0`**.
+- **비교 [도출]**: jupiter `(0.788, 0.647, 0.455)` 는 B 채널이 `0.99` 로 비포화라 낮면에서도 밴드가 B 채널에 남는다 (현행 D4 통과의 근거). neptune `(0.247, 0.427, 0.659)` 은 R 채널 `0.66` 이 비포화다. **세 채널이 모두 포화하는 것은 uranus 뿐**이다.
+- **현행 화면 [실측 — 기존 캡처 재분석, 기하 근사]**: `docs/reports/1130-rotation-axis/ringDefault-uranus.png` (2026-08-19, WebGPU, `rotate` ON, JD `2451545`, 단색 uranus) 에서 disk 중심 `(640, 360)` · 반경 `88 px` (상단 경계 `y = 274` 에서 추정) 의 `0.95R` 표본 `21953 px` 중 **3채널 `≥ 254` = `6023 px` (`27.4%`)**, 1채널 이상 `≥ 254` = `7377 px` (`33.6%`). 표본에 고리가 일부 겹친다. ⇒ 위 기전과 부합하나, **이 수치는 그 한 프레임 · 근사 기하의 값이다** — `verify:756` 프레임의 값이 아니다 (§A12.15).
+- **함의**: uranus 의 D4 신호는 비포화 영역에서만 나온다. 이 영역의 크기는 위상각에 달려 있고 `verify:756` 프레임의 위상각은 미측정이다 → **R1 이 「사실성 vs 디테일」 이전에 「포화」 로 먼저 발현할 수 있다.**
+- **처분 — PR2 Phase 0 (프리뷰 전)**: `verify:756` 프레임에서 uranus · neptune 의 단색 (`surface=off`) disk 표본 3채널 포화 비율을 잰다 (로그). 이 값이 프리뷰 표 (§A12.10) 의 기준선이 된다.
+- **U1 — 사용자 결정 필요 (architect 는 정하지 않는다)**: uranus 낮면이 흰색으로 남는 것을 (a) 수용 — 디테일은 비포화 영역에만 (계약 문면 그대로) / (b) `IceGiant` 전용 **albedo 배율** 축 추가 (uniform `+1`) — 낮면을 비포화로 끌어내리나 uranus 전체 밝기가 `colorHint` 보다 어두워진다 (Visual Fidelity 의 rendering 시점 왜곡 — 데이터 불변이나 「저대비 위도 밴드」 범위를 넘는다) / (c) 전역 광원 세기 변경 — 전 body 가 바뀌므로 **본 이슈 범위 밖**. 1차 프리뷰는 (a) 전제로 만들고 포화 비율을 함께 보여 사용자가 (b) 필요 여부를 판단하게 한다.
+
+> ⏩ **사용자 결정 (2026-10-02, 메인 수령)**: U1 = 위 권고 그대로 — **1차 프리뷰는 (a) 현행 조명 (낮면 흰색 수용) 전제**로 만들고 포화 비율을 함께 제시한다. **(b) albedo 배율은 프리뷰를 본 뒤 사용자가 결정**한다 (그때까지 미채택 — uniform 증분 `0` 유지). **(c) 는 범위 밖**으로 확정.
+
+### A12.13 Concrete Prediction (구현 후 `git diff --stat` 재현)
+
+| 영역 | PR1 | PR2 |
+| --- | --- | --- |
+| `procedural-planet-shader.ts` | `+40 ~ +80` (타입 · 집합 · 테이블 · 해석 함수 · 바인딩 · 미러 인자) / **`FRAGMENT_SHADER` 변경 `0`** | `+30 ~ +70` (enum · 테이블 2+2행 · GLSL 분기 · 미러 분기 · 주석) |
+| 단위 테스트 | `+40 ~ +90` | `+60 ~ +130` (D3 · D7 정적 분석 · D6 (ii) fixture) |
+| `browser-verify-1274-surface-invariance.mjs` | 신규 `+250 ~ +450` | 시나리오 2 body 추가 `+2 ~ +10` |
+| `browser-verify-756` · `-773` | `0` | `+5 ~ +40` |
+| `solar-system.json` | **`0`** | **`0`** |
+| `float fbm(` 사본 | `4` | **`4`** |
+| uniform 배열 항목 | `54` | `54` (파라미터 축만 승인 시) |
+| 카메라 · picking · LOD · tier | `0` | `0` |
+
+**핵심 예측**: (1) PR1 의 4 body 픽셀 diff `0` (D2) 은 「3종을 읽는 GLSL 이 분기 2 뿐」 이라는 구조 판독의 예측이다 — 반증되면 결정 1-5 의 `0` 바인딩이 틀렸다. (2) 데이터 `0` 줄이 깨지면 SSoT 누수다. (3) uniform 증분이 `0` 이 아니면 승인 후보가 형태 축을 요구했다는 뜻이고 §A12.6 을 갱신한다.
+
+### A12.14 Visual Fidelity §의무 체크리스트 4항목
+
+- [x] **데이터 SSoT 보존** — 밴드 파라미터는 rendering-only 코드 상수. `colorHint.hex` 는 read-only `baseColor`. `solar-system.json` 변경 `0` (D9).
+- [x] **rendering 시점 분리** — 셰이더 레이어 단독. physics · 좌표 계약 무접촉.
+- [x] **사용자 D-T2 가이드** — 밴드는 시각 표현이며 Info 패널 표기 대상이 아니다 (§결정 5 동형).
+- [ ] **점유율 · 사실 비율** — mesh 기하 무변경이라 영향 `0` [구조]. 단 U1 (b) 채택 시 uranus 전체 밝기가 바뀌므로 그때 이 항목을 다시 판정한다.
+
+### A12.15 미확인 (실행되지 않은 것 — 근거로 인용 금지)
+
+- `verify:756` 프레임 (`rotate=off`) 에서 uranus · neptune 의 위상각 · 포화 비율 · 단색 OFF 엔트로피
+- 같은 빌드 독립 page load 2회 캡처의 disk 픽셀 동일성 (D2 하네스 자기 대조 전제가 처음 실행한다)
+- 셰이더 · StandardMaterial 광원 재현 오차만으로 생기는 갭 크기 (M1 의 도달 여부)
+- `rotate` ON 프레임의 uranus · neptune 갭 (D15 술어의 입력)
+- 고리가 disk 표본에 겹치는 비율 (uranus 는 `rotate=off` 에서 본체 · 고리 기울기가 다르다 — §A12.1 #6). PR2 Phase 0 로그에 함께 기록한다 (판정 아님 — §A12.18 F1)
+- §A12.10 후보 값의 시각 결과 · 갭
+- 대체 `PLAIN_BODIES` body 의 focus disk 면적
+
+### A12.16 재검토 조건 (신규)
+
+1. **D2 자기 대조가 `0` 이 아님** — 하네스가 `exit 2` 를 낸다. 비결정성의 축 (페이지 로드 · fade · 마스크 로드) 을 먼저 찾는다. 기대치를 완화하지 않는다.
+2. **D13 승인 후보가 밴드 3축 밖을 요구** — 전용 uniform 추가, §A12.6 비용 표 갱신. 형태 변경은 분기 4 안에서만 (결정 2).
+3. **U1 (b) 채택** — albedo 배율 축의 Visual Fidelity 4항목 재판정 (§A12.14 4항).
+4. **다른 body 가 `BAND_SURFACE_TYPES` 타입으로 등록** (예: saturn) — 밴드 테이블 행 추가가 불변식으로 강제된다. 코드 변경은 행 1개 + 타입 테이블 1줄이어야 하고, 넘으면 결정 1 의 추상화를 재검토한다.
+5. **본 ADR 에 Amendment 13 이 필요해짐** — 「표면 타입 카탈로그」 (타입 · body · 파라미터 테이블의 결정) 를 별도 ADR 로 분리할지 판정한다 (§A12.2 비용).
+6. **`fbm` 사본이 5벌째가 됨** — §A10.14 조건 6 동형 재판단.
+
+### A12.17 계약 조정 — **C1~C5 전건 수용 (사용자 2026-10-02)**
+
+> ⏩ **사용자 결정 (2026-10-02, 메인 수령)**: 아래 C1~C5 를 **전건 수용**했다. 수치 완화는 없다. 이슈 #1274 본문 「계약 조정 (2026-10-02)」 절에 반영했고 DoD ID (D1~D17) 는 재구조화하지 않았다. 아래 항목은 제안 당시 문면이다.
+
+- **C1 — D1 의 키 집합**: 문면 「`SURFACE_TYPE_BY_BODY` 키 집합 ↔ 파라미터 테이블 키 집합 양방향 일치」 를 그대로 따르면 earth · mars · moon 이 **아무 분기도 읽지 않는 행**을 가져야 한다 (§A8.9 결정 5 와 충돌). 제안: 「`SURFACE_TYPE_BY_BODY` 중 **밴드 타입 (`BAND_SURFACE_TYPES`) 키 부분집합** ↔ 파라미터 테이블 키 집합 양방향 일치」. 「누락 시 throw」 · 「변이 (행 1개 삭제) FAIL」 은 그대로 성립한다 (§A12.4 계약 4·5).
+- **C2 — D7 의 수단**: 「GLSL 미러 단위 테스트」 → 「`FRAGMENT_SHADER` 정적 블록 분석 (rim · lights 대입이 N = `0` 블록에만 존재 + 양성 대조) + 기존 `nightLightTermMirror` earth `> 0`」. 미러는 GLSL 누수를 볼 수 없다 (§A12.9).
+- **C3 — R4 의 전제**: 「현재 `45`」 → `54`. 「한도」 는 저장소에 수치가 없다 — 판정 대신 증분 기록 (§A12.6).
+- **C4 — R2 의 전제**: 휘도 임계 `8` 은 현행 두 가드에 없고 `PLAIN_BODIES` 는 판정에 쓰이지 않는다 (§A12.1 #7 · #8). R2 는 대체 body 선정 기준 (§A12.9) 으로 대체를 제안한다.
+- **C5 — 위험 R5 추가 + U1**: uranus 낮면 포화 (§A12.12). 계약 수치는 바꾸지 않는다. U1 결정이 프리뷰 전에 필요할 수 있다.
+
+### A12.18 교차검증 반영 사항 — **반영 완료** (agy 2026-10-02, Accepted 전이)
+
+- **호출**: 메인 수행 (agy, 2026-10-02). 로그 `.claude/logs/cross-validate-architecture-20261002-194606.log`. 결과는 메인이 재분석했고, 아래 처분은 그 재분석을 따른다.
+
+**합의** — 질문 5축 전부 동의: (1) 별도 테이블과 §A8.9 결정 5 의 정합 (소비자 jupiter · uranus · neptune 이 실재) (2) `IceGiant` 별도 분기 + uniform 공유가 jupiter diff `0` 을 구조로 보장 (3) D2 exit `2` 전제 (대체로 동의 — 보강은 아래 F2 · F3) (4) R5 도출 (5) D15 처분 술어.
+
+**이견 수용 (원안 수정)**
+
+- **F2 — disk 표본 하한**: agy 는 `> 0` 을 `≥ 500 px` 로 올리자고 했다. `500` 은 새 임계라 **값은 기각**하고, 취지 (작은 표본의 무판별 diff `0`) 는 기존 상수 `SURFACE_MASK_MIN_DISK_PX` 를 전 시나리오 disk 반경 하한 (위반 = exit `2`) 으로 재사용해 **수정 수용**했다 — §A12.8 전제 표.
+- **F3 — 시나리오 집합 단언**: 「캡처된 시나리오 집합 == `EXPECT_ZERO` ∪ `EXPECT_NONZERO`」 를 **수용**했다 (위반 = exit `2`, 새 임계 `0`) — §A12.8 전제 표.
+
+**Claude 재분석으로 기각한 외부 모델 제안**
+
+- **F1 — 「uranus 고리가 `0.95R` 표본을 오염 → 거짓 통과, `&ring=off` 강제」**: **기각.** ① 처방이 동작하지 않는다 — `ring` 파라미터는 `fallback` · `placeholder` 외 값을 조용히 `shader` 로 돌린다 (`apps/web/src/components/sim-canvas.tsx:586-588`). 즉 `ring=off` 는 silent no-op 이다. ② 고리는 ON · OFF (그리고 base · feature) 양 프레임에 같이 그려져 차분에서 상쇄되고, 디스크를 가리는 것은 신호를 **줄이는** 방향 (FAIL 쪽) 이라 fail-open 이 아니다. 잔여 조치: PR2 Phase 0 로그에 uranus disk 표본 중 고리 겹침 비율을 기록한다 (판정 아님 — §A12.15).
+- **F4 — 「D7 정적 분석이 취약하다」**: 변경 없음. 양성 대조 (N = `0` 블록에 `rim =` · `lights =` 존재 단언) 가 이미 설계에 있다 (§A12.9).
+
+**메인 발견 정정 (2건)**
+
+- §A12.1 #9 의 `DEFAULT_PLANET_LIGHTING` (`:1049-1056`) 이 `solar-system-scene.ts` 로 읽힐 수 있었다 — 실제 파일은 `procedural-planet-shader.ts` 다. 귀속을 명시했다.
+- D2 판정 표본이 `0.95R` 안쪽이라 가장자리 띠 (rim 대역 포함) 의 변화가 판정 밖이다 — §A12.8 에 한계로 기록했다.
+
+**고유 발견 (후속 분리)**: 없음 — F1~F4 는 위에서 처분했다.
+
+**Claude 편향 셀프 체크 (호출 후)**
+
+- agy 가 R5 를 「일치」 로 검산한 것은 이 ADR 이 준 계수를 입력으로 썼으므로 **독립 검증이 아니다**. 메인이 계수를 `procedural-planet-shader.ts:1049-1056` `DEFAULT_PLANET_LIGHTING` 에서 따로 도출해 일치를 확인했다.
+- 5축 전부 동의는 근거 검증이 아니다 (본 프로젝트에서 반복된 패턴). 최종 판별은 구현 단계의 변이 주입 (D2 양성 대조 · D5 M1~M4) 이다.
+
+- **호출 전 편향 셀프 체크 (architect 기록)**: 낙관적 일정 — PR2 가 Phase 0 → 프리뷰 → 승인 → 가드 순이라 승인 라운드 수 (#1226 은 3회) 를 예측하지 않았다 ✓ / 결합 간과 — 고리 기울기 · 포화 · 마스크 로드를 하네스 전제와 R5 로 명시했다, 단 **고리 겹침 비율은 미측정** (질문 후보) / 폐기 프레이밍 — 해당 없음 / 순수주의 — GLSL 식 사본 (~5행) 을 수용했다, 사본 수용이 과한지 질문 후보.
+- **cross-validate 질문 후보**: (1) R5 의 포화 기전이 D4 를 구조적으로 막는가 (2) 결정 2 (다) 의 사본 수용 대 (나) 의 분기 공유 (3) D2 하네스 전제 표에 빠진 비결정 축 (4) D15 처분 술어의 2행 (「승격」) 이 #1230 의 범위 판단으로 타당한가.
