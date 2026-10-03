@@ -24,6 +24,7 @@ import { parseSurfaceVisible } from '@/core/parse-surface-mode';
 import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
+import { parseIceGiantCandidate } from '@/core/parse-ice-giant-candidate';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 // #1234 C3-B — renderer 문자열 합성 + late-arrival 판정 (CI 미도달 분기라 순수 함수 + 단위 테스트).
 import {
@@ -636,6 +637,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const nightLightsVisible = parseNightLightsVisible(
           new URLSearchParams(window.location.search).get('nightlights'),
         );
+        // ⚠️ #1274 D13 (프리뷰 임시 — 승인 후 삭제) — 천왕성 · 해왕성 밴드 파라미터 후보 id.
+        const iceGiantCandidate = parseIceGiantCandidate(
+          new URLSearchParams(window.location.search).get('iceGiantCandidate'),
+        );
         // #762 — 천체 압축 곡선 지수 p (default 0.5 sqrt). `?bodyScaleP=0.55` 로 D-T2 실시간 튜닝.
         // URL 부재 시 default p 의 getBodyScale 콜백 그대로 (모듈 로드 시 1회 산출된 BODY_SCALE).
         // ADR 20260629-762 §5 결정 2.7.
@@ -698,6 +703,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #1226 — 지구 야간 도시 불빛. 기본 ON 은 parseNightLightsVisible 기본값 (true) 이 결정 — core
           // 옵션 기본값은 false 유지 (clouds 동형 레이어 분리).
           nightLights: nightLightsVisible,
+          // ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제).
+          iceGiantCandidate,
         });
 
         // #400 ADR 20260512-au-slider-semantics — ScaleControl 양방향 sync 용 camera + tier getter 노출.
