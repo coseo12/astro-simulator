@@ -1,0 +1,1259 @@
+{
+  "note": "#1274 D13 1차 후보 캡처 원자료 (판정 아님 — 정보). 측정 스크립트는 임시였고 커밋 전에 삭제했다 (volt #67). README 의 레시피로 재현한다.",
+  "product_chrome_webgpu": [
+    {
+      "body": "uranus",
+      "variant": "off",
+      "query": "?gpu=a&focus=uranus&lod=auto&surface=off",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 823,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 5970,
+      "sat1": 7302,
+      "sat3Ratio": 0.27603107083410394,
+      "sat1Ratio": 0.33761790271869796,
+      "hfEntropy": 1.119,
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "on",
+      "query": "?gpu=a&focus=uranus&lod=auto",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          4,
+          0.04
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 818,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12007,
+      "sat1": 12118,
+      "sat3Ratio": 0.555159977806547,
+      "sat1Ratio": 0.56029221379693,
+      "hfEntropy": 1.139,
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "a",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=a",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          4,
+          0.04
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 820,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12007,
+      "sat1": 12118,
+      "sat3Ratio": 0.555159977806547,
+      "sat1Ratio": 0.56029221379693,
+      "hfEntropy": 1.139,
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "b",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=b",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          3,
+          0
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 821,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12007,
+      "sat1": 12117,
+      "sat3Ratio": 0.555159977806547,
+      "sat1Ratio": 0.5602459774366562,
+      "hfEntropy": 1.12,
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "c",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 818,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12005,
+      "sat1": 12118,
+      "sat3Ratio": 0.5550675050859997,
+      "sat1Ratio": 0.56029221379693,
+      "hfEntropy": 1.311,
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "zz",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=zz",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          4,
+          0.04
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 818,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12007,
+      "sat1": 12118,
+      "sat3Ratio": 0.555159977806547,
+      "sat1Ratio": 0.56029221379693,
+      "hfEntropy": 1.139,
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": [
+        "[procedural-planet-shader] 알 수 없는 ?iceGiantCandidate=zz — 테이블 값 (후보 a) 으로 폴백 (#1274 D13 프리뷰)",
+        "[procedural-planet-shader] 알 수 없는 ?iceGiantCandidate=zz — 테이블 값 (후보 a) 으로 폴백 (#1274 D13 프리뷰)"
+      ]
+    },
+    {
+      "body": "neptune",
+      "variant": "off",
+      "query": "?gpu=a&focus=neptune&lod=auto&surface=off",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 817,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 2957,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.19792503346720214,
+      "hfEntropy": 0.823,
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "on",
+      "query": "?gpu=a&focus=neptune&lod=auto",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 818,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 9072,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6072289156626506,
+      "hfEntropy": 1.336,
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "a",
+      "query": "?gpu=a&focus=neptune&lod=auto&iceGiantCandidate=a",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 818,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 9072,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6072289156626506,
+      "hfEntropy": 1.336,
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "b",
+      "query": "?gpu=a&focus=neptune&lod=auto&iceGiantCandidate=b",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          4,
+          0
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 820,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 9076,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6074966532797859,
+      "hfEntropy": 1.126,
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "c",
+      "query": "?gpu=a&focus=neptune&lod=auto&iceGiantCandidate=c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.18,
+          8,
+          0.1
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 816,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 9049,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6056894243641232,
+      "hfEntropy": 2.456,
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "zz",
+      "query": "?gpu=a&focus=neptune&lod=auto&iceGiantCandidate=zz",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 816,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 9072,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6072289156626506,
+      "hfEntropy": 1.336,
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": [
+        "[procedural-planet-shader] 알 수 없는 ?iceGiantCandidate=zz — 테이블 값 (후보 a) 으로 폴백 (#1274 D13 프리뷰)",
+        "[procedural-planet-shader] 알 수 없는 ?iceGiantCandidate=zz — 테이블 값 (후보 a) 으로 폴백 (#1274 D13 프리뷰)"
+      ]
+    }
+  ],
+  "frame756_chrome_webgpu": [
+    {
+      "body": "uranus",
+      "variant": "off",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&surface=off",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.6929000034,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 7567,
+      "sat1": 9309,
+      "sat3Ratio": 0.2760671287851149,
+      "sat1Ratio": 0.33962057643195914,
+      "hfEntropy": 1.145,
+      "diskRpx": 98.32038613121188,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "a",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=a",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7813000036,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          4,
+          0.04
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27411,
+      "sat3": 15316,
+      "sat1": 15455,
+      "sat3Ratio": 0.5587537849768341,
+      "sat1Ratio": 0.5638247418919412,
+      "hfEntropy": 1.159,
+      "diskRpx": 98.32043080645599,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27411,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "b",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=b",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.770000001,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          3,
+          0
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 15308,
+      "sat1": 15447,
+      "sat3Ratio": 0.5584823057278365,
+      "sat1Ratio": 0.5635534476468442,
+      "hfEntropy": 1.136,
+      "diskRpx": 98.32044249007299,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "c",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.807700004,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 15299,
+      "sat1": 15442,
+      "sat3Ratio": 0.5581132350795273,
+      "sat1Ratio": 0.5633299284984679,
+      "hfEntropy": 1.274,
+      "diskRpx": 98.32042255955503,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "off",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&surface=off",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.698400006,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 0,
+      "sat1": 5296,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.1932000583685977,
+      "hfEntropy": 0.744,
+      "diskRpx": 98.32039644319036,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "a",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&iceGiantCandidate=a",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7582000056,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27411,
+      "sat3": 0,
+      "sat1": 16758,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6113604027580168,
+      "hfEntropy": 0.916,
+      "diskRpx": 98.32041324076329,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27411,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "b",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&iceGiantCandidate=b",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7666000053,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          4,
+          0
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 0,
+      "sat1": 16756,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.611265139355027,
+      "hfEntropy": 0.836,
+      "diskRpx": 98.32043123279868,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "c",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&iceGiantCandidate=c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7727000043,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.18,
+          8,
+          0.1
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27408,
+      "sat3": 0,
+      "sat1": 16736,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6106246351430239,
+      "hfEntropy": 1.828,
+      "diskRpx": 98.3203023161858,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27408,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    }
+  ],
+  "frame756_swiftshader_webgl": [
+    {
+      "body": "uranus",
+      "variant": "off",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&surface=off",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451547.662999999,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 7571,
+      "sat1": 9308,
+      "sat3Ratio": 0.2761929082153801,
+      "sat1Ratio": 0.339559317087407,
+      "hfEntropy": 1.142,
+      "diskRpx": 98.32044213688232,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 1783
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "a",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=a",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.7119,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          4,
+          0.04
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27408,
+      "sat3": 15316,
+      "sat1": 15453,
+      "sat3Ratio": 0.5588149445417396,
+      "sat1Ratio": 0.5638134851138353,
+      "hfEntropy": 1.161,
+      "diskRpx": 98.32039061274338,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27408,
+        "d": 1782
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "b",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=b",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.7219,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          3,
+          0
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27411,
+      "sat3": 15306,
+      "sat1": 15445,
+      "sat3Ratio": 0.5583889679325819,
+      "sat1Ratio": 0.5634599248476889,
+      "hfEntropy": 1.136,
+      "diskRpx": 98.32045519009262,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27411,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "c",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=c",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.714100002,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 15301,
+      "sat1": 15440,
+      "sat3Ratio": 0.5581861958266453,
+      "sat1Ratio": 0.5632569677513498,
+      "hfEntropy": 1.27,
+      "diskRpx": 98.32043902493604,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 1782
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "off",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&surface=off",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451547.9252999993,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 0,
+      "sat1": 5298,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.19327301911571573,
+      "hfEntropy": 0.745,
+      "diskRpx": 98.32045468743718,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "a",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&iceGiantCandidate=a",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.7288999995,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          6,
+          0.06
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 0,
+      "sat1": 16757,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.611301619728586,
+      "hfEntropy": 0.913,
+      "diskRpx": 98.32042327570537,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "b",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&iceGiantCandidate=b",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.7382000014,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          4,
+          0
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 0,
+      "sat1": 16752,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6111638088288945,
+      "hfEntropy": 0.835,
+      "diskRpx": 98.32033703680895,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "c",
+      "query": "?gpu=a&focus=neptune&lod=auto&rotate=off&iceGiantCandidate=c",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.703499999,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.18,
+          8,
+          0.1
+        ],
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 72.56513680716844,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 0,
+      "sat1": 16740,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6106814533780826,
+      "hfEntropy": 1.837,
+      "diskRpx": 98.32036684180025,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    }
+  ]
+}
