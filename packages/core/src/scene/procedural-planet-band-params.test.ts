@@ -8,6 +8,7 @@
  * 변이 주입 (PR 기록): ① 밴드 테이블 행 1개 삭제 ② 비-밴드 body 행 1개 추가 — 둘 다 아래 「불변식」
  * 테스트가 FAIL 해야 한다.
  */
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
@@ -46,11 +47,33 @@ describe('#1274 D1 — 밴드 테이블 ↔ 밴드 타입 body 불변식 (양방
     expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual(['jupiter']);
   });
 
-  it('jupiter 행 = 기존 밴드 상수 (값 사본이 아니라 상수 참조 — 상수 박제값 가드는 #756 테스트)', () => {
+  it('jupiter 행 값 == 기존 밴드 상수 (값 동일 — 참조 여부는 아래 소스 정적 검사)', () => {
     expect(SURFACE_BAND_PARAMS_BY_BODY.jupiter).toEqual({
       amplitude: GAS_BAND_AMPLITUDE,
       count: GAS_BAND_COUNT,
       turbulence: GAS_TURBULENCE,
+    });
+  });
+
+  it('jupiter 행은 GAS_BAND_* 식별자를 참조한다 — 리터럴 사본 금지 (소스 정적 검사, volt #69)', () => {
+    // 숫자 원시값은 런타임에서 「참조」와 「사본」을 구분할 수 없다 (PR #1276 리뷰 R1 — 리터럴 사본
+    // 변이가 위 값 동일 테스트를 통과했다). 그래서 선언 소스에서 jupiter 행의 우변을 직접 읽는다.
+    const src = readFileSync(new URL('./procedural-planet-shader.ts', import.meta.url), 'utf8');
+    const table = src.match(/export const SURFACE_BAND_PARAMS_BY_BODY[^=]*=\s*\{([\s\S]*?)\n\};/);
+    const tableBody = table?.[1] ?? '';
+    expect(tableBody).not.toBe('');
+    const rowBody = tableBody.match(/\bjupiter:\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(rowBody).not.toBe('');
+    const fields = Object.fromEntries(
+      rowBody
+        .split(',')
+        .map((part) => part.split(':').map((t) => t.trim()))
+        .filter((kv) => kv.length === 2 && kv[0] !== ''),
+    );
+    expect(fields).toEqual({
+      amplitude: 'GAS_BAND_AMPLITUDE',
+      count: 'GAS_BAND_COUNT',
+      turbulence: 'GAS_TURBULENCE',
     });
   });
 
