@@ -1,5 +1,5 @@
 /**
- * #756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개, 라이브러리/에셋 0).
+ * #756 — 절차적 행성 표면 셰이더 (인프라 + `SURFACE_TYPE_BY_BODY` 등록 body, 라이브러리/에셋 0).
  *
  * **목적**: 단색 `StandardMaterial.diffuseColor` 로 렌더되는 행성에 절차적 표면 디테일을
  * 부여해 몰입을 강화한다 (방향성 기획 트랙 A — `principles.md §1 Visual Fidelity`). 외부
@@ -154,6 +154,11 @@ export enum SurfaceType {
   GasBands = 2,
   /** 크레이터형 — 점 분포 크레이터 + 명암 (달). */
   Cratered = 3,
+  /**
+   * 얼음 거성형 — 저대비 위도 밴드 (천왕성 · 해왕성). Amendment 12 (#1274) §A12.5 — GasBands 와
+   * **별도 GLSL 분기** (형태 격리 — jupiter 픽셀 불변의 구조적 보장), 밴드 uniform 3종은 공유.
+   */
+  IceGiant = 4,
 }
 
 /**
@@ -164,13 +169,18 @@ export enum SurfaceType {
  * 누수시키지 않는다. 테이블 미등록 body 는 자동으로 단색 (StandardMaterial) — 23개 비-범위
  * body 무회귀가 **테이블 부재로 자동 보장** (명시적 opt-in).
  *
- * 1차는 대표 4개. 이후 확장 = 데이터 추가가 아닌 **상수 1줄 추가** (R-Phase).
+ * 등록 집합 = 아래 테이블의 키 (#756 의 earth · mars · jupiter · moon + #1274 의 uranus · neptune).
+ * 확장 = 데이터 추가가 아닌 **상수 1줄 추가** (R-Phase). 밴드 타입 (`BAND_SURFACE_TYPES`) 으로
+ * 등록하면 `SURFACE_BAND_PARAMS_BY_BODY` 행도 함께 있어야 한다 (불변식 — 없으면 throw).
  */
 export const SURFACE_TYPE_BY_BODY: Readonly<Record<string, SurfaceType>> = {
   earth: SurfaceType.Rocky,
   mars: SurfaceType.Desert,
   jupiter: SurfaceType.GasBands,
   moon: SurfaceType.Cratered,
+  // Amendment 12 (#1274) — 얼음 거성 2 body. 밴드 값은 `SURFACE_BAND_PARAMS_BY_BODY` 가 body 별로 정한다.
+  uranus: SurfaceType.IceGiant,
+  neptune: SurfaceType.IceGiant,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +242,37 @@ export interface SurfaceBandParams {
 }
 
 /** 밴드 파라미터를 소비하는 표면 타입 집합 — GLSL 에서 밴드 uniform 을 읽는 분기의 타입과 같아야 한다. */
-export const BAND_SURFACE_TYPES: ReadonlySet<SurfaceType> = new Set([SurfaceType.GasBands]);
+export const BAND_SURFACE_TYPES: ReadonlySet<SurfaceType> = new Set([
+  SurfaceType.GasBands,
+  SurfaceType.IceGiant,
+]);
+
+/** `IceGiant` 로 등록된 body id (D13 후보 표의 열). */
+type IceGiantBodyId = 'uranus' | 'neptune';
+
+/**
+ * ⚠️ **#1274 D13 프리뷰 임시 — 사용자 육안 승인 후 같은 PR 에서 삭제한다** (§A12.10).
+ * 승인 후보 값을 `SURFACE_BAND_PARAMS_BY_BODY` 행에 접어 넣고, 이 표 · `iceGiantCandidate` 옵션 ·
+ * web 파서 · URL 플래그를 지운다 (`git grep -c iceGiantCandidate` `0`).
+ *
+ * 밴드 uniform 3축만 바꾼다 (uniform 증분 0). 값은 jupiter `(0.28, 9, 0.12)` 대비 축소에서 출발한
+ * 미학 파라미터이며 임계가 아니다 (ADR §A12.10 후보 표 그대로).
+ *   a — 저대비 기준 / b — 매끈한 넓은 띠 (난류 0) / c — 중대비
+ */
+export const ICE_GIANT_CANDIDATES = {
+  a: {
+    uranus: { amplitude: 0.06, count: 4, turbulence: 0.04 },
+    neptune: { amplitude: 0.1, count: 6, turbulence: 0.06 },
+  },
+  b: {
+    uranus: { amplitude: 0.06, count: 3, turbulence: 0 },
+    neptune: { amplitude: 0.1, count: 4, turbulence: 0 },
+  },
+  c: {
+    uranus: { amplitude: 0.12, count: 6, turbulence: 0.06 },
+    neptune: { amplitude: 0.18, count: 8, turbulence: 0.1 },
+  },
+} as const satisfies Readonly<Record<string, Readonly<Record<IceGiantBodyId, SurfaceBandParams>>>>;
 
 /**
  * body id → 밴드 파라미터. **밴드 타입 body 만** 행을 가진다 (위 불변식).
@@ -245,6 +285,9 @@ export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandPar
     count: GAS_BAND_COUNT,
     turbulence: GAS_TURBULENCE,
   },
+  // ⚠️ #1274 D13 프리뷰 동안은 후보 `a` 를 참조한다 (플래그 없이 열어도 a). 승인 후 승인값으로 교체.
+  uranus: ICE_GIANT_CANDIDATES.a.uranus,
+  neptune: ICE_GIANT_CANDIDATES.a.neptune,
 };
 
 /** 비-밴드 타입이 바인딩하는 값 — 밴드 uniform 을 읽는 GLSL 이 밴드 분기뿐이라 픽셀 영향이 없다 (§A12.4 계약 5). */
@@ -279,6 +322,38 @@ export function resolveSurfaceBandParams(
     );
   }
   return NO_BAND_PARAMS;
+}
+
+/**
+ * ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제) — `IceGiant` body 의 밴드 파라미터를 후보 표에서 고른다.
+ *
+ * - 후보 미지정 · 비-`IceGiant` → `tableParams` 그대로 (프리뷰 플래그가 다른 body 를 건드리지 않는다).
+ * - 미지 후보 id → `console.warn` + `tableParams` (`parse-*-mode.ts` 의 「미지 값 → 기본 + warn」 동형).
+ * - 후보 표에 그 body 열이 없으면 throw (조용히 테이블 값으로 그리지 않는다).
+ */
+function resolveIceGiantPreviewParams(
+  bodyId: string,
+  surfaceType: SurfaceType,
+  tableParams: SurfaceBandParams,
+  candidate: string | undefined,
+): SurfaceBandParams {
+  if (candidate === undefined || surfaceType !== SurfaceType.IceGiant) return tableParams;
+  if (!Object.prototype.hasOwnProperty.call(ICE_GIANT_CANDIDATES, candidate)) {
+    console.warn(
+      `[procedural-planet-shader] 알 수 없는 ?iceGiantCandidate=${candidate} — 테이블 값 (후보 a) 으로 폴백 (#1274 D13 프리뷰)`,
+    );
+    return tableParams;
+  }
+  const column = ICE_GIANT_CANDIDATES[candidate as keyof typeof ICE_GIANT_CANDIDATES] as Readonly<
+    Record<string, SurfaceBandParams>
+  >;
+  const row = Object.prototype.hasOwnProperty.call(column, bodyId) ? column[bodyId] : undefined;
+  if (row === undefined) {
+    throw new Error(
+      `[procedural-planet-shader] ICE_GIANT_CANDIDATES.${candidate} 에 '${bodyId}' 열이 없다 (#1274 D13 프리뷰)`,
+    );
+  }
+  return row;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -721,6 +796,7 @@ uniform int uSurfaceType;
 uniform float rockyContrast;
 uniform float desertDetail;
 uniform float desertRustTint;
+// 밴드 uniform 3종 — gas-bands (2) · ice-giant (4) 분기가 공유한다 (이름은 #756 유래, Amendment 12 §A12.5).
 uniform float gasBandAmplitude;
 uniform float gasBandCount;
 uniform float gasTurbulence;
@@ -1002,6 +1078,17 @@ void main(void) {
     float bands = sin((latitude + turb) * gasBandCount * 3.14159265);
     float mod_ = bands * gasBandAmplitude;
     col = baseColor * (1.0 + mod_);
+  } else if (uSurfaceType == 4) {
+    // ── ice-giant (천왕성·해왕성) — 저대비 위도 밴드 (Amendment 12 #1274 §A12.5) ──────────
+    // 출발 형태는 위 uSurfaceType == 2 (gas-bands) 분기 식의 **사본**이다 (출처 = 그 분기). 분기를
+    // 공유하지 않는 이유: ice giant 형태를 바꿔도 분기 2 (jupiter) 가 구조적으로 무접촉이다 (D6 (i)).
+    // 밴드 uniform 3종은 공유하고 값은 body 별 테이블 SURFACE_BAND_PARAMS_BY_BODY 가 정한다.
+    // 한 draw 는 한 분기만 진입하므로 fbm 호출은 draw 당 1회 그대로다 (§A12.6).
+    float latitude = p.y;
+    float turb = (fbm(p * 4.0) - 0.5) * 2.0 * gasTurbulence;
+    float bands = sin((latitude + turb) * gasBandCount * 3.14159265);
+    float mod_ = bands * gasBandAmplitude;
+    col = baseColor * (1.0 + mod_);
   } else if (uSurfaceType == 3) {
     // ── cratered (달) — 크레이터 점 분포 (cell noise) + 명암 ───────────────
     vec3 scaled = p * craterDensity;
@@ -1117,6 +1204,12 @@ export interface CreateProceduralPlanetMaterialOptions {
    * (core 보수 기본 — 합성이 정확한 no-op). 기본 ON 은 web 레이어 결정 (`?nightlights=off` 옵트아웃).
    */
   nightLights?: boolean | undefined;
+
+  /**
+   * ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제) — `IceGiant` 밴드 파라미터 후보 id (`ICE_GIANT_CANDIDATES`).
+   * 미지정 = 테이블 값. 비-`IceGiant` body 에는 효과 없음.
+   */
+  iceGiantCandidate?: string | undefined;
 }
 
 /** Amendment 1 — lighting 미전달 시 기본값 (단색 행성 PointLight/HemisphericLight 값과 동일 — 일관). */
@@ -1341,7 +1434,13 @@ export function createProceduralPlanetMaterial(
   // Amendment 12 (#1274) §A12.4 — 밴드 uniform 3종은 body 별 테이블에서 해석한다 (누락 · 초과 시 throw).
   // ⚠️ 비-밴드 body (earth · mars · moon) 는 종전 목성 상수 대신 `0` 을 받는다 — 이 3종을 읽는 GLSL 이
   // 밴드 분기뿐이라 픽셀 영향이 없어야 하고, 그 명제를 `verify:1274-invariance` 가 base↔feature 로 잰다.
-  const bandParams = resolveSurfaceBandParams(body.id, surfaceType);
+  // #1274 D13 프리뷰 (임시) — 테이블 해석 (불변식 throw 포함) 뒤에 후보로 덮어쓴다.
+  const bandParams = resolveIceGiantPreviewParams(
+    body.id,
+    surfaceType,
+    resolveSurfaceBandParams(body.id, surfaceType),
+    options.iceGiantCandidate,
+  );
   material.setFloat('gasBandAmplitude', bandParams.amplitude);
   material.setFloat('gasBandCount', bandParams.count);
   material.setFloat('gasTurbulence', bandParams.turbulence);
@@ -1712,7 +1811,9 @@ export function surfaceColorMirror(
     b = bz * (1 + mod);
     r = Math.min(Math.max(r + DESERT_RUST_TINT, 0), 1);
     b = Math.min(Math.max(b - DESERT_RUST_TINT * 0.5, 0), 1);
-  } else if (surfaceType === SurfaceType.GasBands) {
+  } else if (surfaceType === SurfaceType.GasBands || surfaceType === SurfaceType.IceGiant) {
+    // GLSL 은 분기 2 · 4 가 별도 블록이지만 식은 현재 같다 (분기 4 = 분기 2 의 사본, §A12.5).
+    // 분기 4 의 형태가 바뀌면 이 미러도 분리한다.
     const band = requireMirrorBandParams(surfaceType, bands);
     const latitude = py;
     const turb = (fbmMirror(px * 4, py * 4, pz * 4) - 0.5) * 2 * band.turbulence;

@@ -9,7 +9,7 @@
  * 테스트가 FAIL 해야 한다.
  */
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import {
@@ -17,6 +17,7 @@ import {
   GAS_BAND_AMPLITUDE,
   GAS_BAND_COUNT,
   GAS_TURBULENCE,
+  ICE_GIANT_CANDIDATES,
   SURFACE_BAND_PARAMS_BY_BODY,
   SURFACE_TYPE_BY_BODY,
   SurfaceType,
@@ -42,9 +43,13 @@ describe('#1274 D1 — 밴드 테이블 ↔ 밴드 타입 body 불변식 (양방
     expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual(sorted(derived));
   });
 
-  it('PR1 의 정확한 집합 — 밴드 타입 {GasBands} · 밴드 행 {jupiter}', () => {
-    expect([...BAND_SURFACE_TYPES]).toEqual([SurfaceType.GasBands]);
-    expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual(['jupiter']);
+  it('정확한 집합 — 밴드 타입 {GasBands, IceGiant} · 밴드 행 {jupiter, neptune, uranus} (#1274 PR2)', () => {
+    expect([...BAND_SURFACE_TYPES].sort()).toEqual([SurfaceType.GasBands, SurfaceType.IceGiant]);
+    expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual([
+      'jupiter',
+      'neptune',
+      'uranus',
+    ]);
   });
 
   it('jupiter 행 값 == 기존 밴드 상수 (값 동일 — 참조 여부는 아래 소스 정적 검사)', () => {
@@ -219,5 +224,57 @@ describe('#1274 — 밴드 uniform 바인딩이 해석 함수를 따른다 (Null
       scene.dispose();
       engine.dispose();
     }
+  });
+});
+
+// ⚠️ #1274 D13 프리뷰 임시 — `ICE_GIANT_CANDIDATES` · `iceGiantCandidate` 와 함께 승인 후 삭제한다.
+describe('#1274 D13 프리뷰 — iceGiantCandidate 옵션 (임시)', () => {
+  const bandOf = (id: string, candidate: string | undefined): SurfaceBandParams => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    scene.activeCamera = new ArcRotateCamera('cam', 0, Math.PI / 2, 50, Vector3.Zero(), scene);
+    try {
+      const body = { id, colorHint: { hex: '#808080' } } as unknown as LoadedCelestialBody;
+      const m = createProceduralPlanetMaterial(scene, body, `${id}-cand-mat`, {
+        iceGiantCandidate: candidate,
+      });
+      const f = (m as unknown as { _floats: Record<string, number> })._floats;
+      return {
+        amplitude: f.gasBandAmplitude!,
+        count: f.gasBandCount!,
+        turbulence: f.gasTurbulence!,
+      };
+    } finally {
+      scene.dispose();
+      engine.dispose();
+    }
+  };
+
+  it('후보 a · b · c 가 uranus · neptune 바인딩에 실제로 쓰인다 (새 파라미터가 읽히는지)', () => {
+    for (const id of ['a', 'b', 'c'] as const) {
+      expect(bandOf('uranus', id)).toEqual({ ...ICE_GIANT_CANDIDATES[id].uranus });
+      expect(bandOf('neptune', id)).toEqual({ ...ICE_GIANT_CANDIDATES[id].neptune });
+    }
+    // 후보끼리 실제로 다르다 (표가 같은 값을 반복하면 비교가 무의미).
+    expect(bandOf('uranus', 'b')).not.toEqual(bandOf('uranus', 'c'));
+  });
+
+  it('미지정 = 테이블 값 (후보 a)', () => {
+    expect(bandOf('uranus', undefined)).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.uranus });
+    expect(SURFACE_BAND_PARAMS_BY_BODY.uranus).toBe(ICE_GIANT_CANDIDATES.a.uranus);
+  });
+
+  it('미지 후보 → console.warn + 테이블 값', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(bandOf('neptune', 'zz')).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.neptune });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('iceGiantCandidate=zz'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('비-IceGiant body (jupiter) 는 후보 플래그의 영향을 받지 않는다', () => {
+    expect(bandOf('jupiter', 'c')).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.jupiter });
   });
 });

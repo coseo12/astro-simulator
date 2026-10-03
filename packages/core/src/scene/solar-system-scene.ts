@@ -516,7 +516,7 @@ export interface SolarSystemSceneOptions {
    * true 이며 `?surface=off` 가 옵트아웃 (ADR §결정 4). false 면 `createBodyMesh`/`createBodyMeshMid`
    * 가 기존 StandardMaterial 경로를 그대로 탄다 (절차 셰이더 미적용 — 현행 동작 100% 복귀).
    *
-   * 동작 (true 일 때): `SURFACE_TYPE_BY_BODY` 테이블 등록 body (earth/mars/jupiter/moon) 의
+   * 동작 (true 일 때): `SURFACE_TYPE_BY_BODY` 테이블 등록 body (등록 집합 = 그 테이블의 키) 의
    * high/mid variant 머티리얼을 절차 ShaderMaterial 로 교체 (base color = colorHint.hex 위 변조).
    * low (billboard) + tier-c (`forceOverride:'low'`) 는 자동 단색 (별도 코드 0 — ADR §결정 3).
    * 미등록 body 는 테이블 부재로 자동 단색 (무회귀). ADR `docs/decisions/20260628-756-procedural-planet-surface.md`.
@@ -577,6 +577,12 @@ export interface SolarSystemSceneOptions {
   nightLights?: boolean;
 
   /**
+   * ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제) — 천왕성 · 해왕성 (`IceGiant`) 밴드 파라미터 후보 id
+   * (`ICE_GIANT_CANDIDATES`). 미지정 = 테이블 값. `surfaceDetail=false` 면 무효 (절차 머티리얼 없음).
+   */
+  iceGiantCandidate?: string | undefined;
+
+  /**
    * #1234 C2-H3 — 장면 구축 **단계 계측 훅** (계약 SSoT: `../engine/boot-phase.ts`).
    *
    * 구간이 **끝날 때마다** 그 구간 이름으로 호출된다. 소요 시간은 소비자가 직전 호출과의
@@ -619,6 +625,7 @@ export function createSolarSystemScene(
     selfRotation = false,
     clouds = false,
     nightLights = false,
+    iceGiantCandidate,
     onBootPhase,
   } = options;
   // #1234 C2-H3 — 구간 종료 통지 (미주입 시 호출 0). 이름은 「방금 끝난 구간」이다.
@@ -702,6 +709,8 @@ export function createSolarSystemScene(
     // #1226 Amendment 11 — 야간 도시 불빛 (유효 조건 `nightLights && surfaceDetail` — 이 묶음은
     // surfaceDetail=true 일 때만 소비된다). clouds 와 독립.
     nightLights,
+    // #1274 D13 프리뷰 임시 (승인 후 삭제) — IceGiant 밴드 후보 id.
+    iceGiantCandidate,
   };
   // 광원 (HemisphericLight + PointLight) + 셰이더 광원 상수 묶음.
   phase('scene:lights');

@@ -13,7 +13,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import {
+  BAND_SURFACE_TYPES,
   SurfaceType,
   SURFACE_TYPE_BY_BODY,
   SURFACE_BAND_PARAMS_BY_BODY,
@@ -84,22 +86,25 @@ describe('#756 procedural-planet — surfaceType enum ↔ uniform int 매핑 SSo
   // #719 교훈 + cross-validate 이견 수용 2 — JS enum 정수가 곧 GLSL `uniform int surfaceType` 값.
   // drift 시 셰이더 분기가 엉뚱한 표면을 그린다 (조용한 회귀). enum 값 고정 + GLSL 분기 정수 정합.
 
-  it('enum 정수 값 고정 (rocky=0 / desert=1 / gas-bands=2 / cratered=3)', () => {
+  it('enum 정수 값 고정 (rocky=0 / desert=1 / gas-bands=2 / cratered=3 / ice-giant=4)', () => {
     expect(SurfaceType.Rocky).toBe(0);
     expect(SurfaceType.Desert).toBe(1);
     expect(SurfaceType.GasBands).toBe(2);
     expect(SurfaceType.Cratered).toBe(3);
+    // Amendment 12 (#1274) §A12.5 — 별도 enum 값 + 별도 GLSL 분기.
+    expect(SurfaceType.IceGiant).toBe(4);
   });
 
-  it('GLSL fragment 분기 정수가 enum 값과 정합 (uSurfaceType == 0/1/2/3 모두 존재)', () => {
+  it('GLSL fragment 분기 정수가 enum 값과 정합 (uSurfaceType == 0/1/2/3/4 모두 존재)', () => {
     // enum 값마다 대응하는 GLSL if 분기가 있어야 한다 (한쪽만 추가/삭제 시 drift).
     expect(PLANET_FRAGMENT_SHADER).toMatch(/uSurfaceType\s*==\s*0/);
     expect(PLANET_FRAGMENT_SHADER).toMatch(/uSurfaceType\s*==\s*1/);
     expect(PLANET_FRAGMENT_SHADER).toMatch(/uSurfaceType\s*==\s*2/);
     expect(PLANET_FRAGMENT_SHADER).toMatch(/uSurfaceType\s*==\s*3/);
+    expect(PLANET_FRAGMENT_SHADER).toMatch(/uSurfaceType\s*==\s*4/);
   });
 
-  it('enum 멤버 집합 = GLSL 분기 정수 집합 (4종 완비, 추가 시 양쪽 동기화 강제)', () => {
+  it('enum 멤버 집합 = GLSL 분기 정수 집합 (추가 시 양쪽 동기화 강제)', () => {
     // enum 멤버 (숫자 키만).
     const enumValues = Object.values(SurfaceType).filter((v): v is number => typeof v === 'number');
     // GLSL `uSurfaceType ==` 분기가 참조하는 **정수 집합**.
@@ -113,21 +118,33 @@ describe('#756 procedural-planet — surfaceType enum ↔ uniform int 매핑 SSo
         Number(m.replace(/\D/g, '')),
       ),
     );
-    expect(enumValues.length).toBe(4);
+    // #1274 — 종전 `enumValues.length).toBe(4)` (계수 단언) 를 제거했다. 판정은 아래 **집합 동일**이
+    // 하고 (§A12.9 — 계약 변경), 남는 것은 양쪽이 비어 「빈 집합 == 빈 집합」 으로 통과하는 경로의 차단뿐이다.
+    expect(enumValues.length).toBeGreaterThan(0);
     expect([...glslValues].sort((a, b) => a - b)).toEqual(enumValues.slice().sort((a, b) => a - b));
   });
 });
 
 describe('#756 procedural-planet — SURFACE_TYPE_BY_BODY 테이블 (ADR §결정 2)', () => {
-  it('대표 4개만 등록 (earth=rocky / mars=desert / jupiter=gas-bands / moon=cratered)', () => {
-    expect(SURFACE_TYPE_BY_BODY.earth).toBe(SurfaceType.Rocky);
-    expect(SURFACE_TYPE_BY_BODY.mars).toBe(SurfaceType.Desert);
-    expect(SURFACE_TYPE_BY_BODY.jupiter).toBe(SurfaceType.GasBands);
-    expect(SURFACE_TYPE_BY_BODY.moon).toBe(SurfaceType.Cratered);
+  // #1274 D3 (§A12.9) — 종전 「대표 4개만 등록」 (개별 toBe) + 「정확히 4개」 (toHaveLength(4)) 를
+  // **정확한 집합 단언** 하나로 교체했다 (계약 변경 — uranus · neptune 등록). 계수만 세면 키 교체를
+  // 못 잡고, 개별 toBe 만으로는 추가 등록을 못 잡는다 — toEqual 은 둘 다 잡는다.
+  it('등록 집합 정확 단언 (#756 4 body + #1274 IceGiant 2 body)', () => {
+    expect(SURFACE_TYPE_BY_BODY).toEqual({
+      earth: SurfaceType.Rocky,
+      mars: SurfaceType.Desert,
+      jupiter: SurfaceType.GasBands,
+      moon: SurfaceType.Cratered,
+      uranus: SurfaceType.IceGiant,
+      neptune: SurfaceType.IceGiant,
+    });
   });
 
-  it('1차 범위는 정확히 4개 (이후 확장 = 데이터 추가 아닌 상수 추가)', () => {
-    expect(Object.keys(SURFACE_TYPE_BY_BODY)).toHaveLength(4);
+  it('등록 키 ⊂ solar-system.json body id (#1274 §A12.9 — 키 오타는 그 body 를 조용히 미등록으로 만든다)', () => {
+    const ids = new Set(getSolarSystem().bodies.map((b) => b.id));
+    expect(ids.size).toBeGreaterThan(0);
+    const unknown = Object.keys(SURFACE_TYPE_BY_BODY).filter((k) => !ids.has(k));
+    expect(unknown).toEqual([]);
   });
 
   it('비-범위 body 는 미등록 → undefined (자동 단색 무회귀)', () => {
@@ -208,6 +225,9 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
     ['mars/desert', SurfaceType.Desert, [0.7, 0.4, 0.28]],
     ['jupiter/gas-bands', SurfaceType.GasBands, [0.78, 0.68, 0.55]],
     ['moon/cratered', SurfaceType.Cratered, [0.55, 0.55, 0.52]],
+    // #1274 — IceGiant (colorHint #B5E3EC / #3F6DA8 근사).
+    ['uranus/ice-giant', SurfaceType.IceGiant, [0.71, 0.89, 0.925]],
+    ['neptune/ice-giant', SurfaceType.IceGiant, [0.247, 0.427, 0.659]],
   ];
 
   for (const [label, type, base] of BASES) {
@@ -812,9 +832,11 @@ describe('Amendment 4 (#1119) — GLSL 마스크 배선 계약 (§A4.3 결정 3�
     );
   });
 
-  it('fbm 총 호출 수 불변 — 소스 전체에서 5회 (rocky 1 + desert 1 + gas 1 + cratered 1 + 정의부 1)', () => {
+  it('fbm 총 호출 수 — 소스 전체에서 6회 (rocky 1 + desert 1 + gas 1 + ice-giant 1 + cratered 1 + 정의부 1)', () => {
     // §결정 5 "noise 샘플 ±0" 불변식. 마스크 도입이 fbm 을 새로 부르면 이 수가 늘어난다.
-    expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(5);
+    // #1274 §A12.6 — ice-giant 분기 (4) 가 gas-bands 식 사본으로 1회를 더한다 (5 → 6). 한 draw 는
+    // 한 분기만 진입하므로 draw 당 호출 수는 불변이다 (U9 가 인자 문자열까지 박제).
+    expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(6);
   });
 
   it('continents 는 rocky 전용 분기 안에서만 계산 (mars/jupiter/moon fragment 비용 불변)', () => {
@@ -874,10 +896,21 @@ describe('Amendment 4 (#1119) — JS 미러 마스크 경로 (§A4.4 핵심 예�
     expect(violations).toBe(0);
   });
 
-  it('비-rocky 타입은 mask 인자를 무시한다 (분기 격리 — mars/jupiter/moon 픽셀 불변)', () => {
-    for (const type of [SurfaceType.Desert, SurfaceType.GasBands, SurfaceType.Cratered]) {
-      // #1274 — 밴드 타입은 파라미터 필수. 대표 body (gas-bands = jupiter) 의 행을 쓴다.
-      const bands = type === SurfaceType.GasBands ? SURFACE_BAND_PARAMS_BY_BODY.jupiter : undefined;
+  it('비-rocky 타입은 mask 인자를 무시한다 (분기 격리 — 비-rocky body 픽셀 불변)', () => {
+    // #1274 §A12.9 — 타입 목록을 하드코딩하지 않고 enum 에서 Rocky 를 뺀 집합으로 (drift 0).
+    const nonRocky = Object.values(SurfaceType).filter(
+      (v): v is SurfaceType => typeof v === 'number' && v !== SurfaceType.Rocky,
+    );
+    expect(nonRocky.length).toBeGreaterThan(0);
+    for (const type of nonRocky) {
+      // #1274 — 밴드 타입은 파라미터 필수. 그 타입으로 등록된 첫 body 의 행을 쓴다.
+      const bodyOfType = Object.keys(SURFACE_TYPE_BY_BODY).find(
+        (id) => SURFACE_TYPE_BY_BODY[id] === type,
+      );
+      const bands =
+        BAND_SURFACE_TYPES.has(type) && bodyOfType !== undefined
+          ? SURFACE_BAND_PARAMS_BY_BODY[bodyOfType]
+          : undefined;
       for (const p of spherePoints(32)) {
         expect(surfaceColorMirror(base, type, p, { enabled: 1, sample: 1 }, bands)).toEqual(
           surfaceColorMirror(base, type, p, undefined, bands),
@@ -1043,14 +1076,17 @@ describe('Amendment 7 (#1197) — GLSL 배선 계약 (U7/U8/U9 구조 변이 차
     expect(tail).not.toContain('col =');
   });
 
-  it('U9 — 신규 noise/텍스처 샘플 0: fbm 인자 문자열까지 각 1회 + texture2D 1회 (D11)', () => {
+  it('U9 — 신규 noise/텍스처 샘플 0: fbm 인자 문자열까지 박제 + texture2D 1회 (D11)', () => {
     // 계수가 아니라 **호출 인자 문자열까지** 박제한다 (계수만 세면 인자 교체를 못 잡는다).
-    for (const call of ['fbm(p * 2.4)', 'fbm(p * 3.6)', 'fbm(p * 4.0)', 'fbm(p * 5.0)']) {
+    for (const call of ['fbm(p * 2.4)', 'fbm(p * 3.6)', 'fbm(p * 5.0)']) {
       const hits = PLANET_FRAGMENT_SHADER.split(call).length - 1;
       expect(hits).toBe(1);
     }
-    // 정의부 1 + 호출 4 = 5 (Amendment 4 불변식 유지).
-    expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(5);
+    // #1274 §A12.6 — `fbm(p * 4.0)` 은 gas-bands (2) · ice-giant (4) 두 분기에 1회씩 = 2. 한 draw 는
+    // 한 분기만 진입하므로 draw 당 fbm 호출은 그대로 1회다 (분기 4 = 분기 2 식의 사본, §A12.5).
+    expect(PLANET_FRAGMENT_SHADER.split('fbm(p * 4.0)').length - 1).toBe(2);
+    // 정의부 1 + 호출 5 = 6 (Amendment 4 의 5 + ice-giant 분기 1).
+    expect((PLANET_FRAGMENT_SHADER.match(/fbm\(/g) ?? []).length).toBe(6);
     expect((PLANET_FRAGMENT_SHADER.match(/texture2D\(/g) ?? []).length).toBe(1);
     expect(PLANET_FRAGMENT_SHADER).toContain('texture2D(uSurfaceMask, vec2(maskU, maskV))');
   });
