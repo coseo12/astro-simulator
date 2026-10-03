@@ -60,9 +60,12 @@ describe('#1274 D1 — 밴드 테이블 ↔ 밴드 타입 body 불변식 (양방
     // 변이가 위 값 동일 테스트를 통과했다). 그래서 선언 소스에서 jupiter 행의 우변을 직접 읽는다.
     const src = readFileSync(new URL('./procedural-planet-shader.ts', import.meta.url), 'utf8');
     const table = src.match(/export const SURFACE_BAND_PARAMS_BY_BODY[^=]*=\s*\{([\s\S]*?)\n\};/);
-    const tableBody = table?.[1] ?? '';
-    expect(tableBody).not.toBe('');
-    const rowBody = tableBody.match(/\bjupiter:\s*\{([^}]*)\}/)?.[1] ?? '';
+    // 주석을 지운 뒤 jupiter 행이 정확히 1개인지 단언한다 — 주석 속 예시가 실제 행 대신 매칭되지 않게.
+    const tableBody = (table?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(tableBody.trim()).not.toBe('');
+    const rows = [...tableBody.matchAll(/\bjupiter:\s*\{([^}]*)\}/g)];
+    expect(rows).toHaveLength(1);
+    const rowBody = rows[0]?.[1] ?? '';
     expect(rowBody).not.toBe('');
     const fields = Object.fromEntries(
       rowBody

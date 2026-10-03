@@ -14,7 +14,8 @@
  *                                                    기본 시나리오 = `BODIES × {on, off}` 전부.
  *   MODE=compare A=<dir> B=<dir> EXPECT_ZERO=<list> EXPECT_NONZERO=<list> [ALLOW_SAME_BUILD=1]
  *                                                    두 캡처 디렉터리를 비교한다 (브라우저 불요).
- *   한 포트로 「base 캡처 → feature 빌드 · 서버 재시작 → feature 캡처 → compare」 순서로 쓴다.
+ *   한 포트로 「base 캡처 → feature 빌드 → feature 캡처 → compare」 순서로 쓴다. 각 캡처가 실제로
+ *   서빙한 빌드는 C6 의 서빙 지문이 기록한다.
  *
  * ## 종료 코드
  *   0 기대 전건 충족 / 1 기대 위반 / **2 측정 불가** — 아래 전제 중 하나라도 실패.
@@ -33,8 +34,8 @@
  *               `:off` = `StandardMaterial`. `?surface=off` 가 조용한 no-op 이 되면 여기서 걸린다
  *            P9 (하네스 고유) 콘솔 에러 · pageerror `0` 건 — 렌더 실패가 A · B 양쪽에서 똑같이 일어나면
  *               diff `0` 이 판별력 없이 나온다 (PR #1276 리뷰 R2)
- *            P10 (하네스 고유) **기저 신호** — 캡처한 body 마다 `:on` ↔ `:off` disk diff `> 0`.
- *               「표면이 실제로 그려졌다」의 같은 실행 안 증거. 쌍이 없으면 위반 (리뷰 R2)
+ *            P10 (하네스 고유) **기저 신호** — 캡처한 body 마다 `:on` ↔ `:off` disk diff `> 0`
+ *               (`?surface` 토글이 그 프레임에 효과를 냈다). 쌍이 없으면 위반 (리뷰 R2)
  *   compare  C1 `EXPECT_ZERO ∪ EXPECT_NONZERO` 비어 있지 않음 · 두 목록 교집합 `∅` · 형식 `<body>:<on|off>`
  *            C2 캡처된 시나리오 집합 `==` `EXPECT_ZERO ∪ EXPECT_NONZERO` (A · B 각각)
  *            C3 A · B 의 capture 전제 전건 충족 (meta `complete` · `premiseFailures` 0)
@@ -58,7 +59,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -388,6 +389,9 @@ export function loadPremiseFailures(key, body, surface, loadRes, minDiskPx, load
  */
 export function selfComparison(key, states, pngs, ratio) {
   const failures = [];
+  if (pngs.length < 2 || states.length !== pngs.length) {
+    failures.push(`${key}: P4 자기 대조 load ${pngs.length}회 (기대 ≥ 2)`);
+  }
   const first = states[0];
   states.slice(1).forEach((st, i) => {
     if (!sameDisk(first.disk, st.disk)) {
@@ -437,7 +441,7 @@ export function baseSignal(scenarios, readPng, ratio) {
     diffs[body] = d;
     if (!(idx.length > 0 && d > 0)) {
       failures.push(
-        `${body}: P10 :on ↔ :off disk diff ${d}/${idx.length} — 표면이 그려졌다는 신호 없음`,
+        `${body}: P10 :on ↔ :off disk diff ${d}/${idx.length} — ?surface 토글의 효과 없음`,
       );
     }
   }
@@ -642,6 +646,9 @@ async function runCompare() {
 
   // C5 — 캡처 조건 동일 (하네스 버전 · 환경 차이로 다른 프레임을 비교하지 않는다).
   for (const field of ['tJd', 'viewport', 'swiftshader', 'sampleRatio', 'minDiskPx']) {
+    if (!(field in metaA) || !(field in metaB)) {
+      throw new Unmeasurable(`C5 ${field} 필드 부재 (A ${field in metaA} · B ${field in metaB})`);
+    }
     if (stableJson(metaA[field]) !== stableJson(metaB[field])) {
       throw new Unmeasurable(
         `C5 ${field} 불일치 ${stableJson(metaA[field])} ↔ ${stableJson(metaB[field])}`,
@@ -649,6 +656,9 @@ async function runCompare() {
     }
   }
   for (const key of expected) {
+    if (typeof metaA.scenarios[key].query !== 'string') {
+      throw new Unmeasurable(`C5 ${key} query 필드 부재`);
+    }
     if (metaA.scenarios[key].query !== metaB.scenarios[key].query) {
       throw new Unmeasurable(
         `C5 ${key} query 불일치 '${metaA.scenarios[key].query}' ↔ '${metaB.scenarios[key].query}'`,
@@ -758,7 +768,10 @@ async function main() {
 }
 
 // 직접 실행일 때만 돈다 — 전제 함수를 격리 실행 (import) 으로 검증할 수 있게.
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+// argv[1] 을 realpath 로 정규화한다 — `import.meta.url` 은 실경로라, `/tmp` → `/private/tmp` · 심링크
+// 경로로 호출하면 단순 비교가 거짓이 되어 출력 없이 exit 0 이 된다 (PR #1276 리뷰 B2, #962 동형).
+// 저장소 관용구 (`scripts/auto-close-issue-parser.mjs` · `ci-diff-scope.mjs` · `verify-md-tilde.mjs`).
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   main()
     .then((code) => process.exit(code))
     .catch((e) => {
