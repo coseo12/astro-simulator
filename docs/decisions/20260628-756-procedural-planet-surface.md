@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료) · 개정 1 (§A11.17.9 `V2` 술어 재정의 · §A11.18 MN-5b 예측 반증): Accepted (cross-validate agy 2026-09-18 — §A11.19 4축 반영 완료)** — **Amendment 12 (#1274): Accepted (cross-validate 2026-10-02 — §A12.18 4축 반영 완료)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료) · 개정 1 (§A11.17.9 `V2` 술어 재정의 · §A11.18 MN-5b 예측 반증): Accepted (cross-validate agy 2026-09-18 — §A11.19 4축 반영 완료)** — **Amendment 12 (#1274): Accepted (cross-validate 2026-10-02 — §A12.18 4축 반영 완료) · 개정 1 (§A12.19 PR2 착수 보정 — 하네스 「미등록 선언」 전제 · D6 (i) 양성 대조 분리): Accepted (cross-validate 2026-10-03 — §A12.19.11 4축 반영 완료)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -3118,7 +3118,7 @@ MN-6 (Q2=(A)) — 불빛 항을 구름 블렌드 뒤로 옮기는 동형 주입.
 ## Amendment 12 (2026-10-02) — 천왕성·해왕성 절차 표면: `IceGiant` 타입 + 밴드 파라미터 body 별 테이블 (#1274)
 
 - **이슈**: [#1274](https://github.com/coseo12/astro-simulator/issues/1274) — 스프린트 계약 D1~D17 · 위험 R1~R4. §결과·재검토 조건 3 (표면 타입 확장) **발동**.
-- **상태**: Accepted (cross-validate 2026-10-02 — agy, 반영 내역 §A12.18. U1 · 계약 조정 C1~C5 사용자 결정 2026-10-02 반영 §A12.12 · §A12.17)
+- **상태**: Accepted (cross-validate 2026-10-02 — agy, 반영 내역 §A12.18. U1 · 계약 조정 C1~C5 사용자 결정 2026-10-02 반영 §A12.12 · §A12.17) — **개정 1 (§A12.19, 2026-10-03): Accepted** (cross-validate 2026-10-03 — §A12.19.11)
 - **선행 결정 (사용자, 2026-10-02 — 재해석 금지)**: Q1 = uranus · neptune 만, 신규 `IceGiant` (저대비 위도 밴드), Rocky 재분류 없음 / Q2 = Cratered 확장 제외 (로드맵 잔류) / Q3 = 이슈 1 + PR 2 (PR1 파라미터화 · 시각 변화 0 → PR2 신규 타입·body) / Q4 = 프리뷰 → 육안 승인 (D13) → D4 수치 확정 / Q5 = 비-범위 전부 제외.
 - **결과 기록 대상**: §결과·재검토 조건 3 (⏩ 발동) · §A11.15 조건 6 (⚠️ 부기 — §A12.3). 원문은 소급 수정하지 않았다.
 - ⚠️ **본 Amendment 는 설계 박제다.** 밴드 파라미터 수치 · 가드 수치는 정하지 않는다 (D13 승인 후 dev). 라벨: 「실측」 = 실행 출력, 「도출」 = 실측값·데이터에서 산술, 「구조」 = 코드 경로 판독, 「추론」 = 실행되지 않은 예측. 실행되지 않은 것은 §A12.15 에 모았다. 줄 번호는 전부 HEAD `58c02060` 기준이다.
@@ -3239,6 +3239,8 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 - **판정 범위의 한계 (기록)**: 표본이 `0.95R` 안쪽이므로 `0.95R ~ R` 가장자리 띠 (rim 대역 포함) 의 변화는 **판정 밖**이다. PR1 은 rim 경로 (`:912` · `:956`) 를 건드리지 않아 수용한다. 가장자리를 바꾸는 변경에 이 하네스를 쓸 때는 이 한계를 먼저 재판정한다.
 - **PR2 재사용**: D6 (i) (4 body `EXPECT_ZERO`) 과 D8 (uranus · neptune `:off` `EXPECT_ZERO` + `:on` `EXPECT_NONZERO`) 을 **한 번의 compare** 로 낸다 — `:on` 의 비-0 이 같은 실행의 양성 대조를 겸한다.
 
+> ⚠️ **부기 (2026-10-03, PR2 착수 보정 — §A12.19)**: 위 항은 현 하네스로 실행되지 않는다 — base 캡처의 미등록 uranus · neptune 이 P8 · P10 위반으로 exit `2` 다 (§A12.19.1). 또 미등록 body `:on` 의 비-0 은 다른 전제가 이미 정하는 값이라 양성 대조를 겸하지 못한다 (§A12.19.4). 보정: 「미등록 선언」 전제 P11 ~ P13 · C8 · C9 (§A12.19.3) + D6 (i) 양성 대조 별도 compare (§A12.19.5).
+
 ### A12.9 결정 6 — 신규 body 가드 (PR2)
 
 **D3 · D1 단위 테스트**
@@ -3333,6 +3335,8 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 
 **핵심 예측**: (1) PR1 의 4 body 픽셀 diff `0` (D2) 은 「3종을 읽는 GLSL 이 분기 2 뿐」 이라는 구조 판독의 예측이다 — 반증되면 결정 1-5 의 `0` 바인딩이 틀렸다. (2) 데이터 `0` 줄이 깨지면 SSoT 누수다. (3) uniform 증분이 `0` 이 아니면 승인 후보가 형태 축을 요구했다는 뜻이고 §A12.6 을 갱신한다.
 
+> ⚠️ **부기 (2026-10-03, PR2 착수 보정 — §A12.19.9)**: 위 표 `browser-verify-1274-surface-invariance.mjs` 행의 PR2 예측 (「시나리오 2 body 추가 `+2 ~ +10`」) 은 전제가 거짓이어서 철회했다 — base 캡처의 미등록 uranus · neptune 이 전제 위반 (exit `2`) 이라 시나리오 추가만으로는 재사용되지 않는다. 증분 범위 대신 구조 예측 (바뀌는 함수 · 무변경 함수 집합) 으로 대체했다.
+
 ### A12.14 Visual Fidelity §의무 체크리스트 4항목
 
 - [x] **데이터 SSoT 보존** — 밴드 파라미터는 rendering-only 코드 상수. `colorHint.hex` 는 read-only `baseColor`. `solar-system.json` 변경 `0` (D9).
@@ -3399,3 +3403,139 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 
 - **호출 전 편향 셀프 체크 (architect 기록)**: 낙관적 일정 — PR2 가 Phase 0 → 프리뷰 → 승인 → 가드 순이라 승인 라운드 수 (#1226 은 3회) 를 예측하지 않았다 ✓ / 결합 간과 — 고리 기울기 · 포화 · 마스크 로드를 하네스 전제와 R5 로 명시했다, 단 **고리 겹침 비율은 미측정** (질문 후보) / 폐기 프레이밍 — 해당 없음 / 순수주의 — GLSL 식 사본 (~5행) 을 수용했다, 사본 수용이 과한지 질문 후보.
 - **cross-validate 질문 후보**: (1) R5 의 포화 기전이 D4 를 구조적으로 막는가 (2) 결정 2 (다) 의 사본 수용 대 (나) 의 분기 공유 (3) D2 하네스 전제 표에 빠진 비결정 축 (4) D15 처분 술어의 2행 (「승격」) 이 #1230 의 범위 판단으로 타당한가.
+
+### A12.19 PR2 착수 보정 — 하네스 전제에 「미등록 선언」 추가 · D6 (i) 양성 대조 분리 (개정 1, 2026-10-03) — **Accepted** (cross-validate 2026-10-03 — §A12.19.11 4축 반영 완료)
+
+- **입력**: #1274 메인 인계 코멘트 [`5966279713`](https://github.com/coseo12/astro-simulator/issues/1274#issuecomment-5966279713) (PR #1276 라운드 2 리뷰 중점 5) · [`5966324798`](https://github.com/coseo12/astro-simulator/issues/1274#issuecomment-5966324798) (라운드 3 권고). 대상 = `apps/web/scripts/browser-verify-1274-surface-invariance.mjs`. 줄 번호는 develop `a270ae55` 기준이다. 전제 이름은 **하네스 실물** (P1 ~ P10 · C1 ~ C7) 을 따른다 — §A12.8 전제 표는 행에 이름이 없다.
+- **ADR 변경 판정 — 결정 변경이다** (이슈 코멘트로 끝내지 않는 이유): ① 결정 5 (§A12.8) 의 전제 집합에 전제가 더해진다. ② §A12.8 마지막 항 「`:on` 의 비-0 이 같은 실행의 양성 대조를 겸한다」 가 성립하지 않아 D6 (i) 의 양성 대조 수단이 바뀐다 (§A12.19.4 · §A12.19.5). ③ §A12.13 PR2 하네스 행의 예측은 전제가 거짓이다 — Concrete Prediction 반증은 이 ADR 이 Amendment 안에 기록해 왔다 (§A11.18 선례).
+- 원문 (§A12.8 · §A12.13) 은 고치지 않았다. 두 자리에 ⚠️ dated 부기만 더했다.
+
+#### A12.19.1 성립하지 않는 것
+
+- 하네스는 **캡처한 모든 body** 에 P8 (`:on` = `ShaderMaterial`, `:371-374`) 과 P10 (`:on` ↔ `:off` disk diff `> 0`, `baseSignal` `:422-449`) 을 건다.
+- base (develop) 에서 uranus · neptune 은 `SURFACE_TYPE_BY_BODY` 미등록이다 → `createProceduralPlanetMaterial` 이 `null` 을 돌려준다 (`procedural-planet-shader.ts:1248-1249`) → `StandardMaterial` [구조]. 그래서 base 캡처의 `uranus:on` 은 P8 위반이다 [실측 — PR #1276 라운드 1 F8 로그, 리뷰 중점 5]. on · off 가 같은 머티리얼 경로라 P10 도 위반으로 예상된다 [구조 — 미실행].
+- ⇒ base 캡처가 exit `2` 이므로 §A12.8 「한 번의 compare」 는 현 하네스로 실행되지 않는다. §A12.13 PR2 하네스 행 (「시나리오 2 body 추가」) 은 전제부터 틀렸다.
+
+#### A12.19.2 후보 비교
+
+| 축 | (a) compare 2회 분리 | (b) 목록 body 의 P8 · P10 **건너뛰기** | **(c) 목록 = 검증되는 선언 — 목록 body 에서 P8 · P10 을 반대 방향 술어로 대체 (채택)** |
+| --- | --- | --- | --- |
+| 전제 변경 필요 | **여전히 필요** — base 에서 `uranus:off` 만 캡처해도 P10 이 「`:on` · `:off` 쌍 없음」 으로 위반한다 (`:430-433`) | 필요 | 필요 |
+| 등록된 body 를 목록에 잘못 적음 | — | 통과 (그 body 에 대해 확인하는 것이 없다) | exit `2` (P12) |
+| 미등록 body 를 목록에 안 적음 | exit `2` (P8) | exit `2` (P8) | exit `2` (P8 — 기본 경로 무변경) |
+| 목록 body 의 base `:on` ≡ `:off` | 확인 안 함 | 확인 안 함 | 확인 (P13) — §A12.19.4 함의 논증의 입력 |
+| compare 실행 (D6 (i) · D8) | 2 | 1 | 1 (+ D6 (i) 양성 대조 1 — §A12.19.5) |
+
+→ (a) 는 전제 변경을 없애지 못하고 compare 만 늘린다. (b) 는 범위를 좁혔어도 **완화**다 — 목록 자체를 아무것도 확인하지 않아 오기가 조용히 통과한다. **(c) 채택**: 목록은 「이 빌드에서 이 body 는 미등록이다」 라는 **주장**이고 하네스가 그 주장을 확인한다. 목록 body 에서 P8 · P10 을 끄는 것이 아니라 반대 방향 술어로 바꾼다.
+
+#### A12.19.3 결정 — `EXPECT_UNREGISTERED` (capture 전용 env, 기본 = 빈 집합)
+
+| 이름 | 술어 (위반 = exit `2`) | 위치 |
+| --- | --- | --- |
+| **P11** | (i) 항목 형식 `<body>` (`:on` 등 접미 금지) · 중복 없음 (ii) 각 항목이 캡처 시나리오에 `:on` · `:off` 둘 다 있다 (iii) 목록 **밖** 캡처 body `≥ 1` — 그 캡처의 P10 이 적어도 한 body 에서 실행된다 | env · 시나리오 목록만으로 판정 → **브라우저 기동 전** fail-fast |
+| **P12** | 목록 body 의 host 머티리얼 = `StandardMaterial` (`:on` · `:off` 모두). 목록 body 에 한해 P8 을 **대체** | `loadPremiseFailures` |
+| **P13** | 목록 body 의 `:on` ↔ `:off` disk diff `=== 0` 이고 표본 `> 0`. 목록 body 에 한해 P10 을 **대체** | `baseSignal` (목록 인자 추가) |
+| **C8** | A · B meta 에 `expectUnregistered` 가 배열로 존재 (부재 = 구판 캡처 → 비교 불가) | compare, C2 직후 |
+| **C9** | A 목록 ∩ B 목록 `= ∅` — 같은 body 가 양쪽에서 미등록이면 그 body 의 비교에 신호원이 없다. **+ B 목록 `= ∅`** — 미등록 선언은 A (= base) 쪽에서만 한다 (cross-validate G1 수용, §A12.19.11). B 목록이 비면 앞 조건은 자동으로 성립한다 | compare, C8 직후 (C5 ~ C7 보다 먼저) |
+| C7 (갱신) | 파일에서 재계산할 때 **meta 의 목록**으로 P10 / P13 을 가른다 (env 를 다시 읽지 않는다) | compare |
+
+- 목록 밖 body 의 코드 경로는 P8 · P10 그대로다. **env 미지정이면 판정은 PR1 하네스와 같다.** P8 · P10 의 전역 완화 없음, 새 임계 없음.
+- `BODIES` 에 uranus · neptune 을 더한다 (§A12.8 시나리오). 그래서 base 서버에서 env 없이 기본 캡처하면 exit `2` 다 — 이것이 fail-closed 기본값이다.
+
+#### A12.19.4 술어 단위 논증 — 새 공허 통과 경로가 없는가
+
+| 경로 | 결과 | 막는 술어 (§A12.19.7 케이스) |
+| --- | --- | --- |
+| 목록 밖 body | PR1 과 같은 판정 | 코드 경로 무변경 (V10) |
+| 미등록인데 목록에 없음 | exit `2` | P8 (V4) |
+| 등록된 body 를 목록에 적음 (예: feature 캡처에 목록 전달) | exit `2` | P12 (V5) |
+| 오타 · 미캡처 body 를 목록에 적음 | exit `2` | P11 (ii) (V2) |
+| 캡처 body 전부를 목록에 적음 — 그 캡처에 `?surface` 효과 증거가 없다 | exit `2` | P11 (iii) (V3) |
+| A · B 양쪽에서 같은 body 를 미등록 선언 | exit `2` | C9 (V8) |
+| A · B 방향 역전 입력 (`A = feature` · `B = base`) — diff 는 대칭이라 판정이 거짓 통과하지는 않지만, compare 의 서빙 값 A → B 로그와 D8 의 「B 의 P8」 해석이 뒤집힌다 | exit `2` | C9 의 B 목록 `= ∅` (V11) |
+| 목록 body 가 base 에서 on · off 모두 **그려지지 않음** (배경) | P13 은 통과 → compare 의 `:off` 행이 B (그려진 `StandardMaterial`) 와 달라 **exit `1`** | FAIL 방향 — 공허 통과가 아니다 |
+
+**함의 — 목록 body 의 `:on` 행** [구조 — 술어에서 도출]: 목록 body X 에 대해 A 는 P13 으로 `on_A ≡ off_A` 이고, B 는 C9 로 목록 밖이므로 P10 으로 `on_B ≢ off_B` 다. 표본 영역은 C4 (A · B 기하 동일) 와 `baseSignal` 의 `sameDisk` (on · off 기하 동일) 로 하나다. 이때 `X:off` 가 `EXPECT_ZERO` 를 통과하면 (`off_A ≡ off_B`) `on_A ≡ off_A ≡ off_B ≢ on_B` 이므로 `X:on` 의 diff 는 **반드시 `> 0`** 이다.
+
+- ⇒ `X:on` 을 `EXPECT_ZERO` 에 잘못 넣어도 통과할 수 없다 — 별도 술어가 필요 없다.
+- ⇒ 같은 이유로 **`X:on` 의 비-0 은 독립 증거가 아니다.** §A12.8 마지막 항 「`:on` 의 비-0 이 같은 실행의 양성 대조를 겸한다」 는 성립하지 않는다 — 다른 전제가 이미 그 값을 정한다. 그 비-0 은 밴드 진폭이 `0` 이어도 셰이더 · `StandardMaterial` 의 광원 차이만으로 날 수 있다 [추론 — §A12.9 M1 주의와 같은 미측정 축].
+
+#### A12.19.5 결정 — D6 (i) 양성 대조를 별도 compare 로
+
+- **compare 1 (D6 (i) · D8)**: `A = base` (`EXPECT_UNREGISTERED=uranus,neptune`) · `B = feature` (목록 없음). `EXPECT_ZERO` = earth · mars · jupiter · moon × {on, off} + `uranus:off` · `neptune:off`. `EXPECT_NONZERO` = `uranus:on` · `neptune:on`. 기대 exit `0`.
+  - D8 의 직접 증거는 B 의 P8 (`:off` = `StandardMaterial`) 과 `:off` 행 diff `0` 이다. 계약 D8 의 양성 대조 (같은 body `:on` diff `> 0`) 는 이 compare 가 출력하지만, §A12.19.4 의 함의에 따라 **독립 증거로 세지 않는다**고 PR 코멘트에 함께 적는다.
+- **compare 2 (D6 (i) 양성 대조)**: §A12.8 양성 대조 레시피를 PR2 feature 에서 다시 실행한다 — `A = feature` · `B = feature + 미커밋 변이` (`GAS_BAND_AMPLITUDE` 만 변경), 양쪽 목록 없음. `EXPECT_NONZERO` = 변이 상수를 참조하는 밴드 테이블 행의 body `:on`, 나머지 전부 `EXPECT_ZERO`. develop `a270ae55` 에서 그 행은 jupiter 다 (`procedural-planet-shader.ts:244`) — PR2 에서 `git grep -n GAS_BAND_AMPLITUDE -- packages/core/src` 로 다시 확정한다. 변이의 `git diff` 를 로그와 함께 박제한다 (§A11.20 후속 권고).
+  - 이 compare 가 PR2 하네스의 **목록 없는 기본 경로**가 PR1 과 같은 판별력을 갖는지도 함께 보인다 (V10).
+
+#### A12.19.6 Phase 0 · D13 순서 — **변경 없음** (+ base 캡처 시점 추가)
+
+- §A12.7 · §A12.12 의 순서 — Phase 0 (R5 포화 비율 + F1 고리 겹침 비율 로그) → `?iceGiantCandidate=a|b|c` 프리뷰 → D13 승인 → 수치 확정 · 후보 삭제 → 가드 · M1 ~ M4 — 는 그대로다. Phase 0 과 프리뷰는 `verify:756` 프레임과 제품 프레임을 쓰고 이 하네스를 쓰지 않으므로, 하네스 보정이 그 입력을 바꾸지 않는다.
+- **추가 (순서 변경 아님)**: 하네스 보정 커밋과 **base 캡처를 Phase 0 에 둔다**. 이 구간에서는 브랜치의 `packages` · `apps/web/src` 가 develop 과 같아 base 를 따로 체크아웃할 필요가 없다. 그 캡처가 uranus · neptune 에 대한 P3 · P7 · P13 의 첫 실행이 되어 (§A12.19.8), 실패가 프리뷰 전에 드러난다.
+  - 캡처 직전 `git diff --quiet <분기 시점 develop sha> -- packages apps/web/src` 의 exit `0` 을 같은 로그에 남긴다 (provenance 의 `coreSrcDirty` 는 `packages/core/src` 의 **커밋되지 않은** 변경만 본다).
+  - 이후 하네스 파일이 바뀌면 base 를 다시 캡처한다 — 두 캡처가 다른 전제 판본에서 나오지 않게.
+  - **Phase 0 의 첫 하네스 실행 = P13 성립 판정** (cross-validate G3 부분 수용, §A12.19.11): develop 빌드를 서빙한 상태 (하네스 보정 커밋 직후, 위 `git diff --quiet` exit `0`) 에서 `MODE=capture SCENARIOS=uranus:on,uranus:off,neptune:on,neptune:off,earth:on,earth:off EXPECT_UNREGISTERED=uranus,neptune` 를 1회 실행한다. 목록 밖 earth 가 P11 (iii) 을 채운다. P13 이 깨지면 술어를 완화하지 않고 architect 에 회부한다 (§A12.19.8). 사전 대책 (`?surface=off` 에서 항성 분기 분리 등) 은 이 측정 전에 만들지 않는다.
+
+#### A12.19.7 신규 분기별 위반 유도 케이스 (dev 실행 — 명령 · 로그 · exit 를 PR 코멘트에 박제)
+
+| # | 분기 | 유도 | 기대 |
+| --- | --- | --- | --- |
+| V1 | P11 (i) | `MODE=capture EXPECT_UNREGISTERED=uranus:on` | exit `2` · P11 · 브라우저 기동 전 |
+| V2 | P11 (ii) | `EXPECT_UNREGISTERED=uranos` (기본 시나리오) | exit `2` · P11 · 브라우저 기동 전 |
+| V3 | P11 (iii) | `SCENARIOS=uranus:on,uranus:off EXPECT_UNREGISTERED=uranus` | exit `2` · P11 · 브라우저 기동 전 |
+| V4 | 목록 누락 = 기본 fail-closed | base 서버 · env 없이 기본 캡처 | exit `2` · `uranus:on` P8 |
+| V5 | P12 | feature 서버 · `EXPECT_UNREGISTERED=uranus` | exit `2` · `uranus:on` P12 |
+| V6 | P13 (격리 — `baseSignal` import, 합성 PNG) | ① 목록 body on ≢ off ② 목록 body on ≡ off ③ 목록 body 표본 `0` (화면 밖 disk) ④ **목록 밖** body on ≡ off | ① 위반 ② 위반 없음 ③ 위반 ④ 위반 (P10 유지) |
+| V7 | C8 | B 캡처 디렉터리 **사본**의 meta 에서 `expectUnregistered` 삭제 → compare 1 | exit `2` · C8 |
+| V8 | C9 | B 사본 meta 의 `expectUnregistered` 를 `["uranus"]` 로 → compare 1 | exit `2` · **C9** (C7 이 아니다 — 순서 확인) |
+| V9 | C7 갱신 | A 사본 meta 의 `expectUnregistered` 를 `["neptune"]` 로 → compare 1 | exit `2` · C7 (A 의 `uranus` 를 P10 으로 재계산) |
+| V10 | 기본 경로 무변경 | compare 2 (§A12.19.5) | exit `0` · 변이 행만 `> 0` |
+| V11 | C9 (B 목록 `= ∅`) | compare 1 의 A · B 를 맞바꿔 입력 (`A = feature 캡처` · `B = base 캡처`) | exit `2` · C9 |
+
+- V7 ~ V9 는 원본 캡처 디렉터리를 건드리지 않는다 (사본에서만 편집).
+- 통과 경로의 실 브라우저 실행은 base 캡처 자체 (P11 ~ P13 충족) 와 compare 1 이다.
+
+#### A12.19.8 미확인 (실행되지 않은 것 — 근거로 인용 금지)
+
+- base 하네스 프레임에서 uranus · neptune 의 `:on` ≡ `:off` (P13). `?surface=off` 는 항성 머티리얼도 바꾼다 (`body-mesh-factory.ts:75-78`). 그 변화가 uranus · neptune disk 표본에 닿는지는 미측정이다. 닿으면 P13 이 exit `2` 를 내고, 그때 술어를 완화하지 않고 architect 에 회부한다. 첫 판정 시점은 Phase 0 이다 (§A12.19.6).
+- 하네스 프레임에서 uranus · neptune 의 disk 반경 (P3) · LOD level (P7)
+- compare 1 의 jupiter `:on` diff `0` — 셰이더 문자열에 분기를 더한 뒤의 동일성 (D6 (i) 가 처음 잰다)
+
+#### A12.19.9 §A12.13 정정 — PR2 하네스 행
+
+- 원 예측 「시나리오 2 body 추가 `+2 ~ +10`」 은 **철회**한다 — 전제 (시나리오만 더하면 재사용된다) 가 거짓이었다 (§A12.19.1). 새 증분 범위는 적지 않는다. 구현 전에 검산할 수단이 없다.
+- **대신 구조 예측** (PR2 머지 후 diff 로 재현): 하네스 변경은 `BODIES` · env 파싱 (P11) · `loadPremiseFailures` (P12) · `baseSignal` (P13) · `runCapture` (meta 기록 · P11 호출) · `runCompare` (C8 · C9 · C7 인자) · 헤더 주석에 한정된다. `diffCount` · `diskSampleIndices` · `selfComparison` · `loadScenario` · `readSceneState` · `servedSummary` 는 **무변경**이다. 무변경 함수가 바뀌었으면 이 보정의 범위를 넘었다는 뜻이다.
+- §A12.13 의 나머지 행과 핵심 예측 (1) ~ (3) 은 이 보정과 무관하다.
+
+#### A12.19.10 PR2 dev 작업 목록에 포함 (설계 결정 아님)
+
+- 하네스 헤더 `:17-18` 「각 캡처가 실제로 서빙한 **빌드**는 C6 의 서빙 지문이 기록한다」 를 「서빙한 **표면 uniform · fragment 소스**」 로 좁힌다 (#1274 코멘트 `5966324798` — 지문은 표면 머티리얼 `_floats` · `_ints` 와 fragment 소스만 담는다).
+- 헤더 전제 목록에 P11 ~ P13 · C8 · C9 를 더하고, `BODIES` 주석 「PR2 에서 uranus · neptune 을 더한다」 를 갱신한다.
+
+#### A12.19.11 교차검증 반영 사항 — **반영 완료** (agy 2026-10-03, Accepted 전이)
+
+- **호출**: 메인 수행 (agy, 2026-10-03). 로그 `.claude/logs/cross-validate-architecture-20261003-181907.log`. 결과는 메인이 재분석했고, 아래 처분은 그 재분석을 따른다.
+
+**합의** — agy 가 동의한 축: (a) · (b) 기각 근거 (§A12.19.2) / 목록 body `:on > 0` 필연 논증과 그에 따른 D6 (i) 양성 대조의 compare 2 분리 (§A12.19.4 · §A12.19.5) / 과잉 설계가 아니라는 판정.
+
+**이견 수용 (원안 수정)**
+
+- **G1 — compare 방향 역전** (`A = feature` · `B = base`) 이 C8 · C9 를 통과한다: **최소 형태로 수용**. C9 에 「B 목록 `= ∅`」 를 더했다 — 미등록 선언은 A (= base) 쪽에서만 한다. 위반 = exit `2`, 새 임계 없음 (§A12.19.3). 근거: diff 는 대칭이라 판정 자체가 거짓 통과하지는 않는다. 그러나 compare 가 남기는 서빙 값 A → B 로그와 D8 의 해석 (「B 의 P8」) 이 뒤집힌다 — 해석 증거의 방향을 보존한다. compare 2 (양쪽 목록 ∅) 는 영향이 없다. 위반 유도 케이스 V11 추가 (§A12.19.7).
+- **G3 — `?surface=off` 의 항성 머티리얼 변경이 P13 을 깨는 단일 실패점** (`?starSurface=off` 분리 등 사전 대책 권고): **부분 수용**. 사전 대책 구현은 기각한다 — 측정 전에 추정으로 대책을 만드는 것은 measurement-first 위반이다. 대신 Phase 0 의 첫 하네스 실행을 P13 성립 판정으로 명시했다 (§A12.19.6). 메인 판독: `body-mesh-factory.ts:75-78` 의 분기는 항성 **머티리얼**만 바꾸고 조명은 별도 PointLight 라 disk 표본에 닿을 가능성은 낮지만 미측정이다. 깨지면 기존 규약대로 술어를 완화하지 않고 architect 에 회부한다.
+
+**Claude 재분석으로 기각한 외부 모델 제안**
+
+- **G2 — base 에서 uranus 암전 시 P13 공허 통과**: **기각**. agy 스스로 같은 결론을 적었다 — B 가 정상이면 `:off` 행이 exit `1`, B 도 암전이면 B 의 P10 이 exit `2` 다. 최종 exit `0` 경로가 없다 (§A12.19.4 표의 「그려지지 않음」 행과 같은 논거).
+- **G4 — P11 (iii) 의도 설명 강조**: 반영 불요. 문서 가독성 제안이며 판정에 영향이 없다.
+
+**고유 발견 (후속 분리)**: 없음 — G1 ~ G4 는 위에서 처분했다.
+
+**Claude 편향 셀프 체크 (호출 후)**
+
+- agy 는 도구를 실행하지 않은 정적 판독이다. 「수학적」 · 「탁월」 같은 평가는 근거 검증이 아니다 — 판별력은 dev 의 V1 ~ V11 실행으로만 확정된다.
+- agy 의 대안 분석 (P13 을 빼는 안) 은 비교용이며 채택하지 않는다.
+
+**전이**: 위 반영 (C9 보강 · V11 · Phase 0 첫 실행 명시) 후 **Provisional → Accepted (cross-validate 2026-10-03)**.
+
+
+- **호출 전 Claude 편향 셀프 체크 (architect 기록, 초판)**: 낙관적 일정 — 설계 보정만이라 일정 주장 없음 ✓ / 결합 간과 — 목록 선언이 compare 판정에 미치는 결합을 C9 와 함의 논증으로 적었다. 단 **P13 의 전제 (`?surface=off` 가 목록 body 표본에 무영향) 는 미측정**이다 (§A12.19.8) / 폐기 프레이밍 — §A12.8 「양성 대조 겸용」 을 무효로 판정했다. 폐기 쪽으로 기운 판단일 수 있다 → 질문 (2) / 순수주의 — 신규 술어 5개 (P11 ~ P13 · C8 · C9). 줄일 여지 → 질문 (3).
+- **cross-validate 질문 후보**: (1) (c) 의 반대 방향 술어에 남는 공허 통과 경로가 있는가 (2) §A12.19.4 함의 — 목록 body `:on` 비-0 이 독립 증거가 아니라는 판정이 옳은가, compare 2 가 D6 (i) 양성 대조로 충분한가 (3) P11 (iii) · C9 가 다른 술어에 함의되어 불필요한가 (4) P13 이 항성 머티리얼 변화로 거짓 exit `2` 를 낼 가능성.
