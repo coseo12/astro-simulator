@@ -10,12 +10,18 @@
  * PR 코멘트에 박제한다.
  *
  * ## 모드
- *   MODE=capture OUT=<dir> [SCENARIOS=earth:on,...]   현재 서버 (BASE_URL) 의 시나리오를 캡처한다.
+ *   MODE=capture OUT=<dir> [SCENARIOS=earth:on,...] [EXPECT_UNREGISTERED=<body,...>]
+ *                                                    현재 서버 (BASE_URL) 의 시나리오를 캡처한다.
  *                                                    기본 시나리오 = `BODIES × {on, off}` 전부.
+ *                                                    `EXPECT_UNREGISTERED` (capture 전용, 기본 ∅) = 「이 빌드에서
+ *                                                    이 body 는 `SURFACE_TYPE_BY_BODY` 미등록이다」 라는 **검증되는
+ *                                                    선언** — 목록 body 는 P8 · P10 대신 반대 방향 술어 P12 · P13
+ *                                                    으로 판정한다 (§A12.19.3). 목록 밖 body 의 판정은 그대로다.
  *   MODE=compare A=<dir> B=<dir> EXPECT_ZERO=<list> EXPECT_NONZERO=<list> [ALLOW_SAME_BUILD=1]
  *                                                    두 캡처 디렉터리를 비교한다 (브라우저 불요).
  *   한 포트로 「base 캡처 → feature 빌드 → feature 캡처 → compare」 순서로 쓴다. 각 캡처가 실제로
- *   서빙한 빌드는 C6 의 서빙 지문이 기록한다.
+ *   서빙한 표면 uniform · fragment 소스는 C6 의 서빙 지문이 기록한다 (vertex 셰이더 · JS 는 지문 밖 —
+ *   #1274 코멘트 `5966324798`).
  *
  * ## 종료 코드
  *   0 기대 전건 충족 / 1 기대 위반 / **2 측정 불가** — 아래 전제 중 하나라도 실패.
@@ -36,6 +42,12 @@
  *               diff `0` 이 판별력 없이 나온다 (PR #1276 리뷰 R2)
  *            P10 (하네스 고유) **기저 신호** — 캡처한 body 마다 `:on` ↔ `:off` disk diff `> 0`
  *               (`?surface` 토글이 그 프레임에 효과를 냈다). 쌍이 없으면 위반 (리뷰 R2)
+ *            ── `EXPECT_UNREGISTERED` (§A12.19.3) — 목록 body 에 한해 P8 · P10 을 **대체** 한다 (끄지 않는다) ──
+ *            P11 (i) 항목 형식 `<body>` (`:on` 등 접미 금지) · 중복 없음 (ii) 각 항목이 캡처 시나리오에
+ *               `:on` · `:off` 둘 다 있다 (iii) 목록 **밖** 캡처 body `≥ 1` — 그 캡처의 P10 이 적어도 한
+ *               body 에서 실행된다. env · 시나리오만으로 판정 → **브라우저 기동 전** fail-fast
+ *            P12 목록 body 의 host 머티리얼 = `StandardMaterial` (`:on` · `:off` 모두) — P8 대체
+ *            P13 목록 body 의 `:on` ↔ `:off` disk diff `=== 0` 이고 표본 `> 0` — P10 대체
  *   compare  C1 `EXPECT_ZERO ∪ EXPECT_NONZERO` 비어 있지 않음 · 두 목록 교집합 `∅` · 형식 `<body>:<on|off>`
  *            C2 캡처된 시나리오 집합 `==` `EXPECT_ZERO ∪ EXPECT_NONZERO` (A · B 각각)
  *            C3 A · B 의 capture 전제 전건 충족 (meta `complete` · `premiseFailures` 0)
@@ -47,7 +59,11 @@
  *               `ShadersStore` fragment 소스. 디스크 dist 해시만으로는 「빌드 후 서버 재시작 누락」
  *               (디스크 = feature, 서빙 = base) 을 못 잡는다. 같은 빌드 비교가 의도일 때만
  *               `ALLOW_SAME_BUILD=1` 로 허용한다 (기본 금지).
- *            C7 A · B 각각 P10 기저 신호를 **파일에서 다시** 계산해 확인
+ *            C7 A · B 각각 P10 기저 신호를 **파일에서 다시** 계산해 확인 — **meta 의 목록**
+ *               (`expectUnregistered`) 으로 P10 / P13 을 가른다 (env 를 다시 읽지 않는다)
+ *            C8 A · B meta 에 `expectUnregistered` 가 배열로 존재 (부재 = 구판 캡처 → 비교 불가). C2 직후
+ *            C9 A 목록 ∩ B 목록 `= ∅` **+ B 목록 `= ∅`** — 미등록 선언은 A (= base) 쪽에서만 한다
+ *               (cross-validate G1). C8 직후 · C5 ~ C7 보다 먼저
  *   compare 는 시나리오별 서빙 밴드 uniform (`gasBand*`) 의 A → B 값을 출력한다 — 「변경이 실제로
  *   서빙됐다」의 실행 내 기록이다.
  *
@@ -82,8 +98,12 @@ const EXIT_PASS = 0;
 const EXIT_FAIL = 1;
 const EXIT_UNMEASURABLE = 2;
 
-/** PR1 대상 body (§A12.8 시나리오). PR2 에서 uranus · neptune 을 더한다. */
-const BODIES = ['earth', 'mars', 'jupiter', 'moon'];
+/**
+ * 대상 body (§A12.8 시나리오). PR1 의 4 body + PR2 (#1274 `IceGiant`) 의 uranus · neptune.
+ * base (develop) 서버에서 env 없이 기본 캡처하면 미등록 uranus · neptune 이 P8 로 exit 2 다 — 이것이
+ * fail-closed 기본값이다. base 캡처는 `EXPECT_UNREGISTERED=uranus,neptune` 으로 선언한다 (§A12.19.3).
+ */
+const BODIES = ['earth', 'mars', 'jupiter', 'moon', 'uranus', 'neptune'];
 const SURFACE_MODES = ['on', 'off'];
 
 /** 결정적 프레임 고정 JD — `verify:1202` / `verify:1215` / `verify:783` / `verify:1119` 와 같은 값. */
@@ -154,6 +174,50 @@ function parseScenarioList(raw, label) {
   const set = new Set(items);
   if (set.size !== items.length) throw new Unmeasurable(`${label} 에 중복 항목이 있다`);
   return items;
+}
+
+/**
+ * P11 — `EXPECT_UNREGISTERED` 파싱 + 시나리오 대조 (§A12.19.3). 브라우저 기동 전에 부른다.
+ * 미지정 · 빈 문자열 = 빈 집합 (env 미지정이면 판정이 PR1 하네스와 같다).
+ * @param raw env 원문 / @param scenarios 캡처 시나리오 키 배열
+ * @returns {string[]} 정렬된 목록
+ */
+export function parseExpectUnregistered(raw, scenarios) {
+  if (raw === undefined) return [];
+  const items = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  // (i) 형식 · 중복
+  for (const item of items) {
+    if (!/^[a-z0-9_-]+$/.test(item)) {
+      throw new Unmeasurable(
+        `P11 EXPECT_UNREGISTERED 항목 형식 위반 '${item}' (기대 <body> — :on 등 접미 금지)`,
+      );
+    }
+  }
+  if (new Set(items).size !== items.length) {
+    throw new Unmeasurable('P11 EXPECT_UNREGISTERED 에 중복 항목이 있다');
+  }
+  // (ii) 각 항목이 `:on` · `:off` 둘 다 캡처된다 — 오타 · 미캡처 body 의 선언이 아무것도 확인하지 않는 경로 차단.
+  const captured = new Set(scenarios);
+  for (const body of items) {
+    const missing = SURFACE_MODES.filter((s) => !captured.has(scenarioKey(body, s)));
+    if (missing.length) {
+      throw new Unmeasurable(
+        `P11 EXPECT_UNREGISTERED '${body}' 의 시나리오 [${missing.map((s) => scenarioKey(body, s)).join(',')}] 가 캡처 목록에 없다`,
+      );
+    }
+  }
+  // (iii) 목록 밖 캡처 body ≥ 1 — 그 캡처에서 P10 (`?surface` 효과 증거) 이 적어도 한 body 에서 실행된다.
+  const listed = new Set(items);
+  const outside = [...new Set(scenarios.map((k) => k.split(':')[0]))].filter((b) => !listed.has(b));
+  if (outside.length === 0) {
+    throw new Unmeasurable(
+      'P11 캡처 body 전부가 EXPECT_UNREGISTERED 에 있다 — 목록 밖 body ≥ 1 이어야 P10 이 실행된다',
+    );
+  }
+  return [...items].sort();
 }
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -343,8 +407,19 @@ export function diffCount(pngA, pngB, indices) {
 
 export const sameDisk = (a, b) => a.cx === b.cx && a.cy === b.cy && a.r === b.r;
 
-/** 한 load 의 capture 전제 (P1 · P2 일부 · P3 · P5~P9). 위반 문자열 배열을 돌려준다. */
-export function loadPremiseFailures(key, body, surface, loadRes, minDiskPx, load) {
+/**
+ * 한 load 의 capture 전제 (P1 · P2 일부 · P3 · P5~P9 · P12). 위반 문자열 배열을 돌려준다.
+ * @param unregistered `EXPECT_UNREGISTERED` 목록 body 여부 — 참이면 P8 대신 P12 (§A12.19.3)
+ */
+export function loadPremiseFailures(
+  key,
+  body,
+  surface,
+  loadRes,
+  minDiskPx,
+  load,
+  unregistered = false,
+) {
   const tag = `${key}#${load}`;
   const f = [];
   const st = loadRes.state;
@@ -368,9 +443,19 @@ export function loadPremiseFailures(key, body, surface, loadRes, minDiskPx, load
     );
   }
   if (st.lodLevel !== 'high') f.push(`P7 ${body} LOD level '${st.lodLevel}' (기대 'high')`);
-  const expectedClass = surface === 'on' ? 'ShaderMaterial' : 'StandardMaterial';
-  if (st.materialClass !== expectedClass) {
-    f.push(`P8 :${surface} 인데 host 머티리얼 ${st.materialClass} (기대 ${expectedClass})`);
+  if (unregistered) {
+    // P12 — 목록 body 는 `:on` 에서도 미등록이라 `StandardMaterial` 이어야 한다. 등록된 body 를 목록에
+    // 잘못 적으면 (예: feature 캡처에 목록 전달) 여기서 걸린다.
+    if (st.materialClass !== 'StandardMaterial') {
+      f.push(
+        `P12 EXPECT_UNREGISTERED body :${surface} 인데 host 머티리얼 ${st.materialClass} (기대 StandardMaterial — 미등록 선언이 거짓)`,
+      );
+    }
+  } else {
+    const expectedClass = surface === 'on' ? 'ShaderMaterial' : 'StandardMaterial';
+    if (st.materialClass !== expectedClass) {
+      f.push(`P8 :${surface} 인데 host 머티리얼 ${st.materialClass} (기대 ${expectedClass})`);
+    }
   }
   if (body === 'earth' && surface === 'on' && st.uMaskEnabled !== 1) {
     f.push(`P5 earth uMaskEnabled ${st.uMaskEnabled} (기대 1 — 마스크 로드 미완)`);
@@ -415,11 +500,14 @@ export function selfComparison(key, states, pngs, ratio) {
 }
 
 /**
- * P10 · C7 기저 신호 — 캡처한 body 마다 `:on` ↔ `:off` disk diff `> 0`.
+ * P10 · P13 · C7 기저 신호 — 캡처한 body 마다 `:on` ↔ `:off` disk diff 를 잰다.
+ * 목록 밖 body 는 P10 (`> 0`), `unregistered` 목록 body 는 P13 (`=== 0` 이고 표본 `> 0`) 로 판정한다.
  * @param scenarios meta.scenarios / @param readPng `(key) => PNG`
+ * @param unregistered `EXPECT_UNREGISTERED` 목록 (capture = env 파싱 결과, compare = **meta 의 목록**)
  * @returns {{ failures: string[], diffs: Record<string, number> }}
  */
-export function baseSignal(scenarios, readPng, ratio) {
+export function baseSignal(scenarios, readPng, ratio, unregistered = []) {
+  const listed = new Set(unregistered);
   const failures = [];
   const diffs = {};
   const bodies = [...new Set(Object.keys(scenarios).map((k) => k.split(':')[0]))].sort();
@@ -439,7 +527,14 @@ export function baseSignal(scenarios, readPng, ratio) {
     const idx = diskSampleIndices(pOn.width, pOn.height, on.disk, ratio);
     const d = diffCount(pOn, readPng(scenarioKey(body, 'off')), idx);
     diffs[body] = d;
-    if (!(idx.length > 0 && d > 0)) {
+    if (listed.has(body)) {
+      // P13 — 미등록 body 는 on · off 가 같은 머티리얼 경로라 diff 가 정확히 0 이어야 한다.
+      if (!(idx.length > 0 && d === 0)) {
+        failures.push(
+          `${body}: P13 EXPECT_UNREGISTERED body :on ↔ :off disk diff ${d}/${idx.length} (기대 0 · 표본 > 0)`,
+        );
+      }
+    } else if (!(idx.length > 0 && d > 0)) {
       failures.push(
         `${body}: P10 :on ↔ :off disk diff ${d}/${idx.length} — ?surface 토글의 효과 없음`,
       );
@@ -468,6 +563,9 @@ async function runCapture() {
       ? BODIES.flatMap((b) => SURFACE_MODES.map((s) => scenarioKey(b, s)))
       : parseScenarioList(process.env.SCENARIOS, 'SCENARIOS');
   if (scenarios.length === 0) throw new Unmeasurable('캡처 시나리오가 비어 있다');
+  // P11 — 브라우저 기동 · 출력 디렉터리 변경 전에 판정한다.
+  const expectUnregistered = parseExpectUnregistered(process.env.EXPECT_UNREGISTERED, scenarios);
+  const unregisteredSet = new Set(expectUnregistered);
 
   const minDiskPx = await readNumericConst(
     SURFACE_MASK_MIN_DISK_PX_SOURCE,
@@ -489,6 +587,8 @@ async function runCapture() {
     viewport: VIEWPORT,
     sampleRatio,
     minDiskPx,
+    // C8 입력 — 빈 집합도 배열로 기록한다 (부재 = 구판 캡처).
+    expectUnregistered,
     provenance: await provenance(),
     servedFingerprint: null,
     baseSignal: null,
@@ -498,6 +598,7 @@ async function runCapture() {
   console.log(`[capture] OUT=${out} BASE_URL=${baseUrl} SWIFTSHADER=${SWIFTSHADER}`);
   console.log(`[capture] provenance ${JSON.stringify(meta.provenance)}`);
   console.log(`[capture] SURFACE_MASK_MIN_DISK_PX=${minDiskPx} DISK_SAMPLE_RADIUS=${sampleRatio}`);
+  console.log(`[capture] EXPECT_UNREGISTERED=[${expectUnregistered.join(',')}]`);
 
   const firstPngs = {};
   const gpu = SWIFTSHADER ? 'swiftshader' : 'default';
@@ -513,7 +614,7 @@ async function runCapture() {
           loads.push(res);
         }
         const failures = loads.flatMap((l, i) =>
-          loadPremiseFailures(key, body, surface, l, minDiskPx, i + 1),
+          loadPremiseFailures(key, body, surface, l, minDiskPx, i + 1, unregisteredSet.has(body)),
         );
         const first = loads[0].state;
         let selfDiff = null;
@@ -569,10 +670,12 @@ async function runCapture() {
 
   // P10 — 기저 신호 (load 전제를 통과한 시나리오만 PNG 가 있다 — 없으면 위반으로 떨어진다).
   if (meta.premiseFailures.length === 0) {
-    const bs = baseSignal(meta.scenarios, (k) => firstPngs[k], sampleRatio);
+    const bs = baseSignal(meta.scenarios, (k) => firstPngs[k], sampleRatio, expectUnregistered);
     meta.baseSignal = bs.diffs;
     meta.premiseFailures.push(...bs.failures);
-    console.log(`[capture] P10 기저 신호 :on↔:off disk diff ${JSON.stringify(bs.diffs)}`);
+    console.log(
+      `[capture] P10 · P13 기저 신호 :on↔:off disk diff ${JSON.stringify(bs.diffs)} (P13 대상 [${expectUnregistered.join(',')}])`,
+    );
   }
   meta.servedFingerprint = sha256(
     stableJson(Object.fromEntries(Object.entries(meta.scenarios).map(([k, s]) => [k, s.served]))),
@@ -644,6 +747,36 @@ async function runCompare() {
     }
   }
 
+  // C8 — 미등록 선언 필드 존재 (부재 = 구판 캡처 → 목록을 알 수 없어 C7 재계산 불가).
+  for (const [label, meta] of [
+    ['A', metaA],
+    ['B', metaB],
+  ]) {
+    if (!Array.isArray(meta.expectUnregistered)) {
+      throw new Unmeasurable(
+        `C8 ${label} meta 에 expectUnregistered 배열이 없다 — 구판 하네스 캡처는 비교할 수 없다`,
+      );
+    }
+  }
+  // C9 — 같은 body 가 양쪽에서 미등록이면 그 body 의 비교에 신호원이 없다. 또 미등록 선언은 A (= base)
+  // 쪽에서만 한다 — 방향이 뒤집히면 서빙 값 A → B 로그와 D8 의 「B 의 P8」 해석이 뒤집힌다 (G1).
+  const bothUnregistered = metaA.expectUnregistered.filter((b) =>
+    metaB.expectUnregistered.includes(b),
+  );
+  if (bothUnregistered.length) {
+    throw new Unmeasurable(
+      `C9 A · B 양쪽에서 미등록 선언된 body [${bothUnregistered.join(',')}] — 비교 신호원 없음`,
+    );
+  }
+  if (metaB.expectUnregistered.length !== 0) {
+    throw new Unmeasurable(
+      `C9 B 목록 [${metaB.expectUnregistered.join(',')}] ≠ ∅ — 미등록 선언은 A (= base) 쪽에서만 한다 (A · B 방향 역전?)`,
+    );
+  }
+  console.log(
+    `[compare] C8 · C9 A expectUnregistered=[${metaA.expectUnregistered.join(',')}] · B=[]`,
+  );
+
   // C5 — 캡처 조건 동일 (하네스 버전 · 환경 차이로 다른 프레임을 비교하지 않는다).
   for (const field of ['tJd', 'viewport', 'swiftshader', 'sampleRatio', 'minDiskPx']) {
     if (!(field in metaA) || !(field in metaB)) {
@@ -699,7 +832,8 @@ async function runCompare() {
       cache[k] ??= PNG.sync.read(readFileSync(path.join(dir, meta.scenarios[k].file)));
       return cache[k];
     };
-    const bs = baseSignal(meta.scenarios, readPng, meta.sampleRatio);
+    // meta 의 목록으로 P10 / P13 을 가른다 (env 를 다시 읽지 않는다 — §A12.19.3 C7 갱신).
+    const bs = baseSignal(meta.scenarios, readPng, meta.sampleRatio, meta.expectUnregistered);
     if (bs.failures.length) {
       throw new Unmeasurable(`C7 ${label} 기저 신호 위반:\n  - ${bs.failures.join('\n  - ')}`);
     }
