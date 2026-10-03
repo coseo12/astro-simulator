@@ -17,6 +17,7 @@ import {
   GAS_BAND_AMPLITUDE,
   GAS_BAND_COUNT,
   GAS_TURBULENCE,
+  ICE_GIANT_ALBEDO_BY_BODY,
   ICE_GIANT_CANDIDATES,
   SURFACE_BAND_PARAMS_BY_BODY,
   SURFACE_TYPE_BY_BODY,
@@ -229,7 +230,10 @@ describe('#1274 — 밴드 uniform 바인딩이 해석 함수를 따른다 (Null
 
 // ⚠️ #1274 D13 프리뷰 임시 — `ICE_GIANT_CANDIDATES` · `iceGiantCandidate` 와 함께 승인 후 삭제한다.
 describe('#1274 D13 프리뷰 — iceGiantCandidate 옵션 (임시)', () => {
-  const bandOf = (id: string, candidate: string | undefined): SurfaceBandParams => {
+  const bound = (
+    id: string,
+    candidate: string | undefined,
+  ): { band: SurfaceBandParams; albedo: number } => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
     scene.activeCamera = new ArcRotateCamera('cam', 0, Math.PI / 2, 50, Vector3.Zero(), scene);
@@ -240,41 +244,65 @@ describe('#1274 D13 프리뷰 — iceGiantCandidate 옵션 (임시)', () => {
       });
       const f = (m as unknown as { _floats: Record<string, number> })._floats;
       return {
-        amplitude: f.gasBandAmplitude!,
-        count: f.gasBandCount!,
-        turbulence: f.gasTurbulence!,
+        band: {
+          amplitude: f.gasBandAmplitude!,
+          count: f.gasBandCount!,
+          turbulence: f.gasTurbulence!,
+        },
+        albedo: f.iceGiantAlbedo!,
       };
     } finally {
       scene.dispose();
       engine.dispose();
     }
   };
+  const plain = (c: { band: SurfaceBandParams; albedo: number }) => ({
+    band: { ...c.band },
+    albedo: c.albedo,
+  });
 
-  it('후보 a · b · c 가 uranus · neptune 바인딩에 실제로 쓰인다 (새 파라미터가 읽히는지)', () => {
-    for (const id of ['a', 'b', 'c'] as const) {
-      expect(bandOf('uranus', id)).toEqual({ ...ICE_GIANT_CANDIDATES[id].uranus });
-      expect(bandOf('neptune', id)).toEqual({ ...ICE_GIANT_CANDIDATES[id].neptune });
+  it('후보 전건 (1차 a·b·c + 2차 r2a·r2b·r2c) 이 uranus · neptune 바인딩에 실제로 쓰인다', () => {
+    const ids = Object.keys(ICE_GIANT_CANDIDATES) as Array<keyof typeof ICE_GIANT_CANDIDATES>;
+    expect(ids).toEqual(['a', 'b', 'c', 'r2a', 'r2b', 'r2c']);
+    for (const id of ids) {
+      expect(bound('uranus', id)).toEqual(plain(ICE_GIANT_CANDIDATES[id].uranus));
+      expect(bound('neptune', id)).toEqual(plain(ICE_GIANT_CANDIDATES[id].neptune));
     }
     // 후보끼리 실제로 다르다 (표가 같은 값을 반복하면 비교가 무의미).
-    expect(bandOf('uranus', 'b')).not.toEqual(bandOf('uranus', 'c'));
+    expect(bound('uranus', 'b')).not.toEqual(bound('uranus', 'c'));
+    expect(bound('uranus', 'r2a').albedo).not.toBe(bound('uranus', 'r2c').albedo);
+  });
+
+  it('2차 후보는 uranus 밴드를 1차 c 로 고정하고 albedo 만 바꾼다 · neptune 은 1차 a (albedo 1)', () => {
+    for (const id of ['r2a', 'r2b', 'r2c'] as const) {
+      expect(ICE_GIANT_CANDIDATES[id].uranus.band).toEqual(ICE_GIANT_CANDIDATES.c.uranus.band);
+      expect(ICE_GIANT_CANDIDATES[id].neptune).toEqual(ICE_GIANT_CANDIDATES.a.neptune);
+    }
+    expect(ICE_GIANT_CANDIDATES.a.neptune.albedo).toBe(1);
   });
 
   it('미지정 = 테이블 값 (후보 a)', () => {
-    expect(bandOf('uranus', undefined)).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.uranus });
-    expect(SURFACE_BAND_PARAMS_BY_BODY.uranus).toBe(ICE_GIANT_CANDIDATES.a.uranus);
+    expect(bound('uranus', undefined)).toEqual({
+      band: { ...SURFACE_BAND_PARAMS_BY_BODY.uranus },
+      albedo: ICE_GIANT_ALBEDO_BY_BODY.uranus,
+    });
+    expect(SURFACE_BAND_PARAMS_BY_BODY.uranus).toBe(ICE_GIANT_CANDIDATES.a.uranus.band);
   });
 
   it('미지 후보 → console.warn + 테이블 값', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
-      expect(bandOf('neptune', 'zz')).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.neptune });
+      expect(bound('neptune', 'zz').band).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.neptune });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('iceGiantCandidate=zz'));
     } finally {
       warn.mockRestore();
     }
   });
 
-  it('비-IceGiant body (jupiter) 는 후보 플래그의 영향을 받지 않는다', () => {
-    expect(bandOf('jupiter', 'c')).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.jupiter });
+  it('비-IceGiant body (jupiter) 는 후보 플래그의 영향을 받지 않는다 (albedo 바인딩 1)', () => {
+    expect(bound('jupiter', 'r2a')).toEqual({
+      band: { ...SURFACE_BAND_PARAMS_BY_BODY.jupiter },
+      albedo: 1,
+    });
   });
 });

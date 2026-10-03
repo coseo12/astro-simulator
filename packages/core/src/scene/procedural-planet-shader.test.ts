@@ -20,6 +20,7 @@ import {
   SURFACE_TYPE_BY_BODY,
   SURFACE_BAND_PARAMS_BY_BODY,
   resolveSurfaceBandParams,
+  resolveIceGiantAlbedo,
   ROCKY_CONTRAST,
   DESERT_DETAIL,
   DESERT_RUST_TINT,
@@ -233,6 +234,8 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
   for (const [label, type, base] of BASES) {
     // 수집 단계가 아니라 각 it 안에서 해석한다 — 테이블 결함이 파일 전체 수집 실패로 번지지 않게.
     const bandsFor = () => resolveSurfaceBandParams(label.slice(0, label.indexOf('/')), type);
+    // #1274 U1 (b) — IceGiant 는 albedo 도 필수 (비-IceGiant 는 1 이 나오고 미러가 읽지 않는다).
+    const albedoFor = () => resolveIceGiantAlbedo(label.slice(0, label.indexOf('/')), type);
     it(`${label}: 다수 표면점에서 보라/마젠타 부재 (G ≥ min(R,B) 위배 없음)`, () => {
       const bands = bandsFor();
       let violations = 0;
@@ -244,7 +247,7 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
         const z = Math.sin(t * 0.5) * Math.sin(t);
         const len = Math.hypot(x, y, z) || 1;
         const p: [number, number, number] = [x / len, y / len, z / len];
-        const [r, g, b] = surfaceColorMirror(base, type, p, undefined, bands);
+        const [r, g, b] = surfaceColorMirror(base, type, p, undefined, bands, albedoFor());
         // 보라/마젠타 = R 과 B 가 동시에 우세하면서 G 가 결핍 (G < min(R,B)).
         if (g < Math.min(r, b) - 1e-6) violations++;
       }
@@ -258,7 +261,7 @@ describe('#756 procedural-planet — 보라/마젠타 부재 (디자인 루브�
         const p: [number, number, number] = [Math.sin(t), Math.cos(t * 1.3), Math.sin(t * 0.7)];
         const len = Math.hypot(...p) || 1;
         const np: [number, number, number] = [p[0] / len, p[1] / len, p[2] / len];
-        for (const c of surfaceColorMirror(base, type, np, undefined, bands)) {
+        for (const c of surfaceColorMirror(base, type, np, undefined, bands, albedoFor())) {
           expect(c).toBeGreaterThanOrEqual(0);
           expect(c).toBeLessThanOrEqual(1);
         }
@@ -911,9 +914,10 @@ describe('Amendment 4 (#1119) — JS 미러 마스크 경로 (§A4.4 핵심 예�
         BAND_SURFACE_TYPES.has(type) && bodyOfType !== undefined
           ? SURFACE_BAND_PARAMS_BY_BODY[bodyOfType]
           : undefined;
+      const albedo = bodyOfType !== undefined ? resolveIceGiantAlbedo(bodyOfType, type) : undefined;
       for (const p of spherePoints(32)) {
-        expect(surfaceColorMirror(base, type, p, { enabled: 1, sample: 1 }, bands)).toEqual(
-          surfaceColorMirror(base, type, p, undefined, bands),
+        expect(surfaceColorMirror(base, type, p, { enabled: 1, sample: 1 }, bands, albedo)).toEqual(
+          surfaceColorMirror(base, type, p, undefined, bands, albedo),
         );
       }
     }

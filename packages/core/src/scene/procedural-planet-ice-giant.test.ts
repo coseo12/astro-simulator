@@ -15,9 +15,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   BAND_SURFACE_TYPES,
+  ICE_GIANT_ALBEDO_BY_BODY,
   PLANET_FRAGMENT_SHADER,
+  SURFACE_BAND_PARAMS_BY_BODY,
+  SURFACE_TYPE_BY_BODY,
   SurfaceType,
   nightLightTermMirror,
+  resolveIceGiantAlbedo,
+  surfaceColorMirror,
 } from './procedural-planet-shader.js';
 
 /** `//` 주석 제거 (GLSL 소스에 블록 주석은 없다 — 아래 테스트가 단언한다). */
@@ -139,5 +144,50 @@ describe('#1274 D7 — 추출기 판별력 (합성 셰이더 변이)', () => {
 
   it('비교 연산 (`rim == 0.0`) 은 대입으로 세지 않는다', () => {
     expect(assigns('if (rim == 0.0) {}', 'rim')).toBe(false);
+  });
+});
+
+describe('#1274 U1 (b) — IceGiant albedo 배율 (별도 테이블 · 분기 4 전용)', () => {
+  const sorted = (xs: Iterable<string>): string[] => [...xs].sort();
+
+  it('keys(ICE_GIANT_ALBEDO_BY_BODY) == { id | SURFACE_TYPE_BY_BODY[id] == IceGiant } (양방향)', () => {
+    const derived = Object.entries(SURFACE_TYPE_BY_BODY)
+      .filter(([, t]) => t === SurfaceType.IceGiant)
+      .map(([id]) => id);
+    expect(derived.length).toBeGreaterThan(0);
+    expect(sorted(Object.keys(ICE_GIANT_ALBEDO_BY_BODY))).toEqual(sorted(derived));
+  });
+
+  it('누락 · 초과 시 throw (기본값 fallback 금지) · 비-IceGiant 는 1', () => {
+    expect(() => resolveIceGiantAlbedo('uranus', SurfaceType.IceGiant, {})).toThrow(/행이 없다/);
+    expect(() => resolveIceGiantAlbedo('jupiter', SurfaceType.GasBands, { jupiter: 0.5 })).toThrow(
+      /행이 있다/,
+    );
+    expect(resolveIceGiantAlbedo('jupiter', SurfaceType.GasBands)).toBe(1);
+    expect(resolveIceGiantAlbedo('x', SurfaceType.IceGiant, { x: 0.4 })).toBe(0.4);
+  });
+
+  it('GLSL — iceGiantAlbedo 선언 1 + 참조는 N = 4 블록에만 (양성 대조: N = 4 에 있다)', () => {
+    expect(CODE).toContain('uniform float iceGiantAlbedo');
+    const users = [...BLOCKS].filter(([, b]) => /\biceGiantAlbedo\b/.test(b)).map(([n]) => n);
+    expect(users).toEqual([SurfaceType.IceGiant]);
+    // 선언 1 + 분기 4 사용 1 — 분기 밖에서 읽는 경로가 없다.
+    expect(CODE.split('iceGiantAlbedo').length - 1).toBe(2);
+  });
+
+  it('미러 — IceGiant 는 albedo 필수 (미전달 throw) · 배율이 색에 곱해진다 · GasBands 는 읽지 않는다', () => {
+    const base: readonly [number, number, number] = [0.6, 0.5, 0.4];
+    const p: readonly [number, number, number] = [0.3, 0.6, 0.74];
+    const band = SURFACE_BAND_PARAMS_BY_BODY.uranus!;
+    expect(() => surfaceColorMirror(base, SurfaceType.IceGiant, p, undefined, band)).toThrow(
+      /iceGiantAlbedo 인자가 없다/,
+    );
+    const one = surfaceColorMirror(base, SurfaceType.IceGiant, p, undefined, band, 1);
+    const half = surfaceColorMirror(base, SurfaceType.IceGiant, p, undefined, band, 0.5);
+    one.forEach((c, i) => expect(half[i]).toBeCloseTo(c * 0.5, 12));
+    const jb = SURFACE_BAND_PARAMS_BY_BODY.jupiter!;
+    expect(surfaceColorMirror(base, SurfaceType.GasBands, p, undefined, jb, 0.5)).toEqual(
+      surfaceColorMirror(base, SurfaceType.GasBands, p, undefined, jb),
+    );
   });
 });
