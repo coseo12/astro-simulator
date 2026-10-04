@@ -1146,7 +1146,8 @@ describe('Amendment 8 (#1202) — rim GLSL 배선 계약 (D1/D5, ADR §A8.4·A8.
     expect(rimCalcIdx).toBeLessThan(dispatchIdx); // rocky 분기 안
     expect(compositeIdx).toBeGreaterThan(dispatchIdx); // 분기 밖
     // 비-rocky 가 rim 을 0 으로 받는 유일한 근거 — 분기 앞 초기화.
-    const initIdx = FRAGMENT_CODE_ONLY.indexOf('float rim = 0.0');
+    // #1274 리뷰 B1 라운드 2 — 우변까지 완전 일치 (접두 indexOf 는 `= 0.0 + x` 를 초기화로 인정했다).
+    const initIdx = FRAGMENT_CODE_ONLY.search(/\bfloat\s+rim\s*=\s*0\.0\s*;/);
     expect(initIdx).toBeGreaterThan(0);
     expect(initIdx).toBeLessThan(rockyIdx);
   });

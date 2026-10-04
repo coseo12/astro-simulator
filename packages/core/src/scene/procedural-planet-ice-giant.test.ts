@@ -72,8 +72,9 @@ const assigns = (block: string, name: string): boolean =>
  * #1274 리뷰 B1 — `name` 에 대한 **대입 연산 출현 수** (주석 제거된 GLSL 문자열 기준, 정규식).
  *
  * 세는 것: `name =` (선언 `float name =` 포함) · `name += -= *= /=` · `name++` · `name--` · `++name` · `--name`.
- * 세지 않는 것: 비교 (`==` · `!=` · `<=` · `>=`) · 다른 식별자 (`rimGeom` 등 — 단어 경계) · out 인자 ·
- * 매크로 · swizzle 경유 쓰기. 즉 「대입 문법의 출현」 을 세는 텍스트 술어이지 데이터 흐름 분석이 아니다.
+ * 세지 않는 것: 비교 (`==` · `!=` · `<=` · `>=`) · 이름이 더 긴 식별자 (`rimGeom` 등 — 이름 바로 뒤에 공백과
+ * 연산자가 와야 해서) · 앞이 붙은 식별자 (`prim` · `_rim` — 앞쪽 단어 경계) · out 인자 · 매크로 · swizzle 경유
+ * 쓰기. 즉 「대입 문법의 출현」 을 세는 텍스트 술어이지 데이터 흐름 분석이 아니다.
  */
 const countAssignments = (code: string, name: string): number =>
   (
@@ -82,14 +83,27 @@ const countAssignments = (code: string, name: string): number =>
     ) ?? []
   ).length;
 
+/** 출현 수 (전역 정규식). */
+const countMatches = (code: string, re: RegExp): number => (code.match(re) ?? []).length;
+
 /**
- * 가드 블록 (`uSurfaceType == 0`) 밖의 대입 수 = 전체 − N=0 블록 안 − 분기 앞 초기값 선언 1.
+ * #1274 리뷰 B1 라운드 2 — 초기값 선언을 **우변까지 완전 일치**로 센다 (`float rim = 0.0;`).
+ * 접두 매칭 (`float rim = 0.0` 부분 문자열) 은 `float rim = 0.0 + rimStrength;` · `float lights = 0.05;` 를
+ * 선언으로 인정해 계수에서 빼 버렸다 (리뷰 재현 D7d · D7e).
+ */
+const zeroInitDecl = (name: string): RegExp =>
+  new RegExp(`\\bfloat\\s+${name}\\s*=\\s*0\\.0\\s*;`, 'g');
+/** 선언 형태 전체 (우변 무관) — 우변을 바꾼 선언이 별개로 세어지지 않고 이 계수 == 1 단언과 함께 FAIL 하게. */
+const anyDecl = (name: string): RegExp => new RegExp(`\\bfloat\\s+${name}\\s*=`, 'g');
+
+/**
+ * 가드 블록 (`uSurfaceType == 0`) 밖의 대입 수 = 전체 − N=0 블록 안 − 우변까지 일치하는 초기값 선언 (`float name = 0.0;`).
  * `uSurfaceType == N` 추출기가 보지 못하는 경로 (가드 없는 대입 · `>=` / `!=` 등 다른 가드 · 별도 bool 가드)
  * 를 전부 「N=0 블록 밖」 으로 센다 (리뷰 재현 D7a · D7b).
  */
 const assignmentsOutsideRocky = (code: string, name: string): number => {
   const rocky = extractSurfaceTypeBlocks(code).get(SurfaceType.Rocky) ?? '';
-  const decl = code.split(`float ${name} = 0.0`).length - 1;
+  const decl = countMatches(code, zeroInitDecl(name));
   return countAssignments(code, name) - countAssignments(rocky, name) - decl;
 };
 
@@ -127,18 +141,22 @@ describe('#1274 D7 — FRAGMENT_SHADER 정적 블록 분석 (earth 전용 효과
     expect(assigns(ice, 'lights')).toBe(false);
   });
 
-  it('B1 — FRAGMENT_SHADER 전체의 rim · lights 대입 연산 수 == N=0 블록 안 대입 수 + 초기값 선언 1 (가드 없는 대입 · 다른 가드 포함)', () => {
+  it('B1 — FRAGMENT_SHADER 전체의 rim · lights 대입 연산 수 == N=0 블록 안 대입 수 + 우변까지 일치하는 초기값 선언 `float name = 0.0;` 1 (가드 없는 대입 · 다른 가드 · 초기값 변경 포함)', () => {
     for (const name of ['rim', 'lights']) {
       // 초기값 선언은 정확히 1 이고 N=0 블록 안 대입이 ≥ 1 이어야 한다 (양쪽 0 의 공허 통과 차단).
-      expect(CODE.split(`float ${name} = 0.0`).length - 1).toBe(1);
+      expect(countMatches(CODE, zeroInitDecl(name))).toBe(1);
+      expect(countMatches(CODE, anyDecl(name))).toBe(1);
       expect(countAssignments(BLOCKS.get(SurfaceType.Rocky) ?? '', name)).toBeGreaterThanOrEqual(1);
       expect(assignmentsOutsideRocky(CODE, name)).toBe(0);
     }
   });
 
   it('분기 밖 초기값은 0 — 비-rocky 합성이 정확한 no-op 인 근거 (`float rim = 0.0` · `float lights = 0.0`)', () => {
-    expect(CODE).toContain('float rim = 0.0');
-    expect(CODE).toContain('float lights = 0.0');
+    // 우변까지 완전 일치 (리뷰 B1 라운드 2 — 접두 `toContain` 은 `= 0.05` · `= 0.0 + x` 를 통과시켰다).
+    for (const name of ['rim', 'lights']) {
+      expect(countMatches(CODE, zeroInitDecl(name))).toBe(1);
+      expect(countMatches(CODE, anyDecl(name))).toBe(1);
+    }
   });
 
   it('밴드 uniform 참조 블록의 N 집합 == BAND_SURFACE_TYPES (양방향)', () => {
@@ -184,6 +202,16 @@ describe('#1274 D7 — 추출기 판별력 (합성 셰이더 변이)', () => {
     expect(assignmentsOutsideRocky(`${SYNTH_OK} rim++;`, 'rim')).toBe(1);
   });
 
+  it('B1 라운드 2 — 초기값 선언의 우변을 바꾸면 선언으로 빼지 않는다 (D7d · D7e 형)', () => {
+    const d7d = SYNTH_OK.replace('float rim = 0.0;', 'float rim = 0.0 + rimStrength;');
+    expect(d7d).not.toBe(SYNTH_OK);
+    expect(assignmentsOutsideRocky(d7d, 'rim')).toBe(1);
+    const d7e = `float lights = 0.05;\n${SYNTH_OK}`;
+    expect(assignmentsOutsideRocky(d7e, 'lights')).toBe(1);
+    expect(countMatches(d7d, zeroInitDecl('rim'))).toBe(0);
+    expect(countMatches(d7d, anyDecl('rim'))).toBe(1);
+  });
+
   it('B1 오매칭 없음 — 비교 연산 · 접두가 같은 다른 식별자는 세지 않는다', () => {
     const noise = `${SYNTH_OK} if (rim == 0.0 || rim >= 1.0 || rim <= 2.0 || rim != 3.0) {} float rimGeom = 1.0; rimFall = 2.0;`;
     expect(assignmentsOutsideRocky(noise, 'rim')).toBe(0);
@@ -224,11 +252,11 @@ describe('#1274 U1 (b) — IceGiant albedo 배율 (별도 테이블 · 분기 4 
   });
 
   it('GLSL — iceGiantAlbedo 선언 1 + 참조는 N = 4 블록에만 (양성 대조: N = 4 에 있다)', () => {
-    expect(CODE).toContain('uniform float iceGiantAlbedo');
+    expect(countMatches(CODE, /\buniform\s+float\s+iceGiantAlbedo\s*;/g)).toBe(1);
     const users = [...BLOCKS].filter(([, b]) => /\biceGiantAlbedo\b/.test(b)).map(([n]) => n);
     expect(users).toEqual([SurfaceType.IceGiant]);
     // 선언 1 + 분기 4 사용 1 — 분기 밖에서 읽는 경로가 없다.
-    expect(CODE.split('iceGiantAlbedo').length - 1).toBe(2);
+    expect(countMatches(CODE, /\biceGiantAlbedo\b/g)).toBe(2);
   });
 
   it('미러 — IceGiant 는 albedo 필수 (미전달 throw) · 배율이 색에 곱해진다 · GasBands 는 읽지 않는다', () => {
