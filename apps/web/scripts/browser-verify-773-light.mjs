@@ -207,12 +207,14 @@ const SURFACE_BODIES = [
 // #1274 D6 (iii) — neptune 은 IceGiant 로 등록돼 단색 대조군에서 뺐다 (기존 mercury 는 유지 — 선정 기준은 대체분에만). 대체 body = triton. 선정 기준
 // (ADR 756 §A12.9 · 계약 조정 C4 — 두 가드의 배경 배제는 기하라 휘도 임계와 무관): ① SURFACE_TYPE_BY_BODY
 // 미등록 ② 로드맵 Cratered 후보 (mercury · callisto · rhea · titania · oberon · ceres) 밖 — 다음 표면
-// 확장에서 대조군이 다시 사라지지 않게 ③ 첫 실행 로그 disk area > 0 (PR #1278 코멘트).
+// 확장에서 대조군이 다시 사라지지 않게 ③ 첫 실행 로그 disk area > 0 (PR #1278 코멘트). ⚠️ ③ 은 선정 시점에
+// 확인한 기준이고 런타임에 강제되지 않는다 — plain 측정이 실패하거나 area 0 이어도 이 가드는 PASS 한다.
 const PLAIN_BODIES = [{ id: 'venus' }, { id: 'mercury' }, { id: 'saturn' }, { id: 'triton' }];
 
 /**
- * #1274 D6 (iii) — 대조군 · 판정 대상 목록이 비면 그 단계가 아무것도 재지 않고 통과한다 → fail-fast.
- * 「비어 있지 않음」 만 묻는다 (새 임계 0).
+ * #1274 D6 (iii) — 두 목록이 비어 있지 않음만 묻는다 (새 임계 0). `SURFACE_BODIES` 가 비면 표면 판정
+ * 루프가 0 회 돈다 (그 축의 공허 통과). `PLAIN_BODIES` 는 측정값을 `out.plain` 에 **기록만** 하고 판정에 쓰지 않으므로,
+ * 비면 그 로그 단계가 빌 뿐이다 (PR #1278 리뷰 R1).
  */
 if (!(SURFACE_BODIES.length >= 1) || !(PLAIN_BODIES.length >= 1)) {
   console.error(

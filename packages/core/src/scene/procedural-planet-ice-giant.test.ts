@@ -4,8 +4,11 @@
  * **D7 — earth 전용 효과 `0`** (계약 조정 C2): GLSL 미러는 GLSL 과 따로 작성돼 GLSL 의 누수를 볼 수
  * 없다. 그래서 `FRAGMENT_SHADER` 를 **정적 블록 분석**한다 — `//` 주석을 지운 뒤 `uSurfaceType == N`
  * 으로 가드된 모든 블록을 괄호 매칭으로 추출해 N 별로 합치고,
- *   - `rim =` · `lights =` 대입은 N = 0 블록에만 있고 N = 4 블록에는 없다
+ *   - `rim =` · `lights =` 대입은 가드 블록 사이에서 N = 0 블록에만 있고 N = 4 블록에는 없다
  *     (양성 대조: N = 0 블록에 둘 다 있어야 한다 — 없으면 추출기가 고장난 것이다)
+ *   - 리뷰 B1 (PR #1278): 위 비교는 `uSurfaceType == N` 가드 블록끼리만 본다. 그래서 **셰이더 전체의 대입
+ *     연산 수 == N=0 블록 안 대입 수 + 초기값 선언 1** 도 단언한다 — 가드 없는 대입 · `>=` 등 다른 가드를
+ *     잡는다. 세는 대상은 대입 문법의 출현이다 (`countAssignments` 주석 — 데이터 흐름 분석 아님)
  *   - 밴드 uniform (`gasBandAmplitude` · `gasBandCount` · `gasTurbulence`) 참조 블록의 N 집합
  *     == `BAND_SURFACE_TYPES` (결정 1 의 집합과 GLSL 의 양방향 일치 — volt #120)
  *   - 수치 양성 대조: `nightLightTermMirror` 가 earth 대표 입력에서 `> 0`
@@ -65,6 +68,31 @@ function extractSurfaceTypeBlocks(code: string): Map<number, string> {
 const assigns = (block: string, name: string): boolean =>
   new RegExp(`\\b${name}\\s*=(?!=)`).test(block);
 
+/**
+ * #1274 리뷰 B1 — `name` 에 대한 **대입 연산 출현 수** (주석 제거된 GLSL 문자열 기준, 정규식).
+ *
+ * 세는 것: `name =` (선언 `float name =` 포함) · `name += -= *= /=` · `name++` · `name--` · `++name` · `--name`.
+ * 세지 않는 것: 비교 (`==` · `!=` · `<=` · `>=`) · 다른 식별자 (`rimGeom` 등 — 단어 경계) · out 인자 ·
+ * 매크로 · swizzle 경유 쓰기. 즉 「대입 문법의 출현」 을 세는 텍스트 술어이지 데이터 흐름 분석이 아니다.
+ */
+const countAssignments = (code: string, name: string): number =>
+  (
+    code.match(
+      new RegExp(`\\b${name}\\s*(?:[-+*/]?=(?!=)|\\+\\+|--)|(?:\\+\\+|--)\\s*${name}\\b`, 'g'),
+    ) ?? []
+  ).length;
+
+/**
+ * 가드 블록 (`uSurfaceType == 0`) 밖의 대입 수 = 전체 − N=0 블록 안 − 분기 앞 초기값 선언 1.
+ * `uSurfaceType == N` 추출기가 보지 못하는 경로 (가드 없는 대입 · `>=` / `!=` 등 다른 가드 · 별도 bool 가드)
+ * 를 전부 「N=0 블록 밖」 으로 센다 (리뷰 재현 D7a · D7b).
+ */
+const assignmentsOutsideRocky = (code: string, name: string): number => {
+  const rocky = extractSurfaceTypeBlocks(code).get(SurfaceType.Rocky) ?? '';
+  const decl = code.split(`float ${name} = 0.0`).length - 1;
+  return countAssignments(code, name) - countAssignments(rocky, name) - decl;
+};
+
 const BAND_UNIFORMS = ['gasBandAmplitude', 'gasBandCount', 'gasTurbulence'];
 const readsBand = (block: string): boolean =>
   BAND_UNIFORMS.some((u) => new RegExp(`\\b${u}\\b`).test(block));
@@ -89,7 +117,7 @@ describe('#1274 D7 — FRAGMENT_SHADER 정적 블록 분석 (earth 전용 효과
     expect(assigns(rocky, 'lights')).toBe(true);
   });
 
-  it('`rim =` · `lights =` 대입이 있는 블록은 N = 0 뿐이다 (IceGiant N = 4 에는 없다)', () => {
+  it('가드 블록 사이 비교 — `rim =` · `lights =` 대입이 있는 `uSurfaceType == N` 블록은 N = 0 뿐이다 (IceGiant N = 4 에는 없다)', () => {
     const rimTypes = [...BLOCKS].filter(([, b]) => assigns(b, 'rim')).map(([n]) => n);
     const lightTypes = [...BLOCKS].filter(([, b]) => assigns(b, 'lights')).map(([n]) => n);
     expect(rimTypes).toEqual([SurfaceType.Rocky]);
@@ -97,6 +125,15 @@ describe('#1274 D7 — FRAGMENT_SHADER 정적 블록 분석 (earth 전용 효과
     const ice = BLOCKS.get(SurfaceType.IceGiant) ?? '';
     expect(assigns(ice, 'rim')).toBe(false);
     expect(assigns(ice, 'lights')).toBe(false);
+  });
+
+  it('B1 — FRAGMENT_SHADER 전체의 rim · lights 대입 연산 수 == N=0 블록 안 대입 수 + 초기값 선언 1 (가드 없는 대입 · 다른 가드 포함)', () => {
+    for (const name of ['rim', 'lights']) {
+      // 초기값 선언은 정확히 1 이고 N=0 블록 안 대입이 ≥ 1 이어야 한다 (양쪽 0 의 공허 통과 차단).
+      expect(CODE.split(`float ${name} = 0.0`).length - 1).toBe(1);
+      expect(countAssignments(BLOCKS.get(SurfaceType.Rocky) ?? '', name)).toBeGreaterThanOrEqual(1);
+      expect(assignmentsOutsideRocky(CODE, name)).toBe(0);
+    }
   });
 
   it('분기 밖 초기값은 0 — 비-rocky 합성이 정확한 no-op 인 근거 (`float rim = 0.0` · `float lights = 0.0`)', () => {
@@ -131,6 +168,25 @@ describe('#1274 D7 — 추출기 판별력 (합성 셰이더 변이)', () => {
     expect([...b].filter(([, x]) => assigns(x, 'rim')).map(([n]) => n)).toEqual([0]);
     // 중첩 괄호를 넘어 블록 끝까지 읽는다 (조기 종료 시 이 대입이 빠진다).
     expect(b.get(0)).toContain('y = 1.0');
+  });
+
+  it('B1 누수 변이 — 가드 없는 대입 (D7a 형) 을 블록 밖 대입으로 센다', () => {
+    expect(assignmentsOutsideRocky(SYNTH_OK, 'rim')).toBe(0);
+    expect(assignmentsOutsideRocky(`${SYNTH_OK}\n rim = rimStrength;`, 'rim')).toBe(1);
+  });
+
+  it('B1 누수 변이 — `>=` 가드 (D7b 형) · 복합 대입 (`+=` · `*=`) · `++` 도 센다', () => {
+    expect(
+      assignmentsOutsideRocky(`${SYNTH_OK} if (uSurfaceType >= 4) { lights = 3.0; }`, 'lights'),
+    ).toBe(1);
+    expect(assignmentsOutsideRocky(`${SYNTH_OK} rim += 0.1;`, 'rim')).toBe(1);
+    expect(assignmentsOutsideRocky(`${SYNTH_OK} rim *= 2.0;`, 'rim')).toBe(1);
+    expect(assignmentsOutsideRocky(`${SYNTH_OK} rim++;`, 'rim')).toBe(1);
+  });
+
+  it('B1 오매칭 없음 — 비교 연산 · 접두가 같은 다른 식별자는 세지 않는다', () => {
+    const noise = `${SYNTH_OK} if (rim == 0.0 || rim >= 1.0 || rim <= 2.0 || rim != 3.0) {} float rimGeom = 1.0; rimFall = 2.0;`;
+    expect(assignmentsOutsideRocky(noise, 'rim')).toBe(0);
   });
 
   it('누수 변이 — N = 4 블록에 rim 대입을 넣으면 검출된다', () => {
