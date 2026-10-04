@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.91.0] - 2026-10-04
+
 ### Added
 
 - **[#1274] 천왕성 · 해왕성 절차 표면 — `IceGiant` 저대비 위도 밴드 (PR2)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), PR [#1278](https://github.com/coseo12/astro-simulator/pull/1278), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.5 · §A12.20).
@@ -22,7 +24,7 @@ Semantic Versioning을 따른다.
 
 ### Changed
 
-- **[#1274] 절차 표면 밴드 파라미터를 body 별 테이블로 이관 (PR1 — 화면 변화 없음)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.4). 천왕성·해왕성 `IceGiant` 표면 (PR2) 의 선행 작업이다.
+- **[#1274] 절차 표면 밴드 파라미터를 body 별 테이블로 이관 (PR1 — 화면 변화 없음)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), PR [#1276](https://github.com/coseo12/astro-simulator/pull/1276), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.4). 천왕성·해왕성 `IceGiant` 표면 (PR2 [#1278](https://github.com/coseo12/astro-simulator/pull/1278)) 의 선행 작업이다.
   - **`SURFACE_BAND_PARAMS_BY_BODY` · `BAND_SURFACE_TYPES` · `resolveSurfaceBandParams`** — 밴드 uniform 3종 (`gasBandAmplitude` · `gasBandCount` · `gasTurbulence`) 을 body 별 테이블에서 해석한다. 밴드 타입인데 행이 없거나, 비-밴드 타입인데 행이 있으면 throw 한다 (기본값 fallback 없음). jupiter 행은 기존 상수 `GAS_BAND_*` 를 참조한다.
   - **비-밴드 body (earth · mars · moon) 의 밴드 uniform 바인딩이 목성 상수 → `0` 으로 바뀌었다.** 이 3종을 읽는 GLSL 이 밴드 분기뿐이라 화면 변화가 없어야 한다는 설계 예측을 아래 하네스로 실측했다 — base (develop `afee1b13`) ↔ feature, earth · mars · jupiter · moon × `?surface` on/off 8 시나리오 disk 표본 diff 전부 `0` (로컬 SwiftShader). 셰이더 문자열 (`PLANET_FRAGMENT_SHADER` · `PLANET_VERTEX_SHADER`) 은 바이트 동일하다.
   - `surfaceColorMirror` 는 밴드 타입에서 파라미터를 5번째 인자로 받는다 (미전달 시 throw).
@@ -32,7 +34,7 @@ Semantic Versioning을 따른다.
 
 ### Fixed
 
-- **[#1271] `verify:1265-display-panel` — 부팅 핸들 대기 초과가 처리되지 않은 예외로 `exit 1` 이 되던 경로를 판정 구조 안으로** ([#1271](https://github.com/coseo12/astro-simulator/issues/1271)). v0.90.0 prep PR [#1270](https://github.com/coseo12/astro-simulator/pull/1270) 의 CI 에서 같은 코드의 develop 실행은 통과했는데 `F-cloudOn-mid` 의 핸들 대기가 20 s 상한을 넘어 실패했다.
+- **[#1271] `verify:1265-display-panel` — 부팅 핸들 대기 초과가 처리되지 않은 예외로 `exit 1` 이 되던 경로를 판정 구조 안으로** ([#1271](https://github.com/coseo12/astro-simulator/issues/1271), PR [#1273](https://github.com/coseo12/astro-simulator/pull/1273)). v0.90.0 prep PR [#1270](https://github.com/coseo12/astro-simulator/pull/1270) 의 CI 에서 같은 코드의 develop 실행은 통과했는데 `F-cloudOn-mid` 의 핸들 대기가 20 s 상한을 넘어 실패했다.
 
   - **누적은 섹션 사이가 아니라 섹션 안이었다.** 페이지 해제가 섹션 경계에서만 일어나는데 `runClouds` 가 혼자 8 페이지를 열었다. CI 부트 레코드에서 핸들 대기는 열린 컨텍스트 수를 따라 올랐다 — 통과한 run 도 8 번째 페이지가 `13.7 s` (상한의 68%) 였고, 실패 run (attempt 1) 은 `23.6 s` 였다. 이제 하위 블록 경계마다 해제해 전체 실행의 `contexts` 최대가 `3` 이다.
   - **부팅 실패 분류 — 단독 재부팅.** 부팅 예외는 그 섹션만 중단시키고 나머지 섹션은 계속 판정한다. 열린 페이지를 모두 닫고 같은 쿼리로 다시 부팅해 성공하면 **데이터가 미완결인 게이트**가 측정 불가 (`exit 2`) 다 — 게이트마다 읽는 결과 키를 선언하고, 부팅 실패가 있을 때 선언한 키 중 하나라도 없으면 측정 불가, 전부 있으면 같은 섹션이어도 판정한다 (부팅 실패 전에 측정된 FAIL 은 `exit 1` 로 남는다). 여러 페이지의 표본을 모으는 게이트는 기대 표본이 빠지면 FAIL 이 아닌 결과를, 표본이 0 이면 결과를 측정 불가로 바꾼다. 게이트의 평가 함수가 선언 밖의 키를 읽으면 판정 시 결과의 Proxy 가 잡아 하네스 결함 (`exit 1`) 으로 끝낸다. 다시 실패하면 신규 게이트 「부팅 — 단독 핸들 노출」 이 FAIL (`exit 1`) 이다. 판정 메시지는 첫 시도의 열린 컨텍스트 수만 적는다 — 1 이면 첫 시도도 단독이었으므로 재부팅 성공은 재시도 성공이다. 재부팅 페이지의 콘솔 에러는 콘솔 에러 게이트로 들어간다. `INJECT=boot` 로 앞쪽을, `__solarScene` 노출 제거 변이로 뒤쪽을 실행 확인했다. ⚠️ **받아들인 비용**: 첫 시도 부팅이 실패하고 단독 재부팅이 성공하는 회귀는 원인과 무관하게 측정 불가로 분류된다 — 범위는 실패 지점에서 데이터가 미완결인 게이트다 (읽는 키 부재 · 기대 표본 부족 · 누적 표본 0).
