@@ -9,7 +9,7 @@
  * 테스트가 FAIL 해야 한다.
  */
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import {
@@ -18,7 +18,6 @@ import {
   GAS_BAND_COUNT,
   GAS_TURBULENCE,
   ICE_GIANT_ALBEDO_BY_BODY,
-  ICE_GIANT_CANDIDATES,
   SURFACE_BAND_PARAMS_BY_BODY,
   SURFACE_TYPE_BY_BODY,
   SurfaceType,
@@ -228,20 +227,15 @@ describe('#1274 — 밴드 uniform 바인딩이 해석 함수를 따른다 (Null
   });
 });
 
-// ⚠️ #1274 D13 프리뷰 임시 — `ICE_GIANT_CANDIDATES` · `iceGiantCandidate` 와 함께 승인 후 삭제한다.
-describe('#1274 D13 프리뷰 — iceGiantCandidate 옵션 (임시)', () => {
-  const bound = (
-    id: string,
-    candidate: string | undefined,
-  ): { band: SurfaceBandParams; albedo: number } => {
+// #1274 D13 육안 승인값 박제 (사용자 2026-10-04, 2라운드) — drift 시 시각 회귀 (#69).
+describe('#1274 D13 — IceGiant 승인값 박제 + 바인딩', () => {
+  const bound = (id: string): { band: SurfaceBandParams; albedo: number } => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
     scene.activeCamera = new ArcRotateCamera('cam', 0, Math.PI / 2, 50, Vector3.Zero(), scene);
     try {
       const body = { id, colorHint: { hex: '#808080' } } as unknown as LoadedCelestialBody;
-      const m = createProceduralPlanetMaterial(scene, body, `${id}-cand-mat`, {
-        iceGiantCandidate: candidate,
-      });
+      const m = createProceduralPlanetMaterial(scene, body, `${id}-approved-mat`);
       const f = (m as unknown as { _floats: Record<string, number> })._floats;
       return {
         band: {
@@ -256,53 +250,31 @@ describe('#1274 D13 프리뷰 — iceGiantCandidate 옵션 (임시)', () => {
       engine.dispose();
     }
   };
-  const plain = (c: { band: SurfaceBandParams; albedo: number }) => ({
-    band: { ...c.band },
-    albedo: c.albedo,
-  });
 
-  it('후보 전건 (1차 a·b·c + 2차 r2a·r2b·r2c) 이 uranus · neptune 바인딩에 실제로 쓰인다', () => {
-    const ids = Object.keys(ICE_GIANT_CANDIDATES) as Array<keyof typeof ICE_GIANT_CANDIDATES>;
-    expect(ids).toEqual(['a', 'b', 'c', 'r2a', 'r2b', 'r2c']);
-    for (const id of ids) {
-      expect(bound('uranus', id)).toEqual(plain(ICE_GIANT_CANDIDATES[id].uranus));
-      expect(bound('neptune', id)).toEqual(plain(ICE_GIANT_CANDIDATES[id].neptune));
-    }
-    // 후보끼리 실제로 다르다 (표가 같은 값을 반복하면 비교가 무의미).
-    expect(bound('uranus', 'b')).not.toEqual(bound('uranus', 'c'));
-    expect(bound('uranus', 'r2a').albedo).not.toBe(bound('uranus', 'r2c').albedo);
-  });
-
-  it('2차 후보는 uranus 밴드를 1차 c 로 고정하고 albedo 만 바꾼다 · neptune 은 1차 a (albedo 1)', () => {
-    for (const id of ['r2a', 'r2b', 'r2c'] as const) {
-      expect(ICE_GIANT_CANDIDATES[id].uranus.band).toEqual(ICE_GIANT_CANDIDATES.c.uranus.band);
-      expect(ICE_GIANT_CANDIDATES[id].neptune).toEqual(ICE_GIANT_CANDIDATES.a.neptune);
-    }
-    expect(ICE_GIANT_CANDIDATES.a.neptune.albedo).toBe(1);
-  });
-
-  it('미지정 = 테이블 값 (후보 a)', () => {
-    expect(bound('uranus', undefined)).toEqual({
-      band: { ...SURFACE_BAND_PARAMS_BY_BODY.uranus },
-      albedo: ICE_GIANT_ALBEDO_BY_BODY.uranus,
+  it('uranus = 2차 r2b (밴드 0.12 / 6 / 0.06 · albedo 0.45) · neptune = 1차 a (0.10 / 6 / 0.06 · albedo 1)', () => {
+    expect(SURFACE_BAND_PARAMS_BY_BODY.uranus).toEqual({
+      amplitude: 0.12,
+      count: 6,
+      turbulence: 0.06,
     });
-    expect(SURFACE_BAND_PARAMS_BY_BODY.uranus).toBe(ICE_GIANT_CANDIDATES.a.uranus.band);
+    expect(SURFACE_BAND_PARAMS_BY_BODY.neptune).toEqual({
+      amplitude: 0.1,
+      count: 6,
+      turbulence: 0.06,
+    });
+    expect(ICE_GIANT_ALBEDO_BY_BODY).toEqual({ uranus: 0.45, neptune: 1 });
   });
 
-  it('미지 후보 → console.warn + 테이블 값', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    try {
-      expect(bound('neptune', 'zz').band).toEqual({ ...SURFACE_BAND_PARAMS_BY_BODY.neptune });
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('iceGiantCandidate=zz'));
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  it('비-IceGiant body (jupiter) 는 후보 플래그의 영향을 받지 않는다 (albedo 바인딩 1)', () => {
-    expect(bound('jupiter', 'r2a')).toEqual({
-      band: { ...SURFACE_BAND_PARAMS_BY_BODY.jupiter },
+  it('바인딩이 승인값을 따른다 (NullEngine — uniform 이 실제로 읽힌다)', () => {
+    expect(bound('uranus')).toEqual({
+      band: { amplitude: 0.12, count: 6, turbulence: 0.06 },
+      albedo: 0.45,
+    });
+    expect(bound('neptune')).toEqual({
+      band: { amplitude: 0.1, count: 6, turbulence: 0.06 },
       albedo: 1,
     });
+    // 비-IceGiant 는 albedo 1 (분기 4 밖에서 읽지 않는다).
+    expect(bound('jupiter').albedo).toBe(1);
   });
 });

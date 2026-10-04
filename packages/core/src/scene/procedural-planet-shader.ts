@@ -247,53 +247,6 @@ export const BAND_SURFACE_TYPES: ReadonlySet<SurfaceType> = new Set([
   SurfaceType.IceGiant,
 ]);
 
-/** `IceGiant` 로 등록된 body id (D13 후보 표의 열). */
-type IceGiantBodyId = 'uranus' | 'neptune';
-
-/** D13 후보 한 칸 — 밴드 3축 + `IceGiant` 전용 albedo 배율 (§A12.12 U1 (b), 사용자 2026-10-04). */
-export interface IceGiantCandidate {
-  readonly band: SurfaceBandParams;
-  readonly albedo: number;
-}
-
-/** 1차에서 승인된 neptune 값 (D13 1차 결정 2026-10-04 — 후보 a, albedo 미적용 = 1). 2차 후보의 neptune 열. */
-const NEPTUNE_ROUND1_A: IceGiantCandidate = {
-  band: { amplitude: 0.1, count: 6, turbulence: 0.06 },
-  albedo: 1,
-};
-
-/** 1차 후보 c 의 uranus 밴드 — 2차 후보가 밴드를 이것으로 고정하고 albedo 축만 바꾼다. */
-const URANUS_ROUND1_C_BAND: SurfaceBandParams = { amplitude: 0.12, count: 6, turbulence: 0.06 };
-
-/**
- * ⚠️ **#1274 D13 프리뷰 임시 — 사용자 육안 승인 후 같은 PR 에서 삭제한다** (§A12.10).
- * 승인 후보 값을 `SURFACE_BAND_PARAMS_BY_BODY` · `ICE_GIANT_ALBEDO_BY_BODY` 행에 접어 넣고, 이 표 ·
- * `iceGiantCandidate` 옵션 · web 파서 · URL 플래그를 지운다 (`git grep -c iceGiantCandidate` `0`).
- *
- * 값은 미학 파라미터이며 임계가 아니다.
- *   1차 (ADR §A12.10 후보 표 그대로, albedo 1): a — 저대비 기준 / b — 매끈한 넓은 띠 (난류 0) / c — 중대비
- *   2차 (uranus 만 — neptune 은 1차 a 승인값): 밴드 = 1차 c 고정 (1차에서 밴드가 보인 유일한 uranus 후보),
- *     albedo 축만 바꾼다. r2a 0.36 — 낮면 전체 3채널 비포화 (밴드 정점 포함) / r2b 0.45 — 3채널 비포화 ·
- *     G 채널 부분 포화 / r2c 0.60 — 3채널 부분 포화. 도출식은 `docs/reports/1274-ice-giant/d13-candidates-r2/README.md`.
- */
-export const ICE_GIANT_CANDIDATES = {
-  a: {
-    uranus: { band: { amplitude: 0.06, count: 4, turbulence: 0.04 }, albedo: 1 },
-    neptune: NEPTUNE_ROUND1_A,
-  },
-  b: {
-    uranus: { band: { amplitude: 0.06, count: 3, turbulence: 0 }, albedo: 1 },
-    neptune: { band: { amplitude: 0.1, count: 4, turbulence: 0 }, albedo: 1 },
-  },
-  c: {
-    uranus: { band: URANUS_ROUND1_C_BAND, albedo: 1 },
-    neptune: { band: { amplitude: 0.18, count: 8, turbulence: 0.1 }, albedo: 1 },
-  },
-  r2a: { uranus: { band: URANUS_ROUND1_C_BAND, albedo: 0.36 }, neptune: NEPTUNE_ROUND1_A },
-  r2b: { uranus: { band: URANUS_ROUND1_C_BAND, albedo: 0.45 }, neptune: NEPTUNE_ROUND1_A },
-  r2c: { uranus: { band: URANUS_ROUND1_C_BAND, albedo: 0.6 }, neptune: NEPTUNE_ROUND1_A },
-} as const satisfies Readonly<Record<string, Readonly<Record<IceGiantBodyId, IceGiantCandidate>>>>;
-
 /**
  * body id → 밴드 파라미터. **밴드 타입 body 만** 행을 가진다 (위 불변식).
  *
@@ -305,9 +258,10 @@ export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandPar
     count: GAS_BAND_COUNT,
     turbulence: GAS_TURBULENCE,
   },
-  // ⚠️ #1274 D13 프리뷰 동안은 후보 `a` 를 참조한다 (플래그 없이 열어도 a). 승인 후 승인값으로 교체.
-  uranus: ICE_GIANT_CANDIDATES.a.uranus.band,
-  neptune: ICE_GIANT_CANDIDATES.a.neptune.band,
+  // #1274 D13 육안 승인값 (사용자 2026-10-04 — 2라운드, #1274 코멘트 5976286725 · 5970959022).
+  // 미학 파라미터이며 임계가 아니다. 값의 유일한 출처가 이 행이다 (사본 없음 — 단위 테스트가 박제값 단언).
+  uranus: { amplitude: 0.12, count: 6, turbulence: 0.06 }, // 2차 r2b (밴드 = 1차 후보 c)
+  neptune: { amplitude: 0.1, count: 6, turbulence: 0.06 }, // 1차 후보 a
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,11 +276,12 @@ export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandPar
 
 /**
  * body id → albedo 배율 (`IceGiant` body 만 행을 가진다). 분기 4 에서 `baseColor` 에 곱한다.
- * ⚠️ #1274 D13 프리뷰 동안은 후보 `a` 를 참조한다 (uranus 2차 승인 후 승인값으로 교체).
+ * #1274 D13 육안 승인값 (사용자 2026-10-04): uranus `0.45` (2차 r2b — 낮면 직하점 R 비포화) ·
+ * neptune `1` (배율 미적용). 도출식 · 실측은 `docs/reports/1274-ice-giant/d13-candidates-r2/README.md`.
  */
 export const ICE_GIANT_ALBEDO_BY_BODY: Readonly<Record<string, number>> = {
-  uranus: ICE_GIANT_CANDIDATES.a.uranus.albedo,
-  neptune: ICE_GIANT_CANDIDATES.a.neptune.albedo,
+  uranus: 0.45,
+  neptune: 1,
 };
 
 /** 비-`IceGiant` 타입이 바인딩하는 값 — `iceGiantAlbedo` 를 읽는 GLSL 이 분기 4 뿐이라 픽셀 영향이 없다. */
@@ -392,38 +347,6 @@ export function resolveSurfaceBandParams(
     );
   }
   return NO_BAND_PARAMS;
-}
-
-/**
- * ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제) — `IceGiant` body 의 밴드 파라미터 · albedo 를 후보 표에서 고른다.
- *
- * - 후보 미지정 · 비-`IceGiant` → `table` 그대로 (프리뷰 플래그가 다른 body 를 건드리지 않는다).
- * - 미지 후보 id → `console.warn` + `table` (`parse-*-mode.ts` 의 「미지 값 → 기본 + warn」 동형).
- * - 후보 표에 그 body 열이 없으면 throw (조용히 테이블 값으로 그리지 않는다).
- */
-function resolveIceGiantPreviewParams(
-  bodyId: string,
-  surfaceType: SurfaceType,
-  table: IceGiantCandidate,
-  candidate: string | undefined,
-): IceGiantCandidate {
-  if (candidate === undefined || surfaceType !== SurfaceType.IceGiant) return table;
-  if (!Object.prototype.hasOwnProperty.call(ICE_GIANT_CANDIDATES, candidate)) {
-    console.warn(
-      `[procedural-planet-shader] 알 수 없는 ?iceGiantCandidate=${candidate} — 테이블 값 (후보 a) 으로 폴백 (#1274 D13 프리뷰)`,
-    );
-    return table;
-  }
-  const column = ICE_GIANT_CANDIDATES[candidate as keyof typeof ICE_GIANT_CANDIDATES] as Readonly<
-    Record<string, IceGiantCandidate>
-  >;
-  const row = Object.prototype.hasOwnProperty.call(column, bodyId) ? column[bodyId] : undefined;
-  if (row === undefined) {
-    throw new Error(
-      `[procedural-planet-shader] ICE_GIANT_CANDIDATES.${candidate} 에 '${bodyId}' 열이 없다 (#1274 D13 프리뷰)`,
-    );
-  }
-  return row;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1277,12 +1200,6 @@ export interface CreateProceduralPlanetMaterialOptions {
    * (core 보수 기본 — 합성이 정확한 no-op). 기본 ON 은 web 레이어 결정 (`?nightlights=off` 옵트아웃).
    */
   nightLights?: boolean | undefined;
-
-  /**
-   * ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제) — `IceGiant` 밴드 파라미터 후보 id (`ICE_GIANT_CANDIDATES`).
-   * 미지정 = 테이블 값. 비-`IceGiant` body 에는 효과 없음.
-   */
-  iceGiantCandidate?: string | undefined;
 }
 
 /** Amendment 1 — lighting 미전달 시 기본값 (단색 행성 PointLight/HemisphericLight 값과 동일 — 일관). */
@@ -1509,22 +1426,13 @@ export function createProceduralPlanetMaterial(
   // Amendment 12 (#1274) §A12.4 — 밴드 uniform 3종은 body 별 테이블에서 해석한다 (누락 · 초과 시 throw).
   // ⚠️ 비-밴드 body (earth · mars · moon) 는 종전 목성 상수 대신 `0` 을 받는다 — 이 3종을 읽는 GLSL 이
   // 밴드 분기뿐이라 픽셀 영향이 없어야 하고, 그 명제를 `verify:1274-invariance` 가 base↔feature 로 잰다.
-  // #1274 D13 프리뷰 (임시) — 테이블 해석 (불변식 throw 포함) 뒤에 후보로 덮어쓴다.
-  const iceGiant = resolveIceGiantPreviewParams(
-    body.id,
-    surfaceType,
-    {
-      band: resolveSurfaceBandParams(body.id, surfaceType),
-      albedo: resolveIceGiantAlbedo(body.id, surfaceType),
-    },
-    options.iceGiantCandidate,
-  );
-  const bandParams = iceGiant.band;
+  const bandParams = resolveSurfaceBandParams(body.id, surfaceType);
   material.setFloat('gasBandAmplitude', bandParams.amplitude);
   material.setFloat('gasBandCount', bandParams.count);
   material.setFloat('gasTurbulence', bandParams.turbulence);
-  // #1274 U1 (b) — 비-IceGiant 는 1 (분기 4 밖에서 읽지 않아 픽셀 영향 없음 — verify:1274-invariance 로 실증).
-  material.setFloat('iceGiantAlbedo', iceGiant.albedo);
+  // #1274 U1 (b) — IceGiant 전용 albedo 배율. 비-IceGiant 는 1 (분기 4 밖에서 읽지 않아 픽셀 영향 없음 —
+  // 바인딩을 0.5 로 바꾼 변이에서도 verify:1274-invariance 4 body diff 0, PR #1278 코멘트).
+  material.setFloat('iceGiantAlbedo', resolveIceGiantAlbedo(body.id, surfaceType));
   material.setFloat('craterDepth', CRATER_DEPTH);
   material.setFloat('craterDensity', CRATER_DENSITY);
 

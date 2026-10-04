@@ -204,7 +204,22 @@ const SURFACE_BODIES = [
   { id: 'moon', type: 'cratered' },
 ];
 // 단색 행성 (회귀만 확인 — terminator/밤면 대조 baseline).
-const PLAIN_BODIES = [{ id: 'venus' }, { id: 'mercury' }, { id: 'saturn' }, { id: 'neptune' }];
+// #1274 D6 (iii) — neptune 은 IceGiant 로 등록돼 단색 대조군에서 뺐다 (기존 mercury 는 유지 — 선정 기준은 대체분에만). 대체 body = triton. 선정 기준
+// (ADR 756 §A12.9 · 계약 조정 C4 — 두 가드의 배경 배제는 기하라 휘도 임계와 무관): ① SURFACE_TYPE_BY_BODY
+// 미등록 ② 로드맵 Cratered 후보 (mercury · callisto · rhea · titania · oberon · ceres) 밖 — 다음 표면
+// 확장에서 대조군이 다시 사라지지 않게 ③ 첫 실행 로그 disk area > 0 (PR #1278 코멘트).
+const PLAIN_BODIES = [{ id: 'venus' }, { id: 'mercury' }, { id: 'saturn' }, { id: 'triton' }];
+
+/**
+ * #1274 D6 (iii) — 대조군 · 판정 대상 목록이 비면 그 단계가 아무것도 재지 않고 통과한다 → fail-fast.
+ * 「비어 있지 않음」 만 묻는다 (새 임계 0).
+ */
+if (!(SURFACE_BODIES.length >= 1) || !(PLAIN_BODIES.length >= 1)) {
+  console.error(
+    `[fail-fast] SURFACE_BODIES ${SURFACE_BODIES.length} · PLAIN_BODIES ${PLAIN_BODIES.length} — 둘 다 ≥ 1 이어야 한다 (#1274 D6 (iii))`,
+  );
+  process.exit(1);
+}
 
 async function setupPage(browser, query) {
   const context = await browser.newContext({

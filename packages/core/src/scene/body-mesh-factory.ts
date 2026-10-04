@@ -51,11 +51,6 @@ export interface SurfaceLightingArgs {
    * (core 보수 기본). 이 묶음이 `createProceduralPlanetMaterial` 옵션으로 그대로 전달된다.
    */
   nightLights?: boolean | undefined;
-  /**
-   * ⚠️ #1274 D13 프리뷰 임시 (승인 후 삭제) — `IceGiant` 밴드 파라미터 후보 id. 이 묶음이
-   * `createProceduralPlanetMaterial` 옵션으로 그대로 전달된다.
-   */
-  iceGiantCandidate?: string | undefined;
 }
 
 export function createBodyMesh(

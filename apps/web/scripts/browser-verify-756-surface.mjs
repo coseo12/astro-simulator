@@ -56,7 +56,7 @@
  *
  * 판정 (#759 — shader-pixel-guard CI 상시 가드, ADR 20260705-759 결정 3):
  *   per-body 상대 성질만 (절대 임계 금지 — swiftshader/하드웨어 값 편차).
- *   4 body 각각 hfEntropy(ON) − hfEntropy(OFF) ≥ HF_ENTROPY_MARGIN + tier-c 저디테일
+ *   SURFACE_BODIES 각각 hfEntropy(ON) − hfEntropy(OFF) ≥ HF_ENTROPY_MARGIN + tier-c 저디테일
  *   (lodStats 배선 검증 — override='low' && high/mid 0, 판정 블록 주석 참조).
  *   미충족 시 exit 1 (fail-fast).
  *
@@ -139,8 +139,26 @@ const SURFACE_BODIES = [
   { id: 'mars', type: 'desert' },
   { id: 'jupiter', type: 'gas-bands' },
   { id: 'moon', type: 'cratered' },
+  // #1274 D4 — 얼음 거성 (ADR 756 Amendment 12). 판정식 · HF_ENTROPY_MARGIN 무변경 (새 임계 0).
+  { id: 'uranus', type: 'ice-giant' },
+  { id: 'neptune', type: 'ice-giant' },
 ];
-const PLAIN_BODIES = [{ id: 'venus' }, { id: 'saturn' }, { id: 'neptune' }];
+// #1274 D6 (iii) — neptune 은 IceGiant 로 등록돼 단색 대조군에서 뺐다. 대체 body = triton. 선정 기준
+// (ADR 756 §A12.9 · 계약 조정 C4 — 두 가드의 배경 배제는 기하라 휘도 임계와 무관): ① SURFACE_TYPE_BY_BODY
+// 미등록 ② 로드맵 Cratered 후보 (mercury · callisto · rhea · titania · oberon · ceres) 밖 — 다음 표면
+// 확장에서 대조군이 다시 사라지지 않게 ③ 첫 실행 로그 disk area > 0 (PR #1278 코멘트).
+const PLAIN_BODIES = [{ id: 'venus' }, { id: 'saturn' }, { id: 'triton' }];
+
+/**
+ * #1274 D6 (iii) — 대조군 · 판정 대상 목록이 비면 그 단계가 아무것도 재지 않고 통과한다 → fail-fast.
+ * 「비어 있지 않음」 만 묻는다 (새 임계 0).
+ */
+if (!(SURFACE_BODIES.length >= 1) || !(PLAIN_BODIES.length >= 1)) {
+  console.error(
+    `[fail-fast] SURFACE_BODIES ${SURFACE_BODIES.length} · PLAIN_BODIES ${PLAIN_BODIES.length} — 둘 다 ≥ 1 이어야 한다 (#1274 D6 (iii))`,
+  );
+  process.exit(1);
+}
 
 async function setupPage(browser, query) {
   const context = await browser.newContext({
@@ -411,7 +429,7 @@ async function launch() {
   await withBrowser(
     {},
     async (browser) => {
-      console.log('\n=== DoD 1 — 4 body 표면 디테일 (surface ON, 기본) ===');
+      console.log('\n=== DoD 1 — SURFACE_BODIES 표면 디테일 (surface ON, 기본) ===');
       for (const { id, type } of SURFACE_BODIES) {
         const { context, page, consoleErrors } = await setupPage(
           browser,
