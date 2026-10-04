@@ -55,7 +55,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ## 진행 중
 
-없음 — #1265 는 v0.90.0 으로 §완료 이동 (v0.90.0 릴리스 준비 PR 에서 버전 확정과 함께 옮겼다).
+- [#1274](https://github.com/coseo12/astro-simulator/issues/1274) **천왕성 · 해왕성 절차 표면 (`IceGiant`)** (트랙 A) — 저대비 위도 밴드 + uranus albedo 배율 (ADR `20260628-756` Amendment 12). 아래 §후보 첫 행 중 ice giant 부분이다. 릴리스 확정 뒤 §완료 로 옮긴다 (#1226 · #1265 선례 — 릴리스 준비 PR 이 버전과 함께 옮긴다). 직전 착수분 #1265 는 v0.90.0 으로 §완료 이동했다.
 
 ---
 
@@ -80,6 +80,8 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 > 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → 위 §진행 중. 같은 낱말이 §완료·§진행 중 에 남아 있는 것은 정상이다.
 
 > ⚠️ **부기 (2026-10-02, [#1274](https://github.com/coseo12/astro-simulator/issues/1274))**: 첫 행 「지구 밖 천체 표면 확장」 의 리스크 칸 「대기 없는 body 가 rim·불빛을 상속한다」 는 상속 범위를 잘못 적었다. 어떤 body 를 `SurfaceType.Rocky` 로 재분류하면 **biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 대륙 · rim 은 무조건** 상속되고, **불빛은 조건부**다 — 게이트가 `uMaskEnabled` 를 곱하므로 `SURFACE_MASK_BY_BODY` 등록 + 마스크 로드 완료 + 투영 disk `≥ SURFACE_MASK_MIN_DISK_PX` (`16`) 일 때만 켜진다 (코드 경로 판독 — [ADR 20260628-756 §A12.3](../decisions/20260628-756-procedural-planet-surface.md)). 원문은 소급 수정하지 않는다. 착수 범위: #1274 는 ice giant (uranus · neptune) 만 — Rocky 재분류 · Cratered 확장은 이 행에 잔류한다.
+
+> ⚠️ **부기 (2026-10-04, [#1274](https://github.com/coseo12/astro-simulator/issues/1274) PR2)**: 첫 행의 ice giant (uranus · neptune) 부분은 #1274 로 §진행 중 에 올렸다. 행은 지우지 않는다 — 잔여 (Rocky 재분류 · Cratered 확장 · 위성 표면 타입) 가 남아 있다.
 
 > **트랙 C·D 는 방향 결정 대기** — 위 표의 C·D 행은 후보 박제일 뿐 착수 합의가 아니다. 착수 시 트랙 표 상태와 본 문서 제목 범위(「트랙 A/B」)를 함께 재검토한다.
 

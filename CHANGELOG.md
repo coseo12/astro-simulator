@@ -5,6 +5,21 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1274] 천왕성 · 해왕성 절차 표면 — `IceGiant` 저대비 위도 밴드 (PR2)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), PR [#1278](https://github.com/coseo12/astro-simulator/pull/1278), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.5 · §A12.20).
+  - `SurfaceType.IceGiant = 4` + uranus · neptune 등록. GLSL 분기는 gas-bands 와 **별도** (`uSurfaceType == 4`, 밴드 식 사본) 라 jupiter 픽셀이 구조적으로 무접촉이다. 밴드 uniform 3종은 공유한다.
+  - 파라미터는 D13 육안 승인 2라운드로 정했다 — neptune 은 1차 후보 a `(0.10, 6, 0.06)`. uranus 는 2차 r2b `(0.12, 6, 0.06)` + **`IceGiant` 전용 albedo 배율 `0.45`** 다.
+  - albedo 배율은 신규 uniform `iceGiantAlbedo` 다. uniform 배열은 `54 → 55`. 값은 별도 테이블 `ICE_GIANT_ALBEDO_BY_BODY` 에 있고, 누락 · 초과 시 throw 한다.
+  - 가드 — `verify:756-surface` `SURFACE_BODIES` 에 uranus · neptune 을 넣었다 (`HF_ENTROPY_MARGIN 0.15` 무변경). 갭은 swiftshader 기준 uranus `0.668` · neptune `0.169` 다.
+  - `verify:756` · `verify:773` `PLAIN_BODIES` 의 neptune → triton. 두 목록의 `length ≥ 1` fail-fast 를 더했다.
+  - 변이 M1~M4 는 전부 `verify:756` exit `1` 이었다.
+  - 불변성 하네스 `verify:1274-invariance` — base 쪽 「미등록 선언」 `EXPECT_UNREGISTERED` (P11 ~ P13 · C8 · C9, ADR §A12.19) 를 더했다. compare 1 (develop ↔ 최종) 에서 earth · mars · jupiter · moon × on/off 와 uranus · neptune off 의 disk diff 가 `0` 이다.
+
+### Behavior Changes
+
+- **`?focus=uranus` · `?focus=neptune` 에서 단색 대신 위도 밴드가 보인다** (#1274). 둘 다 단색보다 밝고 채도가 높게 렌더된다 — 절차 표면 광원식은 `ndl ≥ 0.12` 인 낮면 전체에 최대 세기를 준다. 낮면 평균 휘도는 단색 대비 uranus `1.110` 배 · neptune `1.68` 배다 (실 Chrome · 제품 프레임). 다른 body · `?surface=off` 는 픽셀 불변이다.
+
 ### Changed
 
 - **[#1274] 절차 표면 밴드 파라미터를 body 별 테이블로 이관 (PR1 — 화면 변화 없음)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.4). 천왕성·해왕성 `IceGiant` 표면 (PR2) 의 선행 작업이다.
