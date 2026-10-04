@@ -28,7 +28,11 @@ import {
 } from '@babylonjs/core';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { HOST_FAMILY_RANK, HostFamilyRegistry } from './cloud-layer.js';
-import { isProceduralPlanetMaterial, NIGHT_LIGHT_STRENGTH } from './procedural-planet-shader.js';
+import {
+  isProceduralPlanetMaterial,
+  NIGHT_LIGHT_STRENGTH,
+  SURFACE_TYPE_BY_BODY,
+} from './procedural-planet-shader.js';
 
 /** 앱 기본 뷰포트와 같은 종횡비 (`procedural-planet-mask-lod.test.ts` 와 같은 값). */
 const RENDER_WIDTH = 1280;
@@ -399,5 +403,25 @@ describe('#1265 isProceduralPlanetMaterial — 생성 함수가 등록한 것만
     expect(isProceduralPlanetMaterial(f.scene.getMeshByName(STARFIELD_MESH)!.material)).toBe(false);
     expect(isProceduralPlanetMaterial(new StandardMaterial('x', f.scene))).toBe(false);
     expect(isProceduralPlanetMaterial(null)).toBe(false);
+  });
+});
+
+describe('#1274 D6 (ii) — 전 body high mesh: 절차 표면 ⇔ SURFACE_TYPE_BY_BODY 등록', () => {
+  it('isProceduralPlanetMaterial(material) === (id ∈ SURFACE_TYPE_BY_BODY), 참 · 거짓 각 ≥ 1', () => {
+    const f = makeScene();
+    const registered = new Set(Object.keys(SURFACE_TYPE_BY_BODY));
+    const rows = [...f.handles.meshes].map(([id, mesh]) => ({
+      id,
+      procedural: isProceduralPlanetMaterial(mesh.material),
+    }));
+    const mismatched = rows.filter((r) => r.procedural !== registered.has(r.id)).map((r) => r.id);
+    expect(mismatched).toEqual([]);
+    // 한쪽 공집합의 공허 통과 차단.
+    expect(rows.filter((r) => r.procedural).length).toBeGreaterThanOrEqual(1);
+    expect(rows.filter((r) => !r.procedural).length).toBeGreaterThanOrEqual(1);
+    // 신규 등록 body 가 실제로 표면 머티리얼을 받는다 (등록 집합 · mesh 집합 교집합이 비지 않음).
+    for (const id of ['uranus', 'neptune']) {
+      expect(rows.find((r) => r.id === id)?.procedural).toBe(true);
+    }
   });
 });

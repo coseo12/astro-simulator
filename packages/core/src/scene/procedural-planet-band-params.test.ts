@@ -17,6 +17,7 @@ import {
   GAS_BAND_AMPLITUDE,
   GAS_BAND_COUNT,
   GAS_TURBULENCE,
+  ICE_GIANT_ALBEDO_BY_BODY,
   SURFACE_BAND_PARAMS_BY_BODY,
   SURFACE_TYPE_BY_BODY,
   SurfaceType,
@@ -42,9 +43,13 @@ describe('#1274 D1 — 밴드 테이블 ↔ 밴드 타입 body 불변식 (양방
     expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual(sorted(derived));
   });
 
-  it('PR1 의 정확한 집합 — 밴드 타입 {GasBands} · 밴드 행 {jupiter}', () => {
-    expect([...BAND_SURFACE_TYPES]).toEqual([SurfaceType.GasBands]);
-    expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual(['jupiter']);
+  it('정확한 집합 — 밴드 타입 {GasBands, IceGiant} · 밴드 행 {jupiter, neptune, uranus} (#1274 PR2)', () => {
+    expect([...BAND_SURFACE_TYPES].sort()).toEqual([SurfaceType.GasBands, SurfaceType.IceGiant]);
+    expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual([
+      'jupiter',
+      'neptune',
+      'uranus',
+    ]);
   });
 
   it('jupiter 행 값 == 기존 밴드 상수 (값 동일 — 참조 여부는 아래 소스 정적 검사)', () => {
@@ -219,5 +224,57 @@ describe('#1274 — 밴드 uniform 바인딩이 해석 함수를 따른다 (Null
       scene.dispose();
       engine.dispose();
     }
+  });
+});
+
+// #1274 D13 육안 승인값 박제 (사용자 2026-10-04, 2라운드) — drift 시 시각 회귀 (#69).
+describe('#1274 D13 — IceGiant 승인값 박제 + 바인딩', () => {
+  const bound = (id: string): { band: SurfaceBandParams; albedo: number } => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    scene.activeCamera = new ArcRotateCamera('cam', 0, Math.PI / 2, 50, Vector3.Zero(), scene);
+    try {
+      const body = { id, colorHint: { hex: '#808080' } } as unknown as LoadedCelestialBody;
+      const m = createProceduralPlanetMaterial(scene, body, `${id}-approved-mat`);
+      const f = (m as unknown as { _floats: Record<string, number> })._floats;
+      return {
+        band: {
+          amplitude: f.gasBandAmplitude!,
+          count: f.gasBandCount!,
+          turbulence: f.gasTurbulence!,
+        },
+        albedo: f.iceGiantAlbedo!,
+      };
+    } finally {
+      scene.dispose();
+      engine.dispose();
+    }
+  };
+
+  it('uranus = 2차 r2b (밴드 0.12 / 6 / 0.06 · albedo 0.45) · neptune = 1차 a (0.10 / 6 / 0.06 · albedo 1)', () => {
+    expect(SURFACE_BAND_PARAMS_BY_BODY.uranus).toEqual({
+      amplitude: 0.12,
+      count: 6,
+      turbulence: 0.06,
+    });
+    expect(SURFACE_BAND_PARAMS_BY_BODY.neptune).toEqual({
+      amplitude: 0.1,
+      count: 6,
+      turbulence: 0.06,
+    });
+    expect(ICE_GIANT_ALBEDO_BY_BODY).toEqual({ uranus: 0.45, neptune: 1 });
+  });
+
+  it('바인딩이 승인값을 따른다 (NullEngine — uniform 이 실제로 읽힌다)', () => {
+    expect(bound('uranus')).toEqual({
+      band: { amplitude: 0.12, count: 6, turbulence: 0.06 },
+      albedo: 0.45,
+    });
+    expect(bound('neptune')).toEqual({
+      band: { amplitude: 0.1, count: 6, turbulence: 0.06 },
+      albedo: 1,
+    });
+    // 비-IceGiant 는 albedo 1 (분기 4 밖에서 읽지 않는다).
+    expect(bound('jupiter').albedo).toBe(1);
   });
 });

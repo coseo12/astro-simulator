@@ -516,7 +516,7 @@ export interface SolarSystemSceneOptions {
    * true 이며 `?surface=off` 가 옵트아웃 (ADR §결정 4). false 면 `createBodyMesh`/`createBodyMeshMid`
    * 가 기존 StandardMaterial 경로를 그대로 탄다 (절차 셰이더 미적용 — 현행 동작 100% 복귀).
    *
-   * 동작 (true 일 때): `SURFACE_TYPE_BY_BODY` 테이블 등록 body (earth/mars/jupiter/moon) 의
+   * 동작 (true 일 때): `SURFACE_TYPE_BY_BODY` 테이블 등록 body (등록 집합 = 그 테이블의 키) 의
    * high/mid variant 머티리얼을 절차 ShaderMaterial 로 교체 (base color = colorHint.hex 위 변조).
    * low (billboard) + tier-c (`forceOverride:'low'`) 는 자동 단색 (별도 코드 0 — ADR §결정 3).
    * 미등록 body 는 테이블 부재로 자동 단색 (무회귀). ADR `docs/decisions/20260628-756-procedural-planet-surface.md`.
