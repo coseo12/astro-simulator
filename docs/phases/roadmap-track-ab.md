@@ -1,7 +1,7 @@
 # 로드맵 트랙 A/B — v3 완주 이후 작업 축
 
-> **Status**: Active — 트랙 B 2라운드 완료 (v0.90.0) / 트랙 A 후보 백로그 잔여 / 트랙 C·D 방향 결정 대기
-> **최종 갱신**: 2026-09-26 ([#1264](https://github.com/coseo12/astro-simulator/issues/1264) — #1226 완료 이동 + 후보 백로그 재구성)
+> **Status**: Active — 트랙 A 천왕성 · 해왕성 표면 완료 (v0.91.0) · 트랙 B 2라운드 완료 (v0.90.0) / 트랙 A 후보 백로그 잔여 / 트랙 C·D 방향 결정 대기
+> **최종 갱신**: 2026-10-04 (v0.91.0 릴리스 준비 — [#1274](https://github.com/coseo12/astro-simulator/issues/1274) 완료 이동)
 > **박제일**: 2026-07-06 ([#794](https://github.com/coseo12/astro-simulator/issues/794) — 2026-07-04 프로젝트 회고 후속)
 > **선행 로드맵**: [`roadmap-v3-incremental.md`](roadmap-v3-incremental.md) — **완주** (2026-06-12, R10b [#664](https://github.com/coseo12/astro-simulator/issues/664) / PR [#670](https://github.com/coseo12/astro-simulator/pull/670), 전 27 body 시각화)
 > **출처**: 방향성 기획 (2026-06-22, 세션 단위 — 저장소 문서 부재). 본 문서가 그 기획의 **저장소 SSoT 승격본**이다.
@@ -26,7 +26,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ---
 
-## 완료 (2026-06-24 ~ 2026-09-30)
+## 완료 (2026-06-24 ~ 2026-10-04)
 
 | 이슈                                                                                                                        | 트랙   | 1줄 요약                                                                                                                                                        | 릴리스            |
 | --------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
@@ -44,6 +44,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | [#1215](https://github.com/coseo12/astro-simulator/issues/1215)                                                             | A      | 지구 구름 레이어 — host 자식 shell · ALPHABLEND · 정렬 키 치환 (ADR `20260628-756` Amendment 10)                                                                | v0.88.0           |
 | [#1226](https://github.com/coseo12/astro-simulator/issues/1226)                                                             | A      | 지구 야간 도시 불빛 — 표면 셰이더 혼입, 대륙 노이즈 임계 재사용 (ADR `20260628-756` Amendment 11)                                                               | v0.89.0           |
 | [#1265](https://github.com/coseo12/astro-simulator/issues/1265)                                                             | B      | 런타임 표시 토글 패널 — 상단 바 「표시」 에서 궤도선 · 별 배경 · 구름 · 야간 불빛 토글, URL 반영 (ADR `20260927-1265`, PR #1267 core + #1268 web)               | v0.90.0           |
+| [#1274](https://github.com/coseo12/astro-simulator/issues/1274)                                                             | A      | 천왕성 · 해왕성 절차 표면 — `IceGiant` 저대비 위도 밴드 + uranus albedo 배율 (ADR `20260628-756` Amendment 12, PR #1276 테이블 이관 + #1278 표면)               | v0.91.0           |
 
 > 사이 릴리스 v0.39.0 (#766) / v0.41.0·v0.45.0 (#779) / v0.46.0 (#759) 은 infra (Z-패턴 allowlist / CI alert fatigue / shader-pixel-guard) — 트랙 밖.
 
@@ -55,7 +56,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ## 진행 중
 
-- [#1274](https://github.com/coseo12/astro-simulator/issues/1274) **천왕성 · 해왕성 절차 표면 (`IceGiant`)** (트랙 A) — 저대비 위도 밴드 + uranus albedo 배율 (ADR `20260628-756` Amendment 12). 아래 §후보 첫 행 중 ice giant 부분이다. 릴리스 확정 뒤 §완료 로 옮긴다 (#1226 · #1265 선례 — 릴리스 준비 PR 이 버전과 함께 옮긴다). 직전 착수분 #1265 는 v0.90.0 으로 §완료 이동했다.
+없음 — #1274 는 v0.91.0 으로 §완료 이동 (v0.91.0 릴리스 준비 PR 에서 버전 확정과 함께 옮겼다).
 
 ---
 
@@ -77,11 +78,13 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | 시간 스크러버 + 이벤트 마커 (근일점·합·식)                           | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 TimeBar · `time-controls.tsx` 헤더 주석 「로그 스크러버는 추후 확장」                                     | 이벤트 계산(식·합) 은 신규 도메인 로직                                                                         |
 | 측정 도구 (두 천체 거리 ruler) · 궤적 trail                          | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 캔버스 오버레이 · [`product-spec.md`](product-spec.md) 연구 모드 「측정 도구」                            | —                                                                                                              |
 
-> 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → 위 §진행 중. 같은 낱말이 §완료·§진행 중 에 남아 있는 것은 정상이다.
+> 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → [#1265](https://github.com/coseo12/astro-simulator/issues/1265) (v0.90.0) — 위 §완료. 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
 
 > ⚠️ **부기 (2026-10-02, [#1274](https://github.com/coseo12/astro-simulator/issues/1274))**: 첫 행 「지구 밖 천체 표면 확장」 의 리스크 칸 「대기 없는 body 가 rim·불빛을 상속한다」 는 상속 범위를 잘못 적었다. 어떤 body 를 `SurfaceType.Rocky` 로 재분류하면 **biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 대륙 · rim 은 무조건** 상속되고, **불빛은 조건부**다 — 게이트가 `uMaskEnabled` 를 곱하므로 `SURFACE_MASK_BY_BODY` 등록 + 마스크 로드 완료 + 투영 disk `≥ SURFACE_MASK_MIN_DISK_PX` (`16`) 일 때만 켜진다 (코드 경로 판독 — [ADR 20260628-756 §A12.3](../decisions/20260628-756-procedural-planet-surface.md)). 원문은 소급 수정하지 않는다. 착수 범위: #1274 는 ice giant (uranus · neptune) 만 — Rocky 재분류 · Cratered 확장은 이 행에 잔류한다.
 
 > ⚠️ **부기 (2026-10-04, [#1274](https://github.com/coseo12/astro-simulator/issues/1274) PR2)**: 첫 행의 ice giant (uranus · neptune) 부분은 #1274 로 §진행 중 에 올렸다. 행은 지우지 않는다 — 잔여 (Rocky 재분류 · Cratered 확장 · 위성 표면 타입) 가 남아 있다.
+
+> ⚠️ **부기 (2026-10-04, v0.91.0 릴리스 준비)**: 위 부기의 ice giant 부분은 #1274 가 v0.91.0 으로 §완료 이동했다. 첫 행은 잔여 (Rocky 재분류 · Cratered 확장 · 위성 표면 타입) 로 유지한다.
 
 > **트랙 C·D 는 방향 결정 대기** — 위 표의 C·D 행은 후보 박제일 뿐 착수 합의가 아니다. 착수 시 트랙 표 상태와 본 문서 제목 범위(「트랙 A/B」)를 함께 재검토한다.
 
@@ -111,7 +114,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 - [`roadmap-v3-incremental.md`](roadmap-v3-incremental.md) — 선행 로드맵 (완주)
 - [ADR 20260624-738](../decisions/20260624-738-procedural-starfield.md) — 트랙 A 첫 라운드 (별 배경)
-- [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) — 표면 셰이더 본체 + Amendment 1~10 (#773/#775 · #782 · #783 · #1119 · #1130 · #1157 · #1197 · #1202 · #1205 · #1215), §A1.8·§A3.7·§A10.14 재검토 조건 (후보 백로그 앵커)
+- [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) — 표면 셰이더 본체 + Amendment 1~12 (#773/#775 · #782 · #783 · #1119 · #1130 · #1157 · #1197 · #1202 · #1205 · #1215 · #1226 · #1274), §A1.8·§A3.7·§A10.14 재검토 조건 (후보 백로그 앵커)
 - [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) — 태양 셰이더, §결과·재검토 조건 (코로나/sunspot 앵커)
 - [#794](https://github.com/coseo12/astro-simulator/issues/794) — 본 문서 신설 이슈 (2026-07-04 회고 발원, 형제 이슈 #793 산출물 수명주기 / #795 운영 마찰 박제)
 - CLAUDE.md 프로젝트 고유 섹션 — "프로젝트 접근" 현행 로드맵 포인터
