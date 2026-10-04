@@ -78,7 +78,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | 시간 스크러버 + 이벤트 마커 (근일점·합·식)                           | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 TimeBar · `time-controls.tsx` 헤더 주석 「로그 스크러버는 추후 확장」                                     | 이벤트 계산(식·합) 은 신규 도메인 로직                                                                         |
 | 측정 도구 (두 천체 거리 ruler) · 궤적 trail                          | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 캔버스 오버레이 · [`product-spec.md`](product-spec.md) 연구 모드 「측정 도구」                            | —                                                                                                              |
 
-> 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → 위 §진행 중. 같은 낱말이 §완료·§진행 중 에 남아 있는 것은 정상이다.
+> 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → [#1265](https://github.com/coseo12/astro-simulator/issues/1265) (v0.90.0) — 위 §완료. 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
 
 > ⚠️ **부기 (2026-10-02, [#1274](https://github.com/coseo12/astro-simulator/issues/1274))**: 첫 행 「지구 밖 천체 표면 확장」 의 리스크 칸 「대기 없는 body 가 rim·불빛을 상속한다」 는 상속 범위를 잘못 적었다. 어떤 body 를 `SurfaceType.Rocky` 로 재분류하면 **biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 대륙 · rim 은 무조건** 상속되고, **불빛은 조건부**다 — 게이트가 `uMaskEnabled` 를 곱하므로 `SURFACE_MASK_BY_BODY` 등록 + 마스크 로드 완료 + 투영 disk `≥ SURFACE_MASK_MIN_DISK_PX` (`16`) 일 때만 켜진다 (코드 경로 판독 — [ADR 20260628-756 §A12.3](../decisions/20260628-756-procedural-planet-surface.md)). 원문은 소급 수정하지 않는다. 착수 범위: #1274 는 ice giant (uranus · neptune) 만 — Rocky 재분류 · Cratered 확장은 이 행에 잔류한다.
 
@@ -114,7 +114,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 - [`roadmap-v3-incremental.md`](roadmap-v3-incremental.md) — 선행 로드맵 (완주)
 - [ADR 20260624-738](../decisions/20260624-738-procedural-starfield.md) — 트랙 A 첫 라운드 (별 배경)
-- [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) — 표면 셰이더 본체 + Amendment 1~10 (#773/#775 · #782 · #783 · #1119 · #1130 · #1157 · #1197 · #1202 · #1205 · #1215), §A1.8·§A3.7·§A10.14 재검토 조건 (후보 백로그 앵커)
+- [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) — 표면 셰이더 본체 + Amendment 1~12 (#773/#775 · #782 · #783 · #1119 · #1130 · #1157 · #1197 · #1202 · #1205 · #1215 · #1226 · #1274), §A1.8·§A3.7·§A10.14 재검토 조건 (후보 백로그 앵커)
 - [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) — 태양 셰이더, §결과·재검토 조건 (코로나/sunspot 앵커)
 - [#794](https://github.com/coseo12/astro-simulator/issues/794) — 본 문서 신설 이슈 (2026-07-04 회고 발원, 형제 이슈 #793 산출물 수명주기 / #795 운영 마찰 박제)
 - CLAUDE.md 프로젝트 고유 섹션 — "프로젝트 접근" 현행 로드맵 포인터

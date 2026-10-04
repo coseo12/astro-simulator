@@ -11,7 +11,7 @@ Semantic Versioning을 따른다.
 
 - **[#1274] 천왕성 · 해왕성 절차 표면 — `IceGiant` 저대비 위도 밴드 (PR2)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), PR [#1278](https://github.com/coseo12/astro-simulator/pull/1278), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.5 · §A12.20).
   - `SurfaceType.IceGiant = 4` + uranus · neptune 등록. GLSL 분기는 gas-bands 와 **별도** (`uSurfaceType == 4`, 밴드 식 사본) 라 jupiter 픽셀이 구조적으로 무접촉이다. 밴드 uniform 3종은 공유한다.
-  - 파라미터는 D13 육안 승인 2라운드로 정했다 — neptune 은 1차 후보 a `(0.10, 6, 0.06)`. uranus 는 2차 r2b `(0.12, 6, 0.06)` + **`IceGiant` 전용 albedo 배율 `0.45`** 다.
+  - 파라미터는 D13 육안 승인 2라운드로 정했다 — neptune 은 1차 후보 a `(0.10, 6, 0.06)` (albedo 배율 `1` — 미적용). uranus 는 2차 r2b `(0.12, 6, 0.06)` + **`IceGiant` 전용 albedo 배율 `0.45`** 다.
   - albedo 배율은 신규 uniform `iceGiantAlbedo` 다. uniform 배열은 `54 → 55`. 값은 별도 테이블 `ICE_GIANT_ALBEDO_BY_BODY` 에 있고, 누락 · 초과 시 throw 한다.
   - 가드 — `verify:756-surface` `SURFACE_BODIES` 에 uranus · neptune 을 넣었다 (`HF_ENTROPY_MARGIN 0.15` 무변경). 갭은 swiftshader 기준 uranus `0.668` · neptune `0.169` 다.
   - `verify:756` · `verify:773` `PLAIN_BODIES` 의 neptune → triton. 두 목록의 `length ≥ 1` fail-fast 를 더했다.
@@ -20,13 +20,13 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-- **`?focus=uranus` · `?focus=neptune` 에서 단색 대신 위도 밴드가 보인다** (#1274). 둘 다 단색보다 밝고 채도가 높게 렌더된다 — 절차 표면 광원식은 `ndl ≥ 0.12` 인 낮면 전체에 최대 세기를 준다. 낮면 평균 휘도는 단색 대비 uranus `1.110` 배 · neptune `1.68` 배다 (실 Chrome · 제품 프레임). 다른 body · `?surface=off` 는 픽셀 불변이다.
+- **`?focus=uranus` · `?focus=neptune` 에서 단색 대신 위도 밴드가 보인다** (#1274). 둘 다 단색보다 밝고 채도가 높게 렌더된다 — 절차 표면 광원식은 `ndl ≥ 0.12` 인 낮면 전체에 최대 세기를 준다. 낮면 평균 휘도는 단색 대비 uranus `1.110` 배 · neptune `1.68` 배다 (실 Chrome · 제품 프레임). neptune 의 증가폭이 큰 것은 albedo 배율을 적용하지 않았기 때문이다. 다른 body · `?surface=off` 는 base ↔ 최종 빌드 disk 표본 diff `0` 이다 (로컬 SwiftShader · 실 Chrome Apple Metal 두 경로에서 실측 — 그 밖의 GPU 는 미측정).
 
 ### Changed
 
 - **[#1274] 절차 표면 밴드 파라미터를 body 별 테이블로 이관 (PR1 — 화면 변화 없음)** ([#1274](https://github.com/coseo12/astro-simulator/issues/1274), PR [#1276](https://github.com/coseo12/astro-simulator/pull/1276), ADR [`20260628-756` Amendment 12](docs/decisions/20260628-756-procedural-planet-surface.md) §A12.4). 천왕성·해왕성 `IceGiant` 표면 (PR2 [#1278](https://github.com/coseo12/astro-simulator/pull/1278)) 의 선행 작업이다.
   - **`SURFACE_BAND_PARAMS_BY_BODY` · `BAND_SURFACE_TYPES` · `resolveSurfaceBandParams`** — 밴드 uniform 3종 (`gasBandAmplitude` · `gasBandCount` · `gasTurbulence`) 을 body 별 테이블에서 해석한다. 밴드 타입인데 행이 없거나, 비-밴드 타입인데 행이 있으면 throw 한다 (기본값 fallback 없음). jupiter 행은 기존 상수 `GAS_BAND_*` 를 참조한다.
-  - **비-밴드 body (earth · mars · moon) 의 밴드 uniform 바인딩이 목성 상수 → `0` 으로 바뀌었다.** 이 3종을 읽는 GLSL 이 밴드 분기뿐이라 화면 변화가 없어야 한다는 설계 예측을 아래 하네스로 실측했다 — base (develop `afee1b13`) ↔ feature, earth · mars · jupiter · moon × `?surface` on/off 8 시나리오 disk 표본 diff 전부 `0` (로컬 SwiftShader). 셰이더 문자열 (`PLANET_FRAGMENT_SHADER` · `PLANET_VERTEX_SHADER`) 은 바이트 동일하다.
+  - **비-밴드 body (earth · mars · moon) 의 밴드 uniform 바인딩이 목성 상수 → `0` 으로 바뀌었다.** 이 3종을 읽는 GLSL 이 밴드 분기뿐이라 화면 변화가 없어야 한다는 설계 예측을 아래 하네스로 실측했다 — base (develop `afee1b13`) ↔ feature, earth · mars · jupiter · moon × `?surface` on/off 8 시나리오 disk 표본 diff 전부 `0` (로컬 SwiftShader). PR1 단계의 셰이더 문자열 (`PLANET_FRAGMENT_SHADER` · `PLANET_VERTEX_SHADER`) 은 바이트 동일했다 (v0.91.0 최종 셰이더는 PR2 의 `IceGiant` 분기·uniform 추가로 바뀐다 — 위 Added).
   - `surfaceColorMirror` 는 밴드 타입에서 파라미터를 5번째 인자로 받는다 (미전달 시 throw).
   - **신규 실행 도구 `verify:1274-invariance`** — 두 빌드의 결정적 프레임을 `MODE=capture` 로 찍고 `MODE=compare` 로 disk 표본 픽셀 diff 를 판정한다 (exit `0` 충족 / `1` 기대 위반 / `2` 측정 불가). 두 빌드를 비교하므로 CI 상시 가드가 아니다. 양성 대조 — `GAS_BAND_AMPLITUDE` 만 바꾼 변이 빌드에서 `jupiter:on` diff `22296 / 27408` px, 나머지 7 시나리오 `0`.
     - **같은 빌드끼리의 비교는 측정 불가 (`exit 2`)** — capture 가 페이지가 실제로 바인딩한 표면 머티리얼 uniform 과 셰이더 소스로 「서빙 지문」을 남기고, compare 는 A · B 의 dist 해시나 서빙 지문이 같으면 거부한다 (의도한 자기 비교만 `ALLOW_SAME_BUILD=1`). compare 는 시나리오별 서빙 `gasBand*` 값을 A → B 로 출력해, 위 D2 실행에서 earth · mars · moon `:on` 이 `0.28/9/0.12 → 0/0/0` 으로 바뀐 채 픽셀 diff 가 `0` 임을 같은 로그에 남긴다 (PR #1276 리뷰 B1).
@@ -42,7 +42,9 @@ Semantic Versioning을 따른다.
 
 ### Notes
 
-- **[#1274] 계약 D11 재조정 (사용자 합의 2026-10-04, [#1274 코멘트 `5977323772`](https://github.com/coseo12/astro-simulator/issues/1274#issuecomment-5977323772)).** 원문 「`fps-baseline-guard` tier-a/b/c PASS」 → 「CI `fps-baseline-guard` PASS (**tier-c** — CI 러너의 GPU tier 감지 결과) + `verify:756` tier-c `lodStats` 기존 임계」. tier 는 설정 매트릭스가 아니라 러너 감지값이고 (`scripts/verify-fps-baseline.mjs:252`), develop 의 같은 가드 run 도 측정 줄이 전부 `tier=c` 였다. 그래서 원문은 CI 에서 실현할 수 없는 전제였다. 임계 완화가 아니라 측정 범위 문면의 정정이다. PR #1278 run `37176459956` 은 tier-c 6 측정 PASS 였다. 실 GPU 확인은 D14 qa 의 실 Chrome (WebGPU) 로 보완한다.
+- **[#1274] 계약 D11 재조정 (사용자 합의 2026-10-04, [#1274 코멘트 `5977323772`](https://github.com/coseo12/astro-simulator/issues/1274#issuecomment-5977323772)).** 원문 「`fps-baseline-guard` tier-a/b/c PASS」 → 「CI `fps-baseline-guard` PASS (**tier-c** — CI 러너의 GPU tier 감지 결과) + `verify:756` tier-c `lodStats` 기존 임계」. tier 는 설정 매트릭스가 아니라 러너 감지값이고 (`scripts/verify-fps-baseline.mjs:252`), develop 의 같은 가드 run 도 측정 줄이 전부 `tier=c` 였다. 그래서 원문은 CI 에서 실현할 수 없는 전제였다. 임계 완화가 아니라 측정 범위 문면의 정정이다 — 다만 tier-a/b 의 fps 는 이 PR 이전에도 이후에도 CI 가 자동 판정하지 않는다는 사실은 그대로다. PR #1278 run `37176459956` 은 tier-c 6 측정 PASS 였다. 실 GPU 확인은 D14 qa 의 실 Chrome (WebGPU) 로 보완한다.
+
+- **릴리스 루틴 cross-validate (agy, 2026-10-04 — `.claude/logs/cross-validate-architecture-20261004-190617.log`).** MINOR 판정 동의. 반영 4건 — Changed 의 「셰이더 바이트 동일」 을 PR1 단계로 한정 / neptune albedo `1` 명시 / 「픽셀 불변」 을 실측 경로로 한정 / D11 Notes 에 tier-a/b 미자동판정 사실 병기. 기각 2건 — 「#1271 의 `exit 2` 분류가 부팅 회귀를 은폐」 (v0.90.x 사이클에서 리뷰·머지된 결정이고 이 릴리스의 변경이 아니다) · 「천왕성 자전축 경사 미반영」 (자전축 기울기를 제거하는 것은 `?rotate=off` 뿐이고 제품 기본은 rotate ON 이다 — [#1230](https://github.com/coseo12/astro-simulator/issues/1230)).
 
 ## [0.90.0] - 2026-09-30
 
