@@ -27,19 +27,33 @@ export function DateTimePicker() {
   };
 
   return (
-    <div className="flex shrink-0 items-center gap-1" data-testid="datetime-picker">
+    // `py-2` — 아래 「UTC」 범례가 입력 위로 8px 걸친다. 상단 바 우측 그룹은 `overflow-x-auto` 스크롤러라 세로도
+    // 잘린다(overflow-x ≠ visible 이면 overflow-y 도 auto) — 범례 높이를 이 상자 안에 담아 잘림을 막는다 (48px 바 안).
+    <div className="flex shrink-0 items-center gap-1 py-2" data-testid="datetime-picker">
       <label className="sr-only" htmlFor="datetime-input">
         특정 UTC 시점 입력
       </label>
-      <input
-        id="datetime-input"
-        type="datetime-local"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        aria-label="특정 UTC 시점으로 점프할 날짜/시간"
-        className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-primary focus:outline-none focus:border-primary/50"
-        data-testid="datetime-input"
-      />
+      {/* #1288 — 화면에 보이는 「UTC」 표기 (종전에는 sr-only 라벨에만 있었다 — qa 소견). 입력 테두리 위에 걸친
+          범례(legend)로 둔다: 상단 바 우측 그룹은 1280 Linux 폰트에서 여유가 좁아(#1281 PR #1283 B1) 글자를 옆에 붙이면
+          폭이 는다. 범례는 폭을 늘리지 않는다. 접근 이름은 기존 `aria-label` 이 이미 「UTC」를 담아 `aria-hidden` 이다. */}
+      <span className="relative flex">
+        <input
+          id="datetime-input"
+          type="datetime-local"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          aria-label="특정 UTC 시점으로 점프할 날짜/시간"
+          className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-primary focus:outline-none focus:border-primary/50"
+          data-testid="datetime-input"
+        />
+        <span
+          aria-hidden="true"
+          data-testid="datetime-utc-legend"
+          className="num pointer-events-none absolute -top-2 left-1.5 rounded-xs bg-bg-surface px-0.5 text-caption leading-none text-fg-secondary"
+        >
+          UTC
+        </span>
+      </span>
       <button
         type="button"
         onClick={handleJump}

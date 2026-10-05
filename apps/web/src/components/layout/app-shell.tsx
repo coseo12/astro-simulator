@@ -11,6 +11,7 @@ import { AboutModal } from './about-modal';
 import { SidePanels } from './side-panels';
 import { ScaleControl } from './scale-control';
 import { TimeControls } from './time-controls';
+import { TimeScrubber } from './time-scrubber';
 import { DateTimePicker } from './date-time-picker';
 import { PhysicsEngineToggle } from './physics-engine-toggle';
 import { SensitivitySettingsModal } from './sensitivity-settings-modal';
@@ -65,6 +66,8 @@ export function AppShell() {
         <ScaleControl />
         <TimeBar>
           <TimeControls />
+          {/* #1288 D6~D8 — 2행 스크러버 (관찰·연구 모드 공통, 모바일 포함 상시 표시). */}
+          <TimeScrubber />
         </TimeBar>
         <SatelliteZoomTooltip />
         <FreeFlyKeyHint />
