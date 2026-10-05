@@ -1,16 +1,19 @@
 'use client';
 
 import * as Slider from '@radix-ui/react-slider';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
 import { useSimCommand } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
 import {
   SCRUBBER_MAX_YEAR,
+  SCRUBBER_MIN_JD,
   SCRUBBER_MIN_YEAR,
+  SCRUBBER_SKIP_MULTIPLIER,
   SCRUBBER_STEP_YEARS,
   isOutsideScrubberRange,
   julianDateToYearValue,
   quantizeYearValue,
+  steppedYearValue,
   yearValueToJulianDate,
 } from '@/lib/time-scrubber';
 
@@ -24,6 +27,22 @@ const EMPHASIZED_TICK_YEAR = 2000;
 /** 배지 문구 — 계약 D8 원문. */
 export const OUT_OF_RANGE_BADGE_TEXT = '궤도 근사 — 오차 증가';
 
+/** 키 → 이동 방향. 가로 슬라이더(좌→우)에서 Radix 와 같은 대응이다. Home/End 는 Radix 기본 처리에 맡긴다. */
+const KEY_DIRECTION: Readonly<Record<string, 1 | -1>> = {
+  ArrowRight: 1,
+  ArrowUp: 1,
+  PageUp: 1,
+  ArrowLeft: -1,
+  ArrowDown: -1,
+  PageDown: -1,
+};
+
+/** 범위 밖일 때 스크린리더 값 — 어느 끝 밖인지 함께 읽힌다 (리뷰 권고). */
+function outOfRangeValueText(belowMin: boolean): string {
+  const edge = belowMin ? `${SCRUBBER_MIN_YEAR}년 이전` : `${SCRUBBER_MAX_YEAR}년 이후`;
+  return `${edge} — ${OUT_OF_RANGE_BADGE_TEXT}`;
+}
+
 /** 연도 값 → 트랙 위 위치(%) — 눈금 배치용. */
 function yearToPercent(year: number): number {
   return ((year - SCRUBBER_MIN_YEAR) / (SCRUBBER_MAX_YEAR - SCRUBBER_MIN_YEAR)) * 100;
@@ -32,7 +51,7 @@ function yearToPercent(year: number): number {
 /**
  * #1288 D6~D8 — 1900~2100 절대 연도 선형 타임라인 스크러버 (TimeBar 2행).
  *
- * - D6 드래그·키보드(Radix 기본: ←/→ 1년, Shift·PageUp/Down 10년, Home/End 끝)로 시점을 옮긴다.
+ * - D6 드래그·키보드(←/→ 가까운 1월 1일부터 1년, Shift·PageUp/Down 10년 — 자체 처리 / Home/End 끝 — Radix 기본)로 시점을 옮긴다.
  *   이동은 `jumpToJulianDate` 하나다 — UTC/JD 표시와 정보 카드는 그 결과 시각을 따라간다.
  * - D7 재생 중에는 썸이 시뮬레이션 시각을 따라간다. 매 프레임 구독 대신 **양자화한 값**을 구독해
  *   썸이 움직일 만큼 바뀔 때만 재렌더한다 (`SCRUBBER_SYNC_QUANTUM_YEARS`). 범위 밖이면 끝 값으로 고정된다.
@@ -49,6 +68,7 @@ export function TimeScrubber() {
   const outOfRange = useSimStore(
     (s) => s.julianDate !== null && isOutsideScrubberRange(s.julianDate),
   );
+  const belowRange = useSimStore((s) => s.julianDate !== null && s.julianDate < SCRUBBER_MIN_JD);
 
   // 포인터를 누르고 있는 동안의 썸 값. `null` 이면 store 값을 따른다.
   // 드래그 판정을 `onValueCommit` 이 아니라 포인터 이벤트로 하는 이유: Radix 는 드래그 끝 값이 시작 값과 같으면
@@ -71,6 +91,25 @@ export function TimeScrubber() {
       if (next === undefined) return;
       if (pointerDownRef.current) setDragValue(next);
       jumpToYear(next);
+    },
+    [jumpToYear],
+  );
+
+  // #1288 리뷰 B1 — 화살표·PageUp/Down 은 Radix 보다 먼저 처리한다. Radix 는 썸 값(0.25년 양자화)에 step 을 더해
+  // 정수로 반올림하므로 연도 중간에서 한 해를 건너뛴다. 여기서는 store 의 **양자화 전** 시각으로 계산하고
+  // `preventDefault()` 로 Radix 기본 처리를 끈다 (Radix 는 `composeEventHandlers` 로 우리 핸들러를 먼저 부르고,
+  // `defaultPrevented` 면 자기 처리를 건너뛴다).
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLSpanElement>) => {
+      const direction = KEY_DIRECTION[event.key];
+      if (direction === undefined) return;
+      const julianDate = useSimStore.getState().julianDate;
+      const current = julianDate === null ? null : julianDateToYearValue(julianDate);
+      if (current === null) return;
+      event.preventDefault();
+      const skip = event.key.startsWith('Page') || event.shiftKey;
+      const years = SCRUBBER_STEP_YEARS * (skip ? SCRUBBER_SKIP_MULTIPLIER : 1);
+      jumpToYear(steppedYearValue(current, direction, years));
     },
     [jumpToYear],
   );
@@ -111,6 +150,7 @@ export function TimeScrubber() {
         step={SCRUBBER_STEP_YEARS}
         disabled={disabled}
         onValueChange={handleValueChange}
+        onKeyDown={handleKeyDown}
         onPointerDown={startPointer}
         onPointerUp={endPointer}
         onPointerCancel={endPointer}
@@ -138,7 +178,7 @@ export function TimeScrubber() {
           data-testid="time-scrubber-thumb"
           aria-label="시뮬레이션 시점 (1900~2100년)"
           aria-valuetext={
-            outOfRange ? `범위 밖 — ${OUT_OF_RANGE_BADGE_TEXT}` : `${Math.floor(shownValue)}년`
+            outOfRange ? outOfRangeValueText(belowRange) : `${Math.floor(shownValue)}년`
           }
           className="block h-3 w-3 rounded-full bg-primary shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         />

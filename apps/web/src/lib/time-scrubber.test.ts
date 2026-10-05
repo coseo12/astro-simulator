@@ -10,6 +10,7 @@ import {
   isOutsideScrubberRange,
   julianDateToYearValue,
   quantizeYearValue,
+  steppedYearValue,
   yearValueToJulianDate,
 } from './time-scrubber';
 
@@ -115,5 +116,37 @@ describe('#1288 D7 — 재생 추종 양자화', () => {
   it('양 끝은 그대로', () => {
     expect(quantizeYearValue(SCRUBBER_MIN_YEAR)).toBe(SCRUBBER_MIN_YEAR);
     expect(quantizeYearValue(SCRUBBER_MAX_YEAR)).toBe(SCRUBBER_MAX_YEAR);
+  });
+});
+
+describe('#1288 리뷰 B1 — 키보드 이동량 (양자화 전 연도 기준)', () => {
+  it('정수 연도에서는 ±n', () => {
+    expect(steppedYearValue(2000, 1, 1)).toBe(2001);
+    expect(steppedYearValue(2000, -1, 1)).toBe(1999);
+    expect(steppedYearValue(2000, 1, 10)).toBe(2010);
+  });
+
+  it('연도 중간에서는 가까운 1월 1일이 첫 칸 — 한 해를 건너뛰지 않는다', () => {
+    // 2026-10-05 (소수부 ≈ 0.76) → 2027 (Radix 반올림은 2028 이었다)
+    const oct5 = julianDateToYearValue(isoToJd('2026-10-05T14:00:00Z')) as number;
+    expect(steppedYearValue(oct5, 1, 1)).toBe(2027);
+    expect(steppedYearValue(oct5, -1, 1)).toBe(2026);
+    // 2026-04-01 (소수부 ≈ 0.25) ← 2026 (Radix 반올림은 2025 였다)
+    const apr1 = julianDateToYearValue(isoToJd('2026-04-01T00:00:00Z')) as number;
+    expect(steppedYearValue(apr1, -1, 1)).toBe(2026);
+    expect(steppedYearValue(apr1, 1, 1)).toBe(2027);
+    expect(steppedYearValue(apr1, 1, 10)).toBe(2036);
+    expect(steppedYearValue(apr1, -1, 10)).toBe(2017);
+  });
+
+  it('1월 1일 0시에 부동소수 잔차가 있어도 제자리에 멈추지 않는다', () => {
+    const tiny = 1e-12;
+    expect(steppedYearValue(2027 - tiny, 1, 1)).toBe(2028);
+    expect(steppedYearValue(2027 + tiny, -1, 1)).toBe(2026);
+  });
+
+  it('범위로 clamp', () => {
+    expect(steppedYearValue(SCRUBBER_MAX_YEAR - 0.5, 1, 10)).toBe(SCRUBBER_MAX_YEAR);
+    expect(steppedYearValue(SCRUBBER_MIN_YEAR, -1, 1)).toBe(SCRUBBER_MIN_YEAR);
   });
 });

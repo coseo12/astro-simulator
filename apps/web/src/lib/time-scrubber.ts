@@ -10,7 +10,7 @@ export const SCRUBBER_MIN_YEAR = 1900;
 export const SCRUBBER_MAX_YEAR = 2100;
 
 /**
- * 드래그·키보드 1칸 (연도). ←/→ 는 1년, Shift+←/→ · PageUp/PageDown 은 Radix 기본 배수(×10)로 10년이다.
+ * 드래그 1칸 (연도). 키보드는 `steppedYearValue` 가 따로 계산한다 (←/→ 1년, Shift+←/→ · PageUp/PageDown 10년).
  * 드래그 해상도는 어차피 픽셀이 정한다 — 200년 축이 트랙 약 246~484px(375·1280 실측)에 놓여 1px ≈ 0.4~0.8년이라,
  * 1년 칸은 픽셀 해상도의 3배 안쪽이다. 연 단위 미만 시점은 상단 날짜 입력이 담당한다.
  */
@@ -80,4 +80,32 @@ export function isOutsideScrubberRange(julianDate: number): boolean {
 /** 재생 추종용 양자화 — `SCRUBBER_SYNC_QUANTUM_YEARS` 단위 반올림. */
 export function quantizeYearValue(value: number): number {
   return Math.round(value / SCRUBBER_SYNC_QUANTUM_YEARS) * SCRUBBER_SYNC_QUANTUM_YEARS;
+}
+
+/** 키보드 큰 이동 배수 — Shift+←/→ · PageUp/PageDown. Radix 기본 배수와 같은 값이다. */
+export const SCRUBBER_SKIP_MULTIPLIER = 10;
+
+/**
+ * 「정수 연도에 있다」고 볼 오차 (연도) — 약 0.03초. JD ↔ Date ms 왕복의 부동소수 잔차가 1월 1일 0시를
+ * 직전 해 `…999.999…` 로 돌려줘도 같은 해 경계로 본다. 그러지 않으면 → 가 제자리에 멈춘다.
+ */
+const YEAR_SNAP_EPSILON = 1e-9;
+
+/**
+ * #1288 리뷰 B1 — 키보드 한 번에 갈 연도. **양자화 전 실제 연도**에서 계산한다.
+ *
+ * 앞으로는 `floor(y) + n`, 뒤로는 `ceil(y) − n` — 연도 중간에서는 가까운 1월 1일을 첫 칸으로 센다
+ * (2026-10-05 → 는 2027-01-01, 2026-04-01 ← 는 2026-01-01). `y` 가 정수면 ±n 이다.
+ * Radix 기본 처리는 썸 값(0.25년 양자화) ± step 을 정수에 **반올림**해 소수부 ≥ 0.5 에서 → 가,
+ * 0 < 소수부 < 0.5 에서 ← 가 한 해를 건너뛰었다. 결과는 범위로 clamp 한다.
+ *
+ * @param current 현재 연도 값 (`julianDateToYearValue` 결과 — 범위 밖이면 이미 끝 값)
+ * @param direction `1` 앞으로 / `-1` 뒤로
+ * @param years 이동 칸 수 (연)
+ */
+export function steppedYearValue(current: number, direction: 1 | -1, years: number): number {
+  const nearest = Math.round(current);
+  const y = Math.abs(current - nearest) < YEAR_SNAP_EPSILON ? nearest : current;
+  const next = direction > 0 ? Math.floor(y) + years : Math.ceil(y) - years;
+  return Math.min(SCRUBBER_MAX_YEAR, Math.max(SCRUBBER_MIN_YEAR, next));
 }

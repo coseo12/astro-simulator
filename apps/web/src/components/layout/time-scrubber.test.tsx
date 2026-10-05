@@ -92,7 +92,7 @@ describe('#1288 TimeScrubber', () => {
     expect(screen.queryByTestId('time-scrubber-out-of-range')).toBeNull();
   });
 
-  it('D6 키보드 — →/← 1년, PageUp 10년, Home/End 끝 (Radix 기본) → jumpToJulianDate', () => {
+  it('D6 키보드 — J2000 출발 →/← 1년, PageUp 10년, Home/End 끝 → jumpToJulianDate', () => {
     render(<TimeScrubber />);
     act(() => thumb().focus());
 
@@ -115,6 +115,41 @@ describe('#1288 TimeScrubber', () => {
 
     // 스크러버는 배속을 건드리지 않는다
     expect(sentCommands.some((c) => c.type === 'setTimeScale')).toBe(false);
+  });
+
+  it('리뷰 B1 — 연도 중간에서 출발한 →/←/PageUp/PageDown 은 가까운 1월 1일부터 센다 (한 해 건너뜀 없음)', () => {
+    render(<TimeScrubber />);
+    act(() => thumb().focus());
+
+    // 「지금」 직후 같은 상태 — 썸은 양자화 값 2026.75
+    setStoreJd(isoToJd('2026-10-05T14:00:00Z'));
+    expect(thumb()).toHaveAttribute('aria-valuenow', '2026.75');
+    fireEvent.keyDown(thumb(), { key: 'ArrowRight' });
+    expect(lastJump()).toBe(isoToJd('2027-01-01T00:00:00Z'));
+
+    setStoreJd(isoToJd('2026-04-01T00:00:00Z'));
+    fireEvent.keyDown(thumb(), { key: 'ArrowLeft' });
+    expect(lastJump()).toBe(isoToJd('2026-01-01T00:00:00Z'));
+
+    setStoreJd(isoToJd('2026-04-01T00:00:00Z'));
+    fireEvent.keyDown(thumb(), { key: 'PageUp' });
+    expect(lastJump()).toBe(isoToJd('2036-01-01T00:00:00Z'));
+
+    setStoreJd(isoToJd('2026-10-05T14:00:00Z'));
+    fireEvent.keyDown(thumb(), { key: 'PageDown' });
+    expect(lastJump()).toBe(isoToJd('2017-01-01T00:00:00Z'));
+
+    setStoreJd(isoToJd('2026-10-05T14:00:00Z'));
+    fireEvent.keyDown(thumb(), { key: 'ArrowRight', shiftKey: true });
+    expect(lastJump()).toBe(isoToJd('2036-01-01T00:00:00Z'));
+  });
+
+  it('범위 밖 aria-valuetext 는 어느 끝 밖인지 말한다', () => {
+    render(<TimeScrubber />);
+    setStoreJd(SCRUBBER_MAX_JD + 1);
+    expect(thumb()).toHaveAttribute('aria-valuetext', `2100년 이후 — ${OUT_OF_RANGE_BADGE_TEXT}`);
+    setStoreJd(SCRUBBER_MIN_JD - 1);
+    expect(thumb()).toHaveAttribute('aria-valuetext', `1900년 이전 — ${OUT_OF_RANGE_BADGE_TEXT}`);
   });
 
   it('D6 드래그 — 포인터 위치의 연도로 점프', () => {
