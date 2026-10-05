@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { DateTimePicker } from './date-time-picker';
 
@@ -26,17 +26,36 @@ describe('DateTimePicker', () => {
     expect(screen.getByTestId('datetime-jump')).toBeDisabled();
   });
 
-  it('유효 날짜 입력 후 점프 → jumpToDate 명령', () => {
+  // #1288 D5 — 입력은 UTC 로 해석한다 (라벨과 일치). 종전에는 로컬 시간대 해석이라 두 결과를 모두 허용했다.
+  // 시간대 2종에서 정확값을 단언하고, 같은 입력의 로컬 해석이 실제로 갈리는지를 양성 대조로 함께 본다.
+  describe('#1288 D5 — UTC 해석', () => {
+    const originalTz = process.env.TZ;
+    afterEach(() => {
+      process.env.TZ = originalTz;
+    });
+
+    it.each(['Asia/Seoul', 'America/Los_Angeles'])(
+      'TZ=%s — 2026-04-14T00:00 → 정확히 UTC 자정',
+      (tz) => {
+        process.env.TZ = tz;
+        expect(new Date('2026-04-14T00:00').toISOString()).not.toBe('2026-04-14T00:00:00.000Z');
+        render(<DateTimePicker />);
+        fireEvent.change(screen.getByTestId('datetime-input'), {
+          target: { value: '2026-04-14T00:00' },
+        });
+        fireEvent.click(screen.getByTestId('datetime-jump'));
+        expect(sentCommands).toEqual([{ type: 'jumpToDate', isoUtc: '2026-04-14T00:00:00.000Z' }]);
+      },
+    );
+  });
+
+  it('JS Date 범위 밖 입력 — 명령 미발행 + 오류 표시', () => {
     render(<DateTimePicker />);
-    const input = screen.getByTestId('datetime-input');
-    fireEvent.change(input, { target: { value: '2026-04-14T00:00' } });
+    fireEvent.change(screen.getByTestId('datetime-input'), {
+      target: { value: '300000-01-01T00:00' },
+    });
     fireEvent.click(screen.getByTestId('datetime-jump'));
-    const cmd = sentCommands.find((c) => c.type === 'jumpToDate');
-    expect(cmd).toBeDefined();
-    // datetime-local은 로컬 타임존으로 파싱되므로 정확한 문자열 대신 ISO 형식만 검증
-    const iso = (cmd as { isoUtc: string }).isoUtc;
-    expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    // 2026-04-14 (KST) = 2026-04-13 15:00 (UTC) 또는 2026-04-14 00:00 (UTC)
-    expect(iso).toMatch(/^2026-04-1[34]T/);
+    expect(sentCommands).toEqual([]);
+    expect(screen.getByText('잘못된 날짜')).toBeInTheDocument();
   });
 });
