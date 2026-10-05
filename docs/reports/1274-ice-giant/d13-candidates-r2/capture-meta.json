@@ -1,0 +1,1053 @@
+{
+  "note": "#1274 D13 2차 후보 캡처 원자료 (판정 아님 — 정보). 측정 스크립트는 임시였고 커밋 전에 삭제했다 (volt #67). README 레시피로 재현한다. neptune 은 플래그 없음 (= 승인안 a) 1건.",
+  "product_chrome_webgpu": [
+    {
+      "body": "uranus",
+      "variant": "off",
+      "query": "?gpu=a&focus=uranus&lod=auto&surface=off",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "albedo": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 821,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 5970,
+      "sat1": 7302,
+      "sat3Ratio": 0.27603107083410394,
+      "sat1Ratio": 0.33761790271869796,
+      "hfEntropy": 1.119,
+      "allMeanLum": 138.68245000452967,
+      "dayArea": 13483,
+      "dayMeanLum": 201.24144796832488,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9736195250664287,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          577,
+          305
+        ]
+      },
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "c",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 1,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 819,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12005,
+      "sat1": 12118,
+      "sat3Ratio": 0.5550675050859997,
+      "sat1Ratio": 0.56029221379693,
+      "hfEntropy": 1.311,
+      "allMeanLum": 165.8933543911125,
+      "dayArea": 13483,
+      "dayMeanLum": 244.8468137872791,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9736195250664287,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          577,
+          305
+        ]
+      },
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2a",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=r2a",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.36,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 821,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 0,
+      "sat1": 0,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0,
+      "hfEntropy": 2.133,
+      "allMeanLum": 120.70432548166225,
+      "dayArea": 13483,
+      "dayMeanLum": 185.78740148085262,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9736195250664287,
+        "rgb": [
+          192,
+          230,
+          205
+        ],
+        "px": [
+          577,
+          305
+        ]
+      },
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 979
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2b",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=r2b",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.45,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 819,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 207,
+      "sat1": 7414,
+      "sat3Ratio": 0.009570926576659885,
+      "sat1Ratio": 0.34279637506935456,
+      "hfEntropy": 2.003,
+      "allMeanLum": 145.33187052382104,
+      "dayArea": 13483,
+      "dayMeanLum": 223.3994522914506,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9736195250664287,
+        "rgb": [
+          240,
+          255,
+          255
+        ],
+        "px": [
+          577,
+          305
+        ]
+      },
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1063
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2c",
+      "query": "?gpu=a&focus=uranus&lod=auto&iceGiantCandidate=r2c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.6,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 825,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 11520,
+      "sat1": 11748,
+      "sat3Ratio": 0.5326428703532458,
+      "sat1Ratio": 0.5431847604956538,
+      "hfEntropy": 1.393,
+      "allMeanLum": 157.7823601820695,
+      "dayArea": 13483,
+      "dayMeanLum": 240.2259631563982,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9736195250664287,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          577,
+          305
+        ]
+      },
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1351
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "on",
+      "query": "?gpu=a&focus=uranus&lod=auto",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.06,
+          4,
+          0.04
+        ],
+        "albedo": 1,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 83.01067038463715,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.7294801809645435,
+          -0.04622222623447685,
+          0.6806379714378477,
+          0.049539107973774296
+        ]
+      },
+      "settle": {
+        "dist": "1/2/29",
+        "fading": 0,
+        "waitedMs": 821,
+        "timedOut": false
+      },
+      "area": 21628,
+      "sat3": 12007,
+      "sat1": 12118,
+      "sat3Ratio": 0.555159977806547,
+      "sat1Ratio": 0.56029221379693,
+      "hfEntropy": 1.139,
+      "allMeanLum": 165.88548724179967,
+      "dayArea": 13483,
+      "dayMeanLum": 244.83412891349178,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9736195250664287,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          577,
+          305
+        ]
+      },
+      "diskRpx": 87.31714094861616,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 21628,
+        "d": 1362
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "neptune",
+      "variant": "on",
+      "query": "?gpu=a&focus=neptune&lod=auto",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451626,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.1,
+          6,
+          0.06
+        ],
+        "albedo": 1,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 98.30451853405711,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": [
+          -0.43797170239227456,
+          0.44093193248734086,
+          0.7384974951010852,
+          -0.26149812340820816
+        ]
+      },
+      "settle": {
+        "dist": "1/1/30",
+        "fading": 0,
+        "waitedMs": 818,
+        "timedOut": false
+      },
+      "area": 14940,
+      "sat3": 0,
+      "sat1": 9072,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.6072289156626506,
+      "hfEntropy": 1.336,
+      "allMeanLum": 149.28644896657912,
+      "dayArea": 9814,
+      "dayMeanLum": 219.2032374420306,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9891563462917499,
+        "rgb": [
+          183,
+          255,
+          255
+        ],
+        "px": [
+          600,
+          303
+        ]
+      },
+      "diskRpx": 72.57690213100864,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 14940,
+        "d": 0
+      },
+      "consoleErrors": [],
+      "warnings": []
+    }
+  ],
+  "frame756_chrome_webgpu": [
+    {
+      "body": "uranus",
+      "variant": "off",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&surface=off",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7090000035,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "albedo": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27411,
+      "sat3": 7567,
+      "sat1": 9309,
+      "sat3Ratio": 0.27605705738572106,
+      "sat1Ratio": 0.339608186494473,
+      "hfEntropy": 1.146,
+      "allMeanLum": 139.17582191275793,
+      "dayArea": 17201,
+      "dayMeanLum": 200.98373080339482,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704128944143476,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.32039470877953,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27411,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "c",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.794300007,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 1,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 15300,
+      "sat1": 15441,
+      "sat3Ratio": 0.5581904414447282,
+      "sat1Ratio": 0.563334549434513,
+      "hfEntropy": 1.273,
+      "allMeanLum": 166.65995828196412,
+      "dayArea": 17202,
+      "dayMeanLum": 244.7290788910414,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9709394521502935,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          571,
+          296
+        ]
+      },
+      "diskRpx": 98.32040504733777,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1784
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2a",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=r2a",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7958000037,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.36,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 0,
+      "sat1": 0,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0,
+      "hfEntropy": 1.937,
+      "allMeanLum": 120.79274457019037,
+      "dayArea": 17202,
+      "dayMeanLum": 184.8069795845359,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704119420895998,
+        "rgb": [
+          196,
+          234,
+          209
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.32041018819575,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 1252
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2b",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=r2b",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.8011000077,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.45,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 0,
+      "sat1": 9113,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.33246990149580447,
+      "hfEntropy": 1.815,
+      "allMeanLum": 145.7758763123498,
+      "dayArea": 17202,
+      "dayMeanLum": 222.74832320498834,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704119289958864,
+        "rgb": [
+          244,
+          255,
+          255
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.32045450436624,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1327
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2c",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=r2c",
+      "state": {
+        "webgpu": true,
+        "renderer": "webgpu | WebGPU1",
+        "jd": 2451548.7842000052,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.6,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 14616,
+      "sat1": 14964,
+      "sat3Ratio": 0.5332360452389638,
+      "sat1Ratio": 0.5459321415541774,
+      "hfEntropy": 1.332,
+      "allMeanLum": 158.5269331384079,
+      "dayArea": 17200,
+      "dayMeanLum": 240.02936476563298,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704118154213216,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.32042187180798,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1762
+      },
+      "consoleErrors": [],
+      "warnings": []
+    }
+  ],
+  "frame756_swiftshader_webgl": [
+    {
+      "body": "uranus",
+      "variant": "off",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&surface=off",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451547.666199999,
+        "materialClass": "StandardMaterial",
+        "band": null,
+        "albedo": null,
+        "surfaceType": null,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27411,
+      "sat3": 7573,
+      "sat1": 9310,
+      "sat3Ratio": 0.2762759476122724,
+      "sat1Ratio": 0.33964466819889827,
+      "hfEntropy": 1.14,
+      "allMeanLum": 139.19307808787144,
+      "dayArea": 17204,
+      "dayMeanLum": 200.98369946299084,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9709535251971881,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          571,
+          296
+        ]
+      },
+      "diskRpx": 98.32045725721832,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27411,
+        "d": 1783
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "c",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=c",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.731799998,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 1,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27412,
+      "sat3": 15302,
+      "sat1": 15442,
+      "sat3Ratio": 0.5582226762002043,
+      "sat1Ratio": 0.5633299284984679,
+      "hfEntropy": 1.27,
+      "allMeanLum": 166.66340221468766,
+      "dayArea": 17204,
+      "dayMeanLum": 244.72818757456088,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.970940282313847,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          571,
+          296
+        ]
+      },
+      "diskRpx": 98.32043352700111,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27412,
+        "d": 1782
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2a",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=r2a",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.7429999993,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.36,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 0,
+      "sat1": 0,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0,
+      "hfEntropy": 1.935,
+      "allMeanLum": 120.79803248881773,
+      "dayArea": 17202,
+      "dayMeanLum": 184.80615255087284,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704127556189975,
+        "rgb": [
+          195,
+          234,
+          209
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.3204026270239,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1250
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2b",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=r2b",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.738599999,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.45,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27410,
+      "sat3": 0,
+      "sat1": 9115,
+      "sat3Ratio": 0,
+      "sat1Ratio": 0.3325428675665815,
+      "hfEntropy": 1.812,
+      "allMeanLum": 145.76931754023173,
+      "dayArea": 17202,
+      "dayMeanLum": 222.74026577257303,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704124242918455,
+        "rgb": [
+          244,
+          255,
+          255
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.32040642081006,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27410,
+        "d": 1322
+      },
+      "consoleErrors": [],
+      "warnings": []
+    },
+    {
+      "body": "uranus",
+      "variant": "r2c",
+      "query": "?gpu=a&focus=uranus&lod=auto&rotate=off&iceGiantCandidate=r2c",
+      "state": {
+        "webgpu": false,
+        "renderer": "webgl | WebGL2",
+        "jd": 2451548.886999999,
+        "materialClass": "ShaderMaterial",
+        "band": [
+          0.12,
+          6,
+          0.06
+        ],
+        "albedo": 0.6,
+        "surfaceType": 4,
+        "lodLevel": "high",
+        "camera": {
+          "alpha": -1.5707963267948966,
+          "beta": 1.2566370614359172,
+          "radius": 73.72071686798878,
+          "fov": 0.8
+        },
+        "canvasCount": 1,
+        "rotQ": null
+      },
+      "settle": null,
+      "area": 27408,
+      "sat3": 14618,
+      "sat1": 14965,
+      "sat3Ratio": 0.5333479276123759,
+      "sat1Ratio": 0.5460084646818447,
+      "hfEntropy": 1.327,
+      "allMeanLum": 158.5355374804033,
+      "dayArea": 17200,
+      "dayMeanLum": 240.0298609828949,
+      "geomMiss": 0,
+      "subsolar": {
+        "ndl": 0.9704107541632253,
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "px": [
+          572,
+          295
+        ]
+      },
+      "diskRpx": 98.32044592880936,
+      "ringCount": 1,
+      "ringOverlap": {
+        "n": 27408,
+        "d": 1760
+      },
+      "consoleErrors": [],
+      "warnings": []
+    }
+  ]
+}

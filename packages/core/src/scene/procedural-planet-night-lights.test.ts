@@ -117,7 +117,8 @@ describe('#1226 N3 — GLSL 배치 (§A11.3)', () => {
     const iceIdx = CODE.indexOf('col = mix(col, iceColor, iceMask)');
     const calcIdx = CODE.indexOf('lights = nightLightStrength');
     const dispatchIdx = CODE.indexOf('} else if (uSurfaceType == 1)');
-    const initIdx = CODE.indexOf('float lights = 0.0');
+    // #1274 리뷰 B1 라운드 2 — 우변까지 완전 일치 (접두 indexOf 는 `= 0.05` 를 초기화로 인정했다).
+    const initIdx = CODE.search(/\bfloat\s+lights\s*=\s*0\.0\s*;/);
     expect(initIdx).toBeGreaterThan(0);
     expect(initIdx).toBeLessThan(rockyIdx);
     expect(calcIdx).toBeGreaterThan(iceIdx);

@@ -1,5 +1,5 @@
 /**
- * #756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개, 라이브러리/에셋 0).
+ * #756 — 절차적 행성 표면 셰이더 (인프라 + `SURFACE_TYPE_BY_BODY` 등록 body, 라이브러리/에셋 0).
  *
  * **목적**: 단색 `StandardMaterial.diffuseColor` 로 렌더되는 행성에 절차적 표면 디테일을
  * 부여해 몰입을 강화한다 (방향성 기획 트랙 A — `principles.md §1 Visual Fidelity`). 외부
@@ -154,6 +154,11 @@ export enum SurfaceType {
   GasBands = 2,
   /** 크레이터형 — 점 분포 크레이터 + 명암 (달). */
   Cratered = 3,
+  /**
+   * 얼음 거성형 — 저대비 위도 밴드 (천왕성 · 해왕성). Amendment 12 (#1274) §A12.5 — GasBands 와
+   * **별도 GLSL 분기** (형태 격리 — jupiter 픽셀 불변의 구조적 보장), 밴드 uniform 3종은 공유.
+   */
+  IceGiant = 4,
 }
 
 /**
@@ -164,13 +169,18 @@ export enum SurfaceType {
  * 누수시키지 않는다. 테이블 미등록 body 는 자동으로 단색 (StandardMaterial) — 23개 비-범위
  * body 무회귀가 **테이블 부재로 자동 보장** (명시적 opt-in).
  *
- * 1차는 대표 4개. 이후 확장 = 데이터 추가가 아닌 **상수 1줄 추가** (R-Phase).
+ * 등록 집합 = 아래 테이블의 키 (#756 의 earth · mars · jupiter · moon + #1274 의 uranus · neptune).
+ * 확장 = 데이터 추가가 아닌 **상수 1줄 추가** (R-Phase). 밴드 타입 (`BAND_SURFACE_TYPES`) 으로
+ * 등록하면 `SURFACE_BAND_PARAMS_BY_BODY` 행도 함께 있어야 한다 (불변식 — 없으면 throw).
  */
 export const SURFACE_TYPE_BY_BODY: Readonly<Record<string, SurfaceType>> = {
   earth: SurfaceType.Rocky,
   mars: SurfaceType.Desert,
   jupiter: SurfaceType.GasBands,
   moon: SurfaceType.Cratered,
+  // Amendment 12 (#1274) — 얼음 거성 2 body. 밴드 값은 `SURFACE_BAND_PARAMS_BY_BODY` 가 body 별로 정한다.
+  uranus: SurfaceType.IceGiant,
+  neptune: SurfaceType.IceGiant,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,6 +216,138 @@ export const CRATER_DEPTH = 0.4;
 
 /** cratered 크레이터 격자 밀도 (셀/방향). 클수록 크레이터가 촘촘. */
 export const CRATER_DENSITY = 14;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Amendment 12 (#1274) §A12.4 결정 1 — 밴드 파라미터 body 별 테이블.
+//
+// 밴드 uniform 3종 (`gasBandAmplitude` · `gasBandCount` · `gasTurbulence`) 은 종전에 body 분기 없이
+// **전 표면 body 에** 목성 상수로 바인딩됐다. 같은 타입의 두 body (uranus · neptune — PR2) 가 서로 다른
+// 값을 가질 수 없는 형태이고, 이슈 #1274 가 지목한 「earth 전용 상수 상속」 과 같은 구조라 별도
+// 테이블로 이관한다. 이관 축은 밴드 식이 읽는 uniform 3종뿐이다 — rocky · desert · cratered 상수와
+// earth 전용 블록은 소비자가 없어 이관하지 않는다 (§A8.9 결정 5 동형).
+//
+// 선례 = `SURFACE_MASK_BY_BODY` (소비하는 body 만 행을 가진 별도 per-body 테이블).
+// 불변식 (단위 테스트 가드): keys(SURFACE_BAND_PARAMS_BY_BODY) ==
+//   { id | SURFACE_TYPE_BY_BODY[id] ∈ BAND_SURFACE_TYPES } — 양방향.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 밴드 변조 파라미터 — GLSL 밴드 uniform 3종과 1:1 (이름은 uniform 이 `gasBand*` 로 유지된다 — §A12.5). */
+export interface SurfaceBandParams {
+  /** 위도 밴드 명암 진폭 → `gasBandAmplitude`. */
+  readonly amplitude: number;
+  /** 밴드 개수 → `gasBandCount`. */
+  readonly count: number;
+  /** 난류 결 진폭 → `gasTurbulence`. */
+  readonly turbulence: number;
+}
+
+/** 밴드 파라미터를 소비하는 표면 타입 집합 — GLSL 에서 밴드 uniform 을 읽는 분기의 타입과 같아야 한다. */
+export const BAND_SURFACE_TYPES: ReadonlySet<SurfaceType> = new Set([
+  SurfaceType.GasBands,
+  SurfaceType.IceGiant,
+]);
+
+/**
+ * body id → 밴드 파라미터. **밴드 타입 body 만** 행을 가진다 (위 불변식).
+ *
+ * jupiter 행은 기존 상수를 **참조**한다 — 값을 옮겨 적지 않는다 (숨은 상수 drift 차단, volt #69).
+ */
+export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandParams>> = {
+  jupiter: {
+    amplitude: GAS_BAND_AMPLITUDE,
+    count: GAS_BAND_COUNT,
+    turbulence: GAS_TURBULENCE,
+  },
+  // #1274 D13 육안 승인값 (사용자 2026-10-04 — 2라운드, #1274 코멘트 5976286725 · 5970959022).
+  // 미학 파라미터이며 임계가 아니다. 값의 유일한 출처가 이 행이다 (사본 없음 — 단위 테스트가 박제값 단언).
+  uranus: { amplitude: 0.12, count: 6, turbulence: 0.06 }, // 2차 r2b (밴드 = 1차 후보 c)
+  neptune: { amplitude: 0.1, count: 6, turbulence: 0.06 }, // 1차 후보 a
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1274 D13 1차 결정 (2026-10-04) U1 (b) — `IceGiant` 전용 albedo 배율 (uniform `iceGiantAlbedo`, +1).
+//
+// 밴드 테이블 (`SURFACE_BAND_PARAMS_BY_BODY`) 을 확장하지 않고 **별도 테이블**로 둔다: 밴드 테이블은
+// GasBands (jupiter) 도 행을 가지므로 거기에 albedo 를 넣으면 jupiter 가 아무도 읽지 않는 필드를 갖게
+// 된다 (§A8.9 결정 5) — 또 §A12.4 결정 1 이 밴드 테이블의 축을 밴드 uniform 3종으로 한정했다.
+// 선례 = `SURFACE_MASK_BY_BODY` (소비 타입 body 만 행을 가진 별도 테이블).
+// 불변식 (단위 테스트 가드): keys(ICE_GIANT_ALBEDO_BY_BODY) == { id | SURFACE_TYPE_BY_BODY[id] == IceGiant }.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * body id → albedo 배율 (`IceGiant` body 만 행을 가진다). 분기 4 에서 `baseColor` 에 곱한다.
+ * #1274 D13 육안 승인값 (사용자 2026-10-04): uranus `0.45` (2차 r2b — 낮면 직하점 R 비포화) ·
+ * neptune `1` (배율 미적용). 도출식 · 실측은 `docs/reports/1274-ice-giant/d13-candidates-r2/README.md`.
+ */
+export const ICE_GIANT_ALBEDO_BY_BODY: Readonly<Record<string, number>> = {
+  uranus: 0.45,
+  neptune: 1,
+};
+
+/** 비-`IceGiant` 타입이 바인딩하는 값 — `iceGiantAlbedo` 를 읽는 GLSL 이 분기 4 뿐이라 픽셀 영향이 없다. */
+const NO_ICE_GIANT_ALBEDO = 1;
+
+/**
+ * #1274 — body 의 `IceGiant` albedo 배율을 해석한다 (불변식의 런타임 사본, 기본값 fallback 없음).
+ * `IceGiant` 인데 행이 없으면 throw / 비-`IceGiant` 인데 행이 있으면 throw / 비-`IceGiant` 는 `1`.
+ *
+ * @param table 주입용 (단위 테스트) — 미전달 시 `ICE_GIANT_ALBEDO_BY_BODY`
+ */
+export function resolveIceGiantAlbedo(
+  bodyId: string,
+  surfaceType: SurfaceType,
+  table: Readonly<Record<string, number>> = ICE_GIANT_ALBEDO_BY_BODY,
+): number {
+  const row = Object.prototype.hasOwnProperty.call(table, bodyId) ? table[bodyId] : undefined;
+  if (surfaceType === SurfaceType.IceGiant) {
+    if (row === undefined) {
+      throw new Error(
+        `[procedural-planet-shader] '${bodyId}' 는 IceGiant 인데 ICE_GIANT_ALBEDO_BY_BODY 행이 없다 (#1274 — 기본값 fallback 금지)`,
+      );
+    }
+    return row;
+  }
+  if (row !== undefined) {
+    throw new Error(
+      `[procedural-planet-shader] '${bodyId}' 는 비-IceGiant (${surfaceType}) 인데 ICE_GIANT_ALBEDO_BY_BODY 행이 있다 (#1274 — 소비자 없는 행)`,
+    );
+  }
+  return NO_ICE_GIANT_ALBEDO;
+}
+
+/** 비-밴드 타입이 바인딩하는 값 — 밴드 uniform 을 읽는 GLSL 이 밴드 분기뿐이라 픽셀 영향이 없다 (§A12.4 계약 5). */
+const NO_BAND_PARAMS: SurfaceBandParams = Object.freeze({ amplitude: 0, count: 0, turbulence: 0 });
+
+/**
+ * #1274 §A12.4 계약 5 — body 의 밴드 파라미터를 해석한다 (불변식의 런타임 사본, 기본값 fallback 없음).
+ *
+ * - 밴드 타입인데 행이 없으면 **throw** — 조용히 0 이나 목성 값으로 그리지 않는다.
+ * - 비-밴드 타입인데 행이 있으면 **throw** — 아무도 읽지 않는 행 (§A8.9 결정 5).
+ * - 비-밴드 타입은 `{ 0, 0, 0 }` 을 돌려준다.
+ *
+ * @param table 주입용 (단위 테스트의 누락 · 초과 테이블) — 미전달 시 `SURFACE_BAND_PARAMS_BY_BODY`
+ */
+export function resolveSurfaceBandParams(
+  bodyId: string,
+  surfaceType: SurfaceType,
+  table: Readonly<Record<string, SurfaceBandParams>> = SURFACE_BAND_PARAMS_BY_BODY,
+): SurfaceBandParams {
+  const row = Object.prototype.hasOwnProperty.call(table, bodyId) ? table[bodyId] : undefined;
+  if (BAND_SURFACE_TYPES.has(surfaceType)) {
+    if (row === undefined) {
+      throw new Error(
+        `[procedural-planet-shader] '${bodyId}' 는 밴드 타입 (${surfaceType}) 인데 SURFACE_BAND_PARAMS_BY_BODY 행이 없다 (#1274 — 기본값 fallback 금지)`,
+      );
+    }
+    return row;
+  }
+  if (row !== undefined) {
+    throw new Error(
+      `[procedural-planet-shader] '${bodyId}' 는 비-밴드 타입 (${surfaceType}) 인데 SURFACE_BAND_PARAMS_BY_BODY 행이 있다 (#1274 — 소비자 없는 행)`,
+    );
+  }
+  return NO_BAND_PARAMS;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Amendment 1 (#773/#775) — 광원 모델 + 대륙 mix rendering-only 미학 상수 SSoT.
@@ -647,9 +789,12 @@ uniform int uSurfaceType;
 uniform float rockyContrast;
 uniform float desertDetail;
 uniform float desertRustTint;
+// 밴드 uniform 3종 — gas-bands (2) · ice-giant (4) 분기가 공유한다 (이름은 #756 유래, Amendment 12 §A12.5).
 uniform float gasBandAmplitude;
 uniform float gasBandCount;
 uniform float gasTurbulence;
+// #1274 U1 (b) — ice-giant (4) 전용 albedo 배율. 분기 4 밖에서 읽지 않는다 (비-IceGiant 는 1 바인딩).
+uniform float iceGiantAlbedo;
 uniform float craterDepth;
 uniform float craterDensity;
 uniform float logDepthConstant;
@@ -928,6 +1073,18 @@ void main(void) {
     float bands = sin((latitude + turb) * gasBandCount * 3.14159265);
     float mod_ = bands * gasBandAmplitude;
     col = baseColor * (1.0 + mod_);
+  } else if (uSurfaceType == 4) {
+    // ── ice-giant (천왕성·해왕성) — 저대비 위도 밴드 (Amendment 12 #1274 §A12.5) ──────────
+    // 출발 형태는 위 uSurfaceType == 2 (gas-bands) 분기 식의 **사본**이다 (출처 = 그 분기). 분기를
+    // 공유하지 않는 이유: ice giant 형태를 바꿔도 분기 2 (jupiter) 가 구조적으로 무접촉이다 (D6 (i)).
+    // 밴드 uniform 3종은 공유하고 값은 body 별 테이블 SURFACE_BAND_PARAMS_BY_BODY 가 정한다.
+    // 한 draw 는 한 분기만 진입하므로 fbm 호출은 draw 당 1회 그대로다 (§A12.6).
+    float latitude = p.y;
+    float turb = (fbm(p * 4.0) - 0.5) * 2.0 * gasTurbulence;
+    float bands = sin((latitude + turb) * gasBandCount * 3.14159265);
+    float mod_ = bands * gasBandAmplitude;
+    // #1274 U1 (b) — albedo 배율 (낮면 휘도 포화 완화, §A12.12). 광원식은 건드리지 않는다.
+    col = baseColor * iceGiantAlbedo * (1.0 + mod_);
   } else if (uSurfaceType == 3) {
     // ── cratered (달) — 크레이터 점 분포 (cell noise) + 명암 ───────────────
     vec3 scaled = p * craterDensity;
@@ -1194,6 +1351,8 @@ export function createProceduralPlanetMaterial(
         'gasBandAmplitude',
         'gasBandCount',
         'gasTurbulence',
+        // #1274 U1 (b) — IceGiant 전용 albedo 배율 (+1).
+        'iceGiantAlbedo',
         'craterDepth',
         'craterDensity',
         'logDepthConstant',
@@ -1264,9 +1423,16 @@ export function createProceduralPlanetMaterial(
   material.setFloat('rockyContrast', ROCKY_CONTRAST);
   material.setFloat('desertDetail', DESERT_DETAIL);
   material.setFloat('desertRustTint', DESERT_RUST_TINT);
-  material.setFloat('gasBandAmplitude', GAS_BAND_AMPLITUDE);
-  material.setFloat('gasBandCount', GAS_BAND_COUNT);
-  material.setFloat('gasTurbulence', GAS_TURBULENCE);
+  // Amendment 12 (#1274) §A12.4 — 밴드 uniform 3종은 body 별 테이블에서 해석한다 (누락 · 초과 시 throw).
+  // ⚠️ 비-밴드 body (earth · mars · moon) 는 종전 목성 상수 대신 `0` 을 받는다 — 이 3종을 읽는 GLSL 이
+  // 밴드 분기뿐이라 픽셀 영향이 없어야 하고, 그 명제를 `verify:1274-invariance` 가 base↔feature 로 잰다.
+  const bandParams = resolveSurfaceBandParams(body.id, surfaceType);
+  material.setFloat('gasBandAmplitude', bandParams.amplitude);
+  material.setFloat('gasBandCount', bandParams.count);
+  material.setFloat('gasTurbulence', bandParams.turbulence);
+  // #1274 U1 (b) — IceGiant 전용 albedo 배율. 비-IceGiant 는 1 (분기 4 밖에서 읽지 않아 픽셀 영향 없음 —
+  // 바인딩을 0.5 로 바꾼 변이에서도 verify:1274-invariance 4 body diff 0, PR #1278 코멘트).
+  material.setFloat('iceGiantAlbedo', resolveIceGiantAlbedo(body.id, surfaceType));
   material.setFloat('craterDepth', CRATER_DEPTH);
   material.setFloat('craterDensity', CRATER_DENSITY);
 
@@ -1540,6 +1706,29 @@ export function oceanDepthMirror(
   return depth * (1 - landMask);
 }
 
+/** #1274 U1 (b) — 미러의 IceGiant 분기는 albedo 를 인자로만 받는다 (미전달 시 throw — fallback 없음). */
+function requireMirrorIceGiantAlbedo(albedo: number | undefined): number {
+  if (albedo === undefined) {
+    throw new Error(
+      '[surfaceColorMirror] IceGiant 에 iceGiantAlbedo 인자가 없다 — resolveIceGiantAlbedo 결과를 넘겨라 (#1274)',
+    );
+  }
+  return albedo;
+}
+
+/** #1274 §A12.4 계약 6 — 미러의 밴드 분기는 파라미터를 인자로만 받는다 (미전달 시 throw — 상수 fallback 없음). */
+function requireMirrorBandParams(
+  surfaceType: SurfaceType,
+  bands: SurfaceBandParams | undefined,
+): SurfaceBandParams {
+  if (bands === undefined) {
+    throw new Error(
+      `[surfaceColorMirror] 밴드 타입 (${surfaceType}) 에 bands 인자가 없다 — resolveSurfaceBandParams 결과를 넘겨라 (#1274)`,
+    );
+  }
+  return bands;
+}
+
 /**
  * #756 — FRAGMENT_SHADER 의 표면 변조 GLSL 의 **순수 JS 미러** (anti-pattern 계약 검증용).
  *
@@ -1555,6 +1744,10 @@ export function oceanDepthMirror(
  * @param surfaceType 표면 타입
  * @param p 정규화 구면 좌표 [x,y,z] (단위 벡터 가정)
  * @param mask Amendment 4 (#1119) 마스크 경로 미러 (미전달 = `uMaskEnabled` 0 = Amendment 3 식 그대로)
+ * @param bands Amendment 12 (#1274) 밴드 파라미터 — 밴드 타입 (`BAND_SURFACE_TYPES`) 에서 **필수**
+ *   (미전달 시 throw — 기본값 fallback 없음). 비-밴드 타입은 읽지 않는다. 런타임 바인딩과 같은 값을
+ *   쓰려면 `resolveSurfaceBandParams(bodyId, surfaceType)` 결과를 넘긴다.
+ * @param iceGiantAlbedo #1274 U1 (b) — `IceGiant` 에서 **필수** (미전달 시 throw). 다른 타입은 읽지 않는다.
  * @returns 변조 후 RGB ∈ [0,1]³ (clamp 적용)
  */
 export function surfaceColorMirror(
@@ -1562,6 +1755,8 @@ export function surfaceColorMirror(
   surfaceType: SurfaceType,
   p: readonly [number, number, number],
   mask?: SurfaceMaskMirrorInput,
+  bands?: SurfaceBandParams,
+  iceGiantAlbedo?: number,
 ): readonly [number, number, number] {
   const [bx, by, bz] = baseColor;
   let r = bx,
@@ -1617,14 +1812,19 @@ export function surfaceColorMirror(
     b = bz * (1 + mod);
     r = Math.min(Math.max(r + DESERT_RUST_TINT, 0), 1);
     b = Math.min(Math.max(b - DESERT_RUST_TINT * 0.5, 0), 1);
-  } else if (surfaceType === SurfaceType.GasBands) {
+  } else if (surfaceType === SurfaceType.GasBands || surfaceType === SurfaceType.IceGiant) {
+    // GLSL 은 분기 2 · 4 가 별도 블록이다. 밴드 식은 같고 (분기 4 = 분기 2 의 사본, §A12.5) 분기 4 만
+    // albedo 배율을 곱한다 (#1274 U1 (b)).
+    const band = requireMirrorBandParams(surfaceType, bands);
+    const albedo =
+      surfaceType === SurfaceType.IceGiant ? requireMirrorIceGiantAlbedo(iceGiantAlbedo) : 1;
     const latitude = py;
-    const turb = (fbmMirror(px * 4, py * 4, pz * 4) - 0.5) * 2 * GAS_TURBULENCE;
-    const bands = Math.sin((latitude + turb) * GAS_BAND_COUNT * Math.PI);
-    const mod = bands * GAS_BAND_AMPLITUDE;
-    r = bx * (1 + mod);
-    g = by * (1 + mod);
-    b = bz * (1 + mod);
+    const turb = (fbmMirror(px * 4, py * 4, pz * 4) - 0.5) * 2 * band.turbulence;
+    const wave = Math.sin((latitude + turb) * band.count * Math.PI);
+    const mod = wave * band.amplitude;
+    r = bx * albedo * (1 + mod);
+    g = by * albedo * (1 + mod);
+    b = bz * albedo * (1 + mod);
   } else if (surfaceType === SurfaceType.Cratered) {
     const fract = (n: number): number => n - Math.floor(n);
     const cellX = Math.floor(px * CRATER_DENSITY),
