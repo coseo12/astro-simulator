@@ -38,7 +38,12 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { clickTestId, setTimePlayback, withBrowser } from './browser-verify-utils.mjs';
+import {
+  clickFocusBody,
+  clickTestId,
+  setTimePlayback,
+  withBrowser,
+} from './browser-verify-utils.mjs';
 import { REGRESSION_RATIO, judgeReport } from './bench-judge.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
@@ -108,10 +113,11 @@ function reportMeasurementFailure(error) {
  * 시나리오 prep 셀렉터 계약 (#1209 과업 1).
  *
  * **필수 (부재 = 측정 실패)** — `clickTestId` pre-assert 로 throw:
- *   `time-preset-1d` · `time-preset-1y` · `focus-earth` · `focus-neptune`
- *   ⚠️ `focus-*` 는 `focus-quick-buttons.tsx` 가 `focus-${b.id}` 로 **동적 생성**한다.
- *      버튼 목록이 바뀌면 통째로 사라지므로, 여기서 실패하지 않으면 「해왕성을 잡지 않은
- *      화면」을 `focus-neptune` 이라는 이름으로 계속 재게 된다.
+ *   `time-preset-1d` · `time-preset-1y` · `body-menu-trigger`
+ *   ⚠️ #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목 `focus-${id}` 가 됐고 (`body-menu.tsx`), 메뉴는
+ *      닫히면 **언마운트**된다. 그래서 부팅 직후 단언 대상은 항목이 아니라 트리거다. 항목 `focus-earth` ·
+ *      `focus-neptune` 의 존재는 prep 의 `clickFocusBody` 가 메뉴를 연 뒤 단언한다 (부재 = throw) — 여기서
+ *      실패하지 않으면 「해왕성을 잡지 않은 화면」을 `focus-neptune` 이라는 이름으로 계속 재게 된다.
  *
  * **선택 (부재가 정상일 수 있는 유일한 자리)** — `setTimePlayback` 이 상태로 단언:
  *   `time-play` ↔ `time-pause` **토글 쌍**. 한 버튼의 testid 가 상태에 따라 갈리므로
@@ -120,12 +126,7 @@ function reportMeasurementFailure(error) {
  *
  * 이 목록 밖에 `.catch(() => {})` 를 새로 들이지 않는다.
  */
-const REQUIRED_TESTIDS = Object.freeze([
-  'time-preset-1d',
-  'time-preset-1y',
-  'focus-earth',
-  'focus-neptune',
-]);
+const REQUIRED_TESTIDS = Object.freeze(['time-preset-1d', 'time-preset-1y', 'body-menu-trigger']);
 
 /**
  * prep 클릭 타임아웃 — **새 임계가 아니라 변경 전 값의 명시**다.
@@ -208,6 +209,7 @@ const { scenarios, nBody } = await withBrowser(
     //   셀렉터라 부재 = 회귀다.
     const click = (testId) => clickTestId(page, testId, { timeout: PREP_CLICK_TIMEOUT_MS });
     const playback = (mode) => setTimePlayback(page, mode, { timeout: PREP_CLICK_TIMEOUT_MS });
+    const focusBody = (bodyId) => clickFocusBody(page, bodyId, { timeout: PREP_CLICK_TIMEOUT_MS });
     const steps = [
       { name: 'idle', prep: () => playback('paused') },
       {
@@ -218,8 +220,9 @@ const { scenarios, nBody } = await withBrowser(
         },
       },
       { name: 'play-1y', prep: () => click('time-preset-1y') },
-      { name: 'focus-earth', prep: () => click('focus-earth') },
-      { name: 'focus-neptune', prep: () => click('focus-neptune') },
+      // #1281 — 메뉴 열기는 prep 안이라 측정 구간 밖이다. 선택하면 메뉴가 닫히므로 측정 화면에 메뉴가 없다.
+      { name: 'focus-earth', prep: () => focusBody('earth') },
+      { name: 'focus-neptune', prep: () => focusBody('neptune') },
     ];
 
     const collected = [];

@@ -28,11 +28,9 @@ export const R1_UI_REGIONS = Object.freeze([
     selector: '[data-r1-region="hud-top-right"]',
     fallback1280x720: { x: 1024, y: 56, width: 256, height: 144 },
   },
-  {
-    id: 'hud-bottom-right',
-    selector: '[data-r1-region="hud-bottom-right"]',
-    fallback1280x720: { x: 1024, y: 600, width: 256, height: 120 },
-  },
+  // #1281 — `hud-bottom-right` (우하 고정 `정확도 · T1 관측` 범례) 영역 제거. 범례 자체가 사라져
+  // selector 미발견으로 가드가 실패하므로 정의와 baseline PNG 3장을 함께 지웠다. Tier 출처는
+  // 관찰 모드 정보 카드의 한 줄로 옮겼다 (선택 시에만 보여 기본 진입 화면 가드 대상이 아니다).
 ]);
 
 export const R1_VIEWPORTS = Object.freeze([
@@ -79,8 +77,8 @@ export const R1_RUN_MODES = Object.freeze(['measure-px-ratio', 'update', 'measur
 /**
  * 비-SSoT 환경(macOS) 실행 처분 판정 (#1258).
  *
- * r1-guard 의 회귀 판정 SSoT 는 **CI Linux** 다 — baseline 12 PNG 가 ubuntu 캡처본이기 때문이다
- * (ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26 §결정 1). 4 영역이 모두 텍스트를
+ * r1-guard 의 회귀 판정 SSoT 는 **CI Linux** 다 — baseline PNG (#1281 이후 3 영역 × 3 viewport = 9장) 가
+ * ubuntu 캡처본이기 때문이다 (ADR `20260425-r1-ui-pixel-diff-guard.md` §Amendment 2026-04-26 §결정 1). 영역이 모두 텍스트를
  * 담고 있어 macOS 폰트 렌더 차이만으로 전 영역이 어긋나고, 그래서 darwin verify 의 **PASS/FAIL
  * 판정에는 정보가 없다**.
  *

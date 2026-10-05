@@ -343,7 +343,7 @@ describe('#619 — r1-ui-regression-guard.mjs targetIds SSoT 정합', () => {
  *
  * "focus 가능"(introducedInRPhase)과 직교 축 — satellite(phobos/deimos)는 focus 가능하나
  * shortcut bar 미등록 (R5 Q4a=A). `showInShortcutBar` 데이터 메타를 SSoT 로,
- * `FOCUS_BUTTONS`(렌더) / `RPHASE_EXPECTED_ENABLED|DISABLED`(verify) 하드코딩과 정합 차단.
+ * `BODY_MENU_ITEMS`(렌더 — #1281 전 `FOCUS_BUTTONS`) / `RPHASE_EXPECTED_ENABLED|DISABLED`(verify) 하드코딩과 정합 차단.
  * (렌더 자동 생성은 비목표 — UI 무변경 + verify 격리성 유지, ADR #613 §결정 D 패턴 정합.)
  */
 describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
@@ -409,13 +409,14 @@ describe('#617 — showInShortcutBar 메타 SSoT 정합', () => {
     }
   });
 
-  it('FOCUS_BUTTONS(focus-quick-buttons.tsx) 의 id 가 showInShortcutBar 파생과 일치', () => {
+  // #1281 — 천체 바로가기가 「천체 ▾」 메뉴 항목이 되어 선언이 `body-menu.tsx` `BODY_MENU_ITEMS` 로 이전했다 (판정 불변).
+  it('BODY_MENU_ITEMS(body-menu.tsx) 의 id 가 showInShortcutBar 파생과 일치', () => {
     const source = fs.readFileSync(
-      path.join(REPO_ROOT, 'apps/web/src/components/layout/focus-quick-buttons.tsx'),
+      path.join(REPO_ROOT, 'apps/web/src/components/layout/body-menu.tsx'),
       'utf-8',
     );
-    const block = source.match(/const\s+FOCUS_BUTTONS\s*=\s*\[([\s\S]+?)\];/);
-    expect(block, 'FOCUS_BUTTONS 선언을 찾지 못함').toBeTruthy();
+    const block = source.match(/const\s+BODY_MENU_ITEMS\s*=\s*\[([\s\S]+?)\];/);
+    expect(block, 'BODY_MENU_ITEMS 선언을 찾지 못함').toBeTruthy();
     const ids = [...block![1]!.matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
     expect(ids).toEqual(shortcutBodies);
   });

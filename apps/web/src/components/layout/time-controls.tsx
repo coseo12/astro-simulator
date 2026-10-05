@@ -111,8 +111,10 @@ export function TimeControls() {
         })}
       </div>
 
+      {/* #1281 — 모바일(`max-sm`)에서는 UTC 를 숨긴다 — 375 에서 타임바 내용(486px)이 가용폭(351px)을 넘긴 주원인이다
+          (계약 D9(c)). 시각은 HUD 좌상 JD 와 날짜 입력에 남는다. */}
       <div
-        className="num text-caption text-fg-secondary border-l border-border-subtle pl-2"
+        className="num text-caption text-fg-secondary border-l border-border-subtle pl-2 max-sm:hidden"
         data-testid="time-utc"
       >
         {utcString}

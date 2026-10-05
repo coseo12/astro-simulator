@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AU } from '@astro-simulator/shared';
 import { useSimCameraTier, useSimCommand } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
+import { useBodyInfo } from '@/hooks/use-body-info';
 import { formatScaleLabel, sceneUnitToAU, type SceneUnitToAUDeps } from './scale-control-utils';
 
 /**
@@ -27,7 +28,9 @@ import { formatScaleLabel, sceneUnitToAU, type SceneUnitToAUDeps } from './scale
  *    onBeforeRender 폭주 / Zustand store mirror 무한 루프 금지.
  *  - **물리량 동일**: 슬라이더가 조절하는 값은 항상 `camera.radius` (scene unit). free-fly /
  *    focus 무관 — `setCameraRadius` command 그대로.
- *  - **라벨만 분기**: free-fly = `{value} {unit}` / focus = `{value} {unit} (focus: <bodyId>)`.
+ *  - **라벨만 분기**: free-fly = `{value} {unit}` / focus = `{value} {unit} (focus: <한글 이름>)`.
+ *    (#1281 — 종전 raw id `<bodyId>` 를 데이터 SSoT `nameKo` 로 교체. 미등록 id 는 선택 단계의
+ *    R-Phase 가드가 막아 도달하지 않으며, 도달하면 id 로 표기한다 — 빈 라벨로 흡수하지 않는다.)
  *  - **엣지 케이스** (Gemini Q3):
  *    - sun focus: sun 위치 = 원점이므로 free-fly 와 값 동일, 텍스트만 분기 (값 변화 0)
  *    - focus target null 자동 free-fly 복귀 — `isRPhaseFocusable` 가드와 정합
@@ -53,6 +56,8 @@ export function ScaleControl() {
   // R1 #334+#335 — selectedBodyId 는 store SSoT. ScaleControl 은 라벨 텍스트 분기에만 사용.
   // 슬라이더가 조절하는 물리량은 selectedBodyId 와 무관 (camera.radius 만 조절).
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
+  // #1281 — 라벨에 raw id 대신 한글 이름 (연구 패널 · 관찰 카드와 같은 조회 경로).
+  const { data: focusBody } = useBodyInfo(selectedBodyId);
 
   // 슬라이더 로컬 state — log10(camera.radius). 마운트 직후 camera 가 ready 되면 effect 가
   // 즉시 실측값으로 갱신 (DoD-3 초기값 hardcode 해소 — Math.log10(35) 자체 기본값은 camera
@@ -121,7 +126,7 @@ export function ScaleControl() {
   };
   const radiusAU = sceneUnitToAU(deps);
   const labelText = formatScaleLabel(radiusAU);
-  const focusSuffix = selectedBodyId ? ` (focus: ${selectedBodyId})` : '';
+  const focusSuffix = selectedBodyId ? ` (focus: ${focusBody?.nameKo ?? selectedBodyId})` : '';
 
   return (
     <div

@@ -19,6 +19,16 @@ let onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
 const render = (ui: ReactElement) =>
   rtlRender(ui, { wrapper: withNuqsTestingAdapter({ onUrlUpdate }) });
 
+/**
+ * #1281 — 천체 항목은 「천체 ▾」 메뉴 안에 있고 메뉴는 닫히면 언마운트된다. 항목을 보는 테스트는 메뉴를 연 뒤 본다
+ * (testid `focus-<id>` · R-Phase 속성 · DOM 순서는 메뉴 안에서 그대로다).
+ */
+const renderMenuOpen = () => {
+  const utils = render(<FocusQuickButtons />);
+  fireEvent.click(screen.getByTestId('body-menu-trigger'));
+  return utils;
+};
+
 beforeEach(() => {
   sentCommands = [];
   onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
@@ -28,6 +38,7 @@ beforeEach(() => {
     mode: 'observe',
     julianDate: null,
     selectedBodyId: null,
+    bodyMenuOpen: false,
     orbitLinesVisible: true, // #688 — 기본 ON 결정적 리셋
     timeScale: 86_400,
     fps: null,
@@ -51,7 +62,7 @@ beforeEach(() => {
  */
 describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus + R4 earth + moon', () => {
   it('7 body 버튼 + reset 렌더 (R1 sun + R2 mercury + R3 venus + R4 earth + moon + R5+ placeholder)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-sun')).toBeInTheDocument();
     expect(screen.getByTestId('focus-mercury')).toBeInTheDocument();
     expect(screen.getByTestId('focus-venus')).toBeInTheDocument();
@@ -63,50 +74,50 @@ describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus + R4 earth + moon
   });
 
   it('mercury 버튼 텍스트 = "수성" (한국어 라벨, axe 자연 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-mercury')).toHaveTextContent('수성');
   });
 
   it('mercury 클릭 시 focusOn 명령 발행 (R1 sun 패턴 재사용)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-mercury'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'mercury' });
   });
 
   // #416 — R3 venus 명시 단언 (PR #414 reviewer 권고 4 — R2/R3 활성 케이스 의미 정합성).
   it('venus 클릭 시 focusOn 명령 발행 (R3 #369 진입 검증)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-venus'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'venus' });
   });
 
   it('venus 버튼 텍스트 = "금성" (한국어 라벨, axe 자연 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-venus')).toHaveTextContent('금성');
   });
 
   it('sun 클릭 시 focusOn 명령 발행 (R1 회귀 0)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-sun'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'sun' });
   });
 
   it('reset 클릭 시 resetCamera 명령 발행', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-reset'));
     expect(sentCommands).toContainEqual({ type: 'resetCamera' });
   });
 
   it('mercury 가 selectedBodyId 일 때 active 스타일 적용', () => {
     useSimStore.setState({ selectedBodyId: 'mercury' });
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     const btn = screen.getByTestId('focus-mercury');
     // active 상태에서는 bg-primary/20 텍스트 색상 변경 (focus-quick-buttons.tsx 28-30 라인)
     expect(btn.className).toContain('bg-primary/20');
   });
 
   it('sun → mercury → venus → earth → moon → jupiter → neptune 거리 순서 보존 (R4 moon 인접)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     const buttons = [
       screen.getByTestId('focus-sun'),
       screen.getByTestId('focus-mercury'),
@@ -141,7 +152,7 @@ describe('FocusQuickButtons — R1 sun + R2 mercury + R3 venus + R4 earth + moon
  */
 describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5 #594)', () => {
   it('R-Phase 박제 body (sun / mercury / venus / earth / moon / mars / jupiter) 는 활성', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-sun')).not.toBeDisabled();
     expect(screen.getByTestId('focus-mercury')).not.toBeDisabled();
     expect(screen.getByTestId('focus-venus')).not.toBeDisabled();
@@ -157,13 +168,13 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
     // negative 는 celestial-tree / celestial-info-panel / scenario-presets 단위 테스트 (R10b #664
     // 부터 vi.mock 부분 mock 승계 — ADR 20260612-r10b §축 5 ②. 이전: halley —
     // R10a #659 에서 pluto 교체) 가 보존.
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-neptune')).not.toBeDisabled();
   });
 
   // R10a #659 — pluto 승격 케이스 단언 (PM Q3=A: pluto 만 추가, 나머지 4 미등록 검증).
   it('pluto (R10a #659 진입 + bar 승격) 은 활성 — 14버튼째 (거리순 마지막)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-pluto')).not.toBeDisabled();
     expect(screen.getByTestId('focus-pluto')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-pluto')).toHaveAttribute('data-r-phase-disabled', 'false');
@@ -171,18 +182,18 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('pluto 버튼 텍스트 = "명왕성" (R10a 박제 + 한국어 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-pluto')).toHaveTextContent('명왕성');
   });
 
   it('pluto 클릭 시 focusOn 명령 발행 (R10a #659 진입 검증)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-pluto'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'pluto' });
   });
 
   it('neptune → pluto DOM 거리 순서 보존 (행성 거리순 블록 + 비-행성 후미 — pluto 가 14번째)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     const neptune = screen.getByTestId('focus-neptune');
     const pluto = screen.getByTestId('focus-pluto');
     expect(neptune.compareDocumentPosition(pluto)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
@@ -190,7 +201,7 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
 
   // R10b #664 — halley 승격 케이스 단언 (PM Q2=A: halley 만 추가, encke/swift-tuttle 미등록 검증).
   it('halley (R10b #664 진입 + bar 승격) 은 활성 — 15버튼째 (비-행성 카테고리 후미 컨벤션)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-halley')).not.toBeDisabled();
     expect(screen.getByTestId('focus-halley')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-halley')).toHaveAttribute('data-r-phase-disabled', 'false');
@@ -198,25 +209,25 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('halley 버튼 텍스트 = "핼리 혜성" (R10b 박제 + 한국어 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-halley')).toHaveTextContent('핼리 혜성');
   });
 
   it('halley 클릭 시 focusOn 명령 발행 (R10b #664 진입 검증)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-halley'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'halley' });
   });
 
   it('pluto → halley DOM 순서 보존 (비-행성 카테고리 후미 — halley 가 bar 마지막. ⚠️ a 17.834 AU 거리순 엄격 삽입 기각, ADR 20260612-r10b §축 6 컨벤션)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     const pluto = screen.getByTestId('focus-pluto');
     const halley = screen.getByTestId('focus-halley');
     expect(pluto.compareDocumentPosition(halley)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('ceres / haumea / makemake / eris 는 shortcut bar 미등록 (PM Q3=A — URL ?focus= 진입, #617 직교 축)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.queryByTestId('focus-ceres')).toBeNull();
     expect(screen.queryByTestId('focus-haumea')).toBeNull();
     expect(screen.queryByTestId('focus-makemake')).toBeNull();
@@ -224,19 +235,19 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('encke / swift-tuttle 는 shortcut bar 미등록 (R10b PM Q2=A — URL ?focus= 진입, #617 직교 축)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.queryByTestId('focus-encke')).toBeNull();
     expect(screen.queryByTestId('focus-swift-tuttle')).toBeNull();
   });
 
   it('neptune 은 aria-disabled="false" + data-r-phase-disabled="false" (R9 enabled 전환)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-neptune')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-neptune')).toHaveAttribute('data-r-phase-disabled', 'false');
   });
 
   it('활성 버튼은 aria-disabled="false" (R4 earth / moon + R5 mars + R6 jupiter 포함)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-sun')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-venus')).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByTestId('focus-earth')).toHaveAttribute('aria-disabled', 'false');
@@ -246,7 +257,7 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('전 버튼 data-r-phase-disabled="false" 회귀 가드 selector 박제 (R9 — bar 전체 enabled)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-sun')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('focus-earth')).toHaveAttribute('data-r-phase-disabled', 'false');
     expect(screen.getByTestId('focus-moon')).toHaveAttribute('data-r-phase-disabled', 'false');
@@ -255,7 +266,7 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('활성 버튼은 title 속성 없음 (불필요 노이즈 차단 — neptune 포함 R9 전환 검증)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-sun')).not.toHaveAttribute('title');
     expect(screen.getByTestId('focus-earth')).not.toHaveAttribute('title');
     expect(screen.getByTestId('focus-moon')).not.toHaveAttribute('title');
@@ -265,66 +276,66 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('neptune 클릭 시 focusOn 명령 발행 (R9 #653 진입 검증)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-neptune'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'neptune' });
   });
 
   it('neptune 버튼 시각 차별화 해제 — opacity-50 cursor-not-allowed 부재 (R9 enabled)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     const neptuneBtn = screen.getByTestId('focus-neptune');
     expect(neptuneBtn.className).not.toContain('opacity-50');
     expect(neptuneBtn.className).not.toContain('cursor-not-allowed');
   });
 
   it('venus 버튼 텍스트 = "금성" (R3 박제 + 한국어 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-venus')).toHaveTextContent('금성');
   });
 
   it('venus 클릭 시 focusOn 명령 발행 (R3 정상 활성)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-venus'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'venus' });
   });
 
   // R4 #532 — earth / moon 활성 케이스 단언 (D3 검증).
   it('earth 버튼 텍스트 = "지구" (R4 박제 + 한국어 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-earth')).toHaveTextContent('지구');
   });
 
   it('moon 버튼 텍스트 = "달" (R4 박제 + 한국어 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-moon')).toHaveTextContent('달');
   });
 
   it('earth 클릭 시 focusOn 명령 발행 (R4 #532 진입 검증)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-earth'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'earth' });
   });
 
   it('moon 클릭 시 focusOn 명령 발행 (R4 #532 satellite 첫 본 사례)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-moon'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'moon' });
   });
 
   // R5 #594 — mars 활성 케이스 단언 (Q4a=A: mars 만 추가, phobos/deimos 미등록 검증)
   it('mars 버튼 텍스트 = "화성" (R5 박제 + 한국어 라벨)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.getByTestId('focus-mars')).toHaveTextContent('화성');
   });
 
   it('mars 클릭 시 focusOn 명령 발행 (R5 #594 Q2=B 2번째 본 인스턴스화)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     fireEvent.click(screen.getByTestId('focus-mars'));
     expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'mars' });
   });
 
   it('phobos / deimos 는 shortcut bar 미등록 (Q4a=A — 모바일 너비 안전)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     // R5 ADR §결정 8: phobos/deimos 는 URL override 또는 mars focus zoom-in 후 mesh 클릭 진입.
     // shortcut bar 미등록으로 10 버튼 (sun/mercury/venus/earth/moon/mars/jupiter/neptune + reset + free-fly)
     // = 356 px < 375 px 모바일 viewport (margin 19 px).
@@ -333,7 +344,7 @@ describe('FocusQuickButtons — R-Phase Allowlist 가드 UI (#402 + R4 #532 + R5
   });
 
   it('triton 은 shortcut bar 미등록 (galilean/titan/titania 패턴 — URL ?focus=triton 진입)', () => {
-    render(<FocusQuickButtons />);
+    renderMenuOpen();
     expect(screen.queryByTestId('focus-triton')).toBeNull();
   });
 });
@@ -446,6 +457,20 @@ describe('FocusQuickButtons — Esc 충돌 가드 (#737 data-modal-open)', () =>
     } finally {
       window.removeEventListener('keydown', capture, { capture: true });
     }
+  });
+
+  it('#1281 D6 — 천체 메뉴를 닫는 Esc 는 enterFreeFly 미발화 · 메뉴 닫힘 · 트리거 포커스 → 다음 Esc 는 발화', () => {
+    useSimStore.setState({ selectedBodyId: 'earth' });
+    renderMenuOpen();
+    expect(screen.getByTestId('body-menu')).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
+    expect(screen.queryByTestId('body-menu')).toBeNull();
+    expect(useSimStore.getState().bodyMenuOpen).toBe(false);
+    expect(document.activeElement).toBe(screen.getByTestId('body-menu-trigger'));
+    // 양성 대조 — 메뉴가 닫힌 상태의 같은 Esc 는 기존 의미(자유시점)로 간다.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(sentCommands).toContainEqual({ type: 'enterFreeFly' });
   });
 
   it('focus 없음(selectedBodyId=null) + Esc → enterFreeFly 미발화 (#509 no-op 보존)', () => {

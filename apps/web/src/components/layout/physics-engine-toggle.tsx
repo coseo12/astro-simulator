@@ -49,7 +49,7 @@ export function PhysicsEngineToggle() {
 
   return (
     <div
-      className="flex items-center gap-0.5 bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm p-0.5"
+      className="flex shrink-0 items-center gap-0.5 bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm p-0.5"
       data-testid="physics-engine-toggle"
       aria-label="물리 엔진"
     >
@@ -67,7 +67,7 @@ export function PhysicsEngineToggle() {
             aria-disabled={!runnable}
             title={e.tooltip}
             onClick={() => runnable && setPhysicsEngine(e.id)}
-            className={`num text-caption px-2 py-1 rounded-xs transition-colors ${
+            className={`num text-caption whitespace-nowrap px-2 py-1 rounded-xs transition-colors ${
               active
                 ? 'bg-primary/25 text-fg-primary'
                 : runnable

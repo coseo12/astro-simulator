@@ -40,7 +40,8 @@ const SIMULATE_FAIL = process.argv.includes('--simulate-fail');
 // WCAG AA 본문 대비 임계.
 const WCAG_AA_TEXT_MIN = 4.5;
 // HUD 박스 최소 기대 개수 — 마커 누락/오타로 0 개가 되면 가드가 조용히 통과하는 사각 차단.
-// 기본 진입 화면에서 항상 보이는 박스: JD(좌상) / renderer(우상) / tier(우하) / scale-label = 4.
+// 기본 진입 화면에서 항상 보이는 박스: JD(좌상) / renderer(우상) / scale-label = 3.
+// (#1281 — 우하 tier 범례 제거로 4 → 3. 관찰 모드 정보 카드는 천체 선택 시에만 보여 기본 화면에 없다.)
 const MIN_EXPECTED_CHIPS = 3;
 // worst-case canvas 픽셀 — 태양 disk / 밝은 천체 white-out.
 const SUN_WHITE = { r: 255, g: 255, b: 255 };

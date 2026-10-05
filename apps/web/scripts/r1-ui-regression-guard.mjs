@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * R1 #329 — UI 회귀 가드 (4 영역 × 3 viewport pixel diff).
+ * R1 #329 — UI 회귀 가드 (영역 × viewport pixel diff — 영역 목록 SSoT 는 `r1-ui-regions.mjs`).
+ *   개수를 여기 적지 않는다 — #1281 PR1 이 영역을 하나 지웠을 때 이 헤더의 「4 영역」 이 stale 로 남았다.
  *
  * playwright + pixelmatch + pngjs 로 baseline 대비 mismatch ratio ≤ 0.5% 검증.
  * 캔버스 (3D scene) 영역은 제외 — sun mesh 추가가 의도 변화 (PM Q2 비-범위).
@@ -833,10 +834,10 @@ async function main() {
   if (disposition === 'not-ssot') {
     console.error('[r1-guard] 전제 미충족 — 이 환경(darwin)은 회귀 판정 SSoT 가 아니다. (#1258)');
     console.error(
-      '  원인: baseline 12 PNG 가 ubuntu CI 캡처본이고, 가드 영역 4개가 모두 텍스트를 담고 있어',
+      '  원인: baseline PNG 가 ubuntu CI 캡처본이고, 가드 영역이 모두 텍스트를 담고 있어',
     );
     console.error(
-      '        macOS 폰트 렌더 차이만으로 4/4 가 어긋난다 — PASS/FAIL 판정에 정보가 없다.',
+      '        macOS 폰트 렌더 차이만으로 전 영역이 어긋난다 — PASS/FAIL 판정에 정보가 없다.',
     );
     console.error('  SSoT: CI(ubuntu) 의 `r1-guard: verify 실행 (4/4)` step 결과를 본다.');
     console.error('  회피: SKIP_LOCAL=1 을 붙이면 검증을 건너뛰고 exit 0 으로 끝난다.');

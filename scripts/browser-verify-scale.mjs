@@ -12,7 +12,7 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { withBrowser } from './browser-verify-utils.mjs';
+import { openBodyMenu, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +46,8 @@ await withBrowser({}, async (browser) => {
 
   for (const t of targets) {
     const before = consoleErrors.length + pageErrors.length;
+    // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목이다 (닫히면 언마운트). 항목마다 메뉴를 연다.
+    await openBodyMenu(page).catch(() => {});
     const btn = await page.$(`[data-testid="focus-${t.id}"]`);
     if (!btn) {
       results.fail.push(`${t.label}: 버튼 없음`);

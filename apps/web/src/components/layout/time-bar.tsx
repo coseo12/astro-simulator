@@ -12,7 +12,9 @@ export function TimeBar({ children }: { children?: ReactNode }) {
       className="absolute bottom-0 inset-x-0 h-16 flex items-center justify-center gap-2 px-3 z-[var(--z-hud)] pointer-events-none"
       data-testid="timebar"
     >
-      <div className="pointer-events-auto flex items-center gap-2 bg-bg-surface/60 backdrop-blur border border-border-subtle rounded-md px-3 py-2">
+      {/* #1281 — `max-w-full min-w-0`: 내용이 가용폭을 넘으면 `justify-center` 가 래퍼를 좌측 화면 밖으로 밀어 역행 버튼이
+          x=-42 에 놓였다 (375 실측, 계약 D9(c)). 래퍼를 가용폭에 묶어 넘침은 안쪽 `time-controls` 의 가로 스크롤이 되게 한다. */}
+      <div className="pointer-events-auto flex max-w-full min-w-0 items-center gap-2 bg-bg-surface/60 backdrop-blur border border-border-subtle rounded-md px-3 py-2">
         {children ?? (
           <span className="text-caption text-fg-secondary num">TimeBar — D5에서 구현</span>
         )}

@@ -65,6 +65,22 @@ describe('useMouseInactivity', () => {
     expect(result.current).toBe(true);
   });
 
+  it('#1281 D7 — pointerdown(터치) 도 활동으로 센다: inactive 에서 즉시 false + 타이머 재시작', () => {
+    const { result } = renderHook(() => useMouseInactivity(500));
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(result.current).toBe(true);
+    act(() => {
+      window.dispatchEvent(new Event('pointerdown'));
+    });
+    expect(result.current).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(result.current).toBe(true);
+  });
+
   it('unmount 시 타이머/리스너 정리', () => {
     // #849 — 구 단언 `window.setTimeout.length ≥ 0` 은 항진 명제 (Function.length 는 항상 ≥ 0).
     // fake timer 카운트 비교로 실제 정리 여부를 검증한다.

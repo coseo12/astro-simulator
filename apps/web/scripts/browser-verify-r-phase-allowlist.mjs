@@ -56,7 +56,7 @@
  * dev 빌드 의존: `window.__simStore` / `window.__solarScene` / `window.__simCore` (sim-canvas.tsx).
  */
 
-import { withBrowser } from '../../../scripts/browser-verify-utils.mjs';
+import { openBodyMenu, withBrowser } from '../../../scripts/browser-verify-utils.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
@@ -149,6 +149,8 @@ async function setupPage(browser) {
  */
 async function verifyButtonStates(page) {
   const results = [];
+  // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목이다 (닫히면 언마운트). 속성 판독 전에 메뉴를 연다 (판독은 메뉴를 닫지 않는다).
+  await openBodyMenu(page);
 
   for (const body of RPHASE_EXPECTED_ENABLED) {
     const selector = `[data-testid="focus-${body}"]`;
@@ -210,7 +212,8 @@ async function verifyDisabledClickIgnored(page) {
       };
     });
 
-    // 강제 click — disabled 우회 (Playwright `force: true`).
+    // 강제 click — disabled 우회 (Playwright `force: true`). #1281 — 열린 메뉴에서 실행한다.
+    await openBodyMenu(page);
     const selector = `[data-testid="focus-${body}"]`;
     await page.locator(selector).click({ force: true });
     await page.waitForTimeout(POST_CLICK_WAIT_MS);
@@ -256,6 +259,8 @@ async function verifyEnabledClickWorks(page) {
   const results = [];
 
   for (const body of RPHASE_EXPECTED_ENABLED) {
+    // #1281 — 항목을 고르면 메뉴가 닫히므로 매번 연다.
+    await openBodyMenu(page);
     const selector = `[data-testid="focus-${body}"]`;
     await page.locator(selector).click();
     await page.waitForTimeout(POST_CLICK_WAIT_MS);

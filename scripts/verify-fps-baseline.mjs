@@ -43,7 +43,7 @@
  *   (3) 5 페르소나 self-consistency — 본 PR 범위 밖
  *   (4) 메타 안정성 — rAF noise ±5% 인지, 회귀 임계 ±10% margin 적용
  */
-import { withBrowser } from './browser-verify-utils.mjs';
+import { openBodyMenu, withBrowser } from './browser-verify-utils.mjs';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -134,9 +134,9 @@ const VIEWPORTS = [
 ];
 
 const SCENARIOS = [
-  { id: 'default', label: 'default (sun 시점)', focusTestId: null },
-  { id: 'earth-focus', label: 'earth focus', focusTestId: 'focus-earth' },
-  { id: 'moon-focus', label: 'moon focus', focusTestId: 'focus-moon' },
+  { id: 'default', label: 'default (sun 시점)', focusBodyId: null },
+  { id: 'earth-focus', label: 'earth focus', focusBodyId: 'earth' },
+  { id: 'moon-focus', label: 'moon focus', focusBodyId: 'moon' },
 ];
 
 async function measureFps(page, durationMs) {
@@ -271,13 +271,16 @@ async function waitForLodSettle(page) {
  *   반환: 측정 시점 LOD 진단 (tier/override/lodCounts).
  */
 async function setupScenario(page, scenario) {
-  if (scenario.focusTestId) {
-    const sel = `[data-testid="${scenario.focusTestId}"]`;
+  if (scenario.focusBodyId) {
+    // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목이다. 메뉴를 연 뒤 항목 유무를 본다 (기존 분기 의미 유지).
+    await openBodyMenu(page);
+    const sel = `[data-testid="focus-${scenario.focusBodyId}"]`;
     const count = await page.locator(sel).count();
     if (count > 0) {
       await page.locator(sel).click();
       await page.waitForTimeout(800); // focus 카메라 전환 안정화
     } else {
+      await page.keyboard.press('Escape'); // 항목이 없으면 연 메뉴를 닫는다 (메뉴 Esc 는 자유시점 비발화 — D6)
       // moon focus 가 default 진입 시 셀렉터 미노출 가능 — URL override 사용
       if (scenario.id === 'moon-focus') {
         await page.goto(`${baseUrl}/?focus=moon`, { waitUntil: 'networkidle' });

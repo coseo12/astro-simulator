@@ -27,7 +27,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
+import { clickFocusBody, pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const SAMPLE_MS = Number(process.env.BENCH_SAMPLE_MS ?? 5_000);
@@ -107,7 +107,8 @@ const scenarios = await withBrowser(
 
     // === Scenario 2 — focus mercury (Option D in-flight 플래그 + onAfterRender 발화) ===
     await pressTimePlay(page, { skipIfAbsent: true });
-    await page.click('[data-testid="focus-mercury"]').catch(() => {});
+    // #1281 — 천체 메뉴 경유 (`clickFocusBody`). 기존 `.catch` 의미(실패 무시)는 그대로 둔다 (범위 밖).
+    await clickFocusBody(page, 'mercury').catch(() => {});
     await page.waitForTimeout(800);
     {
       const stat = await measureFrameStats(SAMPLE_MS);

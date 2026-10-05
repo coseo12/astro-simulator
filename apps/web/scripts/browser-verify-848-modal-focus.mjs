@@ -32,6 +32,7 @@
 import {
   launchBrowser,
   bootstrapScene,
+  clickFocusBody,
   collectConsoleErrors,
   resolveBaseUrl,
 } from '../../../scripts/browser-verify-utils.mjs';
@@ -323,11 +324,9 @@ async function scenarioMouseFocusReclaimed(page) {
   // #699 원 시나리오 그대로: **마우스로만** 단축 바 버튼을 눌러 포커스가 그 버튼에 남은 상태.
   // (키를 한 번이라도 누르면 Chrome 의 modality 가 keyboard 로 바뀌어 `:focus-visible` 이 참이 되고,
   //  그때는 포커스를 지키는 게 옳은 동작이므로 이 시나리오의 전제가 깨진다.)
-  const btn = page.locator('[data-testid="focus-sun"]');
-  if ((await btn.count()) === 0) {
-    throw new Error('[#848] focus-sun 단축 버튼 부재 — 마크업 변경? (testid 셀렉터 깨짐)');
-  }
-  await btn.click();
+  // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목이다. 메뉴를 마우스로 열고 태양을 마우스로 고르면 포커스는 트리거로
+  // 돌아온다 (프로그램 포커스지만 마우스 유래라 `:focus-visible` 거짓 — 아래 판정 전제 동일). 부재는 헬퍼가 throw.
+  await clickFocusBody(page, 'sun');
   await page.waitForTimeout(500);
   const before = await focusSnapshot(page);
 

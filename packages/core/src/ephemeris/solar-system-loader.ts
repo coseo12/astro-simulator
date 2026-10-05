@@ -139,7 +139,7 @@ const CelestialBodyRawSchema = z.object({
   introducedInRPhase: z.number().int().positive(),
   // #617 — shortcut bar 노출 대상 메타 SSoT. "focus 가능"(introducedInRPhase)과 직교 축 —
   // satellite(phobos/deimos 등)는 focus 가능하나 shortcut bar 미등록 (R5 Q4a=A 모바일 너비 정책).
-  // RPHASE_EXPECTED_ENABLED / FOCUS_BUTTONS 정적 매칭 가드 소스 (r-phase-allowlist.test.ts).
+  // RPHASE_EXPECTED_ENABLED / BODY_MENU_ITEMS(#1281 전 FOCUS_BUTTONS) 정적 매칭 가드 소스 (r-phase-allowlist.test.ts).
   showInShortcutBar: z.boolean(),
   orbit: OrbitalElementsRawSchema.optional(),
   colorHint: z

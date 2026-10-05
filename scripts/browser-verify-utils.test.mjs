@@ -25,8 +25,10 @@ import {
   GPU_LAUNCH_ARGS,
   TIME_PLAYBACK_MODES,
   bootstrapScene,
+  clickFocusBody,
   clickTestId,
   hideDomOverlays,
+  openBodyMenu,
   buildLaunchOptions,
   collectConsoleErrors,
   pressTimePlay,
@@ -782,6 +784,71 @@ await run('clickTestId — skipIfAbsent 면 클릭 없이 false', async () => {
   const page = makeLocatorPage([]);
   assert.equal(await clickTestId(page, 'x', { skipIfAbsent: true }), false);
   assert.deepEqual(page.clicks, []);
+});
+
+/**
+ * #1281 — 천체 메뉴 스텁. 트리거를 누르면 메뉴와 `items` 가 생기고, 항목을 누르면 메뉴가 닫힌다 (언마운트).
+ * `waitFor({ state: 'visible' })` 는 존재 여부로 흉내낸다.
+ */
+function makeBodyMenuPage({ open = false, items = ['earth'] } = {}) {
+  const present = new Set(['body-menu-trigger']);
+  const setOpen = (v) => {
+    for (const id of ['body-menu', ...items.map((b) => `focus-${b}`)]) {
+      if (v) present.add(id);
+      else present.delete(id);
+    }
+  };
+  setOpen(open);
+  return {
+    clicks: [],
+    locator(selector) {
+      const m = /^\[data-testid="(.+)"\]$/.exec(selector);
+      if (!m) throw new Error(`예상 밖 셀렉터 형태: ${selector}`);
+      const id = m[1];
+      const self = this;
+      return {
+        async count() {
+          return present.has(id) ? 1 : 0;
+        },
+        async click() {
+          if (!present.has(id)) throw new Error(`부재 요소 클릭: ${id}`);
+          self.clicks.push(id);
+          if (id === 'body-menu-trigger') setOpen(!present.has('body-menu'));
+          else if (id.startsWith('focus-')) setOpen(false);
+        },
+        async waitFor({ state }) {
+          if (state !== 'visible' || !present.has(id))
+            throw new Error(`waitFor 실패: ${id} ${state}`);
+        },
+      };
+    },
+  };
+}
+
+await run('clickFocusBody — 메뉴 닫힘: 트리거 → 항목 순서로 클릭', async () => {
+  const page = makeBodyMenuPage({ open: false });
+  assert.equal(await clickFocusBody(page, 'earth'), true);
+  assert.deepEqual(page.clicks, ['body-menu-trigger', 'focus-earth']);
+});
+
+await run(
+  'clickFocusBody · openBodyMenu — 이미 열림: 트리거를 다시 누르지 않는다 (멱등)',
+  async () => {
+    const page = makeBodyMenuPage({ open: true });
+    await openBodyMenu(page);
+    assert.deepEqual(page.clicks, []);
+    assert.equal(await clickFocusBody(page, 'earth'), true);
+    assert.deepEqual(page.clicks, ['focus-earth']);
+  },
+);
+
+await run('clickFocusBody — 메뉴 항목 부재면 throw (조용한 통과 금지 — #1209 승계)', async () => {
+  const page = makeBodyMenuPage({ open: false, items: ['earth'] });
+  await assert.rejects(
+    () => clickFocusBody(page, 'neptune'),
+    /data-testid="focus-neptune" 부재 — 천체 메뉴 항목 회귀 가능성/,
+  );
+  assert.deepEqual(page.clicks, ['body-menu-trigger']);
 });
 
 await run('pressTimePlay — 기존 에러 문구 보존 (#210 계약 불변)', async () => {

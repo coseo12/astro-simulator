@@ -2,7 +2,7 @@
 
 import type { SimMode } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
-import { useSimCommand } from '@/core/sim-context';
+import { useSwitchMode } from '@/core/use-switch-mode';
 import { useEffect } from 'react';
 
 interface ModeDef {
@@ -23,11 +23,15 @@ const MODES: ModeDef[] = [
  * ModeSwitcher — 4모드 중 하나 선택.
  * P1 스코프: observe/research 활성화. education/sandbox는 비활성 (tooltip).
  * 선택 시 html[data-mode] 속성 갱신 → design-tokens CSS Variables 자동 전환.
+ *
+ * #1281 — 모바일(`max-sm`)에서는 비활성 모드(교육 · 샌드박스)를 숨긴다. 둘 다 누를 수 없는 「P2+ 예정」 표시라
+ * 375 폭에서 좌측 그룹(모드 + 천체 메뉴 + reset · 탐색 · 궤도선)이 가용폭 351px 를 넘겨 우측 그룹을 0px 로 없애던
+ * 폭을 되찾는다 (`top-bar.tsx` — 좌측 `shrink-0`).
  */
 export function ModeSwitcher() {
   const mode = useSimStore((s) => s.mode);
-  const setMode = useSimStore((s) => s.setMode);
-  const sendCommand = useSimCommand();
+  // #1281 — 관찰 모드 카드의 「자세히 → 연구 모드」와 같은 전환 경로.
+  const switchMode = useSwitchMode();
 
   // mode → html data-mode 동기화 (layout에서 초기 observe 세팅하지만 변경 시 동기화 필요)
   useEffect(() => {
@@ -38,8 +42,7 @@ export function ModeSwitcher() {
 
   const handleClick = (next: SimMode, enabled: boolean) => {
     if (!enabled) return;
-    setMode(next);
-    sendCommand({ type: 'setMode', mode: next });
+    switchMode(next);
   };
 
   return (
@@ -59,6 +62,8 @@ export function ModeSwitcher() {
             title={m.tooltip}
             onClick={() => handleClick(m.id, m.enabled)}
             className={`num text-caption px-2 py-1 rounded-xs transition-colors min-w-6 min-h-6 shrink-0 ${
+              m.enabled ? '' : 'max-sm:hidden '
+            }${
               active
                 ? 'bg-primary/25 text-fg-primary'
                 : m.enabled
