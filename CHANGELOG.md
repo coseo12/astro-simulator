@@ -12,7 +12,7 @@ Semantic Versioning을 따른다.
 - **[#1281] 관찰 모드 천체 정보 카드 (PR1)** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281), PR [#1282](https://github.com/coseo12/astro-simulator/pull/1282)). 관찰 모드에서 천체를 선택하면 좌하에 정보 카드가 뜬다 (`body-info-card.tsx`).
   - 표시 항목은 한/영 이름 · 종류 · 태양 거리 · 반지름(km) · 공전주기 · 출처 Tier 한 줄 · 「자세히 → 연구 모드」다. 위성은 「<모체>로부터 거리」를 함께 보이고, 태양은 거리 자리에 「태양계 중심」을 보인다. R-Phase 미진입 body 는 연구 패널과 같은 차단 문구를 띄운다.
   - 태양 거리는 **현재 시뮬레이션 시각 기준**이고 4Hz (`DISTANCE_REFRESH_MS = 250`) 로 갱신한다. 계산은 scene Kepler 경로와 같은 식이다 (`positionAt` 부모 체인 합산, 시각 과장 배율 미적용). 이를 위해 core 루트에 `positionAt` named export 1줄을 더했다 — `physics` namespace 경유는 SSR 500 기전이다 (#402 와 동일).
-  - 엔진이 상태값을 주면(`getBodyState` — Newton · Barnes-Hut) 그 값을 쓰고, `null` 이면(Kepler · 엔진 미준비 · WebGPU) Kepler 식으로 떨어진다. 카드가 화면에 그려진 위치와 같아야 하기 때문이다 — Kepler 식만 쓰면 Newton 모드에서 달-지구 거리가 `36.5만` (엔진 `35.5만`) 으로 2.9% 어긋났다. 엔진 전환은 시각이 멈춰 있어도 다음 갱신에 반영된다.
+  - 엔진이 상태값을 주면(`getBodyState` — Newton · Barnes-Hut) 그 값을 쓰고, `null` 이면(Kepler · 엔진 미준비 · WebGPU) Kepler 식으로 떨어진다. 카드가 화면에 그려진 위치와 같아야 하기 때문이다 — Kepler 식만 쓰면 Newton 모드에서 달-지구 거리가 같은 시각 (JD 2451560.54) 기준 `36.5만` (엔진 `35.5만`) 으로 2.9% 어긋났다. 엔진 전환은 시각이 멈춰 있어도 다음 갱신에 반영된다.
   - × 는 카드만 접는다 (카메라 포커스 유지). 접힌 칩이나 다른 천체 선택으로 다시 열리고, Esc 는 기존대로 자유시점에 진입한다.
   - 출처 줄의 Tier 는 `solar-system.json` 루트 `tier` 에서 읽는다 (`TIER_META.source` 추가 · `isDataTier`).
   - 공용 모듈 추출 — `lib/body-info.ts` (종류 라벨 · 조회 · 공전주기 · 차단 문구 · 사람 단위 포맷터), `hooks/use-body-info.ts`, `core/use-switch-mode.ts`. 연구 모드 우 패널과 ModeSwitcher 는 import 교체만 했다 (내용 불변).
@@ -25,7 +25,7 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-- **관찰 모드에서 천체를 선택하면 좌하에 정보 카드가 뜬다** (#1281). 한/영 이름 · 종류 · 태양 거리 · 반지름(km) · 공전주기 · 출처 Tier 한 줄 · 「자세히 → 연구 모드」를 보인다. 태양 거리는 현재 시뮬레이션 시각 기준이다. × 는 카드만 접고 카메라 포커스는 유지하며, Esc 는 기존대로 자유시점에 진입한다.
+- **관찰 모드에서 천체를 선택하면 좌하에 정보 카드가 뜬다** (#1281). 한/영 이름 · 종류 · 태양 거리 · 반지름(km) · 공전주기 · 출처 Tier 한 줄 · 「자세히 → 연구 모드」를 보인다. 태양 거리는 현재 시뮬레이션 시각 기준이다. × 는 카드를 좌하 칩으로 접고 카메라 포커스는 유지한다 — 칩을 누르거나 다른 천체를 고르면 다시 열린다. Esc 는 기존대로 자유시점에 진입한다.
 - **상단 바의 천체 바로가기 12개가 「천체 ▾」 메뉴 하나로 바뀌었다** (#1281). 천체로 이동하려면 메뉴를 열고 항목을 고른다 — 키보드(Enter/Space/화살표 · Home/End · Esc)로도 조작된다. 메뉴를 닫는 Esc 는 자유시점을 켜지 않는다. 관찰 모드 자동 숨김은 터치도 활동으로 세고, 천체 메뉴가 열린 동안은 숨기지 않는다.
 - **HUD 좌하 `focus · <id>` 칩과 우하 고정 `정확도 · T1 관측` 문구가 사라졌다** (#1281). 거리 슬라이더 라벨과 연구 패널 질량 슬라이더는 raw id 대신 한글 이름을 보인다.
 - **1440 미만 폭에서 상단 바 제목이 숨고 카메라 · 북마크 · 조작 가이드가 아이콘 버튼으로 보인다** (#1281). 라벨은 `sr-only` · 툴팁으로 남는다.
@@ -33,15 +33,19 @@ Semantic Versioning을 따른다.
 
 ### Changed
 
-- **[#1281] HUD 좌하 `focus · <id>` 칩과 우하 고정 `정확도 · T1 관측` 범례 제거** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281), PR [#1282](https://github.com/coseo12/astro-simulator/pull/1282)). raw id 노출 경로가 0 이 됐다.
+- **[#1281] HUD 좌하 `focus · <id>` 칩과 우하 고정 `정확도 · T1 관측` 범례 제거** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281), PR [#1282](https://github.com/coseo12/astro-simulator/pull/1282)). HUD · 거리 슬라이더 · 질량 슬라이더의 raw id 표기를 한글 이름으로 바꿨다.
   - 같은 이유로 거리 슬라이더 라벨 `(focus: <id>)` → `(focus: <한글 이름>)`, 연구 패널 질량 슬라이더 `질량 배수 · <id>` → `질량 배수 · <한글 이름>` (접근 가능한 이름 포함) 으로 바꿨다.
-  - R1 UI 회귀 가드 — 범례가 사라져 `hud-bottom-right` 영역이 selector 를 찾지 못하므로 `r1-ui-regions.mjs` 에서 영역 정의를 지우고 baseline PNG 3장을 삭제했다 (4 영역 12장 → 3 영역 9장). 남은 영역은 바뀌지 않아 재캡처하지 않았다. top-nav · shortcut-bar baseline 재캡처는 PR2 (상단바 천체 메뉴, [#1283](https://github.com/coseo12/astro-simulator/pull/1283)) 에서 한다.
+  - R1 UI 회귀 가드 — 범례가 사라져 `hud-bottom-right` 영역이 selector 를 찾지 못하므로 `r1-ui-regions.mjs` 에서 영역 정의를 지우고 baseline PNG 3장을 삭제했다 (4 영역 12장 → 3 영역 9장). 남은 영역은 바뀌지 않아 재캡처하지 않았다. top-nav · shortcut-bar baseline 은 PR2 (상단바 천체 메뉴, [#1283](https://github.com/coseo12/astro-simulator/pull/1283)) 에서 재캡처했다.
   - `verify-hud-contrast.mjs` — 기본 진입 화면의 HUD 박스 수 주석을 4 → 3 으로 고쳤다 (`MIN_EXPECTED_CHIPS = 3` 무변경).
 - **[#1281] 천체 바로가기를 누르던 스크립트를 공용 헬퍼로 갱신 (PR2)** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281), PR [#1283](https://github.com/coseo12/astro-simulator/pull/1283)). `scripts/browser-verify-utils.mjs` 에 `openBodyMenu` (멱등) · `clickFocusBody` (항목 부재 = throw) 를 더했고 fake page 테스트 3건을 붙였다.
   - `bench-scene.mjs` 부팅 단언 `REQUIRED_TESTIDS` 의 `focus-earth` · `focus-neptune` → `body-menu-trigger` (메뉴가 닫히면 항목은 언마운트된다). 항목 존재는 prep 의 `clickFocusBody` 가 단언한다. 메뉴 열기는 prep 안이라 측정 구간 밖이다. 시나리오 이름은 그대로다.
   - `verify:1265-display-panel` 전제 (17) · (21) 의 **재료 출처만** 바꿨다 (판정 · 임계 불변). 좌측 그룹이 스크롤되지 않게 되어 1280 에서 단축 바 스크롤 재료가 사라졌기 때문이다. 무관 스크롤은 연구 모드 `panel-right` 세로 스크롤, 레이스는 375 폭에서 Tab 이 일으키는 **트리거 조상 체인** 스크롤을 쓴다.
   - `core` `#617` 정적 매칭 테스트의 대상을 `focus-quick-buttons.tsx` `FOCUS_BUTTONS` → `body-menu.tsx` `BODY_MENU_ITEMS` 로 옮겼다 (판정 불변).
   - R1 UI 회귀 가드 — top-nav · shortcut-bar baseline 은 의도된 변경이라 `r1-baseline-bootstrap.yml` 로 재캡처한다. 가드 헤더와 bootstrap workflow 의 「4 영역 × 3 viewport」 · 「12장」 개수 표기는 개수 대신 영역 SSoT (`r1-ui-regions.mjs`) 를 가리키게 고쳤다.
+
+### Notes
+
+- **릴리스 루틴 cross-validate (agy, 2026-10-05 — `.claude/logs/cross-validate-architecture-20261005-202837.log`).** MINOR 판정 동의. 반영 4건 — 「raw id 노출 경로 0」 단정을 실제로 바꾼 3곳으로 한정 / 달 거리 비교에 측정 시각 명시 / PR1 시점의 미래형 재캡처 서술을 과거형으로 / Behavior Changes 에 접힌 칩 재열기 동작 명시. 기각 — 「`focus-<id>` 조건부 마운트가 Breaking Change」 (저장소 내부 검증 스크립트만 해당하고 같은 PR 에서 헬퍼로 갱신), 리스너 누수 · XSS 일반론 (근거 없는 추정).
 
 ## [0.91.0] - 2026-10-04
 
