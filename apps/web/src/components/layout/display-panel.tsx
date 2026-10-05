@@ -10,9 +10,10 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { Layers } from 'lucide-react';
 import { DISPLAY_TOGGLES, type DisplayToggleDef } from '@/core/display-toggles';
 import { useDisplayToggle } from '@/core/use-display-toggle';
-import { getFocusableElements } from '@/lib/focus-trap';
+import { nextFocusableAfter } from '@/lib/focus-trap';
 import { useSimStore } from '@/store/sim-store';
 
 /**
@@ -52,19 +53,6 @@ const VIEWPORT_MARGIN_PX = 8;
 interface PanelPosition {
   top: number;
   right: number;
-}
-
-/**
- * 패널을 빼고 본 문서 포커스 순서에서 트리거 바로 다음 요소. 트리거가 순서에 없거나 (조상 `inert` 등) 마지막이면
- * `null` — 호출부가 트리거로 되돌린다 (`indexOf` 가 -1 일 때 `+1` 로 문서 첫 요소로 튀지 않게, reviewer R5).
- */
-function nextFocusableAfter(trigger: HTMLElement, panel: HTMLElement | null): HTMLElement | null {
-  const order = getFocusableElements(trigger.ownerDocument.body).filter(
-    (el) => !panel?.contains(el),
-  );
-  const i = order.indexOf(trigger);
-  if (i < 0) return null;
-  return order[i + 1] ?? null;
 }
 
 /** 트리거 우측 정렬 + 뷰포트 안쪽 clamp. */
@@ -205,10 +193,12 @@ export function DisplayPanel() {
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         onBlur={handleBlur}
-        className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
+        className="num text-caption shrink-0 whitespace-nowrap max-sm:inline-flex max-sm:items-center bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
-        표시
+        {/* #1281 — 모바일(`max-sm`)은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D9(d)). */}
+        <Layers size={14} aria-hidden="true" className="sm:hidden" />
+        <span className="max-sm:sr-only">표시</span>
       </button>
       {open && position
         ? createPortal(

@@ -15,7 +15,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
+import { clickFocusBody, pressTimePlay, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const MIN_FPS = 30; // 헤드리스 Chromium 하드웨어 가속 제한 — 실 브라우저 60 기대
@@ -76,12 +76,13 @@ await withBrowser({}, async (browser) => {
   scenarios.push({ name: '재생 ×1년/초', fps: await measureFps(SCENARIO_DURATION_MS) });
 
   // 4. 지구 포커스
-  await page.click('[data-testid="focus-earth"]').catch(() => {});
+  // #1281 — 천체 메뉴 경유. 기존 `.catch` 의미(실패 무시)는 그대로 둔다 (범위 밖).
+  await clickFocusBody(page, 'earth').catch(() => {});
   await page.waitForTimeout(600);
   scenarios.push({ name: '지구 포커스 (클로즈업)', fps: await measureFps(SCENARIO_DURATION_MS) });
 
   // 5. 해왕성 포커스
-  await page.click('[data-testid="focus-neptune"]').catch(() => {});
+  await clickFocusBody(page, 'neptune').catch(() => {});
   await page.waitForTimeout(600);
   scenarios.push({ name: '해왕성 포커스 (원거리)', fps: await measureFps(SCENARIO_DURATION_MS) });
 });

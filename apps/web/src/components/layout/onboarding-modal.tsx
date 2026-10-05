@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Keyboard } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { getOnboardingDismissed, markOnboardingDismissed } from '@/lib/onboarding-storage';
 
@@ -124,10 +125,12 @@ export function OnboardingModal() {
         data-testid="onboarding-button"
         title="조작 가이드 (천체 이동 / 선택 / 줌 / 탐색)"
         aria-label="조작 가이드 열기"
-        className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
+        className="num text-caption shrink-0 whitespace-nowrap max-sm:inline-flex max-sm:items-center bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
-        조작 가이드
+        {/* #1281 — 모바일(`max-sm`)은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D9(d)). */}
+        <Keyboard size={14} aria-hidden="true" className="sm:hidden" />
+        <span className="max-sm:sr-only">조작 가이드</span>
       </button>
 
       <Modal

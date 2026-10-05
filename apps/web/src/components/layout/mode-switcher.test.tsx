@@ -25,6 +25,14 @@ beforeEach(() => {
 });
 
 describe('ModeSwitcher', () => {
+  it('#1281 — 모바일(max-sm)에서 비활성 모드(교육 · 샌드박스)만 숨긴다', () => {
+    render(<ModeSwitcher />);
+    expect(screen.getByTestId('mode-education').className).toContain('max-sm:hidden');
+    expect(screen.getByTestId('mode-sandbox').className).toContain('max-sm:hidden');
+    expect(screen.getByTestId('mode-observe').className).not.toContain('max-sm:hidden');
+    expect(screen.getByTestId('mode-research').className).not.toContain('max-sm:hidden');
+  });
+
   it('4개 모드 버튼 렌더', () => {
     render(<ModeSwitcher />);
     expect(screen.getByTestId('mode-observe')).toBeInTheDocument();

@@ -71,9 +71,12 @@
  *        양성 대조: 패널이 닫힌 상태의 같은 Esc 는 자유시점으로 **간다** (그래야 위 `false` 술어가 판별력을 가진다 —
  *        리스너가 죽은 회귀는 게이트 FAIL).
  *   D15 UI  패널 토글 4 개 × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors`.
- *   스크롤  트리거 위치가 바뀐 스크롤에서만 닫는다 — 좌측 단축 바 스크롤 (무관) 뒤 패널 유지 · 좁은 폭 우측 그룹 스크롤
- *        (트리거 이동) 뒤 패널 닫힘. 레이스: 키 간 지연 0 으로 캔버스 → 트리거 Tab → Enter 를 `RACE_TRIALS` 회 반복해
- *        방금 연 패널이 늦게 도착한 좌측 스크롤로 닫히지 않는가 (PR #1268 qa 가 실측한 결함).
+ *   스크롤  트리거 위치가 바뀐 스크롤에서만 닫는다 — 연구 모드 우 패널 세로 스크롤 (무관) 뒤 패널 유지 · 좁은 폭 우측 그룹
+ *        스크롤 (트리거 이동) 뒤 패널 닫힘. 레이스: 키 간 지연 0 으로 캔버스 → 트리거 Tab → Enter 를 `RACE_TRIALS` 회
+ *        반복해 방금 연 패널이 늦게 도착한 스크롤로 닫히지 않는가 (PR #1268 qa 가 실측한 결함).
+ *        #1281 — 재료 출처만 바꿨다 (판정 · 임계 불변): 상단 바 좌측 그룹이 `shrink-0` 가 되어 1280 에서 단축 바와 그
+ *        조상이 스크롤되지 않는다. 무관 스크롤은 연구 모드 `panel-right` 세로 스크롤로, 레이스는 우측 그룹이 스크롤러인
+ *        좁은 폭 (375) 에서 Tab 이 일으키는 **트리거 조상 체인** 스크롤로 재료를 얻는다.
  *
  * ## SKIP 은 PASS 로 세지 않는다
  *   환경상 판정되지 않는 게이트 (하드웨어 전용 · 소프트웨어 전용) 는 `SKIP` 으로 찍고 요약에서 따로 센다 —
@@ -90,12 +93,12 @@
  *   3 `pos:*` 양성 대조 — 로드 ON ↔ 로드 OFF 변화 0   4 `ready:P2` 토글 없는 페이지의 하네스 mid 부재 · 준비 초과
  *   5 `fade:E|F` fade 재현 큐에 mid 부재   6 `edge:D7e` 토글 시점에 mid 가 이미 있음
  *   9 `det:D8` · `pos:D8` (하드웨어) 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일   15 `renderer` 렌더러 판독 불일치
- *   16 `ctl` 자유시점 양성 대조의 선택 재설정 실패   17 `scroll` 스크롤을 일으키지 못함
+ *   16 `ctl` 자유시점 양성 대조의 선택 재설정 실패   17 `scroll` (연구 모드 우 패널) 스크롤을 일으키지 못함
  *   20 `scroll:trigger` 좁은 폭 우측 그룹 스크롤이 트리거를 움직이지 못함
- *   21 `race:scroll` 레이스 반복 중 단축 바 **조상 체인** (단축 바 자신 포함) 의 스크롤 0. 레이스 게이트는 실패 관측
+ *   21 `race:scroll` 레이스 반복 중 트리거 **조상 체인** (#1281 — 종전 단축 바 조상 체인) 의 스크롤 0. 레이스 게이트는 실패 관측
  *      (`bad > 0`) 이 없을 때만 이 전제에 기댄다 — 「패널이 사라졌다」 는 스크롤 유무와 무관하게 관측된 결함이라 전제가
  *      지울 수 없다 (#1271 R12). 계수는 캔버스 포커스 · 트리거 클릭 같은 다른 요소 스크롤을 세지 않는다
- *   `scroll:unrelated` 좌측 단축 바 스크롤이 트리거를 움직임 (그러면 「무관 스크롤」 이 아니다)
+ *   `scroll:unrelated` 무관 스크롤 (연구 모드 우 패널) 이 트리거를 움직임 (그러면 「무관 스크롤」 이 아니다)
  *   18 `d4:timing` 닫힌 채 4 초 안에 숨지 않았지만 더 기다리니 숨음 (타이머 지연)   19 `reload:boot` 새로고침 뒤 핸들 미노출
  *   22 부팅 실패 (#1271) — 섹션 안 페이지 부팅 (`bootstrapScene` — goto · 핸들 노출 대기) 이 예외로 끝나 섹션을 중단했다.
  *      경계 (블록 · 마커) 를 두지 않고 **게이트가 읽는 데이터**로 판정한다: 게이트마다 읽는 결과 키를 `reads` 로 선언하고,
@@ -233,8 +236,13 @@ const DISABLED_CLICKS = 2;
  * 않으므로 `display-toggles.ts` `DISPLAY_DISABLED_REASONS` 의 부분 문자열을 쓴다 — 미준비 사유에는 둘 다 없다.
  */
 const REASON_MARK = { software: '소프트웨어', surfaceOff: 'surface=off' };
-/** 트리거 이동 스크롤 — 우측 그룹이 `overflow-x-auto` 가 되는 좁은 폭 (`max-sm`, 640px 미만). r1-guard 모바일 폭과 같다. */
+/**
+ * 트리거 이동 스크롤 · 레이스 — 우측 그룹이 실제로 넘쳐 스크롤되는 좁은 폭. r1-guard 모바일 폭과 같다.
+ * #1281 — 우측 그룹은 모든 폭에서 `overflow-x-auto` 이지만 1280 에서는 넘치지 않는다. 넘치는 폭은 이 값이다.
+ */
 const NARROW_VIEWPORT = { width: 375, height: 667 };
+/** 무관 스크롤 재료 페이지 (#1281) — 세로 스크롤되는 `panel-right` 가 있는 모드. */
+const UI_SCROLL_MODE = 'research';
 /**
  * 레이스 반복 수. qa 재현율 SwiftShader `2/19` 를 기준으로 결함 판본을 한 번도 못 잡을 확률이 `(17/19)^40 ≈ 1.2%`
  * 가 되는 값이다 (새 판정 임계가 아니라 표본 크기 — 판정은 「실패 0 회」).
@@ -1151,9 +1159,40 @@ async function runUiModes(browser, out, pages) {
       return { right, bar: bar.length, unreachable };
     }, UI_VIEWPORT_WIDTH);
     out.uiModes.push({ mode, store: store.mode, triggers, expanded, toggles, layout });
+    if (mode === UI_SCROLL_MODE) out.uiScroll = await measureUnrelatedScroll(M.page);
     // 모드 페이지는 서로 독립 — 반복마다 닫는다 (#1271 A1 — 섹션 끝까지 두면 4 컨텍스트).
     await retirePages(out, pages);
   }
+}
+
+/**
+ * 무관 스크롤 유지 — 패널을 연 채 트리거와 무관한 요소를 실제로 스크롤한다. 트리거가 움직이지 않는 스크롤이라 패널은
+ * 남아야 한다 (라운드 5 — 스크롤 닫기는 트리거 위치가 바뀐 스크롤에서만. qa 가 「모든 스크롤 닫기」 의 레이스를 실측).
+ *
+ * #1281 — 재료 출처 교체: 종전 재료 (좌측 단축 바 · 그 조상의 가로 스크롤) 는 좌측 그룹이 `shrink-0` 가 되어 1280 에서
+ * 사라졌다. 연구 모드 `panel-right` (세로 `overflow-y-auto`, 트리거 무관 요소) 를 스크롤한다. 판정 · 전제 술어는 그대로다.
+ */
+async function measureUnrelatedScroll(page) {
+  await setPanelOpen(page, true);
+  // 기저 신호 — 스크롤 직전 패널이 실제로 열려 있었는가 (열리자마자 닫히는 회귀에서 결과가 공허해지지 않게).
+  const panelsBefore = await panelCount(page);
+  const triggerBefore = await readTriggerRect(page);
+  const scrolled = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="panel-right"]');
+    if (!panel || panel.scrollHeight <= panel.clientHeight) return null;
+    const before = panel.scrollTop;
+    panel.scrollTop = before === 0 ? panel.scrollHeight : 0;
+    return { before, after: panel.scrollTop };
+  });
+  await frames(page, 2);
+  const result = {
+    scrolled,
+    triggerMoved: triggerBefore !== (await readTriggerRect(page)),
+    panelsBefore,
+    panels: await panelCount(page),
+  };
+  await setPanelOpen(page, false);
+  return result;
 }
 
 /** D4 · D3 · D14 · D14b · D9 · D15 (UI) — 기본 로드 (focus=earth, 관찰 모드). */
@@ -1213,30 +1252,6 @@ async function runUiInteraction(browser, out, pages) {
   await page.locator('[data-testid="toggle-orbits"]').click({ timeout: READY_TIMEOUT_MS });
   const d3AfterBar = await readOrbitSync();
   out.uiD3 = { initial: d3Initial, afterPanel: d3AfterPanel, afterBar: d3AfterBar };
-
-  // ── 무관 스크롤 유지 — 패널을 연 채 좌측 단축 바를 실제로 스크롤한다. 트리거가 움직이지 않는 스크롤이라 패널은
-  // 남아야 한다 (라운드 5 — 스크롤 닫기는 트리거 위치가 바뀐 스크롤에서만. qa 가 「모든 스크롤 닫기」 의 레이스를 실측).
-  await setPanelOpen(page, true);
-  // 기저 신호 — 스크롤 직전 패널이 실제로 열려 있었는가 (열리자마자 닫히는 회귀에서 결과가 공허해지지 않게).
-  const panelsBeforeScroll = await panelCount(page);
-  const triggerBefore = await readTriggerRect(page);
-  const scrolled = await page.evaluate(() => {
-    // 단축 바 또는 그 조상 중 실제로 가로 스크롤되는 첫 요소 (상단 바 좌측 그룹도 overflow-x-auto 다).
-    let bar = document.querySelector('[data-r1-region="shortcut-bar"]');
-    while (bar && bar.scrollWidth <= bar.clientWidth) bar = bar.parentElement;
-    if (!bar) return null;
-    const before = bar.scrollLeft;
-    bar.scrollLeft = before === 0 ? bar.scrollWidth : 0;
-    return { before, after: bar.scrollLeft };
-  });
-  await frames(page, 2);
-  out.uiScroll = {
-    scrolled,
-    triggerMoved: triggerBefore !== (await readTriggerRect(page)),
-    panelsBefore: panelsBeforeScroll,
-    panels: await panelCount(page),
-  };
-  await setPanelOpen(page, false);
 
   // ── D14 — 키보드만: Tab 도달 → Enter → 토글 4개 순회 (Space 반전) → Esc ──
   // 순회 시작점을 문서 첫 포커스 요소(캔버스)로 고정한다. `blur()` 만으로는 부족하다 — Chrome 은 마지막으로
@@ -1552,14 +1567,19 @@ async function runUiTriggerScroll(browser, out, pages) {
  * 레이스 회귀 — 키 간 지연 0 으로 캔버스 → 트리거까지 Tab → Enter 를 반복해 방금 연 패널이 남는지 본다.
  * Tab 이 좌측 단축 바를 스크롤시키고 그 scroll 이 한 프레임 늦게 도착해, 「모든 스크롤 닫기」 판본은 막 연 패널을
  * 닫았다 (PR #1268 qa — SwiftShader 2/19). 반복 수 `RACE_TRIALS` 근거는 상수 주석.
+ *
+ * #1281 — 재료 출처 교체: 1280 에서는 Tab 이 스크롤시킬 요소가 더 없다 (좌측 그룹 `shrink-0`, 우측 그룹 넘침 0). 우측
+ * 그룹이 스크롤러인 `NARROW_VIEWPORT` 에서 Tab 이 트리거를 시야로 끌어오는 **트리거 조상 체인** 스크롤을 재료로 쓴다.
+ * 「트리거 위치 비교」 판본은 열 때의 배치가 이미 스크롤 뒤 값이라 늦게 온 scroll 에도 패널을 남기고, 「모든 스크롤
+ * 닫기」 판본은 닫는다 — 판별 축이 같다.
  */
 async function runUiRace(browser, out, pages) {
-  const Q = await setupUiPage(browser, pages, UI_BASE, 'Q-race');
+  const Q = await setupUiPage(browser, pages, UI_BASE, 'Q-race', NARROW_VIEWPORT);
   await recordBootCaps(Q, out);
   const { page } = Q;
   // 레이스의 재료가 실제로 생겼는지 센다 — 0 이면 이 환경에서 레이스를 재현할 수 없다 (전제 21). 재료는 「Tab 이
-  // 단축 바를 스크롤시켰다」 이므로 단축 바 **조상 체인** (단축 바 자신 포함 — 실제로 넘치는 것은 상단 바 좌측 그룹일
-  // 수 있다) 의 스크롤만 센다. 캔버스 포커스 · 트리거 클릭 같은 다른 요소 스크롤은 진단용 `scrollsAll` 에만 (#1271 R12).
+  // 트리거 쪽을 스크롤시켰다」 이므로 트리거 **조상 체인** (실제로 넘치는 것은 상단 바 우측 그룹) 의 스크롤만 센다
+  // (#1281 — 종전 단축 바 조상 체인). 캔버스 포커스 같은 다른 요소 스크롤은 진단용 `scrollsAll` 에만 (#1271 R12).
   await page.evaluate(() => {
     window.__raceScrolls = 0;
     window.__raceScrollsAll = 0;
@@ -1568,8 +1588,9 @@ async function runUiRace(browser, out, pages) {
       (e) => {
         if (e.target === document) return;
         window.__raceScrollsAll += 1;
-        const bar = document.querySelector('[data-r1-region="shortcut-bar"]');
-        if (bar && e.target instanceof Element && e.target.contains(bar)) window.__raceScrolls += 1;
+        const trigger = document.querySelector('[data-testid="display-panel-toggle"]');
+        if (trigger && e.target instanceof Element && e.target.contains(trigger))
+          window.__raceScrolls += 1;
       },
       { capture: true, passive: true },
     );
@@ -1918,9 +1939,9 @@ function judge(r) {
   if (has('uiD4') && r.uiD4.closedOpacity !== '0' && r.uiD4.closedLate === true)
     fail('d4:timing', `(18) D4 — ${D4_IDLE_MS}ms 뒤 opacity ${r.uiD4.closedOpacity}, 이후에 숨음`);
   if (has('uiScroll')) {
-    // 무관 스크롤 판정의 전제 — 좌측 단축 바 스크롤이 트리거를 움직이지 않았어야 「무관」 이다.
+    // 무관 스크롤 판정의 전제 — 연구 모드 우 패널 스크롤이 트리거를 움직이지 않았어야 「무관」 이다.
     if (r.uiScroll.triggerMoved)
-      fail('scroll:unrelated', '좌측 단축 바 스크롤이 트리거를 움직였다 (무관 스크롤 아님)');
+      fail('scroll:unrelated', '연구 모드 우 패널 스크롤이 트리거를 움직였다 (무관 스크롤 아님)');
     // (17) 스크롤 닫힘 — 스크롤을 실제로 일으켰는가 (레이아웃상 스크롤할 요소가 없으면 측정 불가).
     if (!r.uiScroll.scrolled || r.uiScroll.scrolled.before === r.uiScroll.scrolled.after)
       fail('scroll', `(17) 스크롤 미발생 ${JSON.stringify(r.uiScroll.scrolled)}`);
@@ -1934,12 +1955,12 @@ function judge(r) {
       'scroll:trigger',
       `(20) 트리거를 움직이는 스크롤 미발생 ${JSON.stringify(r.uiTriggerScroll)}`,
     );
-  // (21) 레이스 재료 — 반복 동안 단축 바 조상 체인 스크롤이 실제로 있었는가. 레이스 게이트는 실패 관측이 없을 때만
+  // (21) 레이스 재료 — 반복 동안 트리거 조상 체인 스크롤이 실제로 있었는가. 레이스 게이트는 실패 관측이 없을 때만
   // 이 전제에 기댄다 (judgeUi — R12).
   if (has('uiRace') && !(r.uiRace.scrolls > 0))
     fail(
       'race:scroll',
-      `(21) 레이스 반복 중 단축 바 조상 체인 스크롤 0 (전체 요소 ${r.uiRace.scrollsAll})`,
+      `(21) 레이스 반복 중 트리거 조상 체인 스크롤 0 (전체 요소 ${r.uiRace.scrollsAll})`,
     );
 
   const h = { settleIds: (...pages) => pages.map((p) => `settle:${p}`), hw };
@@ -2423,7 +2444,7 @@ function judgeUi(meta, { settleIds, hw }) {
     ),
     // 스크롤 닫기는 트리거 위치가 바뀐 스크롤에서만 (라운드 5 — (나) 「모든 스크롤」 → (가) 번복, qa 레이스 실측).
     gate(
-      'UI 무관 스크롤 (좌측 단축 바) — 패널 유지',
+      'UI 무관 스크롤 (연구 모드 우 패널) — 패널 유지',
       ['uiScroll'],
       ['scroll', 'scroll:unrelated'],
       (r) => [
@@ -2448,7 +2469,7 @@ function judgeUi(meta, { settleIds, hw }) {
       // 전제 (21) 는 「실패 0」 이 공허할 때만 막는다 — 실패가 관측되면 스크롤 유무와 무관하게 결함이다 (R12).
       raceObservedFail ? [] : ['race:scroll'],
       (r) => [
-        `실패 ${r.uiRace.bad.length} / ${r.uiRace.trials} · Tab ${r.uiRace.tabsToTrigger} · 단축 바 스크롤 ${r.uiRace.scrolls} (전체 요소 ${r.uiRace.scrollsAll}) ${JSON.stringify(r.uiRace.bad.slice(0, 3))}`,
+        `실패 ${r.uiRace.bad.length} / ${r.uiRace.trials} · Tab ${r.uiRace.tabsToTrigger} · 트리거 조상 스크롤 ${r.uiRace.scrolls} (전체 요소 ${r.uiRace.scrollsAll}) ${JSON.stringify(r.uiRace.bad.slice(0, 3))}`,
         `실패 0 / ${RACE_TRIALS}`,
         r.uiRace.trials === RACE_TRIALS && r.uiRace.bad.length === 0,
       ],

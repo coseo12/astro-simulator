@@ -24,7 +24,7 @@ export function DateTimePicker() {
   };
 
   return (
-    <div className="flex items-center gap-1" data-testid="datetime-picker">
+    <div className="flex shrink-0 items-center gap-1" data-testid="datetime-picker">
       <label className="sr-only" htmlFor="datetime-input">
         특정 UTC 시점 입력
       </label>
@@ -41,13 +41,13 @@ export function DateTimePicker() {
         type="button"
         onClick={handleJump}
         disabled={!value}
-        className="num text-caption px-2 py-1 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="num text-caption whitespace-nowrap px-2 py-1 rounded-sm border bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
         data-testid="datetime-jump"
       >
         점프
       </button>
-      {error && <span className="text-caption text-danger">{error}</span>}
+      {error && <span className="text-caption text-danger whitespace-nowrap">{error}</span>}
     </div>
   );
 }

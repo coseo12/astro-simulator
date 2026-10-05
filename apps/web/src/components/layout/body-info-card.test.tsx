@@ -59,7 +59,7 @@ function select(id: string | null) {
   });
 }
 
-/** 상단 바 바로가기 12개 (focus-quick-buttons.tsx FOCUS_BUTTONS) — 표시값은 데이터에서 손으로 옮긴 기대값. */
+/** 상단 바 바로가기 12개 (#1281 이후 「천체 ▾」 메뉴 — body-menu.tsx BODY_MENU_ITEMS) — 표시값은 데이터에서 손으로 옮긴 기대값. */
 const SHORTCUT_BODIES = [
   { id: 'sun', nameKo: '태양', kind: '항성', radius: '695,700 km' },
   { id: 'mercury', nameKo: '수성', kind: '행성', radius: '2,440 km' },

@@ -72,10 +72,12 @@ export function SensitivitySettingsModal() {
         data-testid="sensitivity-settings-button"
         title="free-fly 카메라 감도 설정 (WASD / 줌아웃 / 패닝 / 줌)"
         aria-label="카메라 감도 설정"
-        className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
+        className="num text-caption shrink-0 whitespace-nowrap max-sm:inline-flex max-sm:items-center bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
-        ⚙ 카메라
+        {/* #1281 — 모바일(`max-sm`)은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D9(d)). */}
+        <span aria-hidden="true">⚙</span>
+        <span className="max-sm:sr-only">{' 카메라'}</span>
       </button>
 
       <Modal

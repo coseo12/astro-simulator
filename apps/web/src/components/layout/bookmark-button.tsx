@@ -48,9 +48,11 @@ export function BookmarkButton() {
       onClick={copy}
       disabled={julianDate === null}
       title="현재 시각·포커스·엔진·속도를 URL에 담아 복사"
-      className="num text-caption px-2 py-1 rounded-sm border border-border-subtle bg-bg-surface/80 backdrop-blur text-fg-secondary hover:bg-bg-elevated disabled:opacity-40"
+      className="num text-caption shrink-0 whitespace-nowrap max-sm:inline-flex max-sm:items-center px-2 py-1 rounded-sm border border-border-subtle bg-bg-surface/80 backdrop-blur text-fg-secondary hover:bg-bg-elevated disabled:opacity-40"
     >
-      {copied ? '✓ 복사됨' : '🔖 북마크'}
+      {/* #1281 — 모바일(`max-sm`)은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D9(d)). */}
+      <span aria-hidden="true">{copied ? '✓' : '🔖'}</span>
+      <span className="max-sm:sr-only">{copied ? ' 복사됨' : ' 북마크'}</span>
     </button>
   );
 }

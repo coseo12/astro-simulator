@@ -12,7 +12,7 @@ const INACTIVITY_WAIT_MS = 4000;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  useSimStore.setState({ mode: 'observe', displayPanelOpen: false });
+  useSimStore.setState({ mode: 'observe', displayPanelOpen: false, bodyMenuOpen: false });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -46,6 +46,29 @@ describe('TopBar — 자동 숨김', () => {
     });
     act(() => useSimStore.setState({ displayPanelOpen: false }));
     expect(opacity()).toBe('0');
+  });
+
+  it('#1281 D7 — 천체 메뉴 열림 · 4초 무입력 → opacity 1, 닫으면 다시 숨김', () => {
+    useSimStore.setState({ bodyMenuOpen: true });
+    render(<TopBar />);
+    act(() => {
+      vi.advanceTimersByTime(INACTIVITY_WAIT_MS);
+    });
+    expect(opacity()).toBe('1');
+    act(() => useSimStore.setState({ bodyMenuOpen: false }));
+    expect(opacity()).toBe('0');
+  });
+
+  it('#1281 D7 — 숨은 뒤 터치(pointerdown) → 즉시 opacity 1', () => {
+    render(<TopBar />);
+    act(() => {
+      vi.advanceTimersByTime(INACTIVITY_WAIT_MS);
+    });
+    expect(opacity()).toBe('0');
+    act(() => {
+      window.dispatchEvent(new Event('pointerdown'));
+    });
+    expect(opacity()).toBe('1');
   });
 
   it('research 모드는 패널과 무관하게 숨기지 않는다 (기존 동작 보존)', () => {

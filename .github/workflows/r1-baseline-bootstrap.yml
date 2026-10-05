@@ -17,8 +17,8 @@ name: r1:baseline-bootstrap
 #
 # DoD 매핑: #337 부트스트래핑 1회 dispatch 검증 (volt #45 함정 회피)
 #
-# 본 workflow 는 ubuntu-latest 컨테이너에서 R1 UI 회귀 가드 baseline 12장
-# (4 영역 × 3 viewport) 을 Linux 환경 기준으로 캡처하고 `peter-evans/create-pull-request`
+# 본 workflow 는 ubuntu-latest 컨테이너에서 R1 UI 회귀 가드 baseline 전량
+# (영역 × viewport — 목록 SSoT `apps/web/scripts/r1-ui-regions.mjs`) 을 Linux 환경 기준으로 캡처하고 `peter-evans/create-pull-request`
 # 로 develop 대상 갱신 PR 을 자동 생성한다.
 #
 # ADR: docs/decisions/20260425-r1-ui-pixel-diff-guard.md §Amendment 2026-04-26 §결정 2
@@ -58,7 +58,7 @@ jobs:
             sleep 2
           done
 
-      - name: R1 baseline 12장 캡처 (Linux)
+      - name: R1 baseline 전량 캡처 (Linux)
         env:
           BASE_URL: http://localhost:3001
         run: node apps/web/scripts/r1-ui-regression-guard.mjs --update
@@ -88,7 +88,7 @@ jobs:
             ## Summary
 
             `r1:baseline-bootstrap` workflow 가 ubuntu-latest 환경에서 R1 UI 회귀 가드
-            baseline 12장 (4 영역 × 3 viewport) 을 재캡처. 기존 macOS 캡처본을 Linux
+            baseline 전량 (영역 × viewport — `apps/web/scripts/r1-ui-regions.mjs`) 을 재캡처. 기존 macOS 캡처본을 Linux
             CI 캡처본으로 교체하여 PR check (`ci.yml` r1-guard step) 의 false positive
             (폰트 렌더링 차이) 회피.
 

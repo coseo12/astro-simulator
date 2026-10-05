@@ -4,41 +4,16 @@ import { useEffect } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
 import { useDisplayToggle } from '@/core/use-display-toggle';
-// #402 — R-Phase allowlist SSoT (named import — scene namespace 경유 금지).
-// ADR `20260504-r-phase-allowlist-guard.md` §Amendment 결정 D1.
-//
-// ⚠️ `scene as sceneApi` namespace 경유 시 turbopack module dep graph 가
-//    solar-system-scene → nbody-engine → physics_wasm `__dirname` 평가를 trigger 하여 SSR 500
-//    (라운드 2 실측 재현). 본 컴포넌트는 app-shell.tsx 직접 import → SSR 평가 대상이므로
-//    named import 로 모듈 그래프 영향 0 보장. core/src/index.ts 가 별도 named export 박제.
-import { isRPhaseFocusable } from '@astro-simulator/core';
-
-const FOCUS_BUTTONS = [
-  { id: 'sun', label: '태양' },
-  { id: 'mercury', label: '수성' }, // R2 #361 — sun 다음 천체 거리 순
-  { id: 'venus', label: '금성' }, // R3 #369 — mercury 다음 천체 거리 순
-  { id: 'earth', label: '지구' }, // R4 #532 — venus 다음 천체 거리 순
-  { id: 'moon', label: '달' }, // R4 #532 — earth 인접 (parent-satellite 자연 그룹)
-  { id: 'mars', label: '화성' }, // R5 #594 — Q4a=A (mars 만 추가, phobos/deimos 미등록 — 모바일 너비 안전 356 px < 375 px)
-  { id: 'jupiter', label: '목성' }, // R6 #621 — CURRENT_R_PHASE=6 진입으로 isRPhaseFocusable 자동 enabled (배열 변경 0). galilean 4 는 showInShortcutBar=false 라 bar 미등록
-  { id: 'saturn', label: '토성' }, // R7 #641 — jupiter 다음 천체 거리순 (showInShortcutBar true 전환 동반, #617 가드 정합). titan 은 showInShortcutBar=false (galilean 패턴 — URL ?focus=titan 진입)
-  { id: 'uranus', label: '천왕성' }, // R8 #647 — saturn 다음 천체 거리순 (showInShortcutBar true 전환 동반, #617 가드 정합). titania 는 showInShortcutBar=false (galilean/titan 패턴 — URL ?focus=titania 진입). 12버튼 — 모바일은 overflow-x-auto 흡수 (R7 11버튼 선례)
-  { id: 'neptune', label: '해왕성' }, // R9 #653 enabled — CURRENT_R_PHASE=9 1줄 자동 enabled (#613 Concrete Prediction negative→positive 전환 5번째, 배열 변경 0). triton 은 showInShortcutBar=false (galilean/titan/titania 패턴 — URL ?focus=triton 진입). ADR 20260610-r9 §축 5
-  { id: 'pluto', label: '명왕성' }, // R10a #659 — PM Q3=A pluto 만 승격 (showInShortcutBar true 전환 동반, #617 가드 정합). 거리순 마지막 (39.48 AU). bar 전체 13버튼 (focus 11 + reset + free-fly — 2026-06-12 qa 실측 기준 역산) — 모바일 overflow-x-auto 흡수. ceres/haumea/makemake/eris 는 showInShortcutBar=false (URL ?focus= 진입 — #624 tradeoff). ADR 20260611-r10a §축 4
-  { id: 'halley', label: '핼리 혜성' }, // R10b #664 — PM Q2=A halley 만 승격 (showInShortcutBar true 전환 동반, #617 가드 정합). ⚠️ 배치 컨벤션: "행성 8 거리순 블록 + 비-행성 카테고리 후미 (pluto → halley)" — halley a=17.834 AU 를 saturn/uranus 사이 엄격 삽입하면 행성 거리순 블록이 깨져 기각 (ADR 20260612-r10b §축 6 — 후속 비-행성 추가 시 본 컨벤션 답습). bar 전체 14버튼 = focus 12 (halley 12번째) + reset + free-fly (2026-06-12 qa 실측 — 종전 "15버튼" 표기는 +1 drift 정정) — 모바일 overflow-x-auto 흡수. encke/swift-tuttle 은 showInShortcutBar=false (URL ?focus= 진입 — #624 tradeoff)
-];
-
-// R-Phase 미진입 body 호버 / focus 시 사용자 안내 문구.
-// ADR `20260504-r-phase-allowlist-guard.md` §결정 2.
-const DISABLED_TOOLTIP = '아직 구현되지 않은 천체입니다 (R-Phase 진입 후 활성화)';
+import { BodyMenu } from './body-menu';
 
 /**
- * TopBar 중앙 영역 — 임시 포커스 단축 버튼.
- * D7 CelestialTree (#26) 완성 후 제거 또는 핵심 4개만 유지.
+ * TopBar 좌측 단축 바 — 「천체 ▾」 메뉴 + reset · 탐색 · 궤도선.
  *
- * #402 R-Phase Allowlist 가드 (defense-in-depth UI 측면) —
- * ADR `20260504-r-phase-allowlist-guard.md` §결정 2.
- * R-Phase 미진입 body 는 disabled + tooltip + opacity 50% + cursor-not-allowed.
+ * #1281 — 천체 12개 버튼을 메뉴 하나로 합쳤다 (이슈 Q3 = A). 1280 폭에서 12개 중 11개가 우측 그룹에 가려져 클릭할 수
+ * 없었다 (`top-bar.tsx`). 항목 · R-Phase 가드 (#402) 는 `body-menu.tsx` 로 이전했다. 「D7 이후 제거」 로 시작한 임시
+ * 영역이었으나 캔버스 클릭 (#713) · 트리 (연구 모드) 와 함께 상시 진입 경로로 남는다.
+ *
+ * 영역 속성 `data-r1-region="shortcut-bar"` 는 유지한다 (R1 픽셀 가드 · `verify-a11y-baseline` 폰트 측정 대상).
  */
 export function FocusQuickButtons() {
   const selected = useSimStore((s) => s.selectedBodyId);
@@ -56,7 +31,8 @@ export function FocusQuickButtons() {
       if (e.key !== 'Escape') return;
       // #1265 — 표시 패널은 capture 단계에서 Esc 를 받아 preventDefault 하고 닫힌다. 이 리스너(bubble)가 돌 때 패널은
       // 선택 변경 여부와 무관하게 **이미 없으므로** DOM 속성으로는 막을 수 없다 (PR #1268 변이 c 실측) — 이 한 줄이
-      // 패널 Esc 의 유일한 차단이다 (ADR `20260927-1265` Amendment 1).
+      // 패널 Esc 의 유일한 차단이다 (ADR `20260927-1265` Amendment 1). #1281 천체 메뉴도 같은 방식으로 닫히므로 같은 한 줄이
+      // 메뉴 Esc 의 자유시점 오발화를 막는다 (계약 D6).
       if (e.defaultPrevented) return;
       // #737 — 모달 open 중 Esc 는 모달 닫기 전용. native window listener 라 React
       // stopPropagation 으로 차단 불가 → DOM 속성 가드로 free-fly 오발화 차단
@@ -75,35 +51,8 @@ export function FocusQuickButtons() {
   }, [selected, sendCommand]);
 
   return (
-    <div
-      className="flex items-center gap-1 overflow-x-auto whitespace-nowrap max-w-full"
-      data-r1-region="shortcut-bar"
-    >
-      {FOCUS_BUTTONS.map((b) => {
-        const enabled = isRPhaseFocusable(b.id);
-        return (
-          <button
-            key={b.id}
-            type="button"
-            data-testid={`focus-${b.id}`}
-            data-r-phase-disabled={!enabled}
-            disabled={!enabled}
-            aria-disabled={!enabled}
-            title={enabled ? undefined : DISABLED_TOOLTIP}
-            onClick={() => sendCommand({ type: 'focusOn', bodyId: b.id })}
-            className={`num text-mini min-w-6 min-h-6 shrink-0 px-1 py-0.5 rounded-sm border transition-colors ${
-              !enabled
-                ? 'bg-bg-surface/40 text-fg-muted border-border-subtle opacity-50 cursor-not-allowed'
-                : selected === b.id
-                  ? 'bg-primary/20 text-fg-primary border-primary/40'
-                  : 'bg-bg-surface/80 text-fg-secondary border-border-subtle hover:bg-bg-elevated'
-            }`}
-            style={{ transitionDuration: 'var(--duration-fast)' }}
-          >
-            {b.label}
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-1 whitespace-nowrap" data-r1-region="shortcut-bar">
+      <BodyMenu />
       <button
         type="button"
         data-testid="focus-reset"

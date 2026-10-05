@@ -14,6 +14,12 @@ Semantic Versioning을 따른다.
   - × 는 카드만 접는다 (카메라 포커스 유지). 접힌 칩이나 다른 천체 선택으로 다시 열리고, Esc 는 기존대로 자유시점에 진입한다.
   - 출처 줄의 Tier 는 `solar-system.json` 루트 `tier` 에서 읽는다 (`TIER_META.source` 추가 · `isDataTier`).
   - 공용 모듈 추출 — `lib/body-info.ts` (종류 라벨 · 조회 · 공전주기 · 차단 문구 · 사람 단위 포맷터), `hooks/use-body-info.ts`, `core/use-switch-mode.ts`. 연구 모드 우 패널과 ModeSwitcher 는 import 교체만 했다 (내용 불변).
+- **[#1281] 상단 바 「천체 ▾」 메뉴 + 모바일 결함 수정 (PR2)** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281)). 천체 바로가기 12개를 메뉴 하나로 합쳤다 (`body-menu.tsx`). 1280 폭에서 12개 중 11개가 우측 그룹에 가려져 클릭할 수 없던 문제를 없앤다.
+  - 메뉴는 WAI-ARIA Menu Button 패턴이다 — Enter/Space/↓ 로 열면 선택된 천체(없으면 첫 항목)에 포커스, ↑ 는 마지막 항목, ↓↑ 순환 · Home/End · Enter/Space 선택 · Tab 은 닫고 트리거 다음 요소로 간다. 메뉴를 닫는 Esc 는 window capture 단계에서 `preventDefault` 하므로 자유시점을 켜지 않는다 (표시 패널 #1265 와 같은 신호).
+  - 항목 testid `focus-<id>` 와 R-Phase 속성(`disabled` · `aria-disabled` · `data-r-phase-disabled` · `title`)은 그대로다.
+  - 상단 바 레이아웃 — 좌측 그룹은 `shrink-0`, 넘칠 때 숨는 쪽은 모든 폭에서 우측 그룹(가로 스크롤)이다. 제목은 1440 미만에서 숨긴다. 우측 내부 래퍼 `w-max` + 컨트롤 `shrink-0 whitespace-nowrap` 로 글자가 세로로 눌리던 원인을 없앴다.
+  - 자동 숨김 — 터치(`pointerdown`)를 활동으로 세고, 천체 메뉴가 열린 동안은 숨기지 않는다 (store `bodyMenuOpen`).
+  - 모바일(640px 미만) — 비활성 모드(교육 · 샌드박스) 숨김 / 카메라 · 표시 · 북마크 · 조작 가이드는 아이콘만 보이고 라벨은 `sr-only` / 연구 모드에 패널 탭 [트리] [정보] [닫기] (두 패널이 245px 겹치던 문제) / 타임바 UTC 숨김 + 래퍼 `max-w-full min-w-0` (역행 버튼이 x=−42 로 밀려나던 문제).
 
 ### Changed
 
@@ -21,6 +27,11 @@ Semantic Versioning을 따른다.
   - 같은 이유로 거리 슬라이더 라벨 `(focus: <id>)` → `(focus: <한글 이름>)`, 연구 패널 질량 슬라이더 `질량 배수 · <id>` → `질량 배수 · <한글 이름>` (접근 가능한 이름 포함) 으로 바꿨다.
   - R1 UI 회귀 가드 — 범례가 사라져 `hud-bottom-right` 영역이 selector 를 찾지 못하므로 `r1-ui-regions.mjs` 에서 영역 정의를 지우고 baseline PNG 3장을 삭제했다 (4 영역 12장 → 3 영역 9장). 남은 영역은 바뀌지 않아 재캡처하지 않았다. top-nav · shortcut-bar baseline 재캡처는 PR2 (상단바 천체 메뉴) 에서 한다.
   - `verify-hud-contrast.mjs` — 기본 진입 화면의 HUD 박스 수 주석을 4 → 3 으로 고쳤다 (`MIN_EXPECTED_CHIPS = 3` 무변경).
+- **[#1281] 천체 바로가기를 누르던 스크립트를 공용 헬퍼로 갱신 (PR2)** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281)). `scripts/browser-verify-utils.mjs` 에 `openBodyMenu` (멱등) · `clickFocusBody` (항목 부재 = throw) 를 더했고 fake page 테스트 3건을 붙였다.
+  - `bench-scene.mjs` 부팅 단언 `REQUIRED_TESTIDS` 의 `focus-earth` · `focus-neptune` → `body-menu-trigger` (메뉴가 닫히면 항목은 언마운트된다). 항목 존재는 prep 의 `clickFocusBody` 가 단언한다. 메뉴 열기는 prep 안이라 측정 구간 밖이다. 시나리오 이름은 그대로다.
+  - `verify:1265-display-panel` 전제 (17) · (21) 의 **재료 출처만** 바꿨다 (판정 · 임계 불변). 좌측 그룹이 스크롤되지 않게 되어 1280 에서 단축 바 스크롤 재료가 사라졌기 때문이다. 무관 스크롤은 연구 모드 `panel-right` 세로 스크롤, 레이스는 375 폭에서 Tab 이 일으키는 **트리거 조상 체인** 스크롤을 쓴다.
+  - `core` `#617` 정적 매칭 테스트의 대상을 `focus-quick-buttons.tsx` `FOCUS_BUTTONS` → `body-menu.tsx` `BODY_MENU_ITEMS` 로 옮겼다 (판정 불변).
+  - R1 UI 회귀 가드 — top-nav · shortcut-bar baseline 은 의도된 변경이라 `r1-baseline-bootstrap.yml` 로 재캡처한다. 가드 헤더와 bootstrap workflow 의 「4 영역 × 3 viewport」 · 「12장」 개수 표기는 개수 대신 영역 SSoT (`r1-ui-regions.mjs`) 를 가리키게 고쳤다.
 
 ## [0.91.0] - 2026-10-04
 
