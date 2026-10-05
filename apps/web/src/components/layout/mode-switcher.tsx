@@ -2,7 +2,7 @@
 
 import type { SimMode } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
-import { useSimCommand } from '@/core/sim-context';
+import { useSwitchMode } from '@/core/use-switch-mode';
 import { useEffect } from 'react';
 
 interface ModeDef {
@@ -26,8 +26,8 @@ const MODES: ModeDef[] = [
  */
 export function ModeSwitcher() {
   const mode = useSimStore((s) => s.mode);
-  const setMode = useSimStore((s) => s.setMode);
-  const sendCommand = useSimCommand();
+  // #1281 — 관찰 모드 카드의 「자세히 → 연구 모드」와 같은 전환 경로.
+  const switchMode = useSwitchMode();
 
   // mode → html data-mode 동기화 (layout에서 초기 observe 세팅하지만 변경 시 동기화 필요)
   useEffect(() => {
@@ -38,8 +38,7 @@ export function ModeSwitcher() {
 
   const handleClick = (next: SimMode, enabled: boolean) => {
     if (!enabled) return;
-    setMode(next);
-    sendCommand({ type: 'setMode', mode: next });
+    switchMode(next);
   };
 
   return (

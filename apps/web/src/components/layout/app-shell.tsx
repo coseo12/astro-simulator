@@ -3,6 +3,7 @@
 import { TopBar } from './top-bar';
 import { TimeBar } from './time-bar';
 import { HudCorners } from './hud-corners';
+import { BodyInfoCard } from './body-info-card';
 import { LodDevOverlay } from './lod-dev-overlay';
 import { FocusQuickButtons } from './focus-quick-buttons';
 import { ModeSwitcher } from './mode-switcher';
@@ -55,6 +56,8 @@ export function AppShell() {
         />
         <UrlSync />
         <HudCorners />
+        {/* #1281 — 관찰 모드 선택 천체 정보 카드 (좌하 고정, 종전 `focus · <id>` 칩 대체). */}
+        <BodyInfoCard />
         <LodDevOverlay />
         <SidePanels />
         <ScaleControl />

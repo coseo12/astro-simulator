@@ -5,6 +5,21 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1281] 관찰 모드 천체 정보 카드 (PR1)** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281)). 관찰 모드에서 천체를 선택하면 좌하에 정보 카드가 뜬다 (`body-info-card.tsx`).
+  - 표시 항목은 한/영 이름 · 종류 · 태양 거리 · 반지름(km) · 공전주기 · 출처 Tier 한 줄 · 「자세히 → 연구 모드」다. 위성은 「<모체>로부터 거리」를 함께 보이고, 태양은 거리 자리에 「태양계 중심」을 보인다. R-Phase 미진입 body 는 연구 패널과 같은 차단 문구를 띄운다.
+  - 태양 거리는 **현재 시뮬레이션 시각 기준**이고 4Hz (`DISTANCE_REFRESH_MS = 250`) 로 갱신한다. 계산은 scene Kepler 경로와 같은 식이다 (`positionAt` 부모 체인 합산, 시각 과장 배율 미적용). 이를 위해 core 루트에 `positionAt` named export 1줄을 더했다 — `physics` namespace 경유는 SSR 500 기전이다 (#402 와 동일).
+  - × 는 카드만 접는다 (카메라 포커스 유지). 접힌 칩이나 다른 천체 선택으로 다시 열리고, Esc 는 기존대로 자유시점에 진입한다.
+  - 출처 줄의 Tier 는 `solar-system.json` 루트 `tier` 에서 읽는다 (`TIER_META.source` 추가 · `isDataTier`).
+  - 공용 모듈 추출 — `lib/body-info.ts` (종류 라벨 · 조회 · 공전주기 · 차단 문구 · 사람 단위 포맷터), `hooks/use-body-info.ts`, `core/use-switch-mode.ts`. 연구 모드 우 패널과 ModeSwitcher 는 import 교체만 했다 (내용 불변).
+
+### Changed
+
+- **[#1281] HUD 좌하 `focus · <id>` 칩과 우하 고정 `정확도 · T1 관측` 범례 제거** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281)). raw id 노출 경로가 0 이 됐다.
+  - R1 UI 회귀 가드 — 범례가 사라져 `hud-bottom-right` 영역이 selector 를 찾지 못하므로 `r1-ui-regions.mjs` 에서 영역 정의를 지우고 baseline PNG 3장을 삭제했다 (4 영역 12장 → 3 영역 9장). 남은 영역은 바뀌지 않아 재캡처하지 않았다. top-nav · shortcut-bar baseline 재캡처는 PR2 (상단바 천체 메뉴) 에서 한다.
+  - `verify-hud-contrast.mjs` — 기본 진입 화면의 HUD 박스 수 주석을 4 → 3 으로 고쳤다 (`MIN_EXPECTED_CHIPS = 3` 무변경).
+
 ## [0.91.0] - 2026-10-04
 
 ### Added

@@ -1,20 +1,20 @@
 'use client';
 
-import { ephemeris as ephemerisApi, isRPhaseFocusable } from '@astro-simulator/core';
-import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+import { isRPhaseFocusable } from '@astro-simulator/core';
+import { AU } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale } from '@/constants/body-scale';
+import { useBodyInfo } from '@/hooks/use-body-info';
+// #1281 — 라벨 · 주기 · 차단 문구는 관찰 모드 카드와 공용 모듈로 추출 (내용 불변, import 교체만).
+import {
+  PERIOD_UNAVAILABLE_TEXT,
+  formatDays,
+  kindLabel,
+  orbitalPeriodSeconds,
+  rPhaseBlockedMessage,
+} from '@/lib/body-info';
 import { TierBadge } from '../ui/tier-badge';
 import { MassSlider } from './mass-slider';
-import { useMemo } from 'react';
-
-const KIND_LABEL: Record<string, string> = {
-  star: '항성',
-  planet: '행성',
-  'dwarf-planet': '왜소행성',
-  moon: '위성',
-  comet: '혜성',
-};
 
 // P10-B-2 #274 — colorSource 3종 한국어 라벨.
 const COLOR_SOURCE_LABEL: Record<string, string> = {
@@ -32,12 +32,6 @@ function formatExp(n: number, digits = 3): string {
   return n.toExponential(digits);
 }
 
-function formatDays(seconds: number): string {
-  const days = seconds / 86_400;
-  if (days < 365) return `${days.toFixed(2)} 일`;
-  return `${(days / 365.25).toFixed(3)} 년`;
-}
-
 /**
  * 우 패널 — 선택된 천체 정보.
  * Tier 1 관측 데이터이므로 모든 수치에 T1 배지.
@@ -46,14 +40,7 @@ export function CelestialInfoPanel() {
   const selected = useSimStore((s) => s.selectedBodyId);
 
   // #841 — 공전주기 μ 계산에 모체 질량이 필요하므로 parentId 를 데이터 SSoT 에서 함께 해석한다.
-  const { data, parent } = useMemo(() => {
-    if (!selected) return { data: null, parent: null };
-    const bodies = ephemerisApi.getSolarSystem().bodies;
-    const body = bodies.find((b) => b.id === selected) ?? null;
-    const parentBody =
-      body?.parentId != null ? (bodies.find((b) => b.id === body.parentId) ?? null) : null;
-    return { data: body, parent: parentBody };
-  }, [selected]);
+  const { data, parent } = useBodyInfo(selected);
 
   if (!selected || !data) {
     return (
@@ -76,26 +63,14 @@ export function CelestialInfoPanel() {
     return (
       <div data-testid="info-panel-r-phase-blocked">
         <h3 className="text-body-sm text-fg-secondary mb-2">천체 정보</h3>
-        <p className="text-caption text-fg-secondary">
-          {data.nameKo} 은(는) R-Phase 미진입 — 후속 R-Phase 에서 활성화 예정입니다.
-        </p>
+        <p className="text-caption text-fg-secondary">{rPhaseBlockedMessage(data.nameKo)}</p>
       </div>
     );
   }
 
-  // #841 — 공전주기: 케플러 제3법칙 T = 2π√(a³/μ). orbit.semiMajorAxis 는 모체(parentId) 중심
-  // 거리(loader 계약)이므로 μ 도 반드시 모체 기준 — 기존 태양 질량 하드코딩은 위성 주기를
-  // 수백 배 오계산했다 (달 27.3일 → 약 1.1시간, 이슈 #841). 2체 문제 정확식 μ = G·(M_parent + m)
-  // 사용 — 달은 모체 대비 질량비 1.2% 라 M_parent 단독이면 27.49일로 어긋난다 (실제 항성월 27.32일).
+  // #841 — 공전주기 T = 2π√(a³/μ), μ = G·(M_parent + m) — 식과 근거는 `lib/body-info.ts`.
   // 모체 미해석(parent === null) 시 조용히 태양 질량으로 흡수하지 않고 fail-visible 표기 (#841 계약).
-  const periodSeconds =
-    data.orbit && parent
-      ? 2 *
-        Math.PI *
-        Math.sqrt(
-          data.orbit.semiMajorAxis ** 3 / (GRAVITATIONAL_CONSTANT * (parent.mass + data.mass)),
-        )
-      : null;
+  const periodSeconds = orbitalPeriodSeconds(data, parent);
 
   // R1 #329 — body 별 시각 과장 배수. 1.0 (실측) 이면 과장 안내 미표시.
   const visualScale = getBodyScale(data.id);
@@ -113,7 +88,7 @@ export function CelestialInfoPanel() {
           <h2 className="font-display text-h4 text-fg-primary">{data.nameKo}</h2>
           <span className="text-caption text-fg-secondary">{data.nameEn}</span>
         </div>
-        <div className="text-caption text-fg-secondary">{KIND_LABEL[data.kind] ?? data.kind}</div>
+        <div className="text-caption text-fg-secondary">{kindLabel(data.kind)}</div>
       </div>
 
       <dl className="flex flex-col gap-2 text-body-sm">
@@ -139,7 +114,7 @@ export function CelestialInfoPanel() {
               <Row label="공전주기" value={formatDays(periodSeconds)} />
             ) : (
               // #841 fail-visible — orbit 존재 + 모체 미해석. 조용한 태양 질량 폴백 금지 계약.
-              <Row label="공전주기" value="계산 불가 (모체 질량 미상)" />
+              <Row label="공전주기" value={PERIOD_UNAVAILABLE_TEXT} />
             )}
           </>
         )}
