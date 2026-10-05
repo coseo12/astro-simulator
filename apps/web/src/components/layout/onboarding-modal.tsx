@@ -125,12 +125,13 @@ export function OnboardingModal() {
         data-testid="onboarding-button"
         title="조작 가이드 (천체 이동 / 선택 / 줌 / 탐색)"
         aria-label="조작 가이드 열기"
-        className="num text-caption shrink-0 whitespace-nowrap max-sm:inline-flex max-sm:items-center bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
+        className="num text-caption shrink-0 whitespace-nowrap max-[1439px]:inline-flex max-[1439px]:items-center bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
-        {/* #1281 — 모바일(`max-sm`)은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D9(d)). */}
-        <Keyboard size={14} aria-hidden="true" className="sm:hidden" />
-        <span className="max-sm:sr-only">조작 가이드</span>
+        {/* #1281 — 1440 미만은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D5 · D9(d)). 모바일 세로 눌림뿐 아니라
+            Linux 폰트(CI ubuntu)의 1280 에서 우측 그룹이 넘쳐 `?` 가 화면 밖으로 밀렸다 (PR #1283 CI 실측 우단 1286.6). */}
+        <Keyboard size={14} aria-hidden="true" className="min-[1440px]:hidden" />
+        <span className="max-[1439px]:sr-only">조작 가이드</span>
       </button>
 
       <Modal

@@ -29,8 +29,15 @@ const MOBILE_PANEL_TABS: { id: MobilePanel; label: string }[] = [
  */
 export function SidePanels() {
   const mode = useSimStore((s) => s.mode);
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('tree');
   const expanded = mode === 'research' || mode === 'sandbox';
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('tree');
+  // 패널 모드로 들어올 때마다 기본 탭(트리)으로 되돌린다 — 「닫기」 를 고른 채 관찰 → 연구로 돌아오면 두 패널이 다
+  // 숨은 채 시작했다 (PR #1283 리뷰 권고 3). 렌더 중 「이전 값 비교」 패턴 — effect 로 하면 한 프레임 빈 화면이 보인다.
+  const [prevExpanded, setPrevExpanded] = useState(expanded);
+  if (expanded !== prevExpanded) {
+    setPrevExpanded(expanded);
+    if (expanded) setMobilePanel('tree');
+  }
   // P9 #254 D7/D8 — Galilean Osculating 1Hz polling. 패널이 표시될 때만 enabled.
   // #246 경계: 본 훅은 데이터만 제공, 선택 상태는 미반영.
   const osc = useOsculatingSync({ enabled: expanded });

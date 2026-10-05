@@ -17,7 +17,7 @@ Semantic Versioning을 따른다.
 - **[#1281] 상단 바 「천체 ▾」 메뉴 + 모바일 결함 수정 (PR2)** ([#1281](https://github.com/coseo12/astro-simulator/issues/1281)). 천체 바로가기 12개를 메뉴 하나로 합쳤다 (`body-menu.tsx`). 1280 폭에서 12개 중 11개가 우측 그룹에 가려져 클릭할 수 없던 문제를 없앤다.
   - 메뉴는 WAI-ARIA Menu Button 패턴이다 — Enter/Space/↓ 로 열면 선택된 천체(없으면 첫 항목)에 포커스, ↑ 는 마지막 항목, ↓↑ 순환 · Home/End · Enter/Space 선택 · Tab 은 닫고 트리거 다음 요소로 간다. 메뉴를 닫는 Esc 는 window capture 단계에서 `preventDefault` 하므로 자유시점을 켜지 않는다 (표시 패널 #1265 와 같은 신호).
   - 항목 testid `focus-<id>` 와 R-Phase 속성(`disabled` · `aria-disabled` · `data-r-phase-disabled` · `title`)은 그대로다.
-  - 상단 바 레이아웃 — 좌측 그룹은 `shrink-0`, 넘칠 때 숨는 쪽은 모든 폭에서 우측 그룹(가로 스크롤)이다. 제목은 1440 미만에서 숨긴다. 우측 내부 래퍼 `w-max` + 컨트롤 `shrink-0 whitespace-nowrap` 로 글자가 세로로 눌리던 원인을 없앴다.
+  - 상단 바 레이아웃 — 좌측 그룹은 `shrink-0`, 넘칠 때 숨는 쪽은 모든 폭에서 우측 그룹(가로 스크롤)이다. 1440 미만에서는 제목을 숨기고 카메라 · 북마크 · 조작 가이드를 아이콘만 보인다 (라벨은 `sr-only` · 툴팁) — 라벨을 다 보이면 Linux 폰트(CI ubuntu) 1280 에서 우측 그룹이 넘쳐 `?` 우단이 1286.6 이었다. 우측 내부 래퍼 `w-max` + 컨트롤 `shrink-0 whitespace-nowrap` 로 글자가 세로로 눌리던 원인을 없앴다.
   - 자동 숨김 — 터치(`pointerdown`)를 활동으로 세고, 천체 메뉴가 열린 동안은 숨기지 않는다 (store `bodyMenuOpen`).
   - 모바일(640px 미만) — 비활성 모드(교육 · 샌드박스) 숨김 / 카메라 · 표시 · 북마크 · 조작 가이드는 아이콘만 보이고 라벨은 `sr-only` / 연구 모드에 패널 탭 [트리] [정보] [닫기] (두 패널이 245px 겹치던 문제) / 타임바 UTC 숨김 + 래퍼 `max-w-full min-w-0` (역행 버튼이 x=−42 로 밀려나던 문제).
 

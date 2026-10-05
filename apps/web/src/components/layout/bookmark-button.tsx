@@ -48,11 +48,12 @@ export function BookmarkButton() {
       onClick={copy}
       disabled={julianDate === null}
       title="현재 시각·포커스·엔진·속도를 URL에 담아 복사"
-      className="num text-caption shrink-0 whitespace-nowrap max-sm:inline-flex max-sm:items-center px-2 py-1 rounded-sm border border-border-subtle bg-bg-surface/80 backdrop-blur text-fg-secondary hover:bg-bg-elevated disabled:opacity-40"
+      className="num text-caption shrink-0 whitespace-nowrap max-[1439px]:inline-flex max-[1439px]:items-center px-2 py-1 rounded-sm border border-border-subtle bg-bg-surface/80 backdrop-blur text-fg-secondary hover:bg-bg-elevated disabled:opacity-40"
     >
-      {/* #1281 — 모바일(`max-sm`)은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D9(d)). */}
+      {/* #1281 — 1440 미만은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D5 · D9(d)). 모바일 세로 눌림뿐 아니라
+            Linux 폰트(CI ubuntu)의 1280 에서 우측 그룹이 넘쳐 `?` 가 화면 밖으로 밀렸다 (PR #1283 CI 실측 우단 1286.6). */}
       <span aria-hidden="true">{copied ? '✓' : '🔖'}</span>
-      <span className="max-sm:sr-only">{copied ? ' 복사됨' : ' 북마크'}</span>
+      <span className="max-[1439px]:sr-only">{copied ? ' 복사됨' : ' 북마크'}</span>
     </button>
   );
 }

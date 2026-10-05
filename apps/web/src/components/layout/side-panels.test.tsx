@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSimStore } from '@/store/sim-store';
 import { SidePanels } from './side-panels';
@@ -53,6 +53,17 @@ describe('SidePanels — 모바일 탭 (#1281 D9(b))', () => {
     expect(hiddenOnMobile('panel-right')).toBe(true);
 
     fireEvent.click(screen.getByTestId('panel-tab-tree'));
+    expect(hiddenOnMobile('panel-left')).toBe(false);
+    expect(hiddenOnMobile('panel-right')).toBe(true);
+  });
+
+  it('「닫기」 상태로 관찰 → 연구 재진입하면 기본 탭(트리)으로 돌아온다 (PR #1283 리뷰 권고 3)', () => {
+    render(<SidePanels />);
+    fireEvent.click(screen.getByTestId('panel-tab-none'));
+    expect(hiddenOnMobile('panel-left')).toBe(true);
+    act(() => useSimStore.setState({ mode: 'observe' }));
+    act(() => useSimStore.setState({ mode: 'research' }));
+    expect(screen.getByTestId('panel-tab-tree')).toHaveAttribute('aria-pressed', 'true');
     expect(hiddenOnMobile('panel-left')).toBe(false);
     expect(hiddenOnMobile('panel-right')).toBe(true);
   });
