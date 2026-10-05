@@ -5,6 +5,24 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1288] 시간 UX — 「지금」 버튼 + 100년 프리셋 (PR1)** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288)). 타임바에 「지금」 버튼(`time-now`)과 `100y` 프리셋(`time-preset-100y`)을 더했다.
+  - 「지금」은 시점만 현재 시각으로 옮긴다 (`jumpToJulianDate`, `dateToJulianDate(new Date())` 재사용). 배속 · 재생/정지 · 역행 상태는 그대로다 — `setTimeScale` 을 보내지 않는다.
+  - `100y` 는 core `CENTURY_PER_SEC`(1초 = 100년)를 쓰고 다른 프리셋처럼 역행 부호를 유지한다.
+  - 기존 testid(`time-preset-{1s,1h,1d,1M,1y,10y}` · `time-play`/`time-pause` · `time-reverse`/`time-forward` · `datetime-input`/`datetime-jump`)는 그대로다.
+  - 모바일(640px 미만) 타임바는 간격 · 패딩 · 구분선만 줄여 375 에서 넘치지 않는다 (글자 크기 · 24px hit target 불변). 375 실측 내용 315px / 가용 341px.
+
+### Fixed
+
+- **[#1288] 날짜 입력이 라벨대로 UTC 로 해석된다** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288)). 종전 `new Date(value)` 는 시간대 없는 `datetime-local` 값을 로컬 시간대로 해석해, 「UTC 시점」 입력이 KST 에서 9시간 어긋났다 (`2026-04-14T00:00` → `2026-04-13T15:00Z`).
+- **[#1288] 극단 시각에서 타임바 UTC 표시가 깨지거나 예외를 던지지 않는다** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288)). 연도 > 9999 는 ISO 확장 연도(`+010000-01-01T00:00:30Z`)로, JS Date 범위(약 ±27만 년) 밖은 `JD <값>` 으로 보인다. 종전 `toISOString().slice(0, 19)` 는 확장 연도의 초를 잘랐고, 범위 밖에서는 RangeError 를 던졌다.
+
+### Behavior Changes
+
+- **타임바에 「지금」 버튼과 `100y` 프리셋이 생겼다** (#1288). 「지금」은 현재 시각으로 이동하되 배속은 바꾸지 않는다.
+- **날짜 입력이 UTC 로 해석된다** (#1288). 같은 입력이 종전에는 사용자 시간대만큼 어긋난 시각으로 점프했다.
+
 ## [0.92.0] - 2026-10-05
 
 ### Added

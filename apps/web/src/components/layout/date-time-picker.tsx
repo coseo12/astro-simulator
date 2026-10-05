@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { useSimCommand } from '@/core/sim-context';
+import { datetimeLocalToIsoUtc } from '@/lib/sim-time-format';
 
 /**
  * DateTimePicker — 특정 UTC 시점으로 점프.
  * 입력 형식: YYYY-MM-DDTHH:mm (datetime-local)
+ *
+ * #1288 D5 — 입력값은 **UTC** 로 해석한다 (라벨과 일치). 종전 `new Date(value)` 는 로컬 시간대 해석이었다.
  */
 export function DateTimePicker() {
   const [value, setValue] = useState('');
@@ -14,13 +17,13 @@ export function DateTimePicker() {
 
   const handleJump = () => {
     if (!value) return;
-    try {
-      const iso = new Date(value).toISOString();
-      sendCommand({ type: 'jumpToDate', isoUtc: iso });
-      setError(null);
-    } catch {
+    const iso = datetimeLocalToIsoUtc(value);
+    if (iso === null) {
       setError('잘못된 날짜');
+      return;
     }
+    sendCommand({ type: 'jumpToDate', isoUtc: iso });
+    setError(null);
   };
 
   return (

@@ -121,7 +121,7 @@ function reportMeasurementFailure(error) {
  *
  * **선택 (부재가 정상일 수 있는 유일한 자리)** — `setTimePlayback` 이 상태로 단언:
  *   `time-play` ↔ `time-pause` **토글 쌍**. 한 버튼의 testid 가 상태에 따라 갈리므로
- *   (`time-controls.tsx:70`) 한쪽 부재는 「이미 그 상태」를 뜻한다. 단 **양쪽 다 부재면
+ *   (`time-controls.tsx` 재생/일시정지 버튼) 한쪽 부재는 「이미 그 상태」를 뜻한다. 단 **양쪽 다 부재면
  *   실패** — 「없으면 건너뛴다」를 이 쌍에만, 그리고 형제의 존재를 조건으로 가둔다.
  *
  * 이 목록 밖에 `.catch(() => {})` 를 새로 들이지 않는다.
