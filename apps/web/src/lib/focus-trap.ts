@@ -116,3 +116,21 @@ export function resolveFocusTrapTarget(
   if (!shiftKey && active === last) return first;
   return null;
 }
+
+/**
+ * `popup` 을 빼고 본 문서 포커스 순서에서 `trigger` 바로 다음 요소 — portal 팝업(표시 패널 #1265 · 천체 메뉴 #1281)을
+ * 닫으며 Tab 을 「팝업이 트리거 바로 뒤에 있는 것처럼」 이어 가는 목적지다. 트리거가 순서에 없거나 (조상 `inert` 등)
+ * 마지막이면 `null` — 호출부가 트리거로 되돌린다 (`indexOf` 가 -1 일 때 `+1` 로 문서 첫 요소로 튀지 않게, PR #1268
+ * reviewer R5).
+ */
+export function nextFocusableAfter(
+  trigger: HTMLElement,
+  popup: HTMLElement | null,
+): HTMLElement | null {
+  const order = getFocusableElements(trigger.ownerDocument.body).filter(
+    (el) => !popup?.contains(el),
+  );
+  const i = order.indexOf(trigger);
+  if (i < 0) return null;
+  return order[i + 1] ?? null;
+}

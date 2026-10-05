@@ -69,6 +69,47 @@ export async function clickTestId(page, testId, options = {}) {
   return true;
 }
 
+/** #1281 — 상단 바 「천체 ▾」 메뉴 트리거 · 메뉴 testid (`apps/web/src/components/layout/body-menu.tsx`). */
+export const BODY_MENU_TRIGGER_TESTID = 'body-menu-trigger';
+export const BODY_MENU_TESTID = 'body-menu';
+
+/**
+ * 「천체 ▾」 메뉴를 연다 — **멱등** (#1281).
+ *
+ * 천체 바로가기 12개는 메뉴 항목이 됐고 메뉴는 닫히면 **언마운트**된다. 그래서 `focus-<id>` 를 직접 누르던 스크립트는
+ * 먼저 이 함수를 부른다. 이미 열려 있으면 아무것도 하지 않는다 (트리거를 다시 누르면 닫히므로). 트리거 부재는
+ * `clickTestId` 가 throw 한다 — #1209 의 「조용한 통과 금지」 를 그대로 승계한다.
+ *
+ * @param page Playwright Page
+ * @param options.timeout 트리거 click · 메뉴 표시 대기 타임아웃 (기본 2000ms)
+ */
+export async function openBodyMenu(page, options = {}) {
+  const timeout = options.timeout ?? 2000;
+  const menu = page.locator(`[data-testid="${BODY_MENU_TESTID}"]`);
+  if ((await menu.count()) > 0) return;
+  await clickTestId(page, BODY_MENU_TRIGGER_TESTID, {
+    timeout,
+    reason: '천체 메뉴 트리거 회귀 가능성',
+  });
+  await menu.waitFor({ state: 'visible', timeout });
+}
+
+/**
+ * 천체 메뉴로 `bodyId` 를 선택한다 (#1281) — `openBodyMenu` → `focus-<bodyId>` 클릭. 선택하면 메뉴는 닫힌다.
+ * 항목 부재는 throw (`clickTestId`).
+ *
+ * @param page Playwright Page
+ * @param bodyId 천체 id (`earth` 등 — testid 접두 `focus-` 없이)
+ * @param options.timeout 트리거 · 항목 click 타임아웃 (기본 2000ms)
+ */
+export async function clickFocusBody(page, bodyId, options = {}) {
+  await openBodyMenu(page, options);
+  return clickTestId(page, `focus-${bodyId}`, {
+    timeout: options.timeout,
+    reason: '천체 메뉴 항목 회귀 가능성',
+  });
+}
+
 /**
  * `[data-testid="time-play"]` 버튼을 pre-assert 후 클릭.
  *

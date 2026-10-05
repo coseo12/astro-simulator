@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * R1 #329 — UI 회귀 가드 (4 영역 × 3 viewport pixel diff).
+ * R1 #329 — UI 회귀 가드 (영역 × viewport pixel diff — 영역 목록 SSoT 는 `r1-ui-regions.mjs`).
+ *   개수를 여기 적지 않는다 — #1281 PR1 이 영역을 하나 지웠을 때 이 헤더의 「4 영역」 이 stale 로 남았다.
  *
  * playwright + pixelmatch + pngjs 로 baseline 대비 mismatch ratio ≤ 0.5% 검증.
  * 캔버스 (3D scene) 영역은 제외 — sun mesh 추가가 의도 변화 (PM Q2 비-범위).

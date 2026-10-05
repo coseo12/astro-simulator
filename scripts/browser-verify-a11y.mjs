@@ -91,7 +91,8 @@ const { axe, focusableCount } = await withBrowser({}, async (browser) => {
   check('페이지 body 구성 완료', typeof reducedMotionBody.hasAnimation === 'boolean');
 
   // ===== 스크린샷 (포커스 링 확인) =====
-  await page.focus('[data-testid="focus-earth"]');
+  // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 안이라 닫힌 상태에서는 없다. 상단 바 같은 자리의 메뉴 트리거로 포커스 링을 잡는다.
+  await page.focus('[data-testid="body-menu-trigger"]');
   await page.screenshot({ path: join(reportDir, '01-focus-ring.png') });
 
   // 색약 시뮬레이션 (Chrome Emulate Vision Deficiencies)

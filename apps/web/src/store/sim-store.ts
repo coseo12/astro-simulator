@@ -116,6 +116,8 @@ export interface SimStoreState {
   displayCapabilities: DisplayCapabilities | null;
   /** #1265 — 표시 패널 열림. 상단 바 자동 숨김 억제 (결정 6) 가 구독한다. */
   displayPanelOpen: boolean;
+  /** #1281 — 상단 바 「천체 ▾」 메뉴 열림. `displayPanelOpen` 과 같은 이유로 자동 숨김 억제가 구독한다 (D7). */
+  bodyMenuOpen: boolean;
   /**
    * #704 — free-fly 카메라 감도 4축 계수 (wasd / zoomoutFactor / panning / zoom).
    *
@@ -163,6 +165,7 @@ export interface SimStoreState {
   setNightLightsVisible: (visible: boolean) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
+  setBodyMenuOpen: (open: boolean) => void;
   /**
    * #704 — 단일 감도 축 갱신 (ADR §결정 1/3).
    *
@@ -208,6 +211,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   nightLightsVisible: true,
   displayCapabilities: null,
   displayPanelOpen: false,
+  bodyMenuOpen: false,
   // #704 — 감도 4축 초기값 = camera.ts const default (SSoT). 영속 로드는 클라 mount useEffect 가 담당
   // (Hydration Mismatch 차단 — 서버·클라 동일 default 로 첫 렌더 고정, ADR §결정 3).
   freeFlySensitivity: { ...FREE_FLY_SENSITIVITY_DEFAULT },
@@ -247,6 +251,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setNightLightsVisible: (visible) => set({ nightLightsVisible: visible }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
+  setBodyMenuOpen: (open) => set({ bodyMenuOpen: open }),
   setFreeFlySensitivity: (axis, value, persist = false) =>
     set((state) => {
       // 동일 값이면 no-op (불필요 리렌더/영속 회피 — Hydration 로드가 default 와 같을 때 등).

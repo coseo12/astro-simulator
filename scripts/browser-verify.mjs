@@ -12,7 +12,7 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { withBrowser } from './browser-verify-utils.mjs';
+import { clickFocusBody, openBodyMenu, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,7 +51,8 @@ await withBrowser({}, async (browser) => {
     /renderer\s*·\s*(webgpu|webgl2)/.test(hudText ?? ''),
     (hudText ?? '').match(/renderer\s*·\s*\w+/)?.[0] ?? '없음',
   );
-  check('포커스 버튼 존재 (지구)', (await page.$('[data-testid="focus-earth"]')) !== null);
+  // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목이다 (닫히면 언마운트) — 정적 단계에서는 트리거 존재를 본다.
+  check('천체 메뉴 트리거 존재', (await page.$('[data-testid="body-menu-trigger"]')) !== null);
   check('reset 버튼 존재', (await page.$('[data-testid="focus-reset"]')) !== null);
   check('언어 ko 설정', (await page.evaluate(() => document.documentElement.lang)) === 'ko');
   check(
@@ -68,15 +69,16 @@ await withBrowser({}, async (browser) => {
 
   // ===== Level 2: 인터랙션 =====
   console.log('\n[Level 2] 인터랙션 검증');
-  const earthBtn = await page.$('[data-testid="focus-earth"]');
-  if (earthBtn) {
-    await earthBtn.click();
+  // #1281 — 메뉴로 지구 선택 → 메뉴가 닫히므로 다시 열어 항목의 선택 상태(`aria-checked`)를 본다.
+  try {
+    await clickFocusBody(page, 'earth');
     await page.waitForTimeout(500); // 카메라 애니메이션 대기
-    // 버튼이 선택 상태(primary border)로 전환되는지 확인
-    const cls = (await earthBtn.getAttribute('class')) ?? '';
-    check('지구 포커스 클릭 시 selected 상태 전환', cls.includes('border-primary'));
-  } else {
-    check('지구 포커스 클릭 시 selected 상태 전환', false, '지구 버튼 못 찾음');
+    await openBodyMenu(page);
+    const checked = await page.getAttribute('[data-testid="focus-earth"]', 'aria-checked');
+    await page.keyboard.press('Escape');
+    check('지구 포커스 클릭 시 selected 상태 전환', checked === 'true', `aria-checked=${checked}`);
+  } catch (e) {
+    check('지구 포커스 클릭 시 selected 상태 전환', false, e.message);
   }
 
   // DateTimePicker 렌더

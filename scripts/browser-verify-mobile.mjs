@@ -9,7 +9,7 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { withBrowser } from './browser-verify-utils.mjs';
+import { openBodyMenu, withBrowser } from './browser-verify-utils.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://localhost:3001';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -64,7 +64,8 @@ await withBrowser({}, async (browser) => {
 
   await page.screenshot({ path: join(screenshotDir, '01-mobile-ko.png'), fullPage: false });
 
-  // 터치 포커스 — 지구 버튼 탭
+  // 터치 포커스 — 천체 메뉴를 열고 지구 항목 탭 (#1281 — 바로가기는 메뉴 항목이다)
+  await openBodyMenu(page).catch(() => {});
   const earthBtn = await page.$('[data-testid="focus-earth"]');
   if (earthBtn) {
     await earthBtn.tap();

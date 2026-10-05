@@ -72,10 +72,13 @@ export function SensitivitySettingsModal() {
         data-testid="sensitivity-settings-button"
         title="free-fly 카메라 감도 설정 (WASD / 줌아웃 / 패닝 / 줌)"
         aria-label="카메라 감도 설정"
-        className="num text-caption bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
+        className="num text-caption shrink-0 whitespace-nowrap max-[1439px]:inline-flex max-[1439px]:items-center bg-bg-surface/80 backdrop-blur border border-border-subtle rounded-sm px-2 py-1 text-fg-secondary hover:bg-bg-elevated transition-colors"
         style={{ transitionDuration: 'var(--duration-fast)' }}
       >
-        ⚙ 카메라
+        {/* #1281 — 1440 미만은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D5 · D9(d)). 모바일 세로 눌림뿐 아니라
+            Linux 폰트(CI ubuntu)의 1280 에서 우측 그룹이 넘쳐 `?` 가 화면 밖으로 밀렸다 (PR #1283 CI 실측 우단 1286.6). */}
+        <span aria-hidden="true">⚙</span>
+        <span className="max-[1439px]:sr-only">{' 카메라'}</span>
       </button>
 
       <Modal
