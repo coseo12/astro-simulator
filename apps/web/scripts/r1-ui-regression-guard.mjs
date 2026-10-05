@@ -833,10 +833,10 @@ async function main() {
   if (disposition === 'not-ssot') {
     console.error('[r1-guard] 전제 미충족 — 이 환경(darwin)은 회귀 판정 SSoT 가 아니다. (#1258)');
     console.error(
-      '  원인: baseline 12 PNG 가 ubuntu CI 캡처본이고, 가드 영역 4개가 모두 텍스트를 담고 있어',
+      '  원인: baseline PNG 가 ubuntu CI 캡처본이고, 가드 영역이 모두 텍스트를 담고 있어',
     );
     console.error(
-      '        macOS 폰트 렌더 차이만으로 4/4 가 어긋난다 — PASS/FAIL 판정에 정보가 없다.',
+      '        macOS 폰트 렌더 차이만으로 전 영역이 어긋난다 — PASS/FAIL 판정에 정보가 없다.',
     );
     console.error('  SSoT: CI(ubuntu) 의 `r1-guard: verify 실행 (4/4)` step 결과를 본다.');
     console.error('  회피: SKIP_LOCAL=1 을 붙이면 검증을 건너뛰고 exit 0 으로 끝난다.');

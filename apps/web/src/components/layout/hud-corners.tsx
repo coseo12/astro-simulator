@@ -3,9 +3,12 @@
 import { useSimStore } from '@/store/sim-store';
 
 /**
- * 4코너 HUD — 반투명 + 블러.
- * 관찰 모드: 최소 (좌상 시각, 우상 렌더러)
- * 연구 모드: 풀 (D4에서 확장)
+ * 코너 HUD — 반투명 + 블러. 좌상 시각, 우상 렌더러/FPS, 상단 중앙 알림.
+ *
+ * #1281 — 좌하 `focus · <id>` 칩과 우하 고정 `정확도 · T1 관측` 범례를 제거했다.
+ *   - 선택 천체 정보는 관찰 모드 좌하 카드(`body-info-card.tsx`)가, 연구 모드는 우 패널이 보인다
+ *     (raw id 노출 경로 0 — 계약 D4).
+ *   - 데이터 출처 Tier 는 카드의 한 줄로 옮겼고 데이터 파일 루트 `tier` 에서 읽는다 (계약 D8).
  */
 export function HudCorners() {
   const renderer = useSimStore((s) => s.rendererKind);
@@ -13,7 +16,6 @@ export function HudCorners() {
   const engineNotice = useSimStore((s) => s.engineNotice);
   const dismissEngineNotice = useSimStore((s) => s.dismissEngineNotice);
   const julianDate = useSimStore((s) => s.julianDate);
-  const selected = useSimStore((s) => s.selectedBodyId);
   const fps = useSimStore((s) => s.fps);
   const integrator = useSimStore((s) => s.integrator);
   // P5-B #177 — ?fps=1 URL 옵트인 시 실시간 fps 카운터 표시 (실기기 측정용).
@@ -85,31 +87,6 @@ export function HudCorners() {
           </button>
         </div>
       )}
-
-      {/* 좌하 — 선택 천체 */}
-      {selected && (
-        <div
-          data-testid="hud-bottom-left"
-          data-hud-chip
-          className="hud-chip absolute bottom-20 left-2 text-caption num text-fg-secondary px-2 py-1 pointer-events-none"
-        >
-          focus · {selected}
-        </div>
-      )}
-
-      {/* 우하 — Tier 범례 (D8에서 동적화) */}
-      <div
-        data-testid="hud-bottom-right"
-        data-r1-region="hud-bottom-right"
-        data-hud-chip
-        className="hud-chip absolute bottom-20 right-2 text-caption num text-fg-secondary px-2 py-1 pointer-events-none flex items-center gap-2"
-      >
-        <span
-          className="inline-block w-2 h-2 rounded-full"
-          style={{ background: 'var(--tier-1-observed)' }}
-        />
-        정확도 · T1 관측
-      </div>
     </>
   );
 }

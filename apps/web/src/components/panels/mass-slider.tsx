@@ -1,6 +1,7 @@
 'use client';
 
 import { useSimStore } from '@/store/sim-store';
+import { useBodyInfo } from '@/hooks/use-body-info';
 
 const PRESETS = [0.1, 0.5, 1, 2, 5, 10];
 
@@ -16,6 +17,10 @@ export function MassSlider() {
   const mul = useSimStore((s) => (selected ? (s.massMultipliers[selected] ?? 1) : 1));
   const setMul = useSimStore((s) => s.setMassMultiplier);
   const resetAll = useSimStore((s) => s.resetMassMultipliers);
+  // #1281 — 라벨에 raw id 대신 한글 이름. 미등록 id 는 연구 패널이 이 컴포넌트를 렌더하기 전에
+  // 걸러지므로 도달하지 않으며, 도달하면 id 로 표기한다 (빈 라벨로 흡수하지 않는다).
+  const { data } = useBodyInfo(selected);
+  const name = data?.nameKo ?? selected;
 
   if (!selected) {
     return (
@@ -30,13 +35,13 @@ export function MassSlider() {
   return (
     <div data-testid="mass-slider" className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-caption num text-fg-secondary">질량 배수 · {selected}</span>
+        <span className="text-caption num text-fg-secondary">질량 배수 · {name}</span>
         <span className="text-caption num text-fg-primary">{mul.toFixed(2)}×</span>
       </div>
       <input
         type="range"
         data-testid="mass-slider-input"
-        aria-label={`${selected} 질량 배수`}
+        aria-label={`${name} 질량 배수`}
         min="0.1"
         max="10"
         step="0.1"
