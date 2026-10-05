@@ -24,8 +24,8 @@ const SCALE_PRESETS: ScalePreset[] = [
 ];
 
 /**
- * TimeBar 제어: 재생/일시정지/역행 + 속도 프리셋 + 현재 UTC.
- * 로그 스크러버는 추후 확장 (P1에서는 기본 제어만).
+ * TimeBar 1행 제어: 재생/일시정지/역행 + 속도 프리셋 + 「지금」 + 현재 UTC.
+ * 시점 스크러버는 2행 `time-scrubber.tsx` (#1288 — 로그 스케일안은 기각, 1900~2100 선형).
  */
 export function TimeControls() {
   const julianDate = useSimStore((s) => s.julianDate);
