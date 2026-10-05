@@ -4,6 +4,7 @@
 // §Amendment 결정 D1 패턴).
 import { positionAt } from '@astro-simulator/core';
 import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+import type { BodyStateFn } from '@/core/sim-context';
 import type { LoadedCelestialBody } from './body-info';
 
 export interface BodyDistances {
@@ -26,12 +27,17 @@ const MAX_CHAIN_DEPTH = 8;
  * 시각 과장 배율(`getOrbitVisualScale`)은 적용하지 않는다 — 데이터 SSoT 거리다
  * (principles §1 Visual Fidelity: 왜곡은 렌더 시점에만).
  *
- * Newton 엔진 경로와의 미세 차이는 표시 자릿수로 흡수된다고 본다 (이슈 #1281 §위험, 브라우저 1회 대조).
+ * **엔진 상태값 우선** — `getBodyState` 가 값을 주면(Newton · Barnes-Hut) 그 부모 기준 위치를 쓰고,
+ * `null` 이면(Kepler, 엔진 미준비, WebGPU 의 비동기 velocities) 위 Kepler 식으로 떨어진다. 카드는
+ * 화면에 그려진 위치와 같아야 하기 때문이다 — Kepler 식만 쓰면 Newton 모드에서 달-지구 거리가
+ * 2.9% 어긋났다 (PR #1282 실측: 엔진 `354,781 km` ↔ Kepler `365,248 km`, 표시 `35.5만` ↔ `36.5만`).
+ * 판정은 체인의 고리마다 한다 — 한 엔진 안에서는 모든 고리가 같은 쪽으로 간다.
  */
 export function computeBodyDistances(
   bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
   id: string,
   jd: number,
+  getBodyState: BodyStateFn | null = null,
 ): BodyDistances {
   const body = bodiesById.get(id);
   if (!body) return { fromSunM: null, fromParentM: null };
@@ -45,7 +51,9 @@ export function computeBodyDistances(
     if (!parent || !cur.orbit || depth >= MAX_CHAIN_DEPTH) {
       return { fromSunM: null, fromParentM: null };
     }
-    const p = positionAt(cur.orbit, jd, GRAVITATIONAL_CONSTANT * parent.mass);
+    const p =
+      getBodyState?.(cur.id, parent.id)?.pos ??
+      positionAt(cur.orbit, jd, GRAVITATIONAL_CONSTANT * parent.mass);
     if (local === null) local = [p[0], p[1], p[2]];
     world[0] += p[0];
     world[1] += p[1];

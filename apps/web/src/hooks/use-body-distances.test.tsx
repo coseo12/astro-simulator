@@ -2,13 +2,27 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ephemeris } from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
+import type { BodyStateFn } from '@/core/sim-context';
 import { computeBodyDistances, indexBodies } from '@/lib/body-distance';
 import { DISTANCE_REFRESH_MS, useBodyDistances } from './use-body-distances';
+
+// 엔진 상태값 주입 — scene 의 getBodyState 는 엔진 전환에도 같은 함수 참조라, 동작만 바꾼다.
+const engineMock = vi.hoisted(() => ({ newtonActive: false }));
+const ENGINE_MOON_FROM_EARTH_M = 354_781_000;
+const fakeGetBodyState: BodyStateFn = (id, parentId) => {
+  if (!engineMock.newtonActive) return null;
+  if (id === 'moon' && parentId === 'earth') {
+    return { pos: [ENGINE_MOON_FROM_EARTH_M, 0, 0], vel: [0, 0, 0] };
+  }
+  return null;
+};
+vi.mock('@/core/sim-context', () => ({ useSimBodyState: () => fakeGetBodyState }));
 
 const J2000 = ephemeris.J2000_JD;
 const FIVE_YEARS_DAYS = 5 * 365.25;
 
 beforeEach(() => {
+  engineMock.newtonActive = false;
   vi.useFakeTimers();
   useSimStore.setState({ julianDate: J2000 });
 });
@@ -51,6 +65,18 @@ describe('#1281 useBodyDistances — 4Hz 폴링 (D2)', () => {
       J2000 + FIVE_YEARS_DAYS,
     );
     expect(result.current).toEqual(expected);
+  });
+
+  it('엔진 전환(Kepler → Newton)은 시각이 멈춰 있어도 다음 tick 에 반영된다', () => {
+    const { result } = renderHook(() => useBodyDistances('moon'));
+    const kepler = result.current!.fromParentM;
+    expect(kepler).not.toBe(ENGINE_MOON_FROM_EARTH_M);
+
+    engineMock.newtonActive = true;
+    act(() => {
+      vi.advanceTimersByTime(DISTANCE_REFRESH_MS);
+    });
+    expect(result.current!.fromParentM).toBe(ENGINE_MOON_FROM_EARTH_M);
   });
 
   it('bodyId null 이면 null + 폴링 없음', () => {

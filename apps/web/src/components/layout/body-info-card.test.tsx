@@ -35,6 +35,8 @@ vi.mock('@/core/sim-context', () => ({
   useSimCommand: () => (cmd: CoreCommand) => {
     sentCommands.push(cmd);
   },
+  // 엔진 상태값 없음 = Kepler 경로 (상태값 우선 분기는 body-distance / use-body-distances 테스트).
+  useSimBodyState: () => null,
 }));
 
 const J2000 = 2_451_545;

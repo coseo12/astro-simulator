@@ -9,7 +9,7 @@ import { ScaleControl } from './scale-control';
  *
  * 결정 A (tier-aware AU 환산) + 결정 B (양방향 sync + focus 라벨 분기) 검증 매트릭스:
  *  - tier 별 라벨 텍스트 (T1 / T2 / T3)
- *  - focus 진입 시 라벨 텍스트 `(focus: <bodyId>)` 분기
+ *  - focus 진입 시 라벨 텍스트 `(focus: <한글 이름>)` 분기 (#1281 — raw id 미노출)
  *  - sun focus 엣지 케이스 (값 동일, 텍스트만 분기)
  *  - focus target null 자동 free-fly 복귀
  *  - camera.onViewMatrixChangedObservable 구독 → 슬라이더 thumb 갱신
@@ -120,22 +120,22 @@ describe('ScaleControl — 라벨 텍스트 (ADR 결정 A 환산 + 결정 B focu
     expect(label.textContent).not.toMatch(/focus:/);
   });
 
-  it('T3 body / focus venus: 0.5 unit → "20 km (focus: venus)"', () => {
+  it('T3 body / focus venus: 0.5 unit → "20 km (focus: 금성)"', () => {
     mockCamera = createMockCamera(0.5);
     mockTier = 'body';
     useSimStore.setState({ selectedBodyId: 'venus' });
     render(<ScaleControl />);
     const label = screen.getByTestId('scale-label');
-    expect(label.textContent).toMatch(/^\d+ km \(focus: venus\)$/);
+    expect(label.textContent).toMatch(/^\d+ km \(focus: 금성\)$/);
   });
 
-  it('T2 inner / focus mercury: 1 unit → "4 mAU (focus: mercury)"', () => {
+  it('T2 inner / focus mercury: 1 unit → "4 mAU (focus: 수성)"', () => {
     mockCamera = createMockCamera(1);
     mockTier = 'inner';
     useSimStore.setState({ selectedBodyId: 'mercury' });
     render(<ScaleControl />);
     const label = screen.getByTestId('scale-label');
-    expect(label.textContent).toMatch(/mAU \(focus: mercury\)/);
+    expect(label.textContent).toMatch(/mAU \(focus: 수성\)/);
   });
 
   it('sun focus 엣지 케이스 (Gemini Q3) — 값은 free-fly 와 동일, 텍스트만 분기', () => {
@@ -154,11 +154,11 @@ describe('ScaleControl — 라벨 텍스트 (ADR 결정 A 환산 + 결정 B focu
     render(<ScaleControl />);
     const sunFocusText = screen.getByTestId('scale-label').textContent ?? '';
 
-    // 값 부분 (focus: sun 제외) 이 동일해야 함.
-    const valuePart = sunFocusText.replace(' (focus: sun)', '');
+    // 값 부분 (focus: 태양 제외) 이 동일해야 함.
+    const valuePart = sunFocusText.replace(' (focus: 태양)', '');
     expect(valuePart).toBe(freeFlyText);
     // 텍스트 분기는 발생.
-    expect(sunFocusText).toMatch(/\(focus: sun\)$/);
+    expect(sunFocusText).toMatch(/\(focus: 태양\)$/);
   });
 
   it('focus target null 자동 free-fly 복귀 (Gemini Q3)', () => {
@@ -166,7 +166,7 @@ describe('ScaleControl — 라벨 텍스트 (ADR 결정 A 환산 + 결정 B focu
     mockTier = 'solar';
     useSimStore.setState({ selectedBodyId: 'venus' });
     const { rerender } = render(<ScaleControl />);
-    expect(screen.getByTestId('scale-label').textContent).toMatch(/focus: venus/);
+    expect(screen.getByTestId('scale-label').textContent).toMatch(/focus: 금성/);
 
     // selectedBodyId → null (예: resetCamera 호출 후 store 갱신).
     act(() => {

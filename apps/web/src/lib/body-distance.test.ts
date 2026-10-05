@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ephemeris, physics } from '@astro-simulator/core';
 import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+import type { BodyStateFn } from '@/core/sim-context';
 import { computeBodyDistances, indexBodies } from './body-distance';
 import { formatKmKo, formatSunDistance } from './body-info';
 
@@ -80,5 +81,28 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
       fromSunM: null,
       fromParentM: null,
     });
+  });
+
+  it('엔진 상태값(getBodyState)이 있으면 그것을 쓴다 — Newton 계열 화면 위치와 일치', () => {
+    const MOON_FROM_EARTH_M = 354_781_000;
+    const calls: Array<[string, string]> = [];
+    const getBodyState: BodyStateFn = (id, parentId) => {
+      calls.push([id, parentId]);
+      if (id === 'moon') return { pos: [MOON_FROM_EARTH_M, 0, 0], vel: [0, 0, 0] };
+      if (id === 'earth') return { pos: [AU, 0, 0], vel: [0, 0, 0] };
+      return null;
+    };
+    const d = computeBodyDistances(byId, 'moon', J2000, getBodyState);
+    expect(calls).toEqual([
+      ['moon', 'earth'],
+      ['earth', 'sun'],
+    ]);
+    expect(d.fromParentM).toBe(MOON_FROM_EARTH_M);
+    expect(d.fromSunM).toBe(AU + MOON_FROM_EARTH_M);
+  });
+
+  it('엔진 상태값이 null(Kepler · 엔진 미준비)이면 Kepler 식으로 떨어진다', () => {
+    const kepler = computeBodyDistances(byId, 'moon', J2000);
+    expect(computeBodyDistances(byId, 'moon', J2000, () => null)).toEqual(kepler);
   });
 });

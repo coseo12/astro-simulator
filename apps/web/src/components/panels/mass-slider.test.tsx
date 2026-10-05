@@ -60,4 +60,13 @@ describe('MassSlider', () => {
     const input = screen.getByTestId('mass-slider-input') as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
+
+  it('#1281 — 라벨 · 접근 가능한 이름은 raw id 가 아니라 한글 이름', () => {
+    useSimStore.setState({ selectedBodyId: 'jupiter' });
+    render(<MassSlider />);
+    const slider = screen.getByTestId('mass-slider');
+    expect(slider).toHaveTextContent('질량 배수 · 목성');
+    expect(slider.textContent).not.toContain('jupiter');
+    expect(screen.getByTestId('mass-slider-input')).toHaveAccessibleName('목성 질량 배수');
+  });
 });
