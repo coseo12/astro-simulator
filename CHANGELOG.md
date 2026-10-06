@@ -7,11 +7,6 @@ Semantic Versioning을 따른다.
 
 ### Added
 
-- **[#1288] 시간 UX — 「지금」 버튼 + 100년 프리셋 (PR1)** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288)). 타임바에 「지금」 버튼(`time-now`)과 `100y` 프리셋(`time-preset-100y`)을 더했다.
-  - 「지금」은 시점만 현재 시각으로 옮긴다 (`jumpToJulianDate`, `dateToJulianDate(new Date())` 재사용). 배속 · 재생/정지 · 역행 상태는 그대로다 — `setTimeScale` 을 보내지 않는다.
-  - `100y` 는 core `CENTURY_PER_SEC`(1초 = 100년)를 쓰고 다른 프리셋처럼 역행 부호를 유지한다.
-  - 기존 testid(`time-preset-{1s,1h,1d,1M,1y,10y}` · `time-play`/`time-pause` · `time-reverse`/`time-forward` · `datetime-input`/`datetime-jump`)는 그대로다.
-  - 모바일(640px 미만) 타임바는 간격 · 패딩 · 구분선만 줄여 375 에서 넘치지 않는다 (글자 크기 · 24px hit target 불변). 375 실측 내용 315px / 가용 341px.
 - **[#1293] 천체 검색 대화상자 (PR1)** ([#1293](https://github.com/coseo12/astro-simulator/issues/1293)). 상단 바 좌측 검색 버튼(`body-search-trigger`) 또는 `/` · Ctrl/⌘+K 로 열고, 32개 천체를 한국어 · 영어 이름 · id 로 찾는다. 「천체 ▾」 메뉴(12개)로 갈 수 없던 위성 · 왜소행성 · 혜성도 이름으로 고를 수 있다.
   - 매칭은 순수 함수 `lib/body-search.ts` — 대소문자 · 앞뒤 공백 무시, 이름 접두 일치 > 부분 일치, 동률은 데이터 순. 빈 검색어는 전체 목록이다. 결과마다 종류(`KIND_LABEL`)를 보인다.
   - WAI-ARIA combobox + listbox — 포커스는 입력창에 머물고 ↑/↓ 순환 · Enter 선택 · Esc 닫기. 선택은 메뉴와 같은 `focusOn` 명령이다.
@@ -19,6 +14,28 @@ Semantic Versioning을 따른다.
   - 한글 IME 조합 중 Enter(`isComposing`)는 무시한다 — macOS Chrome 은 조합 중 Enter 에 keydown 을 두 번 보내, 1회차로 선택 · 닫기를 하면 2회차가 복원된 포커스(트리거 등)로 샐 수 있다 (PR #1294 리뷰 B1). 검색어는 NFC 로 정규화한다.
   - 검색창 Esc 는 window capture 단계에서 `preventDefault` 해 자유시점을 켜지 않는다 (천체 메뉴 · 표시 패널과 같은 신호).
   - 셸은 공용 `Modal` 이다. `Modal` 에 `initialFocusRef` (열릴 때 포커스 둘 요소, 생략 시 닫기 버튼 — 기존 모달 3종 불변) 를 더했다.
+
+### Behavior Changes
+
+- **`/` · Ctrl/⌘+K 가 천체 검색을 연다** (#1293). 이 두 키의 브라우저 기본 동작(Firefox `/` 빠른 찾기 · Ctrl/⌘+K 검색창 이동)은 앱이 `preventDefault` 로 가로챈다 — 단 편집 요소 포커스 중 `/` 는 가로채지 않는다.
+
+## [0.93.0] - 2026-10-06
+
+### Added
+
+- **[#1288] 시간 UX — 「지금」 버튼 + 100년 프리셋 (PR1)** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288), PR [#1289](https://github.com/coseo12/astro-simulator/pull/1289)). 타임바에 「지금」 버튼(`time-now`)과 `100y` 프리셋(`time-preset-100y`)을 더했다.
+  - 「지금」은 시점만 현재 시각으로 옮긴다 (`jumpToJulianDate`, `dateToJulianDate(new Date())` 재사용). 배속 · 재생/정지 · 역행 상태는 그대로다 — `setTimeScale` 을 보내지 않는다.
+  - `100y` 는 core `CENTURY_PER_SEC`(1초 = 100년)를 쓰고 다른 프리셋처럼 역행 부호를 유지한다.
+  - 기존 testid(`time-preset-{1s,1h,1d,1M,1y,10y}` · `time-play`/`time-pause` · `time-reverse`/`time-forward` · `datetime-input`/`datetime-jump`)는 그대로다.
+  - 모바일(640px 미만) 타임바는 간격 · 패딩 · 구분선만 줄여 375 에서 넘치지 않는다 (글자 크기 · 24px hit target 불변). 375 실측 내용 315px / 가용 341px.
+- **[#1288] 1900~2100 시간 스크러버 (PR2)** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288), PR [#1290](https://github.com/coseo12/astro-simulator/pull/1290)). 타임바 아래 행에 절대 연도 선형 슬라이더를 더했다 (`@radix-ui/react-slider`, 기존 의존).
+  - 드래그 · 키보드(←/→ 1년, Shift+←/→ · PageUp/PageDown 10년, Home/End 양 끝)로 시점만 옮긴다 — 배속은 그대로다. 키 이동은 가까운 1월 1일 기준이다.
+  - 재생 중 썸이 시각을 따라가고(0.25년 단위 갱신), 포인터를 누른 동안은 재생이 썸을 덮어쓰지 않는다. 범위 밖이면 썸은 끝에 고정되고 「궤도 근사 — 오차 증가」 배지가 뜬다.
+  - 눈금 1950 · 2000 · 2050, 양 끝 라벨 1900 / 2100.
+
+### Changed
+
+- **[#1288] 타임바 2행 배치 + 날짜 입력 「UTC」 표기** (PR [#1290](https://github.com/coseo12/astro-simulator/pull/1290)). 타임바 패널이 위 행(컨트롤) · 아래 행(스크러버) 2행이 됐다. 바깥 footer 높이(64px)와 정보 카드 · 연구 패널 · 토스트 오프셋은 그대로다. 상단 바 날짜 입력 테두리 위에 「UTC」 범례를 붙였다 (상단 바 폭 증가 0).
 
 ### Fixed
 
@@ -29,7 +46,7 @@ Semantic Versioning을 따른다.
 
 - **타임바에 「지금」 버튼과 `100y` 프리셋이 생겼다** (#1288). 「지금」은 현재 시각으로 이동하되 배속은 바꾸지 않는다.
 - **날짜 입력이 UTC 로 해석된다** (#1288). 같은 입력이 종전에는 사용자 시간대만큼 어긋난 시각으로 점프했다.
-- **`/` · Ctrl/⌘+K 가 천체 검색을 연다** (#1293). 이 두 키의 브라우저 기본 동작(Firefox `/` 빠른 찾기 · Ctrl/⌘+K 검색창 이동)은 앱이 `preventDefault` 로 가로챈다 — 단 편집 요소 포커스 중 `/` 는 가로채지 않는다.
+- **타임바 아래 행에 1900~2100 시간 스크러버가 생겼다** (#1288). 드래그 · 키보드로 시점을 옮기고, 재생 중에는 썸이 시각을 따라간다.
 
 ## [0.92.0] - 2026-10-05
 
