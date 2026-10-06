@@ -12,6 +12,12 @@ Semantic Versioning을 따른다.
   - `100y` 는 core `CENTURY_PER_SEC`(1초 = 100년)를 쓰고 다른 프리셋처럼 역행 부호를 유지한다.
   - 기존 testid(`time-preset-{1s,1h,1d,1M,1y,10y}` · `time-play`/`time-pause` · `time-reverse`/`time-forward` · `datetime-input`/`datetime-jump`)는 그대로다.
   - 모바일(640px 미만) 타임바는 간격 · 패딩 · 구분선만 줄여 375 에서 넘치지 않는다 (글자 크기 · 24px hit target 불변). 375 실측 내용 315px / 가용 341px.
+- **[#1293] 천체 검색 대화상자 (PR1)** ([#1293](https://github.com/coseo12/astro-simulator/issues/1293)). 상단 바 좌측 검색 버튼(`body-search-trigger`) 또는 `/` · Ctrl/⌘+K 로 열고, 32개 천체를 한국어 · 영어 이름 · id 로 찾는다. 「천체 ▾」 메뉴(12개)로 갈 수 없던 위성 · 왜소행성 · 혜성도 이름으로 고를 수 있다.
+  - 매칭은 순수 함수 `lib/body-search.ts` — 대소문자 · 앞뒤 공백 무시, 이름 접두 일치 > 부분 일치, 동률은 데이터 순. 빈 검색어는 전체 목록이다. 결과마다 종류(`KIND_LABEL`)를 보인다.
+  - WAI-ARIA combobox + listbox — 포커스는 입력창에 머물고 ↑/↓ 순환 · Enter 선택 · Esc 닫기. 선택은 메뉴와 같은 `focusOn` 명령이다.
+  - 편집 요소(입력창 · 날짜 입력 등) 포커스 중 `/` 는 글자 입력이다. Ctrl/⌘+K 는 편집 요소에서도 연다. 다른 모달이 열려 있으면 열지 않는다.
+  - 검색창 Esc 는 window capture 단계에서 `preventDefault` 해 자유시점을 켜지 않는다 (천체 메뉴 · 표시 패널과 같은 신호).
+  - 셸은 공용 `Modal` 이다. `Modal` 에 `initialFocusRef` (열릴 때 포커스 둘 요소, 생략 시 닫기 버튼 — 기존 모달 3종 불변) 를 더했다.
 
 ### Fixed
 
@@ -22,6 +28,7 @@ Semantic Versioning을 따른다.
 
 - **타임바에 「지금」 버튼과 `100y` 프리셋이 생겼다** (#1288). 「지금」은 현재 시각으로 이동하되 배속은 바꾸지 않는다.
 - **날짜 입력이 UTC 로 해석된다** (#1288). 같은 입력이 종전에는 사용자 시간대만큼 어긋난 시각으로 점프했다.
+- **`/` · Ctrl/⌘+K 가 천체 검색을 연다** (#1293). 이 두 키의 브라우저 기본 동작(Firefox `/` 빠른 찾기 · Ctrl/⌘+K 검색창 이동)은 앱이 `preventDefault` 로 가로챈다 — 단 편집 요소 포커스 중 `/` 는 가로채지 않는다.
 
 ## [0.92.0] - 2026-10-05
 

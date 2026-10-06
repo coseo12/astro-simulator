@@ -6,6 +6,7 @@ import { HudCorners } from './hud-corners';
 import { BodyInfoCard } from './body-info-card';
 import { LodDevOverlay } from './lod-dev-overlay';
 import { FocusQuickButtons } from './focus-quick-buttons';
+import { BodySearch } from './body-search';
 import { ModeSwitcher } from './mode-switcher';
 import { AboutModal } from './about-modal';
 import { SidePanels } from './side-panels';
@@ -36,6 +37,9 @@ export function AppShell() {
           left={
             <div className="flex items-center gap-2">
               <ModeSwitcher />
+              {/* #1293 — 천체 검색 버튼. 좌측 그룹(`shrink-0`, 모든 폭에서 보존)에 둬 375 에서도 스크롤 없이 닿는다.
+                  단축 바(`shortcut-bar`) 밖에 두는 이유: 그 영역은 R1 가드 · a11y 폰트 측정 대상이라 범위를 넓히지 않는다. */}
+              <BodySearch />
               <FocusQuickButtons />
             </div>
           }
