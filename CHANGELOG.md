@@ -7,6 +7,13 @@ Semantic Versioning을 따른다.
 
 ### Added
 
+- **[#1293] 천체 검색 대화상자 (PR1)** ([#1293](https://github.com/coseo12/astro-simulator/issues/1293)). 상단 바 좌측 검색 버튼(`body-search-trigger`) 또는 `/` · Ctrl/⌘+K 로 열고, 32개 천체를 한국어 · 영어 이름 · id 로 찾는다. 「천체 ▾」 메뉴(12개)로 갈 수 없던 위성 · 왜소행성 · 혜성도 이름으로 고를 수 있다.
+  - 매칭은 순수 함수 `lib/body-search.ts` — 대소문자 · 앞뒤 공백 무시, 이름 접두 일치 > 부분 일치, 동률은 데이터 순. 빈 검색어는 전체 목록이다. 결과마다 종류(`KIND_LABEL`)를 보인다.
+  - WAI-ARIA combobox + listbox — 포커스는 입력창에 머물고 ↑/↓ 순환 · Enter 선택 · Esc 닫기. 선택은 메뉴와 같은 `focusOn` 명령이다.
+  - 편집 요소(입력창 · 날짜 입력 등) 포커스 중 `/` 는 글자 입력이다. Ctrl/⌘+K 는 편집 요소에서도 열고, 한글 입력 모드(`key` 가 `ㅏ`)에서도 물리 키(`code === 'KeyK'`)로 연다. 다른 모달이 열려 있으면 열지 않는다.
+  - 한글 IME 조합 중 Enter(`isComposing`)는 무시한다 — macOS Chrome 은 조합 중 Enter 에 keydown 을 두 번 보내, 1회차로 선택 · 닫기를 하면 2회차가 복원된 포커스(트리거 등)로 샐 수 있다 (PR #1294 리뷰 B1). 검색어는 NFC 로 정규화한다.
+  - 검색창 Esc 는 window capture 단계에서 `preventDefault` 해 자유시점을 켜지 않는다 (천체 메뉴 · 표시 패널과 같은 신호).
+  - 셸은 공용 `Modal` 이다. `Modal` 에 `initialFocusRef` (열릴 때 포커스 둘 요소, 생략 시 닫기 버튼 — 기존 모달 3종 불변) 를 더했다.
 - **[#1293] 3D 천체 이름 라벨 + 표시 패널 토글 (PR2)** ([#1293](https://github.com/coseo12/astro-simulator/issues/1293)). 화면의 천체 옆에 한국어 이름(`nameKo`) 라벨이 붙는다. DOM 오버레이라 신규 의존성은 없다.
   - core `getBodyScreenInfo()` — body 별 화면 좌표(CSS px) · 화면 반지름 · 카메라 앞/화면 안 여부 · 카메라 거리 · 모체 구 매몰 여부(`embeddedInParent`)를 내는 pull API. 프레임 위상 · 렌더 루프 순서(ADR `20260907-1205`)는 그대로다.
   - 겹침 처리: 우선순위 태양 > 행성 > 왜소행성 > 위성 > 혜성(같은 등급은 화면에서 큰 쪽), 겹치면 낮은 쪽을 숨긴다. 위성 라벨은 모체(또는 그 위성)를 선택했을 때만 뜬다. 카메라 뒤 · 화면 밖 · 더 가까운 천체 원반 뒤에 가린 천체, 그리고 과장 표시된 모체 구 안에 완전히 묻혀 그려지지 않는 위성(목성 ↔ 이오)은 라벨이 없다.
@@ -15,6 +22,7 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **`/` · Ctrl/⌘+K 가 천체 검색을 연다** (#1293). 이 두 키의 브라우저 기본 동작(Firefox `/` 빠른 찾기 · Ctrl/⌘+K 검색창 이동)은 앱이 `preventDefault` 로 가로챈다 — 단 편집 요소 포커스 중 `/` 는 가로채지 않는다.
 - **기본 화면에 천체 이름 라벨이 보인다** (#1293). `?labels=off` 또는 「표시」 패널에서 끌 수 있다. 화면 캡처 기준선(R1 baseline)이 바뀐다.
 
 ## [0.93.0] - 2026-10-06
