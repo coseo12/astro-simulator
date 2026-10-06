@@ -18,23 +18,38 @@ const SOFTWARE: DisplayCapabilities = { starfield: false, surfaceDetail: true };
 const SURFACE_OFF: DisplayCapabilities = { starfield: true, surfaceDetail: false };
 
 describe('display-toggles — 표 구성', () => {
-  it('4 토글 · 기존 URL 키 4종 · id 중복 없음', () => {
-    expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual(['orbits', 'stars', 'clouds', 'nightLights']);
+  it('5 토글 · URL 키 5종 · id 중복 없음 (#1293 라벨 행 추가)', () => {
+    expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
+      'orbits',
+      'stars',
+      'clouds',
+      'nightLights',
+      'labels',
+    ]);
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
       'stars',
       'clouds',
       'nightlights',
+      'labels',
     ]);
   });
 
-  it('command 빌더가 각자의 core 명령을 가리킨다 (교차 라우팅 0)', () => {
-    expect(DISPLAY_TOGGLES.map((d) => d.command(false))).toEqual([
+  it('command 빌더가 각자의 core 명령을 가리킨다 (교차 라우팅 0) · 라벨은 web 전용 (null)', () => {
+    expect(DISPLAY_TOGGLES.map((d) => d.command?.(false) ?? null)).toEqual([
       { type: 'setOrbitLinesVisible', visible: false },
       { type: 'setStarfieldVisible', visible: false },
       { type: 'setCloudsVisible', visible: false },
       { type: 'setNightLightsVisible', visible: false },
+      null,
     ]);
+  });
+
+  it('#1293 라벨 — 장면 준비 전에도 가능 · 표시 상태 = 의도', () => {
+    const labels = getDisplayToggle('labels');
+    expect(labels.disabledReason(null)).toBeNull();
+    expect(labels.pressed(true, null)).toBe(true);
+    expect(labels.pressed(false, HW)).toBe(false);
   });
 
   it('getDisplayToggle — id 조회', () => {

@@ -110,6 +110,11 @@ export interface SimStoreState {
   cloudsVisible: boolean;
   nightLightsVisible: boolean;
   /**
+   * #1293 — 3D 이름 라벨 (DOM 오버레이) 표시 의도. 기본 true, `?labels=off` 면 sim-canvas 가 mount 직후 false.
+   * web 전용 토글이라 core 명령이 없다 (`display-toggles.ts` 의 `command: null` 행).
+   */
+  labelsVisible: boolean;
+  /**
    * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
    * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
    */
@@ -163,6 +168,8 @@ export interface SimStoreState {
   setStarsVisible: (visible: boolean) => void;
   setCloudsVisible: (visible: boolean) => void;
   setNightLightsVisible: (visible: boolean) => void;
+  /** #1293 — 라벨 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
+  setLabelsVisible: (visible: boolean) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
   setBodyMenuOpen: (open: boolean) => void;
@@ -209,6 +216,8 @@ export const useSimStore = create<SimStoreState>((set) => ({
   starsVisible: true,
   cloudsVisible: true,
   nightLightsVisible: true,
+  // #1293 — 기본 ON (사용자 결정 2026-10-06). `?labels=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  labelsVisible: true,
   displayCapabilities: null,
   displayPanelOpen: false,
   bodyMenuOpen: false,
@@ -249,6 +258,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setStarsVisible: (visible) => set({ starsVisible: visible }),
   setCloudsVisible: (visible) => set({ cloudsVisible: visible }),
   setNightLightsVisible: (visible) => set({ nightLightsVisible: visible }),
+  setLabelsVisible: (visible) => set({ labelsVisible: visible }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
   setBodyMenuOpen: (open) => set({ bodyMenuOpen: open }),
