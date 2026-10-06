@@ -31,9 +31,17 @@ function isEditableElement(el: Element | null): boolean {
   );
 }
 
-/** Ctrl/⌘+K — Shift · Alt 조합은 브라우저 · OS 단축키(예: Firefox Ctrl+Shift+K 콘솔)라 건드리지 않는다. */
+/**
+ * Ctrl/⌘+K — Shift · Alt 조합은 브라우저 · OS 단축키(예: Firefox Ctrl+Shift+K 콘솔)라 건드리지 않는다.
+ * 물리 키(`code === 'KeyK'`)도 본다 — 한글 입력 모드에서는 `key` 가 `ㅏ` 로 올 수 있다 (PR #1294 리뷰 R2).
+ */
 function isCommandK(e: KeyboardEvent): boolean {
-  return (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k';
+  return (
+    (e.ctrlKey || e.metaKey) &&
+    !e.altKey &&
+    !e.shiftKey &&
+    (e.key.toLowerCase() === 'k' || e.code === 'KeyK')
+  );
 }
 
 /** `/` — 수식키 없이. Shift 는 허용한다 (`/` 가 Shift 조합인 자판 배열이 있다). */
@@ -134,6 +142,10 @@ export function BodySearch() {
   }, [open, active]);
 
   const handleInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    // 한글 IME 조합 중 키는 무시한다 (PR #1294 리뷰 B1). macOS Chrome 은 조합 중 Enter 에 keydown 을 두 번 보낸다
+    // (1회차 `isComposing: true`). 1회차가 선택 · 닫기를 하면 2회차 Enter 가 복원된 포커스(트리거 → 재오픈)로 샌다.
+    // `keyCode === 229` 는 보지 않는다 — Safari 는 확정 Enter 를 229 로 1회만 보내 그 조건이면 선택이 막힐 수 있다.
+    if (e.nativeEvent.isComposing) return;
     const count = results.length;
     switch (e.key) {
       case 'ArrowDown':

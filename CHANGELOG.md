@@ -15,7 +15,8 @@ Semantic Versioning을 따른다.
 - **[#1293] 천체 검색 대화상자 (PR1)** ([#1293](https://github.com/coseo12/astro-simulator/issues/1293)). 상단 바 좌측 검색 버튼(`body-search-trigger`) 또는 `/` · Ctrl/⌘+K 로 열고, 32개 천체를 한국어 · 영어 이름 · id 로 찾는다. 「천체 ▾」 메뉴(12개)로 갈 수 없던 위성 · 왜소행성 · 혜성도 이름으로 고를 수 있다.
   - 매칭은 순수 함수 `lib/body-search.ts` — 대소문자 · 앞뒤 공백 무시, 이름 접두 일치 > 부분 일치, 동률은 데이터 순. 빈 검색어는 전체 목록이다. 결과마다 종류(`KIND_LABEL`)를 보인다.
   - WAI-ARIA combobox + listbox — 포커스는 입력창에 머물고 ↑/↓ 순환 · Enter 선택 · Esc 닫기. 선택은 메뉴와 같은 `focusOn` 명령이다.
-  - 편집 요소(입력창 · 날짜 입력 등) 포커스 중 `/` 는 글자 입력이다. Ctrl/⌘+K 는 편집 요소에서도 연다. 다른 모달이 열려 있으면 열지 않는다.
+  - 편집 요소(입력창 · 날짜 입력 등) 포커스 중 `/` 는 글자 입력이다. Ctrl/⌘+K 는 편집 요소에서도 열고, 한글 입력 모드(`key` 가 `ㅏ`)에서도 물리 키(`code === 'KeyK'`)로 연다. 다른 모달이 열려 있으면 열지 않는다.
+  - 한글 IME 조합 중 Enter(`isComposing`)는 무시한다 — macOS Chrome 은 조합 중 Enter 에 keydown 을 두 번 보내, 1회차로 선택 · 닫기를 하면 2회차가 복원된 포커스(트리거 등)로 샐 수 있다 (PR #1294 리뷰 B1). 검색어는 NFC 로 정규화한다.
   - 검색창 Esc 는 window capture 단계에서 `preventDefault` 해 자유시점을 켜지 않는다 (천체 메뉴 · 표시 패널과 같은 신호).
   - 셸은 공용 `Modal` 이다. `Modal` 에 `initialFocusRef` (열릴 때 포커스 둘 요소, 생략 시 닫기 버튼 — 기존 모달 3종 불변) 를 더했다.
 

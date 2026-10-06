@@ -54,6 +54,12 @@ describe('BodySearch — 열기 (D1)', () => {
     expect(dialog()).not.toBeNull();
   });
 
+  it('리뷰 R2 — 한글 입력 모드 Ctrl+K (`key: ㅏ`, `code: KeyK`) 도 연다', () => {
+    render(<BodySearch />);
+    fireEvent.keyDown(document.body, { key: 'ㅏ', code: 'KeyK', ctrlKey: true });
+    expect(dialog()).not.toBeNull();
+  });
+
   it('편집 요소 포커스 중 `/` 는 단축키가 아니다 (글자 입력 보호) — Ctrl+K 는 연다', () => {
     render(
       <div>
@@ -158,6 +164,20 @@ describe('BodySearch — combobox · listbox (D2)', () => {
     await user.type(input(), 'Halley');
     await user.click(screen.getByTestId('body-search-option-halley'));
     expect(sentCommands).toEqual([{ type: 'focusOn', bodyId: 'halley' }]);
+    expect(dialog()).toBeNull();
+  });
+
+  it('리뷰 B1 — IME 조합 중 Enter 는 무시 (선택 · 닫기 0), 이어지는 일반 Enter 가 선택', async () => {
+    const user = userEvent.setup();
+    render(<BodySearch />);
+    await user.click(screen.getByTestId('body-search-trigger'));
+    fireEvent.change(input(), { target: { value: '목성' } });
+    // macOS Chrome 한글 IME — 조합 중 Enter 1회차는 `isComposing: true` (keyCode 229).
+    fireEvent.keyDown(input(), { key: 'Enter', keyCode: 229, isComposing: true });
+    expect(sentCommands).toEqual([]);
+    expect(dialog()).not.toBeNull();
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    expect(sentCommands).toEqual([{ type: 'focusOn', bodyId: 'jupiter' }]);
     expect(dialog()).toBeNull();
   });
 

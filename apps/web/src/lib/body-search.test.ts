@@ -65,4 +65,10 @@ describe('#1293 — 순위 규칙 (합성 데이터)', () => {
   it('normalizeQuery — trim + 소문자', () => {
     expect(normalizeQuery('  Jup \t')).toBe('jup');
   });
+
+  it('리뷰 R4 — NFD(자모 분해형) 한글 검색어도 완성형 데이터와 일치', () => {
+    const nfd = '목성'.normalize('NFD');
+    expect(nfd).not.toBe('목성'); // 전제 — 분해형이 실제로 다른 코드포인트열이다
+    expect(normalizeQuery(nfd)).toBe('목성');
+  });
 });
