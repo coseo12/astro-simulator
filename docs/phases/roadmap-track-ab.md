@@ -1,7 +1,7 @@
 # 로드맵 트랙 A/B — v3 완주 이후 작업 축
 
-> **Status**: Active — 시간 UX (「지금」 · 스크러버) 완료 (v0.93.0) · 트랙 B 관찰 모드 정보 카드 · 천체 메뉴 완료 (v0.92.0) · 트랙 A 천왕성 · 해왕성 표면 완료 (v0.91.0) · 트랙 B 2라운드 완료 (v0.90.0) / 트랙 A 후보 백로그 잔여 / 트랙 C·D 방향 결정 대기
-> **최종 갱신**: 2026-10-06 (v0.93.0 릴리스 준비 — [#1288](https://github.com/coseo12/astro-simulator/issues/1288) §완료 추가)
+> **Status**: Active — 트랙 B 천체 검색 · 3D 이름 라벨 완료 (v0.94.0) · 시간 UX (「지금」 · 스크러버) 완료 (v0.93.0) · 트랙 B 관찰 모드 정보 카드 · 천체 메뉴 완료 (v0.92.0) · 트랙 A 천왕성 · 해왕성 표면 완료 (v0.91.0) · 트랙 B 2라운드 완료 (v0.90.0) / 트랙 A 후보 백로그 잔여 / 트랙 C·D 방향 결정 대기
+> **최종 갱신**: 2026-10-06 (v0.94.0 릴리스 준비 — [#1293](https://github.com/coseo12/astro-simulator/issues/1293) §완료 추가 · §후보 행 제거)
 > **박제일**: 2026-07-06 ([#794](https://github.com/coseo12/astro-simulator/issues/794) — 2026-07-04 프로젝트 회고 후속)
 > **선행 로드맵**: [`roadmap-v3-incremental.md`](roadmap-v3-incremental.md) — **완주** (2026-06-12, R10b [#664](https://github.com/coseo12/astro-simulator/issues/664) / PR [#670](https://github.com/coseo12/astro-simulator/pull/670), 전 27 body 시각화)
 > **출처**: 방향성 기획 (2026-06-22, 세션 단위 — 저장소 문서 부재). 본 문서가 그 기획의 **저장소 SSoT 승격본**이다.
@@ -47,6 +47,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | [#1274](https://github.com/coseo12/astro-simulator/issues/1274)                                                             | A      | 천왕성 · 해왕성 절차 표면 — `IceGiant` 저대비 위도 밴드 + uranus albedo 배율 (ADR `20260628-756` Amendment 12, PR #1276 테이블 이관 + #1278 표면)               | v0.91.0           |
 | [#1281](https://github.com/coseo12/astro-simulator/issues/1281)                                                             | B      | 관찰 모드 천체 정보 카드 + 상단 바 「천체 ▾」 메뉴 + 모바일 레이아웃 결함 (`ui-architecture.md` §2.3 · §2.6 · §3.1, PR #1282 카드 + #1283 메뉴·모바일)          | v0.92.0           |
 | [#1288](https://github.com/coseo12/astro-simulator/issues/1288)                                                             | D      | 시간 UX — 「지금」 버튼 · `100y` 프리셋 · 1900~2100 스크러버 · 날짜 입력 UTC 해석 (PR #1289 + #1290). 이벤트 마커는 §후보 잔류                                  | v0.93.0           |
+| [#1293](https://github.com/coseo12/astro-simulator/issues/1293)                                                             | B      | 천체 검색 (`/` · Ctrl/⌘+K, 32 body) + 3D 이름 라벨 DOM 오버레이 · 겹침 정리 · 「표시」 토글 (PR #1294 검색 + #1297 라벨)                                        | v0.94.0           |
 
 > 사이 릴리스 v0.39.0 (#766) / v0.41.0·v0.45.0 (#779) / v0.46.0 (#759) 은 infra (Z-패턴 allowlist / CI alert fatigue / shader-pixel-guard) — 트랙 밖.
 
@@ -58,7 +59,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ## 진행 중
 
-없음 — #1288 은 v0.93.0 으로 §완료 에 올렸다 (v0.93.0 릴리스 준비 PR 에서 버전 확정과 함께). #1288 도 착수~머지 구간에 §진행 중 을 거치지 않았다. 직전 #1281 은 v0.92.0 으로 §완료 이동했다.
+없음 — #1293 은 v0.94.0 으로 §완료 에 올렸다 (v0.94.0 릴리스 준비 PR 에서 버전 확정과 함께). #1293 도 착수~머지 구간에 §진행 중 을 거치지 않았다. 직전 #1288 은 v0.93.0 으로 §완료 이동했다.
 
 ---
 
@@ -69,7 +70,6 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | 후보                                                                 | 트랙 | 앵커 (재검토 조건 / 후속 분리)                                                                                                                                      | 선행 조건·리스크                                                                                               |
 | -------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | 지구 밖 천체 표면 확장 — rocky 파라미터화 · ice giant/위성 표면 타입 | A    | [ADR 20260628-756](../decisions/20260628-756-procedural-planet-surface.md) §결과·재검토 조건 3 (표면 타입 확장) · §A1.8 재검토 조건 4 (다른 rocky body)             | earth 전용 상수 상속 — 대기 없는 body 가 rim·불빛을 상속한다 (같은 ADR §A8.9 결정 5). body 별 파라미터화 선행  |
-| 천체 검색 + 3D 이름 라벨                                             | B    | [ADR 20260620-713](../decisions/20260620-713-click-body-select.md) §기각/후속 분리 (1) — 라벨 클릭 확장                                                             | 텍스트 라벨 인프라 `0` (Babylon GUI 미사용). 겹침·LOD·HUD 가드 영향                                            |
 | 코로나 / 플레어                                                      | A    | [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) §결과·재검토 조건 5 — disk 밖 효과, 별도 빌보드/glow 레이어                                    | glow/bloom 파이프라인 `0` — 혜성 꼬리와 레이어 공유 가능. 시간 변동 효과면 광과민성 옵션 동반 (아래 횡단 검토) |
 | 혜성 꼬리 / 코마                                                     | A    | [ADR 20260612-r10b](../decisions/20260612-r10b-comets-visualization.md) §비-범위 (R10b — PM Q4)                                                                     | 현재 점광원 + 궤도선만. 코로나와 같은 glow 레이어 선행                                                         |
 | sunspot (흑점)                                                       | A    | [ADR 20260703-774](../decisions/20260703-774-sun-emissive-shader.md) §결과·재검토 조건 2                                                                            | granulation 과 시각 혼동 → DoD 측정 기준 오염 리스크 선해소 필요                                               |
@@ -80,7 +80,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | 시간 스크러버 + 이벤트 마커 (근일점·합·식)                           | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 TimeBar · `time-controls.tsx` 헤더 주석 「로그 스크러버는 추후 확장」                                     | 이벤트 계산(식·합) 은 신규 도메인 로직                                                                         |
 | 측정 도구 (두 천체 거리 ruler) · 궤적 trail                          | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 캔버스 오버레이 · [`product-spec.md`](product-spec.md) 연구 모드 「측정 도구」                            | —                                                                                                              |
 
-> 제거된 행: **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → [#1265](https://github.com/coseo12/astro-simulator/issues/1265) (v0.90.0) — 위 §완료. 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
+> 제거된 행: **천체 검색 + 3D 이름 라벨** → [#1293](https://github.com/coseo12/astro-simulator/issues/1293) (v0.94.0) / **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → [#1265](https://github.com/coseo12/astro-simulator/issues/1265) (v0.90.0) — 위 §완료. 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
 
 > ⚠️ **부기 (2026-10-02, [#1274](https://github.com/coseo12/astro-simulator/issues/1274))**: 첫 행 「지구 밖 천체 표면 확장」 의 리스크 칸 「대기 없는 body 가 rim·불빛을 상속한다」 는 상속 범위를 잘못 적었다. 어떤 body 를 `SurfaceType.Rocky` 로 재분류하면 **biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 대륙 · rim 은 무조건** 상속되고, **불빛은 조건부**다 — 게이트가 `uMaskEnabled` 를 곱하므로 `SURFACE_MASK_BY_BODY` 등록 + 마스크 로드 완료 + 투영 disk `≥ SURFACE_MASK_MIN_DISK_PX` (`16`) 일 때만 켜진다 (코드 경로 판독 — [ADR 20260628-756 §A12.3](../decisions/20260628-756-procedural-planet-surface.md)). 원문은 소급 수정하지 않는다. 착수 범위: #1274 는 ice giant (uranus · neptune) 만 — Rocky 재분류 · Cratered 확장은 이 행에 잔류한다.
 
