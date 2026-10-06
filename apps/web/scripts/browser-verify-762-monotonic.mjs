@@ -151,7 +151,9 @@ async function setup(browser, url) {
   page.on('console', (m) => {
     if (m.type() === 'error') console.log(`    [console.error] ${m.text()}`);
   });
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+  // #1293 — 이름 라벨 (DOM 오버레이) 을 끈다. 캔버스 element 캡처는 화면 영역을 찍어 겹친 DOM 글자가
+  //   판정 픽셀에 섞인다 (#1219 오염 클래스) — 라벨이 기본 ON 이 되면서 측정 페이지마다 명시적으로 끈다.
+  await page.goto(`${url}&labels=off`, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__solarScene !== 'undefined' && typeof window.__simCore !== 'undefined',
     undefined,

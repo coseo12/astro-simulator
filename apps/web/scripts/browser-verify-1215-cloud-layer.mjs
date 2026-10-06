@@ -143,7 +143,9 @@ async function setupPage(browser, query, label) {
   const errors = collectConsoleErrors(page);
   await bootstrapScene(page, {
     baseUrl: BASE_URL,
-    query,
+    // #1293 — 이름 라벨 (DOM 오버레이) 을 끈다. 캔버스 element 캡처는 화면 영역을 찍어 겹친 DOM 글자가
+    //   판정 픽셀에 섞인다 (#1219 오염 클래스) — 라벨이 기본 ON 이 되면서 측정 페이지마다 명시적으로 끈다.
+    query: `${query}&labels=off`,
     handles: ['__simCore', '__solarScene'],
     settleMs: 2800,
     // #1234 C1 — `[boot]` 계측 로그에 실을 페이지 라벨 (판정 무관 진단).
