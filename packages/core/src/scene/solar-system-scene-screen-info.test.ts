@@ -11,6 +11,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ArcRotateCamera, Matrix, NullEngine, Scene, Vector3, Viewport } from '@babylonjs/core';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
+import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 
 const RENDER_WIDTH = 1280;
 const RENDER_HEIGHT = 720;
@@ -133,6 +134,33 @@ describe('#1293 getBodyScreenInfo', () => {
       }
       expect(row.radius).toBeCloseTo(lod[i]!.screenCoverage * 0.5, 9);
     });
+  });
+
+  it('embeddedInParent = 렌더된 위성 구가 렌더된 모체 구 안에 완전히 들어감 (메시 실측 반경 · 모든 행)', () => {
+    const f = makeScene();
+    tick(f);
+    const radius = (id: string) => {
+      const m = f.handles.meshes.get(id)!;
+      return m.getBoundingInfo().boundingBox.extendSize.x * Math.abs(m.absoluteScaling.x);
+    };
+    const info = new Map(f.handles.getBodyScreenInfo().map((r) => [r.id, r]));
+    let withParent = 0;
+    // 모체 관계는 데이터 SSoT 에서 — 판정식을 독립적으로 다시 계산해 대조한다.
+    for (const b of getSolarSystem().bodies) {
+      const row = info.get(b.id);
+      if (!row) continue;
+      if (!b.parentId) {
+        expect(row.embeddedInParent).toBe(false);
+        continue;
+      }
+      const c = f.handles.meshes.get(b.id)!.getAbsolutePosition();
+      const p = f.handles.meshes.get(b.parentId)!.getAbsolutePosition();
+      expect(row.embeddedInParent).toBe(
+        Vector3.Distance(c, p) + radius(b.id) <= radius(b.parentId),
+      );
+      withParent += 1;
+    }
+    expect(withParent).toBeGreaterThan(0);
   });
 
   it('onScreen = inFront ∧ 중심이 캔버스 안 (모든 행)', () => {

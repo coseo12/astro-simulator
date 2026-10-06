@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { ephemeris as ephemerisApi, isRPhaseFocusable } from '@astro-simulator/core';
 import { useSimBodyScreenInfo, useSimCommand } from '@/core/sim-context';
 import { layoutLabels, type LabelCandidate } from '@/lib/label-layout';
@@ -47,7 +47,15 @@ interface LabelDomState {
   shown: boolean;
 }
 
-export function BodyLabels() {
+export function BodyLabels({
+  wheelTargetRef,
+}: {
+  /**
+   * 라벨 위 휠을 넘길 캔버스. 라벨은 클릭을 받으려고 `pointer-events: auto` 라 그 위의 휠이 캔버스 줌에 닿지 않는다
+   * — 포커스 시 큰 행성 원반 위 라벨 띠에서 줌이 먹지 않는 체감 (#1293 리뷰 · qa 권고). 휠만 캔버스로 재발행한다.
+   */
+  wheelTargetRef?: RefObject<HTMLCanvasElement | null>;
+} = {}) {
   const getScreenInfo = useSimBodyScreenInfo();
   const visible = useSimStore((s) => s.labelsVisible);
   const focusedId = useSimStore((s) => s.selectedBodyId);
@@ -62,17 +70,26 @@ export function BodyLabels() {
   );
 
   if (!visible || getScreenInfo === null) return null;
-  return <BodyLabelsLayer bodies={bodies} getScreenInfo={getScreenInfo} focusedId={focusedId} />;
+  return (
+    <BodyLabelsLayer
+      bodies={bodies}
+      getScreenInfo={getScreenInfo}
+      focusedId={focusedId}
+      wheelTargetRef={wheelTargetRef}
+    />
+  );
 }
 
 function BodyLabelsLayer({
   bodies,
   getScreenInfo,
   focusedId,
+  wheelTargetRef,
 }: {
   bodies: readonly LabelBody[];
   getScreenInfo: NonNullable<ReturnType<typeof useSimBodyScreenInfo>>;
   focusedId: string | null;
+  wheelTargetRef?: RefObject<HTMLCanvasElement | null>;
 }) {
   const sendCommand = useSimCommand();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -122,6 +139,7 @@ function BodyLabelsLayer({
           radius: row.radius,
           onScreen: row.onScreen,
           distance: row.cameraDistance,
+          embedded: row.embeddedInParent,
           width: size.width,
           height: size.height,
         });
@@ -178,6 +196,10 @@ function BodyLabelsLayer({
           data-label-visible="false"
           data-focused={focusedId === b.id ? 'true' : undefined}
           onClick={() => sendCommand({ type: 'focusOn', bodyId: b.id })}
+          // 휠은 캔버스로 — 같은 좌표 · 델타로 재발행한다 (Babylon 은 캔버스의 `wheel` 을 듣는다).
+          onWheel={(e) =>
+            wheelTargetRef?.current?.dispatchEvent(new WheelEvent('wheel', e.nativeEvent))
+          }
           // hud-chip = 밝은 천체 위에서도 대비 AA 를 보장하는 backing (#749). 단 blur 는 끈다 — 32 개 라벨이
           // 매 프레임 다시 그려지는 캔버스 위에서 backdrop-filter 를 돌리면 합성 비용이 크고, 대비는 backing 이 담당한다.
           className={`hud-chip pointer-events-auto absolute left-0 top-0 whitespace-nowrap px-1.5 py-0.5 text-mini leading-none cursor-pointer ${

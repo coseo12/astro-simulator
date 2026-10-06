@@ -25,6 +25,7 @@ function cand(over: Partial<LabelCandidate> & { id: string }): LabelCandidate {
     radius: 4,
     onScreen: true,
     distance: 1,
+    embedded: false,
     width: 40,
     height: 20,
     ...over,
@@ -83,6 +84,34 @@ describe('isOccluded — 규칙 1b (더 가까운 body 원반 뒤)', () => {
     const hidden = { ...jupiter, onScreen: false };
     const io = cand({ id: 'io', x: 450, y: 300, distance: 11 });
     expect(isOccluded(io, [hidden, io])).toBe(false);
+  });
+});
+
+describe('규칙 1c — 렌더된 모체 구 안에 묻힌 위성 (#1293 qa B1)', () => {
+  // 목성 원반 반지름 90 · 이오 화면 위치는 원반 안 (중심에서 67) · 카메라 쪽 (목성보다 가까움) — 1b 는 못 잡는다.
+  const jupiter = cand({ id: 'jupiter', x: 400, y: 300, radius: 90, distance: 10 });
+  const ioFront = cand({
+    id: 'io',
+    kind: 'moon',
+    parentId: 'jupiter',
+    x: 467,
+    y: 300,
+    distance: 9,
+  });
+  it('모체 구 안 (embedded) → 앞쪽이어도 숨김', () => {
+    const io = { ...ioFront, embedded: true };
+    expect(isOccluded(io, [jupiter, io])).toBe(false); // 1b 로는 못 잡는 경우임을 고정
+    expect(isLabelEligible(io, 'jupiter')).toBe(false);
+    const out = layoutLabels([jupiter, io], { focusedId: 'jupiter', viewportWidth: VW });
+    expect(out.map((b) => b.id)).toEqual(['jupiter']);
+  });
+  it('모체 구 밖 · 원반 앞을 지나는 통과 (embedded=false) → 표시', () => {
+    const out = layoutLabels([jupiter, { ...ioFront, y: 420 }], {
+      focusedId: 'jupiter',
+      viewportWidth: VW,
+    });
+    expect(out.map((b) => b.id).sort()).toEqual(['io', 'jupiter']);
+    expect(isLabelEligible(ioFront, 'jupiter')).toBe(true);
   });
 });
 
@@ -193,6 +222,7 @@ describe('layoutLabels — D5 겹침 쌍 0 · 우선순위', () => {
           radius: rand() * 60,
           onScreen: rand() < 0.9,
           distance: rand(),
+          embedded: rand() < 0.1,
           width: 20 + rand() * 80,
           height: 16 + rand() * 4,
         }),

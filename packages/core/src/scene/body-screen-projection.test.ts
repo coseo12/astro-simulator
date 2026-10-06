@@ -3,7 +3,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Matrix, Vector3, Viewport } from '@babylonjs/core';
-import { isInsideViewport, projectToScreen, type ScreenPoint } from './body-screen-projection.js';
+import {
+  isInsideViewport,
+  isSphereInsideSphere,
+  projectToScreen,
+  type ScreenPoint,
+} from './body-screen-projection.js';
 
 const W = 1280;
 const H = 720;
@@ -52,5 +57,22 @@ describe('#1293 isInsideViewport', () => {
     expect(isInsideViewport(W, H, W, H)).toBe(true);
     expect(isInsideViewport(-0.1, 10, W, H)).toBe(false);
     expect(isInsideViewport(10, H + 1, W, H)).toBe(false);
+  });
+});
+
+describe('#1293 qa B1 isSphereInsideSphere — 모체 구에 완전히 묻힌 위성', () => {
+  const parent = { x: 0, y: 0, z: 0 };
+  const R = 10;
+  it('완전히 안 (d + r < R) → true — 어느 시점에서도 안 보인다', () => {
+    expect(isSphereInsideSphere({ x: 6, y: 0, z: 0 }, 1, parent, R)).toBe(true);
+  });
+  it('경계 (d + r = R) → true (안쪽에서 접함)', () => {
+    expect(isSphereInsideSphere({ x: 0, y: 9, z: 0 }, 1, parent, R)).toBe(true);
+  });
+  it('중심은 안이지만 일부가 튀어나옴 (d < R < d + r) → false — 튀어나온 부분은 보일 수 있다', () => {
+    expect(isSphereInsideSphere({ x: 0, y: 0, z: 9.5 }, 1, parent, R)).toBe(false);
+  });
+  it('모체 밖 (카메라 쪽 앞을 지나는 통과 포함) → false', () => {
+    expect(isSphereInsideSphere({ x: 0, y: 0, z: -15 }, 1, parent, R)).toBe(false);
   });
 });

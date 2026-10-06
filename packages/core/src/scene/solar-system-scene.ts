@@ -77,7 +77,12 @@ import { runTierTransition } from './tier-transition.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
-import { isInsideViewport, projectToScreen, type ScreenPoint } from './body-screen-projection.js';
+import {
+  isInsideViewport,
+  isSphereInsideSphere,
+  projectToScreen,
+  type ScreenPoint,
+} from './body-screen-projection.js';
 import {
   GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
   resolveGlowMarker,
@@ -398,6 +403,11 @@ export interface BodyScreenInfo {
   onScreen: boolean;
   /** 카메라 ↔ body 중심 거리 (scene unit). body 끼리 앞뒤 비교 (라벨 가림 판정) 용 — 단위 환산 없음. */
   cameraDistance: number;
+  /**
+   * #1293 qa B1 — 렌더된 모체 구 안에 **완전히** 묻혀 어느 시점에서도 보이지 않는가 (`isSphereInsideSphere`).
+   * bodyScale 로 과장된 모체가 가까운 위성 궤도를 삼키는 경우 (목성 ↔ 이오). 모체 없는 body 는 false.
+   */
+  embeddedInParent: boolean;
 }
 
 /**
@@ -2255,6 +2265,13 @@ export function createSolarSystemScene(
   // #1293 — 라벨용 화면 투영 (pull). lodInfo 행을 따라가며 high mesh 위치를 지금의 view × projection 으로
   // 투영한다. high mesh 가 position 의 유일한 owner 라 (위 variant 주석 계약) LOD 단계와 무관하게 중심이 같다.
   const bodyScreenInfo: BodyScreenInfo[] = [];
+  // 렌더된 구 반지름 (scene unit) — high mesh 의 **실제** 크기: 생성 지름 (`body-mesh-factory` 의 실측 반경 ×
+  // 생성 tier renderScale × bodyScale) 의 반 = 로컬 bbox `extendSize.x`, 여기에 tier 전환 scaling (`setTier`) 을 곱한다.
+  // 산식을 다시 쓰지 않고 메시에서 읽는 이유: `?bodyScaleP=` 등 크기 결정 경로가 바뀌어도 그린 크기와 어긋나지 않게.
+  const renderedSphereRadius = (m: {
+    getBoundingInfo(): { boundingBox: { extendSize: Vector3 } };
+    absoluteScaling: Vector3;
+  }): number => m.getBoundingInfo().boundingBox.extendSize.x * Math.abs(m.absoluteScaling.x);
   const screenPointScratch: ScreenPoint = { x: 0, y: 0, inFront: false };
   const getBodyScreenInfo = (): readonly BodyScreenInfo[] => {
     const engine = scene.getEngine();
@@ -2274,6 +2291,16 @@ export function createSolarSystemScene(
       const onScreen = inFront && isInsideViewport(x, y, cssWidth, cssHeight);
       const radius = info.screenCoverage * cssPerEnginePx;
       const cameraDistance = cam ? Vector3.Distance(cam, p) : 0;
+      const parentId = bodiesById.get(info.id)?.parentId;
+      const parentMesh = parentId ? meshes.get(parentId) : undefined;
+      const embeddedInParent =
+        parentMesh !== undefined &&
+        isSphereInsideSphere(
+          p,
+          renderedSphereRadius(mesh),
+          parentMesh.getAbsolutePosition(),
+          renderedSphereRadius(parentMesh),
+        );
       const row = bodyScreenInfo[n];
       if (row) {
         row.id = info.id;
@@ -2283,8 +2310,18 @@ export function createSolarSystemScene(
         row.inFront = inFront;
         row.onScreen = onScreen;
         row.cameraDistance = cameraDistance;
+        row.embeddedInParent = embeddedInParent;
       } else {
-        bodyScreenInfo.push({ id: info.id, x, y, radius, inFront, onScreen, cameraDistance });
+        bodyScreenInfo.push({
+          id: info.id,
+          x,
+          y,
+          radius,
+          inFront,
+          onScreen,
+          cameraDistance,
+          embeddedInParent,
+        });
       }
       n += 1;
     }

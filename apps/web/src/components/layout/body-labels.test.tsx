@@ -42,6 +42,7 @@ const row = (id: string, x: number, y: number, radius = 4, onScreen = true): Bod
   inFront: onScreen,
   onScreen,
   cameraDistance: 1,
+  embeddedInParent: false,
 });
 
 beforeEach(() => {
@@ -117,6 +118,28 @@ describe('BodyLabels', () => {
     runFrame();
     expect(label('moon')).toHaveAttribute('data-label-visible', 'true');
     expect(label('earth')).toHaveAttribute('data-focused', 'true');
+  });
+
+  it('모체 구에 묻힌 위성 (embeddedInParent) → 모체 선택 중에도 숨김 (#1293 qa B1)', () => {
+    screenRows = [row('jupiter', 400, 300, 90), { ...row('io', 467, 300), embeddedInParent: true }];
+    useSimStore.setState({ selectedBodyId: 'jupiter' });
+    render(<BodyLabels />);
+    runFrame();
+    expect(label('io')).toHaveAttribute('data-label-visible', 'false');
+    expect(label('jupiter')).toHaveAttribute('data-label-visible', 'true');
+  });
+
+  it('라벨 위 휠 → 같은 델타로 캔버스에 재발행 (캔버스 줌 유지)', () => {
+    screenRows = [row('jupiter', 400, 300)];
+    const canvas = document.createElement('canvas');
+    const received: WheelEvent[] = [];
+    canvas.addEventListener('wheel', (e) => received.push(e));
+    render(<BodyLabels wheelTargetRef={{ current: canvas }} />);
+    runFrame();
+    fireEvent.wheel(label('jupiter'), { deltaY: 120, clientX: 410, clientY: 305 });
+    expect(received).toHaveLength(1);
+    expect(received[0]!.deltaY).toBe(120);
+    expect(received[0]!.clientX).toBe(410);
   });
 
   it('라벨 클릭 → focusOn 명령', () => {

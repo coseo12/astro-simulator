@@ -59,3 +59,27 @@ export function projectToScreen(
 export function isInsideViewport(x: number, y: number, width: number, height: number): boolean {
   return x >= 0 && x <= width && y >= 0 && y <= height;
 }
+
+/**
+ * #1293 qa B1 — 자식 구가 모체 구 안에 **완전히** 들어 있는가 (렌더 좌표 · scene unit).
+ *
+ * bodyScale 로 과장된 모체 (예: 목성) 는 가까운 위성 (이오) 의 궤도를 삼킨다. 그 위성은 카메라 방향과 무관하게
+ * 한 픽셀도 그려지지 않는데, 화면 깊이 비교 (web 규칙 1b) 는 위성이 모체보다 **먼** 경우만 잡으므로 궤도 앞쪽
+ * 절반에서는 빈 모체 표면 위에 라벨만 뜬다.
+ *
+ * 판정은 「위성 메시가 전혀 보이지 않는가」 이므로 **위성 반지름을 더한다** (`d + r_child ≤ r_parent`).
+ * 중심만 비교 (`d < r_parent`) 하면 모체 표면 밖으로 일부가 튀어나와 실제로 보이는 위성의 라벨까지 지운다.
+ * 반대로 이 조건이 참이면 자식 구의 모든 점이 모체 구 안이라 어느 시점에서도 가려진다 (불투명 모체 전제).
+ * 거리는 카메라와 무관한 3D 렌더 좌표라 통과 (transit — 모체 원반 앞을 지나는 위성) 라벨은 지우지 않는다.
+ */
+export function isSphereInsideSphere(
+  child: { x: number; y: number; z: number },
+  childRadius: number,
+  parent: { x: number; y: number; z: number },
+  parentRadius: number,
+): boolean {
+  const dx = child.x - parent.x;
+  const dy = child.y - parent.y;
+  const dz = child.z - parent.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz) + childRadius <= parentRadius;
+}

@@ -8,6 +8,9 @@
  *  1. 후보 = 카메라 앞 ∧ 중심이 화면 안 (`onScreen`). 카메라 뒤 · 화면 밖 body 는 라벨 0 (D4).
  *  1b. 더 가까운 다른 body 의 화면 원반 안에 중심이 들어간 (= 그 뒤에 가려진) body 는 라벨 0. 예: 목성 뒤로 돈
  *     이오. 원반 = 화면 반지름 (bodyScale 과장 포함 — 화면에 그려진 크기) 이라 실제로 가려진 경우와 일치한다.
+ *  1c. 렌더된 모체 구 안에 완전히 묻힌 body (core `embeddedInParent`) 는 라벨 0 — bodyScale 로 과장된 목성이 이오
+ *     궤도를 삼키면 이오는 궤도 **앞쪽** 절반에서도 그려지지 않는데 1b (깊이 비교) 는 뒤쪽 절반만 잡는다 (#1293 qa B1).
+ *     화면 원반 기준으로 넓히지 않은 이유: 모체 원반 앞을 실제로 지나는 통과 (transit) 위성의 라벨까지 지운다.
  *  2. 위성은 **모체가 선택 (포커스) 됐을 때만** 후보다. 위성 자신이 선택된 경우도 후보로 둔다 — 선택한 천체의
  *     이름이 화면에서 사라지지 않게 (모체 조건의 확장이지 우선순위 변경이 아니다).
  *  3. 우선순위 태양 > 행성 > 왜소행성 > 위성 > 혜성, 같은 등급은 화면 반지름이 큰 쪽 → id 사전순 (결정적).
@@ -49,6 +52,8 @@ export interface LabelCandidate {
   onScreen: boolean;
   /** 카메라까지 거리 (단위 무관 — 후보끼리 대소 비교만 한다). 가림 판정 (규칙 1b) 용. */
   distance: number;
+  /** 렌더된 모체 구 안에 완전히 묻혀 보이지 않음 (규칙 1c — core `embeddedInParent`). */
+  embedded: boolean;
   /** 라벨 DOM 박스 크기 (CSS px). 0 이면 아직 못 잼 → 후보 제외. */
   width: number;
   height: number;
@@ -73,9 +78,9 @@ export function labelKindPriority(kind: string): number {
   return LABEL_KIND_PRIORITY[kind] ?? UNKNOWN_KIND_PRIORITY;
 }
 
-/** 규칙 1 · 2 — 이 후보가 라벨을 가질 자격이 있는가. */
+/** 규칙 1 · 1c · 2 — 이 후보가 라벨을 가질 자격이 있는가. */
 export function isLabelEligible(c: LabelCandidate, focusedId: string | null): boolean {
-  if (!c.onScreen || c.width <= 0 || c.height <= 0) return false;
+  if (!c.onScreen || c.embedded || c.width <= 0 || c.height <= 0) return false;
   if (c.kind === 'moon')
     return focusedId !== null && (focusedId === c.parentId || focusedId === c.id);
   return true;

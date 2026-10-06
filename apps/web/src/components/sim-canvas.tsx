@@ -1441,7 +1441,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         getBodyScreenInfo={cameraTierApi?.getBodyScreenInfo ?? null}
       >
         {/* #1293 — 3D 이름 라벨 오버레이. 캔버스 바로 위 · HUD (children, z-hud) 아래에 둔다 (DOM 순서). */}
-        <BodyLabels />
+        <BodyLabels wheelTargetRef={canvasRef} />
         {children}
       </SimCommandProvider>
     </>
