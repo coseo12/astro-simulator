@@ -135,7 +135,7 @@ export async function pressTimePlay(page, options = {}) {
 /**
  * 시간 재생/정지 토글의 **목표 상태**별 testid 쌍 (#1209).
  *
- * `time-controls.tsx:70` 은 한 버튼의 testid 를 상태로 갈아 끼운다
+ * `time-controls.tsx` 의 재생/일시정지 버튼은 한 버튼의 testid 를 상태로 갈아 끼운다
  * (`data-testid={isPaused ? 'time-play' : 'time-pause'}`). 따라서 `time-pause` 부재는
  * 두 가지를 뜻할 수 있다 — (가) 이미 정지 상태라 버튼이 `time-play` 로 바뀜 (정상),
  * (나) 시간 컨트롤 자체가 사라짐 (회귀). 한쪽만 보면 둘이 같은 「부재」다.

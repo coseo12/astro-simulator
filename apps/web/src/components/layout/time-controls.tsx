@@ -5,6 +5,7 @@ import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from '@/core/sim-context';
 import { Pause, Play, Rewind, FastForward } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { formatUtcLabel } from '@/lib/sim-time-format';
 
 interface ScalePreset {
   label: string;
@@ -18,11 +19,13 @@ const SCALE_PRESETS: ScalePreset[] = [
   { label: '1M', value: timeApi.TimeScalePreset.MONTH_PER_SEC },
   { label: '1y', value: timeApi.TimeScalePreset.YEAR_PER_SEC },
   { label: '10y', value: timeApi.TimeScalePreset.DECADE_PER_SEC },
+  // #1288 D2 — 장기 변화 재생. core 상수 재사용 (새 배속 값 없음).
+  { label: '100y', value: timeApi.TimeScalePreset.CENTURY_PER_SEC },
 ];
 
 /**
- * TimeBar 제어: 재생/일시정지/역행 + 속도 프리셋 + 현재 UTC.
- * 로그 스크러버는 추후 확장 (P1에서는 기본 제어만).
+ * TimeBar 1행 제어: 재생/일시정지/역행 + 속도 프리셋 + 「지금」 + 현재 UTC.
+ * 시점 스크러버는 2행 `time-scrubber.tsx` (#1288 — 로그 스케일안은 기각, 1900~2100 선형).
  */
 export function TimeControls() {
   const julianDate = useSimStore((s) => s.julianDate);
@@ -40,18 +43,24 @@ export function TimeControls() {
   }, [scale]);
   const play = () => setScale(lastNonZeroScaleRef.current);
   const pause = () => setScale(0);
+  // #1288 D1 — 시점만 현재 시각으로 옮긴다. 배속(재생·정지·역행 포함)은 건드리지 않는다 — setTimeScale 미발행.
+  const jumpToNow = () =>
+    sendCommand({ type: 'jumpToJulianDate', julianDate: timeApi.dateToJulianDate(new Date()) });
 
-  const utcString =
-    julianDate !== null ? timeApi.julianDateToIso(julianDate).slice(0, 19) + 'Z' : '—';
+  // #1288 D4 — 연도 > 9999 · JS Date 범위 밖에서도 예외 없이 정의된 형식 (`sim-time-format.ts`).
+  const utcString = formatUtcLabel(julianDate);
   const isPaused = scale === 0;
   const isReverse = scale < 0;
 
   return (
+    // #1288 D9 — `max-sm:` 압축 (간격·패딩·구분선만, 글자 크기·24px hit target 불변): 「지금」·100y 추가로 375 에서
+    // 내용이 가용폭을 넘지 않게 한다. 묶음 구분은 구분선 대신 간격 차(묶음 사이 6px ↔ 묶음 안 2px)로 한다.
+    // 프리셋 라벨은 `num`(JetBrains Mono, next/font 자체 호스팅)이라 폭이 OS 무관하고, OS 글꼴을 타는 글자는 「지금」뿐이다.
     <div
-      className="flex items-center gap-2 overflow-x-auto whitespace-nowrap max-w-full"
+      className="flex items-center gap-2 max-sm:gap-1.5 overflow-x-auto whitespace-nowrap max-w-full"
       data-testid="time-controls"
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 max-sm:gap-0.5">
         <button
           type="button"
           data-testid="time-reverse"
@@ -89,7 +98,7 @@ export function TimeControls() {
         </button>
       </div>
 
-      <div className="flex items-center gap-1 border-l border-border-subtle pl-2">
+      <div className="flex items-center gap-1 max-sm:gap-0.5 border-l border-border-subtle pl-2 max-sm:border-l-0 max-sm:pl-0">
         {SCALE_PRESETS.map((p) => {
           const active = Math.abs(scale) === p.value;
           return (
@@ -98,7 +107,7 @@ export function TimeControls() {
               type="button"
               data-testid={`time-preset-${p.label}`}
               onClick={() => setScale((isReverse ? -1 : 1) * p.value)}
-              className={`num text-caption px-2 py-0.5 rounded-xs border transition-colors min-w-6 min-h-6 shrink-0 ${
+              className={`num text-caption px-2 max-sm:px-1 py-0.5 rounded-xs border transition-colors min-w-6 min-h-6 shrink-0 ${
                 active
                   ? 'bg-primary/20 border-primary/40 text-fg-primary'
                   : 'bg-transparent border-border-subtle text-fg-secondary hover:bg-bg-elevated'
@@ -111,13 +120,22 @@ export function TimeControls() {
         })}
       </div>
 
-      {/* #1281 — 모바일(`max-sm`)에서는 UTC 를 숨긴다 — 375 에서 타임바 내용(486px)이 가용폭(351px)을 넘긴 주원인이다
-          (계약 D9(c)). 시각은 HUD 좌상 JD 와 날짜 입력에 남는다. */}
-      <div
-        className="num text-caption text-fg-secondary border-l border-border-subtle pl-2 max-sm:hidden"
-        data-testid="time-utc"
-      >
-        {utcString}
+      <div className="flex items-center gap-2 border-l border-border-subtle pl-2 max-sm:border-l-0 max-sm:pl-0">
+        {/* #1288 D1 — 「지금」은 시각 표시 옆에 둔다 (시점 이동 ↔ 시각 표시가 한 묶음). 보이는 글자가 곧 접근 이름이다. */}
+        <button
+          type="button"
+          data-testid="time-now"
+          onClick={jumpToNow}
+          className="text-caption px-2 max-sm:px-1 py-0.5 rounded-xs border bg-transparent border-border-subtle text-fg-secondary hover:bg-bg-elevated transition-colors min-w-6 min-h-6 shrink-0"
+          title="현재 시각으로 이동 (배속 유지)"
+        >
+          지금
+        </button>
+        {/* #1281 — 모바일(`max-sm`)에서는 UTC 를 숨긴다 — 375 에서 타임바 내용(486px)이 가용폭(351px)을 넘긴 주원인이다
+            (계약 D9(c)). 시각은 HUD 좌상 JD 와 날짜 입력에 남는다. */}
+        <div className="num text-caption text-fg-secondary max-sm:hidden" data-testid="time-utc">
+          {utcString}
+        </div>
       </div>
     </div>
   );

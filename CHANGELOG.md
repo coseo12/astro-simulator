@@ -5,6 +5,35 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-10-06
+
+### Added
+
+- **[#1288] 시간 UX — 「지금」 버튼 + 100년 프리셋 (PR1)** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288), PR [#1289](https://github.com/coseo12/astro-simulator/pull/1289)). 타임바에 「지금」 버튼(`time-now`)과 `100y` 프리셋(`time-preset-100y`)을 더했다.
+  - 「지금」은 시점만 현재 시각으로 옮긴다 (`jumpToJulianDate`, `dateToJulianDate(new Date())` 재사용). 배속 · 재생/정지 · 역행 상태는 그대로다 — `setTimeScale` 을 보내지 않는다.
+  - `100y` 는 core `CENTURY_PER_SEC`(1초 = 100년)를 쓰고 다른 프리셋처럼 역행 부호를 유지한다.
+  - 기존 testid(`time-preset-{1s,1h,1d,1M,1y,10y}` · `time-play`/`time-pause` · `time-reverse`/`time-forward` · `datetime-input`/`datetime-jump`)는 그대로다.
+  - 모바일(640px 미만) 타임바는 간격 · 패딩 · 구분선만 줄여 375 에서 넘치지 않는다 (글자 크기 · 24px hit target 불변). 375 실측 내용 315px / 가용 341px.
+- **[#1288] 1900~2100 시간 스크러버 (PR2)** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288), PR [#1290](https://github.com/coseo12/astro-simulator/pull/1290)). 타임바 아래 행에 절대 연도 선형 슬라이더를 더했다 (`@radix-ui/react-slider`, 기존 의존).
+  - 드래그 · 키보드(←/→ 1년, Shift+←/→ · PageUp/PageDown 10년, Home/End 양 끝)로 시점만 옮긴다 — 배속은 그대로다. 키 이동은 가까운 1월 1일 기준이다.
+  - 재생 중 썸이 시각을 따라가고(0.25년 단위 갱신), 포인터를 누른 동안은 재생이 썸을 덮어쓰지 않는다. 범위 밖이면 썸은 끝에 고정되고 「궤도 근사 — 오차 증가」 배지가 뜬다.
+  - 눈금 1950 · 2000 · 2050, 양 끝 라벨 1900 / 2100.
+
+### Changed
+
+- **[#1288] 타임바 2행 배치 + 날짜 입력 「UTC」 표기** (PR [#1290](https://github.com/coseo12/astro-simulator/pull/1290)). 타임바 패널이 위 행(컨트롤) · 아래 행(스크러버) 2행이 됐다. 바깥 footer 높이(64px)와 정보 카드 · 연구 패널 · 토스트 오프셋은 그대로다. 상단 바 날짜 입력 테두리 위에 「UTC」 범례를 붙였다 (상단 바 폭 증가 0).
+
+### Fixed
+
+- **[#1288] 날짜 입력이 라벨대로 UTC 로 해석된다** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288)). 종전 `new Date(value)` 는 시간대 없는 `datetime-local` 값을 로컬 시간대로 해석해, 「UTC 시점」 입력이 KST 에서 9시간 어긋났다 (`2026-04-14T00:00` → `2026-04-13T15:00Z`).
+- **[#1288] 극단 시각에서 타임바 UTC 표시가 깨지거나 예외를 던지지 않는다** ([#1288](https://github.com/coseo12/astro-simulator/issues/1288)). 연도 > 9999 는 ISO 확장 연도(`+010000-01-01T00:00:30Z`)로, JS Date 범위(약 ±27만 년) 밖은 `JD <값>` 으로 보인다. 종전 `toISOString().slice(0, 19)` 는 확장 연도의 초를 잘랐고, 범위 밖에서는 RangeError 를 던졌다.
+
+### Behavior Changes
+
+- **타임바에 「지금」 버튼과 `100y` 프리셋이 생겼다** (#1288). 「지금」은 현재 시각으로 이동하되 배속은 바꾸지 않는다.
+- **날짜 입력이 UTC 로 해석된다** (#1288). 같은 입력이 종전에는 사용자 시간대만큼 어긋난 시각으로 점프했다.
+- **타임바 아래 행에 1900~2100 시간 스크러버가 생겼다** (#1288). 드래그 · 키보드로 시점을 옮기고, 재생 중에는 썸이 시각을 따라간다.
+
 ## [0.92.0] - 2026-10-05
 
 ### Added
