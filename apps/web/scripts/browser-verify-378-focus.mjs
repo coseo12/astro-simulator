@@ -96,6 +96,8 @@ const flags = {
 // 정합 (filterBodiesByPhase 데이터 순서 반환 → #598 정적 매칭 가드 통과 위해 동일 순서 필수). 둘 다
 // showInShortcutBar=false (URL/클릭 진입). proteus 는 Neptune 적도면 근접 (i 29.06° ecliptic, REF_PLANE=ECLIPTIC)
 // 이나 focus 진입/추적엔 무관 (triton 역행 선례 — 사실 정합).
+// #1305 — 명왕성 위성 charon 동기화 (CURRENT_R_PHASE=14). pluto 다음 (haumea 전) — solar-system.json 데이터
+// 순서 정합 (#598). showInShortcutBar=false (검색/클릭/URL 진입). 황도 기준 i 112.89° 세로 궤도 — 사실 정합.
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -123,6 +125,7 @@ const FOCUS_BODIES = [
   'proteus',
   'ceres',
   'pluto',
+  'charon',
   'haumea',
   'makemake',
   'eris',

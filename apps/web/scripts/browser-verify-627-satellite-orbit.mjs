@@ -51,7 +51,16 @@ const POST_LOAD_WAIT_MS = 2500; // tier transition + LOD 안정화 마진
 // / uranus=titania #647 / neptune=triton #653). R10+ 진입 시 갱신 (R_PHASE_BODY_ALLOWLIST 의
 // satellite parent 집합과 동기). triton 궤도선은 역행 평면 (ecliptic 129.14°) 이어도 LineSystem
 // 폐곡선 렌더는 동일 — #627 일반화 경로가 parent 추적 + ×75 visual scale 자동 처리.
-const EXPECTED_SATELLITE_PARENTS = ['earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
+// #1305 — pluto 추가 (행성이 아닌 첫 모체 — charon). 위성 경로는 모체 kind 를 보지 않는다 (parentId !== 'sun').
+const EXPECTED_SATELLITE_PARENTS = [
+  'earth',
+  'mars',
+  'jupiter',
+  'saturn',
+  'uranus',
+  'neptune',
+  'pluto',
+];
 
 // DoD 임계.
 const PARENT_TRACK_TOLERANCE = 0.2; // worldCenter ↔ parent scene 좌표 (D-627-1)

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 32개 바디 (sun + 8행성 + moon 15 + 왜소행성 5 + 혜성 3)', () => {
+  it('로드 성공 + 33개 바디 (sun + 8행성 + moon 16 + 왜소행성 5 + 혜성 3)', () => {
     // P8 #244: 포보스/데이모스 추가 → moon 엔티티 3개 (moon + phobos + deimos).
     // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 추가 → moon 엔티티 7개.
     // R7 #641: titan 추가 → moon 엔티티 8개, 총 25 바디.
@@ -10,11 +10,12 @@ describe('loadSolarSystem', () => {
     // R9 #653: triton 추가 → moon 엔티티 10개, 총 27 바디.
     // R11 #721: enceladus/rhea/iapetus 추가 → moon 엔티티 13개, 총 30 바디 (토성계 위성 4개째~6개째).
     // R12 #725: oberon/proteus 추가 → moon 엔티티 15개, 총 32 바디 (거성 위성 — 천왕성/해왕성 2번째).
+    // #1305: charon 추가 → moon 엔티티 16개, 총 33 바디 (왜소행성 모체 첫 위성).
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(32);
-    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(15);
+    expect(data.bodies).toHaveLength(33);
+    expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(16);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
     expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
   });
@@ -369,6 +370,31 @@ describe('loadSolarSystem', () => {
     expect(proteus!.orbit!.inclination).toBeGreaterThan(0);
     expect(proteus!.orbit!.inclination).toBeLessThan(Math.PI / 2); // < 90° (순행, ecliptic frame 정합)
     expect(proteus!.orbit!.inclination).toBeCloseTo((29.0594 * Math.PI) / 180, 3);
+  });
+
+  it('#1305 — charon 로드 (parentId=pluto, Pluto-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC i 112.89°)', () => {
+    const bodies = loadSolarSystem().bodies;
+    const charon = bodies.find((b) => b.id === 'charon');
+    expect(charon).toBeDefined();
+    expect(charon?.kind).toBe('moon');
+    expect(charon?.parentId).toBe('pluto');
+    expect(charon?.introducedInRPhase).toBe(14);
+    expect(charon?.showInShortcutBar).toBe(false); // 위성 패턴 (검색 / 클릭 / URL ?focus=charon 진입)
+    // NASA Pluto Fact Sheet — a=19,596 km, e=0.0002. radius 606 km (IAU2015).
+    expect(charon!.orbit!.semiMajorAxis).toBeCloseTo(19_596_000, -3);
+    expect(charon!.orbit!.eccentricity).toBeCloseTo(0.0002, 5);
+    expect(charon!.radius).toBe(606_000);
+    // 데이터 순서 — pluto 바로 다음 (#619 targetIds / #598 FOCUS_BODIES 정적 매칭 가드가 데이터 순서를 쓴다).
+    const ids = bodies.map((b) => b.id);
+    expect(ids.indexOf('charon')).toBe(ids.indexOf('pluto') + 1);
+    // Horizons (CENTER=500@999, REF_PLANE=ECLIPTIC, 2026-01-01 TDB) — i=112.8878° / Ω=227.3930°.
+    // 황도 기준 > 90° 는 명왕성 자전축 기울기를 따르는 세로 궤도 — 사실 정합 (triton 역행 선례, 버그 오인 금지).
+    expect(charon!.orbit!.inclination).toBeCloseTo((112.8878 * Math.PI) / 180, 4);
+    // 로더가 각도를 (-π, π] 로 정규화 — 227.393° ≡ -132.607°.
+    expect(charon!.orbit!.longitudeOfAscendingNode).toBeCloseTo(
+      ((227.393 - 360) * Math.PI) / 180,
+      4,
+    );
   });
 
   it('R9 #653 — neptune.rings 1 composite layer (densityProfile 12점 ≤ MAX 16) + ringAlphaHint 0.7', () => {

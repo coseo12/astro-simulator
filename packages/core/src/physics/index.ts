@@ -13,6 +13,8 @@ export {
   meanAnomalyAt,
   positionAt,
   orbitalPeriod,
+  twoBodyMu,
+  orbitMu,
 } from './kepler.js';
 export { orbitalStateAt, type StateVector } from './state-vector.js';
 export {

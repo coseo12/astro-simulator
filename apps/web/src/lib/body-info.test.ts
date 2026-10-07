@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ephemeris } from '@astro-simulator/core';
+import { ephemeris, orbitMu, physics } from '@astro-simulator/core';
 import { AU } from '@astro-simulator/shared';
 import {
   findBodyAndParent,
@@ -32,6 +32,26 @@ describe('#1281 body-info — 공용 조회 · 주기', () => {
     const earth = findBodyAndParent(bodies, 'earth');
     expect(formatDays(orbitalPeriodSeconds(moon.data!, moon.parent)!)).toBe('27.32 일');
     expect(formatDays(orbitalPeriodSeconds(earth.data!, earth.parent)!)).toBe('1.000 년');
+  });
+
+  it('#1305 D1 — 카론 정보 카드: 종류 위성 · 모체 명왕성 · 공전주기 6.39 일', () => {
+    const charon = findBodyAndParent(bodies, 'charon');
+    expect(charon.data?.nameKo).toBe('카론');
+    expect(kindLabel(charon.data!.kind)).toBe('위성');
+    expect(charon.parent?.id).toBe('pluto');
+    expect(formatDays(orbitalPeriodSeconds(charon.data!, charon.parent)!)).toBe('6.39 일');
+  });
+
+  it('#1305 D4 — 모든 위성: 카드 주기 == 장면 공전 주기 (scene `orbitMu` 와 같은 μ)', () => {
+    const satellites = bodies.filter((b) => b.orbit && b.parentId && b.parentId !== 'sun');
+    expect(satellites.length).toBeGreaterThanOrEqual(16); // 공허 통과 방지
+    for (const b of satellites) {
+      const { parent } = findBodyAndParent(bodies, b.id);
+      const scene = physics.orbitalPeriod(b.orbit!.semiMajorAxis, orbitMu(b, parent!));
+      // a**3 ↔ a*a*a 연산 순서 차로 마지막 비트가 다를 수 있다 — 상대 1e-12 (μ 차이는 달조차 ~0.6%).
+      const card = orbitalPeriodSeconds(b, parent)!;
+      expect(Math.abs(card / scene - 1), b.id).toBeLessThan(1e-12);
+    }
   });
 
   it('orbitalPeriodSeconds — 모체 미해석 / 궤도 없음은 null (조용한 태양 질량 폴백 금지)', () => {

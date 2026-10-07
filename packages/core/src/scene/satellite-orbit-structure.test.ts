@@ -80,6 +80,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
       oberon: 'uranus', // R12 #725 — uranus 위성 2개째 (titania 와 같은 LineSystem 그룹)
       triton: 'neptune', // R9 #653 — 역행 위성 첫 사례 (parent 추적/분리는 궤도 방향 무관)
       proteus: 'neptune', // R12 #725 — neptune 위성 2개째 (triton 과 같은 LineSystem 그룹)
+      charon: 'pluto', // #1305 — 왜소행성 모체 첫 위성 (모체 kind 무관 — parentId !== 'sun')
     };
     for (const [satId, expectedParent] of Object.entries(satellites)) {
       const body = byId.get(satId);
@@ -89,7 +90,7 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     }
   });
 
-  it('R-Phase allowlist 의 satellite 들은 정확히 earth/mars/jupiter/saturn/uranus/neptune 6 parent 로 그룹화', () => {
+  it('R-Phase allowlist 의 satellite 들은 정확히 earth/mars/jupiter/saturn/uranus/neptune/pluto 7 parent 로 그룹화', () => {
     // 본 fix 의 핵심 불변식 — satellite 궤도선이 parent 수만큼의 LineSystem 으로 생성됨.
     const parents = new Set<string>();
     for (const id of R_PHASE_BODY_ALLOWLIST) {
@@ -101,11 +102,13 @@ describe('#627 — 실 body 데이터 분류 (R6 시점)', () => {
     // / uranus (titania #647) / neptune (triton #653).
     // R12 #725: oberon (uranus 2개째) / proteus (neptune 2개째) 추가 — 기존 parent 그룹에 합류
     // (uranus/neptune 이미 존재) → parent 집합 6개 불변 (LineSystem 그룹 수 변경 0).
+    // #1305: charon 추가 — 신규 parent pluto (LineSystem 그룹 6 → 7).
     expect([...parents].sort()).toEqual([
       'earth',
       'jupiter',
       'mars',
       'neptune',
+      'pluto',
       'saturn',
       'uranus',
     ]);
@@ -138,7 +141,6 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
   });
 
   it('미매핑 parentId → 1.0 fallback (visual scale 미적용, 실측 그대로)', () => {
-    expect(getOrbitVisualScale('pluto')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R10a #659 진입 — 단 위성 0 (charon 데이터 부재) 이라 미매핑 정합
     expect(getOrbitVisualScale('halley')).toBe(DEFAULT_ORBIT_VISUAL_SCALE); // R10b #664 진입 — 단 위성 0 이라 미매핑 정합 (semantics "미진입" → "미매핑", ADR 20260612-r10b §축 5 변경 0 행)
     expect(getOrbitVisualScale('unknown-parent')).toBe(DEFAULT_ORBIT_VISUAL_SCALE);
   });

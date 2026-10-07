@@ -52,13 +52,38 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     const sun = byId.get('sun')!;
     const moon = byId.get('moon')!;
     const e = physics.orbitalStateAt(earth.orbit!, J2000, GRAVITATIONAL_CONSTANT * sun.mass);
-    const m = physics.orbitalStateAt(moon.orbit!, J2000, GRAVITATIONAL_CONSTANT * earth.mass);
+    // #1305 — 위성 μ = G(M_parent + m) (scene `orbitMu` 와 같은 식). J2000 = epoch 라 μ 무관하지만 식을 맞춘다.
+    const m = physics.orbitalStateAt(
+      moon.orbit!,
+      J2000,
+      GRAVITATIONAL_CONSTANT * (earth.mass + moon.mass),
+    );
     const ref = norm([
       e.position[0] + m.position[0],
       e.position[1] + m.position[1],
       e.position[2] + m.position[2],
     ]);
     expect(Math.abs(d.fromSunM! - ref) / ref).toBeLessThan(1e-12);
+  });
+
+  it('#1305 — 카론 태양 거리 == ‖명왕성(G·M☉) + 카론(G(M_pluto + M_charon))‖ (scene 과 같은 μ, jd ≠ epoch)', () => {
+    // 모체 거리 (‖카론 local‖) 는 원궤도라 μ 와 무관하게 ≈ a 다 — μ 를 판별하려면 방향이 들어가는
+    // 태양 거리로 본다. μ 를 G·M_pluto 로 되돌리면 카론 위치가 수천 km 움직여 상대 1e-12 를 넘는다.
+    const charon = byId.get('charon')!;
+    const pluto = byId.get('pluto')!;
+    const sun = byId.get('sun')!;
+    const jd = J2000 + 9_496.5 + 3.3; // epoch 와 다른 시각 — μ 가 위치를 바꾸는 구간
+    const d = computeBodyDistances(byId, 'charon', jd);
+    const p = physics.positionAt(pluto.orbit!, jd, GRAVITATIONAL_CONSTANT * sun.mass);
+    const c = physics.positionAt(
+      charon.orbit!,
+      jd,
+      GRAVITATIONAL_CONSTANT * (pluto.mass + charon.mass),
+    );
+    const ref = norm([p[0] + c[0], p[1] + c[1], p[2] + c[2]]);
+    expect(Math.abs(d.fromSunM! - ref) / ref).toBeLessThan(1e-12);
+    expect(d.fromParentM! / 1000).toBeGreaterThan(19_500);
+    expect(d.fromParentM! / 1000).toBeLessThan(19_700);
   });
 
   it('핼리 — jd 와 jd + 5년의 표시 문자열이 다르다 (재생 중 갱신의 재료)', () => {

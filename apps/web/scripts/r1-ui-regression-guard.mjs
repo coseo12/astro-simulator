@@ -287,6 +287,8 @@ async function measureBodyPxRatios(page) {
     // R12 #725 — 거성 위성 2 (oberon/proteus) 전부 N/A (미박제 — 측정만). 식 px 0.45~2.70 sub-4px,
     // billboard 4px fallback 전면 의존 — 10번째 그룹 (ADR 20260621-725 §축 1). oberon 은 titania 다음
     // (neptune 전), proteus 는 triton 다음 (ceres 전) — 데이터 순서 #619 정적 매칭 가드 통과 필수.
+    // #1305 — charon N/A (미박제 — 측정만). 렌더 반경 = 명왕성의 0.51 (실제 반경비) — pluto 다음 (haumea 전),
+    // 데이터 순서 #619 정적 매칭 가드 통과 필수.
     const targetIds = [
       'sun',
       'mercury',
@@ -314,6 +316,7 @@ async function measureBodyPxRatios(page) {
       'proteus',
       'ceres',
       'pluto',
+      'charon',
       'haumea',
       'makemake',
       'eris',

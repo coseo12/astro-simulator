@@ -5,13 +5,27 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1305] 명왕성 위성 카론** ([#1305](https://github.com/coseo12/astro-simulator/issues/1305)). 명왕성-카론은 질량비 0.122 · 반경비 0.510 의 이중 천체다. 왜소행성이 모체인 첫 위성이며, 위성 경로가 모체 kind 를 보지 않아(`parentId !== 'sun'`) 궤도선 · 라벨 · 검색 · 정보 카드 · 클릭 선택이 코드 변경 없이 붙는다. `introducedInRPhase` 14 · `CURRENT_R_PHASE` 13 → 14 (33 body).
+  - 데이터: a · e 는 NASA Pluto Fact Sheet (19,596 km / 0.0002), i · Ω · 평균경도는 JPL Horizons (`CENTER=500@999`, `REF_PLANE=ECLIPTIC`, 2026-01-01 TDB) 상태벡터에서 구했다 — 황도 기준 경사 112.89° 의 세로 궤도는 명왕성 자전축을 따르는 사실 정합이다. 원시값 · frame 은 `solar-system.json` `$comment`.
+  - 표시 크기는 **실제 반경비 0.51** (사용자 결정 1a) — 다른 위성의 수렴비 대역 [0.05, 0.09] 의 의도적 예외다. 근거는 `body-scale.ts` 주석.
+  - 궤도 시각 배율 명왕성 ×138 — #1299 방식(근점 × 배율 ≥ 1.5 × (명왕성 렌더 반경 + 카론 렌더 반경) 의 최소 정수, 마진 1.502).
+  - 가드 보강: 「json 의 모든 moon 이 `SATELLITE_CONVERGENCE` (모체 일치) 또는 극소형 단일값 그룹에 있다」 단언 (`body-scale.test.ts`). 누락된 위성은 bodyScale 1.0 fallback 으로 실반경 그대로 렌더되는데 궤도 마진 가드는 통과해 조용히 묻혔다 — 카론 항목을 지운 변이에서 마진 가드는 통과하고 새 단언이 실패하는 것을 확인했다.
+
 ### Changed
 
+- **[#1305] 위성 장면 공전 μ = G(M_parent + m)** (사용자 결정 2a). 장면 Kepler 위치 · Newton 초기 속도 · 정보 카드 실시간 거리가 공용 `orbitMu` (core `physics/kepler.ts`) 하나를 쓴다. 이전에는 G·M_parent 만 써서 카론 주기가 6.765일(실제 6.387일, 5.9%)이었고 정보 카드(G(M+m), 6.39일)와 장면이 어긋났다. 이제 모든 위성의 카드 주기 = 장면 주기다. 태양 직속 천체(행성 · 왜소행성 · 혜성)는 G·M_sun 을 유지한다 — 행성까지 바꾸면 목성 위치가 J2000 이후 누적 위상으로 ~0.4° 움직여 범위를 넘는다.
 - **[가드] `verify:699-freefly-unified` S3b 판정을 프레임별 `d/dt` 불변성으로 교체** (PR [#1309](https://github.com/coseo12/astro-simulator/pull/1309)). develop `b41d09d5` · release prep `d774f15e` 에서 재시도까지 연속 FAIL 하던 flake 의 원인 제거. 원인은 측정 방법이다: 구 판정은 wall-clock 100ms vs 200ms hold 의 이동 비율 1.6–2.4 를 단언했는데, 엔진이 적분하는 시간은 눌린 프레임들의 Σdt 라 양 끝에서 각각 최대 한 프레임 간격만큼 어긋난다. 1.6–2.4 가 구조적으로 보장되려면 프레임 간격 ≤ 11.8ms 여야 하는데 소프트웨어 렌더(swiftshader)는 ≈44ms 라 정상 코드가 1.38–3.57 로 흩어졌다 (로컬 N=15 중 FAIL 3, CI 최근 55 시도 중 7회 < 1.6). #1302 이전 core 로도 같은 분포라 #1302 는 원인이 아니다. 반대로 deltaTime 누락 변이는 프레임레이트가 일정하면 비율 ≈2 로 통과해 원리적으로 못 잡았다.
   - 새 판정: hold 중 이동한 프레임마다 `k = 이동량 / deltaTime` 이 같은가. 허용오차는 측정값이 아니라 float64 반올림 해석에서 유도한 값이다 (`(2√3·|target|/min 이동량 + 18)·ε`, 실측 1e-13–3e-13). 정상 코드 k spread 2.9e-15–1.2e-14 (swiftshader 15/15 · GPU 5/5 PASS), 변이(`step = baseStep`) k spread 0.13–0.71 (swiftshader 6/6 · GPU 6/6 FAIL).
   - 공허 통과 차단: hold 별 이동 프레임 0 이면 `FAIL(기저 신호 부재)`, 이동 프레임들의 dt spread 가 허용오차 이하(변이도 일정해 보이는 표본)면 `UNMEASURABLE` 로 FAIL.
   - 지속성(리뷰 B1): k 불변성은 이동한 프레임들만 보므로 hold 도중 이동이 멈추는 회귀를 놓친다 (첫 프레임 뒤 `pressed` 소실 변이 — k spread ≤ 5.5e-15 로 통과, 구 비율 술어는 잡았음). 가드가 `w` keydown · keyup 을 window capture 로 프레임 기록과 같은 로그에 넣고, 그 사이의 프레임이 **전부** 이동했는지 본다. `scene.render()` 는 한 task 안에서 동기로 끝나고 키 이벤트는 task 사이에서만 오므로 어긋남이 0 프레임인 구조 술어다 (수치 임계 없음). 정상 코드는 눌린 프레임 = 이동 프레임 (swiftshader 15/15 · GPU 5/5 PASS), `pressed` 소실 변이는 swiftshader 3/3 · GPU 3/3 `FAIL(지속성)`, `step = baseStep` 변이는 swiftshader 3/3 · GPU 3/3 FAIL.
   - 프로덕션 코드 변경 0 — 계측은 가드가 기존 dev 핸들로 `onAfterRenderObservable` observer 를 붙여 한다. 판정 임계 신설 0. S1–S3 · S4–S6 무변경.
+
+### Behavior Changes
+
+- **명왕성 옆에 카론이 보인다** (#1305). 명왕성 포커스에서 카론 원반 · 궤도선 · 라벨이 뜨고, 검색 「카론」/「charon」 · 클릭 · `?focus=charon` 으로 고를 수 있다. 카론 원반은 명왕성의 절반 크기라 달(지구 대비 0.068)보다 크게 그려진다.
+- **위성의 화면 공전 속도가 조금 빨라진다** (#1305). 평균 운동이 √(1 + m/M) 배 — 카론 5.9%, 달 0.61%, 그 밖의 위성 0.012% 이하 (최대 타이탄). epoch(J2000) 에서는 위치가 같고 시간이 흐를수록 위상 차가 쌓인다 (달은 2026-01-01 에 약 2.1 바퀴 앞선다). J2000 이 아닌 고정 시각으로 위성을 찍는 화면 캡처 기준선이 바뀔 수 있다.
 
 ## [0.94.1] - 2026-10-08
 

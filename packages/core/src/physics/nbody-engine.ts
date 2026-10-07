@@ -6,8 +6,8 @@
  * - 긴 dt는 내부 서브스텝으로 쪼개어 안정성 확보 (기본 1일)
  */
 import { NBodyEngine as WasmEngine } from '@astro-simulator/physics-wasm';
-import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import type { LoadedSolarSystem } from '../ephemeris/solar-system-loader.js';
+import { orbitMu } from './kepler.js';
 import { orbitalStateAt } from './state-vector.js';
 
 const DEFAULT_MAX_SUB_DT_SECONDS = 86_400; // 1 일
@@ -102,8 +102,8 @@ export function buildInitialState(system: LoadedSolarSystem, julianDate: number)
     resolve(parent.id);
     const parentP = worldPos.get(parent.id)!;
     const parentV = worldVel.get(parent.id)!;
-    const mu = GRAVITATIONAL_CONSTANT * parent.mass;
-    const { position, velocity } = orbitalStateAt(body.orbit, julianDate, mu);
+    // #1305 — scene Kepler 경로와 같은 μ (위성 G(M+m) / 태양 직속 G·M). 모체 반동은 비-범위.
+    const { position, velocity } = orbitalStateAt(body.orbit, julianDate, orbitMu(body, parent));
     worldPos.set(id, [
       parentP[0] + position[0],
       parentP[1] + position[1],
