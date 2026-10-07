@@ -1,22 +1,25 @@
 /**
- * #1265 — 표시 패널 토글 4종의 데이터 테이블 (ADR `20260927-1265` 결정 7 — 4 토글의 SSoT).
+ * #1265 — 표시 패널 토글의 데이터 테이블 (ADR `20260927-1265` 결정 7 — 토글의 SSoT). #1293 이 5번째 행
+ * (이름 라벨 — web 전용, `command: null`) 을 더했다.
  *
  * 패널 (`display-panel.tsx`) · 공용 훅 (`use-display-toggle.ts`) · 단위 테스트가 모두 이 표를 읽는다.
  * 행을 늘릴 때 고칠 곳은 이 파일 하나다 — URL 키 · 라벨 · 역방향 파서 · core 명령 · 가용성 · 비활성 사유가
  * 한 행에 모여 있다.
  *
- * URL 어휘는 기존 `parse-*-mode.ts` 4종을 그대로 쓴다 — 새 URL 파라미터 0, 새 파서 0 (결정 5). 쓰는 쪽은
- * `serializeDisplayToggle` 하나이고 그 역방향이 각 행의 `parse` 다.
+ * URL 어휘는 기존 `parse-*-mode.ts` 4종을 그대로 쓴다 — 새 URL 파라미터 0, 새 파서 0 (결정 5). 예외는 #1293 의
+ * `?labels=` (`parse-labels-mode.ts` — 같은 어휘 `off` 옵트아웃). 쓰는 쪽은 `serializeDisplayToggle` 하나이고 그
+ * 역방향이 각 행의 `parse` 다.
  */
 
 import type { CoreCommand } from '@astro-simulator/shared';
 import type { SimStoreState } from '@/store/sim-store';
 import { parseCloudsVisible } from './parse-cloud-mode';
+import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
 import { parseOrbitsVisible } from './parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
 
-export type DisplayToggleId = 'orbits' | 'stars' | 'clouds' | 'nightLights';
+export type DisplayToggleId = 'orbits' | 'stars' | 'clouds' | 'nightLights' | 'labels';
 
 /**
  * 장면이 준비된 뒤 확정되는 환경 가용성. `null` = 장면 미준비 (sim-canvas 가 핸들러를 등록하기 전 ·
@@ -45,18 +48,27 @@ export const DISPLAY_DISABLED_REASONS = {
 } as const;
 
 /** store 에 보관하는 사용자 의도 (URL 의도) 필드. 궤도선은 기존 필드를 그대로 쓴다 (Q4). */
-type IntentKey = 'orbitLinesVisible' | 'starsVisible' | 'cloudsVisible' | 'nightLightsVisible';
+type IntentKey =
+  'orbitLinesVisible' | 'starsVisible' | 'cloudsVisible' | 'nightLightsVisible' | 'labelsVisible';
 type IntentSetterKey =
-  'setOrbitLinesVisible' | 'setStarsVisible' | 'setCloudsVisible' | 'setNightLightsVisible';
+  | 'setOrbitLinesVisible'
+  | 'setStarsVisible'
+  | 'setCloudsVisible'
+  | 'setNightLightsVisible'
+  | 'setLabelsVisible';
 
 export interface DisplayToggleDef {
   id: DisplayToggleId;
   /** URL 쿼리 키 — 기존 파라미터 (`?orbits=` · `?stars=` · `?clouds=` · `?nightlights=`). */
-  urlKey: 'orbits' | 'stars' | 'clouds' | 'nightlights';
+  urlKey: 'orbits' | 'stars' | 'clouds' | 'nightlights' | 'labels';
   label: string;
   /** URL → 의도. `serializeDisplayToggle` 의 역방향 (기존 파서 재사용). */
   parse: (urlParam: string | null | undefined) => boolean;
-  command: (visible: boolean) => CoreCommand;
+  /**
+   * scene 에 보낼 core 명령. `null` = **web 전용 토글** (#1293 라벨 — DOM 오버레이라 scene 상태가 없다).
+   * 그 행은 store 의도만으로 화면이 정해지므로 명령 발행을 건너뛴다 (`use-display-toggle.ts`).
+   */
+  command: ((visible: boolean) => CoreCommand) | null;
   intentKey: IntentKey & keyof SimStoreState;
   setterKey: IntentSetterKey & keyof SimStoreState;
   /** `null` = 사용 가능 · 문자열 = 비활성 사유. */
@@ -122,6 +134,19 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     setterKey: 'setNightLightsVisible',
     disabledReason: surfaceReason,
     pressed: surfacePressed,
+  },
+  {
+    id: 'labels',
+    urlKey: 'labels',
+    label: '이름 라벨',
+    parse: parseLabelsVisible,
+    // #1293 — DOM 오버레이 (`body-labels.tsx`) 가 store 를 직접 구독한다. scene 이 모르는 상태라 명령 없음.
+    command: null,
+    intentKey: 'labelsVisible',
+    setterKey: 'setLabelsVisible',
+    // 장면 준비 전에는 오버레이 자체가 없어 (SimCommandProvider 가 children 보류) 누를 수 있어도 무해하다 — 궤도선과 같은 처리.
+    disabledReason: () => null,
+    pressed: (intent) => intent,
   },
 ];
 

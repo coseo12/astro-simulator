@@ -29,7 +29,7 @@ import { resolveFocusTrapTarget } from '@/lib/focus-trap';
  *   2. `role="dialog"` + `aria-modal="true"` + `aria-labelledby` + `data-modal-open="true"`
  *      (`data-modal-open` 은 focus-quick-buttons 의 Esc 오발화 가드 SSoT — #737 핵심결정 1)
  *   3. Tab / Shift+Tab 순환을 패널 내부로 가둠 (`resolveFocusTrapTarget`)
- *   4. open 시 닫기 버튼 focus / close 시 **직전 포커스 요소** 복원
+ *   4. open 시 닫기 버튼 focus (`initialFocusRef` 가 있으면 그 요소 — #1293 검색 입력창) / close 시 **직전 포커스 요소** 복원
  *   5. Esc + backdrop 클릭 닫기
  *
  * ## focus 복원 대상 = "직전 포커스 요소" (onboarding 의 triggerRef 승격)
@@ -72,6 +72,11 @@ export interface ModalProps {
   panelClassName?: string;
   /** 열림 시점 activeElement 가 없을 때(자동 표시 등) 복원할 대상. */
   fallbackFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * #1293 — 열릴 때 포커스를 둘 요소. 생략하면 닫기 버튼. 검색 대화상자는 입력창이 첫 조작 대상이라 지정한다
+   * (닫기 버튼에 먼저 두면 열자마자 타이핑한 글자가 버려진다).
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
@@ -88,6 +93,7 @@ export function Modal({
   closeTestId,
   panelClassName = 'max-w-2xl max-h-[80vh]',
   fallbackFocusRef,
+  initialFocusRef,
   children,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -140,7 +146,7 @@ export function Modal({
       const active = document.activeElement;
       previousFocusRef.current =
         active instanceof HTMLElement && active !== document.body ? active : null;
-      closeButtonRef.current?.focus();
+      (initialFocusRef?.current ?? closeButtonRef.current)?.focus();
       return;
     }
     if (!hasOpenedRef.current) return;
@@ -149,7 +155,7 @@ export function Modal({
     if (previous && previous.isConnected) previous.focus();
     else fallbackFocusRef?.current?.focus();
     previousFocusRef.current = null;
-  }, [open, fallbackFocusRef]);
+  }, [open, fallbackFocusRef, initialFocusRef]);
 
   const handleBackdropClick = useCallback(() => onCloseRef.current(), []);
 

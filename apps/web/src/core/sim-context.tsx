@@ -1,7 +1,7 @@
 'use client';
 
 import type { SimulationCore } from '@astro-simulator/core';
-import type { Tier } from '@astro-simulator/core/scene';
+import type { BodyScreenInfo, Tier } from '@astro-simulator/core/scene';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
@@ -40,6 +40,12 @@ export type BodyStateFn = (
 ) => { pos: [number, number, number]; vel: [number, number, number] } | null;
 
 /**
+ * #1293 — 3D 이름 라벨용 body 화면 투영 조회 (core `SolarSystemSceneHandles.getBodyScreenInfo`).
+ * 반환은 core 내부 버퍼 (호출마다 in-place 갱신) — 소비자는 읽기만 한다.
+ */
+export type BodyScreenInfoFn = () => readonly BodyScreenInfo[];
+
+/**
  * SimulationCore에 대한 명령 전송 인터페이스.
  * 컴포넌트는 이 context를 통해서만 core에 접근 — core 인스턴스 직접 노출은 피한다.
  *
@@ -59,6 +65,8 @@ interface SimCommandApi {
    * null 이면 소비자(use-osculating-sync)는 정적 JSON 폴백 유지 후 배선 도착 시 재시작.
    */
   getBodyState: BodyStateFn | null;
+  /** #1293 — 라벨 오버레이용 scene handle. scene 생성 완료 전 null (getBodyState 동형). */
+  getBodyScreenInfo: BodyScreenInfoFn | null;
 }
 
 const SimCommandContext = createContext<SimCommandApi | null>(null);
@@ -68,6 +76,7 @@ export function SimCommandProvider({
   camera,
   getActiveTier,
   getBodyState,
+  getBodyScreenInfo,
   children,
 }: {
   core: SimulationCore | null;
@@ -77,6 +86,8 @@ export function SimCommandProvider({
   getActiveTier?: (() => Tier) | null;
   /** #847 — sim-canvas 가 `solar.getBodyState` 를 그대로 전달. osculating 훅이 polling 시점 조회. */
   getBodyState?: BodyStateFn | null;
+  /** #1293 — sim-canvas 가 `solar.getBodyScreenInfo` 를 그대로 전달. 라벨 오버레이가 rAF 마다 조회. */
+  getBodyScreenInfo?: BodyScreenInfoFn | null;
   children: ReactNode;
 }) {
   // #419 — core null 시 children 렌더 보류 (mount 순서 정합화).
@@ -95,8 +106,9 @@ export function SimCommandProvider({
       camera: camera ?? null,
       getActiveTier: getActiveTier ?? null,
       getBodyState: getBodyState ?? null,
+      getBodyScreenInfo: getBodyScreenInfo ?? null,
     };
-  }, [core, camera, getActiveTier, getBodyState]);
+  }, [core, camera, getActiveTier, getBodyState, getBodyScreenInfo]);
 
   if (api === null) return null;
 
@@ -154,4 +166,10 @@ export function useSimCameraTier(): {
 export function useSimBodyState(): BodyStateFn | null {
   const ctx = useContext(SimCommandContext);
   return ctx?.getBodyState ?? null;
+}
+
+/** #1293 — 라벨 오버레이용 화면 투영 조회. scene 준비 전 · Provider 외부에서는 null. */
+export function useSimBodyScreenInfo(): BodyScreenInfoFn | null {
+  const ctx = useContext(SimCommandContext);
+  return ctx?.getBodyScreenInfo ?? null;
 }

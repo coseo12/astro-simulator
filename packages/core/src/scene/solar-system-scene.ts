@@ -78,6 +78,12 @@ import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
+  isInsideViewport,
+  isSphereInsideSphere,
+  projectToScreen,
+  type ScreenPoint,
+} from './body-screen-projection.js';
+import {
   GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
   resolveGlowMarker,
   resolveGlowMarkerRestoreEmissiveScale,
@@ -364,7 +370,44 @@ export interface SolarSystemSceneHandles {
    * **재할당 회피**: 반환 배열은 내부 버퍼 (frozen 아님). 호출자가 mutate 하면 안 됨 (read-only 계약).
    */
   getLodInfo: () => readonly LodBodyInfo[];
+  /**
+   * #1293 — body 별 화면 좌표 (CSS px) · 가시성 · 화면 반지름. 3D 이름 라벨 (DOM 오버레이) 용도.
+   *
+   * **pull API — 프레임 위상 멤버가 아니다.** 호출 시점의 `scene.getTransformMatrix()` 와 mesh 위치로 투영하므로
+   * `scene.render()` 뒤 (같은 rAF 틱의 web 루프) 에 부르면 방금 그린 프레임과 일치한다. 프레임 위상
+   * (`runFramePass`) · 렌더 루프 순서 계약 (ADR `20260907-1205`) 은 건드리지 않는다.
+   *
+   * 화면 반지름은 마지막 `runLodPass` 의 `screenCoverage` 를 CSS px 로 환산한 값이다 (최대 1 프레임 이전).
+   * `runLodPass` 가 아직 돌지 않았으면 빈 배열이다.
+   *
+   * **재할당 회피**: 반환 배열·행은 내부 버퍼 (호출마다 in-place 갱신). 호출자는 mutate 금지 (read-only 계약).
+   */
+  getBodyScreenInfo: () => readonly BodyScreenInfo[];
   dispose: () => void;
+}
+
+/**
+ * #1293 — body 화면 투영 1행. 좌표는 캔버스 좌상단 원점 **CSS px** (`adaptToDeviceRatio` 물리 px 아님).
+ */
+export interface BodyScreenInfo {
+  id: string;
+  /** 화면 x (CSS px). `inFront === false` 면 의미 없음. */
+  x: number;
+  /** 화면 y (CSS px). `inFront === false` 면 의미 없음. */
+  y: number;
+  /** 화면 반지름 (CSS px) — `LodBodyInfo.screenCoverage` 의 CSS 환산 (bodyScale 과장 포함). */
+  radius: number;
+  /** 카메라 앞인가 (clip `w > 0`). */
+  inFront: boolean;
+  /** 카메라 앞 ∧ 중심이 캔버스 안. 라벨 표시의 필요조건. */
+  onScreen: boolean;
+  /** 카메라 ↔ body 중심 거리 (scene unit). body 끼리 앞뒤 비교 (라벨 가림 판정) 용 — 단위 환산 없음. */
+  cameraDistance: number;
+  /**
+   * #1293 qa B1 — 렌더된 모체 구 안에 **완전히** 묻혀 어느 시점에서도 보이지 않는가 (`isSphereInsideSphere`).
+   * bodyScale 로 과장된 모체가 가까운 위성 궤도를 삼키는 경우 (목성 ↔ 이오). 모체 없는 body 는 false.
+   */
+  embeddedInParent: boolean;
 }
 
 /**
@@ -2219,6 +2262,73 @@ export function createSolarSystemScene(
   // #388 — body 별 LOD raw 데이터 노출. dev overlay 가 frame 간격으로 polling.
   const getLodInfo = (): readonly LodBodyInfo[] => lodInfo;
 
+  // #1293 — 라벨용 화면 투영 (pull). lodInfo 행을 따라가며 high mesh 위치를 지금의 view × projection 으로
+  // 투영한다. high mesh 가 position 의 유일한 owner 라 (위 variant 주석 계약) LOD 단계와 무관하게 중심이 같다.
+  const bodyScreenInfo: BodyScreenInfo[] = [];
+  // 렌더된 구 반지름 (scene unit) — high mesh 의 **실제** 크기: 생성 지름 (`body-mesh-factory` 의 실측 반경 ×
+  // 생성 tier renderScale × bodyScale) 의 반 = 로컬 bbox `extendSize.x`, 여기에 tier 전환 scaling (`setTier`) 을 곱한다.
+  // 산식을 다시 쓰지 않고 메시에서 읽는 이유: `?bodyScaleP=` 등 크기 결정 경로가 바뀌어도 그린 크기와 어긋나지 않게.
+  const renderedSphereRadius = (m: {
+    getBoundingInfo(): { boundingBox: { extendSize: Vector3 } };
+    absoluteScaling: Vector3;
+  }): number => m.getBoundingInfo().boundingBox.extendSize.x * Math.abs(m.absoluteScaling.x);
+  const screenPointScratch: ScreenPoint = { x: 0, y: 0, inFront: false };
+  const getBodyScreenInfo = (): readonly BodyScreenInfo[] => {
+    const engine = scene.getEngine();
+    // CSS px = 엔진 px × hardwareScalingLevel (`adaptToDeviceRatio` 면 1/DPR — Babylon `resize` 의 역).
+    const cssPerEnginePx = engine.getHardwareScalingLevel();
+    const cssWidth = engine.getRenderWidth() * cssPerEnginePx;
+    const cssHeight = engine.getRenderHeight() * cssPerEnginePx;
+    const vpArr = scene.getTransformMatrix().m;
+    const cam = scene.activeCamera?.globalPosition;
+    let n = 0;
+    for (const info of lodInfo) {
+      const mesh = meshes.get(info.id);
+      if (!mesh) continue;
+      const p = mesh.getAbsolutePosition();
+      projectToScreen(p.x, p.y, p.z, vpArr, cssWidth, cssHeight, screenPointScratch);
+      const { x, y, inFront } = screenPointScratch;
+      const onScreen = inFront && isInsideViewport(x, y, cssWidth, cssHeight);
+      const radius = info.screenCoverage * cssPerEnginePx;
+      const cameraDistance = cam ? Vector3.Distance(cam, p) : 0;
+      const parentId = bodiesById.get(info.id)?.parentId;
+      const parentMesh = parentId ? meshes.get(parentId) : undefined;
+      const embeddedInParent =
+        parentMesh !== undefined &&
+        isSphereInsideSphere(
+          p,
+          renderedSphereRadius(mesh),
+          parentMesh.getAbsolutePosition(),
+          renderedSphereRadius(parentMesh),
+        );
+      const row = bodyScreenInfo[n];
+      if (row) {
+        row.id = info.id;
+        row.x = x;
+        row.y = y;
+        row.radius = radius;
+        row.inFront = inFront;
+        row.onScreen = onScreen;
+        row.cameraDistance = cameraDistance;
+        row.embeddedInParent = embeddedInParent;
+      } else {
+        bodyScreenInfo.push({
+          id: info.id,
+          x,
+          y,
+          radius,
+          inFront,
+          onScreen,
+          cameraDistance,
+          embeddedInParent,
+        });
+      }
+      n += 1;
+    }
+    if (bodyScreenInfo.length > n) bodyScreenInfo.length = n;
+    return bodyScreenInfo;
+  };
+
   const updateAtKepler = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
     for (const body of system.bodies) {
@@ -2420,6 +2530,7 @@ export function createSolarSystemScene(
     setLodOverride,
     getLodStats,
     getLodInfo,
+    getBodyScreenInfo,
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();

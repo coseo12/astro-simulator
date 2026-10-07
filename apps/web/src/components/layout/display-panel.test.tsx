@@ -19,7 +19,9 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
-const IDS = ['orbits', 'stars', 'clouds', 'nightLights'] as const;
+const IDS = ['orbits', 'stars', 'clouds', 'nightLights', 'labels'] as const;
+/** 패널의 마지막 토글 (#1293 — 라벨 행이 추가돼 불빛에서 라벨로 바뀌었다). */
+const LAST_ID = IDS[IDS.length - 1]!;
 
 function renderPanel() {
   return render(<DisplayPanel />, { wrapper: withNuqsTestingAdapter() });
@@ -35,6 +37,7 @@ beforeEach(() => {
     starsVisible: true,
     cloudsVisible: true,
     nightLightsVisible: true,
+    labelsVisible: true,
     displayCapabilities: { starfield: true, surfaceDetail: true },
     displayPanelOpen: false,
   });
@@ -47,7 +50,7 @@ describe('DisplayPanel — 열기/닫기', () => {
     expect(screen.queryByTestId('display-panel')).toBeNull();
   });
 
-  it('열림: aria-expanded=true · aria-controls=패널 id · 토글 4개 aria-pressed (D1)', () => {
+  it('열림: aria-expanded=true · aria-controls=패널 id · 토글 전부 aria-pressed (D1)', () => {
     renderPanel();
     openPanel();
     const panel = screen.getByTestId('display-panel');
@@ -185,10 +188,10 @@ describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 �
   it('마지막 토글 Tab → 패널 닫힘 + 트리거 다음 요소로 (문서 끝으로 빠지지 않는다)', () => {
     renderWithSiblings();
     openPanel();
-    toggleEl('nightLights').focus();
+    toggleEl(LAST_ID).focus();
     const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     act(() => {
-      toggleEl('nightLights').dispatchEvent(ev);
+      toggleEl(LAST_ID).dispatchEvent(ev);
     });
     expect(ev.defaultPrevented).toBe(true);
     expect(screen.queryByTestId('display-panel')).toBeNull();
@@ -220,7 +223,7 @@ describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 �
     renderPanel(); // 형제 없음 — 패널을 빼면 트리거가 문서의 마지막 포커서블이다
     openPanel();
     act(() => {
-      toggleEl('nightLights').dispatchEvent(
+      toggleEl(LAST_ID).dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
       );
     });
@@ -245,7 +248,7 @@ describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 �
     );
     openPanel();
     act(() => {
-      toggleEl('nightLights').dispatchEvent(
+      toggleEl(LAST_ID).dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
       );
     });

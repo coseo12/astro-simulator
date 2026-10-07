@@ -51,7 +51,8 @@
  *
  * ## 판정 — UI 경로 (PR2 배정분)
  *   장면 준비  UI 페이지마다 부팅 직후 `displayCapabilities !== null` (sim-canvas 가 여는 제품 가용성 게이트 — 게이트다).
- *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 4 개 가시.
+ *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 전부 가시
+ *        (`UI_IDS` — #1293 이 이름 라벨을 더해 5 개).
  *   D2   같은 페이지 — 우측 그룹 버튼 전부 `x + width ≤ 1280` · 좌측 단축 바 버튼 전부 스크롤로 도달 + 그 지점 hit.
  *   D3   패널 궤도선 ↔ 단축 바 `toggle-orbits` ↔ `store.orbitLinesVisible` — 어느 쪽을 눌러도 세 값 일치.
  *   D4   관찰 모드 · 패널 열림 · 4 초 무입력 → 상단 바 computed `opacity === "1"`.
@@ -63,14 +64,14 @@
  *   D11  토글별 OFF → `key=off` · ON → 키 부재 · `history.length` 불변 · 북마크 복사 URL 반영 · 전부 OFF 새로고침 뒤
  *        패널 `aria-pressed` · scene 4축 동일 · 4 키를 전부 끈 로드 직후 (조작 전) URL 불변 · `?orbits=off` → ON →
  *        북마크에 `orbits` 부재. 소프트웨어 렌더의 별은 D9 가 막으므로 별 URL 은 하드웨어 전용.
- *   D14  캔버스에서 Tab 으로 트리거 도달 → Enter → 토글 4 개 선형 순회 (trap 없음) → Space 반전 → Esc 닫힘 + 포커스
+ *   D14  캔버스에서 Tab 으로 트리거 도달 → Enter → 패널 토글 전부 선형 순회 (trap 없음) → Space 반전 → Esc 닫힘 + 포커스
  *        트리거. 엣지: `focus=earth` 에서 Esc → `freeFlyMode === false`. D14b: 패널 연 채 `focusOn mars` 로 선택을
  *        바꿔 (자유시점 리스너가 패널 리스너 **뒤로** 재등록) Esc → 패널 닫힘 ∧ 자유시점 미진입.
  *        포커스 순서: 마지막 토글 Tab → 패널 닫힘 + 트리거의 **기본 Tab 목적지** (패널 닫힌 상태에서 관측한 값) ·
  *        첫 토글 Shift+Tab → 트리거 (패널 유지) · 열린 트리거 Tab → 첫 토글.
  *        양성 대조: 패널이 닫힌 상태의 같은 Esc 는 자유시점으로 **간다** (그래야 위 `false` 술어가 판별력을 가진다 —
  *        리스너가 죽은 회귀는 게이트 FAIL).
- *   D15 UI  패널 토글 4 개 × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors`.
+ *   D15 UI  패널 토글 전부 (`UI_IDS`) × 10 왕복 × (재생 / 일시정지) — `!hasSimErrors`.
  *   스크롤  트리거 위치가 바뀐 스크롤에서만 닫는다 — 연구 모드 우 패널 세로 스크롤 (무관) 뒤 패널 유지 · 좁은 폭 우측 그룹
  *        스크롤 (트리거 이동) 뒤 패널 닫힘. 레이스: 키 간 지연 0 으로 캔버스 → 트리거 Tab → Enter 를 `RACE_TRIALS` 회
  *        반복해 방금 연 패널이 늦게 도착한 스크롤로 닫히지 않는가 (PR #1268 qa 가 실측한 결함).
@@ -220,8 +221,8 @@ const READY_TIMEOUT_MS = 20_000;
 
 /** UI 판정 기본 로드 — D15 스트레스와 같은 쿼리 (4 효과 전부 켜진 상태 · focus=earth · 관찰 모드). */
 const UI_BASE = STRESS;
-/** D11 — 4 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). */
-const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off`;
+/** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` 포함. */
+const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off`;
 /** 계약 D1 — 모드 4종. */
 const UI_MODES = ['observe', 'research', 'education', 'sandbox'];
 /** 계약 D1 · D2 — 1280×720 (`setupPage` · `setupUiPage` 뷰포트와 같은 값). */
@@ -664,6 +665,8 @@ const UI_URL_KEY = {
   stars: 'stars',
   clouds: 'clouds',
   nightLights: 'nightlights',
+  // #1293 — 이름 라벨 (web 전용 5번째 행). 표시 패널 토글 집합이 늘면 여기도 같이 는다 (D1 개수 · D14 순회 · D11 왕복).
+  labels: 'labels',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
 
@@ -1253,7 +1256,7 @@ async function runUiInteraction(browser, out, pages) {
   const d3AfterBar = await readOrbitSync();
   out.uiD3 = { initial: d3Initial, afterPanel: d3AfterPanel, afterBar: d3AfterBar };
 
-  // ── D14 — 키보드만: Tab 도달 → Enter → 토글 4개 순회 (Space 반전) → Esc ──
+  // ── D14 — 키보드만: Tab 도달 → Enter → 패널 토글 전부 순회 (Space 반전) → Esc ──
   // 순회 시작점을 문서 첫 포커스 요소(캔버스)로 고정한다. `blur()` 만으로는 부족하다 — Chrome 은 마지막으로
   // 클릭한 요소를 순차 탐색 시작점으로 기억해 (위 D3 의 클릭) Tab 이 문서 중간에서 출발한다 (1차 실행 실측).
   await page.locator('[data-testid="sim-canvas"]').focus();
@@ -1426,7 +1429,7 @@ async function runUiInteraction(browser, out, pages) {
     out.uiD9 = d9;
   }
 
-  // ── D15 (UI) — 패널 토글 4개 × 10 왕복 × (재생 / 일시정지) ──
+  // ── D15 (UI) — 패널 토글 전부 × 10 왕복 × (재생 / 일시정지) ──
   await setPanelOpen(page, true);
   for (const playback of ['play', 'pause']) {
     await page.evaluate((p) => window.__simCore.command({ type: p }), playback);
@@ -2368,14 +2371,14 @@ function judgeUi(meta, { settleIds, hw }) {
     ),
     // `?mode=` 진입 자체도 조건이다 — 패널 렌더가 앱을 무너뜨리면 모드 반영도 실패하므로 전제로 두지 않는다.
     gate(
-      'UI D1 모드 4종 — ?mode= 진입 · 트리거 1개 · 열림 aria-expanded · 토글 4개 aria-pressed 가시',
+      `UI D1 모드 4종 — ?mode= 진입 · 트리거 1개 · 열림 aria-expanded · 토글 ${UI_IDS.length}개 aria-pressed 가시`,
       ['uiModes'],
       [],
       (r) => [
         JSON.stringify(
           r.uiModes.map((m) => [m.mode, m.store, m.triggers, m.expanded, m.toggles?.length]),
         ),
-        '모드마다 store = 모드 · 1 · "true" · 4 ∧ 전부 가시',
+        `모드마다 store = 모드 · 1 · "true" · ${UI_IDS.length} ∧ 전부 가시`,
         r.uiModes.length > 0 &&
           r.uiModes.every(
             (m) =>
@@ -2663,7 +2666,7 @@ function judgeUi(meta, { settleIds, hw }) {
       ],
     ),
     gate(
-      'UI D14 키보드 — Tab 도달 · Enter 열림 · 토글 4개 순회 · Space 반전 · Esc 닫힘 + 포커스 복귀',
+      `UI D14 키보드 — Tab 도달 · Enter 열림 · 토글 ${UI_IDS.length}개 순회 · Space 반전 · Esc 닫힘 + 포커스 복귀`,
       ['uiD14'],
       [],
       (r) => [
@@ -2749,7 +2752,7 @@ function judgeUi(meta, { settleIds, hw }) {
       ],
     ),
     gate(
-      `UI D15 패널 ${STRESS_ROUND_TRIPS}왕복 × 4 토글 × 재생/일시정지 — 콘솔 에러`,
+      `UI D15 패널 ${STRESS_ROUND_TRIPS}왕복 × ${UI_IDS.length} 토글 × 재생/일시정지 — 콘솔 에러`,
       ['uiD15Errors'],
       [],
       (r) => [String(r.uiD15Errors.length), '!hasSimErrors', !hasSimErrors(r.uiD15Errors)],

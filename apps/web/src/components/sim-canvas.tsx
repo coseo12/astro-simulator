@@ -9,7 +9,7 @@ import {
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
 import { PointerEventTypes } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
-import type { BodyStateFn, CameraSyncSurface } from '@/core/sim-context';
+import type { BodyScreenInfoFn, BodyStateFn, CameraSyncSurface } from '@/core/sim-context';
 // P12-A #298 — Tier 엔진 유틸 (renderScaleForTier) 는 sceneApi 네임스페이스에 이미 re-export 되어 있다.
 // `sceneApi.renderScaleForTier` 로 접근한다 (별도 import 불필요, 아래 onBeforeRender 에서 사용).
 import { attachCoreToStore } from '@/core/core-adapter';
@@ -24,6 +24,7 @@ import { parseSurfaceVisible } from '@/core/parse-surface-mode';
 import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
+import { parseLabelsVisible } from '@/core/parse-labels-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 // #1234 C3-B — renderer 문자열 합성 + late-arrival 판정 (CI 미도달 분기라 순수 함수 + 단위 테스트).
 import {
@@ -32,6 +33,7 @@ import {
 } from '@/core/resolve-renderer-string';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
+import { BodyLabels } from './layout/body-labels';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
@@ -178,6 +180,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     camera: CameraSyncSurface;
     getActiveTier: () => Tier;
     getBodyState: BodyStateFn;
+    // #1293 — 라벨 오버레이 (`BodyLabels`) 용 화면 투영 pull API.
+    getBodyScreenInfo: BodyScreenInfoFn;
   } | null>(null);
 
   useEffect(() => {
@@ -636,6 +640,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const nightLightsVisible = parseNightLightsVisible(
           new URLSearchParams(window.location.search).get('nightlights'),
         );
+        // #1293 — 3D 이름 라벨 기본 ON + `?labels=off` 옵트아웃. web 전용 (DOM 오버레이) 이라 core 옵션이 아니라
+        // 아래 표시 토글 블록에서 store 에만 싣는다.
+        const labelsVisible = parseLabelsVisible(
+          new URLSearchParams(window.location.search).get('labels'),
+        );
         // #762 — 천체 압축 곡선 지수 p (default 0.5 sqrt). `?bodyScaleP=0.55` 로 D-T2 실시간 튜닝.
         // URL 부재 시 default p 의 getBodyScale 콜백 그대로 (모듈 로드 시 1회 산출된 BODY_SCALE).
         // ADR 20260629-762 §5 결정 2.7.
@@ -710,6 +719,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             camera,
             getActiveTier: solar.getTier,
             getBodyState: solar.getBodyState,
+            getBodyScreenInfo: solar.getBodyScreenInfo,
           });
         }
 
@@ -961,6 +971,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           store.setStarsVisible(starsParamVisible);
           store.setCloudsVisible(cloudsVisible);
           store.setNightLightsVisible(nightLightsVisible);
+          store.setLabelsVisible(labelsVisible);
           // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
           store.setDisplayCapabilities({
             starfield: !isSoftwareRenderer,
@@ -1427,7 +1438,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         camera={cameraTierApi?.camera ?? null}
         getActiveTier={cameraTierApi?.getActiveTier ?? null}
         getBodyState={cameraTierApi?.getBodyState ?? null}
+        getBodyScreenInfo={cameraTierApi?.getBodyScreenInfo ?? null}
       >
+        {/* #1293 — 3D 이름 라벨 오버레이. 캔버스 바로 위 · HUD (children, z-hud) 아래에 둔다 (DOM 순서). */}
+        <BodyLabels wheelTargetRef={canvasRef} />
         {children}
       </SimCommandProvider>
     </>

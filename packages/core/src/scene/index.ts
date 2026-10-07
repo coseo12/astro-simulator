@@ -36,6 +36,7 @@ export type {
   SolarSystemSceneHandles,
   SolarSystemSceneOptions,
   PhysicsEngineKind,
+  BodyScreenInfo,
 } from './solar-system-scene.js';
 // P12-A #298 — Tier 엔진 (Display-Relative Scale Unification).
 export {

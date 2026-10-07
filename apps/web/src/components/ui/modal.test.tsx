@@ -89,6 +89,37 @@ describe('Modal (#848 공용 셸)', () => {
     expect(document.activeElement).toBe(screen.getByTestId('test-close'));
   });
 
+  it('#1293 — initialFocusRef 가 있으면 닫기 버튼 대신 그 요소로 초기 focus, 닫으면 트리거 복원', async () => {
+    function InitialFocusHarness() {
+      const [open, setOpen] = useState(false);
+      const inputRef = useRef<HTMLInputElement | null>(null);
+      return (
+        <div>
+          <button data-testid="trigger" onClick={() => setOpen(true)}>
+            열기
+          </button>
+          <Modal
+            open={open}
+            onClose={() => setOpen(false)}
+            title="t"
+            titleId="t"
+            testId="m"
+            closeTestId="c"
+            initialFocusRef={inputRef}
+          >
+            <input ref={inputRef} data-testid="first-input" />
+          </Modal>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<InitialFocusHarness />);
+    await user.click(screen.getByTestId('trigger'));
+    expect(document.activeElement).toBe(screen.getByTestId('first-input'));
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(screen.getByTestId('trigger'));
+  });
+
   describe('focus trap — Tab 순환이 모달 내부에 갇힘', () => {
     it('마지막 요소 → Tab → 첫 요소', async () => {
       const user = userEvent.setup();

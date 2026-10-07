@@ -16,7 +16,7 @@ import { getDisplayToggle, serializeDisplayToggle, type DisplayToggleId } from '
 import { useSimCommand } from './sim-context';
 
 /**
- * 쓰기 대상 URL 키 4종. 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
+ * 쓰기 대상 URL 키 5종. 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
  * 새 URL 읽기 0). 파서는 nuqs 가 키를 다루는 데 필요한 형식일 뿐이다.
  */
 const DISPLAY_URL_KEYS = {
@@ -24,6 +24,7 @@ const DISPLAY_URL_KEYS = {
   stars: parseAsString,
   clouds: parseAsString,
   nightlights: parseAsString,
+  labels: parseAsString,
 };
 
 export function useDisplayToggle(): (id: DisplayToggleId) => void {
@@ -42,7 +43,8 @@ export function useDisplayToggle(): (id: DisplayToggleId) => void {
       if (def.disabledReason(state.displayCapabilities) !== null) return;
       const next = !state[def.intentKey];
       state[def.setterKey](next);
-      sendCommand(def.command(next));
+      // #1293 — web 전용 행 (`command: null`) 은 store 만으로 화면이 정해진다.
+      if (def.command) sendCommand(def.command(next));
       void setUrl({ [def.urlKey]: serializeDisplayToggle(next) });
     },
     [sendCommand, setUrl],
