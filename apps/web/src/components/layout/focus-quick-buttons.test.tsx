@@ -1,9 +1,11 @@
-import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
 import { withNuqsTestingAdapter, type UrlUpdateEvent } from 'nuqs/adapters/testing';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
+import { flushSync } from 'react-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
+import { Modal } from '@/components/ui/modal';
 import { FocusQuickButtons } from './focus-quick-buttons';
 
 let sentCommands: CoreCommand[] = [];
@@ -471,6 +473,72 @@ describe('FocusQuickButtons — Esc 충돌 가드 (#737 data-modal-open)', () =>
     // 양성 대조 — 메뉴가 닫힌 상태의 같은 Esc 는 기존 의미(자유시점)로 간다.
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     expect(sentCommands).toContainEqual({ type: 'enterFreeFly' });
+  });
+
+  /**
+   * #1296 — 실 공용 `Modal` 과의 통합. 실 브라우저 기전을 재현한다:
+   *   (1) 자동 표시 온보딩은 마운트 즉시 열려 모달의 window keydown 리스너가 **먼저** 등록되고, `?focus=` 의
+   *       `selectedBodyId` 는 그 뒤에 정해져 Esc→자유시점 리스너가 **나중에** 등록된다.
+   *   (2) 사용자 입력(trusted) 이벤트는 리스너 사이마다 microtask checkpoint 가 돌아, 모달 리스너의 `setOpen(false)`
+   *       가 다음 리스너 전에 커밋된다 → `[data-modal-open]` 이 이미 사라진 상태로 자유시점 리스너가 돈다.
+   *   jsdom 의 `fireEvent` 는 리스너 사이 커밋이 없으므로 (2) 를 `flushSync` 로 흉내 낸다.
+   */
+  function ModalHarness({ initiallyOpen }: { initiallyOpen: boolean }) {
+    const [open, setOpen] = useState(initiallyOpen);
+    return (
+      <>
+        <button data-testid="harness-open" onClick={() => setOpen(true)}>
+          열기
+        </button>
+        <Modal
+          open={open}
+          onClose={() => flushSync(() => setOpen(false))}
+          title="조작 가이드"
+          titleId="harness-title"
+          testId="harness-modal"
+          closeTestId="harness-close"
+        >
+          <p>본문</p>
+        </Modal>
+      </>
+    );
+  }
+
+  it('#1296 D1 — 자동 표시 모달(리스너 선등록) 뒤에 포커스가 정해져도 모달을 닫는 Esc 는 enterFreeFly 미발화', () => {
+    render(
+      <>
+        <ModalHarness initiallyOpen />
+        <FocusQuickButtons />
+      </>,
+    );
+    // 모달이 열린 **뒤** 포커스 천체가 정해진다 → 자유시점 리스너가 모달 리스너보다 나중에 등록.
+    act(() => useSimStore.setState({ selectedBodyId: 'encke' }));
+    expect(screen.getByTestId('harness-modal')).toBeInTheDocument();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('harness-modal')).toBeNull();
+    expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
+    expect(useSimStore.getState().selectedBodyId).toBe('encke');
+
+    // D3 대조 — 모달이 없는 상태의 다음 Esc 는 기존대로 자유시점으로 간다.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(sentCommands).toContainEqual({ type: 'enterFreeFly' });
+  });
+
+  it('#1296 D2 — 포커스 중 수동으로 연 모달(리스너 후등록)도 Esc 는 enterFreeFly 미발화', () => {
+    useSimStore.setState({ selectedBodyId: 'encke' });
+    render(
+      <>
+        <ModalHarness initiallyOpen={false} />
+        <FocusQuickButtons />
+      </>,
+    );
+    fireEvent.click(screen.getByTestId('harness-open'));
+    expect(screen.getByTestId('harness-modal')).toBeInTheDocument();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('harness-modal')).toBeNull();
+    expect(sentCommands).not.toContainEqual({ type: 'enterFreeFly' });
   });
 
   it('focus 없음(selectedBodyId=null) + Esc → enterFreeFly 미발화 (#509 no-op 보존)', () => {

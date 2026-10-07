@@ -27,10 +27,11 @@ import { resolveFocusTrapTarget } from '@/lib/focus-trap';
  *
  *   1. `createPortal(..., document.body)` + backdrop `z-[100]` — canvas 합성 레이어 위 보장
  *   2. `role="dialog"` + `aria-modal="true"` + `aria-labelledby` + `data-modal-open="true"`
- *      (`data-modal-open` 은 focus-quick-buttons 의 Esc 오발화 가드 SSoT — #737 핵심결정 1)
+ *      (`data-modal-open` 은 focus-quick-buttons 의 Esc 오발화 가드 — #737 핵심결정 1. 등록 순서에 따라 닫힘 커밋 뒤에
+ *      읽혀 무력해질 수 있으므로 주 신호는 5번의 `preventDefault()` 다 — #1296)
  *   3. Tab / Shift+Tab 순환을 패널 내부로 가둠 (`resolveFocusTrapTarget`)
  *   4. open 시 닫기 버튼 focus (`initialFocusRef` 가 있으면 그 요소 — #1293 검색 입력창) / close 시 **직전 포커스 요소** 복원
- *   5. Esc + backdrop 클릭 닫기
+ *   5. Esc (window capture + `preventDefault()` — #1296) + backdrop 클릭 닫기
  *
  * ## focus 복원 대상 = "직전 포커스 요소" (onboarding 의 triggerRef 승격)
  *
@@ -116,16 +117,27 @@ export function Modal({
   // 나간 상태(배경 스크립트가 강제 focus 한 경우 등)에서도 다음 Tab 을 회수해야 하기 때문이다.
   // React 핸들러는 포커스가 패널 안에 있을 때만 발화하므로 그 복구 경로를 못 만든다.
   //
-  // target=`window` 는 기존 3 모달의 Esc 컨벤션 유지 (focus-quick-buttons 의 Esc 가드도 window).
   // keydown 은 focus 요소 → document → window 로 버블하므로 실브라우저 동작은 document 와 동일하고,
   // Tab 기본 동작(포커스 이동)은 dispatch 완료 후 수행되므로 여기서의 preventDefault 로 차단된다.
+  //
+  // ## Esc 는 window **capture** + `preventDefault()` (#1296)
+  //
+  //   `focus-quick-buttons` 의 Esc→자유시점 리스너(window bubble)는 `defaultPrevented` 와 `[data-modal-open]` 을
+  //   보고 물러난다. 예전엔 Esc 도 bubble 에서 닫기만 했으므로 그 리스너는 **DOM 속성에만** 기댔는데, 그 속성은
+  //   등록 순서가 「모달 먼저」일 때 깨진다 — 자동 표시 온보딩은 마운트 즉시 열리고 `?focus=` 의 포커스 천체는 그 뒤에
+  //   정해지기 때문이다. 사용자 입력 이벤트는 리스너 사이마다 microtask checkpoint 가 돌아, 모달 리스너의
+  //   `onClose` → React 커밋이 다음 리스너 전에 끝나 `[data-modal-open]` 이 이미 사라진 채로 자유시점 리스너가 돈다
+  //   (실 Chrome 계측: Esc 1회 동안 document bubble 에서 모달 존재 → window bubble 사이 DOM 제거 → 자유시점 진입).
+  //   capture 단계는 등록 순서와 무관하게 bubble 보다 먼저 돌므로, 여기서 `preventDefault()` 하면 모든 모달 ·
+  //   모든 등록 순서에서 신호가 도달한다 (천체 메뉴 · 표시 패널 · 검색 대화상자와 같은 신호).
   useEffect(() => {
     if (!open) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      onCloseRef.current();
+    };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCloseRef.current();
-        return;
-      }
       if (e.key !== 'Tab') return;
       const panel = panelRef.current;
       if (!panel) return;
@@ -135,8 +147,12 @@ export function Modal({
       e.preventDefault();
       target.focus();
     };
+    window.addEventListener('keydown', handleEscape, { capture: true });
     window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleEscape, { capture: true });
+      window.removeEventListener('keydown', handleKey);
+    };
   }, [open]);
 
   // ── 초기 focus / 복원 ────────────────────────────────────────────────────────

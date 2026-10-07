@@ -32,11 +32,11 @@ export function FocusQuickButtons() {
       // #1265 — 표시 패널은 capture 단계에서 Esc 를 받아 preventDefault 하고 닫힌다. 이 리스너(bubble)가 돌 때 패널은
       // 선택 변경 여부와 무관하게 **이미 없으므로** DOM 속성으로는 막을 수 없다 (PR #1268 변이 c 실측) — 이 한 줄이
       // 패널 Esc 의 유일한 차단이다 (ADR `20260927-1265` Amendment 1). #1281 천체 메뉴도 같은 방식으로 닫히므로 같은 한 줄이
-      // 메뉴 Esc 의 자유시점 오발화를 막는다 (계약 D6).
+      // 메뉴 Esc 의 자유시점 오발화를 막는다 (계약 D6). #1296 — 공용 `Modal` 도 Esc 를 capture 에서 `preventDefault()`
+      // 하므로 모달 Esc 의 주 차단도 이 한 줄이다 (아래 DOM 속성은 등록 순서가 「모달 먼저」면 닫힘 커밋 뒤에 읽혀 무력).
       if (e.defaultPrevented) return;
-      // #737 — 모달 open 중 Esc 는 모달 닫기 전용. native window listener 라 React
-      // stopPropagation 으로 차단 불가 → DOM 속성 가드로 free-fly 오발화 차단
-      // (about/sensitivity/onboarding 3 모달 일괄 정합).
+      // #737 — 모달 open 중 Esc 는 모달 닫기 전용. 이 리스너가 모달 리스너보다 먼저 도는 경우(모달을 나중에 연 경우)의
+      // 보조 가드로 남는다.
       if (document.querySelector('[data-modal-open="true"]')) return;
       const el = document.activeElement;
       const isEditable =

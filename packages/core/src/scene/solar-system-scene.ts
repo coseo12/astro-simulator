@@ -405,7 +405,7 @@ export interface BodyScreenInfo {
   cameraDistance: number;
   /**
    * #1293 qa B1 — 렌더된 모체 구 안에 **완전히** 묻혀 어느 시점에서도 보이지 않는가 (`isSphereInsideSphere`).
-   * bodyScale 로 과장된 모체가 가까운 위성 궤도를 삼키는 경우 (목성 ↔ 이오). 모체 없는 body 는 false.
+   * bodyScale 로 과장된 모체가 가까운 위성 궤도를 삼키는 경우 (#1299 이전 목성 ↔ 이오). 모체 없는 body 는 false.
    */
   embeddedInParent: boolean;
 }
@@ -1017,7 +1017,7 @@ export function createSolarSystemScene(
       if (isSatelliteOrbit(body.parentId)) {
         // R11 #721 — per-body orbit visual scale 적용 (점 좌표에 직접 곱).
         //   #627 까지는 parent 별 단일 LineSystem 의 `.scaling` 으로 visual scale 일괄 적용했으나,
-        //   saturn 위성 4개 (titan 10 / rhea 20 / enceladus 47 / iapetus 10) 가 per-body 로 서로 다른
+        //   saturn 위성 4개 (값은 `orbit-visual-scale.ts` SSoT) 가 per-body 로 서로 다른
         //   scale 을 가지면서 같은 LineSystem 에 묶이면 단일 `.scaling` 으로 표현 불가.
         //   → 점 좌표 생성 시점에 per-body scale 을 곱하고 LineSystem `.scaling` 은 1.0 으로 통일.
         //   per-body 미정의 위성 (moon/galilean/titania/triton 등) 은 parent 룩업 fallback 으로 동일값 →
@@ -2365,8 +2365,8 @@ export function createSolarSystemScene(
         // 실측 데이터 SSoT (`solar-system.json` semiMajorAxis 등) 보존 + mesh radius
         // 박제값 (BODY_SCALE) 보존 양립을 위한 시각 분리. earth-moon 기본값 30.
         // ADR `20260520-r4-earth-moon-visualization.md` §Amendment 2 §결정.
-        // R11 #721 — body.id 2번째 인자 전달로 per-body 룩업 우선 (saturn 위성 enceladus 47/rhea 20/
-        // titan 10/iapetus 10). per-body 미정의 위성은 parent 룩업 fallback (회귀 0). ADR 20260620-721 §축 2.
+        // R11 #721 — body.id 2번째 인자 전달로 per-body 룩업 우선 (saturn 위성 enceladus/rhea/
+        // titan/iapetus — 값은 `orbit-visual-scale.ts` SSoT). per-body 미정의 위성은 parent 룩업 fallback (회귀 0). ADR 20260620-721 §축 2.
         const visualScale = getOrbitVisualScale(body.parentId, body.id);
         const parentWorld = resolveWorld(body.parentId);
         world[0] = parentWorld[0] + local[0] * visualScale;
