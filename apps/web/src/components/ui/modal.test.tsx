@@ -187,6 +187,34 @@ describe('Modal (#848 공용 셸)', () => {
       expect(screen.queryByTestId('test-modal')).toBeNull();
     });
 
+    it.each([
+      ['모달 open 이전', 'before'],
+      ['모달 open 이후', 'after'],
+    ] as const)(
+      '#1296 — Esc 는 `preventDefault()` 로 소비된다 — %s에 등록된 window bubble 리스너도 그 신호를 본다',
+      async (_label, registeredAt) => {
+        const user = userEvent.setup();
+        render(<Harness />);
+        // window bubble 리스너는 등록 순서대로 돈다. Esc→자유시점 리스너(`focus-quick-buttons`)는 포커스 천체가 정해질 때
+        // 등록되므로 모달보다 앞일 수도(수동 열기) 뒤일 수도(자동 표시) 있다. 어느 쪽이든 신호를 받으려면 모달이
+        // **capture** 단계에서 소비해야 한다 — bubble 이면 「모달보다 먼저 등록된 리스너」가 신호 없이 먼저 돈다.
+        let seenDefaultPrevented: boolean | null = null;
+        const other = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') seenDefaultPrevented = e.defaultPrevented;
+        };
+        if (registeredAt === 'before') window.addEventListener('keydown', other);
+        await user.click(screen.getByTestId('trigger'));
+        if (registeredAt === 'after') window.addEventListener('keydown', other);
+        try {
+          fireEvent.keyDown(document, { key: 'Escape' });
+        } finally {
+          window.removeEventListener('keydown', other);
+        }
+        expect(seenDefaultPrevented).toBe(true);
+        expect(screen.queryByTestId('test-modal')).toBeNull();
+      },
+    );
+
     it('backdrop 클릭 → 닫힘 / 패널 내부 클릭 → 유지', async () => {
       const user = userEvent.setup();
       render(<Harness />);
