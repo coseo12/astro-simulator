@@ -111,7 +111,7 @@ describe('#1299 — 목성 갈릴레이 위성 (실제 bodyScale)', () => {
     expect(margin).toBeGreaterThanOrEqual(SEPARATION_MIN);
   });
 
-  it('갈릴레이 4개 전부 근점 마진 ≥ 1.5 (io 가 binding — 나머지는 자동 충족)', () => {
+  it('갈릴레이 4개 전부 근점 마진 ≥ 1.5 (#1299 D5 per-body — io 는 이 조건, 바깥 3개는 D2 순서가 binding)', () => {
     for (const id of GALILEAN) {
       expect(periapsisMargin(id, renderRadius('jupiter')), id).toBeGreaterThanOrEqual(
         SEPARATION_MIN,

@@ -260,6 +260,15 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
     expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.iapetus).toBe(11);
   });
 
+  it('#1299 D5 — 갈릴레이 4개 per-body (io 35 = JUPITER 상수 / europa 24 / ganymede 17 / callisto 11)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.io).toBe(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.europa).toBe(24);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.ganymede).toBe(17);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.callisto).toBe(11);
+    // per-body 가 parent fallback (35) 보다 우선
+    expect(getOrbitVisualScale('jupiter', 'callisto')).toBe(11);
+  });
+
   it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY 는 frozen (런타임 변경 차단)', () => {
     expect(Object.isFrozen(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY)).toBe(true);
   });
@@ -273,10 +282,11 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
       expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(11);
     });
 
-    it('per-body 미정의 위성은 parent 룩업 fallback (회귀 0 — moon/galilean/titania/triton)', () => {
+    it('per-body 미정의 위성은 parent 룩업 fallback (회귀 0 — moon/titania/triton/phobos)', () => {
       // bodyId 가 per-body 에 없으면 parent 룩업으로 fallback. 기존 동작 보존.
+      // #1299 D5 — galilean 은 per-body 로 이동 (위 테스트). jupiter fallback 은 미정의 위성 id 로 확인.
       expect(getOrbitVisualScale('earth', 'moon')).toBe(30); // EARTH_MOON parent 룩업
-      expect(getOrbitVisualScale('jupiter', 'io')).toBe(35); // JUPITER parent 룩업
+      expect(getOrbitVisualScale('jupiter', 'amalthea')).toBe(35); // JUPITER parent 룩업 (per-body 미정의)
       expect(getOrbitVisualScale('uranus', 'titania')).toBe(50); // URANUS parent 룩업
       expect(getOrbitVisualScale('neptune', 'triton')).toBe(75); // NEPTUNE parent 룩업
       expect(getOrbitVisualScale('mars', 'phobos')).toBe(500); // MARS parent 룩업

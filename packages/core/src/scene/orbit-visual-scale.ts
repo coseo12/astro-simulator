@@ -101,10 +101,12 @@ export const EARTH_MOON_ORBIT_VISUAL_SCALE = 30;
 export const MARS_SATELLITES_ORBIT_VISUAL_SCALE = 500;
 
 /**
- * Jupiter-Galilean 궤도 visual scale 배수 (io/europa/ganymede/callisto 4개 적용).
+ * Jupiter-Galilean 궤도 visual scale 배수 — **io 값 + jupiter parent fallback** (#1299 D5 이후).
  *
- * `io world position = jupiter world position + (io local orbit × 35)` (나머지 3개 동일).
- * 실측 거리 (io 4.2023e8 m ~ callisto 1.8826e9 m) 는 보존되며 rendering 단계에서만 ×35 적용.
+ * `io world position = jupiter world position + (io local orbit × 35)`.
+ * #1299 D5 (사용자 결정 2026-10-07) 부터 europa/ganymede/callisto 는 per-body 값
+ * (`ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` — 24 / 17 / 11) 이 우선한다. 4개 모두 per-body 라 본 값은
+ * per-body 미정의 위성의 fallback 안전망이며, 가장 안쪽 io 기준이라 어떤 fallback 위성도 목성 구에 묻히지 않는다.
  *
  * ## #1299 재계산 (2026-10-07) — #762 bodyScale 기준
  *
@@ -114,13 +116,13 @@ export const MARS_SATELLITES_ORBIT_VISUAL_SCALE = 500;
  *
  * 산식 (렌더 좌표 · p=0.5 기본 bodyScale, renderScale 은 분자·분모 공통이라 소거):
  *   margin = (근점 × scale) / (모체 렌더 반경 + 위성 렌더 반경) ≥ 1.5
- *   io: 근점 = a(1−e) = 4.2023e8 × (1 − 0.003988) = 4.1856e8 m
+ *   io: 근점 = a(1−e) = 4.2023e8 × (1 − 0.003988) = 4.1855e8 m
  *       모체 렌더 반경 = 7.1492e7 × 129.31 = 9.2447e9 m / 위성 렌더 반경 = 9.2447e9 × 0.0531 = 4.909e8 m
- *       → scale ≥ 1.5 × 9.7356e9 / 4.1856e8 = 34.89 → **35** (정수 올림, margin 1.505x)
+ *       → scale ≥ 1.5 × 9.7356e9 / 4.1855e8 = 34.89 → **35** (정수 올림, margin 1.505x)
  *
- * 최소값을 택한 이유: 값을 키울수록 칼리스토 시각 궤도 (a × scale) 가 커져 목성 포커스 기본 화면 밖으로
- * 나간다 (×35 = 0.440 AU, ×43 = 0.541 AU). 단일 값이라 갈릴레이 4개 궤도 순서는 자동 보존
- * (europa 2.41x / ganymede 3.76x / callisto 6.61x).
+ * 최소값을 택한 이유: 1차 (×35 를 4개 공통 적용) 에서 칼리스토 시각 궤도가 0.440 AU 로 커져 목성 포커스
+ * 기본 화면 1280 에서 한 공전 주기 중 17.5% 만 화면 안이었다 (×16 시절 100%). 그래서 바깥 3개를 per-body 로
+ * 분리했다 — 산식은 아래 `ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY` §#1299 D5.
  *
  * 가드: `apps/web/src/constants/satellite-orbit-margin.test.ts` — **실제 bodyScale** 을 읽어 위 margin 을
  * 단언한다 (core 는 web 의 bodyScale 을 import 할 수 없어 web 쪽에 둔다). bodyScale 이 다시 바뀌면 거기서 FAIL.
@@ -132,8 +134,10 @@ export const JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 35;
 /**
  * Saturn-Satellites 궤도 visual scale 배수 (R7 titan 단일 — R8+ enceladus 등 확장 전제 복수형).
  *
- * `titan world position = saturn world position + (titan local orbit × 10)` 로 산출.
- * 실측 거리 (titan 1.22187e9 m = 8.1677e-3 AU) 는 보존되며 rendering 단계에서만 ×10 적용.
+ * `titan world position = saturn world position + (titan local orbit × 28)` 로 산출 (#1299 — R7 원값 ×10).
+ * 실측 거리 (titan 1.22187e9 m = 8.1677e-3 AU) 는 보존되며 rendering 단계에서만 배율을 적용한다.
+ *
+ * 아래 R7 서술 (×10 · saturnScale=48) 은 당시 설계 기록이다 — 현행 근거는 §#1299 재계산.
  *
  * **binding constraint = ring outer mesh (R4/R5/R6 과 다른 신규 유형)** — R7 ring × bodyScale
  * 결합 (ADR §축 2a) 으로 F ring outer mesh (1.4018e8 × 48 = 6.7286e9 m) 가 saturn mesh
@@ -218,7 +222,7 @@ export const NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE = 75;
 export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Object.freeze({
   earth: EARTH_MOON_ORBIT_VISUAL_SCALE, // R4 #539 Amendment 2 — moon visual fusion 해결
   mars: MARS_SATELLITES_ORBIT_VISUAL_SCALE, // R5 #594 — phobos + deimos 단일 룩업 (binding constraint=phobos)
-  jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io). #1299 — #762 bodyScale 기준 ×16 → ×35 재계산 (io 마진 1.505x)
+  jupiter: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // R6 #621 — galilean 4 단일 룩업 (binding constraint=io). #1299 — #762 bodyScale 기준 ×16 → ×35 재계산 (io 마진 1.505x). #1299 D5 — 갈릴레이 4개 전부 per-body 우선, 본 값은 fallback
   saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형). R11 #721 — saturn 위성은 per-body 룩업 우선 (아래 ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY). 본 parent 룩업은 fallback 안전망 (per-body 미정의 위성 보호). #1299 — ×10 → ×28 (titan 재계산값)
   uranus: URANUS_SATELLITES_ORBIT_VISUAL_SCALE, // R8 #647 — titania 단일 룩업 (binding constraint=ring outer 2번째 인스턴스, 마진 1.65x — ×30 은 ring 미고려 함정값)
   neptune: NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE, // R9 #653 — triton 단일 룩업 (binding constraint=ring outer 3번째 인스턴스, 마진 1.65x — ×50 uranus 답습은 1.10x 함정값)
@@ -283,8 +287,26 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
  *   - titan     근점 1.1867e9 m — (1) ≥ 26.0 / (2) ≥ 27.8 → **28** (binding, rhea 바깥)
  *   - iapetus   근점 3.4590e9 m — (1) ≥ 8.8  / (2) ≥ 10.6 → **11** (binding, titan 바깥)
  *
- * 최소값을 택한 이유는 jupiter 와 같다 — 값이 클수록 가장 바깥 iapetus (×11 = 0.262 AU) 가 토성 포커스
- * 기본 화면 밖으로 나간다. 가드: `apps/web/src/constants/satellite-orbit-margin.test.ts` (실제 bodyScale).
+ * 최소값을 택한 이유 — 값이 클수록 가장 바깥 iapetus (×11 = 0.262 AU) 가 토성 포커스 기본 화면 밖으로
+ * 나간다. 가드: `apps/web/src/constants/satellite-orbit-margin.test.ts` (실제 bodyScale).
+ *
+ * ## #1299 D5 (2026-10-07, 사용자 결정) — 갈릴레이 4개 per-body
+ *
+ * 1차의 ×35 공통값은 칼리스토를 목성 포커스 기본 화면 밖으로 밀어냈다 (한 공전 주기 중 화면 안 비율 1280 17.5% ·
+ * 375 0%, ×16 시절 100% · 39%). 토성 방식대로 안쪽부터 순차로, 아래 두 조건을 만족하는 **최소 정수**를 고른다.
+ *   (1) 목성 분리: 근점 × scale ≥ 1.5 × (목성 렌더 반경 9.2447e9 m + 위성 렌더 반경)
+ *   (2) 순서 (원반 비중첩): 안쪽 위성 (원지점 × scale + 렌더 반경) < 바깥 위성 (근점 × scale − 렌더 반경)
+ *   위성 렌더 반경 = 9.2447e9 m × 수렴비 (`body-scale.ts` SATELLITE_CONVERGENCE — io 0.0531 / europa 0.0455 /
+ *   ganymede 0.0768 / callisto 0.0702) = 4.909e8 / 4.206e8 / 7.100e8 / 6.490e8 m.
+ *
+ *   - io       근점 4.1855e8 원지점 4.2191e8 — (1) ≥ 34.89 → **35** (binding, 목성 분리. 위 JUPITER 상수)
+ *   - europa   근점 6.6507e8 원지점 6.7754e8 — (1) ≥ 21.8 / (2) (4.2191e8×35 + 4.909e8 + 4.206e8) / 6.6507e8 = 23.57 → **24**
+ *   - ganymede 근점 1.0687e9 원지점 1.0734e9 — (1) ≥ 14.0 / (2) (6.7754e8×24 + 4.206e8 + 7.100e8) / 1.0687e9 = 16.27 → **17**
+ *   - callisto 근점 1.8688e9 원지점 1.8965e9 — (1) ≥ 7.9  / (2) (1.0734e9×17 + 7.100e8 + 6.490e8) / 1.8688e9 = 10.49 → **11**
+ *
+ * 바깥 3개는 순서 조건이 binding 이다. 결과 시각 궤도 반경 (a × scale) 은 io 0.0983 / europa 0.1077 /
+ * ganymede 0.1217 / callisto 0.1384 AU 로, ×16 공통 시절 칼리스토 (0.201 AU) 보다 안쪽이다. 대가는 바깥 3개의
+ * 갈릴레이 궤도 반경 비율 (io : callisto 실제 1 : 4.48) 이 1 : 1.41 로 압축되는 것이다 (Visual Fidelity — 순서만 보존).
  *
  * ## 후속 라운드 인계
  *
@@ -292,7 +314,7 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
  * **거성 위성 a 비대칭 판정 SSoT (R12 #725)**: 신규 위성 a 가 기존 binding 위성보다 **안쪽이면 per-body 필요**
  * (proteus/enceladus), **바깥이면 parent 단일 룩업 양립 검토** (oberon — 마진 ≥ 1.5 산식 A 로 실측 확정).
  * parent 단일 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT`) 은 **단일 위성 또는 추가 위성이 binding 위성보다 바깥일 때만** 유지
- * (titan 단독 R7 / galilean 4 편차 4.5배 R6 / oberon R12). Miranda (a 0.00087 AU = titania 안쪽) 진입 시 per-body 예상.
+ * (titan 단독 R7 / galilean 4 편차 4.5배 R6 — #1299 D5 에서 per-body 로 전환 / oberon R12). Miranda (a 0.00087 AU = titania 안쪽) 진입 시 per-body 예상.
  *
  * R11 ADR `20260620-721-saturn-moons-rhea-iapetus-enceladus.md` §축 2.
  * R12 ADR `20260621-725-giant-moons-oberon-proteus.md` §축 2.
@@ -304,6 +326,11 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY: Readonly<Record<string, numb
     enceladus: 127, // 최내곽 — 고리 분리 (근점 × scale ≥ 1.5 × (F ring 바깥 + 위성 반경)) 가 binding
     rhea: 60, // enceladus 바깥 (원반 비중첩) 이 binding. R11 ×20 은 enceladus 안쪽에 그려져 순서가 뒤집혀 있었다
     iapetus: 11, // 최외곽 — titan 바깥 (원반 비중첩) 이 binding. 최소값 (포커스 화면 이탈 억제)
+    // #1299 D5 — 갈릴레이 4개 per-body (산식은 위 JSDoc §#1299 D5). 바깥 3개는 순서 (원반 비중첩) 가 binding.
+    io: JUPITER_SATELLITES_ORBIT_VISUAL_SCALE, // ×35 — 목성 분리 binding. parent fallback 과 같은 값
+    europa: 24,
+    ganymede: 17,
+    callisto: 11,
     // R12 #725 — proteus (neptune 최내곽 위성, triton 안쪽 a 0.33배 = 3.0배 안쪽). neptune parent ×75 에 묻힘 (마진 0.56x)
     // → per-body 분리. triton 은 per-body 미정의 → parent ×75 fallback 유지 (R9 박제 회귀 0). enceladus binding shift 동형.
     // oberon 은 per-body 미추가 — titania 바깥 (a 1.34배) 이라 uranus parent ×50 으로 자동 양립 (마진 2.22x, ADR §축 2).
@@ -325,8 +352,8 @@ export const DEFAULT_ORBIT_VISUAL_SCALE = 1.0;
  *
  * R11 #721 (ADR §축 2, cross-validate agy 합의) — per-body 룩업을 optional 2번째 인자로 확장해
  * 호출처 호환 유지. 우선순위:
- *   1) per-body 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId]`) — saturn 위성 enceladus/rhea/titan/iapetus
- *   2) parent 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT[parentId]`) — earth/mars/jupiter/uranus/neptune 위성 (기존 동작 보존)
+ *   1) per-body 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId]`) — saturn 위성 4 / galilean 4 (#1299 D5) / neptune proteus
+ *   2) parent 룩업 (`ORBIT_VISUAL_SCALE_BY_PARENT[parentId]`) — earth/mars/uranus/neptune 위성 + per-body 미정의 위성 (기존 동작 보존)
  *   3) `DEFAULT_ORBIT_VISUAL_SCALE` (1.0, 실측 그대로) — 미정의 parent
  *
  * `bodyId` 미전달 (또는 per-body 미정의) 호출처는 기존 parent fallback 으로 회귀 0.
@@ -339,12 +366,12 @@ export function getOrbitVisualScale(
   parentId: string | null | undefined,
   bodyId?: string | null | undefined,
 ): number {
-  // 1) per-body 룩업 우선 (saturn 위성 enceladus/rhea/titan/iapetus + neptune proteus)
+  // 1) per-body 룩업 우선 (saturn 위성 4 + galilean 4 + neptune proteus)
   if (bodyId !== null && bodyId !== undefined) {
     const perBody = ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY[bodyId];
     if (perBody !== undefined) return perBody;
   }
-  // 2) parent 룩업 fallback (earth/mars/jupiter/uranus/neptune 위성 — 기존 동작 보존)
+  // 2) parent 룩업 fallback (earth/mars/uranus/neptune 위성 — 기존 동작 보존)
   if (parentId === null || parentId === undefined) return DEFAULT_ORBIT_VISUAL_SCALE;
   return ORBIT_VISUAL_SCALE_BY_PARENT[parentId] ?? DEFAULT_ORBIT_VISUAL_SCALE;
 }
