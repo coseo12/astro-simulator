@@ -5,6 +5,13 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Changed
+
+- **[가드] `verify:699-freefly-unified` S3b 판정을 프레임별 `d/dt` 불변성으로 교체** — develop `b41d09d5` · release prep `d774f15e` 에서 재시도까지 연속 FAIL 하던 flake 의 원인 제거. 원인은 측정 방법이다: 구 판정은 wall-clock 100ms vs 200ms hold 의 이동 비율 1.6–2.4 를 단언했는데, 엔진이 적분하는 시간은 눌린 프레임들의 Σdt 라 양 끝에서 각각 최대 한 프레임 간격만큼 어긋난다. 1.6–2.4 가 구조적으로 보장되려면 프레임 간격 ≤ 11.8ms 여야 하는데 소프트웨어 렌더(swiftshader)는 ≈44ms 라 정상 코드가 1.38–3.57 로 흩어졌다 (로컬 N=15 중 FAIL 3, CI 최근 55 시도 중 7회 < 1.6). #1302 이전 core 로도 같은 분포라 #1302 는 원인이 아니다. 반대로 deltaTime 누락 변이는 프레임레이트가 일정하면 비율 ≈2 로 통과해 원리적으로 못 잡았다.
+  - 새 판정: hold 중 이동한 프레임마다 `k = 이동량 / deltaTime` 이 같은가. 허용오차는 측정값이 아니라 float64 반올림 해석에서 유도한 값이다 (`(2√3·|target|/min 이동량 + 18)·ε`, 실측 1e-13–3e-13). 정상 코드 k spread 2.9e-15–1.2e-14 (swiftshader 15/15 · GPU 5/5 PASS), 변이(`step = baseStep`) k spread 0.13–0.71 (swiftshader 6/6 · GPU 6/6 FAIL).
+  - 공허 통과 차단: hold 별 이동 프레임 0 이면 `FAIL(기저 신호 부재)`, 이동 프레임들의 dt spread 가 허용오차 이하(변이도 일정해 보이는 표본)면 `UNMEASURABLE` 로 FAIL.
+  - 프로덕션 코드 변경 0 — 계측은 가드가 기존 dev 핸들로 `onAfterRenderObservable` observer 를 붙여 한다. 판정 임계 신설 0. S1–S3 · S4–S6 무변경.
+
 ## [0.94.1] - 2026-10-08
 
 ### Fixed
