@@ -119,12 +119,12 @@ describe('#627 — getOrbitVisualScale 계약 (agy 보강 ② fallback)', () => 
     expect(getOrbitVisualScale('jupiter')).toBe(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE);
   });
 
-  it('R11 #721 — saturn 위성은 per-body 룩업 우선 (bodyId 전달 시 enceladus 47/rhea 20/iapetus 10, titan 10)', () => {
+  it('R11 #721 — saturn 위성은 per-body 룩업 우선 (bodyId 전달 시 enceladus 127/rhea 60/titan 28/iapetus 11 — #1299 재계산)', () => {
     // ADR 20260620-721 §축 2 — rebuildOrbitLines/resolveWorld 가 body.id 를 2번째 인자로 전달.
-    expect(getOrbitVisualScale('saturn', 'enceladus')).toBe(47);
-    expect(getOrbitVisualScale('saturn', 'rhea')).toBe(20);
-    expect(getOrbitVisualScale('saturn', 'titan')).toBe(10);
-    expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(10);
+    expect(getOrbitVisualScale('saturn', 'enceladus')).toBe(127);
+    expect(getOrbitVisualScale('saturn', 'rhea')).toBe(60);
+    expect(getOrbitVisualScale('saturn', 'titan')).toBe(28);
+    expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(11);
     // bodyId 미전달 (기존 호출) 은 parent saturn 룩업 fallback (회귀 0)
     expect(getOrbitVisualScale('saturn')).toBe(SATURN_SATELLITES_ORBIT_VISUAL_SCALE);
   });
