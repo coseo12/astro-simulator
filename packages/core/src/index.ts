@@ -35,10 +35,10 @@ export type { RPhaseBodyId } from './scene/r-phase-allowlist.js';
 //
 // `physics` namespace 경유 (`physics.orbitalStateAt` 등) 는 physics/index → nbody-engine →
 // physics_wasm `__dirname` 평가를 trigger 하여 SSR 500 — 위 #402 와 동일 기전. 카드는
-// app-shell.tsx 직접 import 라 SSR 평가 대상이다. `kepler.ts` 는 type import 만 가져
-// 런타임 모듈 그래프 영향 0. exports field 불변 (ADR `20260504-r-phase-allowlist-guard.md`
-// §Amendment 결정 D1 패턴).
-export { positionAt } from './physics/kepler.js';
+// app-shell.tsx 직접 import 라 SSR 평가 대상이다. `kepler.ts` 는 type import + `@astro-simulator/shared`
+// 상수만 가져 (#1305) 런타임 모듈 그래프 영향 0. exports field 불변 (ADR `20260504-r-phase-allowlist-guard.md`
+// §Amendment 결정 D1 패턴). #1305 — 장면 공전 μ (`orbitMu` / `twoBodyMu`) 도 같은 경로로 노출.
+export { orbitMu, positionAt, twoBodyMu } from './physics/kepler.js';
 
 // #845 — GpuTier / LodLevel 루트 type re-export.
 //

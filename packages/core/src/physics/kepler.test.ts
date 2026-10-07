@@ -10,10 +10,12 @@ import { length } from '../coords/vec3.js';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import {
   meanAnomalyAt,
+  orbitMu,
   orbitalPeriod,
   positionAt,
   solveKeplerEquation,
   trueAnomalyFromEccentric,
+  twoBodyMu,
 } from './kepler.js';
 
 const MU_SUN = GRAVITATIONAL_CONSTANT * SOLAR_MASS;
@@ -132,5 +134,73 @@ describe('positionAt — 태양계 실제 궤도 요소 검증', () => {
     expect(delta).toBeCloseTo(2 * Math.PI, 2);
     // JULIAN_YEAR_SECONDS 사용 smoke check
     expect(JULIAN_YEAR_SECONDS).toBeGreaterThan(0);
+  });
+});
+
+describe('#1305 orbitMu — 위성 장면 공전 μ = G(M_parent + m) (D4)', () => {
+  const bodies = getSolarSystem().bodies;
+  const byId = new Map(bodies.map((b) => [b.id, b]));
+  const SECONDS_PER_DAY = 86_400;
+  /** 이슈 #1305 D4 허용 오차 — 카론 6.387일 ±0.5%. */
+  const PERIOD_TOLERANCE = 0.005;
+  /** Horizons PLU060 카론 평균 궤도 주기 (일). */
+  const CHARON_PERIOD_DAYS = 6.387222;
+
+  const satellites = bodies.filter((b) => b.orbit && b.parentId && b.parentId !== 'sun');
+  const parentOf = (id: string) => byId.get(byId.get(id)!.parentId!)!;
+
+  it('위성 표본이 비어 있지 않다 (공허 통과 방지) — charon 포함', () => {
+    expect(satellites.length).toBeGreaterThanOrEqual(16);
+    expect(satellites.map((b) => b.id)).toContain('charon');
+  });
+
+  it('모든 위성: orbitMu == G·(M_parent + m) (twoBodyMu)', () => {
+    for (const b of satellites) {
+      const parent = parentOf(b.id);
+      expect(orbitMu(b, parent), b.id).toBe(twoBodyMu(parent.mass, b.mass));
+      expect(twoBodyMu(parent.mass, b.mass), b.id).toBe(
+        GRAVITATIONAL_CONSTANT * (parent.mass + b.mass),
+      );
+    }
+  });
+
+  it('태양 직속 body 는 G·M_sun 유지 (#1305 범위 밖 — 행성 위치 불변)', () => {
+    const sun = byId.get('sun')!;
+    for (const b of bodies.filter((x) => x.parentId === 'sun')) {
+      expect(orbitMu(b, sun), b.id).toBe(GRAVITATIONAL_CONSTANT * sun.mass);
+    }
+  });
+
+  it('카론 장면 공전 주기 = 2π√(a³/G(M+m)) = 6.387일 ±0.5% (M 단독이면 6.765일 — 5.9% 초과)', () => {
+    const charon = byId.get('charon')!;
+    const pluto = parentOf('charon');
+    const days =
+      orbitalPeriod(charon.orbit!.semiMajorAxis, orbitMu(charon, pluto)) / SECONDS_PER_DAY;
+    expect(Math.abs(days / CHARON_PERIOD_DAYS - 1)).toBeLessThan(PERIOD_TOLERANCE);
+    // 반대 방향 대조 — 모체 단독 μ 는 같은 허용 오차를 넘는다 (이 테스트가 μ 차이를 판별한다는 증거).
+    const plutoOnly =
+      orbitalPeriod(charon.orbit!.semiMajorAxis, GRAVITATIONAL_CONSTANT * pluto.mass) /
+      SECONDS_PER_DAY;
+    expect(Math.abs(plutoOnly / CHARON_PERIOD_DAYS - 1)).toBeGreaterThan(PERIOD_TOLERANCE);
+  });
+
+  it('달 장면 공전 주기 = 항성월 27.32일 ±0.5% (같은 식)', () => {
+    const moon = byId.get('moon')!;
+    const days =
+      orbitalPeriod(moon.orbit!.semiMajorAxis, orbitMu(moon, parentOf('moon'))) / SECONDS_PER_DAY;
+    expect(Math.abs(days / 27.321661 - 1)).toBeLessThan(PERIOD_TOLERANCE);
+  });
+
+  it('positionAt 은 orbitMu 주기로 한 바퀴 돌아 제자리 — 장면 위치가 이 주기를 쓴다 (전 위성)', () => {
+    // updateAtKepler 와 같은 호출 (`positionAt(orbit, jd, orbitMu(body, parent))`).
+    const jd0 = J2000_JD + 9_496.5; // 2026-01-01 00:00 TDB
+    for (const b of satellites) {
+      const mu = orbitMu(b, parentOf(b.id));
+      const periodDays = orbitalPeriod(b.orbit!.semiMajorAxis, mu) / SECONDS_PER_DAY;
+      const p0 = positionAt(b.orbit!, jd0, mu);
+      const p1 = positionAt(b.orbit!, jd0 + periodDays, mu);
+      const drift = length([p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]]);
+      expect(drift / b.orbit!.semiMajorAxis, b.id).toBeLessThan(1e-6);
+    }
   });
 });

@@ -16,7 +16,7 @@
  * 1. **행성(8) + 왜소행성(5)** — `effective_radius = radius^p × k` 곡선 산출 (p=0.5 sqrt 기본).
  *    `k` 는 **mercury floor 고정** (mercury 현 px 7.0 = 등가 scale 700 유지). 작은 천체일수록 부스트되어
  *    실반경 격차를 압축하되 최종 mesh 가 실반경 순서 단조 보존. 등가 scale = `radius^(p-1) × k`.
- * 2. **위성(15)** — 기존 per-parent 수렴대(0.05~0.09) **mesh 비율 보존**. parent effective 가 곡선으로
+ * 2. **위성(14 — json moon 16 중 극소형 phobos·deimos 는 3번 그룹)** — 기존 per-parent 수렴대(0.05~0.09) **mesh 비율 보존** (예외: charon = 실제 반경비 0.51, #1305). parent effective 가 곡선으로
  *    바뀌므로 위성 등가 scale 도 바뀌나 **모듈 로드 시 1회 정적 역산** (`sat_scale = parent_eff_new ×
  *    수렴대비_old / sat.radius`) 으로 박제. parent 곡선 로직과 강결합 회피 (cross-validate agy 2.0 수용).
  * 3. **comet·극소형 위성(5: phobos/deimos/halley/encke/swift-tuttle)** — 현 5000 단일값 **유지**
@@ -96,6 +96,7 @@ export const BODY_RADIUS_M: Readonly<Record<string, number>> = Object.freeze({
   proteus: 2.1e5,
   ceres: 4.696e5,
   pluto: 1.1883e6,
+  charon: 6.06e5,
   haumea: 7.8e5,
   makemake: 7.15e5,
   eris: 1.163e6,
@@ -120,13 +121,17 @@ export const PLANET_IDS = Object.freeze([
 export const DWARF_IDS = Object.freeze(['ceres', 'pluto', 'haumea', 'makemake', 'eris'] as const);
 
 /**
- * 위성(15) → 모행성 매핑 + 보존할 mesh 수렴대 비율 (현 정책 mesh 비 = sat_radius×sat_scale_old /
+ * 위성(14) → 모행성 매핑 + 보존할 mesh 수렴대 비율 (현 정책 mesh 비 = sat_radius×sat_scale_old /
  * parent_radius×parent_scale_old).
  *
  * 정적 역산: `sat_scale_new = parent_eff_new × convergenceRatio / sat_radius`.
  * convergenceRatio 는 ADR 박제 mesh 비 (volt #69 — drift 가드 위해 명시 박제, 런타임 재계산 아님).
+ *
+ * export 는 테스트 접근 경로 전용 (#1305) — 「json 의 모든 moon 이 이 표 또는 극소형 단일값 그룹에 있다」
+ * 단언용. 누락된 위성은 `getBodyScale` 이 1.0 fallback 으로 실반경 그대로 렌더되는데, 모체 대비 극소라
+ * 궤도 마진 가드도 통과해 조용히 묻힌다.
  */
-const SATELLITE_CONVERGENCE: Readonly<Record<string, { parent: string; ratio: number }>> =
+export const SATELLITE_CONVERGENCE: Readonly<Record<string, { parent: string; ratio: number }>> =
   Object.freeze({
     // moon/earth 0.068 (R4 #539 Amendment 4)
     moon: { parent: 'earth', ratio: 0.0681 },
@@ -146,6 +151,12 @@ const SATELLITE_CONVERGENCE: Readonly<Record<string, { parent: string; ratio: nu
     // neptune 위성 (R9 triton 0.0656 / R12 proteus 0.0102)
     triton: { parent: 'neptune', ratio: 0.0656 },
     proteus: { parent: 'neptune', ratio: 0.0102 },
+    // #1305 — pluto 위성 charon. **수렴대 [0.05, 0.09] 의 의도적 예외** (사용자 결정 1a, 2026-10-08):
+    // 명왕성-카론은 질량비 0.122 · 반경비 0.510 의 이중 천체라, 다른 위성처럼 모체의 5~9% 로 줄이면
+    // 「작은 달」로 보여 이중 천체라는 사실이 사라진다. 그래서 수렴비 = 실제 반경비 (606 / 1188.3 = 0.50997).
+    // 결과로 카론 렌더 반경 (pluto eff × 0.51 ≈ 6.08e8 m) 이 달 (1.88e8 m) 보다 크게 표시된다 — 모체가
+    // 다른 위성 사이의 크기 서열은 이 표가 보장하지 않는다 (기존 위성도 모체별 수렴비라 동일).
+    charon: { parent: 'pluto', ratio: 0.51 },
   });
 
 /**

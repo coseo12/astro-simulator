@@ -2,8 +2,7 @@
 // physics_wasm `__dirname` 평가로 SSR 500 — 카드는 app-shell 직접 import 라 SSR 평가 대상이다.
 // core/src/index.ts 가 positionAt 를 별도 named export 한다 (ADR `20260504-r-phase-allowlist-guard`
 // §Amendment 결정 D1 패턴).
-import { positionAt } from '@astro-simulator/core';
-import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+import { orbitMu, positionAt } from '@astro-simulator/core';
 import type { BodyStateFn } from '@/core/sim-context';
 import type { LoadedCelestialBody } from './body-info';
 
@@ -23,7 +22,7 @@ const MAX_CHAIN_DEPTH = 8;
  * 현재 시뮬레이션 시각 `jd` 의 태양·모체 거리.
  *
  * scene Kepler 경로(`solar-system-scene.ts` `updateAtKepler`)와 **같은 식**이다 — 부모 기준 위치
- * `positionAt(orbit, jd, G·M_parent)` 를 부모 체인을 따라 더해 계 중심 기준 위치를 얻는다.
+ * `positionAt(orbit, jd, orbitMu(body, parent))` (#1305 — 위성 G(M_parent + m) / 태양 직속 G·M) 를 부모 체인을 따라 더해 계 중심 기준 위치를 얻는다.
  * 시각 과장 배율(`getOrbitVisualScale`)은 적용하지 않는다 — 데이터 SSoT 거리다
  * (principles §1 Visual Fidelity: 왜곡은 렌더 시점에만).
  *
@@ -52,8 +51,7 @@ export function computeBodyDistances(
       return { fromSunM: null, fromParentM: null };
     }
     const p =
-      getBodyState?.(cur.id, parent.id)?.pos ??
-      positionAt(cur.orbit, jd, GRAVITATIONAL_CONSTANT * parent.mass);
+      getBodyState?.(cur.id, parent.id)?.pos ?? positionAt(cur.orbit, jd, orbitMu(cur, parent));
     if (local === null) local = [p[0], p[1], p[2]];
     world[0] += p[0];
     world[1] += p[1];

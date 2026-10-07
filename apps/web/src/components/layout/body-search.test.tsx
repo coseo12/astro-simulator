@@ -33,14 +33,14 @@ beforeEach(() => {
 });
 
 describe('BodySearch — 열기 (D1)', () => {
-  it('트리거 클릭 → 대화상자 + 입력창 포커스 + 빈 검색어는 32개 전체', async () => {
+  it('트리거 클릭 → 대화상자 + 입력창 포커스 + 빈 검색어는 33개 전체', async () => {
     const user = userEvent.setup();
     render(<BodySearch />);
     expect(dialog()).toBeNull();
     await user.click(screen.getByTestId('body-search-trigger'));
     expect(screen.getByRole('dialog', { name: '천체 검색' })).toBeInTheDocument();
     expect(document.activeElement).toBe(input());
-    expect(screen.getAllByRole('option')).toHaveLength(32);
+    expect(screen.getAllByRole('option')).toHaveLength(33);
   });
 
   it.each([

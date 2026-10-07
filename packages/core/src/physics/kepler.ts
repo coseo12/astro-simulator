@@ -1,5 +1,9 @@
+import { GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import type { Vec3Double } from '../coords/vec3.js';
-import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
+import type {
+  LoadedCelestialBody,
+  LoadedOrbitalElements,
+} from '../ephemeris/solar-system-loader.js';
 
 /**
  * Kepler 2-body 해석해.
@@ -131,4 +135,31 @@ export function positionAt(
  */
 export function orbitalPeriod(semiMajorAxis: number, mu: number): number {
   return TWO_PI * Math.sqrt((semiMajorAxis * semiMajorAxis * semiMajorAxis) / mu);
+}
+
+/**
+ * #1305 — 2체 문제 중력 파라미터 μ = G·(M + m) [m^3/s^2].
+ *
+ * 상대 궤도 (모체 기준 위성 위치) 의 평균 운동은 두 질량의 합이 정한다. 달은 질량비 1.2% 라 M 단독이면
+ * 주기가 27.49일로 어긋나고 (실제 항성월 27.32일), 명왕성-카론 (질량비 12.2%) 은 6.765일 ↔ 6.387일로 5.9% 어긋난다.
+ */
+export function twoBodyMu(centralMass: number, orbitingMass: number): number {
+  return GRAVITATIONAL_CONSTANT * (centralMass + orbitingMass);
+}
+
+/**
+ * #1305 — 장면 공전에 쓰는 μ. scene Kepler 경로 · Newton 초기 상태 · 정보 카드 거리가 **같은 식**을 쓰도록
+ * 이 함수 하나로 모은다.
+ *
+ * - 위성 (모체가 태양이 아닌 body — `isSatelliteOrbit` 와 같은 규칙): `twoBodyMu(M_parent, m)` (사용자 결정 2a)
+ * - 태양 직속 body (행성 · 왜소행성 · 혜성): `G·M_sun` — 기존 동작 유지. 행성까지 G(M+m) 로 바꾸면 목성 위치가
+ *   J2000 이후 누적 위상으로 ~0.4° 움직여 #1305 범위 (위성) 를 넘는다.
+ */
+export function orbitMu(
+  body: Pick<LoadedCelestialBody, 'mass' | 'parentId'>,
+  parent: Pick<LoadedCelestialBody, 'mass'>,
+): number {
+  return body.parentId !== 'sun'
+    ? twoBodyMu(parent.mass, body.mass)
+    : GRAVITATIONAL_CONSTANT * parent.mass;
 }

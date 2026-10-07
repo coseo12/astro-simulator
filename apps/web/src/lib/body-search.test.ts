@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ephemeris } from '@astro-simulator/core';
 import { normalizeQuery, searchBodies, type SearchableBody } from './body-search';
 
-/** 실데이터 SSoT — 계약 D2 의 1순위 판정은 실제 32 body 위에서 본다. */
+/** 실데이터 SSoT — 계약 D2 의 1순위 판정은 실제 33 body 위에서 본다 (#1305 charon 포함). */
 const bodies = ephemeris.getSolarSystem().bodies;
 const ids = (query: string) => searchBodies(bodies, query).map((b) => b.id);
 
@@ -12,6 +12,8 @@ describe('#1293 D2 — 실데이터 1순위', () => {
     ['jup', 'jupiter'],
     ['Halley', 'halley'],
     ['타이탄', 'titan'],
+    ['카론', 'charon'], // #1305 D1
+    ['charon', 'charon'], // #1305 D1
   ])('「%s」 → %s 가 결과 1순위', (query, expected) => {
     expect(ids(query)[0]).toBe(expected);
   });
@@ -38,9 +40,9 @@ describe('#1293 D2 — 실데이터 1순위', () => {
     expect(ids('zzz-no-such-body')).toEqual([]);
   });
 
-  it('빈 검색어 · 공백만 → 전체를 데이터 순서대로 (32개)', () => {
+  it('빈 검색어 · 공백만 → 전체를 데이터 순서대로 (33개)', () => {
     expect(ids('')).toEqual(bodies.map((b) => b.id));
-    expect(ids('   ')).toHaveLength(32);
+    expect(ids('   ')).toHaveLength(33);
   });
 });
 

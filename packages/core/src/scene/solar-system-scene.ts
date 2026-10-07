@@ -14,7 +14,7 @@ import {
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD, SOLAR_MASS } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import type { BootPhaseHook } from '../engine/boot-phase.js';
-import { positionAt } from '../physics/kepler.js';
+import { orbitMu, positionAt } from '../physics/kepler.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
 import {
   NBodyEngine,
@@ -2341,8 +2341,9 @@ export function createSolarSystemScene(
       }
       const parent = bodiesById.get(body.parentId);
       if (!parent) continue;
-      const mu = GRAVITATIONAL_CONSTANT * parent.mass;
-      const p = positionAt(body.orbit, jd, mu);
+      // #1305 — 위성은 μ = G(M_parent + m) (2체 상대 궤도). 태양 직속은 G·M_sun 유지. `orbitMu` SSoT —
+      // Newton 초기 상태 (`buildInitialState`) · 정보 카드 거리 (`body-distance.ts`) 와 같은 식.
+      const p = positionAt(body.orbit, jd, orbitMu(body, parent));
       buf[0] = p[0];
       buf[1] = p[1];
       buf[2] = p[2];

@@ -1,5 +1,6 @@
-import type { ephemeris } from '@astro-simulator/core';
-import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
+// #1305 — `twoBodyMu` 는 루트 named import (`physics` namespace 경유 금지 — body-distance.ts 와 같은 SSR 사유).
+import { twoBodyMu, type ephemeris } from '@astro-simulator/core';
+import { AU } from '@astro-simulator/shared';
 
 /**
  * #1281 — 천체 정보 공용 모듈.
@@ -57,8 +58,9 @@ export function findBodyAndParent(
  * 오계산했다 (달 27.3일 → 약 1.1시간, 이슈 #841). 2체 문제 정확식 μ = G·(M_parent + m) 사용 —
  * 달은 모체 대비 질량비 1.2% 라 M_parent 단독이면 27.49일로 어긋난다 (실제 항성월 27.32일).
  *
- * ⚠️ 실시간 거리(`body-distance.ts`)는 μ = G·M_parent 를 쓴다 — 목적이 다르다. 거리는 scene
- * Kepler 경로의 렌더 위치와 같은 식이어야 하고, 주기는 항성월 정확도가 목적이다.
+ * #1305 — 위성은 scene Kepler 경로 · 실시간 거리(`body-distance.ts`)도 같은 μ (`orbitMu` → `twoBodyMu`) 를
+ * 써서 카드 주기와 화면 공전 주기가 일치한다. 태양 직속 body 는 scene 이 G·M_sun 을 유지하므로 카드
+ * 주기(G(M_sun + m)) 와 최대 0.05% (목성) 다르다 — 행성 μ 변경은 #1305 범위 밖.
  *
  * @returns 궤도가 없거나 모체 미해석이면 `null`. 호출부는 조용히 태양 질량으로 흡수하지 않고
  *   fail-visible 로 표기한다 (#841 계약).
@@ -68,11 +70,7 @@ export function orbitalPeriodSeconds(
   parent: LoadedCelestialBody | null,
 ): number | null {
   if (!body.orbit || !parent) return null;
-  return (
-    2 *
-    Math.PI *
-    Math.sqrt(body.orbit.semiMajorAxis ** 3 / (GRAVITATIONAL_CONSTANT * (parent.mass + body.mass)))
-  );
+  return 2 * Math.PI * Math.sqrt(body.orbit.semiMajorAxis ** 3 / twoBodyMu(parent.mass, body.mass));
 }
 
 /** #841 fail-visible — orbit 존재 + 모체 미해석 시 공전주기 자리 문구. */
