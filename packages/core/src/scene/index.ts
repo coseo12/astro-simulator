@@ -30,6 +30,9 @@ export {
   FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE,
   resolveFocusMultiplier,
 } from './focus-multiplier.js';
+// #1299 — 위성 궤도 시각 배율 조회. web 의 실제 bodyScale 과 결합한 마진 가드
+// (`apps/web/src/constants/satellite-orbit-margin.test.ts`) 가 소비한다.
+export { getOrbitVisualScale } from './orbit-visual-scale.js';
 export { enableLogarithmicDepth } from './log-depth.js';
 export { createSolarSystemScene } from './solar-system-scene.js';
 export type {

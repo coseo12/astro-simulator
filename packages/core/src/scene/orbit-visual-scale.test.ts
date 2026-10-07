@@ -114,92 +114,40 @@ describe('orbit-visual-scale SSoT (R5 #594 mars-satellites — satellite 2개 �
 });
 
 describe('orbit-visual-scale SSoT (R6 #621 — jupiter-galilean)', () => {
-  it('JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 16 (R6 #621 박제값)', () => {
-    expect(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE).toBe(16);
+  it('JUPITER_SATELLITES_ORBIT_VISUAL_SCALE = 35 (#1299 — #762 bodyScale 기준 재계산, R6 원값 16)', () => {
+    expect(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE).toBe(35);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT.jupiter == JUPITER_SATELLITES_ORBIT_VISUAL_SCALE (룩업 정합)', () => {
     expect(ORBIT_VISUAL_SCALE_BY_PARENT.jupiter).toBe(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE);
   });
 
-  it('getOrbitVisualScale(jupiter) == 16', () => {
-    expect(getOrbitVisualScale('jupiter')).toBe(16);
+  it('getOrbitVisualScale(jupiter) == 35', () => {
+    expect(getOrbitVisualScale('jupiter')).toBe(35);
   });
 
-  it('io 분리 마진 산출 (산식 A, binding constraint) — visual_scale=16 → 1.69x (R5 phobos 정합)', () => {
-    // R6 ADR §결정 4 §축 4 박제값 (실측 거리 + jupiterScale=48 + ioScale=300)
-    const JUPITER_IO_DISTANCE_M = 4.2023e8; // semiMajorAxisAU 0.00280906
-    const JUPITER_MESH_RADIUS_M = 3.4316e9; // 7.1492e7 × 48
-    const IO_MESH_RADIUS_M = 5.465e8; // 1.8216e6 × 300
-    const SUM_MESH_M = JUPITER_MESH_RADIUS_M + IO_MESH_RADIUS_M;
-
-    const visualScale = getOrbitVisualScale('jupiter');
-    const visualDistance = JUPITER_IO_DISTANCE_M * visualScale;
-    const separationMargin = visualDistance / SUM_MESH_M;
-
-    // ADR §결정 4 — io binding 분리 마진 1.69x (≥ 1.5 임계 +0.19, R5 phobos 1.69x 정확 정합)
-    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
-    expect(separationMargin).toBeCloseTo(1.69, 1);
-  });
-
-  it('callisto 분리 마진 산출 (자동 안전) — visual_scale=16 → 7.25x (io binding 자동 통과)', () => {
-    // R6 ADR §결정 4 §축 4 박제값 (실측 거리 + jupiterScale=48 + callistoScale=300)
-    const JUPITER_CALLISTO_DISTANCE_M = 1.8826e9; // semiMajorAxisAU 0.0125847
-    const JUPITER_MESH_RADIUS_M = 3.4316e9; // 7.1492e7 × 48
-    const CALLISTO_MESH_RADIUS_M = 7.231e8; // 2.4103e6 × 300
-    const SUM_MESH_M = JUPITER_MESH_RADIUS_M + CALLISTO_MESH_RADIUS_M;
-
-    const visualScale = getOrbitVisualScale('jupiter');
-    const visualDistance = JUPITER_CALLISTO_DISTANCE_M * visualScale;
-    const separationMargin = visualDistance / SUM_MESH_M;
-
-    // ADR §결정 4 — callisto 자동 안전 7.25x (io 가 binding constraint, 나머지 3개 자동 통과)
-    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
-    expect(separationMargin).toBeCloseTo(7.25, 0);
-  });
+  // #1299 — io / callisto 분리 마진 테스트는 web 으로 이전했다 (`apps/web/src/constants/
+  // satellite-orbit-margin.test.ts`). 여기 있던 판본은 목성 렌더 반경을 jupiterScale=48 상수
+  // (`7.1492e7 × 48`) 로 박아, #762 가 목성 bodyScale 을 129.3 으로 올린 뒤에도 통과했다 — 그 사이 이오 궤도가
+  // 목성 렌더 구 안에 묻혔다. core 는 web 의 bodyScale 을 import 할 수 없으므로 실제 값으로 재는 쪽은 web 이다.
 });
 
 describe('orbit-visual-scale SSoT (R7 #641 — saturn-titan, binding=ring outer 신규 유형)', () => {
-  it('SATURN_SATELLITES_ORBIT_VISUAL_SCALE = 10 (R7 #641 박제값)', () => {
-    expect(SATURN_SATELLITES_ORBIT_VISUAL_SCALE).toBe(10);
+  it('SATURN_SATELLITES_ORBIT_VISUAL_SCALE = 28 (#1299 — titan 재계산값, R7 원값 10)', () => {
+    expect(SATURN_SATELLITES_ORBIT_VISUAL_SCALE).toBe(28);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT.saturn == SATURN_SATELLITES_ORBIT_VISUAL_SCALE (룩업 정합)', () => {
     expect(ORBIT_VISUAL_SCALE_BY_PARENT.saturn).toBe(SATURN_SATELLITES_ORBIT_VISUAL_SCALE);
   });
 
-  it('getOrbitVisualScale(saturn) == 10', () => {
-    expect(getOrbitVisualScale('saturn')).toBe(10);
+  it('getOrbitVisualScale(saturn) == 28', () => {
+    expect(getOrbitVisualScale('saturn')).toBe(28);
   });
 
-  it('titan 분리 마진 산출 (산식 A, binding=ring outer mesh) — visual_scale=10 → 1.75x', () => {
-    // R7 ADR §축 4 박제값. binding constraint 가 parent mesh 가 아닌 ring outer mesh —
-    // ring × bodyScale 결합 (§축 2a) 으로 F ring outer 가 saturn mesh 의 2.326배까지 확장.
-    const SATURN_TITAN_DISTANCE_M = 1.22187e9; // semiMajorAxisAU 8.1677e-3
-    const F_RING_OUTER_MESH_M = 1.4018e8 * 48; // F ring outer 실반경 × saturnScale=48 = 6.7286e9
-    const TITAN_MESH_RADIUS_M = 2.575e6 * 100; // titanScale=100 = 2.575e8
-    const SUM_MESH_M = F_RING_OUTER_MESH_M + TITAN_MESH_RADIUS_M;
-
-    const visualScale = getOrbitVisualScale('saturn');
-    const visualDistance = SATURN_TITAN_DISTANCE_M * visualScale;
-    const separationMargin = visualDistance / SUM_MESH_M;
-
-    // ADR §축 4 — titan 분리 마진 1.75x (≥ 1.5 통과 +0.25, R4 moon 1.78x 근접 정합)
-    expect(separationMargin).toBeGreaterThanOrEqual(1.5);
-    expect(separationMargin).toBeCloseTo(1.75, 1);
-  });
-
-  it('ring 미고려 함정값 검증 — saturn mesh 만 분모로 쓰면 ×10 마진 3.88x 로 과대평가', () => {
-    // R7 ADR §축 4 — ring 미고려 시 ×4 가 1.55x 로 통과 오판하는 함정. binding 정의가
-    // ring outer 임을 회귀 가드 (R8+ uranus ring 보유 진입 시 동일 유형 답습).
-    const SATURN_TITAN_DISTANCE_M = 1.22187e9;
-    const SATURN_MESH_RADIUS_M = 6.0268e7 * 48; // 2.8929e9
-    const TITAN_MESH_RADIUS_M = 2.575e6 * 100;
-    const marginVsMeshOnly =
-      (SATURN_TITAN_DISTANCE_M * getOrbitVisualScale('saturn')) /
-      (SATURN_MESH_RADIUS_M + TITAN_MESH_RADIUS_M);
-    expect(marginVsMeshOnly).toBeCloseTo(3.88, 1);
-  });
+  // #1299 — titan 분리 마진 · 「ring 미고려 함정값」 테스트는 F ring 렌더 반경을 saturnScale=48 상수
+  // (`1.4018e8 × 48`) 로 박아 #762 (토성 bodyScale 140.8) 이후 전제가 무효였다. 실제 bodyScale ·
+  // 실제 렌더 고리 반경으로 재는 판본은 web `apps/web/src/constants/satellite-orbit-margin.test.ts`.
 });
 
 describe('orbit-visual-scale SSoT (R8 #647 — uranus-titania, binding=ring outer 2번째 인스턴스)', () => {
@@ -305,11 +253,20 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
   // R5 §위험 #6 (2026-05-28) → R6 §재검토 트리거 #3 (2026-06-05) 인계 → 본 ADR 첫 실전.
   // a 편차 14.96배 (enceladus 최내곽 ↔ iapetus 최외곽) 로 단일 saturn 룩업 양립 불가 → per-body 룩업.
 
-  it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY 박제값 (enceladus 47 / rhea 20 / titan 10 / iapetus 10)', () => {
-    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.enceladus).toBe(47);
-    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.rhea).toBe(20);
-    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.titan).toBe(10);
-    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.iapetus).toBe(10);
+  it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY 박제값 (#1299 재계산 — enceladus 127 / rhea 60 / titan 28 / iapetus 11)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.enceladus).toBe(127);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.rhea).toBe(60);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.titan).toBe(28);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.iapetus).toBe(11);
+  });
+
+  it('#1299 D5 — 갈릴레이 4개 per-body (io 35 = JUPITER 상수 / europa 24 / ganymede 17 / callisto 11)', () => {
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.io).toBe(JUPITER_SATELLITES_ORBIT_VISUAL_SCALE);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.europa).toBe(24);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.ganymede).toBe(17);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY.callisto).toBe(11);
+    // per-body 가 parent fallback (35) 보다 우선
+    expect(getOrbitVisualScale('jupiter', 'callisto')).toBe(11);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY 는 frozen (런타임 변경 차단)', () => {
@@ -317,38 +274,39 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
   });
 
   describe('getOrbitVisualScale 3계층 우선순위 (per-body > parent > default)', () => {
-    it('per-body 룩업 우선 — saturn 위성은 bodyId 로 per-body scale 반환 (parent saturn=10 무시)', () => {
-      // bodyId 전달 시 per-body 룩업이 parent 룩업 (saturn=10) 보다 우선.
-      expect(getOrbitVisualScale('saturn', 'enceladus')).toBe(47);
-      expect(getOrbitVisualScale('saturn', 'rhea')).toBe(20);
-      expect(getOrbitVisualScale('saturn', 'titan')).toBe(10);
-      expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(10);
+    it('per-body 룩업 우선 — saturn 위성은 bodyId 로 per-body scale 반환 (parent saturn=28 무시)', () => {
+      // bodyId 전달 시 per-body 룩업이 parent 룩업 (saturn=28) 보다 우선.
+      expect(getOrbitVisualScale('saturn', 'enceladus')).toBe(127);
+      expect(getOrbitVisualScale('saturn', 'rhea')).toBe(60);
+      expect(getOrbitVisualScale('saturn', 'titan')).toBe(28);
+      expect(getOrbitVisualScale('saturn', 'iapetus')).toBe(11);
     });
 
-    it('per-body 미정의 위성은 parent 룩업 fallback (회귀 0 — moon/galilean/titania/triton)', () => {
+    it('per-body 미정의 위성은 parent 룩업 fallback (회귀 0 — moon/titania/triton/phobos)', () => {
       // bodyId 가 per-body 에 없으면 parent 룩업으로 fallback. 기존 동작 보존.
+      // #1299 D5 — galilean 은 per-body 로 이동 (위 테스트). jupiter fallback 은 미정의 위성 id 로 확인.
       expect(getOrbitVisualScale('earth', 'moon')).toBe(30); // EARTH_MOON parent 룩업
-      expect(getOrbitVisualScale('jupiter', 'io')).toBe(16); // JUPITER parent 룩업
+      expect(getOrbitVisualScale('jupiter', 'amalthea')).toBe(35); // JUPITER parent 룩업 (per-body 미정의)
       expect(getOrbitVisualScale('uranus', 'titania')).toBe(50); // URANUS parent 룩업
       expect(getOrbitVisualScale('neptune', 'triton')).toBe(75); // NEPTUNE parent 룩업
       expect(getOrbitVisualScale('mars', 'phobos')).toBe(500); // MARS parent 룩업
     });
 
     it('bodyId 미전달 (기존 호출처) — parent 룩업 fallback (회귀 0, getOrbitVisualScale(parentId))', () => {
-      // bodyId 인자 없이 호출 시 기존 동작 그대로. saturn=10 (per-body 미적용).
-      expect(getOrbitVisualScale('saturn')).toBe(10);
+      // bodyId 인자 없이 호출 시 기존 동작 그대로. saturn=28 (per-body 미적용).
+      expect(getOrbitVisualScale('saturn')).toBe(28);
       expect(getOrbitVisualScale('earth')).toBe(30);
-      expect(getOrbitVisualScale('jupiter')).toBe(16);
+      expect(getOrbitVisualScale('jupiter')).toBe(35);
     });
 
     it('bodyId=null/undefined — parent 룩업 fallback (per-body 미적용)', () => {
-      expect(getOrbitVisualScale('saturn', null)).toBe(10);
-      expect(getOrbitVisualScale('saturn', undefined)).toBe(10);
+      expect(getOrbitVisualScale('saturn', null)).toBe(28);
+      expect(getOrbitVisualScale('saturn', undefined)).toBe(28);
     });
 
     it('per-body 정의 + parentId=null — per-body 룩업이 여전히 우선 (parent 무관)', () => {
       // per-body 룩업은 bodyId 만 보므로 parentId 가 null 이어도 적용 (방어적 동작).
-      expect(getOrbitVisualScale(null, 'enceladus')).toBe(47);
+      expect(getOrbitVisualScale(null, 'enceladus')).toBe(127);
     });
 
     it('미매핑 bodyId + 미매핑 parent → 1.0 (DEFAULT_ORBIT_VISUAL_SCALE)', () => {
@@ -356,50 +314,11 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
     });
   });
 
-  describe('4 위성 분리 마진 산출 (산식 A, binding=F ring outer mesh — developer 실측 2026-06-20)', () => {
-    // ADR §축 2 박제값. binding = F ring outer mesh (140680 km × saturnScale 48 = 6.7526e9 m,
-    // saturn mesh 의 2.334배). 4 위성 각각 per-body visual scale 로 margin ≥ 1.5 충족.
-    const F_RING_OUTER_MESH_M = 140680 * 1000 * 48; // 6.7526e9
-    const KM_M = 1000;
-
-    it('enceladus 분리 마진 (binding, 최내곽) — visual ×47 → 1.64x', () => {
-      const A_M = 238040 * KM_M; // NASA Fact Sheet a
-      const SAT_MESH_M = 2.521e5 * 250; // enceladusScale=250 = 6.303e7
-      const margin =
-        (A_M * getOrbitVisualScale('saturn', 'enceladus')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
-      expect(margin).toBeGreaterThanOrEqual(1.5);
-      expect(margin).toBeCloseTo(1.64, 1);
-    });
-
-    it('rhea 분리 마진 — visual ×20 → 1.52x (×10 시 0.76x 묻힘)', () => {
-      const A_M = 527108 * KM_M;
-      const SAT_MESH_M = 7.64e5 * 250; // rheaScale=250 = 1.91e8
-      const margin =
-        (A_M * getOrbitVisualScale('saturn', 'rhea')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
-      expect(margin).toBeGreaterThanOrEqual(1.5);
-      expect(margin).toBeCloseTo(1.52, 1);
-    });
-
-    it('titan 분리 마진 (R7 박제 보존 — 회귀 0) — visual ×10 → 1.74x', () => {
-      const A_M = 1221870 * KM_M;
-      const SAT_MESH_M = 2.575e6 * 100; // titanScale=100 = 2.575e8
-      const margin =
-        (A_M * getOrbitVisualScale('saturn', 'titan')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
-      expect(margin).toBeGreaterThanOrEqual(1.5);
-      expect(margin).toBeCloseTo(1.74, 1);
-    });
-
-    it('iapetus 분리 마진 (최외곽, 자동 안전) — visual ×10 → 5.13x', () => {
-      const A_M = 3560820 * KM_M;
-      const SAT_MESH_M = 7.345e5 * 250; // iapetusScale=250 = 1.836e8
-      const margin =
-        (A_M * getOrbitVisualScale('saturn', 'iapetus')) / (F_RING_OUTER_MESH_M + SAT_MESH_M);
-      expect(margin).toBeGreaterThanOrEqual(1.5);
-      expect(margin).toBeCloseTo(5.13, 1);
-    });
-  });
+  // #1299 — 「4 위성 분리 마진 산출」 블록 (F ring 렌더 반경 = 140680 km × saturnScale 48) 은 #762 이후 전제가
+  // 무효라 web `apps/web/src/constants/satellite-orbit-margin.test.ts` (실제 bodyScale · 렌더 고리 반경) 로 이전했다.
 
   describe('단일 룩업 한계 입증 (per-body 발동 근거 — 회귀 가드)', () => {
+    // R11 설계 시점 (saturnScale=48) 의 근거 산술 기록 — 코드 값을 읽지 않는다. 현행 마진은 #1299 web 가드.
     const F_RING_OUTER_MESH_M = 140680 * 1000 * 48;
     const KM_M = 1000;
 
