@@ -32,6 +32,11 @@ import { getOnboardingDismissed, markOnboardingDismissed } from '@/lib/onboardin
  *   으로 차단 불가 → `document.querySelector('[data-modal-open="true"]')` 가드로 free-fly 오발화를
  *   막는다 (about/sensitivity/onboarding 3 모달 일괄 정합).
  *
+ *   ⚠️ #1296 — 이 속성 가드만으로는 **자동 표시 경로**를 막지 못했다. 자동 표시는 마운트 즉시 열려 모달의 Esc
+ *   리스너가 먼저 등록되고(`?focus=` 포커스는 그 뒤), 사용자 입력은 리스너 사이마다 microtask 가 돌아 모달이 닫힘
+ *   커밋을 끝낸 뒤 자유시점 리스너가 속성을 읽는다. 공용 `Modal` 이 Esc 를 capture 에서 `preventDefault()` 하도록
+ *   고쳐 등록 순서와 무관하게 막는다 (`modal.tsx` §Esc).
+ *
  * ## 콘텐츠 SSoT (camera.ts / sim-canvas.tsx 실측 바인딩 — 임의 변경 금지)
  *
  *   WASD_KEYS = w/a/s/d/q/e (camera.ts:116) / ArcRotate 화살표 회전 / wheelDeltaPercentage 줌 /
