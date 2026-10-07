@@ -5,13 +5,15 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.94.1] - 2026-10-08
+
 ### Fixed
 
-- **[#1299] 이오가 목성 렌더 구 안에 묻혀 어느 시점 · tier 에서도 보이지 않던 결함** ([#1299](https://github.com/coseo12/astro-simulator/issues/1299)). 원인은 #762 회귀다 — #762 가 목성 · 토성 bodyScale 을 48 → 129.3 · 140.8 로 올렸는데, 그 값을 전제로 정한 위성 궤도 시각 배율(`orbit-visual-scale.ts`)이 재계산되지 않았다. 이오 근점 마진(근점 × 배율 / (목성 렌더 반경 + 이오 렌더 반경))이 0.69 였고, 토성 고리도 같은 배수로 커져 엔셀라두스 · 레아 · 타이탄 궤도가 고리 안에 있었다. core 의 기존 마진 테스트는 목성 반경을 jupiterScale=48 상수로 박아 계속 통과했다.
+- **[#1299] 이오가 목성 렌더 구 안에 묻혀 어느 시점 · tier 에서도 보이지 않던 결함** ([#1299](https://github.com/coseo12/astro-simulator/issues/1299), PR [#1302](https://github.com/coseo12/astro-simulator/pull/1302)). 원인은 #762 회귀다 — #762 가 목성 · 토성 bodyScale 을 48 → 129.3 · 140.8 로 올렸는데, 그 값을 전제로 정한 위성 궤도 시각 배율(`orbit-visual-scale.ts`)이 재계산되지 않았다. 이오 근점 마진(근점 × 배율 / (목성 렌더 반경 + 이오 렌더 반경))이 0.69 였고, 토성 고리도 같은 배수로 커져 엔셀라두스 · 레아 · 타이탄 궤도가 고리 안에 있었다. core 의 기존 마진 테스트는 목성 반경을 jupiterScale=48 상수로 박아 계속 통과했다.
   - 목성 갈릴레이 위성을 위성별(per-body) 배율로 바꿨다: io ×35 · europa ×24 · ganymede ×17 · callisto ×11 (이전 공통 ×16). io 는 근점 마진 ≥ 1.5 를 만족하는 최소 정수(마진 1.505)이고, 바깥 3개는 안쪽 위성의 궤도 띠(원반 반경 포함)와 겹치지 않는 최소 정수다. 공통 ×35 를 쓰면 칼리스토가 목성 포커스 기본 화면 밖으로 밀려나서 토성(#721)과 같은 방식으로 분리했다. parent fallback 은 ×35 (= io).
   - 토성 위성 per-body 배율 enceladus 47 → 127 · rhea 20 → 60 · titan 10 → 28 · iapetus 10 → 11, parent fallback 10 → 28. 규칙은 근점 × 배율 ≥ 1.5 × (고리 바깥 렌더 반경 + 위성 렌더 반경) 과 안쪽 → 바깥 궤도 띠(원반 반경 포함) 비중첩을 만족하는 최소 정수. R11 값에서는 엔셀라두스가 레아보다 바깥에 그려져 궤도 순서가 뒤집혀 있었는데 이것도 함께 바로잡았다.
   - 재발 방지: 마진 가드를 web `constants/satellite-orbit-margin.test.ts` 로 옮겨 **실제 bodyScale** 로 잰다 (core 는 web 의 bodyScale 을 import 할 수 없다). 전 위성의 모체 구 분리도 함께 단언한다. core `scene` 에서 `getOrbitVisualScale` 을 export 한다.
-- **[#1296] 포커스 천체가 있을 때 자동 표시된 온보딩 모달을 Esc 로 닫으면 자유시점이 함께 켜지던 결함** ([#1296](https://github.com/coseo12/astro-simulator/issues/1296)). 공용 `Modal` 은 Esc 를 window bubble 에서 닫기만 했고, Esc→자유시점 리스너(`focus-quick-buttons`)는 `[data-modal-open]` DOM 속성으로만 물러났다. 자동 표시 온보딩은 마운트 즉시 열려 모달 리스너가 **먼저** 등록되고 `?focus=` 의 포커스 천체는 그 뒤에 정해져 자유시점 리스너가 **나중에** 등록된다. 사용자 입력 이벤트는 리스너 사이마다 microtask 가 돌아 모달의 닫힘이 다음 리스너 전에 커밋되므로, 자유시점 리스너는 속성이 이미 사라진 상태를 읽었다 (실 Chrome 계측). 수동으로 연 모달은 등록 순서가 반대라 재현되지 않았다.
+- **[#1296] 포커스 천체가 있을 때 자동 표시된 온보딩 모달을 Esc 로 닫으면 자유시점이 함께 켜지던 결함** ([#1296](https://github.com/coseo12/astro-simulator/issues/1296), PR [#1303](https://github.com/coseo12/astro-simulator/pull/1303)). 공용 `Modal` 은 Esc 를 window bubble 에서 닫기만 했고, Esc→자유시점 리스너(`focus-quick-buttons`)는 `[data-modal-open]` DOM 속성으로만 물러났다. 자동 표시 온보딩은 마운트 즉시 열려 모달 리스너가 **먼저** 등록되고 `?focus=` 의 포커스 천체는 그 뒤에 정해져 자유시점 리스너가 **나중에** 등록된다. 사용자 입력 이벤트는 리스너 사이마다 microtask 가 돌아 모달의 닫힘이 다음 리스너 전에 커밋되므로, 자유시점 리스너는 속성이 이미 사라진 상태를 읽었다 (실 Chrome 계측). 수동으로 연 모달은 등록 순서가 반대라 재현되지 않았다.
   - 공용 `Modal` 이 Esc 를 window **capture** 단계에서 `preventDefault()` 하고 닫는다 — 천체 메뉴 · 표시 패널 · 검색 대화상자와 같은 신호다. 등록 순서와 무관하게 자유시점 리스너의 `defaultPrevented` 검사가 막으므로 온보딩 · 정보 · 감도 설정 · 검색 4종 모두에 적용된다.
 
 ### Behavior Changes
