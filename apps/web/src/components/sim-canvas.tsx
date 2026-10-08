@@ -770,13 +770,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           lensing.setPosition(bhx, bhy, bhz);
         }
 
-        instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
+        // #1308 — 시간 위상 등록. `on('timeChanged')` 가 아니라 `bindTimePhase` 인 이유: 이 자리
+        // (`start()` resolve 뒤) 에 오기 전에 부팅의 `timeChanged` 는 이미 전부 발화했다 (URL `?t=`
+        // 의 jump + `start()` 말미 초기 알림). 일시정지 부팅 (`?speed=0`) 은 이후 `tick` 이 발화하지
+        // 않으므로 단순 구독이면 장면이 생성자 기본값 (J2000) 에 머문다. `bindTimePhase` 는 등록
+        // 시점의 현재 시각으로 1회 즉시 동기한다 (simulation-core JSDoc).
+        instance.bindTimePhase((julianDate) => solar.updateAt(julianDate));
 
-        // #1205 — 프레임 위상 등록. 위 `timeChanged` (시간 위상) 과 **같은 effect** 에 두는 것이
+        // #1205 — 프레임 위상 등록. 위 시간 위상 (`bindTimePhase`) 과 **같은 effect** 에 두는 것이
         // 계약이다: 두 위상의 등록/해제 수명이 대칭이어야 한다 (해제는 이 effect 의 return 에서
         // `setFramePassHandler(null)`).
         //
-        // `updateAt` 은 일시정지 (`!running || scale === 0`) 에서 한 번도 돌지 않는데 그 안에
+        // `updateAt` 은 일시정지 (`!running || scale === 0`) 에서 등록 시 1회 외에는 돌지 않는데 그 안에
         // 카메라 종속 갱신 (LOD 판정) 이 섞여 있었다 — 그래서 정지 중에는 줌/포커스를 바꿔도
         // LOD 가 얼어붙었다. 프레임 위상은 렌더 루프가 매 프레임 1회 구동하므로 정지에서도 돈다.
         // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.

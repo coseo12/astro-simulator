@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1308] 일시정지 URL (`?t=<JD>&speed=0`) 로 열면 장면이 `t` 가 아니라 J2000 위치에 머물던 결함** ([#1308](https://github.com/coseo12/astro-simulator/issues/1308)). HUD JD 는 `t` 인데 행성 · 위성은 J2000 자리였다 (목성 경도 36.4° 고정).
+  - 원인: 시간 위상 (`timeChanged` → scene `updateAt`) 구독이 `start()` resolve **뒤** (`sim-canvas` `.then`) 에 붙는데, 부팅의 `timeChanged` 는 그 **전**에 전부 발화한다 — URL `?t=` 의 `jumpToJulianDate` (scene 생성 전) 와 `start()` 말미 초기 알림. 재생 부팅은 `tick` 이 다시 발화해 가려졌고, 일시정지 부팅은 `tick` 이 `false` 라 장면이 생성자 기본값 (J2000) 에 남았다.
+  - 수정: core `SimulationCore.bindTimePhase(handler)` — `timeChanged` 구독 + **등록 시점 현재 시각으로 1회 즉시 호출**. `sim-canvas` 의 시간 위상 등록을 이것으로 바꿨다. 프레임 위상 순서 계약 (ADR `20260907-1205` §결정 3, 렌더 루프 안 배치) 은 무변경.
+  - 테스트: `simulation-core-time-phase.test.ts` 5건 — 부팅 순서 (jump → setTimeScale(0) → `start()` → 등록) 재현. 즉시 호출 제거 변이 4/5 FAIL, 구독 제거 변이 2/5 FAIL.
+
+### Behavior Changes
+
+- **일시정지 상태로 공유 · 북마크 · 새로고침한 URL 이 그 시점의 천체 위치를 보인다** (#1308). 이전에는 `?t=<JD>&speed=0` 부팅이 J2000 위치를 보였다. 실 Chrome (WebGPU) 에서 JD 4종 모두 「재생 부팅 → 일시정지」 화면과 천체 화면 좌표 차 0 px. `t` 없는 `?speed=0` 부팅 (J2000) 은 이전과 같다.
+
 ## [0.95.0] - 2026-10-08
 
 ### Added
