@@ -11,6 +11,7 @@ import {
   SATURN_SATELLITES_ORBIT_VISUAL_SCALE,
   URANUS_SATELLITES_ORBIT_VISUAL_SCALE,
   NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE,
+  PLUTO_SATELLITES_ORBIT_VISUAL_SCALE,
   ORBIT_VISUAL_SCALE_BY_PARENT,
   ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY,
   getOrbitVisualScale,
@@ -38,12 +39,17 @@ describe('orbit-visual-scale SSoT (R4 #539 Amendment 2)', () => {
     expect(getOrbitVisualScale(undefined)).toBe(1.0);
   });
 
-  it('미매핑 parent (pluto / halley — 진입했으나 위성 0) → 1.0', () => {
-    // R10a #659 — pluto 는 allowlist 진입했으나 charon 등 위성 데이터 부재 (R9 인계 #6 이월)
-    // → ORBIT_VISUAL_SCALE_BY_PARENT 미매핑이 정합. halley 도 R10b #664 진입 후 동일 분류 —
-    // semantics "미진입" → "미매핑 (위성 0)" 전환 (단언 불변, ADR 20260612-r10b §축 5 변경 0 행).
-    expect(getOrbitVisualScale('pluto')).toBe(1.0);
+  it('미매핑 parent (halley — 진입했으나 위성 0) → 1.0', () => {
+    // R10b #664 — halley 는 allowlist 진입했으나 위성 0 → ORBIT_VISUAL_SCALE_BY_PARENT 미매핑이 정합
+    // (ADR 20260612-r10b §축 5). pluto 는 #1305 charon 진입으로 매핑됨 (아래 #1305 블록).
     expect(getOrbitVisualScale('halley')).toBe(1.0);
+  });
+
+  it('#1305 — pluto 매핑 = 138 (charon, #1299 방식 최소 정수 — 근점 마진 1.502x)', () => {
+    expect(PLUTO_SATELLITES_ORBIT_VISUAL_SCALE).toBe(138);
+    expect(ORBIT_VISUAL_SCALE_BY_PARENT.pluto).toBe(PLUTO_SATELLITES_ORBIT_VISUAL_SCALE);
+    // charon 은 per-body 미정의 → parent 룩업
+    expect(getOrbitVisualScale('pluto', 'charon')).toBe(138);
   });
 
   it('ORBIT_VISUAL_SCALE_BY_PARENT 는 frozen (런타임 변경 차단)', () => {
@@ -310,7 +316,8 @@ describe('orbit-visual-scale SSoT (R11 #721 — ORBIT_VISUAL_SCALE_BY_PARENT_AND
     });
 
     it('미매핑 bodyId + 미매핑 parent → 1.0 (DEFAULT_ORBIT_VISUAL_SCALE)', () => {
-      expect(getOrbitVisualScale('pluto', 'charon')).toBe(1.0); // 둘 다 미정의
+      // #1305 전에는 ('pluto', 'charon') 이 둘 다 미정의였다 — pluto 매핑 후 가상 ID 로 교체.
+      expect(getOrbitVisualScale('unknown-parent', 'unknown-body')).toBe(1.0); // 둘 다 미정의
     });
   });
 

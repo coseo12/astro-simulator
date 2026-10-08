@@ -6,6 +6,7 @@ import {
   DEFAULT_BODY_SCALE_P,
   DWARF_IDS,
   PLANET_IDS,
+  SATELLITE_CONVERGENCE,
   getBodyScale,
   getBodyScaleForP,
 } from './body-scale';
@@ -103,6 +104,7 @@ describe('#762 — 위성 per-parent 수렴대 보존 (정적 역산)', () => {
     titania: { parent: 'uranus', band: [0.05, 0.09] },
     oberon: { parent: 'uranus', band: [0.05, 0.09] },
     triton: { parent: 'neptune', band: [0.05, 0.09] },
+    // charon 은 의도적 예외 (수렴비 = 실제 반경비 0.51, #1305 결정 1a) — 아래 #1305 블록이 가드.
   };
 
   it('주요 위성 mesh 비(satellite/parent) 수렴대 [0.05~0.09] 보존', () => {
@@ -120,6 +122,36 @@ describe('#762 — 위성 per-parent 수렴대 보존 (정적 역산)', () => {
     expect(eff('enceladus') / eff('saturn')).toBeCloseTo(0.0218, 3);
     // proteus(210km)/triton(1353km) — 0.0102 (수렴대 미달 정상, ADR §축 1 정직 반영).
     expect(eff('proteus') / eff('neptune')).toBeCloseTo(0.0102, 3);
+  });
+
+  it('#1305 D2 — charon/pluto 렌더 반경비 = 실제 반경비 ±5% (수렴대 [0.05, 0.09] 의도적 예외)', () => {
+    const renderRatio = eff('charon') / eff('pluto');
+    const realRatio = RADIUS.charon! / RADIUS.pluto!;
+    expect(
+      Math.abs(renderRatio / realRatio - 1),
+      `렌더 ${renderRatio} / 실제 ${realRatio}`,
+    ).toBeLessThan(0.05);
+    // 예외임을 고정 — 수렴대 상한을 넘는다 (실수로 0.05~0.09 로 되돌리면 여기서 드러난다).
+    expect(renderRatio).toBeGreaterThan(0.09);
+  });
+
+  it('#1305 D3 보강 — json 의 모든 moon 이 SATELLITE_CONVERGENCE (모체 일치) 또는 극소형 단일값 그룹에 있다', () => {
+    // 누락된 위성은 getBodyScale 이 1.0 fallback 으로 실반경 그대로 렌더된다. 모체 대비 극소라 궤도 마진
+    // 가드 (satellite-orbit-margin.test.ts) 도 통과해 조용히 묻힌다 — 여기서 존재 자체를 단언한다.
+    const TINY_MOONS_IN_COMET_GROUP = new Set(['phobos', 'deimos']); // body-scale.ts COMET_IDS 의 위성
+    const moons = (
+      solarSystem as { bodies: { id: string; kind: string; parentId?: string | null }[] }
+    ).bodies.filter((b) => b.kind === 'moon');
+    expect(moons.length).toBeGreaterThanOrEqual(16); // 공허 통과 방지 (#1305 시점 16)
+    for (const m of moons) {
+      if (TINY_MOONS_IN_COMET_GROUP.has(m.id)) {
+        expect(BODY_SCALE[m.id], `${m.id} 극소형 단일값`).toBe(5000);
+        continue;
+      }
+      expect(SATELLITE_CONVERGENCE[m.id], `${m.id} 가 SATELLITE_CONVERGENCE 에 없음`).toBeDefined();
+      expect(SATELLITE_CONVERGENCE[m.id]!.parent, `${m.id} 모체 매핑`).toBe(m.parentId);
+      expect(Object.hasOwn(BODY_SCALE, m.id), `${m.id} BODY_SCALE 산출`).toBe(true);
+    }
   });
 
   it('iapetus/rhea 사실 radius 비 0.961 자동 보존 (동일 수렴대비 → mesh 비 = radius 비)', () => {
@@ -171,6 +203,7 @@ describe('#762 — 그룹 간 경계 단조 assert (silent 회귀 차단)', () =
     'oberon',
     'triton',
     'proteus',
+    'charon', // #1305
   ];
   const COMETS = ['phobos', 'deimos', 'halley', 'encke', 'swift-tuttle'];
   const maxEff = (ids: string[]) => Math.max(...ids.map(eff));
@@ -272,7 +305,7 @@ describe('#762/#764 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #
   // 미러 +10% drift 시 mesh 비가 0.0681→0.0619 로 이동해도 band [0.05,0.09] 안 → 미검출) /
   // comet 은 존재(>0)만 확인하고 값 미검증. 아래 전수 단언이 이 사각을 전부 닫는다.
 
-  it('[#764] 32 body 전수 — 미러 radius == json radius 직접 단언 (위성 13 · 혜성 5 포함)', () => {
+  it('[#764] 33 body 전수 — 미러 radius == json radius 직접 단언 (위성 14 · 혜성 5 포함)', () => {
     const jsonBodies = (solarSystem as { bodies: { id: string; radius?: number }[] }).bodies;
     for (const b of jsonBodies) {
       expect(typeof b.radius, `${b.id} json radius 존재`).toBe('number');
@@ -285,10 +318,10 @@ describe('#762/#764 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #
     const jsonIds = Object.keys(RADIUS).sort();
     const mirrorIds = Object.keys(BODY_RADIUS_M).sort();
     expect(mirrorIds).toEqual(jsonIds);
-    // 전수 로스터 박제: 32 = sun 1 + 행성 8 + 왜소 5 + 위성 13 + comet·극소형 위성 5.
+    // 전수 로스터 박제: 33 = sun 1 + 행성 8 + 왜소 5 + 위성 14 + comet·극소형 위성 5 (#1305 charon +1).
     // 신규 body 추가 시 json + 미러 + 본 단언 3곳 동시 갱신 (의도된 checkpoint — 미러 누락 시
     // getBodyScale 이 1.0 fallback 으로 실측 렌더되는 silent 회귀를 여기서 강제 노출).
-    expect(mirrorIds).toHaveLength(32);
+    expect(mirrorIds).toHaveLength(33);
   });
 
   it('행성·왜소 effective 가 json radius 와 정합 (내부 미러 drift 차단)', () => {

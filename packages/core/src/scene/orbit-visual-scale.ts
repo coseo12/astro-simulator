@@ -215,6 +215,26 @@ export const URANUS_SATELLITES_ORBIT_VISUAL_SCALE = 50;
 export const NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE = 75;
 
 /**
+ * #1305 — Pluto-Satellites 궤도 visual scale 배수 (charon 단일 — 왜소행성 모체 첫 위성).
+ *
+ * `charon world position = pluto world position + (charon local orbit × 138)` 로 산출.
+ * 실측 거리 (charon 1.9596e7 m = 1.30991e-4 AU) 는 보존되며 rendering 단계에서만 ×138 적용.
+ *
+ * #1299 방식 (렌더 좌표 · p=0.5 기본 bodyScale · 조건을 만족하는 **최소 정수**). 고리 없음 → binding = 모체 분리:
+ *   (1) 근점 × scale ≥ 1.5 × (명왕성 렌더 반경 + 카론 렌더 반경)
+ *   명왕성 렌더 반경 = 1.1883e6 × 1003.0 (`body-scale.ts` 곡선 — 700 × √(mercury / pluto)) = 1.1919e9 m
+ *   카론 렌더 반경   = 1.1919e9 × 0.51 (`SATELLITE_CONVERGENCE` — 실제 반경비, #1305 결정 1a) = 6.079e8 m
+ *   근점 = 1.9596e7 × (1 − 0.0002) = 1.9592e7 m
+ *   → scale ≥ 1.5 × 1.7997e9 / 1.9592e7 = 137.79 → **138** (마진 1.502x). ×137 은 1.491x 로 미달.
+ *
+ * 다른 모체보다 배율이 큰 이유 — 카론은 모체 대비 실제 거리가 가깝고 (a / 명왕성 반경 = 16.5, 달 60.3)
+ * 원반이 모체의 절반이라 분모가 크다. 시각 궤도 반경은 a × 138 = 0.0181 AU.
+ *
+ * 가드: `apps/web/src/constants/satellite-orbit-margin.test.ts` (실제 bodyScale 결합 — 전 위성 근점 마진 ≥ 1.5).
+ */
+export const PLUTO_SATELLITES_ORBIT_VISUAL_SCALE = 138;
+
+/**
  * parent body id 별 satellite orbit visual scale 룩업.
  *
  * R5+ 진입 시 parent-satellite 쌍별로 박제값 추가. 미정의 parent 는 1.0 (실측 그대로).
@@ -226,6 +246,7 @@ export const ORBIT_VISUAL_SCALE_BY_PARENT: Readonly<Record<string, number>> = Ob
   saturn: SATURN_SATELLITES_ORBIT_VISUAL_SCALE, // R7 #641 — titan 단일 룩업 (binding constraint=ring outer 신규 유형). R11 #721 — saturn 위성은 per-body 룩업 우선 (아래 ORBIT_VISUAL_SCALE_BY_PARENT_AND_BODY). 본 parent 룩업은 fallback 안전망 (per-body 미정의 위성 보호). #1299 — ×10 → ×28 (titan 재계산값)
   uranus: URANUS_SATELLITES_ORBIT_VISUAL_SCALE, // R8 #647 — titania 단일 룩업 (binding constraint=ring outer 2번째 인스턴스, 마진 1.65x — ×30 은 ring 미고려 함정값)
   neptune: NEPTUNE_SATELLITES_ORBIT_VISUAL_SCALE, // R9 #653 — triton 단일 룩업 (binding constraint=ring outer 3번째 인스턴스, 마진 1.65x — ×50 uranus 답습은 1.10x 함정값)
+  pluto: PLUTO_SATELLITES_ORBIT_VISUAL_SCALE, // #1305 — charon 단일 룩업 (binding constraint=모체 분리, 마진 1.502x — #1299 방식 최소 정수)
 });
 
 /**

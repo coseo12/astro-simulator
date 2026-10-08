@@ -628,7 +628,7 @@ jobs:
       # 검증 5축: (S1) 진입 일관성 4 tier radius 편차 < 5% (tier별 분기 거동 부활 차단)
       #          (S2) io focus(85px)→free-fly px ≥ 40 + onScreen (#631 강제 줌아웃 회귀 차단)
       #          (S3) WASD 1 step screen px ≤ 16 + tier 편차 < 10% (계수 0.05 과대 회귀 차단)
-      #          (S3b) frame-rate 독립 — hold 시간 비례 이동 (deltaTime 정규화 누락 회귀 차단)
+      #          (S3b) frame-rate 독립 — 프레임별 이동량/deltaTime 불변 (deltaTime 정규화 누락 회귀 차단)
       #          (S4) 무회귀 — free-fly originOffset=0(#693) + tier 줌아웃 escalate(#629/#631)
       - name: '#699 free-fly 통합 재설계 회귀 가드 (verify:699-freefly-unified)'
         if: needs.diff-scope.outputs.code_changed == 'true'

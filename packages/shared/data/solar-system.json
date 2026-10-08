@@ -784,6 +784,29 @@
       }
     },
     {
+      "id": "charon",
+      "kind": "moon",
+      "nameKo": "카론",
+      "nameEn": "Charon",
+      "mass": 1.59e21,
+      "radius": 6.06e5,
+      "parentId": "pluto",
+      "introducedInRPhase": 14,
+      "showInShortcutBar": false,
+      "$comment": "#1305 — 명왕성-카론 이중 천체 (질량비 0.122 / 반경비 0.510). 각도 요소는 JPL Horizons API 쿼리 (2026-10-08 쿼리, 2026-01-01 00:00 TDB = JD 2461041.5 epoch). COMMAND=901 / CENTER=500@999 (Pluto body center) / REF_PLANE=ECLIPTIC 명시 / REF_SYSTEM=J2000 — 응답 'Reference frame : Ecliptic of J2000.0' 확인 (#721 교훈). Horizons 원시값 — ELEMENTS: EC=1.6018e-4 / IN=112.8878 / OM=227.3930 / W=172.4679 / MA=75.5547 / A=19595.76 km / PR=551855.8 s, Keplerian GM=975.427 km^3/s^2 (= Pluto 869.326 + Charon 106.10, 계 합계 — 명왕성 단독 GM 아님). VECTORS: X=10162.773 / Y=608.363 / Z=-16742.494 km, VX=-0.1161824 / VY=-0.1742701 / VZ=-0.0768961 km/s. 상태벡터 → i=112.8878 / Ω=227.3930 / 위도 인수 u=248.0403 → L=Ω+u mod 360=115.4334 (e≈0 이라 평균경도≈진경도, 접촉 요소 Ω+ω+M=115.416 과 0.017° 차). ϖ=OM+W mod 360=39.8609 (e=0.0002 라 위치 영향 ≤ 2ea ≈ 8 km). a/e 는 NASA Pluto Fact Sheet (a=19,596 km / e=0.0002). mass 는 Horizons PLU060 GM 106.10 km^3/s^2 ÷ G (명왕성 1.303e22 와 같은 출처), radius 606 km (IAU2015). 황도 기준 경사 112.89° > 90° 는 명왕성 자전축 기울기(122.5°) 를 따르는 세로 궤도이고 공전 방향이 황도 기준 역행으로 보이는 것이 사실 정합 — 버그 아님 (triton 역행 선례). 장면 공전은 μ=G(M_pluto+M_charon) 로 6.386일 (#1305 결정 2a).",
+      "colorHint": { "hex": "#9A948C", "colorSource": "observed" },
+      "dataSource": "NASA Pluto Fact Sheet + JPL Horizons API (2026-10-08 쿼리, 2026-01-01 TDB epoch, Pluto-centric J2000 Ecliptic, REF_PLANE=ECLIPTIC)",
+      "lastVerified": "2026-10-08",
+      "orbit": {
+        "semiMajorAxisAU": 0.000130991,
+        "eccentricity": 0.0002,
+        "inclinationDeg": 112.8878,
+        "longitudeOfAscendingNodeDeg": 227.393,
+        "longitudeOfPerihelionDeg": 39.8609,
+        "meanLongitudeDeg": 115.4334
+      }
+    },
+    {
       "id": "haumea",
       "kind": "dwarf-planet",
       "nameKo": "하우메아",

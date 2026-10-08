@@ -52,6 +52,8 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
   // 최대 (전 위성 중 최단 주기 — 미제외 시 1e-9 임계 초과 위험 최대). oberon 주기 13.47d (titan 15.95d
   // 근접) 도 위성 일괄 제외 패턴 일관. 본 테스트 원 의도(9체 대칭성)는 유지 — 위성 N-body 정합성은
   // Rust 측정 테스트가 담당.
+  // #1305: charon 도 위성 일괄 제외 패턴으로 제외. 임계 초과가 사유는 아니다 — 미제외 시 1년 vel relErr
+  // 1.293e-11 (< 1e-9) 실측 (카론 공전 속도 ~0.2 km/s 라 60 km/s 스케일 대비 작다). 9체 원 의도 보존.
   const EXCLUDED_SATELLITES = new Set([
     'phobos', // P8
     'deimos', // P8
@@ -67,6 +69,7 @@ describe('Verlet 시간 역행 대칭성 — 태양계 9체', () => {
     'iapetus', // R11 #721 — 주기 79.3d (긴 주기지만 토성 위성 일괄 제외 — 9체 원 의도 보존)
     'oberon', // R12 #725 — 주기 13.47d (titan 15.95d 근접, 거성 위성 일괄 제외)
     'proteus', // R12 #725 — 주기 1.123d (전 위성 중 최단 — 325 주기/년, step 누적 최대. enceladus 1.37d 보다 짧음)
+    'charon', // #1305 — 주기 6.39d (위성 일괄 제외 — 9체 원 의도 보존. 미제외도 임계 미만 실측)
   ]);
   const fullSystem = getSolarSystem();
   const system = {

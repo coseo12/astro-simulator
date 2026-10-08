@@ -23,7 +23,7 @@
  * | S1  | 진입 일관성 — sun/earth/io/default 전부 \|radiusΔ\|/radius < 5%  | tier별 분기 거동 부활    |
  * | S2  | 줌아웃 제거 — io focus(85px)→free-fly px ≥ 40 + onScreen          | 1.3px/화면밖 회귀(#631)  |
  * | S3  | 이동 화면체감 — WASD 1 step screen px ≤ 16, tier 편차 < 10%      | 계수 0.05 과대 회귀      |
- * | S3b | frame-rate 독립 — 동일 hold 시간 동일 이동량(deltaTime 정규화)   | deltaTime 누락 회귀      |
+ * | S3b | frame-rate 독립 — 프레임별 이동량/deltaTime 불변(부동소수 허용오차) | deltaTime 누락 회귀      |
  * | S4  | 무회귀 — io 줌아웃 body 유지(escalate 0, #704) / default solar originOffset=0(#693) | 좌표계 깨짐 / io 튕김 |
  * | S5  | 탐색버튼 경로 — focusOn/resetCamera command → enterFreeFly command| 2-emit 회귀(reset로 복귀)|
  * | S6  | 진입 자동 포커스 — 실 버튼 click→캔버스 click 없이 WASD 이동량 > 0 | activeEl≠canvas/WASD 무반응|
@@ -69,8 +69,6 @@ const WASD_PX_MAX = 16;
 // 이동 측정은 keydown 직후 첫 프레임 deltaTime 스파이크로 small-radius(sun) 에서 ~14% noise 가
 // 발생한다(단위 테스트가 산식 정확성을 결정적으로 보증). 실측 noise 흡수 위해 20% 로 둔다.
 const TIER_DEV_REL = 0.2;
-// S3b — frame-rate 독립: 짧은 hold vs 긴 hold 이동량이 hold 시간에 비례(프레임수 무관).
-const FRAMERATE_REL = 0.05;
 
 async function measure(page, bodyId) {
   return await page.evaluate(
@@ -338,10 +336,56 @@ async function scenarioMoveScreenFeel(browser) {
   return { scenario: 'S3', rows, tierDev, pass };
 }
 
-// S3b — frame-rate 독립: 동일 hold 시간 동일 이동량 (deltaTime 정규화). hold 시간 2배 → 이동 2배.
+// S3b — frame-rate 독립: 프레임별 이동량 d_i 가 그 프레임의 deltaTime dt_i 에 정확히 비례하는가.
+//
+// [판정량 — 프레임별 d_i/dt_i 불변성] camera.ts 산식 `step = min(radius×pct, max) × dt/(1/60)` 은
+// hold 중 radius·pct·max 가 상수라 k_i = d_i/dt_i 가 **모든 이동 프레임에서 정확히 같다**(부동소수
+// 오차만). deltaTime 누락 회귀(`step = baseStep`)면 d_i 가 상수로 고정되고 dt_i 만 변해 k_i ∝ 1/dt_i —
+// k 의 max/min 비가 dt 의 max/min 비와 **같아진다**. 따라서 판정은 "k spread ≤ 부동소수 허용오차".
+//
+// [구 판정 폐기 근거 — 2026-10-08 실측] 구 S3b 는 wall-clock 100ms vs 200ms hold 의 이동 비율 1.6~2.4 를
+// 단언했다. 엔진이 적분하는 시간은 wall-clock hold 가 아니라 눌린 프레임들의 Σdt 라 양 끝에서 각각
+// 최대 1 프레임 간격 P 만큼 어긋나고, 1.6~2.4 가 구조적으로 보장되려면 P ≤ 0.1176×hold(=11.8ms) 여야
+// 한다. 로컬 swiftshader(평균 프레임 간격 ≈44ms)에서 정상 코드가 1.38~3.57 로 흩어졌고(N=15 중 FAIL 3),
+// CI 최근 55 시도 중 7회가 < 1.6 이었다. 반대로 deltaTime 누락 변이는 프레임레이트가 일정하면 비율≈2
+// 가 나와 원리적으로 못 잡는다.
+//
+// [지속성 — k 불변성만으로는 부족] k 불변성이 보장하는 Σd = k·Σdt 의 Σdt 는 **이동한 프레임들의** dt
+// 합이다. hold 도중 이동이 멈추는 회귀(첫 프레임 뒤 pressed 소실 · clearKeys/setEnabled(false) 조기
+// 호출 등)는 이동한 프레임만 보면 k 가 여전히 일정해 통과한다. 구 비율 술어는 wall-clock hold 와 비교해
+// 이 회귀를 잡았으므로(PR #1309 리뷰 B1), 지속성을 아래 **이벤트 순서 술어**로 따로 복원한다.
+//
+// [지속성 술어 — 프레임 경계와 키 이벤트의 구조적 순서, 수치 임계 없음] JS 는 단일 스레드라
+// scene.render() 한 번(before-render WASD 이동 → 그리기 → after-render 기록)은 한 task 안에서 동기로
+// 끝나고, keydown/keyup DOM 이벤트는 task 와 task 사이에서만 디스패치된다(Babylon 키보드 입력은 그
+// 디스패치 안에서 동기로 pressed 를 갱신한다). 가드가 같은 이벤트를 window capture 로 받아 프레임 기록과
+// 한 줄 로그에 넣으면, 로그상 keydown 뒤 · keyup 앞에 놓인 after-render 프레임은 그 before-render
+// 시점에도 키가 눌려 있었다 — 키 이벤트와 프레임 경계의 어긋남은 0 프레임이다. 따라서 정상 코드는 그
+// 프레임이 **전부** 이동하고, 하나라도 d = 0 이면 지속성 FAIL 이다. 경계에 걸친 프레임(keydown 이전에
+// 시작해 keydown 이후 끝나는 프레임)은 존재하지 않는다 — 프레임은 task 단위로 원자적이다.
+//
+// [계측 — 프로덕션 훅 추가 0] 기존 dev 핸들(window.__solarScene)로 scene 을 얻어 **가드 쪽에서**
+// onAfterRenderObservable observer 와 window capture 키 리스너를 붙인다. WASD 이동은
+// onBeforeRenderObservable 에서 일어나므로 after-render 간 target 차분 = 그 프레임 이동량,
+// getDeltaTime() = 같은 프레임 WASD 가 읽은 값.
+const S3B_HOLDS_MS = [100, 200];
+// target 좌표 1성분 반올림 오차 상한 = ε/2·|t| → 차분 벡터 노름 오차 ≤ √3·ε·T (양 끝점).
+// 두 프레임 간 k spread 는 그 2배. 나머지 산술(normalize 3 + scale 1 + step 3 + hypot 1 + 나눗셈 1 =
+// 9 연산, 각 ≤ ε 상대) 도 2배. 측정값이 아니라 IEEE-754 float64 오차 해석에서 유도한 허용오차.
+const S3B_FLOAT_OPS_PER_FRAME = 9;
+function s3bFloatTolerance(maxTargetNorm, minMove) {
+  const coordTerm = (2 * Math.sqrt(3) * maxTargetNorm) / minMove;
+  return (coordTerm + 2 * S3B_FLOAT_OPS_PER_FRAME) * Number.EPSILON;
+}
+function relSpread(values) {
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return (max - min) / mean;
+}
 async function scenarioFrameRateIndependent(browser) {
   console.log(
-    '\n[S3b] frame-rate 독립 — hold 시간 비례 이동(deltaTime 정규화). 100ms vs 200ms = 2배',
+    '\n[S3b] frame-rate 독립 — hold 중 프레임별 d_i/dt_i 불변 (deltaTime 정규화, 부동소수 허용오차)',
   );
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
@@ -350,30 +394,107 @@ async function scenarioFrameRateIndependent(browser) {
     await focus(page, 'earth');
     await enterFreeFly(page);
     await focusCanvas(page);
-    const b1 = await measure(page, 'earth');
-    await holdKey(page, 'w', 100);
-    const a1 = await measure(page, 'earth');
-    const move100 = Math.hypot(
-      a1.targetX - b1.targetX,
-      a1.targetY - b1.targetY,
-      a1.targetZ - b1.targetZ,
+    // 프레임 기록 observer 설치. prev 를 설치 시점 target 으로 초기화해 첫 프레임 이동도 누락 없이 잡는다.
+    await page.evaluate(() => {
+      const scene = window.__solarScene.meshes.values().next().value.getScene();
+      const cam = scene.activeCamera;
+      const engine = scene.getEngine();
+      const rec = { hold: -1, frames: [] };
+      let prev = [cam.target.x, cam.target.y, cam.target.z];
+      rec.observer = scene.onAfterRenderObservable.add(() => {
+        const t = [cam.target.x, cam.target.y, cam.target.z];
+        rec.frames.push({
+          hold: rec.hold,
+          dt: engine.getDeltaTime(),
+          d: Math.hypot(t[0] - prev[0], t[1] - prev[1], t[2] - prev[2]),
+          tNorm: Math.hypot(t[0], t[1], t[2]),
+        });
+        prev = t;
+      });
+      // 키 이벤트를 프레임 기록과 같은 로그에 넣는다 (지속성 술어의 순서 기준). capture 단계라
+      // Babylon 의 canvas 리스너와 같은 디스패치 안에서 실행된다.
+      rec.onKey = (e) => {
+        if (e.key.toLowerCase() !== 'w' || e.repeat) return;
+        rec.frames.push({ hold: rec.hold, ev: e.type });
+      };
+      window.addEventListener('keydown', rec.onKey, true);
+      window.addEventListener('keyup', rec.onKey, true);
+      rec.scene = scene;
+      window.__s3bRec = rec;
+    });
+    for (const [i, holdMs] of S3B_HOLDS_MS.entries()) {
+      await page.evaluate((i) => (window.__s3bRec.hold = i), i);
+      await holdKey(page, 'w', holdMs);
+    }
+    const log = await page.evaluate(() => {
+      const rec = window.__s3bRec;
+      rec.scene.onAfterRenderObservable.remove(rec.observer);
+      window.removeEventListener('keydown', rec.onKey, true);
+      window.removeEventListener('keyup', rec.onKey, true);
+      delete window.__s3bRec;
+      return rec.frames;
+    });
+    const frames = log.filter((e) => !e.ev);
+
+    // 이동 프레임 = hold 구간 중 target 이 실제로 움직인 프레임.
+    const moving = frames.filter((f) => f.hold >= 0 && f.d > 0);
+    const movingPerHold = S3B_HOLDS_MS.map((_, i) => moving.filter((f) => f.hold === i).length);
+    // 기저 신호 — 각 hold 에서 최소 1 프레임은 움직여야 한다(키 미입력/포커스 유실/이동 0 = FAIL).
+    const baseSignal = movingPerHold.every((n) => n >= 1);
+    // 지속성 — hold 별 keydown~keyup 사이 프레임(눌린 프레임)이 전부 이동했는가. 이벤트가 정확히
+    // keydown 1 · keyup 1 이 아니면(키 유실 등) 눌린 구간을 정의할 수 없으므로 지속성 FAIL.
+    const pressedPerHold = S3B_HOLDS_MS.map((_, i) => {
+      const entries = log.filter((e) => e.hold === i);
+      const downs = entries.flatMap((e, k) => (e.ev === 'keydown' ? [k] : []));
+      const ups = entries.flatMap((e, k) => (e.ev === 'keyup' ? [k] : []));
+      if (downs.length !== 1 || ups.length !== 1 || ups[0] < downs[0]) return null;
+      return entries.slice(downs[0] + 1, ups[0]).filter((e) => !e.ev);
+    });
+    const pressedCounts = pressedPerHold.map((p) => (p === null ? 'NA' : `${p.length}`));
+    const stalledCounts = pressedPerHold.map((p) =>
+      p === null ? 'NA' : `${p.filter((f) => !(f.d > 0)).length}`,
     );
-    const b2 = await measure(page, 'earth');
-    await holdKey(page, 'w', 200);
-    const a2 = await measure(page, 'earth');
-    const move200 = Math.hypot(
-      a2.targetX - b2.targetX,
-      a2.targetY - b2.targetY,
-      a2.targetZ - b2.targetZ,
+    const persistent = pressedPerHold.every(
+      (p) => p !== null && p.length >= 1 && p.every((f) => f.d > 0),
     );
-    // deltaTime 정규화면 이동량은 hold 시간(누적 deltaSeconds)에 비례 → move200 ≈ 2×move100.
-    const ratio = move200 / Math.max(move100, 1e-9);
-    // 200/100=2 기준 ±오차 허용 (프레임 경계 양자화로 정확히 2 는 아님). 1.6~2.4 통과.
-    const pass = ratio >= 1.6 && ratio <= 2.4 && move100 > 0;
+    const ks = moving.map((f) => f.d / f.dt);
+    const dts = moving.map((f) => f.dt);
+    const kSpread = moving.length >= 2 ? relSpread(ks) : NaN;
+    const dtSpread = moving.length >= 2 ? relSpread(dts) : NaN;
+    const tol =
+      moving.length >= 2
+        ? s3bFloatTolerance(
+            Math.max(...moving.map((f) => f.tNorm)),
+            Math.min(...moving.map((f) => f.d)),
+          )
+        : NaN;
+    // 판별력 전제 — deltaTime 누락 변이의 k 는 dt 와 같은 max/min 비를 가진다(허용오차 규모에서
+    // 상대 spread 도 1차 근사로 같다). dt spread 가 허용오차 이하면 변이도 "일정"으로 보여 PASS 가
+    // 증거가 되지 못한다 → 측정 불가(UNMEASURABLE)로 FAIL.
+    const discriminating = moving.length >= 2 && dtSpread > tol;
+    const kConstant = kSpread <= tol;
+    let status;
+    if (!baseSignal) status = 'FAIL(기저 신호 부재)';
+    else if (!persistent) status = 'FAIL(지속성 — 눌린 프레임 중 이동 0 존재)';
+    else if (!discriminating) status = 'UNMEASURABLE(dt 변동 ≤ 허용오차 — 판별 불가)';
+    else status = kConstant ? 'PASS' : 'FAIL';
+    const pass = status === 'PASS';
     console.log(
-      `  move(100ms)=${move100.toFixed(3)} move(200ms)=${move200.toFixed(3)} ratio=${ratio.toFixed(2)} (≈2.0, deltaTime 비례) → ${pass ? 'PASS' : 'FAIL'}`,
+      `  이동 프레임 ${moving.length} (hold별 ${movingPerHold.join('/')}) 눌린 프레임 ${pressedCounts.join('/')} 중 정지 ${stalledCounts.join('/')} dt spread=${dtSpread.toExponential(2)} k spread=${kSpread.toExponential(2)} 허용오차=${tol.toExponential(2)} → ${status}`,
     );
-    return { scenario: 'S3b', move100, move200, ratio, pass };
+    return {
+      scenario: 'S3b',
+      movingFrames: moving.length,
+      movingPerHold,
+      pressedPerHold: pressedCounts,
+      stalledPerHold: stalledCounts,
+      persistent,
+      dtSpread,
+      kSpread,
+      tolerance: tol,
+      status,
+      pass,
+    };
   } finally {
     await ctx.close();
   }
