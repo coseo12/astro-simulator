@@ -245,7 +245,7 @@ export class SimulationCore {
    * #1205 — **프레임 위상** 핸들러 연결. 렌더 루프가 매 프레임 1회 호출한다.
    *
    * `updateAt` 은 `timeChanged` 이벤트 바인딩이라 `TimeController.tick` 이 `false` 를 반환하는
-   * 일시정지 (`!running || scale === 0`) 에서는 **한 번도 돌지 않는다**. 그 안에 카메라 종속
+   * 일시정지 (`!running || scale === 0`) 에서는 등록 시 1회 (`bindTimePhase`, #1308) 외에는 **돌지 않는다**. 그 안에 카메라 종속
    * 갱신 (LOD 판정) 이 섞여 있어서, 시간이 멈추면 카메라만 움직여도 갱신되지 않았다.
    * 프레임 위상은 그 카메라 종속 갱신의 새 소유자다 — 자세한 계약과 멤버십 3조건은
    * ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md` §결정 2.
@@ -259,6 +259,28 @@ export class SimulationCore {
    */
   setFramePassHandler(handler: (() => void) | null): void {
     this.#framePassHandler = handler;
+  }
+
+  /**
+   * #1308 — **시간 위상** 핸들러 연결. `timeChanged` 를 구독하고, **등록 시점의 현재 시각으로
+   * 1회 즉시 호출**한다 (구독 = 현재 상태 동기 + 이후 변화 추종).
+   *
+   * `timeChanged` 는 「변화」만 알리는 엣지 이벤트라 늦게 붙은 구독자는 그 전의 발화를 받지 못한다.
+   * 부팅에서 시간 위상 구독자 (scene 의 `updateAt`) 는 `start()` 가 resolve 된 **뒤**에야 생기는데,
+   * 그 전에 `timeChanged` 는 이미 전부 발화된다 — URL `?t=` 의 `jumpToJulianDate` (scene 생성 전) 와
+   * `start()` 말미의 초기 알림 (`.then` 콜백보다 먼저, 동기). 재생 중이면 `tick` 이
+   * 다시 발화해 가려지지만, 일시정지 (`!running || scale === 0`) 에서는 `tick` 이 `false` 라 그
+   * 「다음」이 오지 않는다 — 장면이 생성자 기본값 (J2000) 에 머물던 #1308 의 기전이다.
+   *
+   * 즉시 호출은 렌더 루프 밖에서 돈다 — 프레임 위상 순서 계약 (ADR `20260907-1205` §결정 3) 은
+   * 렌더 루프 안의 배치만 규정하며 본 메서드는 그것을 건드리지 않는다.
+   *
+   * 해제 API 는 두지 않는다 — core `dispose` 의 `#emitter.all.clear()` 로 해제된다.
+   */
+  bindTimePhase(handler: (julianDate: number) => void): void {
+    if (this.#disposed) return;
+    this.#emitter.on('timeChanged', ({ julianDate }) => handler(julianDate));
+    handler(this.#time.julianDate);
   }
 
   /** 이벤트 구독. */

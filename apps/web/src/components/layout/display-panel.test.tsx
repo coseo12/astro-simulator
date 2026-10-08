@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { withNuqsTestingAdapter } from 'nuqs/adapters/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { DISPLAY_DISABLED_REASONS } from '@/core/display-toggles';
 import { useSimStore } from '@/store/sim-store';
@@ -159,6 +159,39 @@ describe('DisplayPanel — 열기/닫기', () => {
     spy.mockReturnValue(rectAt(860, 40));
     scrollSomething();
     expect(screen.queryByTestId('display-panel')).toBeNull();
+  });
+
+  // #1313 — 모바일 「⋯」 패널 안에서는 트리거가 화면 왼쪽에 있다. 우측 정렬만 하면 패널이 왼쪽 화면 밖으로 열렸다.
+  describe('배치 clamp (#1313)', () => {
+    const PANEL_W = 240;
+    const MARGIN = 8;
+    const setInnerWidth = (w: number) =>
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    let savedWidth = 0;
+    beforeEach(() => {
+      savedWidth = window.innerWidth;
+    });
+    afterEach(() => setInnerWidth(savedWidth));
+    const panelStyle = () => screen.getByTestId('display-panel').style;
+
+    it('우측 상단 트리거 (1280) → 트리거 우측 정렬 그대로', () => {
+      setInnerWidth(1280);
+      renderPanel();
+      vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue(rectAt(1155, 40));
+      openPanel();
+      expect(panelStyle().right).toBe(`${1280 - 1155}px`);
+      expect(panelStyle().width).toBe(`${PANEL_W}px`);
+    });
+
+    it('왼쪽 트리거 (375 「⋯」 패널) → 패널 왼쪽 끝이 여백 안 (화면 밖으로 안 나감)', () => {
+      setInnerWidth(375);
+      renderPanel();
+      vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue(rectAt(86, 171));
+      openPanel();
+      const right = Number.parseFloat(panelStyle().right);
+      expect(375 - right - PANEL_W).toBeGreaterThanOrEqual(MARGIN);
+      expect(right).toBeGreaterThanOrEqual(MARGIN);
+    });
   });
 
   it('열린 채 언마운트 → store 열림 해제 (자동 숨김 영구 억제 방지)', () => {

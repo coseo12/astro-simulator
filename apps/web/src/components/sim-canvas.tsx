@@ -33,7 +33,7 @@ import {
 } from '@/core/resolve-renderer-string';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
-import { BodyLabels } from './layout/body-labels';
+import { BodyLabels, type LabelDragThresholdPx } from './layout/body-labels';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
@@ -97,6 +97,15 @@ function extractWebglRendererString(): string | null {
  *   → Babylon 메이저 업그레이드 시 위 **3 경로(문서 문구 / 기본값 / InputManager 되돌림)** 를 재확인할 것.
  */
 const CANVAS_TAB_INDEX = 0;
+
+/**
+ * #1313 — 라벨 위 탭 ↔ 드래그 임계. 캔버스 클릭 선택 (아래 `onPointerObservable` 의 `dragThreshold`) 과 같은 core 상수다
+ * — 같은 손짓이 라벨 위와 캔버스 위에서 다르게 판정되지 않게 한다.
+ */
+const LABEL_DRAG_THRESHOLD_PX: LabelDragThresholdPx = {
+  mouse: sceneApi.CLICK_DRAG_THRESHOLD_PX,
+  touch: sceneApi.CLICK_DRAG_THRESHOLD_PX_TOUCH,
+};
 
 /**
  * #848 — 캔버스 자동 refocus 로부터 **보호할** 포커스 요소 셀렉터 (WCAG 2.4.3 Focus Order).
@@ -770,13 +779,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           lensing.setPosition(bhx, bhy, bhz);
         }
 
-        instance.on('timeChanged', ({ julianDate }) => solar.updateAt(julianDate));
+        // #1308 — 시간 위상 등록. `on('timeChanged')` 가 아니라 `bindTimePhase` 인 이유: 이 자리
+        // (`start()` resolve 뒤) 에 오기 전에 부팅의 `timeChanged` 는 이미 전부 발화했다 (URL `?t=`
+        // 의 jump + `start()` 말미 초기 알림). 일시정지 부팅 (`?speed=0`) 은 이후 `tick` 이 발화하지
+        // 않으므로 단순 구독이면 장면이 생성자 기본값 (J2000) 에 머문다. `bindTimePhase` 는 등록
+        // 시점의 현재 시각으로 1회 즉시 동기한다 (simulation-core JSDoc).
+        instance.bindTimePhase((julianDate) => solar.updateAt(julianDate));
 
-        // #1205 — 프레임 위상 등록. 위 `timeChanged` (시간 위상) 과 **같은 effect** 에 두는 것이
+        // #1205 — 프레임 위상 등록. 위 시간 위상 (`bindTimePhase`) 과 **같은 effect** 에 두는 것이
         // 계약이다: 두 위상의 등록/해제 수명이 대칭이어야 한다 (해제는 이 effect 의 return 에서
         // `setFramePassHandler(null)`).
         //
-        // `updateAt` 은 일시정지 (`!running || scale === 0`) 에서 한 번도 돌지 않는데 그 안에
+        // `updateAt` 은 일시정지 (`!running || scale === 0`) 에서 등록 시 1회 외에는 돌지 않는데 그 안에
         // 카메라 종속 갱신 (LOD 판정) 이 섞여 있었다 — 그래서 정지 중에는 줌/포커스를 바꿔도
         // LOD 가 얼어붙었다. 프레임 위상은 렌더 루프가 매 프레임 1회 구동하므로 정지에서도 돈다.
         // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
@@ -1441,7 +1455,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         getBodyScreenInfo={cameraTierApi?.getBodyScreenInfo ?? null}
       >
         {/* #1293 — 3D 이름 라벨 오버레이. 캔버스 바로 위 · HUD (children, z-hud) 아래에 둔다 (DOM 순서). */}
-        <BodyLabels wheelTargetRef={canvasRef} />
+        {/* #1313 — 라벨 위 드래그는 캔버스 클릭 선택과 같은 임계로 탭과 갈라 캔버스 회전으로 넘긴다. */}
+        <BodyLabels wheelTargetRef={canvasRef} dragThresholdPx={LABEL_DRAG_THRESHOLD_PX} />
         {children}
       </SimCommandProvider>
     </>
