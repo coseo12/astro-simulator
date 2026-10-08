@@ -749,15 +749,16 @@
       "introducedInRPhase": 10,
       "showInShortcutBar": false,
       "colorHint": { "hex": "#B0A89E", "colorSource": "observed" },
-      "dataSource": "NASA Dawn mission / JPL SBDB",
-      "lastVerified": "2026-04-21",
+      "dataSource": "NASA Dawn mission / JPL SBDB / 궤도: JPL Horizons API J2000 접촉 요소 (JPL#48, 2026-10-08 쿼리)",
+      "lastVerified": "2026-10-08",
+      "$orbitComment": "#1318 — 궤도 요소 교정. 종전 값 (a=2.7653485 / e=0.0785 / i=10.587 / Ω=80.3293 / ϖ=153.7879 / L=95.9892) 은 루트 epoch(J2000) 로 해석하면 J2000 위치가 JPL Horizons 상태벡터와 4.68e+08 km (태양 거리의 1.2 배) 어긋났다. JPL Horizons API (2026-10-08 쿼리) 로 SBDB 궤도해 JPL#48 를 J2000 에 평가한 접촉 요소로 바꿨다 — COMMAND='1;' / CENTER=500@10 / REF_PLANE=ECLIPTIC / REF_SYSTEM=J2000 / TLIST=2451545.0 TDB, 응답 'Reference frame : Ecliptic of J2000.0'. Horizons J2000 원시값: EC=0.0783756264716304 / A=2.766496019994375 AU / IN=10.58336045805628 / OM=80.49435747295276 / W=73.92286274285223 / MA=6.176654513180486 → ϖ=OM+W mod 360 · L=ϖ+MA mod 360. 교정 후 J2000 위치 오차 ≈ 0 (반올림), 2026-10-08 오차 8.34e+06 km (섭동 + 장면 μ=G·M_sun 위상 차).",
       "orbit": {
-        "semiMajorAxisAU": 2.7653485,
-        "eccentricity": 0.0785,
-        "inclinationDeg": 10.587,
-        "longitudeOfAscendingNodeDeg": 80.3293,
-        "longitudeOfPerihelionDeg": 153.7879,
-        "meanLongitudeDeg": 95.9892
+        "semiMajorAxisAU": 2.766496,
+        "eccentricity": 0.0783756,
+        "inclinationDeg": 10.58336,
+        "longitudeOfAscendingNodeDeg": 80.494357,
+        "longitudeOfPerihelionDeg": 154.41722,
+        "meanLongitudeDeg": 160.593875
       }
     },
     {
@@ -818,16 +819,17 @@
       "introducedInRPhase": 10,
       "showInShortcutBar": false,
       "colorHint": { "hex": "#D9D2C5", "colorSource": "inferred" },
-      "dataSource": "Ragozzine & Brown (2009) / Ortiz et al. (2017)",
-      "lastVerified": "2026-04-21",
+      "dataSource": "Ragozzine & Brown (2009) / Ortiz et al. (2017) / 궤도: JPL Horizons API J2000 접촉 요소 (JPL#132, 2026-10-08 쿼리)",
+      "lastVerified": "2026-10-08",
       "uncertainty": { "mass": 0.04, "radius": 0.1 },
+      "$orbitComment": "#1318 — 궤도 요소 교정. 종전 값 (a=43.13 / e=0.19126 / i=28.2137 / Ω=121.9056 / ϖ=0.9119 / L=205.8075) 은 루트 epoch(J2000) 로 해석하면 J2000 위치가 JPL Horizons 상태벡터와 1.23e+09 km (태양 거리의 0.16 배) 어긋났다. JPL Horizons API (2026-10-08 쿼리) 로 SBDB 궤도해 JPL#132 를 J2000 에 평가한 접촉 요소로 바꿨다 — COMMAND='136108;' / CENTER=500@10 / REF_PLANE=ECLIPTIC / REF_SYSTEM=J2000 / TLIST=2451545.0 TDB, 응답 'Reference frame : Ecliptic of J2000.0'. Horizons J2000 원시값: EC=0.1999209495775153 / A=42.90925766086671 AU / IN=28.20614176692041 / OM=121.9332385932473 / W=240.5907776701779 / MA=189.5952699212157 → ϖ=OM+W mod 360 · L=ϖ+MA mod 360. 교정 후 J2000 위치 오차 ≈ 0 (반올림), 2026-10-08 오차 1.21e+07 km (섭동 + 장면 μ=G·M_sun 위상 차).",
       "orbit": {
-        "semiMajorAxisAU": 43.13,
-        "eccentricity": 0.19126,
-        "inclinationDeg": 28.2137,
-        "longitudeOfAscendingNodeDeg": 121.9056,
-        "longitudeOfPerihelionDeg": 0.9119,
-        "meanLongitudeDeg": 205.8075
+        "semiMajorAxisAU": 42.909258,
+        "eccentricity": 0.1999209,
+        "inclinationDeg": 28.206142,
+        "longitudeOfAscendingNodeDeg": 121.933239,
+        "longitudeOfPerihelionDeg": 2.524016,
+        "meanLongitudeDeg": 192.119286
       }
     },
     {
@@ -841,16 +843,17 @@
       "introducedInRPhase": 10,
       "showInShortcutBar": false,
       "colorHint": { "hex": "#E4A57E", "colorSource": "observed" },
-      "dataSource": "Ortiz et al. (2012) stellar occultation",
-      "lastVerified": "2026-04-21",
+      "dataSource": "Ortiz et al. (2012) stellar occultation / 궤도: JPL Horizons API J2000 접촉 요소 (JPL#130, 2026-10-08 쿼리)",
+      "lastVerified": "2026-10-08",
       "uncertainty": { "mass": 0.5, "radius": 0.01 },
+      "$orbitComment": "#1318 — 궤도 요소 교정. 종전 값 (a=45.791 / e=0.1559 / i=29.004 / Ω=79.366 / ϖ=296.503 / L=165.514) 은 루트 epoch(J2000) 로 해석하면 J2000 위치가 JPL Horizons 상태벡터와 1.62e+09 km (태양 거리의 0.21 배) 어긋났다. JPL Horizons API (2026-10-08 쿼리) 로 SBDB 궤도해 JPL#130 를 J2000 에 평가한 접촉 요소로 바꿨다 — COMMAND='136472;' / CENTER=500@10 / REF_PLANE=ECLIPTIC / REF_SYSTEM=J2000 / TLIST=2451545.0 TDB, 응답 'Reference frame : Ecliptic of J2000.0'. Horizons J2000 원시값: EC=0.1645232903298833 / A=45.37205778306633 AU / IN=29.00018553920376 / OM=79.2749060739329 / W=296.2809991935295 / MA=139.7201624508081 → ϖ=OM+W mod 360 · L=ϖ+MA mod 360. 교정 후 J2000 위치 오차 ≈ 0 (반올림), 2026-10-08 오차 1.27e+07 km (섭동 + 장면 μ=G·M_sun 위상 차).",
       "orbit": {
-        "semiMajorAxisAU": 45.791,
-        "eccentricity": 0.1559,
-        "inclinationDeg": 29.004,
-        "longitudeOfAscendingNodeDeg": 79.366,
-        "longitudeOfPerihelionDeg": 296.503,
-        "meanLongitudeDeg": 165.514
+        "semiMajorAxisAU": 45.372058,
+        "eccentricity": 0.1645233,
+        "inclinationDeg": 29.000186,
+        "longitudeOfAscendingNodeDeg": 79.274906,
+        "longitudeOfPerihelionDeg": 15.555905,
+        "meanLongitudeDeg": 155.276068
       }
     },
     {
@@ -864,15 +867,16 @@
       "introducedInRPhase": 10,
       "showInShortcutBar": false,
       "colorHint": { "hex": "#DAD9D4", "colorSource": "inferred" },
-      "dataSource": "Sicardy et al. (2011) stellar occultation",
-      "lastVerified": "2026-04-21",
+      "dataSource": "Sicardy et al. (2011) stellar occultation / 궤도: JPL Horizons API J2000 접촉 요소 (JPL#103, 2026-10-08 쿼리)",
+      "lastVerified": "2026-10-08",
+      "$orbitComment": "#1318 — 궤도 요소 교정. 종전 값 (a=67.864 / e=0.43607 / i=44.0404 / Ω=36.0139 / ϖ=186.0223 / L=204.16) 은 루트 epoch(J2000) 로 해석하면 J2000 위치가 JPL Horizons 상태벡터와 1.98e+10 km (태양 거리의 1.4 배) 어긋났다. JPL Horizons API (2026-10-08 쿼리) 로 SBDB 궤도해 JPL#103 를 J2000 에 평가한 접촉 요소로 바꿨다 — COMMAND='136199;' / CENTER=500@10 / REF_PLANE=ECLIPTIC / REF_SYSTEM=J2000 / TLIST=2451545.0 TDB, 응답 'Reference frame : Ecliptic of J2000.0'. Horizons J2000 원시값: EC=0.4325050983099001 / A=68.13986865232954 AU / IN=43.74050564207168 / OM=36.12852074096747 / W=150.8448096449848 / MA=194.2903409988061 → ϖ=OM+W mod 360 · L=ϖ+MA mod 360. 교정 후 J2000 위치 오차 ≈ 0 (반올림), 2026-10-08 오차 1.27e+07 km (섭동 + 장면 μ=G·M_sun 위상 차).",
       "orbit": {
-        "semiMajorAxisAU": 67.864,
-        "eccentricity": 0.43607,
-        "inclinationDeg": 44.0404,
-        "longitudeOfAscendingNodeDeg": 36.0139,
-        "longitudeOfPerihelionDeg": 186.0223,
-        "meanLongitudeDeg": 204.16
+        "semiMajorAxisAU": 68.139869,
+        "eccentricity": 0.4325051,
+        "inclinationDeg": 43.740506,
+        "longitudeOfAscendingNodeDeg": 36.128521,
+        "longitudeOfPerihelionDeg": 186.97333,
+        "meanLongitudeDeg": 21.263671
       }
     },
     {
@@ -913,16 +917,17 @@
       "introducedInRPhase": 11,
       "showInShortcutBar": false,
       "colorHint": { "hex": "#B5E0D1", "colorSource": "artistic" },
-      "dataSource": "JPL SBDB (2P/Encke)",
-      "lastVerified": "2026-04-21",
+      "dataSource": "JPL SBDB (2P/Encke) / 궤도: JPL Horizons API J2000 접촉 요소 (JPL#K273/20, 2026-10-08 쿼리)",
+      "lastVerified": "2026-10-08",
       "uncertainty": { "mass": 0.5, "radius": 0.2 },
+      "$orbitComment": "#1318 — 궤도 요소 교정. 종전 값 (a=2.2152 / e=0.848 / i=11.78 / Ω=334.57 / ϖ=161.11 / L=100) 은 루트 epoch(J2000) 로 해석하면 J2000 위치가 JPL Horizons 상태벡터와 5.8e+07 km (태양 거리의 0.13 배) 어긋났다. JPL Horizons API (2026-10-08 쿼리) 로 SBDB 궤도해 JPL#K273/20 를 J2000 에 평가한 접촉 요소로 바꿨다 — COMMAND='DES=2P;CAP;NOFRAG' / CENTER=500@10 / REF_PLANE=ECLIPTIC / REF_SYSTEM=J2000 / TLIST=2451545.0 TDB, 응답 'Reference frame : Ecliptic of J2000.0'. Horizons J2000 원시값: EC=0.8470510684696597 / A=2.217530569052104 AU / IN=11.7642756913588 / OM=334.6296105240829 / W=186.4726239728491 / MA=284.7350454086932 → ϖ=OM+W mod 360 · L=ϖ+MA mod 360. 교정 후 J2000 위치 오차 ≈ 0 (반올림), 2026-10-08 오차 2.79e+06 km (섭동 + 장면 μ=G·M_sun 위상 차).",
       "orbit": {
-        "semiMajorAxisAU": 2.2152,
-        "eccentricity": 0.848,
-        "inclinationDeg": 11.78,
-        "longitudeOfAscendingNodeDeg": 334.57,
-        "longitudeOfPerihelionDeg": 161.11,
-        "meanLongitudeDeg": 100.0
+        "semiMajorAxisAU": 2.2175306,
+        "eccentricity": 0.8470511,
+        "inclinationDeg": 11.764276,
+        "longitudeOfAscendingNodeDeg": 334.629611,
+        "longitudeOfPerihelionDeg": 161.102234,
+        "meanLongitudeDeg": 85.83728
       }
     },
     {
@@ -937,16 +942,17 @@
       "introducedInRPhase": 11,
       "showInShortcutBar": false,
       "colorHint": { "hex": "#C8D8E8", "colorSource": "artistic" },
-      "dataSource": "Jorda & Licandro (2003) / JPL SBDB",
-      "lastVerified": "2026-04-21",
+      "dataSource": "Jorda & Licandro (2003) / JPL SBDB / 궤도: JPL Horizons API J2000 접촉 요소 (JPL#32, 2026-10-08 쿼리)",
+      "lastVerified": "2026-10-08",
       "uncertainty": { "mass": 0.5, "radius": 0.2 },
+      "$orbitComment": "#1318 — 궤도 요소 교정. 종전 값 (a=26.09 / e=0.963 / i=113.45 / Ω=139.38 / ϖ=292.36 / L=300) 은 루트 epoch(J2000) 로 해석하면 J2000 위치가 JPL Horizons 상태벡터와 1.29e+09 km (태양 거리의 0.48 배) 어긋났다. JPL Horizons API (2026-10-08 쿼리) 로 SBDB 궤도해 JPL#32 를 J2000 에 평가한 접촉 요소로 바꿨다 — COMMAND='DES=109P;CAP;NOFRAG' / CENTER=500@10 / REF_PLANE=ECLIPTIC / REF_SYSTEM=J2000 / TLIST=2451545.0 TDB, 응답 'Reference frame : Ecliptic of J2000.0'. Horizons J2000 원시값: EC=0.9631624069830728 / A=26.34271940569137 AU / IN=113.3406285992539 / OM=139.5133225675405 / W=153.2379818767868 / MA=18.77942625229999 → ϖ=OM+W mod 360 · L=ϖ+MA mod 360. 교정 후 J2000 위치 오차 ≈ 0 (반올림), 2026-10-08 오차 1.69e+07 km (섭동 + 장면 μ=G·M_sun 위상 차).",
       "orbit": {
-        "semiMajorAxisAU": 26.09,
-        "eccentricity": 0.963,
-        "inclinationDeg": 113.45,
-        "longitudeOfAscendingNodeDeg": 139.38,
-        "longitudeOfPerihelionDeg": 292.36,
-        "meanLongitudeDeg": 300.0
+        "semiMajorAxisAU": 26.342719,
+        "eccentricity": 0.9631624,
+        "inclinationDeg": 113.340629,
+        "longitudeOfAscendingNodeDeg": 139.513323,
+        "longitudeOfPerihelionDeg": 292.751304,
+        "meanLongitudeDeg": 311.530731
       }
     },
     {

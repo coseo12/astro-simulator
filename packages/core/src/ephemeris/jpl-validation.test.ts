@@ -181,16 +181,24 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
     }
   });
 
-  describe('#1318 소행성 J2000 위치 — JPL Horizons 상태벡터 대조', () => {
+  describe('#1318 태양 직속 소천체 J2000 위치 — JPL Horizons 상태벡터 대조', () => {
     // json 은 SBDB 궤도해를 Horizons 로 J2000 에 평가한 접촉 요소를 ϖ · L 형태로 박제했다. 로더의 ω = ϖ − Ω ·
     // M₀ = L − ϖ 역변환과 루트 epoch(J2000) 해석이 맞으면 J2000 위치가 Horizons 상태벡터와 일치한다.
     // 대조값은 json 과 독립인 Horizons VECTORS 원시값 (CENTER=500@10 / REF_PLANE=ECLIPTIC / J2000 TDB, AU).
-    // 허용 1000 km — 요소 반올림 (a 1e-7 AU ≈ 15 km, 각도 1e-6° ≈ 6 km) 대비 넉넉하고, L 을 0.001° 만 틀려도
-    // (≈ 6,000 km) 걸린다. epoch 시점이라 장면 μ 와 무관하다.
+    // 허용 1000 km — 요소 반올림 (실측 최대 261 km, haumea 43 AU) 대비 넉넉하고, 베스타 L 을 0.001° 만 틀려도
+    // (6,717 km) 걸린다. epoch 시점이라 장면 μ 와 무관하다.
+    // 왜소행성 4 · 혜성 2 는 #1318 에서 같은 방식으로 교정했다 — 종전 값은 J2000 위치가 0.13~1.4 배 (태양 거리 대비)
+    // 어긋났다 (eris 는 태양 반대편). 원시값 · 종전 값은 json `$orbitComment`.
     const HORIZONS_J2000_AU: Record<string, [number, number, number]> = {
       vesta: [-1.353580437607153, -1.673136657862151, 2.149018113721361e-1],
       pallas: [-8.411384433388419e-1, 1.653739426955205, -1.073889494800965],
       hygiea: [-2.374062486038638, -1.463570769967126, -1.781685951459966e-1],
+      ceres: [-2.379327705915647, 7.954860388931395e-1, 4.630055715902157e-1],
+      haumea: [-45.98975416258292, -5.120482285486933, 22.38562723851461],
+      makemake: [-43.5784783265468, 11.47834473139828, 24.91821564163504],
+      eris: [88.39334192774233, 30.76524538911426, -26.0943902751538],
+      encke: [3.089291093891643, 1.14911528860036e-2, 2.778287537600695e-1],
+      'swift-tuttle': [-12.57514687248681, 3.687234330253122, -12.42229064076265],
     };
     const TOLERANCE_KM = 1000;
     for (const [id, ref] of Object.entries(HORIZONS_J2000_AU)) {
@@ -202,6 +210,32 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
         expect(dKm).toBeLessThan(TOLERANCE_KM);
       });
     }
+
+    // 교정하지 않은 2 body — 종전 값이 이미 태양 거리 대비 1.8e-3 이하로 맞다 (pluto 3.0e-4 · halley 1.8e-3).
+    // 접촉 요소로 바꾸면 J2000 은 0 이 되지만 2026 오차가 커진다 (pluto 3.4e6 → 2.3e7 km) 라 유지했다.
+    const KEPT_J2000_AU: Record<string, [number, number, number]> = {
+      pluto: [-9.875347258580963, -27.95878609745811, 5.850454132132248],
+      halley: [-17.38599346385816, 16.9791761108223, -7.577986613535686],
+    };
+    const KEPT_REL_TOLERANCE = 5e-3;
+    for (const [id, ref] of Object.entries(KEPT_J2000_AU)) {
+      it(`${id} J2000 위치 오차 / 태양 거리 < ${KEPT_REL_TOLERANCE}`, () => {
+        const body = byId.get(id);
+        if (!body?.orbit) throw new Error(id);
+        const p = positionAt(body.orbit, J2000_JD, MU_SUN);
+        const d = Math.hypot(p[0] - ref[0] * AU, p[1] - ref[1] * AU, p[2] - ref[2] * AU);
+        expect(d / (Math.hypot(...ref) * AU)).toBeLessThan(KEPT_REL_TOLERANCE);
+      });
+    }
+
+    it('대조 표가 태양 직속 비행성 body 전부를 덮는다 (누락 0)', () => {
+      const covered = new Set([...Object.keys(HORIZONS_J2000_AU), ...Object.keys(KEPT_J2000_AU)]);
+      const targets = system.bodies.filter(
+        (b) => b.parentId === 'sun' && b.kind !== 'planet' && b.orbit,
+      );
+      expect(targets.length).toBeGreaterThanOrEqual(11);
+      for (const b of targets) expect(covered.has(b.id), `${b.id} 대조 표 누락`).toBe(true);
+    });
   });
 
   describe('지구-달 시스템 (부모 중심 좌표)', () => {
