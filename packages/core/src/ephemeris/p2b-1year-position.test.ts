@@ -15,7 +15,10 @@ const MU_SUN = GRAVITATIONAL_CONSTANT * SOLAR_MASS;
 
 describe('P2-B 왜소행성·혜성 1년 위치 수치 건전성', () => {
   const sys = getSolarSystem();
-  const targets = sys.bodies.filter((b) => b.kind === 'dwarf-planet' || b.kind === 'comet');
+  // #1318 — 소행성 (태양 직속 소천체) 도 같은 수치 건전성 대상.
+  const targets = sys.bodies.filter(
+    (b) => b.kind === 'dwarf-planet' || b.kind === 'comet' || b.kind === 'asteroid',
+  );
 
   for (const body of targets) {
     it(`${body.id} 1년 후 위치 유한값 + [peri, apo] 범위`, () => {

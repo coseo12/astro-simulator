@@ -289,6 +289,8 @@ async function measureBodyPxRatios(page) {
     // (neptune 전), proteus 는 triton 다음 (ceres 전) — 데이터 순서 #619 정적 매칭 가드 통과 필수.
     // #1305 — charon N/A (미박제 — 측정만). 렌더 반경 = 명왕성의 0.51 (실제 반경비) — pluto 다음 (haumea 전),
     // 데이터 순서 #619 정적 매칭 가드 통과 필수.
+    // #1318 — 소행성 3 (vesta/pallas/hygiea) N/A (미박제 — 측정만). 왜소행성과 같은 압축 곡선 (body-scale.ts
+    // ASTEROID_IDS) — 데이터 끝 (swift-tuttle 다음), 데이터 순서 #619 정적 매칭 가드 통과 필수.
     const targetIds = [
       'sun',
       'mercury',
@@ -323,6 +325,9 @@ async function measureBodyPxRatios(page) {
       'halley',
       'encke',
       'swift-tuttle',
+      'vesta',
+      'pallas',
+      'hygiea',
     ];
 
     /**

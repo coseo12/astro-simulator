@@ -13,7 +13,7 @@
  *     화면 원반 기준으로 넓히지 않은 이유: 모체 원반 앞을 실제로 지나는 통과 (transit) 위성의 라벨까지 지운다.
  *  2. 위성은 **모체가 선택 (포커스) 됐을 때만** 후보다. 위성 자신이 선택된 경우도 후보로 둔다 — 선택한 천체의
  *     이름이 화면에서 사라지지 않게 (모체 조건의 확장이지 우선순위 변경이 아니다).
- *  3. 우선순위 태양 > 행성 > 왜소행성 > 위성 > 혜성, 같은 등급은 화면 반지름이 큰 쪽 → id 사전순 (결정적).
+ *  3. 우선순위 태양 > 행성 > 왜소행성 > 소행성 > 위성 > 혜성, 같은 등급은 화면 반지름이 큰 쪽 → id 사전순 (결정적).
  *  4. 높은 순위부터 놓고, 이미 놓인 박스와 겹치면 (간격 `LABEL_GAP_PX` 포함) 그 라벨을 숨긴다 → 겹침 쌍 0 (D5).
  *
  * ## 배치
@@ -35,10 +35,13 @@ export const LABEL_KIND_PRIORITY: Readonly<Record<string, number>> = {
   star: 0,
   planet: 1,
   'dwarf-planet': 2,
-  moon: 3,
-  comet: 4,
+  // #1318 — 소행성은 왜소행성 다음 · 위성 앞. 위성 라벨은 모체 포커스 때만 후보라 (규칙 2) 기본 화면에서
+  // 소행성과 경쟁하는 것은 행성 · 왜소행성 · 혜성이다. 태양 직속 소천체로서 왜소행성과 같은 축에 둔다.
+  asteroid: 3,
+  moon: 4,
+  comet: 5,
 };
-const UNKNOWN_KIND_PRIORITY = 5;
+const UNKNOWN_KIND_PRIORITY = 6;
 
 export interface LabelCandidate {
   id: string;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadSolarSystem } from './solar-system-loader.js';
 
 describe('loadSolarSystem', () => {
-  it('로드 성공 + 33개 바디 (sun + 8행성 + moon 16 + 왜소행성 5 + 혜성 3)', () => {
+  it('로드 성공 + 36개 바디 (sun + 8행성 + moon 16 + 왜소행성 5 + 혜성 3 + 소행성 3)', () => {
     // P8 #244: 포보스/데이모스 추가 → moon 엔티티 3개 (moon + phobos + deimos).
     // P9 #254: Galilean 4체 (io/europa/ganymede/callisto) 추가 → moon 엔티티 7개.
     // R7 #641: titan 추가 → moon 엔티티 8개, 총 25 바디.
@@ -11,13 +11,40 @@ describe('loadSolarSystem', () => {
     // R11 #721: enceladus/rhea/iapetus 추가 → moon 엔티티 13개, 총 30 바디 (토성계 위성 4개째~6개째).
     // R12 #725: oberon/proteus 추가 → moon 엔티티 15개, 총 32 바디 (거성 위성 — 천왕성/해왕성 2번째).
     // #1305: charon 추가 → moon 엔티티 16개, 총 33 바디 (왜소행성 모체 첫 위성).
+    // #1318: vesta/pallas/hygiea 추가 → asteroid 엔티티 3개 (첫 asteroid kind), 총 36 바디.
     const data = loadSolarSystem();
     expect(data.epoch).toBe(2451545.0);
     expect(data.tier).toBe(1);
-    expect(data.bodies).toHaveLength(33);
+    expect(data.bodies).toHaveLength(36);
     expect(data.bodies.filter((b) => b.kind === 'moon')).toHaveLength(16);
     expect(data.bodies.filter((b) => b.kind === 'dwarf-planet')).toHaveLength(5);
     expect(data.bodies.filter((b) => b.kind === 'comet')).toHaveLength(3);
+    expect(data.bodies.filter((b) => b.kind === 'asteroid')).toHaveLength(3);
+  });
+
+  it('#1318 — 소행성 3 로드 (태양 직속 · phase 15 · 단축바 비노출 · 데이터 끝 순서 · 실반경 서열)', () => {
+    const bodies = loadSolarSystem().bodies;
+    const ids = bodies.map((b) => b.id);
+    // 데이터 순서 — 혜성 다음 (데이터 끝). #598 FOCUS_BODIES / #619 targetIds 정적 매칭 가드가 데이터 순서를 쓴다.
+    expect(ids.slice(-3)).toEqual(['vesta', 'pallas', 'hygiea']);
+    const byId = new Map(bodies.map((b) => [b.id, b]));
+    for (const id of ['vesta', 'pallas', 'hygiea']) {
+      const b = byId.get(id)!;
+      expect(b.kind).toBe('asteroid');
+      expect(b.parentId).toBe('sun');
+      expect(b.introducedInRPhase).toBe(15);
+      expect(b.showInShortcutBar).toBe(false); // 검색 / 클릭 / URL ?focus= 진입
+      expect(b.uncertainty?.mass).toBeDefined(); // 비구형 소천체 — verify-iau-data 규약
+      expect(b.uncertainty?.radius).toBeDefined();
+    }
+    // 실반경 서열 세레스 > 베스타 > 팔라스 > 히기에아 — #1318 D3 표시 크기 단조성의 입력 전제.
+    const r = (id: string) => byId.get(id)!.radius;
+    expect(r('ceres')).toBeGreaterThan(r('vesta'));
+    expect(r('vesta')).toBeGreaterThan(r('pallas'));
+    expect(r('pallas')).toBeGreaterThan(r('hygiea'));
+    // SBDB GM 17.2882844 km^3/s^2 ÷ G / 지름 522.77 km ÷ 2.
+    expect(byId.get('vesta')!.mass).toBeCloseTo(2.590277e20, -15);
+    expect(r('vesta')).toBe(261_385);
   });
 
   it('태양은 궤도가 없다', () => {

@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
-  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 + R11 토성 위성 3 + R12 거성 위성 2 + phase 14 charon 순서로 정확히 33개', () => {
+  it('현재 박제: R1~R9 (sun~triton) + R10a 왜소행성 5 + R10b 혜성 3 + R11 토성 위성 3 + R12 거성 위성 2 + phase 14 charon + phase 15 소행성 3 순서로 정확히 36개', () => {
     expect(R_PHASE_BODY_ALLOWLIST).toEqual([
       'sun',
       'mercury',
@@ -58,6 +58,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
       'halley', // R10b #664 — 혜성 3 (데이터 등장 순)
       'encke',
       'swift-tuttle',
+      'vesta', // #1318 — 소행성대 대표 3 (phase 15, 데이터 끝 — 혜성 다음)
+      'pallas',
+      'hygiea',
     ]);
   });
 
@@ -65,9 +68,9 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
     expect(Object.isFrozen(R_PHASE_BODY_ALLOWLIST)).toBe(true);
   });
 
-  it('자동 생성 결과 33개 (CURRENT_R_PHASE=14 필터 — #1305 charon 자동 포함)', () => {
-    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. #1305 진입 33개 (위 toEqual).
-    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(33);
+  it('자동 생성 결과 36개 (CURRENT_R_PHASE=15 필터 — #1318 소행성 3 자동 포함)', () => {
+    // #613 — 하드코딩 → introducedInRPhase 데이터 필터 자동 생성. #1318 진입 36개 (위 toEqual).
+    expect(R_PHASE_BODY_ALLOWLIST.length).toBe(36);
   });
 });
 
@@ -81,8 +84,8 @@ describe('R_PHASE_BODY_ALLOWLIST — SSoT 박제값', () => {
 describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
   const bodies = getSolarSystem().bodies;
 
-  it('CURRENT_R_PHASE 는 14 (#1305 명왕성 위성 charon 까지)', () => {
-    expect(CURRENT_R_PHASE).toBe(14);
+  it('CURRENT_R_PHASE 는 15 (#1318 소행성대 대표 3 까지)', () => {
+    expect(CURRENT_R_PHASE).toBe(15);
   });
 
   it('filterBodiesByPhase(CURRENT_R_PHASE) == 현재 자동 생성 allowlist (회귀 0)', () => {
@@ -192,12 +195,29 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     expect(p13).not.toContain('charon');
   });
 
-  it('#1305 — phase 14 = 현재 자동 생성 allowlist 와 동치 33 body (charon 자동 포함 — CURRENT_R_PHASE=14 1줄 적중)', () => {
-    // R12 의 "phase 13 동치" 테스트를 phase 14 동치로 승격 (#613 자동 생성 10번째 실전).
+  it('#1305 — phase 14 고정 시뮬은 33 body (소행성 3 = phase 15 제외 — phase 14/15 경계 가드)', () => {
+    // #1318 진입 후 phase 14 고정 시뮬은 33 body — 분리 메커니즘 경계 가드 (phase 13 = 32 동형).
     const p14 = filterBodiesByPhase(bodies, 14);
-    expect(p14).toEqual([...R_PHASE_BODY_ALLOWLIST]);
     expect(p14.length).toBe(33);
     expect(p14).toContain('charon');
+    for (const id of ['vesta', 'pallas', 'hygiea']) expect(p14).not.toContain(id);
+  });
+
+  it('#1318 — phase 15 = 현재 자동 생성 allowlist 와 동치 36 body (소행성 3 자동 포함 — CURRENT_R_PHASE=15 1줄 적중)', () => {
+    // phase 14 동치 테스트를 phase 15 동치로 승격 (#613 자동 생성 11번째 실전).
+    const p15 = filterBodiesByPhase(bodies, 15);
+    expect(p15).toEqual([...R_PHASE_BODY_ALLOWLIST]);
+    expect(p15.length).toBe(36);
+    for (const id of ['vesta', 'pallas', 'hygiea']) expect(p15).toContain(id);
+  });
+
+  it('소행성 3 body 는 introducedInRPhase === 15 + kind asteroid + parent sun (#1318)', () => {
+    const asteroids = bodies.filter((b) => b.kind === 'asteroid');
+    expect(asteroids.map((b) => b.id)).toEqual(['vesta', 'pallas', 'hygiea']);
+    for (const a of asteroids) {
+      expect(a.introducedInRPhase, `${a.id} 는 phase 15 박제여야 함`).toBe(15);
+      expect(a.parentId, `${a.id} parent 는 sun`).toBe('sun');
+    }
   });
 
   it('charon 은 introducedInRPhase === 14 + parent pluto (#1305 — 왜소행성 모체 첫 위성)', () => {
@@ -235,10 +255,10 @@ describe('#613 — introducedInRPhase 자동 생성 SSoT', () => {
     expect(proteus?.parentId, 'proteus parent 는 neptune').toBe('neptune');
   });
 
-  it('모든 body 에 introducedInRPhase 부여 (1~14 범위 — phase 14 = #1305 charon)', () => {
+  it('모든 body 에 introducedInRPhase 부여 (1~15 범위 — phase 15 = #1318 소행성 3)', () => {
     for (const b of bodies) {
       expect(b.introducedInRPhase, `${b.id} introducedInRPhase 누락`).toBeGreaterThanOrEqual(1);
-      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(14);
+      expect(b.introducedInRPhase, `${b.id} introducedInRPhase 범위 초과`).toBeLessThanOrEqual(15);
     }
   });
 });
@@ -278,6 +298,9 @@ describe('isRPhaseFocusable — focusOn 가드 helper', () => {
     expect(isRPhaseFocusable('halley')).toBe(true); // R10b #664 — 혜성 3 (negative → positive 전환, 역행 i 162.26°)
     expect(isRPhaseFocusable('encke')).toBe(true); // R10b #664
     expect(isRPhaseFocusable('swift-tuttle')).toBe(true); // R10b #664 — 전 데이터 소진 (미진입 body 0)
+    expect(isRPhaseFocusable('vesta')).toBe(true); // #1318 — 소행성 (검색 / 클릭 / URL 진입)
+    expect(isRPhaseFocusable('pallas')).toBe(true); // #1318
+    expect(isRPhaseFocusable('hygiea')).toBe(true); // #1318
   });
 
   it('allowlist 외 가상 ID 는 false (R10b #664 — 미진입 실데이터 0, 가상 ID 로 membership 가드 영구 보존)', () => {

@@ -1176,6 +1176,45 @@ export function createSolarSystemScene(
     );
   };
 
+  /**
+   * #1318 — 궤도선 LineSystem 의 position 을 모체의 로컬 장면 좌표로 맞춘다 (body mesh 와 같은 기준계).
+   *
+   * 궤도점은 모체 원점 기준으로 샘플링된다 (`sampleOrbitPoints`). 따라서 LineSystem 을 모체 자리에 놓아야
+   * 궤도선이 천체를 지난다:
+   *  - 태양 중심 `orbitLines` (행성 · 왜소행성 · 혜성 · 소행성) → 태양 로컬 좌표
+   *  - 위성 `satelliteOrbitLines` (#627) → 모체 로컬 좌표
+   *
+   * 결함 (#1318 실측): 종전에는 위성 쪽만 `updateAt` 에서 동기화하고 `orbitLines` 는 원점 (0,0,0) 에 두었다.
+   * T1/T2 는 floating origin 이 [0,0,0] 이라 태양 로컬 = 원점이어서 드러나지 않았다. T3 (body) 포커스는
+   * `setOriginToBody(focus)` 로 원점이 포커스 천체로 옮겨 가므로, 궤도선이 **포커스 천체 중심**으로 그려졌다
+   * (천체-궤도선 거리 / 태양 거리 — 세레스 포커스 세레스 0.04 · 베스타 포커스 화성 0.15~0.30).
+   *
+   * 호출부는 body mesh.position 을 쓰는 두 곳과 같다 — 시간 위상 `updateAt` 과 `setTier` 즉시 재계산.
+   * `setTier` 는 `rebuildOrbitLines` 로 LineSystem 을 새로 만들어 position 이 (0,0,0) 으로 돌아가는데,
+   * 일시정지 (`updateAt` 미발동) 중 tier 전환이면 다음 `updateAt` 까지 그 값이 남는다 — 위성 궤도선도
+   * 같은 경로라 함께 여기서 맞춘다. origin 을 스칼라로 받는 이유는 `syncSunLightPosition` 과 같다.
+   */
+  const syncOrbitLinePositions = (ox: number, oy: number, oz: number, scale: number): void => {
+    if (orbitLines) {
+      const sunWorld = worldPositions.get('sun') ?? ZERO;
+      orbitLines.position.set(
+        (sunWorld[0] - ox) * scale,
+        (sunWorld[1] - oy) * scale,
+        (sunWorld[2] - oz) * scale,
+      );
+    }
+    for (const [parentId, ls] of satelliteOrbitLines) {
+      const parentWorld = worldPositions.get(parentId);
+      if (parentWorld) {
+        ls.position.set(
+          (parentWorld[0] - ox) * scale,
+          (parentWorld[1] - oy) * scale,
+          (parentWorld[2] - oz) * scale,
+        );
+      }
+    }
+  };
+
   // 소행성대 (#99) — ThinInstances 단일 draw call.
   // Kepler 경로: 각 소행성 독립 해석해.
   // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
@@ -1386,6 +1425,14 @@ export function createSolarSystemScene(
     // 의 fix 다. #782 Amendment 2-i 는 위상 도입 쪽이라 이 즉시 동기 자체의 출처가 아니다).
     // 수식·재현·측정 한계는 `syncSunLightPosition` 정의부 주석이 SSoT.
     syncSunLightPosition(
+      tierTransitionOrigin[0],
+      tierTransitionOrigin[1],
+      tierTransitionOrigin[2],
+      newScale,
+    );
+    // #1318 — 궤도선도 같은 프레임에 새 origin/scale 로. `rebuildOrbitLines` 가 방금 position (0,0,0) 으로
+    // 새로 만들었으므로, 일시정지 중 tier 전환이면 이 호출이 없을 때 다음 `updateAt` 까지 어긋난 채 남는다.
+    syncOrbitLinePositions(
       tierTransitionOrigin[0],
       tierTransitionOrigin[1],
       tierTransitionOrigin[2],
@@ -1664,16 +1711,8 @@ export function createSolarSystemScene(
     // parent (earth/mars/jupiter) 가 sun 주위를 매 프레임 공전하므로 각 satellite 궤도 LineSystem 의
     // position 을 parent scene-unit 좌표로 동기 (parent 추적). satellite mesh 위치는 worldPositions 가
     // sun 중심 좌표라 위 루프에서 처리됨 (별도 처리 불필요).
-    for (const [parentId, ls] of satelliteOrbitLines) {
-      const parentWorld = worldPositions.get(parentId);
-      if (parentWorld) {
-        ls.position.set(
-          (parentWorld[0] - ox) * sceneUnitPerMeter,
-          (parentWorld[1] - oy) * sceneUnitPerMeter,
-          (parentWorld[2] - oz) * sceneUnitPerMeter,
-        );
-      }
-    }
+    // #1318 — 태양 중심 `orbitLines` 도 같은 헬퍼에서 태양 로컬 좌표로 동기 (T3 floating origin 정합).
+    syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
 
     // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
     // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
