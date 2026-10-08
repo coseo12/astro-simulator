@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard } from 'lucide-react';
+// named import 만 — `@astro-simulator/core` namespace 경유는 SSR 500 (body-menu.tsx 상단 주석 동형).
+import { R_PHASE_BODY_ALLOWLIST } from '@astro-simulator/core';
 import { Modal } from '@/components/ui/modal';
 import { getOnboardingDismissed, markOnboardingDismissed } from '@/lib/onboarding-storage';
 
@@ -47,6 +49,12 @@ import { getOnboardingDismissed, markOnboardingDismissed } from '@/lib/onboardin
  *
  *   - 이슈 #737 — architect 설계 코멘트 (핵심결정 1·2·4·5 / 조작 안내 콘텐츠 표)
  */
+
+/**
+ * #1313 — 안내 문구의 천체 개수. 「탐색 가능한」 천체 = 선택 · 검색 · 라벨이 받는 R-Phase allowlist 와 같은 집합이다.
+ * 종전 하드코딩 「27개」가 R10b 이후 body 추가(#721 · #725 · #1305)를 따라가지 못해 33 과 어긋났다 — 데이터에서 파생한다.
+ */
+const EXPLORABLE_BODY_COUNT = R_PHASE_BODY_ALLOWLIST.length;
 
 /** 마우스·키보드 조작 안내 (데스크톱). */
 const POINTER_GUIDE: ReadonlyArray<{ action: string; how: string }> = [
@@ -150,8 +158,9 @@ export function OnboardingModal() {
         fallbackFocusRef={triggerRef}
       >
         <p className="text-caption text-fg-secondary mb-5">
-          태양계 시뮬레이터에 오신 걸 환영합니다. 아래 조작으로 27개 천체를 자유롭게 둘러볼 수
-          있습니다. 이 안내는 우측 상단 &quot;조작 가이드&quot; 버튼으로 언제든 다시 볼 수 있습니다.
+          태양계 시뮬레이터에 오신 걸 환영합니다. 아래 조작으로 {EXPLORABLE_BODY_COUNT}개 천체를
+          자유롭게 둘러볼 수 있습니다. 이 안내는 우측 상단 &quot;조작 가이드&quot; 버튼(모바일은
+          &quot;⋯&quot; 메뉴 안)으로 언제든 다시 볼 수 있습니다.
         </p>
 
         <section className="mb-5">

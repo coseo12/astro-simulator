@@ -46,7 +46,8 @@ export function AppShell() {
           right={
             // #1281 — `w-max`: 우측 그룹 스크롤러(`top-bar.tsx`) 안에서 이 래퍼가 가용폭으로 줄어들면 flex 축소가
             // 버튼 글자를 세로로 눌렀다 (375 실측 카메라 28×76 · 조작 가이드 28×93). 내용 폭을 유지하고 넘침은 스크롤로.
-            <div className="flex w-max items-center gap-2">
+            // #1313 — 모바일(`max-sm`) 은 이 그룹이 「⋯」 패널로 펼쳐지므로 패널 폭 안에서 줄바꿈한다 (스크롤 없음).
+            <div className="flex w-max items-center gap-2 max-sm:w-auto max-sm:flex-wrap">
               <DateTimePicker />
               {/* #841 — UnitToggle 제거. unitSystem 소비자 0 (display-only 버그 패턴) +
                   "P2 확장" 은 폐기된 v2 로드맵 잔재. 재도입 시 실 포매터와 함께 신규 이슈로. */}

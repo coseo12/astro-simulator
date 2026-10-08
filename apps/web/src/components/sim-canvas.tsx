@@ -33,7 +33,7 @@ import {
 } from '@/core/resolve-renderer-string';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
-import { BodyLabels } from './layout/body-labels';
+import { BodyLabels, type LabelDragThresholdPx } from './layout/body-labels';
 import { useSimStore } from '@/store/sim-store';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
@@ -97,6 +97,15 @@ function extractWebglRendererString(): string | null {
  *   → Babylon 메이저 업그레이드 시 위 **3 경로(문서 문구 / 기본값 / InputManager 되돌림)** 를 재확인할 것.
  */
 const CANVAS_TAB_INDEX = 0;
+
+/**
+ * #1313 — 라벨 위 탭 ↔ 드래그 임계. 캔버스 클릭 선택 (아래 `onPointerObservable` 의 `dragThreshold`) 과 같은 core 상수다
+ * — 같은 손짓이 라벨 위와 캔버스 위에서 다르게 판정되지 않게 한다.
+ */
+const LABEL_DRAG_THRESHOLD_PX: LabelDragThresholdPx = {
+  mouse: sceneApi.CLICK_DRAG_THRESHOLD_PX,
+  touch: sceneApi.CLICK_DRAG_THRESHOLD_PX_TOUCH,
+};
 
 /**
  * #848 — 캔버스 자동 refocus 로부터 **보호할** 포커스 요소 셀렉터 (WCAG 2.4.3 Focus Order).
@@ -1446,7 +1455,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         getBodyScreenInfo={cameraTierApi?.getBodyScreenInfo ?? null}
       >
         {/* #1293 — 3D 이름 라벨 오버레이. 캔버스 바로 위 · HUD (children, z-hud) 아래에 둔다 (DOM 순서). */}
-        <BodyLabels wheelTargetRef={canvasRef} />
+        {/* #1313 — 라벨 위 드래그는 캔버스 클릭 선택과 같은 임계로 탭과 갈라 캔버스 회전으로 넘긴다. */}
+        <BodyLabels wheelTargetRef={canvasRef} dragThresholdPx={LABEL_DRAG_THRESHOLD_PX} />
         {children}
       </SimCommandProvider>
     </>

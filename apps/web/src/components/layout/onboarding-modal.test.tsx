@@ -1,5 +1,6 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { ephemeris, isRPhaseFocusable } from '@astro-simulator/core';
 import { OnboardingModal } from './onboarding-modal';
 import { ONBOARDING_STORAGE_KEY, ONBOARDING_SCHEMA_VERSION } from '@/lib/onboarding-storage';
 
@@ -216,6 +217,21 @@ describe('OnboardingModal (#737)', () => {
       const pointer = screen.getByTestId('onboarding-pointer-guide');
       expect(pointer).toHaveTextContent('마우스 휠');
       expect(pointer).toHaveTextContent('방향키');
+    });
+  });
+
+  // #1313 — 안내 문구의 천체 개수는 데이터에서 파생한다 (종전 하드코딩 「27개」 가 33 과 drift).
+  describe('천체 개수 — 데이터 SSoT 파생 (#1313)', () => {
+    it('문구의 개수 == getSolarSystem().bodies 중 탐색 가능(R-Phase allowlist) 개수', () => {
+      const bodies = ephemeris.getSolarSystem().bodies;
+      const explorable = bodies.filter((b) => isRPhaseFocusable(b.id)).length;
+      // 전제 — 표본이 비면 「0개」 문구와 0 이 일치해 공허 통과한다.
+      expect(explorable).toBeGreaterThan(0);
+      render(<OnboardingModal />);
+      const text = screen.getByTestId('onboarding-modal').textContent ?? '';
+      const match = text.match(/(\d+)개 천체/);
+      expect(match).not.toBeNull();
+      expect(Number(match![1])).toBe(explorable);
     });
   });
 });
