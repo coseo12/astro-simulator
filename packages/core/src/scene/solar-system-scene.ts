@@ -1809,7 +1809,7 @@ export function createSolarSystemScene(
     }
 
     // #1205 — LOD 분기 hook 은 여기 있었다. **프레임 위상 (`runFramePass`) 으로 이동**했다.
-    // `updateAt` 은 `timeChanged` 바인딩이라 일시정지에서 한 번도 돌지 않는데, LOD 는 카메라
+    // `updateAt` 은 `timeChanged` 바인딩이라 일시정지에서 등록 시 1회 (#1308) 외에는 돌지 않는데, LOD 는 카메라
     // 종속이라 시간이 멈춰도 갱신돼야 한다. 여기 남겨두면 재생 중 2×/프레임이 되므로 호출을
     // 남기지 않는다. hook 책임 서술은 `runFramePass` 정의부로 함께 옮겼다.
     // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
