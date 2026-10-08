@@ -158,6 +158,7 @@ describe('#1318 — T3 포커스에서 궤도선이 모체 자리에 있다 (flo
   });
 
   it('포커스 해제 (T3 → 기본 tier) — 원점 복귀 후에도 궤도선 == 태양 위치', () => {
+    // fix 판별력 없음 — 회귀 확인용 (변이 M1 · M2 모두 PASS). 원점이 [0,0,0] 으로 돌아오면 태양 mesh 와 rebuild 직후 궤도선이 둘 다 원점이다.
     const f = makeScene();
     f.handles.setFocusOrigin('ceres');
     f.handles.setTier('body');
