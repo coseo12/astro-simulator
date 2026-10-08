@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1308] 일시정지 URL (`?t=<JD>&speed=0`) 로 열면 장면이 `t` 가 아니라 J2000 위치에 머물던 결함** ([#1308](https://github.com/coseo12/astro-simulator/issues/1308)). HUD JD 는 `t` 인데 행성 · 위성은 J2000 자리였다 (목성 경도 36.4° 고정).
+  - 원인: 시간 위상 (`timeChanged` → scene `updateAt`) 구독이 `start()` resolve **뒤** (`sim-canvas` `.then`) 에 붙는데, 부팅의 `timeChanged` 는 그 **전**에 전부 발화한다 — URL `?t=` 의 `jumpToJulianDate` (scene 생성 전) 와 `start()` 말미 초기 알림. 재생 부팅은 `tick` 이 다시 발화해 가려졌고, 일시정지 부팅은 `tick` 이 `false` 라 장면이 생성자 기본값 (J2000) 에 남았다.
+  - 수정: core `SimulationCore.bindTimePhase(handler)` — `timeChanged` 구독 + **등록 시점 현재 시각으로 1회 즉시 호출**. `sim-canvas` 의 시간 위상 등록을 이것으로 바꿨다. 프레임 위상 순서 계약 (ADR `20260907-1205` §결정 3, 렌더 루프 안 배치) 은 무변경.
+  - 테스트: `simulation-core-time-phase.test.ts` 5건 — 부팅 순서 (jump → setTimeScale(0) → `start()` → 등록) 재현. 즉시 호출 제거 변이 4/5 FAIL, 구독 제거 변이 2/5 FAIL.
+
+### Behavior Changes
+
+- **일시정지 상태로 공유 · 북마크 · 새로고침한 URL 이 그 시점의 천체 위치를 보인다** (#1308). 이전에는 `?t=<JD>&speed=0` 부팅이 J2000 위치를 보였다. 실 Chrome (WebGPU) 에서 JD 4종 모두 「재생 부팅 → 일시정지」 화면과 천체 화면 좌표 차 0 px. `t` 없는 `?speed=0` 부팅 (J2000) 은 이전과 같다.
+
 ## [0.95.0] - 2026-10-08
 
 ### Added
@@ -24,18 +35,10 @@ Semantic Versioning을 따른다.
   - 지속성(리뷰 B1): k 불변성은 이동한 프레임들만 보므로 hold 도중 이동이 멈추는 회귀를 놓친다 (첫 프레임 뒤 `pressed` 소실 변이 — k spread ≤ 5.5e-15 로 통과, 구 비율 술어는 잡았음). 가드가 `w` keydown · keyup 을 window capture 로 프레임 기록과 같은 로그에 넣고, 그 사이의 프레임이 **전부** 이동했는지 본다. `scene.render()` 는 한 task 안에서 동기로 끝나고 키 이벤트는 task 사이에서만 오므로 어긋남이 0 프레임인 구조 술어다 (수치 임계 없음). 정상 코드는 눌린 프레임 = 이동 프레임 (swiftshader 15/15 · GPU 5/5 PASS), `pressed` 소실 변이는 swiftshader 3/3 · GPU 3/3 `FAIL(지속성)`, `step = baseStep` 변이는 swiftshader 3/3 · GPU 3/3 FAIL.
   - 프로덕션 코드 변경 0 — 계측은 가드가 기존 dev 핸들로 `onAfterRenderObservable` observer 를 붙여 한다. 판정 임계 신설 0. S1–S3 · S4–S6 무변경.
 
-### Fixed
-
-- **[#1308] 일시정지 URL (`?t=<JD>&speed=0`) 로 열면 장면이 `t` 가 아니라 J2000 위치에 머물던 결함** ([#1308](https://github.com/coseo12/astro-simulator/issues/1308)). HUD JD 는 `t` 인데 행성 · 위성은 J2000 자리였다 (목성 경도 36.4° 고정).
-  - 원인: 시간 위상 (`timeChanged` → scene `updateAt`) 구독이 `start()` resolve **뒤** (`sim-canvas` `.then`) 에 붙는데, 부팅의 `timeChanged` 는 그 **전**에 전부 발화한다 — URL `?t=` 의 `jumpToJulianDate` (scene 생성 전) 와 `start()` 말미 초기 알림. 재생 부팅은 `tick` 이 다시 발화해 가려졌고, 일시정지 부팅은 `tick` 이 `false` 라 장면이 생성자 기본값 (J2000) 에 남았다.
-  - 수정: core `SimulationCore.bindTimePhase(handler)` — `timeChanged` 구독 + **등록 시점 현재 시각으로 1회 즉시 호출**. `sim-canvas` 의 시간 위상 등록을 이것으로 바꿨다. 프레임 위상 순서 계약 (ADR `20260907-1205` §결정 3, 렌더 루프 안 배치) 은 무변경.
-  - 테스트: `simulation-core-time-phase.test.ts` 5건 — 부팅 순서 (jump → setTimeScale(0) → `start()` → 등록) 재현. 즉시 호출 제거 변이 4/5 FAIL, 구독 제거 변이 2/5 FAIL.
-
 ### Behavior Changes
 
 - **명왕성 옆에 카론이 보인다** (#1305). 명왕성 포커스에서 카론 원반 · 궤도선 · 라벨이 뜨고, 검색 「카론」/「charon」 · 클릭 · `?focus=charon` 으로 고를 수 있다. 카론 원반은 명왕성의 절반 크기라 달(지구 대비 0.068)보다 크게 그려진다.
 - **위성의 화면 공전 속도가 조금 빨라진다** (#1305). 평균 운동이 √(1 + m/M) 배 — 카론 5.9%, 달 0.61%, 그 밖의 위성 0.012% 이하 (최대 타이탄). epoch(J2000) 에서는 위치가 같고 시간이 흐를수록 위상 차가 쌓인다 (달은 2026-01-01 에 약 2.1 바퀴 앞선다). J2000 이 아닌 고정 시각으로 위성을 찍는 화면 캡처 기준선이 바뀔 수 있다.
-- **일시정지 상태로 공유 · 북마크 · 새로고침한 URL 이 그 시점의 천체 위치를 보인다** (#1308). 이전에는 `?t=<JD>&speed=0` 부팅이 J2000 위치를 보였다. 실 Chrome (WebGPU) 에서 JD 4종 모두 「재생 부팅 → 일시정지」 화면과 천체 화면 좌표 차 0 px. `t` 없는 `?speed=0` 부팅 (J2000) 은 이전과 같다.
 
 ## [0.94.1] - 2026-10-08
 
