@@ -150,6 +150,94 @@ describe('BodyLabels', () => {
     expect(sentCommands).toEqual([{ type: 'focusOn', bodyId: 'jupiter' }]);
   });
 
+  describe('라벨 위 드래그 → 캔버스 (#1313)', () => {
+    const THRESHOLD = { mouse: 5, touch: 10 };
+    const setup = () => {
+      screenRows = [row('jupiter', 400, 300)];
+      const canvas = document.createElement('canvas');
+      const received: PointerEvent[] = [];
+      canvas.addEventListener('pointerdown', (e) => received.push(e as PointerEvent));
+      canvas.addEventListener('pointermove', (e) => received.push(e as PointerEvent));
+      render(<BodyLabels wheelTargetRef={{ current: canvas }} dragThresholdPx={THRESHOLD} />);
+      runFrame();
+      return received;
+    };
+    const down = (pointerType: string, x: number, y: number) =>
+      fireEvent.pointerDown(label('jupiter'), {
+        pointerId: 7,
+        pointerType,
+        isPrimary: true,
+        clientX: x,
+        clientY: y,
+      });
+    const move = (pointerType: string, x: number, y: number) =>
+      fireEvent.pointerMove(label('jupiter'), {
+        pointerId: 7,
+        pointerType,
+        clientX: x,
+        clientY: y,
+      });
+
+    it('터치 임계 초과 이동 → 누른 지점 down + 현재 move 를 캔버스에 재발행, 뒤이은 click 은 포커스 안 함', () => {
+      const received = setup();
+      down('touch', 410, 305);
+      move('touch', 415, 305); // 5px ≤ 터치 임계 10 — 아직 탭
+      expect(received).toHaveLength(0);
+      move('touch', 430, 305); // 20px > 10 — 드래그
+      expect(received.map((e) => e.type)).toEqual(['pointerdown', 'pointermove']);
+      expect(received[0]!.clientX).toBe(410);
+      expect(received[0]!.pointerId).toBe(7);
+      expect(received[1]!.clientX).toBe(430);
+      fireEvent.click(label('jupiter'));
+      expect(sentCommands).toEqual([]);
+    });
+
+    it('터치 임계 이내 이동 후 떼기 → 재발행 없음 · 탭 = focusOn (기존 동작)', () => {
+      const received = setup();
+      down('touch', 410, 305);
+      move('touch', 418, 305); // 8px ≤ 10
+      fireEvent.pointerUp(label('jupiter'), { pointerId: 7, pointerType: 'touch' });
+      fireEvent.click(label('jupiter'));
+      expect(received).toHaveLength(0);
+      expect(sentCommands).toEqual([{ type: 'focusOn', bodyId: 'jupiter' }]);
+    });
+
+    it('마우스는 마우스 임계 (5) 로 가른다 — 8px 이동이면 드래그', () => {
+      const received = setup();
+      down('mouse', 410, 305);
+      move('mouse', 418, 305);
+      expect(received.map((e) => e.type)).toEqual(['pointerdown', 'pointermove']);
+    });
+
+    it('드래그 뒤 다음 탭은 다시 포커스한다 (삼킴 플래그는 다음 pointerdown 이 초기화)', () => {
+      setup();
+      down('touch', 410, 305);
+      move('touch', 440, 305);
+      // 캡처가 캔버스로 옮겨 가 이 제스처의 click 이 라벨에 오지 않은 경우를 흉내 — click 없이 다음 탭.
+      down('touch', 410, 305);
+      fireEvent.pointerUp(label('jupiter'), { pointerId: 7, pointerType: 'touch' });
+      fireEvent.click(label('jupiter'));
+      expect(sentCommands).toEqual([{ type: 'focusOn', bodyId: 'jupiter' }]);
+    });
+
+    it('dragThresholdPx 없으면 재발행하지 않는다 (종전 동작)', () => {
+      screenRows = [row('jupiter', 400, 300)];
+      const canvas = document.createElement('canvas');
+      const received: Event[] = [];
+      canvas.addEventListener('pointerdown', (e) => received.push(e));
+      render(<BodyLabels wheelTargetRef={{ current: canvas }} />);
+      runFrame();
+      down('touch', 410, 305);
+      move('touch', 480, 305);
+      expect(received).toHaveLength(0);
+    });
+  });
+
+  it('라벨은 touch-action: none — 브라우저 패닝이 터치 드래그를 가져가지 않게 (#1313)', () => {
+    render(<BodyLabels />);
+    expect(label('sun').className).toContain('touch-none');
+  });
+
   it('컨테이너는 포인터를 통과시킨다 (캔버스 드래그 · 클릭 선택 유지 — D6)', () => {
     render(<BodyLabels />);
     expect(screen.getByTestId('body-labels').className).toContain('pointer-events-none');
