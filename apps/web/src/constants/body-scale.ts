@@ -13,7 +13,7 @@
  * 전환해 단조성 회복.
  *
  * ### 그룹별 정책
- * 1. **행성(8) + 왜소행성(5)** — `effective_radius = radius^p × k` 곡선 산출 (p=0.5 sqrt 기본).
+ * 1. **행성(8) + 왜소행성(5) + 소행성(3, #1318)** — `effective_radius = radius^p × k` 곡선 산출 (p=0.5 sqrt 기본).
  *    `k` 는 **mercury floor 고정** (mercury 현 px 7.0 = 등가 scale 700 유지). 작은 천체일수록 부스트되어
  *    실반경 격차를 압축하되 최종 mesh 가 실반경 순서 단조 보존. 등가 scale = `radius^(p-1) × k`.
  * 2. **위성(14 — json moon 16 중 극소형 phobos·deimos 는 3번 그룹)** — 기존 per-parent 수렴대(0.05~0.09) **mesh 비율 보존** (예외: charon = 실제 반경비 0.51, #1305). parent effective 가 곡선으로
@@ -103,6 +103,9 @@ export const BODY_RADIUS_M: Readonly<Record<string, number>> = Object.freeze({
   halley: 5.5e3,
   encke: 2.4e3,
   'swift-tuttle': 1.3e4,
+  vesta: 2.61385e5,
+  pallas: 2.565e5,
+  hygiea: 2.0356e5,
 });
 
 /** 압축 곡선 적용 그룹 — 행성(8). 단조성 회복의 핵심 대상. */
@@ -119,6 +122,17 @@ export const PLANET_IDS = Object.freeze([
 
 /** 압축 곡선 적용 그룹 — 왜소행성(5). 전부 mercury effective 아래 (cross-group floor). */
 export const DWARF_IDS = Object.freeze(['ceres', 'pluto', 'haumea', 'makemake', 'eris'] as const);
+
+/**
+ * #1318 — 압축 곡선 적용 그룹 — 소행성(3). 왜소행성과 **같은 곡선** (`radius^p × k`) 이라 새 정책이 없다:
+ * 곡선이 radius 에 단조 증가이므로 세레스(469.6 km) > 베스타(261.4) > 팔라스(256.5) > 히기에아(203.6) 의
+ * 실반경 서열이 렌더 반경 서열로 그대로 옮겨지고, 소행성 반경 < 가장 작은 왜소행성(세레스) 반경 < 수성 반경 이라
+ * 「소행성이 어떤 행성 · 왜소행성보다도 크게 그려지지 않는다」 도 곡선만으로 성립한다.
+ *
+ * 왜소행성 배열에 섞지 않고 따로 두는 이유는 kind 대응 — `body-scale.test.ts` 가 「json 의 모든 asteroid 가 이
+ * 배열에 있다」 를 단언한다 (누락 시 `getBodyScale` 이 1.0 fallback 으로 실반경 그대로 렌더 — 베스타 기준 곡선 적용 크기의 1/2139 라 화면에서 사라진다).
+ */
+export const ASTEROID_IDS = Object.freeze(['vesta', 'pallas', 'hygiea'] as const);
 
 /**
  * 위성(14) → 모행성 매핑 + 보존할 mesh 수렴대 비율 (현 정책 mesh 비 = sat_radius×sat_scale_old /
@@ -210,7 +224,7 @@ function curveScale(radius: number, p: number): number {
  * 주어진 압축 지수 p 로 전체 body 등가 scale 룩업 산출 (모듈 로드 시 1회 / `?bodyScaleP=` 시 1회).
  *
  * - sun: SUN_SCALE 별도 유지
- * - 행성·왜소: 곡선
+ * - 행성·왜소·소행성: 곡선
  * - 위성: 정적 역산 (parent 곡선 eff × 수렴대비 / sat.radius)
  * - comet·극소형: COMET_SCALE 단일값
  */
@@ -223,6 +237,9 @@ function computeBodyScales(p: number): Record<string, number> {
     scales[id] = curveScale(BODY_RADIUS_M[id]!, p);
   }
   for (const id of DWARF_IDS) {
+    scales[id] = curveScale(BODY_RADIUS_M[id]!, p);
+  }
+  for (const id of ASTEROID_IDS) {
     scales[id] = curveScale(BODY_RADIUS_M[id]!, p);
   }
 

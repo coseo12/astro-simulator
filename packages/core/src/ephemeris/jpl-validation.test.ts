@@ -181,6 +181,29 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
     }
   });
 
+  describe('#1318 소행성 J2000 위치 — JPL Horizons 상태벡터 대조', () => {
+    // json 은 SBDB 궤도해를 Horizons 로 J2000 에 평가한 접촉 요소를 ϖ · L 형태로 박제했다. 로더의 ω = ϖ − Ω ·
+    // M₀ = L − ϖ 역변환과 루트 epoch(J2000) 해석이 맞으면 J2000 위치가 Horizons 상태벡터와 일치한다.
+    // 대조값은 json 과 독립인 Horizons VECTORS 원시값 (CENTER=500@10 / REF_PLANE=ECLIPTIC / J2000 TDB, AU).
+    // 허용 1000 km — 요소 반올림 (a 1e-7 AU ≈ 15 km, 각도 1e-6° ≈ 6 km) 대비 넉넉하고, L 을 0.001° 만 틀려도
+    // (≈ 6,000 km) 걸린다. epoch 시점이라 장면 μ 와 무관하다.
+    const HORIZONS_J2000_AU: Record<string, [number, number, number]> = {
+      vesta: [-1.353580437607153, -1.673136657862151, 2.149018113721361e-1],
+      pallas: [-8.411384433388419e-1, 1.653739426955205, -1.073889494800965],
+      hygiea: [-2.374062486038638, -1.463570769967126, -1.781685951459966e-1],
+    };
+    const TOLERANCE_KM = 1000;
+    for (const [id, ref] of Object.entries(HORIZONS_J2000_AU)) {
+      it(`${id} J2000 위치 오차 < ${TOLERANCE_KM} km`, () => {
+        const body = byId.get(id);
+        if (!body?.orbit) throw new Error(id);
+        const p = positionAt(body.orbit, J2000_JD, MU_SUN);
+        const dKm = Math.hypot(p[0] - ref[0] * AU, p[1] - ref[1] * AU, p[2] - ref[2] * AU) / 1000;
+        expect(dKm).toBeLessThan(TOLERANCE_KM);
+      });
+    }
+  });
+
   describe('지구-달 시스템 (부모 중심 좌표)', () => {
     it('달-지구 거리 [356k, 407k] km', () => {
       const moon = byId.get('moon');

@@ -209,6 +209,28 @@ const IAU_2015_NOMINAL = Object.freeze({
     irregular: true,
     source: 'Jorda & Licandro (2003) / JPL SBDB',
   },
+  // #1318 — 소행성 (비구형 — uncertainty 필수). mass = SBDB GM ÷ G(6.6743e-11), radius = SBDB 지름 / 2.
+  vesta: {
+    mass: 2.590277e20,
+    radius: 2.61385e5, // 유효 지름 522.77 km, 삼축 569 × 554 × 453 km
+    radiusKind: 'mean',
+    irregular: true,
+    source: 'JPL SBDB (GM · 지름 Park et al. 2025)',
+  },
+  pallas: {
+    mass: 2.042162e20,
+    radius: 2.565e5, // 지름 513 km, 삼축 568 × 532 × 448 km
+    radiusKind: 'mean',
+    irregular: true,
+    source: 'JPL SBDB (GM Vernazza et al. 2021 / 지름 Marsset et al. 2020)',
+  },
+  hygiea: {
+    mass: 1.048799e20,
+    radius: 2.0356e5, // 지름 407.12 km (IRAS)
+    radiusKind: 'mean',
+    irregular: true, // 질량 · 지름 출처 간 17% · 6.6% 차 — uncertainty 필수
+    source: 'JPL SBDB (GM Scholl et al. 1987 / 지름 IRAS)',
+  },
 });
 
 /** ±0.01% 공차 (Fact-First 원칙 §2). */

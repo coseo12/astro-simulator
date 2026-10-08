@@ -42,6 +42,16 @@ describe('#1281 body-info — 공용 조회 · 주기', () => {
     expect(formatDays(orbitalPeriodSeconds(charon.data!, charon.parent)!)).toBe('6.39 일');
   });
 
+  it('#1318 D2 — 베스타 정보 카드: 종류 소행성 · 모체 태양 · 공전주기 ≈ 3.63 년 (±1%)', () => {
+    const vesta = findBodyAndParent(bodies, 'vesta');
+    expect(vesta.data?.nameKo).toBe('베스타');
+    expect(kindLabel(vesta.data!.kind)).toBe('소행성');
+    expect(vesta.parent?.id).toBe('sun');
+    const years = orbitalPeriodSeconds(vesta.data!, vesta.parent)! / 86_400 / 365.25;
+    expect(Math.abs(years / 3.63 - 1)).toBeLessThan(0.01);
+    expect(formatDays(orbitalPeriodSeconds(vesta.data!, vesta.parent)!)).toBe('3.629 년');
+  });
+
   it('#1305 D4 — 모든 위성: 카드 주기 == 장면 공전 주기 (scene `orbitMu` 와 같은 μ)', () => {
     const satellites = bodies.filter((b) => b.orbit && b.parentId && b.parentId !== 'sun');
     expect(satellites.length).toBeGreaterThanOrEqual(16); // 공허 통과 방지
@@ -60,13 +70,14 @@ describe('#1281 body-info — 공용 조회 · 주기', () => {
     expect(orbitalPeriodSeconds(findBodyAndParent(bodies, 'sun').data!, null)).toBeNull();
   });
 
-  it('kindLabel — 5종 한국어, 미등록 kind 는 원문', () => {
+  it('kindLabel — 6종 한국어, 미등록 kind 는 원문', () => {
     expect(kindLabel('star')).toBe('항성');
     expect(kindLabel('planet')).toBe('행성');
     expect(kindLabel('dwarf-planet')).toBe('왜소행성');
     expect(kindLabel('moon')).toBe('위성');
     expect(kindLabel('comet')).toBe('혜성');
-    expect(kindLabel('asteroid')).toBe('asteroid');
+    expect(kindLabel('asteroid')).toBe('소행성'); // #1318
+    expect(kindLabel('spacecraft')).toBe('spacecraft'); // 미등록 kind 원문 반환 계약은 다른 kind 로 유지
   });
 
   it('rPhaseBlockedMessage — 연구 패널과 같은 문구', () => {

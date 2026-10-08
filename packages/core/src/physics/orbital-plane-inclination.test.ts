@@ -1,6 +1,6 @@
 /**
  * #1132 — 궤도면 경사 불변식 가드. `Rz(Ω)·Rx(i)·Rz(ω)` 회전 **사본 3개** 각각이 궤도면을
- * 데이터가 선언한 `inclinationDeg` 대로 놓는지를 궤도 보유 **32 body 전건**으로 고정한다.
+ * 데이터가 선언한 `inclinationDeg` 대로 놓는지를 궤도 보유 **35 body 전건**으로 고정한다.
  *
  * ## 배경
  *
@@ -74,7 +74,7 @@
  * | D2 | `positionAt` · `z/r` | `1.665e-16` | `1e-9` | 6.8 자리 |
  * | D2 | `sampleOrbitPoints` · `z/r` | `2.914e-16` | `1e-9` | 6.5 자리 |
  *
- * 모집단은 `solar-system.json` 33 body 중 `orbit` 보유 **32** (`sun` 만 제외).
+ * 모집단은 `solar-system.json` 36 body 중 `orbit` 보유 **35** (`sun` 만 제외).
  *
  * ## 범위 밖 (본 가드가 검증하지 **않는** 것)
  *
@@ -304,7 +304,7 @@ const COPIES: readonly RotationCopy[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// D1 — 불변식 A (평면 경사): 32 body × 3 사본 = 96 셀
+// D1 — 불변식 A (평면 경사): 35 body × 3 사본 = 105 셀
 // ---------------------------------------------------------------------------
 
 for (const copy of COPIES) {
@@ -324,7 +324,7 @@ for (const copy of COPIES) {
 }
 
 // ---------------------------------------------------------------------------
-// D2 — 불변식 B (부호 포함 닫힌형): 32 body × 3 사본 × 3 진근점각 = 288 셀
+// D2 — 불변식 B (부호 포함 닫힌형): 35 body × 3 사본 × 3 진근점각 = 315 셀
 //
 // D1 단독으로는 잡히지 않는 결함이 있다 (D3 의 M3 z-mirror / M5 회전 순서 교환 — 둘 다
 // 법선 경사를 보존한다). D2 가 없으면 #1127 클래스(가드 이름이 내건 축에 판정이 없음)를
@@ -437,7 +437,7 @@ function positionAtMutated(
   return rotateMutated(r * Math.cos(nu), r * Math.sin(nu), el, mutant);
 }
 
-/** 한 변이가 32 body 중 몇 개에서 검출되는지 — D1 단독 / D2 단독 / D1+D2. */
+/** 한 변이가 35 body 중 몇 개에서 검출되는지 — D1 단독 / D2 단독 / D1+D2. */
 function detectionCounts(mutant: Mutant): { d1: number; d2: number; combined: number } {
   let d1 = 0;
   let d2 = 0;
@@ -466,7 +466,7 @@ function detectionCounts(mutant: Mutant): { d1: number; d2: number; combined: nu
 }
 
 describe('#1132 D3 변이 테스트 — 판별력 실증', () => {
-  it('M0 로컬 복제가 positionAt 과 완전 일치 (32 body × 3 ν, 부동소수 비트 동일)', () => {
+  it('M0 로컬 복제가 positionAt 과 완전 일치 (35 body × 3 ν, 부동소수 비트 동일)', () => {
     for (const { id } of ORBITING_BODIES) {
       const body = bodyById.get(id)!;
       const el = body.orbit!;
@@ -484,16 +484,16 @@ describe('#1132 D3 변이 테스트 — 판별력 실증', () => {
   // 재확인 — 이 숫자들은 **로컬 복제**에 대한 검출 수다 (위 ⚠️ 참조).
   const EXPECTED: Record<Mutant, { d1: number; d2: number; combined: number }> = {
     M0: { d1: 0, d2: 0, combined: 0 },
-    M1: { d1: 32, d2: 32, combined: 32 },
-    M2: { d1: 32, d2: 32, combined: 32 },
-    M3: { d1: 0, d2: 32, combined: 32 },
-    M4: { d1: 32, d2: 32, combined: 32 },
-    M5: { d1: 0, d2: 32, combined: 32 },
+    M1: { d1: 35, d2: 35, combined: 35 },
+    M2: { d1: 35, d2: 35, combined: 35 },
+    M3: { d1: 0, d2: 35, combined: 35 },
+    M4: { d1: 35, d2: 35, combined: 35 },
+    M5: { d1: 0, d2: 35, combined: 35 },
   };
 
   for (const mutant of MUTANTS) {
     const e = EXPECTED[mutant];
-    it(`${mutant} ${MUTANT_LABEL[mutant]} — D1 ${e.d1}/32 · D2 ${e.d2}/32 · D1+D2 ${e.combined}/32 검출`, () => {
+    it(`${mutant} ${MUTANT_LABEL[mutant]} — D1 ${e.d1}/35 · D2 ${e.d2}/35 · D1+D2 ${e.combined}/35 검출`, () => {
       expect(detectionCounts(mutant)).toEqual(e);
     });
   }
@@ -504,7 +504,7 @@ describe('#1132 D3 변이 테스트 — 판별력 실증', () => {
 // ---------------------------------------------------------------------------
 
 describe('#1132 측정 하네스 — ν→JD 역산 정확도', () => {
-  it('역산한 JD 에서 다시 구한 ν 가 목표값과 1e-6 rad 이내로 일치 (32 body × 3 ν)', () => {
+  it('역산한 JD 에서 다시 구한 ν 가 목표값과 1e-6 rad 이내로 일치 (35 body × 3 ν)', () => {
     for (const { id } of ORBITING_BODIES) {
       const body = bodyById.get(id)!;
       const el = body.orbit!;
@@ -519,8 +519,8 @@ describe('#1132 측정 하네스 — ν→JD 역산 정확도', () => {
     }
   });
 
-  it(`모집단 = orbit 보유 32 body (sun 제외)`, () => {
-    expect(ORBITING_BODIES).toHaveLength(32);
+  it(`모집단 = orbit 보유 35 body (sun 제외)`, () => {
+    expect(ORBITING_BODIES).toHaveLength(35);
     expect(ORBITING_BODIES.some((b) => b.id === 'sun')).toBe(false);
   });
 });

@@ -57,8 +57,8 @@ describe('isLabelEligible — D4 화면 밖 · 카메라 뒤 · 위성 규칙', 
     expect(isLabelEligible(moon, 'moon')).toBe(true);
   });
 
-  it('행성 · 왜소행성 · 혜성 · 태양은 선택과 무관', () => {
-    for (const kind of ['star', 'planet', 'dwarf-planet', 'comet'])
+  it('행성 · 왜소행성 · 소행성 · 혜성 · 태양은 선택과 무관', () => {
+    for (const kind of ['star', 'planet', 'dwarf-planet', 'asteroid', 'comet'])
       expect(isLabelEligible(cand({ id: kind, kind }), null)).toBe(true);
   });
 });
@@ -149,16 +149,17 @@ describe('placeLabel — D4 투영 위치 ±(반지름 + 오프셋)', () => {
 });
 
 describe('layoutLabels — D5 겹침 쌍 0 · 우선순위', () => {
-  it('겹치면 낮은 순위 숨김: 태양 > 행성 > 왜소행성 > 위성 > 혜성', () => {
+  it('겹치면 낮은 순위 숨김: 태양 > 행성 > 왜소행성 > 소행성 > 위성 > 혜성', () => {
     const order = [
       cand({ id: 'halley', kind: 'comet' }),
       cand({ id: 'moon', kind: 'moon', parentId: 'earth' }),
+      cand({ id: 'vesta', kind: 'asteroid' }), // #1318 D4 — 왜소행성 다음 · 위성 앞
       cand({ id: 'pluto', kind: 'dwarf-planet' }),
       cand({ id: 'earth', kind: 'planet' }),
       cand({ id: 'sun', kind: 'star', parentId: null }),
     ];
     // 전부 같은 위치 — 한 개만 남는다. 하나씩 빼며 그다음 순위가 이기는지 본다.
-    const expected = ['sun', 'earth', 'pluto', 'moon', 'halley'];
+    const expected = ['sun', 'earth', 'pluto', 'vesta', 'moon', 'halley'];
     for (let k = 0; k < expected.length; k += 1) {
       const pool = order.filter((c) => !expected.slice(0, k).includes(c.id));
       const out = layoutLabels(pool, { focusedId: 'earth', viewportWidth: VW });

@@ -16,6 +16,7 @@ export const KIND_LABEL: Record<string, string> = {
   star: '항성',
   planet: '행성',
   'dwarf-planet': '왜소행성',
+  asteroid: '소행성', // #1318
   moon: '위성',
   comet: '혜성',
 };

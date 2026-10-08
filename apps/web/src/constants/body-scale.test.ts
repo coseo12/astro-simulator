@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import solarSystem from '@astro-simulator/shared/data/solar-system.json';
 import {
+  ASTEROID_IDS,
   BODY_RADIUS_M,
   BODY_SCALE,
   DEFAULT_BODY_SCALE_P,
@@ -178,6 +179,51 @@ describe('#762 — 왜소행성 cross-group floor (전부 mercury effective 아�
   });
 });
 
+describe('#1318 D3 — 소행성 표시 크기 (왜소행성과 같은 압축 곡선)', () => {
+  const jsonAsteroids = (solarSystem as { bodies: { id: string; kind: string }[] }).bodies.filter(
+    (b) => b.kind === 'asteroid',
+  );
+
+  it('json 의 모든 asteroid 가 ASTEROID_IDS 에 등록돼 있다 (누락 시 bodyScale 1.0 fallback 차단)', () => {
+    // 누락된 소행성은 getBodyScale 이 1.0 을 돌려 실반경 그대로 (베스타 기준 곡선 적용 크기의 1/2139) 렌더된다 — 화면에서 사라지는데
+    // 미러 radius 가드 ([#764]) 는 BODY_RADIUS_M 만 보므로 통과한다. 여기서 그룹 등록 자체를 단언한다.
+    expect(jsonAsteroids.length).toBeGreaterThanOrEqual(3); // 공허 통과 방지 (#1318 시점 3)
+    for (const a of jsonAsteroids) {
+      expect(ASTEROID_IDS as readonly string[], `${a.id} 가 ASTEROID_IDS 에 없음`).toContain(a.id);
+      expect(getBodyScale(a.id), `${a.id} 곡선 산출 (1.0 fallback 아님)`).not.toBe(1.0);
+    }
+    expect([...ASTEROID_IDS].sort()).toEqual(jsonAsteroids.map((a) => a.id).sort());
+  });
+
+  it('렌더 반경 서열 세레스 > 베스타 > 팔라스 > 히기에아 = 실반경 서열', () => {
+    const order = ['ceres', 'vesta', 'pallas', 'hygiea'];
+    for (let i = 0; i < order.length - 1; i++) {
+      expect(RADIUS[order[i]!]!, `실반경 ${order[i]} > ${order[i + 1]}`).toBeGreaterThan(
+        RADIUS[order[i + 1]!]!,
+      );
+      expect(eff(order[i]!), `렌더 반경 ${order[i]} > ${order[i + 1]}`).toBeGreaterThan(
+        eff(order[i + 1]!),
+      );
+    }
+  });
+
+  it('소행성이 어떤 행성 · 왜소행성보다도 크게 그려지지 않는다 — max(asteroid) < min(dwarf) < min(planet)', () => {
+    const maxAsteroid = Math.max(...ASTEROID_IDS.map(eff));
+    expect(maxAsteroid).toBeLessThan(Math.min(...DWARF_IDS.map(eff)));
+    expect(maxAsteroid).toBeLessThan(Math.min(...PLANET_IDS.map(eff)));
+  });
+
+  it('p 변경 (0.4 / 0.6) 후에도 세레스 > 베스타 > 팔라스 > 히기에아 유지 (같은 곡선이라 p 무관)', () => {
+    for (const p of [0.4, 0.6]) {
+      const fn = getBodyScaleForP(p);
+      const eff2 = (id: string) => RADIUS[id]! * fn(id);
+      expect(eff2('ceres')).toBeGreaterThan(eff2('vesta'));
+      expect(eff2('vesta')).toBeGreaterThan(eff2('pallas'));
+      expect(eff2('pallas')).toBeGreaterThan(eff2('hygiea'));
+    }
+  });
+});
+
 describe('#762 — 그룹 간 경계 단조 assert (silent 회귀 차단)', () => {
   // ⚠️ ADR §5 결정 2.4 원안 assert chain `max(comet) < min(satellite) < min(planet)` 중
   // `max(comet) < min(satellite)` 는 **실 데이터로 충족 불가** (measurement-first 발견, ADR Amendment 1):
@@ -305,7 +351,7 @@ describe('#762/#764 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #
   // 미러 +10% drift 시 mesh 비가 0.0681→0.0619 로 이동해도 band [0.05,0.09] 안 → 미검출) /
   // comet 은 존재(>0)만 확인하고 값 미검증. 아래 전수 단언이 이 사각을 전부 닫는다.
 
-  it('[#764] 33 body 전수 — 미러 radius == json radius 직접 단언 (위성 14 · 혜성 5 포함)', () => {
+  it('[#764] 36 body 전수 — 미러 radius == json radius 직접 단언 (위성 14 · 혜성 5 · 소행성 3 포함)', () => {
     const jsonBodies = (solarSystem as { bodies: { id: string; radius?: number }[] }).bodies;
     for (const b of jsonBodies) {
       expect(typeof b.radius, `${b.id} json radius 존재`).toBe('number');
@@ -318,16 +364,17 @@ describe('#762/#764 — BODY_RADIUS_M ↔ solar-system.json drift 가드 (volt #
     const jsonIds = Object.keys(RADIUS).sort();
     const mirrorIds = Object.keys(BODY_RADIUS_M).sort();
     expect(mirrorIds).toEqual(jsonIds);
-    // 전수 로스터 박제: 33 = sun 1 + 행성 8 + 왜소 5 + 위성 14 + comet·극소형 위성 5 (#1305 charon +1).
+    // 전수 로스터 박제: 36 = sun 1 + 행성 8 + 왜소 5 + 위성 14 + comet·극소형 위성 5 + 소행성 3
+    // (#1305 charon +1, #1318 vesta/pallas/hygiea +3).
     // 신규 body 추가 시 json + 미러 + 본 단언 3곳 동시 갱신 (의도된 checkpoint — 미러 누락 시
     // getBodyScale 이 1.0 fallback 으로 실측 렌더되는 silent 회귀를 여기서 강제 노출).
-    expect(mirrorIds).toHaveLength(33);
+    expect(mirrorIds).toHaveLength(36);
   });
 
-  it('행성·왜소 effective 가 json radius 와 정합 (내부 미러 drift 차단)', () => {
+  it('행성·왜소·소행성 effective 가 json radius 와 정합 (내부 미러 drift 차단)', () => {
     const p = DEFAULT_BODY_SCALE_P;
     const k = 700 * Math.pow(RADIUS.mercury!, 1 - p);
-    for (const id of [...PLANET_IDS, ...DWARF_IDS]) {
+    for (const id of [...PLANET_IDS, ...DWARF_IDS, ...ASTEROID_IDS]) {
       const expectedScale = Math.pow(RADIUS[id]!, p - 1) * k;
       expect(BODY_SCALE[id]!, `${id} 곡선 산출 (radius drift 가드)`).toBeCloseTo(expectedScale, 2);
     }
