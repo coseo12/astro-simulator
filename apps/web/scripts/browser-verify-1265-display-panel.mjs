@@ -78,6 +78,9 @@
  *        #1281 — 재료 출처만 바꿨다 (판정 · 임계 불변): 상단 바 좌측 그룹이 `shrink-0` 가 되어 1280 에서 단축 바와 그
  *        조상이 스크롤되지 않는다. 무관 스크롤은 연구 모드 `panel-right` 세로 스크롤로, 레이스는 우측 그룹이 스크롤러인
  *        좁은 폭 (375) 에서 Tab 이 일으키는 **트리거 조상 체인** 스크롤로 재료를 얻는다.
+ *        #1313 — 375 의 우측 그룹이 「⋯」 메뉴 뒤로 접혀 스크롤러가 사라졌다. 트리거 이동 스크롤 · 레이스는 스크롤러가 남은
+ *        태블릿 폭 (`SCROLLER_VIEWPORT` 768) 으로 재료를 옮기고 (판정 · 임계 불변), 375 는 「⋯」 → 트리거 → 패널 경로와
+ *        Esc 순서를 새 게이트 2 개로 판정한다 (`runUiNarrowOverflow` — 측정 불가 전제 없음, 「⋯」 부재 · 미열림은 FAIL).
  *
  * ## SKIP 은 PASS 로 세지 않는다
  *   환경상 판정되지 않는 게이트 (하드웨어 전용 · 소프트웨어 전용) 는 `SKIP` 으로 찍고 요약에서 따로 센다 —
@@ -95,7 +98,7 @@
  *   5 `fade:E|F` fade 재현 큐에 mid 부재   6 `edge:D7e` 토글 시점에 mid 가 이미 있음
  *   9 `det:D8` · `pos:D8` (하드웨어) 독립 2 로드 비결정 · 로드 ON ↔ OFF 동일   15 `renderer` 렌더러 판독 불일치
  *   16 `ctl` 자유시점 양성 대조의 선택 재설정 실패   17 `scroll` (연구 모드 우 패널) 스크롤을 일으키지 못함
- *   20 `scroll:trigger` 좁은 폭 우측 그룹 스크롤이 트리거를 움직이지 못함
+ *   20 `scroll:trigger` 우측 그룹 스크롤러 폭 (`SCROLLER_VIEWPORT`) 에서 그 스크롤이 트리거를 움직이지 못함
  *   21 `race:scroll` 레이스 반복 중 트리거 **조상 체인** (#1281 — 종전 단축 바 조상 체인) 의 스크롤 0. 레이스 게이트는 실패 관측
  *      (`bad > 0`) 이 없을 때만 이 전제에 기댄다 — 「패널이 사라졌다」 는 스크롤 유무와 무관하게 관측된 결함이라 전제가
  *      지울 수 없다 (#1271 R12). 계수는 캔버스 포커스 · 트리거 클릭 같은 다른 요소 스크롤을 세지 않는다
@@ -238,10 +241,24 @@ const DISABLED_CLICKS = 2;
  */
 const REASON_MARK = { software: '소프트웨어', surfaceOff: 'surface=off' };
 /**
- * 트리거 이동 스크롤 · 레이스 — 우측 그룹이 실제로 넘쳐 스크롤되는 좁은 폭. r1-guard 모바일 폭과 같다.
- * #1281 — 우측 그룹은 모든 폭에서 `overflow-x-auto` 이지만 1280 에서는 넘치지 않는다. 넘치는 폭은 이 값이다.
+ * 트리거 이동 스크롤 · 레이스 — 우측 그룹이 실제로 넘쳐 스크롤되는 폭.
+ * #1281 — 우측 그룹은 sm 이상에서 `overflow-x-auto` 이지만 1280 에서는 넘치지 않는다.
+ * #1313 — 종전 값 375 는 이제 우측 그룹이 「⋯」 메뉴 뒤로 접혀 (`max-sm:hidden`, 열면 줄바꿈 패널) 스크롤러가 없다.
+ * 스크롤러는 sm (640) 이상 ~ 우측 그룹이 넘치지 않는 폭 미만에만 남으므로 그 구간의 태블릿 폭으로 옮겼다 — 재료 출처만
+ * 바꿨고 판정 · 임계는 그대로다. 768 실측 (macOS 폰트): 우측 그룹 가시폭 350 / 내용폭 736, 트리거 좌단 992 (시야 밖) —
+ * Linux 폰트는 내용폭이 더 넓어 (#1281 PR #1283 실측) 넘침이 커지는 방향이다.
+ */
+const SCROLLER_VIEWPORT = { width: 768, height: 1024 };
+/**
+ * #1313 — 모바일 폭 (r1-guard 모바일 폭과 같다). 우측 그룹이 「⋯」 메뉴 뒤에 있다 — 「⋯」 → 표시 패널 경로를 판정한다
+ * (`runUiNarrowOverflow`).
  */
 const NARROW_VIEWPORT = { width: 375, height: 667 };
+/** #1313 — 모바일 「⋯」 토글 · 그 패널이 되는 우측 그룹. */
+const OVERFLOW_TOGGLE = '[data-testid="topbar-overflow-toggle"]';
+const OVERFLOW_GROUP = '[data-testid="topbar-right"]';
+/** #1313 — 「⋯」 hit target 최소 변 (CSS px). WCAG 2.2 SC 2.5.8 Target Size (Minimum) 의 24 — 외부 기준값 (새 임계 아님). */
+const MIN_TARGET_PX = 24;
 /** 무관 스크롤 재료 페이지 (#1281) — 세로 스크롤되는 `panel-right` 가 있는 모드. */
 const UI_SCROLL_MODE = 'research';
 /**
@@ -1539,12 +1556,12 @@ async function runUiUrl(browser, out, pages) {
 }
 
 /**
- * 트리거 이동 스크롤 닫힘 — 우측 그룹이 넘치는 좁은 폭 (`max-sm:overflow-x-auto`) 에서 그 컨테이너를 스크롤해
+ * 트리거 이동 스크롤 닫힘 — 우측 그룹이 넘치는 폭 (`SCROLLER_VIEWPORT`, #1313 — 종전 375) 에서 그 컨테이너를 스크롤해
  * 트리거를 실제로 움직인다. 트리거가 움직이지 않았으면 (스크롤 불가 · 위치 불변) 측정 불가 전제 (20) 이다 —
  * 「트리거가 움직였는가」 는 하네스 조건, 「닫혔는가」 는 제품 속성 (게이트).
  */
 async function runUiTriggerScroll(browser, out, pages) {
-  const W = await setupUiPage(browser, pages, UI_BASE, 'W-narrow', NARROW_VIEWPORT);
+  const W = await setupUiPage(browser, pages, UI_BASE, 'W-narrow', SCROLLER_VIEWPORT);
   await recordBootCaps(W, out);
   const { page } = W;
   await setPanelOpen(page, true);
@@ -1572,12 +1589,13 @@ async function runUiTriggerScroll(browser, out, pages) {
  * 닫았다 (PR #1268 qa — SwiftShader 2/19). 반복 수 `RACE_TRIALS` 근거는 상수 주석.
  *
  * #1281 — 재료 출처 교체: 1280 에서는 Tab 이 스크롤시킬 요소가 더 없다 (좌측 그룹 `shrink-0`, 우측 그룹 넘침 0). 우측
- * 그룹이 스크롤러인 `NARROW_VIEWPORT` 에서 Tab 이 트리거를 시야로 끌어오는 **트리거 조상 체인** 스크롤을 재료로 쓴다.
+ * 그룹이 스크롤러인 `SCROLLER_VIEWPORT` (#1313 — 종전 375) 에서 Tab 이 트리거를 시야로 끌어오는 **트리거 조상 체인**
+ * 스크롤을 재료로 쓴다.
  * 「트리거 위치 비교」 판본은 열 때의 배치가 이미 스크롤 뒤 값이라 늦게 온 scroll 에도 패널을 남기고, 「모든 스크롤
  * 닫기」 판본은 닫는다 — 판별 축이 같다.
  */
 async function runUiRace(browser, out, pages) {
-  const Q = await setupUiPage(browser, pages, UI_BASE, 'Q-race', NARROW_VIEWPORT);
+  const Q = await setupUiPage(browser, pages, UI_BASE, 'Q-race', SCROLLER_VIEWPORT);
   await recordBootCaps(Q, out);
   const { page } = Q;
   // 레이스의 재료가 실제로 생겼는지 센다 — 0 이면 이 환경에서 레이스를 재현할 수 없다 (전제 21). 재료는 「Tab 이
@@ -1631,6 +1649,90 @@ async function runUiRace(browser, out, pages) {
     ),
     trials: trials.length,
   };
+}
+
+/**
+ * #1313 — 모바일 폭 (375) 의 표시 패널 경로. 우측 그룹이 「⋯」 뒤로 접힌 뒤로 트리거 도달은 「⋯」 를 거친다.
+ * 판정 (전부 제품 속성 — 게이트. 측정 불가 전제 없음): 「⋯」 가 정확히 1 개 · `MIN_TARGET_PX` 이상 · 눌러 열림
+ * (`aria-expanded` · `aria-controls` = 우측 그룹 · 그룹 열림) · 열린 뒤 트리거가 화면 안에서 실제로 눌림 위치에 있음
+ * (`elementFromPoint`) · 트리거로 패널 1 개가 뷰포트 안에 열림 · 그 사이 「⋯」 유지 · Esc 1 회 → 패널만 닫힘 (「⋯」
+ * 유지 — 위에 뜬 것부터) · Esc 2 회 → 「⋯」 닫힘 + 포커스 「⋯」 · 내내 자유시점 미진입 (선택 `earth` 에서 시작 — 선택이
+ * 없으면 「미진입」 이 공허하므로 시작 선택도 게이트가 본다) · 가로 스크롤 0.
+ * 「⋯」 가 없거나 열리지 않으면 이후 단계를 건너뛰고 `error` 를 남긴다 — 게이트가 `error === null` 을 요구해 FAIL 이다.
+ */
+async function runUiNarrowOverflow(browser, out, pages) {
+  const N = await setupUiPage(browser, pages, UI_BASE, 'N-overflow', NARROW_VIEWPORT);
+  await recordBootCaps(N, out);
+  const { page } = N;
+  const readState = () =>
+    page.evaluate(
+      ([toggleSel, groupSel, panelSel]) => {
+        const toggle = document.querySelector(toggleSel);
+        const group = document.querySelector(groupSel);
+        const trigger = document.querySelector('[data-testid="display-panel-toggle"]');
+        const panel = document.querySelector(panelSel);
+        const rect = (el) => {
+          if (!el || el.getClientRects().length === 0) return null;
+          const r = el.getBoundingClientRect();
+          return {
+            left: r.left,
+            right: r.right,
+            top: r.top,
+            bottom: r.bottom,
+            width: r.width,
+            height: r.height,
+          };
+        };
+        // 화면 안 · 중심점에서 실제로 그 요소가 눌리는가 (가려짐 · display:none · 화면 밖 전부 false).
+        const hit = (el) => {
+          const r = rect(el);
+          if (!r || r.width === 0 || r.height === 0) return false;
+          const x = r.left + r.width / 2;
+          const y = r.top + r.height / 2;
+          if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+          const h = document.elementFromPoint(x, y);
+          return !!h && (h === el || el.contains(h));
+        };
+        const st = window.__simStore.getState();
+        return {
+          toggles: document.querySelectorAll(toggleSel).length,
+          toggleRect: rect(toggle),
+          toggleHit: hit(toggle),
+          expanded: toggle?.getAttribute('aria-expanded') ?? null,
+          controlsGroup: !!group?.id && toggle?.getAttribute('aria-controls') === group.id,
+          groupOpen: group?.dataset.overflowOpen === 'true',
+          triggerHit: hit(trigger),
+          panelRect: rect(panel),
+          viewport: { width: innerWidth, height: innerHeight },
+          docScrollX: document.documentElement.scrollWidth - innerWidth,
+          focus: document.activeElement?.getAttribute('data-testid') ?? null,
+          selected: st.selectedBodyId,
+          freeFly: st.freeFlyMode,
+        };
+      },
+      [OVERFLOW_TOGGLE, OVERFLOW_GROUP, PANEL],
+    );
+  const result = { closed: await readState(), error: null };
+  try {
+    if (result.closed.toggles !== 1) throw new Error(`「⋯」 ${result.closed.toggles} 개 (기대 1)`);
+    await page.locator(OVERFLOW_TOGGLE).click({ timeout: READY_TIMEOUT_MS });
+    await frames(page, 2);
+    result.opened = await readState();
+    if (!result.opened.triggerHit)
+      throw new Error('「⋯」 를 연 뒤에도 표시 패널 트리거를 누를 수 없다');
+    await setPanelOpen(page, true);
+    await frames(page, 2);
+    result.panelOpen = { ...(await readState()), panels: await panelCount(page) };
+    await page.keyboard.press('Escape');
+    await frames(page, 2);
+    result.afterEsc1 = { ...(await readState()), panels: await panelCount(page) };
+    await page.keyboard.press('Escape');
+    await frames(page, 2);
+    result.afterEsc2 = { ...(await readState()), panels: await panelCount(page) };
+  } catch (e) {
+    result.error = String(e?.message ?? e).split('\n')[0];
+  }
+  out.uiNarrowOverflow = result;
 }
 
 /** D10 — `?surface=off`: 구름·불빛 토글 aria-disabled + 사유, 눌러도 mesh · 머티리얼 · URL 무변화. */
@@ -1736,6 +1838,7 @@ const SECTIONS = [
   ['uiSurfaceOff', runUiSurfaceOff],
   ['uiTriggerScroll', runUiTriggerScroll],
   ['uiRace', runUiRace],
+  ['uiNarrowOverflow', runUiNarrowOverflow],
 ];
 
 async function run(browser) {
@@ -2476,6 +2579,80 @@ function judgeUi(meta, { settleIds, hw }) {
         `실패 0 / ${RACE_TRIALS}`,
         r.uiRace.trials === RACE_TRIALS && r.uiRace.bad.length === 0,
       ],
+    ),
+    // #1313 — 모바일은 우측 그룹이 「⋯」 뒤에 있다. 「⋯」 가 없거나 안 열리면 `error` 로 FAIL (측정 불가 경로 없음).
+    gate(
+      `UI 모바일 (${NARROW_VIEWPORT.width}) 「⋯」 경유 — 트리거 도달 · 패널 뷰포트 안 열림 · 「⋯」 유지`,
+      ['uiNarrowOverflow'],
+      [],
+      (r) => {
+        const n = r.uiNarrowOverflow;
+        const c = n.closed;
+        const o = n.opened;
+        const p = n.panelOpen;
+        const inView = (rc, vp) =>
+          !!rc && rc.left >= 0 && rc.top >= 0 && rc.right <= vp.width && rc.bottom <= vp.height;
+        const ok =
+          n.error === null &&
+          c.toggles === 1 &&
+          c.toggleHit &&
+          c.toggleRect.width >= MIN_TARGET_PX &&
+          c.toggleRect.height >= MIN_TARGET_PX &&
+          c.expanded === 'false' &&
+          !c.triggerHit &&
+          o.expanded === 'true' &&
+          o.controlsGroup &&
+          o.groupOpen &&
+          o.triggerHit &&
+          p.panels === 1 &&
+          inView(p.panelRect, p.viewport) &&
+          p.groupOpen &&
+          p.docScrollX === 0;
+        return [
+          JSON.stringify({
+            error: n.error,
+            toggles: c.toggles,
+            toggle: c.toggleRect && [c.toggleRect.width, c.toggleRect.height],
+            closedTriggerHit: c.triggerHit,
+            opened: o && [o.expanded, o.controlsGroup, o.groupOpen, o.triggerHit],
+            panel: p && [p.panels, p.panelRect, p.groupOpen, p.docScrollX],
+          }),
+          `「⋯」 1 ≥ ${MIN_TARGET_PX}px · 닫힘엔 트리거 불가 · 열면 트리거 도달 · 패널 1 뷰포트 안 · 「⋯」 유지 · 가로 스크롤 0`,
+          ok,
+        ];
+      },
+    ),
+    gate(
+      `UI 모바일 (${NARROW_VIEWPORT.width}) Esc 순서 — 패널 → 「⋯」 (포커스 「⋯」) · 자유시점 미진입`,
+      ['uiNarrowOverflow'],
+      [],
+      (r) => {
+        const n = r.uiNarrowOverflow;
+        const e1 = n.afterEsc1;
+        const e2 = n.afterEsc2;
+        const ok =
+          n.error === null &&
+          n.closed.selected !== null &&
+          e1.panels === 0 &&
+          e1.groupOpen &&
+          !e1.freeFly &&
+          e2.panels === 0 &&
+          !e2.groupOpen &&
+          e2.expanded === 'false' &&
+          e2.focus === 'topbar-overflow-toggle' &&
+          !e2.freeFly &&
+          e2.selected === n.closed.selected;
+        return [
+          JSON.stringify({
+            error: n.error,
+            selectedAtStart: n.closed.selected,
+            esc1: e1 && [e1.panels, e1.groupOpen, e1.freeFly],
+            esc2: e2 && [e2.panels, e2.groupOpen, e2.focus, e2.freeFly, e2.selected],
+          }),
+          '시작 선택 있음 · Esc1 패널 0 ∧ 「⋯」 열림 · Esc2 「⋯」 닫힘 ∧ 포커스 「⋯」 · 자유시점 미진입 · 선택 유지',
+          ok,
+        ];
+      },
     ),
     gate(
       'UI 캡처 직전 패널 요소 수 (D5~D8 UI)',

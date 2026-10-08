@@ -49,18 +49,26 @@ import { useSimStore } from '@/store/sim-store';
 const PANEL_GAP_PX = 4;
 /** 패널이 뷰포트 가장자리에 붙지 않게 두는 최소 여백 (px). */
 const VIEWPORT_MARGIN_PX = 8;
+/** 패널 폭 (px) — 배치 clamp 가 쓰므로 클래스(`w-60`)가 아니라 이 값 하나로 그린다 (종전 `w-60` = 240px 와 같은 값). */
+const PANEL_WIDTH_PX = 240;
 
 interface PanelPosition {
   top: number;
   right: number;
 }
 
-/** 트리거 우측 정렬 + 뷰포트 안쪽 clamp. */
+/**
+ * 트리거 우측 정렬 + 뷰포트 안쪽 clamp (양쪽).
+ * #1313 — 모바일 「⋯」 패널 안에서는 트리거가 화면 왼쪽(x≈54–86)에 놓여, 우측 정렬만 하면 패널 왼쪽 끝이 −154 로 화면
+ * 밖에 열렸다 (verify:1265 「⋯」 게이트 375 실측). 왼쪽 여백도 지키도록 `right` 상한을 둔다. 우측 상단 트리거 (1280 등)
+ * 는 상한에 닿지 않아 배치가 같다.
+ */
 function resolvePanelPosition(trigger: HTMLElement): PanelPosition {
   const rect = trigger.getBoundingClientRect();
+  const maxRight = window.innerWidth - PANEL_WIDTH_PX - VIEWPORT_MARGIN_PX;
   return {
     top: rect.bottom + PANEL_GAP_PX,
-    right: Math.max(VIEWPORT_MARGIN_PX, window.innerWidth - rect.right),
+    right: Math.max(VIEWPORT_MARGIN_PX, Math.min(window.innerWidth - rect.right, maxRight)),
   };
 }
 
@@ -210,8 +218,8 @@ export function DisplayPanel() {
               data-testid="display-panel"
               onKeyDown={handlePanelKeyDown}
               onBlur={handleBlur}
-              className="fixed z-[var(--z-dropdown)] w-60 bg-bg-surface border border-border-subtle rounded-sm p-3 shadow-lg"
-              style={{ top: position.top, right: position.right }}
+              className="fixed z-[var(--z-dropdown)] bg-bg-surface border border-border-subtle rounded-sm p-3 shadow-lg"
+              style={{ top: position.top, right: position.right, width: PANEL_WIDTH_PX }}
             >
               <p id={titleId} className="text-caption text-fg-secondary mb-2">
                 표시
