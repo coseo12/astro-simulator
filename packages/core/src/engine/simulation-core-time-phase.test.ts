@@ -3,7 +3,7 @@
  *
  * 결함 기전: `timeChanged` 는 엣지 이벤트라 늦게 붙은 구독자는 그 전 발화를 못 받는다. 부팅에서
  * scene 의 `updateAt` 구독은 `start()` resolve **뒤**에 붙는데, URL `?t=` 의 `jumpToJulianDate` 와
- * `start()` 말미 초기 알림은 그 **전**에 발화한다. 재생이면 다음 프레임 `tick` 이 다시 발화해 가려지지만,
+ * `start()` 말미 초기 알림은 그 **전**에 발화한다. 재생이면 `tick` 이 다시 발화해 가려지지만,
  * 일시정지 (`?speed=0`) 면 `tick` 이 `false` 라 장면이 생성자 기본값 (J2000) 에 머문다.
  *
  * 테스트는 부팅 순서를 그대로 재현한다 — `url-sync` 의 명령 (jump → setTimeScale) 이 `start()` 보다
