@@ -1,89 +1,89 @@
 {
-  "timestamp": "2026-09-21T10:40:22.220Z",
-  "phase": "1209-roadmap-v3-rebaseline",
-  "commit": "7c9652ad265d37d92f0d83a59fcafe77e1865bcb",
+  "timestamp": "2026-10-09T08:37:59.785Z",
+  "phase": "1319-pr1-gpu-belt",
+  "commit": "c30c68cd9bc776987baa427e5be124ed3def4815",
   "durationMs": 3000,
   "environment": "gh-actions-ubuntu-chromium-headless",
   "viewport": "1280x800",
   "scenarios": [
     {
       "name": "idle",
-      "fps": 106.5,
+      "fps": 112.36,
       "samples": 10,
-      "min": 86.43,
-      "max": 129.15
+      "min": 92.9,
+      "max": 157.58
     },
     {
       "name": "play-1d",
-      "fps": 89.37,
+      "fps": 104.09,
       "samples": 10,
-      "min": 72.02,
-      "max": 114.57
+      "min": 78.35,
+      "max": 123.77
     },
     {
       "name": "play-1y",
-      "fps": 91.88,
+      "fps": 101.13,
       "samples": 10,
-      "min": 70.67,
-      "max": 130.54
+      "min": 74.46,
+      "max": 115.4
     },
     {
       "name": "focus-earth",
-      "fps": 102.85,
+      "fps": 108.41,
       "samples": 10,
-      "min": 74.94,
-      "max": 134.19
+      "min": 88.18,
+      "max": 126.41
     },
     {
       "name": "focus-neptune",
-      "fps": 54.81,
+      "fps": 66.41,
       "samples": 10,
-      "min": 47.39,
-      "max": 70.72
+      "min": 55.43,
+      "max": 87.41
     }
   ],
   "nBody": [
     {
       "n": 10,
-      "fps": 96.11,
+      "fps": 111.88,
       "samples": 10,
-      "min": 73.54,
-      "max": 122.87
+      "min": 87.05,
+      "max": 124.44
     },
     {
       "n": 100,
-      "fps": 62.45,
+      "fps": 109.13,
       "samples": 10,
-      "min": 49.74,
-      "max": 82.57
+      "min": 86.81,
+      "max": 123.87
     },
     {
       "n": 200,
-      "fps": 47.24,
+      "fps": 109.25,
       "samples": 10,
-      "min": 36.65,
-      "max": 62.96
+      "min": 85.36,
+      "max": 120.21
     },
     {
       "n": 1000,
-      "fps": 16.73,
+      "fps": 104.31,
       "samples": 10,
-      "min": 12.48,
-      "max": 23.55
+      "min": 82.08,
+      "max": 118.76
     },
     {
       "n": 5000,
-      "fps": 4.14,
+      "fps": 84.91,
       "samples": 10,
-      "min": 3.12,
-      "max": 5.93
+      "min": 64.9,
+      "max": 103.18
     },
     {
       "n": 10000,
-      "fps": 2.28,
+      "fps": 70.34,
       "samples": 10,
-      "min": 1.66,
-      "max": 3.15
+      "min": 54.99,
+      "max": 84.11
     }
   ],
   "source_count": 10,
