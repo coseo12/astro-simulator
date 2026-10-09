@@ -19,8 +19,8 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
-const IDS = ['orbits', 'stars', 'clouds', 'nightLights', 'labels'] as const;
-/** 패널의 마지막 토글 (#1293 — 라벨 행이 추가돼 불빛에서 라벨로 바뀌었다). */
+const IDS = ['orbits', 'stars', 'clouds', 'nightLights', 'labels', 'belt', 'kuiper'] as const;
+/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 행이 추가돼 마지막이 바뀌었다). */
 const LAST_ID = IDS[IDS.length - 1]!;
 
 function renderPanel() {
@@ -38,7 +38,9 @@ beforeEach(() => {
     cloudsVisible: true,
     nightLightsVisible: true,
     labelsVisible: true,
-    displayCapabilities: { starfield: true, surfaceDetail: true },
+    beltVisible: true,
+    kuiperVisible: true,
+    displayCapabilities: { starfield: true, surfaceDetail: true, belt: true },
     displayPanelOpen: false,
   });
 });
@@ -320,7 +322,9 @@ describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 �
 
 describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B — 사유 1회 낭독)', () => {
   it('비활성 토글: 이름 = 라벨만 · 설명 = 사유', () => {
-    useSimStore.setState({ displayCapabilities: { starfield: false, surfaceDetail: false } });
+    useSimStore.setState({
+      displayCapabilities: { starfield: false, surfaceDetail: false, belt: false },
+    });
     renderPanel();
     openPanel();
     const stars = screen.getByRole('button', { name: '별 배경' });
@@ -360,7 +364,9 @@ describe('DisplayPanel — 토글 분기', () => {
   });
 
   it('소프트웨어 렌더 — 별: aria-disabled + 사유 title/describedby · 네이티브 disabled 아님 · 클릭 no-op (D9)', () => {
-    useSimStore.setState({ displayCapabilities: { starfield: false, surfaceDetail: true } });
+    useSimStore.setState({
+      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false },
+    });
     renderPanel();
     openPanel();
     const stars = toggleEl('stars');
@@ -378,8 +384,40 @@ describe('DisplayPanel — 토글 분기', () => {
     expect(stars).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('#1319 PR3 소프트웨어 렌더 — 소행성대 · 카이퍼: aria-disabled + 띠 사유 · 네이티브 disabled 아님 · 클릭 no-op (결정 3)', () => {
+    useSimStore.setState({
+      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false },
+    });
+    renderPanel();
+    openPanel();
+    for (const id of ['belt', 'kuiper'] as const) {
+      const el = toggleEl(id);
+      expect(el).toHaveAttribute('aria-disabled', 'true');
+      expect(el).not.toBeDisabled();
+      expect(el).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.softwareRendererBelt);
+      expect(el).toHaveAccessibleDescription(DISPLAY_DISABLED_REASONS.softwareRendererBelt);
+      expect(el).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(el);
+      expect(el).toHaveAttribute('aria-pressed', 'false');
+    }
+    expect(sentCommands).toEqual([]);
+  });
+
+  it('#1319 PR3 하드웨어 — 소행성대 클릭 → aria-pressed 반전 + 명령 (카이퍼는 그대로)', () => {
+    renderPanel();
+    openPanel();
+    expect(screen.getByRole('button', { name: '소행성대' })).toBe(toggleEl('belt'));
+    expect(screen.getByRole('button', { name: '카이퍼 벨트' })).toBe(toggleEl('kuiper'));
+    fireEvent.click(toggleEl('belt'));
+    expect(toggleEl('belt')).toHaveAttribute('aria-pressed', 'false');
+    expect(toggleEl('kuiper')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands).toEqual([{ type: 'setAsteroidBeltVisible', visible: false }]);
+  });
+
   it('?surface=off — 구름·불빛 aria-disabled + 사유, 클릭 no-op (D10)', () => {
-    useSimStore.setState({ displayCapabilities: { starfield: true, surfaceDetail: false } });
+    useSimStore.setState({
+      displayCapabilities: { starfield: true, surfaceDetail: false, belt: true },
+    });
     renderPanel();
     openPanel();
     for (const id of ['clouds', 'nightLights'] as const) {
@@ -392,7 +430,9 @@ describe('DisplayPanel — 토글 분기', () => {
   });
 
   it('비활성 토글도 포커스를 받는다 — Tab 순회에서 빠지지 않는다 (D14 · aria-disabled 해석)', () => {
-    useSimStore.setState({ displayCapabilities: { starfield: false, surfaceDetail: false } });
+    useSimStore.setState({
+      displayCapabilities: { starfield: false, surfaceDetail: false, belt: false },
+    });
     renderPanel();
     openPanel();
     for (const id of IDS) {

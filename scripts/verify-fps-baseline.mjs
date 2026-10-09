@@ -15,6 +15,7 @@
  *   1. default (sun 시점, 진입 직후)
  *   2. earth focus (close-up)
  *   3. moon focus (satellite — R4 신규 인스턴스)
+ *   4. belt-forced (#1319 PR3, desktop 만) — 소행성대 · 카이퍼 띠 **기본 켜짐 구성** 강제 생성 (`?belt=3900` — 아래 상수 주석)
  *
  * 회귀 임계:
  *   - baseline 대비 ≥ 30% 저하 = FAIL (headless rAF noise ±12% 실측 후 보수 마진)
@@ -133,11 +134,48 @@ const VIEWPORTS = [
   { id: 'mobile', width: 375, height: 667 },
 ];
 
+/**
+ * #1319 PR3 (ADR `20261008-1319` §교차검증 이견 수용 2) — CI 기본 켜짐 성능 셀.
+ *
+ * 소프트웨어 렌더 게이트 (결정 3) 로 CI 의 기본 화면은 띠를 그리지 않는다 — 그대로면 「CI 통과 → 하드웨어 사용자
+ * 프레임 하락」 경로를 CI 가 못 본다. 그래서 띠를 **강제** 생성한 셀을 하나 둔다. 판정은 이 가드의 기존 규칙
+ * (baseline 대비 `REGRESSION_MARGIN` 저하 · 절대 `MIN_FPS_ABSOLUTE`) 그대로 — 새 임계 0.
+ *
+ * 쿼리 수 3900 의 출처: `?belt=N` 의 N 은 **소행성대 그룹 총수**다 (결정 6). 기본 켜짐 구성은 소행성대 3900
+ * (주 띠 3000 + 힐다 300 + 트로이 600) + 카이퍼 1500 (고전대 1200 + 플루티노 300) = 입자 5400 (결정 4 · Q1 —
+ * `BELT_DEFAULT_COUNTS`). 카이퍼는 N 과 무관하게 기본 수로 함께 강제 생성되므로, 기본 구성을 재현하는 N 은 5400 이
+ * 아니라 3900 이다 (`?belt=5400` 은 소행성대 5400 + 카이퍼 1500 = 6900 입자가 된다).
+ *
+ * desktop 1 셀만 둔다 — ADR 이 정한 것은 강제 셀 1개이고, desktop default 가 두 viewport 중 baseline 이 가장 낮은 셀이다.
+ * 측정 순서상 맨 끝 (자기 쿼리로 다시 진입) 이라 앞 시나리오의 측정 조건을 바꾸지 않는다.
+ */
+const BELT_FORCED_QUERY = '?belt=3900';
+
 const SCENARIOS = [
   { id: 'default', label: 'default (sun 시점)', focusBodyId: null },
   { id: 'earth-focus', label: 'earth focus', focusBodyId: 'earth' },
   { id: 'moon-focus', label: 'moon focus', focusBodyId: 'moon' },
+  {
+    id: 'belt-forced',
+    label: `belt 기본 구성 강제 (${BELT_FORCED_QUERY})`,
+    focusBodyId: null,
+    query: BELT_FORCED_QUERY,
+    viewports: ['desktop'],
+  },
 ];
+
+/** viewport 별 측정 대상 시나리오 — `viewports` 미지정이면 전 viewport. */
+const scenariosFor = (viewportId) =>
+  SCENARIOS.filter((sc) => !sc.viewports || sc.viewports.includes(viewportId));
+
+/** 시나리오 자체 쿼리로 재진입 + 측정 전 정지 (`measureViewport` 시작 절차와 같다). */
+async function enterScenarioQuery(page, query) {
+  await page.goto(`${baseUrl}/${query}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2000);
+  try {
+    await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
+  } catch {}
+}
 
 async function measureFps(page, durationMs) {
   return page.evaluate(
@@ -271,6 +309,7 @@ async function waitForLodSettle(page) {
  *   반환: 측정 시점 LOD 진단 (tier/override/lodCounts).
  */
 async function setupScenario(page, scenario) {
+  if (scenario.query) await enterScenarioQuery(page, scenario.query);
   if (scenario.focusBodyId) {
     // #1281 — 천체 바로가기는 「천체 ▾」 메뉴 항목이다. 메뉴를 연 뒤 항목 유무를 본다 (기존 분기 의미 유지).
     await openBodyMenu(page);
@@ -351,7 +390,7 @@ async function measureViewport(page, client, viewport) {
 
   const results = {};
   const diagnostics = {};
-  for (const sc of SCENARIOS) {
+  for (const sc of scenariosFor(viewport.id)) {
     console.log(`  ${viewport.id} / ${sc.label} 측정 중...`);
     const { fps, attempts, diag, vsyncLock, renderCapacity } = await measureScenario(page, sc);
     results[sc.id] = fps;
@@ -371,7 +410,7 @@ function compareBaseline(current, baseline) {
   const failures = [];
   const absorptions = []; // #820 — vsync 락으로 흡수된 scenario 목록 (annotation 기록용)
   for (const vp of VIEWPORTS) {
-    for (const sc of SCENARIOS) {
+    for (const sc of scenariosFor(vp.id)) {
       const cur = current.viewports[vp.id]?.[sc.id];
       const base = baseline.viewports[vp.id]?.[sc.id];
       if (cur === undefined || base === undefined) {
@@ -484,7 +523,7 @@ const measured = await withBrowser({}, async (browser) => {
       } catch {}
       report.viewports[vp.id] = {};
       console.log(`\n[${vp.id}] ${vp.width}×${vp.height}`);
-      for (const sc of SCENARIOS) {
+      for (const sc of scenariosFor(vp.id)) {
         const diag = await setupScenario(page, sc);
         const samples = [];
         // #820 Phase 0 — rafFps 샘플과 나란히 render-capacity 프로브를 캡처. null(scene 부재)은
@@ -573,7 +612,7 @@ for (const vp of VIEWPORTS) {
   console.log(`\n[${vp.id}] ${vp.width}×${vp.height}`);
   const r = current.viewports[vp.id];
   const d = current.diagnostics[vp.id];
-  for (const sc of SCENARIOS) {
+  for (const sc of scenariosFor(vp.id)) {
     const fps = r[sc.id];
     const mark = fps >= MIN_FPS_ABSOLUTE ? '✓' : '✗';
     const diag = d?.[sc.id];
@@ -632,7 +671,7 @@ if (failures.length > 0) {
   const raceLost = [];
   const settledButSlow = [];
   for (const vp of VIEWPORTS) {
-    for (const sc of SCENARIOS) {
+    for (const sc of scenariosFor(vp.id)) {
       const fps = current.viewports[vp.id]?.[sc.id];
       const base = baseline.viewports[vp.id]?.[sc.id];
       const failed =

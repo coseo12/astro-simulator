@@ -7,8 +7,8 @@
  *   Newton 엔진에 합류시키지 않는다 (O(N²) 폭발 방지).
  * - 프레임당 위치 갱신: ThinInstance matrix 버퍼를 in-place로 갱신한 뒤 업데이트 플래그.
  *
- * #1319 — 장면은 이 CPU 구 경로를 `?beltNbody=1` (N-body 편입) 에서만 쓴다. 그 외 `?belt=N` 은 GPU Kepler
- * 경로(`belt-particles.ts`) 다 — N-body 적분 위치는 Kepler 셰이더로 표현할 수 없어서다
+ * #1319 — 장면은 이 CPU 구 경로를 `?beltNbody=1` (N-body 편입, `?belt=N` 과 함께) 에서만 쓴다. 그 외 (기본 켜짐 ·
+ * `?belt=N`) 는 GPU Kepler 경로(`belt-particles.ts`) 다 — N-body 적분 위치는 Kepler 셰이더로 표현할 수 없어서다
  * (ADR `docs/decisions/20261008-1319-asteroid-belt-gpu.md` 결정 1).
  */
 import {
@@ -25,13 +25,17 @@ import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
 import type { BodyReferenceFrame } from './belt-particles.js';
 // #1319 PR2 — PRNG 정의는 Babylon 비의존 생성기 모듈로 옮겼다 (GPU 띠 분포 · 밝기와 같은 생성기).
-import { mulberry32 } from './belt-population.js';
+// #1319 PR3 — 개수 상한도 같은 모듈로 옮겼다 (web 파서가 루트 named export 로 import — 리터럴 중복 제거).
+import { ASTEROID_BELT_MAX_N, mulberry32 } from './belt-population.js';
+
+export { ASTEROID_BELT_MAX_N };
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. tier 전환 시 본 모듈의
 // ThinInstance 좌표가 body mesh 의 renderScaleForTier(tier) 와 동일 배수로 스케일되도록
-// 호출자가 **모든 진입점** — 생성 시점 `options.sceneUnitPerMeter` + 매 프레임 `updateAt` /
-// `writeWorldPositions` — 에 `sceneUnitPerMeter` 를 주입한다.
-// 주석 계약: `sceneUnitPerMeter === renderScaleForTier(activeTier)` 이어야 rings/행성과
+// 호출자가 **모든 진입점**에서 스케일을 주입한다 — 생성 시점은 `options.sceneUnitPerMeter`, 매 프레임
+// `updateAt` / `writeWorldPositions` 는 기준계 스냅샷 `frame` (`BodyReferenceFrame` — `scale` + `origin*`,
+// #1319 결정 2: body mesh 루프가 쓴 값 그대로라 origin 차감까지 같은 원본에서 온다).
+// 주석 계약: `sceneUnitPerMeter === frame.scale === renderScaleForTier(activeTier)` 이어야 rings/행성과
 // 상대 비율이 보존됨.
 //
 // 본 모듈은 **의도적으로 tier-agnostic** 이다 — `tier.js` 를 import 하지 않으며, 그것이 계약의
@@ -127,18 +131,16 @@ const MAX_INCLINATION_DEG = 20;
 /** 시각 크기 — 진짜 크기(수 km)는 AU 단위에서 완전히 점. 띠 형태가 보이도록 강조. */
 const ASTEROID_VISUAL_DIAMETER_AU = 0.008;
 
-/**
- * 띠 입자 수 상한. `?belt=N` 파싱(`sim-canvas.tsx`) 의 clamp 와 같은 값이다.
- * #1319 — GPU 경로(`belt-particles.ts`) 도 이 상한을 승계한다 (ADR 20261008-1319 §기각 첫 항 — 새 상한 신설 기각).
- */
-export const ASTEROID_BELT_MAX_N = 10_000;
+// 띠 입자 수 상한 `ASTEROID_BELT_MAX_N` 은 `belt-population.ts` 가 정의한다 (위 re-export). 이 모듈은 아래
+// `createAsteroidBelt` 의 `n` clamp 에서만 쓴다 — GPU 경로의 clamp 는 장면(`solar-system-scene.ts` `asteroidBeltN`)
+// 과 web 파서(`parse-belt-mode.ts`) 가 같은 상수로 한다 (ADR 20261008-1319 §기각 첫 항 — 새 상한 신설 기각).
 
 /**
  * 균일 분포 소행성대 궤도 요소 생성 (#99). 분포만 실제(2.2~3.2 AU, e<0.2, i<20°), 개별 궤도는 seeded PRNG.
  *
- * #1319 — CPU 구 경로(`createAsteroidBelt`, `?beltNbody=1`) 와 GPU 경로(`createBeltParticles`) 가
- * **같은 분포**를 쓰도록 생성 루프를 이 함수 하나로 뽑았다 (PR1 은 렌더 경로만 바꾸고 분포는 그대로 — 새 분포는 PR2).
- * 난수 소비 순서는 종전 인라인 루프와 같아 같은 seed 에서 요소가 바이트 동일하다.
+ * #1319 — PR1 에서 생성 루프를 이 함수로 뽑았다. PR2 부터 GPU 경로는 그룹 5종 분포(`belt-population.ts`
+ * `generateBeltPopulation`) 를 쓰므로, 이 균일 분포는 **CPU 구 경로(`createAsteroidBelt`, `?beltNbody=1`) 와
+ * 테스트 fixture 전용**이다. 난수 소비 순서는 종전 인라인 루프와 같아 같은 seed 에서 요소가 바이트 동일하다.
  */
 export function generateUniformBeltElements(
   n: number,
