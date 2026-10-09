@@ -24,6 +24,8 @@ import { positionAt } from '../physics/kepler.js';
 import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
 import type { BodyReferenceFrame } from './belt-particles.js';
+// #1319 PR2 — PRNG 정의는 Babylon 비의존 생성기 모듈로 옮겼다 (GPU 띠 분포 · 밝기와 같은 생성기).
+import { mulberry32 } from './belt-population.js';
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. tier 전환 시 본 모듈의
 // ThinInstance 좌표가 body mesh 의 renderScaleForTier(tier) 와 동일 배수로 스케일되도록
@@ -115,18 +117,6 @@ export interface AsteroidBeltHandles {
   /** 소행성 수 */
   readonly n: number;
   dispose: () => void;
-}
-
-/** mulberry32 — 32bit PRNG, 결정적 재현. #1319 — GPU 띠 입자(`belt-particles.ts`) 밝기 난수도 같은 생성기. */
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 const DEG = Math.PI / 180;
