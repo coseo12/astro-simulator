@@ -25,12 +25,28 @@ import {
 import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
-import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import {
+  ASTEROID_BELT_MAX_N,
+  createAsteroidBelt,
+  type AsteroidBeltHandles,
+} from './asteroid-belt.js';
+import {
+  BELT_COOL_GRAY_RGB,
+  BELT_WARM_GRAY_RGB,
   createBeltParticles,
   type BeltParticlesHandles,
   type BodyReferenceFrame,
 } from './belt-particles.js';
+import {
+  ASTEROID_BELT_GROUPS,
+  BELT_DEFAULT_COUNTS,
+  KUIPER_BELT_GROUPS,
+  beltPlanetsFromSystem,
+  generateBeltPopulation,
+  scaleAsteroidBeltCounts,
+  type BeltOrbit,
+  type BeltPopulation,
+} from './belt-population.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -120,6 +136,14 @@ import type { ArcRotateCamera } from '@babylonjs/core';
  * threshold 를 낮추면 빈번한 shift 로 log-depth 재계산 오버헤드 증가 가능.
  */
 const FLOATING_ORIGIN_THRESHOLD_METERS = AU;
+
+/**
+ * #1319 PR2 — 띠 입자 분포 seed (`generateBeltPopulation`) · 소행성대 메시 밝기 seed.
+ * 구 균일 분포의 기본 seed(42, `asteroid-belt.ts`) 와 같은 값을 승계한다.
+ */
+const BELT_POPULATION_SEED = 42;
+/** 카이퍼 메시 밝기 난수 seed 오프셋 — 소행성대 메시(`seed + 1` 내부 오프셋) 와 스트림을 가른다. */
+const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
 
 /**
  * P11-A #288 — dev-only assert gate.
@@ -390,8 +414,14 @@ export interface SolarSystemSceneHandles {
   getBodyScreenInfo: () => readonly BodyScreenInfo[];
   /**
    * #1319 — GPU 띠 입자 핸들 (`?belt=N` 이고 `?beltNbody=1` 이 아닐 때만). 없으면 null. 진단 · 단위 테스트용.
+   * 소행성대 메시 (주 띠 + 힐다 + 트로이, 웜 그레이) 다. 카이퍼는 `getKuiperParticles`.
    */
   getBeltParticles: () => BeltParticlesHandles | null;
+  /**
+   * #1319 PR2 — 카이퍼 띠 입자 핸들 (고전대 + 플루티노, 쿨 그레이 — ADR 결정 5). 생성 조건은 `getBeltParticles`
+   * 와 같다 (`?belt=N` 옵트인 · `?beltNbody=1` 아님). 없으면 null. 진단 · 단위 테스트용.
+   */
+  getKuiperParticles: () => BeltParticlesHandles | null;
   /**
    * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 의 사본.
    * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
@@ -458,7 +488,11 @@ export interface SolarSystemSceneOptions {
   showOrbitLines?: boolean;
   /** 물리 엔진 선택. 기본: 'kepler' (해석해). 'newton'은 #86에서 추가. */
   physicsEngine?: PhysicsEngineKind;
-  /** 소행성대 샘플 수. 0 또는 undefined면 생성 안 함. */
+  /**
+   * 소행성대 샘플 수. 0 또는 undefined면 생성 안 함. `ASTEROID_BELT_MAX_N` 으로 clamp.
+   * #1319 PR2 (GPU 경로) — 소행성대 그룹(주 띠 + 힐다 + 트로이) 총수다 (ADR 결정 6 — 기본 비율 3000:300:600 유지).
+   * 카이퍼(고전대 + 플루티노) 는 이 수와 무관하게 기본 수(`BELT_DEFAULT_COUNTS`) 로 함께 생성된다.
+   */
   asteroidBeltN?: number;
   /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
@@ -1262,6 +1296,7 @@ export function createSolarSystemScene(
   //    셰이더로 표현할 수 없어 유지한다. origin 은 `bodyFrame` 으로 차감 (결함 (가) 수정).
   let asteroidBelt: AsteroidBeltHandles | null = null;
   let beltParticles: BeltParticlesHandles | null = null;
+  let kuiperParticles: BeltParticlesHandles | null = null;
   // 위치 버퍼 초기화 (`localPositions`/`worldPositions`) + 태양광 동기 헬퍼 정의.
   phase('scene:position-buffers');
   if (asteroidBeltN > 0 && asteroidNbody) {
@@ -1275,8 +1310,34 @@ export function createSolarSystemScene(
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
   } else if (asteroidBeltN > 0) {
+    // #1319 PR2 — 분포는 그룹 5종 생성기 (ADR 결정 4). 목성 · 해왕성 요소는 장면과 같은 로더 데이터에서 읽는다.
+    // N 은 소행성대 그룹 총수 (결정 6) — 카이퍼 수는 N 과 묶지 않는다: 결정 6 이 N 을 소행성대 그룹에만 정의했고
+    // 카이퍼는 별도 토글(`kuiper`, PR3) 을 가진 독립 그룹이라 기본 수(Q1) 를 쓴다.
+    const population: BeltPopulation = generateBeltPopulation(
+      BELT_POPULATION_SEED,
+      {
+        ...scaleAsteroidBeltCounts(Math.min(asteroidBeltN, ASTEROID_BELT_MAX_N)),
+        kuiperClassical: BELT_DEFAULT_COUNTS.kuiperClassical,
+        plutino: BELT_DEFAULT_COUNTS.plutino,
+      },
+      beltPlanetsFromSystem(system),
+    );
+    const collect = (groups: readonly (keyof BeltPopulation)[]): BeltOrbit[] =>
+      groups.flatMap((g) => population[g]);
     beltParticles = createBeltParticles(scene, {
-      n: asteroidBeltN,
+      orbits: collect(ASTEROID_BELT_GROUPS),
+      name: 'belt-particles',
+      color: BELT_WARM_GRAY_RGB,
+      seed: BELT_POPULATION_SEED,
+      epoch: initialJulianDate,
+      frameProvider: () => bodyFrame,
+    });
+    kuiperParticles = createBeltParticles(scene, {
+      orbits: collect(KUIPER_BELT_GROUPS),
+      name: 'kuiper-particles',
+      color: BELT_COOL_GRAY_RGB,
+      // 밝기 스트림을 소행성대 메시와 분리 (같은 seed 면 두 메시의 밝기 수열이 같아진다).
+      seed: BELT_POPULATION_SEED + KUIPER_BRIGHTNESS_SEED_OFFSET,
       epoch: initialJulianDate,
       frameProvider: () => bodyFrame,
     });
@@ -1285,6 +1346,8 @@ export function createSolarSystemScene(
       dispose: () => {
         beltParticles?.dispose();
         beltParticles = null;
+        kuiperParticles?.dispose();
+        kuiperParticles = null;
       },
     });
   }
@@ -1931,6 +1994,7 @@ export function createSolarSystemScene(
     // 소행성대 업데이트.
     // #1319 — GPU 경로는 시간 uniform 만 갱신한다 (위치는 셰이더, 기준계는 draw 직전 `bodyFrame` 읽기).
     beltParticles?.updateAt(jd);
+    kuiperParticles?.updateAt(jd);
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
     // 그 외(`?beltNbody=1` + Kepler 엔진): 기존 해석해 경로 유지.
     if (asteroidBelt) {
@@ -2636,6 +2700,7 @@ export function createSolarSystemScene(
     getLodInfo,
     getBodyScreenInfo,
     getBeltParticles: () => beltParticles,
+    getKuiperParticles: () => kuiperParticles,
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();

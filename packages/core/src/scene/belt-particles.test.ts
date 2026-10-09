@@ -7,24 +7,35 @@
  *  2. epoch rebase — 임계를 넘으면 `M0` 를 새 epoch 로 다시 쓰고, 그 뒤에도 미러 == `positionAt`.
  *  3. 메시 구조 · 수명주기 (NullEngine) — 4N 정점 · 6N 인덱스 · 컬링 제외 · 비선택 · dispose 해제.
  *  4. uniform — `uPxToClip` 이 엔진의 **현재** 렌더 크기에서 계산된다 (리사이즈 반영), 기준계는 provider 값.
+ *  5. (PR2) 속성 = 입력 궤도 요소 (평균운동 포함 — 재유도 없음) · 색 uniform · 같은 seed → 속성 버퍼 바이트 동일.
  *
- * 미러와 GLSL 의 줄 대응은 셰이더 문자열에 미러의 핵심 식이 그대로 있는지로 묶는다 (5).
+ * 미러와 GLSL 의 줄 대응은 정점 셰이더 `main()` 의 **전 문장**을 기대 목록과 대조해 묶는다 (6 — PR #1322 리뷰 권고 1).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NullEngine, Scene } from '@babylonjs/core';
 import { AU, GRAVITATIONAL_CONSTANT, SOLAR_MASS } from '@astro-simulator/shared';
 import { positionAt } from '../physics/kepler.js';
-import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
-import { ASTEROID_BELT_MAX_N, generateUniformBeltElements, mulberry32 } from './asteroid-belt.js';
+import { getSolarSystem, type LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
+import { generateUniformBeltElements } from './asteroid-belt.js';
 import {
+  BELT_COOL_GRAY_RGB,
   BELT_EPOCH_REBASE_DAYS,
   BELT_PARTICLE_PX,
   BELT_VERTEX_SHADER,
+  BELT_WARM_GRAY_RGB,
   beltKeplerPositionF32,
   beltOrbitAttributes,
   createBeltParticles,
   type BodyReferenceFrame,
 } from './belt-particles.js';
+import {
+  BELT_DEFAULT_COUNTS,
+  beltPlanetsFromSystem,
+  generateBeltPopulation,
+  meanMotionRadPerDay,
+  mulberry32,
+  type BeltOrbit,
+} from './belt-population.js';
 
 const MU_SUN = GRAVITATIONAL_CONSTANT * SOLAR_MASS;
 const J2000 = 2_451_545.0;
@@ -38,6 +49,25 @@ const SAMPLE_E_MAX = 0.3;
 const SAMPLE_I_MAX = Math.PI / 4;
 /** `uDays` 격자 — 한쪽 50 점 (총 101 점). 계단 폭(수천 일) 보다 촘촘하다. */
 const DAY_GRID_STEPS = 50;
+
+/** 로더 형식 요소 → 띠 입력 형식 (평균운동은 `√(μ/a³)` — 비공명 입자와 같은 식). */
+function toBeltOrbit(el: LoadedOrbitalElements): BeltOrbit {
+  return {
+    semiMajorAxisAU: el.semiMajorAxis / AU,
+    eccentricity: el.eccentricity,
+    inclination: el.inclination,
+    longitudeOfAscendingNode: el.longitudeOfAscendingNode,
+    argumentOfPeriapsis: el.argumentOfPeriapsis,
+    meanAnomalyAtEpoch: el.meanAnomalyAtEpoch,
+    meanMotion: meanMotionRadPerDay(el.semiMajorAxis, MU_SUN),
+    epoch: el.epoch,
+  };
+}
+
+/** 메시 테스트용 입력 — 구 균일 분포 n 개 (분포 자체는 이 파일의 판정 대상이 아니다). */
+function uniformOrbits(n: number, seed = 42): BeltOrbit[] {
+  return generateUniformBeltElements(n, seed, J2000).map(toBeltOrbit);
+}
 
 function randomElements(seed: number): LoadedOrbitalElements[] {
   const rnd = mulberry32(seed);
@@ -58,7 +88,7 @@ function mirrorAU(
   epochBase: number,
   jd: number,
 ): [number, number, number] {
-  const { orbitA, orbitB } = beltOrbitAttributes(el, MU_SUN, epochBase, 1);
+  const { orbitA, orbitB } = beltOrbitAttributes(toBeltOrbit(el), epochBase, 1);
   return beltKeplerPositionF32(orbitA, orbitB, Math.fround(jd - epochBase));
 }
 
@@ -84,7 +114,7 @@ describe('#1319 셰이더 Kepler float32 미러 vs positionAt', () => {
   it('미러는 회전 순서를 positionAt 과 같게 쓴다 — Ω · ω 를 맞바꾸면 1e-4 AU 를 크게 넘는다', () => {
     // 같은 측정이 순서 · 부호 오류를 실제로 잡는지 (판별력) 확인한다.
     const el = randomElements(7)[0]!;
-    const { orbitA, orbitB } = beltOrbitAttributes(el, MU_SUN, J2000, 1);
+    const { orbitA, orbitB } = beltOrbitAttributes(toBeltOrbit(el), J2000, 1);
     const swapped: [number, number, number, number] = [orbitB[1], orbitB[0], orbitB[2], orbitB[3]];
     const p = beltKeplerPositionF32(orbitA, swapped, 0);
     const q = positionAt(el, J2000, MU_SUN);
@@ -92,7 +122,7 @@ describe('#1319 셰이더 Kepler float32 미러 vs positionAt', () => {
     expect(err).toBeGreaterThan(100 * POSITION_TOLERANCE_AU);
   });
 
-  it('임계를 넘는 |uDays| 에서는 rebase 없이 오차가 한계를 넘는다 — 임계가 장식이 아니다', () => {
+  it('임계 3배 구간 (|uDays| ≤ 3 × BELT_EPOCH_REBASE_DAYS) 에서는 rebase 없이 오차가 한계를 넘는다 — rebase 가 장식이 아니다', () => {
     // 계단 (n·uDays 의 float32 반올림) 이 실재함을 보인다: 임계의 3 배 구간에서 같은 측정이 실패한다.
     const els = randomElements(1319);
     let worst = 0;
@@ -137,7 +167,7 @@ describe('#1319 createBeltParticles — 메시 구조 · 수명주기 (NullEngin
   it('N 쿼드 = 4N 정점 · 6N 인덱스, 컬링 제외 · 비선택', () => {
     const { scene } = makeScene();
     const belt = createBeltParticles(scene, {
-      n: 250,
+      orbits: uniformOrbits(250),
       epoch: J2000,
       frameProvider: () => ZERO_FRAME,
     });
@@ -152,42 +182,92 @@ describe('#1319 createBeltParticles — 메시 구조 · 수명주기 (NullEngin
     belt.dispose();
   });
 
-  it('입자 수는 ASTEROID_BELT_MAX_N 으로 clamp (구 경로 · `?belt=` 파싱과 같은 상한 승계)', () => {
+  it('속성은 입력 요소 그대로 — a · e · 평균운동 n 이 입력과 일치 (n 을 √(μ/a³) 로 재유도하지 않는다)', () => {
     const { scene } = makeScene();
+    // 평균운동을 Kepler 값과 일부러 다르게 — 공명군(트로이 n = n_J 등) 이 재유도로 덮이면 FAIL.
+    const orbits = uniformOrbits(40).map((o, i) => ({
+      ...o,
+      meanMotion: o.meanMotion * (1 + i / 100),
+    }));
     const belt = createBeltParticles(scene, {
-      n: ASTEROID_BELT_MAX_N + 5,
+      orbits,
       epoch: J2000,
       frameProvider: () => ZERO_FRAME,
     });
-    expect(belt.n).toBe(ASTEROID_BELT_MAX_N);
-    belt.dispose();
-  });
-
-  it('분포는 구 경로와 같다 — 속성 a · e 가 generateUniformBeltElements 와 일치 (PR1 은 경로만 교체)', () => {
-    const { scene } = makeScene();
-    const belt = createBeltParticles(scene, {
-      n: 40,
-      seed: 42,
-      epoch: J2000,
-      frameProvider: () => ZERO_FRAME,
-    });
-    const els = generateUniformBeltElements(40, 42, J2000);
+    expect(belt.n).toBe(40);
     const orbitA = belt.mesh.getVerticesData('orbitA')!;
+    const orbitB = belt.mesh.getVerticesData('orbitB')!;
     for (let i = 0; i < 40; i += 1) {
       // 쿼드의 네 정점이 같은 요소를 든다.
       for (let c = 0; c < 4; c += 1) {
         const o = (i * 4 + c) * 4;
-        expect(orbitA[o]).toBe(Math.fround(els[i]!.semiMajorAxis / AU));
-        expect(orbitA[o + 1]).toBe(Math.fround(els[i]!.eccentricity));
+        expect(orbitA[o]).toBe(Math.fround(orbits[i]!.semiMajorAxisAU));
+        expect(orbitA[o + 1]).toBe(Math.fround(orbits[i]!.eccentricity));
+        expect(orbitB[o + 2]).toBe(Math.fround(orbits[i]!.meanMotion));
       }
     }
     belt.dispose();
   });
 
+  it('색 uniform — 기본 웜 그레이, 옵션으로 쿨 그레이 · 메시 이름 지정', () => {
+    const { scene } = makeScene();
+    const warm = createBeltParticles(scene, {
+      orbits: uniformOrbits(4),
+      epoch: J2000,
+      frameProvider: () => ZERO_FRAME,
+    });
+    const cool = createBeltParticles(scene, {
+      orbits: uniformOrbits(4),
+      name: 'kuiper-particles',
+      color: BELT_COOL_GRAY_RGB,
+      epoch: J2000,
+      frameProvider: () => ZERO_FRAME,
+    });
+    expect(warm.mesh.name).toBe('belt-particles');
+    expect(cool.mesh.name).toBe('kuiper-particles');
+    // ShaderMaterial 이 bind 마다 싣는 저장값 (`_colors3`) — 공개 getter 가 없어 내부 맵을 읽는다.
+    const colorOf = (h: typeof warm) =>
+      (h.material as unknown as { _colors3: Record<string, { r: number; g: number; b: number }> })
+        ._colors3['uColor']!;
+    const w = colorOf(warm);
+    const c = colorOf(cool);
+    expect([w.r, w.g, w.b]).toEqual([...BELT_WARM_GRAY_RGB]);
+    expect([c.r, c.g, c.b]).toEqual([...BELT_COOL_GRAY_RGB]);
+    warm.dispose();
+    cool.dispose();
+  });
+
+  it('같은 seed → 속성 버퍼 바이트 동일 (생성기 + 메시 경로 전체) · 다른 seed 는 다르다', () => {
+    const planets = beltPlanetsFromSystem(getSolarSystem());
+    const bytesOf = (seed: number) => {
+      const { scene } = makeScene();
+      const pop = generateBeltPopulation(seed, BELT_DEFAULT_COUNTS, planets);
+      const belt = createBeltParticles(scene, {
+        orbits: [...pop.main, ...pop.hilda, ...pop.trojan],
+        seed,
+        epoch: J2000,
+        frameProvider: () => ZERO_FRAME,
+      });
+      const pack = (kind: string) =>
+        Array.from(new Uint8Array(Float32Array.from(belt.mesh.getVerticesData(kind)!).buffer));
+      const out = { a: pack('orbitA'), b: pack('orbitB') };
+      belt.dispose();
+      return out;
+    };
+    const first = bytesOf(1319);
+    const second = bytesOf(1319);
+    const other = bytesOf(1320);
+    // 공허 통과 방지 — 버퍼가 비어 있지 않다 (기본 수 3900 입자 × 4 정점 × vec4 × 4 바이트).
+    expect(first.a).toHaveLength(3900 * 4 * 4 * 4);
+    expect(second.a).toEqual(first.a);
+    expect(second.b).toEqual(first.b);
+    expect(other.a).not.toEqual(first.a);
+  });
+
   it('dispose 는 메시와 머티리얼을 장면에서 해제한다', () => {
     const { scene } = makeScene();
     const belt = createBeltParticles(scene, {
-      n: 10,
+      orbits: uniformOrbits(10),
       epoch: J2000,
       frameProvider: () => ZERO_FRAME,
     });
@@ -203,7 +283,11 @@ describe('#1319 createBeltParticles — 시간 · uniform', () => {
   it('|jd − epochBase| ≤ 임계면 rebase 없음, 넘으면 epochBase = jd 로 rebase 후 미러 == positionAt', () => {
     const { scene } = makeScene();
     const n = 64;
-    const belt = createBeltParticles(scene, { n, epoch: J2000, frameProvider: () => ZERO_FRAME });
+    const belt = createBeltParticles(scene, {
+      orbits: uniformOrbits(n),
+      epoch: J2000,
+      frameProvider: () => ZERO_FRAME,
+    });
     belt.updateAt(J2000 + BELT_EPOCH_REBASE_DAYS);
     expect(belt.getEpochBase()).toBe(J2000);
     expect(belt.readFrameUniforms()).not.toBeNull();
@@ -236,7 +320,7 @@ describe('#1319 createBeltParticles — 시간 · uniform', () => {
   it('uPxToClip 은 엔진의 현재 렌더 크기에서 계산된다 (캐시 없음 — 리사이즈 반영)', () => {
     const { engine, scene } = makeScene(1280, 720);
     const belt = createBeltParticles(scene, {
-      n: 4,
+      orbits: uniformOrbits(4),
       epoch: J2000,
       frameProvider: () => ZERO_FRAME,
     });
@@ -259,7 +343,11 @@ describe('#1319 createBeltParticles — 시간 · uniform', () => {
       originZ: 0,
       scale: 2.51e-5,
     };
-    const belt = createBeltParticles(scene, { n: 4, epoch: J2000, frameProvider: () => frame });
+    const belt = createBeltParticles(scene, {
+      orbits: uniformOrbits(4),
+      epoch: J2000,
+      frameProvider: () => frame,
+    });
     belt.applyFrameUniforms();
     const u = belt.readFrameUniforms()!;
     expect(u.origin[0]).toBeCloseTo(1.2, 12);
@@ -275,7 +363,11 @@ describe('#1319 createBeltParticles — 시간 · uniform', () => {
   it('draw 직전 경로 — mesh.onBeforeRenderObservable 이 uniform 을 싣는다 (material bind 이전)', () => {
     const { scene } = makeScene();
     const frame: BodyReferenceFrame = { originX: 0, originY: 0, originZ: 0, scale: 1e-9 };
-    const belt = createBeltParticles(scene, { n: 4, epoch: J2000, frameProvider: () => frame });
+    const belt = createBeltParticles(scene, {
+      orbits: uniformOrbits(4),
+      epoch: J2000,
+      frameProvider: () => frame,
+    });
     frame.scale = 3e-9;
     belt.mesh.onBeforeRenderObservable.notifyObservers(belt.mesh);
     expect(belt.readFrameUniforms()!.scale).toBe(3e-9 * AU);
@@ -284,20 +376,58 @@ describe('#1319 createBeltParticles — 시간 · uniform', () => {
 });
 
 describe('#1319 GLSL ↔ 미러 대응 · 크기 상수', () => {
-  it('정점 셰이더가 미러와 같은 Newton 4회 · 회전 순서 · 화면 고정 px 식을 담는다', () => {
-    expect(BELT_VERTEX_SHADER).toContain('for (int k = 0; k < 4; k++)');
-    expect(BELT_VERTEX_SHADER).toContain('E = E - (E - e * sin(E) - M) / (1.0 - e * cos(E));');
-    expect(BELT_VERTEX_SHADER).toContain('float M = mod(orbitA.w + orbitB.z * uDays, TWO_PI);');
-    expect(BELT_VERTEX_SHADER).toContain(
-      'vec3 p = vec3(cosO * x1 - sinO * y2, sinO * x1 + cosO * y2, z2);',
-    );
-    expect(BELT_VERTEX_SHADER).toContain('vec3 local = (p - uOrigin) * uScale;');
-    expect(BELT_VERTEX_SHADER).toContain(
-      'clip.xy += position.xy * PARTICLE_RADIUS_PX * uPxToClip * clip.w;',
-    );
+  /**
+   * 정점 셰이더 `main()` 의 **전 문장** — `beltKeplerPositionF32` 와 줄 단위로 대응한다.
+   * 핵심 식 몇 줄만 `toContain` 하던 PR1 판본은 속성 혼동(ω 자리에 `cos(orbitB.x)`) · 부호 반전
+   * (`-cosI * y1`) 변이를 통과시켰다 (PR #1322 리뷰 권고 1). 셰이더를 고치면 이 목록과 미러를 함께 고친다.
+   */
+  const EXPECTED_VERTEX_MAIN = [
+    'float a = orbitA.x;',
+    'float e = orbitA.y;',
+    'float M = mod(orbitA.w + orbitB.z * uDays, TWO_PI);',
+    'float E = M + e * sin(M);',
+    'for (int k = 0; k < 4; k++) {',
+    'E = E - (E - e * sin(E) - M) / (1.0 - e * cos(E));',
+    '}',
+    'float xo = a * (cos(E) - e);',
+    'float yo = a * sqrt(1.0 - e * e) * sin(E);',
+    'float cosW = cos(orbitB.y);',
+    'float sinW = sin(orbitB.y);',
+    'float x1 = cosW * xo - sinW * yo;',
+    'float y1 = sinW * xo + cosW * yo;',
+    'float cosI = cos(orbitA.z);',
+    'float sinI = sin(orbitA.z);',
+    'float y2 = cosI * y1;',
+    'float z2 = sinI * y1;',
+    'float cosO = cos(orbitB.x);',
+    'float sinO = sin(orbitB.x);',
+    'vec3 p = vec3(cosO * x1 - sinO * y2, sinO * x1 + cosO * y2, z2);',
+    'vec3 local = (p - uOrigin) * uScale;',
+    'vec4 clip = viewProjection * vec4(local, 1.0);',
+    'clip.xy += position.xy * PARTICLE_RADIUS_PX * uPxToClip * clip.w;',
+    'gl_Position = clip;',
+    'vCorner = position.xy;',
+    'vBrightness = orbitB.w;',
+    'vFragmentDepth = 1.0 + clip.w;',
+  ];
+
+  it('정점 셰이더 main() 의 전 문장이 미러와 대응하는 기대 목록과 같다 (순서 포함)', () => {
+    const head = 'void main(void) {';
+    const start = BELT_VERTEX_SHADER.indexOf(head);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const body = BELT_VERTEX_SHADER.slice(start + head.length);
+    // 마지막 닫는 중괄호 = main 의 끝 (셰이더에 main 뒤 함수 없음).
+    const statements = body
+      .slice(0, body.lastIndexOf('}'))
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    expect(statements).toEqual(EXPECTED_VERTEX_MAIN);
+  });
+
+  it('입자 반지름 상수는 BELT_PARTICLE_PX / 2', () => {
     expect(BELT_VERTEX_SHADER).toContain(
       `const float PARTICLE_RADIUS_PX = ${(BELT_PARTICLE_PX / 2).toFixed(4)};`,
     );
-    expect(BELT_VERTEX_SHADER).toContain('vFragmentDepth = 1.0 + clip.w;');
   });
 });

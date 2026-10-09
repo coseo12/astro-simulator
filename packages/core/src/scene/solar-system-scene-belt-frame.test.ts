@@ -19,6 +19,8 @@ import { ArcRotateCamera, NullEngine, Scene, Vector3, type Mesh } from '@babylon
 import { AU, J2000_JD } from '@astro-simulator/shared';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { renderScaleForTier } from './tier.js';
+import { ASTEROID_BELT_MAX_N } from './asteroid-belt.js';
+import { BELT_DEFAULT_COUNTS } from './belt-population.js';
 
 class StubOffscreenCanvas {
   constructor(
@@ -60,7 +62,7 @@ afterEach(() => {
   }
 });
 
-function makeScene(options: { asteroidNbody?: boolean } = {}): Fixture {
+function makeScene(options: { asteroidNbody?: boolean; beltN?: number } = {}): Fixture {
   const engine = new NullEngine({
     renderWidth: 1280,
     renderHeight: 720,
@@ -73,7 +75,7 @@ function makeScene(options: { asteroidNbody?: boolean } = {}): Fixture {
   const handles = createSolarSystemScene(scene, {
     surfaceDetail: false,
     starfield: false,
-    asteroidBeltN: 200,
+    asteroidBeltN: options.beltN ?? 200,
     asteroidNbody: options.asteroidNbody ?? false,
   });
   const f = { engine, scene, handles };
@@ -174,13 +176,58 @@ describe('#1319 결정 2 — 띠 입자 기준계 = body mesh 기준계', () => 
     expect(u.origin).toEqual([0, 0, 0]);
   });
 
-  it('dispose 는 띠 메시 · 머티리얼을 해제한다', () => {
+  it('dispose 는 띠 메시 · 머티리얼을 해제한다 (소행성대 · 카이퍼 둘 다)', () => {
     const f = makeScene();
     const belt = f.handles.getBeltParticles()!;
+    const kuiper = f.handles.getKuiperParticles()!;
     f.handles.dispose();
-    expect(f.scene.meshes).not.toContain(belt.mesh);
-    expect(f.scene.materials).not.toContain(belt.material);
+    for (const h of [belt, kuiper]) {
+      expect(f.scene.meshes).not.toContain(h.mesh);
+      expect(f.scene.materials).not.toContain(h.material);
+    }
     expect(f.handles.getBeltParticles()).toBeNull();
+    expect(f.handles.getKuiperParticles()).toBeNull();
+  });
+
+  it('(가) 카이퍼 메시도 같은 기준계 — body tier + 달 포커스에서 draw 시 uOrigin · uScale 이 소행성대 메시와 같다', () => {
+    const f = makeScene();
+    f.handles.setFocusOrigin('moon');
+    f.handles.setTier('body');
+    f.handles.updateAt(J2000_JD + 10);
+    const beltU = drawBelt(f);
+    const kuiper = f.handles.getKuiperParticles()!;
+    kuiper.mesh.onBeforeRenderObservable.notifyObservers(kuiper.mesh);
+    const kuiperU = kuiper.readFrameUniforms()!;
+    expect(kuiperU.origin).toEqual(beltU.origin);
+    expect(kuiperU.scale).toBe(beltU.scale);
+    expect(kuiperU.days).toBe(beltU.days);
+    // 전제 — 비교 대상이 원점 · solar 스케일 그대로가 아니다 (공허 통과 방지).
+    expect(Math.hypot(...kuiperU.origin)).toBeGreaterThan(0.9);
+    expect(kuiperU.scale).toBe(renderScaleForTier('body') * AU);
+  });
+});
+
+describe('#1319 PR2 — ?belt=N 의 입자 수 (ADR 결정 6)', () => {
+  it('소행성대 메시 = N (주 띠 + 힐다 + 트로이) · 카이퍼 메시 = 기본 수 (N 과 독립)', () => {
+    for (const beltN of [200, 1000]) {
+      const f = makeScene({ beltN });
+      expect(f.handles.getBeltParticles()!.n).toBe(beltN);
+      expect(f.handles.getKuiperParticles()!.n).toBe(
+        BELT_DEFAULT_COUNTS.kuiperClassical + BELT_DEFAULT_COUNTS.plutino,
+      );
+      expect(f.scene.getMeshByName('kuiper-particles')).not.toBeNull();
+    }
+  });
+
+  it('N 은 ASTEROID_BELT_MAX_N 으로 clamp (구 경로 · `?belt=` 파싱과 같은 상한 승계)', () => {
+    const f = makeScene({ beltN: ASTEROID_BELT_MAX_N + 5 });
+    expect(f.handles.getBeltParticles()!.n).toBe(ASTEROID_BELT_MAX_N);
+  });
+
+  it('?beltNbody=1 구 경로에서는 카이퍼 메시를 만들지 않는다 (PR2 범위 밖 — 구 경로 무변경)', () => {
+    const f = makeScene({ asteroidNbody: true });
+    expect(f.handles.getKuiperParticles()).toBeNull();
+    expect(f.scene.getMeshByName('kuiper-particles')).toBeNull();
   });
 });
 
