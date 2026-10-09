@@ -196,7 +196,7 @@ agy (architecture 모드, 2026-10-08, 로그 `.claude/logs/cross-validate-archit
 
 1. **CI 강제 셀은 `?belt=3900`** — §교차검증 수용 2 의 「`?belt=5400`」 은 N 을 전체 입자 수로 본 문구였다. 결정 6 은 N 을 **소행성대 그룹 총수**로 정의했고 카이퍼 1500 은 함께 생성되므로, 기본 구성 5400 입자를 재현하는 값은 `?belt=3900` 이다 (`5400` 이면 6900 입자). desktop 1셀, baseline `46.1` (CI 진단 run `37931104297`, N=5 p50) — 출처는 `docs/benchmarks/fps-lowend-baseline.json` `environment.beltForcedCell`.
 2. **결정 7 의 「현 줌아웃 상한」 전제는 자유시점 경로에만 맞다** — `SOLAR_ZOOMOUT_LIMIT` 은 `sim-canvas.tsx` 에서 자유시점 진입 후 tier 가 실제로 올라간 순간에만 `upperRadiusLimit` 에 대입된다. 기본 진입·포커스 해제·reset 경로의 상한은 카메라 기본값 `1e14` 라 휠 줌아웃은 원래 제한이 없다 (PR2 qa 관측). 따라서 1-F 표의 「현 `SOLAR_ZOOMOUT_LIMIT`」 행은 자유시점 경로의 프레이밍이다. 상수는 결정대로 `1600` 으로 올렸고 기본 경로에 새 상한은 만들지 않았다. 실측: 반경 1600 에서 45·48 AU 원 360/360 점 프레임 안 (1000 에서 218·198/360 = 61%·55% — 1-F 의 61%·56% 와 근접).
-3. **카이퍼는 `?beltNbody=1` 경로와 독립** — `?kuiper` 옵션만 따른다. `?beltNbody=1` 에서도 카이퍼(GPU 경로)가 그려진다.
+3. **카이퍼 생성은 소행성대 경로(`?beltNbody=1`)와 독립** — 로드 시 생성은 `?kuiper`(기본 켜짐) · 소프트웨어 렌더 게이트 · 숫자 `?belt=N` 강제(게이트 우회) 세 가지가 정한다 (`sim-canvas.tsx` `resolveBeltAtLoad(kuiperParamVisible, beltMode.forced, !isSoftwareRenderer)` → core `kuiperBelt`). `?beltNbody=1` 은 소행성대만 구 CPU 경로로 바꾸고 카이퍼 판정에는 관여하지 않는다 — 하드웨어에서 `?beltNbody=1` 로 열면 카이퍼가 그려지고, 소프트웨어 렌더에서는 `?belt=N` 이 함께 있을 때만 그려진다. 런타임 토글의 가용성도 같은 식이다 (`!isSoftwareRenderer || ?belt=N 강제`).
 
 결정 8 의 기본 켜짐 판정 (하드웨어 A/B, 로컬 macOS prod · metal, 기본 vs `?belt=off&kuiper=off`, 3회 중앙값 비): `bench:scene` (vsync 해제) 5 시나리오 최저 `0.983` (focus-neptune) · `verify:fps-baseline` 6셀 `0.998~1.003` (전부 120 Hz vsync 상한 — 「상한 안 동률」까지만 말한다). 전 셀 ≥ `0.90` → **기본 켜짐 채택**.
 

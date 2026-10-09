@@ -64,7 +64,7 @@ describe('parseBeltParam — ?belt= 어휘', () => {
     });
   });
 
-  it('소수 · 음수는 내림 후 판정 — 1.9 → 1 · 0.5 → 꺼짐 · -5 → 꺼짐 (구 clamp 결과 0 과 같은 의미)', () => {
+  it('소수 · 음수는 내림 후 판정 — 1.9 → 1 · 0.5 → 꺼짐 · -5 → 꺼짐 (-5 는 구 clamp 결과 0 과 같은 의미, 0.5 는 구 파서가 생성 경로로 보냈다 — 파서 머리말)', () => {
     expect(parseBeltParam('1.9')).toEqual({ visible: true, count: 1, forced: true });
     expect(parseBeltParam('0.5')).toEqual(OFF);
     expect(parseBeltParam('-5')).toEqual(OFF);
