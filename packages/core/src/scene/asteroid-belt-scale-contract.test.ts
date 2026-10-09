@@ -39,6 +39,7 @@ import {
 } from './asteroid-belt.js';
 import { positionAt } from '../physics/kepler.js';
 import { initialTier, renderScaleForTier } from './tier.js';
+import type { BodyReferenceFrame } from './belt-particles.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BELT_SOURCE = readFileSync(join(__dirname, 'asteroid-belt.ts'), 'utf8');
@@ -55,6 +56,15 @@ const BELT_OUTER_AU = 3.2;
 const BELT_MAX_ECCENTRICITY = 0.2;
 
 const EPOCH_J2000 = 2_451_545.0;
+
+/**
+ * #1319 — 프레임 경로가 `sceneUnitPerMeter` 대신 기준계 스냅샷(`BodyReferenceFrame`)을 받는다.
+ * 본 파일은 스케일 계약만 재므로 origin 0 (T1/T2 의 floating origin 값) 으로 고정한다 — origin 차감은
+ * `solar-system-scene-belt-frame.test.ts` 가 따로 잰다.
+ */
+function originZeroFrame(scale: number): BodyReferenceFrame {
+  return { originX: 0, originY: 0, originZ: 0, scale };
+}
 const SEED = 42;
 const N = 200;
 
@@ -208,7 +218,9 @@ describe('#998 축 C — 생성 시점 sceneUnitPerMeter 주입 계약', () => {
 
     // 생성만 (initial) vs 생성 후 tier 전환 재주입 (initial → updateAt(next)).
     const atCreate = probeBelt(initial, 8);
-    const afterUpdate = probeBelt(initial, 8, (b) => b.updateAt(EPOCH_J2000, next));
+    const afterUpdate = probeBelt(initial, 8, (b) =>
+      b.updateAt(EPOCH_J2000, originZeroFrame(next)),
+    );
 
     for (let i = 0; i < 8; i += 1) {
       expect(afterUpdate.radii[i]! / atCreate.radii[i]!).toBeCloseTo(next / initial, 4);
@@ -223,7 +235,7 @@ describe('#998 축 C — 생성 시점 sceneUnitPerMeter 주입 계약', () => {
     // flat positions(m, heliocentric) × 주입 스케일. offset=0, count=2.
     const positions = new Float64Array([1 * AU, 0, 0, 0, 2 * AU, 0]);
     const probe = probeBelt(renderScaleForTier('solar'), 4, (b) =>
-      b.writeWorldPositions(positions, 0, 2, next),
+      b.writeWorldPositions(positions, 0, 2, originZeroFrame(next)),
     );
 
     expect(probe.translations[0]![0]).toBeCloseTo(1 * AU * next, 3);

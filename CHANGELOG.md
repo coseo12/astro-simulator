@@ -7,6 +7,13 @@ Semantic Versioning을 따른다.
 
 ### Added
 
+- **[#1319] 소행성대 띠 입자 GPU Kepler 렌더 경로 (PR1 — 렌더 경로 교체 + 기준계 계약)** ([#1319](https://github.com/coseo12/astro-simulator/issues/1319)). `?belt=N` 의 띠 입자를 「N 개 쿼드 = 4N 정점」 단일 메시 + GLSL `ShaderMaterial` 로 그린다 (`packages/core/src/scene/belt-particles.ts`). 정점 셰이더가 Kepler 방정식을 Newton 4회로 풀어 위치를 정하고, 화면 고정 지름 `BELT_PARTICLE_PX = 3` 물리 px 쿼드를 `discard` 원형으로 찍는다. 프레임당 CPU 작업은 uniform 5개 (`uDays` · `uScale` · `uOrigin` · `uPxToClip` · `logDepthConstant`) 뿐이다. 로그 depth 는 `LOG_DEPTH_FRAGMENT_WRITE_GLSL` SSoT 그대로. ADR [`20261008-1319`](docs/decisions/20261008-1319-asteroid-belt-gpu.md) 결정 1·2·5.
+  - 분포는 현행 균일 분포 그대로다 (`generateUniformBeltElements` 로 생성 루프를 뽑아 구 경로와 공유 — 같은 seed 에서 요소 바이트 동일). 새 분포 · 토글 · 카이퍼 · 기본 켜짐은 PR2 · PR3.
+  - 기준계 계약 (결정 2): 장면이 body `mesh.position` 을 쓰는 두 지점 (`updateAt` 루프 · `setTier` 즉시 재계산) 에서 쓴 `(origin, scale)` 을 `recordBodyFrame` 으로 기록하고, 띠는 draw 직전 (`mesh.onBeforeRenderObservable` — material bind 이전) 에 그 값을 읽는다. `floatingOrigin.originOffset` 을 그때 다시 읽지 않는다 (가드 C 순서상 다음 프레임 값). `onBindObservable` 이 아닌 이유: Babylon 9.19.0 `ShaderMaterial.bind` 는 저장된 uniform 을 effect 에 먼저 싣고 마지막에 `onBind` 를 알려, 거기서 쓴 값은 다음 draw 에 반영된다 (재생 중 body tier 에서 1 프레임 지연).
+  - epoch rebase: `BELT_EPOCH_REBASE_DAYS = 20_000` 일. JS 미러 vs `positionAt` (a ∈ [2, 50] AU · e ≤ 0.3 · 1000 요소 × `uDays` 201 점) 최대 오차가 `T` 20,000 일까지 바닥 4.7e-5 AU 에 머물고 25,000 일부터 `n · uDays` float32 반올림 계단이 올라온다 (a = 2 AU 의 곱이 128 rad 를 넘는 ≈ 21,000 일). 계단 직전에 둬 한계 1e-4 AU 대비 ≈ 2 배 여유를 GPU `sin`/`cos` 구현 오차 몫으로 남긴다. 측정표는 상수 주석.
+  - 실측 (dev 빌드 · Playwright headless 1280×800, `?belt=1000`): WebGL2 swiftshader · WebGPU metal 모두 콘솔 오류 0, 머티리얼 준비 ≈ 1.0 s (페이지 이동 포함). 웜 그레이 픽셀 수 (`?speed=0` 같은 화면) swiftshader 0 → 389 · metal 6,562 → 6,953. 달 포커스 (body tier) 에서 `uOrigin` == 태양 mesh 역산 origin (차 0 AU), 일시정지 달 포커스 부팅에서 `uScale` == body renderScale × AU, 375×812 리사이즈 후 `uPxToClip` == (2/375, 2/812).
+  - 테스트: `belt-particles.test.ts` (미러 오차 · rebase · 메시 구조 · 수명주기 · uniform) · `solar-system-scene-belt-frame.test.ts` (NullEngine 실 scene — (가) body tier 재생 · (나) 일시정지 `setTier` · 포커스 해제 · `?beltNbody=1` 무게중심) · `log-depth-glsl.test.ts` 4 → 5 셰이더. 변이 확인: `setTier` 기록 제거 → (나) FAIL / 기록을 primary follow 뒤의 `originOffset` 재-read 로 옮김 → (가) · 무게중심 FAIL / 구 경로 origin 차감 제거 → 무게중심 FAIL.
+
 - **[#1318] 소행성대 대표 천체 — 베스타 · 팔라스 · 히기에아** ([#1318](https://github.com/coseo12/astro-simulator/issues/1318)). 첫 `asteroid` kind body 다. 태양 직속이라 궤도선 · 라벨 · 검색 · 정보 카드 · 클릭 선택이 행성 · 왜소행성 경로 그대로 붙는다. `introducedInRPhase` 15 · `CURRENT_R_PHASE` 14 → 15 (36 body). 데이터 끝 (혜성 다음) 에 두어 기존 body 순서를 바꾸지 않는다.
   - 데이터: 궤도 요소는 JPL SBDB 궤도해 (JPL#36 · #74 · #129) 를 JPL Horizons 로 **J2000 에 평가한 접촉 요소** (태양 중심 · Ecliptic of J2000.0) 다. 로더가 모든 body 를 루트 epoch(J2000) 로 해석하는데 SBDB 요소의 epoch 는 2026-06-09 (JD 2461200.5) 라서, SBDB 값을 2체 역전파로 J2000 에 옮기면 J2000 위치 오차가 베스타 9.5e6 · 팔라스 3.1e7 · 히기에아 8.8e7 km 다 (섭동 무시). 채택한 J2000 접촉 요소는 J2000 오차 0, 2026-10-08 오차 4.2e6 · 2.3e6 · 1.9e6 km (섭동 + 장면 μ = G·M_sun 이 GM_sun 보다 2.57e-4 큰 데서 오는 위상 차). SBDB 원시값 · Horizons 원시값 · 출처는 `solar-system.json` `$comment`.
   - 질량은 SBDB GM ÷ G, 반경은 SBDB 지름 / 2. 비구형 소천체라 `uncertainty` 를 단다 (`verify-iau-data.mjs` 대조 표 등록) — 히기에아는 SBDB 값과 Vernazza et al. 2020 이 질량 17% · 지름 6.6% 달라 0.2 · 0.07.
@@ -22,6 +29,11 @@ Semantic Versioning을 따른다.
   - 수정: `syncOrbitLinePositions` — 태양 중심 궤도선은 태양 로컬 좌표, 위성 궤도선은 모체 로컬 좌표로. body mesh.position 을 쓰는 두 곳 (`updateAt` · `setTier` 즉시 재계산) 에서 부른다 (`syncSunLightPosition` #1204 와 같은 형태).
   - 실측 (프로덕션 빌드 · 실 Chrome WebGPU · 1280 / 375): 세레스 · 베스타 · 명왕성 · 핼리 포커스, 재생 · 일시정지 부팅 · 일시정지 중 검색 포커스 전환 (기본 → 베스타 → 세레스 → 명왕성 → reset) 전 셀에서 천체-궤도선 거리 / 태양 (모체) 거리 ≤ 1.2e-3 — 비포커스 정상 수준 (64 분할 폴리라인 현 오차) 과 같다.
   - 테스트: `solar-system-scene-orbit-line-origin.test.ts` (NullEngine 실 scene) — 일시정지 경로 (setFocusOrigin + setTier 만) · 재생 경로 · 포커스 해제. setTier 동기를 뺀 변이에서 일시정지 경로 FAIL, 태양 궤도선 동기를 뺀 변이에서 2건 FAIL.
+- **[#1319] `?beltNbody=1` 띠가 천체 포커스 (T3) 에서 포커스 천체 주위에 그려지던 결함** ([#1319](https://github.com/coseo12/astro-simulator/issues/1319)). ADR `20261008-1319` 실측 1-C (가) — 달 포커스에서 띠 무게중심이 태양에서 ≈ 0.79 AU 떨어진 장면 원점 (달) 주위였다.
+  - 원인: 구 CPU 경로 (`asteroid-belt.ts`) 의 `updateAt` · `writeWorldPositions` 가 `world × scale` 을 그대로 써 floating origin 을 빼지 않았다. ADR `20260422-floating-origin` `:65` 의 「매 프레임 덮어쓰므로 shift 영향 없음」 은 덮어쓰기만 보고 무엇으로 덮어쓰는지 (origin 미차감) 는 보지 않은 판단이었다. 지금까지 입자가 ≈ 0.16 px 라 화면에 안 보였다.
+  - 수정: 두 함수가 `sceneUnitPerMeter` 대신 기준계 스냅샷 `BodyReferenceFrame` (위 GPU 경로와 같은 `recordBodyFrame` 기록값) 을 받아 `(p − origin) × scale` 로 쓴다.
+  - 실측 (dev · metal, `?belt=500&beltNbody=1&focus=moon`): 띠 무게중심 ↔ 태양 mesh `0.289` AU / ↔ 장면 원점 (달) `1.091` AU (태양 ↔ 원점 `0.902` AU). 균일 500 표본의 무게중심이라 0 이 아니다.
+  - 범위 밖: 구 경로는 일시정지 중 tier 전환 (결함 (나)) 을 고치지 않았다 — 갱신이 여전히 `updateAt` 에만 있다. GPU 경로는 구조적으로 닫힌다.
 - **[#1318] 왜소행성 4 · 혜성 2 의 J2000 위치가 실제와 크게 달랐던 데이터 결함** ([#1318](https://github.com/coseo12/astro-simulator/issues/1318)). 태양 직속 비행성 body 8 개를 JPL Horizons J2000 상태벡터 (태양 중심 · Ecliptic of J2000.0) 와 대조했다. 그중 6 개는 로더가 루트 epoch (J2000) 로 해석하는 평균경도 등이 J2000 값이 아니었다.
   - 대조 (J2000 위치 오차 / 태양 거리): 세레스 1.2 · 하우메아 0.16 · 마케마케 0.21 · 에리스 1.4 (평균경도 177° 차 — 태양 반대편) · 엔케 0.13 · 스위프트-터틀 0.48 → **교정**. 명왕성 3.0e-4 · 핼리 1.8e-3 → 유지 (J2000 접촉 요소로 바꾸면 2026 오차가 오히려 커진다 — 명왕성 3.4e6 → 2.3e7 km).
   - 교정: 소행성 3 개와 같은 방식 — SBDB 궤도해를 Horizons 로 J2000 에 평가한 접촉 요소. 교정 후 J2000 오차 ≤ 261 km (반올림), 2026-10-08 오차 2.8e6 ~ 1.7e7 km (태양 거리 대비 8.9e-4 ~ 2.1e-2 — 최대 세레스). 종전 값 · Horizons 원시값 · 쿼리는 각 body 의 `$orbitComment`, 궤도 출처는 `dataSource` 에 추가.
@@ -34,10 +46,14 @@ Semantic Versioning을 따른다.
 - 온보딩 안내의 천체 수가 33 → 36 이 된다 (데이터 파생, #1313).
 - **세레스 · 하우메아 · 마케마케 · 에리스 · 엔케 · 스위프트-터틀이 실제 위치로 옮겨 간다** (#1318). 궤도 모양은 거의 같고 궤도 위 위치가 바뀐다 — J2000 에서 에리스는 태양 반대편으로, 세레스는 태양 거리 2.66 → 2.55 AU 자리로 간다 (J2000 부근). 이 천체들의 정보 카드 태양 거리와 화면 위치가 달라진다.
 - **포커스 후 줌아웃하면 궤도선이 천체를 지난다** (#1318). 이전에는 세레스 · 명왕성 · 혜성 등에 포커스하면 궤도선이 그 천체를 중심으로 그려졌다. 일시정지 중 포커스를 바꿔도 같다.
+- **`?belt=N` 의 소행성대 입자가 보인다** (#1319). 이전에는 기본 진입 화면에서 입자 투영 지름이 ≈ 0.16 px 라 사실상 보이지 않았다. 이제 화면 고정 지름 3 px · 웜 그레이 점으로 화성과 목성 사이에 띠가 그려지고, 줌 · tier 와 무관하게 크기가 같다. 기본 화면은 그대로다 (`?belt=` 미지정이면 띠 없음 — 기본 켜짐은 PR3). 크기 · 색 최종값은 머지 전 사용자 육안 승인 (D-T2).
+- `?belt=N` 이 더는 구 (153 정점) 를 그리지 않아 소프트웨어 렌더 비용이 줄어든다 (ADR 실측 1-D — swiftshader N=1000 `10.7` → `44.4` fps, 기준 N=0 `46.8`). `?beltNbody=1` 은 구 경로 그대로다.
 
 ### Notes
 
 - ADR `20260907-1205` §재검토 조건 4 (「`setTier` 즉시-동기가 4건째로 늘 때」) 발동 (#1318): `syncOrbitLinePositions` 가 4건째 (mesh 루프 · 광원 · ring-anchor 다음). 궤도선 position 은 카메라 무관이라 프레임 위상 이전 조건에 해당하지 않아 유예 — 호출 위치는 mesh 루프 직후 · ring-anchor 앞으로 가드 C 순서와 정합.
+- 같은 조건 4 의 5건째 (#1319): 띠 입자 기준계 기록 `recordBodyFrame`. 이것은 다른 4건과 형태가 다르다 — 결과물 (위치 · 광원) 을 즉시 다시 쓰는 것이 아니라 **기록만** 하고, 소비는 draw 직전 (`onBeforeRender`) 이라 시간 위상에 묶이지 않는다. 카메라 무관이라 프레임 위상 이전 조건에도 해당하지 않아 같은 판단으로 유예.
+- `bench:scene:sweep` 의 `?belt=N` 셀이 새 경로를 잰다 (#1319). 기대값 (ADR 재검토 트리거 1 · 이슈 PR1 DoD): N=1000 ≥ `64.3` fps (`play-1y` baseline `91.88` × 0.7) · N=200 ≥ `47.24`. 구 경로 수치는 비교 무의미하므로 머지 후 `bench:scene:set-baseline` 으로 `nBody` 셀 재기준.
 
 ## [0.95.1] - 2026-10-08
 

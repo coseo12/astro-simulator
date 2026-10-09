@@ -6,6 +6,10 @@
  * - 물리: 각 소행성 Kepler 2-body(태양 중력)만 — 상호 중력 무시(실제도 무시 가능 수준).
  *   Newton 엔진에 합류시키지 않는다 (O(N²) 폭발 방지).
  * - 프레임당 위치 갱신: ThinInstance matrix 버퍼를 in-place로 갱신한 뒤 업데이트 플래그.
+ *
+ * #1319 — 장면은 이 CPU 구 경로를 `?beltNbody=1` (N-body 편입) 에서만 쓴다. 그 외 `?belt=N` 은 GPU Kepler
+ * 경로(`belt-particles.ts`) 다 — N-body 적분 위치는 Kepler 셰이더로 표현할 수 없어서다
+ * (ADR `docs/decisions/20261008-1319-asteroid-belt-gpu.md` 결정 1).
  */
 import {
   Color3,
@@ -19,6 +23,7 @@ import { AU, GRAVITATIONAL_CONSTANT, SOLAR_MASS } from '@astro-simulator/shared'
 import { positionAt } from '../physics/kepler.js';
 import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
+import type { BodyReferenceFrame } from './belt-particles.js';
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. tier 전환 시 본 모듈의
 // ThinInstance 좌표가 body mesh 의 renderScaleForTier(tier) 와 동일 배수로 스케일되도록
@@ -80,22 +85,24 @@ export interface AsteroidBeltHandles {
    * 주어진 jd에 위치 갱신 (Kepler 해석해 경로).
    *
    * @param jd Julian Date
-   * @param sceneUnitPerMeter 현재 tier 의 `renderScaleForTier(tier)` (m → scene unit 배수).
-   *   tier 전환 시 호출자가 새 값을 주입하면 다음 프레임에 스케일 반영.
+   * @param frame body mesh 가 쓴 기준계 스냅샷 — `scale` 은 현재 tier 의 `renderScaleForTier(tier)`
+   *   (m → scene unit 배수), `origin*` 은 floating origin (m). instance 좌표 = `(p − origin) × scale`.
+   *   #1319 (ADR 20261008-1319 결정 2) 이전에는 origin 을 빼지 않아 T3 포커스에서 띠가 장면 원점(포커스 천체)
+   *   주위에 그려졌다 (실측 — 달 포커스 무게중심이 태양에서 ≈ 0.79 AU).
    */
-  updateAt: (jd: number, sceneUnitPerMeter: number) => void;
+  updateAt: (jd: number, frame: BodyReferenceFrame) => void;
   /**
    * P4-A #165 — 각 소행성의 현 월드 좌표(SI m, 태양 원점)를 ThinInstance 버퍼에 반영.
    * 인자는 길이 3N의 flat array. WebGPU 엔진은 Float32Array, Newton/BH는 Float64Array를
    * 반환하므로 유니온으로 받는다. 빈 배열이면 갱신하지 않음 (방어).
    *
-   * @param sceneUnitPerMeter 현재 tier 의 `renderScaleForTier(tier)`.
+   * @param frame body mesh 가 쓴 기준계 스냅샷 (`updateAt` 과 같은 계약).
    */
   writeWorldPositions: (
     positions: Float32Array | Float64Array,
     offset: number,
     count: number,
-    sceneUnitPerMeter: number,
+    frame: BodyReferenceFrame,
   ) => void;
   /**
    * P4-A #165 — N-body 초기 state (positions/velocities/masses). 길이 3N / 3N / N.
@@ -110,8 +117,8 @@ export interface AsteroidBeltHandles {
   dispose: () => void;
 }
 
-/** mulberry32 — 32bit PRNG, 결정적 재현 */
-function mulberry32(seed: number): () => number {
+/** mulberry32 — 32bit PRNG, 결정적 재현. #1319 — GPU 띠 입자(`belt-particles.ts`) 밝기 난수도 같은 생성기. */
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -130,25 +137,24 @@ const MAX_INCLINATION_DEG = 20;
 /** 시각 크기 — 진짜 크기(수 km)는 AU 단위에서 완전히 점. 띠 형태가 보이도록 강조. */
 const ASTEROID_VISUAL_DIAMETER_AU = 0.008;
 
-export function createAsteroidBelt(
-  scene: Scene,
-  options: AsteroidBeltOptions,
-): AsteroidBeltHandles {
-  const n = Math.max(0, Math.min(10_000, options.n ?? 200));
-  const seed = options.seed ?? 42;
-  const epoch = options.epoch ?? 2_451_545.0;
-  const assetMass = options.assetMass ?? 3e18;
-  const { sceneUnitPerMeter } = options;
+/**
+ * 띠 입자 수 상한. `?belt=N` 파싱(`sim-canvas.tsx`) 의 clamp 와 같은 값이다.
+ * #1319 — GPU 경로(`belt-particles.ts`) 도 이 상한을 승계한다 (ADR 20261008-1319 §기각 첫 항 — 새 상한 신설 기각).
+ */
+export const ASTEROID_BELT_MAX_N = 10_000;
 
-  // fail-fast — 타입은 존재를 강제하지만 **값**은 강제하지 못한다. 본 이슈가 고친 결함이
-  // 정확히 "잘못된 스케일이 조용히 통과해 12.57배 오차를 냄" 이었으므로, 0 / NaN / 음수
-  // 주입을 무음 통과시키지 않는다 (CLAUDE.md §가드 설계 원칙 — fallback 분기 금지).
-  if (!Number.isFinite(sceneUnitPerMeter) || sceneUnitPerMeter <= 0) {
-    throw new Error(
-      `[createAsteroidBelt] sceneUnitPerMeter must be a positive finite number, got: ${sceneUnitPerMeter}`,
-    );
-  }
-
+/**
+ * 균일 분포 소행성대 궤도 요소 생성 (#99). 분포만 실제(2.2~3.2 AU, e<0.2, i<20°), 개별 궤도는 seeded PRNG.
+ *
+ * #1319 — CPU 구 경로(`createAsteroidBelt`, `?beltNbody=1`) 와 GPU 경로(`createBeltParticles`) 가
+ * **같은 분포**를 쓰도록 생성 루프를 이 함수 하나로 뽑았다 (PR1 은 렌더 경로만 바꾸고 분포는 그대로 — 새 분포는 PR2).
+ * 난수 소비 순서는 종전 인라인 루프와 같아 같은 seed 에서 요소가 바이트 동일하다.
+ */
+export function generateUniformBeltElements(
+  n: number,
+  seed: number,
+  epoch: number,
+): LoadedOrbitalElements[] {
   const rnd = mulberry32(seed);
   const elements: LoadedOrbitalElements[] = [];
   for (let i = 0; i < n; i += 1) {
@@ -168,6 +174,29 @@ export function createAsteroidBelt(
       epoch,
     });
   }
+  return elements;
+}
+
+export function createAsteroidBelt(
+  scene: Scene,
+  options: AsteroidBeltOptions,
+): AsteroidBeltHandles {
+  const n = Math.max(0, Math.min(ASTEROID_BELT_MAX_N, options.n ?? 200));
+  const seed = options.seed ?? 42;
+  const epoch = options.epoch ?? 2_451_545.0;
+  const assetMass = options.assetMass ?? 3e18;
+  const { sceneUnitPerMeter } = options;
+
+  // fail-fast — 타입은 존재를 강제하지만 **값**은 강제하지 못한다. 본 이슈가 고친 결함이
+  // 정확히 "잘못된 스케일이 조용히 통과해 12.57배 오차를 냄" 이었으므로, 0 / NaN / 음수
+  // 주입을 무음 통과시키지 않는다 (CLAUDE.md §가드 설계 원칙 — fallback 분기 금지).
+  if (!Number.isFinite(sceneUnitPerMeter) || sceneUnitPerMeter <= 0) {
+    throw new Error(
+      `[createAsteroidBelt] sceneUnitPerMeter must be a positive finite number, got: ${sceneUnitPerMeter}`,
+    );
+  }
+
+  const elements = generateUniformBeltElements(n, seed, epoch);
 
   const template = MeshBuilder.CreateSphere(
     'asteroid-template',
@@ -191,16 +220,18 @@ export function createAsteroidBelt(
   // #845 — 리터럴 1.98892e30 을 shared `SOLAR_MASS` SSoT 로 교체 (volt #69 숨은 상수).
   const sun = GRAVITATIONAL_CONSTANT * SOLAR_MASS;
 
-  const updateAt = (jd: number, sceneUnitPerMeter: number) => {
+  const updateAt = (jd: number, frame: BodyReferenceFrame) => {
+    const { originX, originY, originZ, scale } = frame;
     for (let i = 0; i < n; i += 1) {
       const el = elements[i]!;
       const p = positionAt(el, jd, sun);
+      // body mesh 와 같은 3단 변환 — double 뺄셈 먼저, 그 뒤 scene unit (ADR 20260422-floating-origin §3).
       writeTranslation(
         matrixBuffer,
         i,
-        p[0] * sceneUnitPerMeter,
-        p[1] * sceneUnitPerMeter,
-        p[2] * sceneUnitPerMeter,
+        (p[0] - originX) * scale,
+        (p[1] - originY) * scale,
+        (p[2] - originZ) * scale,
       );
     }
     template.thinInstanceBufferUpdated('matrix');
@@ -212,7 +243,9 @@ export function createAsteroidBelt(
   // 이 호출은 여전히 프레임 `updateAt` 이 덮어쓰지만, 안전 근거가 **"덮어써짐" 하나 → "값 자체가
   // 이미 맞음" 으로 바뀐** 것이 본 변경의 요지다. `solar-system-scene.ts` 의 씬 생성 말미 동기
   // `updateAt(initialJulianDate)` 경로가 향후 끊기거나 순서가 밀려도 초기 프레임이 정답 스케일이다.
-  updateAt(epoch, sceneUnitPerMeter);
+  //
+  // #1319 — 생성 시점 origin 은 0 이다 (scene 이 floating origin 을 움직이기 전 — 첫 `updateAt` 이 덮어쓴다).
+  updateAt(epoch, { originX: 0, originY: 0, originZ: 0, scale: sceneUnitPerMeter });
 
   // P4-A #165 — N-body 경로에서 사용할 초기 state vector.
   const getNbodyState = (jd: number, sunMu: number) => {
@@ -238,17 +271,18 @@ export function createAsteroidBelt(
     positions: Float32Array | Float64Array,
     offset: number,
     count: number,
-    sceneUnitPerMeter: number,
+    frame: BodyReferenceFrame,
   ) => {
+    const { originX, originY, originZ, scale } = frame;
     const limit = Math.min(count, n);
     for (let i = 0; i < limit; i += 1) {
       const o = 3 * (offset + i);
       writeTranslation(
         matrixBuffer,
         i,
-        (positions[o] ?? 0) * sceneUnitPerMeter,
-        (positions[o + 1] ?? 0) * sceneUnitPerMeter,
-        (positions[o + 2] ?? 0) * sceneUnitPerMeter,
+        ((positions[o] ?? 0) - originX) * scale,
+        ((positions[o + 1] ?? 0) - originY) * scale,
+        ((positions[o + 2] ?? 0) - originZ) * scale,
       );
     }
     template.thinInstanceBufferUpdated('matrix');
