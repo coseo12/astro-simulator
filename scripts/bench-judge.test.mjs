@@ -361,7 +361,7 @@ run(`판별력 — ${DETECT_ALL_RUNS * 100}% 균일 감속은 10 회차 전건�
   );
 });
 
-run(`판별력 — ${NO_FALSE_FIRE * 100}% 감속은 발화 0 (가장 가까운 건강 관측치 여유 3.86%)`, () => {
+run(`판별력 — ${NO_FALSE_FIRE * 100}% 감속은 발화 0`, () => {
   const verdicts = judgeAllSamples((fps) => fps * (1 - NO_FALSE_FIRE));
   assert.equal(
     verdicts.reduce((a, v) => a + v.counts.regression, 0),
