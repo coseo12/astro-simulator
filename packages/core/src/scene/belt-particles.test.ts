@@ -20,6 +20,8 @@ import { generateUniformBeltElements } from './asteroid-belt.js';
 import {
   BELT_COOL_GRAY_RGB,
   BELT_EPOCH_REBASE_DAYS,
+  BELT_FRAGMENT_SHADER,
+  BELT_HILDA_ACCENT_RGB,
   BELT_PARTICLE_PX,
   BELT_VERTEX_SHADER,
   BELT_WARM_GRAY_RGB,
@@ -237,6 +239,54 @@ describe('#1319 createBeltParticles — 메시 구조 · 수명주기 (NullEngin
     cool.dispose();
   });
 
+  it('강조 플래그 — 참인 입자만 밝기 속성이 음수 (부호 = 강조), |값| 은 밝기 범위 그대로 · 강조색 uniform', () => {
+    const { scene } = makeScene();
+    const n = 12;
+    const flags = Array.from({ length: n }, (_, i) => i % 3 === 1);
+    const belt = createBeltParticles(scene, {
+      orbits: uniformOrbits(n),
+      accentFlags: flags,
+      epoch: J2000,
+      frameProvider: () => ZERO_FRAME,
+    });
+    const orbitB = belt.mesh.getVerticesData('orbitB')!;
+    for (let i = 0; i < n; i += 1) {
+      for (let c = 0; c < 4; c += 1) {
+        const w = orbitB[(i * 4 + c) * 4 + 3]!;
+        expect(w < 0, `#${i}`).toBe(flags[i]);
+        expect(Math.abs(w)).toBeGreaterThanOrEqual(Math.fround(0.6));
+        expect(Math.abs(w)).toBeLessThanOrEqual(1);
+      }
+    }
+    const stored = (
+      belt.material as unknown as {
+        _colors3: Record<string, { r: number; g: number; b: number }>;
+      }
+    )._colors3['uAccentColor']!;
+    expect([stored.r, stored.g, stored.b]).toEqual([...BELT_HILDA_ACCENT_RGB]);
+    belt.dispose();
+  });
+
+  it('강조 플래그 미지정이면 전 입자 양수 · 길이가 orbits 와 다르면 던진다', () => {
+    const { scene } = makeScene();
+    const plain = createBeltParticles(scene, {
+      orbits: uniformOrbits(8),
+      epoch: J2000,
+      frameProvider: () => ZERO_FRAME,
+    });
+    const orbitB = plain.mesh.getVerticesData('orbitB')!;
+    for (let v = 0; v < 8 * 4; v += 1) expect(orbitB[v * 4 + 3]!).toBeGreaterThan(0);
+    plain.dispose();
+    expect(() =>
+      createBeltParticles(scene, {
+        orbits: uniformOrbits(8),
+        accentFlags: [true],
+        epoch: J2000,
+        frameProvider: () => ZERO_FRAME,
+      }),
+    ).toThrow();
+  });
+
   it('같은 seed → 속성 버퍼 바이트 동일 (생성기 + 메시 경로 전체) · 다른 seed 는 다르다', () => {
     const planets = beltPlanetsFromSystem(getSolarSystem());
     const bytesOf = (seed: number) => {
@@ -407,7 +457,8 @@ describe('#1319 GLSL ↔ 미러 대응 · 크기 상수', () => {
     'clip.xy += position.xy * PARTICLE_RADIUS_PX * uPxToClip * clip.w;',
     'gl_Position = clip;',
     'vCorner = position.xy;',
-    'vBrightness = orbitB.w;',
+    'vBrightness = abs(orbitB.w);',
+    'vAccent = step(orbitB.w, 0.0);',
     'vFragmentDepth = 1.0 + clip.w;',
   ];
 
@@ -423,6 +474,13 @@ describe('#1319 GLSL ↔ 미러 대응 · 크기 상수', () => {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
     expect(statements).toEqual(EXPECTED_VERTEX_MAIN);
+  });
+
+  it('fragment 는 강조 입자에 uAccentColor 를 섞는다 (밝기는 |orbitB.w|)', () => {
+    expect(BELT_FRAGMENT_SHADER).toContain('uniform vec3 uAccentColor;');
+    expect(BELT_FRAGMENT_SHADER).toContain(
+      'gl_FragColor = vec4(mix(uColor, uAccentColor, vAccent) * vBrightness, 1.0);',
+    );
   });
 
   it('입자 반지름 상수는 BELT_PARTICLE_PX / 2', () => {

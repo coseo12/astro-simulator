@@ -72,6 +72,18 @@ export const BELT_WARM_GRAY_RGB: readonly [number, number, number] = [0.55, 0.5,
  * 최종 색은 D-T2 육안 승인 대상이다.
  */
 export const BELT_COOL_GRAY_RGB: readonly [number, number, number] = [0.45, 0.5, 0.55];
+/**
+ * 힐다 강조색 (선형 RGB, 밝기 1.0 기준) — **힐다 = 목성 3:2 공명군 강조. 시각 구분 전용이며 물리 색이 아니다.**
+ *
+ * 사용자 결정 (2026-10-09, PR #1324): 힐다 삼각형은 데이터상 구조가 있어도 주 띠 · 트로이와 같은 웜 그레이라
+ * 육안으로 거의 안 보였다. 개수를 늘리는 대신 (분포 왜곡) 색으로만 구분한다.
+ *
+ * 색 선택: 녹청 계열. 배경 별 색 (`starfield.ts` `starColor` — 적황 · 백색 · 청백) · 주 띠 웜 그레이 · 카이퍼 쿨 그레이
+ * 어느 것과도 색상이 겹치지 않는 축이 녹색이다. 상대 휘도 (Rec.709) 는 `0.528` 로 웜 그레이 `0.507` 과 거의 같게
+ * 맞춰 「밝기 계층」 은 그대로 두고 색상만 바꿨다 — 대표 천체 glow marker (body 색 × emissive 1.6 · 2.0) 보다 어둡다
+ * (ADR 20261008-1319 결정 5). 최종 색은 사용자 육안 확인 대상이다.
+ */
+export const BELT_HILDA_ACCENT_RGB: readonly [number, number, number] = [0.33, 0.6, 0.4];
 
 /**
  * epoch rebase 임계 (일). `|jd − epochBase|` 가 이를 넘으면 CPU(double) 에서 `M0` 를 새 epoch 로 다시 쓴다.
@@ -116,6 +128,17 @@ const QUAD_CORNERS: ReadonlyArray<readonly [number, number]> = [
 const BRIGHTNESS_SEED_OFFSET = 1;
 
 /**
+ * 밝기 속성 `orbitB.w` 에 강조 여부를 **부호**로 싣는다 — 음수 = 강조 (힐다), 양수 = 메시 기본색.
+ *
+ * 밝기는 `[BELT_BRIGHTNESS_MIN, BELT_BRIGHTNESS_MAX]` = `[0.6, 1.0]` 로 항상 양수라 부호 비트가 비어 있다.
+ * 정점 속성을 하나 더 두는 대안 (정점당 +4 바이트 · 버퍼 1개 · 속성 선언 1개) 보다 작은 변경이고, 메시를 나누는
+ * 대안 (draw call +1) 과 달리 소행성대가 메시 1개 · draw call 1개로 남는다. 셰이더는 `abs` 로 밝기를, `step` 으로 강조를 푼다.
+ */
+export function encodeBeltBrightness(brightness: number, accent: boolean): number {
+  return accent ? -brightness : brightness;
+}
+
+/**
  * 정점 셰이더. `beltKeplerPositionF32` 가 **줄 단위로 대응**하는 JS 미러다 — 한쪽을 고치면 다른 쪽도 고친다.
  * 회전 순서는 `kepler.ts` `positionAt` 과 같은 Rz(Ω) · Rx(i) · Rz(ω).
  */
@@ -134,6 +157,7 @@ uniform vec2 uPxToClip;
 
 varying vec2 vCorner;
 varying float vBrightness;
+varying float vAccent;
 varying float vFragmentDepth;
 
 const float TWO_PI = 6.283185307179586;
@@ -166,7 +190,8 @@ void main(void) {
   clip.xy += position.xy * PARTICLE_RADIUS_PX * uPxToClip * clip.w;
   gl_Position = clip;
   vCorner = position.xy;
-  vBrightness = orbitB.w;
+  vBrightness = abs(orbitB.w);
+  vAccent = step(orbitB.w, 0.0);
   vFragmentDepth = 1.0 + clip.w;
 }
 `;
@@ -174,22 +199,25 @@ void main(void) {
 /**
  * fragment — 불투명 + 반지름 1 원 밖 `discard`. 로그 depth 는 SSoT 문장 그대로.
  * 색 `uColor` 는 메시(그룹 묶음) 마다 생성 시 1회 설정한다 — 프레임마다 바뀌지 않는다 (PR2 — 웜 / 쿨 2색).
+ * 강조 입자 (`vAccent = 1`, 밝기 속성 음수 — `encodeBeltBrightness`) 는 `uAccentColor` 를 쓴다 (힐다 — 시각 구분 전용).
  */
 export const BELT_FRAGMENT_SHADER = /* glsl */ `
 precision highp float;
 
 varying vec2 vCorner;
 varying float vBrightness;
+varying float vAccent;
 varying float vFragmentDepth;
 
 uniform float logDepthConstant;
 uniform vec3 uColor;
+uniform vec3 uAccentColor;
 
 void main(void) {
   if (dot(vCorner, vCorner) > 1.0) {
     discard;
   }
-  gl_FragColor = vec4(uColor * vBrightness, 1.0);
+  gl_FragColor = vec4(mix(uColor, uAccentColor, vAccent) * vBrightness, 1.0);
   ${LOG_DEPTH_FRAGMENT_WRITE_GLSL}
 }
 `;
@@ -277,6 +305,13 @@ export interface BeltParticlesOptions {
   name?: string;
   /** 선형 RGB (밝기 1.0 기준). 기본 `BELT_WARM_GRAY_RGB`. */
   color?: readonly [number, number, number];
+  /**
+   * 입자별 강조 여부 (길이 = `orbits.length`). 참인 입자는 `accentColor` 로 그린다 — 힐다 3:2 공명군 시각 구분 전용.
+   * 미지정이면 전부 기본색.
+   */
+  accentFlags?: ArrayLike<boolean>;
+  /** 강조색 (선형 RGB). 기본 `BELT_HILDA_ACCENT_RGB`. */
+  accentColor?: readonly [number, number, number];
   /** 밝기 난수 seed. 기본 42. 요소 생성 seed 와 별개다. */
   seed?: number;
   /** 초기 `epochBase` (JD) — 장면 초기 시각. 요소의 epoch 와 달라도 된다 (`beltOrbitAttributes`). */
@@ -322,6 +357,12 @@ export function createBeltParticles(
   const seed = options.seed ?? 42;
   const name = options.name ?? 'belt-particles';
   const color = options.color ?? BELT_WARM_GRAY_RGB;
+  const accentColor = options.accentColor ?? BELT_HILDA_ACCENT_RGB;
+  const { accentFlags } = options;
+  if (accentFlags && accentFlags.length !== n) {
+    // 길이가 어긋나면 강조가 엉뚱한 입자에 붙는다 — 조용히 넘기지 않는다.
+    throw new Error(`[createBeltParticles] accentFlags 길이 ${accentFlags.length} ≠ orbits ${n}`);
+  }
   const { epoch, frameProvider } = options;
 
   const brightnessRnd = mulberry32(seed + BRIGHTNESS_SEED_OFFSET);
@@ -339,7 +380,11 @@ export function createBeltParticles(
 
   let epochBase = epoch;
   const writeParticle = (i: number): void => {
-    const { orbitA, orbitB } = beltOrbitAttributes(elements[i]!, epochBase, brightness[i]!);
+    const { orbitA, orbitB } = beltOrbitAttributes(
+      elements[i]!,
+      epochBase,
+      encodeBeltBrightness(brightness[i]!, accentFlags?.[i] === true),
+    );
     for (let c = 0; c < VERTICES_PER_QUAD; c += 1) {
       const o = (i * VERTICES_PER_QUAD + c) * ORBIT_STRIDE;
       orbitAData.set(orbitA, o);
@@ -390,10 +435,12 @@ export function createBeltParticles(
         'uPxToClip',
         'logDepthConstant',
         'uColor',
+        'uAccentColor',
       ],
     },
   );
   material.setColor3('uColor', new Color3(color[0], color[1], color[2]));
+  material.setColor3('uAccentColor', new Color3(accentColor[0], accentColor[1], accentColor[2]));
   // 쿼드는 화면 공간에서 벌어지므로 감김 방향이 카메라와 무관하게 고정이지만, 엔진별 front-face 규약에
   // 기대지 않도록 컬링을 끈다 (불투명 · depth write on 은 기본값).
   material.backFaceCulling = false;

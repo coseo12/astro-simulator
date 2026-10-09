@@ -20,7 +20,7 @@ import { AU, J2000_JD } from '@astro-simulator/shared';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { renderScaleForTier } from './tier.js';
 import { ASTEROID_BELT_MAX_N } from './asteroid-belt.js';
-import { BELT_DEFAULT_COUNTS } from './belt-population.js';
+import { BELT_DEFAULT_COUNTS, scaleAsteroidBeltCounts } from './belt-population.js';
 
 class StubOffscreenCanvas {
   constructor(
@@ -217,6 +217,33 @@ describe('#1319 PR2 — ?belt=N 의 입자 수 (ADR 결정 6)', () => {
       );
       expect(f.scene.getMeshByName('kuiper-particles')).not.toBeNull();
     }
+  });
+
+  it('힐다만 강조 (밝기 속성 음수) — 주 띠 · 트로이 · 카이퍼는 아니다 (그룹마다 비어 있지 않음을 먼저 단언)', () => {
+    const beltN = 1000;
+    const f = makeScene({ beltN });
+    const counts = scaleAsteroidBeltCounts(beltN);
+    // 그룹 순서 = 장면의 `collect` 순서 (주 띠 → 힐다 → 트로이).
+    const ranges = {
+      main: [0, counts.main],
+      hilda: [counts.main, counts.main + counts.hilda],
+      trojan: [counts.main + counts.hilda, beltN],
+    } as const;
+    const signOf = (data: ArrayLike<number>, from: number, to: number) => {
+      const signs = new Set<boolean>();
+      for (let i = from; i < to; i += 1) {
+        for (let c = 0; c < 4; c += 1) signs.add(data[(i * 4 + c) * 4 + 3]! < 0);
+      }
+      return [...signs];
+    };
+    const beltB = f.handles.getBeltParticles()!.mesh.getVerticesData('orbitB')!;
+    for (const [group, [from, to]] of Object.entries(ranges)) {
+      expect(to - from, group).toBeGreaterThan(0);
+      expect(signOf(beltB, from, to), group).toEqual([group === 'hilda']);
+    }
+    const kuiper = f.handles.getKuiperParticles()!;
+    expect(kuiper.n).toBeGreaterThan(0);
+    expect(signOf(kuiper.mesh.getVerticesData('orbitB')!, 0, kuiper.n)).toEqual([false]);
   });
 
   it('N 은 ASTEROID_BELT_MAX_N 으로 clamp (구 경로 · `?belt=` 파싱과 같은 상한 승계)', () => {

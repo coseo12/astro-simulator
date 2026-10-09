@@ -144,6 +144,8 @@ const FLOATING_ORIGIN_THRESHOLD_METERS = AU;
 const BELT_POPULATION_SEED = 42;
 /** 카이퍼 메시 밝기 난수 seed 오프셋 — 소행성대 메시(`seed + 1` 내부 오프셋) 와 스트림을 가른다. */
 const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
+/** 강조색(`BELT_HILDA_ACCENT_RGB`) 으로 구분하는 그룹 — 힐다 3:2 공명군. 시각 구분 전용 (PR #1324 사용자 결정). */
+const BELT_ACCENT_GROUP = 'hilda';
 
 /**
  * P11-A #288 — dev-only assert gate.
@@ -1328,6 +1330,11 @@ export function createSolarSystemScene(
       orbits: collect(ASTEROID_BELT_GROUPS),
       name: 'belt-particles',
       color: BELT_WARM_GRAY_RGB,
+      // 힐다 (목성 3:2 공명군) 만 강조색 — 시각 구분 전용, 물리 색 아님 (사용자 결정 2026-10-09, PR #1324).
+      // `collect` 와 같은 그룹 순서로 펼쳐 입자 인덱스가 맞는다.
+      accentFlags: ASTEROID_BELT_GROUPS.flatMap((g) =>
+        population[g].map(() => g === BELT_ACCENT_GROUP),
+      ),
       seed: BELT_POPULATION_SEED,
       epoch: initialJulianDate,
       frameProvider: () => bodyFrame,
