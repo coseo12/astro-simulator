@@ -26,6 +26,11 @@ import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
+import {
+  createBeltParticles,
+  type BeltParticlesHandles,
+  type BodyReferenceFrame,
+} from './belt-particles.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -383,6 +388,15 @@ export interface SolarSystemSceneHandles {
    * **재할당 회피**: 반환 배열·행은 내부 버퍼 (호출마다 in-place 갱신). 호출자는 mutate 금지 (read-only 계약).
    */
   getBodyScreenInfo: () => readonly BodyScreenInfo[];
+  /**
+   * #1319 — GPU 띠 입자 핸들 (`?belt=N` 이고 `?beltNbody=1` 이 아닐 때만). 없으면 null. 진단 · 단위 테스트용.
+   */
+  getBeltParticles: () => BeltParticlesHandles | null;
+  /**
+   * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 의 사본.
+   * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
+   */
+  getBodyReferenceFrame: () => BodyReferenceFrame;
   dispose: () => void;
 }
 
@@ -1215,13 +1229,42 @@ export function createSolarSystemScene(
     }
   };
 
-  // 소행성대 (#99) — ThinInstances 단일 draw call.
-  // Kepler 경로: 각 소행성 독립 해석해.
-  // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
+  /**
+   * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 스냅샷.
+   *
+   * 띠 입자는 draw 직전에 **이 값**을 읽는다 (`belt-particles.ts` 머리말). `floatingOrigin.originOffset` 을
+   * 그때 다시 읽으면 안 된다 — `updateAt` 은 mesh 루프 **뒤에** primary follow 의 `setOriginToBody` 를 부르므로
+   * (#380 가드 C) draw 시점의 `originOffset` 은 이미 다음 프레임 origin 이다 (`syncSunLightPosition` 주석과 같은 함정).
+   *
+   * 기록 지점은 body mesh.position 을 쓰는 두 곳뿐이다 — `updateAt` 루프 · `setTier` 즉시 재계산.
+   * 새 mesh.position 쓰기 경로가 생기면 `recordBodyFrame` 도 함께 불러야 한다.
+   *
+   * 초기값: 장면 생성 시점의 floating origin 은 [0,0,0] 이고 scale 은 초기 tier 값이다 — 첫 `updateAt` 이 덮어쓴다.
+   */
+  const bodyFrame: BodyReferenceFrame = {
+    originX: 0,
+    originY: 0,
+    originZ: 0,
+    scale: renderScaleForTier(activeTier),
+  };
+  const recordBodyFrame = (ox: number, oy: number, oz: number, scale: number): void => {
+    bodyFrame.originX = ox;
+    bodyFrame.originY = oy;
+    bodyFrame.originZ = oz;
+    bodyFrame.scale = scale;
+  };
+
+  // 소행성대 (#99).
+  // #1319 — 두 경로로 갈린다 (ADR 20261008-1319 결정 1):
+  //  - GPU Kepler 경로 (`?belt=N`, 기본): N 쿼드 단일 메시 + 정점 셰이더 Kepler. 위치를 셰이더가 정하므로
+  //    시간은 `updateAt` 의 uniform 1개, 기준계는 `bodyFrame` 스냅샷 (draw 직전 읽기).
+  //  - CPU 구 경로 (`?beltNbody=1`, P4-A #165): ThinInstance 구 + engine state 편입. N-body 적분 위치는 Kepler
+  //    셰이더로 표현할 수 없어 유지한다. origin 은 `bodyFrame` 으로 차감 (결함 (가) 수정).
   let asteroidBelt: AsteroidBeltHandles | null = null;
+  let beltParticles: BeltParticlesHandles | null = null;
   // 위치 버퍼 초기화 (`localPositions`/`worldPositions`) + 태양광 동기 헬퍼 정의.
   phase('scene:position-buffers');
-  if (asteroidBeltN > 0) {
+  if (asteroidBeltN > 0 && asteroidNbody) {
     asteroidBelt = createAsteroidBelt(scene, {
       n: asteroidBeltN,
       epoch: initialJulianDate,
@@ -1231,6 +1274,19 @@ export function createSolarSystemScene(
       sceneUnitPerMeter: renderScaleForTier(activeTier),
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
+  } else if (asteroidBeltN > 0) {
+    beltParticles = createBeltParticles(scene, {
+      n: asteroidBeltN,
+      epoch: initialJulianDate,
+      frameProvider: () => bodyFrame,
+    });
+    // 이견 수용 1 — 장면 dispose 시 메시 · 머티리얼 해제.
+    disposables.push({
+      dispose: () => {
+        beltParticles?.dispose();
+        beltParticles = null;
+      },
+    });
   }
   // 소행성대 ThinInstances (`?belt=N` 미지정이면 빈 구간).
   phase('scene:asteroid-belt');
@@ -1415,6 +1471,14 @@ export function createSolarSystemScene(
       );
       mesh.computeWorldMatrix(true);
     }
+    // #1319 결정 2 — 띠 입자가 같은 기준계를 쓰도록 기록. 시간이 멈춰 있어도 (`updateAt` 미발동) 다음 draw 의
+    // 띠가 새 tier 스케일 · origin 을 따른다 (결함 (나) — 일시정지 중 tier 전환 시 solar 스케일 고착).
+    recordBodyFrame(
+      tierTransitionOrigin[0],
+      tierTransitionOrigin[1],
+      tierTransitionOrigin[2],
+      newScale,
+    );
 
     // #1204 — 광원도 **같은 프레임에** 새 origin/scale 로 재계산. 위 mesh 루프와 한 쌍이다:
     // 셰이더 `uSunDirection` 은 `sunLight.position − mesh.absolutePosition` 이라 둘 중 하나만
@@ -1705,6 +1769,8 @@ export function createSolarSystemScene(
         (world[2] - oz) * sceneUnitPerMeter,
       );
     }
+    // #1319 결정 2 — 위 루프가 쓴 기준계를 띠 입자용으로 기록 (아래 primary follow 가 origin 을 옮기기 전 값).
+    recordBodyFrame(ox, oy, oz, sceneUnitPerMeter);
 
     // #627 — satellite orbit line position 동기화 (moon 패턴 일반화, ADR §5 옵션 A 구현 절차 3).
     // satellite orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
@@ -1863,24 +1929,22 @@ export function createSolarSystemScene(
     // `packages/core/src/engine/simulation-core-frame-pass.test.ts`.
 
     // 소행성대 업데이트.
+    // #1319 — GPU 경로는 시간 uniform 만 갱신한다 (위치는 셰이더, 기준계는 draw 직전 `bodyFrame` 읽기).
+    beltParticles?.updateAt(jd);
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
-    // 그 외(Kepler 모드 또는 asteroidNbody=false): 기존 해석해 경로 유지.
+    // 그 외(`?beltNbody=1` + Kepler 엔진): 기존 해석해 경로 유지.
     if (asteroidBelt) {
       // P12-A #298 B1 — 현 tier 의 renderScale 을 매 프레임 주입. tier 전환 시 다음 프레임에 자동 반영.
+      // #1319 결정 2 — origin 도 함께: `bodyFrame` 은 이 함수 위쪽 mesh 루프가 쓴 값이다 (primary follow 이전).
       if (
         asteroidStartIndex >= 0 &&
         newtonEngine &&
         (activeEngine === 'newton' || activeEngine === 'barnes-hut' || activeEngine === 'webgpu')
       ) {
         const flat = newtonEngine.positions();
-        asteroidBelt.writeWorldPositions(
-          flat,
-          asteroidStartIndex,
-          asteroidBelt.n,
-          sceneUnitPerMeter,
-        );
+        asteroidBelt.writeWorldPositions(flat, asteroidStartIndex, asteroidBelt.n, bodyFrame);
       } else {
-        asteroidBelt.updateAt(jd, sceneUnitPerMeter);
+        asteroidBelt.updateAt(jd, bodyFrame);
       }
     }
   };
@@ -2571,6 +2635,8 @@ export function createSolarSystemScene(
     getLodStats,
     getLodInfo,
     getBodyScreenInfo,
+    getBeltParticles: () => beltParticles,
+    getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
