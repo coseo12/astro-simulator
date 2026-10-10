@@ -5,6 +5,21 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1329] 혜성 꼬리 · 코마 렌더 경로 + 소프트웨어 게이트 + `?comettails=` (PR1)** ([#1329](https://github.com/coseo12/astro-simulator/issues/1329)). 혜성 (`kind: 'comet'` 전수 — 핼리 · 엔케 · 스위프트-터틀) 마다 메시 1 · GLSL `ShaderMaterial` 1 (코마 쿼드 + 이온 리본 + 먼지 리본, 정점 136 · 삼각형 130) 을 그린다 (`packages/core/src/scene/comet-tail.ts`). 정점 셰이더가 중심선 `c(t) = head + axis·tL + lag·k·t²L` 을 해석적으로 계산해 view(세계) 공간에서 펼친다. ALPHA_ADD · depth write off · `isPickable = false` · `alwaysSelectAsActiveMesh`. ADR [`20261010-1329`](docs/decisions/20261010-1329-comet-tail-coma.md) 결정 1 – 4.
+  - 기준계 (결정 2): draw 직전 (`onBeforeRenderObservable`) 에 혜성 · 태양 mesh `position` 과 `bodyFrame.scale` 만 읽는다. `floatingOrigin.originOffset` 재-read 없음, 시간 위상 (`updateAt`) 무관. 궤도면 법선 ĥ 는 로드 시 1회 `orbitalStateAt` 로 구한 상수다 (N-body 경로에서도).
+  - 활동도 (결정 3): `a(r) = max(0, ln(3 AU / r) / ln 3)`. 이온 꼬리 길이 `0.3 AU × a` (세계 길이), 먼지 = 이온 × 0.5 · 휨 0.3, 코마 세계 반지름 `1e5 km × a` · 화면 하한 지름 16 물리 px × min(a, 1), 밝기 min(a, 1). 색: 이온 청색 · 먼지 백황색 · 코마 청록. 상수는 전부 rendering-only (`solar-system.json` 무변경) 이고 최종값은 사용자 육안 (D-T2) 대상이다. 꼬리 길이는 관측 차수 (0.1 AU 이상) 안의 **표시 근사**다.
+  - `a = 0` (r ≥ 3 AU) 이면 정점 셰이더가 모든 꼭짓점을 머리로 접어 면적 0 으로 만든다. `isVisible = false` 로 끄지 않는다 — Babylon 9.19 는 그 메시의 `onBeforeRenderObservable` 을 알리지 않아 근일점에 와도 다시 켜지지 않는다 (§교차검증 수용 1). 토글 OFF (`setEnabled`, PR2) 와는 다른 경로다.
+  - 소프트웨어 렌더 게이트 (결정 4): web 이 판정해 core 옵션 `cometTails` 로 넘긴다 (core 기본 false). 파서 `apps/web/src/core/parse-comet-tails-mode.ts` — 미지정 · `on` → 켜짐 / `off` → 꺼짐 / `force` → 켜짐 + 게이트 우회 / 그 외 → 켜짐 + warn. sim-canvas 의 `new URLSearchParams` 증가 0 (#850). 장면 핸들 `getCometTails()` 추가 (진단 · 테스트용).
+  - CI 강제 셀 (§교차검증 수용 2): `verify-fps-baseline` 에 desktop `comet-forced` (`?t=2446479.5&comettails=force` — 핼리 장면 근일점) 1 셀. 전제 = 꼬리 메시 3 개 활성 + 머티리얼 준비 (`requireMaterialReady` — 셰이더 컴파일 실패 시 꼬리 없는 장면을 재는 fail-open 차단). 판정 규칙 · 임계 불변 (새 임계 0). baseline 출처는 `fps-lowend-baseline.json` `environment.cometForcedCell`.
+  - 실측 (prod 빌드 · Playwright headless · 1280×800 · metal WebGPU): 핼리 장면 근일점 기본 카메라 꼬리 축 화면 각도 오차 `0°` · 이온 꼬리 `99 px` · 엔케 장면 근일점 (`t=2461445.5`) `212 px`. 기준계 5단계 (정지 · 정지 중 핼리 포커스 · body tier 재생 · 재생 중 지구 포커스 · 정지) 4,287 프레임에서 머리 상대오차 최대 `5.1e-8` · 축 `2.4e-6°`. J2000 `?speed=0` 꼬리 on/off 같은 프레임 픽셀 차 `0`. 원일점 (`t=2460288.5`) → 장면 근일점 2061-06-09 까지 1 년 간격 진행 시 활동도 `0` (37 단계) → `1.486`, 머리 주변 on/off 차 `1,168 px`. 콘솔 오류 0 (metal WebGPU · 하드웨어 WebGL2 · swiftshader `force`). `bench:scene` A/B (기본 vs `?comettails=off`, 3회 중앙값) 5 셀 비 `1.000 ~ 1.012`.
+  - 테스트: `comet-tail.test.ts` (활동도 · ĥ · 기준계 순수 함수 · 먼지 휨 방향 = 궤도 운동 반대 (역행 핼리 포함) · 길이 비 · 메시 · 머티리얼 · 재활성) · `solar-system-scene-comet-tails.test.ts` (전 comet 커버 · 로드 옵션 · 기준계 5 단계 · 장면 경로 재활성 · dispose) · `parse-comet-tails-mode.test.ts`. 변이 확인: `isVisible = activity > 0` 을 넣으면 재활성 단위 2건 FAIL, 같은 변이의 prod 빌드에서 근일점 활동도 `0` · on/off 차 `0`.
+
+### Behavior Changes
+
+- 하드웨어 렌더 환경의 기본 화면에 혜성 꼬리 · 코마가 생긴다. J2000 첫 프레임은 불변이다 (세 혜성 모두 화면 밖 또는 r ≥ 3 AU — on/off 같은 프레임 픽셀 차 0). 기본 재생을 이어 가면 엔케가 안쪽으로 들어오며 (J2000 + 16 일에 3 AU 통과) 꼬리가 자라고 + 130 일 무렵 화면에 들어온다 (사용자 결정 Q6). `?comettails=off` 로 끈다. 소프트웨어 렌더 (swiftshader · llvmpipe 등) 에서는 기본적으로 만들지 않는다.
+
 ## [0.96.0] - 2026-10-10
 
 ### Added

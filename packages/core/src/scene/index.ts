@@ -62,6 +62,15 @@ export type {
   BeltParticlesOptions,
   BodyReferenceFrame,
 } from './belt-particles.js';
+// #1329 — 혜성 꼬리 · 코마 (ADR 20261010-1329).
+export {
+  createCometTail,
+  cometActivity,
+  cometTailFrame,
+  COMET_ACTIVITY_ONSET_AU,
+  COMET_ION_TAIL_LENGTH_1AU,
+} from './comet-tail.js';
+export type { CometTailHandles, CometTailUniforms, CometTailFrame } from './comet-tail.js';
 // #1319 PR2 — 띠 입자 분포 생성기 (ADR 20261008-1319 결정 4, Babylon 비의존).
 export {
   BELT_DEFAULT_COUNTS,
