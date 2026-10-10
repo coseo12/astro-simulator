@@ -1,6 +1,6 @@
 # ADR 20261010-1329 — 혜성 꼬리 · 코마: 축 빌보드 리본 셰이더 · draw 직전 body mesh 기준계 · 로그 활동도 법칙
 
-- **상태**: Provisional — cross-validate 통합 완료 (2026-10-10, §교차검증 반영 사항). 사용자 결정 Q1~Q7 반영 후 Accepted 전이
+- **상태**: Accepted (cross-validate 2026-10-10 · 사용자 결정 2026-10-10 — Q1~Q7 전부 권고안)
 - **날짜**: 2026-10-10
 - **결정자**: architect (이슈 [#1329](https://github.com/coseo12/astro-simulator/issues/1329) · 사용자 선택 2026-10-10 「v0.96.0 다음 작업」)
 - **관련**:
@@ -141,9 +141,19 @@ a(r) = max(0, ln(r_on / r) / ln(r_on / 1 AU))     r_on = COMET_ACTIVITY_ONSET_AU
   4. 혜성이 추가되어 q < 0.1 AU (sungrazer) 가 생기면 → `a(r)` 의 상한 클램프 도입 (현 데이터 최대 1.985).
   5. 사용자가 혜성 간 밝기 차 (핵 크기 · 고갈) 를 요구 → `M1` 을 데이터 SSoT 로 들이는 별도 결정.
 
-## 사용자 결정 (대기)
+## 사용자 결정 (2026-10-10)
 
-이슈 [#1329](https://github.com/coseo12/astro-simulator/issues/1329) 설계안 코멘트의 Q1~Q7. 결정 후 본 절을 확정 표로 바꾼다.
+이슈 [#1329](https://github.com/coseo12/astro-simulator/issues/1329) 설계안 코멘트의 Q1~Q7 을 **전부 권고안으로** 채택했다.
+
+| # | 항목 | 확정 |
+| --- | --- | --- |
+| Q1 | 꼬리 종류 | 이온 (반태양 직선) + 먼지 (궤도 뒤로 휨) — 결정 1 · 축 2 (ii) |
+| Q2 | 꼬리 길이 배율 | `COMET_ION_TAIL_LENGTH_1AU = 0.3` AU (핼리 근일점 기본 카메라 ≈ 92 px) — 최종값은 D-T2 육안 |
+| Q3 | 혜성 간 차등 | 공통 r 법칙 (encke 꼬리가 가장 김) — 결정 3 |
+| Q4 | 색 | 이온 청색 · 먼지 백황색 · 코마 청록 |
+| Q5 | 코마 화면 하한 | 지름 16 물리 px (glow marker 4.5 px 의 ≈ 3.5 배) |
+| Q6 | 기본 재생 중 encke 꼬리 진입 | 허용 — 결정 6 |
+| Q7 | 소프트웨어 렌더 | 기본 미생성 + CI 용 `?comettails=force` 강제 생성 — 결정 4 (§교차검증 수용 2) |
 
 ## Visual Fidelity — §의무 체크리스트 (principles.md §1)
 
