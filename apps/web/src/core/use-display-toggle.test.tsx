@@ -16,7 +16,7 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
-const HW = { starfield: true, surfaceDetail: true };
+const HW = { starfield: true, surfaceDetail: true, belt: true };
 
 function setup(searchParams = '') {
   const onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
@@ -33,6 +33,8 @@ beforeEach(() => {
     starsVisible: true,
     cloudsVisible: true,
     nightLightsVisible: true,
+    beltVisible: true,
+    kuiperVisible: true,
     displayCapabilities: HW,
   });
 });
@@ -72,7 +74,9 @@ describe('useDisplayToggle', () => {
   });
 
   it('소프트웨어 렌더 — 별 토글은 store · 명령 · URL 전부 무변화 (D9 차단 지점)', async () => {
-    useSimStore.setState({ displayCapabilities: { starfield: false, surfaceDetail: true } });
+    useSimStore.setState({
+      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false },
+    });
     const { toggle, onUrlUpdate } = setup();
     act(() => toggle('stars'));
     expect(useSimStore.getState().starsVisible).toBe(true);
@@ -85,7 +89,9 @@ describe('useDisplayToggle', () => {
   });
 
   it('?surface=off — 구름·불빛 무변화 (D10)', () => {
-    useSimStore.setState({ displayCapabilities: { starfield: true, surfaceDetail: false } });
+    useSimStore.setState({
+      displayCapabilities: { starfield: true, surfaceDetail: false, belt: true },
+    });
     const { toggle } = setup();
     act(() => {
       toggle('clouds');
@@ -106,6 +112,48 @@ describe('useDisplayToggle', () => {
       toggle('orbits');
     });
     expect(sentCommands).toEqual([{ type: 'setOrbitLinesVisible', visible: false }]);
+  });
+
+  it('#1319 PR3 소행성대 · 카이퍼 — OFF 명령 + URL `belt=off` · `kuiper=off`, ON 은 키 삭제', async () => {
+    const { toggle, onUrlUpdate } = setup('?focus=earth');
+    act(() => toggle('belt'));
+    expect(useSimStore.getState().beltVisible).toBe(false);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('belt')).toBe('off');
+    act(() => toggle('kuiper'));
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('kuiper')).toBe('off'),
+    );
+    act(() => toggle('belt'));
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.has('belt')).toBe(false),
+    );
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.get('kuiper')).toBe('off');
+    expect(last.searchParams.get('focus')).toBe('earth');
+    expect(sentCommands).toEqual([
+      { type: 'setAsteroidBeltVisible', visible: false },
+      { type: 'setKuiperBeltVisible', visible: false },
+      { type: 'setAsteroidBeltVisible', visible: true },
+    ]);
+  });
+
+  it('#1319 PR3 소프트웨어 렌더 — 소행성대 · 카이퍼 토글은 store · 명령 · URL 전부 무변화 (결정 3)', async () => {
+    useSimStore.setState({
+      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false },
+    });
+    const { toggle, onUrlUpdate } = setup();
+    act(() => {
+      toggle('belt');
+      toggle('kuiper');
+    });
+    expect(useSimStore.getState().beltVisible).toBe(true);
+    expect(useSimStore.getState().kuiperVisible).toBe(true);
+    expect(sentCommands).toEqual([]);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(onUrlUpdate).not.toHaveBeenCalled();
   });
 
   it('같은 틱 연속 호출 — 호출 시점 store 를 기준으로 반전 (왕복)', () => {

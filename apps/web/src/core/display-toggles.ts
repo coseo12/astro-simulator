@@ -7,19 +7,22 @@
  * 한 행에 모여 있다.
  *
  * URL 어휘는 기존 `parse-*-mode.ts` 4종을 그대로 쓴다 — 새 URL 파라미터 0, 새 파서 0 (결정 5). 예외는 #1293 의
- * `?labels=` (`parse-labels-mode.ts` — 같은 어휘 `off` 옵트아웃). 쓰는 쪽은 `serializeDisplayToggle` 하나이고 그
- * 역방향이 각 행의 `parse` 다.
+ * `?labels=` (`parse-labels-mode.ts` — 같은 어휘 `off` 옵트아웃) 와 #1319 PR3 의 `?belt=` · `?kuiper=`
+ * (`parse-belt-mode.ts` — 같은 `off` 옵트아웃, `?belt=` 는 기존 숫자 의미 유지 — ADR `20261008-1319` 결정 6). 쓰는 쪽은
+ * `serializeDisplayToggle` 하나이고 그 역방향이 각 행의 `parse` 다.
  */
 
 import type { CoreCommand } from '@astro-simulator/shared';
 import type { SimStoreState } from '@/store/sim-store';
+import { parseBeltVisible, parseKuiperVisible } from './parse-belt-mode';
 import { parseCloudsVisible } from './parse-cloud-mode';
 import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
 import { parseOrbitsVisible } from './parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
 
-export type DisplayToggleId = 'orbits' | 'stars' | 'clouds' | 'nightLights' | 'labels';
+export type DisplayToggleId =
+  'orbits' | 'stars' | 'clouds' | 'nightLights' | 'labels' | 'belt' | 'kuiper';
 
 /**
  * 장면이 준비된 뒤 확정되는 환경 가용성. `null` = 장면 미준비 (sim-canvas 가 핸들러를 등록하기 전 ·
@@ -31,6 +34,11 @@ export interface DisplayCapabilities {
   starfield: boolean;
   /** 절차 표면이 켜져 있는가 — `?surface=` (구름·불빛의 core 유효 조건). */
   surfaceDetail: boolean;
+  /**
+   * #1319 PR3 — 띠 입자 (소행성대 · 카이퍼) 를 만들 수 있는가 — `!isSoftwareRenderer || ?belt=N 강제` (ADR `20261008-1319`
+   * 결정 3). 명시 수 `?belt=N` 은 소프트웨어 렌더에서도 메시를 만들므로 (bench · verify 호환) 그때는 토글도 연다.
+   */
+  belt: boolean;
 }
 
 /**
@@ -43,24 +51,35 @@ export interface DisplayCapabilities {
  */
 export const DISPLAY_DISABLED_REASONS = {
   softwareRenderer: '소프트웨어 렌더링 환경에서는 성능 보호를 위해 별 배경을 표시하지 않습니다',
+  // #1319 PR3 — 띠 입자 (결정 3). 별 배경과 같은 사유 표현 (ADR 1265 결정 5 선례).
+  softwareRendererBelt:
+    '소프트웨어 렌더링 환경에서는 성능 보호를 위해 소행성대 · 카이퍼 벨트를 표시하지 않습니다',
   surfaceOff: '표면 표시가 꺼져 있어 사용할 수 없습니다 (?surface=off)',
   sceneNotReady: '장면을 준비하는 중입니다',
 } as const;
 
 /** store 에 보관하는 사용자 의도 (URL 의도) 필드. 궤도선은 기존 필드를 그대로 쓴다 (Q4). */
 type IntentKey =
-  'orbitLinesVisible' | 'starsVisible' | 'cloudsVisible' | 'nightLightsVisible' | 'labelsVisible';
+  | 'orbitLinesVisible'
+  | 'starsVisible'
+  | 'cloudsVisible'
+  | 'nightLightsVisible'
+  | 'labelsVisible'
+  | 'beltVisible'
+  | 'kuiperVisible';
 type IntentSetterKey =
   | 'setOrbitLinesVisible'
   | 'setStarsVisible'
   | 'setCloudsVisible'
   | 'setNightLightsVisible'
-  | 'setLabelsVisible';
+  | 'setLabelsVisible'
+  | 'setBeltVisible'
+  | 'setKuiperVisible';
 
 export interface DisplayToggleDef {
   id: DisplayToggleId;
   /** URL 쿼리 키 — 기존 파라미터 (`?orbits=` · `?stars=` · `?clouds=` · `?nightlights=`). */
-  urlKey: 'orbits' | 'stars' | 'clouds' | 'nightlights' | 'labels';
+  urlKey: 'orbits' | 'stars' | 'clouds' | 'nightlights' | 'labels' | 'belt' | 'kuiper';
   label: string;
   /** URL → 의도. `serializeDisplayToggle` 의 역방향 (기존 파서 재사용). */
   parse: (urlParam: string | null | undefined) => boolean;
@@ -84,6 +103,14 @@ const surfaceReason = (caps: DisplayCapabilities | null): string | null => {
 };
 const surfacePressed = (intent: boolean, caps: DisplayCapabilities | null): boolean =>
   intent && caps !== null && caps.surfaceDetail;
+
+/** #1319 PR3 — 소행성대 · 카이퍼 공통. 로드 경로 `resolveBeltAtLoad` 와 같은 결정식 (의도 ∧ 환경). */
+const beltReason = (caps: DisplayCapabilities | null): string | null => {
+  if (caps === null) return DISPLAY_DISABLED_REASONS.sceneNotReady;
+  return caps.belt ? null : DISPLAY_DISABLED_REASONS.softwareRendererBelt;
+};
+const beltPressed = (intent: boolean, caps: DisplayCapabilities | null): boolean =>
+  intent && caps !== null && caps.belt;
 
 export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
   {
@@ -147,6 +174,30 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     // 장면 준비 전에는 오버레이 자체가 없어 (SimCommandProvider 가 children 보류) 누를 수 있어도 무해하다 — 궤도선과 같은 처리.
     disabledReason: () => null,
     pressed: (intent) => intent,
+  },
+  {
+    // #1319 PR3 — 소행성대 (주 띠 + 힐다 + 트로이). 처음 켤 때 지연 생성, 이후 `setEnabled` (ADR `20261008-1319` 결정 6).
+    id: 'belt',
+    urlKey: 'belt',
+    label: '소행성대',
+    parse: parseBeltVisible,
+    command: (visible) => ({ type: 'setAsteroidBeltVisible', visible }),
+    intentKey: 'beltVisible',
+    setterKey: 'setBeltVisible',
+    disabledReason: beltReason,
+    pressed: beltPressed,
+  },
+  {
+    // #1319 PR3 — 카이퍼 벨트 (고전대 + 플루티노). 줌아웃해야 보인다 (결정 7).
+    id: 'kuiper',
+    urlKey: 'kuiper',
+    label: '카이퍼 벨트',
+    parse: parseKuiperVisible,
+    command: (visible) => ({ type: 'setKuiperBeltVisible', visible }),
+    intentKey: 'kuiperVisible',
+    setterKey: 'setKuiperVisible',
+    disabledReason: beltReason,
+    pressed: beltPressed,
   },
 ];
 

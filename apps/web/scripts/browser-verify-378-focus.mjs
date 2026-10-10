@@ -98,6 +98,8 @@ const flags = {
 // 이나 focus 진입/추적엔 무관 (triton 역행 선례 — 사실 정합).
 // #1305 — 명왕성 위성 charon 동기화 (CURRENT_R_PHASE=14). pluto 다음 (haumea 전) — solar-system.json 데이터
 // 순서 정합 (#598). showInShortcutBar=false (검색/클릭/URL 진입). 황도 기준 i 112.89° 세로 궤도 — 사실 정합.
+// #1318 — 소행성대 대표 3 (vesta/pallas/hygiea) 동기화 (CURRENT_R_PHASE=15). 데이터 끝 (swift-tuttle 다음) —
+// solar-system.json 데이터 순서 정합 (#598). showInShortcutBar=false (검색/클릭/URL 진입).
 const FOCUS_BODIES = [
   'sun',
   'mercury',
@@ -132,6 +134,9 @@ const FOCUS_BODIES = [
   'halley',
   'encke',
   'swift-tuttle',
+  'vesta',
+  'pallas',
+  'hygiea',
 ];
 const MODES = ['observe', 'research'];
 

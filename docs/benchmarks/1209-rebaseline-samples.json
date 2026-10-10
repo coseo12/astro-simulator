@@ -1,16 +1,16 @@
 {
   "_provenance": {
-    "source": "GitHub Actions run 35589678686 (workflow: bench:baseline-remeasure, ubuntu-latest × 10 matrix job)",
-    "url": "https://github.com/coseo12/astro-simulator/actions/runs/35589678686",
-    "measured_commit": "7c9652ad265d37d92f0d83a59fcafe77e1865bcb",
-    "retrieved": "2026-09-22 (gh run download 35589678686 -n bench-run-<i>, retention 7d 내)",
+    "source": "GitHub Actions run 37905796220 (workflow: bench:baseline-remeasure, ubuntu-latest × 10 matrix job)",
+    "url": "https://github.com/coseo12/astro-simulator/actions/runs/37905796220",
+    "measured_commit": "c30c68cd9bc776987baa427e5be124ed3def4815",
+    "retrieved": "2026-10-09 (gh run download 37905796220, retention 7d 내)",
     "why": "#1209 B7 판정선을 유도한 측정 분포 원본. B8(같은 커밋 10회차 재판정 ⚠ 0건)을 CI 에서 상시 재현하기 위해 커밋한다 — 아티팩트는 7일 뒤 만료되므로 원본이 저장소에 없으면 유도 근거를 재실행할 수 없다.",
-    "note": "회차 리포트에 `commit` 필드가 없는 것은 정상 — 그 필드를 심은 변경(#1209)이 이 측정 시점에 아직 develop 에 없었다. 측정 대상 sha 는 위 measured_commit (워크플로 run 의 headSha)."
+    "note": "#1319 PR1 (GPU 띠 경로) 머지 후 baseline 재측정(PR #1323)과 같은 집계. baseline.json 만 갱신하고 이 원본을 함께 갱신하지 않으면 bench-judge.test 의 B8·샘플 원본 단언이 깨진다 (PR #1323 은 workflow 생성 PR 이라 CI 가 돌지 않아 머지 전에 드러나지 않았다)."
   },
   "runs": [
     {
       "artifact": "bench-run-1",
-      "timestamp": "2026-09-21T10:39:59.553Z",
+      "timestamp": "2026-10-09T08:37:15.938Z",
       "phase": "remeasure-run-1",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -18,55 +18,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 110.75
+          "fps": 111.11
         },
         {
           "name": "play-1d",
-          "fps": 93.95
+          "fps": 112.63
         },
         {
           "name": "play-1y",
-          "fps": 83.34
+          "fps": 111.85
         },
         {
           "name": "focus-earth",
-          "fps": 84.54
+          "fps": 115.51
         },
         {
           "name": "focus-neptune",
-          "fps": 58.57
+          "fps": 75.78
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 91.78
+          "fps": 115.68
         },
         {
           "n": 100,
-          "fps": 61.28
+          "fps": 112.41
         },
         {
           "n": 200,
-          "fps": 45.5
+          "fps": 113.26
         },
         {
           "n": 1000,
-          "fps": 16.16
+          "fps": 108.2
         },
         {
           "n": 5000,
-          "fps": 4.14
+          "fps": 86.93
         },
         {
           "n": 10000,
-          "fps": 2.24
+          "fps": 71.64
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-2",
-      "timestamp": "2026-09-21T10:39:50.556Z",
+      "timestamp": "2026-10-09T08:37:32.297Z",
       "phase": "remeasure-run-2",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -74,55 +75,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 129.15
+          "fps": 107.53
         },
         {
           "name": "play-1d",
-          "fps": 99.5
+          "fps": 112.14
         },
         {
           "name": "play-1y",
-          "fps": 92.74
+          "fps": 115.26
         },
         {
           "name": "focus-earth",
-          "fps": 117.49
+          "fps": 113.3
         },
         {
           "name": "focus-neptune",
-          "fps": 69.95
+          "fps": 64.07
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 108.35
+          "fps": 114.58
         },
         {
           "n": 100,
-          "fps": 76.31
+          "fps": 112.69
         },
         {
           "n": 200,
-          "fps": 59.78
+          "fps": 115.15
         },
         {
           "n": 1000,
-          "fps": 23.03
+          "fps": 108.53
         },
         {
           "n": 5000,
-          "fps": 5.84
+          "fps": 87.19
         },
         {
           "n": 10000,
-          "fps": 3.11
+          "fps": 71.25
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-3",
-      "timestamp": "2026-09-21T10:39:44.566Z",
+      "timestamp": "2026-10-09T08:37:22.523Z",
       "phase": "remeasure-run-3",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -130,55 +132,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 119.19
+          "fps": 124.75
         },
         {
           "name": "play-1d",
-          "fps": 114.57
+          "fps": 97.67
         },
         {
           "name": "play-1y",
-          "fps": 130.54
+          "fps": 90.6
         },
         {
           "name": "focus-earth",
-          "fps": 134.19
+          "fps": 107.6
         },
         {
           "name": "focus-neptune",
-          "fps": 70.72
+          "fps": 68.75
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 122.87
+          "fps": 109.18
         },
         {
           "n": 100,
-          "fps": 82.57
+          "fps": 106.48
         },
         {
           "n": 200,
-          "fps": 62.96
+          "fps": 105.61
         },
         {
           "n": 1000,
-          "fps": 23.55
+          "fps": 100.41
         },
         {
           "n": 5000,
-          "fps": 5.93
+          "fps": 82.88
         },
         {
           "n": 10000,
-          "fps": 3.15
+          "fps": 69.44
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-4",
-      "timestamp": "2026-09-21T10:40:01.506Z",
+      "timestamp": "2026-10-09T08:37:12.259Z",
       "phase": "remeasure-run-4",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -186,55 +189,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 86.43
+          "fps": 157.58
         },
         {
           "name": "play-1d",
-          "fps": 72.02
+          "fps": 120.83
         },
         {
           "name": "play-1y",
-          "fps": 70.67
+          "fps": 111.66
         },
         {
           "name": "focus-earth",
-          "fps": 74.94
+          "fps": 126.41
         },
         {
           "name": "focus-neptune",
-          "fps": 47.39
+          "fps": 87.41
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 73.54
+          "fps": 122.3
         },
         {
           "n": 100,
-          "fps": 49.74
+          "fps": 123.87
         },
         {
           "n": 200,
-          "fps": 36.65
+          "fps": 115.96
         },
         {
           "n": 1000,
-          "fps": 12.48
+          "fps": 118.76
         },
         {
           "n": 5000,
-          "fps": 3.12
+          "fps": 103.18
         },
         {
           "n": 10000,
-          "fps": 1.66
+          "fps": 81.9
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-5",
-      "timestamp": "2026-09-21T10:39:56.464Z",
+      "timestamp": "2026-10-09T08:37:08.605Z",
       "phase": "remeasure-run-5",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -242,55 +246,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 114.6
+          "fps": 127.75
         },
         {
           "name": "play-1d",
-          "fps": 86.8
+          "fps": 123.77
         },
         {
           "name": "play-1y",
-          "fps": 90.92
+          "fps": 112.25
         },
         {
           "name": "focus-earth",
-          "fps": 104.85
+          "fps": 109.21
         },
         {
           "name": "focus-neptune",
-          "fps": 54.13
+          "fps": 80.14
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 98.44
+          "fps": 124.44
         },
         {
           "n": 100,
-          "fps": 64.89
+          "fps": 111.78
         },
         {
           "n": 200,
-          "fps": 49.91
+          "fps": 112.9
         },
         {
           "n": 1000,
-          "fps": 18.43
+          "fps": 108.5
         },
         {
           "n": 5000,
-          "fps": 4.71
+          "fps": 92.84
         },
         {
           "n": 10000,
-          "fps": 2.58
+          "fps": 79.54
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-6",
-      "timestamp": "2026-09-21T10:39:55.960Z",
+      "timestamp": "2026-10-09T08:37:24.598Z",
       "phase": "remeasure-run-6",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -298,55 +303,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 91.17
+          "fps": 113.61
         },
         {
           "name": "play-1d",
-          "fps": 78.29
+          "fps": 88.46
         },
         {
           "name": "play-1y",
-          "fps": 84.8
+          "fps": 83.84
         },
         {
           "name": "focus-earth",
-          "fps": 91.69
+          "fps": 88.18
         },
         {
           "name": "focus-neptune",
-          "fps": 53.64
+          "fps": 58.72
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 85.3
+          "fps": 94.44
         },
         {
           "n": 100,
-          "fps": 57.32
+          "fps": 93.77
         },
         {
           "n": 200,
-          "fps": 43.93
+          "fps": 92.75
         },
         {
           "n": 1000,
-          "fps": 15.85
+          "fps": 84.93
         },
         {
           "n": 5000,
-          "fps": 4.08
+          "fps": 70.55
         },
         {
           "n": 10000,
-          "fps": 2.23
+          "fps": 57.81
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-7",
-      "timestamp": "2026-09-21T10:40:00.547Z",
+      "timestamp": "2026-10-09T08:37:29.744Z",
       "phase": "remeasure-run-7",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -354,55 +360,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 99.72
+          "fps": 105.4
         },
         {
           "name": "play-1d",
-          "fps": 89.14
+          "fps": 80.47
         },
         {
           "name": "play-1y",
-          "fps": 106.46
+          "fps": 75.39
         },
         {
           "name": "focus-earth",
-          "fps": 110.25
+          "fps": 88.43
         },
         {
           "name": "focus-neptune",
-          "fps": 56.55
+          "fps": 55.43
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 99.39
+          "fps": 87.05
         },
         {
           "n": 100,
-          "fps": 63.62
+          "fps": 86.81
         },
         {
           "n": 200,
-          "fps": 47.57
+          "fps": 85.77
         },
         {
           "n": 1000,
-          "fps": 16.77
+          "fps": 82.08
         },
         {
           "n": 5000,
-          "fps": 4.14
+          "fps": 64.9
         },
         {
           "n": 10000,
-          "fps": 2.28
+          "fps": 54.99
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-8",
-      "timestamp": "2026-09-21T10:39:52.876Z",
+      "timestamp": "2026-10-09T08:37:30.053Z",
       "phase": "remeasure-run-8",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -410,55 +417,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 102.24
+          "fps": 92.9
         },
         {
           "name": "play-1d",
-          "fps": 93.26
+          "fps": 78.35
         },
         {
           "name": "play-1y",
-          "fps": 109.1
+          "fps": 84.25
         },
         {
           "name": "focus-earth",
-          "fps": 108.88
+          "fps": 88.55
         },
         {
           "name": "focus-neptune",
-          "fps": 54.46
+          "fps": 58.51
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 98.24
+          "fps": 87.31
         },
         {
           "n": 100,
-          "fps": 63.91
+          "fps": 87.07
         },
         {
           "n": 200,
-          "fps": 47.33
+          "fps": 87.82
         },
         {
           "n": 1000,
-          "fps": 16.77
+          "fps": 84.36
         },
         {
           "n": 5000,
-          "fps": 4.18
+          "fps": 66.66
         },
         {
           "n": 10000,
-          "fps": 2.28
+          "fps": 55.56
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-9",
-      "timestamp": "2026-09-21T10:39:59.060Z",
+      "timestamp": "2026-10-09T08:37:10.592Z",
       "phase": "remeasure-run-9",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -466,55 +474,56 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 118.73
+          "fps": 151.31
         },
         {
           "name": "play-1d",
-          "fps": 89.59
+          "fps": 110.52
         },
         {
           "name": "play-1y",
-          "fps": 91.02
+          "fps": 115.4
         },
         {
           "name": "focus-earth",
-          "fps": 94.66
+          "fps": 121.26
         },
         {
           "name": "focus-neptune",
-          "fps": 55.16
+          "fps": 80.61
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 91.77
+          "fps": 119.38
         },
         {
           "n": 100,
-          "fps": 60.9
+          "fps": 122.8
         },
         {
           "n": 200,
-          "fps": 47.15
+          "fps": 120.21
         },
         {
           "n": 1000,
-          "fps": 16.27
+          "fps": 115.37
         },
         {
           "n": 5000,
-          "fps": 4.01
+          "fps": 96.91
         },
         {
           "n": 10000,
-          "fps": 2.24
+          "fps": 84.11
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     },
     {
       "artifact": "bench-run-10",
-      "timestamp": "2026-09-21T10:39:46.855Z",
+      "timestamp": "2026-10-09T08:37:19.537Z",
       "phase": "remeasure-run-10",
       "durationMs": 3000,
       "environment": "playwright-chromium-headless",
@@ -522,51 +531,52 @@
       "scenarios": [
         {
           "name": "idle",
-          "fps": 95.31
+          "fps": 100.27
         },
         {
           "name": "play-1d",
-          "fps": 85.23
+          "fps": 78.53
         },
         {
           "name": "play-1y",
-          "fps": 102.79
+          "fps": 74.46
         },
         {
           "name": "focus-earth",
-          "fps": 100.86
+          "fps": 88.81
         },
         {
           "name": "focus-neptune",
-          "fps": 54.26
+          "fps": 59.14
         }
       ],
       "nBody": [
         {
           "n": 10,
-          "fps": 93.99
+          "fps": 88.48
         },
         {
           "n": 100,
-          "fps": 60.94
+          "fps": 87.46
         },
         {
           "n": 200,
-          "fps": 46.09
+          "fps": 85.36
         },
         {
           "n": 1000,
-          "fps": 16.7
+          "fps": 83.14
         },
         {
           "n": 5000,
-          "fps": 4.15
+          "fps": 67.25
         },
         {
           "n": 10000,
-          "fps": 2.28
+          "fps": 55.98
         }
-      ]
+      ],
+      "commit": "c30c68cd9bc776987baa427e5be124ed3def4815"
     }
   ]
 }

@@ -43,6 +43,9 @@ export class SimulationCore {
   #setStarfieldVisibleHandler: ((visible: boolean) => void) | null = null;
   #setCloudsVisibleHandler: ((visible: boolean) => void) | null = null;
   #setNightLightsVisibleHandler: ((visible: boolean) => void) | null = null;
+  // #1319 PR3 — 소행성대 · 카이퍼 띠 런타임 토글 핸들러 (위 3종 동형 — ADR `20261008-1319` 결정 6).
+  #setAsteroidBeltVisibleHandler: ((visible: boolean) => void) | null = null;
+  #setKuiperBeltVisibleHandler: ((visible: boolean) => void) | null = null;
   // #1205 — 프레임 위상 핸들러. 매 프레임 1회, `timeChanged` 와 무관하게 호출된다.
   // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
   #framePassHandler: (() => void) | null = null;
@@ -242,6 +245,20 @@ export class SimulationCore {
   }
 
   /**
+   * #1319 PR3 — 소행성대 런타임 토글 핸들러 연결. 핸들러는 scene 의 `setAsteroidBeltVisible(visible)` 를 부른다
+   * (처음 켤 때 지연 생성 · 이후 `setEnabled` — ADR `20261008-1319` 결정 6). 소프트웨어 렌더 차단은 여기서 하지
+   * 않는다 (결정 3 — `setStarfieldVisibleHandler` 와 같은 레이어 분리).
+   */
+  setAsteroidBeltVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setAsteroidBeltVisibleHandler = handler;
+  }
+
+  /** #1319 PR3 — 카이퍼 벨트 런타임 토글 핸들러 연결. 계약은 `setAsteroidBeltVisibleHandler` 와 같다. */
+  setKuiperBeltVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setKuiperBeltVisibleHandler = handler;
+  }
+
+  /**
    * #1205 — **프레임 위상** 핸들러 연결. 렌더 루프가 매 프레임 1회 호출한다.
    *
    * `updateAt` 은 `timeChanged` 이벤트 바인딩이라 `TimeController.tick` 이 `false` 를 반환하는
@@ -375,6 +392,12 @@ export class SimulationCore {
         break;
       case 'setNightLightsVisible':
         this.#setNightLightsVisibleHandler?.(cmd.visible);
+        break;
+      case 'setAsteroidBeltVisible':
+        this.#setAsteroidBeltVisibleHandler?.(cmd.visible);
+        break;
+      case 'setKuiperBeltVisible':
+        this.#setKuiperBeltVisibleHandler?.(cmd.visible);
         break;
       default: {
         const _exhaustive: never = cmd;

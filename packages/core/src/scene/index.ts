@@ -55,6 +55,27 @@ export { runTierTransition, computeTargetRadius, computeNewMinZ } from './tier-t
 export type { TierTransitionOptions } from './tier-transition.js';
 export { createAsteroidBelt } from './asteroid-belt.js';
 export type { AsteroidBeltHandles, AsteroidBeltOptions } from './asteroid-belt.js';
+// #1319 — 띠 입자 GPU Kepler 경로 (ADR 20261008-1319).
+export { createBeltParticles, BELT_PARTICLE_PX } from './belt-particles.js';
+export type {
+  BeltParticlesHandles,
+  BeltParticlesOptions,
+  BodyReferenceFrame,
+} from './belt-particles.js';
+// #1319 PR2 — 띠 입자 분포 생성기 (ADR 20261008-1319 결정 4, Babylon 비의존).
+export {
+  BELT_DEFAULT_COUNTS,
+  beltPlanetsFromSystem,
+  generateBeltPopulation,
+  scaleAsteroidBeltCounts,
+} from './belt-population.js';
+export type {
+  BeltCounts,
+  BeltGroup,
+  BeltOrbit,
+  BeltPlanets,
+  BeltPopulation,
+} from './belt-population.js';
 export { createRingPlaceholder } from './ring-placeholder.js';
 export type { RingPlaceholderHandles, RingPlaceholderOptions } from './ring-placeholder.js';
 export {

@@ -8,13 +8,15 @@
     "measureDurationMs": 5000,
     "minFpsAbsolute": 30,
     "regressionMargin": 0.3,
-    "note": "rAF FPS 는 display refresh rate 에 종속 (macOS 120Hz / Linux headless ~60Hz). baseline 은 CI 환경 (Linux 60Hz) 기준이며 로컬 macOS 측정 시 더 높게 나올 수 있음 — 그 경우 회귀 비교는 자연 통과."
+    "note": "rAF FPS 는 display refresh rate 에 종속 (macOS 120Hz / Linux headless ~60Hz). baseline 은 CI 환경 (Linux 60Hz) 기준이며 로컬 macOS 측정 시 더 높게 나올 수 있음 — 그 경우 회귀 비교는 자연 통과.",
+    "beltForcedCell": "#1319 PR3 — desktop/belt-forced (?belt=3900 = 띠 기본 구성 5400 입자 강제) 는 다른 셀과 측정 시점이 다르다: CI ubuntu-latest workflow_dispatch 진단 run 37931104297 (2026-10-09, variance N=5) p50 46.1 · min 43.6 · max 46.3 · cv 2.3%. 나머지 셀은 2026-05-24 값 그대로."
   },
   "viewports": {
     "desktop": {
       "default": 49.9,
       "earth-focus": 60.2,
-      "moon-focus": 60.1
+      "moon-focus": 60.1,
+      "belt-forced": 46.1
     },
     "mobile": {
       "default": 60.4,

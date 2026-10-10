@@ -26,6 +26,25 @@ import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
 import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
+import {
+  BELT_COOL_GRAY_RGB,
+  BELT_WARM_GRAY_RGB,
+  createBeltParticles,
+  type BeltParticlesHandles,
+  type BodyReferenceFrame,
+} from './belt-particles.js';
+import {
+  ASTEROID_BELT_GROUPS,
+  ASTEROID_BELT_MAX_N,
+  BELT_DEFAULT_COUNTS,
+  KUIPER_BELT_GROUPS,
+  beltPlanetsFromSystem,
+  generateBeltPopulation,
+  scaleAsteroidBeltCounts,
+  type BeltCounts,
+  type BeltOrbit,
+  type BeltPopulation,
+} from './belt-population.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -117,6 +136,16 @@ import type { ArcRotateCamera } from '@babylonjs/core';
 const FLOATING_ORIGIN_THRESHOLD_METERS = AU;
 
 /**
+ * #1319 PR2 — 띠 입자 분포 seed (`generateBeltPopulation`) · 소행성대 메시 밝기 seed.
+ * 구 균일 분포의 기본 seed(42, `asteroid-belt.ts`) 와 같은 값을 승계한다.
+ */
+const BELT_POPULATION_SEED = 42;
+/** 카이퍼 메시 밝기 난수 seed 오프셋 — 소행성대 메시(`seed + 1` 내부 오프셋) 와 스트림을 가른다. */
+const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
+/** 강조색(`BELT_HILDA_ACCENT_RGB`) 으로 구분하는 그룹 — 힐다 3:2 공명군. 시각 구분 전용 (PR #1324 사용자 결정). */
+const BELT_ACCENT_GROUP = 'hilda';
+
+/**
  * P11-A #288 — dev-only assert gate.
  *
  * `process` 는 브라우저 번들 runtime 에 존재하지 않을 수 있다 (#715 부터 `@types/node` 로
@@ -203,6 +232,15 @@ export interface SolarSystemSceneHandles {
    * 절차 행성 머티리얼의 `nightLightStrength` 를 함께 바꾼다. `surfaceDetail = false` 면 no-op.
    */
   setNightLightsVisible: (visible: boolean) => void;
+  /**
+   * #1319 PR3 — 소행성대 런타임 토글 (ADR 20261008-1319 결정 6). 없으면 그때 한 번 생성하고 (`asteroidBeltN` 수 ·
+   * 현재 시각 epoch), 이후는 `setEnabled` 만 바꾼다 (별 배경 `setStarfieldVisible` 과 같은 수명 — dispose 는 장면
+   * dispose 때만, 이견 수용 1). CPU 구 경로(`?beltNbody=1`) 가 있으면 그 메시의 가시성만 바꾼다 (N-body state 편입
+   * 이라 재생성하지 않는다). 렌더러 종류는 묻지 않는다 — 소프트웨어 렌더 차단은 호출자 (web) 책임이다 (결정 3).
+   */
+  setAsteroidBeltVisible: (visible: boolean) => void;
+  /** #1319 PR3 — 카이퍼 벨트 런타임 토글. 계약은 `setAsteroidBeltVisible` 과 같다 (CPU 구 경로 없음). */
+  setKuiperBeltVisible: (visible: boolean) => void;
   /**
    * P12-A #298 — 현재 활성 tier.
    *
@@ -383,6 +421,21 @@ export interface SolarSystemSceneHandles {
    * **재할당 회피**: 반환 배열·행은 내부 버퍼 (호출마다 in-place 갱신). 호출자는 mutate 금지 (read-only 계약).
    */
   getBodyScreenInfo: () => readonly BodyScreenInfo[];
+  /**
+   * #1319 — GPU 띠 입자 핸들. 소행성대 메시 (주 띠 + 힐다 + 트로이, 웜 그레이) 다. 카이퍼는 `getKuiperParticles`.
+   * 아직 만들어지지 않았거나 (`asteroidBelt` false 이고 토글 전) CPU 구 경로(`?beltNbody=1`) 면 null. 진단 · 단위 테스트용.
+   */
+  getBeltParticles: () => BeltParticlesHandles | null;
+  /**
+   * #1319 PR2 — 카이퍼 띠 입자 핸들 (고전대 + 플루티노, 쿨 그레이 — ADR 결정 5). PR3 부터 생성 조건은 소행성대와
+   * 독립이다 (`kuiperBelt` 옵션 · `setKuiperBeltVisible`). 없으면 null. 진단 · 단위 테스트용.
+   */
+  getKuiperParticles: () => BeltParticlesHandles | null;
+  /**
+   * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 의 사본.
+   * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
+   */
+  getBodyReferenceFrame: () => BodyReferenceFrame;
   dispose: () => void;
 }
 
@@ -444,8 +497,24 @@ export interface SolarSystemSceneOptions {
   showOrbitLines?: boolean;
   /** 물리 엔진 선택. 기본: 'kepler' (해석해). 'newton'은 #86에서 추가. */
   physicsEngine?: PhysicsEngineKind;
-  /** 소행성대 샘플 수. 0 또는 undefined면 생성 안 함. */
+  /**
+   * 소행성대 그룹(주 띠 + 힐다 + 트로이) 총수 — ADR 20261008-1319 결정 6 (기본 비율 3000:300:600 유지).
+   * `ASTEROID_BELT_MAX_N` 으로 clamp. 생성 여부는 이 값이 아니라 `asteroidBelt` 가 정한다 (#1319 PR3).
+   *  - GPU 경로: 0 또는 undefined 면 기본 수 (`BELT_DEFAULT_COUNTS` 의 세 그룹 합). 런타임 토글의 지연 생성도 같은 수.
+   *  - CPU 구 경로 (`asteroidNbody`): 0 또는 undefined 면 만들지 않는다 (N-body 편입 수라 기본 수가 없다 — 현행 유지).
+   * 카이퍼(고전대 + 플루티노) 는 이 수와 무관하게 기본 수다 (별도 토글 `kuiperBelt`).
+   */
   asteroidBeltN?: number;
+  /**
+   * #1319 PR3 — 소행성대 메시를 **로드 시** 만든다 (ADR 결정 6). 기본 false. false 여도 런타임 토글
+   * (`setAsteroidBeltVisible(true)`) 이 처음 켤 때 지연 생성한다.
+   *
+   * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 3) 는 호출자(web) 가 판정해 이 값으로만 전달한다
+   * (ADR §교차검증 이견 수용 5 · `starfield` 옵션과 같은 레이어 분리).
+   */
+  asteroidBelt?: boolean;
+  /** #1319 PR3 — 카이퍼 메시를 로드 시 만든다 (결정 6). 기본 false. 그 밖의 계약은 `asteroidBelt` 와 같다. */
+  kuiperBelt?: boolean;
   /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
    * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
@@ -648,6 +717,8 @@ export function createSolarSystemScene(
     physicsEngine = 'kepler',
     asteroidBeltN = 0,
     asteroidNbody = false,
+    asteroidBelt: asteroidBeltAtLoad = false,
+    kuiperBelt: kuiperBeltAtLoad = false,
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
@@ -1176,13 +1247,142 @@ export function createSolarSystemScene(
     );
   };
 
-  // 소행성대 (#99) — ThinInstances 단일 draw call.
-  // Kepler 경로: 각 소행성 독립 해석해.
-  // N-body 경로 (P4-A #165, `asteroidNbody=true`): engine state에 편입.
+  /**
+   * #1318 — 궤도선 LineSystem 의 position 을 모체의 로컬 장면 좌표로 맞춘다 (body mesh 와 같은 기준계).
+   *
+   * 궤도점은 모체 원점 기준으로 샘플링된다 (`sampleOrbitPoints`). 따라서 LineSystem 을 모체 자리에 놓아야
+   * 궤도선이 천체를 지난다:
+   *  - 태양 중심 `orbitLines` (행성 · 왜소행성 · 혜성 · 소행성) → 태양 로컬 좌표
+   *  - 위성 `satelliteOrbitLines` (#627) → 모체 로컬 좌표
+   *
+   * 결함 (#1318 실측): 종전에는 위성 쪽만 `updateAt` 에서 동기화하고 `orbitLines` 는 원점 (0,0,0) 에 두었다.
+   * T1/T2 는 floating origin 이 [0,0,0] 이라 태양 로컬 = 원점이어서 드러나지 않았다. T3 (body) 포커스는
+   * `setOriginToBody(focus)` 로 원점이 포커스 천체로 옮겨 가므로, 궤도선이 **포커스 천체 중심**으로 그려졌다
+   * (천체-궤도선 거리 / 태양 거리 — 세레스 포커스 세레스 0.04 · 베스타 포커스 화성 0.15~0.30).
+   *
+   * 호출부는 body mesh.position 을 쓰는 두 곳과 같다 — 시간 위상 `updateAt` 과 `setTier` 즉시 재계산.
+   * `setTier` 는 `rebuildOrbitLines` 로 LineSystem 을 새로 만들어 position 이 (0,0,0) 으로 돌아가는데,
+   * 일시정지 (`updateAt` 미발동) 중 tier 전환이면 다음 `updateAt` 까지 그 값이 남는다 — 위성 궤도선도
+   * 같은 경로라 함께 여기서 맞춘다. origin 을 스칼라로 받는 이유는 `syncSunLightPosition` 과 같다.
+   */
+  const syncOrbitLinePositions = (ox: number, oy: number, oz: number, scale: number): void => {
+    if (orbitLines) {
+      const sunWorld = worldPositions.get('sun') ?? ZERO;
+      orbitLines.position.set(
+        (sunWorld[0] - ox) * scale,
+        (sunWorld[1] - oy) * scale,
+        (sunWorld[2] - oz) * scale,
+      );
+    }
+    for (const [parentId, ls] of satelliteOrbitLines) {
+      const parentWorld = worldPositions.get(parentId);
+      if (parentWorld) {
+        ls.position.set(
+          (parentWorld[0] - ox) * scale,
+          (parentWorld[1] - oy) * scale,
+          (parentWorld[2] - oz) * scale,
+        );
+      }
+    }
+  };
+
+  /**
+   * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 스냅샷.
+   *
+   * 띠 입자는 draw 직전에 **이 값**을 읽는다 (`belt-particles.ts` 머리말). `floatingOrigin.originOffset` 을
+   * 그때 다시 읽으면 안 된다 — `updateAt` 은 mesh 루프 **뒤에** primary follow 의 `setOriginToBody` 를 부르므로
+   * (#380 가드 C) draw 시점의 `originOffset` 은 이미 다음 프레임 origin 이다 (`syncSunLightPosition` 주석과 같은 함정).
+   *
+   * 기록 지점은 body mesh.position 을 쓰는 두 곳뿐이다 — `updateAt` 루프 · `setTier` 즉시 재계산.
+   * 새 mesh.position 쓰기 경로가 생기면 `recordBodyFrame` 도 함께 불러야 한다.
+   *
+   * 초기값: 장면 생성 시점의 floating origin 은 [0,0,0] 이고 scale 은 초기 tier 값이다 — 첫 `updateAt` 이 덮어쓴다.
+   */
+  const bodyFrame: BodyReferenceFrame = {
+    originX: 0,
+    originY: 0,
+    originZ: 0,
+    scale: renderScaleForTier(activeTier),
+  };
+  const recordBodyFrame = (ox: number, oy: number, oz: number, scale: number): void => {
+    bodyFrame.originX = ox;
+    bodyFrame.originY = oy;
+    bodyFrame.originZ = oz;
+    bodyFrame.scale = scale;
+  };
+
+  // 소행성대 (#99).
+  // #1319 — 두 경로로 갈린다 (ADR 20261008-1319 결정 1):
+  //  - GPU Kepler 경로 (기본 켜짐 · `?belt=N`): N 쿼드 단일 메시 + 정점 셰이더 Kepler. 위치를 셰이더가 정하므로
+  //    시간은 `updateAt` 의 uniform 1개, 기준계는 `bodyFrame` 스냅샷 (draw 직전 읽기).
+  //  - CPU 구 경로 (`?beltNbody=1`, P4-A #165): ThinInstance 구 + engine state 편입. N-body 적분 위치는 Kepler
+  //    셰이더로 표현할 수 없어 유지한다. origin 은 `bodyFrame` 으로 차감 (결함 (가) 수정).
+  // #1319 PR3 — 로드 시 생성 여부는 `asteroidBelt` / `kuiperBelt` 옵션이 정하고 (web 이 소프트웨어 게이트를 적용해
+  // 넘긴다 — 결정 3), 꺼진 채 로드한 것은 런타임 토글이 처음 켤 때 같은 생성 함수로 지연 생성한다 (결정 6).
   let asteroidBelt: AsteroidBeltHandles | null = null;
+  let beltParticles: BeltParticlesHandles | null = null;
+  let kuiperParticles: BeltParticlesHandles | null = null;
   // 위치 버퍼 초기화 (`localPositions`/`worldPositions`) + 태양광 동기 헬퍼 정의.
   phase('scene:position-buffers');
-  if (asteroidBeltN > 0) {
+  // 소행성대 그룹 총수 (결정 6). 미지정 = 기본 수 — `scaleAsteroidBeltCounts(합)` 이 기본 3000:300:600 을 그대로 돌려준다.
+  const asteroidBeltTotal =
+    asteroidBeltN > 0
+      ? Math.min(asteroidBeltN, ASTEROID_BELT_MAX_N)
+      : ASTEROID_BELT_GROUPS.reduce((sum, g) => sum + BELT_DEFAULT_COUNTS[g], 0);
+  const beltPlanets = beltPlanetsFromSystem(system);
+  /**
+   * 그룹 묶음 하나의 궤도 요소. 분포는 그룹 5종 생성기 (결정 4) — 목성 · 해왕성 요소는 장면과 같은 로더 데이터에서
+   * 읽는다. 그룹마다 독립 난수 스트림이라 (`generateBeltPopulation` 계약) 다른 묶음의 수를 0 으로 둬도 이 묶음의
+   * 요소는 함께 생성할 때와 같다 — 그래서 두 메시를 따로 (지연) 생성해도 분포가 로드 경로와 같다.
+   */
+  const generateBeltGroups = (counts: Partial<BeltCounts>): BeltPopulation =>
+    generateBeltPopulation(
+      BELT_POPULATION_SEED,
+      { main: 0, hilda: 0, trojan: 0, kuiperClassical: 0, plutino: 0, ...counts },
+      beltPlanets,
+    );
+  const collect = (
+    population: BeltPopulation,
+    groups: readonly (keyof BeltPopulation)[],
+  ): BeltOrbit[] => groups.flatMap((g) => population[g]);
+  /** 소행성대 메시 (주 띠 + 힐다 + 트로이). `epoch` = 생성 시점 장면 시각 (지연 생성이면 `currentJd`). */
+  const createAsteroidBeltParticles = (epoch: number): BeltParticlesHandles => {
+    const population = generateBeltGroups(scaleAsteroidBeltCounts(asteroidBeltTotal));
+    return createBeltParticles(scene, {
+      orbits: collect(population, ASTEROID_BELT_GROUPS),
+      name: 'belt-particles',
+      color: BELT_WARM_GRAY_RGB,
+      // 힐다 (목성 3:2 공명군) 만 강조색 — 시각 구분 전용, 물리 색 아님 (사용자 결정 2026-10-09, PR #1324).
+      // `collect` 와 같은 그룹 순서로 펼쳐 입자 인덱스가 맞는다.
+      accentFlags: ASTEROID_BELT_GROUPS.flatMap((g) =>
+        population[g].map(() => g === BELT_ACCENT_GROUP),
+      ),
+      seed: BELT_POPULATION_SEED,
+      epoch,
+      frameProvider: () => bodyFrame,
+    });
+  };
+  /**
+   * 카이퍼 메시 (고전대 + 플루티노). 수는 소행성대 N 과 묶지 않는다: 결정 6 이 N 을 소행성대 그룹에만 정의했고
+   * 카이퍼는 별도 토글을 가진 독립 그룹이라 기본 수(Q1) 를 쓴다.
+   */
+  const createKuiperBeltParticles = (epoch: number): BeltParticlesHandles =>
+    createBeltParticles(scene, {
+      orbits: collect(
+        generateBeltGroups({
+          kuiperClassical: BELT_DEFAULT_COUNTS.kuiperClassical,
+          plutino: BELT_DEFAULT_COUNTS.plutino,
+        }),
+        KUIPER_BELT_GROUPS,
+      ),
+      name: 'kuiper-particles',
+      color: BELT_COOL_GRAY_RGB,
+      // 밝기 스트림을 소행성대 메시와 분리 (같은 seed 면 두 메시의 밝기 수열이 같아진다).
+      seed: BELT_POPULATION_SEED + KUIPER_BRIGHTNESS_SEED_OFFSET,
+      epoch,
+      frameProvider: () => bodyFrame,
+    });
+  if (asteroidBeltAtLoad && asteroidNbody && asteroidBeltN > 0) {
     asteroidBelt = createAsteroidBelt(scene, {
       n: asteroidBeltN,
       epoch: initialJulianDate,
@@ -1192,8 +1392,20 @@ export function createSolarSystemScene(
       sceneUnitPerMeter: renderScaleForTier(activeTier),
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
+  } else if (asteroidBeltAtLoad) {
+    beltParticles = createAsteroidBeltParticles(initialJulianDate);
   }
-  // 소행성대 ThinInstances (`?belt=N` 미지정이면 빈 구간).
+  if (kuiperBeltAtLoad) kuiperParticles = createKuiperBeltParticles(initialJulianDate);
+  // 이견 수용 1 — 장면 dispose 시 메시 · 머티리얼 해제. 지연 생성분도 같은 변수에 담기므로 항상 등록한다.
+  disposables.push({
+    dispose: () => {
+      beltParticles?.dispose();
+      beltParticles = null;
+      kuiperParticles?.dispose();
+      kuiperParticles = null;
+    },
+  });
+  // 소행성대 · 카이퍼 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:asteroid-belt');
 
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
@@ -1376,6 +1588,14 @@ export function createSolarSystemScene(
       );
       mesh.computeWorldMatrix(true);
     }
+    // #1319 결정 2 — 띠 입자가 같은 기준계를 쓰도록 기록. 시간이 멈춰 있어도 (`updateAt` 미발동) 다음 draw 의
+    // 띠가 새 tier 스케일 · origin 을 따른다 (결함 (나) — 일시정지 중 tier 전환 시 solar 스케일 고착).
+    recordBodyFrame(
+      tierTransitionOrigin[0],
+      tierTransitionOrigin[1],
+      tierTransitionOrigin[2],
+      newScale,
+    );
 
     // #1204 — 광원도 **같은 프레임에** 새 origin/scale 로 재계산. 위 mesh 루프와 한 쌍이다:
     // 셰이더 `uSunDirection` 은 `sunLight.position − mesh.absolutePosition` 이라 둘 중 하나만
@@ -1386,6 +1606,14 @@ export function createSolarSystemScene(
     // 의 fix 다. #782 Amendment 2-i 는 위상 도입 쪽이라 이 즉시 동기 자체의 출처가 아니다).
     // 수식·재현·측정 한계는 `syncSunLightPosition` 정의부 주석이 SSoT.
     syncSunLightPosition(
+      tierTransitionOrigin[0],
+      tierTransitionOrigin[1],
+      tierTransitionOrigin[2],
+      newScale,
+    );
+    // #1318 — 궤도선도 같은 프레임에 새 origin/scale 로. `rebuildOrbitLines` 가 방금 position (0,0,0) 으로
+    // 새로 만들었으므로, 일시정지 중 tier 전환이면 이 호출이 없을 때 다음 `updateAt` 까지 어긋난 채 남는다.
+    syncOrbitLinePositions(
       tierTransitionOrigin[0],
       tierTransitionOrigin[1],
       tierTransitionOrigin[2],
@@ -1658,22 +1886,16 @@ export function createSolarSystemScene(
         (world[2] - oz) * sceneUnitPerMeter,
       );
     }
+    // #1319 결정 2 — 위 루프가 쓴 기준계를 띠 입자용으로 기록 (아래 primary follow 가 origin 을 옮기기 전 값).
+    recordBodyFrame(ox, oy, oz, sceneUnitPerMeter);
 
     // #627 — satellite orbit line position 동기화 (moon 패턴 일반화, ADR §5 옵션 A 구현 절차 3).
     // satellite orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
     // parent (earth/mars/jupiter) 가 sun 주위를 매 프레임 공전하므로 각 satellite 궤도 LineSystem 의
     // position 을 parent scene-unit 좌표로 동기 (parent 추적). satellite mesh 위치는 worldPositions 가
     // sun 중심 좌표라 위 루프에서 처리됨 (별도 처리 불필요).
-    for (const [parentId, ls] of satelliteOrbitLines) {
-      const parentWorld = worldPositions.get(parentId);
-      if (parentWorld) {
-        ls.position.set(
-          (parentWorld[0] - ox) * sceneUnitPerMeter,
-          (parentWorld[1] - oy) * sceneUnitPerMeter,
-          (parentWorld[2] - oz) * sceneUnitPerMeter,
-        );
-      }
-    }
+    // #1318 — 태양 중심 `orbitLines` 도 같은 헬퍼에서 태양 로컬 좌표로 동기 (T3 floating origin 정합).
+    syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
 
     // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
     // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
@@ -1824,24 +2046,23 @@ export function createSolarSystemScene(
     // `packages/core/src/engine/simulation-core-frame-pass.test.ts`.
 
     // 소행성대 업데이트.
+    // #1319 — GPU 경로는 시간 uniform 만 갱신한다 (위치는 셰이더, 기준계는 draw 직전 `bodyFrame` 읽기).
+    beltParticles?.updateAt(jd);
+    kuiperParticles?.updateAt(jd);
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
-    // 그 외(Kepler 모드 또는 asteroidNbody=false): 기존 해석해 경로 유지.
+    // 그 외(`?beltNbody=1` + Kepler 엔진): 기존 해석해 경로 유지.
     if (asteroidBelt) {
       // P12-A #298 B1 — 현 tier 의 renderScale 을 매 프레임 주입. tier 전환 시 다음 프레임에 자동 반영.
+      // #1319 결정 2 — origin 도 함께: `bodyFrame` 은 이 함수 위쪽 mesh 루프가 쓴 값이다 (primary follow 이전).
       if (
         asteroidStartIndex >= 0 &&
         newtonEngine &&
         (activeEngine === 'newton' || activeEngine === 'barnes-hut' || activeEngine === 'webgpu')
       ) {
         const flat = newtonEngine.positions();
-        asteroidBelt.writeWorldPositions(
-          flat,
-          asteroidStartIndex,
-          asteroidBelt.n,
-          sceneUnitPerMeter,
-        );
+        asteroidBelt.writeWorldPositions(flat, asteroidStartIndex, asteroidBelt.n, bodyFrame);
       } else {
-        asteroidBelt.updateAt(jd, sceneUnitPerMeter);
+        asteroidBelt.updateAt(jd, bodyFrame);
       }
     }
   };
@@ -2405,6 +2626,33 @@ export function createSolarSystemScene(
     starfieldHandles?.mesh.setEnabled(false);
   };
 
+  // #1319 PR3 — 띠 런타임 토글 (ADR 20261008-1319 결정 6). 별 배경과 같은 수명 계약: 없을 때만 생성, 이후 `setEnabled`
+  // (dispose 는 장면 dispose 때만 — 이견 수용 1). 지연 생성의 epoch 는 현재 장면 시각이라 `uDays = 0` 에서 시작해
+  // 일시정지 중에 켜도 다음 시간 위상을 기다리지 않고 지금 위치에 그린다 (#1205 클래스 — 시간 위상 비의존).
+  // 기준계는 draw 직전 `bodyFrame` 을 읽으므로 생성 시점과 무관하다 (결정 2).
+  // ⚠️ 렌더러를 묻지 않는다 — 소프트웨어 렌더 (결정 3) 차단의 유일한 지점은 web 의 가용성 검사다 (`setStarfieldVisible` 동형).
+  const setAsteroidBeltVisible = (visible: boolean) => {
+    // CPU 구 경로는 N-body 엔진 state 에 편입돼 있어 재생성하지 않는다 — 호스트 메시 가시성만 바꾼다.
+    if (asteroidBelt) {
+      asteroidBelt.mesh.setEnabled(visible);
+      return;
+    }
+    if (visible) {
+      beltParticles ??= createAsteroidBeltParticles(currentJd);
+      beltParticles.mesh.setEnabled(true);
+      return;
+    }
+    beltParticles?.mesh.setEnabled(false);
+  };
+  const setKuiperBeltVisible = (visible: boolean) => {
+    if (visible) {
+      kuiperParticles ??= createKuiperBeltParticles(currentJd);
+      kuiperParticles.mesh.setEnabled(true);
+      return;
+    }
+    kuiperParticles?.mesh.setEnabled(false);
+  };
+
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
@@ -2508,6 +2756,8 @@ export function createSolarSystemScene(
     setStarfieldVisible,
     setCloudsVisible,
     setNightLightsVisible,
+    setAsteroidBeltVisible,
+    setKuiperBeltVisible,
     getTier,
     setTier,
     updateTierByCamera,
@@ -2532,6 +2782,9 @@ export function createSolarSystemScene(
     getLodStats,
     getLodInfo,
     getBodyScreenInfo,
+    getBeltParticles: () => beltParticles,
+    getKuiperParticles: () => kuiperParticles,
+    getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
