@@ -1,6 +1,6 @@
 # ADR 20261010-1329 — 혜성 꼬리 · 코마: 축 빌보드 리본 셰이더 · draw 직전 body mesh 기준계 · 로그 활동도 법칙
 
-- **상태**: Provisional — cross-validate 결과 통합 전 (CLAUDE.md §ADR Status 워크플로). 사용자 결정 Q1~Q7 대기
+- **상태**: Provisional — cross-validate 통합 완료 (2026-10-10, §교차검증 반영 사항). 사용자 결정 Q1~Q7 반영 후 Accepted 전이
 - **날짜**: 2026-10-10
 - **결정자**: architect (이슈 [#1329](https://github.com/coseo12/astro-simulator/issues/1329) · 사용자 선택 2026-10-10 「v0.96.0 다음 작업」)
 - **관련**:
@@ -120,11 +120,11 @@ a(r) = max(0, ln(r_on / r) / ln(r_on / 1 AU))     r_on = COMET_ACTIVITY_ONSET_AU
 - 먼지 꼬리 길이 `L_dust = L_ion × COMET_DUST_TAIL_LENGTH_RATIO` · 휨 `k = COMET_DUST_TAIL_CURVE` · 폭은 이온의 2배
 - 코마 세계 반지름 `COMET_COMA_RADIUS_1AU_KM × a` · 화면 하한 지름 `COMET_COMA_MIN_PX_1AU × min(a, 1)`
 - 밝기 (알파 배율) `min(a, 1)` — 1 AU 안쪽은 밝기 포화, 길이만 자란다
-- `a = 0` 이면 메시를 그리지 않는다 (`isVisible = false` — 셰이더 비용 0)
+- `a = 0` 이면 정점 셰이더가 모든 꼭짓점을 머리 한 점으로 접어 **면적 0** 으로 만든다 (fragment 비용 0, 정점 136 개 비용만 남음). **`isVisible = false` 로 끄지 않는다** — Babylon 9.19 는 `isVisible` 이 거짓인 메시를 active mesh 에서 빼고 (`scene.pure.js` `_evaluateActiveMeshes` 의 `mesh.isVisible && …` 조건), `onBeforeRenderObservable` 은 그 메시를 그리는 `Mesh.render` 안에서만 알린다 (`mesh.pure.js:2141`). 활동도를 그 observer 안에서 계산하므로 한 번 끄면 다시 켤 기회가 사라진다 (§교차검증 수용 1). 토글 OFF 는 별도 경로 (`setEnabled(false)` — 명령으로 다시 켠다, 결정 5)
 
 상수 값은 사용자 결정 Q2 · Q4 · Q5 와 D-T2 육안으로 확정한다 (§사용자 결정). 모두 rendering-only 상수 — `solar-system.json` 무변경.
 
-**결정 4 — 소프트웨어 렌더 게이트 (ii).** web 이 `detectSoftwareRenderer` 결과로 core 옵션 `cometTails: boolean` 을 넘긴다 (core 는 렌더러를 모른다 — ADR 1265 결정 1 · ADR 1319 이견 수용 5). 강제 생성 파라미터는 두지 않는다 — WebGL2 셰이더 경로 검증은 하드웨어 Chrome 에서 `navigator.gpu` 를 은닉하는 init script 로 가능함을 실측했다 (1-E 의 「metal WebGL2」 행).
+**결정 4 — 소프트웨어 렌더 게이트 (ii).** web 이 `detectSoftwareRenderer` 결과로 core 옵션 `cometTails: boolean` 을 넘긴다 (core 는 렌더러를 모른다 — ADR 1265 결정 1 · ADR 1319 이견 수용 5). **`?comettails=force` 로 게이트를 우회해 강제 생성한다** (초안의 「강제 생성 파라미터는 두지 않는다」 를 뒤집음) (§교차검증 수용 2 — ADR 1319 의 숫자 `?belt=N` 강제와 같은 구조). 게이트만 있으면 CI (소프트웨어 렌더) 가 꼬리 셰이더를 한 번도 컴파일하지 않아, GLSL 오류 · Babylon 업그레이드의 GLSL→WGSL 변환 회귀가 CI 를 그대로 통과한다. 하드웨어 Chrome 의 `navigator.gpu` 은닉 init script 로 로컬 WebGL2 검증이 가능하다는 실측 (1-E) 은 유지하되, 그것은 사람이 돌릴 때만 작동한다.
 
 **결정 5 — 토글 · URL.** 토글 표(`display-toggles.ts`) 에 1행 — `cometTails` (라벨 「혜성 꼬리」, URL `?comettails=off`, ON = 키 삭제 — ADR 1265 결정 5). 꼬리 · 코마를 함께 끈다 (핵 · glow marker · 궤도선은 그대로). 파서는 순수 함수 `parseCometTailsVisible` 하나 (`apps/web/src/core/parse-comet-tails-mode.ts` — #850 계약). 가용성 = `!isSoftwareRenderer`, 비활성 사유는 별 배경 · 띠와 같은 표현. 처음 켤 때 지연 생성, 이후 `setEnabled` (ADR 1319 결정 6 과 같은 수명주기). 장면 dispose 시 메시 · 머티리얼 해제.
 
@@ -154,7 +154,38 @@ a(r) = max(0, ln(r_on / r) / ln(r_on / 1 AU))     r_on = COMET_ACTIVITY_ONSET_AU
 
 ## 교차검증 반영 사항
 
-메인 오케스트레이터가 cross-validate 를 수행한 뒤 4축 (합의 / 이견 수용 / 기각 / 고유 발견) 으로 통합한다. 그 전까지 본 ADR 은 Provisional 이다.
+agy (architecture 모드, 2026-10-10, 로그 `.claude/logs/cross-validate-architecture-20261010-225053.log`, 명시 질문 3개 첨부). 메인이 재분석해 4축으로 분류했다. 사용자 결정 (Q1~Q7) 반영 후 Accepted 전이.
+
+#### 합의
+
+- 렌더 경로 (A) view 공간 리본 · 결정 2 의 draw 직전 위치 읽기 · 파티클 기각을 모두 타당하다고 판정.
+- 셰이더 정규화 특이점 (카메라가 중심선 위) — 결정 1 이 이미 `sinθ` 페이드로 NaN 없이 처리한다고 정했다. 구현에서 `length < ε` 분기로 명시한다 (설계 변경 아님).
+- ĥ 는 N-body 에서도 로드 시 상수라는 계약을 코드 주석에 명시 (결정 2 의 서술을 주석으로 옮김).
+
+#### 이견 수용
+
+1. **[치명] `isVisible = false` 로 끄면 다시 켜지지 않는다** — Babylon 9.19 소스로 확인 (`scene.pure.js` `_evaluateActiveMeshes:3889` 의 `mesh.isVisible && …`, `mesh.pure.js:2141` `Mesh.render` 안의 `_onBeforeRenderObservable.notifyObservers`). 활동도를 그 observer 에서 계산하므로 r ≥ 3 AU 에서 한 번 끄면 근일점에 와도 영영 안 그려진다. 결정 3 을 「정점 셰이더가 a = 0 이면 면적 0 으로 접는다」 로 바꿨다. 이 결함은 메인 · architect 둘 다 놓쳤다 — #1319 띠는 a 같은 on/off 가 없어 선례가 없었다.
+2. **CI 사각 — 게이트만 있으면 꼬리 셰이더가 CI 에서 한 번도 컴파일되지 않는다** — 결정 4 를 「`?comettails=force` 강제 생성」 으로 바꿨다. CI 에서의 실행은 **기존** `verify-fps-baseline.mjs` 의 `requiredMeshes` 전제 (ADR 1319 Amendment 1 · PR #1326 R1) 를 재사용한 강제 셀 1개로 한다 — 꼬리 메시가 활성 + 머티리얼 `isReady()` 를 전제로 단언하고, 판정은 그 가드의 기존 규칙 그대로 (**새 임계 0**). 셀 URL 은 핼리 장면 근일점 (`t=2446479.5`, 1-A) 에서 꼬리가 실제로 그려지는 시각으로 둔다. 기존 가드에 「머티리얼 준비」 전제가 없으면 그 1개를 추가하는 것까지가 범위.
+3. **DPR** — 화면 px 하한식의 `renderHeight` 는 엔진 렌더 버퍼 높이 (물리 px, `engine.getRenderHeight()`) 다. `MIN_WIDTH_PX` · 코마 하한 px 는 ADR 1319 `BELT_PARTICLE_PX` 처럼 **물리 px** 단위로 명시한다.
+
+#### 기각
+
+- **활동도 상한 클램프 `a_max ≈ 3` 즉시 도입** — 현 데이터 최대 `1.985` (encke) 이고 r 은 0 이 되지 않는다. 값 3 은 근거 없는 새 임계라 재검토 트리거 4 (sungrazer 추가 시) 로 둔다.
+- **재생 중 tier 전환 tween 에서 1 프레임 어긋남** — 1-D 실측 1,701 프레임이 이미 「일시정지 중 포커스 (tween + tier 전환) → body tier 재생 → 재생 중 earth 포커스」 를 포함한다 (머리 상대오차 최대 5.6e-8). 「일시정지 상태 측정」 이라는 전제가 틀렸다.
+- **카메라 근접 near-plane 페이드** — 재검토 트리거 2 (사용자 육안 보고 시) 로 둔다. 실측 없는 선제 처리.
+- **꼬리 길이 `∝ a²` 또는 `a·(1 AU / r)`** — 「복사압 1/r²」 근거는 꼬리 길이 법칙이 아니라 힘의 법칙이고, 제안식도 `∝ a` 와 같은 수준의 표시 근사다. 화면에서의 극적 효과는 길이 배율 Q2 와 D-T2 육안으로 조정한다.
+- **진입/진출 비대칭 (근일점 이후 더 밝음)** — 혜성별 비대칭 파라미터를 새로 들여와야 한다 (결정 3 이 피한 데이터 추가). Visual Fidelity 근사로 둔다.
+- **「꼬리를 앞세우고 멀어지는」 모습이 버그로 오인될 수 있다 → 안내 문구** — 그 모습은 실제 물리이고 설계가 재현하는 것이다. 안내 문구는 정보 카드 · 툴팁 작업이라 범위 밖 (§Visual Fidelity 체크리스트 3).
+- **추가 혜성 시 동적 생성 여부 모호** — 결정 1 의 「혜성 1개당 메시 1개」 는 `kind: comet` 전수 순회로 구현한다 (하드코딩 금지). 문서 모호성이지 설계 결함 아님 — 구현 PR 에서 「전 comet 커버」 단언으로 고정.
+
+#### 고유 발견 (Claude)
+
+- 수용 1 의 수정은 **토글 경로와 분리**돼야 한다 — 토글 OFF 는 `setEnabled(false)` 이고 다시 켜는 주체가 명령 (결정 5) 이라 같은 함정이 없다. 「a = 0 → 접기」 와 「토글 → setEnabled」 를 한 플래그로 합치면 함정이 되돌아온다.
+- 수용 1 은 **D2 (원일점에서 픽셀 동일)** 를 바꾸지 않는다 — 면적 0 이면 픽셀 기여 0 이다. 대신 DoD 에 「원일점 (a = 0) 에서 시작해 시간을 근일점까지 진행하면 꼬리가 나타난다」 (재활성) 를 추가해야 이 결함을 잡는다 — 원일점 → 근일점 단방향 테스트가 없으면 수용 1 이전 설계도 모든 DoD 를 통과한다.
+
+#### Claude 편향 셀프 체크
+
+- 분류 결과 수용 3 (치명 1 포함) · 합의 3 · 기각 7 · Claude 고유 2. 기각 7건의 근거는 각각 **현 데이터 범위** / **이미 있는 실측이 전제를 반증** / **트리거로 위임** / **근거가 힘 법칙 오용** / **데이터 추가 필요** / **실제 물리** / **문서 모호성** 으로 서로 다르다. 가장 큰 두 지적 (좀비 메시 · CI 사각) 은 수용했다.
 
 ### 호출 전 Claude 편향 셀프 체크 (architect)
 
