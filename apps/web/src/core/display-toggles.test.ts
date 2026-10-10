@@ -13,18 +13,22 @@ import {
  * 직렬화의 역방향은 기존 `parse-*-mode.ts` 4종이다 — 두 방향이 같은 어휘를 쓰는지를 round-trip 으로 고정한다.
  */
 
-const HW: DisplayCapabilities = { starfield: true, surfaceDetail: true };
-const SOFTWARE: DisplayCapabilities = { starfield: false, surfaceDetail: true };
-const SURFACE_OFF: DisplayCapabilities = { starfield: true, surfaceDetail: false };
+const HW: DisplayCapabilities = { starfield: true, surfaceDetail: true, belt: true };
+const SOFTWARE: DisplayCapabilities = { starfield: false, surfaceDetail: true, belt: false };
+const SURFACE_OFF: DisplayCapabilities = { starfield: true, surfaceDetail: false, belt: true };
+/** #1319 PR3 — 소프트웨어 렌더 + `?belt=N` 강제 (bench · verify 경로) — 띠는 만들어져 있으므로 토글도 열린다. */
+const SOFTWARE_FORCED: DisplayCapabilities = { starfield: false, surfaceDetail: true, belt: true };
 
 describe('display-toggles — 표 구성', () => {
-  it('5 토글 · URL 키 5종 · id 중복 없음 (#1293 라벨 행 추가)', () => {
+  it('7 토글 · URL 키 7종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
       'clouds',
       'nightLights',
       'labels',
+      'belt',
+      'kuiper',
     ]);
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
@@ -32,6 +36,8 @@ describe('display-toggles — 표 구성', () => {
       'clouds',
       'nightlights',
       'labels',
+      'belt',
+      'kuiper',
     ]);
   });
 
@@ -42,6 +48,8 @@ describe('display-toggles — 표 구성', () => {
       { type: 'setCloudsVisible', visible: false },
       { type: 'setNightLightsVisible', visible: false },
       null,
+      { type: 'setAsteroidBeltVisible', visible: false },
+      { type: 'setKuiperBeltVisible', visible: false },
     ]);
   });
 
@@ -94,8 +102,8 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(orbits.pressed(false, SOFTWARE)).toBe(false);
   });
 
-  it('장면 미준비 (caps=null) — 신규 3종 불가 + 준비 중 사유 + 꺼짐', () => {
-    for (const id of ['stars', 'clouds', 'nightLights'] as const) {
+  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 불가 + 준비 중 사유 + 꺼짐', () => {
+    for (const id of ['stars', 'clouds', 'nightLights', 'belt', 'kuiper'] as const) {
       const def = getDisplayToggle(id);
       expect(def.disabledReason(null)).toBe(DISPLAY_DISABLED_REASONS.sceneNotReady);
       expect(def.pressed(true, null)).toBe(false);
@@ -108,6 +116,31 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(stars.pressed(true, SOFTWARE)).toBe(false);
     expect(getDisplayToggle('clouds').disabledReason(SOFTWARE)).toBeNull();
     expect(getDisplayToggle('nightLights').disabledReason(SOFTWARE)).toBeNull();
+  });
+
+  it('#1319 PR3 소프트웨어 렌더 — 소행성대 · 카이퍼 불가 + 띠 사유, 의도가 true 여도 꺼짐 (결정 3)', () => {
+    for (const id of ['belt', 'kuiper'] as const) {
+      const def = getDisplayToggle(id);
+      expect(def.disabledReason(SOFTWARE)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererBelt);
+      expect(def.pressed(true, SOFTWARE)).toBe(false);
+      // 표면 off 는 띠와 무관하다.
+      expect(def.disabledReason(SURFACE_OFF)).toBeNull();
+    }
+    // 띠 사유는 별 사유와 다른 문구 (어느 효과가 막혔는지 낭독이 갈린다).
+    expect(DISPLAY_DISABLED_REASONS.softwareRendererBelt).not.toBe(
+      DISPLAY_DISABLED_REASONS.softwareRenderer,
+    );
+  });
+
+  it('#1319 PR3 소프트웨어 렌더 + ?belt=N 강제 — 띠 토글은 열리고 별은 여전히 막힌다', () => {
+    for (const id of ['belt', 'kuiper'] as const) {
+      const def = getDisplayToggle(id);
+      expect(def.disabledReason(SOFTWARE_FORCED)).toBeNull();
+      expect(def.pressed(true, SOFTWARE_FORCED)).toBe(true);
+    }
+    expect(getDisplayToggle('stars').disabledReason(SOFTWARE_FORCED)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRenderer,
+    );
   });
 
   it('?surface=off — 구름·불빛 불가 (D10), 의도가 true 여도 꺼짐. 별은 영향 없음', () => {

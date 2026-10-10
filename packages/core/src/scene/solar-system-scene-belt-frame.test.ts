@@ -62,7 +62,13 @@ afterEach(() => {
   }
 });
 
-function makeScene(options: { asteroidNbody?: boolean; beltN?: number } = {}): Fixture {
+/**
+ * `beltN` 미지정 = 200. `belt` · `kuiper` 미지정 = 로드 시 생성 (`?belt=N` 강제 경로와 같은 옵션 — PR3 이전 fixture 의미 유지).
+ * `beltN: 0` 은 「수 미지정」 (web 의 기본 켜짐 경로) — 장면이 기본 수를 쓴다.
+ */
+function makeScene(
+  options: { asteroidNbody?: boolean; beltN?: number; belt?: boolean; kuiper?: boolean } = {},
+): Fixture {
   const engine = new NullEngine({
     renderWidth: 1280,
     renderHeight: 720,
@@ -77,6 +83,8 @@ function makeScene(options: { asteroidNbody?: boolean; beltN?: number } = {}): F
     starfield: false,
     asteroidBeltN: options.beltN ?? 200,
     asteroidNbody: options.asteroidNbody ?? false,
+    asteroidBelt: options.belt ?? true,
+    kuiperBelt: options.kuiper ?? true,
   });
   const f = { engine, scene, handles };
   fixtures.push(f);
@@ -251,10 +259,15 @@ describe('#1319 PR2 — ?belt=N 의 입자 수 (ADR 결정 6)', () => {
     expect(f.handles.getBeltParticles()!.n).toBe(ASTEROID_BELT_MAX_N);
   });
 
-  it('?beltNbody=1 구 경로에서는 카이퍼 메시를 만들지 않는다 (PR2 범위 밖 — 구 경로 무변경)', () => {
-    const f = makeScene({ asteroidNbody: true });
-    expect(f.handles.getKuiperParticles()).toBeNull();
-    expect(f.scene.getMeshByName('kuiper-particles')).toBeNull();
+  it('?beltNbody=1 구 경로 — 소행성대는 CPU 구 경로, 카이퍼는 그와 독립 (`kuiperBelt` 가 정한다 — PR3)', () => {
+    // PR2 까지는 구 경로에서 카이퍼를 만들지 않았다. PR3 에서 카이퍼가 자기 토글을 가지며 소행성대 경로와 분리됐다.
+    const off = makeScene({ asteroidNbody: true, kuiper: false });
+    expect(off.handles.getKuiperParticles()).toBeNull();
+    expect(off.scene.getMeshByName('kuiper-particles')).toBeNull();
+    const on = makeScene({ asteroidNbody: true });
+    expect(on.handles.getBeltParticles()).toBeNull();
+    expect(on.scene.getMeshByName('asteroid-template')).not.toBeNull();
+    expect(on.handles.getKuiperParticles()).not.toBeNull();
   });
 });
 
@@ -290,5 +303,112 @@ describe('#1319 결정 1 — ?beltNbody=1 구 CPU 경로 + origin 차감 (결함
     expect(Math.hypot(sun.x, sun.y, sun.z) / scale / AU).toBeGreaterThan(0.9);
     expect(centroidToSunAU).toBeLessThan(0.3);
     expect(centroidToOriginAU).toBeGreaterThan(0.7);
+  });
+});
+
+describe('#1319 PR3 — 로드 시 생성 옵션 · 런타임 토글 (ADR 결정 6)', () => {
+  const KUIPER_DEFAULT = BELT_DEFAULT_COUNTS.kuiperClassical + BELT_DEFAULT_COUNTS.plutino;
+  const ASTEROID_DEFAULT =
+    BELT_DEFAULT_COUNTS.main + BELT_DEFAULT_COUNTS.hilda + BELT_DEFAULT_COUNTS.trojan;
+
+  it('수 미지정 (`asteroidBeltN` 0) — 소행성대 = 기본 3 그룹 합 · 카이퍼 = 기본 수 (기본 켜짐 구성 5400)', () => {
+    const f = makeScene({ beltN: 0 });
+    expect(f.handles.getBeltParticles()!.n).toBe(ASTEROID_DEFAULT);
+    expect(f.handles.getKuiperParticles()!.n).toBe(KUIPER_DEFAULT);
+    expect(ASTEROID_DEFAULT + KUIPER_DEFAULT).toBe(5400);
+  });
+
+  it('로드 시 생성은 메시마다 독립 — 둘 다 끄면 메시 0 · 하나만 켜면 그것만', () => {
+    const none = makeScene({ belt: false, kuiper: false });
+    expect(none.handles.getBeltParticles()).toBeNull();
+    expect(none.handles.getKuiperParticles()).toBeNull();
+    expect(none.scene.getMeshByName('belt-particles')).toBeNull();
+    expect(none.scene.getMeshByName('kuiper-particles')).toBeNull();
+    const kuiperOnly = makeScene({ belt: false });
+    expect(kuiperOnly.handles.getBeltParticles()).toBeNull();
+    expect(kuiperOnly.handles.getKuiperParticles()!.n).toBe(KUIPER_DEFAULT);
+  });
+
+  it('꺼진 채 로드 → 처음 켤 때 지연 생성 (로드 경로와 같은 수 · 같은 궤도 요소 바이트)', () => {
+    const lazy = makeScene({ belt: false, kuiper: false });
+    lazy.handles.setAsteroidBeltVisible(true);
+    lazy.handles.setKuiperBeltVisible(true);
+    const eager = makeScene();
+    for (const get of ['getBeltParticles', 'getKuiperParticles'] as const) {
+      const a = lazy.handles[get]()!;
+      const b = eager.handles[get]()!;
+      expect(a.n, get).toBe(b.n);
+      expect(a.mesh.isEnabled(), get).toBe(true);
+      // epoch 가 같으면 (둘 다 J2000 — 지연 생성 시점 `currentJd` 가 초기 시각 그대로) 속성 버퍼가 바이트 동일하다.
+      for (const kind of ['orbitA', 'orbitB'])
+        expect(Array.from(a.mesh.getVerticesData(kind)!), `${get} ${kind}`).toEqual(
+          Array.from(b.mesh.getVerticesData(kind)!),
+        );
+    }
+  });
+
+  it('OFF 는 dispose 가 아니라 setEnabled(false) — 다시 켜면 같은 메시 (재생성 0) · 같은 상태 요청은 멱등', () => {
+    const f = makeScene();
+    const belt = f.handles.getBeltParticles()!;
+    const kuiper = f.handles.getKuiperParticles()!;
+    const meshCount = f.scene.meshes.length;
+    f.handles.setAsteroidBeltVisible(false);
+    f.handles.setKuiperBeltVisible(false);
+    expect(belt.mesh.isEnabled()).toBe(false);
+    expect(kuiper.mesh.isEnabled()).toBe(false);
+    f.handles.setAsteroidBeltVisible(false);
+    f.handles.setAsteroidBeltVisible(true);
+    f.handles.setAsteroidBeltVisible(true);
+    f.handles.setKuiperBeltVisible(true);
+    expect(f.handles.getBeltParticles()).toBe(belt);
+    expect(f.handles.getKuiperParticles()).toBe(kuiper);
+    expect(belt.mesh.isEnabled()).toBe(true);
+    expect(kuiper.mesh.isEnabled()).toBe(true);
+    expect(f.scene.meshes.length).toBe(meshCount);
+  });
+
+  it('두 토글은 서로의 메시를 건드리지 않는다 (교차 0)', () => {
+    const f = makeScene();
+    f.handles.setAsteroidBeltVisible(false);
+    expect(f.handles.getKuiperParticles()!.mesh.isEnabled()).toBe(true);
+    f.handles.setAsteroidBeltVisible(true);
+    f.handles.setKuiperBeltVisible(false);
+    expect(f.handles.getBeltParticles()!.mesh.isEnabled()).toBe(true);
+  });
+
+  it('일시정지 중 지연 생성 — 생성 epoch 가 현재 장면 시각이라 다음 시간 위상 없이도 uDays = 0 (#1205 클래스)', () => {
+    const f = makeScene({ belt: false, kuiper: false });
+    const jd = J2000_JD + 400;
+    f.handles.updateAt(jd); // 시간 이동 뒤 정지 — 이후 updateAt 은 더 오지 않는다.
+    f.handles.setAsteroidBeltVisible(true);
+    f.handles.setKuiperBeltVisible(true);
+    for (const h of [f.handles.getBeltParticles()!, f.handles.getKuiperParticles()!]) {
+      expect(h.getEpochBase()).toBe(jd);
+      h.mesh.onBeforeRenderObservable.notifyObservers(h.mesh);
+      expect(h.readFrameUniforms()!.days).toBe(0);
+    }
+  });
+
+  it('지연 생성분도 장면 dispose 에서 해제된다 (이견 수용 1)', () => {
+    const f = makeScene({ belt: false, kuiper: false });
+    f.handles.setAsteroidBeltVisible(true);
+    f.handles.setKuiperBeltVisible(true);
+    const created = [f.handles.getBeltParticles()!, f.handles.getKuiperParticles()!];
+    f.handles.dispose();
+    for (const h of created) {
+      expect(f.scene.meshes).not.toContain(h.mesh);
+      expect(f.scene.materials).not.toContain(h.material);
+    }
+  });
+
+  it('CPU 구 경로 (?beltNbody=1) — 소행성대 토글은 구 경로 메시 가시성만 바꾸고 GPU 메시를 만들지 않는다', () => {
+    const f = makeScene({ asteroidNbody: true });
+    const template = f.scene.getMeshByName('asteroid-template')!;
+    f.handles.setAsteroidBeltVisible(false);
+    expect(template.isEnabled()).toBe(false);
+    f.handles.setAsteroidBeltVisible(true);
+    expect(template.isEnabled()).toBe(true);
+    expect(f.handles.getBeltParticles()).toBeNull();
+    expect(f.scene.getMeshByName('belt-particles')).toBeNull();
   });
 });

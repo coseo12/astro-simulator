@@ -25,11 +25,7 @@ import {
 import { BarnesHutNBodyEngine } from '../physics/barnes-hut-engine.js';
 import { WebGpuNBodyEngine } from '../physics/webgpu-nbody-engine.js';
 import { isWebGpuEngine, WebGpuUnavailableError } from '../gpu/index.js';
-import {
-  ASTEROID_BELT_MAX_N,
-  createAsteroidBelt,
-  type AsteroidBeltHandles,
-} from './asteroid-belt.js';
+import { createAsteroidBelt, type AsteroidBeltHandles } from './asteroid-belt.js';
 import {
   BELT_COOL_GRAY_RGB,
   BELT_WARM_GRAY_RGB,
@@ -39,11 +35,13 @@ import {
 } from './belt-particles.js';
 import {
   ASTEROID_BELT_GROUPS,
+  ASTEROID_BELT_MAX_N,
   BELT_DEFAULT_COUNTS,
   KUIPER_BELT_GROUPS,
   beltPlanetsFromSystem,
   generateBeltPopulation,
   scaleAsteroidBeltCounts,
+  type BeltCounts,
   type BeltOrbit,
   type BeltPopulation,
 } from './belt-population.js';
@@ -235,6 +233,15 @@ export interface SolarSystemSceneHandles {
    */
   setNightLightsVisible: (visible: boolean) => void;
   /**
+   * #1319 PR3 — 소행성대 런타임 토글 (ADR 20261008-1319 결정 6). 없으면 그때 한 번 생성하고 (`asteroidBeltN` 수 ·
+   * 현재 시각 epoch), 이후는 `setEnabled` 만 바꾼다 (별 배경 `setStarfieldVisible` 과 같은 수명 — dispose 는 장면
+   * dispose 때만, 이견 수용 1). CPU 구 경로(`?beltNbody=1`) 가 있으면 그 메시의 가시성만 바꾼다 (N-body state 편입
+   * 이라 재생성하지 않는다). 렌더러 종류는 묻지 않는다 — 소프트웨어 렌더 차단은 호출자 (web) 책임이다 (결정 3).
+   */
+  setAsteroidBeltVisible: (visible: boolean) => void;
+  /** #1319 PR3 — 카이퍼 벨트 런타임 토글. 계약은 `setAsteroidBeltVisible` 과 같다 (CPU 구 경로 없음). */
+  setKuiperBeltVisible: (visible: boolean) => void;
+  /**
    * P12-A #298 — 현재 활성 tier.
    *
    * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
@@ -415,13 +422,13 @@ export interface SolarSystemSceneHandles {
    */
   getBodyScreenInfo: () => readonly BodyScreenInfo[];
   /**
-   * #1319 — GPU 띠 입자 핸들 (`?belt=N` 이고 `?beltNbody=1` 이 아닐 때만). 없으면 null. 진단 · 단위 테스트용.
-   * 소행성대 메시 (주 띠 + 힐다 + 트로이, 웜 그레이) 다. 카이퍼는 `getKuiperParticles`.
+   * #1319 — GPU 띠 입자 핸들. 소행성대 메시 (주 띠 + 힐다 + 트로이, 웜 그레이) 다. 카이퍼는 `getKuiperParticles`.
+   * 아직 만들어지지 않았거나 (`asteroidBelt` false 이고 토글 전) CPU 구 경로(`?beltNbody=1`) 면 null. 진단 · 단위 테스트용.
    */
   getBeltParticles: () => BeltParticlesHandles | null;
   /**
-   * #1319 PR2 — 카이퍼 띠 입자 핸들 (고전대 + 플루티노, 쿨 그레이 — ADR 결정 5). 생성 조건은 `getBeltParticles`
-   * 와 같다 (`?belt=N` 옵트인 · `?beltNbody=1` 아님). 없으면 null. 진단 · 단위 테스트용.
+   * #1319 PR2 — 카이퍼 띠 입자 핸들 (고전대 + 플루티노, 쿨 그레이 — ADR 결정 5). PR3 부터 생성 조건은 소행성대와
+   * 독립이다 (`kuiperBelt` 옵션 · `setKuiperBeltVisible`). 없으면 null. 진단 · 단위 테스트용.
    */
   getKuiperParticles: () => BeltParticlesHandles | null;
   /**
@@ -491,11 +498,23 @@ export interface SolarSystemSceneOptions {
   /** 물리 엔진 선택. 기본: 'kepler' (해석해). 'newton'은 #86에서 추가. */
   physicsEngine?: PhysicsEngineKind;
   /**
-   * 소행성대 샘플 수. 0 또는 undefined면 생성 안 함. `ASTEROID_BELT_MAX_N` 으로 clamp.
-   * #1319 PR2 (GPU 경로) — 소행성대 그룹(주 띠 + 힐다 + 트로이) 총수다 (ADR 결정 6 — 기본 비율 3000:300:600 유지).
-   * 카이퍼(고전대 + 플루티노) 는 이 수와 무관하게 기본 수(`BELT_DEFAULT_COUNTS`) 로 함께 생성된다.
+   * 소행성대 그룹(주 띠 + 힐다 + 트로이) 총수 — ADR 20261008-1319 결정 6 (기본 비율 3000:300:600 유지).
+   * `ASTEROID_BELT_MAX_N` 으로 clamp. 생성 여부는 이 값이 아니라 `asteroidBelt` 가 정한다 (#1319 PR3).
+   *  - GPU 경로: 0 또는 undefined 면 기본 수 (`BELT_DEFAULT_COUNTS` 의 세 그룹 합). 런타임 토글의 지연 생성도 같은 수.
+   *  - CPU 구 경로 (`asteroidNbody`): 0 또는 undefined 면 만들지 않는다 (N-body 편입 수라 기본 수가 없다 — 현행 유지).
+   * 카이퍼(고전대 + 플루티노) 는 이 수와 무관하게 기본 수다 (별도 토글 `kuiperBelt`).
    */
   asteroidBeltN?: number;
+  /**
+   * #1319 PR3 — 소행성대 메시를 **로드 시** 만든다 (ADR 결정 6). 기본 false. false 여도 런타임 토글
+   * (`setAsteroidBeltVisible(true)`) 이 처음 켤 때 지연 생성한다.
+   *
+   * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 3) 는 호출자(web) 가 판정해 이 값으로만 전달한다
+   * (ADR §교차검증 이견 수용 5 · `starfield` 옵션과 같은 레이어 분리).
+   */
+  asteroidBelt?: boolean;
+  /** #1319 PR3 — 카이퍼 메시를 로드 시 만든다 (결정 6). 기본 false. 그 밖의 계약은 `asteroidBelt` 와 같다. */
+  kuiperBelt?: boolean;
   /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
    * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
@@ -698,6 +717,8 @@ export function createSolarSystemScene(
     physicsEngine = 'kepler',
     asteroidBeltN = 0,
     asteroidNbody = false,
+    asteroidBelt: asteroidBeltAtLoad = false,
+    kuiperBelt: kuiperBeltAtLoad = false,
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
@@ -1292,16 +1313,76 @@ export function createSolarSystemScene(
 
   // 소행성대 (#99).
   // #1319 — 두 경로로 갈린다 (ADR 20261008-1319 결정 1):
-  //  - GPU Kepler 경로 (`?belt=N`, 기본): N 쿼드 단일 메시 + 정점 셰이더 Kepler. 위치를 셰이더가 정하므로
+  //  - GPU Kepler 경로 (기본 켜짐 · `?belt=N`): N 쿼드 단일 메시 + 정점 셰이더 Kepler. 위치를 셰이더가 정하므로
   //    시간은 `updateAt` 의 uniform 1개, 기준계는 `bodyFrame` 스냅샷 (draw 직전 읽기).
   //  - CPU 구 경로 (`?beltNbody=1`, P4-A #165): ThinInstance 구 + engine state 편입. N-body 적분 위치는 Kepler
   //    셰이더로 표현할 수 없어 유지한다. origin 은 `bodyFrame` 으로 차감 (결함 (가) 수정).
+  // #1319 PR3 — 로드 시 생성 여부는 `asteroidBelt` / `kuiperBelt` 옵션이 정하고 (web 이 소프트웨어 게이트를 적용해
+  // 넘긴다 — 결정 3), 꺼진 채 로드한 것은 런타임 토글이 처음 켤 때 같은 생성 함수로 지연 생성한다 (결정 6).
   let asteroidBelt: AsteroidBeltHandles | null = null;
   let beltParticles: BeltParticlesHandles | null = null;
   let kuiperParticles: BeltParticlesHandles | null = null;
   // 위치 버퍼 초기화 (`localPositions`/`worldPositions`) + 태양광 동기 헬퍼 정의.
   phase('scene:position-buffers');
-  if (asteroidBeltN > 0 && asteroidNbody) {
+  // 소행성대 그룹 총수 (결정 6). 미지정 = 기본 수 — `scaleAsteroidBeltCounts(합)` 이 기본 3000:300:600 을 그대로 돌려준다.
+  const asteroidBeltTotal =
+    asteroidBeltN > 0
+      ? Math.min(asteroidBeltN, ASTEROID_BELT_MAX_N)
+      : ASTEROID_BELT_GROUPS.reduce((sum, g) => sum + BELT_DEFAULT_COUNTS[g], 0);
+  const beltPlanets = beltPlanetsFromSystem(system);
+  /**
+   * 그룹 묶음 하나의 궤도 요소. 분포는 그룹 5종 생성기 (결정 4) — 목성 · 해왕성 요소는 장면과 같은 로더 데이터에서
+   * 읽는다. 그룹마다 독립 난수 스트림이라 (`generateBeltPopulation` 계약) 다른 묶음의 수를 0 으로 둬도 이 묶음의
+   * 요소는 함께 생성할 때와 같다 — 그래서 두 메시를 따로 (지연) 생성해도 분포가 로드 경로와 같다.
+   */
+  const generateBeltGroups = (counts: Partial<BeltCounts>): BeltPopulation =>
+    generateBeltPopulation(
+      BELT_POPULATION_SEED,
+      { main: 0, hilda: 0, trojan: 0, kuiperClassical: 0, plutino: 0, ...counts },
+      beltPlanets,
+    );
+  const collect = (
+    population: BeltPopulation,
+    groups: readonly (keyof BeltPopulation)[],
+  ): BeltOrbit[] => groups.flatMap((g) => population[g]);
+  /** 소행성대 메시 (주 띠 + 힐다 + 트로이). `epoch` = 생성 시점 장면 시각 (지연 생성이면 `currentJd`). */
+  const createAsteroidBeltParticles = (epoch: number): BeltParticlesHandles => {
+    const population = generateBeltGroups(scaleAsteroidBeltCounts(asteroidBeltTotal));
+    return createBeltParticles(scene, {
+      orbits: collect(population, ASTEROID_BELT_GROUPS),
+      name: 'belt-particles',
+      color: BELT_WARM_GRAY_RGB,
+      // 힐다 (목성 3:2 공명군) 만 강조색 — 시각 구분 전용, 물리 색 아님 (사용자 결정 2026-10-09, PR #1324).
+      // `collect` 와 같은 그룹 순서로 펼쳐 입자 인덱스가 맞는다.
+      accentFlags: ASTEROID_BELT_GROUPS.flatMap((g) =>
+        population[g].map(() => g === BELT_ACCENT_GROUP),
+      ),
+      seed: BELT_POPULATION_SEED,
+      epoch,
+      frameProvider: () => bodyFrame,
+    });
+  };
+  /**
+   * 카이퍼 메시 (고전대 + 플루티노). 수는 소행성대 N 과 묶지 않는다: 결정 6 이 N 을 소행성대 그룹에만 정의했고
+   * 카이퍼는 별도 토글을 가진 독립 그룹이라 기본 수(Q1) 를 쓴다.
+   */
+  const createKuiperBeltParticles = (epoch: number): BeltParticlesHandles =>
+    createBeltParticles(scene, {
+      orbits: collect(
+        generateBeltGroups({
+          kuiperClassical: BELT_DEFAULT_COUNTS.kuiperClassical,
+          plutino: BELT_DEFAULT_COUNTS.plutino,
+        }),
+        KUIPER_BELT_GROUPS,
+      ),
+      name: 'kuiper-particles',
+      color: BELT_COOL_GRAY_RGB,
+      // 밝기 스트림을 소행성대 메시와 분리 (같은 seed 면 두 메시의 밝기 수열이 같아진다).
+      seed: BELT_POPULATION_SEED + KUIPER_BRIGHTNESS_SEED_OFFSET,
+      epoch,
+      frameProvider: () => bodyFrame,
+    });
+  if (asteroidBeltAtLoad && asteroidNbody && asteroidBeltN > 0) {
     asteroidBelt = createAsteroidBelt(scene, {
       n: asteroidBeltN,
       epoch: initialJulianDate,
@@ -1311,54 +1392,20 @@ export function createSolarSystemScene(
       sceneUnitPerMeter: renderScaleForTier(activeTier),
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
-  } else if (asteroidBeltN > 0) {
-    // #1319 PR2 — 분포는 그룹 5종 생성기 (ADR 결정 4). 목성 · 해왕성 요소는 장면과 같은 로더 데이터에서 읽는다.
-    // N 은 소행성대 그룹 총수 (결정 6) — 카이퍼 수는 N 과 묶지 않는다: 결정 6 이 N 을 소행성대 그룹에만 정의했고
-    // 카이퍼는 별도 토글(`kuiper`, PR3) 을 가진 독립 그룹이라 기본 수(Q1) 를 쓴다.
-    const population: BeltPopulation = generateBeltPopulation(
-      BELT_POPULATION_SEED,
-      {
-        ...scaleAsteroidBeltCounts(Math.min(asteroidBeltN, ASTEROID_BELT_MAX_N)),
-        kuiperClassical: BELT_DEFAULT_COUNTS.kuiperClassical,
-        plutino: BELT_DEFAULT_COUNTS.plutino,
-      },
-      beltPlanetsFromSystem(system),
-    );
-    const collect = (groups: readonly (keyof BeltPopulation)[]): BeltOrbit[] =>
-      groups.flatMap((g) => population[g]);
-    beltParticles = createBeltParticles(scene, {
-      orbits: collect(ASTEROID_BELT_GROUPS),
-      name: 'belt-particles',
-      color: BELT_WARM_GRAY_RGB,
-      // 힐다 (목성 3:2 공명군) 만 강조색 — 시각 구분 전용, 물리 색 아님 (사용자 결정 2026-10-09, PR #1324).
-      // `collect` 와 같은 그룹 순서로 펼쳐 입자 인덱스가 맞는다.
-      accentFlags: ASTEROID_BELT_GROUPS.flatMap((g) =>
-        population[g].map(() => g === BELT_ACCENT_GROUP),
-      ),
-      seed: BELT_POPULATION_SEED,
-      epoch: initialJulianDate,
-      frameProvider: () => bodyFrame,
-    });
-    kuiperParticles = createBeltParticles(scene, {
-      orbits: collect(KUIPER_BELT_GROUPS),
-      name: 'kuiper-particles',
-      color: BELT_COOL_GRAY_RGB,
-      // 밝기 스트림을 소행성대 메시와 분리 (같은 seed 면 두 메시의 밝기 수열이 같아진다).
-      seed: BELT_POPULATION_SEED + KUIPER_BRIGHTNESS_SEED_OFFSET,
-      epoch: initialJulianDate,
-      frameProvider: () => bodyFrame,
-    });
-    // 이견 수용 1 — 장면 dispose 시 메시 · 머티리얼 해제.
-    disposables.push({
-      dispose: () => {
-        beltParticles?.dispose();
-        beltParticles = null;
-        kuiperParticles?.dispose();
-        kuiperParticles = null;
-      },
-    });
+  } else if (asteroidBeltAtLoad) {
+    beltParticles = createAsteroidBeltParticles(initialJulianDate);
   }
-  // 소행성대 ThinInstances (`?belt=N` 미지정이면 빈 구간).
+  if (kuiperBeltAtLoad) kuiperParticles = createKuiperBeltParticles(initialJulianDate);
+  // 이견 수용 1 — 장면 dispose 시 메시 · 머티리얼 해제. 지연 생성분도 같은 변수에 담기므로 항상 등록한다.
+  disposables.push({
+    dispose: () => {
+      beltParticles?.dispose();
+      beltParticles = null;
+      kuiperParticles?.dispose();
+      kuiperParticles = null;
+    },
+  });
+  // 소행성대 · 카이퍼 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:asteroid-belt');
 
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
@@ -2579,6 +2626,33 @@ export function createSolarSystemScene(
     starfieldHandles?.mesh.setEnabled(false);
   };
 
+  // #1319 PR3 — 띠 런타임 토글 (ADR 20261008-1319 결정 6). 별 배경과 같은 수명 계약: 없을 때만 생성, 이후 `setEnabled`
+  // (dispose 는 장면 dispose 때만 — 이견 수용 1). 지연 생성의 epoch 는 현재 장면 시각이라 `uDays = 0` 에서 시작해
+  // 일시정지 중에 켜도 다음 시간 위상을 기다리지 않고 지금 위치에 그린다 (#1205 클래스 — 시간 위상 비의존).
+  // 기준계는 draw 직전 `bodyFrame` 을 읽으므로 생성 시점과 무관하다 (결정 2).
+  // ⚠️ 렌더러를 묻지 않는다 — 소프트웨어 렌더 (결정 3) 차단의 유일한 지점은 web 의 가용성 검사다 (`setStarfieldVisible` 동형).
+  const setAsteroidBeltVisible = (visible: boolean) => {
+    // CPU 구 경로는 N-body 엔진 state 에 편입돼 있어 재생성하지 않는다 — 호스트 메시 가시성만 바꾼다.
+    if (asteroidBelt) {
+      asteroidBelt.mesh.setEnabled(visible);
+      return;
+    }
+    if (visible) {
+      beltParticles ??= createAsteroidBeltParticles(currentJd);
+      beltParticles.mesh.setEnabled(true);
+      return;
+    }
+    beltParticles?.mesh.setEnabled(false);
+  };
+  const setKuiperBeltVisible = (visible: boolean) => {
+    if (visible) {
+      kuiperParticles ??= createKuiperBeltParticles(currentJd);
+      kuiperParticles.mesh.setEnabled(true);
+      return;
+    }
+    kuiperParticles?.mesh.setEnabled(false);
+  };
+
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
@@ -2682,6 +2756,8 @@ export function createSolarSystemScene(
     setStarfieldVisible,
     setCloudsVisible,
     setNightLightsVisible,
+    setAsteroidBeltVisible,
+    setKuiperBeltVisible,
     getTier,
     setTier,
     updateTierByCamera,

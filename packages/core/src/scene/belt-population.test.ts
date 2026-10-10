@@ -132,11 +132,8 @@ describe('#1319 PR2 주 띠 — 커크우드 간극 (a 분포에만, ADR 1-E · 
     (g) => g.label !== '2:1', // 2:1 은 주 띠 바깥 경계(3.3 AU) 에 붙어 바깥 이웃 bin 이 없다 — DoD 대상 아님.
   );
 
-  it('기본 수 3000 · seed 42 — 3:1 · 5:2 · 7:3 간극 대비 각 ≤ 0.5', () => {
-    const a = population.main.map((o) => o.semiMajorAxisAU);
-    expect(a).toHaveLength(BELT_DEFAULT_COUNTS.main);
-    for (const g of gaps) expect(gapContrast(a, g.centerAU), g.label).toBeLessThanOrEqual(0.5);
-  });
+  // (#1319 PR3) 「기본 수 3000 · seed 42」 단언은 삭제했다 — 3000 표본의 간극 대비는 seed 에 따라 0.5 를 넘나들어
+  // (200 seed 중 14.5% 초과 — PR #1324 reviewer 실측) 판별력이 없었다. 판정은 아래 200,000 대표본이 한다.
 
   it('대표본 200,000 — 간극 대비 ≤ 0.5 (seed 우연이 아닌 분포 성질) · 간극 밖 대조 bin 은 ≈ 1', () => {
     const big = generateBeltPopulation(7, { ...zeroCounts(), main: 200_000 }, planets).main.map(
@@ -241,6 +238,38 @@ describe('#1319 PR2 힐다 (목성 3:2) · 플루티노 (해왕성 2:3) — 공�
       ).size;
     expect(quadrants(population.hilda, planets.jupiter.meanLongitudeAtEpoch)).toBe(4);
     expect(quadrants(population.plutino, planets.neptune.meanLongitudeAtEpoch)).toBe(4);
+  });
+
+  it('갈래별 개수 비율 — 플루티노 3 갈래 각 1/3 (대표본, 갈래 수를 줄이는 변이를 잡는다)', () => {
+    // 위 사분면 단언은 「갈래가 1개뿐」 만 잡는다 — 플루티노를 2 갈래로 줄여도 λ 가 4 사분면에 퍼져 통과한다 (PR #1324
+    // reviewer 실측 35/35 PASS). 그래서 갈래 k 를 각 입자에서 복원해 비율을 직접 본다.
+    // 복원: 공명각 φ 는 갈래와 무관하게 같은 값이라 (3·2πk/3 = 2πk) 생성 구간 안의 대표값으로 접은 뒤, λ 와
+    // 갈래 0 해 (φ 식을 λ 로 푼 값) 의 차를 갈래 간격(2π/갈래 수) 으로 나누면 k 다.
+    const N = 30_000;
+    const big = generateBeltPopulation(11, { ...zeroCounts(), plutino: N }, planets);
+    const branchShares = (
+      orbits: readonly BeltOrbit[],
+      branches: number,
+      branchZeroLambda: (o: BeltOrbit) => number,
+    ) => {
+      const counts = new Array<number>(branches).fill(0);
+      for (const o of orbits) {
+        const diff = meanLongitude(o) - branchZeroLambda(o);
+        const step = (2 * Math.PI) / branches;
+        const k = ((Math.round(diff / step) % branches) + branches) % branches;
+        counts[k] = counts[k]! + 1;
+      }
+      return counts.map((c) => c / orbits.length);
+    };
+    const lambdaN = planets.neptune.meanLongitudeAtEpoch;
+    const plutinoShares = branchShares(big.plutino, 3, (o) => {
+      const raw = 3 * meanLongitude(o) - 2 * lambdaN - perihelionLongitude(o);
+      const phi = Math.PI + wrapSigned(raw - Math.PI); // 생성 구간 180° ± 40° 의 대표값
+      return (phi + 2 * lambdaN + perihelionLongitude(o)) / 3;
+    });
+    // 허용폭 0.02 — 이항 표준편차 (N = 30,000 에서 ≈ 0.003) 의 6배 이상. 갈래를 하나 줄이면 비율이 1/2 · 1/2 · 0
+    // 으로 바뀌어 0.17 이상 벗어난다.
+    for (const share of plutinoShares) expect(Math.abs(share - 1 / 3)).toBeLessThanOrEqual(0.02);
   });
 
   it('평균운동 비 — 힐다 1.5 n_J · 플루티노 (2/3) n_N 정확 (double, float32 cast 전)', () => {

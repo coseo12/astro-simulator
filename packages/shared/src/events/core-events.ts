@@ -57,6 +57,10 @@ export type CoreEvents = {
  * `docs/decisions/20260927-1265-runtime-display-toggles.md` §결정 1). 로드 시점 `?x=off` 경로와는
  * 별개이며 그 경로를 바꾸지 않는다. core 는 렌더러 종류를 모른다 — 소프트웨어 렌더에서 별을 막는
  * 것은 명령을 보내는 web 의 책임이다 (§결정 1 · 5).
+ *
+ * #1319 PR3 — `setAsteroidBeltVisible` / `setKuiperBeltVisible` 추가. 소행성대 · 카이퍼 띠 입자의 런타임 토글
+ * (위 3종과 같은 효과별 명령 — ADR `docs/decisions/20261008-1319-asteroid-belt-gpu.md` 결정 6). 소프트웨어 렌더
+ * 게이트 (결정 3) 도 별 배경과 같이 web 이 한다.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -73,4 +77,6 @@ export type CoreCommand =
   | { type: 'setOrbitLinesVisible'; visible: boolean }
   | { type: 'setStarfieldVisible'; visible: boolean }
   | { type: 'setCloudsVisible'; visible: boolean }
-  | { type: 'setNightLightsVisible'; visible: boolean };
+  | { type: 'setNightLightsVisible'; visible: boolean }
+  | { type: 'setAsteroidBeltVisible'; visible: boolean }
+  | { type: 'setKuiperBeltVisible'; visible: boolean };

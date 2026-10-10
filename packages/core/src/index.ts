@@ -40,6 +40,12 @@ export type { RPhaseBodyId } from './scene/r-phase-allowlist.js';
 // §Amendment 결정 D1 패턴). #1305 — 장면 공전 μ (`orbitMu` / `twoBodyMu`) 도 같은 경로로 노출.
 export { orbitMu, positionAt, twoBodyMu } from './physics/kepler.js';
 
+// #1319 PR3 — `?belt=N` 상한 직접 named export (web `parse-belt-mode.ts` 의 clamp — 리터럴 중복 제거).
+// `scene` namespace 경유는 위 #402 와 같은 SSR 기전에 걸린다 (파서는 표시 토글 표 → 표시 패널 경로로 SSR 평가 대상).
+// `belt-population.ts` 는 Babylon 비의존 (shared 상수 · `kepler.ts` · 로더 type import 만) 이라 모듈 그래프 영향이 위
+// `kepler.ts` 와 같다. exports field 불변.
+export { ASTEROID_BELT_MAX_N } from './scene/belt-population.js';
+
 // #845 — GpuTier / LodLevel 루트 type re-export.
 //
 // `./render` 는 package.json exports sub-path 미등재 (#402 exports 불변 가드 — 신규 sub-path

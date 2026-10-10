@@ -15,13 +15,21 @@ import { SimulationCore } from './simulation-core.js';
 // SimulationCore 생성자는 canvas 참조만 저장 — start() 호출 안 하면 Babylon 초기화 X.
 const makeCanvas = () => ({}) as unknown as HTMLCanvasElement;
 
-type ToggleType = 'setStarfieldVisible' | 'setCloudsVisible' | 'setNightLightsVisible';
+type ToggleType =
+  | 'setStarfieldVisible'
+  | 'setCloudsVisible'
+  | 'setNightLightsVisible'
+  | 'setAsteroidBeltVisible'
+  | 'setKuiperBeltVisible';
 type Register = (core: SimulationCore, handler: (visible: boolean) => void) => void;
 
 const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
   { type: 'setStarfieldVisible', register: (c, h) => c.setStarfieldVisibleHandler(h) },
   { type: 'setCloudsVisible', register: (c, h) => c.setCloudsVisibleHandler(h) },
   { type: 'setNightLightsVisible', register: (c, h) => c.setNightLightsVisibleHandler(h) },
+  // #1319 PR3 — 소행성대 · 카이퍼 띠 토글 (같은 5 케이스).
+  { type: 'setAsteroidBeltVisible', register: (c, h) => c.setAsteroidBeltVisibleHandler(h) },
+  { type: 'setKuiperBeltVisible', register: (c, h) => c.setKuiperBeltVisibleHandler(h) },
 ];
 
 describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, register }) => {
@@ -81,18 +89,22 @@ describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, 
 });
 
 describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
-  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 4종)', () => {
+  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 6종 — #1319 PR3 띠 2종)', () => {
     const core = new SimulationCore(makeCanvas());
     const handlers = {
       setOrbitLinesVisible: vi.fn(),
       setStarfieldVisible: vi.fn(),
       setCloudsVisible: vi.fn(),
       setNightLightsVisible: vi.fn(),
+      setAsteroidBeltVisible: vi.fn(),
+      setKuiperBeltVisible: vi.fn(),
     };
     core.setOrbitLinesVisibleHandler(handlers.setOrbitLinesVisible);
     core.setStarfieldVisibleHandler(handlers.setStarfieldVisible);
     core.setCloudsVisibleHandler(handlers.setCloudsVisible);
     core.setNightLightsVisibleHandler(handlers.setNightLightsVisible);
+    core.setAsteroidBeltVisibleHandler(handlers.setAsteroidBeltVisible);
+    core.setKuiperBeltVisibleHandler(handlers.setKuiperBeltVisible);
 
     for (const type of Object.keys(handlers) as (keyof typeof handlers)[]) {
       for (const h of Object.values(handlers)) h.mockClear();

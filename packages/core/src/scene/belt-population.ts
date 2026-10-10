@@ -41,6 +41,14 @@ const GROUP_ORDER: readonly BeltGroup[] = [...ASTEROID_BELT_GROUPS, ...KUIPER_BE
 
 export type BeltCounts = Record<BeltGroup, number>;
 
+/**
+ * 소행성대 그룹 총수(`?belt=N` 의 N) 상한 — `?belt=` 파서(web `parse-belt-mode.ts`) 와 장면(`asteroidBeltN` clamp ·
+ * CPU 구 경로 `createAsteroidBelt`) 이 모두 이 값을 import 한다 (#1319 PR3 — 리터럴 `10_000` 중복 제거).
+ * Babylon 비의존인 이 모듈에 두는 이유: web 이 패키지 루트 named export 로 가져갈 때 장면 모듈 그래프를 끌어오지
+ * 않게 하려는 것이다 (`packages/core/src/index.ts` #402 주석과 같은 기전).
+ */
+export const ASTEROID_BELT_MAX_N = 10_000;
+
 /** 기본 입자 수 — 사용자 결정 Q1 (합 5400). */
 export const BELT_DEFAULT_COUNTS: Readonly<BeltCounts> = {
   main: 3000,
@@ -150,7 +158,13 @@ const PLUTINO_I_SIGMA = 10 * DEG;
  */
 export const BELT_ECCENTRICITY_CAP = 0.3;
 
-/** 그룹별 난수 스트림 seed 간격 (황금비 32bit) — mulberry32 의 증분(0x6d2b79f5) 과 달라 스트림이 겹치지 않는다. */
+/**
+ * 그룹별 난수 스트림 seed 간격 (황금비 32bit). mulberry32 상태는 증분 `0x6d2b79f5` 의 등차수열이라, 두 스트림이
+ * 겹치는지는 seed 차를 증분으로 나눈 **단계 거리** `stride·d·inc⁻¹ mod 2³²` 로 정해진다 (증분과 「값이 다르다」 는
+ * 것만으로는 근거가 안 된다). 그룹 5종의 스트림 간 거리 (d = 1..4, 양방향 최솟값) 는 **613,683,765 단계** 다
+ * (PR #1324 reviewer 실측 · PR3 재계산 일치). 한 스트림의 소비량은 입자당 난수 몇 개 (각도 3 · 분포 표본 · 기각
+ * 재추출) × 상한 `ASTEROID_BELT_MAX_N` 개라 10⁵ 단위 [추정 — 계수 미실측] 로, 그 거리에 닿지 않는다.
+ */
 const GROUP_SEED_STRIDE = 0x9e3779b9;
 /** 기각 표본추출 무한 루프 방지 — 파라미터가 깨져 수락 확률이 0 이 되면 조용히 멈추지 않고 실패한다. */
 const MAX_REJECTION_ATTEMPTS = 10_000;

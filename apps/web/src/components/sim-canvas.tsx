@@ -23,6 +23,7 @@ import { parseStarsVisible, resolveStarfieldVisible } from '@/core/parse-stars-m
 import { parseSurfaceVisible } from '@/core/parse-surface-mode';
 import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { parseCloudsVisible } from '@/core/parse-cloud-mode';
+import { parseBeltParam, parseKuiperVisible, resolveBeltAtLoad } from '@/core/parse-belt-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
 import { parseLabelsVisible } from '@/core/parse-labels-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
@@ -517,9 +518,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 진입 시 1회 산정이라, free-fly 활성 중 슬라이더 변경은 아래 store 구독이 즉시 재산정한다
         // (ADR §결정 1 줌아웃 실시간 반영 — agy 이견 수용). 함수로 매 사용 시점 store 최신값 pull.
         const getZoomoutFactor = () => useSimStore.getState().freeFlySensitivity.zoomoutFactor;
-        // tier escalation 후 solar 개요에서의 줌아웃 상한 (scene unit). 해왕성 30 AU ≈ 3.8 scene unit
-        // (solar renderScale) 이라 1000 은 외곽 관찰 충분 + 그 너머 빈 공간 차단. D-T2 튜닝 지점.
-        const SOLAR_ZOOMOUT_LIMIT = 1000;
+        // tier escalation 후 solar 개요에서의 줌아웃 상한 (scene unit). solar renderScale 에서 1 unit ≈ 0.0795 AU.
+        // #1319 PR3 (ADR 20261008-1319 결정 7) — 1000 → 1600. 1000 (카메라 거리 79.6 AU) 에서는 부팅 기울기 기준
+        // 카이퍼 고전대 45 AU 원이 61% 만 화면에 들어왔다 (실측 1-F). 1600 (127.3 AU) 에서 45 · 48 AU 원 100%.
+        // ⚠️ 이 상한은 **free-fly 에서 tier 가 실제로 escalate 한 뒤에만** 적용된다 (아래 onBeforeRender 분기). 기본
+        // 진입 화면 (포커스 없음 · free-fly 아님) 의 휠 줌아웃 상한은 `DEFAULT_UPPER_RADIUS_LIMIT` (1e14) 이라
+        // 거기서는 이 값과 무관하게 카이퍼까지 줌아웃할 수 있다.
+        const SOLAR_ZOOMOUT_LIMIT = 1600;
         const DEFAULT_UPPER_RADIUS_LIMIT = camera.upperRadiusLimit ?? 1e14;
         // #699 — setupArcRotateCamera 기본 lowerRadiusLimit (focusOn 이 desiredRadius×0.5 로 낮춘 것을
         // free-fly 진입 시 원복하기 위한 SSoT — ADR §5-2 sun anomaly 차단 (a)).
@@ -529,9 +534,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // `new URLSearchParams` 신규 호출 금지 (#850 감사 — 현행 22회 재파싱의 성장 중단).
         // 기존 22회의 레지스트리 수렴은 #850 Phase 3 범위 — 본 계약은 그때까지 증가만 차단한다.
         // ─────────────────────────────────────────────────────────────────────────────────────
-        // 소행성대 N — URL ?belt=NNN 우선, 없으면 0 (생성 안 함).
-        const beltParam = new URLSearchParams(window.location.search).get('belt');
-        const beltN = beltParam ? Math.max(0, Math.min(10_000, Number(beltParam) || 0)) : 0;
+        // #1319 PR3 — 소행성대 · 카이퍼 (ADR 20261008-1319 결정 6). 종전 `?belt=` 인라인 파싱을 파서로 옮겼다 —
+        // URL 파싱 객체 생성은 종전과 같은 1회 (#850 계약: 증가 0) 이고 같은 객체에서 `?kuiper=` 도 읽는다.
+        // 기본 켜짐 (미지정) · `off` 꺼짐 · 숫자 `N ≥ 1` = 수 + 강제 생성 · `0` 꺼짐. clamp 상한은 core 상수.
+        const beltUrl = new URLSearchParams(window.location.search);
+        const beltMode = parseBeltParam(beltUrl.get('belt'));
+        const kuiperParamVisible = parseKuiperVisible(beltUrl.get('kuiper'));
+        // `beltN` = **명시** 수만 (미지정 = 0). 아래 엔진 자동 선택 (`auto` → N ≥ 1000 이면 webgpu/barnes-hut) 과
+        // N-body 편입 수는 종전 의미 그대로 명시 수만 본다 — 기본 켜짐이 물리 엔진 선택을 바꾸면 안 된다.
+        const beltN = beltMode.count ?? 0;
         // P4-A #165 — ?beltNbody=1 옵트인 시 소행성대를 N-body 엔진에 편입.
         // BH tree / GPU compute 가속 효과를 실측 가능케 한다. 기본 false로 기존 Kepler 경로 유지.
         const beltNbodyParam = new URLSearchParams(window.location.search).get('beltNbody');
@@ -681,6 +692,10 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           physicsEngine: resolveEngine(useSimStore.getState().physicsEngine),
           asteroidBeltN: beltN,
           asteroidNbody,
+          // #1319 PR3 — 로드 시 생성. 소프트웨어 렌더 게이트는 여기서 (결정 3 — core 는 렌더러를 모른다). 꺼진 채
+          // 로드한 것은 표시 패널이 처음 켤 때 지연 생성한다. 기본 ON 은 파서 기본값이 결정 (core 옵션 기본값 false).
+          asteroidBelt: resolveBeltAtLoad(beltMode.visible, beltMode.forced, !isSoftwareRenderer),
+          kuiperBelt: resolveBeltAtLoad(kuiperParamVisible, beltMode.forced, !isSoftwareRenderer),
           grMode,
           integrator,
           ringRenderMode,
@@ -980,16 +995,22 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setStarfieldVisibleHandler((visible) => solar.setStarfieldVisible(visible));
         instance.setCloudsVisibleHandler((visible) => solar.setCloudsVisible(visible));
         instance.setNightLightsVisibleHandler((visible) => solar.setNightLightsVisible(visible));
+        // #1319 PR3 — 소행성대 · 카이퍼 (같은 wiring). 가용성 `belt` = 소프트웨어 렌더가 아니거나 `?belt=N` 강제.
+        instance.setAsteroidBeltVisibleHandler((visible) => solar.setAsteroidBeltVisible(visible));
+        instance.setKuiperBeltVisibleHandler((visible) => solar.setKuiperBeltVisible(visible));
         {
           const store = useSimStore.getState();
           store.setStarsVisible(starsParamVisible);
           store.setCloudsVisible(cloudsVisible);
           store.setNightLightsVisible(nightLightsVisible);
           store.setLabelsVisible(labelsVisible);
+          store.setBeltVisible(beltMode.visible);
+          store.setKuiperVisible(kuiperParamVisible);
           // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
           store.setDisplayCapabilities({
             starfield: !isSoftwareRenderer,
             surfaceDetail: surfaceVisible,
+            belt: !isSoftwareRenderer || beltMode.forced,
           });
         }
 
