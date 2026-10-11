@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.97.0] - 2026-10-11
+
 ### Added
 
 - **[#1329] 혜성 꼬리 · 코마 렌더 경로 + 소프트웨어 게이트 + `?comettails=` (PR1)** ([#1329](https://github.com/coseo12/astro-simulator/issues/1329), PR [#1331](https://github.com/coseo12/astro-simulator/pull/1331)). 혜성 (`kind: 'comet'` 전수 — 핼리 · 엔케 · 스위프트-터틀) 마다 메시 1 · GLSL `ShaderMaterial` 1 (코마 쿼드 + 이온 리본 + 먼지 리본, 정점 136 · 삼각형 130) 을 그린다 (`packages/core/src/scene/comet-tail.ts`). 정점 셰이더가 중심선 `c(t) = head + axis·tL + lag·k·t²L` 을 해석적으로 계산해 view(세계) 공간에서 펼친다. ALPHA_ADD · depth write off · `isPickable = false` · `alwaysSelectAsActiveMesh`. ADR [`20261010-1329`](docs/decisions/20261010-1329-comet-tail-coma.md) 결정 1 – 4.
@@ -17,7 +19,7 @@ Semantic Versioning을 따른다.
   - 실측 (prod 빌드 · Playwright headless · 1280×800 · metal WebGPU): 핼리 장면 근일점 기본 카메라 꼬리 축 화면 각도 오차 `0°` · 이온 꼬리 `99 px` · 엔케 장면 근일점 (`t=2461445.5`) `212 px`. 기준계 5단계 (정지 · 정지 중 핼리 포커스 · body tier 재생 · 재생 중 지구 포커스 · 정지) 4,287 프레임에서 머리 상대오차 최대 `5.1e-8` · 축 `2.4e-6°`. J2000 `?speed=0` 꼬리 on/off 같은 프레임 픽셀 차 `0`. 원일점 (`t=2460288.5`) → 장면 근일점 2061-06-09 까지 1 년 간격 진행 시 활동도 `0` (36 단계) → `1.486`, 머리 주변 on/off 차 `1,168 px`. 콘솔 오류 0 (metal WebGPU · 하드웨어 WebGL2 · swiftshader `force`). `bench:scene` 하드웨어 A/B (기본 vs `?comettails=off`, metal WebGPU · vsync 해제 · 3회 중앙값) 5 셀 비 `0.946` (idle) · `0.969` · `0.968` · `0.964` · `0.960`. ⚠️ `bench:scene` 의 기본 launch 는 macOS headless 에서 **소프트웨어 렌더**라 (`__isSoftwareRenderer = true`) 게이트로 꼬리가 생기지 않는다 — 하드웨어 A/B 는 `--use-angle=metal` 을 더한 실행으로만 성립한다. 핼리 근일점 2 셀 rAF A/B (같은 페이지 on/off 3회 교차): vsync 120 Hz 상한에서 solar · 포커스 모두 `1.000` (metal WebGPU · 하드웨어 WebGL2, 보정 전 측정). vsync 를 푼 수치는 아래 Notes.
   - 테스트: `comet-tail.test.ts` (활동도 · ĥ · 기준계 순수 함수 · 먼지 휨 방향 = 궤도 운동 반대 (역행 핼리 포함) · 길이 비 · 메시 · 머티리얼 · 재활성) · `solar-system-scene-comet-tails.test.ts` (전 comet 커버 · 로드 옵션 · 기준계 5 단계 · 장면 경로 재활성 · dispose) · `parse-comet-tails-mode.test.ts`. 변이 확인: `isVisible = activity > 0` 을 넣으면 재활성 단위 2건 FAIL, 같은 변이의 prod 빌드에서 근일점 활동도 `0` · on/off 차 `0`.
 
-- **[#1329] 혜성 꼬리 표시 토글 (PR2)** ([#1329](https://github.com/coseo12/astro-simulator/issues/1329)). 표시 패널 8번째 행 「혜성 꼬리」 — 꼬리 · 코마를 함께 끈다 (핵 · glow marker · 궤도선은 그대로). ADR [`20261010-1329`](docs/decisions/20261010-1329-comet-tail-coma.md) 결정 5 · Amendment 1.
+- **[#1329] 혜성 꼬리 표시 토글 (PR2)** ([#1329](https://github.com/coseo12/astro-simulator/issues/1329), PR [#1332](https://github.com/coseo12/astro-simulator/pull/1332)). 표시 패널 8번째 행 「혜성 꼬리」 — 꼬리 · 코마를 함께 끈다 (핵 · glow marker · 궤도선은 그대로). ADR [`20261010-1329`](docs/decisions/20261010-1329-comet-tail-coma.md) 결정 5 · Amendment 1.
   - URL 은 ADR 1265 규약 그대로 (`?comettails=off`, ON = 키 삭제, 사용자 조작 전 URL 쓰기 0). core 명령 `setCometTailsVisible` · 장면 핸들 `setCometTailsVisible` — 꺼진 채 로드했으면 처음 켤 때 `kind: 'comet'` 전수로 지연 생성 (PR1 생성 함수 재사용), 이후 꼬리 메시의 `setEnabled` 만 바꾼다. `setEnabled` 는 토글 전용이고 활동도 a = 0 의 접기 (정점 셰이더) 와 섞지 않는다 (ADR §교차검증 Claude 고유 1).
   - 가용성 = `!isSoftwareRenderer || ?comettails=force` (`DisplayCapabilities.cometTails`). 소프트웨어 렌더면 `aria-disabled` + 사유 「소프트웨어 렌더링 환경에서는 성능 보호를 위해 혜성 꼬리를 표시하지 않습니다」. `force` 로 연 경우는 꼬리가 만들어져 있으므로 토글도 열린다 — `?belt=N` 강제와 같은 규약이고, ON = 키 삭제라 끄고 켜면 URL 의 `force` 는 지워진다 (ADR Amendment 1 항목 2).
   - ADR Amendment 1 (결정 불변, 구현 정합): 파서가 함수 3개인 것 (PR #1331 리뷰 권고 6) · 토글 가용성의 `force` · PR1 의 카메라 근접 보정 (재검토 트리거 2) 을 본문에 맞췄다.
