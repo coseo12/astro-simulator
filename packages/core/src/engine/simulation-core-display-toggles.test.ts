@@ -20,7 +20,8 @@ type ToggleType =
   | 'setCloudsVisible'
   | 'setNightLightsVisible'
   | 'setAsteroidBeltVisible'
-  | 'setKuiperBeltVisible';
+  | 'setKuiperBeltVisible'
+  | 'setCometTailsVisible';
 type Register = (core: SimulationCore, handler: (visible: boolean) => void) => void;
 
 const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
@@ -30,6 +31,8 @@ const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
   // #1319 PR3 — 소행성대 · 카이퍼 띠 토글 (같은 5 케이스).
   { type: 'setAsteroidBeltVisible', register: (c, h) => c.setAsteroidBeltVisibleHandler(h) },
   { type: 'setKuiperBeltVisible', register: (c, h) => c.setKuiperBeltVisibleHandler(h) },
+  // #1329 PR2 — 혜성 꼬리 토글 (같은 5 케이스 + 교차 라우팅 0).
+  { type: 'setCometTailsVisible', register: (c, h) => c.setCometTailsVisibleHandler(h) },
 ];
 
 describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, register }) => {

@@ -1,6 +1,6 @@
 # ADR 20261010-1329 — 혜성 꼬리 · 코마: 축 빌보드 리본 셰이더 · draw 직전 body mesh 기준계 · 로그 활동도 법칙
 
-- **상태**: Accepted (cross-validate 2026-10-10 · 사용자 결정 2026-10-10 — Q1~Q7 전부 권고안)
+- **상태**: Accepted (cross-validate 2026-10-10 · 사용자 결정 2026-10-10 — Q1~Q7 전부 권고안 · Amendment 1 2026-10-11 — 결정 불변, 구현 정합)
 - **날짜**: 2026-10-10
 - **결정자**: architect (이슈 [#1329](https://github.com/coseo12/astro-simulator/issues/1329) · 사용자 선택 2026-10-10 「v0.96.0 다음 작업」)
 - **관련**:
@@ -203,6 +203,14 @@ agy (architecture 모드, 2026-10-10, 로그 `.claude/logs/cross-validate-archit
 - **결합 간과** — 결합 3개를 명시했다: (a) 기본 재생 ↔ encke 진입 (결정 6), (b) 반투명 정렬 ↔ 구름 계열 정렬 함수 (받아들인 비용), (c) 소프트웨어 게이트 ↔ CI 미검증 (결정 4).
 - **폐기 프레이밍** — 기존 경로를 폐기하지 않는다 (신규 추가).
 - **순수주의** — 먼지 꼬리를 입자 궤적 (축 2 (iii)) 대신 형태 근사로 둔 것, `n` 약분으로 혜성별 광도 차를 버린 것이 단순화다 → 질문 대상.
+
+## Amendment 1 (2026-10-11, PR [#1331](https://github.com/coseo12/astro-simulator/pull/1331) · PR2 구현 정합)
+
+결정은 바뀌지 않는다. 구현하며 본문 문구가 실제와 어긋난 3곳을 기록한다.
+
+1. **파서는 함수 3개다** (PR #1331 리뷰 권고 6) — 결정 5 의 「파서는 순수 함수 `parseCometTailsVisible` 하나」 는 결정 4 의 `?comettails=force` (§교차검증 수용 2) 를 담기 전 문구였다. `apps/web/src/core/parse-comet-tails-mode.ts` 는 `parseCometTailsParam` (URL → `{ visible, forced }` — 미지정 · `on` 켜짐 / `off` 꺼짐 / `force` 켜짐 + 게이트 우회 / 그 외 켜짐 + warn) · `parseCometTailsVisible` (토글 표의 역방향 파서 — 의도만) · `resolveCometTailsAtLoad` (로드 시 소프트웨어 렌더 게이트) 셋이다. `parse-belt-mode.ts` (ADR 1319 결정 6) 와 같은 형태다.
+2. **토글 가용성은 `!isSoftwareRenderer || ?comettails=force`** — 결정 5 의 「가용성 = `!isSoftwareRenderer`」 에 `force` 를 더했다. `force` 는 소프트웨어 렌더에서도 메시를 만들므로 (CI 강제 셀) 그때 토글을 막으면 만들어진 꼬리를 끌 수 없다. ADR 1319 Amendment 1 항목 3 의 `?belt=N` 강제와 같은 규약이다. URL 은 ON = 키 삭제 규약 그대로라 `force` 로 연 뒤 끄고 켜면 `force` 가 지워진다 (새로고침하면 소프트웨어 렌더에서는 꼬리가 다시 생기지 않는다 — `?belt=N` 과 같은 거동).
+3. **결정 1 의 리본 폭 · 알파에 카메라 근접 보정이 붙었다** (재검토 트리거 2 발화 — 사용자 육안, PR #1331 사용자 결정 (b)) — 머리 쪽 반폭을 코마 반지름 (화면 하한 적용 후) 이하로 자르고, 리본 세기를 머리에서 코마 반지름만큼 0 → 1 로 켜며, 리본 · 코마의 화면 점유 `반폭 / (깊이 · tan(fov/2))` 가 1 을 넘으면 그 배수만큼 알파를 낮춘다. 블렌딩 (ALPHA_ADD) · 기준계 (결정 2) · 활동도 (결정 3) 는 그대로다. 보정 전 → 후 실측은 CHANGELOG `[Unreleased]` `### Notes` (#1329 포커스 화면 보정) 에 있다. 그 실측이 결과·재검토 조건의 「기대 효과 — 하드웨어 프레임 비용 0 (1-E)」 범위를 좁혔다: vsync 상한 밖에서는 포커스 화면에 프레임당 WebGPU `+0.036 ms` · 하드웨어 WebGL2 `+0.515 ms` 가 든다 (보정 후 실측 — 백엔드에 따라 10 배 넘게 갈린다) (재검토 트리거 1 은 `bench:scene` 기준이라 미발화).
 
 ## 참고
 

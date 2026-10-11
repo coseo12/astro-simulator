@@ -200,6 +200,58 @@ describe('#1329 — 혜성 꼬리 장면 통합', () => {
     expect(tail.readFrameUniforms()!.activity).toBeGreaterThan(1.4);
   });
 
+  it('#1329 PR2 setCometTailsVisible — 꺼진 채 로드 → 처음 켤 때 1회 지연 생성 (전 comet) · 이후 setEnabled 만 · 멱등', () => {
+    const f = makeScene({ cometTails: false });
+    expect(f.handles.getCometTails()).toEqual([]);
+    // 끄기는 생성하지 않는다.
+    f.handles.setCometTailsVisible(false);
+    expect(f.handles.getCometTails()).toEqual([]);
+    f.handles.setCometTailsVisible(true);
+    const created = f.handles.getCometTails();
+    const cometIds = getSolarSystem()
+      .bodies.filter((b) => b.kind === 'comet')
+      .map((b) => b.id);
+    expect(created.map((t) => t.bodyId)).toEqual(cometIds);
+    expect(created.every((t) => t.mesh.isEnabled())).toBe(true);
+    const meshCount = f.scene.meshes.filter((m) => m.name.startsWith('comet-tail-')).length;
+    f.handles.setCometTailsVisible(false);
+    expect(created.every((t) => !t.mesh.isEnabled())).toBe(true);
+    // 토글은 메시 활성 플래그만 — 가시성 플래그는 건드리지 않는다 (a = 0 접기와 분리).
+    expect(created.every((t) => t.mesh.isVisible)).toBe(true);
+    f.handles.setCometTailsVisible(true);
+    f.handles.setCometTailsVisible(true);
+    // 재생성 없음 — 같은 핸들 · 같은 메시 수.
+    expect(f.handles.getCometTails()).toBe(created);
+    expect(f.scene.meshes.filter((m) => m.name.startsWith('comet-tail-')).length).toBe(meshCount);
+    expect(created.every((t) => t.mesh.isEnabled())).toBe(true);
+  });
+
+  it('#1329 PR2 로드 시 생성된 꼬리도 토글은 setEnabled 만 (재생성 없음)', () => {
+    const f = makeScene({ cometTails: true });
+    const before = f.handles.getCometTails();
+    f.handles.setCometTailsVisible(false);
+    f.handles.setCometTailsVisible(true);
+    expect(f.handles.getCometTails()).toBe(before);
+    expect(before.every((t) => t.mesh.isEnabled())).toBe(true);
+  });
+
+  it('#1329 PR2 원일점에서 토글 off → on 한 뒤 근일점까지 진행하면 활동도가 다시 양수 (D9 토글 변형)', () => {
+    const f = makeScene({ cometTails: false, jd: 2_460_288.5 });
+    f.handles.setCometTailsVisible(true); // 원일점에서 지연 생성
+    const tail = f.handles.getCometTails().find((t) => t.bodyId === 'halley')!;
+    f.scene.render();
+    expect(tail.readFrameUniforms()!.activity).toBe(0);
+    f.handles.setCometTailsVisible(false);
+    f.scene.render();
+    f.handles.setCometTailsVisible(true);
+    f.scene.render();
+    expect(tail.readFrameUniforms()!.activity).toBe(0);
+    f.handles.updateAt(HALLEY_PERIHELION_JD);
+    f.scene.render();
+    expect(tail.readFrameUniforms()!.rAU).toBeLessThan(0.6);
+    expect(tail.readFrameUniforms()!.activity).toBeGreaterThan(1.4);
+  });
+
   it('dispose — 꼬리 메시 · 머티리얼 해제', () => {
     const f = makeScene({ cometTails: true });
     const materials = f.handles.getCometTails().map((t) => t.material);
