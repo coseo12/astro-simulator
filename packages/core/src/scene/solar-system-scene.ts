@@ -243,6 +243,13 @@ export interface SolarSystemSceneHandles {
   /** #1319 PR3 — 카이퍼 벨트 런타임 토글. 계약은 `setAsteroidBeltVisible` 과 같다 (CPU 구 경로 없음). */
   setKuiperBeltVisible: (visible: boolean) => void;
   /**
+   * #1329 PR2 — 혜성 꼬리 · 코마 런타임 토글 (ADR 20261010-1329 결정 5). 없으면 그때 한 번 `kind: 'comet'` 전수로 생성하고,
+   * 이후는 꼬리 메시들의 `setEnabled` 만 바꾼다 (dispose 는 장면 dispose 때만). 렌더러 종류는 묻지 않는다 (결정 4 — web 책임).
+   * ⚠️ `setEnabled` 는 **토글 전용**이다 — 활동도 a = 0 의 접기는 셰이더 몫이고 메시 플래그를 건드리지 않는다
+   * (ADR §교차검증 Claude 고유 1 — 두 경로를 한 플래그로 합치면 원일점에서 끈 꼬리가 근일점에서 다시 켜지지 않는다).
+   */
+  setCometTailsVisible: (visible: boolean) => void;
+  /**
    * P12-A #298 — 현재 활성 tier.
    *
    * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
@@ -1426,7 +1433,7 @@ export function createSolarSystemScene(
   //  - 대상은 `kind: 'comet'` **전수** (하드코딩 금지 — 혜성이 추가되면 그대로 따라온다).
   //  - 기준계는 draw 직전 혜성 · 태양 mesh.position + `bodyFrame.scale` (결정 2) — 시간 위상에 아무것도 걸지 않는다.
   //  - ĥ (궤도면 법선) 는 여기서 1회 — 2체 Kepler 상수. N-body 경로에서도 상수로 둔다 (`comet-tail.ts` 머리말).
-  //  - 생성 함수는 나중에 다시 부를 수 있는 형태다 — 표시 토글 (PR2) 이 처음 켤 때 지연 생성한다 (결정 5).
+  //  - 생성 함수는 나중에 다시 부를 수 있는 형태다 — 표시 토글 (`setCometTailsVisible`) 이 처음 켤 때 지연 생성한다 (결정 5).
   let cometTails: CometTailHandles[] | null = null;
   const createCometTails = (): CometTailHandles[] => {
     const sunMesh = meshes.get('sun');
@@ -2708,6 +2715,17 @@ export function createSolarSystemScene(
     kuiperParticles?.mesh.setEnabled(false);
   };
 
+  // #1329 PR2 — 혜성 꼬리 런타임 토글 (ADR 20261010-1329 결정 5). 띠와 같은 수명 계약: 없을 때만 생성, 이후 `setEnabled`.
+  // 생성 시점과 무관하게 기준계 · 활동도는 draw 직전 mesh 위치에서 다시 계산된다 (결정 2 — 시간 위상 비의존).
+  const setCometTailsVisible = (visible: boolean) => {
+    if (visible) {
+      cometTails ??= createCometTails();
+      for (const t of cometTails) t.mesh.setEnabled(true);
+      return;
+    }
+    for (const t of cometTails ?? []) t.mesh.setEnabled(false);
+  };
+
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
@@ -2813,6 +2831,7 @@ export function createSolarSystemScene(
     setNightLightsVisible,
     setAsteroidBeltVisible,
     setKuiperBeltVisible,
+    setCometTailsVisible,
     getTier,
     setTier,
     updateTierByCamera,

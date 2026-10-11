@@ -13,14 +13,41 @@ import {
  * 직렬화의 역방향은 기존 `parse-*-mode.ts` 4종이다 — 두 방향이 같은 어휘를 쓰는지를 round-trip 으로 고정한다.
  */
 
-const HW: DisplayCapabilities = { starfield: true, surfaceDetail: true, belt: true };
-const SOFTWARE: DisplayCapabilities = { starfield: false, surfaceDetail: true, belt: false };
-const SURFACE_OFF: DisplayCapabilities = { starfield: true, surfaceDetail: false, belt: true };
+const HW: DisplayCapabilities = {
+  starfield: true,
+  surfaceDetail: true,
+  belt: true,
+  cometTails: true,
+};
+const SOFTWARE: DisplayCapabilities = {
+  starfield: false,
+  surfaceDetail: true,
+  belt: false,
+  cometTails: false,
+};
+const SURFACE_OFF: DisplayCapabilities = {
+  starfield: true,
+  surfaceDetail: false,
+  belt: true,
+  cometTails: true,
+};
 /** #1319 PR3 — 소프트웨어 렌더 + `?belt=N` 강제 (bench · verify 경로) — 띠는 만들어져 있으므로 토글도 열린다. */
-const SOFTWARE_FORCED: DisplayCapabilities = { starfield: false, surfaceDetail: true, belt: true };
+const SOFTWARE_FORCED: DisplayCapabilities = {
+  starfield: false,
+  surfaceDetail: true,
+  belt: true,
+  cometTails: false,
+};
+/** #1329 PR2 — 소프트웨어 렌더 + `?comettails=force` (CI 강제 셀) — 꼬리는 만들어져 있으므로 토글도 열린다. */
+const SOFTWARE_COMET_FORCED: DisplayCapabilities = {
+  starfield: false,
+  surfaceDetail: true,
+  belt: false,
+  cometTails: true,
+};
 
 describe('display-toggles — 표 구성', () => {
-  it('7 토글 · URL 키 7종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 행 추가)', () => {
+  it('8 토글 · URL 키 8종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -29,6 +56,7 @@ describe('display-toggles — 표 구성', () => {
       'labels',
       'belt',
       'kuiper',
+      'cometTails',
     ]);
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
@@ -38,6 +66,7 @@ describe('display-toggles — 표 구성', () => {
       'labels',
       'belt',
       'kuiper',
+      'comettails',
     ]);
   });
 
@@ -50,6 +79,7 @@ describe('display-toggles — 표 구성', () => {
       null,
       { type: 'setAsteroidBeltVisible', visible: false },
       { type: 'setKuiperBeltVisible', visible: false },
+      { type: 'setCometTailsVisible', visible: false },
     ]);
   });
 
@@ -102,8 +132,8 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(orbits.pressed(false, SOFTWARE)).toBe(false);
   });
 
-  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 불가 + 준비 중 사유 + 꺼짐', () => {
-    for (const id of ['stars', 'clouds', 'nightLights', 'belt', 'kuiper'] as const) {
+  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 · 혜성 꼬리 불가 + 준비 중 사유 + 꺼짐', () => {
+    for (const id of ['stars', 'clouds', 'nightLights', 'belt', 'kuiper', 'cometTails'] as const) {
       const def = getDisplayToggle(id);
       expect(def.disabledReason(null)).toBe(DISPLAY_DISABLED_REASONS.sceneNotReady);
       expect(def.pressed(true, null)).toBe(false);
@@ -139,6 +169,32 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
       expect(def.pressed(true, SOFTWARE_FORCED)).toBe(true);
     }
     expect(getDisplayToggle('stars').disabledReason(SOFTWARE_FORCED)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRenderer,
+    );
+  });
+
+  it('#1329 PR2 소프트웨어 렌더 — 혜성 꼬리 불가 + 꼬리 사유, 의도가 true 여도 꺼짐 (결정 4)', () => {
+    const def = getDisplayToggle('cometTails');
+    expect(def.disabledReason(SOFTWARE)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererCometTails);
+    expect(def.pressed(true, SOFTWARE)).toBe(false);
+    expect(def.disabledReason(SURFACE_OFF)).toBeNull();
+    // `?belt=N` 강제는 꼬리 가용성과 무관하다 (각자의 강제만 연다).
+    expect(def.disabledReason(SOFTWARE_FORCED)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRendererCometTails,
+    );
+    expect(DISPLAY_DISABLED_REASONS.softwareRendererCometTails).not.toBe(
+      DISPLAY_DISABLED_REASONS.softwareRendererBelt,
+    );
+  });
+
+  it('#1329 PR2 소프트웨어 렌더 + ?comettails=force — 꼬리 토글은 열리고 띠 · 별은 여전히 막힌다', () => {
+    const def = getDisplayToggle('cometTails');
+    expect(def.disabledReason(SOFTWARE_COMET_FORCED)).toBeNull();
+    expect(def.pressed(true, SOFTWARE_COMET_FORCED)).toBe(true);
+    expect(getDisplayToggle('belt').disabledReason(SOFTWARE_COMET_FORCED)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRendererBelt,
+    );
+    expect(getDisplayToggle('stars').disabledReason(SOFTWARE_COMET_FORCED)).toBe(
       DISPLAY_DISABLED_REASONS.softwareRenderer,
     );
   });

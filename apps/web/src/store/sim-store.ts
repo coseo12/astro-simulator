@@ -121,6 +121,11 @@ export interface SimStoreState {
   beltVisible: boolean;
   kuiperVisible: boolean;
   /**
+   * #1329 PR2 — 혜성 꼬리 · 코마 표시 의도 (기본 true — ADR `20261010-1329` 결정 5). 실제 표시는 의도 ∧ 환경
+   * (`displayCapabilities.cometTails` — 소프트웨어 렌더 게이트, 결정 4) 이다 (`beltVisible` 동형).
+   */
+  cometTailsVisible: boolean;
+  /**
    * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
    * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
    */
@@ -179,6 +184,8 @@ export interface SimStoreState {
   /** #1319 PR3 — 띠 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
   setBeltVisible: (visible: boolean) => void;
   setKuiperVisible: (visible: boolean) => void;
+  /** #1329 PR2 — 혜성 꼬리 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
+  setCometTailsVisible: (visible: boolean) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
   setBodyMenuOpen: (open: boolean) => void;
@@ -230,6 +237,8 @@ export const useSimStore = create<SimStoreState>((set) => ({
   // #1319 PR3 — 기본 ON (결정 8). `?belt=off` · `?kuiper=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
   beltVisible: true,
   kuiperVisible: true,
+  // #1329 PR2 — 기본 ON (결정 5). `?comettails=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  cometTailsVisible: true,
   displayCapabilities: null,
   displayPanelOpen: false,
   bodyMenuOpen: false,
@@ -273,6 +282,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setLabelsVisible: (visible) => set({ labelsVisible: visible }),
   setBeltVisible: (visible) => set({ beltVisible: visible }),
   setKuiperVisible: (visible) => set({ kuiperVisible: visible }),
+  setCometTailsVisible: (visible) => set({ cometTailsVisible: visible }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
   setBodyMenuOpen: (open) => set({ bodyMenuOpen: open }),
