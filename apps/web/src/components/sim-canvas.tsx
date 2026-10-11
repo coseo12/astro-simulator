@@ -24,6 +24,7 @@ import { parseSurfaceVisible } from '@/core/parse-surface-mode';
 import { parseRotateEnabled } from '@/core/parse-rotate-mode';
 import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseBeltParam, parseKuiperVisible, resolveBeltAtLoad } from '@/core/parse-belt-mode';
+import { parseCometTailsParam, resolveCometTailsAtLoad } from '@/core/parse-comet-tails-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
 import { parseLabelsVisible } from '@/core/parse-labels-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
@@ -540,6 +541,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const beltUrl = new URLSearchParams(window.location.search);
         const beltMode = parseBeltParam(beltUrl.get('belt'));
         const kuiperParamVisible = parseKuiperVisible(beltUrl.get('kuiper'));
+        // #1329 — 혜성 꼬리 · 코마 (ADR 20261010-1329 결정 4). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
+        // 미지정 켜짐 · `off` 꺼짐 · `force` 켜짐 + 소프트웨어 렌더 게이트 우회 (CI 셰이더 실행 경로).
+        const cometTailsMode = parseCometTailsParam(beltUrl.get('comettails'));
         // `beltN` = **명시** 수만 (미지정 = 0). 아래 엔진 자동 선택 (`auto` → N ≥ 1000 이면 webgpu/barnes-hut) 과
         // N-body 편입 수는 종전 의미 그대로 명시 수만 본다 — 기본 켜짐이 물리 엔진 선택을 바꾸면 안 된다.
         const beltN = beltMode.count ?? 0;
@@ -696,6 +700,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // 로드한 것은 표시 패널이 처음 켤 때 지연 생성한다. 기본 ON 은 파서 기본값이 결정 (core 옵션 기본값 false).
           asteroidBelt: resolveBeltAtLoad(beltMode.visible, beltMode.forced, !isSoftwareRenderer),
           kuiperBelt: resolveBeltAtLoad(kuiperParamVisible, beltMode.forced, !isSoftwareRenderer),
+          // #1329 — 혜성 꼬리 · 코마. 소프트웨어 렌더 게이트는 여기서 (결정 4 — core 는 렌더러를 모른다).
+          cometTails: resolveCometTailsAtLoad(
+            cometTailsMode.visible,
+            cometTailsMode.forced,
+            !isSoftwareRenderer,
+          ),
           grMode,
           integrator,
           ringRenderMode,
