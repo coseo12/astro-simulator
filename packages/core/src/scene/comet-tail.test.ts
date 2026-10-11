@@ -29,6 +29,7 @@ import {
   COMET_DUST_TAIL_LENGTH_RATIO,
   COMET_ION_TAIL_LENGTH_1AU,
   COMET_TAIL_SEGMENTS,
+  COMET_TAIL_FRAGMENT_SHADER,
   COMET_TAIL_VERTEX_SHADER,
   buildCometTailGeometry,
   cometActivity,
@@ -211,6 +212,27 @@ describe('정점 셰이더 — a = 0 접기 · 축 정면 퇴화 분기 (결정 
     expect(COMET_TAIL_VERTEX_SHADER).toContain('vAlpha = alpha * on;');
     expect(COMET_TAIL_VERTEX_SHADER).toContain('sinTheta > SIN_EPS ? s / sLen : vec3(0.0)');
   });
+
+  it('PR #1331 포커스 보정 — 머리 반폭 ≤ 코마 반지름 · 머리 세기 0 → 1 · 화면 점유 근접 페이드 (리본 · 코마)', () => {
+    // 1. 머리에서 가늘게 — 끝단이 코마 밖으로 드러나지 않는다 (핵 중심 직선 경계 제거).
+    expect(COMET_TAIL_VERTEX_SHADER).toContain(
+      'float headHalf = min(tipHalf * HEAD_WIDTH_FRACTION, comaRadius);',
+    );
+    expect(COMET_TAIL_VERTEX_SHADER).toContain('float halfWorld = mix(headHalf, tipHalf, t);');
+    // 머리 세기 — 코마 반지름만큼 가는 동안 0 → 1.
+    expect(COMET_TAIL_VERTEX_SHADER).toContain(
+      'vHeadFade = comaRadius > 0.0 ? (t * len) / comaRadius : 1.0;',
+    );
+    expect(COMET_TAIL_FRAGMENT_SHADER).toContain('clamp(vHeadFade, 0.0, 1.0)');
+    // 2. 근접 페이드 — 화면 점유 (반폭 / (깊이 · tan(fov/2))) 가 1 을 넘는 배수만큼.
+    expect(COMET_TAIL_VERTEX_SHADER).toContain(
+      'float cover = halfWidth / max(depth * uTanHalfFov, 1e-30);',
+    );
+    expect(COMET_TAIL_VERTEX_SHADER).toContain('alpha *= sinTheta * nearFade;');
+    expect(COMET_TAIL_VERTEX_SHADER).toContain(
+      'float comaCover = comaRadius / max(headDepth * uTanHalfFov, 1e-30);',
+    );
+  });
 });
 
 // ── NullEngine ─────────────────────────────────────────────────────────────────────────────────────────
@@ -305,6 +327,10 @@ describe('createCometTail — 메시 · 머티리얼 계약 (NullEngine)', () =>
       2 / (f.scene.activeCamera!.getProjectionMatrix().m[5]! * 720),
       12,
     );
+    // 근접 페이드 기준 — tan(fov/2) = 1 / P[1][1].
+    expect(u.tanHalfFov).toBeCloseTo(1 / f.scene.activeCamera!.getProjectionMatrix().m[5]!, 12);
+    // 투영 행렬이 float32 저장이라 fov 해석식과는 float32 반올림 차수 (≈ 1e-8) 만 다르다.
+    expect(u.tanHalfFov).toBeCloseTo(Math.tan(f.scene.activeCamera!.fov / 2), 6);
   });
 });
 

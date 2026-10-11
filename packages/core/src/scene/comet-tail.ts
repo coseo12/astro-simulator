@@ -65,25 +65,39 @@ import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
  * 활동 개시 태양 거리 (AU) — 물 얼음 승화가 혜성 활동을 지배하기 시작하는 거리의 **통상값**.
  * 출처: Meech, K. J. & Svoren, J. (2004), "Using Cometary Activity to Trace the Physical and Chemical Evolution of
  * Cometary Nuclei", in *Comets II* (Festou · Keller · Weaver 편, Univ. Arizona Press), pp. 317–335 —
- * 「약 3 AU 안쪽에서는 물 얼음이 활동의 주 동력」.
+ * 취지: 약 3 AU 안쪽에서는 물 얼음이 활동의 주 동력이다 (요지 — 원문 직접 인용 아님).
  */
 export const COMET_ACTIVITY_ONSET_AU = 3;
 /** 광도 법칙의 정규화 거리 (AU) — `m = M1 + 5 log Δ + 2.5 n log r` 의 `M1` 이 r = 1 AU 기준이라 새 기준이 아니다. */
 const ACTIVITY_NORMALIZATION_AU = 1;
 /** r = 1 AU 에서 이온 꼬리 길이 (AU, 세계 길이 — 줌에 따라 화면 길이가 변한다). 사용자 결정 Q2. */
 export const COMET_ION_TAIL_LENGTH_1AU = 0.3;
-/** 먼지 꼬리 길이 / 이온 꼬리 길이 (D-T2). */
+/**
+ * 먼지 꼬리 길이 / 이온 꼬리 길이. 출발값 = 임의 (이슈 #1329 설계안 박제값, D-T2 에서 확정) — 먼지가 이온보다 짧게
+ * 보이는 통상 모습만 반영했다.
+ */
 export const COMET_DUST_TAIL_LENGTH_RATIO = 0.5;
-/** 먼지 꼬리 끝의 횡변위 / 길이 — `c(t) = head + axis·tL + lag·k·t²L` 의 `k` (D-T2). */
+/**
+ * 먼지 꼬리 끝의 횡변위 / 길이 — `c(t) = head + axis·tL + lag·k·t²L` 의 `k`. 출발값 = 임의 (설계안 박제값, D-T2 에서 확정).
+ */
 export const COMET_DUST_TAIL_CURVE = 0.3;
-/** 이온 꼬리 끝(t = 1) 반폭 / 이온 꼬리 길이. 먼지 꼬리는 이 값의 `COMET_DUST_WIDTH_FACTOR` 배 (결정 3 — 폭은 이온의 2배). */
+/**
+ * 이온 꼬리 끝(t = 1) 반폭 / 이온 꼬리 길이. 출발값 = 임의 (D-T2 에서 확정) — ADR 에 값이 없어 PR1 이 정했다.
+ * 먼지 꼬리는 이 값의 `COMET_DUST_WIDTH_FACTOR` 배 (ADR 결정 3 — 폭은 이온의 2배, 같은 t 에서).
+ */
 export const COMET_ION_TAIL_HALF_WIDTH_RATIO = 0.04;
 export const COMET_DUST_WIDTH_FACTOR = 2;
+/**
+ * 머리 쪽(t = 0) 반폭 / 꼬리 끝 반폭 — 선형으로 넓어진다. 출발값 = 임의 (D-T2 에서 확정). 단 머리 쪽 반폭은 코마 반지름
+ * (화면 하한 적용 후) 을 넘지 않게 자른다 — 포커스 근접에서 리본 끝단이 코마 밖으로 드러나 핵 중심을 지나는 직선 경계가
+ * 생겼다 (PR #1331 리뷰 권고 1 · 사용자 육안). 이 상한은 새 임계가 아니라 이미 있는 코마 반지름이다.
+ */
+export const COMET_TAIL_HEAD_WIDTH_FRACTION = 0.25;
 /** 가시 코마 반지름 차수 (km, r = 1 AU, × a) — 10⁴~10⁵ km. */
 export const COMET_COMA_RADIUS_1AU_KM = 1e5;
 /** 코마 화면 하한 지름 (**물리 px**, × min(a, 1)) — 사용자 결정 Q5 (glow marker 4.5 px 의 ≈ 3.5 배). */
 export const COMET_COMA_MIN_PX_1AU = 16;
-/** 리본 폭 화면 하한 (**물리 px**) — 멀리서 계단 소실 방지. */
+/** 리본 폭 화면 하한 (**물리 px**) — 멀리서 계단 소실 방지. 출발값 = 임의 (1 px 반폭 — 래스터화가 끊기지 않는 최소, D-T2). */
 export const COMET_TAIL_MIN_WIDTH_PX = 2;
 /** 리본 분절 수 (꼬리 1개당). 정점 = (분절 + 1) × 2. */
 export const COMET_TAIL_SEGMENTS = 32;
@@ -92,7 +106,13 @@ export const COMET_TAIL_SEGMENTS = 32;
 export const COMET_ION_RGB: readonly [number, number, number] = [0.35, 0.6, 1.0];
 export const COMET_DUST_RGB: readonly [number, number, number] = [1.0, 0.9, 0.7];
 export const COMET_COMA_RGB: readonly [number, number, number] = [0.55, 1.0, 0.85];
-/** 최대 알파 (밝기 1 기준) — ALPHA_ADD 라 겹치는 곳은 더해진다 (D-T2). */
+/**
+ * 최대 알파 (밝기 1 기준) — ALPHA_ADD 라 겹치는 곳은 더해진다. 출발값 = 임의 (D-T2 에서 확정).
+ * 포커스 화면 백색 포화 (PR #1331 사용자 결정 (b)) 는 이 배율이 아니라 겹침 자체를 줄여 해소했다 — 리본은 머리에서 코마
+ * 반지름만큼 0 → 1 로 켜져 코마 중심과 겹치지 않고 (`vHeadFade`), 화면을 넘는 성분은 근접 페이드로 흐려진다.
+ * 세 피크를 합 1 로 정규화 (0.45 · 0.3 · 0.25) 하는 대안은 기본 카메라 꼬리 휘도를 절반으로 깎아 (핼리 장면 근일점
+ * on − off 휘도 합: 같은 보정에 배율 유지 19,449 · 정규화 9,690) 「solar 화면 모습 유지」 와 충돌해 채택하지 않았다.
+ */
 export const COMET_COMA_PEAK_ALPHA = 0.9;
 export const COMET_ION_PEAK_ALPHA = 0.6;
 export const COMET_DUST_PEAK_ALPHA = 0.5;
@@ -239,15 +259,18 @@ uniform vec3 uAxis;
 uniform vec3 uLag;
 uniform vec4 uShape;
 uniform float uPxWorld;
+uniform float uTanHalfFov;
 
 varying vec2 vUv;
 varying float vKind;
 varying float vAlpha;
+varying float vHeadFade;
 varying float vFragmentDepth;
 
 const float DUST_CURVE = ${COMET_DUST_TAIL_CURVE.toFixed(4)};
 const float ION_HALF_WIDTH_RATIO = ${COMET_ION_TAIL_HALF_WIDTH_RATIO.toFixed(4)};
 const float DUST_WIDTH_FACTOR = ${COMET_DUST_WIDTH_FACTOR.toFixed(4)};
+const float HEAD_WIDTH_FRACTION = ${COMET_TAIL_HEAD_WIDTH_FRACTION.toFixed(4)};
 const float TAIL_MIN_HALF_PX = ${(COMET_TAIL_MIN_WIDTH_PX / 2).toFixed(4)};
 const float COMA_MIN_RADIUS_PX = ${(COMET_COMA_MIN_PX_1AU / 2).toFixed(4)};
 const float SIN_EPS = 1e-4;
@@ -261,14 +284,19 @@ void main(void) {
   float kind = position.z;
   vec3 p = uHead;
   float alpha = brightness;
+  // 코마 반지름 (세계 반지름 vs 화면 하한) — 코마 쿼드와 리본 머리 폭이 같은 값을 쓴다.
+  float headDepth = max((viewProjection * vec4(uHead, 1.0)).w, 0.0);
+  float comaRadius = max(uShape.z, COMA_MIN_RADIUS_PX * brightness * headDepth * uPxWorld);
+  vHeadFade = 1.0;
 
   if (kind < 0.5) {
     // 코마 — 카메라 right/up 평면의 쿼드 (view 행렬의 회전 행 = 카메라 기저, 손잡이 무관).
     vec3 right = vec3(view[0][0], view[1][0], view[2][0]);
     vec3 up = vec3(view[0][1], view[1][1], view[2][1]);
-    float depth = max((viewProjection * vec4(uHead, 1.0)).w, 0.0);
-    float radius = max(uShape.z, COMA_MIN_RADIUS_PX * brightness * depth * uPxWorld);
-    p = uHead + (right * position.x + up * position.y) * radius;
+    p = uHead + (right * position.x + up * position.y) * comaRadius;
+    // 카메라 근접 페이드 (화면 점유) — 리본과 같은 규칙. 코마가 화면 높이를 넘으면 넘는 배수만큼 흐려진다.
+    float comaCover = comaRadius / max(headDepth * uTanHalfFov, 1e-30);
+    alpha *= clamp(1.0 / max(comaCover, 1e-30), 0.0, 1.0);
     vUv = position.xy;
   } else {
     float t = position.x;
@@ -289,10 +317,20 @@ void main(void) {
     vec3 sideDir = sinTheta > SIN_EPS ? s / sLen : vec3(0.0);
     float depth = max((viewProjection * vec4(c, 1.0)).w, 0.0);
     float widthFactor = dust ? DUST_WIDTH_FACTOR : 1.0;
-    float halfWorld = uShape.x * ION_HALF_WIDTH_RATIO * widthFactor * (0.25 + 0.75 * t);
+    float tipHalf = uShape.x * ION_HALF_WIDTH_RATIO * widthFactor;
+    // 머리에서 가늘게 — 머리 쪽 반폭은 코마 반지름 이하 (리본 끝단이 코마 밖으로 드러나지 않게).
+    float headHalf = min(tipHalf * HEAD_WIDTH_FRACTION, comaRadius);
+    float halfWorld = mix(headHalf, tipHalf, t);
     float halfWidth = max(halfWorld, TAIL_MIN_HALF_PX * depth * uPxWorld);
     p = c + sideDir * (side * halfWidth);
-    alpha *= sinTheta;
+    // 카메라 근접 페이드 (화면 점유) — 이 지점의 리본 폭이 화면 높이를 넘으면 넘는 배수만큼 흐려진다.
+    // 점유율 = 반폭 / (깊이 · tan(fov/2)). 기준은 화면 자신이라 새 임계가 아니다. 기본 카메라 (solar) 는 리본 폭이
+    // 수 px 라 1 (무변화). 카메라 뒤 (깊이 0) 는 0.
+    float cover = halfWidth / max(depth * uTanHalfFov, 1e-30);
+    float nearFade = clamp(1.0 / max(cover, 1e-30), 0.0, 1.0);
+    alpha *= sinTheta * nearFade;
+    // 머리 세기 — 머리에서 코마 반지름만큼 가는 동안 0 → 1 (fragment 에서 clamp). 코마가 머리를 넘겨받는다.
+    vHeadFade = comaRadius > 0.0 ? (t * len) / comaRadius : 1.0;
     vUv = vec2(t, side);
   }
 
@@ -315,6 +353,7 @@ precision highp float;
 varying vec2 vUv;
 varying float vKind;
 varying float vAlpha;
+varying float vHeadFade;
 varying float vFragmentDepth;
 
 uniform float logDepthConstant;
@@ -337,7 +376,7 @@ void main(void) {
     intensity = COMA_PEAK * exp(-4.0 * r2) * (1.0 - r2);
     color = uComaColor;
   } else {
-    float along = (1.0 - vUv.x) * (1.0 - vUv.x);
+    float along = (1.0 - vUv.x) * (1.0 - vUv.x) * clamp(vHeadFade, 0.0, 1.0);
     float across = 1.0 - vUv.y * vUv.y;
     bool dust = vKind > 1.5;
     intensity = (dust ? DUST_PEAK : ION_PEAK) * along * across;
@@ -413,6 +452,8 @@ export interface CometTailUniforms extends CometTailFrame {
   scale: number;
   /** 깊이 1 에서 물리 px 1개의 세계 길이. */
   pxWorld: number;
+  /** 깊이 1 에서 화면 반높이의 세계 길이 (tan(fov/2)) — 근접 페이드 기준. */
+  tanHalfFov: number;
   logDepthConstant: number;
 }
 
@@ -459,6 +500,7 @@ export function createCometTail(scene: Scene, options: CometTailOptions): CometT
         'uLag',
         'uShape',
         'uPxWorld',
+        'uTanHalfFov',
         'logDepthConstant',
         'uComaColor',
         'uIonColor',
@@ -492,6 +534,8 @@ export function createCometTail(scene: Scene, options: CometTailOptions): CometT
     // 투영 행렬 [1][1] = 1/tan(fov/2) (scene 쪽 사본은 첫 render 전 미정이라 카메라에서 읽는다).
     const p11 = scene.activeCamera?.getProjectionMatrix().m[5] ?? 0;
     const pxWorld = p11 > 0 ? 2 / (p11 * height) : 0;
+    // 화면 반높이의 깊이 1 세계 길이 = tan(fov/2) = 1 / P[1][1] (근접 페이드의 화면 점유 기준).
+    const tanHalfFov = p11 > 0 ? 1 / p11 : 0;
     const maxZ = scene.activeCamera?.maxZ ?? 1e14;
     const logDepthConstant = 2.0 / (Math.log(maxZ + 1.0) / Math.LN2);
     tmpHead.set(frame.head[0], frame.head[1], frame.head[2]);
@@ -503,12 +547,14 @@ export function createCometTail(scene: Scene, options: CometTailOptions): CometT
     tmpShape.set(frame.ionLength, frame.dustLength, frame.comaRadius, frame.activity);
     material.setVector4('uShape', tmpShape);
     material.setFloat('uPxWorld', pxWorld);
+    material.setFloat('uTanHalfFov', tanHalfFov);
     material.setFloat('logDepthConstant', logDepthConstant);
     lastUniforms = {
       ...frame,
       sun: [s.x, s.y, s.z],
       scale,
       pxWorld,
+      tanHalfFov,
       logDepthConstant,
     };
   };
