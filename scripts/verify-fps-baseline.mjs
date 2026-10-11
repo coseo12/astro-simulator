@@ -16,6 +16,7 @@
  *   2. earth focus (close-up)
  *   3. moon focus (satellite — R4 신규 인스턴스)
  *   4. belt-forced (#1319 PR3, desktop 만) — 소행성대 · 카이퍼 띠 **기본 켜짐 구성** 강제 생성 (`?belt=3900` — 아래 상수 주석)
+ *   5. comet-forced (#1329, desktop 만) — 혜성 꼬리 강제 생성 (`?t=2446479.5&comettails=force` — 아래 상수 주석)
  *
  * 회귀 임계:
  *   - baseline 대비 ≥ 30% 저하 = FAIL (headless rAF noise ±12% 실측 후 보수 마진)
@@ -151,6 +152,17 @@ const VIEWPORTS = [
  */
 const BELT_FORCED_QUERY = '?belt=3900';
 
+/**
+ * #1329 (ADR `20261010-1329` §교차검증 이견 수용 2) — 혜성 꼬리 강제 셀. 소프트웨어 렌더 게이트 (결정 4) 만 있으면 CI 가
+ * 꼬리 셰이더를 한 번도 컴파일 · 실행하지 않아 GLSL 오류 · Babylon 업그레이드 회귀가 그대로 통과한다. 그래서 `force` 로
+ * 게이트를 우회한 셀을 하나 둔다. 판정은 이 가드의 기존 규칙 그대로 — 새 임계 0.
+ *
+ * 시각 `t=2446479.5` = 핼리 **장면** 근일점 (ADR 1-A — 2체 Kepler 라 역사 근일점 1986-02-09 과 다르다). 기본 카메라에서
+ * 꼬리가 실제로 그려지는 시각이다 (활동도 1.486 · 이온 꼬리 ≈ 99 px, PR1 실측). 전제는 꼬리 메시 **활성 + 머티리얼 준비**
+ * (`requireMaterialReady`) — 셰이더 컴파일이 실패하면 메시는 활성이어도 그려지지 않아 꼬리 없는 장면을 잰다 (fail-open).
+ */
+const COMET_FORCED_QUERY = '?t=2446479.5&comettails=force';
+
 const SCENARIOS = [
   { id: 'default', label: 'default (sun 시점)', focusBodyId: null },
   { id: 'earth-focus', label: 'earth focus', focusBodyId: 'earth' },
@@ -163,6 +175,16 @@ const SCENARIOS = [
     // 측정 전제 — 강제 경로가 깨져 띠가 안 만들어지면 띠 없는 장면을 재고 통과한다 (fail-open). 그래서 측정 직전
     // 이 메시들이 **활성으로 존재**하는지 기록하고 `compareBaseline` 이 판정 전에 본다 (PR #1326 리뷰 R1).
     requiredMeshes: ['belt-particles', 'kuiper-particles'],
+    viewports: ['desktop'],
+  },
+  {
+    id: 'comet-forced',
+    label: `혜성 꼬리 강제 (${COMET_FORCED_QUERY})`,
+    focusBodyId: null,
+    query: COMET_FORCED_QUERY,
+    // 혜성 3개 (`kind: 'comet'` 전수) 의 꼬리 메시. 장면은 전수를 한꺼번에 만든다 (하나라도 누락이면 생성 실패).
+    requiredMeshes: ['comet-tail-halley', 'comet-tail-encke', 'comet-tail-swift-tuttle'],
+    requireMaterialReady: true,
     viewports: ['desktop'],
   },
 ];
@@ -335,16 +357,23 @@ async function setupScenario(page, scenario) {
   return waitForLodSettle(page);
 }
 
-/** 시나리오 전제 메시 중 활성으로 존재하는 개수 (`requiredMeshes` 없으면 null). `__simCore` 부재도 0 — 실패 방향. */
+/**
+ * 시나리오 전제 메시 중 활성으로 존재하는 개수 (`requiredMeshes` 없으면 null). `__simCore` 부재도 0 — 실패 방향.
+ * `requireMaterialReady` 시나리오는 머티리얼 준비 (`material.isReady(mesh)`) 까지 요구한다 (#1329 — 셰이더 컴파일 실패 =
+ * 메시는 활성이나 그려지지 않음). 플래그 없는 시나리오 (`belt-forced`) 의 판정은 종전과 같다.
+ */
 async function countRequiredMeshes(page, scenario) {
   if (!scenario.requiredMeshes) return null;
   return page
     .evaluate(
-      (names) =>
+      ({ names, requireReady }) =>
         (window.__simCore?.scene?.meshes ?? []).filter(
-          (m) => names.includes(m.name) && m.isEnabled(),
+          (m) =>
+            names.includes(m.name) &&
+            m.isEnabled() &&
+            (!requireReady || m.material?.isReady(m) === true),
         ).length,
-      scenario.requiredMeshes,
+      { names: scenario.requiredMeshes, requireReady: scenario.requireMaterialReady === true },
     )
     .catch(() => 0);
 }
@@ -444,7 +473,7 @@ function compareBaseline(current, baseline) {
         const enabled = current.diagnostics?.[vp.id]?.[sc.id]?.requiredMeshesEnabled;
         if (enabled !== sc.requiredMeshes.length) {
           failures.push(
-            `[${vp.id}/${sc.id}] 측정 전제 실패: 필수 메시 ${sc.requiredMeshes.join(', ')} 중 활성 ${enabled ?? 'n/a'}개 (요구 ${sc.requiredMeshes.length}) — 띠 없는 장면을 쟀다`,
+            `[${vp.id}/${sc.id}] 측정 전제 실패: 필수 메시 ${sc.requiredMeshes.join(', ')} 중 활성 ${enabled ?? 'n/a'}개 (요구 ${sc.requiredMeshes.length}${sc.requireMaterialReady ? ' · 머티리얼 준비 포함' : ''}) — 전제 메시가 없는 장면을 쟀다`,
           );
           continue;
         }

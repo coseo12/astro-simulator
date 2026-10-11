@@ -197,7 +197,7 @@ export function DisplayPanel() {
         aria-expanded={open}
         // 패널은 열릴 때만 존재한다 — 닫힌 동안 없는 id 를 가리키지 않는다.
         aria-controls={open ? panelId : undefined}
-        title="별 배경 · 구름 · 야간 불빛 · 궤도선 · 이름 라벨 켜고 끄기"
+        title="별 배경 · 구름 · 야간 불빛 · 궤도선 · 이름 라벨 · 소행성대 · 카이퍼 벨트 · 혜성 꼬리 켜고 끄기"
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         onBlur={handleBlur}
@@ -218,8 +218,16 @@ export function DisplayPanel() {
               data-testid="display-panel"
               onKeyDown={handlePanelKeyDown}
               onBlur={handleBlur}
-              className="fixed z-[var(--z-dropdown)] bg-bg-surface border border-border-subtle rounded-sm p-3 shadow-lg"
-              style={{ top: position.top, right: position.right, width: PANEL_WIDTH_PX }}
+              className="fixed z-[var(--z-dropdown)] bg-bg-surface border border-border-subtle rounded-sm p-3 shadow-lg overflow-y-auto"
+              // #1329 PR2 — 8번째 행 (혜성 꼬리) 이 들어오며 소프트웨어 렌더 (비활성 사유 4줄) · 375×667 에서 패널이 뷰포트
+              // 아래로 넘쳤다 (verify:1265 「⋯」 경유 게이트 — 패널 bottom 687.75 > 667). 뷰포트 안 높이로 자르고 패널 안에서
+              // 스크롤한다. 패널 안 스크롤은 트리거 위치를 바꾸지 않아 위 `onScroll` 의 닫기 조건에 걸리지 않는다.
+              style={{
+                top: position.top,
+                right: position.right,
+                width: PANEL_WIDTH_PX,
+                maxHeight: `calc(100dvh - ${position.top + VIEWPORT_MARGIN_PX}px)`,
+              }}
             >
               <p id={titleId} className="text-caption text-fg-secondary mb-2">
                 표시

@@ -19,8 +19,17 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
-const IDS = ['orbits', 'stars', 'clouds', 'nightLights', 'labels', 'belt', 'kuiper'] as const;
-/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 행이 추가돼 마지막이 바뀌었다). */
+const IDS = [
+  'orbits',
+  'stars',
+  'clouds',
+  'nightLights',
+  'labels',
+  'belt',
+  'kuiper',
+  'cometTails',
+] as const;
+/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 행이 추가돼 마지막이 바뀌었다). */
 const LAST_ID = IDS[IDS.length - 1]!;
 
 function renderPanel() {
@@ -40,7 +49,8 @@ beforeEach(() => {
     labelsVisible: true,
     beltVisible: true,
     kuiperVisible: true,
-    displayCapabilities: { starfield: true, surfaceDetail: true, belt: true },
+    cometTailsVisible: true,
+    displayCapabilities: { starfield: true, surfaceDetail: true, belt: true, cometTails: true },
     displayPanelOpen: false,
   });
 });
@@ -323,7 +333,12 @@ describe('DisplayPanel — 포커스 순서 (패널이 트리거 바로 뒤에 �
 describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B — 사유 1회 낭독)', () => {
   it('비활성 토글: 이름 = 라벨만 · 설명 = 사유', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: false, surfaceDetail: false, belt: false },
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: false,
+        belt: false,
+        cometTails: false,
+      },
     });
     renderPanel();
     openPanel();
@@ -365,7 +380,12 @@ describe('DisplayPanel — 토글 분기', () => {
 
   it('소프트웨어 렌더 — 별: aria-disabled + 사유 title/describedby · 네이티브 disabled 아님 · 클릭 no-op (D9)', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false },
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+      },
     });
     renderPanel();
     openPanel();
@@ -386,7 +406,12 @@ describe('DisplayPanel — 토글 분기', () => {
 
   it('#1319 PR3 소프트웨어 렌더 — 소행성대 · 카이퍼: aria-disabled + 띠 사유 · 네이티브 disabled 아님 · 클릭 no-op (결정 3)', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false },
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+      },
     });
     renderPanel();
     openPanel();
@@ -414,9 +439,44 @@ describe('DisplayPanel — 토글 분기', () => {
     expect(sentCommands).toEqual([{ type: 'setAsteroidBeltVisible', visible: false }]);
   });
 
+  it('#1329 PR2 소프트웨어 렌더 — 혜성 꼬리: aria-disabled + 꼬리 사유 · 네이티브 disabled 아님 · 클릭 no-op (결정 4)', () => {
+    useSimStore.setState({
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+      },
+    });
+    renderPanel();
+    openPanel();
+    const el = toggleEl('cometTails');
+    expect(el).toHaveAttribute('aria-disabled', 'true');
+    expect(el).not.toBeDisabled();
+    expect(el).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.softwareRendererCometTails);
+    expect(el).toHaveAccessibleDescription(DISPLAY_DISABLED_REASONS.softwareRendererCometTails);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(el);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    expect(sentCommands).toEqual([]);
+  });
+
+  it('#1329 PR2 하드웨어 — 혜성 꼬리 클릭 → aria-pressed 반전 + 명령 (다른 행은 그대로)', () => {
+    renderPanel();
+    openPanel();
+    expect(screen.getByRole('button', { name: '혜성 꼬리' })).toBe(toggleEl('cometTails'));
+    fireEvent.click(toggleEl('cometTails'));
+    expect(toggleEl('cometTails')).toHaveAttribute('aria-pressed', 'false');
+    expect(toggleEl('kuiper')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands).toEqual([{ type: 'setCometTailsVisible', visible: false }]);
+    fireEvent.click(toggleEl('cometTails'));
+    expect(toggleEl('cometTails')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands.at(-1)).toEqual({ type: 'setCometTailsVisible', visible: true });
+  });
+
   it('?surface=off — 구름·불빛 aria-disabled + 사유, 클릭 no-op (D10)', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: true, surfaceDetail: false, belt: true },
+      displayCapabilities: { starfield: true, surfaceDetail: false, belt: true, cometTails: true },
     });
     renderPanel();
     openPanel();
@@ -431,7 +491,12 @@ describe('DisplayPanel — 토글 분기', () => {
 
   it('비활성 토글도 포커스를 받는다 — Tab 순회에서 빠지지 않는다 (D14 · aria-disabled 해석)', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: false, surfaceDetail: false, belt: false },
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: false,
+        belt: false,
+        cometTails: false,
+      },
     });
     renderPanel();
     openPanel();

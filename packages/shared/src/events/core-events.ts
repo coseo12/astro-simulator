@@ -61,6 +61,9 @@ export type CoreEvents = {
  * #1319 PR3 — `setAsteroidBeltVisible` / `setKuiperBeltVisible` 추가. 소행성대 · 카이퍼 띠 입자의 런타임 토글
  * (위 3종과 같은 효과별 명령 — ADR `docs/decisions/20261008-1319-asteroid-belt-gpu.md` 결정 6). 소프트웨어 렌더
  * 게이트 (결정 3) 도 별 배경과 같이 web 이 한다.
+ *
+ * #1329 PR2 — `setCometTailsVisible` 추가. 혜성 꼬리 · 코마의 런타임 토글 (ADR
+ * `docs/decisions/20261010-1329-comet-tail-coma.md` 결정 5). 소프트웨어 렌더 게이트 (결정 4) 는 web 이 한다.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -79,4 +82,5 @@ export type CoreCommand =
   | { type: 'setCloudsVisible'; visible: boolean }
   | { type: 'setNightLightsVisible'; visible: boolean }
   | { type: 'setAsteroidBeltVisible'; visible: boolean }
-  | { type: 'setKuiperBeltVisible'; visible: boolean };
+  | { type: 'setKuiperBeltVisible'; visible: boolean }
+  | { type: 'setCometTailsVisible'; visible: boolean };
