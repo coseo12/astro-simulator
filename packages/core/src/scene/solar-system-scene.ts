@@ -45,6 +45,7 @@ import {
   type BeltOrbit,
   type BeltPopulation,
 } from './belt-population.js';
+import { cometOrbitNormal, createCometTail, type CometTailHandles } from './comet-tail.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -432,6 +433,11 @@ export interface SolarSystemSceneHandles {
    */
   getKuiperParticles: () => BeltParticlesHandles | null;
   /**
+   * #1329 — 혜성 꼬리 · 코마 핸들 (`kind: 'comet'` 전수, 데이터 순서). 아직 만들어지지 않았으면 (`cometTails` false)
+   * 빈 배열. 진단 · 단위 테스트용 (ADR 20261010-1329).
+   */
+  getCometTails: () => readonly CometTailHandles[];
+  /**
    * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 의 사본.
    * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
    */
@@ -515,6 +521,13 @@ export interface SolarSystemSceneOptions {
   asteroidBelt?: boolean;
   /** #1319 PR3 — 카이퍼 메시를 로드 시 만든다 (결정 6). 기본 false. 그 밖의 계약은 `asteroidBelt` 와 같다. */
   kuiperBelt?: boolean;
+  /**
+   * #1329 — 혜성 꼬리 · 코마 메시를 **로드 시** 만든다 (ADR 20261010-1329 결정 4 · 5). 기본 false.
+   *
+   * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 4) 와 `?comettails=force` 우회는 호출자(web) 가
+   * 판정해 이 값으로만 전달한다 (`asteroidBelt` 와 같은 레이어 분리).
+   */
+  cometTails?: boolean;
   /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
    * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
@@ -719,6 +732,7 @@ export function createSolarSystemScene(
     asteroidNbody = false,
     asteroidBelt: asteroidBeltAtLoad = false,
     kuiperBelt: kuiperBeltAtLoad = false,
+    cometTails: cometTailsAtLoad = false,
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
@@ -1407,6 +1421,47 @@ export function createSolarSystemScene(
   });
   // 소행성대 · 카이퍼 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:asteroid-belt');
+
+  // #1329 — 혜성 꼬리 · 코마 (ADR 20261010-1329). 혜성마다 메시 1 · ShaderMaterial 1.
+  //  - 대상은 `kind: 'comet'` **전수** (하드코딩 금지 — 혜성이 추가되면 그대로 따라온다).
+  //  - 기준계는 draw 직전 혜성 · 태양 mesh.position + `bodyFrame.scale` (결정 2) — 시간 위상에 아무것도 걸지 않는다.
+  //  - ĥ (궤도면 법선) 는 여기서 1회 — 2체 Kepler 상수. N-body 경로에서도 상수로 둔다 (`comet-tail.ts` 머리말).
+  //  - 생성 함수는 나중에 다시 부를 수 있는 형태다 — 표시 토글 (PR2) 이 처음 켤 때 지연 생성한다 (결정 5).
+  let cometTails: CometTailHandles[] | null = null;
+  const createCometTails = (): CometTailHandles[] => {
+    const sunMesh = meshes.get('sun');
+    if (!sunMesh) throw new Error('[comet-tail] 태양 mesh 없음');
+    const tails: CometTailHandles[] = [];
+    for (const body of system.bodies) {
+      if (body.kind !== 'comet') continue;
+      const headMesh = meshes.get(body.id);
+      const parent = body.parentId ? bodiesById.get(body.parentId) : undefined;
+      // 조용히 건너뛰지 않는다 — 「전 comet 커버」 계약 (교차검증 기각 7 의 구현 고정).
+      if (!headMesh || !body.orbit || !parent) {
+        throw new Error(`[comet-tail] ${body.id}: host mesh · 궤도 · 모천체 중 누락`);
+      }
+      tails.push(
+        createCometTail(scene, {
+          bodyId: body.id,
+          headMesh,
+          sunMesh,
+          orbitNormal: cometOrbitNormal(body.orbit, system.epoch, orbitMu(body, parent)),
+          frameProvider: () => bodyFrame,
+        }),
+      );
+    }
+    return tails;
+  };
+  if (cometTailsAtLoad) cometTails = createCometTails();
+  // 장면 dispose 시 메시 · 머티리얼 해제 (지연 생성분도 같은 변수).
+  disposables.push({
+    dispose: () => {
+      for (const t of cometTails ?? []) t.dispose();
+      cometTails = null;
+    },
+  });
+  // 혜성 꼬리 (로드 시 꺼져 있으면 빈 구간).
+  phase('scene:comet-tails');
 
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
@@ -2784,6 +2839,7 @@ export function createSolarSystemScene(
     getBodyScreenInfo,
     getBeltParticles: () => beltParticles,
     getKuiperParticles: () => kuiperParticles,
+    getCometTails: () => cometTails ?? [],
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();
