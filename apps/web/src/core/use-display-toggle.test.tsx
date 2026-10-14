@@ -16,7 +16,7 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
-const HW = { starfield: true, surfaceDetail: true, belt: true, cometTails: true };
+const HW = { starfield: true, surfaceDetail: true, belt: true, cometTails: true, corona: true };
 
 function setup(searchParams = '') {
   const onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
@@ -36,6 +36,7 @@ beforeEach(() => {
     beltVisible: true,
     kuiperVisible: true,
     cometTailsVisible: true,
+    coronaVisible: true,
     displayCapabilities: HW,
   });
 });
@@ -81,6 +82,7 @@ describe('useDisplayToggle', () => {
         surfaceDetail: true,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     const { toggle, onUrlUpdate } = setup();
@@ -96,7 +98,13 @@ describe('useDisplayToggle', () => {
 
   it('?surface=off — 구름·불빛 무변화 (D10)', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: true, surfaceDetail: false, belt: true, cometTails: true },
+      displayCapabilities: {
+        starfield: true,
+        surfaceDetail: false,
+        belt: true,
+        cometTails: true,
+        corona: true,
+      },
     });
     const { toggle } = setup();
     act(() => {
@@ -151,6 +159,7 @@ describe('useDisplayToggle', () => {
         surfaceDetail: true,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     const { toggle, onUrlUpdate } = setup();
@@ -188,7 +197,13 @@ describe('useDisplayToggle', () => {
 
   it('#1329 PR2 `?comettails=force` 로 연 뒤 끄고 켜면 URL 의 `force` 는 지워진다 (ON = 키 삭제 규약 — `?belt=N` 과 같음)', async () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: false, surfaceDetail: true, belt: false, cometTails: true },
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: true,
+        corona: false,
+      },
     });
     const { toggle, onUrlUpdate } = setup('?comettails=force');
     act(() => toggle('cometTails'));
@@ -212,11 +227,77 @@ describe('useDisplayToggle', () => {
         surfaceDetail: true,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     const { toggle, onUrlUpdate } = setup();
     act(() => toggle('cometTails'));
     expect(useSimStore.getState().cometTailsVisible).toBe(true);
+    expect(sentCommands).toEqual([]);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+  });
+
+  it('#1335 PR2 태양 코로나 — OFF 명령 + URL `corona=off`, ON 은 키 삭제 (다른 키 유지)', async () => {
+    const { toggle, onUrlUpdate } = setup('?t=2451545&focus=sun');
+    act(() => toggle('corona'));
+    expect(useSimStore.getState().coronaVisible).toBe(false);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('corona')).toBe('off');
+    act(() => toggle('corona'));
+    expect(useSimStore.getState().coronaVisible).toBe(true);
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.has('corona')).toBe(false),
+    );
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.get('t')).toBe('2451545');
+    expect(last.searchParams.get('focus')).toBe('sun');
+    expect(sentCommands).toEqual([
+      { type: 'setSunCoronaVisible', visible: false },
+      { type: 'setSunCoronaVisible', visible: true },
+    ]);
+  });
+
+  it('#1335 PR2 `?corona=force` 로 연 뒤 끄고 켜면 URL 의 `force` 는 지워진다 (ON = 키 삭제 규약)', async () => {
+    useSimStore.setState({
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+        corona: true,
+      },
+    });
+    const { toggle, onUrlUpdate } = setup('?corona=force');
+    act(() => toggle('corona'));
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('corona')).toBe('off'),
+    );
+    act(() => toggle('corona'));
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.has('corona')).toBe(false),
+    );
+    expect(sentCommands).toEqual([
+      { type: 'setSunCoronaVisible', visible: false },
+      { type: 'setSunCoronaVisible', visible: true },
+    ]);
+  });
+
+  it('#1335 PR2 소프트웨어 렌더 — 태양 코로나 토글은 store · 명령 · URL 전부 무변화 (결정 5)', async () => {
+    useSimStore.setState({
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+        corona: false,
+      },
+    });
+    const { toggle, onUrlUpdate } = setup();
+    act(() => toggle('corona'));
+    expect(useSimStore.getState().coronaVisible).toBe(true);
     expect(sentCommands).toEqual([]);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));

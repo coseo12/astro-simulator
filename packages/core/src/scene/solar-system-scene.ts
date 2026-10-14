@@ -46,6 +46,7 @@ import {
   type BeltPopulation,
 } from './belt-population.js';
 import { cometOrbitNormal, createCometTail, type CometTailHandles } from './comet-tail.js';
+import { createSunCorona, type SunCoronaHandles } from './sun-corona.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -250,6 +251,12 @@ export interface SolarSystemSceneHandles {
    */
   setCometTailsVisible: (visible: boolean) => void;
   /**
+   * #1335 — 태양 코로나 표시 토글 (ADR 20261014-1335 결정 4 의 2 · 결정 6). 없으면 그때 한 번 생성하고, 이후는
+   * 코로나 메시의 `setEnabled` 만 바꾼다 (dispose 는 장면 dispose 때만). 렌더러 종류는 묻지 않는다 (결정 5 — web 책임).
+   * ⚠️ `setEnabled` 는 **토글 전용**이다 — LOD 추종은 프레임 위상이 `isVisible` 로 쓴다 (결정 4 의 1). 두 플래그를 합치지 않는다.
+   */
+  setSunCoronaVisible: (visible: boolean) => void;
+  /**
    * P12-A #298 — 현재 활성 tier.
    *
    * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
@@ -444,6 +451,8 @@ export interface SolarSystemSceneHandles {
    * 빈 배열. 진단 · 단위 테스트용 (ADR 20261010-1329).
    */
   getCometTails: () => readonly CometTailHandles[];
+  /** #1335 — 태양 코로나 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용 (ADR 20261014-1335). */
+  getSunCorona: () => SunCoronaHandles | null;
   /**
    * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 의 사본.
    * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
@@ -535,6 +544,14 @@ export interface SolarSystemSceneOptions {
    * 판정해 이 값으로만 전달한다 (`asteroidBelt` 와 같은 레이어 분리).
    */
   cometTails?: boolean;
+  /**
+   * #1335 — 태양 코로나 메시를 **로드 시** 만든다 (ADR 20261014-1335 결정 5 · 6). 기본 false. false 여도
+   * `setSunCoronaVisible(true)` 가 처음 켤 때 지연 생성한다.
+   *
+   * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 5) 와 `?corona=force` 우회는 호출자(web) 가 판정해
+   * 이 값으로만 전달한다 (`cometTails` 와 같은 레이어 분리).
+   */
+  sunCorona?: boolean;
   /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
    * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
@@ -740,6 +757,7 @@ export function createSolarSystemScene(
     asteroidBelt: asteroidBeltAtLoad = false,
     kuiperBelt: kuiperBeltAtLoad = false,
     cometTails: cometTailsAtLoad = false,
+    sunCorona: sunCoronaAtLoad = false,
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
@@ -1469,6 +1487,37 @@ export function createSolarSystemScene(
   });
   // 혜성 꼬리 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:comet-tails');
+
+  // #1335 — 태양 코로나 (ADR 20261014-1335). 태양 1개 = 메시 1 · ShaderMaterial 1.
+  //  - 기준계는 draw 직전 태양 mesh.position + `bodyFrame.scale` (결정 2) — 시간 위상에 아무것도 걸지 않는다.
+  //  - 반경 = `body.radius × bodyScale('sun')` × 기록 스케일 = sun high mesh 세계 반경 (DoD D4).
+  //  - LOD 추종 (`isVisible`) 은 프레임 위상 (`runLodPass`) 이 쓴다 — 아래 `syncSunCoronaLodVisibility` (결정 4 의 1).
+  //  - 생성 함수는 나중에 다시 부를 수 있는 형태다 — 표시 토글 (`setSunCoronaVisible`) 이 처음 켤 때 지연 생성한다 (결정 6).
+  let sunCorona: SunCoronaHandles | null = null;
+  const createSunCoronaForScene = (): SunCoronaHandles => {
+    const sunMesh = meshes.get('sun');
+    const sunBody = bodiesById.get('sun');
+    if (!sunMesh || !sunBody) throw new Error('[sun-corona] 태양 mesh · 데이터 없음');
+    return createSunCorona(scene, {
+      sunMesh,
+      radiusMeters: sunBody.radius * bodyScale('sun'),
+      frameProvider: () => bodyFrame,
+    });
+  };
+  // 결정 4 의 1 — 코로나 가시성 = 태양 rim 을 싣는 variant (high / mid) 가 보이는 동안만 (구름 shell 과 같은 식).
+  // 호출 지점은 프레임 위상 (`runLodPass`) 과 지연 생성 직후뿐이다 — 코로나 자신의 observer 안에서 부르지 않는다.
+  const syncSunCoronaLodVisibility = (corona: SunCoronaHandles): void => {
+    corona.mesh.isVisible = corona.sunMesh.isVisible || midVariants.get('sun')?.isVisible === true;
+  };
+  if (sunCoronaAtLoad) sunCorona = createSunCoronaForScene();
+  disposables.push({
+    dispose: () => {
+      sunCorona?.dispose();
+      sunCorona = null;
+    },
+  });
+  // 태양 코로나 (로드 시 꺼져 있으면 빈 구간).
+  phase('scene:sun-corona');
 
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
@@ -2260,6 +2309,9 @@ export function createSolarSystemScene(
         cloudLayer.mesh.isVisible =
           highMesh.isVisible || midVariants.get(body.id)?.isVisible === true;
       }
+      // #1335 결정 4 의 1 — 코로나도 같은 자리 · 같은 식 (low = bodyScale 미적용 billboard 에서 꺼진다). 쓰는 주체가 코로나
+      // 메시 밖 (프레임 위상) 이라 재활성 경로가 산다. 메시가 없으면 (로드 OFF · 소프트웨어 미생성) 건너뛴다 (§교차검증 합의 2).
+      if (sunCorona && sunCorona.sunMesh === highMesh) syncSunCoronaLodVisibility(sunCorona);
 
       // 집계.
       if (nextLevel === 'high') lodStats.high += 1;
@@ -2726,6 +2778,20 @@ export function createSolarSystemScene(
     for (const t of cometTails ?? []) t.mesh.setEnabled(false);
   };
 
+  // #1335 결정 6 — 태양 코로나 런타임 토글. 혜성 꼬리와 같은 수명 계약: 없을 때만 생성, 이후 `setEnabled`.
+  // 지연 생성 직후 LOD 가시성을 한 번 맞춘다 (다음 프레임 위상까지 low 에서 코로나가 남지 않게).
+  const setSunCoronaVisible = (visible: boolean) => {
+    if (visible) {
+      if (!sunCorona) {
+        sunCorona = createSunCoronaForScene();
+        syncSunCoronaLodVisibility(sunCorona);
+      }
+      sunCorona.mesh.setEnabled(true);
+      return;
+    }
+    sunCorona?.mesh.setEnabled(false);
+  };
+
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
@@ -2832,6 +2898,7 @@ export function createSolarSystemScene(
     setAsteroidBeltVisible,
     setKuiperBeltVisible,
     setCometTailsVisible,
+    setSunCoronaVisible,
     getTier,
     setTier,
     updateTierByCamera,
@@ -2859,6 +2926,7 @@ export function createSolarSystemScene(
     getBeltParticles: () => beltParticles,
     getKuiperParticles: () => kuiperParticles,
     getCometTails: () => cometTails ?? [],
+    getSunCorona: () => sunCorona,
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();

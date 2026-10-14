@@ -197,7 +197,7 @@ export function DisplayPanel() {
         aria-expanded={open}
         // 패널은 열릴 때만 존재한다 — 닫힌 동안 없는 id 를 가리키지 않는다.
         aria-controls={open ? panelId : undefined}
-        title="별 배경 · 구름 · 야간 불빛 · 궤도선 · 이름 라벨 · 소행성대 · 카이퍼 벨트 · 혜성 꼬리 켜고 끄기"
+        title="별 배경 · 구름 · 야간 불빛 · 궤도선 · 이름 라벨 · 소행성대 · 카이퍼 벨트 · 혜성 꼬리 · 태양 코로나 켜고 끄기"
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         onBlur={handleBlur}
