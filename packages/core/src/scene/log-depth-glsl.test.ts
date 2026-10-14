@@ -16,6 +16,7 @@ import { SUN_FRAGMENT_SHADER } from './sun-shader.js';
 import { PLANET_FRAGMENT_SHADER } from './procedural-planet-shader.js';
 import { CLOUD_FRAGMENT_SHADER } from './cloud-layer.js';
 import { BELT_FRAGMENT_SHADER } from './belt-particles.js';
+import { SUN_CORONA_FRAGMENT_SHADER } from './sun-corona.js';
 
 describe('#845 LOG_DEPTH_FRAGMENT_WRITE_GLSL — 커스텀 셰이더 공용 조각 정합', () => {
   // #1215 — 구름 셰이더 추가로 3 → 4 (ADR 20260628-756 §A10.4 — 없으면 shell 이 표면에 depth 거부된다).
@@ -26,6 +27,8 @@ describe('#845 LOG_DEPTH_FRAGMENT_WRITE_GLSL — 커스텀 셰이더 공용 조�
     ['procedural-planet-shader', PLANET_FRAGMENT_SHADER],
     ['cloud-layer', CLOUD_FRAGMENT_SHADER],
     ['belt-particles', BELT_FRAGMENT_SHADER],
+    // #1335 — 코로나 셰이더 (ADR 20261014-1335 결정 1 — 코로나 구 뒷면 평면의 깊이가 수성 · 앞쪽 천체와 같은 공간이어야 한다).
+    ['sun-corona', SUN_CORONA_FRAGMENT_SHADER],
   ];
 
   it('공용 조각 텍스트 자체가 Babylon logDepth 공식 형태를 유지한다', () => {
