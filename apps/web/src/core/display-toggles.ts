@@ -9,7 +9,8 @@
  * URL 어휘는 기존 `parse-*-mode.ts` 4종을 그대로 쓴다 — 새 URL 파라미터 0, 새 파서 0 (결정 5). 예외는 #1293 의
  * `?labels=` (`parse-labels-mode.ts` — 같은 어휘 `off` 옵트아웃) 와 #1319 PR3 의 `?belt=` · `?kuiper=`
  * (`parse-belt-mode.ts` — 같은 `off` 옵트아웃, `?belt=` 는 기존 숫자 의미 유지 — ADR `20261008-1319` 결정 6), #1329 PR2 의
- * `?comettails=` (`parse-comet-tails-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261010-1329` 결정 5). 쓰는 쪽은
+ * `?comettails=` (`parse-comet-tails-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261010-1329` 결정 5), #1335 PR2 의
+ * `?corona=` (`parse-corona-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261014-1335` 결정 6). 쓰는 쪽은
  * `serializeDisplayToggle` 하나이고 그 역방향이 각 행의 `parse` 다.
  */
 
@@ -18,13 +19,22 @@ import type { SimStoreState } from '@/store/sim-store';
 import { parseBeltVisible, parseKuiperVisible } from './parse-belt-mode';
 import { parseCloudsVisible } from './parse-cloud-mode';
 import { parseCometTailsVisible } from './parse-comet-tails-mode';
+import { parseCoronaVisible } from './parse-corona-mode';
 import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
 import { parseOrbitsVisible } from './parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
 
 export type DisplayToggleId =
-  'orbits' | 'stars' | 'clouds' | 'nightLights' | 'labels' | 'belt' | 'kuiper' | 'cometTails';
+  | 'orbits'
+  | 'stars'
+  | 'clouds'
+  | 'nightLights'
+  | 'labels'
+  | 'belt'
+  | 'kuiper'
+  | 'cometTails'
+  | 'corona';
 
 /**
  * 장면이 준비된 뒤 확정되는 환경 가용성. `null` = 장면 미준비 (sim-canvas 가 핸들러를 등록하기 전 ·
@@ -46,6 +56,11 @@ export interface DisplayCapabilities {
    * `force` 는 소프트웨어 렌더에서도 메시를 만들므로 (CI 강제 셀) 그때는 토글도 연다 — `belt` 의 `?belt=N` 과 같은 규약.
    */
   cometTails: boolean;
+  /**
+   * #1335 PR2 — 태양 코로나를 만들 수 있는가 — `!isSoftwareRenderer || ?corona=force` (ADR `20261014-1335` 결정 5 · 6).
+   * `force` 는 소프트웨어 렌더에서도 메시를 만들므로 (CI 강제 셀) 그때는 토글도 연다 — `cometTails` 와 같은 규약.
+   */
+  corona: boolean;
 }
 
 /**
@@ -64,6 +79,9 @@ export const DISPLAY_DISABLED_REASONS = {
   // #1329 PR2 — 혜성 꼬리 (결정 4). 같은 사유 표현.
   softwareRendererCometTails:
     '소프트웨어 렌더링 환경에서는 성능 보호를 위해 혜성 꼬리를 표시하지 않습니다',
+  // #1335 PR2 — 태양 코로나 (결정 5). 같은 사유 표현.
+  softwareRendererCorona:
+    '소프트웨어 렌더링 환경에서는 성능 보호를 위해 태양 코로나를 표시하지 않습니다',
   surfaceOff: '표면 표시가 꺼져 있어 사용할 수 없습니다 (?surface=off)',
   sceneNotReady: '장면을 준비하는 중입니다',
 } as const;
@@ -77,7 +95,8 @@ type IntentKey =
   | 'labelsVisible'
   | 'beltVisible'
   | 'kuiperVisible'
-  | 'cometTailsVisible';
+  | 'cometTailsVisible'
+  | 'coronaVisible';
 type IntentSetterKey =
   | 'setOrbitLinesVisible'
   | 'setStarsVisible'
@@ -86,13 +105,22 @@ type IntentSetterKey =
   | 'setLabelsVisible'
   | 'setBeltVisible'
   | 'setKuiperVisible'
-  | 'setCometTailsVisible';
+  | 'setCometTailsVisible'
+  | 'setCoronaVisible';
 
 export interface DisplayToggleDef {
   id: DisplayToggleId;
   /** URL 쿼리 키 — 기존 파라미터 (`?orbits=` · `?stars=` · `?clouds=` · `?nightlights=`). */
   urlKey:
-    'orbits' | 'stars' | 'clouds' | 'nightlights' | 'labels' | 'belt' | 'kuiper' | 'comettails';
+    | 'orbits'
+    | 'stars'
+    | 'clouds'
+    | 'nightlights'
+    | 'labels'
+    | 'belt'
+    | 'kuiper'
+    | 'comettails'
+    | 'corona';
   label: string;
   /** URL → 의도. `serializeDisplayToggle` 의 역방향 (기존 파서 재사용). */
   parse: (urlParam: string | null | undefined) => boolean;
@@ -227,6 +255,22 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
       return caps.cometTails ? null : DISPLAY_DISABLED_REASONS.softwareRendererCometTails;
     },
     pressed: (intent, caps) => intent && caps !== null && caps.cometTails,
+  },
+  {
+    // #1335 PR2 — 태양 코로나 (태양 disk 는 그대로 — Amendment 1 로 홍염 항이 삭제돼 코로나만 끈다). 처음 켤 때
+    // 지연 생성, 이후 `setEnabled` (ADR `20261014-1335` 결정 6). 로드 경로 `resolveCoronaAtLoad` 와 같은 결정식 (의도 ∧ 환경).
+    id: 'corona',
+    urlKey: 'corona',
+    label: '태양 코로나',
+    parse: parseCoronaVisible,
+    command: (visible) => ({ type: 'setSunCoronaVisible', visible }),
+    intentKey: 'coronaVisible',
+    setterKey: 'setCoronaVisible',
+    disabledReason: (caps) => {
+      if (caps === null) return DISPLAY_DISABLED_REASONS.sceneNotReady;
+      return caps.corona ? null : DISPLAY_DISABLED_REASONS.softwareRendererCorona;
+    },
+    pressed: (intent, caps) => intent && caps !== null && caps.corona,
   },
 ];
 

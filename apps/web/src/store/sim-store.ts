@@ -126,6 +126,11 @@ export interface SimStoreState {
    */
   cometTailsVisible: boolean;
   /**
+   * #1335 PR2 — 태양 코로나 표시 의도 (기본 true — ADR `20261014-1335` 사용자 결정 Q6). 실제 표시는 의도 ∧ 환경
+   * (`displayCapabilities.corona` — 소프트웨어 렌더 게이트, 결정 5) 이다 (`cometTailsVisible` 동형).
+   */
+  coronaVisible: boolean;
+  /**
    * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
    * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
    */
@@ -186,6 +191,8 @@ export interface SimStoreState {
   setKuiperVisible: (visible: boolean) => void;
   /** #1329 PR2 — 혜성 꼬리 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
   setCometTailsVisible: (visible: boolean) => void;
+  /** #1335 PR2 — 태양 코로나 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
+  setCoronaVisible: (visible: boolean) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
   setBodyMenuOpen: (open: boolean) => void;
@@ -239,6 +246,8 @@ export const useSimStore = create<SimStoreState>((set) => ({
   kuiperVisible: true,
   // #1329 PR2 — 기본 ON (결정 5). `?comettails=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
   cometTailsVisible: true,
+  // #1335 PR2 — 기본 ON (Q6). `?corona=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  coronaVisible: true,
   displayCapabilities: null,
   displayPanelOpen: false,
   bodyMenuOpen: false,
@@ -283,6 +292,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setBeltVisible: (visible) => set({ beltVisible: visible }),
   setKuiperVisible: (visible) => set({ kuiperVisible: visible }),
   setCometTailsVisible: (visible) => set({ cometTailsVisible: visible }),
+  setCoronaVisible: (visible) => set({ coronaVisible: visible }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
   setBodyMenuOpen: (open) => set({ bodyMenuOpen: open }),

@@ -64,6 +64,9 @@ export type CoreEvents = {
  *
  * #1329 PR2 — `setCometTailsVisible` 추가. 혜성 꼬리 · 코마의 런타임 토글 (ADR
  * `docs/decisions/20261010-1329-comet-tail-coma.md` 결정 5). 소프트웨어 렌더 게이트 (결정 4) 는 web 이 한다.
+ *
+ * #1335 PR2 — `setSunCoronaVisible` 추가. 태양 코로나의 런타임 토글 (ADR
+ * `docs/decisions/20261014-1335-sun-corona.md` 결정 6). 소프트웨어 렌더 게이트 (결정 5) 는 web 이 한다.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -83,4 +86,5 @@ export type CoreCommand =
   | { type: 'setNightLightsVisible'; visible: boolean }
   | { type: 'setAsteroidBeltVisible'; visible: boolean }
   | { type: 'setKuiperBeltVisible'; visible: boolean }
-  | { type: 'setCometTailsVisible'; visible: boolean };
+  | { type: 'setCometTailsVisible'; visible: boolean }
+  | { type: 'setSunCoronaVisible'; visible: boolean };

@@ -21,7 +21,8 @@ type ToggleType =
   | 'setNightLightsVisible'
   | 'setAsteroidBeltVisible'
   | 'setKuiperBeltVisible'
-  | 'setCometTailsVisible';
+  | 'setCometTailsVisible'
+  | 'setSunCoronaVisible';
 type Register = (core: SimulationCore, handler: (visible: boolean) => void) => void;
 
 const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
@@ -33,6 +34,8 @@ const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
   { type: 'setKuiperBeltVisible', register: (c, h) => c.setKuiperBeltVisibleHandler(h) },
   // #1329 PR2 — 혜성 꼬리 토글 (같은 5 케이스 + 교차 라우팅 0).
   { type: 'setCometTailsVisible', register: (c, h) => c.setCometTailsVisibleHandler(h) },
+  // #1335 PR2 — 태양 코로나 토글 (같은 5 케이스 + 교차 라우팅 0).
+  { type: 'setSunCoronaVisible', register: (c, h) => c.setSunCoronaVisibleHandler(h) },
 ];
 
 describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, register }) => {
@@ -92,7 +95,7 @@ describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, 
 });
 
 describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
-  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 6종 — #1319 PR3 띠 2종)', () => {
+  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 8종 — #1319 PR3 띠 2종 · #1329 혜성 꼬리 · #1335 코로나)', () => {
     const core = new SimulationCore(makeCanvas());
     const handlers = {
       setOrbitLinesVisible: vi.fn(),
@@ -101,6 +104,9 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
       setNightLightsVisible: vi.fn(),
       setAsteroidBeltVisible: vi.fn(),
       setKuiperBeltVisible: vi.fn(),
+      // #1335 PR2 — 혜성 꼬리는 #1329 PR2 가 CASES 에만 넣고 이 집합에는 빠져 있었다 — 코로나와 함께 넣는다.
+      setCometTailsVisible: vi.fn(),
+      setSunCoronaVisible: vi.fn(),
     };
     core.setOrbitLinesVisibleHandler(handlers.setOrbitLinesVisible);
     core.setStarfieldVisibleHandler(handlers.setStarfieldVisible);
@@ -108,6 +114,8 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
     core.setNightLightsVisibleHandler(handlers.setNightLightsVisible);
     core.setAsteroidBeltVisibleHandler(handlers.setAsteroidBeltVisible);
     core.setKuiperBeltVisibleHandler(handlers.setKuiperBeltVisible);
+    core.setCometTailsVisibleHandler(handlers.setCometTailsVisible);
+    core.setSunCoronaVisibleHandler(handlers.setSunCoronaVisible);
 
     for (const type of Object.keys(handlers) as (keyof typeof handlers)[]) {
       for (const h of Object.values(handlers)) h.mockClear();

@@ -18,18 +18,21 @@ const HW: DisplayCapabilities = {
   surfaceDetail: true,
   belt: true,
   cometTails: true,
+  corona: true,
 };
 const SOFTWARE: DisplayCapabilities = {
   starfield: false,
   surfaceDetail: true,
   belt: false,
   cometTails: false,
+  corona: false,
 };
 const SURFACE_OFF: DisplayCapabilities = {
   starfield: true,
   surfaceDetail: false,
   belt: true,
   cometTails: true,
+  corona: true,
 };
 /** #1319 PR3 — 소프트웨어 렌더 + `?belt=N` 강제 (bench · verify 경로) — 띠는 만들어져 있으므로 토글도 열린다. */
 const SOFTWARE_FORCED: DisplayCapabilities = {
@@ -37,6 +40,7 @@ const SOFTWARE_FORCED: DisplayCapabilities = {
   surfaceDetail: true,
   belt: true,
   cometTails: false,
+  corona: false,
 };
 /** #1329 PR2 — 소프트웨어 렌더 + `?comettails=force` (CI 강제 셀) — 꼬리는 만들어져 있으므로 토글도 열린다. */
 const SOFTWARE_COMET_FORCED: DisplayCapabilities = {
@@ -44,10 +48,19 @@ const SOFTWARE_COMET_FORCED: DisplayCapabilities = {
   surfaceDetail: true,
   belt: false,
   cometTails: true,
+  corona: false,
+};
+/** #1335 PR2 — 소프트웨어 렌더 + `?corona=force` (CI 강제 셀) — 코로나는 만들어져 있으므로 토글도 열린다. */
+const SOFTWARE_CORONA_FORCED: DisplayCapabilities = {
+  starfield: false,
+  surfaceDetail: true,
+  belt: false,
+  cometTails: false,
+  corona: true,
 };
 
 describe('display-toggles — 표 구성', () => {
-  it('8 토글 · URL 키 8종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 행 추가)', () => {
+  it('9 토글 · URL 키 9종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -57,6 +70,7 @@ describe('display-toggles — 표 구성', () => {
       'belt',
       'kuiper',
       'cometTails',
+      'corona',
     ]);
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
@@ -67,6 +81,7 @@ describe('display-toggles — 표 구성', () => {
       'belt',
       'kuiper',
       'comettails',
+      'corona',
     ]);
   });
 
@@ -80,6 +95,7 @@ describe('display-toggles — 표 구성', () => {
       { type: 'setAsteroidBeltVisible', visible: false },
       { type: 'setKuiperBeltVisible', visible: false },
       { type: 'setCometTailsVisible', visible: false },
+      { type: 'setSunCoronaVisible', visible: false },
     ]);
   });
 
@@ -132,8 +148,16 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(orbits.pressed(false, SOFTWARE)).toBe(false);
   });
 
-  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 · 혜성 꼬리 불가 + 준비 중 사유 + 꺼짐', () => {
-    for (const id of ['stars', 'clouds', 'nightLights', 'belt', 'kuiper', 'cometTails'] as const) {
+  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 · 혜성 꼬리 · 태양 코로나 불가 + 준비 중 사유 + 꺼짐', () => {
+    for (const id of [
+      'stars',
+      'clouds',
+      'nightLights',
+      'belt',
+      'kuiper',
+      'cometTails',
+      'corona',
+    ] as const) {
       const def = getDisplayToggle(id);
       expect(def.disabledReason(null)).toBe(DISPLAY_DISABLED_REASONS.sceneNotReady);
       expect(def.pressed(true, null)).toBe(false);
@@ -197,6 +221,43 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(getDisplayToggle('stars').disabledReason(SOFTWARE_COMET_FORCED)).toBe(
       DISPLAY_DISABLED_REASONS.softwareRenderer,
     );
+  });
+
+  it('#1335 PR2 소프트웨어 렌더 — 태양 코로나 불가 + 코로나 사유, 의도가 true 여도 꺼짐 (결정 5)', () => {
+    const def = getDisplayToggle('corona');
+    expect(def.label).toBe('태양 코로나');
+    expect(def.disabledReason(SOFTWARE)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererCorona);
+    expect(def.pressed(true, SOFTWARE)).toBe(false);
+    // 다른 강제 (`?belt=N` · `?comettails=force`) 는 코로나 가용성과 무관하다 (각자의 강제만 연다).
+    for (const caps of [SOFTWARE_FORCED, SOFTWARE_COMET_FORCED]) {
+      expect(def.disabledReason(caps)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererCorona);
+      expect(def.pressed(true, caps)).toBe(false);
+    }
+    // `?surface=off` 는 코로나와 무관 (표면 셰이더가 아니라 별도 메시).
+    expect(def.disabledReason(SURFACE_OFF)).toBeNull();
+    expect(new Set(Object.values(DISPLAY_DISABLED_REASONS)).size).toBe(
+      Object.values(DISPLAY_DISABLED_REASONS).length,
+    );
+  });
+
+  it('#1335 PR2 소프트웨어 렌더 + ?corona=force — 코로나 토글은 열리고 혜성 꼬리 · 별은 여전히 막힌다', () => {
+    const def = getDisplayToggle('corona');
+    expect(def.disabledReason(SOFTWARE_CORONA_FORCED)).toBeNull();
+    expect(def.pressed(true, SOFTWARE_CORONA_FORCED)).toBe(true);
+    expect(def.pressed(false, SOFTWARE_CORONA_FORCED)).toBe(false);
+    expect(getDisplayToggle('cometTails').disabledReason(SOFTWARE_CORONA_FORCED)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRendererCometTails,
+    );
+    expect(getDisplayToggle('stars').disabledReason(SOFTWARE_CORONA_FORCED)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRenderer,
+    );
+  });
+
+  it('#1335 PR2 코로나 parse — 로드 전용 `force` 도 의도 ON 으로 읽고, 직렬화하면 키 삭제 (왕복 대상 아님)', () => {
+    const def = getDisplayToggle('corona');
+    expect(def.parse('force')).toBe(true);
+    expect(def.parse('FORCE')).toBe(true);
+    expect(serializeDisplayToggle(def.parse('force'))).toBeNull();
   });
 
   it('?surface=off — 구름·불빛 불가 (D10), 의도가 true 여도 꺼짐. 별은 영향 없음', () => {
