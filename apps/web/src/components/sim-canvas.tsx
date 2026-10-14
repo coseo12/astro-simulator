@@ -1020,6 +1020,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setKuiperBeltVisibleHandler((visible) => solar.setKuiperBeltVisible(visible));
         // #1329 PR2 — 혜성 꼬리 (같은 wiring). 가용성 `cometTails` = 소프트웨어 렌더가 아니거나 `?comettails=force`.
         instance.setCometTailsVisibleHandler((visible) => solar.setCometTailsVisible(visible));
+        // #1335 PR2 — 태양 코로나 (같은 wiring). 가용성 `corona` = 소프트웨어 렌더가 아니거나 `?corona=force`.
+        instance.setSunCoronaVisibleHandler((visible) => solar.setSunCoronaVisible(visible));
         {
           const store = useSimStore.getState();
           store.setStarsVisible(starsParamVisible);
@@ -1029,12 +1031,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           store.setBeltVisible(beltMode.visible);
           store.setKuiperVisible(kuiperParamVisible);
           store.setCometTailsVisible(cometTailsMode.visible);
+          store.setCoronaVisible(coronaMode.visible);
           // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
           store.setDisplayCapabilities({
             starfield: !isSoftwareRenderer,
             surfaceDetail: surfaceVisible,
             belt: !isSoftwareRenderer || beltMode.forced,
             cometTails: !isSoftwareRenderer || cometTailsMode.forced,
+            corona: !isSoftwareRenderer || coronaMode.forced,
           });
         }
 

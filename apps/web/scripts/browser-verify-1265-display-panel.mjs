@@ -52,7 +52,8 @@
  * ## 판정 — UI 경로 (PR2 배정분)
  *   장면 준비  UI 페이지마다 부팅 직후 `displayCapabilities !== null` (sim-canvas 가 여는 제품 가용성 게이트 — 게이트다).
  *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 전부 가시
- *        (`UI_IDS` — #1293 이 이름 라벨을, #1319 PR3 이 소행성대 · 카이퍼 벨트를, #1329 PR2 가 혜성 꼬리를 더해 8 개).
+ *        (`UI_IDS` — #1293 이 이름 라벨을, #1319 PR3 이 소행성대 · 카이퍼 벨트를, #1329 PR2 가 혜성 꼬리를, #1335 PR2 가
+ *        태양 코로나를 더해 9 개).
  *   D2   같은 페이지 — 우측 그룹 버튼 전부 `x + width ≤ 1280` · 좌측 단축 바 버튼 전부 스크롤로 도달 + 그 지점 hit.
  *   D3   패널 궤도선 ↔ 단축 바 `toggle-orbits` ↔ `store.orbitLinesVisible` — 어느 쪽을 눌러도 세 값 일치.
  *   D4   관찰 모드 · 패널 열림 · 4 초 무입력 → 상단 바 computed `opacity === "1"`.
@@ -63,6 +64,8 @@
  *        pressed "false" · URL 키 부재) + 띠 메시 0 (ADR `20261008-1319` 결정 3 — 기본 경로는 소프트웨어에서 띠를 안 만든다).
  *   D9c  (#1329 PR2) 소프트웨어 렌더 전용 — 혜성 꼬리 토글도 같은 술어 + 꼬리 메시 (`comet-tail-*`) 0 (ADR `20261010-1329`
  *        결정 4 — 기본 경로는 소프트웨어에서 꼬리를 안 만든다).
+ *   D9d  (#1335 PR2) 소프트웨어 렌더 전용 — 태양 코로나 토글도 같은 술어 + 코로나 메시 (`sun-corona`) 0 (ADR `20261014-1335`
+ *        결정 5 — 기본 경로는 소프트웨어에서 코로나를 안 만든다).
  *   D10  `?surface=off` — 구름·불빛 `aria-disabled` + 표면 off 사유 · 누른 뒤 mesh · 머티리얼 개수 · URL 무변화 · 구름 0.
  *        (`nightLightStrength` 보유 머티리얼이 0 개라 uniform 술어는 공허 참 — 판정 근거는 개수 술어다.)
  *   D11  토글별 OFF → `key=off` · ON → 키 부재 · `history.length` 불변 · 북마크 복사 URL 반영 · 전부 OFF 새로고침 뒤
@@ -219,6 +222,8 @@ const STARFIELD_MESH = 'starfield';
 const BELT_MESHES = ['belt-particles', 'kuiper-particles'];
 /** #1329 PR2 — 혜성 꼬리 메시 이름 접두 (`comet-tail.ts` — `comet-tail-<id>`, `kind: 'comet'` 전수). */
 const COMET_TAIL_MESH_PREFIX = 'comet-tail-';
+/** #1335 PR2 — 태양 코로나 메시 이름 (`sun-corona.ts`). */
+const CORONA_MESH = 'sun-corona';
 const EARTH_MID = 'earth-lod-mid';
 
 /** 계약 D6 「on/off 3회 왕복」. */
@@ -233,7 +238,7 @@ const READY_TIMEOUT_MS = 20_000;
 /** UI 판정 기본 로드 — D15 스트레스와 같은 쿼리 (4 효과 전부 켜진 상태 · focus=earth · 관찰 모드). */
 const UI_BASE = STRESS;
 /** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` 포함. */
-const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off`;
+const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off`;
 /** 계약 D1 — 모드 4종. */
 const UI_MODES = ['observe', 'research', 'education', 'sandbox'];
 /** 계약 D1 · D2 — 1280×720 (`setupPage` · `setupUiPage` 뷰포트와 같은 값). */
@@ -697,10 +702,12 @@ const UI_URL_KEY = {
   kuiper: 'kuiper',
   // #1329 PR2 — 혜성 꼬리 (8번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261010-1329 결정 4).
   cometTails: 'comettails',
+  // #1335 PR2 — 태양 코로나 (9번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261014-1335 결정 5).
+  corona: 'corona',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
-/** 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다 (D9 · #1319 PR3 D9b · #1329 PR2 D9c). */
-const SOFTWARE_GATED_IDS = ['stars', 'belt', 'kuiper', 'cometTails'];
+/** 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다 (D9 · #1319 PR3 D9b · #1329 PR2 D9c · #1335 PR2 D9d). */
+const SOFTWARE_GATED_IDS = ['stars', 'belt', 'kuiper', 'cometTails', 'corona'];
 
 /** 패널 열림/닫힘을 트리거 클릭으로 맞춘다. 결과(패널 개수)는 호출부가 판정한다. */
 async function setPanelOpen(page, open) {
@@ -1519,6 +1526,36 @@ async function runUiInteraction(browser, out, pages) {
       COMET_TAIL_MESH_PREFIX,
     );
     out.uiD9Comet = d9c;
+
+    // ── D9d (#1335 PR2) — 소프트웨어 렌더: 코로나 토글 aria-disabled + 사유, 두 번 눌러도 코로나 메시 0 · URL 부재 ──
+    await setPanelOpen(page, true);
+    const d9d = { toggles: {} };
+    {
+      const id = 'corona';
+      const el = page.locator(toggleSel(id));
+      const rec = {
+        ariaDisabled: await el.getAttribute('aria-disabled'),
+        title: await el.getAttribute('title'),
+        pressedBefore: await el.getAttribute('aria-pressed'),
+        clicks: [],
+      };
+      for (let i = 0; i < DISABLED_CLICKS; i += 1) {
+        await clickToggle(page, id);
+        await frames(page, 2);
+        rec.clicks.push({
+          pressed: await el.getAttribute('aria-pressed'),
+          url: (await readUrlKeys(page))[UI_URL_KEY[id]],
+        });
+      }
+      d9d.toggles[id] = rec;
+    }
+    await setPanelOpen(page, false);
+    await frames(page, 2);
+    d9d.coronaMeshes = await page.evaluate(
+      (name) => window.__simCore.scene.meshes.filter((m) => m.name === name).length,
+      CORONA_MESH,
+    );
+    out.uiD9Corona = d9d;
   }
 
   // ── D15 (UI) — 패널 토글 전부 × 10 왕복 × (재생 / 일시정지) ──
@@ -2879,6 +2916,32 @@ function judgeUi(meta, { settleIds, hw }) {
           },
         )
       : gate('UI D9c 소프트웨어 렌더 혜성 꼬리 토글 (소프트웨어 전용)', [], ['renderer'], () => [
+          '하드웨어 렌더',
+          '—',
+          SKIP,
+        ]),
+    uiSoftware
+      ? gate(
+          'UI D9d 소프트웨어 렌더 — 태양 코로나 토글 aria-disabled · 사유 · 클릭 후 코로나 메시 0 · URL (#1335 PR2)',
+          ['uiD9Corona'],
+          ['renderer'],
+          (r) => {
+            const t = r.uiD9Corona.toggles.corona;
+            return [
+              JSON.stringify(r.uiD9Corona),
+              `aria-disabled "true" ∧ title ⊃ "${REASON_MARK.software}" ∧ 2회 클릭 내내 pressed "false" · URL 키 부재 ∧ 코로나 메시 0`,
+              !!t &&
+                t.ariaDisabled === 'true' &&
+                typeof t.title === 'string' &&
+                t.title.includes(REASON_MARK.software) &&
+                t.pressedBefore === 'false' &&
+                t.clicks.length === DISABLED_CLICKS &&
+                t.clicks.every((c) => c.pressed === 'false' && c.url === null) &&
+                r.uiD9Corona.coronaMeshes === 0,
+            ];
+          },
+        )
+      : gate('UI D9d 소프트웨어 렌더 태양 코로나 토글 (소프트웨어 전용)', [], ['renderer'], () => [
           '하드웨어 렌더',
           '—',
           SKIP,

@@ -28,8 +28,9 @@ const IDS = [
   'belt',
   'kuiper',
   'cometTails',
+  'corona',
 ] as const;
-/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 행이 추가돼 마지막이 바뀌었다). */
+/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 → #1335 PR2 태양 코로나 행이 추가돼 마지막이 바뀌었다). */
 const LAST_ID = IDS[IDS.length - 1]!;
 
 function renderPanel() {
@@ -50,7 +51,14 @@ beforeEach(() => {
     beltVisible: true,
     kuiperVisible: true,
     cometTailsVisible: true,
-    displayCapabilities: { starfield: true, surfaceDetail: true, belt: true, cometTails: true },
+    coronaVisible: true,
+    displayCapabilities: {
+      starfield: true,
+      surfaceDetail: true,
+      belt: true,
+      cometTails: true,
+      corona: true,
+    },
     displayPanelOpen: false,
   });
 });
@@ -338,6 +346,7 @@ describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B
         surfaceDetail: false,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     renderPanel();
@@ -385,6 +394,7 @@ describe('DisplayPanel — 토글 분기', () => {
         surfaceDetail: true,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     renderPanel();
@@ -411,6 +421,7 @@ describe('DisplayPanel — 토글 분기', () => {
         surfaceDetail: true,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     renderPanel();
@@ -446,6 +457,7 @@ describe('DisplayPanel — 토글 분기', () => {
         surfaceDetail: true,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     renderPanel();
@@ -474,9 +486,51 @@ describe('DisplayPanel — 토글 분기', () => {
     expect(sentCommands.at(-1)).toEqual({ type: 'setCometTailsVisible', visible: true });
   });
 
+  it('#1335 PR2 소프트웨어 렌더 — 태양 코로나: aria-disabled + 코로나 사유 · 네이티브 disabled 아님 · 클릭 no-op (결정 5)', () => {
+    useSimStore.setState({
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+        corona: false,
+      },
+    });
+    renderPanel();
+    openPanel();
+    const el = toggleEl('corona');
+    expect(el).toHaveAttribute('aria-disabled', 'true');
+    expect(el).not.toBeDisabled();
+    expect(el).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.softwareRendererCorona);
+    expect(el).toHaveAccessibleDescription(DISPLAY_DISABLED_REASONS.softwareRendererCorona);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(el);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    expect(sentCommands).toEqual([]);
+  });
+
+  it('#1335 PR2 하드웨어 — 태양 코로나 클릭 → aria-pressed 반전 + 명령 (다른 행은 그대로)', () => {
+    renderPanel();
+    openPanel();
+    expect(screen.getByRole('button', { name: '태양 코로나' })).toBe(toggleEl('corona'));
+    fireEvent.click(toggleEl('corona'));
+    expect(toggleEl('corona')).toHaveAttribute('aria-pressed', 'false');
+    expect(toggleEl('cometTails')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands).toEqual([{ type: 'setSunCoronaVisible', visible: false }]);
+    fireEvent.click(toggleEl('corona'));
+    expect(toggleEl('corona')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands.at(-1)).toEqual({ type: 'setSunCoronaVisible', visible: true });
+  });
+
   it('?surface=off — 구름·불빛 aria-disabled + 사유, 클릭 no-op (D10)', () => {
     useSimStore.setState({
-      displayCapabilities: { starfield: true, surfaceDetail: false, belt: true, cometTails: true },
+      displayCapabilities: {
+        starfield: true,
+        surfaceDetail: false,
+        belt: true,
+        cometTails: true,
+        corona: true,
+      },
     });
     renderPanel();
     openPanel();
@@ -496,6 +550,7 @@ describe('DisplayPanel — 토글 분기', () => {
         surfaceDetail: false,
         belt: false,
         cometTails: false,
+        corona: false,
       },
     });
     renderPanel();
