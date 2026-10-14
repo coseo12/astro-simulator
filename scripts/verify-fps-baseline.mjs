@@ -166,7 +166,15 @@ const COMET_FORCED_QUERY = '?t=2446479.5&comettails=force';
 
 /**
  * #1335 (ADR `20261014-1335` 결정 5 · 사용자 결정 Q7 (a)) — 태양 코로나 강제 셀. 혜성 셀과 같은 이유다: 소프트웨어 렌더
- * 게이트만 있으면 CI 가 코로나 셰이더를 한 번도 컴파일 · 실행하지 않는다. 판정은 이 가드의 기존 규칙 그대로 — 새 임계 0.
+ * 게이트만 있으면 CI 가 코로나 셰이더를 한 번도 컴파일 · 실행하지 않는다.
+ *
+ * ⚠️ 스프린트 계약 재조정 (PR #1337 · 사용자 결정 2026-10-14, ADR Amendment 2): 이 셀은 **존재 · 그려짐 확인 전용**이다
+ * (`fpsJudged: false`). fps 는 재고 로그에 남기지만 절대 하한 · baseline 회귀 판정에서 뺀다 — baseline 값도 두지 않는다.
+ * 측정 전제 (`requiredMeshes` · 머티리얼 준비 · `requireVisible`) 는 그대로 FAIL 이다. 근거 (gate 판정 경로 실측, CI 진단
+ * run 38529487674 · ubuntu-latest · CPU 4x · 소프트웨어 렌더): 같은 run 의 `?gpu=a&corona=off` 대비 on/off 비 `0.620 ~ 0.644`,
+ * 1번 머신 on `25.0 ~ 26.4` (절대 하한 30 미만) · 2번 머신 on `31.9` — 머신에 따라 하한을 사이에 두고 갈린다. 소프트웨어
+ * 렌더 사용자에게는 코로나를 만들지 않으므로 (결정 5) 이 셀의 fps 는 사용자 비용이 아니다. 하드웨어 비용은 `bench:scene` 이
+ * 계속 감시한다. baseline 을 diag 모드 값 (`37.5`) 으로 박제했던 것이 gate 값과 어긋난 원인은 분리하지 않았다.
  *
  * `gpu=a` 를 함께 거는 이유: CI (소프트웨어 렌더) 는 GPU tier 가 `c` 라 LOD 가 `low` 로 강제되고, 태양이 billboard 가 되면
  * 코로나는 LOD 추종 (결정 4 의 1) 으로 `isVisible = false` 다 — 머티리얼은 컴파일되지만 **draw 가 0** 인 장면을 재게 된다
@@ -209,6 +217,8 @@ const SCENARIOS = [
     // PR #1337 리뷰 권고 2 — 활성 + 준비만으로는 LOD 추종 (`isVisible = false`, draw 0) 상태에서도 통과한다.
     // 이 셀은 「코로나가 그려지는 장면」을 재야 하므로 가시성까지 요구한다 (새 임계 아님 — 전제 술어 보강).
     requireVisible: true,
+    // 존재 · 그려짐 확인 전용 — fps 판정 제외 (위 상수 주석 ⚠️ 계약 재조정). baseline 키도 두지 않는다.
+    fpsJudged: false,
     viewports: ['desktop'],
   },
 ];
@@ -422,6 +432,7 @@ async function measureScenario(page, scenario) {
     );
     attempts.push(v);
     fps = Math.max(fps, v);
+    if (scenario.fpsJudged === false) break; // #1335 — 판정 제외 셀은 1회 측정 · 기록만
     const base = baselineForCompare?.viewports?.[currentViewportId]?.[scenario.id];
     const passesAbsolute = v >= MIN_FPS_ABSOLUTE;
     const passesRegression = base === undefined || v >= base * (1 - REGRESSION_MARGIN);
@@ -493,7 +504,9 @@ function compareBaseline(current, baseline) {
     for (const sc of scenariosFor(vp.id)) {
       const cur = current.viewports[vp.id]?.[sc.id];
       const base = baseline.viewports[vp.id]?.[sc.id];
-      if (cur === undefined || base === undefined) {
+      // #1335 — `fpsJudged: false` 셀은 baseline 이 없다 (판정 제외). 측정 누락 · 전제 실패는 그대로 FAIL.
+      const fpsJudged = sc.fpsJudged !== false;
+      if (cur === undefined || (fpsJudged && base === undefined)) {
         failures.push(`[${vp.id}/${sc.id}] baseline 또는 측정 누락`);
         continue;
       }
@@ -508,6 +521,7 @@ function compareBaseline(current, baseline) {
           continue;
         }
       }
+      if (!fpsJudged) continue; // 존재 · 그려짐 확인 전용 — 절대 하한 · 회귀 판정 제외
       const belowAbsolute = cur < MIN_FPS_ABSOLUTE;
       const belowRegression = cur < base * (1 - REGRESSION_MARGIN);
       if (!belowAbsolute && !belowRegression) continue; // 정상 — 실패 아님
@@ -710,18 +724,26 @@ for (const vp of VIEWPORTS) {
   const d = current.diagnostics[vp.id];
   for (const sc of scenariosFor(vp.id)) {
     const fps = r[sc.id];
-    const mark = fps >= MIN_FPS_ABSOLUTE ? '✓' : '✗';
+    const judged = sc.fpsJudged !== false;
+    const mark = !judged ? '·' : fps >= MIN_FPS_ABSOLUTE ? '✓' : '✗';
     const diag = d?.[sc.id];
     const diagStr = diag
       ? ` (tier=${diag.tier} override=${diag.override} attempts=[${diag.attempts.join(', ')}])`
       : '';
-    console.log(`  ${mark} ${sc.label}: ${fps} FPS${diagStr}`);
+    const judgedStr = judged ? '' : ' [fps 판정 제외 — 존재 · 그려짐 확인 전용]';
+    console.log(`  ${mark} ${sc.label}: ${fps} FPS${diagStr}${judgedStr}`);
   }
 }
 
 // baseline 모드 — diagnostics 는 baseline 에 박제하지 않음 (#680, 측정마다 달라지는 진단값).
 if (UPDATE_BASELINE) {
   const { diagnostics: _omit, ...baselineDoc } = current;
+  // #1335 — 판정 제외 셀은 baseline 에 남기지 않는다 (판정에 쓰이지 않는 수치는 오독된다).
+  for (const vp of VIEWPORTS) {
+    for (const sc of scenariosFor(vp.id)) {
+      if (sc.fpsJudged === false) delete baselineDoc.viewports[vp.id]?.[sc.id];
+    }
+  }
   writeFileSync(baselinePath, JSON.stringify(baselineDoc, null, 2) + '\n');
   console.log(`\n✓ baseline 박제: ${baselinePath}`);
   process.exit(0);
