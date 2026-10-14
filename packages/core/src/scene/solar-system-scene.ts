@@ -251,7 +251,7 @@ export interface SolarSystemSceneHandles {
    */
   setCometTailsVisible: (visible: boolean) => void;
   /**
-   * #1335 — 태양 코로나 · 홍염 표시 토글 (ADR 20261014-1335 결정 4 의 2 · 결정 6). 없으면 그때 한 번 생성하고, 이후는
+   * #1335 — 태양 코로나 표시 토글 (ADR 20261014-1335 결정 4 의 2 · 결정 6). 없으면 그때 한 번 생성하고, 이후는
    * 코로나 메시의 `setEnabled` 만 바꾼다 (dispose 는 장면 dispose 때만). 렌더러 종류는 묻지 않는다 (결정 5 — web 책임).
    * ⚠️ `setEnabled` 는 **토글 전용**이다 — LOD 추종은 프레임 위상이 `isVisible` 로 쓴다 (결정 4 의 1). 두 플래그를 합치지 않는다.
    */
@@ -545,7 +545,7 @@ export interface SolarSystemSceneOptions {
    */
   cometTails?: boolean;
   /**
-   * #1335 — 태양 코로나 · 홍염 메시를 **로드 시** 만든다 (ADR 20261014-1335 결정 5 · 6). 기본 false. false 여도
+   * #1335 — 태양 코로나 메시를 **로드 시** 만든다 (ADR 20261014-1335 결정 5 · 6). 기본 false. false 여도
    * `setSunCoronaVisible(true)` 가 처음 켤 때 지연 생성한다.
    *
    * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 5) 와 `?corona=force` 우회는 호출자(web) 가 판정해
@@ -1488,7 +1488,7 @@ export function createSolarSystemScene(
   // 혜성 꼬리 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:comet-tails');
 
-  // #1335 — 태양 코로나 · 홍염 (ADR 20261014-1335). 태양 1개 = 메시 1 · ShaderMaterial 1.
+  // #1335 — 태양 코로나 (ADR 20261014-1335). 태양 1개 = 메시 1 · ShaderMaterial 1.
   //  - 기준계는 draw 직전 태양 mesh.position + `bodyFrame.scale` (결정 2) — 시간 위상에 아무것도 걸지 않는다.
   //  - 반경 = `body.radius × bodyScale('sun')` × 기록 스케일 = sun high mesh 세계 반경 (DoD D4).
   //  - LOD 추종 (`isVisible`) 은 프레임 위상 (`runLodPass`) 이 쓴다 — 아래 `syncSunCoronaLodVisibility` (결정 4 의 1).

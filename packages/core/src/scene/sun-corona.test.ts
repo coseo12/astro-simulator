@@ -1,9 +1,10 @@
 /**
- * #1335 — 태양 코로나 · 홍염 순수 함수 · GLSL 정적 계약 (ADR `20261014-1335` 결정 1 · 3 · 7 · §교차검증 합의 1 · 이견 2, DoD D6 · D9).
+ * #1335 — 태양 코로나 순수 함수 · GLSL 정적 계약 (ADR `20261014-1335` 결정 1 · 3 · 7 · §교차검증 합의 1 · 이견 2, DoD D6 · D9).
  *
  *  1. 반경 프로파일 미러 — ρ = 1 최대 (= 1) · 단조 감소 · ρ_out 에서 0 · 범위 밖 0 (discard 경계).
  *  2. 반경식 · 각반경 · 펼침 — `lowerRadiusLimit` 근접 (d/R ≈ 1.05) 과 태양 안 (d ≤ R) 에서 유한 (D7 의 정적 짝).
  *  3. 각도 상한 — 화면 대각 반시야각 (기본 fov · 1280×800 ≈ 38.6°) 보다 크고 π/2 보다 작다 (§교차검증 이견 2 구현 계약).
+ *     상한 페이드 (ADR Amendment 1) — 시작각이 대각 반시야각보다 크고, 상한에서 기여 0.
  *  4. 고리 기하 — 정점 수 · 매개변수 범위 · 인덱스 범위.
  *  5. GLSL 정적 — 시간 · jd uniform 없음 (D6) · acos clamp (합의 1) · switch 없음 · 상수가 셰이더 텍스트에 실린다.
  */
@@ -12,6 +13,7 @@ import { ArcRotateCamera, Constants, Mesh, NullEngine, Scene, Vector3 } from '@b
 import {
   baumbachProfile,
   buildSunCoronaGeometry,
+  coronaAngleCapFadeMirror,
   coronaAngularRadius,
   coronaEquatorMirror,
   coronaProfileMirror,
@@ -19,6 +21,7 @@ import {
   coronaStreamerMirror,
   createSunCorona,
   sunCoronaFrame,
+  CORONA_ANGLE_CAP_FADE_RAD,
   CORONA_ANGLE_CAP_RAD,
   CORONA_DISPLAY_GAMMA,
   CORONA_OUTER_RHO,
@@ -117,19 +120,55 @@ describe('#1335 반경식 · 각반경 · 펼침 (결정 1 · 2, D7 정적 짝)'
   });
 });
 
+/** 화면 대각 반시야각 — 기본 fov 는 Babylon 카메라 기본값에서 읽는다 (하드코딩 금지 — tier-transition.ts:65 의 0.8 rad). */
+function diagonalHalfAngle(): number {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const fov = new ArcRotateCamera('c', 0, 0, 1, Vector3.Zero(), scene).fov;
+  scene.dispose();
+  engine.dispose();
+  const aspect = VIEW_W / VIEW_H;
+  return Math.atan(Math.tan(fov / 2) * Math.sqrt(1 + aspect * aspect));
+}
+
 describe('#1335 각도 상한 계약 (§교차검증 이견 2 — D9)', () => {
   it('화면 대각 반시야각 (Babylon 기본 fov · 1280×800 ≈ 38.6°) 보다 크고 π/2 보다 작다', () => {
-    const engine = new NullEngine();
-    const scene = new Scene(engine);
-    // 기본 fov 는 Babylon 카메라 기본값에서 읽는다 (하드코딩 금지 — tier-transition.ts:65 의 0.8 rad).
-    const fov = new ArcRotateCamera('c', 0, 0, 1, Vector3.Zero(), scene).fov;
-    const aspect = VIEW_W / VIEW_H;
-    const diagonalHalfAngle = Math.atan(Math.tan(fov / 2) * Math.sqrt(1 + aspect * aspect));
-    expect((diagonalHalfAngle * 180) / Math.PI).toBeCloseTo(38.6, 1);
-    expect(CORONA_ANGLE_CAP_RAD).toBeGreaterThan(diagonalHalfAngle);
+    const diag = diagonalHalfAngle();
+    expect((diag * 180) / Math.PI).toBeCloseTo(38.6, 1);
+    expect(CORONA_ANGLE_CAP_RAD).toBeGreaterThan(diag);
     expect(CORONA_ANGLE_CAP_RAD).toBeLessThan(Math.PI / 2);
-    scene.dispose();
-    engine.dispose();
+  });
+});
+
+describe('#1335 각도 상한 페이드 (ADR Amendment 1 — D-T2)', () => {
+  it('페이드 시작각 (상한 − 폭) 은 화면 대각 반시야각보다 크다 — 태양을 보는 화면에는 걸리지 않는다', () => {
+    expect(CORONA_ANGLE_CAP_FADE_RAD).toBeGreaterThan(0);
+    expect(CORONA_ANGLE_CAP_RAD - CORONA_ANGLE_CAP_FADE_RAD).toBeGreaterThan(diagonalHalfAngle());
+    // 시작각 이하에서는 정확히 1 (곱해도 값이 바뀌지 않는다).
+    expect(coronaAngleCapFadeMirror(CORONA_ANGLE_CAP_RAD - CORONA_ANGLE_CAP_FADE_RAD)).toBe(1);
+    expect(coronaAngleCapFadeMirror(diagonalHalfAngle())).toBe(1);
+  });
+
+  it('상한각에서 기여 0 · 시작각 → 상한 사이 단조 비증가', () => {
+    expect(coronaAngleCapFadeMirror(CORONA_ANGLE_CAP_RAD)).toBe(0);
+    expect(coronaAngleCapFadeMirror(CORONA_ANGLE_CAP_RAD + 0.1)).toBe(0);
+    const start = CORONA_ANGLE_CAP_RAD - CORONA_ANGLE_CAP_FADE_RAD;
+    let prev = 1;
+    for (let i = 0; i <= 100; i += 1) {
+      const v = coronaAngleCapFadeMirror(start + (CORONA_ANGLE_CAP_FADE_RAD * i) / 100);
+      expect(v).toBeLessThanOrEqual(prev);
+      prev = v;
+    }
+  });
+
+  it('GLSL — fragment 가 같은 smoothstep 식으로 기여에 곱한다', () => {
+    expect(SUN_CORONA_FRAGMENT_SHADER).toContain(
+      `const float ANGLE_CAP_FADE = ${CORONA_ANGLE_CAP_FADE_RAD.toFixed(6)};`,
+    );
+    expect(SUN_CORONA_FRAGMENT_SHADER).toContain(
+      'float capFade = 1.0 - smoothstep(ANGLE_CAP - ANGLE_CAP_FADE, ANGLE_CAP, theta);',
+    );
+    expect(SUN_CORONA_FRAGMENT_SHADER).toMatch(/equator \* capFade\)/);
   });
 });
 

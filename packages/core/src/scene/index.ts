@@ -71,7 +71,7 @@ export {
   COMET_ION_TAIL_LENGTH_1AU,
 } from './comet-tail.js';
 export type { CometTailHandles, CometTailUniforms, CometTailFrame } from './comet-tail.js';
-// #1335 — 태양 코로나 · 홍염 (ADR 20261014-1335).
+// #1335 — 태양 코로나 (ADR 20261014-1335).
 export {
   createSunCorona,
   sunCoronaFrame,

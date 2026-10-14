@@ -1,5 +1,5 @@
 /**
- * #1335 — `?corona=` URL 파라미터 → 태양 코로나 · 홍염 초기 상태 파싱 순수 함수
+ * #1335 — `?corona=` URL 파라미터 → 태양 코로나 초기 상태 파싱 순수 함수
  * (ADR `docs/decisions/20261014-1335-sun-corona.md` 결정 5 · 6 · 사용자 결정 Q6 · Q7).
  *
  * 어휘 (`parse-comet-tails-mode.ts` 와 같은 3함수 · 같은 어휘):
@@ -13,7 +13,7 @@
  */
 
 export interface CoronaParam {
-  /** 코로나 · 홍염 표시 의도. */
+  /** 코로나 표시 의도. */
   visible: boolean;
   /** 소프트웨어 렌더 게이트를 우회해 생성한다 (`?corona=force`). */
   forced: boolean;

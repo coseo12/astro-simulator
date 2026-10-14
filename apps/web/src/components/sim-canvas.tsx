@@ -545,7 +545,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #1329 — 혜성 꼬리 · 코마 (ADR 20261010-1329 결정 4). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 미지정 켜짐 · `off` 꺼짐 · `force` 켜짐 + 소프트웨어 렌더 게이트 우회 (CI 셰이더 실행 경로).
         const cometTailsMode = parseCometTailsParam(beltUrl.get('comettails'));
-        // #1335 — 태양 코로나 · 홍염 (ADR 20261014-1335 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
+        // #1335 — 태양 코로나 (ADR 20261014-1335 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 미지정 켜짐 · `off` 꺼짐 · `force` 켜짐 + 소프트웨어 렌더 게이트 우회 (CI 셰이더 실행 경로 — Q7).
         const coronaMode = parseCoronaParam(beltUrl.get('corona'));
         // `beltN` = **명시** 수만 (미지정 = 0). 아래 엔진 자동 선택 (`auto` → N ≥ 1000 이면 webgpu/barnes-hut) 과

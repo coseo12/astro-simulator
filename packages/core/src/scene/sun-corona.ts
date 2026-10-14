@@ -1,5 +1,5 @@
 /**
- * #1335 — 태양 코로나 · 홍염 렌더 경로 (ADR `docs/decisions/20261014-1335-sun-corona.md` 결정 1~8).
+ * #1335 — 태양 코로나 렌더 경로 (ADR `docs/decisions/20261014-1335-sun-corona.md` 결정 1~8).
  *
  * 태양 1개 = 메시 1개 (`sun-corona`) · GLSL `ShaderMaterial` 1개 (draw call +1). 메시는 **시선 정렬 고리(annulus)** 다 —
  * 정점 속성 `position` 은 좌표가 아니라 매개변수 `(u, v, 0)` (`u ∈ [0,1]` 둘레 각 · `v ∈ {0, 1}` 안쪽/바깥 테두리) 이고,
@@ -72,6 +72,13 @@ export const CORONA_SEGMENTS = 96;
  * 코로나 구 안에 있을 때 화면 안에 코로나의 각진 바깥 끝이 보인다. 80° 는 종횡비 약 13 까지의 화면 대각을 덮는다 (계산값).
  */
 export const CORONA_ANGLE_CAP_RAD = (80 * Math.PI) / 180;
+/**
+ * 각도 상한 페이드 폭 (rad) — 시선–태양 각 θ 가 `상한 − 폭` 에서 상한까지 가는 동안 기여를 smoothstep 으로 1 → 0 으로 줄인다
+ * (ADR Amendment 1 — D-T2 사용자 결정). 없으면 카메라가 코로나 구 안 (`3α > 상한`, d/R ≲ 2.2) 에 있을 때 상한에서 가산량이
+ * 계단으로 끊긴다 — 수성 근일점 포커스 실측 79° → 80° 구간 평균 `7.3 ~ 18.4 / 255` → `≈ 0.05` (PR #1337 qa · developer 실측).
+ * 계약: 페이드 시작각 (`상한 − 폭`) 은 화면 대각 반시야각 (38.6°) 보다 크다 — 카메라가 태양을 보는 화면에서는 페이드가 걸리지 않는다.
+ */
+export const CORONA_ANGLE_CAP_FADE_RAD = (20 * Math.PI) / 180;
 
 /**
  * Baumbach (1937) K-코로나 경험식의 세 항 `(계수, 지수)` — `I(ρ) ∝ 0.0532 ρ⁻²·⁵ + 1.425 ρ⁻⁷ + 2.565 ρ⁻¹⁷`.
@@ -99,23 +106,6 @@ export const CORONA_STREAMER_SCALE = 6;
  * 출발값 = 임의 (D-T2 육안 튜닝 — 상한은 박제하지 않는다, §교차검증 고유 2).
  */
 export const CORONA_EQUATORIAL_WEIGHT = 0.5;
-
-/**
- * 홍염 (사용자 결정 Q4 (a) — 정적 · 림 고정 · 높이 과장). D-T2 에서 거슬리면 상수 0 이 아니라 **항 자체를 삭제**한다.
- * 홍염 띠 `ρ ∈ [1, 1 + H]` 안에서 고주파 noise `n = fbm(e · S_p)` 가 문턱 T 를 넘는 방향만 혀(tongue) 모양으로 붉게 칠한다:
- * `excess = clamp((n − T) / RANGE, 0, 1)` 이 그 방향의 홍염 높이 비율, `h = (ρ − 1) / H` 가 그 아래면 켜진다.
- * 문턱 0.64 는 단위 구 위 `fbm` 분포의 상위 약 13 % (developer 실측 — 20,000 방향, p80 0.604 · p90 0.656). 출발값 전부 D-T2.
- */
-export const CORONA_PROMINENCE_HEIGHT = 0.1;
-export const CORONA_PROMINENCE_SCALE = 14;
-export const CORONA_PROMINENCE_THRESHOLD = 0.64;
-export const CORONA_PROMINENCE_RANGE = 0.12;
-/** 혀 끝 부드러움 (h 단위). */
-export const CORONA_PROMINENCE_SOFTNESS = 0.25;
-/** 홍염 피크 혼합 비율 — 코로나 색을 이 비율만큼 홍염 색으로 바꾼다 (가산이면 림의 백색에 묻혀 붉게 안 보인다). */
-export const CORONA_PROMINENCE_PEAK = 0.85;
-/** H-α 계열 적색 (선형 RGB). D-T2. */
-export const CORONA_PROMINENCE_RGB: readonly [number, number, number] = [1.0, 0.32, 0.22];
 
 /** 메시 이름 (verify-fps-baseline `requiredMeshes` · 진단이 이 이름으로 찾는다). */
 export const SUN_CORONA_MESH_NAME = 'sun-corona';
@@ -171,7 +161,7 @@ void main(void) {
 `;
 
 /**
- * fragment — ALPHA_ADD. 출력 rgb 는 가산량 그 자체 (알파 1 — 코로나 · 홍염 두 색을 한 출력에 담는다).
+ * fragment — ALPHA_ADD. 출력 rgb 는 가산량 그 자체 (알파 1).
  * `ρ` 는 정점 보간이 아니라 fragment 마다 계산한다 (`tan` 때문에 보간 ρ 는 비선형).
  */
 export const SUN_CORONA_FRAGMENT_SHADER = /* glsl */ `
@@ -185,21 +175,16 @@ uniform vec3 uSunCenter;
 uniform float uSunRadius;
 uniform float logDepthConstant;
 uniform vec3 uCoronaColor;
-uniform vec3 uProminenceColor;
 
 const float RHO_OUT = ${glslFloat(CORONA_OUTER_RHO)};
+const float ANGLE_CAP = ${glslFloat(CORONA_ANGLE_CAP_RAD)};
+const float ANGLE_CAP_FADE = ${glslFloat(CORONA_ANGLE_CAP_FADE_RAD)};
 const float BAUMBACH_NORM = ${glslFloat(BAUMBACH_NORM)};
 const float DISPLAY_GAMMA = ${glslFloat(CORONA_DISPLAY_GAMMA)};
 const float PEAK_ALPHA = ${glslFloat(CORONA_PEAK_ALPHA)};
 const float STREAMER_AMPLITUDE = ${glslFloat(CORONA_STREAMER_AMPLITUDE)};
 const float STREAMER_SCALE = ${glslFloat(CORONA_STREAMER_SCALE)};
 const float EQUATORIAL_WEIGHT = ${glslFloat(CORONA_EQUATORIAL_WEIGHT)};
-const float PROMINENCE_HEIGHT = ${glslFloat(CORONA_PROMINENCE_HEIGHT)};
-const float PROMINENCE_SCALE = ${glslFloat(CORONA_PROMINENCE_SCALE)};
-const float PROMINENCE_THRESHOLD = ${glslFloat(CORONA_PROMINENCE_THRESHOLD)};
-const float PROMINENCE_RANGE = ${glslFloat(CORONA_PROMINENCE_RANGE)};
-const float PROMINENCE_SOFTNESS = ${glslFloat(CORONA_PROMINENCE_SOFTNESS)};
-const float PROMINENCE_PEAK = ${glslFloat(CORONA_PROMINENCE_PEAK)};
 
 // 3D hash — sin-free fract-mix (sun-shader.ts · procedural-planet-shader.ts 와 동일 텍스트 — fbmMirror 재사용 계약).
 vec3 hash33(vec3 p) {
@@ -245,7 +230,8 @@ void main(void) {
   float alpha = asin(min(uSunRadius / max(d, 1e-30), 1.0));
   float cosAngle = dot(r, s);
   // §교차검증 합의 1 — acos 정의역 clamp.
-  float rho = acos(clamp(cosAngle, -1.0, 1.0)) / max(alpha, 1e-30);
+  float theta = acos(clamp(cosAngle, -1.0, 1.0));
+  float rho = theta / max(alpha, 1e-30);
   if (rho < 1.0 || rho > RHO_OUT) {
     discard;
   }
@@ -259,15 +245,9 @@ void main(void) {
   // 스트리머 (반경 방향으로 곧은 광선 — e 에만 의존) · 적도 집중 (장면 z = 황도 북극).
   float streamer = max(1.0 + STREAMER_AMPLITUDE * (fbm(e * STREAMER_SCALE) - 0.5) * 2.0, 0.0);
   float equator = mix(1.0, 1.0 - abs(e.z), EQUATORIAL_WEIGHT);
-  vec3 col = uCoronaColor * (PEAK_ALPHA * profile * streamer * equator);
-
-  // 홍염 — 림 띠 안에서만 (정적 · 림 고정).
-  float h = (rho - 1.0) / PROMINENCE_HEIGHT;
-  if (h < 1.0) {
-    float excess = clamp((fbm(e * PROMINENCE_SCALE) - PROMINENCE_THRESHOLD) / PROMINENCE_RANGE, 0.0, 1.0);
-    float prom = PROMINENCE_PEAK * clamp((excess - h) / PROMINENCE_SOFTNESS, 0.0, 1.0);
-    col = mix(col, uProminenceColor, prom);
-  }
+  // 각도 상한 페이드 (ADR Amendment 1) — 상한에서 기여 0 이라 펼침 다각형의 바깥 끝이 계단으로 보이지 않는다.
+  float capFade = 1.0 - smoothstep(ANGLE_CAP - ANGLE_CAP_FADE, ANGLE_CAP, theta);
+  vec3 col = uCoronaColor * (PEAK_ALPHA * profile * streamer * equator * capFade);
 
   gl_FragColor = vec4(col, 1.0);
   ${LOG_DEPTH_FRAGMENT_WRITE_GLSL}
@@ -315,6 +295,13 @@ export function coronaStreamerMirror(e: Vec3): number {
 export function coronaEquatorMirror(e: Vec3): number {
   const w = CORONA_EQUATORIAL_WEIGHT;
   return 1 + (1 - Math.abs(e[2]) - 1) * w;
+}
+
+/** 각도 상한 페이드 미러 — `1 − smoothstep(상한 − 폭, 상한, θ)` (θ = 시선–태양 각, rad). */
+export function coronaAngleCapFadeMirror(theta: number): number {
+  const edge0 = CORONA_ANGLE_CAP_RAD - CORONA_ANGLE_CAP_FADE_RAD;
+  const x = Math.min(Math.max((theta - edge0) / CORONA_ANGLE_CAP_FADE_RAD, 0), 1);
+  return 1 - x * x * (3 - 2 * x);
 }
 
 /** 각반경 `α = asin(min(R/d, 1))` (d ≤ 0 이면 π/2 — 셰이더의 `max(d, 1e-30)` 와 같은 포화). */
@@ -436,13 +423,11 @@ export function createSunCorona(scene: Scene, options: SunCoronaOptions): SunCor
         'uSunRadius',
         'logDepthConstant',
         'uCoronaColor',
-        'uProminenceColor',
       ],
       needAlphaBlending: true,
     },
   );
   material.setColor3('uCoronaColor', new Color3(...CORONA_RGB));
-  material.setColor3('uProminenceColor', new Color3(...CORONA_PROMINENCE_RGB));
   material.alphaMode = Constants.ALPHA_ADD;
   material.disableDepthWrite = true;
   // 고리 감김 방향은 시선에 따라 뒤집힌다 — 컬링을 끈다.
