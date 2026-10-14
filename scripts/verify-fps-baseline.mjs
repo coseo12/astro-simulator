@@ -170,8 +170,8 @@ const COMET_FORCED_QUERY = '?t=2446479.5&comettails=force';
  *
  * `gpu=a` 를 함께 거는 이유: CI (소프트웨어 렌더) 는 GPU tier 가 `c` 라 LOD 가 `low` 로 강제되고, 태양이 billboard 가 되면
  * 코로나는 LOD 추종 (결정 4 의 1) 으로 `isVisible = false` 다 — 머티리얼은 컴파일되지만 **draw 가 0** 인 장면을 재게 된다
- * (로컬 swiftshader 실측: `?corona=force` 단독은 코로나 on/off 캔버스 휘도 합 동일, `&gpu=a` 를 더하면 달라진다).
- * tier 를 `a` 로 올려 기본 카메라 (J2000) 에서 태양이 LOD high 가 되게 한다. 전제는 메시 **활성 + 머티리얼 준비**.
+ * (로컬 swiftshader 실측: `?corona=force` 단독은 코로나 캔버스 휘도 합 on = off, `&gpu=a` 를 더하면 on > off).
+ * tier 를 `a` 로 올려 기본 카메라 (J2000) 에서 태양이 LOD high 가 되게 한다. 전제는 메시 **활성 + 머티리얼 준비 + 가시**.
  */
 const CORONA_FORCED_QUERY = '?corona=force&gpu=a';
 
@@ -206,6 +206,9 @@ const SCENARIOS = [
     query: CORONA_FORCED_QUERY,
     requiredMeshes: ['sun-corona'],
     requireMaterialReady: true,
+    // PR #1337 리뷰 권고 2 — 활성 + 준비만으로는 LOD 추종 (`isVisible = false`, draw 0) 상태에서도 통과한다.
+    // 이 셀은 「코로나가 그려지는 장면」을 재야 하므로 가시성까지 요구한다 (새 임계 아님 — 전제 술어 보강).
+    requireVisible: true,
     viewports: ['desktop'],
   },
 ];
@@ -381,20 +384,26 @@ async function setupScenario(page, scenario) {
 /**
  * 시나리오 전제 메시 중 활성으로 존재하는 개수 (`requiredMeshes` 없으면 null). `__simCore` 부재도 0 — 실패 방향.
  * `requireMaterialReady` 시나리오는 머티리얼 준비 (`material.isReady(mesh)`) 까지 요구한다 (#1329 — 셰이더 컴파일 실패 =
- * 메시는 활성이나 그려지지 않음). 플래그 없는 시나리오 (`belt-forced`) 의 판정은 종전과 같다.
+ * 메시는 활성이나 그려지지 않음). `requireVisible` 시나리오는 `isVisible === true` 까지 요구한다 (#1335 — LOD 추종으로
+ * 숨은 메시는 draw 0). 플래그 없는 시나리오 (`belt-forced`) 의 판정은 종전과 같다.
  */
 async function countRequiredMeshes(page, scenario) {
   if (!scenario.requiredMeshes) return null;
   return page
     .evaluate(
-      ({ names, requireReady }) =>
+      ({ names, requireReady, requireVisible }) =>
         (window.__simCore?.scene?.meshes ?? []).filter(
           (m) =>
             names.includes(m.name) &&
             m.isEnabled() &&
-            (!requireReady || m.material?.isReady(m) === true),
+            (!requireReady || m.material?.isReady(m) === true) &&
+            (!requireVisible || m.isVisible === true),
         ).length,
-      { names: scenario.requiredMeshes, requireReady: scenario.requireMaterialReady === true },
+      {
+        names: scenario.requiredMeshes,
+        requireReady: scenario.requireMaterialReady === true,
+        requireVisible: scenario.requireVisible === true,
+      },
     )
     .catch(() => 0);
 }
@@ -494,7 +503,7 @@ function compareBaseline(current, baseline) {
         const enabled = current.diagnostics?.[vp.id]?.[sc.id]?.requiredMeshesEnabled;
         if (enabled !== sc.requiredMeshes.length) {
           failures.push(
-            `[${vp.id}/${sc.id}] 측정 전제 실패: 필수 메시 ${sc.requiredMeshes.join(', ')} 중 활성 ${enabled ?? 'n/a'}개 (요구 ${sc.requiredMeshes.length}${sc.requireMaterialReady ? ' · 머티리얼 준비 포함' : ''}) — 전제 메시가 없는 장면을 쟀다`,
+            `[${vp.id}/${sc.id}] 측정 전제 실패: 필수 메시 ${sc.requiredMeshes.join(', ')} 중 활성 ${enabled ?? 'n/a'}개 (요구 ${sc.requiredMeshes.length}${sc.requireMaterialReady ? ' · 머티리얼 준비 포함' : ''}${sc.requireVisible ? ' · 가시 포함' : ''}) — 전제 메시가 없는 장면을 쟀다`,
           );
           continue;
         }
