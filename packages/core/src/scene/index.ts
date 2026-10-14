@@ -71,6 +71,14 @@ export {
   COMET_ION_TAIL_LENGTH_1AU,
 } from './comet-tail.js';
 export type { CometTailHandles, CometTailUniforms, CometTailFrame } from './comet-tail.js';
+// #1335 — 태양 코로나 · 홍염 (ADR 20261014-1335).
+export {
+  createSunCorona,
+  sunCoronaFrame,
+  SUN_CORONA_MESH_NAME,
+  CORONA_OUTER_RHO,
+} from './sun-corona.js';
+export type { SunCoronaHandles, SunCoronaUniforms, SunCoronaFrame } from './sun-corona.js';
 // #1319 PR2 — 띠 입자 분포 생성기 (ADR 20261008-1319 결정 4, Babylon 비의존).
 export {
   BELT_DEFAULT_COUNTS,

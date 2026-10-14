@@ -17,6 +17,7 @@
  *   3. moon focus (satellite — R4 신규 인스턴스)
  *   4. belt-forced (#1319 PR3, desktop 만) — 소행성대 · 카이퍼 띠 **기본 켜짐 구성** 강제 생성 (`?belt=3900` — 아래 상수 주석)
  *   5. comet-forced (#1329, desktop 만) — 혜성 꼬리 강제 생성 (`?t=2446479.5&comettails=force` — 아래 상수 주석)
+ *   6. corona-forced (#1335, desktop 만) — 태양 코로나 강제 생성 (`?corona=force` — 아래 상수 주석)
  *
  * 회귀 임계:
  *   - baseline 대비 ≥ 30% 저하 = FAIL (headless rAF noise ±12% 실측 후 보수 마진)
@@ -163,6 +164,17 @@ const BELT_FORCED_QUERY = '?belt=3900';
  */
 const COMET_FORCED_QUERY = '?t=2446479.5&comettails=force';
 
+/**
+ * #1335 (ADR `20261014-1335` 결정 5 · 사용자 결정 Q7 (a)) — 태양 코로나 강제 셀. 혜성 셀과 같은 이유다: 소프트웨어 렌더
+ * 게이트만 있으면 CI 가 코로나 셰이더를 한 번도 컴파일 · 실행하지 않는다. 판정은 이 가드의 기존 규칙 그대로 — 새 임계 0.
+ *
+ * `gpu=a` 를 함께 거는 이유: CI (소프트웨어 렌더) 는 GPU tier 가 `c` 라 LOD 가 `low` 로 강제되고, 태양이 billboard 가 되면
+ * 코로나는 LOD 추종 (결정 4 의 1) 으로 `isVisible = false` 다 — 머티리얼은 컴파일되지만 **draw 가 0** 인 장면을 재게 된다
+ * (로컬 swiftshader 실측: `?corona=force` 단독은 코로나 on/off 캔버스 휘도 합 동일, `&gpu=a` 를 더하면 달라진다).
+ * tier 를 `a` 로 올려 기본 카메라 (J2000) 에서 태양이 LOD high 가 되게 한다. 전제는 메시 **활성 + 머티리얼 준비**.
+ */
+const CORONA_FORCED_QUERY = '?corona=force&gpu=a';
+
 const SCENARIOS = [
   { id: 'default', label: 'default (sun 시점)', focusBodyId: null },
   { id: 'earth-focus', label: 'earth focus', focusBodyId: 'earth' },
@@ -184,6 +196,15 @@ const SCENARIOS = [
     query: COMET_FORCED_QUERY,
     // 혜성 3개 (`kind: 'comet'` 전수) 의 꼬리 메시. 장면은 전수를 한꺼번에 만든다 (하나라도 누락이면 생성 실패).
     requiredMeshes: ['comet-tail-halley', 'comet-tail-encke', 'comet-tail-swift-tuttle'],
+    requireMaterialReady: true,
+    viewports: ['desktop'],
+  },
+  {
+    id: 'corona-forced',
+    label: `태양 코로나 강제 (${CORONA_FORCED_QUERY})`,
+    focusBodyId: null,
+    query: CORONA_FORCED_QUERY,
+    requiredMeshes: ['sun-corona'],
     requireMaterialReady: true,
     viewports: ['desktop'],
   },

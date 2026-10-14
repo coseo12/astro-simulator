@@ -29,6 +29,7 @@ import {
   PLANET_FRAGMENT_SHADER,
 } from './procedural-planet-shader.js';
 import { CLOUD_FRAGMENT_SHADER } from './cloud-layer.js';
+import { SUN_CORONA_FRAGMENT_SHADER } from './sun-corona.js';
 
 /** 태양 실측 base 발광색 (colorHint.hex #FFE9A8 — 데이터 SSoT read-only). */
 const SUN_BASE: readonly [number, number, number] = [1.0, 233 / 255, 168 / 255];
@@ -275,6 +276,8 @@ describe('#774 sun-shader — noise 텍스트 planet 동일성 (fbmMirror 재사
       expect(PLANET_FRAGMENT_SHADER).toContain(line);
       // #1215 — 구름 셰이더가 4번째 사본 (ADR 20260628-756 §A10.4 — 같은 계약으로 묶는다).
       expect(CLOUD_FRAGMENT_SHADER).toContain(line);
+      // #1335 — 코로나 셰이더가 5번째 사본 (ADR 20261014-1335 결정 1 재사용 — 미러는 같은 fbmMirror).
+      expect(SUN_CORONA_FRAGMENT_SHADER).toContain(line);
     });
   }
 });
