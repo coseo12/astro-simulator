@@ -16,7 +16,7 @@ import { getDisplayToggle, serializeDisplayToggle, type DisplayToggleId } from '
 import { useSimCommand } from './sim-context';
 
 /**
- * 쓰기 대상 URL 키 9종 (#1319 PR3 — `belt` · `kuiper`, #1329 PR2 — `comettails`, #1335 PR2 — `corona`). 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
+ * 쓰기 대상 URL 키 10종 (#1319 PR3 — `belt` · `kuiper`, #1329 PR2 — `comettails`, #1335 PR2 — `corona`, #1341 PR1 — `trails`). 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
  * 새 URL 읽기 0). 파서는 nuqs 가 키를 다루는 데 필요한 형식일 뿐이다.
  */
 const DISPLAY_URL_KEYS = {
@@ -29,6 +29,8 @@ const DISPLAY_URL_KEYS = {
   kuiper: parseAsString,
   comettails: parseAsString,
   corona: parseAsString,
+  // #1341 PR1 — 기본 꺼짐 행 (`on` 옵트인).
+  trails: parseAsString,
 };
 
 export function useDisplayToggle(): (id: DisplayToggleId) => void {
@@ -49,7 +51,7 @@ export function useDisplayToggle(): (id: DisplayToggleId) => void {
       state[def.setterKey](next);
       // #1293 — web 전용 행 (`command: null`) 은 store 만으로 화면이 정해진다.
       if (def.command) sendCommand(def.command(next));
-      void setUrl({ [def.urlKey]: serializeDisplayToggle(next) });
+      void setUrl({ [def.urlKey]: serializeDisplayToggle(next, def.defaultVisible) });
     },
     [sendCommand, setUrl],
   );

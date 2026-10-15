@@ -53,7 +53,7 @@
  *   장면 준비  UI 페이지마다 부팅 직후 `displayCapabilities !== null` (sim-canvas 가 여는 제품 가용성 게이트 — 게이트다).
  *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 전부 가시
  *        (`UI_IDS` — #1293 이 이름 라벨을, #1319 PR3 이 소행성대 · 카이퍼 벨트를, #1329 PR2 가 혜성 꼬리를, #1335 PR2 가
- *        태양 코로나를 더해 9 개).
+ *        태양 코로나를, #1341 PR1 이 궤적을 더해 10 개).
  *   D2   같은 페이지 — 우측 그룹 버튼 전부 `x + width ≤ 1280` · 좌측 단축 바 버튼 전부 스크롤로 도달 + 그 지점 hit.
  *   D3   패널 궤도선 ↔ 단축 바 `toggle-orbits` ↔ `store.orbitLinesVisible` — 어느 쪽을 눌러도 세 값 일치.
  *   D4   관찰 모드 · 패널 열림 · 4 초 무입력 → 상단 바 computed `opacity === "1"`.
@@ -704,8 +704,17 @@ const UI_URL_KEY = {
   cometTails: 'comettails',
   // #1335 PR2 — 태양 코로나 (9번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261014-1335 결정 5).
   corona: 'corona',
+  // #1341 PR1 — 궤적 (10번째 행). **유일한 기본 꺼짐 행** (ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
+  trails: 'trails',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
+/**
+ * #1341 PR1 — 기본 꺼짐 행. D11 URL 계약 (ON = 키 삭제 / OFF = `off`) 과 「전부 off 로드」 비교는 기본 켜짐 행의 계약이라
+ * 이 행들을 뺀다 — 기본 꺼짐 행의 직렬화 (`on` / 키 삭제) 는 단위 테스트 (`display-toggles.test.ts`) 가 고정한다.
+ * D1 개수 · D14 순회 · D15 스트레스는 `UI_IDS` 전부 그대로다.
+ */
+const DEFAULT_OFF_IDS = ['trails'];
+const UI_DEFAULT_ON_IDS = UI_IDS.filter((id) => !DEFAULT_OFF_IDS.includes(id));
 /** 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다 (D9 · #1319 PR3 D9b · #1329 PR2 D9c · #1335 PR2 D9d). */
 const SOFTWARE_GATED_IDS = ['stars', 'belt', 'kuiper', 'cometTails', 'corona'];
 
@@ -785,10 +794,13 @@ const readSceneDisplay = (ctx) =>
   );
 
 const readUrlKeys = (page) =>
-  page.evaluate((keys) => {
-    const sp = new URLSearchParams(window.location.search);
-    return Object.fromEntries(keys.map((k) => [k, sp.get(k)]));
-  }, Object.values(UI_URL_KEY));
+  page.evaluate(
+    (keys) => {
+      const sp = new URLSearchParams(window.location.search);
+      return Object.fromEntries(keys.map((k) => [k, sp.get(k)]));
+    },
+    UI_DEFAULT_ON_IDS.map((id) => UI_URL_KEY[id]),
+  );
 
 /**
  * URL 키가 기대값이 될 때까지 대기 (`null` = 키 부재). 타임아웃은 `bootstrapScene` `handleTimeout` 기본값과
@@ -1583,7 +1595,9 @@ async function runUiUrl(browser, out, pages) {
   const { page } = R;
   const software = await page.evaluate(() => window.__isSoftwareRenderer === true);
   // 소프트웨어 렌더의 별 · 띠는 가용성이 막아 URL 을 쓰지 않는다 (D9 · D9b) — URL 계약은 하드웨어에서만 잰다.
-  const ids = software ? UI_IDS.filter((id) => !SOFTWARE_GATED_IDS.includes(id)) : UI_IDS;
+  const ids = software
+    ? UI_DEFAULT_ON_IDS.filter((id) => !SOFTWARE_GATED_IDS.includes(id))
+    : UI_DEFAULT_ON_IDS;
   const h0 = await page.evaluate(() => history.length);
   const trips = [];
   for (const id of ids) {
@@ -2561,7 +2575,7 @@ function judgeCore(meta, { settleIds, hw }) {
 function judgeUi(meta, { settleIds, hw }) {
   const syncOk = (x) => x.panel === String(x.store) && x.bar === String(x.store);
   const expectedVisited = UI_IDS.map((id) => `display-toggle-${id}`);
-  const allOff = Object.fromEntries(Object.values(UI_URL_KEY).map((k) => [k, 'off']));
+  const allOff = Object.fromEntries(UI_DEFAULT_ON_IDS.map((id) => [UI_URL_KEY[id], 'off']));
   // R12 — 레이스 실패가 관측됐으면 (`bad > 0`) 스크롤 재료 전제 (21) 와 무관하게 판정한다 (needs 계산).
   const raceObservedFail = (meta.uiRace?.bad.length ?? 0) > 0;
   /** D1 · D2 — 모드마다 1 표본. 부팅 실패로 빠진 모드는 표본 부재 (있는 모드의 FAIL 은 남는다). */

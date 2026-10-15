@@ -26,6 +26,7 @@ import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseBeltParam, parseKuiperVisible, resolveBeltAtLoad } from '@/core/parse-belt-mode';
 import { parseCometTailsParam, resolveCometTailsAtLoad } from '@/core/parse-comet-tails-mode';
 import { parseCoronaParam, resolveCoronaAtLoad } from '@/core/parse-corona-mode';
+import { parseTrailsVisible } from '@/core/parse-trails-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
 import { parseLabelsVisible } from '@/core/parse-labels-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
@@ -548,6 +549,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #1335 — 태양 코로나 (ADR 20261014-1335 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 미지정 켜짐 · `off` 꺼짐 · `force` 켜짐 + 소프트웨어 렌더 게이트 우회 (CI 셰이더 실행 경로 — Q7).
         const coronaMode = parseCoronaParam(beltUrl.get('corona'));
+        // #1341 — 궤적 trail (ADR 20261015-1341 결정 T10). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
+        // 기본 꺼짐 · `on` 옵트인. 로드 시 생성하지 않고 아래 핸들러 등록 블록에서 의도만 scene 에 넘긴다 (지연 생성).
+        const trailsParamVisible = parseTrailsVisible(beltUrl.get('trails'));
         // `beltN` = **명시** 수만 (미지정 = 0). 아래 엔진 자동 선택 (`auto` → N ≥ 1000 이면 webgpu/barnes-hut) 과
         // N-body 편입 수는 종전 의미 그대로 명시 수만 본다 — 기본 켜짐이 물리 엔진 선택을 바꾸면 안 된다.
         const beltN = beltMode.count ?? 0;
@@ -1022,6 +1026,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setCometTailsVisibleHandler((visible) => solar.setCometTailsVisible(visible));
         // #1335 PR2 — 태양 코로나 (같은 wiring). 가용성 `corona` = 소프트웨어 렌더가 아니거나 `?corona=force`.
         instance.setSunCoronaVisibleHandler((visible) => solar.setSunCoronaVisible(visible));
+        // #1341 PR1 — 궤적 trail (같은 wiring). 가용성 `trails` = 활성 물리 엔진이 Kepler (결정 T8 — 렌더러 게이트 없음).
+        instance.setTrailsVisibleHandler((visible) => solar.setTrailsVisible(visible));
+        // 결정 T5 — 방향 = 배속 부호 (0 = 일시정지는 scene 이 직전 부호 유지). 초기값은 store, 이후는 아래 store 구독
+        // (core 의 `timeScaleChanged` 를 core-adapter 가 store 로 옮긴 값). 의도보다 먼저 넘겨 첫 동기가 올바른 방향이게 한다.
+        solar.setTrailDirection(useSimStore.getState().timeScale);
+        solar.setTrailsVisible(trailsParamVisible);
         {
           const store = useSimStore.getState();
           store.setStarsVisible(starsParamVisible);
@@ -1032,6 +1042,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           store.setKuiperVisible(kuiperParamVisible);
           store.setCometTailsVisible(cometTailsMode.visible);
           store.setCoronaVisible(coronaMode.visible);
+          store.setTrailsVisible(trailsParamVisible);
           // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
           store.setDisplayCapabilities({
             starfield: !isSoftwareRenderer,
@@ -1039,6 +1050,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             belt: !isSoftwareRenderer || beltMode.forced,
             cometTails: !isSoftwareRenderer || cometTailsMode.forced,
             corona: !isSoftwareRenderer || coronaMode.forced,
+            trails: solar.getPhysicsEngine() === 'kepler',
           });
         }
 
@@ -1200,6 +1212,16 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         unsubEngine = useSimStore.subscribe((state, prev) => {
           if (state.physicsEngine !== prev.physicsEngine) {
             solar.setPhysicsEngine(resolveEngine(state.physicsEngine));
+            // #1341 결정 T8 — trail 가용성 = 활성 엔진이 Kepler. core 가 메시를 끄고 켜는 것과 같은 판정 (scene 이 SSoT).
+            const caps = useSimStore.getState().displayCapabilities;
+            const trailsAvailable = solar.getPhysicsEngine() === 'kepler';
+            if (caps && caps.trails !== trailsAvailable) {
+              useSimStore.getState().setDisplayCapabilities({ ...caps, trails: trailsAvailable });
+            }
+          }
+          // #1341 결정 T5 — 배속이 바뀌면 trail 방향 (부호) 갱신. 0 은 scene 이 무시한다 (직전 부호 유지).
+          if (state.timeScale !== prev.timeScale) {
+            solar.setTrailDirection(state.timeScale);
           }
           if (state.massMultipliers !== prev.massMultipliers) {
             const prevKeys = new Set(Object.keys(prev.massMultipliers));

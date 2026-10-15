@@ -18,15 +18,16 @@ export type OriginShiftListener = (delta: Vec3Double) => void;
  *  - `update(cameraWorld)` — safety net. free-fly 시 카메라 local 좌표가 threshold 초과하면 shift.
  *
  * ## subscription
- *  - `onOriginShift(listener)` — origin 이 이동할 때마다 delta 를 전달. Trail/Particle 모듈이
- *    자체 GPU 버퍼를 delta 만큼 translate 할 때 사용 (ADR §2, 미래 Phase 용 계약).
+ *  - `onOriginShift(listener)` — origin 이 이동할 때마다 delta 를 전달 (ADR §2, 미래 Phase 용 계약).
+ *    ⚠️ 궤적 trail 은 이 경로를 쓰지 않는다 (ADR 1341 결정 T3) — 발화 시점이 body mesh 루프 **뒤** (#380 가드 C) ·
+ *    `setFocusOrigin` 안이라 메시보다 한 프레임 먼저 옮겨진다. trail 은 메시와 같은 쓰기 지점에서 기록한다.
  */
 export class FloatingOrigin {
   /** 누적 원점 오프셋 (월드 절대좌표 누산) */
   #originOffset: Vec3Double = [0, 0, 0];
   /** shift 트리거 임계 거리 */
   readonly threshold: number;
-  /** origin shift listener 집합 (Trail/Particle 모듈용, ADR §2) */
+  /** origin shift listener 집합 (ADR §2 — 궤적 trail 은 쓰지 않는다, ADR 1341 결정 T3) */
   readonly #listeners = new Set<OriginShiftListener>();
 
   constructor(threshold = 10_000) {
@@ -91,8 +92,9 @@ export class FloatingOrigin {
   /**
    * Origin shift 이벤트 구독.
    *
-   * 미래 Trail/Particle 모듈이 shift 발생 시 자체 GPU 버퍼를 delta 만큼 translate 할 때 사용한다
-   * (ADR §2 Concrete Prediction #4). 호출 순서는 등록 순서.
+   * shift 발생 시 자체 GPU 버퍼를 delta 만큼 translate 하려는 모듈용 계약이다 (ADR §2 Concrete Prediction #4).
+   * 호출 순서는 등록 순서. ⚠️ 궤적 trail 은 이 경로를 쓰지 않는다 (ADR 1341 결정 T3 — 발화 시점이 body mesh 와
+   * 한 프레임 어긋난다). 현재 소비자는 0 이다.
    *
    * @returns unsubscribe 함수.
    */
@@ -112,7 +114,7 @@ export class FloatingOrigin {
       try {
         listener(delta);
       } catch (err) {
-        // Trail 모듈 버그가 scene update 전체를 break 하지 않도록 격리.
+        // listener 버그가 scene update 전체를 break 하지 않도록 격리.
         console.error('[floating-origin] onOriginShift listener 예외', err);
       }
     }
