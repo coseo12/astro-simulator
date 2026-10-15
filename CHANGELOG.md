@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.99.0] - 2026-10-16
+
 ### Added
 
 - **[#1341] 궤적 trail (PR1)** ([#1341](https://github.com/coseo12/astro-simulator/issues/1341), PR [#1343](https://github.com/coseo12/astro-simulator/pull/1343)). 재생 중 각 천체가 지나온 궤도 구간을 천체 색의 선으로 그린다 — 궤도선과 같은 35 천체 (행성 8 · 위성 16 · 왜소행성 5 · 혜성 3 · 소행성 3), 창 = 공전주기 × 1/12 (평균 근점각 30°), 머리 불투명 → 꼬리 투명. **기본 꺼짐** · 표시 패널 10번째 행 「궤적」 · `?trails=on`. ADR [`20261015-1341`](docs/decisions/20261015-1341-trail-ruler.md) 결정 T1 – T10 · §교차검증 합의 1 – 3 · 사용자 결정 Q 표 (전부 권고안).
