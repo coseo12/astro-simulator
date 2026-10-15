@@ -13,13 +13,20 @@ export interface BodyDistances {
   fromParentM: number | null;
 }
 
-type Vec3 = [number, number, number];
+export type Vec3 = [number, number, number];
 
 /** 모체 체인 최대 깊이 — 순환 parentId 데이터 결함 시 무한 루프 차단 (현 데이터 깊이 ≤ 2). */
 const MAX_CHAIN_DEPTH = 8;
 
+interface BodyChainPosition {
+  /** 계 중심 (모체 체인의 뿌리 = 태양) 기준 위치 [m]. */
+  world: Vec3;
+  /** 체인 첫 고리 — 모체 기준 위치 [m]. 뿌리 천체 (태양) 는 `null`. */
+  local: Vec3 | null;
+}
+
 /**
- * 현재 시뮬레이션 시각 `jd` 의 태양·모체 거리.
+ * 모체 체인을 따라 부모 기준 위치를 더해 계 중심 기준 위치를 만든다. 체인이 끊기면 `null`.
  *
  * scene Kepler 경로(`solar-system-scene.ts` `updateAtKepler`)와 **같은 식**이다 — 부모 기준 위치
  * `positionAt(orbit, jd, orbitMu(body, parent))` (#1305 — 위성 G(M_parent + m) / 태양 직속 G·M) 를 부모 체인을 따라 더해 계 중심 기준 위치를 얻는다.
@@ -32,14 +39,14 @@ const MAX_CHAIN_DEPTH = 8;
  * 2.9% 어긋났다 (PR #1282 실측: 엔진 `354,781 km` ↔ Kepler `365,248 km`, 표시 `35.5만` ↔ `36.5만`).
  * 판정은 체인의 고리마다 한다 — 한 엔진 안에서는 모든 고리가 같은 쪽으로 간다.
  */
-export function computeBodyDistances(
+function resolveBodyChain(
   bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
   id: string,
   jd: number,
-  getBodyState: BodyStateFn | null = null,
-): BodyDistances {
+  getBodyState: BodyStateFn | null,
+): BodyChainPosition | null {
   const body = bodiesById.get(id);
-  if (!body) return { fromSunM: null, fromParentM: null };
+  if (!body) return null;
 
   const world: Vec3 = [0, 0, 0];
   let local: Vec3 | null = null;
@@ -47,9 +54,7 @@ export function computeBodyDistances(
   for (let depth = 0; cur.parentId != null; depth += 1) {
     const parent = bodiesById.get(cur.parentId);
     // 체인이 끊기면 조용히 원점으로 흡수하지 않는다 — 호출부가 「계산 불가」로 표기.
-    if (!parent || !cur.orbit || depth >= MAX_CHAIN_DEPTH) {
-      return { fromSunM: null, fromParentM: null };
-    }
+    if (!parent || !cur.orbit || depth >= MAX_CHAIN_DEPTH) return null;
     const p =
       getBodyState?.(cur.id, parent.id)?.pos ?? positionAt(cur.orbit, jd, orbitMu(cur, parent));
     if (local === null) local = [p[0], p[1], p[2]];
@@ -58,6 +63,50 @@ export function computeBodyDistances(
     world[2] += p[2];
     cur = parent;
   }
+  return { world, local };
+}
+
+/**
+ * #1341 PR2 — 현재 시뮬레이션 시각 `jd` 의 계 중심 (태양) 기준 위치 [m]. 체인 미해석 · 미등록 id 면 `null`.
+ * 식 · 출처 우선순위는 `resolveBodyChain` 과 같다 (엔진 상태값 우선 · Kepler 폴백 · 시각 배율 미적용).
+ */
+export function computeBodyWorldPosition(
+  bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
+  id: string,
+  jd: number,
+  getBodyState: BodyStateFn | null = null,
+): Vec3 | null {
+  return resolveBodyChain(bodiesById, id, jd, getBodyState)?.world ?? null;
+}
+
+/**
+ * #1341 PR2 — 두 천체 사이 물리 거리 [m] = `|world(A) − world(B)|` (ADR `20261015-1341` 결정 R3). 시각 배율 미적용 —
+ * 화면 선 길이가 아니라 데이터 SSoT 거리다. 어느 한쪽이라도 체인 미해석이면 `null`.
+ */
+export function computeBodyPairDistance(
+  bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
+  aId: string,
+  bId: string,
+  jd: number,
+  getBodyState: BodyStateFn | null = null,
+): number | null {
+  const a = computeBodyWorldPosition(bodiesById, aId, jd, getBodyState);
+  const b = computeBodyWorldPosition(bodiesById, bId, jd, getBodyState);
+  if (a === null || b === null) return null;
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+/** 현재 시뮬레이션 시각 `jd` 의 태양·모체 거리. 위치는 `resolveBodyChain` (엔진 상태값 우선 · Kepler 폴백). */
+export function computeBodyDistances(
+  bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
+  id: string,
+  jd: number,
+  getBodyState: BodyStateFn | null = null,
+): BodyDistances {
+  const chain = resolveBodyChain(bodiesById, id, jd, getBodyState);
+  if (chain === null) return { fromSunM: null, fromParentM: null };
+  const { world, local } = chain;
+  const body = bodiesById.get(id)!;
 
   const fromSunM = Math.hypot(world[0], world[1], world[2]);
   // 모체가 체인의 뿌리(태양)가 아닐 때만 위성 — 모체 거리가 태양 거리와 다른 정보가 된다.

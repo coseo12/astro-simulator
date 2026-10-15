@@ -19,6 +19,7 @@ import {
   rPhaseBlockedMessage,
 } from '@/lib/body-info';
 import { TIER_META, isDataTier } from '../ui/tier-badge';
+import { RulerRow } from './ruler-row';
 
 /** 태양 카드의 태양 거리 자리 문구. */
 const SUN_CENTER_TEXT = '태양계 중심';
@@ -195,6 +196,11 @@ export function BodyInfoCard() {
           />
         )}
       </dl>
+
+      {/* #1341 PR2 — 거리 자 행 (결정 R4). 카드를 접으면 이 행도 접히고 화면 선은 유지된다. */}
+      <div className="pt-1 border-t border-border-subtle">
+        <RulerRow selectedId={selected} variant="card" />
+      </div>
 
       <footer className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle">
         <span data-testid="body-card-tier" className="num text-mini text-fg-secondary">

@@ -14,6 +14,7 @@ import {
   rPhaseBlockedMessage,
 } from '@/lib/body-info';
 import { TierBadge } from '../ui/tier-badge';
+import { RulerRow } from '../layout/ruler-row';
 import { MassSlider } from './mass-slider';
 
 // P10-B-2 #274 — colorSource 3종 한국어 라벨.
@@ -49,6 +50,10 @@ export function CelestialInfoPanel() {
         <p className="text-caption text-fg-secondary">
           좌측 트리에서 천체를 선택하면 상세 정보가 표시됩니다.
         </p>
+        {/* #1341 PR2 — 선택이 없어도 기준점은 남는다 (Esc · reset). 기준점 · 안내 · 해제만 보인다. */}
+        <div className="mt-3">
+          <RulerRow selectedId={null} variant="panel" />
+        </div>
       </div>
     );
   }
@@ -127,6 +132,11 @@ export function CelestialInfoPanel() {
           </>
         )}
       </dl>
+
+      {/* #1341 PR2 — 거리 자 행 (결정 R4 · R5 광시간). */}
+      <div className="pt-2 border-t border-border-subtle">
+        <RulerRow selectedId={selected} variant="panel" />
+      </div>
 
       {/* R1 #329 — 시각 과장 안내. Gemini 교차검증 개선 제안 2 반영 (사용자 친화 표현 우선).
           ADR `docs/decisions/20260425-r1-sun-visualization.md` Developer 인계 §7. */}
