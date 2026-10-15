@@ -38,10 +38,9 @@ import { useSimStore } from '@/store/sim-store';
  */
 
 // nuqs mock — useQueryState 호출 순서:
-//   1. mode  2. t  3. focus  4. speed  5. engine  6. lod
-// 본 테스트는 focus 만 가변, 나머지는 null 고정.
+//   1. mode  2. t  3. focus  4. speed  5. engine  6. lod  7. ruler (#1341 PR2)
+// 본 테스트는 focus · ruler 가 가변 (ruler 는 setter 도 추적), 나머지는 null 고정. mock 은 호출 순서가 아니라 키로 분기한다.
 let mockUrlFocus: string | null = null;
-// #1341 PR2 — `?ruler=` 값 · setter 추적.
 let mockUrlRuler: string | null = null;
 const setUrlRulerMock = vi.fn();
 

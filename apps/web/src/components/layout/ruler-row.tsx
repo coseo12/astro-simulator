@@ -23,7 +23,7 @@ const VARIANT_CLASS = {
  *
  * - 기준점 없음: 「기준점으로」 버튼만.
  * - 기준점 있음 · B 가 없거나 A 와 같음: 기준점 이름 + 안내 문구 (화면 선은 sim-canvas → scene 이 끈다).
- * - 기준점 있음 · B 다름: 「{A}까지 거리」 (물리 거리, 원값 `data-distance-m`) + 위성 배율 고지 + (연구 모드) 광시간.
+ * - 기준점 있음 · B 다름: 「{A}까지 거리」 (물리 거리, 원값 `data-distance-m`) + 위성 배율 고지 (Kepler 엔진만) + (연구 모드) 광시간.
  *
  * 이 컴포넌트는 장면에 명령을 보내지 않는다 — 화면 선은 store (기준점 · 선택) 를 구독하는 sim-canvas 가 보낸다.
  * 그래서 카드를 접어 이 행이 사라져도 선은 유지된다 (결정 R4).
@@ -37,6 +37,9 @@ export function RulerRow({
 }) {
   const anchorId = useSimStore((s) => s.rulerAnchorId);
   const setRulerAnchor = useSimStore((s) => s.setRulerAnchor);
+  // Amendment 1 (PR #1344 리뷰 B1) — 위성 시각 배율은 Kepler 엔진에서만 그려진다. 기존 엔진 상태를 그대로 읽는다
+  // (`resolveEngine` 은 `kepler` ⇔ `kepler` — 다른 선택은 전부 N-body 로 간다).
+  const keplerEngine = useSimStore((s) => s.physicsEngine === 'kepler');
   const bodiesById = useMemo(() => indexBodies(ephemerisApi.getSolarSystem().bodies), []);
   const distanceM = useRulerDistance(anchorId, selectedId);
   const cls = VARIANT_CLASS[variant];
@@ -63,7 +66,9 @@ export function RulerRow({
   }
 
   const paired = selectedId !== null && selectedId !== anchorId;
-  const notices = paired ? rulerVisualScaleNotices(bodiesById, [anchorId, selectedId]) : [];
+  const notices = paired
+    ? rulerVisualScaleNotices(bodiesById, [anchorId, selectedId], keplerEngine)
+    : [];
 
   return (
     <section

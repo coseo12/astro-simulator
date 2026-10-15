@@ -55,12 +55,20 @@ export function formatLightTime(meters: number): string {
  * 천체마다 한 줄. N 은 장면과 같은 SSoT `getOrbitVisualScale(parentId, id)` — 하드코딩하지 않는다.
  *
  * 화면 선은 장면 메시 위치 (위성은 모체로부터 ×N) 를 잇고, 수치는 물리 거리라 둘이 다르게 보이는 이유를 알린다.
+ *
+ * **Kepler 엔진에서만** (ADR Amendment 1, PR #1344 리뷰 B1) — 시각 배율은 장면 Kepler 경로 (`resolveWorld`) 만 곱한다.
+ * N-body 경로 (Newton · Barnes-Hut · WebGPU) 는 엔진 위치를 그대로 그려 위성이 물리 거리에 있으므로 「×N 떨어져」 는
+ * 거짓이 된다 (리뷰 실측: Newton 에서 지구–달 메시 거리 비 `30.00`).
+ *
+ * @param keplerEngine 활성 물리 엔진이 Kepler 인가. false 면 고지 0.
  */
 export function rulerVisualScaleNotices(
   bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
   ids: readonly string[],
+  keplerEngine: boolean,
 ): string[] {
   const notices: string[] = [];
+  if (!keplerEngine) return notices;
   for (const id of ids) {
     const body = bodiesById.get(id);
     const parent = body?.parentId != null ? bodiesById.get(body.parentId) : undefined;

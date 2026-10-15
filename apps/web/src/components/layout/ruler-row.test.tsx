@@ -30,6 +30,7 @@ beforeEach(() => {
     selectedBodyId: null,
     freeFlyMode: false,
     rulerAnchorId: null,
+    physicsEngine: 'kepler',
   });
 });
 
@@ -71,6 +72,28 @@ describe('#1341 거리 자 — 관찰 모드 카드 흐름 (E5 단위 축)', () 
     expect(screen.getByTestId('ruler-visual-scale-notice')).toHaveTextContent(
       `화면의 달 위치는 모체로부터 ×${getOrbitVisualScale('earth', 'moon')} 떨어져 그려집니다`,
     );
+  });
+
+  it('Amendment 1 (리뷰 B1) — 지구–달 고지는 Kepler 에서만 · N-body 전환 시 사라지고 복귀 시 다시 나온다', () => {
+    useSimStore.setState({
+      selectedBodyId: 'moon',
+      rulerAnchorId: 'earth',
+      physicsEngine: 'kepler',
+    });
+    render(<BodyInfoCard />);
+    expect(screen.getAllByTestId('ruler-visual-scale-notice')).toHaveLength(1);
+    for (const engine of ['newton', 'barnes-hut', 'webgpu', 'auto'] as const) {
+      act(() => {
+        useSimStore.getState().setPhysicsEngine(engine);
+      });
+      expect(screen.queryByTestId('ruler-visual-scale-notice'), engine).toBeNull();
+      // 거리 행 자체는 남는다 — 고지만 엔진 조건이다.
+      expect(screen.getByTestId('ruler-distance'), engine).toBeInTheDocument();
+    }
+    act(() => {
+      useSimStore.getState().setPhysicsEngine('kepler');
+    });
+    expect(screen.getAllByTestId('ruler-visual-scale-notice')).toHaveLength(1);
   });
 
   it('「기준점 해제」 → 행 사라짐 · 「기준점으로」 복귀 / 다른 천체에서 「기준점으로」 → 기준점 교체', () => {

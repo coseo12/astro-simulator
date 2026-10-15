@@ -54,27 +54,38 @@ describe('formatLightTime — 광시간 (결정 R5 · 연구 모드)', () => {
 
 describe('rulerVisualScaleNotices — 위성 배율 고지 (결정 R6)', () => {
   it('행성 · 태양 쌍은 고지 없음', () => {
-    expect(rulerVisualScaleNotices(byId, ['earth', 'mars'])).toEqual([]);
-    expect(rulerVisualScaleNotices(byId, ['sun', 'neptune'])).toEqual([]);
+    expect(rulerVisualScaleNotices(byId, ['earth', 'mars'], true)).toEqual([]);
+    expect(rulerVisualScaleNotices(byId, ['sun', 'neptune'], true)).toEqual([]);
   });
 
   it('위성 포함 쌍 — N = getOrbitVisualScale(parentId, id) (하드코딩 아님)', () => {
     const moonN = getOrbitVisualScale('earth', 'moon');
     expect(moonN).not.toBe(1); // 전제 — 고지 대상
-    expect(rulerVisualScaleNotices(byId, ['earth', 'moon'])).toEqual([
+    expect(rulerVisualScaleNotices(byId, ['earth', 'moon'], true)).toEqual([
       `화면의 달 위치는 모체로부터 ×${moonN} 떨어져 그려집니다`,
     ]);
     const ioN = getOrbitVisualScale('jupiter', 'io');
     const europaN = getOrbitVisualScale('jupiter', 'europa');
     expect(ioN).not.toBe(europaN); // 전제 — per-body 룩업이 실제로 갈린다 (parent 값 재사용 변이 반증)
-    expect(rulerVisualScaleNotices(byId, ['io', 'europa'])).toEqual([
+    expect(rulerVisualScaleNotices(byId, ['io', 'europa'], true)).toEqual([
       `화면의 이오 위치는 모체로부터 ×${ioN} 떨어져 그려집니다`,
       `화면의 유로파 위치는 모체로부터 ×${europaN} 떨어져 그려집니다`,
     ]);
   });
 
+  it('Amendment 1 (리뷰 B1) — N-body 엔진이면 위성 쌍도 고지 0 (시각 배율 미적용)', () => {
+    for (const ids of [
+      ['earth', 'moon'],
+      ['io', 'europa'],
+      ['mars', 'phobos'],
+    ]) {
+      expect(rulerVisualScaleNotices(byId, ids, true).length, ids.join('-')).toBeGreaterThan(0); // 양성 대조
+      expect(rulerVisualScaleNotices(byId, ids, false), ids.join('-')).toEqual([]);
+    }
+  });
+
   it('미등록 id 는 건너뛴다', () => {
-    expect(rulerVisualScaleNotices(byId, ['no-such-body', 'phobos'])).toEqual([
+    expect(rulerVisualScaleNotices(byId, ['no-such-body', 'phobos'], true)).toEqual([
       `화면의 포보스 위치는 모체로부터 ×${getOrbitVisualScale('mars', 'phobos')} 떨어져 그려집니다`,
     ]);
   });
