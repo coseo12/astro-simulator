@@ -2990,7 +2990,13 @@ export function createSolarSystemScene(
     } else {
       disposeNewton();
     }
+    const previousEngine = activeEngine;
     activeEngine = effective;
+    // #1341 PR #1343 리뷰 차단 1 — N-body → Kepler 복귀 시 Kepler 위치 · 메시를 현재 시각으로 다시 쓴다 (기존 시간 위상
+    // 경로 재사용 — 새 기준계 없음). 이것이 없으면 일시정지 중 복귀에서 `worldPositions` 가 N-body 물리 위치 (위성 시각
+    // 배율 미적용, ADR 1341 1-A) 로 남아, trail 머리 (= 그 값) 와 몸통 (Kepler × 시각 배율) 이 다른 모델에서 나온다 —
+    // 위성 첫 선분이 정상의 90 ~ 313 배 (리뷰 실측). 재생 중이면 다음 tick 이 같은 일을 하므로 결과가 같다.
+    if (effective === 'kepler' && previousEngine !== 'kepler') updateAt(currentJd);
     // #1341 결정 T8 — N-body 엔진이면 trail 을 끄고, Kepler 로 돌아오면 사용자 의도대로 다시 켠다 (명령 경로).
     applyTrailsEnabled();
   };

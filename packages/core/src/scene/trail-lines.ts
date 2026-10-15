@@ -100,10 +100,15 @@ export function createTrailLines(
   // 선이 태양계 전역에 퍼져 있어 절두체 컬링 이득이 없고, 정점 갱신마다 bounding 을 다시 잴 필요도 없어진다.
   mesh.alwaysSelectAsActiveMesh = true;
   const material = mesh.material;
-  if (material instanceof ShaderMaterial) {
-    material.alphaMode = Constants.ALPHA_ADD;
-    material.disableDepthWrite = true;
+  // 결정 T6 의 블렌딩 · depth 설정을 조용히 건너뛰지 않는다 — LinesMesh 내부 머티리얼 형태가 바뀌면 (Babylon 업그레이드)
+  // 여기서 멈춘다 (PR #1343 리뷰 권고 2).
+  if (!(material instanceof ShaderMaterial)) {
+    throw new Error(
+      '[trail-lines] LinesMesh 내부 머티리얼이 ShaderMaterial 이 아니다 — ALPHA_ADD · depth write 끔을 걸 수 없다',
+    );
   }
+  material.alphaMode = Constants.ALPHA_ADD;
+  material.disableDepthWrite = true;
   return {
     mesh,
     positions,

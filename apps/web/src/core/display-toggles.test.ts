@@ -124,9 +124,7 @@ describe('display-toggles — 표 구성', () => {
 const DEFAULT_ON_ROWS = DISPLAY_TOGGLES.filter((d) => d.defaultVisible);
 
 describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', () => {
-  it('serialize: ON → 키 삭제(null) · OFF → "off" (기본 인자 = 기본 켜짐, 종전 출력)', () => {
-    expect(serializeDisplayToggle(true)).toBeNull();
-    expect(serializeDisplayToggle(false)).toBe('off');
+  it('serialize: 기본 켜짐 — ON → 키 삭제(null) · OFF → "off" (종전 출력)', () => {
     expect(serializeDisplayToggle(true, true)).toBeNull();
     expect(serializeDisplayToggle(false, true)).toBe('off');
   });
@@ -184,7 +182,7 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
         ['x', null],
       ];
       for (const [s, expected] of cases)
-        expect(serializeDisplayToggle(def.parse(s))).toBe(expected);
+        expect(serializeDisplayToggle(def.parse(s), def.defaultVisible)).toBe(expected);
     },
   );
 });
@@ -307,7 +305,7 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     const def = getDisplayToggle('corona');
     expect(def.parse('force')).toBe(true);
     expect(def.parse('FORCE')).toBe(true);
-    expect(serializeDisplayToggle(def.parse('force'))).toBeNull();
+    expect(serializeDisplayToggle(def.parse('force'), def.defaultVisible)).toBeNull();
   });
 
   it('#1341 PR1 trails — N-body 엔진이면 불가 + 엔진 사유, 의도가 true 여도 꺼짐 (결정 T8) · 렌더러 · 표면과 무관', () => {

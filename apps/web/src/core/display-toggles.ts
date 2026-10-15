@@ -328,12 +328,13 @@ export function getDisplayToggle(id: DisplayToggleId): DisplayToggleDef {
 
 /**
  * 의도 → URL 값. 기본값과 같으면 키 삭제 (`null`), 다르면 `'on'` / `'off'` (사용자 결정 Q2 · #1341 결정 T10 일반화).
- * 기본 켜짐 행 (`defaultVisible = true` — 기본 인자) 은 종전 그대로 ON = 키 삭제 · OFF = `'off'` 다. 역방향은 각 행의
+ * 기본 켜짐 행 (`defaultVisible = true`) 은 종전 그대로 ON = 키 삭제 · OFF = `'off'` 다. `defaultVisible` 은 필수 인자다 —
+ * 기본 인자를 두면 기본 꺼짐 행에서 인자를 빠뜨린 호출이 조용히 흡수된다 (PR #1343 리뷰 권고 3). 역방향은 각 행의
  * `parse` — `parse(serializeDisplayToggle(v, def.defaultVisible)) === v` 가 성립한다 (단위 테스트가 고정).
  */
 export function serializeDisplayToggle(
   visible: boolean,
-  defaultVisible = true,
+  defaultVisible: boolean,
 ): 'on' | 'off' | null {
   if (visible === defaultVisible) return null;
   return visible ? 'on' : 'off';

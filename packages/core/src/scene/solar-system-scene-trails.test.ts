@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ArcRotateCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { ArcRotateCamera, Constants, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { TRAIL_LINES_MESH_NAME } from './trail-lines.js';
 import {
@@ -159,6 +159,23 @@ function tailVertex(f: Fixture, bodyId: string): [number, number, number] {
   throw new Error(bodyId);
 }
 
+/** 천체 1개의 첫 선분 (정점 0↔1) / 둘째 선분 (정점 1↔2) 길이 비 — 머리 이음이 몸통과 같은 모델인지의 지표. */
+function seamRatio(f: Fixture, bodyId: string): number {
+  const lines = f.handles.getTrailLines()!;
+  const p = lines.positions;
+  let v = 0;
+  for (const spec of f.handles.getTrailBodySpecs()) {
+    if (spec.id === bodyId) {
+      const o = 3 * v;
+      const seam = Math.hypot(p[o + 3]! - p[o]!, p[o + 4]! - p[o + 1]!, p[o + 5]! - p[o + 2]!);
+      const next = Math.hypot(p[o + 6]! - p[o + 3]!, p[o + 7]! - p[o + 4]!, p[o + 8]! - p[o + 5]!);
+      return seam / next;
+    }
+    v += spec.segments + 1;
+  }
+  throw new Error(bodyId);
+}
+
 describe('#1341 trail — 장면 통합', () => {
   it('기본 꺼짐 — 로드 시 trail 메시 0 · 샘플러 호출 0', () => {
     const f = makeScene();
@@ -283,6 +300,50 @@ describe('#1341 trail — 장면 통합', () => {
     f.handles.setTrailsVisible(false);
     f.handles.setPhysicsEngine('kepler');
     expect(lines.mesh.isEnabled()).toBe(false);
+  });
+
+  it('PR #1343 리뷰 차단 1 — 일시정지 중 Newton → Kepler 복귀 직후 위성 첫 선분 비 = 같은 jd 정상 상태의 비', () => {
+    const f = makeScene();
+    f.handles.updateAt(J2000);
+    f.handles.setTrailsVisible(true);
+    f.handles.setPhysicsEngine('newton');
+    f.handles.updateAt(J2000 + 10);
+    f.handles.setPhysicsEngine('kepler');
+    // 이후 updateAt 없음 = 일시정지 중 복귀
+    const moons = ['moon', 'io', 'phobos'] as const;
+    const onReturn = Object.fromEntries(moons.map((id) => [id, seamRatio(f, id)]));
+    const bufferOnReturn = Float32Array.from(f.handles.getTrailLines()!.positions);
+    expect(headMismatches(f)).toEqual([]);
+    // 정상 상태 — 같은 jd 에서 시간 위상을 한 번 더 돌린 직후 (새 비율 한계 없이 이것과 비교한다)
+    f.handles.updateAt(J2000 + 10);
+    for (const id of moons) expect(onReturn[id], id).toBe(seamRatio(f, id));
+    expect(
+      Buffer.from(f.handles.getTrailLines()!.positions.buffer).equals(
+        Buffer.from(bufferOnReturn.buffer),
+      ),
+    ).toBe(true);
+  });
+
+  it('PR #1343 리뷰 권고 1 · 합의 1 — T3 지구 포커스에서 시간 위상 2회 뒤 켜도 머리 = mesh.position (bodyFrame 기준계)', () => {
+    const f = makeScene();
+    f.handles.setTier('body');
+    f.handles.setFocusOrigin('earth');
+    f.handles.updateAt(J2000 + 1);
+    f.handles.updateAt(J2000 + 2);
+    // 전제 — primary follow 가 mesh 루프 뒤에 origin 을 옮겨, 기록 기준계와 현재 origin 이 실제로 다르다.
+    const frame = f.handles.getBodyReferenceFrame();
+    const origin = f.handles.floatingOrigin.originOffset;
+    expect(origin[0]).not.toBe(frame.originX);
+    f.handles.setTrailsVisible(true);
+    expect(headMismatches(f)).toEqual([]);
+  });
+
+  it('결정 T6 — 머티리얼 ALPHA_ADD · depth write 끔 (Babylon 업그레이드 시 조용한 생략 방지)', () => {
+    const f = makeScene();
+    f.handles.setTrailsVisible(true);
+    const material = f.handles.getTrailLines()!.mesh.material!;
+    expect(material.alphaMode).toBe(Constants.ALPHA_ADD);
+    expect(material.disableDepthWrite).toBe(true);
   });
 
   it('지연 생성 1회 · 이후 setEnabled 만 · dispose 시 해제', () => {
