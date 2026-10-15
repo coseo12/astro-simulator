@@ -50,6 +50,8 @@ export class SimulationCore {
   #setCometTailsVisibleHandler: ((visible: boolean) => void) | null = null;
   // #1335 PR2 — 태양 코로나 런타임 토글 핸들러 (위 혜성 꼬리 동형 — ADR `20261014-1335` 결정 6).
   #setSunCoronaVisibleHandler: ((visible: boolean) => void) | null = null;
+  // #1341 PR1 — 궤적 trail 런타임 토글 핸들러 (위 코로나 동형 — ADR `20261015-1341` 결정 T7).
+  #setTrailsVisibleHandler: ((visible: boolean) => void) | null = null;
   // #1205 — 프레임 위상 핸들러. 매 프레임 1회, `timeChanged` 와 무관하게 호출된다.
   // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
   #framePassHandler: (() => void) | null = null;
@@ -279,6 +281,14 @@ export class SimulationCore {
   }
 
   /**
+   * #1341 PR1 — 궤적 trail 런타임 토글 핸들러 연결. 핸들러는 scene 의 `setTrailsVisible(visible)` 를 부른다
+   * (처음 켤 때 지연 생성 · 이후 `setEnabled` · N-body 엔진이면 의도만 기억 — ADR `20261015-1341` 결정 T7 · T8).
+   */
+  setTrailsVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setTrailsVisibleHandler = handler;
+  }
+
+  /**
    * #1205 — **프레임 위상** 핸들러 연결. 렌더 루프가 매 프레임 1회 호출한다.
    *
    * `updateAt` 은 `timeChanged` 이벤트 바인딩이라 `TimeController.tick` 이 `false` 를 반환하는
@@ -424,6 +434,9 @@ export class SimulationCore {
         break;
       case 'setSunCoronaVisible':
         this.#setSunCoronaVisibleHandler?.(cmd.visible);
+        break;
+      case 'setTrailsVisible':
+        this.#setTrailsVisibleHandler?.(cmd.visible);
         break;
       default: {
         const _exhaustive: never = cmd;

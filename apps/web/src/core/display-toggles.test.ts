@@ -19,6 +19,7 @@ const HW: DisplayCapabilities = {
   belt: true,
   cometTails: true,
   corona: true,
+  trails: true,
 };
 const SOFTWARE: DisplayCapabilities = {
   starfield: false,
@@ -26,6 +27,7 @@ const SOFTWARE: DisplayCapabilities = {
   belt: false,
   cometTails: false,
   corona: false,
+  trails: true,
 };
 const SURFACE_OFF: DisplayCapabilities = {
   starfield: true,
@@ -33,6 +35,7 @@ const SURFACE_OFF: DisplayCapabilities = {
   belt: true,
   cometTails: true,
   corona: true,
+  trails: true,
 };
 /** #1319 PR3 — 소프트웨어 렌더 + `?belt=N` 강제 (bench · verify 경로) — 띠는 만들어져 있으므로 토글도 열린다. */
 const SOFTWARE_FORCED: DisplayCapabilities = {
@@ -41,6 +44,7 @@ const SOFTWARE_FORCED: DisplayCapabilities = {
   belt: true,
   cometTails: false,
   corona: false,
+  trails: true,
 };
 /** #1329 PR2 — 소프트웨어 렌더 + `?comettails=force` (CI 강제 셀) — 꼬리는 만들어져 있으므로 토글도 열린다. */
 const SOFTWARE_COMET_FORCED: DisplayCapabilities = {
@@ -49,6 +53,7 @@ const SOFTWARE_COMET_FORCED: DisplayCapabilities = {
   belt: false,
   cometTails: true,
   corona: false,
+  trails: true,
 };
 /** #1335 PR2 — 소프트웨어 렌더 + `?corona=force` (CI 강제 셀) — 코로나는 만들어져 있으므로 토글도 열린다. */
 const SOFTWARE_CORONA_FORCED: DisplayCapabilities = {
@@ -57,10 +62,11 @@ const SOFTWARE_CORONA_FORCED: DisplayCapabilities = {
   belt: false,
   cometTails: false,
   corona: true,
+  trails: true,
 };
 
 describe('display-toggles — 표 구성', () => {
-  it('9 토글 · URL 키 9종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 행 추가)', () => {
+  it('10 토글 · URL 키 10종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -71,6 +77,7 @@ describe('display-toggles — 표 구성', () => {
       'kuiper',
       'cometTails',
       'corona',
+      'trails',
     ]);
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
@@ -82,6 +89,7 @@ describe('display-toggles — 표 구성', () => {
       'kuiper',
       'comettails',
       'corona',
+      'trails',
     ]);
   });
 
@@ -96,6 +104,7 @@ describe('display-toggles — 표 구성', () => {
       { type: 'setKuiperBeltVisible', visible: false },
       { type: 'setCometTailsVisible', visible: false },
       { type: 'setSunCoronaVisible', visible: false },
+      { type: 'setTrailsVisible', visible: false },
     ]);
   });
 
@@ -111,20 +120,60 @@ describe('display-toggles — 표 구성', () => {
   });
 });
 
+/** 기본 켜짐 행 — #1341 이전 9행. 출력 불변 (DoD D10) 의 대상. */
+const DEFAULT_ON_ROWS = DISPLAY_TOGGLES.filter((d) => d.defaultVisible);
+
 describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', () => {
-  it('serialize: ON → 키 삭제(null) · OFF → "off"', () => {
+  it('serialize: ON → 키 삭제(null) · OFF → "off" (기본 인자 = 기본 켜짐, 종전 출력)', () => {
     expect(serializeDisplayToggle(true)).toBeNull();
     expect(serializeDisplayToggle(false)).toBe('off');
+    expect(serializeDisplayToggle(true, true)).toBeNull();
+    expect(serializeDisplayToggle(false, true)).toBe('off');
+  });
+
+  it('#1341 D10 — 기존 9행은 defaultVisible=true 라 출력 불변 · trails 만 기본 꺼짐', () => {
+    expect(DEFAULT_ON_ROWS.map((d) => d.id)).toEqual([
+      'orbits',
+      'stars',
+      'clouds',
+      'nightLights',
+      'labels',
+      'belt',
+      'kuiper',
+      'cometTails',
+      'corona',
+    ]);
+    for (const def of DEFAULT_ON_ROWS) {
+      expect(serializeDisplayToggle(true, def.defaultVisible)).toBeNull();
+      expect(serializeDisplayToggle(false, def.defaultVisible)).toBe('off');
+    }
+    expect(getDisplayToggle('trails').defaultVisible).toBe(false);
+  });
+
+  it('#1341 D10 — trails: 켜짐 → "on" · 꺼짐 → 키 삭제 (기본값과 같으면 삭제)', () => {
+    const def = getDisplayToggle('trails');
+    expect(serializeDisplayToggle(true, def.defaultVisible)).toBe('on');
+    expect(serializeDisplayToggle(false, def.defaultVisible)).toBeNull();
+    const cases: Array<[string | null, 'on' | null]> = [
+      [null, null],
+      ['on', 'on'],
+      ['ON', 'on'],
+      ['off', null],
+      ['x', null],
+    ];
+    for (const [s, expected] of cases)
+      expect(serializeDisplayToggle(def.parse(s), def.defaultVisible)).toBe(expected);
   });
 
   it.each(DISPLAY_TOGGLES.map((d) => [d.id, d] as const))(
-    '%s — parse(serialize(v)) === v (v ∈ {true, false})',
+    '%s — parse(serialize(v, defaultVisible)) === v (v ∈ {true, false})',
     (_id, def) => {
-      for (const v of [true, false]) expect(def.parse(serializeDisplayToggle(v))).toBe(v);
+      for (const v of [true, false])
+        expect(def.parse(serializeDisplayToggle(v, def.defaultVisible))).toBe(v);
     },
   );
 
-  it.each(DISPLAY_TOGGLES.map((d) => [d.id, d] as const))(
+  it.each(DEFAULT_ON_ROWS.map((d) => [d.id, d] as const))(
     '%s — serialize(parse(s)) 정규화 (null·on→키 삭제 / off·OFF→off / 모르는 값→ON 폴백)',
     (_id, def) => {
       const cases: Array<[string | null, 'off' | null]> = [
@@ -157,6 +206,7 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
       'kuiper',
       'cometTails',
       'corona',
+      'trails',
     ] as const) {
       const def = getDisplayToggle(id);
       expect(def.disabledReason(null)).toBe(DISPLAY_DISABLED_REASONS.sceneNotReady);
@@ -258,6 +308,22 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(def.parse('force')).toBe(true);
     expect(def.parse('FORCE')).toBe(true);
     expect(serializeDisplayToggle(def.parse('force'))).toBeNull();
+  });
+
+  it('#1341 PR1 trails — N-body 엔진이면 불가 + 엔진 사유, 의도가 true 여도 꺼짐 (결정 T8) · 렌더러 · 표면과 무관', () => {
+    const def = getDisplayToggle('trails');
+    expect(def.label).toBe('궤적');
+    const nbody: DisplayCapabilities = { ...HW, trails: false };
+    expect(def.disabledReason(nbody)).toBe(DISPLAY_DISABLED_REASONS.nbodyTrails);
+    expect(def.pressed(true, nbody)).toBe(false);
+    // 소프트웨어 렌더 게이트 없음 (결정 T10) · 표면 off 무관.
+    for (const caps of [SOFTWARE, SURFACE_OFF]) {
+      expect(def.disabledReason(caps)).toBeNull();
+      expect(def.pressed(true, caps)).toBe(true);
+    }
+    // 다른 행은 엔진과 무관하다.
+    for (const other of DISPLAY_TOGGLES.filter((d) => d.id !== 'trails'))
+      expect(other.disabledReason(nbody)).toBeNull();
   });
 
   it('?surface=off — 구름·불빛 불가 (D10), 의도가 true 여도 꺼짐. 별은 영향 없음', () => {

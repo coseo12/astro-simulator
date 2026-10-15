@@ -97,6 +97,15 @@ import {
 import { runTierTransition } from './tier-transition.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
+import {
+  TRAIL_ORBIT_FRACTION,
+  createTrailBodySpecs,
+  sampleTrailWorld,
+  trailVertexCount,
+  type TrailBodySpec,
+  type TrailDirection,
+} from './trail-sampling.js';
+import { createTrailLines, type TrailLinesHandles } from './trail-lines.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
   isInsideViewport,
@@ -257,6 +266,23 @@ export interface SolarSystemSceneHandles {
    */
   setSunCoronaVisible: (visible: boolean) => void;
   /**
+   * #1341 — 궤적 trail 표시 토글 (ADR 20261015-1341 결정 T7 · T8). 처음 켤 때 지연 생성, 이후 `setEnabled` 만 바꾼다
+   * (dispose 는 장면 dispose 때만). N-body 엔진 (`activeEngine !== 'kepler'`) 이면 의도만 기억하고 켜지 않는다 —
+   * Kepler 로 돌아오면 그 의도대로 켠다. 켠 직후 마지막으로 메시에 쓴 `(origin, scale, jd)` 로 정점을 1회 동기한다
+   * (ADR §교차검증 합의 1 — 일시정지 중 처음 켜도 바로 그려진다).
+   */
+  setTrailsVisible: (visible: boolean) => void;
+  /**
+   * #1341 결정 T5 — trail 방향. 인자는 배속 (부호만 쓴다): 양수 = 꼬리가 과거, 음수 = 꼬리가 미래 (화면에서 지나온 쪽).
+   * 0 · 비유한값은 직전 부호를 유지한다 (일시정지). 바뀌면 마지막 `(origin, scale, jd)` 로 즉시 1회 동기한다
+   * (§교차검증 합의 1 — 일시정지 중 방향 전환도 즉시 반영).
+   */
+  setTrailDirection: (timeScale: number) => void;
+  /** #1341 — trail 메시 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용. */
+  getTrailLines: () => TrailLinesHandles | null;
+  /** #1341 — trail 대상 사양 (정점 배치 순서). 진단 · 단위 테스트용. */
+  getTrailBodySpecs: () => readonly TrailBodySpec[];
+  /**
    * P12-A #298 — 현재 활성 tier.
    *
    * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
@@ -333,8 +359,9 @@ export interface SolarSystemSceneHandles {
    *
    * T3 body tier (P12 단일 모드) 에서 float32 jitter 해소를 위해 scene 내부가 매 프레임
    * `fo.toLocal(world)` 적용. T1/T2 에서는 originOffset=[0,0,0] 유지 (ADR §4 Q10 판정).
-   * 외부 노출은 (a) dev 빌드 `__floatingOrigin` 전역 + (b) 미래 Trail 모듈의 `onOriginShift`
-   * 구독을 위함. Zustand store 는 이 값을 저장하지 않는다 (Heliocentric 불변식 — ADR §3).
+   * 외부 노출은 (a) dev 빌드 `__floatingOrigin` 전역 + (b) `onOriginShift` 구독 계약 (ADR §2) 을 위함.
+   * 궤적 trail 은 이 경로를 쓰지 않는다 (ADR 1341 결정 T3 — 메시와 같은 쓰기 지점 `syncTrails`).
+   * Zustand store 는 이 값을 저장하지 않는다 (Heliocentric 불변식 — ADR §3).
    */
   floatingOrigin: FloatingOrigin;
   /**
@@ -1519,6 +1546,95 @@ export function createSolarSystemScene(
   // 태양 코로나 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:sun-corona');
 
+  // #1341 — 궤적 trail (ADR 20261015-1341 결정 T1 ~ T10). 기본 꺼짐 — 로드 시 아무것도 만들지 않는다 (결정 T10).
+  //  - 점 출처: Kepler 해석해, E 등간격, 무상태 (`trail-sampling.ts`). 대상 = 궤도선과 같은 집합 (결정 T9).
+  //  - 정점 기록은 body `mesh.position` 을 쓰는 **두 지점** (`updateAt` · `setTier`) 에서만 — `syncTrails` (결정 T3).
+  //    Floating Origin 이동 이벤트는 쓰지 않는다 (축 T2 (c) 기각 — 메시보다 한 프레임 먼저 옮겨진다).
+  //  - 가시성 (`setEnabled`) 은 명령 (`setTrailsVisible` · `setPhysicsEngine`) 에서만 (결정 T7). observer 없음.
+  let trailLines: TrailLinesHandles | null = null;
+  /** 사용자 의도 (표시 토글). 실제 표시는 의도 ∧ Kepler 엔진 (결정 T8). */
+  let trailsVisible = false;
+  /** 결정 T5 — 직전 0 아닌 배속의 부호. 초기값 = 재생 방향. */
+  let trailDirection: TrailDirection = 1;
+  // 사양 · world 버퍼는 처음 켤 때 만든다 — 꺼져 있으면 계산 0 (DoD D7).
+  let trailSpecs: TrailBodySpec[] | null = null;
+  let trailWorld: Float64Array | null = null;
+  const ensureTrailSpecs = (): TrailBodySpec[] =>
+    (trailSpecs ??= createTrailBodySpecs(system.bodies, R_PHASE_BODY_ALLOWLIST));
+  const createTrailLinesForScene = (): TrailLinesHandles => {
+    const specs = ensureTrailSpecs();
+    trailWorld = new Float64Array(3 * trailVertexCount(specs));
+    return createTrailLines(
+      scene,
+      specs.map((spec) => {
+        // 색 = 천체 colorHint (결정 T6 · Q-T8). 미지정 fallback 은 body mesh 와 같은 값.
+        const c = hexToColor3(bodiesById.get(spec.id)?.colorHint?.hex ?? '#888888');
+        return { pointCount: spec.segments + 1, color: [c.r, c.g, c.b] as const };
+      }),
+    );
+  };
+  /** 지금 정점을 갱신해야 하는가 — 메시가 있고 · 의도가 켜짐이고 · Kepler 엔진. */
+  const trailsActive = (): boolean =>
+    trailLines !== null && trailsVisible && activeEngine === 'kepler';
+  /**
+   * #1341 결정 T3 — trail 정점을 body `mesh.position` 과 같은 기준계 `(origin, scale)` 로 기록한다.
+   *
+   * 호출부는 `syncOrbitLinePositions` 와 같은 두 곳 (`updateAt` · `setTier`) + 명령 시 1회 동기 (`bodyFrame` 값 —
+   * 마지막으로 메시에 쓴 기준계, §교차검증 합의 1). 시각은 `currentJd` — `worldPositions` 가 계산된 시각과 같다.
+   * origin 을 스칼라로 받는 이유는 `syncSunLightPosition` 과 같다 (스냅샷 값만 받는다).
+   */
+  const syncTrails = (ox: number, oy: number, oz: number, scale: number): void => {
+    if (!trailsActive()) return;
+    const lines = trailLines!;
+    const specs = ensureTrailSpecs();
+    const world = trailWorld!;
+    let offset = 0;
+    for (const spec of specs) {
+      const parentWorld = worldPositions.get(spec.parentId) ?? ZERO;
+      const headWorld = worldPositions.get(spec.id) ?? ZERO;
+      offset +=
+        3 *
+        sampleTrailWorld(
+          spec,
+          currentJd,
+          trailDirection,
+          TRAIL_ORBIT_FRACTION,
+          parentWorld,
+          headWorld,
+          world,
+          offset,
+        );
+    }
+    // body mesh.position 과 같은 식 — float64 뺄셈 · 곱 후 float32 저장 (머리 정점 = 메시 위치, DoD D2 · D4).
+    const out = lines.positions;
+    for (let i = 0; i < offset; i += 3) {
+      out[i] = (world[i]! - ox) * scale;
+      out[i + 1] = (world[i + 1]! - oy) * scale;
+      out[i + 2] = (world[i + 2]! - oz) * scale;
+    }
+    lines.commit();
+  };
+  /** 명령 시 1회 동기 — 마지막으로 메시에 쓴 기준계 (`bodyFrame`) 로 (§교차검증 합의 1). */
+  const syncTrailsToLastBodyFrame = (): void => {
+    syncTrails(bodyFrame.originX, bodyFrame.originY, bodyFrame.originZ, bodyFrame.scale);
+  };
+  /** 결정 T7 · T8 — 가시성 반영. 명령 핸들러 (`setTrailsVisible` · `setPhysicsEngine`) 만 부른다. */
+  const applyTrailsEnabled = (): void => {
+    if (trailsVisible && activeEngine === 'kepler') {
+      trailLines ??= createTrailLinesForScene();
+      trailLines.mesh.setEnabled(true);
+      syncTrailsToLastBodyFrame();
+      return;
+    }
+    trailLines?.mesh.setEnabled(false);
+  };
+  disposables.push({
+    dispose: () => {
+      trailLines?.dispose();
+      trailLines = null;
+    },
+  });
+
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
   let activeEngine: PhysicsEngineKind = physicsEngine;
@@ -1730,6 +1846,8 @@ export function createSolarSystemScene(
       tierTransitionOrigin[2],
       newScale,
     );
+    // #1341 결정 T3 — trail 도 같은 프레임 · 같은 기준계로 (일시정지 중 tier 전환에서 머리가 천체를 놓치지 않게).
+    syncTrails(tierTransitionOrigin[0], tierTransitionOrigin[1], tierTransitionOrigin[2], newScale);
 
     // #782 Amendment 2-i fix (PR #785 reviewer 권고 1 / qa 실측) — ring-anchor 를 setTier 에서도 즉시 동기.
     // updateAt 의 ring-anchor 동기 블록 (#845 라인 앵커화) 은 `timeChanged` 바인딩이라 speed=0 (pause)
@@ -2007,6 +2125,8 @@ export function createSolarSystemScene(
     // sun 중심 좌표라 위 루프에서 처리됨 (별도 처리 불필요).
     // #1318 — 태양 중심 `orbitLines` 도 같은 헬퍼에서 태양 로컬 좌표로 동기 (T3 floating origin 정합).
     syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
+    // #1341 결정 T3 — trail 정점도 위 mesh 루프와 같은 스냅샷 기준계로 (아래 primary follow 가 origin 을 옮기기 전 값).
+    syncTrails(ox, oy, oz, sceneUnitPerMeter);
 
     // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
     // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
@@ -2050,7 +2170,8 @@ export function createSolarSystemScene(
     // focus body 는 태양을 공전하므로 매 프레임 world 좌표가 바뀐다. origin 을 고정하면
     // 다음 프레임에 focus body 가 local 에서 멀어져 jitter 재발 → 매 프레임 origin 을
     // 현재 focus body 의 world 로 따라가게 한다. `setOriginToBody` 가 변화 없으면 no-op
-    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다 (Trail 불필요 호출 방지).
+    // 반환하므로 listener 는 델타가 0 인 프레임에는 호출되지 않는다. 궤적 trail 은 listener 가 아니다 —
+    // 위 `syncTrails` 가 mesh 루프와 같은 스냅샷 기준계로 이미 기록했다 (ADR 1341 결정 T3).
     //
     // #313 M2 — P12 ADR §Q10 Amendment: T3 (body) 에서만 활성. T1/T2 는 setTier 가 origin 을
     // 리셋해 [0,0,0] 유지 → 아래 primary follow skip 으로 매 프레임 setOriginToBody 호출 제거.
@@ -2792,6 +2913,20 @@ export function createSolarSystemScene(
     sunCorona?.mesh.setEnabled(false);
   };
 
+  // #1341 결정 T7 · T10 — 궤적 trail 런타임 토글. 기본 꺼짐 · 처음 켤 때 지연 생성 · 이후 `setEnabled`.
+  const setTrailsVisible = (visible: boolean) => {
+    trailsVisible = visible;
+    applyTrailsEnabled();
+  };
+  // #1341 결정 T5 — 방향은 배속 부호. 0 (일시정지) 은 직전 부호 유지. 바뀌면 즉시 1회 동기 (§교차검증 합의 1).
+  const setTrailDirection = (timeScale: number) => {
+    if (!Number.isFinite(timeScale) || timeScale === 0) return;
+    const next: TrailDirection = timeScale > 0 ? 1 : -1;
+    if (next === trailDirection) return;
+    trailDirection = next;
+    syncTrailsToLastBodyFrame();
+  };
+
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
@@ -2856,6 +2991,8 @@ export function createSolarSystemScene(
       disposeNewton();
     }
     activeEngine = effective;
+    // #1341 결정 T8 — N-body 엔진이면 trail 을 끄고, Kepler 로 돌아오면 사용자 의도대로 다시 켠다 (명령 경로).
+    applyTrailsEnabled();
   };
   const getPhysicsEngine = () => activeEngine;
 
@@ -2899,6 +3036,8 @@ export function createSolarSystemScene(
     setKuiperBeltVisible,
     setCometTailsVisible,
     setSunCoronaVisible,
+    setTrailsVisible,
+    setTrailDirection,
     getTier,
     setTier,
     updateTierByCamera,
@@ -2927,6 +3066,8 @@ export function createSolarSystemScene(
     getKuiperParticles: () => kuiperParticles,
     getCometTails: () => cometTails ?? [],
     getSunCorona: () => sunCorona,
+    getTrailLines: () => trailLines,
+    getTrailBodySpecs: () => ensureTrailSpecs(),
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();

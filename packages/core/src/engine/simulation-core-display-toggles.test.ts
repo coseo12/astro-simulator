@@ -22,7 +22,8 @@ type ToggleType =
   | 'setAsteroidBeltVisible'
   | 'setKuiperBeltVisible'
   | 'setCometTailsVisible'
-  | 'setSunCoronaVisible';
+  | 'setSunCoronaVisible'
+  | 'setTrailsVisible';
 type Register = (core: SimulationCore, handler: (visible: boolean) => void) => void;
 
 const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
@@ -36,6 +37,8 @@ const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
   { type: 'setCometTailsVisible', register: (c, h) => c.setCometTailsVisibleHandler(h) },
   // #1335 PR2 — 태양 코로나 토글 (같은 5 케이스 + 교차 라우팅 0).
   { type: 'setSunCoronaVisible', register: (c, h) => c.setSunCoronaVisibleHandler(h) },
+  // #1341 PR1 — 궤적 trail 토글 (같은 5 케이스 + 교차 라우팅 0).
+  { type: 'setTrailsVisible', register: (c, h) => c.setTrailsVisibleHandler(h) },
 ];
 
 describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, register }) => {
@@ -95,7 +98,7 @@ describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, 
 });
 
 describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
-  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 8종 — #1319 PR3 띠 2종 · #1329 혜성 꼬리 · #1335 코로나)', () => {
+  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 9종 — #1319 PR3 띠 2종 · #1329 혜성 꼬리 · #1335 코로나 · #1341 trail)', () => {
     const core = new SimulationCore(makeCanvas());
     const handlers = {
       setOrbitLinesVisible: vi.fn(),
@@ -107,6 +110,7 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
       // #1335 PR2 — 혜성 꼬리는 #1329 PR2 가 CASES 에만 넣고 이 집합에는 빠져 있었다 — 코로나와 함께 넣는다.
       setCometTailsVisible: vi.fn(),
       setSunCoronaVisible: vi.fn(),
+      setTrailsVisible: vi.fn(),
     };
     core.setOrbitLinesVisibleHandler(handlers.setOrbitLinesVisible);
     core.setStarfieldVisibleHandler(handlers.setStarfieldVisible);
@@ -116,6 +120,7 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
     core.setKuiperBeltVisibleHandler(handlers.setKuiperBeltVisible);
     core.setCometTailsVisibleHandler(handlers.setCometTailsVisible);
     core.setSunCoronaVisibleHandler(handlers.setSunCoronaVisible);
+    core.setTrailsVisibleHandler(handlers.setTrailsVisible);
 
     for (const type of Object.keys(handlers) as (keyof typeof handlers)[]) {
       for (const h of Object.values(handlers)) h.mockClear();

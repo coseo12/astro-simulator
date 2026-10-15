@@ -10,8 +10,9 @@
  * `?labels=` (`parse-labels-mode.ts` — 같은 어휘 `off` 옵트아웃) 와 #1319 PR3 의 `?belt=` · `?kuiper=`
  * (`parse-belt-mode.ts` — 같은 `off` 옵트아웃, `?belt=` 는 기존 숫자 의미 유지 — ADR `20261008-1319` 결정 6), #1329 PR2 의
  * `?comettails=` (`parse-comet-tails-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261010-1329` 결정 5), #1335 PR2 의
- * `?corona=` (`parse-corona-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261014-1335` 결정 6). 쓰는 쪽은
- * `serializeDisplayToggle` 하나이고 그 역방향이 각 행의 `parse` 다.
+ * `?corona=` (`parse-corona-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261014-1335` 결정 6), #1341 PR1 의
+ * `?trails=` (`parse-trails-mode.ts` — **유일한 기본 꺼짐 행**, `on` 옵트인 — ADR `20261015-1341` 결정 T10). 쓰는 쪽은
+ * `serializeDisplayToggle(visible, defaultVisible)` 하나이고 그 역방향이 각 행의 `parse` 다.
  */
 
 import type { CoreCommand } from '@astro-simulator/shared';
@@ -24,6 +25,7 @@ import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
 import { parseOrbitsVisible } from './parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
+import { parseTrailsVisible } from './parse-trails-mode';
 
 export type DisplayToggleId =
   | 'orbits'
@@ -34,7 +36,8 @@ export type DisplayToggleId =
   | 'belt'
   | 'kuiper'
   | 'cometTails'
-  | 'corona';
+  | 'corona'
+  | 'trails';
 
 /**
  * 장면이 준비된 뒤 확정되는 환경 가용성. `null` = 장면 미준비 (sim-canvas 가 핸들러를 등록하기 전 ·
@@ -61,6 +64,12 @@ export interface DisplayCapabilities {
    * `force` 는 소프트웨어 렌더에서도 메시를 만들므로 (CI 강제 셀) 그때는 토글도 연다 — `cometTails` 와 같은 규약.
    */
   corona: boolean;
+  /**
+   * #1341 PR1 — 궤적 trail 을 그릴 수 있는가 — 활성 물리 엔진이 Kepler 인가 (ADR `20261015-1341` 결정 T8 · Q-T4 (a)).
+   * trail 점은 Kepler 해석해라 N-body 위치와 다르므로 그동안 core 가 메시를 끄고, 토글은 비활성 + 사유를 보인다.
+   * 렌더러 축은 없다 (소프트웨어 렌더 게이트 없음 — 결정 T10). sim-canvas 가 엔진 전환마다 갱신한다.
+   */
+  trails: boolean;
 }
 
 /**
@@ -82,6 +91,8 @@ export const DISPLAY_DISABLED_REASONS = {
   // #1335 PR2 — 태양 코로나 (결정 5). 같은 사유 표현.
   softwareRendererCorona:
     '소프트웨어 렌더링 환경에서는 성능 보호를 위해 태양 코로나를 표시하지 않습니다',
+  // #1341 PR1 — 궤적 trail (결정 T8). 렌더러가 아니라 물리 엔진 사유다.
+  nbodyTrails: 'N-body 엔진에서는 궤적을 표시하지 않습니다',
   surfaceOff: '표면 표시가 꺼져 있어 사용할 수 없습니다 (?surface=off)',
   sceneNotReady: '장면을 준비하는 중입니다',
 } as const;
@@ -96,7 +107,8 @@ type IntentKey =
   | 'beltVisible'
   | 'kuiperVisible'
   | 'cometTailsVisible'
-  | 'coronaVisible';
+  | 'coronaVisible'
+  | 'trailsVisible';
 type IntentSetterKey =
   | 'setOrbitLinesVisible'
   | 'setStarsVisible'
@@ -106,7 +118,8 @@ type IntentSetterKey =
   | 'setBeltVisible'
   | 'setKuiperVisible'
   | 'setCometTailsVisible'
-  | 'setCoronaVisible';
+  | 'setCoronaVisible'
+  | 'setTrailsVisible';
 
 export interface DisplayToggleDef {
   id: DisplayToggleId;
@@ -120,8 +133,14 @@ export interface DisplayToggleDef {
     | 'belt'
     | 'kuiper'
     | 'comettails'
-    | 'corona';
+    | 'corona'
+    | 'trails';
   label: string;
+  /**
+   * #1341 PR1 — 기본 표시 여부 (ADR `20261015-1341` 결정 T10). URL 직렬화가 이 값과 같은 의도를 키 삭제로 쓴다.
+   * `trails` 만 `false` (옵트인) — 나머지 9행은 `true` 라 출력이 종전과 같다.
+   */
+  defaultVisible: boolean;
   /** URL → 의도. `serializeDisplayToggle` 의 역방향 (기존 파서 재사용). */
   parse: (urlParam: string | null | undefined) => boolean;
   /**
@@ -158,6 +177,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'orbits',
     urlKey: 'orbits',
     label: '궤도선',
+    defaultVisible: true,
     parse: parseOrbitsVisible,
     command: (visible) => ({ type: 'setOrbitLinesVisible', visible }),
     intentKey: 'orbitLinesVisible',
@@ -170,6 +190,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'stars',
     urlKey: 'stars',
     label: '별 배경',
+    defaultVisible: true,
     parse: parseStarsVisible,
     command: (visible) => ({ type: 'setStarfieldVisible', visible }),
     intentKey: 'starsVisible',
@@ -185,6 +206,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'clouds',
     urlKey: 'clouds',
     label: '구름',
+    defaultVisible: true,
     parse: parseCloudsVisible,
     command: (visible) => ({ type: 'setCloudsVisible', visible }),
     intentKey: 'cloudsVisible',
@@ -196,6 +218,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'nightLights',
     urlKey: 'nightlights',
     label: '야간 불빛',
+    defaultVisible: true,
     parse: parseNightLightsVisible,
     command: (visible) => ({ type: 'setNightLightsVisible', visible }),
     intentKey: 'nightLightsVisible',
@@ -207,6 +230,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'labels',
     urlKey: 'labels',
     label: '이름 라벨',
+    defaultVisible: true,
     parse: parseLabelsVisible,
     // #1293 — DOM 오버레이 (`body-labels.tsx`) 가 store 를 직접 구독한다. scene 이 모르는 상태라 명령 없음.
     command: null,
@@ -221,6 +245,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'belt',
     urlKey: 'belt',
     label: '소행성대',
+    defaultVisible: true,
     parse: parseBeltVisible,
     command: (visible) => ({ type: 'setAsteroidBeltVisible', visible }),
     intentKey: 'beltVisible',
@@ -233,6 +258,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'kuiper',
     urlKey: 'kuiper',
     label: '카이퍼 벨트',
+    defaultVisible: true,
     parse: parseKuiperVisible,
     command: (visible) => ({ type: 'setKuiperBeltVisible', visible }),
     intentKey: 'kuiperVisible',
@@ -246,6 +272,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'cometTails',
     urlKey: 'comettails',
     label: '혜성 꼬리',
+    defaultVisible: true,
     parse: parseCometTailsVisible,
     command: (visible) => ({ type: 'setCometTailsVisible', visible }),
     intentKey: 'cometTailsVisible',
@@ -262,6 +289,7 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     id: 'corona',
     urlKey: 'corona',
     label: '태양 코로나',
+    defaultVisible: true,
     parse: parseCoronaVisible,
     command: (visible) => ({ type: 'setSunCoronaVisible', visible }),
     intentKey: 'coronaVisible',
@@ -271,6 +299,23 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
       return caps.corona ? null : DISPLAY_DISABLED_REASONS.softwareRendererCorona;
     },
     pressed: (intent, caps) => intent && caps !== null && caps.corona,
+  },
+  {
+    // #1341 PR1 — 궤적 trail (ADR `20261015-1341`). **기본 꺼짐** · `?trails=on` 옵트인 (결정 T10). 처음 켤 때 지연 생성,
+    // 이후 `setEnabled` (결정 T7). N-body 엔진이면 core 가 메시를 끄므로 토글도 비활성 + 사유 (결정 T8).
+    id: 'trails',
+    urlKey: 'trails',
+    label: '궤적',
+    defaultVisible: false,
+    parse: parseTrailsVisible,
+    command: (visible) => ({ type: 'setTrailsVisible', visible }),
+    intentKey: 'trailsVisible',
+    setterKey: 'setTrailsVisible',
+    disabledReason: (caps) => {
+      if (caps === null) return DISPLAY_DISABLED_REASONS.sceneNotReady;
+      return caps.trails ? null : DISPLAY_DISABLED_REASONS.nbodyTrails;
+    },
+    pressed: (intent, caps) => intent && caps !== null && caps.trails,
   },
 ];
 
@@ -282,9 +327,14 @@ export function getDisplayToggle(id: DisplayToggleId): DisplayToggleDef {
 }
 
 /**
- * 의도 → URL 값. ON 은 키 삭제 (`null`), OFF 는 `'off'` (사용자 결정 Q2). 역방향은 각 행의 `parse` —
- * `parse(serializeDisplayToggle(v)) === v` 가 성립한다 (단위 테스트가 고정).
+ * 의도 → URL 값. 기본값과 같으면 키 삭제 (`null`), 다르면 `'on'` / `'off'` (사용자 결정 Q2 · #1341 결정 T10 일반화).
+ * 기본 켜짐 행 (`defaultVisible = true` — 기본 인자) 은 종전 그대로 ON = 키 삭제 · OFF = `'off'` 다. 역방향은 각 행의
+ * `parse` — `parse(serializeDisplayToggle(v, def.defaultVisible)) === v` 가 성립한다 (단위 테스트가 고정).
  */
-export function serializeDisplayToggle(visible: boolean): 'off' | null {
-  return visible ? null : 'off';
+export function serializeDisplayToggle(
+  visible: boolean,
+  defaultVisible = true,
+): 'on' | 'off' | null {
+  if (visible === defaultVisible) return null;
+  return visible ? 'on' : 'off';
 }
