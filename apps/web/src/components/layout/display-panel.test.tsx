@@ -29,8 +29,9 @@ const IDS = [
   'kuiper',
   'cometTails',
   'corona',
+  'trails',
 ] as const;
-/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 → #1335 PR2 태양 코로나 행이 추가돼 마지막이 바뀌었다). */
+/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 → #1335 PR2 태양 코로나 → #1341 PR1 궤적 행이 추가돼 마지막이 바뀌었다). */
 const LAST_ID = IDS[IDS.length - 1]!;
 
 function renderPanel() {
@@ -52,12 +53,15 @@ beforeEach(() => {
     kuiperVisible: true,
     cometTailsVisible: true,
     coronaVisible: true,
+    // #1341 — 기본은 꺼짐이지만 이 파일의 전제 (전 토글 ON) 에 맞춘다.
+    trailsVisible: true,
     displayCapabilities: {
       starfield: true,
       surfaceDetail: true,
       belt: true,
       cometTails: true,
       corona: true,
+      trails: true,
     },
     displayPanelOpen: false,
   });
@@ -347,6 +351,7 @@ describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     renderPanel();
@@ -395,6 +400,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     renderPanel();
@@ -422,6 +428,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     renderPanel();
@@ -458,6 +465,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     renderPanel();
@@ -494,6 +502,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     renderPanel();
@@ -522,6 +531,36 @@ describe('DisplayPanel — 토글 분기', () => {
     expect(sentCommands.at(-1)).toEqual({ type: 'setSunCoronaVisible', visible: true });
   });
 
+  it('#1341 PR1 궤적 — 클릭 → aria-pressed 반전 + 명령 / N-body 엔진이면 aria-disabled + 엔진 사유 · 클릭 no-op (D9)', () => {
+    useSimStore.setState({ trailsVisible: false });
+    renderPanel();
+    openPanel();
+    expect(screen.getByRole('button', { name: '궤적' })).toBe(toggleEl('trails'));
+    expect(toggleEl('trails')).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggleEl('trails'));
+    expect(toggleEl('trails')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands).toEqual([{ type: 'setTrailsVisible', visible: true }]);
+    // N-body 전환 (sim-canvas 가 가용성을 내린다)
+    act(() =>
+      useSimStore.setState({
+        displayCapabilities: {
+          starfield: true,
+          surfaceDetail: true,
+          belt: true,
+          cometTails: true,
+          corona: true,
+          trails: false,
+        },
+      }),
+    );
+    expect(toggleEl('trails')).toHaveAttribute('aria-disabled', 'true');
+    expect(toggleEl('trails')).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.nbodyTrails);
+    expect(toggleEl('trails')).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggleEl('trails'));
+    expect(sentCommands).toHaveLength(1);
+    expect(toggleEl('orbits')).toHaveAttribute('aria-disabled', 'false');
+  });
+
   it('?surface=off — 구름·불빛 aria-disabled + 사유, 클릭 no-op (D10)', () => {
     useSimStore.setState({
       displayCapabilities: {
@@ -530,6 +569,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: true,
         cometTails: true,
         corona: true,
+        trails: true,
       },
     });
     renderPanel();
@@ -551,6 +591,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     renderPanel();

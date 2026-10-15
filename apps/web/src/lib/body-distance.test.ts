@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { ephemeris, physics } from '@astro-simulator/core';
 import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import type { BodyStateFn } from '@/core/sim-context';
-import { computeBodyDistances, indexBodies } from './body-distance';
+import {
+  computeBodyDistances,
+  computeBodyPairDistance,
+  computeBodyWorldPosition,
+  indexBodies,
+} from './body-distance';
 import { formatKmKo, formatSunDistance } from './body-info';
 
 const bodies = ephemeris.getSolarSystem().bodies;
@@ -129,5 +134,85 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
   it('엔진 상태값이 null(Kepler · 엔진 미준비)이면 Kepler 식으로 떨어진다', () => {
     const kepler = computeBodyDistances(byId, 'moon', J2000);
     expect(computeBodyDistances(byId, 'moon', J2000, () => null)).toEqual(kepler);
+  });
+});
+
+/**
+ * #1341 PR2 DoD E1 — 두 천체 거리. 독립 계산 = `physics.orbitalStateAt` 를 모체 체인마다 직접 부른 합 (장면 · 카드가 쓰는
+ * `positionAt` 경로와 다른 함수). μ 는 #1305 식 (태양 직속 G·M☉ / 위성 G(M_parent + m)).
+ */
+describe('#1341 computeBodyPairDistance — 두 천체 물리 거리 (E1)', () => {
+  function independentWorld(id: string, jd: number): [number, number, number] {
+    const w: [number, number, number] = [0, 0, 0];
+    let cur = byId.get(id)!;
+    while (cur.parentId != null) {
+      const parent = byId.get(cur.parentId)!;
+      const mu =
+        parent.parentId == null
+          ? GRAVITATIONAL_CONSTANT * parent.mass
+          : GRAVITATIONAL_CONSTANT * (parent.mass + cur.mass);
+      const p = physics.orbitalStateAt(cur.orbit!, jd, mu).position;
+      w[0] += p[0];
+      w[1] += p[1];
+      w[2] += p[2];
+      cur = parent;
+    }
+    return w;
+  }
+
+  const PAIRS = [
+    ['earth', 'mars'],
+    ['earth', 'moon'],
+    ['jupiter', 'io'],
+    ['moon', 'mars'],
+    ['io', 'europa'],
+    ['sun', 'neptune'],
+  ] as const;
+
+  it.each(PAIRS)('%s–%s == 독립 Kepler 계산 (상대 1e-12, jd 3종 · 순서 무관)', (a, b) => {
+    for (const jd of [J2000 - 3_650.25, J2000, J2000 + 9_000.5]) {
+      const wa = independentWorld(a, jd);
+      const wb = independentWorld(b, jd);
+      const ref = Math.hypot(wa[0] - wb[0], wa[1] - wb[1], wa[2] - wb[2]);
+      const got = computeBodyPairDistance(byId, a, b, jd)!;
+      expect(Math.abs(got - ref) / ref).toBeLessThan(1e-12);
+      expect(computeBodyPairDistance(byId, b, a, jd)).toBe(got);
+    }
+  });
+
+  it('지구–달 J2000 = 36~41만 km 대 (시각 배율 ×30 미적용 — 데이터 SSoT 거리)', () => {
+    const km = computeBodyPairDistance(byId, 'earth', 'moon', J2000)! / 1000;
+    expect(km).toBeGreaterThan(356_000);
+    expect(km).toBeLessThan(407_000);
+  });
+
+  it('getBodyState 를 주입하면 그 값을 쓴다 (엔진 상태 우선)', () => {
+    const MOON_FROM_EARTH_M = 354_781_000;
+    const MARS_FROM_SUN = 1.5 * AU;
+    const getBodyState: BodyStateFn = (id) => {
+      if (id === 'moon') return { pos: [MOON_FROM_EARTH_M, 0, 0], vel: [0, 0, 0] };
+      if (id === 'earth') return { pos: [AU, 0, 0], vel: [0, 0, 0] };
+      if (id === 'mars') return { pos: [0, MARS_FROM_SUN, 0], vel: [0, 0, 0] };
+      return null;
+    };
+    expect(computeBodyPairDistance(byId, 'earth', 'moon', J2000, getBodyState)).toBe(
+      MOON_FROM_EARTH_M,
+    );
+    expect(computeBodyPairDistance(byId, 'earth', 'mars', J2000, getBodyState)).toBe(
+      Math.hypot(AU, MARS_FROM_SUN),
+    );
+  });
+
+  it('computeBodyWorldPosition — 태양 = 원점 · 지구 = 독립 계산 · 체인 미해석 · 미등록 id = null', () => {
+    expect(computeBodyWorldPosition(byId, 'sun', J2000)).toEqual([0, 0, 0]);
+    const e = computeBodyWorldPosition(byId, 'earth', J2000)!;
+    const ref = independentWorld('earth', J2000);
+    expect(Math.hypot(e[0] - ref[0], e[1] - ref[1], e[2] - ref[2]) / norm(ref)).toBeLessThan(1e-12);
+    expect(computeBodyWorldPosition(byId, 'no-such-body', J2000)).toBeNull();
+    const orphan = new Map(byId);
+    orphan.delete('earth');
+    expect(computeBodyWorldPosition(orphan, 'moon', J2000)).toBeNull();
+    expect(computeBodyPairDistance(orphan, 'moon', 'mars', J2000)).toBeNull();
+    expect(computeBodyPairDistance(byId, 'earth', 'no-such-body', J2000)).toBeNull();
   });
 });

@@ -16,7 +16,14 @@ vi.mock('@/core/sim-context', () => ({
   },
 }));
 
-const HW = { starfield: true, surfaceDetail: true, belt: true, cometTails: true, corona: true };
+const HW = {
+  starfield: true,
+  surfaceDetail: true,
+  belt: true,
+  cometTails: true,
+  corona: true,
+  trails: true,
+};
 
 function setup(searchParams = '') {
   const onUrlUpdate = vi.fn<(e: UrlUpdateEvent) => void>();
@@ -65,6 +72,26 @@ describe('useDisplayToggle', () => {
     expect(last.searchParams.get('focus')).toBe('earth');
   });
 
+  it('#1341 궤적 (기본 꺼짐 행) — 켜면 URL `trails=on` · 끄면 키 삭제 · 엔진 비가용이면 셋 다 무변화', async () => {
+    useSimStore.setState({ trailsVisible: false });
+    const { toggle, onUrlUpdate } = setup('?focus=earth');
+    act(() => toggle('trails'));
+    expect(useSimStore.getState().trailsVisible).toBe(true);
+    expect(sentCommands).toEqual([{ type: 'setTrailsVisible', visible: true }]);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalledTimes(1));
+    expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('trails')).toBe('on');
+    act(() => toggle('trails'));
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalledTimes(2));
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.has('trails')).toBe(false);
+    expect(last.searchParams.get('focus')).toBe('earth');
+    // N-body 엔진 — 가용성 검사가 막는다
+    useSimStore.setState({ displayCapabilities: { ...HW, trails: false } });
+    act(() => toggle('trails'));
+    expect(useSimStore.getState().trailsVisible).toBe(false);
+    expect(sentCommands).toHaveLength(2);
+  });
+
   it('궤도선 — 기존 명령 · `orbits` 키 (D11 북마크 불일치 해소 경로)', async () => {
     useSimStore.setState({ orbitLinesVisible: false });
     const { toggle, onUrlUpdate } = setup('?orbits=off');
@@ -83,6 +110,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     const { toggle, onUrlUpdate } = setup();
@@ -104,6 +132,7 @@ describe('useDisplayToggle', () => {
         belt: true,
         cometTails: true,
         corona: true,
+        trails: true,
       },
     });
     const { toggle } = setup();
@@ -160,6 +189,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     const { toggle, onUrlUpdate } = setup();
@@ -203,6 +233,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: true,
         corona: false,
+        trails: true,
       },
     });
     const { toggle, onUrlUpdate } = setup('?comettails=force');
@@ -228,6 +259,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     const { toggle, onUrlUpdate } = setup();
@@ -268,6 +300,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: true,
+        trails: true,
       },
     });
     const { toggle, onUrlUpdate } = setup('?corona=force');
@@ -293,6 +326,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        trails: true,
       },
     });
     const { toggle, onUrlUpdate } = setup();

@@ -67,6 +67,12 @@ export type CoreEvents = {
  *
  * #1335 PR2 — `setSunCoronaVisible` 추가. 태양 코로나의 런타임 토글 (ADR
  * `docs/decisions/20261014-1335-sun-corona.md` 결정 6). 소프트웨어 렌더 게이트 (결정 5) 는 web 이 한다.
+ *
+ * #1341 PR1 — `setTrailsVisible` 추가. 궤적 trail 의 런타임 토글 (ADR
+ * `docs/decisions/20261015-1341-trail-ruler.md` 결정 T7 · T10 — 기본 꺼짐). 소프트웨어 렌더 게이트는 없다 (결정 T10).
+ *
+ * #1341 PR2 — `setRuler` 추가. 두 천체 거리 자의 화면 선 (같은 ADR 결정 R1 · R2). `anchorId` = 기준점 A,
+ * `targetId` = 현재 선택 B. 둘 중 하나가 null 이거나 같으면 선을 끈다.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -87,4 +93,6 @@ export type CoreCommand =
   | { type: 'setAsteroidBeltVisible'; visible: boolean }
   | { type: 'setKuiperBeltVisible'; visible: boolean }
   | { type: 'setCometTailsVisible'; visible: boolean }
-  | { type: 'setSunCoronaVisible'; visible: boolean };
+  | { type: 'setSunCoronaVisible'; visible: boolean }
+  | { type: 'setTrailsVisible'; visible: boolean }
+  | { type: 'setRuler'; anchorId: string | null; targetId: string | null };

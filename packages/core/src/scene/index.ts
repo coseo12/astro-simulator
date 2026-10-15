@@ -79,6 +79,14 @@ export {
   CORONA_OUTER_RHO,
 } from './sun-corona.js';
 export type { SunCoronaHandles, SunCoronaUniforms, SunCoronaFrame } from './sun-corona.js';
+// #1341 — 궤적 trail (ADR 20261015-1341). 샘플러는 Babylon 비의존.
+export { TRAIL_LINES_MESH_NAME } from './trail-lines.js';
+export type { TrailLinesHandles } from './trail-lines.js';
+export { TRAIL_ORBIT_FRACTION } from './trail-sampling.js';
+export type { TrailBodySpec, TrailDirection } from './trail-sampling.js';
+// #1341 PR2 — 두 천체 거리 자의 화면 선 (ADR 20261015-1341 결정 R2).
+export { RULER_LINE_MESH_NAME } from './ruler-line.js';
+export type { RulerLineHandles } from './ruler-line.js';
 // #1319 PR2 — 띠 입자 분포 생성기 (ADR 20261008-1319 결정 4, Babylon 비의존).
 export {
   BELT_DEFAULT_COUNTS,

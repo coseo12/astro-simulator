@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useSimStore } from '@/store/sim-store';
 import { useSimCommand } from './sim-context';
 import { parseLodLevel } from './parse-lod-level';
+import { parseRulerAnchor } from './parse-ruler-anchor';
 
 const MODE_VALUES: SimMode[] = ['observe', 'research', 'education', 'sandbox'];
 // P3-0 #126 — barnes-hut/webgpu/auto는 URL로는 받지만 런타임은 미구현 폴백.
@@ -20,7 +21,7 @@ type PhysicsEngineUrl = (typeof ENGINE_VALUES)[number];
 
 /**
  * URL ↔ 시뮬레이션 상태 동기화.
- *  - mode, focus, speed: store ↔ URL 양방향
+ *  - mode, focus, speed, ruler (#1341 PR2): store ↔ URL 양방향
  *  - t (Julian Date): 초기 로드 시에만 URL → store (매 프레임 쓰기 하면 리렌더 폭주)
  *
  * 시간 공유는 향후 "스냅샷/북마크" 기능으로 분리.
@@ -46,6 +47,11 @@ export function UrlSync() {
   // P11-B #289 — ?lod=high|mid|low|auto 초기 1회 파싱 → sendCommand.
   // store 에 저장하지 않음 (LOD 는 scene 내부 상태) — URL → Core → Scene 단방향 파이프.
   const [urlLod] = useQueryState('lod', parseAsString.withOptions({ history: 'replace' }));
+  // #1341 PR2 — `?ruler=<기준점 id>` (ADR `20261015-1341` 결정 R7). B 는 `?focus=` 가 정한다. store ↔ URL 양방향.
+  const [urlRuler, setUrlRuler] = useQueryState(
+    'ruler',
+    parseAsString.withOptions({ history: 'replace' }),
+  );
 
   const mode = useSimStore((s) => s.mode);
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
@@ -53,6 +59,8 @@ export function UrlSync() {
   const physicsEngine = useSimStore((s) => s.physicsEngine);
   const setMode = useSimStore((s) => s.setMode);
   const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
+  const rulerAnchorId = useSimStore((s) => s.rulerAnchorId);
+  const setRulerAnchor = useSimStore((s) => s.setRulerAnchor);
   // #419 §결정 2 — `setSelectedBody` 직접 호출 제거 (race fallback 폐기, event 단일 진실원 회복).
 
   const sendCommand = useSimCommand();
@@ -114,6 +122,13 @@ export function UrlSync() {
     if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
       sendCommand({ type: 'setTimeScale', scale: urlSpeed });
     }
+    // #1341 PR2 — 기준점은 store 만 쓴다. 화면 선은 sim-canvas 가 store (기준점 · 선택) 를 구독해 `setRuler` 명령으로 보낸다.
+    // 무효 값은 파서가 warn 후 null — URL 에서도 지운다 (`?focus=` #418 과 같은 처분).
+    if (urlRuler !== null && urlRuler !== undefined) {
+      const anchor = parseRulerAnchor(urlRuler);
+      if (anchor !== null) setRulerAnchor(anchor);
+      else setUrlRuler(null);
+    }
     if (urlEngine) {
       setPhysicsEngine(urlEngine);
     }
@@ -145,6 +160,11 @@ export function UrlSync() {
     if (!initialized.current) return;
     setUrlEngine(physicsEngine === 'kepler' ? null : physicsEngine);
   }, [physicsEngine, setUrlEngine]);
+
+  useEffect(() => {
+    if (!initialized.current) return;
+    setUrlRuler(rulerAnchorId);
+  }, [rulerAnchorId, setUrlRuler]);
 
   return null;
 }
