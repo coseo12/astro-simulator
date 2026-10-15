@@ -106,6 +106,7 @@ import {
   type TrailDirection,
 } from './trail-sampling.js';
 import { createTrailLines, type TrailLinesHandles } from './trail-lines.js';
+import { createRulerLine, type RulerLineHandles } from './ruler-line.js';
 import { applySatelliteVisibilityGuard } from './satellite-visibility.js';
 import {
   isInsideViewport,
@@ -282,6 +283,15 @@ export interface SolarSystemSceneHandles {
   getTrailLines: () => TrailLinesHandles | null;
   /** #1341 — trail 대상 사양 (정점 배치 순서). 진단 · 단위 테스트용. */
   getTrailBodySpecs: () => readonly TrailBodySpec[];
+  /**
+   * #1341 PR2 — 두 천체 거리 자의 화면 선 (ADR 20261015-1341 결정 R1 · R2). `anchorId` = 기준점 A, `targetId` = 현재
+   * 선택 천체 B. 둘 중 하나가 없거나 · 같거나 · 장면에 메시가 없으면 선을 끈다. 처음 켤 때 지연 생성, 이후 `setEnabled`
+   * 만 바꾼다 (dispose 는 장면 dispose 때만). 켠 직후 마지막으로 메시에 쓴 `(origin, scale)` 로 끝점을 1회 동기한다
+   * (ADR §교차검증 합의 1 — 일시정지 중 설정해도 바로 그려진다).
+   */
+  setRuler: (anchorId: string | null, targetId: string | null) => void;
+  /** #1341 PR2 — 자 선 메시 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용. */
+  getRulerLine: () => RulerLineHandles | null;
   /**
    * P12-A #298 — 현재 활성 tier.
    *
@@ -1635,6 +1645,42 @@ export function createSolarSystemScene(
     },
   });
 
+  // #1341 PR2 — 두 천체 거리 자의 화면 선 (ADR 20261015-1341 결정 R1 · R2). 로드 시 아무것도 만들지 않는다.
+  //  - 끝점 = 기준점 A · 현재 선택 B 의 body `mesh.position` 과 같은 식 · 같은 입력 (`worldPositions` · 기록 기준계).
+  //  - 정점 기록은 trail 과 같은 두 지점 (`updateAt` · `setTier`) + 명령 (`setRuler`) 시 1회 — `syncRuler` (결정 R2).
+  //    Floating Origin 이동 이벤트는 쓰지 않는다 (축 T2 (c) 기각과 같은 이유).
+  //  - 가시성 (`setEnabled`) 은 명령 (`setRuler`) 에서만 (결정 R2 — 결정 T7 과 같은 규칙). observer 없음.
+  //  - 엔진 게이트 없음 — 끝점이 메시 위치 그 자체라 N-body 에서도 메시와 어긋나지 않는다 (trail 결정 T8 과 다르다).
+  let rulerLine: RulerLineHandles | null = null;
+  /** 유효한 쌍일 때만 non-null (둘 다 메시 보유 · 서로 다름). `setRuler` 만 쓴다. */
+  let rulerPair: readonly [string, string] | null = null;
+  /**
+   * #1341 결정 R2 — 자 선 끝점을 body `mesh.position` 과 같은 기준계 `(origin, scale)` 로 기록한다.
+   * 호출부는 `syncTrails` 와 같은 두 곳 (`updateAt` · `setTier`) + `setRuler` 명령 시 1회 (`bodyFrame` 값).
+   */
+  const syncRuler = (ox: number, oy: number, oz: number, scale: number): void => {
+    if (rulerLine === null || rulerPair === null) return;
+    const out = rulerLine.positions;
+    for (let end = 0; end < 2; end += 1) {
+      const world = worldPositions.get(rulerPair[end]!) ?? ZERO;
+      // body mesh.position 과 같은 식 — float64 뺄셈 · 곱 후 float32 저장 (끝점 = 메시 위치, DoD E4).
+      out[3 * end] = (world[0] - ox) * scale;
+      out[3 * end + 1] = (world[1] - oy) * scale;
+      out[3 * end + 2] = (world[2] - oz) * scale;
+    }
+    rulerLine.commit();
+  };
+  /** 명령 시 1회 동기 — 마지막으로 메시에 쓴 기준계 (`bodyFrame`) 로 (§교차검증 합의 1). 새 기준계를 만들지 않는다. */
+  const syncRulerToLastBodyFrame = (): void => {
+    syncRuler(bodyFrame.originX, bodyFrame.originY, bodyFrame.originZ, bodyFrame.scale);
+  };
+  disposables.push({
+    dispose: () => {
+      rulerLine?.dispose();
+      rulerLine = null;
+    },
+  });
+
   // Newton / Barnes-Hut / WebGPU 경로 — 세 엔진 모두 동일 advance/positions 인터페이스 (positions는
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
   let activeEngine: PhysicsEngineKind = physicsEngine;
@@ -1848,6 +1894,8 @@ export function createSolarSystemScene(
     );
     // #1341 결정 T3 — trail 도 같은 프레임 · 같은 기준계로 (일시정지 중 tier 전환에서 머리가 천체를 놓치지 않게).
     syncTrails(tierTransitionOrigin[0], tierTransitionOrigin[1], tierTransitionOrigin[2], newScale);
+    // #1341 결정 R2 — 자 선도 같은 프레임 · 같은 기준계로 (일시정지 중 tier 전환에서 끝점이 천체를 놓치지 않게).
+    syncRuler(tierTransitionOrigin[0], tierTransitionOrigin[1], tierTransitionOrigin[2], newScale);
 
     // #782 Amendment 2-i fix (PR #785 reviewer 권고 1 / qa 실측) — ring-anchor 를 setTier 에서도 즉시 동기.
     // updateAt 의 ring-anchor 동기 블록 (#845 라인 앵커화) 은 `timeChanged` 바인딩이라 speed=0 (pause)
@@ -2127,6 +2175,8 @@ export function createSolarSystemScene(
     syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
     // #1341 결정 T3 — trail 정점도 위 mesh 루프와 같은 스냅샷 기준계로 (아래 primary follow 가 origin 을 옮기기 전 값).
     syncTrails(ox, oy, oz, sceneUnitPerMeter);
+    // #1341 결정 R2 — 자 선 끝점도 같은 스냅샷 기준계로.
+    syncRuler(ox, oy, oz, sceneUnitPerMeter);
 
     // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
     // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
@@ -2927,6 +2977,25 @@ export function createSolarSystemScene(
     syncTrailsToLastBodyFrame();
   };
 
+  // #1341 결정 R1 · R2 — 거리 자 선. 유효 쌍이면 지연 생성 · 켬 · 즉시 1회 동기, 아니면 끔.
+  const setRuler = (anchorId: string | null, targetId: string | null) => {
+    rulerPair =
+      anchorId !== null &&
+      targetId !== null &&
+      anchorId !== targetId &&
+      meshes.has(anchorId) &&
+      meshes.has(targetId)
+        ? [anchorId, targetId]
+        : null;
+    if (rulerPair === null) {
+      rulerLine?.mesh.setEnabled(false);
+      return;
+    }
+    rulerLine ??= createRulerLine(scene);
+    rulerLine.mesh.setEnabled(true);
+    syncRulerToLastBodyFrame();
+  };
+
   // #1265 §결정 2 — 런타임 구름 토글. ON 은 로드 경로 함수 (`enableClouds`) 에 **런타임 전용 2단계**를 더한다.
   const setCloudsVisible = (visible: boolean) => {
     // 유효 조건 `clouds && surfaceDetail` 동형 — 표면이 없으면 구름을 얹을 host 셰이더 계열이 없다.
@@ -3074,6 +3143,8 @@ export function createSolarSystemScene(
     getSunCorona: () => sunCorona,
     getTrailLines: () => trailLines,
     getTrailBodySpecs: () => ensureTrailSpecs(),
+    setRuler,
+    getRulerLine: () => rulerLine,
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
     dispose: () => {
       ambient.dispose();

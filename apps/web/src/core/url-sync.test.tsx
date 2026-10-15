@@ -1,4 +1,4 @@
-import { render, cleanup } from '@testing-library/react';
+import { act, render, cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import type * as AstroCore from '@astro-simulator/core';
@@ -38,14 +38,19 @@ import { useSimStore } from '@/store/sim-store';
  */
 
 // nuqs mock — useQueryState 호출 순서:
-//   1. mode  2. t  3. focus  4. speed  5. engine  6. lod
-// 본 테스트는 focus 만 가변, 나머지는 null 고정.
+//   1. mode  2. t  3. focus  4. speed  5. engine  6. lod  7. ruler (#1341 PR2)
+// 본 테스트는 focus · ruler 가 가변 (ruler 는 setter 도 추적), 나머지는 null 고정. mock 은 호출 순서가 아니라 키로 분기한다.
 let mockUrlFocus: string | null = null;
+let mockUrlRuler: string | null = null;
+const setUrlRulerMock = vi.fn();
 
 vi.mock('nuqs', () => ({
   useQueryState: vi.fn((key: string) => {
     if (key === 'focus') {
       return [mockUrlFocus, vi.fn()];
+    }
+    if (key === 'ruler') {
+      return [mockUrlRuler, setUrlRulerMock];
     }
     return [null, vi.fn()];
   }),
@@ -88,6 +93,8 @@ const { UrlSync } = await import('./url-sync');
 beforeEach(() => {
   sentCommands = [];
   mockUrlFocus = null;
+  mockUrlRuler = null;
+  setUrlRulerMock.mockReset();
   rPhaseMock.disabledIds = []; // 기본 passthrough (실모듈) — disabled 계약 테스트만 개별 지정
   useSimStore.setState({
     rendererKind: null,
@@ -98,6 +105,7 @@ beforeEach(() => {
     timeScale: 86_400,
     physicsEngine: 'kepler',
     fps: null,
+    rulerAnchorId: null,
   });
 });
 
@@ -260,5 +268,36 @@ describe('UrlSync — ?focus= R-Phase Allowlist 가드 (#415)', () => {
     expect(useSimStore.getState().selectedBodyId).toBeNull();
     expect(sentCommands.filter((c) => c.type === 'focusOn')).toEqual([]);
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('UrlSync — ?ruler= 거리 자 기준점 (#1341 PR2 결정 R7)', () => {
+  it('?ruler=earth → store rulerAnchorId = earth · 명령 직접 발행 0 (선은 sim-canvas 구독이 보낸다)', () => {
+    mockUrlRuler = 'earth';
+    render(<UrlSync />);
+    expect(useSimStore.getState().rulerAnchorId).toBe('earth');
+    expect(sentCommands.filter((c) => c.type === 'setRuler')).toEqual([]);
+  });
+
+  it('?ruler=nope → 무시 + console.warn + URL 키 제거', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockUrlRuler = 'nope';
+    render(<UrlSync />);
+    expect(useSimStore.getState().rulerAnchorId).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/\?ruler=nope/));
+    expect(setUrlRulerMock).toHaveBeenCalledWith(null);
+  });
+
+  it('store → URL — 기준점 설정 · 해제가 URL 키에 반영된다', () => {
+    render(<UrlSync />);
+    setUrlRulerMock.mockClear();
+    act(() => {
+      useSimStore.getState().setRulerAnchor('mars');
+    });
+    expect(setUrlRulerMock).toHaveBeenLastCalledWith('mars');
+    act(() => {
+      useSimStore.getState().setRulerAnchor(null);
+    });
+    expect(setUrlRulerMock).toHaveBeenLastCalledWith(null);
   });
 });

@@ -1028,6 +1028,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setSunCoronaVisibleHandler((visible) => solar.setSunCoronaVisible(visible));
         // #1341 PR1 — 궤적 trail (같은 wiring). 가용성 `trails` = 활성 물리 엔진이 Kepler (결정 T8 — 렌더러 게이트 없음).
         instance.setTrailsVisibleHandler((visible) => solar.setTrailsVisible(visible));
+        // #1341 PR2 — 거리 자 선 (결정 R2). 명령은 아래 store 구독 (기준점 · 선택 변경) 과 마운트 직후 1회가 보낸다.
+        instance.setRulerHandler((anchorId, targetId) => solar.setRuler(anchorId, targetId));
         // 결정 T5 — 방향 = 배속 부호 (0 = 일시정지는 scene 이 직전 부호 유지). 초기값은 store, 이후는 아래 store 구독
         // (core 의 `timeScaleChanged` 를 core-adapter 가 store 로 옮긴 값). 의도보다 먼저 넘겨 첫 동기가 올바른 방향이게 한다.
         solar.setTrailDirection(useSimStore.getState().timeScale);
@@ -1277,6 +1279,18 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             // 경로는 1차 분기가 이미 처리하므로 본 분기는 free-fly→reset 에만 한정 발화.
             syncFocusToScene(null);
           }
+          // #1341 PR2 결정 R1 · R2 — 거리 자 선 = 기준점 A ↔ 현재 선택 B. 선택 경로 5종은 전부 `selectedBodyId` 로 수렴하므로
+          // 여기 한 곳만 보면 된다 (가로채기 0). 위 포커스 동기 뒤에 보낸다 — scene 은 마지막으로 메시에 쓴 기준계로 1회 동기한다.
+          if (
+            state.rulerAnchorId !== prev.rulerAnchorId ||
+            state.selectedBodyId !== prev.selectedBodyId
+          ) {
+            instance.command({
+              type: 'setRuler',
+              anchorId: state.rulerAnchorId,
+              targetId: state.selectedBodyId,
+            });
+          }
         });
 
         // #704 — free-fly 감도 zoom / zoomoutFactor push 구독 (ADR §결정 1 축 1-A).
@@ -1319,6 +1333,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // 마운트 직후 명시적 1회 sync 로 첫 프레임부터 high LOD 진입.
         // ADR `20260425-r1-store-scene-sync-unification.md` §축 3 후보 B.
         syncFocusToScene(useSimStore.getState().selectedBodyId);
+        // #1341 PR2 — 거리 자 초기 1회 (`?ruler=` 는 UrlSync 가 마운트 시 store 에 넣는다 — 위 구독은 이후 변화만 본다).
+        {
+          const { rulerAnchorId, selectedBodyId } = useSimStore.getState();
+          instance.command({ type: 'setRuler', anchorId: rulerAnchorId, targetId: selectedBodyId });
+        }
 
         // P12-A #298 — Tier 하이브리드 트리거 자동 판정 (Q7=7-d2).
         //

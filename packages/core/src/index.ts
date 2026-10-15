@@ -46,6 +46,11 @@ export { orbitMu, positionAt, twoBodyMu } from './physics/kepler.js';
 // `kepler.ts` 와 같다. exports field 불변.
 export { ASTEROID_BELT_MAX_N } from './scene/belt-population.js';
 
+// #1341 PR2 — 위성 궤도 시각 배율 SSoT 직접 named export (거리 자의 배율 고지 — ADR `20261015-1341` 결정 R6, N 하드코딩
+// 금지). 고지는 관찰 모드 카드 (app-shell 직접 import → SSR 평가 대상) 가 쓴다 — `scene` namespace 경유는 위 #402 와 같은
+// SSR 기전에 걸린다. `orbit-visual-scale.ts` 는 import 0 (상수 표 + 순수 함수) 이라 모듈 그래프 영향 0. exports field 불변.
+export { getOrbitVisualScale } from './scene/orbit-visual-scale.js';
+
 // #845 — GpuTier / LodLevel 루트 type re-export.
 //
 // `./render` 는 package.json exports sub-path 미등재 (#402 exports 불변 가드 — 신규 sub-path

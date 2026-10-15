@@ -131,3 +131,24 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
     core.dispose();
   });
 });
+
+describe('SimulationCore setRuler command 라우팅 (#1341 PR2)', () => {
+  it('핸들러 등록 전 명령은 no-op · 등록 후 인자 그대로 전달 · 다른 토글 핸들러는 부르지 않는다', () => {
+    const core = new SimulationCore(makeCanvas());
+    expect(() =>
+      core.command({ type: 'setRuler', anchorId: 'earth', targetId: 'mars' }),
+    ).not.toThrow();
+    const ruler = vi.fn();
+    const trails = vi.fn();
+    core.setRulerHandler(ruler);
+    core.setTrailsVisibleHandler(trails);
+    core.command({ type: 'setRuler', anchorId: 'earth', targetId: 'mars' });
+    core.command({ type: 'setRuler', anchorId: null, targetId: null });
+    expect(ruler.mock.calls).toEqual([
+      ['earth', 'mars'],
+      [null, null],
+    ]);
+    expect(trails).not.toHaveBeenCalled();
+    core.dispose();
+  });
+});

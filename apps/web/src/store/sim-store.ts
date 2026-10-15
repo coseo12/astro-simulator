@@ -136,6 +136,12 @@ export interface SimStoreState {
    */
   trailsVisible: boolean;
   /**
+   * #1341 PR2 — 거리 자 기준점 A (ADR `20261015-1341` 결정 R1). `null` = 자 없음. B 는 현재 선택 (`selectedBodyId`) 이다 —
+   * 선택 경로 5종을 가로채지 않는다. 초기값은 URL `?ruler=` (`UrlSync`), 이후 카드 · 우 패널의 「기준점으로」 · 「기준점 해제」.
+   * Esc (자유시점) 는 선택만 `null` 로 만들고 기준점은 남긴다.
+   */
+  rulerAnchorId: string | null;
+  /**
    * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
    * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
    */
@@ -200,6 +206,8 @@ export interface SimStoreState {
   setCoronaVisible: (visible: boolean) => void;
   /** #1341 PR1 — 궤적 trail 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
   setTrailsVisible: (visible: boolean) => void;
+  /** #1341 PR2 — 거리 자 기준점 설정 · 해제 (`null`). */
+  setRulerAnchor: (id: string | null) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
   setBodyMenuOpen: (open: boolean) => void;
@@ -257,6 +265,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   coronaVisible: true,
   // #1341 PR1 — 기본 OFF (결정 T10). `?trails=on` 은 sim-canvas 가 mount 직후 true 로 덮어쓴다.
   trailsVisible: false,
+  rulerAnchorId: null,
   displayCapabilities: null,
   displayPanelOpen: false,
   bodyMenuOpen: false,
@@ -303,6 +312,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setCometTailsVisible: (visible) => set({ cometTailsVisible: visible }),
   setCoronaVisible: (visible) => set({ coronaVisible: visible }),
   setTrailsVisible: (visible) => set({ trailsVisible: visible }),
+  setRulerAnchor: (id) => set({ rulerAnchorId: id }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
   setBodyMenuOpen: (open) => set({ bodyMenuOpen: open }),
