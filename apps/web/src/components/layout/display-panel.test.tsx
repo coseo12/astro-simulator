@@ -30,8 +30,9 @@ const IDS = [
   'cometTails',
   'corona',
   'trails',
+  'events',
 ] as const;
-/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 → #1335 PR2 태양 코로나 → #1341 PR1 궤적 행이 추가돼 마지막이 바뀌었다). */
+/** 패널의 마지막 토글 (#1293 라벨 → #1319 PR3 카이퍼 벨트 → #1329 PR2 혜성 꼬리 → #1335 PR2 태양 코로나 → #1341 PR1 궤적 → #1347 시간 사건 행이 추가돼 마지막이 바뀌었다). */
 const LAST_ID = IDS[IDS.length - 1]!;
 
 function renderPanel() {
@@ -55,6 +56,7 @@ beforeEach(() => {
     coronaVisible: true,
     // #1341 — 기본은 꺼짐이지만 이 파일의 전제 (전 토글 ON) 에 맞춘다.
     trailsVisible: true,
+    eventsVisible: true,
     displayCapabilities: {
       starfield: true,
       surfaceDetail: true,

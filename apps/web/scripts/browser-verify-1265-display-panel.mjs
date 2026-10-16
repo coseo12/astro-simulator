@@ -706,6 +706,8 @@ const UI_URL_KEY = {
   corona: 'corona',
   // #1341 PR1 — 궤적 (10번째 행). **유일한 기본 꺼짐 행** (ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
   trails: 'trails',
+  // #1347 — 시간 사건 마커 (11번째 행). web 전용 · 기본 켜짐 (`?events=off` 옵트아웃 — ADR 20261016-1347 결정 D7).
+  events: 'events',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
 /**

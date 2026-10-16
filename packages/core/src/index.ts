@@ -51,6 +51,25 @@ export { ASTEROID_BELT_MAX_N } from './scene/belt-population.js';
 // SSR 기전에 걸린다. `orbit-visual-scale.ts` 는 import 0 (상수 표 + 순수 함수) 이라 모듈 그래프 영향 0. exports field 불변.
 export { getOrbitVisualScale } from './scene/orbit-visual-scale.js';
 
+// #1347 — 시간 이벤트 마커 (ADR `20261016-1347`) · 모체 체인 위치 직접 named export. 사건 계산은 타임바 (app-shell 직접
+// import → SSR 평가 대상) 가, 체인 위치는 정보 카드 · 거리 자 (`body-distance.ts`) 가 쓴다 — `physics` namespace 경유는 위
+// #402 와 같은 SSR 기전에 걸린다. 두 모듈은 `kepler.ts` · `time/julian-date.ts` · 로더 type import 만 가져 모듈 그래프 영향이
+// 위 `kepler.ts` 와 같다. exports field 불변.
+export {
+  EVENT_KINDS,
+  EVENT_KIND_TOLERANCE_DAYS,
+  computeEventsForKind,
+  eventDateIso,
+  getEventKind,
+} from './events/index.js';
+export type { AstroEvent, EventFilterId, EventKindDef, EventKindId } from './events/index.js';
+export { heliocentricPositionAt, resolveBodyChainPosition } from './physics/body-chain.js';
+export type {
+  BodyChainPosition,
+  ChainBody,
+  ParentRelativePositionFn,
+} from './physics/body-chain.js';
+
 // #845 — GpuTier / LodLevel 루트 type re-export.
 //
 // `./render` 는 package.json exports sub-path 미등재 (#402 exports 불변 가드 — 신규 sub-path

@@ -28,6 +28,7 @@ import { parseCometTailsParam, resolveCometTailsAtLoad } from '@/core/parse-come
 import { parseCoronaParam, resolveCoronaAtLoad } from '@/core/parse-corona-mode';
 import { parseTrailsVisible } from '@/core/parse-trails-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
+import { parseEventsVisible } from '@/core/parse-events-mode';
 import { parseLabelsVisible } from '@/core/parse-labels-mode';
 import { detectSoftwareRenderer } from '@/core/detect-software-renderer';
 // #1234 C3-B — renderer 문자열 합성 + late-arrival 판정 (CI 미도달 분기라 순수 함수 + 단위 테스트).
@@ -677,6 +678,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const labelsVisible = parseLabelsVisible(
           new URLSearchParams(window.location.search).get('labels'),
         );
+        // #1347 — 타임바 시간 이벤트 마커 기본 ON + `?events=off` 옵트아웃 (ADR 20261016-1347 결정 D7). web 전용 (타임바 DOM) 이라
+        // 라벨과 같이 아래 표시 토글 블록에서 store 에만 싣는다. 사건 계산은 가용성 (`displayCapabilities`) 이 열린 뒤에만
+        // 시작하므로 (`use-time-events.ts`), 이 값이 먼저 store 에 들어가 `off` 로드에서는 계산이 0회다 (결정 D3).
+        const eventsVisible = parseEventsVisible(
+          new URLSearchParams(window.location.search).get('events'),
+        );
         // #762 — 천체 압축 곡선 지수 p (default 0.5 sqrt). `?bodyScaleP=0.55` 로 D-T2 실시간 튜닝.
         // URL 부재 시 default p 의 getBodyScale 콜백 그대로 (모듈 로드 시 1회 산출된 BODY_SCALE).
         // ADR 20260629-762 §5 결정 2.7.
@@ -1040,6 +1047,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           store.setCloudsVisible(cloudsVisible);
           store.setNightLightsVisible(nightLightsVisible);
           store.setLabelsVisible(labelsVisible);
+          store.setEventsVisible(eventsVisible);
           store.setBeltVisible(beltMode.visible);
           store.setKuiperVisible(kuiperParamVisible);
           store.setCometTailsVisible(cometTailsMode.visible);
