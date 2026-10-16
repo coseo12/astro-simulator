@@ -275,7 +275,11 @@ describe('#1319 PR2 힐다 (목성 3:2) · 플루티노 (해왕성 2:3) — 공�
   it('평균운동 비 — 힐다 1.5 n_J · 플루티노 (2/3) n_N 정확 (double, float32 cast 전)', () => {
     for (const o of population.hilda) {
       expect(o.meanMotion).toBe(1.5 * planets.jupiter.meanMotion);
-      expect(o.meanMotion / planets.jupiter.meanMotion).toBe(1.5);
+      // 곱 `1.5 · n_J` 와 나눗셈이 각각 반올림하므로 비가 1.5 와 정확히 같다는 보장은 없다 — 2 ulp 안
+      // (#1349 — 태양 GM 교정 뒤 n_J 에서 `1.4999999999999998` 로 실측. 정확성 계약은 위 줄의 곱 동일성이다).
+      expect(Math.abs(o.meanMotion / planets.jupiter.meanMotion - 1.5)).toBeLessThanOrEqual(
+        2 * Number.EPSILON,
+      );
     }
     for (const o of population.plutino) {
       expect(o.meanMotion).toBe((2 / 3) * planets.neptune.meanMotion);
