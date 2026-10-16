@@ -237,8 +237,8 @@ const READY_TIMEOUT_MS = 20_000;
 
 /** UI 판정 기본 로드 — D15 스트레스와 같은 쿼리 (4 효과 전부 켜진 상태 · focus=earth · 관찰 모드). */
 const UI_BASE = STRESS;
-/** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` 포함. */
-const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off`;
+/** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` · #1347 `events` 포함. */
+const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off&events=off`;
 /** 계약 D1 — 모드 4종. */
 const UI_MODES = ['observe', 'research', 'education', 'sandbox'];
 /** 계약 D1 · D2 — 1280×720 (`setupPage` · `setupUiPage` 뷰포트와 같은 값). */

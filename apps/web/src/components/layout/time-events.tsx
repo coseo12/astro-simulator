@@ -99,6 +99,19 @@ function resolvePanelPosition(trigger: HTMLElement): PanelPosition {
   };
 }
 
+/**
+ * listbox 이동 키 → 다음 활성 위치. 이동 키가 아니면 `null`. ↑↓ 는 한 칸 · 양 끝에서 제자리, Home / End 는 끝.
+ * 순수 함수로 둔 이유: 「모든 사건에 키보드로 도달」 을 전 위치에 대해 싸게 단언하기 위해서다 (`time-events.test.tsx`).
+ */
+export function listboxNextIndex(key: string, current: number, length: number): number | null {
+  if (length <= 0) return null;
+  if (key === 'ArrowDown') return Math.min(length - 1, current + 1);
+  if (key === 'ArrowUp') return Math.max(0, current - 1);
+  if (key === 'Home') return 0;
+  if (key === 'End') return length - 1;
+  return null;
+}
+
 /** `YYYY-MM-DD` (UTC) — 사건 id 의 날짜부와 같다 (core `eventDateIso`). 시:분은 표시하지 않는다 (결정 D5). */
 function eventDate(event: AstroEvent): string {
   return event.id.slice(event.id.indexOf(':') + 1);
@@ -384,16 +397,13 @@ function TimeEventsPanelBody({
 
   const handleListKeyDown = (e: ReactKeyboardEvent<HTMLUListElement>) => {
     if (filtered.length === 0) return;
-    let next = activeIndex;
-    if (e.key === 'ArrowDown') next = Math.min(filtered.length - 1, activeIndex + 1);
-    else if (e.key === 'ArrowUp') next = Math.max(0, activeIndex - 1);
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = filtered.length - 1;
-    else if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (active) select(active);
       return;
-    } else return;
+    }
+    const next = listboxNextIndex(e.key, activeIndex, filtered.length);
+    if (next === null) return;
     e.preventDefault();
     setActiveId(filtered[next]!.id);
   };

@@ -10,6 +10,7 @@ import {
   EVENTS_NBODY_DISABLED_REASON,
   TimeEventTicks,
   TimeEventsButton,
+  listboxNextIndex,
 } from './time-events';
 
 /**
@@ -187,7 +188,20 @@ describe('사건 패널 — 조작 (M6)', () => {
     expect(screen.getAllByTestId('time-event-tick')).toHaveLength(221 + 183);
   });
 
-  it('목성 · 토성까지 전부 켜면 목록의 모든 사건에 키보드로 도달 (↓ 반복 · End · Home)', async () => {
+  /**
+   * 「모든 사건에 키보드로 도달」 을 귀납으로 본다 — ↓ 597회 전수 대신.
+   *
+   * 전수판은 CI 에서 `45.8` s · `20` s 타임아웃 (PR #1351 qa B2, 로컬 `4.4 ~ 4.7` s) 이었다. 키 1회마다 597행 목록을 다시
+   * 그리므로 비용이 키 수에 비례한다. 판별력은 아래 세 단언의 합으로 지킨다:
+   *   (a) 목록 길이 = 전 종류 사건 수 (필터에서 빠진 종류가 없다)
+   *   (b) Home = 첫 항목 · End = 마지막 항목, 양 끝에서 더 누르면 제자리 (clamp)
+   *   (c) ↓ 한 번 = 정확히 다음 항목 · ↑ 한 번 = 정확히 이전 항목 — 앞 구간 · 가운데 · 뒤 구간 표본에서. 앞 구간 (1900~)
+   *       은 네 종류가 섞여 종류 경계 (인접 항목의 종류가 다름) 를 여러 번 지난다.
+   * (d) 키 → 위치 규칙 자체 (`listboxNextIndex`) 는 597 전 위치에서 ↓↑ 를 단언한다 (아래 별도 테스트 — 렌더 없이 싸다).
+   * (d) 가 규칙이 위치와 무관함을, (c) 가 컴포넌트가 그 규칙을 그대로 쓰는지 (종류 경계 포함) 를 보므로 Home 에서 ↓ 를 반복하면
+   * 모든 항목에 닿는다. 실브라우저 M6 은 ↓ 596회 전수 도달을 따로 확인했다.
+   */
+  it('목성 · 토성까지 전부 켜면 목록의 모든 사건에 키보드로 도달 (길이 · Home/End · ↓↑ 한 칸 규칙)', async () => {
     useSimStore.setState({
       eventFilters: {
         'mars-opposition': true,
@@ -203,23 +217,70 @@ describe('사건 패널 — 조작 (M6)', () => {
     fireEvent.click(trigger());
     const list = screen.getByTestId('time-events-list');
     const options = screen.getAllByTestId('time-event-option');
+    // (a)
     expect(options).toHaveLength(94 + 125 + 183 + 193 + 2);
-    const visited = new Set<string>();
-    const activeOptionId = () => list.getAttribute('aria-activedescendant');
-    visited.add(activeOptionId()!);
-    for (let i = 0; i < options.length; i += 1) {
-      fireEvent.keyDown(list, { key: 'ArrowDown' });
-      visited.add(activeOptionId()!);
+    const activeIndex = () =>
+      options.findIndex((o) => o.id === list.getAttribute('aria-activedescendant'));
+    const press = (key: string) => fireEvent.keyDown(list, { key });
+    const SAMPLE_STEPS = 12;
+
+    // (b) 양 끝 + clamp
+    press('Home');
+    expect(activeIndex()).toBe(0);
+    press('ArrowUp');
+    expect(activeIndex()).toBe(0);
+    press('End');
+    expect(activeIndex()).toBe(options.length - 1);
+    press('ArrowDown');
+    expect(activeIndex()).toBe(options.length - 1);
+
+    // (c) 한 칸 규칙 — 앞 구간 (종류 경계 다수)
+    press('Home');
+    const kinds = new Set<string>();
+    for (let i = 1; i <= SAMPLE_STEPS; i += 1) {
+      press('ArrowDown');
+      expect(activeIndex()).toBe(i);
+      kinds.add(options[i]!.dataset.eventId!.split(':')[0]!);
     }
-    expect(visited.size).toBe(options.length);
-    fireEvent.keyDown(list, { key: 'Home' });
-    expect(activeOptionId()).toBe(options[0]!.id);
-    fireEvent.keyDown(list, { key: 'End' });
-    expect(activeOptionId()).toBe(options.at(-1)!.id);
-    // 597회 키 입력 — 로컬 실측 `4.36 ~ 4.67` s (3회). 기본 5 s 와 여유가 없어 20 s 로 둔다 (CI 러너가 로컬보다 느리다).
-    // 종전 `~11.7` s 는 jsdom 탓이 아니라 mock 의 `useSimCommand` 가 렌더마다 새 함수라 `memo` 행 전부가 다시 그려졌기
-    // 때문이었다 (위 `sendCommandMock` 주석). 실브라우저 M6 이 같은 도달을 다시 본다.
+    expect(kinds.size).toBeGreaterThanOrEqual(3); // 표본이 실제로 종류 경계를 지났다
+    // 가운데 — 클릭으로 활성 항목을 옮긴 뒤 ↓ · ↑
+    const mid = Math.floor(options.length / 2);
+    fireEvent.click(options[mid]!);
+    expect(activeIndex()).toBe(mid);
+    for (let i = 1; i <= SAMPLE_STEPS; i += 1) {
+      press('ArrowDown');
+      expect(activeIndex()).toBe(mid + i);
+    }
+    for (let i = SAMPLE_STEPS - 1; i >= 0; i -= 1) {
+      press('ArrowUp');
+      expect(activeIndex()).toBe(mid + i);
+    }
+    // 뒤 구간 — End 에서 ↑
+    press('End');
+    for (let i = 1; i <= SAMPLE_STEPS; i += 1) {
+      press('ArrowUp');
+      expect(activeIndex()).toBe(options.length - 1 - i);
+    }
+    // 로컬 실측 `0.57 ~ 0.60` s (3회). 직전 CI 는 로컬의 약 10배 (전수판 로컬 `4.4 ~ 4.7` s ↔ CI `45.8` s) 라 기본 5 s 를
+    // 넘을 수 있어 20 s 로 둔다.
   }, 20_000);
+
+  it('(d) listboxNextIndex — 전 위치 (597) 에서 ↓ 는 다음 · ↑ 는 이전 · 양 끝 제자리 · Home/End · 그 외 키 null', () => {
+    const n = 94 + 125 + 183 + 193 + 2;
+    for (let i = 0; i < n; i += 1) {
+      expect(listboxNextIndex('ArrowDown', i, n)).toBe(Math.min(n - 1, i + 1));
+      expect(listboxNextIndex('ArrowUp', i, n)).toBe(Math.max(0, i - 1));
+      expect(listboxNextIndex('Home', i, n)).toBe(0);
+      expect(listboxNextIndex('End', i, n)).toBe(n - 1);
+      expect(listboxNextIndex('a', i, n)).toBeNull();
+    }
+    // Home 에서 ↓ 를 반복하면 전 항목을 한 번씩 지나 끝에 닿는다.
+    const seen = new Set<number>([0]);
+    for (let i = 0, cur = 0; i < n; i += 1)
+      seen.add((cur = listboxNextIndex('ArrowDown', cur, n)!));
+    expect(seen.size).toBe(n);
+    expect(listboxNextIndex('ArrowDown', 0, 0)).toBeNull();
+  });
 
   it('Esc — 패널 닫고 트리거로 포커스 · 기본 동작 차단 (자유시점 Esc 와 충돌 0)', async () => {
     renderEvents();
