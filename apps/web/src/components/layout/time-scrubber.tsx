@@ -4,6 +4,7 @@ import * as Slider from '@radix-ui/react-slider';
 import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
 import { useSimCommand } from '@/core/sim-context';
 import { useSimStore } from '@/store/sim-store';
+import { TimeEventTicks, TimeEventsButton } from './time-events';
 import {
   SCRUBBER_MAX_YEAR,
   SCRUBBER_MIN_JD,
@@ -15,6 +16,7 @@ import {
   quantizeYearValue,
   steppedYearValue,
   yearValueToJulianDate,
+  yearValueToTrackPercent,
 } from '@/lib/time-scrubber';
 
 /** 시각이 아직 없을 때(엔진 초기화 전) 썸 자리 — 기본 시작 시각 J2000 의 연도. */
@@ -41,11 +43,6 @@ const KEY_DIRECTION: Readonly<Record<string, 1 | -1>> = {
 function outOfRangeValueText(belowMin: boolean): string {
   const edge = belowMin ? `${SCRUBBER_MIN_YEAR}년 이전` : `${SCRUBBER_MAX_YEAR}년 이후`;
   return `${edge} — ${OUT_OF_RANGE_BADGE_TEXT}`;
-}
-
-/** 연도 값 → 트랙 위 위치(%) — 눈금 배치용. */
-function yearToPercent(year: number): number {
-  return ((year - SCRUBBER_MIN_YEAR) / (SCRUBBER_MAX_YEAR - SCRUBBER_MIN_YEAR)) * 100;
 }
 
 /**
@@ -169,10 +166,12 @@ export function TimeScrubber() {
                 className={`absolute top-1/2 w-px -translate-x-1/2 -translate-y-1/2 bg-fg-tertiary ${
                   year === EMPHASIZED_TICK_YEAR ? 'h-3' : 'h-2'
                 }`}
-                style={{ left: `${yearToPercent(year)}%` }}
+                style={{ left: `${yearValueToTrackPercent(year)}%` }}
               />
             ))}
           </span>
+          {/* #1347 — 시간 사건 눈금 (비대화형). 꺼짐 · N-body 면 그리지 않는다. */}
+          <TimeEventTicks />
         </Slider.Track>
         <Slider.Thumb
           data-testid="time-scrubber-thumb"
@@ -186,6 +185,8 @@ export function TimeScrubber() {
       <span className="num text-caption text-fg-secondary shrink-0" aria-hidden="true">
         {SCRUBBER_MAX_YEAR}
       </span>
+      {/* #1347 — 사건 패널 버튼 (스크러버 행 오른쪽 끝 — 사용자 결정 Q-U2 (a)). 꺼짐이면 그리지 않는다. */}
+      <TimeEventsButton />
     </div>
   );
 }

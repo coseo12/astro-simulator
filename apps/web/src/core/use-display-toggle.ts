@@ -16,7 +16,9 @@ import { getDisplayToggle, serializeDisplayToggle, type DisplayToggleId } from '
 import { useSimCommand } from './sim-context';
 
 /**
- * 쓰기 대상 URL 키 10종 (#1319 PR3 — `belt` · `kuiper`, #1329 PR2 — `comettails`, #1335 PR2 — `corona`, #1341 PR1 — `trails`). 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
+ * 쓰기 대상 URL 키 11종 (#1319 PR3 — `belt` · `kuiper`, #1329 PR2 — `comettails`, #1335 PR2 — `corona`, #1341 PR1 — `trails`, #1347 — `events`).
+ * ⚠️ 표시 토글 표 (`display-toggles.ts`) 에 행을 더하면 여기에도 키를 더해야 한다 — 이 맵에 없는 키는 nuqs 가 조용히 무시해
+ * 토글해도 URL 이 바뀌지 않는다 (#1347 qa B1). 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
  * 새 URL 읽기 0). 파서는 nuqs 가 키를 다루는 데 필요한 형식일 뿐이다.
  */
 const DISPLAY_URL_KEYS = {
@@ -31,6 +33,8 @@ const DISPLAY_URL_KEYS = {
   corona: parseAsString,
   // #1341 PR1 — 기본 꺼짐 행 (`on` 옵트인).
   trails: parseAsString,
+  // #1347 — 시간 사건 마커 (web 전용 · 기본 켜짐 행 — `off` 옵트아웃).
+  events: parseAsString,
 };
 
 export function useDisplayToggle(): (id: DisplayToggleId) => void {

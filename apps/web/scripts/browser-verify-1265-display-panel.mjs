@@ -237,8 +237,8 @@ const READY_TIMEOUT_MS = 20_000;
 
 /** UI 판정 기본 로드 — D15 스트레스와 같은 쿼리 (4 효과 전부 켜진 상태 · focus=earth · 관찰 모드). */
 const UI_BASE = STRESS;
-/** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` 포함. */
-const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off`;
+/** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` · #1347 `events` 포함. */
+const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off&events=off`;
 /** 계약 D1 — 모드 4종. */
 const UI_MODES = ['observe', 'research', 'education', 'sandbox'];
 /** 계약 D1 · D2 — 1280×720 (`setupPage` · `setupUiPage` 뷰포트와 같은 값). */
@@ -706,6 +706,8 @@ const UI_URL_KEY = {
   corona: 'corona',
   // #1341 PR1 — 궤적 (10번째 행). **유일한 기본 꺼짐 행** (ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
   trails: 'trails',
+  // #1347 — 시간 사건 마커 (11번째 행). web 전용 · 기본 켜짐 (`?events=off` 옵트아웃 — ADR 20261016-1347 결정 D7).
+  events: 'events',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
 /**

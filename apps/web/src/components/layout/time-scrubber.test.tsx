@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { J2000_JD, type CoreCommand } from '@astro-simulator/shared';
 import { time as timeApi } from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
 import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
+import { getTimeEventsSnapshot, requestTimeEvents } from '@/lib/time-events';
 import { OUT_OF_RANGE_BADGE_TEXT, TimeScrubber } from './time-scrubber';
 
 let sentCommands: CoreCommand[] = [];
@@ -37,9 +38,34 @@ function setStoreJd(julianDate: number | null): void {
   });
 }
 
+/**
+ * #1347 DoD M6 — 사건 눈금이 **있는** 상태에서 이 파일 전건이 통과해야 한다 (드래그 · 키보드 계약 무변경). 사건을 미리 다 계산해
+ * 두고 (모듈 메모) 장면 준비 · 표시 의도를 켜 둔다 — 그러지 않으면 눈금이 없어 이 전제가 공허하게 참이 된다.
+ */
+beforeAll(async () => {
+  requestTimeEvents();
+  for (let i = 0; i < 50 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  if (getTimeEventsSnapshot().status !== 'ready') throw new Error('[M6] 사건 계산이 끝나지 않았다');
+});
+
 beforeEach(() => {
   sentCommands = [];
-  useSimStore.setState({ julianDate: J2000_JD, timeScale: 86_400 });
+  useSimStore.setState({
+    julianDate: J2000_JD,
+    timeScale: 86_400,
+    eventsVisible: true,
+    physicsEngine: 'kepler',
+    displayCapabilities: {
+      starfield: true,
+      surfaceDetail: true,
+      belt: true,
+      cometTails: true,
+      corona: true,
+      trails: true,
+    },
+  });
   // Radix 슬라이더는 포인터 캡처와 요소 크기에 의존한다 — jsdom 미구현분만 채운다.
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
     x: 0,
@@ -63,6 +89,13 @@ afterEach(() => {
 });
 
 describe('#1288 TimeScrubber', () => {
+  it('#1347 M6 전제 — 사건 눈금 (비대화형) 과 패널 버튼이 있다', () => {
+    render(<TimeScrubber />);
+    expect(screen.getAllByTestId('time-event-tick').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('time-event-ticks')).toHaveClass('pointer-events-none');
+    expect(screen.getByTestId('time-events-toggle')).toBeInTheDocument();
+  });
+
   it('D7 — 썸이 시뮬레이션 시각을 따른다 (양자화 0.25년)', () => {
     render(<TimeScrubber />);
     expect(thumb()).toHaveAttribute('aria-valuenow', '2000');

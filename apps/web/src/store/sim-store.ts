@@ -1,7 +1,8 @@
-import type { physics } from '@astro-simulator/core';
+import type { EventFilterId, physics } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
 import type { DisplayCapabilities } from '@/core/display-toggles';
+import { EVENT_FILTER_DEFAULTS } from '@/lib/event-filters';
 import {
   FREE_FLY_SENSITIVITY_DEFAULT,
   savePersistedSensitivity,
@@ -136,6 +137,16 @@ export interface SimStoreState {
    */
   trailsVisible: boolean;
   /**
+   * #1347 — 타임바 시간 이벤트 마커 표시 의도 (기본 true — ADR `20261016-1347` 결정 D7, `?events=off` 옵트아웃). web 전용 토글
+   * (`display-toggles.ts` 의 `command: null` 행). 꺼져 있으면 사건 계산도 하지 않는다 (결정 D3).
+   */
+  eventsVisible: boolean;
+  /**
+   * #1347 — 사건 패널 종류 필터 (결정 D7 — 화성 충 · 금성 내합 · 혜성 근일점 켜짐, 목성 · 토성 충 꺼짐). URL 에 넣지 않는다.
+   * 눈금 (스크러버 트랙) 과 패널 목록이 같은 필터를 쓴다.
+   */
+  eventFilters: Readonly<Record<EventFilterId, boolean>>;
+  /**
    * #1341 PR2 — 거리 자 기준점 A (ADR `20261015-1341` 결정 R1). `null` = 자 없음. B 는 현재 선택 (`selectedBodyId`) 이다 —
    * 선택 경로 5종을 가로채지 않는다. 초기값은 URL `?ruler=` (`UrlSync`), 이후 카드 · 우 패널의 「기준점으로」 · 「기준점 해제」.
    * Esc (자유시점) 는 선택만 `null` 로 만들고 기준점은 남긴다.
@@ -206,6 +217,10 @@ export interface SimStoreState {
   setCoronaVisible: (visible: boolean) => void;
   /** #1341 PR1 — 궤적 trail 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
   setTrailsVisible: (visible: boolean) => void;
+  /** #1347 — 시간 이벤트 마커 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
+  setEventsVisible: (visible: boolean) => void;
+  /** #1347 — 사건 종류 필터 한 칸 설정. */
+  setEventFilter: (id: EventFilterId, enabled: boolean) => void;
   /** #1341 PR2 — 거리 자 기준점 설정 · 해제 (`null`). */
   setRulerAnchor: (id: string | null) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
@@ -265,6 +280,9 @@ export const useSimStore = create<SimStoreState>((set) => ({
   coronaVisible: true,
   // #1341 PR1 — 기본 OFF (결정 T10). `?trails=on` 은 sim-canvas 가 mount 직후 true 로 덮어쓴다.
   trailsVisible: false,
+  // #1347 — 기본 ON (결정 D7). `?events=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  eventsVisible: true,
+  eventFilters: { ...EVENT_FILTER_DEFAULTS },
   rulerAnchorId: null,
   displayCapabilities: null,
   displayPanelOpen: false,
@@ -312,6 +330,13 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setCometTailsVisible: (visible) => set({ cometTailsVisible: visible }),
   setCoronaVisible: (visible) => set({ coronaVisible: visible }),
   setTrailsVisible: (visible) => set({ trailsVisible: visible }),
+  setEventsVisible: (visible) => set({ eventsVisible: visible }),
+  setEventFilter: (id, enabled) =>
+    set((state) =>
+      state.eventFilters[id] === enabled
+        ? state
+        : { eventFilters: { ...state.eventFilters, [id]: enabled } },
+    ),
   setRulerAnchor: (id) => set({ rulerAnchorId: id }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
