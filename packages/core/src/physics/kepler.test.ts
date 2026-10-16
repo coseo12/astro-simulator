@@ -3,6 +3,7 @@ import {
   GRAVITATIONAL_CONSTANT,
   J2000_JD,
   JULIAN_YEAR_SECONDS,
+  SOLAR_GM,
   SOLAR_MASS,
 } from '@astro-simulator/shared';
 import { describe, expect, it } from 'vitest';
@@ -164,7 +165,7 @@ describe('#1305 orbitMu — 위성 장면 공전 μ = G(M_parent + m) (D4)', () 
     }
   });
 
-  it('태양 직속 body 는 G·M_sun 유지 (#1305 범위 밖 — 행성 위치 불변)', () => {
+  it('태양 직속 body 는 G·M_sun (#1305 범위 밖 — 2체 G(M+m) 아님. 값 교정은 #1349)', () => {
     const sun = byId.get('sun')!;
     for (const b of bodies.filter((x) => x.parentId === 'sun')) {
       expect(orbitMu(b, sun), b.id).toBe(GRAVITATIONAL_CONSTANT * sun.mass);
@@ -201,6 +202,70 @@ describe('#1305 orbitMu — 위성 장면 공전 μ = G(M_parent + m) (D4)', () 
       const p1 = positionAt(b.orbit!, jd0 + periodDays, mu);
       const drift = length([p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]]);
       expect(drift / b.orbit!.semiMajorAxis, b.id).toBeLessThan(1e-6);
+    }
+  });
+});
+
+describe('#1349 태양 직속 μ = IAU GM — 장면 행성 위상', () => {
+  const bodies = getSolarSystem().bodies;
+  const byId = new Map(bodies.map((b) => [b.id, b]));
+  const sun = byId.get('sun')!;
+  /** 이슈 #1349 완료 기준 — 장면 μ 와 IAU GM 상대오차. */
+  const MU_REL_TOLERANCE = 1e-9;
+  /** 이슈 #1349 완료 기준 — 일심 황경 오차 (deg). */
+  const LONGITUDE_TOLERANCE_DEG = 0.2;
+  /**
+   * JPL Horizons 일심 위치 (AU, Ecliptic of J2000.0, center `500@10`, TDB, VECTORS, DE441) — 2026-10-16 조회.
+   * EMB = `COMMAND='3'`, 화성 = `COMMAND='499'`. 네트워크 조회 없이 fixture 로 고정한다.
+   */
+  const HORIZONS = [
+    {
+      id: 'earth',
+      label: '2026-10-16',
+      jd: 2461329.5,
+      xy: [0.9226538805090628, 0.3779370942019316],
+    },
+    {
+      id: 'mars',
+      label: '2026-10-16',
+      jd: 2461329.5,
+      xy: [-0.07451650775942574, 1.574170253863151],
+    },
+    {
+      id: 'earth',
+      label: '1900-01-01',
+      jd: 2415020.5,
+      xy: [-0.1968855472576664, 0.9633225046945481],
+    },
+    {
+      id: 'earth',
+      label: '2100-01-01',
+      jd: 2488069.5,
+      xy: [-0.1574347093273749, 0.9706900209623327],
+    },
+  ] as const;
+  const RAD_TO_DEG = 180 / Math.PI;
+  const wrapDeg = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
+
+  it('데이터 sun mass == SOLAR_MASS (= SOLAR_GM / G) — 숨은 상수 drift 차단', () => {
+    expect(sun.mass).toBe(SOLAR_MASS);
+  });
+
+  it('태양 직속 body 전부: |orbitMu / SOLAR_GM − 1| ≤ 1e-9', () => {
+    const direct = bodies.filter((b) => b.parentId === 'sun');
+    expect(direct.length).toBeGreaterThanOrEqual(8); // 공허 통과 방지
+    for (const b of direct) {
+      expect(Math.abs(orbitMu(b, sun) / SOLAR_GM - 1), b.id).toBeLessThanOrEqual(MU_REL_TOLERANCE);
+    }
+  });
+
+  it('Horizons 대비 일심 황경 |오차| ≤ 0.2° — 2026-10-16 지구·화성, 1900 · 2100 지구', () => {
+    // 교정 전 (G × 1.98892e30) 은 지구 +1.189° · 화성 +0.506° · 1900 −4.587° · 2100 +4.584° 로 전건 FAIL.
+    for (const h of HORIZONS) {
+      const body = byId.get(h.id)!;
+      const p = positionAt(body.orbit!, h.jd, orbitMu(body, sun));
+      const errDeg = wrapDeg((Math.atan2(p[1], p[0]) - Math.atan2(h.xy[1], h.xy[0])) * RAD_TO_DEG);
+      expect(Math.abs(errDeg), `${h.id} ${h.label}`).toBeLessThanOrEqual(LONGITUDE_TOLERANCE_DEG);
     }
   });
 });

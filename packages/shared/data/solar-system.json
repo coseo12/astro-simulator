@@ -9,14 +9,14 @@
       "kind": "star",
       "nameKo": "태양",
       "nameEn": "Sun",
-      "mass": 1.98892e30,
+      "mass": 1.988409870698051e30,
       "radius": 6.957e8,
       "parentId": null,
       "introducedInRPhase": 1,
       "showInShortcutBar": true,
       "colorHint": { "hex": "#FFE9A8", "temperatureK": 5778, "colorSource": "artistic" },
-      "dataSource": "IAU 2015 Resolution B3 §1",
-      "lastVerified": "2026-04-21"
+      "dataSource": "IAU 2015 Resolution B3 (GM)☉N ÷ G",
+      "lastVerified": "2026-10-16"
     },
     {
       "id": "mercury",
