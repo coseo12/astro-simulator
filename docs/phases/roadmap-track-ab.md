@@ -1,7 +1,7 @@
 # 로드맵 트랙 A/B — v3 완주 이후 작업 축
 
-> **Status**: Active — 트랙 D 궤적 trail · 거리 측정 완료 (v0.99.0) · 태양 코로나 완료 (v0.98.0) · 혜성 꼬리 · 코마 완료 (v0.97.0) · 소행성대 대표 천체 · 띠 입자 (주 띠 · 힐다 · 트로이 · 카이퍼) 완료 (v0.96.0) · 명왕성 위성 카론 완료 (v0.95.0) · 트랙 B 천체 검색 · 3D 이름 라벨 완료 (v0.94.0) · 시간 UX (「지금」 · 스크러버) 완료 (v0.93.0) · 트랙 B 관찰 모드 정보 카드 · 천체 메뉴 완료 (v0.92.0) · 트랙 A 천왕성 · 해왕성 표면 완료 (v0.91.0) · 트랙 B 2라운드 완료 (v0.90.0) / 트랙 A 후보 백로그 잔여 / 트랙 C·D 방향 결정 대기
-> **최종 갱신**: 2026-10-16 (v0.99.0 릴리스 준비 — [#1341](https://github.com/coseo12/astro-simulator/issues/1341) §완료 추가 · §후보 「측정 도구 · 궤적 trail」 행 제거 · 트랙 D 상태 갱신)
+> **Status**: Active — 트랙 D 시간 이벤트 마커 완료 (v0.100.0) · 트랙 D 궤적 trail · 거리 측정 완료 (v0.99.0) · 태양 코로나 완료 (v0.98.0) · 혜성 꼬리 · 코마 완료 (v0.97.0) · 소행성대 대표 천체 · 띠 입자 (주 띠 · 힐다 · 트로이 · 카이퍼) 완료 (v0.96.0) · 명왕성 위성 카론 완료 (v0.95.0) · 트랙 B 천체 검색 · 3D 이름 라벨 완료 (v0.94.0) · 시간 UX (「지금」 · 스크러버) 완료 (v0.93.0) · 트랙 B 관찰 모드 정보 카드 · 천체 메뉴 완료 (v0.92.0) · 트랙 A 천왕성 · 해왕성 표면 완료 (v0.91.0) · 트랙 B 2라운드 완료 (v0.90.0) / 트랙 A 후보 백로그 잔여 / 트랙 C·D 방향 결정 대기
+> **최종 갱신**: 2026-10-16 (v0.100.0 릴리스 준비 — [#1347](https://github.com/coseo12/astro-simulator/issues/1347) · [#1349](https://github.com/coseo12/astro-simulator/issues/1349) §완료 추가 · §후보 「시간 스크러버 + 이벤트 마커」 행 제거)
 > **박제일**: 2026-07-06 ([#794](https://github.com/coseo12/astro-simulator/issues/794) — 2026-07-04 프로젝트 회고 후속)
 > **선행 로드맵**: [`roadmap-v3-incremental.md`](roadmap-v3-incremental.md) — **완주** (2026-06-12, R10b [#664](https://github.com/coseo12/astro-simulator/issues/664) / PR [#670](https://github.com/coseo12/astro-simulator/pull/670), 전 27 body 시각화)
 > **출처**: 방향성 기획 (2026-06-22, 세션 단위 — 저장소 문서 부재). 본 문서가 그 기획의 **저장소 SSoT 승격본**이다.
@@ -12,13 +12,13 @@
 
 v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 완성, 경험 레이어 미착수"** — 배경 단색 / 표면 텍스처 0 / 오디오 0 (grep 실측). "감상/탐험형" 정체성인데 도표형에 머묾. 이에 5 트랙을 도출했다:
 
-| 트랙  | 테마                                  | 상태                                                                                                 |
-| ----- | ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **A** | 몰입 (별 배경 / 표면 디테일 / 사운드) | **진행 중** (본 문서 §완료/§후보)                                                                    |
-| **B** | 온보딩 (discoverability, no-regret)   | 1라운드 (#737, #740+#749) · **2라운드 (#1265, v0.90.0)** 완료                                        |
-| C     | 교육 깊이                             | 미착수 — 후보만 박제 (§후보, 방향 결정 대기)                                                         |
-| D     | 관측 실용                             | **첫 착수** — 궤적 trail · 거리 측정 (#1341, v0.99.0, 사용자 선택 2026-10-15). 나머지 D 후보는 §후보 |
-| E     | 폴리시                                | 미착수                                                                                               |
+| 트랙  | 테마                                  | 상태                                                                                                           |
+| ----- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **A** | 몰입 (별 배경 / 표면 디테일 / 사운드) | **진행 중** (본 문서 §완료/§후보)                                                                              |
+| **B** | 온보딩 (discoverability, no-regret)   | 1라운드 (#737, #740+#749) · **2라운드 (#1265, v0.90.0)** 완료                                                  |
+| C     | 교육 깊이                             | 미착수 — 후보만 박제 (§후보, 방향 결정 대기)                                                                   |
+| D     | 관측 실용                             | **진행** — 궤적 trail · 거리 측정 (#1341, v0.99.0) · 시간 이벤트 마커 (#1347, v0.100.0). 나머지 D 후보는 §후보 |
+| E     | 폴리시                                | 미착수                                                                                                         |
 
 추천 시퀀스 = **B (no-regret) → A → 방향 결정 후 C/D**. 실제 진행도 이 순서를 따랐다 (#737 온보딩 → 트랙 A 연속 라운드).
 
@@ -54,6 +54,8 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | [#1329](https://github.com/coseo12/astro-simulator/issues/1329)                                                             | A      | 혜성 꼬리 · 코마 — 이온 + 먼지 리본 · 활동도 a(r) · 근접 보정 + 표시 토글 (PR #1331 · #1332)                                                                    | v0.97.0           |
 | [#1335](https://github.com/coseo12/astro-simulator/issues/1335)                                                             | A      | 태양 코로나 — 시선 정렬 고리 셰이더 · 스트리머 + 적도 집중 · 각도 상한 페이드 + 표시 토글 (PR #1337 · #1338)                                                    | v0.98.0           |
 | [#1341](https://github.com/coseo12/astro-simulator/issues/1341)                                                             | D      | 궤적 trail (무상태 Kepler 샘플 · 기본 꺼짐 `?trails=on`) + 두 천체 거리 측정 (기준점 + 현재 선택 · `?ruler=`) (PR #1343 · #1344)                                | v0.99.0           |
+| [#1349](https://github.com/coseo12/astro-simulator/issues/1349)                                                             | A 연계 | 태양 중력 파라미터 IAU GM 교정 — 행성 위상 누적 오차 해소 (현재 지구 황경 +1.19° → −0.06°) · #1347 선행 (PR #1350)                                              | v0.100.0          |
+| [#1347](https://github.com/coseo12/astro-simulator/issues/1347)                                                             | D      | 타임바 시간 이벤트 마커 — 화성 · 목성 · 토성 충 · 금성 내합 · 혜성 근일점 2 · 사건 패널 · 충/내합 선택 시 거리 자 자동 (PR #1351)                               | v0.100.0          |
 
 > 사이 릴리스 v0.39.0 (#766) / v0.41.0·v0.45.0 (#779) / v0.46.0 (#759) 은 infra (Z-패턴 allowlist / CI alert fatigue / shader-pixel-guard) — 트랙 밖.
 
@@ -65,7 +67,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ## 진행 중
 
-없음 — #1341 은 v0.99.0 으로 §완료 에 올렸다 (v0.99.0 릴리스 준비 PR 에서 버전 확정과 함께). #1341 도 착수~머지 구간에 §진행 중 을 거치지 않았다. 직전 #1335 는 v0.98.0 으로 §완료 이동했다.
+없음 — #1347 · #1349 는 v0.100.0 으로 §완료 에 올렸다 (v0.100.0 릴리스 준비 PR 에서 버전 확정과 함께). 둘 다 착수~머지 구간에 §진행 중 을 거치지 않았다. 직전 #1341 은 v0.99.0 으로 §완료 이동했다.
 
 ---
 
@@ -82,9 +84,8 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 | 달 위상 / 일식·월식 그림자                                           | A·C  | [ADR 20260520-r4](../decisions/20260520-r4-earth-moon-visualization.md) §비-범위 — 「후속 별도 이슈」                                                               | 그림자 처리 `0`. 셰이더·픽셀 가드 전반 영향                                                                                                |
 | 교육 모드 활성화 — 가이드 투어 · 설명 바                             | C    | [`ui-architecture.md`](ui-architecture.md) §3.3 교육 모드 · `apps/web/src/components/layout/mode-switcher.tsx` 의 `education` 모드 (`enabled: false`, 「P2+ 예정」) | 카메라 제어권 설계 선행 (free-fly 상태기계 — #1113 재평가와 연결)                                                                          |
 | 별자리 선 / 이름 라벨                                                | C    | [ADR 20260624-738](../decisions/20260624-738-procedural-starfield.md) §후속 분리 후보 — 「교육 트랙」                                                               | 현재 별은 절차 배치라 실측 카탈로그(같은 절) 선행                                                                                          |
-| 시간 스크러버 + 이벤트 마커 (근일점·합·식)                           | D    | [`ui-architecture.md`](ui-architecture.md) §3.2 연구 모드 TimeBar · `time-controls.tsx` 헤더 주석 「로그 스크러버는 추후 확장」                                     | 이벤트 계산(식·합) 은 신규 도메인 로직                                                                                                     |
 
-> 제거된 행 (v0.99.0): **측정 도구 · 궤적 trail** → [#1341](https://github.com/coseo12/astro-simulator/issues/1341) (v0.99.0). 축소된 행: **코로나 / 플레어** → 정적 코로나는 [#1335](https://github.com/coseo12/astro-simulator/issues/1335) (v0.98.0) 로 §완료, 행은 「플레어 · 홍염 (시간 변동)」 잔여로 남았다. 제거된 행: **혜성 꼬리 / 코마** → [#1329](https://github.com/coseo12/astro-simulator/issues/1329) (v0.97.0) / **천체 검색 + 3D 이름 라벨** → [#1293](https://github.com/coseo12/astro-simulator/issues/1293) (v0.94.0) / **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → [#1265](https://github.com/coseo12/astro-simulator/issues/1265) (v0.90.0) — 위 §완료. 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
+> 제거된 행 (v0.100.0): **시간 스크러버 + 이벤트 마커** → [#1347](https://github.com/coseo12/astro-simulator/issues/1347) (v0.100.0). 일 · 월식 마커는 현재 달 궤도 모델 (승교점 고정) 로 날짜를 맞출 수 없어 제외했다 (ADR 20261016-1347 §1-B) — 「달 위상 / 일식·월식 그림자」 행과 함께 다룬다. 제거된 행 (v0.99.0): **측정 도구 · 궤적 trail** → [#1341](https://github.com/coseo12/astro-simulator/issues/1341) (v0.99.0). 축소된 행: **코로나 / 플레어** → 정적 코로나는 [#1335](https://github.com/coseo12/astro-simulator/issues/1335) (v0.98.0) 로 §완료, 행은 「플레어 · 홍염 (시간 변동)」 잔여로 남았다. 제거된 행: **혜성 꼬리 / 코마** → [#1329](https://github.com/coseo12/astro-simulator/issues/1329) (v0.97.0) / **천체 검색 + 3D 이름 라벨** → [#1293](https://github.com/coseo12/astro-simulator/issues/1293) (v0.94.0) / **야간 도시 불빛** → [#1226](https://github.com/coseo12/astro-simulator/issues/1226) (v0.89.0) / **바다 깊이색** → [#1197](https://github.com/coseo12/astro-simulator/issues/1197) (v0.86.0) / **대기 fresnel rim** → [#1202](https://github.com/coseo12/astro-simulator/issues/1202) (v0.87.0) / **구름 레이어** → [#1215](https://github.com/coseo12/astro-simulator/issues/1215) (v0.88.0) — 전부 위 §완료 표로 이동했다. **런타임 표시 토글 패널** → [#1265](https://github.com/coseo12/astro-simulator/issues/1265) (v0.90.0) — 위 §완료. 같은 낱말이 §완료 에 남아 있는 것은 정상이다.
 
 > ⚠️ **부기 (2026-10-02, [#1274](https://github.com/coseo12/astro-simulator/issues/1274))**: 첫 행 「지구 밖 천체 표면 확장」 의 리스크 칸 「대기 없는 body 가 rim·불빛을 상속한다」 는 상속 범위를 잘못 적었다. 어떤 body 를 `SurfaceType.Rocky` 로 재분류하면 **biome 육지색 · 극관 · 바다 깊이 감쇠 · fbm 대륙 · rim 은 무조건** 상속되고, **불빛은 조건부**다 — 게이트가 `uMaskEnabled` 를 곱하므로 `SURFACE_MASK_BY_BODY` 등록 + 마스크 로드 완료 + 투영 disk `≥ SURFACE_MASK_MIN_DISK_PX` (`16`) 일 때만 켜진다 (코드 경로 판독 — [ADR 20260628-756 §A12.3](../decisions/20260628-756-procedural-planet-surface.md)). 원문은 소급 수정하지 않는다. 착수 범위: #1274 는 ice giant (uranus · neptune) 만 — Rocky 재분류 · Cratered 확장은 이 행에 잔류한다.
 

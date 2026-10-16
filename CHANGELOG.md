@@ -5,9 +5,11 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.100.0] - 2026-10-16
+
 ### Added
 
-- **[#1347] 타임바 시간 이벤트 마커** ([#1347](https://github.com/coseo12/astro-simulator/issues/1347)). 스크러버 (1900~2100) 트랙에 화성 충 · 금성 내합 · 목성 충 · 토성 충 · 혜성 근일점 (핼리 1986 · 스위프트-터틀 1992) 눈금이 보이고, 스크러버 행 오른쪽 끝 버튼이 「시간 사건」 패널을 연다 (종류 필터 · 이전/다음 사건 · 목록 · 종류별 오차 배지 · 일 · 월식 미포함 안내). 사건을 고르면 그 시각으로 가서 주체 천체에 포커스하고 일시정지하며, 충 · 내합은 거리 자 기준점을 지구로 둔다 (`?ruler=earth`). 표시 패널 11번째 행 「시간 사건 마커」 · 기본 켜짐 · `?events=off`. ADR [`20261016-1347`](docs/decisions/20261016-1347-event-markers.md) 결정 D1 – D8 · 사용자 결정 (Q0 (b) · K1 (a) · S2 (a) + S3 (b) · 나머지 권고안) · §교차검증 합의 1 – 5 · Amendment 1.
+- **[#1347] 타임바 시간 이벤트 마커** ([#1347](https://github.com/coseo12/astro-simulator/issues/1347), PR [#1351](https://github.com/coseo12/astro-simulator/pull/1351)). 스크러버 (1900~2100) 트랙에 화성 충 · 금성 내합 · 목성 충 · 토성 충 · 혜성 근일점 (핼리 1986 · 스위프트-터틀 1992) 눈금이 보이고, 스크러버 행 오른쪽 끝 버튼이 「시간 사건」 패널을 연다 (종류 필터 · 이전/다음 사건 · 목록 · 종류별 오차 배지 · 일 · 월식 미포함 안내). 사건을 고르면 그 시각으로 가서 주체 천체에 포커스하고 일시정지하며, 충 · 내합은 거리 자 기준점을 지구로 둔다 (`?ruler=earth`). 표시 패널 11번째 행 「시간 사건 마커」 · 기본 켜짐 · `?events=off`. ADR [`20261016-1347`](docs/decisions/20261016-1347-event-markers.md) 결정 D1 – D8 · 사용자 결정 (Q0 (b) · K1 (a) · S2 (a) + S3 (b) · 나머지 권고안) · §교차검증 합의 1 – 5 · Amendment 1.
   - 계산 (결정 D2): `packages/core/src/events/` — 장면과 같은 식 (모체 체인 `positionAt(orbit, jd, orbitMu(body, parent))` · `meanAnomalyAt`). 충 · 내합 = 일심 황경 같은 쪽 일치 (4일 간격 부호 변화 + 이분법, 반대쪽 일치 = 외합 거부), 근일점 = `M ≡ 0 (mod 2π)` 해석해. 모체 체인 합산을 core `resolveBodyChainPosition` 하나로 올려 정보 카드 · 거리 자 (`body-distance.ts`) 와 같은 함수를 쓴다.
   - 지연 계산 (결정 D3): 켜져 있고 Kepler 엔진이며 장면이 준비된 뒤에만 `requestIdleCallback` (미지원 시 `setTimeout`) 으로 종류별 1청크씩 계산해 모듈에 메모한다. 꺼져 있으면 계산 0회.
   - N-body 엔진 (결정 D8): 눈금 숨김 · 버튼 `aria-disabled` + 사유 · 열린 패널은 닫힘. Kepler 로 돌아오면 다시 보인다.
