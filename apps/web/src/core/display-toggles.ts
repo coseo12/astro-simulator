@@ -20,6 +20,7 @@ import type { SimStoreState } from '@/store/sim-store';
 import { parseBeltVisible, parseKuiperVisible } from './parse-belt-mode';
 import { parseCloudsVisible } from './parse-cloud-mode';
 import { parseCometTailsVisible } from './parse-comet-tails-mode';
+import { parseEventsVisible } from './parse-events-mode';
 import { parseCoronaVisible } from './parse-corona-mode';
 import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
@@ -37,7 +38,8 @@ export type DisplayToggleId =
   | 'kuiper'
   | 'cometTails'
   | 'corona'
-  | 'trails';
+  | 'trails'
+  | 'events';
 
 /**
  * 장면이 준비된 뒤 확정되는 환경 가용성. `null` = 장면 미준비 (sim-canvas 가 핸들러를 등록하기 전 ·
@@ -108,7 +110,8 @@ type IntentKey =
   | 'kuiperVisible'
   | 'cometTailsVisible'
   | 'coronaVisible'
-  | 'trailsVisible';
+  | 'trailsVisible'
+  | 'eventsVisible';
 type IntentSetterKey =
   | 'setOrbitLinesVisible'
   | 'setStarsVisible'
@@ -119,7 +122,8 @@ type IntentSetterKey =
   | 'setKuiperVisible'
   | 'setCometTailsVisible'
   | 'setCoronaVisible'
-  | 'setTrailsVisible';
+  | 'setTrailsVisible'
+  | 'setEventsVisible';
 
 export interface DisplayToggleDef {
   id: DisplayToggleId;
@@ -134,7 +138,8 @@ export interface DisplayToggleDef {
     | 'kuiper'
     | 'comettails'
     | 'corona'
-    | 'trails';
+    | 'trails'
+    | 'events';
   label: string;
   /**
    * #1341 PR1 — 기본 표시 여부 (ADR `20261015-1341` 결정 T10). URL 직렬화가 이 값과 같은 의도를 키 삭제로 쓴다.
@@ -316,6 +321,21 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
       return caps.trails ? null : DISPLAY_DISABLED_REASONS.nbodyTrails;
     },
     pressed: (intent, caps) => intent && caps !== null && caps.trails,
+  },
+  {
+    // #1347 — 타임바 시간 이벤트 마커 (눈금 + 사건 패널 버튼 — ADR `20261016-1347` 결정 D7). 기본 켜짐 · `?events=off` 옵트아웃.
+    // web 전용 (타임바 DOM) 이라 core 명령이 없다 — 라벨 행과 같은 처리. N-body 엔진 게이트 (결정 D8) 는 이 행이 아니라
+    // 타임바 쪽 (`time-events.tsx`) 이 건다 — 의도는 엔진과 무관하게 보존하고 Kepler 로 돌아오면 다시 보인다.
+    id: 'events',
+    urlKey: 'events',
+    label: '시간 사건 마커',
+    defaultVisible: true,
+    parse: parseEventsVisible,
+    command: null,
+    intentKey: 'eventsVisible',
+    setterKey: 'setEventsVisible',
+    disabledReason: () => null,
+    pressed: (intent) => intent,
   },
 ];
 

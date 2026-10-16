@@ -77,6 +77,14 @@ export function isOutsideScrubberRange(julianDate: number): boolean {
   return julianDate < SCRUBBER_MIN_JD || julianDate > SCRUBBER_MAX_JD;
 }
 
+/**
+ * 연도 값 → 트랙 위 위치 (%) — 눈금 배치용 (연도 눈금 `TICK_YEARS` · #1347 사건 눈금이 같은 식을 쓴다). 배치 컨테이너는 썸 반폭
+ * 안쪽 (`inset-x-1.5`) 이라 값 v 의 썸 중심과 같은 자리에 놓인다.
+ */
+export function yearValueToTrackPercent(year: number): number {
+  return ((year - SCRUBBER_MIN_YEAR) / (SCRUBBER_MAX_YEAR - SCRUBBER_MIN_YEAR)) * 100;
+}
+
 /** 재생 추종용 양자화 — `SCRUBBER_SYNC_QUANTUM_YEARS` 단위 반올림. */
 export function quantizeYearValue(value: number): number {
   return Math.round(value / SCRUBBER_SYNC_QUANTUM_YEARS) * SCRUBBER_SYNC_QUANTUM_YEARS;

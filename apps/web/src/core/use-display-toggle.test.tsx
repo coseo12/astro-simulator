@@ -92,6 +92,22 @@ describe('useDisplayToggle', () => {
     expect(sentCommands).toHaveLength(2);
   });
 
+  it('#1347 시간 사건 (web 전용 · 기본 켜짐) — 끄면 URL `events=off` · 켜면 키 삭제 · 명령 0건', async () => {
+    useSimStore.setState({ eventsVisible: true });
+    const { toggle, onUrlUpdate } = setup('?focus=earth');
+    act(() => toggle('events'));
+    expect(useSimStore.getState().eventsVisible).toBe(false);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalledTimes(1));
+    expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('events')).toBe('off');
+    act(() => toggle('events'));
+    expect(useSimStore.getState().eventsVisible).toBe(true);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalledTimes(2));
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.has('events')).toBe(false);
+    expect(last.searchParams.get('focus')).toBe('earth');
+    expect(sentCommands).toEqual([]);
+  });
+
   it('궤도선 — 기존 명령 · `orbits` 키 (D11 북마크 불일치 해소 경로)', async () => {
     useSimStore.setState({ orbitLinesVisible: false });
     const { toggle, onUrlUpdate } = setup('?orbits=off');

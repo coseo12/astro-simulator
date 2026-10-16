@@ -66,7 +66,7 @@ const SOFTWARE_CORONA_FORCED: DisplayCapabilities = {
 };
 
 describe('display-toggles — 표 구성', () => {
-  it('10 토글 · URL 키 10종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 행 추가)', () => {
+  it('11 토글 · URL 키 11종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 · #1347 시간 사건 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -78,6 +78,7 @@ describe('display-toggles — 표 구성', () => {
       'cometTails',
       'corona',
       'trails',
+      'events',
     ]);
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
@@ -90,6 +91,7 @@ describe('display-toggles — 표 구성', () => {
       'comettails',
       'corona',
       'trails',
+      'events',
     ]);
   });
 
@@ -105,6 +107,7 @@ describe('display-toggles — 표 구성', () => {
       { type: 'setCometTailsVisible', visible: false },
       { type: 'setSunCoronaVisible', visible: false },
       { type: 'setTrailsVisible', visible: false },
+      null,
     ]);
   });
 
@@ -113,6 +116,16 @@ describe('display-toggles — 표 구성', () => {
     expect(labels.disabledReason(null)).toBeNull();
     expect(labels.pressed(true, null)).toBe(true);
     expect(labels.pressed(false, HW)).toBe(false);
+  });
+
+  it('#1347 시간 사건 — web 전용 · 장면 준비 전에도 가능 · 표시 상태 = 의도 · ?events= 파서', () => {
+    const events = getDisplayToggle('events');
+    expect(events.command).toBeNull();
+    expect(events.disabledReason(null)).toBeNull();
+    expect(events.pressed(true, null)).toBe(true);
+    expect(events.pressed(false, HW)).toBe(false);
+    expect(events.parse(serializeDisplayToggle(false, events.defaultVisible))).toBe(false);
+    expect(events.parse(serializeDisplayToggle(true, events.defaultVisible))).toBe(true);
   });
 
   it('getDisplayToggle — id 조회', () => {
@@ -129,7 +142,7 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
     expect(serializeDisplayToggle(false, true)).toBe('off');
   });
 
-  it('#1341 D10 — 기존 9행은 defaultVisible=true 라 출력 불변 · trails 만 기본 꺼짐', () => {
+  it('#1341 D10 — 기존 9행 + #1347 events 는 defaultVisible=true 라 출력 불변 · trails 만 기본 꺼짐', () => {
     expect(DEFAULT_ON_ROWS.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -140,6 +153,7 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
       'kuiper',
       'cometTails',
       'corona',
+      'events',
     ]);
     for (const def of DEFAULT_ON_ROWS) {
       expect(serializeDisplayToggle(true, def.defaultVisible)).toBeNull();

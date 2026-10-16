@@ -55,10 +55,12 @@ const JSON_PATH = resolve(__dirname, '../packages/shared/data/solar-system.json'
 const IAU_2015_NOMINAL = Object.freeze({
   // 항성
   sun: {
-    mass: 1.98892e30,
+    // #1349 — B3 는 태양 질량이 아니라 GM 을 정한다 ((GM)☉N = 1.3271244e20 m^3/s^2, 정확값).
+    // 질량 = (GM)☉N / G (CODATA 2018 6.67430e-11) — shared `SOLAR_MASS` 와 같은 리터럴.
+    mass: 1.988409870698051e30,
     radius: 6.957e8,
     radiusKind: 'equatorial',
-    source: 'IAU 2015 Resolution B3 §1',
+    source: 'IAU 2015 Resolution B3 (GM)☉N / CODATA 2018 G',
   },
   // 행성 (IAU 2015 B3 = Sun/Earth/Jupiter 만, 나머지는 NASA Fact Sheet)
   mercury: {

@@ -1,8 +1,8 @@
 // #1281 — named import 필수 (`physics` namespace 경유 금지). `physics/index` → nbody-engine →
 // physics_wasm `__dirname` 평가로 SSR 500 — 카드는 app-shell 직접 import 라 SSR 평가 대상이다.
-// core/src/index.ts 가 positionAt 를 별도 named export 한다 (ADR `20260504-r-phase-allowlist-guard`
+// core/src/index.ts 가 체인 위치 함수를 별도 named export 한다 (ADR `20260504-r-phase-allowlist-guard`
 // §Amendment 결정 D1 패턴).
-import { orbitMu, positionAt } from '@astro-simulator/core';
+import { resolveBodyChainPosition, type BodyChainPosition } from '@astro-simulator/core';
 import type { BodyStateFn } from '@/core/sim-context';
 import type { LoadedCelestialBody } from './body-info';
 
@@ -15,23 +15,12 @@ export interface BodyDistances {
 
 export type Vec3 = [number, number, number];
 
-/** 모체 체인 최대 깊이 — 순환 parentId 데이터 결함 시 무한 루프 차단 (현 데이터 깊이 ≤ 2). */
-const MAX_CHAIN_DEPTH = 8;
-
-interface BodyChainPosition {
-  /** 계 중심 (모체 체인의 뿌리 = 태양) 기준 위치 [m]. */
-  world: Vec3;
-  /** 체인 첫 고리 — 모체 기준 위치 [m]. 뿌리 천체 (태양) 는 `null`. */
-  local: Vec3 | null;
-}
-
 /**
  * 모체 체인을 따라 부모 기준 위치를 더해 계 중심 기준 위치를 만든다. 체인이 끊기면 `null`.
  *
- * scene Kepler 경로(`solar-system-scene.ts` `updateAtKepler`)와 **같은 식**이다 — 부모 기준 위치
- * `positionAt(orbit, jd, orbitMu(body, parent))` (#1305 — 위성 G(M_parent + m) / 태양 직속 G·M) 를 부모 체인을 따라 더해 계 중심 기준 위치를 얻는다.
- * 시각 과장 배율(`getOrbitVisualScale`)은 적용하지 않는다 — 데이터 SSoT 거리다
- * (principles §1 Visual Fidelity: 왜곡은 렌더 시점에만).
+ * #1347 — 체인 합산은 core `resolveBodyChainPosition` 하나다 (ADR `20261016-1347` §교차검증 합의 5). 시간 이벤트 계산
+ * (`events/`) 이 같은 함수를 써서, 사건 시각의 위치와 카드 · 거리 자의 위치가 **같은 함수**에서 나온다. 식은 scene Kepler 경로
+ * (`updateAtKepler`) 와 같다 — 부모 기준 `positionAt(orbit, jd, orbitMu(body, parent))` 의 체인 합, 시각 배율 미적용.
  *
  * **엔진 상태값 우선** — `getBodyState` 가 값을 주면(Newton · Barnes-Hut) 그 부모 기준 위치를 쓰고,
  * `null` 이면(Kepler, 엔진 미준비, WebGPU 의 비동기 velocities) 위 Kepler 식으로 떨어진다. 카드는
@@ -45,25 +34,12 @@ function resolveBodyChain(
   jd: number,
   getBodyState: BodyStateFn | null,
 ): BodyChainPosition | null {
-  const body = bodiesById.get(id);
-  if (!body) return null;
-
-  const world: Vec3 = [0, 0, 0];
-  let local: Vec3 | null = null;
-  let cur: LoadedCelestialBody = body;
-  for (let depth = 0; cur.parentId != null; depth += 1) {
-    const parent = bodiesById.get(cur.parentId);
-    // 체인이 끊기면 조용히 원점으로 흡수하지 않는다 — 호출부가 「계산 불가」로 표기.
-    if (!parent || !cur.orbit || depth >= MAX_CHAIN_DEPTH) return null;
-    const p =
-      getBodyState?.(cur.id, parent.id)?.pos ?? positionAt(cur.orbit, jd, orbitMu(cur, parent));
-    if (local === null) local = [p[0], p[1], p[2]];
-    world[0] += p[0];
-    world[1] += p[1];
-    world[2] += p[2];
-    cur = parent;
-  }
-  return { world, local };
+  return resolveBodyChainPosition(
+    bodiesById,
+    id,
+    jd,
+    getBodyState ? (bodyId, parentId) => getBodyState(bodyId, parentId)?.pos : null,
+  );
 }
 
 /**

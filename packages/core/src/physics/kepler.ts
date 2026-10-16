@@ -152,8 +152,12 @@ export function twoBodyMu(centralMass: number, orbitingMass: number): number {
  * 이 함수 하나로 모은다.
  *
  * - 위성 (모체가 태양이 아닌 body — `isSatelliteOrbit` 와 같은 규칙): `twoBodyMu(M_parent, m)` (사용자 결정 2a)
- * - 태양 직속 body (행성 · 왜소행성 · 혜성): `G·M_sun` — 기존 동작 유지. 행성까지 G(M+m) 로 바꾸면 목성 위치가
- *   J2000 이후 누적 위상으로 ~0.4° 움직여 #1305 범위 (위성) 를 넘는다.
+ * - 태양 직속 body (행성 · 왜소행성 · 혜성): `G·M_sun` = IAU 2015 Resolution B3 `(GM)☉N` (#1349).
+ *   데이터 sun `mass` 를 `SOLAR_GM / G` 로 교정해 이 곱이 IAU GM 과 같다 (상대오차 ≤ 1e-9 — `kepler.test.ts`).
+ *   교정 전 `G × 1.98892e30` 은 `0.02566 %` 커서 J2000 에서 멀수록 위상이 누적됐다 (2026-10-16 지구 황경 `+1.19°`
+ *   → 교정 후 `−0.06°`, JPL Horizons 기준). 이 분기를 상수로 따로 두지 않고 데이터 질량을 고친 것은 N-body 엔진
+ *   (Newton · Barnes-Hut · WebGPU) 의 힘 계산이 같은 `mass` 를 쓰기 때문이다 — μ 만 바꾸면 초기 속도와 힘이 어긋난다.
+ *   G(M+m) 는 쓰지 않는다 (#1305 — 행성 m 을 더하면 목성 위상이 J2000 이후 `~0.4°` 움직인다).
  */
 export function orbitMu(
   body: Pick<LoadedCelestialBody, 'mass' | 'parentId'>,
