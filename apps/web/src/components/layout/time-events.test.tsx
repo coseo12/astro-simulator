@@ -19,10 +19,13 @@ import {
  */
 
 let sentCommands: CoreCommand[] = [];
+// 안정 참조 — 실제 앱의 `useSimCommand` 는 `useMemo` 된 api 의 `command` 라 렌더마다 같은 함수다 (`sim-context.tsx`).
+// 렌더마다 새 함수를 주면 패널의 `select` (`useCallback` 의존) 가 매번 바뀌어 `memo` 된 목록 행 전부가 다시 그려진다.
+const sendCommandMock = (cmd: CoreCommand) => {
+  sentCommands.push(cmd);
+};
 vi.mock('@/core/sim-context', () => ({
-  useSimCommand: () => (cmd: CoreCommand) => {
-    sentCommands.push(cmd);
-  },
+  useSimCommand: () => sendCommandMock,
 }));
 
 // M7 — 계산 함수 호출 횟수를 센다 (구현은 실제 함수 그대로).
@@ -213,8 +216,10 @@ describe('사건 패널 — 조작 (M6)', () => {
     expect(activeOptionId()).toBe(options[0]!.id);
     fireEvent.keyDown(list, { key: 'End' });
     expect(activeOptionId()).toBe(options.at(-1)!.id);
-    // 597회 키 입력 × 597행 목록 — jsdom 에서 ~11 s (로컬 실측). 실브라우저 M6 이 같은 도달을 다시 본다.
-  }, 60_000);
+    // 597회 키 입력 — 로컬 실측 `4.36 ~ 4.67` s (3회). 기본 5 s 와 여유가 없어 20 s 로 둔다 (CI 러너가 로컬보다 느리다).
+    // 종전 `~11.7` s 는 jsdom 탓이 아니라 mock 의 `useSimCommand` 가 렌더마다 새 함수라 `memo` 행 전부가 다시 그려졌기
+    // 때문이었다 (위 `sendCommandMock` 주석). 실브라우저 M6 이 같은 도달을 다시 본다.
+  }, 20_000);
 
   it('Esc — 패널 닫고 트리거로 포커스 · 기본 동작 차단 (자유시점 Esc 와 충돌 0)', async () => {
     renderEvents();
@@ -337,5 +342,8 @@ describe('N-body 엔진 (M9 단위 부분)', () => {
     act(() => useSimStore.setState({ physicsEngine: 'kepler' }));
     expect(screen.getAllByTestId('time-event-tick')).toHaveLength(221);
     expect(trigger()).toHaveAttribute('aria-disabled', 'false');
+    // 전환으로 닫힌 패널은 Kepler 로 돌아와도 닫혀 있다 — 열림 의도가 남아 있으면 복귀 순간 저절로 다시 열린다.
+    expect(panel()).toBeNull();
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
   });
 });

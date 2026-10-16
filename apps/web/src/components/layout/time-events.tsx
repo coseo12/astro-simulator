@@ -280,9 +280,7 @@ export function TimeEventsButton() {
         aria-controls={open ? panelId : undefined}
         aria-disabled={disabled}
         aria-describedby={disabled ? reasonId : undefined}
-        title={
-          disabled ? EVENTS_NBODY_DISABLED_REASON : '시간 사건 — 화성 충 · 금성 내합 · 혜성 근일점'
-        }
+        title={disabled ? EVENTS_NBODY_DISABLED_REASON : '시간 사건 — 충 · 내합 · 혜성 근일점'}
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         onBlur={handleBlur}

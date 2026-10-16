@@ -680,7 +680,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         );
         // #1347 — 타임바 시간 이벤트 마커 기본 ON + `?events=off` 옵트아웃 (ADR 20261016-1347 결정 D7). web 전용 (타임바 DOM) 이라
         // 라벨과 같이 아래 표시 토글 블록에서 store 에만 싣는다. 사건 계산은 가용성 (`displayCapabilities`) 이 열린 뒤에만
-        // 시작하므로 (`use-time-events.ts`), 이 값이 먼저 store 에 들어가 `off` 로드에서는 계산이 0회다 (결정 D3).
+        // 시작하므로 (`time-events.tsx` 의 `useTimeEventsGate` · `useTimeEvents`), 이 값이 먼저 store 에 들어가 `off` 로드에서는 계산이 0회다 (결정 D3).
         const eventsVisible = parseEventsVisible(
           new URLSearchParams(window.location.search).get('events'),
         );
