@@ -22,12 +22,18 @@ import {
  *      대칭 허용치 (i) 만으로는 한 방향 밀림을 놓친다 (ADR M3 결함판 표).
  */
 
+/**
+ * 이 fixture (JPL Horizons) 가 덮는 종류 — 식 (`syzygy-eclipse`) 은 기준이 NASA 식 목록이라 `eclipse-events.test.ts` 가
+ * 따로 잰다 (#1354 DoD E2 ~ E4).
+ */
+const HORIZONS_KINDS = EVENT_KINDS.filter((k) => k.computation.type !== 'syzygy-eclipse');
+
 const START_JD = dateToJulianDate(new Date(Date.UTC(1900, 0, 1)));
 const END_JD = dateToJulianDate(new Date(Date.UTC(2100, 0, 1)));
 
 const bodiesById = new Map(getSolarSystem().bodies.map((b) => [b.id, b]));
 const modelTimes = new Map<EventKindId, number[]>(
-  EVENT_KINDS.map((k) => [
+  HORIZONS_KINDS.map((k) => [
     k.id,
     computeEventsForKind(bodiesById, k, START_JD, END_JD).map((e) => e.julianDate),
   ]),
@@ -55,10 +61,11 @@ function sampleVerdict(sample: ExternalReferenceSample, shiftDays: number) {
 }
 
 describe('M3 — 외부 기준 (JPL Horizons) 정합', () => {
-  it('fixture 가 결정 D1 의 전 종류를 덮는다', () => {
+  it('fixture 가 결정 D1 의 전 종류를 덮는다 (식 2종은 NASA fixture — eclipse-events.test.ts)', () => {
     expect(new Set(EXTERNAL_REFERENCE_SAMPLES.map((s) => s.kind))).toEqual(
-      new Set(EVENT_KINDS.map((k) => k.id)),
+      new Set(HORIZONS_KINDS.map((k) => k.id)),
     );
+    expect(EVENT_KINDS.length - HORIZONS_KINDS.length).toBe(2);
   });
 
   it.each(EXTERNAL_REFERENCE_SAMPLES.map((s) => [`${s.kind} ${s.year}`, s] as const))(
@@ -79,7 +86,7 @@ describe('M3 — 외부 기준 (JPL Horizons) 정합', () => {
    * 모든 표본을 잡고, 대칭 허용치 (i) 도 핼리 −1일을 뺀 전 경우를 잡는다 (핼리 오차는 `+7.8` 일 한쪽 부호라 −1일은 허용치 안으로 들어온다).
    */
   it.each([-1, 1])('결함판 (사건 시각 %+d일) — 종류마다 판정 FAIL', (shift) => {
-    for (const kind of EVENT_KINDS) {
+    for (const kind of HORIZONS_KINDS) {
       const samples = EXTERNAL_REFERENCE_SAMPLES.filter((s) => s.kind === kind.id);
       const verdicts = samples.map((s) => sampleVerdict(s, shift));
       expect(verdicts.some((v) => !(v.withinTolerance && v.withinBand))).toBe(true);

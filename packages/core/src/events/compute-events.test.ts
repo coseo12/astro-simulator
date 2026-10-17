@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
-import type { ChainBody } from '../physics/body-chain.js';
 import { meanAnomalyAt, orbitMu } from '../physics/kepler.js';
 import { dateToJulianDate } from '../time/julian-date.js';
 import {
@@ -8,6 +7,7 @@ import {
   heliocentricLongitudeDifference,
   isSameSideBracket,
   type AstroEvent,
+  type EventBody,
 } from './compute-events.js';
 import { EVENT_KINDS, getEventKind, type EventKindId } from './event-kinds.js';
 
@@ -39,7 +39,7 @@ const COMPLETENESS: Partial<Record<EventKindId, { count: number; gap: [number, n
 };
 const GAP_SLACK_DAYS = 1;
 
-let bodiesById: ReadonlyMap<string, ChainBody>;
+let bodiesById: ReadonlyMap<string, EventBody>;
 const eventsByKind = new Map<EventKindId, AstroEvent[]>();
 
 beforeAll(() => {

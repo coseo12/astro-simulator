@@ -3,13 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import * as core from '@astro-simulator/core';
 import { EVENT_FILTER_DEFAULTS } from '@/lib/event-filters';
-import { getTimeEventsSnapshot, resetTimeEventsForTest } from '@/lib/time-events';
+import {
+  TIME_EVENT_CHUNKS,
+  getTimeEventsSnapshot,
+  resetTimeEventsForTest,
+} from '@/lib/time-events';
+import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
 import { useSimStore } from '@/store/sim-store';
 import {
-  ECLIPSE_EXCLUSION_NOTE,
   EVENTS_NBODY_DISABLED_REASON,
   TimeEventTicks,
   TimeEventsButton,
+  eclipseScaleNotice,
   listboxNextIndex,
 } from './time-events';
 
@@ -17,6 +22,8 @@ import {
  * #1347 — 타임바 시간 이벤트 마커 (ADR `docs/decisions/20261016-1347-event-markers.md`).
  * M5 (선택 — 명령 순서 · 거리 자) · M6 (조작 — 필터 · 이전/다음 · listbox 키보드 · 계산 전 열기) · M7 (꺼짐 = 계산 0회 spy) ·
  * M9 (N-body 비활성 · 런타임 전환) 의 단위 부분.
+ * #1354 (ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md`) — U1 (식 선택 — 달 포커스 · 거리 자 · 배율 고지) ·
+ * U2 (종류명 · 배지 · 미포함 안내 제거) · E6 (식 필터 기본 꺼짐) · E9 (식 10년 청크) 의 단위 부분.
  */
 
 let sentCommands: CoreCommand[] = [];
@@ -60,7 +67,7 @@ function renderEvents() {
 
 /** idle 청크 (jsdom 은 `requestIdleCallback` 이 없어 `setTimeout` 폴백) 를 전부 돌린다. */
 async function flushChunks() {
-  for (let i = 0; i < core.EVENT_KINDS.length + 1; i += 1) {
+  for (let i = 0; i < TIME_EVENT_CHUNKS.length + 1; i += 1) {
     await act(async () => {
       vi.runOnlyPendingTimers();
     });
@@ -124,15 +131,34 @@ describe('M7 — 꺼짐이면 계산 0회', () => {
     expect(computeSpy).not.toHaveBeenCalled();
   });
 
-  it('켜짐 — 종류별 1청크씩 (호출 = 종류 수), 다시 그려도 재계산 없음 (모듈 메모)', async () => {
+  it('켜짐 — 청크마다 1회 (식 외 종류는 1청크, 식은 10년 청크 20개씩), 다시 그려도 재계산 없음 (모듈 메모)', async () => {
+    // 청크 계획 — 식 외 6종 × 1 + 식 2종 × 20 (1900 ~ 2100 / 10년).
+    expect(TIME_EVENT_CHUNKS).toHaveLength(6 + 2 * 20);
     const { unmount } = renderEvents();
     expect(computeSpy).not.toHaveBeenCalled(); // 동기 경로에서 돌지 않는다 — idle 로 넘긴다
     await flushChunks();
-    expect(computeSpy).toHaveBeenCalledTimes(core.EVENT_KINDS.length);
+    expect(computeSpy).toHaveBeenCalledTimes(TIME_EVENT_CHUNKS.length);
     unmount();
     renderEvents();
     await flushChunks();
-    expect(computeSpy).toHaveBeenCalledTimes(core.EVENT_KINDS.length);
+    expect(computeSpy).toHaveBeenCalledTimes(TIME_EVENT_CHUNKS.length);
+  });
+
+  it('E9 — 식 청크를 이어 붙인 목록 = 200년 한 번에 계산한 목록 (청크 경계에서 빠지거나 겹치는 사건 0)', async () => {
+    renderEvents();
+    await flushChunks();
+    const actual = await vi.importActual<typeof core>('@astro-simulator/core');
+    const bodiesById = new Map(actual.ephemeris.getSolarSystem().bodies.map((b) => [b.id, b]));
+    for (const id of ['solar-eclipse', 'lunar-eclipse'] as const) {
+      const whole = actual
+        .computeEventsForKind(bodiesById, actual.getEventKind(id), SCRUBBER_MIN_JD, SCRUBBER_MAX_JD)
+        .map((e) => e.id);
+      const chunked = getTimeEventsSnapshot()
+        .events.filter((e) => e.kind === id)
+        .map((e) => e.id);
+      expect(chunked).toEqual(whole);
+      expect(chunked.length).toBeGreaterThan(450);
+    }
   });
 });
 
@@ -168,12 +194,34 @@ describe('사건 패널 — 조작 (M6)', () => {
     expect(screen.getAllByTestId('time-event-option')).toHaveLength(221);
   });
 
-  it('일 · 월식 미포함 안내 1줄 (§교차검증 합의 3)', async () => {
+  it('#1354 E7 — 일 · 월식 미포함 안내는 없다 · 식 필터가 꺼져 있으면 배율 고지도 없다', async () => {
     renderEvents();
     fireEvent.click(trigger());
-    expect(screen.getByTestId('time-events-eclipse-note')).toHaveTextContent(
-      ECLIPSE_EXCLUSION_NOTE,
-    );
+    expect(screen.queryByTestId('time-events-eclipse-note')).toBeNull();
+    expect(screen.queryByTestId('time-events-scale-note')).toBeNull();
+    expect(panel()).not.toHaveTextContent('넣지 않았습니다');
+  });
+
+  it('#1354 E6 — 식 필터 칩 2개는 기본 꺼짐 · 켜면 눈금 · 목록에 들어온다', async () => {
+    renderEvents();
+    await flushChunks();
+    fireEvent.click(trigger());
+    const solar = screen.getByTestId('time-event-filter-solar-eclipse');
+    const lunar = screen.getByTestId('time-event-filter-lunar-eclipse');
+    expect(solar).toHaveAttribute('aria-pressed', 'false');
+    expect(lunar).toHaveAttribute('aria-pressed', 'false');
+    expect(solar).toHaveTextContent('일식');
+    expect(lunar).toHaveTextContent('월식');
+    const count = (kind: string) =>
+      getTimeEventsSnapshot().events.filter((e) => e.kind === kind).length;
+    fireEvent.click(solar);
+    expect(screen.getAllByTestId('time-event-option')).toHaveLength(221 + count('solar-eclipse'));
+    fireEvent.click(lunar);
+    const total = 221 + count('solar-eclipse') + count('lunar-eclipse');
+    expect(screen.getAllByTestId('time-event-option')).toHaveLength(total);
+    expect(screen.getAllByTestId('time-event-tick')).toHaveLength(total);
+    expect(count('solar-eclipse')).toBeGreaterThan(450);
+    expect(count('lunar-eclipse')).toBeGreaterThan(450);
   });
 
   it('필터 토글 — 목성 충 켜면 목록 · 눈금에 들어온다', async () => {
@@ -209,6 +257,8 @@ describe('사건 패널 — 조작 (M6)', () => {
         'jupiter-opposition': true,
         'saturn-opposition': true,
         'comet-perihelion': true,
+        'solar-eclipse': false,
+        'lunar-eclipse': false,
       },
       julianDate: 2_415_020.5, // 1900 — 첫 사건부터
     });
@@ -375,6 +425,69 @@ describe('선택 (M5)', () => {
     fireEvent.click(screen.getByTestId('time-event-prev'));
     expect(jumps()[2]!.julianDate).toBe(firstNext);
   });
+});
+
+describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
+  const ECLIPSE_FILTERS_ON = {
+    ...EVENT_FILTER_DEFAULTS,
+    'solar-eclipse': true,
+    'lunar-eclipse': true,
+  };
+
+  function option(id: string): HTMLElement {
+    const el = screen.getAllByTestId('time-event-option').find((o) => o.dataset.eventId === id);
+    if (!el) throw new Error(`option 없음: ${id}`);
+    return el;
+  }
+
+  it('U2 — 목록에 종류명 (「개기일식」 · 「금환일식」 · 「부분일식」 · 「개기월식」 · 「부분월식」 · 「반영월식」) · ±0.3일 배지', async () => {
+    useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON });
+    renderEvents();
+    await flushChunks();
+    fireEvent.click(trigger());
+    // NASA 목록의 종류 (2017-08-21 개기 · 2023-10-14 금환 · 2022-10-25 부분 · 2025-03-14 개기월식 · 2023-10-28 부분월식 ·
+    // 2024-03-25 반영월식) — 모델 판정도 같다.
+    const cases: Array<[string, string]> = [
+      ['solar-eclipse:2017-08-21', '개기일식'],
+      ['solar-eclipse:2023-10-14', '금환일식'],
+      ['solar-eclipse:2022-10-25', '부분일식'],
+      ['lunar-eclipse:2025-03-14', '개기월식'],
+      ['lunar-eclipse:2023-10-28', '부분월식'],
+      ['lunar-eclipse:2024-03-25', '반영월식'],
+    ];
+    for (const [id, label] of cases) {
+      const el = option(id);
+      expect(el).toHaveTextContent(label);
+      expect(el).toHaveTextContent('±0.3일');
+      expect(el).toHaveAccessibleName(expect.stringContaining(label));
+    }
+    expect(screen.getByTestId('time-events-scale-note')).toHaveTextContent(eclipseScaleNotice());
+  });
+
+  it.each([
+    ['solar-eclipse:2017-08-21'],
+    ['solar-eclipse:2024-04-08'],
+    ['lunar-eclipse:2025-03-14'],
+  ])(
+    'U1 — %s 선택: 시각 → 달 포커스 → 일시정지 · 거리 자 기준점 = 지구 · 배율 고지에 getOrbitVisualScale 값',
+    async (id) => {
+      useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON, rulerAnchorId: null });
+      renderEvents();
+      await flushChunks();
+      fireEvent.click(trigger());
+      const event = getTimeEventsSnapshot().events.find((e) => e.id === id)!;
+      fireEvent.click(option(id));
+      expect(sentCommands).toEqual([
+        { type: 'jumpToJulianDate', julianDate: event.julianDate },
+        { type: 'focusOn', bodyId: 'moon' },
+        { type: 'setTimeScale', scale: 0 },
+      ]);
+      expect(useSimStore.getState().rulerAnchorId).toBe('earth');
+      expect(option(id)).toHaveAttribute('aria-selected', 'true');
+      const note = screen.getByTestId('time-events-scale-note');
+      expect(note).toHaveTextContent(`×${core.getOrbitVisualScale('earth', 'moon')}`);
+    },
+  );
 });
 
 describe('N-body 엔진 (M9 단위 부분)', () => {

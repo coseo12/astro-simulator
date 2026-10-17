@@ -60,9 +60,16 @@ export {
   EVENT_KIND_TOLERANCE_DAYS,
   computeEventsForKind,
   eventDateIso,
+  eventLabelKo,
   getEventKind,
 } from './events/index.js';
-export type { AstroEvent, EventFilterId, EventKindDef, EventKindId } from './events/index.js';
+export type {
+  AstroEvent,
+  EclipseType,
+  EventFilterId,
+  EventKindDef,
+  EventKindId,
+} from './events/index.js';
 export { heliocentricPositionAt, resolveBodyChainPosition } from './physics/body-chain.js';
 export type {
   BodyChainPosition,
