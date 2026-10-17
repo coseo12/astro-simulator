@@ -1,4 +1,5 @@
 // #1347 — 시간 이벤트 지연 계산 · 메모 (ADR `docs/decisions/20261016-1347-event-markers.md` 결정 D3).
+// #1354 — 일식 · 월식은 10년 단위 청크로 나눈다 (ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md` 결정 E9).
 //
 // 루트 named import (`physics` · `scene` namespace 경유 금지 — 타임바는 app-shell 직접 import 라 SSR 평가 대상, body-distance.ts 와
 // 같은 사유). `ephemeris` namespace 는 거리 자 (`use-ruler-distance.ts`) 가 이미 같은 방식으로 쓴다.
@@ -7,15 +8,59 @@ import {
   computeEventsForKind,
   ephemeris as ephemerisApi,
   type AstroEvent,
-  type EventKindId,
+  type EventKindDef,
 } from '@astro-simulator/core';
-import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from './time-scrubber';
+import {
+  SCRUBBER_MAX_JD,
+  SCRUBBER_MAX_YEAR,
+  SCRUBBER_MIN_JD,
+  SCRUBBER_MIN_YEAR,
+  startOfYearJulianDate,
+} from './time-scrubber';
 
 /**
- * 종류별 청크 시간 측정 이름 접두 — `performance.measure('astro-events:<kind>')` (DoD M7). 브라우저에서
- * `performance.getEntriesByType('measure')` 로 읽는다.
+ * 청크 시간 측정 이름 접두 — `performance.measure('astro-events:<kind>')` (1347 DoD M7), 나눈 종류는
+ * `astro-events:<kind>:<시작 연도>` (1354 DoD E9). 브라우저에서 `performance.getEntriesByType('measure')` 로 읽는다.
  */
 export const EVENT_CHUNK_MEASURE_PREFIX = 'astro-events:';
+
+/**
+ * 식 (`syzygy-eclipse`) 청크 폭 [년] — 결정 E9. 200년 한 번이면 Node 실측 일식 `43.7` · 월식 `36.5` ms 라 브라우저에서
+ * long task (`50` ms) 경계에 걸린다. 10년이면 청크당 그 1/20 이다 (실브라우저 측정은 PR 본문).
+ */
+export const ECLIPSE_CHUNK_YEARS = 10;
+
+/** 계산 단위 하나 — 종류 하나의 `[startJd, endJd)`. */
+export interface TimeEventChunk {
+  readonly key: string;
+  readonly kind: EventKindDef;
+  readonly startJd: number;
+  readonly endJd: number;
+}
+
+/** 청크 계획 — 식은 {@link ECLIPSE_CHUNK_YEARS} 단위, 나머지 종류는 범위 전체 1청크 (1347 D3 그대로). */
+function buildChunkPlan(): TimeEventChunk[] {
+  const plan: TimeEventChunk[] = [];
+  for (const kind of EVENT_KINDS) {
+    if (kind.computation.type !== 'syzygy-eclipse') {
+      plan.push({ key: kind.id, kind, startJd: SCRUBBER_MIN_JD, endJd: SCRUBBER_MAX_JD });
+      continue;
+    }
+    for (let y = SCRUBBER_MIN_YEAR; y < SCRUBBER_MAX_YEAR; y += ECLIPSE_CHUNK_YEARS) {
+      const end = Math.min(y + ECLIPSE_CHUNK_YEARS, SCRUBBER_MAX_YEAR);
+      plan.push({
+        key: `${kind.id}:${y}`,
+        kind,
+        startJd: startOfYearJulianDate(y),
+        endJd: startOfYearJulianDate(end),
+      });
+    }
+  }
+  return plan;
+}
+
+/** 청크 계획 (모듈 상수 — 종류 표 · 스크러버 범위는 런타임에 바뀌지 않는다). */
+export const TIME_EVENT_CHUNKS: readonly TimeEventChunk[] = buildChunkPlan();
 
 /** idle 콜백 최대 대기 [ms] — 렌더 루프가 idle 기간을 남기지 않아도 이 시간 뒤에는 청크를 돌린다. */
 const IDLE_TIMEOUT_MS = 1_000;
@@ -30,7 +75,7 @@ export interface TimeEventsSnapshot {
 
 const IDLE_SNAPSHOT: TimeEventsSnapshot = { status: 'idle', events: [] };
 
-let memo = new Map<EventKindId, AstroEvent[]>();
+let memo = new Map<string, AstroEvent[]>();
 let snapshot: TimeEventsSnapshot = IDLE_SNAPSHOT;
 let started = false;
 let pendingCancel: (() => void) | null = null;
@@ -55,25 +100,28 @@ function mergedEvents(): AstroEvent[] {
   return [...memo.values()].flat().sort((a, b) => a.julianDate - b.julianDate);
 }
 
-/** 종류 하나 = 청크 하나. 끝나면 다음 종류를 다시 idle 로 넘긴다 — 한 번에 돌리면 long task (ADR 1-E `~100` ms). */
+/**
+ * 청크 하나를 돌리고 다음 청크를 다시 idle 로 넘긴다 — 한 번에 돌리면 long task (ADR 1347 1-E `~100` ms). 청크는 종류 하나
+ * (식은 종류 하나의 10년) 다.
+ */
 function runNextChunk(): void {
   pendingCancel = null;
-  const kind = EVENT_KINDS.find((k) => !memo.has(k.id));
-  if (!kind) {
+  const chunk = TIME_EVENT_CHUNKS.find((c) => !memo.has(c.key));
+  if (!chunk) {
     emit({ status: 'ready', events: mergedEvents() });
     return;
   }
   const bodiesById = new Map(ephemerisApi.getSolarSystem().bodies.map((b) => [b.id, b]));
   const start = performance.now();
-  const events = computeEventsForKind(bodiesById, kind, SCRUBBER_MIN_JD, SCRUBBER_MAX_JD);
+  const events = computeEventsForKind(bodiesById, chunk.kind, chunk.startJd, chunk.endJd);
   const end = performance.now();
   try {
-    performance.measure(`${EVENT_CHUNK_MEASURE_PREFIX}${kind.id}`, { start, end });
+    performance.measure(`${EVENT_CHUNK_MEASURE_PREFIX}${chunk.key}`, { start, end });
   } catch {
     // User Timing L3 미지원 환경 — 측정만 빠지고 계산 결과는 그대로 쓴다.
   }
-  memo.set(kind.id, events);
-  const done = memo.size === EVENT_KINDS.length;
+  memo.set(chunk.key, events);
+  const done = memo.size === TIME_EVENT_CHUNKS.length;
   emit({ status: done ? 'ready' : 'computing', events: mergedEvents() });
   if (!done) pendingCancel = scheduleIdle(runNextChunk);
 }

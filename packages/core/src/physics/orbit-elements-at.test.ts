@@ -361,8 +361,10 @@ describe('#1354 I1 — 다른 천체 불변 (달 율 · 주기 항 유 ↔ 무, 
   });
 
   it('기존 6종 사건 목록 julianDate 비트 동일 (1900 ~ 2100)', () => {
-    expect(EVENT_KINDS).toHaveLength(6);
-    for (const kind of EVENT_KINDS) {
+    // 식 2종 (#1354 PR2 — `syzygy-eclipse`) 은 달 위치가 곧 사건이라 이 대조의 대상이 아니다 (eclipse-events.test.ts).
+    const legacy = EVENT_KINDS.filter((k) => k.computation.type !== 'syzygy-eclipse');
+    expect(legacy).toHaveLength(6);
+    for (const kind of legacy) {
       const a = computeEventsForKind(fullById, kind, JD_1900, JD_2100).map((e) => e.julianDate);
       const c = computeEventsForKind(v0ById, kind, JD_1900, JD_2100).map((e) => e.julianDate);
       expect(a.length, kind.id).toBeGreaterThan(0);

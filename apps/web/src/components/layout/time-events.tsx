@@ -2,7 +2,9 @@
 
 import {
   EVENT_KIND_TOLERANCE_DAYS,
+  eventLabelKo,
   getEventKind,
+  getOrbitVisualScale,
   type AstroEvent,
   type EventFilterId,
   type EventKindId,
@@ -40,9 +42,10 @@ import { useSimStore } from '@/store/sim-store';
  * - **눈금** (`TimeEventTicks`) — 스크러버 트랙 안 `pointer-events-none` 1px 선 (결정 D4). 누를 대상이 아니다 — 데스크톱 24px hit
  *   target 이 9.9년이라 사건 하나하나를 누를 수 없다 (ADR 1-D). 드래그 · 키보드 계약은 그대로 Radix 슬라이더가 받는다.
  * - **사건 패널** (`TimeEventsButton`) — 스크러버 행 오른쪽 끝 24px 버튼 → 비모달 패널 (`display-panel.tsx` 패턴): 종류 필터 ·
- *   이전/다음 사건 · 목록 (listbox — ↑↓ · Home/End · Enter) · 종류별 오차 배지 · 일 · 월식 미포함 안내 (§교차검증 합의 3).
- * - **선택** (결정 D6 · 사용자 결정 S3 (b)) — `jumpToJulianDate(t*)` → `focusOn(주체)` → `setTimeScale(0)`, 충 · 내합은 거리 자
- *   기준점을 지구로 (`?ruler=earth` 는 `UrlSync` 가 store 에서 쓴다). 순서가 계약이다 — core 는 `jumpToJulianDate` 에서 `timeChanged`
+ *   이전/다음 사건 · 목록 (listbox — ↑↓ · Home/End · Enter) · 종류별 오차 배지. 일 · 월식 미포함 안내 (§교차검증 합의 3) 는
+ *   #1354 가 식을 넣으며 지웠고 (결정 E7), 식 필터가 켜져 있으면 그 자리에 위성 배율 고지 1줄을 둔다 (결정 E5 · 축 S (a)).
+ * - **선택** (결정 D6 · 사용자 결정 S3 (b)) — `jumpToJulianDate(t*)` → `focusOn(주체)` → `setTimeScale(0)`, 충 · 내합 · 식 (주체 =
+ *   달 — #1354 사용자 결정 S (a)) 은 거리 자 기준점을 지구로 (`?ruler=earth` 는 `UrlSync` 가 store 에서 쓴다). 순서가 계약이다 — core 는 `jumpToJulianDate` 에서 `timeChanged`
  *   를 동기 발화해 장면 위치를 `t*` 로 옮긴 **뒤** `focusOn` 이 카메라를 잡는다 (§교차검증 합의 1).
  * - **꺼짐** (`?events=off`) — 둘 다 아무것도 그리지 않고 계산도 시작하지 않는다 (결정 D3 · DoD M8).
  * - **N-body 엔진** — 눈금 숨김 · 버튼 `aria-disabled` + 사유, 열린 패널은 닫는다. Kepler 로 돌아오면 다시 보인다 (결정 D8).
@@ -56,6 +59,8 @@ const KIND_COLOR_CLASS: Readonly<Record<EventKindId, string>> = {
   'saturn-opposition': 'bg-star-a',
   'halley-perihelion': 'bg-nebula-teal',
   'swift-tuttle-perihelion': 'bg-nebula-teal',
+  'solar-eclipse': 'bg-star-o',
+  'lunar-eclipse': 'bg-nebula-violet',
 };
 
 /** 필터 칩 라벨 · 순서 (결정 D7). */
@@ -65,15 +70,25 @@ const FILTER_LABELS: ReadonlyArray<{ id: EventFilterId; label: string; kind: Eve
   { id: 'comet-perihelion', label: '혜성 근일점', kind: 'halley-perihelion' },
   { id: 'jupiter-opposition', label: '목성 충', kind: 'jupiter-opposition' },
   { id: 'saturn-opposition', label: '토성 충', kind: 'saturn-opposition' },
+  { id: 'solar-eclipse', label: '일식', kind: 'solar-eclipse' },
+  { id: 'lunar-eclipse', label: '월식', kind: 'lunar-eclipse' },
 ];
 
 /** N-body 비활성 사유 (결정 D8). 버튼 `title` 과 `aria-describedby` 가 같은 문자열을 쓴다. */
 export const EVENTS_NBODY_DISABLED_REASON =
   'Kepler 해석해 기준 사건입니다 — 현재 엔진에서는 천체 위치가 달라 사용할 수 없습니다';
 
-/** 일 · 월식 미포함 안내 (§교차검증 합의 3 — 근거 ADR 1-B). */
-export const ECLIPSE_EXCLUSION_NOTE =
-  '일식 · 월식은 현재 달 궤도 모델로 날짜를 맞출 수 없어 넣지 않았습니다.';
+/** 식 필터 (켜져 있으면 배율 고지를 보인다 — 결정 E5). */
+const ECLIPSE_FILTER_IDS: readonly EventFilterId[] = ['solar-eclipse', 'lunar-eclipse'];
+
+/**
+ * 식 사건 배율 고지 (#1354 결정 E5 · 사용자 결정 X (a)). 장면의 달은 지구로부터 ×N 거리에 그려지지만 지구 → 달 **방향**은
+ * 물리값 그대로라 (ADR 축 S) 식 순간의 정렬은 화면에서도 맞고, 거리 · 크기 비만 다르다. N 은 장면과 같은 SSoT
+ * `getOrbitVisualScale('earth', 'moon')` — 리터럴로 쓰지 않는다 (1341 R6).
+ */
+export function eclipseScaleNotice(): string {
+  return `식 — 화면의 달은 지구로부터 실제 거리의 ×${getOrbitVisualScale('earth', 'moon')} 에 그려집니다. 정렬 방향은 실제와 같고, 거리 자 수치는 실제 거리입니다.`;
+}
 
 /** 트리거 위 패널 간격 (px). */
 const PANEL_GAP_PX = 4;
@@ -293,7 +308,11 @@ export function TimeEventsButton() {
         aria-controls={open ? panelId : undefined}
         aria-disabled={disabled}
         aria-describedby={disabled ? reasonId : undefined}
-        title={disabled ? EVENTS_NBODY_DISABLED_REASON : '시간 사건 — 충 · 내합 · 혜성 근일점'}
+        title={
+          disabled
+            ? EVENTS_NBODY_DISABLED_REASON
+            : '시간 사건 — 충 · 내합 · 혜성 근일점 · 일식 · 월식'
+        }
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         onBlur={handleBlur}
@@ -413,9 +432,11 @@ function TimeEventsPanelBody({
       <p id={titleId} className="text-caption text-fg-secondary mb-1">
         시간 사건 (1900~2100)
       </p>
-      <p className="text-mini text-fg-secondary mb-2" data-testid="time-events-eclipse-note">
-        {ECLIPSE_EXCLUSION_NOTE}
-      </p>
+      {ECLIPSE_FILTER_IDS.some((id) => filters[id]) ? (
+        <p className="text-mini text-fg-secondary mb-2" data-testid="time-events-scale-note">
+          {eclipseScaleNotice()}
+        </p>
+      ) : null}
       <div role="group" aria-label="사건 종류" className="flex flex-wrap gap-1 mb-2">
         {FILTER_LABELS.map((f) => (
           <button
@@ -502,7 +523,7 @@ function TimeEventsPanelBody({
 }
 
 /**
- * 목록 한 행. `memo` — 전 종류를 켜면 597행이라, ↑↓ 한 번에 활성 표시가 바뀐 두 행만 다시 그린다.
+ * 목록 한 행. `memo` — 전 종류를 켜면 597행 (식까지 켜면 + 일식 · 월식) 이라, ↑↓ 한 번에 활성 표시가 바뀐 두 행만 다시 그린다.
  */
 const EventOption = memo(function EventOption({
   event,
@@ -515,7 +536,6 @@ const EventOption = memo(function EventOption({
   isActive: boolean;
   onSelect: (event: AstroEvent) => void;
 }) {
-  const kind = getEventKind(event.kind);
   return (
     <li
       id={optionId}
@@ -533,7 +553,7 @@ const EventOption = memo(function EventOption({
         className={`h-2 w-2 shrink-0 rounded-full ${KIND_COLOR_CLASS[event.kind]}`}
       />
       <span className="num">{eventDate(event)}</span>
-      <span className="flex-1 truncate">{kind.labelKo}</span>
+      <span className="flex-1 truncate">{eventLabelKo(event)}</span>
       <span className="num shrink-0 text-fg-secondary" title="모델 사건 시각과 실제 날짜의 최대 차">
         <span className="sr-only">오차 </span>
         {formatTolerance(event.kind)}

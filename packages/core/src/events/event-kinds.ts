@@ -4,9 +4,12 @@
  * 종류를 늘릴 때 고칠 곳은 이 표 한 행이다 — 계산 함수 (`compute-events.ts`) 는 **계산 유형**으로만 분기하고 종류 id 를
  * 모른다 (ADR §Concrete Prediction). web 쪽 눈금 색은 `Record<EventKindId, …>` 라 행을 더하면 타입 검사가 누락을 잡는다.
  *
- * 포함 근거는 ADR 축 K 표 — 「고른 시각에 화면에서 사건이 보이고, 실제 날짜와 며칠 이내인가」. 일식 · 월식 · 지구 근일점 ·
- * 엥케 · 핼리 1910/2061 · 화성 근일점은 넣지 않는다 (사용자 결정 K1 (a) · K2 (a) · K3 (a)).
+ * 포함 근거는 ADR 축 K 표 — 「고른 시각에 화면에서 사건이 보이고, 실제 날짜와 며칠 이내인가」. 지구 근일점 · 엥케 ·
+ * 핼리 1910/2061 · 화성 근일점은 넣지 않는다 (사용자 결정 K1 (a) · K2 (a) · K3 (a)). 일식 · 월식은 #1354 가 달 궤도 시간 변화
+ * 모델 (PR1) 위에서 더했다 (ADR `20261017-1354-lunar-precession-eclipses.md` 결정 E1 ~ E6).
  */
+
+import type { EclipseType } from './eclipse-geometry.js';
 
 /** 계산 유형 — 계산 함수의 유일한 분기 축. */
 export type EventComputation =
@@ -16,7 +19,13 @@ export type EventComputation =
    */
   | { type: 'heliocentric-alignment'; referenceId: string }
   /** 근일점 통과 — 모체 기준 궤도의 평균근점이각 `M ≡ 0 (mod 2π)`. */
-  | { type: 'perihelion' };
+  | { type: 'perihelion' }
+  /**
+   * 삭망 식 (#1354 결정 E1) — 주체 = 위성 (달), 중심 = 그 모체 (지구), 광원 = 체인 뿌리 (태양). 삭망 = 지구 중심 황경차
+   * `0` (삭 `new` — 일식) · `π` (망 `full` — 월식) 의 근, 사건 시각은 그 근 ±0.4일 안의 **최대식** (일식 γ 최소 · 월식 그림자
+   * 중심 이각 최소 — NASA 목록 시각 정의와 같다). 식이 아닌 삭망은 사건이 아니다.
+   */
+  | { type: 'syzygy-eclipse'; phase: 'new' | 'full' };
 
 export type EventKindId =
   | 'mars-opposition'
@@ -24,7 +33,9 @@ export type EventKindId =
   | 'jupiter-opposition'
   | 'saturn-opposition'
   | 'halley-perihelion'
-  | 'swift-tuttle-perihelion';
+  | 'swift-tuttle-perihelion'
+  | 'solar-eclipse'
+  | 'lunar-eclipse';
 
 /** 패널 필터 칩 — 혜성 근일점 2종은 한 칩이다 (결정 D7). */
 export type EventFilterId =
@@ -32,14 +43,16 @@ export type EventFilterId =
   | 'venus-inferior-conjunction'
   | 'jupiter-opposition'
   | 'saturn-opposition'
-  | 'comet-perihelion';
+  | 'comet-perihelion'
+  | 'solar-eclipse'
+  | 'lunar-eclipse';
 
 export interface EventKindDef {
   id: EventKindId;
   /** 사건의 주체 천체 — 선택 시 `focusOn` 대상 (결정 D6). */
   subjectId: string;
   computation: EventComputation;
-  /** 목록 · 스크린리더에 쓰는 사건명 (「화성 충」). */
+  /** 목록 · 스크린리더에 쓰는 사건명 (「화성 충」). 식은 종류 접두가 붙는다 — {@link eventLabelKo}. */
   labelKo: string;
   filter: EventFilterId;
   /**
@@ -48,8 +61,8 @@ export interface EventKindDef {
    */
   window: { start: string; end: string } | null;
   /**
-   * 선택 시 거리 자 기준점을 지구로 자동 설정하는가 (사용자 결정 S3 (b) — 충 · 내합만, 혜성 근일점은 (a)).
-   * 지구–행성 선이 그려지고 줌아웃하면 태양–지구–행성 정렬이 보인다.
+   * 선택 시 거리 자 기준점을 지구로 자동 설정하는가 (사용자 결정 S3 (b) — 충 · 내합 · 식, 혜성 근일점은 (a)).
+   * 지구–행성 선이 그려지고 줌아웃하면 태양–지구–행성 정렬이 보인다. 식은 지구–달 선 (#1354 사용자 결정 S (a)).
    */
   autoRulerAnchorEarth: boolean;
 }
@@ -109,6 +122,24 @@ export const EVENT_KINDS: readonly EventKindDef[] = [
     window: null,
     autoRulerAnchorEarth: false,
   },
+  {
+    id: 'solar-eclipse',
+    subjectId: 'moon',
+    computation: { type: 'syzygy-eclipse', phase: 'new' },
+    labelKo: '일식',
+    filter: 'solar-eclipse',
+    window: null,
+    autoRulerAnchorEarth: true,
+  },
+  {
+    id: 'lunar-eclipse',
+    subjectId: 'moon',
+    computation: { type: 'syzygy-eclipse', phase: 'full' },
+    labelKo: '월식',
+    filter: 'lunar-eclipse',
+    window: null,
+    autoRulerAnchorEarth: true,
+  },
 ];
 
 /**
@@ -127,7 +158,28 @@ export const EVENT_KIND_TOLERANCE_DAYS: Readonly<Record<EventKindId, number>> = 
   'saturn-opposition': 0.4,
   'halley-perihelion': 8.1,
   'swift-tuttle-perihelion': 0.6,
+  // #1354 결정 E4 — 같은 규칙, 기준은 NASA 최대식 TD 시각 (`__test-utils__/nasa-eclipse-fixture.ts`). 적중 사건의 최대
+  // |오차| 는 `eclipse-events.test.ts` E4 가 기록한다 (일식 0.661 h · 월식 0.670 h = 0.028 일 → 0.1 올림 + 0.2).
+  'solar-eclipse': 0.3,
+  'lunar-eclipse': 0.3,
 };
+
+/** 식 종류 접두 — 「개기」 + 「일식」 = 「개기일식」 (사용자 결정 T (a)). 혼성 일식은 개기 / 금환으로 표기된다. */
+const ECLIPSE_TYPE_PREFIX_KO: Readonly<Record<EclipseType, string>> = {
+  total: '개기',
+  annular: '금환',
+  partial: '부분',
+  penumbral: '반영',
+};
+
+/**
+ * 사건 하나의 표기명 — 목록 · 스크린리더 (#1354 결정 E3). 식은 종류를 붙인다 (「개기일식」 · 「반영월식」), 그 밖은 종류 표의
+ * `labelKo` 그대로.
+ */
+export function eventLabelKo(event: { kind: EventKindId; eclipseType?: EclipseType }): string {
+  const label = getEventKind(event.kind).labelKo;
+  return event.eclipseType ? `${ECLIPSE_TYPE_PREFIX_KO[event.eclipseType]}${label}` : label;
+}
 
 export function getEventKind(id: EventKindId): EventKindDef {
   const def = EVENT_KINDS.find((d) => d.id === id);
