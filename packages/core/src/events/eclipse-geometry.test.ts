@@ -120,7 +120,12 @@ describe('#1360 G2 — 일식 원뿔 함수 추출 (판정식 비트 동일)', (
     expect(mismatches).toBe(0);
   });
 
-  it('원뿔 파라미터로 기본면 반경을 다시 만들면 판정식 l1 · l2 와 비트 동일 (uniform 과 판정이 같은 식)', () => {
+  /**
+   * ⚠️ 판별력 한계 — 이 테스트는 cone **값** 이 바뀌어도 FAIL 하지 않는다. 양쪽이 같은 `solarEclipseCone` 출력에서
+   * 계산되기 때문이다 (리뷰 실측: `tanF1 = sin/cos` 변이에서 PASS). 고정하는 것은 「판정식이 cone 필드를 이 식 모양으로
+   * 쓴다」 뿐이고, 값의 비트 동일은 위 동결 사본 대조가 판별한다.
+   */
+  it('원뿔 파라미터로 기본면 반경을 다시 만들면 판정식 l1 · l2 와 비트 동일 — 식 모양만 고정 (cone 값 변이는 판별 못 함)', () => {
     for (const c of configs.slice(0, 200)) {
       const cone = solarEclipseCone(c.moon, c.sun, RADII);
       const g = solarEclipseGeometry(c.moon, c.sun, RADII);
@@ -133,6 +138,18 @@ describe('#1360 G2 — 일식 원뿔 함수 추출 (판정식 비트 동일)', (
         true,
       );
     }
+  });
+
+  it('l2 부호 — 음수면 본영 꼭짓점이 그 평면 너머 (z < z_v), 양수면 평면이 꼭짓점 너머 (z > z_v)', () => {
+    const cone = solarEclipseCone([3.8e8, 0, 0], [AU, 0, 0], RADII);
+    const l2 = (z: number) => z * cone.tanF2 - cone.moonRadiusSecF2;
+    const zVertex = cone.moonRadiusSecF2 / cone.tanF2;
+    // 꼭짓점은 달에서 약 3.74e8 m — 지구–달 거리 근처 (개기 · 금환 경계가 성립하는 이유).
+    expect(zVertex).toBeGreaterThan(3.7e8);
+    expect(zVertex).toBeLessThan(3.8e8);
+    expect(l2(0)).toBe(-cone.moonRadiusSecF2);
+    expect(l2(0.9 * zVertex)).toBeLessThan(0);
+    expect(l2(1.1 * zVertex)).toBeGreaterThan(0);
   });
 
   it('원뿔 파라미터 정의 — 축은 태양 → 달 단위 벡터, sin f1 · sin f2 · sec 항', () => {

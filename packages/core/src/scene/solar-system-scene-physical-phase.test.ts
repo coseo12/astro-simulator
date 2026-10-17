@@ -211,6 +211,27 @@ describe('#1360 G3 — getPhysicalLocal (배율 전 물리 위치) · DoD D2', (
       false,
     );
   });
+  it('N-body → Kepler 복귀 — 다시 Kepler 배율 전 위치 (체인 local) 와 비트 동일 · 배율 30 ↔ 1 비트 동일', () => {
+    // 초기값이 'kepler' 라서, 복귀 경로를 밟지 않으면 `updateAt` Kepler 분기의 `positionSource = 'kepler'` 대입이
+    // 빠져도 다른 테스트는 통과한다 (PR #1364 리뷰 변이 MX6). 대입이 빠지면 복귀 뒤에도 N-body 분기가
+    // `world[moon] − world[earth] = local × 배율` 을 읽는다.
+    const jd = J2000 + 20;
+    const run = (scale: number) => {
+      scaleOverride.value = scale;
+      const f = makeScene();
+      f.handles.updateAt(J2000);
+      f.handles.setPhysicsEngine('newton');
+      f.handles.updateAt(J2000 + 10);
+      f.handles.setPhysicsEngine('kepler');
+      f.handles.updateAt(jd);
+      expect(f.handles.getPhysicsEngine()).toBe('kepler');
+      return [...f.handles.getPhysicalLocal('moon')];
+    };
+    const a = run(30);
+    const b = run(1);
+    expect(bitsEqual(a, resolveBodyChainPosition(bodiesById, 'moon', jd)!.local!)).toBe(true);
+    expect(bitsEqual(a, b)).toBe(true);
+  });
 });
 
 describe('#1360 G4 — 달 uSunDirection 물리 기준점 · DoD D6', () => {

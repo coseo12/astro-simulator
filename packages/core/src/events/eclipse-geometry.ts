@@ -62,7 +62,9 @@ function dot(a: Vec3Double, b: Vec3Double): number {
  * 의 출력을 쓴다 — 두 곳이 각자 `f1` · `f2` 를 계산하면 판정 「개기」 와 렌더 「본영」 이 다른 식이 될 수 있다.
  *
  * 그림자 축 위에서 달로부터 축 방향 거리 `z` [m] 인 평면의 반경 [m] 은
- * `l1(z) = z·tanF1 + moonRadiusSecF1` (반영) · `l2(z) = z·tanF2 − moonRadiusSecF2` (본영, 음수면 꼭짓점 너머).
+ * `l1(z) = z·tanF1 + moonRadiusSecF1` (반영) · `l2(z) = z·tanF2 − moonRadiusSecF2` (본영). `l2` 가 음수면 본영 꼭짓점이 그
+ * 평면 너머 (개기 쪽), 양수면 평면이 꼭짓점 너머 (금환 쪽) 다 — 꼭짓점은 `z_v = moonRadiusSecF2 / tanF2`
+ * (`SolarEclipseGeometry.umbraRadius` 의 「음수면 본영 꼭짓점이 기본면 너머」 와 같은 주어).
  */
 export interface SolarEclipseCone {
   /** 그림자 축 단위 벡터 (태양 → 달). */
