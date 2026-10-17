@@ -107,7 +107,7 @@ describe('#1281 BodyInfoCard — 12 천체 렌더 (D1 · D4)', () => {
     render(<BodyInfoCard />);
     expect(screen.getByText('지구로부터 거리')).toBeInTheDocument();
     expect(screen.getByTestId('body-card-parent-distance').textContent).toMatch(
-      /^(3[5-9]|40)\.\d만 km$/, // 근지점 ~36만 · 원지점 ~40.6만 km (J2000 = 40.0만)
+      /^(3[5-9]|40)\.\d만 km$/, // 근지점 ~36만 · 원지점 ~40.6만 km (J2000 = 40.3만 — #1354 주기 항 전 40.0만)
     );
     expect(screen.getByTestId('body-card-period')).toHaveTextContent('27.32 일');
   });

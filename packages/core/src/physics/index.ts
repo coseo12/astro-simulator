@@ -18,6 +18,15 @@ export {
 } from './kepler.js';
 export { orbitalStateAt, type StateVector } from './state-vector.js';
 export {
+  elementsAt,
+  meanMotionOf,
+  parentRelativePositionAt,
+  periodicPerturbationAt,
+  siderealPeriodOf,
+  type OrbitPositionBody,
+  type PeriodicPerturbation,
+} from './orbit-elements-at.js';
+export {
   NBodyEngine,
   buildInitialState,
   type GrMode,

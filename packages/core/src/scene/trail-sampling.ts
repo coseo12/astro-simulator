@@ -19,6 +19,7 @@
  */
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { orbitMu, solveKeplerEquation } from '../physics/kepler.js';
+import { elementsAt, meanMotionOf } from '../physics/orbit-elements-at.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
 
 const TWO_PI = Math.PI * 2;
@@ -51,7 +52,7 @@ export interface TrailBodySpec {
   readonly semiMajorAxis: number;
   /** `a·√(1 − e²)` — 궤도면 y 성분 계수. */
   readonly semiMinorAxis: number;
-  /** 평균 운동 n [rad/s] — `meanAnomalyAt` 과 같은 식. */
+  /** 평균 운동 n [rad/s] — `meanMotionOf` (율 보유 궤도는 `L̇ − ϖ̇`, 그 밖은 `meanAnomalyAt` 과 같은 Kepler 식). */
   readonly meanMotion: number;
   readonly meanAnomalyAtEpoch: number;
   readonly epoch: number;
@@ -72,13 +73,20 @@ export function trailSegmentsFor(eccentricity: number): number {
     : TRAIL_SEGMENTS;
 }
 
-/** 궤도 보유 천체 1개의 사양. 모체가 없거나 궤도가 없으면 `null`. */
+/**
+ * 궤도 보유 천체 1개의 사양. 모체가 없거나 궤도가 없으면 `null`.
+ *
+ * #1354 결정 V1 — `julianDate` 의 시각 요소 (`elementsAt`) 로 만든다. `rates` 보유 천체 (달) 는 요소가 시간에 따라 돌므로
+ * 호출자 (scene `syncTrails`) 가 프레임마다 현재 시각으로 다시 만든다 ({@link hasSecularRates}). `rates` 없는 천체는 시각과
+ * 무관하게 같은 사양이다. 생략하면 데이터 epoch.
+ */
 export function createTrailBodySpec(
   body: LoadedCelestialBody,
   parent: LoadedCelestialBody,
+  julianDate?: number,
 ): TrailBodySpec | null {
-  const orbit = body.orbit;
-  if (!orbit || !body.parentId) return null;
+  if (!body.orbit || !body.parentId) return null;
+  const orbit = elementsAt(body.orbit, julianDate ?? body.orbit.epoch);
   const a = orbit.semiMajorAxis;
   const e = orbit.eccentricity;
   const mu = orbitMu(body, parent);
@@ -94,7 +102,7 @@ export function createTrailBodySpec(
     eccentricity: e,
     semiMajorAxis: a,
     semiMinorAxis: a * Math.sqrt(1 - e * e),
-    meanMotion: Math.sqrt(mu / (a * a * a)),
+    meanMotion: meanMotionOf(orbit, mu),
     meanAnomalyAtEpoch: orbit.meanAnomalyAtEpoch,
     epoch: orbit.epoch,
     // Rz(Ω)·Rx(i)·Rz(ω) 의 1 · 2 열 — `positionAt` 의 3단 회전을 (xOrb, 0, 0) · (0, yOrb, 0) 에 적용한 것과 같다.
@@ -103,6 +111,11 @@ export function createTrailBodySpec(
     visualScale: getOrbitVisualScale(body.parentId, body.id),
     segments: trailSegmentsFor(e),
   };
+}
+
+/** #1354 — 궤도 요소가 시간에 따라 변하는 천체 (사양 · 궤도선을 현재 시각으로 다시 만들어야 한다). */
+export function hasSecularRates(body: Pick<LoadedCelestialBody, 'orbit'>): boolean {
+  return body.orbit?.rates !== undefined;
 }
 
 /**

@@ -6,6 +6,7 @@
  */
 import { Vector3 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import { elementsAt } from '../physics/orbit-elements-at.js';
 import { renderScaleForTier, type Tier } from './tier.js';
 
 /**
@@ -29,9 +30,18 @@ export function isSatelliteOrbit(parentId: string | null | undefined): parentId 
   return parentId !== null && parentId !== undefined && parentId !== 'sun';
 }
 
-export function sampleOrbitPoints(body: LoadedCelestialBody, tier: Tier): Vector3[] | null {
+/**
+ * @param julianDate 궤도 요소를 평가할 시각 (#1354 결정 V1). `rates` 보유 천체 (달) 는 이 시각의 **평균 요소** 타원이다 —
+ *   주기 항은 넣지 않는다 (달이 선에서 반경 방향 최대 `1.83 %` 벗어나는 것은 ADR 이 받아들인 비용). `rates` 없는 천체는
+ *   시각과 무관하게 같은 점이다 (`elementsAt` 가 같은 객체). 생략하면 데이터 epoch 요소.
+ */
+export function sampleOrbitPoints(
+  body: LoadedCelestialBody,
+  tier: Tier,
+  julianDate?: number,
+): Vector3[] | null {
   if (!body.orbit || !body.parentId) return null;
-  const orbit = body.orbit;
+  const orbit = elementsAt(body.orbit, julianDate ?? body.orbit.epoch);
   // 궤도 한 바퀴 샘플링 (진근점각 기준 등간격)
   // R10b #664 — 고이심률 (e ≥ 0.6) body 는 256 seg: 진근점각 등간격은 근일점 자동 밀집 +
   // 원일점 희소가 구조라, halley (e 0.967) 원일점측 chord sagitta 가 프레임핏 13.97px 로

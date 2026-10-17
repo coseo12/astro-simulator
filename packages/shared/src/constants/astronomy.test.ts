@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { AU, J2000_JD, JULIAN_YEAR_SECONDS, LIGHT_YEAR } from './astronomy.js';
+import {
+  AU,
+  GENERAL_PRECESSION_DEG_PER_CENTURY,
+  J2000_JD,
+  JULIAN_YEAR_SECONDS,
+  LIGHT_YEAR,
+} from './astronomy.js';
 
 describe('astronomy constants', () => {
   it('AU 정의값 — IAU 2012', () => {
@@ -17,5 +23,9 @@ describe('astronomy constants', () => {
 
   it('J2000.0 = JD 2451545.0', () => {
     expect(J2000_JD).toBe(2_451_545.0);
+  });
+
+  it('#1354 일반세차 p_A = 5028.796195″/세기 (IAU 2006 P03 선형항) — 도 단위', () => {
+    expect(GENERAL_PRECESSION_DEG_PER_CENTURY * 3600).toBeCloseTo(5028.796195, 9);
   });
 });

@@ -57,8 +57,9 @@ describe('#1281 body-info — 공용 조회 · 주기', () => {
     expect(satellites.length).toBeGreaterThanOrEqual(16); // 공허 통과 방지
     for (const b of satellites) {
       const { parent } = findBodyAndParent(bodies, b.id);
-      const scene = physics.orbitalPeriod(b.orbit!.semiMajorAxis, orbitMu(b, parent!));
-      // a**3 ↔ a*a*a 연산 순서 차로 마지막 비트가 다를 수 있다 — 상대 1e-12 (μ 차이는 달조차 ~0.6%).
+      // #1354 — 장면 공전 주기는 `siderealPeriodOf` (율 보유 달은 평균경도 율 `2π / L̇`, 그 밖은 Kepler 식).
+      const scene = physics.siderealPeriodOf(b.orbit!, orbitMu(b, parent!));
+      // 상대 1e-12 — 위성은 카드 μ (`twoBodyMu`) 와 장면 μ (`orbitMu`) 가 같은 식이라 사실상 비트 동일 (μ 차이는 달조차 ~0.6%).
       const card = orbitalPeriodSeconds(b, parent)!;
       expect(Math.abs(card / scene - 1), b.id).toBeLessThan(1e-12);
     }

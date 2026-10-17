@@ -116,7 +116,26 @@
         "inclinationDeg": 5.145,
         "longitudeOfAscendingNodeDeg": 125.08,
         "longitudeOfPerihelionDeg": 83.22,
-        "meanLongitudeDeg": 218.32
+        "meanLongitudeDeg": 218.32,
+        "$ratesComment": "#1354 결정 M1 · M2 — J. Meeus, Astronomical Algorithms 2판 (1998) 47장 식 47.1 (L′ 율) · 47.7 (Ω 율) 과 평균 근지점 율 (PyMeeus Moon.longitude_mean_perigee — 47장 재현, 2026-10-17 대조). 값은 문헌 원값 (날짜 평균 분점 기준, 도/율리우스 세기) 이고 로더가 일반세차 p_A 를 빼 J2000 고정 분점 율로 옮긴다. 기점 값 (위 Ω · ϖ · L) 은 바꾸지 않는다 (Q-D2 (a)).",
+        "rates": {
+          "frame": "mean-equinox-of-date",
+          "meanLongitudeDegPerCentury": 481267.88123421,
+          "longitudeOfAscendingNodeDegPerCentury": -1934.1362891,
+          "longitudeOfPerihelionDegPerCentury": 4069.0137287
+        },
+        "$periodicTermsComment": "#1354 결정 M1 (B9) — Meeus 47장 표 47.A (경도 Σl · 거리 Σr) · 47.B (위도 Σb) 중 Kepler 타원 · 경사가 이미 담는 항 (D · M 계수가 모두 0) 을 뺀 진폭 상위 경도 4 · 위도 3 · 거리 2 항. 경도 · 위도 = 도, 거리 = km. 인자는 장면 요소에서 만든다 (D = L′ − L☉, M = 지구 평균근점이각, M′ = 달 평균근점이각, F = L′ − Ω).",
+        "periodicTerms": [
+          { "component": "longitude", "D": 2, "M": 0, "Mp": -1, "F": 0, "amplitude": 1.274027 },
+          { "component": "longitude", "D": 2, "M": 0, "Mp": 0, "F": 0, "amplitude": 0.658314 },
+          { "component": "longitude", "D": 0, "M": 1, "Mp": 0, "F": 0, "amplitude": -0.185116 },
+          { "component": "longitude", "D": 2, "M": 0, "Mp": -2, "F": 0, "amplitude": 0.058793 },
+          { "component": "latitude", "D": 2, "M": 0, "Mp": 0, "F": -1, "amplitude": 0.173237 },
+          { "component": "latitude", "D": 2, "M": 0, "Mp": -1, "F": 1, "amplitude": 0.055413 },
+          { "component": "latitude", "D": 2, "M": 0, "Mp": -1, "F": -1, "amplitude": 0.046271 },
+          { "component": "distance", "D": 2, "M": 0, "Mp": -1, "F": 0, "amplitude": -3699.111 },
+          { "component": "distance", "D": 2, "M": 0, "Mp": 0, "F": 0, "amplitude": -2955.968 }
+        ]
       }
     },
     {
