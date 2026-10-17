@@ -216,7 +216,7 @@ ADR 1347 은 일식 · 월식을 제외했다 — 달 요소가 상수라 식 �
 | 고정 요소 대조 | `packages/core/src/scene/trail-sampling.test.ts:118` (35 천체 × 1900 · J2000 · 2100 정점 = 고정 orbit `positionAt`, `1e-9`) · `packages/core/src/physics/orbital-plane-inclination.test.ts:295` · `:448` | 대조 기준을 `elementsAt(jd)` 로 |
 | 체인 손 전개 대조 | `packages/core/src/physics/body-chain.test.ts:15` (`PARITY_JDS` 1900 · J2000 · 2100) · `:47` · `apps/web/src/lib/body-distance.test.ts:58-64` (`orbitalStateAt(moon.orbit, J2000)` 대조) | 결정 M4 단일 함수로 기대값을 다시 만든다 |
 | 궤적 머리 = 메시 | `packages/core/src/scene/solar-system-scene-trails.test.ts:213` · `:305-319` | 결정 V1 이 지키면 불변 |
-| 범위 · 정규식 | `jpl-validation.test.ts:247` (`356k ~ 407k km`) · `body-info-card.test.tsx:110` (`(3[5-9]|40).x만 km` — 주석 「J2000 = 40.0만」 경계 근처) | (b) 는 J2000 거리가 `+2,346 km` 바뀐다 (`Δr −2,192 → +154`) — 정규식 재확인 |
+| 범위 · 정규식 | `jpl-validation.test.ts:247` (`356k ~ 407k km`) · `body-info-card.test.tsx:110` (`(3[5-9]\|40).x만 km` — 주석 「J2000 = 40.0만」 경계 근처) | (b) 는 J2000 거리가 `+2,346 km` 바뀐다 (`Δr −2,192 → +154`) — 정규식 재확인 |
 | 브라우저 · 시각 고정 | `apps/web/scripts/browser-verify-1274-surface-invariance.mjs:110` · `browser-verify-783-earth-detail.mjs:133` (`T_JD = 2451626` = J2000 + 81일 — 달 이동 (a) `4,535 km` · (b) `6,675 km`) | 같은 빌드 안 on/off 대조라면 불변, 빌드 간 대조라면 달 영역 차이 |
 | 기본 로드 실측 임계 | `browser-verify-756-surface.mjs:141` · `browser-verify-773-light.mjs:541` · `browser-verify-774-sun.mjs:515` · `r1-ui-regression-guard.mjs:177` · `scripts/verify-fps-baseline.mjs:165` · `:384` | [추정] 영향 작음 — qa 가 1회 재실행해 확인 |
 
