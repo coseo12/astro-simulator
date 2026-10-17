@@ -1180,6 +1180,14 @@ export interface CreateProceduralPlanetMaterialOptions {
   sunPositionProvider?: () => Vector3;
 
   /**
+   * #1360 결정 G4 — `uSunDirection` 기준점 provider (scene-unit world). `null` (또는 미전달) 이면 현행대로 draw 중인 mesh 의
+   * 절대 위치를 쓴다. 장면은 달에만 물리 위치 (`모체 메시 + 배율 전 위치 × renderScale`) 를 돌려준다 — 달 메시는 위성 배율 ×30
+   * 에 있어 메시 기준 위상이 화면 기하를 따르기 때문이다 (ADR `20261018-1360-moon-phase-eclipse-shadows.md` §1-B).
+   * onBind 마다 호출되므로 반환 Vector3 는 재사용 버퍼여도 된다 (즉시 소비).
+   */
+  sunDirectionAnchorProvider?: ((bodyId: string) => Vector3 | null) | undefined;
+
+  /**
    * Amendment 1 (#773) §A1.3 결정 2 — 광원 물리 상수 (scene SSoT 주입). 미전달 시 단색 행성과
    * 불일치하므로 호출부 (scene) 가 반드시 전달. 테스트 등 미전달 시 안전 기본값 (단색 행성 값) 적용.
    */
@@ -1549,6 +1557,7 @@ export function createProceduralPlanetMaterial(
   }
 
   const sunPositionProvider = options.sunPositionProvider;
+  const sunDirectionAnchorProvider = options.sunDirectionAnchorProvider;
   if (sunPositionProvider || maskFileName !== undefined) {
     // onBindObservable — 각 draw 직전 mesh 핸들과 함께 호출 (scene 이 material 핸들 별도 추적 불요,
     // 옵션 d Map 대비 우월 — ADR §A1.3 결정 1 c). tmpVector 재사용으로 alloc 0 (cross-validate 이견 2).
@@ -1559,10 +1568,12 @@ export function createProceduralPlanetMaterial(
     material.onBindObservable.add((mesh) => {
       if (sunPositionProvider) {
         const sunPos = sunPositionProvider();
-        // sunDir = normalize(sunPos − meshAbsPos) (world). Amendment 2 옵션 e: vNormal 도 world normal.
-        // satellite (달) 도 parent 상속 위치를 getAbsolutePosition 이 정확히 반영 (ADR §A1.3 결정 1).
-        const meshPos = (mesh as Mesh).getAbsolutePosition();
-        sunPos.subtractToRef(meshPos, tmpSunDir);
+        // sunDir = normalize(sunPos − anchor) (world). Amendment 2 옵션 e: vNormal 도 world normal.
+        // anchor 기본값은 draw 중인 mesh 의 절대 위치 (mid variant 는 parent 상속 위치를 getAbsolutePosition 이 반영 —
+        // ADR §A1.3 결정 1). #1360 결정 G4 — provider 가 값을 주는 천체 (달) 는 물리 위치를 기준점으로 쓴다.
+        const anchor =
+          sunDirectionAnchorProvider?.(body.id) ?? (mesh as Mesh).getAbsolutePosition();
+        sunPos.subtractToRef(anchor, tmpSunDir);
         tmpSunDir.normalize();
         material.setVector3('uSunDirection', tmpSunDir);
       }

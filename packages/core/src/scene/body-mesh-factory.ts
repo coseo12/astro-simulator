@@ -51,6 +51,11 @@ export interface SurfaceLightingArgs {
    * (core 보수 기본). 이 묶음이 `createProceduralPlanetMaterial` 옵션으로 그대로 전달된다.
    */
   nightLights?: boolean | undefined;
+  /**
+   * #1360 결정 G4 — `uSunDirection` 기준점 provider. `null` 이면 mesh 위치 (현행). 장면은 달에만 물리 위치를 준다.
+   * 이 묶음이 `createProceduralPlanetMaterial` 옵션으로 그대로 전달된다.
+   */
+  sunDirectionAnchorProvider?: ((bodyId: string) => Vector3 | null) | undefined;
 }
 
 export function createBodyMesh(
