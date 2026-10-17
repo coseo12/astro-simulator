@@ -5,6 +5,17 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1360] 달 위상이 물리 기하를 따른다 (PR1)** ([#1360](https://github.com/coseo12/astro-simulator/issues/1360)). 달 절차 셰이더의 태양 방향 (`uSunDirection`) 기준점을 달 메시 (화면) 위치에서 물리 위치 `지구 메시 + 배율 전 달 위치 × renderScale` 로 바꿨다. 화면의 달은 지구로부터 실제 거리 × 위성 배율 30 에 있어, 종전 위상은 그 화면 기하를 따랐다 — 2년 스윕에서 조명 비율 차 `|Δk|` 최대 `0.040` · 위상각 차 최대 `4.576°` (ADR [`20261018-1360`](docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md) §1-B). 결정 G2 · G3 · G4.
+  - G3: 장면 핸들에 `getPhysicalLocal(id)` 를 더했다 — 장면이 이번 프레임에 쓴 「위성 배율을 곱하기 전」 모체 기준 위치. Kepler 는 `localPositions`, N-body 는 엔진 위치의 차를 읽는다. 위성 배율과 독립인 함수가 아니라, 배율이 Kepler 경로에서만 곱해진다는 현재 구조에 의존한다 — 테스트가 배율 30 ↔ 1 에서 출력 비트 동일을 단언해 그 의존을 고정한다 (DoD D2).
+  - G2: `eclipse-geometry.ts` 에서 일식 원뿔 파라미터 함수 `solarEclipseCone` 를 추출했고 `solarEclipseGeometry` 가 그것을 쓴다. 판정 결과는 추출 전 동결 사본과 2,000 표본 비트 동일이다.
+  - 실측 (단위, JD 5개 — ADR §1-B 표): 물리 기준점 방향과의 각 `0 ~ 8.5e-7°` (DoD D6 허용 `1e-4°`). 종전 (메시 기준) 은 같은 JD 에서 `1.19 ~ 4.51°`.
+
+### Behavior Changes
+
+- [#1360] 절차 표면을 켠 달 (high · mid LOD) 의 명암 경계가 모든 시각에서 바뀐다 (최대 위상각 `4.576°`). 1274 하네스 (`T_JD 2451626`, 위상각 차 약 `2°`) 에서 달 표본 1,700 픽셀 중 112 픽셀이 바뀌었고 (평균 휘도 `139.76 → 137.85`), 그 밖의 시나리오 11개는 0 이다. 지구 · 다른 천체 · `?surface=off` · LOD low · N-body 경로 (배율을 곱하지 않아 물리 위치 = 메시 위치) 는 그대로다. 다른 위성의 위상 (`StandardMaterial` · `PointLight`) 은 미처리로 남는다.
+
 ## [0.101.0] - 2026-10-17
 
 ### Added

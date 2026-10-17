@@ -17,6 +17,7 @@ import type { BootPhaseHook } from '../engine/boot-phase.js';
 import { orbitMu } from '../physics/kepler.js';
 import { elementsAt, parentRelativePositionAt } from '../physics/orbit-elements-at.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
+import type { Vec3Double } from '../coords/vec3.js';
 import {
   NBodyEngine,
   buildInitialState,
@@ -164,6 +165,13 @@ const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
  * `solar-system-scene-lunar-orbit-line.test.ts` 가 단언한다.
  */
 export const PRECESSING_ORBIT_LINE_THRESHOLD_RAD = (0.5 * Math.PI) / 180;
+
+/**
+ * #1360 결정 G4 — 절차 셰이더 `uSunDirection` 기준점을 메시 (화면) 위치 대신 물리 위치로 두는 천체. 달 전용이다 — 달의 화면
+ * 위치는 지구로부터 실제 거리 × 위성 배율 (`orbit-visual-scale.ts`) 에 있어, 메시 기준이면 위상각이 최대 `4.576°` 어긋난다
+ * (ADR `20261018-1360-moon-phase-eclipse-shadows.md` §1-B — 2년 스윕).
+ */
+export const PHYSICAL_PHASE_BODY_IDS: ReadonlySet<string> = new Set(['moon']);
 /** 강조색(`BELT_HILDA_ACCENT_RGB`) 으로 구분하는 그룹 — 힐다 3:2 공명군. 시각 구분 전용 (PR #1324 사용자 결정). */
 const BELT_ACCENT_GROUP = 'hilda';
 
@@ -505,6 +513,13 @@ export interface SolarSystemSceneHandles {
    * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
    */
   getBodyReferenceFrame: () => BodyReferenceFrame;
+  /**
+   * #1360 결정 G3 — 장면이 이번 프레임에 쓴 「위성 배율을 곱하기 **전**」 모체 기준 위치 [m] 의 사본. 뿌리 천체 · 미등록 id 는
+   * `[0, 0, 0]`. 위상 (G4) · 그림자 (PR2 · PR3) 의 물리 기하 입력이다. 진단 · 단위 테스트용.
+   *
+   * ⚠️ 위성 배율과 **독립이 아니다** — 배율이 어디서 곱해지는지에 의존한다 (정의부 주석).
+   */
+  getPhysicalLocal: (id: string) => Vec3Double;
   dispose: () => void;
 }
 
@@ -902,6 +917,9 @@ export function createSolarSystemScene(
     // #1226 Amendment 11 — 야간 도시 불빛 (유효 조건 `nightLights && surfaceDetail` — 이 묶음은
     // surfaceDetail=true 일 때만 소비된다). clouds 와 독립.
     nightLights,
+    // #1360 결정 G4 — 달 위상 기준점 (물리 위치). 정의부 (`physicalPhaseAnchor`) 는 위치 버퍼 · `bodyFrame` 뒤에 있으므로
+    // 화살표로 감싸 호출 시점에 읽는다 — onBind 는 draw 때만 불리고 장면 생성 중에는 불리지 않는다.
+    sunDirectionAnchorProvider: (bodyId: string) => physicalPhaseAnchor(bodyId),
   };
   // 광원 (HemisphericLight + PointLight) + 셰이더 광원 상수 묶음.
   phase('scene:lights');
@@ -1479,6 +1497,74 @@ export function createSolarSystemScene(
     bodyFrame.originY = oy;
     bodyFrame.originZ = oz;
     bodyFrame.scale = scale;
+  };
+
+  /**
+   * #1360 결정 G3 — `updateAt` 이 이번 프레임 위치를 어느 경로로 썼는가. `activeEngine` 만으로는 정할 수 없다 —
+   * N-body 엔진을 골랐어도 엔진 인스턴스가 아직 없으면 `updateAt` 은 Kepler 경로로 떨어진다 (`updateAt` 첫 분기).
+   */
+  let positionSource: 'kepler' | 'nbody' = 'kepler';
+
+  /**
+   * #1360 결정 G3 — 장면이 이번 프레임에 쓴 「위성 배율을 곱하기 **전**」 모체 기준 위치 [m] 를 `out` 에 쓴다.
+   *
+   *  - Kepler 경로: `localPositions` — `resolveWorld` 가 `getOrbitVisualScale` 을 곱하기 **전** 값.
+   *  - N-body 경로: 엔진 위치의 차 `world[id] − world[parent]` — 이 경로는 배율을 곱하지 않는다 (ADR 1341 Amendment 3).
+   *
+   * ⚠️ **이 함수는 위성 배율과 「독립」 이 아니다 — 배율이 어디서 곱해지는지에 의존한다** (#1354 교훈). 지금은 Kepler
+   * 경로만 곱하므로 Kepler 는 곱하기 전 버퍼를, N-body 는 엔진 차를 읽는다. N-body 경로가 배율을 곱하게 바뀌면 N-body
+   * 분기도 「곱하기 전」 값을 읽도록 함께 바뀌어야 한다. 이 의존은 `solar-system-scene-physical-phase.test.ts` (DoD D2 —
+   * 배율 30 ↔ 1 에서 출력 비트 동일) 가 고정한다.
+   */
+  const physicalLocalInto = (id: string, out: MutVec3): MutVec3 => {
+    const body = bodiesById.get(id);
+    if (!body?.parentId) {
+      out[0] = 0;
+      out[1] = 0;
+      out[2] = 0;
+      return out;
+    }
+    if (positionSource === 'kepler') {
+      const local = localPositions.get(id) ?? ZERO;
+      out[0] = local[0];
+      out[1] = local[1];
+      out[2] = local[2];
+      return out;
+    }
+    const world = worldPositions.get(id) ?? ZERO;
+    const parentWorld = worldPositions.get(body.parentId) ?? ZERO;
+    out[0] = world[0] - parentWorld[0];
+    out[1] = world[1] - parentWorld[1];
+    out[2] = world[2] - parentWorld[2];
+    return out;
+  };
+
+  const tmpPhysicalLocal: MutVec3 = [0, 0, 0];
+  const tmpPhaseAnchor = new Vector3();
+  /**
+   * #1360 결정 G4 — 절차 셰이더 `uSunDirection` 의 기준점 (장면 단위). 달만 물리 위치
+   * `모체 메시 + physicalLocal × bodyFrame.scale` 을 돌려주고, 그 밖은 `null` (셰이더가 메시 위치를 쓴다 — 현행).
+   *
+   * 배율은 메시 위치에만 남고 위상은 배율 전 값을 쓴다 (principles §1 — rendering 시점 분리). 다른 위성은 `StandardMaterial`
+   * · `PointLight` 라 같은 화면 기하 위상이지만 범위 밖이다 — 「독립」 이 아니라 **미처리** (ADR §비-범위).
+   *
+   * `bodyFrame.scale` 은 메시 위치가 마지막으로 쓰인 배율이다 (`updateAt` · `setTier` 두 지점) — 모체 메시 위치와 같은
+   * 기준계라 차가 물리적으로 의미를 갖는다 (`syncSunLightPosition` 의 #1204 계약과 같은 논거).
+   */
+  const physicalPhaseAnchor = (bodyId: string): Vector3 | null => {
+    if (!PHYSICAL_PHASE_BODY_IDS.has(bodyId)) return null;
+    const parentId = bodiesById.get(bodyId)?.parentId;
+    const parentMesh = parentId ? meshes.get(parentId) : undefined;
+    if (!parentMesh) return null;
+    physicalLocalInto(bodyId, tmpPhysicalLocal);
+    const s = bodyFrame.scale;
+    const p = parentMesh.getAbsolutePosition();
+    tmpPhaseAnchor.set(
+      p.x + tmpPhysicalLocal[0] * s,
+      p.y + tmpPhysicalLocal[1] * s,
+      p.z + tmpPhysicalLocal[2] * s,
+    );
+    return tmpPhaseAnchor;
   };
 
   // 소행성대 (#99).
@@ -2206,6 +2292,7 @@ export function createSolarSystemScene(
         newtonLastJd = jd;
       }
       const flat = newtonEngine.positions();
+      positionSource = 'nbody';
       for (const body of system.bodies) {
         const idx = newtonIdIndex.get(body.id);
         const world = worldPositions.get(body.id)!;
@@ -2221,6 +2308,7 @@ export function createSolarSystemScene(
       }
     } else {
       updateAtKepler(jd);
+      positionSource = 'kepler';
     }
 
     // 가드 C (#380 G3 fix) — Floating Origin primary follow sub-frame 이동.
@@ -3253,6 +3341,10 @@ export function createSolarSystemScene(
     setRuler,
     getRulerLine: () => rulerLine,
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
+    getPhysicalLocal: (id: string) => {
+      const out: MutVec3 = [0, 0, 0];
+      return physicalLocalInto(id, out);
+    },
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();
