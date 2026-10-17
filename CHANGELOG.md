@@ -5,6 +5,29 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1360] 월식 그림자 (PR2)** ([#1360](https://github.com/coseo12/astro-simulator/issues/1360)). 이제 지구 그림자가 달 표면 (절차 표면 high · mid LOD) 에 떨어진다. 반영 안에서는 직사광이 거리에 비례해 줄고 (결정 R4 — 거리 선형), 본영 안에서는 붉은 빛이 더해진다. 붉은 빛은 Danjon L = 2 를 미학 상수로 표현한 것이고, 본영 중심이 어둡고 가장자리가 밝다 (결정 R5 — 출처 NASA GSFC Espenak 「Danjon Scale of Lunar Eclipse Brightness」). 세기는 사용자 육안 승인에서 확정한다. 월식을 고르면 달에 포커스하면서 시점을 달의 지구 쪽 반구로 돌린다 (결정 C3 · ADR 1354 Amendment 1). ADR [`20261018-1360`](docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md) 결정 R1 · R2 · R4 · R5 · C2 · C3 (월식).
+  - uniform 빌더 `events/eclipse-shadow-uniforms.ts` 는 Babylon 에 의존하지 않는 순수 함수다. 판정식 `lunarEclipseGeometry` 의 출력 (σ · `Ru` · `Rp` · `S☾`) 을 그대로 쓰므로, 판정이 「식 아님」 이면 그림자도 없다 (`uEclMode 0`). 입력은 장면의 배율 전 위치 (`getPhysicalLocal`) 다. Kepler 는 `localPositions`, N-body 는 엔진 상태를 읽는다.
+  - 셰이더 (`procedural-planet-shader.ts`) 에 uniform 5개와 함수 1개를 더했고, 합성은 `shade -= sunShade * ecl.x; shade += uEclGlow * (ecl.y * sunFactor)` 다. `#define` 분기는 없다. 붉은 빛은 기존 `sunFactor` 로 태양 쪽 반구에만 건다. 화성 · 목성 · 지구 등 다른 절차 머티리얼은 `uEclMode 0` 으로 고정한다.
+  - 장면은 `updateAt` 에서 프레임당 1회 계산해 머티리얼에 직접 쓴다. onBind 에서 쓰면 Babylon 의 uniform 업로드 뒤라 한 프레임 늦게 반영되기 때문이다. lazy 로 생성되는 달 mid 에는 생성 즉시 쓴다. 검증용 토글 `setEclipseShadowsEnabled(boolean)` 을 더했다 (기본 `true`, UI 없음 — 결정 C2).
+  - 카메라: `FocusTarget.viewDirection` 을 주면 alpha · beta 도 같은 전환 시간으로 맞춘다. 사건 종류 데이터 `focusView: 'facing-parent'` 는 월식에만 있다. 시점은 지구 방향에서 카메라 위쪽으로 `15°` 기울인다. 정확히 지구 방향이면 거리 자 선이 카메라를 관통해 화면에 세로선으로 늘어지기 때문이다 (실 Chrome 실측).
+  - 실측 D3 (SwiftShader, 같은 프레임 on/off):
+    - 2022-11-08 최대식: 휘도비 `0.0900` · R/G `1.572`
+    - −70분: 어두운 쪽 방향 오차 `6.0°`
+    - 2023-05-05 반영월식: 휘도비 `0.7942`
+    - +1일 · +3일: 변경 픽셀 `0` · `0`
+    - 2025-03-14 최대식 (기록): `0.1233` · `1.457`
+  - 결함판 변이 (D3):
+    - `a` 부호 반전: −70분 방향 오차 `176.2°`
+    - 화면 기하 uniform: 반영월식 휘도비 `0.1665` · +1일 변경 `163,487` 픽셀
+    - 붉은 빛 0: R/G `1.013`
+  - 실측 D5 (develop `b34df1c3` ↔ 본 PR):
+    - SwiftShader · ANGLE Metal · WebGPU Metal 에서 기본 화면 · 지구 포커스 (자전 끔 · 켬) · 달 포커스 J2000 · 식 시각 그림자 끔 5 화면이 바이트 동일하다.
+    - 양성 대조로 전 절차 머티리얼에 전면 차폐를 넣으면 `30,149` ~ `30,155` 바이트가 다르다.
+    - 1274 하네스는 12 시나리오 전부 `diff 0` 이다 (`ALLOW_SAME_BUILD` 미사용).
+  - 실측 D7 (SwiftShader 중앙값): 지구 화면 채움 `28.5 → 28.6` ms (`+0.35%`), 달 화면 채움 · 개기 최대식 `23.9 → 24.5` ms (`+2.51%`).
+
 ### Fixed
 
 - **[#1360] 달 위상이 물리 기하를 따른다 (PR1)** ([#1360](https://github.com/coseo12/astro-simulator/issues/1360)). 달 절차 셰이더의 태양 방향 (`uSunDirection`) 기준점을 달 메시 (화면) 위치에서 물리 위치 `지구 메시 + 배율 전 달 위치 × renderScale` 로 바꿨다. 화면의 달은 지구로부터 실제 거리 × 위성 배율 30 에 있어, 종전 위상은 그 화면 기하를 따랐다 — 2년 스윕에서 조명 비율 차 `|Δk|` 최대 `0.040` · 위상각 차 최대 `4.576°` (ADR [`20261018-1360`](docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md) §1-B). 결정 G2 · G3 · G4.
@@ -14,6 +37,7 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- [#1360 PR2] 월식 시각 (판정식 「반영」 이상) 에는 절차 표면을 켠 달 (high · mid) 이 어두워지고 본영 안이 붉어진다. 식이 아닌 시각과 그 밖의 천체는 바이트 동일하다 (D5). 사건 패널에서 월식을 고르면 카메라 alpha · beta 가 바뀐다 (달의 지구 쪽에서 위로 `15°`). 이미 달에 포커스 중이어도 바뀐다. 다른 사건을 고르면 종전처럼 시점 각을 유지한다.
 - [#1360] 절차 표면을 켠 달 (high · mid LOD) 의 명암 경계가 모든 시각에서 바뀐다 (최대 위상각 `4.576°`). 1274 하네스 (`T_JD 2451626`, 위상각 차 약 `2°`) 에서 달 표본 1,700 픽셀 중 112 픽셀이 바뀌었고 (평균 휘도 `139.76 → 137.85`), 그 밖의 시나리오 11개는 0 이다. 지구 · 다른 천체 · `?surface=off` · LOD low · N-body 경로 (배율을 곱하지 않아 물리 위치 = 메시 위치) 는 그대로다. 다른 위성의 위상 (`StandardMaterial` · `PointLight`) 은 미처리로 남는다.
 
 ## [0.101.0] - 2026-10-17

@@ -155,6 +155,48 @@ export interface FocusTarget {
   mesh: Mesh;
   /** 메쉬로부터의 기본 거리 (씬 단위). 기본: 메쉬 반경 × 5 */
   radius?: number;
+  /**
+   * #1360 PR2 결정 C3 (ADR 1354 Q-S Amendment) — 시점 방향: 대상 → 카메라 world 방향 (정규화 불요). 주면 카메라 `alpha` ·
+   * `beta` 도 같은 전환 시간으로 그 방향에 맞춘다 (`alpha` 는 짧은 쪽으로 돈다). 생략하면 현행대로 시점 각을 유지한다.
+   */
+  viewDirection?: Vector3;
+}
+
+/** 시점 방향 → ArcRotate 각. `beta` 는 카메라 한계로 자른다 (극 방향이면 `alpha` 는 정의상 임의 — 현재 값을 유지). */
+export interface ArcAngles {
+  alpha: number;
+  beta: number;
+}
+
+const TWO_PI = Math.PI * 2;
+/** 극 방향 판정 — 수평 성분이 이보다 작으면 `alpha` 를 바꾸지 않는다 (atan2(0, 0) 회피). */
+const POLAR_HORIZONTAL_EPSILON = 1e-9;
+
+/**
+ * #1360 PR2 — 대상 → 카메라 방향 `dir` 을 ArcRotate 각으로 바꾼다. Babylon ArcRotate 위치식
+ * `target + r·(cos α sin β, cos β, sin α sin β)` (upVector = +Y — `camera.ts` 기본) 의 역이다.
+ * `alpha` 는 `currentAlpha` 에서 짧은 쪽으로 도는 값 (`|Δ| ≤ π`) 을 돌려준다 — 전환 애니메이션이 한 바퀴 돌지 않게.
+ */
+export function viewDirectionToArcAngles(
+  dir: { readonly x: number; readonly y: number; readonly z: number },
+  currentAlpha: number,
+  lowerBetaLimit: number | null,
+  upperBetaLimit: number | null,
+): ArcAngles {
+  const len = Math.hypot(dir.x, dir.y, dir.z);
+  if (!(len > 0)) return { alpha: currentAlpha, beta: Number.NaN };
+  const y = dir.y / len;
+  let beta = Math.acos(Math.min(1, Math.max(-1, y)));
+  if (lowerBetaLimit != null) beta = Math.max(lowerBetaLimit, beta);
+  if (upperBetaLimit != null) beta = Math.min(upperBetaLimit, beta);
+  if (Math.hypot(dir.x, dir.z) / len < POLAR_HORIZONTAL_EPSILON)
+    return { alpha: currentAlpha, beta };
+  const raw = Math.atan2(dir.z, dir.x);
+  // currentAlpha 기준 (−π, π] 로 감싼 차.
+  let delta = (raw - currentAlpha) % TWO_PI;
+  if (delta > Math.PI) delta -= TWO_PI;
+  if (delta <= -Math.PI) delta += TWO_PI;
+  return { alpha: currentAlpha + delta, beta };
 }
 
 /**
@@ -343,6 +385,34 @@ export class CameraController {
       Animation.ANIMATIONLOOPMODE_CONSTANT,
       this.#easing,
     );
+
+    // #1360 PR2 결정 C3 — 선택적 시점 방향. 같은 전환 시간 · easing 으로 alpha · beta 를 맞춘다.
+    if (target.viewDirection) {
+      const angles = viewDirectionToArcAngles(
+        target.viewDirection,
+        this.camera.alpha,
+        this.camera.lowerBetaLimit,
+        this.camera.upperBetaLimit,
+      );
+      if (Number.isFinite(angles.beta)) {
+        for (const [name, from, to] of [
+          ['alpha', this.camera.alpha, angles.alpha],
+          ['beta', this.camera.beta, angles.beta],
+        ] as const) {
+          Animation.CreateAndStartAnimation(
+            `cam-${name}`,
+            this.camera,
+            name,
+            FRAMES_PER_SECOND,
+            (TRANSITION_MS / 1000) * FRAMES_PER_SECOND,
+            from,
+            to,
+            Animation.ANIMATIONLOOPMODE_CONSTANT,
+            this.#easing,
+          );
+        }
+      }
+    }
   }
 
   /** 카메라 reset — 기본 위치로 복귀 */

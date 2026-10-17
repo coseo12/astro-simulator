@@ -67,8 +67,15 @@ import { SCENE_CLEAR_COLOR_RGBA, hexToColor3 } from './color-utils.js';
 import {
   isProceduralPlanetMaterial,
   resolveNightLightStrength,
+  setEclipseShadowUniforms,
   type PlanetLightingConstants,
 } from './procedural-planet-shader.js';
+import {
+  copyEclipseShadowUniforms,
+  lunarEclipseShadowUniforms,
+  noEclipseShadowUniforms,
+  type EclipseShadowUniforms,
+} from '../events/eclipse-shadow-uniforms.js';
 // #850 Phase 1 — 아래 4 모듈은 본 파일 테일 (구 2041-2502) 에서 순수 이동한 헬퍼다 (동작 변경 0).
 import {
   createBodyMesh,
@@ -172,6 +179,12 @@ export const PRECESSING_ORBIT_LINE_THRESHOLD_RAD = (0.5 * Math.PI) / 180;
  * (ADR `20261018-1360-moon-phase-eclipse-shadows.md` §1-B — 2년 스윕).
  */
 export const PHYSICAL_PHASE_BODY_IDS: ReadonlySet<string> = new Set(['moon']);
+
+/**
+ * #1360 PR2 결정 R2 — 월식 그림자를 받는 천체 (그 모체의 그림자 · 체인 뿌리의 빛). 달 전용이다 — 다른 위성 식은 비-범위
+ * (ADR §비-범위). 그 밖의 절차 머티리얼은 `uEclMode = 0` 고정 (머티리얼 생성 기본값). 일식 (지구 수신) 은 PR3.
+ */
+export const LUNAR_ECLIPSE_SHADOW_BODY_ID = 'moon';
 /** 강조색(`BELT_HILDA_ACCENT_RGB`) 으로 구분하는 그룹 — 힐다 3:2 공명군. 시각 구분 전용 (PR #1324 사용자 결정). */
 const BELT_ACCENT_GROUP = 'hilda';
 
@@ -520,6 +533,16 @@ export interface SolarSystemSceneHandles {
    * ⚠️ 위성 배율과 **독립이 아니다** — 배율이 어디서 곱해지는지에 의존한다 (정의부 주석).
    */
   getPhysicalLocal: (id: string) => Vec3Double;
+  /**
+   * #1360 PR2 결정 C2 (사용자 결정 Q-T (a)) — 식 그림자 검증용 토글 (기본 `true`). 같은 프레임 on/off 대조가 이 setter 로
+   * 이뤄진다 — UI 토글은 두지 않는다. 값만 바꾸고 셰이더는 재컴파일하지 않는다 (`#define` 분기 없음 — 결정 R1).
+   */
+  setEclipseShadowsEnabled: (enabled: boolean) => void;
+  getEclipseShadowsEnabled: () => boolean;
+  /**
+   * #1360 PR2 — 월식 수신 천체 (달) 머티리얼에 지금 쓰인 그림자 uniform 의 사본 (토글 반영 후 값). 진단 · 단위 테스트용.
+   */
+  getLunarEclipseShadowUniforms: () => EclipseShadowUniforms;
   dispose: () => void;
 }
 
@@ -1567,6 +1590,71 @@ export function createSolarSystemScene(
     return tmpPhaseAnchor;
   };
 
+  /**
+   * #1360 PR2 — 월식 그림자 상태. `computedLunarShadow` 는 이번 시각의 판정식 출력 (`updateAt` 이 프레임당 1회 갱신),
+   * `appliedLunarShadow` 는 토글을 반영해 머티리얼에 실제로 쓴 값이다.
+   *
+   * 기하 입력 = 결정 G3 의 `physicalLocalInto` — 달은 `moon − earth`, 태양은 `−(earth − sun)` (지구 중심, 배율 전 [m]).
+   * ⚠️ `physicalLocalInto` 와 같은 의존을 갖는다 — 위성 배율이 Kepler 경로에서만 곱해진다는 구조에 기대며, 「배율과 독립」
+   * 이 아니다 (`solar-system-scene-eclipse-shadow.test.ts` 가 배율 30 ↔ 1 비트 동일로 고정한다).
+   */
+  let eclipseShadowsEnabled = true;
+  const computedLunarShadow = noEclipseShadowUniforms();
+  const appliedLunarShadow = noEclipseShadowUniforms();
+  const noShadow = noEclipseShadowUniforms();
+  const tmpEclipseMoon: MutVec3 = [0, 0, 0];
+  const tmpEclipseSun: MutVec3 = [0, 0, 0];
+  const lunarShadowRadii = (() => {
+    const subject = bodiesById.get(LUNAR_ECLIPSE_SHADOW_BODY_ID);
+    const parent = subject?.parentId ? bodiesById.get(subject.parentId) : undefined;
+    const root = parent?.parentId ? bodiesById.get(parent.parentId) : undefined;
+    // 체인 = 위성 → 행성 → 뿌리 (판정식 `eclipseRadiiOf` 와 같은 반경 출처 — 데이터 `radius`). 하나라도 없으면 그림자 없음.
+    if (!subject || !parent || !root || root.parentId) return null;
+    return { sun: root.radius, earth: parent.radius, moon: subject.radius };
+  })();
+
+  /** 수신 천체의 high · mid 머티리얼에 `appliedLunarShadow` 를 쓴다 (low billboard · `?surface=off` 는 절차 머티리얼이 아니라 무시). */
+  const writeLunarShadowTo = (mesh: Mesh | undefined) => {
+    const material = mesh?.material;
+    if (isProceduralPlanetMaterial(material))
+      setEclipseShadowUniforms(material, appliedLunarShadow);
+  };
+  const applyLunarShadow = () => {
+    copyEclipseShadowUniforms(
+      eclipseShadowsEnabled ? computedLunarShadow : noShadow,
+      appliedLunarShadow,
+    );
+    writeLunarShadowTo(meshes.get(LUNAR_ECLIPSE_SHADOW_BODY_ID));
+    writeLunarShadowTo(midVariants.get(LUNAR_ECLIPSE_SHADOW_BODY_ID));
+  };
+  /**
+   * #1360 PR2 — 이번 시각의 월식 그림자를 계산해 머티리얼에 쓴다. `updateAt` 의 위치 갱신 뒤 프레임당 1회 (시간 위상 — 값은
+   * 시각 · 엔진 상태만의 함수이고 카메라와 무관하다. 그래서 프레임 위상 (`runFramePass`) 멤버가 아니다 — ADR 1205 §결정 2).
+   * 머티리얼 쓰기를 onBind 가 아니라 여기서 하는 이유: onBind 는 Babylon `ShaderMaterial.bind` 의 uniform 업로드 **뒤**
+   * (`_afterBind`) 에 불려 값이 다음 draw 에 반영된다 — 토글 · 시각 점프 직후 한 프레임이 이전 그림자로 그려진다.
+   */
+  const updateLunarShadow = () => {
+    if (lunarShadowRadii) {
+      physicalLocalInto(LUNAR_ECLIPSE_SHADOW_BODY_ID, tmpEclipseMoon);
+      const parentId = bodiesById.get(LUNAR_ECLIPSE_SHADOW_BODY_ID)!.parentId!;
+      physicalLocalInto(parentId, tmpEclipseSun);
+      tmpEclipseSun[0] = -tmpEclipseSun[0];
+      tmpEclipseSun[1] = -tmpEclipseSun[1];
+      tmpEclipseSun[2] = -tmpEclipseSun[2];
+      lunarEclipseShadowUniforms(
+        tmpEclipseMoon,
+        tmpEclipseSun,
+        lunarShadowRadii,
+        computedLunarShadow,
+      );
+    }
+    applyLunarShadow();
+  };
+  const setEclipseShadowsEnabled = (enabled: boolean) => {
+    eclipseShadowsEnabled = enabled;
+    applyLunarShadow();
+  };
+
   // 소행성대 (#99).
   // #1319 — 두 경로로 갈린다 (ADR 20261008-1319 결정 1):
   //  - GPU Kepler 경로 (기본 켜짐 · `?belt=N`): N 쿼드 단일 메시 + 정점 셰이더 Kepler. 위치를 셰이더가 정하므로
@@ -2355,6 +2443,8 @@ export function createSolarSystemScene(
     }
     // #1319 결정 2 — 위 루프가 쓴 기준계를 띠 입자용으로 기록 (아래 primary follow 가 origin 을 옮기기 전 값).
     recordBodyFrame(ox, oy, oz, sceneUnitPerMeter);
+    // #1360 PR2 — 월식 그림자 (이번 시각 · 이번 위치 경로의 배율 전 위치). 방향 · 비율만이라 기준계와 무관하다.
+    updateLunarShadow();
 
     // #627 — satellite orbit line position 동기화 (moon 패턴 일반화, ADR §5 옵션 A 구현 절차 3).
     // satellite orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
@@ -2868,6 +2958,9 @@ export function createSolarSystemScene(
           surfaceLightingArgs,
         );
         midVariants.set(body.id, m);
+        // #1360 PR2 — lazy 생성된 달 mid 에 현재 그림자를 쓴다. 값은 시간 위상 (`updateAt`) 이 갱신하므로, 일시정지 중
+        // 생성되면 다음 시각 변경까지 생성 기본값 (그림자 없음) 으로 남는다.
+        if (body.id === LUNAR_ECLIPSE_SHADOW_BODY_ID) writeLunarShadowTo(m);
         // #1215 §A10.6 — lazy 생성 variant 를 host 계열 식별자 집합에 등록 (계열 host 가 아니면 no-op).
         hostFamilies.registerMember(m, highMesh, HOST_FAMILY_RANK);
       }
@@ -3345,6 +3438,10 @@ export function createSolarSystemScene(
       const out: MutVec3 = [0, 0, 0];
       return physicalLocalInto(id, out);
     },
+    setEclipseShadowsEnabled,
+    getEclipseShadowsEnabled: () => eclipseShadowsEnabled,
+    getLunarEclipseShadowUniforms: () =>
+      copyEclipseShadowUniforms(appliedLunarShadow, noEclipseShadowUniforms()),
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();

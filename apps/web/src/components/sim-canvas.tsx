@@ -1074,6 +1074,41 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         //  - id !== null  → solar.setFocusOrigin(id) + controller.focusOn(mesh) (mesh 존재 시)
         //  - id === null  → solar.clearFocus() + controller.reset(35)
         //                   ("focus 해제 = 카메라 reset" 박제 — ADR §결정 3).
+        // #1360 PR2 결정 C3 — 포커스 시점 요청 (store `focusViewRequest`) 소비. 대상이 이번 포커스 body 면 시점 방향
+        // (대상 → 카메라 world) 을 돌려주고, 아니면 버린다 — 어느 쪽이든 비운다 (다음 무관한 포커스에 새지 않게).
+        // `facing-parent` = 모체 메시 쪽 (월식 — 달의 지구 쪽 반구). 지구 → 달 방향은 위성 배율과 무관하게 물리
+        // 방향 그대로라 (배율은 반경 방향 스칼라) 메시 위치의 차로 충분하다.
+        /** #1360 PR2 — `facing-parent` 시점의 위쪽 기울기 (모체 방향에서 카메라 +Y 쪽으로) [rad]. rendering-only 구도 상수. */
+        const FOCUS_VIEW_TILT_RAD = (15 * Math.PI) / 180;
+        /** 모체 방향이 카메라 위 방향과 거의 평행하면 기울이지 않는다 (기울일 축의 길이 하한). */
+        const FOCUS_VIEW_TILT_MIN_AXIS = 1e-6;
+        const consumeFocusView = (bodyId: string | null) => {
+          const request = useSimStore.getState().focusViewRequest;
+          if (request === null) return undefined;
+          useSimStore.getState().setFocusViewRequest(null);
+          if (bodyId === null || request.bodyId !== bodyId) return undefined;
+          const mesh = solar.meshes.get(bodyId);
+          const parentId = solar.getBodyParentId(bodyId);
+          const parentMesh = parentId ? solar.meshes.get(parentId) : undefined;
+          if (!mesh || !parentMesh) return undefined;
+          mesh.computeWorldMatrix(true);
+          parentMesh.computeWorldMatrix(true);
+          const toParent = parentMesh
+            .getAbsolutePosition()
+            .subtract(mesh.getAbsolutePosition())
+            .normalize();
+          // 정확히 모체 방향이면 카메라가 「대상 ↔ 모체」 선 위에 놓여 거리 자 선 (기준점 = 지구) 이 카메라를 관통해 화면에
+          // 한 줄로 늘어진다 (실 Chrome 실측). 카메라 위 (+Y) 쪽으로 조금 기울여 지구 쪽 반구를 보면서 선은 지구 쪽으로
+          // 물러나게 한다. 위 방향과 평행 (극) 이면 기울일 축이 정의되지 않아 그대로 둔다.
+          const up = toParent.clone().scaleInPlace(-toParent.y);
+          up.y += 1;
+          const upLength = up.length();
+          if (upLength < FOCUS_VIEW_TILT_MIN_AXIS) return toParent;
+          return toParent
+            .scaleInPlace(Math.cos(FOCUS_VIEW_TILT_RAD))
+            .addInPlace(up.scaleInPlace(Math.sin(FOCUS_VIEW_TILT_RAD) / upLength));
+        };
+
         const syncFocusToScene = (bodyId: string | null) => {
           if (bodyId !== null) {
             const mesh = solar.meshes.get(bodyId);
@@ -1135,7 +1170,12 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
 
               // controller.focusOn 도 동일 식 적용 (sim-canvas SSoT 단일). 명시적 radius 전달로
               // camera-controller 내부 default 식 (×5) 우회 — Amendment 3 satellite 분기 정합.
-              controller.focusOn({ mesh, radius: desiredRadius });
+              // #1360 PR2 결정 C3 — 사건 선택이 시점을 요청했으면 같은 전환으로 alpha · beta 도 맞춘다.
+              controller.focusOn({
+                mesh,
+                radius: desiredRadius,
+                viewDirection: consumeFocusView(bodyId),
+              });
               // #693 — focus 진입 시 패닝 비활성 (ADR §결정 3 옵션 A). focus 중 followObserver 가
               // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.
               freeFlyActive = false;
@@ -1265,6 +1305,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             } else {
               syncFocusToScene(state.selectedBodyId);
             }
+          } else if (
+            state.focusViewRequest !== prev.focusViewRequest &&
+            state.focusViewRequest !== null &&
+            state.focusViewRequest.bodyId === state.selectedBodyId
+          ) {
+            // #1360 PR2 결정 C3 — 이미 그 body 에 포커스 중인 사건 선택. 선택이 바뀌지 않아 위 분기가 돌지 않으므로 여기서
+            // 포커스 동기를 다시 돌려 요청한 시점을 적용한다 (대상이 다르면 요청은 이어지는 포커스 진입이 소비한다).
+            syncFocusToScene(state.selectedBodyId);
           } else if (state.freeFlyMode !== prev.freeFlyMode && state.freeFlyMode) {
             // #693 — solar 개요(selectedBodyId 이미 null)에서 free-fly 직접 진입 경로.
             // 이 경우 selectedBodyId 가 변하지 않아 위 분기가 발화하지 않는다(enterFreeFly 가

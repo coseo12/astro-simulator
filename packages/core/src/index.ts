@@ -67,6 +67,7 @@ export type {
   AstroEvent,
   EclipseType,
   EventFilterId,
+  EventFocusView,
   EventKindDef,
   EventKindId,
 } from './events/index.js';

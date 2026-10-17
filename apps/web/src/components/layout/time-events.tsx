@@ -390,8 +390,14 @@ function TimeEventsPanelBody({
   const select = useCallback(
     (event: AstroEvent) => {
       const kind = getEventKind(event.kind);
-      // 순서가 계약이다 (모듈 머리 주석) — 시각 → 포커스 → 일시정지.
+      // 순서가 계약이다 (모듈 머리 주석) — 시각 → (시점 요청) → 포커스 → 일시정지.
       sendCommand({ type: 'jumpToJulianDate', julianDate: event.julianDate });
+      // #1360 PR2 결정 C3 — 시점 요청은 포커스 **전에** 둔다. 포커스 동기 (`sim-canvas`) 가 진입 때 소비한다.
+      if (kind.focusView) {
+        useSimStore
+          .getState()
+          .setFocusViewRequest({ bodyId: kind.subjectId, view: kind.focusView });
+      }
       sendCommand({ type: 'focusOn', bodyId: kind.subjectId });
       sendCommand({ type: 'setTimeScale', scale: 0 });
       if (kind.autoRulerAnchorEarth) setRulerAnchor('earth');

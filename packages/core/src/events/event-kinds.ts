@@ -47,6 +47,12 @@ export type EventFilterId =
   | 'solar-eclipse'
   | 'lunar-eclipse';
 
+/**
+ * #1360 PR2 결정 C3 (ADR 1354 Q-S Amendment) — 선택 시 카메라 시점. `facing-parent` = 주체의 모체 쪽 반구를 본다 (월식 — 달의
+ * 지구 쪽 반구에 그림자가 떨어진다). 웹 레이어가 장면 메시에서 방향을 만들어 `FocusTarget.viewDirection` 으로 넘긴다.
+ */
+export type EventFocusView = 'facing-parent';
+
 export interface EventKindDef {
   id: EventKindId;
   /** 사건의 주체 천체 — 선택 시 `focusOn` 대상 (결정 D6). */
@@ -65,6 +71,8 @@ export interface EventKindDef {
    * 지구–행성 선이 그려지고 줌아웃하면 태양–지구–행성 정렬이 보인다. 식은 지구–달 선 (#1354 사용자 결정 S (a)).
    */
   autoRulerAnchorEarth: boolean;
+  /** 선택 시 카메라 시점 ({@link EventFocusView}). 생략 = 시점 각 유지 (ADR 1347 D6 현행). */
+  focusView?: EventFocusView;
 }
 
 export const EVENT_KINDS: readonly EventKindDef[] = [
@@ -139,6 +147,7 @@ export const EVENT_KINDS: readonly EventKindDef[] = [
     filter: 'lunar-eclipse',
     window: null,
     autoRulerAnchorEarth: true,
+    focusView: 'facing-parent',
   },
 ];
 

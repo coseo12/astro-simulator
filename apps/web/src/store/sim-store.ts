@@ -1,4 +1,4 @@
-import type { EventFilterId, physics } from '@astro-simulator/core';
+import type { EventFilterId, EventFocusView, physics } from '@astro-simulator/core';
 import type { SimMode } from '@astro-simulator/shared';
 import { create } from 'zustand';
 import type { DisplayCapabilities } from '@/core/display-toggles';
@@ -153,6 +153,12 @@ export interface SimStoreState {
    */
   rulerAnchorId: string | null;
   /**
+   * #1360 PR2 결정 C3 — 다음 포커스 진입에 쓸 시점 요청 (사건 선택 — 월식 = 달의 지구 쪽). `sim-canvas` 의 포커스 동기가
+   * 소비하고 비운다 (대상 body 가 다르면 버린다). 이미 그 body 에 포커스 중이면 요청 시점에 바로 소비한다 — 선택이 바뀌지
+   * 않아 포커스 동기가 다시 돌지 않기 때문이다. 요청 객체는 매번 새로 만든다 (같은 요청 반복도 구독이 감지).
+   */
+  focusViewRequest: { bodyId: string; view: EventFocusView } | null;
+  /**
    * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
    * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
    */
@@ -223,6 +229,8 @@ export interface SimStoreState {
   setEventFilter: (id: EventFilterId, enabled: boolean) => void;
   /** #1341 PR2 — 거리 자 기준점 설정 · 해제 (`null`). */
   setRulerAnchor: (id: string | null) => void;
+  /** #1360 PR2 — 포커스 시점 요청 · 비움 (`null`). */
+  setFocusViewRequest: (request: { bodyId: string; view: EventFocusView } | null) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
   setBodyMenuOpen: (open: boolean) => void;
@@ -284,6 +292,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   eventsVisible: true,
   eventFilters: { ...EVENT_FILTER_DEFAULTS },
   rulerAnchorId: null,
+  focusViewRequest: null,
   displayCapabilities: null,
   displayPanelOpen: false,
   bodyMenuOpen: false,
@@ -338,6 +347,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
         : { eventFilters: { ...state.eventFilters, [id]: enabled } },
     ),
   setRulerAnchor: (id) => set({ rulerAnchorId: id }),
+  setFocusViewRequest: (request) => set({ focusViewRequest: request }),
   setDisplayCapabilities: (caps) => set({ displayCapabilities: caps }),
   setDisplayPanelOpen: (open) => set({ displayPanelOpen: open }),
   setBodyMenuOpen: (open) => set({ bodyMenuOpen: open }),
