@@ -1,4 +1,9 @@
-import { AU, J2000_JD } from '@astro-simulator/shared';
+import {
+  AU,
+  GENERAL_PRECESSION_DEG_PER_CENTURY,
+  J2000_JD,
+  JULIAN_CENTURY_DAYS,
+} from '@astro-simulator/shared';
 import { z } from 'zod';
 import solarSystemRaw from '@astro-simulator/shared/data/solar-system.json' with { type: 'json' };
 
@@ -26,6 +31,33 @@ export const MAX_ARCS = 4;
 export const MAX_DENSITY_POINTS = 16;
 
 /**
+ * #1354 결정 M2 — 궤도 요소의 시간 변화 율 (optional). 값은 출처 문헌 숫자 그대로 [도/율리우스 세기] 이고, `frame` 이
+ * 그 숫자의 경도 기준을 밝힌다. 로더가 장면 좌표 (J2000 고정 분점) 율로 옮긴다 — `rate − p_A`
+ * (`GENERAL_PRECESSION_DEG_PER_CENTURY`). `frame` 은 `z.literal` 이라 다른 값은 파싱 실패다 (변환 규칙이 없는 틀을
+ * 조용히 받지 않는다). ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md`.
+ */
+const OrbitalRatesRawSchema = z.object({
+  frame: z.literal('mean-equinox-of-date'),
+  meanLongitudeDegPerCentury: z.number(),
+  longitudeOfAscendingNodeDegPerCentury: z.number(),
+  longitudeOfPerihelionDegPerCentury: z.number(),
+});
+
+/**
+ * #1354 결정 M2 — 주기 섭동 항 1행. 인자 `D·D + M·M + Mp·M′ + F·F` (Meeus 47장 정의 — D 이각 · M 모체의 평균근점이각 ·
+ * M′ 위성의 평균근점이각 · F 위도 인수). 경도 · 위도 항은 `amplitude · sin(인자)` [도], 거리 항은 `amplitude · cos(인자)`
+ * [km]. 인자 정의가 「모체가 태양을 도는 위성」 에서만 성립하므로 그 밖의 천체에 이 필드가 있으면 로더가 거부한다.
+ */
+const PeriodicTermRawSchema = z.object({
+  component: z.enum(['longitude', 'latitude', 'distance']),
+  D: z.number().int(),
+  M: z.number().int(),
+  Mp: z.number().int(),
+  F: z.number().int(),
+  amplitude: z.number(),
+});
+
+/**
  * Raw JSON 스키마 — 소스 파일에서 읽은 궤도 요소는 도/AU 단위.
  */
 const OrbitalElementsRawSchema = z.object({
@@ -35,6 +67,8 @@ const OrbitalElementsRawSchema = z.object({
   longitudeOfAscendingNodeDeg: z.number(),
   longitudeOfPerihelionDeg: z.number(),
   meanLongitudeDeg: z.number(),
+  rates: OrbitalRatesRawSchema.optional(),
+  periodicTerms: z.array(PeriodicTermRawSchema).min(1).optional(),
 });
 
 /**
@@ -237,6 +271,35 @@ export interface LoadedOrbitalElements {
   argumentOfPeriapsis: number; // rad
   meanAnomalyAtEpoch: number; // rad
   epoch: number; // JD
+  /**
+   * #1354 — 시간 변화 율 (장면 좌표 = J2000 고정 분점, rad/일). 있으면 이 요소는 `elementsAt` 로 시각 요소를 만들어 쓴다
+   * (`physics/orbit-elements-at.ts`) — 평균근점이각 율이 `√(μ/a³)` 대신 `meanLongitude − longitudeOfPerihelion` 이다.
+   * 없으면 고정 요소 (현행 경로 그대로).
+   */
+  rates?: LoadedOrbitalRates;
+  /** #1354 — 주기 섭동 항 (경도 · 위도 = rad, 거리 = m). 「모체가 태양을 도는 위성」 만 가진다 (로더 검사). */
+  periodicTerms?: ReadonlyArray<LoadedPeriodicTerm>;
+}
+
+/** #1354 결정 M2 — 로더가 J2000 고정 분점 틀로 옮긴 율 [rad/일]. */
+export interface LoadedOrbitalRates {
+  /** 평균경도 L 의 율. */
+  meanLongitude: number;
+  /** 승교점 경도 Ω 의 율. */
+  longitudeOfAscendingNode: number;
+  /** 근점 경도 ϖ 의 율. */
+  longitudeOfPerihelion: number;
+}
+
+/** #1354 결정 M2 — 주기 섭동 항 1행 (SI). */
+export interface LoadedPeriodicTerm {
+  component: 'longitude' | 'latitude' | 'distance';
+  D: number;
+  M: number;
+  Mp: number;
+  F: number;
+  /** 경도 · 위도 = rad, 거리 = m. */
+  amplitude: number;
 }
 
 /**
@@ -329,12 +392,46 @@ function normalizeAngle(rad: number): number {
   return a;
 }
 
+/** 율 1개 — 문헌 원값 [도/세기, 날짜 평균 분점] → 장면 좌표 [rad/일, J2000 고정 분점]. */
+function rateToSceneFrame(degPerCenturyOfDate: number): number {
+  return ((degPerCenturyOfDate - GENERAL_PRECESSION_DEG_PER_CENTURY) * DEG) / JULIAN_CENTURY_DAYS;
+}
+
+/** 거리 항 진폭 [km] → [m]. */
+const METERS_PER_KM = 1000;
+
+/**
+ * #1354 결정 M2 — 주기 항 인자 (D · M · M′ · F) 는 「모체가 계 뿌리 (태양) 를 도는 위성」 에서만 정의된다. 그 밖의 천체에
+ * `periodicTerms` 가 있으면 거부한다 — 인자를 만들 모체 요소가 없거나 의미가 달라 조용히 틀린 위치가 된다.
+ */
+function assertPeriodicTermsHost(bodies: ReadonlyArray<z.infer<typeof CelestialBodyRawSchema>>) {
+  const byId = new Map(bodies.map((b) => [b.id, b] as const));
+  for (const b of bodies) {
+    if (!b.orbit?.periodicTerms) continue;
+    const parent = b.parentId === null ? undefined : byId.get(b.parentId);
+    const grandparent =
+      parent?.parentId === null || parent?.parentId === undefined
+        ? undefined
+        : byId.get(parent.parentId);
+    const isSatelliteOfRootOrbiter =
+      parent?.orbit !== undefined && grandparent !== undefined && grandparent.parentId === null;
+    if (!isSatelliteOfRootOrbiter) {
+      throw new Error(
+        `[solar-system] ${b.id}: periodicTerms 는 「모체가 태양을 도는 위성」 에만 둘 수 있다 (모체 ${b.parentId ?? '없음'})`,
+      );
+    }
+  }
+}
+
 /**
  * 태양계 데이터를 로드·검증·변환한다.
  * JSON import는 번들러가 정적으로 포함 — 런타임 네트워크 요청 없음.
+ *
+ * @param raw 원본 JSON — 기본값은 `solar-system.json`. 테스트가 변형 데이터 (예: 달 율 제거판) 를 넣을 때만 준다.
  */
-export function loadSolarSystem(): LoadedSolarSystem {
-  const parsed = SolarSystemRawSchema.parse(solarSystemRaw);
+export function loadSolarSystem(raw: unknown = solarSystemRaw): LoadedSolarSystem {
+  const parsed = SolarSystemRawSchema.parse(raw);
+  assertPeriodicTermsHost(parsed.bodies);
   const epoch = parsed.epoch;
 
   const bodies: LoadedCelestialBody[] = parsed.bodies.map((b) => {
@@ -395,6 +492,25 @@ export function loadSolarSystem(): LoadedSolarSystem {
       meanAnomalyAtEpoch: normalizeAngle(L - varpi),
       epoch,
     };
+    const rates = b.orbit.rates;
+    if (rates) {
+      base.orbit.rates = {
+        meanLongitude: rateToSceneFrame(rates.meanLongitudeDegPerCentury),
+        longitudeOfAscendingNode: rateToSceneFrame(rates.longitudeOfAscendingNodeDegPerCentury),
+        longitudeOfPerihelion: rateToSceneFrame(rates.longitudeOfPerihelionDegPerCentury),
+      };
+    }
+    const terms = b.orbit.periodicTerms;
+    if (terms) {
+      base.orbit.periodicTerms = terms.map((t) => ({
+        component: t.component,
+        D: t.D,
+        M: t.M,
+        Mp: t.Mp,
+        F: t.F,
+        amplitude: t.component === 'distance' ? t.amplitude * METERS_PER_KM : t.amplitude * DEG,
+      }));
+    }
 
     return base;
   });

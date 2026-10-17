@@ -14,7 +14,8 @@ import {
 import { AU, GRAVITATIONAL_CONSTANT, J2000_JD, SOLAR_MASS } from '@astro-simulator/shared';
 import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import type { BootPhaseHook } from '../engine/boot-phase.js';
-import { orbitMu, positionAt } from '../physics/kepler.js';
+import { orbitMu } from '../physics/kepler.js';
+import { elementsAt, parentRelativePositionAt } from '../physics/orbit-elements-at.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
 import {
   NBodyEngine,
@@ -99,7 +100,9 @@ import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import {
   TRAIL_ORBIT_FRACTION,
+  createTrailBodySpec,
   createTrailBodySpecs,
+  hasSecularRates,
   sampleTrailWorld,
   trailVertexCount,
   type TrailBodySpec,
@@ -154,6 +157,13 @@ const FLOATING_ORIGIN_THRESHOLD_METERS = AU;
 const BELT_POPULATION_SEED = 42;
 /** 카이퍼 메시 밝기 난수 seed 오프셋 — 소행성대 메시(`seed + 1` 내부 오프셋) 와 스트림을 가른다. */
 const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
+/**
+ * #1354 결정 V1 — 율 보유 천체 궤도선 정점 갱신 문턱 (Ω 또는 ϖ 변화) [rad]. 달 기준 ϖ `0.111°/일` 이라 `4.49` 일마다
+ * 갱신한다. 실측 (1900 ~ 2100 · 문턱 직전까지 지연): 선 ↔ 달 평균 위치 최대 거리 — 매 프레임 갱신 `516` km · `0.5°`
+ * `672` km · `1°` `881` km · `2°` `1,320` km. `672` km × 위성 배율 30 = 달 메시 반경의 `1.45 %`. 장면 동작은
+ * `solar-system-scene-lunar-orbit-line.test.ts` 가 단언한다.
+ */
+export const PRECESSING_ORBIT_LINE_THRESHOLD_RAD = (0.5 * Math.PI) / 180;
 /** 강조색(`BELT_HILDA_ACCENT_RGB`) 으로 구분하는 그룹 — 힐다 3:2 공명군. 시각 구분 전용 (PR #1324 사용자 결정). */
 const BELT_ACCENT_GROUP = 'hilda';
 
@@ -1137,8 +1147,75 @@ export function createSolarSystemScene(
     satelliteOrbitLines.clear();
   };
 
-  const rebuildOrbitLines = () => {
+  // #1354 결정 V1 — 궤도 요소가 시간에 따라 도는 천체 (`rates` 보유 — 달) 를 담은 LineSystem. 현재 시각의 **평균 요소**
+  // 타원으로 정점만 갱신한다 (`instance` — 재생성 금지: ADR 1265 결정 3 의 머티리얼 `uniqueId` 순서). 갱신 시점 =
+  // 샘플링한 요소에서 Ω 또는 ϖ 가 `PRECESSING_ORBIT_LINE_THRESHOLD_RAD` 이상 돌았을 때 (시각 점프 포함 — 판정이 시각
+  // 차가 아니라 요소 차라 점프도 같은 규칙에 걸린다).
+  interface PrecessingOrbitLineGroup {
+    readonly mesh: ReturnType<typeof MeshBuilder.CreateLineSystem>;
+    /** LineSystem 의 선 순서대로의 천체 (율 없는 천체도 같은 LineSystem 에 있으면 함께 다시 샘플링 — 값은 불변). */
+    readonly bodies: readonly LoadedCelestialBody[];
+    /** 마지막으로 샘플링한 요소의 (Ω, ϖ) — 율 보유 천체만. */
+    readonly sampled: Map<string, { node: number; perihelion: number }>;
+  }
+  let precessingOrbitLineGroups: PrecessingOrbitLineGroup[] = [];
+
+  /** 천체 1개의 궤도점 — 위성은 per-body 시각 배율을 곱한다 (R11 #721). `rebuildOrbitLines` 와 갱신이 같은 식을 쓴다. */
+  const orbitLinePointsFor = (body: LoadedCelestialBody, jd: number): Vector3[] | null => {
+    const pts = sampleOrbitPoints(body, activeTier, jd);
+    if (!pts || !isSatelliteOrbit(body.parentId)) return pts;
+    const perBodyScale = getOrbitVisualScale(body.parentId, body.id);
+    return pts.map((p) => p.scale(perBodyScale));
+  };
+
+  /** 율 보유 천체의 현재 (Ω, ϖ) — 정규화하지 않은 연속값 (`elementsAt` 결과) 이라 차를 그대로 문턱과 비교한다. */
+  const secularAnglesAt = (body: LoadedCelestialBody, jd: number) => {
+    const el = elementsAt(body.orbit!, jd);
+    return {
+      node: el.longitudeOfAscendingNode,
+      perihelion: el.longitudeOfAscendingNode + el.argumentOfPeriapsis,
+    };
+  };
+
+  const registerPrecessingGroup = (
+    mesh: ReturnType<typeof MeshBuilder.CreateLineSystem>,
+    bodies: readonly LoadedCelestialBody[],
+    jd: number,
+  ) => {
+    const sampled = new Map<string, { node: number; perihelion: number }>();
+    for (const b of bodies) if (hasSecularRates(b)) sampled.set(b.id, secularAnglesAt(b, jd));
+    precessingOrbitLineGroups.push({ mesh, bodies, sampled });
+  };
+
+  /**
+   * #1354 결정 V1 — 율 보유 천체의 궤도선을 시각 `jd` 의 평균 요소로 갱신 (문턱을 넘은 그룹만). `updateAt` 이 매 프레임
+   * 부른다 — 율 보유 천체가 없으면 그룹이 비어 연산 0.
+   */
+  const refreshPrecessingOrbitLines = (jd: number) => {
+    for (const group of precessingOrbitLineGroups) {
+      let stale = false;
+      for (const [id, prev] of group.sampled) {
+        const now = secularAnglesAt(bodiesById.get(id)!, jd);
+        if (
+          Math.abs(now.node - prev.node) >= PRECESSING_ORBIT_LINE_THRESHOLD_RAD ||
+          Math.abs(now.perihelion - prev.perihelion) >= PRECESSING_ORBIT_LINE_THRESHOLD_RAD
+        ) {
+          stale = true;
+          break;
+        }
+      }
+      if (!stale) continue;
+      const lines = group.bodies.map((b) => orbitLinePointsFor(b, jd)!);
+      MeshBuilder.CreateLineSystem(group.mesh.name, { lines, instance: group.mesh }, scene);
+      for (const id of group.sampled.keys()) {
+        group.sampled.set(id, secularAnglesAt(bodiesById.get(id)!, jd));
+      }
+    }
+  };
+
+  const rebuildOrbitLines = (jd: number) => {
     // 기존 라인 제거 후 현재 tier 의 renderScale 로 재샘플링.
+    precessingOrbitLineGroups = [];
     if (orbitLines) {
       orbitLines.dispose();
       orbitLines = null;
@@ -1149,14 +1226,18 @@ export function createSolarSystemScene(
 
     // planet 궤도 (sun 중심) batch + parent 별 satellite 궤도 batch 분리 수집.
     const batches: Vector3[][] = [];
+    const batchBodies: LoadedCelestialBody[] = [];
     // #627 — parentId → 해당 parent 의 satellite 궤도점 배열 묶음 (한 LineSystem 에 다수 satellite).
     const satellitePtsByParent = new Map<string, Vector3[][]>();
+    const satelliteBodiesByParent = new Map<string, LoadedCelestialBody[]>();
     for (const body of system.bodies) {
       if (!body.orbit) continue;
       // defense-in-depth #5 (이슈 #439): R-Phase 미진입 body 는 본체가 점 수준이라
       // 궤도선만 그리면 시각 혼란. R_PHASE_BODY_ALLOWLIST SSoT 직접 참조 (BODY_SCALE 의존 역전 회피).
       if (!(R_PHASE_BODY_ALLOWLIST as readonly string[]).includes(body.id)) continue;
-      const pts = sampleOrbitPoints(body, activeTier);
+      // #1354 결정 V1 — 시각 `jd` 의 요소로 샘플링 (율 없는 천체는 시각 무관하게 같은 점). 위성은 per-body 시각
+      //   배율까지 곱한 점이다 — 정점 갱신 (`refreshPrecessingOrbitLines`) 과 같은 함수 `orbitLinePointsFor`.
+      const pts = orbitLinePointsFor(body, jd);
       if (!pts) continue;
       // #627 — satellite (parentId !== 'sun') 는 parent 별 별도 LineSystem (parent 추적 + visual scale).
       //   sampleOrbitPoints 는 parent 0 원점 기준 ellipse 점을 반환하므로 sun 중심 batch 에 넣으면
@@ -1170,17 +1251,27 @@ export function createSolarSystemScene(
         //   per-body 미정의 위성 (moon/galilean/titania/triton 등) 은 parent 룩업 fallback 으로 동일값 →
         //   기존 LineSystem `.scaling` × 동일 결과 (회귀 0). resolveWorld 의 mesh position 과 동일 scale 정합.
         //   ADR 20260620-721 §축 2 (Concrete Prediction "코드 0 보장 불가 축").
-        const perBodyScale = getOrbitVisualScale(body.parentId, body.id);
-        const scaledPts = pts.map((p) => p.scale(perBodyScale));
+        //   #1354 — 곱셈은 `orbitLinePointsFor` 로 옮겼다 (위 `pts` 가 이미 배율 적용 점).
         const arr = satellitePtsByParent.get(body.parentId!) ?? [];
-        arr.push(scaledPts);
+        arr.push(pts);
         satellitePtsByParent.set(body.parentId!, arr);
+        const bodiesArr = satelliteBodiesByParent.get(body.parentId!) ?? [];
+        bodiesArr.push(body);
+        satelliteBodiesByParent.set(body.parentId!, bodiesArr);
       } else {
         batches.push(pts);
+        batchBodies.push(body);
       }
     }
     if (batches.length > 0) {
-      orbitLines = MeshBuilder.CreateLineSystem('orbit-lines', { lines: batches }, scene);
+      // #1354 — 율 보유 천체가 든 LineSystem 만 `updatable` (정점 갱신 대상). 그 밖은 생성 옵션이 현행 그대로다.
+      const precessing = batchBodies.some(hasSecularRates);
+      orbitLines = MeshBuilder.CreateLineSystem(
+        'orbit-lines',
+        precessing ? { lines: batches, updatable: true } : { lines: batches },
+        scene,
+      );
+      if (precessing) registerPrecessingGroup(orbitLines, batchBodies, jd);
       // 일반 (planet) 궤도선. satellite orbit 은 satelliteOrbitLines 별도 SSoT.
       // 본 색상은 #552 a11y fix 비대상 (moon orbit 만 WCAG 1.4.11 격차였음).
       // #845 — 리터럴 → PLANET_ORBIT_COLOR SSoT (satellite 기본색과 동일 톤 계약 명시).
@@ -1190,11 +1281,14 @@ export function createSolarSystemScene(
 
     // #627 — parent 별 satellite 궤도 LineSystem 생성 (moon 패턴 일반화).
     for (const [parentId, ptsBatches] of satellitePtsByParent) {
+      const groupBodies = satelliteBodiesByParent.get(parentId)!;
+      const precessing = groupBodies.some(hasSecularRates);
       const ls = MeshBuilder.CreateLineSystem(
         `satellite-orbit-line-${parentId}`,
-        { lines: ptsBatches },
+        precessing ? { lines: ptsBatches, updatable: true } : { lines: ptsBatches },
         scene,
       );
+      if (precessing) registerPrecessingGroup(ls, groupBodies, jd);
       // 색상 — earth (moon) 는 a11y 강조 색상 (#552), 나머지 satellite 는 planet 톤.
       // earth 초기 색상은 default — focus 상태에 따라 setMoonOrbitHighlight 가 갱신.
       // (focusBodyIdForAssert TDZ 회피 위해 default 로 시작. tier 전환 후 setFocusOrigin 이
@@ -1225,7 +1319,7 @@ export function createSolarSystemScene(
     earthOrbitLine.color =
       focusedBodyId === 'earth' ? MOON_ORBIT_COLOR_EARTH_FOCUS : MOON_ORBIT_COLOR_DEFAULT;
   };
-  rebuildOrbitLines();
+  rebuildOrbitLines(initialJulianDate);
   // 궤도선 — body 별 샘플링 (혜성 e≥0.6 은 256 seg) + LineSystem 빌드. 정점 수가 가장 많은 구간.
   phase('scene:orbit-lines');
   disposables.push({
@@ -1599,7 +1693,15 @@ export function createSolarSystemScene(
     const specs = ensureTrailSpecs();
     const world = trailWorld!;
     let offset = 0;
-    for (const spec of specs) {
+    for (let i = 0; i < specs.length; i += 1) {
+      let spec = specs[i]!;
+      // #1354 결정 V1 — 율 보유 천체 (달) 는 사양 (p · q · M₀ · epoch) 을 현재 시각 요소로 다시 만든다. 점 수는 같다
+      //   (이심률 불변 → 선분 수 불변) 라 정점 배치 · 오프셋이 그대로다.
+      const body = bodiesById.get(spec.id)!;
+      if (hasSecularRates(body)) {
+        spec = createTrailBodySpec(body, bodiesById.get(spec.parentId)!, currentJd)!;
+        specs[i] = spec;
+      }
       const parentWorld = worldPositions.get(spec.parentId) ?? ZERO;
       const headWorld = worldPositions.get(spec.id) ?? ZERO;
       offset +=
@@ -1823,7 +1925,7 @@ export function createSolarSystemScene(
       // 여기서 world matrix 를 동기 계산해두지 않으면 다음 프레임 전까지 이전 값 반환.
       mesh.computeWorldMatrix(true);
     }
-    rebuildOrbitLines();
+    rebuildOrbitLines(currentJd);
     // R4 #532 — tier 전환으로 moon orbit line 이 재생성되어 default 색상 초기화됨.
     // focus 가 earth 라면 강조 복원 (ADR §결정 4).
     setMoonOrbitHighlight(focusBodyIdForAssert);
@@ -2173,6 +2275,8 @@ export function createSolarSystemScene(
     // sun 중심 좌표라 위 루프에서 처리됨 (별도 처리 불필요).
     // #1318 — 태양 중심 `orbitLines` 도 같은 헬퍼에서 태양 로컬 좌표로 동기 (T3 floating origin 정합).
     syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
+    // #1354 결정 V1 — 율 보유 천체 (달) 궤도선을 현재 시각 평균 요소로 (문턱을 넘을 때만 정점 갱신).
+    refreshPrecessingOrbitLines(jd);
     // #1341 결정 T3 — trail 정점도 위 mesh 루프와 같은 스냅샷 기준계로 (아래 primary follow 가 origin 을 옮기기 전 값).
     syncTrails(ox, oy, oz, sceneUnitPerMeter);
     // #1341 결정 R2 — 자 선 끝점도 같은 스냅샷 기준계로.
@@ -2849,7 +2953,10 @@ export function createSolarSystemScene(
       if (!parent) continue;
       // #1305 — 위성은 μ = G(M_parent + m) (2체 상대 궤도). 태양 직속은 G·M_sun 유지. `orbitMu` SSoT —
       // Newton 초기 상태 (`buildInitialState`) · 정보 카드 거리 (`body-distance.ts`) 와 같은 식.
-      const p = positionAt(body.orbit, jd, orbitMu(body, parent));
+      // #1354 결정 M4 — 위치는 `parentRelativePositionAt` 단일 함수 (체인 위치 `resolveBodyChainPosition` 과 같은 함수).
+      //   율 보유 궤도 (달) 는 시각 요소 + 주기 항, 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 (비트 동일).
+      const grandparent = parent.parentId == null ? null : bodiesById.get(parent.parentId);
+      const p = parentRelativePositionAt(body, parent, grandparent, jd);
       buf[0] = p[0];
       buf[1] = p[1];
       buf[2] = p[2];

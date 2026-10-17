@@ -10,4 +10,6 @@ export type {
   LoadedSolarSystem,
   LoadedCelestialBody,
   LoadedOrbitalElements,
+  LoadedOrbitalRates,
+  LoadedPeriodicTerm,
 } from './solar-system-loader.js';

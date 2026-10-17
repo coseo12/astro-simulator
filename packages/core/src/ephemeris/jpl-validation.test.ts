@@ -2,6 +2,7 @@ import { AU, GRAVITATIONAL_CONSTANT, J2000_JD, SOLAR_MASS } from '@astro-simulat
 import { describe, expect, it } from 'vitest';
 import { length } from '../coords/vec3.js';
 import { positionAt, orbitalPeriod } from '../physics/kepler.js';
+import { parentRelativePositionAt, siderealPeriodOf } from '../physics/orbit-elements-at.js';
 import { getSolarSystem } from './solar-system-loader.js';
 
 const MU_SUN = GRAVITATIONAL_CONSTANT * SOLAR_MASS;
@@ -242,9 +243,9 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
     it('달-지구 거리 [356k, 407k] km', () => {
       const moon = byId.get('moon');
       if (!moon?.orbit) throw new Error('moon');
-      const muEarth = GRAVITATIONAL_CONSTANT * 5.9722e24;
-      // 달은 지구 상대 좌표
-      const pos = positionAt(moon.orbit, J2000_JD, muEarth);
+      // 달은 지구 상대 좌표. #1354 — 장면과 같은 단일 함수 (율 · 주기 9항 포함). J2000 실측 `402,603 km`
+      // (종전 고정 요소 `positionAt` `400,257 km` — DE441 `402,449 km` 쪽으로 이동).
+      const pos = parentRelativePositionAt(moon, byId.get('earth')!, byId.get('sun')!, J2000_JD);
       const r = length(pos) / 1000; // km
       expect(r).toBeGreaterThan(356_000);
       expect(r).toBeLessThan(407_000);
@@ -254,7 +255,8 @@ describe('JPL Horizons 대비 궤도 정확도 검증 (E1)', () => {
       const moon = byId.get('moon');
       if (!moon?.orbit) throw new Error('moon');
       const muEarth = GRAVITATIONAL_CONSTANT * 5.9722e24;
-      const periodDays = orbitalPeriod(moon.orbit.semiMajorAxis, muEarth) / 86_400;
+      // #1354 — 장면 공전 주기 (율 보유 달 = 2π / L̇ = 27.32166 일).
+      const periodDays = siderealPeriodOf(moon.orbit, muEarth) / 86_400;
       const err = Math.abs(periodDays - 27.32) / 27.32;
       expect(err).toBeLessThan(0.01);
     });

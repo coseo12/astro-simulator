@@ -1,6 +1,6 @@
 import type { Vec3Double } from '../coords/vec3.js';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
-import { orbitMu, positionAt } from './kepler.js';
+import { parentRelativePositionAt } from './orbit-elements-at.js';
 
 /**
  * #1347 — 모체 체인 위치 (ADR `docs/decisions/20261016-1347-event-markers.md` §교차검증 합의 5).
@@ -9,7 +9,8 @@ import { orbitMu, positionAt } from './kepler.js';
  * **같은 함수**로 위치를 얻는다 — 함수가 둘이면 parity 테스트가 필요하고, 하나면 동일성이 구조로 보장된다.
  *
  * 식은 scene Kepler 경로 (`solar-system-scene.ts` `updateAtKepler`) 와 같다 — 부모 기준 위치
- * `positionAt(orbit, jd, orbitMu(body, parent))` 를 부모 체인을 따라 더해 계 중심 (태양) 기준 위치를 얻는다.
+ * `parentRelativePositionAt(body, parent, grandparent, jd)` (#1354 결정 M4 — 같은 함수를 scene 도 부른다) 를 부모 체인을
+ * 따라 더해 계 중심 (태양) 기준 위치를 얻는다.
  * 위성 궤도 시각 배율 (`getOrbitVisualScale`) 은 적용하지 않는다 — 데이터 SSoT 거리다 (principles §1 Visual Fidelity).
  */
 
@@ -55,8 +56,10 @@ export function resolveBodyChainPosition(
   for (let depth = 0; cur.parentId != null; depth += 1) {
     const parent = bodiesById.get(cur.parentId);
     if (!parent || !cur.orbit || depth >= MAX_CHAIN_DEPTH) return null;
+    const grandparent = parent.parentId == null ? null : bodiesById.get(parent.parentId);
     const p: Vec3Double =
-      override?.(cur.id, parent.id) ?? positionAt(cur.orbit, julianDate, orbitMu(cur, parent));
+      override?.(cur.id, parent.id) ??
+      parentRelativePositionAt(cur, parent, grandparent, julianDate);
     if (local === null) local = [p[0], p[1], p[2]];
     world[0] += p[0];
     world[1] += p[1];
