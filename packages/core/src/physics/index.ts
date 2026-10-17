@@ -21,9 +21,11 @@ export {
   elementsAt,
   meanMotionOf,
   parentRelativePositionAt,
+  periodicArgumentsAt,
   periodicPerturbationAt,
   siderealPeriodOf,
   type OrbitPositionBody,
+  type PeriodicArguments,
   type PeriodicPerturbation,
 } from './orbit-elements-at.js';
 export {

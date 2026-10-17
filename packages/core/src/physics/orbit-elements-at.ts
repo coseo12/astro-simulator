@@ -88,24 +88,32 @@ export interface PeriodicPerturbation {
   distance: number;
 }
 
+/** 주기 항 인자 [rad] — Meeus 47장 기호 (D 이각 · M 모체 평균근점이각 · M′ 위성 평균근점이각 · F 위도 인수). 감지 않은 연속값. */
+export interface PeriodicArguments {
+  D: number;
+  M: number;
+  Mp: number;
+  F: number;
+}
+
 /**
- * 주기 섭동 합 (결정 M4). 인자는 **모델 자신의 요소**에서 만든다 — 상수를 따로 두지 않는다 (ADR 1347 D2 와 같은 원리):
+ * 주기 항 인자 (결정 M4). **모델 자신의 요소**에서 만든다 — 상수를 따로 두지 않는다 (ADR 1347 D2 와 같은 원리):
  * `L′ = Ω + ω + M′` (위성 평균경도) · `F = L′ − Ω` · `D = L′ − L☉` (`L☉ = L_모체 + π` — 모체에서 본 태양) ·
- * `M` = 모체의 평균근점이각 (= 모체에서 본 태양의 평균근점이각).
+ * `M` = 모체의 평균근점이각 (= 모체에서 본 태양의 평균근점이각). Meeus 다항식 (47.2 – 47.5) 과의 대조는
+ * `orbit-elements-at.test.ts` 가 단언한다 — B9 9행은 D 계수가 0 · 2 뿐이라 `+π` 누락이 위치에 드러나지 않는다.
  *
  * @param elements 위성의 시각 요소 (`elementsAt` 결과)
  * @param mu 위성 궤도 μ (`orbitMu(body, parent)`)
  * @param parentOrbit 모체 궤도 요소 (고정 또는 율 보유 — 여기서 `elementsAt` 를 거친다)
  * @param parentMu 모체 궤도 μ (`orbitMu(parent, grandparent)`)
  */
-export function periodicPerturbationAt(
-  terms: ReadonlyArray<LoadedPeriodicTerm>,
+export function periodicArgumentsAt(
   elements: LoadedOrbitalElements,
   mu: number,
   parentOrbit: LoadedOrbitalElements,
   parentMu: number,
   julianDate: number,
-): PeriodicPerturbation {
+): PeriodicArguments {
   const meanAnomaly = meanAnomalyAt(elements, julianDate, mu);
   const meanLongitude =
     elements.longitudeOfAscendingNode + elements.argumentOfPeriapsis + meanAnomaly;
@@ -116,15 +124,30 @@ export function periodicPerturbationAt(
     parentElements.argumentOfPeriapsis +
     parentMeanAnomaly +
     Math.PI;
-  const elongation = meanLongitude - sunMeanLongitude;
-  const argumentOfLatitude = meanLongitude - elements.longitudeOfAscendingNode;
+  return {
+    D: meanLongitude - sunMeanLongitude,
+    M: parentMeanAnomaly,
+    Mp: meanAnomaly,
+    F: meanLongitude - elements.longitudeOfAscendingNode,
+  };
+}
+
+/** 주기 섭동 합 (결정 M4) — 인자는 {@link periodicArgumentsAt}. 매개변수도 그 함수와 같다. */
+export function periodicPerturbationAt(
+  terms: ReadonlyArray<LoadedPeriodicTerm>,
+  elements: LoadedOrbitalElements,
+  mu: number,
+  parentOrbit: LoadedOrbitalElements,
+  parentMu: number,
+  julianDate: number,
+): PeriodicPerturbation {
+  const args = periodicArgumentsAt(elements, mu, parentOrbit, parentMu, julianDate);
   const centuries = (julianDate - J2000_JD) / JULIAN_CENTURY_DAYS;
   const eccentricityFactor = 1 - EARTH_ECCENTRICITY_FACTOR_PER_CENTURY * centuries;
 
   const out: PeriodicPerturbation = { longitude: 0, latitude: 0, distance: 0 };
   for (const t of terms) {
-    const arg =
-      t.D * elongation + t.M * parentMeanAnomaly + t.Mp * meanAnomaly + t.F * argumentOfLatitude;
+    const arg = t.D * args.D + t.M * args.M + t.Mp * args.Mp + t.F * args.F;
     const amplitude = t.amplitude * eccentricityFactor ** Math.abs(t.M);
     if (t.component === 'distance') out.distance += amplitude * Math.cos(arg);
     else out[t.component] += amplitude * Math.sin(arg);

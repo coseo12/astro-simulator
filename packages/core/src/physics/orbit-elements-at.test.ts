@@ -35,6 +35,7 @@ import {
   elementsAt,
   meanMotionOf,
   parentRelativePositionAt,
+  periodicArgumentsAt,
   siderealPeriodOf,
 } from './orbit-elements-at.js';
 import { orbitalStateAt } from './state-vector.js';
@@ -470,6 +471,8 @@ describe('#1354 V1 — 궤도선 = 현재 시각 평균 요소 타원', () => {
    * (`463.4 km`) 는 원의 현 처짐이다. 궤도선은 초점 기준 진근점각 등간격이라 원지점 쪽 현이 길고 (`r_apo·Δν`) 그 점의 곡률
    * 반경이 `b²/a` 로 작아, 처짐 상한은 `(a(1+e)·Δν)² / (8·a(1−e²)) = a·(1+e)/(1−e)·Δν²/8` (`517.4 km`) 다. 2026-10-17
    * (원지점 근처, r `405,853 km`) 에서 새로 그린 선과 달의 거리 실측 `501.5 km` 가 원 한계를 넘고 타원 한계 안이다.
+   * 이 판정은 **그 시각에 새로 그린 선** 기준이다 — 재생 중 장면의 선은 최대 `4.49` 일 묵고, 그때 거리 상한은 `672 km`
+   * (갱신 문턱 `0.5°` 의 비용, `PRECESSING_ORBIT_LINE_THRESHOLD_RAD` 주석의 실측표) 다. 재생 중 `517.4 km` 초과는 회귀가 아니다.
    */
   const ELLIPSE_POLYLINE_SAG_M =
     ((a * (1 + e)) / (1 - e)) * ((TWO_PI / ORBIT_LINE_SEGMENTS) ** 2 / 8);
@@ -520,5 +523,57 @@ describe('#1354 계약 1 — 정보 카드 달 공전주기 (항성월)', () => 
     const mars = fullById.get('mars')!;
     const mu = orbitMu(mars, sun);
     expect(siderealPeriodOf(mars.orbit!, mu)).toBe(orbitalPeriod(mars.orbit!.semiMajorAxis, mu));
+  });
+});
+
+/**
+ * PR #1356 리뷰 권고 2 — 주기 항 인자 (D · M · M′ · F) 를 Meeus 47장 다항식 (식 47.2 – 47.5, PyMeeus `Moon.py` 재현값) 과
+ * 대조한다. B9 9행은 D 계수가 0 · 2 뿐이라 `L☉ = L_지구 + π` 의 `+π` 가 빠져도 위치가 같다 (`2(D+π) ≡ 2D`) — 위치 테스트로는
+ * 못 잡고, D 계수가 홀수인 항 (예: 시차부등 `[1,0,0,0]`) 을 넣는 순간 (ADR §Concrete Prediction B9 → B28) 드러난다.
+ */
+describe('#1354 주기 항 인자 = Meeus 다항식 (리뷰 권고 2)', () => {
+  /** Meeus 다항식 [도] — T = J2000 기준 율리우스 세기. */
+  function meeusArgumentsDeg(jd: number) {
+    const T = (jd - J2000_JD) / JULIAN_CENTURY_DAYS;
+    return {
+      D:
+        297.8501921 +
+        445267.1114034 * T -
+        0.0018819 * T ** 2 +
+        T ** 3 / 545868 -
+        T ** 4 / 113065000,
+      M: 357.5291092 + 35999.0502909 * T - 0.0001536 * T ** 2 + T ** 3 / 24490000,
+      Mp:
+        134.9633964 + 477198.8675055 * T + 0.0087414 * T ** 2 + T ** 3 / 69699 - T ** 4 / 14712000,
+      F:
+        93.272095 + 483202.0175233 * T - 0.0036539 * T ** 2 - T ** 3 / 3526000 + T ** 4 / 863310000,
+    };
+  }
+
+  /**
+   * 허용 차 [도]. 실측 (모델 − Meeus, D / M / M′ / F): J2000 `+0.005 / −0.002 / +0.137 / −0.032` · 2100-01-01
+   * `+0.201 / +0.127 / +0.128 / −0.028` · 1900-01-01 `−0.187 / −0.131 / +0.128 / −0.028` (PR #1356 리뷰 probe 와 J2000 은
+   * 같고, 2100 은 `0.01°` 안에서 같다). 최댓값 `0.201°` (2100 D — 1900 과 부호가 반대인 시간 비례 차. 원인 단정은 하지 않는다 — ADR 축 M 「잔여의 추세」) 위에
+   * 여유를 두어 `0.3°` 로 둔다. M′ 의 `~0.13°` 는 기점 반올림 (Q-D2 (a) — 기점 값 유지) 이다. `+π` 누락은 D 를 `180°`
+   * 옮기므로 이 대역보다 세 자릿수 크다.
+   */
+  const ARGUMENT_TOLERANCE_DEG = 0.3;
+
+  it.each([
+    ['J2000', J2000_JD],
+    ['2100-01-01', JD_2100],
+  ] as const)('%s — |모델 − Meeus| ≤ 0.3° (D · M · M′ · F)', (_label, jd) => {
+    const args = periodicArgumentsAt(
+      elementsAt(moon.orbit!, jd),
+      moonMu,
+      earth.orbit!,
+      orbitMu(earth, sun),
+      jd,
+    );
+    const ref = meeusArgumentsDeg(jd);
+    for (const key of ['D', 'M', 'Mp', 'F'] as const) {
+      const diffDeg = wrapAngle(args[key] - ref[key] * DEG) / DEG;
+      expect(Math.abs(diffDeg), key).toBeLessThanOrEqual(ARGUMENT_TOLERANCE_DEG);
+    }
   });
 });

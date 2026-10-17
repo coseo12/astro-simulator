@@ -7,12 +7,15 @@
  *  3. tier 전환 재생성은 현재 시각 요소로.
  *  4. 율 없는 천체의 LineSystem 은 갱신 경로를 타지 않는다 (정점 바이트 동일).
  *  5. 궤적 — 달 사양을 현재 시각으로 다시 만든다 (머리 = 메시는 `solar-system-scene-trails.test.ts` D2 가 단언).
+ *  6. 결정 M4 — 장면 달 메시 = 지구 메시 + 배율 × 체인 위치 local (장면이 `resolveBodyChainPosition` 과 같은 함수를 쓴다).
  *
  * 픽스처는 `solar-system-scene-trails.test.ts` 와 같다 (OffscreenCanvas 스텁 포함).
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3, VertexBuffer } from '@babylonjs/core';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
+import { resolveBodyChainPosition } from '../physics/body-chain.js';
+import { orbitMu, positionAt } from '../physics/kepler.js';
 import { elementsAt } from '../physics/orbit-elements-at.js';
 import { sampleOrbitPoints } from './orbit-sampling.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
@@ -65,7 +68,9 @@ afterEach(() => {
 const J2000 = 2_451_545.0;
 const DEG = Math.PI / 180;
 const MOON_LINE = 'satellite-orbit-line-earth';
-const moon = getSolarSystem().bodies.find((b) => b.id === 'moon')!;
+const system = getSolarSystem();
+const bodiesById = new Map(system.bodies.map((b) => [b.id, b] as const));
+const moon = bodiesById.get('moon')!;
 /** ϖ̇ [rad/일] — 문턱에 먼저 닿는 쪽 (|ϖ̇| `0.111°/일` > |Ω̇| `0.053°/일`). */
 const perihelionRate = moon.orbit!.rates!.longitudeOfPerihelion;
 /** 문턱에 닿기까지의 일 수 (ϖ 기준). */
@@ -174,5 +179,48 @@ describe('#1354 V1 — 달 궤도선 정점 갱신 (장면)', () => {
     expect(moonSpec.meanAnomalyAtEpoch).toBe(el.meanAnomalyAtEpoch);
     for (const s of specs)
       if (s.id !== 'moon') expect(s).toEqual(loadSpecs.find((x) => x.id === s.id));
+  });
+});
+
+/**
+ * PR #1356 리뷰 권고 1 — 결정 M4 (장면 · 체인 위치 단일 함수) 의 장면 쪽 단언. 장면 `updateAtKepler` 를 고정 요소
+ * `positionAt(body.orbit, …)` 로 되돌려도 위 테스트들은 통과한다 (궤적 머리는 메시에 묶이고 궤도선 테스트는 메시를 보지
+ * 않는다). 여기서는 J2000 이외 시각에서 달 메시 위치 자체를 체인 위치와 대조한다.
+ */
+describe('#1354 결정 M4 — 장면 달 메시 = 지구 메시 + 배율 × resolveBodyChainPosition local', () => {
+  /** J2000 + 9,000.5 일 (2024-08) — 율 · 주기 항이 모두 0 이 아닌 시각. */
+  const JD = J2000 + 9_000.5;
+  /**
+   * 허용 — 지구 일심 거리 (`~1.5e11 m`) 에 대한 상대 `1e-6` (`~150 km`, 장면 단위로는 배율을 곱한 값). 메시 위치는
+   * float32 라 성분당 `~6e-8 × 1.5e11 ≈ 9 km` 반올림이 들어간다. 고정 요소 경로와의 차 (아래 양성 대조) 는 이보다 세
+   * 자릿수 이상 크다.
+   */
+  const RELATIVE_TOLERANCE = 1e-6;
+
+  function moonMinusEarthMesh(f: Fixture): [number, number, number] {
+    const m = f.handles.meshes.get('moon')!.position;
+    const e = f.handles.meshes.get('earth')!.position;
+    return [m.x - e.x, m.y - e.y, m.z - e.z];
+  }
+
+  it('Kepler 장면 — 달 메시 − 지구 메시 = scale × 배율 × local (체인 위치)', () => {
+    const f = makeScene();
+    f.handles.updateAt(JD);
+    const { scale } = f.handles.getBodyReferenceFrame();
+    const visualScale = getOrbitVisualScale('earth', 'moon');
+    const local = resolveBodyChainPosition(bodiesById, 'moon', JD)!.local!;
+    const earthWorld = resolveBodyChainPosition(bodiesById, 'earth', JD)!.world;
+    const expected = local.map((x) => x * visualScale * scale);
+    const got = moonMinusEarthMesh(f);
+    const tolerance = RELATIVE_TOLERANCE * Math.hypot(...earthWorld) * scale;
+    const err = Math.hypot(got[0] - expected[0]!, got[1] - expected[1]!, got[2] - expected[2]!);
+    expect(err).toBeLessThanOrEqual(tolerance);
+
+    // 양성 대조 — 고정 요소 (V0) 경로라면 같은 자리에서 허용의 1,000 배 넘게 벗어난다.
+    const v0Local = positionAt(moon.orbit!, JD, orbitMu(moon, bodiesById.get('earth')!));
+    const v0 = v0Local.map((x) => x * visualScale * scale);
+    expect(Math.hypot(got[0] - v0[0]!, got[1] - v0[1]!, got[2] - v0[2]!)).toBeGreaterThan(
+      tolerance * 1_000,
+    );
   });
 });

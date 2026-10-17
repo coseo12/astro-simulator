@@ -20,7 +20,8 @@ export type Vec3 = [number, number, number];
  *
  * #1347 — 체인 합산은 core `resolveBodyChainPosition` 하나다 (ADR `20261016-1347` §교차검증 합의 5). 시간 이벤트 계산
  * (`events/`) 이 같은 함수를 써서, 사건 시각의 위치와 카드 · 거리 자의 위치가 **같은 함수**에서 나온다. 식은 scene Kepler 경로
- * (`updateAtKepler`) 와 같다 — 부모 기준 `positionAt(orbit, jd, orbitMu(body, parent))` 의 체인 합, 시각 배율 미적용.
+ * (`updateAtKepler`) 와 같다 — 부모 기준 위치 `parentRelativePositionAt(body, parent, grandparent, jd)` (#1354 결정 M4 — 장면과
+ * 같은 함수. 율 보유 달은 시각 요소 + 주기 항, 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로) 의 체인 합, 시각 배율 미적용.
  *
  * **엔진 상태값 우선** — `getBodyState` 가 값을 주면(Newton · Barnes-Hut) 그 부모 기준 위치를 쓰고,
  * `null` 이면(Kepler, 엔진 미준비, WebGPU 의 비동기 velocities) 위 Kepler 식으로 떨어진다. 카드는
