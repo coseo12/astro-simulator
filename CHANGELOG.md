@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.101.0] - 2026-10-17
+
 ### Added
 
 - **[#1354] 일식 · 월식 이벤트 마커 (PR2)** ([#1354](https://github.com/coseo12/astro-simulator/issues/1354), PR [#1357](https://github.com/coseo12/astro-simulator/pull/1357)). 시간 사건 패널에 「일식」 · 「월식」 필터 칩을 넣었다 (기본 꺼짐). 켜면 1900 ~ 2100 일식 455건 · 월식 458건이 눈금과 목록에 들어오고, 목록에는 종류가 붙는다 (「개기일식」 · 「금환일식」 · 「부분일식」 · 「개기월식」 · 「부분월식」 · 「반영월식」 · 배지 `±0.3일`). 식을 고르면 그 시각으로 가서 달에 포커스하고 일시정지하며, 거리 자 기준점을 지구로 둔다. 일 · 월식 미포함 안내는 지웠고, 식 필터가 켜져 있으면 그 자리에 배율 고지 1줄 (`getOrbitVisualScale('earth', 'moon')` 값) 을 보인다. ADR [`20261017-1354`](docs/decisions/20261017-1354-lunar-precession-eclipses.md) 결정 E1 – E9 · 사용자 결정 T (a) · K1 (a) · S (a) · X (a).
