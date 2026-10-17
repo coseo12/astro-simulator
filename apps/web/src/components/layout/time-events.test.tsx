@@ -39,9 +39,15 @@ vi.mock('@/core/sim-context', () => ({
 // M7 — 계산 함수 호출 횟수를 센다 (구현은 실제 함수 그대로).
 vi.mock('@astro-simulator/core', async (importOriginal) => {
   const actual = await importOriginal<typeof core>();
-  return { ...actual, computeEventsForKind: vi.fn(actual.computeEventsForKind) };
+  return {
+    ...actual,
+    computeEventsForKind: vi.fn(actual.computeEventsForKind),
+    // #1354 A3 — 배율 고지가 SSoT 값을 따르는지 (리터럴 하드코딩 판별) 보려고 spy 로 감싼다. 구현은 실제 함수 그대로.
+    getOrbitVisualScale: vi.fn(actual.getOrbitVisualScale),
+  };
 });
 const computeSpy = vi.mocked(core.computeEventsForKind);
+const visualScaleSpy = vi.mocked(core.getOrbitVisualScale);
 
 const CAPS = {
   starfield: true,
@@ -488,6 +494,32 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
       expect(note).toHaveTextContent(`×${core.getOrbitVisualScale('earth', 'moon')}`);
     },
   );
+
+  it('U1 — 배율 고지는 getOrbitVisualScale(earth, moon) 의 값을 따른다 (다른 값을 돌려주면 문자열도 바뀐다)', async () => {
+    // 실제 값 (30) 과 다른 값 — 고지가 리터럴이면 이 테스트가 FAIL 한다.
+    const SPY_SCALE = 77;
+    const actual = await vi.importActual<typeof core>('@astro-simulator/core');
+    expect(actual.getOrbitVisualScale('earth', 'moon')).not.toBe(SPY_SCALE);
+    visualScaleSpy.mockClear();
+    visualScaleSpy.mockImplementation((parentId, childId) =>
+      parentId === 'earth' && childId === 'moon'
+        ? SPY_SCALE
+        : actual.getOrbitVisualScale(parentId, childId),
+    );
+    try {
+      useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON, rulerAnchorId: null });
+      renderEvents();
+      await flushChunks();
+      fireEvent.click(trigger());
+      fireEvent.click(option('solar-eclipse:2024-04-08'));
+      const note = screen.getByTestId('time-events-scale-note');
+      expect(note).toHaveTextContent(`×${SPY_SCALE}`);
+      expect(note).not.toHaveTextContent(`×${actual.getOrbitVisualScale('earth', 'moon')}`);
+      expect(visualScaleSpy).toHaveBeenCalledWith('earth', 'moon');
+    } finally {
+      visualScaleSpy.mockImplementation(actual.getOrbitVisualScale);
+    }
+  });
 });
 
 describe('N-body 엔진 (M9 단위 부분)', () => {

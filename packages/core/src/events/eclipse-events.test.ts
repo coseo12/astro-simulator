@@ -74,6 +74,9 @@ const E3 = { 'solar-eclipse': 438, 'lunar-eclipse': 430 } as const;
 /** DoD E4 — 적중마다 `|t* − NASA TD|` 상한 [h]. 구현 실측 일식 `−0.660 ~ +0.661` · 월식 `−0.670 ~ +0.665` h. */
 const E4_MAX_HOURS = 1.0;
 
+/** 완전성 — 삭망 인접 간격 상한 [일] (실제 `29.27 ~ 29.83` 일). 범위 양 끝 여백에도 같은 상한을 건다. */
+const MAX_SYZYGY_GAP_DAYS = 29.9;
+
 /** DoD E1 — 삭망 시각 허용 [h] (PR1 과 같은 대역). */
 const E1_SYZYGY_TOLERANCE_HOURS = 1.0;
 
@@ -178,16 +181,40 @@ describe('#1354 E1 — 사건 경로의 삭망 근 (DE441 717개)', () => {
     expect(worst).toBeLessThanOrEqual(E1_SYZYGY_TOLERANCE_HOURS);
   });
 
-  it('완전성 — 1900 ~ 2100 삭 · 망 각각 인접 간격 29.2 ~ 29.9 일 (근 하나가 빠지면 간격이 2배)', () => {
+  /**
+   * 완전성 — 인접 간격만으로는 범위 양 끝에서 근을 놓쳐도 통과한다 (리뷰 변이 A: 첫 씨앗 부호 반전). 그래서 양 끝 여백도 같은 상한
+   * (`29.9` 일) 으로 단언한다 — 「범위 시작 ~ 첫 근」 · 「마지막 근 ~ 범위 끝」 을 간격으로 보면 `[start, end)` 전체가 덮인다.
+   * 개수 고정 (`2_474`) 대신 이 술어를 쓴 이유: 데이터 (달 율 · 항) 에 기대지 않는 구조 조건이라 모델이 바뀌어도 틀리지 않는다.
+   */
+  it('완전성 — 인접 간격 29.2 ~ 29.9 일 + 범위 양 끝 여백 < 29.9 일 (근 하나가 빠지면 간격이 2배)', () => {
     for (const list of [roots.new, roots.full]) {
       // 200년 / 평균 삭망월 29.53 일 = 2,474 — 범위 끝에서 ±1.
       expect(list.length).toBeGreaterThanOrEqual(2_472);
       expect(list.length).toBeLessThanOrEqual(2_475);
       const gaps = list.slice(1).map((t, i) => t - list[i]!);
       expect(Math.min(...gaps)).toBeGreaterThan(29.2);
-      expect(Math.max(...gaps)).toBeLessThan(29.9);
+      expect(Math.max(...gaps)).toBeLessThan(MAX_SYZYGY_GAP_DAYS);
       expect(list[0]!).toBeGreaterThanOrEqual(START_JD);
       expect(list.at(-1)!).toBeLessThan(END_JD);
+      expect(list[0]! - START_JD).toBeLessThan(MAX_SYZYGY_GAP_DAYS);
+      expect(END_JD - list.at(-1)!).toBeLessThan(MAX_SYZYGY_GAP_DAYS);
+    }
+  });
+
+  it('청크 경계 — 10년 창으로 나눠 이어 붙여도 200년 한 번과 같은 근 (창마다 시작 처리가 20번 돈다)', () => {
+    const DECADE_DAYS = 3_652.5;
+    for (const [phase, whole] of [
+      ['new', roots.new],
+      ['full', roots.full],
+    ] as const) {
+      const chunked: number[] = [];
+      for (let a = START_JD; a < END_JD; a += DECADE_DAYS) {
+        chunked.push(...syzygyTimes(fullById, 'moon', phase, a, Math.min(a + DECADE_DAYS, END_JD)));
+      }
+      expect(chunked.length).toBe(whole.length);
+      for (let i = 0; i < whole.length; i += 1) {
+        expect(Math.abs(chunked[i]! - whole[i]!)).toBeLessThan(1e-6);
+      }
     }
   });
 
@@ -285,14 +312,19 @@ describe('#1354 E4 — 최대식 시각 · 허용 오차', () => {
     },
   );
 
-  it('판별력 — 사건 시각 1일 이동은 E4 를 넘는다', () => {
-    const shifted = fullEvents['solar-eclipse'].map((e) => ({
-      ...e,
-      julianDate: e.julianDate + 1,
-    }));
-    const m = matchAgainstNasa(shifted, 'solar-eclipse');
-    expect(Math.max(...m.errorsHours.map(Math.abs))).toBeGreaterThan(E4_MAX_HOURS);
-  });
+  it.each(ECLIPSE_KINDS.flatMap((k) => [-1, 1].map((d) => [k, d] as const)))(
+    '판별력 — %s 사건 시각 %+d일 이동은 E4 · 허용치를 넘는다',
+    (kind, shift) => {
+      const shifted = fullEvents[kind].map((e) => ({ ...e, julianDate: e.julianDate + shift }));
+      const m = matchAgainstNasa(shifted, kind);
+      // 매칭 창 ±3일 안이라 적중 수는 그대로 — 오차만 커진다.
+      expect(m.hits).toBe(fullMatch[kind].hits);
+      expect(Math.max(...m.errorsHours.map(Math.abs))).toBeGreaterThan(E4_MAX_HOURS);
+      expect(Math.min(...m.errorsHours.map(Math.abs)) / HOURS_PER_DAY).toBeGreaterThan(
+        EVENT_KIND_TOLERANCE_DAYS[kind],
+      );
+    },
+  );
 });
 
 describe('#1354 최대식 정합 · 사전 필터', () => {
