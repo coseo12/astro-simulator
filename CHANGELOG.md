@@ -7,7 +7,7 @@ Semantic Versioning을 따른다.
 
 ### Changed
 
-- **[#1354] 달 궤도 시간 변화 모델 (PR1)** ([#1354](https://github.com/coseo12/astro-simulator/issues/1354), PR **PR**). 달 궤도에 승교점 · 근지점 세차와 평균경도 율, 주기 섭동 9항 (B9) 을 넣었다. 장면 · 정보 카드 · 거리 자가 모두 같은 달 위치를 쓴다. ADR [`20261017-1354`](docs/decisions/20261017-1354-lunar-precession-eclipses.md) 결정 M1 – M5 · V1 · 사용자 결정 (전부 권고안). 일식 · 월식 사건은 PR2 에서 한다.
+- **[#1354] 달 궤도 시간 변화 모델 (PR1)** ([#1354](https://github.com/coseo12/astro-simulator/issues/1354), PR [#1356](https://github.com/coseo12/astro-simulator/pull/1356)). 달 궤도에 승교점 · 근지점 세차와 평균경도 율, 주기 섭동 9항 (B9) 을 넣었다. 장면 · 정보 카드 · 거리 자가 모두 같은 달 위치를 쓴다. ADR [`20261017-1354`](docs/decisions/20261017-1354-lunar-precession-eclipses.md) 결정 M1 – M5 · V1 · 사용자 결정 (전부 권고안). 일식 · 월식 사건은 PR2 에서 한다.
   - 데이터 (결정 M2): `solar-system.json` `moon.orbit` 에 `rates` (Meeus 47장 원값 · `frame: 'mean-equinox-of-date'`) 와 `periodicTerms` 9행 (경도 4 · 위도 3 · 거리 2) 을 넣었다. 로더는 율에서 일반세차 `p_A` (shared `GENERAL_PRECESSION_DEG_PER_CENTURY`, IAU 2006 `5028.796195″/세기`) 를 빼 J2000 고정 분점 rad/일로 옮긴다. 「모체가 태양을 도는 위성」 이 아닌 천체에 `periodicTerms` 가 있으면 로드를 거부한다. 기점 값은 바꾸지 않았다 (Q-D2 (a)).
   - 위치 (결정 M3 · M4): core `physics/orbit-elements-at.ts` 를 새로 두었다. `elementsAt` 은 시각 요소를 만들고 평균근점이각 율로 `√(μ/a³)` 대신 `L̇ − ϖ̇` 를 쓴다. `parentRelativePositionAt` 은 시각 요소의 Kepler 위치에 주기 항을 더한다. 장면 `updateAtKepler` 와 `resolveBodyChainPosition` 이 둘 다 `parentRelativePositionAt` 을 부른다. 율이 없는 궤도에서는 `elementsAt` 이 같은 객체를 돌려주므로 다른 35 천체는 비트 동일하다.
   - N-body (결정 M5): `buildInitialState` 는 율을 반영한 시각 요소의 상태 벡터를 쓰고, 주기 항은 넣지 않는다.
