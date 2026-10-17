@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import { heliocentricPositionAt, resolveBodyChainPosition } from './body-chain.js';
-import { orbitMu, positionAt } from './kepler.js';
+import { parentRelativePositionAt } from './orbit-elements-at.js';
 
 /**
  * #1347 — 모체 체인 위치 (DoD M4 · 교차검증 합의 5). 사건 계산과 web 거리 계산이 이 함수 하나를 쓴다. 여기서는 그 함수가
- * scene Kepler 경로의 식 (부모 기준 `positionAt(orbit, jd, orbitMu(body, parent))` 의 체인 합) 과 같은 값을 내는지 본다.
+ * scene Kepler 경로의 식 (부모 기준 위치의 체인 합) 과 같은 값을 내는지 본다.
+ *
+ * #1354 결정 M4 — 부모 기준 위치는 scene 과 같은 단일 함수 `parentRelativePositionAt` 이다 (율 보유 달은 시각 요소 + 주기 항,
+ * 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 — 후자의 비트 동일은 `orbit-elements-at.test.ts` I1 이 단언한다).
+ * 여기서는 체인 합만 본다.
  */
 
 const bodies = getSolarSystem().bodies;
@@ -21,7 +25,8 @@ function handChain(id: string, jd: number): [number, number, number] {
   const out: [number, number, number] = [0, 0, 0];
   while (cur.parentId != null) {
     const parent = bodiesById.get(cur.parentId)!;
-    const p = positionAt(cur.orbit!, jd, orbitMu(cur, parent));
+    const grandparent = parent.parentId == null ? null : bodiesById.get(parent.parentId)!;
+    const p = parentRelativePositionAt(cur, parent, grandparent, jd);
     out[0] += p[0];
     out[1] += p[1];
     out[2] += p[2];
@@ -47,7 +52,12 @@ describe('resolveBodyChainPosition', () => {
     const r = resolveBodyChainPosition(bodiesById, 'moon', 2_451_545.0)!;
     const moon = bodiesById.get('moon')!;
     expect(r.local).toEqual([
-      ...positionAt(moon.orbit!, 2_451_545.0, orbitMu(moon, bodiesById.get('earth')!)),
+      ...parentRelativePositionAt(
+        moon,
+        bodiesById.get('earth')!,
+        bodiesById.get('sun')!,
+        2_451_545.0,
+      ),
     ]);
     expect(r.world).not.toEqual(r.local);
   });

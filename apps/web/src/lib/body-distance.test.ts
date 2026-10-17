@@ -57,17 +57,11 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     const sun = byId.get('sun')!;
     const moon = byId.get('moon')!;
     const e = physics.orbitalStateAt(earth.orbit!, J2000, GRAVITATIONAL_CONSTANT * sun.mass);
-    // #1305 — 위성 μ = G(M_parent + m) (scene `orbitMu` 와 같은 식). J2000 = epoch 라 μ 무관하지만 식을 맞춘다.
-    const m = physics.orbitalStateAt(
-      moon.orbit!,
-      J2000,
-      GRAVITATIONAL_CONSTANT * (earth.mass + moon.mass),
-    );
-    const ref = norm([
-      e.position[0] + m.position[0],
-      e.position[1] + m.position[1],
-      e.position[2] + m.position[2],
-    ]);
+    // #1354 결정 M4 — 달은 율 · 주기 항 보유라 장면과 같은 단일 함수 `parentRelativePositionAt` 로 기대값을 만든다
+    // (그 함수의 정확도는 core `orbit-elements-at.test.ts` E1 · P1 이 DE441 로 단언). 종전 `orbitalStateAt(moon.orbit)` 은
+    // J2000 에서도 주기 9항만큼 (`5,357 km`) 다르다.
+    const m = physics.parentRelativePositionAt(moon, earth, sun, J2000);
+    const ref = norm([e.position[0] + m[0], e.position[1] + m[1], e.position[2] + m[2]]);
     expect(Math.abs(d.fromSunM! - ref) / ref).toBeLessThan(1e-12);
   });
 
@@ -140,6 +134,9 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
 /**
  * #1341 PR2 DoD E1 — 두 천체 거리. 독립 계산 = `physics.orbitalStateAt` 를 모체 체인마다 직접 부른 합 (장면 · 카드가 쓰는
  * `positionAt` 경로와 다른 함수). μ 는 #1305 식 (태양 직속 G·M☉ / 위성 G(M_parent + m)).
+ *
+ * #1354 결정 M4 — 율 보유 궤도 (달) 고리는 독립 경로가 없다 (주기 항의 다른 구현을 두지 않는다 — 함수가 둘이면 parity 가
+ * 테스트에 기댄다). 그 고리만 장면과 같은 `parentRelativePositionAt` 로 만든다. 정확도는 core E1 · P1 (DE441) 이 단언한다.
  */
 describe('#1341 computeBodyPairDistance — 두 천체 물리 거리 (E1)', () => {
   function independentWorld(id: string, jd: number): [number, number, number] {
@@ -151,7 +148,10 @@ describe('#1341 computeBodyPairDistance — 두 천체 물리 거리 (E1)', () =
         parent.parentId == null
           ? GRAVITATIONAL_CONSTANT * parent.mass
           : GRAVITATIONAL_CONSTANT * (parent.mass + cur.mass);
-      const p = physics.orbitalStateAt(cur.orbit!, jd, mu).position;
+      const grandparent = parent.parentId == null ? null : byId.get(parent.parentId)!;
+      const p = cur.orbit!.rates
+        ? physics.parentRelativePositionAt(cur, parent, grandparent, jd)
+        : physics.orbitalStateAt(cur.orbit!, jd, mu).position;
       w[0] += p[0];
       w[1] += p[1];
       w[2] += p[2];

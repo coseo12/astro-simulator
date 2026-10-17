@@ -1,5 +1,5 @@
 // #1305 — `twoBodyMu` 는 루트 named import (`physics` namespace 경유 금지 — body-distance.ts 와 같은 SSR 사유).
-import { twoBodyMu, type ephemeris } from '@astro-simulator/core';
+import { siderealPeriodOf, twoBodyMu, type ephemeris } from '@astro-simulator/core';
 import { AU } from '@astro-simulator/shared';
 
 /**
@@ -63,6 +63,9 @@ export function findBodyAndParent(
  * 써서 카드 주기와 화면 공전 주기가 일치한다. 태양 직속 body 는 scene 이 G·M_sun 을 유지하므로 카드
  * 주기(G(M_sun + m)) 와 최대 0.05% (목성) 다르다 — 행성 μ 변경은 #1305 범위 밖.
  *
+ * #1354 — 주기는 core `siderealPeriodOf` (평균경도가 2π 를 도는 시간). 율 보유 궤도 (달) 는 장면이 평균경도 율 `L̇` 로
+ * 공전하므로 `2π / L̇` = `27.32166` 일 (Kepler `27.32181` 일 — 표시 「27.32 일」 은 같다), 그 밖은 Kepler 식 그대로다.
+ *
  * @returns 궤도가 없거나 모체 미해석이면 `null`. 호출부는 조용히 태양 질량으로 흡수하지 않고
  *   fail-visible 로 표기한다 (#841 계약).
  */
@@ -71,7 +74,7 @@ export function orbitalPeriodSeconds(
   parent: LoadedCelestialBody | null,
 ): number | null {
   if (!body.orbit || !parent) return null;
-  return 2 * Math.PI * Math.sqrt(body.orbit.semiMajorAxis ** 3 / twoBodyMu(parent.mass, body.mass));
+  return siderealPeriodOf(body.orbit, twoBodyMu(parent.mass, body.mass));
 }
 
 /** #841 fail-visible — orbit 존재 + 모체 미해석 시 공전주기 자리 문구. */

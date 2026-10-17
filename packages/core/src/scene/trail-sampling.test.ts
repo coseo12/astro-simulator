@@ -24,6 +24,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import { orbitMu, positionAt } from '../physics/kepler.js';
+import { elementsAt } from '../physics/orbit-elements-at.js';
 import { R_PHASE_BODY_ALLOWLIST } from './r-phase-allowlist.js';
 import {
   HIGH_ECCENTRICITY_THRESHOLD,
@@ -31,6 +32,7 @@ import {
   TRAIL_SEGMENTS,
   TRAIL_SEGMENTS_HIGH_ECCENTRICITY,
   continuousEccentricAnomaly,
+  createTrailBodySpec,
   createTrailBodySpecs,
   sampleTrailLocal,
   sampleTrailWorld,
@@ -103,8 +105,16 @@ describe('#1341 trail 대상 집합 (결정 T9)', () => {
 });
 
 describe('#1341 D1 — 샘플 정합 (positionAt(t_k) 대조)', () => {
-  /** 한 시각 · 한 방향의 최대 상대오차 + 꼬리 M 오차. */
-  function check(spec: TrailBodySpec, jd: number, direction: TrailDirection) {
+  /**
+   * 한 시각 · 한 방향의 최대 상대오차 + 꼬리 M 오차.
+   *
+   * #1354 결정 V1 — 사양 · 기준은 그 시각의 요소 (`elementsAt(orbit, jd)`) 로 만든다 (scene `syncTrails` 가 율 보유 천체의
+   * 사양을 현재 시각으로 다시 만드는 것과 같다). 율 없는 천체는 `elementsAt` 가 같은 객체라 종전 대조와 같다.
+   */
+  function check(epochSpec: TrailBodySpec, jd: number, direction: TrailDirection) {
+    const body = bodiesById.get(epochSpec.id)!;
+    const spec = createTrailBodySpec(body, bodiesById.get(epochSpec.parentId)!, jd)!;
+    const orbitAtJd = elementsAt(body.orbit!, jd);
     const mu = muOf(spec);
     const out = new Float64Array(3 * (spec.segments + 1));
     sampleTrailLocal(spec, jd, direction, TRAIL_ORBIT_FRACTION, out, 0);
@@ -114,8 +124,7 @@ describe('#1341 D1 — 샘플 정합 (positionAt(t_k) 대조)', () => {
       const E = head + ((tail - head) * k) / spec.segments;
       // 시각 t_k 를 평균 근점각 M_k 로 표현 — epoch = t_k 로 둔 요소에 같은 t_k 를 넣는다 (dt = 0, JD 반올림 없음).
       const mK = E - spec.eccentricity * Math.sin(E);
-      const orbit = bodiesById.get(spec.id)!.orbit!;
-      const ref = positionAt({ ...orbit, meanAnomalyAtEpoch: mK, epoch: J2000 }, J2000, mu);
+      const ref = positionAt({ ...orbitAtJd, meanAnomalyAtEpoch: mK, epoch: J2000 }, J2000, mu);
       const d = Math.hypot(
         out[3 * k]! - ref[0],
         out[3 * k + 1]! - ref[1],
@@ -124,7 +133,7 @@ describe('#1341 D1 — 샘플 정합 (positionAt(t_k) 대조)', () => {
       maxRel = Math.max(maxRel, d / Math.hypot(ref[0], ref[1], ref[2]));
     }
     // 머리 = positionAt(jd) 그대로 (역산 시각을 거치지 않는 직접 대조).
-    const headRef = positionAt(bodiesById.get(spec.id)!.orbit!, jd, mu);
+    const headRef = positionAt(orbitAtJd, jd, mu);
     const headRel =
       Math.hypot(out[0]! - headRef[0], out[1]! - headRef[1], out[2]! - headRef[2]) /
       Math.hypot(headRef[0], headRef[1], headRef[2]);

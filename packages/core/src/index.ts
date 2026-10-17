@@ -60,15 +60,31 @@ export {
   EVENT_KIND_TOLERANCE_DAYS,
   computeEventsForKind,
   eventDateIso,
+  eventLabelKo,
   getEventKind,
 } from './events/index.js';
-export type { AstroEvent, EventFilterId, EventKindDef, EventKindId } from './events/index.js';
+export type {
+  AstroEvent,
+  EclipseType,
+  EventFilterId,
+  EventKindDef,
+  EventKindId,
+} from './events/index.js';
 export { heliocentricPositionAt, resolveBodyChainPosition } from './physics/body-chain.js';
 export type {
   BodyChainPosition,
   ChainBody,
   ParentRelativePositionFn,
 } from './physics/body-chain.js';
+// #1354 — 궤도 요소 시간 변화 · 위치 단일 함수 직접 named export. 정보 카드 공전주기 (`siderealPeriodOf`) 가 쓴다 —
+// SSR 기전은 위 `kepler.ts` 와 같다 (`orbit-elements-at.ts` 는 `kepler.ts` · shared 상수 · 로더 type import 만). exports field 불변.
+export {
+  elementsAt,
+  meanMotionOf,
+  parentRelativePositionAt,
+  siderealPeriodOf,
+} from './physics/orbit-elements-at.js';
+export type { OrbitPositionBody, PeriodicPerturbation } from './physics/orbit-elements-at.js';
 
 // #845 — GpuTier / LodLevel 루트 type re-export.
 //

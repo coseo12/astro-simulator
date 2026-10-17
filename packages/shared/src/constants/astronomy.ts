@@ -25,3 +25,13 @@ export const J2000_JD = 2_451_545.0;
 
 /** 율리우스 세기 [일] — 36525일 */
 export const JULIAN_CENTURY_DAYS = 36_525;
+
+/**
+ * #1354 — 일반세차 (황경 방향 누적 세차 율) [도/율리우스 세기]. IAU 2006 P03 (Capitaine et al. 2003, ERFA `p06e.c`
+ * `p_A` 의 선형항 `5028.796195″/세기`).
+ *
+ * 「날짜 평균 분점」 기준으로 표기된 경도 율 (예: Meeus *Astronomical Algorithms* 2판 47장의 달 평균 요소) 을
+ * 장면 좌표 (J2000 황도 · 고정 분점) 의 율로 옮길 때 뺀다 — 로더가 `rates.frame === 'mean-equinox-of-date'` 에 적용한다.
+ * ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md` 결정 M2.
+ */
+export const GENERAL_PRECESSION_DEG_PER_CENTURY = 5028.796195 / 3600;

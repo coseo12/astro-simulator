@@ -25,7 +25,7 @@ export const SCRUBBER_STEP_YEARS = 1;
 export const SCRUBBER_SYNC_QUANTUM_YEARS = 0.25;
 
 /** 해당 연도 1월 1일 0시(UTC)의 JD. `Date.UTC` 의 0~99 → 1900+ 변환을 피해 `setUTCFullYear` 로 넣는다. */
-function startOfYearJulianDate(year: number): number {
+export function startOfYearJulianDate(year: number): number {
   const date = new Date(0);
   date.setUTCFullYear(year, 0, 1);
   date.setUTCHours(0, 0, 0, 0);
