@@ -11,7 +11,8 @@
  * (`parse-belt-mode.ts` — 같은 `off` 옵트아웃, `?belt=` 는 기존 숫자 의미 유지 — ADR `20261008-1319` 결정 6), #1329 PR2 의
  * `?comettails=` (`parse-comet-tails-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261010-1329` 결정 5), #1335 PR2 의
  * `?corona=` (`parse-corona-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261014-1335` 결정 6), #1341 PR1 의
- * `?trails=` (`parse-trails-mode.ts` — **유일한 기본 꺼짐 행**, `on` 옵트인 — ADR `20261015-1341` 결정 T10). 쓰는 쪽은
+ * `?trails=` (`parse-trails-mode.ts` — 기본 꺼짐 행, `on` 옵트인 — ADR `20261015-1341` 결정 T10), #1373 PR2 의 `?constellations=`
+ * (`parse-constellations-mode.ts` — 같은 기본 꺼짐 · `on` 옵트인 — ADR `20261018-1373` 결정 T1). 쓰는 쪽은
  * `serializeDisplayToggle(visible, defaultVisible)` 하나이고 그 역방향이 각 행의 `parse` 다.
  */
 
@@ -27,10 +28,12 @@ import { parseNightLightsVisible } from './parse-night-lights-mode';
 import { parseOrbitsVisible } from './parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
 import { parseTrailsVisible } from './parse-trails-mode';
+import { parseConstellationsVisible } from './parse-constellations-mode';
 
 export type DisplayToggleId =
   | 'orbits'
   | 'stars'
+  | 'constellations'
   | 'clouds'
   | 'nightLights'
   | 'labels'
@@ -93,6 +96,9 @@ export const DISPLAY_DISABLED_REASONS = {
   // #1335 PR2 — 태양 코로나 (결정 5). 같은 사유 표현.
   softwareRendererCorona:
     '소프트웨어 렌더링 환경에서는 성능 보호를 위해 태양 코로나를 표시하지 않습니다',
+  // #1373 PR2 — 별자리 (결정 R5). 별 배경과 같은 게이트 · 같은 사유 표현.
+  softwareRendererConstellations:
+    '소프트웨어 렌더링 환경에서는 성능 보호를 위해 별자리를 표시하지 않습니다',
   // #1341 PR1 — 궤적 trail (결정 T8). 렌더러가 아니라 물리 엔진 사유다.
   nbodyTrails: 'N-body 엔진에서는 궤적을 표시하지 않습니다',
   surfaceOff: '표면 표시가 꺼져 있어 사용할 수 없습니다 (?surface=off)',
@@ -103,6 +109,7 @@ export const DISPLAY_DISABLED_REASONS = {
 type IntentKey =
   | 'orbitLinesVisible'
   | 'starsVisible'
+  | 'constellationsVisible'
   | 'cloudsVisible'
   | 'nightLightsVisible'
   | 'labelsVisible'
@@ -115,6 +122,7 @@ type IntentKey =
 type IntentSetterKey =
   | 'setOrbitLinesVisible'
   | 'setStarsVisible'
+  | 'setConstellationsVisible'
   | 'setCloudsVisible'
   | 'setNightLightsVisible'
   | 'setLabelsVisible'
@@ -131,6 +139,7 @@ export interface DisplayToggleDef {
   urlKey:
     | 'orbits'
     | 'stars'
+    | 'constellations'
     | 'clouds'
     | 'nightlights'
     | 'labels'
@@ -143,7 +152,7 @@ export interface DisplayToggleDef {
   label: string;
   /**
    * #1341 PR1 — 기본 표시 여부 (ADR `20261015-1341` 결정 T10). URL 직렬화가 이 값과 같은 의도를 키 삭제로 쓴다.
-   * `trails` 만 `false` (옵트인) — 나머지 9행은 `true` 라 출력이 종전과 같다.
+   * `trails` · `constellations` (#1373 PR2) 만 `false` (옵트인) — 나머지 행은 `true` 라 출력이 종전과 같다.
    */
   defaultVisible: boolean;
   /** URL → 의도. `serializeDisplayToggle` 의 역방향 (기존 파서 재사용). */
@@ -206,6 +215,24 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
     },
     // 로드 경로와 같은 결정식 (`resolveStarfieldVisible`) — 소프트웨어 렌더면 의도와 무관하게 꺼짐.
     pressed: (intent, caps) => caps !== null && resolveStarfieldVisible(intent, caps.starfield),
+  },
+  {
+    // #1373 PR2 — 별자리 선 · 이름 (ADR `20261018-1373` 결정 T1 · T2). **기본 꺼짐** · `?constellations=on` 옵트인. 처음 켤 때
+    // 두 파일을 받아 지연 생성, 이후 `setEnabled` (결정 T4). 가용성은 별 배경과 같은 `starfield` (결정 R5 — 별 배경 의도와는 독립,
+    // 결정 T3). 이름은 이 행 ∧ 「이름 라벨」 행이 둘 다 켜졌을 때 보인다 (결정 T2 — 오버레이가 건다).
+    id: 'constellations',
+    urlKey: 'constellations',
+    label: '별자리',
+    defaultVisible: false,
+    parse: parseConstellationsVisible,
+    command: (visible) => ({ type: 'setConstellationsVisible', visible }),
+    intentKey: 'constellationsVisible',
+    setterKey: 'setConstellationsVisible',
+    disabledReason: (caps) => {
+      if (caps === null) return DISPLAY_DISABLED_REASONS.sceneNotReady;
+      return caps.starfield ? null : DISPLAY_DISABLED_REASONS.softwareRendererConstellations;
+    },
+    pressed: (intent, caps) => intent && caps !== null && caps.starfield,
   },
   {
     id: 'clouds',

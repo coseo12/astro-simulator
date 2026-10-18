@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   DISPLAY_DISABLED_REASONS,
   DISPLAY_TOGGLES,
@@ -66,10 +66,11 @@ const SOFTWARE_CORONA_FORCED: DisplayCapabilities = {
 };
 
 describe('display-toggles — 표 구성', () => {
-  it('11 토글 · URL 키 11종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 · #1347 시간 사건 행 추가)', () => {
+  it('12 토글 · URL 키 12종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 · #1347 시간 사건 · #1373 PR2 별자리 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
+      'constellations',
       'clouds',
       'nightLights',
       'labels',
@@ -83,6 +84,7 @@ describe('display-toggles — 표 구성', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.urlKey)).toEqual([
       'orbits',
       'stars',
+      'constellations',
       'clouds',
       'nightlights',
       'labels',
@@ -99,6 +101,7 @@ describe('display-toggles — 표 구성', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.command?.(false) ?? null)).toEqual([
       { type: 'setOrbitLinesVisible', visible: false },
       { type: 'setStarfieldVisible', visible: false },
+      { type: 'setConstellationsVisible', visible: false },
       { type: 'setCloudsVisible', visible: false },
       { type: 'setNightLightsVisible', visible: false },
       null,
@@ -142,7 +145,7 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
     expect(serializeDisplayToggle(false, true)).toBe('off');
   });
 
-  it('#1341 D10 — 기존 9행 + #1347 events 는 defaultVisible=true 라 출력 불변 · trails 만 기본 꺼짐', () => {
+  it('#1341 D10 — 기존 9행 + #1347 events 는 defaultVisible=true 라 출력 불변 · trails · constellations (#1373) 만 기본 꺼짐', () => {
     expect(DEFAULT_ON_ROWS.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -160,6 +163,24 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
       expect(serializeDisplayToggle(false, def.defaultVisible)).toBe('off');
     }
     expect(getDisplayToggle('trails').defaultVisible).toBe(false);
+    expect(getDisplayToggle('constellations').defaultVisible).toBe(false);
+  });
+
+  it('#1373 PR2 constellations: 켜짐 → "on" · 꺼짐 → 키 삭제 · 모르는 값 (force 포함) → 키 삭제', () => {
+    const def = getDisplayToggle('constellations');
+    expect(serializeDisplayToggle(true, def.defaultVisible)).toBe('on');
+    expect(serializeDisplayToggle(false, def.defaultVisible)).toBeNull();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const cases: Array<[string | null, 'on' | null]> = [
+      [null, null],
+      ['on', 'on'],
+      ['ON', 'on'],
+      ['off', null],
+      ['force', null],
+    ];
+    for (const [s, expected] of cases)
+      expect(serializeDisplayToggle(def.parse(s), def.defaultVisible)).toBe(expected);
+    warn.mockRestore();
   });
 
   it('#1341 D10 — trails: 켜짐 → "on" · 꺼짐 → 키 삭제 (기본값과 같으면 삭제)', () => {
@@ -219,6 +240,7 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
       'cometTails',
       'corona',
       'trails',
+      'constellations',
     ] as const) {
       const def = getDisplayToggle(id);
       expect(def.disabledReason(null)).toBe(DISPLAY_DISABLED_REASONS.sceneNotReady);
@@ -353,5 +375,23 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
       expect(def.pressed(true, HW)).toBe(true);
       expect(def.pressed(false, HW)).toBe(false);
     }
+  });
+});
+
+describe('#1373 PR2 별자리 — 가용성 (결정 R5 · T3)', () => {
+  it('소프트웨어 렌더 → 불가 + 별자리 사유, 의도가 true 여도 꺼짐 · 하드웨어 → 가능', () => {
+    const def = getDisplayToggle('constellations');
+    expect(def.disabledReason(SOFTWARE)).toBe(
+      DISPLAY_DISABLED_REASONS.softwareRendererConstellations,
+    );
+    expect(def.pressed(true, SOFTWARE)).toBe(false);
+    expect(def.disabledReason(HW)).toBeNull();
+    expect(def.pressed(true, HW)).toBe(true);
+    expect(def.pressed(false, HW)).toBe(false);
+  });
+  it('가용성은 별 배경 의도와 무관 — 표면 · 띠 · 엔진 축에도 묶이지 않는다', () => {
+    const def = getDisplayToggle('constellations');
+    expect(def.disabledReason(SURFACE_OFF)).toBeNull();
+    expect(def.disabledReason({ ...HW, belt: false, corona: false, trails: false })).toBeNull();
   });
 });

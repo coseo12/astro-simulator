@@ -53,7 +53,7 @@
  *   장면 준비  UI 페이지마다 부팅 직후 `displayCapabilities !== null` (sim-canvas 가 여는 제품 가용성 게이트 — 게이트다).
  *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 전부 가시
  *        (`UI_IDS` — #1293 이 이름 라벨을, #1319 PR3 이 소행성대 · 카이퍼 벨트를, #1329 PR2 가 혜성 꼬리를, #1335 PR2 가
- *        태양 코로나를, #1341 PR1 이 궤적을 더해 10 개).
+ *        태양 코로나를, #1341 PR1 이 궤적을, #1347 이 시간 사건 마커를, #1373 PR2 가 별자리를 더해 12 개).
  *   D2   같은 페이지 — 우측 그룹 버튼 전부 `x + width ≤ 1280` · 좌측 단축 바 버튼 전부 스크롤로 도달 + 그 지점 hit.
  *   D3   패널 궤도선 ↔ 단축 바 `toggle-orbits` ↔ `store.orbitLinesVisible` — 어느 쪽을 눌러도 세 값 일치.
  *   D4   관찰 모드 · 패널 열림 · 4 초 무입력 → 상단 바 computed `opacity === "1"`.
@@ -693,6 +693,9 @@ const toggleSel = (id) => `[data-testid="display-toggle-${id}"]`;
 const UI_URL_KEY = {
   orbits: 'orbits',
   stars: 'stars',
+  // #1373 PR2 — 별자리 (3번째 행 — 표 순서 = 패널 DOM 순서 = D14 Tab 순서). 기본 꺼짐 (`?constellations=on` 옵트인 —
+  // ADR 20261018-1373 결정 T1) · 소프트웨어 렌더에서는 별 배경과 같은 가용성이 막는다 (결정 R5).
+  constellations: 'constellations',
   clouds: 'clouds',
   nightLights: 'nightlights',
   // #1293 — 이름 라벨 (web 전용 5번째 행). 표시 패널 토글 집합이 늘면 여기도 같이 는다 (D1 개수 · D14 순회 · D11 왕복).
@@ -715,10 +718,10 @@ const UI_IDS = Object.keys(UI_URL_KEY);
  * 이 행들을 뺀다 — 기본 꺼짐 행의 직렬화 (`on` / 키 삭제) 는 단위 테스트 (`display-toggles.test.ts`) 가 고정한다.
  * D1 개수 · D14 순회 · D15 스트레스는 `UI_IDS` 전부 그대로다.
  */
-const DEFAULT_OFF_IDS = ['trails'];
+const DEFAULT_OFF_IDS = ['trails', 'constellations'];
 const UI_DEFAULT_ON_IDS = UI_IDS.filter((id) => !DEFAULT_OFF_IDS.includes(id));
 /** 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다 (D9 · #1319 PR3 D9b · #1329 PR2 D9c · #1335 PR2 D9d). */
-const SOFTWARE_GATED_IDS = ['stars', 'belt', 'kuiper', 'cometTails', 'corona'];
+const SOFTWARE_GATED_IDS = ['stars', 'constellations', 'belt', 'kuiper', 'cometTails', 'corona'];
 
 /** 패널 열림/닫힘을 트리거 클릭으로 맞춘다. 결과(패널 개수)는 호출부가 판정한다. */
 async function setPanelOpen(page, open) {

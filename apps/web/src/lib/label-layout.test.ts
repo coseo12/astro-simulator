@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CONSTELLATION_LABEL_KIND,
   boxesOverlap,
   isLabelEligible,
   isOccluded,
+  labelKindPriority,
   layoutLabels,
   LABEL_GAP_PX,
   LABEL_OFFSET_PX,
@@ -232,6 +234,93 @@ describe('layoutLabels — D5 겹침 쌍 0 · 우선순위', () => {
       expect(overlapPairs(out)).toBe(0);
       const eligible = new Set(cands.filter((c) => isLabelEligible(c, 'p0')).map((c) => c.id));
       for (const b of out) expect(eligible.has(b.id)).toBe(true);
+    }
+  });
+});
+
+/** #1373 PR2 결정 N1 — 별자리 라벨 (최저 우선순위 · 중앙 정렬 · 원반 안 숨김). */
+describe('별자리 라벨 — 같은 배치 패스 (N1)', () => {
+  const cons = (over: Partial<LabelCandidate> & { id: string }): LabelCandidate =>
+    cand({
+      kind: CONSTELLATION_LABEL_KIND,
+      parentId: null,
+      radius: 0,
+      distance: Number.POSITIVE_INFINITY,
+      width: 60,
+      height: 14,
+      ...over,
+    });
+
+  it('우선순위 — 혜성 · 미등록 kind 보다도 뒤', () => {
+    const p = labelKindPriority(CONSTELLATION_LABEL_KIND);
+    expect(p).toBeGreaterThan(labelKindPriority('comet'));
+    expect(p).toBeGreaterThan(labelKindPriority('some-new-kind'));
+  });
+
+  it('배치 — 기준점 중앙 정렬 (반지름 · 오프셋 무관)', () => {
+    expect(placeLabel(cons({ id: 'Ori', x: 300, y: 200 }), VW)).toEqual({
+      id: 'Ori',
+      left: 270,
+      top: 193,
+      width: 60,
+      height: 14,
+    });
+  });
+
+  it('body 라벨과 겹치면 별자리 쪽이 숨는다 — body 는 그대로 (입력 순서 무관)', () => {
+    const body = cand({ id: 'mars', x: 300, y: 200 });
+    const c = cons({ id: 'Ori', x: 330, y: 200 });
+    for (const input of [
+      [body, c],
+      [c, body],
+    ]) {
+      const out = layoutLabels(input, { focusedId: null, viewportWidth: VW });
+      expect(out.map((b) => b.id)).toEqual(['mars']);
+    }
+  });
+
+  it('기준점이 body 화면 원반 안 → 숨김 (규칙 1b) · 원반 밖 → 보임', () => {
+    const disc = cand({ id: 'jupiter', x: 600, y: 400, radius: 80, width: 50 });
+    const inside = cons({ id: 'Sgr', x: 600, y: 470 });
+    const outside = cons({ id: 'Sco', x: 600, y: 300 });
+    const out = layoutLabels([disc, inside, outside], { focusedId: null, viewportWidth: VW });
+    expect(out.map((b) => b.id).sort()).toEqual(['Sco', 'jupiter']);
+  });
+
+  it('위성 (라벨 자격 없음) 원반도 가린다 — 렌더된 원반은 라벨 자격과 무관', () => {
+    const moonDisc = cand({
+      id: 'moon',
+      kind: 'moon',
+      parentId: 'earth',
+      x: 500,
+      y: 500,
+      radius: 30,
+    });
+    const c = cons({ id: 'Tau', x: 505, y: 505 });
+    expect(layoutLabels([moonDisc, c], { focusedId: null, viewportWidth: VW })).toEqual([]);
+  });
+
+  it('별자리 원반 0 — 별자리가 body 를 가리지 않는다', () => {
+    const c = cons({ id: 'Leo', x: 100, y: 100 });
+    const body = cand({ id: 'mars', x: 100, y: 100, distance: 5 });
+    expect(isOccluded(body, [c, body])).toBe(false);
+  });
+
+  it('표본 50개 무작위 배치 — body ↔ 별자리 겹침 쌍 0 · 전체 겹침 쌍 0 (결정적 LCG)', () => {
+    let seed = 1373;
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    for (const vw of [1280, 375]) {
+      const vh = vw === 375 ? 812 : 800;
+      const input: LabelCandidate[] = [];
+      for (let i = 0; i < 20; i += 1)
+        input.push(cand({ id: `b${i}`, x: rnd() * vw, y: rnd() * vh, radius: rnd() * 10 }));
+      for (let i = 0; i < 30; i += 1)
+        input.push(cons({ id: `c${i}`, x: rnd() * vw, y: rnd() * vh }));
+      const out = layoutLabels(input, { focusedId: null, viewportWidth: vw });
+      expect(overlapPairs(out)).toBe(0);
     }
   });
 });

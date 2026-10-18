@@ -1,7 +1,7 @@
 'use client';
 
 import type { SimulationCore } from '@astro-simulator/core';
-import type { BodyScreenInfo, Tier } from '@astro-simulator/core/scene';
+import type { BodyScreenInfo, ConstellationScreenInfo, Tier } from '@astro-simulator/core/scene';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
@@ -46,6 +46,12 @@ export type BodyStateFn = (
 export type BodyScreenInfoFn = () => readonly BodyScreenInfo[];
 
 /**
+ * #1373 PR2 결정 N2 — 별자리 라벨 기준점 화면 투영 조회 (core `getConstellationScreenInfo`). 별자리가 꺼져 있거나 아직
+ * 만들어지지 않았으면 빈 배열. 반환은 core 내부 버퍼 — 소비자는 읽기만 한다.
+ */
+export type ConstellationScreenInfoFn = () => readonly ConstellationScreenInfo[];
+
+/**
  * SimulationCore에 대한 명령 전송 인터페이스.
  * 컴포넌트는 이 context를 통해서만 core에 접근 — core 인스턴스 직접 노출은 피한다.
  *
@@ -67,6 +73,8 @@ interface SimCommandApi {
   getBodyState: BodyStateFn | null;
   /** #1293 — 라벨 오버레이용 scene handle. scene 생성 완료 전 null (getBodyState 동형). */
   getBodyScreenInfo: BodyScreenInfoFn | null;
+  /** #1373 PR2 — 별자리 라벨용 scene handle. scene 생성 완료 전 null. */
+  getConstellationScreenInfo: ConstellationScreenInfoFn | null;
 }
 
 const SimCommandContext = createContext<SimCommandApi | null>(null);
@@ -77,6 +85,7 @@ export function SimCommandProvider({
   getActiveTier,
   getBodyState,
   getBodyScreenInfo,
+  getConstellationScreenInfo,
   children,
 }: {
   core: SimulationCore | null;
@@ -88,6 +97,8 @@ export function SimCommandProvider({
   getBodyState?: BodyStateFn | null;
   /** #1293 — sim-canvas 가 `solar.getBodyScreenInfo` 를 그대로 전달. 라벨 오버레이가 rAF 마다 조회. */
   getBodyScreenInfo?: BodyScreenInfoFn | null;
+  /** #1373 PR2 — sim-canvas 가 `solar.getConstellationScreenInfo` 를 그대로 전달. 라벨 오버레이가 rAF 마다 조회. */
+  getConstellationScreenInfo?: ConstellationScreenInfoFn | null;
   children: ReactNode;
 }) {
   // #419 — core null 시 children 렌더 보류 (mount 순서 정합화).
@@ -107,8 +118,9 @@ export function SimCommandProvider({
       getActiveTier: getActiveTier ?? null,
       getBodyState: getBodyState ?? null,
       getBodyScreenInfo: getBodyScreenInfo ?? null,
+      getConstellationScreenInfo: getConstellationScreenInfo ?? null,
     };
-  }, [core, camera, getActiveTier, getBodyState, getBodyScreenInfo]);
+  }, [core, camera, getActiveTier, getBodyState, getBodyScreenInfo, getConstellationScreenInfo]);
 
   if (api === null) return null;
 
@@ -172,4 +184,10 @@ export function useSimBodyState(): BodyStateFn | null {
 export function useSimBodyScreenInfo(): BodyScreenInfoFn | null {
   const ctx = useContext(SimCommandContext);
   return ctx?.getBodyScreenInfo ?? null;
+}
+
+/** #1373 PR2 — 별자리 라벨용 기준점 투영 조회. scene 준비 전 · Provider 외부에서는 null. */
+export function useSimConstellationScreenInfo(): ConstellationScreenInfoFn | null {
+  const ctx = useContext(SimCommandContext);
+  return ctx?.getConstellationScreenInfo ?? null;
 }

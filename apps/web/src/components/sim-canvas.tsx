@@ -10,7 +10,12 @@ import {
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
 import { PointerEventTypes } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
-import type { BodyScreenInfoFn, BodyStateFn, CameraSyncSurface } from '@/core/sim-context';
+import type {
+  BodyScreenInfoFn,
+  BodyStateFn,
+  CameraSyncSurface,
+  ConstellationScreenInfoFn,
+} from '@/core/sim-context';
 // P12-A #298 — Tier 엔진 유틸 (renderScaleForTier) 는 sceneApi 네임스페이스에 이미 re-export 되어 있다.
 // `sceneApi.renderScaleForTier` 로 접근한다 (별도 import 불필요, 아래 onBeforeRender 에서 사용).
 import { attachCoreToStore } from '@/core/core-adapter';
@@ -28,6 +33,7 @@ import { parseBeltParam, parseKuiperVisible, resolveBeltAtLoad } from '@/core/pa
 import { parseCometTailsParam, resolveCometTailsAtLoad } from '@/core/parse-comet-tails-mode';
 import { parseCoronaParam, resolveCoronaAtLoad } from '@/core/parse-corona-mode';
 import { parseTrailsVisible } from '@/core/parse-trails-mode';
+import { parseConstellationsVisible } from '@/core/parse-constellations-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
 import { parseEventsVisible } from '@/core/parse-events-mode';
 import { parseLabelsVisible } from '@/core/parse-labels-mode';
@@ -197,6 +203,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     getBodyState: BodyStateFn;
     // #1293 — 라벨 오버레이 (`BodyLabels`) 용 화면 투영 pull API.
     getBodyScreenInfo: BodyScreenInfoFn;
+    // #1373 PR2 — 별자리 라벨 기준점 투영 pull API (같은 오버레이가 한 배치 패스에서 쓴다 — 결정 N1).
+    getConstellationScreenInfo: ConstellationScreenInfoFn;
   } | null>(null);
 
   useEffect(() => {
@@ -554,6 +562,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #1341 — 궤적 trail (ADR 20261015-1341 결정 T10). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 기본 꺼짐 · `on` 옵트인. 로드 시 생성하지 않고 아래 핸들러 등록 블록에서 의도만 scene 에 넘긴다 (지연 생성).
         const trailsParamVisible = parseTrailsVisible(beltUrl.get('trails'));
+        // #1373 PR2 — 별자리 (ADR 20261018-1373 결정 T1). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
+        // 기본 꺼짐 · `on` 옵트인. 로드 시 생성하지 않고 아래 핸들러 등록 블록에서 의도 ∧ 환경만 scene 에 넘긴다 (지연 생성).
+        const constellationsParamVisible = parseConstellationsVisible(
+          beltUrl.get('constellations'),
+        );
         // `beltN` = **명시** 수만 (미지정 = 0). 아래 엔진 자동 선택 (`auto` → N ≥ 1000 이면 webgpu/barnes-hut) 과
         // N-body 편입 수는 종전 의미 그대로 명시 수만 본다 — 기본 켜짐이 물리 엔진 선택을 바꾸면 안 된다.
         const beltN = beltMode.count ?? 0;
@@ -779,6 +792,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             getActiveTier: solar.getTier,
             getBodyState: solar.getBodyState,
             getBodyScreenInfo: solar.getBodyScreenInfo,
+            getConstellationScreenInfo: solar.getConstellationScreenInfo,
           });
         }
 
@@ -1039,12 +1053,19 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setSunCoronaVisibleHandler((visible) => solar.setSunCoronaVisible(visible));
         // #1341 PR1 — 궤적 trail (같은 wiring). 가용성 `trails` = 활성 물리 엔진이 Kepler (결정 T8 — 렌더러 게이트 없음).
         instance.setTrailsVisibleHandler((visible) => solar.setTrailsVisible(visible));
+        // #1373 PR2 — 별자리 (같은 wiring). 가용성 = 별 배경과 같은 `starfield` (결정 R5 — 소프트웨어 렌더면 명령이 막힌다).
+        instance.setConstellationsVisibleHandler((visible) =>
+          solar.setConstellationsVisible(visible),
+        );
         // #1341 PR2 — 거리 자 선 (결정 R2). 명령은 아래 store 구독 (기준점 · 선택 변경) 과 마운트 직후 1회가 보낸다.
         instance.setRulerHandler((anchorId, targetId) => solar.setRuler(anchorId, targetId));
         // 결정 T5 — 방향 = 배속 부호 (0 = 일시정지는 scene 이 직전 부호 유지). 초기값은 store, 이후는 아래 store 구독
         // (core 의 `timeScaleChanged` 를 core-adapter 가 store 로 옮긴 값). 의도보다 먼저 넘겨 첫 동기가 올바른 방향이게 한다.
         solar.setTrailDirection(useSimStore.getState().timeScale);
         solar.setTrailsVisible(trailsParamVisible);
+        // #1373 PR2 결정 R5 — 소프트웨어 렌더면 의도와 무관하게 켜지 않는다 (fetch 0). 꺼진 의도는 명령 자체를 보내지 않는다 —
+        // URL 없는 로드는 별자리 경로를 전혀 밟지 않는다 (DoD D5 바이트 동일).
+        if (constellationsParamVisible && !isSoftwareRenderer) solar.setConstellationsVisible(true);
         {
           const store = useSimStore.getState();
           store.setStarsVisible(starsParamVisible);
@@ -1057,6 +1078,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           store.setCometTailsVisible(cometTailsMode.visible);
           store.setCoronaVisible(coronaMode.visible);
           store.setTrailsVisible(trailsParamVisible);
+          store.setConstellationsVisible(constellationsParamVisible);
           // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
           store.setDisplayCapabilities({
             starfield: !isSoftwareRenderer,
@@ -1605,6 +1627,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         getActiveTier={cameraTierApi?.getActiveTier ?? null}
         getBodyState={cameraTierApi?.getBodyState ?? null}
         getBodyScreenInfo={cameraTierApi?.getBodyScreenInfo ?? null}
+        getConstellationScreenInfo={cameraTierApi?.getConstellationScreenInfo ?? null}
       >
         {/* #1293 — 3D 이름 라벨 오버레이. 캔버스 바로 위 · HUD (children, z-hud) 아래에 둔다 (DOM 순서). */}
         {/* #1313 — 라벨 위 드래그는 캔버스 클릭 선택과 같은 임계로 탭과 갈라 캔버스 회전으로 넘긴다. */}

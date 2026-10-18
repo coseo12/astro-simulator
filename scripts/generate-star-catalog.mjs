@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 /**
- * #1373 — 실측 별 카탈로그 바이너리 생성기 (HYG v4.4 → `star-catalog.bin` + 데이터 README).
+ * #1373 — 실측 별 카탈로그 · 별자리 생성기 (HYG v4.4 + d3-celestial → `star-catalog.bin` · `constellations.json` + 데이터 README).
  *
  * ADR `docs/decisions/20261018-1373-star-catalog-constellations.md` 결정 D1 · D2 · D3 (인덱스 고정) · D4.
  *
  * **네트워크는 개발자 실행 시점만** — 빌드 · CI 경로가 아니다. 산출물 (`star-catalog.bin` · `README.md`) 은
- * 커밋되며, 단위 테스트 (`star-catalog-file.test.ts`) 는 커밋된 파일만 검사한다 (네트워크 무관).
+ * 커밋되며, 단위 테스트 (`star-catalog-file.test.ts` · `constellations-file.test.ts`) 는 커밋된 파일만 검사한다 (네트워크 무관).
  * 원천 파일은 임시 디렉터리 (`--src-dir`, 기본 `os.tmpdir()` 아래 새 디렉터리) 에만 내려받는다 — 저장소에 넣지 않는다.
  *
  * ── 원천 (취득 2026-10-18) ────────────────────────────────────────────────────
  *   HYG v4.4      : Codeberg `astronexus/hyg` — GitHub `astronexus/HYG-Database` 는 archived 이며 README 가
  *                   「now hosted at https://codeberg.org/astronexus/hyg」 로 이전을 고지한다. 커밋 고정 URL.
  *                   라이선스 CC BY-SA 4.0 (`data/hyg/CURRENT/LICENSE`).
- *   d3-celestial  : GitHub `ofrohn/d3-celestial` `data/constellations.lines.json` — BSD-3-Clause.
- *                   PR1 은 선 정점을 **끝점 별 포함 · 인덱스 고정** 용도로만 읽는다 (선 파일 출력은 PR2).
+ *   d3-celestial  : GitHub `ofrohn/d3-celestial` `data/constellations.lines.json` (선) · `data/constellations.json`
+ *                   (한국어 이름 `ko` · 라벨 기준점) — BSD-3-Clause. 선 정점은 끝점 별 포함 · 인덱스 고정 (PR1) 과
+ *                   `constellations.json` 선분 인덱스 (PR2) 에 같은 스냅 결과를 쓴다.
  *
  * ── 파이프라인 ────────────────────────────────────────────────────────────────
  *   1. 두 원천 다운로드 → sha256 대조 (불일치 = 즉시 중단. 원천 변조 · 버전 변경을 조용히 흡수하지 않는다)
@@ -21,6 +22,8 @@
  *   3. d3 선 정점마다 스냅 후보 집합 (V ≤ 7.0) 의 최근접 별 → 허용 60″ 초과면 실패. 주 집합 밖이면 포함
  *   4. 정렬 (V×100 정수 오름차순 → HYG id 오름차순) — 이 순서가 PR2 `constellations.json` 이 참조하는 인덱스다
  *   5. 바이너리 기록 (ADR D2 형식) + README 렌더 (prettier 로 정규화 — lint-staged 와 같은 출력)
+ *   6. (PR2) 별자리 — 선분 = d3 polyline 의 연속 정점 쌍 → 4 의 인덱스 쌍. 이름 = d3 `ko` + `NAME_KO_OVERRIDES`
+ *      (Q-N 대조표 권고). 뱀자리 두 조각은 선을 합치고 라벨은 머리 쪽 1개 (ADR D3). 산출 `constellations.json`
  *
  * 사용:
  *   node scripts/generate-star-catalog.mjs                    # 재생성
@@ -55,6 +58,10 @@ const D3_LINES_URL = `https://raw.githubusercontent.com/ofrohn/d3-celestial/${D3
 const D3_LICENSE_URL = `https://raw.githubusercontent.com/ofrohn/d3-celestial/${D3_COMMIT}/LICENSE`;
 const D3_LINES_SHA256 = '294f66bef5d5cf50b1e17f16d2efa1d97a15131612c68dd935adef6e7373e13c';
 const D3_LINES_BYTES = 27_136;
+/** 이름 · 라벨 기준점 파일 (같은 커밋). ADR §1-C 「50,581 B」. */
+const D3_NAMES_URL = `https://raw.githubusercontent.com/ofrohn/d3-celestial/${D3_COMMIT}/data/constellations.json`;
+const D3_NAMES_SHA256 = 'ab4ae692027cbc042c0d6791a84456a65eb7c55656107fd00c58ff6e55d4d8b2';
+const D3_NAMES_BYTES = 50_581;
 
 /** 취득일 — 산출 README 에 박는다 (실행 시각을 쓰면 `--check` 가 날짜마다 깨진다). */
 const ACQUIRED_ON = '2026-10-18';
@@ -65,6 +72,23 @@ const MAG_LIMIT = 6.5;
 const SNAP_CANDIDATE_MAG_LIMIT = 7.0;
 /** D3 스냅 허용 각거리 [″]. 넘으면 생성 실패. */
 const SNAP_TOLERANCE_ARCSEC = 60;
+
+/** D3 별자리 계약 — 생성 시 이 값과 다르면 실패한다 (ADR §1-C 실측 · DoD D3). */
+const EXPECTED_SEGMENTS = 743;
+const EXPECTED_CONSTELLATIONS = 88;
+/** `constellations.json` 형식 표지 (`star-catalog.bin` 의 `STC1` 과 같은 역할). */
+const CONSTELLATION_FORMAT = 'CNS1';
+
+/**
+ * D5 한국어 이름 — d3 `ko` 를 출발점으로, 표준 표기와 다른 항목만 덮어쓴다 (Q-N 대조표 **권고** 열 — 사용자 확정 전 초안).
+ * 대조표 · 1차 출처 URL 은 PR #1373 PR2 코멘트에 있다. 값을 바꾸면 `constellations.json` 이 바뀐다 (`--check` 가 잡는다).
+ */
+const NAME_KO_OVERRIDES = Object.freeze({
+  // 한국천문연구원 별자리 페이지 `https://astro.kasi.re.kr/learning/pageView/5373` (제목 「헤르쿨레스자리」 · 약자 Her)
+  Her: '헤르쿨레스자리',
+  // 같은 출처 `https://astro.kasi.re.kr/learning/pageView/5342` (제목 「백조자리」 · 약자 Cyg)
+  Cyg: '백조자리',
+});
 
 /** D2 바이너리 형식. */
 const MAGIC = 'STC1';
@@ -86,6 +110,7 @@ const REFERENCE_STARS = [
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_DIR_RELATIVE = 'apps/web/public/data/stars';
 const BIN_RELATIVE = `${OUTPUT_DIR_RELATIVE}/star-catalog.bin`;
+const CONSTELLATIONS_RELATIVE = `${OUTPUT_DIR_RELATIVE}/constellations.json`;
 const README_RELATIVE = `${OUTPUT_DIR_RELATIVE}/README.md`;
 
 const DEG = Math.PI / 180;
@@ -254,7 +279,7 @@ function lineVertices(linesJson) {
       segments += polyline.length - 1;
       for (const [lon, lat] of polyline) {
         const key = `${lon},${lat}`;
-        if (!seen.has(key)) seen.set(key, { raDeg: lon < 0 ? lon + 360 : lon, decDeg: lat });
+        if (!seen.has(key)) seen.set(key, { key, raDeg: lon < 0 ? lon + 360 : lon, decDeg: lat });
       }
     }
   }
@@ -264,6 +289,8 @@ function lineVertices(linesJson) {
 function snapVertices(vertices, candidates) {
   const candVec = candidates.map((s) => unitVector(s.raDeg, s.decDeg));
   const snapped = new Set();
+  /** 정점 키 (`lineVertices` 와 같은 `${lon},${lat}`) → 스냅된 별 — 별자리 선분 인덱스 (PR2) 가 쓴다. */
+  const starByKey = new Map();
   const errors = [];
   for (const v of vertices) {
     const vv = unitVector(v.raDeg, v.decDeg);
@@ -282,10 +309,84 @@ function snapVertices(vertices, candidates) {
       );
     }
     snapped.add(candidates[best]);
+    starByKey.set(v.key, candidates[best]);
     errors.push(bestArc);
   }
   errors.sort((a, b) => a - b);
-  return { snapped, errors };
+  return { snapped, errors, starByKey };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 별자리 (D3 · D5 — PR2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** d3 `[lon, lat]` → `[RA°, Dec°]` (RA 를 [0, 360) 로 펼친다 — `lineVertices` 와 같은 규칙). */
+const lonLatToRaDec = ([lon, lat]) => [lon < 0 ? lon + 360 : lon, lat];
+
+/**
+ * d3 선 · 이름 → 별자리 목록. 선분 = polyline 연속 정점 쌍 → 정렬된 카탈로그 인덱스 쌍.
+ * 같은 IAU 약어의 feature (뱀자리 머리 · 꼬리) 는 선을 합치고, 이름 · 라벨은 **처음** feature (머리) 의 것을 쓴다 (ADR D3).
+ * 계약 위반 (선분 수 · 별자리 수 · 이름 누락 · 인덱스 범위 · 길이 0 선분) 은 생성 실패 — 조용히 흡수하지 않는다.
+ */
+function buildConstellations(linesJson, namesJson, starByKey, stars) {
+  const indexOf = new Map(stars.map((s, i) => [s, i]));
+  const segmentsById = new Map();
+  let segmentCount = 0;
+  for (const feature of linesJson.features) {
+    const pairs = segmentsById.get(feature.id) ?? [];
+    for (const polyline of feature.geometry.coordinates) {
+      for (let k = 1; k < polyline.length; k += 1) {
+        const ends = [polyline[k - 1], polyline[k]].map(([lon, lat]) => {
+          const star = starByKey.get(`${lon},${lat}`);
+          const index = star === undefined ? undefined : indexOf.get(star);
+          if (index === undefined)
+            throw new Error(`${feature.id} 선 정점 (${lon}, ${lat}) 인덱스 없음`);
+          return index;
+        });
+        if (ends[0] === ends[1]) throw new Error(`${feature.id} 길이 0 선분 (별 ${ends[0]})`);
+        pairs.push(ends[0], ends[1]);
+        segmentCount += 1;
+      }
+    }
+    segmentsById.set(feature.id, pairs);
+  }
+  if (segmentCount !== EXPECTED_SEGMENTS)
+    throw new Error(`선분 ${segmentCount} ≠ 계약 ${EXPECTED_SEGMENTS}`);
+
+  const constellations = [];
+  const seen = new Set();
+  for (const feature of namesJson.features) {
+    if (seen.has(feature.id)) continue; // 뱀자리 꼬리 — 라벨은 머리 1개
+    seen.add(feature.id);
+    const d3Ko = feature.properties.ko;
+    const nameKo = NAME_KO_OVERRIDES[feature.id] ?? d3Ko;
+    if (typeof nameKo !== 'string' || nameKo.trim() === '')
+      throw new Error(`${feature.id} 한국어 이름 없음`);
+    const lines = segmentsById.get(feature.id);
+    if (!lines) throw new Error(`${feature.id} 선 데이터 없음`);
+    constellations.push({
+      id: feature.id,
+      nameKo,
+      label: lonLatToRaDec(feature.geometry.coordinates),
+      lines,
+    });
+  }
+  for (const id of segmentsById.keys())
+    if (!seen.has(id)) throw new Error(`선만 있고 이름이 없는 별자리 ${id}`);
+  for (const id of Object.keys(NAME_KO_OVERRIDES))
+    if (!seen.has(id)) throw new Error(`NAME_KO_OVERRIDES 의 모르는 약어 ${id}`);
+  if (constellations.length !== EXPECTED_CONSTELLATIONS)
+    throw new Error(`별자리 ${constellations.length} ≠ 계약 ${EXPECTED_CONSTELLATIONS}`);
+  return { constellations, segmentCount, featureCount: namesJson.features.length };
+}
+
+function renderConstellationsJson({ constellations, binSha, starCount }) {
+  return `${JSON.stringify({
+    format: CONSTELLATION_FORMAT,
+    // 인덱스가 가리키는 카탈로그 — 바뀌면 선이 엉뚱한 별을 잇는다 (무결성 테스트가 대조).
+    starCatalog: { sha256: binSha, count: starCount },
+    constellations,
+  })}\n`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -340,6 +441,9 @@ function renderReadme(ctx) {
     hygLicenseText,
     d3LicenseText,
     refRows,
+    cons,
+    consSha,
+    consBytes,
   } = ctx;
   const fmtArc = (x) => `${x.toFixed(1)}″`;
   const p = (q) =>
@@ -358,6 +462,12 @@ function renderReadme(ctx) {
         `| ${r.name} | ${r.hr} | ${r.index} | ${r.raDeg.toFixed(6)} | ${r.decDeg.toFixed(6)} | ${r.magQ} | ${r.bvQ} |`,
     )
     .join('\n');
+  const overrideRows = Object.entries(NAME_KO_OVERRIDES)
+    .map(([id, name]) => {
+      const d3Ko = cons.d3KoById.get(id);
+      return `| ${id} | ${d3Ko} | ${name} |`;
+    })
+    .join('\n');
   const quote = (text) =>
     text
       .trim()
@@ -369,7 +479,7 @@ function renderReadme(ctx) {
 
 > 이 파일은 \`scripts/generate-star-catalog.mjs\` 가 생성한다. 손으로 고치지 말 것 — \`--check\` 가 바이트 대조로 어긋남을 잡는다.
 
-ADR [\`20261018-1373-star-catalog-constellations.md\`](../../../../../docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D4.
+ADR [\`20261018-1373-star-catalog-constellations.md\`](../../../../../docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D3 · D4 · D5.
 
 ## \`star-catalog.bin\`
 
@@ -409,7 +519,7 @@ ADR [\`20261018-1373-star-catalog-constellations.md\`](../../../../../docs/decis
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${extraRows}
 
-4. **정렬**: V × ${MAG_SCALE} 정수 오름차순 → HYG \`id\` 오름차순. 이 순서가 별자리 선 파일 (PR2) 이 참조하는 인덱스다 — 바뀌면 선이 엉뚱한 별을 잇는다. 선 원천: ${lines.features} feature · ${lines.segments} 선분.
+4. **정렬**: V × ${MAG_SCALE} 정수 오름차순 → HYG \`id\` 오름차순. 이 순서가 \`constellations.json\` 이 참조하는 인덱스다 — 바뀌면 선이 엉뚱한 별을 잇는다. 선 원천: ${lines.features} feature · ${lines.segments} 선분.
 
 ### 기준 별 (단위 테스트 골든 값)
 
@@ -421,6 +531,36 @@ ${refTable}
 
 원천 CSV 에서 위 선택 · 정렬을 거쳐 4개 열 (\`ra\` · \`dec\` · \`mag\` · \`ci\`) 만 남기고, \`ra\` 를 시에서 도로 바꾸고, 위 형식으로 양자화했다 (RA · Dec float32 · V · B−V 고정소수점 int16). 나머지 열은 버렸다.
 
+## \`constellations.json\`
+
+| 항목 | 값 |
+| --- | --- |
+| 원천 | **d3-celestial** (Olaf Frohn) 커밋 \`${D3_COMMIT}\` |
+| 선 | \`data/constellations.lines.json\` — sha256 \`${D3_LINES_SHA256}\` (${D3_LINES_BYTES.toLocaleString('en-US')} B) |
+| 이름 · 라벨 기준점 | \`data/constellations.json\` — sha256 \`${D3_NAMES_SHA256}\` (${D3_NAMES_BYTES.toLocaleString('en-US')} B) |
+| 별자리 | **${cons.constellations.length}** (원천 ${cons.featureCount} feature — 뱀자리 머리 · 꼬리를 1개로) |
+| 선분 | **${cons.segmentCount}** |
+| 파일 크기 | ${consBytes.toLocaleString('en-US')} B |
+| 파일 sha256 | \`${consSha}\` |
+| 라이선스 | **BSD-3-Clause** (아래) |
+
+### 형식 (JSON)
+
+- \`format\` — \`"${CONSTELLATION_FORMAT}"\`.
+- \`starCatalog\` — 인덱스가 가리키는 \`star-catalog.bin\` 의 sha256 · 별 수. 런타임은 이 값을 읽지 않는다 (무결성 테스트가 대조한다).
+- \`constellations[]\` — \`id\` (IAU 약어) · \`nameKo\` (한국어 이름) · \`label\` (라벨 기준점 \`[RA°, Dec°]\`, J2000 — d3 \`geometry.coordinates\` 의 RA 를 [0, 360) 로 펼친 값) · \`lines\` (별 인덱스 평면 배열 — 연속 2개가 선분 1개).
+
+선 정점 좌표는 담지 않는다 — 런타임이 로드한 \`star-catalog.bin\` 에서 인덱스로 읽는다 (선 끝이 그려진 별과 정확히 만난다). 인덱스는 위 「선택 · 정렬」 3 의 스냅 결과다.
+
+### 변경 사항
+
+- 선: d3 polyline 정점 좌표를 \`star-catalog.bin\` 인덱스로 바꿨다 (최근접 별 스냅). 뱀자리 두 조각은 한 항목으로 합쳤다.
+- 이름: d3 \`ko\` 를 출발점으로, 아래 항목만 바꿨다 (한국천문연구원 · 한국천문학회 표기 대조 — 이슈 #1373 PR2 대조표). 라벨 기준점은 뱀자리 머리 쪽 1개.
+
+| IAU | d3 \`ko\` | 사용 |
+| --- | --- | --- |
+${overrideRows}
+
 ## 재생성 (네트워크 필요 — 개발자 실행 시점만, 빌드 · CI 경로 아님)
 
 \`\`\`bash
@@ -428,7 +568,7 @@ node scripts/generate-star-catalog.mjs          # 재생성
 node scripts/generate-star-catalog.mjs --check  # 기존 파일과 바이트 대조 (미기록)
 \`\`\`
 
-원천 두 파일의 sha256 은 스크립트 상수다. 다운로드 직후 대조하고 다르면 중단한다.
+원천 세 파일 (HYG CSV · d3 선 · d3 이름) 의 sha256 은 스크립트 상수다. 다운로드 직후 대조하고 다르면 중단한다.
 
 ## 라이선스
 
@@ -442,12 +582,13 @@ ${quote(hygLicenseText)}
 
 ### d3-celestial — BSD-3-Clause
 
-별자리 선 정점 (\`constellations.lines.json\`, sha256 \`${D3_LINES_SHA256}\` · ${D3_LINES_BYTES.toLocaleString('en-US')} B · 커밋 \`${D3_COMMIT}\`) 을 생성 단계의 끝점 별 선택에 쓴다. 원문 \`LICENSE\` (\`${D3_LICENSE_URL}\`):
+\`constellations.json\` 은 d3-celestial 의 별자리 선 (\`constellations.lines.json\`) · 이름 · 라벨 기준점 (\`constellations.json\`) 의 파생 데이터다. 선 정점은 \`star-catalog.bin\` 의 끝점 별 선택에도 쓴다. 원문 \`LICENSE\` (\`${D3_LICENSE_URL}\`):
 
 ${quote(d3LicenseText)}
 `;
 }
 
+/** prettier 정규화 (확장자로 파서를 고른다 — `.md` · `.json`). */
 async function formatMarkdown(md, filepath) {
   // lint-staged 가 같은 prettier 로 다시 포맷한다 — 생성기가 미리 같은 출력을 내야 `--check` 가 커밋 후에도 성립한다.
   const prettier = await import('prettier');
@@ -472,6 +613,12 @@ async function main() {
     D3_LINES_BYTES,
     path.join(srcDir, 'constellations.lines.json'),
   );
+  const namesBuf = await download(
+    D3_NAMES_URL,
+    D3_NAMES_SHA256,
+    D3_NAMES_BYTES,
+    path.join(srcDir, 'constellations.json'),
+  );
   // 라이선스 원문은 인용용 — 내용이 바뀌면 README 바이트가 바뀌어 `--check` 가 잡는다 (sha 상수는 두지 않는다).
   const hygLicenseText = (
     await download(HYG_LICENSE_URL, null, 0, path.join(srcDir, 'HYG_LICENSE'))
@@ -483,7 +630,9 @@ async function main() {
   const all = parseHyg(gunzipSync(hygGz).toString('utf8'));
   const primary = all.filter((s) => s.mag <= MAG_LIMIT);
   const candidates = all.filter((s) => s.mag <= SNAP_CANDIDATE_MAG_LIMIT);
-  const lines = lineVertices(JSON.parse(linesBuf.toString('utf8')));
+  const linesJson = JSON.parse(linesBuf.toString('utf8'));
+  const namesJson = JSON.parse(namesBuf.toString('utf8'));
+  const lines = lineVertices(linesJson);
   const snap = snapVertices(lines.vertices, candidates);
 
   const primarySet = new Set(primary);
@@ -509,6 +658,19 @@ async function main() {
     };
   });
 
+  const cons = buildConstellations(linesJson, namesJson, snap.starByKey, stars);
+  cons.d3KoById = new Map(namesJson.features.map((f) => [f.id, f.properties.ko]));
+  const consPath = path.join(REPO_ROOT, CONSTELLATIONS_RELATIVE);
+  const consText = await formatMarkdown(
+    renderConstellationsJson({
+      constellations: cons.constellations,
+      binSha: sha256(bin),
+      starCount: stars.length,
+    }),
+    consPath,
+  );
+  const consBuf = Buffer.from(consText, 'utf8');
+
   const readmePath = path.join(REPO_ROOT, README_RELATIVE);
   const readme = await formatMarkdown(
     renderReadme({
@@ -522,6 +684,9 @@ async function main() {
       hygLicenseText,
       d3LicenseText,
       refRows,
+      cons,
+      consSha: sha256(consBuf),
+      consBytes: consBuf.length,
     }),
     readmePath,
   );
@@ -532,12 +697,16 @@ async function main() {
   console.log(
     `[star-catalog] 선 ${lines.features} feature · ${lines.segments} 선분 · 정점 ${lines.vertices.length} · 스냅 최대 ${snap.errors[snap.errors.length - 1].toFixed(2)}″`,
   );
+  console.log(
+    `[star-catalog] 별자리 ${cons.constellations.length} · 선분 ${cons.segmentCount} · 이름 덮어쓰기 ${Object.keys(NAME_KO_OVERRIDES).length} · ${consBuf.length} B · sha256 ${sha256(consBuf)}`,
+  );
 
   const binPath = path.join(REPO_ROOT, BIN_RELATIVE);
   if (checkOnly) {
     let ok = true;
     for (const [p, data] of [
       [binPath, bin],
+      [consPath, consBuf],
       [readmePath, Buffer.from(readme, 'utf8')],
     ]) {
       if (!existsSync(p)) {
@@ -556,8 +725,11 @@ async function main() {
   }
   await mkdir(path.dirname(binPath), { recursive: true });
   await writeFile(binPath, bin);
+  await writeFile(consPath, consBuf);
   await writeFile(readmePath, readme, 'utf8');
-  console.log(`[star-catalog] 기록 ${BIN_RELATIVE} · ${README_RELATIVE}`);
+  console.log(
+    `[star-catalog] 기록 ${BIN_RELATIVE} · ${CONSTELLATIONS_RELATIVE} · ${README_RELATIVE}`,
+  );
 }
 
 main().catch((err) => {

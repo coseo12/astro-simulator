@@ -35,6 +35,8 @@ const DISPLAY_URL_KEYS = {
   trails: parseAsString,
   // #1347 — 시간 사건 마커 (web 전용 · 기본 켜짐 행 — `off` 옵트아웃).
   events: parseAsString,
+  // #1373 PR2 — 별자리 (기본 꺼짐 행 — `on` 옵트인). 맵에 없는 키는 nuqs 가 조용히 무시한다 (#1347 B1).
+  constellations: parseAsString,
 };
 
 export function useDisplayToggle(): (id: DisplayToggleId) => void {
