@@ -5,6 +5,22 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1373] 실측 별 카탈로그 (PR1)** ([#1373](https://github.com/coseo12/astro-simulator/issues/1373)). 별 배경이 실제 하늘로 바뀐다 — HYG Stellar Database v4.4 (CC BY-SA 4.0) 의 V ≤ 6.5 별 `8,920` 개 + 별자리 선 끝점 별 `2` 개 = `8,922` 개를 실제 위치 (J2000) · 등급 · 색지수로 그린다. 지구 자전축이 북극성을 가리킨다. ADR [`20261018-1373`](docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D4 (별 파일) · D6 · D7 · R1 ~ R5 · PR 분할 표 PR1.
+  - 데이터: `apps/web/public/data/stars/star-catalog.bin` (`107,072` B — 헤더 `STC1` + count, 레코드 12 B: float32 RA · Dec + int16 V×100 · B−V×1000, 리틀 엔디언). 원천 적도 좌표 그대로 담고 런타임 fetch 한다 (JS 번들 증가 0). 생성기 `scripts/generate-star-catalog.mjs` 가 원천 2개 (HYG v4.4 · d3-celestial 선) 를 커밋 고정 URL 로 받아 sha256 을 대조하고, d3 선 정점 `757` 개를 V ≤ 7.0 최근접 별에 스냅해 (최대 `16.3″`, 허용 `60″`) 끝점 별을 포함 · 인덱스를 고정한다 (PR2 별자리 선이 이 인덱스를 쓴다). `--check` 는 바이너리 · README 바이트 대조. 출처 · 라이선스 원문 인용은 `public/data/stars/README.md` (생성 산출물) 와 About 모달.
+  - 좌표: `equatorialJ2000ToEcliptic` (`coords/equatorial.ts`, `R_x(+ε)`, ε = `84381.406″` — 신규 상수 `J2000_MEAN_OBLIQUITY_ARCSEC`) → 기존 `toScene` (ADR 1366). 메시 정점 쓰기가 유일한 반전 지점이다.
+  - 렌더: `star-catalog.ts` — 쿼드 메시 1개 (정점 `35,688`, draw 1) · `infiniteDistance` · 그룹 0 · 가산 블렌드 · `alphaIndex −2` (코로나 앞) · depth write off · 표준 depth (행성 원반 뒤 별은 depth test 로 가려진다). 지름은 CSS px × DPR. 등급 → 크기 · 밝기 (`STAR_MAGNITUDE_MAPPING`, 반지름 `0.8 ~ 2.2` CSS px · 밝기 `0.22 ~ 1`) 와 B−V → 색 (Ballesteros 2012 → Planck 궤적 → D65 CCT 6504 K 흑체로 백색 맞춤 → 채도 `0.55`) 은 rendering-only 초안이고 최종값은 육안 승인 (D-T2) 대상이다.
+  - 장면: 옵션 `starCatalogBaseUrl` (web 은 `/data/stars/`). fetch 는 별 구가 처음 만들어질 때 장면당 1회, 응답 시점의 `?stars` 의도로 켜진다 (fetch 중 끈 토글이 다시 켜지지 않는다) · dispose 후 응답은 무시 · 실패는 `console.warn` 1회 + 은하수만.
+  - 실측 D2 (headless Chromium `--use-angle=metal`, 2026-10-18 00:00 UT, WebGPU · WebGL2 같은 값): 지구 자전축 ↔ 북극성 `0.7355°` (기대 `0.736 ± 0.01`) · 별 메시 정점 ↔ 순수 함수 최대 `1.3e-6°` (기대 `≤ 1e-4`) · 5개 별 화면 밝기 중심 ↔ 투영 최대 `0.37` px (WebGPU) · `0.42` px (WebGL2) (기대 `≤ 1.5`) · 태양 ↔ 스피카 `2.0860°` (기대 `2.099 ± 0.1`).
+  - 실측 D5 (develop `a769d93d` ↔ 본 PR, 1280×800): SwiftShader 기본 화면 · Metal WebGPU `?stars=off` (기본 · 지구 포커스) 3셀 바이트 동일. 소프트웨어 렌더에서 `star-catalog.bin` 요청 `0`.
+  - 실측 D6: 목성 · 태양 · 지구 포커스에서 별 쿼드만 켜고 끈 같은 프레임 — 원반 안 (반경 × 0.9) 변경 픽셀 `0` (WebGPU · WebGL2 `?gpu=a`), 원반 밖 `8,036 ~ 8,386` (양성 대조).
+  - 실측 D7 (실 Chrome 155 headful · Metal, 별 쿼드 on/off 3회 교차 · 3 s 중앙값): vsync 유지 fps 비 `0.998 ~ 1.002` (WebGPU · WebGL2, 기본 · 지구 포커스) · vsync 해제 프레임당 증분 최대 `+0.052` ms (기대 `≤ +0.3`).
+
+### Behavior Changes
+
+- **별 배경이 절차 별에서 실측 별로 바뀐다** (#1373) — 기본 화면 (하드웨어 렌더) 의 별 위치 · 밝기 · 색이 달라진다. 은하수 띠는 남되 법선이 실제 은하 북극 (RA `192.85948°` · Dec `+27.12825°`) 방향이 되어 띠가 실제 은하면에 놓인다 (ADR 1373 결정 R4 — 절차 별 셀 경로 삭제). `?stars=off` · 소프트웨어 렌더 화면은 바뀌지 않는다 (D5 바이트 동일). About 모달에 HYG 출처 · 「별 크기 · 밝기는 등급 시각화」 안내가 추가된다.
+
 ## [0.102.0] - 2026-10-18
 
 ### Added

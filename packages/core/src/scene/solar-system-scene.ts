@@ -53,6 +53,8 @@ import { createSunCorona, type SunCoronaHandles } from './sun-corona.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
+import { createStarCatalog, type StarCatalogHandles } from './star-catalog.js';
+import { STAR_CATALOG_FILE_NAME, parseStarCatalog } from './star-catalog-data.js';
 // #1215 — 지구 구름 레이어 (ADR 20260628-756 Amendment 10).
 import {
   applyCloudDrift,
@@ -266,6 +268,9 @@ export interface SolarSystemSceneHandles {
    * 없으면 그때 한 번 생성하고, 이후는 `setEnabled` 만 바꾼다 (재생성 금지 — 머티리얼 `uniqueId` 가
    * 커지면 그룹 0 불투명 큐 순서가 로드와 달라진다). 렌더러 종류는 묻지 않는다 — 소프트웨어 렌더
    * 차단은 호출자 (web) 책임이다. `window.__starfieldVisible` (로드 시점 판정) 은 갱신하지 않는다.
+   *
+   * #1373 결정 T3 — 은하수 구와 실측 별 쿼드를 함께 켜고 끈다. 첫 ON 에서 카탈로그를 요청하며 (장면당 1회,
+   * `starCatalogBaseUrl` 이 있을 때), 도착 시점의 최신 의도로 쿼드 가시성을 정한다 (T4).
    */
   setStarfieldVisible: (visible: boolean) => void;
   /**
@@ -749,8 +754,20 @@ export interface SolarSystemSceneOptions {
    * clearColor 직후 1개 추가. floating-origin/tier/줌 불변 (엔진 레벨), `isPickable=false` (raycast
    * 비간섭), `renderingGroupId=0` (background queue — 모든 body/orbit/ring 이 그 위에 덮어씀).
    * ADR `docs/decisions/20260624-738-procedural-starfield.md`.
+   *
+   * #1373 — 별은 실측 카탈로그 쿼드 (`star-catalog.ts`) 가 그린다. 구는 은하수만 남았다. 카탈로그는
+   * `starCatalogBaseUrl` 이 있을 때만 받는다 (이 옵션이 별 구를 만드는 시점 — 로드 또는 첫 ON).
    */
   starfield?: boolean;
+
+  /**
+   * #1373 — 별 카탈로그 (`star-catalog.bin`) 기준 URL (ADR `20261018-1373` 결정 D2 · T4). 예: `'/data/stars/'`.
+   *
+   * 미지정이면 fetch 하지 않는다 — 은하수만 보인다 (NullEngine 단위 테스트 무회귀, `surfaceMaskBaseUrl` 과 같은 레이어 분리:
+   * core 는 web 라우팅을 모르고 파일명만 `STAR_CATALOG_FILE_NAME` 으로 갖는다). fetch 는 별 구가 처음 만들어질 때
+   * (로드 `starfield` 또는 `setStarfieldVisible(true)`) 장면당 1회 — 소프트웨어 렌더는 web 이 별 구를 막으므로 받지 않는다 (R5).
+   */
+  starCatalogBaseUrl?: string;
 
   /**
    * #756 — 절차적 행성 표면 셰이더 (`procedural-planet-shader.ts`).
@@ -864,6 +881,7 @@ export function createSolarSystemScene(
     glowMarker = false,
     glowMarkerSatelliteRatio = GLOW_MARKER_DEFAULT_SATELLITE_RATIO,
     starfield = false,
+    starCatalogBaseUrl,
     surfaceDetail = false,
     surfaceMaskBaseUrl,
     selfRotation = false,
@@ -902,6 +920,47 @@ export function createSolarSystemScene(
     dispose: () => {
       starfieldHandles?.dispose();
       starfieldHandles = null;
+    },
+  });
+
+  // #1373 — 실측 별 쿼드 (ADR 20261018-1373 결정 R1 · T3 · T4). `?stars=` 의 의미 (별 + 은하수) 는 그대로라
+  // `setStarfieldVisible` 이 구와 쿼드를 함께 켜고 끈다. 쿼드는 카탈로그 fetch 완료 뒤 만들어지고 그 전엔 은하수만 보인다.
+  //
+  // 비동기 계약 (T4): fetch 는 장면당 1회 · 응답 시 장면이 dispose 됐으면 아무것도 만들지 않는다 · 만든 직후 **그 시점의**
+  // 최신 의도 (`starfieldVisibleIntent`) 로 `setEnabled` (fetch 중 끈 토글이 응답 도착으로 다시 켜지지 않는다) · 실패는
+  // `console.warn` 1회 + 은하수만 (재시도 없음 — 콘솔 에러 0 계약).
+  let starfieldVisibleIntent = starfield;
+  let starCatalogHandles: StarCatalogHandles | null = null;
+  let starCatalogRequested = false;
+  let starCatalogSceneDisposed = false;
+  const requestStarCatalog = (): void => {
+    if (starCatalogRequested || starCatalogBaseUrl === undefined) return;
+    starCatalogRequested = true;
+    const url = `${starCatalogBaseUrl}${STAR_CATALOG_FILE_NAME}`;
+    void fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.arrayBuffer();
+      })
+      .then((buffer) => {
+        if (starCatalogSceneDisposed || scene.isDisposed) return;
+        const catalog = parseStarCatalog(buffer);
+        if (!catalog) return;
+        starCatalogHandles = createStarCatalog(scene, catalog);
+        starCatalogHandles.mesh.setEnabled(starfieldVisibleIntent);
+      })
+      .catch((err: unknown) => {
+        if (starCatalogSceneDisposed) return;
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[star-catalog] ${url} 로드 실패 — 은하수만 표시한다 (${message})`);
+      });
+  };
+  if (starfield) requestStarCatalog();
+  disposables.push({
+    dispose: () => {
+      starCatalogSceneDisposed = true;
+      starCatalogHandles?.dispose();
+      starCatalogHandles = null;
     },
   });
   // 별 배경 (전체화면 절차 셰이더 머티리얼 1개). starfield=false 면 빈 구간.
@@ -3278,13 +3337,18 @@ export function createSolarSystemScene(
   // web 의 가용성 검사**다. 계약 D9 「`disabled`」 는 `aria-disabled="true"` + 클릭 no-op 으로 해석한다
   // (2026-09-27 사용자 확정 — 네이티브 `disabled` 는 Tab 순서에서 빠져 D14 키보드 순회를 CI 에서 채울 수
   // 없다). 즉 버튼이 포커스·클릭을 받으므로, web 이 가용성 검사 없이 이 명령을 보내면 별이 생성된다.
+  // #1373 T3 — 별 쿼드도 같은 의도를 따른다. 카탈로그는 첫 ON 에서 요청되고 (장면당 1회), 도착하면 그때의 의도로 켜진다.
   const setStarfieldVisible = (visible: boolean) => {
+    starfieldVisibleIntent = visible;
     if (visible) {
       starfieldHandles ??= createStarfield(scene);
       starfieldHandles.mesh.setEnabled(true);
+      starCatalogHandles?.mesh.setEnabled(true);
+      requestStarCatalog();
       return;
     }
     starfieldHandles?.mesh.setEnabled(false);
+    starCatalogHandles?.mesh.setEnabled(false);
   };
 
   // #1319 PR3 — 띠 런타임 토글 (ADR 20261008-1319 결정 6). 별 배경과 같은 수명 계약: 없을 때만 생성, 이후 `setEnabled`

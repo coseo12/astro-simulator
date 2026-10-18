@@ -46,3 +46,15 @@ export const EARTH_ROTATION_ANGLE_AT_J2000_TURNS = 0.779_057_273_264;
 
 /** #1362 — 지구 자전각의 율 [회전수/UT1 일]. IERS Conventions (2010) 식 5.15 (위 상수와 짝). */
 export const EARTH_ROTATION_ANGLE_RATE_TURNS_PER_DAY = 1.002_737_811_911_354_48;
+
+/**
+ * #1373 — J2000.0 평균 황도경사 ε [″]. IAU 2006 (Hilton et al. 2006 · IERS Conventions (2010) 식 5.40 상수항 `84381.406″`).
+ *
+ * 적도 J2000 (별 카탈로그 RA · Dec) → 황도 J2000 (장면 데이터 좌표) 변환 `R_x(+ε)` 에 쓴다
+ * (`packages/core/src/coords/equatorial.ts`). 지구 자전축 기울기 데이터 `axialTiltDeg = 23.44` 는 NASA 반올림값이라
+ * 이 상수와 0.0007° 다르다 — 두 값을 섞지 않는다. ADR `docs/decisions/20261018-1373-star-catalog-constellations.md` 결정 D6.
+ */
+export const J2000_MEAN_OBLIQUITY_ARCSEC = 84_381.406;
+
+/** #1373 — {@link J2000_MEAN_OBLIQUITY_ARCSEC} 의 도 단위 (23.4392794…°). */
+export const J2000_MEAN_OBLIQUITY_DEG = J2000_MEAN_OBLIQUITY_ARCSEC / 3600;
