@@ -828,9 +828,11 @@ void main(void) {
  *  - 일식: `n` 을 지구 반경 단위 표면점으로 읽는다 (`uEclA` = 달 위치 / R⊕, 축 = 태양 → 달). 달에서 축 방향 거리 `z` 의 평면에서
  *    반영 반경 `z·k.x + k.y`, 본영 반경 `|z·k.z − k.w|` 이고 그 사이는 거리 선형 (결정 R4 — 금환 쪽 반영 안쪽도 같은 식이라
  *    본영 · 금환 중심은 전부 차폐 `1`). 지구 반경 단위라 bodyScale 과 무관하다 (결정 R6).
- *    ⚠️ 축 기준 밤 반구 (`n·axis > 0`) 는 0 이다 — 그림자 원기둥은 지구를 관통해 밤면에서도 「축 근처」 가 되는데, 그곳은 지구
- *    자신에 가려 달 그림자와 무관하다. 직사광 (`sunShade`) 은 밤면에서 이미 0 이라 이 게이트가 바꾸는 것은 밤면 쪽 rim 띠
- *    (`rimNdlLo < ndl < 0`) 뿐이다 — 게이트가 없으면 γ ≳ 0.4 일식에서 지구 반대편 밤 가장자리 rim 이 반영에 깎인다.
+ *    ⚠️ 밤 반구 게이트 (`n·axis > 0` → 0) 를 두지 않는다 (PR #1369 리뷰 R2 · 실측). 차폐는 축과의 수직 거리 `perp` 로 정해지고
+ *    `z` 는 달까지 ~60 R 라 ±1 R 차이가 무시되므로, 밤면 점은 terminator 평면 (축에 수직) 에 대한 거울 짝 (낮면 점) 과 같은
+ *    차폐를 받는다. 직사광은 밤면에서 0 이라 바뀌는 것은 rim 띠 (`rimNdlLo < ndl < 0`) 뿐이고, 그 점들의 거울 짝은 terminator
+ *    바로 건너편 낮면이다 — 그래서 rim 이 terminator 를 가로질러 연속이다. 게이트를 두면 부분식 (그림자가 terminator 에 걸침)
+ *    에서 낮 쪽 rim 만 줄고 밤 쪽은 그대로라 terminator 에 이음선이 생겼다 (2022-10-25 실측 — 낮 쪽 `62.8` < 밤 쪽 `69.5`).
  *  - `uEclMode = 0` 이면 `vec2(0.0)` — 합성 (`shade -= sunShade * x; shade += uEclGlow * (y * sunFactor)`) 이 정확한
  *    항등이다 (붉은 빛은 태양 쪽 반구에만 — `sunFactor` 는 fragment 의 기존 명암 계수). 단 컴파일러가
  *    식 구조에 따라 결과 비트를 바꿀 수 있어 구조만으로는 보장되지 않는다 — 셰이더 텍스트를 바꾸면 3 백엔드 「그림자 0 바이트
@@ -862,7 +864,6 @@ vec2 eclipseShadow(vec3 n) {
     float edge = mix(uEclK.z, 1.0, clamp(s / uEclK.x, 0.0, 1.0));
     return vec2(1.0 - vis, umb * edge);
   }
-  if (dot(n, uEclAxis) > 0.0) return vec2(0.0);
   vec3 d = n - uEclA;
   float z = dot(d, uEclAxis);
   float perp = length(d - z * uEclAxis);

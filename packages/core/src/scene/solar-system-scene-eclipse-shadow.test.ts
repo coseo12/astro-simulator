@@ -458,7 +458,7 @@ describe('#1360 PR3 — 셰이더 텍스트 (결정 R1 · R3)', () => {
     expect(iCol).toBeGreaterThan(iEcl);
   });
 
-  it('표면 fragment — rim 은 같은 차폐율로 감쇠 (rim 계산 직후) · 야간 불빛 항은 그림자를 읽지 않는다 · 일식 분기 · 밤 반구 게이트', () => {
+  it('표면 fragment — rim 은 같은 차폐율로 감쇠 (rim 계산 직후) · 야간 불빛 항은 그림자를 읽지 않는다 · 일식 분기 · 밤 반구 게이트 없음', () => {
     makeScene();
     const frag = Effect.ShadersStore.proceduralPlanetFragmentShader!;
     const iRim = frag.indexOf('rim = rimStrength * rimFall * rimLight;');
@@ -469,7 +469,8 @@ describe('#1360 PR3 — 셰이더 텍스트 (결정 R1 · R3)', () => {
     expect(frag).toContain('lights = nightLightStrength * nightFactor * lightGate * lightDensity;');
     const lightsLine = frag.split('\n').find((l) => l.includes('lights = nightLightStrength'))!;
     expect(lightsLine).not.toContain('ecl');
-    expect(ECLIPSE_SHADOW_GLSL).toContain('if (dot(n, uEclAxis) > 0.0) return vec2(0.0);');
+    // PR #1369 리뷰 R2 — 밤 반구 게이트를 두지 않는다 (부분식 terminator rim 이음선). 되살리면 이 단언이 FAIL 한다.
+    expect(ECLIPSE_SHADOW_GLSL).not.toMatch(/dot\(n, uEclAxis\) > 0\.0/);
     expect(ECLIPSE_SHADOW_GLSL).toContain('float ru = abs(z * uEclK.z - uEclK.w);');
   });
 });

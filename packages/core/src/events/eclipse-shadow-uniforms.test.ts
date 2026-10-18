@@ -227,7 +227,6 @@ function solarUniformsAt(jd: number) {
 function solarOcclusionAt(u: ReturnType<typeof solarEclipseShadowUniforms>, n: number[]): number {
   const dot3 = (p: readonly number[], q: readonly number[]) =>
     p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
-  if (dot3(n, u.axis) > 0) return 0;
   const d = n.map((v, i) => v - u.a[i]!);
   const z = dot3(d, u.axis);
   const perp = Math.hypot(...d.map((v, i) => v - z * u.axis[i]!));
@@ -333,20 +332,12 @@ describe('#1360 PR3 — 일식 uniform 기하', () => {
     expect(u.glow).toEqual([0, 0, 0]);
   });
 
-  it('셰이더 식 (JS 대조) — 축 지표 교점은 본영 (차폐 1) · 반영 밖과 밤 반구는 0 · 축에서 멀수록 차폐가 줄어든다', () => {
+  it('셰이더 식 (JS 대조) — 축 지표 교점은 본영 (차폐 1) · 반영 밖은 0 · 축에서 멀수록 차폐가 줄어든다', () => {
     for (const date of ['2017-08-21', '2024-04-08', '2023-10-14']) {
       const { u } = solarUniformsAt(at(date));
       const p = axisSurfacePoint(u);
       expect(p, date).not.toBeNull();
       expect(solarOcclusionAt(u, p!), date).toBe(1);
-      // 같은 점의 대척점 — 그림자 원기둥이 지구를 관통한 밤 반구 쪽. 게이트가 0 으로 만든다.
-      expect(
-        solarOcclusionAt(
-          u,
-          p!.map((v) => -v),
-        ),
-        date,
-      ).toBe(0);
       // 지표 위에서 축 교점으로부터 멀어지는 대원 — 차폐 단조 비증가, 끝은 반영 밖 (0).
       const ref = u.axis[0] !== 0 || u.axis[1] !== 0 ? [0, 0, 1] : [1, 0, 0];
       const side = [
@@ -365,6 +356,44 @@ describe('#1360 PR3 — 일식 uniform 기하', () => {
       }
       expect(prev, `${date} 60°`).toBe(0);
     }
+  });
+
+  it('PR #1369 리뷰 R2 — 부분식 2022-10-25 (γ > 1): 그림자가 축 기준 terminator 에 걸치고, 차폐는 terminator 를 가로질러 연속 (낮 · 밤 거울 짝 차 < 0.01)', () => {
+    const { u, g } = solarUniformsAt(at('2022-10-25'));
+    expect(g.type).toBe('partial');
+    expect(g.gamma).toBeGreaterThan(1);
+    const dot3 = (p: readonly number[], q: readonly number[]) =>
+      p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
+    const norm = (p: number[]) => {
+      const l = Math.hypot(...p);
+      return p.map((x) => x / l);
+    };
+    // terminator 평면 (축에 수직) 위에서 그림자 쪽 방향 û 와 그 접선 ŵ.
+    const al = dot3(u.a, u.axis);
+    const uHat = norm(u.a.map((x, i) => x - al * u.axis[i]!));
+    const w = [
+      u.axis[1] * uHat[2]! - u.axis[2] * uHat[1]!,
+      u.axis[2] * uHat[0]! - u.axis[0] * uHat[2]!,
+      u.axis[0] * uHat[1]! - u.axis[1] * uHat[0]!,
+    ];
+    let maxOcc = 0;
+    for (let deg = -40; deg <= 40; deg += 4) {
+      const th = (deg * Math.PI) / 180;
+      const n0 = uHat.map((x, i) => x * Math.cos(th) + w[i]! * Math.sin(th));
+      for (const delta of [0.02, 0.1, 0.25]) {
+        const day = norm(n0.map((x, i) => x - delta * u.axis[i]!));
+        const night = norm(n0.map((x, i) => x + delta * u.axis[i]!));
+        const occDay = solarOcclusionAt(u, day);
+        // 거울 짝은 축 수직 거리가 같고 축 방향 거리 z 만 ~2δ R 다르다 — 반경이 2δ·tan f (~0.005·2δ) 만큼 달라지는 몫만 남는다.
+        // 1e-3 으로 두었을 때 −28° · δ 0.1 에서 0.0017 로 넘었다 (실측). 밤 반구 게이트가 있으면 밤 쪽이 0 이라 차가 `maxOcc` (> 0.5) 수준이 된다.
+        expect(Math.abs(occDay - solarOcclusionAt(u, night)), `${deg}° δ ${delta}`).toBeLessThan(
+          0.01,
+        );
+        maxOcc = Math.max(maxOcc, occDay);
+      }
+    }
+    // 판별력 전제 — terminator 근처 차폐가 실제로 크다 (밤 반구 게이트가 있으면 밤 쪽만 0 이 되어 위 단언이 FAIL).
+    expect(maxOcc).toBeGreaterThan(0.5);
   });
 
   it('반영 · 본영 반경 — 지표 근처 (z ≈ 기본면) 에서 반영 반경 = 판정식 l1, 개기는 l2 < 0 · 금환은 l2 > 0', () => {
