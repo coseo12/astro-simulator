@@ -109,6 +109,7 @@ beforeEach(() => {
     timeScale: 86_400,
     rulerAnchorId: null,
     selectedBodyId: null,
+    focusViewRequest: null,
   });
 });
 
@@ -492,6 +493,32 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
       expect(option(id)).toHaveAttribute('aria-selected', 'true');
       const note = screen.getByTestId('time-events-scale-note');
       expect(note).toHaveTextContent(`×${core.getOrbitVisualScale('earth', 'moon')}`);
+    },
+  );
+
+  it.each([
+    ['lunar-eclipse:2025-03-14', { bodyId: 'moon', view: 'facing-parent' }],
+    ['solar-eclipse:2024-04-08', null],
+  ] as const)(
+    '#1360 PR2 C3 — %s 선택: 시점 요청은 포커스 명령 **전에** store 에 있다 (월식만 facing-parent)',
+    async (id, expected) => {
+      useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON });
+      renderEvents();
+      await flushChunks();
+      fireEvent.click(trigger());
+      // 포커스 명령이 나가는 순간의 요청 — sim-canvas 의 포커스 동기가 이 시점에 소비한다.
+      let atFocus: unknown = 'not-sent';
+      const pushed = sentCommands.length;
+      const origPush = sentCommands.push.bind(sentCommands);
+      sentCommands.push = (...cmds: CoreCommand[]) => {
+        for (const c of cmds) {
+          if (c.type === 'focusOn') atFocus = useSimStore.getState().focusViewRequest;
+        }
+        return origPush(...cmds);
+      };
+      fireEvent.click(option(id));
+      expect(sentCommands.length).toBeGreaterThan(pushed);
+      expect(atFocus).toEqual(expected);
     },
   );
 

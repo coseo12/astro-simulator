@@ -116,11 +116,13 @@ import {
   Matrix,
   ShaderMaterial,
   Vector3,
+  Vector4,
   Viewport,
   type Mesh,
   type Scene,
 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import type { EclipseShadowUniforms } from '../events/eclipse-shadow-uniforms.js';
 // #1157 — 회전 불변 시각 반경 SSoT (#790). `camera-controller.ts` 는 `@babylonjs/core` 외의
 // 모듈을 import 하지 않으므로 순환 없음 (`tier-transition.ts` 가 같은 방향으로 이미 의존한다).
 import { resolveMeshWorldVisualRadius } from './camera-controller.js';
@@ -706,6 +708,37 @@ export function isProceduralPlanetMaterial(material: unknown): material is Shade
   return material instanceof ShaderMaterial && proceduralPlanetMaterials.has(material);
 }
 
+/** #1360 PR2 — 머티리얼별 식 그림자 uniform 버퍼 (`setVector3` 등은 참조 저장이라 머티리얼마다 따로 둔다). */
+interface EclipseUniformBuffers {
+  a: Vector3;
+  axis: Vector3;
+  k: Vector4;
+  glow: Vector3;
+}
+const eclipseUniformBuffers = new WeakMap<ShaderMaterial, EclipseUniformBuffers>();
+
+/**
+ * #1360 PR2 — 절차 행성 머티리얼에 식 그림자 uniform 5개를 쓴다 (값 = `events/eclipse-shadow-uniforms.ts` 빌더 출력).
+ * 절차 행성 머티리얼이 아니면 `false` (아무것도 쓰지 않는다). 할당 0 — 생성 시 만든 머티리얼 버퍼를 갱신한다.
+ */
+export function setEclipseShadowUniforms(
+  material: ShaderMaterial,
+  u: Readonly<EclipseShadowUniforms>,
+): boolean {
+  const buffers = eclipseUniformBuffers.get(material);
+  if (!buffers) return false;
+  buffers.a.set(u.a[0], u.a[1], u.a[2]);
+  buffers.axis.set(u.axis[0], u.axis[1], u.axis[2]);
+  buffers.k.set(u.k[0], u.k[1], u.k[2], u.k[3]);
+  buffers.glow.set(u.glow[0], u.glow[1], u.glow[2]);
+  material.setFloat('uEclMode', u.mode);
+  material.setVector3('uEclA', buffers.a);
+  material.setVector3('uEclAxis', buffers.axis);
+  material.setVector4('uEclK', buffers.k);
+  material.setVector3('uEclGlow', buffers.glow);
+  return true;
+}
+
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield 패턴 답습). */
 const SHADER_NAME = 'proceduralPlanet';
 
@@ -759,6 +792,49 @@ void main(void) {
   vFragmentDepth = 1.0 + clip.w;
 }
 `;
+
+/**
+ * #1360 PR2 결정 R1 — 식 그림자 uniform 5개 + 함수 1개 (ADR `docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md`).
+ *
+ * 값은 순수 빌더 `events/eclipse-shadow-uniforms.ts` 가 판정식 (`lunarEclipseGeometry`) 출력으로 만든다 — 셰이더는 기하를 다시
+ * 계산하지 않는다 (결정 G2). 반환 `x` = 직사광 차폐율 (0 = 그림자 없음), `y` = 본영 붉은 빛 세기 (월식 — Danjon L = 2).
+ *
+ *  - `uEclMode` `1` = 월식 (달 머티리얼). 그 밖의 값은 그림자 없음 — 일식 (`2`) 분기는 PR3 가 더한다. `#define` 분기를 쓰지
+ *    않는다 — define 변경은 effect 재생성이고 컴파일 동안 `isReady` 가 `false` 라 메시가 안 그려진다 (결정 R1).
+ *  - 월식: `q = uEclA + n⊥` 는 지구 그림자 중심 기준 표면점의 하늘면 위치 [달 반경] (축 = 지구 → 달). 반영은 거리 선형
+ *    (결정 R4), 본영 붉은 빛은 중심 `uEclK.z` → 경계 `1` 로 밝아진다 (결정 R5 — L = 2 「가장자리 비교적 밝다」).
+ *  - `uEclMode = 0` 이면 `vec2(0.0)` — 합성 (`shade -= sunShade * x; shade += uEclGlow * (y * sunFactor)`) 이 정확한
+ *    항등이다 (붉은 빛은 태양 쪽 반구에만 — `sunFactor` 는 fragment 의 기존 명암 계수). 단 컴파일러가
+ *    식 구조에 따라 결과 비트를 바꿀 수 있어 구조만으로는 보장되지 않는다 — 셰이더 텍스트를 바꾸면 3 백엔드 「그림자 0 바이트
+ *    동일」 을 다시 잰다 (ADR §구현 인계 · DoD D5).
+ *  - 인자 `n` 은 world normal 이다 (Amendment 2 옵션 e). 장면 world 축 = 물리 위치 축이라 빌더의 방향과 그대로 내적한다.
+ */
+export const ECLIPSE_SHADOW_GLSL = /* glsl */ `
+uniform float uEclMode;
+uniform vec3 uEclA;
+uniform vec3 uEclAxis;
+uniform vec4 uEclK;
+uniform vec3 uEclGlow;
+
+vec2 eclipseShadow(vec3 n) {
+  if (abs(uEclMode - 1.0) > 0.5) return vec2(0.0);
+  vec3 q = uEclA + (n - dot(n, uEclAxis) * uEclAxis);
+  float s = length(q);
+  float vis = clamp((s - uEclK.x) / (uEclK.y - uEclK.x), 0.0, 1.0);
+  float umb = 1.0 - smoothstep(uEclK.x * (1.0 - uEclK.w), uEclK.x, s);
+  float edge = mix(uEclK.z, 1.0, clamp(s / uEclK.x, 0.0, 1.0));
+  return vec2(1.0 - vis, umb * edge);
+}
+`;
+
+/** #1360 PR2 — 식 그림자 uniform 이름 5개 (uniforms 배열 · 기본값 바인딩 · `setEclipseShadowUniforms` 가 공유). */
+export const ECLIPSE_SHADOW_UNIFORM_NAMES = [
+  'uEclMode',
+  'uEclA',
+  'uEclAxis',
+  'uEclK',
+  'uEclGlow',
+] as const;
 
 /**
  * GLSL fragment shader — base color 위 표면 타입별 절차 변조 (단일 셰이더 + if-else 분기).
@@ -891,7 +967,7 @@ uniform float nightLightHi;
 uniform float nightLightClusterMix;
 uniform float nightLightClusterLo;
 uniform float nightLightClusterHi;
-
+${ECLIPSE_SHADOW_GLSL}
 // equirectangular UV 역수 상수 (매직 넘버 분리 — 1/(2π), 1/π).
 const float INV_TWO_PI = 0.1591549430918953;
 const float INV_PI = 0.3183098861837907;
@@ -952,6 +1028,12 @@ void main(void) {
   vec3 sunShade = sunIntensity * sunDiffuse * sunFactor;
   // 합성 명암 (StandardMaterial PointLight+HemisphericLight diffuse 항 재현 — diffuseColor 곱 전).
   vec3 shade = ambientShade + sunShade;
+  // #1360 PR2 결정 R1 — 식 그림자. 직사광만 차폐하고 (주변광 항은 남긴다) 본영 붉은 빛을 더한다. 차감 · 가산 형태라
+  // 그림자 0 (ecl = 0) 이면 항등이다. 붉은 빛은 태양 쪽 반구에만 — 지구 대기를 지나 굴절된 빛은 태양 방향에서 오므로
+  // 밤면 (달 뒷면) 이 붉어지지 않게 위 sunFactor 를 재사용해 건다 (재계산 금지 — volt #21).
+  vec2 ecl = eclipseShadow(N);
+  shade -= sunShade * ecl.x;
+  shade += uEclGlow * (ecl.y * sunFactor);
   vec3 col = baseColor;
   // Amendment 8 (#1202) — 대기 산란 rim 세기. rocky 분기 안에서만 계산되고 (§A8.4 — mars/jupiter/
   // moon 의 fragment 추가 비용은 아래 합성 3 FMA 뿐), 비-rocky 는 0 이라 합성이 정확한 no-op 이다.
@@ -1414,6 +1496,8 @@ export function createProceduralPlanetMaterial(
         'nightLightClusterMix',
         'nightLightClusterLo',
         'nightLightClusterHi',
+        // #1360 PR2 — 식 그림자 uniform (+5 — float 1 + vec3 3 + vec4 1). 값은 `setEclipseShadowUniforms`.
+        ...ECLIPSE_SHADOW_UNIFORM_NAMES,
       ],
       // Amendment 4 (#1119) — sampler 명시. Phase 0 게이트는 **명시한 상태에서만** 측정됐고
       // 생략 시 거동은 미측정이다 (이슈 #1119 게이트 코멘트 §잔여 미측정 1) — 추측하지 말고 명시한다.
@@ -1523,6 +1607,22 @@ export function createProceduralPlanetMaterial(
   material.setFloat('nightLightClusterMix', NIGHT_LIGHT_CLUSTER_MIX);
   material.setFloat('nightLightClusterLo', NIGHT_LIGHT_CLUSTER_LO);
   material.setFloat('nightLightClusterHi', NIGHT_LIGHT_CLUSTER_HI);
+
+  // #1360 PR2 결정 R2 — 식 그림자 기본값 = 그림자 없음 (`uEclMode 0`). 수신 천체 (달) 만 장면이 프레임마다 값을 바꾸고,
+  // 그 밖의 절차 머티리얼 (지구 · 화성 · 목성 · 천왕성 · 해왕성) 은 이 값에 고정된다. 버퍼는 머티리얼마다 따로 둔다 —
+  // `setVector3` · `setVector4` 는 객체를 **참조로** 저장하므로 공유 버퍼면 머티리얼끼리 값이 섞인다.
+  const eclipseBuffers: EclipseUniformBuffers = {
+    a: new Vector3(0, 0, 0),
+    axis: new Vector3(0, 0, 1),
+    k: new Vector4(0, 0, 0, 0),
+    glow: new Vector3(0, 0, 0),
+  };
+  eclipseUniformBuffers.set(material, eclipseBuffers);
+  material.setFloat('uEclMode', 0);
+  material.setVector3('uEclA', eclipseBuffers.a);
+  material.setVector3('uEclAxis', eclipseBuffers.axis);
+  material.setVector4('uEclK', eclipseBuffers.k);
+  material.setVector3('uEclGlow', eclipseBuffers.glow);
 
   // Amendment 1 (#773) §A1.3 결정 1 — 태양 방향 uniform.
   //   기본 +X (provider 미전달 시 테스트 fallback). provider 가 있으면 onBind 에서 매 draw 갱신.
