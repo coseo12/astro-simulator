@@ -61,6 +61,7 @@ export const EARTH_ORIENTATION_MODEL = 'earth-era';
 
 /**
  * #782 — body 데이터에서 자전 파라미터 산출. `rotationPeriodHours` 미지정 시 null (자전 없음).
+ * ⚠️ 지구 (`EARTH_ORIENTATION_BODY_ID`) 만 `orientation` 표지가 붙는다 (#1362 — ERA 방향 모델).
  * 규약 (i): ω 는 양수 magnitude (방향은 tiltRad 에 내재). loader schema 가 0 을 차단하나 방어적 재확인.
  */
 export function computeRotationState(body: LoadedCelestialBody): RotationState | null {
@@ -98,6 +99,7 @@ export function computeSpinAngle(jd: number, epoch: number, omega: number): numb
 
 /**
  * #782 §A2.3 결정 5 — jd 순수 함수 자전각 → `tilt(axialTilt) ∘ spin(spinAngle)` quaternion.
+ * ⚠️ 지구 (`state.orientation` 보유) 는 `computeEarthOrientationQuaternion` 으로 분기한다 (#1362 — epoch · ω 미사용).
  *
  * `spinAngle = ((jd − epoch) × ω) mod 2π` (float64 CPU — jd 큰 수 뺄셈을 먼저 수행해 정밀도 보존,
  * cross-validate Q3 실측 ≤ 3.1e-8° 오차). `q = tilt.multiply(spin)` = spin(local Y) 먼저 적용 후
@@ -213,7 +215,8 @@ export function earthRotationAngle(jd: number): number {
  * #1362 — 지구 방향 quaternion `tilt(ε − π/2) ∘ spin(−ERA(jd))`.
  *
  * 경도 0 오프셋은 `0` 이다 — 마스크 규약 (local `+X` = 경도 0°, `+Z` = 경도 90°E) 그대로 ERA 를 직접 쓴다
- * (Phase 0 실측: 2000~2030 직하점 잔차 최대 `0.16°`, J2000 고정 극 · 세차 무시 근사).
+ * (J2000 고정 극 · 세차 무시 근사 — 직하점 위도 잔차가 연 `≈ 0.0066°` 씩 커져 2031년에 `0.2°` 를 넘는다.
+ * ADR §Amendment 13 §A13.6).
  *
  * @param jd 현재 Julian Date (UTC 기반 — UT1 근사)
  * @param tiltRad obliquity [rad] (데이터 `axialTiltDeg`)

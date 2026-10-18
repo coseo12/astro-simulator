@@ -152,7 +152,10 @@ async function measureRotation(page, body, jd0, jd1) {
       });
       const qRelRaw = mul(q1c, conj0);
       // q 와 −q 는 같은 회전 — w ≥ 0 으로 정규화해야 회전축 부호가 회전 방향을 뜻한다 (#1362: 축 부호를
-      // 판정에 쓰게 되면서 필요해졌다. Δ = 1/4 회전이라 실제로는 w > 0 이다).
+      // 판정에 쓰게 되면서 필요해졌다). ⚠️ 이 정규화가 **지구 판정을 실제로 지탱한다** — 지구 spin 각은
+      // `−ERA mod 2π` 라 JD0 (J2000.0) 에서 ERA 가 `280.461° → 10.461°` 로 2π 경계를 넘고, 그래서
+      // `qRelRaw.w = −0.7071` 이 나온다 (PR #1367 리뷰 권고 1 — core `computeSpinQuaternion` 으로 재현).
+      // 정규화를 빼면 회전축 부호가 뒤집혀 지구가 `along` 으로 판정되고 DoD 2 가 FAIL 한다.
       const qSign = qRelRaw.w < 0 ? -1 : 1;
       const qRel = {
         w: qRelRaw.w * qSign,

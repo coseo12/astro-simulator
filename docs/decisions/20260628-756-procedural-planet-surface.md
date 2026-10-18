@@ -1,6 +1,6 @@
 # ADR 20260628-756 — 절차적 행성 표면 셰이더 (1차: 인프라 + 대표 4개)
 
-- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료) · 개정 1 (§A11.17.9 `V2` 술어 재정의 · §A11.18 MN-5b 예측 반증): Accepted (cross-validate agy 2026-09-18 — §A11.19 4축 반영 완료)** — **Amendment 12 (#1274): Accepted (cross-validate 2026-10-02 — §A12.18 4축 반영 완료) · 개정 1 (§A12.19 PR2 착수 보정 — 하네스 「미등록 선언」 전제 · D6 (i) 양성 대조 분리): Accepted (cross-validate 2026-10-03 — §A12.19.11 4축 반영 완료)** — **Amendment 13 (#1362): Accepted (2026-10-18 — 단순 결정, 지구 방향 교정)**
+- **상태**: Accepted (cross-validate 2026-06-28) — **Amendment 1 (#773/#775): Accepted (cross-validate 2026-06-30)** — **Amendment 2 (#782): Accepted (cross-validate 2026-07-01)** — **Amendment 3 (#783): Accepted (cross-validate 2026-07-04)** — **Amendment 4 (#1119): Accepted (cross-validate agy 2026-08-17 — §A4.8 4축 통합 완료)** — **Amendment 5 (#1130): Accepted (2026-08-18 — 자전 기준면 정정)** — **Amendment 6 (#1157): Accepted (2026-08-27 — 마스크 LOD 반경 회전 불변화. ⚠️ 본 항목은 #1197 에서 backfill 됐다 — Amendment 6 머지 시 상태 라인 갱신이 누락된 선재 drift)** — **Amendment 7 (#1197): Accepted (cross-validate agy 2026-09-05 — §A7.8 4축 통합 완료)** — **Amendment 8 (#1202): Accepted (cross-validate agy 2026-09-07 — §A8.12 4축 통합 완료)** — **Amendment 9 (#1205): Accepted (cross-validate 2026-09-07 — 선행 ADR [20260907-1205](20260907-1205-frame-phase-vs-time-phase.md) §교차검증 반영 사항 4축 통합과 함께 전이)** — **Amendment 10 (#1215): Accepted (cross-validate agy 2026-09-11 — §A10.16 4축 통합 완료)** — **Amendment 11 (#1226): Accepted (cross-validate agy 2026-09-13 — §A11.16 반영 완료) · 개정 1 (§A11.17.9 `V2` 술어 재정의 · §A11.18 MN-5b 예측 반증): Accepted (cross-validate agy 2026-09-18 — §A11.19 4축 반영 완료)** — **Amendment 12 (#1274): Accepted (cross-validate 2026-10-02 — §A12.18 4축 반영 완료) · 개정 1 (§A12.19 PR2 착수 보정 — 하네스 「미등록 선언」 전제 · D6 (i) 양성 대조 분리): Accepted (cross-validate 2026-10-03 — §A12.19.11 4축 반영 완료)** — **Amendment 13 (#1362): Accepted (claude-only analysis 2026-10-18 — cross-validate 응답 없음 #1363, §A13.6)**
 - **날짜**: 2026-06-28 (Amendment 1: 2026-06-30, Amendment 2: 2026-07-01, Amendment 3: 2026-07-04, Amendment 4: 2026-08-17)
 - **이슈**: [#756](https://github.com/coseo12/astro-simulator/issues/756) / Amendment 1: [#773](https://github.com/coseo12/astro-simulator/issues/773) (광원 일관성 회귀, high) + [#775](https://github.com/coseo12/astro-simulator/issues/775) (지구 대륙 mix, low) / Amendment 2: [#782](https://github.com/coseo12/astro-simulator/issues/782) (self-rotation 자전 + 광원 world normal 옵션 e 전환, medium) / Amendment 3: [#783](https://github.com/coseo12/astro-simulator/issues/783) (지구 디테일 — 극관 + biome 위도 색 변화, medium) / Amendment 4: [#1119](https://github.com/coseo12/astro-simulator/issues/1119) (지구 대륙 윤곽 실제화 — 「에셋 0」 조건부 예외, high)
 - **관련**: [#738 절차적 별 배경](20260624-738-procedural-starfield.md) (트랙 A 선행), [`docs/architecture/principles.md` §1 Visual Fidelity](../architecture/principles.md)
@@ -3637,7 +3637,7 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 ## Amendment 13 (2026-10-18) — 지구 자전축 방향 · 실제 시각 자전 위상 (ERA) (#1362)
 
 - **날짜**: 2026-10-18
-- **상태**: Accepted (2026-10-18) — 사용자 결정 (범위 (a) 지구만 · 허용오차 `±0.2°`) 을 구현으로 옮기는 단순 결정이라 직접 Accepted
+- **상태**: Accepted (claude-only analysis 2026-10-18 — cross-validate 응답 없음 #1363, §A13.6) — 사용자 결정 (범위 (a) 지구만 · 허용오차 `±0.2°`) 을 구현으로 옮기는 단순 결정
 - **이슈**: [#1362](https://github.com/coseo12/astro-simulator/issues/1362) (bug, priority:medium) — Phase 0 실측 + 사용자 결정은 [코멘트 6245464331](https://github.com/coseo12/astro-simulator/issues/1362#issuecomment-6245464331)
 - **선행**: §Amendment 2 (#782 자전) · §Amendment 5 (#1130 기준면). 다른 8천체 · 고리의 결정은 **불변**이다.
 
@@ -3660,6 +3660,7 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 
 - 장면은 오른손 황도 좌표를 Babylon 왼손계에 그대로 넣는다. 그래서 화면 전체가 황도면 기준 **거울상**이다 (#1366 — 별도 이슈).
 - 그 화면에서 지구의 local `+Y` (마스크 북극) 는 data 좌표 `(0, sin ε, −cos ε)` 를 가리킨다. 궤도 법선 `+Z` 에서 재면 `180° − ε` 다.
+  - ⚠️ 이 절의 「data 좌표」 표기 (local `+Y` · 각속도 축 벡터) 는 #1366 PR 에서 갱신할 대상이다 — (ii) 장면 경계 z 반전이 장면 좌표의 z 부호를 바꾸기 때문이다.
 - 자전 **각속도** 축은 `(0, −sin ε, cos ε)` 로 일반 식의 pole 과 같은 방향이다 (`+Z` 에서 `ε`). 감기 방향이 다른 순행 행성과 같다는 뜻이다.
 - **다른 천체는 local `+Y` 가 반대 극이다.** 절차 표면이라 관측되는 피해가 없어 범위 밖이다 (사용자 결정 (a)). 극 방위 근사 오차 (화성 `36.8°` · 해왕성 `51.4°`) 도 같은 이유로 범위 밖이다.
 - 가드 판정축 — `browser-verify-782-rotation.mjs` DoD 2 · 3 은 local `+Y` 가 아니라 **각속도 축**으로 obliquity · 감기 방향을 잰다. 다른 body 는 두 축이 같은 방향이라 판정값이 그대로다. 대신 local `+Y` 와 각속도 축의 관계 (`textureNorth`) 를 행마다 단언한다 — 지구 `anti`, 나머지 `along`.
@@ -3681,6 +3682,20 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 
 ### A13.5 비-범위 · 재검토 조건
 
-- 비-범위: 세차 · 장동 (J2000 고정 극 — 2000~2030 잔차 최대 `0.16°`), 다른 천체의 극 방위, 좌수계 거울상 (#1366).
-- 재검토 1: #1366 이 장면 좌표계를 오른손계로 바꾸면 `EARTH_SCREEN_NORTH_FLIP` 과 `EARTH_SPIN_SIGN` 을 함께 재유도한다 — 두 상수는 거울상 화면을 전제로 한다.
-- 재검토 2: 표시 범위가 2000~2030 밖으로 넓어지며 직하점 오차가 `0.2°` 를 넘는 요구가 생기면 세차 (IAU 2006) 를 넣는다.
+- 비-범위: 세차 · 장동 (J2000 고정 극 — 잔차는 §A13.6 (b)), 다른 천체의 극 방위, 좌수계 거울상 (#1366).
+- 재검토 1: `EARTH_SCREEN_NORTH_FLIP` 과 `EARTH_SPIN_SIGN` 은 **Babylon 좌수계 (`useRightHandedSystem` 미사용) + 마스크 경도 규약 (`lon = atan2(z, x)` — local `+X` = 경도 0°, `+Z` = 경도 90°E)** 을 전제로 한다. 둘 중 하나를 바꾸면 두 상수를 함께 재유도한다.
+  - #1366 은 사용자 결정 (2026-10-18, [#1366 코멘트 6245686624](https://github.com/coseo12/astro-simulator/issues/1366#issuecomment-6245686624)) 으로 (ii) 장면 경계 z 반전을 택했다. architect 분석상 (ii) 에서는 이 식이 그대로이고 재유도 대상이 아니다 (§A13.6 (c)).
+  - ⚠️ 초판의 「두 상수는 거울상 화면을 전제」 는 부정확했다 — 거울상 자체가 아니라 위 두 규약이 전제다 (PR #1367 리뷰 권고 2).
+- 재검토 2: 2030년 이후 시각을 정확도 요구 대상으로 다루면 세차 (IAU 2006) 를 넣는다 — 직하점 위도 잔차가 2031년에 `0.2°` 를 넘는다 (§A13.6 (b)).
+
+### A13.6 교차검증 반영 사항
+
+**교차검증: 미수행 — `cross_validate.sh` 의 agy 단계가 3회 연속 응답 없이 멈췄다 (#1363). claude-only analysis completed — 단일 모델 편향 노출 미확보.** 경량 모델 폴백은 하지 않았다. 아래는 Claude 단독 분석 요지다 (메인 작성 3줄, 수치는 developer 실측으로 대체).
+
+- **(a) 규약 고지** — 지구만 local `+Y` 규약이 다르다는 점을 코드 주석 (`self-rotation.ts` 섹션 주석 · `computeRotationState` / `computeSpinQuaternion` JSDoc) 과 본 Amendment §A13.3 에 고지했다.
+- **(b) J2000 고정 극 잔차** — 세차를 넣지 않아 직하점 잔차가 해마다 커진다. 실측 결과는 아래와 같다.
+  - 실측 방법: 장면 식 (단위 테스트와 같은 경로 — quaternion + `heliocentricPositionAt`) 을 Meeus 25장 + 식 12.4 + 22장 (장동 주요 4항) 기준식과 비교했다. 표본은 각 해 365일 × UT 3시각 (`0.00` · `0.37` · `0.71` 일) 이고, 기준식은 Phase 0 기준값 4개를 `±0.001°` 로 재현한다.
+  - 연도별 최대 위도 잔차는 2000년 `0.002°` · 2024년 `0.155°` · 2030년 `0.196°` · **2031년 `0.202°`** · 2040년 `0.256°` 이고, 경도 잔차는 2030년 `0.136°` 이고 2045년 `0.203°` 에서 처음 `0.2°` 를 넘는다. 위도 기준 증가율은 연 `≈ 0.0066°` 다.
+  - ⇒ **2031년부터 위도 `±0.2°` 를 넘는다.** 기준식 자체의 정밀도 (Meeus 25장 저정밀 식 `≈ 0.01°` — 위 증가율로 약 1.5년) 만큼 경계 연도가 흔들릴 수 있다.
+  - ⚠️ Phase 0 이 적은 「2000~2030 최대 `0.16°`」 는 이 조밀 표본으로는 재현되지 않는다 (2030년 `0.196°`). 그래도 2030년까지 `±0.2°` 안이라는 결론은 그대로이고, 사용자 결정 (허용오차 `±0.2°`) 의 근거도 유지된다. 대신 본 Amendment 와 코드 주석의 `0.16°` 서술은 위 실측값으로 바꿨다.
+- **(c) #1366 (ii) 와의 호환** — (ii) 장면 경계 z 반전 `S_z = diag(1, 1, −1)` 에서 본 식은 대수적으로 호환된다 (architect `Qᵀ·S_z` 실측). 재유도가 필요한 경우는 §A13.5 재검토 1 의 두 규약을 바꿀 때뿐이다.
