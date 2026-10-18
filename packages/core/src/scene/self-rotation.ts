@@ -133,7 +133,7 @@ export function computeSpinQuaternion(
   // ⚠️ **`+ π/2` 가 기준면 보정이다** (#1130). obliquity 는 **궤도 법선**에서 재는 각인데, 이
   // 씬의 기준 궤도면은 XY 라 궤도 법선은 **world Z** 다 (근거는 측정이 아니라 구조 —
   // `physics/state-vector.ts` 의 `z = sinI · y₁` 이 inclination 0 에서 `z ≡ 0` 을 보장하고,
-  // 씬은 이 좌표를 기저 변환 없이 직결한다). 그런데 spin 축이 local Y 라 보정이 없으면
+  // 씬은 이 좌표의 z 부호만 뒤집어 넣는다 — #1366 `S_z` 라 XY 평면 · Z 축은 그대로다). 그런데 spin 축이 local Y 라 보정이 없으면
   // `tiltRad = 0` 일 때 자전축이 world **Y** — 즉 궤도면 **안**에 눕는다. 그 90° 를 메운다.
   Quaternion.RotationAxisToRef(ROT_TILT_AXIS, ORBITAL_NORMAL_OFFSET + state.tiltRad, tmpTilt);
   // q = tilt ∘ spin (spin 먼저 적용 후 tilt — Babylon A.multiply(B) = B 먼저).

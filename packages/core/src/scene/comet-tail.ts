@@ -24,7 +24,8 @@
  *
  * ## 궤도면 법선 ĥ 는 상수다 — N-body 경로에서도
  *
- * ĥ 는 로드 시 1회 `orbitalStateAt` (기존 해석해) 의 `normalize(position × velocity)` 로 구한다 (`cometOrbitNormal`).
+ * ĥ 는 로드 시 1회 `orbitalStateAt` (기존 해석해) 의 `normalize(position × velocity)` 로 구한다 (`cometOrbitNormal` — 데이터
+ * 공간). 장면은 그것을 `axialToScene` 으로 장면 공간 축벡터로 바꿔 넘긴다 (#1366).
  * **N-body 엔진 경로에서도 상수로 둔다** — 꼬리 머리 · 축은 mesh 위치를 따르므로 엔진과 무관하게 맞고, ĥ 는 먼지 꼬리
  * 휨 방향에만 쓰인다. 섭동에 의한 궤도면 변화는 무시한다 (ADR 결정 2 · 교차검증 합의 3).
  *
@@ -194,7 +195,7 @@ export interface CometTailFrame {
  * @param head 혜성 mesh.position (scene unit)
  * @param sun 태양 mesh.position (scene unit)
  * @param scale `bodyFrame.scale` — scene unit / m
- * @param orbitNormal ĥ (단위 벡터)
+ * @param orbitNormal ĥ (단위 벡터) — `head` · `sun` 과 같은 공간의 축벡터. 장면에서는 `axialToScene` 적용값이다 (#1366).
  */
 export function cometTailFrame(
   head: Vec3,
@@ -438,7 +439,11 @@ export interface CometTailOptions {
   headMesh: Mesh;
   /** 태양 mesh. */
   sunMesh: Mesh;
-  /** 궤도면 법선 ĥ (`cometOrbitNormal`). */
+  /**
+   * 궤도면 법선 ĥ — **장면 공간 축벡터**다. 호출자는 데이터 공간 `cometOrbitNormal` 출력을 `axialToScene` (`(−x, −y, z)`,
+   * #1366 `coords/scene-handedness.ts`) 으로 바꿔 넘긴다. 머리 · 태양이 장면 좌표라 먼지 휨 `ĥ × axis` 도 장면에서 계산되며,
+   * 데이터 ĥ 를 그대로 넣으면 휨이 운동 쪽으로 뒤집힌다.
+   */
   orbitNormal: Vec3;
   /** body mesh 가 쓴 기준계 스냅샷 제공자 — draw 직전마다 호출 (캐시 금지). `scale` 만 쓴다. */
   frameProvider: () => BodyReferenceFrame;

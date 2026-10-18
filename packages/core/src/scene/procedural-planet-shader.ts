@@ -807,7 +807,11 @@ void main(void) {
  *    항등이다 (붉은 빛은 태양 쪽 반구에만 — `sunFactor` 는 fragment 의 기존 명암 계수). 단 컴파일러가
  *    식 구조에 따라 결과 비트를 바꿀 수 있어 구조만으로는 보장되지 않는다 — 셰이더 텍스트를 바꾸면 3 백엔드 「그림자 0 바이트
  *    동일」 을 다시 잰다 (ADR §구현 인계 · DoD D5).
- *  - 인자 `n` 은 world normal 이다 (Amendment 2 옵션 e). 장면 world 축 = 물리 위치 축이라 빌더의 방향과 그대로 내적한다.
+ *  - 인자 `n` 은 **장면** world normal 이다 (Amendment 2 옵션 e). 장면 world 축은 데이터 (물리 위치) 축의 z 반전이다 (#1366 —
+ *    `coords/scene-handedness.ts`). 그래서 `uEclA` · `uEclAxis` 는 **장면 좌표**로 들어와야 한다 — uniform 빌더
+ *    (`events/eclipse-shadow-uniforms.ts`) 는 데이터 공간 순수 함수이고, 장면 (`solar-system-scene.ts` `updateLunarShadow`) 이
+ *    머티리얼에 쓰기 전에 두 방향 벡터 (극벡터) 의 z 를 `toSceneZ` 로 바꾼다. 길이 · 비율 (`uEclK` · `|uEclA|`) 은 반사에 불변이다.
+ *    일식 (`2`, PR3) uniform 도 같은 경로를 거쳐야 한다 — 빌더 출력을 그대로 쓰면 그림자가 황도면 기준 거울 위치에 떨어진다.
  */
 export const ECLIPSE_SHADOW_GLSL = /* glsl */ `
 uniform float uEclMode;
