@@ -783,6 +783,8 @@ export interface SolarSystemSceneOptions {
    * `rotationQuaternion = tilt(axialTilt) ∘ spin(spinAngle(jd))` 를 매 프레임 설정. 자전각은 jd 순수
    * 함수 (`(jd − epoch) × ω mod 2π`, 누적 금지 — frame-rate 독립·결정적). ring 있는 body 4개는
    * ring-anchor (비회전 tilt-only 노드) 로 ring disc 를 격리해 wobble 0 (ADR §A2.3 결정 1).
+   * ⚠️ 지구만 `tilt(ε − π/2) ∘ spin(−ERA(jd))` — 실제 시각 기준 방향 (#1362, `self-rotation.ts`
+   * `computeEarthOrientationQuaternion`).
    */
   selfRotation?: boolean;
 

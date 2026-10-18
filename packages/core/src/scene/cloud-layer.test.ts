@@ -3,7 +3,8 @@
  *
  * 계약:
  *  (A) 상대 자전각 = jd 순수 함수 (`computeSpinAngle`) — 결정성 · mod wrap · 누적 없음 (§A10.8).
- *  (B) `CLOUD_DRIFT_OMEGA > 0` — `0` 이면 「다른 속도」 계약이 공허하게 참이 된다 (§A10.8).
+ *  (B) `CLOUD_DRIFT_OMEGA ≠ 0` — `0` 이면 「다른 속도」 계약이 공허하게 참이 된다 (§A10.8). 부호는 host
+ *      spin 을 따라 지표 기준 동쪽 (#1362).
  *  (C) 투명 정렬 키 치환 (§A10.6 결정 4):
  *      (1) 계열 밖 쌍은 Babylon `defaultTransparentSortCompare` 와 부호가 같다
  *      (2) 구름은 거리 잡음을 넣어도 같은 계열의 host · mid · low 보다 항상 뒤
@@ -15,6 +16,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  Matrix,
   MeshBuilder,
   NullEngine,
   Quaternion,
@@ -26,7 +28,7 @@ import {
   type SubMesh,
 } from '@babylonjs/core';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
-import { computeSpinAngle } from './self-rotation.js';
+import { computeSpinAngle, EARTH_SPIN_SIGN } from './self-rotation.js';
 import {
   applyCloudDrift,
   CLOUD_SHELL_RADIUS_RATIO,
@@ -91,12 +93,39 @@ describe('#1215 (B) CLOUD_DRIFT_OMEGA — 상대 각속도', () => {
     expect(CLOUD_ZONAL_WIND_MS).toBeGreaterThan(0);
   });
 
-  it('earth 데이터로 계산한 CLOUD_DRIFT_OMEGA > 0 (0 이면 차등 계약이 공허)', () => {
-    expect(computeCloudDriftOmega(earth)).toBeGreaterThan(0);
+  it('earth 데이터로 계산한 CLOUD_DRIFT_OMEGA ≠ 0 (0 이면 차등 계약이 공허)', () => {
+    expect(Math.abs(computeCloudDriftOmega(earth))).toBeGreaterThan(0);
   });
 
-  it('= CLOUD_ZONAL_WIND_MS × 86400 / radius[m] (차원 rad/day)', () => {
-    expect(computeCloudDriftOmega(earth)).toBe((CLOUD_ZONAL_WIND_MS * 86_400) / earth.radius);
+  it('= EARTH_SPIN_SIGN × CLOUD_ZONAL_WIND_MS × 86400 / radius[m] (차원 rad/day · 부호 = host spin)', () => {
+    // #1362 — 크기는 풍속, 부호는 host spin (지구 `−1`). 이전에는 양이었다.
+    expect(EARTH_SPIN_SIGN).toBe(-1);
+    expect(computeCloudDriftOmega(earth)).toBe(
+      (EARTH_SPIN_SIGN * (CLOUD_ZONAL_WIND_MS * 86_400)) / earth.radius,
+    );
+  });
+
+  it('#1362 — 구름은 지표 기준 **동쪽**으로 흐른다 (지구 local 경도가 시간에 따라 증가)', () => {
+    // 구름 local 의 고정점 (경도 0°, 적도) 을 host (지구) local 로 옮겨 마스크 규약으로 경도를 읽는다
+    // (local `+X` = 경도 0°, `+Z` = 경도 90°E — `self-rotation.test.ts` #1362 블록과 같은 규약).
+    // 구름 local 회전은 `applyCloudDrift` 와 같은 식 (local Y 주위 `computeSpinAngle`).
+    const omega = computeCloudDriftOmega(earth);
+    const epoch = 2451545.0;
+    const cloudLonAt = (jd: number): number => {
+      const m = new Matrix();
+      Matrix.FromQuaternionToRef(
+        Quaternion.RotationAxis(new Vector3(0, 1, 0), computeSpinAngle(jd, epoch, omega)),
+        m,
+      );
+      const p = Vector3.TransformNormal(new Vector3(1, 0, 0), m);
+      return (Math.atan2(p.z, p.x) * 180) / Math.PI;
+    };
+    const jd = 2460480.25;
+    const stepDeg = cloudLonAt(jd + 1) - cloudLonAt(jd);
+    // 하루 이동량 = |ω|·1일 (`10 m/s` → `≈ 7.76°/일`) — 방향 (동쪽 +) 과 크기를 함께 단언.
+    expect(stepDeg).toBeGreaterThan(0);
+    // Babylon `Matrix` 가 float32 라 4 자리로 판정한다 (실측 차 `2.4e-6°`).
+    expect(stepDeg).toBeCloseTo((Math.abs(omega) * 180) / Math.PI, 4);
   });
 });
 

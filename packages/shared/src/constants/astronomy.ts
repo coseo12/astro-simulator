@@ -35,3 +35,14 @@ export const JULIAN_CENTURY_DAYS = 36_525;
  * ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md` 결정 M2.
  */
 export const GENERAL_PRECESSION_DEG_PER_CENTURY = 5028.796195 / 3600;
+
+/**
+ * #1362 — 지구 자전각 (Earth Rotation Angle) 식의 J2000.0 값 [회전수]. IERS Conventions (2010) 식 5.15
+ * `θ(T_u) = 2π(0.7790572732640 + 1.00273781191135448·T_u)`, `T_u = JD(UT1) − 2451545.0`.
+ *
+ * 장면 jd 는 UTC 기반 (`time/julian-date.ts`) 이라 UT1 대신 쓴다 — `|UT1 − UTC| < 0.9 s` 는 자전각 `< 0.004°` 다.
+ */
+export const EARTH_ROTATION_ANGLE_AT_J2000_TURNS = 0.779_057_273_264;
+
+/** #1362 — 지구 자전각의 율 [회전수/UT1 일]. IERS Conventions (2010) 식 5.15 (위 상수와 짝). */
+export const EARTH_ROTATION_ANGLE_RATE_TURNS_PER_DAY = 1.002_737_811_911_354_48;
