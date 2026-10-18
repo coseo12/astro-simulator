@@ -76,6 +76,7 @@ import {
   noEclipseShadowUniforms,
   type EclipseShadowUniforms,
 } from '../events/eclipse-shadow-uniforms.js';
+import { eclipseRadiiOf } from '../events/compute-events.js';
 // #850 Phase 1 — 아래 4 모듈은 본 파일 테일 (구 2041-2502) 에서 순수 이동한 헬퍼다 (동작 변경 0).
 import {
   createBodyMesh,
@@ -1604,14 +1605,8 @@ export function createSolarSystemScene(
   const noShadow = noEclipseShadowUniforms();
   const tmpEclipseMoon: MutVec3 = [0, 0, 0];
   const tmpEclipseSun: MutVec3 = [0, 0, 0];
-  const lunarShadowRadii = (() => {
-    const subject = bodiesById.get(LUNAR_ECLIPSE_SHADOW_BODY_ID);
-    const parent = subject?.parentId ? bodiesById.get(subject.parentId) : undefined;
-    const root = parent?.parentId ? bodiesById.get(parent.parentId) : undefined;
-    // 체인 = 위성 → 행성 → 뿌리 (판정식 `eclipseRadiiOf` 와 같은 반경 출처 — 데이터 `radius`). 하나라도 없으면 그림자 없음.
-    if (!subject || !parent || !root || root.parentId) return null;
-    return { sun: root.radius, earth: parent.radius, moon: subject.radius };
-  })();
+  // 반경 = 위성 · 모체 · 체인 뿌리의 데이터 `radius` — 사건 판정과 **같은 함수** (`eclipseRadiiOf`). 없으면 그림자 없음.
+  const lunarShadowRadii = eclipseRadiiOf(bodiesById, LUNAR_ECLIPSE_SHADOW_BODY_ID);
 
   /** 수신 천체의 high · mid 머티리얼에 `appliedLunarShadow` 를 쓴다 (low billboard · `?surface=off` 는 절차 머티리얼이 아니라 무시). */
   const writeLunarShadowTo = (mesh: Mesh | undefined) => {
@@ -2958,8 +2953,9 @@ export function createSolarSystemScene(
           surfaceLightingArgs,
         );
         midVariants.set(body.id, m);
-        // #1360 PR2 — lazy 생성된 달 mid 에 현재 그림자를 쓴다. 값은 시간 위상 (`updateAt`) 이 갱신하므로, 일시정지 중
-        // 생성되면 다음 시각 변경까지 생성 기본값 (그림자 없음) 으로 남는다.
+        // #1360 PR2 — lazy 생성된 달 mid 에 현재 그림자 (`appliedLunarShadow`) 를 지금 쓴다. 값을 갱신하는 시간 위상
+        // (`updateAt`) 은 일시정지 중 돌지 않으므로, 이 쓰기가 없으면 일시정지 중 생성된 mid 는 다음 시각 변경까지 생성
+        // 기본값 (그림자 없음) 으로 그려진다 — 지우지 말 것 (`solar-system-scene-eclipse-shadow.test.ts` lazy mid 단언).
         if (body.id === LUNAR_ECLIPSE_SHADOW_BODY_ID) writeLunarShadowTo(m);
         // #1215 §A10.6 — lazy 생성 variant 를 host 계열 식별자 집합에 등록 (계열 host 가 아니면 no-op).
         hostFamilies.registerMember(m, highMesh, HOST_FAMILY_RANK);

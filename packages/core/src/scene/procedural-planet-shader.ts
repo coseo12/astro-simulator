@@ -803,7 +803,8 @@ void main(void) {
  *    않는다 — define 변경은 effect 재생성이고 컴파일 동안 `isReady` 가 `false` 라 메시가 안 그려진다 (결정 R1).
  *  - 월식: `q = uEclA + n⊥` 는 지구 그림자 중심 기준 표면점의 하늘면 위치 [달 반경] (축 = 지구 → 달). 반영은 거리 선형
  *    (결정 R4), 본영 붉은 빛은 중심 `uEclK.z` → 경계 `1` 로 밝아진다 (결정 R5 — L = 2 「가장자리 비교적 밝다」).
- *  - `uEclMode = 0` 이면 `vec2(0.0)` — 합성 (`shade -= sunShade * x; shade += glow * y`) 이 정확한 항등이다. 단 컴파일러가
+ *  - `uEclMode = 0` 이면 `vec2(0.0)` — 합성 (`shade -= sunShade * x; shade += uEclGlow * (y * sunFactor)`) 이 정확한
+ *    항등이다 (붉은 빛은 태양 쪽 반구에만 — `sunFactor` 는 fragment 의 기존 명암 계수). 단 컴파일러가
  *    식 구조에 따라 결과 비트를 바꿀 수 있어 구조만으로는 보장되지 않는다 — 셰이더 텍스트를 바꾸면 3 백엔드 「그림자 0 바이트
  *    동일」 을 다시 잰다 (ADR §구현 인계 · DoD D5).
  *  - 인자 `n` 은 world normal 이다 (Amendment 2 옵션 e). 장면 world 축 = 물리 위치 축이라 빌더의 방향과 그대로 내적한다.
