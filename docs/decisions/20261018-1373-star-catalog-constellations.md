@@ -1,6 +1,6 @@
 # ADR 20261018-1373 — 실측 별 카탈로그 · 별자리 선 · 이름
 
-- **상태**: Provisional (사용자 결정 Q 표 대기 · 교차검증 결과는 §교차검증 반영 사항)
+- **상태**: Provisional (cross-validate 2026-10-18 통합 완료 · 사용자 결정 Q 표 대기 — Q 확정 후 Accepted 전이)
 - **날짜**: 2026-10-18
 - **결정자**: architect (이슈 [#1373](https://github.com/coseo12/astro-simulator/issues/1373) · 사용자 선택 2026-10-18 「트랙 C — 별자리 선 / 이름 라벨」)
 - **관련**:
@@ -175,8 +175,11 @@ headless 프레임 간격이 0.3 ms 대라 이 방법의 잡음 폭 (≈ ±0.04 
 ### 데이터
 
 1. **D1 카탈로그** — HYG v4.4 · V ≤ 6.5 (8,920개) + 별자리 선 끝점 별 (컷 밖 2개) 를 쓴다 (Q-C · Q-M). 위치는 J2000 (고유운동 · 세차 미적용 — 장면이 J2000 황도 고정 분점이라 지구 자전축과 같은 틀).
-2. **D2 저장** — 바이너리 `apps/web/public/data/stars/star-catalog.bin` (헤더 8 B + 12 B/별: float32 RA° · Dec° · int16 V×100 · int16 B−V×1000, 결측 `−32768`). 런타임 fetch — JS 번들 증가 0. 원천 좌표계 (적도) 그대로 둔다. 변환은 코드 (순수 함수) 가 한다 — 데이터 파일이 1차 출처와 행 단위로 대조 가능해야 하기 때문이다.
+2. **D2 저장** — 바이너리 `apps/web/public/data/stars/star-catalog.bin`, **리틀 엔디언 · `DataView` 로 읽는다**. 헤더 8 B = 매직 `char[4]` `"STC1"` + 별 수 `uint32`. 레코드 12 B = offset 0 `float32` RA° · 4 `float32` Dec° · 8 `int16` V×100 · 10 `int16` B−V×1000 (결측 `−32768`). 로더는 `byteLength === 8 + 12 · count` 를 확인하고 어긋나면 별을 만들지 않는다 (경고 1회). 런타임 fetch — JS 번들 증가 0. 원천 좌표계 (적도) 그대로 둔다. 변환은 코드 (순수 함수) 가 한다 — 데이터 파일이 1차 출처와 행 단위로 대조 가능해야 하기 때문이다.
 3. **D3 별자리** — `apps/web/public/data/stars/constellations.json`: IAU 약어 · 한국어 이름 · 라벨 기준점 (RA · Dec) · 선분 (별 인덱스 쌍). d3-celestial 선 정점을 생성 단계에서 카탈로그 최근접 별에 스냅 (허용 60″, 실측 최대 16.3″ — 넘으면 생성 실패).
+   - **인덱스 고정**: 생성 스크립트는 PR1 부터 선 데이터를 함께 읽어 끝점 별을 포함하고 정렬 순서를 고정한다. PR2 는 같은 스크립트로 `constellations.json` 을 더하며 `star-catalog.bin` 은 `--check` 로 바이트 동일해야 한다.
+   - **런타임 결합**: 선 정점은 이미 로드된 카탈로그 버퍼에서 인덱스로 읽는다 (좌표를 JSON 에 중복 저장하지 않는다 — 선 끝이 그려진 별과 정확히 만나는 근거). 별자리를 켰는데 카탈로그가 아직 없으면 두 파일이 모두 도착한 뒤 만든다. 인덱스가 `count` 이상이면 그 별자리를 건너뛰고 경고한다.
+   - **뱀자리**: d3 의 두 조각 (머리 · 꼬리) 은 선을 모두 그리고 라벨은 1개 (머리 쪽 기준점) 만 둔다 — 이름 88개.
 4. **D4 생성 · 박제** — `scripts/generate-star-catalog.mjs` (네트워크는 개발자 실행 시점만, `--check` 바이트 대조) · `apps/web/public/data/stars/README.md` (출처 URL · 커밋/버전 · 취득일 · sha256 · 라이선스 원문 인용 · 컷 · 형식) · 무결성 단위 테스트 (네트워크 무관). 선례는 `textures/README.md` (#1119). 데이터 디렉터리 라이선스: 카탈로그 파생 파일 CC BY-SA 4.0 · 별자리 파일 BSD-3 고지.
 5. **D5 이름** — d3 `ko` 를 출발점으로, 한국천문연구원 · 한국천문학회 표기와 대조한 차이 표를 PR2 에 싣고 사용자가 확정한다 (Q-N).
 
@@ -187,12 +190,13 @@ headless 프레임 간격이 0.3 ms 대라 이 방법의 잡음 폭 (≈ ±0.04 
 
 ### 렌더
 
-8. **R1 별** — 신규 `packages/core/src/scene/star-catalog.ts`: 쿼드 메시 1개 + GLSL ShaderMaterial (축 R (a)). 지름은 CSS px × DPR (물리 px). 블렌드 가산 · `disableDepthWrite` · depth test 유지 · 렌더 그룹 0 · `alphaIndex` 최저 (투명 큐 맨 앞) · `isPickable = false` · `alwaysSelectAsActiveMesh`.
+8. **R1 별** — 신규 `packages/core/src/scene/star-catalog.ts`: 쿼드 메시 1개 + GLSL ShaderMaterial (축 R (a)). 지름은 CSS px × DPR (물리 px). `uPxToClip` 은 draw 직전 (`onBeforeRenderObservable`) 에 매번 렌더 버퍼 크기에서 다시 계산한다 — 리사이즈 · DPR 변화 대응 (`belt-particles.ts` 와 같다. 줌은 카메라 반경이라 FOV 는 고정). 블렌드 가산 · `disableDepthWrite` · depth test 유지 · 렌더 그룹 0 · `alphaIndex` 최저 (투명 큐 맨 앞) · `isPickable = false` · `alwaysSelectAsActiveMesh`.
 9. **R2 등급 → 크기 · 밝기** — 상대 플럭스 `f = 10^(−0.4 (V − 6.5))` 의 로그에 선형: 반지름 `r = clamp(r0 + r1 · log2 f, rMin, rMax)` · 밝기 `I = clamp(i0 + i1 · log2 f, iMin, 1)`. 상수는 rendering-only SSoT, 최종값은 사용자 육안 승인 (D-T2). 반짝임 없음.
 10. **R3 B−V → 색** — 순수 함수 `bvToRgb(bv)`: Ballesteros (2012) 식으로 유효 온도 → 흑체 근사 RGB → 백색과 혼합해 채도를 낮춘다. ADR 738 §결정 4 의 「보라 · 마젠타 금지」 를 단위 테스트로 잇는다. B−V 결측은 백색.
 11. **R4 은하수** — 구 셰이더에서 별 셀 경로를 지우고 띠만 남긴다. 법선을 은하 북극 장면 방향으로 바꾼다 (축 M (a)). 절차 별은 남기지 않는다 — 실제 하늘에 없는 별이 별자리 옆에 찍히면 이슈 목표 1 과 충돌한다.
 12. **R5 소프트웨어 렌더** — 별 · 선 · 이름 모두 starfield 와 같은 게이트 (`!isSoftwareRenderer`). 소프트웨어 렌더에서는 파일을 fetch 하지 않는다. `force` 류 강제 플래그는 만들지 않는다 (방향 DoD 는 단위 + 하드웨어 실측으로 닫는다).
 13. **R6 별자리 선** — `LinesMesh` 1개 (`ruler-line.ts` 패턴, 정점 1,486). `alpha < 1` (투명 큐 → D8p 대상 밖) · `infiniteDistance` · `alphaIndex` 최저 + 1 · `isPickable = false`. 색은 궤도선 (청회색) 과 다른 계열 — 최종값 D-T2.
+   - **그리기 순서**: 은하수 구 (그룹 0 불투명 큐 · depth write off) → body · 궤도선 (불투명 · depth write) → 별 쿼드 (투명 큐 맨 앞) → 별자리 선 → 그 밖의 투명 메시. `alphaIndex` 값은 이름 붙은 상수 (`STAR_CATALOG_ALPHA_INDEX` · `CONSTELLATION_LINES_ALPHA_INDEX`) 로 둔다.
 
 ### 이름 라벨
 
@@ -207,6 +211,7 @@ headless 프레임 간격이 0.3 ms 대라 이 방법의 잡음 폭 (≈ ±0.04 
 19. **T2** — 선과 이름은 같은 토글이다. 이름은 추가로 `?labels=` 가 켜져 있어야 보인다 (Q-L 권고 (a)).
 20. **T3** — `?stars=` 의 의미 (별 + 은하수) 와 기본값 (켬) 은 유지한다. `setStarfieldVisible` 이 구 · 별 쿼드를 함께 켜고 끈다. 별자리 토글은 `?stars=` 와 독립이다.
 21. **T4** — 지연 생성 · 이후 `setEnabled` (ADR 1265 §결정 3 수명 계약). 별 쿼드는 카탈로그 fetch 완료 뒤 생성되며, 그 전에는 은하수만 보인다.
+   - **비동기 계약**: fetch 는 장면당 1회. 응답이 왔을 때 장면이 dispose 됐으면 아무것도 만들지 않는다. 메시를 만든 직후 그 시점의 최신 의도 (`starfieldVisible` · `constellationsVisible`) 로 `setEnabled` 를 정한다 — fetch 중에 끈 토글이 응답 도착으로 다시 켜지지 않는다. fetch 실패는 `console.warn` 1회 + 은하수만 유지 (재시도 없음, 콘솔 에러 0 계약 유지).
 
 ### 모바일
 
@@ -285,8 +290,39 @@ headless 프레임 간격이 0.3 ms 대라 이 방법의 잡음 폭 (≈ ±0.04 
 - 시작 지점: PR1 — `generate-star-catalog.mjs` 로 데이터 · README 를 먼저 만들고 무결성 테스트 → 변환 · 색 순수 함수 (D1 · D4) → `star-catalog.ts` → `starfield.ts` 별 셀 삭제 · 법선 → 장면 배선 · `setStarfieldVisible`.
 - 쿼드 셰이더의 출발점은 `belt-particles.ts` (`uPxToClip` · `clip.xy += corner · r · uPxToClip · clip.w`) 다. 이 셰이더는 로그 depth 를 쓰지만 별은 쓰지 않는다 (starfield 와 같은 표준 depth — body 가 쓴 로그 depth 보다 항상 뒤라 가려진다. POC 관측 1).
 - 측정 함정: (1) headless 기본은 SwiftShader 라 별이 없다 — `--use-angle=metal` 또는 실 Chrome 으로 잰다 (2) ArcRotate 카메라는 타깃 (태양) 을 향하므로 특정 별을 화면 중앙에 두면 태양이 가린다 — 방위를 비켜서 잰다 (3) headless rAF 간격은 GPU 비용을 판별하지 못한다 (1-F).
+- 생성 스크립트는 원천 파일의 sha256 을 상수로 갖고 다운로드 직후 대조한다 (불일치 시 중단 — 원천 변조 · 버전 변경을 조용히 흡수하지 않는다).
 - 라이선스 고지: About 모달 · `public/data/stars/README.md` 에 HYG (CC BY-SA 4.0, astronexus) · d3-celestial (BSD-3, Olaf Frohn) 을 적는다. 고지 문구는 각 원문 라이선스를 인용한다.
 
 ## 교차검증 반영 사항
 
-(cross-validate 실행 후 갱신)
+cross-validate (agy, `architecture` 유형) 1회 실행 — **outcome `applied` (exit 0, 외부 모델 응답 55초)**, `plan_bypass: false`. #1363 의 무응답은 이번에는 재현되지 않았다. 아래는 Claude 재분석 결과다.
+
+### 합의 (본문에 반영)
+
+1. **PR 간 인덱스 고정 · 런타임 결합** — `constellations.json` 이 카탈로그 인덱스를 참조하므로 PR1 생성 단계에서 끝점 별 · 정렬을 고정해야 한다. → D3 하위 항목 (인덱스 고정 · 런타임 결합).
+2. **비동기 fetch 수명** — dispose 후 도착 · fetch 중 토글 · 실패 처리가 빠져 있었다. → T4 하위 항목 (비동기 계약).
+3. **바이너리 형식 명세** — 헤더 레이아웃 · 엔디언 · 필드 오프셋. → D2.
+4. **뱀자리 89 feature ↔ 이름 88** — DoD D3 와 원천이 어긋나 있었다. → D3 하위 항목 (라벨 1개).
+5. **런타임 경계 검사** — `byteLength` · 인덱스 범위. → D2 · D3.
+6. **원천 sha256 대조** — 생성 스크립트에 상수로. → 구현 인계.
+7. **`uPxToClip` 갱신 시점 · 그리기 순서 한 줄 · `alphaIndex` 상수** → R1 · R6.
+
+### 이견 수용
+
+- 헤더 안 (`version: uint16` · `count: uint16`) 대신 매직 4 B + `count: uint32` 로 정했다. 별 수 8,922 는 `uint16` 에 들어가지만, 등급 컷을 올리는 재검토 (예: V ≤ 8 → 수만 개) 에서 형식을 바꾸지 않으려는 것이다. 버전은 매직 문자열 (`STC1`) 에 넣었다.
+
+### Claude 재분석으로 기각
+
+- **별자리 선의 near-plane 클리핑 아티팩트** — 정점이 모두 카메라에서 같은 거리 R 에 있고 (`infiniteDistance`), 가장 긴 선분이 25.65° (용골자리) 라 선분 위 점과 카메라의 최소 거리는 `R · cos(12.8°) = 0.975 R` 이다. near plane (`minZ = 0.01`) 과는 자릿수가 다르다. 한 끝이 카메라 뒤인 경우는 GPU 의 clip 공간 클리핑이 처리한다 (가산 블렌드 · 표준 투영 — 커스텀 투영 없음). 설계 변경은 하지 않는다. 다만 D8 (흐름) 의 카메라 회전 확인에서 함께 본다 — 비용이 0 이다.
+
+### 고유 발견 (후속 분리)
+
+- 없음. 위 항목은 모두 본 ADR 범위 안에서 반영했다.
+
+### Claude 편향 셀프 체크 (호출 전)
+
+- 셀프 체크 결과를 호출 프롬프트에 질문으로 넣지는 못했다 — `architecture` 유형은 고정 프롬프트 (6개 기준) 를 쓴다.
+- 낙관적 일정 — **판정 보류**. PR1 에 생성 스크립트 · 무결성 테스트 · 셰이더 · 은하수 · 테스트 재작성이 몰린다. 리뷰에서 PR1 이 과대하면 「데이터 + 무결성」 과 「렌더」 로 다시 나눈다.
+- 결합 간과 — **미통과**. PR1 ↔ PR2 인덱스 결합 · 비동기 fetch 레이스를 외부가 찾았다 (합의 1 · 2).
+- 폐기 프레이밍 — 절차 별 제거 (R4) 는 「실제 하늘에 없는 별」 이라는 이슈 목표 충돌로 근거를 댔다. 통과.
+- 순수주의 — 데이터 파일을 원천 적도 좌표로 두는 결정 (D2) 은 변환 비용 (8,922회 · 초기화 1회) 이 무시할 만해 순수주의 비용이 없다. 통과.
