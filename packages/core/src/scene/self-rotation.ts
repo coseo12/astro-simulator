@@ -10,6 +10,11 @@
  *   (dead reference — #1130 에서 발견). `.ts` 는 `verify-docs-links` 스캔 모집단 밖이라 잡히지 않았다.
  */
 import { Quaternion, Vector3 } from '@babylonjs/core';
+import {
+  EARTH_ROTATION_ANGLE_AT_J2000_TURNS,
+  EARTH_ROTATION_ANGLE_RATE_TURNS_PER_DAY,
+  J2000_JD,
+} from '@astro-simulator/shared';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +42,22 @@ export interface RotationState {
   omega: number;
   /** 자전축 기울기 [rad] (axialTiltDeg — obliquity, X 축 주위. 0~π 범위). */
   tiltRad: number;
+  /**
+   * #1362 — 지구 전용 방향 모델 표지. 있으면 `computeSpinQuaternion` 이 `computeEarthOrientationQuaternion`
+   * 으로 분기한다 (`omega` · epoch 는 쓰지 않는다 — 위상은 ERA 식이 정한다). 지구 외 body 는 이 필드가
+   * **없다** (#1362 이전 객체와 같은 모양 — 값 불변).
+   */
+  orientation?: typeof EARTH_ORIENTATION_MODEL;
 }
+
+/**
+ * #1362 — 실제 시각 기준 방향 (ERA) 을 쓰는 body. 지구 하나다 (ERA 는 정의상 지구 자전각이다).
+ * `cloud-layer.ts` 의 `CLOUD_LAYER_BODY_ID` 와 같은 「body id 상수」 규약.
+ */
+export const EARTH_ORIENTATION_BODY_ID = 'earth';
+
+/** #1362 — `RotationState.orientation` 값 (지구 전용 방향 모델). */
+export const EARTH_ORIENTATION_MODEL = 'earth-era';
 
 /**
  * #782 — body 데이터에서 자전 파라미터 산출. `rotationPeriodHours` 미지정 시 null (자전 없음).
@@ -50,6 +70,10 @@ export function computeRotationState(body: LoadedCelestialBody): RotationState |
   // 실수로 들어와도 방향은 tiltRad(obliquity) 가 결정하므로 magnitude 만 사용, 이중 적용 차단).
   const omega = (2 * Math.PI * 24) / Math.abs(periodHours);
   const tiltRad = ((body.axialTiltDeg ?? 0) * Math.PI) / 180;
+  // #1362 — 지구만 실제 시각 방향 모델. 다른 body 는 필드를 붙이지 않는다 (객체 모양 · 값 불변).
+  if (body.id === EARTH_ORIENTATION_BODY_ID) {
+    return { omega, tiltRad, orientation: EARTH_ORIENTATION_MODEL };
+  }
   return { omega, tiltRad };
 }
 
@@ -95,6 +119,11 @@ export function computeSpinQuaternion(
   tmpTilt: Quaternion,
   out: Quaternion,
 ): void {
+  // #1362 — 지구는 실제 시각 방향 (ERA). 다른 body 는 아래 식 그대로 (값 불변).
+  if (state.orientation === EARTH_ORIENTATION_MODEL) {
+    computeEarthOrientationQuaternion(jd, state.tiltRad, tmpSpin, tmpTilt, out);
+    return;
+  }
   // (jd − epoch) 뺄셈을 float64 로 먼저 (큰 수 − 큰 수 = 작은 수) → mod 2π 로 각 누적 없이 결정적.
   const spinAngle = computeSpinAngle(jd, epoch, state.omega);
   // spin: local Y (자전축) 주위. tilt: world X 주위.
@@ -130,3 +159,77 @@ const ROT_TILT_AXIS = new Vector3(1, 0, 0);
  * 단언한다 (변이 실측: 한쪽만 되돌리면 각각 2건 · 4건 FAIL).
  */
 export const ORBITAL_NORMAL_OFFSET = Math.PI / 2;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1362 — 지구 전용 방향 (자전축 방향 + 실제 시각 자전 위상).
+//
+// ADR `docs/decisions/20260628-756-procedural-planet-surface.md` **§Amendment 13** (#1362).
+//
+// 일반 식 (`tilt(π/2 + ε) ∘ spin(+θ)`) 을 지구에 쓰면 두 증상이 한 결함에서 나온다 — 6월에 남반구가
+// 여름 (태양 직하 위도 부호 반전) 이고, 지표가 동→서로 돌아 직하점 경도가 `+15°/h` 로 움직인다
+// (실제 `−15°/h` — 태양이 서쪽에서 뜬다). Phase 0 실측 (#1362 코멘트 6245464331): 현재 방향 =
+// 올바른 방향 ∘ `RotX(π)`. 그래서 지구는 `tilt(ε − π/2) ∘ spin(−ERA)` 를 쓴다.
+//
+// ⚠️ **지구만 local `+Y` (표면 마스크의 북극) 가 실제 북극이다 — 화면 기준.** 장면은 오른손 황도 좌표를
+// Babylon 왼손계에 그대로 넣어 화면 전체가 황도면 기준 거울상이고 (#1366), 그 화면에서 지구의 local `+Y`
+// 는 data 좌표 `−Z` 쪽 (`(0, sin ε, −cos ε)`) 을 가리킨다. 각속도 벡터는 일반 식과 같은 쪽 (`+Z` 쪽) 이라
+// 공전 · 자전 감기 방향은 다른 행성과 같다.
+// 다른 천체는 local `+Y` 가 **반대 극**이다 — 절차 표면이라 관측되는 피해가 없어 범위 밖 (#1362 사용자
+// 결정 (a) 지구만). 좌수계 거울상 자체는 #1366.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * #1362 — 지구 화면 북극 보정 `π`. 일반 기울기 각 (`ORBITAL_NORMAL_OFFSET + ε`) 에서 빼면 local `+Y`
+ * 가 반대 극으로 넘어간다 (`ε − π/2`). spin 부호 반전 (`−ERA`) 과 **짝**이다 — 하나만 바꾸면 위도는
+ * 맞아도 자전 방향이 남거나 (Phase 0 기각안 `π/2 − ε`), 그 반대가 된다.
+ */
+const EARTH_SCREEN_NORTH_FLIP = Math.PI;
+
+/**
+ * #1362 — 지구 spin 의 local `+Y` 기준 부호 (`spin(EARTH_SPIN_SIGN × ERA)`). 음수가 지표를 **서→동**으로
+ * 돌린다 (직하점 경도 `−15°/h`). 구름 상대 자전 (`cloud-layer.ts` `computeCloudDriftOmega`) 이 **같은
+ * 상수**로 부호를 정한다 — 구름의 순행 (지표 기준 동쪽) 은 host spin 과 같은 감기 방향이기 때문이다.
+ */
+export const EARTH_SPIN_SIGN = -1;
+
+/**
+ * #1362 — 지구 자전각 ERA [rad, 0~2π). IERS Conventions (2010) 식 5.15
+ * `θ = 2π(0.7790572732640 + 1.00273781191135448·(jd − 2451545.0))`.
+ *
+ * 정수 회전수를 먼저 떼어 (`T % 1`) 큰 수 곱의 유효숫자 손실을 피한다 (IERS 권고 형태 — 율에서 1 을 빼면
+ * 나머지 항이 작다). 장면 jd 는 UTC 기반이라 UT1 근사로 쓴다 (`|UT1 − UTC| < 0.9 s`).
+ */
+export function earthRotationAngle(jd: number): number {
+  const tu = jd - J2000_JD;
+  const turns =
+    (tu % 1) +
+    EARTH_ROTATION_ANGLE_AT_J2000_TURNS +
+    (EARTH_ROTATION_ANGLE_RATE_TURNS_PER_DAY - 1) * tu;
+  const frac = turns - Math.floor(turns);
+  return 2 * Math.PI * frac;
+}
+
+/**
+ * #1362 — 지구 방향 quaternion `tilt(ε − π/2) ∘ spin(−ERA(jd))`.
+ *
+ * 경도 0 오프셋은 `0` 이다 — 마스크 규약 (local `+X` = 경도 0°, `+Z` = 경도 90°E) 그대로 ERA 를 직접 쓴다
+ * (Phase 0 실측: 2000~2030 직하점 잔차 최대 `0.16°`, J2000 고정 극 · 세차 무시 근사).
+ *
+ * @param jd 현재 Julian Date (UTC 기반 — UT1 근사)
+ * @param tiltRad obliquity [rad] (데이터 `axialTiltDeg`)
+ */
+export function computeEarthOrientationQuaternion(
+  jd: number,
+  tiltRad: number,
+  tmpSpin: Quaternion,
+  tmpTilt: Quaternion,
+  out: Quaternion,
+): void {
+  Quaternion.RotationAxisToRef(ROT_SPIN_AXIS, EARTH_SPIN_SIGN * earthRotationAngle(jd), tmpSpin);
+  Quaternion.RotationAxisToRef(
+    ROT_TILT_AXIS,
+    ORBITAL_NORMAL_OFFSET + tiltRad - EARTH_SCREEN_NORTH_FLIP,
+    tmpTilt,
+  );
+  tmpTilt.multiplyToRef(tmpSpin, out);
+}

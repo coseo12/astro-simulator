@@ -11,11 +11,15 @@
  *
  * 측정 축 (ADR §A2.5 DoD):
  *  - DoD 1: 자전각 = jd 순수 함수 — 두 시점 quaternion 상대 회전각 Δ = 이론 ω·Δjd (±5%).
- *  - DoD 2: axialTilt body 적용 — 지구 자전축이 **궤도 법선(world Z)** 에서 23.44° 기울어짐.
+ *  - DoD 2: axialTilt body 적용 — 자전 **각속도** 축이 **궤도 법선(world Z)** 에서 obliquity 만큼 기울어짐
+ *    (지구 23.44°). + local `+Y` (표면 마스크 북극) 가 각속도 축과 같은 쪽인가 / 반대쪽인가 (`textureNorth`).
  *    ⚠️ 구판은 이 기준이 `world Y` 였다 (#1130). 그 기준 자체가 버그의 정의였고 가드는 6주간
  *    PASS 를 보고했다 — **틀린 명제를 정확히** 검사한 셈이다.
+ *    ⚠️ #1362 — 지구만 local `+Y` 가 각속도 축의 **반대**다 (`tilt(ε − π/2) ∘ spin(−ERA)` — 화면 기준 실제
+ *    북극, 좌수계 거울상 #1366). 그래서 판정축을 local `+Y` 에서 **각속도 축**으로 옮겼다 — 다른 body 는
+ *    둘이 같은 방향이라 판정값 불변이다.
  *  - DoD 3: 역행 부호 — 금성(177.36° obliquity)/천왕성(97.77°) 이 순행 body 와 반대 화면 spin 방향
- *           (규약 i: period 양수 magnitude, 방향은 obliquity>90 에서 창발 — CW).
+ *           (규약 i: period 양수 magnitude, 방향은 obliquity>90 에서 창발 — CW). 부호는 각속도 축의 z.
  *  - DoD 6: ring wobble 0 — ring disc world normal 이 두 시점 불변 (body spin Δ>0 인데도).
  *
  * 사용법:
@@ -38,8 +42,9 @@ const J2000_JD = 2451545.0;
 const JD0 = J2000_JD;
 
 // 검증 대상 — major body 전체 + moon. type 은 순행/역행 라벨 (DoD 3).
+// `textureNorth` — local `+Y` (마스크 북극) 와 각속도 축의 관계. 지구만 'anti' (#1362), 나머지 'along'.
 const ROTATING = [
-  { id: 'earth', tiltDeg: 23.44, periodH: 23.9345, dir: 'prograde' },
+  { id: 'earth', tiltDeg: 23.44, periodH: 23.9345, dir: 'prograde', textureNorth: 'anti' },
   { id: 'mars', tiltDeg: 25.19, periodH: 24.6229, dir: 'prograde' },
   { id: 'jupiter', tiltDeg: 3.13, periodH: 9.925, dir: 'prograde', hasRing: true },
   { id: 'saturn', tiltDeg: 26.73, periodH: 10.656, dir: 'prograde', hasRing: true },
@@ -145,7 +150,16 @@ async function measureRotation(page, body, jd0, jd1) {
         y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
         z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
       });
-      const qRel = mul(q1c, conj0);
+      const qRelRaw = mul(q1c, conj0);
+      // q 와 −q 는 같은 회전 — w ≥ 0 으로 정규화해야 회전축 부호가 회전 방향을 뜻한다 (#1362: 축 부호를
+      // 판정에 쓰게 되면서 필요해졌다. Δ = 1/4 회전이라 실제로는 w > 0 이다).
+      const qSign = qRelRaw.w < 0 ? -1 : 1;
+      const qRel = {
+        w: qRelRaw.w * qSign,
+        x: qRelRaw.x * qSign,
+        y: qRelRaw.y * qSign,
+        z: qRelRaw.z * qSign,
+      };
       // 회전각 = 2·acos(|w|). 부호 (회전 방향) 는 qRel 의 회전축이 자전축(tilt 된 pole)과 같은/반대 방향.
       const relAngle = 2 * Math.acos(Math.min(1, Math.abs(qRel.w)));
 
@@ -164,7 +178,9 @@ async function measureRotation(page, body, jd0, jd1) {
       //   법선은 **world Z** → acos(pole·(0,0,1)) = acos(pole.z). ⚠️ 엄밀히는 황도 법선 기준.
       // ⚠️ 구판은 `acos(pole.y)` 였다. 그 기준이 곧 버그의 정의였고, 가드는 6주간 **정확하게**
       //   PASS 를 보고했다 — 틀린 명제를. 기준을 바꾸지 않으면 수정된 구현이 FAIL 로 뒤집힌다.
-      const tiltMeasuredDeg = (Math.acos(Math.min(1, Math.max(-1, pole.z))) * 180) / Math.PI;
+      // #1362 — 판정은 local `+Y` 가 아니라 **각속도 축** (아래 spinAxis) 으로 한다. local `+Y` 기준값은
+      //   참고로 남긴다 (`poleTiltDeg`).
+      const poleTiltDeg = (Math.acos(Math.min(1, Math.max(-1, pole.z))) * 180) / Math.PI;
 
       // 화면 spin 방향 (DoD 3) — qRel 회전축이 자전축과 같은 부호인지 (순행) 반대인지 (역행).
       // qRel 축 = (qRel.x, qRel.y, qRel.z) 정규화. 자전축 pole 과 dot > 0 → 축 정렬 (Δjd>0 이면 +ω).
@@ -175,14 +191,21 @@ async function measureRotation(page, body, jd0, jd1) {
       const relAxisDotPole =
         (qRel.x * spinAxisWorld.x + qRel.y * spinAxisWorld.y + qRel.z * spinAxisWorld.z) /
         relAxisLen;
-      // ecliptic north = **+Z** (#1130) 기준 유효 spin 부호 = sign(ω) × sign(pole.z). ω>0 (Δjd>0).
-      const eclipticSpinSign = pole.z >= 0 ? 'CCW(prograde)' : 'CW(retrograde)';
+      // #1362 — 각속도 축 = pole × sign(relAxisDotPole). 지구는 spin 이 local `+Y` 기준 음이라 pole 의 반대.
+      const textureNorth = relAxisDotPole >= 0 ? 'along' : 'anti';
+      const s = relAxisDotPole >= 0 ? 1 : -1;
+      const spinAxis = { x: pole.x * s, y: pole.y * s, z: pole.z * s };
+      const tiltMeasuredDeg = (Math.acos(Math.min(1, Math.max(-1, spinAxis.z))) * 180) / Math.PI;
+      // ecliptic north = **+Z** (#1130) 기준 유효 spin 부호 = sign(각속도 축 z).
+      const eclipticSpinSign = spinAxis.z >= 0 ? 'CCW(prograde)' : 'CW(retrograde)';
 
       return {
         q0: q0c,
         q1: q1c,
         relAngleRad: relAngle,
         tiltMeasuredDeg: Number(tiltMeasuredDeg.toFixed(3)),
+        poleTiltDeg: Number(poleTiltDeg.toFixed(3)),
+        textureNorth,
         // #1130 — 판정축은 z 다. y 는 구 기준(참고용)이라 **판정에 쓰지 않는다**.
         poleWorldZ: Number(pole.z.toFixed(4)),
         poleWorldY: Number(pole.y.toFixed(4)),
@@ -269,9 +292,11 @@ async function launch() {
         // DoD 2 — axialTilt 적용 (측정 tilt ≈ obliquity, obliquity>90 은 pole 이 뒤집혀 180-tilt 로 측정될
         // 수 있어 min(tilt, 180-tilt) vs min(obliquity, 180-obliquity) 로 비교하지 않고 직접 obliquity 비교).
         // #1130 — pole = rotate((0,1,0), (π/2 + tiltRad)(X)) → pole.z = cos(tiltRad).
-        //   tiltMeasuredDeg = acos(pole.z) = obliquity (궤도 법선 기준).
+        //   tiltMeasuredDeg = acos(각속도 축 z) = obliquity (궤도 법선 기준 — #1362 에서 pole → 각속도 축).
+        // #1362 — + local `+Y` 와 각속도 축의 관계 (지구 'anti' / 나머지 'along'). 지구 일반 식 회귀를 잡는다.
         const tiltErr = Math.abs(m.tiltMeasuredDeg - body.tiltDeg);
-        const dod2 = tiltErr <= 1.5; // 0.034° 같은 미세값 floor 여유
+        const expectedTextureNorth = body.textureNorth ?? 'along';
+        const dod2 = tiltErr <= 1.5 && m.textureNorth === expectedTextureNorth; // 0.034° 같은 미세값 floor 여유
 
         // DoD 3 — 역행 부호 (금성/천왕성 = CW/retrograde, 나머지 CCW/prograde).
         const expectedSign = body.dir === 'retrograde' ? 'CW(retrograde)' : 'CCW(prograde)';
@@ -302,6 +327,8 @@ async function launch() {
           dod2_tilt: dod2,
           tiltMeasuredDeg: m.tiltMeasuredDeg,
           tiltExpectedDeg: body.tiltDeg,
+          textureNorth: m.textureNorth,
+          textureNorthExpected: expectedTextureNorth,
           dod3_sign: dod3,
           measuredSign: m.eclipticSpinSign,
           expectedSign,
@@ -311,7 +338,7 @@ async function launch() {
         };
         console.log(
           `  ${body.id.padEnd(8)} DoD1(angle)=${dod1 ? 'PASS' : 'FAIL'}(err${deltaErrPct.toFixed(1)}%) ` +
-            `DoD2(tilt)=${dod2 ? 'PASS' : 'FAIL'}(${m.tiltMeasuredDeg}°vs${body.tiltDeg}°) ` +
+            `DoD2(tilt)=${dod2 ? 'PASS' : 'FAIL'}(${m.tiltMeasuredDeg}°vs${body.tiltDeg}° north=${m.textureNorth}) ` +
             `DoD3(sign)=${dod3 ? 'PASS' : 'FAIL'}(${m.eclipticSpinSign}) ` +
             `DoD6(ring)=${body.hasRing ? (dod6 ? 'PASS' : 'FAIL') + `(Δ${ringDeltaDeg}°)` : 'n/a'} ` +
             `optionEWarn=${out.optionEWarns[body.id]} err=${consoleErrors.length}`,
