@@ -34,7 +34,7 @@ const SOURCES = [
     purpose: '배경 별 8,922개 — 위치 (J2000) · 실시 등급 · 색지수 (V ≤ 6.5 + 별자리 선 끝점 별)',
     url: 'https://codeberg.org/astronexus/hyg',
     license:
-      'CC BY-SA 4.0 — “This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.” 변경: 등급 컷 · 4개 열만 남김 · 바이너리 양자화 (파생 파일도 CC BY-SA 4.0)',
+      'CC BY-SA 4.0 — “This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.” 변경: 등급 컷 · 4개 열만 남김 · 바이너리 양자화 (파생 파일도 CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/)',
   },
 ];
 

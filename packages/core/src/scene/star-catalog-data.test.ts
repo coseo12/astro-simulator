@@ -109,9 +109,10 @@ describe('#1373 D4 — 등급 → 크기 · 밝기 (R2)', () => {
     expect(starIntensity(-1.44)).toBe(1);
   });
 
-  it('밝은 별과 어두운 별이 실제로 구분된다 — V 0 ↔ V 6 반지름 차 ≥ 0.8 CSS px · 밝기 비 ≥ 3', () => {
-    expect(starRadiusCssPx(0) - starRadiusCssPx(6)).toBeGreaterThanOrEqual(0.8);
-    expect(starIntensity(0) / starIntensity(6)).toBeGreaterThanOrEqual(3);
+  it('밝은 별과 어두운 별이 실제로 구분된다 — V 0 ↔ V 6 반지름 차 ≥ 1.4 CSS px · 밝기 비 ≥ 2.7 (D-T2 B안 값)', () => {
+    // B안 계산값: 반지름 2.455 − 1.020 = 1.435 · 밝기 1 / 0.366 = 2.73. 매핑을 바꾸면 이 하한도 함께 다시 정한다.
+    expect(starRadiusCssPx(0) - starRadiusCssPx(6)).toBeGreaterThanOrEqual(1.4);
+    expect(starIntensity(0) / starIntensity(6)).toBeGreaterThanOrEqual(2.7);
   });
 });
 
@@ -149,7 +150,8 @@ describe('#1373 D4 — B−V → 색 (R3)', () => {
     }
   });
 
-  it('저채도 — 태양형 (0.65) 은 거의 백색 (|R − B| < 0.1), 범위 밖 B−V 는 끝값과 같다, 결측은 백색', () => {
+  // 채도 상수 (`STAR_COLOR_SATURATION`) 는 이 테스트가 묶지 않는다 — 태양형은 백색 맞춤 때문에 채도와 무관하게 거의 백색이다 (PR #1375 리뷰 권고 2).
+  it('태양형 (0.65) 은 거의 백색 (|R − B| < 0.1), 범위 밖 B−V 는 끝값과 같다, 결측은 백색', () => {
     const sun = bvToRgb(0.65);
     expect(Math.abs(sun[0] - sun[2])).toBeLessThan(0.1);
     expect(bvToRgb(-1)).toEqual(bvToRgb(STAR_BV_MIN));

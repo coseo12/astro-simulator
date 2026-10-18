@@ -110,17 +110,18 @@ export interface StarMagnitudeMapping {
 }
 
 /**
- * 초안 (D-T2 전). `log2 f` 는 V 6.5 → 0 · V 3 → 4.65 · V 0 → 8.64 · 시리우스 (V −1.44) → 10.55.
- * 반지름 0.8 → 2.2 CSS px, 밝기 0.22 → 1 (V ≈ 0.3 에서 포화). 근거는 육안 비교 스크린샷 (PR 본문).
+ * 사용자 육안 승인 (D-T2, 2026-10-19 — PR #1375 비교 화면 A/B/C 중 **B안 「크고 밝게」**).
+ * `log2 f` 는 V 6.5 → 0 · V 3 → 4.65 · V 0 → 8.64 · 시리우스 (V −1.44) → 10.55.
+ * 반지름 0.9 → 3.0 CSS px (상한은 V ≈ −2.3 — 카탈로그 최밝은 시리우스는 2.80 이라 닿지 않는다), 밝기 0.3 → 1 (V ≈ 1.2 에서 포화).
  */
 export const STAR_MAGNITUDE_MAPPING: StarMagnitudeMapping = Object.freeze({
-  r0: 0.8,
-  r1: 0.13,
-  rMin: 0.8,
-  rMax: 2.2,
-  i0: 0.22,
-  i1: 0.095,
-  iMin: 0.22,
+  r0: 0.9,
+  r1: 0.18,
+  rMin: 0.9,
+  rMax: 3.0,
+  i0: 0.3,
+  i1: 0.1,
+  iMin: 0.3,
 });
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
