@@ -453,6 +453,8 @@ describe('#1319 GLSL ↔ 미러 대응 · 크기 상수', () => {
     'float sinO = sin(orbitB.x);',
     'vec3 p = vec3(cosO * x1 - sinO * y2, sinO * x1 + cosO * y2, z2);',
     'vec3 local = (p - uOrigin) * uScale;',
+    // #1366 — 장면 경계 z 반전 (미러는 데이터 공간 위치까지 — 반전은 미러 밖).
+    'local.z *= SCENE_Z_SIGN;',
     'vec4 clip = viewProjection * vec4(local, 1.0);',
     'clip.xy += position.xy * PARTICLE_RADIUS_PX * uPxToClip * clip.w;',
     'gl_Position = clip;',

@@ -17,6 +17,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3, type Mesh } from '@babylonjs/core';
 import { AU, J2000_JD } from '@astro-simulator/shared';
+import { fromSceneZ } from '../coords/scene-handedness.js';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { renderScaleForTier } from './tier.js';
 import { ASTEROID_BELT_MAX_N } from './asteroid-belt.js';
@@ -94,7 +95,8 @@ function makeScene(
 /** body mesh 루프가 실제로 쓴 origin (m) — 태양 mesh 위치에서 역산. */
 function originFromSunMesh(f: Fixture, scale: number): [number, number, number] {
   const sun = f.handles.meshes.get('sun')!.position;
-  return [-sun.x / scale, -sun.y / scale, -sun.z / scale];
+  // #1366 — 메시 위치는 장면 공간 (z 반전) 이라 데이터 공간 origin 으로 되돌린다 (`fromSceneZ`).
+  return [-sun.x / scale, -sun.y / scale, -fromSceneZ(sun.z) / scale];
 }
 
 /** draw 경로를 태운다 — Babylon 이 mesh render 직전에 알리는 observable (belt-particles.ts 머리말). */

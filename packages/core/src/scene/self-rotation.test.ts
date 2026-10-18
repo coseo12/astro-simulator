@@ -92,8 +92,8 @@ function angleDeg(a: Vector3, b: Vector3): number {
  * 이 씬의 **기준 궤도 법선** — world Z (#1130).
  *
  * 근거는 측정이 아니라 **구조**다: `physics/state-vector.ts` 가 `z = sinI · y₁` 로 궤도면을 만들어,
- * inclination `0` 이면 `z ≡ 0` 이다. 즉 기준 궤도면(황도)은 **XY** 이고 씬은 이 좌표를 기저 변환
- * 없이 직결한다.
+ * inclination `0` 이면 `z ≡ 0` 이다. 즉 기준 궤도면(황도)은 **XY** 이고 씬은 이 좌표의 z 부호만 뒤집어
+ * 넣는다 (#1366 장면 경계 `S_z` — XY 평면과 Z 축은 그대로, 황도 북극이 장면 `−Z` 쪽).
  *
  * ⚠️ 엄밀히는 **황도** 법선이라 body 자기 궤도면과는 inclination 만큼 다르다 (mercury `7.005°` /
  * moon `5.145°`). obliquity 를 「자기 궤도면 기준」으로 재려면 body 별 법선이 필요하다 — 그건
@@ -200,8 +200,8 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
     for (const [id, degrees] of OBLIQUITY) {
       const s = computeRotationState(body({ id, rotationPeriodHours: 24, axialTiltDeg: degrees }))!;
       const q = spin(epoch, s);
-      // #1362 — 지구만 local `+Y` (마스크 북극) 가 data `−Z` 쪽이다 (화면 기준 북극 — 좌수계 거울상 #1366).
-      //   그래서 지구는 `+Z` 에서 `180° − ε` 이고, 자전 **각속도** 축은 아래 테스트가 `+Z` 쪽임을 단언한다.
+      // #1362 — 지구만 local `+Y` (마스크 북극) 가 장면 `−Z` 쪽이다 (= 데이터 `+Z` 쪽, 실제 천구 북극 — #1366 `S_z`).
+      //   그래서 지구는 장면 `+Z` 에서 `180° − ε` 이고, 자전 **각속도** 축은 아래 테스트가 장면 `+Z` 쪽임을 단언한다.
       const expected = id === EARTH_ORIENTATION_BODY_ID ? 180 - degrees : degrees;
       // 허용 오차 5e-5° — `acos` 의 수치 오차(실측 최대 1.2e-6°)보다 크고 계약값 ±0.05° 보다
       //   3 자릿수 엄격하다. 6 자리로 조이면 saturn 이 acos 오차만으로 FAIL 한다.

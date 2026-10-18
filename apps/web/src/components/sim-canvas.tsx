@@ -4,6 +4,7 @@ import {
   SimulationCore,
   scene as sceneApi,
   gpu as gpuApi,
+  coords as coordsApi,
   isRPhaseFocusable,
 } from '@astro-simulator/core';
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
@@ -1420,7 +1421,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const origin = solar.floatingOrigin.originOffset;
           const cx = activeCam.globalPosition.x * metersPerSceneUnit + origin[0];
           const cy = activeCam.globalPosition.y * metersPerSceneUnit + origin[1];
-          const cz = activeCam.globalPosition.z * metersPerSceneUnit + origin[2];
+          // #1366 — 장면 z 는 데이터 z 의 반전 (장면 경계 `S_z`). origin 은 데이터 공간이라 되돌린 뒤 더한다.
+          const cz =
+            coordsApi.fromSceneZ(activeCam.globalPosition.z) * metersPerSceneUnit + origin[2];
           const cameraFromSunMeters = Math.sqrt(cx * cx + cy * cy + cz * cz);
           // focus body 와의 거리 — ArcRotateCamera 의 `radius` 가 target 과의 거리 (scene unit).
           // focus 가 없을 때 (free-fly) 도 값은 있지만 solar.updateTierByCamera 가 focus id 부재를

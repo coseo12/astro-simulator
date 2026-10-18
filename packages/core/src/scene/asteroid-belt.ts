@@ -20,6 +20,7 @@ import {
   type Scene,
 } from '@babylonjs/core';
 import { AU, GRAVITATIONAL_CONSTANT, SOLAR_MASS } from '@astro-simulator/shared';
+import { toSceneZ } from '../coords/scene-handedness.js';
 import { positionAt } from '../physics/kepler.js';
 import { orbitalStateAt } from '../physics/state-vector.js';
 import type { LoadedOrbitalElements } from '../ephemeris/solar-system-loader.js';
@@ -218,12 +219,13 @@ export function createAsteroidBelt(
       const el = elements[i]!;
       const p = positionAt(el, jd, sun);
       // body mesh 와 같은 3단 변환 — double 뺄셈 먼저, 그 뒤 scene unit (ADR 20260422-floating-origin §3).
+      // #1366 — z 는 장면 경계에서 반전 (`toSceneZ`, body mesh 와 같은 식).
       writeTranslation(
         matrixBuffer,
         i,
         (p[0] - originX) * scale,
         (p[1] - originY) * scale,
-        (p[2] - originZ) * scale,
+        toSceneZ((p[2] - originZ) * scale),
       );
     }
     template.thinInstanceBufferUpdated('matrix');
@@ -274,7 +276,7 @@ export function createAsteroidBelt(
         i,
         ((positions[o] ?? 0) - originX) * scale,
         ((positions[o + 1] ?? 0) - originY) * scale,
-        ((positions[o + 2] ?? 0) - originZ) * scale,
+        toSceneZ(((positions[o + 2] ?? 0) - originZ) * scale),
       );
     }
     template.thinInstanceBufferUpdated('matrix');

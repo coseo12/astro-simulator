@@ -21,6 +21,7 @@ import {
   noEclipseShadowUniforms,
   type EclipseShadowUniforms,
 } from '../events/eclipse-shadow-uniforms.js';
+import { toSceneZ } from '../coords/scene-handedness.js';
 import { lunarEclipseGeometry } from '../events/eclipse-geometry.js';
 import { dateToJulianDate } from '../time/julian-date.js';
 import { ECLIPSE_SHADOW_GLSL, ECLIPSE_SHADOW_UNIFORM_NAMES } from './procedural-planet-shader.js';
@@ -116,6 +117,18 @@ function makeScene(opts: { jd?: number; surfaceDetail?: boolean } = {}): Fixture
 function flatten(u: EclipseShadowUniforms): number[] {
   return [u.mode, ...u.a, ...u.axis, ...u.k, ...u.glow];
 }
+/**
+ * #1366 — 판정식 · uniform 빌더 출력 (데이터 공간) 을 장면 공간으로 — 장면 `updateLunarShadow` 와 같은 식 (극벡터 `a` ·
+ * `axis` 의 z 반전, 그림자 없음은 그대로). 핸들 · 머티리얼 값은 장면 공간이다.
+ */
+function toSceneShadow(u: EclipseShadowUniforms): EclipseShadowUniforms {
+  if (u.mode === 0) return u;
+  return {
+    ...u,
+    a: [u.a[0], u.a[1], toSceneZ(u.a[2])],
+    axis: [u.axis[0], u.axis[1], toSceneZ(u.axis[2])],
+  };
+}
 function bitsEqual(a: readonly number[], b: readonly number[]): boolean {
   return a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 }
@@ -155,7 +168,7 @@ describe('#1360 PR2 — 월식 그림자 uniform 출처 · D2 · D8', () => {
     expect(classifyLunarShadowUniforms(u)).toBe('total');
     // 장면 입력 (배율 전 위치) 과 사건 입력 (체인 위치) 은 같은 함수에서 오지만 태양 벡터의 뺄셈 순서가 달라 비트 동일까지는
     // 요구하지 않는다 — 각 성분 상대 1e-12.
-    const ref = lunarEclipseShadowUniforms(geo.moon, geo.sun, RADII);
+    const ref = toSceneShadow(lunarEclipseShadowUniforms(geo.moon, geo.sun, RADII));
     flatten(u).forEach((v, i) => expect(v).toBeCloseTo(flatten(ref)[i]!, 10));
     // float32 저장 없이 JS 값 그대로 머티리얼에 들어간다.
     expect(bitsEqual(materialShadow(f, 'moon'), flatten(u))).toBe(true);
@@ -196,13 +209,18 @@ describe('#1360 PR2 — 월식 그림자 uniform 출처 · D2 · D8', () => {
     const u = a.handles.getLunarEclipseShadowUniforms();
     const moon = a.handles.getBodyState('moon', 'earth')!.pos;
     const earth = a.handles.getBodyState('earth', 'sun')!.pos;
-    const fromEngine = lunarEclipseShadowUniforms(moon, [-earth[0], -earth[1], -earth[2]], RADII);
+    const fromEngine = toSceneShadow(
+      lunarEclipseShadowUniforms(moon, [-earth[0], -earth[1], -earth[2]], RADII),
+    );
     expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.lunar);
     expect(bitsEqual(flatten(u), flatten(fromEngine))).toBe(true);
     // 경로 분기 판별 — 같은 시각 Kepler 체인 위치로 만든 값과 다르다 (적분 vs 해석해).
     const geo = syzygyGeometryAt(bodiesById, 'moon', ECLIPSE_JD)!;
     expect(
-      bitsEqual(flatten(u), flatten(lunarEclipseShadowUniforms(geo.moon, geo.sun, RADII))),
+      bitsEqual(
+        flatten(u),
+        flatten(toSceneShadow(lunarEclipseShadowUniforms(geo.moon, geo.sun, RADII))),
+      ),
     ).toBe(false);
     // N-body 도 배율 30 ↔ 1 비트 동일.
     const b = run(1);

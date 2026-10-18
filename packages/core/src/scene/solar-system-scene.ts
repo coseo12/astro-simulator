@@ -17,6 +17,7 @@ import type { BootPhaseHook } from '../engine/boot-phase.js';
 import { orbitMu } from '../physics/kepler.js';
 import { elementsAt, parentRelativePositionAt } from '../physics/orbit-elements-at.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
+import { axialToScene, fromSceneZ, toSceneZ } from '../coords/scene-handedness.js';
 import type { Vec3Double } from '../coords/vec3.js';
 import {
   NBodyEngine,
@@ -542,6 +543,7 @@ export interface SolarSystemSceneHandles {
   getEclipseShadowsEnabled: () => boolean;
   /**
    * #1360 PR2 — 월식 수신 천체 (달) 머티리얼에 지금 쓰인 그림자 uniform 의 사본 (토글 반영 후 값). 진단 · 단위 테스트용.
+   * #1366 — 머티리얼 값이라 **장면 공간**이다 (`a` · `axis` 의 z 가 판정식 출력의 반전). 길이 · 비율은 판정식과 같다.
    */
   getLunarEclipseShadowUniforms: () => EclipseShadowUniforms;
   dispose: () => void;
@@ -1204,12 +1206,18 @@ export function createSolarSystemScene(
   }
   let precessingOrbitLineGroups: PrecessingOrbitLineGroup[] = [];
 
-  /** 천체 1개의 궤도점 — 위성은 per-body 시각 배율을 곱한다 (R11 #721). `rebuildOrbitLines` 와 갱신이 같은 식을 쓴다. */
+  /**
+   * 천체 1개의 궤도점 — 위성은 per-body 시각 배율을 곱한다 (R11 #721). `rebuildOrbitLines` 와 갱신이 같은 식을 쓴다.
+   * #1366 — 샘플러는 데이터 공간 (순수 함수 계약) 이고, LineSystem 에 넣는 여기서 장면 좌표로 바꾼다 (`toSceneZ`).
+   */
   const orbitLinePointsFor = (body: LoadedCelestialBody, jd: number): Vector3[] | null => {
-    const pts = sampleOrbitPoints(body, activeTier, jd);
-    if (!pts || !isSatelliteOrbit(body.parentId)) return pts;
-    const perBodyScale = getOrbitVisualScale(body.parentId, body.id);
-    return pts.map((p) => p.scale(perBodyScale));
+    const sampled = sampleOrbitPoints(body, activeTier, jd);
+    if (!sampled) return null;
+    const pts = isSatelliteOrbit(body.parentId)
+      ? sampled.map((p) => p.scale(getOrbitVisualScale(body.parentId!, body.id)))
+      : sampled;
+    for (const p of pts) p.z = toSceneZ(p.z);
+    return pts;
   };
 
   /** 율 보유 천체의 현재 (Ω, ϖ) — 정규화하지 않은 연속값 (`elementsAt` 결과) 이라 차를 그대로 문턱과 비교한다. */
@@ -1457,7 +1465,7 @@ export function createSolarSystemScene(
     sunLight.position.set(
       (sunWorld[0] - ox) * scale,
       (sunWorld[1] - oy) * scale,
-      (sunWorld[2] - oz) * scale,
+      toSceneZ((sunWorld[2] - oz) * scale),
     );
   };
 
@@ -1485,7 +1493,7 @@ export function createSolarSystemScene(
       orbitLines.position.set(
         (sunWorld[0] - ox) * scale,
         (sunWorld[1] - oy) * scale,
-        (sunWorld[2] - oz) * scale,
+        toSceneZ((sunWorld[2] - oz) * scale),
       );
     }
     for (const [parentId, ls] of satelliteOrbitLines) {
@@ -1494,7 +1502,7 @@ export function createSolarSystemScene(
         ls.position.set(
           (parentWorld[0] - ox) * scale,
           (parentWorld[1] - oy) * scale,
-          (parentWorld[2] - oz) * scale,
+          toSceneZ((parentWorld[2] - oz) * scale),
         );
       }
     }
@@ -1585,10 +1593,11 @@ export function createSolarSystemScene(
     physicalLocalInto(bodyId, tmpPhysicalLocal);
     const s = bodyFrame.scale;
     const p = parentMesh.getAbsolutePosition();
+    // #1366 — physicalLocal 은 데이터 공간 변위라 장면 메시 위치에 더하기 전에 z 를 장면으로.
     tmpPhaseAnchor.set(
       p.x + tmpPhysicalLocal[0] * s,
       p.y + tmpPhysicalLocal[1] * s,
-      p.z + tmpPhysicalLocal[2] * s,
+      p.z + toSceneZ(tmpPhysicalLocal[2]) * s,
     );
     return tmpPhaseAnchor;
   };
@@ -1644,6 +1653,13 @@ export function createSolarSystemScene(
         lunarShadowRadii,
         computedLunarShadow,
       );
+      // #1366 — 판정식 · uniform 빌더는 데이터 공간 (순수 함수 계약). 셰이더는 장면 world normal 과 내적하므로 방향
+      // 벡터 2개 (`a` · `axis` — 둘 다 극벡터) 를 장면으로 옮긴다. 길이 · 비율 (`k`) 은 반사에 불변이다.
+      // 그림자 없음 (`mode 0`) 은 셰이더 합성이 항등이라 값을 그대로 둔다.
+      if (computedLunarShadow.mode !== 0) {
+        computedLunarShadow.a[2] = toSceneZ(computedLunarShadow.a[2]);
+        computedLunarShadow.axis[2] = toSceneZ(computedLunarShadow.axis[2]);
+      }
     }
     applyLunarShadow();
   };
@@ -1772,7 +1788,10 @@ export function createSolarSystemScene(
           bodyId: body.id,
           headMesh,
           sunMesh,
-          orbitNormal: cometOrbitNormal(body.orbit, system.epoch, orbitMu(body, parent)),
+          // #1366 — 궤도 법선은 축벡터라 단순 z 반전이 아니라 `(−x, −y, z)` (먼지 휨 `ĥ × axis` 방향 보존).
+          orbitNormal: axialToScene(
+            cometOrbitNormal(body.orbit, system.epoch, orbitMu(body, parent)),
+          ),
           frameProvider: () => bodyFrame,
         }),
       );
@@ -1893,7 +1912,7 @@ export function createSolarSystemScene(
     for (let i = 0; i < offset; i += 3) {
       out[i] = (world[i]! - ox) * scale;
       out[i + 1] = (world[i + 1]! - oy) * scale;
-      out[i + 2] = (world[i + 2]! - oz) * scale;
+      out[i + 2] = toSceneZ((world[i + 2]! - oz) * scale);
     }
     lines.commit();
   };
@@ -1939,7 +1958,7 @@ export function createSolarSystemScene(
       // body mesh.position 과 같은 식 — float64 뺄셈 · 곱 후 float32 저장 (끝점 = 메시 위치, DoD E4).
       out[3 * end] = (world[0] - ox) * scale;
       out[3 * end + 1] = (world[1] - oy) * scale;
-      out[3 * end + 2] = (world[2] - oz) * scale;
+      out[3 * end + 2] = toSceneZ((world[2] - oz) * scale);
     }
     rulerLine.commit();
   };
@@ -2130,7 +2149,7 @@ export function createSolarSystemScene(
       mesh.position.set(
         (world[0] - tierTransitionOrigin[0]) * newScale,
         (world[1] - tierTransitionOrigin[1]) * newScale,
-        (world[2] - tierTransitionOrigin[2]) * newScale,
+        toSceneZ((world[2] - tierTransitionOrigin[2]) * newScale),
       );
       mesh.computeWorldMatrix(true);
     }
@@ -2418,7 +2437,10 @@ export function createSolarSystemScene(
     // Floating Origin 계약 (ADR `docs/decisions/20260422-floating-origin.md` §3):
     //   - `world` (worldPositions): Heliocentric 절대 좌표 (m) — Rust engine / Zustand store 와 동일
     //   - `local = floatingOrigin.toLocal(world)` : scene 삽입 직전 origin shift 적용 (m)
-    //   - `mesh.position` : scene unit (local × renderScaleForTier(activeTier))
+    //   - `mesh.position` : scene unit (S_z(local × renderScaleForTier(activeTier)))
+    //     #1366 — `S_z` 는 장면 경계 z 반전 (`coords/scene-handedness.ts` `toSceneZ`). 데이터는 오른손 황도, Babylon 장면은
+    //     왼손계라 그대로 넣으면 화면이 황도면 기준 거울상이 된다. origin 은 데이터 공간 — 뺀 **뒤** 반전한다.
+    //     장면 → 데이터 역변환 (`fromSceneZ`) 지점: 아래 free-fly safety net · `runLodPass` 카메라 · web tier 판정.
     // 이 3단 변환을 우회하여 `world * SCENE_UNIT_PER_METER` 를 직접 할당하면 float32 jitter regression
     // 재발 (#271 재현). 아래 루프 수정 시 이 주석 계약 유지 필수. P12-A 부터 SCENE_UNIT_PER_METER 는
     // `renderScaleForTier(activeTier)` 로 교체 — ADR §결정 §1 R4 DoD.
@@ -2435,7 +2457,7 @@ export function createSolarSystemScene(
       mesh.position.set(
         (world[0] - ox) * sceneUnitPerMeter,
         (world[1] - oy) * sceneUnitPerMeter,
-        (world[2] - oz) * sceneUnitPerMeter,
+        toSceneZ((world[2] - oz) * sceneUnitPerMeter),
       );
     }
     // #1319 결정 2 — 위 루프가 쓴 기준계를 띠 입자용으로 기록 (아래 primary follow 가 origin 을 옮기기 전 값).
@@ -2542,7 +2564,7 @@ export function createSolarSystemScene(
       const cameraLocalMeters = [
         cam.globalPosition.x * metersPerSceneUnit,
         cam.globalPosition.y * metersPerSceneUnit,
-        cam.globalPosition.z * metersPerSceneUnit,
+        fromSceneZ(cam.globalPosition.z) * metersPerSceneUnit,
       ] as const;
       // local → world = local + current origin (shift 전 기준)
       const cameraWorldMeters: [number, number, number] = [
@@ -2676,7 +2698,8 @@ export function createSolarSystemScene(
     // camera.globalPosition 은 local (floating origin 적용된 scene unit). 월드 m 환산 = local(m) + origin.
     const camWorldX = camera.globalPosition.x * metersPerSceneUnit + origin[0];
     const camWorldY = camera.globalPosition.y * metersPerSceneUnit + origin[1];
-    const camWorldZ = camera.globalPosition.z * metersPerSceneUnit + origin[2];
+    // #1366 — 장면 z → 데이터 z (`fromSceneZ`). 아래 거리 · 위치는 데이터 공간, `screenCoverageRadius` 입력만 장면 공간.
+    const camWorldZ = fromSceneZ(camera.globalPosition.z) * metersPerSceneUnit + origin[2];
 
     for (const body of system.bodies) {
       const world = worldPositions.get(body.id);
@@ -2684,9 +2707,10 @@ export function createSolarSystemScene(
       if (!world || !highMesh) continue;
 
       // body 의 local 좌표 (m, FO 적용된) — screenCoverageRadius 에 전달할 scene 좌표 basis.
+      // #1366 — `vpArr` · `cameraUpWorld` 가 장면 공간이라 z 를 장면으로 (메시 위치와 같은 식).
       const localX = world[0] - origin[0];
       const localY = world[1] - origin[1];
-      const localZ = world[2] - origin[2];
+      const localZ = toSceneZ(world[2] - origin[2]);
 
       // 카메라-body 실세계 거리 (m).
       const dx = world[0] - camWorldX;

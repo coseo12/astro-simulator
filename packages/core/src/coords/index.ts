@@ -9,3 +9,4 @@
 
 export * from './vec3.js';
 export * from './floating-origin.js';
+export * from './scene-handedness.js';
