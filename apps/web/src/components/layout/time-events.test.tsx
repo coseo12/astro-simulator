@@ -472,12 +472,13 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
   });
 
   it.each([
-    ['solar-eclipse:2017-08-21'],
-    ['solar-eclipse:2024-04-08'],
-    ['lunar-eclipse:2025-03-14'],
+    // #1360 PR3 결정 C3 — 일식은 지구 포커스 (그림자가 지구에 떨어진다), 월식은 달 포커스.
+    ['solar-eclipse:2017-08-21', 'earth'],
+    ['solar-eclipse:2024-04-08', 'earth'],
+    ['lunar-eclipse:2025-03-14', 'moon'],
   ])(
-    'U1 — %s 선택: 시각 → 달 포커스 → 일시정지 · 거리 자 기준점 = 지구 · 배율 고지에 getOrbitVisualScale 값',
-    async (id) => {
+    'U1 — %s 선택: 시각 → %s 포커스 → 일시정지 · 거리 자 기준점 = 지구 · 배율 고지에 getOrbitVisualScale 값',
+    async (id, focusBodyId) => {
       useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON, rulerAnchorId: null });
       renderEvents();
       await flushChunks();
@@ -486,7 +487,7 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
       fireEvent.click(option(id));
       expect(sentCommands).toEqual([
         { type: 'jumpToJulianDate', julianDate: event.julianDate },
-        { type: 'focusOn', bodyId: 'moon' },
+        { type: 'focusOn', bodyId: focusBodyId },
         { type: 'setTimeScale', scale: 0 },
       ]);
       expect(useSimStore.getState().rulerAnchorId).toBe('earth');
@@ -498,9 +499,10 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
 
   it.each([
     ['lunar-eclipse:2025-03-14', { bodyId: 'moon', view: 'facing-parent' }],
-    ['solar-eclipse:2024-04-08', null],
+    // #1360 PR3 — 일식은 지구의 모체 (태양) 쪽 반구.
+    ['solar-eclipse:2024-04-08', { bodyId: 'earth', view: 'facing-parent' }],
   ] as const)(
-    '#1360 PR2 C3 — %s 선택: 시점 요청은 포커스 명령 **전에** store 에 있다 (월식만 facing-parent)',
+    '#1360 PR2 · PR3 C3 — %s 선택: 시점 요청은 포커스 명령 **전에** store 에 있다 (월식 = 달 · 일식 = 지구의 facing-parent)',
     async (id, expected) => {
       useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON });
       renderEvents();

@@ -1,5 +1,6 @@
 /**
- * #1360 PR2 — 장면의 월식 그림자 배선 (NullEngine 실 scene). ADR `docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md`.
+ * #1360 PR2 · PR3 — 장면의 월식 · 일식 그림자 배선 (NullEngine 실 scene). ADR `docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md`.
+ * PR3 (일식 — 지구 표면 high · mid + 구름) 블록은 파일 끝.
  *
  *  - DoD D2 확장 — 위성 배율 30 ↔ 1 에서 달 머티리얼에 쓰인 그림자 uniform 비트 동일. ⚠️ 고정하는 것은 「배율과의 독립」 이
  *    아니라 **배율이 Kepler 경로의 `resolveWorld` 에서만 곱해진다는 현재 구조에 대한 의존**이다 (결정 G3).
@@ -17,14 +18,17 @@ import { syzygyGeometryAt } from '../events/compute-events.js';
 import {
   ECLIPSE_SHADOW_MODE,
   classifyLunarShadowUniforms,
+  classifySolarShadowUniforms,
   lunarEclipseShadowUniforms,
   noEclipseShadowUniforms,
+  solarEclipseShadowUniforms,
   type EclipseShadowUniforms,
 } from '../events/eclipse-shadow-uniforms.js';
 import { toSceneZ } from '../coords/scene-handedness.js';
 import { lunarEclipseGeometry } from '../events/eclipse-geometry.js';
 import { dateToJulianDate } from '../time/julian-date.js';
 import { ECLIPSE_SHADOW_GLSL, ECLIPSE_SHADOW_UNIFORM_NAMES } from './procedural-planet-shader.js';
+import { CLOUD_FRAGMENT_SHADER } from './cloud-layer.js';
 import {
   LUNAR_ECLIPSE_SHADOW_BODY_ID,
   createSolarSystemScene,
@@ -93,7 +97,7 @@ const RADII = {
 /** 2022-11-08 개기월식 최대식 근처 (UTC 11:00) — 판정 `total` (ADR §1-E 표). */
 const ECLIPSE_JD = dateToJulianDate(new Date(Date.UTC(2022, 10, 8, 11, 0, 0)));
 
-function makeScene(opts: { jd?: number; surfaceDetail?: boolean } = {}): Fixture {
+function makeScene(opts: { jd?: number; surfaceDetail?: boolean; clouds?: boolean } = {}): Fixture {
   const engine = new NullEngine({
     renderWidth: 1280,
     renderHeight: 800,
@@ -106,6 +110,7 @@ function makeScene(opts: { jd?: number; surfaceDetail?: boolean } = {}): Fixture
   scene.activeCamera = camera;
   const handles = createSolarSystemScene(scene, {
     surfaceDetail: opts.surfaceDetail ?? true,
+    clouds: opts.clouds ?? false,
     starfield: false,
     initialJulianDate: opts.jd ?? ECLIPSE_JD,
   });
@@ -294,5 +299,178 @@ describe('#1360 PR2 — 셰이더 텍스트 (결정 R1)', () => {
     expect(iEcl).toBeGreaterThan(iShade);
     expect(iMul).toBeGreaterThan(iEcl);
     expect(ECLIPSE_SHADOW_GLSL).not.toMatch(/#\s*(define|ifdef|if)\b/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1360 PR3 — 일식 (지구 수신 · 표면 + 구름)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 2024-04-08 개기일식 최대식 근처 (UTC 18:17) — 판정 `total`. */
+const SOLAR_JD = dateToJulianDate(new Date(Date.UTC(2024, 3, 8, 18, 17, 0)));
+const CLOUD_MESH = 'earth-cloud';
+
+function solarRef(jd: number): EclipseShadowUniforms {
+  const geo = syzygyGeometryAt(bodiesById, 'moon', jd)!;
+  return toSceneShadow(solarEclipseShadowUniforms(geo.moon, geo.sun, RADII));
+}
+
+describe('#1360 PR3 — 일식 그림자 uniform 출처 · D2 · D8', () => {
+  it('Kepler — 판정식 원뿔과 같은 기하 (개기, 재분류 일치) · 지구 표면 · 구름 머티리얼 = 핸들 사본 · 달은 0', () => {
+    const f = makeScene({ jd: SOLAR_JD, clouds: true });
+    f.handles.updateAt(SOLAR_JD);
+    const u = f.handles.getSolarEclipseShadowUniforms();
+    expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.solar);
+    expect(classifySolarShadowUniforms(u)).toBe('total');
+    // 장면 입력 (배율 전 위치) 과 사건 입력 (체인 위치) 은 태양 벡터 뺄셈 순서가 달라 비트 동일까지는 요구하지 않는다.
+    const ref = flatten(solarRef(SOLAR_JD));
+    flatten(u).forEach((v, i) => expect(v).toBeCloseTo(ref[i]!, 10));
+    // #1366 — 핸들 · 머티리얼 값은 장면 공간 (z 반전). 데이터 공간 그대로면 이 단언이 FAIL 한다 (거울 위치 결함판).
+    const geo = syzygyGeometryAt(bodiesById, 'moon', SOLAR_JD)!;
+    expect(u.a[2]).toBeCloseTo(-geo.moon[2] / RADII.earth, 8);
+    expect(Math.abs(u.a[2])).toBeGreaterThan(1e-3);
+    expect(bitsEqual(materialShadow(f, 'earth'), flatten(u))).toBe(true);
+    expect(bitsEqual(materialShadow(f, CLOUD_MESH), flatten(u))).toBe(true);
+    // 월식 수신 천체 (달) 는 일식 시각에 그림자 없음.
+    expect(bitsEqual(materialShadow(f, 'moon'), flatten(noEclipseShadowUniforms()))).toBe(true);
+    expect(f.handles.getLunarEclipseShadowUniforms().mode).toBe(ECLIPSE_SHADOW_MODE.none);
+  });
+
+  it('D2 — 위성 배율 30 ↔ 1 에서 일식 uniform 비트 동일', () => {
+    scaleOverride.value = 30;
+    const a = makeScene({ jd: SOLAR_JD });
+    a.handles.updateAt(SOLAR_JD);
+    scaleOverride.value = 1;
+    const b = makeScene({ jd: SOLAR_JD });
+    b.handles.updateAt(SOLAR_JD);
+    const ua = flatten(a.handles.getSolarEclipseShadowUniforms());
+    expect(ua[0]).toBe(ECLIPSE_SHADOW_MODE.solar);
+    expect(bitsEqual(ua, flatten(b.handles.getSolarEclipseShadowUniforms()))).toBe(true);
+  });
+
+  it('D8 — N-body: 엔진 상태에서 만든 값과 비트 동일 · Kepler 해석해와 다르다 · 배율 30 ↔ 1 비트 동일', () => {
+    const jd0 = SOLAR_JD - 0.5;
+    const run = (scale: number) => {
+      scaleOverride.value = scale;
+      const f = makeScene({ jd: jd0 });
+      f.handles.updateAt(jd0);
+      f.handles.setPhysicsEngine('newton');
+      f.handles.updateAt(SOLAR_JD);
+      expect(f.handles.getPhysicsEngine()).toBe('newton');
+      return f;
+    };
+    const a = run(30);
+    const u = a.handles.getSolarEclipseShadowUniforms();
+    const moon = a.handles.getBodyState('moon', 'earth')!.pos;
+    const earth = a.handles.getBodyState('earth', 'sun')!.pos;
+    const fromEngine = toSceneShadow(
+      solarEclipseShadowUniforms(moon, [-earth[0], -earth[1], -earth[2]], RADII),
+    );
+    expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.solar);
+    expect(bitsEqual(flatten(u), flatten(fromEngine))).toBe(true);
+    expect(bitsEqual(flatten(u), flatten(solarRef(SOLAR_JD)))).toBe(false);
+    const b = run(1);
+    expect(bitsEqual(flatten(u), flatten(b.handles.getSolarEclipseShadowUniforms()))).toBe(true);
+  });
+});
+
+describe('#1360 PR3 — 일식 수신 · 토글 · mid · 구름 (결정 R2 · R3 · C2)', () => {
+  it('일식 시각에 지구만 일식 모드 — 화성 · 목성 · 달은 그림자 없음 · 월식 시각에는 지구 · 구름도 그림자 없음', () => {
+    const f = makeScene({ jd: SOLAR_JD, clouds: true });
+    f.handles.updateAt(SOLAR_JD);
+    const none = flatten(noEclipseShadowUniforms());
+    for (const id of ['mars', 'jupiter', 'moon']) {
+      expect(bitsEqual(materialShadow(f, id), none), id).toBe(true);
+    }
+    expect(materialShadow(f, 'earth')[0]).toBe(ECLIPSE_SHADOW_MODE.solar);
+    f.handles.updateAt(ECLIPSE_JD);
+    expect(bitsEqual(materialShadow(f, 'earth'), none)).toBe(true);
+    expect(bitsEqual(materialShadow(f, CLOUD_MESH), none)).toBe(true);
+    expect(materialShadow(f, 'moon')[0]).toBe(ECLIPSE_SHADOW_MODE.lunar);
+  });
+
+  it('식 아님 (+3일) — 지구 · 구름 그림자 없음 값', () => {
+    const f = makeScene({ jd: SOLAR_JD, clouds: true });
+    f.handles.updateAt(SOLAR_JD + 3);
+    const none = flatten(noEclipseShadowUniforms());
+    expect(bitsEqual(materialShadow(f, 'earth'), none)).toBe(true);
+    expect(bitsEqual(materialShadow(f, CLOUD_MESH), none)).toBe(true);
+  });
+
+  it('setEclipseShadowsEnabled(false) → 지구 · 구름 즉시 그림자 없음 · true → 복귀 (updateAt 없이)', () => {
+    const f = makeScene({ jd: SOLAR_JD, clouds: true });
+    f.handles.updateAt(SOLAR_JD);
+    const on = materialShadow(f, 'earth');
+    expect(on[0]).toBe(ECLIPSE_SHADOW_MODE.solar);
+    f.handles.setEclipseShadowsEnabled(false);
+    const none = flatten(noEclipseShadowUniforms());
+    expect(bitsEqual(materialShadow(f, 'earth'), none)).toBe(true);
+    expect(bitsEqual(materialShadow(f, CLOUD_MESH), none)).toBe(true);
+    expect(f.handles.getSolarEclipseShadowUniforms().mode).toBe(ECLIPSE_SHADOW_MODE.none);
+    f.handles.setEclipseShadowsEnabled(true);
+    expect(bitsEqual(materialShadow(f, 'earth'), on)).toBe(true);
+    expect(bitsEqual(materialShadow(f, CLOUD_MESH), on)).toBe(true);
+  });
+
+  it('lazy 생성된 지구 mid variant 도 생성 즉시 같은 값', () => {
+    const f = makeScene({ jd: SOLAR_JD });
+    f.handles.updateAt(SOLAR_JD);
+    expect(f.scene.getMeshByName('earth-lod-mid')).toBeNull();
+    f.handles.setLodOverride('mid');
+    f.handles.runFramePass();
+    expect(f.scene.getMeshByName('earth-lod-mid')).not.toBeNull();
+    expect(bitsEqual(materialShadow(f, 'earth-lod-mid'), materialShadow(f, 'earth'))).toBe(true);
+    expect(materialShadow(f, 'earth-lod-mid')[0]).toBe(ECLIPSE_SHADOW_MODE.solar);
+    f.handles.setEclipseShadowsEnabled(false);
+    expect(materialShadow(f, 'earth-lod-mid')[0]).toBe(ECLIPSE_SHADOW_MODE.none);
+  });
+
+  it('런타임 구름 ON (일시정지 — updateAt 없이) — 새 구름 머티리얼에 즉시 현재 그림자 · OFF → ON 반복도 같다', () => {
+    const f = makeScene({ jd: SOLAR_JD, clouds: false });
+    f.handles.updateAt(SOLAR_JD);
+    expect(f.scene.getMeshByName(CLOUD_MESH)).toBeNull();
+    f.handles.setCloudsVisible(true);
+    expect(bitsEqual(materialShadow(f, CLOUD_MESH), materialShadow(f, 'earth'))).toBe(true);
+    expect(materialShadow(f, CLOUD_MESH)[0]).toBe(ECLIPSE_SHADOW_MODE.solar);
+    f.handles.setCloudsVisible(false);
+    f.handles.setCloudsVisible(true);
+    expect(materialShadow(f, CLOUD_MESH)[0]).toBe(ECLIPSE_SHADOW_MODE.solar);
+  });
+});
+
+describe('#1360 PR3 — 셰이더 텍스트 (결정 R1 · R3)', () => {
+  it('구름 fragment 는 표면과 같은 그림자 함수 (같은 상수 보간) · 합성 1줄 · uniform 5개 · 붉은 빛 항 없음', () => {
+    expect(CLOUD_FRAGMENT_SHADER).toContain(ECLIPSE_SHADOW_GLSL);
+    for (const name of ECLIPSE_SHADOW_UNIFORM_NAMES) {
+      expect(
+        CLOUD_FRAGMENT_SHADER.match(new RegExp(`uniform \\w+ ${name};`, 'g')),
+        name,
+      ).toHaveLength(1);
+    }
+    expect(CLOUD_FRAGMENT_SHADER).toContain('vec2 ecl = eclipseShadow(N);');
+    expect(CLOUD_FRAGMENT_SHADER).toContain('shade -= sunShade * ecl.x;');
+    expect(CLOUD_FRAGMENT_SHADER).not.toContain('uEclGlow * (');
+    const iShade = CLOUD_FRAGMENT_SHADER.indexOf('vec3 shade = ambientShade + sunShade;');
+    const iEcl = CLOUD_FRAGMENT_SHADER.indexOf('shade -= sunShade * ecl.x;');
+    const iCol = CLOUD_FRAGMENT_SHADER.indexOf('vec3 col = clamp(cloudColor * shade, 0.0, 1.0);');
+    expect(iShade).toBeGreaterThan(0);
+    expect(iEcl).toBeGreaterThan(iShade);
+    expect(iCol).toBeGreaterThan(iEcl);
+  });
+
+  it('표면 fragment — rim 은 같은 차폐율로 감쇠 (rim 계산 직후) · 야간 불빛 항은 그림자를 읽지 않는다 · 일식 분기 · 밤 반구 게이트 없음', () => {
+    makeScene();
+    const frag = Effect.ShadersStore.proceduralPlanetFragmentShader!;
+    const iRim = frag.indexOf('rim = rimStrength * rimFall * rimLight;');
+    const iRimEcl = frag.indexOf('rim -= rim * ecl.x;');
+    expect(iRim).toBeGreaterThan(0);
+    expect(iRimEcl).toBeGreaterThan(iRim);
+    expect(frag.match(/rim -= rim \* ecl\.x;/g)).toHaveLength(1);
+    expect(frag).toContain('lights = nightLightStrength * nightFactor * lightGate * lightDensity;');
+    const lightsLine = frag.split('\n').find((l) => l.includes('lights = nightLightStrength'))!;
+    expect(lightsLine).not.toContain('ecl');
+    // PR #1369 리뷰 R2 — 밤 반구 게이트를 두지 않는다 (부분식 terminator rim 이음선). 되살리면 이 단언이 FAIL 한다.
+    expect(ECLIPSE_SHADOW_GLSL).not.toMatch(/dot\(n, uEclAxis\) > 0\.0/);
+    expect(ECLIPSE_SHADOW_GLSL).toContain('float ru = abs(z * uEclK.z - uEclK.w);');
   });
 });
