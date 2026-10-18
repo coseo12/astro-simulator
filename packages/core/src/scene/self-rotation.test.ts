@@ -13,11 +13,17 @@ import { describe, expect, it } from 'vitest';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
 import {
   computeRotationState,
+  computeSpinAngle,
   computeSpinQuaternion,
+  earthRotationAngle,
+  EARTH_ORIENTATION_BODY_ID,
   ORBITAL_NORMAL_OFFSET,
+  type RotationState,
 } from './self-rotation.js';
 import { RING_DISC_BASE_TILT_X } from './ring-shader.js';
-import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import { heliocentricPositionAt } from '../physics/body-chain.js';
+import { isoToJulianDate } from '../time/julian-date.js';
 
 /** 자전 파라미터만 의미 있는 최소 body stub (본 모듈은 id/radius/orbit 을 읽지 않는다). */
 function body(overrides: Partial<LoadedCelestialBody>): LoadedCelestialBody {
@@ -86,8 +92,8 @@ function angleDeg(a: Vector3, b: Vector3): number {
  * 이 씬의 **기준 궤도 법선** — world Z (#1130).
  *
  * 근거는 측정이 아니라 **구조**다: `physics/state-vector.ts` 가 `z = sinI · y₁` 로 궤도면을 만들어,
- * inclination `0` 이면 `z ≡ 0` 이다. 즉 기준 궤도면(황도)은 **XY** 이고 씬은 이 좌표를 기저 변환
- * 없이 직결한다.
+ * inclination `0` 이면 `z ≡ 0` 이다. 즉 기준 궤도면(황도)은 **XY** 이고 씬은 이 좌표의 z 부호만 뒤집어
+ * 넣는다 (#1366 장면 경계 `S_z` — XY 평면과 Z 축은 그대로, 황도 북극이 장면 `−Z` 쪽).
  *
  * ⚠️ 엄밀히는 **황도** 법선이라 body 자기 궤도면과는 inclination 만큼 다르다 (mercury `7.005°` /
  * moon `5.145°`). obliquity 를 「자기 궤도면 기준」으로 재려면 body 별 법선이 필요하다 — 그건
@@ -190,12 +196,44 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
   it('#1130 — obliquity 는 **궤도 법선에서 재는 각**이다 (9 body 전건)', () => {
     // 「누운 행성」(uranus/venus)이 실제로 눕는지가 판별력의 핵심 — 보정 전 uranus 는 7.77° 로
     // **똑바로 서 보였다**(기대 97.77°). 정상 행성과 역행 행성이 서로 뒤바뀐 형태였다.
+    // #1362 — state 를 **실제 id 로** 만든다 (지구는 `computeRotationState` 가 지구 방향 모델을 붙인다).
     for (const [id, degrees] of OBLIQUITY) {
-      const q = spin(epoch, { omega: TWO_PI, tiltRad: (degrees * Math.PI) / 180 });
+      const s = computeRotationState(body({ id, rotationPeriodHours: 24, axialTiltDeg: degrees }))!;
+      const q = spin(epoch, s);
+      // #1362 — 지구만 local `+Y` (마스크 북극) 가 장면 `−Z` 쪽이다 (= 데이터 `+Z` 쪽, 실제 천구 북극 — #1366 `S_z`).
+      //   그래서 지구는 장면 `+Z` 에서 `180° − ε` 이고, 자전 **각속도** 축은 아래 테스트가 장면 `+Z` 쪽임을 단언한다.
+      const expected = id === EARTH_ORIENTATION_BODY_ID ? 180 - degrees : degrees;
       // 허용 오차 5e-5° — `acos` 의 수치 오차(실측 최대 1.2e-6°)보다 크고 계약값 ±0.05° 보다
       //   3 자릿수 엄격하다. 6 자리로 조이면 saturn 이 acos 오차만으로 FAIL 한다.
-      expect(angleDeg(poleOf(q), ORBITAL_NORMAL), id).toBeCloseTo(degrees, 4);
+      expect(angleDeg(poleOf(q), ORBITAL_NORMAL), id).toBeCloseTo(expected, 4);
     }
+  });
+
+  it('#1362 — 자전 **각속도** 축은 지구도 obliquity 만큼 기운 `+Z` 쪽 (감기 방향이 순행 body 와 같다)', () => {
+    // 지구는 local `+Y` 를 뒤집고 spin 부호도 뒤집었다 (`tilt(ε − π/2) ∘ spin(−ERA)`). 둘이 짝이라
+    // 각속도 벡터는 일반 식과 같은 쪽에 남는다 — 하나만 바꾸면 여기서 깨진다.
+    const spinAxisAt = (s: RotationState, jd: number): Vector3 => {
+      const q0 = spin(jd, s);
+      const q1 = spin(jd + 0.01, s);
+      // world 상대 회전 R1 ∘ R0⁻¹ (Babylon `A.multiply(B)` = B 먼저). q 와 −q 동치라 w ≥ 0 으로 정규화.
+      const rel = q1.multiply(Quaternion.Inverse(q0));
+      const sign = rel.w < 0 ? -1 : 1;
+      return new Vector3(rel.x * sign, rel.y * sign, rel.z * sign).normalize();
+    };
+    const mars = computeRotationState(
+      body({ id: 'mars', rotationPeriodHours: 24.6229, axialTiltDeg: 25.19 }),
+    )!;
+    const earth = computeRotationState(
+      body({ id: EARTH_ORIENTATION_BODY_ID, rotationPeriodHours: 23.9345, axialTiltDeg: 23.44 }),
+    )!;
+    const jd = epoch + 8000.25;
+    expect(angleDeg(spinAxisAt(mars, jd), ORBITAL_NORMAL)).toBeCloseTo(25.19, 3);
+    expect(angleDeg(spinAxisAt(earth, jd), ORBITAL_NORMAL)).toBeCloseTo(23.44, 3);
+    // 지구의 각속도 축은 #1362 이전 일반 식의 pole (`(0, −sin ε, cos ε)`) 과 같은 방향이다.
+    const legacy = computeRotationState(
+      body({ rotationPeriodHours: 23.9345, axialTiltDeg: 23.44 }),
+    )!;
+    expect(angleDeg(spinAxisAt(earth, jd), poleOf(spin(jd, legacy)))).toBeCloseTo(0, 3);
   });
 
   it('out 파라미터에 결과를 쓰고 tmp 버퍼를 재사용 (매 프레임 alloc 0 계약)', () => {
@@ -209,5 +247,138 @@ describe('#782 §A2.3 결정 5 — computeSpinQuaternion (jd 순수 함수 자�
     const out2 = new Quaternion();
     computeSpinQuaternion(epoch + 0.5, epoch, state, tmpSpin, tmpTilt, out2);
     expect(out2.equalsWithEpsilon(out, 1e-15)).toBe(true);
+  });
+});
+
+/**
+ * #1362 — 지구 방향 (자전축 방향 + 실제 시각 자전 위상). ADR `20260628-756` §Amendment 13.
+ *
+ * 장면 mesh 없이 **quaternion + 태양 방향**으로 태양 직하점을 계산해 실제 천문력 값과 비교한다.
+ *  - 태양 방향: 장면 Kepler 경로와 같은 함수 (`heliocentricPositionAt` — 태양 = 원점) 의 지구 위치 반대 방향.
+ *  - 직하점: 태양 방향을 지구 local 로 되돌려 마스크 규약 (local `+Y` = 북극, `+X` = 경도 0°, `+Z` = 경도
+ *    90°E — `procedural-planet-shader.ts` UV · `surface-mask-texture.ts` `invertY=false`) 으로 읽는다.
+ *
+ * 기준값 출처 — Meeus, _Astronomical Algorithms_ 2판: 25장 (태양 겉보기 위치 · 저정밀 식) + 12장 식 12.4
+ * (그리니치 평균 항성시) + 22장 (장동 · 분점차) 으로 계산한 직하점 (#1362 Phase 0, 코멘트 6245464331).
+ * 2017-08-21 적위 `11.860°` 은 NASA 개기일식 자료의 태양 적위 `11.862°` 와 교차 확인했다.
+ *
+ * 허용오차 `±0.2°` (사용자 확정) — 장면 식은 J2000 고정 극 (세차 무시) + ERA (분점차 무시) 근사이고,
+ * 2000~2030 일 단위 표본에서 위도 잔차 최대 `0.196°` (2030년) 다 — ADR `20260628-756` §A13.6.
+ */
+describe('#1362 — 지구 방향: 태양 직하점이 실제 천문력과 일치', () => {
+  const TOLERANCE_DEG = 0.2;
+  const system = getSolarSystem();
+  const bodiesById = new Map(system.bodies.map((b) => [b.id, b]));
+  const earthBody = bodiesById.get(EARTH_ORIENTATION_BODY_ID)!;
+  const earthState = computeRotationState(earthBody)!;
+
+  /** 지구 local 에서 본 태양 방향의 위도·경도 [deg] (경도 −180~180, 동경 +). */
+  function subsolarPoint(jd: number): { lat: number; lon: number } {
+    const q = new Quaternion();
+    computeSpinQuaternion(jd, system.epoch, earthState, new Quaternion(), new Quaternion(), q);
+    const pos = heliocentricPositionAt(bodiesById, EARTH_ORIENTATION_BODY_ID, jd)!;
+    const sunWorld = new Vector3(-pos[0], -pos[1], -pos[2]).normalize();
+    const world = new Matrix();
+    Matrix.FromQuaternionToRef(q, world);
+    const local = Vector3.TransformNormal(sunWorld, world.invert()).normalize();
+    return {
+      lat: (Math.asin(local.y) * 180) / Math.PI,
+      lon: (Math.atan2(local.z, local.x) * 180) / Math.PI,
+    };
+  }
+  /** 경도 차 [deg] 를 −180~180 으로. */
+  const lonDiff = (a: number, b: number): number => ((((a - b) % 360) + 540) % 360) - 180;
+
+  // [라벨, UT ISO, 기준 위도, 기준 경도] — 출처는 describe 주석.
+  const REFERENCE: ReadonlyArray<readonly [string, string, number, number]> = [
+    ['2024 하지', '2024-06-20T20:51:00Z', 23.439, -132.302],
+    ['2024 동지', '2024-12-21T09:20:00Z', -23.439, 39.565],
+    ['2017-08-21 개기일식 최대', '2017-08-21T18:26:40Z', 11.86, -95.91],
+    ['2024-04-08 개기일식 최대', '2024-04-08T18:17:16Z', 7.593, -93.905],
+  ];
+
+  it('computeRotationState(earth) 는 지구 방향 모델을 붙인다 (다른 body 는 붙이지 않는다)', () => {
+    expect(earthState.orientation).toBeDefined();
+    for (const b of system.bodies) {
+      if (b.id === EARTH_ORIENTATION_BODY_ID) continue;
+      const s = computeRotationState(b);
+      if (s) expect(Object.keys(s).sort(), b.id).toEqual(['omega', 'tiltRad']);
+    }
+  });
+
+  for (const [label, iso, refLat, refLon] of REFERENCE) {
+    it(`${label} (${iso}) — 직하점 위도 ${refLat}° · 경도 ${refLon}° (±${TOLERANCE_DEG}°)`, () => {
+      const { lat, lon } = subsolarPoint(isoToJulianDate(iso));
+      expect(Math.abs(lat - refLat), `위도 ${lat}`).toBeLessThanOrEqual(TOLERANCE_DEG);
+      expect(Math.abs(lonDiff(lon, refLon)), `경도 ${lon}`).toBeLessThanOrEqual(TOLERANCE_DEG);
+    });
+  }
+
+  it('직하점 경도는 서쪽으로 ≈ 15°/h 움직인다 (지표가 서→동 자전 — 태양이 동쪽에서 뜬다)', () => {
+    // 평균 태양일 24h 에 360° — 항성 자전 `15.041°/h` 에서 태양의 겉보기 이동 `0.041°/h` 를 뺀 값.
+    // 균시차 변화가 하루 `±30 s` 이내라 1시간 율은 ±0.01°/h 안이다.
+    const MEAN_SOLAR_RATE_DEG_PER_HOUR = -15;
+    const RATE_TOLERANCE = 0.02;
+    for (const [, iso] of REFERENCE) {
+      const jd = isoToJulianDate(iso);
+      const rate = lonDiff(subsolarPoint(jd + 1 / 24).lon, subsolarPoint(jd).lon);
+      expect(
+        Math.abs(rate - MEAN_SOLAR_RATE_DEG_PER_HOUR),
+        `${iso} 율 ${rate}`,
+      ).toBeLessThanOrEqual(RATE_TOLERANCE);
+    }
+  });
+
+  it('earthRotationAngle — J2000.0 에서 2π × 0.7790572732640 (IERS 2010 식 5.15), 값역 [0, 2π)', () => {
+    expect(earthRotationAngle(2451545.0)).toBeCloseTo(2 * Math.PI * 0.779057273264, 12);
+    for (const jd of [2451545.0 - 40_000.3, 2451545.0, 2460000.123, 2470000.9]) {
+      const a = earthRotationAngle(jd);
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(a).toBeLessThan(2 * Math.PI);
+    }
+    // 1 UT1 일에 1.00273781191135448 회전 — 하루 뒤 각 증가분 = 0.00273781191135448 회전.
+    const d = earthRotationAngle(2460000.5) - earthRotationAngle(2459999.5);
+    expect(d / (2 * Math.PI)).toBeCloseTo(0.00273781191135448, 9);
+  });
+
+  it('지구 외 body 의 자전 quaternion 은 #1362 이전 식과 **비트 동일** (실제 데이터 · 여러 시각)', () => {
+    // #1362 이전 `computeSpinQuaternion` 본문을 그대로 재구성한다 (같은 연산 · 같은 순서 → 같은 비트).
+    const legacy = (jd: number, s: RotationState): Quaternion => {
+      const tmpSpin = new Quaternion();
+      const tmpTilt = new Quaternion();
+      const out = new Quaternion();
+      Quaternion.RotationAxisToRef(
+        new Vector3(0, 1, 0),
+        computeSpinAngle(jd, system.epoch, s.omega),
+        tmpSpin,
+      );
+      Quaternion.RotationAxisToRef(
+        new Vector3(1, 0, 0),
+        ORBITAL_NORMAL_OFFSET + s.tiltRad,
+        tmpTilt,
+      );
+      tmpTilt.multiplyToRef(tmpSpin, out);
+      return out;
+    };
+    let compared = 0;
+    for (const b of system.bodies) {
+      if (b.id === EARTH_ORIENTATION_BODY_ID) continue;
+      const s = computeRotationState(b);
+      if (!s) continue;
+      for (const jd of [system.epoch, 2451545.37, 2460390.25, 2462000.75]) {
+        const now = new Quaternion();
+        computeSpinQuaternion(jd, system.epoch, s, new Quaternion(), new Quaternion(), now);
+        const was = legacy(jd, s);
+        expect([now.x, now.y, now.z, now.w], `${b.id} @ ${jd}`).toEqual([
+          was.x,
+          was.y,
+          was.z,
+          was.w,
+        ]);
+        compared++;
+      }
+    }
+    // 빈 표본 공허 통과 차단 — 자전하는 지구 외 body 가 실제로 비교됐다.
+    expect(compared).toBeGreaterThanOrEqual(8 * 4);
   });
 });

@@ -279,8 +279,11 @@ export function syzygyTimes(
 /** 체인 뿌리 탐색 최대 깊이 — 순환 parentId 데이터 결함 시 무한 루프 차단 (`body-chain.ts` 와 같은 값, 현 데이터 깊이 ≤ 2). */
 const ROOT_SEARCH_MAX_DEPTH = 8;
 
-/** 주체 (위성) · 모체 · 체인 뿌리의 반경 — 식 판정 입력. 하나라도 없으면 `null`. */
-function eclipseRadiiOf(
+/**
+ * 주체 (위성) · 모체 · 체인 뿌리의 반경 — 식 판정 입력. 하나라도 없으면 `null`. #1360 PR2 — 장면의 월식 그림자 uniform 도
+ * 같은 함수로 반경을 얻는다 (판정과 렌더의 반경 출처 단일화).
+ */
+export function eclipseRadiiOf(
   bodiesById: ReadonlyMap<string, EventBody>,
   subjectId: string,
 ): EclipseRadii | null {

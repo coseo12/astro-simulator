@@ -37,6 +37,7 @@ import {
   type AsteroidBeltHandles,
   type AsteroidBeltOptions,
 } from './asteroid-belt.js';
+import { toSceneZ } from '../coords/scene-handedness.js';
 import { positionAt } from '../physics/kepler.js';
 import { initialTier, renderScaleForTier } from './tier.js';
 import type { BodyReferenceFrame } from './belt-particles.js';
@@ -155,7 +156,8 @@ describe('#998 축 C — 생성 시점 sceneUnitPerMeter 주입 계약', () => {
       // (12.566배 회귀는 물론, 1% drift 도 잡는다).
       expect(m[12]).toBeCloseTo(expected[0] * scale, 3);
       expect(m[13]).toBeCloseTo(expected[1] * scale, 3);
-      expect(m[14]).toBeCloseTo(expected[2] * scale, 3);
+      // #1366 — ThinInstance 는 장면 공간 (z 반전 — body mesh 와 같은 식).
+      expect(m[14]).toBeCloseTo(toSceneZ(expected[2] * scale), 3);
     }
 
     belt.dispose();

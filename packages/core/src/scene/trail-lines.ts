@@ -3,7 +3,8 @@
  *
  * 전 천체 선을 `LinesMesh` 1개에 묶는다 (인덱스 선분 — 천체 경계에서는 선분을 잇지 않는다). draw call 1.
  *
- * - **정점 위치** — 절대 장면 좌표 `(world − origin) × scale` 를 float64 로 계산해 `Float32Array` 에 담는다 (결정 T3).
+ * - **정점 위치** — 절대 장면 좌표 `S_z((world − origin) × scale)` 를 float64 로 계산해 `Float32Array` 에 담는다 (결정 T3 ·
+ *   `S_z` = #1366 장면 경계 z 반전, `coords/scene-handedness.ts`).
  *   body `mesh.position` 과 같은 식 · 같은 입력이라 머리 정점과 천체 중심이 같은 float32 값이 된다. 메시 자신의
  *   world 행렬은 항등 (position 0 · scaling 1) 이다.
  * - **정점 색** — 천체 `colorHint` (결정 T6 · Q-T8), alpha 는 **인덱스 기반 고정 페이드** (머리 1 → 꼬리 0). 생성 시

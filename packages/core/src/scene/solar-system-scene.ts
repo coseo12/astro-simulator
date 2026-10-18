@@ -17,6 +17,8 @@ import type { BootPhaseHook } from '../engine/boot-phase.js';
 import { orbitMu } from '../physics/kepler.js';
 import { elementsAt, parentRelativePositionAt } from '../physics/orbit-elements-at.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
+import { axialToScene, fromSceneZ, toSceneZ } from '../coords/scene-handedness.js';
+import type { Vec3Double } from '../coords/vec3.js';
 import {
   NBodyEngine,
   buildInitialState,
@@ -66,8 +68,17 @@ import { SCENE_CLEAR_COLOR_RGBA, hexToColor3 } from './color-utils.js';
 import {
   isProceduralPlanetMaterial,
   resolveNightLightStrength,
+  setEclipseShadowUniforms,
   type PlanetLightingConstants,
 } from './procedural-planet-shader.js';
+import {
+  copyEclipseShadowUniforms,
+  lunarEclipseShadowUniforms,
+  noEclipseShadowUniforms,
+  solarEclipseShadowUniforms,
+  type EclipseShadowUniforms,
+} from '../events/eclipse-shadow-uniforms.js';
+import { eclipseRadiiOf } from '../events/compute-events.js';
 // #850 Phase 1 — 아래 4 모듈은 본 파일 테일 (구 2041-2502) 에서 순수 이동한 헬퍼다 (동작 변경 0).
 import {
   createBodyMesh,
@@ -164,6 +175,20 @@ const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
  * `solar-system-scene-lunar-orbit-line.test.ts` 가 단언한다.
  */
 export const PRECESSING_ORBIT_LINE_THRESHOLD_RAD = (0.5 * Math.PI) / 180;
+
+/**
+ * #1360 결정 G4 — 절차 셰이더 `uSunDirection` 기준점을 메시 (화면) 위치 대신 물리 위치로 두는 천체. 달 전용이다 — 달의 화면
+ * 위치는 지구로부터 실제 거리 × 위성 배율 (`orbit-visual-scale.ts`) 에 있어, 메시 기준이면 위상각이 최대 `4.576°` 어긋난다
+ * (ADR `20261018-1360-moon-phase-eclipse-shadows.md` §1-B — 2년 스윕).
+ */
+export const PHYSICAL_PHASE_BODY_IDS: ReadonlySet<string> = new Set(['moon']);
+
+/**
+ * #1360 PR2 결정 R2 — 월식 그림자를 받는 천체 (그 모체의 그림자 · 체인 뿌리의 빛). 달 전용이다 — 다른 위성 식은 비-범위
+ * (ADR §비-범위). 그 밖의 절차 머티리얼은 `uEclMode = 0` 고정 (머티리얼 생성 기본값). 일식은 이 천체의 **모체** (지구) 가
+ * 받는다 (PR3 — 표면 high · mid + 구름).
+ */
+export const LUNAR_ECLIPSE_SHADOW_BODY_ID = 'moon';
 /** 강조색(`BELT_HILDA_ACCENT_RGB`) 으로 구분하는 그룹 — 힐다 3:2 공명군. 시각 구분 전용 (PR #1324 사용자 결정). */
 const BELT_ACCENT_GROUP = 'hilda';
 
@@ -505,6 +530,29 @@ export interface SolarSystemSceneHandles {
    * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
    */
   getBodyReferenceFrame: () => BodyReferenceFrame;
+  /**
+   * #1360 결정 G3 — 장면이 이번 프레임에 쓴 「위성 배율을 곱하기 **전**」 모체 기준 위치 [m] 의 사본. 뿌리 천체 · 미등록 id 는
+   * `[0, 0, 0]`. 위상 (G4) · 그림자 (PR2 · PR3) 의 물리 기하 입력이다. 진단 · 단위 테스트용.
+   *
+   * ⚠️ 위성 배율과 **독립이 아니다** — 배율이 어디서 곱해지는지에 의존한다 (정의부 주석).
+   */
+  getPhysicalLocal: (id: string) => Vec3Double;
+  /**
+   * #1360 PR2 결정 C2 (사용자 결정 Q-T (a)) — 식 그림자 검증용 토글 (기본 `true`). 같은 프레임 on/off 대조가 이 setter 로
+   * 이뤄진다 — UI 토글은 두지 않는다. 값만 바꾸고 셰이더는 재컴파일하지 않는다 (`#define` 분기 없음 — 결정 R1).
+   */
+  setEclipseShadowsEnabled: (enabled: boolean) => void;
+  getEclipseShadowsEnabled: () => boolean;
+  /**
+   * #1360 PR2 — 월식 수신 천체 (달) 머티리얼에 지금 쓰인 그림자 uniform 의 사본 (토글 반영 후 값). 진단 · 단위 테스트용.
+   * #1366 — 머티리얼 값이라 **장면 공간**이다 (`a` · `axis` 의 z 가 판정식 출력의 반전). 길이 · 비율은 판정식과 같다.
+   */
+  getLunarEclipseShadowUniforms: () => EclipseShadowUniforms;
+  /**
+   * #1360 PR3 — 일식 수신 천체 (지구 — 달의 모체) 표면 · 구름 머티리얼에 지금 쓰인 그림자 uniform 의 사본 (토글 반영 후 값).
+   * 진단 · 단위 테스트용. 장면 공간이다 (`a` · `axis` 의 z 가 빌더 출력의 반전). `k` 는 판정식 원뿔 파라미터와 같다.
+   */
+  getSolarEclipseShadowUniforms: () => EclipseShadowUniforms;
   dispose: () => void;
 }
 
@@ -744,6 +792,8 @@ export interface SolarSystemSceneOptions {
    * `rotationQuaternion = tilt(axialTilt) ∘ spin(spinAngle(jd))` 를 매 프레임 설정. 자전각은 jd 순수
    * 함수 (`(jd − epoch) × ω mod 2π`, 누적 금지 — frame-rate 독립·결정적). ring 있는 body 4개는
    * ring-anchor (비회전 tilt-only 노드) 로 ring disc 를 격리해 wobble 0 (ADR §A2.3 결정 1).
+   * ⚠️ 지구만 `tilt(ε − π/2) ∘ spin(−ERA(jd))` — 실제 시각 기준 방향 (#1362, `self-rotation.ts`
+   * `computeEarthOrientationQuaternion`).
    */
   selfRotation?: boolean;
 
@@ -902,6 +952,9 @@ export function createSolarSystemScene(
     // #1226 Amendment 11 — 야간 도시 불빛 (유효 조건 `nightLights && surfaceDetail` — 이 묶음은
     // surfaceDetail=true 일 때만 소비된다). clouds 와 독립.
     nightLights,
+    // #1360 결정 G4 — 달 위상 기준점 (물리 위치). 정의부 (`physicalPhaseAnchor`) 는 위치 버퍼 · `bodyFrame` 뒤에 있으므로
+    // 화살표로 감싸 호출 시점에 읽는다 — onBind 는 draw 때만 불리고 장면 생성 중에는 불리지 않는다.
+    sunDirectionAnchorProvider: (bodyId: string) => physicalPhaseAnchor(bodyId),
   };
   // 광원 (HemisphericLight + PointLight) + 셰이더 광원 상수 묶음.
   phase('scene:lights');
@@ -1160,12 +1213,18 @@ export function createSolarSystemScene(
   }
   let precessingOrbitLineGroups: PrecessingOrbitLineGroup[] = [];
 
-  /** 천체 1개의 궤도점 — 위성은 per-body 시각 배율을 곱한다 (R11 #721). `rebuildOrbitLines` 와 갱신이 같은 식을 쓴다. */
+  /**
+   * 천체 1개의 궤도점 — 위성은 per-body 시각 배율을 곱한다 (R11 #721). `rebuildOrbitLines` 와 갱신이 같은 식을 쓴다.
+   * #1366 — 샘플러는 데이터 공간 (순수 함수 계약) 이고, LineSystem 에 넣는 여기서 장면 좌표로 바꾼다 (`toSceneZ`).
+   */
   const orbitLinePointsFor = (body: LoadedCelestialBody, jd: number): Vector3[] | null => {
-    const pts = sampleOrbitPoints(body, activeTier, jd);
-    if (!pts || !isSatelliteOrbit(body.parentId)) return pts;
-    const perBodyScale = getOrbitVisualScale(body.parentId, body.id);
-    return pts.map((p) => p.scale(perBodyScale));
+    const sampled = sampleOrbitPoints(body, activeTier, jd);
+    if (!sampled) return null;
+    const pts = isSatelliteOrbit(body.parentId)
+      ? sampled.map((p) => p.scale(getOrbitVisualScale(body.parentId!, body.id)))
+      : sampled;
+    for (const p of pts) p.z = toSceneZ(p.z);
+    return pts;
   };
 
   /** 율 보유 천체의 현재 (Ω, ϖ) — 정규화하지 않은 연속값 (`elementsAt` 결과) 이라 차를 그대로 문턱과 비교한다. */
@@ -1413,7 +1472,7 @@ export function createSolarSystemScene(
     sunLight.position.set(
       (sunWorld[0] - ox) * scale,
       (sunWorld[1] - oy) * scale,
-      (sunWorld[2] - oz) * scale,
+      toSceneZ((sunWorld[2] - oz) * scale),
     );
   };
 
@@ -1441,7 +1500,7 @@ export function createSolarSystemScene(
       orbitLines.position.set(
         (sunWorld[0] - ox) * scale,
         (sunWorld[1] - oy) * scale,
-        (sunWorld[2] - oz) * scale,
+        toSceneZ((sunWorld[2] - oz) * scale),
       );
     }
     for (const [parentId, ls] of satelliteOrbitLines) {
@@ -1450,7 +1509,7 @@ export function createSolarSystemScene(
         ls.position.set(
           (parentWorld[0] - ox) * scale,
           (parentWorld[1] - oy) * scale,
-          (parentWorld[2] - oz) * scale,
+          toSceneZ((parentWorld[2] - oz) * scale),
         );
       }
     }
@@ -1479,6 +1538,197 @@ export function createSolarSystemScene(
     bodyFrame.originY = oy;
     bodyFrame.originZ = oz;
     bodyFrame.scale = scale;
+  };
+
+  /**
+   * #1360 결정 G3 — `updateAt` 이 이번 프레임 위치를 어느 경로로 썼는가. `activeEngine` 만으로는 정할 수 없다 —
+   * N-body 엔진을 골랐어도 엔진 인스턴스가 아직 없으면 `updateAt` 은 Kepler 경로로 떨어진다 (`updateAt` 첫 분기).
+   */
+  let positionSource: 'kepler' | 'nbody' = 'kepler';
+
+  /**
+   * #1360 결정 G3 — 장면이 이번 프레임에 쓴 「위성 배율을 곱하기 **전**」 모체 기준 위치 [m] 를 `out` 에 쓴다.
+   *
+   *  - Kepler 경로: `localPositions` — `resolveWorld` 가 `getOrbitVisualScale` 을 곱하기 **전** 값.
+   *  - N-body 경로: 엔진 위치의 차 `world[id] − world[parent]` — 이 경로는 배율을 곱하지 않는다 (ADR 1341 Amendment 3).
+   *
+   * ⚠️ **이 함수는 위성 배율과 「독립」 이 아니다 — 배율이 어디서 곱해지는지에 의존한다** (#1354 교훈). 지금은 Kepler
+   * 경로만 곱하므로 Kepler 는 곱하기 전 버퍼를, N-body 는 엔진 차를 읽는다. N-body 경로가 배율을 곱하게 바뀌면 N-body
+   * 분기도 「곱하기 전」 값을 읽도록 함께 바뀌어야 한다. 이 의존은 `solar-system-scene-physical-phase.test.ts` (DoD D2 —
+   * 배율 30 ↔ 1 에서 출력 비트 동일) 가 고정한다.
+   */
+  const physicalLocalInto = (id: string, out: MutVec3): MutVec3 => {
+    const body = bodiesById.get(id);
+    if (!body?.parentId) {
+      out[0] = 0;
+      out[1] = 0;
+      out[2] = 0;
+      return out;
+    }
+    if (positionSource === 'kepler') {
+      const local = localPositions.get(id) ?? ZERO;
+      out[0] = local[0];
+      out[1] = local[1];
+      out[2] = local[2];
+      return out;
+    }
+    const world = worldPositions.get(id) ?? ZERO;
+    const parentWorld = worldPositions.get(body.parentId) ?? ZERO;
+    out[0] = world[0] - parentWorld[0];
+    out[1] = world[1] - parentWorld[1];
+    out[2] = world[2] - parentWorld[2];
+    return out;
+  };
+
+  const tmpPhysicalLocal: MutVec3 = [0, 0, 0];
+  const tmpPhaseAnchor = new Vector3();
+  /**
+   * #1360 결정 G4 — 절차 셰이더 `uSunDirection` 의 기준점 (장면 단위). 달만 물리 위치
+   * `모체 메시 + physicalLocal × bodyFrame.scale` 을 돌려주고, 그 밖은 `null` (셰이더가 메시 위치를 쓴다 — 현행).
+   *
+   * 배율은 메시 위치에만 남고 위상은 배율 전 값을 쓴다 (principles §1 — rendering 시점 분리). 다른 위성은 `StandardMaterial`
+   * · `PointLight` 라 같은 화면 기하 위상이지만 범위 밖이다 — 「독립」 이 아니라 **미처리** (ADR §비-범위).
+   *
+   * `bodyFrame.scale` 은 메시 위치가 마지막으로 쓰인 배율이다 (`updateAt` · `setTier` 두 지점) — 모체 메시 위치와 같은
+   * 기준계라 차가 물리적으로 의미를 갖는다 (`syncSunLightPosition` 의 #1204 계약과 같은 논거).
+   */
+  const physicalPhaseAnchor = (bodyId: string): Vector3 | null => {
+    if (!PHYSICAL_PHASE_BODY_IDS.has(bodyId)) return null;
+    const parentId = bodiesById.get(bodyId)?.parentId;
+    const parentMesh = parentId ? meshes.get(parentId) : undefined;
+    if (!parentMesh) return null;
+    physicalLocalInto(bodyId, tmpPhysicalLocal);
+    const s = bodyFrame.scale;
+    const p = parentMesh.getAbsolutePosition();
+    // #1366 — physicalLocal 은 데이터 공간 변위라 장면 메시 위치에 더하기 전에 z 를 장면으로.
+    tmpPhaseAnchor.set(
+      p.x + tmpPhysicalLocal[0] * s,
+      p.y + tmpPhysicalLocal[1] * s,
+      p.z + toSceneZ(tmpPhysicalLocal[2]) * s,
+    );
+    return tmpPhaseAnchor;
+  };
+
+  /**
+   * #1360 PR2 — 월식 그림자 상태. `computedLunarShadow` 는 이번 시각의 판정식 출력 (`updateAt` 이 프레임당 1회 갱신),
+   * `appliedLunarShadow` 는 토글을 반영해 머티리얼에 실제로 쓴 값이다.
+   *
+   * 기하 입력 = 결정 G3 의 `physicalLocalInto` — 달은 `moon − earth`, 태양은 `−(earth − sun)` (지구 중심, 배율 전 [m]).
+   * ⚠️ `physicalLocalInto` 와 같은 의존을 갖는다 — 위성 배율이 Kepler 경로에서만 곱해진다는 구조에 기대며, 「배율과 독립」
+   * 이 아니다 (`solar-system-scene-eclipse-shadow.test.ts` 가 배율 30 ↔ 1 비트 동일로 고정한다).
+   */
+  let eclipseShadowsEnabled = true;
+  const computedLunarShadow = noEclipseShadowUniforms();
+  const appliedLunarShadow = noEclipseShadowUniforms();
+  const noShadow = noEclipseShadowUniforms();
+  const tmpEclipseMoon: MutVec3 = [0, 0, 0];
+  const tmpEclipseSun: MutVec3 = [0, 0, 0];
+  // 반경 = 위성 · 모체 · 체인 뿌리의 데이터 `radius` — 사건 판정과 **같은 함수** (`eclipseRadiiOf`). 없으면 그림자 없음.
+  const lunarShadowRadii = eclipseRadiiOf(bodiesById, LUNAR_ECLIPSE_SHADOW_BODY_ID);
+  // #1360 PR3 — 일식 수신 천체 = 달의 모체 (지구). 기하 입력 · 반경은 월식과 같다 (같은 삼체 · 같은 `eclipseRadiiOf`).
+  const solarShadowReceiverId = bodiesById.get(LUNAR_ECLIPSE_SHADOW_BODY_ID)?.parentId ?? null;
+  const computedSolarShadow = noEclipseShadowUniforms();
+  const appliedSolarShadow = noEclipseShadowUniforms();
+
+  /** 수신 천체의 high · mid 머티리얼에 `appliedLunarShadow` 를 쓴다 (low billboard · `?surface=off` 는 절차 머티리얼이 아니라 무시). */
+  const writeLunarShadowTo = (mesh: Mesh | undefined) => {
+    const material = mesh?.material;
+    if (isProceduralPlanetMaterial(material))
+      setEclipseShadowUniforms(material, appliedLunarShadow);
+  };
+  const applyLunarShadow = () => {
+    copyEclipseShadowUniforms(
+      eclipseShadowsEnabled ? computedLunarShadow : noShadow,
+      appliedLunarShadow,
+    );
+    writeLunarShadowTo(meshes.get(LUNAR_ECLIPSE_SHADOW_BODY_ID));
+    writeLunarShadowTo(midVariants.get(LUNAR_ECLIPSE_SHADOW_BODY_ID));
+  };
+  /**
+   * #1360 PR3 — 일식 수신 천체 (지구) 의 high · mid 머티리얼에 `appliedSolarShadow` 를 쓴다. 구름은 {@link writeSolarShadowToCloud}
+   * (구름 머티리얼은 절차 행성 머티리얼 집합 밖이라 따로 쓴다 — 결정 R3).
+   */
+  const writeSolarShadowTo = (mesh: Mesh | undefined) => {
+    const material = mesh?.material;
+    if (isProceduralPlanetMaterial(material))
+      setEclipseShadowUniforms(material, appliedSolarShadow);
+  };
+  const writeSolarShadowToCloud = () => {
+    if (cloudLayer) setEclipseShadowUniforms(cloudLayer.material, appliedSolarShadow);
+  };
+  const applySolarShadow = () => {
+    copyEclipseShadowUniforms(
+      eclipseShadowsEnabled ? computedSolarShadow : noShadow,
+      appliedSolarShadow,
+    );
+    if (solarShadowReceiverId === null) return;
+    writeSolarShadowTo(meshes.get(solarShadowReceiverId));
+    writeSolarShadowTo(midVariants.get(solarShadowReceiverId));
+    writeSolarShadowToCloud();
+  };
+  /**
+   * #1360 PR2 — 이번 시각의 월식 그림자를 계산해 머티리얼에 쓴다. `updateAt` 의 위치 갱신 뒤 프레임당 1회 (시간 위상 — 값은
+   * 시각 · 엔진 상태만의 함수이고 카메라와 무관하다. 그래서 프레임 위상 (`runFramePass`) 멤버가 아니다 — ADR 1205 §결정 2).
+   * 머티리얼 쓰기를 onBind 가 아니라 여기서 하는 이유: onBind 는 Babylon `ShaderMaterial.bind` 의 uniform 업로드 **뒤**
+   * (`_afterBind`) 에 불려 값이 다음 draw 에 반영된다 — 토글 · 시각 점프 직후 한 프레임이 이전 그림자로 그려진다.
+   */
+  const updateLunarShadow = () => {
+    if (lunarShadowRadii) {
+      physicalLocalInto(LUNAR_ECLIPSE_SHADOW_BODY_ID, tmpEclipseMoon);
+      const parentId = bodiesById.get(LUNAR_ECLIPSE_SHADOW_BODY_ID)!.parentId!;
+      physicalLocalInto(parentId, tmpEclipseSun);
+      tmpEclipseSun[0] = -tmpEclipseSun[0];
+      tmpEclipseSun[1] = -tmpEclipseSun[1];
+      tmpEclipseSun[2] = -tmpEclipseSun[2];
+      lunarEclipseShadowUniforms(
+        tmpEclipseMoon,
+        tmpEclipseSun,
+        lunarShadowRadii,
+        computedLunarShadow,
+      );
+      // #1366 — 판정식 · uniform 빌더는 데이터 공간 (순수 함수 계약). 셰이더는 장면 world normal 과 내적하므로 방향
+      // 벡터 2개 (`a` · `axis` — 둘 다 극벡터) 를 장면으로 옮긴다. 길이 · 비율 (`k`) 은 반사에 불변이다.
+      // 그림자 없음 (`mode 0`) 은 셰이더 합성이 항등이라 값을 그대로 둔다.
+      if (computedLunarShadow.mode !== 0) {
+        computedLunarShadow.a[2] = toSceneZ(computedLunarShadow.a[2]);
+        computedLunarShadow.axis[2] = toSceneZ(computedLunarShadow.axis[2]);
+      }
+    }
+    applyLunarShadow();
+  };
+  /**
+   * #1360 PR3 — 이번 시각의 일식 그림자 (지구 수신) 를 계산해 지구 표면 · 구름 머티리얼에 쓴다. 호출 위치 · 이유는
+   * {@link updateLunarShadow} 와 같다 (`updateAt` 위치 갱신 뒤 프레임당 1회 · onBind 는 한 프레임 늦다). 입력은 월식과 같은
+   * `physicalLocalInto` (배율 전 위치) 이고, 같은 의존 (위성 배율이 Kepler 경로에서만 곱해진다) 을 갖는다.
+   */
+  const updateSolarShadow = () => {
+    if (lunarShadowRadii) {
+      // updateLunarShadow 가 이번 프레임에 채운 tmpEclipseMoon · tmpEclipseSun (지구 중심 달 · 태양, 데이터 공간) 을 다시 읽지
+      // 않고 새로 만든다 — 호출 순서에 기대지 않게 한다.
+      physicalLocalInto(LUNAR_ECLIPSE_SHADOW_BODY_ID, tmpEclipseMoon);
+      physicalLocalInto(solarShadowReceiverId!, tmpEclipseSun);
+      tmpEclipseSun[0] = -tmpEclipseSun[0];
+      tmpEclipseSun[1] = -tmpEclipseSun[1];
+      tmpEclipseSun[2] = -tmpEclipseSun[2];
+      solarEclipseShadowUniforms(
+        tmpEclipseMoon,
+        tmpEclipseSun,
+        lunarShadowRadii,
+        computedSolarShadow,
+      );
+      // #1366 — 셰이더는 장면 world normal 과 내적하므로 극벡터 2개 (`a` = 달 위치 · `axis` = 태양 → 달) 의 z 를 장면으로.
+      // `k` (원뿔 파라미터 — 길이 · 비율) 는 반사에 불변이다. 그림자 없음은 셰이더 합성이 항등이라 그대로 둔다.
+      if (computedSolarShadow.mode !== 0) {
+        computedSolarShadow.a[2] = toSceneZ(computedSolarShadow.a[2]);
+        computedSolarShadow.axis[2] = toSceneZ(computedSolarShadow.axis[2]);
+      }
+    }
+    applySolarShadow();
+  };
+  const setEclipseShadowsEnabled = (enabled: boolean) => {
+    eclipseShadowsEnabled = enabled;
+    applyLunarShadow();
+    applySolarShadow();
   };
 
   // 소행성대 (#99).
@@ -1601,7 +1851,10 @@ export function createSolarSystemScene(
           bodyId: body.id,
           headMesh,
           sunMesh,
-          orbitNormal: cometOrbitNormal(body.orbit, system.epoch, orbitMu(body, parent)),
+          // #1366 — 궤도 법선은 축벡터라 단순 z 반전이 아니라 `(−x, −y, z)` (먼지 휨 `ĥ × axis` 방향 보존).
+          orbitNormal: axialToScene(
+            cometOrbitNormal(body.orbit, system.epoch, orbitMu(body, parent)),
+          ),
           frameProvider: () => bodyFrame,
         }),
       );
@@ -1722,7 +1975,7 @@ export function createSolarSystemScene(
     for (let i = 0; i < offset; i += 3) {
       out[i] = (world[i]! - ox) * scale;
       out[i + 1] = (world[i + 1]! - oy) * scale;
-      out[i + 2] = (world[i + 2]! - oz) * scale;
+      out[i + 2] = toSceneZ((world[i + 2]! - oz) * scale);
     }
     lines.commit();
   };
@@ -1768,7 +2021,7 @@ export function createSolarSystemScene(
       // body mesh.position 과 같은 식 — float64 뺄셈 · 곱 후 float32 저장 (끝점 = 메시 위치, DoD E4).
       out[3 * end] = (world[0] - ox) * scale;
       out[3 * end + 1] = (world[1] - oy) * scale;
-      out[3 * end + 2] = (world[2] - oz) * scale;
+      out[3 * end + 2] = toSceneZ((world[2] - oz) * scale);
     }
     rulerLine.commit();
   };
@@ -1959,7 +2212,7 @@ export function createSolarSystemScene(
       mesh.position.set(
         (world[0] - tierTransitionOrigin[0]) * newScale,
         (world[1] - tierTransitionOrigin[1]) * newScale,
-        (world[2] - tierTransitionOrigin[2]) * newScale,
+        toSceneZ((world[2] - tierTransitionOrigin[2]) * newScale),
       );
       mesh.computeWorldMatrix(true);
     }
@@ -2206,6 +2459,7 @@ export function createSolarSystemScene(
         newtonLastJd = jd;
       }
       const flat = newtonEngine.positions();
+      positionSource = 'nbody';
       for (const body of system.bodies) {
         const idx = newtonIdIndex.get(body.id);
         const world = worldPositions.get(body.id)!;
@@ -2221,6 +2475,7 @@ export function createSolarSystemScene(
       }
     } else {
       updateAtKepler(jd);
+      positionSource = 'kepler';
     }
 
     // 가드 C (#380 G3 fix) — Floating Origin primary follow sub-frame 이동.
@@ -2245,7 +2500,10 @@ export function createSolarSystemScene(
     // Floating Origin 계약 (ADR `docs/decisions/20260422-floating-origin.md` §3):
     //   - `world` (worldPositions): Heliocentric 절대 좌표 (m) — Rust engine / Zustand store 와 동일
     //   - `local = floatingOrigin.toLocal(world)` : scene 삽입 직전 origin shift 적용 (m)
-    //   - `mesh.position` : scene unit (local × renderScaleForTier(activeTier))
+    //   - `mesh.position` : scene unit (S_z(local × renderScaleForTier(activeTier)))
+    //     #1366 — `S_z` 는 장면 경계 z 반전 (`coords/scene-handedness.ts` `toSceneZ`). 데이터는 오른손 황도, Babylon 장면은
+    //     왼손계라 그대로 넣으면 화면이 황도면 기준 거울상이 된다. origin 은 데이터 공간 — 뺀 **뒤** 반전한다.
+    //     장면 → 데이터 역변환 (`fromSceneZ`) 지점: 아래 free-fly safety net · `runLodPass` 카메라 · web tier 판정.
     // 이 3단 변환을 우회하여 `world * SCENE_UNIT_PER_METER` 를 직접 할당하면 float32 jitter regression
     // 재발 (#271 재현). 아래 루프 수정 시 이 주석 계약 유지 필수. P12-A 부터 SCENE_UNIT_PER_METER 는
     // `renderScaleForTier(activeTier)` 로 교체 — ADR §결정 §1 R4 DoD.
@@ -2262,11 +2520,14 @@ export function createSolarSystemScene(
       mesh.position.set(
         (world[0] - ox) * sceneUnitPerMeter,
         (world[1] - oy) * sceneUnitPerMeter,
-        (world[2] - oz) * sceneUnitPerMeter,
+        toSceneZ((world[2] - oz) * sceneUnitPerMeter),
       );
     }
     // #1319 결정 2 — 위 루프가 쓴 기준계를 띠 입자용으로 기록 (아래 primary follow 가 origin 을 옮기기 전 값).
     recordBodyFrame(ox, oy, oz, sceneUnitPerMeter);
+    // #1360 PR2 · PR3 — 월식 · 일식 그림자 (이번 시각 · 이번 위치 경로의 배율 전 위치). 방향 · 비율만이라 기준계와 무관하다.
+    updateLunarShadow();
+    updateSolarShadow();
 
     // #627 — satellite orbit line position 동기화 (moon 패턴 일반화, ADR §5 옵션 A 구현 절차 3).
     // satellite orbit ellipse 점은 sampleOrbitPoints 가 parent 0 원점 기준으로 산출.
@@ -2367,7 +2628,7 @@ export function createSolarSystemScene(
       const cameraLocalMeters = [
         cam.globalPosition.x * metersPerSceneUnit,
         cam.globalPosition.y * metersPerSceneUnit,
-        cam.globalPosition.z * metersPerSceneUnit,
+        fromSceneZ(cam.globalPosition.z) * metersPerSceneUnit,
       ] as const;
       // local → world = local + current origin (shift 전 기준)
       const cameraWorldMeters: [number, number, number] = [
@@ -2501,7 +2762,8 @@ export function createSolarSystemScene(
     // camera.globalPosition 은 local (floating origin 적용된 scene unit). 월드 m 환산 = local(m) + origin.
     const camWorldX = camera.globalPosition.x * metersPerSceneUnit + origin[0];
     const camWorldY = camera.globalPosition.y * metersPerSceneUnit + origin[1];
-    const camWorldZ = camera.globalPosition.z * metersPerSceneUnit + origin[2];
+    // #1366 — 장면 z → 데이터 z (`fromSceneZ`). 아래 거리 · 위치는 데이터 공간, `screenCoverageRadius` 입력만 장면 공간.
+    const camWorldZ = fromSceneZ(camera.globalPosition.z) * metersPerSceneUnit + origin[2];
 
     for (const body of system.bodies) {
       const world = worldPositions.get(body.id);
@@ -2509,9 +2771,10 @@ export function createSolarSystemScene(
       if (!world || !highMesh) continue;
 
       // body 의 local 좌표 (m, FO 적용된) — screenCoverageRadius 에 전달할 scene 좌표 basis.
+      // #1366 — `vpArr` · `cameraUpWorld` 가 장면 공간이라 z 를 장면으로 (메시 위치와 같은 식).
       const localX = world[0] - origin[0];
       const localY = world[1] - origin[1];
-      const localZ = world[2] - origin[2];
+      const localZ = toSceneZ(world[2] - origin[2]);
 
       // 카메라-body 실세계 거리 (m).
       const dx = world[0] - camWorldX;
@@ -2780,6 +3043,12 @@ export function createSolarSystemScene(
           surfaceLightingArgs,
         );
         midVariants.set(body.id, m);
+        // #1360 PR2 — lazy 생성된 달 mid 에 현재 그림자 (`appliedLunarShadow`) 를 지금 쓴다. 값을 갱신하는 시간 위상
+        // (`updateAt`) 은 일시정지 중 돌지 않으므로, 이 쓰기가 없으면 일시정지 중 생성된 mid 는 다음 시각 변경까지 생성
+        // 기본값 (그림자 없음) 으로 그려진다 — 지우지 말 것 (`solar-system-scene-eclipse-shadow.test.ts` lazy mid 단언).
+        if (body.id === LUNAR_ECLIPSE_SHADOW_BODY_ID) writeLunarShadowTo(m);
+        // #1360 PR3 — 일식 수신 천체 (지구) 의 lazy mid 도 같은 이유로 생성 즉시 쓴다.
+        if (body.id === solarShadowReceiverId) writeSolarShadowTo(m);
         // #1215 §A10.6 — lazy 생성 variant 를 host 계열 식별자 집합에 등록 (계열 host 가 아니면 no-op).
         hostFamilies.registerMember(m, highMesh, HOST_FAMILY_RANK);
       }
@@ -3134,6 +3403,10 @@ export function createSolarSystemScene(
     //     로 남는다 (#1205 클래스 — ADR 1205 §결정 2). 게이트는 `updateAt` 과 같은 `rotationStates.has`.
     //     가시성 (`isVisible`) 은 프레임 위상 (`runFramePass`) 이 렌더 직전 매 프레임 쓰므로 여기서 불요.
     if (rotationStates.has(CLOUD_LAYER_BODY_ID)) applyCloudDrift(layer, currentJd, rotationEpoch);
+    // (c) #1360 PR3 — 새 구름 머티리얼은 그림자 없음 기본값으로 생긴다. 일식 uniform 갱신은 시간 위상 (`updateAt`) 에만 있어
+    //     일시정지 중 켜면 다음 시각 변경까지 구름이 그림자 위에서 밝게 남는다 — 지금 쓴다 (위 (b) 와 같은 #1205 클래스).
+    //     로드 경로 (`enableClouds` 직접 호출) 는 그 뒤 첫 `updateAt` 이 쓴다.
+    writeSolarShadowToCloud();
   };
 
   // #1265 §결정 4 — 불빛 상태는 `surfaceLightingArgs.nightLights` 하나다 (lazy mid 가 이 객체를 참조로
@@ -3253,6 +3526,16 @@ export function createSolarSystemScene(
     setRuler,
     getRulerLine: () => rulerLine,
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
+    getPhysicalLocal: (id: string) => {
+      const out: MutVec3 = [0, 0, 0];
+      return physicalLocalInto(id, out);
+    },
+    setEclipseShadowsEnabled,
+    getEclipseShadowsEnabled: () => eclipseShadowsEnabled,
+    getLunarEclipseShadowUniforms: () =>
+      copyEclipseShadowUniforms(appliedLunarShadow, noEclipseShadowUniforms()),
+    getSolarEclipseShadowUniforms: () =>
+      copyEclipseShadowUniforms(appliedSolarShadow, noEclipseShadowUniforms()),
     dispose: () => {
       ambient.dispose();
       sunLight.dispose();

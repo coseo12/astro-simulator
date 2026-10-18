@@ -28,8 +28,13 @@ import {
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import type { SurfaceLightingArgs } from './body-mesh-factory.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
-import { SOFT_TERMINATOR_WIDTH } from './procedural-planet-shader.js';
-import { computeSpinAngle } from './self-rotation.js';
+import {
+  ECLIPSE_SHADOW_GLSL,
+  ECLIPSE_SHADOW_UNIFORM_NAMES,
+  initEclipseShadowUniforms,
+  SOFT_TERMINATOR_WIDTH,
+} from './procedural-planet-shader.js';
+import { computeSpinAngle, EARTH_SPIN_SIGN } from './self-rotation.js';
 import { renderScaleForTier, type Tier } from './tier.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,13 +108,17 @@ export const HOST_FAMILY_RANK = 0;
 export const CLOUD_SORT_RANK = 1;
 
 /**
- * §A10.8 — 구름의 **상대** 각속도 [rad/day] = `CLOUD_ZONAL_WIND_MS × 86400 / body.radius`.
+ * §A10.8 — 구름의 **상대** 각속도 [rad/day] = `EARTH_SPIN_SIGN × CLOUD_ZONAL_WIND_MS × 86400 / body.radius`.
  *
  * `body.radius` 는 데이터 SSoT (m — earth `6378137.0`) 라 차원이 rad/day 로 맞다 (§A10.16 C3).
- * 부호는 **양 (순행)** — 구름의 유효 각속도는 `ω_earth + CLOUD_DRIFT_OMEGA` 다.
+ * 크기는 풍속이 정하고 **부호는 host spin 이 정한다** (#1362). 구름 local 회전은 host 의 spin 뒤에
+ * 곱해지므로 (`tilt ∘ spin(EARTH_SPIN_SIGN·ERA) ∘ spin(Δθ)`) 순행 — 지표 기준 **동쪽** — 은 `Δθ` 가
+ * host spin 과 같은 부호일 때다. 지구 spin 은 local `+Y` 기준 **음**이라 이 값도 음이다.
+ * ⚠️ #1362 이전에는 양이었고 host spin 도 양이라 「같은 부호 = 순행」 이었지만, 그 host spin 자체가 지표를
+ * 동→서로 돌렸다 (결함) — 그래서 구름도 지표 기준 **서쪽**으로 흘렀다.
  */
 export function computeCloudDriftOmega(body: Pick<LoadedCelestialBody, 'radius'>): number {
-  return (CLOUD_ZONAL_WIND_MS * SECONDS_PER_DAY) / body.radius;
+  return (EARTH_SPIN_SIGN * (CLOUD_ZONAL_WIND_MS * SECONDS_PER_DAY)) / body.radius;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,7 +189,7 @@ uniform float cloudOpacity;
 uniform float cloudFrequency;
 uniform float cloudDetailFreqRatio;
 uniform float cloudDetailWeight;
-
+${ECLIPSE_SHADOW_GLSL}
 // 3D hash — sin-free fract-mix (starfield.ts hash33 답습 — swiftshader/tier-c fps 보호).
 vec3 hash33(vec3 p) {
   p = fract(p * vec3(0.1031, 0.1030, 0.0973));
@@ -226,7 +235,12 @@ void main(void) {
   vec3 ambientShade = ambientIntensity * mix(ambientGround, ambientSky, hemiFactor);
   float ndl = dot(N, uSunDirection);
   float sunFactor = smoothstep(0.0, softTerminatorWidth, ndl);
-  vec3 shade = ambientShade + sunIntensity * sunDiffuse * sunFactor;
+  vec3 sunShade = sunIntensity * sunDiffuse * sunFactor;
+  vec3 shade = ambientShade + sunShade;
+  // #1360 PR3 결정 R3 (사용자 결정 Q-C (a)) — 일식 그림자. 표면 셰이더와 같은 함수 (ECLIPSE_SHADOW_GLSL 보간 — 사본 아님) ·
+  // 같은 합성이다. 구름이 그림자 위에서 밝게 남지 않게 한다. 붉은 빛 항 (ecl.y) 은 월식 전용이라 구름은 쓰지 않는다.
+  vec2 ecl = eclipseShadow(N);
+  shade -= sunShade * ecl.x;
 
   // 밀도 — 저주파 덩어리 + 디테일 결. 디테일 fbm 은 다른 격자 위상을 쓰도록 좌표만 스케일한다.
   float coarse = fbm(p * cloudFrequency);
@@ -296,6 +310,8 @@ export function createCloudMaterial(
         'cloudFrequency',
         'cloudDetailFreqRatio',
         'cloudDetailWeight',
+        // #1360 PR3 — 식 그림자 uniform (값은 장면이 `setEclipseShadowUniforms` 로 쓴다).
+        ...ECLIPSE_SHADOW_UNIFORM_NAMES,
       ],
       needAlphaBlending: true,
     },
@@ -323,6 +339,8 @@ export function createCloudMaterial(
   material.setFloat('cloudFrequency', CLOUD_FREQUENCY);
   material.setFloat('cloudDetailFreqRatio', CLOUD_DETAIL_FREQ_RATIO);
   material.setFloat('cloudDetailWeight', CLOUD_DETAIL_WEIGHT);
+  // #1360 PR3 — 식 그림자 기본값 = 그림자 없음. 일식 시각에는 장면이 지구 표면과 같은 값을 쓴다 (`updateSolarShadow`).
+  initEclipseShadowUniforms(material);
 
   // 태양 방향 — onBind 에서 매 draw 갱신 (캐시 금지). 초기값은 provider 가 없을 때의 fallback 이 아니라
   // 첫 bind 전 uniform 공백 방지용이다 (첫 bind 가 즉시 덮어쓴다).
@@ -414,7 +432,7 @@ const CLOUD_DRIFT_AXIS = new Vector3(0, 1, 0);
 /**
  * §A10.8 결정 6 — 구름 local 회전 = local Y 주위 `Δθ(jd) = computeSpinAngle(jd, epoch, driftOmega)`.
  *
- * host 가 `tilt ∘ spin(θs)` 이므로 world 는 `tilt ∘ spin(θs + Δθ)` 가 된다. **jd 순수 함수** — 매 프레임
+ * host 가 `tilt ∘ spin(θs)` 이므로 world 는 `tilt ∘ spin(θs + Δθ)` 가 된다 (지구 `θs = −ERA` — #1362). **jd 순수 함수** — 매 프레임
  * 누적 금지 (§A2.3 결정 5). 호출 위치·게이트는 scene 이 소유한다 (host 자전과 같은 루프 ·
  * `rotationStates.has(host.id)` 와 같은 조건 — 결정 7 `?rotate=off` 구조적 상속).
  */

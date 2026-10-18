@@ -46,12 +46,14 @@ import {
   type Scene,
 } from '@babylonjs/core';
 import { AU } from '@astro-simulator/shared';
+import { SCENE_Z_SIGN } from '../coords/scene-handedness.js';
 import { mulberry32, type BeltOrbit } from './belt-population.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
 
 /**
- * body `mesh.position` 이 쓰인 기준계 — `mesh.position = (world − origin) × scale`.
- * origin 은 m (heliocentric), scale 은 m → scene unit (`renderScaleForTier(tier)`).
+ * body `mesh.position` 이 쓰인 기준계 — `mesh.position = S_z((world − origin) × scale)`.
+ * origin 은 m (heliocentric, 데이터 공간), scale 은 m → scene unit (`renderScaleForTier(tier)`).
+ * `S_z` 는 #1366 장면 경계 z 반전 (`coords/scene-handedness.ts`) — origin 을 뺀 **뒤** 장면 경계에서 적용한다.
  */
 export interface BodyReferenceFrame {
   originX: number;
@@ -162,6 +164,8 @@ varying float vFragmentDepth;
 
 const float TWO_PI = 6.283185307179586;
 const float PARTICLE_RADIUS_PX = ${(BELT_PARTICLE_PX / 2).toFixed(4)};
+// #1366 — 장면 경계 z 반전 (coords/scene-handedness.ts SCENE_Z_SIGN 주입). p · uOrigin 은 데이터 공간 [AU].
+const float SCENE_Z_SIGN = ${SCENE_Z_SIGN.toFixed(1)};
 
 void main(void) {
   float a = orbitA.x;
@@ -186,6 +190,7 @@ void main(void) {
   vec3 p = vec3(cosO * x1 - sinO * y2, sinO * x1 + cosO * y2, z2);
 
   vec3 local = (p - uOrigin) * uScale;
+  local.z *= SCENE_Z_SIGN;
   vec4 clip = viewProjection * vec4(local, 1.0);
   clip.xy += position.xy * PARTICLE_RADIUS_PX * uPxToClip * clip.w;
   gl_Position = clip;
@@ -470,8 +475,8 @@ export function createBeltParticles(
     const height = Math.max(1, engine.getRenderHeight());
     const maxZ = scene.activeCamera?.maxZ ?? 1e14;
     const logDepthConstant = 2.0 / (Math.log(maxZ + 1.0) / Math.LN2);
-    // origin 을 AU 로 — 셰이더의 `p` 가 AU 라 `(p − uOrigin) × uScale` 이 body mesh 의
-    // `(world − origin) × scale` 과 같은 식이 된다 (uScale = scale × AU, scene unit / AU).
+    // origin 을 AU 로 — 셰이더의 `p` 가 AU 라 `S_z((p − uOrigin) × uScale)` 이 body mesh 의
+    // `S_z((world − origin) × scale)` 과 같은 식이 된다 (uScale = scale × AU, scene unit / AU · `S_z` 는 셰이더 안 — #1366).
     tmpOrigin.set(frame.originX / AU, frame.originY / AU, frame.originZ / AU);
     tmpPxToClip.set(2 / width, 2 / height);
     const uScale = frame.scale * AU;

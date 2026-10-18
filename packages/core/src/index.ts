@@ -60,6 +60,7 @@ export {
   EVENT_KIND_TOLERANCE_DAYS,
   computeEventsForKind,
   eventDateIso,
+  eventFocusBodyId,
   eventLabelKo,
   getEventKind,
 } from './events/index.js';
@@ -67,6 +68,7 @@ export type {
   AstroEvent,
   EclipseType,
   EventFilterId,
+  EventFocusView,
   EventKindDef,
   EventKindId,
 } from './events/index.js';

@@ -58,12 +58,75 @@ function dot(a: Vec3Double, b: Vec3Double): number {
 }
 
 /**
+ * #1360 결정 G2 — 일식 그림자 원뿔 파라미터. 판정 (`solarEclipseGeometry`) 과 그림자 렌더 uniform (PR2 · PR3) 이 **같은 함수**
+ * 의 출력을 쓴다 — 두 곳이 각자 `f1` · `f2` 를 계산하면 판정 「개기」 와 렌더 「본영」 이 다른 식이 될 수 있다.
+ *
+ * 그림자 축 위에서 달로부터 축 방향 거리 `z` [m] 인 평면의 반경 [m] 은
+ * `l1(z) = z·tanF1 + moonRadiusSecF1` (반영) · `l2(z) = z·tanF2 − moonRadiusSecF2` (본영). `l2` 가 음수면 본영 꼭짓점이 그
+ * 평면 너머 (개기 쪽), 양수면 평면이 꼭짓점 너머 (금환 쪽) 다 — 꼭짓점은 `z_v = moonRadiusSecF2 / tanF2`
+ * (`SolarEclipseGeometry.umbraRadius` 의 「음수면 본영 꼭짓점이 기본면 너머」 와 같은 주어).
+ */
+export interface SolarEclipseCone {
+  /** 그림자 축 단위 벡터 (태양 → 달). */
+  readonly axis: Vec3Double;
+  /** 태양–달 거리 [m]. */
+  readonly sunMoonDistance: number;
+  /** `tan f1` (`sin f1 = (R☉ + R☾)/d`). */
+  readonly tanF1: number;
+  /** `tan f2` (`sin f2 = (R☉ − R☾)/d`). */
+  readonly tanF2: number;
+  /** `R☾·sec f1` [m]. */
+  readonly moonRadiusSecF1: number;
+  /** `R☾·sec f2` [m]. */
+  readonly moonRadiusSecF2: number;
+}
+
+/**
+ * 일식 원뿔 파라미터 (결정 G2) — 입력 규약은 `solarEclipseGeometry` 와 같다.
+ *
+ * ⚠️ 연산 순서를 바꾸지 마라 — `solarEclipseGeometry` 는 추출 전과 **비트 동일**해야 한다 (#1354 E1 ~ E5 무수정 통과 ·
+ * `eclipse-geometry.test.ts` 동결 사본 대조). `tan` · `R☾/cos` 를 따로 계산해 두고 판정식이 같은 순서로 더한다.
+ *
+ * @param moon 지구 중심 달 위치 [m]
+ * @param sun 지구 중심 태양 위치 [m]
+ */
+export function solarEclipseCone(
+  moon: Vec3Double,
+  sun: Vec3Double,
+  radii: EclipseRadii,
+): SolarEclipseCone {
+  const toMoon: Vec3Double = [moon[0] - sun[0], moon[1] - sun[1], moon[2] - sun[2]];
+  const sunMoonDistance = norm(toMoon);
+  const axis: Vec3Double = [
+    toMoon[0] / sunMoonDistance,
+    toMoon[1] / sunMoonDistance,
+    toMoon[2] / sunMoonDistance,
+  ];
+  const f1 = Math.asin((radii.sun + radii.moon) / sunMoonDistance);
+  const f2 = Math.asin((radii.sun - radii.moon) / sunMoonDistance);
+  return {
+    axis,
+    sunMoonDistance,
+    tanF1: Math.tan(f1),
+    tanF2: Math.tan(f2),
+    moonRadiusSecF1: radii.moon / Math.cos(f1),
+    moonRadiusSecF2: radii.moon / Math.cos(f2),
+  };
+}
+
+/**
  * 일식 기하 — 기본면 (지구 중심을 지나고 그림자 축에 수직) 에서 반영 `l1 = z·tan f1 + k·sec f1`, 본영
  * `l2 = z·tan f2 − k·sec f2` (`sin f1 = (R☉ + R☾)/d`, `sin f2 = (R☉ − R☾)/d`, `z` = 달에서 기본면까지, `k = R☾`).
+ * 원뿔 파라미터는 `solarEclipseCone` (#1360 결정 G2) 이 만든다.
  *
  * - `γ < 1 + l1` → 식 (부분 이상).
  * - `γ < 1` → 축이 지표에 닿는 점 (기본면에서 달 쪽으로 `√(1 − γ²)`) 의 본영 반경 부호로 개기 (음수) / 금환.
  * - `1 ≤ γ < 1 + |l2|` → 비중심 개기 / 금환 (기본면 `l2` 의 부호).
+ *
+ * ⚠️ **삭 근처 전용 — `moon·axis < 0` (달이 지구보다 태양 쪽) 전제.** 경계식에 이 조건이 없어, 망 (달이 지구 뒤) 에서는 「개기」
+ * 를 낸다 (#1360 PR3 — 2022-11-08 월식 시각 실측: γ `0.250` · `l2 −0.559`). 사건 경로는 삭 ±0.4일 안에서만 부르므로 도달하지
+ * 않는다 (PR #1369 리뷰 R3 실측 — 1990~2040 삭 618건 × ±0.4일, `cos(달, 축)` 최댓값 `−0.9912`). 다른 시각에 부르는 쪽은 직접
+ * 막아야 한다 — `solarEclipseShadowUniforms` 가 그렇게 한다.
  *
  * @param moon 지구 중심 달 위치 [m]
  * @param sun 지구 중심 태양 위치 [m]
@@ -73,23 +136,16 @@ export function solarEclipseGeometry(
   sun: Vec3Double,
   radii: EclipseRadii,
 ): SolarEclipseGeometry {
-  const axis: Vec3Double = [moon[0] - sun[0], moon[1] - sun[1], moon[2] - sun[2]];
-  const sunMoonDistance = norm(axis);
-  const u: Vec3Double = [
-    axis[0] / sunMoonDistance,
-    axis[1] / sunMoonDistance,
-    axis[2] / sunMoonDistance,
-  ];
+  const cone = solarEclipseCone(moon, sun, radii);
+  const u = cone.axis;
   // 달 위치의 축 방향 성분 — 달이 지구보다 태양 쪽이면 음수. 기본면까지 거리 z = −along.
   const along = dot(moon, u);
   const perp: Vec3Double = [moon[0] - u[0] * along, moon[1] - u[1] * along, moon[2] - u[2] * along];
   const gamma = norm(perp) / radii.earth;
   const z = -along;
-  const f1 = Math.asin((radii.sun + radii.moon) / sunMoonDistance);
-  const f2 = Math.asin((radii.sun - radii.moon) / sunMoonDistance);
-  const tanF2 = Math.tan(f2);
-  const penumbraRadius = (z * Math.tan(f1) + radii.moon / Math.cos(f1)) / radii.earth;
-  const umbraRadius = (z * tanF2 - radii.moon / Math.cos(f2)) / radii.earth;
+  const tanF2 = cone.tanF2;
+  const penumbraRadius = (z * cone.tanF1 + cone.moonRadiusSecF1) / radii.earth;
+  const umbraRadius = (z * tanF2 - cone.moonRadiusSecF2) / radii.earth;
 
   let type: SolarEclipseType | null = null;
   if (gamma < 1) {

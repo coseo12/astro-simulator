@@ -2,6 +2,7 @@
 
 import {
   EVENT_KIND_TOLERANCE_DAYS,
+  eventFocusBodyId,
   eventLabelKo,
   getEventKind,
   getOrbitVisualScale,
@@ -44,7 +45,8 @@ import { useSimStore } from '@/store/sim-store';
  * - **사건 패널** (`TimeEventsButton`) — 스크러버 행 오른쪽 끝 24px 버튼 → 비모달 패널 (`display-panel.tsx` 패턴): 종류 필터 ·
  *   이전/다음 사건 · 목록 (listbox — ↑↓ · Home/End · Enter) · 종류별 오차 배지. 일 · 월식 미포함 안내 (§교차검증 합의 3) 는
  *   #1354 가 식을 넣으며 지웠고 (결정 E7), 식 필터가 켜져 있으면 그 자리에 위성 배율 고지 1줄을 둔다 (결정 E5 · 축 S (a)).
- * - **선택** (결정 D6 · 사용자 결정 S3 (b)) — `jumpToJulianDate(t*)` → `focusOn(주체)` → `setTimeScale(0)`, 충 · 내합 · 식 (주체 =
+ * - **선택** (결정 D6 · 사용자 결정 S3 (b)) — `jumpToJulianDate(t*)` → `focusOn(포커스 천체)` → `setTimeScale(0)`. 포커스 천체는 주체이고,
+ *   일식만 지구다 (`eventFocusBodyId` — #1360 PR3 결정 C3, 그림자가 지구에 떨어진다). 충 · 내합 · 식 (주체 =
  *   달 — #1354 사용자 결정 S (a)) 은 거리 자 기준점을 지구로 (`?ruler=earth` 는 `UrlSync` 가 store 에서 쓴다). 순서가 계약이다 — core 는 `jumpToJulianDate` 에서 `timeChanged`
  *   를 동기 발화해 장면 위치를 `t*` 로 옮긴 **뒤** `focusOn` 이 카메라를 잡는다 (§교차검증 합의 1).
  * - **꺼짐** (`?events=off`) — 둘 다 아무것도 그리지 않고 계산도 시작하지 않는다 (결정 D3 · DoD M8).
@@ -390,9 +392,15 @@ function TimeEventsPanelBody({
   const select = useCallback(
     (event: AstroEvent) => {
       const kind = getEventKind(event.kind);
-      // 순서가 계약이다 (모듈 머리 주석) — 시각 → 포커스 → 일시정지.
+      // 순서가 계약이다 (모듈 머리 주석) — 시각 → (시점 요청) → 포커스 → 일시정지.
       sendCommand({ type: 'jumpToJulianDate', julianDate: event.julianDate });
-      sendCommand({ type: 'focusOn', bodyId: kind.subjectId });
+      // #1360 PR2 결정 C3 — 시점 요청은 포커스 **전에** 둔다. 포커스 동기 (`sim-canvas`) 가 진입 때 소비한다.
+      // #1360 PR3 결정 C3 — 포커스 천체는 주체와 다를 수 있다 (일식 = 지구).
+      const focusBodyId = eventFocusBodyId(kind);
+      if (kind.focusView) {
+        useSimStore.getState().setFocusViewRequest({ bodyId: focusBodyId, view: kind.focusView });
+      }
+      sendCommand({ type: 'focusOn', bodyId: focusBodyId });
       sendCommand({ type: 'setTimeScale', scale: 0 });
       if (kind.autoRulerAnchorEarth) setRulerAnchor('earth');
       setActiveId(event.id);

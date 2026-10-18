@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArcRotateCamera, Constants, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { toSceneZ } from '../coords/scene-handedness.js';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { TRAIL_LINES_MESH_NAME } from './trail-lines.js';
 import {
@@ -234,7 +235,7 @@ describe('#1341 trail — 장면 통합', () => {
     const frame = f.handles.getBodyReferenceFrame();
     const fwdWorld = expectedSunChildWorld(f, J2000 + 10, 1);
     const bwdWorld = expectedSunChildWorld(f, J2000 + 10, -1);
-    // 지구 꼬리: 지구는 태양 직속 · 시각 배율 1 → 장면 좌표 = (world − origin) × scale.
+    // 지구 꼬리: 지구는 태양 직속 · 시각 배율 1 → 장면 좌표 = S_z((world − origin) × scale) (#1366 — z 만 반전).
     const earthTailBwd = tailVertex(f, 'earth');
     const specs = f.handles.getTrailBodySpecs();
     let v = 0;
@@ -244,10 +245,15 @@ describe('#1341 trail — 장면 통합', () => {
     }
     const earthSpec = specs.find((s) => s.id === 'earth')!;
     const o = 3 * (v + earthSpec.segments);
+    const toSceneAxis = (c: number, v: number) => (c === 2 ? toSceneZ(v) : v);
     for (let c = 0; c < 3; c += 1) {
       const origin = [frame.originX, frame.originY, frame.originZ][c]!;
-      expect(earthTailBwd[c]).toBe(Math.fround((bwdWorld[o + c]! - origin) * frame.scale));
-      expect(forward[o + c]).toBe(Math.fround((fwdWorld[o + c]! - origin) * frame.scale));
+      expect(earthTailBwd[c]).toBe(
+        Math.fround(toSceneAxis(c, (bwdWorld[o + c]! - origin) * frame.scale)),
+      );
+      expect(forward[o + c]).toBe(
+        Math.fround(toSceneAxis(c, (fwdWorld[o + c]! - origin) * frame.scale)),
+      );
     }
     // 0 배속 (일시정지) 은 직전 부호 유지 — 정점 불변.
     const before = Float32Array.from(backward);
