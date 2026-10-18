@@ -20,6 +20,7 @@ import {
   type PointLight,
 } from '@babylonjs/core';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
+import { toScene } from '../coords/scene-handedness.js';
 import { resolveBodyChainPosition } from '../physics/body-chain.js';
 import {
   PHYSICAL_PHASE_BODY_IDS,
@@ -139,11 +140,14 @@ function boundSunDirection(f: Fixture, meshName: string): Vector3 {
   return vectors.uSunDirection!.clone();
 }
 
-/** 물리 기준 태양 방향 — 장면과 무관한 체인 위치 (`resolveBodyChainPosition`, 배율 미적용) 로 만든다. */
-function physicalSunDirection(jd: number): [number, number, number] {
+/**
+ * 물리 기준 태양 방향 — 장면과 무관한 체인 위치 (`resolveBodyChainPosition`, 배율 미적용) 로 만든다.
+ * #1366 — 체인 위치는 데이터 공간이고 셰이더 uniform 은 장면 공간이라 `toScene` (장면 경계 z 반전) 으로 옮겨 비교한다.
+ */
+function physicalSunDirection(jd: number): readonly [number, number, number] {
   const moon = resolveBodyChainPosition(bodiesById, 'moon', jd)!.world;
   const sun = resolveBodyChainPosition(bodiesById, 'sun', jd)!.world;
-  return [sun[0] - moon[0], sun[1] - moon[1], sun[2] - moon[2]];
+  return toScene([sun[0] - moon[0], sun[1] - moon[1], sun[2] - moon[2]]);
 }
 
 /** 현행 (결함판) 기준 — 태양 광원 위치 − 달 메시 위치 (장면 단위). */

@@ -11,8 +11,10 @@ import {
  * 이고, 장면은 그 값을 `getPhysicalLocal` (배율 전 위치 — 결정 G3) 로 만든다. 판정 「개기」 와 렌더 「본영」 이 같은 식의
  * 출력이 되도록 기하를 다시 계산하지 않고 판정식 출력 (σ · `Ru` · `Rp` · `S☾`) 을 그대로 쓴다.
  *
- * 좌표계: 장면 world 축은 물리 위치 축과 같다 (메시 위치 = `(world − origin) × renderScale`, 축 교환 없음). 그래서 이
- * 함수가 만든 방향 벡터를 셰이더의 world normal 과 그대로 내적한다. 출력은 방향 · 비율뿐이라 floating origin · tier ·
+ * 좌표계: 입력 · 출력 모두 **데이터 공간** (오른손 황도) 이다. 장면 world 축은 데이터 축의 z 반전이다 (#1366 — 메시 위치 =
+ * `S_z((world − origin) × renderScale)`, `coords/scene-handedness.ts`). 그래서 장면이 머티리얼에 쓰기 전에 방향 벡터
+ * `a` · `axis` (둘 다 극벡터) 의 z 를 `toSceneZ` 로 바꾼 뒤 셰이더의 world normal 과 내적한다 (`solar-system-scene.ts`
+ * `updateLunarShadow`). 길이 · 비율 (`k` · `|a|`) 은 반사에 불변이다. 출력은 방향 · 비율뿐이라 floating origin · tier ·
  * 위성 배율 · bodyScale 과 무관하다 (결정 R6 — 그림자는 천체 반경 단위로 계산).
  */
 

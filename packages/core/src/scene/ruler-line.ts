@@ -3,7 +3,8 @@
  *
  * `LinesMesh` 1개 · 정점 2개 (기준점 A · 현재 선택 B). 단색 · 불투명 · `isPickable = false`.
  *
- * - **정점 위치** — 절대 장면 좌표 `(world − origin) × scale` 를 float64 로 계산해 `Float32Array` 에 담는다. body
+ * - **정점 위치** — 절대 장면 좌표 `S_z((world − origin) × scale)` 를 float64 로 계산해 `Float32Array` 에 담는다
+ *   (`S_z` = #1366 장면 경계 z 반전, `coords/scene-handedness.ts`). body
  *   `mesh.position` 과 같은 식 · 같은 입력이라 끝점과 천체 중심이 같은 float32 값이 된다 (결정 R2 · DoD E4). 메시
  *   자신의 world 행렬은 항등이다.
  * - **깊이** — 기본 깊이 판정 그대로. 확대된 구 안쪽 구간은 가려져 선이 표면에서 나온다 (축 R2 (a)).

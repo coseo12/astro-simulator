@@ -14,6 +14,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3, VertexBuffer } from '@babylonjs/core';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
+import { toScene, toSceneZ } from '../coords/scene-handedness.js';
 import { resolveBodyChainPosition } from '../physics/body-chain.js';
 import { orbitMu, positionAt } from '../physics/kepler.js';
 import { elementsAt } from '../physics/orbit-elements-at.js';
@@ -103,11 +104,11 @@ function positionsOf(f: Fixture, name: string): Float32Array {
   return Float32Array.from(mesh.getVerticesData(VertexBuffer.PositionKind)!);
 }
 
-/** 기대 정점 — `rebuildOrbitLines` 와 같은 식 (그 시각 요소 × 위성 배율), float32. */
+/** 기대 정점 — `rebuildOrbitLines` 와 같은 식 (그 시각 요소 × 위성 배율 → 장면 경계 z 반전 #1366), float32. */
 function expectedMoonLine(f: Fixture, jd: number): Float32Array {
   const scale = getOrbitVisualScale('earth', 'moon');
   const pts = sampleOrbitPoints(moon, f.handles.getTier(), jd)!;
-  return Float32Array.from(pts.flatMap((p) => [p.x * scale, p.y * scale, p.z * scale]));
+  return Float32Array.from(pts.flatMap((p) => [p.x * scale, p.y * scale, toSceneZ(p.z * scale)]));
 }
 
 describe('#1354 V1 — 달 궤도선 정점 갱신 (장면)', () => {
@@ -210,7 +211,8 @@ describe('#1354 결정 M4 — 장면 달 메시 = 지구 메시 + 배율 × reso
     const visualScale = getOrbitVisualScale('earth', 'moon');
     const local = resolveBodyChainPosition(bodiesById, 'moon', JD)!.local!;
     const earthWorld = resolveBodyChainPosition(bodiesById, 'earth', JD)!.world;
-    const expected = local.map((x) => x * visualScale * scale);
+    // #1366 — 체인 위치는 데이터 공간, 메시 차는 장면 공간 (z 반전).
+    const expected = toScene(local).map((x) => x * visualScale * scale);
     const got = moonMinusEarthMesh(f);
     const tolerance = RELATIVE_TOLERANCE * Math.hypot(...earthWorld) * scale;
     const err = Math.hypot(got[0] - expected[0]!, got[1] - expected[1]!, got[2] - expected[2]!);
@@ -218,7 +220,7 @@ describe('#1354 결정 M4 — 장면 달 메시 = 지구 메시 + 배율 × reso
 
     // 양성 대조 — 고정 요소 (V0) 경로라면 같은 자리에서 허용의 1,000 배 넘게 벗어난다.
     const v0Local = positionAt(moon.orbit!, JD, orbitMu(moon, bodiesById.get('earth')!));
-    const v0 = v0Local.map((x) => x * visualScale * scale);
+    const v0 = toScene(v0Local).map((x) => x * visualScale * scale);
     expect(Math.hypot(got[0] - v0[0]!, got[1] - v0[1]!, got[2] - v0[2]!)).toBeGreaterThan(
       tolerance * 1_000,
     );
