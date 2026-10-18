@@ -24,6 +24,17 @@ describe('AboutModal (P10-C-3 #278 / P12-C #298 — 단일 모드)', () => {
     expect(sources).toHaveTextContent('NASA JPL Horizons');
   });
 
+  it('#1373 — 별 카탈로그 출처 (HYG v4.4 · CC BY-SA 4.0 원문 인용) + 등급 시각화 안내', () => {
+    render(<AboutModal />);
+    fireEvent.click(screen.getByTestId('about-button'));
+    const sources = screen.getByTestId('about-sources');
+    expect(sources).toHaveTextContent('HYG Stellar Database v4.4');
+    expect(sources).toHaveTextContent(
+      'This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.',
+    );
+    expect(screen.getByTestId('about-stars')).toHaveTextContent('크기와 밝기는 실시 등급');
+  });
+
   it('스케일 정책 — v3 incremental build + 3단 tier 설명 포함', () => {
     render(<AboutModal />);
     fireEvent.click(screen.getByTestId('about-button'));

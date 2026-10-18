@@ -3,6 +3,8 @@ import {
   AU,
   GENERAL_PRECESSION_DEG_PER_CENTURY,
   J2000_JD,
+  J2000_MEAN_OBLIQUITY_ARCSEC,
+  J2000_MEAN_OBLIQUITY_DEG,
   JULIAN_YEAR_SECONDS,
   LIGHT_YEAR,
 } from './astronomy.js';
@@ -23,6 +25,11 @@ describe('astronomy constants', () => {
 
   it('J2000.0 = JD 2451545.0', () => {
     expect(J2000_JD).toBe(2_451_545.0);
+  });
+
+  it('#1373 J2000 평균 황도경사 ε = 84381.406″ (IAU 2006) — 도 단위 23.4392794°', () => {
+    expect(J2000_MEAN_OBLIQUITY_ARCSEC).toBe(84_381.406);
+    expect(J2000_MEAN_OBLIQUITY_DEG).toBeCloseTo(23.439_279_4, 7);
   });
 
   it('#1354 일반세차 p_A = 5028.796195″/세기 (IAU 2006 P03 선형항) — 도 단위', () => {

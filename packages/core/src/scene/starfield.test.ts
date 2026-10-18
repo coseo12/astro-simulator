@@ -1,5 +1,6 @@
 /**
- * #738 — 절차적 starfield + 은하수 단위 테스트.
+ * #738 — 은하수 배경 구 단위 테스트. #1373 (ADR `20261018-1373` 결정 R4) 로 재작성 — 절차 별 셀 경로가 지워지고
+ * 띠 법선이 은하 북극 장면 방향이 됐다. 별 (색 · 크기 · 위치) 은 `star-catalog-data.test.ts` · `star-catalog.test.ts`.
  *
  * `createStarfield` 는 Babylon 엔진 (ShaderMaterial 컴파일 / MeshBuilder) 이 필요하므로 NullEngine
  * 헤드리스로는 비결정적 (solar-system-scene.test.ts 의 NullEngine 회피 패턴 동일) — 대신:
@@ -17,19 +18,19 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { toScene } from '../coords/scene-handedness.js';
+import { equatorialJ2000ToEcliptic } from '../coords/equatorial.js';
 import {
   STARFIELD_SPHERE_DIAMETER,
   STARFIELD_SPHERE_SEGMENTS,
-  STARFIELD_GRID_DENSITY,
-  STARFIELD_THRESHOLD,
   MILKY_WAY_NORMAL,
   MILKY_WAY_GLOW_INTENSITY,
   MILKY_WAY_BAND_WIDTH,
   MILKY_WAY_GLOW_COLOR,
   STARFIELD_VERTEX_SHADER,
   STARFIELD_FRAGMENT_SHADER,
-  starColorMirror,
 } from './starfield.js';
+import { STAR_CATALOG_RADIUS } from './star-catalog.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(join(__dirname, 'starfield.ts'), 'utf8');
@@ -41,18 +42,32 @@ describe('#738 starfield — 미학 상수 SSoT (ADR §결정 — drift 가드)'
     expect(STARFIELD_SPHERE_SEGMENTS).toBe(16);
   });
 
-  it('별 격자 밀도 / 유무 임계 (measurement-first 박제)', () => {
-    expect(STARFIELD_GRID_DENSITY).toBe(240);
-    expect(STARFIELD_THRESHOLD).toBeGreaterThan(0.9);
-    expect(STARFIELD_THRESHOLD).toBeLessThan(1.0);
+  it('#1373 R4 — 은하수 법선 = 은하 북극 (RA 192.85948° · Dec +27.12825°) 장면 방향 (ADR §축 M 기대값)', () => {
+    const [x, y, z] = MILKY_WAY_NORMAL;
+    expect(Math.hypot(x, y, z)).toBeCloseTo(1, 12);
+    // ADR 1373 §축 M — `(−0.86767, −0.00035, −0.49715)` (5자리 반올림).
+    expect(x).toBeCloseTo(-0.86767, 4);
+    expect(y).toBeCloseTo(-0.00035, 4);
+    expect(z).toBeCloseTo(-0.49715, 4);
+    // 같은 변환 경로 (적도 → 황도 데이터 → toScene) 를 거친다 — 장면 경계 z 반전 (ADR 1366).
+    expect(MILKY_WAY_NORMAL).toEqual(toScene(equatorialJ2000ToEcliptic(192.85948, 27.12825)));
   });
 
-  it('은하수 법선은 단위 벡터 근사 (정규화 전 합리 범위)', () => {
-    const [x, y, z] = MILKY_WAY_NORMAL;
-    const len = Math.hypot(x, y, z);
-    // shader 가 normalize 하므로 정확히 1 일 필요 없으나, 0 벡터/극단값 방어.
-    expect(len).toBeGreaterThan(0.5);
-    expect(len).toBeLessThan(2.0);
+  it('#1373 R4 — 결함판 판별: z 반전을 빠뜨린 법선 · 구 임의 법선과는 수십 도 어긋난다', () => {
+    const angle = (a: readonly number[], b: readonly number[]) =>
+      (Math.acos(
+        Math.abs(a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!) /
+          (Math.hypot(...a) * Math.hypot(...b)),
+      ) *
+        180) /
+      Math.PI;
+    const noFlip = equatorialJ2000ToEcliptic(192.85948, 27.12825);
+    expect(angle(MILKY_WAY_NORMAL, noFlip)).toBeGreaterThan(30);
+    expect(angle(MILKY_WAY_NORMAL, [0.2, 0.92, 0.34])).toBeGreaterThan(30);
+  });
+
+  it('#1373 D7 — 별 쿼드 반지름은 은하수 구 안쪽 (< 500)', () => {
+    expect(STAR_CATALOG_RADIUS).toBeLessThan(STARFIELD_SPHERE_DIAMETER / 2);
   });
 
   it('은하수 발광은 미묘 (네온 금지 — §5 시각 품질)', () => {
@@ -97,80 +112,24 @@ describe('#738 starfield — mesh/material 계약 markers (ADR §결정 1/5/6 �
     expect(STARFIELD_VERTEX_SHADER).not.toContain('attribute vec2 uv');
   });
 
-  it('fragment shader 가 은하수 띠 + 별 셀 noise 합성 (단일 draw call — ADR §결정 3)', () => {
+  it('#1373 R4 — fragment 는 은하수 띠만 (절차 별 셀 경로 삭제 — 실제 하늘에 없는 별 0)', () => {
     expect(STARFIELD_FRAGMENT_SHADER).toContain('milkyWay');
-    expect(STARFIELD_FRAGMENT_SHADER).toContain('gridDensity');
-    expect(STARFIELD_FRAGMENT_SHADER).toContain('hash33');
+    // 구름 결 fbm 은 남는다 (hash33 → valueNoise).
+    expect(STARFIELD_FRAGMENT_SHADER).toContain('fbm');
+    // 별 셀 경로 표지 — 격자 밀도 · 임계 · 셀 색온도 · 점 falloff.
+    expect(STARFIELD_FRAGMENT_SHADER).not.toContain('gridDensity');
+    expect(STARFIELD_FRAGMENT_SHADER).not.toContain('starThreshold');
+    expect(STARFIELD_FRAGMENT_SHADER).not.toContain('starColor');
+    expect(STARFIELD_FRAGMENT_SHADER).not.toContain('pointFalloff');
+    expect(SOURCE).not.toMatch(/setFloat\('gridDensity'/);
   });
 });
 
-describe('#738 starfield — 색온도 anti-pattern 부재 (ADR §결정 4 — Originality)', () => {
-  // §결정 4 — 다수 백색~담황 + 소수 청백/적황. 보라/마젠타 그라데이션 금지.
-  it('starColorMirror: t 전 구간에서 보라/마젠타 부재 (R+B 동시 우세 & G 결핍 금지)', () => {
-    for (let i = 0; i <= 20; i++) {
-      const t = i / 20;
-      const [r, g, b] = starColorMirror(t);
-      // 보라/마젠타 = R, B 높고 G 낮음. 별색은 G 가 항상 R 와 B 사이 또는 그 이상이어야 (백색 근처).
-      // 마젠타 판정: G 가 min(R,B) 보다 현저히 낮으면 안 됨.
-      expect(g).toBeGreaterThanOrEqual(Math.min(r, b) - 1e-6);
-    }
-  });
-
-  it('starColorMirror: 모든 채널 [0,1] 범위 내', () => {
-    for (let i = 0; i <= 20; i++) {
-      const [r, g, b] = starColorMirror(i / 20);
-      for (const c of [r, g, b]) {
-        expect(c).toBeGreaterThanOrEqual(0);
-        expect(c).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it('starColorMirror: 양 끝이 적황(warm)/청백(cool), 중앙이 백색', () => {
-    const warm = starColorMirror(0);
-    const white = starColorMirror(0.5);
-    const cool = starColorMirror(1);
-    // 적황: R > B (따뜻).
-    expect(warm[0]).toBeGreaterThan(warm[2]);
-    // 청백: B > R (차가움).
-    expect(cool[2]).toBeGreaterThan(cool[0]);
-    // 백색: R ≈ B (저채도, 거의 백색).
-    expect(Math.abs(white[0] - white[2])).toBeLessThan(0.1);
-  });
-
+describe('#738 starfield — 은하수 색조 anti-pattern 부재 (ADR 738 §결정 4 — Originality)', () => {
+  // 별 색 (B−V → RGB) 의 보라/마젠타 부재 단언은 #1373 `star-catalog-data.test.ts` (bvToRgb) 로 이어진다.
   it('은하수 발광 색조도 저채도 (보라/마젠타 부재)', () => {
     const [r, g, b] = MILKY_WAY_GLOW_COLOR;
     // 담청백 — G 가 min(R,B) 이상 (마젠타 부재).
     expect(g).toBeGreaterThanOrEqual(Math.min(r, b) - 1e-6);
-  });
-});
-
-describe('#738 starfield — GLSL starColor ↔ JS starColorMirror SSoT drift 가드 (reviewer 권고 1, PR #742)', () => {
-  // #719 교훈 — 테스트 미러(starColorMirror) 와 GLSL 원본(starColor) 은 동일 식이어야 한다(SSoT).
-  // GLSL 은 직접 단위 테스트 불가 → 미러로 검증하는데, GLSL 단독 변경 시 미러가 stale 해도 위
-  // anti-pattern 테스트는 그대로 PASS (조용한 drift). 본 가드가 GLSL FRAGMENT_SHADER 문자열에
-  // 미러와 동일한 vec3 리터럴이 존재하는지 regex 로 단언 → 한쪽만 바뀌면 즉시 fail.
-
-  // GLSL `vec3(a, b, c)` — 공백 변형 허용 regex. 인자는 GLSL 표기 문자열(예 '1.0') 그대로 받는다.
-  // (JS number 로 받으면 `${1.0}` → '1' 로 좁혀져 GLSL '1.0' 과 불일치. GLSL 소스 표기 SSoT.)
-  const escapeDot = (s: string): string => s.replace(/\./g, '\\.');
-  const glslVec3 = (r: string, g: string, b: string): RegExp =>
-    new RegExp(`vec3\\(\\s*${escapeDot(r)}\\s*,\\s*${escapeDot(g)}\\s*,\\s*${escapeDot(b)}\\s*\\)`);
-
-  it('GLSL starColor 에 warm/white/cool vec3 리터럴 3개 모두 존재 (미러와 동기)', () => {
-    // starColorMirror: warm [1.0, 0.86, 0.72] / white [1.0, 0.98, 0.96] / cool [0.78, 0.86, 1.0].
-    expect(STARFIELD_FRAGMENT_SHADER).toMatch(glslVec3('1.0', '0.86', '0.72')); // warm (적황 M/K)
-    expect(STARFIELD_FRAGMENT_SHADER).toMatch(glslVec3('1.0', '0.98', '0.96')); // white (백색~담황 G)
-    expect(STARFIELD_FRAGMENT_SHADER).toMatch(glslVec3('0.78', '0.86', '1.0')); // cool (청백 O/B)
-  });
-
-  it('GLSL 리터럴이 starColorMirror 의 반환 끝점과 정확히 일치 (값 drift 차단)', () => {
-    // 미러 끝점 = GLSL 리터럴 값이어야 한다. 한쪽 값만 바뀌면 toEqual 또는 위 regex 단언이 fail.
-    const warm = starColorMirror(0); // mix(warm, white, 0) = warm
-    const white = starColorMirror(0.5); // 경계 = white
-    const cool = starColorMirror(1); // mix(white, cool, 1) = cool
-    expect(warm).toEqual([1.0, 0.86, 0.72]);
-    expect(white).toEqual([1.0, 0.98, 0.96]);
-    expect(cool).toEqual([0.78, 0.86, 1.0]);
   });
 });

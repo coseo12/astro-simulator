@@ -123,6 +123,7 @@ headless 프레임 간격이 0.3 ms 대라 이 방법의 잡음 폭 (≈ ±0.04 
 - **CI 는 별을 그리지 않는다.** `DisplayCapabilities.starfield = !isSoftwareRenderer` (`display-toggles.ts:50`) · ADR 738 §Amendment 2 · `browser-verify-738-starfield.mjs` S6. CI 의 픽셀 · fps 셀 (SwiftShader) 은 starfield 메시가 없어 이번 변경과 무관하다 — 본 설계도 같은 게이트를 쓴다 (결정 R5).
 - `packages/core/src/scene/starfield.test.ts` (176 줄) — 격자 밀도 · 임계 · `starColorMirror` · 은하수 법선 상수를 24곳에서 단언. 별 셀 경로 제거 · 법선 교체로 **재작성 대상**.
 - `apps/web/scripts/browser-verify-738-starfield.mjs` — S1 (켠 화면이 더 밝다) · S2 (고정 방향 투영 불변, starfield 구 local 정점 사용) 는 구가 남으므로 유효. 하드웨어 전용.
+  - **정정 (PR #1375 실측)** — S1 은 유효하지 않았다: launch 를 Metal 로 바꾼 사본에서 develop `30.72 % > 23.79 %` PASS · PR1 `18.49 % > 23.79 %` FAIL (술어가 절차 별 밀도 · 띠 방향에 묶여 있었다). 커밋된 실행 경로 (`withBrowser({})` 소프트웨어 고정 · 워크플로 호출처 0) 에서는 S1 이 발화하지 않으므로 **술어는 고치지 않고 기록만 둔다** (사용자 결정 2026-10-19). 재검토는 스크립트 재검토 조건 1 (CI 하드웨어 GPU 도입) 때.
 - `apps/web/scripts/browser-verify-1265-display-panel.mjs` — D8 · D8b · D8p · D9 가 메시 이름 `starfield` 와 `setStarfieldVisible` 을 쓴다. **D8p** 는 「그룹 0 불투명 메시 중 starfield 외는 depth write」 를 단언한다 → 새 메시 (별 쿼드 · 선) 는 반드시 블렌드 (투명 큐) 여야 D8p 를 지킨다.
 - `browser-verify-756-surface.mjs:559` · `browser-verify-790-focus-zoom.mjs:30,51` — 로컬 하드웨어에서 「starfield 별 오염」 을 주석으로 다룬다. 로컬 수치가 바뀔 수 있다 (CI 무관).
 - 장면 테스트 16개 파일이 `starfield` 옵션 이름을 쓴다 — 옵션 이름은 유지한다.
@@ -192,7 +193,7 @@ headless 프레임 간격이 0.3 ms 대라 이 방법의 잡음 폭 (≈ ±0.04 
 
 8. **R1 별** — 신규 `packages/core/src/scene/star-catalog.ts`: 쿼드 메시 1개 + GLSL ShaderMaterial (축 R (a)). 지름은 CSS px × DPR (물리 px). `uPxToClip` 은 draw 직전 (`onBeforeRenderObservable`) 에 매번 렌더 버퍼 크기에서 다시 계산한다 — 리사이즈 · DPR 변화 대응 (`belt-particles.ts` 와 같다. 줌은 카메라 반경이라 FOV 는 고정). 블렌드 가산 · `disableDepthWrite` · depth test 유지 · 렌더 그룹 0 · `alphaIndex` 최저 (투명 큐 맨 앞) · `isPickable = false` · `alwaysSelectAsActiveMesh`.
 9. **R2 등급 → 크기 · 밝기** — 상대 플럭스 `f = 10^(−0.4 (V − 6.5))` 의 로그에 선형: 반지름 `r = clamp(r0 + r1 · log2 f, rMin, rMax)` · 밝기 `I = clamp(i0 + i1 · log2 f, iMin, 1)`. 상수는 rendering-only SSoT, 최종값은 사용자 육안 승인 (D-T2). 반짝임 없음.
-10. **R3 B−V → 색** — 순수 함수 `bvToRgb(bv)`: Ballesteros (2012) 식으로 유효 온도 → 흑체 근사 RGB → 백색과 혼합해 채도를 낮춘다. ADR 738 §결정 4 의 「보라 · 마젠타 금지」 를 단위 테스트로 잇는다. B−V 결측은 백색.
+10. **R3 B−V → 색** — 순수 함수 `bvToRgb(bv)`: Ballesteros (2012) 식으로 유효 온도 → 흑체 근사 RGB → 백색과 혼합해 채도를 낮춘다. 흑체 RGB 는 D65 상관 색온도 6504 K 흑체 색으로 채널별 나눠 백색을 맞춘다 (PR #1375 실측 — 맞춤 없이는 6,000 – 7,000 K 에서 G < min(R, B) 최대 0.013 으로 마젠타 단언 FAIL). ADR 738 §결정 4 의 「보라 · 마젠타 금지」 를 단위 테스트로 잇는다. B−V 결측은 백색.
 11. **R4 은하수** — 구 셰이더에서 별 셀 경로를 지우고 띠만 남긴다. 법선을 은하 북극 장면 방향으로 바꾼다 (축 M (a)). 절차 별은 남기지 않는다 — 실제 하늘에 없는 별이 별자리 옆에 찍히면 이슈 목표 1 과 충돌한다.
 12. **R5 소프트웨어 렌더** — 별 · 선 · 이름 모두 starfield 와 같은 게이트 (`!isSoftwareRenderer`). 소프트웨어 렌더에서는 파일을 fetch 하지 않는다. `force` 류 강제 플래그는 만들지 않는다 (방향 DoD 는 단위 + 하드웨어 실측으로 닫는다).
 13. **R6 별자리 선** — `LinesMesh` 1개 (`ruler-line.ts` 패턴, 정점 1,486). `alpha < 1` (투명 큐 → D8p 대상 밖) · `infiniteDistance` · `alphaIndex` 최저 + 1 · `isPickable = false`. 색은 궤도선 (청회색) 과 다른 계열 — 최종값 D-T2.

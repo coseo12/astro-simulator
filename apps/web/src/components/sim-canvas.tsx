@@ -748,6 +748,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           // #738 — 별 배경 + 은하수. 기본 ON 은 parseStarsVisible 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR 20260624-738 §결정 7 레이어 분리).
           starfield: starfieldVisible,
+          // #1373 — 실측 별 카탈로그 (`public/data/stars/star-catalog.bin`). 별 구가 만들어질 때만 받는다 —
+          // 소프트웨어 렌더는 `starfieldVisible` 이 false 라 fetch 0 (ADR 20261018-1373 결정 R5).
+          starCatalogBaseUrl: '/data/stars/',
           // #756 — 절차적 행성 표면. 기본 ON 은 parseSurfaceVisible 기본값 (true) 이 결정 —
           // core 옵션 기본값은 false 유지 (ADR 20260628-756 §결정 4 레이어 분리).
           surfaceDetail: surfaceVisible,
