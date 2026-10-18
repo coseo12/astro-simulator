@@ -26,7 +26,7 @@ export type EclipseShadowMode = (typeof ECLIPSE_SHADOW_MODE)[keyof typeof ECLIPS
  * 결정 R5 (사용자 결정 Q-L (a)) — 개기 월식 본영 안의 붉은 빛 (명암 `shade` 에 더하는 RGB). Danjon 척도 L = 2 의 표현을 고정
  * 미학 상수로 둔다. 출처: F. Espenak, NASA GSFC 「Danjon Scale of Lunar Eclipse Brightness」
  * (`eclipse.gsfc.nasa.gov/OH/Danjon.html`) — L = 2 는 「짙은 빨강 또는 녹슨 색, 본영 중심은 매우 어둡고 가장자리는 비교적
- * 밝다」. 세기는 사용자 육안 승인에서 확정한다 (DoD D3 의 R/G 하한은 그때 재조정 — 세 위치 박제).
+ * 밝다」. 세기는 사용자 승인 2026-10-18 (「이대로」 — 현행 유지) 로 확정했다. DoD D3 의 R/G 하한 `1.4` 도 그대로다.
  *
  * rendering-only — 식마다의 실제 L 값 데이터는 없다 (Q-L (c) 기각 사유).
  */
