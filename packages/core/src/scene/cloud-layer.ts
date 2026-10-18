@@ -28,7 +28,12 @@ import {
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import type { SurfaceLightingArgs } from './body-mesh-factory.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
-import { SOFT_TERMINATOR_WIDTH } from './procedural-planet-shader.js';
+import {
+  ECLIPSE_SHADOW_GLSL,
+  ECLIPSE_SHADOW_UNIFORM_NAMES,
+  initEclipseShadowUniforms,
+  SOFT_TERMINATOR_WIDTH,
+} from './procedural-planet-shader.js';
 import { computeSpinAngle, EARTH_SPIN_SIGN } from './self-rotation.js';
 import { renderScaleForTier, type Tier } from './tier.js';
 
@@ -184,7 +189,7 @@ uniform float cloudOpacity;
 uniform float cloudFrequency;
 uniform float cloudDetailFreqRatio;
 uniform float cloudDetailWeight;
-
+${ECLIPSE_SHADOW_GLSL}
 // 3D hash — sin-free fract-mix (starfield.ts hash33 답습 — swiftshader/tier-c fps 보호).
 vec3 hash33(vec3 p) {
   p = fract(p * vec3(0.1031, 0.1030, 0.0973));
@@ -230,7 +235,12 @@ void main(void) {
   vec3 ambientShade = ambientIntensity * mix(ambientGround, ambientSky, hemiFactor);
   float ndl = dot(N, uSunDirection);
   float sunFactor = smoothstep(0.0, softTerminatorWidth, ndl);
-  vec3 shade = ambientShade + sunIntensity * sunDiffuse * sunFactor;
+  vec3 sunShade = sunIntensity * sunDiffuse * sunFactor;
+  vec3 shade = ambientShade + sunShade;
+  // #1360 PR3 결정 R3 (사용자 결정 Q-C (a)) — 일식 그림자. 표면 셰이더와 같은 함수 (ECLIPSE_SHADOW_GLSL 보간 — 사본 아님) ·
+  // 같은 합성이다. 구름이 그림자 위에서 밝게 남지 않게 한다. 붉은 빛 항 (ecl.y) 은 월식 전용이라 구름은 쓰지 않는다.
+  vec2 ecl = eclipseShadow(N);
+  shade -= sunShade * ecl.x;
 
   // 밀도 — 저주파 덩어리 + 디테일 결. 디테일 fbm 은 다른 격자 위상을 쓰도록 좌표만 스케일한다.
   float coarse = fbm(p * cloudFrequency);
@@ -300,6 +310,8 @@ export function createCloudMaterial(
         'cloudFrequency',
         'cloudDetailFreqRatio',
         'cloudDetailWeight',
+        // #1360 PR3 — 식 그림자 uniform (값은 장면이 `setEclipseShadowUniforms` 로 쓴다).
+        ...ECLIPSE_SHADOW_UNIFORM_NAMES,
       ],
       needAlphaBlending: true,
     },
@@ -327,6 +339,8 @@ export function createCloudMaterial(
   material.setFloat('cloudFrequency', CLOUD_FREQUENCY);
   material.setFloat('cloudDetailFreqRatio', CLOUD_DETAIL_FREQ_RATIO);
   material.setFloat('cloudDetailWeight', CLOUD_DETAIL_WEIGHT);
+  // #1360 PR3 — 식 그림자 기본값 = 그림자 없음. 일식 시각에는 장면이 지구 표면과 같은 값을 쓴다 (`updateSolarShadow`).
+  initEclipseShadowUniforms(material);
 
   // 태양 방향 — onBind 에서 매 draw 갱신 (캐시 금지). 초기값은 provider 가 없을 때의 fallback 이 아니라
   // 첫 bind 전 uniform 공백 방지용이다 (첫 bind 가 즉시 덮어쓴다).

@@ -7,6 +7,19 @@ Semantic Versioning을 따른다.
 
 ### Added
 
+- **[#1360] 일식 그림자 (PR3)** ([#1360](https://github.com/coseo12/astro-simulator/issues/1360)). 이제 달 그림자가 지구 표면 (절차 표면 high · mid LOD) 과 구름 · 대기 rim 에 떨어진다. 반영 안에서는 직사광이 거리에 비례해 줄고 (결정 R4), 본영 안은 직사광이 0 이다 (주변광만 남는다). 그림자는 판정식과 같은 원뿔 (`solarEclipseCone`) 의 출력이고 물리 크기 그대로다 (결정 R6 — 지구 반경 단위라 bodyScale 과 무관). 일식을 고르면 지구에 포커스하면서 시점을 지구의 태양 쪽 반구로 돌린다 (결정 C3). ADR [`20261018-1360`](docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md) 결정 R1 · R2 · R3 · R4 · R6 · C3 (일식) · PR 분할 표 PR3.
+  - uniform 빌더 `solarEclipseShadowUniforms` (`events/eclipse-shadow-uniforms.ts`, 순수 · Babylon 무의존): `a` = 달 위치 / R⊕, `axis` = 태양 → 달, `k` = `(tan f1, R☾·sec f1 / R⊕, tan f2, R☾·sec f2 / R⊕)`. 판정식이 식이 아니면 그림자 없음 (`uEclMode 0`). 판정식 경계식은 삭 근처 전용이라 (망에서 「개기」 를 낸다 — 단위 테스트 실측) 빌더가 「달이 지구보다 태양 쪽」 조건을 더한다. `classifySolarShadowUniforms` 는 uniform 만으로 종류를 다시 분류한다.
+  - 셰이더: `ECLIPSE_SHADOW_GLSL` 에 `uEclMode 2` (일식) 분기를 더했다. 축 기준 밤 반구 (`n·axis > 0`) 는 그림자 0 이다 — 그림자 원기둥이 지구를 관통해 밤면 가장자리 rim 을 깎지 않게 한다. 지표는 PR2 합성 (`shade -= sunShade * ecl.x`) 그대로, rim 은 같은 차폐율로 줄인다 (`rim -= rim * ecl.x`). 야간 불빛은 건드리지 않는다 (#1226 「낮면 불변」). 구름 셰이더는 같은 상수를 보간해 같은 합성을 한다 (사본 아님).
+  - 장면: `updateAt` 에서 프레임당 1회 계산해 지구 high · mid · 구름 머티리얼에 쓴다 (`toSceneZ` 로 `a` · `axis` 를 장면 좌표로 — #1366). lazy mid · 런타임 구름 ON 은 생성 즉시 쓴다. 토글 `setEclipseShadowsEnabled` 가 일식에도 닿고, 진단용 `getSolarEclipseShadowUniforms` 를 더했다.
+  - 사건 종류 데이터: 일식 행에 `focusBodyId: 'earth'` · `focusView: 'facing-parent'` (지구의 모체 = 태양 쪽, 위로 `15°` 는 PR2 와 같다). `eventFocusBodyId` 를 export 한다.
+  - 실측 D4 (SwiftShader, 같은 프레임 on/off · 지구만 그리는 보조 카메라, 본영 핵 = 「전면 본영」 기준 프레임과 바이트가 같은 픽셀):
+    - 2017-08-21 · 2024-04-08 최대식, 지구 디스크 반경 `233` · `251.5` px: 본영 핵 중심 ↔ 축 지표 교점 `0.0048` · `0.0003` R (허용 `0.03`).
+    - 지리 위치 (근접 시점, `0.0014` R/px): 본영 핵 중심 ↔ 위치 모델 참 지점 — 2024-04-08 18:17 UT `1.16` km · 2017-08-21 18:26 UT `1.25` km · JD 2460409.2478 `1.50` km (#1366 qa 와 같은 시각, 참 지점 `25.043°N 99.156°W`). 셰이더 uniform 의 축 교점 ↔ 참 지점 `0.03 ~ 0.06` km.
+    - 구름 덮인 본영: 기하 본영 안 구름 픽셀이 전부 「전면 본영」 과 같다 (2017-08-21 근접 `4/4` · 2023-10-14 근접 `34/34`).
+    - 결함판: `a` · `axis` 의 z 미반전 (거울) → 본영 핵이 `−12.1°N 83.0°W` (참 지점에서 `4,489` km), 구름 그림자 0 → 기하 본영 안 「전면 본영」 일치 `0` · 본영 핵 0 픽셀.
+  - 실측 D5 (develop `50bb4d6a` ↔ 본 PR, 1280×720): SwiftShader · ANGLE Metal · WebGPU Metal 에서 기본 화면 · 지구 포커스 (자전 끔 · 켬 · mid LOD) · 달 포커스 · 일식 시각 그림자 끔 · 일식 −1 · +1 · +3일 (그림자 켬) 이 바이트 동일하다. 양성 대조 (일식 시각 그림자 켬) 는 `177,165 ~ 177,172` 바이트가 다르다. 1274 하네스는 12 시나리오 전부 `diff 0` 이다 (`ALLOW_SAME_BUILD` 미사용).
+  - 실측 D7 (지구 화면 채움 · 일식 최대식 · 그림자 활성, 중앙값): SwiftShader `25.7 → 25.9` ms (`+0.78%`, 5라운드) · `24.5 → 25.6` ms (`+4.49%`, 9라운드), ANGLE Metal `1.6 → 1.6` ms, WebGPU Metal `1.9 → 1.8` ms. 식이 아닌 같은 구도도 SwiftShader `+3.7 ~ +4.2%` 다 — 그림자 활성 여부와 무관하게 비슷한 증가이고, 구름을 끈 구도에서는 `+2.0%` 다. 기본 화면은 절차 표면 픽셀이 없어 (ADR 결정 C1) 이 비용이 들어가지 않는다.
+
 - **[#1360] 월식 그림자 (PR2)** ([#1360](https://github.com/coseo12/astro-simulator/issues/1360)). 이제 지구 그림자가 달 표면 (절차 표면 high · mid LOD) 에 떨어진다. 반영 안에서는 직사광이 거리에 비례해 줄고 (결정 R4 — 거리 선형), 본영 안에서는 붉은 빛이 더해진다. 붉은 빛은 Danjon L = 2 를 미학 상수로 표현한 것이고, 본영 중심이 어둡고 가장자리가 밝다 (결정 R5 — 출처 NASA GSFC Espenak 「Danjon Scale of Lunar Eclipse Brightness」). 세기 · 가장자리 밝기 · 시점 기울기 `15°` 는 사용자 승인 2026-10-18 (「이대로」 — 현행 유지). 월식을 고르면 달에 포커스하면서 시점을 달의 지구 쪽 반구로 돌린다 (결정 C3 · ADR 1354 Amendment 1). ADR [`20261018-1360`](docs/decisions/20261018-1360-moon-phase-eclipse-shadows.md) 결정 R1 · R2 · R4 · R5 · C2 · C3 (월식).
   - uniform 빌더 `events/eclipse-shadow-uniforms.ts` 는 Babylon 에 의존하지 않는 순수 함수다. 판정식 `lunarEclipseGeometry` 의 출력 (σ · `Ru` · `Rp` · `S☾`) 을 그대로 쓰므로, 판정이 「식 아님」 이면 그림자도 없다 (`uEclMode 0`). 입력은 장면의 배율 전 위치 (`getPhysicalLocal`) 다. Kepler 는 `localPositions`, N-body 는 엔진 상태를 읽는다.
   - 셰이더 (`procedural-planet-shader.ts`) 에 uniform 5개와 함수 1개를 더했고, 합성은 `shade -= sunShade * ecl.x; shade += uEclGlow * (ecl.y * sunFactor)` 다. `#define` 분기는 없다. 붉은 빛은 기존 `sunFactor` 로 태양 쪽 반구에만 건다. 화성 · 목성 · 지구 등 다른 절차 머티리얼은 `uEclMode 0` 으로 고정한다.
@@ -46,6 +59,9 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- [#1360 PR3] 일식 시각 (판정식 「부분」 이상 · 달이 지구보다 태양 쪽) 에는 절차 표면을 켠 지구 (high · mid) · 구름 · 대기 rim 이 달 그림자로 어두워진다. 식이 아닌 시각과 그 밖의 천체는 바이트 동일하다 (D5). 사건 패널에서 일식을 고르면 **지구**에 포커스한다 (종전 달). 시점은 지구의 태양 쪽에서 위로 `15°` 다. 거리 자 기준점은 종전처럼 지구라, 지구를 고른 상태에서는 거리 대신 「다른 천체를 선택하면 지구까지 거리를 표시합니다」 안내가 보인다 (종전 일식 선택은 지구–달 거리 · 선을 보였다). URL 은 `focus=earth&ruler=earth` 다.
+  - 같은 셰이더 텍스트 변경으로 월식 시각의 달 (그림자 켬) 도 SwiftShader · WebGPU Metal 에서 바이트 동일했다. ANGLE Metal 은 3회 중 1회 `60` 바이트 (최대 `24`) 가 달랐고 나머지 2회는 같았다 — 같은 두 빌드에서 갈리므로 로드 간 비결정성이다 (ADR §1-F 의 WebGPU 재캡처 불일치와 같은 크기).
+  - N-body (`?engine=newton`) 에서는 엔진 상태로 그림자를 계산한다 (G3). 일식 시각으로 바로 진입한 N-body 상태는 달이 그림자 축에서 `26 ~ 58` R 떨어져 있어 그림자가 없다 (콘솔 오류 0 — N-body 사건 패널은 ADR 1347 D8 대로 비활성).
 - [#1366] 궤도 경사가 있는 선 (명왕성 · 혜성 · 에리스 · 위성 궤도 등) 과 천체의 황도 위 · 아래 위치가 반대편으로 바뀐다 (실제와 같은 쪽). 달은 실제 황위 쪽에 있고, 월식 그림자는 같은 기하로 따라간다. 기본 진입 화면의 2D 배치 · 카메라 드래그 방향 · free-fly WASD · 천체 외형 · 지구 자전은 바뀌지 않는다 (기본 카메라는 이제 데이터 황도 **북쪽**에서 내려다본다 — 종전에는 남쪽 + 거울상이라 같은 2D 배치로 보였다). 장면 핸들 `getLunarEclipseShadowUniforms` 의 `a` · `axis` 는 장면 좌표다 (판정식 출력의 z 반전).
   - 고리 · 자전축: 메시와 장면 회전은 그대로다. 다만 극 방위를 모델링하지 않으므로 (world X 축 주위 obliquity 근사) 장면 극이 가리키는 **실제 방향**이 바뀌고, IAU 극과의 각도 차가 달라진다. 실측 (프로젝트 `computeRotationState` · `computeSpinQuaternion` 장면 극 ↔ IAU WGCCRE J2000 극, 고리 법선은 극과 평행, 선 각도): 토성 `54.5° → 5.0°` (개선) · 해왕성 `22.7° → 50.8°` (악화) · 천왕성 `19.8° → 12.2°` · 목성 `1.4° → 5.2°`. 극 방위 모델링 (IAU 극) 은 범위 밖이다.
 - [#1362] 자전을 켠 (기본) 지구의 계절과 자전 방향이 바뀐다 — 6월에 북반구 극관 · 낮면이 태양 쪽이고, 시간을 재생하면 지표가 서→동으로 돌아 태양이 동쪽에서 뜬다. 같은 시각이면 태양을 향한 경도가 실제와 같다 (종전에는 시각과 무관). 구름은 지표 기준 동쪽으로 흐른다. 다른 8천체 · 고리의 자전 quaternion 은 비트 동일하고, `?rotate=off` 는 그대로 정지다.

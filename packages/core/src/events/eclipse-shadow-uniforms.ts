@@ -1,8 +1,11 @@
 import type { Vec3Double } from '../coords/vec3.js';
 import {
   lunarEclipseGeometry,
+  solarEclipseCone,
+  solarEclipseGeometry,
   type EclipseRadii,
   type LunarEclipseType,
+  type SolarEclipseType,
 } from './eclipse-geometry.js';
 
 /**
@@ -19,7 +22,8 @@ import {
  */
 
 /**
- * `uEclMode` 값. 셰이더는 `1` 만 월식으로 읽고 그 밖은 그림자 없음으로 읽는다 — 일식 (`2`) 분기는 PR3 가 더한다.
+ * `uEclMode` 값. 셰이더는 `1` 을 월식 (달 머티리얼), `2` 를 일식 (지구 표면 · 구름 머티리얼 — #1360 PR3), 그 밖을 그림자 없음으로
+ * 읽는다.
  */
 export const ECLIPSE_SHADOW_MODE = { none: 0, lunar: 1, solar: 2 } as const;
 export type EclipseShadowMode = (typeof ECLIPSE_SHADOW_MODE)[keyof typeof ECLIPSE_SHADOW_MODE];
@@ -167,5 +171,83 @@ export function classifyLunarShadowUniforms(
   if (offset < u.k[0] - 1) return 'total';
   if (offset < u.k[0] + 1) return 'partial';
   if (offset < u.k[1] + 1) return 'penumbral';
+  return null;
+}
+
+/**
+ * #1360 PR3 — 일식 그림자 uniform (결정 G2 · R2 · R6). 판정식이 식이 아니라고 하면 (`type === null`, `γ ≥ 1 + l1`) 또는 달이
+ * 지구보다 태양 쪽이 아니면 (본문 주석) 그림자 없음 (`mode 0`). 원뿔 파라미터는 판정식과 **같은 함수** (`solarEclipseCone`) 의 출력이다 — 판정 「개기」 와 렌더 「본영」 이 같은
+ * `f1` · `f2` 를 쓴다.
+ *
+ * 지구 반경 단위 기하 (지구 중심 원점, 축 = 태양 → 달):
+ *  - `a` = 달 위치 / R⊕.
+ *  - `axis` = 그림자 축 단위 벡터 (태양 → 달).
+ *  - `k` = `(tan f1, R☾·sec f1 / R⊕, tan f2, R☾·sec f2 / R⊕)` — 표면점 `n` 에서 달까지 축 방향 거리 `z = (n − a)·axis`
+ *    [지구 반경] 의 평면에서 반영 반경 `l1 = z·k.x + k.y`, 본영 반경 `l2 = z·k.z − k.w` (음수면 개기 쪽 — 셰이더는 `|l2|`).
+ *  - `glow` = 0 (붉은 빛은 월식 전용).
+ *
+ * 셰이더는 world normal `n` 을 지구 반경 단위의 표면점으로 읽는다 — 그래서 bodyScale 로 지구 화면 크기가 과장돼도 그림자가
+ * 지표에서 차지하는 각 영역은 실제와 같다 (결정 R6).
+ *
+ * @param moon 지구 중심 달 위치 [m] (물리 — 위성 배율 미적용)
+ * @param sun 지구 중심 태양 위치 [m]
+ * @param out 결과 버퍼 (생략 시 새로 만든다)
+ */
+export function solarEclipseShadowUniforms(
+  moon: Vec3Double,
+  sun: Vec3Double,
+  radii: EclipseRadii,
+  out: EclipseShadowUniforms = noEclipseShadowUniforms(),
+): EclipseShadowUniforms {
+  const cone = solarEclipseCone(moon, sun, radii);
+  // 달이 지구보다 태양 쪽이 아니면 (기본면까지 축 거리 `z = −moon·axis ≤ 0`) 그림자 없음. 판정식 경계식에는 이 조건이 없다 —
+  // 사건 경로는 판정식을 삭 근처에서만 부르기 때문이다 (`syzygy-eclipse` phase `new`). 장면은 매 프레임 부르므로 여기서 막는다:
+  // 망에서는 `z < 0` 이라 `|l2|` 가 커져 판정식이 「개기」 를 낸다 (단위 테스트 실측 — 2022-11-08 월식 시각).
+  if (moon[0] * cone.axis[0] + moon[1] * cone.axis[1] + moon[2] * cone.axis[2] >= 0)
+    return setNone(out);
+  const g = solarEclipseGeometry(moon, sun, radii);
+  if (g.type === null) return setNone(out);
+
+  out.mode = ECLIPSE_SHADOW_MODE.solar;
+  out.a[0] = moon[0] / radii.earth;
+  out.a[1] = moon[1] / radii.earth;
+  out.a[2] = moon[2] / radii.earth;
+  out.axis[0] = cone.axis[0];
+  out.axis[1] = cone.axis[1];
+  out.axis[2] = cone.axis[2];
+  out.k[0] = cone.tanF1;
+  out.k[1] = cone.moonRadiusSecF1 / radii.earth;
+  out.k[2] = cone.tanF2;
+  out.k[3] = cone.moonRadiusSecF2 / radii.earth;
+  out.glow[0] = 0;
+  out.glow[1] = 0;
+  out.glow[2] = 0;
+  return out;
+}
+
+/**
+ * uniform 만으로 일식 종류를 다시 분류한다 (DoD D1 확장) — 셰이더가 보는 값 (`a` · `axis` · `k`) 으로 `solarEclipseGeometry` 의
+ * 경계식을 다시 세운다. 기본면 (지구 중심을 지나고 축에 수직) 까지 거리 `z = −a·axis`, `γ = |a − (a·axis)·axis|`,
+ * `l1 = z·k.x + k.y`, `l2 = z·k.z − k.w`. 경계식은 판정식과 같다 — `γ < 1` 이면 축이 지표에 닿는 점의 본영 반경
+ * (`l2 − √(1 − γ²)·k.z`) 부호, `γ < 1 + |l2|` 이면 기본면 `l2` 부호, `γ < 1 + l1` 이면 부분.
+ */
+export function classifySolarShadowUniforms(
+  u: Readonly<EclipseShadowUniforms>,
+): SolarEclipseType | null {
+  if (u.mode !== ECLIPSE_SHADOW_MODE.solar) return null;
+  const along = u.a[0] * u.axis[0] + u.a[1] * u.axis[1] + u.a[2] * u.axis[2];
+  const gamma = Math.hypot(
+    u.a[0] - u.axis[0] * along,
+    u.a[1] - u.axis[1] * along,
+    u.a[2] - u.axis[2] * along,
+  );
+  const z = -along;
+  // 빌더는 z ≤ 0 (달이 지구 뒤) 에서 mode 0 을 내므로 여기 도달하지 않는다 — 같은 조건을 그대로 둔다 (uniform 단독 해석).
+  if (z <= 0) return null;
+  const penumbra = z * u.k[0] + u.k[1];
+  const umbra = z * u.k[2] - u.k[3];
+  if (gamma < 1) return umbra - Math.sqrt(1 - gamma * gamma) * u.k[2] < 0 ? 'total' : 'annular';
+  if (gamma < 1 + Math.abs(umbra)) return umbra < 0 ? 'total' : 'annular';
+  if (gamma < 1 + penumbra) return 'partial';
   return null;
 }
