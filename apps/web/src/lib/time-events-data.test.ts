@@ -20,6 +20,8 @@ import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from './time-scrubber';
  * #1377 — 사전 계산 파일 (`src/data/time-events.json`) 의 생성기 겸 drift 가드.
  *
  * - 쓰기 모드 (`TIME_EVENTS_WRITE=1`, `pnpm --filter @astro-simulator/web generate:time-events`): 전 범위를 계산해 파일을 쓴다.
+ *   ⚠️ 이 테스트는 `@astro-simulator/core` 의 **`dist`** 를 읽는다 — core src 만 고치고 빌드하지 않으면 옛 모델로 「재생성」 된다
+ *   (PR #1379 리뷰 R2 실측: md5 불변 · 4 passed). 그래서 생성 스크립트는 shared · core 빌드를 먼저 돈다.
  *   prettier 로 정규화해 쓴다 — 커밋 시 lint-staged 가 같은 출력을 내므로 생성물 ↔ 포맷 drift 가 없다.
  * - 검사 모드 (기본 — CI): 커밋된 파일을 복원한 목록이 `computeEventsForKind` **전 범위** 결과와 깊은 비교로 같아야 한다.
  *   위치 모델 (궤도 요소 · μ · 시각 모델) 이 바뀌어 사건 하나라도 움직이면 FAIL — 「파일을 다시 생성하라」 는 뜻이다.
@@ -69,8 +71,14 @@ describe('#1377 사전 계산 파일', () => {
     }
     const committed: unknown = JSON.parse(readFileSync(DATA_PATH, 'utf8'));
     const decoded = decodeTimeEvents(committed, RANGE);
-    // toEqual 은 숫자를 Object.is 로 비교한다 — JD 는 비트 단위로 같아야 한다 (JSON 숫자는 왕복 정확).
-    expect(decoded).toEqual(computed);
+    // toEqual 은 숫자를 Object.is 로 비교한다 — JD 는 비트 단위로 같아야 한다. 비트 동일의 사거리는 **소스 파일 → vitest** 까지다
+    // (JSON.stringify → JSON.parse 왕복은 정확하다). prod 번들은 번들러가 데이터를 `JSON.parse('…')` 문자열로 다시 담으며
+    // 1,510건 중 35건이 1 ulp (약 40 µs) 어긋난다 (PR #1379 리뷰 R1 실측) — 기능 영향 0 (UTC 자정 최근접 사건도 16.3 s 떨어져
+    // id 날짜 불변, 배지는 ±0.3일). 그래서 「prod 앱 JD == 계산값」 을 비트 단위로 단언하지 말 것.
+    expect(
+      decoded,
+      '사전 계산 파일이 계산 결과와 다르다 — 위치 모델이 바뀌었으면 `pnpm --filter @astro-simulator/web generate:time-events` (core 빌드 포함) 로 재생성하라',
+    ).toEqual(computed);
   });
 
   it('종류별 사건 수 — 구 런타임과 같다 (일식 455 · 월식 458 …)', () => {

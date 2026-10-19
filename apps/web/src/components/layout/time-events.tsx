@@ -261,6 +261,9 @@ export function TimeEventsButton() {
       return;
     }
     if (triggerRef.current) setPosition(resolvePanelPosition(triggerRef.current));
+    // #1377 — 불러오기에 실패한 상태면 패널을 **열 때** 1회 다시 요청한다. 열어 둔 동안에는 다시 부르지 않는다 — 재시도는
+    // 사용자의 여는 동작 1회당 최대 1회라 무한 재시도가 없다 (`requestTimeEvents` 는 실패 시 `started` 만 되돌린다).
+    if (snapshot.status === 'error') requestTimeEvents();
     setOpen(true);
   };
 

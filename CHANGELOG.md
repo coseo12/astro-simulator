@@ -34,7 +34,7 @@ Semantic Versioning을 따른다.
   - 원인: 페이지를 열 때마다 메인 스레드가 사건 목록을 `requestIdleCallback` 청크 46개로 계산했고, 청크마다 목록을 다시 그렸다. CI (CPU 4x · SwiftShader) 실측으로 로드 1회에 약 3.4 s 를 썼다 (계산 1.2~1.3 s + 재렌더 46회 약 2.1 s).
   - 원인 확정: #1377 Phase 0 의 같은 VM bisect 에서 #1354 PR2 가 주 계단, #1347 이 부 계단으로 나왔다.
   - 수정: 1900~2100 의 사건 8종 (1,510건) 을 생성 시점에 계산해 `apps/web/src/data/time-events.json` 으로 넣었다. 형식은 `TEV1`, 크기는 `50,205` B (gzip `15,230` B) 다. 런타임은 이 파일을 dynamic import 로 1회 받아 1회 반영하고, `?events=off` 이면 받지 않는다.
-  - 생성: `pnpm --filter @astro-simulator/web generate:time-events`.
+  - 생성: `pnpm --filter @astro-simulator/web generate:time-events` (shared · core 빌드를 먼저 돈다 — 테스트가 core `dist` 를 읽는다).
   - drift 가드: `time-events-data.test.ts` 가 「파일 복원 == `computeEventsForKind` 전 범위」 를 JD 비트 단위로 단언한다. 위치 모델을 바꾸면 FAIL 하며, 변이 ΔT `69.2` s 에서 FAIL 함을 확인했다.
   - ADR [`20261016-1347`](docs/decisions/20261016-1347-event-markers.md) · [`20261017-1354`](docs/decisions/20261017-1354-lunar-precession-eclipses.md) Amendment 2.
   - 실측 (같은 VM · develop `53aa8dc2` ↔ 수정본 번갈아 N=10 — CI 진단 run 39206847551 · `next dev` · SwiftShader · 4x, rAF FPS 중앙값):
@@ -53,7 +53,7 @@ Semantic Versioning을 따른다.
 - **별 배경이 절차 별에서 실측 별로 바뀐다** (#1373) — 기본 화면 (하드웨어 렌더) 의 별 위치 · 밝기 · 색이 달라진다. 은하수 띠는 남되 법선이 실제 은하 북극 (RA `192.85948°` · Dec `+27.12825°`) 방향이 되어 띠가 실제 은하면에 놓인다 (ADR 1373 결정 R4 — 절차 별 셀 경로 삭제). `?stars=off` · 소프트웨어 렌더 화면은 바뀌지 않는다 (D5 바이트 동일). About 모달에 HYG 출처 · 「별 크기 · 밝기는 등급 시각화」 안내가 추가된다.
 - **표시 패널에 「별자리」 토글이 생긴다** (#1373 PR2) — 기본 꺼짐이라 URL 없는 화면은 바뀌지 않는다 (D5 바이트 동일). `?constellations=on` 이거나 토글을 켜면 별자리 선과 (이름 라벨이 켜져 있으면) 한국어 이름이 보인다. 패널 토글 순서가 바뀐다 (별 배경 다음에 별자리 — 키보드 Tab 순서 포함). 소프트웨어 렌더에서는 별 배경과 같은 사유로 비활성이다. About 모달의 라이선스 URI 가 링크가 된다.
 - **사건 패널 대기 문구** (#1377). 「사건 계산 중…」 이 「사건 불러오는 중…」 으로 바뀐다.
-  - 파일을 받지 못하면 「사건 목록을 불러오지 못했습니다」 를 보이고, 패널을 다시 열 때 재시도한다.
+  - 파일을 받지 못하면 「사건 목록을 불러오지 못했습니다」 를 보인다. 다시 불러오는 때는 셋이다: 실패 상태에서 사건 패널을 **여는** 순간 (여는 동작 1회당 1회 — 연 채로는 다시 시도하지 않는다), 사건 표시를 끄고 켜거나 엔진을 Kepler 로 되돌릴 때, 새 페이지 로드.
   - 계산 중에 목록이 조금씩 채워지던 부분 목록 단계는 없어졌다 — 목록이 한 번에 나타난다.
   - 사건 수 · 필터 · 목록 · 눈금 · 선택 동작은 그대로다.
 

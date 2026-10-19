@@ -4,7 +4,8 @@
 // 그래서 런타임에 계산하지 않고 생성 시점에 한 번 계산해 둔다 (ADR `20261016-1347-event-markers.md` · `20261017-1354-...` Amendment).
 // 런타임 계산은 CI 실측으로 로드마다 메인 스레드 약 3.4 초 (계산 1.2~1.3 s + 청크마다 재렌더 약 2.1 s) 였다 — #1377 Phase 0.
 //
-// 생성: `pnpm --filter @astro-simulator/web generate:time-events` (= `time-events-data.test.ts` 를 쓰기 모드로 실행).
+// 생성: `pnpm --filter @astro-simulator/web generate:time-events` (= shared · core 빌드 후 `time-events-data.test.ts` 를 쓰기 모드로 실행 —
+// 테스트가 core `dist` 를 읽으므로 빌드가 선행돼야 한다).
 // drift: 같은 테스트가 커밋된 파일을 복원한 목록과 `computeEventsForKind` 전 범위 결과를 깊은 비교한다 — 위치 모델이 바뀌어
 // 사건이 움직이면 FAIL 한다.
 import {

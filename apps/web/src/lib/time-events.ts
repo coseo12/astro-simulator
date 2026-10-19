@@ -44,7 +44,9 @@ function emit(next: TimeEventsSnapshot): void {
 
 /**
  * 불러오기 시작 (멱등). 처음 호출될 때만 파일을 받고, 도착하면 복원해 **한 번** 반영한다. 결과는 모듈 수명 동안 메모한다.
- * 실패하면 (chunk 로드 실패 · 형식 불일치) `error` 로 두고 `started` 를 되돌린다 — 다음 요청 (패널 재마운트 등) 이 다시 시도한다.
+ * 실패하면 (chunk 로드 실패 · 형식 불일치) `error` 로 두고 `started` 를 되돌린다. 자동 재시도는 없다 — 다음 호출이 다시
+ * 시도하며, 호출 지점은 셋이다: 사건 패널을 **여는** 순간 (`error` 일 때만 — `TimeEventsButton`), 눈금 · 버튼의 활성 조건
+ * (`active` — 표시 의도 · 장면 준비 · Kepler 엔진) 이 다시 참이 될 때, 새 페이지 로드.
  */
 export function requestTimeEvents(): void {
   if (started) return;

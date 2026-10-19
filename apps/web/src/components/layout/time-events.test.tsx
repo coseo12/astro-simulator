@@ -8,7 +8,6 @@ import {
   resetTimeEventsForTest,
   subscribeTimeEvents,
 } from '@/lib/time-events';
-import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
 import { useSimStore } from '@/store/sim-store';
 import {
   EVENTS_NBODY_DISABLED_REASON,
@@ -20,7 +19,7 @@ import {
 
 /**
  * #1347 — 타임바 시간 이벤트 마커 (ADR `docs/decisions/20261016-1347-event-markers.md`).
- * M5 (선택 — 명령 순서 · 거리 자) · M6 (조작 — 필터 · 이전/다음 · listbox 키보드 · 계산 전 열기) · M7 (꺼짐 = 계산 0회 spy) ·
+ * M5 (선택 — 명령 순서 · 거리 자) · M6 (조작 — 필터 · 이전/다음 · listbox 키보드 · 반영 전 열기) · M7 (꺼짐 = 불러오기 0회 · 계산 0회 spy) ·
  * M9 (N-body 비활성 · 런타임 전환) 의 단위 부분.
  * #1354 (ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md`) — U1 (식 선택 — 달 포커스 · 거리 자 · 배율 고지) ·
  * U2 (종류명 · 배지 · 미포함 안내 제거) · E6 (식 필터 기본 꺼짐) 의 단위 부분.
@@ -174,7 +173,7 @@ describe('M7 — 꺼짐이면 불러오기 0회 · 켜짐이어도 런타임 계
     expect(computeSpy).not.toHaveBeenCalled();
   });
 
-  it('불러오기 실패 — 패널은 「불러오지 못했습니다」 · 눈금 없음 · 다음 요청이 다시 시도한다', async () => {
+  it('불러오기 실패 — 패널은 「불러오지 못했습니다」 · 눈금 없음 · 활성 조건 재진입 (재마운트) 이 다시 시도한다', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const failing = vi.fn(() => Promise.reject(new Error('chunk load failed')));
     resetTimeEventsForTest(failing);
@@ -182,9 +181,6 @@ describe('M7 — 꺼짐이면 불러오기 0회 · 켜짐이어도 런타임 계
     await flushEvents();
     expect(getTimeEventsSnapshot().status).toBe('error');
     expect(screen.queryByTestId('time-event-ticks')).toBeNull();
-    fireEvent.click(trigger());
-    expect(screen.getByTestId('time-events-error')).toHaveTextContent('불러오지 못했습니다');
-    expect(screen.queryByTestId('time-events-loading')).toBeNull();
     expect(consoleSpy).toHaveBeenCalled();
     unmount();
     renderEvents();
@@ -192,21 +188,44 @@ describe('M7 — 꺼짐이면 불러오기 0회 · 켜짐이어도 런타임 계
     expect(failing).toHaveBeenCalledTimes(2);
   });
 
-  it('식 목록 = 200년 한 번에 계산한 목록 (사전 계산 파일이 계산 함수와 같은 사건을 준다)', async () => {
+  it('불러오기 실패 → 패널을 **다시 열면** 1회 재시도 · 열어 둔 동안은 재요청 없음 · 성공하면 ready (PR #1379 B1)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // 1회째는 실패, 2회째부터는 실제 파일 — 호출마다 결과를 정한다.
+    let calls = 0;
+    const flaky = vi.fn(() => {
+      calls += 1;
+      return calls === 1
+        ? Promise.reject(new Error('chunk load failed'))
+        : Promise.resolve(committedFile);
+    });
+    resetTimeEventsForTest(flaky);
     renderEvents();
+    // 불러오는 중에 연다 → 실패가 열린 패널에 도착한다.
+    fireEvent.click(trigger());
+    expect(screen.getByTestId('time-events-loading')).toBeInTheDocument();
     await flushEvents();
-    const actual = await vi.importActual<typeof core>('@astro-simulator/core');
-    const bodiesById = new Map(actual.ephemeris.getSolarSystem().bodies.map((b) => [b.id, b]));
-    for (const id of ['solar-eclipse', 'lunar-eclipse'] as const) {
-      const whole = actual
-        .computeEventsForKind(bodiesById, actual.getEventKind(id), SCRUBBER_MIN_JD, SCRUBBER_MAX_JD)
-        .map((e) => e.id);
-      const chunked = getTimeEventsSnapshot()
-        .events.filter((e) => e.kind === id)
-        .map((e) => e.id);
-      expect(chunked).toEqual(whole);
-      expect(chunked.length).toBeGreaterThan(450);
-    }
+    expect(screen.getByTestId('time-events-error')).toHaveTextContent('불러오지 못했습니다');
+    // 연 채로 패널을 다시 그려도 (필터 칩 토글) 재요청하지 않는다 — 무한 재시도 0.
+    fireEvent.click(screen.getByTestId('time-event-filter-jupiter-opposition'));
+    await flushEvents();
+    expect(flaky).toHaveBeenCalledTimes(1);
+    expect(getTimeEventsSnapshot().status).toBe('error');
+    // 닫기 → 다시 열기 = 재시도 1회.
+    fireEvent.click(trigger());
+    expect(panel()).toBeNull();
+    expect(flaky).toHaveBeenCalledTimes(1);
+    fireEvent.click(trigger());
+    expect(flaky).toHaveBeenCalledTimes(2);
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('ready');
+    expect(screen.queryByTestId('time-events-error')).toBeNull();
+    // 목성 충 필터를 켜 둔 상태 — 기본 221 + 목성 충 183.
+    expect(screen.getAllByTestId('time-event-option')).toHaveLength(221 + 183);
+    // 성공한 뒤 다시 여닫아도 추가 요청 없음.
+    fireEvent.click(trigger());
+    fireEvent.click(trigger());
+    await flushEvents();
+    expect(flaky).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -244,6 +263,7 @@ describe('사건 패널 — 조작 (M6)', () => {
 
   it('#1354 E7 — 일 · 월식 미포함 안내는 없다 · 식 필터가 꺼져 있으면 배율 고지도 없다', async () => {
     renderEvents();
+    await flushEvents();
     fireEvent.click(trigger());
     expect(screen.queryByTestId('time-events-eclipse-note')).toBeNull();
     expect(screen.queryByTestId('time-events-scale-note')).toBeNull();
@@ -382,6 +402,7 @@ describe('사건 패널 — 조작 (M6)', () => {
 
   it('Esc — 패널 닫고 트리거로 포커스 · 기본 동작 차단 (자유시점 Esc 와 충돌 0)', async () => {
     renderEvents();
+    await flushEvents();
     fireEvent.click(trigger());
     const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     act(() => {
@@ -392,8 +413,9 @@ describe('사건 패널 — 조작 (M6)', () => {
     expect(document.activeElement).toBe(trigger());
   });
 
-  it('패널 밖 pointerdown 으로 닫힌다', () => {
+  it('패널 밖 pointerdown 으로 닫힌다', async () => {
     renderEvents();
+    await flushEvents();
     fireEvent.click(trigger());
     fireEvent.pointerDown(screen.getByText('after'));
     expect(panel()).toBeNull();

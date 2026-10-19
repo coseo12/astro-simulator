@@ -293,4 +293,4 @@ events (`packages/core/src/events/*.test.ts`) · `p2b-1year-position.test.ts` �
 
 - **바뀌는 결정**: E9. 식 계산은 런타임에 돌지 않는다. ADR [20261016-1347](20261016-1347-event-markers.md) Amendment 2 의 사전 계산 파일이 식 2종(일식 455 · 월식 458)을 포함한다. 그래서 10년 청크 40개와 DoD E9(청크당 ≤ 50 ms)는 대상이 없어졌다.
 - **이유**: E9 는 청크 **하나**의 시간만 쟀다. 그런데 비용을 정한 것은 청크 40개의 합과 청크마다 일어난 재렌더였다. #1377 Phase 0 CI 실측(같은 VM, 정지 고정)에서 이 결정의 PR2(`851bcbb9`)가 mobile 을 `60.1 → 41.3` FPS 로 낮췄고, 창1 의 사건 작업은 `3,463` ms 였다.
-- **불변**: 식 판정식 · 최대식 탐색 · 종류(`eclipseType`) · 선택 동작(결정 E5 · Amendment 1)은 그대로다. 식 목록이 「200년 한 번에 계산한 목록」 과 같다는 점은 `time-events.test.tsx` 와 drift 테스트가 단언한다.
+- **불변**: 식 판정식 · 최대식 탐색 · 종류(`eclipseType`) · 선택 동작(결정 E5 · Amendment 1)은 그대로다. 식 목록이 「200년 한 번에 계산한 목록」 과 같다는 점은 drift 테스트(`apps/web/src/lib/time-events-data.test.ts`)가 단언한다 — id · 시각 비트 · 식 종류까지 비교한다.
