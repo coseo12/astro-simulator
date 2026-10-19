@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
-import type { BodyScreenInfo } from '@astro-simulator/core/scene';
+import type { BodyScreenInfo, ConstellationScreenInfo } from '@astro-simulator/core/scene';
 import { LABEL_OFFSET_PX } from '@/lib/label-layout';
 import { useSimStore } from '@/store/sim-store';
 import { BodyLabels } from './body-labels';
@@ -14,7 +14,9 @@ import { BodyLabels } from './body-labels';
 let sentCommands: CoreCommand[] = [];
 let screenRows: BodyScreenInfo[] = [];
 let screenInfoAvailable = true;
+let constellationRows: ConstellationScreenInfo[] = [];
 vi.mock('@/core/sim-context', () => ({
+  useSimConstellationScreenInfo: () => () => constellationRows,
   useSimCommand: () => (cmd: CoreCommand) => {
     sentCommands.push(cmd);
   },
@@ -48,6 +50,7 @@ const row = (id: string, x: number, y: number, radius = 4, onScreen = true): Bod
 beforeEach(() => {
   sentCommands = [];
   screenInfoAvailable = true;
+  constellationRows = [];
   rafQueue = [];
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
     rafQueue.push(cb);
@@ -242,5 +245,82 @@ describe('BodyLabels', () => {
     render(<BodyLabels />);
     expect(screen.getByTestId('body-labels').className).toContain('pointer-events-none');
     expect(label('sun').className).toContain('pointer-events-auto');
+  });
+});
+
+/** #1373 PR2 결정 N1 ~ N4 · T2 — 별자리 이름이 같은 배치 패스로 DOM 에 닿는가. 규칙 자체는 `label-layout.test.ts`. */
+describe('BodyLabels — 별자리 이름 (#1373 PR2)', () => {
+  const crow = (id: string, x: number, y: number, onScreen = true): ConstellationScreenInfo => ({
+    id,
+    nameKo: `${id}자리`,
+    x,
+    y,
+    inFront: onScreen,
+    onScreen,
+  });
+  const cLabel = (id: string) => screen.getByTestId(`constellation-label-${id}`);
+
+  it('행이 없으면 (꺼짐 · 생성 전) 별자리 DOM 0', () => {
+    screenRows = [row('earth', 400, 300, 5)];
+    render(<BodyLabels />);
+    runFrame();
+    runFrame();
+    expect(screen.queryAllByTestId(/^constellation-label-/)).toHaveLength(0);
+  });
+
+  it('행 도착 → 이름 생성 · 기준점 중앙 정렬 표시 · body 라벨과 겹치면 별자리만 숨김', () => {
+    screenRows = [row('earth', 400, 300, 5)];
+    constellationRows = [crow('Ori', 800, 200), crow('Tau', 420, 300)];
+    render(<BodyLabels />);
+    runFrame(); // 이름 목록을 state 로 올린다
+    runFrame(); // 재측정된 루프의 첫 배치
+    expect(cLabel('Ori')).toHaveTextContent('Ori자리');
+    expect(cLabel('Ori')).toHaveAttribute('data-label-visible', 'true');
+    expect(cLabel('Ori').style.transform).toBe(
+      `translate3d(${800 - LABEL_W / 2}px, ${200 - LABEL_H / 2}px, 0)`,
+    );
+    // Tau 박스 (400..440) 가 지구 라벨 (411..451) 과 겹친다 → body 우선.
+    expect(cLabel('Tau')).toHaveAttribute('data-label-visible', 'false');
+    expect(label('earth')).toHaveAttribute('data-label-visible', 'true');
+  });
+
+  it('기준점이 body 원반 안 → 숨김 (규칙 1b)', () => {
+    screenRows = [row('jupiter', 600, 400, 80)];
+    constellationRows = [crow('Sgr', 600, 470)];
+    render(<BodyLabels />);
+    runFrame();
+    runFrame();
+    expect(cLabel('Sgr')).toHaveAttribute('data-label-visible', 'false');
+  });
+
+  it('별자리를 끄면 (행 0) 다음 프레임에 전부 숨김', () => {
+    constellationRows = [crow('Ori', 800, 200)];
+    render(<BodyLabels />);
+    runFrame();
+    runFrame();
+    expect(cLabel('Ori')).toHaveAttribute('data-label-visible', 'true');
+    constellationRows = [];
+    runFrame();
+    expect(cLabel('Ori')).toHaveAttribute('data-label-visible', 'false');
+    expect(cLabel('Ori').style.visibility).toBe('hidden');
+  });
+
+  it('N3 — 포인터를 받지 않고 · 버튼이 아니며 · 화면 장식 (aria-hidden)', () => {
+    constellationRows = [crow('Ori', 800, 200)];
+    render(<BodyLabels />);
+    runFrame();
+    runFrame();
+    const el = cLabel('Ori');
+    expect(el.tagName).toBe('SPAN');
+    expect(el.className).toContain('pointer-events-none');
+    expect(el).toHaveAttribute('aria-hidden', 'true');
+    expect(el).not.toHaveAttribute('tabindex');
+  });
+
+  it('T2 — ?labels=off 면 별자리 이름도 없다 (오버레이 미렌더)', () => {
+    useSimStore.setState({ labelsVisible: false });
+    constellationRows = [crow('Ori', 800, 200)];
+    render(<BodyLabels />);
+    expect(screen.queryByTestId('constellation-label-Ori')).toBeNull();
   });
 });

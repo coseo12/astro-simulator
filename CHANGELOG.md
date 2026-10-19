@@ -17,9 +17,21 @@ Semantic Versioning을 따른다.
   - 실측 D6: 목성 · 태양 · 지구 포커스에서 별 쿼드만 켜고 끈 같은 프레임 — 원반 안 (반경 × 0.9) 변경 픽셀 `0` (WebGPU · WebGL2 `?gpu=a`), 원반 밖 `9,530 ~ 9,928` (양성 대조, B안 — 초안 A 는 `8,036 ~ 8,374`).
   - 실측 D7 (실 Chrome 155 headful · Metal, 별 쿼드 on/off 3회 교차 · 3 s 중앙값): B안 · WebGL2 는 `?gpu=a`: vsync 유지 fps 비 `0.9975 ~ 1.0009` (WebGPU · WebGL2, 기본 · 지구 포커스) · vsync 해제 프레임당 증분 최대 `+0.028` ms (기대 `≤ +0.3`).
 
+- **[#1373] 별자리 선 · 이름 (PR2)** ([#1373](https://github.com/coseo12/astro-simulator/issues/1373)). 88개 별자리의 선과 한국어 이름을 표시 패널 「별자리」 토글로 켠다 — **기본 꺼짐**, `?constellations=on` 옵트인. 이름은 「이름 라벨」 (`?labels=`) 도 켜져 있어야 보인다. ADR [`20261018-1373`](docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D3 · D4 (별자리 파일) · D5 · R6 · N1 ~ N4 · T1 · T2 · PR 분할 표 PR2.
+  - 데이터: `apps/web/public/data/stars/constellations.json` (`17,786` B — 형식 `CNS1`, 별자리 `88` · 선분 `743`). d3-celestial (BSD-3-Clause) 선 · 이름 · 라벨 기준점을 같은 생성기 (`scripts/generate-star-catalog.mjs`) 가 받아 sha256 대조 후 만든다. 선 정점은 좌표가 아니라 `star-catalog.bin` **인덱스**다 — 런타임이 로드한 카탈로그에서 읽어 선 끝이 그려진 별과 정확히 만난다. 뱀자리 두 조각은 선을 합치고 라벨은 머리 쪽 1개. `--check` 로 `star-catalog.bin` 은 PR1 과 바이트 동일 (인덱스 고정 유지).
+  - 이름 (D5 · Q-N): d3 `ko` 를 출발점으로 한국천문연구원 별자리 페이지와 대조한 차이 표 (PR 코멘트) 의 권고대로 Her → 「헤르쿨레스자리」 · Cyg → 「백조자리」 2건만 바꿨다 (CrB 「북쪽왕관자리」 · 1차 출처 미확인 35개는 d3 유지). 사용자 확정 대기.
+  - 렌더: `constellation-lines.ts` — `LinesMesh` 1개 (정점 `1,486`, draw 1) · `infiniteDistance` · 그룹 0 · `alpha 0.45` 투명 큐 · `alphaIndex −1` (별 쿼드 바로 뒤) · depth write off · 표준 depth (행성 원반 뒤 선은 가려진다). 색 `#b8a07a` (모래색 — 궤도선 청회색과 다른 계열) · 불투명도는 rendering-only (D-T2 대기).
+  - 이름 라벨: 기존 오버레이 (`body-labels.tsx`) 의 같은 배치 패스에 최저 우선순위 kind `constellation` 으로 들어간다 (`label-layout.ts` 규칙 5 — body 라벨이 먼저 놓여 겹침 쌍 0, 기준점이 body 원반 안이면 숨김, 기준점 중앙 정렬). core pull API `getConstellationScreenInfo()`. 별자리 라벨은 `pointer-events: none` · `aria-hidden` · 포커스 대상 아님 (N3), 11 px · 불투명도 0.75 (N4, D-T2 대기).
+  - 토글 · 수명: `display-toggles.ts` 행 (별 배경 다음, 가용성 = 별 배경과 같은 `!isSoftwareRenderer`) · 파서 `parse-constellations-mode.ts` · core 명령 `setConstellationsVisible`. 첫 ON 에서 카탈로그 (별 배경과 공유 — 장면당 1회) · `constellations.json` (장면당 1회) 을 받아 **둘 다 도착한 뒤** 선을 만들고 그 시점의 의도로 켠다 (PR1 T4 계약). 인덱스가 카탈로그 범위 밖인 별자리는 건너뛰고 경고한다. `?stars=` 와 독립이다 — `?stars=off&constellations=on` 은 선만 그린다.
+  - About 모달: d3-celestial (BSD-3-Clause) 고지 추가 · HYG 의 CC BY-SA 4.0 URI 와 d3 LICENSE URI 를 클릭 가능한 링크로 (PR #1375 qa 관측 2).
+  - 실측 D5 (develop `bd811c36` ↔ 본 PR, 1280×800): URL 없는 화면 Metal WebGPU (기본 · `?stars=off` · 지구 포커스) · WebGL2 `?gpu=a` · SwiftShader 4셀 바이트 동일 · URL 없는 로드에서 `constellations.json` 요청 `0`. `?constellations=on` 로드 후 런타임 OFF ↔ URL 없는 로드 full frame 차이 `0` (WebGPU · WebGL2). `verify:1265-display-panel` `SWIFTSHADER=1` · `BROWSER_VERIFY_GPU=metal` 둘 다 판정 55 (PASS 55 · FAIL 0) · SKIP 4.
+  - 실측 D6: 오리온을 태양 · 목성 · 지구 뒤에 둔 같은 프레임에서 선만 켜고 끈 차분 — 원반 안 (반경 × 0.9) 변경 `0` (WebGPU · WebGL2), 천체를 숨긴 양성 대조 `380 ~ 676`. body ↔ 별자리 라벨 겹침 쌍 `0` (1280 · 375, 시점 5종).
+  - 실측 D7 (실 Chrome headful · Metal · DPR 2, on/off 3회 교차 · 3 s 중앙값): 별자리 (선 + 이름) — vsync 유지 fps 비 `0.9989 ~ 1.0001`, vsync 해제 증분 최대 `+0.078` ms. 별 + 선 + 이름 — vsync 유지 비 `0.9991 ~ 1.0007`, 해제 증분 최대 `+0.119` ms (기대 `≥ 0.98` · `≤ +0.3`).
+
 ### Behavior Changes
 
 - **별 배경이 절차 별에서 실측 별로 바뀐다** (#1373) — 기본 화면 (하드웨어 렌더) 의 별 위치 · 밝기 · 색이 달라진다. 은하수 띠는 남되 법선이 실제 은하 북극 (RA `192.85948°` · Dec `+27.12825°`) 방향이 되어 띠가 실제 은하면에 놓인다 (ADR 1373 결정 R4 — 절차 별 셀 경로 삭제). `?stars=off` · 소프트웨어 렌더 화면은 바뀌지 않는다 (D5 바이트 동일). About 모달에 HYG 출처 · 「별 크기 · 밝기는 등급 시각화」 안내가 추가된다.
+- **표시 패널에 「별자리」 토글이 생긴다** (#1373 PR2) — 기본 꺼짐이라 URL 없는 화면은 바뀌지 않는다 (D5 바이트 동일). `?constellations=on` 이거나 토글을 켜면 별자리 선과 (이름 라벨이 켜져 있으면) 한국어 이름이 보인다. 패널 토글 순서가 바뀐다 (별 배경 다음에 별자리 — 키보드 Tab 순서 포함). 소프트웨어 렌더에서는 별 배경과 같은 사유로 비활성이다. About 모달의 라이선스 URI 가 링크가 된다.
 
 ## [0.102.0] - 2026-10-18
 

@@ -2,7 +2,7 @@
 
 > 이 파일은 `scripts/generate-star-catalog.mjs` 가 생성한다. 손으로 고치지 말 것 — `--check` 가 바이트 대조로 어긋남을 잡는다.
 
-ADR [`20261018-1373-star-catalog-constellations.md`](../../../../../docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D4.
+ADR [`20261018-1373-star-catalog-constellations.md`](../../../../../docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D3 · D4 · D5.
 
 ## `star-catalog.bin`
 
@@ -43,7 +43,7 @@ ADR [`20261018-1373-star-catalog-constellations.md`](../../../../../docs/decisio
 |   8920 |  42981 | 43100 | 3474 | 6.58 | 131.666595 | 28.765059 |
 |   8921 |  69259 | 69481 | 5328 | 6.62 | 213.365775 | 51.787868 |
 
-4. **정렬**: V × 100 정수 오름차순 → HYG `id` 오름차순. 이 순서가 별자리 선 파일 (PR2) 이 참조하는 인덱스다 — 바뀌면 선이 엉뚱한 별을 잇는다. 선 원천: 89 feature · 743 선분.
+4. **정렬**: V × 100 정수 오름차순 → HYG `id` 오름차순. 이 순서가 `constellations.json` 이 참조하는 인덱스다 — 바뀌면 선이 엉뚱한 별을 잇는다. 선 원천: 89 feature · 743 선분.
 
 ### 기준 별 (단위 테스트 골든 값)
 
@@ -59,6 +59,37 @@ ADR [`20261018-1373-star-catalog-constellations.md`](../../../../../docs/decisio
 
 원천 CSV 에서 위 선택 · 정렬을 거쳐 4개 열 (`ra` · `dec` · `mag` · `ci`) 만 남기고, `ra` 를 시에서 도로 바꾸고, 위 형식으로 양자화했다 (RA · Dec float32 · V · B−V 고정소수점 int16). 나머지 열은 버렸다.
 
+## `constellations.json`
+
+| 항목               | 값                                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 원천               | **d3-celestial** (Olaf Frohn) 커밋 `7e720a3de062059d4c5400a379146a601d9010e0`                                           |
+| 선                 | `data/constellations.lines.json` — sha256 `294f66bef5d5cf50b1e17f16d2efa1d97a15131612c68dd935adef6e7373e13c` (27,136 B) |
+| 이름 · 라벨 기준점 | `data/constellations.json` — sha256 `ab4ae692027cbc042c0d6791a84456a65eb7c55656107fd00c58ff6e55d4d8b2` (50,581 B)       |
+| 별자리             | **88** (원천 89 feature — 뱀자리 머리 · 꼬리를 1개로)                                                                   |
+| 선분               | **743**                                                                                                                 |
+| 파일 크기          | 17,786 B                                                                                                                |
+| 파일 sha256        | `2f5e6f628889f5e5ae2c5cbc6761907b92af020615fd94ae684333a0349860a4`                                                      |
+| 라이선스           | **BSD-3-Clause** (아래)                                                                                                 |
+
+### 형식 (JSON)
+
+- `format` — `"CNS1"`.
+- `starCatalog` — 인덱스가 가리키는 `star-catalog.bin` 의 sha256 · 별 수. 런타임은 이 값을 읽지 않는다 (무결성 테스트가 대조한다).
+- `constellations[]` — `id` (IAU 약어) · `nameKo` (한국어 이름) · `label` (라벨 기준점 `[RA°, Dec°]`, J2000 — d3 `geometry.coordinates` 의 RA 를 [0, 360) 로 펼친 값) · `lines` (별 인덱스 평면 배열 — 연속 2개가 선분 1개).
+
+선 정점 좌표는 담지 않는다 — 런타임이 로드한 `star-catalog.bin` 에서 인덱스로 읽는다 (선 끝이 그려진 별과 정확히 만난다). 인덱스는 위 「선택 · 정렬」 3 의 스냅 결과다.
+
+### 변경 사항
+
+- 선: d3 polyline 정점 좌표를 `star-catalog.bin` 인덱스로 바꿨다 (최근접 별 스냅). 뱀자리 두 조각은 한 항목으로 합쳤다.
+- 이름: d3 `ko` 를 출발점으로, 아래 항목만 바꿨다 (한국천문연구원 · 한국천문학회 표기 대조 — 이슈 #1373 PR2 대조표). 라벨 기준점은 뱀자리 머리 쪽 1개.
+
+| IAU | d3 `ko`      | 사용           |
+| --- | ------------ | -------------- |
+| Her | 허큘리스자리 | 헤르쿨레스자리 |
+| Cyg | 고니자리     | 백조자리       |
+
 ## 재생성 (네트워크 필요 — 개발자 실행 시점만, 빌드 · CI 경로 아님)
 
 ```bash
@@ -66,7 +97,7 @@ node scripts/generate-star-catalog.mjs          # 재생성
 node scripts/generate-star-catalog.mjs --check  # 기존 파일과 바이트 대조 (미기록)
 ```
 
-원천 두 파일의 sha256 은 스크립트 상수다. 다운로드 직후 대조하고 다르면 중단한다.
+원천 세 파일 (HYG CSV · d3 선 · d3 이름) 의 sha256 은 스크립트 상수다. 다운로드 직후 대조하고 다르면 중단한다.
 
 ## 라이선스
 
@@ -89,7 +120,7 @@ node scripts/generate-star-catalog.mjs --check  # 기존 파일과 바이트 대
 
 ### d3-celestial — BSD-3-Clause
 
-별자리 선 정점 (`constellations.lines.json`, sha256 `294f66bef5d5cf50b1e17f16d2efa1d97a15131612c68dd935adef6e7373e13c` · 27,136 B · 커밋 `7e720a3de062059d4c5400a379146a601d9010e0`) 을 생성 단계의 끝점 별 선택에 쓴다. 원문 `LICENSE` (`https://raw.githubusercontent.com/ofrohn/d3-celestial/7e720a3de062059d4c5400a379146a601d9010e0/LICENSE`):
+`constellations.json` 은 d3-celestial 의 별자리 선 (`constellations.lines.json`) · 이름 · 라벨 기준점 (`constellations.json`) 의 파생 데이터다. 선 정점은 `star-catalog.bin` 의 끝점 별 선택에도 쓴다. 원문 `LICENSE` (`https://raw.githubusercontent.com/ofrohn/d3-celestial/7e720a3de062059d4c5400a379146a601d9010e0/LICENSE`):
 
 > Copyright (c) 2015, Olaf Frohn
 > All rights reserved.

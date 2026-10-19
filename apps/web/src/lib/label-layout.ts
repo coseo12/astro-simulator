@@ -15,6 +15,9 @@
  *     이름이 화면에서 사라지지 않게 (모체 조건의 확장이지 우선순위 변경이 아니다).
  *  3. 우선순위 태양 > 행성 > 왜소행성 > 소행성 > 위성 > 혜성, 같은 등급은 화면 반지름이 큰 쪽 → id 사전순 (결정적).
  *  4. 높은 순위부터 놓고, 이미 놓인 박스와 겹치면 (간격 `LABEL_GAP_PX` 포함) 그 라벨을 숨긴다 → 겹침 쌍 0 (D5).
+ *  5. (#1373 PR2 결정 N1) 별자리 라벨 (`kind = 'constellation'`) 은 **가장 낮은 우선순위** 로 같은 패스에 들어간다 — body 라벨이
+ *     모두 먼저 놓이므로 body ↔ 별자리 겹침 쌍 0 이 규칙 4 로 그대로 성립한다. 반지름 0 · 거리 무한 (무한 원거리 기준점) 이라
+ *     규칙 1b 가 「기준점이 body 원반 안이면 숨김」 을 그대로 한다. 박스는 기준점 **중앙 정렬** (`placeLabel`).
  *
  * ## 배치
  * 라벨 박스 왼쪽 변을 body 중심에서 `min(반지름, LABEL_RADIUS_CAP_PX) + LABEL_OFFSET_PX` 만큼 오른쪽에 두고
@@ -42,6 +45,9 @@ export const LABEL_KIND_PRIORITY: Readonly<Record<string, number>> = {
   comet: 5,
 };
 const UNKNOWN_KIND_PRIORITY = 6;
+/** #1373 PR2 결정 N1 — 별자리 라벨 kind. 미등록 kind 보다도 뒤 (가장 낮은 우선순위). */
+export const CONSTELLATION_LABEL_KIND = 'constellation';
+const CONSTELLATION_PRIORITY = UNKNOWN_KIND_PRIORITY + 1;
 
 export interface LabelCandidate {
   id: string;
@@ -78,6 +84,7 @@ export interface LabelLayoutContext {
 }
 
 export function labelKindPriority(kind: string): number {
+  if (kind === CONSTELLATION_LABEL_KIND) return CONSTELLATION_PRIORITY;
   return LABEL_KIND_PRIORITY[kind] ?? UNKNOWN_KIND_PRIORITY;
 }
 
@@ -100,8 +107,17 @@ export function isOccluded(c: LabelCandidate, all: readonly LabelCandidate[]): b
   );
 }
 
-/** 배치 — 중심 오른쪽, 화면 오른쪽을 넘으면 왼쪽. */
+/** 배치 — 중심 오른쪽, 화면 오른쪽을 넘으면 왼쪽. 별자리는 기준점 중앙 정렬 (규칙 5). */
 export function placeLabel(c: LabelCandidate, viewportWidth: number): LabelBox {
+  if (c.kind === CONSTELLATION_LABEL_KIND) {
+    return {
+      id: c.id,
+      left: Math.round(c.x - c.width / 2),
+      top: Math.round(c.y - c.height / 2),
+      width: c.width,
+      height: c.height,
+    };
+  }
   const reach = Math.min(Math.max(c.radius, 0), LABEL_RADIUS_CAP_PX) + LABEL_OFFSET_PX;
   const rightLeft = c.x + reach;
   const left = rightLeft + c.width > viewportWidth ? c.x - reach - c.width : rightLeft;

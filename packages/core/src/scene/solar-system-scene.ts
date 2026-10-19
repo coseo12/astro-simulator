@@ -53,8 +53,16 @@ import { createSunCorona, type SunCoronaHandles } from './sun-corona.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
-import { createStarCatalog, type StarCatalogHandles } from './star-catalog.js';
-import { STAR_CATALOG_FILE_NAME, parseStarCatalog } from './star-catalog-data.js';
+import { STAR_CATALOG_RADIUS, createStarCatalog, type StarCatalogHandles } from './star-catalog.js';
+import { STAR_CATALOG_FILE_NAME, parseStarCatalog, type StarCatalog } from './star-catalog-data.js';
+import {
+  CONSTELLATIONS_FILE_NAME,
+  constellationLabelSceneDirection,
+  parseConstellations,
+  resolveConstellations,
+  type ConstellationEntry,
+} from './constellation-data.js';
+import { createConstellationLines, type ConstellationLinesHandles } from './constellation-lines.js';
 // #1215 — 지구 구름 레이어 (ADR 20260628-756 Amendment 10).
 import {
   applyCloudDrift,
@@ -333,6 +341,24 @@ export interface SolarSystemSceneHandles {
   /** #1341 PR2 — 자 선 메시 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용. */
   getRulerLine: () => RulerLineHandles | null;
   /**
+   * #1373 PR2 — 별자리 선 · 이름 표시 토글 (ADR `20261018-1373` 결정 T1 · T2 · T4). 처음 켤 때 별 카탈로그 (`star-catalog.bin`,
+   * 별 배경과 공유 — 장면당 1회) 와 `constellations.json` (장면당 1회) 을 요청하고, **두 파일이 모두 도착한 뒤** 선 메시를 만든다.
+   * 만든 직후 그 시점의 최신 의도로 `setEnabled` 를 정한다 (fetch 중 끈 토글이 도착으로 다시 켜지지 않는다). 이후는 `setEnabled`
+   * 만 바꾼다 (dispose 는 장면 dispose 때만). `?stars=` (`setStarfieldVisible`) 와 독립이다 (결정 T3).
+   * ⚠️ 렌더러를 묻지 않는다 — 소프트웨어 렌더 차단 (결정 R5) 은 web 의 가용성 검사가 한다 (`setStarfieldVisible` 동형).
+   */
+  setConstellationsVisible: (visible: boolean) => void;
+  /** #1373 PR2 — 별자리 선 메시 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용. */
+  getConstellationLines: () => ConstellationLinesHandles | null;
+  /**
+   * #1373 PR2 결정 N2 — 별자리 라벨 기준점의 화면 좌표 (CSS px). `getBodyScreenInfo` 와 같은 pull API · 같은 프레임 정합
+   * (호출 시점 `scene.getTransformMatrix()`). 별자리가 꺼져 있거나 선 메시가 아직 없으면 빈 배열이다 — 라벨 오버레이는 이
+   * 배열이 비면 별자리 라벨을 모두 숨긴다. 기준점은 무한 원거리 (카메라 위치 + 방향 × 반지름) 로 투영한다 (D7).
+   *
+   * **재할당 회피**: 반환 배열 · 행은 내부 버퍼 (호출마다 in-place 갱신). 호출자는 mutate 금지.
+   */
+  getConstellationScreenInfo: () => readonly ConstellationScreenInfo[];
+  /**
    * P12-A #298 — 현재 활성 tier.
    *
    * 하이브리드 트리거로 자동 결정되지만, 외부에서 강제 지정하고 싶을 때 `setTier` 사용.
@@ -583,6 +609,21 @@ export interface BodyScreenInfo {
    * bodyScale 로 과장된 모체가 가까운 위성 궤도를 삼키는 경우 (#1299 이전 목성 ↔ 이오). 모체 없는 body 는 false.
    */
   embeddedInParent: boolean;
+}
+
+/** #1373 PR2 결정 N2 — 별자리 라벨 기준점의 화면 투영 (`getConstellationScreenInfo`). */
+export interface ConstellationScreenInfo {
+  /** IAU 약어. */
+  id: string;
+  nameKo: string;
+  /** 화면 x (CSS px). `inFront === false` 면 의미 없음. */
+  x: number;
+  /** 화면 y (CSS px). */
+  y: number;
+  /** 카메라 앞인가. */
+  inFront: boolean;
+  /** 카메라 앞 ∧ 기준점이 캔버스 안. */
+  onScreen: boolean;
 }
 
 /**
@@ -933,6 +974,17 @@ export function createSolarSystemScene(
   let starCatalogHandles: StarCatalogHandles | null = null;
   let starCatalogRequested = false;
   let starCatalogSceneDisposed = false;
+  // #1373 PR2 — 파싱한 카탈로그는 별 쿼드와 별자리 선 (인덱스 결합 — 결정 D3) 이 함께 쓴다. 요청은 여전히 장면당 1회다.
+  let starCatalog: StarCatalog | null = null;
+  // 별 쿼드는 별 구가 한 번이라도 만들어진 뒤에만 만든다 — 별자리만 켠 로드 (`?stars=off&constellations=on`) 에서 카탈로그가
+  // 도착해도 쿼드를 만들지 않고, 그 뒤 별 배경을 켤 때 만든다. 별자리를 쓰지 않는 경로는 PR1 과 같다 (요청 = 별 구 생성 시점).
+  const ensureStarQuads = (): void => {
+    if (starCatalog === null || starCatalogHandles !== null || starfieldHandles === null) return;
+    starCatalogHandles = createStarCatalog(scene, starCatalog);
+    starCatalogHandles.mesh.setEnabled(starfieldVisibleIntent);
+  };
+  /** 카탈로그 도착 시 소비자 (별 쿼드 · 별자리 선) 에 알린다. `ensureConstellationLines` 는 아래에서 정의된다. */
+  const onStarCatalogReady: Array<() => void> = [];
   const requestStarCatalog = (): void => {
     if (starCatalogRequested || starCatalogBaseUrl === undefined) return;
     starCatalogRequested = true;
@@ -946,8 +998,9 @@ export function createSolarSystemScene(
         if (starCatalogSceneDisposed || scene.isDisposed) return;
         const catalog = parseStarCatalog(buffer);
         if (!catalog) return;
-        starCatalogHandles = createStarCatalog(scene, catalog);
-        starCatalogHandles.mesh.setEnabled(starfieldVisibleIntent);
+        starCatalog = catalog;
+        ensureStarQuads();
+        for (const notify of onStarCatalogReady) notify();
       })
       .catch((err: unknown) => {
         if (starCatalogSceneDisposed) return;
@@ -961,6 +1014,71 @@ export function createSolarSystemScene(
       starCatalogSceneDisposed = true;
       starCatalogHandles?.dispose();
       starCatalogHandles = null;
+    },
+  });
+
+  // #1373 PR2 — 별자리 선 (ADR 20261018-1373 결정 D3 · R6 · T1 · T4). 기본 꺼짐 — 로드 시 아무것도 받지 않는다 (web 이 첫
+  // `setConstellationsVisible(true)` 를 보낼 때 요청). 비동기 계약은 별 쿼드 (T4) 와 같다: 파일마다 장면당 1회 · 응답 시 장면이
+  // dispose 됐으면 만들지 않음 · 두 파일 (카탈로그 · 별자리) 이 모두 도착한 뒤 생성 · 생성 직후 최신 의도로 `setEnabled` ·
+  // 실패는 `console.warn` 1회 (재시도 없음).
+  let constellationsVisibleIntent = false;
+  let constellationLines: ConstellationLinesHandles | null = null;
+  let constellationEntries: ConstellationEntry[] | null = null;
+  /** 결합 검사를 통과한 별자리 (라벨 대상) — 선 메시와 같은 시점에 정해진다. */
+  let constellationLabels: Array<{
+    entry: ConstellationEntry;
+    dir: readonly [number, number, number];
+  }> = [];
+  let constellationsRequested = false;
+  const ensureConstellationLines = (): void => {
+    if (starCatalog === null || constellationEntries === null || constellationLines !== null)
+      return;
+    if (starCatalogSceneDisposed || scene.isDisposed) return;
+    const valid = resolveConstellations(constellationEntries, starCatalog.count);
+    // 생성 실패는 여기서 별자리 접두사로 경고한다 — 카탈로그가 별자리 파일보다 늦게 오면 이 함수는 카탈로그 fetch 의
+    // `.then` 안에서 돌아, 잡지 않으면 `[star-catalog] … 로드 실패` 로 원인이 잘못 찍힌다 (PR #1376 리뷰 권고 4).
+    // 별 쿼드는 그보다 먼저 만들어지므로 영향이 없다. 재시도는 없다 (두 파일은 장면당 1회씩만 도착한다).
+    try {
+      constellationLines = createConstellationLines(scene, starCatalog, valid);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[constellations] 선 메시 생성 실패 — 별자리를 표시하지 않는다 (${message})`);
+      return;
+    }
+    constellationLines.mesh.setEnabled(constellationsVisibleIntent);
+    constellationLabels = valid.map((entry) => ({
+      entry,
+      dir: constellationLabelSceneDirection(entry),
+    }));
+  };
+  onStarCatalogReady.push(ensureConstellationLines);
+  const requestConstellations = (): void => {
+    if (constellationsRequested || starCatalogBaseUrl === undefined) return;
+    constellationsRequested = true;
+    const url = `${starCatalogBaseUrl}${CONSTELLATIONS_FILE_NAME}`;
+    void fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<unknown>;
+      })
+      .then((json) => {
+        if (starCatalogSceneDisposed || scene.isDisposed) return;
+        const entries = parseConstellations(json);
+        if (!entries) return;
+        constellationEntries = entries;
+        ensureConstellationLines();
+      })
+      .catch((err: unknown) => {
+        if (starCatalogSceneDisposed) return;
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[constellations] ${url} 로드 실패 — 별자리를 표시하지 않는다 (${message})`);
+      });
+  };
+  disposables.push({
+    dispose: () => {
+      constellationLines?.dispose();
+      constellationLines = null;
+      constellationLabels = [];
     },
   });
   // 별 배경 (전체화면 절차 셰이더 머티리얼 1개). starfield=false 면 빈 구간.
@@ -3267,6 +3385,57 @@ export function createSolarSystemScene(
     return bodyScreenInfo;
   };
 
+  // #1373 PR2 결정 N2 — 별자리 라벨 기준점 투영 (pull). 무한 원거리 기준점 = 카메라 위치 + 장면 방향 × 반지름 (선 메시의
+  // `infiniteDistance` 와 같은 배치). `getBodyScreenInfo` 와 같은 행렬 · CSS 환산.
+  const constellationScreenInfo: ConstellationScreenInfo[] = [];
+  const getConstellationScreenInfo = (): readonly ConstellationScreenInfo[] => {
+    const cam = scene.activeCamera?.globalPosition;
+    if (!constellationsVisibleIntent || constellationLines === null || !cam) {
+      constellationScreenInfo.length = 0;
+      return constellationScreenInfo;
+    }
+    const engine = scene.getEngine();
+    const cssPerEnginePx = engine.getHardwareScalingLevel();
+    const cssWidth = engine.getRenderWidth() * cssPerEnginePx;
+    const cssHeight = engine.getRenderHeight() * cssPerEnginePx;
+    const vpArr = scene.getTransformMatrix().m;
+    let n = 0;
+    for (const { entry, dir } of constellationLabels) {
+      projectToScreen(
+        cam.x + dir[0] * STAR_CATALOG_RADIUS,
+        cam.y + dir[1] * STAR_CATALOG_RADIUS,
+        cam.z + dir[2] * STAR_CATALOG_RADIUS,
+        vpArr,
+        cssWidth,
+        cssHeight,
+        screenPointScratch,
+      );
+      const { x, y, inFront } = screenPointScratch;
+      const onScreen = inFront && isInsideViewport(x, y, cssWidth, cssHeight);
+      const row = constellationScreenInfo[n];
+      if (row) {
+        row.id = entry.id;
+        row.nameKo = entry.nameKo;
+        row.x = x;
+        row.y = y;
+        row.inFront = inFront;
+        row.onScreen = onScreen;
+      } else {
+        constellationScreenInfo.push({
+          id: entry.id,
+          nameKo: entry.nameKo,
+          x,
+          y,
+          inFront,
+          onScreen,
+        });
+      }
+      n += 1;
+    }
+    if (constellationScreenInfo.length > n) constellationScreenInfo.length = n;
+    return constellationScreenInfo;
+  };
+
   const updateAtKepler = (jd: number) => {
     // 1) 각 바디의 부모-로컬 좌표 계산 (부모가 없으면 (0,0,0))
     for (const body of system.bodies) {
@@ -3344,11 +3513,25 @@ export function createSolarSystemScene(
       starfieldHandles ??= createStarfield(scene);
       starfieldHandles.mesh.setEnabled(true);
       starCatalogHandles?.mesh.setEnabled(true);
+      // #1373 PR2 — 별자리가 먼저 카탈로그를 받아 둔 경우 (`?stars=off` 로드) 여기서 쿼드를 만든다.
+      ensureStarQuads();
       requestStarCatalog();
       return;
     }
     starfieldHandles?.mesh.setEnabled(false);
     starCatalogHandles?.mesh.setEnabled(false);
+  };
+
+  // #1373 PR2 결정 T1 · T4 — 별자리. 첫 ON 에서 두 파일을 요청하고 (장면당 1회씩), 도착하면 그때의 의도로 켜진다.
+  const setConstellationsVisible = (visible: boolean) => {
+    constellationsVisibleIntent = visible;
+    if (visible) {
+      constellationLines?.mesh.setEnabled(true);
+      requestStarCatalog();
+      requestConstellations();
+      return;
+    }
+    constellationLines?.mesh.setEnabled(false);
   };
 
   // #1319 PR3 — 띠 런타임 토글 (ADR 20261008-1319 결정 6). 별 배경과 같은 수명 계약: 없을 때만 생성, 이후 `setEnabled`
@@ -3589,6 +3772,9 @@ export function createSolarSystemScene(
     getTrailBodySpecs: () => ensureTrailSpecs(),
     setRuler,
     getRulerLine: () => rulerLine,
+    setConstellationsVisible,
+    getConstellationLines: () => constellationLines,
+    getConstellationScreenInfo,
     getBodyReferenceFrame: () => ({ ...bodyFrame }),
     getPhysicalLocal: (id: string) => {
       const out: MutVec3 = [0, 0, 0];
