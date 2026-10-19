@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.103.0] - 2026-10-19
+
 ### Added
 
 - **[#1373] 실측 별 카탈로그 (PR1)** ([#1373](https://github.com/coseo12/astro-simulator/issues/1373)). 별 배경이 실제 하늘로 바뀐다 — HYG Stellar Database v4.4 (CC BY-SA 4.0) 의 V ≤ 6.5 별 `8,920` 개 + 별자리 선 끝점 별 `2` 개 = `8,922` 개를 실제 위치 (J2000) · 등급 · 색지수로 그린다. 지구 자전축이 북극성을 가리킨다. ADR [`20261018-1373`](docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D4 (별 파일) · D6 · D7 · R1 ~ R5 · PR 분할 표 PR1.
