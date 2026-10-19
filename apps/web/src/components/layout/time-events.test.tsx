@@ -72,17 +72,20 @@ function renderEvents() {
   );
 }
 
-/** 실제 파일 로더를 감싼 spy — 불러오기 횟수를 센다 (#1377 M7: 꺼짐 = 0회). */
-const realLoader = () =>
-  import('@/data/time-events.json').then((m: { default: unknown }) => m.default);
-const loaderSpy = vi.fn(realLoader);
+/**
+ * 파일 로더 spy — 불러오기 횟수를 센다 (#1377 M7: 꺼짐 = 0회). 내용은 **실제 커밋된 파일** 이다 (beforeAll 에서 실제 dynamic
+ * import 로 받아 둔다). spy 는 이미 받은 값을 `Promise.resolve` 로 돌려준다 — fake timer 아래에서 dynamic import 의 모듈 로딩은
+ * 이벤트 루프 턴이 필요해 microtask 만 비워서는 끝나지 않는다 (CI 에서 flake 실측, PR #1379). 실제 dynamic import 경로는
+ * `time-scrubber.test.tsx` (real timer · 기본 로더) 가 지난다.
+ */
+let committedFile: unknown = null;
+const loaderSpy = vi.fn(() => Promise.resolve(committedFile));
 
-// 첫 dynamic import 는 실제 I/O 라 fake timer 아래에서 늦을 수 있다 — 모듈 캐시를 미리 채워 둔다.
 beforeAll(async () => {
-  await realLoader();
+  committedFile = (await import('@/data/time-events.json')).default;
 });
 
-/** 사건 파일 도착 → 반영까지 기다린다 (캐시된 모듈이라 microtask 몇 번이면 끝난다). 계속 loading 이면 throw. */
+/** 사건 파일 반영까지 기다린다 (로더가 `Promise.resolve` 라 microtask 몇 번이면 끝난다). 계속 loading 이면 throw. */
 async function flushEvents() {
   for (let i = 0; i < 50 && getTimeEventsSnapshot().status === 'loading'; i += 1) {
     await act(async () => {

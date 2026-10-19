@@ -44,8 +44,9 @@ function setStoreJd(julianDate: number | null): void {
  */
 beforeAll(async () => {
   requestTimeEvents();
-  for (let i = 0; i < 50 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
-    await new Promise((r) => setTimeout(r, 0));
+  // #1377 — 실제 dynamic import (모듈 로딩) 를 기다린다. CI 부하에서 턴 수가 늘어날 수 있어 시간 상한 (10 ms × 500) 으로 둔다.
+  for (let i = 0; i < 500 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
+    await new Promise((r) => setTimeout(r, 10));
   }
   if (getTimeEventsSnapshot().status !== 'ready')
     throw new Error('[M6] 사건 파일이 반영되지 않았다');
