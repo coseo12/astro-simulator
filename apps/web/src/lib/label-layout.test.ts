@@ -306,7 +306,7 @@ describe('별자리 라벨 — 같은 배치 패스 (N1)', () => {
     expect(isOccluded(body, [c, body])).toBe(false);
   });
 
-  it('표본 50개 무작위 배치 — body ↔ 별자리 겹침 쌍 0 · 전체 겹침 쌍 0 (결정적 LCG)', () => {
+  it('표본 50개 무작위 배치 — 전체 겹침 쌍 0 · body 라벨 집합 보존 (결정적 LCG)', () => {
     let seed = 1373;
     const rnd = () => {
       seed = (seed * 1664525 + 1013904223) % 4294967296;
@@ -321,6 +321,14 @@ describe('별자리 라벨 — 같은 배치 패스 (N1)', () => {
         input.push(cons({ id: `c${i}`, x: rnd() * vw, y: rnd() * vh }));
       const out = layoutLabels(input, { focusedId: null, viewportWidth: vw });
       expect(overlapPairs(out)).toBe(0);
+      // 우선순위 (PR #1376 리뷰 권고 2) — 별자리를 더해도 body 라벨은 하나도 사라지지 않는다.
+      // body 만 배치한 집합 ⊆ body + 별자리 배치 집합 (겹침 쌍 0 은 우선순위와 무관하게 규칙 4 가 늘 보장한다).
+      const bodyOnly = layoutLabels(
+        input.filter((c) => c.kind !== CONSTELLATION_LABEL_KIND),
+        { focusedId: null, viewportWidth: vw },
+      ).map((b) => b.id);
+      const withCons = new Set(out.map((b) => b.id));
+      expect(bodyOnly.filter((id) => !withCons.has(id))).toEqual([]);
     }
   });
 });

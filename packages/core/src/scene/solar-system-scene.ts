@@ -1035,7 +1035,16 @@ export function createSolarSystemScene(
       return;
     if (starCatalogSceneDisposed || scene.isDisposed) return;
     const valid = resolveConstellations(constellationEntries, starCatalog.count);
-    constellationLines = createConstellationLines(scene, starCatalog, valid);
+    // 생성 실패는 여기서 별자리 접두사로 경고한다 — 카탈로그가 별자리 파일보다 늦게 오면 이 함수는 카탈로그 fetch 의
+    // `.then` 안에서 돌아, 잡지 않으면 `[star-catalog] … 로드 실패` 로 원인이 잘못 찍힌다 (PR #1376 리뷰 권고 4).
+    // 별 쿼드는 그보다 먼저 만들어지므로 영향이 없다. 재시도는 없다 (두 파일은 장면당 1회씩만 도착한다).
+    try {
+      constellationLines = createConstellationLines(scene, starCatalog, valid);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[constellations] 선 메시 생성 실패 — 별자리를 표시하지 않는다 (${message})`);
+      return;
+    }
     constellationLines.mesh.setEnabled(constellationsVisibleIntent);
     constellationLabels = valid.map((entry) => ({
       entry,
