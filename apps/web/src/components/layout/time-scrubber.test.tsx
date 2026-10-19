@@ -4,7 +4,13 @@ import { J2000_JD, type CoreCommand } from '@astro-simulator/shared';
 import { time as timeApi } from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
 import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
-import { getTimeEventsSnapshot, requestTimeEvents } from '@/lib/time-events';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  getTimeEventsSnapshot,
+  requestTimeEvents,
+  resetTimeEventsForTest,
+} from '@/lib/time-events';
 import { OUT_OF_RANGE_BADGE_TEXT, TimeScrubber } from './time-scrubber';
 
 let sentCommands: CoreCommand[] = [];
@@ -43,8 +49,13 @@ function setStoreJd(julianDate: number | null): void {
  * 두고 (모듈 메모) 장면 준비 · 표시 의도를 켜 둔다 — 그러지 않으면 눈금이 없어 이 전제가 공허하게 참이 된다.
  */
 beforeAll(async () => {
+  // #1377 — 기본 로더는 `fetch('/data/events/…')` 라 jsdom 에서는 base URL 이 없다. 커밋된 파일을 fs 로 읽어 넘긴다
+  // (fetch 경로 자체는 `time-events.test.tsx` 「기본 로더 (fetch)」 가 덮는다).
+  const file: unknown = JSON.parse(
+    readFileSync(resolve(__dirname, '../../../public/data/events/time-events.json'), 'utf8'),
+  );
+  resetTimeEventsForTest(() => Promise.resolve(file));
   requestTimeEvents();
-  // #1377 — 실제 dynamic import (모듈 로딩) 를 기다린다. CI 부하에서 턴 수가 늘어날 수 있어 시간 상한 (10 ms × 500) 으로 둔다.
   for (let i = 0; i < 500 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
     await new Promise((r) => setTimeout(r, 10));
   }

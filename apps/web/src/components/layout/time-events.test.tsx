@@ -1,9 +1,12 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import * as core from '@astro-simulator/core';
 import { EVENT_FILTER_DEFAULTS } from '@/lib/event-filters';
 import {
+  TIME_EVENTS_URL,
   getTimeEventsSnapshot,
   resetTimeEventsForTest,
   subscribeTimeEvents,
@@ -72,17 +75,14 @@ function renderEvents() {
 }
 
 /**
- * 파일 로더 spy — 불러오기 횟수를 센다 (#1377 M7: 꺼짐 = 0회). 내용은 **실제 커밋된 파일** 이다 (beforeAll 에서 실제 dynamic
- * import 로 받아 둔다). spy 는 이미 받은 값을 `Promise.resolve` 로 돌려준다 — fake timer 아래에서 dynamic import 의 모듈 로딩은
- * 이벤트 루프 턴이 필요해 microtask 만 비워서는 끝나지 않는다 (CI 에서 flake 실측, PR #1379). 실제 dynamic import 경로는
- * `time-scrubber.test.tsx` (real timer · 기본 로더) 가 지난다.
+ * 파일 로더 spy — 불러오기 횟수를 센다 (#1377 M7: 꺼짐 = 0회). 내용은 **실제 커밋된 파일** 이다 (fs 로 읽는다). spy 는 그 값을
+ * `Promise.resolve` 로 돌려준다 — microtask 만으로 끝나 fake timer 와 섞여도 결정적이다 (CI flake 실측, PR #1379). 기본 로더
+ * (`fetch`) 경로는 아래 「기본 로더 (fetch)」 묶음이 `fetch` stub 으로 지난다.
  */
-let committedFile: unknown = null;
+const committedFile: unknown = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../public/data/events/time-events.json'), 'utf8'),
+);
 const loaderSpy = vi.fn(() => Promise.resolve(committedFile));
-
-beforeAll(async () => {
-  committedFile = (await import('@/data/time-events.json')).default;
-});
 
 /** 사건 파일 반영까지 기다린다 (로더가 `Promise.resolve` 라 microtask 몇 번이면 끝난다). 계속 loading 이면 throw. */
 async function flushEvents() {
@@ -175,7 +175,7 @@ describe('M7 — 꺼짐이면 불러오기 0회 · 켜짐이어도 런타임 계
 
   it('불러오기 실패 — 패널은 「불러오지 못했습니다」 · 눈금 없음 · 활성 조건 재진입 (재마운트) 이 다시 시도한다', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const failing = vi.fn(() => Promise.reject(new Error('chunk load failed')));
+    const failing = vi.fn(() => Promise.reject(new Error('network error')));
     resetTimeEventsForTest(failing);
     const { unmount } = renderEvents();
     await flushEvents();
@@ -195,7 +195,7 @@ describe('M7 — 꺼짐이면 불러오기 0회 · 켜짐이어도 런타임 계
     const flaky = vi.fn(() => {
       calls += 1;
       return calls === 1
-        ? Promise.reject(new Error('chunk load failed'))
+        ? Promise.reject(new Error('network error'))
         : Promise.resolve(committedFile);
     });
     resetTimeEventsForTest(flaky);
@@ -643,5 +643,86 @@ describe('N-body 엔진 (M9 단위 부분)', () => {
     // 전환으로 닫힌 패널은 Kepler 로 돌아와도 닫혀 있다 — 열림 의도가 남아 있으면 복귀 순간 저절로 다시 열린다.
     expect(panel()).toBeNull();
     expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('기본 로더 (fetch) — #1377 qa 차단 (dynamic import 는 실패 promise 를 캐시해 재시도 불가)', () => {
+  type FetchResult = { ok: boolean; status: number; json: () => Promise<unknown> };
+  const ok = (body: unknown): FetchResult => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(body),
+  });
+
+  function useFetch(...results: Array<FetchResult | Error>) {
+    const fetchSpy = vi.fn((_url: string) => {
+      const next = results.shift() ?? ok(committedFile);
+      return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    resetTimeEventsForTest(); // 기본 로더 (fetch)
+    return fetchSpy;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('성공 — `TIME_EVENTS_URL` 1회 요청 · ready · 눈금 221 · 다시 그려도 재요청 0', async () => {
+    const fetchSpy = useFetch(ok(committedFile));
+    const { unmount } = renderEvents();
+    await flushEvents();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(TIME_EVENTS_URL);
+    expect(TIME_EVENTS_URL).toBe('/data/events/time-events.json');
+    expect(getTimeEventsSnapshot().status).toBe('ready');
+    expect(screen.getAllByTestId('time-event-tick')).toHaveLength(221);
+    unmount();
+    renderEvents();
+    await flushEvents();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['네트워크 실패 (reject)', () => new Error('network error')],
+    [
+      '비-2xx (404)',
+      (): FetchResult => ({ ok: false, status: 404, json: () => Promise.resolve({}) }),
+    ],
+    [
+      'JSON 파싱 실패',
+      (): FetchResult => ({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+      }),
+    ],
+    ['형식 불일치 (decode throw)', () => ok({ format: 'TEV0' })],
+  ])('실패 — %s → error · 「불러오지 못했습니다」', async (_name, make) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    useFetch(make());
+    renderEvents();
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('error');
+    fireEvent.click(trigger()); // 여는 순간 재시도 — 2회째는 성공 파일
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('ready');
+  });
+
+  it('B1 (fetch) — 실패 도착 후 연 채로는 재요청 0 · 닫고 다시 열면 재요청 1회 → 목록 표시', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchSpy = useFetch(new Error('network error'), ok(committedFile));
+    renderEvents();
+    fireEvent.click(trigger()); // 불러오는 중에 연다
+    await flushEvents();
+    expect(screen.getByTestId('time-events-error')).toHaveTextContent('불러오지 못했습니다');
+    fireEvent.click(screen.getByTestId('time-event-filter-jupiter-opposition')); // 연 채로 다시 그리기
+    await flushEvents();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fireEvent.click(trigger()); // 닫기
+    fireEvent.click(trigger()); // 다시 열기
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    await flushEvents();
+    expect(screen.getAllByTestId('time-event-option')).toHaveLength(221 + 183);
   });
 });

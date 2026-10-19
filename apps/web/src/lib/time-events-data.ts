@@ -1,4 +1,4 @@
-// #1377 — 시간 사건 사전 계산 파일 (`apps/web/src/data/time-events.json`) 의 형식 · 복원.
+// #1377 — 시간 사건 사전 계산 파일 (`apps/web/public/data/events/time-events.json`) 의 형식 · 복원.
 //
 // 사건 목록은 정적 데이터 (`solar-system.json` 의 궤도 요소 · μ) 와 고정 범위 (스크러버 1900~2100) 만으로 정해지는 결정적 값이다.
 // 그래서 런타임에 계산하지 않고 생성 시점에 한 번 계산해 둔다 (ADR `20261016-1347-event-markers.md` · `20261017-1354-...` Amendment).

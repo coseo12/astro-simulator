@@ -1,5 +1,5 @@
 // #1347 — 시간 이벤트 목록 공급 (ADR `docs/decisions/20261016-1347-event-markers.md` 결정 D3).
-// #1377 — 런타임 계산을 없애고 **사전 계산 파일** 을 1회 읽어 1회 반영한다 (ADR 1347 · 1354 Amendment). 구 경로 (idle 청크
+// #1377 — 런타임 계산을 없애고 **사전 계산 파일** (public 정적 파일 fetch) 을 1회 읽어 1회 반영한다 (ADR 1347 · 1354 Amendment). 구 경로 (idle 청크
 // 46개 — 식은 10년 청크, 청크마다 emit) 는 CI 실측으로 로드마다 메인 스레드 약 3.4 초 (계산 1.2~1.3 s + 청크마다 재렌더 약
 // 2.1 s) 를 썼다 — #1377 Phase 0. 파일 형식 · drift 가드는 `time-events-data.ts` · `time-events-data.test.ts`.
 import type { AstroEvent } from '@astro-simulator/core';
@@ -23,12 +23,24 @@ export interface TimeEventsSnapshot {
 const IDLE_SNAPSHOT: TimeEventsSnapshot = { status: 'idle', events: [] };
 
 /**
- * 파일 로더 — 번들러가 JSON 을 별도 chunk 로 나눈다 (dynamic import). 기능이 꺼져 있어 `requestTimeEvents` 가 한 번도 불리지
- * 않으면 chunk 도 받지 않는다 (DoD M7 — 「꺼짐 = 0회」 의 대상이 계산에서 불러오기로 바뀌었다).
+ * 사전 계산 파일 URL — `apps/web/public/data/events/time-events.json` (public 정적 파일, #1373 별 카탈로그와 같은 규약).
+ */
+export const TIME_EVENTS_URL = '/data/events/time-events.json';
+
+/**
+ * 파일 로더 — public 정적 파일을 `fetch` 한다. 기능이 꺼져 있어 `requestTimeEvents` 가 한 번도 불리지 않으면 요청도 0 이다
+ * (DoD M7 — 「꺼짐 = 0회」 의 대상이 계산에서 불러오기로 바뀌었다).
+ *
+ * dynamic import (`import('…json')`) 를 쓰지 않는 이유: 번들러 (Turbopack — dev · prod) 는 **실패한 chunk 로드 promise 를
+ * 캐시**해서, 두 번째 `import()` 가 네트워크 요청 없이 곧바로 reject 한다 — 실패 후 재시도가 영영 동작하지 않는다 (PR #1379 qa
+ * 실측). `fetch` 는 호출마다 새 요청이다. 실패 (네트워크 · 비-2xx · JSON 파싱) 는 전부 reject 로 모아 `error` 로 보낸다.
  */
 type TimeEventsLoader = () => Promise<unknown>;
-const defaultLoader: TimeEventsLoader = () =>
-  import('@/data/time-events.json').then((m: { default: unknown }) => m.default);
+const defaultLoader: TimeEventsLoader = async () => {
+  const res = await fetch(TIME_EVENTS_URL);
+  if (!res.ok) throw new Error(`[time-events] HTTP ${res.status} ${TIME_EVENTS_URL}`);
+  return res.json();
+};
 
 let loader: TimeEventsLoader = defaultLoader;
 let snapshot: TimeEventsSnapshot = IDLE_SNAPSHOT;
@@ -44,7 +56,7 @@ function emit(next: TimeEventsSnapshot): void {
 
 /**
  * 불러오기 시작 (멱등). 처음 호출될 때만 파일을 받고, 도착하면 복원해 **한 번** 반영한다. 결과는 모듈 수명 동안 메모한다.
- * 실패하면 (chunk 로드 실패 · 형식 불일치) `error` 로 두고 `started` 를 되돌린다. 자동 재시도는 없다 — 다음 호출이 다시
+ * 실패하면 (네트워크 · 비-2xx · JSON 파싱 · 형식 불일치) `error` 로 두고 `started` 를 되돌린다. 자동 재시도는 없다 — 다음 호출이 다시
  * 시도하며, 호출 지점은 셋이다: 사건 패널을 **여는** 순간 (`error` 일 때만 — `TimeEventsButton`), 눈금 · 버튼의 활성 조건
  * (`active` — 표시 의도 · 장면 준비 · Kepler 엔진) 이 다시 참이 될 때, 새 페이지 로드.
  */

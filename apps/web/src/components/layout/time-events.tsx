@@ -148,7 +148,7 @@ function useTimeEventsGate(): { shown: boolean; kepler: boolean } {
 
 /**
  * 사건 목록 구독 + (켜져 있고 Kepler 면) 사전 계산 파일 불러오기 시작 (#1377). 꺼져 있으면 `requestTimeEvents` 를 부르지 않는다
- * (M7 — 파일 chunk 도 받지 않는다).
+ * (M7 — 사건 파일 요청도 0 이다).
  */
 function useTimeEvents(active: boolean): TimeEventsSnapshot {
   useEffect(() => {
