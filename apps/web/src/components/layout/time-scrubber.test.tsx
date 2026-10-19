@@ -39,7 +39,7 @@ function setStoreJd(julianDate: number | null): void {
 }
 
 /**
- * #1347 DoD M6 — 사건 눈금이 **있는** 상태에서 이 파일 전건이 통과해야 한다 (드래그 · 키보드 계약 무변경). 사건을 미리 다 계산해
+ * #1347 DoD M6 — 사건 눈금이 **있는** 상태에서 이 파일 전건이 통과해야 한다 (드래그 · 키보드 계약 무변경). 사건을 미리 다 불러와
  * 두고 (모듈 메모) 장면 준비 · 표시 의도를 켜 둔다 — 그러지 않으면 눈금이 없어 이 전제가 공허하게 참이 된다.
  */
 beforeAll(async () => {
@@ -47,7 +47,8 @@ beforeAll(async () => {
   for (let i = 0; i < 50 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
     await new Promise((r) => setTimeout(r, 0));
   }
-  if (getTimeEventsSnapshot().status !== 'ready') throw new Error('[M6] 사건 계산이 끝나지 않았다');
+  if (getTimeEventsSnapshot().status !== 'ready')
+    throw new Error('[M6] 사건 파일이 반영되지 않았다');
 });
 
 beforeEach(() => {
