@@ -30,7 +30,7 @@ Semantic Versioning을 따른다.
 
 ### Fixed
 
-- **[#1377] 시간 사건 사전 계산 — 런타임 계산 0 · 단일 렌더** ([#1377](https://github.com/coseo12/astro-simulator/issues/1377)). #1347 · #1354 PR2 이후 이어지던 fps 회귀를 고쳤다.
+- **[#1377] 시간 사건 사전 계산 — 런타임 계산 0 · 단일 렌더** ([#1377](https://github.com/coseo12/astro-simulator/issues/1377)). #1347 · #1354 PR2 이후 이어지던 fps 회귀 중 **사건 계산 몫**(mobile 이 60 FPS 로 회복하고, 측정 창 안 사건 작업이 0 ms 가 됨)을 고쳤다. desktop default 의 LOCK ≥ 30 회복 여부는 판정하지 못했다(n=2, 27~29 FPS). 이 값은 가드 정지 결함 [#1378](https://github.com/coseo12/astro-simulator/issues/1378) 을 고친 뒤 다시 잰다.
   - 원인: 페이지를 열 때마다 메인 스레드가 사건 목록을 `requestIdleCallback` 청크 46개로 계산했고, 청크마다 목록을 다시 그렸다. CI (CPU 4x · SwiftShader) 실측으로 로드 1회에 약 3.4 s 를 썼다 (계산 1.2~1.3 s + 재렌더 46회 약 2.1 s).
   - 원인 확정: #1377 Phase 0 의 같은 VM bisect 에서 #1354 PR2 가 주 계단, #1347 이 부 계단으로 나왔다.
   - 수정: 1900~2100 의 사건 8종 (1,510건) 을 생성 시점에 계산해 `apps/web/src/data/time-events.json` 으로 넣었다. 형식은 `TEV1`, 크기는 `50,205` B (gzip `15,230` B) 다. 런타임은 이 파일을 dynamic import 로 1회 받아 1회 반영하고, `?events=off` 이면 받지 않는다.
