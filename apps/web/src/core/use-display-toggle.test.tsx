@@ -3,7 +3,8 @@ import { withNuqsTestingAdapter, type UrlUpdateEvent } from 'nuqs/adapters/testi
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
-import { useDisplayToggle } from './use-display-toggle';
+import { DISPLAY_TOGGLES } from './display-toggles';
+import { DISPLAY_URL_KEYS, useDisplayToggle } from './use-display-toggle';
 
 /**
  * #1265 D16 — 공용 토글 훅: store → command → URL(replace) 를 한 호출에서, 불가하면 셋 다 건드리지 않는다.
@@ -366,5 +367,13 @@ describe('useDisplayToggle', () => {
       { type: 'setNightLightsVisible', visible: true },
     ]);
     expect(useSimStore.getState().nightLightsVisible).toBe(true);
+  });
+});
+
+describe('#1373 PR2 — nuqs 키 맵 ↔ 표시 토글 표 (PR #1376 리뷰 권고 3 · #1347 qa B1 클래스)', () => {
+  it('표의 urlKey 가 전부 DISPLAY_URL_KEYS 에 있다 — 없으면 nuqs 가 조용히 무시해 URL 이 안 바뀐다', () => {
+    expect(DISPLAY_TOGGLES.map((d) => d.urlKey).filter((k) => !(k in DISPLAY_URL_KEYS))).toEqual(
+      [],
+    );
   });
 });

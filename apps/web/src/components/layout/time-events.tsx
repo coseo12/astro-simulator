@@ -49,7 +49,7 @@ import { useSimStore } from '@/store/sim-store';
  *   일식만 지구다 (`eventFocusBodyId` — #1360 PR3 결정 C3, 그림자가 지구에 떨어진다). 충 · 내합 · 식 (주체 =
  *   달 — #1354 사용자 결정 S (a)) 은 거리 자 기준점을 지구로 (`?ruler=earth` 는 `UrlSync` 가 store 에서 쓴다). 순서가 계약이다 — core 는 `jumpToJulianDate` 에서 `timeChanged`
  *   를 동기 발화해 장면 위치를 `t*` 로 옮긴 **뒤** `focusOn` 이 카메라를 잡는다 (§교차검증 합의 1).
- * - **꺼짐** (`?events=off`) — 둘 다 아무것도 그리지 않고 계산도 시작하지 않는다 (결정 D3 · DoD M8).
+ * - **꺼짐** (`?events=off`) — 둘 다 아무것도 그리지 않고 사건 파일도 받지 않는다 (결정 D3 · DoD M8 · #1377 사전 계산).
  * - **N-body 엔진** — 눈금 숨김 · 버튼 `aria-disabled` + 사유, 열린 패널은 닫는다. Kepler 로 돌아오면 다시 보인다 (결정 D8).
  */
 
@@ -146,7 +146,10 @@ function useTimeEventsGate(): { shown: boolean; kepler: boolean } {
   return { shown: visible && ready, kepler };
 }
 
-/** 사건 목록 구독 + (켜져 있고 Kepler 면) 지연 계산 시작. 꺼져 있으면 `requestTimeEvents` 를 부르지 않는다 (M7). */
+/**
+ * 사건 목록 구독 + (켜져 있고 Kepler 면) 사전 계산 파일 불러오기 시작 (#1377). 꺼져 있으면 `requestTimeEvents` 를 부르지 않는다
+ * (M7 — 사건 파일 요청도 0 이다).
+ */
 function useTimeEvents(active: boolean): TimeEventsSnapshot {
   useEffect(() => {
     if (active) requestTimeEvents();
@@ -258,6 +261,9 @@ export function TimeEventsButton() {
       return;
     }
     if (triggerRef.current) setPosition(resolvePanelPosition(triggerRef.current));
+    // #1377 — 불러오기에 실패한 상태면 패널을 **열 때** 1회 다시 요청한다. 열어 둔 동안에는 다시 부르지 않는다 — 재시도는
+    // 사용자의 여는 동작 1회당 최대 1회라 무한 재시도가 없다 (`requestTimeEvents` 는 실패 시 `started` 만 되돌린다).
+    if (snapshot.status === 'error') requestTimeEvents();
     setOpen(true);
   };
 
@@ -373,7 +379,7 @@ function TimeEventsPanelBody({
   const setEventFilter = useSimStore((s) => s.setEventFilter);
   const setRulerAnchor = useSimStore((s) => s.setRulerAnchor);
   const filtered = useFilteredEvents(snapshot.events);
-  const computing = snapshot.status !== 'ready';
+  const loading = snapshot.status !== 'ready';
   const listId = useId();
   const listRef = useRef<HTMLUListElement | null>(null);
 
@@ -473,7 +479,7 @@ function TimeEventsPanelBody({
           type="button"
           data-testid="time-event-prev"
           onClick={() => step(-1)}
-          disabled={computing}
+          disabled={loading}
           className="flex-1 inline-flex items-center justify-center gap-0.5 min-h-6 rounded-sm border border-border-subtle bg-bg-surface px-1.5 text-mini text-fg-primary hover:bg-bg-elevated disabled:opacity-40"
         >
           <ChevronLeft size={12} aria-hidden="true" />
@@ -483,20 +489,20 @@ function TimeEventsPanelBody({
           type="button"
           data-testid="time-event-next"
           onClick={() => step(1)}
-          disabled={computing}
+          disabled={loading}
           className="flex-1 inline-flex items-center justify-center gap-0.5 min-h-6 rounded-sm border border-border-subtle bg-bg-surface px-1.5 text-mini text-fg-primary hover:bg-bg-elevated disabled:opacity-40"
         >
           다음 사건
           <ChevronRight size={12} aria-hidden="true" />
         </button>
       </div>
-      {computing ? (
-        <p
-          role="status"
-          className="text-mini text-fg-secondary"
-          data-testid="time-events-computing"
-        >
-          사건 계산 중…
+      {snapshot.status === 'error' ? (
+        <p role="status" className="text-mini text-fg-secondary" data-testid="time-events-error">
+          사건 목록을 불러오지 못했습니다
+        </p>
+      ) : loading ? (
+        <p role="status" className="text-mini text-fg-secondary" data-testid="time-events-loading">
+          사건 불러오는 중…
         </p>
       ) : filtered.length === 0 ? (
         <p className="text-mini text-fg-secondary" data-testid="time-events-empty">

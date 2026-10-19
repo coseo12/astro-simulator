@@ -5,6 +5,61 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.103.0] - 2026-10-19
+
+### Added
+
+- **[#1373] 실측 별 카탈로그 (PR1)** ([#1373](https://github.com/coseo12/astro-simulator/issues/1373)). 별 배경이 실제 하늘로 바뀐다 — HYG Stellar Database v4.4 (CC BY-SA 4.0) 의 V ≤ 6.5 별 `8,920` 개 + 별자리 선 끝점 별 `2` 개 = `8,922` 개를 실제 위치 (J2000) · 등급 · 색지수로 그린다. 지구 자전축이 북극성을 가리킨다. ADR [`20261018-1373`](docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D1 · D2 · D4 (별 파일) · D6 · D7 · R1 ~ R5 · PR 분할 표 PR1.
+  - 데이터: `apps/web/public/data/stars/star-catalog.bin` (`107,072` B — 헤더 `STC1` + count, 레코드 12 B: float32 RA · Dec + int16 V×100 · B−V×1000, 리틀 엔디언). 원천 적도 좌표 그대로 담고 런타임 fetch 한다 (JS 번들 증가 0). 생성기 `scripts/generate-star-catalog.mjs` 가 원천 2개 (HYG v4.4 · d3-celestial 선) 를 커밋 고정 URL 로 받아 sha256 을 대조하고, d3 선 정점 `757` 개를 V ≤ 7.0 최근접 별에 스냅해 (최대 `16.3″`, 허용 `60″`) 끝점 별을 포함 · 인덱스를 고정한다 (PR2 별자리 선이 이 인덱스를 쓴다). `--check` 는 바이너리 · README 바이트 대조. 출처 · 라이선스 원문 인용은 `public/data/stars/README.md` (생성 산출물) 와 About 모달.
+  - 좌표: `equatorialJ2000ToEcliptic` (`coords/equatorial.ts`, `R_x(+ε)`, ε = `84381.406″` — 신규 상수 `J2000_MEAN_OBLIQUITY_ARCSEC`) → 기존 `toScene` (ADR 1366). 메시 정점 쓰기가 유일한 반전 지점이다.
+  - 렌더: `star-catalog.ts` — 쿼드 메시 1개 (정점 `35,688`, draw 1) · `infiniteDistance` · 그룹 0 · 가산 블렌드 · `alphaIndex −2` (코로나 앞) · depth write off · 표준 depth (행성 원반 뒤 별은 depth test 로 가려진다). 지름은 CSS px × DPR. 등급 → 크기 · 밝기 (`STAR_MAGNITUDE_MAPPING`, 반지름 `0.9 ~ 3.0` CSS px · 밝기 `0.3 ~ 1`) 는 rendering-only 상수이고 사용자 육안 승인 (D-T2, 2026-10-19 — 비교 화면 A/B/C 중 B안 「크고 밝게」) 으로 정했다. B−V → 색 (Ballesteros 2012 → Planck 궤적 → D65 CCT 6504 K 흑체로 백색 맞춤 → 채도 `0.55`) 도 rendering-only 다.
+  - 장면: 옵션 `starCatalogBaseUrl` (web 은 `/data/stars/`). fetch 는 별 구가 처음 만들어질 때 장면당 1회, 응답 시점의 `?stars` 의도로 켜진다 (fetch 중 끈 토글이 다시 켜지지 않는다) · dispose 후 응답은 무시 · 실패는 `console.warn` 1회 + 은하수만.
+  - 실측 D2 (headless Chromium `--use-angle=metal`, 2026-10-18 00:00 UT, WebGPU · WebGL2 같은 값): 지구 자전축 ↔ 북극성 `0.7355°` (기대 `0.736 ± 0.01`) · 별 메시 정점 ↔ 순수 함수 최대 `1.3e-6°` (기대 `≤ 1e-4`) · 5개 별 화면 밝기 중심 ↔ 투영 최대 `0.25` px (WebGPU, B안) (기대 `≤ 1.5` — 초안 A 에서는 WebGPU `0.37` · WebGL2 `0.42` px) · 태양 ↔ 스피카 `2.0860°` (기대 `2.099 ± 0.1`).
+  - 실측 D5 (develop `a769d93d` ↔ 본 PR, 1280×800): SwiftShader 기본 화면 · Metal WebGPU `?stars=off` (기본 · 지구 포커스) 3셀 바이트 동일. 소프트웨어 렌더에서 `star-catalog.bin` 요청 `0`.
+  - 실측 D6: 목성 · 태양 · 지구 포커스에서 별 쿼드만 켜고 끈 같은 프레임 — 원반 안 (반경 × 0.9) 변경 픽셀 `0` (WebGPU · WebGL2 `?gpu=a`), 원반 밖 `9,530 ~ 9,928` (양성 대조, B안 — 초안 A 는 `8,036 ~ 8,374`).
+  - 실측 D7 (실 Chrome 155 headful · Metal, 별 쿼드 on/off 3회 교차 · 3 s 중앙값): B안 · WebGL2 는 `?gpu=a`: vsync 유지 fps 비 `0.9975 ~ 1.0009` (WebGPU · WebGL2, 기본 · 지구 포커스) · vsync 해제 프레임당 증분 최대 `+0.028` ms (기대 `≤ +0.3`).
+
+- **[#1373] 별자리 선 · 이름 (PR2)** ([#1373](https://github.com/coseo12/astro-simulator/issues/1373)). 88개 별자리의 선과 한국어 이름을 표시 패널 「별자리」 토글로 켠다 — **기본 꺼짐**, `?constellations=on` 옵트인. 이름은 「이름 라벨」 (`?labels=`) 도 켜져 있어야 보인다. ADR [`20261018-1373`](docs/decisions/20261018-1373-star-catalog-constellations.md) 결정 D3 · D4 (별자리 파일) · D5 · R6 · N1 ~ N4 · T1 · T2 · PR 분할 표 PR2.
+  - 데이터: `apps/web/public/data/stars/constellations.json` (`17,786` B — 형식 `CNS1`, 별자리 `88` · 선분 `743`). d3-celestial (BSD-3-Clause) 선 · 이름 · 라벨 기준점을 같은 생성기 (`scripts/generate-star-catalog.mjs`) 가 받아 sha256 대조 후 만든다. 선 정점은 좌표가 아니라 `star-catalog.bin` **인덱스**다 — 런타임이 로드한 카탈로그에서 읽어 선 끝이 그려진 별과 정확히 만난다. 뱀자리 두 조각은 선을 합치고 라벨은 머리 쪽 1개. `--check` 로 `star-catalog.bin` 은 PR1 과 바이트 동일 (인덱스 고정 유지).
+  - 이름 (D5 · Q-N): d3 `ko` 를 출발점으로 한국천문연구원 별자리 페이지와 대조한 차이 표 (PR 코멘트) 의 권고대로 Her → 「헤르쿨레스자리」 · Cyg → 「백조자리」 2건만 바꿨다 (CrB 「북쪽왕관자리」 · 1차 출처 미확인 35개는 d3 유지). 사용자 확정 대기.
+  - 렌더: `constellation-lines.ts` — `LinesMesh` 1개 (정점 `1,486`, draw 1) · `infiniteDistance` · 그룹 0 · `alpha 0.45` 투명 큐 · `alphaIndex −1` (별 쿼드 바로 뒤) · depth write off · 표준 depth (행성 원반 뒤 선은 가려진다). 색 `#b8a07a` (모래색 — 궤도선 청회색과 다른 계열) · 불투명도는 rendering-only (D-T2 대기).
+  - 이름 라벨: 기존 오버레이 (`body-labels.tsx`) 의 같은 배치 패스에 최저 우선순위 kind `constellation` 으로 들어간다 (`label-layout.ts` 규칙 5 — body 라벨이 먼저 놓여 겹침 쌍 0, 기준점이 body 원반 안이면 숨김, 기준점 중앙 정렬). core pull API `getConstellationScreenInfo()`. 별자리 라벨은 `pointer-events: none` · `aria-hidden` · 포커스 대상 아님 (N3), 11 px · 불투명도 0.75 (N4, D-T2 대기).
+  - 토글 · 수명: `display-toggles.ts` 행 (별 배경 다음, 가용성 = 별 배경과 같은 `!isSoftwareRenderer`) · 파서 `parse-constellations-mode.ts` · core 명령 `setConstellationsVisible`. 첫 ON 에서 카탈로그 (별 배경과 공유 — 장면당 1회) · `constellations.json` (장면당 1회) 을 받아 **둘 다 도착한 뒤** 선을 만들고 그 시점의 의도로 켠다 (PR1 T4 계약). 인덱스가 카탈로그 범위 밖인 별자리는 건너뛰고 경고한다. `?stars=` 와 독립이다 — `?stars=off&constellations=on` 은 선만 그린다.
+  - About 모달: d3-celestial (BSD-3-Clause) 고지 추가 · HYG 의 CC BY-SA 4.0 URI 와 d3 LICENSE URI 를 클릭 가능한 링크로 (PR #1375 qa 관측 2).
+  - 실측 D5 (develop `bd811c36` ↔ 본 PR, 1280×800): URL 없는 화면 Metal WebGPU (기본 · `?stars=off` · 지구 포커스) · WebGL2 `?gpu=a` · SwiftShader 4셀 바이트 동일 · URL 없는 로드에서 `constellations.json` 요청 `0`. `?constellations=on` 로드 후 런타임 OFF ↔ URL 없는 로드 full frame 차이 `0` (WebGPU · WebGL2). `verify:1265-display-panel` `SWIFTSHADER=1` · `BROWSER_VERIFY_GPU=metal` 둘 다 판정 55 (PASS 55 · FAIL 0) · SKIP 4.
+  - 실측 D6: 오리온을 태양 · 목성 · 지구 뒤에 둔 같은 프레임에서 선만 켜고 끈 차분 — 원반 안 (반경 × 0.9) 변경 `0` (WebGPU · WebGL2), 천체를 숨긴 양성 대조 `380 ~ 676`. body ↔ 별자리 라벨 겹침 쌍 `0` (1280 · 375, 시점 5종).
+  - 실측 D7 (실 Chrome headful · Metal · DPR 2, on/off 3회 교차 · 3 s 중앙값): 별자리 (선 + 이름) — vsync 유지 fps 비 `0.9989 ~ 1.0001`, vsync 해제 증분 최대 `+0.078` ms. 별 + 선 + 이름 — vsync 유지 비 `0.9991 ~ 1.0007`, 해제 증분 최대 `+0.119` ms (기대 `≥ 0.98` · `≤ +0.3`).
+
+### Fixed
+
+- **[#1377] 시간 사건 사전 계산 — 런타임 계산 0 · 단일 렌더** ([#1377](https://github.com/coseo12/astro-simulator/issues/1377)). #1347 · #1354 PR2 이후 이어지던 fps 회귀 중 **사건 계산 몫**(mobile 이 60 FPS 로 회복하고, 측정 창 안 사건 작업이 0 ms 가 됨)을 고쳤다. desktop default 의 LOCK ≥ 30 회복 여부는 판정하지 못했다(n=2, 27~29 FPS). 이 값은 가드 정지 결함 [#1378](https://github.com/coseo12/astro-simulator/issues/1378) 을 고친 뒤 다시 잰다.
+  - 원인: 페이지를 열 때마다 메인 스레드가 사건 목록을 `requestIdleCallback` 청크 46개로 계산했고, 청크마다 목록을 다시 그렸다. CI (CPU 4x · SwiftShader) 실측으로 로드 1회에 약 3.4 s 를 썼다 (계산 1.2~1.3 s + 재렌더 46회 약 2.1 s).
+  - 원인 확정: #1377 Phase 0 의 같은 VM bisect 에서 #1354 PR2 가 주 계단, #1347 이 부 계단으로 나왔다.
+  - 수정: 1900~2100 의 사건 8종 (1,510건) 을 생성 시점에 계산해 public 정적 파일 `apps/web/public/data/events/time-events.json` 으로 넣었다 (#1373 별 카탈로그와 같은 규약). 형식은 `TEV1`, 크기는 `50,205` B 이고 전송은 `14,612` B (`next start` · dev 실측 — gzip) 다. 런타임은 이 파일을 `fetch` 로 1회 받아 1회 반영하고, `?events=off` 이면 요청하지 않는다. 실패 (네트워크 · 비-2xx · JSON 파싱 · 형식 불일치) 는 전부 「불러오지 못했습니다」 로 간다.
+  - dynamic import 를 쓰지 않는 이유: Turbopack (dev · prod) 이 실패한 chunk 로드 promise 를 캐시해, 두 번째 `import()` 가 네트워크 요청 없이 곧바로 reject 했다 — 실패 후 재시도가 동작하지 않았다 (PR #1379 qa 실측). `fetch` 는 호출마다 새 요청이다.
+  - 생성: `pnpm --filter @astro-simulator/web generate:time-events` (shared · core 빌드를 먼저 돈다 — 테스트가 core `dist` 를 읽는다).
+  - drift 가드: `time-events-data.test.ts` 가 「파일 복원 == `computeEventsForKind` 전 범위」 를 JD 비트 단위로 단언한다. 위치 모델을 바꾸면 FAIL 하며, 변이 ΔT `69.2` s 에서 FAIL 함을 확인했다.
+  - ADR [`20261016-1347`](docs/decisions/20261016-1347-event-markers.md) · [`20261017-1354`](docs/decisions/20261017-1354-lunar-precession-eclipses.md) Amendment 2.
+  - 실측 (같은 VM · develop `53aa8dc2` ↔ 수정본 번갈아 N=10 — CI 진단 run 39206847551 · `next dev` · SwiftShader · 4x, rAF FPS 중앙값):
+
+    | 셀                  | 측정 상태                  | develop | 수정본                          |
+    | ------------------- | -------------------------- | ------- | ------------------------------- |
+    | mobile default      | 부팅부터 정지 (`?speed=0`) | `51.9`  | `60.1` (10/10 이 `60.0 ~ 60.2`) |
+    | mobile default      | 가드 절차                  | `39.3`  | `60.2`                          |
+    | desktop default 창1 | 정지                       | `31.6`  | `43.4`                          |
+    | desktop default 창1 | 가드 절차                  | `28.8`  | `30.6`                          |
+    - 측정 창 안의 사건 작업: develop 창1 `3,224` ms (mobile `1,503` ms) → 수정본 `0` ms. 수정본은 반영이 부팅 직후에 끝난다 (`astro-events:apply` `1.8 ~ 1.9` ms, 로컬).
+    - earth · moon 셀은 변화가 없다 (±0.5).
+
+### Behavior Changes
+
+- **별 배경이 절차 별에서 실측 별로 바뀐다** (#1373) — 기본 화면 (하드웨어 렌더) 의 별 위치 · 밝기 · 색이 달라진다. 은하수 띠는 남되 법선이 실제 은하 북극 (RA `192.85948°` · Dec `+27.12825°`) 방향이 되어 띠가 실제 은하면에 놓인다 (ADR 1373 결정 R4 — 절차 별 셀 경로 삭제). `?stars=off` · 소프트웨어 렌더 화면은 바뀌지 않는다 (D5 바이트 동일). About 모달에 HYG 출처 · 「별 크기 · 밝기는 등급 시각화」 안내가 추가된다.
+- **표시 패널에 「별자리」 토글이 생긴다** (#1373 PR2) — 기본 꺼짐이라 URL 없는 화면은 바뀌지 않는다 (D5 바이트 동일). `?constellations=on` 이거나 토글을 켜면 별자리 선과 (이름 라벨이 켜져 있으면) 한국어 이름이 보인다. 패널 토글 순서가 바뀐다 (별 배경 다음에 별자리 — 키보드 Tab 순서 포함). 소프트웨어 렌더에서는 별 배경과 같은 사유로 비활성이다. About 모달의 라이선스 URI 가 링크가 된다.
+- **사건 패널 대기 문구** (#1377). 「사건 계산 중…」 이 「사건 불러오는 중…」 으로 바뀐다.
+  - 파일을 받지 못하면 「사건 목록을 불러오지 못했습니다」 를 보인다. 다시 불러오는 때는 셋이다: 실패 상태에서 사건 패널을 **여는** 순간 (여는 동작 1회당 1회 — 연 채로는 다시 시도하지 않는다), 사건 표시를 끄고 켜거나 엔진을 Kepler 로 되돌릴 때, 새 페이지 로드.
+  - 계산 중에 목록이 조금씩 채워지던 부분 목록 단계는 없어졌다 — 목록이 한 번에 나타난다.
+  - 사건 수 · 필터 · 목록 · 눈금 · 선택 동작은 그대로다.
+
 ## [0.102.0] - 2026-10-18
 
 ### Added

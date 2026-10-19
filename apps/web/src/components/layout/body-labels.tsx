@@ -4,12 +4,18 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
 import { ephemeris as ephemerisApi, isRPhaseFocusable } from '@astro-simulator/core';
-import { useSimBodyScreenInfo, useSimCommand } from '@/core/sim-context';
-import { layoutLabels, type LabelCandidate } from '@/lib/label-layout';
+import {
+  useSimBodyScreenInfo,
+  useSimCommand,
+  useSimConstellationScreenInfo,
+  type ConstellationScreenInfoFn,
+} from '@/core/sim-context';
+import { CONSTELLATION_LABEL_KIND, layoutLabels, type LabelCandidate } from '@/lib/label-layout';
 import { useSimStore } from '@/store/sim-store';
 
 /**
@@ -45,6 +51,14 @@ import { useSimStore } from '@/store/sim-store';
  * ## 키보드
  * 라벨은 매 프레임 움직이고 화면에 따라 나타났다 사라지므로 Tab 순서에 넣지 않는다 (`tabIndex=-1`). 키보드
  * 사용자의 천체 선택 경로는 「천체 ▾」 메뉴와 검색 (#1293 PR1) 이다.
+ *
+ * ## 별자리 이름 (#1373 PR2 — ADR `20261018-1373` 결정 N1 ~ N4 · T2)
+ * 같은 rAF · **같은 배치 패스** 에 최저 우선순위 후보로 넣는다 — body 라벨이 먼저 놓여 body ↔ 별자리 겹침 쌍 0 (규칙 5).
+ * 이 오버레이 자체가 `?labels=off` 면 없으므로 이름은 「별자리 ∧ 이름 라벨」 일 때만 보인다 (T2). core 의
+ * `getConstellationScreenInfo` 가 빈 배열이면 (별자리 꺼짐 · 아직 생성 전) 전부 숨긴다. 이름 목록은 core 가 파일을 받은 뒤에야
+ * 알 수 있어, 처음 행이 들어온 프레임에 한 번 state 로 올려 `<span>` 을 만든다 (이후 루프는 DOM 만 쓴다).
+ * 별자리 라벨은 포인터를 받지 않고 (`pointer-events: none` — 캔버스 드래그를 막지 않는다) 포커스 대상도 아니다 (N3).
+ * 화면 장식이라 `aria-hidden` 이다 (매 프레임 움직이는 텍스트 88개를 스크린 리더에 노출하지 않는다).
  */
 
 /** 라벨 대상 body (정적 — 데이터 SSoT `solar-system.json`). focusOn 이 받는 body 만 (allowlist). */
@@ -54,6 +68,19 @@ interface LabelBody {
   kind: string;
   parentId: string | null;
 }
+
+/** #1373 PR2 — 별자리 라벨 (core 가 파일에서 읽은 이름). */
+interface ConstellationLabel {
+  id: string;
+  nameKo: string;
+}
+
+/** 후보 id 접두 — body id (`earth`) 와 IAU 약어 (`Ori`) 가 한 배치 패스에서 섞이므로 이름공간을 가른다. */
+const CONSTELLATION_ID_PREFIX = 'cst:';
+const EMPTY_CONSTELLATIONS: readonly ConstellationLabel[] = [];
+const EMPTY_ROWS: ReturnType<ConstellationScreenInfoFn> = [];
+/** N4 — 별자리 이름 불투명도 (rendering-only, D-T2). */
+const CONSTELLATION_LABEL_OPACITY = 0.75;
 
 /** 라벨 1개의 마지막으로 쓴 DOM 상태 — 바뀐 값만 쓰기 위한 캐시. */
 interface LabelDomState {
@@ -88,6 +115,7 @@ export function BodyLabels({
   dragThresholdPx?: LabelDragThresholdPx;
 } = {}) {
   const getScreenInfo = useSimBodyScreenInfo();
+  const getConstellationInfo = useSimConstellationScreenInfo();
   const visible = useSimStore((s) => s.labelsVisible);
   const focusedId = useSimStore((s) => s.selectedBodyId);
 
@@ -105,6 +133,7 @@ export function BodyLabels({
     <BodyLabelsLayer
       bodies={bodies}
       getScreenInfo={getScreenInfo}
+      getConstellationInfo={getConstellationInfo}
       focusedId={focusedId}
       wheelTargetRef={wheelTargetRef}
       dragThresholdPx={dragThresholdPx}
@@ -115,12 +144,14 @@ export function BodyLabels({
 function BodyLabelsLayer({
   bodies,
   getScreenInfo,
+  getConstellationInfo,
   focusedId,
   wheelTargetRef,
   dragThresholdPx,
 }: {
   bodies: readonly LabelBody[];
   getScreenInfo: NonNullable<ReturnType<typeof useSimBodyScreenInfo>>;
+  getConstellationInfo: ConstellationScreenInfoFn | null;
   focusedId: string | null;
   wheelTargetRef?: RefObject<HTMLCanvasElement | null>;
   dragThresholdPx?: LabelDragThresholdPx;
@@ -128,6 +159,10 @@ function BodyLabelsLayer({
   const sendCommand = useSimCommand();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const labelRefs = useRef(new Map<string, HTMLButtonElement>());
+  // #1373 PR2 — 별자리 라벨 DOM (키 = 접두 붙은 후보 id). 이름 목록은 core 가 처음 행을 줄 때 정해진다.
+  const constellationRefs = useRef(new Map<string, HTMLSpanElement>());
+  const [constellations, setConstellations] =
+    useState<readonly ConstellationLabel[]>(EMPTY_CONSTELLATIONS);
   const pendingPointerRef = useRef<PendingLabelPointer | null>(null);
   // 드래그로 넘긴 제스처의 뒤이은 `click` 을 삼킨다. 다음 pointerdown 이 초기화한다 — 캡처가 캔버스로 옮겨 가
   // 라벨에 `click` 이 오지 않는 경우에도 다음 탭이 막히지 않는다.
@@ -174,13 +209,20 @@ function BodyLabelsLayer({
     const domState = new Map<string, LabelDomState>();
     let viewportWidth = container.clientWidth;
 
+    const constellationLabels = constellationRefs.current;
     const measure = () => {
       viewportWidth = container.clientWidth;
-      for (const [id, el] of labels) {
-        const r = el.getBoundingClientRect();
-        sizes.set(id, { width: r.width, height: r.height });
+      for (const map of [labels, constellationLabels]) {
+        for (const [id, el] of map) {
+          const r = el.getBoundingClientRect();
+          sizes.set(id, { width: r.width, height: r.height });
+        }
       }
     };
+    // 이미 만든 별자리 이름 집합 (id 순서 문자열) — 새 행이 오면 한 번 state 로 올린다.
+    const knownConstellationKey = constellations.map((c) => c.id).join(',');
+    // state 갱신은 이 루프 인스턴스당 1회 — 리렌더가 effect 를 다시 세울 때까지 같은 목록을 거듭 올리지 않는다.
+    let constellationUpdateRequested = false;
     measure();
     // 웹폰트가 늦게 오면 글자 폭이 바뀐다 — 로드 뒤 한 번 더 잰다.
     let disposed = false;
@@ -215,13 +257,40 @@ function BodyLabelsLayer({
           height: size.height,
         });
       }
+      // #1373 PR2 — 별자리 (최저 우선순위 · 반지름 0 · 거리 무한 — 규칙 5). 빈 배열 = 꺼짐 / 생성 전.
+      const constellationRows = getConstellationInfo?.() ?? EMPTY_ROWS;
+      if (constellationRows.length > 0) {
+        const key = constellationRows.map((r) => r.id).join(',');
+        if (key !== knownConstellationKey && !constellationUpdateRequested) {
+          constellationUpdateRequested = true;
+          setConstellations(constellationRows.map((r) => ({ id: r.id, nameKo: r.nameKo })));
+        }
+        for (const row of constellationRows) {
+          const id = CONSTELLATION_ID_PREFIX + row.id;
+          const size = sizes.get(id);
+          if (!size) continue;
+          candidates.push({
+            id,
+            kind: CONSTELLATION_LABEL_KIND,
+            parentId: null,
+            x: row.x,
+            y: row.y,
+            radius: 0,
+            onScreen: row.onScreen,
+            distance: Number.POSITIVE_INFINITY,
+            embedded: false,
+            width: size.width,
+            height: size.height,
+          });
+        }
+      }
       // 선택은 store 에서 매 프레임 읽는다 — prop 은 강조 스타일 (리렌더) 용이고 루프는 재시작하지 않는다.
       const placed = layoutLabels(candidates, {
         focusedId: useSimStore.getState().selectedBodyId,
         viewportWidth,
       });
       const shownBoxes = new Map(placed.map((b) => [b.id, b]));
-      for (const [id, el] of labels) {
+      for (const [id, el] of [...labels, ...constellationLabels]) {
         const box = shownBoxes.get(id);
         const prev = domState.get(id);
         if (box) {
@@ -245,7 +314,7 @@ function BodyLabelsLayer({
       cancelAnimationFrame(raf);
       resizeObserver.disconnect();
     };
-  }, [bodies, getScreenInfo]);
+  }, [bodies, getScreenInfo, getConstellationInfo, constellations]);
 
   return (
     <div
@@ -290,6 +359,29 @@ function BodyLabelsLayer({
         >
           {b.nameKo}
         </button>
+      ))}
+      {constellations.map((c) => (
+        <span
+          key={c.id}
+          ref={(el) => {
+            const id = CONSTELLATION_ID_PREFIX + c.id;
+            if (el) constellationRefs.current.set(id, el);
+            else constellationRefs.current.delete(id);
+          }}
+          aria-hidden="true"
+          data-testid={`constellation-label-${c.id}`}
+          data-constellation-label={c.id}
+          data-label-visible="false"
+          // N4 — body 라벨보다 작고 흐리게 (backing 없음 · 글리프 그림자만). 스타일은 D-T2 육안 승인 대상.
+          className="pointer-events-none select-none absolute left-0 top-0 whitespace-nowrap text-[11px] leading-none tracking-wide text-fg-secondary"
+          style={{
+            visibility: 'hidden',
+            opacity: CONSTELLATION_LABEL_OPACITY,
+            textShadow: '0 1px 2px rgba(0, 0, 0, 0.9)',
+          }}
+        >
+          {c.nameKo}
+        </span>
       ))}
     </div>
   );

@@ -24,6 +24,36 @@ describe('AboutModal (P10-C-3 #278 / P12-C #298 — 단일 모드)', () => {
     expect(sources).toHaveTextContent('NASA JPL Horizons');
   });
 
+  it('#1373 — 별 카탈로그 출처 (HYG v4.4 · CC BY-SA 4.0 원문 인용) + 등급 시각화 안내', () => {
+    render(<AboutModal />);
+    fireEvent.click(screen.getByTestId('about-button'));
+    const sources = screen.getByTestId('about-sources');
+    expect(sources).toHaveTextContent('HYG Stellar Database v4.4');
+    expect(sources).toHaveTextContent(
+      'This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.',
+    );
+    expect(screen.getByTestId('about-stars')).toHaveTextContent('크기와 밝기는 실시 등급');
+  });
+
+  it('#1373 PR2 — d3-celestial (BSD-3) 고지 · 라이선스 URI 는 클릭 가능한 링크 (새 탭 · noopener)', () => {
+    render(<AboutModal />);
+    fireEvent.click(screen.getByTestId('about-button'));
+    const sources = screen.getByTestId('about-sources');
+    expect(sources).toHaveTextContent('d3-celestial (Olaf Frohn)');
+    expect(sources).toHaveTextContent('BSD-3-Clause');
+    expect(sources).toHaveTextContent('Copyright (c) 2015, Olaf Frohn');
+    for (const href of [
+      'https://creativecommons.org/licenses/by-sa/4.0/',
+      'https://github.com/ofrohn/d3-celestial/blob/7e720a3de062059d4c5400a379146a601d9010e0/LICENSE',
+    ]) {
+      const link = screen.getByRole('link', { name: href });
+      expect(link).toHaveAttribute('href', href);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+    expect(screen.getByTestId('about-constellations')).toHaveTextContent('기본으로 꺼져');
+  });
+
   it('스케일 정책 — v3 incremental build + 3단 tier 설명 포함', () => {
     render(<AboutModal />);
     fireEvent.click(screen.getByTestId('about-button'));

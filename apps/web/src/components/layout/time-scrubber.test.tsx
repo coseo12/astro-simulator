@@ -4,7 +4,13 @@ import { J2000_JD, type CoreCommand } from '@astro-simulator/shared';
 import { time as timeApi } from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
 import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
-import { getTimeEventsSnapshot, requestTimeEvents } from '@/lib/time-events';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  getTimeEventsSnapshot,
+  requestTimeEvents,
+  resetTimeEventsForTest,
+} from '@/lib/time-events';
 import { OUT_OF_RANGE_BADGE_TEXT, TimeScrubber } from './time-scrubber';
 
 let sentCommands: CoreCommand[] = [];
@@ -39,15 +45,22 @@ function setStoreJd(julianDate: number | null): void {
 }
 
 /**
- * #1347 DoD M6 — 사건 눈금이 **있는** 상태에서 이 파일 전건이 통과해야 한다 (드래그 · 키보드 계약 무변경). 사건을 미리 다 계산해
+ * #1347 DoD M6 — 사건 눈금이 **있는** 상태에서 이 파일 전건이 통과해야 한다 (드래그 · 키보드 계약 무변경). 사건을 미리 다 불러와
  * 두고 (모듈 메모) 장면 준비 · 표시 의도를 켜 둔다 — 그러지 않으면 눈금이 없어 이 전제가 공허하게 참이 된다.
  */
 beforeAll(async () => {
+  // #1377 — 기본 로더는 `fetch('/data/events/…')` 라 jsdom 에서는 base URL 이 없다. 커밋된 파일을 fs 로 읽어 넘긴다
+  // (fetch 경로 자체는 `time-events.test.tsx` 「기본 로더 (fetch)」 가 덮는다).
+  const file: unknown = JSON.parse(
+    readFileSync(resolve(__dirname, '../../../public/data/events/time-events.json'), 'utf8'),
+  );
+  resetTimeEventsForTest(() => Promise.resolve(file));
   requestTimeEvents();
-  for (let i = 0; i < 50 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
-    await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 500 && getTimeEventsSnapshot().status !== 'ready'; i += 1) {
+    await new Promise((r) => setTimeout(r, 10));
   }
-  if (getTimeEventsSnapshot().status !== 'ready') throw new Error('[M6] 사건 계산이 끝나지 않았다');
+  if (getTimeEventsSnapshot().status !== 'ready')
+    throw new Error('[M6] 사건 파일이 반영되지 않았다');
 });
 
 beforeEach(() => {

@@ -1,7 +1,12 @@
 /**
- * #738 — 절차적 별 배경 + 은하수 띠 (라이브러리/에셋 0).
+ * #738 — 은하수 띠 배경 구 (라이브러리/에셋 0). #1373 부터 별은 실측 카탈로그 (`star-catalog.ts`) 가 그린다.
  *
- * **목적**: 단색 배경 (`scene.clearColor`) 위에 절차적 별 배경 + 은하수 띠를 단일 draw call
+ * **#1373 변경** (ADR `docs/decisions/20261018-1373-star-catalog-constellations.md` 결정 R4): 절차 별 (view direction
+ * 셀 해시) 경로를 지우고 은하수 띠만 남긴다 — 실제 하늘에 없는 별이 실측 별 옆에 찍히면 이슈 목표와 충돌한다.
+ * 띠 법선을 「감상용 임의 방향」 에서 **은하 북극** (J2000 RA 192.85948° · Dec +27.12825°) 의 장면 방향으로 바꿨다.
+ * 아래 §결정 2 · 4 (셀 해시 · 색온도) 서술은 ADR 738 의 이력이다.
+ *
+ * **목적** (ADR 738 이력 — #1373 이후 이 구에는 별이 없다): 단색 배경 (`scene.clearColor`) 위에 절차적 별 배경 + 은하수 띠를 단일 draw call
  * 로 렌더해 "우주에 있다" 는 몰입을 제공한다 (방향성 기획서 트랙 A1 — `principles.md §1
  * Visual Fidelity`). 외부 star catalog / 에셋 / 신규 라이브러리 0.
  *
@@ -37,6 +42,8 @@ import {
   type Mesh,
   type Scene,
 } from '@babylonjs/core';
+import { equatorialJ2000ToEcliptic } from '../coords/equatorial.js';
+import { toScene } from '../coords/scene-handedness.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 미학 상수 SSoT (#69 숨은 상수 drift 차단 — starfield.test.ts 가드 대상).
@@ -54,22 +61,19 @@ const STARFIELD_SPHERE_DIAMETER = 1000;
 const STARFIELD_SPHERE_SEGMENTS = 16;
 
 /**
- * 별 격자 밀도 (셀/방향). 값이 클수록 별이 촘촘 (별 개수 ∝ density³ 근사). fps trade-off 핵심
- * 파라미터 — measurement-first 박제 (감상 밀도 충분 + fps 무회귀). 줌/회전 무관 무한 해상도.
+ * 은하 북극 J2000 적도 좌표 [°] (IAU 1958 은하 좌표계의 FK5 J2000 값 — RA 12h51m26.275s · Dec +27°07′41.70″).
+ * #1373 결정 R4 — 은하수 띠를 실제 은하면에 놓는다 (ADR §축 M (a)).
  */
-const STARFIELD_GRID_DENSITY = 240;
+const GALACTIC_NORTH_POLE_RA_DEG = 192.85948;
+const GALACTIC_NORTH_POLE_DEC_DEG = 27.12825;
 
 /**
- * 별 유무 임계 (per-cell hash > threshold 이면 별). 높을수록 별이 적다. 지수 분포로 다수 희미한
- * 별 + 소수 밝은 별을 만들기 위한 1차 필터.
+ * 은하수 평면 법선 = 은하 북극의 **장면** 방향 (적도 → 황도 데이터 → `toScene`). 대원 (great circle) 이 은하수 띠 —
+ * view direction 과의 내적이 0 근처면 띠 영역. ADR 1373 §축 M 기대값 `(−0.86767, −0.00035, −0.49715)`.
  */
-const STARFIELD_THRESHOLD = 0.965;
-
-/**
- * 은하수 평면 법선 (정규화). 대원(great circle)이 은하수 띠 — view direction 과의 내적이 0 근처
- * 면 띠 영역. 황도/은하 좌표 정렬 불필요 (감상용 임의 미학 방향 — Visual Fidelity rendering-only).
- */
-const MILKY_WAY_NORMAL: readonly [number, number, number] = [0.2, 0.92, 0.34];
+const MILKY_WAY_NORMAL: readonly [number, number, number] = toScene(
+  equatorialJ2000ToEcliptic(GALACTIC_NORTH_POLE_RA_DEG, GALACTIC_NORTH_POLE_DEC_DEG),
+);
 
 /**
  * 은하수 띠 발광 강도 (0~1). 과도한 네온 금지 — 실제 밤하늘 은하수는 미묘 (§5 시각 품질 가이드).
@@ -111,12 +115,10 @@ void main(void) {
 `;
 
 /**
- * GLSL fragment shader — 절차적 별 (cell noise) + 은하수 띠.
+ * GLSL fragment shader — 은하수 띠 (#1373 결정 R4 — 절차 별 셀 경로 삭제).
  *
  * uniforms:
- *   - gridDensity: 별 격자 밀도 (셀/방향)
- *   - starThreshold: 별 유무 임계 (hash > threshold 이면 별)
- *   - milkyWayNormal: 은하수 평면 법선 (정규화)
+ *   - milkyWayNormal: 은하수 평면 법선 = 은하 북극 장면 방향 (정규화)
  *   - milkyWayGlow: 은하수 발광 강도
  *   - milkyWayBandWidth: 은하수 띠 폭
  *   - milkyWayColor: 은하수 발광 색조
@@ -129,8 +131,6 @@ precision highp float;
 
 varying vec3 vDirection;
 
-uniform float gridDensity;
-uniform float starThreshold;
 uniform vec3 milkyWayNormal;
 uniform float milkyWayGlow;
 uniform float milkyWayBandWidth;
@@ -177,19 +177,6 @@ float fbm(vec3 p) {
   return 0.65 * valueNoise(p) + 0.35 * valueNoise(p * 2.7);
 }
 
-// 색온도 → RGB 근사 (저채도 흑체). t ∈ [0,1]: 0=적황(M), 0.5=백색~담황(G/K 다수), 1=청백(O/B).
-// 보라/마젠타 그라데이션 금지 (디자인 루브릭 Originality) — R↗ 또는 B↗ 단조 tint 만 사용.
-vec3 starColor(float t) {
-  // 백색 기준에서 양 끝으로 미세 tint (채도 낮게 — 실제 밤하늘 별은 거의 백색).
-  vec3 warm = vec3(1.0, 0.86, 0.72); // 적황 (M/K)
-  vec3 white = vec3(1.0, 0.98, 0.96); // 백색~담황 (G — 다수)
-  vec3 cool = vec3(0.78, 0.86, 1.0); // 청백 (O/B)
-  if (t < 0.5) {
-    return mix(warm, white, t * 2.0);
-  }
-  return mix(white, cool, (t - 0.5) * 2.0);
-}
-
 void main(void) {
   vec3 dir = normalize(vDirection);
 
@@ -208,39 +195,7 @@ void main(void) {
     milkyWay = milkyWayColor * milkyWayGlow * bandFactor * bandFactor * cloud;
   }
 
-  // ── 별 (cell noise) ──────────────────────────────────────────────────────
-  // view direction 을 grid 셀로 양자화. 셀 내 무작위 jitter 로 격자 패턴 잔재 차단.
-  vec3 scaled = dir * gridDensity;
-  vec3 cell = floor(scaled);
-  vec3 frac = fract(scaled);
-  vec3 rnd = hash33(cell);
-
-  // 은하수 띠 영역은 별 밀도 증가 — threshold 를 띠 안에서 낮춘다 (별이 더 자주 등장).
-  float localThreshold = starThreshold - bandFactor * 0.02;
-
-  vec3 star = vec3(0.0);
-  // rnd.x 가 임계 초과 → 이 셀에 별 존재.
-  if (rnd.x > localThreshold) {
-    // 셀 내 별 위치 무작위화 (격자 패턴 차단) — rnd.yz 로 jitter.
-    vec2 starPos = vec2(rnd.y, rnd.z);
-    float dist = length(frac.xy - starPos);
-
-    // 밝기: 지수 분포 — 다수 희미 + 소수 밝음. (rnd.x - threshold) 를 정규화 후 거듭제곱.
-    float norm = (rnd.x - localThreshold) / max(1.0 - localThreshold, 1e-6);
-    float brightness = pow(norm, 3.0);
-
-    // 점 형태 — 거리 기반 falloff (작고 또렷한 점, 셀 크기에 비례).
-    float pointFalloff = 1.0 - smoothstep(0.0, 0.08, dist);
-
-    // 색온도 — 별마다 다른 분포. 다수 백색 근처 (rnd 를 중앙 편향).
-    float temp = hash33(cell + 1.7).x;
-    vec3 col = starColor(temp);
-
-    star = col * brightness * pointFalloff;
-  }
-
-  vec3 finalColor = star + milkyWay;
-  gl_FragColor = vec4(finalColor, 1.0);
+  gl_FragColor = vec4(milkyWay, 1.0);
 }
 `;
 
@@ -257,11 +212,6 @@ function registerStarfieldShader(): void {
 }
 
 export interface CreateStarfieldOptions {
-  /**
-   * 별 격자 밀도 override. 기본 `STARFIELD_GRID_DENSITY`. tier-c (저성능) 약화 / 디버그용.
-   * (향후 `quality` 3단 경로는 fps 실측이 필요 증명한 만큼만 — ADR §교차검증 기각 2 YAGNI.)
-   */
-  gridDensity?: number;
   /** 은하수 발광 강도 override. 기본 `MILKY_WAY_GLOW_INTENSITY`. tier-c 약화용. */
   milkyWayGlow?: number;
 }
@@ -280,14 +230,13 @@ export interface StarfieldHandles {
 }
 
 /**
- * 절차적 별 배경 + 은하수 띠 생성 (단일 inverted sphere + fragment ShaderMaterial).
+ * 은하수 띠 배경 구 생성 (단일 inverted sphere + fragment ShaderMaterial). 별은 `star-catalog.ts` (#1373).
  *
  * `infiniteDistance=true` 가 카메라 위치 추종 + 회전 반영을 라이브러리 레벨로 보장하므로,
- * floating-origin shift / tier scale 전환 / 줌(radius 변동) 에 별이 불변이다 (별 추종 코드 0).
- * 별/은하수는 fragment 에서 view direction 기반 절차 생성 — 별 개수와 무관한 단일 draw call.
+ * floating-origin shift / tier scale 전환 / 줌(radius 변동) 에 띠가 불변이다 (추종 코드 0).
  *
  * @param scene Babylon 씬
- * @param options 별 밀도 / 은하수 발광 override (tier-c 약화 / 디버그용)
+ * @param options 은하수 발광 override (tier-c 약화 / 디버그용)
  */
 export function createStarfield(
   scene: Scene,
@@ -295,7 +244,6 @@ export function createStarfield(
 ): StarfieldHandles {
   registerStarfieldShader();
 
-  const gridDensity = options.gridDensity ?? STARFIELD_GRID_DENSITY;
   const milkyWayGlow = options.milkyWayGlow ?? MILKY_WAY_GLOW_INTENSITY;
 
   // inverted sphere — 안쪽을 향한 법선 (sideOrientation BACKSIDE). 카메라가 항상 내부에 위치.
@@ -322,8 +270,6 @@ export function createStarfield(
       attributes: ['position'],
       uniforms: [
         'worldViewProjection',
-        'gridDensity',
-        'starThreshold',
         'milkyWayNormal',
         'milkyWayGlow',
         'milkyWayBandWidth',
@@ -332,8 +278,6 @@ export function createStarfield(
     },
   );
 
-  material.setFloat('gridDensity', gridDensity);
-  material.setFloat('starThreshold', STARFIELD_THRESHOLD);
   material.setVector3('milkyWayNormal', new Vector3(...MILKY_WAY_NORMAL));
   material.setFloat('milkyWayGlow', milkyWayGlow);
   material.setFloat('milkyWayBandWidth', MILKY_WAY_BAND_WIDTH);
@@ -355,43 +299,12 @@ export function createStarfield(
   return { mesh, material, dispose };
 }
 
-/**
- * #738 — GLSL fragment `starColor` 함수의 **순수 JS 미러** (색온도 anti-pattern 계약 검증용).
- *
- * GLSL 은 직접 단위 테스트 불가하므로, 이 미러로 색온도 분포가 §결정 4 계약 (다수 백색~담황 +
- * 소수 청백/적황, **보라/마젠타 금지**) 을 따르는지 결정적으로 검증한다 (디자인 루브릭 Originality).
- *
- * ⚠️ 이 함수와 FRAGMENT_SHADER 의 GLSL `starColor` 는 동일 식이어야 한다 (SSoT — 한쪽 수정 시
- * 양쪽 동기화 의무). drift 시 starfield.test.ts 의 색조 단조성 / 보라 부재 단언이 감지.
- *
- * @param t 색온도 ∈ [0,1]: 0=적황(M), 0.5=백색~담황(G/K 다수), 1=청백(O/B)
- * @returns RGB ∈ [0,1]³
- */
-export function starColorMirror(t: number): readonly [number, number, number] {
-  const warm: readonly [number, number, number] = [1.0, 0.86, 0.72];
-  const white: readonly [number, number, number] = [1.0, 0.98, 0.96];
-  const cool: readonly [number, number, number] = [0.78, 0.86, 1.0];
-  const mix = (
-    a: readonly [number, number, number],
-    b: readonly [number, number, number],
-    f: number,
-  ): readonly [number, number, number] => [
-    a[0] + (b[0] - a[0]) * f,
-    a[1] + (b[1] - a[1]) * f,
-    a[2] + (b[2] - a[2]) * f,
-  ];
-  if (t < 0.5) return mix(warm, white, t * 2.0);
-  return mix(white, cool, (t - 0.5) * 2.0);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 테스트/검증용 re-export (starfield.test.ts SSoT 가드 — #69 drift 차단).
 // ─────────────────────────────────────────────────────────────────────────────
 export {
   STARFIELD_SPHERE_DIAMETER,
   STARFIELD_SPHERE_SEGMENTS,
-  STARFIELD_GRID_DENSITY,
-  STARFIELD_THRESHOLD,
   MILKY_WAY_NORMAL,
   MILKY_WAY_GLOW_INTENSITY,
   MILKY_WAY_BAND_WIDTH,
